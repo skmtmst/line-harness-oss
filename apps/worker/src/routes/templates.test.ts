@@ -104,6 +104,40 @@ describe('テンプレートのLINEアカウント境界', () => {
     expect(mocks.getTemplateUsage).not.toHaveBeenCalled();
   });
 
+  // #891: 使用先の集計・詳細はテンプレートと同じアカウントの設定だけを
+  // 対象にする。別アカウントの設定は名前も遷移先も見せられないので、
+  // 数だけ数えると削除が永久に止まる。
+  it('詳細の使用先はテンプレートのアカウントで絞ってDB層へ渡す', async () => {
+    const response = await makeApp().fetch(
+      new Request('https://example.com/api/templates/tpl-1'),
+      env,
+    );
+
+    expect(response.status).toBe(200);
+    expect(mocks.getTemplateUsage).toHaveBeenCalledWith(env.DB, 'tpl-1', 'account-1');
+  });
+
+  it('使用先一覧APIもテンプレートのアカウントで絞ってDB層へ渡す', async () => {
+    const response = await makeApp().fetch(
+      new Request('https://example.com/api/templates/tpl-1/usages'),
+      env,
+    );
+
+    expect(response.status).toBe(200);
+    expect(mocks.getTemplateUsage).toHaveBeenCalledWith(env.DB, 'tpl-1', 'account-1');
+  });
+
+  it('削除の使用中断定もテンプレートのアカウントで絞る', async () => {
+    mocks.getTemplateUsage.mockResolvedValue({ ...EMPTY_USAGE, autoReplies: [{ id: 'ar-1' }] });
+    const response = await makeApp().fetch(
+      new Request('https://example.com/api/templates/tpl-1', { method: 'DELETE' }),
+      env,
+    );
+
+    expect(response.status).toBe(409);
+    expect(mocks.getTemplateUsage).toHaveBeenCalledWith(env.DB, 'tpl-1', 'account-1');
+  });
+
   it('新規作成はLINEアカウント所属を必須にする', async () => {
     const response = await makeApp().fetch(
       new Request('https://example.com/api/templates', {

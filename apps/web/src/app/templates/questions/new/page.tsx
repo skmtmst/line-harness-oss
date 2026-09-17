@@ -282,7 +282,7 @@ function QuestionTemplatePageInner() {
           <section className="bg-canvas border-hairline rounded-card shadow-card border p-4 text-label">
             <h2 className="font-bold text-ink">この質問を使う場所</h2>
             <p className="text-ink-secondary text-label mt-2">
-              {id ? `シナリオ ${usageCount}通` : '保存後にシナリオから選べます'}
+              {id ? `使用先 ${usageCount}か所` : '保存後にシナリオから選べます'}
             </p>
             <Link href="/scenarios" className="text-accent mt-3 inline-block font-semibold hover:underline">
               シナリオで使う

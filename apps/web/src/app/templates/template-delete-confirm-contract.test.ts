@@ -92,8 +92,12 @@ describe('テンプレート一覧の削除確認', () => {
     )
     expect(PAGE, '使用中の行から使用先へ行けない').toContain('使用先を見る')
     expect(PAGE).toContain('使用中のテンプレートは削除できません')
-    expect(PAGE).toContain('差し替える画面へ')
     expect(PAGE).toContain('replacementDestinations.map')
+    // N-135: 使用先が複数あっても各行が個別のリンクになる。
+    // 「差し替える画面へ」ボタンが replacementDestinations[0] だけを
+    // 開いていた退行を固定する。
+    expect(PAGE, '1件目だけを開く導線に戻ってはいけない').not.toContain('replacementDestinations[0]')
+    expect(PAGE, '使用先の行が個別リンクになっていない').toContain('href={href}')
   })
 })
 
