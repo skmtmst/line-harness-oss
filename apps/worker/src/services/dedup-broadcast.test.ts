@@ -1075,8 +1075,12 @@ describe('processMultiAccountDedupBroadcast per-account common vars (N-184)', ()
     mockTwoShopsActive();
     // 現行スキーマは value NOT NULL のため、制約前の旧行 (value NULL) を
     // 読み取り境界で再現する。2回目以降の呼び出し (B店) は実実装を使う。
-    const spy = vi.spyOn(dbModule, 'getCommonVarMap')
-      .mockResolvedValueOnce({ hours: null as unknown as string });
+    const spy = vi.spyOn(dbModule, 'resolveCommonVarValuesAt')
+      .mockResolvedValueOnce({
+        ok: true,
+        values: { hours: null as unknown as string },
+        entries: [],
+      } as never);
     const clients: MockLineClient[] = [];
     const factory = (token: string) => {
       const c = new MockLineClient(token);

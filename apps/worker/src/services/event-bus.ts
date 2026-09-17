@@ -413,7 +413,7 @@ async function processAutomations(
           await replayStep(execution, `event:legacy:${automation.id}:${index}`, async () => {
             const idempotencyKey = execution
               ? await stableWebhookStepId(execution.sourceEventId, `legacy:${automation.id}:${index}`) : undefined;
-            await executeAction(db, action, payload, lineAccessToken, lineAccountId, idempotencyKey);
+            await executeAction(db, action, payload, lineAccessToken, lineAccountId, idempotencyKey, automation.id);
           });
           results.push({ action: action.type, success: true });
         } catch (err) {
@@ -487,6 +487,7 @@ async function executeAction(
   lineAccessToken?: string,
   lineAccountId?: string | null,
   idempotencyKey?: string,
+  automationId?: string,
 ): Promise<void> {
   const friendId = payload.friendId;
   if (!friendId && action.type !== 'send_webhook') {
@@ -531,6 +532,16 @@ async function executeAction(
           resolvedContent = tpl.message_content;
         }
       }
+
+      // テンプレート/直接本文に {{var.*}} が書かれていても、この経路は従来
+      // 差し込みを展開せず生のまま送っていた。消えた共通情報は fail-closed で
+      // 止め、解決できるものは送信時点の値へ置き換える。
+      const { expandSendCommonVars } = await import('./interpolation-context.js');
+      resolvedContent = await expandSendCommonVars(
+        db, resolvedContent,
+        { kind: 'automation', id: automationId ?? tplId ?? 'send_message' },
+        { lineAccountId: lineAccountId ?? null, friendId },
+      );
 
       let msg: Message;
       let logContent: string;

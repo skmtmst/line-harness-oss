@@ -26,7 +26,7 @@ import { addJitter, sleep } from './stealth.js';
 import { getSendPermissionForAccount, type SendPermission, type SendPermissionCache } from './send-entitlements.js';
 import { buildMessage } from './line-message.js';
 import { expandVariables, resolveMetadata } from './step-delivery.js';
-import { resolveInterpolationExtra } from './interpolation-context.js';
+import { resolveSendInterpolationExtra } from './interpolation-context.js';
 import { resolveReminderSendAt } from '@line-crm/shared';
 import {
   classifyExternalDeliveryError,
@@ -67,6 +67,9 @@ export async function buildReminderStepMessage(
   step: ReminderStepRow,
   friend: NonNullable<Awaited<ReturnType<typeof getFriendById>>>,
   deliveredAt: Date,
+  // 下書き試験から呼ぶときは 'test_send' を渡す。台帳の送信種別が
+  // 本番配信とテスト送信で分かれる。
+  sourceKind: 'reminder' | 'test_send' = 'reminder',
 ): Promise<{
   message: Message;
   messageType: string;
@@ -83,7 +86,9 @@ export async function buildReminderStepMessage(
     }
   }
   const resolvedMeta = await resolveMetadata(db, friend);
-  const extra = await resolveInterpolationExtra(db, friend.id, messageContent);
+  const extra = await resolveSendInterpolationExtra(
+    db, friend.id, messageContent, { kind: sourceKind, id: step.id },
+  );
   const expanded = expandVariables(
     messageContent,
     { ...friend, metadata: resolvedMeta },

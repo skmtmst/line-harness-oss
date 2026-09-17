@@ -227,6 +227,8 @@ export interface FormEffectInput {
   layout: FormLayout;
   friendId: string;
   answers: FormAnswers;
+  /** 解決失敗の台帳に残す出所（フォームID）。無いときは回答IDを使う */
+  formId?: string;
   /** タグ付与に伴うシナリオの即時配信で使う */
   push?: { defaultAccessToken: string; workerUrl?: string };
   /** テキスト送信・テンプレート送信で使う。無ければその動作は飛ばす */
@@ -589,7 +591,13 @@ export async function runFormAction(
   switch (action.kind) {
     case 'send_text':
       if (input.pushText && action.text) {
-        await input.pushText(action.text, pushSuffix ?? `send_text:${action.text}`);
+        const { expandSendCommonVars } = await import('./interpolation-context.js');
+        const text = await expandSendCommonVars(
+          db, action.text,
+          { kind: 'form_reply', id: input.formId ?? input.idempotencyPrefix ?? friendId },
+          { friendId },
+        );
+        await input.pushText(text, pushSuffix ?? `send_text:${action.text}`);
       }
       return;
 
@@ -601,9 +609,17 @@ export async function runFormAction(
       // 配信側と同じ組み立て(buildMessage)を通して実際に送る。
       // N-177: 以前は非テキストを warn して素通りしていたため、選んだ
       // テンプレートが顧客にも運用にも見えず届かなかった。
+      // {{var.*}} の共通情報は消えていれば fail-closed で止め、
+      // 解決できるものは送信時点の値へ置き換える。
+      const { expandSendCommonVars } = await import('./interpolation-context.js');
+      const content = await expandSendCommonVars(
+        db, template.message_content,
+        { kind: 'form_reply', id: input.formId ?? input.idempotencyPrefix ?? friendId },
+        { friendId },
+      );
       if (template.message_type === 'text') {
-        if (template.message_content) {
-          await input.pushText(template.message_content, pushSuffix ?? `send_template:${action.templateId}`);
+        if (content) {
+          await input.pushText(content, pushSuffix ?? `send_template:${action.templateId}`);
         }
         return;
       }
@@ -613,7 +629,7 @@ export async function runFormAction(
         throw new Error(`form send_template: no push channel for ${template.message_type} template`);
       }
       await input.pushMessage(
-        buildMessage(template.message_type, template.message_content, template.name),
+        buildMessage(template.message_type, content, template.name),
         pushSuffix ?? `send_template:${action.templateId}`,
       );
       return;

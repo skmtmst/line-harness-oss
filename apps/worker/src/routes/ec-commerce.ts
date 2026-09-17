@@ -1066,10 +1066,20 @@ ecCommerce.post('/api/ec-commerce/test-send', requireRole('owner', 'admin'), asy
   ).bind(body.accountId, ...friendIds).all<{ id: string; line_user_id: string }>();
   if (!friends.results.length) return c.json({ success: false, error: 'No active test recipients' }, 400);
 
+  // テスト送信の見出し・前後の文章にも {{var.*}} を書ける。
+  // 消えた共通情報は空文字にせず、テスト送信を止める。
+  const { expandSendCommonVars } = await import('../services/interpolation-context.js');
+  const ecTestSource = { kind: 'test_send' as const, id: `ec-${body.eventType}` };
+  const ecTestCtx = { lineAccountId: body.accountId };
+  const [testTitle, testIntro, testOutro] = await Promise.all([
+    expandSendCommonVars(c.env.DB, body.title.trim(), ecTestSource, ecTestCtx),
+    expandSendCommonVars(c.env.DB, body.introText.trim(), ecTestSource, ecTestCtx),
+    expandSendCommonVars(c.env.DB, body.outroText.trim(), ecTestSource, ecTestCtx),
+  ]);
   const message = ecFlexMessage(testEvent(body.eventType), {
-    title: body.title.trim(),
-    introText: body.introText.trim(),
-    outroText: body.outroText.trim(),
+    title: testTitle,
+    introText: testIntro,
+    outroText: testOutro,
     buttonLabel: body.buttonLabel.trim(),
     buttonUrl: body.buttonUrl.trim(),
     imageUrl: body.imageUrl.trim(),

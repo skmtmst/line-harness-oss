@@ -180,7 +180,7 @@ function strictMessage(type: string, content: string, altText?: string): Message
 
 async function resolveMessage(
   context: AutomationActionContext,
-): Promise<{ message: Message; content: string }> {
+): Promise<{ type: string; content: string; altText?: string }> {
   const templateId = context.action.params.templateId ?? context.action.params.template_id;
   if (templateId !== undefined) {
     const id = requiredString(templateId, 'template_id_missing', 'テンプレート');
@@ -193,13 +193,14 @@ async function resolveMessage(
     ).bind(id, context.lineAccountId).first<{ message_type: string; message_content: string }>();
     if (!template) throw invalid('template_not_found', 'テンプレートが見つかりません');
     return {
-      message: strictMessage(template.message_type, template.message_content, optionalString(context.action.params.altText)),
+      type: template.message_type,
       content: template.message_content,
+      altText: optionalString(context.action.params.altText),
     };
   }
   const type = optionalString(context.action.params.messageType) ?? 'text';
   const content = requiredText(context.action.params.content, 'message_content_missing', 'メッセージ内容');
-  return { message: strictMessage(type, content, optionalString(context.action.params.altText)), content };
+  return { type, content, altText: optionalString(context.action.params.altText) };
 }
 
 function optionalString(value: unknown): string | undefined {
@@ -338,7 +339,29 @@ async function sendMessageExecutor(
   dependencies: AutomationActionExecutorDependencies,
 ): Promise<{ output: Record<string, unknown> }> {
   const friend = await requireFriend(context);
-  const { message, content } = await resolveMessage(context);
+  const resolved = await resolveMessage(context);
+  // テンプレート/直接本文に {{var.*}} が書かれていても、この経路は従来
+  // 差し込みを展開せず生のまま送っていた。消えた共通情報は fail-closed で
+  // 止め、解決できるものは送信時点の値へ置き換える。
+  let content: string;
+  try {
+    const { expandSendCommonVars } = await import('./interpolation-context.js');
+    content = await expandSendCommonVars(
+      context.db, resolved.content,
+      { kind: 'automation', id: context.action.id },
+      { lineAccountId: context.lineAccountId },
+    );
+  } catch (error) {
+    const { CommonVarResolutionFailedError } = await import('./interpolation-context.js');
+    if (error instanceof CommonVarResolutionFailedError) {
+      throw invalid(
+        'common_var_unresolved',
+        `共通情報を解決できません: ${error.failures.map((f) => `{{var.${f.varKey}}}`).join(', ')}`,
+      );
+    }
+    throw error;
+  }
+  const message = strictMessage(resolved.type, content, resolved.altText);
   const payload = JSON.stringify({ to: friend.line_user_id, messages: [message] });
   if (await reserveLineOperation(context, payload) === 'replay') {
     return { output: { replayed: true } };

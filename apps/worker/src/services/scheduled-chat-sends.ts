@@ -79,14 +79,21 @@ async function dispatchOne(
   // 解決しきれない `{{…}}` が残るなら LINE を呼ばず、行だけ失敗で残す。
   const rendered = await renderChatMessageContent(
     env.DB, target.friend, row.message_type, row.content, target.liffId,
+    { kind: 'chat', id: row.id },
   );
   if (rendered.unresolved.length > 0) {
+    // 消えた共通情報は運用者が定義を直せば送れる失敗。上限まで
+    // バックオフで再試行し、冪等キーが変わらないので重複送信にならない。
+    const retryable = row.attempt_count < SCHEDULED_CHAT_SEND_MAX_ATTEMPTS;
     await markScheduledChatSendFailed(env.DB, {
       id: row.id,
       leaseToken: row.lease_token!,
       errorCode: 'unresolved_template_variables',
       error: `差し込みを解決できません: ${rendered.unresolved.map((v) => `{{${v}}}`).join(', ')}`,
-      retryable: false,
+      retryable,
+      nextScheduledAt: retryable
+        ? new Date(Date.now() + RETRY_BACKOFF_MS * row.attempt_count).toISOString()
+        : undefined,
       now: nowIso,
     });
     return;

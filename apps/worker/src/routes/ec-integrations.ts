@@ -720,10 +720,22 @@ ecIntegrations.post('/api/integrations/eccube/events', async (c) => {
       return c.json({ success: true, status: 'skipped' }, 202);
     }
 
+    // 通知設定の見出し・前後の文章にも {{var.*}} を書ける。消えた
+    // 共通情報は空文字へ置き換えず、この通知を止める（台帳に残る）。
+    const { expandSendCommonVars } = await import('../services/interpolation-context.js');
+    const ecSource = { kind: 'notification' as const, id: row.id };
+    const ecCtx = { lineAccountId, friendId: friend.id };
+    const expandEcField = (value: string | null) =>
+      value ? expandSendCommonVars(c.env.DB, value, ecSource, ecCtx) : Promise.resolve(value);
+    const [ecTitle, ecIntroText, ecOutroText] = await Promise.all([
+      expandEcField(setting?.title_override ?? null),
+      expandEcField(setting?.intro_text ?? null),
+      expandEcField(setting?.outro_text ?? null),
+    ]);
     const message = ecFlexMessage(event, {
-      title: setting?.title_override,
-      introText: setting?.intro_text,
-      outroText: setting?.outro_text,
+      title: ecTitle ?? undefined,
+      introText: ecIntroText ?? undefined,
+      outroText: ecOutroText ?? undefined,
       buttonLabel: setting?.button_label,
       buttonUrl: setting?.button_url,
       imageUrl: setting?.image_url,

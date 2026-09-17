@@ -2602,12 +2602,23 @@ broadcasts.post('/api/broadcasts/:id/test-send', requireRole('owner', 'admin'), 
      * 使った本文は `assertNoUnresolvedBroadcastVariables` で落ちる。
      * **確かめるための機能が、確かめたい本文だけ通らない**ことになる。
      */
-    const { resolveInterpolationExtra } = await import('../services/interpolation-context.js');
-    const { getCommonVarMap } = await import('@line-crm/db');
+    const { resolveSendCommonVars, CommonVarResolutionFailedError, contentNeedsFriendFields } = await import('../services/interpolation-context.js');
+    const { getFriendFieldMap } = await import('@line-crm/db');
     const allContent = combinedMessageContent(parts);
-    const commonVars = /\{\{\s*var\./.test(allContent)
-      ? await getCommonVarMap(c.env.DB, accountId)
-      : undefined;
+    let commonVars: Record<string, string> | undefined;
+    try {
+      commonVars = await resolveSendCommonVars(c.env.DB, accountId, allContent, {
+        kind: 'test_send', id: c.req.param('id'),
+      });
+    } catch (error) {
+      if (error instanceof CommonVarResolutionFailedError) {
+        return c.json({
+          success: false,
+          error: `共通情報を解決できません: ${error.failures.map((f) => `{{var.${f.varKey}}}`).join(', ')}`,
+        }, 422);
+      }
+      throw error;
+    }
     // 配信日の起点は「いま」。テスト送信は今すぐ届くので、今日の日付でよい。
     const testSendAt = new Date();
 
@@ -2617,11 +2628,14 @@ broadcasts.post('/api/broadcasts/:id/test-send', requireRole('owner', 'admin'), 
 
     for (const friend of friends.results) {
       try {
-        const extra = await resolveInterpolationExtra(c.env.DB, friend.id, allContent);
+        // 共通情報は上で厳格解決済み。ここでは友だち情報欄だけを引く。
+        const fields = contentNeedsFriendFields(allContent)
+          ? await getFriendFieldMap(c.env.DB, friend.id)
+          : undefined;
         const rendered = renderMessageParts(parts, {
           liffId,
           displayName: friend.display_name,
-          fields: extra.fields,
+          fields,
           vars: commonVars,
           deliveredAt: testSendAt,
         });
