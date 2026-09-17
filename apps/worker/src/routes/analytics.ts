@@ -1103,8 +1103,13 @@ analytics.delete('/api/funnels/:id', requireRole('owner', 'admin'), async (c) =>
   try {
     const account = await resolveAccount(c);
     if (!account.ok) return account.response;
+    const funnel = await getFunnelById(c.env.DB, account.accountId, c.req.param('id'));
     const version = await getCurrentFunnelVersion(c.env.DB, account.accountId, c.req.param('id'));
-    if (version) return c.json({ success: false, error: 'Not found' }, 404);
+    if (!funnel || version) return c.json({ success: false, error: 'Not found' }, 404);
+    // 停止・保管したファネルの物理削除は受け付けない（再開してから消す運用に限定）
+    if (funnel.status !== 'active') {
+      return c.json({ success: false, error: 'analytics_funnel_not_active' }, 422);
+    }
     await deleteFunnel(c.env.DB, account.accountId, c.req.param('id'));
     return c.json({ success: true, data: null });
   } catch (err) {
@@ -1120,6 +1125,10 @@ analytics.get('/api/funnels/:id/result', async (c) => {
     if (!account.ok) return account.response;
     const funnel = await getFunnelById(c.env.DB, account.accountId, c.req.param('id'));
     if (!funnel) return c.json({ success: false, error: 'Not found' }, 404);
+    // 停止・保管したファネルのその場集計は新規runにあたるため拒否する
+    if (funnel.status !== 'active') {
+      return c.json({ success: false, error: 'analytics_funnel_not_active' }, 422);
+    }
 
     const range = readRange(c);
     if (!range.ok) return c.json({ success: false, error: range.error }, 400);

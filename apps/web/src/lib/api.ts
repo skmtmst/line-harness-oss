@@ -5301,6 +5301,9 @@ export const api = {
         name?: string
         windowDays: number
         steps: Array<{ label: string; kind: string; match: Record<string, string> }>
+        // フォームに出せない絞り込み・比較条件は元の版からそのまま返す
+        segment?: unknown
+        comparisonGroups?: unknown[]
         expectedVersionNumber: number
       }) => fetchApi<ApiResponse<{ id: string; versionNumber: number }>>(
         `/api/analytics/funnels/${funnelId}/versions?account_id=${encodeURIComponent(accountId)}`,

@@ -577,6 +577,20 @@ describe('ファネルの結果', () => {
     const res = await req(`/api/funnels/nope/result?${ACCOUNT}`);
     expect(res.status).toBe(404);
   });
+
+  it('停止・保管したファネルのその場集計は新規runとして拒否する', async () => {
+    for (const status of ['stopped', 'archived'] as const) {
+      vi.clearAllMocks();
+      mocks.getFunnelById.mockResolvedValue({ ...FUNNEL, status });
+      mocks.getStaffById.mockResolvedValue({ account_scope: 'all' });
+      mocks.getStaffAccountScopeIds.mockResolvedValue([]);
+      const res = await req(`/api/funnels/fn-1/result?${ACCOUNT}`);
+      expect(res.status).toBe(422);
+      const body = (await res.json()) as { error: string };
+      expect(body.error).toBe('analytics_funnel_not_active');
+      expect(mocks.countFunnelStep).not.toHaveBeenCalled();
+    }
+  });
 });
 
 describe('現行ファネルの削除', () => {
@@ -591,6 +605,14 @@ describe('現行ファネルの削除', () => {
     const res = await req(`/api/funnels/fn-1?${ACCOUNT}`, 'DELETE');
     expect(res.status).toBe(200);
     expect(mocks.deleteFunnel).toHaveBeenCalledWith(env.DB, 'account-a', 'fn-1');
+  });
+
+  it('停止・保管したファネルは物理削除できない', async () => {
+    mocks.getFunnelById.mockResolvedValue({ ...FUNNEL, status: 'archived' });
+    mocks.getCurrentFunnelVersion.mockResolvedValueOnce(null);
+    const res = await req(`/api/funnels/fn-1?${ACCOUNT}`, 'DELETE');
+    expect(res.status).toBe(422);
+    expect(mocks.deleteFunnel).not.toHaveBeenCalled();
   });
 });
 

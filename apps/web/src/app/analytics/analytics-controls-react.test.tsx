@@ -485,6 +485,66 @@ describe('ファネルの編集・停止・保管(#841)', () => {
     expect(host.textContent).toContain('他の人が先に変更しています')
   })
 
+  it('編集の新版保存はフォームに出せない条件（絞り込み・比較・段の副条件）を落とさない', async () => {
+    fixture.tab = 'funnel'
+    const detail = {
+      ...FUNNEL_DETAIL,
+      currentVersion: {
+        ...FUNNEL_DETAIL.currentVersion,
+        segment: { kind: 'tag', tagId: 'tag-vip' },
+        comparisonGroups: [{ key: 'g1', label: '比較ぶん', filter: { kind: 'all' } }],
+        steps: [
+          { stepOrder: 1, label: '案内', kind: 'friend_add', match: {} },
+          // action のようなフォームに出せない副条件が残ることを確かめる
+          { stepOrder: 2, label: '外し', kind: 'tag', match: { tagId: 'tag-9', action: 'removed' } },
+        ],
+      },
+    }
+    net.handler = funnelHandler([FUNNEL_ACTIVE], detail)
+    await render()
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); await Promise.resolve() })
+
+    await click('定義を編集')
+    await act(async () => { await Promise.resolve(); await Promise.resolve() })
+    // 7/30/90以外の日数（14日）も選択肢として残る
+    expect(host.textContent).toContain('14日以内')
+
+    let sent: Record<string, unknown> | null = null
+    net.handler = (async (path: string, init?: RequestInit) => {
+      if (path.includes('/versions?')) {
+        sent = JSON.parse(String(init?.body))
+        return { success: true, data: { id: 'version-2', versionNumber: 2 } }
+      }
+      return funnelHandler([FUNNEL_ACTIVE], detail)(path)
+    }) as typeof net.handler
+    await click('新版として保存')
+
+    expect(sent).not.toBeNull()
+    expect(sent!.segment).toEqual({ kind: 'tag', tagId: 'tag-vip' })
+    expect(sent!.comparisonGroups).toEqual([{ key: 'g1', label: '比較ぶん', filter: { kind: 'all' } }])
+    const steps = sent!.steps as Array<{ kind: string; match: Record<string, string> }>
+    expect(steps[1].match).toEqual({ tagId: 'tag-9', action: 'removed' })
+  })
+
+  it('停止中ファネルの結果画面では対象者づくりの操作を出さない', async () => {
+    fixture.tab = 'funnel'
+    net.handler = funnelHandler([FUNNEL_STOPPED])
+    await render()
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); await Promise.resolve() })
+
+    await click('結果を見る')
+    await act(async () => { await Promise.resolve(); await Promise.resolve() })
+    const firstStage = host.querySelector('button[aria-label="案内の段"]') as HTMLButtonElement | null
+    await act(async () => { firstStage?.click(); await Promise.resolve(); await Promise.resolve() })
+
+    expect(host.textContent).toContain('停止中・保管したファネルでは対象者づくりはできません')
+    expect(host.querySelector('#funnel-audience-selection')).toBeNull()
+    expect(
+      Array.from(host.querySelectorAll('button')).some((b) => b.textContent === '友だち一覧で見る'),
+    ).toBe(false)
+    expect(net.calls.some((call) => call.path.includes('/audiences?'))).toBe(false)
+  })
+
   it('staffには編集・停止・保管の操作を出さない', async () => {
     fixture.tab = 'funnel'
     net.handler = async (path: string) => {
