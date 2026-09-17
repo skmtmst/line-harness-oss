@@ -8,6 +8,11 @@ export type SummaryCardProps = {
   /** 取得できない場合は null を渡すと「—」を表示する。 */
   value: number | null
   unit: string
+  /**
+   * 数では表せない値（「1時間24分」「96.7%」など）をそのまま出す。
+   * 渡したときは value と unit を使わない（★V6 37-6 の数値カード帯）。
+   */
+  valueText?: string
   detail: ReactNode
   badge?: string
   badgeTone?: 'accent' | 'neutral' | 'danger'
@@ -37,6 +42,7 @@ export default function SummaryCard({
   variant = 'v5',
   className,
   valueTone = 'default',
+  valueText,
   ...cardProps
 }: SummaryCardProps) {
   const variantClass = {
@@ -71,8 +77,8 @@ export default function SummaryCard({
         <div className={styles.skeleton} aria-hidden="true" />
       ) : (
         <p className={[styles.value, valueTone === 'warning' && styles.valueWarning].filter(Boolean).join(' ')}>
-          {value === null ? '—' : value.toLocaleString('ja-JP')}
-          {unit}
+          {valueText !== undefined ? valueText : value === null ? '—' : value.toLocaleString('ja-JP')}
+          {valueText !== undefined ? null : unit}
         </p>
       )}
 

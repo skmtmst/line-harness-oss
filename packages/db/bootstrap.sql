@@ -2697,6 +2697,30 @@ CREATE TABLE google_calendar_connections (
   updated_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 );
 
+CREATE TABLE hq_support_messages (
+  id               TEXT PRIMARY KEY,
+  request_id       TEXT NOT NULL REFERENCES hq_support_requests(id) ON DELETE CASCADE,
+  author_kind      TEXT NOT NULL CHECK (author_kind IN ('tenant', 'ops')),
+  author_staff_id  TEXT,
+  author_name      TEXT NOT NULL DEFAULT '',
+  body             TEXT NOT NULL,
+  attachment_keys  TEXT NOT NULL DEFAULT '[]',
+  -- AI の下書きをそのまま／直して送ったか（品質の振り返り用）
+  ai_assisted      INTEGER NOT NULL DEFAULT 0,
+  -- 統括へ届けた手段の記録（JSON 配列: email / screen / line）
+  delivered_via    TEXT NOT NULL DEFAULT '[]',
+  created_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
+);
+
+CREATE TABLE hq_support_reply_drafts (
+  request_id       TEXT PRIMARY KEY REFERENCES hq_support_requests(id) ON DELETE CASCADE,
+  body             TEXT NOT NULL,
+  ai_generated     INTEGER NOT NULL DEFAULT 0,
+  generated_at     TEXT,
+  author_staff_id  TEXT,
+  updated_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
+);
+
 CREATE TABLE hq_support_requests (
   id               TEXT PRIMARY KEY,
   tenant_id        TEXT NOT NULL REFERENCES tenants(id),
@@ -2713,7 +2737,10 @@ CREATE TABLE hq_support_requests (
   notified_at      TEXT,
   created_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
-);
+, ticket_no INTEGER, stage TEXT NOT NULL DEFAULT 'new'
+  CHECK (stage IN ('new', 'in_progress', 'waiting', 'resolved', 'closed')), priority TEXT NOT NULL DEFAULT 'medium'
+  CHECK (priority IN ('low', 'medium', 'high')), channel TEXT NOT NULL DEFAULT 'admin'
+  CHECK (channel IN ('admin', 'line', 'ops')), subject_auto INTEGER NOT NULL DEFAULT 0, assignee_staff_id TEXT, first_replied_at TEXT, last_message_at TEXT, resolved_at TEXT, closed_at TEXT);
 
 CREATE TABLE hq_template_distribution_results (
   run_id TEXT NOT NULL,
@@ -4467,6 +4494,11 @@ CREATE TABLE platform_audit_logs (
   ip                 TEXT,
   visible_to_tenant  INTEGER NOT NULL DEFAULT 0,
   created_at         TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
+);
+
+CREATE TABLE platform_counters (
+  name   TEXT PRIMARY KEY,
+  value  INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE TABLE pool_accounts (
@@ -6778,8 +6810,17 @@ CREATE INDEX idx_handover_decisions_handover
 
 CREATE INDEX idx_health_logs_account ON account_health_logs (line_account_id);
 
+CREATE INDEX idx_hq_support_messages_request
+  ON hq_support_messages(request_id, created_at);
+
+CREATE INDEX idx_hq_support_requests_stage
+  ON hq_support_requests(stage, last_message_at DESC);
+
 CREATE INDEX idx_hq_support_requests_tenant
   ON hq_support_requests(tenant_id, created_at DESC);
+
+CREATE UNIQUE INDEX idx_hq_support_requests_ticket_no
+  ON hq_support_requests(ticket_no) WHERE ticket_no IS NOT NULL;
 
 CREATE INDEX idx_hq_template_owned_r2_reconcile
   ON hq_template_owned_r2_keys(tenant_id, state, updated_at);

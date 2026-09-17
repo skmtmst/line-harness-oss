@@ -3,7 +3,7 @@
 - 要件: `docs/v6-requirements/v6-37-master-console-requirements-draft.md`（`docs/v6-requirements/` は司令塔の所有パスのため、このPRには含めず司令塔の枝から取り込む。原本は Claude の作業ツリーにある）
 - 入口: `/ops`（ログインは `/ops/login`）
 - 第 1 段の範囲: 37-1 ログイン／37-3 契約先一覧／37-4 契約先詳細／37-5 代理ログイン（＋5-A・5-B）／37-8 監査ログ／37-9 アカウントメニュー／37-10 メンバー管理。
-  ダッシュボード・お問い合わせ・お知らせは案内だけの画面（第 2・3 段）。
+  第 2 段（このメモの末尾）で 37-6 お問い合わせを足した。ダッシュボード・お知らせは案内だけの画面（第 3 段）。
 
 ## 変えたもの
 
@@ -84,3 +84,24 @@ SQL を流さない手順（推奨）: `platform_admins` が空の間は、既�
 - `Deploy Cloudflare Staging` は配備前に検証D1の `_migrations` とリポジトリ内のmigration一覧を比較する
 - dry-run は未適用件数とファイル名をJob Summaryへ出すだけで、DBを書き換えない
 - apply は未適用が1件でもあれば失敗する。先に `Migrate D1` の正式経路で適用し、未適用0件にしてから再実行する
+
+## 第 2 段：お問い合わせ（37-6 / 37-6-A / 37-6-B）
+
+統括の 36-3 が書き込む `hq_support_requests` を、運営側で「チケット」として扱う。表は増やさず列を足した（migration 421）。
+
+| 場所 | 内容 |
+|---|---|
+| `packages/db/migrations/421_ops_support_tickets.sql` | `ticket_no`（#MB-0001 から）・`stage`（新規／対応中／待ち／解決済み／クローズ）・`priority`・`channel`・返信の表 `hq_support_messages`・下書きの表 `hq_support_reply_drafts`・採番の `platform_counters` |
+| `packages/db/src/ops-support.ts` | 一覧・数値カード・返信・下書き・契約先の状況の読み書き。`statusForStage` が統括向けの `status` を導く |
+| `apps/worker/src/routes/ops-support.ts` | `/api/ops/support/*`。返信は登録メールへ送り、統括の 36-3 の履歴にも載せる。AI の下書きは Workers AI（`AI` binding、`@cf/zai-org/glm-4.7-flash`）で作り、メールアドレスや LINE ID は渡さない |
+| `apps/worker/src/routes/hq-support.ts` | 統括側の一覧に `ticketLabel`・`stage`・`replies` を足した |
+| `apps/web/src/app/ops/support/page.tsx` | 画面。左が一覧、右が内容と返信。AI の下書きは「作成中…」→「AIが作った下書きです」の 2 状態を持つ |
+| `apps/web/src/app/hq/support/page.tsx` | 「これまでの問い合わせ」に運営からの返信を出す |
+
+決まりごと:
+
+- `hq_support_requests.status` の CHECK（open/answered/closed）は後から変えられないので、運営の細かい進み具合は `stage` に持ち、`status` は `stage` から導く。
+- 返信すると `stage` は既定で「待ち」（相手の返事待ち）。返信と同時に「解決済み」にもできる。クローズ済みには返信できない。
+- 監査: 閲覧 `ticket.view`（統括には見せない）、返信 `ticket.reply`（統括に見せる）、状態変更 `ticket.stage.change`、運営の起票 `ticket.create`。
+- 「契約者専用LINEにも通知します」は 37-7（お知らせ配信）の LINE の口ができてから足す。いまは `delivered_via` に `screen` / `email` だけが入る。
+- AI が未設定（`AI` binding なし）の環境ではボタンを押せず、API は 503 を返す。

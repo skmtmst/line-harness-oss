@@ -289,6 +289,7 @@ export default function HqSupportPage() {
                   <li key={item.id} className="flex flex-col gap-1 border-b border-divider-soft px-4 py-3 last:border-b-0">
                     <p className="truncate text-label font-semibold text-ink">{item.subject}</p>
                     <p className="flex items-center gap-2 text-micro text-ink-faint">
+                      {item.ticketLabel ? <span>{item.ticketLabel}・</span> : null}
                       {shortDateTime(item.createdAt)}
                       <span className="text-ink-faint">・{item.kindLabel}</span>
                       <span
@@ -301,6 +302,16 @@ export default function HqSupportPage() {
                         {SUPPORT_STATUS_LABELS[item.status]}
                       </span>
                     </p>
+                    {item.replies && item.replies.length > 0 ? (
+                      <div className="mt-1 flex flex-col gap-1">
+                        {item.replies.map((reply) => (
+                          <p key={reply.id} className="whitespace-pre-wrap rounded-control bg-accent-soft px-3 py-2 text-caption text-ink">
+                            <span className="block text-micro text-ink-faint">運営からの返信・{shortDateTime(reply.createdAt)}</span>
+                            {reply.body}
+                          </p>
+                        ))}
+                      </div>
+                    ) : null}
                   </li>
                 ))}
               </ul>
