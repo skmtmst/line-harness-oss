@@ -19,6 +19,7 @@ import type {
   ReminderDraftVersion,
   ReminderPreviewResult,
   ReminderPublishResult,
+  ReminderStopConditions,
   ReminderValidationResult,
   AutoReplyRunsResponse,
   AutoReplyConflict,
@@ -2815,7 +2816,15 @@ export type ReminderDeliveryRun = RunRecord & {
 }
 
 export type ReminderDeliveryRunsResponse = {
-  reminder: { id: string; name: string; isActive: boolean }
+  reminder: {
+    id: string
+    name: string
+    isActive: boolean
+    /** 公開版スナップショットのライフサイクル。 */
+    lifecycleStatus: 'draft' | 'published' | 'stopped'
+    /** 公開版の停止条件。公開版が無いときは null（未取得と区別する）。 */
+    stopConditions: ReminderStopConditions | null
+  }
   summary: {
     sent: number
     scheduled: number

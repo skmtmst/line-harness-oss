@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   getSteps: vi.fn(),
   getRun: vi.fn(),
   retryRun: vi.fn(),
+  getPublishedVersion: vi.fn(),
 }))
 
 vi.mock('../services/account-access.js', () => ({
@@ -22,6 +23,7 @@ vi.mock('@line-crm/db', async (importOriginal) => ({
   getReminderDeliveryStepSummaries: mocks.getSteps,
   getReminderDeliveryRunById: mocks.getRun,
   retryReminderDeliveryRun: mocks.retryRun,
+  getReminderPublishedVersion: mocks.getPublishedVersion,
 }))
 
 const { reminders } = await import('./reminders.js')
@@ -42,6 +44,7 @@ const reminder = {
   name: '来店前のお知らせ',
   is_active: 1,
   line_account_id: 'account-1',
+  lifecycle_status: 'published',
 }
 
 const run = {
@@ -65,6 +68,7 @@ beforeEach(() => {
   mocks.getSteps.mockResolvedValue([])
   mocks.getRun.mockResolvedValue(run)
   mocks.retryRun.mockResolvedValue({ kind: 'scheduled', run: { ...run, status: 'queued' } })
+  mocks.getPublishedVersion.mockResolvedValue(null)
 })
 
 describe('リマインダ実行記録のアカウント範囲', () => {
@@ -137,6 +141,40 @@ describe('リマインダ実行記録のアカウント範囲', () => {
       expect.anything(),
       expect.objectContaining({ reminderId: 'reminder-1', status: 'succeeded' }),
     )
+  })
+
+  it('公開版スナップショットの停止条件を返し、公開版が無ければ未取得としてnullにする', async () => {
+    mocks.canAccess.mockResolvedValue(true)
+    mocks.getPublishedVersion.mockResolvedValue({
+      id: 'version-1',
+      settings_snapshot: JSON.stringify({
+        stopConditions: {
+          bookingCancelled: true,
+          supportMarkCompleted: false,
+          daysAfterTarget: 7,
+          friendBlocked: true,
+        },
+      }),
+    })
+
+    const published = await createApp().request('/api/reminders/reminder-1/runs')
+    const publishedBody = await published.json() as any
+
+    expect(published.status).toBe(200)
+    expect(publishedBody.data.reminder.lifecycleStatus).toBe('published')
+    expect(publishedBody.data.reminder.stopConditions).toEqual({
+      bookingCancelled: true,
+      supportMarkCompleted: false,
+      daysAfterTarget: 7,
+      friendBlocked: true,
+    })
+
+    mocks.getPublishedVersion.mockResolvedValue(null)
+    const unpublished = await createApp().request('/api/reminders/reminder-1/runs')
+    const unpublishedBody = await unpublished.json() as any
+
+    expect(unpublished.status).toBe(200)
+    expect(unpublishedBody.data.reminder.stopConditions).toBeNull()
   })
 
   it('知らない状態名は検索せず400にする', async () => {

@@ -987,15 +987,25 @@ reminders.get('/api/reminders/:id/runs', async (c) => {
     const offset = Number.isInteger(rawOffset) ? Math.max(0, rawOffset) : 0;
     const search = c.req.query('search')?.trim().slice(0, 100) || undefined;
 
-    const [runs, summary, stepRows] = await Promise.all([
+    const [runs, summary, stepRows, publishedVersion] = await Promise.all([
       listReminderDeliveryRuns(c.env.DB, { reminderId, status, search, limit, offset }),
       getReminderDeliveryRunSummary(c.env.DB, reminderId),
       getReminderDeliveryStepSummaries(c.env.DB, reminderId),
+      getReminderPublishedVersion(c.env.DB, reminderId),
     ]);
+    // 公開版のスナップショットが実際の停止条件。下書きや旧API由来の行で
+    // 取れないときは null にし、画面側で「未取得」と区別する。
+    const publishedSettings = publishedVersion ? parseReminderVersionSettings(publishedVersion) : null;
     return c.json({
       success: true,
       data: {
-        reminder: { id: reminder.id, name: reminder.name, isActive: Boolean(reminder.is_active) },
+        reminder: {
+          id: reminder.id,
+          name: reminder.name,
+          isActive: Boolean(reminder.is_active),
+          lifecycleStatus: reminder.lifecycle_status,
+          stopConditions: publishedSettings?.stopConditions ?? null,
+        },
         summary,
         steps: stepRows.map((row, index) => ({
           id: row.id,
