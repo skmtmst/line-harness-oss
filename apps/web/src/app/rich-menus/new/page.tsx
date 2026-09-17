@@ -16,6 +16,8 @@ import { usePageTitle } from '@/components/shell/page-chrome'
 import { useAccount } from '@/contexts/account-context'
 import { api } from '@/lib/api'
 import { TEMPLATES } from '@/lib/rich-menu-templates'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
 
 export default function NewRichMenuPage() {
   usePageTitle('リッチメニューを作る')
@@ -29,6 +31,15 @@ export default function NewRichMenuPage() {
   const [trackedLinks, setTrackedLinks] = useState<RichMenuOption[]>([])
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  /*
+   * N-162: 初期値から1か所でも変わっていたら未保存とみなす。
+   * freshRichMenuCreateValue は決定的なので、丸ごと比較で足りる。
+   * 作成成功後は編集画面へ router.push で進み、警告は出さない。
+   */
+  const [initialValue] = useState(freshRichMenuCreateValue)
+  const dirty = JSON.stringify(value) !== JSON.stringify(initialValue)
+  const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty, busy: submitting })
 
   useEffect(() => {
     let cancelled = false
@@ -96,6 +107,15 @@ export default function NewRichMenuPage() {
         />
         {error ? <div role="alert" className="border-danger bg-danger-bg text-danger mt-3 rounded-control border p-3 text-sm">{error}</div> : null}
       </form>
+      <ConfirmDialog
+        open={leaveTarget !== null}
+        title="入力中の内容があります"
+        description="このまま移動すると、入力した内容は保存されません。移動しますか？"
+        confirmLabel="保存せずに移動"
+        cancelLabel="入力を続ける"
+        onConfirm={confirmLeave}
+        onCancel={cancelLeave}
+      />
     </main>
   )
 }
