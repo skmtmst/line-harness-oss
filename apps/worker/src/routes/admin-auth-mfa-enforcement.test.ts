@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
 import type { Env } from '../index.js';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
@@ -103,6 +103,11 @@ beforeEach(() => {
   testDb = createTestD1();
 });
 
+afterEach(() => {
+  vi.restoreAllMocks();
+  testDb.raw.close();
+});
+
 describe('N-426: 管理者のTOTP未登録では通常セッションを発行しない', () => {
   it('メール+パスワード: オーナーが未登録なら設定用の合言葉だけ返し、セッションは出さない', async () => {
     await seedOwnerWithPassword();
@@ -193,6 +198,23 @@ describe('N-426: 初回設定（setup合言葉 → 確認 → セッション）
     expect(done.totp_enabled_at).toBeTruthy();
     expect(done.totp_last_used_step).toBe(Math.floor(Date.now() / 30_000));
     expect(challengeRows()).toEqual([]);
+  });
+
+  it('初回設定完了時の監査記録が例外でもセッションを発行する', async () => {
+    await seedOwnerWithPassword();
+    const token = await setupTokenFor('s1');
+    const setup = await call('POST', '/api/auth/two-factor/setup', { challengeToken: token });
+    const uri = (await setup.json() as { data: { provisioningUri: string } }).data.provisioningUri;
+    const secret = new URL(uri).searchParams.get('secret')!;
+    const db = await import('@line-crm/db');
+    vi.spyOn(db, 'recordLoginAudit').mockRejectedValueOnce(new Error('audit unavailable'));
+
+    const confirm = await call('POST', '/api/auth/two-factor/setup/confirm', {
+      challengeToken: token,
+      code: await currentCode(secret),
+    });
+    expect(confirm.status).toBe(200);
+    expect(cookieFor(confirm, 'lh_admin_session')).toBeTruthy();
   });
 
   it('コードが違うと400で試行回数が増え、5回で合言葉が消える', async () => {
@@ -332,6 +354,27 @@ describe('N-434: セッション期限（既定8時間・明示選択で7日・c
   });
 });
 
+describe('N-426: 2要素認証確認の監査はbest-effort', () => {
+  it('確認成功後の監査記録が例外でもセッションを発行する', async () => {
+    await seedOwnerWithPassword();
+    await enableTotp('s1');
+    const login = await call('POST', '/api/auth/password/login', {
+      email: 'owner@example.com',
+      password: 'Abcdefg1',
+    });
+    const challengeToken = (await login.json() as { data: { challengeToken: string } }).data.challengeToken;
+    const db = await import('@line-crm/db');
+    vi.spyOn(db, 'recordLoginAudit').mockRejectedValueOnce(new Error('audit unavailable'));
+
+    const verify = await call('POST', '/api/auth/two-factor/verify', {
+      challengeToken,
+      code: await currentCode(),
+    });
+    expect(verify.status).toBe(200);
+    expect(cookieFor(verify, 'lh_admin_session')).toBeTruthy();
+  });
+});
+
 describe('N-426: LINEログイン経路でも同じ門を通る', () => {
   function lineFetchMock(sub: string) {
     return vi.spyOn(globalThis, 'fetch')
@@ -340,6 +383,224 @@ describe('N-426: LINEログイン経路でも同じ門を通る', () => {
   }
 
   const oauthCookies = 'lh_line_state=expected; lh_line_nonce=nonce; lh_line_verifier=verifier';
+
+  function callbackCookies(options: { next?: 'ops'; remember?: boolean } = {}): string {
+    return [
+      oauthCookies,
+      options.next === 'ops' ? 'lh_line_next=ops' : '',
+      options.remember ? 'lh_line_remember=1' : '',
+    ].filter(Boolean).join('; ');
+  }
+
+  function seedPlatformAdmin(staffId: string, activationState = 'active') {
+    testDb.raw.prepare(
+      `INSERT INTO platform_admins (staff_id, is_active, activation_state) VALUES (?, 1, ?)`,
+    ).run(staffId, activationState);
+  }
+
+  function callback(cookie: string, state = 'expected') {
+    return app().request(`https://api.example.com/api/auth/line/callback?code=abc&state=${state}`, {
+      headers: { Cookie: cookie },
+    }, env());
+  }
+
+  const failureCases = [
+    {
+      code: 'line_token_failed',
+      mock: () => vi.spyOn(globalThis, 'fetch')
+        .mockResolvedValueOnce(new Response('{}', { status: 400 })),
+    },
+    {
+      code: 'line_id_token_missing',
+      mock: () => vi.spyOn(globalThis, 'fetch')
+        .mockResolvedValueOnce(new Response('{}', { status: 200 })),
+    },
+    {
+      code: 'line_verify_failed',
+      mock: () => vi.spyOn(globalThis, 'fetch')
+        .mockResolvedValueOnce(new Response(JSON.stringify({ id_token: 'id-token' }), { status: 200 }))
+        .mockResolvedValueOnce(new Response('{}', { status: 400 })),
+    },
+    {
+      code: 'line_profile_missing',
+      mock: () => vi.spyOn(globalThis, 'fetch')
+        .mockResolvedValueOnce(new Response(JSON.stringify({ id_token: 'id-token' }), { status: 200 }))
+        .mockResolvedValueOnce(new Response('{}', { status: 200 })),
+    },
+  ] as const;
+
+  it.each(failureCases)('next=ops の $code は運営ログインへ原因別コードで戻る', async ({ code, mock }) => {
+    mock();
+    const res = await callback(callbackCookies({ next: 'ops' }));
+    expect(res.status).toBe(302);
+    expect(res.headers.get('Location')).toBe(`https://admin.example.com/ops/login?error=${code}`);
+  });
+
+  it.each(failureCases)('next無しの $code は従来の統括ログインへ戻る', async ({ code, mock }) => {
+    mock();
+    const res = await callback(callbackCookies());
+    expect(res.status).toBe(302);
+    expect(res.headers.get('Location')).toBe(`https://admin.example.com/login?error=${code}`);
+  });
+
+  it('state不一致でもnext=opsを保ち、OAuth Cookie 6種をすべて失効する', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch');
+    const res = await callback(callbackCookies({ next: 'ops', remember: true }), 'wrong');
+    expect(res.headers.get('Location')).toBe('https://admin.example.com/ops/login?error=invalid_state');
+    expect(fetchSpy).not.toHaveBeenCalled();
+    const headers = res.headers as Headers & { getSetCookie?: () => string[] };
+    const cookies = typeof headers.getSetCookie === 'function'
+      ? headers.getSetCookie()
+      : [res.headers.get('set-cookie') ?? ''];
+    for (const name of [
+      'lh_line_state', 'lh_line_nonce', 'lh_line_verifier',
+      'lh_line_invite', 'lh_line_next', 'lh_line_remember',
+    ]) {
+      expect(cookies.some((cookie) => cookie.startsWith(`${name}=`) && cookie.includes('Max-Age=0'))).toBe(true);
+    }
+  });
+
+  it('運営メンバーでないstaffはnext=opsで通常セッションを受け取れない', async () => {
+    seedStaff('not-ops', { role: 'staff' });
+    testDb.raw.prepare(`UPDATE staff_members SET line_user_id = 'U-not-ops' WHERE id = 'not-ops'`).run();
+    lineFetchMock('U-not-ops');
+    const res = await callback(callbackCookies({ next: 'ops' }));
+    expect(res.headers.get('Location')).toBe('https://admin.example.com/ops/login?error=not_authorized');
+    expect(sessionRows()).toEqual([]);
+  });
+
+  it('awaiting_totpの運営メンバーは設定画面へ進み、通常セッションを受け取らない', async () => {
+    seedStaff('awaiting', { role: 'staff' });
+    seedPlatformAdmin('awaiting', 'awaiting_totp');
+    testDb.raw.prepare(`UPDATE staff_members SET line_user_id = 'U-awaiting' WHERE id = 'awaiting'`).run();
+    lineFetchMock('U-awaiting');
+    const res = await callback(callbackCookies({ next: 'ops' }));
+    const location = new URL(res.headers.get('Location')!);
+    expect(location.pathname).toBe('/login/two-factor/setup');
+    expect(location.search).toBe('?next=ops');
+    expect(new URLSearchParams(location.hash.slice(1)).get('lh_2fa')).toBeTruthy();
+    expect(challengeRows()).toMatchObject([{ staff_id: 'awaiting', purpose: 'setup' }]);
+    expect(sessionRows()).toEqual([]);
+  });
+
+  it('invite Cookie無しでは既存staffのLINE連携を変更しない', async () => {
+    seedStaff('existing', { role: 'staff' });
+    seedPlatformAdmin('existing');
+    testDb.raw.prepare(`UPDATE staff_members SET line_user_id = 'U-existing' WHERE id = 'existing'`).run();
+    lineFetchMock('U-existing');
+    await callback(callbackCookies({ next: 'ops' }));
+    const row = testDb.raw.prepare(`SELECT line_user_id FROM staff_members WHERE id = 'existing'`).get() as { line_user_id: string };
+    expect(row.line_user_id).toBe('U-existing');
+  });
+
+  it('TOTP登録済み運営メンバーは確認画面へ進み、通常セッションを受け取らない', async () => {
+    seedStaff('verified-ops', { role: 'staff' });
+    seedPlatformAdmin('verified-ops');
+    testDb.raw.prepare(`UPDATE staff_members SET line_user_id = 'U-verified' WHERE id = 'verified-ops'`).run();
+    await enableTotp('verified-ops');
+    lineFetchMock('U-verified');
+    const res = await callback(callbackCookies({ next: 'ops' }));
+    const location = new URL(res.headers.get('Location')!);
+    expect(location.pathname).toBe('/login/two-factor');
+    expect(location.search).toBe('?next=ops');
+    expect(new URLSearchParams(location.hash.slice(1)).get('lh_2fa')).toBeTruthy();
+    expect(challengeRows()).toMatchObject([{ staff_id: 'verified-ops', purpose: 'verify' }]);
+    expect(sessionRows()).toEqual([]);
+  });
+
+  it('TOTP未登録の既存owner運営メンバーは設定画面へ進む', async () => {
+    seedStaff('owner-ops', { role: 'owner' });
+    seedPlatformAdmin('owner-ops');
+    testDb.raw.prepare(`UPDATE staff_members SET line_user_id = 'U-owner-ops' WHERE id = 'owner-ops'`).run();
+    lineFetchMock('U-owner-ops');
+    const res = await callback(callbackCookies({ next: 'ops' }));
+    const location = new URL(res.headers.get('Location')!);
+    expect(location.pathname).toBe('/login/two-factor/setup');
+    expect(location.search).toBe('?next=ops');
+    expect(challengeRows()).toMatchObject([{ staff_id: 'owner-ops', purpose: 'setup' }]);
+  });
+
+  it('role=staffの運営メンバーにもTOTP設定を必須にする', async () => {
+    seedStaff('staff-ops', { role: 'staff' });
+    seedPlatformAdmin('staff-ops');
+    testDb.raw.prepare(`UPDATE staff_members SET line_user_id = 'U-staff-ops' WHERE id = 'staff-ops'`).run();
+    lineFetchMock('U-staff-ops');
+    const res = await callback(callbackCookies({ next: 'ops' }));
+    expect(new URL(res.headers.get('Location')!).pathname).toBe('/login/two-factor/setup');
+    expect(challengeRows()).toMatchObject([{ staff_id: 'staff-ops', purpose: 'setup' }]);
+    expect(sessionRows()).toEqual([]);
+  });
+
+  it('LINE OAuthのrememberをchallengeと7日セッションへ引き継ぐ', async () => {
+    seedStaff('remember-ops', { role: 'staff' });
+    seedPlatformAdmin('remember-ops');
+    testDb.raw.prepare(`UPDATE staff_members SET line_user_id = 'U-remember' WHERE id = 'remember-ops'`).run();
+    await enableTotp('remember-ops');
+    lineFetchMock('U-remember');
+    const callbackResponse = await callback(callbackCookies({ next: 'ops', remember: true }));
+    const challengeToken = new URLSearchParams(new URL(callbackResponse.headers.get('Location')!).hash.slice(1)).get('lh_2fa')!;
+    expect(challengeRows()).toMatchObject([{ staff_id: 'remember-ops', purpose: 'verify', remember: 1 }]);
+
+    const verify = await call('POST', '/api/auth/two-factor/verify', {
+      challengeToken,
+      code: await currentCode(),
+    });
+    expect(verify.status).toBe(200);
+    expect(cookieFor(verify, 'lh_admin_session') ?? '').toContain('Max-Age=604800');
+  });
+
+  it('統括側のLINEログインはnext無しの確認画面へ進む', async () => {
+    seedStaff('hq-owner', { role: 'owner' });
+    testDb.raw.prepare(`UPDATE staff_members SET line_user_id = 'U-hq-owner' WHERE id = 'hq-owner'`).run();
+    await enableTotp('hq-owner');
+    lineFetchMock('U-hq-owner');
+    const res = await callback(callbackCookies());
+    const location = new URL(res.headers.get('Location')!);
+    expect(location.pathname).toBe('/login/two-factor');
+    expect(location.search).toBe('');
+  });
+
+  it('セッションDBが古い場合はLINE callbackを安全に失敗させ、Cookieを出さない', async () => {
+    seedStaff('legacy-schema', { role: 'staff' });
+    testDb.raw.prepare(`UPDATE staff_members SET line_user_id = 'U-legacy-schema' WHERE id = 'legacy-schema'`).run();
+    testDb.raw.prepare(`ALTER TABLE admin_sessions DROP COLUMN user_agent`).run();
+    testDb.raw.prepare(`ALTER TABLE admin_sessions DROP COLUMN ip_prefix`).run();
+    lineFetchMock('U-legacy-schema');
+    const res = await callback(callbackCookies());
+    expect(res.headers.get('Location')).toBe('https://admin.example.com/login?error=line_login_failed');
+    expect(cookieFor(res, 'lh_admin_session')).toBeUndefined();
+  });
+
+  it('2要素認証後のセッション作成が失敗してもCookieを出さない', async () => {
+    seedStaff('session-failure', { role: 'staff' });
+    seedPlatformAdmin('session-failure');
+    testDb.raw.prepare(`UPDATE staff_members SET line_user_id = 'U-session-failure' WHERE id = 'session-failure'`).run();
+    await enableTotp('session-failure');
+    lineFetchMock('U-session-failure');
+    const callbackResponse = await callback(callbackCookies({ next: 'ops' }));
+    const challengeToken = new URLSearchParams(new URL(callbackResponse.headers.get('Location')!).hash.slice(1)).get('lh_2fa')!;
+    testDb.raw.prepare(`ALTER TABLE admin_sessions DROP COLUMN user_agent`).run();
+    testDb.raw.prepare(`ALTER TABLE admin_sessions DROP COLUMN ip_prefix`).run();
+
+    const verify = await call('POST', '/api/auth/two-factor/verify', {
+      challengeToken,
+      code: await currentCode(),
+    });
+    expect(verify.status).toBe(500);
+    expect(cookieFor(verify, 'lh_admin_session')).toBeUndefined();
+  });
+
+  it('監査記録が例外でもLINE callbackの正常ログインを成立させる', async () => {
+    const db = await import('@line-crm/db');
+    vi.spyOn(db, 'recordLoginAudit').mockRejectedValueOnce(new Error('audit unavailable'));
+    seedStaff('audit-failure', { role: 'staff' });
+    testDb.raw.prepare(`UPDATE staff_members SET line_user_id = 'U-audit-failure' WHERE id = 'audit-failure'`).run();
+    lineFetchMock('U-audit-failure');
+    const res = await callback(callbackCookies());
+    expect(res.status).toBe(302);
+    expect(new URL(res.headers.get('Location')!).pathname).toBe('/');
+    expect(cookieFor(res, 'lh_admin_session')).toBeTruthy();
+  });
 
   it('TOTP未登録の管理者は設定画面へ回され、セッションは発行されない', async () => {
     seedStaff('s1', { role: 'admin' });
@@ -384,6 +645,49 @@ describe('N-426: LINEログイン経路でも同じ門を通る', () => {
     expect(res.status).toBe(302);
     expect(challengeRows()).toMatchObject([{ staff_id: 's1', purpose: 'setup', remember: 1 }]);
     spy.mockRestore();
+  });
+});
+
+describe('運営コンソールのパスワードログインも役割に関係なくTOTP必須', () => {
+  it('role=staffの運営メンバーを設定用challengeへ回し、通常セッションを発行しない', async () => {
+    const hash = await hashPassword('Abcdefg1');
+    testDb.raw.prepare(
+      `INSERT INTO staff_members (id, name, email, role, api_key, is_active, password_hash)
+       VALUES ('password-staff-ops', '運営担当', 'password-staff-ops@example.com', 'staff', 'key-password-staff-ops', 1, ?)`,
+    ).run(hash);
+    testDb.raw.prepare(
+      `INSERT INTO platform_admins (staff_id, is_active, activation_state) VALUES ('password-staff-ops', 1, 'active')`,
+    ).run();
+
+    const res = await call('POST', '/api/auth/password/login', {
+      email: 'password-staff-ops@example.com',
+      password: 'Abcdefg1',
+      next: 'ops',
+    });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({
+      success: true,
+      data: { twoFactorSetup: true, challengeToken: expect.any(String) },
+    });
+    expect(challengeRows()).toMatchObject([{ staff_id: 'password-staff-ops', purpose: 'setup' }]);
+    expect(sessionRows()).toEqual([]);
+  });
+
+  it('監査記録が例外でも通常のパスワードログインを成立させる', async () => {
+    const db = await import('@line-crm/db');
+    vi.spyOn(db, 'recordLoginAudit').mockRejectedValueOnce(new Error('audit unavailable'));
+    const hash = await hashPassword('Abcdefg1');
+    testDb.raw.prepare(
+      `INSERT INTO staff_members (id, name, email, role, api_key, is_active, password_hash)
+       VALUES ('password-audit', '一般担当', 'password-audit@example.com', 'staff', 'key-password-audit', 1, ?)`,
+    ).run(hash);
+
+    const res = await call('POST', '/api/auth/password/login', {
+      email: 'password-audit@example.com',
+      password: 'Abcdefg1',
+    });
+    expect(res.status).toBe(200);
+    expect(cookieFor(res, 'lh_admin_session')).toBeTruthy();
   });
 });
 

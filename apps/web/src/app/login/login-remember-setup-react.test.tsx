@@ -20,7 +20,7 @@ const fixture = vi.hoisted(() => ({
 
 vi.mock('next/link', () => ({ default: () => null }))
 vi.mock('next/navigation', () => ({
-  useSearchParams: () => new URLSearchParams(''),
+  useSearchParams: () => new URLSearchParams(window.location.search),
   usePathname: () => '/login',
   useRouter: () => ({ push() {}, replace() {}, refresh() {}, back() {}, forward() {}, prefetch() {} }),
 }))
@@ -41,6 +41,7 @@ beforeEach(() => {
   fixture.bodies = []
   fixture.loginResponse = { success: true, data: { twoFactorSetup: true, challengeToken: 'setup-tok-1' }, csrfToken: 'csrf-1' }
   process.env.NEXT_PUBLIC_API_URL = 'https://api.example.test'
+  window.history.replaceState(null, '', '/login')
   vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url
     if (init?.body) fixture.bodies.push(JSON.parse(String(init.body)) as Record<string, unknown>)
@@ -69,6 +70,21 @@ function field(selector: string): HTMLElement | null {
 }
 
 describe('N-434: 7日間ログインを保持する選択', () => {
+  it.each([
+    'line_token_failed',
+    'line_id_token_missing',
+    'line_verify_failed',
+    'line_profile_missing',
+    'line_login_failed',
+  ])('%s は詳細を露出せず LINE ログインの共通案内を出す', async (errorCode) => {
+    window.history.replaceState(null, '', `/login?error=${errorCode}`)
+    await render()
+
+    expect(host.querySelector('[role="alert"]')?.textContent).toBe(
+      'LINEログインを完了できませんでした。もう一度お試しください。',
+    )
+  })
+
   it('チェックを入れると password/login へ remember:true が乗る', async () => {
     await render()
     const checkbox = field('input[type="checkbox"]') as HTMLInputElement

@@ -36,6 +36,21 @@ afterEach(() => {
 })
 
 describe('運営ログインの二段階認証', () => {
+  it.each([
+    'line_token_failed',
+    'line_id_token_missing',
+    'line_verify_failed',
+    'line_profile_missing',
+    'line_login_failed',
+  ])('%s は詳細を露出せず LINE ログインの共通案内を出す', async (errorCode) => {
+    window.history.replaceState(null, '', `/ops/login?error=${errorCode}`)
+    await act(async () => { root.render(<OpsLoginPage />) })
+
+    expect(host.querySelector('[role="alert"]')?.textContent).toBe(
+      'LINEログインを完了できませんでした。もう一度お試しください。',
+    )
+  })
+
   it('運営用途をWorkerへ渡し、未設定ならnext=opsを保って初回設定へ進む', async () => {
     await act(async () => { root.render(<OpsLoginPage />) })
     const email = host.querySelector('#ops-login-email') as HTMLInputElement

@@ -11,6 +11,14 @@ import { storeAdminSession, adminSessionHeaders } from '@/lib/admin-session'
 import { authRequest, emailError } from '@/lib/auth-email'
 import { AUTH_SELECTION_CLEARED_KEY } from '@/lib/hq-navigation'
 
+const LINE_LOGIN_FAILURE_CODES = new Set([
+  'line_token_failed',
+  'line_id_token_missing',
+  'line_verify_failed',
+  'line_profile_missing',
+  'line_login_failed',
+])
+
 /**
  * 運営コンソールのログイン。★V6 37-1（`InTGF`）。
  *
@@ -31,8 +39,10 @@ export default function OpsLoginPage() {
       setError('このアカウントは運営メンバーに登録されていません。ほかの運営メンバーに追加を依頼してください。')
     } else if (errorCode === 'not_platform_admin') {
       setError('ログインはできましたが、運営メンバーではありません。')
-    } else if (errorCode) {
+    } else if (errorCode && (LINE_LOGIN_FAILURE_CODES.has(errorCode) || errorCode === 'invalid_state')) {
       setError('LINEログインを完了できませんでした。もう一度お試しください。')
+    } else if (errorCode) {
+      setError('ログインを完了できませんでした。もう一度お試しください。')
     }
   }, [])
 
