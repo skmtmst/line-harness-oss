@@ -2687,7 +2687,8 @@ CREATE TABLE funnels (
   -- 何日以内に次の段へ進んだものを数えるか。
   window_days  INTEGER NOT NULL DEFAULT 30,
   created_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f','now','+9 hours'))
-, line_account_id TEXT REFERENCES line_accounts(id) ON DELETE CASCADE);
+, line_account_id TEXT REFERENCES line_accounts(id) ON DELETE CASCADE, status TEXT NOT NULL DEFAULT 'active'
+  CHECK (status IN ('active', 'stopped', 'archived')));
 
 CREATE TABLE google_calendar_connections (
   id            TEXT PRIMARY KEY,
