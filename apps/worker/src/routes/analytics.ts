@@ -14,6 +14,8 @@ import {
   countFunnelStep,
   createVersionedFunnel,
   createFunnelVersion,
+  getFunnelWithCurrentVersion,
+  setFunnelStatus,
   runChronologicalFunnel,
   getLatestFunnelRun,
   createFunnelResultAudience,
@@ -317,6 +319,7 @@ function serializeFunnel(f: Funnel) {
     name: f.name,
     windowDays: f.window_days,
     createdAt: f.created_at,
+    status: f.status,
   };
 }
 
@@ -327,9 +330,10 @@ function explicitTimestamp(value: unknown, code: string): string {
   return parsed.toISOString();
 }
 
-function funnelErrorStatus(error: unknown): 404 | 422 | 500 {
+function funnelErrorStatus(error: unknown): 404 | 409 | 422 | 500 {
   const message = error instanceof Error ? error.message : '';
   if (message.endsWith('_not_found')) return 404;
+  if (message.endsWith('_conflict')) return 409;
   if (message.startsWith('analytics_funnel_')
       || message.startsWith('analytics_cross_')
       || message.startsWith('analytics_saved_')) return 422;
@@ -825,7 +829,7 @@ analytics.get('/api/analytics/funnels', async (c) => {
     const result = await getFunnelsWithCurrentVersions(
       c.env.DB,
       account.accountId,
-      { page, pageSize },
+      { page, pageSize, includeInactive: c.req.query('includeInactive') === '1' },
     );
     const items = result.items.map((funnel) => ({
       ...serializeFunnel(funnel),
@@ -869,12 +873,37 @@ analytics.post('/api/analytics/funnels', requireRole('owner', 'admin'), async (c
   }
 });
 
+// 編集画面が現在の定義を丸ごと読む口。停止・保管中のファネルも中身は読める。
+analytics.get('/api/analytics/funnels/:id', async (c) => {
+  try {
+    const account = await resolveAccount(c);
+    if (!account.ok) return account.response;
+    const found = await getFunnelWithCurrentVersion(
+      c.env.DB,
+      account.accountId,
+      c.req.param('id'),
+    );
+    if (!found) return c.json({ success: false, error: 'Not found' }, 404);
+    return c.json({
+      success: true,
+      data: {
+        ...serializeFunnel(found.funnel),
+        currentVersion: found.currentVersion,
+      },
+    });
+  } catch (error) {
+    console.error('GET /api/analytics/funnels/:id error:', error);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
 analytics.post('/api/analytics/funnels/:id/versions', requireRole('owner', 'admin'), async (c) => {
   try {
     const account = await resolveAccount(c);
     if (!account.ok) return account.response;
     const body = await c.req.json<{
       windowDays?: unknown; steps?: unknown; segment?: unknown; comparisonGroups?: unknown;
+      expectedVersionNumber?: unknown; name?: unknown;
     }>();
     const version = await createFunnelVersion(c.env.DB, {
       lineAccountId: account.accountId,
@@ -883,6 +912,10 @@ analytics.post('/api/analytics/funnels/:id/versions', requireRole('owner', 'admi
       steps: body.steps,
       segment: body.segment,
       comparisonGroups: body.comparisonGroups,
+      expectedVersionNumber: body.expectedVersionNumber === undefined
+        ? undefined
+        : Number(body.expectedVersionNumber),
+      name: typeof body.name === 'string' ? body.name : undefined,
       createdBy: c.get('staff').id,
       createdAt: new Date().toISOString(),
     });
@@ -890,6 +923,32 @@ analytics.post('/api/analytics/funnels/:id/versions', requireRole('owner', 'admi
   } catch (error) {
     const status = funnelErrorStatus(error);
     if (status === 500) console.error('POST /api/analytics/funnels/:id/versions error:', error);
+    return c.json({ success: false, error: status === 500 ? 'Internal server error' : (error as Error).message }, status);
+  }
+});
+
+// 停止・保管・再開。今の状態を expectedStatus で渡させ、二重操作や読み違えを 409 で弾く。
+analytics.put('/api/analytics/funnels/:id/status', requireRole('owner', 'admin'), async (c) => {
+  try {
+    const account = await resolveAccount(c);
+    if (!account.ok) return account.response;
+    const body = await c.req.json<{ status?: unknown; expectedStatus?: unknown }>();
+    const next = String(body.status ?? '');
+    const expected = String(body.expectedStatus ?? '');
+    if (!['active', 'stopped', 'archived'].includes(next)
+        || !['active', 'stopped', 'archived'].includes(expected)) {
+      return c.json({ success: false, error: 'analytics_funnel_status_invalid' }, 422);
+    }
+    const funnel = await setFunnelStatus(c.env.DB, {
+      lineAccountId: account.accountId,
+      funnelId: c.req.param('id'),
+      status: next as 'active' | 'stopped' | 'archived',
+      expectedStatus: expected as 'active' | 'stopped' | 'archived',
+    });
+    return c.json({ success: true, data: serializeFunnel(funnel) });
+  } catch (error) {
+    const status = funnelErrorStatus(error);
+    if (status === 500) console.error('PUT /api/analytics/funnels/:id/status error:', error);
     return c.json({ success: false, error: status === 500 ? 'Internal server error' : (error as Error).message }, status);
   }
 });
