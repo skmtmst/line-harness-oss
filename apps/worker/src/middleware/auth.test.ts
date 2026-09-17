@@ -389,6 +389,14 @@ describe('topology guard', () => {
 });
 
 describe('protected API access', () => {
+  test('未定義の運営APIは通常staffの認証があっても200にしない', async () => {
+    const res = await app().request('/api/ops/unknown', {
+      headers: { Authorization: 'Bearer ops-staff-key' },
+    }, crossSiteEnv());
+    expect(res.status).not.toBe(200);
+    expect(res.status).toBe(404);
+  });
+
   test.each([
     '/api/rich-menu-images/rich-menus/account/group/page/image.png',
     '/api/rich-menu-groups/external/rich-menu-id/image?accountId=account',

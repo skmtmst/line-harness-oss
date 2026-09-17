@@ -16,7 +16,7 @@
 | `apps/worker/src/middleware/auth.ts` | 認証の直後に代理ログインを解決する |
 | `apps/worker/src/routes/ops.ts` | `/api/ops/*` と `/api/hq/operator-history` |
 | `apps/worker/src/routes/tenants.ts` | `canManageTenants()` を `platform_admins` 判定へ |
-| `apps/worker/src/routes/admin-auth.ts` | LINE ログインの `?next=ops`、`/api/auth/session` に `platformAdmin` と `impersonation` |
+| `apps/worker/src/routes/admin-auth.ts` | LINE ログインの `?next=ops` と2要素認証、`/api/auth/session` に `platformAdmin` と `impersonation` |
 | `apps/web/src/app/ops/**` | 画面 |
 | `apps/web/src/components/ops/**` | 外枠・環境帯・代理ログイン帯 |
 | `apps/web/src/components/app-shell.tsx` | `/ops` は運営の外枠、それ以外には代理ログイン帯 |
@@ -56,7 +56,7 @@ SQL を流さない手順（推奨）: `platform_admins` が空の間は、既�
 
 ## 確かめること（要件 §7 の第 1 段ぶん）
 
-- 登録した LINE / メールで `/ops` に入れる。統括のオーナーは `/api/ops/*` が 403
+- 登録した LINE / メールで `/ops` に入れる。どちらのログインも、TOTP登録済みなら6桁の確認、未登録なら設定を終えるまで通常セッションを発行しない。統括のオーナーは `/api/ops/*` が 403
 - 契約先を停止すると `tenants.status = 'suspended'`、`platform_audit_logs` が 1 件（`visible_to_tenant = 1`）
 - 代理ログインで統括の画面が開き、赤い帯が出る。閲覧のみでは書き込み API が 403
 - 理由を入れて書き込みに切り替えると書ける。契約先の `/hq` に「運営による操作」が出る
@@ -65,7 +65,7 @@ SQL を流さない手順（推奨）: `platform_admins` が空の間は、既�
 
 ## 未実装・注意
 
-- 2 要素認証の画面を通ったあとは `/ops` へ戻る（`lh_next=ops`）
+- 2 要素認証の画面を通ったあとは `/ops` へ戻る。Worker は `?next=ops` を付け、画面は query を正本、`lh_next=ops` と一時保存を後方互換として読む
 - 伏せ字は `/api/friends` `/api/chats` `/api/inbox` `/api/conversations` `/api/support` `/api/nen-members` `/api/form-submissions` `/api/forms/` の応答に掛かる。ほかの経路で氏名を返す API があれば `middleware/impersonation.ts` の `PII_MASK_PREFIXES` に足す
 - 代理ログインでも止める操作は `isForbiddenWhileImpersonating`（権限者の削除・LINE アカウントの削除・課金ポータル・契約状態の変更）
 
@@ -75,6 +75,12 @@ SQL を流さない手順（推奨）: `platform_admins` が空の間は、既�
 - 相手はメールのリンク（`/ops/invite#invite=…`）を開き、パスワードが無ければ名前とパスワードを設定 → そのまま `/ops/two-factor` で 2要素認証を登録 → 登録完了で運営マスターになる
 - 状態は `platform_admins.activation_state`（invited → awaiting_totp → active）。active だけを運営マスターとして扱う（`getPlatformAdminByStaffId`）
 - 新しいメールは運営会社（既定の統括）の権限者（role staff）として作る。別の統括の権限者はメール招待では加えられない（Kenta / Kyohei は初期の特例）
-- 既存の 3 名（2要素認証 未設定）はそのまま使える（決定 1-A）。左下メニューの「2要素認証の設定」→ `/ops/two-factor` から登録できる。全員が設定を終えたら、未設定の人を `/ops` に入れない切り替え（1-B）を検討する
+- 既存の運営メンバーも `/ops/login` から入ると2要素認証が必須。未設定ならログイン途中の設定画面へ進み、登録完了後に `/ops` へ戻る。左下メニューの「2要素認証の設定」→ `/ops/two-factor` から事前登録もできる
 - 招待メールを送り直すと前のリンクは失効する。2要素認証の確認（`/api/staff/:id/two-factor/confirm`）が通った瞬間に `activatePlatformAdminIfAwaitingTotp` が active にする
 - 公開の口は `/api/auth/ops-invite/check` と `/api/auth/ops-invite/accept`（トークンだけで守る。Turnstile は使わない）
+
+## 検証配備とD1の整合性
+
+- `Deploy Cloudflare Staging` は配備前に検証D1の `_migrations` とリポジトリ内のmigration一覧を比較する
+- dry-run は未適用件数とファイル名をJob Summaryへ出すだけで、DBを書き換えない
+- apply は未適用が1件でもあれば失敗する。先に `Migrate D1` の正式経路で適用し、未適用0件にしてから再実行する
