@@ -18,6 +18,7 @@ import { RICH_MENU_DIMENSIONS } from '@line-crm/shared'
 import { datetimeLocalJstToUtcIso } from '@/lib/jst-datetime'
 import { useScheduleSubmit } from './schedule-submit'
 import { ManualPublishAttempt } from './manual-publish-attempt'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 
 /**
  * 保存されている条件を読む。
@@ -33,6 +34,57 @@ function parseStoredCondition(raw: string | null): SegmentCondition | null {
   } catch {
     return null
   }
+}
+
+/*
+ * 下書きとして送る面の形。persistDraft と同じ投影を使い、
+ * 「保存済みの形」と「いま画面上にある形」の差分だけを未保存とみなす。
+ * 画像はアップロード時点で保存済みなので署名には入れない。
+ */
+function projectAreaForDraft(a: Area) {
+  return {
+    id: a.id,
+    boundsX: a.boundsX,
+    boundsY: a.boundsY,
+    boundsWidth: a.boundsWidth,
+    boundsHeight: a.boundsHeight,
+    actionType: a.actionType,
+    actionData: a.actionData,
+    intent: a.intent ?? null,
+    label: a.label ?? null,
+    tagIds: a.tagIds ?? null,
+    scoreChange: a.scoreChange ?? null,
+    templateId: a.templateId ?? null,
+    formId: a.formId ?? null,
+    trackedLinkId: a.trackedLinkId ?? null,
+  }
+}
+
+function draftSignatureOf(fields: {
+  name: string
+  chatBarText: string
+  isDefaultForAll: boolean
+  targetingEnabled: boolean
+  targetingPriority: number
+  targetingCondition: SegmentCondition | null
+  folderId: string
+  pages: Page[]
+}): string {
+  return JSON.stringify({
+    name: fields.name,
+    chatBarText: fields.chatBarText,
+    isDefaultForAll: fields.isDefaultForAll,
+    targetingEnabled: fields.targetingEnabled,
+    targetingPriority: fields.targetingPriority,
+    targetingCondition: fields.targetingCondition ? JSON.stringify(fields.targetingCondition) : null,
+    folderId: fields.folderId || null,
+    pages: fields.pages.map((p, i) => ({
+      id: p.id,
+      name: p.name,
+      orderIndex: i,
+      areas: p.areas.map(projectAreaForDraft),
+    })),
+  })
 }
 
 type Page = {
@@ -208,6 +260,12 @@ function Editor({
    * 開いている窓は1つだけ。`ConfirmDialog` を3つ並べるより、どれが開いて
    * いるかを1か所で見たほうが、二重に開く形を作りにくい。
    */
+  /*
+   * N-162: 読み込み・保存が終わった時点の「保存済みの形」を署名で持つ。
+   * 署名と今の入力が違う間だけ離脱確認を出す。保存・公開の成功は
+   * reload() 経由で署名が更新されるので、保存直後には警告が出ない。
+   */
+  const [baselineSignature, setBaselineSignature] = useState<string | null>(null)
   const [confirmKind, setConfirmKind] = useState<'removePage' | 'publish' | 'unpublish' | 'deleteGroup' | null>(null)
   /** 消す前に打ち込んでもらう名前。**打ち間違いを止めるための二重確認。** */
   const [deleteTyped, setDeleteTyped] = useState('')
@@ -245,6 +303,43 @@ function Editor({
   const [targetPreviewLoading, setTargetPreviewLoading] = useState(false)
   const [targetPreviewError, setTargetPreviewError] = useState('')
 
+  /*
+   * N-162: 保存済み署名との差分がある間だけ離脱確認を出す。
+   * busy 中は確認窓を足さない（保存の返事を待っている最中に重ねない）。
+   * 画像はアップロード時点で保存済み・プレビュー表示は dirty に含めない。
+   */
+  const dirty = baselineSignature !== null && draftSignatureOf({
+    name,
+    chatBarText,
+    isDefaultForAll,
+    targetingEnabled,
+    targetingPriority,
+    targetingCondition,
+    folderId,
+    pages,
+  }) !== baselineSignature
+  const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({
+    dirty,
+    busy: saving || publishing || unpublishing || deleting || busy,
+  })
+  /*
+   * N-162: 離脱確認の窓は step 1/2/3 のどこにいても出す。
+   * targeting/publish は早期 return で別ツリーになるため、ここで要素化して
+   * 全経路へ差し込む。step 1 だけに置くと、dirty 中のリンクが黙って止まり
+   * 「保存せずに移動」を選ぶ手段がなくなる。
+   */
+  const leaveConfirmDialog = (
+    <ConfirmDialog
+      open={leaveTarget !== null}
+      title="保存していない変更があります"
+      description="このまま移動すると、メニューへの変更は失われます。保存せずに移動しますか？"
+      confirmLabel="保存せずに移動"
+      cancelLabel="編集を続ける"
+      onConfirm={confirmLeave}
+      onCancel={cancelLeave}
+    ></ConfirmDialog>
+  )
+
   const closeConfirm = () => {
     if (publishing || unpublishing) return
     setConfirmKind(null)
@@ -273,6 +368,16 @@ function Editor({
       setTargetingCondition(parseStoredCondition(g.targetingCondition))
       setFolderId(g.folderId ?? '')
       setPages(g.pages)
+      setBaselineSignature(draftSignatureOf({
+        name: g.name,
+        chatBarText: g.chatBarText,
+        isDefaultForAll: g.isDefaultForAll,
+        targetingEnabled: g.targetingEnabled,
+        targetingPriority: g.targetingPriority,
+        targetingCondition: parseStoredCondition(g.targetingCondition),
+        folderId: g.folderId ?? '',
+        pages: g.pages,
+      }))
       void api.richMenuGroups
         .tapStats(g.accountId)
         .then((res) => {
@@ -475,24 +580,7 @@ function Editor({
         ...(p.id.startsWith('tmp-') ? {} : { id: p.id }),
         name: p.name,
         orderIndex: i,
-        areas: p.areas.map((a) => ({
-          // id を渡すと、そのボタンの記録（押された回数）が保存後も続く。
-          // まだ保存されていない id は、サーバー側で新しく振り直される。
-          id: a.id,
-          boundsX: a.boundsX,
-          boundsY: a.boundsY,
-          boundsWidth: a.boundsWidth,
-          boundsHeight: a.boundsHeight,
-          actionType: a.actionType,
-          actionData: a.actionData,
-          intent: a.intent ?? null,
-          label: a.label ?? null,
-          tagIds: a.tagIds ?? null,
-          scoreChange: a.scoreChange ?? null,
-          templateId: a.templateId ?? null,
-          formId: a.formId ?? null,
-          trackedLinkId: a.trackedLinkId ?? null,
-        })),
+        areas: p.areas.map(projectAreaForDraft),
       })),
     })
     if (!res.success) throw new Error(res.error ?? '保存失敗')
@@ -664,6 +752,7 @@ function Editor({
 
   if (editorStep === 'targeting') {
     return (
+      <>
       <TargetingStep
         group={group}
         targetingEnabled={targetingEnabled}
@@ -680,11 +769,14 @@ function Editor({
         onRefresh={() => void reloadTargetPreview()}
         onSave={() => void handleSave()}
       />
+      {leaveConfirmDialog}
+      </>
     )
   }
 
   if (editorStep === 'publish') {
     return (
+      <>
       <PublishStep
         group={group}
         pages={pages}
@@ -695,6 +787,8 @@ function Editor({
         onPublishNow={() => void handlePublish()}
         onSchedule={scheduleSubmit}
       />
+      {leaveConfirmDialog}
+      </>
     )
   }
 
@@ -1224,6 +1318,12 @@ function Editor({
         </ul>
       </ConfirmDialog>
 
+      {/*
+        N-162: 未保存の変更がある間だけ、画面を離れる操作に確認を出す。
+        保存成功後は署名が更新されて dirty が外れるので、確認は出ない。
+      */}
+      {leaveConfirmDialog}
+
       <StickyBar actions={(
         <div className="flex items-center gap-2">
           <label className="mr-2 flex cursor-pointer items-center gap-1.5 text-sm text-gray-600">
@@ -1263,17 +1363,24 @@ function Editor({
 }
 
 function StepHeader({ active, groupId }: { active: 1 | 2 | 3; groupId: string }) {
+  const router = useRouter()
   const steps = [
     { number: 1, label: '形とボタン', href: `/rich-menus/edit?id=${groupId}` },
     { number: 2, label: '誰に出すか', href: `/rich-menus/edit?id=${groupId}&step=targeting` },
     { number: 3, label: '公開のしかた', href: `/rich-menus/edit?id=${groupId}&step=publish` },
   ]
+  /*
+   * N-162: ステップ移動は同じ編集画面の中で起き、入力は消えない。
+   * Link(a[href]) のままだと離脱確認のクリック捕捉に載ってしまうので、
+   * 画面内の段階移動だけ router.push で行う。
+   */
   return (
     <div className="border-hairline bg-canvas mb-6 grid grid-cols-3 overflow-hidden rounded-card border">
       {steps.map((step) => (
-        <Link
+        <button
           key={step.number}
-          href={step.href}
+          type="button"
+          onClick={() => router.push(step.href)}
           className={`flex min-w-0 items-center justify-center gap-3 border-r px-4 py-4 last:border-r-0 ${
             step.number === active ? 'bg-accent/5 text-accent' : 'text-ink-secondary'
           }`}
@@ -1285,7 +1392,7 @@ function StepHeader({ active, groupId }: { active: 1 | 2 | 3; groupId: string })
             <span className="block text-xs font-bold tracking-wider">STEP {step.number}</span>
             <span className="block truncate text-sm font-semibold">{step.label}</span>
           </span>
-        </Link>
+        </button>
       ))}
     </div>
   )
@@ -1329,6 +1436,8 @@ function TargetingStep({
   onRefresh: () => void
   onSave: () => void
 }) {
+  // N-162: ステップ移動は画面内の段階移動なので a[href] ではなく router.push で行う。
+  const router = useRouter()
   const [conditionEditorOpen, setConditionEditorOpen] = useState(false)
   const firstRule = targetingCondition?.rules[0]
   const selectedTagName = firstRule?.type.startsWith('tag_')
@@ -1386,7 +1495,7 @@ function TargetingStep({
         </aside>
       </div>
 
-      <StickyBar actions={<div className="flex w-full items-center justify-between gap-3"><span className="text-ink-faint text-xs">{group.status === 'published' ? 'LINE登録済み' : '下書き（まだ誰にも出ていません）'}</span><div className="flex gap-2"><Button href={`/rich-menus/edit?id=${group.id}`}>前へ：形とボタン</Button><Button onClick={onSave} disabled={saving}>{saving ? '保存中…' : '下書きに保存'}</Button><Button variant="primary" href={`/rich-menus/edit?id=${group.id}&step=publish`}>次へ：公開のしかた</Button></div></div>} />
+      <StickyBar actions={<div className="flex w-full items-center justify-between gap-3"><span className="text-ink-faint text-xs">{group.status === 'published' ? 'LINE登録済み' : '下書き（まだ誰にも出ていません）'}</span><div className="flex gap-2"><Button onClick={() => router.push(`/rich-menus/edit?id=${group.id}`)}>前へ：形とボタン</Button><Button onClick={onSave} disabled={saving}>{saving ? '保存中…' : '下書きに保存'}</Button><Button variant="primary" onClick={() => router.push(`/rich-menus/edit?id=${group.id}&step=publish`)}>次へ：公開のしかた</Button></div></div>} />
     </main>
   )
 }
@@ -1410,6 +1519,8 @@ function PublishStep({
   onPublishNow: () => void
   onSchedule: (input: RichMenuScheduleInput) => Promise<void>
 }) {
+  // N-162: ステップ移動は画面内の段階移動なので a[href] ではなく router.push で行う。
+  const router = useRouter()
   const [mode, setMode] = useState<'now' | 'scheduled' | 'period'>('now')
   const [startsAt, setStartsAt] = useState('')
   const [endsAt, setEndsAt] = useState('')
@@ -1582,7 +1693,7 @@ function PublishStep({
           </ul>
         )) : null}
       </section>
-      <StickyBar actions={<div className="flex w-full items-center justify-between gap-3"><Button href={`/rich-menus/edit?id=${group.id}&step=targeting`}>前へ：誰に出すか</Button><div className="flex gap-2"><Button onClick={onSave} disabled={saving || publishing}>下書きに保存</Button><Button variant="primary" onClick={submit} disabled={saving || publishing || (mode !== 'now' && !startsAt) || (mode === 'period' && !endsAt)}>{publishing ? '公開中…' : mode === 'now' ? 'この内容で公開する' : 'この内容で予約する'}</Button></div></div>} />
+      <StickyBar actions={<div className="flex w-full items-center justify-between gap-3"><Button onClick={() => router.push(`/rich-menus/edit?id=${group.id}&step=targeting`)}>前へ：誰に出すか</Button><div className="flex gap-2"><Button onClick={onSave} disabled={saving || publishing}>下書きに保存</Button><Button variant="primary" onClick={submit} disabled={saving || publishing || (mode !== 'now' && !startsAt) || (mode === 'period' && !endsAt)}>{publishing ? '公開中…' : mode === 'now' ? 'この内容で公開する' : 'この内容で予約する'}</Button></div></div>} />
     </main>
   )
 }

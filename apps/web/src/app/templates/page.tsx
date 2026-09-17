@@ -519,16 +519,19 @@ export default function TemplatesPage() {
     })),
     ...drawerData.usedBy.autoReplies.map((usage) => ({
       key: `auto-reply-${usage.id}`,
-      href: '/auto-replies',
+      href: `/auto-replies/edit?id=${usage.id}`,
       label: `自動応答「${usage.keyword}」の返信`,
       icon: MessageCircle,
     })),
     ...drawerData.usedBy.automations.map((usage) => ({
       key: `automation-${usage.id}`,
-      href: '/automations',
+      // 旧形式のオートメーション表の設定で、開ける画面が無い。
+      // /automations は新形式(automation_definitions)だけを出し、
+      // /automations/drafts は別のID空間なのでリンクにしない。
+      href: null as string | null,
       label: usage.eventType === 'inbox_favorite'
         ? '受信箱の「よく使う」（担当3人が登録）'
-        : `オートメーション「${usage.name}」`,
+        : `オートメーション「${usage.name}」（旧形式・画面からは開けません）`,
       icon: usage.eventType === 'inbox_favorite' ? Star : Bot,
     })),
     ...drawerData.usedBy.reminderSteps.map((usage) => ({
@@ -1192,16 +1195,18 @@ export default function TemplatesPage() {
                       <ul className="space-y-1.5 text-xs">
                         {drawerData.usedBy.autoReplies.map((ar) => (
                           <li key={`ar-${ar.id}`}>
-                            <a href="/auto-replies" className="text-accent hover:underline">
+                            <a href={`/auto-replies/edit?id=${ar.id}`} className="text-accent hover:underline">
                               自動返信: {ar.keyword} <span className="text-ink-faint">({ar.matchType})</span>
                             </a>
                           </li>
                         ))}
                         {drawerData.usedBy.automations.map((au) => (
                           <li key={`au-${au.id}`}>
-                            <a href="/automations" className="text-accent hover:underline">
-                              オートメーション: {au.name} <span className="text-ink-faint">({au.eventType})</span>
-                            </a>
+                            {/* 旧形式のオートメーションには開ける画面が無い。リンクにすると
+                                別のID空間の画面へ飛んで「見つかりません」になるだけ。 */}
+                            <span>
+                              オートメーション: {au.name} <span className="text-ink-faint">({au.eventType}・旧形式)</span>
+                            </span>
                           </li>
                         ))}
                         {scenarioStepUsages.map((ss) => (
@@ -1267,7 +1272,7 @@ export default function TemplatesPage() {
               <div className="rounded-lg border border-danger bg-danger-bg px-4 py-3 text-danger">
             <p className="flex items-start gap-2 text-xs font-bold">
               <TriangleAlert size={17} className="mt-0.5 shrink-0" aria-hidden="true" />
-              このテンプレートは{blockedDelete?.usageCount ?? 0}か所で使われています。先に差し替えると、配信や返信を止めずに整理できます。
+              このテンプレートは{drawerData ? drawerUsageCount : (blockedDelete?.usageCount ?? 0)}か所で使われています。先に差し替えると、配信や返信を止めずに整理できます。
             </p>
             {drawerLoading ? (
               <p className="mt-3 text-xs">使用先を読み込んでいます…</p>
@@ -1275,10 +1280,23 @@ export default function TemplatesPage() {
               <p className="mt-3 text-xs font-bold">使用先を確認できませんでした。画面を閉じて、もう一度お試しください。</p>
             ) : (
               <ul className="mt-3 space-y-2 text-xs font-semibold">
-                {replacementDestinations.map(({ key, label, icon: Icon }) => (
-                  <li key={key} className="flex items-center gap-2">
-                    <Icon size={15} className="shrink-0" aria-hidden="true" />
-                    {label}
+                {replacementDestinations.map(({ key, label, href, icon: Icon }) => (
+                  <li key={key}>
+                    {href ? (
+                      <a
+                        href={href}
+                        className="flex items-center gap-2 rounded-control px-1.5 py-1 text-accent hover:bg-canvas-sunken hover:underline"
+                      >
+                        <Icon size={15} className="shrink-0" aria-hidden="true" />
+                        <span className="min-w-0 flex-1">{label}</span>
+                        <ArrowRight size={14} className="shrink-0 text-ink-faint" aria-hidden="true" />
+                      </a>
+                    ) : (
+                      <span className="flex items-center gap-2 px-1.5 py-1">
+                        <Icon size={15} className="shrink-0" aria-hidden="true" />
+                        <span className="min-w-0 flex-1">{label}</span>
+                      </span>
+                    )}
                   </li>
                 ))}
               </ul>
@@ -1288,7 +1306,7 @@ export default function TemplatesPage() {
               <div>
                 <p className="mb-2 text-sm font-bold text-ink">どうしますか</p>
                 <div className="rounded-lg border border-accent-soft bg-accent-soft px-4 py-3 text-accent-deep">
-                  <p className="text-sm font-bold">{blockedDelete?.usageCount ?? 0}か所の差し替え画面を開きます</p>
+                  <p className="text-sm font-bold">上の使用先を1か所ずつ開いて、別のテンプレートへ差し替えてください</p>
                   <p className="mt-1 text-xs text-accent-deep">差し替えが終わるまで、このテンプレートは一覧に残ります。</p>
                 </div>
               </div>
@@ -1304,10 +1322,6 @@ export default function TemplatesPage() {
                   }}
                 >
                   キャンセル
-                </Button>
-                <Button href={replacementDestinations[0]?.href ?? '/templates'} variant="primary" className="gap-1.5">
-                  <ArrowRight size={15} aria-hidden="true" />
-                  差し替える画面へ
                 </Button>
               </div>
             </footer>
