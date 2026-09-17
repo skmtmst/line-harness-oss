@@ -4,6 +4,7 @@ export * from "./interpolation";
 export * from "./japanese-holidays";
 export * from "./response-window";
 export * from "./reminder-timing";
+export * from "./reminder-name";
 export * from "./anniversary";
 export * from "./shipping-schedule";
 export * from "./form-layout";
