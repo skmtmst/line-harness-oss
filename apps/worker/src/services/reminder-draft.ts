@@ -103,6 +103,13 @@ export async function validateReminderDraft(
       : !fieldValid
         ? '基準日に使う友だち情報欄を選んでください'
         : '基準日にするイベントを選んでください'));
+  // N-068: 毎年くり返す友だち情報欄起点では、2月29日の平年の扱いが
+  // 保存済みであることを公開前に確かめる。
+  const leapValid = !(settings.repeatYearly && settings.triggerType === 'friend_field')
+    || ['feb28', 'mar1', 'skip'].includes(settings.leapYearPolicy ?? '');
+  checks.push(check('leap_year_policy', '2月29日の扱い', leapValid, leapValid
+    ? '2月29日が基準日のときの扱いが設定されています'
+    : '2月29日が基準日のときの平年の扱いを選んでください'));
   const stopConfirmed = settings.stopConditions.bookingCancelled
     || settings.stopConditions.supportMarkCompleted
     || settings.stopConditions.friendBlocked

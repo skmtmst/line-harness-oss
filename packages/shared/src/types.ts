@@ -1471,6 +1471,8 @@ export interface Reminder {
   triggerFieldId?: string | null;
   /** 154: 毎年くり返すか（誕生日なら true）。 */
   repeatYearly?: boolean;
+  /** 419: 2月29日が基準日の毎年くり返しで、平年にいつ扱うか。 */
+  leapYearPolicy?: 'feb28' | 'mar1' | 'skip';
   createdAt: string;
   updatedAt: string;
 }
@@ -2140,6 +2142,8 @@ export interface ReminderDraftSettings {
   /** triggerType が 'event' のときの起点イベント。未指定(NULL)は全イベントが起点になる従来動作。 */
   triggerEventId?: string | null;
   repeatYearly?: boolean;
+  /** 419: 2月29日が基準日の毎年くり返しで、平年にいつ扱うか。既定 'feb28'。 */
+  leapYearPolicy?: 'feb28' | 'mar1' | 'skip';
   triggerOffsetMinutes?: number | null;
   sendAtTime?: string | null;
   targetTagId?: string | null;

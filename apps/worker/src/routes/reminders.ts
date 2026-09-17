@@ -35,6 +35,7 @@ import {
   type ReminderVersionRow,
   type ReminderDeliveryRunStatus,
 } from '@line-crm/db';
+import { LEAP_YEAR_POLICIES } from '@line-crm/shared';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
@@ -114,6 +115,7 @@ function publicReminder(row: ReminderListRow, stepCount?: number, hasFailure?: b
     deliveryMode: row.delivery_mode ?? 'countdown',
     triggerFieldId: row.trigger_field_id ?? null,
     repeatYearly: row.repeat_yearly === 1,
+    leapYearPolicy: row.leap_year_policy,
     triggerOffsetMinutes: row.trigger_offset_minutes ?? null,
     sendAtTime: row.send_at_time ?? null,
     targetTagId: row.target_tag_id ?? null,
@@ -208,8 +210,8 @@ async function createReminderIdempotent(
       `INSERT OR IGNORE INTO reminders
          (id, name, description, trigger_type, trigger_offset_minutes,
           send_at_time, target_tag_id, delivery_mode,
-          trigger_field_id, repeat_yearly, folder_id, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          trigger_field_id, repeat_yearly, leap_year_policy, folder_id, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     ).bind(
       reminderId,
       args.name,
@@ -221,6 +223,7 @@ async function createReminderIdempotent(
       (args.trigger.deliveryMode as string) ?? 'countdown',
       (args.trigger.triggerFieldId as string | null) ?? null,
       args.trigger.repeatYearly ? 1 : 0,
+      (args.trigger.leapYearPolicy as 'feb28' | 'mar1' | 'skip' | null) ?? 'feb28',
       (args.trigger.folderId as string | null) ?? null,
       now,
       now,
@@ -291,6 +294,16 @@ function readTriggerInput(
       return { ok: false, error: 'repeatYearly must be boolean' };
     }
     out.repeatYearly = body.repeatYearly;
+  }
+  if (has('leapYearPolicy')) {
+    const raw = body.leapYearPolicy;
+    if (raw === null || raw === undefined) {
+      out.leapYearPolicy = 'feb28';
+    } else if (!(LEAP_YEAR_POLICIES as readonly string[]).includes(raw as string)) {
+      return { ok: false, error: `leapYearPolicy must be one of ${LEAP_YEAR_POLICIES.join(', ')}` };
+    } else {
+      out.leapYearPolicy = raw as 'feb28' | 'mar1' | 'skip';
+    }
   }
   if (has('deliveryMode')) {
     if (!DELIVERY_MODES.includes(body.deliveryMode as (typeof DELIVERY_MODES)[number])) {
@@ -433,6 +446,14 @@ function readDraftSettings(
   if (sendAtTime !== null && !/^([01]\d|2[0-3]):[0-5]\d$/.test(sendAtTime)) {
     return { ok: false, error: '送る時刻はHH:MMで指定してください' };
   }
+  const leapYearPolicy = body.leapYearPolicy == null
+    ? undefined
+    : (LEAP_YEAR_POLICIES as readonly string[]).includes(body.leapYearPolicy as string)
+      ? body.leapYearPolicy as 'feb28' | 'mar1' | 'skip'
+      : undefined;
+  if (body.leapYearPolicy != null && leapYearPolicy === undefined) {
+    return { ok: false, error: '2月29日の扱いが正しくありません' };
+  }
   return {
     ok: true,
     value: {
@@ -444,6 +465,7 @@ function readDraftSettings(
       triggerFieldId: typeof body.triggerFieldId === 'string' && body.triggerFieldId ? body.triggerFieldId : null,
       triggerEventId: typeof body.triggerEventId === 'string' && body.triggerEventId ? body.triggerEventId : null,
       repeatYearly: body.repeatYearly === true,
+      leapYearPolicy,
       triggerOffsetMinutes,
       sendAtTime,
       targetTagId: typeof body.targetTagId === 'string' && body.targetTagId ? body.targetTagId : null,
@@ -495,13 +517,20 @@ async function validateReminderDraftReferences(
   return null;
 }
 
-function versionResponse(row: ReminderVersionRow) {
+function versionResponse(row: ReminderVersionRow, fallbackLeapYearPolicy?: 'feb28' | 'mar1' | 'skip') {
+  const settings = parseReminderVersionSettings(row);
+  // 419 より前に保存された版には leapYearPolicy が無い。その場合は
+  // reminders 行の現在値（移行で 'mar1' が入っている）を見せる。
+  // 画面の既定 'feb28' で埋めると、開いて保存するだけで方針が無断で変わる。
+  if (settings.leapYearPolicy === undefined && fallbackLeapYearPolicy) {
+    settings.leapYearPolicy = fallbackLeapYearPolicy;
+  }
   return {
     reminderId: row.reminder_id,
     versionId: row.id,
     versionNumber: Number(row.version_number),
     status: row.status,
-    settings: parseReminderVersionSettings(row),
+    settings,
     lastTestStatus: row.last_test_status,
     lastTestedAt: row.last_tested_at,
     publishedAt: row.published_at,
@@ -700,6 +729,8 @@ reminders.post('/api/reminders/drafts', requireRole('owner', 'admin'), async (c)
     if (folderError) return c.json({ success: false, error: folderError }, 422);
     const referenceError = await validateReminderDraftReferences(c.env.DB, parsed.value);
     if (referenceError) return c.json({ success: false, error: referenceError }, 422);
+    // 新規作成で省略された方針は要件の既定 'feb28'。
+    parsed.value.leapYearPolicy ??= 'feb28';
     const created = await createReminderWithDraftVersion(c.env.DB, parsed.value);
     return c.json({
       success: true,
@@ -732,12 +763,15 @@ reminders.get('/api/reminders/:id', async (c) => {
         lifecycleStatus: reminder.lifecycle_status,
         currentDraftVersionId: reminder.current_draft_version_id,
         currentPublishedVersionId: reminder.current_published_version_id,
-        publishedVersion: publishedVersion ? versionResponse(publishedVersion) : null,
+        publishedVersion: publishedVersion
+          ? versionResponse(publishedVersion, reminder.leap_year_policy)
+          : null,
         triggerType: reminder.trigger_type ?? 'manual',
         deliveryMode: reminder.delivery_mode ?? 'countdown',
         triggerFieldId: reminder.trigger_field_id ?? null,
         triggerEventId: reminder.trigger_event_id ?? null,
         repeatYearly: reminder.repeat_yearly === 1,
+        leapYearPolicy: reminder.leap_year_policy,
         triggerOffsetMinutes: reminder.trigger_offset_minutes ?? null,
         sendAtTime: reminder.send_at_time ?? null,
         targetTagId: reminder.target_tag_id ?? null,
@@ -767,7 +801,10 @@ reminders.get('/api/reminders/:id/draft', async (c) => {
   try {
     const draft = await getReminderDraftVersion(c.env.DB, c.req.param('id'));
     if (!draft) return c.json({ success: false, error: '下書きが見つかりません' }, 404);
-    return c.json({ success: true, data: versionResponse(draft) });
+    const reminderRow = await c.env.DB.prepare(
+      `SELECT leap_year_policy FROM reminders WHERE id = ?`,
+    ).bind(c.req.param('id')).first<{ leap_year_policy: 'feb28' | 'mar1' | 'skip' }>();
+    return c.json({ success: true, data: versionResponse(draft, reminderRow?.leap_year_policy) });
   } catch (err) {
     console.error('GET /api/reminders/:id/draft error:', err);
     return c.json({ success: false, error: '下書きを読み込めませんでした' }, 500);
@@ -788,6 +825,20 @@ reminders.put('/api/reminders/:id/draft', requireRole('owner', 'admin'), async (
     if (referenceError) return c.json({ success: false, error: referenceError }, 422);
     // N-080: 画面を開いたときの下書き版を送ってもらい、先に別の保存・公開が
     // 走っていたら 409 で止める。古い画面からの上書き保存を防ぐ。
+    if (parsed.value.leapYearPolicy === undefined) {
+      const currentDraft = await getReminderDraftVersion(c.env.DB, c.req.param('id'));
+      const current = currentDraft
+        ? parseReminderVersionSettings(currentDraft).leapYearPolicy
+        : undefined;
+      if (current) {
+        parsed.value.leapYearPolicy = current;
+      } else {
+        const row = await c.env.DB.prepare(
+          `SELECT leap_year_policy FROM reminders WHERE id = ?`,
+        ).bind(c.req.param('id')).first<{ leap_year_policy: 'feb28' | 'mar1' | 'skip' }>();
+        parsed.value.leapYearPolicy = row?.leap_year_policy ?? 'feb28';
+      }
+    }
     const expectedVersionId = rawBody && typeof rawBody === 'object' && !Array.isArray(rawBody)
       && typeof (rawBody as Record<string, unknown>).expectedVersionId === 'string'
       ? (rawBody as Record<string, unknown>).expectedVersionId as string

@@ -33,6 +33,9 @@ export default function NewReminderPage() {
   const [triggerType, setTriggerType] = useState<ReminderTriggerType>('booking')
   const [triggerFieldId, setTriggerFieldId] = useState('')
   const [triggerEventId, setTriggerEventId] = useState('')
+  const [repeatYearly, setRepeatYearly] = useState(false)
+  // N-068: 2月29日が基準日のときの平年の扱い。要件の既定は 2/28。
+  const [leapYearPolicy, setLeapYearPolicy] = useState<'feb28' | 'mar1' | 'skip'>('feb28')
   const [dateFields, setDateFields] = useState<FriendField[]>([])
   const [fieldsLoadState, setFieldsLoadState] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
   const [events, setEvents] = useState<EventListItem[]>([])
@@ -47,7 +50,7 @@ export default function NewReminderPage() {
    * N-080: 名前・メモ・起点を入れた状態で画面を離れるとき確認する。
    * フォルダは初期値が自動で入るので dirty の判定には入れない。
    */
-  const dirty = Boolean(name.trim() || description.trim() || triggerFieldId || triggerEventId)
+  const dirty = Boolean(name.trim() || description.trim() || triggerFieldId || triggerEventId || repeatYearly)
   const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty, busy: saving })
 
   useEffect(() => {
@@ -106,7 +109,9 @@ export default function NewReminderPage() {
         folderId: folderId || null, triggerType, deliveryMode: 'time',
         triggerFieldId: triggerType === 'friend_field' ? triggerFieldId || null : null,
         triggerEventId: triggerType === 'event' ? triggerEventId || null : null,
-        repeatYearly: false, triggerOffsetMinutes: null, sendAtTime: '18:00', targetTagId: null,
+        repeatYearly: triggerType === 'friend_field' ? repeatYearly : false,
+        leapYearPolicy,
+        triggerOffsetMinutes: null, sendAtTime: '18:00', targetTagId: null,
         stopConditions: { bookingCancelled: true, supportMarkCompleted: true, daysAfterTarget: 7, friendBlocked: true },
         steps: [{ stableStepId: crypto.randomUUID(), offsetMinutes: 0, offsetDays: -1, sendAtTime: '18:00', messageType: 'text', messageContent: '明日のGoogle Meet相談のご案内です。' }],
       }
@@ -161,6 +166,33 @@ export default function NewReminderPage() {
                 </div>
               </Field>
               {fieldsLoadState === 'ready' && dateFields.length === 0 ? <small>このアカウントに日付型の情報欄がまだありません。友だち情報欄から追加してください。</small> : null}
+              <div className="mt-3">
+                <label className="flex items-center gap-2 text-sm font-bold text-ink">
+                  <input
+                    type="checkbox"
+                    checked={repeatYearly}
+                    onChange={(event) => setRepeatYearly(event.target.checked)}
+                    aria-label="毎年くり返す"
+                  />
+                  毎年くり返す（誕生日・契約更新日など）
+                </label>
+                {repeatYearly ? (
+                  <div className="mt-2">
+                    <Field label="2月29日が基準日のとき" note="うるう年は2月29日に届きます。平年の扱いを選んでください。">
+                      <SelectField
+                        value={leapYearPolicy}
+                        onChange={(event) => setLeapYearPolicy(event.target.value as 'feb28' | 'mar1' | 'skip')}
+                        aria-label="2月29日が基準日のときの平年の扱い"
+                        options={[
+                          { value: 'feb28', label: '2月28日に届ける' },
+                          { value: 'mar1', label: '3月1日に届ける' },
+                          { value: 'skip', label: 'その年は届けない' },
+                        ]}
+                      />
+                    </Field>
+                  </div>
+                ) : null}
+              </div>
             </div>
           ) : null}
           {triggerType === 'event' ? (

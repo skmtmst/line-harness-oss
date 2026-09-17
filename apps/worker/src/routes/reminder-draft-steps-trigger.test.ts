@@ -84,7 +84,11 @@ function reminderRow(overrides: Record<string, unknown> = {}) {
  * 参照存在チェック用の最小DB。events への問い合わせだけ結果を差し替える。
  * その他の SELECT は件数0を返す (対象者数の集計に使われる)。
  */
-function dbWithEvent(event: { id: string } | null) {
+function dbWithEvent(
+  event: { id: string } | null,
+  options: { field?: { id: string } | null; leapYearPolicy?: string } = {},
+) {
+  const { field = null, leapYearPolicy } = options
   return {
     prepare(query: string) {
       return {
@@ -92,6 +96,10 @@ function dbWithEvent(event: { id: string } | null) {
           return {
             async first() {
               if (query.includes('FROM events')) return event
+              if (query.includes('FROM friend_fields')) return field
+              if (query.includes('leap_year_policy FROM reminders')) {
+                return leapYearPolicy ? { leap_year_policy: leapYearPolicy } : null
+              }
               if (query.includes('COUNT')) return { count: 3 }
               return null
             },
@@ -181,6 +189,86 @@ describe('下書き保存の楽観ロック', () => {
       success: false,
       error: 'この下書きは別の画面で先に更新されました。最新の内容を読み込み直してください',
     })
+  })
+})
+
+describe('2月29日の扱い（3択）', () => {
+  it('下書き保存で leapYearPolicy を保存層へ渡す', async () => {
+    mocks.saveDraft.mockResolvedValue(versionRow())
+    const response = await createApp(dbWithEvent(null, { field: { id: 'f-1' } })).request('/api/reminders/r-1/draft', {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(draft({ triggerType: 'friend_field', triggerFieldId: 'f-1', repeatYearly: true, leapYearPolicy: 'skip' })),
+    })
+    expect(response.status).toBe(200)
+    const settings = mocks.saveDraft.mock.calls[0][2] as { leapYearPolicy: string }
+    expect(settings.leapYearPolicy).toBe('skip')
+  })
+
+  it('3択以外の leapYearPolicy は保存しない', async () => {
+    const response = await createApp(dbWithEvent(null)).request('/api/reminders/r-1/draft', {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(draft({ leapYearPolicy: 'feb29' })),
+    })
+    expect(response.status).toBe(400)
+    expect(mocks.saveDraft).not.toHaveBeenCalled()
+  })
+
+  it('省略時は今の下書きの方針を守る（旧クライアントの保存で無断変更しない）', async () => {
+    mocks.getDraft.mockResolvedValue(versionRow({
+      settings_snapshot: JSON.stringify(draft({ leapYearPolicy: 'mar1' })),
+    }))
+    mocks.saveDraft.mockResolvedValue(versionRow())
+    const response = await createApp(dbWithEvent(null)).request('/api/reminders/r-1/draft', {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(draft()),
+    })
+    expect(response.status).toBe(200)
+    const settings = mocks.saveDraft.mock.calls[0][2] as { leapYearPolicy: string }
+    expect(settings.leapYearPolicy).toBe('mar1')
+  })
+
+  it('省略かつ旧版に方針が無ければ reminders 行の値を守る', async () => {
+    const oldSnapshot = draft()
+    delete (oldSnapshot as Record<string, unknown>).leapYearPolicy
+    mocks.getDraft.mockResolvedValue(versionRow({ settings_snapshot: JSON.stringify(oldSnapshot) }))
+    mocks.saveDraft.mockResolvedValue(versionRow())
+    const response = await createApp(dbWithEvent(null, { leapYearPolicy: 'skip' })).request('/api/reminders/r-1/draft', {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(draft()),
+    })
+    expect(response.status).toBe(200)
+    const settings = mocks.saveDraft.mock.calls[0][2] as { leapYearPolicy: string }
+    expect(settings.leapYearPolicy).toBe('skip')
+  })
+
+  it('419より前の版（方針キー無し）のGETは reminders 行の値で埋める', async () => {
+    const oldSnapshot = draft({ triggerType: 'friend_field', triggerFieldId: 'f-1', repeatYearly: true })
+    delete (oldSnapshot as Record<string, unknown>).leapYearPolicy
+    mocks.getDraft.mockResolvedValue(versionRow({ settings_snapshot: JSON.stringify(oldSnapshot) }))
+    mocks.getReminder.mockResolvedValue(reminderRow({ trigger_type: 'friend_field', leap_year_policy: 'mar1' }))
+    const response = await createApp(dbWithEvent(null, { leapYearPolicy: 'mar1' })).request('/api/reminders/r-1/draft')
+    expect(response.status).toBe(200)
+    const body = await response.json() as { data: { settings: { leapYearPolicy: string } } }
+    expect(body.data.settings.leapYearPolicy).toBe('mar1')
+  })
+
+  it('毎年くり返す友だち情報欄起点で方針が壊れている版は公開前検査を通さない', async () => {
+    mocks.getDraft.mockResolvedValue(versionRow({
+      settings_snapshot: JSON.stringify(draft({
+        triggerType: 'friend_field', triggerFieldId: 'f-1', repeatYearly: true, leapYearPolicy: 'broken',
+      })),
+    }))
+    const response = await createApp(dbWithEvent(null, { field: { id: 'f-1' } })).request('/api/reminders/r-1/validate', {
+      method: 'POST',
+    })
+    expect(response.status).toBe(200)
+    const body = await response.json() as { data: { valid: boolean; checks: Array<{ key: string; status: string }> } }
+    expect(body.data.checks.find((item) => item.key === 'leap_year_policy')).toMatchObject({ status: 'failed' })
+    expect(body.data.valid).toBe(false)
   })
 })
 
