@@ -91,19 +91,21 @@ export async function startTwoFactorChallenge(
   return challengeToken;
 }
 
-export function twoFactorLoginUrl(c: Context<Env>, challengeToken: string): string {
+export function twoFactorLoginUrl(c: Context<Env>, challengeToken: string, next?: string | null): string {
   const base = c.env.ADMIN_PUBLIC_URL?.replace(/\/+$/, '');
   if (!base) throw new Error('ADMIN_PUBLIC_URL is not configured');
   const url = new URL(`${base}/login/two-factor`);
+  if (next === 'ops') url.searchParams.set('next', 'ops');
   url.hash = new URLSearchParams({ lh_2fa: challengeToken }).toString();
   return url.toString();
 }
 
 /** TOTP未登録の管理者向け。画面は `/login/two-factor/setup#lh_2fa=` で受け取る。 */
-export function twoFactorSetupUrl(c: Context<Env>, challengeToken: string): string {
+export function twoFactorSetupUrl(c: Context<Env>, challengeToken: string, next?: string | null): string {
   const base = c.env.ADMIN_PUBLIC_URL?.replace(/\/+$/, '');
   if (!base) throw new Error('ADMIN_PUBLIC_URL is not configured');
   const url = new URL(`${base}/login/two-factor/setup`);
+  if (next === 'ops') url.searchParams.set('next', 'ops');
   url.hash = new URLSearchParams({ lh_2fa: challengeToken }).toString();
   return url.toString();
 }

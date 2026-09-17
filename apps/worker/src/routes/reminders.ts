@@ -35,7 +35,7 @@ import {
   type ReminderVersionRow,
   type ReminderDeliveryRunStatus,
 } from '@line-crm/db';
-import { LEAP_YEAR_POLICIES } from '@line-crm/shared';
+import { LEAP_YEAR_POLICIES, REMINDER_NAME_MAX_LENGTH, REMINDER_NAME_TOO_LONG_MESSAGE } from '@line-crm/shared';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
@@ -132,6 +132,58 @@ function publicReminder(row: ReminderListRow, stepCount?: number, hasFailure?: b
 function escapedLike(value: string): string {
   return value.replace(/[\\%_]/g, '\\$&');
 }
+
+/*
+ * N-072: 一覧の並び順。画面の `sort` 値をここで列へ写す。
+ * 画面から来た文字列をそのまま ORDER BY へ入れない（SQL 注入になるので、
+ * 白名簿以外は 400 で止める）。
+ */
+const REMINDER_LIST_SORTS: Record<string, { orderBy: string; meta: ReadonlyArray<{ field: string; direction: 'asc' | 'desc' }> }> = {
+  order: {
+    orderBy: 'r.display_order ASC, r.created_at DESC, r.id ASC',
+    meta: [
+      { field: 'displayOrder', direction: 'asc' },
+      { field: 'createdAt', direction: 'desc' },
+      { field: 'id', direction: 'asc' },
+    ],
+  },
+  next: {
+    orderBy: `CASE WHEN EXISTS (
+                SELECT 1 FROM reminder_delivery_runs upcoming
+                WHERE upcoming.reminder_id = r.id
+                  AND upcoming.status IN ('queued', 'retry_wait')
+              ) THEN 0 ELSE 1 END,
+              (SELECT MIN(upcoming.scheduled_at) FROM reminder_delivery_runs upcoming
+               WHERE upcoming.reminder_id = r.id
+                 AND upcoming.status IN ('queued', 'retry_wait')),
+              r.id ASC`,
+    meta: [
+      { field: 'nextScheduledAt', direction: 'asc' },
+      { field: 'id', direction: 'asc' },
+    ],
+  },
+  created: {
+    orderBy: 'r.created_at DESC, r.id ASC',
+    meta: [
+      { field: 'createdAt', direction: 'desc' },
+      { field: 'id', direction: 'asc' },
+    ],
+  },
+  updated: {
+    orderBy: 'r.updated_at DESC, r.id ASC',
+    meta: [
+      { field: 'updatedAt', direction: 'desc' },
+      { field: 'id', direction: 'asc' },
+    ],
+  },
+  name: {
+    orderBy: 'LOWER(r.name) ASC, r.id ASC',
+    meta: [
+      { field: 'name', direction: 'asc' },
+      { field: 'id', direction: 'asc' },
+    ],
+  },
+};
 
 function runDurationMs(startedAt: string | null, completedAt: string | null): number | null {
   if (!startedAt || !completedAt) return null;
@@ -362,6 +414,11 @@ function readDraftSettings(
   const name = typeof body.name === 'string' ? body.name.trim() : '';
   const lineAccountId = typeof body.lineAccountId === 'string' ? body.lineAccountId.trim() : '';
   if (!name) return { ok: false, error: 'リマインダ名を入力してください' };
+  // N-078: 画面の maxLength と同じ上限をサーバーでも守る。画面だけだと
+  // API を直接叩かれたときに上限を越えた名前が入る。
+  if (name.length > REMINDER_NAME_MAX_LENGTH) {
+    return { ok: false, error: REMINDER_NAME_TOO_LONG_MESSAGE, status: 422 };
+  }
   if (!lineAccountId) return { ok: false, error: 'LINEアカウントを選んでください' };
   if (!TRIGGER_TYPES.includes(body.triggerType as TriggerType)) {
     return { ok: false, error: '基準日の種類が正しくありません' };
@@ -586,7 +643,7 @@ reminders.get('/api/reminders', requireRole('owner', 'admin', 'staff'), async (c
     const q = (c.req.query('q') ?? '').trim().toLocaleLowerCase('ja-JP');
     const folderId = c.req.query('folderId') ?? '';
     const status = c.req.query('status') ?? '';
-    const usesListContract = ['page', 'limit', 'q', 'folderId', 'status']
+    const usesListContract = ['page', 'limit', 'q', 'folderId', 'status', 'sort']
       .some((key) => c.req.query(key) !== undefined);
 
     if (usesListContract) {
@@ -609,9 +666,20 @@ reminders.get('/api/reminders', requireRole('owner', 'admin', 'staff'), async (c
         clauses.push(accountParts.length > 0 ? `(${accountParts.join(' OR ')})` : '1 = 0');
       }
       if (q) {
-        clauses.push(`(LOWER(r.name) LIKE ? ESCAPE '\\' OR LOWER(COALESCE(r.description, '')) LIKE ? ESCAPE '\\')`);
+        // N-077: 「名前・内容で検索」と画面が言う以上、通知本文も対象にする。
+        // JOIN だと通の数だけ行が増えて total がずれるので EXISTS で検査する。
+        // 本文は公開済みが reminder_steps、まだ公開していない下書きが
+        // current_draft_version_id のぶら下がる reminder_version_steps にある。
+        clauses.push(`(LOWER(r.name) LIKE ? ESCAPE '\\' OR LOWER(COALESCE(r.description, '')) LIKE ? ESCAPE '\\'
+          OR EXISTS (SELECT 1 FROM reminder_steps search_steps
+            WHERE search_steps.reminder_id = r.id
+              AND LOWER(search_steps.message_content) LIKE ? ESCAPE '\\')
+          OR EXISTS (SELECT 1 FROM reminder_versions draft_version
+            JOIN reminder_version_steps draft_steps ON draft_steps.reminder_version_id = draft_version.id
+            WHERE draft_version.id = r.current_draft_version_id
+              AND LOWER(draft_steps.message_content) LIKE ? ESCAPE '\\'))`);
         const searchPattern = `%${escapedLike(q)}%`;
-        bindings.push(searchPattern, searchPattern);
+        bindings.push(searchPattern, searchPattern, searchPattern, searchPattern);
       }
       if (folderId === '__unfiled__') clauses.push('r.folder_id IS NULL');
       else if (folderId) {
@@ -626,6 +694,11 @@ reminders.get('/api/reminders', requireRole('owner', 'admin', 'staff'), async (c
       else if (status === 'stopped') clauses.push(`(r.lifecycle_status = 'stopped' OR r.is_active = 0)`);
       else if (status) return c.json({ success: false, error: 'status is invalid' }, 400);
 
+      // N-072: 並び順は画面の選択をそのままSQLへ流さず、白名簿で列へ写す。
+      const sortKey = c.req.query('sort') ?? 'order';
+      const sortSpec = REMINDER_LIST_SORTS[sortKey];
+      if (!sortSpec) return c.json({ success: false, error: 'sort is invalid' }, 400);
+
       const where = clauses.join(' AND ');
       const totalRow = await c.env.DB
         .prepare(`SELECT COUNT(*) AS total FROM reminders r WHERE ${where}`)
@@ -637,7 +710,7 @@ reminders.get('/api/reminders', requireRole('owner', 'admin', 'staff'), async (c
             EXISTS (SELECT 1 FROM reminder_delivery_runs failed
               WHERE failed.reminder_id = r.id AND failed.status IN ('retry_wait', 'permanent_failed')) AS has_failure
           FROM reminders r WHERE ${where}
-          ORDER BY r.display_order ASC, r.created_at DESC, r.id ASC
+          ORDER BY ${sortSpec.orderBy}
           LIMIT ? OFFSET ?`)
         .bind(...bindings, paging.limit, paging.offset)
         .all<ReminderListRow>();
@@ -647,11 +720,7 @@ reminders.get('/api/reminders', requireRole('owner', 'admin', 'staff'), async (c
           items: result.results.map((row) => publicReminder(row)),
           total: Number(totalRow?.total ?? 0),
           paging,
-          sort: [
-            { field: 'displayOrder', direction: 'asc' },
-            { field: 'createdAt', direction: 'desc' },
-            { field: 'id', direction: 'asc' },
-          ],
+          sort: sortSpec.meta,
         }),
       });
     }
@@ -1105,7 +1174,12 @@ reminders.post('/api/reminders', requireRole('owner', 'admin'), async (c) => {
       description?: string;
       lineAccountId?: string | null;
     } & Record<string, unknown>>();
-    if (!body.name) return c.json({ success: false, error: 'name is required' }, 400);
+    // N-078: 下書き保存と同じ規則で、前後空白を落としてから上限を数える。
+    const name = typeof body.name === 'string' ? body.name.trim() : '';
+    if (!name) return c.json({ success: false, error: 'name is required' }, 400);
+    if (name.length > REMINDER_NAME_MAX_LENGTH) {
+      return c.json({ success: false, error: REMINDER_NAME_TOO_LONG_MESSAGE }, 422);
+    }
     if (typeof body.lineAccountId !== 'string' || !body.lineAccountId.trim()) {
       return c.json({ success: false, error: 'LINEアカウントを選んでください' }, 400);
     }
@@ -1124,14 +1198,14 @@ reminders.post('/api/reminders', requireRole('owner', 'admin'), async (c) => {
       }
       const result = await createReminderIdempotent(c.env.DB, {
         lineAccountId: body.lineAccountId.trim(),
-        name: body.name,
+        name,
         description: typeof body.description === 'string' ? body.description : undefined,
         trigger: trigger.value,
         requestKey,
       });
       return c.json(result.body, result.status);
     }
-    const item = await createReminder(c.env.DB, { ...body, ...trigger.value });
+    const item = await createReminder(c.env.DB, { ...body, name, ...trigger.value });
     // Save line_account_id if provided
     if (body.lineAccountId) {
       await c.env.DB.prepare(`UPDATE reminders SET line_account_id = ? WHERE id = ?`)
@@ -1164,6 +1238,16 @@ reminders.put('/api/reminders/:id', requireRole('owner', 'admin'), async (c) => 
     }
     const folderError = await validateReminderFolder(c.env.DB, trigger.value.folderId);
     if (folderError) return c.json({ success: false, error: folderError }, 422);
+    // N-078: 名前の更新も作成と同じ上限で止める。画面の maxLength だけでは
+    // API を直接叩かれたときに抜ける。
+    if (body.name !== undefined) {
+      const name = typeof body.name === 'string' ? body.name.trim() : '';
+      if (!name) return c.json({ success: false, error: 'リマインダ名を入力してください' }, 400);
+      if (name.length > REMINDER_NAME_MAX_LENGTH) {
+        return c.json({ success: false, error: REMINDER_NAME_TOO_LONG_MESSAGE }, 422);
+      }
+      body.name = name;
+    }
     await updateReminder(c.env.DB, id, { ...body, ...trigger.value });
     const updated = await getReminderById(c.env.DB, id);
     if (!updated) return c.json({ success: false, error: 'Not found' }, 404);

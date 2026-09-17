@@ -83,6 +83,34 @@ function adminLoginUrl(c: Context<Env>, error?: string, next?: string | null): s
   return `${base}${path}${error ? `?error=${encodeURIComponent(error)}` : ''}`;
 }
 
+function authFailureDetail(error: unknown): { name: string; message: string } {
+  return error instanceof Error
+    ? { name: error.name, message: error.message }
+    : { name: 'UnknownError', message: 'Unknown failure' };
+}
+
+function logAuthFailure(branch: string, error: unknown): void {
+  console.error('[admin-auth] authentication branch failed', {
+    branch,
+    ...authFailureDetail(error),
+  });
+}
+
+async function recordLoginAuditBestEffort(c: Context<Env>, staffId: string): Promise<void> {
+  try {
+    await recordLoginAudit(c.env.DB, {
+      adminUserId: staffId,
+      action: 'login',
+      ip: clientIp(c),
+      userAgent: c.req.header('user-agent') ?? null,
+    });
+  } catch (error) {
+    // 監査台帳の一時障害で、発行済みセッションや認証成功を失敗扱いにしない。
+    // Cookie・OAuth code・token・LINE user id はログへ出さない。
+    logAuthFailure('recordLoginAudit', error);
+  }
+}
+
 adminAuth.get('/api/auth/line', async (c) => {
   const config = resolveAdminAuthConfig(c.env, { requestOrigin: new URL(c.req.url).origin });
   if (config.misconfigured) return c.json({ success: false, error: config.misconfigured }, 500);
@@ -152,9 +180,9 @@ adminAuth.get('/api/auth/line/callback', async (c) => {
         code_verifier: verifier,
       }),
     });
-    if (!tokenResponse.ok) return c.redirect(adminLoginUrl(c, 'line_login_failed'));
+    if (!tokenResponse.ok) return c.redirect(adminLoginUrl(c, 'line_token_failed', next));
     const tokens = await tokenResponse.json<{ id_token?: string }>();
-    if (!tokens.id_token) return c.redirect(adminLoginUrl(c, 'line_login_failed'));
+    if (!tokens.id_token) return c.redirect(adminLoginUrl(c, 'line_id_token_missing', next));
 
     const verifyResponse = await fetch('https://api.line.me/oauth2/v2.1/verify', {
       method: 'POST',
@@ -165,9 +193,9 @@ adminAuth.get('/api/auth/line/callback', async (c) => {
         nonce,
       }),
     });
-    if (!verifyResponse.ok) return c.redirect(adminLoginUrl(c, 'line_login_failed'));
+    if (!verifyResponse.ok) return c.redirect(adminLoginUrl(c, 'line_verify_failed', next));
     const profile = await verifyResponse.json<{ sub?: string }>();
-    if (!profile.sub) return c.redirect(adminLoginUrl(c, 'line_login_failed'));
+    if (!profile.sub) return c.redirect(adminLoginUrl(c, 'line_profile_missing', next));
 
     let staff = await getStaffByLineUserId(c.env.DB, profile.sub);
     if (!staff && invite) {
@@ -210,21 +238,35 @@ adminAuth.get('/api/auth/line/callback', async (c) => {
 
     const config = resolveAdminAuthConfig(c.env, { requestOrigin: new URL(c.req.url).origin });
     if (config.misconfigured) return c.redirect(adminLoginUrl(c, 'configuration_error', next));
-    // LINE でログインしたときは LINE 側で本人確認が済んでいるため、運営コンソール
-    // 向けは 2 要素の確認を省く（要件 §3 37-1・9 章「要確認」）。
-    if (next !== 'ops' && twoFactorRequired(staff)) {
-      if (!c.env.TOTP_ENCRYPTION_KEY) return c.redirect(adminLoginUrl(c, 'configuration_error'));
-      const challengeToken = await startTwoFactorChallenge(c, staff.id, { purpose: 'verify', remember });
-      return c.redirect(twoFactorLoginUrl(c, challengeToken));
+    if (twoFactorRequired(staff)) {
+      if (!c.env.TOTP_ENCRYPTION_KEY) return c.redirect(adminLoginUrl(c, 'configuration_error', next));
+      try {
+        const challengeToken = await startTwoFactorChallenge(c, staff.id, { purpose: 'verify', remember });
+        return c.redirect(twoFactorLoginUrl(c, challengeToken, next));
+      } catch (error) {
+        logAuthFailure('startTwoFactorChallenge', error);
+        return c.redirect(adminLoginUrl(c, 'line_login_failed', next));
+      }
     }
-    // 管理者束（owner/admin・閲覧専用でない）はTOTP登録が必須。未登録のまま
-    // 通常セッションは渡さず、設定専用の合言葉だけを返す（N-426）。
-    if (next !== 'ops' && staffRequiresMfa(staff)) {
-      if (!c.env.TOTP_ENCRYPTION_KEY) return c.redirect(adminLoginUrl(c, 'configuration_error'));
-      const challengeToken = await startTwoFactorChallenge(c, staff.id, { purpose: 'setup', remember });
-      return c.redirect(twoFactorSetupUrl(c, challengeToken));
+    // 運営コンソールは役割束に関係なくTOTP必須。統括側は従来どおり
+    // 管理者束（owner/admin・閲覧専用でない）だけを設定へ回す（N-426）。
+    if (next === 'ops' || staffRequiresMfa(staff)) {
+      if (!c.env.TOTP_ENCRYPTION_KEY) return c.redirect(adminLoginUrl(c, 'configuration_error', next));
+      try {
+        const challengeToken = await startTwoFactorChallenge(c, staff.id, { purpose: 'setup', remember });
+        return c.redirect(twoFactorSetupUrl(c, challengeToken, next));
+      } catch (error) {
+        logAuthFailure('startTwoFactorChallenge', error);
+        return c.redirect(adminLoginUrl(c, 'line_login_failed', next));
+      }
     }
-    const session = await issueSession(c, staff.id, config.sameSite, remember);
+    let session: Awaited<ReturnType<typeof issueSession>>;
+    try {
+      session = await issueSession(c, staff.id, config.sameSite, remember);
+    } catch (error) {
+      logAuthFailure('issueSession', error);
+      return c.redirect(adminLoginUrl(c, 'line_login_failed', next));
+    }
     const adminUrl = new URL(c.env.ADMIN_PUBLIC_URL!.replace(/\/+$/, ''));
     if (next === 'ops') adminUrl.pathname = `${adminUrl.pathname.replace(/\/+$/, '')}/ops`;
     if (config.crossSite) {
@@ -233,15 +275,10 @@ adminAuth.get('/api/auth/line/callback', async (c) => {
         lh_csrf: session.csrfToken,
       }).toString();
     }
-    await recordLoginAudit(c.env.DB, {
-      adminUserId: staff.id,
-      action: 'login',
-      ip: clientIp(c),
-      userAgent: c.req.header('user-agent') ?? null,
-    });
+    await recordLoginAuditBestEffort(c, staff.id);
     return c.redirect(adminUrl.toString());
   } catch (error) {
-    console.error('[admin-auth] LINE Login callback failed', error);
+    logAuthFailure('lineCallback', error);
     return c.redirect(adminLoginUrl(c, 'line_login_failed', next));
   }
 });
@@ -291,13 +328,14 @@ adminAuth.post('/api/auth/two-factor/verify', async (c) => {
     return c.json({ success: false, error: 'この認証コードは使用済みです。次のコードを入力してください' }, 409);
   }
   await deleteTwoFactorChallenge(c.env.DB, tokenHash);
-  const session = await issueSession(c, staff.id, config.sameSite, challenge.remember === 1);
-  await recordLoginAudit(c.env.DB, {
-    adminUserId: staff.id,
-    action: 'login',
-    ip: clientIp(c),
-    userAgent: c.req.header('user-agent') ?? null,
-  });
+  let session: Awaited<ReturnType<typeof issueSession>>;
+  try {
+    session = await issueSession(c, staff.id, config.sameSite, challenge.remember === 1);
+  } catch (error) {
+    logAuthFailure('issueSession', error);
+    return c.json({ success: false, error: 'ログイン状態を作成できませんでした。ログインからやり直してください' }, 500);
+  }
+  await recordLoginAuditBestEffort(c, staff.id);
   return c.json({
     success: true,
     // Same-site deployments keep the credential HttpOnly. Only the documented
@@ -407,13 +445,14 @@ adminAuth.post('/api/auth/two-factor/setup/confirm', async (c) => {
   await activatePlatformAdminIfAwaitingTotp(c.env.DB, staff.id);
   await deleteTwoFactorChallenge(c.env.DB, tokenHash);
 
-  const session = await issueSession(c, staff.id, config.sameSite, challenge.remember === 1);
-  await recordLoginAudit(c.env.DB, {
-    adminUserId: staff.id,
-    action: 'login',
-    ip: clientIp(c),
-    userAgent: c.req.header('user-agent') ?? null,
-  });
+  let session: Awaited<ReturnType<typeof issueSession>>;
+  try {
+    session = await issueSession(c, staff.id, config.sameSite, challenge.remember === 1);
+  } catch (error) {
+    logAuthFailure('issueSession', error);
+    return c.json({ success: false, error: 'ログイン状態を作成できませんでした。ログインからやり直してください' }, 500);
+  }
+  await recordLoginAuditBestEffort(c, staff.id);
   return c.json({
     success: true,
     data: { sessionToken: config.crossSite ? session.sessionToken : undefined },

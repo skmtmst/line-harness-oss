@@ -84,4 +84,14 @@ describe('Deploy Cloudflare Staging workflow', () => {
     expect(workflow).not.toContain('d1 migrations apply');
     expect(workflow).not.toContain('apply-d1-migrations');
   });
+
+  it('counts staging D1 migrations and blocks apply while any are pending', () => {
+    expect(workflow).toContain('name: Count pending staging D1 migrations');
+    expect(workflow).toContain('--command "SELECT name FROM _migrations" --json');
+    expect(workflow).toContain('pending_count=$((pending_count + 1))');
+    expect(workflow).toContain('検証D1の未適用マイグレーション: ${pending_count} 件');
+    expect(workflow).toContain('if [ "$DELIVERY_MODE" = "apply" ] && [ "$pending_count" -ne 0 ]');
+    expect(workflow).toContain('Migrate D1を先に実行してください。');
+    expect(workflow).not.toContain('CREATE TABLE IF NOT EXISTS _migrations');
+  });
 });

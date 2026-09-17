@@ -439,8 +439,7 @@ export function ecTextMessage(event: EcEvent, options?: EcMessageOptions): Messa
 }
 
 ecIntegrations.post('/api/integrations/eccube/events', async (c) => {
-  const lineAccountId = c.req.header('x-line-account-id')?.trim();
-  if (!lineAccountId) return c.json({ success: false, error: 'LINE account is required' }, 400);
+  const requestedLineAccountId = c.req.header('x-line-account-id')?.trim();
   const secret = c.env.ECCUBE_WEBHOOK_SECRET;
   if (!secret || secret.length < 32) {
     console.error('[ec-event] ECCUBE_WEBHOOK_SECRET is missing or too short');
@@ -455,13 +454,31 @@ ecIntegrations.post('/api/integrations/eccube/events', async (c) => {
   const rawBody = await c.req.text();
   if (utf8Length(rawBody) > MAX_BODY_BYTES) return c.json({ success: false, error: 'Payload too large' }, 413);
 
+  let lineAccountId = requestedLineAccountId;
+  if (!lineAccountId) {
+    const activeAccounts = await c.env.DB.prepare(
+      `SELECT id
+         FROM line_accounts
+        WHERE is_active = 1 AND archived_at IS NULL
+        ORDER BY id
+        LIMIT 2`,
+    ).all<{ id: string }>();
+    if (activeAccounts.results.length !== 1) {
+      return c.json({ success: false, error: 'LINE account is required' }, 400);
+    }
+    lineAccountId = activeAccounts.results[0]!.id;
+  }
+
   const timestamp = c.req.header('x-nen-timestamp') || '';
   const signature = (c.req.header('x-nen-signature') || '').replace(/^sha256=/i, '');
   const timestampSeconds = Number(timestamp);
   if (!Number.isInteger(timestampSeconds) || Math.abs(Date.now() / 1000 - timestampSeconds) > MAX_CLOCK_SKEW_SECONDS) {
     return c.json({ success: false, error: 'Expired request' }, 401);
   }
-  const expected = await hmacHex(secret, `${timestamp}.${lineAccountId}.${rawBody}`);
+  const signedPayload = requestedLineAccountId
+    ? `${timestamp}.${lineAccountId}.${rawBody}`
+    : `${timestamp}.${rawBody}`;
+  const expected = await hmacHex(secret, signedPayload);
   if (!constantTimeHexEqual(signature.toLowerCase(), expected)) {
     return c.json({ success: false, error: 'Invalid signature' }, 401);
   }
