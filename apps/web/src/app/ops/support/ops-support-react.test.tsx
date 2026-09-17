@@ -3,7 +3,8 @@ import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import OpsSupportPage, { compareLabel, durationLabel, elapsedLabel } from './page'
+import OpsSupportPage from './page'
+import { compareLabel, durationLabel, elapsedLabel } from './format'
 
 vi.mock('next/link', () => ({ default: ({ children }: { children: React.ReactNode }) => <a>{children}</a> }))
 
