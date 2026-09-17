@@ -36,6 +36,11 @@ export interface FolderAddDialogProps {
    * 入れる項目が同じで、離すと文言や色の並びがまたずれるため。
    */
   folder?: Folder
+  /**
+   * フォルダの持ち主のLINE公式アカウント。アカウント単位の kind
+   * （template など）では必ず渡す。渡さないと共有（未所属）のフォルダになる。
+   */
+  accountId?: string | null
   /** 窓の下に出す一言。「消しても中身は未分類に残る」など。 */
   note?: string
   /** 例に出す名前。 */
@@ -48,6 +53,7 @@ export interface FolderAddDialogProps {
 export default function FolderAddDialog({
   kind,
   folder,
+  accountId,
   note,
   placeholder = '例: 01_キャンペーン',
   onClose,
@@ -68,8 +74,8 @@ export default function FolderAddDialog({
       // 名前だけ直して選んだ色を捨てる以前の挙動へ戻さない。
       const folderUpdates = { name: trimmed, color }
       const res = folder
-        ? await api.folders.update(folder.id, folderUpdates)
-        : await api.folders.create({ kind, name: trimmed, color })
+        ? await api.folders.update(folder.id, folderUpdates, accountId ?? undefined)
+        : await api.folders.create({ kind, name: trimmed, color, accountId })
       if (!res.success) {
         setError(res.error)
         return

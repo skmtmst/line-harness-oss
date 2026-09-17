@@ -724,6 +724,35 @@ const spec = {
     '/api/ops/members/{staffId}': {
       patch: { tags: ['Ops Console'], summary: '運営メンバーの停止・再開', parameters: [{ name: 'staffId', in: 'path', required: true, schema: { type: 'string' } }], requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['isActive'], properties: { isActive: { type: 'boolean' } } } } } }, responses: { '200': { description: 'Updated' }, '400': { description: 'Self or last member' }, '404': { description: 'Staff not found' } } },
     },
+    // ── Ops Console: お問い合わせ（★V6 37-6） ────────────────────────────
+    '/api/ops/support/summary': {
+      get: { tags: ['Ops Console'], summary: 'お問い合わせの状態別件数と数値カード（未対応・初回返信・解決率・解決時間）', responses: { '200': { description: 'Counts by stage and KPIs' } } },
+    },
+    '/api/ops/support/tickets': {
+      get: { tags: ['Ops Console'], summary: 'チケット一覧（状態・優先度・検索・並び替え）', parameters: [
+        { name: 'stage', in: 'query', required: false, schema: { type: 'string', enum: ['all', 'new', 'in_progress', 'waiting', 'resolved', 'closed'] } },
+        { name: 'priority', in: 'query', required: false, schema: { type: 'string', enum: ['low', 'medium', 'high'] } },
+        { name: 'q', in: 'query', required: false, schema: { type: 'string' } },
+        { name: 'sort', in: 'query', required: false, schema: { type: 'string', enum: ['newest', 'oldest', 'priority'] } },
+        { name: 'limit', in: 'query', required: false, schema: { type: 'integer' } },
+        { name: 'offset', in: 'query', required: false, schema: { type: 'integer' } },
+      ], responses: { '200': { description: 'Tickets with total' } } },
+      post: { tags: ['Ops Console'], summary: '運営が代わりに起票する', requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['tenantId', 'subject', 'body'], properties: { tenantId: { type: 'string' }, subject: { type: 'string' }, body: { type: 'string' }, kind: { type: 'string' }, priority: { type: 'string', enum: ['low', 'medium', 'high'] }, channel: { type: 'string', enum: ['ops', 'line'] }, staffId: { type: 'string' } } } } } }, responses: { '201': { description: 'Created' }, '400': { description: 'Validation error' }, '404': { description: 'Staff not found' } } },
+    },
+    '/api/ops/support/tickets/{id}': {
+      get: { tags: ['Ops Console'], summary: 'チケットの内容・やり取り・下書き・契約先の状況（閲覧を監査に記録）', parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }], responses: { '200': { description: 'Ticket detail' }, '404': { description: 'Not found' } } },
+      patch: { tags: ['Ops Console'], summary: '状態・優先度を変える', parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }], requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', properties: { stage: { type: 'string', enum: ['new', 'in_progress', 'waiting', 'resolved', 'closed'] }, priority: { type: 'string', enum: ['low', 'medium', 'high'] } } } } } }, responses: { '200': { description: 'Updated' }, '400': { description: 'Validation error' }, '404': { description: 'Not found' } } },
+    },
+    '/api/ops/support/tickets/{id}/reply': {
+      post: { tags: ['Ops Console'], summary: '返信する（登録メールへ送り、統括の履歴に載せる）', parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }], requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['body'], properties: { body: { type: 'string' }, nextStage: { type: 'string' }, aiAssisted: { type: 'boolean' } } } } } }, responses: { '201': { description: 'Replied' }, '400': { description: 'Validation error' }, '404': { description: 'Not found' }, '409': { description: 'Closed ticket' } } },
+    },
+    '/api/ops/support/tickets/{id}/draft': {
+      put: { tags: ['Ops Console'], summary: '返信の下書きを保存する（空なら削除）', parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }], requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', properties: { body: { type: 'string' } } } } } }, responses: { '200': { description: 'Saved' }, '404': { description: 'Not found' } } },
+      delete: { tags: ['Ops Console'], summary: '返信の下書きを消す', parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }], responses: { '200': { description: 'Deleted' }, '404': { description: 'Not found' } } },
+    },
+    '/api/ops/support/tickets/{id}/draft/ai': {
+      post: { tags: ['Ops Console'], summary: 'AI（Workers AI）で返信の下書きを作る', parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }], responses: { '201': { description: 'Draft generated' }, '404': { description: 'Not found' }, '502': { description: 'AI failed' }, '503': { description: 'AI not configured' } } },
+    },
     '/api/hq/operator-history': {
       get: { tags: ['HQ Support'], summary: '契約先から見える運営の操作履歴（書き込みを伴ったものだけ）', responses: { '200': { description: 'Visible operator actions for the caller tenant' } } },
     },
@@ -816,6 +845,29 @@ const spec = {
           { name: 'runId', in: 'path', required: true, schema: { type: 'string' } },
         ],
         responses: { '200': { description: 'Distribution result' }, '403': { description: 'Owner or admin role required' }, '404': { description: 'Not found' } },
+      },
+    },
+    // ── Analytics ──────────────────────────────────────────────────────────
+    '/api/analytics/report-schedules/{id}': {
+      put: {
+        tags: ['Analytics'], summary: '定期レポートの内容を更新（楽観ロック: expectedUpdatedAt 必須、1回限りの依頼は不可）',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['expectedUpdatedAt'], properties: { expectedUpdatedAt: { type: 'string' }, name: { type: 'string' }, cadence: { type: 'string', enum: ['weekly', 'monthly'] }, weekday: { type: 'integer', minimum: 0, maximum: 6 }, monthDay: { type: 'integer', minimum: 1, maximum: 31 }, sendTime: { type: 'string' }, timeZone: { type: 'string' }, channels: { type: 'array', items: { type: 'string' } }, savedAnalysisIds: { type: 'array', items: { type: 'string' } }, recipients: { type: 'array', items: { type: 'object' } } } } } } },
+        responses: { '200': { description: 'Updated report schedule' }, '403': { description: 'Owner or admin role required' }, '404': { description: 'Not found' }, '409': { description: 'Updated elsewhere first' }, '422': { description: 'Validation failed' } },
+      },
+    },
+    '/api/analytics/report-schedules/{id}/status': {
+      put: {
+        tags: ['Analytics'], summary: '定期レポートの停止・再開・しまう（楽観ロック: expectedUpdatedAt 必須。再開は次回を未来へ置き直す）',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['status', 'expectedUpdatedAt'], properties: { status: { type: 'string', enum: ['paused', 'active', 'archived'] }, expectedUpdatedAt: { type: 'string' } } } } } },
+        responses: { '200': { description: 'Updated report schedule' }, '403': { description: 'Owner or admin role required' }, '404': { description: 'Not found' }, '409': { description: 'Updated elsewhere first' }, '422': { description: 'Validation failed' } },
       },
     },
     // ── Friends ─────────────────────────────────────────────────────────────

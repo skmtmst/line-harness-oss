@@ -8,6 +8,8 @@ import {
   markHqSupportRequestNotified,
   type HqSupportKind,
   type HqSupportRequest,
+  formatTicketNo,
+  listSupportMessages,
 } from '@line-crm/db';
 import type { Env } from '../index.js';
 import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
@@ -47,7 +49,9 @@ function workerUrl(c: Context<Env>): string {
   return c.env.WORKER_URL || new URL(c.req.url).origin;
 }
 
-function serialize(row: HqSupportRequest, base: string) {
+type ReplyView = { id: string; authorName: string; body: string; createdAt: string };
+
+function serialize(row: HqSupportRequest, base: string, replies: ReplyView[] = []) {
   let keys: string[] = [];
   try {
     const parsed = JSON.parse(row.attachment_keys) as unknown;
@@ -67,6 +71,10 @@ function serialize(row: HqSupportRequest, base: string) {
     staffName: row.staff_name,
     notified: row.notified_at !== null,
     createdAt: row.created_at,
+    // 運営側のチケット番号と返信（★V6 37-6 の返信は統括の履歴にも載る）
+    ticketLabel: formatTicketNo(row.ticket_no ?? null),
+    stage: row.stage,
+    replies,
   };
 }
 
@@ -96,7 +104,14 @@ hqSupport.get('/api/hq/support/requests', async (c) => {
   try {
     const rows = await listHqSupportRequests(c.env.DB, tenantOf(c));
     const base = workerUrl(c);
-    return c.json({ success: true, data: rows.map((row) => serialize(row, base)) });
+    const data = await Promise.all(rows.map(async (row) => {
+      const messages = await listSupportMessages(c.env.DB, row.id);
+      const replies = messages
+        .filter((m) => m.author_kind === 'ops')
+        .map((m) => ({ id: m.id, authorName: m.author_name, body: m.body, createdAt: m.created_at }));
+      return serialize(row, base, replies);
+    }));
+    return c.json({ success: true, data });
   } catch (err) {
     console.error('GET /api/hq/support/requests error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);

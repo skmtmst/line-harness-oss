@@ -13,6 +13,7 @@ import { cleanup, render, screen, waitFor } from '@testing-library/react'
 const fixture = vi.hoisted(() => ({
   selectedAccountId: 'acc-1' as string | null,
   templatesCalls: [] as unknown[],
+  foldersCalls: [] as unknown[],
 }))
 
 vi.mock('@/contexts/account-context', () => ({
@@ -37,7 +38,10 @@ vi.mock('@/lib/api', () => ({
       },
     },
     folders: {
-      list: async () => ({ success: true, data: [] }),
+      list: async (...args: unknown[]) => {
+        fixture.foldersCalls.push(args)
+        return { success: true, data: [] }
+      },
     },
   },
 }))
@@ -47,6 +51,7 @@ const { default: TemplatePicker } = await import('./template-picker')
 afterEach(() => {
   cleanup()
   fixture.templatesCalls = []
+  fixture.foldersCalls = []
 })
 
 describe('テンプレート選択の口座絞り(N-136)', () => {
@@ -58,6 +63,18 @@ describe('テンプレート選択の口座絞り(N-136)', () => {
       expect(fixture.templatesCalls.length).toBeGreaterThan(0)
     })
     const last = fixture.templatesCalls[fixture.templatesCalls.length - 1] as unknown[]
+    expect(last[1]).toBe('acc-1')
+  })
+
+  test('置き場一覧も選択中のアカウントIDを渡す（N-147）', async () => {
+    await act(async () => {
+      render(<TemplatePicker open onClose={() => {}} onPick={() => {}} />)
+    })
+    await waitFor(() => {
+      expect(fixture.foldersCalls.length).toBeGreaterThan(0)
+    })
+    const last = fixture.foldersCalls[fixture.foldersCalls.length - 1] as unknown[]
+    expect(last[0]).toBe('template')
     expect(last[1]).toBe('acc-1')
   })
 

@@ -4434,6 +4434,77 @@ export type OpsMemberSummary = {
 
 export type OperatorHistoryRow = { id: string; action: string; operatorName: string; reason: string | null; createdAt: string }
 
+/** 運営コンソールのお問い合わせ（★V6 37-6）。形は `apps/worker/src/routes/ops-support.ts`。 */
+export type OpsSupportStage = 'new' | 'in_progress' | 'waiting' | 'resolved' | 'closed'
+export type OpsSupportPriority = 'low' | 'medium' | 'high'
+export type OpsSupportChannel = 'admin' | 'line' | 'ops'
+export type OpsSupportAttachment = { key: string; url: string; name: string }
+export type OpsSupportTicket = {
+  id: string
+  ticketNo: number | null
+  ticketLabel: string
+  tenantId: string
+  tenantName: string
+  tenantPlanKey: string | null
+  tenantPlanStatus: string
+  tenantStatus: string
+  staffId: string | null
+  staffName: string
+  staffRole: string | null
+  staffEmailRegistered: boolean
+  kind: string
+  kindLabel: string
+  subject: string
+  subjectAuto: boolean
+  body: string
+  attachments: OpsSupportAttachment[]
+  stage: OpsSupportStage
+  stageLabel: string
+  priority: OpsSupportPriority
+  priorityLabel: string
+  channel: OpsSupportChannel
+  channelLabel: string
+  assigneeStaffId: string | null
+  replyCount: number
+  firstRepliedAt: string | null
+  lastMessageAt: string
+  resolvedAt: string | null
+  closedAt: string | null
+  createdAt: string
+  updatedAt: string
+}
+export type OpsSupportMessage = {
+  id: string
+  authorKind: 'tenant' | 'ops'
+  authorName: string
+  body: string
+  attachments: OpsSupportAttachment[]
+  aiAssisted: boolean
+  deliveredVia: string[]
+  createdAt: string
+}
+export type OpsSupportDraft = { body: string; aiGenerated: boolean; generatedAt: string | null; updatedAt: string }
+export type OpsSupportSummary = {
+  byStage: Record<OpsSupportStage | 'all', number>
+  kpis: {
+    untouched: number
+    untouchedFromLine: number
+    avgFirstReplyMinutes: number | null
+    prevAvgFirstReplyMinutes: number | null
+    resolutionRate: number | null
+    prevResolutionRate: number | null
+    avgResolutionMinutes: number | null
+    prevAvgResolutionMinutes: number | null
+  }
+}
+export type OpsSupportDetail = {
+  ticket: OpsSupportTicket
+  tenant: { accountCount: number; staffCount: number; staffWithLine: number; pastTickets: number; pastOpen: number }
+  messages: OpsSupportMessage[]
+  draft: OpsSupportDraft | null
+  ai: { available: boolean }
+}
+
 export const api = {
   system: {
     health: () =>
@@ -5054,6 +5125,20 @@ export const api = {
       > & { sendOnce?: boolean }) => fetchApi<ApiResponse<AnalyticsReportSchedule>>(
         `/api/analytics/report-schedules?account_id=${encodeURIComponent(accountId)}`,
         { method: 'POST', body: JSON.stringify(data) },
+      ),
+      update: (accountId: string, id: string, data: Omit<
+        AnalyticsReportSchedule,
+        'id' | 'lineAccountId' | 'status' | 'isOneTime' | 'nextRunAt' | 'createdBy' | 'createdAt' | 'updatedAt'
+      > & { expectedUpdatedAt: string }) => fetchApi<ApiResponse<AnalyticsReportSchedule>>(
+        `/api/analytics/report-schedules/${encodeURIComponent(id)}?account_id=${encodeURIComponent(accountId)}`,
+        { method: 'PUT', body: JSON.stringify(data) },
+      ),
+      setStatus: (accountId: string, id: string, data: {
+        status: 'active' | 'paused' | 'archived'
+        expectedUpdatedAt: string
+      }) => fetchApi<ApiResponse<AnalyticsReportSchedule>>(
+        `/api/analytics/report-schedules/${encodeURIComponent(id)}/status?account_id=${encodeURIComponent(accountId)}`,
+        { method: 'PUT', body: JSON.stringify(data) },
       ),
     },
     friendsOverview: (accountId: string, params?: { from?: string; to?: string }) =>
@@ -5718,19 +5803,19 @@ export const api = {
     list: (kind?: string, accountId?: string) =>
       fetchApi<ApiResponse<Folder[]> & { unfiledCount?: number }>(`/api/folders${kind ? `?kind=${kind}` : ''}${kind && accountId ? `&account_id=${encodeURIComponent(accountId)}` : ''}`),
     /** 色（#RRGGBB）はフォルダに付く。中身の印にこの色が出る。 */
-    create: (data: { kind: string; name: string; parentId?: string | null; color?: string | null }) =>
+    create: (data: { kind: string; name: string; parentId?: string | null; color?: string | null; accountId?: string | null }) =>
       fetchApi<ApiResponse<Folder>>('/api/folders', {
         method: 'POST',
         body: JSON.stringify(data),
       }),
-    update: (id: string, data: { name?: string; parentId?: string | null; displayOrder?: number }) =>
-      fetchApi<ApiResponse<Folder>>(`/api/folders/${id}`, {
+    update: (id: string, data: { name?: string; parentId?: string | null; displayOrder?: number }, accountId?: string) =>
+      fetchApi<ApiResponse<Folder>>(`/api/folders/${id}${accountId ? `?account_id=${encodeURIComponent(accountId)}` : ''}`, {
         method: 'PATCH',
         body: JSON.stringify(data),
       }),
     /** 中身は消えず未分類に戻る。子フォルダは一緒に消える。 */
-    delete: (id: string) =>
-      fetchApi<ApiResponse<null>>(`/api/folders/${id}`, { method: 'DELETE' }),
+    delete: (id: string, accountId?: string) =>
+      fetchApi<ApiResponse<null>>(`/api/folders/${id}${accountId ? `?account_id=${encodeURIComponent(accountId)}` : ''}`, { method: 'DELETE' }),
   },
   tagGroups: {
     list: (accountId?: string | null) => fetchApi<ApiResponse<TagGroup[]>>(
@@ -6416,6 +6501,34 @@ export const api = {
       fetchApi<ApiResponse<{ staffId: string; activationState: OpsMemberActivationState }>>(`/api/ops/members/${encodeURIComponent(staffId)}/resend-invite`, { method: 'POST', body: JSON.stringify({}) }),
     setMemberActive: (staffId: string, isActive: boolean) =>
       fetchApi<ApiResponse<{ staffId: string; isActive: boolean }>>(`/api/ops/members/${encodeURIComponent(staffId)}`, { method: 'PATCH', body: JSON.stringify({ isActive }) }),
+    /** お問い合わせ（チケット）★V6 37-6。 */
+    support: {
+      summary: () => fetchApi<ApiResponse<OpsSupportSummary>>('/api/ops/support/summary'),
+      tickets: (params?: { stage?: OpsSupportStage | 'all'; priority?: OpsSupportPriority; q?: string; sort?: 'newest' | 'oldest' | 'priority'; limit?: number; offset?: number }) => {
+        const query = new URLSearchParams()
+        if (params?.stage) query.set('stage', params.stage)
+        if (params?.priority) query.set('priority', params.priority)
+        if (params?.q) query.set('q', params.q)
+        if (params?.sort) query.set('sort', params.sort)
+        if (params?.limit) query.set('limit', String(params.limit))
+        if (params?.offset) query.set('offset', String(params.offset))
+        const qs = query.toString()
+        return fetchApi<ApiResponse<OpsSupportTicket[]> & { total: number }>(`/api/ops/support/tickets${qs ? `?${qs}` : ''}`)
+      },
+      ticket: (id: string) => fetchApi<ApiResponse<OpsSupportDetail>>(`/api/ops/support/tickets/${encodeURIComponent(id)}`),
+      update: (id: string, input: { stage?: OpsSupportStage; priority?: OpsSupportPriority }) =>
+        fetchApi<ApiResponse<OpsSupportTicket>>(`/api/ops/support/tickets/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify(input) }),
+      reply: (id: string, input: { body: string; nextStage?: OpsSupportStage; aiAssisted?: boolean }) =>
+        fetchApi<ApiResponse<{ ticket: OpsSupportTicket; message: OpsSupportMessage; mailSent: boolean; mailSkippedReason: 'no_email' | 'send_failed' | null }>>(`/api/ops/support/tickets/${encodeURIComponent(id)}/reply`, { method: 'POST', body: JSON.stringify(input) }),
+      saveDraft: (id: string, body: string) =>
+        fetchApi<ApiResponse<OpsSupportDraft | null>>(`/api/ops/support/tickets/${encodeURIComponent(id)}/draft`, { method: 'PUT', body: JSON.stringify({ body }) }),
+      deleteDraft: (id: string) =>
+        fetchApi<ApiResponse<null>>(`/api/ops/support/tickets/${encodeURIComponent(id)}/draft`, { method: 'DELETE' }),
+      aiDraft: (id: string) =>
+        fetchApi<ApiResponse<OpsSupportDraft>>(`/api/ops/support/tickets/${encodeURIComponent(id)}/draft/ai`, { method: 'POST', body: '{}' }),
+      create: (input: { tenantId: string; subject: string; body: string; kind?: string; priority?: OpsSupportPriority; channel?: 'ops' | 'line'; staffId?: string }) =>
+        fetchApi<ApiResponse<OpsSupportTicket>>('/api/ops/support/tickets', { method: 'POST', body: JSON.stringify(input) }),
+    },
   },
   /** 契約先（統括）から見える運営の操作履歴。書き込みを伴ったものだけ。 */
   operatorHistory: () => fetchApi<ApiResponse<OperatorHistoryRow[]>>('/api/hq/operator-history'),

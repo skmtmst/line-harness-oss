@@ -59,11 +59,11 @@ export async function getFolders(
   scope?: FolderItemCountScope,
 ): Promise<Folder[]> {
   if (scope) {
-    // Account-owned rows are never public. Only tag/webinar legacy rows have
+    // Account-owned rows are never public. Only tag/webinar/template legacy rows have
     // the unassigned policy; other existing folder kinds keep their old list.
     const ids = accountId ? scope.allowedAccountIds.filter((id) => id === accountId) : scope.allowedAccountIds;
     const own = ids.length ? `account_id IN (${ids.map(() => "?").join(",")})` : "0";
-    const legacy = scope.canSeeUnassigned ? "account_id IS NULL" : "(account_id IS NULL AND kind NOT IN ('tag', 'webinar'))";
+    const legacy = scope.canSeeUnassigned ? "account_id IS NULL" : "(account_id IS NULL AND kind NOT IN ('tag', 'webinar', 'template'))";
     const result = await db.prepare(`SELECT * FROM folders WHERE (${own} OR ${legacy})${kind ? " AND kind = ?" : ""}
       ORDER BY kind ASC, display_order ASC, name ASC`).bind(...ids, ...(kind ? [kind] : [])).all<Folder>();
     return result.results;

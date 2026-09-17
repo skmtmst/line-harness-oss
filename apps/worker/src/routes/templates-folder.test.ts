@@ -52,6 +52,7 @@ const env = { DB: {} as D1Database };
 const TEMPLATE_FOLDER = {
   id: 'fld-1',
   kind: 'template',
+  account_id: 'account-1',
   name: 'お知らせ',
   parent_id: null,
   display_order: 0,
@@ -85,6 +86,10 @@ function put(body: Record<string, unknown>) {
 beforeEach(() => {
   vi.clearAllMocks();
   accountAccess.canAccessAllLineAccounts.mockResolvedValue(true);
+  accountAccess.getVisibleLineAccountScope.mockResolvedValue({
+    allowedAccountIds: ['account-1'],
+    canSeeUnassigned: true,
+  });
   mocks.getTemplateById.mockResolvedValue({
     id: 'tpl-1',
     line_account_id: 'account-1',

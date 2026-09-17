@@ -1,4 +1,5 @@
 import { jstNow } from './utils.js';
+import { nextSupportTicketNo } from './ops-support.js';
 
 /**
  * 統括から運営へのお問い合わせ（36-3）。
@@ -26,6 +27,17 @@ export interface HqSupportRequest {
   notified_at: string | null;
   created_at: string;
   updated_at: string;
+  // 運営コンソール向け（migration 421）
+  ticket_no: number | null;
+  stage: 'new' | 'in_progress' | 'waiting' | 'resolved' | 'closed';
+  priority: 'low' | 'medium' | 'high';
+  channel: 'admin' | 'line' | 'ops';
+  subject_auto: number;
+  assignee_staff_id: string | null;
+  first_replied_at: string | null;
+  last_message_at: string | null;
+  resolved_at: string | null;
+  closed_at: string | null;
 }
 
 export async function listHqSupportRequests(
@@ -69,11 +81,14 @@ export async function createHqSupportRequest(
 ): Promise<HqSupportRequest> {
   const id = crypto.randomUUID();
   const now = jstNow();
+  // 運営側のチケット番号（★V6 37-6）。統括の画面にも同じ番号を出す。
+  const ticketNo = await nextSupportTicketNo(db);
   await db
     .prepare(
       `INSERT INTO hq_support_requests
-         (id, tenant_id, staff_id, staff_name, staff_email, kind, subject, body, line_account_id, attachment_keys, status, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'open', ?, ?)`,
+         (id, tenant_id, staff_id, staff_name, staff_email, kind, subject, body, line_account_id, attachment_keys, status,
+          ticket_no, stage, priority, channel, last_message_at, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'open', ?, 'new', 'medium', 'admin', ?, ?, ?)`,
     )
     .bind(
       id,
@@ -86,6 +101,8 @@ export async function createHqSupportRequest(
       input.body,
       input.lineAccountId,
       JSON.stringify(input.attachmentKeys),
+      ticketNo,
+      now,
       now,
       now,
     )

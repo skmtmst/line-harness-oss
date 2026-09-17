@@ -130,19 +130,21 @@ function TemplateDetailInner() {
       key: `auto-reply-${u.id}`,
       kind: '自動応答',
       name: u.keyword,
-      href: '/auto-replies',
+      href: `/auto-replies/edit?id=${u.id}`,
     })),
     ...(usage?.scenarioSteps ?? []).map((u) => ({
       key: `scenario-step-${u.stepId}`,
       kind: 'シナリオ配信',
       name: `${u.scenarioName} ／ ステップ${u.stepOrder}`,
-      href: '/scenarios',
+      href: `/scenarios/detail?id=${u.scenarioId}`,
     })),
     ...(usage?.automations ?? []).map((u) => ({
       key: `automation-${u.id}`,
       kind: 'オートメーション',
       name: u.name,
-      href: '/automations',
+      // 旧形式のオートメーションには開ける画面が無い
+      // （/automations は新形式のみ、/automations/drafts は別ID空間）。
+      href: null as string | null,
     })),
     ...(usage?.reminderSteps ?? []).map((u) => ({
       key: `reminder-step-${u.reminderId}-${u.stepId}`,
@@ -226,9 +228,13 @@ function TemplateDetailInner() {
                         <p className="text-ink-faint text-xs">{u.kind}</p>
                         <p className="text-ink truncate text-sm">{u.name}</p>
                       </div>
-                      <Link href={u.href} className="text-accent shrink-0 text-xs hover:underline">
-                        開く
-                      </Link>
+                      {u.href ? (
+                        <Link href={u.href} className="text-accent shrink-0 text-xs hover:underline">
+                          開く
+                        </Link>
+                      ) : (
+                        <span className="text-ink-faint shrink-0 text-xs">開ける画面がありません</span>
+                      )}
                     </li>
                   ))}
                 </ul>

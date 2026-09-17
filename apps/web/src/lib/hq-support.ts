@@ -18,6 +18,10 @@ export interface HqSupportRequest {
   staffName: string
   notified: boolean
   createdAt: string
+  /** 運営側のチケット番号（#MB-0312）。古い行は番号なし。 */
+  ticketLabel?: string
+  /** 運営からの返信（★V6 37-6）。登録メールにも同じ内容が届く。 */
+  replies?: Array<{ id: string; authorName: string; body: string; createdAt: string }>
 }
 
 export const SUPPORT_SUBJECT_MAX = 100
