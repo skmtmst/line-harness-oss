@@ -9,6 +9,7 @@ import {
   permissionForApiPath,
 } from './auth.js';
 import { resolveCorsOrigin } from './admin-auth-config.js';
+import { requirePlatformAdmin } from './platform-admin.js';
 import { adminAuth } from '../routes/admin-auth.js';
 import { encryptTotpSecret, totpAtStep } from '../lib/totp.js';
 import type { Env } from '../index.js';
@@ -16,7 +17,9 @@ import type { Env } from '../index.js';
 vi.mock('@line-crm/db', () => ({
   // 代理ログイン（★V6 37-5）。ここでは常に「無し」。
   getActiveImpersonation: vi.fn(async () => null),
-  getPlatformAdminByStaffId: vi.fn(async () => null),
+  getPlatformAdminByStaffId: vi.fn(async (_db: unknown, staffId: string) => staffId === 'ops-staff-1'
+    ? { staff_id: staffId, is_active: 1, activation_state: 'active' }
+    : null),
   getPlatformAdminRecord: vi.fn(async () => null),
   getStaffByApiKey: vi.fn(async (_db: unknown, token: string) => {
     if (token === 'viewer-key') return { id: 'viewer-1', name: 'Viewer One', role: 'staff', access_level: 'read_only' };
@@ -40,6 +43,7 @@ vi.mock('@line-crm/db', () => ({
     if (token === 'photo-download-key') return { id: 'photo-download-1', name: 'Photo Downloader', role: 'staff', permission_keys: '["photo.original.download"]' };
     if (token === 'rich-menus-key') return { id: 'rich-menus-1', name: 'Rich Menu Staff', role: 'staff', permission_keys: '["/rich-menus"]' };
     if (token === 'no-permissions-key') return { id: 'none-1', name: 'No Permission Staff', role: 'staff', permission_keys: '[]' };
+    if (token === 'ops-staff-key') return { id: 'ops-staff-1', name: 'Ops Staff', role: 'staff', permission_keys: '[]' };
     if (token !== 'staff-key') return null;
     return {
       id: 'staff-1', name: 'Staff One', role: 'admin',
@@ -118,6 +122,7 @@ function app() {
   a.route('/', adminAuth);
   a.get('/api/protected', (c) => c.json({ success: true, data: c.get('staff') }));
   a.post('/api/protected', (c) => c.json({ success: true, data: c.get('staff') }));
+  a.get('/api/ops/me', requirePlatformAdmin(), (c) => c.json({ success: true, data: c.get('staff') }));
   a.get('/api/auto-reply-runs', (c) => c.json({ success: true }));
   a.get('/api/automation-runs', (c) => c.json({ success: true }));
   a.get('/api/rich-menu-images/:key{.+}', (c) => c.json({ success: true }));
@@ -896,6 +901,16 @@ describe('N-423 staff deny-by-default (#670)', () => {
     expect(res.status).toBe(200);
     const body = await res.json() as { data: { role: string } };
     expect(body.data.role).toBe('staff');
+  });
+
+  test('運営会社の staff は通常の画面権限ではなく platform_admins で /api/ops を判定する', async () => {
+    const allowed = await app().request('/api/ops/me', staffBearer('ops-staff-key'), crossSiteEnv());
+    expect(allowed.status).toBe(200);
+    expect((await allowed.json() as { data: { id: string } }).data.id).toBe('ops-staff-1');
+
+    const denied = await app().request('/api/ops/me', staffBearer('no-permissions-key'), crossSiteEnv());
+    expect(denied.status).toBe(403);
+    expect((await denied.json() as { error: string }).error).toBe('運営コンソールを使う権限がありません');
   });
 
   test('追加した権限表の対応', () => {
