@@ -8424,10 +8424,16 @@ export const api = {
       }),
     getDraft: (id: string) =>
       fetchApi<ApiResponse<ReminderDraftVersion>>(`/api/reminders/${id}/draft`),
-    saveDraft: (id: string, settings: ReminderDraftSettings) =>
+    /**
+     * `expectedVersionId` を渡すと楽観ロックになる——画面を開いたときの
+     * 版とずれていれば409。別タブでの先勝ち保存を古い内容で上書きしない。
+     */
+    saveDraft: (id: string, settings: ReminderDraftSettings, options: { expectedVersionId?: string } = {}) =>
       fetchApi<ApiResponse<ReminderDraftVersion>>(`/api/reminders/${id}/draft`, {
         method: 'PUT',
-        body: JSON.stringify(settings),
+        body: JSON.stringify(options.expectedVersionId
+          ? { ...settings, expectedVersionId: options.expectedVersionId }
+          : settings),
       }),
     validateDraft: (id: string) =>
       fetchApi<ApiResponse<ReminderValidationResult>>(`/api/reminders/${id}/validate`, {

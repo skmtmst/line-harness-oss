@@ -2,9 +2,11 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import type { Folder, ReminderDraftSettings, ReminderTriggerType } from '@line-crm/shared'
-import { api } from '@/lib/api'
+import type { Folder, FriendField, ReminderDraftSettings, ReminderTriggerType } from '@line-crm/shared'
+import { api, eventsApi, type EventListItem } from '@/lib/api'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import Button from '@/components/shared/button'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
 import SelectField from '@/components/shared/select-field'
 import { TextArea, TextInput } from '@/components/shared/form-controls'
 import { TableHeadRow, Th } from '@/components/shared/table'
@@ -29,11 +31,24 @@ export default function NewReminderPage() {
   const [description, setDescription] = useState('')
   const [folderId, setFolderId] = useState('')
   const [triggerType, setTriggerType] = useState<ReminderTriggerType>('booking')
+  const [triggerFieldId, setTriggerFieldId] = useState('')
+  const [triggerEventId, setTriggerEventId] = useState('')
+  const [dateFields, setDateFields] = useState<FriendField[]>([])
+  const [fieldsLoadState, setFieldsLoadState] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
+  const [events, setEvents] = useState<EventListItem[]>([])
+  const [eventsLoadState, setEventsLoadState] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
   const [folders, setFolders] = useState<Folder[]>([])
   const [foldersLoadState, setFoldersLoadState] = useState<'loading' | 'ready' | 'error'>('loading')
   const [foldersReloadToken, setFoldersReloadToken] = useState(0)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+
+  /*
+   * N-080: 名前・メモ・起点を入れた状態で画面を離れるとき確認する。
+   * フォルダは初期値が自動で入るので dirty の判定には入れない。
+   */
+  const dirty = Boolean(name.trim() || description.trim() || triggerFieldId || triggerEventId)
+  const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty, busy: saving })
 
   useEffect(() => {
     let active = true
@@ -49,15 +64,48 @@ export default function NewReminderPage() {
     return () => { active = false }
   }, [foldersReloadToken])
 
+  /*
+   * N-074: 起点の候補は選んだ種類が必要になってから、そのアカウントの
+   * 実在データだけを読む。日付系以外の情報欄は起点にならないので外す。
+   * 読み直しは 'idle' へ戻すだけ。in-flight のGETを途中で打ち消すと、
+   * 'loading' へ遷移した瞬間のeffect再実行で自分の応答を捨ててしまう。
+   */
+  useEffect(() => {
+    if (triggerType !== 'friend_field' || !selectedAccountId || fieldsLoadState !== 'idle') return
+    setFieldsLoadState('loading')
+    void api.friendFields.list(selectedAccountId).then((res) => {
+      if (!res.success) return setFieldsLoadState('error')
+      setDateFields(res.data.filter((field) => field.type === 'date' || field.type === 'datetime'))
+      setFieldsLoadState('ready')
+    }).catch(() => setFieldsLoadState('error'))
+  }, [triggerType, selectedAccountId, fieldsLoadState])
+
+  useEffect(() => {
+    if (triggerType !== 'event' || !selectedAccountId || eventsLoadState !== 'idle') return
+    setEventsLoadState('loading')
+    void eventsApi.listEvents(selectedAccountId, { filter: 'all', limit: 100, sort: 'name' }).then((res) => {
+      setEvents(res.items)
+      setEventsLoadState('ready')
+    }).catch(() => setEventsLoadState('error'))
+  }, [triggerType, selectedAccountId, eventsLoadState])
+
   async function save() {
     if (accountLoading || !selectedAccountId) return setError('LINEアカウントを選んでください')
     if (!name.trim()) return setError('リマインダ名を入力してください')
+    if (triggerType === 'friend_field' && !triggerFieldId) {
+      return setError('基準日に使う友だち情報欄を選んでください')
+    }
+    if (triggerType === 'event' && !triggerEventId) {
+      return setError('基準日にするイベントを選んでください')
+    }
     setSaving(true)
     setError('')
     try {
       const settings: ReminderDraftSettings = {
         name: name.trim(), description: description.trim() || null, lineAccountId: selectedAccountId!,
-        folderId: folderId || null, triggerType, deliveryMode: 'time', triggerFieldId: null,
+        folderId: folderId || null, triggerType, deliveryMode: 'time',
+        triggerFieldId: triggerType === 'friend_field' ? triggerFieldId || null : null,
+        triggerEventId: triggerType === 'event' ? triggerEventId || null : null,
         repeatYearly: false, triggerOffsetMinutes: null, sendAtTime: '18:00', targetTagId: null,
         stopConditions: { bookingCancelled: true, supportMarkCompleted: true, daysAfterTarget: 7, friendBlocked: true },
         steps: [{ stableStepId: crypto.randomUUID(), offsetMinutes: 0, offsetDays: -1, sendAtTime: '18:00', messageType: 'text', messageContent: '明日のGoogle Meet相談のご案内です。' }],
@@ -94,6 +142,48 @@ export default function NewReminderPage() {
         </ReminderPanel>
         <ReminderPanel title="基準日の選択" note="予約日時・友だち情報欄の日付・フォーム回答日から選べます。">
           <div className={`${styles.baseChoices} grid gap-2 md:grid-cols-3`}><Choice selected={triggerType === 'booking'} title="予約日時を基準にする" note="予約管理・Google Meet相談の日時に連動します。" onClick={() => setTriggerType('booking')} /><Choice selected={triggerType === 'friend_field'} title="友だち情報欄の日付" note="誕生日・契約終了日など、日付型の情報欄を選びます。" onClick={() => setTriggerType('friend_field')} /><Choice selected={triggerType === 'event'} title="フォーム回答日" note="回答フォームに答えた日を起点にします。" onClick={() => setTriggerType('event')} /></div>
+          {triggerType === 'friend_field' ? (
+            <div className="mt-3">
+              <Field label="基準日に使う情報欄　必須" note="日付・日時型の項目だけを表示しています">
+                <div className="flex items-center gap-2">
+                  <SelectField
+                    value={triggerFieldId}
+                    onChange={(event) => setTriggerFieldId(event.target.value)}
+                    disabled={fieldsLoadState !== 'ready'}
+                    aria-label="基準日に使う情報欄"
+                    className={inputClass}
+                    options={[
+                      { value: '', label: fieldsLoadState === 'loading' || fieldsLoadState === 'idle' ? '情報欄を読み込み中' : fieldsLoadState === 'error' ? '情報欄を読み込めませんでした' : '選んでください' },
+                      ...dateFields.map((field) => ({ value: field.id, label: field.name })),
+                    ]}
+                  />
+                  {fieldsLoadState === 'error' ? <Button onClick={() => setFieldsLoadState('idle')}>再読み込み</Button> : null}
+                </div>
+              </Field>
+              {fieldsLoadState === 'ready' && dateFields.length === 0 ? <small>このアカウントに日付型の情報欄がまだありません。友だち情報欄から追加してください。</small> : null}
+            </div>
+          ) : null}
+          {triggerType === 'event' ? (
+            <div className="mt-3">
+              <Field label="基準日にするイベント　必須" note="このイベントの予約日時を起点にします">
+                <div className="flex items-center gap-2">
+                  <SelectField
+                    value={triggerEventId}
+                    onChange={(event) => setTriggerEventId(event.target.value)}
+                    disabled={eventsLoadState !== 'ready'}
+                    aria-label="基準日にするイベント"
+                    className={inputClass}
+                    options={[
+                      { value: '', label: eventsLoadState === 'loading' || eventsLoadState === 'idle' ? 'イベントを読み込み中' : eventsLoadState === 'error' ? 'イベントを読み込めませんでした' : '選んでください' },
+                      ...events.map((event) => ({ value: event.id, label: event.name })),
+                    ]}
+                  />
+                  {eventsLoadState === 'error' ? <Button onClick={() => setEventsLoadState('idle')}>再読み込み</Button> : null}
+                </div>
+              </Field>
+              {eventsLoadState === 'ready' && events.length === 0 ? <small>このアカウントにイベントがまだありません。イベント管理から作成してください。</small> : null}
+            </div>
+          ) : null}
         </ReminderPanel>
         <ReminderPanel title="ひな形から作る" note="よく使う組み合わせです。">
           <div className="overflow-hidden rounded-lg border border-hairline"><table className="w-full text-left text-xs"><thead className="bg-canvas-sunken text-ink-faint"><TableHeadRow><Th>ひな形</Th><Th>基準日</Th><Th>通知のタイミング</Th></TableHeadRow></thead><tbody className="divide-y divide-hairline">{templateRows.map(([title,note,base,timing]) => <tr key={title}><td className="p-2"><strong className="block text-ink">{title}</strong><span className="text-ink-faint">{note}</span></td><td>{base}</td><td>{timing}</td></tr>)}</tbody></table></div>
@@ -101,6 +191,7 @@ export default function NewReminderPage() {
         </div>
       </ReminderWorkspace>
       <ReminderFooter primary={saving ? '保存中…' : '対象設定へ'} primaryDisabled={saving} onPrimary={() => void save()} />
+      <ConfirmDialog open={leaveTarget !== null} title="入力中の内容があります" description="このまま移動すると、入力した内容は保存されません。移動しますか？" confirmLabel="保存せずに移動" cancelLabel="入力を続ける" onConfirm={confirmLeave} onCancel={cancelLeave} />
     </div>
   )
 }

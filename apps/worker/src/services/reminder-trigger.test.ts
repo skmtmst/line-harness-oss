@@ -11,6 +11,7 @@ const RULE: ReminderTriggerRow = {
   trigger_offset_minutes: null,
   send_at_time: null,
   target_tag_id: null,
+  trigger_event_id: null,
   current_published_version_id: 'version-1',
 };
 
@@ -183,5 +184,53 @@ describe('きっかけによる自動登録', () => {
       lineAccountId: 'account-1',
     })).rejects.toThrow('REMINDER_ACCOUNT_MISMATCH');
     expect(mocks.enroll).not.toHaveBeenCalled();
+  });
+
+  it('イベント限定ルールは、起こったイベントと一致するときだけ登録する', async () => {
+    const { db } = makeDb({ rules: [{ ...RULE, trigger_type: 'event', trigger_event_id: 'event-a' }] });
+    const wrongEvent = await enrollByTrigger(db, {
+      triggerType: 'event',
+      friendId: 'f-1',
+      startsAtIso: '2026-08-20T01:00:00.000Z',
+      eventId: 'event-b',
+      lineAccountId: 'account-1',
+    });
+    expect(wrongEvent).toBe(0);
+    expect(mocks.enroll).not.toHaveBeenCalled();
+
+    const rightEvent = await enrollByTrigger(db, {
+      triggerType: 'event',
+      friendId: 'f-1',
+      startsAtIso: '2026-08-20T01:00:00.000Z',
+      eventId: 'event-a',
+      lineAccountId: 'account-1',
+    });
+    expect(rightEvent).toBe(1);
+    expect(mocks.enroll).toHaveBeenCalledWith(db, expect.objectContaining({ reminderId: 'r-1' }));
+  });
+
+  it('イベント限定ルールへイベントidが来ないときは登録しない', async () => {
+    // 呼出元がイベントidを取りこぼしたとき、全イベントへ誤配信しない。
+    const { db } = makeDb({ rules: [{ ...RULE, trigger_type: 'event', trigger_event_id: 'event-a' }] });
+    const n = await enrollByTrigger(db, {
+      triggerType: 'event',
+      friendId: 'f-1',
+      startsAtIso: '2026-08-20T01:00:00.000Z',
+      lineAccountId: 'account-1',
+    });
+    expect(n).toBe(0);
+    expect(mocks.enroll).not.toHaveBeenCalled();
+  });
+
+  it('イベント無指定ルールはどのイベントでも登録する（従来動作）', async () => {
+    const { db } = makeDb({ rules: [{ ...RULE, trigger_type: 'event', trigger_event_id: null }] });
+    const n = await enrollByTrigger(db, {
+      triggerType: 'event',
+      friendId: 'f-1',
+      startsAtIso: '2026-08-20T01:00:00.000Z',
+      eventId: 'event-b',
+      lineAccountId: 'account-1',
+    });
+    expect(n).toBe(1);
   });
 });

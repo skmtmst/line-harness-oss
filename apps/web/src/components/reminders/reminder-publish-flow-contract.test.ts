@@ -61,7 +61,12 @@ describe('V6 リマインダの公開フロー', () => {
     for (const label of ['＋ フォルダを追加', 'ひな形を管理', 'このひな形を使う']) {
       expect(NEW_PAGE, `${label} が新規作成に描かれています`).not.toContain(`>${label}<`)
     }
-    for (const label of ['＋ 通知を追加', 'この通知を複製', 'この通知を削除', '通知イメージを見る', '＋ アクションを追加']) {
+    /*
+     * 追加・削除・並べ替えはN-066で実動作にした。描くのは問題なく、
+     * 動作は reminder-step-editor.react.test.tsx が保証する。
+     * まだ動かない「複製」「通知イメージを見る」は描かないままにする。
+     */
+    for (const label of ['この通知を複製', '通知イメージを見る', '＋ アクションを追加']) {
       expect(STEP_EDITOR, `${label} が通知編集に描かれています`).not.toContain(`>${label}<`)
     }
   })
