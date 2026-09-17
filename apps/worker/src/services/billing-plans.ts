@@ -32,6 +32,10 @@ export interface BillingPlan {
   fallbackYearlyYen: number;
   /** バナー生成の月間枚数。 */
   monthlyImages: number;
+  /** 配信の月間通数（features の「配信 月 N通」と同じ値。運営ダッシュボードの使用量に使う）。 */
+  monthlyMessages: number;
+  /** 登録メディアの容量（バイト）。features の「登録メディア NGB」と同じ値。 */
+  mediaBytes: number;
   /** 権限者の上限。null は無制限。 */
   maxStaff: number | null;
   /** 画面に出す内容の箇条書き。 */
@@ -49,6 +53,8 @@ export const BILLING_PLANS: BillingPlan[] = [
     fallbackMonthlyYen: 9800,
     fallbackYearlyYen: 99000,
     monthlyImages: 50,
+    monthlyMessages: 5_000,
+    mediaBytes: 5 * 1024 ** 3,
     maxStaff: 3,
     features: ['LINE公式アカウント 1', '権限者 3人', '配信 月 5,000通', 'バナー生成 月 50枚', '登録メディア 5GB'],
     cta: 'checkout',
@@ -60,6 +66,8 @@ export const BILLING_PLANS: BillingPlan[] = [
     fallbackMonthlyYen: 29800,
     fallbackYearlyYen: 303000,
     monthlyImages: 150,
+    monthlyMessages: 30_000,
+    mediaBytes: 30 * 1024 ** 3,
     maxStaff: 10,
     features: ['LINE公式アカウント 5', '権限者 10人', '配信 月 30,000通', 'バナー生成 月 150枚', '登録メディア 30GB', '統括ひな形の配布'],
     recommended: true,
@@ -72,6 +80,8 @@ export const BILLING_PLANS: BillingPlan[] = [
     fallbackMonthlyYen: 59800,
     fallbackYearlyYen: 609000,
     monthlyImages: 500,
+    monthlyMessages: 100_000,
+    mediaBytes: 200 * 1024 ** 3,
     maxStaff: null,
     features: ['LINE公式アカウント 無制限', '権限者 無制限', '配信 月 100,000通', 'バナー生成 月 500枚', '登録メディア 200GB', '優先サポート・API'],
     cta: 'checkout',

@@ -779,6 +779,15 @@ const spec = {
     '/api/ops/members/{staffId}': {
       patch: { tags: ['Ops Console'], summary: '運営メンバーの停止・再開', parameters: [{ name: 'staffId', in: 'path', required: true, schema: { type: 'string' } }], requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['isActive'], properties: { isActive: { type: 'boolean' } } } } } }, responses: { '200': { description: 'Updated' }, '400': { description: 'Self or last member' }, '404': { description: 'Staff not found' } } },
     },
+    // ── Ops Console: ダッシュボード（★V6 37-2） ────────────────────────────
+    '/api/ops/dashboard': {
+      get: { tags: ['Ops Console'], summary: '運営ダッシュボード（MRR は定価ベース・契約数・月ごとの売上・要対応・チケット・LINE登録・使用量）', parameters: [
+        { name: 'period', in: 'query', required: false, schema: { type: 'string', enum: ['month', 'prev_month', 'year'] } },
+      ], responses: { '200': { description: 'Dashboard aggregates' } } },
+    },
+    '/api/ops/dashboard/line-unregistered': {
+      get: { tags: ['Ops Console'], summary: 'LINE 未登録の権限者（名前と契約先だけ）', responses: { '200': { description: 'Unregistered staff' } } },
+    },
     // ── Ops Console: お問い合わせ（★V6 37-6） ────────────────────────────
     '/api/ops/support/summary': {
       get: { tags: ['Ops Console'], summary: 'お問い合わせの状態別件数と数値カード（未対応・初回返信・解決率・解決時間）', responses: { '200': { description: 'Counts by stage and KPIs' } } },

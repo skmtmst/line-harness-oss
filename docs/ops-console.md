@@ -3,7 +3,7 @@
 - 要件: `docs/v6-requirements/v6-37-master-console-requirements-draft.md`（`docs/v6-requirements/` は司令塔の所有パスのため、このPRには含めず司令塔の枝から取り込む。原本は Claude の作業ツリーにある）
 - 入口: `/ops`（ログインは `/ops/login`）
 - 第 1 段の範囲: 37-1 ログイン／37-3 契約先一覧／37-4 契約先詳細／37-5 代理ログイン（＋5-A・5-B）／37-8 監査ログ／37-9 アカウントメニュー／37-10 メンバー管理。
-  第 2 段（このメモの末尾）で 37-6 お問い合わせを足した。ダッシュボード・お知らせは案内だけの画面（第 3 段）。
+  第 2 段で 37-6 お問い合わせ、第 3 段で 37-2 ダッシュボードを足した（このメモの末尾）。お知らせ配信（37-7）は案内だけの画面。
 
 ## 変えたもの
 
@@ -108,3 +108,24 @@ SQL を流さない手順（推奨）: `platform_admins` が空の間は、既�
 - 運営コンソールの画面は API の例外を `opsCall`（`apps/web/src/components/ops/ops-ui.tsx`）で受ける。`fetchApi` は 2xx 以外を例外にするため、これが無いと busy のまま画面が固まる。
 - AI の下書きモデルは `OPS_SUPPORT_AI_MODEL`（未設定なら `@cf/meta/llama-3.3-70b-instruct-fp8-fast`）。応答は 45 秒で打ち切って 504。
 - AI が未設定（`AI` binding なし）の環境ではボタンを押せず、API は 503 を返す。
+
+## 第 3 段：ダッシュボード（37-2）
+
+| 場所 | 内容 |
+|---|---|
+| `packages/db/src/ops-dashboard.ts` | 契約先・Stripe の出来事・要対応・チケット・LINE 登録・使用量の読み取り |
+| `apps/worker/src/routes/ops-dashboard.ts` | `GET /api/ops/dashboard?period=month|prev_month|year`、`GET /api/ops/dashboard/line-unregistered` |
+| `apps/worker/src/services/billing-plans.ts` | プランに `monthlyMessages`・`mediaBytes` を足した（使用量の上限） |
+| `apps/web/src/app/ops/dashboard/page.tsx` | 画面 |
+| `apps/web/src/components/ops/ops-charts.tsx` | 棒グラフとドーナツ（SVG、色はトークンだけ） |
+| `apps/web/src/app/ops/tenants/page.tsx` | `?status=past_due` などで来たときの初期絞り込み、決済失敗の札 |
+
+決まりごと:
+
+- **金額は契約中プランの定価**（`fallbackMonthlyYen`）で数える（決定 2026-09-17）。画面に「定価で数えています」と出す。Stripe の実売上は後で差し替える。
+- 契約中＝`plan_status` が `active` か `past_due`。トライアルは月額に入れない。運営会社（既定の統括）と `archived` の契約先は数えない。
+- 過去の月の売上は「その月末に契約中だった契約先」を、いまの契約先と解約日（`billing_events` の `customer.subscription.deleted`）から逆算した概算。
+- 解約数は同じ出来事を期間で数え、解約率は期間はじめの契約数で割る。
+- 要対応: 決済失敗（`past_due`）／トライアル期限 3 日以内／LINE トークン期限 14 日以内（`line_accounts.token_expires_at`）／未返信のお問い合わせ（`stage = 'new'`）。
+- 「契約者専用LINEの登録」は、いまは権限者の `line_user_id` の有無で数える。「未登録の N 人へ案内」は対象の一覧を出すまで。案内の送信は 37-7 の LINE の口ができてから。
+- 使用量: 今月の配信通数（`messages_log` の outgoing）・バナー生成（`banner_usage_ledger`）・メディア容量（`media.size_bytes`）を、プランの上限と比べて使用率の高い順に 5 件。

@@ -4497,6 +4497,47 @@ export type OpsSupportSummary = {
     prevAvgResolutionMinutes: number | null
   }
 }
+/** 運営ダッシュボード（★V6 37-2）。形は `apps/worker/src/routes/ops-dashboard.ts`。金額は定価ベース。 */
+export type OpsDashboardPeriod = 'month' | 'prev_month' | 'year'
+export type OpsDashboard = {
+  period: OpsDashboardPeriod
+  periodLabel: string
+  pricing: 'list_price'
+  plans: Array<{ key: string; label: string; monthlyYen: number }>
+  kpis: {
+    mrr: number
+    mrrDelta: number
+    active: number
+    byPlan: Record<'light' | 'standard' | 'pro', number>
+    trialing: number
+    newInPeriod: number
+    newTrialsInPeriod: number
+    churnInPeriod: number
+    churnRate: number
+  }
+  revenueByMonth: Array<{ month: string; label: string; yen: number; current: boolean }>
+  planShare: { total: number; rows: Array<{ key: string; label: string; count: number; percent: number }> }
+  alerts: { pastDue: number; trialEndingSoon: number; lineTokenExpiring: number; unansweredTickets: number }
+  tickets: { newCount: number; inProgressCount: number; avgFirstReplyMinutes: number | null; closedInPeriod: number }
+  lineRegistration: { registered: number; total: number; unregisteredCount: number }
+  usage: Array<{
+    tenantId: string
+    tenantName: string
+    planKey: string | null
+    planLabel: string
+    messages: number
+    bannerUnits: number
+    mediaBytes: number
+    limits: { messages: number | null; images: number | null; mediaBytes: number | null }
+    usageRate: number
+  }>
+  generatedAt: string
+}
+export type OpsLineUnregistered = {
+  registered: number
+  total: number
+  people: Array<{ staffId: string; name: string; tenantName: string; hasEmail: boolean }>
+}
 export type OpsSupportDetail = {
   ticket: OpsSupportTicket
   tenant: { accountCount: number; staffCount: number; staffWithLine: number; pastTickets: number; pastOpen: number }
@@ -6561,6 +6602,10 @@ export const api = {
       fetchApi<ApiResponse<{ staffId: string; activationState: OpsMemberActivationState }>>(`/api/ops/members/${encodeURIComponent(staffId)}/resend-invite`, { method: 'POST', body: JSON.stringify({}) }),
     setMemberActive: (staffId: string, isActive: boolean) =>
       fetchApi<ApiResponse<{ staffId: string; isActive: boolean }>>(`/api/ops/members/${encodeURIComponent(staffId)}`, { method: 'PATCH', body: JSON.stringify({ isActive }) }),
+    /** ダッシュボード ★V6 37-2。 */
+    dashboard: (period?: OpsDashboardPeriod) =>
+      fetchApi<ApiResponse<OpsDashboard>>(`/api/ops/dashboard${period ? `?period=${period}` : ''}`),
+    lineUnregistered: () => fetchApi<ApiResponse<OpsLineUnregistered>>('/api/ops/dashboard/line-unregistered'),
     /** お問い合わせ（チケット）★V6 37-6。 */
     support: {
       summary: () => fetchApi<ApiResponse<OpsSupportSummary>>('/api/ops/support/summary'),

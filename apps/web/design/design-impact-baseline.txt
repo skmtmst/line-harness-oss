@@ -92,6 +92,7 @@ shared-button-importer app/nen-members/page.tsx
 shared-button-importer app/nen-members/photo-publications.tsx
 shared-button-importer app/nen-members/photo-review-detail.tsx
 shared-button-importer app/ops/audit/page.tsx
+shared-button-importer app/ops/dashboard/page.tsx
 shared-button-importer app/ops/invite/page.tsx
 shared-button-importer app/ops/login/page.tsx
 shared-button-importer app/ops/members/page.tsx
