@@ -618,6 +618,46 @@ const spec = {
         responses: { '200': { description: 'Saved products' }, '400': { description: 'Validation failed' }, '403': { description: 'Owner or admin role required' } },
       },
     },
+    // ── NEN Pets / Health（★V6 37-3／37-4） ──────────────────────────────
+    '/api/nen/pets': {
+      get: {
+        tags: ['NEN Members'], summary: 'マイペット一覧（今日の目安・避妊去勢・運動量・主食・体重の更新）と数値を取得',
+        parameters: [
+          { name: 'accountId', in: 'query', required: true, schema: { type: 'string' } },
+          { name: 'q', in: 'query', schema: { type: 'string' } },
+          { name: 'species', in: 'query', schema: { type: 'string', enum: ['dog', 'cat'] } },
+          { name: 'product', in: 'query', schema: { type: 'string' } },
+          { name: 'weight', in: 'query', schema: { type: 'string', enum: ['stale', 'fresh'] } },
+          { name: 'sort', in: 'query', schema: { type: 'string', enum: ['updated_desc', 'name', 'weight_desc', 'age_desc'] } },
+          { name: 'page', in: 'query', schema: { type: 'integer', minimum: 1 } },
+        ],
+        responses: { '200': { description: 'Paged pets with KPIs' }, '400': { description: 'accountId is required' }, '403': { description: 'Account not visible' } },
+      },
+    },
+    '/api/nen/health': {
+      get: {
+        tags: ['NEN Members'], summary: '健康日記の一覧（最終記録・30日の記録数・8週の体重推移・気になる変化）と数値を取得',
+        parameters: [
+          { name: 'accountId', in: 'query', required: true, schema: { type: 'string' } },
+          { name: 'q', in: 'query', schema: { type: 'string' } },
+          { name: 'change', in: 'query', schema: { type: 'string', enum: ['concern', 'silent', 'none'] } },
+          { name: 'last', in: 'query', schema: { type: 'string', enum: ['7', '30', 'over30'] } },
+          { name: 'sort', in: 'query', schema: { type: 'string', enum: ['concern', 'recent', 'records_desc'] } },
+          { name: 'page', in: 'query', schema: { type: 'integer', minimum: 1 } },
+        ],
+        responses: { '200': { description: 'Paged pets with health summaries and KPIs' }, '400': { description: 'accountId is required' }, '403': { description: 'Account not visible' } },
+      },
+    },
+    '/api/nen/health/{petId}/summary': {
+      get: {
+        tags: ['NEN Members'], summary: '診察時に獣医師へ見せる「30日のまとめ」（記録・集計。医療判断はしない）',
+        parameters: [
+          { name: 'petId', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'accountId', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        responses: { '200': { description: '30-day summary' }, '403': { description: 'Account not visible' }, '404': { description: 'Pet not found' } },
+      },
+    },
     // ── LIFF：然のマイページ（★V6 37-2） ──────────────────────────────────
     '/api/liff/nen/pets/{id}': {
       put: {
@@ -868,6 +908,27 @@ const spec = {
         ],
         requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['status', 'expectedUpdatedAt'], properties: { status: { type: 'string', enum: ['paused', 'active', 'archived'] }, expectedUpdatedAt: { type: 'string' } } } } } },
         responses: { '200': { description: 'Updated report schedule' }, '403': { description: 'Owner or admin role required' }, '404': { description: 'Not found' }, '409': { description: 'Updated elsewhere first' }, '422': { description: 'Validation failed' } },
+      },
+    },
+    '/api/analytics/funnels/{id}': {
+      get: {
+        tags: ['Analytics'], summary: 'ファネル1件と現在版の全定義（編集画面の読み込み用）',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        responses: { '200': { description: 'Funnel with current version' }, '404': { description: 'Not found' } },
+      },
+    },
+    '/api/analytics/funnels/{id}/status': {
+      put: {
+        tags: ['Analytics'], summary: 'ファネルの停止・再開・保管（expectedStatus 必須。保管は終端で復帰不可）',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['status', 'expectedStatus'], properties: { status: { type: 'string', enum: ['active', 'stopped', 'archived'] }, expectedStatus: { type: 'string', enum: ['active', 'stopped', 'archived'] } } } } } },
+        responses: { '200': { description: 'Updated funnel' }, '403': { description: 'Owner or admin role required' }, '404': { description: 'Not found' }, '409': { description: 'Status changed elsewhere first' }, '422': { description: 'Invalid status or transition' } },
       },
     },
     // ── Friends ─────────────────────────────────────────────────────────────
