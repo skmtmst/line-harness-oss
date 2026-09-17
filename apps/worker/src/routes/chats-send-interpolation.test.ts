@@ -208,6 +208,25 @@ describe('手動送信の差し込み(N-026)', () => {
     expect(outbox()).toHaveLength(2); // 成功分の image+text のみ
   });
 
+  test('消えた共通情報は空文字にせず400で止め、失敗台帳へ変数名を残す(N-189)', async () => {
+    const res = await postSend({ content: '営業時間: {{var.deleted_key}}', revision: 0 }, KEY5);
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { code?: string; data?: { variables?: string[] } };
+    expect(body.code).toBe('UNRESOLVED_TEMPLATE_VARIABLES');
+    expect(body.data?.variables).toEqual(['var.deleted_key']);
+    // LINE呼出し0・履歴0・予約0
+    expect(pushMessage).not.toHaveBeenCalled();
+    expect(outbox()).toHaveLength(0);
+    expect(scheduledRows()).toHaveLength(0);
+    // 台帳には変数名・送信種別・理由だけ残る（本文や値は残さない）
+    const ledger = sqlite.raw.prepare(
+      `SELECT source_kind, source_id, var_key, reason FROM common_var_resolution_failures`,
+    ).all() as Array<Record<string, string>>;
+    expect(ledger).toEqual([
+      { source_kind: 'chat', source_id: 'fr-1', var_key: 'deleted_key', reason: 'missing' },
+    ]);
+  });
+
   test('プレビューは送信と同じ解決結果を返し、送信も書き込みもしない', async () => {
     const res = await postPreview({ content: '{{name}}さん {{pet_name}}' });
     expect(res.status).toBe(200);
