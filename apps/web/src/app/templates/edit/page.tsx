@@ -349,8 +349,9 @@ function TemplateEditInner() {
   // 置き場の選択肢。category 文字列とは別に folderId で保存する。
   // フォルダはアカウント単位（N-147）。テンプレートの所属アカウントで絞る。
   useEffect(() => {
+    // 読み替えるまで前のアカウントの帯を残さない（他の編集画面と同じ）。
+    setFolders([])
     if (!editorAccountId) {
-      setFolders([])
       return
     }
     let cancelled = false
