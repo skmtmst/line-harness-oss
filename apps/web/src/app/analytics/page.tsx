@@ -2107,18 +2107,27 @@ function SavedAnalyticsTab({ accountId, onCountChange, canManage }: {
     }
   }, [accountId])
 
+  const schedulesAlive = useRef(true)
+  useEffect(() => () => {
+    schedulesAlive.current = false
+  }, [])
+
   const reloadSchedules = useCallback(() => {
     setSchedulesLoading(true)
     void api.analytics.reportSchedules
       .list(accountId)
       .then((response) => {
+        if (!schedulesAlive.current) return
         if (!response.success) throw new Error(response.error)
         setSchedules(response.data.items)
       })
       .catch((caught: unknown) => {
+        if (!schedulesAlive.current) return
         setSchedulesError(caught instanceof Error ? caught.message : '定期レポートを確認できませんでした')
       })
-      .finally(() => setSchedulesLoading(false))
+      .finally(() => {
+        if (schedulesAlive.current) setSchedulesLoading(false)
+      })
   }, [accountId])
 
   useEffect(() => {
@@ -2231,7 +2240,7 @@ function SavedAnalyticsTab({ accountId, onCountChange, canManage }: {
         <div className="border-hairline flex items-center justify-between border-b px-4 py-3">
           <h2 className="text-sm font-semibold">定期レポート</h2>
           <div className="flex items-center gap-2">
-            <span className="text-ink-faint text-xs">{schedulesLoading ? '確認中' : `${schedules.length}件`}</span>
+            <span className="text-ink-faint text-xs">{schedulesLoading ? '確認中' : schedulesError ? '—' : `${schedules.length}件`}</span>
             {canManage && <Button href="/analytics/reports/new" variant="secondary">定期レポートを作る</Button>}
           </div>
         </div>
@@ -2239,10 +2248,14 @@ function SavedAnalyticsTab({ accountId, onCountChange, canManage }: {
         {schedulesLoading ? (
           <p className="text-ink-faint p-8 text-center text-sm">定期レポートを読み込んでいます</p>
         ) : schedules.length === 0 ? (
+          // 取得失敗のまま「まだありません」と出すと、未作成と見分けがつかない。
+          // 失敗は上のバナーだけにして、空の主張はしない。
+          schedulesError ? null : (
           <div className="p-8 text-center">
             <p className="text-ink text-sm font-medium">定期レポートはまだありません</p>
             <p className="text-ink-faint mt-2 text-sm">決まった曜日や日に、集計結果をメールやLINEへ届けられます。</p>
           </div>
+          )
         ) : (
           <table className="w-full table-fixed">
             <thead>
@@ -2391,7 +2404,7 @@ function SavedAnalyticsTab({ accountId, onCountChange, canManage }: {
             <h2 className="text-ink text-sm font-semibold">結果の履歴</h2>
             {selected && (
               <p className="text-ink-faint mt-1 truncate text-xs" title={selected.name}>
-                {selected.name} ／ 定期レポート {schedulesLoading ? '確認中' : `${schedules.filter((schedule) => schedule.savedAnalysisIds.includes(selected.id)).length}件`}
+                {selected.name} ／ 定期レポート {schedulesLoading ? '確認中' : schedulesError ? '—' : `${schedules.filter((schedule) => schedule.savedAnalysisIds.includes(selected.id)).length}件`}
               </p>
             )}
             {error && items.length > 0 && <p className="text-danger mt-3 text-xs">{error}</p>}

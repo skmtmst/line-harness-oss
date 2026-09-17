@@ -73,6 +73,10 @@ function AnalyticsReportFormPage() {
     setError('')
     setNotice('')
     setOptions(null)
+    // id が外れた/変わったとき前の編集対象が残ると、新規作成のつもりが旧レポートへ
+    // PUT してしまう。取り直すたびに編集状態も初期化する。
+    setEditing(null)
+    setEditMissing(false)
     if (!selectedAccountId) {
       setLoading(false)
       return () => { active = false }
@@ -157,7 +161,9 @@ function AnalyticsReportFormPage() {
         })
         if (!response.success) throw new Error(response.error)
         setEditing(response.data)
-        setNotice(`定期レポートを更新しました。次は${nextLabel}に届きます。`)
+        setNotice(response.data.status === 'paused'
+          ? '定期レポートを更新しました。止まっている間は届きません。再開すると次の予定から届きます。'
+          : `定期レポートを更新しました。次は${nextLabel}に届きます。`)
       } else {
         const response = await api.analytics.reportSchedules.create(selectedAccountId, {
           ...payload, sendOnce,
@@ -174,9 +180,10 @@ function AnalyticsReportFormPage() {
 
   if (accountLoading || loading) return <ListState kind="loading" title="定期レポートを読み込んでいます" />
   if (!selectedAccountId) return <ListState kind="empty" title="LINE公式アカウントを選んでください" description="上のバーで、レポートを作るLINE公式アカウントを選んでください。" />
+  // 一覧の取得失敗を「見つかりません」へ化けさせない。一時障害はやり直せる画面を先に出す。
+  if (error && !options) return <ListState kind="error" title="定期レポートを表示できませんでした" description={error} onRetry={() => setReloadSeq((n) => n + 1)} />
   if (editMissing || (editing === null && editId)) return <ListState kind="error" title="定期レポートが見つかりませんでした" description="一覧から選び直してください。" />
   if (editing?.isOneTime) return <ListState kind="empty" title="1回だけ送る依頼は変更できません" description="同じ内容が必要なときは、新しく作ってください。" />
-  if (error && !options) return <ListState kind="error" title="定期レポートを表示できませんでした" description={error} onRetry={() => setReloadSeq((n) => n + 1)} />
   if (!options || options.recipients.length === 0) return (
     <ListState
       kind="empty"

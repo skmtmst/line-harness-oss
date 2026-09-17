@@ -214,6 +214,18 @@ describe('V6 保存タブの定期レポート', () => {
     expect(net.calls.filter((call) => call.path.startsWith('/api/analytics/report-schedules') && call.method === 'GET').length).toBeGreaterThanOrEqual(2)
   })
 
+  it('一覧の取得失敗はバナーだけにし、0件や「まだありません」と偽らない', async () => {
+    net.handler = (path, init) => {
+      if (path === '/api/staff/me') return Promise.resolve({ success: true, data: { role: 'owner' } })
+      if (path.startsWith('/api/analytics/report-schedules')) return Promise.reject(new Error('接続できませんでした'))
+      return defaultHandler(path, init)
+    }
+    await render()
+    expect(host.textContent).toContain('接続できませんでした')
+    expect(host.textContent).not.toContain('定期レポートはまだありません')
+    expect(host.textContent).not.toContain('定期レポート 0件')
+  })
+
   it('運用担当には一覧は見せるが変更操作は出さない', async () => {
     fixture.role = 'staff'
     await render()
