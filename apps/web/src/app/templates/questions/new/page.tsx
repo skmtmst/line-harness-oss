@@ -62,6 +62,8 @@ function QuestionTemplatePageInner() {
   const [category, setCategory] = useState('未分類')
   const [folderId, setFolderId] = useState<string | null>(null)
   const [folders, setFolders] = useState<Folder[]>([])
+  // 編集時はテンプレートが属するアカウント。選択中と食い違うことがある（N-147）。
+  const [templateAccountId, setTemplateAccountId] = useState<string | null>(null)
   const [question, setQuestion] = useState<ScenarioQuestion>(() => emptyQuestion())
   const [categories, setCategories] = useState<string[]>([])
   const [usageCount, setUsageCount] = useState(0)
@@ -75,19 +77,21 @@ function QuestionTemplatePageInner() {
   usePageTitle(canMutateTemplates ? '質問を作る' : '質問テンプレート')
 
   // 分類名の候補は置き場の一覧から取る。テンプレ全件を引くと件数が増えるほど重くなる。
+  // 置き場は「編集しているテンプレートのアカウント」のものだけを出す。
+  // 読み替えるまで前のアカウントの帯は残さない（N-147）。
+  const folderAccountId = id ? templateAccountId : selectedAccountId
   useEffect(() => {
-    if (!selectedAccountId) {
-      setCategories([])
-      return
-    }
+    setFolders([])
+    setCategories([])
+    if (!folderAccountId) return
     let cancelled = false
-    void api.folders.list('template', selectedAccountId).then((res) => {
+    void api.folders.list('template', folderAccountId).then((res) => {
       if (cancelled || !res.success) return
       setFolders(res.data)
       setCategories([...new Set(res.data.map((item) => item.name).filter(Boolean))])
     })
     return () => { cancelled = true }
-  }, [selectedAccountId])
+  }, [folderAccountId])
 
   useEffect(() => {
     if (!id || !selectedAccountId) return
@@ -102,6 +106,7 @@ function QuestionTemplatePageInner() {
           return
         }
         setName(template.data.name)
+        setTemplateAccountId(template.data.accountId ?? null)
         setCategory(template.data.category || '未分類')
         setFolderId(template.data.folderId ?? null)
         if (!isEditableQuestion(template.data.question)) {

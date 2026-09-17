@@ -41,6 +41,7 @@ async function readFolderId(
   db: D1Database,
   body: Record<string, unknown>,
   accountId: string | null,
+  canSeeUnassigned: boolean,
 ): Promise<{ ok: true; folderId?: string | null } | { ok: false; error: string }> {
   if (!('folderId' in body)) return { ok: true };
   const raw = body.folderId;
@@ -52,8 +53,9 @@ async function readFolderId(
     return { ok: false, error: 'テンプレートのフォルダではありません' };
   }
   // フォルダはアカウント単位（N-147）。別アカウントのフォルダへ入れさせない。
-  // account_id が NULL の共有フォルダ（移行前のもの）は従来どおり使える。
-  if (folder.account_id !== null && folder.account_id !== accountId) {
+  // 未所属のものは一覧・更新と同じく「見えない」扱い——見えない置き場へ
+  // 入れると、そのテンプレートはどの絞り込みにも出なくなる。
+  if (folder.account_id !== accountId && (folder.account_id !== null || !canSeeUnassigned)) {
     return { ok: false, error: 'そのフォルダはありません' };
   }
   return { ok: true, folderId: id };
@@ -437,7 +439,8 @@ templates.post('/api/templates', requireRole('owner', 'admin'), async (c) => {
     if (body.questionStatus && body.questionStatus !== 'draft' && body.questionStatus !== 'published') {
       return c.json({ success: false, error: '質問の保存状態を確認してください' }, 400);
     }
-    const folder = await readFolderId(c.env.DB, body as unknown as Record<string, unknown>, body.accountId);
+    const folderScope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+    const folder = await readFolderId(c.env.DB, body as unknown as Record<string, unknown>, body.accountId, folderScope.canSeeUnassigned);
     if (!folder.ok) return c.json({ success: false, error: folder.error }, 422);
     const item = await createTemplate(c.env.DB, {
       ...body,
@@ -520,7 +523,8 @@ templates.put('/api/templates/:id', requireRole('owner', 'admin'), async (c) => 
     if (body.questionStatus && body.questionStatus !== 'draft' && body.questionStatus !== 'published') {
       return c.json({ success: false, error: '質問の保存状態を確認してください' }, 400);
     }
-    const folder = await readFolderId(c.env.DB, body as unknown as Record<string, unknown>, existing.line_account_id);
+    const folderScope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+    const folder = await readFolderId(c.env.DB, body as unknown as Record<string, unknown>, existing.line_account_id, folderScope.canSeeUnassigned);
     if (!folder.ok) return c.json({ success: false, error: folder.error }, 422);
     const metadataUpdates: {
       name?: string;

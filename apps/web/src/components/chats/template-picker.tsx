@@ -93,7 +93,9 @@ export default function TemplatePicker({
       if (!cancelled) setTemplatesStatus('error')
     })
     // 置き場（099 で templates.folder_id が入っている）。
-    void api.folders.list('template').then((res) => {
+    // テンプレートと同じく選択中アカウントで絞る。渡さないと
+    // 可視範囲の全部が並び、別アカウントの置き場が出る（N-147）。
+    void api.folders.list('template', selectedAccountId ?? undefined).then((res) => {
       if (cancelled) return
       if (res.success) {
         setFolders(res.data)

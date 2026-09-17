@@ -86,6 +86,10 @@ function put(body: Record<string, unknown>) {
 beforeEach(() => {
   vi.clearAllMocks();
   accountAccess.canAccessAllLineAccounts.mockResolvedValue(true);
+  accountAccess.getVisibleLineAccountScope.mockResolvedValue({
+    allowedAccountIds: ['account-1'],
+    canSeeUnassigned: true,
+  });
   mocks.getTemplateById.mockResolvedValue({
     id: 'tpl-1',
     line_account_id: 'account-1',

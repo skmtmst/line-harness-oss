@@ -83,6 +83,8 @@ function CarouselEditorInner() {
   const [loadFailed, setLoadFailed] = useState(false)
   const [folderId, setFolderId] = useState<string | null>(null)
   const [folders, setFolders] = useState<Folder[]>([])
+  // 編集時はテンプレートが属するアカウント。選択中と食い違うことがある（N-147）。
+  const [templateAccountId, setTemplateAccountId] = useState<string | null>(null)
   const [tapLimitMode, setTapLimitMode] = useState<'none' | 'once'>('none')
   const [tapLimitText, setTapLimitText] = useState('')
   /*
@@ -93,17 +95,18 @@ function CarouselEditorInner() {
     typeof window === 'undefined' ? true : isOwnerOrAdmin())
   const actionOptions = useActionOptions()
 
+  // 置き場は「編集しているテンプレートのアカウント」のものだけを出す。
+  // 新規作成では選択中のアカウント。読み替えるまで前のアカウントの帯は残さない。
+  const folderAccountId = id ? templateAccountId : selectedAccountId
   useEffect(() => {
-    if (!selectedAccountId) {
-      setFolders([])
-      return
-    }
+    setFolders([])
+    if (!folderAccountId) return
     let cancelled = false
-    void api.folders.list('template', selectedAccountId).then((res) => {
+    void api.folders.list('template', folderAccountId).then((res) => {
       if (!cancelled && res.success) setFolders(res.data)
     })
     return () => { cancelled = true }
-  }, [selectedAccountId])
+  }, [folderAccountId])
 
   const markLoadFailed = () => {
     setLoadFailed(true)
@@ -120,6 +123,7 @@ function CarouselEditorInner() {
           return
         }
         setName(res.data.name)
+        setTemplateAccountId(res.data.accountId ?? null)
         setFolderId(res.data.folderId ?? null)
         setTapLimitMode(res.data.carouselTapLimitMode === 'once' ? 'once' : 'none')
         setTapLimitText(res.data.carouselTapLimitText ?? '')

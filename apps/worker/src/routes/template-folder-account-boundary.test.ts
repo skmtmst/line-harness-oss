@@ -99,7 +99,11 @@ describe('テンプレートフォルダのアカウント境界（N-147）', ()
     // 同じアカウントのフォルダには入れられる
     expect((await req('/api/templates/tpl-a', 'PUT', { folderId: 'folder-a' })).status).toBe(200);
     expect(fixture.raw.prepare('SELECT folder_id FROM templates WHERE id=?').get('tpl-a')).toEqual({ folder_id: 'folder-a' });
-    // 共有（未所属）フォルダは従来どおり使える
+    // 未所属（共有）フォルダは「見えない人」へは入れさせない。一覧・更新・削除と同じ境界。
+    expect((await req('/api/templates/tpl-a', 'PUT', { folderId: 'legacy' })).status).toBe(422);
+    expect(fixture.raw.prepare('SELECT folder_id FROM templates WHERE id=?').get('tpl-a')).toEqual({ folder_id: 'folder-a' });
+    // 全アカウントを見られる人は従来どおり共有フォルダを使える
+    actor.id = 'env-owner'; actor.role = 'owner';
     expect((await req('/api/templates/tpl-a', 'PUT', { folderId: 'legacy' })).status).toBe(200);
   });
 });
