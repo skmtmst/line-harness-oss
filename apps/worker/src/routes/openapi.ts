@@ -669,6 +669,15 @@ const spec = {
         responses: { '200': { description: 'Updated pet with feeding plan' }, '400': { description: 'Validation failed' }, '401': { description: 'LIFF identity required' }, '404': { description: 'Pet not found' } },
       },
     },
+    '/api/liff/nen/health-logs/summary': {
+      get: {
+        tags: ['NEN Members'], summary: '健康日記「獣医師に見せる（直近30日のまとめ）」（★V6 37-2-B）。管理画面の 30日のまとめ と同じ計算',
+        security: [],
+        description: 'LIFF の ID トークンで本人確認する（Authorization: Bearer）。本人のペットだけ。医療判断は含めない。',
+        parameters: [{ name: 'petId', in: 'query', required: true, schema: { type: 'string' } }],
+        responses: { '200': { description: '30-day summary (records, weight, heart/respiratory averages, stool/appetite/skin/tear counts, notes, logs)' }, '401': { description: 'LIFF identity required' }, '404': { description: 'Pet not found' } },
+      },
+    },
     // ── HQ Billing ─────────────────────────────────────────────────────────
     '/api/hq/billing/summary': {
       get: {
