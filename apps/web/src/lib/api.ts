@@ -5259,14 +5259,34 @@ export const api = {
       { method: 'POST', body: JSON.stringify(data) },
     ),
     v6Funnels: {
-      list: (accountId: string) => fetchApi<ApiResponse<Array<{
+      list: (accountId: string, options?: { includeInactive?: boolean }) => fetchApi<ApiResponse<Array<{
         id: string
         name: string
         windowDays: number
         createdAt: string
+        status: 'active' | 'stopped' | 'archived'
         currentVersion: { id: string; versionNumber: number; createdAt: string } | null
         migrationState: 'ready' | 'needs_migration'
-      }>>>(`/api/analytics/funnels?account_id=${encodeURIComponent(accountId)}`),
+      }>>>(`/api/analytics/funnels?account_id=${encodeURIComponent(accountId)}${options?.includeInactive ? '&includeInactive=1' : ''}`),
+      // 編集画面が現在の定義（段・期間・絞り込み）を丸ごと読む口。
+      get: (accountId: string, funnelId: string) => fetchApi<ApiResponse<{
+        id: string
+        name: string
+        windowDays: number
+        createdAt: string
+        status: 'active' | 'stopped' | 'archived'
+        currentVersion: {
+          id: string
+          versionNumber: number
+          windowDays: number
+          steps: Array<{ label: string; kind: string; match: Record<string, string> }>
+          segment: unknown
+          comparisonGroups: unknown[]
+          createdAt: string
+        } | null
+      }>>(
+        `/api/analytics/funnels/${funnelId}?account_id=${encodeURIComponent(accountId)}`,
+      ),
       create: (accountId: string, data: {
         name: string
         windowDays: number
@@ -5274,6 +5294,25 @@ export const api = {
       }) => fetchApi<ApiResponse<{ funnelId: string; version: { id: string; versionNumber: number } }>>(
         `/api/analytics/funnels?account_id=${encodeURIComponent(accountId)}`,
         { method: 'POST', body: JSON.stringify(data) },
+      ),
+      // 既存ファネルの編集 = 現在版を元に新版を積む。expectedVersionNumber で
+      // 画面を開いた後に誰かが保存していないかを検査する。
+      createVersion: (accountId: string, funnelId: string, data: {
+        name?: string
+        windowDays: number
+        steps: Array<{ label: string; kind: string; match: Record<string, string> }>
+        expectedVersionNumber: number
+      }) => fetchApi<ApiResponse<{ id: string; versionNumber: number }>>(
+        `/api/analytics/funnels/${funnelId}/versions?account_id=${encodeURIComponent(accountId)}`,
+        { method: 'POST', body: JSON.stringify(data) },
+      ),
+      // 停止・保管・再開。expectedStatus で開いてからの状態変化を検査する。
+      setStatus: (accountId: string, funnelId: string, data: {
+        status: 'active' | 'stopped' | 'archived'
+        expectedStatus: 'active' | 'stopped' | 'archived'
+      }) => fetchApi<ApiResponse<{ id: string; status: 'active' | 'stopped' | 'archived' }>>(
+        `/api/analytics/funnels/${funnelId}/status?account_id=${encodeURIComponent(accountId)}`,
+        { method: 'PUT', body: JSON.stringify(data) },
       ),
       latestRun: (accountId: string, funnelId: string) =>
         fetchApi<ApiResponse<AnalyticsFunnelRunResult>>(

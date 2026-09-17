@@ -198,7 +198,7 @@ describe('分析の対象者種別・期間選択(#835)', () => {
     net.handler = async (path) => {
       if (path.startsWith('/api/staff/me')) return { success: true, data: { role: 'admin' } }
       if (path.startsWith('/api/analytics/funnels?')) {
-        return { success: true, data: [{ id: 'funnel-1', name: '申込導線', windowDays: 14, createdAt: '2026-01-01T00:00:00.000Z', currentVersion: { id: 'version-1', versionNumber: 1, createdAt: '2026-01-01T00:00:00.000Z' }, migrationState: 'ready' }] }
+        return { success: true, data: [{ id: 'funnel-1', name: '申込導線', windowDays: 14, createdAt: '2026-01-01T00:00:00.000Z', status: 'active', currentVersion: { id: 'version-1', versionNumber: 1, createdAt: '2026-01-01T00:00:00.000Z' }, migrationState: 'ready' }] }
       }
       if (path.includes('/runs/latest?')) return { success: true, data: funnelRun() }
       if (path.includes('/run?')) return { success: true, data: funnelRun() }
@@ -255,7 +255,7 @@ describe('分析の対象者種別・期間選択(#835)', () => {
     net.handler = async (path) => {
       if (path.startsWith('/api/staff/me')) return { success: true, data: { role: 'admin' } }
       if (path.startsWith('/api/analytics/funnels?')) {
-        return { success: true, data: [{ id: 'funnel-1', name: '申込導線', windowDays: 14, createdAt: '2026-01-01T00:00:00.000Z', currentVersion: { id: 'version-1', versionNumber: 1, createdAt: '2026-01-01T00:00:00.000Z' }, migrationState: 'ready' }] }
+        return { success: true, data: [{ id: 'funnel-1', name: '申込導線', windowDays: 14, createdAt: '2026-01-01T00:00:00.000Z', status: 'active', currentVersion: { id: 'version-1', versionNumber: 1, createdAt: '2026-01-01T00:00:00.000Z' }, migrationState: 'ready' }] }
       }
       if (path.includes('/runs/latest?')) return { success: false, error: 'Not found' }
       if (path.includes('/run?')) return late.promise
@@ -313,5 +313,193 @@ describe('分析の対象者種別・期間選択(#835)', () => {
     await act(async () => { await Promise.resolve(); await Promise.resolve() })
     expect(host.textContent).not.toContain('古い店舗のテンプレート')
     expect(host.textContent).toContain('テンプレート')
+  })
+})
+
+const FUNNEL_ACTIVE = {
+  id: 'funnel-1', name: '申込導線', windowDays: 14, createdAt: '2026-01-01T00:00:00.000Z',
+  status: 'active',
+  currentVersion: { id: 'version-1', versionNumber: 1, createdAt: '2026-01-01T00:00:00.000Z' },
+  migrationState: 'ready',
+}
+const FUNNEL_DETAIL = {
+  ...FUNNEL_ACTIVE,
+  currentVersion: {
+    id: 'version-1', versionNumber: 1, windowDays: 14,
+    steps: [
+      { stepOrder: 1, label: '案内', kind: 'friend_add', match: {} },
+      { stepOrder: 2, label: '申込', kind: 'form', match: { formId: 'form-1' } },
+    ],
+    segment: { kind: 'all' }, comparisonGroups: [], createdAt: '2026-01-01T00:00:00.000Z',
+  },
+}
+const FUNNEL_STOPPED = { ...FUNNEL_ACTIVE, id: 'funnel-2', name: '古い導線', status: 'stopped' }
+
+function funnelHandler(funnels: unknown[], detail: unknown = FUNNEL_DETAIL) {
+  return async (path: string) => {
+    if (path.startsWith('/api/staff/me')) return { success: true, data: { role: 'admin' } }
+    if (path.startsWith('/api/analytics/funnels?')) return { success: true, data: funnels }
+    if (path.match(/\/api\/analytics\/funnels\/[^/]+\?/)) return { success: true, data: detail }
+    if (path.includes('/runs/latest?')) return { success: true, data: funnelRun() }
+    throw new Error(`未設定: ${path}`)
+  }
+}
+
+function type(id: string, value: string) {
+  const input = host.querySelector(`#${id}`) as HTMLInputElement | null
+  if (!input) throw new Error(`input #${id} が見つかりません`)
+  const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!
+  setter.call(input, value)
+  input.dispatchEvent(new Event('input', { bubbles: true }))
+}
+
+async function clickInDocument(label: string) {
+  const target = Array.from(document.body.querySelectorAll('button')).find(
+    (item) => item.textContent === label,
+  )
+  if (!target) throw new Error(`「${label}」のボタンが見つかりません: ${document.body.textContent}`)
+  await act(async () => { target.click(); await Promise.resolve(); await Promise.resolve() })
+}
+
+describe('ファネルの編集・停止・保管(#841)', () => {
+  it('現在版を下書きへ読み、新版として保存すると expectedVersionNumber と名前を送る', async () => {
+    fixture.tab = 'funnel'
+    net.handler = funnelHandler([FUNNEL_ACTIVE])
+    await render()
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); await Promise.resolve() })
+
+    await click('定義を編集')
+    await act(async () => { await Promise.resolve(); await Promise.resolve() })
+    const nameInput = host.querySelector('#fn-name') as HTMLInputElement | null
+    expect(nameInput?.value).toBe('申込導線')
+    const stepInputs = Array.from(host.querySelectorAll('input'))
+      .map((input) => input.value)
+    expect(stepInputs).toContain('案内')
+    expect(stepInputs).toContain('form-1')
+    expect(host.textContent).toContain('新版として保存')
+
+    await act(async () => { type('fn-name', '申込導線（改訂）'); await Promise.resolve() })
+    net.handler = (async (path: string, init?: RequestInit) => {
+      if (path.includes('/versions?')) {
+        const body = JSON.parse(String(init?.body))
+        expect(body).toMatchObject({
+          name: '申込導線（改訂）', windowDays: 14, expectedVersionNumber: 1,
+        })
+        expect(body.steps).toHaveLength(2)
+        return { success: true, data: { id: 'version-2', versionNumber: 2 } }
+      }
+      return funnelHandler([FUNNEL_ACTIVE])(path)
+    }) as typeof net.handler
+    await click('新版として保存')
+    const request = net.calls.find((call) => call.path.includes('/versions?'))
+    expect(request).toBeDefined()
+    expect(request!.path).toContain('/api/analytics/funnels/funnel-1/versions')
+  })
+
+  it('停止は確認窓を通してPUTし、一覧から外れて「停止中」として残る', async () => {
+    fixture.tab = 'funnel'
+    let funnels: unknown[] = [FUNNEL_ACTIVE]
+    net.handler = async (path: string, init?: RequestInit) => {
+      if (path.startsWith('/api/staff/me')) return { success: true, data: { role: 'admin' } }
+      if (path.startsWith('/api/analytics/funnels?')) return { success: true, data: funnels }
+      if (path.match(/\/api\/analytics\/funnels\/[^/]+\?/)) return { success: true, data: FUNNEL_DETAIL }
+      if (path.includes('/status?')) return { success: true, data: { id: 'funnel-1', status: 'stopped' } }
+      if (path.includes('/runs/latest?')) return { success: true, data: funnelRun() }
+      throw new Error(`未設定: ${path}`)
+    }
+    await render()
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); await Promise.resolve() })
+
+    await click('停止')
+    expect(document.body.textContent).toContain('ファネルを停止しますか')
+    funnels = [FUNNEL_STOPPED]
+    await clickInDocument('停止する')
+
+    const request = net.calls.find((call) => call.path.includes('/status?'))
+    expect(request).toBeDefined()
+    expect(request!.init?.method).toBe('PUT')
+    expect(JSON.parse(String(request!.init?.body))).toEqual({
+      status: 'stopped', expectedStatus: 'active',
+    })
+    await act(async () => { await Promise.resolve(); await Promise.resolve() })
+    expect(host.textContent).toContain('停止中・保管したファネル')
+    expect(host.textContent).toContain('古い導線')
+  })
+
+  it('停止中のファネルは再集計ボタンを止め、確認窓から再開する', async () => {
+    fixture.tab = 'funnel'
+    net.handler = funnelHandler([FUNNEL_STOPPED])
+    await render()
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); await Promise.resolve() })
+
+    // 利用可能なファネルが無いので空の案内と停止中一覧が出る
+    expect(host.textContent).toContain('停止中・保管したファネル')
+    await click('結果を見る')
+    await act(async () => { await Promise.resolve(); await Promise.resolve() })
+    expect(host.textContent).toContain('停止中です。再集計や対象者づくりはできません。')
+    const runButton = Array.from(host.querySelectorAll('button')).find(
+      (item) => item.textContent?.includes('再集計'),
+    ) as HTMLButtonElement | undefined
+    expect(runButton?.disabled).toBe(true)
+
+    await click('再開')
+    await clickInDocument('再開する')
+    const request = net.calls.find((call) => call.path.includes('/status?'))
+    expect(JSON.parse(String(request!.init?.body))).toEqual({
+      status: 'active', expectedStatus: 'stopped',
+    })
+  })
+
+  it('保管の確認窓は戻せないことを明示する', async () => {
+    fixture.tab = 'funnel'
+    net.handler = funnelHandler([FUNNEL_ACTIVE])
+    await render()
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); await Promise.resolve() })
+
+    await click('保管')
+    expect(document.body.textContent).toContain('あとから戻せません')
+    await clickInDocument('保管する')
+    const request = net.calls.find((call) => call.path.includes('/status?'))
+    expect(JSON.parse(String(request!.init?.body))).toEqual({
+      status: 'archived', expectedStatus: 'active',
+    })
+  })
+
+  it('版がずれていたときは上書きせず、開き直しを促す', async () => {
+    fixture.tab = 'funnel'
+    net.handler = async (path: string, init?: RequestInit) => {
+      if (path.startsWith('/api/staff/me')) return { success: true, data: { role: 'admin' } }
+      if (path.startsWith('/api/analytics/funnels?')) return { success: true, data: [FUNNEL_ACTIVE] }
+      if (path.includes('/versions?')) return { success: false, error: 'analytics_funnel_version_conflict' }
+      if (path.match(/\/api\/analytics\/funnels\/[^/]+\?/)) return { success: true, data: FUNNEL_DETAIL }
+      if (path.includes('/runs/latest?')) return { success: true, data: funnelRun() }
+      throw new Error(`未設定: ${path}`)
+    }
+    await render()
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); await Promise.resolve() })
+
+    await click('定義を編集')
+    await act(async () => { await Promise.resolve() })
+    await click('新版として保存')
+    await act(async () => { await Promise.resolve(); await Promise.resolve() })
+    expect(host.textContent).toContain('他の人が先に変更しています')
+  })
+
+  it('staffには編集・停止・保管の操作を出さない', async () => {
+    fixture.tab = 'funnel'
+    net.handler = async (path: string) => {
+      if (path.startsWith('/api/staff/me')) return { success: true, data: { role: 'staff' } }
+      if (path.startsWith('/api/analytics/funnels?')) return { success: true, data: [FUNNEL_ACTIVE] }
+      if (path.includes('/runs/latest?')) return { success: true, data: funnelRun() }
+      throw new Error(`未設定: ${path}`)
+    }
+    await render()
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); await Promise.resolve() })
+
+    expect(host.textContent).not.toContain('定義を編集')
+    expect(host.textContent).not.toContain('保管')
+    expect(
+      Array.from(host.querySelectorAll('button')).some((item) => item.textContent === '停止'),
+    ).toBe(false)
   })
 })
