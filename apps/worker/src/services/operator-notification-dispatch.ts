@@ -430,9 +430,33 @@ async function sendLineDelivery(
       },
     });
   }
+  // 運用者が書く通知文にも {{var.*}} を置ける。消えた共通情報は生の
+  // 差し込み名のままスタッフへ届けず、この配送を失敗として残す。
+  let text = input.text;
+  try {
+    const { expandSendCommonVars } = await import('./interpolation-context.js');
+    text = await expandSendCommonVars(
+      db, input.text,
+      { kind: 'notification', id: input.deliveryId },
+      { lineAccountId: input.lineAccountId },
+    );
+  } catch (error) {
+    const { CommonVarResolutionFailedError } = await import('./interpolation-context.js');
+    if (!(error instanceof CommonVarResolutionFailedError)) throw error;
+    return finishOperatorDelivery(db, {
+      id: input.deliveryId,
+      lineAccountId: input.lineAccountId,
+      retryKey: input.retryKey,
+      finish: {
+        kind: 'failed',
+        errorCode: 'common_var_unresolved',
+        errorMessage: `共通情報を解決できません: ${error.failures.map((f) => `{{var.${f.varKey}}}`).join(', ')}`,
+      },
+    });
+  }
   try {
     const result = await new LineClient(input.token).pushMessageWithRequestId(
-      input.lineUserId, [{ type: 'text', text: input.text }], input.retryKey,
+      input.lineUserId, [{ type: 'text', text }], input.retryKey,
     );
     const requestId = (result as { requestId?: unknown } | null | undefined)?.requestId;
     if (typeof requestId === 'string' && requestId.length > 0) {

@@ -125,12 +125,30 @@ export async function handleQuestionAnswer(
 
   await logPostback(db, friend.id, input.choiceIndex, target, input.lineAccountId ?? null)
 
+  // 選択肢の返信文にも {{var.*}} を書ける。消えた共通情報は空文字や
+  // 生の差し込み名のまま送らず、fail-closed で返信を止める。
+  const expandReply = async (text: string): Promise<string | null> => {
+    try {
+      const { expandSendCommonVars } = await import('./interpolation-context.js')
+      return await expandSendCommonVars(
+        db, text,
+        { kind: 'scenario', id: target.versionStepId ?? input.stepId },
+        { lineAccountId: target.scenarioAccountId ?? input.lineAccountId ?? null, friendId: friend.id },
+      )
+    } catch (err) {
+      console.error('[scenario-question] common var resolution failed', err)
+      return null
+    }
+  }
+
   if (answered) {
     // 2度目。返すだけで、タグもシナリオも動かさない。
     const text = choice.repeatReply && choice.repeatReply.trim() !== ''
       ? choice.repeatReply
       : DEFAULT_REPEAT_REPLY
-    result.replyTokenConsumed = await sendReply(lineClient, friend, replyToken, text)
+    const expanded = await expandReply(text)
+    if (expanded === null) return result
+    result.replyTokenConsumed = await sendReply(lineClient, friend, replyToken, expanded)
     return result
   }
 
@@ -160,7 +178,10 @@ export async function handleQuestionAnswer(
   }
 
   if (choice.reply && choice.reply.trim() !== '') {
-    result.replyTokenConsumed = await sendReply(lineClient, friend, replyToken, choice.reply)
+    const expanded = await expandReply(choice.reply)
+    if (expanded !== null) {
+      result.replyTokenConsumed = await sendReply(lineClient, friend, replyToken, expanded)
+    }
   }
 
   return result

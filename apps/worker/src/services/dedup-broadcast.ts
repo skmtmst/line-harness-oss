@@ -192,7 +192,6 @@ export async function computeDedupBroadcastPreview(
 
 import { LineClient } from '@line-crm/line-sdk';
 import {
-  getCommonVarMap,
   getLineAccountById,
   jstNow,
   updateBroadcastLineRequestId,
@@ -208,6 +207,7 @@ import { classifyDeliveryFailure, deliveryErrorCode } from './broadcast-delivery
 import {
   assertMessagePartsResolved,
   buildMessages,
+  combinedMessageContent,
   hasRecipientVariablesInParts,
   parseBroadcastMessageParts,
   renderMessageParts,
@@ -429,9 +429,17 @@ export async function processMultiAccountDedupBroadcast(
     if (sourceParts.some((part) => /\{\{\s*var\./.test(part.messageContent))) {
       try {
         const fixedSnapshot = parseBroadcastCommonVarSnapshot(broadcast.common_var_snapshot);
-        accountVars = fixedSnapshot
-          ? commonVarValuesForAccount(fixedSnapshot, account.id)
-          : await getCommonVarMap(db, account.id);
+        if (fixedSnapshot) {
+          accountVars = commonVarValuesForAccount(fixedSnapshot, account.id);
+        } else {
+          // snapshot に乗らない到達経路でも、消えた共通情報を空文字へ落とさず
+          // fail-closed にする。失敗は throw で下の catch が失敗台帳側へ回す。
+          const { resolveSendCommonVars } = await import('./interpolation-context.js');
+          accountVars = await resolveSendCommonVars(
+            db, account.id, combinedMessageContent(sourceParts),
+            { kind: 'broadcast', id: broadcast.id },
+          );
+        }
         if (!accountVars) {
           failedAccountIds.push(account.id);
           continue;

@@ -24,7 +24,7 @@ import {
   messageToLogPayload,
 } from './step-delivery.js';
 import { decorateForFriendPush } from './auto-track.js';
-import { resolveInterpolationExtra } from './interpolation-context.js';
+import { resolveSendInterpolationExtra } from './interpolation-context.js';
 import { buildQuestionMessages, parseQuestion } from './scenario-question.js';
 
 export interface ImmediatePushContext {
@@ -393,7 +393,13 @@ export async function pushImmediateFirstStep(
       ctx.accountChannelId ? getLineAccountByChannelId(db, ctx.accountChannelId) : null,
     ]);
     const friendWithMeta = { ...friend, metadata: resolvedMeta } as Parameters<typeof expandVariables>[1];
-    const extra = await resolveInterpolationExtra(db, friend.id, resolved.messageContent);
+    // 質問の前文・選択肢文にも差し込みが効くので、スキャンは本文と
+    // 質問JSONを合わせた全体で行う。
+    const extra = await resolveSendInterpolationExtra(
+      db, friend.id,
+      `${resolved.messageContent}\n${resolved.questionJson ?? ''}`,
+      { kind: 'first_step', id: firstStep.id },
+    );
     const expanded = expandVariables(
       resolved.messageContent,
       friendWithMeta,
