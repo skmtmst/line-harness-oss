@@ -9,6 +9,7 @@ import { Field, inputClass } from '@/components/shared/create-page'
 import SelectField from '@/components/shared/select-field'
 import InlineActionList, { useActionOptions } from '@/components/auto-replies/inline-action-list'
 import { useAccount } from '@/contexts/account-context'
+import { isOwnerOrAdmin } from '@/lib/staff-capability'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import {
   readInlineActions,
@@ -84,6 +85,12 @@ function CarouselEditorInner() {
   const [folders, setFolders] = useState<Folder[]>([])
   const [tapLimitMode, setTapLimitMode] = useState<'none' | 'once'>('none')
   const [tapLimitText, setTapLimitText] = useState('')
+  /*
+   * N-144: カルーセルの作成・保存APIは owner/admin だけ。staff が
+   * シナリオ画面の選択肢から辿って来ても、フォームは出さない。
+   */
+  const [canMutateTemplates] = useState(() =>
+    typeof window === 'undefined' ? true : isOwnerOrAdmin())
   const actionOptions = useActionOptions()
 
   useEffect(() => {
@@ -287,6 +294,24 @@ function CarouselEditorInner() {
     } finally {
       setSaving(false)
     }
+  }
+
+  if (!canMutateTemplates) {
+    return (
+      <div>
+        <nav data-design="Crumb" className="text-ink-faint mb-2 text-xs">
+          <Link href="/templates" className="hover:underline">
+            テンプレート
+          </Link>
+          <span className="mx-1.5">/</span>
+          <span>カルーセル</span>
+        </nav>
+        <div role="alert" className="bg-canvas rounded-card border-hairline border p-8 text-sm">
+          <p className="font-bold text-ink">カルーセルの作成・変更はオーナーと管理者だけができます</p>
+          <Link href="/templates" className="text-accent hover:underline mt-3 inline-block text-sm">一覧へ戻る</Link>
+        </div>
+      </div>
+    )
   }
 
   return (

@@ -1365,7 +1365,23 @@ export default function TemplatesPage() {
       />
       </div>
       </div>
-      </> : <BroadcastAssetManager kind={activeSection} />}
+      </> : canMutateTemplates ? (
+        <BroadcastAssetManager kind={activeSection} />
+      ) : (
+        /*
+         * N-144: 資産タブの作成・編集・削除APIも owner/admin 限定。
+         * BroadcastAssetManager は別領域の部品なので、ここでは staff の
+         * 操作だけを inert で止め、中身の閲覧は残す。
+         */
+        <div>
+          <p className="text-ink-faint text-xs mb-3">
+            カルーセル・リッチメッセージ・クーポン・リサーチの作成・変更・削除はオーナーと管理者だけができます。一覧の閲覧はこのまま使えます。
+          </p>
+          <div inert>
+            <BroadcastAssetManager kind={activeSection} />
+          </div>
+        </div>
+      )}
       </div>
     </div>
   )

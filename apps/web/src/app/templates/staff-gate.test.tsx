@@ -12,6 +12,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 
 const templateGet = vi.hoisted(() => vi.fn())
+const searchParams = vi.hoisted(() => ({ value: new URLSearchParams() }))
 
 const TEMPLATES = [
   {
@@ -53,6 +54,9 @@ vi.mock('@/lib/api', () => ({
     },
     friendFields: { list: () => Promise.resolve({ success: true, data: [] }) },
     commonVars: { list: () => Promise.resolve({ success: true, data: [] }) },
+    tags: { list: () => Promise.resolve({ success: true, data: [] }) },
+    supportMarks: { list: () => Promise.resolve({ success: true, data: [] }) },
+    scenarios: { list: () => Promise.resolve({ success: true, data: [] }) },
   },
 }))
 
@@ -61,7 +65,7 @@ vi.mock('next/navigation', () => ({
     push: () => {}, replace: () => {}, refresh: () => {},
     back: () => {}, forward: () => {}, prefetch: () => {},
   }),
-  useSearchParams: () => new URLSearchParams(),
+  useSearchParams: () => searchParams.value,
   usePathname: () => '/templates',
 }))
 
@@ -72,6 +76,8 @@ vi.mock('next/link', () => ({
 
 import TemplatesPage from './page'
 import TemplateEditPage from './edit/page'
+import TemplateDetailPage from './detail/page'
+import CarouselEditorPage from './carousel/page'
 import QuestionTemplatePage from './questions/new/page'
 
 function stubRole(role: string | null) {
@@ -83,6 +89,7 @@ function stubRole(role: string | null) {
 }
 
 beforeEach(() => {
+  searchParams.value = new URLSearchParams()
   templateGet.mockReset()
   templateGet.mockImplementation((id: string) => Promise.resolve({
     success: true,
@@ -175,6 +182,75 @@ describe('テンプレート一覧のstaffゲート (N-144)', () => {
     await renderListAndWait()
     expect(screen.getByText('テンプレートを作る')).toBeTruthy()
     expect(screen.getByText('フォルダを追加')).toBeTruthy()
+  })
+})
+
+describe('資産タブのstaffゲート (N-144)', () => {
+  test('staffはカルーセル等のタブを閲覧できるが操作は効かない（inert）', async () => {
+    stubRole('staff')
+    await renderListAndWait()
+
+    fireEvent.click(screen.getByText('カルーセル'))
+    await act(async () => { await Promise.resolve() })
+    await act(async () => { await Promise.resolve() })
+
+    // 変更系の操作は生きていない: 中身は見えるが inert で包まれる
+    expect(screen.getByText(/オーナーと管理者だけができます。一覧の閲覧はこのまま使えます/)).toBeTruthy()
+    const inertRegion = document.querySelector('[inert]')
+    expect(inertRegion).toBeTruthy()
+  })
+
+  test('ownerの資産タブはinertにならず操作できる', async () => {
+    stubRole('owner')
+    await renderListAndWait()
+
+    fireEvent.click(screen.getByText('カルーセル'))
+    await act(async () => { await Promise.resolve() })
+    await act(async () => { await Promise.resolve() })
+
+    expect(document.querySelector('[inert]')).toBeNull()
+    expect(screen.queryByText(/オーナーと管理者だけができます。一覧の閲覧はこのまま使えます/)).toBeNull()
+  })
+})
+
+describe('テンプレート詳細画面のstaffゲート (N-144)', () => {
+  test('staffには編集・削除ボタンが出ず、中身は読める', async () => {
+    stubRole('staff')
+    searchParams.value = new URLSearchParams('id=tpl-1')
+    render(<TemplateDetailPage />)
+    await act(async () => { await Promise.resolve() })
+    await act(async () => { await Promise.resolve() })
+
+    // 閲覧は残る（本文が読める — 本文とプレビューの2箇所に出る）
+    expect((await screen.findAllByText('ご来店ありがとうございました。')).length).toBeGreaterThan(0)
+    // 編集・削除の口は出ない
+    expect(screen.queryByText('テンプレートを編集')).toBeNull()
+    expect(screen.queryByText('テンプレートを削除')).toBeNull()
+    expect(screen.queryByText('使用中のため削除できません')).toBeNull()
+  })
+
+  test('ownerには編集・削除ボタンが出る', async () => {
+    stubRole('owner')
+    searchParams.value = new URLSearchParams('id=tpl-1')
+    render(<TemplateDetailPage />)
+    await act(async () => { await Promise.resolve() })
+    await act(async () => { await Promise.resolve() })
+
+    expect((await screen.findAllByText('ご来店ありがとうございました。')).length).toBeGreaterThan(0)
+    expect(screen.getByText('テンプレートを編集')).toBeTruthy()
+  })
+})
+
+describe('カルーセル編集画面のstaffゲート (N-144)', () => {
+  test('staffが正規導線から来てもフォームは出ず案内だけが出る', async () => {
+    stubRole('staff')
+    render(<CarouselEditorPage />)
+    await act(async () => { await Promise.resolve() })
+    await act(async () => { await Promise.resolve() })
+
+    expect(screen.getByRole('alert')).toBeTruthy()
+    expect(screen.getByText('カルーセルの作成・変更はオーナーと管理者だけができます')).toBeTruthy()
+    expect(screen.getByText('一覧へ戻る')).toBeTruthy()
   })
 })
 
