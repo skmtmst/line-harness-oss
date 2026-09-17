@@ -112,6 +112,17 @@ async function makeDirty() {
   expect(button('機能設定を保存').disabled).toBe(false)
 }
 
+/** 保存に必須の変更理由を入れる。 */
+async function fillReason(text = 'テスト') {
+  const input = host.querySelector<HTMLInputElement>('#feature-settings-reason')
+  if (!input) throw new Error('変更理由の入力欄がありません')
+  const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!
+  await act(async () => {
+    setter.call(input, text)
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+  })
+}
+
 function beforeUnload() {
   const event = new Event('beforeunload', { cancelable: true })
   window.dispatchEvent(event)
@@ -161,6 +172,7 @@ describe('N-445 機能設定の未保存離脱確認', () => {
     await render()
     expect(beforeUnload().defaultPrevented).toBe(false)
     await makeDirty()
+    await fillReason()
     expect(beforeUnload().defaultPrevented).toBe(true)
     expect(add.mock.calls.filter(([name]) => name === 'beforeunload')).toHaveLength(1)
 

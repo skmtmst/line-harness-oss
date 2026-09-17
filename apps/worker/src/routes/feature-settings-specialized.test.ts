@@ -49,7 +49,7 @@ async function putCatalog(catalog: unknown, staff: AuthenticatedStaff = operator
   return app(staff).request('/api/settings/features?account_id=default-account', {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ catalog }),
+    body: JSON.stringify({ catalog, reason: 'テスト' }),
   }, environment());
 }
 
@@ -81,7 +81,7 @@ describe('専用機能目録 API', () => {
     const response = await app().request('/api/settings/features?account_id=default-account', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ expectedVersion: 0, features: { restaurant_test: true } }),
+      body: JSON.stringify({ expectedVersion: 0, reason: 'テスト', features: { restaurant_test: true } }),
     }, bindings);
 
     expect(response.status).toBe(200);

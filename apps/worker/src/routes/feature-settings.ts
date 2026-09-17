@@ -1,14 +1,20 @@
 import { Hono } from 'hono';
 import type { Context } from 'hono';
 import {
+  auditDeviceFamily,
+  auditEventStatement,
   getAccountSetting,
   getVersionedAccountSetting,
+  maskAuditIp,
   setAccountSetting,
 } from '@line-crm/db';
 import {
   DEFAULT_TENANT_ID,
   FEATURE_CATALOG,
   FEATURE_IDS,
+  MENU_SECTION_LABELS,
+  expectedMenuItemOrder,
+  isMenuSectionId,
   type FeatureId,
 } from '@line-crm/shared';
 import type { Env } from '../index.js';
@@ -795,6 +801,52 @@ function cleanItemOrder(raw: unknown): Record<string, string[]> | null {
   return cleaned;
 }
 
+/**
+ * 区分の並び（sidebarOrder）の保存値検査。
+ *
+ * 読み出し側は部分・未知を許容して残すが、書き込みはカタログの
+ * 区分見出しをちょうど1回ずつ並べた完全な順序だけを受け付ける。
+ * 未知の区分や過不足を通すと、読み出し側の「知らない値は捨てる」
+ * 処理で並びが黙って欠ける（N-441）。
+ */
+function cleanSidebarOrderStrict(raw: unknown): string[] | null {
+  const values = cleanStringArray(raw);
+  if (!values) return null;
+  if (values.length !== MENU_SECTION_LABELS.length) return null;
+  const known = new Set(MENU_SECTION_LABELS);
+  return values.every((label) => known.has(label)) ? values : null;
+}
+
+/**
+ * 区分ごとの項目の並び（sidebarItemOrder）の保存値検査。
+ *
+ * 画面が組み立てる完全な順序と同じ約束をサーバーでも検査する:
+ * 知らない区分・知らない項目・別区分の項目・重複・欠落・余分は
+ * 全部400。専用機能の区分は、そのアカウントの専用カタログへ
+ * 実際に載っている項目だけが正解になる（画面側の絞り込みと同じ）。
+ */
+function cleanItemOrderStrict(
+  raw: unknown,
+  specializedFeatureKeys: ReadonlySet<string>,
+): Record<string, string[]> | null {
+  const cleaned = cleanItemOrder(raw);
+  if (!cleaned) return null;
+  const expected = expectedMenuItemOrder(specializedFeatureKeys);
+  for (const sectionId of Object.keys(cleaned)) {
+    if (!isMenuSectionId(sectionId)) return null;
+  }
+  for (const [sectionId, ids] of Object.entries(cleaned)) {
+    const wanted = expected[sectionId] ?? [];
+    if (ids.length !== wanted.length) return null;
+    const submitted = new Set(ids);
+    if (!wanted.every((id) => submitted.has(id))) return null;
+  }
+  for (const sectionId of Object.keys(expected)) {
+    if (!Object.prototype.hasOwnProperty.call(cleaned, sectionId)) return null;
+  }
+  return cleaned;
+}
+
 async function loadLegacyFeatureSettings(
   db: D1Database,
   accountId: string,
@@ -1082,6 +1134,7 @@ featureSettings.put('/api/settings/features', requireRole('owner', 'admin'), asy
       catalog?: unknown;
       expectedVersion?: unknown;
       impactToken?: unknown;
+      reason?: unknown;
     }>();
 
     let catalog: ToggleableFeature[] | undefined;
@@ -1123,22 +1176,33 @@ featureSettings.put('/api/settings/features', requireRole('owner', 'admin'), asy
 
     let sidebarOrder: string[] | null | undefined;
     if (body.sidebarOrder !== undefined) {
-      sidebarOrder = cleanStringArray(body.sidebarOrder);
+      sidebarOrder = cleanSidebarOrderStrict(body.sidebarOrder);
       if (!sidebarOrder) {
         return c.json({
           success: false,
-          error: 'sidebarOrder は重複のない文字列配列で指定してください',
+          error: 'sidebarOrder はすべての区分を過不足なく並べた配列で指定してください',
         }, 400);
       }
     }
 
     let sidebarItemOrder: Record<string, string[]> | null | undefined;
     if (body.sidebarItemOrder !== undefined) {
-      sidebarItemOrder = cleanItemOrder(body.sidebarItemOrder);
+      /*
+       * 正解の顔ぶれはアカウントごとの専用カタログで変わる。
+       * 同じ要求でカタログも変わるなら保存後の姿（新しいカタログ）を
+       * 正解にする。画面が現在の表示から組み立てた完全な並びと
+       * 一致するものだけを受け付ける（N-441）。
+       */
+      const specializedKeys = catalog !== undefined
+        ? new Set<string>(catalog)
+        : new Set(specializedCatalog(
+            await getAccountSetting(c.env.DB, accountId, SPECIALIZED_CATALOG_KEY),
+          ));
+      sidebarItemOrder = cleanItemOrderStrict(body.sidebarItemOrder, specializedKeys);
       if (!sidebarItemOrder) {
         return c.json({
           success: false,
-          error: 'sidebarItemOrder は重複のない文字列配列を持つオブジェクトで指定してください',
+          error: 'sidebarItemOrder は各区分の項目を過不足なく並べたオブジェクトで指定してください',
         }, 400);
       }
     }
@@ -1146,6 +1210,19 @@ featureSettings.put('/api/settings/features', requireRole('owner', 'admin'), asy
     const hasBundleUpdate = body.features !== undefined
       || body.sidebarOrder !== undefined
       || body.sidebarItemOrder !== undefined;
+
+    /*
+     * 変更理由の必須化（N-444）。あとから「なぜ変えたか」を追えるよう、
+     * 保存する要求は全部、空白ではない理由を持つこと。
+     */
+    const reason = typeof body.reason === 'string' ? body.reason.trim() : '';
+    if ((hasBundleUpdate || catalog !== undefined) && reason.length === 0) {
+      return c.json({
+        success: false,
+        error: '変更理由を入力してください',
+        code: 'FEATURE_SETTINGS_REASON_REQUIRED',
+      }, 400);
+    }
     /*
      * 機能・順序の保存は版なしでは受け付けない(#643)。版なし逐次保存は
      * 途中失敗で部分反映になり、版付きGETとの不整合を起こすため。
@@ -1188,6 +1265,8 @@ featureSettings.put('/api/settings/features', requireRole('owner', 'admin'), asy
      */
     const restaurantEnabledForImpact = restaurantTestEnabled(c.env);
     let presentedToken: string | null = null;
+    /** 監査へ残す影響確認の結果。確認が要らない変更は要らなかったと記録する。 */
+    let impactAudit: { offCount: number; blocking: boolean; confirmed: boolean } | null = null;
     if (body.features !== undefined) {
       const impactCurrent = await loadFeatureSettings(
         c.env.DB,
@@ -1202,7 +1281,9 @@ featureSettings.put('/api/settings/features', requireRole('owner', 'admin'), asy
       const impactOffs = offTransitions(impactCurrent.features, impactNext);
       if (impactOffs.length > 0) {
         const impacts = await buildImpacts(c.env.DB, accountId, impactOffs);
-        if (impacts.some((impact) => impact.blocking)) {
+        const blocking = impacts.some((impact) => impact.blocking);
+        impactAudit = { offCount: impactOffs.length, blocking, confirmed: false };
+        if (blocking) {
           const fingerprint = await impactFingerprint({
             accountId,
             version: impactCurrent.version,
@@ -1223,11 +1304,13 @@ featureSettings.put('/api/settings/features', requireRole('owner', 'admin'), asy
             }, 409);
           }
           presentedToken = body.impactToken;
+          impactAudit = { offCount: impactOffs.length, blocking: true, confirmed: true };
         }
       }
     }
 
     let savedVersion: number | null = null;
+    let auditSaved = false;
 
     /**
      * 一括保存(#643)。一括設定・専用カタログ・確認トークン消費を
@@ -1313,6 +1396,46 @@ featureSettings.put('/api/settings/features', requireRole('owner', 'admin'), asy
             WHERE line_account_id = ? AND key = ? AND ${versionGuard}`,
         ).bind(accountId, OFF_CONFIRM_KEY, ...guardParams));
       }
+      /*
+       * 保存の監査（N-444）も同じbatch・同じ判定式で書く。
+       * CASに負けたときは監査行も0行になり、「保存されていない成功」や
+       * 「前後versionが混ざった監査」は残らない。
+       */
+      const staff = c.get('staff');
+      const auditData = {
+        features: { ...current.features, ...incomingFeatures },
+        sidebarOrder: sidebarOrder === undefined ? current.sidebarOrder : sidebarOrder,
+        sidebarItemOrder: sidebarItemOrder === undefined
+          ? current.sidebarItemOrder
+          : sidebarItemOrder,
+      };
+      statements.push(auditEventStatement(
+        c.env.DB,
+        {
+          sourceKind: 'feature_settings',
+          tenantId: staff?.tenantId,
+          lineAccountId: accountId,
+          category: 'business',
+          actorPrincipalId: staff?.id,
+          actorRole: staff?.role,
+          action: 'feature_settings.save',
+          targetKind: 'feature_settings',
+          targetId: accountId,
+          result: 'success',
+          before: { ...current },
+          after: {
+            version: nextVersion,
+            ...auditData,
+            catalog: catalog ?? null,
+            impact: impactAudit,
+          },
+          reason,
+          requestTraceId: c.req.header('cf-ray') ?? c.req.header('x-request-id') ?? null,
+          ipPrefix: maskAuditIp(c.req.header('cf-connecting-ip')),
+          deviceFamily: auditDeviceFamily(c.req.header('user-agent')),
+        },
+        { sql: versionGuard, params: guardParams },
+      ));
       // 一括設定の更新は最後に置く。先に置くと後続の判定式が
       // 「新しい版」を見てしまい、同じ前提で揃わなくなる。
       const casIndex = statements.length;
@@ -1362,14 +1485,51 @@ featureSettings.put('/api/settings/features', requireRole('owner', 'admin'), asy
         }, 409);
       }
       savedVersion = nextVersion;
+      auditSaved = true;
     } else if (catalog !== undefined) {
-      // 専用カタログだけの変更は単独1行の保存で、部分反映は起きない。
-      await setAccountSetting(
-        c.env.DB,
-        accountId,
-        SPECIALIZED_CATALOG_KEY,
-        JSON.stringify(catalog),
-      );
+      /*
+       * 専用カタログだけの変更は単独1行の保存で部分反映は起きないが、
+       * 監査も同じbatchに入れて「保存だけ残る」「監査だけ残る」の
+       * どちらも起こさない（N-444）。
+       */
+      const staff = c.get('staff');
+      const now = new Date(Date.now() + 9 * 60 * 60_000)
+        .toISOString()
+        .replace('Z', '+09:00');
+      const catalogValue = JSON.stringify(catalog);
+      const previousRaw = await getAccountSetting(c.env.DB, accountId, SPECIALIZED_CATALOG_KEY);
+      await c.env.DB.batch([
+        c.env.DB.prepare(
+          `INSERT INTO account_settings (id, line_account_id, key, value, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?)
+           ON CONFLICT (line_account_id, key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`,
+        ).bind(crypto.randomUUID(), accountId, SPECIALIZED_CATALOG_KEY, catalogValue, now, now),
+        auditEventStatement(c.env.DB, {
+          sourceKind: 'feature_settings',
+          tenantId: staff?.tenantId,
+          lineAccountId: accountId,
+          category: 'business',
+          actorPrincipalId: staff?.id,
+          actorRole: staff?.role,
+          action: 'feature_settings.save',
+          targetKind: 'feature_settings',
+          targetId: accountId,
+          result: 'success',
+          before: { catalog: previousRaw ? specializedCatalog(previousRaw) : null },
+          after: { catalog },
+          reason,
+          requestTraceId: c.req.header('cf-ray') ?? c.req.header('x-request-id') ?? null,
+          ipPrefix: maskAuditIp(c.req.header('cf-connecting-ip')),
+          deviceFamily: auditDeviceFamily(c.req.header('user-agent')),
+        }),
+      ]);
+      auditSaved = true;
+    }
+
+    if (auditSaved) {
+      // 詳しい監査は保存と同じbatchで書いた。共通middlewareの
+      // 素の記録（api.put…）と二重にしない。
+      c.set('auditRecorded', true);
     }
 
     // 確認トークンの使い切り消費は保存と同じbatchに含めた。
