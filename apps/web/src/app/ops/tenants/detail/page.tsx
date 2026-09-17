@@ -13,6 +13,7 @@ import {
   formatDateTime,
   planLabel,
   tenantStatusChip,
+  opsCall,
 } from '@/components/ops/ops-ui'
 import Button from '@/components/shared/button'
 import Card, { CardHeader } from '@/components/shared/card'
@@ -58,7 +59,7 @@ function OpsTenantDetailContent() {
 
   const load = useCallback(async () => {
     if (!id) { setError('契約先が指定されていません'); return }
-    const res = await api.ops.tenant(id)
+    const res = await opsCall(api.ops.tenant(id))
     if (!res.success) { setError(res.error || '読み込めませんでした'); return }
     setDetail(res.data)
   }, [id])
@@ -68,7 +69,7 @@ function OpsTenantDetailContent() {
   const impersonate = async () => {
     if (!detail) return
     setBusy(true)
-    const res = await api.ops.impersonation.start(detail.tenant.id)
+    const res = await opsCall(api.ops.impersonation.start(detail.tenant.id))
     setBusy(false)
     if (!res.success) { setError(res.error || '代理ログインを始められませんでした'); return }
     window.location.assign('/hq')
@@ -266,7 +267,7 @@ function StatusDialog({ tenantId, target, tenantName, onClose, onDone }: { tenan
     if (!ready || busy) return
     setBusy(true)
     setError('')
-    const res = await api.ops.changeTenantStatus(tenantId, { status: target, reason: reason.trim(), confirmName: needsName ? confirmName : undefined })
+    const res = await opsCall(api.ops.changeTenantStatus(tenantId, { status: target, reason: reason.trim(), confirmName: needsName ? confirmName : undefined }))
     setBusy(false)
     if (!res.success) { setError(res.error || '変更できませんでした'); return }
     onDone()

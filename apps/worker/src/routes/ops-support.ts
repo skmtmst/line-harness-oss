@@ -49,7 +49,10 @@ opsSupport.use('/api/ops/support/*', requirePlatformAdmin());
 const REPLY_MAX = 4000;
 const SUBJECT_MAX = 120;
 const BODY_MAX = 4000;
-const AI_MODEL = '@cf/zai-org/glm-4.7-flash';
+/** 既定の下書きモデル。環境変数 OPS_SUPPORT_AI_MODEL で差し替えられる（値は Workers AI のモデル名）。 */
+const DEFAULT_AI_MODEL = '@cf/meta/llama-3.3-70b-instruct-fp8-fast';
+/** Workers AI の応答を待つ上限。超えたら 504 を返し、画面は「待たずに手で書く」へ戻す。 */
+const AI_TIMEOUT_MS = 45_000;
 
 function workerUrl(c: Context<Env>): string {
   return c.env.WORKER_URL || new URL(c.req.url).origin;
@@ -397,20 +400,33 @@ opsSupport.post('/api/ops/support/tickets/:id/draft/ai', requirePlatformAdminWri
     messages: messages.map((m) => ({ authorKind: m.author_kind, authorName: m.author_name, body: m.body })),
     opsName: staff.name,
   });
+  const model = c.env.OPS_SUPPORT_AI_MODEL || DEFAULT_AI_MODEL;
   let text = '';
   try {
-    const result = await (c.env.AI.run as (model: string, input: unknown) => Promise<unknown>)(AI_MODEL, {
+    const run = (c.env.AI.run as (model: string, input: unknown) => Promise<unknown>)(model, {
       messages: [
         { role: 'system', content: prompt.system },
         { role: 'user', content: prompt.user },
       ],
       temperature: 0.3,
-      max_completion_tokens: 900,
+      max_tokens: 900,
     });
-    text = aiText(result);
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const timeout = new Promise<never>((_, reject) => {
+      timer = setTimeout(() => reject(new Error(`AI timeout after ${AI_TIMEOUT_MS}ms`)), AI_TIMEOUT_MS);
+    });
+    try {
+      text = aiText(await Promise.race([run, timeout]));
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
   } catch (error) {
-    console.error('[ops-support] AI draft failed', { message: error instanceof Error ? error.message : String(error) });
-    return c.json({ success: false, error: 'AI の下書きを作れませんでした。しばらくしてからもう一度お試しください' }, 502);
+    const detail = error instanceof Error ? { name: error.name, message: error.message } : { name: 'UnknownError', message: String(error) };
+    console.error('[ops-support] AI draft failed', { model, ...detail });
+    if (detail.message.startsWith('AI timeout')) {
+      return c.json({ success: false, error: 'AI の応答が 45 秒以内に返りませんでした。手で書くか、少し待ってからもう一度お試しください' }, 504);
+    }
+    return c.json({ success: false, error: `AI の下書きを作れませんでした（${detail.message.slice(0, 120)}）` }, 502);
   }
   if (!text) return c.json({ success: false, error: 'AI の下書きが空でした。もう一度お試しください' }, 502);
   const draft = await saveSupportReplyDraft(db, { requestId: ticket.id, body: text.slice(0, REPLY_MAX), aiGenerated: true, authorStaffId: staff.id });
