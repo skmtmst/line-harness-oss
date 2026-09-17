@@ -12,7 +12,7 @@ const editor = readFileSync(join(HERE, '..', '..', 'components', 'scenarios', 'q
 describe('V6 質問テンプレート', () => {
   it('NNDMRを質問専用画面として開き、本文タイトルを重ねない', () => {
     expect(page).toContain('data-design-node="NNDMR"')
-    expect(page).toContain("usePageTitle('質問を作る')")
+    expect(page).toContain("usePageTitle(canMutateTemplates ? '質問を作る' : '質問テンプレート')")
     expect(page).not.toContain('<h1')
     expect(page).not.toContain("import Header from '@/components/layout/header'")
     expect(templates).toContain('href="/templates/questions/new"')

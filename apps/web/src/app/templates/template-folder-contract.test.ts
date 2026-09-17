@@ -47,7 +47,7 @@ describe('V6 テンプレートのフォルダ操作（CzndJ）', () => {
 
   it('設計と同じ操作メニューを撮る入口がある', () => {
     // 真ん中の行を開き、上へ・下へを同時に画像へ残す。
-    expect(PAGE).toContain("qaOpen: folder.name === '予約' ? 'CzndJ' : undefined")
+    expect(PAGE).toContain("qaOpen: canMutateTemplates && folder.name === '予約' ? 'CzndJ' : undefined")
     expect(PANEL).toContain('data-qa-open={row.qaOpen}')
   })
 

@@ -22,6 +22,16 @@ function isPrivilegedRole(): boolean {
   return role === 'owner' || role === 'admin';
 }
 
+/**
+ * サーバーが項目キーではなく役割で門を閉めている操作（例: テンプレートの
+ * 作成・更新・削除は requireRole('owner','admin')）を画面へ出してよいか。
+ * staff に項目キーがあっても API は拒否するので、ここは役割だけを見る。
+ */
+export function isOwnerOrAdmin(): boolean {
+  if (typeof window === 'undefined') return false;
+  return isPrivilegedRole();
+}
+
 /** 変更系操作を画面へ出してよいか（edit キー相当）。 */
 export function canEditFeature(permission: string): boolean {
   if (typeof window === 'undefined') return false;

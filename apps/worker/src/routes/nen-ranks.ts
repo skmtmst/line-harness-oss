@@ -23,6 +23,13 @@ import { requireRole } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 import { NenRankSyncError, buildNenRankSyncPayload, pushNenRankSettingsToEc } from '../services/nen-rank-sync.js';
 import { refreshAllNenTags } from '../services/nen-tag-sync.js';
+import {
+  ENERGY_FACTORS,
+  NenFeedingValidationError,
+  listFeedingProducts,
+  refreshAccountFeeding,
+  saveFeedingProducts,
+} from '../services/nen-feeding.js';
 
 /**
  * 然-NEN- 会員（ランク・ライフタイム・マイル）。★V6 37-1（`IqL2Z`）／37-1-A（`p7xHl`）／37-1-B（`Vt65m`）。
@@ -219,6 +226,53 @@ nenRanks.post('/api/nen/rank-settings/resync', requireRole('owner', 'admin'), as
   await ensureNenRankDefaults(c.env.DB, accountId);
   const sync = await syncToEc(c, accountId);
   return c.json({ success: true, data: { ...(await settingsResponse(c, accountId)), sync } });
+});
+
+/**
+ * 主食のカロリー表（★V6 37-1 会員 › 給与量）。マイページ「今日の目安」のグラム数はここから決まる。
+ * ペットの正本は LINE 側。EC には送らない。
+ */
+function feedingProductsResponse(products: Awaited<ReturnType<typeof listFeedingProducts>>, petCount: number) {
+  return {
+    products: products.map((p) => ({ id: p.id, name: p.name, kcalPer100g: Number(p.kcal_per_100g), isDefault: p.is_default === 1 })),
+    petCount,
+    factors: ENERGY_FACTORS,
+  };
+}
+
+async function accountPetCount(db: D1Database, accountId: string): Promise<number> {
+  const row = await db.prepare(
+    `SELECT COUNT(*) AS n FROM nen_pet_profiles p JOIN friends f ON f.id = p.friend_id WHERE f.line_account_id = ?`,
+  ).bind(accountId).first<{ n: number }>();
+  return Number(row?.n ?? 0);
+}
+
+nenRanks.get('/api/nen/feeding-products', async (c) => {
+  const accountId = accountIdFrom(c);
+  const denied = await requireAccount(c, accountId);
+  if (denied) return denied;
+  const [products, petCount] = await Promise.all([listFeedingProducts(c.env.DB, accountId), accountPetCount(c.env.DB, accountId)]);
+  return c.json({ success: true, data: feedingProductsResponse(products, petCount) });
+});
+
+nenRanks.put('/api/nen/feeding-products', requireRole('owner', 'admin'), async (c) => {
+  const body = await c.req.json<{ accountId?: string; products?: unknown }>().catch(() => null);
+  const accountId = accountIdFrom(c, body);
+  const denied = await requireAccount(c, accountId);
+  if (denied) return denied;
+  if (!body || !Array.isArray(body.products)) return c.json({ success: false, error: 'products is required' }, 400);
+  const now = jstNow();
+  let products;
+  try {
+    products = await saveFeedingProducts(c.env.DB, accountId, body.products, now);
+  } catch (error) {
+    if (error instanceof NenFeedingValidationError) return c.json({ success: false, error: error.message }, 400);
+    throw error;
+  }
+  // 表を変えたら、登録済みのペットの目安も直す（表示は毎回計算するが、保存値も揃えておく）。
+  const refreshed = await refreshAccountFeeding(c.env.DB, accountId, now);
+  const petCount = await accountPetCount(c.env.DB, accountId);
+  return c.json({ success: true, data: { ...feedingProductsResponse(products, petCount), refreshedPets: refreshed } });
 });
 
 nenRanks.get('/api/nen/members', async (c) => {

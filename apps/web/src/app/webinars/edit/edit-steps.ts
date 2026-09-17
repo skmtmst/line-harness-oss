@@ -41,7 +41,7 @@ export type StepState = 'done' | 'current' | 'todo'
  * 通り過ぎただけで済みにすると、空のまま公開へ進める。
  * 設計の緑のチェックは「その段の入力が入っている」という意味で使う。
  */
-export function stepStateOf(key: StepKey, current: StepKey, webinar: Webinar | null): StepState {
+export function stepStateOf(key: StepKey, current: StepKey, webinar: Webinar | null, ctaCount?: number): StepState {
   if (key === current) return 'current'
   if (!webinar) return 'todo'
   switch (key) {
@@ -51,8 +51,13 @@ export function stepStateOf(key: StepKey, current: StepKey, webinar: Webinar | n
       return webinar.videoPrefix && webinar.durationSeconds > 0 && webinar.schedule.length > 0
         ? 'done'
         : 'todo'
+    /*
+      CTAの正本はカード（webinar_ctas）。旧 webinar.cta は管理画面からは
+      もう書けない。カード件数が渡されたらそれを見て、渡されない古い
+      呼び方だけ旧欄へ倒す。
+    */
     case 'cta':
-      return webinar.cta ? 'done' : 'todo'
+      return (ctaCount !== undefined ? ctaCount > 0 : Boolean(webinar.cta)) ? 'done' : 'todo'
     /*
       通知と確認は、この画面が持っている値だけでは「済み」と言えない。
       通知の設定は別の口にあり、確認は人が読んで決めること。

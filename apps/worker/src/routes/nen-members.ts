@@ -18,6 +18,18 @@ import { pushViaHarnessProxy } from '../services/line-proxy-send.js';
 import { dispatchLineProxyLocally } from '../services/local-line-proxy.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 import { installNenRichMenu } from '../services/nen-rich-menu.js';
+import {
+  ACTIVITY_LABELS,
+  type FeedingPlan,
+  type FeedingProductRow,
+  listFeedingProducts,
+  neuteredFromInput,
+  neuteredFromRow,
+  normalizeActivity,
+  pickProduct,
+  planForPetRow,
+  refreshStoredFeeding,
+} from '../services/nen-feeding.js';
 import { attachTagAndFireSideEffects } from '../services/friend-tag-attach.js';
 import {
   refreshAllNenTags,
@@ -409,17 +421,66 @@ async function buildMembership(db: D1Database, lineAccountId: string | null, sna
   };
 }
 
-function mapPet(row: Record<string, unknown>) {
+/**
+ * LIFF に返すペット。`feeding` は NRC／FEDIAF の式で毎回計算し直す（★V6 37-2「今日の目安」）。
+ * 主食（nen_feeding_products）が無いアカウントでは kcal だけ返し、グラムは null。
+ */
+function mapPet(row: Record<string, unknown>, products: FeedingProductRow[] = []) {
+  const neutered = neuteredFromRow(row.neutered);
+  const plan = planForPetRow({
+    id: String(row.id), animal_type: String(row.animal_type || 'dog'), weight_kg: row.weight_kg as number | null,
+    birthday: (row.birthday as string | null) ?? null, neutered: row.neutered as number | null,
+    activity_level: (row.activity_level as string | null) ?? null, feeding_product_id: (row.feeding_product_id as string | null) ?? null,
+  }, products);
   return {
     id: row.id, customerId: row.customer_id, name: row.name, animalType: row.animal_type,
     gender: row.gender, breed: row.breed, birthday: row.birthday, weightKg: row.weight_kg,
     concerns: JSON.parse(String(row.concerns || '[]')),
+    neutered: neutered === true ? 'yes' : neutered === false ? 'no' : 'unknown',
+    activityLevel: normalizeActivity(row.activity_level) ?? 'normal',
+    feedingProductId: row.feeding_product_id || null,
+    feeding: feedingView(plan),
     recommendedDailyGrams: row.recommended_daily_grams,
     recommendedDailyMinGrams: row.recommended_daily_min_grams,
     recommendedDailyMaxGrams: row.recommended_daily_max_grams,
     venisonDailyGrams: row.venison_daily_grams, foodCycleDays: row.food_cycle_days,
     imageUrl: row.image_url || null,
   };
+}
+
+function feedingView(plan: FeedingPlan | null) {
+  if (!plan) return null;
+  return {
+    dailyKcal: plan.dailyKcal, dailyGrams: plan.dailyGrams, minGrams: plan.minGrams, maxGrams: plan.maxGrams,
+    rerKcal: plan.rerKcal, factor: plan.factor, factorLabel: plan.factorLabel, stage: plan.stage, stageLabel: plan.stageLabel,
+    ageMonths: plan.ageMonths, product: plan.product,
+  };
+}
+
+function feedingProductsView(products: FeedingProductRow[]) {
+  return products.map((p) => ({ id: p.id, name: p.name, kcalPer100g: Number(p.kcal_per_100g), isDefault: p.is_default === 1 }));
+}
+
+async function accountFeedingProducts(c: Context<Env>, friend: FriendRow): Promise<FeedingProductRow[]> {
+  if (!friend.line_account_id) return [];
+  try {
+    return await listFeedingProducts(c.env.DB, friend.line_account_id);
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * ペットの登録・変更に共通の入力（体重・避妊去勢・活動量・主食）。
+ * 想定外の値はエラーにせず「変更しない」（undefined）として扱う。
+ */
+function petFeedingInput(body: Record<string, unknown> | null, products: FeedingProductRow[]) {
+  const neutered = neuteredFromInput(body?.neutered);
+  const activityLevel = normalizeActivity(body?.activityLevel);
+  const rawProduct = body?.feedingProductId;
+  const feedingProductId = rawProduct === null || rawProduct === '' ? null
+    : typeof rawProduct === 'string' && products.some((p) => p.id === rawProduct) ? rawProduct : undefined;
+  return { neutered, activityLevel, feedingProductId };
 }
 
 function decodeJpegData(data: unknown): Uint8Array | null {
@@ -454,10 +515,13 @@ nenMembers.get('/api/liff/nen/member', async (c) => {
     c.env.DB.prepare(`SELECT id, pet_id, topic, result_text, tag_name, created_at FROM nen_consultation_logs_v2 WHERE friend_id = ? ORDER BY created_at DESC LIMIT 20`).bind(friend.id).all<Record<string, unknown>>(),
   ]);
   const membership = await buildMembership(c.env.DB, friend.line_account_id, snapshot);
+  const feedingProducts = await accountFeedingProducts(c, friend);
   return c.json({ success: true, data: {
     owner: { displayName: friend.display_name, customerId: snapshot?.customer_id || null },
     membership,
-    pets: pets.results.map(mapPet),
+    pets: pets.results.map((row) => mapPet(row, feedingProducts)),
+    feedingProducts: feedingProductsView(feedingProducts),
+    activityLabels: ACTIVITY_LABELS,
     commerce: snapshot ? {
       orders: JSON.parse(String(snapshot.orders_json || '[]')),
       subscription: snapshot.subscription_json ? JSON.parse(String(snapshot.subscription_json)) : null,
@@ -547,6 +611,8 @@ nenMembers.post('/api/liff/nen/pets', async (c) => {
     return c.json({ success: false, error: '入力内容を確認してください' }, 400);
   }
   const guide = feedingGuide(animalType, weightKg);
+  const products = await accountFeedingProducts(c, friend);
+  const feeding = petFeedingInput(body, products);
   const id = crypto.randomUUID();
   const now = jstNow();
   const photoBytes = body?.photoData ? decodeJpegData(body.photoData) : null;
@@ -558,18 +624,102 @@ nenMembers.post('/api/liff/nen/pets', async (c) => {
     `INSERT INTO nen_pet_profiles
       (id, friend_id, customer_id, name, animal_type, gender, birthday, breed, weight_kg, concerns,
        recommended_daily_grams, recommended_daily_min_grams, recommended_daily_max_grams,
-       venison_daily_grams, food_cycle_days, image_r2_key, image_url, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       venison_daily_grams, food_cycle_days, image_r2_key, image_url, created_at, updated_at,
+       neutered, activity_level, feeding_product_id)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).bind(
     id, friend.id, friend.user_id, name, animalType,
     ['male', 'female'].includes(String(body?.gender)) ? String(body?.gender) : 'unknown',
     birthday, breed, weightKg, JSON.stringify(concerns), guide.daily, guide.min, guide.max,
     guide.venison, guide.cycleDays, photoKey, imageUrl, now, now,
+    feeding.neutered === undefined || feeding.neutered === null ? null : feeding.neutered ? 1 : 0,
+    feeding.activityLevel ?? 'normal',
+    feeding.feedingProductId ?? null,
   ).run();
+  // NRC／FEDIAF の式で目安を上書き（主食が登録されているときだけグラムが決まる）。
+  const plan = planForPetRow({
+    id, animal_type: animalType, weight_kg: weightKg, birthday, neutered: feeding.neutered == null ? null : feeding.neutered ? 1 : 0,
+    activity_level: feeding.activityLevel ?? 'normal', feeding_product_id: feeding.feedingProductId ?? null,
+  }, products);
+  await refreshStoredFeeding(c.env.DB, id, plan, now);
   await syncNenPetTags(c.env.DB, friend.id);
   const saved = await c.env.DB.prepare(`SELECT * FROM nen_pet_profiles WHERE id = ?`).bind(id).first<Record<string, unknown>>();
   if (saved) c.executionCtx.waitUntil(pushPetCard(c, friend, saved).catch((err: unknown) => console.error('pet card push failed', err)));
-  return c.json({ success: true, data: mapPet(saved || { id }) }, 201);
+  return c.json({ success: true, data: mapPet(saved || { id }, products) }, 201);
+});
+
+/**
+ * ペットの変更（★V6 37-2 マイペット「編集」）。体重・避妊去勢・活動量・主食・お悩みなど、
+ * 送られてきた項目だけを変える。目安（daily_kcal / recommended_*）はそのたびに計算し直す。
+ */
+nenMembers.put('/api/liff/nen/pets/:id', async (c) => {
+  const friend = await currentFriend(c);
+  if (!friend) return c.json({ success: false, error: 'Unauthorized' }, 401);
+  const petId = c.req.param('id');
+  const current = await c.env.DB.prepare(`SELECT * FROM nen_pet_profiles WHERE id = ? AND friend_id = ?`).bind(petId, friend.id).first<Record<string, unknown>>();
+  if (!current) return c.json({ success: false, error: 'Pet not found' }, 404);
+  const body = await c.req.json<Record<string, unknown>>().catch(() => null);
+  if (!body || typeof body !== 'object') return c.json({ success: false, error: '入力内容を確認してください' }, 400);
+
+  const sets: string[] = [];
+  const values: unknown[] = [];
+  if (body.name !== undefined) {
+    const name = typeof body.name === 'string' ? body.name.trim() : '';
+    if (!name || name.length > 80) return c.json({ success: false, error: '名前は1〜80文字で入力してください' }, 400);
+    sets.push('name = ?'); values.push(name);
+  }
+  if (body.breed !== undefined) {
+    const breed = typeof body.breed === 'string' ? body.breed.trim().slice(0, 80) : '';
+    if (!breed) return c.json({ success: false, error: '品種を入力してください' }, 400);
+    sets.push('breed = ?'); values.push(breed);
+  }
+  if (body.gender !== undefined) {
+    sets.push('gender = ?'); values.push(['male', 'female'].includes(String(body.gender)) ? String(body.gender) : 'unknown');
+  }
+  if (body.birthday !== undefined) {
+    const birthday = dateOnly(body.birthday);
+    if (!birthday) return c.json({ success: false, error: '誕生日を確認してください' }, 400);
+    sets.push('birthday = ?'); values.push(birthday);
+  }
+  if (body.weightKg !== undefined) {
+    const weightKg = Number(body.weightKg);
+    if (!Number.isFinite(weightKg) || weightKg < 0.2 || weightKg > 150) return c.json({ success: false, error: '体重は 0.2〜150kg で入力してください' }, 400);
+    sets.push('weight_kg = ?'); values.push(Math.round(weightKg * 10) / 10);
+  }
+  if (body.concerns !== undefined) {
+    const concerns = Array.isArray(body.concerns) ? body.concerns.filter((v): v is string => typeof v === 'string' && CONCERNS.has(v)).slice(0, 10) : [];
+    sets.push('concerns = ?'); values.push(JSON.stringify(concerns));
+  }
+  const products = await accountFeedingProducts(c, friend);
+  const feeding = petFeedingInput(body, products);
+  if (body.neutered !== undefined) {
+    if (feeding.neutered === undefined) return c.json({ success: false, error: '避妊去勢の選択を確認してください' }, 400);
+    sets.push('neutered = ?'); values.push(feeding.neutered === null ? null : feeding.neutered ? 1 : 0);
+  }
+  if (body.activityLevel !== undefined) {
+    if (!feeding.activityLevel) return c.json({ success: false, error: '活動量の選択を確認してください' }, 400);
+    sets.push('activity_level = ?'); values.push(feeding.activityLevel);
+  }
+  if (body.feedingProductId !== undefined) {
+    if (feeding.feedingProductId === undefined) return c.json({ success: false, error: '主食の選択を確認してください' }, 400);
+    sets.push('feeding_product_id = ?'); values.push(feeding.feedingProductId);
+  }
+  if (sets.length === 0) return c.json({ success: false, error: '変更する項目がありません' }, 400);
+
+  const now = jstNow();
+  sets.push('updated_at = ?'); values.push(now);
+  await c.env.DB.prepare(`UPDATE nen_pet_profiles SET ${sets.join(', ')} WHERE id = ? AND friend_id = ?`).bind(...values, petId, friend.id).run();
+  const updated = await c.env.DB.prepare(`SELECT * FROM nen_pet_profiles WHERE id = ?`).bind(petId).first<Record<string, unknown>>();
+  if (!updated) return c.json({ success: false, error: 'Pet not found' }, 404);
+  const plan = planForPetRow({
+    id: petId, animal_type: String(updated.animal_type), weight_kg: updated.weight_kg as number | null, birthday: (updated.birthday as string | null) ?? null,
+    neutered: updated.neutered as number | null, activity_level: (updated.activity_level as string | null) ?? null,
+    feeding_product_id: (updated.feeding_product_id as string | null) ?? null,
+  }, products);
+  await refreshStoredFeeding(c.env.DB, petId, plan, now);
+  await syncNenPetTags(c.env.DB, friend.id);
+  const saved = await c.env.DB.prepare(`SELECT * FROM nen_pet_profiles WHERE id = ?`).bind(petId).first<Record<string, unknown>>();
+  return c.json({ success: true, data: mapPet(saved || updated, products) });
 });
 
 nenMembers.post('/api/liff/nen/pets/:id/photo', async (c) => {

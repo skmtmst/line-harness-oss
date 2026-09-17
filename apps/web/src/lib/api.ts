@@ -11049,6 +11049,12 @@ export type Webinar = {
   slug: string
   status: 'draft' | 'active' | 'archived'
   videoPrefix: string | null
+  /**
+   * 動画の選択元メディアID。保存値 videoPrefix は選んだメディアの
+   * r2_key からサーバーが生成する。ライブラリ外の prefix なら null。
+   * 保存時にこちらを送ると videoPrefix より優先され、両方は送れない。
+   */
+  videoMediaId?: string | null
   durationSeconds: number
   schedule: WebinarScheduleRule[]
   cta: { label: string; url: string; showAtSeconds: number } | null
@@ -11236,6 +11242,8 @@ export type WebinarEditor = {
   viewingCondition: { kind: string; label: string }
   publicDescription: string
   registrationFormId: string | null
+  /* カード方式のCTAの件数。段の印・最終確認はこれを見る。 */
+  ctaCount: number
   notificationMessages: Record<string, string>
   notificationTest: { status?: string; sent?: number; failed?: number; testedAt?: string } | null
   actionPolicy: {
