@@ -261,6 +261,40 @@ describe('メール＋パスワードのログイン', () => {
     expect(res.headers.get('set-cookie') ?? '').not.toContain('lh_admin_session=');
     expect(testDb.raw.prepare('SELECT COUNT(*) AS n FROM admin_two_factor_challenges').get()).toEqual({ n: 1 });
   });
+
+  it('運営ログインは有効な運営メンバーだけが二段階認証へ進める', async () => {
+    await seedOwner();
+    testDb.raw.prepare(`UPDATE staff_members SET totp_secret_enc = 'enc', totp_enabled_at = '2026-09-01T00:00:00.000+09:00' WHERE id = 's1'`).run();
+    // 別の運営メンバーがいる状態にして、platform_admins が空の間だけの互換判定を閉じる。
+    testDb.raw.prepare(`INSERT INTO staff_members (id, name, role, api_key) VALUES ('other-admin', '別の運営', 'owner', 'other-key')`).run();
+    testDb.raw.prepare(`INSERT INTO platform_admins (staff_id, is_active, activation_state) VALUES ('other-admin', 1, 'active')`).run();
+
+    const denied = await call('POST', '/api/auth/password/login', {
+      email: 'owner@example.com', password: 'Abcdefg1', next: 'ops',
+    }, { env: { TOTP_ENCRYPTION_KEY: 'k' } });
+    expect(denied.status).toBe(403);
+    expect((await json(denied)).code).toBe('not_platform_admin');
+    expect(testDb.raw.prepare('SELECT COUNT(*) AS n FROM admin_two_factor_challenges').get()).toEqual({ n: 0 });
+
+    testDb.raw.prepare(`INSERT INTO platform_admins (staff_id, is_active, activation_state) VALUES ('s1', 1, 'active')`).run();
+    const allowed = await call('POST', '/api/auth/password/login', {
+      email: 'owner@example.com', password: 'Abcdefg1', next: 'ops',
+    }, { env: { TOTP_ENCRYPTION_KEY: 'k' } });
+    expect(allowed.status).toBe(200);
+    expect((await json(allowed)).data.twoFactor).toBe(true);
+    expect(testDb.raw.prepare('SELECT COUNT(*) AS n FROM admin_two_factor_challenges').get()).toEqual({ n: 1 });
+  });
+
+  it('招待中の運営メンバーがログイン画面へ来たら招待リンクへ案内し、ループさせない', async () => {
+    await seedOwner();
+    testDb.raw.prepare(`INSERT INTO platform_admins (staff_id, is_active, activation_state) VALUES ('s1', 1, 'invited')`).run();
+    const res = await call('POST', '/api/auth/password/login', {
+      email: 'owner@example.com', password: 'Abcdefg1', next: 'ops',
+    });
+    expect(res.status).toBe(403);
+    expect(await json(res)).toMatchObject({ code: 'ops_invite_pending', error: expect.stringContaining('招待メール') });
+    expect(testDb.raw.prepare('SELECT COUNT(*) AS n FROM admin_sessions').get()).toEqual({ n: 0 });
+  });
 });
 
 describe('パスワード再設定（36-6）', () => {

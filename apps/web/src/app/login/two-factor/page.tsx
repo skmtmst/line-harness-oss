@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
-import { captureTwoFactorChallenge, clearTwoFactorChallenge, takeTwoFactorNextPath, storeAdminSession } from '@/lib/admin-session'
+import { adminSessionHandoffPath, adminSessionHeaders, captureTwoFactorChallenge, clearTwoFactorChallenge, takeTwoFactorNextPath, storeAdminSession } from '@/lib/admin-session'
 import { useBrand } from '@/lib/use-brand'
 
 export default function TwoFactorLoginPage() {
@@ -28,9 +28,32 @@ export default function TwoFactorLoginPage() {
       const body = await response.json() as { success: boolean; error?: string; data?: { sessionToken?: string }; csrfToken?: string }
       if (!response.ok || !body.success) throw new Error(body.error || '認証できませんでした')
       if (body.data?.sessionToken) storeAdminSession(body.data.sessionToken, body.csrfToken)
-      else if (body.csrfToken) localStorage.setItem('lh_csrf', body.csrfToken)
+      else if (body.csrfToken) {
+        try { localStorage.setItem('lh_csrf', body.csrfToken) } catch { /* Cookie session is sufficient */ }
+      }
+      const nextPath = takeTwoFactorNextPath()
+      // 運営ログインは、遷移前に session と運営権限を確かめる。ここを省くと
+      // 認可失敗まで「成功」に見え、/ops/login との往復ループになる。
+      if (nextPath === '/ops') {
+        const session = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/session`, {
+          credentials: 'include',
+          headers: adminSessionHeaders(body.data?.sessionToken),
+        })
+        const sessionBody = await session.json().catch(() => ({})) as { success?: boolean; data?: { platformAdmin?: boolean; platformAdminState?: string | null } }
+        if (!session.ok || !sessionBody.success || !sessionBody.data) {
+          throw new Error('ログイン状態を確認できませんでした。もう一度ログインしてください')
+        }
+        if (!sessionBody.data.platformAdmin) {
+          if (sessionBody.data.platformAdminState === 'awaiting_totp') {
+            clearTwoFactorChallenge()
+            window.location.assign(adminSessionHandoffPath('/ops/two-factor', body.data?.sessionToken, body.csrfToken))
+            return
+          }
+          throw new Error('このアカウントは運営メンバーとして有効ではありません。招待メールのリンクから登録を完了してください')
+        }
+      }
       clearTwoFactorChallenge()
-      window.location.assign(takeTwoFactorNextPath())
+      window.location.assign(adminSessionHandoffPath(nextPath, body.data?.sessionToken, body.csrfToken))
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : '認証できませんでした')
       setDigits(['', '', '', '', '', ''])

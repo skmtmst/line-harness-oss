@@ -22,12 +22,12 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
     // staff identity and refreshes the CSRF token if it was lost (e.g. reload).
     const checkSession = async () => {
       try {
-        localStorage.removeItem('lh_api_key')
-        captureAdminSessionHandoff()
+        try { localStorage.removeItem('lh_api_key') } catch { /* HttpOnly / bearer session is still usable */ }
+        const handoffToken = captureAdminSessionHandoff()
         const apiUrl = process.env.NEXT_PUBLIC_API_URL
         const res = await fetch(`${apiUrl}/api/auth/session`, {
           credentials: 'include',
-          headers: adminSessionHeaders(),
+          headers: adminSessionHeaders(handoffToken),
         })
         if (!res.ok) throw new Error('unauthenticated')
         const data = await res.json()

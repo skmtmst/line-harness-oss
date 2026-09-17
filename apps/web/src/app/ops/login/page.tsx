@@ -50,13 +50,14 @@ export default function OpsLoginPage() {
     const res = await authRequest<{ twoFactor: boolean; challengeToken?: string; sessionToken?: string }>('/api/auth/password/login', {
       email: email.trim(),
       password,
+      next: 'ops',
     })
     if (!res.ok || !res.data) {
       setError(res.error || 'ログインできませんでした')
       setBusy(null)
       return
     }
-    sessionStorage.removeItem(AUTH_SELECTION_CLEARED_KEY)
+    try { sessionStorage.removeItem(AUTH_SELECTION_CLEARED_KEY) } catch { /* non-essential navigation marker */ }
     if (res.data.twoFactor && res.data.challengeToken) {
       // `next=ops` は URL に残す。シークレットモードで別サイト Cookie が止まっても、
       // 二段階認証のあと通常ログインへ戻らず、運営コンソールへ確実に戻す。
@@ -90,7 +91,7 @@ export default function OpsLoginPage() {
 
   const lineLogin = () => {
     setBusy('line')
-    sessionStorage.removeItem(AUTH_SELECTION_CLEARED_KEY)
+    try { sessionStorage.removeItem(AUTH_SELECTION_CLEARED_KEY) } catch { /* non-essential navigation marker */ }
     const apiUrl = process.env.NEXT_PUBLIC_API_URL
     if (!apiUrl) return setBusy(null)
     window.location.assign(`${apiUrl}/api/auth/line?next=ops`)
