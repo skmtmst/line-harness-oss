@@ -11,10 +11,12 @@ import {
   createFunnelVersion,
   createVersionedFunnel,
   evaluateChronologicalFunnel,
+  getFunnelWithCurrentVersion,
   getLatestFunnelRun,
   getCurrentFunnelVersion,
   getFunnelsWithCurrentVersions,
   runChronologicalFunnel,
+  setFunnelStatus,
   validateFunnelComparisonGroups,
   validateV6FunnelSteps,
   type FunnelTimelineEvent,
@@ -411,5 +413,201 @@ describe('V6ファネルの版・結果・一時対象者', () => {
       ],
       createdAt: '2026-08-01T00:00:00.000Z',
     })).rejects.toThrow('analytics_funnel_reference_missing:2');
+  });
+});
+
+describe('V6ファネルの運用状態（停止・保管・編集）', () => {
+  let sqlite: Database.Database;
+  let db: D1Database;
+
+  beforeEach(() => {
+    sqlite = new Database(':memory:');
+    sqlite.exec(readFileSync(join(ROOT, 'bootstrap.sql'), 'utf8'));
+    sqlite.prepare(
+      `INSERT INTO line_accounts (
+         id, channel_id, name, channel_access_token, channel_secret, timezone
+       ) VALUES ('account-a', 'channel-a', 'A', 'token-a', 'secret-a', 'Asia/Tokyo'),
+                ('account-b', 'channel-b', 'B', 'token-b', 'secret-b', 'Asia/Tokyo')`,
+    ).run();
+    sqlite.prepare(
+      `INSERT INTO friends (id, line_user_id, line_account_id)
+       VALUES ('friend-a', 'Ua', 'account-a')`,
+    ).run();
+    sqlite.prepare(
+      `INSERT INTO forms (id, name, fields) VALUES ('form-1', '申込', '[]')`,
+    ).run();
+    sqlite.prepare(
+      `INSERT INTO form_accounts (form_id, line_account_id) VALUES ('form-1', 'account-a')`,
+    ).run();
+    db = asD1(sqlite);
+  });
+
+  afterEach(() => sqlite.close());
+
+  async function makeFunnel(name = '購入まで') {
+    return createVersionedFunnel(db, {
+      lineAccountId: 'account-a', name, windowDays: 7,
+      steps: STEPS, createdBy: 'staff-1', createdAt: '2026-08-01T00:00:00.000Z',
+    });
+  }
+
+  function insertRun(funnelId: string, versionId: string) {
+    sqlite.prepare(
+      `INSERT INTO analytics_funnel_runs (
+         id, line_account_id, funnel_id, funnel_version_id, cohort_from, cohort_to,
+         time_zone, data_cutoff_at, state, result_json, created_by, created_at
+       ) VALUES (
+         'run-1', 'account-a', ?, ?, '2026-08-01T00:00:00.000Z', '2026-08-10T00:00:00.000Z',
+         'Asia/Tokyo', '2026-08-10T00:00:00.000Z', 'available',
+         '{"groups":[{"key":"all","label":"全体","steps":[{"stepOrder":2,"label":"フォーム回答","reached":1}]}]}',
+         'staff-1', '2026-08-10T00:00:00.000Z'
+       )`,
+    ).run(funnelId, versionId);
+    sqlite.prepare(
+      `INSERT INTO analytics_funnel_run_members (
+         run_id, line_account_id, friend_id, group_key, highest_step_order,
+         state, started_at, last_reached_at, deadline_at
+       ) VALUES (
+         'run-1', 'account-a', 'friend-a', 'all', 2,
+         'dropped', '2026-08-01T00:00:00.000Z', '2026-08-02T00:00:00.000Z', '2026-08-09T00:00:00.000Z'
+       )`,
+    ).run();
+  }
+
+  it('一覧は既定でactiveだけ、includeInactiveで停止・保管も状態つきで返す', async () => {
+    const first = await makeFunnel('A');
+    const second = await makeFunnel('B');
+    const third = await makeFunnel('C');
+    await setFunnelStatus(db, {
+      lineAccountId: 'account-a', funnelId: second.funnelId,
+      status: 'stopped', expectedStatus: 'active',
+    });
+    await setFunnelStatus(db, {
+      lineAccountId: 'account-a', funnelId: third.funnelId,
+      status: 'archived', expectedStatus: 'active',
+    });
+
+    const active = await getFunnelsWithCurrentVersions(db, 'account-a');
+    expect(active.total).toBe(1);
+    expect(active.items.map((item) => item.id)).toEqual([first.funnelId]);
+    expect(active.items[0].status).toBe('active');
+
+    const all = await getFunnelsWithCurrentVersions(db, 'account-a', { includeInactive: true });
+    expect(all.total).toBe(3);
+    expect(all.items.map((item) => item.status).sort()).toEqual(['active', 'archived', 'stopped']);
+  });
+
+  it('状態遷移は現在状態を要し、保管は終端、二重操作は競合になる', async () => {
+    const { funnelId } = await makeFunnel();
+
+    await expect(setFunnelStatus(db, {
+      lineAccountId: 'account-a', funnelId, status: 'stopped', expectedStatus: 'stopped',
+    })).rejects.toThrow('analytics_funnel_status_conflict');
+
+    const stopped = await setFunnelStatus(db, {
+      lineAccountId: 'account-a', funnelId, status: 'stopped', expectedStatus: 'active',
+    });
+    expect(stopped.status).toBe('stopped');
+
+    await expect(setFunnelStatus(db, {
+      lineAccountId: 'account-a', funnelId, status: 'stopped', expectedStatus: 'active',
+    })).rejects.toThrow('analytics_funnel_status_conflict');
+
+    const resumed = await setFunnelStatus(db, {
+      lineAccountId: 'account-a', funnelId, status: 'active', expectedStatus: 'stopped',
+    });
+    expect(resumed.status).toBe('active');
+
+    await setFunnelStatus(db, {
+      lineAccountId: 'account-a', funnelId, status: 'archived', expectedStatus: 'active',
+    });
+    await expect(setFunnelStatus(db, {
+      lineAccountId: 'account-a', funnelId, status: 'active', expectedStatus: 'archived',
+    })).rejects.toThrow('analytics_funnel_invalid_transition');
+
+    await expect(setFunnelStatus(db, {
+      lineAccountId: 'account-a', funnelId: 'missing', status: 'stopped', expectedStatus: 'active',
+    })).rejects.toThrow('analytics_funnel_not_found');
+    await expect(setFunnelStatus(db, {
+      lineAccountId: 'account-b', funnelId, status: 'stopped', expectedStatus: 'archived',
+    })).rejects.toThrow('analytics_funnel_not_found');
+  });
+
+  it('停止中は再集計と対象者づくりを拒否し、過去の結果は読める', async () => {
+    const created = await makeFunnel();
+    insertRun(created.funnelId, created.version.id);
+    await setFunnelStatus(db, {
+      lineAccountId: 'account-a', funnelId: created.funnelId,
+      status: 'stopped', expectedStatus: 'active',
+    });
+
+    await expect(runChronologicalFunnel(db, {
+      lineAccountId: 'account-a', funnelId: created.funnelId,
+      cohortFrom: '2026-08-01T00:00:00.000Z', cohortTo: '2026-08-10T00:00:00.000Z',
+      timeZone: 'Asia/Tokyo', dataCutoffAt: '2026-08-10T00:00:00.000Z', persist: true,
+    })).rejects.toThrow('analytics_funnel_not_active');
+
+    await expect(createFunnelResultAudience(db, {
+      lineAccountId: 'account-a', runId: 'run-1', stepOrder: 2,
+      selection: 'stopped', now: new Date('2026-08-11T00:00:00.000Z'),
+    })).rejects.toThrow('analytics_funnel_not_active');
+
+    const past = await getLatestFunnelRun(db, 'account-a', created.funnelId);
+    expect(past?.runId).toBe('run-1');
+  });
+
+  it('停止中は新版を置けず、activeへ戻すと置ける', async () => {
+    const created = await makeFunnel();
+    await setFunnelStatus(db, {
+      lineAccountId: 'account-a', funnelId: created.funnelId,
+      status: 'stopped', expectedStatus: 'active',
+    });
+    await expect(createFunnelVersion(db, {
+      lineAccountId: 'account-a', funnelId: created.funnelId,
+      windowDays: 14, steps: STEPS, expectedVersionNumber: 1,
+      createdAt: '2026-08-02T00:00:00.000Z',
+    })).rejects.toThrow('analytics_funnel_not_active');
+
+    await setFunnelStatus(db, {
+      lineAccountId: 'account-a', funnelId: created.funnelId,
+      status: 'active', expectedStatus: 'stopped',
+    });
+    const version = await createFunnelVersion(db, {
+      lineAccountId: 'account-a', funnelId: created.funnelId,
+      windowDays: 14, steps: STEPS, expectedVersionNumber: 1,
+      createdAt: '2026-08-02T00:00:00.000Z',
+    });
+    expect(version.versionNumber).toBe(2);
+  });
+
+  it('新版保存は expectedVersionNumber でずれを拒否し、名前を同時に更新できる', async () => {
+    const created = await makeFunnel('旧名');
+
+    await expect(createFunnelVersion(db, {
+      lineAccountId: 'account-a', funnelId: created.funnelId,
+      windowDays: 14, steps: STEPS, expectedVersionNumber: 9,
+      createdAt: '2026-08-02T00:00:00.000Z',
+    })).rejects.toThrow('analytics_funnel_version_conflict');
+    expect(
+      (await getCurrentFunnelVersion(db, 'account-a', created.funnelId))!.versionNumber,
+    ).toBe(1);
+
+    const saved = await createFunnelVersion(db, {
+      lineAccountId: 'account-a', funnelId: created.funnelId,
+      windowDays: 30, steps: STEPS.slice(0, 2), name: '新しい名前',
+      expectedVersionNumber: 1, createdAt: '2026-08-02T00:00:00.000Z',
+    });
+    expect(saved.versionNumber).toBe(2);
+    const detail = await getFunnelWithCurrentVersion(db, 'account-a', created.funnelId);
+    expect(detail?.funnel.name).toBe('新しい名前');
+    expect(detail?.currentVersion?.versionNumber).toBe(2);
+    expect(detail?.currentVersion?.steps).toHaveLength(2);
+    expect(detail?.currentVersion?.windowDays).toBe(30);
+
+    await expect(createFunnelVersion(db, {
+      lineAccountId: 'account-a', funnelId: created.funnelId,
+      windowDays: 14, steps: STEPS, expectedVersionNumber: 1,
+      createdAt: '2026-08-03T00:00:00.000Z',
+    })).rejects.toThrow('analytics_funnel_version_conflict');
   });
 });
