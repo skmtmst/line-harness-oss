@@ -756,7 +756,15 @@ async function handleEvent(
         try {
           const template = await getMessageTemplateById(db, referralRoute.intro_template_id);
           if (template) {
-            const message = buildMessage(template.message_type, template.message_content);
+            // 紹介リンクの案内文にも {{var.*}} を書ける。消えた共通情報は
+            // 空文字にせず止め、解決できるものは送信時点の値へ置き換える。
+            const { expandSendCommonVars } = await import('../services/interpolation-context.js');
+            const introContent = await expandSendCommonVars(
+              db, template.message_content,
+              { kind: 'notification', id: referralRoute.id },
+              { lineAccountId, friendId: friend.id },
+            );
+            const message = buildMessage(template.message_type, introContent);
             try {
               await lineClient.pushMessage(userId, [message], sendRetryKey(`referral-intro:${referralRoute.id}`));
             } catch (pushErr) {
@@ -822,7 +830,15 @@ async function handleEvent(
               });
             }
             try {
-              await lineClient.pushMessage(userId, [{ type: 'text', text }], sendRetryKey('coupon'));
+              // 設定画面で書けるクーポン本文にも {{var.*}} を置ける。
+              // 消えた共通情報は fail-closed で止める。
+              const { expandSendCommonVars } = await import('../services/interpolation-context.js');
+              const expanded = await expandSendCommonVars(
+                db, text,
+                { kind: 'notification', id: 'friend_add_coupon' },
+                { lineAccountId, friendId: friend.id },
+              );
+              await lineClient.pushMessage(userId, [{ type: 'text', text: expanded }], sendRetryKey('coupon'));
             } catch (pushErr) {
               noteSendOutcome(classifyFollowSendFailure(pushErr));
               throw pushErr;

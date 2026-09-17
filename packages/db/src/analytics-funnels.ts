@@ -1,5 +1,11 @@
 import { ANALYTICS_EVENT_TYPES, type AnalyticsEventType } from './analytics-event-types.js';
-import { getFunnelById, getFunnelSteps, type Funnel, type FunnelStepKind } from './funnels.js';
+import {
+  getFunnelById,
+  getFunnelSteps,
+  type Funnel,
+  type FunnelStatus,
+  type FunnelStepKind,
+} from './funnels.js';
 
 const DAY_MS = 86_400_000;
 
@@ -538,14 +544,16 @@ export async function getCurrentFunnelVersion(
 export async function getFunnelsWithCurrentVersions(
   db: D1Database,
   lineAccountId: string,
-  options: { page?: number; pageSize?: number } = {},
+  options: { page?: number; pageSize?: number; includeInactive?: boolean } = {},
 ): Promise<FunnelWithCurrentVersionPage> {
   const page = Math.max(1, Math.floor(options.page ?? 1));
   const pageSize = Math.min(200, Math.max(1, Math.floor(options.pageSize ?? 200)));
   const offset = (page - 1) * pageSize;
+  const activeClause = options.includeInactive ? '' : ` AND f.status = 'active'`;
 
   const countPromise = db.prepare(
-    `SELECT COUNT(*) AS total FROM funnels WHERE line_account_id = ?`,
+    `SELECT COUNT(*) AS total FROM funnels f
+      WHERE f.line_account_id = ?${activeClause}`,
   ).bind(lineAccountId).first<{ total: number }>();
   const rowsPromise = db.prepare(
     `WITH latest_versions AS (
@@ -564,7 +572,7 @@ export async function getFunnelsWithCurrentVersions(
          ON v.line_account_id = f.line_account_id
         AND v.funnel_id = f.id
         AND v.version_number = latest.version_number
-      WHERE f.line_account_id = ?
+      WHERE f.line_account_id = ?${activeClause}
       ORDER BY f.created_at DESC, f.id DESC
       LIMIT ? OFFSET ?`,
   ).bind(lineAccountId, lineAccountId, pageSize, offset).all<Funnel & {
@@ -582,6 +590,7 @@ export async function getFunnelsWithCurrentVersions(
       segment_json: row.segment_json,
       window_days: row.window_days,
       created_at: row.created_at,
+      status: row.status,
       currentVersion: row.current_version_id === null
         ? null
         : {
@@ -596,6 +605,55 @@ export async function getFunnelsWithCurrentVersions(
   };
 }
 
+/** 編集画面が読む1件。現在版の全内容（段・絞り込み・比較条件）を返す。 */
+export async function getFunnelWithCurrentVersion(
+  db: D1Database,
+  lineAccountId: string,
+  funnelId: string,
+): Promise<{ funnel: Funnel; currentVersion: FunnelVersion | null } | null> {
+  const funnel = await getFunnelById(db, lineAccountId, funnelId);
+  if (!funnel) return null;
+  const currentVersion = await getCurrentFunnelVersion(db, lineAccountId, funnelId);
+  return { funnel, currentVersion };
+}
+
+// 運用状態の遷移表。archived は終端で復帰しない。
+const FUNNEL_STATUS_TRANSITIONS: Record<FunnelStatus, readonly FunnelStatus[]> = {
+  active: ['stopped', 'archived'],
+  stopped: ['active', 'archived'],
+  archived: [],
+};
+
+/**
+ * ファネルの運用状態を変える。expectedStatus に今の状態を書かせ、
+ * 読み違えや二重操作を 409 として弾く。
+ */
+export async function setFunnelStatus(
+  db: D1Database,
+  input: {
+    lineAccountId: string;
+    funnelId: string;
+    status: FunnelStatus;
+    expectedStatus: FunnelStatus;
+  },
+): Promise<Funnel> {
+  const funnel = await getFunnelById(db, input.lineAccountId, input.funnelId);
+  if (!funnel) throw new Error('analytics_funnel_not_found');
+  // 先に楽観ロック: 呼び出し側が見ていた状態と違えば競合。
+  if (funnel.status !== input.expectedStatus) {
+    throw new Error('analytics_funnel_status_conflict');
+  }
+  if (!FUNNEL_STATUS_TRANSITIONS[funnel.status].includes(input.status)) {
+    throw new Error('analytics_funnel_invalid_transition');
+  }
+  const result = await db.prepare(
+    `UPDATE funnels SET status = ?
+      WHERE id = ? AND line_account_id = ? AND status = ?`,
+  ).bind(input.status, input.funnelId, input.lineAccountId, input.expectedStatus).run();
+  if (!result.meta?.changes) throw new Error('analytics_funnel_status_conflict');
+  return (await getFunnelById(db, input.lineAccountId, input.funnelId))!;
+}
+
 export async function createFunnelVersion(
   db: D1Database,
   input: {
@@ -605,12 +663,17 @@ export async function createFunnelVersion(
     steps: unknown;
     segment?: unknown;
     comparisonGroups?: unknown;
+    // 編集者が見ていた現在版。ずれていたら新しい版を置かず競合として弾く。
+    expectedVersionNumber?: number;
+    // 名前は版ではなくファネル本体の属性なので、新版保存と同じ操作で更新する。
+    name?: string;
     createdBy?: string | null;
     createdAt: string;
   },
 ): Promise<FunnelVersion> {
   const funnel = await getFunnelById(db, input.lineAccountId, input.funnelId);
   if (!funnel) throw new Error('analytics_funnel_not_found');
+  if (funnel.status !== 'active') throw new Error('analytics_funnel_not_active');
   if (!Number.isInteger(input.windowDays) || input.windowDays < 1 || input.windowDays > 365) {
     throw new Error('analytics_funnel_window_days_invalid');
   }
@@ -619,25 +682,53 @@ export async function createFunnelVersion(
     ? { kind: 'all' } as const
     : validateFunnelAudienceFilter(input.segment);
   const groups = validateFunnelComparisonGroups(input.comparisonGroups);
+  const name = input.name === undefined
+    ? null
+    : requiredString(input.name, 'analytics_funnel_name_required');
   await assertFunnelReferences(db, input.lineAccountId, steps);
   await assertFunnelFilterReference(db, input.lineAccountId, segment);
   for (const group of groups) {
     await assertFunnelFilterReference(db, input.lineAccountId, group.filter);
   }
+  const current = await db.prepare(
+    `SELECT MAX(version_number) AS version_number
+       FROM analytics_funnel_versions
+      WHERE funnel_id = ? AND line_account_id = ?`,
+  ).bind(input.funnelId, input.lineAccountId)
+    .first<{ version_number: number | null }>();
+  const currentVersionNumber = current?.version_number ?? 0;
+  if (input.expectedVersionNumber !== undefined
+      && input.expectedVersionNumber !== currentVersionNumber) {
+    throw new Error('analytics_funnel_version_conflict');
+  }
   const id = crypto.randomUUID();
-  await db.prepare(
-    `INSERT INTO analytics_funnel_versions (
-       id, funnel_id, line_account_id, version_number, window_days,
-       steps_json, segment_json, comparison_groups_json, created_by, created_at
-     ) SELECT ?, ?, ?, COALESCE(MAX(version_number), 0) + 1, ?, ?, ?, ?, ?, ?
-         FROM analytics_funnel_versions
-        WHERE funnel_id = ? AND line_account_id = ?`,
-  ).bind(
-    id, input.funnelId, input.lineAccountId, input.windowDays,
-    JSON.stringify(steps), JSON.stringify(segment), JSON.stringify(groups),
-    input.createdBy ?? null, input.createdAt,
-    input.funnelId, input.lineAccountId,
-  ).run();
+  const statements: D1PreparedStatement[] = [
+    // 版番号は読み取った最大値+1を明示する。間に別の保存が割り込むと
+    // UNIQUE(funnel_id, version_number) が衝突し、下のcatchで競合へ変換する。
+    db.prepare(
+      `INSERT INTO analytics_funnel_versions (
+         id, funnel_id, line_account_id, version_number, window_days,
+         steps_json, segment_json, comparison_groups_json, created_by, created_at
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).bind(
+      id, input.funnelId, input.lineAccountId, currentVersionNumber + 1, input.windowDays,
+      JSON.stringify(steps), JSON.stringify(segment), JSON.stringify(groups),
+      input.createdBy ?? null, input.createdAt,
+    ),
+    ...(name === null
+      ? []
+      : [db.prepare(
+        `UPDATE funnels SET name = ? WHERE id = ? AND line_account_id = ?`,
+      ).bind(name, input.funnelId, input.lineAccountId)]),
+  ];
+  try {
+    await db.batch(statements);
+  } catch (error) {
+    if (error instanceof Error && error.message.includes('UNIQUE')) {
+      throw new Error('analytics_funnel_version_conflict');
+    }
+    throw error;
+  }
   const inserted = await db.prepare(
     `SELECT * FROM analytics_funnel_versions WHERE id = ? AND line_account_id = ?`,
   ).bind(id, input.lineAccountId).first<{
@@ -855,6 +946,8 @@ export async function runChronologicalFunnel(
 ): Promise<FunnelRunResult> {
   const funnel = await getFunnelById(db, input.lineAccountId, input.funnelId);
   if (!funnel) throw new Error('analytics_funnel_not_found');
+  // 停止・保管したファネルは新しい集計を受け付けない。過去の結果は読める。
+  if (funnel.status !== 'active') throw new Error('analytics_funnel_not_active');
   let version = await getCurrentFunnelVersion(db, input.lineAccountId, input.funnelId);
   if (!version) {
     const legacySteps = await getFunnelSteps(db, input.funnelId);
@@ -1084,10 +1177,14 @@ export async function createFunnelResultAudience(
     throw new Error('analytics_funnel_audience_step_invalid');
   }
   const run = await db.prepare(
-    `SELECT id, result_json FROM analytics_funnel_runs
+    `SELECT id, funnel_id, result_json FROM analytics_funnel_runs
       WHERE id = ? AND line_account_id = ? AND state IN ('available', 'partial')`,
-  ).bind(input.runId, input.lineAccountId).first<{ id: string; result_json: string }>();
+  ).bind(input.runId, input.lineAccountId)
+    .first<{ id: string; funnel_id: string; result_json: string }>();
   if (!run) throw new Error('analytics_funnel_run_not_found');
+  const funnel = await getFunnelById(db, input.lineAccountId, run.funnel_id);
+  // 停止・保管したファネルからは新しい対象者を作らない。
+  if (!funnel || funnel.status !== 'active') throw new Error('analytics_funnel_not_active');
   const groupKey = input.groupKey?.trim() || 'all';
   const result = JSON.parse(run.result_json) as { groups?: FunnelGroupEvaluation[] };
   const selectedGroup = result.groups?.find((group) => group.key === groupKey);

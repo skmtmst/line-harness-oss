@@ -213,7 +213,8 @@ const STAFF_API_PERMISSIONS: Array<[string, string]> = [
   ['/api/nen-campaigns', '/nen-campaigns'], ['/api/nen-members', '/nen-members'], ['/api/ec-commerce', '/ec-commerce'],
   // 然の会員（★V6 37-1）。メニューの href は /nen/members。
   ['/api/nen/rank-settings', '/nen/members'], ['/api/nen/lifetime-milestones', '/nen/members'], ['/api/nen/members', '/nen/members'],
-  ['/api/nen/feeding-products', '/nen/members'],
+  // 然のマイペット・健康日記（★V6 37-3／37-4）。主食のカロリー表はマイペット画面へ移した。
+  ['/api/nen/feeding-products', '/nen/pets'], ['/api/nen/pets', '/nen/pets'], ['/api/nen/health', '/nen/health'],
   // ログインユーザー一覧・権限のかたまり・監査の閲覧は「設定」の点キーで守る（N-424）。
   // route 側の requirePermission が最終判定を握る。
   ['/api/access', 'access.user.view'],

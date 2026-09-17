@@ -147,6 +147,13 @@ export async function resolveCommonVarValuesAt(
     const before = !invalidWindow && fromMs !== null && executionMs < fromMs;
     const expired = !invalidWindow && untilMs !== null && executionMs >= untilMs;
     if (!invalidWindow && !before && !expired) {
+      // 制約導入前の旧行は value が NULL で残り得る。NULL を値として返すと
+      // 呼出し側の `vars[key] ?? ''` で空文字化して送られるため、
+      // 文字列でない値は missing 相当の失敗に倒す。
+      if (typeof row.value !== 'string') {
+        failures.push({ varKey, reason: 'missing' });
+        continue;
+      }
       values[varKey] = row.value;
       entries.push({
         id: row.id,
@@ -157,7 +164,7 @@ export async function resolveCommonVarValuesAt(
       });
       continue;
     }
-    if (row.expiry_behavior === 'fallback' && row.fallback_value !== null) {
+    if (row.expiry_behavior === 'fallback' && typeof row.fallback_value === 'string') {
       values[varKey] = row.fallback_value;
       entries.push({
         id: row.id,

@@ -379,6 +379,43 @@ describe('回答を配る', () => {
     expect(mocks.attachTag).not.toHaveBeenCalled();
   });
 
+  // N-189: 選択肢の送信文に消えた共通情報が残っていても、生の差し込み名を
+  // 送らない。効果は未完として記録され、運用者が直せば再送で補完される。
+  test('解決できない共通情報を含む送信文は送らず、その効果を未完に残す', async () => {
+    const layout = layoutWith([
+      input({
+        name: 'want',
+        label: '希望',
+        type: 'radio',
+        choiceMode: 'action',
+        choices: [
+          {
+            id: 'c1',
+            label: '資料がほしい',
+            actions: [{ kind: 'send_text', text: '営業時間は{{var.hours}}です' }],
+          },
+        ],
+      }),
+    ]);
+    const { db } = fakeDb();
+    const sent: string[] = [];
+
+    const result = await applyFormLayoutEffects({
+      db,
+      layout,
+      friendId: 'f1',
+      answers: { want: '資料がほしい' },
+      formId: 'form-1',
+      pushText: async (text) => {
+        sent.push(text);
+      },
+    });
+
+    expect(sent).toEqual([]);
+    // 選択肢の動作を束ねる choices:<ブロックID> が未完に残る。
+    expect(result.failedEffects.some((id) => id.startsWith('choices:'))).toBe(true);
+  });
+
   test('日付の回答からリマインダを動かす', async () => {
     const layout = layoutWith([
       input({

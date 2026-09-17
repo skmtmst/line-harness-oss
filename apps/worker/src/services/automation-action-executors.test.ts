@@ -335,6 +335,71 @@ describe('V6オートメーションの既存処理接続', () => {
     ).get()).toEqual({ content: 'こんにちは', source: 'automation_v6', line_account_id: 'account-1' });
   });
 
+  // N-189: send_message/send_template の本文に {{var.*}} を書ける。
+  // 消えた共通情報は生のまま・空文字でも送らず、fail-closed で止める。
+  it('共通情報を本文の値へ置き換えて送り、送信記録にも解決後の本文が残る', async () => {
+    testDb.raw.prepare(
+      `INSERT INTO common_vars (id, line_account_id, name, var_key, type, value)
+       VALUES ('cv-1', 'account-1', '営業時間', 'hours', 'text', '10時から18時')`,
+    ).run();
+    const pushMessage = vi.fn(async () => ({ requestId: 'line-request-1' }));
+    const result = await execute(testDb, {
+      accountId: 'account-1', friendId: 'friend-1',
+      action: {
+        id: 'message', type: 'send_message',
+        params: { messageType: 'text', content: '営業時間は{{var.hours}}です' }, onFailure: 'stop',
+      },
+      executors: createAutomationActionExecutors({
+        resolveLineAccessToken: async () => 'token-1',
+        createLineClient: () => ({
+          pushMessage,
+          linkRichMenuToUser: vi.fn(),
+          unlinkRichMenuFromUser: vi.fn(),
+        }),
+        now: () => NOW,
+      }),
+    });
+
+    expect(result.status).toBe('success');
+    const [, messages] = pushMessage.mock.calls[0] as unknown as [string, Array<{ text: string }>];
+    expect(messages[0].text).toBe('営業時間は10時から18時です');
+    expect(testDb.raw.prepare(
+      `SELECT content FROM messages_log WHERE friend_id = 'friend-1'`,
+    ).get()).toEqual({ content: '営業時間は10時から18時です' });
+  });
+
+  it('消えた共通情報はLINEを呼ばずアクションを失敗にし、台帳へ出所を残す', async () => {
+    const pushMessage = vi.fn(async () => ({ requestId: 'line-request-1' }));
+    const result = await execute(testDb, {
+      accountId: 'account-1', friendId: 'friend-1',
+      action: {
+        id: 'message', type: 'send_message',
+        params: { messageType: 'text', content: '前{{var.deleted_key}}後' }, onFailure: 'stop',
+      },
+      executors: createAutomationActionExecutors({
+        resolveLineAccessToken: async () => 'token-1',
+        createLineClient: () => ({
+          pushMessage,
+          linkRichMenuToUser: vi.fn(),
+          unlinkRichMenuFromUser: vi.fn(),
+        }),
+        now: () => NOW,
+      }),
+    });
+
+    expect(result.status).toBe('failed');
+    expect(pushMessage).not.toHaveBeenCalled();
+    expect(testDb.raw.prepare(
+      `SELECT COUNT(*) AS n FROM messages_log WHERE friend_id = 'friend-1'`,
+    ).get()).toEqual({ n: 0 });
+    expect(testDb.raw.prepare(
+      `SELECT source_kind, source_id, var_key, reason FROM common_var_resolution_failures`,
+    ).get()).toEqual({
+      source_kind: 'automation', source_id: 'message',
+      var_key: 'deleted_key', reason: 'missing',
+    });
+  });
+
   it('LINEの5xxは再試行、認証エラーは即時失敗に分ける', async () => {
     const lineClient = (message: string) => ({
       pushMessage: vi.fn(async () => { throw new Error(message); }),

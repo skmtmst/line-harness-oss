@@ -78,7 +78,7 @@ const ALLOWED_H1: Record<string, string> = {
 
 describe('画面名を本文とトップバーで2回出さない', () => {
   it('全ページを読めている', () => {
-    expect(PAGES.length).toBe(177)  // 2026-09-17: 管理者向け二段階認証の初回設定画面を足した後の実測値。
+    expect(PAGES.length).toBe(179)  // 2026-09-16 採用: マイペット（/nen/pets）と健康日記（/nen/health）を足した後の実測値。
   })
 
   it('page.tsx が h1 を直接持たない', () => {
