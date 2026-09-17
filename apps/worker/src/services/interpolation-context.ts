@@ -111,10 +111,13 @@ export async function resolveSendCommonVars(
   if (!resolved.ok) {
     const now = new Date().toISOString();
     try {
+      // retryable=1: 共通情報を直せば同じ送信を重複なく再試行できる失敗。
+      // 台帳へ残すのは変数名・送信種別・理由・再試行可否だけで、
+      // 顧客本文や共通情報の値は書かない。
       await db.batch(resolved.failures.map((failure) => db.prepare(
         `INSERT OR IGNORE INTO common_var_resolution_failures
-           (id, line_account_id, source_kind, source_id, var_key, reason, execution_at, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+           (id, line_account_id, source_kind, source_id, var_key, reason, retryable, execution_at, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?)`,
       ).bind(
         crypto.randomUUID(), lineAccountId, source.kind, source.id,
         failure.varKey, failure.reason, executionAt, now,

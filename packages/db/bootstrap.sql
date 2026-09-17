@@ -1541,6 +1541,9 @@ CREATE TABLE "common_var_resolution_failures" (
   source_id       TEXT NOT NULL,
   var_key         TEXT NOT NULL,
   reason          TEXT NOT NULL CHECK (reason IN ('missing', 'not_started', 'expired', 'fallback_missing', 'invalid_window')),
+  -- 1 = 共通情報を直せば同じ送信を重複なく再試行できる。0 = 再試行しても
+  -- 治らない失敗（今のところ解決失敗はすべて 1。将来の恒久的失敗用の印）。
+  retryable       INTEGER NOT NULL DEFAULT 1 CHECK (retryable IN (0, 1)),
   execution_at    TEXT NOT NULL,
   created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f','now','+9 hours')),
   UNIQUE(source_kind, source_id, var_key, execution_at)

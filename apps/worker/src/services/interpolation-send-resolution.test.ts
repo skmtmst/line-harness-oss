@@ -70,10 +70,11 @@ function ledgerRows(): Array<{
   source_id: string;
   var_key: string;
   reason: string;
+  retryable: number;
   execution_at: string;
 }> {
   return sqlite.raw.prepare(
-    `SELECT line_account_id, source_kind, source_id, var_key, reason, execution_at
+    `SELECT line_account_id, source_kind, source_id, var_key, reason, retryable, execution_at
        FROM common_var_resolution_failures ORDER BY created_at`,
   ).all() as never;
 }
@@ -106,6 +107,8 @@ describe('送信経路の共通情報解決(N-189)', () => {
       source_id: 'fs-1',
       var_key: 'deleted_key',
       reason: 'missing',
+      // 修復後に重複なく再試行できる失敗であることも台帳へ残す。
+      retryable: 1,
     });
   });
 
