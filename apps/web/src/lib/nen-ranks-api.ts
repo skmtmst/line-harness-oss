@@ -86,7 +86,26 @@ export interface NenMemberListData {
 
 export type NenMemberSort = 'annual_desc' | 'lifetime_desc' | 'balance_desc' | 'recent'
 
+export interface NenFeedingProduct {
+  id: string
+  name: string
+  kcalPer100g: number
+  isDefault: boolean
+}
+
+export interface NenFeedingData {
+  products: NenFeedingProduct[]
+  petCount: number
+  refreshedPets?: number
+}
+
 export const nenRanksApi = {
+  feeding: (accountId: string) =>
+    fetchApi<ApiResponse<NenFeedingData>>(`/api/nen/feeding-products?accountId=${encodeURIComponent(accountId)}`),
+  saveFeeding: (accountId: string, products: Array<{ id?: string | null; name: string; kcalPer100g: number; isDefault: boolean }>) =>
+    fetchApi<ApiResponse<NenFeedingData>>('/api/nen/feeding-products', {
+      method: 'PUT', body: JSON.stringify({ accountId, products }),
+    }),
   settings: (accountId: string) =>
     fetchApi<ApiResponse<NenRankSettingsData>>(`/api/nen/rank-settings?accountId=${encodeURIComponent(accountId)}`),
   saveRanks: (accountId: string, ranks: Array<{ id?: string | null; name: string; annualThresholdYen: number; mileRatePercent: number }>) =>

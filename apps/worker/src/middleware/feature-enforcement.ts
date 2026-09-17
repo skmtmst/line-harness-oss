@@ -128,6 +128,7 @@ export const FEATURE_ROUTE_MANIFEST: readonly FeatureRouteMetadata[] = [
   feature('/api/nen/rank-settings', 'ec_commerce'),
   feature('/api/nen/lifetime-milestones', 'ec_commerce'),
   feature('/api/nen/members', 'ec_commerce'),
+  feature('/api/nen/feeding-products', 'ec_commerce'),
   feature('/api/restaurant-test', 'restaurant_test'),
 
   exempt('/api/settings', 'core', '機能を再度オンにするため停止対象外'),

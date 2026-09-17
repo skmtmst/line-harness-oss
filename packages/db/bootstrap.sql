@@ -3736,6 +3736,17 @@ CREATE TABLE nen_ec_member_snapshots (
   synced_at TEXT NOT NULL
 , annual_miles_yen INTEGER NOT NULL DEFAULT 0, lifetime_miles_yen INTEGER NOT NULL DEFAULT 0, member_rank_key TEXT, mile_rate_percent REAL, rank_valid_until TEXT, mile_balance INTEGER NOT NULL DEFAULT 0, miles_used_this_month INTEGER NOT NULL DEFAULT 0, last_purchased_at TEXT);
 
+CREATE TABLE nen_feeding_products (
+  id              TEXT PRIMARY KEY,
+  line_account_id TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
+  name            TEXT NOT NULL,
+  kcal_per_100g   REAL NOT NULL CHECK (kcal_per_100g > 0 AND kcal_per_100g <= 1000),
+  is_default      INTEGER NOT NULL DEFAULT 0 CHECK (is_default IN (0, 1)),
+  sort_order      INTEGER NOT NULL DEFAULT 0,
+  created_at      TEXT NOT NULL,
+  updated_at      TEXT NOT NULL
+);
+
 CREATE TABLE "nen_friend_add_coupon_issues" (
   id              TEXT PRIMARY KEY,
   line_account_id TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
@@ -3808,7 +3819,7 @@ CREATE TABLE nen_pet_profiles (
   birthday TEXT,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
-, breed TEXT, weight_kg REAL, concerns TEXT NOT NULL DEFAULT '[]' CHECK (json_valid(concerns)), recommended_daily_grams INTEGER, recommended_daily_min_grams INTEGER, recommended_daily_max_grams INTEGER, venison_daily_grams INTEGER, food_cycle_days INTEGER, image_r2_key TEXT, image_url TEXT);
+, breed TEXT, weight_kg REAL, concerns TEXT NOT NULL DEFAULT '[]' CHECK (json_valid(concerns)), recommended_daily_grams INTEGER, recommended_daily_min_grams INTEGER, recommended_daily_max_grams INTEGER, venison_daily_grams INTEGER, food_cycle_days INTEGER, image_r2_key TEXT, image_url TEXT, neutered INTEGER CHECK (neutered IN (0, 1)), activity_level TEXT NOT NULL DEFAULT 'normal' CHECK (activity_level IN ('low', 'normal', 'high')), daily_kcal INTEGER, feeding_product_id TEXT);
 
 CREATE TABLE nen_photo_assessment_runs (
   id TEXT PRIMARY KEY,
@@ -7026,6 +7037,9 @@ CREATE INDEX idx_nen_delivery_jobs_due
 
 CREATE INDEX idx_nen_delivery_jobs_friend
   ON nen_delivery_jobs(friend_id, created_at DESC);
+
+CREATE INDEX idx_nen_feeding_products_account
+  ON nen_feeding_products(line_account_id, sort_order);
 
 CREATE INDEX idx_nen_friend_coupon_status
   ON nen_friend_add_coupon_issues(line_account_id, status, updated_at);
