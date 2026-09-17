@@ -337,7 +337,7 @@ function Editor({
       cancelLabel="編集を続ける"
       onConfirm={confirmLeave}
       onCancel={cancelLeave}
-    />
+    ></ConfirmDialog>
   )
 
   const closeConfirm = () => {
