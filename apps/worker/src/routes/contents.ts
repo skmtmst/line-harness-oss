@@ -989,13 +989,17 @@ contents.patch('/api/media/:id', requireRole('owner', 'admin'), async (c) => {
  * 監査行へ残す。二重実行は既に目的側の状態なので 409 で引き返す。
  */
 async function mediaArchiveRoute(c: Context<Env>, archive: boolean, mediaId: string) {
-  const body = await c.req.json().catch(() => null) as { accountId?: string; reason?: string } | null;
-  const accountId = c.req.query('accountId')?.trim() || body?.accountId?.trim();
+  const raw = await c.req.json().catch(() => null);
+  const body = raw && typeof raw === 'object'
+    ? raw as { accountId?: unknown; reason?: unknown }
+    : null;
+  const bodyAccountId = typeof body?.accountId === 'string' ? body.accountId.trim() : '';
+  const accountId = c.req.query('accountId')?.trim() || bodyAccountId;
   if (!accountId) return c.json({ success: false, error: 'accountId required' }, 400);
   if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
     return c.json({ success: false, error: 'Not found' }, 404);
   }
-  const reason = body?.reason?.trim();
+  const reason = typeof body?.reason === 'string' ? body.reason.trim() : '';
   if (!reason) {
     return c.json({ success: false, code: 'media_reason_required', error: '理由を入力してください' }, 400);
   }

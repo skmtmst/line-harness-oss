@@ -1893,6 +1893,13 @@ describe('メディアのアーカイブと復元', () => {
     expect(json.code).toBe(status);
   });
 
+  it.each(['archive', 'restore'])('文字列でない理由・accountIdは500ではなく400で弾く（%s）', async (action) => {
+    const res = await req(`/api/media/md-1/${action}`, 'POST', { accountId: 123, reason: 456 });
+    expect(res.status).toBe(400);
+    expect(mocks.archiveMedia).not.toHaveBeenCalled();
+    expect(mocks.restoreMedia).not.toHaveBeenCalled();
+  });
+
   it('一覧は既定で退避済みを外し、archived=only でだけ退避済みを返す', async () => {
     mocks.getMedia.mockResolvedValue([]);
     mocks.countMedia.mockResolvedValue(0);

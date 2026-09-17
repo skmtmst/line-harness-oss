@@ -16,6 +16,7 @@ const fixture = vi.hoisted(() => ({
   archiveCalls: [] as Array<{ id: string; accountId: string; reason: string }>,
   restoreCalls: [] as Array<{ id: string; accountId: string; reason: string }>,
   archiveResult: { success: true } as { success: boolean; error?: string; data?: unknown },
+  archiveThrows: null as null | { status: number },
   archived: false,
 }))
 
@@ -76,11 +77,15 @@ vi.mock('@/lib/api', () => {
         detail: () => Promise.reject(new ApiError(404, 'Not found')),
         archive: (id: string, accountId: string, reason: string) => {
           fixture.archiveCalls.push({ id, accountId, reason })
-          return Promise.resolve(fixture.archiveResult)
+          return fixture.archiveThrows
+            ? Promise.reject(new ApiError(fixture.archiveThrows.status, 'conflict'))
+            : Promise.resolve(fixture.archiveResult)
         },
         restore: (id: string, accountId: string, reason: string) => {
           fixture.restoreCalls.push({ id, accountId, reason })
-          return Promise.resolve(fixture.archiveResult)
+          return fixture.archiveThrows
+            ? Promise.reject(new ApiError(fixture.archiveThrows.status, 'conflict'))
+            : Promise.resolve(fixture.archiveResult)
         },
         contentUrl: (id: string, accountId: string) => `/api/media/${id}/content?accountId=${accountId}`,
       },
@@ -141,6 +146,7 @@ beforeEach(() => {
   fixture.archiveCalls.length = 0
   fixture.restoreCalls.length = 0
   fixture.archiveResult = { success: true, data: MEDIA }
+  fixture.archiveThrows = null
   fixture.archived = false
   window.history.replaceState({}, '', '/contents')
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
@@ -236,7 +242,8 @@ describe('登録メディアの退避と復帰（N-201）', () => {
   })
 
   it('409（直前に退避済み）は失敗文を出しつつ一覧を読み直す', async () => {
-    fixture.archiveResult = { success: false, error: 'このメディアは既にアーカイブ済みです' }
+    // fetchApi は非2xxで ApiError を投げる。{success:false} の返りでは来ない。
+    fixture.archiveThrows = { status: 409 }
     await renderPage()
     await waitForText(MEDIA.filename)
     const callsBefore = fixture.listCalls.length
@@ -249,7 +256,7 @@ describe('登録メディアの退避と復帰（N-201）', () => {
     })
     await act(async () => { [...document.body.querySelectorAll<HTMLButtonElement>('button')].find((b) => b.textContent === 'アーカイブする')!.click(); await settle() })
 
-    expect(document.body.textContent).toContain('処理できませんでした')
+    expect(document.body.textContent).toContain('既にアーカイブ済みです')
     expect(fixture.listCalls.length).toBeGreaterThan(callsBefore)
   })
 })

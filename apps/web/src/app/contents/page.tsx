@@ -663,7 +663,19 @@ function MediaLibraryInner() {
         ? `「${item.filename}」をアーカイブしました。使っている場所はそのまま動き、一覧と新規選択からだけ外れます。`
         : `「${item.filename}」を一覧へ戻しました。`)
       void load()
-    } catch {
+    } catch (e) {
+      /*
+        fetchApi は 2xx 以外で ApiError を投げる。409（直前に誰かが
+        同じ操作を済ませた）は汎用エラーで止めず、一覧を読み直して
+        最新の見え方に合わせる。
+      */
+      if (e instanceof ApiError && e.status === 409) {
+        setArchiveError(mode === 'archive'
+          ? 'このメディアは既にアーカイブ済みです。一覧を読み直しました。'
+          : 'このメディアは既に一覧へ戻っています。一覧を読み直しました。')
+        void load()
+        return
+      }
       setArchiveError('処理に失敗しました。もう一度お試しください。')
     } finally {
       setArchiveBusy(false)
