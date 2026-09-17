@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { useEffect, useState, type FormEvent } from 'react'
 import Button from '@/components/shared/button'
 import { TextField } from '@/components/shared/text-field'
-import { captureTwoFactorChallenge, clearTwoFactorChallenge, storeAdminSession, takeTwoFactorNextPath } from '@/lib/admin-session'
+import { adminSessionHandoffPath, adminSessionHeaders, captureTwoFactorChallenge, clearTwoFactorChallenge, storeAdminSession, takeTwoFactorNextPath } from '@/lib/admin-session'
 import { useBrand } from '@/lib/use-brand'
 
 type SetupData = { provisioningUri: string; manualKey: string }
@@ -70,9 +70,22 @@ export default function TwoFactorSetupPage() {
       const body = await response.json() as { success: boolean; error?: string; data?: { sessionToken?: string }; csrfToken?: string }
       if (!response.ok || !body.success) throw new Error(body.error || '登録を完了できませんでした')
       if (body.data?.sessionToken) storeAdminSession(body.data.sessionToken, body.csrfToken)
-      else if (body.csrfToken) localStorage.setItem('lh_csrf', body.csrfToken)
+      else if (body.csrfToken) {
+        try { localStorage.setItem('lh_csrf', body.csrfToken) } catch { /* Cookie session is sufficient */ }
+      }
+      const nextPath = takeTwoFactorNextPath()
+      if (nextPath === '/ops') {
+        const session = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/session`, {
+          credentials: 'include',
+          headers: adminSessionHeaders(body.data?.sessionToken),
+        })
+        const sessionBody = await session.json().catch(() => ({})) as { success?: boolean; data?: { platformAdmin?: boolean } }
+        if (!session.ok || !sessionBody.success || !sessionBody.data?.platformAdmin) {
+          throw new Error('2要素認証は登録できましたが、運営メンバーの有効状態を確認できませんでした')
+        }
+      }
       clearTwoFactorChallenge()
-      window.location.assign(takeTwoFactorNextPath())
+      window.location.assign(adminSessionHandoffPath(nextPath, body.data?.sessionToken, body.csrfToken))
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : '登録を完了できませんでした')
       setCode('')

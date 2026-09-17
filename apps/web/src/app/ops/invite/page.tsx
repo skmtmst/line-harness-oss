@@ -6,7 +6,7 @@ import PasswordField from '@/components/auth/password-field'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import { TextField } from '@/components/shared/text-field'
-import { storeAdminSession } from '@/lib/admin-session'
+import { adminSessionHandoffPath, storeAdminSession } from '@/lib/admin-session'
 import { authRequest, passwordError } from '@/lib/auth-email'
 import { AUTH_SELECTION_CLEARED_KEY } from '@/lib/hq-navigation'
 
@@ -69,10 +69,12 @@ export default function OpsInvitePage() {
       setBusy(false)
       return
     }
-    sessionStorage.removeItem(AUTH_SELECTION_CLEARED_KEY)
+    try { sessionStorage.removeItem(AUTH_SELECTION_CLEARED_KEY) } catch { /* non-essential navigation marker */ }
     if (res.data.sessionToken) storeAdminSession(res.data.sessionToken, res.csrfToken)
-    else if (res.csrfToken) localStorage.setItem('lh_csrf', res.csrfToken)
-    window.location.assign('/ops/two-factor')
+    else if (res.csrfToken) {
+      try { localStorage.setItem('lh_csrf', res.csrfToken) } catch { /* Cookie session is sufficient */ }
+    }
+    window.location.assign(adminSessionHandoffPath('/ops/two-factor', res.data.sessionToken, res.csrfToken))
   }
 
   return (
