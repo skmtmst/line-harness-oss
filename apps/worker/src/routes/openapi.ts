@@ -1347,6 +1347,13 @@ const spec = {
         responses: { '200': { description: 'Reminder step deleted' }, '403': { description: 'Owner or admin role required' }, '404': { description: 'Reminder or step not found in account scope' } },
       },
     },
+    '/api/reminders/{id}/test-recipient': {
+      get: {
+        tags: ['Reminders'], summary: '下書きのテスト送信で実際に届く送信先の状態を取得（N-070）',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { '200': { description: 'Test recipient state: unset / unavailable / ready' }, '403': { description: 'Staff role required' }, '404': { description: 'Draft not found' } },
+      },
+    },
     '/api/friends/{friendId}/reminders': {
       get: {
         tags: ['Reminders'], summary: '閲覧可能な友だちのリマインダ登録を取得',

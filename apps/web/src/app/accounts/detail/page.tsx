@@ -10,6 +10,7 @@ import ListState from '@/components/shared/list-state'
 import Breadcrumb from '@/components/shared/breadcrumb'
 import StatusBadge from '@/components/shared/status-badge'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import TestRecipientsSetting from '@/components/accounts/test-recipients-setting'
 import { Tabs } from '@/components/shared/tabs'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { connectionLabel, webhookLabel } from '../account-list-view'
@@ -191,6 +192,14 @@ function AccountDetail() {
                 ))}
               </div>
               {actionError && <p role="alert" className="text-danger mt-3 text-xs">{actionError}</p>}
+            </section>
+
+            <section className="bg-canvas rounded-card border-hairline border p-5">
+              <p className="text-ink text-sm font-bold">テスト送信先</p>
+              <p className="text-ink-secondary mt-1 text-xs">
+                リマインダや配信のテスト送信が届く先です。変更はこのアカウントだけに効きます。
+              </p>
+              <TestRecipientsSetting accountId={account.id} />
             </section>
           </div>
 
