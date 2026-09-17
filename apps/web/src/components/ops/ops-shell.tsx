@@ -16,6 +16,7 @@ import {
   Users,
 } from 'lucide-react'
 import { api, type OpsMe } from '@/lib/api'
+import Button from '@/components/shared/button'
 import { adminSessionHeaders, captureAdminSessionHandoff } from '@/lib/admin-session'
 import { logoutAndGoToLogin } from '@/lib/logout'
 import OpsEnvBar from './ops-env-bar'
@@ -56,7 +57,9 @@ export default function OpsShell({ children }: { children: ReactNode }) {
       }
       const body = await res.json() as { success?: boolean; data?: { platformAdmin?: boolean; platformAdminState?: string | null }; csrfToken?: string }
       if (!body.success || !body.data) throw new Error('運営コンソールのログイン状態を確認できませんでした')
-      if (body.csrfToken) localStorage.setItem('lh_csrf', body.csrfToken)
+      if (body.csrfToken) {
+        try { localStorage.setItem('lh_csrf', body.csrfToken) } catch { /* Bearer session remains usable */ }
+      }
       if (!body.data.platformAdmin) {
         // 招待を受けて 2要素認証待ちの人は、設定画面へ（★V6 37-10-B）
         router.replace(body.data.platformAdminState === 'awaiting_totp' ? '/ops/two-factor' : '/ops/login?error=not_platform_admin')
@@ -91,8 +94,8 @@ export default function OpsShell({ children }: { children: ReactNode }) {
         <div className="w-full max-w-md rounded-card border border-hairline bg-canvas p-6 text-center shadow-sm">
           <p role="alert" className="text-label font-bold text-status-danger">{loadError || '運営コンソールを読み込めませんでした'}</p>
           <div className="mt-4 flex justify-center gap-2">
-            <button type="button" onClick={() => { setChecked(false); setLoadError(''); void load() }} className="rounded-control bg-accent-deep px-4 py-2 text-label font-bold text-on-accent">もう一度試す</button>
-            <button type="button" onClick={() => void logoutAndGoToLogin('/ops/login')} className="rounded-control border border-hairline px-4 py-2 text-label font-bold text-ink">ログインへ戻る</button>
+            <Button variant="primary" onClick={() => { setChecked(false); setLoadError(''); void load() }}>もう一度試す</Button>
+            <Button onClick={() => void logoutAndGoToLogin('/ops/login')}>ログインへ戻る</Button>
           </div>
         </div>
       </div>

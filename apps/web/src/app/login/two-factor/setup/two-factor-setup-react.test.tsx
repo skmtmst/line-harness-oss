@@ -65,6 +65,7 @@ beforeEach(() => {
     if (init?.body) fixture.calls.push({ url, body: JSON.parse(String(init.body)) as Record<string, unknown> })
     if (url.endsWith('/api/auth/two-factor/setup/confirm')) return json(fixture.confirmResponse)
     if (url.endsWith('/api/auth/two-factor/setup')) return json(fixture.setupResponse)
+    if (url.endsWith('/api/auth/session')) return json({ success: true, data: { platformAdmin: true } })
     return json({ success: false, error: 'unexpected' }, 500)
   }))
   host = document.createElement('div')
@@ -113,6 +114,25 @@ describe('N-426: 初回設定画面', () => {
     })
     expect(window.sessionStorage.getItem('lh_admin_session_fallback')).toBe('sess-1')
     expect(window.location.pathname).toBe('/')
+  })
+
+  it('運営ログインからの初回設定はsessionと運営権限を確認して /ops へ進む', async () => {
+    window.history.replaceState(null, '', `/login/two-factor/setup?next=ops${fixture.hash}`)
+    await render()
+    const input = host.querySelector('#totp-setup-code') as HTMLInputElement
+    await act(async () => {
+      const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')!.set!
+      setter.call(input, '123456')
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    const form = host.querySelector('form')!
+    await act(async () => { form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })) })
+    await flush()
+    expect(vi.mocked(fetch)).toHaveBeenCalledWith(
+      'https://api.example.test/api/auth/session',
+      expect.objectContaining({ headers: { Authorization: 'Bearer lh_session:sess-1' } }),
+    )
+    expect(window.location.pathname).toBe('/ops')
   })
 
   it('合言葉が無いときは setup を呼ばず、ログインへ戻る導線を出す', async () => {

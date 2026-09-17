@@ -47,7 +47,7 @@ export default function OpsLoginPage() {
     }
     setBusy('password')
     setError('')
-    const res = await authRequest<{ twoFactor: boolean; challengeToken?: string; sessionToken?: string }>('/api/auth/password/login', {
+    const res = await authRequest<{ twoFactor: boolean; twoFactorSetup?: boolean; challengeToken?: string; sessionToken?: string }>('/api/auth/password/login', {
       email: email.trim(),
       password,
       next: 'ops',
@@ -58,6 +58,10 @@ export default function OpsLoginPage() {
       return
     }
     try { sessionStorage.removeItem(AUTH_SELECTION_CLEARED_KEY) } catch { /* non-essential navigation marker */ }
+    if (res.data.twoFactorSetup && res.data.challengeToken) {
+      window.location.assign(`/login/two-factor/setup?next=ops#${new URLSearchParams({ lh_2fa: res.data.challengeToken }).toString()}`)
+      return
+    }
     if (res.data.twoFactor && res.data.challengeToken) {
       // `next=ops` は URL に残す。シークレットモードで別サイト Cookie が止まっても、
       // 二段階認証のあと通常ログインへ戻らず、運営コンソールへ確実に戻す。
