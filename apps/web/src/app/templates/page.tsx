@@ -7,6 +7,7 @@ import { api, ApiError, type BroadcastAssetKind, type TemplateQuestion } from '@
 import FlexPreviewComponent from '@/components/flex-preview'
 import ImageUploader from '@/components/shared/image-uploader'
 import BroadcastAssetManager from '@/components/broadcasts/broadcast-asset-manager'
+import StaffAssetList from './staff-asset-list'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
@@ -27,6 +28,7 @@ import { templateDeleteDescription } from './template-delete-message'
 import { messageTypeText } from './template-message-type'
 import styles from './templates-v6.module.css'
 import { useAccount } from '@/contexts/account-context'
+import { isOwnerOrAdmin } from '@/lib/staff-capability'
 import { ArrowRight, Bot, MessageCircle, Star, TriangleAlert, Workflow, X } from 'lucide-react'
 
 interface Template {
@@ -121,6 +123,13 @@ function normalizeTemplateSearchText(value: string): string {
 
 export default function TemplatesPage() {
   const { selectedAccountId, accounts, loading: accountLoading } = useAccount()
+  /*
+   * N-144: テンプレートの作成・編集・公開・削除は API が requireRole('owner',
+   * 'admin') で閉じている。staff へ操作を見せると押しても 403 になるだけ
+   * なので、ここで操作ごと出さない。閲覧（一覧・詳細の閲覧）は残す。
+   */
+  const [canMutateTemplates] = useState(() =>
+    typeof window === 'undefined' ? true : isOwnerOrAdmin())
   const activeAccountRef = useRef<string | null>(selectedAccountId)
   const [activeSection, setActiveSection] = useState<'message' | BroadcastAssetKind>('message')
   const [templates, setTemplates] = useState<Template[]>([])
@@ -595,7 +604,7 @@ export default function TemplatesPage() {
         />
       </div>
 
-      {activeSection === 'message' && (
+      {activeSection === 'message' && canMutateTemplates && (
         <div
           className={`${styles.createActions} flex items-center justify-between`}
           data-design="CreateActions"
@@ -623,6 +632,11 @@ export default function TemplatesPage() {
           </div>
         </div>
       )}
+      {activeSection === 'message' && !canMutateTemplates && (
+        <p className="text-ink-faint text-xs mb-3">
+          テンプレートの作成・変更・削除はオーナーと管理者だけができます。一覧と中身の閲覧はこのまま使えます。
+        </p>
+      )}
 
       {/* 一覧本体（設計 `Body`）。 */}
       <div className={styles.body} data-design="Body">
@@ -638,7 +652,7 @@ export default function TemplatesPage() {
           total={`${folders.length} 件`}
           activeId={selectedCategory}
           onSelect={setSelectedCategory}
-          onAddFolder={() => setFolderDialogOpen(true)}
+          onAddFolder={canMutateTemplates ? () => setFolderDialogOpen(true) : undefined}
           rows={[
             { id: 'all', label: 'すべて', count: templates.length },
             ...folders.map((folder, index) => ({
@@ -650,12 +664,12 @@ export default function TemplatesPage() {
               count: folder.itemCount ?? null,
               color: folder.color,
               // 設計 `CzndJ` と同じ操作メニューを、文言に依存せず撮影する。
-              qaOpen: folder.name === '予約' ? 'CzndJ' : undefined,
-              onEdit: () => setEditingFolder(folder),
+              qaOpen: canMutateTemplates && folder.name === '予約' ? 'CzndJ' : undefined,
+              onEdit: canMutateTemplates ? () => setEditingFolder(folder) : undefined,
               // 端の行には口を出さない。押せない矢印を置かない。
-              onMoveUp: index > 0 ? () => void moveFolder(index, -1) : undefined,
-              onMoveDown: index < folders.length - 1 ? () => void moveFolder(index, 1) : undefined,
-              onDelete: () => setDeletingFolder(folder),
+              onMoveUp: canMutateTemplates && index > 0 ? () => void moveFolder(index, -1) : undefined,
+              onMoveDown: canMutateTemplates && index < folders.length - 1 ? () => void moveFolder(index, 1) : undefined,
+              onDelete: canMutateTemplates ? () => setDeletingFolder(folder) : undefined,
               deleteNote: '削除しても、中のテンプレートは未分類に残ります。',
             })),
             {
@@ -666,9 +680,11 @@ export default function TemplatesPage() {
           ]}
         >
           {folderError ? <p role="alert" className="text-danger text-xs">{folderError}</p> : null}
-          <p className="text-ink-faint text-xs leading-relaxed">
-            テンプレートは一覧の「置き場」から移せます。
-          </p>
+          {canMutateTemplates ? (
+            <p className="text-ink-faint text-xs leading-relaxed">
+              テンプレートは一覧の「置き場」から移せます。
+            </p>
+          ) : null}
         </FolderPanel>
       </div>
       <div className="min-w-0 flex-1">
@@ -950,7 +966,7 @@ export default function TemplatesPage() {
                       >
                         一斉配信で使う
                       </a>
-                      {t.usageCount > 0 ? (
+                      {canMutateTemplates && (t.usageCount > 0 ? (
                         <Button
                           onClick={(e) => { e.stopPropagation(); handleDelete(t) }}
                         >
@@ -963,7 +979,7 @@ export default function TemplatesPage() {
                         >
                           テンプレートを削除
                         </button>
-                      )}
+                      ))}
                       </div>
                     </td>
                   </tr>
@@ -994,9 +1010,9 @@ export default function TemplatesPage() {
                   />
                 ) : (
                   <h3
-                    className="text-sm font-semibold truncate cursor-text"
-                    onClick={() => setEditName(drawerData?.name ?? '')}
-                    title="クリックで編集"
+                    className={`text-sm font-semibold truncate ${canMutateTemplates ? 'cursor-text' : ''}`}
+                    onClick={canMutateTemplates ? () => setEditName(drawerData?.name ?? '') : undefined}
+                    title={canMutateTemplates ? 'クリックで編集' : undefined}
                   >
                     {drawerData?.name ?? '読み込み中...'}
                   </h3>
@@ -1036,7 +1052,7 @@ export default function TemplatesPage() {
                   >
                     {drawerData.publishedAt == null ? '未公開' : drawerData.hasDraft ? '編集中' : `公開版${drawerData.publishedVersion ?? ''}`}
                   </StatusBadge>
-                  {drawerData.hasDraft && (
+                  {drawerData.hasDraft && canMutateTemplates && (
                     <Button
                       variant="primary"
                       onClick={() => void handlePublish(drawerData)}
@@ -1051,20 +1067,31 @@ export default function TemplatesPage() {
                 )}
 
                 <div>
-                  <label className="mb-1.5 block text-[11px] font-medium text-ink-faint" htmlFor="template-folder-select">
-                    置き場
-                  </label>
-                  <SelectField
-                    id="template-folder-select"
-                    aria-label="置き場"
-                    value={drawerData.folderId ?? ''}
-                    disabled={movingId === drawerData.id}
-                    onChange={(event) => void moveTemplate(
-                      drawerData,
-                      event.target.value === '' ? null : event.target.value,
-                    )}
-                    options={[{ value: '', label: '未分類' }, ...folders.map((folder) => ({ value: folder.id, label: folder.name }))]}
-                  />
+                  {canMutateTemplates ? (
+                    <>
+                      <label className="mb-1.5 block text-[11px] font-medium text-ink-faint" htmlFor="template-folder-select">
+                        置き場
+                      </label>
+                      <SelectField
+                        id="template-folder-select"
+                        aria-label="置き場"
+                        value={drawerData.folderId ?? ''}
+                        disabled={movingId === drawerData.id}
+                        onChange={(event) => void moveTemplate(
+                          drawerData,
+                          event.target.value === '' ? null : event.target.value,
+                        )}
+                        options={[{ value: '', label: '未分類' }, ...folders.map((folder) => ({ value: folder.id, label: folder.name }))]}
+                      />
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-ink-faint mb-1.5 text-xs font-medium">置き場</p>
+                      <p className="text-sm text-ink">
+                        {folders.find((folder) => folder.id === drawerData.folderId)?.name ?? '未分類'}
+                      </p>
+                    </>
+                  )}
                 </div>
 
                 {/* Preview */}
@@ -1115,12 +1142,14 @@ export default function TemplatesPage() {
 
                 {/* Edit JSON / content */}
                 {drawerData.question ? (
-                  <Button
-                    href={`/templates/questions/new?id=${encodeURIComponent(drawerData.id)}`}
-                    variant="secondary"
-                  >
-                    質問を編集
-                  </Button>
+                  canMutateTemplates && (
+                    <Button
+                      href={`/templates/questions/new?id=${encodeURIComponent(drawerData.id)}`}
+                      variant="secondary"
+                    >
+                      質問を編集
+                    </Button>
+                  )
                 ) : <div>
                   <h4 className="text-[11px] font-medium text-ink-faint mb-1.5 uppercase tracking-wide">内容 / JSON 編集</h4>
                   <textarea
@@ -1128,10 +1157,12 @@ export default function TemplatesPage() {
                     className="w-full border border-hairline rounded-lg px-3 py-2 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-green-500 resize-y"
                     value={editContent ?? drawerData.messageContent}
                     onChange={(e) => setEditContent(e.target.value)}
+                    readOnly={!canMutateTemplates}
+                    title={canMutateTemplates ? undefined : '変更はオーナー・管理者だけができます（閲覧のみ）'}
                   />
                 </div>}
 
-                {(editContent !== null || editName !== null) && (
+                {canMutateTemplates && (editContent !== null || editName !== null) && (
                   <div className="flex gap-2">
                     <button
                       onClick={handleSaveEdit}
@@ -1342,7 +1373,21 @@ export default function TemplatesPage() {
       />
       </div>
       </div>
-      </> : <BroadcastAssetManager kind={activeSection} />}
+      </> : canMutateTemplates ? (
+        <BroadcastAssetManager kind={activeSection} />
+      ) : (
+        /*
+         * N-144: 資産タブの作成・編集・削除APIも owner/admin 限定。
+         * BroadcastAssetManager は別領域の部品かつ変更系の操作を内蔵するため、
+         * staff へは閲覧専用の一覧だけを出す。
+         */
+        <div>
+          <p className="text-ink-faint text-xs mb-3">
+            カルーセル・リッチメッセージ・クーポン・リサーチの作成・変更・削除はオーナーと管理者だけができます。一覧の閲覧はこのまま使えます。
+          </p>
+          <StaffAssetList kind={activeSection} />
+        </div>
+      )}
       </div>
     </div>
   )

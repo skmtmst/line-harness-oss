@@ -22,7 +22,7 @@ describe('V6 ウェビナー公開前確認と公開完了の契約', () => {
   })
 
   it('動画・配信枠・動画時間が無い状態では公開させない', () => {
-    expect(FORM).toContain("if (!videoPrefix.trim())")
+    expect(FORM).toContain('if (!videoReady)')
     expect(FORM).toContain('if (rules.length === 0)')
     expect(FORM).toContain('durationMinutes < 1')
     expect(FORM.indexOf('const problem = publicationProblem()')).toBeLessThan(FORM.indexOf('setPublishConfirmOpen(true)'))

@@ -312,6 +312,7 @@ beforeEach(() => {
   vi.stubGlobal('localStorage', store({
     [CSRF_STORAGE_KEY]: CSRF,
     lh_selected_account: 'account-a',
+    lh_staff_role: 'owner',
   }))
   vi.stubGlobal('fetch', vi.fn(fakeApi))
 })

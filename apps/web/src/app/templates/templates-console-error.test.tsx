@@ -61,6 +61,12 @@ const consoleErrors: string[] = []
 let restore: (() => void) | null = null
 
 beforeEach(() => {
+  // N-144: 変更操作は owner/admin だけに出す。操作を試す試験は owner で立てる。
+  vi.stubGlobal('localStorage', {
+    getItem: (key: string) => (key === 'lh_staff_role' ? 'owner' : null),
+    setItem: () => {},
+    removeItem: () => {},
+  })
   consoleErrors.length = 0
   const spy = vi.spyOn(console, 'error').mockImplementation((...args: unknown[]) => {
     consoleErrors.push(args.map((arg) => String(arg)).join(' '))

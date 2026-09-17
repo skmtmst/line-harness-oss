@@ -186,7 +186,7 @@ beforeEach(() => {
     }
   }
   vi.stubGlobal('sessionStorage', store({ [ADMIN_SESSION_STORAGE_KEY]: SESSION }))
-  vi.stubGlobal('localStorage', store({ [CSRF_STORAGE_KEY]: CSRF }))
+  vi.stubGlobal('localStorage', store({ [CSRF_STORAGE_KEY]: CSRF, lh_staff_role: 'owner' }))
   vi.stubGlobal('window', {
     dispatchEvent: (event: Event) => {
       if (event.type === SESSION_LOST_EVENT) sessionLost()
