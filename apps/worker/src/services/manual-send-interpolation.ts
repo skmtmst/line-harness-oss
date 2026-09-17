@@ -3,7 +3,14 @@ import {
   renderBroadcastMessageContent,
   type BroadcastRenderContext,
 } from './render-message.js';
-import { resolveInterpolationExtra } from './interpolation-context.js';
+import { getFriendFieldMap } from '@line-crm/db';
+import {
+  resolveInterpolationExtra,
+  resolveSendCommonVars,
+  CommonVarResolutionFailedError,
+  contentNeedsFriendFields,
+  type CommonVarSendSource,
+} from './interpolation-context.js';
 
 /*
  * N-026: 1対1トーク(手動返信・送信予約・プレビュー)の差し込み解決。
@@ -39,6 +46,9 @@ export async function renderChatMessageContent(
   messageType: string,
   content: string,
   liffId?: string | null,
+  // 送信経路から呼ぶときは必ず渡す。渡された場合、消えた共通情報は
+  // 空文字にせず台帳へ残したうえで未解決として拒否側へ回す。
+  source?: CommonVarSendSource,
 ): Promise<ChatRenderResult> {
   // 差し込みを含まない本文は読み取りクエリを増やさずそのまま返す。
   if (!content.includes('{{')) {
@@ -51,9 +61,28 @@ export async function renderChatMessageContent(
   };
   // liff_id は account 参照が必要なので、本文で使うときだけ呼び出し側から受け取る。
   if (liffId !== undefined) context.liffId = liffId;
-  const extra = await resolveInterpolationExtra(db, friend.id, content);
-  context.fields = extra.fields;
-  context.vars = extra.vars;
+  if (source) {
+    // 送信経路: 共通情報は厳格resolverへ任せ、ここでは情報欄だけを引く。
+    context.fields = contentNeedsFriendFields(content)
+      ? await getFriendFieldMap(db, friend.id)
+      : undefined;
+    try {
+      context.vars = await resolveSendCommonVars(db, friend.line_account_id, content, source);
+    } catch (error) {
+      if (error instanceof CommonVarResolutionFailedError) {
+        // 変数名は定義上の名前なので運用者へ見せてよい。値や本文は含めない。
+        return {
+          content,
+          unresolved: error.failures.map((failure) => `var.${failure.varKey}`),
+        };
+      }
+      throw error;
+    }
+  } else {
+    const extra = await resolveInterpolationExtra(db, friend.id, content);
+    context.fields = extra.fields;
+    context.vars = extra.vars;
+  }
 
   let rendered = content;
   if (RENDERABLE_TYPES.has(messageType)) {

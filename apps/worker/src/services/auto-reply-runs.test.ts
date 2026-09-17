@@ -30,7 +30,12 @@ vi.mock('@line-crm/db', () => dbMocks);
 vi.mock('./auto-reply-conditions.js', () => conditionMocks);
 vi.mock('./scenario-actions.js', () => actionMocks);
 vi.mock('./event-bus.js', () => eventMocks);
-vi.mock('./interpolation-context.js', () => ({ resolveInterpolationExtra: vi.fn().mockResolvedValue({}) }));
+vi.mock('./interpolation-context.js', () => ({
+  resolveInterpolationExtra: vi.fn().mockResolvedValue({}),
+  resolveSendInterpolationExtra: vi.fn().mockResolvedValue({}),
+  resolveSendCommonVars: vi.fn().mockResolvedValue(undefined),
+  contentNeedsFriendFields: vi.fn().mockReturnValue(false),
+}));
 vi.mock('./step-delivery.js', () => ({
   resolveMetadata: vi.fn().mockResolvedValue({}),
   expandVariables: vi.fn((value: string) => value),

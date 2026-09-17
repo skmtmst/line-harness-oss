@@ -105,6 +105,10 @@ vi.mock('../services/carousel-tap.js', () => ({
 
 vi.mock('../services/interpolation-context.js', () => ({
   resolveInterpolationExtra: vi.fn().mockResolvedValue({}),
+  // 送信経路の厳格解決も同じく「差し込みなし」扱いで通す。
+  resolveSendInterpolationExtra: vi.fn().mockResolvedValue({}),
+  resolveSendCommonVars: vi.fn().mockResolvedValue(undefined),
+  contentNeedsFriendFields: vi.fn().mockReturnValue(false),
 }));
 
 vi.mock('../services/step-delivery.js', () => ({

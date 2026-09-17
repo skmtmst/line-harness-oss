@@ -380,7 +380,8 @@
     "419_reminder_leap_year_policy.sql",
     "420_nen_pet_feeding.sql",
     "421_ops_support_tickets.sql",
-    "422_funnel_status.sql"
+    "422_funnel_status.sql",
+    "423_common_var_failure_sources.sql"
   ],
-  "migrationCount": 381
+  "migrationCount": 382
 }

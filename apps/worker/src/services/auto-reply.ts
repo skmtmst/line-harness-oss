@@ -24,7 +24,11 @@ import {
   type ScenarioActionRow,
 } from './scenario-actions.js';
 import { recordAutoReplyHit } from '@line-crm/db';
-import { resolveInterpolationExtra } from './interpolation-context.js';
+import {
+  resolveInterpolationExtra,
+  resolveSendInterpolationExtra,
+  type CommonVarSendSource,
+} from './interpolation-context.js';
 import {
   buildMessage,
   expandVariables,
@@ -193,16 +197,23 @@ export async function resolveAutoReplyContent(
   return { messageType: rule.response_type, content: rule.response_content };
 }
 
-/** 送信せず、本番と同じ差し込み解決まで行った返信内容を返す。 */
+/**
+ * 送信せず、本番と同じ差し込み解決まで行った返信内容を返す。
+ * source を渡すと送信経路として扱い、消えた共通情報は空文字にせず
+ * CommonVarResolutionFailedError で止める（dry-run は渡さない）。
+ */
 export async function previewAutoReplyContent(
   db: D1Database,
   friend: Friend,
   rule: AutoReply,
   workerUrl?: string,
+  source?: CommonVarSendSource,
 ): Promise<{ messageType: string; content: string }> {
   const resolvedMeta = await resolveMetadata(db, friend);
   const resolved = await resolveAutoReplyContent(db, rule);
-  const extra = await resolveInterpolationExtra(db, friend.id, resolved.content);
+  const extra = source
+    ? await resolveSendInterpolationExtra(db, friend.id, resolved.content, source)
+    : await resolveInterpolationExtra(db, friend.id, resolved.content);
   return {
     messageType: resolved.messageType,
     content: expandVariables(
@@ -629,7 +640,9 @@ export async function matchAndReply(
   let messageLogId: string | null = null;
   let replyError: unknown = null;
   try {
-    const resolved = await previewAutoReplyContent(db, friend, rule, workerUrl);
+    const resolved = await previewAutoReplyContent(db, friend, rule, workerUrl, {
+      kind: 'auto_reply', id: rule.id,
+    });
     const replyMsg = buildMessage(resolved.messageType, resolved.content);
     const response = await lineClient.replyMessageWithRequestId(replyToken, [replyMsg]);
     replyTokenConsumed = true;

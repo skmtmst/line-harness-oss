@@ -1496,6 +1496,7 @@ chats.post('/api/chats/:id/send', requireRole('owner', 'admin', 'staff'), requir
     // lease・冪等予約より前に置くので、拒否時はDBへ何も書かない。
     const rendered = await renderChatMessageContent(
       c.env.DB, friend, body.messageType ?? 'text', body.content, liffId,
+      { kind: 'chat', id: friend.id },
     );
     if (rendered.unresolved.length > 0) {
       return c.json({ success: false, ...unresolvedVariablesPayload(rendered.unresolved) }, 400);
@@ -1834,6 +1835,7 @@ chats.post('/api/chats/:id/render-preview', requireRole('owner', 'admin', 'staff
       return c.json({ success: false, error: 'Chat not found' }, 404);
     }
 
+    // 送信しないプレビュー。共通情報の厳格解決・台帳記録は行わない（lenient）。
     const rendered = await renderChatMessageContent(
       c.env.DB, friend, messageType, content, liffId,
     );
@@ -1931,6 +1933,7 @@ chats.post('/api/chats/:id/send-combined', requireRole('owner', 'admin', 'staff'
       // 素通しだと、画像つき送信が `{{name}}` をそのまま相手へ出す。
       const renderedText = await renderChatMessageContent(
         c.env.DB, friend, 'text', text, liffId,
+        { kind: 'chat', id: friend.id },
       );
       if (renderedText.unresolved.length > 0) {
         return c.json({ success: false, ...unresolvedVariablesPayload(renderedText.unresolved) }, 400);

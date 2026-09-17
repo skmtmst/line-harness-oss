@@ -1143,6 +1143,19 @@ liffRoutes.get('/auth/callback', async (c) => {
             }
           }
         }
+        // intro テンプレートの {{var.*}} は送信時点の値へ置き換える。
+        // 消えた共通情報があれば fail-closed で止める（この catch 節へ落ちる）。
+        if (introTemplate) {
+          const { expandSendCommonVars } = await import('../services/interpolation-context.js');
+          introTemplate = {
+            ...introTemplate,
+            message_content: await expandSendCommonVars(
+              db, introTemplate.message_content,
+              { kind: 'liff', id: introTemplate.id },
+              { lineAccountId: friend.line_account_id, friendId: friend.id },
+            ),
+          };
+        }
         const introMessage = buildIntroMessage(introTemplate, formLiffUrl);
 
         const lineClient = new LineClient(accessToken);
@@ -2145,6 +2158,19 @@ liffRoutes.post('/api/liff/send-form-link', async (c) => {
       if (trackedLink?.intro_template_id) {
         introTemplate = await getMessageTemplateById(c.env.DB, trackedLink.intro_template_id);
       }
+    }
+    // intro テンプレートの {{var.*}} は送信時点の値へ置き換える。
+    // 消えた共通情報があれば fail-closed で止める。
+    if (introTemplate) {
+      const { expandSendCommonVars } = await import('../services/interpolation-context.js');
+      introTemplate = {
+        ...introTemplate,
+        message_content: await expandSendCommonVars(
+          c.env.DB, introTemplate.message_content,
+          { kind: 'liff', id: introTemplate.id },
+          { lineAccountId: (friend as any).line_account_id ?? null, friendId: friend.id },
+        ),
+      };
     }
     const introMessage = buildIntroMessage(introTemplate, formLiffUrl);
 

@@ -248,7 +248,7 @@ export async function testReminderDraft(
 
   const account = await getLineAccountById(db, settings.lineAccountId);
   if (!account) throw new Error('REMINDER_LINE_ACCOUNT_NOT_FOUND');
-  const built = await buildReminderStepMessage(db, step, friend, new Date());
+  const built = await buildReminderStepMessage(db, step, friend, new Date(), 'test_send');
   const response = await new LineClient(account.channel_access_token)
     .pushMessageWithRequestId(friend.line_user_id, [built.message], requestKey);
   const logId = crypto.randomUUID();
