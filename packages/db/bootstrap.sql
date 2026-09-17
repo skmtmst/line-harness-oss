@@ -4628,7 +4628,8 @@ CREATE TABLE "reminders" (
   created_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 , display_order INTEGER NOT NULL DEFAULT 0, deleted_at TEXT, lifecycle_status TEXT NOT NULL DEFAULT 'published'
-  CHECK (lifecycle_status IN ('draft', 'published', 'stopped')), current_draft_version_id TEXT, current_published_version_id TEXT, created_from_recipe_id TEXT REFERENCES recipes(id), recipe_clone_run_id TEXT REFERENCES recipe_clone_runs(id), trigger_event_id TEXT);
+  CHECK (lifecycle_status IN ('draft', 'published', 'stopped')), current_draft_version_id TEXT, current_published_version_id TEXT, created_from_recipe_id TEXT REFERENCES recipes(id), recipe_clone_run_id TEXT REFERENCES recipe_clone_runs(id), trigger_event_id TEXT, leap_year_policy TEXT NOT NULL DEFAULT 'mar1'
+  CHECK (leap_year_policy IN ('feb28', 'mar1', 'skip')));
 
 CREATE TABLE rich_menu_area_taps (
   id              TEXT PRIMARY KEY,

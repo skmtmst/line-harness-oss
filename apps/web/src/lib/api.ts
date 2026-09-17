@@ -8200,9 +8200,10 @@ export const api = {
       { method: 'DELETE' },
     ),
     birthdayCoupon: (accountId: string) => fetchApi<ApiResponse<{
-      isEnabled: boolean; codePrefix: string; benefitLabel: string; discountAmount: number; validityDays: number; updatedAt: string
+      isEnabled: boolean; codePrefix: string; benefitLabel: string; discountAmount: number; validityDays: number;
+      leapYearPolicy: 'feb28' | 'mar1' | 'skip'; updatedAt: string
     }>>(`/api/nen-campaigns/birthday-coupon?lineAccountId=${encodeURIComponent(accountId)}`),
-    updateBirthdayCoupon: (accountId: string, data: { isEnabled: boolean; codePrefix: string; benefitLabel: string; discountAmount: number; validityDays: number }) =>
+    updateBirthdayCoupon: (accountId: string, data: { isEnabled: boolean; codePrefix: string; benefitLabel: string; discountAmount: number; validityDays: number; leapYearPolicy?: 'feb28' | 'mar1' | 'skip' }) =>
       fetchApi<{ success: boolean }>(`/api/nen-campaigns/birthday-coupon?lineAccountId=${encodeURIComponent(accountId)}`, { method: 'PUT', body: JSON.stringify(data) }),
   },
   nenMembers: {

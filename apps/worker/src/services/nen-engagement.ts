@@ -1,5 +1,5 @@
 import { accountFeatureOffExclusionSql, getFriendById, getLineAccountById, jstNow } from '@line-crm/db';
-import { NEN_CAMPAIGN_BODY_MAX_LENGTH } from '@line-crm/shared';
+import { NEN_CAMPAIGN_BODY_MAX_LENGTH, effectiveAnniversaryMonthDay, type LeapYearPolicy } from '@line-crm/shared';
 import type { Message } from '@line-crm/line-sdk';
 import type { EcEvent } from '../routes/ec-integrations.js';
 import { logOutgoingMessage } from './event-bus.js';
@@ -90,6 +90,8 @@ export type NenBirthdayCouponSettingRow = {
   benefit_label: string;
   discount_amount: number;
   validity_days: number;
+  /** 419: 2月29日生まれの子への平年の扱い。未保存の古い設定は 'skip' 扱い（従来は平年に届かなかった）。 */
+  leap_year_policy?: LeapYearPolicy;
   updated_at: string;
 };
 
@@ -469,12 +471,18 @@ export async function getNenBirthdayCouponSetting(
       || Number(parsed.validity_days) < 1
       || Number(parsed.validity_days) > 3650
     ) return null;
+    const leapYearPolicy = parsed.leap_year_policy === 'feb28'
+      || parsed.leap_year_policy === 'mar1'
+      || parsed.leap_year_policy === 'skip'
+      ? parsed.leap_year_policy
+      : undefined;
     return {
       is_enabled: parsed.is_enabled!,
       code_prefix: parsed.code_prefix,
       benefit_label: parsed.benefit_label,
       discount_amount: parsed.discount_amount!,
       validity_days: parsed.validity_days!,
+      leap_year_policy: leapYearPolicy,
       updated_at: typeof parsed.updated_at === 'string' ? parsed.updated_at : '',
     };
   } catch {
@@ -636,10 +644,10 @@ export async function enqueueBirthdayCoupons(
 ): Promise<number> {
   const { issueYear, monthDay, deliveryAt } = birthdayDeliveryTarget(now);
   const pets = await db.prepare(
-    `SELECT p.id, p.friend_id, p.name, f.line_account_id
+    `SELECT p.id, p.friend_id, p.name, p.birthday, f.line_account_id
        FROM nen_pet_profiles p JOIN friends f ON f.id = p.friend_id
-      WHERE p.birthday IS NOT NULL AND substr(p.birthday, 6, 5) = ? AND f.is_following = 1`,
-  ).bind(monthDay).all<{ id: string; friend_id: string; name: string; line_account_id: string | null }>();
+      WHERE p.birthday IS NOT NULL AND substr(p.birthday, 6, 5) IN (?, '02-29') AND f.is_following = 1`,
+  ).bind(monthDay).all<{ id: string; friend_id: string; name: string; birthday: string; line_account_id: string | null }>();
   const issuedAt = jstNow();
   const accountConfiguration = new Map<string, {
     setting: NenBirthdayCouponSettingRow;
@@ -665,6 +673,13 @@ export async function enqueueBirthdayCoupons(
     const configuration = accountConfiguration.get(pet.line_account_id);
     if (!configuration) continue;
     const { setting, campaign } = configuration;
+    // 2月29日生まれ: うるう年はそのまま2/29に当たる。平年はアカウントの
+    // 方針（2/28・3/1・送らない）に従う。機能07リマインダと同じ共有規則（419）。
+    const petMonthDay = pet.birthday.slice(5);
+    if (petMonthDay !== monthDay) {
+      const effective = effectiveAnniversaryMonthDay(2, 29, issueYear, setting.leap_year_policy ?? 'skip');
+      if (effective !== monthDay) continue;
+    }
     const expires = new Date(deliveryAt.getTime() + setting.validity_days * 86_400_000);
     const existing = await db.prepare(
       `SELECT id FROM nen_coupon_issues WHERE pet_id = ? AND issue_year = ?`,

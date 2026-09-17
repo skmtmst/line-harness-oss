@@ -137,6 +137,57 @@ describe('起点の実在候補選択', () => {
   })
 })
 
+describe('2月29日の扱い（3択）', () => {
+  async function chooseBirthdayField() {
+    fireEvent.click(screen.getByRole('button', { name: /友だち情報欄の日付/ }))
+    await waitFor(() => {
+      const select = screen.getByLabelText('基準日に使う情報欄') as HTMLSelectElement
+      expect([...select.options].some((option) => option.value === 'field-birthday')).toBe(true)
+    })
+    fireEvent.change(screen.getByLabelText('基準日に使う情報欄'), { target: { value: 'field-birthday' } })
+  }
+
+  it('「毎年くり返す」を付けると3択が出て、既定は 2月28日', async () => {
+    render(<NewReminderPage />)
+    fillName()
+    await chooseBirthdayField()
+
+    expect(screen.queryByLabelText('2月29日が基準日のときの平年の扱い')).toBeNull()
+    fireEvent.click(screen.getByLabelText('毎年くり返す'))
+
+    const select = await screen.findByLabelText('2月29日が基準日のときの平年の扱い') as HTMLSelectElement
+    expect(select.value).toBe('feb28')
+    expect([...select.options].map((option) => option.textContent))
+      .toEqual(['2月28日に届ける', '3月1日に届ける', 'その年は届けない'])
+  })
+
+  it('選んだ方針を repeatYearly と一緒に保存する', async () => {
+    render(<NewReminderPage />)
+    fillName()
+    await chooseBirthdayField()
+    fireEvent.click(screen.getByLabelText('毎年くり返す'))
+    fireEvent.change(await screen.findByLabelText('2月29日が基準日のときの平年の扱い'), { target: { value: 'skip' } })
+
+    fireEvent.click(screen.getByRole('button', { name: '対象設定へ' }))
+    await waitFor(() => expect(fixture.createDraft).toHaveBeenCalled())
+    const settings = fixture.createDraft.mock.calls[0][0]
+    expect(settings.repeatYearly).toBe(true)
+    expect(settings.leapYearPolicy).toBe('skip')
+  })
+
+  it('くり返さない基準日では repeatYearly は false のまま保存する', async () => {
+    render(<NewReminderPage />)
+    fillName()
+    await chooseBirthdayField()
+
+    fireEvent.click(screen.getByRole('button', { name: '対象設定へ' }))
+    await waitFor(() => expect(fixture.createDraft).toHaveBeenCalled())
+    const settings = fixture.createDraft.mock.calls[0][0]
+    expect(settings.repeatYearly).toBe(false)
+    expect(settings.leapYearPolicy).toBe('feb28')
+  })
+})
+
 describe('未保存の入力保護', () => {
   it('入力途中で離れようとすると確認を出す', async () => {
     render(<NewReminderPage />)

@@ -67,8 +67,9 @@ export async function processFriendFieldReminders(
 
       for (const friend of friends) {
         // 毎年くり返すなら「次に来るその日」、くり返さないなら「その日が今日か」。
+        // 2月29日は設定者が選んだ平年の扱い（2/28・3/1・送らない）に従う（419）。
         const targetDate = reminder.repeat_yearly === 1
-          ? nextAnniversary(friend.value, now)
+          ? nextAnniversary(friend.value, now, reminder.leap_year_policy)
           : isSameJstDay(friend.value, now)
             ? toJstParts(now).date
             : null;

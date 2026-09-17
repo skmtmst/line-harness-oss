@@ -25,6 +25,8 @@ export interface ReminderRow {
   trigger_event_id: string | null;
   /** 154: 毎年くり返すか。 */
   repeat_yearly: number;
+  /** 419: 2月29日が基準日のとき、平年にいつ扱うか。 */
+  leap_year_policy: 'feb28' | 'mar1' | 'skip';
   /** 156: フォルダ。null は未分類。消しても未分類に戻るだけ。 */
   folder_id: string | null;
   /** 161: 並び順。同じ値のときは created_at の新しい順。 */
@@ -104,6 +106,8 @@ export interface ReminderDraftSettings {
   /** 418: イベント起点のとき絞るイベント。null/未指定は全イベント。 */
   triggerEventId?: string | null;
   repeatYearly?: boolean;
+  /** 419: 2月29日が基準日のときの平年の扱い。 */
+  leapYearPolicy?: 'feb28' | 'mar1' | 'skip';
   triggerOffsetMinutes?: number | null;
   sendAtTime?: string | null;
   targetTagId?: string | null;
@@ -228,6 +232,8 @@ export interface ReminderTriggerInput {
   triggerEventId?: string | null;
   /** 154: 毎年くり返すか（誕生日なら true）。 */
   repeatYearly?: boolean;
+  /** 419: 2月29日が基準日のときの平年の扱い。 */
+  leapYearPolicy?: 'feb28' | 'mar1' | 'skip';
   triggerOffsetMinutes?: number | null;
   sendAtTime?: string | null;
   targetTagId?: string | null;
@@ -245,8 +251,8 @@ export async function createReminder(
     `INSERT INTO reminders
        (id, name, description, trigger_type, trigger_offset_minutes,
         send_at_time, target_tag_id, delivery_mode,
-        trigger_field_id, trigger_event_id, repeat_yearly, folder_id, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        trigger_field_id, trigger_event_id, repeat_yearly, leap_year_policy, folder_id, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   )
     .bind(
       id,
@@ -262,6 +268,7 @@ export async function createReminder(
       input.triggerFieldId ?? null,
       input.triggerEventId ?? null,
       input.repeatYearly ? 1 : 0,
+      input.leapYearPolicy ?? 'feb28',
       input.folderId ?? null,
       now,
       now,
@@ -289,6 +296,7 @@ export async function updateReminder(
   if (updates.triggerFieldId !== undefined) { sets.push('trigger_field_id = ?'); values.push(updates.triggerFieldId); }
   if (updates.triggerEventId !== undefined) { sets.push('trigger_event_id = ?'); values.push(updates.triggerEventId); }
   if (updates.repeatYearly !== undefined) { sets.push('repeat_yearly = ?'); values.push(updates.repeatYearly ? 1 : 0); }
+  if (updates.leapYearPolicy !== undefined) { sets.push('leap_year_policy = ?'); values.push(updates.leapYearPolicy); }
   // delivery_mode はここで変えない。作成時に決めたものを守る（153）。
   // 途中で変えると、すでに登録済みの友だちの配信予定がすべて変わる。
   if ('triggerOffsetMinutes' in updates) { sets.push('trigger_offset_minutes = ?'); values.push(updates.triggerOffsetMinutes ?? null); }
@@ -410,9 +418,9 @@ export async function createReminderWithDraftVersion(
       `INSERT INTO reminders
          (id, name, description, is_active, line_account_id, trigger_type,
           trigger_offset_minutes, send_at_time, target_tag_id, folder_id,
-          delivery_mode, trigger_field_id, trigger_event_id, repeat_yearly, lifecycle_status,
-          current_draft_version_id, created_at, updated_at)
-       VALUES (?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft', ?, ?, ?)`,
+          delivery_mode, trigger_field_id, trigger_event_id, repeat_yearly, leap_year_policy,
+          lifecycle_status, current_draft_version_id, created_at, updated_at)
+       VALUES (?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft', ?, ?, ?)`,
     ).bind(
       reminderId,
       settings.name,
@@ -427,6 +435,7 @@ export async function createReminderWithDraftVersion(
       settings.triggerFieldId ?? null,
       settings.triggerEventId ?? null,
       settings.repeatYearly ? 1 : 0,
+      settings.leapYearPolicy ?? 'feb28',
       versionId,
       now,
       now,
@@ -562,7 +571,7 @@ export async function publishReminderDraftVersion(
       `UPDATE reminders
           SET name = ?, description = ?, line_account_id = ?, trigger_type = ?,
               delivery_mode = ?, trigger_field_id = ?, trigger_event_id = ?, repeat_yearly = ?,
-              trigger_offset_minutes = ?, send_at_time = ?, target_tag_id = ?, folder_id = ?,
+              leap_year_policy = ?, trigger_offset_minutes = ?, send_at_time = ?, target_tag_id = ?, folder_id = ?,
               is_active = 1, lifecycle_status = 'published',
               current_published_version_id = ?, current_draft_version_id = NULL, updated_at = ?
         WHERE id = ? AND deleted_at IS NULL`,
@@ -575,6 +584,7 @@ export async function publishReminderDraftVersion(
       settings.triggerFieldId ?? null,
       settings.triggerEventId ?? null,
       settings.repeatYearly ? 1 : 0,
+      settings.leapYearPolicy ?? 'mar1',
       settings.triggerOffsetMinutes ?? null,
       settings.sendAtTime ?? null,
       settings.targetTagId ?? null,
@@ -716,6 +726,7 @@ async function ensureReminderPublishedVersion(
     triggerFieldId: reminder.trigger_field_id,
     triggerEventId: reminder.trigger_event_id,
     repeatYearly: reminder.repeat_yearly === 1,
+    leapYearPolicy: reminder.leap_year_policy,
     triggerOffsetMinutes: reminder.trigger_offset_minutes,
     sendAtTime: reminder.send_at_time,
     targetTagId: reminder.target_tag_id,
@@ -1898,6 +1909,7 @@ export interface FriendFieldReminderRow {
   name: string;
   trigger_field_id: string | null;
   repeat_yearly: number;
+  leap_year_policy: 'feb28' | 'mar1' | 'skip';
   line_account_id: string | null;
   scan_cursor: string | null;
 }
@@ -1908,8 +1920,8 @@ export async function getFriendFieldReminders(
 ): Promise<FriendFieldReminderRow[]> {
   const rows = await db
     .prepare(
-      `SELECT r.id, r.name, r.trigger_field_id, r.repeat_yearly, r.line_account_id,
-              s.cursor AS scan_cursor
+      `SELECT r.id, r.name, r.trigger_field_id, r.repeat_yearly, r.leap_year_policy,
+              r.line_account_id, s.cursor AS scan_cursor
          FROM reminders r
          LEFT JOIN friend_field_reminder_scan_states s ON s.reminder_id = r.id
         WHERE r.is_active = 1
