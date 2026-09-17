@@ -22,6 +22,18 @@ describe('EC LINE通知カード', () => {
     expect(json).toContain('シェッドプロダクツ（カ');
   });
 
+  it('LINE Flex に無い項目（letterSpacing）を含めない。検証の Outbox 再送で 2 件が拒否された（2026-09-17）', () => {
+    const message = ecFlexMessage({
+      event_id: 'test-flex-fields-1', event_type: 'ec.order.confirmed',
+      occurred_at: '2026-08-20T12:00:00+09:00',
+      line_user_id: 'U00000000000000000000000000000000',
+      order: { number: 'NEN-009', total: 2430, payment_method: 'クレジットカード' },
+    }, { title: 'ご注文ありがとうございます', introText: 'いつもありがとうございます', test: true });
+    const json = JSON.stringify(message);
+    expect(json).not.toContain('letterSpacing');
+    expect(json).toContain('"text":"NEN"');
+  });
+
   it('銀行振込以外の注文には口座情報を付けない', () => {
     const message = ecFlexMessage({
       event_id: 'test-order-card-1', event_type: 'ec.order.confirmed',
