@@ -77,6 +77,25 @@ const TOO_MANY = '送信回数の上限に達しました。しばらく待っ�
 
 type Body = Record<string, unknown>;
 
+async function recordSuccessfulLoginAudit(c: Context<Env>, staffId: string): Promise<void> {
+  try {
+    await recordLoginAudit(c.env.DB, {
+      adminUserId: staffId,
+      action: 'login',
+      ip: clientIp(c),
+      userAgent: c.req.header('user-agent') ?? null,
+    });
+  } catch (error) {
+    const detail = error instanceof Error
+      ? { name: error.name, message: error.message }
+      : { name: 'UnknownError', message: 'Unknown failure' };
+    console.error('[auth-email] authentication branch failed', {
+      branch: 'recordLoginAudit',
+      ...detail,
+    });
+  }
+}
+
 async function readBody(c: Context<Env>): Promise<Body> {
   return c.req.json<Body>().catch(() => ({}) as Body);
 }
@@ -358,19 +377,14 @@ authEmail.post('/api/auth/password/login', async (c) => {
   }
   // 管理者束はTOTP登録が必須。未登録のまま通常セッションは発行せず、
   // 設定専用の合言葉へ回す（N-426）。
-  if (staffRequiresMfa(staff)) {
+  if (body.next === 'ops' || staffRequiresMfa(staff)) {
     if (!c.env.TOTP_ENCRYPTION_KEY) return c.json({ success: false, error: '二段階認証の設定に不備があります。運営にお問い合わせください' }, 500);
     const challengeToken = await startTwoFactorChallenge(c, staff.id, { purpose: 'setup', remember });
     return c.json({ success: true, data: { twoFactorSetup: true, challengeToken } });
   }
 
   const session = await issueSession(c, staff.id, config.sameSite, remember);
-  await recordLoginAudit(c.env.DB, {
-    adminUserId: staff.id,
-    action: 'login',
-    ip: clientIp(c),
-    userAgent: c.req.header('user-agent') ?? null,
-  });
+  await recordSuccessfulLoginAudit(c, staff.id);
   return c.json({
     success: true,
     data: { twoFactor: false, sessionToken: config.crossSite ? session.sessionToken : undefined },

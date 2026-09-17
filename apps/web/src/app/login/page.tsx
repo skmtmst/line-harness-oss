@@ -11,6 +11,14 @@ import { storeAdminSession } from '@/lib/admin-session'
 import { authRequest, emailError } from '@/lib/auth-email'
 import { AUTH_SELECTION_CLEARED_KEY } from '@/lib/hq-navigation'
 
+const LINE_LOGIN_FAILURE_CODES = new Set([
+  'line_token_failed',
+  'line_id_token_missing',
+  'line_verify_failed',
+  'line_profile_missing',
+  'line_login_failed',
+])
+
 /**
  * ログイン。★V6 0-1（`UufG8`、カード `m3tWJ`）。
  *
@@ -30,8 +38,10 @@ export default function LoginPage() {
     const errorCode = new URLSearchParams(window.location.search).get('error')
     if (errorCode === 'not_authorized') {
       setError('このLINEアカウントには管理者権限がありません。オーナーに追加を依頼してください。')
-    } else if (errorCode) {
+    } else if (errorCode && (LINE_LOGIN_FAILURE_CODES.has(errorCode) || errorCode === 'invalid_state')) {
       setError('LINEログインを完了できませんでした。もう一度お試しください。')
+    } else if (errorCode) {
+      setError('ログインを完了できませんでした。もう一度お試しください。')
     }
   }, [])
 

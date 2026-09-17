@@ -76,7 +76,7 @@ async function putFeatures(
     {
       method: 'PUT',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(body),
+      body: JSON.stringify({ reason: 'テスト', ...(body as Record<string, unknown>) }),
     },
     { DB: testDb.db, ...ENV },
   );

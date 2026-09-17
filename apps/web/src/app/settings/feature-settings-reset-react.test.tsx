@@ -114,6 +114,17 @@ function mutableSwitch(): HTMLButtonElement {
   return found
 }
 
+/** 保存に必須の変更理由を入れる。 */
+async function fillReason(text = 'テスト') {
+  const input = host.querySelector<HTMLInputElement>('#feature-settings-reason')
+  if (!input) throw new Error('変更理由の入力欄がありません')
+  const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!
+  await act(async () => {
+    setter.call(input, text)
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+  })
+}
+
 describe('N-446 機能設定を保存済み状態へ戻す', () => {
   it('変更を取り消すは保存失敗後も、最後に取得したaccount別snapshotへ戻し、APIは呼ばない', async () => {
     await render()
@@ -122,6 +133,7 @@ describe('N-446 機能設定を保存済み状態へ戻す', () => {
     await act(async () => { toggle.click() })
     expect(toggle.getAttribute('aria-checked')).not.toBe(savedChecked)
 
+    await fillReason()
     network.saveFails = true
     await act(async () => { button('機能設定を保存').click(); await settle() })
     expect(network.puts).toBe(1)

@@ -47,7 +47,11 @@ async function call(db: D1Database, path: string, init?: RequestInit) {
 const putFeatures = (db: D1Database, body: unknown) => call(
   db,
   '/api/settings/features?account_id=account-1',
-  { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) },
+  {
+    method: 'PUT',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ reason: 'テスト', ...(body as Record<string, unknown>) }),
+  },
 );
 
 const postImpact = (db: D1Database, body: unknown) => call(
@@ -67,6 +71,13 @@ function setting(testDb: SqliteD1, key: string) {
   return testDb.raw.prepare(
     'SELECT value FROM account_settings WHERE line_account_id = ? AND key = ?',
   ).get('account-1', key) as { value: string } | undefined;
+}
+
+/** 保存の監査行(N-444)。負けた要求は1行も残せない。 */
+function audits(testDb: SqliteD1) {
+  return testDb.raw.prepare(
+    `SELECT * FROM audit_events WHERE action = 'feature_settings.save' ORDER BY created_at, id`,
+  ).all() as Record<string, unknown>[];
 }
 
 /**
@@ -138,6 +149,10 @@ describe('同時保存の原子性', () => {
       // 敗者の副作用は1つも残らない。カタログは書かれず、トークンも消えない。
       expect(setting(testDb, CATALOG_KEY)).toBeUndefined();
       expect(setting(testDb, CONFIRM_KEY)?.value).toBe(confirmBefore?.value);
+      // 監査も同じ判定式で書かれるので、残るのは勝者の1行だけ。
+      const auditRows = audits(testDb);
+      expect(auditRows).toHaveLength(1);
+      expect(JSON.parse(auditRows[0].after_json as string)).toMatchObject({ version: 1 });
     } finally {
       testDb.raw.close();
     }
