@@ -361,7 +361,7 @@ describe('V6オートメーションの既存処理接続', () => {
     });
 
     expect(result.status).toBe('success');
-    const [, messages] = pushMessage.mock.calls[0] as [string, Array<{ text: string }>];
+    const [, messages] = pushMessage.mock.calls[0] as unknown as [string, Array<{ text: string }>];
     expect(messages[0].text).toBe('営業時間は10時から18時です');
     expect(testDb.raw.prepare(
       `SELECT content FROM messages_log WHERE friend_id = 'friend-1'`,

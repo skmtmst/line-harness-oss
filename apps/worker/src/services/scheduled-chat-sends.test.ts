@@ -193,7 +193,7 @@ describe('送信予約のdispatcher(N-025)', () => {
     expect(pushMessage).not.toHaveBeenCalled();
     expect(row('s-unres').status).toBe('scheduled');
     expect(row('s-unres').last_error_code).toBe('unresolved_template_variables');
-    expect(row('s-unres').scheduled_at > '2026-01-09T23:00:00.000Z').toBe(true);
+    expect(String(row('s-unres').scheduled_at) > '2026-01-09T23:00:00.000Z').toBe(true);
     // 送信履歴も残らない。
     const logged = sqlite.raw.prepare(
       `SELECT COUNT(*) AS n FROM messages_log WHERE friend_id = 'fr-1'`,

@@ -40,6 +40,7 @@ const SEND_PATHS: Array<{ file: string; mustCall: string; label: string }> = [
   { file: 'routes/webhook.ts', mustCall: 'expandSendCommonVars', label: '流入リンク案内・追加クーポン' },
   { file: 'routes/ec-integrations.ts', mustCall: 'expandSendCommonVars', label: 'ECイベント通知' },
   { file: 'routes/ec-commerce.ts', mustCall: 'expandSendCommonVars', label: 'EC通知のテスト送信' },
+  { file: 'services/operator-notification-dispatch.ts', mustCall: 'expandSendCommonVars', label: '運用者向けLINE通知' },
 ];
 
 /*
@@ -55,12 +56,16 @@ const NON_TEMPLATE_PATHS: Array<{ file: string; label: string }> = [
   { file: 'services/booking-notifier.ts', label: '予約通知（固定文）' },
   { file: 'services/event-booking-notifier.ts', label: 'イベント予約通知（固定文）' },
   { file: 'services/operation-notifications.ts', label: '運用アラート通知（固定文）' },
+  { file: 'services/operation-alert-notifications.ts', label: '運用アラートのスタッフ通知（固定文）' },
   { file: 'routes/meet-callback.ts', label: 'Meet結果通知（固定文）' },
+  { file: 'routes/line-notifications.ts', label: '通知の再試行（描画済みペイロードの再送）' },
   { file: 'services/segment-send.ts', label: '旧セグメント配信（呼出元なし・未使用）' },
 ];
 
 // LINE API への実送信を示す呼出しパターン。
-const LINE_SEND_PATTERN = /\.(pushMessage|replyMessage|multicast|broadcast|narrowcast)\s*\(/;
+// WithRequestId 形も含める（含めないとその経路だけ分類を強制できない）。
+const LINE_SEND_PATTERN =
+  /\.(pushMessage|replyMessage|multicast|broadcast|narrowcast)(WithRequestId)?\s*\(/;
 
 describe('全送信経路が共通情報の厳格resolverを通る(N-189)', () => {
   for (const { file, mustCall, label } of SEND_PATHS) {
@@ -130,6 +135,8 @@ describe('全送信経路が共通情報の厳格resolverを通る(N-189)', () =
     const strict = new Set(SEND_PATHS.map((p) => p.file));
     strict.add('routes/chats.ts');
     strict.add('services/scheduled-chat-sends.ts');
+    // テスト送信は buildReminderStepMessage（厳格化済み）が組み立てた本文を送る。
+    strict.add('services/reminder-draft.ts');
     const nonTemplate = new Set(NON_TEMPLATE_PATHS.map((p) => p.file));
 
     for (const file of sendFiles) {

@@ -1349,16 +1349,15 @@ friends.post('/api/friends/:id/messages', requireRole('owner', 'admin', 'staff')
     // この経路は従来 {{var.*}} を展開せず生のまま送っていた。消えた共通情報は
     // 空文字にせず止め、解決できるものは送信時点の値へ置き換える。
     // 予約・追跡より先に行うので、拒否時はDBへ何も書かない。
+    const { expandSendCommonVars, CommonVarResolutionFailedError } = await import('../services/interpolation-context.js');
     let resolvedContent = body.content;
     try {
-      const { expandSendCommonVars, CommonVarResolutionFailedError } = await import('../services/interpolation-context.js');
       resolvedContent = await expandSendCommonVars(
         db, body.content,
         { kind: 'friend_direct', id: friend.id },
         { lineAccountId: friendAccountId },
       );
     } catch (error) {
-      const { CommonVarResolutionFailedError } = await import('../services/interpolation-context.js');
       if (error instanceof CommonVarResolutionFailedError) {
         return c.json({
           success: false,
