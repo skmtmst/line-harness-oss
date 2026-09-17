@@ -1080,11 +1080,12 @@ describe('フォルダ', () => {
 
   it('2段までしか作れない', async () => {
     // 深くすると画面が組み立てられなくなる。
-    folders.getFolderById.mockResolvedValue({ ...FOLDER, parent_id: 'fo-0' });
+    folders.getFolderById.mockResolvedValue({ ...FOLDER, account_id: 'account-1', parent_id: 'fo-0' });
     const res = await req('/api/folders', 'POST', {
       kind: 'template',
       name: '孫',
       parentId: 'fo-1',
+      accountId: 'account-1',
     });
     expect(res.status).toBe(422);
   });
@@ -1095,11 +1096,13 @@ describe('フォルダ', () => {
       kind: 'template',
       name: 'x',
       parentId: 'fo-1',
+      accountId: 'account-1',
     });
     expect(res.status).toBe(422);
   });
 
   it('自分を自分の親にはできない', async () => {
+    folders.getFolderById.mockResolvedValue({ ...FOLDER, account_id: 'account-1' });
     const res = await req('/api/folders/fo-1', 'PATCH', { parentId: 'fo-1' });
     expect(res.status).toBe(422);
   });

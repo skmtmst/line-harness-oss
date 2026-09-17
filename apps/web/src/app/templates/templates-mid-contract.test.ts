@@ -16,7 +16,8 @@ const ASSET_EDITOR = fs.readFileSync(
 
 describe('点検・中: テンプレートの画面契約', () => {
   it('中2: 質問の分類候補は置き場一覧から取り、全件取得しない', () => {
-    expect(QUESTION_NEW).toContain("api.folders.list('template')")
+    // 置き場は選択中アカウントのものだけを読む（#892）。
+    expect(QUESTION_NEW).toContain("api.folders.list('template',")
     expect(QUESTION_NEW).not.toContain('api.templates.list(')
   })
 
@@ -37,7 +38,7 @@ describe('点検・中: テンプレートの画面契約', () => {
     for (const page of [EDIT, CAROUSEL, QUESTION_NEW]) {
       expect(page).toContain('置き場')
       expect(page).toContain('folderId')
-      expect(page).toContain("api.folders.list('template')")
+      expect(page).toContain("api.folders.list('template',")
     }
     expect(EDIT).toContain('folderId,')
     expect(CAROUSEL).toContain('folderId,')

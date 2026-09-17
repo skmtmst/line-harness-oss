@@ -198,6 +198,15 @@ export default function TemplatesPage() {
     setPendingDelete(null)
     setBlockedDelete(null)
     setDeleteError('')
+    // フォルダはアカウント単位。切り替えたら前のアカウントの帯も
+    // 選択中のフォルダも残さない（N-147）。
+    setFolders([])
+    setUnfiledCount(null)
+    setSelectedCategory('all')
+    setFolderDialogOpen(false)
+    setEditingFolder(null)
+    setDeletingFolder(null)
+    setFolderError('')
   }, [selectedAccountId])
 
   const load = useCallback(async () => {
@@ -311,19 +320,27 @@ export default function TemplatesPage() {
     return [t]
   }), [normalizedTemplateQuery, selectedCategory, templateSearchIndex, typeFilter])
 
-  /** フォルダを読み直す。並び順は API の `displayOrder` に従う。 */
+  /** フォルダを読み直す。並び順は API の `displayOrder` に従う。アカウント単位。 */
   const loadFolders = useCallback(async () => {
+    if (!selectedAccountId) {
+      setFolders([])
+      setUnfiledCount(null)
+      return
+    }
+    const accountId = selectedAccountId
     setFolderError('')
     try {
-      const res = await api.folders.list('template')
+      const res = await api.folders.list('template', accountId)
+      // 切替後に前の要求が返ってきても採用しない（N-147）。
+      if (activeAccountRef.current !== accountId) return
       if (res.success) {
         setFolders(res.data)
         setUnfiledCount(res.unfiledCount ?? null)
       } else setFolderError('フォルダを読み込めませんでした。')
     } catch {
-      setFolderError('フォルダを読み込めませんでした。')
+      if (activeAccountRef.current === accountId) setFolderError('フォルダを読み込めませんでした。')
     }
-  }, [])
+  }, [selectedAccountId])
 
   useEffect(() => { void loadFolders() }, [loadFolders])
 
@@ -340,8 +357,8 @@ export default function TemplatesPage() {
     setFolderBusy(true)
     setFolderError('')
     try {
-      await api.folders.update(target.id, { displayOrder: neighbor.displayOrder })
-      await api.folders.update(neighbor.id, { displayOrder: target.displayOrder })
+      await api.folders.update(target.id, { displayOrder: neighbor.displayOrder }, selectedAccountId ?? undefined)
+      await api.folders.update(neighbor.id, { displayOrder: target.displayOrder }, selectedAccountId ?? undefined)
       await loadFolders()
     } catch {
       setFolderError('並び順を変えられませんでした。')
@@ -371,7 +388,7 @@ export default function TemplatesPage() {
     setFolderBusy(true)
     setFolderError('')
     try {
-      const res = await api.folders.delete(deletingFolder.id)
+      const res = await api.folders.delete(deletingFolder.id, selectedAccountId ?? undefined)
       if (!res.success) throw new Error(res.error ?? '削除できませんでした')
       setDeletingFolder(null)
       if (selectedCategory === deletingFolder.id) setSelectedCategory('all')
@@ -1349,6 +1366,7 @@ export default function TemplatesPage() {
       {folderDialogOpen && (
         <FolderAddDialog
           kind="template"
+          accountId={selectedAccountId}
           note="テンプレートを分けてしまう箱です。削除しても、中のテンプレートは未分類に残ります。"
           placeholder="例: 01_定期便"
           onClose={() => setFolderDialogOpen(false)}
@@ -1360,6 +1378,7 @@ export default function TemplatesPage() {
         <FolderAddDialog
           kind="template"
           folder={editingFolder}
+          accountId={selectedAccountId}
           note="テンプレートを分けてしまう箱です。削除しても、中のテンプレートは未分類に残ります。"
           placeholder="例: 01_定期便"
           onClose={() => setEditingFolder(null)}

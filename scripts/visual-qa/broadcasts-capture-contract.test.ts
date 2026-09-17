@@ -42,7 +42,7 @@ describe('一斉配信の画面確認契約', () => {
       expect(FOLDER_PANEL).toContain(label)
     }
     expect(FOLDER_DIALOG).toContain('const folderUpdates = { name: trimmed, color }')
-    expect(FOLDER_DIALOG).toContain('api.folders.update(folder.id, folderUpdates)')
+    expect(FOLDER_DIALOG).toContain('api.folders.update(folder.id, folderUpdates, accountId ?? undefined)')
   })
 
   it('予約取消と条件保存の変種まで撮影手順を持つ', () => {
