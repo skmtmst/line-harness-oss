@@ -47,6 +47,7 @@ import {
 } from '../services/outbound-idempotency.js';
 import {
   previewReminderDraft,
+  resolveReminderTestRecipient,
   testReminderDraft,
   validateReminderDraft,
 } from '../services/reminder-draft.js';
@@ -900,6 +901,30 @@ reminders.post('/api/reminders/:id/preview', async (c) => {
   }
 });
 
+/*
+ * 送信前に「今設定されているテスト送信先」を返す。
+ * testReminderDraft と同じ resolveReminderTestRecipient で判定するので、
+ * 画面に出る送信先と実際に届く先がずれない。参照のみなので GET /draft と同じく
+ * /reminders 権限があれば読める。
+ */
+reminders.get('/api/reminders/:id/test-recipient', async (c) => {
+  try {
+    const draft = await getReminderDraftVersion(c.env.DB, c.req.param('id'));
+    if (!draft) return c.json({ success: false, error: '下書きが見つかりません' }, 404);
+    const settings = parseReminderVersionSettings(draft);
+    // 送信先がどのアカウントの設定かを見てから返す。別アカウントの下書きを
+    // 指されたときに、そのアカウントの送信先名を漏らさない。
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [settings.lineAccountId])) {
+      return c.json({ success: false, error: 'Reminder not found' }, 404);
+    }
+    const status = await resolveReminderTestRecipient(c.env.DB, settings.lineAccountId);
+    return c.json({ success: true, data: status });
+  } catch (err) {
+    console.error('GET /api/reminders/:id/test-recipient error:', err);
+    return c.json({ success: false, error: 'テスト送信先を読み込めませんでした' }, 500);
+  }
+});
+
 reminders.post('/api/reminders/:id/test-send', requireRole('owner', 'admin'), async (c) => {
   const draft = await getReminderDraftVersion(c.env.DB, c.req.param('id'));
   if (!draft) return c.json({ success: false, error: '下書きが見つかりません' }, 404);
@@ -909,6 +934,9 @@ reminders.post('/api/reminders/:id/test-send', requireRole('owner', 'admin'), as
   }
   try {
     const settings = parseReminderVersionSettings(draft);
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [settings.lineAccountId])) {
+      return c.json({ success: false, error: 'Reminder not found' }, 404);
+    }
     const referenceError = await validateReminderDraftReferences(c.env.DB, settings);
     if (referenceError) return c.json({ success: false, error: referenceError }, 422);
     const result = await testReminderDraft(c.env.DB, draft, settings, requestKey);
@@ -923,8 +951,20 @@ reminders.post('/api/reminders/:id/test-send', requireRole('owner', 'admin'), as
       staffId: c.get('staff').id,
     });
     const code = err instanceof Error ? err.message : '';
-    if (code === 'REMINDER_TEST_RECIPIENT_NOT_CONFIGURED' || code === 'REMINDER_TEST_RECIPIENT_NOT_AVAILABLE') {
-      return c.json({ success: false, error: 'テスト送信先を設定してください' }, 422);
+    if (code === 'REMINDER_TEST_RECIPIENT_NOT_CONFIGURED') {
+      // 未設定と「設定済みだが届けられない」を分けて返す（画面の導線が違う）。
+      return c.json({
+        success: false,
+        error: 'テスト送信先を設定してください',
+        code: 'TEST_RECIPIENT_NOT_CONFIGURED',
+      }, 422);
+    }
+    if (code === 'REMINDER_TEST_RECIPIENT_NOT_AVAILABLE') {
+      return c.json({
+        success: false,
+        error: '設定済みのテスト送信先がこのアカウントで利用できません',
+        code: 'TEST_RECIPIENT_NOT_AVAILABLE',
+      }, 422);
     }
     if (code === 'REMINDER_TEST_STEP_NOT_FOUND') {
       return c.json({ success: false, error: '送る内容を1件以上設定してください' }, 422);

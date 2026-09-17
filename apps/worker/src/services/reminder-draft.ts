@@ -170,21 +170,53 @@ export async function previewReminderDraft(
   };
 }
 
+export interface ReminderTestRecipientStatus {
+  // unset=未設定 / unavailable=設定済みだが届けられない / ready=送信できる
+  state: 'unset' | 'unavailable' | 'ready';
+  recipient: { id: string; displayName: string; pictureUrl: string | null } | null;
+}
+
+/*
+ * テスト送信の届け先を解決する。送信前の画面表示（GET test-recipient）と
+ * 実送信（testReminderDraft）が同じ判定を使うので、表示と送信がずれない。
+ */
+export async function resolveReminderTestRecipient(
+  db: D1Database,
+  lineAccountId: string,
+): Promise<ReminderTestRecipientStatus> {
+  const setting = await db.prepare(
+    `SELECT value FROM account_settings WHERE line_account_id = ? AND key = 'test_recipients'`,
+  ).bind(lineAccountId).first<{ value: string }>();
+  const friendId = setting ? (JSON.parse(setting.value) as string[])[0] : undefined;
+  if (!friendId) return { state: 'unset', recipient: null };
+  const friend = await getFriendById(db, friendId);
+  if (!friend || friend.line_account_id !== lineAccountId || !friend.is_following) {
+    return { state: 'unavailable', recipient: null };
+  }
+  return {
+    state: 'ready',
+    recipient: {
+      id: friend.id,
+      displayName: friend.display_name ?? 'テスト送信先',
+      pictureUrl: friend.picture_url,
+    },
+  };
+}
+
 export async function testReminderDraft(
   db: D1Database,
   version: ReminderVersionRow,
   settings: ReminderDraftSettings,
   requestKey: string,
 ): Promise<{ sent: number; recipientName: string; replayed: boolean; testedAt: string; requestId: string | null }> {
-  const setting = await db.prepare(
-    `SELECT value FROM account_settings WHERE line_account_id = ? AND key = 'test_recipients'`,
-  ).bind(settings.lineAccountId).first<{ value: string }>();
-  const friendId = setting ? (JSON.parse(setting.value) as string[])[0] : undefined;
-  if (!friendId) throw new Error('REMINDER_TEST_RECIPIENT_NOT_CONFIGURED');
-  const friend = await getFriendById(db, friendId);
-  if (!friend || friend.line_account_id !== settings.lineAccountId || !friend.is_following) {
+  const recipient = await resolveReminderTestRecipient(db, settings.lineAccountId);
+  if (recipient.state === 'unset') throw new Error('REMINDER_TEST_RECIPIENT_NOT_CONFIGURED');
+  if (recipient.state !== 'ready' || !recipient.recipient) {
     throw new Error('REMINDER_TEST_RECIPIENT_NOT_AVAILABLE');
   }
+  const friendId = recipient.recipient.id;
+  const friend = await getFriendById(db, friendId);
+  if (!friend) throw new Error('REMINDER_TEST_RECIPIENT_NOT_AVAILABLE');
   const step = (await getReminderVersionSteps(db, version.id))[0];
   if (!step) throw new Error('REMINDER_TEST_STEP_NOT_FOUND');
 

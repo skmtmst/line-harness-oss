@@ -19,6 +19,7 @@ import type {
   ReminderDraftVersion,
   ReminderPreviewResult,
   ReminderPublishResult,
+  ReminderTestRecipientStatus,
   ReminderStopConditions,
   ReminderValidationResult,
   AutoReplyRunsResponse,
@@ -8454,6 +8455,11 @@ export const api = {
         method: 'POST',
         body: JSON.stringify(targetDate ? { targetDate } : {}),
       }),
+    /** 送信前に出すテスト送信先の状態。実送信と同じ判定をWorker側で使う。 */
+    getTestRecipient: (id: string) =>
+      fetchApi<ApiResponse<ReminderTestRecipientStatus>>(
+        `/api/reminders/${id}/test-recipient`,
+      ),
     testDraft: (id: string, idempotencyKey: string) =>
       fetchApi<ApiResponse<{
         sent: number
@@ -8461,7 +8467,7 @@ export const api = {
         replayed: boolean
         requestId: string | null
         testedAt: string
-      }>>(
+      }> & { code?: string }>(
         `/api/reminders/${id}/test-send`,
         { method: 'POST', headers: { 'Idempotency-Key': idempotencyKey } },
       ),

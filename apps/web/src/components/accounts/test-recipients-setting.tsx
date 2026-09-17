@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { api } from '@/lib/api'
 
 interface Friend {
@@ -22,33 +22,51 @@ export default function TestRecipientsSetting({ accountId }: TestRecipientsSetti
   const [recipients, setRecipients] = useState<Friend[]>([])
   const [loginUsers, setLoginUsers] = useState<LoginUserCandidate[]>([])
   const [loading, setLoading] = useState(true)
+  // 読み込み失敗と未設定を分ける。失敗を黙って空配列にすると「未設定」の嘘を出す。
+  const [loadError, setLoadError] = useState(false)
+  const [saveError, setSaveError] = useState('')
   const [search, setSearch] = useState('')
   const [searchResults, setSearchResults] = useState<Friend[]>([])
   const [searching, setSearching] = useState(false)
   const [saving, setSaving] = useState(false)
+  // アカウント切替後に遅れて届いた応答が別アカウントの送信先を上書きしないよう、
+  // 読み込みごとに世代を進めて最新のものだけを描く。
+  const generationRef = useRef(0)
 
   const load = useCallback(async () => {
+    const generation = ++generationRef.current
     setLoading(true)
-    try {
-      const [recipientResult, loginUserResult] = await Promise.allSettled([
-        api.accountSettings.getTestRecipients(accountId),
-        api.accountSettings.getTestRecipientLoginUsers(accountId),
-      ])
-      if (recipientResult.status === 'fulfilled' && recipientResult.value.success) {
-        setRecipients(recipientResult.value.data)
-      }
-      if (loginUserResult.status === 'fulfilled' && loginUserResult.value.success) {
-        setLoginUsers(loginUserResult.value.data)
-      }
-    } catch { /* ignore */ }
-    finally { setLoading(false) }
+    setLoadError(false)
+    const [recipientResult, loginUserResult] = await Promise.allSettled([
+      api.accountSettings.getTestRecipients(accountId),
+      api.accountSettings.getTestRecipientLoginUsers(accountId),
+    ])
+    if (generationRef.current !== generation) return
+    let failed = false
+    if (recipientResult.status === 'fulfilled' && recipientResult.value.success) {
+      setRecipients(recipientResult.value.data)
+    } else {
+      failed = true
+    }
+    if (loginUserResult.status === 'fulfilled' && loginUserResult.value.success) {
+      setLoginUsers(loginUserResult.value.data)
+    } else {
+      failed = true
+    }
+    setLoadError(failed)
+    setLoading(false)
   }, [accountId])
 
-  useEffect(() => { load() }, [load])
+  useEffect(() => {
+    setSearch('')
+    setSearchResults([])
+    void load()
+  }, [load])
 
   // Debounced friend search
   useEffect(() => {
     if (search.length < 2) { setSearchResults([]); return }
+    let cancelled = false
     const timer = setTimeout(async () => {
       setSearching(true)
       try {
@@ -61,6 +79,7 @@ export default function TestRecipientsSetting({ accountId }: TestRecipientsSetti
         // includeTags=false: tags not rendered here; skipping the per-row
         // tag fetch turns ~11 D1 reads/keystroke into 2 (count + list).
         const res = await api.friends.list({ search, accountId, limit: 10, includeTags: false })
+        if (cancelled) return
         if (res.success) {
           const existing = new Set(recipients.map(r => r.id))
           const items = (res.data as unknown as { items: Friend[] }).items ?? res.data
@@ -71,9 +90,9 @@ export default function TestRecipientsSetting({ accountId }: TestRecipientsSetti
           )
         }
       } catch { /* ignore */ }
-      finally { setSearching(false) }
+      finally { if (!cancelled) setSearching(false) }
     }, 300)
-    return () => clearTimeout(timer)
+    return () => { cancelled = true; clearTimeout(timer) }
   }, [search, accountId, recipients])
 
   const addRecipient = async (friend: Friend) => {
@@ -82,23 +101,43 @@ export default function TestRecipientsSetting({ accountId }: TestRecipientsSetti
     setSearch('')
     setSearchResults([])
     setSaving(true)
+    setSaveError('')
     try {
-      await api.accountSettings.updateTestRecipients(accountId, updated.map(r => r.id))
-    } catch { /* ignore */ }
-    finally { setSaving(false) }
+      const res = await api.accountSettings.updateTestRecipients(accountId, updated.map(r => r.id))
+      if (!res.success) throw new Error('save failed')
+    } catch {
+      // 保存だけ失敗したのに一覧へ出続けると「入っている」と誤認させる。
+      // 失敗を表示し、サーバの真値へ戻す。
+      setSaveError('テスト送信先を保存できませんでした。')
+      void load()
+    } finally { setSaving(false) }
   }
 
   const removeRecipient = async (friendId: string) => {
     const updated = recipients.filter(r => r.id !== friendId)
     setRecipients(updated)
     setSaving(true)
+    setSaveError('')
     try {
-      await api.accountSettings.updateTestRecipients(accountId, updated.map(r => r.id))
-    } catch { /* ignore */ }
-    finally { setSaving(false) }
+      const res = await api.accountSettings.updateTestRecipients(accountId, updated.map(r => r.id))
+      if (!res.success) throw new Error('save failed')
+    } catch {
+      setSaveError('テスト送信先を保存できませんでした。')
+      void load()
+    } finally { setSaving(false) }
   }
 
   if (loading) return <p className="text-xs text-gray-400">読み込み中...</p>
+  if (loadError) {
+    return (
+      <div className="mt-3">
+        <p className="text-danger text-xs">テスト送信先を読み込めませんでした。通信状態を確認してください。</p>
+        <button type="button" onClick={() => void load()} className="text-action mt-1 text-xs hover:underline">
+          再読み込み
+        </button>
+      </div>
+    )
+  }
 
   const recipientIds = new Set(recipients.map((recipient) => recipient.id))
   const availableLoginUsers = loginUsers.filter(
@@ -106,8 +145,8 @@ export default function TestRecipientsSetting({ accountId }: TestRecipientsSetti
   )
 
   return (
-    <div className="mt-3 pt-3 border-t border-gray-100">
-      <h4 className="text-xs font-semibold text-gray-600 mb-2">テスト送信先</h4>
+    <div className="mt-3">
+      {saveError ? <p className="text-danger mb-2 text-xs">{saveError}</p> : null}
 
       {/* Current recipients */}
       {recipients.length > 0 && (

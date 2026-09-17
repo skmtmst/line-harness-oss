@@ -112,7 +112,7 @@ export default function TestSendSection({ broadcastId, accountId, disabled }: Te
       ) : recipients.length === 0 ? (
         <p className="text-ink-faint text-xs">
           テスト送信先が未設定です。
-          <Link href="/accounts" className="text-action ml-1 hover:underline">アカウント設定</Link>
+          <Link href={`/accounts/detail?id=${encodeURIComponent(accountId)}`} className="text-action ml-1 hover:underline">アカウント設定</Link>
           から設定してください。
         </p>
       ) : (
