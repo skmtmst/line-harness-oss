@@ -887,8 +887,19 @@ export default function TemplatesPage() {
                 {filteredTemplates.map((t) => (
                   <tr
                     key={t.id}
+                    role="link"
+                    tabIndex={0}
+                    aria-label={`${t.name}の詳細を開く`}
                     onClick={() => setDrawerId(t.id)}
-                    className={`hover:bg-canvas-sunken cursor-pointer transition-colors ${drawerId === t.id ? 'bg-accent-soft' : ''}`}
+                    onKeyDown={(event) => {
+                      // 行内のリンク・ボタンにフォーカスがあるときは行を開かない。
+                      if (event.target !== event.currentTarget) return
+                      if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault()
+                        setDrawerId(t.id)
+                      }
+                    }}
+                    className={`hover:bg-canvas-sunken cursor-pointer transition-colors focus:bg-canvas-sunken focus:outline-none ${drawerId === t.id ? 'bg-accent-soft' : ''}`}
                   >
                     <td className="px-4 py-3">
                       <p className="text-sm font-medium text-ink">{t.name}</p>
