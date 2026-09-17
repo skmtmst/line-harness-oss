@@ -123,7 +123,7 @@ describe('リマインダ公開フローの実データ表示', () => {
   })
 
   it('TestStage は本文の実差し込みだけを並べ、実装に無い変数名を出さない', () => {
-    render(<TestStage draft={DRAFT} recipientName="山田 花子" onConfirm={() => {}} onNext={() => {}} />)
+    render(<TestStage draft={DRAFT} recipientName="山田 花子" recipientView={{ kind: 'ready', recipient: { id: 'f1', displayName: '山田 花子', pictureUrl: null } }} onRecipientRecheck={() => {}} onConfirm={() => {}} onNext={() => {}} />)
     expect(screen.getByText('{{name}}')).toBeTruthy()
     expect(screen.getAllByText('山田 花子').length).toBeGreaterThanOrEqual(1)
     expect(screen.queryByText(/meet_datetime/)).toBeNull()
@@ -132,6 +132,47 @@ describe('リマインダ公開フローの実データ表示', () => {
     // フッターは下書きの実テスト記録を見る。
     expect(screen.getByText(/テスト済み 2026\/09\/10/)).toBeTruthy()
     expect(screen.queryByText(/2026\/09\/06/)).toBeNull()
+  })
+
+  it('TestStage は送信前に設定済みの送信先を出す', () => {
+    render(<TestStage draft={DRAFT} recipientName={null} recipientView={{ kind: 'ready', recipient: { id: 'f1', displayName: '田中 太郎', pictureUrl: null } }} onRecipientRecheck={() => {}} onConfirm={() => {}} onNext={() => {}} />)
+    // 送る前から実際の送信先が見える。「送ったあとに分かる」ではない。
+    expect(screen.getAllByText('田中 太郎').length).toBeGreaterThanOrEqual(2)
+    expect(screen.queryByText('テスト送信後に表示')).toBeNull()
+  })
+
+  it('TestStage は未設定のとき設定画面への導線と再確認を出す', () => {
+    const recheck = vi.fn()
+    render(<TestStage draft={DRAFT} recipientName={null} recipientView={{ kind: 'unset' }} onRecipientRecheck={recheck} onConfirm={() => {}} onNext={() => {}} />)
+    expect(screen.getAllByText('未設定').length).toBeGreaterThanOrEqual(1)
+    const link = screen.getByText('アカウント設定').closest('a')
+    // 下書きのLINEアカウントの設定画面へ直接行ける。
+    expect(link?.getAttribute('href')).toBe('/accounts/detail?id=account-1')
+    fireEvent.click(screen.getByRole('button', { name: '送信先を再確認' }))
+    expect(recheck).toHaveBeenCalledTimes(1)
+  })
+
+  it('TestStage は設定済みでも届かないときは別の案内を出す', () => {
+    render(<TestStage draft={DRAFT} recipientName={null} recipientView={{ kind: 'unavailable' }} onRecipientRecheck={() => {}} onConfirm={() => {}} onNext={() => {}} />)
+    expect(screen.getAllByText('届けられません').length).toBeGreaterThanOrEqual(1)
+    expect(screen.getByText(/別の送信先を選び直してください/)).toBeTruthy()
+    expect(screen.queryByText(/まだ設定されていません/)).toBeNull()
+  })
+
+  it('TestStage は読み込み失敗と未設定を分け、再確認できる', () => {
+    const recheck = vi.fn()
+    render(<TestStage draft={DRAFT} recipientName={null} recipientView={{ kind: 'error' }} onRecipientRecheck={recheck} onConfirm={() => {}} onNext={() => {}} />)
+    expect(screen.getAllByText('読み込めませんでした').length).toBeGreaterThanOrEqual(1)
+    expect(screen.queryByText('未設定')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: '送信先を再確認' }))
+    expect(recheck).toHaveBeenCalledTimes(1)
+  })
+
+  it('TestStage は読み込み中に未設定と誤認させない', () => {
+    render(<TestStage draft={DRAFT} recipientName={null} recipientView={{ kind: 'loading' }} onRecipientRecheck={() => {}} onConfirm={() => {}} onNext={() => {}} />)
+    expect(screen.getAllByText('確認中').length).toBeGreaterThanOrEqual(1)
+    expect(screen.queryByText('未設定')).toBeNull()
+    expect(screen.queryByText('送信先を再確認')).toBeNull()
   })
 
   it('DoneStage の主ボタンは詳細画面への実リンクで、Slackを約束しない', () => {

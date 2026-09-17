@@ -2201,6 +2201,20 @@ export interface ReminderPublishResult {
   nextScheduledAt: string | null;
 }
 
+/**
+ * テスト送信前に画面へ出す送信先の状態（N-070）。
+ * unset=未設定 / unavailable=設定済みだがこのアカウントで届けられない /
+ * ready=送信できる。送信本体と同じ判定を使うので表示と実送信がずれない。
+ */
+export interface ReminderTestRecipientStatus {
+  state: "unset" | "unavailable" | "ready";
+  recipient: {
+    id: string;
+    displayName: string;
+    pictureUrl: string | null;
+  } | null;
+}
+
 /** 7機能の実行記録画面で共通に使う所有元。書込台帳は機能ごとに安全に保つ。 */
 export type ExecutionOwnerKind =
   | "broadcast"

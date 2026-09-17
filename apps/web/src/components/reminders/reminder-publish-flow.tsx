@@ -6,6 +6,8 @@ import { describeReminderTiming } from '@line-crm/shared'
 import type { ReminderDraftSettings, ReminderDraftVersion, ReminderPreviewResult, ReminderPublishResult, ReminderValidationResult } from '@line-crm/shared'
 import { api } from '@/lib/api'
 import { firstReminderStepMessage, reminderPlaceholders, reminderStepTimings, reminderStopSummary, reminderTriggerLabel } from './reminder-labels'
+import { useReminderTestRecipient, type ReminderTestRecipientView } from './use-reminder-test-recipient'
+import { TestRecipientGuidance, testRecipientLabel } from './test-recipient-guidance'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
@@ -56,6 +58,8 @@ export default function ReminderPublishFlow({ reminderId, stage }: { reminderId:
   const [error, setError] = useState('')
   const [testConfirm, setTestConfirm] = useState(false)
   const [testRecipientName, setTestRecipientName] = useState<string | null>(null)
+  // 送信先はテスト段だけ読む。ほかの段で余計なGETを打たない。
+  const testRecipient = useReminderTestRecipient(stage === 'test' ? reminderId : null)
 
   const go = useCallback((next: ReminderPublishStage) => router.push(`/reminders/edit?id=${encodeURIComponent(reminderId)}&stage=${next}`), [reminderId, router])
   const loadDraft = useCallback(async () => {
@@ -87,7 +91,15 @@ export default function ReminderPublishFlow({ reminderId, stage }: { reminderId:
     setBusy(true); setError('')
     try {
       const response = await api.reminders.testDraft(reminderId, crypto.randomUUID())
-      if (!response.success) throw new Error(response.error)
+      if (!response.success) {
+        // 送信先起因の失敗はパネル側の状態も最新へ揃える。
+        if (response.code === 'TEST_RECIPIENT_NOT_CONFIGURED' || response.code === 'TEST_RECIPIENT_NOT_AVAILABLE') {
+          void testRecipient.reload()
+        }
+        setError(response.error || 'テスト送信に失敗しました。LINE連携と通知内容を確認してください。')
+        setTestConfirm(false)
+        return
+      }
       setDraft((current) => current ? { ...current, lastTestStatus: 'succeeded', lastTestedAt: response.data.testedAt } : current)
       setTestRecipientName(response.data.recipientName)
       setTestConfirm(false)
@@ -110,7 +122,7 @@ export default function ReminderPublishFlow({ reminderId, stage }: { reminderId:
       {error ? <p className="bg-danger-bg text-danger mb-3 rounded-lg p-3 text-sm">{error}</p> : null}
       {stage === 'target' ? <TargetStage settings={settings} validation={validation} onChange={setSettings} onNext={() => void saveTarget()} busy={busy} /> : null}
       {stage === 'preview' ? <PreviewStage settings={settings} preview={preview} onNext={() => go('test')} /> : null}
-      {stage === 'test' ? <TestStage draft={draft} recipientName={testRecipientName} onConfirm={() => setTestConfirm(true)} onNext={() => go('confirm')} /> : null}
+      {stage === 'test' ? <TestStage draft={draft} recipientName={testRecipientName} recipientView={testRecipient.view} onRecipientRecheck={() => void testRecipient.reload()} onConfirm={() => setTestConfirm(true)} onNext={() => go('confirm')} /> : null}
       {stage === 'confirm' ? <ConfirmStage draft={draft} settings={settings} validation={validation} onPublish={() => void publishDraft()} busy={busy} /> : null}
       {stage === 'done' ? <DoneStage draft={draft} published={published} preview={preview} validation={validation} /> : null}
       <ConfirmDialog open={testConfirm} title="テスト送信しますか？" description="自分のLINEへ確認用メッセージを1通送信します。" confirmLabel="テスト送信" cancelLabel="配信予定へ戻る" busy={busy} onConfirm={() => void sendTest()} onCancel={() => setTestConfirm(false)} />
@@ -150,11 +162,11 @@ export function PreviewStage({ settings, preview, onNext }: { settings: Reminder
   </ReminderWorkspace></div>
 }
 
-export function TestStage({ draft, recipientName, onConfirm, onNext }: { draft: ReminderDraftVersion; recipientName: string | null; onConfirm: () => void; onNext: () => void }) {
+export function TestStage({ draft, recipientName, recipientView, onRecipientRecheck, onConfirm, onNext }: { draft: ReminderDraftVersion; recipientName: string | null; recipientView: ReminderTestRecipientView; onRecipientRecheck: () => void; onConfirm: () => void; onNext: () => void }) {
   const testedAt = formatDateTime(draft.lastTestedAt)
-  const recipient = recipientName ?? 'テスト送信後に表示'
+  const recipient = testRecipientLabel(recipientView, recipientName)
   return <div data-design-node="W98zZQ"><ReminderWorkspace aside={<><SummaryCard rows={[["本番への影響", 'なし'], ['送信数', '1通'], ['送信先', recipient], ['送信方法', 'LINE公式']]} /><LinePreview caption="テスト送信される1通目の内容">{firstReminderStepMessage(draft.settings) || '本文がありません'}</LinePreview></>}>
-    <ReminderPanel title="テスト対象" note="自分のLINEへ確認用メッセージを送ります。"><dl className="grid grid-cols-2 gap-3 text-xs"><Metric label="送信先" value={recipient} /><Metric label="最終テスト日時" value={testedAt} /></dl></ReminderPanel>
+    <ReminderPanel title="テスト対象" note="自分のLINEへ確認用メッセージを送ります。"><dl className="grid grid-cols-2 gap-3 text-xs"><Metric label="送信先" value={recipient} /><Metric label="最終テスト日時" value={testedAt} /></dl><TestRecipientGuidance view={recipientView} accountId={draft.settings.lineAccountId} onRecheck={onRecipientRecheck} /></ReminderPanel>
     <ReminderPanel title="差し込み値の確認" note="本文に書いた差し込みだけを並べ、どこから取るかを確認します。">{reminderPlaceholders(draft.settings, recipientName).length === 0 ? <p className="text-ink-faint text-xs">本文に差し込み値はありません。</p> : <table className="w-full text-left text-xs"><thead><TableHeadRow><Th>変数</Th><Th>テストで使う値</Th><Th>本番での取得元</Th></TableHeadRow></thead><tbody className="divide-y divide-hairline">{reminderPlaceholders(draft.settings, recipientName).map((placeholder) => <tr key={placeholder.token}><td className="py-2"><code>{placeholder.token}</code></td><td>{placeholder.testValue}</td><td>{placeholder.source}</td></tr>)}</tbody></table>}</ReminderPanel>
     <ReminderPanel title="テスト送信の履歴" note="下書きに記録された直近のテストだけを表示します。" action={draft.lastTestStatus === 'succeeded' ? <Pill tone="success">直近のテストは成功</Pill> : undefined}><table className="w-full text-left text-xs"><thead><TableHeadRow><Th>送信日時</Th><Th>送信した通知・宛先</Th><Th>結果</Th></TableHeadRow></thead><tbody className="divide-y divide-hairline"><tr><td className="py-2">{testedAt}</td><td>下書きの通知 ／ {recipient}</td><td><Pill tone={draft.lastTestStatus === 'succeeded' ? 'success' : 'warning'}>{draft.lastTestStatus === 'succeeded' ? '送信できました' : '成功記録なし'}</Pill></td></tr></tbody></table></ReminderPanel>
     <ReminderFooter status={draft.lastTestStatus === 'succeeded' ? `テスト済み ${formatDateTime(draft.lastTestedAt)}` : '下書き保存'} secondary={{ label: 'テスト送信', onClick: onConfirm }} primary="最終確認へ" primaryDisabled={draft.lastTestStatus !== 'succeeded'} onPrimary={onNext} />

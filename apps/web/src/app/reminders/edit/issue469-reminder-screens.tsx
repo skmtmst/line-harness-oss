@@ -23,6 +23,8 @@ import {
 } from '@/components/reminders/reminder-v6-ui'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { firstReminderStepMessage, reminderPlaceholders } from '@/components/reminders/reminder-labels'
+import { useReminderTestRecipient } from '@/components/reminders/use-reminder-test-recipient'
+import { TestRecipientGuidance, testRecipientLabel } from '@/components/reminders/test-recipient-guidance'
 
 function formatTestedAt(value: string | null): string {
   if (!value) return 'テスト記録なし'
@@ -246,6 +248,9 @@ export function Issue469ReminderTestStage({ reminderId }: { reminderId: string }
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [recipientName, setRecipientName] = useState<string | null>(null)
+  // 送信前に「今の送信先」を出す。遅い応答が別リマインダの送信先を出さないよう
+  // 世代付きで読む（useReminderTestRecipient 内）。
+  const testRecipient = useReminderTestRecipient(reminderId)
 
   useEffect(() => {
     void api.reminders.getDraft(reminderId).then((response) => {
@@ -258,7 +263,15 @@ export function Issue469ReminderTestStage({ reminderId }: { reminderId: string }
     setBusy(true)
     try {
       const response = await api.reminders.testDraft(reminderId, crypto.randomUUID())
-      if (!response.success) throw new Error(response.error)
+      if (!response.success) {
+        // 送信先起因の失敗はパネル側の状態も最新へ揃える。
+        if (response.code === 'TEST_RECIPIENT_NOT_CONFIGURED' || response.code === 'TEST_RECIPIENT_NOT_AVAILABLE') {
+          void testRecipient.reload()
+        }
+        setError(response.error || 'テスト送信に失敗しました。LINE連携と通知内容を確認してください。')
+        setConfirmOpen(false)
+        return
+      }
       setDraft((current) => current ? { ...current, lastTestStatus: 'succeeded', lastTestedAt: response.data.testedAt } : current)
       setRecipientName(response.data.recipientName)
       setConfirmOpen(false)
@@ -268,7 +281,7 @@ export function Issue469ReminderTestStage({ reminderId }: { reminderId: string }
   if (!draft) return <p className={error ? 'text-danger p-6 text-sm' : 'text-ink-faint p-6 text-sm'}>{error || '下書きを読み込んでいます'}</p>
 
   const testedAt = formatTestedAt(draft.lastTestedAt)
-  const recipient = recipientName ?? 'テスト送信後に表示'
+  const recipient = testRecipientLabel(testRecipient.view, recipientName)
 
   return <div data-design-node="W98zZQ" className="space-y-3">
     <ReminderWizard current={4} />
@@ -277,7 +290,7 @@ export function Issue469ReminderTestStage({ reminderId }: { reminderId: string }
       <LinePreview caption="テスト送信される1通目の内容">{firstReminderStepMessage(draft.settings) || '本文がありません'}</LinePreview>
       <div className="grid grid-cols-2 gap-2"><Button onClick={() => setConfirmOpen(true)}>テスト送信</Button></div>
     </div>}>
-      <ReminderPanel title="テスト対象" note="自分のLINEへ確認用メッセージを送ります。"><dl className="grid min-h-24 grid-cols-2 gap-4 text-xs"><Metric label="送信先" value={recipient} /><Metric label="最終テスト日時" value={testedAt} /></dl></ReminderPanel>
+      <ReminderPanel title="テスト対象" note="自分のLINEへ確認用メッセージを送ります。"><dl className="grid min-h-24 grid-cols-2 gap-4 text-xs"><Metric label="送信先" value={recipient} /><Metric label="最終テスト日時" value={testedAt} /></dl><TestRecipientGuidance view={testRecipient.view} accountId={draft.settings.lineAccountId} onRecheck={() => void testRecipient.reload()} /></ReminderPanel>
       <ReminderPanel title="差し込み値の確認" note="本文に書いた差し込みだけを並べ、どこから取るかを確認します。">{reminderPlaceholders(draft.settings, recipientName).length === 0 ? <p className="text-ink-faint px-3 py-3 text-xs">本文に差し込み値はありません。</p> : <table className="w-full border-collapse text-left text-xs"><thead><TableHeadRow><Th>変数</Th><Th>テストで使う値</Th><Th>本番での取得元</Th></TableHeadRow></thead><tbody className="border-hairline border-t">{reminderPlaceholders(draft.settings, recipientName).map((placeholder) => <tr key={placeholder.token} className="border-hairline border-t"><td className="px-3 py-3"><code>{placeholder.token}</code></td><td className="px-3 py-3">{placeholder.testValue}</td><td className="px-3 py-3">{placeholder.source}</td></tr>)}</tbody></table>}</ReminderPanel>
       <ReminderPanel title="テスト送信の履歴" note="下書きに記録された直近のテストだけを表示します。" action={draft.lastTestStatus === 'succeeded' ? <Pill tone="success">直近のテストは成功</Pill> : undefined}><table className="w-full border-collapse text-left text-xs"><thead><TableHeadRow><Th>送信日時</Th><Th>送信した通知・宛先</Th><Th>結果</Th></TableHeadRow></thead><tbody className="border-hairline border-t"><tr><td className="px-3 py-3">{testedAt}</td><td className="px-3 py-3">下書きの通知 ／ {recipient}</td><td className="px-3 py-3"><Pill tone={draft.lastTestStatus === 'succeeded' ? 'success' : 'warning'}>{draft.lastTestStatus === 'succeeded' ? '送信できました' : '成功記録なし'}</Pill></td></tr></tbody></table></ReminderPanel>
       {error ? <p className="text-danger text-xs">{error}</p> : null}
