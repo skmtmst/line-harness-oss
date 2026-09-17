@@ -130,19 +130,19 @@ function TemplateDetailInner() {
       key: `auto-reply-${u.id}`,
       kind: '自動応答',
       name: u.keyword,
-      href: '/auto-replies',
+      href: `/auto-replies/edit?id=${u.id}`,
     })),
     ...(usage?.scenarioSteps ?? []).map((u) => ({
       key: `scenario-step-${u.stepId}`,
       kind: 'シナリオ配信',
       name: `${u.scenarioName} ／ ステップ${u.stepOrder}`,
-      href: '/scenarios',
+      href: `/scenarios/detail?id=${u.scenarioId}`,
     })),
     ...(usage?.automations ?? []).map((u) => ({
       key: `automation-${u.id}`,
       kind: 'オートメーション',
       name: u.name,
-      href: '/automations',
+      href: `/automations/drafts?id=${u.id}`,
     })),
     ...(usage?.reminderSteps ?? []).map((u) => ({
       key: `reminder-step-${u.reminderId}-${u.stepId}`,

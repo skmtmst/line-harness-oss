@@ -307,7 +307,7 @@ templates.get('/api/templates/:id', async (c) => {
     if (!item || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [item.line_account_id])) {
       return c.json({ success: false, error: 'Template not found' }, 404);
     }
-    const usedBy = await getTemplateUsage(c.env.DB, id);
+    const usedBy = await getTemplateUsage(c.env.DB, id, item.line_account_id);
     return c.json({
       success: true,
       data: {
@@ -349,7 +349,7 @@ templates.get('/api/templates/:id/usages', async (c) => {
       return c.json({ success: false, error: 'Template not found' }, 404);
     }
 
-    return c.json({ success: true, data: await getTemplateUsage(c.env.DB, templateId) });
+    return c.json({ success: true, data: await getTemplateUsage(c.env.DB, templateId, tpl.line_account_id) });
   } catch (err) {
     console.error('GET /api/templates/:id/usages error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
@@ -685,7 +685,7 @@ templates.delete('/api/templates/:id', requireRole('owner', 'admin'), async (c) 
     }
     // ON DELETE SET NULL や本文の控えがあっても、参照中の設定を運用者に知らせず
     // 切ることはしない。すべての利用先を先に差し替えてもらう。
-    const usage = await getTemplateUsage(c.env.DB, id);
+    const usage = await getTemplateUsage(c.env.DB, id, existing.line_account_id);
     const usageCount = templateUsageCount(usage);
     if (usageCount > 0) {
       return c.json({

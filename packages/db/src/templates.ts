@@ -677,24 +677,43 @@ export interface TemplateUsage {
  * 現行の templates.id を参照する運用中の設定をすべて返す。
  * messages_log.template_id_at_send は送信済み履歴なので、削除を止める参照には含めない。
  *   automations は数十件規模なので LIKE で十分高速。
+ *
+ * templateAccountId を渡すと、使用先もテンプレートと同じアカウント
+ * （またはアカウント未設定）のものだけに絞る。別アカウントの設定は
+ * 名前・遷移先ともに見せられず、そこへ直しに行けないまま削除だけが
+ * 止まるので、ここで除外する（#891 N-135/142/143）。
  */
-export async function getTemplateUsage(db: D1Database, templateId: string): Promise<TemplateUsage> {
+export async function getTemplateUsage(
+  db: D1Database,
+  templateId: string,
+  templateAccountId?: string | null,
+): Promise<TemplateUsage> {
+  // テンプレートがアカウント所属なら、使用先は「同じアカウント or 未設定」に限る。
+  // テンプレート自体が未設定（null）なら全アカウントの使用先を返す。
+  const scope = (column: string) =>
+    templateAccountId ? ` AND (${column} IS NULL OR ${column} = ?)` : '';
+  const scopeBinds = (values: unknown[]) =>
+    templateAccountId ? [...values, templateAccountId] : values;
+
   const arRes = await db
     .prepare(
       `SELECT id, keyword, match_type, line_account_id
-       FROM auto_replies WHERE template_id = ? ORDER BY created_at DESC`,
+       FROM auto_replies WHERE template_id = ?${scope('line_account_id')} ORDER BY created_at DESC`,
     )
-    .bind(templateId)
+    .bind(...scopeBinds([templateId]))
     .all<{ id: string; keyword: string; match_type: 'exact' | 'contains'; line_account_id: string | null }>();
 
   // automations の actions JSON を全件取って JS 側で template_id をマッチさせる。
   // SQL LIKE で "%\"template_id\":\"<id>\"%" を投げると D1 SQLite の
   // "pattern too complex" 上限に当たるので JS 処理にしている。
   const autRes = await db
-    .prepare(`SELECT id, name, event_type, actions FROM automations ORDER BY created_at DESC`)
-    .all<{ id: string; name: string; event_type: string; actions: string }>();
+    .prepare(`SELECT id, name, event_type, actions, line_account_id FROM automations ORDER BY created_at DESC`)
+    .all<{ id: string; name: string; event_type: string; actions: string; line_account_id: string | null }>();
   const matchedAutomations: Array<{ id: string; name: string; event_type: string }> = [];
   for (const r of autRes.results ?? []) {
+    if (templateAccountId && r.line_account_id !== null && r.line_account_id !== templateAccountId) {
+      continue;
+    }
     try {
       const actions = JSON.parse(r.actions) as Array<{ params?: { template_id?: string } }>;
       if (actions.some((a) => a.params?.template_id === templateId)) {
@@ -710,10 +729,10 @@ export async function getTemplateUsage(db: D1Database, templateId: string): Prom
       `SELECT ss.id AS step_id, ss.step_order, ss.scenario_id, s.name AS scenario_name
        FROM scenario_steps ss
        JOIN scenarios s ON s.id = ss.scenario_id
-       WHERE ss.template_id = ?
+       WHERE ss.template_id = ?${scope('s.line_account_id')}
        ORDER BY s.name, ss.step_order`,
     )
-    .bind(templateId)
+    .bind(...scopeBinds([templateId]))
     .all<{ step_id: string; step_order: number; scenario_id: string; scenario_name: string }>();
 
   const reminderRes = await db
@@ -721,10 +740,10 @@ export async function getTemplateUsage(db: D1Database, templateId: string): Prom
       `SELECT rs.id AS step_id, r.id AS reminder_id, r.name AS reminder_name
        FROM reminder_steps rs
        JOIN reminders r ON r.id = rs.reminder_id
-       WHERE rs.template_id = ?
+       WHERE rs.template_id = ?${scope('r.line_account_id')}
        ORDER BY r.name, rs.offset_minutes`,
     )
-    .bind(templateId)
+    .bind(...scopeBinds([templateId]))
     .all<{ step_id: string; reminder_id: string; reminder_name: string }>();
 
   const richMenuRes = await db
@@ -734,10 +753,10 @@ export async function getTemplateUsage(db: D1Database, templateId: string): Prom
        FROM rich_menu_areas a
        JOIN rich_menu_pages p ON p.id = a.page_id
        JOIN rich_menu_groups g ON g.id = p.group_id
-       WHERE a.template_id = ?
+       WHERE a.template_id = ?${scope('g.account_id')}
        ORDER BY g.name, p.order_index, a.id`,
     )
-    .bind(templateId)
+    .bind(...scopeBinds([templateId]))
     .all<{
       area_id: string;
       label: string | null;
@@ -747,8 +766,8 @@ export async function getTemplateUsage(db: D1Database, templateId: string): Prom
     }>();
 
   const trackedLinkRes = await db
-    .prepare(`SELECT id, name FROM tracked_links WHERE template_id = ? ORDER BY name`)
-    .bind(templateId)
+    .prepare(`SELECT id, name FROM tracked_links WHERE template_id = ?${scope('line_account_id')} ORDER BY name`)
+    .bind(...scopeBinds([templateId]))
     .all<{ id: string; name: string }>();
 
   return {
@@ -872,46 +891,75 @@ export async function getTemplatesWithUsageCount(
   const tplStmt = pageValues.length > 0 ? db.prepare(pageSql).bind(...pageValues) : db.prepare(pageSql);
   const templates = await tplStmt.all<TemplateRow>();
 
-  // 2. 列で参照している設定は1回の問い合わせでまとめて数える。
+  // 2. 列で参照している設定を1回の問い合わせでまとめて取る。
+  // 使用先のアカウントも一緒に返し、テンプレートと同じアカウント
+  // （または未設定）の使用先だけを数える。詳細の getTemplateUsage と
+  // 同じ粒度・同じ境界にしないと「一覧の数」と「詳細の件数」がずれる
+  // （#891 N-135/142/143）。
   const relationalRes = await db.prepare(
-    `SELECT template_id, SUM(cnt) AS cnt
-     FROM (
-       SELECT template_id, COUNT(*) AS cnt FROM auto_replies WHERE template_id IS NOT NULL GROUP BY template_id
+    `SELECT template_id, acct FROM (
+       SELECT template_id, line_account_id AS acct FROM auto_replies WHERE template_id IS NOT NULL
        UNION ALL
-       SELECT template_id, COUNT(*) AS cnt FROM scenario_steps WHERE template_id IS NOT NULL GROUP BY template_id
+       SELECT ss.template_id, s.line_account_id AS acct
+         FROM scenario_steps ss JOIN scenarios s ON s.id = ss.scenario_id
+        WHERE ss.template_id IS NOT NULL
        UNION ALL
-       SELECT template_id, COUNT(*) AS cnt FROM reminder_steps WHERE template_id IS NOT NULL GROUP BY template_id
+       SELECT rs.template_id, r.line_account_id AS acct
+         FROM reminder_steps rs JOIN reminders r ON r.id = rs.reminder_id
+        WHERE rs.template_id IS NOT NULL
        UNION ALL
-       SELECT template_id, COUNT(*) AS cnt FROM rich_menu_areas WHERE template_id IS NOT NULL GROUP BY template_id
+       SELECT a.template_id, g.account_id AS acct
+         FROM rich_menu_areas a
+         JOIN rich_menu_pages p ON p.id = a.page_id
+         JOIN rich_menu_groups g ON g.id = p.group_id
+        WHERE a.template_id IS NOT NULL
        UNION ALL
-       SELECT template_id, COUNT(*) AS cnt FROM tracked_links WHERE template_id IS NOT NULL GROUP BY template_id
-     ) references_by_kind
-     GROUP BY template_id`,
-  ).all<{ template_id: string; cnt: number }>();
-  const relationalCount = new Map<string, number>();
-  for (const r of relationalRes.results ?? []) relationalCount.set(r.template_id, r.cnt);
+       SELECT template_id, line_account_id AS acct FROM tracked_links WHERE template_id IS NOT NULL
+     ) references_by_kind`,
+  ).all<{ template_id: string; acct: string | null }>();
 
-  // 3. automations の actions JSON を取って template_id を抽出
+  // 使用先1件を (template_id, 使用先のアカウント) の行として集める。
+  const usageRefs = new Map<string, Array<string | null>>();
+  const addRef = (templateId: string, acct: string | null) => {
+    const list = usageRefs.get(templateId);
+    if (list) list.push(acct);
+    else usageRefs.set(templateId, [acct]);
+  };
+  for (const r of relationalRes.results ?? []) addRef(r.template_id, r.acct);
+
+  // 3. automations の actions JSON を取って template_id を抽出。
+  // 詳細側は「そのテンプレートを使うオートメーション」を1件として
+  // 数えるので、一覧側も同じテンプレートを複数アクションで使う
+  // オートメーションは1件として数える。
   const autRes = await db
-    .prepare(`SELECT actions FROM automations`)
-    .all<{ actions: string }>();
-  const automationCount = new Map<string, number>();
+    .prepare(`SELECT actions, line_account_id FROM automations`)
+    .all<{ actions: string; line_account_id: string | null }>();
   for (const r of autRes.results ?? []) {
     try {
       const actions = JSON.parse(r.actions) as Array<{ params?: { template_id?: string } }>;
-      for (const a of actions) {
-        const tid = a.params?.template_id;
-        if (tid) automationCount.set(tid, (automationCount.get(tid) ?? 0) + 1);
-      }
+      const referenced = new Set(
+        actions.map((a) => a.params?.template_id).filter((v): v is string => Boolean(v)),
+      );
+      for (const tid of referenced) addRef(tid, r.line_account_id);
     } catch {
       // ignore malformed JSON rows
     }
   }
 
+  // テンプレートがアカウント所属なら、使用先は同じアカウント or
+  // 未設定のものだけ。別アカウントの設定は名前も遷移先も見せられず、
+  // 数だけ残ると削除が永久に止まる（#891）。
+  const countVisible = (template: TemplateRow): number => {
+    const refs = usageRefs.get(template.id) ?? [];
+    const account = template.line_account_id;
+    if (!account) return refs.length;
+    return refs.filter((acct) => acct === null || acct === account).length;
+  };
+
   return {
     items: (templates.results ?? []).map((t) => ({
       ...t,
-      usage_count: (relationalCount.get(t.id) ?? 0) + (automationCount.get(t.id) ?? 0),
+      usage_count: countVisible(t),
     })),
     total: Number(totalRow?.total ?? 0),
   };
