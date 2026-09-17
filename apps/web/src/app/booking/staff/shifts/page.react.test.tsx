@@ -32,7 +32,10 @@ function switchAccount(id: string | null) {
   act(() => { accountSetters.forEach((setId) => setId(id)) })
 }
 
-vi.mock('next/navigation', () => ({ useSearchParams: () => new URLSearchParams() }))
+vi.mock('next/navigation', () => ({
+  useSearchParams: () => new URLSearchParams(),
+  useRouter: () => ({ replace: vi.fn(), push: vi.fn() }),
+}))
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => undefined }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => useControllableAccount() }))
 vi.mock('./staff-detail', () => ({ default: () => <div>担当者別</div> }))
@@ -59,6 +62,8 @@ vi.mock('@/lib/api', () => {
       deleteResource: (...args: unknown[]) => fixture.deleteResource(...args),
       getAvailability: (...args: unknown[]) => fixture.getAvailability(...args),
       createException: vi.fn(),
+      // N-411: staff ロールの入口は本人の予約スタッフ解決。未紐づけを既定にする。
+      listMyStaff: vi.fn(async () => ({ staff: [] })),
     },
   }
 })
@@ -153,10 +158,13 @@ afterEach(() => {
   vi.clearAllMocks()
 })
 
-async function renderEditor() {
+async function renderEditor(viewOnly = false) {
   const availabilityCallsBeforeRender = fixture.getAvailability.mock.calls.length
   render(<StaffShiftsPage />)
-  await screen.findByRole('button', { name: '営業時間を保存' })
+  // N-411: 閲覧のみの人には保存ボタンを出さない。代わりに閲覧注記を待つ。
+  await (viewOnly
+    ? screen.findByText('閲覧のみです。変更には予約設定の権限が必要です。')
+    : screen.findByRole('button', { name: '営業時間を保存' }))
   await waitFor(() => expect(fixture.getAvailability.mock.calls.length).toBeGreaterThan(availabilityCallsBeforeRender))
   await act(async () => { await Promise.resolve() })
 }
@@ -279,11 +287,14 @@ describe('予約設備の編集', () => {
     cleanup()
     accountSetters.clear()
     window.localStorage.setItem('lh_staff_role', 'staff')
+    // N-411: 紐づけ無しでも店舗の受付枠を見られる staff（予約の閲覧権限あり）は
+    // 従来どおり店舗ビューへ進む。閲覧のみで編集はできないことを確かめる。
+    window.localStorage.setItem('lh_staff_view_permissions', '["/booking/bookings"]')
     fixture.listResources.mockResolvedValue({ data: { resources: [resource()] } })
-    await renderEditor()
+    await renderEditor(true)
     expect((await screen.findByLabelText('個室Aの設備名') as HTMLInputElement).disabled).toBe(true)
     expect(screen.queryByRole('button', { name: '設備を保存' })).toBeNull()
-    expect(screen.getByText(/閲覧のみです/)).toBeTruthy()
+    expect(screen.getAllByText(/閲覧のみです/).length).toBeGreaterThan(0)
   })
 
   test('account切替直後は旧設備を新accountとして描画せず、旧保存応答も捨てる', async () => {

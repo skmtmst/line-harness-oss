@@ -64,11 +64,13 @@ export default function Sidebar({
   const [staffName, setStaffName] = useState<string | null>(null)
   const [staffRole, setStaffRole] = useState<string | null>(null)
   const [staffPermissions, setStaffPermissions] = useState<string[]>([])
+  const [staffViewPermissions, setStaffViewPermissions] = useState<string[]>([])
 
   useEffect(() => {
     setStaffName(localStorage.getItem('lh_staff_name'))
     setStaffRole(localStorage.getItem('lh_staff_role'))
     try { setStaffPermissions(JSON.parse(localStorage.getItem('lh_staff_permissions') || '[]')) } catch { setStaffPermissions([]) }
+    try { setStaffViewPermissions(JSON.parse(localStorage.getItem('lh_staff_view_permissions') || '[]')) } catch { setStaffViewPermissions([]) }
   }, [])
 
   // 未対応件数 polling — メニュー項目にバッジを出す。5 分間隔。
@@ -195,8 +197,12 @@ export default function Sidebar({
         if (friendAttributesV2Mode && item.href === '/analytics') return false
         if (item.href === '/staff' && staffRole !== 'owner' && staffRole !== 'admin') return false
         if (item.href === '/accounts' && staffRole === 'staff') return false
+        // N-411: staff 専用項目（自分の勤務）は owner/admin には出さない。
+        if (item.staffOnly && staffRole !== 'staff') return false
         // 失敗時にも必須ナビは残す。任意機能だけを権限・可視性で絞る。
-        if (staffRole === 'staff' && !item.required && !staffPermissions.includes(item.href)) return false
+        // 変えられる権限でも見えるだけ権限でも、メニューには出す（N-424）。
+        const permissionKey = item.permissionKey ?? item.href
+        if (staffRole === 'staff' && !item.required && !staffPermissions.includes(permissionKey) && !staffViewPermissions.includes(permissionKey)) return false
         const featureKey = SIDEBAR_FEATURE_BY_HREF[item.href]
         if (!featureKey) return true
         if (!currentVisibility || currentVisibility[featureKey] !== true) return false

@@ -596,6 +596,28 @@ export interface ChatDetailMessage {
   sentByStaffId: string | null
   sentByStaffName: string | null
   scenarioName: string | null
+  /** 引用返信のとき、引用元の要約。取り消された引用元は isUnsent: true で本文は空。 */
+  quoted: {
+    id: string
+    direction: 'incoming' | 'outgoing'
+    messageType: string
+    content: string
+    isUnsent: boolean
+    createdAt: string | null
+  } | null
+  createdAt: string
+}
+
+/** `GET /api/chats/:id/scheduled` が返す送信予約1件。 */
+export interface ScheduledChatSend {
+  id: string
+  messageType: string
+  content: string
+  quotedMessageId: string | null
+  scheduledAt: string
+  status: 'scheduled' | 'sending' | 'sent' | 'failed' | 'cancelled'
+  attemptCount: number
+  lastErrorCode: string | null
   createdAt: string
 }
 
@@ -8313,18 +8335,44 @@ export const api = {
         method: 'PUT',
         body: JSON.stringify(data),
       }),
-    send: (id: string, data: { content: string; messageType?: string; revision?: number }, idempotencyKey: string) =>
+    send: (id: string, data: { content: string; messageType?: string; revision?: number; quotedMessageId?: string }, idempotencyKey: string) =>
       fetchApi<ApiResponse<{ sent: true; messageId: string; sentByStaffName: string; revision: number }>>(`/api/chats/${id}/send`, {
         method: 'POST',
         headers: { 'Idempotency-Key': idempotencyKey },
         body: JSON.stringify(data),
       }),
+    // N-026: 送信と同じ解決器で差し込みを展開したプレビュー。
+    // unresolved に残る名は、送信すると UNRESOLVED_TEMPLATE_VARIABLES で拒否されるもの。
+    renderPreview: (id: string, data: { content: string; messageType?: string }) =>
+      fetchApi<ApiResponse<{ content: string; unresolved: string[] }>>(`/api/chats/${id}/render-preview`, {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
     // N-022: 画像と本文を1回の送信単位にする結合口。両方あるときだけ使う。
-    sendCombined: (id: string, data: { image: { originalContentUrl: string; previewImageUrl: string }; text: string; revision?: number }, idempotencyKey: string) =>
+    sendCombined: (id: string, data: { image: { originalContentUrl: string; previewImageUrl: string }; text: string; revision?: number; quotedMessageId?: string }, idempotencyKey: string) =>
       fetchApi<ApiResponse<{ sent: true; messageId: string; messageIds: string[]; sentByStaffName: string; revision: number }>>(`/api/chats/${id}/send-combined`, {
         method: 'POST',
         headers: { 'Idempotency-Key': idempotencyKey },
         body: JSON.stringify(data),
+      }),
+    // N-025: 送信予約。scheduledAt は JST の datetime-local 値でも受け付ける
+    // (サーバー側でUTCへ正規化)。取消・変更は送信中以降になると409で拒否される。
+    schedule: (id: string, data: { content: string; scheduledAt: string; quotedMessageId?: string }, idempotencyKey: string) =>
+      fetchApi<ApiResponse<ScheduledChatSend & { replayed: boolean }>>(`/api/chats/${id}/schedule`, {
+        method: 'POST',
+        headers: { 'Idempotency-Key': idempotencyKey },
+        body: JSON.stringify(data),
+      }),
+    scheduled: (id: string) =>
+      fetchApi<ApiResponse<{ scheduled: ScheduledChatSend[] }>>(`/api/chats/${id}/scheduled`),
+    updateScheduled: (id: string, scheduleId: string, data: { scheduledAt?: string; content?: string }) =>
+      fetchApi<ApiResponse<{ updated: true }>>(`/api/chats/${id}/scheduled/${scheduleId}`, {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      }),
+    cancelScheduled: (id: string, scheduleId: string) =>
+      fetchApi<ApiResponse<{ cancelled: true }>>(`/api/chats/${id}/scheduled/${scheduleId}`, {
+        method: 'DELETE',
       }),
     markRead: (id: string) =>
       fetchApi<ApiResponse<{ isUnread: false }>>(`/api/chats/${id}/read`, {
@@ -9014,9 +9062,10 @@ export const api = {
         method: 'POST',
         body: JSON.stringify(data),
       }),
-    update: (id: string, data: { name?: string; email?: string | null; role?: string; isActive?: boolean; lineLinked?: false; permissionKeys?: string[]; notificationPreferences?: Record<string, { email: boolean; line: boolean }>; assignedLineAccountId?: string; canAccessDescendantAccounts?: boolean; accountScope?: 'all' | 'accounts'; scopedLineAccountIds?: string[]; managementContext?: 'hq' }) =>
+    update: (id: string, data: { name?: string; email?: string | null; role?: string; isActive?: boolean; lineLinked?: false; permissionKeys?: string[]; notificationPreferences?: Record<string, { email: boolean; line: boolean }>; assignedLineAccountId?: string; canAccessDescendantAccounts?: boolean; accountScope?: 'all' | 'accounts'; scopedLineAccountIds?: string[]; managementContext?: 'hq'; roleBundle?: 'administrator' | 'operations' | 'reception' | 'view_only' | 'custom'; permissionScope?: Record<string, 'edit' | 'view' | 'none'>; permissionViewKeys?: string[]; emailMask?: 'full' | 'masked' | 'none' }, stepUpToken?: string) =>
       fetchApi<ApiResponse<StaffMember>>(`/api/staff/${id}`, {
         method: 'PATCH',
+        headers: stepUpToken ? { 'X-Step-Up-Token': stepUpToken } : undefined,
         body: JSON.stringify(data),
       }),
     loginSummary: (id: string) =>
@@ -9026,8 +9075,17 @@ export const api = {
     /** 招待メールを送り直す。まだメールを確認していない人だけ。 */
     resendInvite: (id: string) =>
       fetchApi<ApiResponse<StaffMember>>(`/api/staff/${encodeURIComponent(id)}/resend-invite`, { method: 'POST', body: JSON.stringify({}) }),
-    delete: (id: string) =>
-      fetchApi<ApiResponse<StaffMember>>(`/api/staff/${id}`, { method: 'DELETE' }),
+    delete: (id: string, stepUpToken?: string) =>
+      fetchApi<ApiResponse<StaffMember>>(`/api/staff/${id}`, {
+        method: 'DELETE',
+        headers: stepUpToken ? { 'X-Step-Up-Token': stepUpToken } : undefined,
+      }),
+    /** 高危険操作の直前再認証。権限変更・二段階認証の解除用。 */
+    stepUp: (code: string, purpose: 'staff.permissions.change' | 'staff.two_factor.remove') =>
+      fetchApi<ApiResponse<{ token: string; purpose: string; expiresAt: string }>>(
+        '/api/auth/step-up',
+        { method: 'POST', body: JSON.stringify({ code, purpose }) },
+      ),
     acceptInvitation: (token: string) =>
       fetchApi<ApiResponse<{ status: 'pending_line' }>>('/api/staff/invitations/confirm/verify', {
         method: 'POST',
@@ -9037,8 +9095,33 @@ export const api = {
       fetchApi<ApiResponse<{ provisioningUri: string; manualKey: string }>>(`/api/staff/${id}/two-factor/setup`, { method: 'POST' }),
     confirmTwoFactorSetup: (id: string, code: string) =>
       fetchApi<ApiResponse<StaffMember>>(`/api/staff/${id}/two-factor/confirm`, { method: 'POST', body: JSON.stringify({ code }) }),
-    disableTwoFactor: (id: string) =>
-      fetchApi<ApiResponse<StaffMember>>(`/api/staff/${id}/two-factor`, { method: 'DELETE' }),
+    disableTwoFactor: (id: string, stepUpToken?: string) =>
+      fetchApi<ApiResponse<StaffMember>>(`/api/staff/${id}/two-factor`, {
+        method: 'DELETE',
+        headers: stepUpToken ? { 'X-Step-Up-Token': stepUpToken } : undefined,
+      }),
+  },
+  /** 本人のログイン中セッション（N-427）。一覧・個別失効・他端末一括失効。 */
+  sessions: {
+    list: () =>
+      fetchApi<ApiResponse<{
+        sessions: Array<{
+          id: string
+          current: boolean
+          createdAt: string
+          expiresAt: string
+          userAgent: string | null
+          ipPrefix: string | null
+        }>
+      }>>('/api/auth/sessions'),
+    /** 今使っている端末を消すときは confirmCurrent: true が必須。 */
+    revoke: (tokenHash: string, options: { confirmCurrent?: boolean } = {}) =>
+      fetchApi<ApiResponse<{ revoked: number; current: boolean }>>(
+        `/api/auth/sessions/${encodeURIComponent(tokenHash)}${options.confirmCurrent ? '?confirmCurrent=1' : ''}`,
+        { method: 'DELETE' },
+      ),
+    revokeOthers: () =>
+      fetchApi<ApiResponse<{ revoked: number }>>('/api/auth/sessions/revoke-others', { method: 'POST' }),
   },
   usersGrouped: {
     list: (opts?: {
@@ -9965,6 +10048,8 @@ export interface BookingStaff {
   sort_order: number;
   is_designation_optional: number;
   is_active: number;
+  /** N-411: 本人勤務の対象となるログインユーザー。 */
+  staff_member_id?: string | null;
 }
 
 export interface BookingMenuStaff {
@@ -10385,6 +10470,11 @@ export const bookingApi = {
   // Staff
   listStaff: (accountId: string) =>
     fetchApi<{ staff: BookingStaff[] }>(withAccount('/api/booking/admin/staff', accountId)),
+  // N-411: 自分に紐づく予約スタッフ。本人勤務の画面が自分のレコードを特定するために使う。
+  listMyStaff: (accountId?: string) =>
+    fetchApi<{ staff: BookingStaff[] }>(
+      accountId ? withAccount('/api/booking/admin/staff/me', accountId) : '/api/booking/admin/staff/me',
+    ),
   createStaff: (accountId: string, body: Partial<BookingStaff>) =>
     fetchApi<{ id: string }>(withAccount('/api/booking/admin/staff', accountId), {
       method: 'POST',

@@ -1,7 +1,7 @@
 import type { Context } from 'hono';
 import type { Env } from '../index.js';
-import { adminSessionCookie, csrfCookie, SESSION_MAX_AGE, sha256Hex } from '../middleware/auth.js';
-import { createAdminSession, createTwoFactorChallenge, deleteExpiredTwoFactorChallenges, type StaffMember } from '@line-crm/db';
+import { adminSessionCookie, csrfCookie, SESSION_DEFAULT_MAX_AGE, SESSION_REMEMBER_MAX_AGE, sha256Hex } from '../middleware/auth.js';
+import { createAdminSession, createTwoFactorChallenge, deleteExpiredTwoFactorChallenges, type StaffMember, type TwoFactorChallengePurpose } from '@line-crm/db';
 
 /**
  * 権限者のセッション発行と、それに付随する小さな道具。
@@ -11,6 +11,8 @@ import { createAdminSession, createTwoFactorChallenge, deleteExpiredTwoFactorCha
  */
 
 export const TWO_FACTOR_CHALLENGE_MAX_AGE = 5 * 60 * 1000;
+/** 初回設定はQRを読んでアプリへ登録する手間があるため、確認用より長く持たせる。 */
+export const TWO_FACTOR_SETUP_CHALLENGE_MAX_AGE = 15 * 60 * 1000;
 
 export function randomToken(bytes = 32): string {
   const value = new Uint8Array(bytes);
@@ -35,13 +37,33 @@ export function clientIp(c: { req: { header: (name: string) => string | undefine
   );
 }
 
-export async function issueSession(c: Context<Env>, staffId: string, sameSite: 'Strict' | 'Lax' | 'None') {
+/**
+ * 一覧画面で端末を見分けるための伏せた接続元。
+ *
+ * 生のIPは個人情報に近いので保存しない。IPv4は先頭2オクテット、
+ * IPv6は先頭3セグメントまで残す。
+ */
+export function maskIpPrefix(ip: string | null): string | null {
+  if (!ip) return null;
+  if (ip.includes('.')) {
+    const parts = ip.split('.');
+    return parts.length === 4 ? `${parts[0]}.${parts[1]}.*.*` : null;
+  }
+  const parts = ip.split(':');
+  return parts.length >= 3 ? `${parts.slice(0, 3).join(':')}::*` : null;
+}
+
+export async function issueSession(c: Context<Env>, staffId: string, sameSite: 'Strict' | 'Lax' | 'None', remember = false) {
   const sessionToken = randomToken();
-  const expiresAt = new Date(Date.now() + SESSION_MAX_AGE * 1000).toISOString();
-  await createAdminSession(c.env.DB, await sha256Hex(sessionToken), staffId, expiresAt);
+  const maxAge = remember ? SESSION_REMEMBER_MAX_AGE : SESSION_DEFAULT_MAX_AGE;
+  const expiresAt = new Date(Date.now() + maxAge * 1000).toISOString();
+  await createAdminSession(c.env.DB, await sha256Hex(sessionToken), staffId, expiresAt, {
+    userAgent: c.req.header('user-agent')?.slice(0, 300) ?? null,
+    ipPrefix: maskIpPrefix(clientIp(c)),
+  });
   const csrfToken = randomToken();
-  c.header('Set-Cookie', adminSessionCookie(sessionToken, sameSite), { append: true });
-  c.header('Set-Cookie', csrfCookie(csrfToken, sameSite), { append: true });
+  c.header('Set-Cookie', adminSessionCookie(sessionToken, sameSite, maxAge), { append: true });
+  c.header('Set-Cookie', csrfCookie(csrfToken, sameSite, maxAge), { append: true });
   return { csrfToken, sessionToken };
 }
 
@@ -50,14 +72,21 @@ export function twoFactorRequired(staff: Pick<StaffMember, 'totp_enabled_at' | '
 }
 
 /** 二段階認証の合言葉を作って返す。画面はこれを `/login/two-factor#lh_2fa=` で受け取る。 */
-export async function startTwoFactorChallenge(c: Context<Env>, staffId: string): Promise<string> {
+export async function startTwoFactorChallenge(
+  c: Context<Env>,
+  staffId: string,
+  options: { purpose?: TwoFactorChallengePurpose; remember?: boolean } = {},
+): Promise<string> {
   const challengeToken = randomToken();
   await deleteExpiredTwoFactorChallenges(c.env.DB, new Date().toISOString());
+  const purpose = options.purpose ?? 'verify';
+  const maxAge = purpose === 'setup' ? TWO_FACTOR_SETUP_CHALLENGE_MAX_AGE : TWO_FACTOR_CHALLENGE_MAX_AGE;
   await createTwoFactorChallenge(
     c.env.DB,
     await sha256Hex(challengeToken),
     staffId,
-    new Date(Date.now() + TWO_FACTOR_CHALLENGE_MAX_AGE).toISOString(),
+    new Date(Date.now() + maxAge).toISOString(),
+    { purpose, remember: options.remember },
   );
   return challengeToken;
 }
@@ -66,6 +95,15 @@ export function twoFactorLoginUrl(c: Context<Env>, challengeToken: string): stri
   const base = c.env.ADMIN_PUBLIC_URL?.replace(/\/+$/, '');
   if (!base) throw new Error('ADMIN_PUBLIC_URL is not configured');
   const url = new URL(`${base}/login/two-factor`);
+  url.hash = new URLSearchParams({ lh_2fa: challengeToken }).toString();
+  return url.toString();
+}
+
+/** TOTP未登録の管理者向け。画面は `/login/two-factor/setup#lh_2fa=` で受け取る。 */
+export function twoFactorSetupUrl(c: Context<Env>, challengeToken: string): string {
+  const base = c.env.ADMIN_PUBLIC_URL?.replace(/\/+$/, '');
+  if (!base) throw new Error('ADMIN_PUBLIC_URL is not configured');
+  const url = new URL(`${base}/login/two-factor/setup`);
   url.hash = new URLSearchParams({ lh_2fa: challengeToken }).toString();
   return url.toString();
 }

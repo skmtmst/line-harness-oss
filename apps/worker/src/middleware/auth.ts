@@ -10,8 +10,12 @@ export const ADMIN_SESSION_BEARER_PREFIX = 'lh_session:';
 export const CSRF_COOKIE = 'lh_csrf';
 export const CSRF_HEADER = 'x-csrf-token';
 
-// 7 days, matching the previous localStorage session longevity.
-export const SESSION_MAX_AGE = 604800;
+// 既定は 8 時間（要件 v6-30 §10）。利用者が明示して「記憶する」を選んだ
+// ときだけ 7 日にする。cookie の Max-Age と admin_sessions.expires_at は
+// 必ずこの同じ秒数から作り、ブラウザ側とサーバー側の期限を一致させる。
+export const SESSION_DEFAULT_MAX_AGE = 8 * 60 * 60;
+export const SESSION_REMEMBER_MAX_AGE = 7 * 24 * 60 * 60;
+export const SESSION_MAX_AGE = SESSION_REMEMBER_MAX_AGE;
 
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 
@@ -85,8 +89,8 @@ function buildCookie(
 }
 
 /** HttpOnly session cookie carrying the API token. */
-export function adminSessionCookie(token: string, sameSite: AdminSameSite): string {
-  return buildCookie(ADMIN_AUTH_COOKIE, token, sameSite, SESSION_MAX_AGE, true);
+export function adminSessionCookie(token: string, sameSite: AdminSameSite, maxAge = SESSION_DEFAULT_MAX_AGE): string {
+  return buildCookie(ADMIN_AUTH_COOKIE, token, sameSite, maxAge, true);
 }
 
 /**
@@ -97,8 +101,8 @@ export function adminSessionCookie(token: string, sameSite: AdminSameSite): stri
  * header against this cookie, which the browser does send back to the API
  * (SameSite=None).
  */
-export function csrfCookie(token: string, sameSite: AdminSameSite): string {
-  return buildCookie(CSRF_COOKIE, token, sameSite, SESSION_MAX_AGE, false);
+export function csrfCookie(token: string, sameSite: AdminSameSite, maxAge = SESSION_DEFAULT_MAX_AGE): string {
+  return buildCookie(CSRF_COOKIE, token, sameSite, maxAge, false);
 }
 
 export function expiredCookie(name: string, sameSite: AdminSameSite): string {
@@ -124,6 +128,10 @@ export type AuthenticatedStaff = {
   /** true なら役割にかかわらず更新・削除・設定変更をさせない。 */
   readOnly: boolean;
   permissionKeys?: string[];
+  /** N-424: 「見えるだけ」の key。GET系だけを許可し、変更系は edit の key が要る。 */
+  viewPermissionKeys?: string[];
+  /** N-424: スタッフのメール表示。未設定は従来判定（access.user.email.view）。 */
+  emailMask?: 'full' | 'masked' | 'none' | null;
   assignedLineAccountId?: string | null;
   canAccessDescendantAccounts?: boolean;
   /** 所属する統括。認可への実適用は後続工程で行う。 */
@@ -138,18 +146,27 @@ function toAuthenticatedStaff(staff: {
   role: StaffRole;
   access_level?: 'full' | 'read_only';
   permission_keys?: string;
+  view_permission_keys?: string | null;
+  email_mask?: string | null;
   assigned_line_account_id?: string | null;
   can_access_descendant_accounts?: number;
   tenant_id?: string | null;
 }): AuthenticatedStaff {
   let permissionKeys: string[] = [];
   try { permissionKeys = staff.permission_keys ? JSON.parse(staff.permission_keys) as string[] : []; } catch { permissionKeys = []; }
+  let viewPermissionKeys: string[] = [];
+  try { viewPermissionKeys = staff.view_permission_keys ? JSON.parse(staff.view_permission_keys) as string[] : []; } catch { viewPermissionKeys = []; }
+  const emailMask = staff.email_mask === 'full' || staff.email_mask === 'masked' || staff.email_mask === 'none'
+    ? staff.email_mask
+    : null;
   return {
     id: staff.id,
     name: staff.name,
     role: staff.role,
     readOnly: staff.access_level === 'read_only',
     permissionKeys,
+    viewPermissionKeys,
+    emailMask,
     assignedLineAccountId: staff.assigned_line_account_id ?? null,
     canAccessDescendantAccounts: Boolean(staff.can_access_descendant_accounts),
     tenantId: staff.tenant_id ?? null,
@@ -196,6 +213,10 @@ const STAFF_API_PERMISSIONS: Array<[string, string]> = [
   ['/api/nen-campaigns', '/nen-campaigns'], ['/api/nen-members', '/nen-members'], ['/api/ec-commerce', '/ec-commerce'],
   // 然の会員（★V6 37-1）。メニューの href は /nen/members。
   ['/api/nen/rank-settings', '/nen/members'], ['/api/nen/lifetime-milestones', '/nen/members'], ['/api/nen/members', '/nen/members'],
+  // ログインユーザー一覧・権限のかたまり・監査の閲覧は「設定」の点キーで守る（N-424）。
+  // route 側の requirePermission が最終判定を握る。
+  ['/api/access', 'access.user.view'],
+  ['/api/audit', 'access.audit.view'],
 ];
 
 /**
@@ -204,6 +225,20 @@ const STAFF_API_PERMISSIONS: Array<[string, string]> = [
  * cannot inherit chat or friend-attribute access from the friends permission.
  */
 const STAFF_API_PERMISSION_OVERRIDES: Array<[RegExp, string]> = [
+  // 予約の細かい権限（N-411）。広い '/api/booking' → '/booking/bookings' より先に評価する。
+  // 本人勤務は route 側で「自分に紐づく予約スタッフか」を確認する。
+  [/^\/api\/booking\/admin\/staff\/me(?:\/|$)/, 'booking.staff.own'],
+  [/^\/api\/booking\/admin\/staff\/[^/]+\/(?:availability-rules|breaks|break-dates|shifts|google-calendar)(?:\/|$)/, 'booking.staff.own'],
+    // メニューと担当割当は「予約メニュー」の鍵。
+  [/^\/api\/booking\/admin\/staff-menus(?:\/|$)/, '/booking/menus'],
+  [/^\/api\/booking\/admin\/staff\/[^/]+\/menus(?:\/|$)/, '/booking/menus'],
+  [/^\/api\/booking\/admin\/menus(?:\/|$)/, '/booking/menus'],
+  // 予約設定（受付枠・資源・例外）の GET は予約の閲覧に含め、
+  // 変更は route 側で 'booking.settings' を要求する（後方互換のため）。
+  // 運用状態の健全性サマリは '/health' 権限で守る（N-424）。
+  // /api/accounts 全体ではなくこの配下だけを対象にする。
+  [/^\/api\/accounts\/health-summary(?:\/|$)/, '/health'],
+  [/^\/api\/accounts\/[^/]+\/health(?:\/|$)/, '/health'],
   [/^\/api\/nen-members\/photos\/decisions\/bulk(?:\/|$)/, 'photo.submission.bulk_review'],
   [/^\/api\/nen-members\/photos\/(?:original-download\/[^/]+|[^/]+\/original-download)(?:\/|$)/, 'photo.original.download'],
   [/^\/api\/nen-members\/photos\/[^/]+\/(?:assessments\/re-evaluate|assets\/process|review|notification\/retry)(?:\/|$)/, 'photo.submission.review'],
@@ -231,6 +266,9 @@ export function permissionForApiPath(path: string): string | null {
 const STAFF_SELF_ENDPOINTS: Array<[method: string, path: string]> = [
   ['GET', '/api/auth/session'],
   ['POST', '/api/auth/step-up'],
+  // 本人のログイン中セッション一覧と一括失効。handler が本人分だけを対象にする。
+  ['GET', '/api/auth/sessions'],
+  ['POST', '/api/auth/sessions/revoke-others'],
   ['GET', '/api/staff/me'],
   ['GET', '/api/tenants/me'],
   ['POST', '/api/client-errors'],
@@ -254,6 +292,7 @@ const STAFF_SELF_ROUTE_TEMPLATES: Array<[method: string, path: string]> = [
   ['POST', '/api/staff/:id/two-factor/setup'],
   ['POST', '/api/staff/:id/two-factor/confirm'],
   ['DELETE', '/api/staff/:id/two-factor'],
+  ['DELETE', '/api/auth/sessions/:tokenHash'],
 ];
 
 export function isStaffSelfRouteTemplate(method: string, path: string): boolean {
@@ -276,9 +315,18 @@ const STAFF_SELF_PATH_PATTERNS: Array<[method: string, pattern: RegExp]> = [
   ['DELETE', /^\/api\/staff\/([^/]+)\/two-factor$/],
 ];
 
+/**
+ * handler が本人の資産だけを対象にする口。path の可変部は staff id ではない
+ * ため id 比較をせず、認証済みなら誰でも通す（中身は本人分に閉じる）。
+ */
+const STAFF_SELF_SCOPED_PATTERNS: Array<[method: string, pattern: RegExp]> = [
+  ['DELETE', /^\/api\/auth\/sessions\/[^/]+$/],
+];
+
 export function isStaffSelfEndpoint(method: string, path: string, staffId?: string): boolean {
   const normalizedMethod = method.toUpperCase();
   if (STAFF_SELF_ENDPOINTS.some(([m, p]) => m === normalizedMethod && p === path)) return true;
+  if (STAFF_SELF_SCOPED_PATTERNS.some(([m, pattern]) => m === normalizedMethod && pattern.test(path))) return true;
   if (!staffId) return false;
   return STAFF_SELF_PATH_PATTERNS.some(([m, pattern]) => {
     if (m !== normalizedMethod) return false;
@@ -350,6 +398,9 @@ export function isPublicApiBoundary(method: string, path: string): boolean {
     path === '/api/auth/line' ||
     path === '/api/auth/line/callback' ||
     path === '/api/auth/two-factor/verify' ||
+    // TOTP未登録の管理者の初回設定。合言葉で本人確認する公開経路（N-426）。
+    path === '/api/auth/two-factor/setup' ||
+    path === '/api/auth/two-factor/setup/confirm' ||
     // 会員登録・メールログイン・パスワード再設定。Turnstile と回数制限で守る。
     /^\/api\/auth\/(register|password|ops-invite)\//.test(path) ||
     /^\/api\/staff\/invitations\/[^/]+\/verify$/.test(path) ||
@@ -521,7 +572,11 @@ export async function authMiddleware(c: Context<Env>, next: Next): Promise<Respo
   // 本人・自組織と明示許可の口以外すべて 403。owner/admin は従来どおり通す。
   if (staff.role === 'staff' && !isStaffSelfEndpoint(method, path, staff.id) && !isStaffExplicitAllow(method, path)) {
     const requiredPermission = permissionForApiPath(path);
-    if (!requiredPermission || !staff.permissionKeys?.includes(requiredPermission)) {
+    // N-424: 「見えるだけ」の key は GET系だけを許可する。変更系は edit の key が要る。
+    const granted = requiredPermission
+      && (staff.permissionKeys?.includes(requiredPermission)
+        || (SAFE_METHODS.has(method) && staff.viewPermissionKeys?.includes(requiredPermission)));
+    if (!requiredPermission || !granted) {
       return c.json({ success: false, error: 'この機能を操作する権限がありません' }, 403);
     }
   }

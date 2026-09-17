@@ -192,7 +192,7 @@ CREATE TABLE admin_sessions (
   staff_id   TEXT NOT NULL,
   expires_at TEXT NOT NULL,
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')), selected_restaurant_store_id TEXT
-  REFERENCES rt_stores(id) ON DELETE SET NULL,
+  REFERENCES rt_stores(id) ON DELETE SET NULL, user_agent TEXT, ip_prefix TEXT,
   FOREIGN KEY (staff_id) REFERENCES staff_members(id) ON DELETE CASCADE
 );
 
@@ -201,7 +201,7 @@ CREATE TABLE admin_two_factor_challenges (
   staff_id TEXT NOT NULL,
   expires_at TEXT NOT NULL,
   attempts INTEGER NOT NULL DEFAULT 0,
-  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')), purpose TEXT NOT NULL DEFAULT 'verify', remember INTEGER NOT NULL DEFAULT 0,
   FOREIGN KEY (staff_id) REFERENCES staff_members(id) ON DELETE CASCADE
 );
 
@@ -3329,7 +3329,7 @@ CREATE TABLE messages_log (
   line_account_id  TEXT,
   sent_by_staff_id TEXT,
   created_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
-, origin_kind TEXT, origin_id TEXT, scenario_version_step_id TEXT, line_message_id TEXT, line_message_account_key TEXT, unsent_at TEXT);
+, origin_kind TEXT, origin_id TEXT, scenario_version_step_id TEXT, line_message_id TEXT, line_message_account_key TEXT, unsent_at TEXT, quote_token TEXT, quoted_message_id TEXT);
 
 CREATE TABLE mileage_adjustment_notifications (
   id                TEXT PRIMARY KEY,
@@ -5214,6 +5214,32 @@ CREATE TABLE scenarios (
   updated_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 , line_account_id TEXT, folder_id TEXT REFERENCES folders(id) ON DELETE SET NULL, display_order INTEGER NOT NULL DEFAULT 0, allow_concurrent INTEGER NOT NULL DEFAULT 0, audience_condition_json TEXT, on_complete_mode TEXT NOT NULL DEFAULT 'pause', on_complete_scenario_id TEXT REFERENCES scenarios (id) ON DELETE SET NULL, created_from_recipe_id TEXT REFERENCES recipes(id), recipe_clone_run_id TEXT REFERENCES recipe_clone_runs(id), current_published_version_id TEXT);
 
+CREATE TABLE scheduled_chat_sends (
+  id TEXT PRIMARY KEY,
+  friend_id TEXT NOT NULL,
+  line_account_id TEXT,
+  staff_id TEXT NOT NULL,
+  message_type TEXT NOT NULL DEFAULT 'text',
+  content TEXT NOT NULL,
+  quoted_message_id TEXT,
+  idempotency_key TEXT NOT NULL UNIQUE,
+  scheduled_at TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'scheduled'
+    CHECK (status IN ('scheduled', 'sending', 'sent', 'failed', 'cancelled')),
+  lease_token TEXT,
+  lease_expires_at TEXT,
+  attempt_count INTEGER NOT NULL DEFAULT 0,
+  last_error_code TEXT,
+  last_error TEXT,
+  sent_message_id TEXT,
+  sent_at TEXT,
+  failed_at TEXT,
+  cancelled_by_staff_id TEXT,
+  cancelled_at TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
 CREATE TABLE scoring_rules (
   id          TEXT PRIMARY KEY,
   name        TEXT NOT NULL,
@@ -5266,7 +5292,7 @@ CREATE TABLE staff (
   is_active                INTEGER NOT NULL DEFAULT 1,
   deleted_at               TEXT,
   created_at               TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
-  updated_at               TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  updated_at               TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')), staff_member_id TEXT,
   FOREIGN KEY (line_account_id) REFERENCES line_accounts(id)
 );
 
@@ -5336,7 +5362,7 @@ CREATE TABLE staff_members (
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 , line_user_id TEXT, totp_secret_enc TEXT, totp_pending_secret_enc TEXT, totp_enabled_at TEXT, totp_last_used_step INTEGER, assigned_line_account_id TEXT REFERENCES line_accounts(id) ON DELETE SET NULL, can_access_descendant_accounts INTEGER NOT NULL DEFAULT 0, tenant_id TEXT REFERENCES tenants(id), account_scope TEXT NOT NULL DEFAULT 'all'
-  CHECK (account_scope IN ('all', 'accounts')), policy_version INTEGER NOT NULL DEFAULT 1, password_hash TEXT, password_updated_at TEXT);
+  CHECK (account_scope IN ('all', 'accounts')), policy_version INTEGER NOT NULL DEFAULT 1, password_hash TEXT, password_updated_at TEXT, role_bundle TEXT, view_permission_keys TEXT, email_mask TEXT);
 
 CREATE TABLE staff_menus (
   staff_id                  TEXT NOT NULL,
@@ -6902,6 +6928,9 @@ CREATE UNIQUE INDEX idx_messages_log_line_message_scope
 CREATE INDEX idx_messages_log_origin
   ON messages_log (origin_kind, created_at);
 
+CREATE INDEX idx_messages_log_quoted
+  ON messages_log (quoted_message_id);
+
 CREATE INDEX idx_messages_log_version_step
   ON messages_log (friend_id, scenario_version_step_id)
   WHERE scenario_version_step_id IS NOT NULL;
@@ -7352,6 +7381,15 @@ CREATE INDEX idx_scenarios_order ON scenarios (display_order);
 CREATE INDEX idx_schedule_publications_schedule
   ON rich_menu_schedule_publications (schedule_id, kind);
 
+CREATE INDEX idx_scheduled_chat_sends_due
+  ON scheduled_chat_sends (status, scheduled_at);
+
+CREATE INDEX idx_scheduled_chat_sends_friend
+  ON scheduled_chat_sends (friend_id, status, scheduled_at);
+
+CREATE INDEX idx_scheduled_chat_sends_lease
+  ON scheduled_chat_sends (status, lease_expires_at);
+
 CREATE INDEX idx_shifts_staff_date ON staff_shifts (staff_id, work_date);
 
 CREATE INDEX idx_site_events_account_host_path
@@ -7380,6 +7418,8 @@ CREATE INDEX idx_staff_break_dates_staff
 
 CREATE INDEX idx_staff_breaks_staff
   ON staff_breaks (staff_id, weekday);
+
+CREATE INDEX idx_staff_member_link ON staff (staff_member_id);
 
 CREATE UNIQUE INDEX idx_staff_members_api_key ON staff_members(api_key);
 

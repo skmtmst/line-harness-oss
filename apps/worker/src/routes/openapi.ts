@@ -380,6 +380,20 @@ const spec = {
         responses: { '200': { description: 'Password updated and session issued' }, '400': { description: 'Invalid or expired token' } },
       },
     },
+    '/api/auth/two-factor/setup': {
+      post: {
+        tags: ['Auth'], summary: 'TOTP未登録の管理者向けに二段階認証の初回設定を開始', security: [],
+        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['challengeToken'], properties: { challengeToken: { type: 'string' } } } } } },
+        responses: { '200': { description: 'provisioningUri and manualKey issued' }, '400': { description: 'Missing challenge token' }, '401': { description: 'Invalid or expired setup challenge' }, '409': { description: 'TOTP already configured' } },
+      },
+    },
+    '/api/auth/two-factor/setup/confirm': {
+      post: {
+        tags: ['Auth'], summary: '二段階認証の初回設定を確認してセッションを発行', security: [],
+        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['challengeToken', 'code'], properties: { challengeToken: { type: 'string' }, code: { type: 'string' } } } } } },
+        responses: { '200': { description: 'TOTP enabled; session issued' }, '400': { description: 'Invalid code' }, '401': { description: 'Invalid or expired setup challenge' }, '429': { description: 'Attempt limit exceeded' } },
+      },
+    },
     '/api/auth/ops-invite/check': {
       get: {
         tags: ['Auth'], summary: '運営メンバーの招待を確認（★V6 37-10-A）', security: [],
@@ -392,6 +406,32 @@ const spec = {
         tags: ['Auth'], summary: '運営メンバーの招待を受ける（名前・パスワード設定 → 2要素認証待ち）', security: [],
         requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['token'], properties: { token: { type: 'string' }, name: { type: 'string' }, password: { type: 'string' } } } } } },
         responses: { '200': { description: 'Session issued; next = two-factor-setup' }, '400': { description: 'Invalid name or password' }, '404': { description: 'Unknown invite' }, '410': { description: 'Expired or used' } },
+      },
+    },
+    '/api/auth/sessions': {
+      get: {
+        tags: ['Auth'], summary: '本人のアクティブなセッション一覧',
+        responses: { '200': { description: 'Sessions with current flag, user agent, masked IP' }, '401': { description: 'Not authenticated' } },
+      },
+    },
+    '/api/auth/sessions/{tokenHash}': {
+      delete: {
+        tags: ['Auth'], summary: '本人のセッションを1件失効（現在のセッションは confirmCurrent=1 が必須）',
+        parameters: [{ name: 'tokenHash', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { '200': { description: 'Session revoked' }, '401': { description: 'Not authenticated' }, '404': { description: 'Session not found or not owned' }, '409': { description: 'Current-session confirmation required' } },
+      },
+    },
+    '/api/auth/sessions/revoke-others': {
+      post: {
+        tags: ['Auth'], summary: '今のセッション以外をまとめて失効',
+        responses: { '200': { description: 'Count of revoked sessions' }, '401': { description: 'Not authenticated' } },
+      },
+    },
+    '/api/auth/step-up': {
+      post: {
+        tags: ['Auth'], summary: '高危険操作用の5分・1回限り再認証grantを発行',
+        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['code', 'purpose'], properties: { code: { type: 'string' }, purpose: { type: 'string', enum: ['operations.control', 'affiliate.payout.export', 'photo.original.download', 'staff.permissions.change', 'staff.two_factor.remove'] } } } } } },
+        responses: { '201': { description: 'Step-up grant issued' }, '400': { description: 'Invalid or wrong code' }, '403': { description: 'TOTP not configured' }, '409': { description: 'Code already used' }, '429': { description: 'Attempt limit exceeded' } },
       },
     },
     // ── HQ Banners ─────────────────────────────────────────────────────────
@@ -1003,6 +1043,7 @@ const spec = {
                   },
                   text: { type: 'string' },
                   revision: { type: 'integer' },
+                  quotedMessageId: { type: 'string' },
                 },
               },
             },
@@ -1013,6 +1054,122 @@ const spec = {
           '400': { description: 'Idempotency-Key が無い／内容が壊れている' },
           '404': { description: 'Chat not found' },
           '409': { description: '版が食い違う／同じ鍵で内容が違う' },
+        },
+      },
+    },
+    /*
+     * N-026: 送信内容の差し込み解決プレビュー。/send と同じ解決器を通し、
+     * 未解決のまま残る差し込み名を返す(送信はそれらを400で拒否する)。
+     * 読み取りのみ。LINE呼出し・履歴書込みは行わない。
+     */
+    '/api/chats/{id}/render-preview': {
+      post: {
+        tags: ['Chats'],
+        summary: '差し込みを解決した送信プレビューを返す',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                properties: {
+                  messageType: { type: 'string' },
+                  content: { type: 'string' },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          '200': { description: '解決済み本文と未解決の差し込み名' },
+          '400': { description: 'content が無い／壊れている' },
+          '404': { description: 'Chat not found' },
+        },
+      },
+    },
+    /*
+     * N-025: 返信の送信予約。作成は Idempotency-Key 必須で、時刻は未来のみ。
+     * 予約の実行はcronのscheduledジョブがlease付きで行う。
+     */
+    '/api/chats/{id}/schedule': {
+      post: {
+        tags: ['Chats'],
+        summary: '返信を予約送信する',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                properties: {
+                  content: { type: 'string' },
+                  scheduledAt: { type: 'string', format: 'date-time' },
+                  quotedMessageId: { type: 'string' },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          '200': { description: 'Scheduled' },
+          '400': { description: 'Idempotency-Key・本文・日時のいずれかが不正' },
+          '404': { description: 'Chat not found／引用元のメッセージが無い' },
+        },
+      },
+    },
+    '/api/chats/{id}/scheduled': {
+      get: {
+        tags: ['Chats'],
+        summary: '会話の送信予約一覧（待機中・送信中）',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: {
+          '200': { description: 'Pending scheduled sends' },
+          '404': { description: 'Chat not found' },
+        },
+      },
+    },
+    '/api/chats/{id}/scheduled/{scheduleId}': {
+      patch: {
+        tags: ['Chats'],
+        summary: '送信予約の日時・本文を変更',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'scheduleId', in: 'path', required: true, schema: { type: 'string' } },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                properties: {
+                  scheduledAt: { type: 'string', format: 'date-time' },
+                  content: { type: 'string' },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          '200': { description: 'Updated' },
+          '400': { description: '変更項目が無い／値が不正' },
+          '404': { description: '予約が見つかりません' },
+          '409': { description: '送信処理が始まっている／処理済み' },
+        },
+      },
+      delete: {
+        tags: ['Chats'],
+        summary: '送信予約を取消',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'scheduleId', in: 'path', required: true, schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': { description: 'Cancelled' },
+          '404': { description: '予約が見つかりません' },
+          '409': { description: '送信処理が始まっている／処理済み' },
         },
       },
     },
@@ -2526,6 +2683,21 @@ const spec = {
         ],
         requestBody: { content: { 'application/json': { schema: { type: 'object', properties: { expectedVersion: { type: 'string' }, breaks: { type: 'array', maxItems: 366, items: { type: 'object', properties: { id: { type: 'string' }, work_date: { type: 'string' }, start_time: { type: 'string' }, end_time: { type: 'string' } }, required: ['work_date', 'start_time', 'end_time'] } } }, required: ['breaks', 'expectedVersion'] } } } },
         responses: { '200': { description: 'Replaced with version' }, '400': { description: 'Invalid request' }, '403': { description: 'Owner or admin role required' }, '404': { description: 'Staff not in account' }, '409': { description: 'Version conflict' }, '422': { description: 'Invalid date, DST gap, overlap, outside hours, or time range' } },
+      },
+    },
+    // ── Booking staff self link (N-411 #866) ─────────────────────────────
+    '/api/booking/admin/staff/me': {
+      get: {
+        tags: ['Booking'],
+        summary: 'ログイン中ユーザーに紐づく予約スタッフの一覧（本人勤務の対象解決）',
+        parameters: [
+          { name: 'account_id', in: 'query', required: false, schema: { type: 'string' }, description: '指定時はそのアカウントの紐づけだけを返す。省略時は全アカウント分。' },
+        ],
+        responses: {
+          '200': { description: 'Linked booking staff records' },
+          '401': { description: 'Unauthorized' },
+          '403': { description: 'booking.staff.own permission required (staff role)' },
+        },
       },
     },
     // ── Booking staff×menu matrix bulk save (N-410 #819) ──────────────────

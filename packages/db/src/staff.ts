@@ -27,6 +27,12 @@ export interface StaffMember {
   can_access_descendant_accounts?: number;
   account_scope?: 'all' | 'accounts';
   policy_version?: number;
+  /** N-424: 明示保存された役割bundle。NULL は従来どおり role+access_level から導出。 */
+  role_bundle?: string | null;
+  /** N-424: 「見えるだけ」の permission key(JSON配列)。GET系だけを許可する。 */
+  view_permission_keys?: string | null;
+  /** N-424: スタッフのメール表示。'full'|'masked'|'none'、NULL は従来判定。 */
+  email_mask?: string | null;
   tenant_id: string | null;
   created_at: string;
   updated_at: string;
@@ -47,6 +53,9 @@ export interface CreateStaffInput {
   assigned_line_account_id?: string | null;
   can_access_descendant_accounts?: boolean;
   account_scope?: 'all' | 'accounts';
+  role_bundle?: string | null;
+  view_permission_keys?: string[];
+  email_mask?: string | null;
   tenant_id?: string | null;
 }
 
@@ -73,6 +82,9 @@ export interface UpdateStaffInput {
   assigned_line_account_id?: string | null;
   can_access_descendant_accounts?: boolean;
   account_scope?: 'all' | 'accounts';
+  role_bundle?: string | null;
+  view_permission_keys?: string[];
+  email_mask?: string | null;
 }
 
 function generateApiKey(): string {
@@ -151,8 +163,9 @@ export async function createStaffMember(
        (id, name, email, role, access_level, api_key, line_user_id, is_active,
         permission_keys, notification_preferences, invite_status, invite_token_hash,
         invite_expires_at, assigned_line_account_id, can_access_descendant_accounts,
-        account_scope, tenant_id, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        account_scope, role_bundle, view_permission_keys, email_mask,
+        tenant_id, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       id, input.name, input.email ?? null, input.role, input.access_level ?? 'full', apiKey,
@@ -162,6 +175,9 @@ export async function createStaffMember(
       input.invite_expires_at ?? null, input.assigned_line_account_id ?? null,
       input.can_access_descendant_accounts ? 1 : 0,
       input.account_scope ?? 'all',
+      input.role_bundle ?? null,
+      input.view_permission_keys ? JSON.stringify(input.view_permission_keys) : null,
+      input.email_mask ?? null,
       input.tenant_id ?? DEFAULT_TENANT_ID, now, now,
     )
     .run();
@@ -203,6 +219,9 @@ export async function updateStaffMember(
   if (input.assigned_line_account_id !== undefined) { sets.push('assigned_line_account_id = ?'); values.push(input.assigned_line_account_id); }
   if (input.can_access_descendant_accounts !== undefined) { sets.push('can_access_descendant_accounts = ?'); values.push(input.can_access_descendant_accounts ? 1 : 0); }
   if (input.account_scope !== undefined) { sets.push('account_scope = ?'); values.push(input.account_scope); }
+  if (input.role_bundle !== undefined) { sets.push('role_bundle = ?'); values.push(input.role_bundle); }
+  if (input.view_permission_keys !== undefined) { sets.push('view_permission_keys = ?'); values.push(JSON.stringify(input.view_permission_keys)); }
+  if (input.email_mask !== undefined) { sets.push('email_mask = ?'); values.push(input.email_mask); }
 
   values.push(id);
   await db
@@ -300,14 +319,67 @@ export async function createAdminSession(
   tokenHash: string,
   staffId: string,
   expiresAt: string,
+  device: { userAgent?: string | null; ipPrefix?: string | null } = {},
 ): Promise<void> {
   await db
     .prepare(
-      `INSERT INTO admin_sessions (token_hash, staff_id, expires_at)
-       VALUES (?, ?, ?)`,
+      `INSERT INTO admin_sessions (token_hash, staff_id, expires_at, user_agent, ip_prefix)
+       VALUES (?, ?, ?, ?, ?)`,
     )
-    .bind(tokenHash, staffId, expiresAt)
+    .bind(tokenHash, staffId, expiresAt, device.userAgent ?? null, device.ipPrefix ?? null)
     .run();
+}
+
+/** 本人のセッション一覧用。token_hash は漏れても認証に使えない指紋として返す。 */
+export interface AdminSessionSummary {
+  token_hash: string;
+  created_at: string;
+  expires_at: string;
+  user_agent: string | null;
+  ip_prefix: string | null;
+}
+
+export async function listAdminSessionsByStaff(
+  db: D1Database,
+  staffId: string,
+  now: string,
+): Promise<AdminSessionSummary[]> {
+  const result = await db
+    .prepare(
+      `SELECT token_hash, created_at, expires_at, user_agent, ip_prefix
+       FROM admin_sessions
+       WHERE staff_id = ? AND expires_at > ?
+       ORDER BY created_at DESC`,
+    )
+    .bind(staffId, now)
+    .all<AdminSessionSummary>();
+  return result.results ?? [];
+}
+
+/** 本人のセッションだけを消す。他人の token_hash を指定しても削除しない。 */
+export async function deleteAdminSessionForStaff(
+  db: D1Database,
+  staffId: string,
+  tokenHash: string,
+): Promise<boolean> {
+  const result = await db
+    .prepare('DELETE FROM admin_sessions WHERE staff_id = ? AND token_hash = ?')
+    .bind(staffId, tokenHash)
+    .run();
+  return (result.meta.changes ?? 0) > 0;
+}
+
+/** 今のセッション以外をまとめて失効させる。消した件数を返す。 */
+export async function deleteOtherAdminSessions(
+  db: D1Database,
+  staffId: string,
+  keepTokenHash: string,
+): Promise<number> {
+  const result = await db
+    .prepare('DELETE FROM admin_sessions WHERE staff_id = ? AND token_hash <> ?')
+    .bind(staffId, keepTokenHash)
+    .run();
+  return result.meta.changes ?? 0;
 }
 
 export async function getStaffByAdminSession(
@@ -348,12 +420,18 @@ export async function revokeStaffAuthentication(db: D1Database, staffId: string)
   ]);
 }
 
+export type TwoFactorChallengePurpose = 'verify' | 'setup';
+
 export interface TwoFactorChallenge {
   token_hash: string;
   staff_id: string;
   expires_at: string;
   attempts: number;
   created_at: string;
+  /** 'verify' は登録済みの確認用、'setup' は未登録者の初回設定用。混ぜて使えない。 */
+  purpose: TwoFactorChallengePurpose;
+  /** 1 なら確認後に発行するセッションを 7 日、0 なら既定の 8 時間にする。 */
+  remember: number;
 }
 
 export async function createTwoFactorChallenge(
@@ -361,11 +439,12 @@ export async function createTwoFactorChallenge(
   tokenHash: string,
   staffId: string,
   expiresAt: string,
+  options: { purpose?: TwoFactorChallengePurpose; remember?: boolean } = {},
 ): Promise<void> {
   await db.prepare('DELETE FROM admin_two_factor_challenges WHERE staff_id = ?').bind(staffId).run();
   await db.prepare(
-    'INSERT INTO admin_two_factor_challenges (token_hash, staff_id, expires_at) VALUES (?, ?, ?)',
-  ).bind(tokenHash, staffId, expiresAt).run();
+    'INSERT INTO admin_two_factor_challenges (token_hash, staff_id, expires_at, purpose, remember) VALUES (?, ?, ?, ?, ?)',
+  ).bind(tokenHash, staffId, expiresAt, options.purpose ?? 'verify', options.remember ? 1 : 0).run();
 }
 
 export async function getTwoFactorChallenge(

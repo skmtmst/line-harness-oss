@@ -74,6 +74,7 @@ shared-button-importer app/line-notifications/operator/new/page.tsx
 shared-button-importer app/line-notifications/operator-notification-rules.tsx
 shared-button-importer app/line-notifications/page.tsx
 shared-button-importer app/login/page.tsx
+shared-button-importer app/login/two-factor/setup/page.tsx
 shared-button-importer app/mileage/action-score-tab.tsx
 shared-button-importer app/mileage/friends/detail/mileage-adjustment-dialog.tsx
 shared-button-importer app/mileage/friends/detail/page.tsx

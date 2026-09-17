@@ -21,7 +21,7 @@ const EMAIL_PATTERN = String.raw`/^[^\s@]+@[^\s@]+\.[^\s@]+$/`
 
 describe('ログインユーザーの軽修正(#581)', () => {
   it('編集窓が追加画面・サーバーと同じ形式チェックを先に行う', () => {
-    const body = slice(PAGE, 'const save = async () => { if (!email.trim())', 'await onSaved(); onClose()')
+    const body = slice(PAGE, 'const save = async (stepUpToken?: string) => { if (!email.trim())', 'await onSaved(); onClose()')
     expect(body, '形式チェックが無い').toContain(`if (!${EMAIL_PATTERN}.test(email.trim()))`)
     expect(body, '文言がサーバーと違う').toContain("setError('正しいメールアドレスを入力してください')")
     expect(NEW_PAGE, '追加画面の形式チェックが変わっている').toContain(`!${EMAIL_PATTERN}.test(email.trim())`)

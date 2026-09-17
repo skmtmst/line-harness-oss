@@ -11,6 +11,7 @@ import SearchField from '@/components/shared/search-field'
 import { Tabs } from '@/components/shared/tabs'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import StepUpDialog from '@/components/shared/step-up-dialog'
 import NotificationSwitch from '@/components/ui/notification-switch'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { useAccount } from '@/contexts/account-context'
@@ -25,8 +26,9 @@ import {
   type AuditEventItem,
 } from '@/lib/api'
 import type { StaffMember } from '@line-crm/shared'
+import { SCOPE_ITEMS, BUNDLE_PRESETS, type FeatureAccessLevel, type ScopeLevels } from '@line-crm/shared'
 import { csvCell } from '@/lib/presentation'
-import { isActiveAdministrator, matchStaffMember, scopeBundleToStaffRole, staffActionPolicy } from './staff-actions'
+import { isActiveAdministrator, matchStaffMember, staffActionPolicy } from './staff-actions'
 import { CONVERSION_APPROVAL_EDIT_KEY, PERMISSION_LABELS, normalizeStaffPermissionKeys, permissionLabel, toggleStaffPermissionKey } from './permission-labels'
 
 type Channel = { email: boolean; line: boolean }
@@ -135,12 +137,118 @@ function LoginHistoryNote({ count, loading, failed = false }: { count: number | 
   return <p className="text-xs font-medium text-ink-secondary">{count ? `このユーザーにはログイン履歴が ${count} 件あります` : 'ログイン履歴はありません'}</p>
 }
 
+/* 高危険操作が 428 で止まったとき、直前に立てる本人確認の窓（N-427）。 */
+type StepUpPurpose = 'staff.permissions.change' | 'staff.two_factor.remove'
+type StepUpRequest = { purpose: StepUpPurpose; retry: (token: string) => Promise<void> }
+
+function isStepUpRequired(error: unknown): boolean {
+  return error instanceof ApiError && error.code === 'STEP_UP_REQUIRED'
+}
+
+function StepUpPrompt({ request, onDone, onClose }: { request: StepUpRequest; onDone: () => void; onClose: () => void }) {
+  const [busy, setBusy] = useState(false), [error, setError] = useState('')
+  const submit = async (code: string) => {
+    if (busy) return
+    setBusy(true); setError('')
+    try {
+      const res = await api.staff.stepUp(code, request.purpose)
+      if (!res.success) throw new Error(res.error)
+      await request.retry(res.data.token)
+      onDone()
+    } catch (caught) {
+      setError(messageOf(caught))
+    } finally {
+      setBusy(false)
+    }
+  }
+  return <StepUpDialog open action={request.purpose === 'staff.two_factor.remove' ? '二段階認証を解除する' : '権限を変更する'} busy={busy} error={error} onSubmit={(code) => void submit(code)} onCancel={onClose} />
+}
+
+/** 本人がいまログインしている端末の一覧と失効（N-427）。 */
+function SessionsCard() {
+  const [sessions, setSessions] = useState<Array<{ id: string; current: boolean; createdAt: string; expiresAt: string; userAgent: string | null; ipPrefix: string | null }> | null>(null)
+  const [error, setError] = useState(''), [notice, setNotice] = useState('')
+  const [revokingId, setRevokingId] = useState<string | null>(null), [confirmCurrent, setConfirmCurrent] = useState(false), [confirmOthers, setConfirmOthers] = useState(false)
+  const load = useCallback(async () => {
+    try {
+      const res = await api.sessions.list()
+      if (res.success) setSessions(res.data.sessions)
+      else setError('ログイン中の端末を読み込めませんでした')
+    } catch { setError('ログイン中の端末を読み込めませんでした') }
+  }, [])
+  useEffect(() => { void load() }, [load])
+  const revoke = async (id: string, isCurrent: boolean) => {
+    setRevokingId(id); setError(''); setNotice('')
+    try {
+      await api.sessions.revoke(id, { confirmCurrent: isCurrent })
+      if (isCurrent) {
+        // 自分のセッションを消したので、この画面はもう使えない。ログインへ戻す。
+        window.location.assign('/login')
+        return
+      }
+      setNotice('その端末のログインを終了しました')
+      await load()
+    } catch (caught) { setError(messageOf(caught)) } finally { setRevokingId(null) }
+  }
+  const revokeOthers = async () => {
+    setRevokingId('others'); setError(''); setNotice('')
+    try {
+      const res = await api.sessions.revokeOthers()
+      if (res.success) { setNotice(res.data.revoked > 0 ? `この端末以外の ${res.data.revoked} 件のログインを終了しました` : '他にログイン中の端末はありませんでした') }
+      await load()
+    } catch (caught) { setError(messageOf(caught)) } finally { setRevokingId(null); setConfirmOthers(false) }
+  }
+  const deviceLabel = (userAgent: string | null): string => {
+    if (!userAgent) return '端末情報なし'
+    const os = /iPhone|iPad/.test(userAgent) ? 'iPhone / iPad' : /Android/.test(userAgent) ? 'Android' : /Windows/.test(userAgent) ? 'Windows' : /Mac OS/.test(userAgent) ? 'Mac' : /Linux/.test(userAgent) ? 'Linux' : 'その他の端末'
+    const browser = /Edg\//.test(userAgent) ? 'Edge' : /Chrome\//.test(userAgent) ? 'Chrome' : /Safari\//.test(userAgent) ? 'Safari' : /Firefox\//.test(userAgent) ? 'Firefox' : ''
+    return browser ? `${os}・${browser}` : os
+  }
+  return <section className="mb-4 rounded-card border border-hairline bg-canvas p-4" aria-label="ログイン中の端末">
+    <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-sm font-bold text-ink">ログイン中の端末</h2><p className="mt-1 text-xs text-ink-secondary">あなたのアカウントでいまログインしている端末です。見覚えのない端末があれば「ログインを終了」で切り離せます。</p></div>
+      {sessions && sessions.length > 1 && <Button variant="secondary" onClick={() => setConfirmOthers(true)}>この端末以外をすべて終了</Button>}</div>
+    {error && <p className="mt-3 rounded-control bg-danger-bg p-3 text-sm text-danger" role="alert">{error}</p>}
+    {notice && <p className="mt-3 rounded-control bg-info-bg p-3 text-sm font-medium text-accent" role="status">{notice}</p>}
+    {sessions === null ? <p className="mt-3 text-xs text-ink-faint">読み込んでいます…</p> : sessions.length === 0 ? <p className="mt-3 text-xs text-ink-faint">ログイン中の端末はありません。</p> : (
+      <ul className="mt-3 divide-y divide-hairline">
+        {sessions.map((session) => <li key={session.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
+          <div className="min-w-0"><p className="truncate text-sm font-medium text-ink" title={session.userAgent ?? undefined}>{deviceLabel(session.userAgent)}{session.current && <span className="ml-2 rounded-full bg-accent-soft px-2 py-0.5 text-xs font-semibold text-accent">この端末</span>}</p>
+            <p className="mt-0.5 text-xs text-ink-faint">ログイン：{formatStaffDate(session.createdAt)}{session.ipPrefix ? `　・　接続元：${session.ipPrefix}` : ''}</p></div>
+          <Button variant="secondary" disabled={revokingId === session.id} onClick={() => (session.current ? setConfirmCurrent(true) : void revoke(session.id, false))}>{revokingId === session.id ? '終了中…' : 'ログインを終了'}</Button>
+        </li>)}
+      </ul>
+    )}
+    <ConfirmDialog
+      open={confirmCurrent}
+      title="この端末のログインを終了しますか？"
+      description="いま使っているこの端末のログインが終わり、ログイン画面へ戻ります。"
+      confirmLabel="この端末を終了する"
+      busy={revokingId === sessions?.find((s) => s.current)?.id}
+      onConfirm={() => { const current = sessions?.find((s) => s.current); if (current) { setConfirmCurrent(false); void revoke(current.id, true) } }}
+      onCancel={() => setConfirmCurrent(false)}
+    />
+    <ConfirmDialog
+      open={confirmOthers}
+      title="この端末以外のログインをすべて終了しますか？"
+      description="他の端末はすべてログイン画面へ戻ります。この端末のログインは続きます。"
+      confirmLabel="すべて終了する"
+      busy={revokingId === 'others'}
+      onConfirm={() => void revokeOthers()}
+      onCancel={() => { if (revokingId === 'others') return; setConfirmOthers(false) }}
+    />
+  </section>
+}
+
 const SCOPE_ROWS = [
   ['友だち', '名前・タグ・対応状況', 'すべて', 'すべて', '見るだけ'],
   ['個人情報', '電話番号・住所・メール', 'すべて', '伏せて表示', '見せない'],
   ['配信', '一斉配信・シナリオ・リマインダ', '作成・配信', '作成・配信', '見るだけ'],
   ['受信箱', '友だちとのやりとり', '返信できる', '返信できる', '見るだけ'],
   ['予約', '予約・イベントの受付', '変更できる', '変更できる', '見るだけ'],
+  // N-411: 予約の細かい権限。SCOPE_ITEMS と同じ順で並べる（index で対応）。
+  ['予約メニュー', 'メニューと担当の編集', '変更できる', '見るだけ', '見せない'],
+  ['予約設定', '受付枠・資源・予約スタッフ', '変更できる', '見るだけ', '見せない'],
+  ['本人の勤務', '自分のシフト・休憩・連携', '変更できる', '見るだけ', '見せない'],
   ['分析', '成果・流入・レポート', 'すべて', '見られる', '見られる'],
   ['設定', 'LINE・外部連携・ユーザー', '変更できる', '見せない', '見せない'],
   ['運用状態', '健全性・緊急停止・更新履歴', '操作できる', '見られる', '見られる'],
@@ -157,6 +265,14 @@ function PermissionScopeView({ user, memberId, canSave, copyCandidates, onClose,
   const [bundle, setBundle] = useState<Exclude<AccessRoleBundle, 'custom'>>(
     user.roleBundle === 'custom' ? 'reception' : user.roleBundle,
   )
+  /*
+   * 「項目ごとに決める」の上書き。null はbundle初期値のまま。
+   * 1項目でも触ると個別設定（custom）として保存される。
+   */
+  const [customLevels, setCustomLevels] = useState<ScopeLevels | null>(null)
+  const levels: ScopeLevels = customLevels ?? BUNDLE_PRESETS[bundle].levels
+  const setLevel = (itemId: string, level: FeatureAccessLevel) =>
+    setCustomLevels({ ...levels, [itemId]: level })
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState('')
   const [saveConfirmOpen, setSaveConfirmOpen] = useState(false)
@@ -165,6 +281,7 @@ function PermissionScopeView({ user, memberId, canSave, copyCandidates, onClose,
   const [copyOpen, setCopyOpen] = useState(false)
   const [copySourceId, setCopySourceId] = useState('')
   const [copyNotice, setCopyNotice] = useState('')
+  const [stepUp, setStepUp] = useState<StepUpRequest | null>(null)
   /*
    * 「見せる範囲を保存」は更新口へつなぐ。閉じるだけにしない。
    * 受付に更新口の書き分けは無いので運用へ寄る(保存後に読み直すと
@@ -177,19 +294,30 @@ function PermissionScopeView({ user, memberId, canSave, copyCandidates, onClose,
     setSaveConfirmError('')
     setSaveConfirmOpen(true)
   }
-  const save = async () => {
+  const save = async (stepUpToken?: string) => {
     if (!memberId || !canSave || savingRef.current) return
     savingRef.current = true
     setSaving(true)
     setSaveError('')
     setSaveConfirmError('')
     try {
-      const result = await api.staff.update(memberId, { role: scopeBundleToStaffRole(bundle) })
+      // N-424: bundle 名をそのまま送る。role へ潰すと「受付」と「運用」が区別できない。
+      // 項目を1つでも触っていたら3択表ごと送り、API側が個別設定として保存する。
+      const piiLevel = customLevels?.pii
+      const result = await api.staff.update(memberId, {
+        roleBundle: bundle,
+        permissionScope: customLevels ?? undefined,
+        emailMask: piiLevel === 'edit' ? 'full' : piiLevel === 'view' ? 'masked' : piiLevel === 'none' ? 'none' : undefined,
+      }, stepUpToken)
       if (!result.success) throw new Error(result.error)
       setSaveConfirmOpen(false)
       await onSaved()
       onClose()
     } catch (caught) {
+      if (!stepUpToken && isStepUpRequired(caught)) {
+        setStepUp({ purpose: 'staff.permissions.change', retry: save })
+        return
+      }
       const message = messageOf(caught)
       setSaveError(message)
       setSaveConfirmError(message)
@@ -219,7 +347,7 @@ function PermissionScopeView({ user, memberId, canSave, copyCandidates, onClose,
     <div className="grid items-start gap-4" style={{ gridTemplateColumns: 'minmax(0, 1fr) 390px' }}>
       <main className="space-y-3">
         <section className="rounded-card border border-hairline bg-canvas p-4"><h2 className="text-base font-bold text-ink">かたまりから選ぶ</h2><p className="mt-1 text-xs text-ink-faint">よく使う組み合わせを用意しています。選んでから、下で細かく直せます。</p><div className="mt-3 grid grid-cols-4 gap-3">{bundles.map(([value, label, count, note]) => <button key={value} type="button" onClick={() => setBundle(value)} className={`rounded-control border p-3 text-left ${bundle === value ? 'border-accent bg-accent-soft' : 'border-divider-soft bg-canvas'}`}><span className="flex items-center justify-between"><span className="text-sm font-bold text-ink">{label}</span><span className="text-xs text-ink-faint">{count}</span></span><span className={`mt-2 block text-xs ${bundle === value ? 'font-semibold text-success' : 'text-ink-faint'}`}>{note}</span></button>)}</div></section>
-        <section className="overflow-hidden rounded-card border border-hairline bg-canvas"><div className="px-4 py-4"><h2 className="text-base font-bold text-ink">項目ごとに決める</h2><p className="mt-1 text-xs text-ink-faint">「変えられる」「見えるだけ」「出さない」の3つから選びます。</p></div><div className="grid items-center border-y border-hairline bg-canvas-sunken px-4 py-3 text-xs font-bold text-ink-faint" style={{ gridTemplateColumns: '1.45fr repeat(3, 140px) 1.2fr' }}><span>メニューの項目</span><span className="text-center">変えられる</span><span className="text-center">見えるだけ</span><span className="text-center">出さない</span><span>補足</span></div><div className="divide-y divide-hairline">{SCOPE_ROWS.map(([label, note, full, partial, none], index) => <div key={label} className="grid items-center px-4" style={{ minHeight: 46, gridTemplateColumns: '1.45fr repeat(3, 140px) 1.2fr' }}><div><p className="text-xs font-bold text-ink">{label}</p><p className="mt-0.5 text-xs text-ink-faint">{note}</p></div>{[full, partial, none].map((text, option) => { const selected = bundle === 'reception' ? option === (index === 1 || index === 6 ? 2 : index === 5 || index === 7 ? 1 : 0) : option === (bundle === 'administrator' ? 0 : bundle === 'view_only' ? 2 : 1); return <button key={`${option}:${text}`} type="button" aria-label={`${label}を${text}`} className={`mx-auto flex h-5 w-5 items-center justify-center rounded-full border text-xs ${selected ? 'border-accent text-accent' : 'border-divider-soft text-transparent'}`}>✓</button> })}<p className="text-xs font-semibold text-warning">{index === 1 ? '電話番号と住所は伏せます' : index === 2 ? '誤送信を防ぐためです' : index === 5 ? '売上の数字が見えます' : ''}</p></div>)}</div></section>
+        <section className="overflow-hidden rounded-card border border-hairline bg-canvas"><div className="px-4 py-4"><h2 className="text-base font-bold text-ink">項目ごとに決める</h2><p className="mt-1 text-xs text-ink-faint">「変えられる」「見えるだけ」「出さない」の3つから選びます。</p></div><div className="grid items-center border-y border-hairline bg-canvas-sunken px-4 py-3 text-xs font-bold text-ink-faint" style={{ gridTemplateColumns: '1.45fr repeat(3, 140px) 1.2fr' }}><span>メニューの項目</span><span className="text-center">変えられる</span><span className="text-center">見えるだけ</span><span className="text-center">出さない</span><span>補足</span></div><div className="divide-y divide-hairline">{SCOPE_ROWS.map(([label, note, full, partial, none], index) => { const item = SCOPE_ITEMS[index]; const level = levels[item.id] ?? 'none'; return <div key={label} className="grid items-center px-4" style={{ minHeight: 46, gridTemplateColumns: '1.45fr repeat(3, 140px) 1.2fr' }}><div><p className="text-xs font-bold text-ink">{label}</p><p className="mt-0.5 text-xs text-ink-faint">{note}</p></div>{([full, partial, none] as const).map((text, option) => { const optionLevel: FeatureAccessLevel = option === 0 ? 'edit' : option === 1 ? 'view' : 'none'; const selected = level === optionLevel; return <button key={`${option}:${text}`} type="button" aria-label={`${label}を${text}`} aria-pressed={selected} disabled={!canSave} onClick={() => setLevel(item.id, optionLevel)} className={`mx-auto flex h-5 w-5 items-center justify-center rounded-full border text-xs ${selected ? 'border-accent text-accent' : 'border-divider-soft text-transparent'} ${canSave ? 'cursor-pointer' : 'cursor-not-allowed'}`}>✓</button> })}<p className="text-xs font-semibold text-warning">{item.id === 'pii' ? '電話番号と住所は伏せます' : item.id === 'delivery' ? '誤送信を防ぐためです' : item.id === 'analytics' ? '売上の数字が見えます' : ''}</p></div> })}</div></section>
       </main>
       <aside className="space-y-3"><section className="rounded-card border border-hairline bg-canvas p-4"><h2 className="text-sm font-bold text-ink">この決め方で、この人にはこう見えます</h2><div className="mt-3 space-y-3 text-xs text-ink-secondary"><p><b className="text-ink">◉　サイドメニューに出るのは4項目</b><br />　　受信箱・友だち・友だち属性・予約管理・コンテンツ</p><p><b className="text-ink">◉　出さない項目はURLを直に打っても開けません</b><br />　　「見る権限がありません」と出ます</p><p><b className="text-ink">◉　電話番号と住所は伏せます</b><br />　　下4桁だけが見えます。コピーもできません</p></div></section><section className="rounded-card border border-hairline bg-canvas p-4"><h2 className="text-sm font-bold text-ink">つながる先</h2><div className="mt-3 space-y-3 text-xs"><p className="font-bold text-action">→ 機能設定</p><p className="font-bold text-action">→ 入った記録</p><p className="font-bold text-action">→ 運用状態</p><p className="font-bold text-action">→ 予約設定</p></div></section><section className="rounded-card border border-warning bg-warning-bg p-4"><h2 className="text-sm font-bold text-warning">気をつけること</h2><p className="mt-2 text-xs font-bold text-warning">配信を出さないと、受信箱からの返信もできません</p><p className="mt-2 text-xs text-warning">保存すると、対象者はもう一度ログインする必要があります。</p></section></aside>
     </div>
@@ -234,6 +362,7 @@ function PermissionScopeView({ user, memberId, canSave, copyCandidates, onClose,
       onConfirm={() => void save()}
       onCancel={() => { if (saving) return; setSaveConfirmOpen(false); setSaveConfirmError('') }}
     />
+    {stepUp && <StepUpPrompt request={stepUp} onDone={() => setStepUp(null)} onClose={() => setStepUp(null)} />}
   </div>
 }
 
@@ -252,6 +381,8 @@ function EditModal({ member, administrator, currentUserId, activeAdministratorCo
    * ので、共通の `ConfirmDialog` へ移した。
    */
   const [unlinkOpen, setUnlinkOpen] = useState(false), [unlinking, setUnlinking] = useState(false), [unlinkError, setUnlinkError] = useState('')
+  /* 権限・利用状態・LINE連携の変更は 428 で止まる。止まったら本人確認の窓を立てて、grant を付けて同じ操作をやり直す。 */
+  const [stepUp, setStepUp] = useState<StepUpRequest | null>(null)
   const policy = staffActionPolicy({ member, currentUserId, administrator, activeAdministratorCount })
   useEffect(() => {
     if (!administrator) return
@@ -260,7 +391,7 @@ function EditModal({ member, administrator, currentUserId, activeAdministratorCo
     return () => { active = false }
   }, [administrator, member.id])
   const toggleNotification = (key: string, channel: keyof Channel) => setNotifications((current) => ({ ...current, [key]: { ...current[key], [channel]: !current[key][channel] } }))
-  const save = async () => { if (!email.trim()) return setError('メールアドレスを入力してください'); if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) return setError('正しいメールアドレスを入力してください'); setSaving(true); setError(''); try { await api.staff.update(member.id, { name: administrator ? name.trim() : undefined, email: email.trim(), role: administrator ? role : undefined, permissionKeys: administrator && role === 'staff' ? normalizeStaffPermissionKeys(permissions) : undefined, notificationPreferences: notifications }); await onSaved(); onClose() } catch (caught) { setError(messageOf(caught)) } finally { setSaving(false) } }
+  const save = async (stepUpToken?: string) => { if (!email.trim()) return setError('メールアドレスを入力してください'); if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) return setError('正しいメールアドレスを入力してください'); setSaving(true); setError(''); try { await api.staff.update(member.id, { name: administrator ? name.trim() : undefined, email: email.trim(), role: administrator ? role : undefined, permissionKeys: administrator && role === 'staff' ? normalizeStaffPermissionKeys(permissions) : undefined, notificationPreferences: notifications }, stepUpToken); await onSaved(); onClose() } catch (caught) { if (!stepUpToken && isStepUpRequired(caught)) { setStepUp({ purpose: 'staff.permissions.change', retry: save }); return } setError(messageOf(caught)) } finally { setSaving(false) } }
   /**
    * LINE連携を外す。
    *
@@ -268,8 +399,8 @@ function EditModal({ member, administrator, currentUserId, activeAdministratorCo
    * 失敗は握りつぶさず、窓の中に運用者の言葉で出す。生のAPIエラーだと
    * 次に何をすればよいか読み取れない。
    */
-  const unlinkLine = async () => { if (unlinking) return; setUnlinking(true); setUnlinkError(''); try { const res = await api.staff.update(member.id, { lineLinked: false }); if (!res.success) throw new Error(res.error); setUnlinkOpen(false); await onSaved(); onClose() } catch { setUnlinkError('LINE連携を解除できませんでした。状態を読み直してから、もう一度お試しください。') } finally { setUnlinking(false) } }
-  const toggleActive = async () => { if (policy.statusBlockedReason) return; setStatusSaving(true); setError(''); try { await api.staff.update(member.id, { isActive: !member.isActive }); await onSaved(); onClose() } catch (caught) { setError(messageOf(caught)) } finally { setStatusSaving(false) } }
+  const unlinkLine = async (stepUpToken?: string) => { if (unlinking) return; setUnlinking(true); setUnlinkError(''); try { const res = await api.staff.update(member.id, { lineLinked: false }, stepUpToken); if (!res.success) throw new Error(res.error); setUnlinkOpen(false); await onSaved(); onClose() } catch (caught) { if (!stepUpToken && isStepUpRequired(caught)) { setStepUp({ purpose: 'staff.permissions.change', retry: unlinkLine }); return } setUnlinkError('LINE連携を解除できませんでした。状態を読み直してから、もう一度お試しください。') } finally { setUnlinking(false) } }
+  const toggleActive = async (stepUpToken?: string) => { if (policy.statusBlockedReason) return; setStatusSaving(true); setError(''); try { await api.staff.update(member.id, { isActive: !member.isActive }, stepUpToken); await onSaved(); onClose() } catch (caught) { if (!stepUpToken && isStepUpRequired(caught)) { setStepUp({ purpose: 'staff.permissions.change', retry: toggleActive }); return } setError(messageOf(caught)) } finally { setStatusSaving(false) } }
   return <Modal onClose={onClose} wide><div data-design-node="EOTS4"><div className="flex items-start justify-between"><div><h2 className="text-xl font-bold text-ink">見せる範囲を決める</h2><p className="mt-1 text-xs text-ink-secondary">役割・表示機能・担当範囲を確認し、このユーザーに必要な範囲だけを設定します。</p></div><button onClick={onClose} className="cursor-pointer rounded-control p-2 text-ink-faint hover:bg-canvas-sunken">×</button></div>
     <div className="mt-5 rounded-control bg-canvas-sunken p-3"><p className="font-semibold text-ink">{member.name}</p><p className="text-xs text-ink-secondary">{ROLE_LABEL[member.role]}</p></div>{error && <p className="mt-4 rounded-control bg-danger-bg p-3 text-sm text-danger">{error}</p>}
     {policy.showAccountActions && <section className={`mt-5 rounded-card border p-4 ${member.isActive ? 'border-accent bg-accent-soft' : 'border-warning bg-warning-bg'}`} aria-label="ユーザーの利用状態"><div className="flex flex-wrap items-center justify-between gap-4"><div><p className="text-sm font-bold text-ink">ログイン状態：{member.isActive ? '有効' : '無効'}</p><p className="mt-1 text-xs leading-5 text-ink-secondary">{member.isActive ? '無効にすると、このユーザーはログインできなくなります。' : '有効にすると、このユーザーは再びログインできます。'}</p><div className="mt-2"><LoginHistoryNote count={loginCount} loading={loginHistoryLoading} failed={loginHistoryFailed} /></div></div><button type="button" onClick={() => void toggleActive()} disabled={statusSaving || Boolean(policy.statusBlockedReason)} className={`min-w-48 rounded-control px-4 py-2.5 text-sm font-bold disabled:cursor-not-allowed disabled:opacity-40 ${member.isActive ? 'border border-warning bg-canvas text-warning hover:bg-warning-bg' : 'bg-accent text-on-accent hover:bg-accent-hover'}`}>{statusSaving ? '変更中…' : member.isActive ? 'このユーザーを無効にする' : 'このユーザーを有効にする'}</button></div>{policy.statusBlockedReason && <p className="mt-3 rounded-control bg-canvas p-3 text-xs font-medium text-warning">{policy.statusBlockedReason}</p>}</section>}
@@ -292,6 +423,7 @@ function EditModal({ member, administrator, currentUserId, activeAdministratorCo
     >
       <p className="text-ink-secondary text-sm">通知設定でLINEを選んでいるお知らせは、解除したあと届かなくなります。メールを選んでいるぶんはそのまま届きます。</p>
     </ConfirmDialog>
+    {stepUp && <StepUpPrompt request={stepUp} onDone={() => setStepUp(null)} onClose={() => setStepUp(null)} />}
   </div></Modal>
 }
 
@@ -330,6 +462,8 @@ function StaffPageHost() {
   const [disablingTarget, setDisablingTarget] = useState<StaffMember | null>(null), [disablingTwoFactor, setDisablingTwoFactor] = useState(false), [disableError, setDisableError] = useState('')
   const [removingTarget, setRemovingTarget] = useState<StaffMember | null>(null), [removing, setRemoving] = useState(false), [removeError, setRemoveError] = useState('')
   const [resendingId, setResendingId] = useState<string | null>(null), [resendNotice, setResendNotice] = useState(''), [resendError, setResendError] = useState('')
+  /* 権限停止・二段階認証の解除が 428 で止まったときの本人確認窓。 */
+  const [stepUp, setStepUp] = useState<StepUpRequest | null>(null)
   const [permissionSaveNotice, setPermissionSaveNotice] = useState('')
   /* 送信中の掛け金。state は次の描画まで古いままなので、素早い二度押しの2回目を止められない。 */
   const resendingRef = useRef(false)
@@ -419,24 +553,25 @@ function StaffPageHost() {
    *
    * 処理中は受け付けない。失敗は握りつぶさず、窓の中に運用者の言葉で出す。
    */
-  const runDisableTwoFactor = async () => { if (!disablingTarget || disablingTwoFactor) return; setDisablingTwoFactor(true); setDisableError(''); try { const res = await api.staff.disableTwoFactor(disablingTarget.id); if (!res.success) throw new Error(res.error); setDisablingTarget(null); await load() } catch { setDisableError('二段階認証を解除できませんでした。状態を読み直してから、もう一度お試しください。') } finally { setDisablingTwoFactor(false) } }
+  const runDisableTwoFactor = async (stepUpToken?: string) => { if (!disablingTarget || disablingTwoFactor) return; setDisablingTwoFactor(true); setDisableError(''); try { const res = await api.staff.disableTwoFactor(disablingTarget.id, stepUpToken); if (!res.success) throw new Error(res.error); setDisablingTarget(null); await load() } catch (caught) { if (!stepUpToken && isStepUpRequired(caught)) { setStepUp({ purpose: 'staff.two_factor.remove', retry: runDisableTwoFactor }); return } setDisableError('二段階認証を解除できませんでした。状態を読み直してから、もう一度お試しください。') } finally { setDisablingTwoFactor(false) } }
   /**
    * ログインユーザーを外す。
    *
    * 確認前は停止口を呼ばず、同じ描画中の二度押しも ref で止める。
    * 失敗時はサーバーが返した理由を確認窓に残し、運用者が判断できるようにする。
    */
-  const runRemove = async () => {
+  const runRemove = async (stepUpToken?: string) => {
     if (!removingTarget || removingRef.current) return
     removingRef.current = true
     setRemoving(true)
     setRemoveError('')
     try {
-      const result = await api.staff.delete(removingTarget.id)
+      const result = await api.staff.delete(removingTarget.id, stepUpToken)
       if (!result.success) throw new Error(result.error)
       setRemovingTarget(null)
       await load()
     } catch (caught) {
+      if (!stepUpToken && isStepUpRequired(caught)) { setStepUp({ purpose: 'staff.permissions.change', retry: runRemove }); return }
       setRemoveError(messageOf(caught))
     } finally {
       removingRef.current = false
@@ -487,6 +622,7 @@ function StaffPageHost() {
     {resendNotice && <div className="mb-4 rounded-control bg-info-bg px-4 py-3 text-sm font-medium text-accent" role="status"><p>{resendNotice}</p></div>}
     {resendError && <div className="mb-4 rounded-control bg-danger-bg p-3 text-sm text-danger" role="alert"><p>{resendError}</p></div>}
     {permissionSaveNotice && <div className="mb-4 rounded-control bg-info-bg px-4 py-3 text-sm font-medium text-accent" role="status"><p>{permissionSaveNotice}</p></div>}
+    {tab === 'members' && <SessionsCard />}
     {tab === 'roles' && <div className="mb-4 grid gap-3 md:grid-cols-2 xl:grid-cols-5">{accessRoles.map((role) => <div key={role.id} className="rounded-card border border-hairline bg-canvas p-4"><div className="flex items-start justify-between gap-2"><p className="font-semibold text-ink">{role.name}</p><span className="rounded-full bg-accent-soft px-2 py-1 text-[11px] font-semibold text-accent">{role.assignedUserCount}人</span></div><p className="mt-2 text-xs leading-5 text-ink-secondary">{role.description}</p><p className="mt-3 text-xs text-ink-faint">{role.requiresMfa ? '2段階の確認が必要' : role.featureAccess === 'view' ? '閲覧のみ' : role.featureAccess === 'custom' ? '機能ごとに設定' : '編集できる'}</p></div>)}</div>}
     <div className="mb-3 flex flex-wrap items-center gap-3"><SearchField value={query} onChange={setQuery} onClear={() => setQuery('')} placeholder="人の名前・メールで検索" className="min-w-64 flex-1" /><Select aria-label="並び順" value={sort} onChange={setSort} options={LIST_SORT_OPTIONS} /></div>
     <div className="mb-3"><Tabs items={[{ label: 'すべて', count: tabUsers.length, current: roleFilter === 'all', onClick: () => setRoleFilter('all') }, ...(['administrator', 'operations', 'reception', 'view_only', 'custom'] as const).map((role) => ({ label: ACCESS_ROLE_LABEL[role], count: tabUsers.filter((user) => user.roleBundle === role).length, current: roleFilter === role, onClick: () => setRoleFilter(role) }))]} /></div>
@@ -518,6 +654,7 @@ function StaffPageHost() {
     >
       <p className="text-ink-secondary text-sm">これまでの設定と操作記録は残ります。</p>
     </ConfirmDialog>
+    {stepUp && <StepUpPrompt request={stepUp} onDone={() => setStepUp(null)} onClose={() => setStepUp(null)} />}
   </div>
 }
 

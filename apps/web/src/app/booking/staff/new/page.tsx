@@ -1,8 +1,8 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { BOOKING_STAFF_LIMITS, parseBookingStaffInput } from '@line-crm/shared'
-import { bookingApi, type BookingMenu } from '@/lib/api'
+import { BOOKING_STAFF_LIMITS, parseBookingStaffInput, type StaffMember } from '@line-crm/shared'
+import { api, bookingApi, type BookingMenu } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import CreatePage, {
   AsideCard,
@@ -10,6 +10,9 @@ import CreatePage, {
   FormSection,
   inputClass,
 } from '@/components/shared/create-page'
+import ListState from '@/components/shared/list-state'
+import Select from '@/components/shared/select'
+import { canEditFeature } from '@/lib/staff-capability'
 
 /**
  * 予約スタッフを登録する（設計 V2 8-2-2 / node bEL9g）。
@@ -30,6 +33,9 @@ export default function NewBookingStaffPage() {
   const [isActive, setIsActive] = useState(true)
   const [menus, setMenus] = useState<BookingMenu[]>([])
   const [offered, setOffered] = useState<Set<string>>(new Set())
+  // N-411 本人勤務: 登録と同時にログインユーザーへ紐づけられるようにする。
+  const [staffMemberId, setStaffMemberId] = useState('')
+  const [members, setMembers] = useState<StaffMember[]>([])
 
   useEffect(() => {
     if (!selectedAccountId) return
@@ -47,6 +53,20 @@ export default function NewBookingStaffPage() {
     }
   }, [selectedAccountId])
 
+  useEffect(() => {
+    let alive = true
+    api.staff.list()
+      .then((res) => {
+        if (alive && res.success) setMembers(res.data.filter((m) => m.isActive))
+      })
+      .catch(() => {
+        // ログインユーザー一覧が引けなくても登録自体はできる。
+      })
+    return () => {
+      alive = false
+    }
+  }, [])
+
   function toggle(id: string) {
     setOffered((cur) => {
       const next = new Set(cur)
@@ -55,6 +75,10 @@ export default function NewBookingStaffPage() {
       return next
     })
   }
+
+  // N-411: 予約スタッフ登録は 'booking.settings' の実効permission必須。
+  const [canManageStaff] = useState(() =>
+    typeof window === 'undefined' ? true : canEditFeature('booking.settings'))
 
   const shownName = displayName.trim() || name.trim() || 'スタッフ'
   const staffInput = () => ({
@@ -65,7 +89,20 @@ export default function NewBookingStaffPage() {
     bio,
     is_designation_optional: isDesignationOptional,
     is_active: isActive,
+    staff_member_id: staffMemberId || null,
   })
+
+  if (!canManageStaff) {
+    return (
+      <div className="mx-auto max-w-2xl p-6">
+        <ListState
+          kind="error"
+          title="予約設定の変更権限がありません"
+          description="予約スタッフの登録は、予約設定の権限を持つログインユーザーだけが実行できます。管理者へ権限の確認を依頼してください。"
+        />
+      </div>
+    )
+  }
 
   return (
     <CreatePage
@@ -303,6 +340,24 @@ export default function NewBookingStaffPage() {
             </span>
           </span>
         </label>
+
+        <Field
+          label="ログインユーザーとの紐づけ"
+          htmlFor="bs-member"
+          note="紐づけると、そのログインユーザーが「本人の勤務」としてこの担当者のシフト・休憩・外部連携を管理できます。"
+        >
+          <Select
+            aria-label="ログインユーザーとの紐づけ"
+            id="bs-member"
+            size="full"
+            value={staffMemberId}
+            onChange={setStaffMemberId}
+            options={[
+              { value: '', label: '紐づけない' },
+              ...members.map((m) => ({ value: m.id, label: `${m.name}${m.email ? `（${m.email}）` : ''}` })),
+            ]}
+          />
+        </Field>
       </FormSection>
     </CreatePage>
   )

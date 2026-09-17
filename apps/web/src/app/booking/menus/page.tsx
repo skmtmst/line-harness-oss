@@ -17,6 +17,7 @@ import {
   type BookingSettings,
 } from '@/lib/api'
 import type { Tag } from '@line-crm/shared'
+import { canEditFeature } from '@/lib/staff-capability'
 import { useAccount } from '@/contexts/account-context'
 import { Suspense } from 'react'
 import { useMergedTab } from '@/components/layout/merged-tabs'
@@ -97,6 +98,9 @@ function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuC
   const [supportingLoadState, setSupportingLoadState] = useState<SupportingLoadState>('loading')
   const [page, setPage] = useState(1)
   const [canManageResources, setCanManageResources] = useState(false)
+  // N-411: メニュー編集は '/booking/menus'、予約設定・資源は 'booking.settings' の
+  // 実効permissionで出し分ける。役割だけで見せるとAPIが403で落ちる。
+  const [canEditMenus, setCanEditMenus] = useState(false)
   const loadGenerationRef = useRef(0)
   const selectedAccountIdRef = useRef(selectedAccountId)
   selectedAccountIdRef.current = selectedAccountId
@@ -157,8 +161,8 @@ function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuC
   }, [load])
 
   useEffect(() => {
-    const role = window.localStorage.getItem('lh_staff_role')
-    setCanManageResources(role === 'owner' || role === 'admin')
+    setCanManageResources(canEditFeature('booking.settings'))
+    setCanEditMenus(canEditFeature('/booking/menus'))
   }, [])
 
   useEffect(() => {
@@ -320,6 +324,7 @@ function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuC
           items={items}
           loading={loading}
           error={error ?? settingsError}
+          canManageResources={canManageResources}
           onRetry={() => void load()}
           onSaved={(next) => {
             // 保存中に店舗を切り替えた場合、旧店舗の遅い応答を新店舗へ反映しない。
@@ -341,7 +346,7 @@ function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuC
             kind="empty"
             title="まだ予約メニューがありません"
             description="メニューを作ると、お客様の予約画面に出ます。"
-            action={<Button variant="primary" href="/booking/menus/new">＋ 予約メニューを作る</Button>}
+            action={canEditMenus ? <Button variant="primary" href="/booking/menus/new">＋ 予約メニューを作る</Button> : undefined}
           />
         </div>
       ) : (
@@ -404,9 +409,11 @@ function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuC
                         <button onClick={() => setEditing(m)} className="border-hairline rounded-control border px-2 py-1 font-semibold">
                           中身を見る
                         </button>
-                        <button onClick={() => setVisibilityTarget(m)} className="border-hairline rounded-control border px-2 py-1 font-semibold">
-                          止める・出す
-                        </button>
+                        {canEditMenus && (
+                          <button onClick={() => setVisibilityTarget(m)} className="border-hairline rounded-control border px-2 py-1 font-semibold">
+                            止める・出す
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -429,6 +436,7 @@ function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuC
           tags={tags}
           accountId={selectedAccountId}
           canManageResources={canManageResources}
+          canEdit={canEditMenus}
           onSave={save}
           onReloadLatest={async () => {
             await load()
@@ -460,12 +468,13 @@ function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuC
   )
 }
 
-function BookingRulesSummary({ accountId, settings, items, loading, error, onRetry, onSaved }: {
+function BookingRulesSummary({ accountId, settings, items, loading, error, canManageResources, onRetry, onSaved }: {
   accountId: string | null
   settings: BookingSettings | null
   items: BookingMenu[]
   loading: boolean
   error: string | null
+  canManageResources: boolean
   onRetry: () => void
   onSaved: (settings: BookingSettings) => void
 }) {
@@ -490,6 +499,7 @@ function BookingRulesSummary({ accountId, settings, items, loading, error, onRet
         key={accountId}
         accountId={accountId}
         initial={settings}
+        canEdit={canManageResources}
         onRetry={onRetry}
         onSaved={onSaved}
       />
@@ -518,9 +528,11 @@ function BookingRulesSummary({ accountId, settings, items, loading, error, onRet
   )
 }
 
-function BookingRulesEditor({ accountId, initial, onRetry, onSaved }: {
+function BookingRulesEditor({ accountId, initial, canEdit, onRetry, onSaved }: {
   accountId: string
   initial: BookingSettings
+  /** false のとき閲覧のみ。入力を無効化し保存ボタンを出さない（APIも403で拒否）。 */
+  canEdit: boolean
   onRetry: () => void
   onSaved: (settings: BookingSettings) => void
 }) {
@@ -563,6 +575,7 @@ function BookingRulesEditor({ accountId, initial, onRetry, onSaved }: {
 
   return (
     <div className="bg-canvas rounded-card border-hairline border p-5">
+      <fieldset disabled={!canEdit} className="contents">
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         <Field label="タイムゾーン" required>
           <input
@@ -605,15 +618,22 @@ function BookingRulesEditor({ accountId, initial, onRetry, onSaved }: {
         </div>
       )}
       {saved && <p className="text-success mt-4 text-sm font-semibold" role="status">予約の基本ルールを保存しました。</p>}
-      <div className="border-hairline mt-5 flex justify-end border-t pt-4">
-        <Button
-          onClick={() => void submit()}
-          disabled={saving}
-          variant="primary"
-        >
-          {saving ? '保存中…' : initial.version === 0 ? '基本ルールを作成' : '変更を保存'}
-        </Button>
-      </div>
+      </fieldset>
+      {canEdit ? (
+        <div className="border-hairline mt-5 flex justify-end border-t pt-4">
+          <Button
+            onClick={() => void submit()}
+            disabled={saving}
+            variant="primary"
+          >
+            {saving ? '保存中…' : initial.version === 0 ? '基本ルールを作成' : '変更を保存'}
+          </Button>
+        </div>
+      ) : (
+        <p className="text-ink-faint mt-5 border-t border-hairline pt-4 text-xs">
+          予約設定の変更権限がないため、閲覧のみです。
+        </p>
+      )}
     </div>
   )
 }
@@ -672,6 +692,7 @@ function EditMenuModal({
   tags,
   accountId,
   canManageResources,
+  canEdit,
   onSave,
   onReloadLatest,
   onResourcesSaved,
@@ -681,6 +702,8 @@ function EditMenuModal({
   tags: Tag[]
   accountId: string | null
   canManageResources: boolean
+  /** false のとき閲覧のみ。保存ボタンを無効化する（APIも403で拒否）。 */
+  canEdit: boolean
   onSave: (m: BookingMenu) => Promise<void>
   /** 版競合(409)のとき。一覧を読み直して、この窓は閉じる。 */
   onReloadLatest: () => Promise<void>
@@ -1105,7 +1128,8 @@ function EditMenuModal({
           </button>
           <button
             onClick={submit}
-            disabled={saving}
+            disabled={saving || !canEdit}
+            title={canEdit ? undefined : '予約メニューの変更権限がありません'}
             className="bg-accent-deep text-on-accent rounded-control px-4 py-2 text-sm font-medium transition-colors hover:brightness-92 disabled:opacity-50"
           >
             {saving ? '保存中…' : '保存'}

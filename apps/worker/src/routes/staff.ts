@@ -4,7 +4,7 @@ import {
   getStaffMembers, getStaffById, getStaffByInviteTokenHash,
   createStaffMember, updateStaffMember, deleteStaffMember, countLoginAudit, getLastLoginByStaff,
   getStaffAccountScopeIds, getStaffAccountScopeMap, replaceStaffAccountScopes, revokeStaffAuthentication,
-  reserveTwoFactorSetupAttempt, clearTwoFactorSetupAttempts,
+  reserveTwoFactorSetupAttempt, clearTwoFactorSetupAttempts, consumeStepUpGrant,
 } from '@line-crm/db';
 import type { StaffMember } from '@line-crm/db';
 import { requireRole } from '../middleware/role-guard.js';
@@ -15,11 +15,31 @@ import type { Env } from '../index.js';
 import { getLineAccounts } from '@line-crm/db';
 import { getVisibleLineAccountScope } from '../services/account-access.js';
 import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
+import {
+  ACCESS_ROLE_BUNDLE_IDS, SCOPE_ITEMS, BUNDLE_PRESETS, scopeLevelsToKeys, keysToScopeLevels,
+  type AccessRoleBundleId, type FeatureAccessLevel, type EmailMaskLevel, type ScopeLevels,
+} from '@line-crm/shared';
 
 const staff = new Hono<Env>();
 // 招待の有効期限は7日。要件 v6-30 §9-2・§17(既存の48時間招待はその期限のまま守り、新規・再送から7日)。
 const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const TWO_FACTOR_ATTEMPT_LIMIT_ERROR = '入力回数を超えました。しばらく待ってからやり直してください';
+
+/**
+ * 高危険な権限変更の直前再認証（N-427）。
+ *
+ * X-Step-Up-Token の grant は 5 分・1 回限り。消費は atomic なので
+ * 同じ token を 2 回使い回しても 2 回目は必ず失敗する。
+ */
+async function consumeStaffStepUp(c: { req: { header: (name: string) => string | undefined }; env: Env['Bindings']; get: (key: 'staff') => Env['Variables']['staff'] }, purpose: 'staff.permissions.change' | 'staff.two_factor.remove'): Promise<boolean> {
+  const token = c.req.header('X-Step-Up-Token')?.trim();
+  if (!token) return false;
+  return consumeStepUpGrant(c.env.DB, {
+    tokenHash: await sha256Hex(token),
+    staffId: c.get('staff').id,
+    purpose,
+  });
+}
 
 function invitationConfirmationUrl(c: { env: Env['Bindings']; req: { url: string } }, token: string): string {
   const base = c.env.ADMIN_PUBLIC_URL?.trim() || new URL(c.req.url).origin;
@@ -33,6 +53,38 @@ function safeJson<T>(value: string | null | undefined, fallback: T): T {
   try { return value ? JSON.parse(value) as T : fallback; } catch { return fallback; }
 }
 
+/**
+ * N-424: 役割バンドル（v6-30 §7 のカタログ）。
+ * role_bundle 列が正本。未保存の行は role/access_level から従来どおり推定する。
+ */
+function parseRoleBundle(value: string | null | undefined): AccessRoleBundleId | null {
+  return value && (ACCESS_ROLE_BUNDLE_IDS as readonly string[]).includes(value)
+    ? value as AccessRoleBundleId
+    : null;
+}
+
+function staffBundle(member: Pick<StaffMember, 'role' | 'access_level' | 'role_bundle'>): AccessRoleBundleId {
+  const saved = parseRoleBundle(member.role_bundle);
+  if (saved) return saved;
+  if (member.access_level === 'read_only') return 'view_only';
+  return member.role === 'owner' || member.role === 'admin' ? 'administrator' : 'custom';
+}
+
+function parseEmailMask(value: unknown): EmailMaskLevel | null | undefined {
+  if (value === undefined) return undefined;
+  return value === 'full' || value === 'masked' || value === 'none' ? value : null;
+}
+
+function parseScope(value: unknown): ScopeLevels | null | undefined {
+  if (value === undefined) return undefined;
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  for (const [key, level] of Object.entries(value)) {
+    if (!SCOPE_ITEMS.some((item) => item.id === key)) return null;
+    if (level !== 'none' && level !== 'view' && level !== 'edit') return null;
+  }
+  return value as ScopeLevels;
+}
+
 function displayRole(row: StaffMember): 'admin' | 'staff' | 'viewer' {
   if (row.access_level === 'read_only') return 'viewer';
   return row.role === 'staff' ? 'staff' : 'admin';
@@ -44,31 +96,54 @@ function maskEmail(email: string | null): string | null {
   return at > 0 ? `${email.slice(0, 1)}***${email.slice(at)}` : '***';
 }
 
-function canViewStaffEmail(c: { get: (key: 'staff') => Env['Variables']['staff'] }, targetId: string): boolean {
+/**
+ * スタッフのメールアドレスの見せ方（N-424 フィールド権限）。
+ * email_mask 列が正本: full=そのまま / masked=伏せ字 / none=出さない。
+ * 未設定の行は従来判定（本人・管理者・access.user.email.view だけ実アドレス）。
+ */
+function staffEmailVisibility(
+  c: { get: (key: 'staff') => Env['Variables']['staff'] },
+  targetId: string,
+): 'full' | 'masked' | 'none' {
   const current = c.get('staff');
-  return current.id === targetId || current.role === 'owner' || current.role === 'admin'
-    || current.permissionKeys?.includes('access.user.email.view') === true;
+  if (current.id === targetId) return 'full';
+  if (current.emailMask === 'full' || current.emailMask === 'masked' || current.emailMask === 'none') {
+    return current.emailMask;
+  }
+  return current.role === 'owner' || current.role === 'admin'
+    || current.permissionKeys?.includes('access.user.email.view') === true
+    ? 'full'
+    : 'masked';
 }
 
 async function serializeStaff(
   db: D1Database,
   row: StaffMember,
-  exposeEmail = true,
+  emailVisibility: 'full' | 'masked' | 'none' = 'full',
   preloadedScopes?: Map<string, string[]>,
 ) {
   const accountScope = row.account_scope ?? 'all';
+  const editKeys = safeJson<string[]>(row.permission_keys, []);
+  const viewKeys = safeJson<string[]>(row.view_permission_keys, []);
+  const emailMask = parseEmailMask(row.email_mask) ?? null;
+  // 個人情報行はキー表に載らない別枠なので、メール見せ方から3択へ写す。
+  const piiLevel = emailMask === 'full' ? 'edit' : emailMask === 'none' ? 'none' : 'view';
   return {
     id: row.id,
     // The browser uses this authenticated scope to namespace recoverable
     // idempotency receipts. It is an identifier, never a credential.
     tenantId: row.tenant_id ?? DEFAULT_TENANT_ID,
     name: row.name,
-    email: exposeEmail ? row.email : maskEmail(row.email),
+    email: emailVisibility === 'full' ? row.email : emailVisibility === 'masked' ? maskEmail(row.email) : null,
     role: displayRole(row),
+    roleBundle: staffBundle(row),
+    emailMask,
     lineLinked: Boolean(row.line_user_id),
     twoFactorEnabled: Boolean(row.totp_enabled_at && row.totp_secret_enc),
     isActive: Boolean(row.is_active),
-    permissionKeys: safeJson<string[]>(row.permission_keys, []),
+    permissionKeys: editKeys,
+    permissionViewKeys: viewKeys,
+    permissionScope: { ...keysToScopeLevels(editKeys, viewKeys), pii: piiLevel },
     notificationPreferences: safeJson<Record<string, { email: boolean; line: boolean }>>(row.notification_preferences, {}),
     inviteStatus: row.invite_status || 'active',
     inviteExpiresAt: row.invite_expires_at ?? null,
@@ -243,7 +318,7 @@ staff.get('/api/staff', async (c) => {
     return c.json({
       success: true,
       data: await Promise.all(members.map((member) => (
-        serializeStaff(c.env.DB, member, canViewStaffEmail(c, member.id), scopes)
+        serializeStaff(c.env.DB, member, staffEmailVisibility(c, member.id), scopes)
       ))),
     });
   } catch (error) {
@@ -321,7 +396,7 @@ staff.get('/api/staff/:id', requireRole('owner', 'admin', 'staff'), async (c) =>
   }
   const member = await getStaffById(c.env.DB, id);
   return member && isInCurrentTenant(c, member)
-    ? c.json({ success: true, data: await serializeStaff(c.env.DB, member, canViewStaffEmail(c, member.id)) })
+    ? c.json({ success: true, data: await serializeStaff(c.env.DB, member, staffEmailVisibility(c, member.id)) })
     : c.json({ success: false, error: 'Staff member not found' }, 404);
 });
 
@@ -377,10 +452,14 @@ staff.post('/api/staff', requireRole('owner', 'admin'), async (c) => {
     }
 
     const token = randomToken();
+    // N-424: 作成時点の role から bundle を写す（role は初期値、実権限は保存キーが決める）。
     const member = await createStaffMember(c.env.DB, {
       name, email,
       role: body.role === 'admin' ? 'admin' : 'staff',
       access_level: body.role === 'viewer' ? 'read_only' : 'full',
+      role_bundle: body.role === 'admin' ? 'administrator' : body.role === 'viewer' ? 'view_only' : 'custom',
+      view_permission_keys: body.role === 'viewer' ? scopeLevelsToKeys(BUNDLE_PRESETS.view_only.levels).view : [],
+      email_mask: body.role === 'admin' ? 'full' : 'masked',
       is_active: 0,
       permission_keys: body.role === 'staff' ? (body.permissionKeys ?? []) : [],
       notification_preferences: body.notificationPreferences ?? {},
@@ -495,9 +574,25 @@ staff.patch('/api/staff/:id', async (c) => {
     permissionKeys?: string[]; notificationPreferences?: Record<string, { email: boolean; line: boolean }>;
     assignedLineAccountId?: string | null; canAccessDescendantAccounts?: boolean;
     accountScope?: 'all' | 'accounts'; scopedLineAccountIds?: string[]; managementContext?: 'hq';
+    roleBundle?: string; permissionScope?: Record<string, string>;
+    permissionViewKeys?: string[]; emailMask?: string;
   }>();
-  const keyError = invalidPermissionKeys(body.permissionKeys) ?? invalidNotificationPreferences(body.notificationPreferences);
+  const keyError = invalidPermissionKeys(body.permissionKeys)
+    ?? invalidPermissionKeys(body.permissionViewKeys)
+    ?? invalidNotificationPreferences(body.notificationPreferences);
   if (keyError) return c.json({ success: false, error: keyError }, 400);
+  const bundle = body.roleBundle === undefined ? undefined : parseRoleBundle(body.roleBundle);
+  if (body.roleBundle !== undefined && !bundle) {
+    return c.json({ success: false, error: '役割バンドルが正しくありません' }, 400);
+  }
+  const scope = parseScope(body.permissionScope);
+  if (scope === null) {
+    return c.json({ success: false, error: '機能の権限範囲が正しくありません' }, 400);
+  }
+  const emailMask = parseEmailMask(body.emailMask);
+  if (emailMask === null) {
+    return c.json({ success: false, error: 'メールの見せ方が正しくありません' }, 400);
+  }
   const accountScope = normalizeAccountScopeInput(body);
   if ('error' in accountScope) return c.json({ success: false, error: accountScope.error }, 400);
 
@@ -513,7 +608,8 @@ staff.patch('/api/staff/:id', async (c) => {
   }
   if (!administrator && (
     body.name !== undefined || body.role !== undefined || body.isActive !== undefined || body.permissionKeys !== undefined ||
-    body.assignedLineAccountId !== undefined || body.canAccessDescendantAccounts !== undefined || body.accountScope !== undefined
+    body.assignedLineAccountId !== undefined || body.canAccessDescendantAccounts !== undefined || body.accountScope !== undefined ||
+    bundle !== undefined || scope !== undefined || body.permissionViewKeys !== undefined || emailMask !== undefined
   )) {
     return c.json({ success: false, error: '権限と利用状態は管理者だけが変更できます' }, 403);
   }
@@ -527,9 +623,13 @@ staff.patch('/api/staff/:id', async (c) => {
     body.email = email;
   }
 
+  // bundle指定のときも「管理者が0人になる」判定が効くよう実効roleへ写す。
+  const effectiveRole = bundle !== undefined
+    ? (bundle === 'administrator' ? 'admin' : bundle === 'view_only' ? 'viewer' : 'staff')
+    : body.role;
   const guard = await guardLastAdmin(c.env.DB, target, currentTenantId(c), {
     isActive: body.isActive,
-    role: body.role,
+    role: effectiveRole,
     self: id === c.get('staff').id,
   });
   if (guard) return c.json({ success: false, error: guard }, 400);
@@ -555,27 +655,8 @@ staff.patch('/api/staff/:id', async (c) => {
     return c.json({ success: false, error: '権限のないLINEアカウントは指定できません' }, 403);
   }
 
-  const updated = await updateStaffMember(c.env.DB, id, {
-    name: body.name, email: body.email,
-    role: body.role === 'admin' ? 'admin' : body.role ? 'staff' : undefined,
-    access_level: body.role === undefined ? undefined : body.role === 'viewer' ? 'read_only' : 'full',
-    is_active: body.isActive === undefined ? undefined : body.isActive ? 1 : 0,
-    // 連携を外すだけ。付け直しはLINEログイン側でしか起こらないので、
-    // ここで受けるのは false（解除）のときだけにする。
-    line_user_id: body.lineLinked === false ? null : undefined,
-    line_linked_at: body.lineLinked === false ? null : undefined,
-    permission_keys: body.permissionKeys,
-    notification_preferences: body.notificationPreferences,
-    assigned_line_account_id: body.assignedLineAccountId,
-    can_access_descendant_accounts:
-      body.role === 'admin' || (body.role === undefined && target.role !== 'staff')
-        ? body.canAccessDescendantAccounts
-        : false,
-    account_scope: accountScope.accountScope,
-  });
-  if (updated && accountScope.accountScope !== undefined) {
-    await replaceStaffAccountScopes(c.env.DB, id, accountScope.scopedLineAccountIds);
-  }
+  // 権限・利用状態・連携・見せる範囲の変更は乗っ取り悪用されやすい高危険操作。
+  // 判定は書き込みより前に行い、step-up無しならDBへ何も書かない（N-427）。
   const authenticationPolicyChanged =
     body.role !== undefined ||
     body.isActive !== undefined ||
@@ -583,11 +664,81 @@ staff.patch('/api/staff/:id', async (c) => {
     body.permissionKeys !== undefined ||
     body.assignedLineAccountId !== undefined ||
     body.canAccessDescendantAccounts !== undefined ||
-    body.accountScope !== undefined;
+    body.accountScope !== undefined ||
+    bundle !== undefined || scope !== undefined ||
+    body.permissionViewKeys !== undefined || emailMask !== undefined;
+  if (authenticationPolicyChanged && !await consumeStaffStepUp(c, 'staff.permissions.change')) {
+    return c.json({ success: false, error: '権限の変更には二段階認証による再認証が必要です', code: 'STEP_UP_REQUIRED' }, 428);
+  }
+
+  // N-424: 役割bundleは「初期値のプリセット」。保存されるのは role_bundle と
+  // 展開済みの edit/view キーで、実際の認可は保存済みキーが決める。
+  // bundle と項目・メールを同時に指定したときはプリセットから外れた=カスタムとして保存する。
+  let roleWrite: 'admin' | 'staff' | undefined =
+    body.role === 'admin' ? 'admin' : body.role ? 'staff' : undefined;
+  let levelWrite: 'read_only' | 'full' | undefined =
+    body.role === undefined ? undefined : body.role === 'viewer' ? 'read_only' : 'full';
+  let bundleWrite: string | null | undefined;
+  let editKeysWrite: string[] | undefined = body.permissionKeys;
+  let viewKeysWrite: string[] | undefined = body.permissionViewKeys;
+  let maskWrite: EmailMaskLevel | null | undefined = emailMask;
+
+  if (bundle != null && bundle !== 'custom') {
+    const preset = BUNDLE_PRESETS[bundle];
+    const presetKeys = scopeLevelsToKeys(preset.levels);
+    const customized = scope !== undefined || body.permissionKeys !== undefined
+      || body.permissionViewKeys !== undefined || emailMask !== undefined;
+    roleWrite = bundle === 'administrator' ? 'admin' : 'staff';
+    levelWrite = bundle === 'view_only' ? 'read_only' : 'full';
+    bundleWrite = customized ? 'custom' : bundle;
+    editKeysWrite = scope !== undefined ? scopeLevelsToKeys(scope).edit : body.permissionKeys ?? presetKeys.edit;
+    viewKeysWrite = scope !== undefined ? scopeLevelsToKeys(scope).view : body.permissionViewKeys ?? presetKeys.view;
+    maskWrite = emailMask ?? preset.emailMask;
+  } else if (bundle === 'custom' || scope !== undefined
+    || body.permissionViewKeys !== undefined || emailMask !== undefined) {
+    bundleWrite = 'custom';
+    if (bundle === 'custom') { roleWrite = 'staff'; levelWrite = 'full'; }
+    if (scope !== undefined) {
+      const keys = scopeLevelsToKeys(scope);
+      editKeysWrite = keys.edit;
+      viewKeysWrite = keys.view;
+    }
+  } else if (body.role !== undefined) {
+    // 旧来の role 指定も bundle へ写す（画面・監査で同じ言葉を使うため）。
+    bundleWrite = body.role === 'admin' ? 'administrator' : body.role === 'viewer' ? 'view_only' : 'custom';
+    if (body.role === 'viewer' && viewKeysWrite === undefined) {
+      viewKeysWrite = scopeLevelsToKeys(BUNDLE_PRESETS.view_only.levels).view;
+    }
+  }
+
+  const updated = await updateStaffMember(c.env.DB, id, {
+    name: body.name, email: body.email,
+    role: roleWrite,
+    access_level: levelWrite,
+    role_bundle: bundleWrite,
+    view_permission_keys: viewKeysWrite,
+    email_mask: maskWrite,
+    is_active: body.isActive === undefined ? undefined : body.isActive ? 1 : 0,
+    // 連携を外すだけ。付け直しはLINEログイン側でしか起こらないので、
+    // ここで受けるのは false（解除）のときだけにする。
+    line_user_id: body.lineLinked === false ? null : undefined,
+    line_linked_at: body.lineLinked === false ? null : undefined,
+    permission_keys: editKeysWrite,
+    notification_preferences: body.notificationPreferences,
+    assigned_line_account_id: body.assignedLineAccountId,
+    can_access_descendant_accounts:
+      roleWrite === 'admin' || (roleWrite === undefined && target.role !== 'staff')
+        ? body.canAccessDescendantAccounts
+        : false,
+    account_scope: accountScope.accountScope,
+  });
+  if (updated && accountScope.accountScope !== undefined) {
+    await replaceStaffAccountScopes(c.env.DB, id, accountScope.scopedLineAccountIds);
+  }
   if (updated && authenticationPolicyChanged) {
     await revokeStaffAuthentication(c.env.DB, id);
   }
-  return updated ? c.json({ success: true, data: await serializeStaff(c.env.DB, updated) }) : c.json({ success: false, error: 'Staff member not found' }, 404);
+  return updated ? c.json({ success: true, data: await serializeStaff(c.env.DB, updated, staffEmailVisibility(c, updated.id)) }) : c.json({ success: false, error: 'Staff member not found' }, 404);
 });
 
 function canEditMember(c: { get: (key: 'staff') => Env['Variables']['staff'] }, id: string): boolean {
@@ -651,7 +802,7 @@ staff.post('/api/staff/:id/two-factor/confirm', async (c) => {
     await activatePlatformAdminIfAwaitingTotp(c.env.DB, id);
     await revokeStaffAuthentication(c.env.DB, id);
   }
-  return c.json({ success: true, data: await serializeStaff(c.env.DB, updated!) });
+  return c.json({ success: true, data: await serializeStaff(c.env.DB, updated!, staffEmailVisibility(c, updated!.id)) });
 });
 
 staff.delete('/api/staff/:id/two-factor', async (c) => {
@@ -659,6 +810,10 @@ staff.delete('/api/staff/:id/two-factor', async (c) => {
   const member = await getStaffById(c.env.DB, id);
   if (!member || !isInCurrentTenant(c, member)) return c.json({ success: false, error: 'Staff member not found' }, 404);
   if (!canEditMember(c, id)) return c.json({ success: false, error: '自分の二段階認証だけ解除できます' }, 403);
+  // 二段階認証の解除は本人・他人どちらでも高危険。解除後は対象の全セッションも切る（N-427）。
+  if (!await consumeStaffStepUp(c, 'staff.two_factor.remove')) {
+    return c.json({ success: false, error: '二段階認証の解除には再認証が必要です', code: 'STEP_UP_REQUIRED' }, 428);
+  }
   const updated = await updateStaffMember(c.env.DB, id, {
     totp_secret_enc: null,
     totp_pending_secret_enc: null,
@@ -666,7 +821,7 @@ staff.delete('/api/staff/:id/two-factor', async (c) => {
     totp_last_used_step: null,
   });
   if (updated) await revokeStaffAuthentication(c.env.DB, id);
-  return updated ? c.json({ success: true, data: await serializeStaff(c.env.DB, updated) }) : c.json({ success: false, error: 'Staff member not found' }, 404);
+  return updated ? c.json({ success: true, data: await serializeStaff(c.env.DB, updated, staffEmailVisibility(c, updated.id)) }) : c.json({ success: false, error: 'Staff member not found' }, 404);
 });
 
 staff.delete('/api/staff/:id', requireRole('owner', 'admin'), async (c) => {
@@ -676,10 +831,14 @@ staff.delete('/api/staff/:id', requireRole('owner', 'admin'), async (c) => {
   if (!target || !isInCurrentTenant(c, target)) return c.json({ success: false, error: 'Staff member not found' }, 404);
   const guard = await guardLastAdmin(c.env.DB, target, currentTenantId(c), { isActive: false, self: false });
   if (guard) return c.json({ success: false, error: guard }, 400);
+  // 利用停止は権限変更と同じ高危険操作として再認証を要求する（N-427）。
+  if (!await consumeStaffStepUp(c, 'staff.permissions.change')) {
+    return c.json({ success: false, error: 'スタッフの利用停止には二段階認証による再認証が必要です', code: 'STEP_UP_REQUIRED' }, 428);
+  }
   const updated = await updateStaffMember(c.env.DB, id, { is_active: 0 });
   await revokeStaffAuthentication(c.env.DB, id);
   return updated
-    ? c.json({ success: true, data: await serializeStaff(c.env.DB, updated) })
+    ? c.json({ success: true, data: await serializeStaff(c.env.DB, updated, staffEmailVisibility(c, updated.id)) })
     : c.json({ success: false, error: 'Staff member not found' }, 404);
 });
 

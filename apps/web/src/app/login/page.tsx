@@ -21,6 +21,7 @@ import { AUTH_SELECTION_CLEARED_KEY } from '@/lib/hq-navigation'
 export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [remember, setRemember] = useState(false)
   const [emailMessage, setEmailMessage] = useState<string | null>(null)
   const [busy, setBusy] = useState<'password' | 'line' | null>(null)
   const [error, setError] = useState('')
@@ -45,9 +46,10 @@ export default function LoginPage() {
     }
     setBusy('password')
     setError('')
-    const res = await authRequest<{ twoFactor: boolean; challengeToken?: string; sessionToken?: string }>('/api/auth/password/login', {
+    const res = await authRequest<{ twoFactor: boolean; twoFactorSetup?: boolean; challengeToken?: string; sessionToken?: string }>('/api/auth/password/login', {
       email: email.trim(),
       password,
+      remember,
     })
     if (!res.ok || !res.data) {
       setError(res.error || 'ログインできませんでした')
@@ -55,6 +57,10 @@ export default function LoginPage() {
       return
     }
     sessionStorage.removeItem(AUTH_SELECTION_CLEARED_KEY)
+    if (res.data.twoFactorSetup && res.data.challengeToken) {
+      window.location.assign(`/login/two-factor/setup#${new URLSearchParams({ lh_2fa: res.data.challengeToken }).toString()}`)
+      return
+    }
     if (res.data.twoFactor && res.data.challengeToken) {
       window.location.assign(`/login/two-factor#${new URLSearchParams({ lh_2fa: res.data.challengeToken }).toString()}`)
       return
@@ -69,7 +75,8 @@ export default function LoginPage() {
     sessionStorage.removeItem(AUTH_SELECTION_CLEARED_KEY)
     const apiUrl = process.env.NEXT_PUBLIC_API_URL
     if (!apiUrl) return setBusy(null)
-    window.location.assign(`${apiUrl}/api/auth/line`)
+    // 「7日間ログインを保持」の選択をOAuth往復へ持ち越す印（N-434）
+    window.location.assign(`${apiUrl}/api/auth/line${remember ? '?remember=1' : ''}`)
   }
 
   return (
@@ -101,6 +108,15 @@ export default function LoginPage() {
         <AuthField label="パスワード" htmlFor="login-password">
           <PasswordField id="login-password" value={password} onChange={setPassword} autoComplete="current-password" />
         </AuthField>
+        <label className="flex items-center gap-2 text-caption text-ink-secondary">
+          <input
+            type="checkbox"
+            checked={remember}
+            onChange={(event) => setRemember(event.target.checked)}
+            className="h-4 w-4 accent-accent-deep"
+          />
+          この端末では7日間ログインを保持する
+        </label>
         <div className="flex justify-end">
           <Link href="/password/forgot" className="text-caption font-semibold text-accent-deep hover:underline">
             パスワードを忘れた方はこちら

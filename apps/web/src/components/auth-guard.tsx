@@ -35,6 +35,8 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
         if (data.data.name) localStorage.setItem('lh_staff_name', data.data.name)
         if (data.data.role) localStorage.setItem('lh_staff_role', data.data.role)
         localStorage.setItem('lh_staff_permissions', JSON.stringify(data.data.permissionKeys ?? []))
+        // N-424: 「見えるだけ」のキーは別枠で持つ。メニュー表示には両方を使う。
+        localStorage.setItem('lh_staff_view_permissions', JSON.stringify(data.data.viewPermissionKeys ?? []))
         if (data.csrfToken) localStorage.setItem('lh_csrf', data.csrfToken)
         clearSelectionAfterAuthentication(localStorage, sessionStorage)
         if (!cancelled) setChecked(true)

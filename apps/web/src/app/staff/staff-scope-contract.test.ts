@@ -9,7 +9,9 @@ const actionsSource = readFileSync(join(directory, 'staff-actions.ts'), 'utf8')
 
 describe('V6 30 見せる範囲の保存と名寄せ(#530)', () => {
   it('保存ボタンは閉じるだけでなく更新口を呼ぶ', () => {
-    expect(staffSource).toContain('scopeBundleToStaffRole(bundle)')
+    // N-424: bundle名をそのまま送る。roleへ潰すと「受付」と「運用」が区別できない。
+    expect(staffSource).toContain('roleBundle: bundle')
+    expect(staffSource).not.toContain('scopeBundleToStaffRole(bundle)')
     expect(staffSource).toContain('api.staff.update(memberId')
     expect(staffSource).toContain('保存中…')
     expect(staffSource).toContain('setSaveError')
