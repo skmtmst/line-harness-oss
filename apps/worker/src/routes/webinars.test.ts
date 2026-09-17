@@ -1433,6 +1433,8 @@ describe('admin CRUD', () => {
       on_submit_tag_id: 'tag-1', on_submit_scenario_id: 'scenario-1',
       on_submit_message_type: 'text', on_submit_webhook_url: null,
     });
+    // カード方式のCTAが2件 → 段の印・最終確認が見る件数として返る。
+    dbMocks.getWebinarCtas.mockResolvedValue([{ id: 'cta-1' }, { id: 'cta-2' }]);
 
     const res = await adminReq('/api/webinars/w1/editor');
     const body = (await res.json()) as { data: Record<string, any> };
@@ -1440,6 +1442,7 @@ describe('admin CRUD', () => {
     expect(res.status).toBe(200);
     expect(body.data).toMatchObject({
       version: 4, deliveryKind: 'on_demand', publicDescription: '説明',
+      ctaCount: 2,
       viewingCondition: { kind: 'registered', label: '申込済みの友だち' },
       publicPage: {
         liffId: '999-test', form: {

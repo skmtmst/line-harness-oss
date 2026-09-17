@@ -886,12 +886,13 @@ function formCompletionActions(form: Awaited<ReturnType<typeof getFormById>>): s
 async function getEditorPayload(c: Context<Env>, row: Webinar) {
   const stored = await getWebinarEditorSettings(c.env.DB, row.id);
   const settings = stored ?? defaultEditorSettings(row);
-  const [form, account, monitoring] = await Promise.all([
+  const [form, account, monitoring, ctas] = await Promise.all([
     settings.registration_form_id
       ? getFormById(c.env.DB, settings.registration_form_id)
       : Promise.resolve(null),
     getWebinarPublicAccount(c.env.DB, row.account_id),
     getWebinarMonitoringSummary(c.env.DB, row.id),
+    getWebinarCtas(c.env.DB, row.id),
   ]);
   const liffId = account?.liff_id ?? null;
   const publicUrl = liffId
@@ -903,6 +904,12 @@ async function getEditorPayload(c: Context<Env>, row: Webinar) {
     viewingCondition: parseJson(settings.viewing_condition_json, { kind: 'registered', label: '申込者向け' }),
     publicDescription: settings.public_description,
     registrationFormId: settings.registration_form_id,
+    /*
+     * CTAカードの件数。旧 cta_json ではなくカード方式の正本を見る。
+     * 段の印と最終確認が、カードを保存したのに「未設定」と出る退行を
+     * 防ぐための口（編集本体は子タブが /ctas から持つ）。
+     */
+    ctaCount: ctas.length,
     notificationMessages: parseJson<Record<string, string>>(settings.notification_messages_json, {}),
     notificationTest: parseJson<Record<string, unknown> | null>(settings.notification_test_json, null),
     actionPolicy: {

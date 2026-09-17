@@ -11242,6 +11242,8 @@ export type WebinarEditor = {
   viewingCondition: { kind: string; label: string }
   publicDescription: string
   registrationFormId: string | null
+  /* カード方式のCTAの件数。段の印・最終確認はこれを見る。 */
+  ctaCount: number
   notificationMessages: Record<string, string>
   notificationTest: { status?: string; sent?: number; failed?: number; testedAt?: string } | null
   actionPolicy: {

@@ -26,7 +26,7 @@ const card = (over: Partial<WebinarCtaCard> = {}): WebinarCtaCard => ({
   ...over,
 })
 
-describe('CTAカードの保存前チェック (N-115)', () => {
+describe('CTAカードの保存前チェック (N-119)', () => {
   it('不足の無いカードはそのまま通る', () => {
     expect(ctaCardProblems([card()], ['10:00'], 3600, parseMinSec)).toEqual([])
     expect(ctaCardProblems([card({ kind: 'form', formId: 'f1', url: null })], ['600'], 3600, parseMinSec)).toEqual([])

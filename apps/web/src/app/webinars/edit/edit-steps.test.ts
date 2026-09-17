@@ -67,6 +67,18 @@ describe('段の印', () => {
     expect(stepStateOf('cta', 'cta', webinar())).toBe('current')
     expect(stepStateOf('basic', 'basic', null)).toBe('current')
   })
+
+  it('CTAの印はカード件数で決める', () => {
+    /*
+      N-114: 旧 webinar.cta は管理画面から書けない。カードを保存しても
+      旧欄を見ると永遠に「todo」のままになるので、件数を渡して判断する。
+    */
+    expect(stepStateOf('cta', 'basic', webinar(), 2)).toBe('done')
+    expect(stepStateOf('cta', 'basic', webinar(), 0)).toBe('todo')
+    // 件数を渡さない古い呼び方だけ旧欄へ倒す（旧データの目印として残す）
+    expect(stepStateOf('cta', 'basic', webinar({ cta: { label: 'x' } } as Partial<Webinar>))).toBe('done')
+    expect(stepStateOf('cta', 'basic', webinar())).toBe('todo')
+  })
 })
 
 describe('設定サマリー', () => {

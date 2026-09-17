@@ -1,5 +1,5 @@
 /*
- * N-119: ウェビナー動画の指定を R2 prefix 自由入力からメディア選択へ変える。
+ * N-115: ウェビナー動画の指定を R2 prefix 自由入力からメディア選択へ変える。
  *
  * 実SQLite（bootstrap.sql を流した better-sqlite3）に実物の webinars
  * ルートを当て、認証も実物（Bearer APIキー → staff_members → 役割・
@@ -122,7 +122,7 @@ beforeEach(async () => {
   ({ webinarRoutes } = await import('./webinars.js'));
 });
 
-describe('ウェビナー動画のメディア選択 (N-119)', () => {
+describe('ウェビナー動画のメディア選択 (N-115)', () => {
   test('同じアカウントの動画メディアを選ぶと、保存値はそのr2_keyになる', async () => {
     const res = await put(WEBINAR_A, KEY_OWNER, { videoMediaId: MEDIA_VIDEO_A });
     expect(res.status).toBe(200);

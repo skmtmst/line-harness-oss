@@ -1289,7 +1289,7 @@ function emptyFormCandidates(accountId: string | null): FormCandidates {
   return { accountId, state: accountId ? 'loading' : 'idle', items: [] }
 }
 
-function CtaDesignStep({ webinarId, accountId, durationSeconds, editor, registrations, onEditorChange }: { webinarId: string; accountId: string | null; durationSeconds: number; editor: WebinarEditor; registrations: number | null; onEditorChange: (editor: WebinarEditor) => void }) {
+function CtaDesignStep({ webinarId, accountId, durationSeconds, editor, registrations, onEditorChange, onCtasReport }: { webinarId: string; accountId: string | null; durationSeconds: number; editor: WebinarEditor; registrations: number | null; onEditorChange: (editor: WebinarEditor) => void; onCtasReport?: (ctas: WebinarCtaCard[] | null) => void }) {
   /* 子から受け取った CTA も「どのウェビナーの分か」を一緒に持つ。 */
   const [reportedCtas, setReportedCtas] = useState<{ webinarId: string; items: WebinarCtaCard[] }>(() => ({ webinarId, items: [] }))
   const ctas = reportedCtas.webinarId === webinarId ? reportedCtas.items : []
@@ -1316,7 +1316,9 @@ function CtaDesignStep({ webinarId, accountId, durationSeconds, editor, registra
   */
   const handleCtasLoaded = useCallback((next: WebinarCtaCard[] | null) => {
     setReportedCtas({ webinarId, items: next ?? [] })
-  }, [webinarId])
+    /* 段の印と最終確認もカード件数で決めるため、親へも届ける。 */
+    onCtasReport?.(next)
+  }, [webinarId, onCtasReport])
 
   const loadRegistrationForms = useCallback(() => {
     const requestId = ++formRequestId.current
@@ -1665,7 +1667,7 @@ type PaneKey = StepKey | ExtraKey
  * STEP 5 確認（設計 `D6yO7e`）。**公開の前に、足りないものを1つずつ言う。**
  * ここで言えないと、公開してから友だちの画面で気づくことになる。
  */
-function ReviewStep({ webinar, editor, registrations, onBack }: { webinar: Webinar; editor: WebinarEditor; registrations: number | null; onBack: (key: StepKey) => void }) {
+function ReviewStep({ webinar, editor, registrations, ctaCount, onBack }: { webinar: Webinar; editor: WebinarEditor; registrations: number | null; ctaCount: number; onBack: (key: StepKey) => void }) {
   const [validation, setValidation] = useState<WebinarPublishValidation | null>(null)
   const [validationState, setValidationState] = useState<'loading' | 'ready' | 'error'>('loading')
   const [publishing, setPublishing] = useState(false)
@@ -1745,7 +1747,7 @@ function ReviewStep({ webinar, editor, registrations, onBack }: { webinar: Webin
           ['動画・公開', webinar.videoPrefix ? '申込者向け' : '未設定'],
           ['公開期間', deliveryWindow(webinar)],
           ['対象', registrations === null ? '—（未取得）' : `${registrations.toLocaleString('ja-JP')}人`],
-          ['CTA・フォーム', webinar.cta ? '動画＋CTA＋フォーム' : '未設定'],
+          ['CTA・フォーム', ctaCount > 0 ? `${ctaCount}件のCTA` : webinar.cta ? '動画＋CTA＋フォーム' : '未設定'],
           ['アクション', '設定内容は視聴後アクションで確認'],
         ].map(([label, value]) => (
           <div key={label} className="flex flex-wrap items-baseline justify-between gap-2 px-4 py-3">
@@ -1806,6 +1808,18 @@ function EditWebinarInner() {
     ? requestedPane as PaneKey
     : 'basic'
   const [pane, setPane] = useState<PaneKey>(initialPane)
+  /*
+    CTAの印と最終確認が見るカード件数。初期値はエディタ応答の ctaCount、
+    CTAの段を開いた後は子タブが保存・再取得した結果を正本にする。
+    「どのウェビナーの分か」を一緒に持ち、切替後に前の件数を出さない。
+  */
+  const [reportedCtaCount, setReportedCtaCount] = useState<{ webinarId: string; count: number } | null>(null)
+  const ctaCount = reportedCtaCount && reportedCtaCount.webinarId === id
+    ? reportedCtaCount.count
+    : (editor?.ctaCount ?? 0)
+  const handleCtasReport = useCallback((ctas: WebinarCtaCard[] | null) => {
+    setReportedCtaCount({ webinarId: id ?? '', count: ctas?.length ?? 0 })
+  }, [id])
 
   const paneTitle: Record<PaneKey, string> = {
     basic: 'ウェビナー編集',
@@ -1946,7 +1960,7 @@ function EditWebinarInner() {
       {showSteps ? (
         <ol data-design="Steps" className="border-hairline bg-canvas mb-4 flex flex-wrap items-center gap-1 rounded-2xl border p-3 shadow-sm">
           {STEPS.map((step) => {
-            const state = stepStateOf(step.key, railPane, webinar)
+            const state = stepStateOf(step.key, railPane, webinar, ctaCount)
             return (
               <li key={step.key} className="flex min-w-0 flex-1 items-center gap-2">
                 <button
@@ -1986,9 +2000,9 @@ function EditWebinarInner() {
 
       {pane === 'basic' && <WebinarForm key={`${webinar.id}-${webinar.updatedAt}`} initial={webinar} />}
       {pane === 'video' && <VideoDesignStep webinar={webinar} editor={editor} registrations={registrations} />}
-      {pane === 'cta' && <CtaDesignStep webinarId={webinar.id} accountId={webinar.accountId} durationSeconds={webinar.durationSeconds} editor={editor} registrations={registrations} onEditorChange={setEditor} />}
+      {pane === 'cta' && <CtaDesignStep webinarId={webinar.id} accountId={webinar.accountId} durationSeconds={webinar.durationSeconds} editor={editor} registrations={registrations} onEditorChange={setEditor} onCtasReport={handleCtasReport} />}
       {pane === 'notifications' && <NotificationDesignStep webinarId={webinar.id} registrations={registrations} />}
-      {pane === 'review' && <ReviewStep webinar={webinar} editor={editor} registrations={registrations} onBack={setPane} />}
+      {pane === 'review' && <ReviewStep webinar={webinar} editor={editor} registrations={registrations} ctaCount={ctaCount} onBack={setPane} />}
       {pane === 'comments' && <CommentsTab webinarId={webinar.id} />}
       {pane === 'actions' && <WebinarActionsTab webinarId={webinar.id} editor={editor} onEditorChange={setEditor} />}
       {pane === 'preview' && <PublicPreviewStep webinar={webinar} editor={editor} publicUrl={publicUrl} registrations={registrations} publicPageReason={publicPageReason} onEditorChange={setEditor} />}

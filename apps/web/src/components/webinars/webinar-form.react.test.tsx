@@ -78,7 +78,7 @@ beforeEach(() => {
 
 afterEach(cleanup)
 
-describe('ウェビナー基本設定の動画選択 (N-119) と旧CTA撤去 (N-114)', () => {
+describe('ウェビナー基本設定の動画選択 (N-115) と旧CTA撤去 (N-114)', () => {
   it('動画はメディア一覧から選び、保存には選択IDを送る', async () => {
     render(<WebinarForm initial={baseWebinar()} />)
 
