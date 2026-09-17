@@ -2938,8 +2938,11 @@ async function runFormPostEffects(input: {
         messages.push(rewardFromTrackedLink as ReturnType<typeof buildMessage>);
       } else if (form.on_submit_message_type && form.on_submit_message_content) {
         // Custom form message replaces default diagnostic result
-        const { resolveInterpolationExtra } = await import('../services/interpolation-context.js');
-        const extra = await resolveInterpolationExtra(db, friend.id, form.on_submit_message_content);
+        const { resolveSendInterpolationExtra } = await import('../services/interpolation-context.js');
+        const extra = await resolveSendInterpolationExtra(
+          db, friend.id, form.on_submit_message_content,
+          { kind: 'form_reply', id: input.formId },
+        );
         const expanded = expandVariables(form.on_submit_message_content, friendData, apiOrigin, form.on_submit_message_type, extra);
         // 1:1 push → /t リンクに f=<friendId> を焼き込み (LIFF 識別ホップ回避)
         const { appendFriendToTrackedLinks } = await import('../services/auto-track.js');

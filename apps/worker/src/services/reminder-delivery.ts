@@ -26,7 +26,7 @@ import { addJitter, sleep } from './stealth.js';
 import { getSendPermissionForAccount, type SendPermission, type SendPermissionCache } from './send-entitlements.js';
 import { buildMessage } from './line-message.js';
 import { expandVariables, resolveMetadata } from './step-delivery.js';
-import { resolveInterpolationExtra } from './interpolation-context.js';
+import { resolveSendInterpolationExtra } from './interpolation-context.js';
 import { resolveReminderSendAt } from '@line-crm/shared';
 import {
   classifyExternalDeliveryError,
@@ -83,7 +83,9 @@ export async function buildReminderStepMessage(
     }
   }
   const resolvedMeta = await resolveMetadata(db, friend);
-  const extra = await resolveInterpolationExtra(db, friend.id, messageContent);
+  const extra = await resolveSendInterpolationExtra(
+    db, friend.id, messageContent, { kind: 'reminder', id: step.id },
+  );
   const expanded = expandVariables(
     messageContent,
     { ...friend, metadata: resolvedMeta },

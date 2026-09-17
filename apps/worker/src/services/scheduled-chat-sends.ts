@@ -79,6 +79,7 @@ async function dispatchOne(
   // 解決しきれない `{{…}}` が残るなら LINE を呼ばず、行だけ失敗で残す。
   const rendered = await renderChatMessageContent(
     env.DB, target.friend, row.message_type, row.content, target.liffId,
+    { kind: 'chat', id: row.id },
   );
   if (rendered.unresolved.length > 0) {
     await markScheduledChatSendFailed(env.DB, {

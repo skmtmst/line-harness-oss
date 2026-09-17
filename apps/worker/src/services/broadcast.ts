@@ -23,7 +23,8 @@ import {
   type BroadcastRenderContext,
 } from './render-message.js';
 import { aggregationUnitFor, aggregationUnits } from './broadcast-aggregation.js';
-import { resolveInterpolationExtra } from './interpolation-context.js';
+import { getFriendFieldMap } from '@line-crm/db';
+import { contentNeedsFriendFields } from './interpolation-context.js';
 import { createBroadcastRetryKey } from './broadcast-retry-key.js';
 import { classifyDeliveryFailure, deliveryErrorCode } from './broadcast-delivery-outcome.js';
 import { evaluateQuota, fetchQuota, shortfallMessage } from './broadcast-quota-guard.js';
@@ -89,7 +90,8 @@ async function broadcastWideContext(
   db: D1Database,
   accountId: string | null,
   content: string,
-  fixedVars?: Record<string, string>,
+  fixedVars: Record<string, string> | undefined,
+  broadcastId: string,
 ): Promise<BroadcastRenderContext> {
   const context: BroadcastRenderContext = { deliveredAt: new Date() };
   if (accountId) {
@@ -98,11 +100,14 @@ async function broadcastWideContext(
     context.liffId = (acct as unknown as { liff_id?: string | null } | null)?.liff_id ?? null;
   }
   // 共通情報は本文で使っているときだけ引く。使わない配信で毎回1クエリ増やさない。
+  // snapshot の無い到達経路でも、消えた共通情報を空文字へ落とさず fail-closed にする。
   if (/\{\{\s*var\./.test(content)) {
     if (fixedVars) context.vars = fixedVars;
     else {
-      const { getCommonVarMap } = await import('@line-crm/db');
-      context.vars = await getCommonVarMap(db, accountId);
+      const { resolveSendCommonVars } = await import('./interpolation-context.js');
+      context.vars = await resolveSendCommonVars(
+        db, accountId, content, { kind: 'broadcast', id: broadcastId },
+      );
     }
   }
   return context;
@@ -278,6 +283,7 @@ export async function processBroadcastSend(
     broadcastAccountId,
     combinedMessageContent(finalParts),
     commonVarValuesForAccount(commonVarSnapshot, broadcastAccountId),
+    broadcast.id,
   );
   finalParts = renderMessageParts(finalParts, wideContext);
   assertMessagePartsResolved(finalParts);
@@ -746,6 +752,7 @@ async function processQueuedBroadcastBatches(
       queuedAccountId,
       combinedMessageContent(finalParts),
       commonVarValuesForAccount(commonVarSnapshot, queuedAccountId),
+      broadcast.id,
     );
     finalParts = renderMessageParts(finalParts, wide);
   }
@@ -913,12 +920,14 @@ async function processQueuedBroadcastBatches(
         }
 
         try {
-          // 友だち情報欄は人ごとに違うので、ここで引く。本文で使っていなければ
-          // 引かない（resolveInterpolationExtra が中で判断する）。
-          const extra = await resolveInterpolationExtra(db, friend.id, combinedMessageContent(finalParts));
+          // 友だち情報欄は人ごとに違うので、ここで引く。本文で使っていなければ引かない。
+          // 共通情報は広域contextで厳格解決済みなので、ここで再解決しない。
+          const fields = contentNeedsFriendFields(combinedMessageContent(finalParts))
+            ? await getFriendFieldMap(db, friend.id)
+            : undefined;
           const renderedParts = renderMessageParts(finalParts, {
             displayName: friend.display_name,
-            fields: extra.fields,
+            fields,
           });
           assertMessagePartsResolved(renderedParts);
           const personalizedMessages = buildMessages(renderedParts);

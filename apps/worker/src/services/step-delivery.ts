@@ -2,7 +2,7 @@ import { extractFlexAltText } from '../utils/flex-alt-text.js';
 // メッセージの組み立ては一斉配信と共有する。ここからも取れるようにしておく（呼び出し側が多い）。
 import { buildMessage } from './line-message.js';
 export { buildMessage };
-import { resolveInterpolationExtra } from './interpolation-context.js';
+import { resolveSendInterpolationExtra } from './interpolation-context.js';
 import {
   getFriendScenariosDueForDelivery,
   getStepsForDelivery,
@@ -503,7 +503,13 @@ async function processSingleDelivery(
   // Expand template variables ({{name}}, {{uid}}, {{auth_url:CHANNEL_ID}}, {{metadata.KEY}}, etc.)
   const resolvedMeta = await resolveMetadata(db, { user_id: (friend as unknown as Record<string, string | null>).user_id, metadata: (friend as unknown as Record<string, string | null>).metadata });
   const friendWithMeta = { ...friend, metadata: resolvedMeta } as Parameters<typeof expandVariables>[1];
-  const extra = await resolveInterpolationExtra(db, friend.id, resolved.messageContent);
+  // 質問の前文・選択肢文にも expandVariables が効くので、共通情報の
+  // 厳格スキャンは本文と質問JSONを合わせた全体で行う。
+  const extra = await resolveSendInterpolationExtra(
+    db, friend.id,
+    `${resolved.messageContent}\n${resolved.questionJson ?? ''}`,
+    { kind: 'scenario', id: fs.id },
+  );
   /*
    * 日付の差し込みの起点は「いま」。
    *

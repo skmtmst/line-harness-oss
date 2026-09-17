@@ -13,7 +13,7 @@ import type { ScenarioStep } from '@line-crm/db'
 import { LineClient } from '@line-crm/line-sdk'
 import type { Message } from '@line-crm/line-sdk'
 import { expandVariables, resolveMetadata, buildMessage } from './step-delivery.js'
-import { resolveInterpolationExtra } from './interpolation-context.js'
+import { resolveSendInterpolationExtra } from './interpolation-context.js'
 import { parseQuestion, buildQuestionMessages } from './scenario-question.js'
 
 export interface TestSendResult {
@@ -45,7 +45,13 @@ export async function buildStepMessages(
     metadata: (friend as unknown as Record<string, string | null>).metadata,
   })
   const friendWithMeta = { ...friend, metadata: meta } as Parameters<typeof expandVariables>[1]
-  const extra = await resolveInterpolationExtra(db, friend.id, resolved.messageContent)
+  // 質問の前文・選択肢文にも差し込みが効くので、スキャンは本文と
+  // 質問JSONを合わせた全体で行う。
+  const extra = await resolveSendInterpolationExtra(
+    db, friend.id,
+    `${resolved.messageContent}\n${resolved.questionJson ?? ''}`,
+    { kind: 'test_send', id: step.id },
+  )
 
   const question = parseQuestion(resolved.questionJson)
   if (question) {
