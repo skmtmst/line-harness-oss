@@ -52,6 +52,7 @@ const env = { DB: {} as D1Database };
 const TEMPLATE_FOLDER = {
   id: 'fld-1',
   kind: 'template',
+  account_id: 'account-1',
   name: 'お知らせ',
   parent_id: null,
   display_order: 0,

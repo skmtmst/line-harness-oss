@@ -347,15 +347,20 @@ function TemplateEditInner() {
     accounts.find((account) => account.id === accountId)?.name ?? null
 
   // 置き場の選択肢。category 文字列とは別に folderId で保存する。
+  // フォルダはアカウント単位（N-147）。テンプレートの所属アカウントで絞る。
   useEffect(() => {
+    if (!editorAccountId) {
+      setFolders([])
+      return
+    }
     let cancelled = false
-    void api.folders.list('template')
+    void api.folders.list('template', editorAccountId)
       .then((res) => {
         if (!cancelled && res.success) setFolders(res.data)
       })
       .catch(() => undefined)
     return () => { cancelled = true }
-  }, [])
+  }, [editorAccountId])
 
   /*
    * 出した順番。片付けのたびに1つ進めるので、画面から離れたあとの応答も、

@@ -81,7 +81,7 @@ function QuestionTemplatePageInner() {
       return
     }
     let cancelled = false
-    void api.folders.list('template').then((res) => {
+    void api.folders.list('template', selectedAccountId).then((res) => {
       if (cancelled || !res.success) return
       setFolders(res.data)
       setCategories([...new Set(res.data.map((item) => item.name).filter(Boolean))])

@@ -26,7 +26,7 @@ const DIALOG = read('../../components/shared/folder-add-dialog.tsx')
  */
 describe('V6 テンプレートのフォルダ操作（CzndJ）', () => {
   it('文字列ではなく、本物のフォルダを読む', () => {
-    expect(PAGE).toContain("api.folders.list('template')")
+    expect(PAGE).toContain("api.folders.list('template', accountId)")
     // `category` から帯を組み立てる作りへ戻さない。
     expect(PAGE).not.toContain('categoryCounts')
   })

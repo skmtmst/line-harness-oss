@@ -94,12 +94,16 @@ function CarouselEditorInner() {
   const actionOptions = useActionOptions()
 
   useEffect(() => {
+    if (!selectedAccountId) {
+      setFolders([])
+      return
+    }
     let cancelled = false
-    void api.folders.list('template').then((res) => {
+    void api.folders.list('template', selectedAccountId).then((res) => {
       if (!cancelled && res.success) setFolders(res.data)
     })
     return () => { cancelled = true }
-  }, [])
+  }, [selectedAccountId])
 
   const markLoadFailed = () => {
     setLoadFailed(true)
