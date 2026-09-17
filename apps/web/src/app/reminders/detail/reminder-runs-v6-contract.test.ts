@@ -99,6 +99,7 @@ describe('V6 7-1-H リマインダ実行結果', () => {
     expect(PAGE).toContain('リマインダの設定を編集')
     expect(PAGE).toContain("{ label: 'リマインダ一覧', href: '/reminders' }")
     expect(PAGE).toContain('リマインダを一時停止')
-    expect(PAGE).toContain('api.reminders.update(reminderId, { isActive: false })')
+    expect(PAGE).toContain('リマインダを再開')
+    expect(PAGE).toContain('api.reminders.update(reminderId, { isActive })')
   })
 })

@@ -23,11 +23,16 @@ describe('リマインダ公開フローの実データ表示', () => {
     expect(FLOW).not.toContain('426人')
   })
 
-  it('口にないテスト値は表示例と明記し、固定の履歴を出さない', () => {
+  it('口にない値は実際の取得元を示し、作りかけの固定例を出さない', () => {
     for (const source of [FLOW, ISSUE_469]) {
-      expect(source).toContain('テストで使う値（表示例）')
+      expect(source).toContain('テストで使う値')
+      expect(source).toContain('reminderPlaceholders')
       expect(source).not.toContain('8/23 01:30')
       expect(source).not.toContain('Kenta Kawano')
+      // 実装に無い差し込み名・架空の例値を「取得元」付きで並べない
+      expect(source).not.toContain('meet_datetime')
+      expect(source).not.toContain('meet_url')
+      expect(source).not.toContain('meet.google.com')
     }
   })
 

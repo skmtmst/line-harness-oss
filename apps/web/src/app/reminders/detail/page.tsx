@@ -18,6 +18,7 @@ import NoteBar from '@/components/shared/note-bar'
 import Pagination from '@/components/shared/pagination'
 import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
 import { LinePreview, ReminderFooter } from '@/components/reminders/reminder-v6-ui'
+import { reminderStopSummary } from '@/components/reminders/reminder-labels'
 import styles from './reminder-runs.module.css'
 import { csvCell } from '@/lib/presentation'
 import { ReminderRegistrantsPanel } from './registrants-panel'
@@ -214,19 +215,21 @@ export default function ReminderRunsPage() {
     }
   }
 
-  const pauseReminder = async () => {
-    if (!data?.reminder.isActive) return
+  const setReminderActive = async (isActive: boolean) => {
+    if (!data || data.reminder.isActive === isActive) return
     setActionMessage('')
     try {
-      const response = await api.reminders.update(reminderId, { isActive: false })
+      const response = await api.reminders.update(reminderId, { isActive })
       if (!response.success) throw new Error(response.error)
       setData((current) => current ? {
         ...current,
-        reminder: { ...current.reminder, isActive: false },
+        reminder: { ...current.reminder, isActive },
       } : current)
-      setActionMessage('リマインダを一時停止しました。')
+      setActionMessage(isActive ? 'リマインダを再開しました。' : 'リマインダを一時停止しました。')
     } catch {
-      setActionMessage('一時停止できませんでした。状態を読み直してからお試しください。')
+      setActionMessage(isActive
+        ? '再開できませんでした。状態を読み直してからお試しください。'
+        : '一時停止できませんでした。状態を読み直してからお試しください。')
     }
   }
 
@@ -393,7 +396,7 @@ export default function ReminderRunsPage() {
               <Fact label="状態" value={data ? (data.reminder.isActive ? '稼働中' : '停止中') : '—'} />
               <Fact label="対象者" value={data ? `${data.summary.targetCount.toLocaleString('ja-JP')}人` : '—'} />
               <Fact label="次回送信" value={data ? formatJst(data.summary.nextScheduledAt) : '—'} />
-              <Fact label="停止予定" value="—" />
+              <Fact label="停止予定" value={data ? (data.reminder.lifecycleStatus === 'stopped' ? '停止済み' : data.reminder.stopConditions === null ? '未設定' : reminderStopSummary(data.reminder.stopConditions)) : '—'} />
             </dl>
           </Card>
 
@@ -417,7 +420,9 @@ export default function ReminderRunsPage() {
 
       <ReminderFooter
         status={loading ? '読み込み中' : error ? '状態を取得できません' : data?.reminder.isActive ? '稼働中' : '停止中'}
-        secondary={data?.reminder.isActive ? { label: 'リマインダを一時停止', onClick: () => void pauseReminder() } : undefined}
+        secondary={data ? data.reminder.isActive
+          ? { label: 'リマインダを一時停止', onClick: () => void setReminderActive(false) }
+          : { label: 'リマインダを再開', onClick: () => void setReminderActive(true) } : undefined}
         primary="リマインダの設定を編集"
         onPrimary={() => { router.push(`/reminders/edit?id=${reminderId}`) }}
       />

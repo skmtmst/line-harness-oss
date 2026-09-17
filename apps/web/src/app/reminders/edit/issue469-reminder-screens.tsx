@@ -22,6 +22,7 @@ import {
   SummaryCard,
 } from '@/components/reminders/reminder-v6-ui'
 import { usePageTitle } from '@/components/shell/page-chrome'
+import { firstReminderStepMessage, reminderPlaceholders } from '@/components/reminders/reminder-labels'
 
 function formatTestedAt(value: string | null): string {
   if (!value) return 'テスト記録なし'
@@ -273,15 +274,15 @@ export function Issue469ReminderTestStage({ reminderId }: { reminderId: string }
     <ReminderWizard current={4} />
     <ReminderWorkspace aside={<div className="grid gap-3">
       <SummaryCard rows={[["本番への影響", 'なし'], ['送信数', '1通'], ['送信先', recipient], ['送信方法', 'LINE公式']]} />
-      <LinePreview caption="［テスト］表示例">［テスト］名前さん、明日のGoogle Meet相談のご案内です。{`\n`}日時：相談の日時{`\n`}参加URL：参加URL{`\n\n`}Google Meetに参加</LinePreview>
+      <LinePreview caption="テスト送信される1通目の内容">{firstReminderStepMessage(draft.settings) || '本文がありません'}</LinePreview>
       <div className="grid grid-cols-2 gap-2"><Button onClick={() => setConfirmOpen(true)}>テスト送信</Button></div>
     </div>}>
       <ReminderPanel title="テスト対象" note="自分のLINEへ確認用メッセージを送ります。"><dl className="grid min-h-24 grid-cols-2 gap-4 text-xs"><Metric label="送信先" value={recipient} /><Metric label="最終テスト日時" value={testedAt} /></dl></ReminderPanel>
-      <ReminderPanel title="差し込み値の確認" note="口に保存されていない値は表示例です。本番でどこから取るかを並べて確認します。"><table className="w-full border-collapse text-left text-xs"><thead><TableHeadRow><Th>変数</Th><Th>テストで使う値（表示例）</Th><Th>本番での取得元</Th></TableHeadRow></thead><tbody className="border-hairline border-t"><tr><td className="px-3 py-3">{'{{name}}'}</td><td className="px-3 py-3">Kenta</td><td className="px-3 py-3">友だちのLINE表示名</td></tr><tr className="border-hairline border-t"><td className="px-3 py-3">{'{{meet_datetime}}'}</td><td className="px-3 py-3">8/24（月）18:00</td><td className="px-3 py-3">予約管理の予約日時</td></tr><tr className="border-hairline border-t"><td className="px-3 py-3">{'{{meet_url}}'}</td><td className="px-3 py-3">meet.google.com/test-0000</td><td className="px-3 py-3">予約ごとに発行されるMeet URL</td></tr></tbody></table></ReminderPanel>
+      <ReminderPanel title="差し込み値の確認" note="本文に書いた差し込みだけを並べ、どこから取るかを確認します。">{reminderPlaceholders(draft.settings, recipientName).length === 0 ? <p className="text-ink-faint px-3 py-3 text-xs">本文に差し込み値はありません。</p> : <table className="w-full border-collapse text-left text-xs"><thead><TableHeadRow><Th>変数</Th><Th>テストで使う値</Th><Th>本番での取得元</Th></TableHeadRow></thead><tbody className="border-hairline border-t">{reminderPlaceholders(draft.settings, recipientName).map((placeholder) => <tr key={placeholder.token} className="border-hairline border-t"><td className="px-3 py-3"><code>{placeholder.token}</code></td><td className="px-3 py-3">{placeholder.testValue}</td><td className="px-3 py-3">{placeholder.source}</td></tr>)}</tbody></table>}</ReminderPanel>
       <ReminderPanel title="テスト送信の履歴" note="下書きに記録された直近のテストだけを表示します。" action={draft.lastTestStatus === 'succeeded' ? <Pill tone="success">直近のテストは成功</Pill> : undefined}><table className="w-full border-collapse text-left text-xs"><thead><TableHeadRow><Th>送信日時</Th><Th>送信した通知・宛先</Th><Th>結果</Th></TableHeadRow></thead><tbody className="border-hairline border-t"><tr><td className="px-3 py-3">{testedAt}</td><td className="px-3 py-3">下書きの通知 ／ {recipient}</td><td className="px-3 py-3"><Pill tone={draft.lastTestStatus === 'succeeded' ? 'success' : 'warning'}>{draft.lastTestStatus === 'succeeded' ? '送信できました' : '成功記録なし'}</Pill></td></tr></tbody></table></ReminderPanel>
       {error ? <p className="text-danger text-xs">{error}</p> : null}
     </ReminderWorkspace>
-    <div className="mt-16"><ReminderFooter status="テスト済み 2026/09/06 18:00" secondary={{ label: 'テスト送信', onClick: () => setConfirmOpen(true) }} primary="最終確認へ" onPrimary={() => router.push(`/reminders/edit?id=${encodeURIComponent(reminderId)}&stage=confirm`)} /></div>
+    <div className="mt-16"><ReminderFooter status={draft.lastTestStatus === 'succeeded' ? `テスト済み ${testedAt}` : '下書き保存'} secondary={{ label: 'テスト送信', onClick: () => setConfirmOpen(true) }} primary="最終確認へ" onPrimary={() => router.push(`/reminders/edit?id=${encodeURIComponent(reminderId)}&stage=confirm`)} /></div>
     <ConfirmDialog open={confirmOpen} title="テスト送信しますか？" description="自分のLINEへ確認用メッセージを1通送信します。" confirmLabel="テスト送信" cancelLabel="配信予定へ戻る" busy={busy} onConfirm={() => void sendTest()} onCancel={() => setConfirmOpen(false)} />
   </div>
 }

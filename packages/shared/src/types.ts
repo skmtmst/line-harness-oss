@@ -2279,6 +2279,10 @@ export interface ReminderDeliveryRunsResponse {
     id: string;
     name: string;
     isActive: boolean;
+    /** 公開版スナップショットのライフサイクル。旧API由来の行は 'published' 相当。 */
+    lifecycleStatus: "draft" | "published" | "stopped";
+    /** 公開版スナップショットの停止条件。公開版が無いときは null（未取得と区別する）。 */
+    stopConditions: ReminderStopConditions | null;
   };
   summary: {
     sent: number;
