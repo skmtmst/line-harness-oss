@@ -87,7 +87,7 @@ function renderHistory(rows: NenDelivery[], detail: NenDeliveryDetail | null, on
         petMetrics={null}
         deliveryList={listWith(rows)}
         deliveryDetail={detail}
-        coupon={{ isEnabled: false, codePrefix: '', benefitLabel: '', discountAmount: 0, validityDays: 0 }}
+        coupon={{ isEnabled: false, codePrefix: '', benefitLabel: '', discountAmount: 0, validityDays: 0, leapYearPolicy: 'feb28' }}
         friends={[]}
         testFriendId=""
         previewCampaignKey={null}

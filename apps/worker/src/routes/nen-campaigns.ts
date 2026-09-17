@@ -738,7 +738,11 @@ nenCampaigns.get('/api/nen-campaigns/birthday-coupon', async (c) => {
   return c.json({ success: true, data: {
     isEnabled: row?.is_enabled === 1, codePrefix: row?.code_prefix ?? '',
     benefitLabel: row?.benefit_label ?? '', discountAmount: row?.discount_amount ?? 0,
-    validityDays: row?.validity_days ?? 0, updatedAt: row?.updated_at ?? '',
+    validityDays: row?.validity_days ?? 0,
+    // 419: キー無しの既存設定は従来動作（平年に届かない）= 'skip'。
+    // まだ保存したことが無いアカウントは要件の既定 'feb28' を見せる。
+    leapYearPolicy: row ? (row.leap_year_policy ?? 'skip') : 'feb28',
+    updatedAt: row?.updated_at ?? '',
   } });
 });
 
@@ -754,12 +758,25 @@ nenCampaigns.put('/api/nen-campaigns/birthday-coupon', requireRole('owner', 'adm
       || !Number.isInteger(days) || days < 1 || days > 365) {
     return c.json({ success: false, error: 'Invalid coupon settings' }, 400);
   }
+  // 419: 2月29日生まれの扱い。送られてきたら検証し、省略なら既存値を守る
+  // （旧クライアントからの保存で 'skip' 扱いの設定を無断で変えない）。
+  let leapYearPolicy: 'feb28' | 'mar1' | 'skip' | undefined;
+  if (body.leapYearPolicy !== undefined) {
+    if (!['feb28', 'mar1', 'skip'].includes(body.leapYearPolicy as string)) {
+      return c.json({ success: false, error: 'Invalid leapYearPolicy' }, 400);
+    }
+    leapYearPolicy = body.leapYearPolicy as 'feb28' | 'mar1' | 'skip';
+  } else {
+    const existing = await getNenBirthdayCouponSetting(c.env.DB, accountId);
+    leapYearPolicy = existing ? (existing.leap_year_policy ?? 'skip') : 'feb28';
+  }
   await saveNenBirthdayCouponSetting(c.env.DB, accountId, {
     is_enabled: body.isEnabled ? 1 : 0,
     code_prefix: body.codePrefix,
     benefit_label: body.benefitLabel.trim(),
     discount_amount: amount,
     validity_days: days,
+    leap_year_policy: leapYearPolicy,
     updated_at: jstNow(),
   });
   return c.json({ success: true });

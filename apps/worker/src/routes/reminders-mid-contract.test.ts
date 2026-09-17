@@ -13,6 +13,7 @@ const dbMocks = vi.hoisted(() => ({
   updateReminder: vi.fn(),
   createReminderStep: vi.fn(),
   saveReminderDraftVersion: vi.fn(),
+  getReminderDraftVersion: vi.fn(),
 }))
 
 const accessMocks = vi.hoisted(() => ({
@@ -100,6 +101,7 @@ beforeEach(() => {
   ])
   dbMocks.reorderReminders.mockResolvedValue(undefined)
   dbMocks.updateReminder.mockResolvedValue(undefined)
+  dbMocks.getReminderDraftVersion.mockResolvedValue(null)
   dbMocks.createReminderStep.mockImplementation(async (_db: unknown, input: Record<string, unknown>) => ({
     id: 'step-9',
     reminder_id: input.reminderId,

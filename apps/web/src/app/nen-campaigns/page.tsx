@@ -59,7 +59,7 @@ export default function NenCampaignsPage() {
   const [petMetrics, setPetMetrics] = useState<NenPetMetrics | null>(null)
   const [deliveryList, setDeliveryList] = useState<NenDeliveryList | null>(null)
   const [deliveryDetail, setDeliveryDetail] = useState<NenDeliveryDetail | null>(null)
-  const [coupon, setCoupon] = useState<NenCoupon>({ isEnabled: true, codePrefix: 'NENBDAY', benefitLabel: 'お誕生日月限定クーポン', discountAmount: 500, validityDays: 31 })
+  const [coupon, setCoupon] = useState<NenCoupon>({ isEnabled: true, codePrefix: 'NENBDAY', benefitLabel: 'お誕生日月限定クーポン', discountAmount: 500, validityDays: 31, leapYearPolicy: 'feb28' })
   const [saving, setSaving] = useState<string | null>(null)
   const [testing, setTesting] = useState<string | null>(null)
   const [previewCampaignKey, setPreviewCampaignKey] = useState<string | null>(null)

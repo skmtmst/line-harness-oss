@@ -25,6 +25,7 @@ function reminder(patch: Record<string, unknown> = {}) {
     name: '誕生日',
     trigger_field_id: 'field-birthday',
     repeat_yearly: 1,
+    leap_year_policy: 'mar1',
     line_account_id: null,
     scan_cursor: null,
     ...patch,
@@ -90,6 +91,63 @@ describe('processFriendFieldReminders', () => {
       const result = await processFriendFieldReminders(db, jst('2026-04-01T00:05'));
 
       expect(result).toEqual({ enrolled: 0, skipped: 1, scanned: 1, hasMore: false });
+    });
+  });
+
+  describe('2月29日生まれ（419: 3択の方針）', () => {
+    const feb29Friend = [{ friend_id: 'f-29', value: '2000-02-29' }];
+
+    it("方針'mar1'は平年に3月1日へ立てる（設定ができる前の動作）", async () => {
+      getFriendFieldReminders.mockResolvedValue([reminder({ leap_year_policy: 'mar1' })]);
+      getFriendsWithFieldValuePage.mockResolvedValue(feb29Friend);
+
+      await processFriendFieldReminders(db, jst('2026-01-10T00:05'));
+
+      expect(enrollFriendsInReminderOnce).toHaveBeenCalledWith(
+        db, 'rem-1',
+        [expect.objectContaining({ targetDate: '2026-03-01T00:00:00+09:00' })],
+      );
+    });
+
+    it("方針'feb28'は平年に2月28日へ立てる", async () => {
+      getFriendFieldReminders.mockResolvedValue([reminder({ leap_year_policy: 'feb28' })]);
+      getFriendsWithFieldValuePage.mockResolvedValue(feb29Friend);
+
+      await processFriendFieldReminders(db, jst('2026-01-10T00:05'));
+
+      expect(enrollFriendsInReminderOnce).toHaveBeenCalledWith(
+        db, 'rem-1',
+        [expect.objectContaining({ targetDate: '2026-02-28T00:00:00+09:00' })],
+      );
+    });
+
+    it("方針'skip'は平年に立てない", async () => {
+      getFriendFieldReminders.mockResolvedValue([reminder({ leap_year_policy: 'skip' })]);
+      getFriendsWithFieldValuePage.mockResolvedValue(feb29Friend);
+
+      const result = await processFriendFieldReminders(db, jst('2026-01-10T00:05'));
+
+      // 次のゴールはうるう年の 2028-02-29。カーソル走査の時点では立てない。
+      expect(enrollFriendsInReminderOnce).toHaveBeenCalledWith(
+        db, 'rem-1',
+        [expect.objectContaining({ targetDate: '2028-02-29T00:00:00+09:00' })],
+      );
+      expect(result.enrolled).toBe(1);
+    });
+
+    it('うるう年はどの方針でも2月29日へ立てる', async () => {
+      for (const policy of ['feb28', 'mar1', 'skip']) {
+        getFriendFieldReminders.mockResolvedValue([reminder({ leap_year_policy: policy })]);
+        getFriendsWithFieldValuePage.mockResolvedValue(feb29Friend);
+        enrollFriendsInReminderOnce.mockClear();
+
+        await processFriendFieldReminders(db, jst('2028-01-10T00:05'));
+
+        expect(enrollFriendsInReminderOnce).toHaveBeenCalledWith(
+          db, 'rem-1',
+          [expect.objectContaining({ targetDate: '2028-02-29T00:00:00+09:00' })],
+        );
+      }
     });
   });
 

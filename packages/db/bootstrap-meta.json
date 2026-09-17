@@ -376,7 +376,8 @@
     "415_admin_session_device_info.sql",
     "416_staff_role_bundle_view_keys_email_mask.sql",
     "417_booking_staff_member_link.sql",
-    "418_reminder_trigger_event.sql"
+    "418_reminder_trigger_event.sql",
+    "419_reminder_leap_year_policy.sql"
   ],
-  "migrationCount": 377
+  "migrationCount": 378
 }

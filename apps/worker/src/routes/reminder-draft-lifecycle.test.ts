@@ -78,7 +78,13 @@ function createApp(role: 'owner' | 'admin' | 'staff' = 'owner') {
   const app = new Hono<any>()
   app.use('*', async (c, next) => {
     c.set('staff', { id: 'staff-1', role, readOnly: false, tenantId: 'tenant-a' })
-    c.env = { DB: {} }
+    c.env = {
+      DB: {
+        prepare: () => ({
+          bind: () => ({ first: async () => null, all: async () => ({ results: [] }) }),
+        }),
+      },
+    }
     await next()
   })
   app.route('/', reminders)
