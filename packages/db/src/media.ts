@@ -278,6 +278,24 @@ export async function getMediaById(
     .bind(id, lineAccountId).first<Media>();
 }
 
+/**
+ * r2_key から同一アカウントのメディアIDを引く。
+ * ウェビナー動画のように「保存値が r2_key のまま残る」使用先が、
+ * 現在どのメディアを指しているかを戻り値へ載せるために使う。
+ */
+export async function getMediaIdByR2Key(
+  db: D1Database,
+  r2Key: string,
+  lineAccountId: string | null,
+): Promise<string | null> {
+  const row = lineAccountId === null
+    ? await db.prepare(`SELECT id FROM media WHERE r2_key = ? AND line_account_id IS NULL`)
+        .bind(r2Key).first<{ id: string }>()
+    : await db.prepare(`SELECT id FROM media WHERE r2_key = ? AND line_account_id = ?`)
+        .bind(r2Key, lineAccountId).first<{ id: string }>();
+  return row?.id ?? null;
+}
+
 export async function createMedia(
   db: D1Database,
   input: {
