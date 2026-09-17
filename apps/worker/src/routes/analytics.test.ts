@@ -18,6 +18,8 @@ const mocks = {
   countFunnelStep: vi.fn(),
   createVersionedFunnel: vi.fn(),
   createFunnelVersion: vi.fn(),
+  getFunnelWithCurrentVersion: vi.fn(),
+  setFunnelStatus: vi.fn(),
   runChronologicalFunnel: vi.fn(),
   getLatestFunnelRun: vi.fn(),
   createFunnelResultAudience: vi.fn(),
@@ -127,7 +129,7 @@ function reqAsStaff(path: string, method = 'GET', body?: unknown) {
   );
 }
 
-const FUNNEL = { id: 'fn-1', line_account_id: 'account-a', name: '購入まで', segment_json: null, window_days: 30, created_at: '2026-08-16' };
+const FUNNEL = { id: 'fn-1', line_account_id: 'account-a', name: '購入まで', segment_json: null, window_days: 30, created_at: '2026-08-16', status: 'active' };
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -575,6 +577,20 @@ describe('ファネルの結果', () => {
     const res = await req(`/api/funnels/nope/result?${ACCOUNT}`);
     expect(res.status).toBe(404);
   });
+
+  it('停止・保管したファネルのその場集計は新規runとして拒否する', async () => {
+    for (const status of ['stopped', 'archived'] as const) {
+      vi.clearAllMocks();
+      mocks.getFunnelById.mockResolvedValue({ ...FUNNEL, status });
+      mocks.getStaffById.mockResolvedValue({ account_scope: 'all' });
+      mocks.getStaffAccountScopeIds.mockResolvedValue([]);
+      const res = await req(`/api/funnels/fn-1/result?${ACCOUNT}`);
+      expect(res.status).toBe(422);
+      const body = (await res.json()) as { error: string };
+      expect(body.error).toBe('analytics_funnel_not_active');
+      expect(mocks.countFunnelStep).not.toHaveBeenCalled();
+    }
+  });
 });
 
 describe('現行ファネルの削除', () => {
@@ -589,6 +605,14 @@ describe('現行ファネルの削除', () => {
     const res = await req(`/api/funnels/fn-1?${ACCOUNT}`, 'DELETE');
     expect(res.status).toBe(200);
     expect(mocks.deleteFunnel).toHaveBeenCalledWith(env.DB, 'account-a', 'fn-1');
+  });
+
+  it('停止・保管したファネルは物理削除できない', async () => {
+    mocks.getFunnelById.mockResolvedValue({ ...FUNNEL, status: 'archived' });
+    mocks.getCurrentFunnelVersion.mockResolvedValueOnce(null);
+    const res = await req(`/api/funnels/fn-1?${ACCOUNT}`, 'DELETE');
+    expect(res.status).toBe(422);
+    expect(mocks.deleteFunnel).not.toHaveBeenCalled();
   });
 });
 
@@ -613,7 +637,7 @@ describe('V6ファネルAPI', () => {
       pagination: { page: 2, pageSize: 50, total: 1 },
     });
     expect(mocks.getFunnelsWithCurrentVersions).toHaveBeenCalledWith(
-      env.DB, 'account-a', { page: 2, pageSize: 50 },
+      env.DB, 'account-a', { page: 2, pageSize: 50, includeInactive: false },
     );
     expect(mocks.getCurrentFunnelVersion).not.toHaveBeenCalled();
   });
@@ -716,6 +740,132 @@ describe('V6ファネルAPI', () => {
       success: true,
       data: { id: 'audience-1', memberCount: 1 },
     });
+  });
+
+  it('一覧は includeInactive=1 のときだけ停止・保管済みも返す(N-273)', async () => {
+    mocks.getFunnelsWithCurrentVersions.mockResolvedValueOnce({
+      items: [
+        { ...FUNNEL, currentVersion: { id: 'v-1', versionNumber: 1, createdAt: '2026-08-16' } },
+        { ...FUNNEL, id: 'fn-2', status: 'stopped', currentVersion: null },
+      ],
+      total: 2, page: 1, pageSize: 200,
+    });
+    const res = await req(`/api/analytics/funnels?${ACCOUNT}&includeInactive=1`);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({
+      data: [{ id: 'fn-1', status: 'active' }, { id: 'fn-2', status: 'stopped' }],
+    });
+    expect(mocks.getFunnelsWithCurrentVersions).toHaveBeenCalledWith(
+      env.DB, 'account-a', expect.objectContaining({ includeInactive: true }),
+    );
+  });
+
+  it('1件の定義を現在版つきで返し、別アカウントや無いものは404(N-272)', async () => {
+    mocks.getFunnelWithCurrentVersion.mockResolvedValueOnce({
+      funnel: FUNNEL,
+      currentVersion: {
+        id: 'v-1', funnelId: 'fn-1', lineAccountId: 'account-a', versionNumber: 2,
+        windowDays: 14,
+        steps: [{ stepOrder: 1, label: '追加', kind: 'friend_add', match: {} }],
+        segment: { kind: 'all' }, comparisonGroups: [],
+        createdBy: 'u-1', createdAt: '2026-08-16',
+      },
+    });
+    const res = await req(`/api/analytics/funnels/fn-1?${ACCOUNT}`);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({
+      data: { id: 'fn-1', status: 'active', currentVersion: { versionNumber: 2, windowDays: 14 } },
+    });
+    expect(mocks.getFunnelWithCurrentVersion).toHaveBeenCalledWith(env.DB, 'account-a', 'fn-1');
+
+    mocks.getFunnelWithCurrentVersion.mockResolvedValueOnce(null);
+    const missing = await req(`/api/analytics/funnels/nope?${ACCOUNT}`);
+    expect(missing.status).toBe(404);
+  });
+
+  it('新版保存は expectedVersionNumber と名前をdbへ渡し、版競合は409(N-272)', async () => {
+    mocks.createFunnelVersion.mockResolvedValueOnce({ id: 'v-2', versionNumber: 2 });
+    const res = await req(`/api/analytics/funnels/fn-1/versions?${ACCOUNT}`, 'POST', {
+      windowDays: 14,
+      steps: body.steps,
+      name: '購入まで v2',
+      expectedVersionNumber: 1,
+    });
+    expect(res.status).toBe(201);
+    expect(mocks.createFunnelVersion).toHaveBeenCalledWith(
+      env.DB,
+      expect.objectContaining({
+        lineAccountId: 'account-a', funnelId: 'fn-1',
+        name: '購入まで v2', expectedVersionNumber: 1, createdBy: 'u-1',
+      }),
+    );
+
+    mocks.createFunnelVersion.mockRejectedValueOnce(new Error('analytics_funnel_version_conflict'));
+    const conflict = await req(`/api/analytics/funnels/fn-1/versions?${ACCOUNT}`, 'POST', {
+      windowDays: 14, steps: body.steps, expectedVersionNumber: 0,
+    });
+    expect(conflict.status).toBe(409);
+  });
+
+  it('停止・再開・保管は現在状態を要し、競合409・不正遷移422・staffは403(N-273)', async () => {
+    mocks.setFunnelStatus.mockResolvedValueOnce({ ...FUNNEL, status: 'stopped' });
+    const stopped = await req(`/api/analytics/funnels/fn-1/status?${ACCOUNT}`, 'PUT', {
+      status: 'stopped', expectedStatus: 'active',
+    });
+    expect(stopped.status).toBe(200);
+    expect(mocks.setFunnelStatus).toHaveBeenCalledWith(env.DB, {
+      lineAccountId: 'account-a', funnelId: 'fn-1',
+      status: 'stopped', expectedStatus: 'active',
+    });
+
+    mocks.setFunnelStatus.mockRejectedValueOnce(new Error('analytics_funnel_status_conflict'));
+    const conflict = await req(`/api/analytics/funnels/fn-1/status?${ACCOUNT}`, 'PUT', {
+      status: 'stopped', expectedStatus: 'active',
+    });
+    expect(conflict.status).toBe(409);
+
+    mocks.setFunnelStatus.mockRejectedValueOnce(new Error('analytics_funnel_invalid_transition'));
+    const invalid = await req(`/api/analytics/funnels/fn-1/status?${ACCOUNT}`, 'PUT', {
+      status: 'active', expectedStatus: 'archived',
+    });
+    expect(invalid.status).toBe(422);
+
+    const missing = await req(`/api/analytics/funnels/fn-1/status?${ACCOUNT}`, 'PUT', {
+      status: 'unknown',
+    });
+    expect(missing.status).toBe(422);
+
+    // 現在状態なしの遷移は二重操作を弾けないので受け付けない。
+    const noExpected = await req(`/api/analytics/funnels/fn-1/status?${ACCOUNT}`, 'PUT', {
+      status: 'stopped',
+    });
+    expect(noExpected.status).toBe(422);
+    const badExpected = await req(`/api/analytics/funnels/fn-1/status?${ACCOUNT}`, 'PUT', {
+      status: 'stopped', expectedStatus: 'unknown',
+    });
+    expect(badExpected.status).toBe(422);
+    expect(mocks.setFunnelStatus).toHaveBeenCalledTimes(3);
+
+    const staff = await reqAsStaff(`/api/analytics/funnels/fn-1/status?${ACCOUNT}`, 'PUT', {
+      status: 'stopped', expectedStatus: 'active',
+    });
+    expect(staff.status).toBe(403);
+  });
+
+  it('停止・保管したファネルの再集計と新版は422で止める(N-273)', async () => {
+    mocks.runChronologicalFunnel.mockRejectedValueOnce(new Error('analytics_funnel_not_active'));
+    const res = await req(`/api/analytics/funnels/fn-1/run?${ACCOUNT}`, 'POST', {
+      cohortFrom: '2026-08-01T00:00:00.000+09:00',
+      cohortTo: '2026-08-10T23:59:59.999+09:00',
+    });
+    expect(res.status).toBe(422);
+    expect(await res.json()).toMatchObject({ error: 'analytics_funnel_not_active' });
+
+    mocks.createFunnelVersion.mockRejectedValueOnce(new Error('analytics_funnel_not_active'));
+    const version = await req(`/api/analytics/funnels/fn-1/versions?${ACCOUNT}`, 'POST', {
+      windowDays: 14, steps: body.steps,
+    });
+    expect(version.status).toBe(422);
   });
 });
 

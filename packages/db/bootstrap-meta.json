@@ -379,7 +379,8 @@
     "418_reminder_trigger_event.sql",
     "419_reminder_leap_year_policy.sql",
     "420_nen_pet_feeding.sql",
-    "421_ops_support_tickets.sql"
+    "421_ops_support_tickets.sql",
+    "422_funnel_status.sql"
   ],
-  "migrationCount": 380
+  "migrationCount": 381
 }

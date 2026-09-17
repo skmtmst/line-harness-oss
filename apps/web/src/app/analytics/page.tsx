@@ -41,7 +41,41 @@ import {
 function explainStartError(code: string, fallback: string): string {
   if (code === 'analytics_cross_busy') return '他の集計が動いています。終わってからもう一度押してください'
   if (code === 'analytics_funnel_too_soon') return 'さきほど集計したばかりです。少し待ってから押してください'
+  if (code === 'analytics_funnel_not_active') return '停止中・保管したファネルでは再集計や対象者づくりはできません'
+  if (code === 'analytics_funnel_version_conflict' || code === 'analytics_funnel_status_conflict') {
+    return '他の人が先に変更しています。最新の状態を開き直してください'
+  }
+  if (code === 'analytics_funnel_invalid_transition') return 'その状態へは進めません'
   return fallback
+}
+
+// 保存済みの段の条件（match）を、編集フォームの1入力へ戻す。
+function funnelStepFormValue(kind: string, match: Record<string, string>): string {
+  switch (kind) {
+    case 'tag': return match.tagId ?? ''
+    case 'field': return match.fieldId ?? ''
+    case 'form': return match.formId ?? ''
+    case 'site_event': return match.pathGroup ?? ''
+    case 'link_click': return match.trackedLinkId ?? ''
+    case 'conversion': return match.conversionPointId ?? ''
+    case 'automation': return match.automationId ?? ''
+    default: return ''
+  }
+}
+
+// 編集フォームが直接いじるmatchのキー。それ以外の副条件(例: tagの付け外し向き)は
+// フォームに出せないため、新版へ写すとき元の値をそのまま残す。
+function funnelStepPrimaryKey(kind: string): string | null {
+  switch (kind) {
+    case 'tag': return 'tagId'
+    case 'field': return 'fieldId'
+    case 'form': return 'formId'
+    case 'site_event': return 'pathGroup'
+    case 'link_click': return 'trackedLinkId'
+    case 'conversion': return 'conversionPointId'
+    case 'automation': return 'automationId'
+    default: return null
+  }
 }
 
 const TABS = [
@@ -951,6 +985,7 @@ function FunnelTab({ accountId, canManage }: { accountId: string; canManage: boo
       name: string
       windowDays: number
       createdAt: string
+      status: 'active' | 'stopped' | 'archived'
       currentVersion: { id: string; versionNumber: number; createdAt: string } | null
       migrationState: 'ready' | 'needs_migration'
     }>
@@ -992,12 +1027,14 @@ function FunnelTab({ accountId, canManage }: { accountId: string; canManage: boo
     setPicked(null)
     setFunnelAudience(null)
     void api.analytics.v6Funnels
-      .list(accountId)
+      .list(accountId, { includeInactive: true })
       .then((res) => {
         if (!active) return
         if (res.success) {
           setFunnels(res.data)
-          if (res.data.length > 0) setSelected(res.data[0].id)
+          // 停止・保管したものは選ばせない。最初の利用可能なファネルを開く。
+          const firstActive = res.data.find((f) => f.status === 'active')
+          if (firstActive) setSelected(firstActive.id)
         } else {
           setListError(res.error || 'ファネルを読み込めませんでした')
         }
@@ -1066,6 +1103,96 @@ function FunnelTab({ accountId, canManage }: { accountId: string; canManage: boo
     }
   }
 
+  const reloadFunnels = async (pickId?: string) => {
+    const res = await api.analytics.v6Funnels.list(accountId, { includeInactive: true })
+    if (!res.success) return
+    setFunnels(res.data)
+    if (pickId !== undefined) {
+      setSelected(pickId)
+      return
+    }
+    setSelected((prev) => {
+      const still = res.data.find((f) => f.id === prev)
+      if (still && still.status === 'active') return prev
+      return res.data.find((f) => f.status === 'active')?.id ?? ''
+    })
+  }
+
+  // 定義の編集は「現在版を下書きへ読み、新版として保存」。過去の版と結果は変えない。
+  const [editTarget, setEditTarget] = useState<{
+    funnelId: string
+    name: string
+    windowDays: string
+    steps: Array<{ label: string; kind: string; value: string; match: Record<string, string> }>
+    segment: unknown
+    comparisonGroups: unknown[]
+    expectedVersionNumber: number
+  } | null>(null)
+  const [editLoading, setEditLoading] = useState(false)
+  const startEdit = async () => {
+    if (!selected) return
+    setEditLoading(true)
+    setRunError('')
+    try {
+      const res = await api.analytics.v6Funnels.get(accountId, selected)
+      if (!res.success) {
+        setRunError(res.error || '定義を読み込めませんでした')
+        return
+      }
+      if (!res.data.currentVersion) {
+        setRunError('このファネルは旧形式のため編集できません。新しい段を組んで作り直してください')
+        return
+      }
+      const version = res.data.currentVersion
+      setEditTarget({
+        funnelId: res.data.id,
+        name: res.data.name,
+        windowDays: String(version.windowDays),
+        steps: version.steps.map((step) => ({
+          label: step.label,
+          kind: step.kind,
+          value: funnelStepFormValue(step.kind, step.match),
+          match: step.match,
+        })),
+        segment: version.segment,
+        comparisonGroups: version.comparisonGroups,
+        expectedVersionNumber: version.versionNumber,
+      })
+    } catch {
+      setRunError('定義を読み込めませんでした')
+    } finally {
+      setEditLoading(false)
+    }
+  }
+
+  // 停止は再開できる。保管は終端で、一覧と再集計から外れて戻せない。
+  const [statusTarget, setStatusTarget] = useState<{
+    funnel: { id: string; name: string; status: 'active' | 'stopped' | 'archived' }
+    to: 'stopped' | 'archived' | 'active'
+  } | null>(null)
+  const [statusBusy, setStatusBusy] = useState(false)
+  const applyStatusChange = async () => {
+    if (!statusTarget || statusBusy) return
+    setStatusBusy(true)
+    setRunError('')
+    try {
+      const res = await api.analytics.v6Funnels.setStatus(accountId, statusTarget.funnel.id, {
+        status: statusTarget.to,
+        expectedStatus: statusTarget.funnel.status,
+      })
+      if (!res.success) {
+        setRunError(explainStartError(res.error, '状態を変えられませんでした'))
+        return
+      }
+      setStatusTarget(null)
+      await reloadFunnels()
+    } catch {
+      setRunError('状態を変えられませんでした')
+    } finally {
+      setStatusBusy(false)
+    }
+  }
+
   const activeGroup = run?.groups.find((group) => group.key === groupKey) ?? run?.groups[0] ?? null
   const result = activeGroup?.steps ?? null
 
@@ -1084,6 +1211,7 @@ function FunnelTab({ accountId, canManage }: { accountId: string; canManage: boo
 
   const prepareFunnelAudience = async () => {
     if (!run?.runId || picked === null || !result?.[picked] || !activeGroup) return
+    if (selectedFunnel?.status !== 'active') return
     const generation = viewGeneration.current
     setRunError('')
     try {
@@ -1098,7 +1226,10 @@ function FunnelTab({ accountId, canManage }: { accountId: string; canManage: boo
       setFunnelAudience(response.data)
     } catch (error) {
       if (generation !== viewGeneration.current) return
-      setRunError(error instanceof Error ? error.message : '対象者を準備できませんでした')
+      setRunError(explainStartError(
+        error instanceof Error ? error.message : '',
+        '対象者を準備できませんでした',
+      ))
     }
   }
 
@@ -1139,6 +1270,7 @@ function FunnelTab({ accountId, canManage }: { accountId: string; canManage: boo
 
   const top = result?.[0]?.reached ?? 0
   const selectedFunnel = funnels.find((f) => f.id === selected) ?? null
+  const inactiveFunnels = funnels.filter((f) => f.status !== 'active')
   const exportFunnel = () => {
     if (!result) return
     downloadCsv('analytics-funnel.csv', [
@@ -1159,16 +1291,18 @@ function FunnelTab({ accountId, canManage }: { accountId: string; canManage: boo
       <AnalyticsNotice>段は上から順に見ます。同じ人が同じ段を2回通っても1回として数えます。判定できる期間は、最初の段から設定した日数です。まだ途中の人は完了した人に含めません。</AnalyticsNotice>
       <p className="text-sm text-ink-secondary">友だちがどこまで進んで、どこで離れたかを段階ごとに見ます。段を自由に組み替えられるので、配信の流れでも購入の流れでも作れます。</p>
 
-      {creating ? (
+      {creating || editTarget ? (
         <FunnelForm
           accountId={accountId}
-          onCancel={() => setCreating(false)}
+          edit={editTarget ?? undefined}
+          onCancel={() => {
+            setCreating(false)
+            setEditTarget(null)
+          }}
           onCreated={(id) => {
             setCreating(false)
-            void api.analytics.v6Funnels.list(accountId).then((res) => {
-              if (res.success) setFunnels(res.data)
-            })
-            setSelected(id)
+            setEditTarget(null)
+            void reloadFunnels(id)
           }}
         />
       ) : listError ? (
@@ -1209,7 +1343,11 @@ function FunnelTab({ accountId, canManage }: { accountId: string; canManage: boo
                     setRunning(false)
                   }}
                 />
-                <Button onClick={() => void runNow()} disabled={running} variant="secondary">
+                <Button
+                  onClick={() => void runNow()}
+                  disabled={running || selectedFunnel?.status !== 'active'}
+                  variant="secondary"
+                >
                   {running ? '再集計中' : `この${funnelDays}日を再集計`}
                 </Button>
                 {canManage && (
@@ -1233,7 +1371,18 @@ function FunnelTab({ accountId, canManage }: { accountId: string; canManage: boo
                 onChange={(e) => setSelected(e.target.value)}
                 aria-label="ファネル"
                 className="border-hairline rounded-control w-full border px-3 py-2 text-sm sm:w-72"
-                options={funnels.map((funnel) => ({ value: funnel.id, label: funnel.name }))}
+                options={
+                  funnels.some((funnel) => funnel.status === 'active' || funnel.id === selected)
+                    ? funnels
+                        .filter((funnel) => funnel.status === 'active' || funnel.id === selected)
+                        .map((funnel) => ({
+                          value: funnel.id,
+                          label: funnel.status === 'active'
+                            ? funnel.name
+                            : `${funnel.name}（${funnel.status === 'stopped' ? '停止中' : '保管済み'}）`,
+                        }))
+                    : [{ value: '', label: '使えるファネルがありません' }]
+                }
               />
               {selectedFunnel && (
                 <p className="text-ink-faint mt-1 text-xs">
@@ -1241,7 +1390,52 @@ function FunnelTab({ accountId, canManage }: { accountId: string; canManage: boo
                   {selectedFunnel.currentVersion
                     ? ` 定義版 ${selectedFunnel.currentVersion.versionNumber}`
                     : ' 現行定義の移行が必要です'}
+                  {selectedFunnel.status === 'stopped' && ' 停止中です。再集計や対象者づくりはできません。'}
+                  {selectedFunnel.status === 'archived' && ' 保管済みです。過去の結果だけを見られます。'}
                 </p>
+              )}
+              {canManage && selectedFunnel && (
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {selectedFunnel.status === 'active' && (
+                    <>
+                      <Button
+                        onClick={() => void startEdit()}
+                        disabled={editLoading || !selectedFunnel.currentVersion}
+                        variant="secondary"
+                      >
+                        {editLoading ? '定義を読み込み中' : '定義を編集'}
+                      </Button>
+                      <Button
+                        onClick={() => setStatusTarget({ funnel: selectedFunnel, to: 'stopped' })}
+                        variant="secondary"
+                      >
+                        停止
+                      </Button>
+                      <Button
+                        onClick={() => setStatusTarget({ funnel: selectedFunnel, to: 'archived' })}
+                        variant="secondary"
+                      >
+                        保管
+                      </Button>
+                    </>
+                  )}
+                  {selectedFunnel.status === 'stopped' && (
+                    <>
+                      <Button
+                        onClick={() => setStatusTarget({ funnel: selectedFunnel, to: 'active' })}
+                        variant="secondary"
+                      >
+                        再開
+                      </Button>
+                      <Button
+                        onClick={() => setStatusTarget({ funnel: selectedFunnel, to: 'archived' })}
+                        variant="secondary"
+                      >
+                        保管
+                      </Button>
+                    </>
+                  )}
+                </div>
               )}
             </div>
 
@@ -1375,30 +1569,36 @@ function FunnelTab({ accountId, canManage }: { accountId: string; canManage: boo
 
               <div className="border-hairline mt-4 border-t pt-3">
                 {picked != null && result[picked] ? (
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div className="space-y-2">
-                      <SelectField
-                        id="funnel-audience-selection"
-                        value={audienceSelection}
-                        onChange={(event) => setAudienceSelection(event.target.value as 'reached' | 'stopped' | 'in_progress')}
-                        aria-label="対象者の種類"
-                        className="v6-select w-full sm:w-64"
-                        options={[
-                          { value: 'reached', label: 'この段まで到達した人' },
-                          { value: 'stopped', label: 'この段で止まった人' },
-                          { value: 'in_progress', label: 'この段で進行中の人' },
-                        ]}
-                      />
-                      <p className="text-ink text-sm">
-                        {audienceSelection === 'stopped'
-                          ? `「${result[picked].label}で止まった人」を選択中`
-                          : audienceSelection === 'reached'
-                            ? `「${result[picked].label}まで到達した人」を選択中`
-                            : `「${result[picked].label}で進行中の人」を選択中`}
-                      </p>
+                  selectedFunnel?.status === 'active' ? (
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="space-y-2">
+                        <SelectField
+                          id="funnel-audience-selection"
+                          value={audienceSelection}
+                          onChange={(event) => setAudienceSelection(event.target.value as 'reached' | 'stopped' | 'in_progress')}
+                          aria-label="対象者の種類"
+                          className="v6-select w-full sm:w-64"
+                          options={[
+                            { value: 'reached', label: 'この段まで到達した人' },
+                            { value: 'stopped', label: 'この段で止まった人' },
+                            { value: 'in_progress', label: 'この段で進行中の人' },
+                          ]}
+                        />
+                        <p className="text-ink text-sm">
+                          {audienceSelection === 'stopped'
+                            ? `「${result[picked].label}で止まった人」を選択中`
+                            : audienceSelection === 'reached'
+                              ? `「${result[picked].label}まで到達した人」を選択中`
+                              : `「${result[picked].label}で進行中の人」を選択中`}
+                        </p>
+                      </div>
+                      {canManage && <Button onClick={() => void prepareFunnelAudience()} variant="secondary">友だち一覧で見る</Button>}
                     </div>
-                    {canManage && <Button onClick={() => void prepareFunnelAudience()} variant="secondary">友だち一覧で見る</Button>}
-                  </div>
+                  ) : (
+                    <p className="text-ink-faint text-xs">
+                      停止中・保管したファネルでは対象者づくりはできません。結果の確認だけができます。
+                    </p>
+                  )
                 ) : (
                   <p className="text-ink-faint text-xs">
                     段を押すと、到達・停止・進行中の人を選べます。
@@ -1436,6 +1636,80 @@ function FunnelTab({ accountId, canManage }: { accountId: string; canManage: boo
           </section>
         </>
       )}
+
+      {inactiveFunnels.length > 0 && (
+        <section className="bg-canvas rounded-card border-hairline mt-3 border p-4">
+          <h3 className="text-ink text-sm font-semibold">停止中・保管したファネル</h3>
+          <p className="text-ink-faint mt-0.5 text-xs">
+            停止中は再集計と対象者づくりを止めています。保管したものは戻せません。過去の結果は残っています。
+          </p>
+          <ul className="mt-2 space-y-2">
+            {inactiveFunnels.map((funnel) => (
+              <li
+                key={funnel.id}
+                className="border-hairline flex flex-wrap items-center gap-2 rounded-lg border px-3 py-2"
+              >
+                <span className="text-ink text-sm font-medium">{funnel.name}</span>
+                <Chip tone={funnel.status === 'stopped' ? 'warn' : 'neutral'}>
+                  {funnel.status === 'stopped' ? '停止中' : '保管済み'}
+                </Chip>
+                <button
+                  onClick={() => setSelected(funnel.id)}
+                  className="text-accent text-xs font-medium hover:underline"
+                >
+                  結果を見る
+                </button>
+                {canManage && funnel.status === 'stopped' && (
+                  <>
+                    <Button
+                      onClick={() => setStatusTarget({ funnel, to: 'active' })}
+                      variant="secondary"
+                    >
+                      再開
+                    </Button>
+                    <Button
+                      onClick={() => setStatusTarget({ funnel, to: 'archived' })}
+                      variant="secondary"
+                    >
+                      保管
+                    </Button>
+                  </>
+                )}
+                {funnel.status === 'archived' && (
+                  <span className="text-ink-faint text-xs">戻せません</span>
+                )}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+      <ConfirmDialog
+        open={statusTarget !== null}
+        title={
+          statusTarget?.to === 'stopped'
+            ? 'ファネルを停止しますか'
+            : statusTarget?.to === 'archived'
+              ? 'ファネルを保管しますか'
+              : 'ファネルを再開しますか'
+        }
+        description={
+          statusTarget?.to === 'stopped'
+            ? `「${statusTarget.funnel.name}」の再集計と対象者づくりを止めます。過去の結果は残り、あとから再開できます。`
+            : statusTarget?.to === 'archived'
+              ? `「${statusTarget.funnel.name}」を保管すると一覧から外れ、あとから戻せません。過去の結果は残ります。`
+              : statusTarget
+                ? `「${statusTarget.funnel.name}」を再開します。再集計と対象者づくりがまた使えます。`
+                : ''
+        }
+        confirmLabel={
+          statusTarget?.to === 'stopped' ? '停止する'
+            : statusTarget?.to === 'archived' ? '保管する' : '再開する'
+        }
+        destructive={statusTarget?.to === 'archived'}
+        busy={statusBusy}
+        onConfirm={() => void applyStatusChange()}
+        onCancel={() => setStatusTarget(null)}
+      />
     </div>
   )
 }
@@ -1450,10 +1724,23 @@ function FunnelForm({
   accountId,
   onCancel,
   onCreated,
+  edit,
 }: {
   accountId: string
   onCancel: () => void
   onCreated: (id: string) => void
+  // 指定すると「現在版を下書きへ読んだ状態」で開き、保存は新版の追加になる。
+  // 過去の版と過去の結果は書き換えない。match・segment・comparisonGroupsは
+  // フォームに出せない副条件ごと元の版から受け取り、保存時にそのまま返す。
+  edit?: {
+    funnelId: string
+    expectedVersionNumber: number
+    name: string
+    windowDays: string
+    steps: Array<{ label: string; kind: string; value: string; match: Record<string, string> }>
+    segment: unknown
+    comparisonGroups: unknown[]
+  }
 }) {
   const KINDS = [
     { key: 'friend_add', label: '友だち追加', hint: '' },
@@ -1469,13 +1756,20 @@ function FunnelForm({
     { key: 'automation', label: 'オートメーションが動いた', hint: 'オートメーションのID' },
   ]
 
-  const [name, setName] = useState('')
+  const [name, setName] = useState(edit?.name ?? '')
   // 何日以内の通過で数えるか(点検#508軽11)。裏は1〜365日を受け付ける。
-  const [windowDays, setWindowDays] = useState('30')
-  const [steps, setSteps] = useState([
-    { label: '', kind: 'tag', value: '' },
-    { label: '', kind: 'conversion', value: '' },
-  ])
+  const [windowDays, setWindowDays] = useState(edit?.windowDays ?? '30')
+  const [steps, setSteps] = useState<Array<{
+    label: string
+    kind: string
+    value: string
+    matchBase?: Record<string, string>
+  }>>(
+    edit?.steps.map((s) => ({ label: s.label, kind: s.kind, value: s.value, matchBase: s.match })) ?? [
+      { label: '', kind: 'tag', value: '' },
+      { label: '', kind: 'conversion', value: '' },
+    ],
+  )
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
@@ -1511,20 +1805,42 @@ function FunnelForm({
     setSaving(true)
     setError('')
     try {
-      const res = await api.analytics.v6Funnels.create(accountId, {
-        name: name.trim(),
-        windowDays: Number(windowDays),
-        steps: steps.map((s) => ({
-          label: s.label.trim(),
-          kind: s.kind,
-          match: matchFor(s.kind, s.value.trim()),
-        })),
+      const payloadSteps = steps.map((s) => {
+        // フォームに出せない副条件は元の版から残す。段の種類を変えた段は
+        // matchBaseを捨ててあるので、ここで混ざることはない。
+        const match = s.matchBase ? { ...s.matchBase } : matchFor(s.kind, s.value.trim())
+        if (s.matchBase) {
+          const key = funnelStepPrimaryKey(s.kind)
+          if (key) match[key] = s.value.trim()
+        }
+        return { label: s.label.trim(), kind: s.kind, match }
       })
-      if (!res.success) {
-        setError(res.error)
-        return
+      if (edit) {
+        const res = await api.analytics.v6Funnels.createVersion(accountId, edit.funnelId, {
+          name: name.trim(),
+          windowDays: Number(windowDays),
+          steps: payloadSteps,
+          segment: edit.segment,
+          comparisonGroups: edit.comparisonGroups,
+          expectedVersionNumber: edit.expectedVersionNumber,
+        })
+        if (!res.success) {
+          setError(explainStartError(res.error, res.error))
+          return
+        }
+        onCreated(edit.funnelId)
+      } else {
+        const res = await api.analytics.v6Funnels.create(accountId, {
+          name: name.trim(),
+          windowDays: Number(windowDays),
+          steps: payloadSteps,
+        })
+        if (!res.success) {
+          setError(res.error)
+          return
+        }
+        onCreated(res.data.funnelId)
       }
-      onCreated(res.data.funnelId)
     } catch {
       setError('保存に失敗しました')
     } finally {
@@ -1557,6 +1873,10 @@ function FunnelForm({
           value={windowDays}
           onChange={(e) => setWindowDays(e.target.value)}
           options={[
+            // API経由で7/30/90以外の日数が付いたファネルも、編集で値を失わないよう現在値を足す
+            ...(['7', '30', '90'].includes(windowDays)
+              ? []
+              : [{ value: windowDays, label: `${windowDays}日以内` }]),
             { value: '7', label: '7日以内' },
             { value: '30', label: '30日以内' },
             { value: '90', label: '90日以内' },
@@ -1590,7 +1910,8 @@ function FunnelForm({
                 value={step.kind}
                 onChange={(e) =>
                   setSteps((prev) =>
-                    prev.map((s, j) => (i === j ? { ...s, kind: e.target.value } : s)),
+                    // 種類を変えた段は旧条件のmatchを引き継がない（別種類のキーが残ると誤集計になる）
+                    prev.map((s, j) => (i === j ? { ...s, kind: e.target.value, matchBase: undefined } : s)),
                   )
                 }
                 aria-label={`${i + 1}段目で何をしたら進むか`}
@@ -1646,7 +1967,7 @@ function FunnelForm({
           disabled={saving}
           variant="primary"
         >
-          {saving ? '保存中...' : '作成'}
+          {saving ? '保存中...' : edit ? '新版として保存' : '作成'}
         </Button>
         <Button
           onClick={onCancel}
