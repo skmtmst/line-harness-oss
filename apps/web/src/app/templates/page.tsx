@@ -7,6 +7,7 @@ import { api, ApiError, type BroadcastAssetKind, type TemplateQuestion } from '@
 import FlexPreviewComponent from '@/components/flex-preview'
 import ImageUploader from '@/components/shared/image-uploader'
 import BroadcastAssetManager from '@/components/broadcasts/broadcast-asset-manager'
+import StaffAssetList from './staff-asset-list'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
@@ -679,9 +680,11 @@ export default function TemplatesPage() {
           ]}
         >
           {folderError ? <p role="alert" className="text-danger text-xs">{folderError}</p> : null}
-          <p className="text-ink-faint text-xs leading-relaxed">
-            テンプレートは一覧の「置き場」から移せます。
-          </p>
+          {canMutateTemplates ? (
+            <p className="text-ink-faint text-xs leading-relaxed">
+              テンプレートは一覧の「置き場」から移せます。
+            </p>
+          ) : null}
         </FolderPanel>
       </div>
       <div className="min-w-0 flex-1">
@@ -1064,25 +1067,30 @@ export default function TemplatesPage() {
                 )}
 
                 <div>
-                  <label className="mb-1.5 block text-[11px] font-medium text-ink-faint" htmlFor="template-folder-select">
-                    置き場
-                  </label>
                   {canMutateTemplates ? (
-                    <SelectField
-                      id="template-folder-select"
-                      aria-label="置き場"
-                      value={drawerData.folderId ?? ''}
-                      disabled={movingId === drawerData.id}
-                      onChange={(event) => void moveTemplate(
-                        drawerData,
-                        event.target.value === '' ? null : event.target.value,
-                      )}
-                      options={[{ value: '', label: '未分類' }, ...folders.map((folder) => ({ value: folder.id, label: folder.name }))]}
-                    />
+                    <>
+                      <label className="mb-1.5 block text-[11px] font-medium text-ink-faint" htmlFor="template-folder-select">
+                        置き場
+                      </label>
+                      <SelectField
+                        id="template-folder-select"
+                        aria-label="置き場"
+                        value={drawerData.folderId ?? ''}
+                        disabled={movingId === drawerData.id}
+                        onChange={(event) => void moveTemplate(
+                          drawerData,
+                          event.target.value === '' ? null : event.target.value,
+                        )}
+                        options={[{ value: '', label: '未分類' }, ...folders.map((folder) => ({ value: folder.id, label: folder.name }))]}
+                      />
+                    </>
                   ) : (
-                    <p className="text-sm text-ink">
-                      {folders.find((folder) => folder.id === drawerData.folderId)?.name ?? '未分類'}
-                    </p>
+                    <>
+                      <p className="text-ink-faint mb-1.5 text-xs font-medium">置き場</p>
+                      <p className="text-sm text-ink">
+                        {folders.find((folder) => folder.id === drawerData.folderId)?.name ?? '未分類'}
+                      </p>
+                    </>
                   )}
                 </div>
 
@@ -1370,16 +1378,14 @@ export default function TemplatesPage() {
       ) : (
         /*
          * N-144: 資産タブの作成・編集・削除APIも owner/admin 限定。
-         * BroadcastAssetManager は別領域の部品なので、ここでは staff の
-         * 操作だけを inert で止め、中身の閲覧は残す。
+         * BroadcastAssetManager は別領域の部品かつ変更系の操作を内蔵するため、
+         * staff へは閲覧専用の一覧だけを出す。
          */
         <div>
           <p className="text-ink-faint text-xs mb-3">
             カルーセル・リッチメッセージ・クーポン・リサーチの作成・変更・削除はオーナーと管理者だけができます。一覧の閲覧はこのまま使えます。
           </p>
-          <div inert>
-            <BroadcastAssetManager kind={activeSection} />
-          </div>
+          <StaffAssetList kind={activeSection} />
         </div>
       )}
       </div>

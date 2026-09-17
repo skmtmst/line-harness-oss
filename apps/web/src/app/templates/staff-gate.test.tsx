@@ -12,6 +12,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 
 const templateGet = vi.hoisted(() => vi.fn())
+const assetList = vi.hoisted(() => vi.fn())
 const searchParams = vi.hoisted(() => ({ value: new URLSearchParams() }))
 
 const TEMPLATES = [
@@ -46,7 +47,7 @@ vi.mock('@/lib/api', () => ({
       delete: vi.fn(),
       publish: vi.fn(),
     },
-    broadcastMessageAssets: { list: () => Promise.resolve({ success: true, data: [] }) },
+    broadcastMessageAssets: { list: assetList },
     folders: {
       list: () => Promise.resolve({ success: true, data: FOLDERS }),
       update: vi.fn(),
@@ -88,9 +89,15 @@ function stubRole(role: string | null) {
   })
 }
 
+const ASSETS = [
+  { id: 'asset-1', name: '秋キャンペーン', kind: 'card_message', updatedAt: '2026-09-10T00:00:00.000Z', payload: {} },
+]
+
 beforeEach(() => {
   searchParams.value = new URLSearchParams()
   templateGet.mockReset()
+  assetList.mockReset()
+  assetList.mockImplementation(() => Promise.resolve({ success: true, data: ASSETS }))
   templateGet.mockImplementation((id: string) => Promise.resolve({
     success: true,
     data: {
@@ -186,29 +193,32 @@ describe('テンプレート一覧のstaffゲート (N-144)', () => {
 })
 
 describe('資産タブのstaffゲート (N-144)', () => {
-  test('staffはカルーセル等のタブを閲覧できるが操作は効かない（inert）', async () => {
+  test('staffは資産の一覧を閲覧できるが、作成・編集・削除の操作は一切表示されない', async () => {
     stubRole('staff')
     await renderListAndWait()
 
     fireEvent.click(screen.getByText('カルーセル'))
-    await act(async () => { await Promise.resolve() })
-    await act(async () => { await Promise.resolve() })
-
-    // 変更系の操作は生きていない: 中身は見えるが inert で包まれる
+    // 閲覧は残る（一覧が出る）
+    expect(await screen.findByText('秋キャンペーン')).toBeTruthy()
+    // 案内文が出る
     expect(screen.getByText(/オーナーと管理者だけができます。一覧の閲覧はこのまま使えます/)).toBeTruthy()
-    const inertRegion = document.querySelector('[inert]')
-    expect(inertRegion).toBeTruthy()
+    // 変更系の操作は画面上に存在しない
+    expect(screen.queryByText('カルーセルを作る')).toBeNull()
+    expect(screen.queryByText('編集')).toBeNull()
+    expect(screen.queryByText('削除')).toBeNull()
+    // 閲覧系の遷移（一斉配信で使う）は残る
+    expect(screen.getByText('一斉配信で使う')).toBeTruthy()
   })
 
-  test('ownerの資産タブはinertにならず操作できる', async () => {
+  test('ownerの資産タブは変更系の操作も従来どおり出る', async () => {
     stubRole('owner')
     await renderListAndWait()
 
     fireEvent.click(screen.getByText('カルーセル'))
-    await act(async () => { await Promise.resolve() })
-    await act(async () => { await Promise.resolve() })
-
-    expect(document.querySelector('[inert]')).toBeNull()
+    // owner には作成ボタンと各カードの編集・削除が出る
+    expect(await screen.findByText('カルーセルを作る')).toBeTruthy()
+    expect(screen.getByText('編集')).toBeTruthy()
+    expect(screen.getByText('削除')).toBeTruthy()
     expect(screen.queryByText(/オーナーと管理者だけができます。一覧の閲覧はこのまま使えます/)).toBeNull()
   })
 })
@@ -223,10 +233,11 @@ describe('テンプレート詳細画面のstaffゲート (N-144)', () => {
 
     // 閲覧は残る（本文が読める — 本文とプレビューの2箇所に出る）
     expect((await screen.findAllByText('ご来店ありがとうございました。')).length).toBeGreaterThan(0)
-    // 編集・削除の口は出ない
+    // 編集・削除の口は出ない（セクションの見出し自体も出さない）
     expect(screen.queryByText('テンプレートを編集')).toBeNull()
     expect(screen.queryByText('テンプレートを削除')).toBeNull()
     expect(screen.queryByText('使用中のため削除できません')).toBeNull()
+    expect(screen.queryByText('このテンプレートを削除する')).toBeNull()
   })
 
   test('ownerには編集・削除ボタンが出る', async () => {

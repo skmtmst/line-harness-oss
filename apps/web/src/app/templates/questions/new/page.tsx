@@ -54,7 +54,6 @@ function questionSummary(question: ScenarioQuestion): string[] {
 }
 
 function QuestionTemplatePageInner() {
-  usePageTitle('質問を作る')
   const router = useRouter()
   const { selectedAccountId, loading: accountLoading } = useAccount()
   const params = useSearchParams()
@@ -73,6 +72,7 @@ function QuestionTemplatePageInner() {
   // フォームを出さず、保存まで辿り着けないようにする。
   const [canMutateTemplates] = useState(() =>
     typeof window === 'undefined' ? true : isOwnerOrAdmin())
+  usePageTitle(canMutateTemplates ? '質問を作る' : '質問テンプレート')
 
   // 分類名の候補は置き場の一覧から取る。テンプレ全件を引くと件数が増えるほど重くなる。
   useEffect(() => {

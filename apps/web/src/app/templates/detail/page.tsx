@@ -238,14 +238,14 @@ function TemplateDetailInner() {
               </p>
             </section>
 
-            <section className="border-danger-bg bg-canvas rounded-card border p-5">
-              <p className="text-danger text-sm font-semibold">このテンプレートを削除する</p>
-              <p className="text-ink-faint mt-1 text-xs leading-relaxed">
-                {usageCount > 0
-                  ? `${usageCount}か所で使われています。先に上の使用先を差し替えてください。`
-                  : 'どこからも呼ばれていないので、削除しても他の画面に影響しません。'}
-              </p>
-              {canMutateTemplates && (
+            {canMutateTemplates && (
+              <section className="border-danger-bg bg-canvas rounded-card border p-5">
+                <p className="text-danger text-sm font-semibold">このテンプレートを削除する</p>
+                <p className="text-ink-faint mt-1 text-xs leading-relaxed">
+                  {usageCount > 0
+                    ? `${usageCount}か所で使われています。先に上の使用先を差し替えてください。`
+                    : 'どこからも呼ばれていないので、削除しても他の画面に影響しません。'}
+                </p>
                 <button
                   onClick={() => { setDeleteError(''); setDeleteOpen(true) }}
                   disabled={usageCount > 0}
@@ -254,8 +254,8 @@ function TemplateDetailInner() {
                 >
                   {usageCount > 0 ? '使用中のため削除できません' : 'テンプレートを削除'}
                 </button>
-              )}
-            </section>
+              </section>
+            )}
           </div>
 
           <div data-design="Right" className="w-full shrink-0 space-y-4 xl:w-80">
