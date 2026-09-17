@@ -8,17 +8,19 @@ import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { ApiError } from '@/lib/api'
 import { nenRanksApi, type NenRankSettingsData } from '@/lib/nen-ranks-api'
+import FeedingTab from './feeding-tab'
 import LifetimeTab from './lifetime-tab'
 import MembersTab from './members-tab'
 import RankSettingsTab from './rank-settings-tab'
 
-export type MemberTab = 'members' | 'ranks' | 'lifetime'
+export type MemberTab = 'members' | 'ranks' | 'lifetime' | 'feeding'
 export type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden'
 
 /**
  * 然-NEN- 会員。★V6 37-1（`IqL2Z`）会員一覧／37-1-A（`p7xHl`）ランク設定／37-1-B（`Vt65m`）ライフタイム。
  *
  * L 一覧型: 1行目（タブ）→ 数値カード帯 → 案内帯 → 一覧操作 → 表。
+ * 「給与量」タブ：主食のカロリー表（マイページ「今日の目安」の元。★V6 37-2）。
  * 「ECとの照合」タブは既存の「会員のつき合わせ」（23-1-A）へつなぐ。
  *
  * 言葉：お客様に見える「ポイント」は使わず「マイル」。通年（1〜12月の購入額）／ライフタイム（累計）／マイル残高。
@@ -37,7 +39,7 @@ function MembersInner() {
   const params = useSearchParams()
   const { selectedAccountId } = useAccount()
   const tabParam = params.get('tab')
-  const tab: MemberTab = tabParam === 'ranks' ? 'ranks' : tabParam === 'lifetime' ? 'lifetime' : 'members'
+  const tab: MemberTab = tabParam === 'ranks' ? 'ranks' : tabParam === 'lifetime' ? 'lifetime' : tabParam === 'feeding' ? 'feeding' : 'members'
 
   const [status, setStatus] = useState<LoadStatus>('loading')
   const [settings, setSettings] = useState<NenRankSettingsData | null>(null)
@@ -70,6 +72,7 @@ function MembersInner() {
             { label: '会員一覧', count: settings?.kpis.members, current: tab === 'members', onClick: () => changeTab('members') },
             { label: 'ランク設定', current: tab === 'ranks', onClick: () => changeTab('ranks') },
             { label: 'ライフタイム', current: tab === 'lifetime', onClick: () => changeTab('lifetime') },
+            { label: '給与量', current: tab === 'feeding', onClick: () => changeTab('feeding') },
             { label: 'ECとの照合', href: '/ec-commerce/identity-candidates' },
           ]}
         />
@@ -79,6 +82,8 @@ function MembersInner() {
         <RankSettingsTab accountId={selectedAccountId} status={status} settings={settings} onSaved={setSettings} onRetry={() => void load()} />
       ) : tab === 'lifetime' ? (
         <LifetimeTab accountId={selectedAccountId} status={status} settings={settings} onSaved={setSettings} onRetry={() => void load()} />
+      ) : tab === 'feeding' ? (
+        <FeedingTab accountId={selectedAccountId} />
       ) : (
         <MembersTab accountId={selectedAccountId} settingsStatus={status} settings={settings} />
       )}

@@ -438,8 +438,49 @@ export function ecTextMessage(event: EcEvent, options?: EcMessageOptions): Messa
   ], options);
 }
 
+/**
+ * `X-Line-Account-Id` が無いときの宛先の決め方（EC-CUBE 側はこのヘッダーを送らず、
+ * 署名も `timestamp.body`（アカウントIDなし）で作る。/columns と同じ決まり）。
+ *
+ * 1. 出来事の `line_user_id` が、動いている LINE アカウントの友だちとして 1 件だけ見つかれば、そのアカウント
+ * 2. 見つからなければ、動いているアカウントが 1 つだけならそのアカウント
+ * 3. どちらでも決まらなければ null（→ 400）
+ */
+async function resolveAccountIdWithoutHeader(db: D1Database, lineUserId: string | null): Promise<string | null> {
+  if (lineUserId) {
+    const friends = await db.prepare(
+      `SELECT f.line_account_id AS id FROM friends f JOIN line_accounts a ON a.id = f.line_account_id
+        WHERE f.line_user_id = ? AND a.is_active = 1 AND a.archived_at IS NULL LIMIT 2`,
+    ).bind(lineUserId).all<{ id: string }>();
+    const ids = [...new Set((friends.results ?? []).map((row) => String(row.id)))];
+    if (ids.length === 1) return ids[0];
+  }
+  const activeAccounts = await db.prepare(
+    `SELECT id
+       FROM line_accounts
+      WHERE is_active = 1 AND archived_at IS NULL
+      ORDER BY id
+      LIMIT 2`,
+  ).all<{ id: string }>();
+  const ids = (activeAccounts.results ?? []).map((row) => String(row.id));
+  return ids.length === 1 ? ids[0] : null;
+}
+
+function lineUserIdFromRawBody(rawBody: string): string | null {
+  try {
+    const parsed = JSON.parse(rawBody) as { line_user_id?: unknown };
+    return typeof parsed?.line_user_id === 'string' && /^U[0-9a-f]{32}$/i.test(parsed.line_user_id) ? parsed.line_user_id : null;
+  } catch {
+    return null;
+  }
+}
+
 ecIntegrations.post('/api/integrations/eccube/events', async (c) => {
   const requestedLineAccountId = c.req.header('x-line-account-id')?.trim();
+  // ヘッダー無し（EC-CUBE 標準）で署名の時刻も無い呼び出しは、宛先を探す前に断る。
+  if (!requestedLineAccountId && !c.req.header('x-nen-timestamp')) {
+    return c.json({ success: false, error: 'LINE account is required' }, 400);
+  }
   const secret = c.env.ECCUBE_WEBHOOK_SECRET;
   if (!secret || secret.length < 32) {
     console.error('[ec-event] ECCUBE_WEBHOOK_SECRET is missing or too short');
@@ -454,34 +495,22 @@ ecIntegrations.post('/api/integrations/eccube/events', async (c) => {
   const rawBody = await c.req.text();
   if (utf8Length(rawBody) > MAX_BODY_BYTES) return c.json({ success: false, error: 'Payload too large' }, 413);
 
-  let lineAccountId = requestedLineAccountId;
-  if (!lineAccountId) {
-    const activeAccounts = await c.env.DB.prepare(
-      `SELECT id
-         FROM line_accounts
-        WHERE is_active = 1 AND archived_at IS NULL
-        ORDER BY id
-        LIMIT 2`,
-    ).all<{ id: string }>();
-    if (activeAccounts.results.length !== 1) {
-      return c.json({ success: false, error: 'LINE account is required' }, 400);
-    }
-    lineAccountId = activeAccounts.results[0]!.id;
-  }
-
   const timestamp = c.req.header('x-nen-timestamp') || '';
   const signature = (c.req.header('x-nen-signature') || '').replace(/^sha256=/i, '');
   const timestampSeconds = Number(timestamp);
   if (!Number.isInteger(timestampSeconds) || Math.abs(Date.now() / 1000 - timestampSeconds) > MAX_CLOCK_SKEW_SECONDS) {
     return c.json({ success: false, error: 'Expired request' }, 401);
   }
+  // ヘッダー無し（EC-CUBE 標準）は署名を先に確かめ、本文の line_user_id から宛先を決める。
   const signedPayload = requestedLineAccountId
-    ? `${timestamp}.${lineAccountId}.${rawBody}`
+    ? `${timestamp}.${requestedLineAccountId}.${rawBody}`
     : `${timestamp}.${rawBody}`;
   const expected = await hmacHex(secret, signedPayload);
   if (!constantTimeHexEqual(signature.toLowerCase(), expected)) {
     return c.json({ success: false, error: 'Invalid signature' }, 401);
   }
+  const lineAccountId = requestedLineAccountId || await resolveAccountIdWithoutHeader(c.env.DB, lineUserIdFromRawBody(rawBody));
+  if (!lineAccountId) return c.json({ success: false, error: 'LINE account is required' }, 400);
 
   const account = await getLineAccountById(c.env.DB, lineAccountId);
   if (!account || account.is_active !== 1) {

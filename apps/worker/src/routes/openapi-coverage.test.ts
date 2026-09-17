@@ -198,6 +198,7 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'GET /api/mileage/redemptions',
   'GET /api/mileage/rules',
   'GET /api/mileage/rules/export',
+  'GET /api/nen/feeding-products',
   'GET /api/nen/members',
   'GET /api/nen/rank-settings',
   'GET /api/nen-campaigns/deliveries',
@@ -349,6 +350,8 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'PUT /api/scenarios/{id}/steps/{stepId}',
   'PUT /api/users/{id}',
   'PUT /api/nen/lifetime-milestones',
+  'PUT /api/liff/nen/pets/{id}',
+  'PUT /api/nen/feeding-products',
   'PUT /api/nen/rank-settings',
 ]);
 
