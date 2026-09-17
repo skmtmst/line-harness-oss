@@ -94,6 +94,7 @@ shared-button-importer app/ops/audit/page.tsx
 shared-button-importer app/ops/invite/page.tsx
 shared-button-importer app/ops/login/page.tsx
 shared-button-importer app/ops/members/page.tsx
+shared-button-importer app/ops/support/page.tsx
 shared-button-importer app/ops/tenants/detail/page.tsx
 shared-button-importer app/ops/tenants/page.tsx
 shared-button-importer app/ops/two-factor/page.tsx
