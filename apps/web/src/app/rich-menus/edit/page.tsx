@@ -322,6 +322,23 @@ function Editor({
     dirty,
     busy: saving || publishing || unpublishing || deleting || busy,
   })
+  /*
+   * N-162: 離脱確認の窓は step 1/2/3 のどこにいても出す。
+   * targeting/publish は早期 return で別ツリーになるため、ここで要素化して
+   * 全経路へ差し込む。step 1 だけに置くと、dirty 中のリンクが黙って止まり
+   * 「保存せずに移動」を選ぶ手段がなくなる。
+   */
+  const leaveConfirmDialog = (
+    <ConfirmDialog
+      open={leaveTarget !== null}
+      title="保存していない変更があります"
+      description="このまま移動すると、メニューへの変更は失われます。保存せずに移動しますか？"
+      confirmLabel="保存せずに移動"
+      cancelLabel="編集を続ける"
+      onConfirm={confirmLeave}
+      onCancel={cancelLeave}
+    />
+  )
 
   const closeConfirm = () => {
     if (publishing || unpublishing) return
@@ -735,6 +752,7 @@ function Editor({
 
   if (editorStep === 'targeting') {
     return (
+      <>
       <TargetingStep
         group={group}
         targetingEnabled={targetingEnabled}
@@ -751,11 +769,14 @@ function Editor({
         onRefresh={() => void reloadTargetPreview()}
         onSave={() => void handleSave()}
       />
+      {leaveConfirmDialog}
+      </>
     )
   }
 
   if (editorStep === 'publish') {
     return (
+      <>
       <PublishStep
         group={group}
         pages={pages}
@@ -766,6 +787,8 @@ function Editor({
         onPublishNow={() => void handlePublish()}
         onSchedule={scheduleSubmit}
       />
+      {leaveConfirmDialog}
+      </>
     )
   }
 
@@ -1299,15 +1322,7 @@ function Editor({
         N-162: 未保存の変更がある間だけ、画面を離れる操作に確認を出す。
         保存成功後は署名が更新されて dirty が外れるので、確認は出ない。
       */}
-      <ConfirmDialog
-        open={leaveTarget !== null}
-        title="保存していない変更があります"
-        description="このまま移動すると、メニューへの変更は失われます。保存せずに移動しますか？"
-        confirmLabel="保存せずに移動"
-        cancelLabel="編集を続ける"
-        onConfirm={confirmLeave}
-        onCancel={cancelLeave}
-      />
+      {leaveConfirmDialog}
 
       <StickyBar actions={(
         <div className="flex items-center gap-2">

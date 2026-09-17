@@ -202,6 +202,23 @@ describe('リッチメニュー編集の未保存ガード (N-162)', () => {
     expect(screen.queryByText('保存していない変更があります')).toBeNull()
   })
 
+  test('step=targeting でも離脱確認が出る（どの段階でも窓は届く）', async () => {
+    searchParams.value = new URLSearchParams('id=grp-1&step=targeting')
+    render(<RichMenuEditPage />)
+    await flush()
+
+    // 出し分けをONにしてdirty化（2つ目の audience radio が「条件に当てはまる友だちだけ」）
+    await screen.findByText('このメニューを出す相手')
+    const radios = document.querySelectorAll<HTMLInputElement>('input[name="audience"]')
+    fireEvent.click(radios[1])
+    await flush()
+    fireEvent.click(screen.getByText('リッチメニュー'))
+    await flush()
+
+    expect(screen.getByText('保存していない変更があります')).toBeTruthy()
+    expect(routerPush).not.toHaveBeenCalled()
+  })
+
   test('ステップ移動は同一画面の段階移動なので確認を出さない', async () => {
     searchParams.value = new URLSearchParams('id=grp-1')
     render(<RichMenuEditPage />)
