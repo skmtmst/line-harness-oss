@@ -12,7 +12,7 @@ import type {
   BannerStats,
   BannerUsage,
 } from './hq-banners'
-import type { HqSupportKind, HqSupportRequest } from './hq-support'
+import type { HqSupportDetail, HqSupportKind, HqSupportMessage, HqSupportRequest } from './hq-support'
 import type { BillingInterval, BillingInvoice, BillingSummary, PlanKey } from './hq-billing'
 import type {
   ReminderDraftSettings,
@@ -6622,6 +6622,14 @@ export const api = {
       attachments?: Array<{ mimeType: string; data: string }>
     }) =>
       fetchApi<ApiResponse<HqSupportRequest & { notified: boolean }>>('/api/hq/support/requests', {
+        method: 'POST',
+        body: JSON.stringify(input),
+      }),
+    /** 1 件のやり取り（★V6 36-3-A）。 */
+    detail: (id: string) => fetchApi<ApiResponse<HqSupportDetail>>(`/api/hq/support/requests/${encodeURIComponent(id)}`),
+    /** 続きを送る。運営のチケットは対応中へ戻る。 */
+    followUp: (id: string, input: { body: string; attachments?: Array<{ mimeType: string; data: string }> }) =>
+      fetchApi<ApiResponse<HqSupportMessage & { stage: string; status: string }>>(`/api/hq/support/requests/${encodeURIComponent(id)}/messages`, {
         method: 'POST',
         body: JSON.stringify(input),
       }),

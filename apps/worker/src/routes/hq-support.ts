@@ -8,8 +8,12 @@ import {
   markHqSupportRequestNotified,
   type HqSupportKind,
   type HqSupportRequest,
+  addSupportTenantMessage,
   formatTicketNo,
+  getHqSupportRequest,
+  getSupportTicket,
   listSupportMessages,
+  SUPPORT_STAGE_LABELS,
 } from '@line-crm/db';
 import type { Env } from '../index.js';
 import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
@@ -100,6 +104,27 @@ function decodeBase64(data: string): Uint8Array | null {
   }
 }
 
+type Upload = { key: string; bytes: Uint8Array; mimeType: string };
+
+/** 添付（base64 の画像）を検査して R2 のキーを決める。36-3 の送信と 36-3-A の続きで共通。 */
+function parseAttachments(raw: unknown): { uploads: Upload[] } | { error: string; status: 400 | 413 } {
+  const attachmentsRaw = Array.isArray(raw) ? raw : [];
+  if (attachmentsRaw.length > ATTACHMENT_MAX) return { error: `画像は${ATTACHMENT_MAX}枚までです`, status: 400 };
+  const uploads: Upload[] = [];
+  for (const item of attachmentsRaw) {
+    const record = item as Record<string, unknown>;
+    const mimeType = typeof record.mimeType === 'string' ? record.mimeType : '';
+    const data = typeof record.data === 'string' ? record.data : '';
+    if (!ATTACHMENT_TYPES.has(mimeType)) return { error: '画像は PNG・JPEG のみ添付できます', status: 400 };
+    const bytes = decodeBase64(data);
+    if (!bytes) return { error: '画像の中身を読み取れませんでした', status: 400 };
+    if (bytes.byteLength > ATTACHMENT_BYTES_MAX) return { error: '画像が大きすぎます（1枚 5MB まで）', status: 413 };
+    if (!hasImageSignature(bytes, mimeType)) return { error: '画像の実際の形式が、選択された形式と一致しません', status: 400 };
+    uploads.push({ key: `support/${crypto.randomUUID()}.${mimeType === 'image/png' ? 'png' : 'jpg'}`, bytes, mimeType });
+  }
+  return { uploads };
+}
+
 hqSupport.get('/api/hq/support/requests', async (c) => {
   try {
     const rows = await listHqSupportRequests(c.env.DB, tenantOf(c));
@@ -157,22 +182,9 @@ hqSupport.post('/api/hq/support/requests', requireRole('owner', 'admin', 'staff'
       lineAccountName = accountLabel?.name ?? null;
     }
 
-    const attachmentsRaw = Array.isArray(body.attachments) ? body.attachments : [];
-    if (attachmentsRaw.length > ATTACHMENT_MAX) {
-      return c.json({ success: false, error: `画像は${ATTACHMENT_MAX}枚までです` }, 400);
-    }
-    const uploads: Array<{ key: string; bytes: Uint8Array; mimeType: string }> = [];
-    for (const item of attachmentsRaw) {
-      const record = item as Record<string, unknown>;
-      const mimeType = typeof record.mimeType === 'string' ? record.mimeType : '';
-      const data = typeof record.data === 'string' ? record.data : '';
-      if (!ATTACHMENT_TYPES.has(mimeType)) return c.json({ success: false, error: '画像は PNG・JPEG のみ添付できます' }, 400);
-      const bytes = decodeBase64(data);
-      if (!bytes) return c.json({ success: false, error: '画像の中身を読み取れませんでした' }, 400);
-      if (bytes.byteLength > ATTACHMENT_BYTES_MAX) return c.json({ success: false, error: '画像が大きすぎます（1枚 5MB まで）' }, 413);
-      if (!hasImageSignature(bytes, mimeType)) return c.json({ success: false, error: '画像の実際の形式が、選択された形式と一致しません' }, 400);
-      uploads.push({ key: `support/${crypto.randomUUID()}.${mimeType === 'image/png' ? 'png' : 'jpg'}`, bytes, mimeType });
-    }
+    const parsed = parseAttachments(body.attachments);
+    if ('error' in parsed) return c.json({ success: false, error: parsed.error }, parsed.status);
+    const uploads = parsed.uploads;
     for (const upload of uploads) {
       await c.env.IMAGES.put(upload.key, upload.bytes, { httpMetadata: { contentType: upload.mimeType } });
     }
@@ -237,6 +249,124 @@ hqSupport.post('/api/hq/support/requests', requireRole('owner', 'admin', 'staff'
     }, 201);
   } catch (err) {
     console.error('POST /api/hq/support/requests error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+/** 36-3-A：1 件のやり取り。統括の境界（tenant_id）で必ず絞る。 */
+hqSupport.get('/api/hq/support/requests/:id', async (c) => {
+  try {
+    const tenantId = tenantOf(c);
+    const row = await getHqSupportRequest(c.env.DB, c.req.param('id'), tenantId);
+    if (!row) return c.json({ success: false, error: 'お問い合わせが見つかりません' }, 404);
+    const base = workerUrl(c);
+    const messages = await listSupportMessages(c.env.DB, row.id);
+    return c.json({
+      success: true,
+      data: {
+        ...serialize(row, base, messages.filter((m) => m.author_kind === 'ops').map((m) => ({ id: m.id, authorName: m.author_name, body: m.body, createdAt: m.created_at }))),
+        stageLabel: SUPPORT_STAGE_LABELS[row.stage],
+        messages: messages.map((m) => ({
+          id: m.id,
+          authorKind: m.author_kind,
+          authorName: m.author_kind === 'ops' ? `musubo 運営 ／ ${m.author_name}` : m.author_name,
+          body: m.body,
+          attachments: safeKeysOf(m.attachment_keys).map((key) => ({ key, url: `${base}/images/${key}` })),
+          createdAt: m.created_at,
+        })),
+        canFollowUp: true,
+      },
+    });
+  } catch (err) {
+    console.error('GET /api/hq/support/requests/:id error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+function safeKeysOf(raw: string): string[] {
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    return Array.isArray(parsed) ? parsed.filter((k): k is string => typeof k === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
+/** 36-3-A：続きを送る。運営のチケットは対応中へ戻り、運営へ通知メール、送信者に控えを送る。 */
+hqSupport.post('/api/hq/support/requests/:id/messages', requireRole('owner', 'admin', 'staff'), async (c) => {
+  try {
+    const tenantId = tenantOf(c);
+    const staff = c.get('staff');
+    const row = await getHqSupportRequest(c.env.DB, c.req.param('id'), tenantId);
+    if (!row) return c.json({ success: false, error: 'お問い合わせが見つかりません' }, 404);
+    const body = await c.req.json<Record<string, unknown>>().catch(() => null);
+    if (!body) return c.json({ success: false, error: '送信内容を読み取れませんでした' }, 400);
+    const text = typeof body.body === 'string' ? body.body.trim() : '';
+    if (!text) return c.json({ success: false, error: '本文を入力してください' }, 400);
+    if (text.length > BODY_MAX) return c.json({ success: false, error: `本文は${BODY_MAX}文字以内で入力してください` }, 400);
+    const parsed = parseAttachments(body.attachments);
+    if ('error' in parsed) return c.json({ success: false, error: parsed.error }, parsed.status);
+    for (const upload of parsed.uploads) {
+      await c.env.IMAGES.put(upload.key, upload.bytes, { httpMetadata: { contentType: upload.mimeType } });
+    }
+    const member = staff?.id ? await getStaffById(c.env.DB, staff.id).catch(() => null) : null;
+    const staffName = member?.name ?? staff?.name ?? '';
+    const staffEmail = member?.email ?? row.staff_email ?? null;
+    const message = await addSupportTenantMessage(c.env.DB, {
+      requestId: row.id,
+      staffId: staff?.id ?? null,
+      staffName,
+      body: text,
+      attachmentKeys: parsed.uploads.map((u) => u.key),
+    });
+
+    const base = workerUrl(c);
+    const ticket = await getSupportTicket(c.env.DB, row.id);
+    const ticketLabel = formatTicketNo(row.ticket_no ?? null);
+    const lines = [
+      `チケット: ${ticketLabel}`,
+      `件名: ${row.subject}`,
+      `統括: ${ticket?.tenant_name ?? tenantId}`,
+      `送信者: ${staffName}${staffEmail ? ` <${staffEmail}>` : ''}`,
+      '',
+      text,
+      parsed.uploads.length > 0 ? '' : null,
+      parsed.uploads.length > 0 ? `添付: ${parsed.uploads.map((u) => `${base}/images/${u.key}`).join('\n')}` : null,
+    ].filter((line): line is string => line !== null);
+    const operatorTo = c.env.SUPPORT_NOTIFY_EMAIL || c.env.CONTACT_EMAIL;
+    try {
+      if (operatorTo) {
+        await sendPlainMail(c.env, {
+          to: operatorTo,
+          subject: `【musubo お問い合わせ】続き ${ticketLabel}: ${row.subject}`,
+          body: lines.join('\n'),
+        });
+      }
+      if (staffEmail) {
+        await sendPlainMail(c.env, {
+          to: staffEmail,
+          subject: `【musubo】お問い合わせの続きを受け付けました ${ticketLabel}: ${row.subject}`,
+          body: `${staffName} 様\n\nお問い合わせの続きを受け付けました。返信は登録メールアドレスと管理画面のお問い合わせに届きます。\n\n${lines.join('\n')}`,
+        });
+      }
+    } catch (error) {
+      console.warn('hq support follow-up mail failed:', error instanceof Error ? error.message : error);
+    }
+    return c.json({
+      success: true,
+      data: {
+        id: message.id,
+        authorKind: 'tenant',
+        authorName: message.author_name,
+        body: message.body,
+        attachments: parsed.uploads.map((u) => ({ key: u.key, url: `${base}/images/${u.key}` })),
+        createdAt: message.created_at,
+        stage: ticket?.stage ?? 'in_progress',
+        status: ticket?.status ?? 'open',
+      },
+    }, 201);
+  } catch (err) {
+    console.error('POST /api/hq/support/requests/:id/messages error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });

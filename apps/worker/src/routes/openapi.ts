@@ -730,6 +730,12 @@ const spec = {
       },
     },
     // ── Ops Console（★V6 37 運営コンソール）─────────────────────────────
+    '/api/hq/support/requests/{id}': {
+      get: { tags: ['HQ Support'], summary: 'お問い合わせ 1 件のやり取り（★V6 36-3-A）', parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }], responses: { '200': { description: 'Request with messages' }, '404': { description: 'Not found' } } },
+    },
+    '/api/hq/support/requests/{id}/messages': {
+      post: { tags: ['HQ Support'], summary: 'お問い合わせの続きを送る（運営へ通知・控えを送信）', parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }], requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['body'], properties: { body: { type: 'string' }, attachments: { type: 'array', items: { type: 'object' } } } } } } }, responses: { '201': { description: 'Message added' }, '400': { description: 'Validation error' }, '404': { description: 'Not found' }, '413': { description: 'Attachment too large' } } },
+    },
     '/api/ops/me': {
       get: { tags: ['Ops Console'], summary: 'ログイン中の運営マスター', responses: { '200': { description: 'Platform admin identity and active impersonation' }, '403': { description: 'Not a platform admin' } } },
     },

@@ -104,4 +104,7 @@ SQL を流さない手順（推奨）: `platform_admins` が空の間は、既�
 - 返信すると `stage` は既定で「待ち」（相手の返事待ち）。返信と同時に「解決済み」にもできる。クローズ済みには返信できない。
 - 監査: 閲覧 `ticket.view`（統括には見せない）、返信 `ticket.reply`（統括に見せる）、状態変更 `ticket.stage.change`、運営の起票 `ticket.create`。
 - 「契約者専用LINEにも通知します」は 37-7（お知らせ配信）の LINE の口ができてから足す。いまは `delivered_via` に `screen` / `email` だけが入る。
+- 統括側の続き（★V6 36-3-A `Nt0UH`）: `GET /api/hq/support/requests/:id`・`POST /api/hq/support/requests/:id/messages`（`apps/worker/src/routes/hq-support.ts`）と `apps/web/src/app/hq/support/detail/page.tsx`。36-3 の「これまでの問い合わせ」から開く。続きを送ると運営のチケットは待ち・解決済み・クローズから「対応中」へ戻り、運営（`SUPPORT_NOTIFY_EMAIL` か `CONTACT_EMAIL`）へ通知、送信者に控えが届く。
+- 運営コンソールの画面は API の例外を `opsCall`（`apps/web/src/components/ops/ops-ui.tsx`）で受ける。`fetchApi` は 2xx 以外を例外にするため、これが無いと busy のまま画面が固まる。
+- AI の下書きモデルは `OPS_SUPPORT_AI_MODEL`（未設定なら `@cf/meta/llama-3.3-70b-instruct-fp8-fast`）。応答は 45 秒で打ち切って 504。
 - AI が未設定（`AI` binding なし）の環境ではボタンを押せず、API は 503 を返す。
