@@ -6,6 +6,8 @@ import {
   getFolderById,
   updateMedia,
   deleteMedia,
+  archiveMedia,
+  restoreMedia,
   getMediaUsages,
   getMediaDeleteImpact,
   getMediaDeleteImpactSnapshot,
@@ -249,6 +251,9 @@ function serializeMedia(row: Media, workerUrl: string) {
     liveUrl: `${workerUrl}/media/${row.id}/content`,
     uploadedBy: row.uploaded_by,
     createdAt: row.created_at,
+    archivedAt: row.archived_at ?? null,
+    archivedBy: row.archived_by ?? null,
+    archiveReason: row.archive_reason ?? null,
     usageCount: row.usage_count === undefined ? undefined : Number(row.usage_count),
   };
 }
@@ -679,6 +684,9 @@ contents.get('/api/media', async (c) => {
       query: c.req.query('query')?.trim() || undefined,
       unusedOnly: c.req.query('unusedOnly') === '1',
       nearLimitOnly: c.req.query('nearLimitOnly') === '1',
+      archived: c.req.query('archived') === 'only' || c.req.query('archived') === 'all'
+        ? c.req.query('archived') as 'only' | 'all'
+        : undefined,
     };
     const [items, total] = await Promise.all([
       getMedia(c.env.DB, { ...filters, sort, limit, offset }),
@@ -971,6 +979,59 @@ contents.patch('/api/media/:id', requireRole('owner', 'admin'), async (c) => {
     }
   } catch (err) {
     console.error('PATCH /api/media/:id error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+/**
+ * アーカイブ／復元。消去ではなく一覧・新規選択から隠すだけなので、本文や
+ * 過去配信からの参照は切れない。理由を必須にして、いつ・誰が・なぜを
+ * 監査行へ残す。二重実行は既に目的側の状態なので 409 で引き返す。
+ */
+async function mediaArchiveRoute(c: Context<Env>, archive: boolean, mediaId: string) {
+  const body = await c.req.json().catch(() => null) as { accountId?: string; reason?: string } | null;
+  const accountId = c.req.query('accountId')?.trim() || body?.accountId?.trim();
+  if (!accountId) return c.json({ success: false, error: 'accountId required' }, 400);
+  if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
+    return c.json({ success: false, error: 'Not found' }, 404);
+  }
+  const reason = body?.reason?.trim();
+  if (!reason) {
+    return c.json({ success: false, code: 'media_reason_required', error: '理由を入力してください' }, 400);
+  }
+  const fn = archive ? archiveMedia : restoreMedia;
+  const result = await fn(c.env.DB, {
+    id: mediaId,
+    lineAccountId: accountId,
+    actorId: c.get('staff').id,
+    reason,
+  });
+  if (result.status === 'not_found') return c.json({ success: false, error: 'Not found' }, 404);
+  if (result.status === 'archived' || result.status === 'restored') {
+    const workerUrl = c.env.WORKER_URL || new URL(c.req.url).origin;
+    return c.json({ success: true, data: serializeMedia(result.media, workerUrl) });
+  }
+  return c.json({
+    success: false,
+    code: result.status,
+    error: archive ? 'このメディアは既にアーカイブ済みです' : 'このメディアは既に一覧へ戻っています',
+  }, 409);
+}
+
+contents.post('/api/media/:id/archive', requireRole('owner', 'admin'), async (c) => {
+  try {
+    return await mediaArchiveRoute(c, true, c.req.param('id'));
+  } catch (err) {
+    console.error('POST /api/media/:id/archive error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+contents.post('/api/media/:id/restore', requireRole('owner', 'admin'), async (c) => {
+  try {
+    return await mediaArchiveRoute(c, false, c.req.param('id'));
+  } catch (err) {
+    console.error('POST /api/media/:id/restore error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });

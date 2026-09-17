@@ -1094,6 +1094,72 @@ const spec = {
       },
     },
     /*
+     * アーカイブは消去ではない。本文・過去配信からの参照はそのまま使え、
+     * 一覧と新規選択からだけ外れる。理由と実行者を監査行へ残すため必須。
+     */
+    '/api/media/{id}/archive': {
+      post: {
+        tags: ['Contents'],
+        summary: '登録メディアを一覧・新規選択から退避（理由必須）',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['accountId', 'reason'],
+                properties: {
+                  accountId: { type: 'string' },
+                  reason: { type: 'string', description: '退避の理由（監査履歴へ残る）' },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          '200': { description: 'Archived media item' },
+          '400': { description: 'accountId or reason missing' },
+          '403': { description: 'Owner or admin role required' },
+          '404': { description: 'Media not found in account scope' },
+          '409': { description: 'Already archived' },
+        },
+      },
+    },
+    '/api/media/{id}/restore': {
+      post: {
+        tags: ['Contents'],
+        summary: '退避した登録メディアを一覧へ戻す（理由必須）',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['accountId', 'reason'],
+                properties: {
+                  accountId: { type: 'string' },
+                  reason: { type: 'string', description: '復帰の理由（監査履歴へ残る）' },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          '200': { description: 'Restored media item' },
+          '400': { description: 'accountId or reason missing' },
+          '403': { description: 'Owner or admin role required' },
+          '404': { description: 'Media not found in account scope' },
+          '409': { description: 'Already active' },
+        },
+      },
+    },
+    /*
      * 画像と本文を1回の送信単位にする（N-022）。2回に分けると画像だけが
      * 先に届く部分送信になる。片方だけの送信もこの口で受け付ける。
      */
