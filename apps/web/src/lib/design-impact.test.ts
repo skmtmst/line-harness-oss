@@ -50,7 +50,7 @@ describe('共通部品の影響範囲', () => {
     expect(directImporters(files, paginationCss, importIndex)).toEqual([pagination])
   })
 
-  it('共通Paginationを直接importする32ファイルだけを利用先に数える', () => {
+  it('共通Paginationを直接importする34ファイルだけを利用先に数える', () => {
     // ダッシュボードの受信カードが自前の「前へ／次へ」をやめて共通へ寄せた。
     // 設計（`vUXKb` / `NjK9q`）は表の下にページ送りがあり、番号で飛べる。
     // 2026-09-02: 成果地点と流入経路の押せない「前へ／次へ」も共通へ寄せた。
@@ -87,8 +87,11 @@ describe('共通部品の影響範囲', () => {
       'app/mileage/action-score-tab.tsx',
       'app/mileage/mileage-history-tab.tsx',
       'app/mileage/page.tsx',
+      // 2026-09-16 採用: 然の健康日記（★V6 37-4）とマイペット（★V6 37-3）。20頭ずつのページ送り。
+      'app/nen/health/health-tab.tsx',
       // 2026-09-16: 然の会員一覧（★V6 37-1）。20人ずつのページ送り。
       'app/nen/members/members-tab.tsx',
+      'app/nen/pets/pets-tab.tsx',
       'app/ops/audit/page.tsx',
       // 2026-09-04: 7-1-H 実行結果。友だち×通の実行が並ぶので、表の下にページ送りが要る。
       'app/reminders/detail/page.tsx',

@@ -104,6 +104,9 @@ export const MENU_SECTION_CATALOG: readonly MenuSectionCatalogEntry[] = [
     title: '専用機能',
     items: [
       { id: 'nen-members', featureKey: 'ec_commerce' },
+      // ★V6 37-3／37-4（2026-09-16 採用）。「投稿」と同じ photo_review の受け口。
+      { id: 'nen-pets', featureKey: 'photo_review' },
+      { id: 'nen-health', featureKey: 'photo_review' },
       { id: 'photo-review', featureKey: 'photo_review' },
       { id: 'nen-campaigns', featureKey: 'nen_campaigns' },
     ],
