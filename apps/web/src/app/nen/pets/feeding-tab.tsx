@@ -29,7 +29,7 @@ const FACTOR_ROWS: Array<{ label: string; dog: string; cat: string }> = [
 ]
 
 /**
- * 給与量タブ。★V6 37-1 会員の4つ目のタブ。
+ * 主食のカロリー タブ。★V6 37-3-A（`HVnzL`）マイペットの2つ目のタブ。
  *
  * 主食の「100g あたり kcal」を商品ごとに持つ。マイページ「今日の目安」（★V6 37-2）のグラム数はここから決まる。
  * 左：主食の表（商品名・kcal・既定）。右：計算のしかた（NRC／FEDIAF の式と係数。表示だけ）。
@@ -114,9 +114,9 @@ export default function FeedingTab({ accountId }: { accountId: string }) {
     }
   }
 
-  if (status === 'loading' && !data) return <ListState kind="loading" title="給与量の設定を読み込んでいます" />
+  if (status === 'loading' && !data) return <ListState kind="loading" title="主食のカロリー表を読み込んでいます" />
   if (status === 'forbidden') return <ListState kind="forbidden" />
-  if (status === 'error' || !data) return <ListState kind="error" title="給与量の設定を読み込めませんでした" description="通信の状態を確認して、もう一度お試しください。" onRetry={() => void load()} />
+  if (status === 'error' || !data) return <ListState kind="error" title="主食のカロリー表を読み込めませんでした" description="通信の状態を確認して、もう一度お試しください。" onRetry={() => void load()} />
 
   return (
     <>

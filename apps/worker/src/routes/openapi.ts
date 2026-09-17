@@ -618,6 +618,46 @@ const spec = {
         responses: { '200': { description: 'Saved products' }, '400': { description: 'Validation failed' }, '403': { description: 'Owner or admin role required' } },
       },
     },
+    // ── NEN Pets / Health（★V6 37-3／37-4） ──────────────────────────────
+    '/api/nen/pets': {
+      get: {
+        tags: ['NEN Members'], summary: 'マイペット一覧（今日の目安・避妊去勢・運動量・主食・体重の更新）と数値を取得',
+        parameters: [
+          { name: 'accountId', in: 'query', required: true, schema: { type: 'string' } },
+          { name: 'q', in: 'query', schema: { type: 'string' } },
+          { name: 'species', in: 'query', schema: { type: 'string', enum: ['dog', 'cat'] } },
+          { name: 'product', in: 'query', schema: { type: 'string' } },
+          { name: 'weight', in: 'query', schema: { type: 'string', enum: ['stale', 'fresh'] } },
+          { name: 'sort', in: 'query', schema: { type: 'string', enum: ['updated_desc', 'name', 'weight_desc', 'age_desc'] } },
+          { name: 'page', in: 'query', schema: { type: 'integer', minimum: 1 } },
+        ],
+        responses: { '200': { description: 'Paged pets with KPIs' }, '400': { description: 'accountId is required' }, '403': { description: 'Account not visible' } },
+      },
+    },
+    '/api/nen/health': {
+      get: {
+        tags: ['NEN Members'], summary: '健康日記の一覧（最終記録・30日の記録数・8週の体重推移・気になる変化）と数値を取得',
+        parameters: [
+          { name: 'accountId', in: 'query', required: true, schema: { type: 'string' } },
+          { name: 'q', in: 'query', schema: { type: 'string' } },
+          { name: 'change', in: 'query', schema: { type: 'string', enum: ['concern', 'silent', 'none'] } },
+          { name: 'last', in: 'query', schema: { type: 'string', enum: ['7', '30', 'over30'] } },
+          { name: 'sort', in: 'query', schema: { type: 'string', enum: ['concern', 'recent', 'records_desc'] } },
+          { name: 'page', in: 'query', schema: { type: 'integer', minimum: 1 } },
+        ],
+        responses: { '200': { description: 'Paged pets with health summaries and KPIs' }, '400': { description: 'accountId is required' }, '403': { description: 'Account not visible' } },
+      },
+    },
+    '/api/nen/health/{petId}/summary': {
+      get: {
+        tags: ['NEN Members'], summary: '診察時に獣医師へ見せる「30日のまとめ」（記録・集計。医療判断はしない）',
+        parameters: [
+          { name: 'petId', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'accountId', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        responses: { '200': { description: '30-day summary' }, '403': { description: 'Account not visible' }, '404': { description: 'Pet not found' } },
+      },
+    },
     // ── LIFF：然のマイページ（★V6 37-2） ──────────────────────────────────
     '/api/liff/nen/pets/{id}': {
       put: {

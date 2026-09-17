@@ -128,7 +128,10 @@ export const FEATURE_ROUTE_MANIFEST: readonly FeatureRouteMetadata[] = [
   feature('/api/nen/rank-settings', 'ec_commerce'),
   feature('/api/nen/lifetime-milestones', 'ec_commerce'),
   feature('/api/nen/members', 'ec_commerce'),
-  feature('/api/nen/feeding-products', 'ec_commerce'),
+  feature('/api/nen/feeding-products', 'photo_review'),
+  // マイペット・健康日記は LINE 側だけで完結する然の機能。投稿（photo_review）と同じ束で止める。
+  feature('/api/nen/pets', 'photo_review'),
+  feature('/api/nen/health', 'photo_review'),
   feature('/api/restaurant-test', 'restaurant_test'),
 
   exempt('/api/settings', 'core', '機能を再度オンにするため停止対象外'),
