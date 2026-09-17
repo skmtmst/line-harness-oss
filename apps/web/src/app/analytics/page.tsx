@@ -8,6 +8,7 @@ import {
   api,
   ApiError,
   type AnalyticsFriendsOverview,
+  type AnalyticsReportSchedule,
   type AnalyticsCrossAxis,
   type AnalyticsCrossResult,
   type AnalyticsFunnelRunResult,
@@ -24,6 +25,7 @@ import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
 import Button from '@/components/shared/button'
 import Breadcrumb from '@/components/shared/breadcrumb'
 import Chip, { type ChipTone } from '@/components/shared/chip'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import { useAccount } from '@/contexts/account-context'
 import { csvCell } from '@/lib/presentation'
@@ -2040,7 +2042,28 @@ const SAVED_STATE_TONES: Record<SavedAnalyticsSnapshot['state'], ChipTone> = {
   failed: 'danger',
 }
 
-function SavedAnalyticsTab({ accountId, onCountChange }: { accountId: string; onCountChange?: (count: number | null) => void }) {
+const REPORT_SCHEDULE_STATUS_LABELS: Record<AnalyticsReportSchedule['status'], string> = {
+  active: '送る予定あり',
+  paused: '止めている',
+  archived: 'しまった',
+}
+const REPORT_SCHEDULE_STATUS_TONES: Record<AnalyticsReportSchedule['status'], ChipTone> = {
+  active: 'ok',
+  paused: 'neutral',
+  archived: 'neutral',
+}
+
+function reportScheduleCadenceLabel(schedule: AnalyticsReportSchedule): string {
+  return schedule.cadence === 'weekly'
+    ? `毎週${'日月火水木金土'[schedule.weekday ?? 0]}曜 ${schedule.sendTime}`
+    : `毎月${schedule.monthDay}日 ${schedule.sendTime}`
+}
+
+function SavedAnalyticsTab({ accountId, onCountChange, canManage }: {
+  accountId: string
+  onCountChange?: (count: number | null) => void
+  canManage: boolean
+}) {
   const [items, setItems] = useState<SavedAnalyticsSummary[]>([])
   const [query, setQuery] = useState('')
   const [selectedId, setSelectedId] = useState('')
@@ -2048,6 +2071,11 @@ function SavedAnalyticsTab({ accountId, onCountChange }: { accountId: string; on
   const [loading, setLoading] = useState(true)
   const [snapshotLoading, setSnapshotLoading] = useState(false)
   const [error, setError] = useState('')
+  const [schedules, setSchedules] = useState<AnalyticsReportSchedule[]>([])
+  const [schedulesLoading, setSchedulesLoading] = useState(true)
+  const [schedulesError, setSchedulesError] = useState('')
+  const [scheduleBusyId, setScheduleBusyId] = useState('')
+  const [archiveTarget, setArchiveTarget] = useState<AnalyticsReportSchedule | null>(null)
 
   useEffect(() => {
     let active = true
@@ -2078,6 +2106,78 @@ function SavedAnalyticsTab({ accountId, onCountChange }: { accountId: string; on
       active = false
     }
   }, [accountId])
+
+  const schedulesAlive = useRef(true)
+  useEffect(() => () => {
+    schedulesAlive.current = false
+  }, [])
+
+  const reloadSchedules = useCallback(() => {
+    setSchedulesLoading(true)
+    void api.analytics.reportSchedules
+      .list(accountId)
+      .then((response) => {
+        if (!schedulesAlive.current) return
+        if (!response.success) throw new Error(response.error)
+        setSchedules(response.data.items)
+      })
+      .catch((caught: unknown) => {
+        if (!schedulesAlive.current) return
+        setSchedulesError(caught instanceof Error ? caught.message : '定期レポートを確認できませんでした')
+      })
+      .finally(() => {
+        if (schedulesAlive.current) setSchedulesLoading(false)
+      })
+  }, [accountId])
+
+  useEffect(() => {
+    let active = true
+    setSchedulesLoading(true)
+    setSchedules([])
+    setSchedulesError('')
+    void api.analytics.reportSchedules
+      .list(accountId)
+      .then((response) => {
+        if (!active) return
+        if (!response.success) throw new Error(response.error)
+        setSchedules(response.data.items)
+      })
+      .catch((caught: unknown) => {
+        if (!active) return
+        setSchedulesError(caught instanceof Error ? caught.message : '定期レポートを確認できませんでした')
+      })
+      .finally(() => {
+        if (active) setSchedulesLoading(false)
+      })
+    return () => {
+      active = false
+    }
+  }, [accountId])
+
+  const changeScheduleStatus = async (schedule: AnalyticsReportSchedule, status: 'active' | 'paused' | 'archived') => {
+    setScheduleBusyId(schedule.id)
+    setSchedulesError('')
+    try {
+      const response = await api.analytics.reportSchedules.setStatus(accountId, schedule.id, {
+        status,
+        expectedUpdatedAt: schedule.updatedAt,
+      })
+      if (!response.success) {
+        // 先に誰かが変えていたら最新を読み直してから知らせる。
+        setSchedulesError(response.error)
+        reloadSchedules()
+        return
+      }
+      setSchedules((current) => status === 'archived'
+        ? current.filter((item) => item.id !== schedule.id)
+        : current.map((item) => (item.id === schedule.id ? response.data : item)))
+      setArchiveTarget(null)
+    } catch (caught) {
+      setSchedulesError(caught instanceof Error ? caught.message : '定期レポートを更新できませんでした')
+    } finally {
+      setScheduleBusyId('')
+    }
+  }
 
   useEffect(() => {
     if (!selectedId) {
@@ -2132,9 +2232,96 @@ function SavedAnalyticsTab({ accountId, onCountChange }: { accountId: string; on
       <div className="bg-info-bg border-info rounded-card border px-4 py-3 text-sm">
         <p className="text-ink font-medium">条件の定義と集計結果を分けて保存しています</p>
         <p className="text-ink-secondary mt-1 text-xs">
-          あとから条件が変わっても、保存時点の結果は書き換わりません。定期レポートは現在「なし」です。
+          あとから条件が変わっても、保存時点の結果は書き換わりません。定期レポートはこの下の一覧で止めたり変えたりできます。
         </p>
       </div>
+
+      <section className="bg-canvas rounded-card border-hairline overflow-hidden border">
+        <div className="border-hairline flex items-center justify-between border-b px-4 py-3">
+          <h2 className="text-sm font-semibold">定期レポート</h2>
+          <div className="flex items-center gap-2">
+            <span className="text-ink-faint text-xs">{schedulesLoading ? '確認中' : schedulesError ? '—' : `${schedules.length}件`}</span>
+            {canManage && <Button href="/analytics/reports/new" variant="secondary">定期レポートを作る</Button>}
+          </div>
+        </div>
+        {schedulesError && <p className="text-danger border-hairline border-b px-4 py-2 text-xs">{schedulesError}</p>}
+        {schedulesLoading ? (
+          <p className="text-ink-faint p-8 text-center text-sm">定期レポートを読み込んでいます</p>
+        ) : schedules.length === 0 ? (
+          // 取得失敗のまま「まだありません」と出すと、未作成と見分けがつかない。
+          // 失敗は上のバナーだけにして、空の主張はしない。
+          schedulesError ? null : (
+          <div className="p-8 text-center">
+            <p className="text-ink text-sm font-medium">定期レポートはまだありません</p>
+            <p className="text-ink-faint mt-2 text-sm">決まった曜日や日に、集計結果をメールやLINEへ届けられます。</p>
+          </div>
+          )
+        ) : (
+          <table className="w-full table-fixed">
+            <thead>
+              <TableHeadRow>
+                <Th>レポート名</Th>
+                <Th>間隔</Th>
+                <Th>次に届く予定</Th>
+                <Th>状態</Th>
+                <Th align="right">操作</Th>
+              </TableHeadRow>
+            </thead>
+            <tbody className="divide-hairline divide-y">
+              {schedules.map((schedule) => (
+                <tr key={schedule.id} className="text-sm">
+                  <td className="text-ink truncate px-4 py-3 font-medium" title={schedule.name}>{schedule.name}</td>
+                  <td className="text-ink-secondary px-3 py-3 text-sm whitespace-nowrap">
+                    {schedule.isOneTime ? '1回だけ' : reportScheduleCadenceLabel(schedule)}
+                  </td>
+                  <td className="text-ink-secondary px-3 py-3 text-xs tabular-nums whitespace-nowrap">
+                    {schedule.status === 'paused' ? '—' : formatAnalyticsDateTime(schedule.nextRunAt)}
+                  </td>
+                  <td className="px-3 py-3 text-xs">
+                    <Chip tone={REPORT_SCHEDULE_STATUS_TONES[schedule.status]}>
+                      {REPORT_SCHEDULE_STATUS_LABELS[schedule.status]}
+                    </Chip>
+                  </td>
+                  <td className="px-4 py-2">
+                    {canManage && (
+                      <div className="flex justify-end gap-2 whitespace-nowrap">
+                        {!schedule.isOneTime && (
+                          <Button key="edit" href={`/analytics/reports/new?id=${schedule.id}`} variant="secondary">内容を変える</Button>
+                        )}
+                        {schedule.status === 'active' && !schedule.isOneTime && (
+                          <Button
+                            key="pause"
+                            variant="secondary"
+                            disabled={scheduleBusyId === schedule.id}
+                            onClick={() => void changeScheduleStatus(schedule, 'paused')}
+                          >止める</Button>
+                        )}
+                        {schedule.status === 'paused' && (
+                          <Button
+                            key="resume"
+                            variant="secondary"
+                            disabled={scheduleBusyId === schedule.id}
+                            onClick={() => void changeScheduleStatus(schedule, 'active')}
+                          >また送る</Button>
+                        )}
+                        {!schedule.isOneTime && (
+                          <Button
+                            key="archive"
+                            variant="secondary"
+                            className="border-danger text-danger"
+                            disabled={scheduleBusyId === schedule.id}
+                            onClick={() => setArchiveTarget(schedule)}
+                          >しまう</Button>
+                        )}
+                      </div>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </section>
 
       <div className="flex flex-wrap items-center gap-2">
         <label htmlFor="saved-analysis-search" className="sr-only">分析名・作った人で探す</label>
@@ -2217,7 +2404,7 @@ function SavedAnalyticsTab({ accountId, onCountChange }: { accountId: string; on
             <h2 className="text-ink text-sm font-semibold">結果の履歴</h2>
             {selected && (
               <p className="text-ink-faint mt-1 truncate text-xs" title={selected.name}>
-                {selected.name} ／ 定期レポート なし
+                {selected.name} ／ 定期レポート {schedulesLoading ? '確認中' : schedulesError ? '—' : `${schedules.filter((schedule) => schedule.savedAnalysisIds.includes(selected.id)).length}件`}
               </p>
             )}
             {error && items.length > 0 && <p className="text-danger mt-3 text-xs">{error}</p>}
@@ -2248,6 +2435,16 @@ function SavedAnalyticsTab({ accountId, onCountChange }: { accountId: string; on
           </aside>
         </div>
       )}
+      <ConfirmDialog
+        open={archiveTarget !== null}
+        title="定期レポートをしまいますか"
+        description={archiveTarget ? `「${archiveTarget.name}」をしまうと、一覧から消えて今後の送信も止まります。` : ''}
+        confirmLabel="しまう"
+        destructive
+        busy={archiveTarget !== null && scheduleBusyId === archiveTarget.id}
+        onConfirm={() => { if (archiveTarget) void changeScheduleStatus(archiveTarget, 'archived') }}
+        onCancel={() => setArchiveTarget(null)}
+      />
     </div>
   )
 }
@@ -2305,7 +2502,7 @@ function AnalyticsInner() {
       )}
       {tab === 'funnel' && <FunnelTab accountId={selectedAccountId} canManage={canManage} />}
       {tab === 'url-clicks' && <UrlClicksOverviewTab accountId={selectedAccountId} />}
-      {tab === 'saved' && <SavedAnalyticsTab accountId={selectedAccountId} onCountChange={setSavedCount} />}
+      {tab === 'saved' && <SavedAnalyticsTab accountId={selectedAccountId} onCountChange={setSavedCount} canManage={canManage} />}
     </div>
   )
 }

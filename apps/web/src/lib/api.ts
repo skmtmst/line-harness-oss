@@ -5126,6 +5126,20 @@ export const api = {
         `/api/analytics/report-schedules?account_id=${encodeURIComponent(accountId)}`,
         { method: 'POST', body: JSON.stringify(data) },
       ),
+      update: (accountId: string, id: string, data: Omit<
+        AnalyticsReportSchedule,
+        'id' | 'lineAccountId' | 'status' | 'isOneTime' | 'nextRunAt' | 'createdBy' | 'createdAt' | 'updatedAt'
+      > & { expectedUpdatedAt: string }) => fetchApi<ApiResponse<AnalyticsReportSchedule>>(
+        `/api/analytics/report-schedules/${encodeURIComponent(id)}?account_id=${encodeURIComponent(accountId)}`,
+        { method: 'PUT', body: JSON.stringify(data) },
+      ),
+      setStatus: (accountId: string, id: string, data: {
+        status: 'active' | 'paused' | 'archived'
+        expectedUpdatedAt: string
+      }) => fetchApi<ApiResponse<AnalyticsReportSchedule>>(
+        `/api/analytics/report-schedules/${encodeURIComponent(id)}/status?account_id=${encodeURIComponent(accountId)}`,
+        { method: 'PUT', body: JSON.stringify(data) },
+      ),
     },
     friendsOverview: (accountId: string, params?: { from?: string; to?: string }) =>
       fetchApi<ApiResponse<AnalyticsFriendsOverview>>(
@@ -5789,19 +5803,19 @@ export const api = {
     list: (kind?: string, accountId?: string) =>
       fetchApi<ApiResponse<Folder[]> & { unfiledCount?: number }>(`/api/folders${kind ? `?kind=${kind}` : ''}${kind && accountId ? `&account_id=${encodeURIComponent(accountId)}` : ''}`),
     /** 色（#RRGGBB）はフォルダに付く。中身の印にこの色が出る。 */
-    create: (data: { kind: string; name: string; parentId?: string | null; color?: string | null }) =>
+    create: (data: { kind: string; name: string; parentId?: string | null; color?: string | null; accountId?: string | null }) =>
       fetchApi<ApiResponse<Folder>>('/api/folders', {
         method: 'POST',
         body: JSON.stringify(data),
       }),
-    update: (id: string, data: { name?: string; parentId?: string | null; displayOrder?: number }) =>
-      fetchApi<ApiResponse<Folder>>(`/api/folders/${id}`, {
+    update: (id: string, data: { name?: string; parentId?: string | null; displayOrder?: number }, accountId?: string) =>
+      fetchApi<ApiResponse<Folder>>(`/api/folders/${id}${accountId ? `?account_id=${encodeURIComponent(accountId)}` : ''}`, {
         method: 'PATCH',
         body: JSON.stringify(data),
       }),
     /** 中身は消えず未分類に戻る。子フォルダは一緒に消える。 */
-    delete: (id: string) =>
-      fetchApi<ApiResponse<null>>(`/api/folders/${id}`, { method: 'DELETE' }),
+    delete: (id: string, accountId?: string) =>
+      fetchApi<ApiResponse<null>>(`/api/folders/${id}${accountId ? `?account_id=${encodeURIComponent(accountId)}` : ''}`, { method: 'DELETE' }),
   },
   tagGroups: {
     list: (accountId?: string | null) => fetchApi<ApiResponse<TagGroup[]>>(

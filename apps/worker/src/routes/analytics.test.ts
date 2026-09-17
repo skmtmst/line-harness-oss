@@ -32,7 +32,10 @@ const mocks = {
   getSavedAnalytics: vi.fn(),
   getSavedAnalyticsSnapshots: vi.fn(),
   getAnalyticsReportSchedules: vi.fn(),
+  getAnalyticsReportSchedule: vi.fn(),
   createAnalyticsReportSchedule: vi.fn(),
+  updateAnalyticsReportSchedule: vi.fn(),
+  setAnalyticsReportScheduleStatus: vi.fn(),
   getStaffMembers: vi.fn(),
   createAnalyticsCrossAudience: vi.fn(),
   getCurrentFunnelVersion: vi.fn(),
@@ -206,6 +209,9 @@ beforeEach(() => {
     id: 'report-1', ...input, status: 'active', isOneTime: Boolean(input.isOneTime),
     lineAccountId: input.lineAccountId, createdAt: input.now, updatedAt: input.now,
   }));
+  mocks.getAnalyticsReportSchedule.mockResolvedValue(null);
+  mocks.updateAnalyticsReportSchedule.mockResolvedValue('updated');
+  mocks.setAnalyticsReportScheduleStatus.mockResolvedValue('updated');
   mocks.getStaffMembers.mockResolvedValue([
     { id: 'u-1', name: 'テスト', role: 'owner', email: 'owner@example.com', line_user_id: 'U1', is_active: 1, invite_status: 'active', account_scope: 'all' },
   ]);
@@ -780,5 +786,105 @@ describe('V6 定期レポートAPI', () => {
     const res = await req(`/api/analytics/report-schedules?${ACCOUNT}`);
     expect(res.status).toBe(500);
     expect(await res.json()).toMatchObject({ success: false });
+  });
+
+  const existingSchedule = {
+    id: 'report-1', lineAccountId: 'account-a', name: '週次まとめ',
+    sections: ['friends'], savedAnalysisIds: [], cadence: 'weekly', weekday: 1,
+    monthDay: null, sendTime: '09:00', timeZone: 'Asia/Tokyo', periodDays: 7,
+    recipients: [{ kind: 'staff', staffId: 'u-1', label: 'テスト' }],
+    channels: ['dashboard', 'line'], alertRules: [], status: 'active',
+    isOneTime: false, nextRunAt: '2026-09-21T00:00:00.000Z', createdBy: 'u-1',
+    createdAt: '2026-09-01T00:00:00.000Z', updatedAt: '2026-09-01T00:00:00.000Z',
+  };
+
+  it('統括は読み取った版つきで内容を更新でき、次回予定を新しい間隔で置き直す', async () => {
+    mocks.getAnalyticsReportSchedule.mockResolvedValue(existingSchedule);
+    const res = await req(`/api/analytics/report-schedules/report-1?${ACCOUNT}`, 'PUT', {
+      ...body, name: '火曜のまとめ', expectedUpdatedAt: existingSchedule.updatedAt,
+    });
+    expect(res.status).toBe(200);
+    expect(mocks.updateAnalyticsReportSchedule).toHaveBeenCalledWith(
+      env.DB,
+      expect.objectContaining({
+        id: 'report-1', lineAccountId: 'account-a', name: '火曜のまとめ',
+        expectedUpdatedAt: '2026-09-01T00:00:00.000Z',
+      }),
+    );
+    // 次回予定は過去でなく未来に置き直す(積み残しの回を送り直さない)
+    const call = mocks.updateAnalyticsReportSchedule.mock.calls[0][1] as { nextRunAt: string };
+    expect(Date.parse(call.nextRunAt)).toBeGreaterThan(Date.now());
+  });
+
+  it('版なし・版ずれ・存在しないID・1回きりの予定は更新できない', async () => {
+    mocks.getAnalyticsReportSchedule.mockResolvedValue(existingSchedule);
+    expect((await req(`/api/analytics/report-schedules/report-1?${ACCOUNT}`, 'PUT', body)).status).toBe(422);
+    mocks.updateAnalyticsReportSchedule.mockResolvedValueOnce('conflict');
+    const conflict = await req(`/api/analytics/report-schedules/report-1?${ACCOUNT}`, 'PUT', {
+      ...body, expectedUpdatedAt: 'old',
+    });
+    expect(conflict.status).toBe(409);
+    mocks.getAnalyticsReportSchedule.mockResolvedValue(null);
+    expect((await req(`/api/analytics/report-schedules/ghost?${ACCOUNT}`, 'PUT', {
+      ...body, expectedUpdatedAt: 'x',
+    })).status).toBe(404);
+    mocks.getAnalyticsReportSchedule.mockResolvedValue({ ...existingSchedule, isOneTime: true });
+    expect((await req(`/api/analytics/report-schedules/report-1?${ACCOUNT}`, 'PUT', {
+      ...body, expectedUpdatedAt: existingSchedule.updatedAt,
+    })).status).toBe(422);
+  });
+
+  it('運用担当は更新も状態変更もできない', async () => {
+    expect((await reqAsStaff(`/api/analytics/report-schedules/report-1?${ACCOUNT}`, 'PUT', {
+      ...body, expectedUpdatedAt: 'x',
+    })).status).toBe(403);
+    expect((await reqAsStaff(`/api/analytics/report-schedules/report-1/status?${ACCOUNT}`, 'PUT', {
+      status: 'paused', expectedUpdatedAt: 'x',
+    })).status).toBe(403);
+  });
+
+  it('止める・また送る・しまうを版つきで受け、再開は未来の次回だけを予約する', async () => {
+    mocks.getAnalyticsReportSchedule.mockResolvedValue(existingSchedule);
+    const paused = await req(`/api/analytics/report-schedules/report-1/status?${ACCOUNT}`, 'PUT', {
+      status: 'paused', expectedUpdatedAt: existingSchedule.updatedAt,
+    });
+    expect(paused.status).toBe(200);
+    expect(mocks.setAnalyticsReportScheduleStatus).toHaveBeenCalledWith(
+      env.DB, expect.objectContaining({ status: 'paused', nextRunAt: undefined }),
+    );
+
+    mocks.getAnalyticsReportSchedule.mockResolvedValue({ ...existingSchedule, status: 'paused' });
+    const resumed = await req(`/api/analytics/report-schedules/report-1/status?${ACCOUNT}`, 'PUT', {
+      status: 'active', expectedUpdatedAt: existingSchedule.updatedAt,
+    });
+    expect(resumed.status).toBe(200);
+    const resumeCall = mocks.setAnalyticsReportScheduleStatus.mock.calls.at(-1)![1] as { nextRunAt?: string };
+    expect(resumeCall.nextRunAt && Date.parse(resumeCall.nextRunAt)).toBeGreaterThan(Date.now());
+
+    const archived = await req(`/api/analytics/report-schedules/report-1/status?${ACCOUNT}`, 'PUT', {
+      status: 'archived', expectedUpdatedAt: existingSchedule.updatedAt,
+    });
+    expect(archived.status).toBe(200);
+
+    mocks.setAnalyticsReportScheduleStatus.mockResolvedValueOnce('conflict');
+    mocks.getAnalyticsReportSchedule.mockResolvedValue({ ...existingSchedule, status: 'paused' });
+    expect((await req(`/api/analytics/report-schedules/report-1/status?${ACCOUNT}`, 'PUT', {
+      status: 'active', expectedUpdatedAt: 'old',
+    })).status).toBe(409);
+    expect((await req(`/api/analytics/report-schedules/report-1/status?${ACCOUNT}`, 'PUT', {
+      status: 'bogus', expectedUpdatedAt: 'x',
+    })).status).toBe(422);
+    expect((await req(`/api/analytics/report-schedules/report-1/status?${ACCOUNT}`, 'PUT', {
+      status: 'paused',
+    })).status).toBe(422);
+
+    // 同じ状態への再送は冪等に200で返し、書き込みは起こさない
+    mocks.getAnalyticsReportSchedule.mockResolvedValue({ ...existingSchedule, status: 'paused' });
+    mocks.setAnalyticsReportScheduleStatus.mockClear();
+    const idempotent = await req(`/api/analytics/report-schedules/report-1/status?${ACCOUNT}`, 'PUT', {
+      status: 'paused', expectedUpdatedAt: existingSchedule.updatedAt,
+    });
+    expect(idempotent.status).toBe(200);
+    expect(mocks.setAnalyticsReportScheduleStatus).not.toHaveBeenCalled();
   });
 });

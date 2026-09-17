@@ -1,7 +1,8 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { Suspense, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
+import { useSearchParams } from 'next/navigation'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import PageHeader from '@/components/shared/page-header'
@@ -11,6 +12,7 @@ import { usePageTitle } from '@/components/shell/page-chrome'
 import { useAccount } from '@/contexts/account-context'
 import {
   api,
+  type AnalyticsReportSchedule,
   type AnalyticsReportScheduleOptions,
   type AnalyticsReportSection,
 } from '@/lib/api'
@@ -25,10 +27,14 @@ const SECTION_CHOICES: Array<{ id: AnalyticsReportSection; title: string; detail
 
 const ROLE_LABEL = { owner: '統括', admin: '管理者', staff: '運用担当' } as const
 
-export default function AnalyticsReportNewPage() {
-  usePageTitle('定期レポートをつくる')
+function AnalyticsReportFormPage() {
+  const searchParams = useSearchParams()
+  const editId = searchParams.get('id')
+  usePageTitle(editId ? '定期レポートを直す' : '定期レポートをつくる')
   const { selectedAccountId, loading: accountLoading } = useAccount()
   const [options, setOptions] = useState<AnalyticsReportScheduleOptions | null>(null)
+  const [editing, setEditing] = useState<AnalyticsReportSchedule | null>(null)
+  const [editMissing, setEditMissing] = useState(false)
   const [canManage, setCanManage] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -67,6 +73,10 @@ export default function AnalyticsReportNewPage() {
     setError('')
     setNotice('')
     setOptions(null)
+    // id が外れた/変わったとき前の編集対象が残ると、新規作成のつもりが旧レポートへ
+    // PUT してしまう。取り直すたびに編集状態も初期化する。
+    setEditing(null)
+    setEditMissing(false)
     if (!selectedAccountId) {
       setLoading(false)
       return () => { active = false }
@@ -77,13 +87,33 @@ export default function AnalyticsReportNewPage() {
         setError(response.error || '定期レポートの設定を読み込めませんでした')
       } else {
         setOptions(response.data.options)
+        if (editId) {
+          const schedule = response.data.items.find((item) => item.id === editId)
+          if (!schedule) {
+            setEditMissing(true)
+          } else {
+            setEditing(schedule)
+            setName(schedule.name)
+            setSections(schedule.sections)
+            setSavedAnalysisIds(schedule.savedAnalysisIds)
+            setCadence(schedule.cadence)
+            setWeekday(String(schedule.weekday ?? 1))
+            setMonthDay(String(schedule.monthDay ?? 1))
+            setSendTime(schedule.sendTime)
+            setPeriodDays(String(schedule.periodDays))
+            setStaffIds(schedule.recipients.filter((item) => item.kind === 'staff' && item.staffId).map((item) => item.staffId as string))
+            setEmails(schedule.recipients.filter((item) => item.kind === 'email' && item.email).map((item) => item.email as string))
+            setLineEnabled(schedule.channels.includes('line'))
+            setAlertsEnabled(schedule.alertRules.length > 0)
+          }
+        }
       }
       setLoading(false)
     }).catch(() => {
       if (active) { setError('定期レポートの設定を読み込めませんでした'); setLoading(false) }
     })
     return () => { active = false }
-  }, [selectedAccountId, reloadSeq])
+  }, [selectedAccountId, reloadSeq, editId])
 
   const nextLabel = useMemo(() => cadence === 'weekly'
     ? `${['日', '月', '火', '水', '木', '金', '土'][Number(weekday)]}曜 ${sendTime}`
@@ -112,24 +142,37 @@ export default function AnalyticsReportNewPage() {
       })),
       ...emailRecipients.map((email) => ({ kind: 'email' as const, email, label: email })),
     ]
+    const payload = {
+      name: name.trim(), sections, savedAnalysisIds, cadence,
+      weekday: cadence === 'weekly' ? Number(weekday) : null,
+      monthDay: cadence === 'monthly' ? Number(monthDay) : null,
+      sendTime, timeZone: options.timeZone, periodDays: Number(periodDays), recipients,
+      channels: ['dashboard', ...(emailRecipients.length ? ['email' as const] : []), ...(lineEnabled ? ['line' as const] : [])] as AnalyticsReportSchedule['channels'],
+      alertRules: alertsEnabled ? [
+        { metric: 'block_rate' as const, operator: 'greater_than' as const, threshold: 0.5, minimumSample: 20 },
+        { metric: 'friend_adds' as const, operator: 'decrease_percent' as const, threshold: 20, minimumSample: 20 },
+        { metric: 'conversions' as const, operator: 'zero_streak_days' as const, threshold: 3, minimumSample: 20 },
+      ] : [],
+    }
     try {
-      const response = await api.analytics.reportSchedules.create(selectedAccountId, {
-        name: name.trim(), sections, savedAnalysisIds, cadence,
-        weekday: cadence === 'weekly' ? Number(weekday) : null,
-        monthDay: cadence === 'monthly' ? Number(monthDay) : null,
-        sendTime, timeZone: options.timeZone, periodDays: Number(periodDays), recipients,
-        channels: ['dashboard', ...(emailRecipients.length ? ['email' as const] : []), ...(lineEnabled ? ['line' as const] : [])],
-        alertRules: alertsEnabled ? [
-          { metric: 'block_rate', operator: 'greater_than', threshold: 0.5, minimumSample: 20 },
-          { metric: 'friend_adds', operator: 'decrease_percent', threshold: 20, minimumSample: 20 },
-          { metric: 'conversions', operator: 'zero_streak_days', threshold: 3, minimumSample: 20 },
-        ] : [],
-        sendOnce,
-      })
-      if (!response.success) throw new Error(response.error)
-      setNotice(sendOnce ? '1回だけ送る依頼を受け付けました。送信結果は運用状態に残ります。' : `${nextLabel}から届く定期レポートを作りました。`)
+      if (editing) {
+        const response = await api.analytics.reportSchedules.update(selectedAccountId, editing.id, {
+          ...payload, expectedUpdatedAt: editing.updatedAt,
+        })
+        if (!response.success) throw new Error(response.error)
+        setEditing(response.data)
+        setNotice(response.data.status === 'paused'
+          ? '定期レポートを更新しました。止まっている間は届きません。再開すると次の予定から届きます。'
+          : `定期レポートを更新しました。次は${nextLabel}に届きます。`)
+      } else {
+        const response = await api.analytics.reportSchedules.create(selectedAccountId, {
+          ...payload, sendOnce,
+        })
+        if (!response.success) throw new Error(response.error)
+        setNotice(sendOnce ? '1回だけ送る依頼を受け付けました。送信結果は運用状態に残ります。' : `${nextLabel}から届く定期レポートを作りました。`)
+      }
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : '定期レポートを作れませんでした')
+      setError(caught instanceof Error ? caught.message : editing ? '定期レポートを更新できませんでした' : '定期レポートを作れませんでした')
     } finally {
       setSaving(false)
     }
@@ -137,7 +180,10 @@ export default function AnalyticsReportNewPage() {
 
   if (accountLoading || loading) return <ListState kind="loading" title="定期レポートを読み込んでいます" />
   if (!selectedAccountId) return <ListState kind="empty" title="LINE公式アカウントを選んでください" description="上のバーで、レポートを作るLINE公式アカウントを選んでください。" />
+  // 一覧の取得失敗を「見つかりません」へ化けさせない。一時障害はやり直せる画面を先に出す。
   if (error && !options) return <ListState kind="error" title="定期レポートを表示できませんでした" description={error} onRetry={() => setReloadSeq((n) => n + 1)} />
+  if (editMissing || (editing === null && editId)) return <ListState kind="error" title="定期レポートが見つかりませんでした" description="一覧から選び直してください。" />
+  if (editing?.isOneTime) return <ListState kind="empty" title="1回だけ送る依頼は変更できません" description="同じ内容が必要なときは、新しく作ってください。" />
   if (!options || options.recipients.length === 0) return (
     <ListState
       kind="empty"
@@ -150,8 +196,8 @@ export default function AnalyticsReportNewPage() {
   return (
     <div className="text-ink mx-auto max-w-screen-2xl px-6 pb-24" data-design-node="URqOA">
       <PageHeader
-        breadcrumb={[{ label: '分析', href: '/analytics' }, { label: '定期レポートをつくる' }]}
-        title="定期レポートをつくる"
+        breadcrumb={[{ label: '分析', href: '/analytics' }, { label: editing ? '定期レポートを直す' : '定期レポートをつくる' }]}
+        title={editing ? '定期レポートを直す' : '定期レポートをつくる'}
         description=""
       />
       {!canManage && <div className="bg-canvas-sunken mb-4 rounded-control px-4 py-3 text-sm">運用担当は内容を確認できます。作成は統括または管理者が行います。</div>}
@@ -283,9 +329,20 @@ export default function AnalyticsReportNewPage() {
       </div>
 
       <StickyBar
-        status={<>まだ動いていません。つくると、次の{nextLabel}から届きはじめます。</>}
-        actions={<><Link className="text-ink-secondary p-3 text-sm no-underline" href="/analytics">キャンセル</Link><Button variant="secondary" disabled={saving || !canManage || !hasRecipient} onClick={() => void submit(true)}>いますぐ1回だけ送ってみる</Button><Button disabled={saving || !canManage || !hasRecipient} onClick={() => void submit(false)}>{saving ? '作っています' : 'つくって動かす'}</Button></>}
+        status={editing
+          ? <>「{editing.name}」を直しています。保存すると、次の{nextLabel}から新しい内容で届きます。</>
+          : <>まだ動いていません。つくると、次の{nextLabel}から届きはじめます。</>}
+        actions={<><Link className="text-ink-secondary p-3 text-sm no-underline" href="/analytics">キャンセル</Link>{!editing && <Button variant="secondary" disabled={saving || !canManage || !hasRecipient} onClick={() => void submit(true)}>いますぐ1回だけ送ってみる</Button>}<Button disabled={saving || !canManage || !hasRecipient} onClick={() => void submit(false)}>{saving ? (editing ? '保存しています' : '作っています') : (editing ? '変更を保存する' : 'つくって動かす')}</Button></>}
       />
     </div>
+  )
+}
+
+export default function AnalyticsReportNewPage() {
+  // useSearchParams は Suspense の中でしか使えない（静的書き出しのため）。
+  return (
+    <Suspense fallback={<div className="text-ink-faint p-6 text-sm">読み込み中...</div>}>
+      <AnalyticsReportFormPage />
+    </Suspense>
   )
 }

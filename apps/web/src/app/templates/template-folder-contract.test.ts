@@ -26,7 +26,7 @@ const DIALOG = read('../../components/shared/folder-add-dialog.tsx')
  */
 describe('V6 テンプレートのフォルダ操作（CzndJ）', () => {
   it('文字列ではなく、本物のフォルダを読む', () => {
-    expect(PAGE).toContain("api.folders.list('template')")
+    expect(PAGE).toContain("api.folders.list('template', accountId)")
     // `category` から帯を組み立てる作りへ戻さない。
     expect(PAGE).not.toContain('categoryCounts')
   })
@@ -86,7 +86,9 @@ describe('V6 テンプレートのフォルダ操作（CzndJ）', () => {
   it('名前と色を直す窓は、追加と同じ窓を使う', () => {
     // 窓を2つ作ると、文言や色の並びがまたずれる。
     expect(DIALOG).toContain('folder?: Folder')
-    expect(DIALOG).toContain('api.folders.update(folder.id')
+    // N-147: 追加も更新もフォルダの持ち主アカウントをAPIへ渡す。
+    expect(DIALOG).toContain('api.folders.update(folder.id, folderUpdates, accountId ?? undefined)')
+    expect(DIALOG).toContain('api.folders.create({ kind, name: trimmed, color, accountId })')
     expect(DIALOG).toContain("{folder ? 'フォルダを直す' : 'フォルダを追加'}")
   })
 
