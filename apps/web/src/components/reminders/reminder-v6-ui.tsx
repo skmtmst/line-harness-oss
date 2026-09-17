@@ -98,8 +98,8 @@ export function ReminderButton(props: ButtonProps) {
   return <Button {...props} className={[styles.smallButton, props.className].filter(Boolean).join(' ')} />
 }
 
-export function ReminderStepCard({ selected, number, timing, title, note }: { selected: boolean; number: number; timing: string; title: string; note: string }) {
-  return <button type="button" className={selected ? styles.stepCardActive : styles.stepCard}><span>{number}</span><strong>{timing}</strong><b>{title}</b><small>{note}</small></button>
+export function ReminderStepCard({ selected, number, timing, title, note, onClick }: { selected: boolean; number: number; timing: string; title: string; note: string; onClick?: () => void }) {
+  return <button type="button" className={selected ? styles.stepCardActive : styles.stepCard} onClick={onClick}><span>{number}</span><strong>{timing}</strong><b>{title}</b><small>{note}</small></button>
 }
 
 export function Field({ label, note, children }: { label: string; note?: string; children: ReactNode }) {

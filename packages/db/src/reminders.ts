@@ -21,6 +21,8 @@ export interface ReminderRow {
   delivery_mode: string;
   /** 154: 友だち情報欄の日付を起点にするとき、見る欄。 */
   trigger_field_id: string | null;
+  /** 418: イベント起点のとき絞るイベント。null は全イベントが起点。 */
+  trigger_event_id: string | null;
   /** 154: 毎年くり返すか。 */
   repeat_yearly: number;
   /** 156: フォルダ。null は未分類。消しても未分類に戻るだけ。 */
@@ -99,6 +101,8 @@ export interface ReminderDraftSettings {
   triggerType: 'manual' | 'booking' | 'event' | 'friend_field';
   deliveryMode: 'time' | 'countdown';
   triggerFieldId?: string | null;
+  /** 418: イベント起点のとき絞るイベント。null/未指定は全イベント。 */
+  triggerEventId?: string | null;
   repeatYearly?: boolean;
   triggerOffsetMinutes?: number | null;
   sendAtTime?: string | null;
@@ -220,6 +224,8 @@ export interface ReminderTriggerInput {
   deliveryMode?: 'time' | 'countdown';
   /** 154: 友だち情報欄の日付を起点にするとき、どの欄を見るか。 */
   triggerFieldId?: string | null;
+  /** 418: イベント起点のとき絞るイベント。null/未指定は全イベント。 */
+  triggerEventId?: string | null;
   /** 154: 毎年くり返すか（誕生日なら true）。 */
   repeatYearly?: boolean;
   triggerOffsetMinutes?: number | null;
@@ -239,8 +245,8 @@ export async function createReminder(
     `INSERT INTO reminders
        (id, name, description, trigger_type, trigger_offset_minutes,
         send_at_time, target_tag_id, delivery_mode,
-        trigger_field_id, repeat_yearly, folder_id, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        trigger_field_id, trigger_event_id, repeat_yearly, folder_id, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   )
     .bind(
       id,
@@ -254,6 +260,7 @@ export async function createReminder(
       // すべて変わってしまう（153）。
       input.deliveryMode ?? 'countdown',
       input.triggerFieldId ?? null,
+      input.triggerEventId ?? null,
       input.repeatYearly ? 1 : 0,
       input.folderId ?? null,
       now,
@@ -280,6 +287,7 @@ export async function updateReminder(
   }
   if (updates.triggerType !== undefined) { sets.push('trigger_type = ?'); values.push(updates.triggerType); }
   if (updates.triggerFieldId !== undefined) { sets.push('trigger_field_id = ?'); values.push(updates.triggerFieldId); }
+  if (updates.triggerEventId !== undefined) { sets.push('trigger_event_id = ?'); values.push(updates.triggerEventId); }
   if (updates.repeatYearly !== undefined) { sets.push('repeat_yearly = ?'); values.push(updates.repeatYearly ? 1 : 0); }
   // delivery_mode はここで変えない。作成時に決めたものを守る（153）。
   // 途中で変えると、すでに登録済みの友だちの配信予定がすべて変わる。
@@ -402,9 +410,9 @@ export async function createReminderWithDraftVersion(
       `INSERT INTO reminders
          (id, name, description, is_active, line_account_id, trigger_type,
           trigger_offset_minutes, send_at_time, target_tag_id, folder_id,
-          delivery_mode, trigger_field_id, repeat_yearly, lifecycle_status,
+          delivery_mode, trigger_field_id, trigger_event_id, repeat_yearly, lifecycle_status,
           current_draft_version_id, created_at, updated_at)
-       VALUES (?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft', ?, ?, ?)`,
+       VALUES (?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft', ?, ?, ?)`,
     ).bind(
       reminderId,
       settings.name,
@@ -417,6 +425,7 @@ export async function createReminderWithDraftVersion(
       settings.folderId ?? null,
       settings.deliveryMode,
       settings.triggerFieldId ?? null,
+      settings.triggerEventId ?? null,
       settings.repeatYearly ? 1 : 0,
       versionId,
       now,
@@ -442,11 +451,18 @@ export async function saveReminderDraftVersion(
   db: D1Database,
   reminderId: string,
   settings: ReminderDraftSettings,
+  options: { expectedVersionId?: string | null } = {},
 ): Promise<ReminderVersionRow> {
   const reminder = await getReminderById(db, reminderId);
   if (!reminder) throw new Error('REMINDER_NOT_FOUND');
   const now = jstNow();
   const existing = await getReminderDraftVersion(db, reminderId);
+  // N-080 (#869): 開いたときの版を指定されたら照合する。別タブで先に保存・
+  // 公開された下書きへ、古い画面の内容をそのまま上書きさせない。
+  if (options.expectedVersionId !== undefined
+      && (existing?.id ?? null) !== options.expectedVersionId) {
+    throw new Error('REMINDER_DRAFT_CONFLICT');
+  }
   const versionId = existing?.id ?? crypto.randomUUID();
 
   if (existing) {
@@ -545,7 +561,7 @@ export async function publishReminderDraftVersion(
     db.prepare(
       `UPDATE reminders
           SET name = ?, description = ?, line_account_id = ?, trigger_type = ?,
-              delivery_mode = ?, trigger_field_id = ?, repeat_yearly = ?,
+              delivery_mode = ?, trigger_field_id = ?, trigger_event_id = ?, repeat_yearly = ?,
               trigger_offset_minutes = ?, send_at_time = ?, target_tag_id = ?, folder_id = ?,
               is_active = 1, lifecycle_status = 'published',
               current_published_version_id = ?, current_draft_version_id = NULL, updated_at = ?
@@ -557,6 +573,7 @@ export async function publishReminderDraftVersion(
       settings.triggerType,
       settings.deliveryMode,
       settings.triggerFieldId ?? null,
+      settings.triggerEventId ?? null,
       settings.repeatYearly ? 1 : 0,
       settings.triggerOffsetMinutes ?? null,
       settings.sendAtTime ?? null,
@@ -697,6 +714,7 @@ async function ensureReminderPublishedVersion(
     triggerType: reminder.trigger_type as ReminderDraftSettings['triggerType'],
     deliveryMode: reminder.delivery_mode === 'time' ? 'time' : 'countdown',
     triggerFieldId: reminder.trigger_field_id,
+    triggerEventId: reminder.trigger_event_id,
     repeatYearly: reminder.repeat_yearly === 1,
     triggerOffsetMinutes: reminder.trigger_offset_minutes,
     sendAtTime: reminder.send_at_time,
