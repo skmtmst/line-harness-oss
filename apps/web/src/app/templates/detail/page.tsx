@@ -7,6 +7,7 @@ import { api } from '@/lib/api'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { usePageTitle } from '@/components/shell/page-chrome'
+import { isOwnerOrAdmin } from '@/lib/staff-capability'
 import { templateDeleteDescription } from '../template-delete-message'
 import { messageTypeText } from '../template-message-type'
 
@@ -38,6 +39,12 @@ function TemplateDetailInner() {
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState('')
+  /*
+   * N-144: 編集・削除APIは owner/admin だけ。staff へは閲覧だけ残し、
+   * 押すと 403 になる口は出さない。
+   */
+  const [canMutateTemplates] = useState(() =>
+    typeof window === 'undefined' ? true : isOwnerOrAdmin())
   usePageTitle(template?.name ?? null)
 
   useEffect(() => {
@@ -167,9 +174,11 @@ function TemplateDetailInner() {
           <span className="mx-1.5">/</span>
           <span>詳細</span>
         </nav>
-        <Button href={`/templates/edit?id=${id}`} variant="primary">
-          テンプレートを編集
-        </Button>
+        {canMutateTemplates && (
+          <Button href={`/templates/edit?id=${id}`} variant="primary">
+            テンプレートを編集
+          </Button>
+        )}
       </div>
 
       {error && <p className="text-danger mb-3 text-sm">{error}</p>}
@@ -229,22 +238,24 @@ function TemplateDetailInner() {
               </p>
             </section>
 
-            <section className="border-danger-bg bg-canvas rounded-card border p-5">
-              <p className="text-danger text-sm font-semibold">このテンプレートを削除する</p>
-              <p className="text-ink-faint mt-1 text-xs leading-relaxed">
-                {usageCount > 0
-                  ? `${usageCount}か所で使われています。先に上の使用先を差し替えてください。`
-                  : 'どこからも呼ばれていないので、削除しても他の画面に影響しません。'}
-              </p>
-              <button
-                onClick={() => { setDeleteError(''); setDeleteOpen(true) }}
-                disabled={usageCount > 0}
-                title={usageCount > 0 ? '使用先を差し替えると削除できます' : undefined}
-                className="text-danger hover:bg-danger-bg rounded-control mt-3 px-4 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                {usageCount > 0 ? '使用中のため削除できません' : 'テンプレートを削除'}
-              </button>
-            </section>
+            {canMutateTemplates && (
+              <section className="border-danger-bg bg-canvas rounded-card border p-5">
+                <p className="text-danger text-sm font-semibold">このテンプレートを削除する</p>
+                <p className="text-ink-faint mt-1 text-xs leading-relaxed">
+                  {usageCount > 0
+                    ? `${usageCount}か所で使われています。先に上の使用先を差し替えてください。`
+                    : 'どこからも呼ばれていないので、削除しても他の画面に影響しません。'}
+                </p>
+                <button
+                  onClick={() => { setDeleteError(''); setDeleteOpen(true) }}
+                  disabled={usageCount > 0}
+                  title={usageCount > 0 ? '使用先を差し替えると削除できます' : undefined}
+                  className="text-danger hover:bg-danger-bg rounded-control mt-3 px-4 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  {usageCount > 0 ? '使用中のため削除できません' : 'テンプレートを削除'}
+                </button>
+              </section>
+            )}
           </div>
 
           <div data-design="Right" className="w-full shrink-0 space-y-4 xl:w-80">

@@ -16,6 +16,7 @@ import { TextField } from '@/components/shared/text-field'
 import type { Folder } from '@line-crm/shared'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { useAccount } from '@/contexts/account-context'
+import { isOwnerOrAdmin } from '@/lib/staff-capability'
 
 function displayText(value: string): string {
   return value
@@ -53,7 +54,6 @@ function questionSummary(question: ScenarioQuestion): string[] {
 }
 
 function QuestionTemplatePageInner() {
-  usePageTitle('質問を作る')
   const router = useRouter()
   const { selectedAccountId, loading: accountLoading } = useAccount()
   const params = useSearchParams()
@@ -68,6 +68,11 @@ function QuestionTemplatePageInner() {
   const [loading, setLoading] = useState(Boolean(id))
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  // N-144: 質問テンプレートの作成・編集APIも owner/admin だけ。staff へは
+  // フォームを出さず、保存まで辿り着けないようにする。
+  const [canMutateTemplates] = useState(() =>
+    typeof window === 'undefined' ? true : isOwnerOrAdmin())
+  usePageTitle(canMutateTemplates ? '質問を作る' : '質問テンプレート')
 
   // 分類名の候補は置き場の一覧から取る。テンプレ全件を引くと件数が増えるほど重くなる。
   useEffect(() => {
@@ -163,6 +168,22 @@ function QuestionTemplatePageInner() {
   }
 
   if (loading || accountLoading) return <ListState kind="loading" title="質問テンプレートを読み込んでいます" />
+
+  if (!canMutateTemplates) {
+    return (
+      <div className="pb-24">
+        <nav className="text-ink-faint mb-4 text-xs" aria-label="現在地">
+          <Link href="/templates" className="text-accent hover:underline">テンプレート</Link>
+          <span className="mx-2">›</span>
+          <span className="text-accent">質問</span>
+        </nav>
+        <div role="alert" className="bg-canvas rounded-card border-hairline border p-8 text-sm">
+          <p className="font-bold text-ink">質問テンプレートの作成・変更はオーナーと管理者だけができます</p>
+          <Link href="/templates" className="text-accent hover:underline mt-3 inline-block text-sm">一覧へ戻る</Link>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div data-design-node="NNDMR" className="pb-24">

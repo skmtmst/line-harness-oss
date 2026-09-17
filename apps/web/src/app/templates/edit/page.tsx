@@ -5,6 +5,7 @@ import React, { Suspense, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { api, ApiError } from '@/lib/api'
+import { isOwnerOrAdmin } from '@/lib/staff-capability'
 import { type Folder } from '@line-crm/shared'
 import { Field, inputClass } from '@/components/shared/create-page'
 import { useAccount } from '@/contexts/account-context'
@@ -289,6 +290,13 @@ function newTemplateEditorState(templateId: string | null, visual: boolean): Tem
 function TemplateEditInner() {
   const router = useRouter()
   const { accounts, selectedAccountId } = useAccount()
+  /*
+   * N-144: 作成・編集APIは requireRole('owner','admin') で閉じている。
+   * staff が URL 直打ちで来てもフォームを出さず、保存まで辿り着けない
+   * ようにする。一覧の閲覧は /templates に残る。
+   */
+  const [canMutateTemplates] = useState(() =>
+    typeof window === 'undefined' ? true : isOwnerOrAdmin())
   const params = useSearchParams()
   const id = params.get('id')
   const assetKind = params.get('kind')
@@ -448,6 +456,23 @@ function TemplateEditInner() {
     } finally {
       setSaving(false)
     }
+  }
+
+  if (!canMutateTemplates) {
+    return (
+      <div aria-label="テンプレート編集">
+        <nav data-design="Crumb" className="text-ink-faint mb-2 text-xs">
+          <Link href="/templates" className="hover:underline">
+            テンプレート
+          </Link>
+        </nav>
+        <div role="alert" className="bg-canvas rounded-card border-hairline border p-8 text-sm">
+          <p className="font-bold text-ink">テンプレートの作成・変更はオーナーと管理者だけができます</p>
+          <p className="text-ink-secondary mt-1">中身の確認は一覧の行を開くと読めます。</p>
+          <Link href="/templates" className="text-accent hover:underline mt-3 inline-block text-sm">一覧へ戻る</Link>
+        </div>
+      </div>
+    )
   }
 
   if (assetKind === 'rich_message' || assetKind === 'coupon' || assetKind === 'research') {

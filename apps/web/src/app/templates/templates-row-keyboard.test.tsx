@@ -55,6 +55,12 @@ const EMPTY_USED_BY = {
 }
 
 beforeEach(() => {
+  // N-144: 変更操作は owner/admin だけに出す。行の操作を試す試験は owner で立てる。
+  vi.stubGlobal('localStorage', {
+    getItem: (key: string) => (key === 'lh_staff_role' ? 'owner' : null),
+    setItem: () => {},
+    removeItem: () => {},
+  })
   templateGet.mockReset()
   templateGet.mockImplementation((id: string) => Promise.resolve({
     success: true,
