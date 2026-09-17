@@ -51,6 +51,7 @@ describe('テンプレートの使用先数と詳細の一致 (#891)', () => {
              ('tpl-one', '一か所', 'text', '本文', 'account-1'),
              ('tpl-multi', 'たくさん', 'text', '本文', 'account-1'),
              ('tpl-cross', '別店から参照', 'text', '本文', 'account-1'),
+             ('tpl-camel', 'キャメルキー参照', 'text', '本文', 'account-1'),
              ('tpl-other', '支店のテンプレ', 'text', '本文', 'account-2');
 
       -- tpl-one: 自動応答1件だけ。さらに別アカウントのオートメーションからも
@@ -63,10 +64,15 @@ describe('テンプレートの使用先数と詳細の一致 (#891)', () => {
 
       -- tpl-multi: 1つのオートメーションが同じテンプレートを2アクションで
       -- 使う。使用先としてはオートメーション1件（詳細と同じ粒度）。
-      -- au-x は別アカウントのオートメーションで tpl-one を参照している。
+      -- au-2 は実行系が読むもう1つのキー templateId（キャメル）で
+      -- tpl-camel を参照する。au-x は別アカウントのオートメーションで
+      -- tpl-one を参照している。
       INSERT INTO automations (id, name, event_type, actions, line_account_id)
       VALUES ('au-1', '予約後フォロー', 'booking',
               '[{"type":"send","params":{"template_id":"tpl-multi"}},{"type":"send","params":{"template_id":"tpl-multi"}}]',
+              'account-1'),
+             ('au-2', 'キャメルキー', 'booking',
+              '[{"type":"send_message","params":{"templateId":"tpl-camel"}}]',
               'account-1'),
              ('au-x', '支店の仕掛け', 'booking',
               '[{"type":"send","params":{"template_id":"tpl-one"}}]',
@@ -132,6 +138,15 @@ describe('テンプレートの使用先数と詳細の一致 (#891)', () => {
   it('1つのオートメーションが同じテンプレートを複数アクションで使っても1件', async () => {
     const usage = await getTemplateUsage(db, 'tpl-multi', 'account-1');
     expect(usage.automations.map((a) => a.id)).toEqual(['au-1']);
+  });
+
+  it('オートメーションは templateId（キャメル）のキーも参照として数える', async () => {
+    const list = await getTemplatesWithUsageCount(db);
+    const usage = await getTemplateUsage(db, 'tpl-camel', 'account-1');
+
+    expect(list.items.find((t) => t.id === 'tpl-camel')?.usage_count).toBe(1);
+    expect(usage.automations.map((a) => a.id)).toEqual(['au-2']);
+    expect(usageTotal(usage)).toBe(1);
   });
 
   it('別アカウントの使用先は一覧の数にも詳細にも出ない', async () => {

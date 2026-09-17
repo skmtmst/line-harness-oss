@@ -142,7 +142,9 @@ function TemplateDetailInner() {
       key: `automation-${u.id}`,
       kind: 'オートメーション',
       name: u.name,
-      href: `/automations/drafts?id=${u.id}`,
+      // 旧形式のオートメーションには開ける画面が無い
+      // （/automations は新形式のみ、/automations/drafts は別ID空間）。
+      href: null as string | null,
     })),
     ...(usage?.reminderSteps ?? []).map((u) => ({
       key: `reminder-step-${u.reminderId}-${u.stepId}`,
@@ -226,9 +228,13 @@ function TemplateDetailInner() {
                         <p className="text-ink-faint text-xs">{u.kind}</p>
                         <p className="text-ink truncate text-sm">{u.name}</p>
                       </div>
-                      <Link href={u.href} className="text-accent shrink-0 text-xs hover:underline">
-                        開く
-                      </Link>
+                      {u.href ? (
+                        <Link href={u.href} className="text-accent shrink-0 text-xs hover:underline">
+                          開く
+                        </Link>
+                      ) : (
+                        <span className="text-ink-faint shrink-0 text-xs">開ける画面がありません</span>
+                      )}
                     </li>
                   ))}
                 </ul>

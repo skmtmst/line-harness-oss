@@ -525,10 +525,13 @@ export default function TemplatesPage() {
     })),
     ...drawerData.usedBy.automations.map((usage) => ({
       key: `automation-${usage.id}`,
-      href: `/automations/drafts?id=${usage.id}`,
+      // 旧形式のオートメーション表の設定で、開ける画面が無い。
+      // /automations は新形式(automation_definitions)だけを出し、
+      // /automations/drafts は別のID空間なのでリンクにしない。
+      href: null as string | null,
       label: usage.eventType === 'inbox_favorite'
         ? '受信箱の「よく使う」（担当3人が登録）'
-        : `オートメーション「${usage.name}」`,
+        : `オートメーション「${usage.name}」（旧形式・画面からは開けません）`,
       icon: usage.eventType === 'inbox_favorite' ? Star : Bot,
     })),
     ...drawerData.usedBy.reminderSteps.map((usage) => ({
@@ -1199,9 +1202,11 @@ export default function TemplatesPage() {
                         ))}
                         {drawerData.usedBy.automations.map((au) => (
                           <li key={`au-${au.id}`}>
-                            <a href={`/automations/drafts?id=${au.id}`} className="text-accent hover:underline">
-                              オートメーション: {au.name} <span className="text-ink-faint">({au.eventType})</span>
-                            </a>
+                            {/* 旧形式のオートメーションには開ける画面が無い。リンクにすると
+                                別のID空間の画面へ飛んで「見つかりません」になるだけ。 */}
+                            <span>
+                              オートメーション: {au.name} <span className="text-ink-faint">({au.eventType}・旧形式)</span>
+                            </span>
                           </li>
                         ))}
                         {scenarioStepUsages.map((ss) => (
@@ -1267,7 +1272,7 @@ export default function TemplatesPage() {
               <div className="rounded-lg border border-danger bg-danger-bg px-4 py-3 text-danger">
             <p className="flex items-start gap-2 text-xs font-bold">
               <TriangleAlert size={17} className="mt-0.5 shrink-0" aria-hidden="true" />
-              このテンプレートは{blockedDelete?.usageCount ?? 0}か所で使われています。先に差し替えると、配信や返信を止めずに整理できます。
+              このテンプレートは{drawerData ? drawerUsageCount : (blockedDelete?.usageCount ?? 0)}か所で使われています。先に差し替えると、配信や返信を止めずに整理できます。
             </p>
             {drawerLoading ? (
               <p className="mt-3 text-xs">使用先を読み込んでいます…</p>
@@ -1277,14 +1282,21 @@ export default function TemplatesPage() {
               <ul className="mt-3 space-y-2 text-xs font-semibold">
                 {replacementDestinations.map(({ key, label, href, icon: Icon }) => (
                   <li key={key}>
-                    <a
-                      href={href}
-                      className="flex items-center gap-2 rounded-control px-1.5 py-1 text-accent hover:bg-canvas-sunken hover:underline"
-                    >
-                      <Icon size={15} className="shrink-0" aria-hidden="true" />
-                      <span className="min-w-0 flex-1">{label}</span>
-                      <ArrowRight size={14} className="shrink-0 text-ink-faint" aria-hidden="true" />
-                    </a>
+                    {href ? (
+                      <a
+                        href={href}
+                        className="flex items-center gap-2 rounded-control px-1.5 py-1 text-accent hover:bg-canvas-sunken hover:underline"
+                      >
+                        <Icon size={15} className="shrink-0" aria-hidden="true" />
+                        <span className="min-w-0 flex-1">{label}</span>
+                        <ArrowRight size={14} className="shrink-0 text-ink-faint" aria-hidden="true" />
+                      </a>
+                    ) : (
+                      <span className="flex items-center gap-2 px-1.5 py-1">
+                        <Icon size={15} className="shrink-0" aria-hidden="true" />
+                        <span className="min-w-0 flex-1">{label}</span>
+                      </span>
+                    )}
                   </li>
                 ))}
               </ul>

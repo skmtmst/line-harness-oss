@@ -148,11 +148,14 @@ describe('テンプレート詳細の使用先リンク (#891 N-143)', () => {
     expect(hrefs).toEqual([
       '/auto-replies/edit?id=ar-1',
       '/scenarios/detail?id=sc-1',
-      '/automations/drafts?id=au-1',
       '/reminders/edit?id=re-1',
       '/rich-menus/edit?id=rg-1',
       '/inflow-links/detail?id=tl-1',
     ])
+    // 旧形式オートメーションは開ける画面が無い。リンクを出さず理由を示す
+    expect(screen.getByText('開ける画面がありません')).toBeTruthy()
+    expect(screen.getByText('オートメーション')).toBeTruthy()
+    expect(screen.getByText('予約後フォロー')).toBeTruthy()
   })
 
   test('使用先が0件なら「どこからも呼ばれていません」と出る', async () => {
@@ -185,11 +188,13 @@ describe('テンプレート一覧の差し替え導線 (#891 N-135)', () => {
     expect(links).toEqual([
       '/scenarios/detail?id=sc-1',
       '/auto-replies/edit?id=ar-1',
-      '/automations/drafts?id=au-1',
       '/reminders/edit?id=re-1',
       '/rich-menus/edit?id=rg-1',
       '/inflow-links/detail?id=tl-1',
     ])
+    // 旧形式オートメーションはリンクにせず「開けない」と伝える
+    expect(dialog.textContent).toContain('オートメーション「予約後フォロー」')
+    expect(dialog.textContent).toContain('旧形式')
     // 「Nか所の差し替え画面を開きます」と言いながら1件目しか開かなかった退行
     expect(dialog.textContent).not.toContain('か所の差し替え画面を開きます')
   })
@@ -208,8 +213,10 @@ describe('テンプレート一覧の差し替え導線 (#891 N-135)', () => {
 
     expect(screen.getByText('自動返信: 予約', { exact: false }).closest('a')?.getAttribute('href'))
       .toBe('/auto-replies/edit?id=ar-1')
-    expect(screen.getByText('オートメーション: 予約後フォロー', { exact: false }).closest('a')?.getAttribute('href'))
-      .toBe('/automations/drafts?id=au-1')
+    // 旧形式オートメーションはリンクにしない（別ID空間の画面へ飛ばさない）
+    const automationText = screen.getByText('オートメーション: 予約後フォロー', { exact: false })
+    expect(automationText.closest('a')).toBeNull()
+    expect(automationText.textContent).toContain('旧形式')
   })
 })
 

@@ -715,8 +715,12 @@ export async function getTemplateUsage(
       continue;
     }
     try {
-      const actions = JSON.parse(r.actions) as Array<{ params?: { template_id?: string } }>;
-      if (actions.some((a) => a.params?.template_id === templateId)) {
+      const actions = JSON.parse(r.actions) as Array<{
+        params?: { template_id?: string; templateId?: string };
+      }>;
+      // 実行系は template_id / templateId の両方のキーを参照として扱う
+      // （automation-action-executors と移行347と同じ判定）。
+      if (actions.some((a) => (a.params?.template_id ?? a.params?.templateId) === templateId)) {
         matchedAutomations.push({ id: r.id, name: r.name, event_type: r.event_type });
       }
     } catch {
@@ -936,9 +940,13 @@ export async function getTemplatesWithUsageCount(
     .all<{ actions: string; line_account_id: string | null }>();
   for (const r of autRes.results ?? []) {
     try {
-      const actions = JSON.parse(r.actions) as Array<{ params?: { template_id?: string } }>;
+      const actions = JSON.parse(r.actions) as Array<{
+        params?: { template_id?: string; templateId?: string };
+      }>;
       const referenced = new Set(
-        actions.map((a) => a.params?.template_id).filter((v): v is string => Boolean(v)),
+        actions
+          .map((a) => a.params?.template_id ?? a.params?.templateId)
+          .filter((v): v is string => Boolean(v)),
       );
       for (const tid of referenced) addRef(tid, r.line_account_id);
     } catch {
