@@ -7,7 +7,7 @@ import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
 import { TextField } from '@/components/shared/text-field'
-import { adminSessionHeaders } from '@/lib/admin-session'
+import { adminSessionHeaders, captureAdminSessionHandoff } from '@/lib/admin-session'
 import { api } from '@/lib/api'
 import { logoutAndGoToLogin } from '@/lib/logout'
 
@@ -35,7 +35,8 @@ export default function OpsTwoFactorPage() {
     const apiUrl = process.env.NEXT_PUBLIC_API_URL
     void (async () => {
       try {
-        const res = await fetch(`${apiUrl}/api/auth/session`, { credentials: 'include', headers: adminSessionHeaders() })
+        const handoffToken = captureAdminSessionHandoff()
+        const res = await fetch(`${apiUrl}/api/auth/session`, { credentials: 'include', headers: adminSessionHeaders(handoffToken) })
         if (!res.ok) throw new Error('unauthenticated')
         const body = await res.json() as { success?: boolean; data?: Session; csrfToken?: string }
         if (!body.success || !body.data) throw new Error('unauthenticated')

@@ -96,9 +96,13 @@ export async function validateReminderDraft(
     ? '同じ時刻の通知はありません'
     : '同じ時刻になる通知があります'));
   const fieldValid = settings.triggerType !== 'friend_field' || Boolean(settings.triggerFieldId);
-  checks.push(check('trigger_field', '基準日', fieldValid, fieldValid
-    ? '基準日が設定されています'
-    : '基準日に使う友だち情報欄を選んでください'));
+  const eventValid = settings.triggerType !== 'event' || Boolean(settings.triggerEventId);
+  checks.push(check('trigger_field', '基準日', fieldValid && eventValid,
+    fieldValid && eventValid
+      ? '基準日が設定されています'
+      : !fieldValid
+        ? '基準日に使う友だち情報欄を選んでください'
+        : '基準日にするイベントを選んでください'));
   const stopConfirmed = settings.stopConditions.bookingCancelled
     || settings.stopConditions.supportMarkCompleted
     || settings.stopConditions.friendBlocked

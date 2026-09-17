@@ -12,6 +12,7 @@ import {
   createTrialTenant,
   getActiveStaffByEmail,
   getAuthEmailToken,
+  getPlatformAdminRecord,
   getStaffById,
   getStaffWithPasswordByEmail,
   hasStaffWithEmail,
@@ -28,6 +29,7 @@ import {
 import { clientIp, issueSession, randomToken, startTwoFactorChallenge, twoFactorRequired } from '../services/admin-session.js';
 import { hashPassword, validatePasswordPolicy, verifyPassword } from '../services/password-hash.js';
 import { turnstileErrorMessage, verifyTurnstile } from '../services/turnstile.js';
+import { candidateFromStaffRow, isPlatformAdminRow } from '../middleware/platform-admin.js';
 import {
   PASSWORD_RESET_TOKEN_TTL_MS,
   SIGNUP_TOKEN_TTL_MS,
@@ -333,6 +335,22 @@ authEmail.post('/api/auth/password/login', async (c) => {
   }
 
   await clearAuthThrottle(c.env.DB, throttleKey);
+  if (body.next === 'ops') {
+    const admin = await isPlatformAdminRow(c.env.DB, candidateFromStaffRow(staff));
+    if (!admin) {
+      const pending = await getPlatformAdminRecord(c.env.DB, staff.id);
+      if (!(pending?.is_active === 1 && pending.activation_state === 'awaiting_totp')) {
+        const invited = pending?.is_active === 1 && pending.activation_state === 'invited';
+        return c.json({
+          success: false,
+          error: invited
+            ? '招待メールのリンクから登録を完了してください'
+            : 'このアカウントは運営メンバーとして有効ではありません',
+          code: invited ? 'ops_invite_pending' : 'not_platform_admin',
+        }, 403);
+      }
+    }
+  }
   if (twoFactorRequired(staff)) {
     if (!c.env.TOTP_ENCRYPTION_KEY) return c.json({ success: false, error: '二段階認証の設定に不備があります。運営にお問い合わせください' }, 500);
     const challengeToken = await startTwoFactorChallenge(c, staff.id, { purpose: 'verify', remember });

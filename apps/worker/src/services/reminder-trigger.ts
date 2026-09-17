@@ -25,6 +25,8 @@ export interface ReminderTriggerRow {
   trigger_offset_minutes: number | null;
   send_at_time: string | null;
   target_tag_id: string | null;
+  /** 418: イベント起点を特定イベントへ絞る列。NULL は全イベント対象。 */
+  trigger_event_id: string | null;
   current_published_version_id: string | null;
 }
 
@@ -81,6 +83,12 @@ export async function enrollByTrigger(
     sourceEventId?: string | null;
     /** 追跡用の発生元区分。未指定なら triggerType (個別相談は 'meet' を渡す)。 */
     sourceKind?: string | null;
+    /**
+     * 418: 起こったイベント定義のid (triggerType==='event' のとき)。
+     * trigger_event_id を持つルールは、このidと一致するときだけ登録する。
+     * 未指定ならイベント限定ルールはどれにも登録しない（取り違え防止）。
+     */
+    eventId?: string | null;
     /** 必須。ルールと友だちがこの店舗のもの一致するときだけ登録する。 */
     lineAccountId: string;
   },
@@ -97,7 +105,7 @@ export async function enrollByTrigger(
   const rules = await db
     .prepare(
       `SELECT id, trigger_type, trigger_offset_minutes, send_at_time, target_tag_id,
-              current_published_version_id
+              trigger_event_id, current_published_version_id
          FROM reminders
         WHERE is_active = 1 AND lifecycle_status = 'published'
           AND deleted_at IS NULL AND trigger_type = ? AND line_account_id = ?`,
@@ -108,6 +116,8 @@ export async function enrollByTrigger(
 
   let enrolled = 0;
   for (const rule of rules.results) {
+    // 418: イベント限定ルールは、起こったイベントと一致するときだけ動く。
+    if (rule.trigger_event_id && rule.trigger_event_id !== (input.eventId ?? null)) continue;
     if (rule.target_tag_id) {
       const tagged = await db
         .prepare(`SELECT 1 FROM friend_tags WHERE friend_id = ? AND tag_id = ? LIMIT 1`)
@@ -247,7 +257,7 @@ export async function rescheduleByTrigger(
   const rules = await db
     .prepare(
       `SELECT id, trigger_type, trigger_offset_minutes, send_at_time, target_tag_id,
-              current_published_version_id
+              trigger_event_id, current_published_version_id
          FROM reminders
         WHERE is_active = 1 AND lifecycle_status = 'published'
           AND deleted_at IS NULL AND trigger_type = ?`,
@@ -355,7 +365,7 @@ export async function reconcileV6ToStartsAt(
   const rules = await db
     .prepare(
       `SELECT id, trigger_type, trigger_offset_minutes, send_at_time, target_tag_id,
-              current_published_version_id
+              trigger_event_id, current_published_version_id
          FROM reminders
         WHERE is_active = 1 AND lifecycle_status = 'published'
           AND deleted_at IS NULL AND trigger_type = ?`,
@@ -444,7 +454,7 @@ async function anchorsForStartsAt(
   const rules = await db
     .prepare(
       `SELECT id, trigger_type, trigger_offset_minutes, send_at_time, target_tag_id,
-              current_published_version_id
+              trigger_event_id, current_published_version_id
          FROM reminders
         WHERE is_active = 1 AND lifecycle_status = 'published'
           AND deleted_at IS NULL AND trigger_type = ?`,

@@ -2137,6 +2137,8 @@ export interface ReminderDraftSettings {
   triggerType: ReminderTriggerType;
   deliveryMode: "time" | "countdown";
   triggerFieldId?: string | null;
+  /** triggerType が 'event' のときの起点イベント。未指定(NULL)は全イベントが起点になる従来動作。 */
+  triggerEventId?: string | null;
   repeatYearly?: boolean;
   triggerOffsetMinutes?: number | null;
   sendAtTime?: string | null;

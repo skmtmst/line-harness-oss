@@ -215,8 +215,8 @@ describe('運営メンバー', () => {
 
     // 一覧には招待中として出る
     const list = await app(master).request('/api/ops/members', {}, environment());
-    const listed = (await list.json() as { data: Array<{ staffId: string; activationState: string }>; summary: { members: number; invited: number } });
-    expect(listed.data.find((m) => m.staffId === body.data.staffId)?.activationState).toBe('invited');
+    const listed = (await list.json() as { data: Array<{ staffId: string; isActive: boolean; activationState: string }>; summary: { members: number; invited: number } });
+    expect(listed.data.find((m) => m.staffId === body.data.staffId)).toMatchObject({ isActive: true, activationState: 'invited' });
     expect(listed.summary).toMatchObject({ members: 3, invited: 1 });
 
     // 招待を受ける（名前とパスワードを設定）→ 2要素認証待ち

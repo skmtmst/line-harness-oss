@@ -276,6 +276,16 @@ function readTriggerInput(
       out.triggerFieldId = raw;
     }
   }
+  if (has('triggerEventId')) {
+    const raw = body.triggerEventId;
+    if (raw === null || raw === '' || raw === undefined) {
+      out.triggerEventId = null;
+    } else if (typeof raw !== 'string') {
+      return { ok: false, error: 'triggerEventId must be a string' };
+    } else {
+      out.triggerEventId = raw;
+    }
+  }
   if (has('repeatYearly')) {
     if (typeof body.repeatYearly !== 'boolean') {
       return { ok: false, error: 'repeatYearly must be boolean' };
@@ -432,6 +442,7 @@ function readDraftSettings(
       triggerType: body.triggerType as ReminderDraftSettings['triggerType'],
       deliveryMode: body.deliveryMode as ReminderDraftSettings['deliveryMode'],
       triggerFieldId: typeof body.triggerFieldId === 'string' && body.triggerFieldId ? body.triggerFieldId : null,
+      triggerEventId: typeof body.triggerEventId === 'string' && body.triggerEventId ? body.triggerEventId : null,
       repeatYearly: body.repeatYearly === true,
       triggerOffsetMinutes,
       sendAtTime,
@@ -465,6 +476,13 @@ async function validateReminderDraftReferences(
        WHERE ff.id = ? AND (ffs.line_account_id = ? OR ffs.line_account_id IS NULL)`,
     ).bind(settings.triggerFieldId, settings.lineAccountId).first<{ id: string }>();
     if (!field) return '基準日に使う友だち情報欄が見つかりません';
+  }
+  if (settings.triggerEventId) {
+    const event = await db.prepare(
+      `SELECT id FROM events
+        WHERE id = ? AND line_account_id = ? AND deleted_at IS NULL`,
+    ).bind(settings.triggerEventId, settings.lineAccountId).first<{ id: string }>();
+    if (!event) return '基準日に使うイベントが見つかりません';
   }
   for (const step of settings.steps) {
     if (!step.templateId) continue;
@@ -718,6 +736,7 @@ reminders.get('/api/reminders/:id', async (c) => {
         triggerType: reminder.trigger_type ?? 'manual',
         deliveryMode: reminder.delivery_mode ?? 'countdown',
         triggerFieldId: reminder.trigger_field_id ?? null,
+        triggerEventId: reminder.trigger_event_id ?? null,
         repeatYearly: reminder.repeat_yearly === 1,
         triggerOffsetMinutes: reminder.trigger_offset_minutes ?? null,
         sendAtTime: reminder.send_at_time ?? null,
@@ -757,7 +776,8 @@ reminders.get('/api/reminders/:id/draft', async (c) => {
 
 reminders.put('/api/reminders/:id/draft', requireRole('owner', 'admin'), async (c) => {
   try {
-    const parsed = readDraftSettings(await c.req.json<unknown>());
+    const rawBody = await c.req.json<unknown>();
+    const parsed = readDraftSettings(rawBody);
     if (!parsed.ok) return c.json({ success: false, error: parsed.error }, parsed.status === 422 ? 422 : 400);
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [parsed.value.lineAccountId])) {
       return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
@@ -766,9 +786,20 @@ reminders.put('/api/reminders/:id/draft', requireRole('owner', 'admin'), async (
     if (folderError) return c.json({ success: false, error: folderError }, 422);
     const referenceError = await validateReminderDraftReferences(c.env.DB, parsed.value);
     if (referenceError) return c.json({ success: false, error: referenceError }, 422);
-    const saved = await saveReminderDraftVersion(c.env.DB, c.req.param('id'), parsed.value);
+    // N-080: 画面を開いたときの下書き版を送ってもらい、先に別の保存・公開が
+    // 走っていたら 409 で止める。古い画面からの上書き保存を防ぐ。
+    const expectedVersionId = rawBody && typeof rawBody === 'object' && !Array.isArray(rawBody)
+      && typeof (rawBody as Record<string, unknown>).expectedVersionId === 'string'
+      ? (rawBody as Record<string, unknown>).expectedVersionId as string
+      : undefined;
+    const saved = await saveReminderDraftVersion(
+      c.env.DB, c.req.param('id'), parsed.value, { expectedVersionId },
+    );
     return c.json({ success: true, data: versionResponse(saved) });
   } catch (err) {
+    if (err instanceof Error && err.message === 'REMINDER_DRAFT_CONFLICT') {
+      return c.json({ success: false, error: 'この下書きは別の画面で先に更新されました。最新の内容を読み込み直してください' }, 409);
+    }
     console.error('PUT /api/reminders/:id/draft error:', err);
     return c.json({ success: false, error: '下書きを保存できませんでした' }, 500);
   }

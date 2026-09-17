@@ -4628,7 +4628,7 @@ CREATE TABLE "reminders" (
   created_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 , display_order INTEGER NOT NULL DEFAULT 0, deleted_at TEXT, lifecycle_status TEXT NOT NULL DEFAULT 'published'
-  CHECK (lifecycle_status IN ('draft', 'published', 'stopped')), current_draft_version_id TEXT, current_published_version_id TEXT, created_from_recipe_id TEXT REFERENCES recipes(id), recipe_clone_run_id TEXT REFERENCES recipe_clone_runs(id));
+  CHECK (lifecycle_status IN ('draft', 'published', 'stopped')), current_draft_version_id TEXT, current_published_version_id TEXT, created_from_recipe_id TEXT REFERENCES recipes(id), recipe_clone_run_id TEXT REFERENCES recipe_clone_runs(id), trigger_event_id TEXT);
 
 CREATE TABLE rich_menu_area_taps (
   id              TEXT PRIMARY KEY,
@@ -7249,6 +7249,8 @@ CREATE INDEX idx_reminder_versions_status
 CREATE INDEX idx_reminders_display_order ON reminders(display_order, created_at);
 
 CREATE INDEX idx_reminders_folder ON reminders(folder_id);
+
+CREATE INDEX idx_reminders_trigger_event ON reminders (trigger_event_id);
 
 CREATE INDEX idx_reminders_visible_order
   ON reminders (line_account_id, display_order, created_at)
