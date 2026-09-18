@@ -1,6 +1,7 @@
 import { readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
+import { AUTOMATION_DRAFT_TRIGGER_OPTIONS } from '@line-crm/shared'
 
 /**
  * ルールを作る（★V6 `Rv8Jv`）の見張り。
@@ -30,11 +31,16 @@ const PAGE_CODE = PAGE.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm,
 const CSS = readFileSync(join(HERE, 'new-automation.module.css'), 'utf8')
 const TYPES = readFileSync(join(REPO, 'packages', 'shared', 'src', 'types.ts'), 'utf8')
 
-/** 画面が並べているきっかけの値。 */
+/**
+ * 画面が並べているきっかけの値。
+ *
+ * #942 N-355: 画面の EVENTS は共有の正本（`AUTOMATION_DRAFT_TRIGGER_OPTIONS`）
+ * からそのまま作る。ここでは「本当に共有から描いている」ことを確かめたうえで、
+ * 共有の値を画面の選択肢として返す。
+ */
 function screenEventValues(): string[] {
-  const block = /const EVENTS[\s\S]*?\n\]\n/.exec(PAGE)
-  if (!block) throw new Error('EVENTS の定義が読めません')
-  return [...block[0].matchAll(/value: '([^']+)'/g)].map((m) => m[1])
+  expect(PAGE, '画面が共有の選択肢から描いていない').toContain('AUTOMATION_DRAFT_TRIGGER_OPTIONS.map')
+  return AUTOMATION_DRAFT_TRIGGER_OPTIONS.map((option) => option.value)
 }
 
 /** `AutomationEventType` が許している値。 */
@@ -61,7 +67,7 @@ function firedEventTypes(): Set<string> {
     // フォーム・リンク・予約はルートがイベントバスへ渡し、日時系は
     // trigger_type としてCronが拾う。直接 fireEvent の形だけに限定しない。
     for (const m of source.matchAll(/(?:eventType|triggerType): '(form_submitted|link_clicked|calendar_booked|datetime|daily|weekly)'/g)) fired.add(m[1])
-    for (const m of source.matchAll(/trigger_type IN \('datetime', 'daily', 'weekly'\)/g)) {
+    if (/trigger_type IN \('datetime', 'daily', 'weekly'\)/.test(source)) {
       for (const type of ['datetime', 'daily', 'weekly']) fired.add(type)
     }
     if (source.includes("'ec.order.confirmed'") && source.includes('EVENT_TRIGGER_TYPES')) fired.add('ec.order.confirmed')
@@ -203,8 +209,9 @@ describe('V6 ルールを作る（Rv8Jv）', () => {
     expect(PAGE).not.toContain('actions: [\n')
   })
 
-  it('設計の6種類を表示し、下書き・見込み人数・1人テスト・公開へ接続する', () => {
-    expect(screenEventValues()).toHaveLength(6)
+  it('共有の全種類を表示し、下書き・見込み人数・1人テスト・公開へ接続する', () => {
+    // #942 N-355: 下書きunionと同じ10種を全部出す（以前は6種だけ）。
+    expect(screenEventValues()).toHaveLength(AUTOMATION_DRAFT_TRIGGER_OPTIONS.length)
     expect(PAGE).toContain('api.automations.createDraftFromTemplate')
     expect(PAGE).toContain('api.automations.updateDraft')
     expect(PAGE).toContain('api.automations.audiencePreview')
@@ -213,10 +220,8 @@ describe('V6 ルールを作る（Rv8Jv）', () => {
     expect(PAGE).toContain('つくって動かす')
   })
 
-  it('同じきっかけ注意はこの店だけ見て選べない分岐を持たない (#580)', () => {
+  it('同じきっかけ注意はこの店だけ見る (#580)', () => {
     expect(PAGE).toContain('api.automations.list({ accountId: selectedAccountId })')
-    expect(PAGE).not.toContain('triggerConfig.trackedLinkId')
-    expect(PAGE).not.toContain('triggerConfig.bookingType')
     expect(PAGE).toContain('保存した時点の内容で試します')
   })
 })

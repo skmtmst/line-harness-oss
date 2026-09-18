@@ -44,7 +44,11 @@ describe('V6 オートメーション一覧の状態', () => {
   it('各行の実行回数・失敗回数と詳細導線を表示する', () => {
     expect(PAGE).toContain("automation.executionCount30d.toLocaleString('ja-JP')")
     expect(PAGE).toContain('automation.failureCount30d > 0')
-    expect(PAGE).toContain('href={`/automations/drafts?id=')
+    // #942 N-352: 編集は公開版を写した下書きを作ってから開く。実行記録への
+    // 導線は行の名前を検索語に載せる。
+    expect(PAGE).toContain('api.automations.createDraftFromAutomation(')
+    expect(PAGE).toContain('router.push(`/automations/drafts?id=')
+    expect(PAGE).toContain('href={`/automations/runs?search=')
   })
 
   it('空の状態を共通部品とdata-list-stateで見分けられる', () => {
@@ -64,9 +68,12 @@ describe('V6 オートメーション一覧の状態', () => {
     expect(PAGE).not.toContain('handleCreate')
     expect(PAGE).not.toContain('automations.create(')
     expect(PAGE).not.toContain('新規オートメーションを作成')
-    // 稼働切替・削除で使う更新・削除は残す
-    expect(PAGE).toContain('api.automations.update(')
-    expect(PAGE).toContain('api.automations.delete(')
+    // #942 N-352: 稼働切替と「保管」はV6の定義ステータス遷移で行う。
+    // 削除は保管に置き換わり、旧 PUT/DELETE には接続しない。
+    expect(PAGE).toContain('api.automations.setStatus(')
+    expect(PAGE).toContain("'archived'")
+    expect(PAGE).not.toContain('api.automations.update(')
+    expect(PAGE).not.toContain('api.automations.delete(')
   })
 
   it('「動いた回数が多い順」は30日実績で並べる（#554 点検#519中8）', () => {

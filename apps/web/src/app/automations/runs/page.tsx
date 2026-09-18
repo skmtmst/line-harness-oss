@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { useAccount } from '@/contexts/account-context'
-import { fetchApi } from '@/lib/api'
+import { api, fetchApi, type AutomationRunDetail } from '@/lib/api'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import MergedTabs from '@/components/layout/merged-tabs'
@@ -25,6 +25,12 @@ type AutomationRun = {
   durationMs: number | null
   automationName: string
   canRetry: boolean
+  /** #942 N-354: 実行時に固定された版番号。 */
+  versionNumber: number
+  /** #942 N-354: 1人テストの実行か。 */
+  isTest: boolean
+  /** #942 N-353: 取りやめられるのは、まだ終わっていない実行だけ。 */
+  canCancel: boolean
 }
 
 type RunsResponse = {
@@ -56,6 +62,17 @@ const STATUS_LABEL: Record<RunStatus, string> = {
   retry_wait: '再試行を待っています',
   permanent_failed: '失敗しました',
   cancelled: '取り消しました',
+}
+
+/** 処理ごとの結果の状態（#942 N-354）。 */
+const STEP_STATUS_LABEL: Record<AutomationRunDetail['steps'][number]['status'], string> = {
+  queued: '待機中',
+  running: '実行中',
+  waiting: '再試行待ち',
+  success: '成功',
+  failed: '失敗',
+  skipped: '見送り',
+  cancelled: '取りやめ',
 }
 
 function formatOccurredAt(value: string): string {
@@ -95,8 +112,12 @@ export default function AutomationRunsPage() {
   const [query, setQuery] = useState(searchFromUrl)
   const [resultFilter, setResultFilter] = useState<'all' | 'executed' | 'skipped' | 'problems'>('all')
   const [selectedRun, setSelectedRun] = useState<AutomationRun | null>(null)
+  const [selectedDetail, setSelectedDetail] = useState<AutomationRunDetail | null>(null)
+  const [detailLoading, setDetailLoading] = useState(false)
   const [retryingId, setRetryingId] = useState<string | null>(null)
   const [retryNotice, setRetryNotice] = useState('')
+  const [cancellingId, setCancellingId] = useState<string | null>(null)
+  const [confirmCancel, setConfirmCancel] = useState(false)
 
   // 検索の連打で古い応答が新しい表示を上書きしないよう世代で守る（#519 軽）。
   const loadGeneration = useRef(0)
@@ -144,6 +165,57 @@ export default function AutomationRunsPage() {
     return () => window.clearTimeout(timer)
   }, [load])
 
+  /*
+   * 詳細パネルを開いたら、版番号・テスト印・処理ごとの結果を
+   * 1件の口（GET /api/automation-runs/:id）から取り直す（#942 N-354）。
+   * 一覧の行には無い情報なので、開いたときだけ読む。
+   */
+  useEffect(() => {
+    if (!selectedRun) {
+      setSelectedDetail(null)
+      setConfirmCancel(false)
+      return
+    }
+    let cancelled = false
+    setDetailLoading(true)
+    api.automations.getRun(selectedRun.id)
+      .then((response) => {
+        if (cancelled) return
+        setSelectedDetail(response.success ? response.data : null)
+      })
+      .catch(() => {
+        if (!cancelled) setSelectedDetail(null)
+      })
+      .finally(() => {
+        if (!cancelled) setDetailLoading(false)
+      })
+    return () => { cancelled = true }
+  }, [selectedRun])
+
+  /**
+   * #942 N-353: まだ終わっていない実行の取りやめ。
+   *
+   * 記録は消さず `cancelled` で閉じる。確認を挟むのは、
+   * 取りやめたあと実行は戻せないから（記録自体は残る）。
+   */
+  const cancelRun = async (run: AutomationRun) => {
+    if (!run.canCancel || cancellingId) return
+    setCancellingId(run.id)
+    setRetryNotice('')
+    try {
+      const response = await api.automations.cancelRun(run.id)
+      if (!response.success) throw new Error(response.error)
+      setRetryNotice('実行を取りやめました。記録は残っています。')
+      setSelectedRun(null)
+      setConfirmCancel(false)
+      await load()
+    } catch (caught) {
+      setRetryNotice(caught instanceof Error ? caught.message : '実行を取りやめられませんでした')
+    } finally {
+      setCancellingId(null)
+    }
+  }
+
   const retryRun = async (run: AutomationRun) => {
     if (!run.canRetry || retryingId) return
     setRetryingId(run.id)
@@ -166,13 +238,24 @@ export default function AutomationRunsPage() {
     }
   }
 
+  /*
+   * #942 N-353: CSV書き出し。画面の検索・絞り込みと同じ行を、
+   * `format=csv` でそのままファイルにする。セッション認証で開けるので
+   * ただのリンクでよい（先にJSONを取る必要はない）。
+   */
+  const csvUrl = api.automations.runsCsvUrl({
+    accountId: selectedAccountId || undefined,
+    search: query.trim() || undefined,
+    status: resultFilter !== 'all' ? resultFilter : undefined,
+  })
+
   return (
     <div data-design-node="DkPY0">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-ink-faint">自動化 ＞ オートメーション ＞ 動いた記録</p>
         <div className="text-right">
-          <Button disabled>CSVで書き出す</Button>
-          <p className="mt-1 text-xs text-ink-faint">CSV書き出しは未接続</p>
+          <Button href={csvUrl}>CSVで書き出す</Button>
+          <p className="mt-1 text-xs text-ink-faint">いまの検索・絞り込みの行が出ます</p>
         </div>
       </div>
       <div className="mb-4"><MergedTabs basePath="/automations/runs" paramName="tab" tabs={TABS} active="runs" /></div>
@@ -221,7 +304,7 @@ export default function AutomationRunsPage() {
           {data.items.map((run) => (
             <div key={run.id} className="grid min-h-14 grid-cols-6 items-center gap-3 border-t border-hairline px-4 py-2 text-sm">
               <div className="min-w-0"><p className="truncate font-semibold text-ink">{formatOccurredAt(run.occurredAt)} ／ {run.subject ?? '友だち名なし'}</p><p className="truncate text-xs text-ink-faint">{run.accountLabel ?? 'アカウント名なし'}</p></div>
-              <div className="min-w-0"><p className="truncate text-ink" title={run.automationName}>{run.automationName}</p><p className="truncate text-xs text-ink-faint" title={run.triggerLabel}>{run.triggerLabel}</p></div>
+              <div className="min-w-0"><p className="truncate text-ink" title={run.automationName}>{run.automationName}<span className="ml-1 text-xs font-normal text-ink-faint">v{run.versionNumber}</span>{run.isTest ? <span className="ml-1 rounded-full border border-hairline bg-canvas-sunken px-2 py-0.5 text-xs font-semibold text-ink-secondary">テスト</span> : null}</p><p className="truncate text-xs text-ink-faint" title={run.triggerLabel}>{run.triggerLabel}</p></div>
               <span className={run.status === 'permanent_failed' || run.status === 'retry_wait' ? 'font-semibold text-danger' : run.status === 'succeeded' ? 'font-semibold text-accent-deep' : 'font-semibold text-ink-faint'}>{STATUS_LABEL[run.status]}</span>
               <p className="truncate text-ink-secondary" title={run.detail ?? '何もしていません'}>{run.detail ?? '何もしていません'}</p>
               <span className="tabular-nums text-ink-secondary">{formatDuration(run.durationMs)}</span>
@@ -246,7 +329,13 @@ export default function AutomationRunsPage() {
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <p className="text-xs font-semibold text-info">実行記録の中身</p>
-              <h2 className="mt-1 text-lg font-bold text-ink">{selectedRun.automationName}</h2>
+              <h2 className="mt-1 text-lg font-bold text-ink">
+                {selectedRun.automationName}
+                <span className="ml-2 text-sm font-normal text-ink-faint">版 v{(selectedDetail ?? selectedRun).versionNumber}</span>
+                {(selectedDetail ?? selectedRun).isTest ? (
+                  <span className="ml-2 rounded-full border border-hairline bg-canvas-sunken px-2 py-0.5 text-xs font-semibold text-ink-secondary">テスト実行</span>
+                ) : null}
+              </h2>
               <p className="mt-1 text-sm text-ink-secondary">{formatOccurredAt(selectedRun.occurredAt)} ／ {selectedRun.subject ?? '友だち名なし'}</p>
             </div>
             <Button onClick={() => setSelectedRun(null)}>閉じる</Button>
@@ -257,16 +346,62 @@ export default function AutomationRunsPage() {
             <RunDetail label="したこと・失敗理由" value={selectedRun.detail ?? '何もしていません'} />
             <RunDetail label="かかった時間" value={formatDuration(selectedRun.durationMs)} />
           </dl>
+
+          {/* #942 N-354: 処理ごとの結果と試行回数。 */}
+          <div className="mt-4">
+            <p className="text-xs font-semibold text-ink-faint">処理ごとの結果</p>
+            {detailLoading ? (
+              <p className="mt-2 text-sm text-ink-faint">読み込んでいます</p>
+            ) : selectedDetail && selectedDetail.steps.length > 0 ? (
+              <ul className="mt-2 divide-y divide-hairline rounded-control border border-hairline">
+                {selectedDetail.steps.map((step) => (
+                  <li key={step.stepKey} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-sm">
+                    <span className="min-w-0 truncate text-ink">
+                      {step.actionLabel}
+                      {step.commonActionVersionId ? <span className="ml-1 text-xs text-ink-faint">（共通アクション）</span> : null}
+                    </span>
+                    <span className="flex items-center gap-3 text-xs">
+                      <span className="tabular-nums text-ink-faint">{step.attemptNumber}回目</span>
+                      <span className={step.status === 'failed' ? 'font-semibold text-danger' : step.status === 'success' ? 'font-semibold text-accent-deep' : 'font-semibold text-ink-faint'}>
+                        {STEP_STATUS_LABEL[step.status]}
+                      </span>
+                    </span>
+                    {step.errorMessage ? <p className="w-full text-xs text-danger">{step.errorMessage}</p> : null}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="mt-2 text-sm text-ink-faint">処理の記録はありません</p>
+            )}
+          </div>
+
           <div className="mt-4 rounded-control border border-hairline bg-canvas-sunken px-4 py-3 text-sm text-ink-secondary">
             {selectedRun.canRetry
               ? '失敗した処理だけを、成功済みの処理と重ならないようにもう一度実行できます。'
-              : '安全な再実行の対象ではありません。成功済みの処理を二重に動かさないため、この記録からは再実行できません。'}
+              : selectedRun.canCancel
+                ? 'まだ終わっていない実行です。取りやめるとこれ以降の処理は動きませんが、記録は残ります。'
+                : '安全な再実行の対象ではありません。成功済みの処理を二重に動かさないため、この記録からは再実行できません。'}
           </div>
-          {selectedRun.canRetry ? (
-            <Button className="mt-3" onClick={() => void retryRun(selectedRun)} disabled={retryingId !== null}>
-              {retryingId === selectedRun.id ? '実行中' : '失敗した処理をもう一度やる'}
-            </Button>
-          ) : null}
+          <div className="mt-3 flex flex-wrap items-center gap-3">
+            {selectedRun.canRetry ? (
+              <Button onClick={() => void retryRun(selectedRun)} disabled={retryingId !== null}>
+                {retryingId === selectedRun.id ? '実行中' : '失敗した処理をもう一度やる'}
+              </Button>
+            ) : null}
+            {selectedRun.canCancel ? (
+              confirmCancel ? (
+                <>
+                  <span className="text-xs font-semibold text-danger">この実行を取りやめますか？記録は残りますが、実行は戻せません。</span>
+                  <Button onClick={() => void cancelRun(selectedRun)} disabled={cancellingId !== null}>
+                    {cancellingId === selectedRun.id ? '取りやめ中' : '取りやめる'}
+                  </Button>
+                  <Button onClick={() => setConfirmCancel(false)} disabled={cancellingId !== null}>やめる</Button>
+                </>
+              ) : (
+                <Button onClick={() => setConfirmCancel(true)} disabled={cancellingId !== null}>この実行を取りやめる</Button>
+              )
+            ) : null}
+          </div>
         </section>
       ) : null}
     </div>

@@ -68,11 +68,24 @@ describe('V6 オートメーションが動いた記録（DkPY0）', () => {
     expect(PAGE).toContain('/api/automation-runs/${encodeURIComponent(run.id)}/retry')
     expect(PAGE).toContain('成功済みの処理は二重に実行しません')
     expect(PAGE).toContain('失敗した処理をもう一度やる')
-    expect(PAGE).toContain('CSV書き出しは未接続')
-    expect(PAGE).toContain('<Button disabled>CSVで書き出す</Button>')
     expect(PAGE).toContain('setSelectedRun(run)')
     expect(PAGE).toContain('実行記録の中身')
     expect(PAGE).toContain('成功済みの処理を二重に動かさないため')
+  })
+
+  it('CSV書き出しと実行の取りやめを実口へ接続する (#942 N-353)', () => {
+    expect(PAGE).toContain('api.automations.runsCsvUrl')
+    expect(PAGE).toContain('api.automations.cancelRun')
+    expect(PAGE).toContain('この実行を取りやめる')
+    expect(PAGE).toContain('実行を取りやめました。記録は残っています。')
+  })
+
+  it('詳細に版番号・テスト印・処理ごとの結果を出す (#942 N-354)', () => {
+    expect(PAGE).toContain('api.automations.getRun')
+    expect(PAGE).toContain('versionNumber')
+    expect(PAGE).toContain('isTest')
+    expect(PAGE).toContain('処理ごとの結果')
+    expect(PAGE).toContain('attemptNumber')
   })
 
   it('壊れた応答を描画せず取得失敗へ倒す', () => {
