@@ -131,6 +131,16 @@ beforeEach(async () => {
   ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
   net.calls.length = 0
   routing.params = new URLSearchParams('id=friend-1&tab=info')
+  /*
+    N-037で情報欄の保存はオーナー・管理者専用になった。権限の正本は
+    auth-guardが保存するlocalStorageなので、ここでは管理者として開く。
+    （権限別の出し分けは friend-detail-permission.test.tsx が固定する）
+  */
+  vi.stubGlobal('localStorage', {
+    getItem: (key: string) => (key === 'lh_staff_role' ? 'admin' : null),
+    setItem: () => {},
+    removeItem: () => {},
+  })
   host = document.createElement('div')
   document.body.appendChild(host)
   root = createRoot(host)
@@ -143,6 +153,7 @@ afterEach(async () => {
   })
   host.remove()
   vi.restoreAllMocks()
+  vi.unstubAllGlobals()
 })
 
 async function render() {

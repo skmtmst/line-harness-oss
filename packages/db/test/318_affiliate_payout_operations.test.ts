@@ -93,6 +93,48 @@ describe('migration 318 affiliate settlement and payout ledger', () => {
     expect(sqlite.prepare('SELECT COUNT(*) AS count FROM affiliate_reward_entries').get()).toEqual({ count: 1 });
   });
 
+  it('報酬0円の成果は締め対象から外れ、件数と対象がプレビューに出る(N-219)', async () => {
+    // 案件に結びつかない承認済み成果は、版が0円で保存される。
+    // 締め対象から外れるのは仕様どおりだが、黙って捨てずに返す。
+    sqlite.exec(`
+      INSERT INTO conversion_events
+        (id, conversion_point_id, friend_id, affiliate_id, attributed_ref_code,
+         approval_status, approved_at, value_snapshot)
+      VALUES ('conversion-zero', 'point-1', 'friend-1', 'affiliate-1', NULL,
+        'approved', '2026-08-15T00:00:00.000Z', 10000);
+    `);
+    await ensureConversionRewardSnapshot(db, 'conversion-zero', '2026-08-15T00:00:00.000Z');
+    const calc = sqlite.prepare(
+      `SELECT amount_minor FROM affiliate_reward_calculations WHERE conversion_event_id = 'conversion-zero'`,
+    ).get() as { amount_minor: number };
+    expect(calc.amount_minor).toBe(0);
+
+    const period = {
+      tenantId: TENANT_ID, lineAccountId: 'account-1',
+      periodFrom: '2026-08-01T00:00:00.000Z', periodTo: '2026-08-31T23:59:59.000Z',
+    };
+    const preview = await previewAffiliateAccountSettlement(db, period);
+    // 締める額・件数は従来どおり0円を数えない。
+    expect(preview).toMatchObject({ totalAmount: 5000, conversionCount: 1 });
+    // 外れた行は件数と対象を返す。
+    expect(preview.excludedZeroAmount.count).toBe(1);
+    expect(preview.excludedZeroAmount.rows).toEqual([
+      expect.objectContaining({
+        conversionEventId: 'conversion-zero',
+        affiliateId: 'affiliate-1',
+        approvedAt: '2026-08-15T00:00:00.000Z',
+        rewardAmount: 0,
+      }),
+    ]);
+
+    // 締めは従来どおり0円を含めず成立する(除外仕様は変えない)。
+    const closed = await closeAffiliateAccountSettlement(db, {
+      ...period, actorId: 'staff-1', expectedPreviewVersion: preview.previewVersion,
+      idempotencyKey: 'settlement-zero-1', requestFingerprint: 'zero-1',
+    });
+    expect(closed).toMatchObject({ kind: 'created', totalAmount: 5000, conversionCount: 1 });
+  });
+
   it('承認時の版があれば全体締めも凍結し、entryへ必ず紐付ける', async () => {
     sqlite.exec(`
       INSERT INTO conversion_events

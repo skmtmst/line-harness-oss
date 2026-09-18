@@ -153,6 +153,19 @@ export default function FriendListRow({
         </div>
       ) : null}
 
+      {/*
+        流入元（N-038）。友だち追加時に一度だけ付く計測値で、
+        詳細の「友だち情報」にあるものと同じ firstTrackedLinkName。
+        計測なしは空欄にせず「不明」と出す（詳細と同じ言葉）。
+      */}
+      {visibleColumns.has('source') ? (
+        <div className="min-w-0">
+          <p className={`truncate text-xs ${friend.firstTrackedLinkName ? 'text-ink-secondary' : 'text-ink-faint'}`} title={friend.firstTrackedLinkName || '不明'}>
+            {friend.firstTrackedLinkName || '不明'}
+          </p>
+        </div>
+      ) : null}
+
       {visibleColumns.has('last') ? (
         <div className="text-center text-xs tabular-nums text-ink-faint" title={formatDateTime(lastContact)}>
           {formatDate(lastContact)}

@@ -1634,7 +1634,7 @@ function FunnelTab({ accountId, canManage }: { accountId: string; canManage: boo
           <section className="bg-canvas rounded-card border-hairline mt-3 border p-4">
             <h3 className="text-ink text-sm font-semibold">段の作り方</h3>
             <ul className="text-ink-faint mt-2 space-y-1.5 text-xs leading-relaxed">
-              <li>・段には タグ・友だち情報・フォーム回答・サイトの行動・購入 を置けます</li>
+              <li>・段には {FUNNEL_STEP_KIND_OPTIONS.map((item) => item.label).join('・')} を置けます</li>
               <li>・順番どおりに通った人だけを数えます。飛ばした人は含みません</li>
               <li>・比較条件を定義版に含めると、最大3群の通過率を同じ結果で比べられます</li>
               <li>・再集計すると新しい結果を作り、前の結果は書き換えません</li>
@@ -1720,6 +1720,23 @@ function FunnelTab({ accountId, canManage }: { accountId: string; canManage: boo
   )
 }
 
+// 段に置ける種類の選択肢。正本は packages/db/src/analytics-funnels.ts の
+// V6_FUNNEL_STEP_KINDS（この並びと同じ種類・同じ順を保つ。契約試験が照合する）。
+// 「段の作り方」の案内もこの一覧から作るので、選べる種類と説明がずれない。
+const FUNNEL_STEP_KIND_OPTIONS = [
+  { key: 'friend_add', label: '友だち追加', hint: '' },
+  { key: 'tag', label: 'タグが付いた', hint: 'タグのID' },
+  { key: 'field', label: '情報欄に値が入った', hint: '項目のID（値は問いません）' },
+  { key: 'form', label: 'フォームに答えた', hint: 'フォームのID' },
+  { key: 'site_event', label: 'サイトのページを見た', hint: 'パスのまとまり（例: thanks）' },
+  { key: 'purchase', label: '購入が確定した', hint: '' },
+  { key: 'link_click', label: 'リンクを踏んだ', hint: '計測リンクのID' },
+  { key: 'conversion', label: '成果が記録された', hint: '成果地点のID' },
+  { key: 'message', label: 'メッセージを受信した', hint: '' },
+  { key: 'booking', label: '予約が確定した', hint: '' },
+  { key: 'automation', label: 'オートメーションが動いた', hint: 'オートメーションのID' },
+]
+
 /**
  * ファネルの作成。
  *
@@ -1748,20 +1765,6 @@ function FunnelForm({
     comparisonGroups: unknown[]
   }
 }) {
-  const KINDS = [
-    { key: 'friend_add', label: '友だち追加', hint: '' },
-    { key: 'tag', label: 'タグが付いた', hint: 'タグのID' },
-    { key: 'field', label: '情報欄に値が入った', hint: '項目のID（値は問いません）' },
-    { key: 'form', label: 'フォームに答えた', hint: 'フォームのID' },
-    { key: 'site_event', label: 'サイトのページを見た', hint: 'パスのまとまり（例: thanks）' },
-    { key: 'purchase', label: '購入が確定した', hint: '' },
-    { key: 'link_click', label: 'リンクを踏んだ', hint: '計測リンクのID' },
-    { key: 'conversion', label: '成果が記録された', hint: '成果地点のID' },
-    { key: 'message', label: 'メッセージを受信した', hint: '' },
-    { key: 'booking', label: '予約が確定した', hint: '' },
-    { key: 'automation', label: 'オートメーションが動いた', hint: 'オートメーションのID' },
-  ]
-
   const [name, setName] = useState(edit?.name ?? '')
   // 何日以内の通過で数えるか(点検#508軽11)。裏は1〜365日を受け付ける。
   const [windowDays, setWindowDays] = useState(edit?.windowDays ?? '30')
@@ -1922,12 +1925,12 @@ function FunnelForm({
                 }
                 aria-label={`${i + 1}段目で何をしたら進むか`}
                 className="border-hairline rounded-control border px-2 py-1.5 text-sm"
-                options={KINDS.map((kind) => ({ value: kind.key, label: kind.label }))}
+                options={FUNNEL_STEP_KIND_OPTIONS.map((kind) => ({ value: kind.key, label: kind.label }))}
               />
             </div>
             <div className="min-w-[10rem] flex-1">
               <label className="text-ink-faint mb-1 block text-xs">
-                {KINDS.find((k) => k.key === step.kind)?.hint || '追加の指定はありません'}
+                {FUNNEL_STEP_KIND_OPTIONS.find((k) => k.key === step.kind)?.hint || '追加の指定はありません'}
               </label>
               <input
                 type="text"
@@ -2162,6 +2165,29 @@ function ReactionsOverviewTab({ accountId }: { accountId: string }) {
   const clicked = shownValue(overview.metrics.lineClicked)
   const clickRate = delivered && clicked !== null ? clicked / delivered * 100 : null
   const maxHourly = Math.max(1, ...overview.trackedClickHours.map((item) => item.clicks))
+  // 打切りに達した系統だけ、一覧に実際に出ている件数で「先頭○件まで」を告げる。
+  const broadcastShown = overview.campaigns.filter((item) => item.kind === 'broadcast').length
+  const scenarioShown = overview.campaigns.length - broadcastShown
+  const truncationNote = [
+    overview.campaignsTruncation.broadcast ? `一斉配信は新しい方から先頭${broadcastShown}件` : null,
+    overview.campaignsTruncation.scenario ? `シナリオは新しい方から先頭${scenarioShown}件` : null,
+  ].filter(Boolean).join('・')
+  const exportCampaigns = () => downloadCsv('analytics-reactions.csv', [
+    ['配信', '種類', '送った日時', '対象', '到達', '開封', 'LINEクリック', '成果'],
+    ...overview.campaigns.map((item) => [
+      item.name,
+      item.kind === 'broadcast' ? '一斉配信' : 'シナリオ',
+      item.sentAt,
+      shownValue(item.targetPeople),
+      shownValue(item.delivered),
+      shownValue(item.opened),
+      shownValue(item.lineClicked),
+      shownValue(item.outcomes),
+    ]),
+    // 打切りのときはCSV側にも範囲の断りを残す。一覧だけに書くと、
+    // 書き出した表だけを見た人に全件のように見える。
+    ...(truncationNote ? [[`※${truncationNote}までを表示（それより古い配信は含みません）`]] : []),
+  ])
   return <div data-design-node="J6Inc" className="space-y-4">
     <AnalyticsPeriodControl days={days} onChange={setDays} />
     <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
@@ -2171,6 +2197,7 @@ function ReactionsOverviewTab({ accountId }: { accountId: string }) {
       <KpiCard title="取得できない配信" value={shownValue(overview.metrics.unavailableCampaigns)} unit="件" detail={overview.metrics.unavailableCampaigns.reason ?? '開封などを取得できない配信'} />
     </div>
     <AnalyticsNotice>配信ごとの開かれ方・押され方です。20人未満など取得できない数は、0ではなく「—」と理由で示します。</AnalyticsNotice>
+    {truncationNote && <AnalyticsNotice>{truncationNote}までを表示しています。それより古い配信は一覧にもCSVの書き出しにも入りません。</AnalyticsNotice>}
     <section className="bg-canvas rounded-card border-hairline border p-4">
       <h2 className="font-semibold text-ink">送った時間ごとの「押された回数」</h2>
       <p className="mt-1 text-xs text-ink-faint">こちらで作った中継URLのクリックを、時間帯ごとに並べています。</p>
@@ -2181,6 +2208,7 @@ function ReactionsOverviewTab({ accountId }: { accountId: string }) {
         })}
       </div>
     </section>
+    <div className="flex justify-end"><AnalyticsExportButton onClick={exportCampaigns} disabled={overview.campaigns.length === 0} /></div>
     <div className="bg-canvas rounded-card border-hairline overflow-hidden border"><table className="w-full table-fixed">
       <thead><TableHeadRow><Th>配信</Th><Th>種類・日時</Th><Th align="right">対象</Th><Th align="right">到達</Th><Th align="right">開封</Th><Th align="right">LINEクリック</Th><Th align="right">成果</Th></TableHeadRow></thead>
       <tbody className="divide-hairline divide-y">{overview.campaigns.length === 0 ? <tr><td colSpan={7} className="text-ink-faint p-8 text-center text-sm">この期間の配信はありません</td></tr> : overview.campaigns.map((item) => <tr key={`${item.kind}:${item.id}`} className="text-sm"><td className="truncate px-4 py-3 font-medium" title={item.name}>{item.name}</td><td className="text-ink-secondary px-3 py-3">{item.kind === 'broadcast' ? '一斉配信' : 'シナリオ'}<br /><span className="text-xs tabular-nums">{item.sentAt.slice(0, 16).replace('T', ' ')}</span></td><td className="px-3 py-3 text-right"><MetricCell metric={item.targetPeople} /></td><td className="px-3 py-3 text-right"><MetricCell metric={item.delivered} /></td><td className="px-3 py-3 text-right"><MetricCell metric={item.opened} /></td><td className="px-3 py-3 text-right"><MetricCell metric={item.lineClicked} /></td><td className="px-3 py-3 text-right"><MetricCell metric={item.outcomes} /></td></tr>)}</tbody>

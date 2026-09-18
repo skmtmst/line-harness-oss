@@ -11,6 +11,9 @@ const KPIS = readFileSync(join(HERE, 'friend-kpis.tsx'), 'utf8')
 const SUMMARY_CARD_CSS = readFileSync(join(HERE, '..', 'shared', 'summary-card.module.css'), 'utf8')
 const PAGINATION = readFileSync(join(HERE, '..', 'shared', 'pagination.tsx'), 'utf8')
 const ADVANCED = readFileSync(join(HERE, 'advanced-search-dialog.tsx'), 'utf8')
+/* N-039: 保存検索・通知の窓は overlay 規約へ乗せるため部品へ切り出した。 */
+const SAVED_DIALOG = readFileSync(join(HERE, 'saved-search-dialog.tsx'), 'utf8')
+const NOTICE_DIALOG = readFileSync(join(HERE, 'notice-dialog.tsx'), 'utf8')
 const TIMELINE = readFileSync(join(HERE, 'friend-timeline.tsx'), 'utf8')
 const DETAIL = readFileSync(join(HERE, '..', '..', 'app', 'friends', 'detail', 'page.tsx'), 'utf8')
 const DUPLICATES = readFileSync(join(HERE, '..', '..', 'app', 'duplicates', 'page.tsx'), 'utf8')
@@ -91,7 +94,7 @@ describe('友だちV6の画面契約', () => {
     expect(PAGE).toContain('名前・LINE名・タグ・メモで検索')
     expect(PAGE).toContain('詳細条件')
     expect(PAGE).toContain('SavedSearchDialog')
-    expect(PAGE).toContain('api.friendSavedViews.list')
+    expect(SAVED_DIALOG).toContain('api.friendSavedViews.list')
     expect(PAGE).toContain('savedSearchId')
     expect(ADVANCED).toContain('この条件で表示')
     expect(PAGE).toContain('友だち追加の新しい順')
@@ -153,8 +156,12 @@ describe('友だちV6の画面契約', () => {
   it('ブラウザ標準アラートを使わず独自ダイアログを出す', () => {
     expect(PAGE).not.toContain('window.alert')
     expect(PAGE).not.toContain('window.confirm')
-    expect(PAGE).toContain('role="dialog"')
-    expect(PAGE).toContain('aria-modal="true"')
+    /* N-039: 通知・保存検索の窓は部品側へ。共通overlay規約（Esc・復元）に乗せる。 */
+    for (const source of [NOTICE_DIALOG, SAVED_DIALOG]) {
+      expect(source).toContain('role="dialog"')
+      expect(source).toContain('aria-modal="true"')
+      expect(source).toContain('useOverlayFocus')
+    }
   })
 
   it('既存の検索・タグ・対応・詳細・受信箱への経路を残す', () => {
