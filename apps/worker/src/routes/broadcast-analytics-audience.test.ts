@@ -212,6 +212,17 @@ describe('分析対象者を配信へ渡す(N-274)', () => {
     expect(row.status).toBe('draft');
   });
 
+  test('送信の二度押しは2回目を409で止める', async () => {
+    seedAudience('aud-dbl', 'acc-1');
+    seedSegmentBroadcast('bc-dbl', 'acc-1', audienceCondition('aud-dbl'));
+    const first = await postSend('bc-dbl');
+    expect(first.status).toBe(202);
+    const second = await postSend('bc-dbl');
+    expect(second.status).toBe(409);
+    const row = sqlite.raw.prepare(`SELECT status FROM broadcasts WHERE id = 'bc-dbl'`).get() as { status: string };
+    expect(row.status).toBe('sending');
+  });
+
   test('send-segmentの条件でも所属・期限を確かめる', async () => {
     seedAudience('aud-seg', 'acc-1', { expiresInMs: -1 });
     sqlite.raw.prepare(

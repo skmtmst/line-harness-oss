@@ -36,8 +36,16 @@ function scoreRangeCondition(params: URLSearchParams): SegmentCondition | null {
 /** 分析画面から渡された一時対象者。URL には ID だけを載せ、中身は API で読み直す。 */
 interface AudienceHandoff {
   id: string
+  sourceKind: string
+  selectionKey: string | null
   memberCount: number
   expiresAt: string
+}
+
+/** 対象者がどの分析から来たかの見え方。selectionKey は集計の位置を運用者へ示す。 */
+function audienceLabel(audience: AudienceHandoff): string {
+  const source = audience.sourceKind === 'funnel' ? 'ファネル分析' : 'クロス集計'
+  return audience.selectionKey ? `${source}「${audience.selectionKey}」` : `${source}の対象者`
 }
 
 function NewBroadcastPageContent() {
@@ -96,6 +104,7 @@ function NewBroadcastPageContent() {
       .then((res) => {
         if (cancelled) return
         if (res.success) setAudience(res.data)
+        else setAudienceError('missing')
       })
       .catch((err: unknown) => {
         if (cancelled) return
@@ -106,13 +115,26 @@ function NewBroadcastPageContent() {
     }
   }, [audienceId, accountLoading, selectedAccountId])
 
-  const audiencePending = Boolean(audienceId) && !audience && !audienceError
+  // アカウント未選択では対象者を確かめられない。スピナーで待たせず案内を出す。
+  const audienceNoAccount = Boolean(audienceId) && !accountLoading && !selectedAccountId
+  const audiencePending = Boolean(audienceId) && Boolean(selectedAccountId) && !audience && !audienceError
 
   return (
     <div>
       {loading || audiencePending || (audienceId && accountLoading) ? (
         <div className="bg-canvas rounded-card border-hairline text-ink-faint border p-8 text-center text-sm">
           読み込み中...
+        </div>
+      ) : audienceNoAccount ? (
+        <div className="bg-canvas rounded-card border-hairline border p-8 text-center">
+          <p className="text-ink text-sm font-semibold">
+            対象者を確認するには、先にLINE公式アカウントを選んでください。
+          </p>
+          <div className="mt-4 flex items-center justify-center gap-3">
+            <Link href="/analytics" className="text-accent text-sm font-medium hover:underline">
+              分析画面へ戻る
+            </Link>
+          </div>
         </div>
       ) : audienceError ? (
         <div className="bg-canvas rounded-card border-hairline border p-8 text-center">
@@ -143,7 +165,7 @@ function NewBroadcastPageContent() {
           initialTemplateId={searchParams.get('templateId')}
           initialContentTemplateId={searchParams.get('contentTemplateId')}
           initialCondition={initialCondition}
-          audienceNotice={audience}
+          audienceNotice={audience ? { ...audience, label: audienceLabel(audience) } : null}
           initialScheduledDate={initialScheduledDate}
           initialScheduledTime={initialScheduledTime}
           currentStep={currentStep}

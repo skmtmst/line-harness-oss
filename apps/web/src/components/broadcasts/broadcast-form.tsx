@@ -68,7 +68,7 @@ interface BroadcastFormProps {
   initialContentTemplateId?: string | null
   initialCondition?: SegmentCondition | null
   /** 分析画面から渡された一時対象者。人数・期限はAPIで読み直したもの。 */
-  audienceNotice?: { memberCount: number; expiresAt: string } | null
+  audienceNotice?: { memberCount: number; expiresAt: string; label?: string } | null
   initialScheduledDate?: string
   initialScheduledTime?: string
   /** 正本の `?step=`。未指定は一覧内の従来フォームとして全節を表示する。 */
@@ -1317,6 +1317,7 @@ export default function BroadcastForm({
             <div className="bg-accent-soft rounded-card mt-3 flex flex-wrap items-center justify-between gap-2 p-3">
               <p className="text-ink text-sm">
                 分析で作った対象者
+                {audienceNotice.label && <span className="ml-1 text-ink-secondary text-xs">{audienceNotice.label}</span>}
                 <span className="ml-2 font-bold">{audienceNotice.memberCount.toLocaleString('ja-JP')}人</span>
               </p>
               <p className="text-ink-faint text-xs">

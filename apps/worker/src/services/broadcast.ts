@@ -155,6 +155,52 @@ export async function processBroadcastSend(
     && broadcast.target_type !== 'multi-account-dedup') {
     const raw = broadcast as unknown as Record<string, unknown>;
     const accountId = raw.line_account_id as string | null;
+
+    /*
+     * 絞り込み条件つきの個人化配信。
+     *
+     * 保存済みの segment_conditions をそのまま残す。is_following だけへ
+     * 上書きすると、分析の一時対象者（analytics_audience）を含む条件が消えて
+     * 全フォロワーへ届く。条件はキュー側が各束で読み直すので、期限切れの
+     * 対象者は残りが自然に0人になる。
+     */
+    if (broadcast.target_type === 'segment') {
+      const stored = raw.segment_conditions as string | null;
+      if (!stored) {
+        throw new Error('segment_conditions is required for segment broadcast');
+      }
+      let storedConditions: SegmentCondition;
+      try {
+        storedConditions = JSON.parse(stored) as SegmentCondition;
+      } catch {
+        throw new Error('segment_conditions is malformed');
+      }
+      // 分析の一時対象者は送信直前にも所属・期限を確かめ直す。
+      await assertAnalyticsAudiencesUsable(db, storedConditions, accountId);
+      const { buildSegmentQuery } = await import('./segment-query.js');
+      const { sql, bindings } = buildSegmentQuery(storedConditions);
+      const segmentAudienceSql = accountId
+        ? `SELECT COUNT(*) AS total,
+                  SUM(CASE WHEN q.display_name IS NULL OR trim(q.display_name) = '' THEN 1 ELSE 0 END) AS missing_name
+             FROM (${sql.replace('WHERE', 'WHERE f.line_account_id = ? AND')}) q`
+        : `SELECT COUNT(*) AS total,
+                  SUM(CASE WHEN q.display_name IS NULL OR trim(q.display_name) = '' THEN 1 ELSE 0 END) AS missing_name
+             FROM (${sql}) q`;
+      const segmentAudience = await db
+        .prepare(segmentAudienceSql)
+        .bind(...(accountId ? [accountId, ...bindings] : bindings))
+        .first<{ total: number; missing_name: number | null }>();
+      if (Number(segmentAudience?.missing_name ?? 0) > 0) {
+        throw new Error(`Cannot personalize broadcast: ${segmentAudience!.missing_name} recipient(s) have no display name`);
+      }
+      await db.prepare(
+        `UPDATE broadcasts
+            SET status = 'sending', batch_offset = 0, total_count = ?
+          WHERE id = ?`,
+      ).bind(Number(segmentAudience?.total ?? 0), broadcast.id).run();
+      return (await getBroadcastById(db, broadcastId))!;
+    }
+
     const where: string[] = ['f.is_following = 1'];
     const binds: unknown[] = [];
     if (accountId) {

@@ -200,6 +200,61 @@ describe('分析対象者の予約・キュー再確認(N-274)', () => {
     expect(line.pushed).toHaveLength(0);
   });
 
+  it('本文に受信者変数を入れても、対象者の外へは送らない（条件を捨てない）', async () => {
+    const store = createTestD1();
+    seedAccount(store.raw, 'acc-a');
+    seedFriend(store.raw, 'f-in', 'acc-a');
+    seedFriend(store.raw, 'f-out-1', 'acc-a');
+    seedFriend(store.raw, 'f-out-2', 'acc-a');
+    seedAudience(store.raw, 'aud-p', 'acc-a', {
+      expiresAt: '2026-09-17T00:00:00.000Z',
+      friendIds: ['f-in'],
+    });
+    store.raw.prepare(`
+      INSERT INTO broadcasts
+        (id, title, message_type, message_content, target_type, status,
+         scheduled_at, line_account_id, segment_conditions)
+      VALUES ('bc-p', '対象者へ配信', 'text', 'こんにちは {{name}}', 'segment', 'scheduled',
+              '2026-09-16T00:00:00.000Z', 'acc-a', ?)
+    `).run(audienceConditions('aud-p'));
+
+    await processScheduledBroadcasts(store.db, {} as never);
+
+    // 条件が is_following だけへ上書きされると total_count=3（全員）になる。
+    const row = broadcastRow(store, 'bc-p');
+    expect(row.status).toBe('sending');
+    expect(row.total_count).toBe(1);
+    const stored = store.raw.prepare(
+      `SELECT segment_conditions FROM broadcasts WHERE id = 'bc-p'`,
+    ).get() as { segment_conditions: string };
+    expect(stored.segment_conditions).toContain('aud-p');
+
+    await processQueuedBroadcasts(store.db, {} as never);
+    const recipients = line.pushed.flatMap((p) => (p as { to: string[] }).to);
+    expect(recipients).toEqual(['U-f-in']);
+    expect(broadcastRow(store, 'bc-p').status).toBe('sent');
+  });
+
+  it('受信者変数つきの予約でも、期限切れの対象者は送信せず下書きへ戻す', async () => {
+    const store = createTestD1();
+    seedAccount(store.raw, 'acc-a');
+    seedAudience(store.raw, 'aud-old-p', 'acc-a', { expiresAt: '2026-09-15T00:00:00.000Z' });
+    store.raw.prepare(`
+      INSERT INTO broadcasts
+        (id, title, message_type, message_content, target_type, status,
+         scheduled_at, line_account_id, segment_conditions)
+      VALUES ('bc-p2', '対象者へ配信', 'text', 'こんにちは {{name}}', 'segment', 'scheduled',
+              '2026-09-16T00:00:00.000Z', 'acc-a', ?)
+    `).run(audienceConditions('aud-old-p'));
+
+    await processScheduledBroadcasts(store.db, {} as never);
+
+    const row = broadcastRow(store, 'bc-p2');
+    expect(row.status).toBe('draft');
+    expect(row.scheduled_at).toBeNull();
+    expect(line.pushed).toHaveLength(0);
+  });
+
   it('キュー処理は、有効な対象者なら対象者の友だちだけへ送る', async () => {
     const store = createTestD1();
     seedAccount(store.raw, 'acc-a');

@@ -104,6 +104,7 @@ describe('配信作成への分析対象者の受け渡し(N-274)', () => {
     await flush()
     expect(mocks.audience).toHaveBeenCalledWith('aud-1', 'acc-1')
     expect(host.textContent).toContain('分析で作った対象者')
+    expect(host.textContent).toContain('クロス集計「a:b」')
     expect(host.textContent).toContain('5人')
     expect(host.textContent).toContain('まで有効')
   })
@@ -161,5 +162,14 @@ describe('配信作成への分析対象者の受け渡し(N-274)', () => {
     await flush()
     expect(host.textContent).toContain('分析で作った対象者')
     expect(host.textContent).toContain('0人')
+  })
+
+  it('アカウント未選択では読み込みで待たせず、選択を促す', async () => {
+    mocks.accountId = ''
+    await mount()
+    await flush()
+    expect(mocks.audience).not.toHaveBeenCalled()
+    expect(host.textContent).toContain('LINE公式アカウントを選んでください')
+    expect(host.textContent).not.toContain('読み込み中')
   })
 })
