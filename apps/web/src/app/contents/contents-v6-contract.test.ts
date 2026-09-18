@@ -7,6 +7,7 @@ const DETAIL = readFileSync(new URL('./media-detail-dialog.tsx', import.meta.url
 const REPLACEMENT = readFileSync(new URL('./media-replacement-dialog.tsx', import.meta.url), 'utf8')
 const API = readFileSync(new URL('../../lib/api.ts', import.meta.url), 'utf8')
 const WORKER = readFileSync(new URL('../../../../worker/src/routes/contents.ts', import.meta.url), 'utf8')
+const DB = readFileSync(new URL('../../../../../packages/db/src/media.ts', import.meta.url), 'utf8')
 const GUIDANCE = readFileSync(new URL('./media-quota-guidance.tsx', import.meta.url), 'utf8')
 
 describe('V6 登録メディア一覧の契約', () => {
@@ -161,8 +162,8 @@ describe('V6 登録メディア一覧の契約', () => {
   it('使用先を取得できないメディアを未使用として選択・削除しない', () => {
     expect(PAGE).toContain('function isKnownUnused(item: MediaItem)')
     expect(PAGE).toContain('return item.usageCount === 0')
-    expect(PAGE).toContain('const removable = items.filter(isKnownUnused)')
-    expect(PAGE).toContain('disabled={!isKnownUnused(item)}')
+    expect(PAGE).toContain('isKnownUnused(item) && !item.archivedAt')
+    expect(PAGE).toContain('disabled={!isKnownUnused(item) || !!item.archivedAt}')
     expect(PAGE).toContain('使用先を確認できないため選べません')
     expect(PAGE).toContain('removableSelected.length !== selected.size')
     expect(PAGE).not.toContain('item.usageCount === undefined || item.usageCount === 0')
@@ -179,5 +180,22 @@ describe('V6 登録メディア一覧の契約', () => {
   it('ブラウザ申告だけでなく実ファイル形式を確認する', () => {
     expect(WORKER).toContain('hasMediaSignature(signatureBytes, session.expected_mime)')
     expect(WORKER).toContain('failMediaUploadSession')
+  })
+
+  it('退避・復帰は管理者口だけから理由付きで呼ぶ（N-201）', () => {
+    // 既定の一覧は退避済みを外し、明示の棚だけが archived=only を渡す。
+    expect(PAGE).toContain("archived: showArchivedOnly ? 'only' : undefined")
+    expect(API).toContain("q.set('archived', params.archived)")
+    // 画面側は必ず理由付きで呼ぶ。staff には押し口を出さない。
+    expect(API).toContain('body: JSON.stringify({ accountId, reason })')
+    expect(PAGE).toContain('理由（必須・あとから履歴で確認できます）')
+    expect(PAGE).toContain('{canManageMedia ? (')
+    // worker は owner/admin だけを通し、理由なしは 400、二重実行は 409。
+    expect(WORKER).toContain("contents.post('/api/media/:id/archive', requireRole('owner', 'admin')")
+    expect(WORKER).toContain("contents.post('/api/media/:id/restore', requireRole('owner', 'admin')")
+    expect(WORKER).toContain("code: 'media_reason_required'")
+    // 状態遷移と監査は db 側の条件付き UPDATE で行う。
+    expect(DB).toContain('archived_at IS NULL')
+    expect(DB).toContain('operation_audit')
   })
 })

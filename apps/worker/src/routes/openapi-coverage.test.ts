@@ -195,6 +195,8 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'GET /api/media/{id}',
   'GET /api/media/{id}/content',
   'GET /api/media/{id}/download',
+  'POST /api/media/{id}/archive',
+  'POST /api/media/{id}/restore',
   'GET /api/mileage/redemptions',
   'GET /api/mileage/rules',
   'GET /api/mileage/rules/export',
