@@ -30,6 +30,18 @@ export interface CommonVarExportJob {
   failure_reason: string | null;
 }
 
+/**
+ * detail（状態ポーリング）や list（履歴一覧）が使う項目部分。
+ * csv_text は1行あたり最大4MiBのCSV本文なので、画面応答用の読み取りには
+ * 含めず、ダウンロード経路だけが別途読む（D1応答上限・Workerメモリ対策）。
+ */
+export type CommonVarExportJobMeta = Omit<CommonVarExportJob, 'csv_text'>;
+
+/** detail/list 用の読み取り列。csv_text を列射影から外したもの。 */
+const EXPORT_JOB_META_COLUMNS = `id, line_account_id, filter_json, status, total_count,
+  processed_count, row_count, byte_size, created_by, created_by_name,
+  created_at, started_at, finished_at, expires_at, failure_reason`;
+
 export interface CommonVarExportFilter {
   accountId: string;
   folderId?: string;
@@ -74,7 +86,7 @@ export async function createCommonVarExportJob(
     createdAt: string;
     expiresAt: string;
   },
-): Promise<CommonVarExportJob> {
+): Promise<CommonVarExportJobMeta> {
   await db.prepare(`INSERT INTO common_var_export_jobs
     (id, line_account_id, filter_json, status, processed_count,
      created_by, created_by_name, created_at, expires_at)
@@ -88,20 +100,32 @@ export async function createCommonVarExportJob(
 export async function getCommonVarExportJob(
   db: D1Database,
   id: string,
-): Promise<CommonVarExportJob | null> {
-  return db.prepare('SELECT * FROM common_var_export_jobs WHERE id = ?')
-    .bind(id).first<CommonVarExportJob>();
+): Promise<CommonVarExportJobMeta | null> {
+  return db.prepare(`SELECT ${EXPORT_JOB_META_COLUMNS} FROM common_var_export_jobs WHERE id = ?`)
+    .bind(id).first<CommonVarExportJobMeta>();
 }
 
 export async function listCommonVarExportJobs(
   db: D1Database,
   lineAccountId: string,
   limit = 20,
-): Promise<CommonVarExportJob[]> {
-  const result = await db.prepare(`SELECT * FROM common_var_export_jobs
+): Promise<CommonVarExportJobMeta[]> {
+  const result = await db.prepare(`SELECT ${EXPORT_JOB_META_COLUMNS} FROM common_var_export_jobs
     WHERE line_account_id = ? ORDER BY created_at DESC, id DESC LIMIT ?`)
-    .bind(lineAccountId, Math.max(1, Math.min(Math.floor(limit), 100))).all<CommonVarExportJob>();
+    .bind(lineAccountId, Math.max(1, Math.min(Math.floor(limit), 100))).all<CommonVarExportJobMeta>();
   return result.results;
+}
+
+/**
+ * ダウンロード専用の読み口。CSV本文が要る経路だけが status と一緒に
+ * csv_text を読む。detail/list からは呼ばないこと。
+ */
+export async function getCommonVarExportCsv(
+  db: D1Database,
+  id: string,
+): Promise<Pick<CommonVarExportJob, 'status' | 'csv_text'> | null> {
+  return db.prepare('SELECT status, csv_text FROM common_var_export_jobs WHERE id = ?')
+    .bind(id).first<Pick<CommonVarExportJob, 'status' | 'csv_text'>>();
 }
 
 export async function markCommonVarExportRunning(
