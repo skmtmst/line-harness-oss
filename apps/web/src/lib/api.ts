@@ -5648,6 +5648,8 @@ export const api = {
       query?: string
       unusedOnly?: boolean
       nearLimitOnly?: boolean
+      /** 'only' でアーカイブ済みだけ、'all' で全部。既定は非アーカイブ。 */
+      archived?: 'only' | 'all'
       sort?: 'newest' | 'oldest' | 'name' | 'size' | 'usage'
       limit?: number
       offset?: number
@@ -5660,6 +5662,7 @@ export const api = {
       if (params?.query) q.set('query', params.query)
       if (params?.unusedOnly) q.set('unusedOnly', '1')
       if (params?.nearLimitOnly) q.set('nearLimitOnly', '1')
+      if (params?.archived) q.set('archived', params.archived)
       if (params?.sort) q.set('sort', params.sort)
       if (params?.limit) q.set('limit', String(params.limit))
       if (params?.offset) q.set('offset', String(params.offset))
@@ -5732,6 +5735,21 @@ export const api = {
       fetchApi<ApiResponse<null>>(`/api/media/${id}?accountId=${encodeURIComponent(accountId)}`, {
         method: 'DELETE',
       }),
+    /**
+     * 一覧・新規選択からの退避。使用中でも止めない（消去ではなく、本文や
+     * 過去配信からの参照は残る）。理由は必須。既に退避済みなら 409。
+     */
+    archive: (id: string, accountId: string, reason: string) =>
+      fetchApi<ApiResponse<MediaItem>>(
+        `/api/media/${encodeURIComponent(id)}/archive`,
+        { method: 'POST', body: JSON.stringify({ accountId, reason }) },
+      ),
+    /** 退避したメディアを一覧へ戻す。理由は必須。 */
+    restore: (id: string, accountId: string, reason: string) =>
+      fetchApi<ApiResponse<MediaItem>>(
+        `/api/media/${encodeURIComponent(id)}/restore`,
+        { method: 'POST', body: JSON.stringify({ accountId, reason }) },
+      ),
     /** 保存URLへ直接行かず、権限確認と監査を通る口から受け取る。 */
     download: (id: string, accountId: string) =>
       fetchApiBlob(`/api/media/${encodeURIComponent(id)}/download?accountId=${encodeURIComponent(accountId)}`),

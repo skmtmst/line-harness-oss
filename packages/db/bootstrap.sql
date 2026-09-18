@@ -3214,7 +3214,7 @@ CREATE TABLE media (
   public_url  TEXT,
   uploaded_by TEXT,
   created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f','now','+9 hours'))
-, line_account_id TEXT REFERENCES line_accounts(id) ON DELETE CASCADE);
+, line_account_id TEXT REFERENCES line_accounts(id) ON DELETE CASCADE, archived_at TEXT, archived_by TEXT, archive_reason TEXT);
 
 CREATE TABLE media_storage_quotas (
   line_account_id TEXT PRIMARY KEY REFERENCES line_accounts(id) ON DELETE CASCADE,
@@ -6935,6 +6935,9 @@ CREATE INDEX idx_manual_link_check_history_v316_key_time
   ON manual_link_check_history(link_key, checked_at DESC);
 
 CREATE INDEX idx_manual_links_status ON manual_links (status);
+
+CREATE INDEX idx_media_account_archived_v424
+  ON media(line_account_id, archived_at);
 
 CREATE INDEX idx_media_account_created
   ON media(line_account_id, created_at DESC, id);

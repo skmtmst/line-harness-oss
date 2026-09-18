@@ -381,7 +381,8 @@
     "420_nen_pet_feeding.sql",
     "421_ops_support_tickets.sql",
     "422_funnel_status.sql",
-    "423_common_var_failure_sources.sql"
+    "423_common_var_failure_sources.sql",
+    "424_media_archive.sql"
   ],
-  "migrationCount": 382
+  "migrationCount": 383
 }
