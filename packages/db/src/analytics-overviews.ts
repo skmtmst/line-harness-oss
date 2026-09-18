@@ -278,6 +278,10 @@ async function loadCampaignMarkers(db: D1Database, context: AnalyticsOverviewCon
   ].sort((a, b) => a.occurredAt.localeCompare(b.occurredAt));
 }
 
+// 配信反応の一覧は系統ごとに先頭からこの件数まで。1件多く取って打切りを検知し、
+// 画面が「全部出ている」のか「先頭だけ出ている」のかを区別できるようにする。
+const REACTION_CAMPAIGN_LIMIT = 200;
+
 export async function getAnalyticsReactionsOverview(
   db: D1Database,
   context: AnalyticsOverviewContext,
@@ -294,7 +298,7 @@ export async function getAnalyticsReactionsOverview(
          )
         WHERE b.line_account_id = ? AND b.sent_at IS NOT NULL
           AND julianday(b.sent_at) >= julianday(?) AND julianday(b.sent_at) < julianday(?)
-        ORDER BY b.sent_at DESC, b.id DESC LIMIT 200`,
+        ORDER BY b.sent_at DESC, b.id DESC LIMIT ${REACTION_CAMPAIGN_LIMIT + 1}`,
     ).bind(context.lineAccountId, context.from, context.toExclusive).all<{
       id: string; title: string; sent_at: string; total_count: number; success_count: number;
       delivered: number | null; unique_impression: number | null; unique_click: number | null;
@@ -307,7 +311,7 @@ export async function getAnalyticsReactionsOverview(
          JOIN scenarios s ON s.id = ss.scenario_id
         WHERE m.line_account_id = ? AND m.direction = 'outgoing'
           AND julianday(m.created_at) >= julianday(?) AND julianday(m.created_at) < julianday(?)
-        GROUP BY s.id, s.name ORDER BY sent_at DESC LIMIT 200`,
+        GROUP BY s.id, s.name ORDER BY sent_at DESC LIMIT ${REACTION_CAMPAIGN_LIMIT + 1}`,
     ).bind(context.lineAccountId, context.from, context.toExclusive).all<{
       id: string; name: string; sent_at: string; sent_count: number; target_count: number;
     }>(),
@@ -321,7 +325,11 @@ export async function getAnalyticsReactionsOverview(
     getCoverage(db, context.lineAccountId, 'conversion_approved', context.from),
   ]);
 
-  const campaigns: ReactionCampaign[] = broadcastRows.results.map((row) => {
+  const broadcastTruncated = broadcastRows.results.length > REACTION_CAMPAIGN_LIMIT;
+  const scenarioTruncated = scenarioRows.results.length > REACTION_CAMPAIGN_LIMIT;
+  const campaigns: ReactionCampaign[] = broadcastRows.results
+    .slice(0, REACTION_CAMPAIGN_LIMIT)
+    .map((row) => {
     const insufficient = row.success_count > 0 && row.success_count < 20;
     const insightState: AnalyticsMetricState = insufficient
       ? 'insufficient'
@@ -350,7 +358,7 @@ export async function getAnalyticsReactionsOverview(
       fetchedAt: row.fetched_at,
     };
   });
-  campaigns.push(...scenarioRows.results.map((row) => ({
+  campaigns.push(...scenarioRows.results.slice(0, REACTION_CAMPAIGN_LIMIT).map((row) => ({
     id: row.id,
     name: row.name,
     kind: 'scenario' as const,
@@ -398,6 +406,12 @@ export async function getAnalyticsReactionsOverview(
       unavailableCampaigns: metric(unavailableCampaigns),
     },
     campaigns: campaigns.sort((a, b) => b.sentAt.localeCompare(a.sentAt)),
+    // 上限に達した系統だけ true。画面はこれを見て「先頭○件まで表示」の注記を出す。
+    campaignsTruncation: {
+      limit: REACTION_CAMPAIGN_LIMIT,
+      broadcast: broadcastTruncated,
+      scenario: scenarioTruncated,
+    },
     trackedClickHours: clickHours,
     clickDefinition: '自社計測URLが実際にクリックされた時間',
   });

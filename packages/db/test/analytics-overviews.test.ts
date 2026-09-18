@@ -146,6 +146,72 @@ describe('V6分析の概要4画面', () => {
       opened: { value: 0, state: 'available' },
       lineClicked: { value: 0, state: 'available' },
     });
+    // 上限未満なら打切りを示さない（画面は注記を出さない）。
+    expect(result.data.campaignsTruncation).toEqual({ limit: 200, broadcast: false, scenario: false });
+  });
+
+  it('一斉配信が200件を超えると打切りを返し、別アカウントの配信を混ぜない', async () => {
+    sqlite.prepare(
+      `WITH RECURSIVE seq(n) AS (SELECT 1 UNION ALL SELECT n + 1 FROM seq WHERE n < 201)
+       INSERT INTO broadcasts (
+         id, title, message_type, message_content, status, sent_at,
+         total_count, success_count, line_account_id
+       ) SELECT 'b-' || n, '配信' || n, 'text', 'x', 'sent',
+                '2026-08-10T00:00:00.000Z', 30, 30, 'account-a' FROM seq`,
+    ).run();
+    sqlite.prepare(
+      `INSERT INTO broadcasts (
+         id, title, message_type, message_content, status, sent_at,
+         total_count, success_count, line_account_id
+       ) VALUES ('b-other','別店舗の配信','text','x','sent',
+                 '2026-08-11T00:00:00.000Z',30,30,'account-b')`,
+    ).run();
+
+    const result = await getAnalyticsReactionsOverview(db, CONTEXT);
+    expect(result.data.campaignsTruncation).toEqual({ limit: 200, broadcast: true, scenario: false });
+    const broadcasts = result.data.campaigns.filter((item) => item.kind === 'broadcast');
+    expect(broadcasts).toHaveLength(200);
+    // 別アカウントの配信は打切り判定にも一覧にも混ざらない。
+    expect(result.data.campaigns.some((item) => item.id === 'b-other')).toBe(false);
+    expect(result.data.campaigns.every((item) => item.id !== 'b-other')).toBe(true);
+    // 件数の指標も自分のアカウント分だけ。
+    expect(result.data.metrics.sent.value).toBe(200 * 30);
+  });
+
+  it('シナリオが200件を超えると打切りを返し、別アカウントのシナリオを混ぜない', async () => {
+    sqlite.exec(`
+      WITH RECURSIVE seq(n) AS (SELECT 1 UNION ALL SELECT n + 1 FROM seq WHERE n < 201)
+      INSERT INTO scenarios (id, name, trigger_type, line_account_id)
+      SELECT 'sc-' || n, 'シナリオ' || n, 'manual', 'account-a' FROM seq;
+      WITH RECURSIVE seq(n) AS (SELECT 1 UNION ALL SELECT n + 1 FROM seq WHERE n < 201)
+      INSERT INTO scenario_steps (id, scenario_id, step_order, message_type, message_content)
+      SELECT 'ss-' || n, 'sc-' || n, 1, 'text', 'x' FROM seq;
+      WITH RECURSIVE seq(n) AS (SELECT 1 UNION ALL SELECT n + 1 FROM seq WHERE n < 201)
+      INSERT INTO messages_log (
+        id, friend_id, direction, message_type, content,
+        scenario_step_id, line_account_id, created_at
+      ) SELECT 'm-' || n, 'friend-a', 'outgoing', 'text', 'x',
+               'ss-' || n, 'account-a', '2026-08-10T00:00:00.000Z' FROM seq;
+    `);
+    sqlite.exec(`
+      INSERT INTO scenarios (id, name, trigger_type, line_account_id)
+      VALUES ('sc-other','別店舗のシナリオ','manual','account-b');
+      INSERT INTO scenario_steps (id, scenario_id, step_order, message_type, message_content)
+      VALUES ('ss-other','sc-other',1,'text','x');
+      INSERT INTO messages_log (
+        id, friend_id, direction, message_type, content,
+        scenario_step_id, line_account_id, created_at
+      ) VALUES ('m-other','friend-x','outgoing','text','x',
+                'ss-other','account-b','2026-08-10T00:00:00.000Z');
+    `);
+
+    const result = await getAnalyticsReactionsOverview(db, CONTEXT);
+    expect(result.data.campaignsTruncation).toEqual({ limit: 200, broadcast: false, scenario: true });
+    const scenarios = result.data.campaigns.filter((item) => item.kind === 'scenario');
+    expect(scenarios).toHaveLength(200);
+    expect(result.data.campaigns.some((item) => item.id === 'sc-other')).toBe(false);
+    // 対象人数の合計も自分のアカウント分だけ（各シナリオ1人ずつ）。
+    expect(result.data.metrics.sent.value).toBe(200);
   });
 
   it('流入経路は第一接触で帰属し、広告費がないとき0円にしない', async () => {
