@@ -5,11 +5,13 @@ import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { Bookmark, Check, Circle, SlidersHorizontal, Star } from 'lucide-react'
 import type { Scenario, Tag } from '@line-crm/shared'
-import { api, ApiError, fetchApi, type FriendListItem, type FriendSavedView, type SupportMarkListItem } from '@/lib/api'
+import { api, ApiError, fetchApi, type FriendListItem, type SupportMarkListItem } from '@/lib/api'
 import FriendKpis from '@/components/friends/friend-kpis'
 import FriendListTable from '@/components/friends/friend-list-table'
 import AdvancedSearchDialog, { type AdvancedSearchResult } from '@/components/friends/advanced-search-dialog'
 import SingleFriendActions from '@/components/friends/single-friend-actions'
+import NoticeDialog from '@/components/friends/notice-dialog'
+import SavedSearchDialog from '@/components/friends/saved-search-dialog'
 import { useAccount } from '@/contexts/account-context'
 import { useFeatureVisibility } from '@/lib/use-feature-visibility'
 import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
@@ -24,8 +26,6 @@ import { emptyMessageOf } from './friend-list-empty'
 import { csvExportLine } from './csv-export'
 import BulkRunDialog from '@/components/friends/bulk-run-dialog'
 import { canRunBulk } from '@/components/friends/bulk-run-view'
-import { savedSearchParams, savedSearchSummary } from '@/components/friends/saved-search-utils'
-
 const PAGE_SIZE_OPTIONS = [10, 20, 30, 40, 50] as const
 /*
   検索行の副操作は設計 `PhxG6` で高さ38px。共通Buttonは36pxなので当てない
@@ -222,7 +222,7 @@ function FriendsPageInner({
   }
 
   const exportCurrentPage = useCallback(() => {
-    const header = ['友だち名', '対応', 'シナリオ', '最新メッセージ', '登録日']
+    const header = ['友だち名', '対応', 'シナリオ', '最新メッセージ', '流入元', '登録日']
     const rows = friends.map((friend) => [
       friend.displayName,
       friend.chatStatus === 'unread'
@@ -234,6 +234,7 @@ function FriendsPageInner({
             : '対応済み',
       friend.activeScenario?.name ?? '',
       friend.latestIncomingMessage?.content ?? '',
+      friend.firstTrackedLinkName ?? '',
       friend.createdAt.slice(0, 10),
     ])
     // 先頭 =+-@ の数式インジェクション対策つき(#496-4)。出るのは表示中のページ分だけ(#496-21)。
@@ -533,102 +534,6 @@ function FriendsPageInner({
       ) : null}
 
       <div className="hidden" data-friends-v6-contract="10,20,30,40,50|compact-pagination|前へ|次へ|no-native-alert|1px-right-1px-down" />
-    </div>
-  )
-}
-
-function NoticeDialog({ notice, onClose }: { notice: Exclude<Notice, null>; onClose: () => void }) {
-  return (
-    <div className="fixed inset-0 z-70 flex items-center justify-center bg-ink/35 p-4" role="presentation" onMouseDown={onClose}>
-      <section role="dialog" aria-modal="true" aria-labelledby="friends-notice-title" className={`w-full max-w-md rounded-panel border border-hairline bg-canvas p-5 shadow-card`} onMouseDown={(event) => event.stopPropagation()}>
-        <h2 id="friends-notice-title" className="text-lg font-bold text-ink">{notice.title}</h2>
-        <p className="mt-2 text-sm leading-6 text-ink-secondary">{notice.message}</p>
-        <div className="mt-5 flex justify-end">
-          <button type="button" onClick={onClose} className="rounded-control bg-accent-deep px-5 py-2 text-sm font-bold text-on-accent hover:brightness-92">確認</button>
-        </div>
-      </section>
-    </div>
-  )
-}
-
-function SavedSearchDialog({
-  accountId,
-  tags,
-  onClose,
-  onApply,
-  onOpenAdvanced,
-}: {
-  accountId: string | null
-  tags: Tag[]
-  onClose: () => void
-  onApply: (result: AdvancedSearchResult) => void
-  onOpenAdvanced: () => void
-}) {
-  const [saved, setSaved] = useState<FriendSavedView[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
-
-  useEffect(() => {
-    let cancelled = false
-    setLoading(true)
-    setError('')
-    if (!accountId) {
-      setSaved([])
-      setLoading(false)
-      return
-    }
-    void api.friendSavedViews.list(accountId, { suppressFeatureDisabledEvent: true }).then((res) => {
-      if (!cancelled && res.success) setSaved(res.data.items)
-    }).catch(() => {
-      if (!cancelled) setError('保存した検索を読み込めませんでした')
-    }).finally(() => {
-      if (!cancelled) setLoading(false)
-    })
-    return () => { cancelled = true }
-  }, [accountId])
-
-  return (
-    <div className="fixed inset-0 z-100 flex items-center justify-center bg-ink/35 p-4" role="presentation" onMouseDown={onClose}>
-      <section role="dialog" aria-modal="true" aria-labelledby="saved-search-title" className={`w-full max-w-lg rounded-panel border border-hairline bg-canvas p-5 shadow-card`} onMouseDown={(event) => event.stopPropagation()}>
-        <h2 id="saved-search-title" className="text-lg font-bold text-ink">保存した検索</h2>
-        {loading ? <p className="mt-4 text-sm text-ink-faint">読み込み中…</p> : null}
-        {error ? <p className="mt-4 rounded-control bg-status-danger-soft p-3 text-sm text-danger">{error}</p> : null}
-        {!loading && saved.length > 0 ? (
-          <div className="mt-4 max-h-80 space-y-2 overflow-y-auto">
-            {saved.map((search) => {
-              const summary = savedSearchSummary(search.conditions, tags)
-              return (
-                <button
-                  key={search.id}
-                  type="button"
-                  onClick={() => onApply({ params: savedSearchParams(search.id, search.conditions), summary })}
-                  className="w-full rounded-card border border-divider-soft bg-surface-pearl p-4 text-left hover:border-accent"
-                >
-                  <span className="flex items-center gap-2 text-sm font-bold text-ink">
-                    {search.name}
-                    <span className="rounded-pill bg-canvas px-2 py-0.5 text-xs font-medium text-ink-faint">{search.isShared ? '全員' : '自分だけ'}</span>
-                  </span>
-                  <span className="mt-2 block text-xs leading-5 text-ink-secondary">{summary.slice(0, 3).join(' ／ ') || '条件を確認してください'}</span>
-                  <span className="mt-1 block text-xs font-semibold text-accent">
-                    {search.match.total === null ? search.match.error ?? '人数を確認できません' : `${search.match.total.toLocaleString('ja-JP')}人`}
-                  </span>
-                </button>
-              )
-            })}
-          </div>
-        ) : !loading ? (
-          <div className="mt-4 rounded-card border border-hairline bg-surface-pearl p-4">
-            <p className="text-sm font-semibold text-ink-secondary">保存した条件はまだありません。</p>
-            <p className="mt-1 text-xs leading-5 text-ink-faint">「詳細条件」で絞り込みを組み、条件を保存すると次回からここで呼び出せます。</p>
-          </div>
-        ) : null}
-        <div className="mt-5 flex items-center justify-end gap-2">
-          <button type="button" onClick={onClose} className="rounded-control border border-hairline bg-canvas px-4 py-2 text-sm font-semibold text-ink-secondary hover:bg-canvas-sunken">閉じる</button>
-          {saved.length === 0 ? (
-            <button type="button" onClick={onOpenAdvanced} className="rounded-control bg-accent-deep px-5 py-2 text-sm font-bold text-on-accent hover:brightness-92">詳細条件を設定</button>
-          ) : null}
-        </div>
-      </section>
     </div>
   )
 }

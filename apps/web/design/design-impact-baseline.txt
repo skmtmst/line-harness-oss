@@ -167,6 +167,8 @@ shared-button-importer components/friend-fields/tags-page-v4.tsx
 shared-button-importer components/forms/options-dialog.tsx
 shared-button-importer components/friends/advanced-search-dialog.tsx
 shared-button-importer components/friends/bulk-run-dialog.tsx
+shared-button-importer components/friends/notice-dialog.tsx
+shared-button-importer components/friends/saved-search-dialog.tsx
 shared-button-importer components/hq/account-list.tsx
 shared-button-importer components/hq/banners/generation-panel.tsx
 shared-button-importer components/hq/banners/image-detail-modal.tsx

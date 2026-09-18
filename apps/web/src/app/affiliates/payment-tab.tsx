@@ -64,6 +64,10 @@ function SettlementCloseDialog({
     setIdempotencyKey(crypto.randomUUID())
   }, [preview])
 
+  // 0円で締め対象から外れた成果。古いWorkerでは項目自体が無いので、
+  // 無いときは何も出さず今までどおりの確認画面にする(N-219)。
+  const excludedZero = preview?.excludedZeroAmount ?? null
+
   const closeSettlement = async () => {
     if (!preview || busy) return
     setBusy(true)
@@ -124,6 +128,25 @@ function SettlementCloseDialog({
               </tbody>
             </table>
           </div>
+          {excludedZero && excludedZero.count > 0 ? (
+            <div className="border-hairline rounded-control border p-3">
+              <p className="text-ink-secondary text-xs leading-5">
+                報酬が0円の成果 {excludedZero.count.toLocaleString('ja-JP')}件は、支払えないため今回の締め対象から外れています。
+              </p>
+              <ul className="text-ink-faint mt-2 max-h-32 space-y-1 overflow-y-auto text-xs">
+                {excludedZero.rows.map((row) => (
+                  <li key={row.conversionEventId}>
+                    {row.affiliateName}（{row.code}）・{dateLabel(row.approvedAt)}に承認・{yen(row.rewardAmount)}
+                  </li>
+                ))}
+              </ul>
+              {excludedZero.count > excludedZero.rows.length ? (
+                <p className="text-ink-faint mt-1 text-xs">
+                  ほか {(excludedZero.count - excludedZero.rows.length).toLocaleString('ja-JP')}件
+                </p>
+              ) : null}
+            </div>
+          ) : null}
           <p className="text-ink-secondary text-xs leading-5">振込そのものは行いません。締めたあとに明細を発行し、本人確認をして銀行用CSVを書き出します。</p>
         </div>
       ) : null}
@@ -385,6 +408,12 @@ export default function AffiliatePaymentTab({ accountId }: { accountId: string }
       <div className="rounded-control border border-info bg-info-bg px-4 py-3 text-sm text-info">
         締める前なら、成果を却下すると今回の支払いから外れます。締めたあとの取消は次の支払いで差し引きます。
       </div>
+
+      {preview?.excludedZeroAmount && preview.excludedZeroAmount.count > 0 ? (
+        <div className="rounded-control border border-warning bg-warning-bg px-4 py-3 text-sm text-warning">
+          報酬が0円の成果 {preview.excludedZeroAmount.count.toLocaleString('ja-JP')}件は、支払えないため今回の締め対象から外れています。対象は「{dateLabel(preview.periodTo)} で締める」の確認画面で見られます。
+        </div>
+      ) : null}
 
       {closed ? (
         <div className="rounded-control border border-success bg-success-bg px-4 py-3 text-sm text-success">
