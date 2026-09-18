@@ -1,7 +1,8 @@
 import { Hono, type Context } from 'hono';
 import type { Env } from '../index.js';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
-import { ACTIVITY_LABELS, listFeedingProducts, planForPetRow, pickProduct, type FeedingProductRow } from '../services/nen-feeding.js';
+import { ACTIVITY_LABELS, DEFAULT_TREAT_LIMIT_PERCENT, getTreatLimitPercent, listFeedingProducts, planForPetRow, pickProduct, stapleProducts, type FeedingProductRow } from '../services/nen-feeding.js';
+import { petCallName, petGender } from '../services/nen-pet-name.js';
 import {
   APPETITE_LABELS, STOOL_LABELS, lastLoggedLabel, summarizePetHealth, thirtyDaySummary, type HealthLogRow,
 } from '../services/nen-health-admin.js';
@@ -69,16 +70,18 @@ function daysBetween(iso: string, today: Date): number | null {
   return Math.floor((today.getTime() - t) / 86_400_000);
 }
 
-function petView(row: PetRow, products: FeedingProductRow[], today: Date) {
+function petView(row: PetRow, products: FeedingProductRow[], today: Date, treatLimitPercent = DEFAULT_TREAT_LIMIT_PERCENT) {
   const plan = planForPetRow({
     id: row.id, animal_type: row.animal_type, weight_kg: row.weight_kg, birthday: row.birthday,
     neutered: row.neutered, activity_level: row.activity_level, feeding_product_id: row.feeding_product_id,
-  }, products, today);
+  }, products, today, treatLimitPercent);
   const product = pickProduct(products, row.feeding_product_id);
   const weightAgeDays = daysBetween(row.updated_at, today);
   return {
     id: row.id,
     name: row.name,
+    callName: petCallName(row.name, row.gender),
+    gender: petGender(row.gender),
     animalType: row.animal_type === 'cat' ? 'cat' : 'dog',
     breed: row.breed ?? '',
     birthday: row.birthday,
@@ -88,7 +91,7 @@ function petView(row: PetRow, products: FeedingProductRow[], today: Date) {
     activityLevel: (row.activity_level === 'low' || row.activity_level === 'high' ? row.activity_level : 'normal') as 'low' | 'normal' | 'high',
     activityLabel: ACTIVITY_LABELS[row.activity_level === 'low' || row.activity_level === 'high' ? row.activity_level : 'normal'],
     productName: product?.name ?? null,
-    feeding: plan ? { dailyKcal: plan.dailyKcal, dailyGrams: plan.dailyGrams, factorLabel: plan.factorLabel, stageLabel: plan.stageLabel } : null,
+    feeding: plan ? { dailyKcal: plan.dailyKcal, dailyGrams: plan.dailyGrams, factorLabel: plan.factorLabel, stageLabel: plan.stageLabel, venisonGrams: plan.venison.grams, venisonKcal: plan.venison.kcal, treatName: plan.venison.product?.name ?? null } : null,
     imageUrl: row.image_url,
     updatedAt: row.updated_at,
     weightStale: weightAgeDays != null && weightAgeDays >= STALE_WEIGHT_DAYS,
@@ -118,8 +121,8 @@ nenPets.get('/api/nen/pets', async (c) => {
   const denied = await requireAccount(c, accountId);
   if (denied) return denied;
   const today = new Date();
-  const [pets, products] = await Promise.all([loadPets(c.env.DB, accountId), listFeedingProducts(c.env.DB, accountId)]);
-  const views = pets.map((row) => petView(row, products, today));
+  const [pets, products, treatLimitPercent] = await Promise.all([loadPets(c.env.DB, accountId), listFeedingProducts(c.env.DB, accountId), getTreatLimitPercent(c.env.DB, accountId)]);
+  const views = pets.map((row) => petView(row, products, today, treatLimitPercent));
 
   const monthStart = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), 1)).toISOString().slice(0, 10);
   const kpis = {
@@ -144,7 +147,7 @@ nenPets.get('/api/nen/pets', async (c) => {
   else if (sort === 'weight_desc') filtered = [...filtered].sort((a, b) => (b.weightKg ?? 0) - (a.weightKg ?? 0));
   else if (sort === 'age_desc') filtered = [...filtered].sort((a, b) => (a.birthday ?? '9999').localeCompare(b.birthday ?? '9999'));
 
-  return c.json({ success: true, data: { ...paginate(filtered, c.req.query('page'), c.req.query('pageSize')), kpis, products: products.map((p) => ({ id: p.id, name: p.name })) } });
+  return c.json({ success: true, data: { ...paginate(filtered, c.req.query('page'), c.req.query('pageSize')), kpis, products: stapleProducts(products).map((p) => ({ id: p.id, name: p.name })), treatLimitPercent } });
 });
 
 // ---------------------------------------------------------------- 健康日記（37-4）
@@ -192,7 +195,7 @@ nenPets.get('/api/nen/health', async (c) => {
       if (summary.daysSinceLast >= 30 && !summary.changes.some((ch) => ch.key === 'silent')) summary.changes.push({ key: 'silent', label: '30日以上 記録なし', tone: 'faint' });
     }
     return {
-      pet: { id: pet.id, name: pet.name, animalType: pet.animal_type === 'cat' ? 'cat' : 'dog', breed: pet.breed ?? '', ageLabel: ageLabel(pet.birthday, today), imageUrl: pet.image_url },
+      pet: { id: pet.id, name: pet.name, callName: petCallName(pet.name, pet.gender), animalType: pet.animal_type === 'cat' ? 'cat' : 'dog', breed: pet.breed ?? '', ageLabel: ageLabel(pet.birthday, today), imageUrl: pet.image_url },
       owner: { friendId: pet.friend_id, name: pet.owner_name ?? '', customerId: pet.ec_customer_id ?? pet.customer_id ?? null },
       lastLoggedOn: summary.lastLoggedOn,
       lastLoggedLabel: lastLoggedLabel(summary),
@@ -237,10 +240,10 @@ nenPets.get('/api/nen/health/:petId/summary', async (c) => {
   if (denied) return denied;
   const petId = c.req.param('petId');
   const pet = await c.env.DB.prepare(
-    `SELECT p.id, p.name, p.animal_type, p.breed, p.birthday, p.weight_kg, p.friend_id, f.display_name AS owner_name
+    `SELECT p.id, p.name, p.gender, p.animal_type, p.breed, p.birthday, p.weight_kg, p.friend_id, f.display_name AS owner_name
        FROM nen_pet_profiles p JOIN friends f ON f.id = p.friend_id
       WHERE p.id = ? AND f.line_account_id = ?`,
-  ).bind(petId, accountId).first<{ id: string; name: string; animal_type: string; breed: string | null; birthday: string | null; weight_kg: number | null; friend_id: string; owner_name: string | null }>();
+  ).bind(petId, accountId).first<{ id: string; name: string; gender: string | null; animal_type: string; breed: string | null; birthday: string | null; weight_kg: number | null; friend_id: string; owner_name: string | null }>();
   if (!pet) return c.json({ success: false, error: 'Pet not found' }, 404);
   const since = new Date(Date.now() - 30 * 86_400_000).toISOString().slice(0, 10);
   const logs = await c.env.DB.prepare(
@@ -249,7 +252,7 @@ nenPets.get('/api/nen/health/:petId/summary', async (c) => {
   ).bind(petId, since).all<HealthRow>();
   const today = new Date();
   return c.json({ success: true, data: {
-    pet: { id: pet.id, name: pet.name, animalType: pet.animal_type === 'cat' ? 'cat' : 'dog', breed: pet.breed ?? '', ageLabel: ageLabel(pet.birthday, today), weightKg: pet.weight_kg },
+    pet: { id: pet.id, name: pet.name, callName: petCallName(pet.name, pet.gender), animalType: pet.animal_type === 'cat' ? 'cat' : 'dog', breed: pet.breed ?? '', ageLabel: ageLabel(pet.birthday, today), weightKg: pet.weight_kg },
     owner: { friendId: pet.friend_id, name: pet.owner_name ?? '' },
     generatedAt: today.toISOString(),
     summary: thirtyDaySummary(logs.results ?? [], today),

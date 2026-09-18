@@ -614,7 +614,7 @@ const spec = {
       },
       put: {
         tags: ['NEN Members'], summary: '主食のカロリー表を一括保存し、登録済みペットの目安を計算し直す',
-        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['accountId', 'products'], properties: { accountId: { type: 'string' }, products: { type: 'array', maxItems: 20, items: { type: 'object', required: ['name', 'kcalPer100g'], properties: { id: { type: 'string', nullable: true }, name: { type: 'string', maxLength: 40 }, kcalPer100g: { type: 'number', minimum: 1, maximum: 1000 }, isDefault: { type: 'boolean' } } } } } } } } },
+        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['accountId', 'products'], properties: { accountId: { type: 'string' }, treatLimitPercent: { type: 'integer', minimum: 1, maximum: 30, description: 'おやつの上限（1日の必要カロリーに対する %）。省略時は現在値（既定 10）' }, products: { type: 'array', maxItems: 20, items: { type: 'object', required: ['name', 'kcalPer100g'], properties: { id: { type: 'string', nullable: true }, name: { type: 'string', maxLength: 40 }, kcalPer100g: { type: 'number', minimum: 1, maximum: 1000 }, isDefault: { type: 'boolean' }, kind: { type: 'string', enum: ['staple', 'nen'], description: 'staple＝主食、nen＝然の商品（おやつ）' } } } } } } } } },
         responses: { '200': { description: 'Saved products' }, '400': { description: 'Validation failed' }, '403': { description: 'Owner or admin role required' } },
       },
     },

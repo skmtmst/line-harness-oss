@@ -68,10 +68,10 @@ function admin(role = 'owner') {
 
 const auth = { Authorization: 'Bearer token', 'Content-Type': 'application/json' };
 
-async function saveProducts(products: unknown) {
+async function saveProducts(products: unknown, treatLimitPercent?: unknown) {
   const res = await admin().request('/api/nen/feeding-products', {
     method: 'PUT', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ accountId: 'account-nen', products }),
+    body: JSON.stringify({ accountId: 'account-nen', products, ...(treatLimitPercent === undefined ? {} : { treatLimitPercent }) }),
   });
   return { status: res.status, body: await res.json() as any };
 }
@@ -124,7 +124,56 @@ describe('管理画面：主食のカロリー表', () => {
   });
 });
 
+describe('管理画面：然の商品（おやつ）と上限（★V6 37-3-A 更新）', () => {
+  it('主食と然の商品を分けて保存し、然の鹿肉の目安（必要カロリー × 上限% ÷ 然商品の kcal）を保存する', async () => {
+    const saved = await saveProducts([
+      { name: 'ドライフード', kcalPer100g: 360, isDefault: true },
+      { name: '然 鹿肉ジャーキー', kcalPer100g: 300, isDefault: true, kind: 'nen' },
+      { name: '然 鹿肉ミンチ', kcalPer100g: 135, kind: 'nen' },
+    ], 10);
+    expect(saved.status).toBe(200);
+    expect(saved.body.data.treatLimitPercent).toBe(10);
+    expect(saved.body.data.products.map((p: any) => [p.name, p.kind, p.isDefault])).toEqual([
+      ['ドライフード', 'staple', true], ['然 鹿肉ジャーキー', 'nen', true], ['然 鹿肉ミンチ', 'nen', false],
+    ]);
+    // 10kg → 630kcal → 主食 175g。おやつ 63kcal ÷ 300kcal/100g → 21g
+    const row = sql.prepare(`SELECT recommended_daily_grams, venison_daily_grams, daily_kcal FROM nen_pet_profiles WHERE id = 'pet-old'`).get() as any;
+    expect(row).toEqual({ recommended_daily_grams: 175, venison_daily_grams: 21, daily_kcal: 630 });
+
+    // 上限を 15% にすると 95kcal → 32g
+    const raised = await saveProducts(saved.body.data.products, 15);
+    expect(raised.body.data.treatLimitPercent).toBe(15);
+    expect((sql.prepare(`SELECT venison_daily_grams FROM nen_pet_profiles WHERE id = 'pet-old'`).get() as any).venison_daily_grams).toBe(32);
+    expect((await saveProducts([], 40)).status).toBe(400);
+
+    // LIFF：主食の選択肢には然の商品が出ず、feeding.venison が返る
+    const member = await liff('U-a').request('/api/liff/nen/member', { headers: auth });
+    const data = ((await member.json()) as any).data;
+    expect(data.feedingProducts.map((p: any) => p.name)).toEqual(['ドライフード']);
+    expect(data.nenProducts.map((p: any) => p.name)).toEqual(['然 鹿肉ジャーキー', '然 鹿肉ミンチ']);
+    expect(data.treatLimitPercent).toBe(15);
+    expect(data.pets[0].feeding.venison).toMatchObject({ limitPercent: 15, kcal: 95, grams: 32, product: { name: '然 鹿肉ジャーキー' } });
+    expect(data.pets[0].callName).toBe('モモちゃん');
+    expect(JSON.stringify(data)).not.toContain('ポイント');
+  });
+});
+
 describe('LIFF：マイペットの登録・変更', () => {
+  it('性別は必須。男の子は「くん」、女の子は「ちゃん」の呼び名になる', async () => {
+    const noGender = await liff('U-b').request('/api/liff/nen/pets', {
+      method: 'POST', headers: auth,
+      body: JSON.stringify({ name: '豆太郎', animalType: 'dog', breed: '柴犬', birthday: '2022-04-01', weightKg: 10 }),
+    });
+    expect(noGender.status).toBe(400);
+    const boy = await liff('U-b').request('/api/liff/nen/pets', {
+      method: 'POST', headers: auth,
+      body: JSON.stringify({ name: '豆太郎', animalType: 'dog', breed: '柴犬', birthday: '2022-04-01', weightKg: 10, gender: 'male' }),
+    });
+    expect(boy.status).toBe(201);
+    expect(((await boy.json()) as any).data).toMatchObject({ gender: 'male', callName: '豆太郎くん' });
+  });
+
+
   it('避妊去勢・活動量・主食を受け取り、feeding（kcal・g・係数）を返す', async () => {
     await saveProducts([{ name: '鹿肉ミンチ', kcalPer100g: 120, isDefault: true }]);
     const res = await liff('U-b').request('/api/liff/nen/pets', {

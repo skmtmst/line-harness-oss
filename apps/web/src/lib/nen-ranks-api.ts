@@ -86,15 +86,21 @@ export interface NenMemberListData {
 
 export type NenMemberSort = 'annual_desc' | 'lifetime_desc' | 'balance_desc' | 'recent'
 
+export type NenFeedingKind = 'staple' | 'nen'
+
 export interface NenFeedingProduct {
   id: string
   name: string
   kcalPer100g: number
   isDefault: boolean
+  /** staple＝主食（お客様が選ぶ一般的なフード）、nen＝然の商品（おやつ・トッピング） */
+  kind: NenFeedingKind
 }
 
 export interface NenFeedingData {
   products: NenFeedingProduct[]
+  /** おやつの上限（1日の必要カロリーに対する %）。既定 10 */
+  treatLimitPercent: number
   petCount: number
   refreshedPets?: number
 }
@@ -102,9 +108,9 @@ export interface NenFeedingData {
 export const nenRanksApi = {
   feeding: (accountId: string) =>
     fetchApi<ApiResponse<NenFeedingData>>(`/api/nen/feeding-products?accountId=${encodeURIComponent(accountId)}`),
-  saveFeeding: (accountId: string, products: Array<{ id?: string | null; name: string; kcalPer100g: number; isDefault: boolean }>) =>
+  saveFeeding: (accountId: string, products: Array<{ id?: string | null; name: string; kcalPer100g: number; isDefault: boolean; kind: NenFeedingKind }>, treatLimitPercent: number) =>
     fetchApi<ApiResponse<NenFeedingData>>('/api/nen/feeding-products', {
-      method: 'PUT', body: JSON.stringify({ accountId, products }),
+      method: 'PUT', body: JSON.stringify({ accountId, products, treatLimitPercent }),
     }),
   settings: (accountId: string) =>
     fetchApi<ApiResponse<NenRankSettingsData>>(`/api/nen/rank-settings?accountId=${encodeURIComponent(accountId)}`),
