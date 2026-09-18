@@ -41,15 +41,6 @@ export function collectAnalyticsAudienceIds(condition: SegmentCondition | null):
   return [...ids];
 }
 
-export function conditionHasAnalyticsAudience(condition: SegmentCondition | null): boolean {
-  try {
-    return collectAnalyticsAudienceIds(condition).length > 0;
-  } catch (error) {
-    if (error instanceof BroadcastAudienceError) return true;
-    throw error;
-  }
-}
-
 /*
  * 各対象者について、要求アカウントへの所属と期限を再確認する。
  * 他アカウント・消えた対象者は missing、期限切れは expired で拒否する。

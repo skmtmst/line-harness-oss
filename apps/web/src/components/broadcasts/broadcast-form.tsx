@@ -1313,7 +1313,7 @@ export default function BroadcastForm({
               </label>
             ))}
           </div>
-          {audienceNotice && (
+          {audienceNotice && targetMode === 'advanced' && (
             <div className="bg-accent-soft rounded-card mt-3 flex flex-wrap items-center justify-between gap-2 p-3">
               <p className="text-ink text-sm">
                 分析で作った対象者

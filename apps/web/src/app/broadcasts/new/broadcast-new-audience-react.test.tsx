@@ -24,10 +24,11 @@ const mocks = vi.hoisted(() => ({
   accountLoading: false,
   audience: vi.fn(),
   tagsList: vi.fn(),
+  replace: vi.fn(),
 }))
 
 vi.mock('next/navigation', () => ({
-  useRouter: () => ({ push: vi.fn(), replace: vi.fn(), refresh: vi.fn(), back: vi.fn(), forward: vi.fn(), prefetch: vi.fn() }),
+  useRouter: () => ({ push: vi.fn(), replace: mocks.replace, refresh: vi.fn(), back: vi.fn(), forward: vi.fn(), prefetch: vi.fn() }),
   useSearchParams: () => new URLSearchParams(mocks.query),
 }))
 
@@ -162,6 +163,31 @@ describe('配信作成への分析対象者の受け渡し(N-274)', () => {
     await flush()
     expect(host.textContent).toContain('分析で作った対象者')
     expect(host.textContent).toContain('0人')
+  })
+
+  it('エラー画面の「対象者なしで作成を続ける」でフォームへ進める', async () => {
+    const { ApiError } = await import('@/lib/api')
+    mocks.audience.mockRejectedValue(new ApiError(404, 'Not found'))
+    await mount()
+    await flush()
+    expect(host.textContent).toContain('対象者が見つかりません')
+    const button = [...host.querySelectorAll('button')].find((b) => b.textContent === '対象者なしで作成を続ける')
+    expect(button).toBeTruthy()
+    await act(async () => {
+      button!.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+    await flush()
+    expect(host.textContent).not.toContain('対象者が見つかりません')
+    expect(host.textContent).toContain('配信対象')
+    expect(mocks.replace).toHaveBeenCalledWith('/broadcasts/new')
+  })
+
+  it('通信失敗(非ApiError)は存在しない扱いにせず読み込み失敗と出す', async () => {
+    mocks.audience.mockRejectedValue(new TypeError('fetch failed'))
+    await mount()
+    await flush()
+    expect(host.textContent).toContain('読み込みに失敗しました')
+    expect(host.textContent).not.toContain('対象者が見つかりません')
   })
 
   it('アカウント未選択では読み込みで待たせず、選択を促す', async () => {

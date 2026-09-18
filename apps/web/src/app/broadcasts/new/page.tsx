@@ -56,9 +56,12 @@ function NewBroadcastPageContent() {
   const [loading, setLoading] = useState(true)
   const audienceId = searchParams.get('audienceId')?.trim() ?? ''
   const [audience, setAudience] = useState<AudienceHandoff | null>(null)
-  const [audienceError, setAudienceError] = useState<'missing' | 'expired' | null>(null)
-  const audienceCondition: SegmentCondition | null = audienceId
-    ? { operator: 'AND', rules: [{ type: 'analytics_audience', value: { audienceId } }] }
+  const [audienceError, setAudienceError] = useState<'missing' | 'expired' | 'error' | null>(null)
+  // 「対象者なしで続ける」を押した後、URL へ反映されるまでの間も待機へ戻らないよう持つ。
+  const [audienceDismissed, setAudienceDismissed] = useState(false)
+  const effectiveAudienceId = audienceDismissed ? '' : audienceId
+  const audienceCondition: SegmentCondition | null = effectiveAudienceId
+    ? { operator: 'AND', rules: [{ type: 'analytics_audience', value: { audienceId: effectiveAudienceId } }] }
     : null
   const initialCondition = audienceCondition
     ?? scoreRangeCondition(new URLSearchParams(searchParams.toString()))
@@ -95,12 +98,19 @@ function NewBroadcastPageContent() {
    * 遅れて届いた古い応答（切替前の結果）は捨てる。
    */
   useEffect(() => {
-    if (!audienceId) return
-    if (accountLoading || !selectedAccountId) return
+    setAudienceDismissed(false)
+  }, [audienceId])
+
+  useEffect(() => {
+    if (!effectiveAudienceId || accountLoading || !selectedAccountId) {
+      setAudience(null)
+      setAudienceError(null)
+      return
+    }
     let cancelled = false
     setAudience(null)
     setAudienceError(null)
-    api.analytics.audience(audienceId, selectedAccountId)
+    api.analytics.audience(effectiveAudienceId, selectedAccountId)
       .then((res) => {
         if (cancelled) return
         if (res.success) setAudience(res.data)
@@ -108,20 +118,21 @@ function NewBroadcastPageContent() {
       })
       .catch((err: unknown) => {
         if (cancelled) return
-        setAudienceError(err instanceof ApiError && err.status === 410 ? 'expired' : 'missing')
+        if (err instanceof ApiError) setAudienceError(err.status === 410 ? 'expired' : 'missing')
+        else setAudienceError('error')
       })
     return () => {
       cancelled = true
     }
-  }, [audienceId, accountLoading, selectedAccountId])
+  }, [effectiveAudienceId, accountLoading, selectedAccountId])
 
   // アカウント未選択では対象者を確かめられない。スピナーで待たせず案内を出す。
-  const audienceNoAccount = Boolean(audienceId) && !accountLoading && !selectedAccountId
-  const audiencePending = Boolean(audienceId) && Boolean(selectedAccountId) && !audience && !audienceError
+  const audienceNoAccount = Boolean(effectiveAudienceId) && !accountLoading && !selectedAccountId
+  const audiencePending = Boolean(effectiveAudienceId) && Boolean(selectedAccountId) && !audience && !audienceError
 
   return (
     <div>
-      {loading || audiencePending || (audienceId && accountLoading) ? (
+      {loading || audiencePending || (effectiveAudienceId && accountLoading) ? (
         <div className="bg-canvas rounded-card border-hairline text-ink-faint border p-8 text-center text-sm">
           読み込み中...
         </div>
@@ -141,13 +152,21 @@ function NewBroadcastPageContent() {
           <p className="text-ink text-sm font-semibold">
             {audienceError === 'expired'
               ? 'この分析結果の対象者は24時間を過ぎました。もう一度集計してください。'
-              : '対象者が見つかりません。別のアカウントで作られたか、取り消されています。'}
+              : audienceError === 'error'
+                ? '対象者の読み込みに失敗しました。通信状態を確かめてもう一度開いてください。'
+                : '対象者が見つかりません。別のアカウントで作られたか、取り消されています。'}
           </p>
           <div className="mt-4 flex items-center justify-center gap-3">
             <Link href="/analytics" className="text-accent text-sm font-medium hover:underline">
               分析画面へ戻る
             </Link>
-            <Button variant="secondary" onClick={() => router.replace('/broadcasts/new')}>
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setAudienceDismissed(true)
+                router.replace('/broadcasts/new')
+              }}
+            >
               対象者なしで作成を続ける
             </Button>
           </div>

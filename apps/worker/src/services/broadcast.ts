@@ -750,7 +750,7 @@ export async function processQueuedBroadcasts(
           if (!(audienceError instanceof BroadcastAudienceError)) throw audienceError;
           console.warn(`[broadcast] queued broadcast ${broadcast.id} held: ${audienceError.blocker}`);
           await db.prepare(
-            `UPDATE broadcasts SET status = 'draft' WHERE id = ? AND status = 'sending' AND batch_offset = 0`,
+            `UPDATE broadcasts SET status = 'draft', scheduled_at = NULL WHERE id = ? AND status = 'sending' AND batch_offset = 0`,
           ).bind(broadcast.id).run();
           continue;
         }
