@@ -34,6 +34,7 @@ shared-button-importer app/common-actions/new/page.tsx
 shared-button-importer app/common-actions/page.tsx
 shared-button-importer app/common-actions/versions/page.tsx
 shared-button-importer app/contents/media-detail-dialog.tsx
+shared-button-importer app/contents/media-picker-dialog.tsx
 shared-button-importer app/contents/media-replacement-dialog.tsx
 shared-button-importer app/contents/media-upload-dialog.tsx
 shared-button-importer app/contents/page.tsx
