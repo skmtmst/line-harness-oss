@@ -541,13 +541,16 @@ export interface CommonVarSchedule {
  */
 export async function countCommonVars(
   db: D1Database,
-  opts: { folderId?: string; lineAccountId: string },
+  opts: { folderId?: string; ungrouped?: boolean; lineAccountId: string },
 ): Promise<number> {
   const row = opts.folderId
     ? await db.prepare(`SELECT COUNT(*) AS total FROM common_vars WHERE line_account_id = ? AND archived_at IS NULL AND folder_id = ?`)
       .bind(opts.lineAccountId, opts.folderId).first<{ total: number }>()
-    : await db.prepare(`SELECT COUNT(*) AS total FROM common_vars WHERE line_account_id = ? AND archived_at IS NULL`)
-      .bind(opts.lineAccountId).first<{ total: number }>();
+    : opts.ungrouped
+      ? await db.prepare(`SELECT COUNT(*) AS total FROM common_vars WHERE line_account_id = ? AND archived_at IS NULL AND folder_id IS NULL`)
+        .bind(opts.lineAccountId).first<{ total: number }>()
+      : await db.prepare(`SELECT COUNT(*) AS total FROM common_vars WHERE line_account_id = ? AND archived_at IS NULL`)
+        .bind(opts.lineAccountId).first<{ total: number }>();
   return Number(row?.total ?? 0);
 }
 
