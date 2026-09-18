@@ -338,7 +338,10 @@ nenCampaigns.get('/api/nen-campaigns/metrics/flows', requireRole('owner', 'admin
   const accountId = await requireAccount(c);
   if (typeof accountId !== 'string') return accountId;
   try {
-    const data = await getNenFlowMetrics(c.env.DB, accountId, nenMetricsRange(c.req.query('days')));
+    // ★V6 37-6: 「今月」「先月」の数値カードは from/to で月の範囲を渡す（deliveries 口と同じ決めごと）。
+    const data = await getNenFlowMetrics(c.env.DB, accountId, nenDeliveryRange({
+      from: c.req.query('from'), to: c.req.query('to'), days: c.req.query('days'),
+    }));
     return c.json({ success: true, data });
   } catch (error) {
     return metricsError(c, error);
@@ -349,7 +352,9 @@ nenCampaigns.get('/api/nen-campaigns/metrics/columns', requireRole('owner', 'adm
   const accountId = await requireAccount(c);
   if (typeof accountId !== 'string') return accountId;
   try {
-    const data = await getNenColumnMetrics(c.env.DB, accountId, nenMetricsRange(c.req.query('days')));
+    const data = await getNenColumnMetrics(c.env.DB, accountId, nenDeliveryRange({
+      from: c.req.query('from'), to: c.req.query('to'), days: c.req.query('days'),
+    }));
     return c.json({ success: true, data });
   } catch (error) {
     return metricsError(c, error);

@@ -1,17 +1,24 @@
 'use client'
 
 import { Fragment, useMemo, useState, type ReactNode } from 'react'
+import { Gift, MessageSquare, Newspaper, Package, RotateCw, Send } from 'lucide-react'
+import ActionMenu from '@/components/shared/action-menu'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import Drawer from '@/components/shared/drawer'
 import FilterChip from '@/components/shared/filter-chip'
 import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
-import SearchField from '@/components/shared/search-field'
-import SelectField from '@/components/shared/select-field'
-import { FeatureLinkCard } from '@/components/shared/side-cards'
+import PageHeader from '@/components/shared/page-header'
+import Pagination from '@/components/shared/pagination'
+import { MoreAction } from '@/components/shared/row-actions'
+import Select from '@/components/shared/select'
+import StatusBadge from '@/components/shared/status-badge'
+import StickyBar from '@/components/shared/sticky-bar'
 import SummaryCard from '@/components/shared/summary-card'
-import { TableHeadRow, Th } from '@/components/shared/table'
+import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { Tabs } from '@/components/shared/tabs'
+import { TextArea, TextField } from '@/components/shared/text-field'
 import type {
   NenCampaignSetting,
   NenColumn,
@@ -19,28 +26,23 @@ import type {
   NenDeliveryDetail,
   NenDeliveryList,
   NenFlowMetrics,
-  NenPetMetrics,
-  NenPetProfile,
 } from '@/lib/api'
-import { formatCampaignContent, formatCampaignTiming, formatNenJobDateTime } from './campaign-display'
+import { campaignTriggerLabel, formatCampaignAudience, formatCampaignTiming, formatNenJobDateTime } from './campaign-display'
 import { publishedAtIso } from './columns/new/column-form'
+import { CampaignLinePreview, COLUMN_PET_NAME_FALLBACK, ColumnLinePreview } from './line-preview'
+import { jstLongDateTime, jstShortDate, jstShortDateTime } from './nen-period'
 
-export type NenTab = 'flow' | 'columns' | 'pets' | 'history'
+/*
+ * NEN配信の一覧。★V6 37-6（`z4q1K`）自動配信／37-6-A（`u66A0`）コラム。
+ *
+ * タブは 自動配信／コラム／送った履歴／停止中 の4つ。ペットの一覧は
+ * 「マイペット」（★V6 37-3）へ移した。誕生日クーポンの決めごとは、誕生日配信の行の
+ * その他操作から右パネルで直す。
+ *
+ * ここは見た目だけを持つ。取得・保存は `page.tsx`。
+ */
 
-export type NenJob = {
-  id: string
-  campaignKey: string
-  label: string
-  friendName: string | null
-  scheduledAt: string
-  status: string
-  attempts: number
-  lastError: string | null
-  sentAt: string | null
-  triggerLabel?: string | null
-  reactionLabel?: string | null
-  lineAccountName?: string | null
-}
+export type NenTab = 'auto' | 'columns' | 'history' | 'paused'
 
 export type NenCoupon = {
   isEnabled: boolean
@@ -52,6 +54,28 @@ export type NenCoupon = {
   leapYearPolicy: 'feb28' | 'mar1' | 'skip'
 }
 
+/** 数値カード帯（★V6 37-6）。取れなかった値は null。 */
+export type NenKpis = {
+  monthLabel: string
+  sentThisMonth: number | null
+  sentLastMonth: number | null
+  /** コラムの記事を開いた割合（%）。自動配信は LINE から個人開封を取得できない。 */
+  openRate: number | null
+  orders: number | null
+  orderAmount: number | null
+  undelivered: number | null
+  blocked: number
+  unfollowed: number
+}
+
+export type ColumnDeliveryPlan = {
+  when: 'now' | 'schedule'
+  /** `datetime-local` の値（日本時間）。 */
+  scheduledAt: string
+}
+
+export type FriendOption = { id: string; displayName: string | null }
+
 const statusLabel: Record<string, string> = {
   pending: 'これから送ります',
   processing: '送信中',
@@ -62,20 +86,13 @@ const statusLabel: Record<string, string> = {
 }
 
 const columnStatusLabel: Record<NenColumn['deliveryStatus'], string> = {
-  draft: '下書き',
-  scheduled: '予約ずみ',
+  draft: '未配信',
+  scheduled: '予約',
   queued: '配信待ち',
-  sent: '出したもの',
+  sent: '配信済み',
 }
 
-const categoryLabel: Record<NenCampaignSetting['category'], string> = {
-  transactional: '購入通知',
-  follow_up: '購入後フォロー',
-  column: 'NENコラム',
-  birthday: '記念日',
-}
-
-// #727: skipped の5理由の日本語文言(worker の safeFailureReason と同じ意味)。
+// #727: skipped の理由の日本語文言(worker の safeFailureReason と同じ意味)。
 const skippedReasonLabel: Record<string, string> = {
   friend_unavailable: '友だちが配信対象ではありません',
   line_account_unavailable: 'LINE公式アカウントの送信設定を確認できません',
@@ -119,64 +136,84 @@ function skippedReasonsDetail(skippedReasons: Record<string, number> | undefined
   return `送らなかった内訳 ${breakdown}(うち直せる ${fixable})`
 }
 
-function Kpis({
-  tab,
-  flowMetrics,
-  columnMetrics,
-  petMetrics,
-  deliveryList,
-}: {
-  tab: NenTab
-  flowMetrics: NenFlowMetrics | null
-  columnMetrics: NenColumnMetrics | null
-  petMetrics: NenPetMetrics | null
-  deliveryList: NenDeliveryList | null
-}) {
-  const topColumn = columnMetrics ? [...columnMetrics.columns]
-    .filter((column) => column.articleOpened.state === 'available')
-    .sort((a, b) => (b.articleOpened.value ?? 0) - (a.articleOpened.value ?? 0))[0] : undefined
-  const nextColumn = columnMetrics ? [...columnMetrics.columns]
-    .filter((column) => column.deliveryAt && ['scheduled', 'queued'].includes(column.deliveryStatus))
-    .sort((a, b) => String(a.deliveryAt).localeCompare(String(b.deliveryAt)))[0] : undefined
-  const petRegistrationRate = petMetrics && petMetrics.summary.friends > 0
-    ? Math.round((petMetrics.summary.pets / petMetrics.summary.friends) * 1000) / 10
-    : null
-  const nextDelivery = [...(deliveryList?.deliveries ?? [])]
-    .filter((delivery) => ['pending', 'processing'].includes(delivery.status))
-    .sort((a, b) => a.scheduledAt.localeCompare(b.scheduledAt))[0]
-  const cards = tab === 'flow'
-    ? [
-        { title: '動いている配信', value: flowMetrics?.summary.active ?? null, unit: 'つ', detail: `止めているもの ${flowMetrics?.summary.paused ?? '—'}つ` },
-        { title: 'この30日に送った', value: flowMetrics?.summary.sent ?? null, unit: '通', detail: `予定 ${flowMetrics?.summary.planned ?? '—'}通` },
-        { title: '到達率・クリック率', value: null, unit: '%', detail: flowMetrics?.flows[0]?.openRate.reason ?? 'LINEから個人開封を取得できません' },
-        { title: 'この配信からの成果', value: flowMetrics?.summary.associatedConversionAmount ?? null, unit: '円', detail: `送信後7日以内 ${flowMetrics?.summary.associatedConversions ?? '—'}件` },
-      ]
-    : tab === 'columns'
-      ? [
-          { title: '出したコラム', value: columnMetrics?.summary.sent ?? null, unit: '本', detail: `下書き ${columnMetrics?.summary.drafts ?? '—'}本` },
-          { title: '次に出すもの', value: columnMetrics?.summary.scheduled ?? null, unit: '本', detail: nextColumn ? `${columnMetricDate(nextColumn.deliveryAt)} ／ ${nextColumn.title}` : '予約ずみのコラムはありません' },
-          { title: 'いちばん読まれた', value: topColumn?.articleOpened.value ?? null, unit: '人', detail: topColumn?.title ?? '計測できる記事がありません' },
-          { title: 'コラムからの成果', value: columnMetrics?.summary.associatedConversionAmount ?? null, unit: '円', detail: `送信後7日以内 ${columnMetrics?.summary.associatedConversions ?? '—'}件` },
-        ]
-      : tab === 'pets'
-        ? [
-            { title: 'ペットの登録', value: petMetrics?.summary.pets ?? null, unit: '匹', detail: `友だち ${petMetrics?.summary.friends ?? '—'}人のうち ${petRegistrationRate ?? '—'}%` },
-            { title: '今月 誕生日の子', value: petMetrics?.summary.birthdayThisMonth ?? null, unit: '匹', detail: `誕生日未登録 ${petMetrics?.summary.birthdayMissing ?? '—'}匹` },
-            { title: '誕生日配信の到達率', value: typeof petMetrics?.summary.birthdayReachRate === 'number' ? Math.round(petMetrics.summary.birthdayReachRate * 1000) / 10 : null, unit: '%', detail: 'ふつうの配信の 2倍以上' },
-            { title: '誕生日配信のクリック率', value: typeof petMetrics?.summary.birthdayClickRate === 'number' ? Math.round(petMetrics.summary.birthdayClickRate * 1000) / 10 : null, unit: '%', detail: `${petMetrics?.summary.coupons.used ?? '—'}匹ぶんが使われました` },
-          ]
-        : [
-            { title: '送りました', value: deliveryList?.summary.sent ?? null, unit: '通', detail: deliveryList ? `1日あたり ${Math.round((deliveryList.summary.sent / deliveryList.range.days) * 10) / 10}通` : 'この30日の合計' },
-            { title: 'これから送る', value: deliveryList ? deliveryList.summary.pending + deliveryList.summary.processing : null, unit: '通', detail: nextDelivery ? `いちばん近いのは ${formatNenJobDateTime(nextDelivery.scheduledAt)}` : '送信待ちはありません' },
-            { title: '届かなかった', value: deliveryList ? deliveryList.summary.failed + deliveryList.summary.skipped : null, unit: '通', detail: [`ブロック ${deliveryList?.summary.unmetReasons?.blocked ?? 0}・退会 ${deliveryList?.summary.unmetReasons?.unfollowed ?? 0}・その他 ${deliveryList?.summary.unmetReasons?.other ?? 0}`, deliveryList?.summary.skippedReasons ? skippedReasonsDetail(deliveryList.summary.skippedReasons as Record<string, number>) : null].filter(Boolean).join(' ／ ') },
-            { title: 'やり直しが必要', value: deliveryList?.summary.retryRequired ?? null, unit: '通', detail: '最大回数まで失敗した記録' },
-          ]
+function num(value: number | null | undefined): string {
+  return value == null ? '—' : value.toLocaleString('ja-JP')
+}
 
+/** 自動配信の行に付ける印。実キーごと（★V6 37-6 の1列目）。 */
+function CampaignIcon({ campaignKey }: { campaignKey: string }) {
+  const Icon = campaignKey === 'arrival_check' ? Package
+    : campaignKey === 'review_request' ? MessageSquare
+      : campaignKey === 'cross_sell' ? RotateCw
+        : campaignKey === 'birthday_coupon' ? Gift
+          : campaignKey === 'column' ? Newspaper
+            : Send
   return (
-    <div className="grid grid-cols-2 gap-3 xl:grid-cols-4" data-design="KPIs">
-      {cards.map((card) => <SummaryCard key={card.title} {...card} variant="v6" />)}
+    <span aria-hidden="true" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-control bg-accent-soft text-accent-deep">
+      <Icon size={18} />
+    </span>
+  )
+}
+
+function Kpis({ kpis, loading }: { kpis: NenKpis | null; loading: boolean }) {
+  const month = kpis?.monthLabel ?? '今月'
+  return (
+    <div data-design="KPIs" data-design-node="nen-kpis" className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <SummaryCard variant="v6" title={`${month} 送った数`} value={kpis?.sentThisMonth ?? null} unit="通" detail={kpis ? `先月 ${num(kpis.sentLastMonth)}通` : '—'} loading={loading} />
+      <SummaryCard variant="v6" title="開封" value={null} unit="%" valueText={kpis?.openRate == null ? '—' : `${kpis.openRate}%`} detail="コラムを開いた割合（自動配信はLINEから個人開封を取得できません）" loading={loading} />
+      <SummaryCard variant="v6" title="配信からの注文" value={kpis?.orders ?? null} unit="件" detail={kpis?.orderAmount == null ? '送信後7日以内の注文' : `¥${num(kpis.orderAmount)}（送信後7日以内）`} loading={loading} />
+      <SummaryCard variant="v6" title="届かなかった" value={kpis?.undelivered ?? null} unit="通" detail={kpis ? `友だち解除 ${num(kpis.unfollowed)}・ブロック ${num(kpis.blocked)}` : '友だち解除・ブロック'} loading={loading} />
     </div>
   )
+}
+
+export type NenOverviewProps = {
+  tab: NenTab
+  topAction: ReactNode
+  onTabChange: (tab: NenTab) => void
+  settings: NenCampaignSetting[]
+  columns: NenColumn[]
+  kpis: NenKpis | null
+  flowMetrics: NenFlowMetrics | null
+  columnMetrics: NenColumnMetrics | null
+  deliveryList: NenDeliveryList | null
+  deliveryDetail: NenDeliveryDetail | null
+  friends: FriendOption[]
+  testFriendId: string
+  onTestFriendChange: (id: string) => void
+  loading: boolean
+  notice: { tone: 'success' | 'error'; text: string } | null
+  // 自動配信・停止中
+  saving: string | null
+  testing: string | null
+  previewCampaignKey: string | null
+  onPreviewCampaign: (key: string | null) => void
+  onToggleSetting: (setting: NenCampaignSetting) => void
+  onTestSend: (setting: NenCampaignSetting) => void
+  // 誕生日クーポンの決めごと（誕生日配信の行から開く）
+  coupon: NenCoupon
+  couponOpen: boolean
+  onCouponOpenChange: (open: boolean) => void
+  onCouponChange: (coupon: NenCoupon) => void
+  onSaveCoupon: () => void
+  savingCoupon: boolean
+  // コラム
+  selectedColumnId: string | null
+  onSelectColumn: (id: string | null) => void
+  audienceCount: number | null
+  plan: ColumnDeliveryPlan
+  onPlanChange: (plan: ColumnDeliveryPlan) => void
+  introDraft: string
+  onIntroChange: (text: string) => void
+  onSaveIntro: (column: NenColumn) => void
+  savingColumnId: string | null
+  onDeliverColumn: (column: NenColumn, scheduledAt?: string) => void
+  onDuplicateColumn: (column: NenColumn) => void
+  onTestColumn: (column: NenColumn) => void
+  // 送った履歴
+  onShowDelivery: (id: string) => void
+  onRetryDelivery: (id: string, version: number, reason: string) => void
+  onChangeDeliveryView: (status?: string, cursor?: string) => void
 }
 
 export function NenOverview({
@@ -185,356 +222,594 @@ export function NenOverview({
   onTabChange,
   settings,
   columns,
-  pets,
+  kpis,
   flowMetrics,
   columnMetrics,
-  petMetrics,
   deliveryList,
   deliveryDetail,
-  coupon,
   friends,
   testFriendId,
-  previewCampaignKey,
-  previewColumnId,
-  editingColumnId,
+  onTestFriendChange,
+  loading,
+  notice,
   saving,
   testing,
-  savingColumnId,
-  petDraft,
-  notice,
-  onTestFriendChange,
+  previewCampaignKey,
   onPreviewCampaign,
-  onPreviewColumn,
-  onEditColumn,
-  onUpdateColumn,
-  onSaveColumn,
-  onDeliverColumn,
-  onDuplicateColumn,
-  onTestColumn,
   onToggleSetting,
   onTestSend,
-  onPetDraftChange,
-  onAddPet,
-  onDeletePet,
+  coupon,
+  couponOpen,
+  onCouponOpenChange,
   onCouponChange,
   onSaveCoupon,
   savingCoupon,
+  selectedColumnId,
+  onSelectColumn,
+  audienceCount,
+  plan,
+  onPlanChange,
+  introDraft,
+  onIntroChange,
+  onSaveIntro,
+  savingColumnId,
+  onDeliverColumn,
+  onDuplicateColumn,
+  onTestColumn,
   onShowDelivery,
   onRetryDelivery,
   onChangeDeliveryView,
-  renderCampaignPreview,
-  renderColumnPreview,
-}: {
-  tab: NenTab
-  topAction: ReactNode
-  onTabChange: (tab: NenTab) => void
-  settings: NenCampaignSetting[]
-  columns: NenColumn[]
-  pets: NenPetProfile[]
-  flowMetrics: NenFlowMetrics | null
-  columnMetrics: NenColumnMetrics | null
-  petMetrics: NenPetMetrics | null
-  deliveryList: NenDeliveryList | null
-  deliveryDetail: NenDeliveryDetail | null
-  coupon: NenCoupon
-  friends: Array<{ id: string; displayName: string | null }>
-  testFriendId: string
-  previewCampaignKey: string | null
-  previewColumnId: string | null
-  editingColumnId: string | null
-  saving: string | null
-  testing: string | null
-  savingColumnId: string | null
-  petDraft: { friendId: string; name: string; animalType: string; gender: string; birthday: string }
-  notice: { tone: 'success' | 'error'; text: string } | null
-  onTestFriendChange: (id: string) => void
-  onPreviewCampaign: (key: string | null) => void
-  onPreviewColumn: (id: string | null) => void
-  onEditColumn: (id: string | null) => void
-  onUpdateColumn: (id: string, text: string) => void
-  onSaveColumn: (column: NenColumn) => void
-  onDeliverColumn: (column: NenColumn, scheduledAt?: string) => void
-  onDuplicateColumn: (column: NenColumn) => void
-  onTestColumn: (column: NenColumn) => void
-  onToggleSetting: (setting: NenCampaignSetting) => void
-  onTestSend: (setting: NenCampaignSetting) => void
-  onPetDraftChange: (draft: { friendId: string; name: string; animalType: string; gender: string; birthday: string }) => void
-  onAddPet: () => void
-  onDeletePet: (pet: NenPetProfile) => void
-  onCouponChange: (coupon: NenCoupon) => void
-  onSaveCoupon: () => void
-  savingCoupon: boolean
-  onShowDelivery: (id: string) => void
-  onRetryDelivery: (id: string, version: number, reason: string) => void
-  onChangeDeliveryView: (status?: string, cursor?: string) => void
-  renderCampaignPreview: (setting: NenCampaignSetting) => ReactNode
-  renderColumnPreview: (column: NenColumn) => ReactNode
-}) {
+}: NenOverviewProps) {
+  // コラムは自分のタブを持つので、自動配信の表には出さない。
+  const autoSettings = settings.filter((setting) => setting.category !== 'column')
+  const pausedSettings = autoSettings.filter((setting) => !setting.isEnabled)
+  const previewSetting = previewCampaignKey ? settings.find((setting) => setting.campaignKey === previewCampaignKey) ?? null : null
+  const columnSetting = settings.find((setting) => setting.category === 'column') ?? null
+
   return (
-    <main className="mx-auto flex w-full flex-col gap-4 px-4 pb-8 sm:px-6" style={{ maxWidth: 1600 }} data-design-node={tab === 'flow' ? 'VLMGH' : tab === 'columns' ? 'DEX0k' : tab === 'pets' ? 'q4lajm' : 'WeXbL'}>
-      <div data-design="Crumb" className="flex flex-wrap items-center justify-between gap-3 text-xs">
-        <nav className="text-ink-faint" aria-label="パンくず">
-          <span className="text-action font-semibold">専用機能</span>
-          <span className="mx-2">›</span>
-          <span>NEN配信</span>
-        </nav>
-        {topAction}
+    <main data-design-node={tab === 'columns' ? 'u66A0' : 'z4q1K'} className="mx-auto flex w-full flex-col gap-4 px-4 pb-8 sm:px-6" style={{ maxWidth: 1600 }}>
+      <div data-design="Crumb" data-design-node="nen-header">
+        <PageHeader
+          breadcrumb={[{ label: '専用機能' }, { label: 'NEN配信' }]}
+          title="NEN配信"
+          description=""
+          actions={topAction}
+        />
       </div>
-      <Tabs
-        items={[
-          { label: '配信フロー', count: settings.length, current: tab === 'flow', onClick: () => onTabChange('flow') },
-          { label: 'NENコラム', count: columns.length, current: tab === 'columns', onClick: () => onTabChange('columns') },
-          { label: 'ペット・記念日', current: tab === 'pets', onClick: () => onTabChange('pets') },
-          { label: '配信履歴', current: tab === 'history', onClick: () => onTabChange('history') },
-        ]}
-      />
-      <Kpis tab={tab} flowMetrics={flowMetrics} columnMetrics={columnMetrics} petMetrics={petMetrics} deliveryList={deliveryList} />
+      <div data-design="Tabs" data-design-node="nen-tabs">
+        <Tabs
+          items={[
+            { label: '自動配信', count: autoSettings.length, current: tab === 'auto', onClick: () => onTabChange('auto') },
+            { label: 'コラム', count: columns.length, current: tab === 'columns', onClick: () => onTabChange('columns') },
+            { label: '送った履歴', current: tab === 'history', onClick: () => onTabChange('history') },
+            { label: '停止中', count: pausedSettings.length, current: tab === 'paused', onClick: () => onTabChange('paused') },
+          ]}
+        />
+      </div>
+      <Kpis kpis={kpis} loading={loading && kpis === null} />
       {notice ? <NoteBar tone={notice.tone === 'success' ? 'info' : 'danger'}>{notice.text}</NoteBar> : null}
-      {tab === 'flow' ? (
-        <FlowPanel
-          settings={settings}
-          friends={friends}
-          testFriendId={testFriendId}
-          previewCampaignKey={previewCampaignKey}
+      {tab === 'auto' || tab === 'paused' ? (
+        <AutoPanel
+          settings={tab === 'paused' ? pausedSettings : autoSettings}
+          pausedOnly={tab === 'paused'}
+          metrics={flowMetrics}
+          monthLabel={kpis?.monthLabel ?? '今月'}
+          loading={loading}
           saving={saving}
-          testing={testing}
-          onTestFriendChange={onTestFriendChange}
           onPreview={onPreviewCampaign}
           onToggle={onToggleSetting}
           onTestSend={onTestSend}
-          renderPreview={renderCampaignPreview}
-          metrics={flowMetrics}
+          onEditCoupon={() => onCouponOpenChange(true)}
+          testFriendId={testFriendId}
         />
       ) : null}
       {tab === 'columns' ? (
         <ColumnsPanel
           columns={columns}
-          previewColumnId={previewColumnId}
-          editingColumnId={editingColumnId}
+          metrics={columnMetrics}
+          loading={loading}
+          selectedColumnId={selectedColumnId}
+          onSelect={onSelectColumn}
+          audienceCount={audienceCount}
+          plan={plan}
+          onPlanChange={onPlanChange}
+          introDraft={introDraft}
+          onIntroChange={onIntroChange}
+          onSaveIntro={onSaveIntro}
           savingColumnId={savingColumnId}
-          onPreview={onPreviewColumn}
-          onEdit={onEditColumn}
-          onUpdate={onUpdateColumn}
-          onSave={onSaveColumn}
           onDeliver={onDeliverColumn}
           onDuplicate={onDuplicateColumn}
           onTest={onTestColumn}
-          onShowHistory={() => onTabChange('history')}
-          renderPreview={renderColumnPreview}
-          metrics={columnMetrics}
-        />
-      ) : null}
-      {tab === 'pets' ? (
-        <PetsPanel
-          pets={pets}
-          coupon={coupon}
+          columnEnabled={columnSetting?.isEnabled ?? true}
+          buttonLabel={columnSetting?.buttonLabel || 'コラムを読む'}
           friends={friends}
-          petDraft={petDraft}
-          onPetDraftChange={onPetDraftChange}
-          onAddPet={onAddPet}
-          onDeletePet={onDeletePet}
-          onCouponChange={onCouponChange}
-          onSaveCoupon={onSaveCoupon}
-          savingCoupon={savingCoupon}
-          metrics={petMetrics}
+          testFriendId={testFriendId}
+          onTestFriendChange={onTestFriendChange}
         />
       ) : null}
-      {tab === 'history' ? <HistoryPanel deliveryList={deliveryList} detail={deliveryDetail} onShowDetail={onShowDelivery} onRetry={onRetryDelivery} onChangeView={onChangeDeliveryView} /> : null}
+      {tab === 'history' ? (
+        <HistoryPanel deliveryList={deliveryList} detail={deliveryDetail} loading={loading} onShowDetail={onShowDelivery} onRetry={onRetryDelivery} onChangeView={onChangeDeliveryView} />
+      ) : null}
+
+      <Drawer
+        open={previewSetting !== null}
+        title={previewSetting ? `${previewSetting.label}の中身` : '配信の中身'}
+        description="お客様ごとの情報は見本に置き換えています。"
+        onClose={() => onPreviewCampaign(null)}
+        footer={previewSetting ? (
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <Select aria-label="テスト送信先" size="standard" value={testFriendId} onChange={onTestFriendChange} options={[{ value: '', label: '送信先：未設定' }, ...friends.map((friend) => ({ value: friend.id, label: friend.displayName || '名前未取得' }))]} />
+            <Button type="button" variant="primary" disabled={!testFriendId || testing === previewSetting.campaignKey} onClick={() => onTestSend(previewSetting)}>{testing === previewSetting.campaignKey ? '送信中…' : '自分にテスト送信'}</Button>
+          </div>
+        ) : undefined}
+      >
+        {previewSetting ? (
+          <div className="flex flex-col gap-3">
+            <p className="text-caption text-ink-secondary">{formatCampaignTiming(previewSetting)}に、{formatCampaignAudience(previewSetting)}へ届きます。</p>
+            <CampaignLinePreview setting={previewSetting} />
+            <p className="text-micro text-ink-faint">テスト送信は同じLINEアカウントの確認用ユーザーだけに送ります。</p>
+          </div>
+        ) : null}
+      </Drawer>
+
+      <CouponDrawer open={couponOpen} coupon={coupon} saving={savingCoupon} onClose={() => onCouponOpenChange(false)} onChange={onCouponChange} onSave={onSaveCoupon} />
     </main>
   )
 }
 
-function FlowPanel({
+/* ───────────── 自動配信／停止中 ───────────── */
+
+type AutoSort = 'sent_desc' | 'name'
+
+function AutoPanel({
   settings,
+  pausedOnly,
   metrics,
-  friends,
-  testFriendId,
-  previewCampaignKey,
+  monthLabel,
+  loading,
   saving,
-  testing,
-  onTestFriendChange,
   onPreview,
   onToggle,
   onTestSend,
-  renderPreview,
+  onEditCoupon,
+  testFriendId,
 }: {
   settings: NenCampaignSetting[]
+  pausedOnly: boolean
   metrics: NenFlowMetrics | null
-  friends: Array<{ id: string; displayName: string | null }>
-  testFriendId: string
-  previewCampaignKey: string | null
+  monthLabel: string
+  loading: boolean
   saving: string | null
-  testing: string | null
-  onTestFriendChange: (id: string) => void
   onPreview: (key: string | null) => void
   onToggle: (setting: NenCampaignSetting) => void
   onTestSend: (setting: NenCampaignSetting) => void
-  renderPreview: (setting: NenCampaignSetting) => ReactNode
+  onEditCoupon: () => void
+  testFriendId: string
 }) {
-  const deliverySettings = settings.filter((setting) => setting.category === 'transactional' || setting.category === 'follow_up')
-  const flow = [
-    ['order_confirmed', '注文が確定', 'すぐ', '注文ありがとうございます'],
-    ['shipping_confirmed', '発送しました', '当日', 'お荷物の追跡番号'],
-    ['arrival_check', '届きました', '到着の翌日', '使い方のご案内'],
-    ['care_check', '3日目', '3日後', '困っていませんか'],
-    ['review_request', '7日目', '7日後', '口コミのお願い'],
-    ['cross_sell', '30日目', '30日後', 'そろそろ無くなるころ'],
-    ['birthday_coupon', '記念日', '毎年', 'お誕生日クーポン'],
-  ]
+  const [search, setSearch] = useState('')
+  const [trigger, setTrigger] = useState('')
+  const [status, setStatus] = useState('')
+  const [sort, setSort] = useState<AutoSort>('sent_desc')
+  const [openMenuKey, setOpenMenuKey] = useState<string | null>(null)
+
+  const metricFor = (setting: NenCampaignSetting) => metrics?.flows.find((flow) => flow.campaignKey === setting.campaignKey)
+  const shown = settings
+    .filter((setting) => setting.label.toLowerCase().includes(search.trim().toLowerCase()))
+    .filter((setting) => !trigger || setting.category === trigger)
+    .filter((setting) => !status || (status === 'on' ? setting.isEnabled : !setting.isEnabled))
+    .sort((a, b) => sort === 'name'
+      ? a.label.localeCompare(b.label, 'ja')
+      : (metricFor(b)?.sent ?? 0) - (metricFor(a)?.sent ?? 0))
+  const triggers = [...new Set(settings.map((setting) => setting.category))]
+
   return (
     <>
-      <NoteBar>買っていただいた方に、注文からの日数や記念日に合わせて自動で送る配信です。もとになる注文は「EC連携」から来ます。</NoteBar>
-      <section className="rounded-v6-card border border-hairline bg-canvas p-4 shadow-v6-card">
-        <h2 className="text-base font-bold text-ink">買っていただいてからの流れ</h2>
-        <div className="mt-5 grid grid-cols-2 gap-4 md:grid-cols-4 xl:grid-cols-7">
-          {flow.map(([campaignKey, title, when, message]) => {
-            const compatibleKeys = campaignKey === 'order_confirmed' ? ['order_confirmed', 'order_thanks'] : campaignKey === 'shipping_confirmed' ? ['shipping_confirmed', 'shipping_notice'] : [campaignKey]
-            const active = settings.find((setting) => compatibleKeys.includes(setting.campaignKey))?.isEnabled === true
-            return (
-              <div key={title} className="relative text-center">
-                <span className={active ? 'mx-auto flex h-8 w-8 items-center justify-center rounded-full bg-v6-action text-sm font-bold text-on-accent' : 'mx-auto flex h-8 w-8 items-center justify-center rounded-full bg-surface-muted text-sm font-bold text-ink-faint'}>{active ? '✓' : 'Ⅱ'}</span>
-                <p className="mt-2 text-sm font-bold text-ink">{title}</p>
-                <p className="mt-1 text-xs text-ink-faint">{when}</p>
-                <p className="mt-2 text-xs leading-5 text-ink-secondary">{message}</p>
-              </div>
-            )
-          })}
+      <div data-design="Note" data-design-node="nen-auto-note">
+        <NoteBar tone="info">
+          {pausedOnly
+            ? '止めている配信です。「動かす」を押すと、次のきっかけから自動で送ります。止めている間のきっかけは送りません。'
+            : '然の出来事（注文・発送・ペット登録・記録・誕生日）をきっかけに、決めた日数後に自動で送ります。文面にはペット名・クーポンを差し込めます。取引の通知（注文受付・発送）は「設定 › LINE通知」で管理します。'}
+        </NoteBar>
+      </div>
+
+      <div data-design="ListControls" data-design-node="nen-auto-controls" className="flex flex-wrap items-center gap-3">
+        <div className="min-w-64 flex-1">
+          <TextField aria-label="配信名で検索" placeholder="配信名で検索" value={search} onChange={(event) => setSearch(event.target.value)} />
         </div>
-      </section>
-      <section className="overflow-hidden rounded-v6-card border border-hairline bg-canvas shadow-v6-card">
-        {deliverySettings.length === 0 ? (
-          <ListState kind="empty" title="配信フローはまだありません" description="EC連携から注文の流れを接続すると、ここに配信が並びます。" />
+        <Select
+          aria-label="きっかけで絞り込む"
+          value={trigger}
+          onChange={setTrigger}
+          options={[{ value: '', label: 'きっかけ：すべて' }, ...triggers.map((category) => ({ value: category, label: `きっかけ：${campaignTriggerLabel[category]}` }))]}
+        />
+        {pausedOnly ? null : (
+          <Select
+            aria-label="状態で絞り込む"
+            value={status}
+            onChange={setStatus}
+            options={[{ value: '', label: '状態：すべて' }, { value: 'on', label: '状態：配信中' }, { value: 'off', label: '状態：停止中' }]}
+          />
+        )}
+        <Select
+          aria-label="並び順"
+          value={sort}
+          onChange={(value) => setSort(value === 'name' ? 'name' : 'sent_desc')}
+          options={[{ value: 'sent_desc', label: `並び：${monthLabel}の送信が多い順` }, { value: 'name', label: '並び：名前順' }]}
+        />
+        <span className="ml-auto text-caption font-semibold text-ink-faint">{shown.length}件</span>
+      </div>
+
+      <section data-design="Table" data-design-node="nen-auto-table">
+        {loading && settings.length === 0 ? (
+          <ListState kind="loading" title="配信を読み込んでいます" />
+        ) : settings.length === 0 ? (
+          pausedOnly
+            ? <ListState kind="empty" emptyPreset="readonly" title="止めている配信はありません" description="すべての自動配信が動いています。" />
+            : <ListState kind="empty" emptyPreset="readonly" title="自動配信はまだありません" description="EC連携から注文の流れを接続すると、ここに配信が並びます。" />
+        ) : shown.length === 0 ? (
+          <ListState kind="empty" emptyPreset="readonly" title="条件に合う配信はありません" description="検索や絞り込みを変えてみてください。" />
         ) : (
-          <table className="w-full table-fixed border-separate border-spacing-0 text-sm">
-            <thead className="bg-surface-muted text-left text-xs text-ink-faint"><TableHeadRow><Th style={{ width: '26%' }}>配信</Th><Th style={{ width: '16%' }}>いつ送るか</Th><Th style={{ width: '17%' }}>中身</Th><Th style={{ width: '14%' }}>この30日</Th><Th style={{ width: '12%' }}>到達率・クリック率</Th><Th style={{ width: '15%' }}>操作</Th></TableHeadRow></thead>
+          <DataTable>
+            <thead>
+              <TableHeadRow>
+                <Th>配信</Th>
+                <Th className="w-56">きっかけ</Th>
+                <Th className="w-44">対象</Th>
+                <Th className="w-24" align="right">{monthLabel} 送信</Th>
+                <Th className="w-20" align="right">開封</Th>
+                <Th className="w-20" align="right">注文</Th>
+                <Th className="w-24">状態</Th>
+                <Th className="w-28" align="right"><span className="sr-only">操作</span></Th>
+              </TableHeadRow>
+            </thead>
             <tbody>
-              {deliverySettings.map((setting) => {
-                const metricKeys = setting.campaignKey === 'order_thanks' || setting.campaignKey === 'order_confirmed'
-                  ? ['order_thanks', 'order_confirmed']
-                  : setting.campaignKey === 'shipping_notice' || setting.campaignKey === 'shipping_confirmed'
-                    ? ['shipping_notice', 'shipping_confirmed']
-                    : [setting.campaignKey]
-                const metric = metrics?.flows.find((candidate) => metricKeys.includes(candidate.campaignKey))
-                return <Fragment key={setting.campaignKey}>
-                  <tr className="border-t border-hairline">
-                    <td className="px-3 py-3"><p className="font-bold text-ink">{setting.label}</p><p className="mt-1 text-xs text-ink-faint">{categoryLabel[setting.category]} ／ {formatCampaignTiming(setting)}</p></td>
-                    <td className="px-3 py-3 text-ink-secondary">{formatCampaignTiming(setting)}</td>
-                    <td className="px-3 py-3 text-ink-secondary">{formatCampaignContent(setting)}</td>
-                    <td className="px-3 py-3 text-ink-secondary"><p className="font-semibold text-ink">{metric?.sent.toLocaleString('ja-JP') ?? '—'}通</p><p className="mt-1 text-xs text-ink-faint">予定 {metric?.planned.toLocaleString('ja-JP') ?? '—'}通</p></td>
-                    <td className="px-3 py-3 text-ink-secondary"><p className="font-semibold text-ink" title={metric?.openRate.reason}>到達・クリックはLINE集計で確認</p><p className="mt-1 text-xs text-ink-faint">関連成果 {metric?.associatedConversions.toLocaleString('ja-JP') ?? '—'}件 ／ {metric?.associatedConversionAmount?.toLocaleString('ja-JP') ?? '—'}円</p></td>
-                    <td className="px-3 py-3"><div className="flex flex-wrap justify-end gap-2"><Button onClick={() => onPreview(previewCampaignKey === setting.campaignKey ? null : setting.campaignKey)}>{previewCampaignKey === setting.campaignKey ? '閉じる' : '中身を見る'}</Button><Button onClick={() => onToggle(setting)} disabled={saving === setting.campaignKey}>{setting.isEnabled ? '止める' : '動かす'}</Button></div></td>
-                  </tr>
-                  {previewCampaignKey === setting.campaignKey ? <tr key={`${setting.campaignKey}-preview`}><td colSpan={6} className="border-t border-hairline p-3">{renderPreview(setting)}</td></tr> : null}
-                </Fragment>
+              {shown.map((setting) => {
+                const metric = metricFor(setting)
+                const busy = saving === setting.campaignKey
+                const menuItems = [
+                  { id: 'preview', label: '中身を見る', onSelect: () => onPreview(setting.campaignKey) },
+                  { id: 'test', label: '自分にテスト送信', disabled: !testFriendId, onSelect: () => onTestSend(setting) },
+                  ...(setting.category === 'birthday' ? [{ id: 'coupon', label: 'クーポンの決めごと', onSelect: onEditCoupon }] : []),
+                  { id: 'toggle', label: setting.isEnabled ? '止める' : '動かす', disabled: busy, dividerBefore: true, onSelect: () => onToggle(setting) },
+                ]
+                return (
+                  <Tr key={setting.campaignKey}>
+                    <Td>
+                      <span className="flex items-center gap-3">
+                        <CampaignIcon campaignKey={setting.campaignKey} />
+                        <span className="min-w-0">
+                          <span className="block truncate text-label font-semibold text-ink" title={setting.label}>{setting.label}</span>
+                          <span className="block truncate text-micro text-ink-faint">{setting.title}</span>
+                        </span>
+                      </span>
+                    </Td>
+                    <Td><span className="text-label text-ink-secondary">{formatCampaignTiming(setting)}</span></Td>
+                    <Td><span className="text-label text-ink-secondary">{formatCampaignAudience(setting)}</span></Td>
+                    <Td align="right"><span className="text-label font-semibold tabular-nums text-ink">{num(metric?.sent ?? null)}</span></Td>
+                    <Td align="right"><span className="text-label tabular-nums text-ink-faint" title={metric?.openRate.reason ?? 'LINEから個人開封を取得できません'}>—</span></Td>
+                    <Td align="right">
+                      {metric && metric.associatedConversions > 0
+                        ? <span className="text-label font-semibold tabular-nums text-accent-deep" title={`¥${num(metric.associatedConversionAmount)}（送信後7日以内）`}>{num(metric.associatedConversions)}件</span>
+                        : <span className="text-label tabular-nums text-ink-faint">—</span>}
+                    </Td>
+                    <Td>{setting.isEnabled ? <StatusBadge tone="success" size="compact">配信中</StatusBadge> : <StatusBadge tone="warning" size="compact">停止中</StatusBadge>}</Td>
+                    <Td align="right">
+                      <span className="relative inline-flex items-center justify-end gap-2">
+                        <Button href={`/nen-campaigns/edit?key=${encodeURIComponent(setting.campaignKey)}`} size="field">編集</Button>
+                        <MoreAction label={`${setting.label}のその他の操作`} onClick={() => setOpenMenuKey((current) => current === setting.campaignKey ? null : setting.campaignKey)} />
+                        <ActionMenu open={openMenuKey === setting.campaignKey} ariaLabel={`${setting.label}の操作`} onClose={() => setOpenMenuKey(null)} items={menuItems} />
+                      </span>
+                    </Td>
+                  </Tr>
+                )
               })}
             </tbody>
-          </table>
+          </DataTable>
         )}
-      </section>
-      <section id="nen-test-send" className="rounded-v6-card border border-hairline bg-canvas p-4 shadow-v6-card">
-        <div className="flex flex-wrap items-end justify-between gap-3">
-          <div><h2 className="text-sm font-bold text-ink">テスト送信</h2><p className="mt-1 text-xs text-ink-faint">同じLINEアカウントの確認用ユーザーだけに送ります。</p></div>
-          <div className="flex flex-wrap items-end gap-2"><SelectField value={testFriendId} onChange={(event) => onTestFriendChange(event.target.value)} aria-label="テスト送信先" options={[{ value: '', label: '未設定' }, ...friends.map((friend) => ({ value: friend.id, label: friend.displayName || '名前未取得' }))]} /><Button variant="primary" disabled={!testFriendId || settings.length === 0 || testing !== null} onClick={() => settings[0] && onTestSend(settings[0])}>{testing ? '送信中...' : '最初の配信をテスト'}</Button></div>
-        </div>
       </section>
     </>
   )
 }
 
+/* ───────────── 誕生日クーポンの決めごと ───────────── */
+
+function CouponDrawer({ open, coupon, saving, onClose, onChange, onSave }: {
+  open: boolean
+  coupon: NenCoupon
+  saving: boolean
+  onClose: () => void
+  onChange: (coupon: NenCoupon) => void
+  onSave: () => void
+}) {
+  return (
+    <Drawer
+      open={open}
+      title="誕生日クーポンの決めごと"
+      description="誕生日は3日前の10:00に送ります。名前と誕生日は、マイページで登録されたペット情報を使います。"
+      busy={saving}
+      onClose={onClose}
+      footer={<Button type="button" variant="primary" disabled={saving} onClick={onSave}>{saving ? '保存中…' : '設定を保存'}</Button>}
+    >
+      <div className="flex flex-col gap-4">
+        <label className="flex flex-col gap-1 text-caption font-semibold text-ink">
+          割引の額（円）
+          <TextField type="number" min={1} max={100000} inputMode="numeric" value={coupon.discountAmount} onChange={(event) => onChange({ ...coupon, discountAmount: Number(event.target.value) })} />
+        </label>
+        <label className="flex flex-col gap-1 text-caption font-semibold text-ink">
+          使える日数
+          <TextField type="number" min={1} max={365} inputMode="numeric" value={coupon.validityDays} onChange={(event) => onChange({ ...coupon, validityDays: Number(event.target.value) })} />
+        </label>
+        <label className="flex flex-col gap-1 text-caption font-semibold text-ink">
+          クーポンの頭の文字
+          <TextField value={coupon.codePrefix} maxLength={10} onChange={(event) => onChange({ ...coupon, codePrefix: event.target.value.toUpperCase() })} />
+          <span className="text-micro font-normal text-ink-faint">半角大文字・数字・- で3〜10文字。発行されるクーポンは「{coupon.codePrefix || 'NENBDAY'}-1234」のようになります。</span>
+        </label>
+        <div className="flex flex-col gap-1 text-caption font-semibold text-ink">
+          2月29日生まれの子
+          <Select
+            aria-label="2月29日生まれの子への平年の扱い"
+            size="full"
+            value={coupon.leapYearPolicy}
+            onChange={(value) => onChange({ ...coupon, leapYearPolicy: value === 'mar1' || value === 'skip' ? value : 'feb28' })}
+            options={[{ value: 'feb28', label: '2月28日に送る' }, { value: 'mar1', label: '3月1日に送る' }, { value: 'skip', label: 'その年は送らない' }]}
+          />
+        </div>
+        <p className="text-micro text-ink-faint">クーポンが使われた記録は「コンバージョン」で確認できます。</p>
+      </div>
+    </Drawer>
+  )
+}
+
+/* ───────────── コラム ───────────── */
+
+type ColumnDeliveryFilter = '' | 'draft' | 'scheduled' | 'sent'
+
+function columnDeliveryBadge(column: NenColumn) {
+  if (column.deliveryStatus === 'sent') return <StatusBadge tone="success" size="compact">配信済み {jstShortDate(column.deliveryAt)}</StatusBadge>
+  if (column.deliveryStatus === 'scheduled') return <StatusBadge tone="warning" size="compact">予約 {jstShortDateTime(column.deliveryAt)}</StatusBadge>
+  if (column.deliveryStatus === 'queued') return <StatusBadge tone="info" size="compact">配信待ち {jstShortDateTime(column.deliveryAt)}</StatusBadge>
+  return <StatusBadge tone="neutral" size="compact">{columnStatusLabel[column.deliveryStatus]}</StatusBadge>
+}
+
 function ColumnsPanel({
   columns,
   metrics,
-  previewColumnId,
-  editingColumnId,
+  loading,
+  selectedColumnId,
+  onSelect,
+  audienceCount,
+  plan,
+  onPlanChange,
+  introDraft,
+  onIntroChange,
+  onSaveIntro,
   savingColumnId,
-  onPreview,
-  onEdit,
-  onUpdate,
-  onSave,
   onDeliver,
   onDuplicate,
   onTest,
-  onShowHistory,
-  renderPreview,
+  columnEnabled,
+  buttonLabel,
+  friends,
+  testFriendId,
+  onTestFriendChange,
 }: {
   columns: NenColumn[]
   metrics: NenColumnMetrics | null
-  previewColumnId: string | null
-  editingColumnId: string | null
+  loading: boolean
+  selectedColumnId: string | null
+  onSelect: (id: string | null) => void
+  audienceCount: number | null
+  plan: ColumnDeliveryPlan
+  onPlanChange: (plan: ColumnDeliveryPlan) => void
+  introDraft: string
+  onIntroChange: (text: string) => void
+  onSaveIntro: (column: NenColumn) => void
   savingColumnId: string | null
-  onPreview: (id: string | null) => void
-  onEdit: (id: string | null) => void
-  onUpdate: (id: string, text: string) => void
-  onSave: (column: NenColumn) => void
   onDeliver: (column: NenColumn, scheduledAt?: string) => void
   onDuplicate: (column: NenColumn) => void
   onTest: (column: NenColumn) => void
-  onShowHistory: () => void
-  renderPreview: (column: NenColumn) => ReactNode
+  columnEnabled: boolean
+  buttonLabel: string
+  friends: FriendOption[]
+  testFriendId: string
+  onTestFriendChange: (id: string) => void
 }) {
   const [search, setSearch] = useState('')
-  const [status, setStatus] = useState<'all' | NenColumn['deliveryStatus'] | 'unread'>('all')
-  const [sort, setSort] = useState<'newest' | 'read'>('newest')
+  const [category, setCategory] = useState('')
+  const [delivery, setDelivery] = useState<ColumnDeliveryFilter>('')
   const [page, setPage] = useState(1)
   /* 配信予約は確認なしのワンクリックにしない(点検 #512 の中9)。 */
   const [confirmDeliver, setConfirmDeliver] = useState<{ column: NenColumn; scheduledAt?: string } | null>(null)
-  const shown = columns.filter((column) => {
-    const matchesSearch = `${column.title} ${column.excerpt} ${column.category ?? ''}`.toLowerCase().includes(search.toLowerCase())
-    const metric = metrics?.columns.find((candidate) => candidate.id === column.id)
-    return matchesSearch && (status === 'all' || (status === 'unread' ? (metric?.unread ?? 0) > 0 : column.deliveryStatus === status))
-  }).sort((a, b) => sort === 'read'
-    ? (metrics?.columns.find((column) => column.id === b.id)?.articleOpened.value ?? -1) - (metrics?.columns.find((column) => column.id === a.id)?.articleOpened.value ?? -1)
-    : String(b.publishedAt ?? b.deliveryAt ?? '').localeCompare(String(a.publishedAt ?? a.deliveryAt ?? '')))
-  const count = (value: NenColumn['deliveryStatus']) => columns.filter((column) => column.deliveryStatus === value).length
-  const pageSize = 6
+
+  const pageSize = 8
+  const shown = useMemo(() => columns
+    .filter((column) => `${column.title} ${column.excerpt}`.toLowerCase().includes(search.trim().toLowerCase()))
+    .filter((column) => !category || (column.category ?? '') === category)
+    .filter((column) => !delivery || (delivery === 'scheduled' ? column.deliveryStatus === 'scheduled' || column.deliveryStatus === 'queued' : column.deliveryStatus === delivery))
+    .sort((a, b) => String(b.publishedAt ?? b.updatedAt).localeCompare(String(a.publishedAt ?? a.updatedAt))), [columns, search, category, delivery])
   const pageCount = Math.max(1, Math.ceil(shown.length / pageSize))
   const currentPage = Math.min(page, pageCount)
   const visible = shown.slice((currentPage - 1) * pageSize, currentPage * pageSize)
-  const first = shown.length === 0 ? 0 : (currentPage - 1) * pageSize + 1
-  const last = Math.min(currentPage * pageSize, shown.length)
+  const categories = [...new Set(columns.map((column) => column.category).filter((value): value is string => Boolean(value)))]
+  const selected = columns.find((column) => column.id === selectedColumnId) ?? null
+  const scheduledIso = plan.when === 'schedule' ? publishedAtIso(plan.scheduledAt) : null
+  const scheduleInvalid = plan.when === 'schedule' && !scheduledIso
+  const planLabel = selected
+    ? plan.when === 'now' ? `「${selected.title}」を今すぐ送る` : scheduledIso ? `「${selected.title}」を ${jstShortDateTime(scheduledIso)} に予約` : `「${selected.title}」の予約日時を入れてください`
+    : 'コラムを選ぶと、ここに予定が出ます'
+  const introDirty = selected !== null && introDraft !== selected.introText
+
   return (
     <>
-      <NoteBar>コラムは売り込みをしない配信です。記事の正本は外部サイトで管理し、ここではLINEへ出す内容と日時を決めます。</NoteBar>
-      <div className="flex flex-wrap items-center justify-between gap-3"><div className="w-full" style={{ maxWidth: 460 }}><SearchField value={search} onChange={(value) => { setSearch(value); setPage(1) }} onClear={() => { setSearch(''); setPage(1) }} placeholder="コラムの題名・概要で検索" /></div><div className="flex items-center gap-2"><span className="rounded-v6-control border border-hairline bg-canvas px-3 py-2 text-sm text-ink-secondary">この{metrics?.range.days ?? 90}日</span><span className="rounded-v6-control border border-hairline bg-canvas px-3 py-2 text-sm text-ink-secondary">6件表示</span><Button href="/nen-campaigns/columns/new" variant="primary">コラムを書く</Button></div></div>
-      <div className="flex flex-wrap items-center justify-between gap-2"><div className="flex flex-wrap gap-2">{[
-        ['all', `すべて ${columns.length}`], ['sent', `出したもの ${count('sent')}`], ['draft', `下書き ${count('draft')}`], ['scheduled', `予約ずみ ${count('scheduled')}`],
-        ...(metrics?.summary.unread === null ? [] : [['unread', `読まれていない ${metrics?.summary.unread ?? 0}`]]),
-      ].map(([value, label]) => <FilterChip key={value} selected={status === value} onChange={(selected) => { setStatus(selected ? value as typeof status : 'all'); setPage(1) }}>{label}</FilterChip>)}</div><SelectField aria-label="コラムの並び順" value={sort} onChange={(event) => { setSort(event.target.value as typeof sort); setPage(1) }} options={[{ value: 'newest', label: '出した日が新しい順' }, { value: 'read', label: '読まれた数が多い順' }]} /></div>
-      {shown.length === 0 ? (
-        <ListState kind="empty" title={columns.length === 0 ? 'まだコラムがありません' : '条件に合うコラムはありません'} description="売らない配信です。ここで信用がたまると、売る配信が届きやすくなります。" action={<Button href="/nen-campaigns/columns/new" variant="primary">コラムを書く</Button>} />
-      ) : (
-        <section className="overflow-hidden rounded-v6-card border border-hairline bg-canvas shadow-v6-card">
-          <table className="w-full table-fixed border-separate border-spacing-0 text-sm"><thead className="bg-surface-muted text-left text-xs text-ink-faint"><TableHeadRow><Th style={{ width: '27%' }}>コラム</Th><Th style={{ width: '11%' }}>出す日</Th><Th style={{ width: '11%' }}>届く人</Th><Th style={{ width: '11%' }}>読まれた</Th><Th style={{ width: '14%' }}>この記事からの成果</Th><Th style={{ width: '26%' }}>操作</Th></TableHeadRow></thead><tbody>
-            {visible.map((column) => {
-              const metric = metrics?.columns.find((candidate) => candidate.id === column.id)
-              return <Fragment key={column.id}>
-                <tr><td className="border-t border-hairline px-3 py-3"><p className="font-bold text-ink">{column.title}</p><p className="mt-1 text-xs text-ink-faint">{column.category || '分類なし'} ／ {column.excerpt || '概要なし'}</p></td><td className="border-t border-hairline px-3 py-3 text-ink-secondary">{columnDeliveryDate(column)}</td><td className="border-t border-hairline px-3 py-3 text-ink-secondary"><p className="font-semibold text-ink">{metric?.targeted.toLocaleString('ja-JP') ?? '—'}人</p><p className="mt-1 text-xs text-ink-faint">送信 {metric?.sent.toLocaleString('ja-JP') ?? '—'}人</p></td><td className="border-t border-hairline px-3 py-3 text-ink-secondary" title={metric?.articleOpened.reason ?? undefined}><p className="font-semibold text-ink">{metric?.articleOpened.value?.toLocaleString('ja-JP') ?? '—'}人</p><p className="mt-1 text-xs text-ink-faint">読了 {metric?.completionRate.value?.toLocaleString('ja-JP') ?? '—'}人</p></td><td className="border-t border-hairline px-3 py-3 text-ink-secondary"><p className="font-semibold text-ink">{metric?.associatedConversions.toLocaleString('ja-JP') ?? '—'}件</p><p className="mt-1 text-xs text-ink-faint">{typeof metric?.associatedConversionAmount === 'number' ? `${metric.associatedConversionAmount.toLocaleString('ja-JP')}円` : '—'}</p></td><td className="border-t border-hairline px-3 py-3"><div className="flex flex-wrap justify-end gap-2"><Button onClick={() => onPreview(previewColumnId === column.id ? null : column.id)}>中身を見る</Button><Button onClick={() => onDuplicate(column)}>同じ形で書く</Button><Button onClick={() => onTest(column)}>テスト送信</Button><Button onClick={onShowHistory}>配信結果</Button><Button onClick={() => onEdit(editingColumnId === column.id ? null : column.id)}>{editingColumnId === column.id ? '設定を閉じる' : '配信を設定'}</Button></div></td></tr>
-                {previewColumnId === column.id ? <tr key={`${column.id}-preview`}><td colSpan={6} className="border-t border-hairline p-3">{renderPreview(column)}</td></tr> : null}
-                {editingColumnId === column.id ? <tr key={`${column.id}-controls`}><td colSpan={6} className="border-t border-hairline bg-surface-muted px-3 py-3"><div className="flex flex-wrap items-center justify-between gap-3"><div className="flex flex-wrap gap-2"><Button onClick={() => onEdit(null)}>設定を閉じる</Button><Button onClick={() => setConfirmDeliver({ column })} variant="primary">今すぐ配信予約</Button><input type="datetime-local" aria-label={`${column.title}の配信日時`} onChange={(event) => { const scheduledAt = publishedAtIso(event.target.value); if (scheduledAt) setConfirmDeliver({ column, scheduledAt }) }} className="rounded-v6-control border border-hairline bg-canvas px-3 py-2 text-sm text-ink" /></div><span className="text-xs font-semibold text-ink-secondary">{columnStatusLabel[column.deliveryStatus]}</span></div><div className="mt-3"><label className="text-sm font-bold text-ink">カードの前に送る紹介文<textarea value={column.introText} rows={5} maxLength={1500} onChange={(event) => onUpdate(column.id, event.target.value)} className="mt-2 block w-full rounded-v6-control border border-hairline bg-canvas px-3 py-2 text-sm leading-6 text-ink" /></label><div className="mt-2 flex justify-end"><Button variant="primary" disabled={savingColumnId === column.id} onClick={() => onSave(column)}>{savingColumnId === column.id ? '保存中...' : '配信文を保存'}</Button></div></div></td></tr> : null}
-              </Fragment>
-            })}
-          </tbody></table>
-        </section>
-      )}
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-xs text-ink-faint">コラム {columns.length}本中 {first}〜{last}本を表示</p>
-        {pageCount > 1 ? (
-          <div className="flex items-center gap-2" aria-label="コラムのページ送り">
-            <Button disabled={currentPage === 1} onClick={() => setPage((value) => Math.max(1, value - 1))}>前へ</Button>
-            {Array.from({ length: pageCount }, (_, index) => index + 1).map((value) => (
-              <Button key={value} variant={value === currentPage ? 'primary' : 'secondary'} onClick={() => setPage(value)}>{value}</Button>
-            ))}
-            <Button disabled={currentPage === pageCount} onClick={() => setPage((value) => Math.min(pageCount, value + 1))}>次へ</Button>
-          </div>
-        ) : null}
+      <div data-design="Note" data-design-node="nen-columns-note">
+        <NoteBar tone="info">
+          ECサイトのジャーナル（コラム）は公開すると自動でここに届きます。配信したいコラムを選び、LINEのカード（見出し・画像・抜粋・「{buttonLabel}」ボタン）を確認して、今すぐ送るか日時を予約します。コラムは売り込みをしない配信です。
+        </NoteBar>
       </div>
+
+      <div className="grid gap-4 xl:grid-cols-3">
+        <div className="flex flex-col gap-4 xl:col-span-2">
+          <div data-design="ListControls" data-design-node="nen-columns-controls" className="flex flex-wrap items-center gap-3">
+            <div className="min-w-64 flex-1">
+              <TextField aria-label="コラムの題名で検索" placeholder="コラムの題名で検索" value={search} onChange={(event) => { setSearch(event.target.value); setPage(1) }} />
+            </div>
+            <Select
+              aria-label="分類で絞り込む"
+              value={category}
+              onChange={(value) => { setCategory(value); setPage(1) }}
+              options={[{ value: '', label: '分類：すべて' }, ...categories.map((value) => ({ value, label: `分類：${value}` }))]}
+            />
+            <Select
+              aria-label="配信の状態で絞り込む"
+              value={delivery}
+              onChange={(value) => { setDelivery(value === 'draft' || value === 'scheduled' || value === 'sent' ? value : ''); setPage(1) }}
+              options={[{ value: '', label: '配信：すべて' }, { value: 'draft', label: '配信：未配信' }, { value: 'scheduled', label: '配信：予約' }, { value: 'sent', label: '配信：配信済み' }]}
+            />
+            <span className="ml-auto text-caption font-semibold text-ink-faint">{shown.length}本</span>
+          </div>
+
+          <section data-design="Table" data-design-node="nen-columns-table">
+            {loading && columns.length === 0 ? (
+              <ListState kind="loading" title="コラムを読み込んでいます" />
+            ) : columns.length === 0 ? (
+              <ListState kind="empty" title="まだコラムがありません" description="ECサイトでジャーナルを公開すると、ここに届きます。売らない配信です。ここで信用がたまると、売る配信が届きやすくなります。" action={<Button href="/nen-campaigns/columns/new" variant="primary">コラムを書く</Button>} />
+            ) : shown.length === 0 ? (
+              <ListState kind="empty" emptyPreset="readonly" title="条件に合うコラムはありません" description="検索や絞り込みを変えてみてください。" />
+            ) : (
+              <>
+                <DataTable>
+                  <thead>
+                    <TableHeadRow>
+                      <Th>コラム</Th>
+                      <Th className="w-24">分類</Th>
+                      <Th className="w-20">公開日</Th>
+                      <Th className="w-40">LINE配信</Th>
+                      <Th className="w-16" align="right">閲覧</Th>
+                      <Th className="w-28" align="right"><span className="sr-only">操作</span></Th>
+                    </TableHeadRow>
+                  </thead>
+                  <tbody>
+                    {visible.map((column) => {
+                      const metric = metrics?.columns.find((candidate) => candidate.id === column.id)
+                      const isSelected = column.id === selectedColumnId
+                      return (
+                        <Tr key={column.id} aria-selected={isSelected} className="aria-selected:bg-accent-soft">
+                          <Td>
+                            <span className="flex items-center gap-3">
+                              {column.imageUrl ? (
+                                // eslint-disable-next-line @next/next/no-img-element -- ECのコラム画像
+                                <img src={column.imageUrl} alt="" className="h-9 w-14 shrink-0 rounded-mini object-cover" />
+                              ) : (
+                                <span aria-hidden="true" className="flex h-9 w-14 shrink-0 items-center justify-center rounded-mini bg-canvas-sunken text-ink-faint"><Newspaper size={16} /></span>
+                              )}
+                              <button type="button" onClick={() => onSelect(column.id)} className="min-w-0 text-left">
+                                <span className="block truncate text-label font-semibold text-ink" title={column.title}>{column.title}</span>
+                              </button>
+                            </span>
+                          </Td>
+                          <Td><span className="text-label text-ink-secondary">{column.category || '—'}</span></Td>
+                          <Td><span className="text-label tabular-nums text-ink-secondary">{jstShortDate(column.publishedAt)}</span></Td>
+                          <Td>{columnDeliveryBadge(column)}</Td>
+                          <Td align="right"><span className="text-label tabular-nums text-ink" title={metric?.articleOpened.reason ?? undefined}>{num(metric?.articleOpened.value ?? null)}</span></Td>
+                          <Td align="right">
+                            {isSelected ? (
+                              <span className="text-label font-semibold text-ink-faint">選択中</span>
+                            ) : (
+                              <button type="button" onClick={() => onSelect(column.id)} className="text-label font-semibold text-accent-deep">
+                                {column.deliveryStatus === 'sent' ? 'もう一度送る' : column.deliveryStatus === 'draft' ? '選ぶ' : '予約を見る'}
+                              </button>
+                            )}
+                          </Td>
+                        </Tr>
+                      )
+                    })}
+                  </tbody>
+                </DataTable>
+                {pageCount > 1 ? <Pagination page={currentPage} pageCount={pageCount} onPageChange={setPage} /> : null}
+              </>
+            )}
+          </section>
+        </div>
+
+        <aside data-design="Panel" data-design-node="nen-column-panel" className="flex flex-col gap-4">
+          <section className="flex flex-col gap-3 rounded-card border border-hairline bg-canvas p-4">
+            <div className="flex items-baseline justify-between gap-3">
+              <h2 className="text-label font-bold text-ink">LINEに届くカード</h2>
+              <span className="text-micro text-ink-faint">選んだコラムから自動で作られます</span>
+            </div>
+            {selected ? (
+              <>
+                <ColumnLinePreview column={selected} introText={introDraft} buttonLabel={buttonLabel} />
+                <p className="text-micro text-ink-faint">差し込み：{'{{pet_name}}'} → {COLUMN_PET_NAME_FALLBACK}（コラムは全員に同じ文面で届きます）</p>
+                <label className="flex flex-col gap-1 text-caption font-semibold text-ink">
+                  カードの前に送る紹介文
+                  <TextArea rows={4} maxLength={1500} value={introDraft} onChange={(event) => onIntroChange(event.target.value)} />
+                </label>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-micro text-ink-faint">{introDraft.length}／1500文字</span>
+                  <Button type="button" size="field" disabled={!introDirty || savingColumnId === selected.id || !introDraft.trim()} onClick={() => onSaveIntro(selected)}>{savingColumnId === selected.id ? '保存中…' : '紹介文を保存'}</Button>
+                </div>
+              </>
+            ) : (
+              <ListState kind="empty" emptyPreset="readonly" title="コラムを選んでください" description="左の一覧から選ぶと、LINEに届く見え方をここで確認できます。" />
+            )}
+          </section>
+
+          <section className="flex flex-col gap-3 rounded-card border border-hairline bg-canvas p-4">
+            <h2 className="text-label font-bold text-ink">誰に・いつ送るか</h2>
+            <div className="flex flex-col gap-1 text-caption font-semibold text-ink">
+              送る相手
+              <span className="rounded-control border border-hairline bg-canvas-sunken px-3 py-2 text-label font-normal text-ink">
+                {selected
+                  ? selected.targetMode === 'tag' ? `タグで絞り込み（${audienceCount == null ? '—' : num(audienceCount)}人）` : `友だち 全員（${audienceCount == null ? '—' : num(audienceCount)}人）`
+                  : '—'}
+              </span>
+              <span className="text-micro font-normal text-ink-faint">送る相手はコラムを作るときに決めます。友だち解除・ブロックの人には送られません。</span>
+            </div>
+            <div className="flex flex-col gap-2 text-caption font-semibold text-ink">
+              送る時
+              <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="送る時">
+                <Button type="button" role="radio" aria-checked={plan.when === 'now'} variant={plan.when === 'now' ? 'primary' : 'secondary'} onClick={() => onPlanChange({ ...plan, when: 'now' })}>今すぐ</Button>
+                <Button type="button" role="radio" aria-checked={plan.when === 'schedule'} variant={plan.when === 'schedule' ? 'primary' : 'secondary'} onClick={() => onPlanChange({ ...plan, when: 'schedule' })}>日時を予約</Button>
+              </div>
+              {plan.when === 'schedule' ? (
+                <TextField type="datetime-local" aria-label="予約日時（日本時間）" value={plan.scheduledAt} invalid={scheduleInvalid} onChange={(event) => onPlanChange({ ...plan, scheduledAt: event.target.value })} />
+              ) : null}
+            </div>
+            <p className="text-micro text-ink-faint">
+              {selected && audienceCount != null ? `送信数 約${num(audienceCount)}通。` : ''}
+              {columnEnabled ? '' : 'コラムの配信が停止中のため、いまは送れません。「自動配信」タブで動かしてください。'}
+            </p>
+            {selected ? (
+              <div className="flex flex-wrap gap-2">
+                <Button type="button" size="field" onClick={() => onDuplicate(selected)}>同じ形で書く</Button>
+                <Button href="/nen-campaigns/columns/new" size="field">コラムを書く</Button>
+              </div>
+            ) : null}
+          </section>
+        </aside>
+      </div>
+
+      <StickyBar
+        status={planLabel}
+        actions={(
+          <>
+            <Select aria-label="テスト送信先" value={testFriendId} onChange={onTestFriendChange} options={[{ value: '', label: '送信先：未設定' }, ...friends.map((friend) => ({ value: friend.id, label: friend.displayName || '名前未取得' }))]} />
+            <Button type="button" disabled={!selected || !testFriendId} onClick={() => selected && onTest(selected)}>自分にテスト送信</Button>
+            <Button type="button" variant="primary" disabled={!selected || !columnEnabled || scheduleInvalid} onClick={() => selected && setConfirmDeliver({ column: selected, scheduledAt: scheduledIso ?? undefined })}>
+              {plan.when === 'now' ? 'この内容で送る' : 'この内容で予約する'}
+            </Button>
+          </>
+        )}
+      />
+
       <ConfirmDialog
         open={confirmDeliver !== null}
         title={`「${confirmDeliver?.column.title ?? ''}」を配信予約しますか？`}
         description={confirmDeliver?.scheduledAt
-          ? `予約日時 ${confirmDeliver.scheduledAt.replace('T', ' ').slice(0, 16)}（日本時間）。対象の友だちへ配信待ちに入ります。`
-          : 'すぐに配信待ちに入ります。対象の友だちへ送られます。'}
-        confirmLabel="予約する"
+          ? `${jstLongDateTime(confirmDeliver.scheduledAt)}（日本時間）に、${audienceCount == null ? '対象' : `約${num(audienceCount)}人`}の友だちへ送ります。`
+          : `すぐに配信待ちに入り、${audienceCount == null ? '対象' : `約${num(audienceCount)}人`}の友だちへ送られます。`}
+        confirmLabel={confirmDeliver?.scheduledAt ? '予約する' : '送る'}
         onConfirm={() => { if (confirmDeliver) onDeliver(confirmDeliver.column, confirmDeliver.scheduledAt); setConfirmDeliver(null) }}
         onCancel={() => setConfirmDeliver(null)}
       />
@@ -542,88 +817,143 @@ function ColumnsPanel({
   )
 }
 
-function PetsPanel({ pets, metrics, coupon, friends, petDraft, onPetDraftChange, onAddPet, onDeletePet, onCouponChange, onSaveCoupon, savingCoupon }: {
-  pets: NenPetProfile[]
-  metrics: NenPetMetrics | null
-  coupon: NenCoupon
-  friends: Array<{ id: string; displayName: string | null }>
-  petDraft: { friendId: string; name: string; animalType: string; gender: string; birthday: string }
-  onPetDraftChange: (draft: { friendId: string; name: string; animalType: string; gender: string; birthday: string }) => void
-  onAddPet: () => void
-  onDeletePet: (pet: NenPetProfile) => void
-  onCouponChange: (coupon: NenCoupon) => void
-  onSaveCoupon: () => void
-  savingCoupon: boolean
-}) {
-  const [previewPetId, setPreviewPetId] = useState<string | null>(null)
-  /* ペットの登録外しは確認なしのワンクリックにしない(点検 #512 の中9)。 */
-  const [confirmPet, setConfirmPet] = useState<NenPetProfile | null>(null)
-  const previewPet = pets.find((pet) => pet.id === previewPetId) ?? pets.find((pet) => pet.birthday) ?? pets[0]
-  const missingBirthday = metrics?.summary.birthdayMissing
-  return (
-    <>
-      <NoteBar>名前と誕生日は、答えてくれた方のペット情報だけを使います。誕生日は3日前の10:00に送ります。</NoteBar>
-      <section className="rounded-v6-card border border-hairline bg-canvas p-4 shadow-v6-card"><h2 className="text-base font-bold text-ink">誕生日クーポンの決めごと</h2><div className="mt-4 grid gap-3 md:grid-cols-6"><ReadOnlyField label="いつ送るか" value="誕生日の3日前" /><ReadOnlyField label="時刻" value="10:00" /><NumberField label="割引の額（円）" value={coupon.discountAmount} onChange={(value) => onCouponChange({ ...coupon, discountAmount: value })} /><NumberField label="使える日数" value={coupon.validityDays} onChange={(value) => onCouponChange({ ...coupon, validityDays: value })} /><label className="text-xs font-bold text-ink">クーポンの頭の文字<input value={coupon.codePrefix} onChange={(event) => onCouponChange({ ...coupon, codePrefix: event.target.value.toUpperCase() })} className="mt-2 block w-full rounded-v6-control border border-hairline px-3 py-2 text-sm" /></label><label className="text-xs font-bold text-ink">2月29日生まれの子<span className="mt-2 block"><SelectField value={coupon.leapYearPolicy} onChange={(event) => onCouponChange({ ...coupon, leapYearPolicy: event.target.value as NenCoupon['leapYearPolicy'] })} aria-label="2月29日生まれの子への平年の扱い" options={[{ value: 'feb28', label: '2月28日に送る' }, { value: 'mar1', label: '3月1日に送る' }, { value: 'skip', label: 'その年は送らない' }]} /></span></label></div><div className="mt-3 flex justify-end"><Button variant="primary" onClick={onSaveCoupon} disabled={savingCoupon}>{savingCoupon ? '保存中...' : '設定を保存'}</Button></div></section>
-      <div className="grid gap-4 xl:grid-cols-3">
-        <section className="overflow-hidden rounded-v6-card border border-hairline bg-canvas shadow-v6-card xl:col-span-2"><div className="flex flex-wrap items-end justify-between gap-3 border-b border-hairline p-4"><div><h2 className="text-base font-bold text-ink">登録してもらったペット</h2><p className="mt-1 text-xs text-ink-faint">名前は配信に差し込まれます。まちがいがあると、そのまま届きます。</p></div><details><summary className="cursor-pointer text-sm font-bold text-v6-action">ペット情報を登録</summary><div className="mt-3 grid gap-2 sm:grid-cols-2"><SelectField value={petDraft.friendId} onChange={(event) => onPetDraftChange({ ...petDraft, friendId: event.target.value })} aria-label="ペット情報を登録するLINEユーザー" options={[{ value: '', label: 'LINEユーザーを選択' }, ...friends.map((friend) => ({ value: friend.id, label: friend.displayName || '名前未取得' }))]} /><input aria-label="ペットの名前" placeholder="ペットの名前" value={petDraft.name} onChange={(event) => onPetDraftChange({ ...petDraft, name: event.target.value })} className="rounded-v6-control border border-hairline px-3 py-2 text-sm" /><input aria-label="ペットの誕生日" type="date" value={petDraft.birthday} onChange={(event) => onPetDraftChange({ ...petDraft, birthday: event.target.value })} className="rounded-v6-control border border-hairline px-3 py-2 text-sm" /><Button variant="primary" onClick={onAddPet}>登録する</Button></div></details></div>{pets.length === 0 ? <ListState kind="empty" title="ペットはまだ登録されていません" description="聞きとりフォームか、この画面から登録してください。" /> : <table className="w-full table-fixed text-sm"><thead className="bg-surface-muted text-left text-xs text-ink-faint"><TableHeadRow><Th style={{ width: '23%' }}>ペット</Th><Th style={{ width: '17%' }}>飼い主</Th><Th style={{ width: '12%' }}>誕生日</Th><Th style={{ width: '22%' }}>次の配信・履歴</Th><Th style={{ width: '26%' }}>操作</Th></TableHeadRow></thead><tbody>{pets.map((pet) => { const metric = metrics?.pets.find((candidate) => candidate.id === pet.id); return <tr key={pet.id}><td className="border-t border-hairline px-3 py-3"><p className="font-bold text-ink">{pet.name}</p><p className="text-xs text-ink-faint">{petTypeLabel(pet.animalType)} ／ {metric?.breed || '品種未登録'}{petAge(pet.birthday)}</p></td><td className="border-t border-hairline px-3 py-3 text-ink-secondary">{metric?.ownerName || pet.ownerName || '名前未取得'}</td><td className="border-t border-hairline px-3 py-3 font-semibold text-ink">{petBirthdayLabel(pet.birthday)}</td><td className="border-t border-hairline px-3 py-3 text-ink-secondary"><p>{nextBirthdayLabel(pet.birthday)}</p><p className="mt-1 text-xs text-ink-faint">この30日の配信 {metric?.ownerDeliveryHistory.count ?? '—'}回</p></td><td className="border-t border-hairline px-3 py-3"><div className="flex flex-wrap justify-end gap-2"><Button onClick={() => { setPreviewPetId(pet.id); document.getElementById('nen-pet-preview')?.scrollIntoView({ behavior: 'smooth' }) }}>中身を見る</Button><Button href={`/friends/detail?id=${encodeURIComponent(pet.friendId)}`}>飼い主を見る</Button><Button onClick={() => setConfirmPet(pet)}>登録を外す</Button></div></td></tr> })}</tbody></table>}</section>
-      <ConfirmDialog
-        open={confirmPet !== null}
-        title={`「${confirmPet?.name ?? ''}」の登録を外しますか？`}
-        description="誕生日配信の対象から外れます。この操作は取り消せません。"
-        confirmLabel="外す"
-        destructive
-        onConfirm={() => { if (confirmPet) onDeletePet(confirmPet); setConfirmPet(null) }}
-        onCancel={() => setConfirmPet(null)}
-      />
-        <aside id="nen-pet-preview" className="flex flex-col gap-4"><section className="rounded-v6-card border border-hairline bg-canvas p-4 shadow-v6-card"><h2 className="text-sm font-bold text-ink">{previewPet ? `${previewPet.name}にはこう届きます` : 'LINEプレビュー'}</h2><div className="mt-3 rounded-v6-card bg-info-bg p-4"><p className="text-center text-xs font-bold text-ink-secondary">LINEプレビュー</p><p className="mt-3 text-center text-xs font-bold text-ink-secondary">誕生日の3日前 10:00 に届きます</p><div className="mt-3 rounded-v6-control bg-canvas p-4"><p className="text-sm font-bold leading-6 text-ink">{previewPet ? `${previewPet.name}、もうすぐお誕生日ですね。おめでとうございます。` : 'ペットを登録すると文面を確認できます。'}</p><p className="mt-2 text-sm leading-6 text-ink-secondary">お祝いに{coupon.discountAmount.toLocaleString('ja-JP')}円ぶんのクーポンをお送りします。{coupon.validityDays}日間お使いいただけます。</p><p className="mt-3 rounded-v6-control bg-v6-action py-2 text-center text-sm font-bold text-on-accent">クーポンを受け取る</p></div></div></section><section className="rounded-v6-card border border-warning bg-warning-bg p-4"><h2 className="text-sm font-bold text-warning">手を入れたほうがよいところ</h2><p className="mt-3 text-sm font-bold text-warning">誕生日が入っていない子が {missingBirthday ?? '—'}匹</p><p className="mt-1 text-xs leading-5 text-ink-secondary">名前だけ登録されています。もう一度お願いを出せます。</p><p className="mt-3 text-sm font-bold text-warning">ペット未登録の友だちが {metrics?.summary.friendsWithoutPet ?? '—'}人</p><p className="mt-1 text-xs leading-5 text-ink-secondary">選択中のLINEアカウントの友だちと照合した人数です。</p></section><FeatureLinkCard items={[{ label: '回答フォーム', note: 'ペットのご紹介（聞きとり）', href: '/form-submissions' }, { label: '友だち属性', note: 'ペットの名前・誕生日', href: '/tags?tab=fields' }, { label: 'テンプレート', note: '誕生日クーポンの文面', href: '/templates' }, { label: 'コンバージョン', note: 'クーポンが使われた記録', href: '/conversions' }, { label: 'NEN配信', note: '記念日の配信', href: '/nen-campaigns' }]} /></aside>
-      </div>
-    </>
-  )
-}
+/* ───────────── 送った履歴 ───────────── */
 
-function HistoryPanel({ deliveryList, detail, onShowDetail, onRetry, onChangeView }: {
+type HistoryFilter = 'all' | 'sent' | 'pending' | 'failed' | 'skipped'
+
+function HistoryPanel({ deliveryList, detail, loading, onShowDetail, onRetry, onChangeView }: {
   deliveryList: NenDeliveryList | null
   detail: NenDeliveryDetail | null
+  loading: boolean
   onShowDetail: (id: string) => void
   onRetry: (id: string, version: number, reason: string) => void
   onChangeView: (status?: string, cursor?: string) => void
 }) {
   const [search, setSearch] = useState('')
-  const [filter, setFilter] = useState<'all' | 'sent' | 'pending' | 'failed' | 'skipped'>('all')
+  const [filter, setFilter] = useState<HistoryFilter>('all')
   const [retryReasons, setRetryReasons] = useState<Record<string, string>>({})
-  const deliveries = deliveryList?.deliveries ?? []
-  const shown = useMemo(() => deliveries.filter((delivery) => {
-    const matches = `${delivery.friendName ?? ''} ${delivery.label}`.toLowerCase().includes(search.toLowerCase())
-    return matches
-  }), [deliveries, search])
+  const deliveries = useMemo(() => deliveryList?.deliveries ?? [], [deliveryList])
+  const shown = useMemo(() => deliveries.filter((delivery) => `${delivery.friendName ?? ''} ${delivery.label}`.toLowerCase().includes(search.trim().toLowerCase())), [deliveries, search])
   const summary = deliveryList?.summary
   const cursor = Number(deliveryList?.pagination.cursor ?? 0)
   const limit = deliveryList?.pagination.limit ?? 20
-  const rangeLabel = deliveryList ? `この${deliveryList.range.days}日（${shortDate(deliveryList.range.from)}〜${shortDate(deliveryList.range.to)}）` : 'この30日'
+  const rangeLabel = deliveryList?.range ? `この${deliveryList.range.days}日（${jstShortDate(deliveryList.range.from)}〜${jstShortDate(deliveryList.range.to)}）` : 'この30日'
+  const undeliveredDetail = summary
+    ? [`ブロック ${summary.unmetReasons?.blocked ?? 0}・退会 ${summary.unmetReasons?.unfollowed ?? 0}・その他 ${summary.unmetReasons?.other ?? 0}`, skippedReasonsDetail(summary.skippedReasons as Record<string, number> | undefined)].filter(Boolean).join(' ／ ')
+    : null
+
   return (
     <>
-      <NoteBar>いつ・だれに・何を送ったかの記録です。届かなかったものもここで分かります。</NoteBar>
-      <div className="flex flex-wrap items-center justify-between gap-3"><div className="w-full" style={{ maxWidth: 460 }}><SearchField value={search} onChange={setSearch} onClear={() => setSearch('')} placeholder="友だちの名前・配信の名前で検索" /></div><div className="flex gap-2"><span className="rounded-v6-control border border-hairline bg-canvas px-3 py-2 text-sm text-ink-secondary">{rangeLabel}</span><span className="rounded-v6-control border border-hairline bg-canvas px-3 py-2 text-sm text-ink-secondary">{limit}件表示</span></div></div>
+      <div data-design="Note" data-design-node="nen-history-note">
+        <NoteBar tone="info">いつ・だれに・何を送ったかの記録です。届かなかったものもここで分かります。{undeliveredDetail ? ` ${undeliveredDetail}。` : ''}</NoteBar>
+      </div>
+
+      <div data-design="ListControls" data-design-node="nen-history-controls" className="flex flex-wrap items-center gap-3">
+        <div className="min-w-64 flex-1">
+          <TextField aria-label="友だちの名前・配信の名前で検索" placeholder="友だちの名前・配信の名前で検索" value={search} onChange={(event) => setSearch(event.target.value)} />
+        </div>
+        <span className="text-caption text-ink-faint">{rangeLabel}・送った日が新しい順</span>
+      </div>
       {/* #727: チップに出ている数を押したら、その数だけ並ぶ。failed と skipped は
           どちらも溜まり続け運用者のやることが違うため別チップで単一状態ずつ絞る。
           「これから」は processing がごく短い一時状態でそこだけ見る場面がないため、
           チップは1つのまま pending,processing の複数状態で絞る。 */}
-      <div className="flex flex-wrap gap-2">{[
-        ['all', `すべて ${deliveryList?.pagination.total ?? '—'}`],
-        ['sent', `送りました ${summary?.sent ?? '—'}`],
-        ['pending', `これから ${summary ? summary.pending + summary.processing : '—'}`],
-        ['failed', `届きませんでした ${summary?.failed ?? '—'}`],
-        ['skipped', `送りませんでした ${summary?.skipped ?? '—'}`],
-      ].map(([value, label]) => <FilterChip key={value} selected={filter === value} onChange={(selected) => { const next = selected ? value as typeof filter : 'all'; setFilter(next); onChangeView(deliveryViewStatus(next)) }}>{label}</FilterChip>)}<span className="rounded-v6-control border border-hairline bg-canvas px-3 py-2 text-sm text-ink-secondary">送った日が新しい順</span></div>
-      {shown.length === 0 ? <ListState kind="empty" title="配信履歴はまだありません" description="配信が予約されると、送信前からここに記録が並びます。" /> : <section className="overflow-hidden rounded-v6-card border border-hairline bg-canvas shadow-v6-card"><table className="w-full table-fixed text-sm"><thead className="bg-surface-muted text-left text-xs text-ink-faint"><TableHeadRow><Th style={{ width: '24%' }}>いつ・だれに</Th><Th style={{ width: '18%' }}>配信</Th><Th style={{ width: '18%' }}>状態</Th><Th style={{ width: '15%' }}>きっかけ</Th><Th style={{ width: '12%' }}>到達率・クリック率</Th><Th style={{ width: '13%' }}>操作</Th></TableHeadRow></thead><tbody>{shown.map((delivery) => <Fragment key={delivery.id}><tr><td className="border-t border-hairline px-3 py-3"><p className="font-bold text-ink">{formatNenJobDateTime(delivery.sentAt || delivery.scheduledAt)} ／ {delivery.friendName || '名前未取得'}</p><p className="mt-1 text-xs text-ink-faint">{delivery.lineAccountName}</p></td><td className="border-t border-hairline px-3 py-3 text-ink">{delivery.label}</td><td className="border-t border-hairline px-3 py-3"><p className="font-semibold text-ink">{statusLabel[delivery.status] ?? '状態を確認できません'}</p>{delivery.unmetReason ? <p className="mt-1 text-xs text-danger">{delivery.unmetReason}</p> : null}</td><td className="border-t border-hairline px-3 py-3 text-xs text-ink-faint">{deliveryTriggerLabel(delivery.campaignKey)}</td><td className="border-t border-hairline px-3 py-3 text-xs text-ink-faint" title={delivery.reaction.reason}>取得不可</td><td className="border-t border-hairline px-3 py-3"><Button onClick={() => onShowDetail(delivery.id)}>{detail?.id === delivery.id ? '閉じる' : '中身を見る'}</Button></td></tr>{detail?.id === delivery.id ? <tr><td colSpan={6} className="border-t border-hairline bg-surface-muted p-4"><div className="grid gap-4 lg:grid-cols-3"><div className="lg:col-span-2"><p className="text-xs font-bold text-ink-faint">{detail.trigger}</p><h3 className="mt-1 font-bold text-ink">{detail.content.title || detail.label}</h3><p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-ink-secondary">{detail.content.bodyText || detail.content.reason}</p>{detail.content.buttonLabel ? <p className="mt-2 text-sm font-bold text-v6-action">{detail.content.buttonLabel}</p> : null}</div>{canRetryDelivery(delivery) ? <div><label className="text-xs font-bold text-ink">再送する理由（500文字まで）<textarea value={retryReasons[delivery.id] ?? ''} onChange={(event) => setRetryReasons((current) => ({ ...current, [delivery.id]: event.target.value }))} rows={3} maxLength={500} className="mt-2 block w-full rounded-v6-control border border-hairline bg-canvas px-3 py-2 text-sm" /></label><Button variant="primary" disabled={!(retryReasons[delivery.id] ?? '').trim()} onClick={() => onRetry(delivery.id, delivery.version, retryReasons[delivery.id] ?? '')}>再送待ちへ戻す</Button></div> : delivery.status === 'skipped' ? <p className="text-xs text-ink-faint">{skippedNoRetryNote[delivery.unmetReasonCode ?? ''] ?? 'この記録は再送できません。'}</p> : <p className="text-xs text-ink-faint">再送は最大回数まで失敗した記録と、直せる理由で止まった記録だけ行えます。</p>}</div></td></tr> : null}</Fragment>)}</tbody></table></section>}
-      <p className="text-xs text-ink-faint">記録 {deliveryList?.pagination.total ?? 0}件中 {shown.length === 0 ? 0 : cursor + 1}〜{cursor + shown.length}件を表示</p>
-      {deliveryList && (cursor > 0 || deliveryList.pagination.nextCursor) ? <div className="flex justify-end gap-2" aria-label="配信履歴のページ送り"><Button disabled={cursor === 0} onClick={() => onChangeView(deliveryViewStatus(filter), String(Math.max(0, cursor - limit)))}>前へ</Button><Button disabled={!deliveryList.pagination.nextCursor} onClick={() => onChangeView(deliveryViewStatus(filter), deliveryList.pagination.nextCursor ?? undefined)}>次へ</Button></div> : null}
+      <div className="flex flex-wrap gap-2">
+        {([
+          ['all', `すべて ${deliveryList?.pagination.total ?? '—'}`],
+          ['sent', `送りました ${summary?.sent ?? '—'}`],
+          ['pending', `これから ${summary ? summary.pending + summary.processing : '—'}`],
+          ['failed', `届きませんでした ${summary?.failed ?? '—'}`],
+          ['skipped', `送りませんでした ${summary?.skipped ?? '—'}`],
+        ] as Array<[HistoryFilter, string]>).map(([value, label]) => (
+          <FilterChip key={value} selected={filter === value} onChange={(selected) => { const next = selected ? value : 'all'; setFilter(next); onChangeView(deliveryViewStatus(next)) }}>{label}</FilterChip>
+        ))}
+      </div>
+
+      <section data-design="Table" data-design-node="nen-history-table">
+        {loading && !deliveryList ? (
+          <ListState kind="loading" title="送った履歴を読み込んでいます" />
+        ) : shown.length === 0 ? (
+          <ListState kind="empty" emptyPreset="readonly" title="送った履歴はまだありません" description="配信が予約されると、送信前からここに記録が並びます。" />
+        ) : (
+          <DataTable>
+            <thead>
+              <TableHeadRow>
+                <Th className="w-64">いつ・だれに</Th>
+                <Th>配信</Th>
+                <Th className="w-48">状態</Th>
+                <Th className="w-36">きっかけ</Th>
+                <Th className="w-20" align="right">開封</Th>
+                <Th className="w-24" align="right"><span className="sr-only">操作</span></Th>
+              </TableHeadRow>
+            </thead>
+            <tbody>
+              {shown.map((delivery) => (
+                <Fragment key={delivery.id}>
+                  <Tr>
+                    <Td>
+                      <span className="block text-label font-semibold text-ink">{formatNenJobDateTime(delivery.sentAt || delivery.scheduledAt)}</span>
+                      <span className="block truncate text-micro text-ink-faint">{delivery.friendName || '名前未取得'}・{delivery.lineAccountName}</span>
+                    </Td>
+                    <Td><span className="text-label text-ink">{delivery.label}</span></Td>
+                    <Td>
+                      <span className="block text-label font-semibold text-ink">{statusLabel[delivery.status] ?? '状態を確認できません'}</span>
+                      {delivery.unmetReason ? <span className="block text-micro text-danger">{delivery.unmetReason}</span> : null}
+                    </Td>
+                    <Td><span className="text-label text-ink-secondary">{deliveryTriggerLabel(delivery.campaignKey)}</span></Td>
+                    <Td align="right"><span className="text-label text-ink-faint" title={delivery.reaction.reason}>取得不可</span></Td>
+                    <Td align="right">
+                      <button type="button" onClick={() => onShowDetail(delivery.id)} className="text-label font-semibold text-accent-deep">{detail?.id === delivery.id ? '閉じる' : '中身を見る'}</button>
+                    </Td>
+                  </Tr>
+                  {detail?.id === delivery.id ? (
+                    <tr>
+                      <td colSpan={6} className="border-t border-hairline bg-canvas-sunken p-4">
+                        <div className="grid gap-4 lg:grid-cols-3">
+                          <div className="lg:col-span-2">
+                            <p className="text-micro font-bold text-ink-faint">{detail.trigger}</p>
+                            <h3 className="mt-1 text-label font-bold text-ink">{detail.content.title || detail.label}</h3>
+                            <p className="mt-2 whitespace-pre-wrap text-caption leading-6 text-ink-secondary">{detail.content.bodyText || detail.content.reason}</p>
+                            {detail.content.buttonLabel ? <p className="mt-2 text-caption font-bold text-accent-deep">{detail.content.buttonLabel}</p> : null}
+                          </div>
+                          {canRetryDelivery(delivery) ? (
+                            <div className="flex flex-col gap-2">
+                              <label className="flex flex-col gap-1 text-caption font-bold text-ink">
+                                再送する理由（500文字まで）
+                                <TextArea value={retryReasons[delivery.id] ?? ''} onChange={(event) => setRetryReasons((current) => ({ ...current, [delivery.id]: event.target.value }))} rows={3} maxLength={500} />
+                              </label>
+                              <Button type="button" variant="primary" disabled={!(retryReasons[delivery.id] ?? '').trim()} onClick={() => onRetry(delivery.id, delivery.version, retryReasons[delivery.id] ?? '')}>再送待ちへ戻す</Button>
+                            </div>
+                          ) : delivery.status === 'skipped' ? (
+                            <p className="text-micro text-ink-faint">{skippedNoRetryNote[delivery.unmetReasonCode ?? ''] ?? 'この記録は再送できません。'}</p>
+                          ) : (
+                            <p className="text-micro text-ink-faint">再送は最大回数まで失敗した記録と、直せる理由で止まった記録だけ行えます。</p>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ) : null}
+                </Fragment>
+              ))}
+            </tbody>
+          </DataTable>
+        )}
+      </section>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="text-caption text-ink-faint">記録 {deliveryList?.pagination.total ?? 0}件中 {shown.length === 0 ? 0 : cursor + 1}〜{cursor + shown.length}件を表示</p>
+        {deliveryList && (cursor > 0 || deliveryList.pagination.nextCursor) ? (
+          <div className="flex gap-2" aria-label="送った履歴のページ送り">
+            <Button type="button" disabled={cursor === 0} onClick={() => onChangeView(deliveryViewStatus(filter), String(Math.max(0, cursor - limit)))}>前へ</Button>
+            <Button type="button" disabled={!deliveryList.pagination.nextCursor} onClick={() => onChangeView(deliveryViewStatus(filter), deliveryList.pagination.nextCursor ?? undefined)}>次へ</Button>
+          </div>
+        ) : null}
+      </div>
     </>
   )
 }
 
 // #727: チップの選択を配信状態の絞り込み文字列へ変える。「これから」だけ複数状態。
-function deliveryViewStatus(filter: 'all' | 'sent' | 'pending' | 'failed' | 'skipped'): string | undefined {
+function deliveryViewStatus(filter: HistoryFilter): string | undefined {
   if (filter === 'all') return undefined
   if (filter === 'pending') return 'pending,processing'
   return filter
@@ -635,60 +965,4 @@ function deliveryTriggerLabel(campaignKey: string) {
     review_request: '発送後の口コミ依頼', cross_sell: '発送後のご案内', column: 'コラムの予約', birthday_coupon: 'ペットの誕生日',
   }
   return labels[campaignKey] ?? '配信の決めごと'
-}
-
-function shortDate(value: string) {
-  const date = new Date(value)
-  return Number.isNaN(date.getTime()) ? '日時不明' : new Intl.DateTimeFormat('ja-JP', { month: 'numeric', day: 'numeric', timeZone: 'Asia/Tokyo' }).format(date)
-}
-
-function ReadOnlyField({ label, value }: { label: string; value: string }) {
-  return <label className="text-xs font-bold text-ink">{label}<input value={value} readOnly className="mt-2 block w-full rounded-v6-control border border-hairline bg-surface-muted px-3 py-2 text-sm text-ink" /></label>
-}
-
-function NumberField({ label, value, onChange }: { label: string; value: number; onChange: (value: number) => void }) {
-  return <label className="text-xs font-bold text-ink">{label}<input type="number" min={1} value={value} onChange={(event) => onChange(Number(event.target.value))} className="mt-2 block w-full rounded-v6-control border border-hairline px-3 py-2 text-sm text-ink" /></label>
-}
-
-function columnDeliveryDate(column: NenColumn) {
-  if (column.deliveryStatus === 'draft') return '下書き'
-  const source = column.deliveryAt || column.publishedAt
-  if (!source) return columnStatusLabel[column.deliveryStatus]
-  const date = new Date(source)
-  return Number.isNaN(date.getTime()) ? '日時を確認できません' : new Intl.DateTimeFormat('ja-JP', { month: 'numeric', day: 'numeric', timeZone: 'Asia/Tokyo' }).format(date)
-}
-
-function columnMetricDate(value: string | null) {
-  if (!value) return '日時未定'
-  const date = new Date(value)
-  return Number.isNaN(date.getTime()) ? '日時を確認できません' : new Intl.DateTimeFormat('ja-JP', { month: 'numeric', day: 'numeric', timeZone: 'Asia/Tokyo' }).format(date)
-}
-
-function petTypeLabel(type: NenPetProfile['animalType']) {
-  return type === 'dog' ? '犬' : type === 'cat' ? '猫' : 'その他'
-}
-
-function petAge(birthday: string | null) {
-  if (!birthday || !/^\d{4}-\d{2}-\d{2}$/.test(birthday)) return ''
-  const born = new Date(`${birthday}T00:00:00+09:00`)
-  if (Number.isNaN(born.getTime())) return ''
-  const now = new Date()
-  let age = now.getFullYear() - born.getFullYear()
-  if (now.getMonth() < born.getMonth() || (now.getMonth() === born.getMonth() && now.getDate() < born.getDate())) age -= 1
-  return age >= 0 ? ` ${age}歳` : ''
-}
-
-function petBirthdayLabel(birthday: string | null) {
-  if (!birthday || !/^\d{4}-\d{2}-\d{2}$/.test(birthday)) return '未登録'
-  return `${Number(birthday.slice(5, 7))}/${Number(birthday.slice(8, 10))}`
-}
-
-function nextBirthdayLabel(birthday: string | null) {
-  if (!birthday || !/^\d{4}-\d{2}-\d{2}$/.test(birthday)) return '送れません'
-  const now = new Date()
-  const month = Number(birthday.slice(5, 7))
-  const day = Number(birthday.slice(8, 10))
-  const delivery = new Date(now.getFullYear(), month - 1, day - 3)
-  if (delivery.getTime() < now.getTime()) delivery.setFullYear(delivery.getFullYear() + 1)
-  return `${delivery.getMonth() + 1}/${delivery.getDate()} に誕生日クーポン`
 }

@@ -21,15 +21,14 @@ describe('NEN配信のテスト送信先', () => {
     expect(editor).toContain('accountId: selectedAccountId ?? undefined');
   });
 
-  test('設定・履歴・コラム・ペット・クーポンを選択中LINEアカウントへ限定する', () => {
+  test('設定・履歴・コラム・実績・クーポンを選択中LINEアカウントへ限定する', () => {
     expect(page).toContain('api.nenCampaigns.settings(selectedAccountId)');
     expect(page).toContain('api.nenCampaigns.deliveries(selectedAccountId, { limit: 20 })');
-    expect(page).toContain('api.nenCampaigns.flowMetrics(selectedAccountId)');
-    expect(page).toContain('api.nenCampaigns.columnMetrics(selectedAccountId, 90)');
-    expect(page).toContain('api.nenCampaigns.petMetrics(selectedAccountId)');
+    expect(page).toContain('api.nenCampaigns.flowMetrics(selectedAccountId, { from: thisMonth.from, to: thisMonth.to })');
+    expect(page).toContain('api.nenCampaigns.columnMetrics(selectedAccountId, { from: thisMonth.from, to: thisMonth.to })');
     expect(page).toContain('api.nenCampaigns.columns(selectedAccountId)');
-    expect(page).toContain('api.nenCampaigns.pets(selectedAccountId)');
     expect(page).toContain('api.nenCampaigns.birthdayCoupon(selectedAccountId)');
+    expect(page).toContain('api.nenCampaigns.columnAudience(selectedAccountId, selectedColumn.targetMode, selectedColumn.targetTagId)');
     expect(editor).toContain('api.nenCampaigns.settings(selectedAccountId)');
     expect(api).toContain('lineAccountId=${encodeURIComponent(accountId)}');
   });
@@ -47,8 +46,8 @@ describe('NEN配信のテスト送信先', () => {
   });
 
   test('取得済みの失敗・待機件数を表示し、配信日時を日本時間へ変える', () => {
-    expect(overview).toContain('deliveryList.summary.pending + deliveryList.summary.processing');
-    expect(overview).toContain('deliveryList.summary.failed + deliveryList.summary.skipped');
+    expect(overview).toContain('summary.pending + summary.processing');
+    expect(page).toContain('undelivered: thisMonthRes.data.summary.failed');
     expect(overview).toContain('formatNenJobDateTime(delivery.sentAt || delivery.scheduledAt)');
     expect(overview).not.toContain('予定：{delivery.scheduledAt}');
   });

@@ -55,3 +55,27 @@ export function formatNenJobDateTime(value: string): string {
     timeZone: 'Asia/Tokyo',
   })
 }
+
+/*
+ * ★V6 37-6（`z4q1K`）「対象」列。だれに届く配信かを、実キーごとに運用の言葉で示す。
+ * 実キーは上と同じ5つ。増えたらここも手で揃える。
+ */
+const audienceByCampaign: Record<string, string> = {
+  arrival_check: '注文した会員',
+  review_request: '注文した会員',
+  cross_sell: '注文した会員',
+  column: '友だち 全員',
+  birthday_coupon: '誕生日を登録したペットの飼い主',
+}
+
+export function formatCampaignAudience(setting: Pick<NenCampaignSetting, 'campaignKey' | 'category'>): string {
+  return audienceByCampaign[setting.campaignKey] ?? (setting.category === 'birthday' ? 'ペットを登録した会員' : '注文した会員')
+}
+
+/** ★V6 37-6 「きっかけ」の絞り込み。実キーの category を運用の言葉にする。 */
+export const campaignTriggerLabel: Record<NenCampaignSetting['category'], string> = {
+  transactional: '注文・発送',
+  follow_up: '注文のあと',
+  column: 'コラム',
+  birthday: 'ペットの誕生日',
+}

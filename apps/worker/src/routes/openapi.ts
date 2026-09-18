@@ -2000,6 +2000,8 @@ const spec = {
         parameters: [
           { name: 'lineAccountId', in: 'query', required: true, schema: { type: 'string' } },
           { name: 'days', in: 'query', schema: { type: 'integer', minimum: 1, maximum: 365, default: 30 } },
+          { name: 'from', in: 'query', description: 'to と両方指定で days の代わりに期間を決める（ISO 8601）', schema: { type: 'string', format: 'date-time' } },
+          { name: 'to', in: 'query', schema: { type: 'string', format: 'date-time' } },
         ],
         responses: { '200': { description: 'Flow metrics' }, '403': { description: 'Account access denied' } },
       },
@@ -2012,6 +2014,8 @@ const spec = {
         parameters: [
           { name: 'lineAccountId', in: 'query', required: true, schema: { type: 'string' } },
           { name: 'days', in: 'query', schema: { type: 'integer', minimum: 1, maximum: 365, default: 30 } },
+          { name: 'from', in: 'query', description: 'to と両方指定で days の代わりに期間を決める（ISO 8601）', schema: { type: 'string', format: 'date-time' } },
+          { name: 'to', in: 'query', schema: { type: 'string', format: 'date-time' } },
         ],
         responses: { '200': { description: 'Column metrics' }, '403': { description: 'Account access denied' } },
       },
