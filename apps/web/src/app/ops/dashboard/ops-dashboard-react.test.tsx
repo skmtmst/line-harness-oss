@@ -3,7 +3,8 @@ import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import OpsDashboardPage, { deltaLabel, minutesLabel } from './page'
+import OpsDashboardPage from './page'
+import { deltaLabel, minutesLabel } from './format'
 import { formatBytes, formatYenShort, niceCeiling } from '@/components/ops/ops-charts'
 
 vi.mock('next/link', () => ({ default: ({ children, href }: { children: React.ReactNode; href: string }) => <a href={href}>{children}</a> }))
