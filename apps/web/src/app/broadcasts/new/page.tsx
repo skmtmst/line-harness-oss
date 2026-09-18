@@ -118,7 +118,8 @@ function NewBroadcastPageContent() {
       })
       .catch((err: unknown) => {
         if (cancelled) return
-        if (err instanceof ApiError) setAudienceError(err.status === 410 ? 'expired' : 'missing')
+        if (err instanceof ApiError && err.status === 410) setAudienceError('expired')
+        else if (err instanceof ApiError && (err.status === 404 || err.status === 400)) setAudienceError('missing')
         else setAudienceError('error')
       })
     return () => {
