@@ -7,7 +7,7 @@ import Pagination from '@/components/shared/pagination'
 import ListState from '@/components/shared/list-state'
 import FriendListRow from './friend-list-row'
 
-export type FriendListColumn = 'support' | 'scenario' | 'latest' | 'tags' | 'last'
+export type FriendListColumn = 'support' | 'scenario' | 'latest' | 'tags' | 'source' | 'last'
 
 interface Props {
   friends: FriendListItem[]
@@ -33,6 +33,9 @@ const COLUMN_LABELS: Array<{ key: FriendListColumn; label: string }> = [
   { key: 'scenario', label: 'シナリオ' },
   { key: 'latest', label: '最新メッセージ' },
   { key: 'tags', label: 'タグ・属性' },
+  // N-038: 流入元は追加時に一度だけ付く計測値。一覧に列が無く、
+  // どの施策から来た人か一覧では読めなかった。
+  { key: 'source', label: '流入元' },
   { key: 'last', label: '最終接触' },
 ]
 
@@ -95,6 +98,7 @@ export default function FriendListTable({
     visible.has('scenario') ? 'minmax(85px,.65fr)' : null,
     visible.has('latest') ? 'minmax(150px,1.45fr)' : null,
     visible.has('tags') ? 'minmax(150px,1.35fr)' : null,
+    visible.has('source') ? 'minmax(110px,.8fr)' : null,
     visible.has('last') ? '90px' : null,
   ].filter(Boolean).join(' '), [visible])
 
@@ -176,6 +180,7 @@ export default function FriendListTable({
         {visible.has('scenario') ? <div className="truncate" data-column="scenario">シナリオ</div> : null}
         {visible.has('latest') ? <div className="truncate">最新メッセージ</div> : null}
         {visible.has('tags') ? <div className="truncate">タグ・属性</div> : null}
+        {visible.has('source') ? <div className="truncate" data-column="source">流入元</div> : null}
         {visible.has('last') ? <div className="truncate text-center">最終接触</div> : null}
       </div>
 

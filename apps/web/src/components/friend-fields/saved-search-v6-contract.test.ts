@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest'
 const root = process.cwd()
 const editPage = readFileSync(resolve(root, 'src/app/tags/searches/edit/page.tsx'), 'utf8')
 const friendsPage = readFileSync(resolve(root, 'src/app/friends/page.tsx'), 'utf8')
+  + readFileSync(resolve(root, 'src/components/friends/saved-search-dialog.tsx'), 'utf8')
 const advanced = readFileSync(resolve(root, 'src/components/friends/advanced-search-dialog.tsx'), 'utf8')
 const list = readFileSync(resolve(root, 'src/components/friend-fields/saved-search-list.tsx'), 'utf8')
 

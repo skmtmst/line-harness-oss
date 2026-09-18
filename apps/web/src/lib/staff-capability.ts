@@ -18,8 +18,13 @@ function readKeys(storageKey: string): string[] {
 
 /** owner/admin は全通過。staff は保存済みキーで判定する。 */
 function isPrivilegedRole(): boolean {
-  const role = window.localStorage.getItem('lh_staff_role');
-  return role === 'owner' || role === 'admin';
+  try {
+    const role = window.localStorage.getItem('lh_staff_role');
+    return role === 'owner' || role === 'admin';
+  } catch {
+    // localStorage が使えない環境（プライベート窓・試験環境）では fail-closed。
+    return false;
+  }
 }
 
 /**
