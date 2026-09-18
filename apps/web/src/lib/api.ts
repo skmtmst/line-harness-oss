@@ -1590,6 +1590,18 @@ export type AnalyticsUsageOverview = AnalyticsEnvelope<{
     brokenReferences: AnalyticsMetric<number>
     lastUsedAt: AnalyticsMetric<string>
   }>
+  /**
+   * 全任意機能の利用状況（N-448）。共有カタログの featureId で機械照合する。
+   * 計測できる機能は直近90日の回数（または現在の利用数）と最終利用を持ち、
+   * 計測できない機能は activity/lastUsedAt が未取得＋理由を持つ。
+   */
+  features: Array<{
+    featureId: string
+    activityUnit: string | null
+    activityBasis: 'last90days' | 'current' | null
+    activity: AnalyticsMetric<number>
+    lastUsedAt: AnalyticsMetric<string>
+  }>
 }>
 
 export type AnalyticsUrlClicksOverview = AnalyticsEnvelope<{
