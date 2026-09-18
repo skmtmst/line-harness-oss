@@ -169,7 +169,7 @@ export default function MediaPickerDialog({
         ) : (
           <>
             <ul
-              className="border-hairline rounded-control max-h-72 divide-y divide-[var(--color-hairline)] overflow-y-auto border"
+              className="border-hairline rounded-control max-h-72 divide-y divide-hairline overflow-y-auto border"
               role="listbox"
               aria-label="メディア候補"
             >
@@ -189,7 +189,7 @@ export default function MediaPickerDialog({
                         className="border-hairline h-10 w-10 shrink-0 rounded-control border object-cover"
                       />
                     ) : (
-                      <span className="border-hairline text-ink-faint flex h-10 w-10 shrink-0 items-center justify-center rounded-control border text-[10px]">
+                      <span className="border-hairline text-ink-faint flex h-10 w-10 shrink-0 items-center justify-center rounded-control border text-nano">
                         {KIND_LABEL[item.kind]}
                       </span>
                     )}
@@ -197,7 +197,7 @@ export default function MediaPickerDialog({
                       <span className="text-ink block truncate text-sm" title={item.filename}>
                         {item.filename}
                       </span>
-                      <span className="text-ink-faint block text-[11px]">{KIND_LABEL[item.kind]}</span>
+                      <span className="text-ink-faint block text-micro">{KIND_LABEL[item.kind]}</span>
                     </span>
                   </button>
                 </li>

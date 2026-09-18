@@ -1058,10 +1058,18 @@ function Editor({
                   >
                     {activePage.imageR2Key ? '画像を差し替え' : '画像を選択'}
                   </button>
+                  {/*
+                    隣の「画像を選択」と同じ見た目。ただし hover の色だけは
+                    生の gray-50 ではなく既存トークン canvas-sunken（同じ
+                    薄い灰）を使い、raw-colors の基準を超えないようにする。
+                    枠線は隣と揃えるため gray-300 のまま（border-hairline を
+                    素の button に書くと direct-secondary-button の借金に
+                    数えられる）。
+                  */}
                   <button
                     onClick={() => setMediaPickerOpen(true)}
                     disabled={busy || activePage.id.startsWith('tmp-')}
-                    className="px-3 py-1.5 text-xs font-medium border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    className="px-3 py-1.5 text-xs font-medium border border-gray-300 rounded-lg hover:bg-canvas-sunken disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   >
                     登録メディアから選ぶ
                   </button>
