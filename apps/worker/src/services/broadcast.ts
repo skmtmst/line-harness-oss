@@ -31,6 +31,8 @@ import { evaluateQuota, fetchQuota, shortfallMessage } from './broadcast-quota-g
 import { getSendPermissionForAccount, type SendPermissionCache } from './send-entitlements.js';
 import { recordLineTokenDefaultFallback } from './line-token.js';
 import { featureJobCanRun } from './feature-enforcement.js';
+import { assertAnalyticsAudiencesUsable, BroadcastAudienceError } from './segment-audience-guard.js';
+import type { SegmentCondition } from './segment-query.js';
 import {
   assertMessagePartsResolved,
   autoTrackMessageParts,
@@ -153,6 +155,52 @@ export async function processBroadcastSend(
     && broadcast.target_type !== 'multi-account-dedup') {
     const raw = broadcast as unknown as Record<string, unknown>;
     const accountId = raw.line_account_id as string | null;
+
+    /*
+     * 絞り込み条件つきの個人化配信。
+     *
+     * 保存済みの segment_conditions をそのまま残す。is_following だけへ
+     * 上書きすると、分析の一時対象者（analytics_audience）を含む条件が消えて
+     * 全フォロワーへ届く。条件はキュー側が各束で読み直すので、期限切れの
+     * 対象者は残りが自然に0人になる。
+     */
+    if (broadcast.target_type === 'segment') {
+      const stored = raw.segment_conditions as string | null;
+      if (!stored) {
+        throw new Error('segment_conditions is required for segment broadcast');
+      }
+      let storedConditions: SegmentCondition;
+      try {
+        storedConditions = JSON.parse(stored) as SegmentCondition;
+      } catch {
+        throw new Error('segment_conditions is malformed');
+      }
+      // 分析の一時対象者は送信直前にも所属・期限を確かめ直す。
+      await assertAnalyticsAudiencesUsable(db, storedConditions, accountId);
+      const { buildSegmentQuery } = await import('./segment-query.js');
+      const { sql, bindings } = buildSegmentQuery(storedConditions);
+      const segmentAudienceSql = accountId
+        ? `SELECT COUNT(*) AS total,
+                  SUM(CASE WHEN q.display_name IS NULL OR trim(q.display_name) = '' THEN 1 ELSE 0 END) AS missing_name
+             FROM (${sql.replace('WHERE', 'WHERE f.line_account_id = ? AND')}) q`
+        : `SELECT COUNT(*) AS total,
+                  SUM(CASE WHEN q.display_name IS NULL OR trim(q.display_name) = '' THEN 1 ELSE 0 END) AS missing_name
+             FROM (${sql}) q`;
+      const segmentAudience = await db
+        .prepare(segmentAudienceSql)
+        .bind(...(accountId ? [accountId, ...bindings] : bindings))
+        .first<{ total: number; missing_name: number | null }>();
+      if (Number(segmentAudience?.missing_name ?? 0) > 0) {
+        throw new Error(`Cannot personalize broadcast: ${segmentAudience!.missing_name} recipient(s) have no display name`);
+      }
+      await db.prepare(
+        `UPDATE broadcasts
+            SET status = 'sending', batch_offset = 0, total_count = ?
+          WHERE id = ?`,
+      ).bind(Number(segmentAudience?.total ?? 0), broadcast.id).run();
+      return (await getBroadcastById(db, broadcastId))!;
+    }
+
     const where: string[] = ['f.is_following = 1'];
     const binds: unknown[] = [];
     if (accountId) {
@@ -205,8 +253,13 @@ export async function processBroadcastSend(
       throw new Error('segment_conditions is malformed');
     }
     const { buildSegmentQuery } = await import('./segment-query.js');
-    const { sql, bindings } = buildSegmentQuery(conditions as Parameters<typeof buildSegmentQuery>[0]);
     const accountId = raw.line_account_id as string | null;
+    // 分析の一時対象者は送信直前にも所属・期限を確かめ直す。
+    // BroadcastAudienceError は呼出し側が拾い、予約を下書きへ戻す。
+    await assertAnalyticsAudiencesUsable(
+      db, conditions as Parameters<typeof buildSegmentQuery>[0], accountId,
+    );
+    const { sql, bindings } = buildSegmentQuery(conditions as Parameters<typeof buildSegmentQuery>[0]);
     const countSql = accountId
       ? `SELECT COUNT(*) AS cnt FROM (${sql.replace('WHERE', 'WHERE f.line_account_id = ? AND')}) q`
       : `SELECT COUNT(*) AS cnt FROM (${sql}) q`;
@@ -598,6 +651,19 @@ export async function processScheduledBroadcasts(
 
       await processBroadcastSend(db, deliveryClient, broadcast.id, workerUrl);
     } catch (err) {
+      // 分析の一時対象者が期限切れ・消滅している予約は毎tick再試行しても
+      // 届かない。下書きへ戻して予約を消す（内容は残るので作り直せる）。
+      if (err instanceof BroadcastAudienceError) {
+        console.warn(`[broadcast] scheduled broadcast ${broadcast.id} held: ${err.blocker}`);
+        try {
+          await db.prepare(
+            `UPDATE broadcasts SET status = 'draft', scheduled_at = NULL WHERE id = ? AND status = 'sending'`,
+          ).bind(broadcast.id).run();
+        } catch (demoteErr) {
+          console.error(`Failed to demote broadcast ${broadcast.id} to draft:`, demoteErr);
+        }
+        continue;
+      }
       console.error(`Failed to send scheduled broadcast ${broadcast.id}:`, err);
       // Reset to scheduled so it can be retried next cron
       try {
@@ -637,6 +703,16 @@ export function stealthChunkSize(
  * Cronから呼ばれるキュー処理。status='queued' のブロードキャストを
  * batch_offset から500人ずつ処理する。1回のCron実行で全バッチを処理可能。
  */
+function parseStoredConditions(stored: unknown): SegmentCondition | null {
+  if (typeof stored !== 'string' || stored === '') return null;
+  try {
+    const parsed = JSON.parse(stored) as SegmentCondition;
+    return parsed && Array.isArray(parsed.rules) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
 export async function processQueuedBroadcasts(
   db: D1Database,
   lineClient: LineClient,
@@ -657,6 +733,28 @@ export async function processQueuedBroadcasts(
     if (!permission.allowed) {
       console.warn(`[broadcast] queued broadcast ${broadcast.id} held: ${permission.reason}`);
       continue;
+    }
+    /*
+     * 分析の一時対象者は送信開始の直前にも所属・期限を確かめ直す。
+     * まだ誰にも送っていない（batch_offset=0）ものは下書きへ戻す。
+     * 途中まで送った配信は、条件のSQL側が期限を評価ごとに確かめるので
+     * 残りは誰にも一致せず自然に終わる。ここで戻すと再送が二重になる。
+     */
+    const queuedRaw = broadcast as unknown as Record<string, unknown>;
+    if (((queuedRaw.batch_offset as number) || 0) === 0) {
+      const storedConditions = parseStoredConditions(queuedRaw.segment_conditions);
+      if (storedConditions) {
+        try {
+          await assertAnalyticsAudiencesUsable(db, storedConditions, accountId);
+        } catch (audienceError) {
+          if (!(audienceError instanceof BroadcastAudienceError)) throw audienceError;
+          console.warn(`[broadcast] queued broadcast ${broadcast.id} held: ${audienceError.blocker}`);
+          await db.prepare(
+            `UPDATE broadcasts SET status = 'draft', scheduled_at = NULL WHERE id = ? AND status = 'sending' AND batch_offset = 0`,
+          ).bind(broadcast.id).run();
+          continue;
+        }
+      }
     }
     let client = lineClient;
     if (accountId) {

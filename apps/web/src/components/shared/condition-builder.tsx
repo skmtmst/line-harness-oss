@@ -747,6 +747,9 @@ function RuleEditor({ rule, onChange, tags, fields, marks, scenarios }: RuleEdit
         </div>
       )
 
+    case 'analytics_audience':
+      return <span className="text-ink-faint text-xs">分析で作った一時対象者（この画面では編集できません）</span>
+
     default:
       return <span className="text-ink-faint text-xs">この条件はこの画面では編集できません（{rule.type}）</span>
   }

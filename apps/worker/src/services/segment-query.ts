@@ -47,6 +47,12 @@ export interface SegmentRule {
     | 'last_reaction_at'
     | 'reaction_state'
     | 'score_range'
+    /**
+     * 分析画面で作った一時対象者（analytics_result_audiences）。friend ID を
+     * 条件へ埋めず audience ID だけを持ち、評価のたびに所属・期限を見直す。
+     * 画面の条件ビルダーには出さない。
+     */
+    | 'analytics_audience'
     /** 内部用途: 作成時点の宛先IDを固定した配信。画面の条件ビルダーには出さない。 */
     | 'friend_id_in'
   value: unknown
@@ -482,6 +488,29 @@ function buildRuleClause(rule: SegmentRule): { sql: string; bindings: unknown[] 
         bindings.push(max)
       }
       return { sql: `(${clauses.join(' AND ')})`, bindings }
+    }
+
+    /*
+     * 分析の一時対象者。member 表の所属に加えて、アカウントと期限を
+     * 評価のたびに確かめる。期限切れ・他アカウント・消えた対象者は
+     * 誰にも一致しない（fail-closed）。保存・送信の直前には
+     * assertAnalyticsAudiencesUsable が明示的に拒否する。
+     */
+    case 'analytics_audience': {
+      const v = asRecord(rule.value, 'analytics_audience')
+      const audienceId = typeof v.audienceId === 'string' ? v.audienceId.trim() : ''
+      if (audienceId === '') {
+        throw new Error('analytics_audience rule requires an audienceId')
+      }
+      bindings.push(audienceId, new Date().toISOString())
+      return {
+        sql: `EXISTS (SELECT 1 FROM analytics_result_audience_members arm
+                JOIN analytics_result_audiences ara ON ara.id = arm.audience_id
+               WHERE arm.friend_id = f.id AND ara.id = ?
+                 AND ara.line_account_id = f.line_account_id
+                 AND ara.expires_at > ?)`,
+        bindings,
+      }
     }
 
     default: {
