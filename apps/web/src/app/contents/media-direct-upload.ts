@@ -44,6 +44,65 @@ export function fileMatchesMediaKind(file: Pick<File, 'type'>, kind: MediaItem['
   return KIND_MIME_TYPES[kind].includes(file.type)
 }
 
+export type MediaMetadataInput = {
+  width?: number
+  height?: number
+  durationMs?: number
+  pageCount?: number
+  codec?: string
+}
+
+/**
+ * 版追加の互換判定に使う内容情報を、選択した実ファイルから読む。
+ * 読めない環境・形式では undefined のまま返し、API 側が「判定材料不足」
+ * として明示的に拒否する（ここで推測して埋めない）。
+ */
+export async function extractMediaMetadata(file: File): Promise<MediaMetadataInput> {
+  const codec = /;\s*codecs="?([^";]+)"?/i.exec(file.type)?.[1]
+  if (file.type.startsWith('image/')) {
+    try {
+      const bitmap = await createImageBitmap(file)
+      const result: MediaMetadataInput = { width: bitmap.width, height: bitmap.height }
+      bitmap.close()
+      return codec ? { ...result, codec } : result
+    } catch {
+      return codec ? { codec } : {}
+    }
+  }
+  if (file.type.startsWith('video/') || file.type.startsWith('audio/')) {
+    const durationMs = await new Promise<number | undefined>((resolve) => {
+      try {
+        const url = URL.createObjectURL(file)
+        const el = document.createElement(file.type.startsWith('video/') ? 'video' : 'audio')
+        el.preload = 'metadata'
+        el.onloadedmetadata = () => {
+          const seconds = el.duration
+          URL.revokeObjectURL(url)
+          resolve(Number.isFinite(seconds) && seconds > 0 ? Math.round(seconds * 1000) : undefined)
+        }
+        el.onerror = () => {
+          URL.revokeObjectURL(url)
+          resolve(undefined)
+        }
+        el.src = url
+      } catch {
+        resolve(undefined)
+      }
+    })
+    return { durationMs, codec }
+  }
+  if (file.type === 'application/pdf') {
+    try {
+      const text = await file.text()
+      const pageCount = (text.match(/\/Type\s*\/Page(?![a-zA-Z])/g) ?? []).length
+      return pageCount > 0 ? { pageCount, codec } : { codec }
+    } catch {
+      return codec ? { codec } : {}
+    }
+  }
+  return codec ? { codec } : {}
+}
+
 /**
  * 署名URLは秘密値なので保持・記録せず、この1回のPUTにだけ使う。
  * XMLHttpRequestを使うのはファイル単位の送信進捗を表示するため。
