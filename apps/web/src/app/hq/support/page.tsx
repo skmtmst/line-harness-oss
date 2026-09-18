@@ -1,10 +1,11 @@
 'use client'
 
-import { ImagePlus, Send, X } from 'lucide-react'
+import { CheckCircle2, ImagePlus, Send, X } from 'lucide-react'
 import Link from 'next/link'
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { LineAccount, StaffMember } from '@line-crm/shared'
 import Button from '@/components/shared/button'
+import Dialog from '@/components/shared/dialog'
 import NoteBar from '@/components/shared/note-bar'
 import SelectField from '@/components/shared/select-field'
 import StickyBar from '@/components/shared/sticky-bar'
@@ -152,12 +153,20 @@ export default function HqSupportPage() {
         </NoteBar>
       </div>
 
-      {sent ? (
-        <div className="rounded-card bg-accent-soft px-4 py-3 text-label text-ink" role="status">
-          お問い合わせを送りました。
-          {sent.notified ? '控えが登録メールアドレスにも届きます。' : '控えメールは送れませんでしたが、内容は運営に届いています。'}
-        </div>
-      ) : null}
+      {/* 送信完了の知らせ（2026-09-18 決定: 帯だけでは気づきにくいので、窓で止めて伝える） */}
+      <Dialog
+        open={sent !== null}
+        title="送信完了しました"
+        description={sent?.notified
+          ? '運営に届きました。控えが登録メールアドレスにも届きます。返信は登録メールアドレスと、この画面の「これまでの問い合わせ」に届きます（平日 2営業日以内）。'
+          : '運営に届きました。控えメールは送れませんでしたが、内容は運営に届いています。返信はこの画面の「これまでの問い合わせ」に届きます。'}
+        titleIcon={<CheckCircle2 aria-hidden="true" className="h-5 w-5 text-accent-deep" />}
+        onCancel={() => setSent(null)}
+        footer={<div className="flex justify-end"><Button variant="primary" onClick={() => setSent(null)}>閉じる</Button></div>}
+        designNode="X6LZP"
+      >
+        {sent?.ticketLabel ? <p className="text-label text-ink">受付番号：<span className="font-bold">{sent.ticketLabel}</span>　件名：{sent.subject}</p> : null}
+      </Dialog>
 
       <div data-design-node="VKxoO" className="flex flex-col gap-4 xl:flex-row xl:items-start">
         <form
