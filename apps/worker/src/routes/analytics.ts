@@ -1050,6 +1050,44 @@ analytics.post('/api/analytics/results/:id/audiences', requireRole('owner', 'adm
   }
 });
 
+/*
+ * 一時対象者の詳細。配信作成が「audienceId だけを URL に載せ、人数・期限は
+ * ここで読み直す」ために使う。友だちIDは返さない。他アカウント・消えた
+ * 対象者は404、期限切れは410（friends の audienceId と同じ返し方）。
+ */
+analytics.get('/api/analytics/audiences/:id', async (c) => {
+  try {
+    const account = await resolveAccount(c);
+    if (!account.ok) return account.response;
+    const row = await c.env.DB.prepare(
+      `SELECT id, source_kind, selection_key, member_count, expires_at, created_at
+         FROM analytics_result_audiences
+        WHERE id = ? AND line_account_id = ?`,
+    ).bind(c.req.param('id'), account.accountId).first<{
+      id: string; source_kind: string; selection_key: string | null;
+      member_count: number; expires_at: string; created_at: string;
+    }>();
+    if (!row) return c.json({ success: false, error: 'Not found' }, 404);
+    if (row.expires_at <= new Date().toISOString()) {
+      return c.json({ success: false, error: 'この分析結果の対象者は24時間を過ぎました。もう一度集計してください' }, 410);
+    }
+    return c.json({
+      success: true,
+      data: {
+        id: row.id,
+        sourceKind: row.source_kind,
+        selectionKey: row.selection_key,
+        memberCount: row.member_count,
+        expiresAt: row.expires_at,
+        createdAt: row.created_at,
+      },
+    });
+  } catch (err) {
+    console.error('GET /api/analytics/audiences/:id error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
 analytics.post('/api/funnels', requireRole('owner', 'admin'), async (c) => {
   try {
     const account = await resolveAccount(c);

@@ -66,6 +66,9 @@ export function isRuleComplete(rule: SegmentRule): boolean {
       return typeof v?.fieldId === 'string' && v.fieldId !== ''
     case 'scenario_state':
       return typeof v?.scenarioId === 'string' && v.scenarioId !== ''
+    case 'analytics_audience':
+      // 分析画面から渡された一時対象者。audienceId が空なら書きかけと同じく落とす。
+      return typeof v?.audienceId === 'string' && v.audienceId !== ''
     case 'scenario_subscribed':
       return typeof rule.value === 'string' && rule.value !== ''
     case 'score_range': {
