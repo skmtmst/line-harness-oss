@@ -22,7 +22,6 @@ type Membership = {
 };
 type MemberData = { owner: { displayName: string | null }; membership?: Membership; pets: Pet[]; feedingProducts?: FeedingProduct[]; commerce: { orders: CommerceOrder[]; subscription: any; purchaseCount: number; purchaseAmount: number; points: number; rank: string }; photos: MemberPhoto[]; photoStats: { submittedCount: number; pendingCount: number; adoptedCount: number; earnedPoints: number } };
 type HealthLog = { id: string; pet_id: string; logged_on: string; weight_kg: number | null; heart_rate_bpm: number | null; respiratory_rate_bpm: number | null; stool_status: string; appetite: string; skin_status: string; tear_stain_status: string; note: string };
-type HealthMetric = 'weight_kg' | 'heart_rate_bpm' | 'respiratory_rate_bpm';
 type HealthPeriod = 'day' | 'week' | 'month';
 type Tab = 'home' | 'pets' | 'health' | 'orders' | 'photos';
 let root: Root | null = null;
@@ -282,49 +281,82 @@ function PetsView({ ctx, pets, products, onChanged, onHealth }: { ctx: Ctx; pets
   </section>;
 }
 
-const healthMetrics: Array<{ value: HealthMetric; label: string; short: string; unit: string; color: string }> = [
-  { value: 'weight_kg', label: '体重', short: '体重', unit: 'kg', color: '#16815b' },
-  { value: 'heart_rate_bpm', label: '心拍数', short: '心拍', unit: '回/分', color: '#d46272' },
-  { value: 'respiratory_rate_bpm', label: '呼吸数', short: '呼吸', unit: '回/分', color: '#4f7fac' },
+// ---------------------------------------------------------------- 健康日記（★V6 37-2-B `CkgoD`）
+
+type HealthKey = 'weight' | 'heart' | 'resp' | 'stool' | 'appetite';
+const healthKeys: Array<{ value: HealthKey; label: string; unit: string }> = [
+  { value: 'weight', label: '体重', unit: 'kg' },
+  { value: 'heart', label: '心拍', unit: '回/分' },
+  { value: 'resp', label: '呼吸', unit: '回/分' },
+  { value: 'stool', label: '便', unit: '' },
+  { value: 'appetite', label: '食いつき', unit: '' },
 ];
+const stoolLabel: Record<string, string> = { normal: '正常', soft: 'やわらかい', hard: 'かたい', diarrhea: '下痢', bloody: '血が混じる', other: 'その他' };
+const appetiteLabel: Record<string, string> = { good: '良好', normal: '普通', poor: '不良' };
+const skinLabel: Record<string, string> = { normal: '問題なし', itchy: 'かゆそう', red: '赤み', other: 'その他' };
+const tearLabel: Record<string, string> = { normal: '問題なし', mild: '少し気になる', concern: '気になる' };
+/** 便・食いつきは 3 段階の点数にして棒にする（3＝いつも通り、1＝気になる）。 */
+const stoolScore: Record<string, number> = { normal: 3, soft: 2, hard: 2, other: 2, diarrhea: 1, bloody: 1 };
+const appetiteScore: Record<string, number> = { good: 3, normal: 2, poor: 1 };
 
-function healthSeries(logs: HealthLog[], metric: HealthMetric, period: HealthPeriod) {
-  const grouped = new Map<string, { label: string; values: number[] }>();
-  const now = new Date();
-  const cutoff = new Date(now);
-  cutoff.setDate(cutoff.getDate() - (period === 'day' ? 30 : period === 'week' ? 7 * 26 : 31 * 18));
-  logs.forEach(log => {
-    const rawValue = log[metric];
-    if (rawValue == null) return;
-    const value = Number(rawValue);
-    const date = new Date(`${log.logged_on}T00:00:00`);
-    if (!Number.isFinite(value) || date < cutoff) return;
-    let key = log.logged_on; let label = `${date.getMonth() + 1}/${date.getDate()}`;
-    if (period === 'week') {
-      const monday = new Date(date); const day = (monday.getDay() + 6) % 7; monday.setDate(monday.getDate() - day);
-      key = monday.toISOString().slice(0, 10); label = `${monday.getMonth() + 1}/${monday.getDate()}週`;
-    } else if (period === 'month') {
-      key = log.logged_on.slice(0, 7); label = `${date.getFullYear().toString().slice(2)}年${date.getMonth() + 1}月`;
-    }
-    const current = grouped.get(key) || { label, values: [] }; current.values.push(value); grouped.set(key, current);
-  });
-  return [...grouped.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([key, item]) => ({ key, label: item.label, value: item.values.reduce((sum, value) => sum + value, 0) / item.values.length })).slice(period === 'day' ? -14 : -12);
+function healthValue(log: HealthLog, key: HealthKey): number | null {
+  if (key === 'weight') return log.weight_kg == null ? null : Number(log.weight_kg);
+  if (key === 'heart') return log.heart_rate_bpm == null ? null : Number(log.heart_rate_bpm);
+  if (key === 'resp') return log.respiratory_rate_bpm == null ? null : Number(log.respiratory_rate_bpm);
+  if (key === 'stool') return stoolScore[log.stool_status] ?? null;
+  return appetiteScore[log.appetite] ?? null;
 }
-
-function HealthLineChart({ points, metric }: { points: Array<{ key: string; label: string; value: number }>; metric: typeof healthMetrics[number] }) {
-  if (!points.length) return <div className="nm-chart-empty"><span>＋</span><b>まだ記録がありません</b><p>下のフォームから記録すると、ここに推移が表示されます。</p></div>;
-  const width = 340; const height = 190; const left = 38; const right = 12; const top = 20; const bottom = 34;
-  const values = points.map(point => point.value); const rawMin = Math.min(...values); const rawMax = Math.max(...values); const spread = Math.max(rawMax - rawMin, metric.value === 'weight_kg' ? 1 : 10);
-  const min = Math.max(0, rawMin - spread * .22); const max = rawMax + spread * .22;
-  const x = (index: number) => left + (points.length === 1 ? (width - left - right) / 2 : index * (width - left - right) / (points.length - 1));
-  const y = (value: number) => top + (max - value) * (height - top - bottom) / Math.max(.001, max - min);
-  const line = points.map((point, index) => `${x(index)},${y(point.value)}`).join(' ');
-  const labelIndexes = new Set([0, Math.floor((points.length - 1) / 2), points.length - 1]);
-  return <div className="nm-chart-wrap"><svg className="nm-health-chart" viewBox={`0 0 ${width} ${height}`} role="img" aria-label={`${metric.label}の推移`}>
-    {[0, .5, 1].map((step, index) => { const yy = top + step * (height - top - bottom); const value = max - step * (max - min); return <g key={index}><line x1={left} y1={yy} x2={width - right} y2={yy} className="nm-chart-grid"/><text x={left - 6} y={yy + 3} textAnchor="end" className="nm-chart-axis">{metric.value === 'weight_kg' ? value.toFixed(1) : Math.round(value)}</text></g>; })}
-    {points.length > 1 && <polyline points={line} fill="none" stroke={metric.color} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="nm-chart-line"/>}
-    {points.map((point, index) => <g key={point.key}><circle cx={x(index)} cy={y(point.value)} r="4.5" fill="#fff" stroke={metric.color} strokeWidth="3"/><text x={x(index)} y={y(point.value) - 10} textAnchor="middle" className="nm-chart-value">{metric.value === 'weight_kg' ? point.value.toFixed(1) : Math.round(point.value)}</text>{labelIndexes.has(index) && <text x={x(index)} y={height - 9} textAnchor={index === 0 ? 'start' : index === points.length - 1 ? 'end' : 'middle'} className="nm-chart-axis">{point.label}</text>}</g>)}
-  </svg></div>;
+function fmtValue(key: HealthKey, value: number): string {
+  if (key === 'weight') return value.toFixed(1);
+  if (key === 'stool' || key === 'appetite') return value >= 2.5 ? '良' : value >= 1.5 ? '中' : '注';
+  return String(Math.round(value));
+}
+/** 期間ごとに 8 枠（日＝直近8日、週＝直近8週の平均、月＝直近8か月の平均）。記録の無い枠は null。 */
+function healthBars(logs: HealthLog[], key: HealthKey, period: HealthPeriod): Array<{ label: string; value: number | null }> {
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const slots: Array<{ start: Date; end: Date; label: string }> = [];
+  for (let i = 7; i >= 0; i -= 1) {
+    if (period === 'day') { const d = new Date(today); d.setDate(d.getDate() - i); const e = new Date(d); e.setDate(e.getDate() + 1); slots.push({ start: d, end: e, label: `${d.getMonth() + 1}/${d.getDate()}` }); }
+    else if (period === 'week') { const e = new Date(today); e.setDate(e.getDate() - i * 7 + 1); const d = new Date(e); d.setDate(d.getDate() - 7); slots.push({ start: d, end: e, label: `${d.getMonth() + 1}/${d.getDate()}` }); }
+    else { const d = new Date(today.getFullYear(), today.getMonth() - i, 1); const e = new Date(today.getFullYear(), today.getMonth() - i + 1, 1); slots.push({ start: d, end: e, label: `${d.getMonth() + 1}月` }); }
+  }
+  return slots.map(slot => {
+    const values = logs.map(log => ({ date: new Date(`${log.logged_on}T00:00:00`), value: healthValue(log, key) }))
+      .filter(item => item.value != null && item.date >= slot.start && item.date < slot.end).map(item => item.value as number);
+    return { label: slot.label, value: values.length ? Math.round((values.reduce((a, b) => a + b, 0) / values.length) * 10) / 10 : null };
+  });
+}
+/** 棒グラフ（★V6 37-2-B 推移カード）。8 枠。数値は最小〜最大の幅で高さを決める。 */
+function HealthBars({ bars, keyName }: { bars: Array<{ label: string; value: number | null }>; keyName: HealthKey }) {
+  const known = bars.map(b => b.value).filter((v): v is number => v != null);
+  if (!known.length) return <div className="nm-v6-bars-empty"><b>この期間の記録はまだありません</b><p>「今日を記録」から付けると、ここに推移が出ます。</p></div>;
+  const min = keyName === 'stool' || keyName === 'appetite' ? 0 : Math.min(...known); const max = keyName === 'stool' || keyName === 'appetite' ? 3 : Math.max(...known);
+  const height = (v: number) => max === min ? 60 : 24 + Math.round(((v - min) / (max - min)) * 72);
+  return <div className="nm-v6-bars" role="img" aria-label={`${healthKeys.find(k => k.value === keyName)?.label}の推移`}>
+    {bars.map((bar, index) => <div key={index} className="nm-v6-bar-col">
+      {bar.value == null ? <i className="nm-v6-bar nm-v6-bar-empty" /> : <i className={`nm-v6-bar${(keyName === 'stool' || keyName === 'appetite') && bar.value < 1.5 ? ' nm-v6-bar-warn' : ''}`} style={{ height: `${height(bar.value)}%` }}><b>{fmtValue(keyName, bar.value)}</b></i>}
+      <span>{bar.label}</span>
+    </div>)}
+  </div>;
+}
+function weekAgoNote(logs: HealthLog[]): string {
+  const latest = logs.find(log => log.weight_kg != null);
+  if (!latest) return '—';
+  const latestDate = new Date(`${latest.logged_on}T00:00:00`);
+  const before = logs.find(log => log.weight_kg != null && (latestDate.getTime() - new Date(`${log.logged_on}T00:00:00`).getTime()) >= 6 * 86_400_000);
+  if (!before) return '先週の記録なし';
+  const diff = Math.round((Number(latest.weight_kg) - Number(before.weight_kg)) * 10) / 10;
+  return diff === 0 ? '先週と同じ' : `先週 ${diff > 0 ? '+' : ''}${diff.toFixed(1)}`;
+}
+function stableNote(logs: HealthLog[], key: 'heart' | 'resp'): string {
+  const values = logs.map(log => healthValue(log, key)).filter((v): v is number => v != null);
+  if (!values.length) return '—';
+  if (values.length < 3) return '記録を続けましょう';
+  const [latest, ...rest] = values; const avg = rest.slice(0, 5).reduce((a, b) => a + b, 0) / Math.min(5, rest.length);
+  return Math.abs(latest - avg) / avg <= 0.15 ? '安定' : latest > avg ? 'いつもより多め' : 'いつもより少なめ';
+}
+function recordLine(log: HealthLog): string {
+  return [log.weight_kg == null ? '' : `${Number(log.weight_kg).toFixed(1)}kg`, `便 ${stoolLabel[log.stool_status] ?? log.stool_status}`, `食いつき ${appetiteLabel[log.appetite] ?? log.appetite}`].filter(Boolean).join('・');
 }
 
 function HealthForm({ ctx, pet, onSaved }: { ctx: Ctx; pet: Pet; onSaved: () => void }) {
@@ -332,23 +364,79 @@ function HealthForm({ ctx, pet, onSaved }: { ctx: Ctx; pet: Pet; onSaved: () => 
   const [message, setMessage] = useState(''); const [busy, setBusy] = useState(false);
   useEffect(() => { setForm(value => ({ ...value, petId: pet.id })); setMessage(''); }, [pet.id]);
   const submit = async () => { setBusy(true); setMessage(''); try { const res = await call<{ data: { careRequired: boolean } }>(ctx, '/api/liff/nen/health-logs', { method: 'POST', body: JSON.stringify(form) }); setMessage(res.data.careRequired ? '記録しました。気になる状態が続いているため、管理画面に要ケアとして共有しました。' : '今日の健康記録を保存しました。'); onSaved(); } catch (error) { setMessage(error instanceof Error ? error.message : '記録できませんでした'); } finally { setBusy(false); } };
-  return <section className="nm-card nm-health-form"><div className="nm-section-heading"><span>DAILY RECORD</span><h2>{pet.name}ちゃんの健康を記録</h2></div><div className="nm-grid"><Field label="記録日"><input type="date" value={form.loggedOn} onChange={e => setForm({ ...form, loggedOn: e.target.value })} /></Field><Field label="体重（kg）"><input inputMode="decimal" type="number" min="0.2" max="150" step="0.1" placeholder="例：8.4" value={form.weightKg} onChange={e => setForm({ ...form, weightKg: e.target.value })} /></Field><Field label="心拍数（回/分）"><input inputMode="numeric" type="number" min="20" max="300" step="1" placeholder="例：96" value={form.heartRateBpm} onChange={e => setForm({ ...form, heartRateBpm: e.target.value })} /></Field><Field label="呼吸数（回/分）"><input inputMode="numeric" type="number" min="5" max="150" step="1" placeholder="例：24" value={form.respiratoryRateBpm} onChange={e => setForm({ ...form, respiratoryRateBpm: e.target.value })} /></Field><Field label="便"><select value={form.stoolStatus} onChange={e => setForm({ ...form, stoolStatus: e.target.value })}><option value="normal">正常</option><option value="soft">やわらかい</option><option value="hard">かたい</option><option value="diarrhea">下痢</option><option value="bloody">血が混じる</option><option value="other">その他</option></select></Field><Field label="食いつき"><select value={form.appetite} onChange={e => setForm({ ...form, appetite: e.target.value })}><option value="good">良好</option><option value="normal">普通</option><option value="poor">不良</option></select></Field><Field label="皮膚"><select value={form.skinStatus} onChange={e => setForm({ ...form, skinStatus: e.target.value })}><option value="normal">問題なし</option><option value="itchy">かゆそう</option><option value="red">赤み</option><option value="other">その他</option></select></Field><Field label="涙やけ"><select value={form.tearStainStatus} onChange={e => setForm({ ...form, tearStainStatus: e.target.value })}><option value="normal">問題なし</option><option value="mild">少し気になる</option><option value="concern">気になる</option></select></Field></div><Field label="その日の様子・獣医師に伝えたいこと"><textarea rows={4} placeholder="食事、運動、投薬、気になった変化など" value={form.note} onChange={e => setForm({ ...form, note: e.target.value })} /></Field>{message && <Notice>{message}</Notice>}<button className="nm-primary" disabled={busy} onClick={() => void submit()}>{busy ? '保存中…' : '今日の記録を保存'}</button></section>;
+  return <section className="nm-card nm-health-form nm-v6-form"><div className="nm-section-heading"><span>DAILY RECORD</span><h2>{pet.name}ちゃんの健康を記録</h2></div><div className="nm-grid"><Field label="記録日"><input type="date" value={form.loggedOn} onChange={e => setForm({ ...form, loggedOn: e.target.value })} /></Field><Field label="体重（kg）"><input inputMode="decimal" type="number" min="0.2" max="150" step="0.1" placeholder="例：8.4" value={form.weightKg} onChange={e => setForm({ ...form, weightKg: e.target.value })} /></Field><Field label="心拍数（回/分）"><input inputMode="numeric" type="number" min="20" max="300" step="1" placeholder="例：96" value={form.heartRateBpm} onChange={e => setForm({ ...form, heartRateBpm: e.target.value })} /></Field><Field label="呼吸数（回/分）"><input inputMode="numeric" type="number" min="5" max="150" step="1" placeholder="例：24" value={form.respiratoryRateBpm} onChange={e => setForm({ ...form, respiratoryRateBpm: e.target.value })} /></Field><Field label="便"><select value={form.stoolStatus} onChange={e => setForm({ ...form, stoolStatus: e.target.value })}><option value="normal">正常</option><option value="soft">やわらかい</option><option value="hard">かたい</option><option value="diarrhea">下痢</option><option value="bloody">血が混じる</option><option value="other">その他</option></select></Field><Field label="食いつき"><select value={form.appetite} onChange={e => setForm({ ...form, appetite: e.target.value })}><option value="good">良好</option><option value="normal">普通</option><option value="poor">不良</option></select></Field><Field label="皮膚"><select value={form.skinStatus} onChange={e => setForm({ ...form, skinStatus: e.target.value })}><option value="normal">問題なし</option><option value="itchy">かゆそう</option><option value="red">赤み</option><option value="other">その他</option></select></Field><Field label="涙やけ"><select value={form.tearStainStatus} onChange={e => setForm({ ...form, tearStainStatus: e.target.value })}><option value="normal">問題なし</option><option value="mild">少し気になる</option><option value="concern">気になる</option></select></Field></div><Field label="その日の様子・獣医師に伝えたいこと"><textarea rows={4} placeholder="食事、運動、投薬、気になった変化など" value={form.note} onChange={e => setForm({ ...form, note: e.target.value })} /></Field>{message && <Notice>{message}</Notice>}<button className="nm-primary nm-v6-primary" disabled={busy} onClick={() => void submit()}>{busy ? '保存中…' : '今日の記録を保存'}</button></section>;
+}
+
+function MeasureGuide() {
+  return <section className="nm-card nm-measure-guide"><div className="nm-section-heading"><span>HOW TO MEASURE</span><h2>おうちでの測り方</h2></div><div className="nm-measure-item"><i>01</i><div><h3>体重</h3><p>ペットを抱いて体重計に乗り、表示された重さから飼い主さま自身の体重を差し引きます。毎回できるだけ同じ時間・同じ条件で測ると変化を比べやすくなります。</p></div></div><div className="nm-measure-item"><i>02</i><div><h3>心拍数</h3><p>落ち着いている時に胸のあたりへそっと手を当て、15秒間の拍動数を数えて4倍します。家庭での参考目安は大型犬60〜80回、小型犬80〜120回、猫130〜160回/分ですが、年齢・体格・緊張などで変わります。</p></div></div><div className="nm-measure-item"><i>03</i><div><h3>呼吸数</h3><p>眠っている時や安静時に胸・お腹の上下を見て、「吸って吐く」を1回として15秒間数え、4倍します。20〜30回/分をひとつの参考にし、パンティング中や猫が喉を鳴らしている時は避けましょう。</p></div></div><div className="nm-health-caution">数値だけで病気を判断するものではありません。普段と違う状態が続く、呼吸が苦しそう、ぐったりしているなどの症状がある場合は、記録を待たず獣医師へご相談ください。</div></section>;
+}
+
+type HealthSummaryData = { pet: { id: string; name: string; animalType: string; breed: string; birthday: string | null; weightKg: number | null }; owner: { name: string }; generatedAt: string; summary: { days: number; records: number; weight: { first: number; last: number; min: number; max: number } | null; heartRateAvg: number | null; respiratoryRateAvg: number | null; stool: Record<string, number>; appetite: Record<string, number>; skin: Record<string, number>; tearStain: Record<string, number>; notes: Array<{ loggedOn: string; note: string }>; logs: Array<{ loggedOn: string; weightKg: number | null; heartRateBpm: number | null; respiratoryRateBpm: number | null; stool: string; appetite: string; skin: string | null; tearStain: string | null }> } };
+function countText(counts: Record<string, number>, labels: Record<string, string>): string {
+  const entries = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+  return entries.length ? entries.map(([k, n]) => `${labels[k] ?? k} ${n}回`).join('・') : '—';
+}
+/** 「獣医師に見せる（直近30日のまとめ）」。管理画面の 30日のまとめ と同じ内容を、診察室で見せやすい 1 画面にする。 */
+function HealthSummaryView({ ctx, pet, onBack }: { ctx: Ctx; pet: Pet; onBack: () => void }) {
+  const [data, setData] = useState<HealthSummaryData | null>(null); const [error, setError] = useState('');
+  useEffect(() => { let active = true; call<{ data: HealthSummaryData }>(ctx, `/api/liff/nen/health-logs/summary?petId=${encodeURIComponent(pet.id)}`).then(r => { if (active) setData(r.data); }).catch(e => { if (active) setError(e instanceof Error ? e.message : '読み込めませんでした'); }); return () => { active = false; }; }, [ctx, pet.id]);
+  const s = data?.summary;
+  return <section className="nm-stack nm-home-stack nm-v6-edit nm-v6-summary"><button className="nm-back" type="button" onClick={onBack}>← 健康日記へ戻る</button>
+    <div className="nm-v6-heading"><span>FOR YOUR VET</span><h2>直近30日のまとめ</h2><p>{pet.name}ちゃん（{petBasics(pet)}）。診察のときに獣医師へそのままお見せください。</p></div>
+    {error ? <Notice>{error}</Notice> : !s || !data ? <Notice>まとめを作っています…</Notice> : <>
+      <div className="nm-v6-facts nm-v6-summary-facts">
+        <div><span>記録</span><b>{s.records}件／{s.days}日</b></div>
+        <div><span>体重</span><b>{s.weight ? `${s.weight.first}→${s.weight.last}kg` : '—'}</b></div>
+        <div><span>体重の幅</span><b>{s.weight ? `${s.weight.min}〜${s.weight.max}` : '—'}</b></div>
+        <div><span>心拍（平均）</span><b>{s.heartRateAvg == null ? '—' : `${s.heartRateAvg}回/分`}</b></div>
+        <div><span>呼吸（平均）</span><b>{s.respiratoryRateAvg == null ? '—' : `${s.respiratoryRateAvg}回/分`}</b></div>
+        <div><span>作成</span><b>{data.generatedAt.slice(5, 10).replace('-', '/')}</b></div>
+      </div>
+      <div className="nm-v6-summary-list">
+        <div><span>便</span><b>{countText(s.stool, stoolLabel)}</b></div>
+        <div><span>食いつき</span><b>{countText(s.appetite, appetiteLabel)}</b></div>
+        <div><span>皮膚</span><b>{countText(s.skin, skinLabel)}</b></div>
+        <div><span>涙やけ</span><b>{countText(s.tearStain, tearLabel)}</b></div>
+      </div>
+      {s.logs.length > 0 && <div className="nm-v6-summary-table"><div className="nm-v6-summary-row nm-v6-summary-head"><span>日付</span><span>体重</span><span>心拍</span><span>呼吸</span><span>便</span><span>食いつき</span></div>{s.logs.map(log => <div className="nm-v6-summary-row" key={log.loggedOn}><span>{log.loggedOn.slice(5).replace('-', '/')}</span><span>{log.weightKg == null ? '—' : Number(log.weightKg).toFixed(1)}</span><span>{log.heartRateBpm ?? '—'}</span><span>{log.respiratoryRateBpm ?? '—'}</span><span>{stoolLabel[log.stool] ?? log.stool}</span><span>{appetiteLabel[log.appetite] ?? log.appetite}</span></div>)}</div>}
+      {s.notes.length > 0 && <div className="nm-v6-summary-notes"><b>メモ</b>{s.notes.map(note => <p key={note.loggedOn}><span>{note.loggedOn.slice(5).replace('-', '/')}</span>{note.note}</p>)}</div>}
+      <p className="nm-note">お客様がマイページで付けた記録をまとめたものです。診断や治療の判断は含みません。</p>
+    </>}
+  </section>;
 }
 
 function HealthDiary({ ctx, pets }: { ctx: Ctx; pets: Pet[] }) {
-  const [petId, setPetId] = useState(pets[0]?.id || ''); const [logs, setLogs] = useState<HealthLog[]>([]); const [metricKey, setMetricKey] = useState<HealthMetric>('weight_kg'); const [period, setPeriod] = useState<HealthPeriod>('day'); const [loading, setLoading] = useState(true);
+  const [petId, setPetId] = useState(pets[0]?.id || ''); const [logs, setLogs] = useState<HealthLog[]>([]); const [keyName, setKeyName] = useState<HealthKey>('weight'); const [period, setPeriod] = useState<HealthPeriod>('week'); const [loading, setLoading] = useState(true);
+  const [view, setView] = useState<'diary' | 'record' | 'summary'>('diary'); const [showAll, setShowAll] = useState(false);
   const loadLogs = useCallback(async () => { setLoading(true); try { const response = await call<{ data: HealthLog[] }>(ctx, '/api/liff/nen/health-logs'); setLogs(response.data); } finally { setLoading(false); } }, [ctx]);
   useEffect(() => { void loadLogs(); }, [loadLogs]);
   useEffect(() => { if (!pets.some(pet => pet.id === petId)) setPetId(pets[0]?.id || ''); }, [pets, petId]);
-  if (!pets.length) return <section className="nm-stack"><div className="nm-health-hero"><span>HEALTH DIARY</span><h2>なるべく早く愛犬愛猫の異変に気付くためには、<br/>ご家庭での健康管理が大切です。</h2></div><Notice>先にマイペットを登録してください。</Notice></section>;
-  const pet = pets.find(item => item.id === petId) || pets[0]; const petLogs = logs.filter(log => log.pet_id === pet.id); const metric = healthMetrics.find(item => item.value === metricKey)!; const points = healthSeries(petLogs, metricKey, period);
-  const latestFor = (key: HealthMetric) => petLogs.find(log => log[key] != null && Number.isFinite(Number(log[key])))?.[key];
-  return <section className="nm-stack nm-health-page"><div className="nm-health-hero"><span>HEALTH DIARY</span><h2>なるべく早く愛犬愛猫の異変に気付くためには、<br/>ご家庭での健康管理が大切です。</h2><p>いつもの数値を残しておくと、小さな変化を見つけやすく、診察時にも経過を正確に伝えられます。</p></div>
-    <section className="nm-card nm-health-dashboard"><div className="nm-health-toolbar"><label><span>記録を見るペット</span><select value={pet.id} onChange={e => setPetId(e.target.value)}>{pets.map(item => <option key={item.id} value={item.id}>{item.name}ちゃん</option>)}</select></label><div className="nm-health-period">{([['day','日'],['week','週'],['month','月']] as const).map(([value,label]) => <button className={period === value ? 'active' : ''} onClick={() => setPeriod(value)} key={value}>{label}</button>)}</div></div>
-      <div className="nm-vital-cards">{healthMetrics.map(item => { const latest = latestFor(item.value); return <button className={metricKey === item.value ? 'active' : ''} style={{ '--vital-color': item.color } as React.CSSProperties} onClick={() => setMetricKey(item.value)} key={item.value}><span>{item.short}</span><b>{latest == null ? '—' : item.value === 'weight_kg' ? Number(latest).toFixed(1) : Math.round(Number(latest))}</b><small>{item.unit}</small></button>; })}</div>
-      <div className="nm-chart-heading"><div><span>{period === 'day' ? '日別' : period === 'week' ? '週平均' : '月平均'}</span><h3>{metric.label}の推移</h3></div><i style={{ background: metric.color }}/></div>{loading ? <div className="nm-chart-empty"><b>記録を読み込んでいます…</b></div> : <HealthLineChart points={points} metric={metric}/>}<p className="nm-chart-note">診察時はこの画面を獣医師へ見せて、普段との差や変化の期間をお伝えください。</p>{petLogs.length > 0 && <div className="nm-health-recent"><h4>最近の記録</h4>{petLogs.slice(0, 5).map(log => <div key={log.id}><time>{log.logged_on.replaceAll('-', '.')}</time><span>体重 <b>{log.weight_kg == null ? '—' : `${Number(log.weight_kg).toFixed(1)}kg`}</b></span><span>心拍 <b>{log.heart_rate_bpm == null ? '—' : `${log.heart_rate_bpm}回`}</b></span><span>呼吸 <b>{log.respiratory_rate_bpm == null ? '—' : `${log.respiratory_rate_bpm}回`}</b></span>{log.note && <p>{log.note}</p>}</div>)}</div>}</section>
-    <section className="nm-card nm-measure-guide"><div className="nm-section-heading"><span>HOW TO MEASURE</span><h2>おうちでの測り方</h2></div><div className="nm-measure-item"><i>01</i><div><h3>体重</h3><p>ペットを抱いて体重計に乗り、表示された重さから飼い主さま自身の体重を差し引きます。毎回できるだけ同じ時間・同じ条件で測ると変化を比べやすくなります。</p></div></div><div className="nm-measure-item"><i>02</i><div><h3>心拍数</h3><p>落ち着いている時に胸のあたりへそっと手を当て、15秒間の拍動数を数えて4倍します。家庭での参考目安は大型犬60〜80回、小型犬80〜120回、猫130〜160回/分ですが、年齢・体格・緊張などで変わります。</p></div></div><div className="nm-measure-item"><i>03</i><div><h3>呼吸数</h3><p>眠っている時や安静時に胸・お腹の上下を見て、「吸って吐く」を1回として15秒間数え、4倍します。20〜30回/分をひとつの参考にし、パンティング中や猫が喉を鳴らしている時は避けましょう。</p></div></div><div className="nm-health-caution">数値だけで病気を判断するものではありません。普段と違う状態が続く、呼吸が苦しそう、ぐったりしているなどの症状がある場合は、記録を待たず獣医師へご相談ください。</div></section>
-    <HealthForm ctx={ctx} pet={pet} onSaved={() => void loadLogs()}/>
+  if (!pets.length) return <section className="nm-stack nm-home-stack nm-v6-health"><div className="nm-v6-heading"><span>HEALTH DIARY</span><h2>健康日記</h2><p>なるべく早く愛犬愛猫の異変に気付くためには、ご家庭での健康管理が大切です。</p></div><Notice>先にマイペットを登録してください。</Notice></section>;
+  const pet = pets.find(item => item.id === petId) || pets[0]; const petLogs = logs.filter(log => log.pet_id === pet.id);
+  if (view === 'record') return <section className="nm-stack nm-home-stack nm-v6-edit"><button className="nm-back" type="button" onClick={() => setView('diary')}>← 健康日記へ戻る</button><HealthForm ctx={ctx} pet={pet} onSaved={() => { void loadLogs(); setView('diary'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} /><MeasureGuide /></section>;
+  if (view === 'summary') return <HealthSummaryView ctx={ctx} pet={pet} onBack={() => setView('diary')} />;
+  const latestWeight = petLogs.find(log => log.weight_kg != null)?.weight_kg; const latestHeart = petLogs.find(log => log.heart_rate_bpm != null)?.heart_rate_bpm; const latestResp = petLogs.find(log => log.respiratory_rate_bpm != null)?.respiratory_rate_bpm;
+  const bars = healthBars(petLogs, keyName, period); const keyMeta = healthKeys.find(k => k.value === keyName)!;
+  const recent = showAll ? petLogs.slice(0, 30) : petLogs.slice(0, 3);
+  return <section className="nm-stack nm-home-stack nm-v6-health">
+    <div className="nm-v6-heading-row"><div className="nm-v6-heading"><span>HEALTH DIARY</span><h2>健康日記</h2></div><button type="button" className="nm-v6-add" onClick={() => setView('record')}>＋ 今日を記録</button></div>
+    {pets.length > 1 && <div className="nm-v6-pet-switch" role="tablist" aria-label="記録を見るペット">{pets.map(item => <button type="button" role="tab" aria-selected={item.id === pet.id} className={item.id === pet.id ? 'active' : ''} key={item.id} onClick={() => setPetId(item.id)}><i>{item.imageUrl ? <img src={item.imageUrl} alt="" /> : null}</i>{item.name}ちゃん</button>)}</div>}
+    <div className="nm-v6-vitals">
+      <div><span>体重</span><b>{latestWeight == null ? '—' : Number(latestWeight).toFixed(1)}<small>kg</small></b><em>{weekAgoNote(petLogs)}</em></div>
+      <div><span>心拍</span><b>{latestHeart == null ? '—' : Math.round(Number(latestHeart))}<small>回/分</small></b><em>{stableNote(petLogs, 'heart')}</em></div>
+      <div><span>呼吸</span><b>{latestResp == null ? '—' : Math.round(Number(latestResp))}<small>回/分</small></b><em>{stableNote(petLogs, 'resp')}</em></div>
+    </div>
+    <div className="nm-v6-trend">
+      <div className="nm-v6-trend-head"><div className="nm-v6-heading"><span>{period === 'day' ? '日別' : period === 'week' ? '週平均' : '月平均'}</span><h2>{keyMeta.label}の推移</h2></div><div className="nm-v6-period" role="radiogroup" aria-label="期間">{([['day', '日'], ['week', '週'], ['month', '月']] as const).map(([value, label]) => <button type="button" role="radio" aria-checked={period === value} className={period === value ? 'active' : ''} key={value} onClick={() => setPeriod(value)}>{label}</button>)}</div></div>
+      <div className="nm-v6-keys" role="radiogroup" aria-label="指標">{healthKeys.map(k => <button type="button" role="radio" aria-checked={keyName === k.value} className={keyName === k.value ? 'active' : ''} key={k.value} onClick={() => setKeyName(k.value)}>{k.label}</button>)}</div>
+      {loading ? <div className="nm-v6-bars-empty"><b>記録を読み込んでいます…</b></div> : <HealthBars bars={bars} keyName={keyName} />}
+      <p>診察のときは、この画面を獣医師へ見せて「普段との差」と「変化の期間」をお伝えください。</p>
+    </div>
+    <button type="button" className="nm-v6-btn nm-v6-btn-accent nm-v6-btn-wide" onClick={() => setView('summary')}>獣医師に見せる（直近30日のまとめ）</button>
+    <div className="nm-v6-recent">
+      <div className="nm-v6-recent-head"><b>最近の記録</b>{petLogs.length > 3 && <button type="button" className="nm-link" onClick={() => setShowAll(v => !v)}>{showAll ? '閉じる' : 'すべて見る'}</button>}</div>
+      {recent.length === 0 ? <p className="nm-v6-recent-empty">まだ記録がありません。「今日を記録」から始めましょう。</p> : recent.map(log => <div className="nm-v6-recent-row" key={log.id}><time>{log.logged_on.slice(5).replace('-', '.')}</time><div><b>{recordLine(log)}</b>{log.note && <p>{log.note}</p>}</div></div>)}
+    </div>
   </section>;
 }
 
@@ -446,7 +534,7 @@ function App({ ctx }: { ctx: Ctx }) {
     : data.commerce.subscription ? [data.commerce.subscription] : [];
   const recentOrders = data.commerce.orders.slice(0, 3);
   return <main className="nm-app">
-    {tab === 'home' ? <header className="nm-home-header"><div><h1>マイページ</h1><span>然 -NEN-</span></div><p>{data.owner.displayName || 'お客様'}さん</p></header> : tab === 'pets' ? <header className="nm-home-header"><div><h1>マイペット</h1><span>然 -NEN-</span></div><p>{data.owner.displayName || 'お客様'}さん</p></header> : <header className="nm-page-header"><span>NEN MEMBERS</span><h1>{tabLabel}</h1></header>}
+    {tab === 'home' ? <header className="nm-home-header"><div><h1>マイページ</h1><span>然 -NEN-</span></div><p>{data.owner.displayName || 'お客様'}さん</p></header> : tab === 'pets' ? <header className="nm-home-header"><div><h1>マイペット</h1><span>然 -NEN-</span></div><p>{data.owner.displayName || 'お客様'}さん</p></header> : tab === 'health' ? <header className="nm-home-header"><div><h1>健康日記</h1><span>然 -NEN-</span></div><p>{data.owner.displayName || 'お客様'}さん</p></header> : <header className="nm-page-header"><span>NEN MEMBERS</span><h1>{tabLabel}</h1></header>}
     {tab === 'home' && <section className="nm-stack nm-home-stack">
       <MembershipSheet membership={membership} ownerName={data.owner.displayName || 'お客様'} />
       <div className="nm-card nm-lifetime"><div className="nm-lifetime-row"><span>ライフタイム</span><b>{yen(membership.lifetimeMilesYen)}</b></div><p className="nm-sub">{membership.nextMilestone ? `これまでの累計。あと ${yen(membership.nextMilestone.remainingYen)} で「${membership.nextMilestone.title}」。節目で限定グッズをご用意します` : 'これまでの累計。節目で限定グッズをご用意します'}</p></div>

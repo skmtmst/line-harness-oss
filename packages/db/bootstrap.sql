@@ -3242,7 +3242,11 @@ CREATE TABLE media_upload_sessions (
   created_by        TEXT,
   created_at        TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f','now','+9 hours')),
   completed_at      TEXT
-);
+, width INTEGER
+  CHECK (width IS NULL OR width > 0), height INTEGER
+  CHECK (height IS NULL OR height > 0), duration_ms INTEGER
+  CHECK (duration_ms IS NULL OR duration_ms > 0), page_count INTEGER
+  CHECK (page_count IS NULL OR page_count > 0), codec TEXT);
 
 CREATE TABLE media_usage_scan_state (
   id               INTEGER PRIMARY KEY CHECK (id = 1),

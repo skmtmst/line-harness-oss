@@ -31,6 +31,7 @@ import {
   refreshStoredFeeding,
 } from '../services/nen-feeding.js';
 import { attachTagAndFireSideEffects } from '../services/friend-tag-attach.js';
+import { APPETITE_LABELS, STOOL_LABELS, thirtyDaySummary, type HealthLogRow } from '../services/nen-health-admin.js';
 import {
   refreshAllNenTags,
   syncNenHealthTags,
@@ -792,6 +793,32 @@ nenMembers.get('/api/liff/nen/health-logs', async (c) => {
   if (!friend) return c.json({ success: false, error: 'Unauthorized' }, 401);
   const rows = await c.env.DB.prepare(`SELECT * FROM nen_health_logs WHERE friend_id = ? ORDER BY logged_on DESC LIMIT 730`).bind(friend.id).all<Record<string, unknown>>();
   return c.json({ success: true, data: rows.results });
+});
+
+/**
+ * 「獣医師に見せる（直近30日のまとめ）」（★V6 37-2-B）。管理画面の 30日のまとめ（★V6 37-4）と同じ計算。
+ * 本人のペットだけ。医療判断は含めない。
+ */
+nenMembers.get('/api/liff/nen/health-logs/summary', async (c) => {
+  const friend = await currentFriend(c);
+  if (!friend) return c.json({ success: false, error: 'Unauthorized' }, 401);
+  const petId = (c.req.query('petId') ?? '').trim();
+  const pet = await c.env.DB.prepare(`SELECT id, name, animal_type, breed, birthday, weight_kg FROM nen_pet_profiles WHERE id = ? AND friend_id = ?`)
+    .bind(petId, friend.id).first<{ id: string; name: string; animal_type: string; breed: string | null; birthday: string | null; weight_kg: number | null }>();
+  if (!pet) return c.json({ success: false, error: 'Pet not found' }, 404);
+  const today = new Date();
+  const since = new Date(today.getTime() - 30 * 86_400_000).toISOString().slice(0, 10);
+  const logs = await c.env.DB.prepare(
+    `SELECT pet_id, logged_on, weight_kg, stool_status, appetite, skin_status, tear_stain_status, heart_rate_bpm, respiratory_rate_bpm, note
+       FROM nen_health_logs WHERE pet_id = ? AND logged_on >= ? ORDER BY logged_on DESC`,
+  ).bind(pet.id, since).all<HealthLogRow>();
+  return c.json({ success: true, data: {
+    pet: { id: pet.id, name: pet.name, animalType: pet.animal_type === 'cat' ? 'cat' : 'dog', breed: pet.breed ?? '', birthday: pet.birthday, weightKg: pet.weight_kg },
+    owner: { name: friend.display_name ?? '' },
+    generatedAt: today.toISOString(),
+    summary: thirtyDaySummary(logs.results ?? [], today),
+    labels: { stool: STOOL_LABELS, appetite: APPETITE_LABELS },
+  } });
 });
 
 nenMembers.post('/api/liff/nen/photos', async (c) => {
