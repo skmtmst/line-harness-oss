@@ -1529,6 +1529,26 @@ CREATE TABLE common_actions (
   archived_at                  TEXT
 );
 
+CREATE TABLE common_var_export_jobs (
+  id TEXT PRIMARY KEY,
+  line_account_id TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE RESTRICT,
+  filter_json TEXT NOT NULL CHECK (json_valid(filter_json)),
+  status TEXT NOT NULL DEFAULT 'queued'
+    CHECK (status IN ('queued','running','completed','failed','expired')),
+  total_count INTEGER CHECK (total_count IS NULL OR total_count >= 0),
+  processed_count INTEGER NOT NULL DEFAULT 0 CHECK (processed_count >= 0),
+  row_count INTEGER CHECK (row_count IS NULL OR row_count >= 0),
+  byte_size INTEGER CHECK (byte_size IS NULL OR byte_size >= 0),
+  csv_text TEXT,
+  created_by TEXT NOT NULL,
+  created_by_name TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  started_at TEXT,
+  finished_at TEXT,
+  expires_at TEXT NOT NULL,
+  failure_reason TEXT
+);
+
 CREATE TABLE "common_var_replacement_runs" (id TEXT PRIMARY KEY, line_account_id TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE, source_common_var_id TEXT NOT NULL REFERENCES "common_vars"(id), replacement_common_var_id TEXT NOT NULL REFERENCES "common_vars"(id), source_version INTEGER NOT NULL, expected_usage_count INTEGER NOT NULL, replaced_usage_count INTEGER NOT NULL, actor_id TEXT, status TEXT NOT NULL CHECK (status IN ('completed', 'partial')), created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f','now','+9 hours')));
 
 CREATE TABLE "common_var_resolution_failures" (
@@ -6446,6 +6466,9 @@ CREATE INDEX idx_common_action_versions_action_status
 
 CREATE INDEX idx_common_actions_account_status
   ON common_actions(line_account_id, status, updated_at DESC);
+
+CREATE INDEX idx_common_var_export_jobs_account
+  ON common_var_export_jobs(line_account_id, created_at DESC);
 
 CREATE INDEX idx_common_var_replacement_runs_v403_source ON common_var_replacement_runs(source_common_var_id, created_at DESC);
 
