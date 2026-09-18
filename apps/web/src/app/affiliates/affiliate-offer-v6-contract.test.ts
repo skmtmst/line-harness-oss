@@ -256,13 +256,14 @@ describe('V6 アフィリエイターを追加する（xqT1Z）', () => {
     // `limit: 200` で止めると数が小さく出て支払い判断を誤る。
     // offset で送って短い頁まで取り、安全弁のときだけ注記を出す。
     expect(TABS).toContain('listAllConversionApprovals')
-    expect(TABS).toContain('offset: page * APPROVAL_PAGE_SIZE')
+    expect(TABS).toContain('offset: startOffset + page * APPROVAL_PAGE_SIZE')
     expect(TABS).toContain('直近5000件まで')
-    // KPI 用の読み出し（紹介者タブの pending/approved、案件タブの3状態）は
-    // 全件取りに替えた。成果承認の作業列は表示用のため対象外で、
-    // 「直近最大200件」の注記を残す。
+    // KPI 用の読み出し（紹介者タブの pending/approved、案件タブの3状態）に
+    // 加え、成果承認の作業列も同じ読み方へ替えた(N-207)。「各状態
+    // 最大200件」の注記は残さない。
     expect(TABS).not.toContain("api.conversionApprovals.list({ status: 'pending', limit: 200 })")
     expect(TABS).not.toContain('api.conversionApprovals.list({ status, limit: 200 })')
     expect(TABS).not.toContain('合計 ${formatYen(pendingYen)}（直近最大200件）')
+    expect(TABS).not.toContain('直近最大200件')
   })
 })

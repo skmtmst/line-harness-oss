@@ -363,6 +363,37 @@ describe('getConversionApprovalQueue', () => {
     });
     expect(approvals.map((row) => row.eventId)).toEqual(['own-2', 'own-1']);
   });
+
+  test('アカウント絞りのため、行は成果地点のアカウントIDと名前を返す(N-218)', async () => {
+    insertFriend(sqlite, 'f1', { userId: 'uid-a' });
+    insertAffiliate(sqlite, 'aff1');
+    sqlite.prepare(
+      `INSERT INTO line_accounts (id, channel_id, name, channel_access_token, channel_secret)
+       VALUES (?, ?, ?, 'token', 'secret')`,
+    ).run('acc-a', 'channel-a', '本店');
+    insertPoint(sqlite, 'p-owned', 100, 'acc-a');
+    insertPoint(sqlite, 'p-free', 100, null);
+    insertConversion(sqlite, {
+      id: 'cv-owned', pointId: 'p-owned', friendId: 'f1', affiliateId: 'aff1', refCode: null,
+      approvalStatus: 'pending', createdAt: '2026-02-01T00:00:00.000+09:00',
+    });
+    insertConversion(sqlite, {
+      id: 'cv-free', pointId: 'p-free', friendId: 'f1', affiliateId: 'aff1', refCode: null,
+      approvalStatus: 'pending', createdAt: '2026-02-02T00:00:00.000+09:00',
+    });
+
+    // allowedAccountIds が空のままだと未割当の行しか返らないので、
+    // 権限内アカウントを指定したscopeで読む。
+    const rows = await getConversionApprovalQueue(db, {
+      status: 'pending',
+      scope: { allowedAccountIds: ['acc-a'], includeUnassigned: true },
+      identityKeySql: IDENTITY_KEY_SQL,
+    });
+    const byEvent = new Map(rows.map((r) => [r.eventId, r]));
+    expect(byEvent.get('cv-owned')).toMatchObject({ lineAccountId: 'acc-a', lineAccountName: '本店' });
+    // 未割当の地点は id・名ともに null。画面側は「アカウント未設定」と出す。
+    expect(byEvent.get('cv-free')).toMatchObject({ lineAccountId: null, lineAccountName: null });
+  });
 });
 
 describe('setConversionApproval', () => {

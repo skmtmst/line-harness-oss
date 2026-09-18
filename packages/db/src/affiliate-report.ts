@@ -794,6 +794,13 @@ export interface ConversionApprovalRow {
    * 停止中の案件・動作未設定・未承認の行は false。
    */
   offerActionsIncomplete: boolean;
+  /**
+   * 成果地点が属するLINEアカウント。キューのアカウント絞り(N-218)は
+   * scope と同じ `cp.line_account_id` で数える。未割当の地点は null。
+   */
+  lineAccountId: string | null;
+  /** アカウント名。削除済み・未割当は null（画面側で未設定と出す）。 */
+  lineAccountName: string | null;
 }
 
 /**
@@ -880,11 +887,14 @@ export async function getConversionApprovalQueue(
                                        WHERE fsd.id = 'conversion-offer:' || ce.id
                                          AND fsd.friend_id = ce.friend_id
                                          AND fsd.scenario_id = off.scenario_id)))
-              THEN 1 ELSE 0 END AS offer_actions_incomplete
+              THEN 1 ELSE 0 END AS offer_actions_incomplete,
+         cp.line_account_id AS line_account_id,
+         la.name AS line_account_name
        FROM conversion_events ce
        JOIN friends ON friends.id = ce.friend_id
        LEFT JOIN affiliates a ON a.id = ce.affiliate_id
        JOIN conversion_points cp ON cp.id = ce.conversion_point_id
+       LEFT JOIN line_accounts la ON la.id = cp.line_account_id
        LEFT JOIN affiliate_links al ON al.ref_code = ce.attributed_ref_code
        LEFT JOIN affiliate_offers off ON off.id = al.offer_id
        LEFT JOIN dup_keys dk
@@ -912,6 +922,8 @@ export async function getConversionApprovalQueue(
       approval_status: 'pending' | 'approved' | 'rejected';
       duplicate_flag: number;
       offer_actions_incomplete: number;
+      line_account_id: string | null;
+      line_account_name: string | null;
     }>();
 
   return result.results.map((r) => ({
@@ -929,5 +941,7 @@ export async function getConversionApprovalQueue(
     approvalStatus: r.approval_status,
     duplicateFlag: r.duplicate_flag === 1,
     offerActionsIncomplete: r.offer_actions_incomplete === 1,
+    lineAccountId: r.line_account_id,
+    lineAccountName: r.line_account_name,
   }));
 }

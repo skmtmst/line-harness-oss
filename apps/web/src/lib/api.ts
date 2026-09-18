@@ -1022,6 +1022,10 @@ export type ConversionApprovalItem = {
   duplicateFlag: boolean
   /** 承認済みで案件の付帯動作(タグ付与・シナリオ開始)が未完の行だけ true */
   offerActionsIncomplete: boolean
+  /** 成果地点が属するLINEアカウント。アカウント絞りはこの値で数える。未割当は null */
+  lineAccountId: string | null
+  /** アカウント名。削除済み・未割当は null */
+  lineAccountName: string | null
 }
 
 export type ConversionDefinitionStatus = 'active' | 'stopped'
