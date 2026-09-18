@@ -1539,6 +1539,8 @@ export type AnalyticsReactionsOverview = AnalyticsEnvelope<{
     outcomes: AnalyticsMetric<number>
     fetchedAt: string | null
   }>
+  /** 一覧の打切り情報。上限に達した系統だけ true になり、画面は「先頭○件まで表示」を出す。 */
+  campaignsTruncation: { limit: number; broadcast: boolean; scenario: boolean }
   trackedClickHours: Array<{ hour: number; clicks: number }>
   clickDefinition: string
 }>
