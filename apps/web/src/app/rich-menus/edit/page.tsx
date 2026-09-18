@@ -14,7 +14,8 @@ import ConfirmDialog from '@/components/shared/confirm-dialog'
 import StickyBar from '@/components/shared/sticky-bar'
 import type { SegmentCondition } from '@/lib/segment-condition'
 import { usePageTitle } from '@/components/shell/page-chrome'
-import { RICH_MENU_DIMENSIONS } from '@line-crm/shared'
+import { RICH_MENU_DIMENSIONS, type MediaItem } from '@line-crm/shared'
+import MediaPickerDialog from '@/app/contents/media-picker-dialog'
 import { datetimeLocalJstToUtcIso } from '@/lib/jst-datetime'
 import { useScheduleSubmit } from './schedule-submit'
 import { ManualPublishAttempt } from './manual-publish-attempt'
@@ -251,6 +252,8 @@ function Editor({
   const [unpublishing, setUnpublishing] = useState(false)
   const [busy, setBusy] = useState(false)
   const [imageVersion, setImageVersion] = useState(0)
+  /** 登録メディアから画像を選ぶ窓（N-193）。 */
+  const [mediaPickerOpen, setMediaPickerOpen] = useState(false)
 
   /*
    * 確認の窓。**ブラウザの `confirm()` は使わない。**
@@ -721,6 +724,38 @@ function Editor({
     }
   }
 
+  /**
+   * 登録メディアから選んだ画像をこのページの画像にする（N-193）。
+   * 認証と監査を通る取得口から受け取り、既存のアップロード経路へ流す。
+   * 形式・寸法・容量の検査はアップロードと同じ場所で行う。
+   */
+  async function handleMediaPick(item: MediaItem) {
+    setMediaPickerOpen(false)
+    if (!activePage || !group) return
+    if (activePage.id.startsWith('tmp-')) {
+      setError('先に「下書きを保存」でページを保存してから、画像を選んでください。')
+      return
+    }
+    setBusy(true)
+    setError(null)
+    try {
+      const blob = await api.media.download(item.id, group.accountId)
+      const file = new File([blob], item.filename, {
+        type: item.mimeType || blob.type || 'image/png',
+      })
+      const res = await api.richMenuGroups.uploadImage(groupId, activePage.id, file)
+      updatePage(activePage.id, {
+        imageR2Key: res.data.imageR2Key,
+        imageContentType: res.data.imageContentType,
+      })
+      setImageVersion((v) => v + 1)
+    } catch (e) {
+      setError(imageUploadErrorText(e))
+    } finally {
+      setBusy(false)
+    }
+  }
+
   if (loading) {
     return (
       <main className="p-6 max-w-7xl mx-auto">
@@ -1015,13 +1050,22 @@ function Editor({
                     e.target.value = ''
                   }}
                 />
-                <button
-                  onClick={() => fileInput.current?.click()}
-                  disabled={busy || activePage.id.startsWith('tmp-')}
-                  className="mt-2 px-3 py-1.5 text-xs font-medium border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                >
-                  {activePage.imageR2Key ? '画像を差し替え' : '画像を選択'}
-                </button>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <button
+                    onClick={() => fileInput.current?.click()}
+                    disabled={busy || activePage.id.startsWith('tmp-')}
+                    className="px-3 py-1.5 text-xs font-medium border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    {activePage.imageR2Key ? '画像を差し替え' : '画像を選択'}
+                  </button>
+                  <button
+                    onClick={() => setMediaPickerOpen(true)}
+                    disabled={busy || activePage.id.startsWith('tmp-')}
+                    className="px-3 py-1.5 text-xs font-medium border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    登録メディアから選ぶ
+                  </button>
+                </div>
                 <p className="mt-1.5 text-[11px] text-gray-500">
                   PNG / JPEG, {SIZE_LABEL[group.size]}, 1MB 以下
                 </p>
@@ -1323,6 +1367,14 @@ function Editor({
         保存成功後は署名が更新されて dirty が外れるので、確認は出ない。
       */}
       {leaveConfirmDialog}
+
+      <MediaPickerDialog
+        open={mediaPickerOpen}
+        accountId={group.accountId}
+        kind="image"
+        onClose={() => setMediaPickerOpen(false)}
+        onSelect={(item) => void handleMediaPick(item)}
+      />
 
       <StickyBar actions={(
         <div className="flex items-center gap-2">

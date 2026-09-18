@@ -2,12 +2,14 @@
 
 import Link from 'next/link'
 import { useState } from 'react'
+import type { MediaItem } from '@line-crm/shared'
 import { api, type BroadcastAssetKind } from '@/lib/api'
 import Button from '@/components/shared/button'
 import StickyBar from '@/components/shared/sticky-bar'
 import { TextField } from '@/components/shared/text-field'
 import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
+import MediaPickerDialog from '@/app/contents/media-picker-dialog'
 
 type AssetKind = Extract<BroadcastAssetKind, 'rich_message' | 'coupon' | 'research'>
 
@@ -35,10 +37,21 @@ export default function TemplateAssetEditor({ kind, visual = false }: { kind: As
   const [folder, setFolder] = useState(visual ? meta.folder : '未分類')
   const [description, setDescription] = useState(visual ? (kind === 'coupon' ? '会計時にこの画面をご提示ください。他の割引との併用はできません。' : kind === 'research' ? '来月も定期便を続けたいと思いますか？' : '') : '')
   const [imageUrl, setImageUrl] = useState('')
+  /** 登録メディアから選んだ1件。IDと種別も保存値へ残す（N-193）。 */
+  const [pickedMedia, setPickedMedia] = useState<MediaItem | null>(null)
+  /** メディア選択窓を開いている対象。null なら閉じている。 */
+  const [pickerFor, setPickerFor] = useState<'rich_message' | 'coupon' | null>(null)
   const [shape, setShape] = useState('3')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [saved, setSaved] = useState(false)
+
+  const pickMedia = (item: MediaItem) => {
+    // 配信用の公開URLを保存値へ入れる（管理画面の表示用URLではない）。
+    setImageUrl(item.url)
+    setPickedMedia(item)
+    setPickerFor(null)
+  }
 
   const save = async () => {
     if (!selectedAccountId) return setError('上のバーでLINE公式アカウントを選んでください。')
@@ -46,9 +59,26 @@ export default function TemplateAssetEditor({ kind, visual = false }: { kind: As
     setSaving(true)
     setError('')
     const payload = kind === 'rich_message'
-      ? { imageUrl, shape, tapAreas: [{ label: 'A', action: 'タグ「夏CP」を付ける' }, { label: 'B', action: 'キャンペーンページを開く' }] }
+      ? {
+          imageUrl,
+          // 選んだ登録メディアのID・種別も保存値へ残す（N-193）。
+          imageMediaId: pickedMedia?.id ?? null,
+          imageMediaKind: pickedMedia?.kind ?? null,
+          shape,
+          tapAreas: [{ label: 'A', action: 'タグ「夏CP」を付ける' }, { label: 'B', action: 'キャンペーンページを開く' }],
+        }
       : kind === 'coupon'
-        ? { description, startsAt: '2026-08-25T00:00', endsAt: '2026-09-30T23:59', oncePerFriend: true, lotteryRate: 20, winnerLimit: 500 }
+        ? {
+            description,
+            imageUrl,
+            imageMediaId: pickedMedia?.id ?? null,
+            imageMediaKind: pickedMedia?.kind ?? null,
+            startsAt: '2026-08-25T00:00',
+            endsAt: '2026-09-30T23:59',
+            oncePerFriend: true,
+            lotteryRate: 20,
+            winnerLimit: 500,
+          }
         : { description, questionCount: 3, answerAction: 'タグと友だち情報へ保存' }
     try {
       const result = await api.broadcastMessageAssets.create({
@@ -104,8 +134,9 @@ export default function TemplateAssetEditor({ kind, visual = false }: { kind: As
               <section className="bg-canvas border-hairline rounded-card shadow-card border p-4">
                 <Field label="画像" note="1040 × 1040px 推奨。上下に分けるときは 1040 × 520px も選べます。">
                   <div className="border-hairline rounded-control mt-2 border border-dashed p-5 text-center">
-                    <Button type="button">登録メディアから選ぶ</Button>
-                    <input className="border-hairline rounded-control bg-canvas text-ink focus:ring-accent mt-3 w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none" value={imageUrl} onChange={(event) => setImageUrl(event.target.value)} placeholder="画像URL" />
+                    <Button type="button" onClick={() => setPickerFor('rich_message')}>登録メディアから選ぶ</Button>
+                    {pickedMedia ? <p className="text-success mt-2 text-xs">選択中: {pickedMedia.filename}</p> : null}
+                    <input className="border-hairline rounded-control bg-canvas text-ink focus:ring-accent mt-3 w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none" value={imageUrl} onChange={(event) => { setImageUrl(event.target.value); setPickedMedia(null) }} placeholder="画像URL" />
                   </div>
                 </Field>
               </section>
@@ -118,7 +149,11 @@ export default function TemplateAssetEditor({ kind, visual = false }: { kind: As
           ) : kind === 'coupon' ? (
             <>
               <section className="bg-canvas border-hairline rounded-card shadow-card grid gap-4 border p-4 md:grid-cols-2">
-                <Field label="画像"><Button type="button" className="mt-2 w-full">登録メディアから選ぶ</Button><span className="text-caption mt-1 block font-normal text-ink-faint">1029 × 1029px 推奨</span></Field>
+                <Field label="画像">
+                  <Button type="button" className="mt-2 w-full" onClick={() => setPickerFor('coupon')}>登録メディアから選ぶ</Button>
+                  {pickedMedia ? <span className="text-success mt-1 block text-xs">選択中: {pickedMedia.filename}</span> : null}
+                  <span className="text-caption mt-1 block font-normal text-ink-faint">1029 × 1029px 推奨</span>
+                </Field>
                 <Field label="使える期間　必須"><div className="mt-2 flex items-center gap-2"><input className="border-hairline rounded-control bg-canvas text-ink focus:ring-accent w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none" value="2026/08/25 00:00" readOnly /><span>から</span><input className="border-hairline rounded-control bg-canvas text-ink focus:ring-accent w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none" value="2026/09/30 23:59" readOnly /></div></Field>
                 <Field label="使い方のご案内（お客さまに見えます）"><textarea className="border-hairline rounded-control bg-canvas text-ink focus:ring-accent mt-2 w-full resize-y border px-3 py-2 text-sm focus:ring-2 focus:outline-none" rows={3} value={description} onChange={(event) => setDescription(event.target.value)} /></Field>
                 <div className="grid gap-3 text-sm"><Field label="使える回数"><select className="border-hairline rounded-control bg-canvas text-ink focus:ring-accent mt-2 w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none"><option>1人1回だけ</option><option>期間中なら何回でも</option></select></Field><Field label="だれに見えるか"><select className="border-hairline rounded-control bg-canvas text-ink focus:ring-accent mt-2 w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none"><option>友だちだけ</option><option>リンクを知っている人</option></select></Field></div>
@@ -158,6 +193,14 @@ export default function TemplateAssetEditor({ kind, visual = false }: { kind: As
       </div>
 
       <StickyBar status={saved ? '保存しました。一覧へ戻れます。' : '下書き（まだ誰にも送られません）'} actions={<><Button href="/templates" variant="secondary">キャンセル</Button><Button type="button" variant="secondary" disabled={saving || saved} onClick={() => void save()}>下書きに保存</Button><Button type="button" variant="primary" disabled={saving || saved} onClick={() => void save()}>{saving ? '保存中…' : saved ? '保存しました' : 'テンプレートを保存'}</Button></>} />
+
+      <MediaPickerDialog
+        open={pickerFor !== null}
+        accountId={selectedAccountId}
+        kind="image"
+        onClose={() => setPickerFor(null)}
+        onSelect={pickMedia}
+      />
     </div>
   )
 }

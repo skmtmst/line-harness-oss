@@ -709,6 +709,7 @@ function FormEditInner() {
             {editorTab === 'design' ? (
               <FormDesignSettings
                 formId={id}
+                accountId={selectedAccountId}
                 value={layout.options.theme}
                 ogTitle={ogTitle}
                 ogDescription={ogDescription}
