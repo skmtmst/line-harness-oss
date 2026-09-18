@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 
 import Database from 'better-sqlite3';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { FEATURE_IDS } from '@line-crm/shared';
 
 import {
   getAnalyticsFriendsOverview,
@@ -733,5 +734,118 @@ describe('V6分析の概要4画面', () => {
       clickRate: { value: null, state: 'unavailable' },
       usageLocations: ['broadcast_all'],
     });
+  });
+
+  /*
+   * N-448: 全任意機能の利用状況。共有カタログの featureId で機械照合し、
+   * 直近90日の回数・最終利用・未計測理由のどれかを必ず返す。
+   */
+  it('全任意機能を共有カタログIDで返し、計測できない機能を0にしない', async () => {
+    // 直近90日（2026-06-01T16:00Z 以降）・90日より前・別アカウントを混ぜる。
+    sqlite.prepare(
+      `INSERT INTO broadcasts (id, title, message_type, message_content, status, sent_at, line_account_id)
+       VALUES ('b-1','A','text','a','sent','2026-08-10T00:00:00.000Z','account-a'),
+              ('b-2','B','text','b','sent','2026-08-20T00:00:00.000Z','account-a'),
+              ('b-old','古','text','o','sent','2026-03-01T00:00:00.000Z','account-a'),
+              ('b-draft','下書','text','d','draft',NULL,'account-a'),
+              ('b-x','別','text','x','sent','2026-08-10T00:00:00.000Z','account-b')`,
+    ).run();
+    sqlite.prepare(
+      `INSERT INTO auto_reply_hits (id, auto_reply_id, friend_id, line_account_id, hit_at)
+       VALUES ('hit-1','ar-1','friend-a','account-a','2026-08-11T00:00:00.000Z'),
+              ('hit-2','ar-1','friend-a','account-a','2026-08-12T00:00:00.000Z'),
+              ('hit-x','ar-x','friend-x','account-b','2026-08-11T00:00:00.000Z')`,
+    ).run();
+    sqlite.prepare(`INSERT INTO site_visitors (id) VALUES ('visitor-a')`).run();
+    sqlite.prepare(
+      `INSERT INTO site_events (id, visitor_id, event_type, occurred_at, line_account_id)
+       VALUES ('ev-1','visitor-a','page_view','2026-08-13T00:00:00.000Z','account-a'),
+              ('ev-old','visitor-a','page_view','2026-03-05T00:00:00.000Z','account-a')`,
+    ).run();
+    sqlite.prepare(
+      `INSERT INTO tracked_links (id, name, original_url, line_account_id)
+       VALUES ('link-a','A','https://example.com','account-a')`,
+    ).run();
+    sqlite.prepare(
+      `INSERT INTO link_clicks (id, tracked_link_id, friend_id, clicked_at)
+       VALUES ('click-old','link-a','friend-a','2026-03-05T00:00:00.000Z')`,
+    ).run();
+    sqlite.prepare(`INSERT INTO support_marks (id, name) VALUES ('mark-a','対応中')`).run();
+    sqlite.prepare(`UPDATE friends SET support_mark_id = 'mark-a' WHERE id = 'friend-a'`).run();
+
+    const result = await getAnalyticsUsageOverview(db, CONTEXT);
+    const features = result.data.features;
+    // 共有カタログの全 featureId を重複なく返す（画面側の機械照合の正本）。
+    expect(features.map((item) => item.featureId).slice().sort())
+      .toEqual(FEATURE_IDS.slice().sort());
+
+    const byId = new Map(features.map((item) => [item.featureId, item]));
+    // 直近90日・自アカウントだけを数える。90日前と別アカウントは入らない。
+    expect(byId.get('broadcasts')).toMatchObject({
+      activityBasis: 'last90days',
+      activityUnit: '配信',
+      activity: { value: 2, state: 'available' },
+      lastUsedAt: { value: '2026-08-20T00:00:00.000Z' },
+    });
+    expect(byId.get('auto_replies')?.activity).toMatchObject({ value: 2 });
+    expect(byId.get('site_tracking')?.activity).toMatchObject({ value: 1 });
+    // 90日の利用は無いが、それ以前の最終利用は最終利用として返す。
+    expect(byId.get('inflow_tracking')).toMatchObject({
+      activity: { value: 0, state: 'available' },
+      lastUsedAt: { value: '2026-03-05T00:00:00.000Z' },
+    });
+    // 現在の利用数は期間を区切らない現在値。
+    expect(byId.get('support_marks')).toMatchObject({
+      activityBasis: 'current',
+      activity: { value: 1, state: 'available' },
+      lastUsedAt: { value: null, state: 'unavailable' },
+    });
+    // 計測できない機能は0や無表示にせず、未計測理由を返す。
+    for (const id of ['analytics', 'multi_store_hierarchy', 'restaurant_test'] as const) {
+      expect(byId.get(id)?.activity).toMatchObject({ value: null, state: 'unavailable' });
+      expect(byId.get(id)?.activity.reason).toBeTruthy();
+    }
+    // 記録の無い機能は取得失敗ではなく真の0。
+    expect(byId.get('booking')?.activity).toMatchObject({ value: 0, state: 'available' });
+    expect(byId.get('booking')?.lastUsedAt).toMatchObject({ value: null, state: 'available' });
+  });
+
+  it('機能の利用状況は機能ごとに問い合わせず領域ごとの固定文で集計する', async () => {
+    const preparedSql: string[] = [];
+    const countedDb = {
+      ...db,
+      prepare(sql: string) {
+        preparedSql.push(sql);
+        return db.prepare(sql);
+      },
+    } as D1Database;
+
+    const result = await getAnalyticsUsageOverview(countedDb, CONTEXT);
+    const featureSql = preparedSql.filter((sql) => sql.includes('usage-feature-'));
+    // 機能数に依らず固定の領域文だけ（N+1 回避）。行は取り出さずSQL側で数える。
+    expect(featureSql).toHaveLength(5);
+    expect(featureSql.every((sql) => !sql.toUpperCase().includes('UNION'))).toBe(true);
+    expect(result.data.features).toHaveLength(FEATURE_IDS.length);
+  });
+
+  it('ある領域の集計だけ失敗したとき、その領域の機能だけをfailedで返す', async () => {
+    const failedDb = {
+      ...db,
+      prepare(sql: string) {
+        if (sql.includes('usage-feature-content')) {
+          throw new Error('content query failed');
+        }
+        return db.prepare(sql);
+      },
+    } as D1Database;
+
+    const result = await getAnalyticsUsageOverview(failedDb, CONTEXT);
+    const byId = new Map(result.data.features.map((item) => [item.featureId, item]));
+    for (const id of ['rich_menus', 'forms', 'media', 'common_vars'] as const) {
+      expect(byId.get(id)?.activity).toMatchObject({ value: null, state: 'failed' });
+      expect(byId.get(id)?.activity.reason).toBeTruthy();
+    }
+    expect(byId.get('broadcasts')?.activity).toMatchObject({ value: 0, state: 'available' });
+    expect(byId.get('analytics')?.activity.state).toBe('unavailable');
   });
 });

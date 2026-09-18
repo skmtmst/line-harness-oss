@@ -68,7 +68,10 @@ describe('V6共通情報一覧', () => {
   it('一覧は空・期限つき・未使用の絞り込みとCSVを実際に操作できる', () => {
     expect(PAGE).toContain("setStateFilter(value)")
     expect(PAGE).toContain("label: '使われている数が多い順'")
-    expect(PAGE).toContain('commonVarsCsv(filtered)')
+    // N-192: CSVは端末生成から監査台帳つきのサーバ出力へ切り替えた。
+    expect(PAGE).toContain('VarsExportPanel')
+    expect(API).toContain('createExport')
+    expect(API).toContain('/api/common-vars/exports')
     expect(PAGE).toContain('中身が空のまま使われているものが')
   })
 

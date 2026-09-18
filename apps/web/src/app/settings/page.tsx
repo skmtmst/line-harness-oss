@@ -78,6 +78,7 @@ function groupSummary(group: FeatureGroup, features: Record<string, boolean>) {
 }
 
 type UsageCategory = AnalyticsUsageOverview['data']['categories'][number]
+type FeatureUsage = AnalyticsUsageOverview['data']['features'][number]
 
 /**
  * オフ前の影響確認(票643)の応答。件数と対象種別だけを持ち、
@@ -116,15 +117,13 @@ type LeaveTarget =
   | { kind: 'link'; href: string }
   | { kind: 'history-back' }
 
+/*
+ * オン／オフを持たない項目だけが使う、分類ごとの利用数バッジ。
+ * 切り替えられる機能（keys を持つ行）は共有カタログの featureId で
+ * 機械照合する features 側を見る。ここに残るのは「友だち属性」だけ。
+ */
 const USAGE_ITEM_IDS_BY_KEY: Record<string, string[]> = {
-  templates: ['templates'],
-  scenarios: ['scenarios'],
-  forms: ['forms'],
-  rich_menus: ['rich-menus'],
   friend_attributes: ['friend-attributes'],
-  inflow_conversion: ['inflow', 'conversions'],
-  automations: ['automations'],
-  media_vars: ['common-vars', 'contents'],
 }
 
 function UsageBadge({ category, onRetry }: { category: UsageCategory; onRetry?: () => void }) {
@@ -160,11 +159,103 @@ function UsageBadge({ category, onRetry }: { category: UsageCategory; onRetry?: 
   )
 }
 
-function FeatureRow({ item, features, ordering, usage, usageRetry, sharedSwitch, canMoveUp, canMoveDown, onMove, onToggle }: {
+/** 最終利用の日付だけを短く出す。時刻はバッジに入らないのでタイトルへ残す。 */
+function shortUsageDate(value: string): string {
+  return value.slice(0, 10).replaceAll('-', '/')
+}
+
+/**
+ * 機能ごとの利用状況バッジ（N-448）。
+ *
+ * 直近90日の回数・現在の利用数・最終利用・未計測理由のどれかを必ず出す。
+ * 取得不可を 0 や無表示にしない。数え方の注意（partial）はタイトルへ載せる。
+ */
+function FeatureUsageBadge({ usage, label, onRetry }: {
+  usage: FeatureUsage
+  label: string
+  onRetry?: () => void
+}) {
+  const { activity, activityBasis, activityUnit, lastUsedAt } = usage
+  const lastUsed = lastUsedAt.value ? shortUsageDate(lastUsedAt.value) : null
+  const titleParts = [
+    lastUsed ? `最終利用 ${lastUsed}` : null,
+    lastUsedAt.reason && !lastUsed ? lastUsedAt.reason : null,
+    activity.reason ?? null,
+  ].filter((part): part is string => Boolean(part))
+  const title = `${label}：${titleParts.length > 0 ? titleParts.join('・') : '利用状況'}`
+  if (activity.state === 'failed') {
+    return (
+      <span
+        className="rounded-pill border-hairline bg-canvas-sunken whitespace-nowrap border px-2 py-0.5 text-[10px] font-bold text-ink-faint"
+        title={title}
+      >
+        利用状況は取得失敗
+        {onRetry && (
+          <button
+            type="button"
+            onClick={onRetry}
+            aria-label="利用状況を読み直す"
+            className="ml-1 cursor-pointer underline hover:no-underline"
+          >
+            読み直す
+          </button>
+        )}
+      </span>
+    )
+  }
+  if (activity.value === null) {
+    const reason = activity.reason ?? lastUsedAt.reason ?? 'この機能の利用は計測していません'
+    return (
+      <>
+        <span
+          className="rounded-pill border-hairline bg-canvas-sunken whitespace-nowrap border px-2 py-0.5 text-[10px] font-bold text-ink-faint"
+          title={title}
+        >
+          利用状況は未計測
+        </span>
+        <span className="min-w-0 truncate text-[10px] text-ink-faint" title={reason}>
+          {reason}
+        </span>
+      </>
+    )
+  }
+  const count = activity.value.toLocaleString('ja-JP')
+  if (activityBasis === 'current') {
+    return (
+      <span
+        className="rounded-pill border-info bg-info-bg text-info whitespace-nowrap border px-2 py-0.5 text-[10px] font-bold"
+        title={title}
+      >
+        {activityUnit} {count}
+      </span>
+    )
+  }
+  if (activity.value === 0 && lastUsed) {
+    return (
+      <span
+        className="rounded-pill border-hairline bg-canvas-sunken whitespace-nowrap border px-2 py-0.5 text-[10px] font-bold text-ink-faint"
+        title={`${label}：直近90日の${activityUnit}は0・最終利用 ${lastUsed}`}
+      >
+        最終利用 {lastUsed}
+      </span>
+    )
+  }
+  return (
+    <span
+      className="rounded-pill border-info bg-info-bg text-info whitespace-nowrap border px-2 py-0.5 text-[10px] font-bold"
+      title={title}
+    >
+      90日で {count}{activityUnit}
+    </span>
+  )
+}
+
+function FeatureRow({ item, features, ordering, usage, featureUsage, usageRetry, sharedSwitch, canMoveUp, canMoveDown, onMove, onToggle }: {
   item: FeatureItem
   features: Record<string, boolean>
   ordering: boolean
   usage?: UsageCategory
+  featureUsage?: FeatureUsage
   usageRetry?: () => void
   sharedSwitch: boolean
   canMoveUp: boolean
@@ -190,7 +281,8 @@ function FeatureRow({ item, features, ordering, usage, usageRetry, sharedSwitch,
                 {item.badge}
               </span>
             )}
-            {usage && <UsageBadge category={usage} onRetry={usageRetry} />}
+            {featureUsage && <FeatureUsageBadge usage={featureUsage} label={item.label} onRetry={usageRetry} />}
+            {!featureUsage && usage && <UsageBadge category={usage} onRetry={usageRetry} />}
           </div>
           <p className="mt-0.5 truncate text-[11px] leading-relaxed text-ink-faint" title={item.note}>{item.note}</p>
         </div>
@@ -231,11 +323,12 @@ function FeatureRow({ item, features, ordering, usage, usageRetry, sharedSwitch,
   )
 }
 
-function FeatureSection({ group, features, ordering, usageByItemId, usageRetry, onItemToggle, onGroupToggle, onMove }: {
+function FeatureSection({ group, features, ordering, usageByItemId, usageByFeatureId, usageRetry, onItemToggle, onGroupToggle, onMove }: {
   group: FeatureGroup
   features: Record<string, boolean>
   ordering: boolean
   usageByItemId: Map<string, UsageCategory>
+  usageByFeatureId: Map<string, FeatureUsage>
   usageRetry?: () => void
   onItemToggle: (item: FeatureItem, next: boolean) => void
   onGroupToggle: (group: FeatureGroup, next: boolean) => void
@@ -273,7 +366,8 @@ function FeatureSection({ group, features, ordering, usageByItemId, usageRetry, 
             item={item}
             features={features}
             ordering={ordering}
-            usage={usageByItemId.get(item.id)}
+            usage={item.keys.length === 0 ? usageByItemId.get(item.id) : undefined}
+            featureUsage={item.keys[0] ? usageByFeatureId.get(item.keys[0]) : undefined}
             usageRetry={usageRetry}
             sharedSwitch={Boolean(item.keys[0]) && (switchCount.get(item.keys[0]) ?? 0) > 1}
             canMoveUp={index > 0}
@@ -351,6 +445,8 @@ export default function SettingsPage() {
   const [itemOrder, setItemOrder] = useState<MenuItemOrder>({})
   const [specializedFeatureKeys, setSpecializedFeatureKeys] = useState<string[]>([])
   const [usageCategories, setUsageCategories] = useState<UsageCategory[]>([])
+  /** 全任意機能の利用状況（N-448）。共有カタログの featureId で照合する。 */
+  const [usageFeatures, setUsageFeatures] = useState<FeatureUsage[]>([])
   /** 利用数の取得に失敗したときだけ出す「読み直す」の印。 */
   const [usageFailed, setUsageFailed] = useState(false)
   const [ordering, setOrdering] = useState(false)
@@ -397,6 +493,7 @@ export default function SettingsPage() {
       setSettingsVersion(0)
       setSpecializedFeatureKeys([])
       setUsageCategories([])
+      setUsageFeatures([])
       setUsageFailed(false)
       setOrdering(false)
       setError('')
@@ -426,6 +523,7 @@ export default function SettingsPage() {
       if (!accountGuard.isCurrent(ticket, selectedAccountId)) return
       if (usageResponse?.success) {
         setUsageCategories(usageResponse.data.data.categories)
+        setUsageFeatures(usageResponse.data.data.features ?? [])
       } else {
         setUsageFailed(true)
       }
@@ -444,6 +542,7 @@ export default function SettingsPage() {
       setSettingsVersion(0)
       setSpecializedFeatureKeys([])
       setUsageCategories([])
+      setUsageFeatures([])
       setLeaveTarget(null)
       setLoading(false)
       return
@@ -585,6 +684,13 @@ export default function SettingsPage() {
     }
     return result
   }, [usageCategories])
+
+  /** 共有カタログの featureId → 利用状況。切り替えられる全機能を機械照合する。 */
+  const usageByFeatureId = useMemo(() => {
+    const result = new Map<string, FeatureUsage>()
+    for (const entry of usageFeatures) result.set(entry.featureId, entry)
+    return result
+  }, [usageFeatures])
 
   const groupColumns = useMemo(() => {
     return splitFeatureGroups(groups, 3)
@@ -956,6 +1062,23 @@ export default function SettingsPage() {
           ) : (
             <div className={ordering ? 'grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_20rem]' : ''}>
               {/*
+                利用状況の取得自体に失敗したとき。バッジは付かないので、
+                無表示のままにせず一覧の先頭で理由とやり直しを出す。
+                設定の切替はこの間も触れるままにする。
+              */}
+              {usageFailed && (
+                <div className="border-hairline bg-canvas-sunken text-ink-faint mb-4 flex items-center gap-2 rounded-card border px-4 py-2 text-xs">
+                  <span>機能の利用状況を読めませんでした。設定の切替はそのまま使えます。</span>
+                  <button
+                    type="button"
+                    onClick={() => void loadUsage()}
+                    className="text-action cursor-pointer font-bold underline hover:no-underline"
+                  >
+                    利用状況を読み直す
+                  </button>
+                </div>
+              )}
+              {/*
                 区分ごとの印は付けない。区分と項目はサイドメニューと同じ一覧
                 （src/lib/menu.ts）から作るので、並びと顔ぶれは
                 sidebar-design.test.ts が見ている。ここで二重に縛ると、
@@ -974,7 +1097,8 @@ export default function SettingsPage() {
                         features={features}
                         ordering={ordering}
                         usageByItemId={usageByItemId}
-                        usageRetry={usageFailed ? () => void loadUsage() : undefined}
+                        usageByFeatureId={usageByFeatureId}
+                        usageRetry={() => void loadUsage()}
                         onItemToggle={toggleItem}
                         onGroupToggle={toggleGroup}
                         onMove={moveItem}

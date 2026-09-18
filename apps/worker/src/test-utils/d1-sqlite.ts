@@ -88,14 +88,34 @@ export function createTestD1(
 
   const db = {
     prepare: (sql: string) => ({
-      bind: (...args: unknown[]) => wrap(raw, sql, args),
+      // batch が SELECT へ .all() を振り分けられるよう、元の SQL を残しておく。
+      bind: (...args: unknown[]) => ({ ...wrap(raw, sql, args), sql }),
+      sql,
       ...(isSelect(sql) ? wrap(raw, sql, []) : wrap(raw, sql, [])),
     }),
     batch: async (statements: D1PreparedStatement[]) => {
       raw.exec('BEGIN IMMEDIATE')
       try {
         const results = []
-        for (const statement of statements) results.push(await statement.run())
+        for (const statement of statements) {
+          /*
+           * 実 D1 の batch は SELECT 文でも .results を返す。ここで一律
+           * .run() すると .results が無く、batch 内で SELECT を投げる
+           * 呼び出し側（使用先のまとめ集計など）が黙って壊れる。
+           */
+          const sql = (statement as unknown as { sql?: string }).sql ?? '';
+          if (!isSelect(sql)) {
+            results.push(await statement.run());
+            continue;
+          }
+          try {
+            results.push(await statement.all());
+          } catch {
+            // WITH x AS (...) INSERT ... のように WITH で始まる書き込みもある。
+            // returnsData が無い文に .all() すると実行前に失敗するので .run() へ倒す。
+            results.push(await statement.run());
+          }
+        }
         raw.exec('COMMIT')
         return results
       } catch (error) {

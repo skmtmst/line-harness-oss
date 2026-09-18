@@ -20,9 +20,15 @@ export default function MediaReplacementDialog({
   onComplete: (message: string) => void
 }) {
   const requestRef = useRef(0)
+  const candidateRequestRef = useRef(0)
   const [candidates, setCandidates] = useState<MediaItem[]>([])
   const [candidateTotal, setCandidateTotal] = useState(0)
   const [candidatePage, setCandidatePage] = useState(1)
+  /** 候補の読み込み状態。読込中・0件・失敗を分けて出す（N-205）。 */
+  const [candidatePhase, setCandidatePhase] = useState<'loading' | 'ready' | 'empty' | 'error'>('loading')
+  /** 名前検索。確定した語だけをAPIへ送る（入力中の1文字ごとには呼ばない）。 */
+  const [candidateQueryInput, setCandidateQueryInput] = useState('')
+  const [candidateQuery, setCandidateQuery] = useState('')
   const [replacementId, setReplacementId] = useState('')
   const [impact, setImpact] = useState<MediaReplacementImpact | null>(null)
   const [phase, setPhase] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
@@ -31,31 +37,46 @@ export default function MediaReplacementDialog({
 
   useEffect(() => {
     requestRef.current += 1
+    candidateRequestRef.current += 1
     setReplacementId('')
     setImpact(null)
     setPhase('idle')
     setBusy(false)
     setError('')
     setCandidatePage(1)
+    setCandidateQueryInput('')
+    setCandidateQuery('')
   }, [source])
 
   useEffect(() => {
-    if (!source || !accountId) { setCandidates([]); setCandidateTotal(0); return }
-    let active = true
-    void api.media.list(accountId, {
+    if (!source || !accountId) { setCandidates([]); setCandidateTotal(0); setCandidatePhase('empty'); return }
+    const request = ++candidateRequestRef.current
+    const requestedAccount = accountId
+    setCandidatePhase('loading')
+    void api.media.list(requestedAccount, {
       kind: source.kind,
       excludeId: source.id,
+      query: candidateQuery || undefined,
       limit: 50,
       offset: (candidatePage - 1) * 50,
     })
       .then((response) => {
-        if (!active || !response.success) return
-        setCandidates(response.data.items)
+        // アカウント切替・窓の開き直し・検索で古くなった応答は捨てる。
+        if (candidateRequestRef.current !== request) return
+        if (!response.success) {
+          setCandidatePhase('error')
+          return
+        }
+        // 別アカウントの候補は出さない（共有 lineAccountId=null は残す）。
+        const scoped = response.data.items.filter(
+          (item) => item.lineAccountId == null || item.lineAccountId === requestedAccount,
+        )
+        setCandidates(scoped)
         setCandidateTotal(response.data.total)
+        setCandidatePhase(scoped.length === 0 ? 'empty' : 'ready')
       })
-      .catch(() => { if (active) setError('差し替え候補を読み込めませんでした') })
-    return () => { active = false }
-  }, [accountId, candidatePage, source])
+      .catch(() => { if (candidateRequestRef.current === request) setCandidatePhase('error') })
+  }, [accountId, candidatePage, candidateQuery, source])
 
   async function selectReplacement(id: string) {
     setReplacementId(id)
@@ -128,24 +149,59 @@ export default function MediaReplacementDialog({
       <div className="space-y-4">
         <div>
           <label className="text-ink-secondary mb-1 block text-xs font-semibold">差し替え先</label>
-          <Select
-            aria-label="差し替え先"
-            value={replacementId}
-            options={[{ value: '', label: '別のメディアを選択' }, ...candidates.map((item) => ({ value: item.id, label: item.filename }))]}
-            onChange={(value) => void selectReplacement(value)}
-          />
-          {candidates.length === 0 ? (
-            <p className="text-ink-faint mt-2 text-xs">同じ種類の別メディアがありません。先に差し替え先を登録してください。</p>
-          ) : null}
-          {candidateTotal > 50 ? (
-            <div className="mt-2 flex items-center justify-between text-xs">
-              <span className="text-ink-faint">候補 {candidateTotal}件</span>
-              <div className="flex gap-2">
-                <Button type="button" disabled={candidatePage <= 1} onClick={() => setCandidatePage((page) => page - 1)}>前へ</Button>
-                <Button type="button" disabled={candidatePage * 50 >= candidateTotal} onClick={() => setCandidatePage((page) => page + 1)}>次へ</Button>
-              </div>
-            </div>
-          ) : null}
+          {/*
+            N-205: 候補が多いと一覧から探せない。名前で絞り込み、
+            絞り込んだ結果をそのままページ送りできる（検索とページングの併用）。
+          */}
+          <form
+            className="mb-2 flex gap-2"
+            onSubmit={(event) => {
+              event.preventDefault()
+              setCandidatePage(1)
+              setCandidateQuery(candidateQueryInput.trim())
+            }}
+          >
+            <input
+              type="text"
+              aria-label="差し替え候補を名前で検索"
+              placeholder="名前で探す"
+              value={candidateQueryInput}
+              onChange={(event) => setCandidateQueryInput(event.target.value)}
+              className="border-hairline rounded-control bg-canvas text-ink focus:ring-accent w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
+            />
+            <Button type="submit">検索</Button>
+          </form>
+          {candidatePhase === 'loading' ? (
+            <p className="text-ink-faint mt-2 text-xs" role="status">差し替え候補を読み込んでいます…</p>
+          ) : candidatePhase === 'error' ? (
+            <p className="text-danger mt-2 text-xs" role="alert">差し替え候補を読み込めませんでした。読み直してから、もう一度お試しください。</p>
+          ) : candidatePhase === 'empty' ? (
+            <p className="text-ink-faint mt-2 text-xs">
+              {candidateQuery
+                ? `「${candidateQuery}」に合う候補が見つかりませんでした。`
+                : '同じ種類の別メディアがありません。先に差し替え先を登録してください。'}
+            </p>
+          ) : (
+            <>
+              <Select
+                aria-label="差し替え先"
+                value={replacementId}
+                options={[{ value: '', label: '別のメディアを選択' }, ...candidates.map((item) => ({ value: item.id, label: item.filename }))]}
+                onChange={(value) => void selectReplacement(value)}
+              />
+              {candidateTotal > 50 ? (
+                <div className="mt-2 flex items-center justify-between text-xs">
+                  <span className="text-ink-faint">候補 {candidateTotal}件{candidateQuery ? `（「${candidateQuery}」で絞り込み中）` : ''}</span>
+                  <div className="flex gap-2">
+                    <Button type="button" disabled={candidatePage <= 1} onClick={() => setCandidatePage((page) => page - 1)}>前へ</Button>
+                    <Button type="button" disabled={candidatePage * 50 >= candidateTotal} onClick={() => setCandidatePage((page) => page + 1)}>次へ</Button>
+                  </div>
+                </div>
+              ) : candidateQuery ? (
+                <p className="text-ink-faint mt-2 text-xs">「{candidateQuery}」で絞り込み中（{candidateTotal}件）</p>
+              ) : null}
+            </>
+          )}
         </div>
 
         {phase === 'loading' ? (

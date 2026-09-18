@@ -1590,6 +1590,18 @@ export type AnalyticsUsageOverview = AnalyticsEnvelope<{
     brokenReferences: AnalyticsMetric<number>
     lastUsedAt: AnalyticsMetric<string>
   }>
+  /**
+   * 全任意機能の利用状況（N-448）。共有カタログの featureId で機械照合する。
+   * 計測できる機能は直近90日の回数（または現在の利用数）と最終利用を持ち、
+   * 計測できない機能は activity/lastUsedAt が未取得＋理由を持つ。
+   */
+  features: Array<{
+    featureId: string
+    activityUnit: string | null
+    activityBasis: 'last90days' | 'current' | null
+    activity: AnalyticsMetric<number>
+    lastUsedAt: AnalyticsMetric<string>
+  }>
 }>
 
 export type AnalyticsUrlClicksOverview = AnalyticsEnvelope<{
@@ -4360,6 +4372,32 @@ export type CommonVarsListResponse = ApiResponse<CommonVar[]> & {
   meta?: { total: number; limited: boolean; limit: number }
 }
 
+/**
+ * 共通情報CSVの出力台帳1件（N-192）。
+ * status: queued/running は生成中、completed は期限内ダウンロード可、
+ * failed は生成失敗、expired は期限切れ（再生成で新しい期限が付く）。
+ */
+export type CommonVarExportStatus = 'queued' | 'running' | 'completed' | 'failed' | 'expired'
+export interface CommonVarExportJob {
+  id: string
+  lineAccountId: string
+  folderId: string | null
+  ungrouped: boolean
+  status: CommonVarExportStatus
+  totalCount: number | null
+  processedCount: number
+  rowCount: number | null
+  byteSize: number | null
+  createdBy: string
+  createdByName: string
+  createdAt: string
+  startedAt: string | null
+  finishedAt: string | null
+  expiresAt: string
+  failureReason: string | null
+  downloadUrl: string | null
+}
+
 
 // ---------------------------------------------------------------------------
 // 運営コンソール（★V6 37）
@@ -5927,6 +5965,26 @@ export const api = {
     deleteSchedule: (id: string, scheduleId: string, accountId: string) =>
       fetchApi<ApiResponse<null>>(`/api/common-vars/${id}/schedules/${scheduleId}?accountId=${encodeURIComponent(accountId)}`, {
         method: 'DELETE',
+      }),
+    /*
+      監査付きCSV出力（N-192）。作成は非同期で、detail をポーリングして
+      完了・失敗・期限切れを追う。downloadUrl は api host 直結の
+      content-disposition 付きURL。
+    */
+    listExports: (accountId: string) =>
+      fetchApi<ApiResponse<CommonVarExportJob[]>>(
+        `/api/common-vars/exports?accountId=${encodeURIComponent(accountId)}`,
+      ),
+    createExport: (input: { accountId: string; folderId?: string | null; ungrouped?: boolean }) =>
+      fetchApi<ApiResponse<CommonVarExportJob>>('/api/common-vars/exports', {
+        method: 'POST',
+        body: JSON.stringify(input),
+      }),
+    exportDetail: (id: string) =>
+      fetchApi<ApiResponse<CommonVarExportJob>>(`/api/common-vars/exports/${encodeURIComponent(id)}`),
+    regenerateExport: (id: string) =>
+      fetchApi<ApiResponse<CommonVarExportJob>>(`/api/common-vars/exports/${encodeURIComponent(id)}/regenerate`, {
+        method: 'POST',
       }),
   },
   /** 汎用フォルダ。一覧13画面で共通に使う。 */

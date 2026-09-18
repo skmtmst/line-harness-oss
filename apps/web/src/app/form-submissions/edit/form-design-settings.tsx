@@ -1,15 +1,18 @@
 'use client'
 
+import { useState } from 'react'
 import {
   FORM_THEME_DEFAULT,
   type FormCornerRadius,
   type FormFontFamily,
   type FormTheme,
 } from '@line-crm/shared'
+import type { MediaItem } from '@line-crm/shared'
 import Button from '@/components/shared/button'
 import SelectField from '@/components/shared/select-field'
 import { Field, TextArea, TextInput } from '@/components/shared/form-controls'
 import { useRouter } from 'next/navigation'
+import MediaPickerDialog from '@/app/contents/media-picker-dialog'
 
 const COLOR_ROLES: Array<{
   key: keyof Pick<FormTheme, 'main' | 'sub' | 'accent' | 'error' | 'text'>
@@ -25,6 +28,7 @@ const COLOR_ROLES: Array<{
 
 export default function FormDesignSettings({
   formId,
+  accountId,
   value,
   ogTitle,
   ogDescription,
@@ -35,6 +39,8 @@ export default function FormDesignSettings({
   onOgImageUrlChange,
 }: {
   formId: string
+  /** メディア選択窓が読むアカウント。未選択なら窓は案内だけ出す。 */
+  accountId: string | null
   value: FormTheme | undefined
   ogTitle: string
   ogDescription: string
@@ -46,8 +52,20 @@ export default function FormDesignSettings({
 }) {
   const router = useRouter()
   const theme = value ?? FORM_THEME_DEFAULT
+  /** メディア選択窓を開いている対象。null なら閉じている（N-193）。 */
+  const [pickerFor, setPickerFor] = useState<'background' | 'ogImage' | null>(null)
   const patch = <K extends keyof FormTheme>(key: K, next: FormTheme[K]) => {
     onChange({ ...theme, [key]: next })
+  }
+
+  const pickMedia = (item: MediaItem) => {
+    // 配信用の公開URLを保存値へ入れる（管理画面の表示用URLではない）。
+    if (pickerFor === 'background') {
+      patch('backgroundImageUrl', item.url)
+    } else if (pickerFor === 'ogImage') {
+      onOgImageUrlChange(item.url)
+    }
+    setPickerFor(null)
   }
 
   const close = () => router.replace(`/form-submissions/edit?id=${encodeURIComponent(formId)}&tab=basic`)
@@ -138,11 +156,29 @@ export default function FormDesignSettings({
         </div>
 
         {/*
-          #725: 背景画像の選択肢は「なし」1つだけで、選ぶものが無かったので消した。
-          値そのものは生きている（`form-preview.tsx` が背景として描き、
-          `normalizeFormTheme` が https のURLだけ通す）。選べる画像の出どころ
-          （登録メディア一覧など）を繋いだら、ここへ選択欄を戻す。
+          背景画像（N-193）: #725 で選ぶものが無く消していた選択欄を、
+          登録メディアへの接続ができたので戻した。値は `form-preview.tsx`
+          が背景として描き、`normalizeFormTheme` が https のURLだけ通す。
         */}
+        <div className="border-hairline mt-5 border-t pt-5">
+          <h3 className="text-ink text-sm font-medium">背景</h3>
+          <div className="mt-3 flex items-center justify-between gap-3">
+            <p className="text-ink text-sm font-semibold">
+              {theme.backgroundImageUrl ? '登録メディアの画像を使っています' : '背景画像は使っていません'}
+            </p>
+            <div className="flex gap-2">
+              {theme.backgroundImageUrl ? (
+                <Button onClick={() => patch('backgroundImageUrl', null)}>画像を外す</Button>
+              ) : null}
+              <Button onClick={() => setPickerFor('background')}>登録メディアから選ぶ</Button>
+            </div>
+          </div>
+          {theme.backgroundImageUrl ? (
+            <p className="text-ink-faint mt-2 truncate text-xs" title={theme.backgroundImageUrl}>
+              {theme.backgroundImageUrl}
+            </p>
+          ) : null}
+        </div>
 
         <div className="border-hairline mt-5 border-t pt-5">
           <h3 className="text-ink text-sm font-medium">リンクの見え方</h3>
@@ -165,7 +201,7 @@ export default function FormDesignSettings({
                 onChange={(event) => onOgDescriptionChange(event.target.value)}
               />
             </Field>
-            <Field label="カードの画像URL" htmlFor="form-og-image-url" note="https で始まるURLだけ使えます。">
+            <Field label="カードの画像URL" htmlFor="form-og-image-url" note="https で始まるURLだけ使えます。登録メディアからも選べます。">
               <TextInput
                 id="form-og-image-url"
                 type="url"
@@ -175,6 +211,9 @@ export default function FormDesignSettings({
                 onChange={(event) => onOgImageUrlChange(event.target.value)}
               />
             </Field>
+            <div>
+              <Button onClick={() => setPickerFor('ogImage')}>登録メディアから選ぶ</Button>
+            </div>
           </div>
         </div>
         </div>
@@ -189,6 +228,14 @@ export default function FormDesignSettings({
           <Button onClick={close}>閉じる</Button>
         </footer>
       </section>
+
+      <MediaPickerDialog
+        open={pickerFor !== null}
+        accountId={accountId}
+        kind="image"
+        onClose={() => setPickerFor(null)}
+        onSelect={pickMedia}
+      />
     </div>
   )
 }

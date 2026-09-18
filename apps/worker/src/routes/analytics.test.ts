@@ -330,6 +330,22 @@ describe('V6分析の概要API', () => {
           { key: 'automations', brokenReferences: { value: 1, state: 'partial', reason: '未対応の参照種別があります' } },
           { key: 'rich_menus', brokenReferences: { value: null, state: 'failed', reason: '参照を確認できませんでした' } },
         ],
+        features: [
+          {
+            featureId: 'broadcasts',
+            activityBasis: 'last90days',
+            activityUnit: '配信',
+            activity: { value: 2, state: 'available', reason: null },
+            lastUsedAt: { value: '2026-08-20T00:00:00.000Z', state: 'available', reason: null },
+          },
+          {
+            featureId: 'analytics',
+            activityBasis: 'unmeasured',
+            activityUnit: '',
+            activity: { value: null, state: 'unavailable', reason: '利用回数の記録はありません。分析ページは内容確認用です' },
+            lastUsedAt: { value: null, state: 'unavailable', reason: '閲覧時刻は記録していません' },
+          },
+        ],
       },
     });
 
@@ -346,6 +362,11 @@ describe('V6分析の概要API', () => {
             { key: 'templates', brokenReferences: { value: 0, state: 'available' } },
             { key: 'automations', brokenReferences: { value: 1, state: 'partial' } },
             { key: 'rich_menus', brokenReferences: { value: null, state: 'failed' } },
+          ],
+          // 全任意機能を共有カタログIDで返し、未計測は0ではなく理由付きのまま透過する。
+          features: [
+            { featureId: 'broadcasts', activity: { value: 2, state: 'available' } },
+            { featureId: 'analytics', activity: { value: null, state: 'unavailable' } },
           ],
         },
       },
