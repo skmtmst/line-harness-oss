@@ -937,7 +937,10 @@ function CrossTab({ accountId, canManage }: { accountId: string; canManage: bool
                 {audience && (
                   <div className="bg-success-bg rounded-control flex flex-wrap items-center justify-between gap-2 p-3 text-xs">
                     <span className="text-success">{audience.memberCount}人を24時間の対象者として準備しました</span>
-                    <Link href={`/friends?audienceId=${encodeURIComponent(audience.id)}`} className="text-accent font-medium hover:underline">対象者を開く</Link>
+                    <span className="flex items-center gap-3">
+                      <Link href={`/friends?audienceId=${encodeURIComponent(audience.id)}`} className="text-accent font-medium hover:underline">対象者を開く</Link>
+                      <Link href={`/broadcasts/new?audienceId=${encodeURIComponent(audience.id)}`} className="text-accent font-medium hover:underline">この対象者へ配信を作成</Link>
+                    </span>
                   </div>
                 )}
               </div>
@@ -1607,7 +1610,10 @@ function FunnelTab({ accountId, canManage }: { accountId: string; canManage: boo
                 {funnelAudience && (
                   <div className="bg-success-bg mt-3 flex flex-wrap items-center justify-between gap-2 rounded-control p-3 text-xs">
                     <span className="text-success">{funnelAudience.memberCount}人を24時間の対象者として準備しました</span>
-                    <Link href={`/friends?audienceId=${encodeURIComponent(funnelAudience.id)}`} className="text-accent font-medium hover:underline">対象者を開く</Link>
+                    <span className="flex items-center gap-3">
+                      <Link href={`/friends?audienceId=${encodeURIComponent(funnelAudience.id)}`} className="text-accent font-medium hover:underline">対象者を開く</Link>
+                      <Link href={`/broadcasts/new?audienceId=${encodeURIComponent(funnelAudience.id)}`} className="text-accent font-medium hover:underline">この対象者へ配信を作成</Link>
+                    </span>
                   </div>
                 )}
               </div>

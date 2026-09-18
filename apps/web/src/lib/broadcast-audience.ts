@@ -116,6 +116,11 @@ export function describeAudience(
   }
   const usable = pruneCondition(input.condition)
   if (!usable) return '詳細条件（未入力）'
+  // 分析画面から受け取った一時対象者は、条件の中身ではなく「何を使ったか」を出す。
+  if (usable.rules.some((r) => r.type === 'analytics_audience')
+      || (usable.groups ?? []).some((g) => g.rules.some((r) => r.type === 'analytics_audience'))) {
+    return '分析で作った対象者'
+  }
   const count = usable.rules.length + (usable.groups ?? []).reduce((n, g) => n + g.rules.length, 0)
   return `詳細条件 ${count} 件`
 }

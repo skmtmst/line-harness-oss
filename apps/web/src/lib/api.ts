@@ -5258,6 +5258,16 @@ export const api = {
       `/api/analytics/results/${resultId}/audiences?account_id=${encodeURIComponent(accountId)}`,
       { method: 'POST', body: JSON.stringify(data) },
     ),
+    // 一時対象者の詳細。配信作成が人数・期限を読み直すために使う。
+    // 友だちIDは返ってこない。期限切れは410、他アカウント・不存在は404。
+    audience: (id: string, accountId: string) => fetchApi<ApiResponse<{
+      id: string
+      sourceKind: string
+      selectionKey: string | null
+      memberCount: number
+      expiresAt: string
+      createdAt: string
+    }>>(`/api/analytics/audiences/${encodeURIComponent(id)}?account_id=${encodeURIComponent(accountId)}`),
     v6Funnels: {
       list: (accountId: string, options?: { includeInactive?: boolean }) => fetchApi<ApiResponse<Array<{
         id: string

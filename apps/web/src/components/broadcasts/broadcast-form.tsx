@@ -67,6 +67,8 @@ interface BroadcastFormProps {
   initialTemplateId?: string | null
   initialContentTemplateId?: string | null
   initialCondition?: SegmentCondition | null
+  /** 分析画面から渡された一時対象者。人数・期限はAPIで読み直したもの。 */
+  audienceNotice?: { memberCount: number; expiresAt: string } | null
   initialScheduledDate?: string
   initialScheduledTime?: string
   /** 正本の `?step=`。未指定は一覧内の従来フォームとして全節を表示する。 */
@@ -461,6 +463,7 @@ export default function BroadcastForm({
   initialTemplateId = null,
   initialContentTemplateId = null,
   initialCondition = null,
+  audienceNotice = null,
   initialScheduledDate = '',
   initialScheduledTime = '10:00',
   currentStep = null,
@@ -1310,6 +1313,17 @@ export default function BroadcastForm({
               </label>
             ))}
           </div>
+          {audienceNotice && (
+            <div className="bg-accent-soft rounded-card mt-3 flex flex-wrap items-center justify-between gap-2 p-3">
+              <p className="text-ink text-sm">
+                分析で作った対象者
+                <span className="ml-2 font-bold">{audienceNotice.memberCount.toLocaleString('ja-JP')}人</span>
+              </p>
+              <p className="text-ink-faint text-xs">
+                {new Date(audienceNotice.expiresAt).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}まで有効・送る直前にもう一度確かめます
+              </p>
+            </div>
+          )}
           <div className="mt-3 flex flex-wrap items-center gap-2">
             {/* ブロック中の人は countRules の is_following=true で外れている。
                 外していることを書かないと、人数が合わないように見える。 */}
