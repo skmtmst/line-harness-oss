@@ -149,6 +149,7 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'GET /api/affiliates/{id}',
   'GET /api/affiliates/{id}/report',
   'GET /api/auto-replies',
+  'GET /api/automation-runs/{id}',
   'GET /api/auth/ops-invite/check',
   'GET /api/auth/password/reset/check',
   'GET /api/auth/register/check',
@@ -273,6 +274,10 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'POST /api/auth/two-factor/setup',
   'POST /api/auth/two-factor/setup/confirm',
   'POST /api/auto-reply-runs/{id}/retry',
+  'POST /api/automation-runs/{id}/cancel',
+  'POST /api/automations/{id}/draft',
+  'POST /api/automations/{id}/duplicate',
+  'POST /api/automations/{id}/status',
   'POST /api/friend-add-runs/{id}/retry',
   'POST /api/booking/admin/resources',
   'POST /api/broadcasts',
@@ -701,7 +706,7 @@ const ALLOWLIST = new Set<string>([
   'POST /api/rich-menus/{id}/default',
   'POST /api/rich-menus/{id}/image',
 
-  // 機能「automations」の管理画面用API（OpenAPI未記載・順次記載）（23件）
+  // 機能「automations」の管理画面用API（OpenAPI未記載・順次記載）（24件）
   'DELETE /api/automations/{id}',
   'GET /api/automation-draft-resources',
   'GET /api/automation-drafts/{id}',

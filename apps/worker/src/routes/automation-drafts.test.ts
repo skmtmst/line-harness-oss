@@ -64,19 +64,35 @@ describe('オートメーション下書きAPI', () => {
     expect(allowed.status).toBe(200);
   });
 
-  it('担当者は見本を見られても下書きを作成できない', async () => {
-    const response = await app(testDb.db, {
+  /*
+   * #942 N-351: 下書きの作成は `/automations` の権限キーが門。
+   * 以前は role=staff を一律 403 にしていたため、権限を持つ担当者が
+   * 正規の入口から下書きを作れなかった。鍵を持つ担当者は作成できる。
+   */
+  it('権限キーを持つ担当者は下書きを作成でき、持たない担当者は作れない', async () => {
+    const staff: AuthenticatedStaff = {
       ...admin,
       id: 'staff-1',
       name: '担当者',
       role: 'staff',
       permissionKeys: ['/automations'],
-    }).request('/api/automation-templates/welcome-scenario/drafts?account_id=account-1', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: '{}',
-    });
-    expect(response.status).toBe(403);
+    };
+    const denied = await app(testDb.db, { ...staff, permissionKeys: [] })
+      .request('/api/automation-templates/welcome-scenario/drafts?account_id=account-1', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: '{}',
+      });
+    expect(denied.status).toBe(403);
+
+    const allowed = await app(testDb.db, staff)
+      .request('/api/automation-templates/welcome-scenario/drafts?account_id=account-1', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: '{}',
+      });
+    expect(allowed.status).toBe(201);
+    await expect(allowed.json()).resolves.toMatchObject({ success: true });
   });
 
   it('1人テストは閲覧権限と実行権限を別々に再確認する', async () => {

@@ -42,4 +42,6 @@ export const AUTOMATION_DRAFT_ACTION_OPTIONS: readonly AutomationDraftActionOpti
   { value: 'add_tag', label: 'タグを付ける' },
   { value: 'start_scenario', label: 'シナリオを始める' },
   { value: 'send_message', label: 'メッセージを送る' },
+  // #942 N-356: 公開済みの共通アクションを呼ぶ。実行時に版が固定される。
+  { value: 'common_action', label: '共通アクションを実行' },
 ];
