@@ -1,5 +1,4 @@
 import type { CommonVar } from '@line-crm/shared'
-import { csvCell } from '@/lib/presentation'
 
 export type CommonVarFilter = 'all' | 'empty' | 'scheduled' | 'unused'
 export type CommonVarOrder = 'usage_desc' | 'updated_desc' | 'name_asc'
@@ -27,20 +26,4 @@ export function filterAndSortCommonVars(
       const rightUsage = right.usageCount ?? -1
       return rightUsage - leftUsage || left.name.localeCompare(right.name, 'ja-JP')
     })
-}
-
-export function commonVarsCsv(items: CommonVar[]): string {
-  const rows = items.map((item) => [
-    item.name,
-    `{${item.name}}`,
-    item.value,
-    item.usageCount ?? '未取得',
-    item.updatedAt,
-    item.nextSchedule?.effectiveFrom ?? '',
-    item.nextSchedule?.value ?? '',
-  ])
-  return [
-    ['共通情報', '差し込みキー', '中身', '使われている場所', '更新', '次の変更日時', '次の中身'],
-    ...rows,
-  ].map((row) => row.map(csvCell).join(',')).join('\r\n')
 }

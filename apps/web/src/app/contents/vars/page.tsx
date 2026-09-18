@@ -32,11 +32,11 @@ import FeatureGate from '@/components/feature-gate'
 import { useAccount } from '@/contexts/account-context'
 import SelectField from '@/components/shared/select-field'
 import {
-  commonVarsCsv,
   filterAndSortCommonVars,
   type CommonVarFilter,
   type CommonVarOrder,
 } from './list-model'
+import VarsExportPanel from './export-panel'
 
 /**
  * 共通情報の一覧。
@@ -214,18 +214,6 @@ function VarsPageInner() {
   useEffect(() => {
     if (page > pageCount) setPage(pageCount)
   }, [page, pageCount])
-
-  const exportVisibleCsv = () => {
-    if (filtered.length === 0) return
-    const url = URL.createObjectURL(
-      new Blob([`\uFEFF${commonVarsCsv(filtered)}`], { type: 'text/csv;charset=utf-8' }),
-    )
-    const anchor = document.createElement('a')
-    anchor.href = url
-    anchor.download = 'common-information.csv'
-    anchor.click()
-    URL.revokeObjectURL(url)
-  }
 
   const addFolder = async () => {
     const name = folderName.trim()
@@ -564,13 +552,19 @@ function VarsPageInner() {
         </div>
       )}
 
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+      <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2">
           <Button href="/contents/vars/new" variant="primary">＋ 共通情報を作る</Button>
         </div>
-        <Button type="button" onClick={exportVisibleCsv} disabled={filtered.length === 0}>
-          CSVで書き出す
-        </Button>
+        {/*
+          N-192: 端末で見えている分だけをCSV化するのをやめ、台帳へ残る
+          サーバ出力へ切り替えた。選択中のフォルダ条件はそのまま渡す。
+        */}
+        <VarsExportPanel
+          accountId={selectedAccountId}
+          folderId={folderFilter && folderFilter !== UNGROUPED ? folderFilter : null}
+          ungrouped={folderFilter === UNGROUPED}
+        />
       </div>
 
       {emptyInUseCount > 0 ? (

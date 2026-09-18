@@ -50,6 +50,7 @@ async function render(overrides: Partial<{ ogTitle: string; ogDescription: strin
     root.render(
       <FormDesignSettings
         formId="form-1"
+        accountId={null}
         value={undefined}
         ogTitle={overrides.ogTitle ?? ''}
         ogDescription={overrides.ogDescription ?? ''}
@@ -127,10 +128,10 @@ describe('デザイン設定に無反応な操作面を残さない(#725)', () =
     expect(dead.map((button) => button.textContent?.trim())).toEqual([])
   })
 
-  it('選択肢が1つしか無い背景画像の欄を出さない', async () => {
+  it('背景画像は登録メディアへ繋がったので選択欄を戻した（#725 の条件が解消）', async () => {
     await render()
-    expect(host.querySelector('#form-theme-background')).toBeNull()
-    expect(host.textContent).not.toContain('背景画像')
+    // 「なし」一択だった頃は欄ごと消していた。選べる中身ができたので戻す。
+    expect(host.textContent).toContain('登録メディアから選ぶ')
     // 選べる中身がある欄は残っている。
     expect(host.querySelector('#form-theme-font')).toBeTruthy()
     expect(host.querySelector('#form-theme-radius')).toBeTruthy()

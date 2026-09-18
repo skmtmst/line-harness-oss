@@ -1,41 +1,32 @@
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import type { CommonVar } from '@line-crm/shared'
 import { describe, expect, it } from 'vitest'
-import { commonVarsCsv } from './list-model'
 import { impactCsv } from './impact-review'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const PAGE = readFileSync(join(HERE, 'page.tsx'), 'utf8')
-const LIST_MODEL = readFileSync(join(HERE, 'list-model.ts'), 'utf8')
+const EXPORT_PANEL = readFileSync(join(HERE, 'export-panel.tsx'), 'utf8')
 const IMPACT_REVIEW = readFileSync(join(HERE, 'impact-review.tsx'), 'utf8')
+const WORKER_EXPORT = readFileSync(join(HERE, '..', '..', '..', '..', '..', 'worker', 'src', 'routes', 'common-var-exports.ts'), 'utf8')
 const EDIT_PAGE = readFileSync(join(HERE, 'edit', 'page.tsx'), 'utf8')
 const API = readFileSync(join(HERE, '..', '..', '..', 'lib', 'api.ts'), 'utf8')
 const MOCK_API = readFileSync(join(HERE, '..', '..', '..', '..', '..', '..', 'scripts', 'visual-qa', 'mock-api.mjs'), 'utf8')
 const FIXTURES = readFileSync(join(HERE, '..', '..', '..', '..', '..', '..', 'scripts', 'visual-qa', 'fixtures.mjs'), 'utf8')
 
-function item(over: Partial<CommonVar> = {}): CommonVar {
-  return {
-    id: 'v1', lineAccountId: 'a1', folderId: null, name: '会社名', varKey: 'company',
-    type: 'text', value: '株式会社NEN', createdAt: '2026-08-01', updatedAt: '2026-08-02',
-    usageCount: 3, nextSchedule: null, ...over,
-  }
-}
-
 describe('#544 N7/L1 CSVの数式インジェクション対策と共通化', () => {
-  it('2か所の自前csvCellをやめ、共有の無害化つき関数を使う', () => {
-    expect(LIST_MODEL).toContain("from '@/lib/presentation'")
+  it('一覧CSVは端末生成をやめ、無害化はサーバ側の共有関数に集約する', () => {
+    // N-192: 画面側の commonVarsCsv は撤去し、worker の台帳付き出力へ移した。
+    // 無害化は db package の protectCsvCell を通す（実値検証は route 試験側）。
+    expect(EXPORT_PANEL).not.toContain('commonVarsCsv')
+    expect(PAGE).not.toContain('commonVarsCsv')
+    expect(WORKER_EXPORT).toContain('protectCsvCell')
     expect(IMPACT_REVIEW).toContain("from '@/lib/presentation'")
-    expect(LIST_MODEL).not.toContain('function csvCell')
     expect(IMPACT_REVIEW).not.toContain('function csvCell')
   })
 
-  it('一覧CSVは = + - @ で始まる値を無害化する', () => {
-    const csv = commonVarsCsv([item({ value: '=1+1' }), item({ id: 'v2', value: '+cmd' })])
-    expect(csv).toContain("\"'=1+1\"")
-    expect(csv).toContain("\"'+cmd\"")
-    expect(csv).not.toMatch(/"=[^']/)
+  it('一覧CSVの各行は全セルを無害化してから結合する', () => {
+    expect(WORKER_EXPORT).toMatch(/map\(\(cell\) => protectCsvCell\(cell\)\)/)
   })
 
   it('影響一覧CSVは差し替え後の文を無害化する', () => {

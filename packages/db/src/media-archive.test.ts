@@ -197,7 +197,9 @@ describe('メディアのアーカイブと復元', () => {
     const id = await seedMedia(db, 'm1');
     // 最初のSELECTの直後に別プロセスが退避した状態を再現する。
     let interleaved = false;
-    const racing: D1Database = {
+    // 実体は asD1 の薄いラッパなので、必要なメンバーだけ持つ。spread は
+    // 型上 D1Database を満たさないため unknown 経由で戻す。
+    const racing = {
       ...db,
       prepare(query: string) {
         const statement = db.prepare(query);
@@ -221,7 +223,7 @@ describe('メディアのアーカイブと復元', () => {
         }
         return statement;
       },
-    };
+    } as unknown as D1Database;
 
     const result = await archiveMedia(racing, {
       id, lineAccountId: 'account-a', actorId: 'staff-1', reason: '負けた側',
