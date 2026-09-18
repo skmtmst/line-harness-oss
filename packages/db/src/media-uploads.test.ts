@@ -4,6 +4,7 @@ import Database from 'better-sqlite3';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { createMedia, getMediaById } from './media.js';
 import {
+  MediaVersionConflictError,
   MediaVersionIncompatibleError,
   backfillMediaVersionMetadata,
   completeNewMediaUpload,
@@ -216,6 +217,30 @@ describe('メディアのアップロード予約と版の内容情報', () => {
 
     expect(error).toBeInstanceOf(MediaVersionIncompatibleError);
     expect((error as MediaVersionIncompatibleError).blockers).toContain('different_kind');
+  });
+
+  it('先に版が進んでいれば競合エラーで拒否し、版もメディアも変更しない', async () => {
+    const first = await verifiedSession(db, {}, { width: 100, height: 50 });
+    const media = await completeNewMediaUpload(db, first);
+    const next = await verifiedSession(db, {
+      targetMediaId: media.id, filename: 'b.png',
+    }, { width: 100, height: 50 });
+
+    const error = await createMediaVersionFromUpload(db, {
+      mediaId: media.id,
+      lineAccountId: 'account-a',
+      uploadSessionId: next.id,
+      expectedVersionNo: 99,
+      changeReason: '遅れた書き込み',
+    }).catch((e) => e);
+
+    expect(error).toBeInstanceOf(MediaVersionConflictError);
+    expect((error as MediaVersionConflictError).currentVersionNo).toBe(1);
+    expect((await getLatestMediaVersion(db, media.id, 'account-a'))?.version_no).toBe(1);
+    expect((await getMediaById(db, media.id, 'account-a'))?.filename).toBe(media.filename);
+    // セッションは completed にされず再確認できる
+    const session = await getMediaUploadSession(db, next.id, 'account-a');
+    expect(session?.status).toBe('verified');
   });
 
   it('別アカウントのメディアIDでは版を作れず、現行版番号も取れない', async () => {

@@ -71,22 +71,26 @@ export async function extractMediaMetadata(file: File): Promise<MediaMetadataInp
   }
   if (file.type.startsWith('video/') || file.type.startsWith('audio/')) {
     const durationMs = await new Promise<number | undefined>((resolve) => {
+      let url = ''
+      const finish = (value: number | undefined) => {
+        clearTimeout(timer)
+        if (url) URL.revokeObjectURL(url)
+        resolve(value)
+      }
+      // loadedmetadata が来ない環境で準備自体が止まらないよう打ち切る
+      const timer = setTimeout(() => finish(undefined), 10_000)
       try {
-        const url = URL.createObjectURL(file)
+        url = URL.createObjectURL(file)
         const el = document.createElement(file.type.startsWith('video/') ? 'video' : 'audio')
         el.preload = 'metadata'
         el.onloadedmetadata = () => {
           const seconds = el.duration
-          URL.revokeObjectURL(url)
-          resolve(Number.isFinite(seconds) && seconds > 0 ? Math.round(seconds * 1000) : undefined)
+          finish(Number.isFinite(seconds) && seconds > 0 ? Math.round(seconds * 1000) : undefined)
         }
-        el.onerror = () => {
-          URL.revokeObjectURL(url)
-          resolve(undefined)
-        }
+        el.onerror = () => finish(undefined)
         el.src = url
       } catch {
-        resolve(undefined)
+        finish(undefined)
       }
     })
     return { durationMs, codec }
