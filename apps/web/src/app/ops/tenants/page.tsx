@@ -22,6 +22,7 @@ import { TextField } from '@/components/shared/text-field'
 const STATUS_FILTERS: Array<{ key: string; label: string }> = [
   { key: 'trialing', label: 'トライアル' },
   { key: 'active', label: '契約中' },
+  { key: 'past_due', label: '決済失敗' },
   { key: 'suspended', label: '停止' },
   { key: 'archived', label: '解約' },
 ]
@@ -53,9 +54,16 @@ export default function OpsTenantsPage() {
     return () => { cancelled = true }
   }, [load])
 
+  // ダッシュボード（★V6 37-2）の「要対応」から ?status= 付きで来たときの初期絞り込み。
+  useEffect(() => {
+    const status = new URLSearchParams(window.location.search).get('status') ?? ''
+    if (STATUS_FILTERS.some((f) => f.key === status)) setFilter(status)
+  }, [])
+
   const visible = rows.filter((row) => {
     if (!filter) return true
     if (filter === 'trialing') return row.plan_status === 'trialing'
+    if (filter === 'past_due') return row.plan_status === 'past_due'
     if (filter === 'active') return row.status === 'active' && row.plan_status !== 'trialing'
     return row.status === filter
   })

@@ -1,9 +1,11 @@
 'use client'
 
-import { ImagePlus, Send, X } from 'lucide-react'
+import { CheckCircle2, ImagePlus, Send, X } from 'lucide-react'
+import Link from 'next/link'
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { LineAccount, StaffMember } from '@line-crm/shared'
 import Button from '@/components/shared/button'
+import Dialog from '@/components/shared/dialog'
 import NoteBar from '@/components/shared/note-bar'
 import SelectField from '@/components/shared/select-field'
 import StickyBar from '@/components/shared/sticky-bar'
@@ -151,12 +153,20 @@ export default function HqSupportPage() {
         </NoteBar>
       </div>
 
-      {sent ? (
-        <div className="rounded-card bg-accent-soft px-4 py-3 text-label text-ink" role="status">
-          お問い合わせを送りました。
-          {sent.notified ? '控えが登録メールアドレスにも届きます。' : '控えメールは送れませんでしたが、内容は運営に届いています。'}
-        </div>
-      ) : null}
+      {/* 送信完了の知らせ（2026-09-18 決定: 帯だけでは気づきにくいので、窓で止めて伝える） */}
+      <Dialog
+        open={sent !== null}
+        title="送信完了しました"
+        description={sent?.notified
+          ? '運営に届きました。控えが登録メールアドレスにも届きます。返信は登録メールアドレスと、この画面の「これまでの問い合わせ」に届きます（平日 2営業日以内）。'
+          : '運営に届きました。控えメールは送れませんでしたが、内容は運営に届いています。返信はこの画面の「これまでの問い合わせ」に届きます。'}
+        titleIcon={<CheckCircle2 aria-hidden="true" className="h-5 w-5 text-accent-deep" />}
+        onCancel={() => setSent(null)}
+        footer={<div className="flex justify-end"><Button variant="primary" onClick={() => setSent(null)}>閉じる</Button></div>}
+        designNode="X6LZP"
+      >
+        {sent?.ticketLabel ? <p className="text-label text-ink">受付番号：<span className="font-bold">{sent.ticketLabel}</span>　件名：{sent.subject}</p> : null}
+      </Dialog>
 
       <div data-design-node="VKxoO" className="flex flex-col gap-4 xl:flex-row xl:items-start">
         <form
@@ -286,32 +296,27 @@ export default function HqSupportPage() {
             ) : (
               <ul className="flex flex-col">
                 {history.slice(0, 10).map((item) => (
-                  <li key={item.id} className="flex flex-col gap-1 border-b border-divider-soft px-4 py-3 last:border-b-0">
-                    <p className="truncate text-label font-semibold text-ink">{item.subject}</p>
-                    <p className="flex items-center gap-2 text-micro text-ink-faint">
-                      {item.ticketLabel ? <span>{item.ticketLabel}・</span> : null}
-                      {shortDateTime(item.createdAt)}
-                      <span className="text-ink-faint">・{item.kindLabel}</span>
-                      <span
-                        className={
-                          item.status === 'open'
-                            ? 'inline-flex h-4.5 items-center rounded-pill bg-status-info-soft px-2 text-nano font-bold text-status-info'
-                            : 'inline-flex h-4.5 items-center rounded-pill bg-accent-soft px-2 text-nano font-bold text-accent-deep'
-                        }
-                      >
-                        {SUPPORT_STATUS_LABELS[item.status]}
+                  <li key={item.id} className="border-b border-divider-soft last:border-b-0">
+                    <Link href={`/hq/support/detail?id=${encodeURIComponent(item.id)}`} className="flex flex-col gap-1 px-4 py-3 hover:bg-canvas-sunken">
+                      <span className="truncate text-label font-semibold text-ink">{item.subject}</span>
+                      <span className="flex items-center gap-2 text-micro text-ink-faint">
+                        {item.ticketLabel ? <span>{item.ticketLabel}・</span> : null}
+                        {shortDateTime(item.createdAt)}
+                        <span className="text-ink-faint">・{item.kindLabel}</span>
+                        <span
+                          className={
+                            item.status === 'open'
+                              ? 'inline-flex h-4.5 items-center rounded-pill bg-status-info-soft px-2 text-nano font-bold text-status-info'
+                              : 'inline-flex h-4.5 items-center rounded-pill bg-accent-soft px-2 text-nano font-bold text-accent-deep'
+                          }
+                        >
+                          {SUPPORT_STATUS_LABELS[item.status]}
+                        </span>
                       </span>
-                    </p>
-                    {item.replies && item.replies.length > 0 ? (
-                      <div className="mt-1 flex flex-col gap-1">
-                        {item.replies.map((reply) => (
-                          <p key={reply.id} className="whitespace-pre-wrap rounded-control bg-accent-soft px-3 py-2 text-caption text-ink">
-                            <span className="block text-micro text-ink-faint">運営からの返信・{shortDateTime(reply.createdAt)}</span>
-                            {reply.body}
-                          </p>
-                        ))}
-                      </div>
-                    ) : null}
+                      {item.replies && item.replies.length > 0 ? (
+                        <span className="text-micro text-accent-deep">運営からの返信 {item.replies.length}件・開いて続きを送れます</span>
+                      ) : null}
+                    </Link>
                   </li>
                 ))}
               </ul>

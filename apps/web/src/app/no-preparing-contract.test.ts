@@ -107,7 +107,7 @@ describe('画面に「準備中」を置かない', () => {
     // 数え漏れ（読む場所を間違えて 0 件になる）だけを見張る。
     // ちょうどの枚数は画面が増えるたびに動くので、下限をゆるく取る。
     expect(FILES.length).toBeGreaterThan(300)
-    expect(FILES.filter((f) => /^app\/.*\/page\.tsx$/.test(f.p) || f.p === 'app/page.tsx')).toHaveLength(179)  // 2026-09-16 採用: マイペット（/nen/pets）と健康日記（/nen/health）を足した後の実測値。
+    expect(FILES.filter((f) => /^app\/.*\/page\.tsx$/.test(f.p) || f.p === 'app/page.tsx')).toHaveLength(180)  // 2026-09-17: 統括のお問い合わせの続き（36-3-A）を足した後の実測値（マイペット・健康日記の 179 に +1）。
   })
 
   it('共通部品に「準備中」が1つも無い', () => {

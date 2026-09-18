@@ -122,6 +122,7 @@ export * from './friend-bulk-runs';
 export * from './banner-generation';
 export * from './hq-support-requests';
 export * from './ops-support';
+export * from './ops-dashboard';
 export * from './tenant-billing';
 export * from './auth-email';
 export * from './friend-tag-side-effects';
