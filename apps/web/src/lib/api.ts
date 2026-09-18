@@ -1022,6 +1022,10 @@ export type ConversionApprovalItem = {
   duplicateFlag: boolean
   /** 承認済みで案件の付帯動作(タグ付与・シナリオ開始)が未完の行だけ true */
   offerActionsIncomplete: boolean
+  /** 成果地点が属するLINEアカウント。アカウント絞りはこの値で数える。未割当は null */
+  lineAccountId: string | null
+  /** アカウント名。削除済み・未割当は null */
+  lineAccountName: string | null
 }
 
 export type ConversionDefinitionStatus = 'active' | 'stopped'
@@ -1256,6 +1260,22 @@ export type AffiliateAccountSettlementPreview = {
     /** 管理画面へ口座番号を返さず、登録の有無だけを扱う。 */
     bankProfileRegistered: boolean
   }>
+  /**
+   * 報酬0円で締め対象から外れた成果(N-219)。除外自体は仕様どおりだが、
+   * 件数と対象を運用者が締めの前に確認できるよう返す。
+   * 古いWorkerでは付かないので、画面側は未設定でも動くこと。
+   */
+  excludedZeroAmount?: {
+    count: number
+    rows: Array<{
+      conversionEventId: string
+      affiliateId: string
+      affiliateName: string
+      code: string
+      approvedAt: string
+      rewardAmount: number
+    }>
+  }
   previewVersion: string
 }
 

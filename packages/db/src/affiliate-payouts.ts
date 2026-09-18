@@ -157,6 +157,24 @@ export interface AffiliateSettlementPreviewRow {
   bankProfileRegistered: boolean;
 }
 
+/**
+ * 締め対象から外れた成果。報酬が0円(以下)の行は支払えないため締めへ
+ * 含めないのは仕様どおりだが、件数と対象を運用者が確認できるよう
+ * プレビューへ出す(N-219)。
+ */
+export interface AffiliateSettlementExcludedRow {
+  conversionEventId: string;
+  affiliateId: string;
+  affiliateName: string;
+  code: string;
+  approvedAt: string;
+  /** 丸め後の報酬額(円)。0円以下が対象。 */
+  rewardAmount: number;
+}
+
+/** 除外行の明細は先頭分だけ返す。残りは件数で分かる。 */
+export const EXCLUDED_ZERO_AMOUNT_PREVIEW_ROWS = 100;
+
 export interface AffiliateAccountSettlementPreview {
   lineAccountId: string;
   periodFrom: string;
@@ -165,6 +183,11 @@ export interface AffiliateAccountSettlementPreview {
   totalAmount: number;
   conversionCount: number;
   affiliates: AffiliateSettlementPreviewRow[];
+  /** 報酬0円で対象から外れた成果の件数と明細(先頭100件)。 */
+  excludedZeroAmount: {
+    count: number;
+    rows: AffiliateSettlementExcludedRow[];
+  };
   previewVersion: string;
 }
 
@@ -173,7 +196,11 @@ async function sha256(value: string): Promise<string> {
   return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
 }
 
-async function eligibleRewards(
+/**
+ * 締め対象候補の全行。0円以下の行も含めて返すので、呼び出し側が
+ * 「含める行」と「外れた行」を分けて数えられる(N-219)。
+ */
+async function eligibleRewardRows(
   db: D1Database,
   input: { tenantId: string; lineAccountId: string; periodFrom: string; periodTo: string },
 ): Promise<EligibleRewardRow[]> {
@@ -216,7 +243,18 @@ async function eligibleRewards(
     input.lineAccountId, input.tenantId, input.lineAccountId,
     input.periodFrom, input.periodTo, input.periodTo,
   ).all<EligibleRewardRow>();
-  return result.results.filter((row) => Math.round(Number(row.reward_amount)) > 0);
+  return result.results;
+}
+
+function isPayableReward(row: EligibleRewardRow): boolean {
+  return Math.round(Number(row.reward_amount)) > 0;
+}
+
+async function eligibleRewards(
+  db: D1Database,
+  input: { tenantId: string; lineAccountId: string; periodFrom: string; periodTo: string },
+): Promise<EligibleRewardRow[]> {
+  return (await eligibleRewardRows(db, input)).filter(isPayableReward);
 }
 
 /**
@@ -238,7 +276,20 @@ export async function previewAffiliateAccountSettlement(
   db: D1Database,
   input: { tenantId: string; lineAccountId: string; periodFrom: string; periodTo: string },
 ): Promise<AffiliateAccountSettlementPreview> {
-  const rows = await eligibleRewards(db, input);
+  const candidates = await eligibleRewardRows(db, input);
+  const rows = candidates.filter(isPayableReward);
+  // 0円以下で外れた行は黙って捨てない。件数と対象を締めプレビューへ
+  // 出し、運用者が「外れる成果」を確かめてから締められるようにする。
+  const excluded = candidates
+    .filter((row) => !isPayableReward(row))
+    .map((row) => ({
+      conversionEventId: row.conversion_event_id,
+      affiliateId: row.affiliate_id,
+      affiliateName: row.affiliate_name,
+      code: row.affiliate_code,
+      approvedAt: row.approved_at,
+      rewardAmount: Math.round(Number(row.reward_amount)),
+    }));
   const grouped = new Map<string, AffiliateSettlementPreviewRow>();
   for (const row of rows) {
     const current = grouped.get(row.affiliate_id) ?? {
@@ -261,6 +312,10 @@ export async function previewAffiliateAccountSettlement(
     totalAmount: rows.reduce((sum, row) => sum + Math.round(Number(row.reward_amount)), 0),
     conversionCount: rows.length,
     affiliates: Array.from(grouped.values()),
+    excludedZeroAmount: {
+      count: excluded.length,
+      rows: excluded.slice(0, EXCLUDED_ZERO_AMOUNT_PREVIEW_ROWS),
+    },
     previewVersion: await accountPreviewVersion(rows),
   };
 }

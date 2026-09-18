@@ -16,14 +16,19 @@ const fixture = vi.hoisted(() => ({
   listImpl: null as null | ((params?: unknown) => Promise<unknown>),
   bulkDecideImpl: null as null | ((items: unknown) => Promise<unknown>),
   approveImpl: null as null | ((eventId: string, expectedStatus: string) => Promise<unknown>),
+  accountsImpl: null as null | ((includeStats?: boolean) => Promise<unknown>),
   approveCalls: [] as Array<{ eventId: string; expectedStatus: string }>,
   bulkDecideCalls: [] as unknown[],
+  listCalls: [] as Array<{ status?: string; limit?: number; offset?: number }>,
 }))
 
 vi.mock('@/lib/api', () => ({
   api: {
     conversionApprovals: {
-      list: (params?: unknown) => fixture.listImpl!(params),
+      list: (params?: unknown) => {
+        fixture.listCalls.push((params ?? {}) as { status?: string; limit?: number; offset?: number })
+        return fixture.listImpl!(params)
+      },
       approve: (eventId: string, expectedStatus: string) => {
         fixture.approveCalls.push({ eventId, expectedStatus })
         return fixture.approveImpl!(eventId, expectedStatus)
@@ -33,6 +38,9 @@ vi.mock('@/lib/api', () => ({
         fixture.bulkDecideCalls.push(items)
         return fixture.bulkDecideImpl!(items)
       },
+    },
+    lineAccounts: {
+      list: (includeStats?: boolean) => fixture.accountsImpl!(includeStats),
     },
   },
 }))
@@ -55,12 +63,16 @@ function item(eventId: string, friendName: string) {
     approvalStatus: 'pending',
     duplicateFlag: false,
     offerActionsIncomplete: false,
+    lineAccountId: null,
+    lineAccountName: null,
   }
 }
 
 beforeEach(() => {
   fixture.bulkDecideCalls = []
   fixture.approveCalls = []
+  fixture.listCalls = []
+  fixture.accountsImpl = async () => ({ success: true, data: [] })
   fixture.approveImpl = async () => ({ success: true, data: { id: 'x', approvalStatus: 'approved' } })
   let decided = false
   fixture.listImpl = async (params?: unknown) => {
@@ -276,5 +288,156 @@ describe('付帯動作のやり直し', () => {
       expect(screen.getByText('条件に合う成果がありません')).toBeTruthy()
     })
     expect(screen.queryByRole('button', { name: '付帯動作をやり直す' })).toBeNull()
+  })
+})
+
+/*
+ * 200件打切り(N-207)。
+ * 以前は各状態を limit:200 で1回だけ取り、201件目以降は画面に出ず操作も
+ * できなかった。全ページ読むことを「offset を送ったrequest」と
+ * 「201件目の行を探して選べること」で固定する。
+ */
+describe('200件を超える成果の読み込みと操作', () => {
+  function usePagedPendingList(total: number) {
+    const all = Array.from({ length: total }, (_, i) =>
+      item(`ev-${i + 1}`, `利用者${i + 1}`),
+    )
+    fixture.listImpl = async (params?: unknown) => {
+      const p = (params ?? {}) as { status?: string; limit?: number; offset?: number }
+      if (p.status === 'pending') {
+        const offset = p.offset ?? 0
+        return { success: true, data: all.slice(offset, offset + (p.limit ?? 200)) }
+      }
+      return { success: true, data: [] }
+    }
+  }
+
+  test('pending が200件で切れないとき offset を進めて次ページも読む', async () => {
+    usePagedPendingList(201)
+    render(<ApprovalQueue />)
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /認めるのを待っている 201/ })).toBeTruthy()
+    })
+    // 1ページ目(offset 0)と2ページ目(offset 200)の両方がpendingで出ている。
+    const pendingCalls = fixture.listCalls.filter((c) => c.status === 'pending')
+    expect(pendingCalls.map((c) => c.offset)).toEqual([0, 200])
+    expect(pendingCalls.map((c) => c.limit)).toEqual([200, 200])
+  })
+
+  test('201件目以降の成果も探して選び、まとめて認められる', async () => {
+    usePagedPendingList(201)
+    render(<ApprovalQueue />)
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /認めるのを待っている 201/ })).toBeTruthy()
+    })
+    // 201件目は末尾のページにいるので、検索で絞って選ぶ。
+    await act(async () => {
+      fireEvent.change(screen.getByLabelText('成果承認を検索'), { target: { value: '利用者201' } })
+    })
+    const checkbox = await screen.findByLabelText('利用者201の成果を選ぶ')
+    await act(async () => {
+      fireEvent.click(checkbox)
+      fireEvent.click(screen.getByRole('button', { name: '選んだ1件をまとめて認める' }))
+    })
+    const dialog = await screen.findByRole('dialog')
+    expect(within(dialog).getByText('利用者201／紹介者1／案件A')).toBeTruthy()
+    await act(async () => {
+      fireEvent.click(within(dialog).getByRole('button', { name: 'まとめて認める' }))
+    })
+    expect(fixture.bulkDecideCalls[0]).toEqual([
+      { id: 'ev-201', status: 'approved', expectedStatus: 'pending' },
+    ])
+  })
+
+  test('5000件で止まるときは続きを読むボタンを出し、続きを読める', async () => {
+    usePagedPendingList(5001)
+    render(<ApprovalQueue />)
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /認めるのを待っている 5000/ })).toBeTruthy()
+    })
+    const more = await screen.findByRole('button', { name: /さらに読み込む/ })
+    await act(async () => {
+      fireEvent.click(more)
+    })
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /認めるのを待っている 5001/ })).toBeTruthy()
+    })
+    const pendingCalls = fixture.listCalls.filter((c) => c.status === 'pending')
+    expect(pendingCalls[pendingCalls.length - 1].offset).toBe(5000)
+  })
+})
+
+/*
+ * アカウント絞り(N-218)。
+ * 権限のあるアカウント一覧(= /api/line-accounts が返す範囲)で絞れて、
+ * 一覧・件数・まとめて操作の対象が絞りに従うことを固定する。
+ */
+describe('アカウントでの絞り込み', () => {
+  beforeEach(() => {
+    fixture.accountsImpl = async () => ({
+      success: true,
+      data: [
+        { id: 'acc-a', name: '本店' },
+        { id: 'acc-b', name: '支店' },
+      ],
+    })
+    fixture.listImpl = async (params?: unknown) => {
+      const status = (params as { status?: string } | undefined)?.status
+      if (status === 'pending') {
+        return {
+          success: true,
+          data: [
+            { ...item('ev-a', '利用者A'), lineAccountId: 'acc-a', lineAccountName: '本店' },
+            { ...item('ev-b', '利用者B'), lineAccountId: 'acc-b', lineAccountName: '支店' },
+          ],
+        }
+      }
+      if (status === 'approved') {
+        return {
+          success: true,
+          data: [{ ...item('ev-c', '利用者C'), approvalStatus: 'approved', lineAccountId: 'acc-b', lineAccountName: '支店' }],
+        }
+      }
+      return { success: true, data: [] }
+    }
+  })
+
+  test('絞ると一覧・件数・まとめて操作の対象がそのアカウントだけになる', async () => {
+    render(<ApprovalQueue />)
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /認めるのを待っている 2/ })).toBeTruthy()
+    })
+    // アカウントの絞りを「支店」に変える。
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: '成果承認をアカウントで絞る' }))
+    })
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: '支店' }))
+    })
+    // 支店の行だけ残り、本店の行は消える。
+    await waitFor(() => {
+      expect(screen.getByLabelText('利用者Bの成果を選ぶ')).toBeTruthy()
+      expect(screen.queryByLabelText('利用者Aの成果を選ぶ')).toBeNull()
+    })
+    // 件数も絞った顔ぶれで数える。
+    expect(screen.getByRole('button', { name: /認めるのを待っている 1/ })).toBeTruthy()
+    expect(screen.getByRole('button', { name: /認めた 1/ })).toBeTruthy()
+    // まとめて操作も支店の行だけが対象になる。
+    await act(async () => {
+      fireEvent.click(screen.getByLabelText('利用者Bの成果を選ぶ'))
+      fireEvent.click(screen.getByRole('button', { name: '選んだ1件をまとめて認める' }))
+    })
+    const dialog = await screen.findByRole('dialog')
+    expect(within(dialog).getByText('利用者B／紹介者1／案件A')).toBeTruthy()
+    expect(within(dialog).queryByText('利用者A／紹介者1／案件A')).toBeNull()
+  })
+
+  test('アカウント列にアカウント名が出る', async () => {
+    render(<ApprovalQueue />)
+    await waitFor(() => {
+      expect(screen.getByLabelText('利用者Aの成果を選ぶ')).toBeTruthy()
+    })
+    expect(screen.getByText('本店')).toBeTruthy()
+    expect(screen.getByText('支店')).toBeTruthy()
   })
 })
