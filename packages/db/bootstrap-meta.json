@@ -383,7 +383,8 @@
     "422_funnel_status.sql",
     "423_common_var_failure_sources.sql",
     "424_media_archive.sql",
-    "425_media_upload_metadata.sql"
+    "425_media_upload_metadata.sql",
+    "426_nen_feeding_kind_treat_limit.sql"
   ],
-  "migrationCount": 384
+  "migrationCount": 385
 }

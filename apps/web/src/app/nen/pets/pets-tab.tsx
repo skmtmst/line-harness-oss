@@ -73,7 +73,7 @@ export default function PetsTab({
 
       <div data-design="Note" data-design-node="pets-note">
         <NoteBar tone="info">
-          「今日の目安」は 体重・年齢・避妊去勢・運動量 から公的な指針（NRC／FEDIAF）の式で計算し、「主食のカロリー」タブの kcal でグラムにします。ペットの登録・変更はお客様がマイページで行います。
+          「今日の目安」は 体重・年齢・避妊去勢・運動量 から公的な指針（NRC／FEDIAF）の式で計算し、「主食のカロリー」タブの kcal でグラムにします。「鹿肉」は然の商品（おやつ）の1日の目安です。ペットの登録・変更はお客様がマイページで行います。
         </NoteBar>
       </div>
 
@@ -179,7 +179,7 @@ function PetRow({ pet }: { pet: NenPetRow }) {
             <span aria-hidden="true" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-pill bg-accent-soft text-caption font-bold text-accent-deep">{initial}</span>
           )}
           <span className="min-w-0">
-            <span className="block truncate text-label font-semibold text-ink" title={pet.name}>{pet.name || '（名前なし）'}</span>
+            <span className="block truncate text-label font-semibold text-ink" title={pet.callName}>{pet.callName || pet.name || '（名前なし）'}</span>
             <span className="block truncate text-micro text-ink-faint">{pet.breed ? `${kind}・${pet.breed}` : kind}</span>
           </span>
         </span>
@@ -194,12 +194,12 @@ function PetRow({ pet }: { pet: NenPetRow }) {
         {pet.feeding?.dailyGrams != null ? (
           <>
             <span className="block text-label font-semibold tabular-nums text-ink">{pet.feeding.dailyGrams}g／日</span>
-            <span className="block text-micro text-ink-faint">{`約${pet.feeding.dailyKcal}kcal${pet.feeding.stageLabel && pet.feeding.stageLabel !== '成犬' && pet.feeding.stageLabel !== '成猫' ? `・${pet.feeding.stageLabel}` : ''}`}</span>
+            <span className="block text-micro text-ink-faint">{`約${pet.feeding.dailyKcal}kcal${pet.feeding.stageLabel && pet.feeding.stageLabel !== '成犬' && pet.feeding.stageLabel !== '成猫' ? `・${pet.feeding.stageLabel}` : ''}${pet.feeding.venisonGrams != null ? `・鹿肉 ${pet.feeding.venisonGrams}g` : ''}`}</span>
           </>
         ) : pet.feeding ? (
           <>
             <span className="block text-label text-ink-secondary">—</span>
-            <span className="block text-micro text-ink-faint">{`約${pet.feeding.dailyKcal}kcal・主食が未設定`}</span>
+            <span className="block text-micro text-ink-faint">{`約${pet.feeding.dailyKcal}kcal・主食が未設定${pet.feeding.venisonGrams != null ? `・鹿肉 ${pet.feeding.venisonGrams}g` : ''}`}</span>
           </>
         ) : (
           <>

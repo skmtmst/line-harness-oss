@@ -12,6 +12,9 @@ export type PetActivity = 'low' | 'normal' | 'high'
 export interface NenPetRow {
   id: string
   name: string
+  /** 呼び名（男の子＝くん、女の子＝ちゃん） */
+  callName: string
+  gender: 'male' | 'female' | 'unknown'
   animalType: 'dog' | 'cat'
   breed: string
   birthday: string | null
@@ -21,7 +24,7 @@ export interface NenPetRow {
   activityLevel: PetActivity
   activityLabel: string
   productName: string | null
-  feeding: { dailyKcal: number; dailyGrams: number | null; factorLabel: string; stageLabel: string } | null
+  feeding: { dailyKcal: number; dailyGrams: number | null; factorLabel: string; stageLabel: string; venisonGrams: number | null; venisonKcal: number; treatName: string | null } | null
   imageUrl: string | null
   updatedAt: string
   weightStale: boolean
@@ -44,6 +47,7 @@ export interface NenPetListData {
   pageSize: number
   kpis: NenPetKpis
   products: Array<{ id: string; name: string }>
+  treatLimitPercent: number
 }
 
 export type NenPetSort = 'updated_desc' | 'name' | 'weight_desc' | 'age_desc'
@@ -56,7 +60,7 @@ export interface NenHealthChange {
 }
 
 export interface NenHealthRow {
-  pet: { id: string; name: string; animalType: 'dog' | 'cat'; breed: string; ageLabel: string; imageUrl: string | null }
+  pet: { id: string; name: string; callName: string; animalType: 'dog' | 'cat'; breed: string; ageLabel: string; imageUrl: string | null }
   owner: { friendId: string; name: string; customerId: string | null }
   lastLoggedOn: string | null
   lastLoggedLabel: string
@@ -93,7 +97,7 @@ export type NenHealthLastFilter = '' | '7' | '30' | 'over30'
 export type NenHealthSort = 'concern' | 'recent' | 'records_desc'
 
 export interface NenHealthSummaryData {
-  pet: { id: string; name: string; animalType: 'dog' | 'cat'; breed: string; ageLabel: string; weightKg: number | null }
+  pet: { id: string; name: string; callName: string; animalType: 'dog' | 'cat'; breed: string; ageLabel: string; weightKg: number | null }
   owner: { friendId: string; name: string }
   generatedAt: string
   summary: {

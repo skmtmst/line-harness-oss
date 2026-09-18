@@ -202,7 +202,7 @@ function HealthRow({ row, onOpenSummary }: { row: NenHealthRow; onOpenSummary: (
             <span aria-hidden="true" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-pill bg-accent-soft text-caption font-bold text-accent-deep">{initial}</span>
           )}
           <span className="min-w-0">
-            <span className="block truncate text-label font-semibold text-ink" title={row.pet.name}>{row.pet.name || '（名前なし）'}</span>
+            <span className="block truncate text-label font-semibold text-ink" title={row.pet.callName}>{row.pet.callName || row.pet.name || '（名前なし）'}</span>
             <span className="block truncate text-micro text-ink-faint">{row.pet.ageLabel === '—' ? kind : `${kind}・${row.pet.ageLabel}`}</span>
           </span>
         </span>

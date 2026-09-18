@@ -5,7 +5,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   ageInMonths, energyFactor, feedingPlan, gramsFor, lifeStageFor, neuteredFromInput, neuteredFromRow,
-  pickProduct, restingEnergyKcal, validateFeedingProducts,
+  pickProduct, pickTreat, restingEnergyKcal, validateFeedingProducts, validateTreatLimitPercent, venisonPlan,
+  type FeedingProductRow,
 } from './nen-feeding.js';
 
 const today = new Date('2026-09-16T00:00:00Z');
@@ -100,19 +101,41 @@ describe('入力の解釈', () => {
   });
 
   it('主食は ペットの選択 → 既定 → 先頭 の順に選ぶ', () => {
-    const rows = [
-      { id: 'a', line_account_id: 'x', name: 'A', kcal_per_100g: 100, is_default: 0, sort_order: 0, created_at: '', updated_at: '' },
-      { id: 'b', line_account_id: 'x', name: 'B', kcal_per_100g: 200, is_default: 1, sort_order: 1, created_at: '', updated_at: '' },
+    const rows: FeedingProductRow[] = [
+      { id: 'a', line_account_id: 'x', name: 'A', kcal_per_100g: 100, is_default: 0, sort_order: 0, kind: 'staple', created_at: '', updated_at: '' },
+      { id: 'b', line_account_id: 'x', name: 'B', kcal_per_100g: 200, is_default: 1, sort_order: 1, kind: 'staple', created_at: '', updated_at: '' },
+      { id: 'n', line_account_id: 'x', name: '然 鹿肉ジャーキー', kcal_per_100g: 300, is_default: 1, sort_order: 2, kind: 'nen', created_at: '', updated_at: '' },
     ];
     expect(pickProduct(rows, 'a')?.name).toBe('A');
     expect(pickProduct(rows, 'missing')?.name).toBe('B');
     expect(pickProduct(rows, null)?.name).toBe('B');
     expect(pickProduct([rows[0]], null)?.name).toBe('A');
     expect(pickProduct([], null)).toBeNull();
+    // 然の商品は主食として選ばれない。おやつ（目安に使う）としてだけ選ばれる
+    expect(pickProduct(rows, 'n')?.name).toBe('B');
+    expect(pickTreat(rows)?.name).toBe('然 鹿肉ジャーキー');
+    expect(pickTreat(rows.slice(0, 2))).toBeNull();
+  });
+
+  it('然の鹿肉（おやつ）の目安：必要カロリー × 上限% ÷ 然商品の kcal/100g × 100', () => {
+    // 10kg 成犬・避妊去勢済み → 630kcal。10% = 63kcal → 300kcal/100g のジャーキーで 21g
+    const plan = feedingPlan({ animalType: 'dog', weightKg: 10, birthday: '2022-04-01', neutered: true, activityLevel: 'normal' }, { id: 's', name: 'ドライ', kcalPer100g: 360 }, new Date('2026-09-18T00:00:00Z'), { id: 'n', name: '然 鹿肉ジャーキー', kcalPer100g: 300 }, 10);
+    expect(plan.dailyKcal).toBe(630);
+    expect(plan.dailyGrams).toBe(175);
+    expect(plan.venison).toEqual({ limitPercent: 10, kcal: 63, grams: 21, product: { id: 'n', name: '然 鹿肉ジャーキー', kcalPer100g: 300 } });
+    // 然の商品が無ければ kcal だけ
+    expect(venisonPlan(630, null, 15)).toEqual({ limitPercent: 15, kcal: 95, grams: null, product: null });
+    expect(validateTreatLimitPercent(undefined)).toBe(10);
+    expect(validateTreatLimitPercent('12')).toBe(12);
+    expect(() => validateTreatLimitPercent(0)).toThrow('上限');
+    expect(() => validateTreatLimitPercent(31)).toThrow('上限');
   });
 
   it('主食の一覧を検証する（名前・kcal・重複・既定は1つ）', () => {
-    expect(validateFeedingProducts([{ name: '鹿肉ミンチ', kcalPer100g: 120.26 }])).toEqual([{ id: null, name: '鹿肉ミンチ', kcalPer100g: 120.3, isDefault: true }]);
+    expect(validateFeedingProducts([{ name: '鹿肉ミンチ', kcalPer100g: 120.26 }])).toEqual([{ id: null, name: '鹿肉ミンチ', kcalPer100g: 120.3, isDefault: true, kind: 'staple' }]);
+    // 主食と然の商品は、それぞれの種類で既定を1つ持つ
+    expect(validateFeedingProducts([{ name: 'ドライ', kcalPer100g: 360 }, { name: '然 ジャーキー', kcalPer100g: 300, kind: 'nen' }]).map((p) => [p.kind, p.isDefault])).toEqual([['staple', true], ['nen', true]]);
+    expect(() => validateFeedingProducts([{ name: 'A', kcalPer100g: 100, kind: 'nen', isDefault: true }, { name: 'B', kcalPer100g: 200, kind: 'nen', isDefault: true }])).toThrow('然の商品');
     expect(() => validateFeedingProducts([{ name: '', kcalPer100g: 120 }])).toThrow('商品名');
     expect(() => validateFeedingProducts([{ name: 'A', kcalPer100g: 0 }])).toThrow('カロリー');
     expect(() => validateFeedingProducts([{ name: 'A', kcalPer100g: 100 }, { name: 'A', kcalPer100g: 200 }])).toThrow('同じ商品名');

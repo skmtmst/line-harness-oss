@@ -3785,6 +3785,12 @@ CREATE TABLE nen_feeding_products (
   sort_order      INTEGER NOT NULL DEFAULT 0,
   created_at      TEXT NOT NULL,
   updated_at      TEXT NOT NULL
+, kind TEXT NOT NULL DEFAULT 'staple' CHECK (kind IN ('staple', 'nen')));
+
+CREATE TABLE nen_feeding_settings (
+  line_account_id     TEXT PRIMARY KEY REFERENCES line_accounts(id) ON DELETE CASCADE,
+  treat_limit_percent INTEGER NOT NULL DEFAULT 10 CHECK (treat_limit_percent BETWEEN 1 AND 30),
+  updated_at          TEXT NOT NULL
 );
 
 CREATE TABLE "nen_friend_add_coupon_issues" (
