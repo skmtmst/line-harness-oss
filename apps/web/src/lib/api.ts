@@ -4617,6 +4617,57 @@ export type OpsLineUnregistered = {
   total: number
   people: Array<{ staffId: string; name: string; tenantName: string; hasEmail: boolean }>
 }
+/** 運営からのお知らせ配信（★V6 37-7）。形は `apps/worker/src/routes/ops-announcements.ts`。 */
+export type OpsAnnouncementAudience = 'all' | 'plan' | 'tenants'
+export type OpsAnnouncementChannel = 'line' | 'screen' | 'email'
+export type OpsAnnouncementStatus = 'draft' | 'scheduled' | 'sending' | 'sent' | 'failed'
+export type OpsAnnouncement = {
+  id: string
+  subject: string
+  body: string
+  audienceKind: OpsAnnouncementAudience
+  audiencePlans: string[]
+  audienceTenantIds: string[]
+  audienceLabel: string
+  channels: OpsAnnouncementChannel[]
+  channelLabels: string[]
+  status: OpsAnnouncementStatus
+  statusLabel: string
+  publishAt: string | null
+  sentAt: string | null
+  recipientsTotal: number
+  lineSent: number
+  lineFailed: number
+  mailSent: number
+  mailFailed: number
+  screenRead: number
+  screenTotal: number
+  lastError: string | null
+  createdByName: string
+  createdAt: string
+  updatedAt: string
+}
+export type OpsAnnouncementInput = {
+  subject: string
+  body: string
+  audienceKind: OpsAnnouncementAudience
+  audiencePlans: string[]
+  audienceTenantIds: string[]
+  channels: OpsAnnouncementChannel[]
+  publishAt: string | null
+  mode: 'draft' | 'schedule' | 'send'
+}
+export type OpsAudiencePreview = { tenants: number; staff: number; lineLinked: number; withEmail: number }
+export type OpsNoticeLineAccount = {
+  currentId: string | null
+  current: { id: string; name: string; basicId: string | null; addFriendUrl: string | null } | null
+  candidates: Array<{ id: string; name: string; basicId: string | null }>
+  linked: { linked: number; total: number }
+}
+export type HqNotice = { id: string; subject: string; body: string; sentAt: string | null }
+export type HqLineRegistration =
+  | { available: false }
+  | { available: true; accountName: string; basicId: string | null; addFriendUrl: string | null; linked: boolean; code: string | null; codeExpiresAt: string | null }
 export type OpsSupportDetail = {
   ticket: OpsSupportTicket
   tenant: { accountCount: number; staffCount: number; staffWithLine: number; pastTickets: number; pastOpen: number }
@@ -6722,6 +6773,18 @@ export const api = {
     dashboard: (period?: OpsDashboardPeriod) =>
       fetchApi<ApiResponse<OpsDashboard>>(`/api/ops/dashboard${period ? `?period=${period}` : ''}`),
     lineUnregistered: () => fetchApi<ApiResponse<OpsLineUnregistered>>('/api/ops/dashboard/line-unregistered'),
+    /** お知らせ配信 ★V6 37-7。 */
+    announcements: {
+      list: () => fetchApi<ApiResponse<OpsAnnouncement[]> & { linked: { linked: number; total: number }; noticeLineConfigured: boolean }>('/api/ops/announcements'),
+      preview: (input: { audienceKind: OpsAnnouncementAudience; audiencePlans: string[]; audienceTenantIds: string[] }) =>
+        fetchApi<ApiResponse<OpsAudiencePreview>>('/api/ops/announcements/preview', { method: 'POST', body: JSON.stringify(input) }),
+      create: (input: OpsAnnouncementInput) => fetchApi<ApiResponse<OpsAnnouncement>>('/api/ops/announcements', { method: 'POST', body: JSON.stringify(input) }),
+      update: (id: string, input: OpsAnnouncementInput) => fetchApi<ApiResponse<OpsAnnouncement>>(`/api/ops/announcements/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify(input) }),
+      remove: (id: string) => fetchApi<ApiResponse<null>>(`/api/ops/announcements/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+    },
+    noticeLineAccount: () => fetchApi<ApiResponse<OpsNoticeLineAccount>>('/api/ops/notice-line-account'),
+    setNoticeLineAccount: (lineAccountId: string | null) =>
+      fetchApi<ApiResponse<{ currentId: string | null }>>('/api/ops/notice-line-account', { method: 'PUT', body: JSON.stringify({ lineAccountId }) }),
     /** お問い合わせ（チケット）★V6 37-6。 */
     support: {
       summary: () => fetchApi<ApiResponse<OpsSupportSummary>>('/api/ops/support/summary'),
@@ -6750,6 +6813,12 @@ export const api = {
       create: (input: { tenantId: string; subject: string; body: string; kind?: string; priority?: OpsSupportPriority; channel?: 'ops' | 'line'; staffId?: string }) =>
         fetchApi<ApiResponse<OpsSupportTicket>>('/api/ops/support/tickets', { method: 'POST', body: JSON.stringify(input) }),
     },
+  },
+  /** 運営からのお知らせ（統括の画面）と契約者専用LINEの登録案内。 */
+  hqNotices: {
+    list: () => fetchApi<ApiResponse<HqNotice[]>>('/api/hq/notices'),
+    markRead: (id: string) => fetchApi<ApiResponse<{ read: boolean }>>(`/api/hq/notices/${encodeURIComponent(id)}/read`, { method: 'POST', body: '{}' }),
+    lineRegistration: () => fetchApi<ApiResponse<HqLineRegistration>>('/api/hq/notices/line-registration'),
   },
   /** 契約先（統括）から見える運営の操作履歴。書き込みを伴ったものだけ。 */
   operatorHistory: () => fetchApi<ApiResponse<OperatorHistoryRow[]>>('/api/hq/operator-history'),

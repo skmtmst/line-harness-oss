@@ -7,6 +7,7 @@ import Button from '@/components/shared/button'
 import PageHeader from '@/components/shared/page-header'
 import StickyBar from '@/components/shared/sticky-bar'
 import StatusBadge from '@/components/shared/status-badge'
+import NoticeLineRegisterDialog from '@/components/hq/notice-line-register-dialog'
 import { CHECK_STATE_LABEL, canSave, stoppedAt, toSteps } from '../connection-check-view'
 
 const WIZARD_STEPS = [
@@ -51,6 +52,11 @@ export default function NewLineAccountPage() {
   const workerBase = (process.env.NEXT_PUBLIC_API_URL ?? '').replace(/\/$/, '')
   const callbackUrl = workerBase ? `${workerBase}/auth/callback` : '—'
   const importingIds = (importState?.phase ?? connection?.followerImport.phase) === 'importing_ids'
+  // 登録完了（取り込みも終わった）直後に、契約者専用LINEの登録案内を一度だけ出す（決定 2026-09-18）
+  const [noticeDialog, setNoticeDialog] = useState<'idle' | 'open' | 'done'>('idle')
+  useEffect(() => {
+    if (currentStep === 5 && connection && !importingIds && noticeDialog === 'idle') setNoticeDialog('open')
+  }, [currentStep, connection, importingIds, noticeDialog])
 
   useEffect(() => { stepPanelRef.current?.focus() }, [currentStep])
 
@@ -283,6 +289,7 @@ export default function NewLineAccountPage() {
         </div>
 
         {error && <p role="alert" aria-live="assertive" className="bg-danger-bg text-danger rounded-control mt-4 p-3 text-sm">{error}</p>}
+        <NoticeLineRegisterDialog open={noticeDialog === 'open'} onClose={() => setNoticeDialog('done')} />
         <div data-design="Actions">
           <StickyBar
             className="mt-4"
