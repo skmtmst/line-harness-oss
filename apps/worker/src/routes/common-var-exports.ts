@@ -7,6 +7,7 @@ import {
   countCommonVars,
   createCommonVarExportJob,
   failCommonVarExport,
+  getCommonVarExportCsv,
   getCommonVarExportJob,
   getCommonVarUsageSummaries,
   getFolderById,
@@ -17,7 +18,7 @@ import {
   parseCommonVarExportFilter,
   protectCsvCell,
   updateCommonVarExportProgress,
-  type CommonVarExportJob,
+  type CommonVarExportJobMeta,
 } from '@line-crm/db';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
@@ -45,7 +46,7 @@ const EXPORT_JOBS_LIST_LIMIT = 20;
  */
 const CSV_HEADER = '共通情報,差し込みキー,中身,使われている場所,更新,次の変更日時,次の中身';
 
-function exportJobJson(job: CommonVarExportJob, nowIso = new Date().toISOString()) {
+function exportJobJson(job: CommonVarExportJobMeta, nowIso = new Date().toISOString()) {
   const filter = parseCommonVarExportFilter(job.filter_json);
   const effectiveStatus = job.status === 'completed' && job.expires_at <= nowIso ? 'expired' : job.status;
   return {
@@ -153,7 +154,7 @@ async function accessibleExportJob(
   db: D1Database,
   staff: Parameters<typeof canAccessAllLineAccounts>[1],
   id: string,
-): Promise<CommonVarExportJob | null> {
+): Promise<CommonVarExportJobMeta | null> {
   const job = await getCommonVarExportJob(db, id);
   if (!job) return null;
   return (await canAccessAllLineAccounts(db, staff, [job.line_account_id])) ? job : null;
@@ -248,7 +249,8 @@ commonVarExports.get('/api/common-vars/exports/:id/download', requireRole('owner
   if (job.status === 'completed' && job.expires_at <= new Date().toISOString()) {
     await markCommonVarExportExpired(c.env.DB, job.id);
   }
-  const fresh = await getCommonVarExportJob(c.env.DB, job.id);
+  // download 経路だけが csv_text（最大4MiB）を読む。detail/list は触らない。
+  const fresh = await getCommonVarExportCsv(c.env.DB, job.id);
   const status = fresh?.status ?? job.status;
   if (status === 'expired') {
     auditLog(c, 'common_var_export.download', { kind: 'common_var_export', id: job.id }, detail);
