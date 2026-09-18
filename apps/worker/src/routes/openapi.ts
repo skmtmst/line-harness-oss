@@ -955,6 +955,16 @@ const spec = {
         responses: { '200': { description: 'Updated funnel' }, '403': { description: 'Owner or admin role required' }, '404': { description: 'Not found' }, '409': { description: 'Status changed elsewhere first' }, '422': { description: 'Invalid status or transition' } },
       },
     },
+    '/api/analytics/audiences/{id}': {
+      get: {
+        tags: ['Analytics'], summary: '分析の一時対象者の詳細（配信作成の読み直し用。友だちIDは返さない）',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        responses: { '200': { description: 'Audience detail' }, '404': { description: 'Not found' }, '410': { description: 'Audience expired (24h)' } },
+      },
+    },
     // ── Friends ─────────────────────────────────────────────────────────────
     '/api/friends': {
       get: {

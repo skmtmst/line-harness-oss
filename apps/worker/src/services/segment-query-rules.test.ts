@@ -228,3 +228,77 @@ describe('matchesCondition', () => {
     expect(await matchesCondition(db, 'c', { operator: 'AND', rules: [] })).toBe(true)
   })
 })
+
+describe('分析の一時対象者(N-274)', () => {
+  /*
+   * audience の中身（friend ID）を条件へ埋めず、audience ID だけを持つ。
+   * 評価のたびに所属アカウントと期限を確かめるので、期限切れ・他アカウント・
+   * 消えた対象者は誰にもあてはまらない（fail-closed）。
+   */
+  function seedAudienceRow(
+    id: string,
+    accountId: string,
+    expiresAt: string,
+    friendIds: string[],
+  ): void {
+    raw.prepare(
+      `INSERT INTO line_accounts (id, channel_id, name, channel_access_token, channel_secret, is_active)
+       VALUES (?, ?, ?, 'token', 'secret', 1)`,
+    ).run(accountId, `channel-${accountId}`, accountId)
+    raw.prepare(
+      `INSERT INTO analytics_cross_runs
+         (id, line_account_id, query_json, state, period_from, period_to, time_zone, data_cutoff_at, created_at)
+       VALUES (?, ?, '{}', 'available', '2026-09-01', '2026-09-30', 'Asia/Tokyo', '2026-10-01T00:00:00.000Z', '2026-10-01T00:00:00.000Z')`,
+    ).run(`run-${id}`, accountId)
+    raw.prepare(
+      `INSERT INTO analytics_result_audiences
+         (id, line_account_id, source_kind, source_result_id, selection_key, member_count, expires_at, created_at)
+       VALUES (?, ?, 'cross', ?, 'a:b', ?, ?, '2026-10-01T00:00:00.000Z')`,
+    ).run(id, accountId, `run-${id}`, friendIds.length, expiresAt)
+    for (const friendId of friendIds) {
+      raw.prepare(
+        `INSERT INTO analytics_result_audience_members (audience_id, friend_id) VALUES (?, ?)`,
+      ).run(id, friendId)
+    }
+  }
+
+  it('対象者の友だちだけが残る', async () => {
+    seedAudienceRow('aud-1', 'acc-seg', '2999-01-01T00:00:00.000Z', ['a', 'b'])
+    raw.prepare(`UPDATE friends SET line_account_id = 'acc-seg'`).run()
+    const matched = await idsMatching({
+      operator: 'AND',
+      rules: [{ type: 'analytics_audience', value: { audienceId: 'aud-1' } }],
+    })
+    expect(matched).toEqual(['a', 'b'])
+  })
+
+  it('期限切れ・他アカウント・不存在は誰にもあてはまらない', async () => {
+    seedAudienceRow('aud-expired', 'acc-seg', '2000-01-01T00:00:00.000Z', ['a'])
+    seedAudienceRow('aud-other', 'acc-other', '2999-01-01T00:00:00.000Z', ['a'])
+    raw.prepare(`UPDATE friends SET line_account_id = 'acc-seg'`).run()
+    for (const audienceId of ['aud-expired', 'aud-other', 'aud-none']) {
+      const matched = await idsMatching({
+        operator: 'AND',
+        rules: [{ type: 'analytics_audience', value: { audienceId } }],
+      })
+      expect(matched).toEqual([])
+    }
+  })
+
+  it('audienceId の空欄は全員一致にせず組み立てを断る', () => {
+    expect(() =>
+      buildSegmentQuery({ operator: 'AND', rules: [{ type: 'analytics_audience', value: { audienceId: '' } }] }),
+    ).toThrow()
+    expect(() =>
+      buildSegmentQuery({ operator: 'AND', rules: [{ type: 'analytics_audience', value: {} }] }),
+    ).toThrow()
+  })
+
+  it('一般の条件保存口でも使える（配信の保存経路が通る）', () => {
+    const { sql } = buildPublicSegmentQuery({
+      operator: 'AND',
+      rules: [{ type: 'analytics_audience', value: { audienceId: 'aud-1' } }],
+    })
+    expect(sql).toContain('analytics_result_audience_members')
+  })
+})
