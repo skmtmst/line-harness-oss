@@ -226,13 +226,14 @@ const APPROVAL_MAX_PAGES = 25
 
 async function listAllConversionApprovals(
   status: 'pending' | 'approved' | 'rejected',
+  startOffset = 0,
 ): Promise<{ items: ConversionApprovalItem[]; truncated: boolean }> {
   const items: ConversionApprovalItem[] = []
   for (let page = 0; page < APPROVAL_MAX_PAGES; page += 1) {
     const res = await api.conversionApprovals.list({
       status,
       limit: APPROVAL_PAGE_SIZE,
-      offset: page * APPROVAL_PAGE_SIZE,
+      offset: startOffset + page * APPROVAL_PAGE_SIZE,
     })
     if (!res.success) throw new Error('承認の読み込みに失敗しました')
     items.push(...res.data)
@@ -1590,6 +1591,11 @@ function OfferFormModal({ initial, accounts, tags, scenarios, onClose, onSaved }
 
 type ApprovalStatus = 'pending' | 'approved' | 'rejected'
 
+// アカウント絞りの特別な値(N-218)。アカウント未割当の成果地点だけを
+// 集める札で、実IDとは衝突しない文字列にする。
+const APPROVAL_FILTER_ALL = 'all'
+const APPROVAL_FILTER_UNASSIGNED = '__unassigned__'
+
 export function ApprovalQueue() {
   const [status, setStatus] = useState<ApprovalStatus>('pending')
   const [items, setItems] = useState<ConversionApprovalItem[]>([])
@@ -1603,18 +1609,23 @@ export function ApprovalQueue() {
   const [page, setPage] = useState(1)
   const [selected, setSelected] = useState<Set<string>>(() => new Set())
   const [detailItem, setDetailItem] = useState<ConversionApprovalItem | null>(null)
+  // N-207: 各状態を短い頁が返るまで全部読む。安全弁(状態ごと5000件)で
+  // 打ち切った状態だけここに残し、「さらに読み込む」で続きを取る。
+  const [truncatedStatuses, setTruncatedStatuses] = useState<ApprovalStatus[]>([])
+  const [loadingMore, setLoadingMore] = useState(false)
+  // N-218: アカウント絞り。選択肢は権限内アカウント( /api/line-accounts は
+  // scope 済み)と、読み込んだ行にだけある未割当。
+  const [accounts, setAccounts] = useState<Array<{ id: string; name: string }>>([])
+  const [accountFilter, setAccountFilter] = useState<string>(APPROVAL_FILTER_ALL)
 
   const loadItems = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
-      const results = await Promise.all(
-        (['pending', 'approved', 'rejected'] as const).map((value) =>
-          api.conversionApprovals.list({ status: value, limit: 200 }),
-        ),
-      )
-      if (results.some((result) => !result.success)) throw new Error('読み込みに失敗しました')
-      setItems(results.flatMap((result) => result.data))
+      const statuses = ['pending', 'approved', 'rejected'] as const
+      const results = await Promise.all(statuses.map((value) => listAllConversionApprovals(value)))
+      setItems(results.flatMap((result) => result.items))
+      setTruncatedStatuses(statuses.filter((value, index) => results[index].truncated))
       setSelected(new Set())
     } catch (e) {
       setError(e instanceof Error ? e.message : '読み込みエラー')
@@ -1624,6 +1635,51 @@ export function ApprovalQueue() {
   }, [])
 
   useEffect(() => { void loadItems() }, [loadItems])
+
+  // 安全弁で止まった状態の続きを読む。既読みの件数を offset にして
+  // 次の頁から取り、同じ成果が重ならないよう eventId で除く(N-207)。
+  const loadMoreItems = useCallback(async () => {
+    if (loadingMore || truncatedStatuses.length === 0) return
+    setLoadingMore(true)
+    setError(null)
+    try {
+      const results = await Promise.all(
+        truncatedStatuses.map(async (value) => {
+          const already = items.filter((item) => item.approvalStatus === value).length
+          const result = await listAllConversionApprovals(value, already)
+          return { status: value, ...result }
+        }),
+      )
+      setItems((current) => {
+        const seen = new Set(current.map((item) => item.eventId))
+        const additions = results.flatMap((result) => result.items).filter((item) => !seen.has(item.eventId))
+        return [...current, ...additions]
+      })
+      setTruncatedStatuses(results.filter((result) => result.truncated).map((result) => result.status))
+    } catch (e) {
+      setError(e instanceof Error ? e.message : '続きを読み込めませんでした')
+    } finally {
+      setLoadingMore(false)
+    }
+  }, [items, loadingMore, truncatedStatuses])
+
+  useEffect(() => {
+    let cancelled = false
+    // アカウント一覧が取れなくてもキュー自体は全件で使える。
+    // その場合は行に載っているアカウントだけが選択肢に出る。
+    const load = async () => {
+      try {
+        const res = await api.lineAccounts.list()
+        if (!cancelled && res.success && Array.isArray(res.data)) {
+          setAccounts(res.data.map((account) => ({ id: account.id, name: account.name })))
+        }
+      } catch {
+        // 一覧の口が無い・失敗しても絞り以外は動かす
+      }
+    }
+    void load()
+    return () => { cancelled = true }
+  }, [])
 
   const handleApprove = useCallback(async (eventId: string, expectedStatus: 'pending' | 'approved' | 'rejected') => {
     if (actioning) return
@@ -1718,6 +1774,38 @@ export function ApprovalQueue() {
     }
   }, [loadItems])
 
+  // N-218: アカウント絞りは一覧・件数・一括操作すべての元にする。
+  // ここを通った行だけが数えられ・選ばれ・まとめて処理される。
+  const accountItems = useMemo(() => {
+    if (accountFilter === APPROVAL_FILTER_ALL) return items
+    if (accountFilter === APPROVAL_FILTER_UNASSIGNED) return items.filter((item) => !item.lineAccountId)
+    return items.filter((item) => item.lineAccountId === accountFilter)
+  }, [accountFilter, items])
+
+  // 絞りの選択肢。権限内アカウント(lineAccounts.list は scope 済み)へ、
+  // 読み込んだ行にだけあるIDと未割当を足す。行が無いアカウントは
+  // 選んでも0件にしかならないので、行にあるIDだけを出す。
+  const accountOptions = useMemo(() => {
+    const nameById = new Map<string, string>()
+    for (const account of accounts) nameById.set(account.id, account.name)
+    for (const item of items) {
+      if (item.lineAccountId && !nameById.has(item.lineAccountId)) {
+        nameById.set(item.lineAccountId, item.lineAccountName ?? '名前を確認できません')
+      }
+    }
+    const options = [{ value: APPROVAL_FILTER_ALL, label: 'すべてのアカウント' }]
+    for (const [id, name] of nameById) options.push({ value: id, label: name })
+    if (items.some((item) => !item.lineAccountId)) {
+      options.push({ value: APPROVAL_FILTER_UNASSIGNED, label: 'アカウント未設定' })
+    }
+    // 絞りを選んだまま対象行が0件になっても、選択肢から消して
+    // 空白の札にしない。選んだままの値は最後に残す。
+    if (accountFilter !== APPROVAL_FILTER_ALL && !options.some((option) => option.value === accountFilter)) {
+      options.push({ value: accountFilter, label: accountFilter === APPROVAL_FILTER_UNASSIGNED ? 'アカウント未設定' : '選択中のアカウント' })
+    }
+    return options
+  }, [accountFilter, accounts, items])
+
   const retryBulkLeftovers = useCallback(() => {
     if (!bulkResult) return
     const leftoverIds = new Set([
@@ -1727,7 +1815,7 @@ export function ApprovalQueue() {
     ])
     // 読み直し後の最新状態で選び直す。競合で状態が変わった対象は
     // 最新の一覧から外れるため、誤って再送しない。
-    const retryable = items.filter((item) => leftoverIds.has(item.eventId) && item.approvalStatus === 'pending')
+    const retryable = accountItems.filter((item) => leftoverIds.has(item.eventId) && item.approvalStatus === 'pending')
     setBulkResult(null)
     if (retryable.length === 0) {
       setSelected(new Set())
@@ -1735,14 +1823,14 @@ export function ApprovalQueue() {
     }
     setSelected(new Set(retryable.map((item) => item.eventId)))
     setBulkConfirm({ action: bulkResult.action, items: retryable })
-  }, [bulkResult, items])
+  }, [bulkResult, accountItems])
 
   const counts = {
-    pending: items.filter((item) => item.approvalStatus === 'pending').length,
-    approved: items.filter((item) => item.approvalStatus === 'approved').length,
-    rejected: items.filter((item) => item.approvalStatus === 'rejected').length,
+    pending: accountItems.filter((item) => item.approvalStatus === 'pending').length,
+    approved: accountItems.filter((item) => item.approvalStatus === 'approved').length,
+    rejected: accountItems.filter((item) => item.approvalStatus === 'rejected').length,
   }
-  const pendingItems = items.filter((item) => item.approvalStatus === 'pending')
+  const pendingItems = accountItems.filter((item) => item.approvalStatus === 'pending')
   const flaggedCount = pendingItems.filter((item) => item.duplicateFlag).length
   const pendingYen = pendingItems.reduce((sum, item) => sum + (item.value ?? 0), 0)
   const averageWaitDays = pendingItems.length === 0
@@ -1754,7 +1842,7 @@ export function ApprovalQueue() {
 
   const shownItems = useMemo(() => {
     const needle = query.trim().toLocaleLowerCase('ja-JP')
-    return items
+    return accountItems
       .filter((item) => item.approvalStatus === status)
       .filter((item) => !flaggedOnly || item.duplicateFlag)
       .filter((item) => {
@@ -1770,7 +1858,7 @@ export function ApprovalQueue() {
         const time = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
         return sort === 'oldest' ? time : -time
       })
-  }, [flaggedOnly, items, query, sort, status])
+  }, [accountItems, flaggedOnly, query, sort, status])
 
   const approvalPageCount = pageCountOf(shownItems.length, pageSize)
   const currentPage = Math.min(page, approvalPageCount)
@@ -1789,18 +1877,19 @@ export function ApprovalQueue() {
     if (actioning) return
     // 確認を開く前に選んだ対象を確定する。確認画面に並んだ顔ぶれが
     // 実行対象とずれないようにするため、開いた後は選び直しを受けない。
-    const targets = items.filter((item) => selected.has(item.eventId) && item.approvalStatus === 'pending')
+    const targets = accountItems.filter((item) => selected.has(item.eventId) && item.approvalStatus === 'pending')
     if (targets.length === 0) return
     setBulkResult(null)
     setBulkConfirm({ action, items: targets })
-  }, [actioning, items, selected])
+  }, [actioning, accountItems, selected])
 
   const exportApprovalsCsv = () => {
-    const header = ['日時', '友だち', 'アフィリエイター', '案件', '成果地点', '金額', '確認状態']
+    const header = ['日時', '友だち', 'アフィリエイター', 'アカウント', '案件', '成果地点', '金額', '確認状態']
     const lines = shownItems.map((item) => [
       formatDateTime(item.createdAt),
       personNameText(item.friendName),
       item.affiliateName ?? '名前を取得できませんでした',
+      item.lineAccountName ?? 'アカウント未設定',
       item.offerName ?? '未設定',
       item.conversionPointName ?? '未設定',
       item.value ?? '',
@@ -1843,7 +1932,7 @@ export function ApprovalQueue() {
           title="認めた成果"
           value={loading || error ? null : counts.approved}
           unit={loading || error ? '' : '件'}
-          detail="直近最大200件"
+          detail={truncatedStatuses.includes('approved') ? 'まだ読み込んでいない分があります' : '絞り込み条件での全件'}
           loading={loading}
         />
         <KpiCard
@@ -1863,6 +1952,13 @@ export function ApprovalQueue() {
           onChange={(value) => { setQuery(value); setPage(1); setSelected(new Set()) }}
           onClear={() => { setQuery(''); setPage(1); setSelected(new Set()) }}
           className="w-full md:max-w-lg"
+        />
+        <span className="text-ink-faint whitespace-nowrap text-xs">アカウント</span>
+        <Select
+          aria-label="成果承認をアカウントで絞る"
+          value={accountFilter}
+          options={accountOptions}
+          onChange={(value) => { setAccountFilter(value); setPage(1); setSelected(new Set()) }}
         />
         <span className="text-ink-faint whitespace-nowrap text-xs">並び順</span>
         <Select
@@ -1974,6 +2070,7 @@ export function ApprovalQueue() {
                   </span>
                 </Th>
                 <Th>紹介した人</Th>
+                <Th>アカウント</Th>
                 <Th>案件と成果地点</Th>
                 <Th align="right">報酬</Th>
                 <Th align="center">確認</Th>
@@ -2016,6 +2113,9 @@ export function ApprovalQueue() {
                   </td>
                   <td className="text-ink px-4 py-3 text-sm font-medium">
                     {item.affiliateName ?? '名前を取得できませんでした'}
+                  </td>
+                  <td className="text-ink-secondary whitespace-nowrap px-4 py-3 text-sm">
+                    {item.lineAccountName ?? 'アカウント未設定'}
                   </td>
                   <td className="text-ink-secondary px-4 py-3 text-sm">
                     <span className="text-ink block font-medium">{item.offerName ?? '未設定'}</span>
@@ -2080,7 +2180,7 @@ export function ApprovalQueue() {
               <p className="text-ink-secondary mt-2 text-sm">
                 {personNameText(detailItem.friendName)}／{detailItem.affiliateName ?? '紹介者名を取得できませんでした'}／{detailItem.offerName ?? '案件未設定'}
               </p>
-              <p className="text-ink-faint mt-1 text-xs">{formatDateTime(detailItem.createdAt)}・{detailItem.conversionPointName ?? '成果地点未設定'}・{formatYenNullable(detailItem.value)}</p>
+              <p className="text-ink-faint mt-1 text-xs">{formatDateTime(detailItem.createdAt)}・{detailItem.lineAccountName ?? 'アカウント未設定'}・{detailItem.conversionPointName ?? '成果地点未設定'}・{formatYenNullable(detailItem.value)}</p>
             </div>
             <AffiliateButton onClick={() => setDetailItem(null)}>閉じる</AffiliateButton>
           </div>
@@ -2090,12 +2190,24 @@ export function ApprovalQueue() {
       {!loading && !error && items.length > 0 && (
         <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
           <p className="text-ink-faint text-xs font-semibold tabular-nums">
-            {shownItems.length}件 / 全 {counts[status]}件（各状態 最大200件）
+            {shownItems.length}件 / 全 {counts[status]}件
+            {truncatedStatuses.includes(status) ? '（まだ続きがあります）' : ''}
           </p>
           <Pagination page={currentPage} pageCount={approvalPageCount} onPageChange={(value) => {
             setPage(value)
             setSelected(new Set())
           }} />
+        </div>
+      )}
+
+      {!loading && !error && truncatedStatuses.length > 0 && (
+        <div className="bg-canvas rounded-card border-hairline mt-3 flex flex-wrap items-center gap-3 border p-3">
+          <p className="text-ink-secondary text-sm">
+            件数が多いため{truncatedStatuses.map((value) => (value === 'pending' ? '承認待ち' : value === 'approved' ? '承認済み' : '却下済み')).join('・')}の一部はまだ読み込んでいません。
+          </p>
+          <AffiliateButton onClick={() => { void loadMoreItems() }} disabled={loadingMore}>
+            {loadingMore ? '読み込んでいます…' : 'さらに読み込む'}
+          </AffiliateButton>
         </div>
       )}
 

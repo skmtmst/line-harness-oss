@@ -3,8 +3,9 @@
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import type { FriendField } from '@line-crm/shared'
-import { api, type FriendDetail, type MileageSummary } from '@/lib/api'
+import type { Chat, FriendField } from '@line-crm/shared'
+import { api, ApiError, type FriendDetail, type MileageSummary } from '@/lib/api'
+import { canEditFeature, isOwnerOrAdmin } from '@/lib/staff-capability'
 import { useAccount } from '@/contexts/account-context'
 import { useFeatureVisibility } from '@/lib/use-feature-visibility'
 import { FeatureDisabledScreen } from '@/components/feature-disabled-gate'
@@ -66,12 +67,15 @@ function FieldInput({
   field,
   value,
   onChange,
+  disabled = false,
 }: {
   field: FriendField
   value: string
   onChange: (v: string) => void
+  /** N-037: 保存権限が無い人には値を読ませるだけにする（PUTは403になる）。 */
+  disabled?: boolean
 }) {
-  const readOnly = field.ecIsMaster
+  const readOnly = disabled || field.ecIsMaster
   const base =
     'border-hairline rounded-control w-full border px-3 py-2 text-sm disabled:bg-canvas-sunken disabled:text-ink-faint'
 
@@ -211,6 +215,27 @@ function FriendDetailInner() {
   const [mileage, setMileage] = useState<MileageSummary | null>(null)
   const [richMenu, setRichMenu] = useState<{ name: string | null; isDefault: boolean } | null>(null)
   const [richMenuFailed, setRichMenuFailed] = useState(false)
+  /*
+    N-037: PUT /api/friends/:id/fields はオーナー・管理者専用
+    （requireRole('owner','admin')）。staff は押すと403になるので、
+    入力欄と保存ボタンを出さず読むだけにする。localStorage の役割は
+    auth-guard が /api/auth/session から保存したもの。
+  */
+  const [canSaveFields] = useState(() => typeof window === 'undefined' ? true : isOwnerOrAdmin())
+  /*
+    N-035: 担当・対応状況は PUT /api/chats/:id で変えられる
+    （owner/admin/staff + '/chats' 編集キー）。友だち詳細にも同じ権限で
+    だけ編集口を出す。鍵の無いstaff・viewerには出さない。
+  */
+  const [canEditSupport] = useState(() => typeof window === 'undefined' ? true : canEditFeature('/chats'))
+  const [supportEditing, setSupportEditing] = useState(false)
+  const [supportStatus, setSupportStatus] = useState<Chat['status']>('resolved')
+  const [supportOperatorId, setSupportOperatorId] = useState('')
+  const [supportRevision, setSupportRevision] = useState(0)
+  const [supportOperators, setSupportOperators] = useState<Array<{ id: string; name: string }>>([])
+  const [supportBusy, setSupportBusy] = useState(false)
+  const [supportError, setSupportError] = useState('')
+  const [supportNotice, setSupportNotice] = useState('')
   // ID切替で遅い返事が新しい画面に残らないよう、世代で捨てる(#496-20。一覧側と同型)。
   const loadRequestRef = useRef(0)
   const group = params.get('group') ?? BASIC_GROUP
@@ -260,6 +285,69 @@ function FriendDetailInner() {
   useEffect(() => {
     void load()
   }, [load])
+
+  /*
+    編集を開くたびに今の担当・対応状況を取り直す。GET /api/chats/:id は
+    友だちIDでも引けて、行が無い友だちでは 'resolved'・revision 0 の
+    合成値を返す（新規作成はしない）。選択肢の担当者もここで取る。
+  */
+  const openSupportEditor = async () => {
+    if (supportBusy) return
+    setSupportEditing(true)
+    setSupportError('')
+    setSupportNotice('')
+    setSupportBusy(true)
+    try {
+      const [chatRes, operatorRes] = await Promise.all([
+        api.chats.get(friendId),
+        api.operators.list(),
+      ])
+      if (chatRes.success) {
+        setSupportStatus(chatRes.data.status)
+        setSupportOperatorId(chatRes.data.operatorId ?? '')
+        setSupportRevision(chatRes.data.revision)
+      }
+      if (operatorRes.success) setSupportOperators(operatorRes.data)
+      else setSupportError('担当者の選択肢を読み込めませんでした')
+    } catch {
+      setSupportError('対応の状況を読み込めませんでした')
+    } finally {
+      setSupportBusy(false)
+    }
+  }
+
+  const saveSupport = async () => {
+    if (supportBusy) return
+    setSupportBusy(true)
+    setSupportError('')
+    setSupportNotice('')
+    try {
+      // 友だちIDで送る（サーバー側で行を引く・無ければ作る）。
+      // 読んだ改訂値を付けて、ほかの人の変更を黙って上書きしない。
+      const res = await api.chats.update(friendId, {
+        status: supportStatus,
+        operatorId: supportOperatorId || null,
+        revision: supportRevision,
+      })
+      if (!res.success) {
+        setSupportError(res.error)
+        return
+      }
+      setSupportEditing(false)
+      setSupportNotice('担当・対応状況を更新しました')
+      void load()
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 409) {
+        setSupportError('ほかの担当者が先に更新しました。最新の内容を読み直しました')
+        setSupportEditing(false)
+        void load()
+      } else {
+        setSupportError(err instanceof ApiError ? err.message : '保存に失敗しました')
+      }
+    } finally {
+      setSupportBusy(false)
+    }
+  }
 
   const save = async () => {
     setSaving(true)
@@ -392,11 +480,28 @@ function FriendDetailInner() {
             <div className="space-y-4 p-5">
               {/* ---- 対応 ---- */}
               <div>
-                <SectionHead
-                  label="対応"
-                  actionLabel="編集"
-                  href={inboxHrefForFriend(friendId)}
-                />
+                {/*
+                  N-035: 担当・対応状況はこの画面からも変えられる。
+                  受信箱の PUT /api/chats/:id と同じ権限（'/chats' 編集キー）で
+                  だけ編集口を出し、鍵の無い人には受信箱への案内だけを残す。
+                */}
+                <div className="mb-1.5 flex items-baseline justify-between gap-2">
+                  <p className="text-ink-faint text-xs font-semibold">対応</p>
+                  {canEditSupport ? (
+                    <button
+                      type="button"
+                      onClick={() => (supportEditing ? setSupportEditing(false) : void openSupportEditor())}
+                      aria-expanded={supportEditing}
+                      className="text-accent shrink-0 text-xs hover:underline"
+                    >
+                      {supportEditing ? 'やめる' : '編集'}
+                    </button>
+                  ) : (
+                    <Link href={inboxHrefForFriend(friendId)} className="text-accent shrink-0 text-xs hover:underline">
+                      編集
+                    </Link>
+                  )}
+                </div>
                 <dl className="space-y-1 text-xs">
                   <div className="flex justify-between gap-2">
                     <dt className="text-ink-faint">対応状況</dt>
@@ -411,8 +516,66 @@ function FriendDetailInner() {
                     </dd>
                   </div>
                 </dl>
+                {supportEditing ? (
+                  <div className="border-hairline bg-canvas-sunken rounded-control mt-2 space-y-2 border p-3" data-support-editor>
+                    <label className="text-ink-faint block text-xs">
+                      対応状況
+                      <SelectField
+                        value={supportStatus}
+                        disabled={supportBusy}
+                        onChange={(e) => setSupportStatus(e.target.value as Chat['status'])}
+                        aria-label="対応状況を変える"
+                        className="border-hairline rounded-control bg-canvas text-ink mt-1 w-full border px-2 py-1.5 text-xs"
+                        options={[
+                          { value: 'unread', label: '未対応' },
+                          { value: 'in_progress', label: '対応中' },
+                          { value: 'on_hold', label: '保留' },
+                          { value: 'resolved', label: '対応済み' },
+                        ]}
+                      />
+                    </label>
+                    <label className="text-ink-faint block text-xs">
+                      担当者
+                      <SelectField
+                        value={supportOperatorId}
+                        disabled={supportBusy}
+                        onChange={(e) => setSupportOperatorId(e.target.value)}
+                        aria-label="担当者を変える"
+                        className="border-hairline rounded-control bg-canvas text-ink mt-1 w-full border px-2 py-1.5 text-xs"
+                        options={[
+                          { value: '', label: '未割り当て' },
+                          ...supportOperators.map((operator) => ({ value: operator.id, label: operator.name })),
+                        ]}
+                      />
+                    </label>
+                    {supportError ? <p className="text-danger text-xs" role="alert">{supportError}</p> : null}
+                    <div className="flex items-center gap-2">
+                      <Button
+                        type="button"
+                        variant="primary"
+                        onClick={() => void saveSupport()}
+                        disabled={supportBusy}
+                      >
+                        {supportBusy ? '処理中…' : '保存する'}
+                      </Button>
+                      <Button
+                        type="button"
+                        onClick={() => setSupportEditing(false)}
+                        disabled={supportBusy}
+                      >
+                        キャンセル
+                      </Button>
+                    </div>
+                  </div>
+                ) : null}
+                {supportNotice && !supportEditing ? (
+                  <p className="text-success mt-2 text-xs">{supportNotice}</p>
+                ) : null}
+                {supportError && !supportEditing ? (
+                  <p className="text-danger mt-2 text-xs" role="alert">{supportError}</p>
+                ) : null}
                 <p className="text-ink-faint mt-2 mb-1 text-xs">個別メモ</p>
-                {/* 書き換えは受信箱側が持っている。ここは読むだけ。 */}
+                {/* 個別メモの書き換えは受信箱側が持っている。ここは読むだけ。 */}
                 <p className="border-hairline bg-canvas-sunken text-ink-secondary rounded-control min-h-[3.5rem] border px-3 py-2 text-xs leading-relaxed whitespace-pre-wrap">
                   {friend?.support?.notes || 'メモはありません'}
                 </p>
@@ -591,12 +754,15 @@ function FriendDetailInner() {
                     {group === BASIC_GROUP
                       ? '情報欄の項目がまだありません。'
                       : 'この分類の項目はまだありません。'}
-                    <Link
-                      href={`/tags/fields/new?back=/friends/detail?id=${friendId}`}
-                      className="text-accent ml-1 hover:underline"
-                    >
-                      項目を追加
-                    </Link>
+                    {/* 項目の新規登録もオーナー・管理者専用（POST /api/friend-fields）。 */}
+                    {canSaveFields ? (
+                      <Link
+                        href={`/tags/fields/new?back=/friends/detail?id=${friendId}`}
+                        className="text-accent ml-1 hover:underline"
+                      >
+                        項目を追加
+                      </Link>
+                    ) : null}
                   </p>
                 ) : (
                   <>
@@ -618,6 +784,7 @@ function FriendDetailInner() {
                           field={field}
                           value={values[field.id] ?? ''}
                           onChange={(v) => setValues((prev) => ({ ...prev, [field.id]: v }))}
+                          disabled={!canSaveFields}
                         />
                         {field.ecIsMaster && (
                           <p className="text-ink-faint mt-1 text-xs">
@@ -643,21 +810,32 @@ function FriendDetailInner() {
                     )}
                     {notice && <p className="text-success mb-3 text-sm">{notice}</p>}
 
-                    <div className="flex flex-wrap items-center gap-2">
-                      <button
-                        onClick={save}
-                        disabled={saving}
-                        className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control px-4 py-2 text-sm font-medium transition-colors disabled:opacity-40"
-                      >
-                        {saving ? '保存中...' : '保存'}
-                      </button>
-                      <Link
-                        href={`/tags/fields/new?back=/friends/detail?id=${friendId}`}
-                        className="border-hairline text-ink-secondary rounded-control hover:bg-canvas-sunken border px-4 py-2 text-sm font-medium"
-                      >
-                        項目を追加
-                      </Link>
-                    </div>
+                    {/*
+                      N-037: 保存はオーナー・管理者専用。staff に編集できる
+                      見た目と押せるボタンを出すと、押した時点で403になる。
+                      値は読めるので、読み取り専用と分かる一言だけ置く。
+                    */}
+                    {canSaveFields ? (
+                      <div className="flex flex-wrap items-center gap-2">
+                        <button
+                          onClick={save}
+                          disabled={saving}
+                          className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control px-4 py-2 text-sm font-medium transition-colors disabled:opacity-40"
+                        >
+                          {saving ? '保存中...' : '保存'}
+                        </button>
+                        <Link
+                          href={`/tags/fields/new?back=/friends/detail?id=${friendId}`}
+                          className="border-hairline text-ink-secondary rounded-control hover:bg-canvas-sunken border px-4 py-2 text-sm font-medium"
+                        >
+                          項目を追加
+                        </Link>
+                      </div>
+                    ) : (
+                      <p className="text-ink-faint text-xs">
+                        情報欄の値を保存できるのはオーナーと管理者です。
+                      </p>
+                    )}
                   </>
                 )}
               </div>

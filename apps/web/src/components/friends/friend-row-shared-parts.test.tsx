@@ -32,7 +32,7 @@ const BASE: FriendListItem = {
   supportMark: null,
 }
 
-const COLUMNS = new Set<FriendListColumn>(['support', 'scenario', 'latest', 'tags', 'last'])
+const COLUMNS = new Set<FriendListColumn>(['support', 'scenario', 'latest', 'tags', 'source', 'last'])
 
 const render = (friend: FriendListItem) =>
   renderToStaticMarkup(
@@ -54,6 +54,13 @@ describe('友だち行の担当者とアバター（描画）', () => {
     expect(html).toContain('担当：未割り当て')
     /* 空の丸だけが並ぶと「読み込み中で出ていない」と見分けが付かない。 */
     expect(html).not.toContain('data-operator-avatar="unassigned"></span>')
+  })
+
+  it('流入元は計測名を出し、無い人は「不明」と出す（N-038）', () => {
+    const tracked = render({ ...BASE, firstTrackedLinkName: '春のキャンペーンLP' })
+    expect(tracked).toContain('春のキャンペーンLP')
+    const unknown = render(BASE)
+    expect(unknown).toContain('>不明</p>')
   })
 
   it('アバターは真円ではなく設計のr=18で描く', () => {
