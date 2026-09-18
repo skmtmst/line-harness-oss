@@ -69,6 +69,8 @@ const mocks = {
   completeNewMediaUpload: vi.fn(),
   createMediaVersionFromUpload: vi.fn(),
   getCurrentMediaVersionNo: vi.fn(),
+  getLatestMediaVersion: vi.fn(),
+  backfillMediaVersionMetadata: vi.fn(),
   MediaVersionConflictError: MockMediaVersionConflictError,
   jstNow: vi.fn(() => '2026-08-31T10:00:00.000+09:00'),
   getCommonVars: vi.fn(),
@@ -123,7 +125,13 @@ const mocks = {
       ? { ok: true as const }
       : { ok: false as const, error: 'bad key' },
 };
-vi.mock('@line-crm/db', () => mocks);
+// 純粋な判定ロジック（evaluateMediaVersionCompat やエラークラス）は実物を使い、
+// DBへ触る関数だけモックにする。互換判定を形だけのモックにすると、
+// ルートが本当に拒否できるか検証できないため。
+vi.mock('@line-crm/db', async () => {
+  const actual = await vi.importActual<typeof import('@line-crm/db')>('@line-crm/db');
+  return { ...actual, ...mocks };
+});
 const accessMocks = { canAccessAllLineAccounts: vi.fn(async () => true) };
 vi.mock('../services/account-access.js', () => accessMocks);
 const scanMocks = { scanSingleMediaUsage: vi.fn() };
@@ -132,6 +140,8 @@ const signingMocks = { createR2PresignedPutUrl: vi.fn() };
 vi.mock('../services/r2-presigned-upload.js', () => signingMocks);
 
 const { contents } = await import('./contents.js');
+// 実物のエラークラス（モックは actual を引き継ぐので本物の instanceof が効く）
+const { MediaVersionIncompatibleError } = await import('@line-crm/db');
 
 // R2 の put/delete は Promise を返す。undefined を返すモックにすると、
 // 実装の .catch() が落ちて本物と違う結果になる。
@@ -183,8 +193,8 @@ const MEDIA = {
   filename: 'a.png',
   mime_type: 'image/png',
   size_bytes: 100,
-  width: null,
-  height: null,
+  width: 100,
+  height: 50,
   duration_ms: null,
   r2_key: 'media/xxx.png',
   public_url: null,
@@ -216,6 +226,11 @@ const UPLOAD_SESSION = {
   status: 'pending',
   failure_code: null,
   etag: null,
+  width: 100,
+  height: 50,
+  duration_ms: null,
+  page_count: null,
+  codec: null,
   expires_at: '2099-01-01T00:00:00.000Z',
   created_by: 'u-1',
   created_at: '2026-09-07T00:00:00.000Z',
@@ -306,6 +321,14 @@ const EMPTY_COMMON_VAR_IMPACT = {
 /** 1x1 の PNG。中身は問わないので短い base64 で足りる。 */
 const TINY_PNG = 'iVBORw0KGgo=';
 
+/** 640x480 の PNG 先頭（シグネチャ＋IHDR）。寸法の実測に使う。 */
+const PNG_640x480_PREFIX = Uint8Array.from([
+  0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
+  0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44, 0x52,
+  0x00, 0x00, 0x02, 0x80, 0x00, 0x00, 0x01, 0xe0,
+  0x08, 0x06, 0x00, 0x00, 0x00,
+]);
+
 beforeEach(() => {
   vi.clearAllMocks();
   put.mockResolvedValue(undefined);
@@ -320,9 +343,7 @@ beforeEach(() => {
     },
   });
   get.mockResolvedValue({
-    arrayBuffer: async () => Uint8Array.from(
-      [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a],
-    ).buffer,
+    arrayBuffer: async () => PNG_640x480_PREFIX.buffer.slice(0),
   });
   accessMocks.canAccessAllLineAccounts.mockResolvedValue(true);
   scanMocks.scanSingleMediaUsage.mockResolvedValue({ scanned: 1, matched: 0, pruned: 0 });
@@ -341,6 +362,8 @@ beforeEach(() => {
   mocks.applyMediaReplacementPlan.mockResolvedValue(1);
   mocks.getMediaStorageQuota.mockResolvedValue(QUOTA);
   mocks.getMediaVersionList.mockResolvedValue([]);
+  mocks.getLatestMediaVersion.mockResolvedValue(null);
+  mocks.backfillMediaVersionMetadata.mockResolvedValue(undefined);
   mocks.getMediaUsageReferenceStates.mockResolvedValue([]);
   mocks.getMediaLiveTarget.mockResolvedValue(null);
   mocks.retargetMediaUsageReference.mockResolvedValue({
@@ -570,9 +593,13 @@ describe('メディアの容量・直接アップロード・版', () => {
     });
     expect(res.status).toBe(201);
     expect(head).toHaveBeenCalledWith(UPLOAD_SESSION.r2_key);
-    expect(get).toHaveBeenCalledWith(UPLOAD_SESSION.r2_key, { range: { offset: 0, length: 16 } });
+    // 画像はシグネチャだけでなく寸法を測るため、先頭を広めに読む
+    expect(get).toHaveBeenCalledWith(UPLOAD_SESSION.r2_key, {
+      range: { offset: 0, length: 256 * 1024 },
+    });
     expect(mocks.verifyMediaUploadSession).toHaveBeenCalledWith(
       env.DB, 'upload-1', 'account-1', 'etag-1',
+      { width: 640, height: 480 }, true,
     );
     expect(mocks.completeNewMediaUpload).toHaveBeenCalled();
   });
@@ -648,6 +675,173 @@ describe('メディアの容量・直接アップロード・版', () => {
     expect(res.status).toBe(409);
     expect(await res.json()).toMatchObject({
       code: 'media_version_conflict', currentVersionNo: 3,
+    });
+  });
+
+  it('予約へ内容情報を載せ、形式の合わない値は400で拒否する', async () => {
+    const ok = await req('/api/media/upload-sessions', 'POST', {
+      accountId: 'account-1',
+      files: [{
+        filename: 'a.mp4', mimeType: 'video/mp4', sizeBytes: 100,
+        metadata: { durationMs: 5000, codec: 'avc1' },
+      }],
+    });
+    expect(ok.status).toBe(201);
+    expect(mocks.createMediaUploadSession).toHaveBeenCalledWith(env.DB, expect.objectContaining({
+      metadata: {
+        width: null, height: null, duration_ms: 5000, page_count: null, codec: 'avc1',
+      },
+    }));
+
+    const bad = await req('/api/media/upload-sessions', 'POST', {
+      accountId: 'account-1',
+      files: [{
+        filename: 'a.mp4', mimeType: 'video/mp4', sizeBytes: 100,
+        metadata: { durationMs: '5秒' },
+      }],
+    });
+    expect(bad.status).toBe(400);
+    expect(await bad.json()).toMatchObject({ code: 'media_file_invalid' });
+  });
+
+  it('寸法が違う差し替えはプレビューで拒否し、理由と内容情報を返す', async () => {
+    mocks.getMediaUploadSession.mockResolvedValue({
+      ...UPLOAD_SESSION,
+      target_media_id: 'md-1', status: 'verified', etag: 'etag-1',
+      width: 200, height: 100,
+    });
+    const res = await req('/api/media/md-1/replacement-preview', 'POST', {
+      accountId: 'account-1', uploadSessionId: 'upload-1',
+    });
+    expect(res.status).toBe(200);
+    const body = await res.json() as {
+      data: {
+        canReplace: boolean;
+        blockers: string[];
+        currentMetadata: { width: number | null };
+        incomingMetadata: { width: number | null };
+        previewToken: string;
+      };
+    };
+    expect(body.data.canReplace).toBe(false);
+    expect(body.data.blockers).toContain('incompatible_dimensions');
+    expect(body.data.currentMetadata).toMatchObject({ width: 100, height: 50 });
+    expect(body.data.incomingMetadata).toMatchObject({ width: 200, height: 100 });
+
+    // 拒否されたプレビューのトークンでは版を作れない
+    const version = await req('/api/media/md-1/versions', 'POST', {
+      accountId: 'account-1', uploadSessionId: 'upload-1',
+      previewToken: body.data.previewToken, changeReason: '差し替え',
+    });
+    expect(version.status).toBe(409);
+    expect(mocks.createMediaVersionFromUpload).not.toHaveBeenCalled();
+  });
+
+  it('判定材料が足りない差し替えは互換とみなさず明示的に拒否する', async () => {
+    mocks.getMediaUploadSession.mockResolvedValue({
+      ...UPLOAD_SESSION,
+      target_media_id: 'md-1', status: 'verified', etag: 'etag-1',
+      width: null, height: null,
+    });
+    const res = await req('/api/media/md-1/replacement-preview', 'POST', {
+      accountId: 'account-1', uploadSessionId: 'upload-1',
+    });
+    const body = await res.json() as { data: { canReplace: boolean; blockers: string[] } };
+    expect(body.data.canReplace).toBe(false);
+    expect(body.data.blockers).toContain('metadata_missing');
+  });
+
+  it('内容情報の無い旧メディアは実体から寸法を測って補い、互換なら版を作れる', async () => {
+    // 旧データ: メディアにも版にも寸法が記録されていない
+    mocks.getMediaById.mockResolvedValue({ ...MEDIA, width: null, height: null });
+    mocks.getMediaUploadSession.mockResolvedValue({
+      ...UPLOAD_SESSION,
+      target_media_id: 'md-1', status: 'verified', etag: 'etag-1',
+      width: 640, height: 480,
+    });
+    const res = await req('/api/media/md-1/replacement-preview', 'POST', {
+      accountId: 'account-1', uploadSessionId: 'upload-1',
+    });
+    const body = await res.json() as { data: { canReplace: boolean; blockers: string[] } };
+    // 保存済みオブジェクトの先頭から 640x480 を実測して補完する
+    expect(get).toHaveBeenCalledWith(MEDIA.r2_key, {
+      range: { offset: 0, length: 256 * 1024 },
+    });
+    expect(mocks.backfillMediaVersionMetadata).toHaveBeenCalledWith(
+      env.DB,
+      expect.objectContaining({ id: 'md-1' }),
+      null,
+      { width: 640, height: 480 },
+    );
+    expect(body.data.blockers).toEqual([]);
+    expect(body.data.canReplace).toBe(true);
+  });
+
+  it('実体からも測れない旧メディアは判定材料不足で拒否する', async () => {
+    mocks.getMediaById.mockResolvedValue({ ...MEDIA, width: null, height: null });
+    get.mockResolvedValueOnce({
+      arrayBuffer: async () => new Uint8Array([0x89, 0x50]).buffer,
+    });
+    mocks.getMediaUploadSession.mockResolvedValue({
+      ...UPLOAD_SESSION,
+      target_media_id: 'md-1', status: 'verified', etag: 'etag-1',
+      width: 640, height: 480,
+    });
+    const res = await req('/api/media/md-1/replacement-preview', 'POST', {
+      accountId: 'account-1', uploadSessionId: 'upload-1',
+    });
+    const body = await res.json() as { data: { canReplace: boolean; blockers: string[] } };
+    expect(body.data.canReplace).toBe(false);
+    expect(body.data.blockers).toContain('metadata_missing');
+    expect(mocks.backfillMediaVersionMetadata).not.toHaveBeenCalled();
+  });
+
+  it('プレビュー後に内容情報が変わるとトークンが無効になり版を作れない', async () => {
+    mocks.getMediaUploadSession.mockResolvedValue({
+      ...UPLOAD_SESSION, target_media_id: 'md-1', status: 'verified', etag: 'etag-1',
+    });
+    const previewResponse = await req('/api/media/md-1/replacement-preview', 'POST', {
+      accountId: 'account-1', uploadSessionId: 'upload-1',
+    });
+    const preview = (await previewResponse.json()) as {
+      data: { canReplace: boolean; previewToken: string };
+    };
+    expect(preview.data.canReplace).toBe(true);
+
+    // プレビュー後に別ファイルへすり替わったセッションを再現する。
+    // duration_ms は画像の互換判定に効かないため、トークンへ内容情報を
+    // 混ぜていなければ古いトークンが通ってしまう。
+    mocks.getMediaUploadSession.mockResolvedValue({
+      ...UPLOAD_SESSION, target_media_id: 'md-1', status: 'verified', etag: 'etag-1',
+      duration_ms: 1234,
+    });
+    const res = await req('/api/media/md-1/versions', 'POST', {
+      accountId: 'account-1', uploadSessionId: 'upload-1',
+      previewToken: preview.data.previewToken, changeReason: '差し替え',
+    });
+    expect(res.status).toBe(409);
+    expect(mocks.createMediaVersionFromUpload).not.toHaveBeenCalled();
+  });
+
+  it('プレビューを飛ばした書き込み側の互換拒否も409で理由を返す', async () => {
+    mocks.getMediaUploadSession.mockResolvedValue({
+      ...UPLOAD_SESSION, target_media_id: 'md-1', status: 'verified', etag: 'etag-1',
+    });
+    const previewResponse = await req('/api/media/md-1/replacement-preview', 'POST', {
+      accountId: 'account-1', uploadSessionId: 'upload-1',
+    });
+    const preview = (await previewResponse.json()) as { data: { previewToken: string } };
+    mocks.createMediaVersionFromUpload.mockRejectedValueOnce(
+      new MediaVersionIncompatibleError(['incompatible_dimensions']),
+    );
+    const res = await req('/api/media/md-1/versions', 'POST', {
+      accountId: 'account-1', uploadSessionId: 'upload-1',
+      previewToken: preview.data.previewToken, changeReason: '差し替え',
+    });
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({
+      code: 'media_replacement_blocked',
+      data: { blockers: ['incompatible_dimensions'] },
     });
   });
 });

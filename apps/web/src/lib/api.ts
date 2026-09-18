@@ -4317,13 +4317,32 @@ export type MediaUploadCompletion = {
   targetMediaId?: string | null
 }
 
+export type MediaVersionMetadata = {
+  width: number | null
+  height: number | null
+  duration_ms: number | null
+  page_count: number | null
+  codec: string | null
+}
+
+export type MediaVersionBlocker =
+  | 'different_kind'
+  | 'upload_not_verified'
+  | 'metadata_missing'
+  | 'incompatible_dimensions'
+  | 'incompatible_duration'
+  | 'incompatible_pages'
+  | 'incompatible_codec'
+
 export type MediaVersionPreview = {
   mediaId: string
   uploadSessionId: string
   currentVersionNo: number
   previewToken: string
-  blockers: Array<'different_kind' | 'upload_not_verified'>
+  blockers: MediaVersionBlocker[]
   canReplace: boolean
+  currentMetadata?: MediaVersionMetadata
+  incomingMetadata?: MediaVersionMetadata
 }
 
 export type MediaVersionResult = {
@@ -5724,6 +5743,13 @@ export const api = {
         sizeBytes: number
         folderId?: string | null
         targetMediaId?: string | null
+        metadata?: {
+          width?: number
+          height?: number
+          durationMs?: number
+          pageCount?: number
+          codec?: string
+        } | null
       }>
     }) => fetchApi<ApiResponse<{ sessions: MediaUploadSession[] }>>('/api/media/upload-sessions', {
       method: 'POST',

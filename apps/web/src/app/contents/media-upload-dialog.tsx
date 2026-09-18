@@ -7,7 +7,7 @@ import { ApiError, api } from '@/lib/api'
 import Button from '@/components/shared/button'
 import Select from '@/components/shared/select'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
-import { MEDIA_ACCEPT, putMediaFile, validateMediaFile } from './media-direct-upload'
+import { MEDIA_ACCEPT, extractMediaMetadata, putMediaFile, validateMediaFile } from './media-direct-upload'
 
 type UploadState = 'ready' | 'preparing' | 'uploading' | 'verifying' | 'done' | 'error'
 
@@ -88,12 +88,13 @@ export default function MediaUploadDialog({
     try {
       const prepared = await api.media.prepareUploads({
         accountId,
-        files: pending.map(({ entry }) => ({
+        files: await Promise.all(pending.map(async ({ entry }) => ({
           filename: entry.file.name,
           mimeType: entry.file.type,
           sizeBytes: entry.file.size,
           folderId: folderId || null,
-        })),
+          metadata: await extractMediaMetadata(entry.file),
+        }))),
       })
       if (!prepared.success || prepared.data.sessions.length !== pending.length) {
         throw new Error('送信の準備結果を確認できませんでした')

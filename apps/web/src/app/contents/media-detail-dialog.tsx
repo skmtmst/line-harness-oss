@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import type { MediaDeleteImpactReference, MediaItem } from '@line-crm/shared'
-import { ApiError, api, type MediaVersionPreview } from '@/lib/api'
+import { ApiError, api, type MediaVersionBlocker, type MediaVersionPreview } from '@/lib/api'
 import Button from '@/components/shared/button'
 import Select from '@/components/shared/select'
 import { formatMediaSize } from './media-usage-display'
@@ -15,11 +15,31 @@ import {
   type MediaUsageReferenceTarget,
 } from './media-usage-references'
 import {
+  extractMediaMetadata,
   fileMatchesMediaKind,
   mediaAcceptForKind,
   putMediaFile,
   validateMediaFile,
 } from './media-direct-upload'
+
+/** 版追加を止めた理由を、互換基準ごとに運用者へ説明する。 */
+function versionBlockerText(blockers: MediaVersionBlocker[]): string {
+  if (blockers.includes('different_kind')) {
+    return 'ファイルの種類が違うため、このメディアへ追加できません。'
+  }
+  if (blockers.includes('upload_not_verified')) {
+    return 'ファイルの確認が終わっていません。もう一度確認してください。'
+  }
+  const reasons: string[] = []
+  if (blockers.includes('incompatible_dimensions')) reasons.push('寸法')
+  if (blockers.includes('incompatible_duration')) reasons.push('長さ')
+  if (blockers.includes('incompatible_pages')) reasons.push('ページ数')
+  if (blockers.includes('incompatible_codec')) reasons.push('コーデック')
+  if (reasons.length > 0) {
+    return `現在のメディアと${reasons.join('・')}が違うため、このメディアへ追加できません。`
+  }
+  return '互換性を確かめるための内容情報（寸法・長さ・ページ数）が足りないため、このメディアへ追加できません。別のメディアとして新規登録してください。'
+}
 
 function formatDate(value: string): string {
   const date = new Date(value)
@@ -240,6 +260,7 @@ export default function MediaDetailDialog({
           mimeType: versionFile.type,
           sizeBytes: versionFile.size,
           targetMediaId: item.id,
+          metadata: await extractMediaMetadata(versionFile),
         }],
       })
       const session = prepared.success ? prepared.data.sessions[0] : null
@@ -369,7 +390,7 @@ export default function MediaDetailDialog({
               <div className={versionPreview.canReplace ? 'bg-accent-soft text-accent-deep mt-3 rounded-control p-3 text-xs' : 'bg-danger-bg text-danger mt-3 rounded-control p-3 text-xs'}>
                 {versionPreview.canReplace
                   ? `現在の第${versionPreview.currentVersionNo}版から第${versionPreview.currentVersionNo + 1}版へ追加できます。`
-                  : 'ファイルの種類が違うため、このメディアへ追加できません。'}
+                  : versionBlockerText(versionPreview.blockers)}
               </div>
             ) : null}
             {versionPreview?.canReplace ? (

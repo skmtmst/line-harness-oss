@@ -27,7 +27,12 @@ import {
   completeNewMediaUpload,
   createMediaVersionFromUpload,
   getCurrentMediaVersionNo,
+  getLatestMediaVersion,
+  evaluateMediaVersionCompat,
+  backfillMediaVersionMetadata,
   MediaVersionConflictError,
+  MediaVersionIncompatibleError,
+  type MediaMetadata,
   jstNow,
   getCommonVars,
   countCommonVars,
@@ -68,6 +73,7 @@ import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { auditLog } from '../lib/audit-log.js';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
+import { imageDimensions, IMAGE_METADATA_PREFIX_BYTES } from '../services/media-metadata.js';
 import { scanSingleMediaUsage } from '../services/media-usage-scan.js';
 import { createR2PresignedPutUrl } from '../services/r2-presigned-upload.js';
 import type { MediaReplacementImpact } from '@line-crm/shared';
@@ -271,6 +277,32 @@ function normalizedEtag(value: string): string {
   return value.trim().replace(/^"|"$/g, '');
 }
 
+/**
+ * アップロード予約に載せる内容情報。省略は null、型が違えば undefined で
+ * 呼び出し側が 400 にする。版追加の互換判定はここに保存した値を正本にする。
+ */
+function parseUploadMetadata(raw: unknown): MediaMetadata | null | undefined {
+  if (raw == null) return null;
+  if (typeof raw !== 'object' || Array.isArray(raw)) return undefined;
+  const record = raw as Record<string, unknown>;
+  const readInt = (value: unknown): number | null | undefined => {
+    if (value == null) return null;
+    return Number.isSafeInteger(value) && (value as number) > 0 ? (value as number) : undefined;
+  };
+  const width = readInt(record.width);
+  const height = readInt(record.height);
+  const durationMs = readInt(record.durationMs);
+  const pageCount = readInt(record.pageCount);
+  if (width === undefined || height === undefined
+    || durationMs === undefined || pageCount === undefined) return undefined;
+  const codecRaw = record.codec;
+  const codec = codecRaw == null ? null
+    : typeof codecRaw === 'string' && codecRaw.trim().length > 0 && codecRaw.trim().length <= 100
+      ? codecRaw.trim() : undefined;
+  if (codec === undefined) return undefined;
+  return { width, height, duration_ms: durationMs, page_count: pageCount, codec };
+}
+
 async function mediaVersionPreview(
   c: Context<Env>,
   mediaId: string,
@@ -285,12 +317,45 @@ async function mediaVersionPreview(
   if (!media || !session || currentVersionNo === null || session.target_media_id !== mediaId) {
     return null;
   }
-  const blockers = session.status === 'verified'
-    ? (session.kind === media.kind ? [] : ['different_kind'])
-    : ['upload_not_verified'];
+  const latestVersion = await getLatestMediaVersion(c.env.DB, mediaId, accountId);
+  // 旧データには版の内容情報が無い。画像は実体の先頭から寸法を測って補い、
+  // それでも足りなければ互換とみなさず明示的に拒否する。
+  let currentMetadata: MediaMetadata = {
+    width: latestVersion?.width ?? media.width,
+    height: latestVersion?.height ?? media.height,
+    duration_ms: latestVersion?.duration_ms ?? media.duration_ms,
+    page_count: latestVersion?.page_count ?? null,
+    codec: latestVersion?.codec ?? null,
+  };
+  if (media.kind === 'image' && (currentMetadata.width == null || currentMetadata.height == null)) {
+    const measured = await measureStoredImageMetadata(c, media);
+    if (measured) {
+      currentMetadata = { ...currentMetadata, ...measured };
+      await backfillMediaVersionMetadata(c.env.DB, media, latestVersion, measured);
+    }
+  }
+  const incomingMetadata: MediaMetadata = {
+    width: session.width,
+    height: session.height,
+    duration_ms: session.duration_ms,
+    page_count: session.page_count,
+    codec: session.codec,
+  };
+  const blockers: string[] = session.status !== 'verified'
+    ? ['upload_not_verified']
+    : evaluateMediaVersionCompat(
+      { kind: media.kind, ...currentMetadata },
+      { kind: session.kind, ...incomingMetadata },
+    );
   const raw = [
     media.id, media.r2_key, String(currentVersionNo), session.id, session.r2_key,
     session.etag ?? '', session.kind, session.expected_mime, String(session.expected_size),
+    String(session.width ?? ''), String(session.height ?? ''),
+    String(session.duration_ms ?? ''), String(session.page_count ?? ''),
+    session.codec ?? '',
+    String(currentMetadata.width ?? ''), String(currentMetadata.height ?? ''),
+    String(currentMetadata.duration_ms ?? ''), String(currentMetadata.page_count ?? ''),
+    currentMetadata.codec ?? '',
     ...blockers,
   ].join('\n');
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(raw));
@@ -302,8 +367,27 @@ async function mediaVersionPreview(
     currentVersionNo,
     previewToken,
     blockers,
+    currentMetadata,
+    incomingMetadata,
     canReplace: blockers.length === 0,
   };
+}
+
+async function measureStoredImageMetadata(
+  c: Context<Env>,
+  media: { r2_key: string; mime_type: string },
+): Promise<{ width: number; height: number } | null> {
+  try {
+    const object = await c.env.IMAGES.get(media.r2_key, {
+      range: { offset: 0, length: IMAGE_METADATA_PREFIX_BYTES },
+    });
+    if (!object) return null;
+    const bytes = new Uint8Array(await object.arrayBuffer());
+    return imageDimensions(bytes, media.mime_type);
+  } catch (err) {
+    console.error('stored media metadata read failed:', err);
+    return null;
+  }
 }
 
 // 容量は現行ファイルだけでなく旧版と期限内アップロード予約も含める。
@@ -334,6 +418,7 @@ contents.post(
           sizeBytes?: unknown;
           folderId?: unknown;
           targetMediaId?: unknown;
+          metadata?: unknown;
         }>;
       }>().catch(() => null);
       const accountId = typeof body?.accountId === 'string' ? body.accountId.trim() : '';
@@ -357,6 +442,7 @@ contents.post(
         sizeBytes: number;
         folderId: string | null;
         targetMediaId: string | null;
+        metadata: MediaMetadata | null;
         spec: { kind: MediaKind; ext: string[]; maxBytes: number };
       }> = [];
       for (const file of body.files) {
@@ -380,10 +466,18 @@ contents.post(
             error: `${filename || 'ファイル'}の形式、拡張子、容量を確認してください`,
           }, 400);
         }
+        const metadata = parseUploadMetadata(file?.metadata);
+        if (metadata === undefined) {
+          return c.json({
+            success: false,
+            code: 'media_file_invalid',
+            error: `${filename}の内容情報が正しくありません`,
+          }, 400);
+        }
         if (targetMediaId && !await getMediaById(c.env.DB, targetMediaId, accountId)) {
           return c.json({ success: false, error: 'Not found' }, 404);
         }
-        validated.push({ filename, mimeType, sizeBytes, folderId, targetMediaId, spec });
+        validated.push({ filename, mimeType, sizeBytes, folderId, targetMediaId, metadata, spec });
       }
       const quota = await getMediaStorageQuota(c.env.DB, accountId);
       const requestedBytes = validated.reduce((total, file) => total + file.sizeBytes, 0);
@@ -410,6 +504,7 @@ contents.post(
           kind: file.spec.kind,
           mimeType: file.mimeType,
           sizeBytes: file.sizeBytes,
+          metadata: file.metadata,
           r2Key,
           expiresAt,
           createdBy: c.get('staff')?.id ?? null,
@@ -496,7 +591,8 @@ contents.post(
           error: 'アップロードしたファイルを確認できませんでした',
         }, 409);
       }
-      const bodyObject = await c.env.IMAGES.get(session.r2_key, { range: { offset: 0, length: 16 } });
+      const headBytes = session.kind === 'image' ? IMAGE_METADATA_PREFIX_BYTES : 16;
+      const bodyObject = await c.env.IMAGES.get(session.r2_key, { range: { offset: 0, length: headBytes } });
       const signatureBytes = bodyObject
         ? new Uint8Array(await bodyObject.arrayBuffer())
         : new Uint8Array();
@@ -509,7 +605,18 @@ contents.post(
           error: 'ファイルの実際の形式が申告と一致しません',
         }, 409);
       }
-      session = await verifyMediaUploadSession(c.env.DB, session.id, accountId, objectEtag);
+      // 画像は実体の先頭から寸法を測り、申告値ではなく実測値を正本として残す。
+      // 測れなかった場合は寸法を null に戻し、版追加は「判定材料不足」で拒否する。
+      const measured = session.kind === 'image'
+        ? imageDimensions(signatureBytes, session.expected_mime)
+        : null;
+      session = await verifyMediaUploadSession(
+        c.env.DB, session.id, accountId, objectEtag,
+        session.kind === 'image'
+          ? { width: measured?.width ?? null, height: measured?.height ?? null }
+          : undefined,
+        session.kind === 'image',
+      );
       if (!session) throw new Error('verified upload session is unavailable');
       if (session.target_media_id) {
         return c.json({
@@ -575,7 +682,11 @@ contents.post('/api/media/:id/versions', requireRole('owner', 'admin', 'staff'),
         success: false,
         code: 'media_replacement_blocked',
         error: 'このファイルは現在のメディアと互換性がありません',
-        data: { blockers: preview.blockers },
+        data: {
+          blockers: preview.blockers,
+          currentMetadata: preview.currentMetadata,
+          incomingMetadata: preview.incomingMetadata,
+        },
       }, 409);
     }
     const version = await createMediaVersionFromUpload(c.env.DB, {
@@ -599,6 +710,14 @@ contents.post('/api/media/:id/versions', requireRole('owner', 'admin', 'staff'),
       },
     }, 201);
   } catch (err) {
+    if (err instanceof MediaVersionIncompatibleError) {
+      return c.json({
+        success: false,
+        code: 'media_replacement_blocked',
+        error: 'このファイルは現在のメディアと互換性がありません',
+        data: { blockers: err.blockers },
+      }, 409);
+    }
     if (err instanceof MediaVersionConflictError) {
       return c.json({
         success: false,
@@ -650,6 +769,8 @@ contents.post(
           previewToken: preview.previewToken,
           blockers: preview.blockers,
           canReplace: preview.canReplace,
+          currentMetadata: preview.currentMetadata,
+          incomingMetadata: preview.incomingMetadata,
         },
       });
     } catch (err) {
