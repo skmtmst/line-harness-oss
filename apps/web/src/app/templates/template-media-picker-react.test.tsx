@@ -10,6 +10,8 @@ import type { MediaItem } from '@line-crm/shared'
  * ID・種別が載るところまでを直接証明する。
  */
 const fixture = vi.hoisted(() => ({
+  /** useAccount が返すアカウント。試験の途中で切り替えられるよう変数にする。 */
+  accountId: 'account-a',
   listCalls: [] as Array<{ accountId: string; params?: { kind?: string } }>,
   createCalls: [] as Array<{ lineAccountId: string; kind: string; name: string; payload: Record<string, unknown> }>,
 }))
@@ -32,7 +34,7 @@ const MEDIA: MediaItem = {
 }
 
 vi.mock('@/contexts/account-context', () => ({
-  useAccount: () => ({ selectedAccountId: 'account-a', loading: false }),
+  useAccount: () => ({ selectedAccountId: fixture.accountId, loading: false }),
 }))
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => undefined }))
 vi.mock('@/lib/api', () => ({
@@ -92,6 +94,7 @@ async function waitForDialogText(text: string) {
 }
 
 beforeEach(() => {
+  fixture.accountId = 'account-a'
   fixture.listCalls.length = 0
   fixture.createCalls.length = 0
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
@@ -154,5 +157,39 @@ describe('テンプレート作成の「登録メディアから選ぶ」（N-19
       await settle()
     })
     expect(host.textContent).toContain('選択中: キャンペーン画像.png')
+  })
+
+  it('アカウントを切り替えると、前のアカウントで選んだ候補は保存対象から外れる', async () => {
+    await renderEditor('rich_message')
+    await act(async () => { buttonByText('登録メディアから選ぶ').click(); await settle() })
+    await waitForDialogText('キャンペーン画像.png')
+    await act(async () => {
+      ;[...dialog().querySelectorAll<HTMLButtonElement>('[role="option"]')].find((b) => b.textContent?.includes('キャンペーン画像.png'))!.click()
+      await settle()
+    })
+    expect(host.textContent).toContain('選択中: キャンペーン画像.png')
+
+    // account-b へ切り替えると、「選択中」表示とURL欄のピック値が消える。
+    fixture.accountId = 'account-b'
+    await act(async () => {
+      root.render(<TemplateAssetEditor kind="rich_message" />)
+      await settle()
+    })
+    expect(host.textContent).not.toContain('選択中:')
+    expect(host.querySelector<HTMLInputElement>('input[placeholder="画像URL"]')!.value).toBe('')
+
+    // そのまま保存しても、別アカウントのメディアID・種別は保存値へ載らない。
+    const nameInput = host.querySelector<HTMLInputElement>('input[type="text"]')!
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!
+    await act(async () => {
+      setter.call(nameInput, '夏のキャンペーン告知')
+      nameInput.dispatchEvent(new Event('input', { bubbles: true }))
+      await settle()
+    })
+    await act(async () => { buttonByText('テンプレートを保存').click(); await settle() })
+    expect(fixture.createCalls).toHaveLength(1)
+    expect(fixture.createCalls[0].lineAccountId).toBe('account-b')
+    expect(fixture.createCalls[0].payload.imageMediaId).toBeNull()
+    expect(fixture.createCalls[0].payload.imageMediaKind).toBeNull()
   })
 })

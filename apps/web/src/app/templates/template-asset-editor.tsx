@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { MediaItem } from '@line-crm/shared'
 import { api, type BroadcastAssetKind } from '@/lib/api'
 import Button from '@/components/shared/button'
@@ -45,6 +45,17 @@ export default function TemplateAssetEditor({ kind, visual = false }: { kind: As
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [saved, setSaved] = useState(false)
+
+  /*
+   * アカウントを切り替えたら、前のアカウントで選んだ候補は捨てる。
+   * そのままにすると、切替後のアカウントの保存へ別アカウントの
+   * imageMediaId が紛れ込み、「選択中」の表示も残ったままになる。
+   * URL欄もピックした値を持つため、整合のため一緒に初期化する。
+   */
+  useEffect(() => {
+    setPickedMedia(null)
+    setImageUrl('')
+  }, [selectedAccountId])
 
   const pickMedia = (item: MediaItem) => {
     // 配信用の公開URLを保存値へ入れる（管理画面の表示用URLではない）。
