@@ -4,7 +4,7 @@ import { Download } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import { api, type OpsAuditRow } from '@/lib/api'
 import OpsPageHeader from '@/components/ops/ops-page-header'
-import { AUDIT_ACTION_LABEL, auditActionChip, formatDateTime } from '@/components/ops/ops-ui'
+import { AUDIT_ACTION_LABEL, auditActionChip, formatDateTime, opsCall } from '@/components/ops/ops-ui'
 import Button from '@/components/shared/button'
 import FilterChip from '@/components/shared/filter-chip'
 import ListState from '@/components/shared/list-state'
@@ -37,7 +37,7 @@ export default function OpsAuditPage() {
     setLoading(true)
     setError('')
     const actions = FILTERS.find((f) => f.key === filter)?.actions || undefined
-    const res = await api.ops.audit({ action: actions, from: from || undefined, to: to ? `${to}T23:59:59` : undefined, limit: PAGE, offset: (page - 1) * PAGE })
+    const res = await opsCall(api.ops.audit({ action: actions, from: from || undefined, to: to ? `${to}T23:59:59` : undefined, limit: PAGE, offset: (page - 1) * PAGE }))
     setLoading(false)
     if (!res.success) { setError(res.error || '読み込めませんでした'); return }
     setRows(res.data)

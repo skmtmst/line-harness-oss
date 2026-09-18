@@ -25,6 +25,7 @@ let host: HTMLDivElement
 let root: Root
 let calls: Array<{ url: string; method: string; body: Record<string, unknown> | null }>
 let draft: { body: string; aiGenerated: boolean; generatedAt: string | null; updatedAt: string } | null
+let aiFails = false
 
 function respond(url: string, init?: RequestInit) {
   const method = init?.method ?? 'GET'
@@ -36,6 +37,7 @@ function respond(url: string, init?: RequestInit) {
   }
   if (url.includes('/api/ops/support/tickets?')) return json({ success: true, data: [ticket], total: 86 })
   if (url.endsWith('/draft/ai')) {
+    if (aiFails) return json({ success: false, error: 'AI の応答が 45 秒以内に返りませんでした' }, 504)
     draft = { body: '山田さま\nご連絡ありがとうございます。', aiGenerated: true, generatedAt: '2026-09-15T09:31:00.000+09:00', updatedAt: '2026-09-15T09:31:00.000+09:00' }
     return json({ success: true, data: draft }, 201)
   }
@@ -51,6 +53,7 @@ function respond(url: string, init?: RequestInit) {
 beforeEach(() => {
   calls = []
   draft = null
+  aiFails = false
   process.env.NEXT_PUBLIC_API_URL = 'https://api.example.test'
   vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => respond(String(input), init)))
   host = document.createElement('div')
@@ -91,6 +94,18 @@ describe('表記の決まり', () => {
 })
 
 describe('画面', () => {
+  it('AI が失敗（5xx）しても「作成中…」のまま固まらず、エラー文を出して手書きに戻る', async () => {
+    aiFails = true
+    await act(async () => { root.render(<OpsSupportPage />) })
+    await flush()
+    const aiButton = Array.from(host.querySelectorAll('button')).find((b) => b.textContent?.includes('AIで下書きを作る'))
+    await act(async () => { aiButton!.click() })
+    await flush()
+    expect(host.textContent).not.toContain('AIが下書きを作っています')
+    expect(host.textContent).toContain('時間内に終わりませんでした')
+    expect(host.querySelector('textarea[aria-label="返信"]')).not.toBeNull()
+  })
+
   it('状態タブの件数・数値カード・一覧・内容と返信が出る', async () => {
     await act(async () => { root.render(<OpsSupportPage />) })
     await flush()

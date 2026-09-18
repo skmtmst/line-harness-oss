@@ -250,10 +250,25 @@ describe('下書きと AI', () => {
     expect(body.data.aiGenerated).toBe(true);
     expect(body.data.body).toContain('山田さま');
     expect(body.data.generatedAt).toBeTruthy();
-    expect(run).toHaveBeenCalledWith('@cf/zai-org/glm-4.7-flash', expect.objectContaining({ messages: expect.any(Array) }));
+    expect(run).toHaveBeenCalledWith('@cf/meta/llama-3.3-70b-instruct-fp8-fast', expect.objectContaining({ messages: expect.any(Array), max_tokens: 900 }));
     const input = run.mock.calls[0][1] as { messages: Array<{ role: string; content: string }> };
     // 個人のメールアドレスは AI に渡さない
     expect(input.messages.map((m) => m.content).join('\n')).not.toContain('yamada@example.com');
+  });
+
+  it('AI が時間内に返らなければ 504 で、下書きは作られない', async () => {
+    vi.useFakeTimers();
+    try {
+      const t = await seedTicket();
+      const run = vi.fn(() => new Promise<unknown>(() => {}));
+      const pending = app(master, { run }).request(`/api/ops/support/tickets/${t.id}/draft/ai`, json({}));
+      await vi.advanceTimersByTimeAsync(46_000);
+      const res = await pending;
+      expect(res.status).toBe(504);
+      expect((await res.json() as { error: string }).error).toContain('45 秒');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('AI が失敗したら 502 で、下書きは作られない', async () => {

@@ -147,6 +147,16 @@ function MediaLibraryInner() {
   const [query, setQuery] = useState('')
   const [showUnusedOnly, setShowUnusedOnly] = useState(false)
   const [showNearLimitOnly, setShowNearLimitOnly] = useState(false)
+  /** 退避済みだけを見る棚。普段の一覧には出ない。 */
+  const [showArchivedOnly, setShowArchivedOnly] = useState(false)
+  /*
+    退避・一覧への復帰はどちらも理由が必須（あとから「なぜ」を追えるように）。
+    押し口を開いた札と向きを持ち、確定時に同じ窓で理由を聞く。
+  */
+  const [archiveTarget, setArchiveTarget] = useState<{ item: MediaItem; mode: 'archive' | 'restore' } | null>(null)
+  const [archiveReason, setArchiveReason] = useState('')
+  const [archiveBusy, setArchiveBusy] = useState(false)
+  const [archiveError, setArchiveError] = useState('')
   const [sort, setSort] = useState<MediaSort>('newest')
   const [pageSize, setPageSize] = useState(20)
   const [page, setPage] = useState(1)
@@ -321,6 +331,8 @@ function MediaLibraryInner() {
     setBulkConfirm(null)
     setBulkBusy(false)
     setBulkProgress(null)
+    setArchiveTarget(null)
+    setArchiveError('')
   }, [selectedAccountId])
 
   const load = useCallback(async () => {
@@ -343,6 +355,7 @@ function MediaLibraryInner() {
           query: query.trim() || undefined,
           unusedOnly: showUnusedOnly,
           nearLimitOnly: showNearLimitOnly,
+          archived: showArchivedOnly ? 'only' : undefined,
           sort,
           limit: pageSize,
           offset: (page - 1) * pageSize,
@@ -370,7 +383,7 @@ function MediaLibraryInner() {
     } finally {
       if (accountAtRequest === latestAccountRef.current) setLoading(false)
     }
-  }, [folderFilter, kinds, page, pageSize, query, selectedAccountId, showNearLimitOnly, showUnusedOnly, sort])
+  }, [folderFilter, kinds, page, pageSize, query, selectedAccountId, showArchivedOnly, showNearLimitOnly, showUnusedOnly, sort])
 
   useEffect(() => {
     if (accountLoading) return
@@ -623,6 +636,52 @@ function MediaLibraryInner() {
     setDeleteError('')
   }
 
+  /**
+   * 退避・復帰の確定。両方とも理由が必須。409（直前に誰かが同じ操作を
+   * 済ませた）は一覧を読み直して最新の見え方に合わせる。
+   */
+  async function confirmArchiveChange() {
+    if (!archiveTarget || !selectedAccountId || archiveBusy) return
+    const reason = archiveReason.trim()
+    if (!reason) return
+    const accountAtRequest = selectedAccountId
+    const { item, mode } = archiveTarget
+    setArchiveBusy(true)
+    setArchiveError('')
+    try {
+      const res = mode === 'archive'
+        ? await api.media.archive(item.id, accountAtRequest, reason)
+        : await api.media.restore(item.id, accountAtRequest, reason)
+      if (accountAtRequest !== latestAccountRef.current) return
+      if (!res.success) {
+        setArchiveError(`処理できませんでした。${res.error}`)
+        void load()
+        return
+      }
+      setArchiveTarget(null)
+      setSuccessMessage(mode === 'archive'
+        ? `「${item.filename}」をアーカイブしました。使っている場所はそのまま動き、一覧と新規選択からだけ外れます。`
+        : `「${item.filename}」を一覧へ戻しました。`)
+      void load()
+    } catch (e) {
+      /*
+        fetchApi は 2xx 以外で ApiError を投げる。409（直前に誰かが
+        同じ操作を済ませた）は汎用エラーで止めず、一覧を読み直して
+        最新の見え方に合わせる。
+      */
+      if (e instanceof ApiError && e.status === 409) {
+        setArchiveError(mode === 'archive'
+          ? 'このメディアは既にアーカイブ済みです。一覧を読み直しました。'
+          : 'このメディアは既に一覧へ戻っています。一覧を読み直しました。')
+        void load()
+        return
+      }
+      setArchiveError('処理に失敗しました。もう一度お試しください。')
+    } finally {
+      setArchiveBusy(false)
+    }
+  }
+
   const pageCount = Math.max(1, Math.ceil(total / pageSize))
   const current = items
 
@@ -630,7 +689,8 @@ function MediaLibraryInner() {
     if (page > pageCount) setPage(pageCount)
   }, [page, pageCount])
 
-  const removable = items.filter(isKnownUnused)
+  // まとめて削除の候補は未使用かつ一覧にいるものだけ。退避済みは選ばない。
+  const removable = items.filter((item) => isKnownUnused(item) && !item.archivedAt)
   const allSelected = removable.length > 0 && removable.every((item) => selected.has(item.id))
 
   if (!urlReady || (detailId && (detailPhase === 'idle' || detailPhase === 'loading'))) {
@@ -825,11 +885,12 @@ function MediaLibraryInner() {
       {/* 種別と使用状態。選ぶと必ず1ページ目へ戻る。 */}
       <div className="mb-3 flex flex-wrap items-center gap-3">
         <FilterChip
-          selected={kinds.size === KINDS.length && !showUnusedOnly}
+          selected={kinds.size === KINDS.length && !showUnusedOnly && !showArchivedOnly}
           onChange={() => {
             setKinds(new Set(KINDS.map((kind) => kind.key)))
             setShowUnusedOnly(false)
             setShowNearLimitOnly(false)
+            setShowArchivedOnly(false)
             setPage(1)
           }}
         >
@@ -838,11 +899,12 @@ function MediaLibraryInner() {
         {KINDS.map((kind) => (
           <FilterChip
             key={kind.key}
-            selected={kinds.size === 1 && kinds.has(kind.key)}
+            selected={kinds.size === 1 && kinds.has(kind.key) && !showArchivedOnly}
             onChange={() => {
               setKinds(new Set([kind.key]))
               setShowUnusedOnly(false)
               setShowNearLimitOnly(false)
+              setShowArchivedOnly(false)
               setPage(1)
             }}
           >
@@ -854,6 +916,7 @@ function MediaLibraryInner() {
           onChange={(selectedValue) => {
             setShowUnusedOnly(selectedValue)
             setShowNearLimitOnly(false)
+            setShowArchivedOnly(false)
             if (selectedValue) setKinds(new Set(KINDS.map((kind) => kind.key)))
             setPage(1)
           }}
@@ -865,11 +928,24 @@ function MediaLibraryInner() {
           onChange={(selectedValue) => {
             setShowNearLimitOnly(selectedValue)
             setShowUnusedOnly(false)
+            setShowArchivedOnly(false)
             if (selectedValue) setKinds(new Set(KINDS.map((kind) => kind.key)))
             setPage(1)
           }}
         >
           上限に近い
+        </FilterChip>
+        <FilterChip
+          selected={showArchivedOnly}
+          onChange={(selectedValue) => {
+            setShowArchivedOnly(selectedValue)
+            setShowUnusedOnly(false)
+            setShowNearLimitOnly(false)
+            if (selectedValue) setKinds(new Set(KINDS.map((kind) => kind.key)))
+            setPage(1)
+          }}
+        >
+          アーカイブ済み
         </FilterChip>
       </div>
 
@@ -969,7 +1045,7 @@ function MediaLibraryInner() {
                         <input
                           type="checkbox"
                           checked={selected.has(item.id)}
-                          disabled={!isKnownUnused(item)}
+                          disabled={!isKnownUnused(item) || !!item.archivedAt}
                           onChange={() =>
                             setSelected((prev) => {
                               const next = new Set(prev)
@@ -980,11 +1056,13 @@ function MediaLibraryInner() {
                           }
                           aria-label={`${item.filename}を選ぶ`}
                           title={
-                            item.usageCount == null
-                              ? '使用先を確認できないため選べません'
-                              : item.usageCount > 0
-                                ? '使用先から外すまで削除できません'
-                                : undefined
+                            item.archivedAt
+                              ? '退避済みは削除できません。一覧へ戻してから削除してください'
+                              : item.usageCount == null
+                                ? '使用先を確認できないため選べません'
+                                : item.usageCount > 0
+                                  ? '使用先から外すまで削除できません'
+                                  : undefined
                           }
                           className="accent-green-500 mt-0.5"
                         />
@@ -992,6 +1070,14 @@ function MediaLibraryInner() {
                       <span className="bg-ink-secondary text-on-accent rounded px-1 py-0.5 text-[10px] leading-none">
                         {KINDS.find((k) => k.key === item.kind)?.label ?? 'ファイル'}
                       </span>
+                      {item.archivedAt ? (
+                        <span
+                          className="bg-canvas-sunken text-ink-secondary rounded px-1 py-0.5 text-[10px] leading-none"
+                          title={item.archiveReason ? `退避の理由：${item.archiveReason}` : '退避済み'}
+                        >
+                          退避済み
+                        </span>
+                      ) : null}
                       <span className="text-ink min-w-0 flex-1 truncate text-caption font-bold" title={item.filename}>
                         {item.filename}
                       </span>
@@ -1018,7 +1104,7 @@ function MediaLibraryInner() {
                   </>
                 )}
 
-                <div className="mt-auto flex items-center justify-end gap-1 pt-1">
+                <div className="mt-auto flex flex-wrap items-center justify-end gap-1 pt-1">
                   <button
                     onClick={() => setDetailUrl(item.id)}
                     disabled={!canManageMedia}
@@ -1028,7 +1114,7 @@ function MediaLibraryInner() {
                   >
                     使用箇所
                   </button>
-                  {canManageMedia ? (
+                  {canManageMedia && !item.archivedAt ? (
                   <button
                     onClick={() => { setRenameError(''); setRenaming({ id: item.id, value: item.filename }) }}
                     title="名前を変える"
@@ -1047,7 +1133,25 @@ function MediaLibraryInner() {
                   >
                     {downloadingIds.has(item.id) ? '取得中…' : 'ダウンロード'}
                   </button>
+                  {/*
+                    退避は消去ではない。使用中でも止めないが、理由を必ず聞く。
+                    退避済みは編集・削除の押し口を出さず、戻す口だけを残す。
+                  */}
                   {canManageMedia ? (
+                  <Button
+                    type="button"
+                    onClick={() => {
+                      setArchiveError('')
+                      setArchiveReason('')
+                      setArchiveTarget({ item, mode: item.archivedAt ? 'restore' : 'archive' })
+                    }}
+                    title={item.archivedAt ? '一覧へ戻す' : '一覧と新規選択から外す'}
+                    aria-label={item.archivedAt ? `${item.filename}を一覧へ戻す` : `${item.filename}をアーカイブ`}
+                  >
+                    {item.archivedAt ? '一覧へ戻す' : 'アーカイブ'}
+                  </Button>
+                  ) : null}
+                  {canManageMedia && !item.archivedAt ? (
                   <Button
                     type="button"
                     onClick={() => void openDelete(item)}
@@ -1198,6 +1302,56 @@ function MediaLibraryInner() {
             処理中…（{bulkProgress.done}/{bulkProgress.total}件）
           </p>
         ) : null}
+      </Dialog>
+
+      {/*
+        退避・復帰の理由を聞く窓。監査に残すため理由なしでは確定できない。
+        退避しても本文・過去配信からの参照は切れない旨を先に伝える。
+      */}
+      <Dialog
+        open={archiveTarget !== null}
+        title={archiveTarget?.mode === 'archive'
+          ? `「${archiveTarget.item.filename}」をアーカイブしますか？`
+          : archiveTarget ? `「${archiveTarget.item.filename}」を一覧へ戻しますか？` : ''}
+        description={archiveTarget?.mode === 'archive'
+          ? '一覧と新規選択から外れます。使っている場所や過去の配信はそのまま動きます。'
+          : '一覧と新規選択へ戻ります。'}
+        busy={archiveBusy}
+        error={archiveError || undefined}
+        onCancel={() => {
+          if (archiveBusy) return
+          setArchiveTarget(null)
+        }}
+        footer={
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <Button type="button" onClick={() => setArchiveTarget(null)} disabled={archiveBusy}>
+              やめる
+            </Button>
+            <Button
+              type="button"
+              variant="primary"
+              disabled={archiveBusy || !archiveReason.trim()}
+              onClick={() => void confirmArchiveChange()}
+            >
+              {archiveBusy
+                ? '処理中…'
+                : archiveTarget?.mode === 'archive' ? 'アーカイブする' : '一覧へ戻す'}
+            </Button>
+          </div>
+        }
+      >
+        <label className="block space-y-1.5">
+          <span className="text-ink text-xs font-bold">理由（必須・あとから履歴で確認できます）</span>
+          <input
+            type="text"
+            autoFocus
+            value={archiveReason}
+            onChange={(event) => setArchiveReason(event.target.value)}
+            placeholder={archiveTarget?.mode === 'archive' ? '例：古いキャンペーンの素材のため' : '例：再び使うため'}
+            aria-label="理由"
+            className="border-hairline rounded-control focus:ring-accent w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
+          />
+        </label>
       </Dialog>
 
       <div className="mt-4 flex flex-wrap items-center justify-between gap-3">

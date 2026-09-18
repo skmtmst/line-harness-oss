@@ -13,7 +13,7 @@ import {
   type OpsTenantRow,
 } from '@/lib/api'
 import OpsPageHeader from '@/components/ops/ops-page-header'
-import { formatDateTime, planLabel, PLAN_STATUS_LABEL, ROLE_LABEL, tenantDetailHref } from '@/components/ops/ops-ui'
+import { formatDateTime, planLabel, PLAN_STATUS_LABEL, ROLE_LABEL, tenantDetailHref, opsCall } from '@/components/ops/ops-ui'
 import Button from '@/components/shared/button'
 import Chip, { type ChipTone } from '@/components/shared/chip'
 import ListState from '@/components/shared/list-state'
@@ -98,13 +98,13 @@ export default function OpsSupportPage() {
   const aiAbort = useRef<{ cancelled: boolean } | null>(null)
 
   const loadSummary = useCallback(async () => {
-    const res = await api.ops.support.summary()
+    const res = await opsCall(api.ops.support.summary())
     if (res.success) setSummary(res.data)
   }, [])
 
   const loadList = useCallback(async () => {
     setLoading(true)
-    const res = await api.ops.support.tickets({ stage, priority: priority || undefined, q: q.trim() || undefined, sort, limit: 50 })
+    const res = await opsCall(api.ops.support.tickets({ stage, priority: priority || undefined, q: q.trim() || undefined, sort, limit: 50 }))
     setLoading(false)
     if (!res.success) { setError(res.error || '読み込めませんでした'); return }
     setTickets(res.data)
@@ -114,7 +114,7 @@ export default function OpsSupportPage() {
 
   const loadDetail = useCallback(async (id: string) => {
     setDetailLoading(true)
-    const res = await api.ops.support.ticket(id)
+    const res = await opsCall(api.ops.support.ticket(id))
     setDetailLoading(false)
     if (!res.success) { setError(res.error || '内容を読み込めませんでした'); return }
     setDetail(res.data)
@@ -143,7 +143,7 @@ export default function OpsSupportPage() {
     if (!detail) return
     setBusy(true)
     setError('')
-    const res = await api.ops.support.update(detail.ticket.id, { stage: next })
+    const res = await opsCall(api.ops.support.update(detail.ticket.id, { stage: next }))
     setBusy(false)
     if (!res.success) { setError(res.error || '変更できませんでした'); return }
     setNotice(`${res.data.ticketLabel} を「${res.data.stageLabel}」にしました`)
@@ -152,7 +152,7 @@ export default function OpsSupportPage() {
 
   const changePriority = async (next: OpsSupportPriority) => {
     if (!detail) return
-    const res = await api.ops.support.update(detail.ticket.id, { priority: next })
+    const res = await opsCall(api.ops.support.update(detail.ticket.id, { priority: next }))
     if (!res.success) { setError(res.error || '変更できませんでした'); return }
     await refreshAll()
   }
@@ -161,7 +161,7 @@ export default function OpsSupportPage() {
     if (!detail) return
     setDraftSaving(true)
     setError('')
-    const res = await api.ops.support.saveDraft(detail.ticket.id, reply)
+    const res = await opsCall(api.ops.support.saveDraft(detail.ticket.id, reply))
     setDraftSaving(false)
     if (!res.success) { setError(res.error || '下書きを保存できませんでした'); return }
     setReplyFromAi(null)
@@ -174,7 +174,7 @@ export default function OpsSupportPage() {
     aiAbort.current = token
     setAiBusy(true)
     setError('')
-    const res = await api.ops.support.aiDraft(detail.ticket.id)
+    const res = await opsCall(api.ops.support.aiDraft(detail.ticket.id))
     if (token.cancelled) return
     setAiBusy(false)
     if (!res.success) { setError(res.error || 'AI の下書きを作れませんでした'); return }
@@ -190,7 +190,7 @@ export default function OpsSupportPage() {
 
   const discardAi = async () => {
     if (!detail) return
-    const res = await api.ops.support.deleteDraft(detail.ticket.id)
+    const res = await opsCall(api.ops.support.deleteDraft(detail.ticket.id))
     if (!res.success) { setError(res.error || '下書きを消せませんでした'); return }
     setReply('')
     setReplyFromAi(null)
@@ -200,7 +200,7 @@ export default function OpsSupportPage() {
     if (!detail || !reply.trim()) return
     setBusy(true)
     setError('')
-    const res = await api.ops.support.reply(detail.ticket.id, { body: reply, aiAssisted: replyFromAi !== null })
+    const res = await opsCall(api.ops.support.reply(detail.ticket.id, { body: reply, aiAssisted: replyFromAi !== null }))
     setBusy(false)
     if (!res.success) { setError(res.error || '返信できませんでした'); return }
     setReply('')
@@ -217,7 +217,7 @@ export default function OpsSupportPage() {
     event.preventDefault()
     setBusy(true)
     setError('')
-    const res = await api.ops.support.create({ tenantId: form.tenantId, subject: form.subject.trim(), body: form.body.trim(), kind: form.kind, priority: form.priority })
+    const res = await opsCall(api.ops.support.create({ tenantId: form.tenantId, subject: form.subject.trim(), body: form.body.trim(), kind: form.kind, priority: form.priority }))
     setBusy(false)
     if (!res.success) { setError(res.error || '作れませんでした'); return }
     setCreating(false)
@@ -463,7 +463,7 @@ export default function OpsSupportPage() {
 
 async function impersonate(tenantId: string, setBusy: (v: boolean) => void, setError: (v: string) => void) {
   setBusy(true)
-  const res = await api.ops.impersonation.start(tenantId)
+  const res = await opsCall(api.ops.impersonation.start(tenantId))
   setBusy(false)
   if (!res.success) { setError(res.error || '代理ログインを始められませんでした'); return }
   window.location.assign('/hq')

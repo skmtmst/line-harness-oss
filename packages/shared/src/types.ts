@@ -327,6 +327,10 @@ export interface MediaItem {
   url: string;
   uploadedBy: string | null;
   createdAt: string;
+  /** アーカイブ済みなら退避した時刻・実行者・理由。使用中でも触れない消去ではない。 */
+  archivedAt?: string | null;
+  archivedBy?: string | null;
+  archiveReason?: string | null;
   /** 0は未使用。省略は旧APIなどでまだ取得できていない状態。 */
   usageCount?: number;
 }

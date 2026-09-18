@@ -39,6 +39,8 @@ const mocks = {
   getFolderById: vi.fn(),
   updateMedia: vi.fn(),
   deleteMedia: vi.fn(),
+  archiveMedia: vi.fn(),
+  restoreMedia: vi.fn(),
   getMediaUsages: vi.fn(),
   countMediaUsages: vi.fn(),
   getMediaDeleteImpact: vi.fn(),
@@ -1818,5 +1820,103 @@ describe('日付での切り替え', () => {
     });
     expect(res.status).toBe(413);
     expect(mocks.createCommonVarSchedule).not.toHaveBeenCalled();
+  });
+});
+
+describe('メディアのアーカイブと復元', () => {
+  const archivedMedia = { ...MEDIA, archived_at: '2026-09-07T01:00:00.000Z', archived_by: 'u-1', archive_reason: '整理' };
+
+  it('owner/adminは理由付きで退避でき、実行者とアカウントをdbへ渡す', async () => {
+    mocks.archiveMedia.mockResolvedValue({ status: 'archived', media: archivedMedia });
+    const res = await req('/api/media/md-1/archive', 'POST', { accountId: 'account-1', reason: '古い素材' }, 'admin');
+    expect(res.status).toBe(200);
+    expect(mocks.archiveMedia).toHaveBeenCalledWith(env.DB, {
+      id: 'md-1', lineAccountId: 'account-1', actorId: 'u-1', reason: '古い素材',
+    });
+    const json = await res.json() as { data: { archivedAt: string | null; archiveReason: string | null } };
+    expect(json.data.archivedAt).toBe('2026-09-07T01:00:00.000Z');
+    expect(json.data.archiveReason).toBe('整理');
+  });
+
+  it('owner/adminは理由付きで一覧へ戻せる', async () => {
+    mocks.restoreMedia.mockResolvedValue({ status: 'restored', media: MEDIA });
+    const res = await req('/api/media/md-1/restore', 'POST', { accountId: 'account-1', reason: '再び使う' });
+    expect(res.status).toBe(200);
+    expect(mocks.restoreMedia).toHaveBeenCalledWith(env.DB, {
+      id: 'md-1', lineAccountId: 'account-1', actorId: 'u-1', reason: '再び使う',
+    });
+  });
+
+  it.each(['archive', 'restore'])('staffは%sできず403で止まり、dbを触らない', async (action) => {
+    const res = await req(`/api/media/md-1/${action}`, 'POST', { accountId: 'account-1', reason: 'x' }, 'staff');
+    expect(res.status).toBe(403);
+    expect(mocks.archiveMedia).not.toHaveBeenCalled();
+    expect(mocks.restoreMedia).not.toHaveBeenCalled();
+  });
+
+  it.each(['archive', 'restore'])('理由なしの%sは400で止まり、dbを触らない', async (action) => {
+    const res = await req(`/api/media/md-1/${action}`, 'POST', { accountId: 'account-1' });
+    expect(res.status).toBe(400);
+    const json = await res.json() as { code?: string };
+    expect(json.code).toBe('media_reason_required');
+    expect(mocks.archiveMedia).not.toHaveBeenCalled();
+    expect(mocks.restoreMedia).not.toHaveBeenCalled();
+  });
+
+  it.each(['archive', 'restore'])('空文字だけの理由も%sを受け付けない', async (action) => {
+    const res = await req(`/api/media/md-1/${action}`, 'POST', { accountId: 'account-1,', reason: '   ' });
+    expect(res.status).toBe(400);
+  });
+
+  it('存在しない・別アカウントのメディアは404', async () => {
+    mocks.archiveMedia.mockResolvedValue({ status: 'not_found' });
+    const res = await req('/api/media/md-x/archive', 'POST', { accountId: 'account-1', reason: 'x' });
+    expect(res.status).toBe(404);
+  });
+
+  it('アカウントへのアクセス権がなければ404で、dbを触らない', async () => {
+    accessMocks.canAccessAllLineAccounts.mockResolvedValueOnce(false);
+    const res = await req('/api/media/md-1/archive', 'POST', { accountId: 'account-9', reason: 'x' });
+    expect(res.status).toBe(404);
+    expect(mocks.archiveMedia).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['archive', 'already_archived'],
+    ['restore', 'already_active'],
+  ])('既に目的側の状態なら%sは409で引き返す', async (action, status) => {
+    mocks.archiveMedia.mockResolvedValue({ status: 'already_archived' });
+    mocks.restoreMedia.mockResolvedValue({ status: 'already_active' });
+    const res = await req(`/api/media/md-1/${action}`, 'POST', { accountId: 'account-1', reason: 'x' });
+    expect(res.status).toBe(409);
+    const json = await res.json() as { code?: string };
+    expect(json.code).toBe(status);
+  });
+
+  it.each(['archive', 'restore'])('文字列でない理由・accountIdは500ではなく400で弾く（%s）', async (action) => {
+    const res = await req(`/api/media/md-1/${action}`, 'POST', { accountId: 123, reason: 456 });
+    expect(res.status).toBe(400);
+    expect(mocks.archiveMedia).not.toHaveBeenCalled();
+    expect(mocks.restoreMedia).not.toHaveBeenCalled();
+  });
+
+  it('一覧は既定で退避済みを外し、archived=only でだけ退避済みを返す', async () => {
+    mocks.getMedia.mockResolvedValue([]);
+    mocks.countMedia.mockResolvedValue(0);
+    await req('/api/media?accountId=account-1', 'GET');
+    expect(mocks.getMedia).toHaveBeenLastCalledWith(env.DB,
+      expect.not.objectContaining({ archived: expect.anything() }));
+    await req('/api/media?accountId=account-1&archived=only', 'GET');
+    expect(mocks.getMedia).toHaveBeenLastCalledWith(env.DB,
+      expect.objectContaining({ archived: 'only' }));
+  });
+
+  it('archivedに変な値を渡しても既定（非アーカイブ）のまま', async () => {
+    mocks.getMedia.mockResolvedValue([]);
+    mocks.countMedia.mockResolvedValue(0);
+    const res = await req('/api/media?accountId=account-1&archived=yes', 'GET');
+    expect(res.status).toBe(200);
+    expect(mocks.getMedia).toHaveBeenLastCalledWith(env.DB,
+      expect.not.objectContaining({ archived: expect.anything() }));
   });
 });

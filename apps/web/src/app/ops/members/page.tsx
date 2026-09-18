@@ -4,7 +4,7 @@ import { Plus } from 'lucide-react'
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { api, type OpsMember, type OpsMemberSummary } from '@/lib/api'
 import OpsPageHeader from '@/components/ops/ops-page-header'
-import { formatDateTime } from '@/components/ops/ops-ui'
+import { formatDateTime, opsCall } from '@/components/ops/ops-ui'
 import Button from '@/components/shared/button'
 import Chip from '@/components/shared/chip'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -54,7 +54,7 @@ export default function OpsMembersPage() {
     event.preventDefault()
     setBusy(true)
     setError('')
-    const res = await api.ops.addMember({ email: email.trim() })
+    const res = await opsCall(api.ops.addMember({ email: email.trim() }))
     setBusy(false)
     if (!res.success) { setError(res.error || '招待できませんでした'); return }
     setNotice(res.data.activationState === 'active'
@@ -68,7 +68,7 @@ export default function OpsMembersPage() {
   const resend = async (member: OpsMember) => {
     setResendingId(member.staffId)
     setError('')
-    const res = await api.ops.resendInvite(member.staffId)
+    const res = await opsCall(api.ops.resendInvite(member.staffId))
     setResendingId(null)
     if (!res.success) { setError(res.error || '送り直せませんでした'); return }
     setNotice(`${member.email ?? member.name} に招待メールを送り直しました`)
@@ -79,7 +79,7 @@ export default function OpsMembersPage() {
     if (!toggling) return
     setBusy(true)
     setError('')
-    const res = await api.ops.setMemberActive(toggling.staffId, !toggling.isActive)
+    const res = await opsCall(api.ops.setMemberActive(toggling.staffId, !toggling.isActive))
     setBusy(false)
     if (!res.success) { setError(res.error || '変更できませんでした'); return }
     setToggling(null)
