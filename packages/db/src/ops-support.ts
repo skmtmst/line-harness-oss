@@ -246,7 +246,7 @@ export async function addSupportReply(
   return (await db.prepare('SELECT * FROM hq_support_messages WHERE id = ?').bind(id).first<SupportMessage>())!;
 }
 
-/** 統括側からの追記（36-3 の続き。いまは API だけ用意し、画面は後続）。 */
+/** 統括側からの続き（★V6 36-3-A）。待ち・解決済み・クローズは対応中へ戻す。 */
 export async function addSupportTenantMessage(
   db: D1Database,
   input: { requestId: string; staffId: string | null; staffName: string; body: string; attachmentKeys: string[] },
@@ -259,8 +259,9 @@ export async function addSupportTenantMessage(
                 VALUES (?, ?, 'tenant', ?, ?, ?, ?, ?)`)
       .bind(id, input.requestId, input.staffId, input.staffName, input.body, JSON.stringify(input.attachmentKeys), now),
     db.prepare(`UPDATE hq_support_requests
-                   SET last_message_at = ?, stage = CASE WHEN stage IN ('waiting', 'resolved') THEN 'in_progress' ELSE stage END,
-                       status = CASE WHEN stage = 'closed' THEN status ELSE 'open' END, updated_at = ?
+                   SET last_message_at = ?,
+                       stage = CASE WHEN stage IN ('waiting', 'resolved', 'closed') THEN 'in_progress' ELSE stage END,
+                       status = 'open', resolved_at = NULL, closed_at = NULL, updated_at = ?
                  WHERE id = ?`)
       .bind(now, now, input.requestId),
   ]);

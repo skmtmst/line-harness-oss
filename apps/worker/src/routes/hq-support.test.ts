@@ -171,3 +171,54 @@ describe('統括からのお問い合わせ', () => {
     expect(data.map((k) => k.key)).toEqual(['usage', 'bug', 'billing', 'feature', 'other']);
   });
 });
+
+describe('お問い合わせの続き（★V6 36-3-A）', () => {
+  async function seed() {
+    const created = await call('POST', '/api/hq/support/requests', REQUEST);
+    const body = await created.json<{ data: { id: string } }>();
+    mail.send.mockReset();
+    return body.data.id;
+  }
+
+  it('1 件のやり取りを読める。別の統括からは 404', async () => {
+    const id = await seed();
+    testDb.raw.prepare(`INSERT INTO hq_support_messages (id, request_id, author_kind, author_staff_id, author_name, body, created_at) VALUES ('m1', ?, 'ops', 'master-1', '坂本 真人', '確認します。', '2026-09-15T09:05:00.000+09:00')`).run(id);
+    const res = await call('GET', `/api/hq/support/requests/${id}`);
+    expect(res.status).toBe(200);
+    const body = await res.json<{ data: { ticketLabel: string; stageLabel: string; messages: Array<{ authorKind: string; authorName: string }>; replies: unknown[] } }>();
+    expect(body.data.ticketLabel).toBe('#MB-0001');
+    expect(body.data.stageLabel).toBe('新規');
+    expect(body.data.messages).toEqual([expect.objectContaining({ authorKind: 'ops', authorName: 'musubo 運営 ／ 坂本 真人' })]);
+    expect(body.data.replies).toHaveLength(1);
+    const other = await call('GET', `/api/hq/support/requests/${id}`, undefined, { staff: staffOf({ id: 'staff-9', tenantId: 'tenant-2' }) });
+    expect(other.status).toBe(404);
+  });
+
+  it('続きを送ると運営のチケットが対応中へ戻り、運営へ通知、送信者に控えが届く', async () => {
+    const id = await seed();
+    testDb.raw.prepare(`UPDATE hq_support_requests SET stage = 'closed', status = 'closed', closed_at = '2026-09-15T10:00:00.000+09:00', resolved_at = '2026-09-15T10:00:00.000+09:00' WHERE id = ?`).run(id);
+    const res = await call('POST', `/api/hq/support/requests/${id}/messages`, { body: '直りました。ありがとうございます。', attachments: [{ mimeType: 'image/png', data: toB64(PNG) }] });
+    expect(res.status).toBe(201);
+    const body = await res.json<{ data: { authorKind: string; stage: string; status: string; attachments: Array<{ url: string }> } }>();
+    expect(body.data).toMatchObject({ authorKind: 'tenant', stage: 'in_progress', status: 'open' });
+    expect(body.data.attachments[0].url).toContain('https://api.example.com/images/support/');
+    const row = testDb.raw.prepare('SELECT stage, status, closed_at, resolved_at FROM hq_support_requests WHERE id = ?').get(id) as Record<string, unknown>;
+    expect(row).toEqual({ stage: 'in_progress', status: 'open', closed_at: null, resolved_at: null });
+    expect(mail.send).toHaveBeenCalledTimes(2);
+    const [toOps, toStaff] = mail.send.mock.calls.map((c) => c[1] as { to: string; subject: string; body: string });
+    expect(toOps.to).toBe('ops@example.com');
+    expect(toOps.subject).toContain('続き #MB-0001');
+    expect(toStaff.to).toBe('masato@example.com');
+    expect(toStaff.subject).toContain('続きを受け付けました');
+    expect(r2Store.size).toBe(1);
+  });
+
+  it('空の本文は 400、別の統括の問い合わせには送れない', async () => {
+    const id = await seed();
+    expect((await call('POST', `/api/hq/support/requests/${id}/messages`, { body: '  ' })).status).toBe(400);
+    const other = await call('POST', `/api/hq/support/requests/${id}/messages`, { body: 'x' }, { staff: staffOf({ id: 'staff-9', tenantId: 'tenant-2' }) });
+    expect(other.status).toBe(404);
+    const n = testDb.raw.prepare('SELECT COUNT(*) AS n FROM hq_support_messages').get() as { n: number };
+    expect(n.n).toBe(0);
+  });
+});

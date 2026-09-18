@@ -614,7 +614,7 @@ const spec = {
       },
       put: {
         tags: ['NEN Members'], summary: '主食のカロリー表を一括保存し、登録済みペットの目安を計算し直す',
-        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['accountId', 'products'], properties: { accountId: { type: 'string' }, products: { type: 'array', maxItems: 20, items: { type: 'object', required: ['name', 'kcalPer100g'], properties: { id: { type: 'string', nullable: true }, name: { type: 'string', maxLength: 40 }, kcalPer100g: { type: 'number', minimum: 1, maximum: 1000 }, isDefault: { type: 'boolean' } } } } } } } } },
+        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['accountId', 'products'], properties: { accountId: { type: 'string' }, treatLimitPercent: { type: 'integer', minimum: 1, maximum: 30, description: 'おやつの上限（1日の必要カロリーに対する %）。省略時は現在値（既定 10）' }, products: { type: 'array', maxItems: 20, items: { type: 'object', required: ['name', 'kcalPer100g'], properties: { id: { type: 'string', nullable: true }, name: { type: 'string', maxLength: 40 }, kcalPer100g: { type: 'number', minimum: 1, maximum: 1000 }, isDefault: { type: 'boolean' }, kind: { type: 'string', enum: ['staple', 'nen'], description: 'staple＝主食、nen＝然の商品（おやつ）' } } } } } } } } },
         responses: { '200': { description: 'Saved products' }, '400': { description: 'Validation failed' }, '403': { description: 'Owner or admin role required' } },
       },
     },
@@ -730,6 +730,12 @@ const spec = {
       },
     },
     // ── Ops Console（★V6 37 運営コンソール）─────────────────────────────
+    '/api/hq/support/requests/{id}': {
+      get: { tags: ['HQ Support'], summary: 'お問い合わせ 1 件のやり取り（★V6 36-3-A）', parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }], responses: { '200': { description: 'Request with messages' }, '404': { description: 'Not found' } } },
+    },
+    '/api/hq/support/requests/{id}/messages': {
+      post: { tags: ['HQ Support'], summary: 'お問い合わせの続きを送る（運営へ通知・控えを送信）', parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }], requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['body'], properties: { body: { type: 'string' }, attachments: { type: 'array', items: { type: 'object' } } } } } } }, responses: { '201': { description: 'Message added' }, '400': { description: 'Validation error' }, '404': { description: 'Not found' }, '413': { description: 'Attachment too large' } } },
+    },
     '/api/ops/me': {
       get: { tags: ['Ops Console'], summary: 'ログイン中の運営マスター', responses: { '200': { description: 'Platform admin identity and active impersonation' }, '403': { description: 'Not a platform admin' } } },
     },
@@ -772,6 +778,15 @@ const spec = {
     },
     '/api/ops/members/{staffId}': {
       patch: { tags: ['Ops Console'], summary: '運営メンバーの停止・再開', parameters: [{ name: 'staffId', in: 'path', required: true, schema: { type: 'string' } }], requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['isActive'], properties: { isActive: { type: 'boolean' } } } } } }, responses: { '200': { description: 'Updated' }, '400': { description: 'Self or last member' }, '404': { description: 'Staff not found' } } },
+    },
+    // ── Ops Console: ダッシュボード（★V6 37-2） ────────────────────────────
+    '/api/ops/dashboard': {
+      get: { tags: ['Ops Console'], summary: '運営ダッシュボード（MRR は定価ベース・契約数・月ごとの売上・要対応・チケット・LINE登録・使用量）', parameters: [
+        { name: 'period', in: 'query', required: false, schema: { type: 'string', enum: ['month', 'prev_month', 'year'] } },
+      ], responses: { '200': { description: 'Dashboard aggregates' } } },
+    },
+    '/api/ops/dashboard/line-unregistered': {
+      get: { tags: ['Ops Console'], summary: 'LINE 未登録の権限者（名前と契約先だけ）', responses: { '200': { description: 'Unregistered staff' } } },
     },
     // ── Ops Console: お問い合わせ（★V6 37-6） ────────────────────────────
     '/api/ops/support/summary': {
@@ -938,6 +953,16 @@ const spec = {
         ],
         requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['status', 'expectedStatus'], properties: { status: { type: 'string', enum: ['active', 'stopped', 'archived'] }, expectedStatus: { type: 'string', enum: ['active', 'stopped', 'archived'] } } } } } },
         responses: { '200': { description: 'Updated funnel' }, '403': { description: 'Owner or admin role required' }, '404': { description: 'Not found' }, '409': { description: 'Status changed elsewhere first' }, '422': { description: 'Invalid status or transition' } },
+      },
+    },
+    '/api/analytics/audiences/{id}': {
+      get: {
+        tags: ['Analytics'], summary: '分析の一時対象者の詳細（配信作成の読み直し用。友だちIDは返さない）',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        responses: { '200': { description: 'Audience detail' }, '404': { description: 'Not found' }, '410': { description: 'Audience expired (24h)' } },
       },
     },
     // ── Friends ─────────────────────────────────────────────────────────────

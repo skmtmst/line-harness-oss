@@ -37,6 +37,7 @@ import {
 import { computeDedupBroadcastPreview } from '../services/dedup-broadcast.js';
 import { processSegmentSend } from '../services/segment-send.js';
 import type { SegmentCondition } from '../services/segment-query.js';
+import { assertAnalyticsAudiencesUsable, BroadcastAudienceError } from '../services/segment-audience-guard.js';
 import { getLineAccountById } from '@line-crm/db';
 import type { Env } from '../index.js';
 import { resolveLineToken } from '../services/line-token.js';
@@ -264,6 +265,40 @@ async function validateAfterActionVersion(
         AND ca.line_account_id = ? AND ca.status = 'published'`,
   ).bind(versionId, lineAccountId).first<{ id: string }>();
   return Boolean(row);
+}
+
+/*
+ * 分析で作った一時対象者を条件に持つ配信の再確認。
+ * 対象者は24時間で消えるため、下書き保存・送信直前のたびに所属と期限を
+ * 見直す。他アカウント・消えた対象者は404、期限切れは410で拒否する
+ * （friends の audienceId と同じ返し方）。
+ */
+async function rejectIfAudienceUnusable(
+  c: Context<Env>,
+  conditions: SegmentCondition | null,
+  accountId: string | null,
+): Promise<Response | null> {
+  try {
+    await assertAnalyticsAudiencesUsable(c.env.DB, conditions, accountId);
+    return null;
+  } catch (error) {
+    if (error instanceof BroadcastAudienceError) {
+      return error.blocker === 'audience_expired'
+        ? c.json({ success: false, error: 'この分析結果の対象者は24時間を過ぎました。もう一度集計してください' }, 410)
+        : c.json({ success: false, error: 'Not found' }, 404);
+    }
+    throw error;
+  }
+}
+
+function parseStoredSegmentConditions(stored: unknown): SegmentCondition | null {
+  if (typeof stored !== 'string' || stored === '') return null;
+  try {
+    const parsed = JSON.parse(stored) as SegmentCondition;
+    return Array.isArray(parsed?.rules) ? parsed : null;
+  } catch {
+    return null;
+  }
 }
 
 /*
@@ -1030,6 +1065,15 @@ broadcasts.post('/api/broadcasts', async (c) => {
       segmentConditions = JSON.stringify(raw);
     }
 
+    // 分析の一時対象者は保存時点で所属・期限を確かめる。
+    // segment 以外の宛先では条件は使われないので確かめない。
+    if (targetType === 'segment' && segmentConditions) {
+      const audienceError = await rejectIfAudienceUnusable(
+        c, JSON.parse(segmentConditions) as SegmentCondition, body.lineAccountId ?? null,
+      );
+      if (audienceError) return audienceError;
+    }
+
     if (targetType === 'segment' && !segmentConditions && !saveAsDraft) {
       return c.json(
         { success: false, error: 'segmentConditions is required when targetType is "segment"' },
@@ -1241,6 +1285,20 @@ broadcasts.put('/api/broadcasts/:id', async (c) => {
     } else if (body.segmentConditions === null) {
       segmentConditions = null;
     }
+
+    // 分析の一時対象者は、下書きを保存し直すたびに所属・期限を確かめる。
+    // 今回の条件が来なければ、保存済みの条件をそのまま確かめる。
+    // 対象の決め方が segment 以外へ変わる保存では条件は使われないので確かめない。
+    const resultingSegmentConditions = segmentConditions !== undefined
+      ? parseStoredSegmentConditions(segmentConditions)
+      : parseStoredSegmentConditions(existingRaw.segment_conditions);
+    if (resultingTargetType === 'segment' && resultingSegmentConditions) {
+      const audienceError = await rejectIfAudienceUnusable(
+        c, resultingSegmentConditions, resultingAccountId,
+      );
+      if (audienceError) return audienceError;
+    }
+
     if (body.targetType === 'segment' && !segmentConditions) {
       return c.json(
         { success: false, error: 'segmentConditions is required when targetType is "segment"' },
@@ -1831,6 +1889,13 @@ broadcasts.post('/api/broadcasts/:id/send', requireIrreversibleConfirmation('bro
         return c.json({ success: false, error: 'この配信には絞り込み条件が入っていません' }, 400);
       }
 
+      // 分析の一時対象者は送信直前にも所属・期限を確かめ直す。
+      const sendAudienceError = await rejectIfAudienceUnusable(
+        c, conditions,
+        (existing as unknown as Record<string, unknown>).line_account_id as string | null,
+      );
+      if (sendAudienceError) return sendAudienceError;
+
       const { buildSegmentQuery } = await import('../services/segment-query.js');
       let sql: string;
       let bindings: unknown[];
@@ -2188,6 +2253,13 @@ broadcasts.post('/api/broadcasts/:id/send-segment', requireRole('owner', 'admin'
         400,
       );
     }
+
+    // 分析の一時対象者は送信直前にも所属・期限を確かめ直す。
+    const audienceError = await rejectIfAudienceUnusable(
+      c, body.conditions,
+      (existing as unknown as Record<string, unknown>).line_account_id as string | null,
+    );
+    if (audienceError) return audienceError;
 
     let segmentParts;
     try {

@@ -897,11 +897,12 @@ export const FRIEND_ADD_CONDITION_MAX_DEPTH = 8;
 export const FRIEND_ADD_CONDITION_MAX_NODES = 200;
 
 /**
- * 条件で使える公開ルール種別。内部専用の `friend_id_in` は、友だち追加時の
- * 条件として保存させない。イベント申込者へ送る固定snapshotを別の導線から
+ * 条件で使える公開ルール種別。内部専用の `friend_id_in` と
+ * `analytics_audience` は、友だち追加時の条件として保存させない。
+ * イベント申込者・分析対象者へ送る固定snapshotを別の導線から
  * 作れてしまうと、条件ビルダーの権限境界を迂回するためである。
  */
-type FriendAddSegmentRuleType = Exclude<SegmentRule['type'], 'friend_id_in'>;
+type FriendAddSegmentRuleType = Exclude<SegmentRule['type'], 'friend_id_in' | 'analytics_audience'>;
 
 const SEGMENT_RULE_TYPE_MAP: Record<FriendAddSegmentRuleType, true> = {
   tag_exists: true,

@@ -24,6 +24,21 @@ export interface HqSupportRequest {
   replies?: Array<{ id: string; authorName: string; body: string; createdAt: string }>
 }
 
+/** 1 件のやり取り（★V6 36-3-A）。最初の本文は `body`、2 通目以降が `messages`。 */
+export type HqSupportMessage = {
+  id: string
+  authorKind: 'tenant' | 'ops'
+  authorName: string
+  body: string
+  attachments: Array<{ key: string; url: string }>
+  createdAt: string
+}
+export type HqSupportDetail = HqSupportRequest & {
+  stageLabel: string
+  messages: HqSupportMessage[]
+  canFollowUp: boolean
+}
+
 export const SUPPORT_SUBJECT_MAX = 100
 export const SUPPORT_BODY_MAX = 4000
 export const SUPPORT_ATTACHMENT_MAX = 3

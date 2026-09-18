@@ -12,7 +12,7 @@ import type {
   BannerStats,
   BannerUsage,
 } from './hq-banners'
-import type { HqSupportKind, HqSupportRequest } from './hq-support'
+import type { HqSupportDetail, HqSupportKind, HqSupportMessage, HqSupportRequest } from './hq-support'
 import type { BillingInterval, BillingInvoice, BillingSummary, PlanKey } from './hq-billing'
 import type {
   ReminderDraftSettings,
@@ -4516,6 +4516,47 @@ export type OpsSupportSummary = {
     prevAvgResolutionMinutes: number | null
   }
 }
+/** 運営ダッシュボード（★V6 37-2）。形は `apps/worker/src/routes/ops-dashboard.ts`。金額は定価ベース。 */
+export type OpsDashboardPeriod = 'month' | 'prev_month' | 'year'
+export type OpsDashboard = {
+  period: OpsDashboardPeriod
+  periodLabel: string
+  pricing: 'list_price'
+  plans: Array<{ key: string; label: string; monthlyYen: number }>
+  kpis: {
+    mrr: number
+    mrrDelta: number
+    active: number
+    byPlan: Record<'light' | 'standard' | 'pro', number>
+    trialing: number
+    newInPeriod: number
+    newTrialsInPeriod: number
+    churnInPeriod: number
+    churnRate: number
+  }
+  revenueByMonth: Array<{ month: string; label: string; yen: number; current: boolean }>
+  planShare: { total: number; rows: Array<{ key: string; label: string; count: number; percent: number }> }
+  alerts: { pastDue: number; trialEndingSoon: number; lineTokenExpiring: number; unansweredTickets: number }
+  tickets: { newCount: number; inProgressCount: number; avgFirstReplyMinutes: number | null; closedInPeriod: number }
+  lineRegistration: { registered: number; total: number; unregisteredCount: number }
+  usage: Array<{
+    tenantId: string
+    tenantName: string
+    planKey: string | null
+    planLabel: string
+    messages: number
+    bannerUnits: number
+    mediaBytes: number
+    limits: { messages: number | null; images: number | null; mediaBytes: number | null }
+    usageRate: number
+  }>
+  generatedAt: string
+}
+export type OpsLineUnregistered = {
+  registered: number
+  total: number
+  people: Array<{ staffId: string; name: string; tenantName: string; hasEmail: boolean }>
+}
 export type OpsSupportDetail = {
   ticket: OpsSupportTicket
   tenant: { accountCount: number; staffCount: number; staffWithLine: number; pastTickets: number; pastOpen: number }
@@ -5277,6 +5318,16 @@ export const api = {
       `/api/analytics/results/${resultId}/audiences?account_id=${encodeURIComponent(accountId)}`,
       { method: 'POST', body: JSON.stringify(data) },
     ),
+    // 一時対象者の詳細。配信作成が人数・期限を読み直すために使う。
+    // 友だちIDは返ってこない。期限切れは410、他アカウント・不存在は404。
+    audience: (id: string, accountId: string) => fetchApi<ApiResponse<{
+      id: string
+      sourceKind: string
+      selectionKey: string | null
+      memberCount: number
+      expiresAt: string
+      createdAt: string
+    }>>(`/api/analytics/audiences/${encodeURIComponent(id)}?account_id=${encodeURIComponent(accountId)}`),
     v6Funnels: {
       list: (accountId: string, options?: { includeInactive?: boolean }) => fetchApi<ApiResponse<Array<{
         id: string
@@ -6587,6 +6638,10 @@ export const api = {
       fetchApi<ApiResponse<{ staffId: string; activationState: OpsMemberActivationState }>>(`/api/ops/members/${encodeURIComponent(staffId)}/resend-invite`, { method: 'POST', body: JSON.stringify({}) }),
     setMemberActive: (staffId: string, isActive: boolean) =>
       fetchApi<ApiResponse<{ staffId: string; isActive: boolean }>>(`/api/ops/members/${encodeURIComponent(staffId)}`, { method: 'PATCH', body: JSON.stringify({ isActive }) }),
+    /** ダッシュボード ★V6 37-2。 */
+    dashboard: (period?: OpsDashboardPeriod) =>
+      fetchApi<ApiResponse<OpsDashboard>>(`/api/ops/dashboard${period ? `?period=${period}` : ''}`),
+    lineUnregistered: () => fetchApi<ApiResponse<OpsLineUnregistered>>('/api/ops/dashboard/line-unregistered'),
     /** お問い合わせ（チケット）★V6 37-6。 */
     support: {
       summary: () => fetchApi<ApiResponse<OpsSupportSummary>>('/api/ops/support/summary'),
@@ -6648,6 +6703,14 @@ export const api = {
       attachments?: Array<{ mimeType: string; data: string }>
     }) =>
       fetchApi<ApiResponse<HqSupportRequest & { notified: boolean }>>('/api/hq/support/requests', {
+        method: 'POST',
+        body: JSON.stringify(input),
+      }),
+    /** 1 件のやり取り（★V6 36-3-A）。 */
+    detail: (id: string) => fetchApi<ApiResponse<HqSupportDetail>>(`/api/hq/support/requests/${encodeURIComponent(id)}`),
+    /** 続きを送る。運営のチケットは対応中へ戻る。 */
+    followUp: (id: string, input: { body: string; attachments?: Array<{ mimeType: string; data: string }> }) =>
+      fetchApi<ApiResponse<HqSupportMessage & { stage: string; status: string }>>(`/api/hq/support/requests/${encodeURIComponent(id)}/messages`, {
         method: 'POST',
         body: JSON.stringify(input),
       }),

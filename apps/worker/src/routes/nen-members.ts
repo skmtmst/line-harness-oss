@@ -22,7 +22,12 @@ import {
   ACTIVITY_LABELS,
   type FeedingPlan,
   type FeedingProductRow,
+  DEFAULT_TREAT_LIMIT_PERCENT,
+  getTreatLimitPercent,
   listFeedingProducts,
+  nenProducts,
+  productKind,
+  stapleProducts,
   neuteredFromInput,
   neuteredFromRow,
   normalizeActivity,
@@ -32,6 +37,7 @@ import {
 } from '../services/nen-feeding.js';
 import { attachTagAndFireSideEffects } from '../services/friend-tag-attach.js';
 import { APPETITE_LABELS, STOOL_LABELS, thirtyDaySummary, type HealthLogRow } from '../services/nen-health-admin.js';
+import { petCallName, petGender } from '../services/nen-pet-name.js';
 import {
   refreshAllNenTags,
   syncNenHealthTags,
@@ -426,16 +432,16 @@ async function buildMembership(db: D1Database, lineAccountId: string | null, sna
  * LIFF に返すペット。`feeding` は NRC／FEDIAF の式で毎回計算し直す（★V6 37-2「今日の目安」）。
  * 主食（nen_feeding_products）が無いアカウントでは kcal だけ返し、グラムは null。
  */
-function mapPet(row: Record<string, unknown>, products: FeedingProductRow[] = []) {
+function mapPet(row: Record<string, unknown>, products: FeedingProductRow[] = [], treatLimitPercent = DEFAULT_TREAT_LIMIT_PERCENT) {
   const neutered = neuteredFromRow(row.neutered);
   const plan = planForPetRow({
     id: String(row.id), animal_type: String(row.animal_type || 'dog'), weight_kg: row.weight_kg as number | null,
     birthday: (row.birthday as string | null) ?? null, neutered: row.neutered as number | null,
     activity_level: (row.activity_level as string | null) ?? null, feeding_product_id: (row.feeding_product_id as string | null) ?? null,
-  }, products);
+  }, products, new Date(), treatLimitPercent);
   return {
-    id: row.id, customerId: row.customer_id, name: row.name, animalType: row.animal_type,
-    gender: row.gender, breed: row.breed, birthday: row.birthday, weightKg: row.weight_kg,
+    id: row.id, customerId: row.customer_id, name: row.name, callName: petCallName(String(row.name ?? ''), row.gender), animalType: row.animal_type,
+    gender: petGender(row.gender), breed: row.breed, birthday: row.birthday, weightKg: row.weight_kg,
     concerns: JSON.parse(String(row.concerns || '[]')),
     neutered: neutered === true ? 'yes' : neutered === false ? 'no' : 'unknown',
     activityLevel: normalizeActivity(row.activity_level) ?? 'normal',
@@ -455,19 +461,27 @@ function feedingView(plan: FeedingPlan | null) {
     dailyKcal: plan.dailyKcal, dailyGrams: plan.dailyGrams, minGrams: plan.minGrams, maxGrams: plan.maxGrams,
     rerKcal: plan.rerKcal, factor: plan.factor, factorLabel: plan.factorLabel, stage: plan.stage, stageLabel: plan.stageLabel,
     ageMonths: plan.ageMonths, product: plan.product,
+    venison: plan.venison,
   };
 }
 
+/** マイページの「いつもの主食」に出すのは主食だけ。然の商品（おやつ）は目安の計算にだけ使う。 */
 function feedingProductsView(products: FeedingProductRow[]) {
-  return products.map((p) => ({ id: p.id, name: p.name, kcalPer100g: Number(p.kcal_per_100g), isDefault: p.is_default === 1 }));
+  return stapleProducts(products).map((p) => ({ id: p.id, name: p.name, kcalPer100g: Number(p.kcal_per_100g), isDefault: p.is_default === 1, kind: productKind(p.kind) }));
+}
+function nenProductsView(products: FeedingProductRow[]) {
+  return nenProducts(products).map((p) => ({ id: p.id, name: p.name, kcalPer100g: Number(p.kcal_per_100g), isDefault: p.is_default === 1, kind: productKind(p.kind) }));
 }
 
-async function accountFeedingProducts(c: Context<Env>, friend: FriendRow): Promise<FeedingProductRow[]> {
-  if (!friend.line_account_id) return [];
+type FeedingCatalog = { products: FeedingProductRow[]; treatLimitPercent: number };
+
+async function accountFeedingProducts(c: Context<Env>, friend: FriendRow): Promise<FeedingCatalog> {
+  if (!friend.line_account_id) return { products: [], treatLimitPercent: DEFAULT_TREAT_LIMIT_PERCENT };
   try {
-    return await listFeedingProducts(c.env.DB, friend.line_account_id);
+    const [products, treatLimitPercent] = await Promise.all([listFeedingProducts(c.env.DB, friend.line_account_id), getTreatLimitPercent(c.env.DB, friend.line_account_id)]);
+    return { products, treatLimitPercent };
   } catch {
-    return [];
+    return { products: [], treatLimitPercent: DEFAULT_TREAT_LIMIT_PERCENT };
   }
 }
 
@@ -480,7 +494,7 @@ function petFeedingInput(body: Record<string, unknown> | null, products: Feeding
   const activityLevel = normalizeActivity(body?.activityLevel);
   const rawProduct = body?.feedingProductId;
   const feedingProductId = rawProduct === null || rawProduct === '' ? null
-    : typeof rawProduct === 'string' && products.some((p) => p.id === rawProduct) ? rawProduct : undefined;
+    : typeof rawProduct === 'string' && stapleProducts(products).some((p) => p.id === rawProduct) ? rawProduct : undefined;
   return { neutered, activityLevel, feedingProductId };
 }
 
@@ -516,12 +530,15 @@ nenMembers.get('/api/liff/nen/member', async (c) => {
     c.env.DB.prepare(`SELECT id, pet_id, topic, result_text, tag_name, created_at FROM nen_consultation_logs_v2 WHERE friend_id = ? ORDER BY created_at DESC LIMIT 20`).bind(friend.id).all<Record<string, unknown>>(),
   ]);
   const membership = await buildMembership(c.env.DB, friend.line_account_id, snapshot);
-  const feedingProducts = await accountFeedingProducts(c, friend);
+  const catalog = await accountFeedingProducts(c, friend);
+  const feedingProducts = catalog.products;
   return c.json({ success: true, data: {
     owner: { displayName: friend.display_name, customerId: snapshot?.customer_id || null },
     membership,
-    pets: pets.results.map((row) => mapPet(row, feedingProducts)),
+    pets: pets.results.map((row) => mapPet(row, feedingProducts, catalog.treatLimitPercent)),
     feedingProducts: feedingProductsView(feedingProducts),
+    nenProducts: nenProductsView(feedingProducts),
+    treatLimitPercent: catalog.treatLimitPercent,
     activityLabels: ACTIVITY_LABELS,
     commerce: snapshot ? {
       orders: JSON.parse(String(snapshot.orders_json || '[]')),
@@ -608,11 +625,14 @@ nenMembers.post('/api/liff/nen/pets', async (c) => {
   const weightKg = Number(body?.weightKg);
   const birthday = dateOnly(body?.birthday);
   const concerns = Array.isArray(body?.concerns) ? body.concerns.filter((v): v is string => typeof v === 'string' && CONCERNS.has(v)).slice(0, 10) : [];
-  if (!name || name.length > 80 || !animalType || !breed || !birthday || !Number.isFinite(weightKg) || weightKg < 0.2 || weightKg > 150) {
+  const gender = petGender(body?.gender);
+  // 性別は必須（呼び名「くん」「ちゃん」を決めるため。★V6 37-2-A-2）
+  if (!name || name.length > 80 || !animalType || !breed || !birthday || !Number.isFinite(weightKg) || weightKg < 0.2 || weightKg > 150 || gender === 'unknown') {
     return c.json({ success: false, error: '入力内容を確認してください' }, 400);
   }
   const guide = feedingGuide(animalType, weightKg);
-  const products = await accountFeedingProducts(c, friend);
+  const catalog = await accountFeedingProducts(c, friend);
+  const products = catalog.products;
   const feeding = petFeedingInput(body, products);
   const id = crypto.randomUUID();
   const now = jstNow();
@@ -630,7 +650,7 @@ nenMembers.post('/api/liff/nen/pets', async (c) => {
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).bind(
     id, friend.id, friend.user_id, name, animalType,
-    ['male', 'female'].includes(String(body?.gender)) ? String(body?.gender) : 'unknown',
+    gender,
     birthday, breed, weightKg, JSON.stringify(concerns), guide.daily, guide.min, guide.max,
     guide.venison, guide.cycleDays, photoKey, imageUrl, now, now,
     feeding.neutered === undefined || feeding.neutered === null ? null : feeding.neutered ? 1 : 0,
@@ -641,12 +661,12 @@ nenMembers.post('/api/liff/nen/pets', async (c) => {
   const plan = planForPetRow({
     id, animal_type: animalType, weight_kg: weightKg, birthday, neutered: feeding.neutered == null ? null : feeding.neutered ? 1 : 0,
     activity_level: feeding.activityLevel ?? 'normal', feeding_product_id: feeding.feedingProductId ?? null,
-  }, products);
+  }, products, new Date(), catalog.treatLimitPercent);
   await refreshStoredFeeding(c.env.DB, id, plan, now);
   await syncNenPetTags(c.env.DB, friend.id);
   const saved = await c.env.DB.prepare(`SELECT * FROM nen_pet_profiles WHERE id = ?`).bind(id).first<Record<string, unknown>>();
   if (saved) c.executionCtx.waitUntil(pushPetCard(c, friend, saved).catch((err: unknown) => console.error('pet card push failed', err)));
-  return c.json({ success: true, data: mapPet(saved || { id }, products) }, 201);
+  return c.json({ success: true, data: mapPet(saved || { id }, products, catalog.treatLimitPercent) }, 201);
 });
 
 /**
@@ -691,7 +711,8 @@ nenMembers.put('/api/liff/nen/pets/:id', async (c) => {
     const concerns = Array.isArray(body.concerns) ? body.concerns.filter((v): v is string => typeof v === 'string' && CONCERNS.has(v)).slice(0, 10) : [];
     sets.push('concerns = ?'); values.push(JSON.stringify(concerns));
   }
-  const products = await accountFeedingProducts(c, friend);
+  const catalog = await accountFeedingProducts(c, friend);
+  const products = catalog.products;
   const feeding = petFeedingInput(body, products);
   if (body.neutered !== undefined) {
     if (feeding.neutered === undefined) return c.json({ success: false, error: '避妊去勢の選択を確認してください' }, 400);
@@ -716,11 +737,11 @@ nenMembers.put('/api/liff/nen/pets/:id', async (c) => {
     id: petId, animal_type: String(updated.animal_type), weight_kg: updated.weight_kg as number | null, birthday: (updated.birthday as string | null) ?? null,
     neutered: updated.neutered as number | null, activity_level: (updated.activity_level as string | null) ?? null,
     feeding_product_id: (updated.feeding_product_id as string | null) ?? null,
-  }, products);
+  }, products, new Date(), catalog.treatLimitPercent);
   await refreshStoredFeeding(c.env.DB, petId, plan, now);
   await syncNenPetTags(c.env.DB, friend.id);
   const saved = await c.env.DB.prepare(`SELECT * FROM nen_pet_profiles WHERE id = ?`).bind(petId).first<Record<string, unknown>>();
-  return c.json({ success: true, data: mapPet(saved || updated, products) });
+  return c.json({ success: true, data: mapPet(saved || updated, products, catalog.treatLimitPercent) });
 });
 
 nenMembers.post('/api/liff/nen/pets/:id/photo', async (c) => {
@@ -803,8 +824,8 @@ nenMembers.get('/api/liff/nen/health-logs/summary', async (c) => {
   const friend = await currentFriend(c);
   if (!friend) return c.json({ success: false, error: 'Unauthorized' }, 401);
   const petId = (c.req.query('petId') ?? '').trim();
-  const pet = await c.env.DB.prepare(`SELECT id, name, animal_type, breed, birthday, weight_kg FROM nen_pet_profiles WHERE id = ? AND friend_id = ?`)
-    .bind(petId, friend.id).first<{ id: string; name: string; animal_type: string; breed: string | null; birthday: string | null; weight_kg: number | null }>();
+  const pet = await c.env.DB.prepare(`SELECT id, name, gender, animal_type, breed, birthday, weight_kg FROM nen_pet_profiles WHERE id = ? AND friend_id = ?`)
+    .bind(petId, friend.id).first<{ id: string; name: string; gender: string | null; animal_type: string; breed: string | null; birthday: string | null; weight_kg: number | null }>();
   if (!pet) return c.json({ success: false, error: 'Pet not found' }, 404);
   const today = new Date();
   const since = new Date(today.getTime() - 30 * 86_400_000).toISOString().slice(0, 10);
@@ -813,7 +834,7 @@ nenMembers.get('/api/liff/nen/health-logs/summary', async (c) => {
        FROM nen_health_logs WHERE pet_id = ? AND logged_on >= ? ORDER BY logged_on DESC`,
   ).bind(pet.id, since).all<HealthLogRow>();
   return c.json({ success: true, data: {
-    pet: { id: pet.id, name: pet.name, animalType: pet.animal_type === 'cat' ? 'cat' : 'dog', breed: pet.breed ?? '', birthday: pet.birthday, weightKg: pet.weight_kg },
+    pet: { id: pet.id, name: pet.name, callName: petCallName(pet.name, pet.gender), animalType: pet.animal_type === 'cat' ? 'cat' : 'dog', breed: pet.breed ?? '', birthday: pet.birthday, weightKg: pet.weight_kg },
     owner: { name: friend.display_name ?? '' },
     generatedAt: today.toISOString(),
     summary: thirtyDaySummary(logs.results ?? [], today),
