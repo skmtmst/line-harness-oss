@@ -138,6 +138,7 @@ import { friendAttributes } from './routes/friend-attributes.js';
 import { featureSettings } from './routes/feature-settings.js';
 import { friendAddRules } from './routes/friend-add-rules.js';
 import { contents } from './routes/contents.js';
+import { commonVarExports } from './routes/common-var-exports.js';
 import { analytics } from './routes/analytics.js';
 import { dashboard } from './routes/dashboard.js';
 import { siteTracking } from './routes/site-tracking.js';
@@ -493,6 +494,9 @@ app.route('/', friendFields);
 app.route('/', friendAttributes);
 app.route('/', featureSettings);
 app.route('/', friendAddRules);
+// /api/common-vars/exports は contents の /api/common-vars/:id より先に
+// 登録しないと、静的な 'exports' が :id に取られて届かない。
+app.route('/', commonVarExports);
 app.route('/', contents);
 app.route('/', analytics);
 app.route('/', dashboard);
