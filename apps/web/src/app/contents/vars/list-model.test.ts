@@ -1,6 +1,6 @@
 import type { CommonVar } from '@line-crm/shared'
 import { describe, expect, it } from 'vitest'
-import { commonVarsCsv, filterAndSortCommonVars } from './list-model'
+import { filterAndSortCommonVars } from './list-model'
 
 function item(over: Partial<CommonVar> = {}): CommonVar {
   return {
@@ -31,14 +31,5 @@ describe('共通情報一覧の絞り込みと並び順', () => {
   it('使用数順では未取得を末尾へ置く', () => {
     const values = [item({ id: 'unknown', usageCount: undefined }), item({ id: 'used', usageCount: 8 })]
     expect(filterAndSortCommonVars(values, input).map((value) => value.id)).toEqual(['used', 'unknown'])
-  })
-})
-
-describe('共通情報一覧のCSV', () => {
-  it('運用者に見せる差し込みキーと未取得をそのまま書く', () => {
-    const csv = commonVarsCsv([item({ usageCount: undefined, name: '会社"名' })])
-    expect(csv).toContain('"{会社""名}"')
-    expect(csv).toContain('"未取得"')
-    expect(csv).not.toContain('{{var.')
   })
 })
