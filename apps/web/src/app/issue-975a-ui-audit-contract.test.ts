@@ -38,11 +38,14 @@ describe('U044: 767px以下ではテンプレート一覧をカードへ畳む',
 
   it('表のマークアップは残し、CSSでカードに変える', () => {
     expect(page).toContain('data-template-list')
-    expect(styles).toContain('[data-template-list]')
     expect(styles).toContain('@media (max-width: 767.98px)')
-    expect(styles).toMatch(/\[data-template-list\] tbody tr \{\s*display: flex/)
-    expect(styles).toMatch(/\[data-template-list\] thead \{\s*display: none/)
-    expect(styles).toMatch(/\[data-template-list\] table \{\s*min-width: 0/)
+    // CSS module はpureモード（各セレクタにローカルクラスが必須）。
+    // 属性セレクタを行頭に書くと next build が止まるので `.body` を起点にする。
+    expect(styles).toMatch(/\.body \[data-template-list\] tbody tr \{\s*display: flex/)
+    expect(styles).toMatch(/\.body \[data-template-list\] thead \{\s*display: none/)
+    expect(styles).toMatch(/\.body \[data-template-list\] table \{\s*min-width: 0/)
+    expect(styles).not.toMatch(/^\s*\[data-template-list\]/m)
+    expect(styles).not.toMatch(/^\s*:global\(/m)
   })
 })
 
