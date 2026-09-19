@@ -325,27 +325,36 @@ export default function NewBookingMenuPage() {
           />
         </Field>
 
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="所要時間（分）" htmlFor="bm-duration" required>
-            <input
-              id="bm-duration"
-              type="number"
-              min={1}
-              value={durationMinutes}
-              onChange={(e) => setDurationMinutes(e.target.value)}
-              className={`${inputClass} tabular-nums`}
-            />
+        {/* U055: 320pxで2列のままだと数値欄と単位が潰れるので、
+            狭い画面では1列に積む。単位はラベルではなく入力のすぐ右に
+            置いて、どの欄も「数値 + 単位」の同じ並びにそろえる。 */}
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-3">
+          <Field label="所要時間" htmlFor="bm-duration" required>
+            <div className="flex items-center gap-1.5">
+              <input
+                id="bm-duration"
+                type="number"
+                min={1}
+                value={durationMinutes}
+                onChange={(e) => setDurationMinutes(e.target.value)}
+                className={`${inputClass} tabular-nums`}
+              />
+              <span className="text-ink-faint whitespace-nowrap text-xs">分</span>
+            </div>
           </Field>
           <Field label="料金" htmlFor="bm-price" note="税込の金額。0円は「無料」、空けると「お問い合わせ」と出ます。">
-            <input
-              id="bm-price"
-              type="number"
-              min={0}
-              value={basePrice}
-              onChange={(e) => setBasePrice(e.target.value)}
-              placeholder="6600"
-              className={`${inputClass} tabular-nums`}
-            />
+            <div className="flex items-center gap-1.5">
+              <input
+                id="bm-price"
+                type="number"
+                min={0}
+                value={basePrice}
+                onChange={(e) => setBasePrice(e.target.value)}
+                placeholder="6600"
+                className={`${inputClass} tabular-nums`}
+              />
+              <span className="text-ink-faint whitespace-nowrap text-xs">円</span>
+            </div>
           </Field>
         </div>
 
@@ -373,20 +382,23 @@ export default function NewBookingMenuPage() {
       </FormSection>
 
       <FormSection step={2} label="予約の受け方">
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-3">
           <Field
             label="同時に受けられる件数"
             htmlFor="bm-capacity"
             note="同じ時間帯に何組まで受けるかです。"
           >
-            <input
-              id="bm-capacity"
-              type="number"
-              min={1}
-              value={concurrentCapacity}
-              onChange={(e) => setConcurrentCapacity(e.target.value)}
-              className={`${inputClass} tabular-nums`}
-            />
+            <div className="flex items-center gap-1.5">
+              <input
+                id="bm-capacity"
+                type="number"
+                min={1}
+                value={concurrentCapacity}
+                onChange={(e) => setConcurrentCapacity(e.target.value)}
+                className={`${inputClass} tabular-nums`}
+              />
+              <span className="text-ink-faint whitespace-nowrap text-xs">件</span>
+            </div>
           </Field>
           <Field
             label="予約を受け付ける期間"
@@ -445,18 +457,21 @@ export default function NewBookingMenuPage() {
         </div>
 
         <Field
-          label="後の空き時間（分）"
+          label="後の空き時間"
           htmlFor="bm-buffer"
           note="片づけや移動の時間です。次の予約はこのぶん後ろから入ります。"
         >
-          <input
-            id="bm-buffer"
-            type="number"
-            min={0}
-            value={bufferAfterMinutes}
-            onChange={(e) => setBufferAfterMinutes(e.target.value)}
-            className={`${inputClass} w-28 tabular-nums`}
-          />
+          <div className="flex items-center gap-1.5">
+            <input
+              id="bm-buffer"
+              type="number"
+              min={0}
+              value={bufferAfterMinutes}
+              onChange={(e) => setBufferAfterMinutes(e.target.value)}
+              className={`${inputClass} tabular-nums`}
+            />
+            <span className="text-ink-faint whitespace-nowrap text-xs">分</span>
+          </div>
         </Field>
       </FormSection>
 

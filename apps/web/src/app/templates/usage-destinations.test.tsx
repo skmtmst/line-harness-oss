@@ -174,7 +174,9 @@ describe('テンプレート一覧の差し替え導線 (#891 N-135)', () => {
     await act(async () => { await Promise.resolve() })
     await screen.findByText('来店お礼')
 
-    fireEvent.click(screen.getByText('使用先を見る'))
+    // U043: 副操作は行の「…」メニューへ。押してから項目を選ぶ。
+    fireEvent.click(screen.getByLabelText('来店お礼のその他操作'))
+    fireEvent.click(screen.getByRole('menuitem', { name: '使用先を見る' }))
     await act(async () => { await Promise.resolve() })
     await act(async () => { await Promise.resolve() })
     await screen.findByText('使用中のテンプレートは削除できません')
