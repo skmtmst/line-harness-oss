@@ -766,11 +766,19 @@ ecCommerce.get(
          MAX(CASE WHEN status = 'processed' THEN processed_at END) AS last_succeeded_at
        FROM ec_events WHERE line_account_id = ?`,
     ).bind(lineAccountId).first<Record<string, unknown>>(),
+    /*
+     * #948 N-320: 「止めると影響する数」は EC の出来事を起点にする設定だけを
+     * 数える。コラム・誕生日など EC と無関係なNEN配信、手動のマイル・項目を
+     * 全体件数として混ぜると、止めても変わらないものまで影響に見える。
+     * conversion_events と analytics_saved_analyses は EC 起点かを判定する
+     * 列を持たないため、アカウント全体の記録数として返す（画面側で区別して
+     * 表示する）。
+     */
     Promise.all([
-      c.env.DB.prepare('SELECT COUNT(*) AS count FROM nen_campaign_settings').first<{ count: number }>(),
+      c.env.DB.prepare(`SELECT COUNT(*) AS count FROM nen_campaign_settings WHERE trigger_event LIKE 'ec.%'`).first<{ count: number }>(),
       c.env.DB.prepare('SELECT COUNT(*) AS count FROM conversion_events e JOIN friends f ON f.id = e.friend_id WHERE f.line_account_id = ?').bind(lineAccountId).first<{ count: number }>(),
-      c.env.DB.prepare('SELECT COUNT(*) AS count FROM mileage_rules').first<{ count: number }>(),
-      c.env.DB.prepare('SELECT COUNT(*) AS count FROM friend_fields').first<{ count: number }>(),
+      c.env.DB.prepare(`SELECT COUNT(*) AS count FROM mileage_rules WHERE source = 'ec'`).first<{ count: number }>(),
+      c.env.DB.prepare(`SELECT COUNT(*) AS count FROM friend_fields WHERE source = 'ec'`).first<{ count: number }>(),
       c.env.DB.prepare('SELECT COUNT(*) AS count FROM analytics_saved_analyses WHERE line_account_id = ?').bind(lineAccountId).first<{ count: number }>(),
     ]),
   ]);
