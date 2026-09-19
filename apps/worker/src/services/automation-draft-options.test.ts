@@ -19,10 +19,10 @@ import {
  * 実装を読む。文字列の有無だけ見る試験は置かない。
  *
  * - S1: 共有のきっかけ10種 = 下書きunionの10種(過不足なし)
- * - S2: 共有の処理3種 = 下書きunionの3種(過不足なし)
+ * - S2: 共有の処理4種 = 下書きunionの4種(過不足なし)
  * - S3: 共有のきっかけ10種 ⊆ 実行門(出来事門+定期門)
- * - S4: 共有の処理3種 ⊆ 実行器の鍵(本物の実行器表から取る)
- * - S5: 共有の10種×3処理を下書き保存が受け付ける(実DB)
+ * - S4: 共有の処理 ⊆ 実行器の鍵(共通アクションは実行計画で展開)
+ * - S5: 共有の10種×4処理を下書き保存が受け付ける(実DB)
  * - S6: union外のきっかけ・処理は保存しない
  */
 
@@ -90,6 +90,15 @@ describe('下書きの選択可能一覧(#734)', () => {
       `INSERT INTO friends (id, line_user_id, line_account_id, display_name)
        VALUES ('friend-1', 'U-1', 'account-1', '一郎')`,
     ).run();
+    // #942 N-356: 共通アクションの選択肢。呼べるのは公開済みだけ。
+    testDb.raw.prepare(
+      `INSERT INTO common_actions (id, line_account_id, name, status, current_published_version_id)
+       VALUES ('common-1', 'account-1', '会員向け一式', 'published', 'cv-1')`,
+    ).run();
+    testDb.raw.prepare(
+      `INSERT INTO common_action_versions (id, common_action_id, version_number, status, action_config)
+       VALUES ('cv-1', 'common-1', 1, 'published', '[]')`,
+    ).run();
   });
 
   it('S1: 共有のきっかけ = 下書きunion(過不足なし)', () => {
@@ -112,14 +121,23 @@ describe('下書きの選択可能一覧(#734)', () => {
     }
   });
 
-  it('S4: 共有の処理 ⊆ 実行器の鍵', () => {
+  /*
+   * `common_action` は実行器を持たない。#942 N-356: 実行計画
+   * （automation-engine.ts の buildExecutionPlan）が公開済みの版へ固定し、
+   * `common_action_marker` と中身の処理へ展開する。だから直接の実行器鍵は
+   * 持たず、計画側で `type === 'common_action'` を特別扱いする。
+   */
+  it('S4: 共有の処理 ⊆ 実行器の鍵（共通アクションは実行計画で展開）', () => {
     const keys = new Set(Object.keys(createAutomationActionExecutors({})));
+    const engine = readFileSync(join(import.meta.dirname, 'automation-engine.ts'), 'utf8');
+    expect(engine).toContain("action.type === 'common_action'");
     for (const option of AUTOMATION_DRAFT_ACTION_OPTIONS) {
+      if (option.value === 'common_action') continue;
       expect(keys.has(option.value), `実行器に無い処理: ${option.value}`).toBe(true);
     }
   });
 
-  it('S5: 共有の10種×3処理を下書き保存が受け付ける', async () => {
+  it('S5: 共有の10種×4処理を下書き保存が受け付ける', async () => {
     for (const trigger of AUTOMATION_DRAFT_TRIGGER_OPTIONS) {
       for (const action of AUTOMATION_DRAFT_ACTION_OPTIONS) {
         const created = await createAutomationDraftFromTemplate(testDb.db, {
@@ -140,7 +158,9 @@ describe('下書きの選択可能一覧(#734)', () => {
               ? { tagId: 'tag-1' }
               : action.value === 'start_scenario'
                 ? { scenarioId: 'scenario-1' }
-                : { messageType: 'text', content: '確認' },
+                : action.value === 'common_action'
+                  ? { commonActionId: 'common-1' }
+                  : { messageType: 'text', content: '確認' },
             onFailure: 'stop',
           }],
         });

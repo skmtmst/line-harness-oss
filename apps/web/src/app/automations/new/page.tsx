@@ -5,7 +5,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import type { Automation } from '@line-crm/shared'
-import { AUTOMATION_DRAFT_ACTION_OPTIONS } from '@line-crm/shared'
+import { AUTOMATION_DRAFT_ACTION_OPTIONS, AUTOMATION_DRAFT_TRIGGER_OPTIONS } from '@line-crm/shared'
 import { api, ApiError, type AutomationDraftAction, type AutomationDraftDetail } from '@/lib/api'
 import Breadcrumb from '@/components/shared/breadcrumb'
 import StickyBar from '@/components/shared/sticky-bar'
@@ -13,8 +13,9 @@ import { TextArea, TextField } from '@/components/shared/text-field'
 import { CareCard, FeatureLinkCard } from '@/components/shared/side-cards'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { useAccount } from '@/contexts/account-context'
-// APIの owner/admin 制約は共通アクションと同じ（`requireRole('owner','admin')`）。
-// 同じ判定を2つ持つと、片方だけ直したときに画面ごとに食い違う。
+// 下書きの作成・保存は `/automations` の権限キーが門（#942 N-351）。
+// owner/admin は常に通り、権限キーを持つスタッフも通す。表示の判定は
+// 共通アクションと同じフック1本に寄せる（サーバの認可が正本）。
 import { useCanManageCommonActions } from '@/components/automations/use-common-action-permission'
 import styles from './new-automation.module.css'
 import Button from '@/components/shared/button'
@@ -31,37 +32,37 @@ import Button from '@/components/shared/button'
  */
 
 /**
- * 画面に出すきっかけ(#734: 設計の6種で凍結)。
+ * 画面に出すきっかけ（#942 N-355: 共有の正本から全部描画する）。
  *
- * **実際に動くものだけを並べる。** 6種すべて実行門で動く
- * (`apps/worker/src/services/automation-triggers.ts` の `EVENT_TRIGGER_TYPES`
- * +`SCHEDULE_TRIGGER_TYPES`)。V6は「実装されていない選択肢を表示しない」と
- * 決めている（`docs/v6-requirements/v6-25-automation-requirements-draft.md`
- * §4-2・§11）。設計(Rv8Jv)が6種のため、残り4種(link_clicked・
- * calendar_booked・daily・weekly)は下書き編集で扱う。6種が共有の正本
- * (`AUTOMATION_DRAFT_TRIGGER_OPTIONS`)から外れていないことは、
- * `automation-new-options.test.ts` の N1 が見張る。
+ * **実際に動くものだけを並べる。** 下書きunion
+ * (`apps/worker/src/services/automation-drafts.ts` の
+ * `AutomationDraftTriggerType`)と一致し、全部実行門で動く
+ * (`apps/worker/src/services/automation-triggers.ts`)。
+ * V6は「実装されていない選択肢を表示しない」と決めている
+ * （`docs/v6-requirements/v6-25-automation-requirements-draft.md` §4-2・§11）。
+ * 以前は設計の6種だけで、残り4種は下書き編集でしか作れなかった。
+ * 共有の正本（`AUTOMATION_DRAFT_TRIGGER_OPTIONS`）が全部持つので、
+ * ここはそのまま描き、説明文だけこの画面で足す。
  */
-const EVENTS: ReadonlyArray<{ value: Automation['eventType']; label: string; note: string }> = [
-  {
-    value: 'message_received',
-    label: 'メッセージを受け取ったとき',
-    note: '友だちからのトークが届いたとき。含まれる言葉で絞れます。',
-  },
-  {
-    value: 'friend_add',
-    label: '友だちになったとき',
-    note: '友だち追加のとき。ブロック解除では動きません。',
-  },
-  {
-    value: 'tag_change',
-    label: 'タグが付いた・外れたとき',
-    note: '選んだタグが付いたとき・外れたときに動きます。下でどちらかを選びます。',
-  },
-  { value: 'form_submitted', label: 'フォームに回答したとき', note: '回答が保存されたとき。フォームを指定できます。' },
-  { value: 'ec.order.confirmed', label: '注文が確定したとき', note: 'EC連携で注文確定が記録された人に動きます。' },
-  { value: 'datetime', label: '決めた時刻になったとき', note: '一度だけ・毎日・毎週から選び、5分刻みで動きます。' },
-]
+const EVENT_NOTES: Record<string, string> = {
+  friend_add: '友だち追加のとき。ブロック解除では動きません。',
+  message_received: '友だちからのトークが届いたとき。含まれる言葉で絞れます。',
+  tag_change: '選んだタグが付いたとき・外れたときに動きます。下でどちらかを選びます。',
+  form_submitted: '回答が保存されたとき。フォームを指定できます。',
+  link_clicked: '計測リンクが押されたとき。リンクを指定できます。',
+  calendar_booked: '予約が確定したとき。種類やメニューで絞れます。',
+  datetime: '一度だけ。5分刻みで動き、対象の友だちを選びます。',
+  daily: '毎日決まった時刻に、対象の友だちへ動きます。',
+  weekly: '毎週決まった曜日・時刻に、対象の友だちへ動きます。',
+  'ec.order.confirmed': 'EC連携で注文確定が記録された人に動きます。',
+}
+
+const EVENTS: ReadonlyArray<{ value: Automation['eventType']; label: string; note: string }> =
+  AUTOMATION_DRAFT_TRIGGER_OPTIONS.map((option) => ({
+    value: option.value as Automation['eventType'],
+    label: option.label,
+    note: EVENT_NOTES[option.value] ?? '',
+  }))
 
 /** 言葉で絞れるきっかけ。ほかは本文を持たないので条件欄を出さない。 */
 const KEYWORD_EVENTS: ReadonlyArray<string> = ['message_received']
@@ -93,6 +94,8 @@ interface ActionDraft {
   tagId: string
   message: string
   scenarioId: string
+  /** #942 N-356: 共通アクションを呼ぶときの選択。 */
+  commonActionId: string
 }
 
 let actionKeySeed = 0
@@ -102,6 +105,7 @@ const newActionDraft = (): ActionDraft => ({
   tagId: '',
   message: '',
   scenarioId: '',
+  commonActionId: '',
 })
 
 /**
@@ -287,7 +291,6 @@ export default function NewAutomationPage() {
   const [conditionType, setConditionType] = useState<(typeof CONDITION_AXES)[number][0] | ''>('')
   const [conditionValue, setConditionValue] = useState('')
   const [triggerConfig, setTriggerConfig] = useState<Record<string, unknown>>({})
-  const [scheduleType, setScheduleType] = useState<'datetime' | 'daily' | 'weekly'>('datetime')
   const [savedDraft, setSavedDraft] = useState<StoredDraft | null>(null)
   const [previewCount, setPreviewCount] = useState<number | null>(null)
   const [testFriendId, setTestFriendId] = useState('')
@@ -296,6 +299,7 @@ export default function NewAutomationPage() {
   const [tagsLoading, setTagsLoading] = useState(true)
   const [tagsFailed, setTagsFailed] = useState(false)
   const [scenarios, setScenarios] = useState<Array<{ id: string; name: string }>>([])
+  const [commonActions, setCommonActions] = useState<Array<{ id: string; name: string }>>([])
   const [saving, setSaving] = useState(false)
   const [testing, setTesting] = useState(false)
   const [preparingTest, setPreparingTest] = useState(false)
@@ -327,6 +331,7 @@ export default function NewAutomationPage() {
         if (res.success) {
           setTags(res.data.tags)
           setScenarios(res.data.scenarios)
+          setCommonActions(res.data.commonActions ?? [])
         } else setTagsFailed(true)
       })
       .catch(() => {
@@ -386,6 +391,14 @@ export default function NewAutomationPage() {
       const tagName = tags.find((tag) => tag.id === row.tagId)?.name
       return tagName ? `タグ「${tagName}」を付ける` : '選んだタグを付ける'
     }
+    if (row.type === 'common_action') {
+      const commonActionName = commonActions.find((item) => item.id === row.commonActionId)?.name
+      return commonActionName ? `共通アクション「${commonActionName}」を実行` : '共通アクションを実行'
+    }
+    if (row.type === 'start_scenario') {
+      const scenarioName = scenarios.find((item) => item.id === row.scenarioId)?.name
+      return scenarioName ? `シナリオ「${scenarioName}」を始める` : 'シナリオを始める'
+    }
     return row.message.trim() ? '入力したメッセージを送る' : 'メッセージを送る'
   }).join('、')
 
@@ -395,12 +408,14 @@ export default function NewAutomationPage() {
       ? { id: `step-${index + 1}`, type: 'add_tag' as const, params: { tagId: row.tagId }, onFailure: 'stop' as const }
       : row.type === 'start_scenario'
         ? { id: `step-${index + 1}`, type: 'start_scenario' as const, params: { scenarioId: row.scenarioId }, onFailure: 'stop' as const }
-        : {
-            id: `step-${index + 1}`,
-            type: 'send_message' as const,
-            params: { messageType: 'text', content: row.message.trim() },
-            onFailure: 'stop' as const,
-          }
+        : row.type === 'common_action'
+          ? { id: `step-${index + 1}`, type: 'common_action' as const, params: { commonActionId: row.commonActionId }, onFailure: 'stop' as const }
+          : {
+              id: `step-${index + 1}`,
+              type: 'send_message' as const,
+              params: { messageType: 'text', content: row.message.trim() },
+              onFailure: 'stop' as const,
+            }
   ))
 
   /**
@@ -416,12 +431,17 @@ export default function NewAutomationPage() {
         const tagId = String(step.params.tagId ?? '')
         return `タグ「${tags.find((tag) => tag.id === tagId)?.name ?? tagId}」を付ける`
       }
+      if (step.type === 'common_action') {
+        const commonActionId = String(step.params.commonActionId ?? '')
+        return `共通アクション「${commonActions.find((item) => item.id === commonActionId)?.name ?? commonActionId}」を実行`
+      }
       return `シナリオ「${String(step.params.scenarioId ?? '')}」を始める`
     }),
     effects: [
       list.some((step) => step.type === 'send_message') ? 'メッセージが相手に届きます' : null,
       list.some((step) => step.type === 'add_tag') ? 'タグが相手に付きます' : null,
       list.some((step) => step.type === 'start_scenario') ? 'シナリオが相手に始まります' : null,
+      list.some((step) => step.type === 'common_action') ? '共通アクションの処理が相手に動きます' : null,
     ].filter((item): item is string => item !== null),
   })
 
@@ -429,18 +449,21 @@ export default function NewAutomationPage() {
     setTriggerConfig({})
   }, [eventType])
 
-  // #519 軽: EVENTS から選べないきっかけの分岐は持たない。追加時に足す。
+  // #519 軽 + #942 N-355: 共有の選択肢すべてを描く。設定の要約もそれぞれ持つ。
   const triggerConfigSummary = eventType === 'datetime'
     ? String(triggerConfig.at ?? '日時を指定')
     : eventType === 'daily' || eventType === 'weekly'
       ? String(triggerConfig.time ?? '時刻を指定')
       : eventType === 'form_submitted'
         ? String(triggerConfig.formId ?? 'すべてのフォーム')
-        : ''
+        : eventType === 'link_clicked'
+          ? String(triggerConfig.trackedLinkId ?? 'すべての計測リンク')
+          : eventType === 'calendar_booked'
+            ? String(triggerConfig.bookingType === 'salon' ? 'サロン予約' : triggerConfig.bookingType === 'event' ? 'イベント予約' : 'すべての予約')
+            : ''
 
-  const draftEventType: AutomationDraftDetail['eventType'] = eventType === 'datetime'
-    ? scheduleType
-    : selectedEvent.value as AutomationDraftDetail['eventType']
+  const draftEventType: AutomationDraftDetail['eventType'] =
+    selectedEvent.value as AutomationDraftDetail['eventType']
   const normalizedTriggerConfig = () => {
     if (draftEventType === 'message_received') return keyword.trim() ? { keyword: keyword.trim() } : {}
     if (draftEventType === 'tag_change') return {
@@ -456,6 +479,20 @@ export default function NewAutomationPage() {
       friendIds: String(triggerConfig.friendIds ?? '').split(',').map((id) => id.trim()).filter(Boolean),
       ...(draftEventType === 'weekly' ? { weekdays: String(triggerConfig.weekdays ?? '').split(',').map(Number).filter((day) => Number.isInteger(day) && day >= 0 && day <= 6) } : {}),
     }
+    if (draftEventType === 'link_clicked') {
+      const trackedLinkId = String(triggerConfig.trackedLinkId ?? '').trim()
+      return trackedLinkId ? { trackedLinkId } : {}
+    }
+    if (draftEventType === 'calendar_booked') {
+      const bookingType = String(triggerConfig.bookingType ?? '')
+      const menuId = String(triggerConfig.menuId ?? '').trim()
+      const eventId = String(triggerConfig.eventId ?? '').trim()
+      return {
+        ...(bookingType === 'salon' || bookingType === 'event' ? { bookingType } : {}),
+        ...(menuId ? { menuId } : {}),
+        ...(eventId ? { eventId } : {}),
+      }
+    }
     return triggerConfig
   }
 
@@ -464,10 +501,17 @@ export default function NewAutomationPage() {
 
   const validate = (): string | null => {
     if (!name.trim()) return 'ルール名を入力してください'
+    // 時刻・日時のきっかけは対象の友だちが必須（サーバの検証と同じ条件）。
+    if (eventType === 'datetime' && !String(triggerConfig.at ?? '').trim()) return '実行日時を入力してください'
+    if ((eventType === 'daily' || eventType === 'weekly') && !String(triggerConfig.time ?? '').trim()) return '実行時刻を入力してください'
+    if (eventType === 'weekly' && !String(triggerConfig.weekdays ?? '').trim()) return '曜日を入力してください'
+    if ((eventType === 'datetime' || eventType === 'daily' || eventType === 'weekly')
+      && !String(triggerConfig.friendIds ?? '').trim()) return '対象の友だちを入力してください'
     if (actions.length === 0) return 'することを1つ以上決めてください'
     for (const row of actions) {
       if (row.type === 'add_tag' && !row.tagId) return '付けるタグを選んでください'
       if (row.type === 'start_scenario' && !row.scenarioId) return '始めるシナリオを選んでください'
+      if (row.type === 'common_action' && !row.commonActionId) return '使う共通アクションを選んでください'
       if (row.type === 'send_message' && !row.message.trim()) return '送る文面を入力してください'
     }
     return null
@@ -737,18 +781,21 @@ export default function NewAutomationPage() {
               </div>
             </div>
 
-            {eventType === 'tag_change' || eventType === 'form_submitted' || eventType === 'datetime' ? (
+            {['tag_change', 'form_submitted', 'link_clicked', 'calendar_booked', 'datetime', 'daily', 'weekly'].includes(eventType) ? (
               <div className="mt-4 rounded-control border border-hairline bg-canvas-sunken p-3">
                 <p className="text-xs font-semibold text-ink-secondary">きっかけの詳しい設定</p>
                 <div className="mt-2 grid gap-3 sm:grid-cols-2">
                   {eventType === 'tag_change' ? <SelectField aria-label="きっかけのタグ" value={String(triggerConfig.tagId ?? '')} onChange={(e) => setTriggerConfig({ ...triggerConfig, tagId: e.target.value })} options={[{ value: '', label: 'どのタグか選ぶ' }, ...tags.map((tag) => ({ value: tag.id, label: tag.name }))]} className={styles.select} /> : null}
                   {eventType === 'tag_change' ? <SelectField aria-label="付いたとき・外れたとき" value={String(triggerConfig.action ?? 'add')} onChange={(e) => setTriggerConfig({ ...triggerConfig, action: e.target.value })} options={[{ value: 'add', label: '付いたとき' }, { value: 'remove', label: '外れたとき' }]} className={styles.select} /> : null}
                   {eventType === 'form_submitted' ? <TextField aria-label="回答フォーム" placeholder="フォームID（空欄ならすべて）" value={String(triggerConfig.formId ?? '')} onChange={(e) => setTriggerConfig({ formId: e.target.value })} /> : null}
-                  {eventType === 'datetime' ? <SelectField aria-label="時刻の繰り返し" value={scheduleType} onChange={(e) => setScheduleType(e.target.value as typeof scheduleType)} options={[{ value: 'datetime', label: '一度だけ' }, { value: 'daily', label: '毎日' }, { value: 'weekly', label: '毎週' }]} className={styles.select} /> : null}
-                  {eventType === 'datetime' && scheduleType === 'datetime' ? <TextField aria-label="実行日時" type="datetime-local" value={String(triggerConfig.at ?? '')} onChange={(e) => setTriggerConfig({ ...triggerConfig, at: e.target.value })} /> : null}
-                  {eventType === 'datetime' && scheduleType !== 'datetime' ? <TextField aria-label="実行時刻" type="time" step={300} value={String(triggerConfig.time ?? '')} onChange={(e) => setTriggerConfig({ ...triggerConfig, time: e.target.value })} /> : null}
-                  {eventType === 'datetime' && scheduleType === 'weekly' ? <TextField aria-label="曜日" placeholder="曜日番号（例: 1,3 は月・水）" value={String(triggerConfig.weekdays ?? '')} onChange={(e) => setTriggerConfig({ ...triggerConfig, weekdays: e.target.value })} /> : null}
-                  {eventType === 'datetime' ? <TextField aria-label="対象の友だち" placeholder="友だちID（複数はカンマ区切り、最大100人）" value={String(triggerConfig.friendIds ?? '')} onChange={(e) => setTriggerConfig({ ...triggerConfig, friendIds: e.target.value })} /> : null}
+                  {eventType === 'link_clicked' ? <TextField aria-label="計測リンク" placeholder="計測リンクID（空欄ならすべて）" value={String(triggerConfig.trackedLinkId ?? '')} onChange={(e) => setTriggerConfig({ trackedLinkId: e.target.value })} /> : null}
+                  {eventType === 'calendar_booked' ? <SelectField aria-label="予約の種類" value={String(triggerConfig.bookingType ?? '')} onChange={(e) => setTriggerConfig({ ...triggerConfig, bookingType: e.target.value })} options={[{ value: '', label: 'すべての予約' }, { value: 'salon', label: 'サロン予約' }, { value: 'event', label: 'イベント予約' }]} className={styles.select} /> : null}
+                  {eventType === 'calendar_booked' && triggerConfig.bookingType !== 'event' ? <TextField aria-label="予約メニュー" placeholder="メニューID（空欄ならすべて）" value={String(triggerConfig.menuId ?? '')} onChange={(e) => setTriggerConfig({ ...triggerConfig, menuId: e.target.value })} /> : null}
+                  {eventType === 'calendar_booked' && triggerConfig.bookingType === 'event' ? <TextField aria-label="対象イベント" placeholder="イベントID（空欄ならすべて）" value={String(triggerConfig.eventId ?? '')} onChange={(e) => setTriggerConfig({ ...triggerConfig, eventId: e.target.value })} /> : null}
+                  {eventType === 'datetime' ? <TextField aria-label="実行日時" type="datetime-local" value={String(triggerConfig.at ?? '')} onChange={(e) => setTriggerConfig({ ...triggerConfig, at: e.target.value })} /> : null}
+                  {eventType === 'daily' || eventType === 'weekly' ? <TextField aria-label="実行時刻" type="time" step={300} value={String(triggerConfig.time ?? '')} onChange={(e) => setTriggerConfig({ ...triggerConfig, time: e.target.value })} /> : null}
+                  {eventType === 'weekly' ? <TextField aria-label="曜日" placeholder="曜日番号（例: 1,3 は月・水）" value={String(triggerConfig.weekdays ?? '')} onChange={(e) => setTriggerConfig({ ...triggerConfig, weekdays: e.target.value })} /> : null}
+                  {eventType === 'datetime' || eventType === 'daily' || eventType === 'weekly' ? <TextField aria-label="対象の友だち" placeholder="友だちID（複数はカンマ区切り、最大100人）" value={String(triggerConfig.friendIds ?? '')} onChange={(e) => setTriggerConfig({ ...triggerConfig, friendIds: e.target.value })} /> : null}
                 </div>
                 <p className="mt-2 text-xs text-ink-faint">{triggerConfigSummary}。保存後も設定を確認できます。</p>
               </div>
@@ -848,6 +895,18 @@ export default function NewAutomationPage() {
                       tagsLoading={tagsLoading}
                       tagsFailed={tagsFailed}
                       failedNote="シナリオを読み込めませんでした。画面を再読み込みしてください。"
+                    />
+                  ) : row.type === 'common_action' ? (
+                    <ResourcePickRow
+                      title="使う共通アクション"
+                      id={`au-common-action-${row.key}`}
+                      selectLabel="自動化で使う共通アクション"
+                      value={row.commonActionId}
+                      onPick={(value) => updateAction(row.key, { commonActionId: value })}
+                      options={commonActions.map((item) => ({ value: item.id, label: item.name }))}
+                      tagsLoading={tagsLoading}
+                      tagsFailed={tagsFailed}
+                      failedNote="共通アクションを読み込めませんでした。画面を再読み込みしてください。"
                     />
                   ) : (
                     <div className={styles.field}>

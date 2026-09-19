@@ -60,6 +60,7 @@ const NON_TEMPLATE_PATHS: Array<{ file: string; label: string }> = [
   { file: 'routes/meet-callback.ts', label: 'Meet結果通知（固定文）' },
   { file: 'routes/line-notifications.ts', label: '通知の再試行（描画済みペイロードの再送）' },
   { file: 'services/segment-send.ts', label: '旧セグメント配信（呼出元なし・未使用）' },
+  { file: 'services/platform-announcements.ts', label: '運営からのお知らせ（★V6 37-7。契約先の権限者宛て。友だち向けの共通情報は展開しない）' },
 ];
 
 // LINE API への実送信を示す呼出しパターン。

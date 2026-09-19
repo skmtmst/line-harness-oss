@@ -18,12 +18,17 @@ describe('V6 NEN配信の運用者向け文言契約', () => {
     expect(PAGE).not.toContain('title="準備中です"')
   })
 
-  it('コラムの状態を内部値のまま表示しない', () => {
-    expect(OVERVIEW).toContain("draft: '下書き'")
-    expect(OVERVIEW).toContain("scheduled: '予約ずみ'")
+  it('コラムの状態を内部値のまま表示しない（★V6 37-6-A の LINE配信 列）', () => {
+    expect(OVERVIEW).toContain("draft: '未配信'")
+    expect(OVERVIEW).toContain("scheduled: '予約'")
     expect(OVERVIEW).toContain("queued: '配信待ち'")
-    expect(OVERVIEW).toContain("sent: '出したもの'")
+    expect(OVERVIEW).toContain("sent: '配信済み'")
     expect(OVERVIEW).toContain('{columnStatusLabel[column.deliveryStatus]}')
     expect(OVERVIEW).not.toContain('{column.deliveryStatus}</span>')
+  })
+
+  it('「ポイント」の語を出さない（然の用語はマイル）', () => {
+    expect(OVERVIEW).not.toContain('ポイント')
+    expect(PAGE).not.toContain('ポイント')
   })
 })

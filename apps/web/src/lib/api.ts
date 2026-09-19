@@ -2641,7 +2641,7 @@ export type AutomationTemplateSummary = {
 }
 export type AutomationDraftAction = {
   id: string
-  type: 'add_tag' | 'start_scenario' | 'send_message'
+  type: 'add_tag' | 'start_scenario' | 'send_message' | 'common_action'
   params: Record<string, unknown>
   onFailure: 'stop'
 }
@@ -2656,6 +2656,48 @@ export type AutomationDraftDetail = {
   triggerConfig: Record<string, unknown>
   conditions: Record<string, unknown>
   actions: AutomationDraftAction[]
+}
+
+/** #942 N-354: 実行記録1件の詳細。処理ごとの結果と試行数を持つ。 */
+export type AutomationRunStep = {
+  stepKey: string
+  actionType: string
+  actionLabel: string
+  status: 'queued' | 'running' | 'waiting' | 'success' | 'failed' | 'skipped' | 'cancelled'
+  attemptNumber: number
+  errorCode: string | null
+  errorMessage: string | null
+  commonActionVersionId: string | null
+  startedAt: string | null
+  completedAt: string | null
+}
+export type AutomationRunDetail = {
+  id: string
+  automationId: string
+  automationName: string
+  automationVersionId: string
+  /** 実行時に固定された版番号。 */
+  versionNumber: number
+  /** 1人テストの実行か。 */
+  isTest: boolean
+  /** 取りやめられるのは、まだ終わっていない実行だけ。 */
+  canCancel: boolean
+  canRetry: boolean
+  occurredAt: string
+  subject: string | null
+  accountLabel: string | null
+  triggerLabel: string
+  status: 'queued' | 'claimed' | 'succeeded' | 'skipped' | 'retry_wait' | 'permanent_failed' | 'cancelled'
+  domainStatus: string
+  detail: string | null
+  durationMs: number | null
+  failureReason: string | null
+  successfulActions: string[]
+  skippedActions: string[]
+  failedAction: string | null
+  friendId: string | null
+  friendName: string | null
+  steps: AutomationRunStep[]
 }
 export type ActionScoreBand = 'high' | 'normal' | 'low'
 export type ActionScoreFilter = 'all' | ActionScoreBand | 'decreased'
@@ -3795,6 +3837,14 @@ export type NenUnavailableMetric = {
 }
 
 export type NenMetricsRange = { days: number; from: string; to: string }
+export type NenMetricsQueryRange = { from: string; to: string }
+
+function nenMetricsQuery(accountId: string, range: number | NenMetricsQueryRange): string {
+  const query = new URLSearchParams({ lineAccountId: accountId })
+  if (typeof range === 'number') query.set('days', String(range))
+  else { query.set('from', range.from); query.set('to', range.to) }
+  return query.toString()
+}
 
 export type NenFlowMetrics = {
   range: NenMetricsRange
@@ -4617,6 +4667,57 @@ export type OpsLineUnregistered = {
   total: number
   people: Array<{ staffId: string; name: string; tenantName: string; hasEmail: boolean }>
 }
+/** 運営からのお知らせ配信（★V6 37-7）。形は `apps/worker/src/routes/ops-announcements.ts`。 */
+export type OpsAnnouncementAudience = 'all' | 'plan' | 'tenants'
+export type OpsAnnouncementChannel = 'line' | 'screen' | 'email'
+export type OpsAnnouncementStatus = 'draft' | 'scheduled' | 'sending' | 'sent' | 'failed'
+export type OpsAnnouncement = {
+  id: string
+  subject: string
+  body: string
+  audienceKind: OpsAnnouncementAudience
+  audiencePlans: string[]
+  audienceTenantIds: string[]
+  audienceLabel: string
+  channels: OpsAnnouncementChannel[]
+  channelLabels: string[]
+  status: OpsAnnouncementStatus
+  statusLabel: string
+  publishAt: string | null
+  sentAt: string | null
+  recipientsTotal: number
+  lineSent: number
+  lineFailed: number
+  mailSent: number
+  mailFailed: number
+  screenRead: number
+  screenTotal: number
+  lastError: string | null
+  createdByName: string
+  createdAt: string
+  updatedAt: string
+}
+export type OpsAnnouncementInput = {
+  subject: string
+  body: string
+  audienceKind: OpsAnnouncementAudience
+  audiencePlans: string[]
+  audienceTenantIds: string[]
+  channels: OpsAnnouncementChannel[]
+  publishAt: string | null
+  mode: 'draft' | 'schedule' | 'send'
+}
+export type OpsAudiencePreview = { tenants: number; staff: number; lineLinked: number; withEmail: number }
+export type OpsNoticeLineAccount = {
+  currentId: string | null
+  current: { id: string; name: string; basicId: string | null; addFriendUrl: string | null } | null
+  candidates: Array<{ id: string; name: string; basicId: string | null }>
+  linked: { linked: number; total: number }
+}
+export type HqNotice = { id: string; subject: string; body: string; sentAt: string | null }
+export type HqLineRegistration =
+  | { available: false }
+  | { available: true; accountName: string; basicId: string | null; addFriendUrl: string | null; linked: boolean; code: string | null; codeExpiresAt: string | null }
 export type OpsSupportDetail = {
   ticket: OpsSupportTicket
   tenant: { accountCount: number; staffCount: number; staffWithLine: number; pastTickets: number; pastOpen: number }
@@ -6722,6 +6823,18 @@ export const api = {
     dashboard: (period?: OpsDashboardPeriod) =>
       fetchApi<ApiResponse<OpsDashboard>>(`/api/ops/dashboard${period ? `?period=${period}` : ''}`),
     lineUnregistered: () => fetchApi<ApiResponse<OpsLineUnregistered>>('/api/ops/dashboard/line-unregistered'),
+    /** お知らせ配信 ★V6 37-7。 */
+    announcements: {
+      list: () => fetchApi<ApiResponse<OpsAnnouncement[]> & { linked: { linked: number; total: number }; noticeLineConfigured: boolean }>('/api/ops/announcements'),
+      preview: (input: { audienceKind: OpsAnnouncementAudience; audiencePlans: string[]; audienceTenantIds: string[] }) =>
+        fetchApi<ApiResponse<OpsAudiencePreview>>('/api/ops/announcements/preview', { method: 'POST', body: JSON.stringify(input) }),
+      create: (input: OpsAnnouncementInput) => fetchApi<ApiResponse<OpsAnnouncement>>('/api/ops/announcements', { method: 'POST', body: JSON.stringify(input) }),
+      update: (id: string, input: OpsAnnouncementInput) => fetchApi<ApiResponse<OpsAnnouncement>>(`/api/ops/announcements/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify(input) }),
+      remove: (id: string) => fetchApi<ApiResponse<null>>(`/api/ops/announcements/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+    },
+    noticeLineAccount: () => fetchApi<ApiResponse<OpsNoticeLineAccount>>('/api/ops/notice-line-account'),
+    setNoticeLineAccount: (lineAccountId: string | null) =>
+      fetchApi<ApiResponse<{ currentId: string | null }>>('/api/ops/notice-line-account', { method: 'PUT', body: JSON.stringify({ lineAccountId }) }),
     /** お問い合わせ（チケット）★V6 37-6。 */
     support: {
       summary: () => fetchApi<ApiResponse<OpsSupportSummary>>('/api/ops/support/summary'),
@@ -6750,6 +6863,12 @@ export const api = {
       create: (input: { tenantId: string; subject: string; body: string; kind?: string; priority?: OpsSupportPriority; channel?: 'ops' | 'line'; staffId?: string }) =>
         fetchApi<ApiResponse<OpsSupportTicket>>('/api/ops/support/tickets', { method: 'POST', body: JSON.stringify(input) }),
     },
+  },
+  /** 運営からのお知らせ（統括の画面）と契約者専用LINEの登録案内。 */
+  hqNotices: {
+    list: () => fetchApi<ApiResponse<HqNotice[]>>('/api/hq/notices'),
+    markRead: (id: string) => fetchApi<ApiResponse<{ read: boolean }>>(`/api/hq/notices/${encodeURIComponent(id)}/read`, { method: 'POST', body: '{}' }),
+    lineRegistration: () => fetchApi<ApiResponse<HqLineRegistration>>('/api/hq/notices/line-registration'),
   },
   /** 契約先（統括）から見える運営の操作履歴。書き込みを伴ったものだけ。 */
   operatorHistory: () => fetchApi<ApiResponse<OperatorHistoryRow[]>>('/api/hq/operator-history'),
@@ -8012,6 +8131,8 @@ export const api = {
       fetchApi<ApiResponse<{
         tags: Array<{ id: string; name: string }>
         scenarios: Array<{ id: string; name: string }>
+        /** 呼び出せるのは公開済みだけ（#942 N-356）。 */
+        commonActions: Array<{ id: string; name: string }>
       }>>(`/api/automation-draft-resources?account_id=${encodeURIComponent(accountId)}`),
     updateDraft: (id: string, accountId: string, data: {
       expectedDraftVersionId: string
@@ -8028,6 +8149,42 @@ export const api = {
       fetchApi<ApiResponse<{ id: string; versionId: string; versionNumber: number; status: 'active' | 'stopped' }>>(
         `/api/automation-drafts/${encodeURIComponent(id)}/publish?account_id=${encodeURIComponent(accountId)}`,
         { method: 'POST', body: JSON.stringify({ expectedDraftVersionId, activate }) },
+      ),
+    // #942 N-352: 一覧の「編集」。公開済みの定義に改訂用の下書きをぶら下げる。
+    // すでに下書きがあればそれを返す（何度押しても1件）。
+    createDraftFromAutomation: (id: string) =>
+      fetchApi<ApiResponse<{ id: string; draftVersionId: string }>>(
+        `/api/automations/${encodeURIComponent(id)}/draft`,
+        { method: 'POST', body: '{}' },
+      ),
+    // #942 N-352: 一覧の「複製」。いま見えている版を写した新しい下書き。
+    duplicate: (id: string) =>
+      fetchApi<ApiResponse<{ id: string; draftVersionId: string }>>(
+        `/api/automations/${encodeURIComponent(id)}/duplicate`,
+        { method: 'POST', body: '{}' },
+      ),
+    // #942 N-352: 稼働切替と「保管」。保管は一方通行。実行記録は残る。
+    setStatus: (id: string, status: 'active' | 'stopped' | 'archived') =>
+      fetchApi<ApiResponse<{ id: string; status: 'active' | 'stopped' | 'archived' }>>(
+        `/api/automations/${encodeURIComponent(id)}/status`,
+        { method: 'POST', body: JSON.stringify({ status }) },
+      ),
+    // #942 N-354: 実行記録1件の詳細（版番号・テスト印・処理ごとの結果）。
+    getRun: (id: string) =>
+      fetchApi<ApiResponse<AutomationRunDetail>>(`/api/automation-runs/${encodeURIComponent(id)}`),
+    // #942 N-353: 実行記録のCSV書き出し口。画面の絞り込みと同じ条件を渡す。
+    runsCsvUrl: (params?: { accountId?: string; search?: string; status?: string }) => {
+      const query = new URLSearchParams({ format: 'csv' })
+      if (params?.accountId) query.set('lineAccountId', params.accountId)
+      if (params?.search) query.set('search', params.search)
+      if (params?.status) query.set('status', params.status)
+      return `${API_URL}/api/automation-runs?${query}`
+    },
+    // #942 N-353: まだ終わっていない実行を取りやめる。取消済みはそのまま成功。
+    cancelRun: (id: string) =>
+      fetchApi<ApiResponse<{ runId: string; status: 'cancelled'; alreadyCancelled: boolean; cancelledStepCount: number }>>(
+        `/api/automation-runs/${encodeURIComponent(id)}/cancel`,
+        { method: 'POST', body: '{}' },
       ),
   },
   commonActions: {
@@ -8455,17 +8612,20 @@ export const api = {
       ),
   },
   nenCampaigns: {
-    flowMetrics: (accountId: string, days = 30) => fetchApi<ApiResponse<NenFlowMetrics>>(
-      `/api/nen-campaigns/metrics/flows?lineAccountId=${encodeURIComponent(accountId)}&days=${days}`,
+    /** 期間は日数か、★V6 37-6 の「今月・先月」のための from/to（ISO 8601）。 */
+    flowMetrics: (accountId: string, range: number | NenMetricsQueryRange = 30) => fetchApi<ApiResponse<NenFlowMetrics>>(
+      `/api/nen-campaigns/metrics/flows?${nenMetricsQuery(accountId, range)}`,
     ),
-    columnMetrics: (accountId: string, days = 30) => fetchApi<ApiResponse<NenColumnMetrics>>(
-      `/api/nen-campaigns/metrics/columns?lineAccountId=${encodeURIComponent(accountId)}&days=${days}`,
+    columnMetrics: (accountId: string, range: number | NenMetricsQueryRange = 30) => fetchApi<ApiResponse<NenColumnMetrics>>(
+      `/api/nen-campaigns/metrics/columns?${nenMetricsQuery(accountId, range)}`,
     ),
     petMetrics: (accountId: string, days = 30) => fetchApi<ApiResponse<NenPetMetrics>>(
       `/api/nen-campaigns/metrics/pets?lineAccountId=${encodeURIComponent(accountId)}&days=${days}`,
     ),
-    deliveries: (accountId: string, options: { days?: number; status?: string; cursor?: string; limit?: number } = {}) => {
+    deliveries: (accountId: string, options: { days?: number; from?: string; to?: string; status?: string; cursor?: string; limit?: number } = {}) => {
       const query = new URLSearchParams({ lineAccountId: accountId, days: String(options.days ?? 30), limit: String(options.limit ?? 50) })
+      // from/to を両方渡すと days の代わりにその期間で数える（実口 nenDeliveryRange と同じ決めごと）。
+      if (options.from && options.to) { query.delete('days'); query.set('from', options.from); query.set('to', options.to) }
       if (options.status) query.set('status', options.status)
       if (options.cursor) query.set('cursor', options.cursor)
       return fetchApi<ApiResponse<NenDeliveryList>>(`/api/nen-campaigns/deliveries?${query}`)
@@ -8520,6 +8680,11 @@ export const api = {
         `/api/nen-campaigns/columns-preview?${query}`,
       )
     },
+    /** ★V6 37-6-A「ECのコラムを取り込む」。宛先が決まらず未割り当てになっているECコラムを、このアカウントへ割り当てる。 */
+    importColumns: (accountId: string) => fetchApi<ApiResponse<{ imported: number }>>(
+      `/api/nen-campaigns/columns/import?lineAccountId=${encodeURIComponent(accountId)}`,
+      { method: 'POST' },
+    ),
     duplicateColumn: (id: string, accountId: string) => fetchApi<ApiResponse<{ id: string; sourceColumnId: string }>>(
       `/api/nen-campaigns/columns/${encodeURIComponent(id)}/duplicate`,
       { method: 'POST', body: JSON.stringify({ accountId }) },

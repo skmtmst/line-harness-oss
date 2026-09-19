@@ -42,6 +42,10 @@ export interface AutomationExecutionRunRow {
   automation_id: string;
   automation_name: string;
   automation_version_id: string;
+  /** 実行時に固定された版番号（#942 N-354：詳細・CSVで見せる）。 */
+  version_number: number;
+  /** 1人テストの実行は1（#942 N-354：テスト実行の印）。 */
+  is_test: number;
   friend_id: string | null;
   friend_name: string | null;
   source_event_id: string;
@@ -114,6 +118,7 @@ export async function getAutomationExecutionRuns(
     db.prepare(
       `SELECT r.id, r.line_account_id, la.name AS account_name,
               r.automation_id, d.name AS automation_name, r.automation_version_id,
+              v.version_number, r.is_test,
               r.friend_id, f.display_name AS friend_name, r.source_event_id,
               v.trigger_type, r.status, r.started_at, r.completed_at, r.created_at,
               CASE WHEN r.started_at IS NOT NULL AND r.completed_at IS NOT NULL
@@ -164,6 +169,74 @@ export async function getAutomationExecutionRuns(
       most_run_count: mostRun ? Number(mostRun.most_run_count) : null,
     },
   };
+}
+
+/**
+ * 1件の実行記録を、詳細表示に必要な項目つきで読む（#942 N-354）。
+ *
+ * 版番号・テスト実行の印は実行時に `automation_version_id` / `is_test` へ
+ * 固定されているものをそのまま出す。対象アカウント外は見せない。
+ */
+export async function getAutomationExecutionRun(
+  db: D1Database,
+  input: { runId: string; allowedAccountIds: string[] },
+): Promise<AutomationExecutionRunRow | null> {
+  if (input.allowedAccountIds.length === 0) return null;
+  return db.prepare(
+    `SELECT r.id, r.line_account_id, la.name AS account_name,
+            r.automation_id, d.name AS automation_name, r.automation_version_id,
+            v.version_number, r.is_test,
+            r.friend_id, f.display_name AS friend_name, r.source_event_id,
+            v.trigger_type, r.status, r.started_at, r.completed_at, r.created_at,
+            CASE WHEN r.started_at IS NOT NULL AND r.completed_at IS NOT NULL
+                 THEN MAX(0, ROUND((julianday(r.completed_at) - julianday(r.started_at)) * 86400000))
+                 ELSE NULL END AS duration_ms,
+            GROUP_CONCAT(CASE WHEN s.status = 'success' THEN s.action_type END, ' / ') AS successful_actions,
+            GROUP_CONCAT(CASE WHEN s.status = 'skipped' THEN s.action_type END, ' / ') AS skipped_actions,
+            MAX(CASE WHEN s.status = 'failed' THEN s.action_type END) AS failed_action,
+            MAX(CASE WHEN s.status = 'failed' THEN s.error_code END) AS failure_code
+       FROM automation_runs r
+       JOIN automation_definitions d ON d.id = r.automation_id
+       JOIN automation_versions v ON v.id = r.automation_version_id
+       LEFT JOIN friends f ON f.id = r.friend_id
+       LEFT JOIN line_accounts la ON la.id = r.line_account_id
+       LEFT JOIN automation_run_steps s ON s.automation_run_id = r.id
+      WHERE r.id = ?
+        AND r.line_account_id IN (${input.allowedAccountIds.map(() => '?').join(',')})
+      GROUP BY r.id`,
+  ).bind(input.runId, ...input.allowedAccountIds).first<AutomationExecutionRunRow>();
+}
+
+export interface AutomationExecutionRunStepRow {
+  step_key: string;
+  action_type: string;
+  common_action_version_id: string | null;
+  status: 'queued' | 'running' | 'waiting' | 'success' | 'failed' | 'skipped' | 'cancelled';
+  attempt_number: number;
+  error_code: string | null;
+  error_message: string | null;
+  started_at: string | null;
+  completed_at: string | null;
+}
+
+/**
+ * 実行の処理ごとの結果を順番どおりに読む（#942 N-354：処理ごとの結果と試行数）。
+ *
+ * `output_json` / `input_json` は API へ出さない。友だちの情報や送った内容が
+ * 入りうるため、結果の状態・回数・エラーの種類だけを返す。
+ */
+export async function getAutomationExecutionRunSteps(
+  db: D1Database,
+  runId: string,
+): Promise<AutomationExecutionRunStepRow[]> {
+  const result = await db.prepare(
+    `SELECT step_key, action_type, common_action_version_id, status, attempt_number,
+            error_code, error_message, started_at, completed_at
+       FROM automation_run_steps
+      WHERE automation_run_id = ?
+      ORDER BY rowid ASC`,
+  ).bind(runId).all<AutomationExecutionRunStepRow>();
+  return result.results ?? [];
 }
 
 // --- 自動化ルール ---

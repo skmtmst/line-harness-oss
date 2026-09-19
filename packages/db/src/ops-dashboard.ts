@@ -110,13 +110,13 @@ export async function dashboardTickets(db: D1Database, input: { from: string; to
   };
 }
 
-/** 契約先の権限者のうち LINE を連携している人数。 */
+/** 契約先の権限者のうち契約者専用LINE（★V6 37-7）に登録した人数。`staff_members.notice_friend_id` で数える。 */
 export async function dashboardLineRegistration(
   db: D1Database,
   excludeTenantId: string,
 ): Promise<{ registered: number; total: number; unregistered: Array<{ staffId: string; name: string; email: string | null; tenantName: string }> }> {
   const total = await db
-    .prepare(`SELECT COUNT(*) AS n, SUM(CASE WHEN sm.line_user_id IS NOT NULL THEN 1 ELSE 0 END) AS linked
+    .prepare(`SELECT COUNT(*) AS n, SUM(CASE WHEN sm.notice_friend_id IS NOT NULL THEN 1 ELSE 0 END) AS linked
                 FROM staff_members sm JOIN tenants t ON t.id = sm.tenant_id
                WHERE sm.is_active = 1 AND t.id <> ? AND t.status <> 'archived'`)
     .bind(excludeTenantId)
@@ -124,7 +124,7 @@ export async function dashboardLineRegistration(
   const { results } = await db
     .prepare(`SELECT sm.id AS staff_id, sm.name, sm.email, t.name AS tenant_name
                 FROM staff_members sm JOIN tenants t ON t.id = sm.tenant_id
-               WHERE sm.is_active = 1 AND sm.line_user_id IS NULL AND t.id <> ? AND t.status <> 'archived'
+               WHERE sm.is_active = 1 AND sm.notice_friend_id IS NULL AND t.id <> ? AND t.status <> 'archived'
                ORDER BY t.name, sm.name LIMIT 200`)
     .bind(excludeTenantId)
     .all<{ staff_id: string; name: string; email: string | null; tenant_name: string }>();

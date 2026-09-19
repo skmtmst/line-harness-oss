@@ -6,7 +6,10 @@ import NewLineAccountPage from './page'
 const calls = vi.hoisted(() => ({
   connectCheck: vi.fn(), connect: vi.fn(), stepFollowerImport: vi.fn(),
 }))
-vi.mock('@/lib/api', () => ({ api: { lineAccounts: calls } }))
+// 登録完了直後の契約者専用LINEの登録案内（★V6 37-7）。既定は「運営側で未設定」なので何も出ない
+const notices = vi.hoisted(() => ({ lineRegistration: vi.fn() }))
+vi.mock('@/lib/api', () => ({ api: { lineAccounts: calls, hqNotices: notices } }))
+vi.mock('qrcode', () => ({ default: { toDataURL: async () => 'data:image/png;base64,QR' } }))
 vi.mock('next/navigation', () => ({ usePathname: () => '/accounts/new', useRouter: () => ({ push: vi.fn() }) }))
 
 const passedSteps = [
@@ -35,6 +38,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   calls.connectCheck.mockResolvedValue(checked)
   calls.connect.mockResolvedValue({ success: true, data: { ...checked.data, id: 'new-account' } })
+  notices.lineRegistration.mockResolvedValue({ success: true, data: { available: false } })
 })
 
 const fill = (id: string, value: string) => fireEvent.change(document.getElementById(id)!, { target: { value } })
@@ -120,6 +124,24 @@ describe('LINEアカウント作成ウィザード', () => {
     expect(screen.getByRole('link', { name: '登録したアカウントを見る' }).getAttribute('href')).toBe('/accounts/detail?id=new-account')
     expect(screen.getByRole('link', { name: '統括コンソールへ' }).getAttribute('href')).toBe('/hq')
     expect(document.body.textContent).not.toContain('synthetic-secret')
+    await waitFor(() => expect(notices.lineRegistration).toHaveBeenCalled())
+    expect(document.body.textContent).not.toContain('musubo 運営（契約者専用）')
+  })
+
+  it('登録完了の直後に、契約者専用LINEの登録案内を一度だけ出す（案内だけで、閉じられる）', async () => {
+    notices.lineRegistration.mockResolvedValue({ success: true, data: {
+      available: true, accountName: 'musubo 運営（契約者専用）', basicId: '@musubo', addFriendUrl: 'https://line.me/R/ti/p/@musubo',
+      linked: false, code: '123456', codeExpiresAt: '2026-09-19T00:00:00.000Z',
+    } })
+    await enterConnectionStep()
+    await checkConnection()
+    fireEvent.click(screen.getByRole('button', { name: '接続して保存' }))
+    await screen.findByText('登録が完了しました', { selector: 'h2' })
+    await screen.findByText('musubo 運営（契約者専用）の LINE を登録してください')
+    expect(document.body.textContent).toContain('123456')
+    fireEvent.click(screen.getByRole('button', { name: 'あとで確認する' }))
+    await waitFor(() => expect(screen.queryByText('musubo 運営（契約者専用）の LINE を登録してください')).toBeNull())
+    expect(notices.lineRegistration).toHaveBeenCalledTimes(1)
   })
 
   it('認証済みはID取り込み中のボタンを止め、hydrating_profilesで有効にする', async () => {

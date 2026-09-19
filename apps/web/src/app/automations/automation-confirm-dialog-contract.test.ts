@@ -53,7 +53,7 @@ describe('オートメーションの確認窓', () => {
 
   it('押した時点のアカウントを窓に固定する', () => {
     expect(PAGE, 'アカウントを窓に持っていない').toContain(
-      "setPending({ kind: 'delete', automation: target, accountId: selectedAccountId })",
+      "setPending({ kind: 'archive', automation: target, accountId: selectedAccountId })",
     )
     expect(PAGE, '切り替わりを見ていない').toContain(
       'const accountChanged = pending !== null && pending.accountId !== selectedAccountId',
@@ -67,10 +67,10 @@ describe('オートメーションの確認窓', () => {
     )
   })
 
-  it('取り消せない削除だけを赤にする', () => {
+  it('取り消せない保管だけを赤にする', () => {
     const dialog = dialogWith(PAGE, 'open={pending !== null}')
     expect(dialog, '戻せる稼働の切り替えまで赤になっている').toContain(
-      "destructive={pending?.kind === 'delete'}",
+      "destructive={pending?.kind === 'archive'}",
     )
     expect(dialog, '処理中を窓へ渡していない').toContain('busy={working}')
     expect(dialog, '失敗を窓の中に出していない').toContain('error={actionError}')
@@ -78,7 +78,7 @@ describe('オートメーションの確認窓', () => {
 
   it('何が消え・何が残るかを本文で読ませる', () => {
     const dialog = dialogWith(PAGE, 'open={pending !== null}')
-    expect(dialog).toContain('すでに動いたぶん（付けたタグ・送ったメッセージ）はそのまま残り、取り消せません。')
+    expect(dialog).toContain('一覧から隠します。動いた記録と設定は残りますが、この画面からは元に戻せません。')
     expect(dialog).toContain('ルールの設定は残るので、あとから動かし直せます。')
     // 実行の記録を持っていない。0回と書かずに、数えていないことを断る。
     expect(dialog).toContain('このルールが何回動いたかは記録していないため、ここには出せません。')

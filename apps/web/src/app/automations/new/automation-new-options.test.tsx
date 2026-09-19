@@ -8,11 +8,11 @@ import {
 } from '@line-crm/shared'
 
 /*
- * #734: 新規作成の選択肢は共有の正本から描く。下書き編集と同じ一覧。
+ * #734・#942 N-355: 新規作成の選択肢は共有の正本から描く。下書き編集と同じ一覧。
  * 本物のReactで新規作成ページをmountし、共有を本物で import して見張る。
  *
- * - N1: きっかけの選択肢が共有のうち定期まとめ分を除いた行と一致する
- * - N2: することの選択肢が共有の3件と一致する
+ * - N1: きっかけの行が共有の全件と一致する（#942で全10種へ）
+ * - N2: することの選択肢が共有の全件と一致する（#942で共通アクションを追加）
  * - N3: シナリオ開始を選んで保存すると、scenarioId付きで送る
  */
 
@@ -133,22 +133,18 @@ async function typeText(input: HTMLInputElement, value: string): Promise<void> {
 }
 
 describe('新規作成の選択可能一覧(#734)', () => {
-  it('N1: きっかけの6行が共有の正本から外れない', async () => {
-    // 設計(Rv8Jv)が6種で凍結しているため、行は手書きのまま。
+  it('N1: きっかけの行が共有の全件と一致する', async () => {
+    // #942 N-355: 以前は設計の6種だけで、残りは下書き編集でしか作れなかった。
     // 共有へ無い値を足す・共有から値が消える逆変異はここで赤になる。
     const el = await mountPage()
     // きっかけは押しボタン群(ラベル+説明の2段)。説明spanを持つボタンを拾う。
     const labels = Array.from(el.querySelectorAll('span.line-clamp-2')).map(
       (note) => note.parentElement?.querySelector('span')?.textContent ?? '',
     )
-    expect(labels).toHaveLength(6)
-    const sharedLabels = new Set(AUTOMATION_DRAFT_TRIGGER_OPTIONS.map((option) => option.label))
-    for (const label of labels) {
-      expect(sharedLabels.has(label), `共有に無いきっかけ: ${label}`).toBe(true)
-    }
+    expect(labels).toEqual(AUTOMATION_DRAFT_TRIGGER_OPTIONS.map((option) => option.label))
   })
 
-  it('N2: することの選択肢が共有の3件と一致する', async () => {
+  it('N2: することの選択肢が共有の全件と一致する', async () => {
     const el = await mountPage()
     const actionSelect = Array.from(el.querySelectorAll('select')).find((select) =>
       Array.from(select.querySelectorAll('option')).some((option) => option.textContent === 'メッセージを送る'),

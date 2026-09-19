@@ -165,6 +165,7 @@ export const FEATURE_ROUTE_MANIFEST: readonly FeatureRouteMetadata[] = [
   exempt('/api/hq/banners', 'core', '統括バナー生成。ルート内でtenantと統括編集権限を検証'),
   exempt('/api/hq/billing', 'core', '統括の契約・課金基盤。管理APIはtenant境界と役割、WebhookはStripe署名を検証'),
   exempt('/api/hq/support', 'core', '統括利用者から運営への問い合わせ。ルート内でtenant境界と役割を検証'),
+  exempt('/api/hq/notices', 'core', '運営からのお知らせと契約者専用LINEの登録案内（★V6 37-7）。ルート内で staff.tenantId に絞る'),
   exempt('/api/hq/templates', 'core', '統括ひな形。ルート内でtenantと統括編集権限を検証'),
   exempt('/api/recipes', 'core', '設定テンプレート'),
   exempt('/api/manual-links', 'core', 'ヘルプ導線設定'),

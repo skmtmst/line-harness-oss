@@ -14,80 +14,68 @@ import {
   type NenDeliveryDetail,
   type NenDeliveryList,
   type NenFlowMetrics,
-  type NenPetMetrics,
-  type NenPetProfile,
 } from '@/lib/api'
-import { NenOverview, type NenCoupon, type NenTab } from './nen-overview'
+import { NenOverview, type ColumnDeliveryPlan, type FriendOption, type NenCoupon, type NenKpis, type NenTab } from './nen-overview'
+import { defaultScheduleLocal, jstMonthRange } from './nen-period'
 
 type Notice = { tone: 'success' | 'error'; text: string }
-type FriendOption = { id: string; displayName: string | null }
-function ColumnLinePreview({ column, onClose }: { column: NenColumn; onClose: () => void }) {
-  return (
-    <section id={`column-preview-${column.id}`} className="overflow-hidden rounded-v6-card border border-hairline bg-canvas lg:max-w-[920px]">
-      {/* 見出し帯はLINEのトーク見出しの再現。相当するトークンが無いため直書き(#728) */}
-      <div className="flex min-h-[52px] items-center justify-between gap-3 bg-[#3f3f3f] px-4 py-3 text-white">
-        <div><p className="text-sm font-bold">LINEプレビュー</p><p className="mt-0.5 text-xs text-gray-300">実際のトーク画面に近い見え方です</p></div>
-        <Button onClick={onClose}>プレビューを隠す</Button>
-      </div>
-      <div className="min-h-[220px] bg-line-preview p-5"><div className="mx-auto max-w-[480px] rounded-v6-card rounded-tl-[4px] bg-white p-4 shadow-v6-card"><p className="whitespace-pre-wrap text-sm leading-[1.65] text-ink">{column.introText}</p><div className="mt-3 border-t border-hairline pt-3"><h4 className="font-bold tracking-[0.01em] text-ink">{column.title}</h4><p className="mt-2 text-sm leading-6 text-ink-secondary">{column.excerpt}</p><p className="mt-3 min-h-[36px] rounded-v6-control bg-v6-action py-2 text-center text-sm font-bold text-white">コラムを読む</p></div></div></div>
-    </section>
-  )
+
+const TABS: NenTab[] = ['auto', 'columns', 'history', 'paused']
+const EMPTY_ERRORS: Record<NenTab, string> = { auto: '', columns: '', history: '', paused: '' }
+
+function isTab(value: string | null): value is NenTab {
+  return value !== null && (TABS as string[]).includes(value)
 }
 
-function CampaignLinePreview({ setting, onClose }: { setting: NenCampaignSetting; onClose: () => void }) {
-  const samples: Record<string, string> = { '{{pet_name}}': 'ココ', '{{coupon_code}}': 'NENBDAY-1234', '{{coupon_expiry}}': '2026-09-30' }
-  const replaceSample = (value: string) => Object.entries(samples).reduce((result, [from, to]) => result.replaceAll(from, to), value)
-  return (
-    <section id={`campaign-preview-${setting.campaignKey}`} className="overflow-hidden rounded-v6-card border border-hairline bg-canvas lg:max-w-[920px]">
-      {/* 見出し帯はLINEのトーク見出しの再現。相当するトークンが無いため直書き(#728) */}
-      <div className="flex min-h-[52px] items-center justify-between gap-3 bg-[#3f3f3f] px-4 py-3 text-white"><div><p className="text-sm font-bold">{setting.label}のLINEプレビュー</p><p className="mt-0.5 text-xs text-gray-300">お客様ごとの情報は見本に置き換えています</p></div><Button onClick={onClose}>プレビューを隠す</Button></div>
-      <div className="min-h-[220px] bg-line-preview p-5"><div className="mx-auto min-h-[240px] max-w-[480px] rounded-v6-card rounded-tl-[4px] bg-white p-4 shadow-v6-card"><h4 className="font-bold leading-6 tracking-[0.01em] text-ink">{replaceSample(setting.title)}</h4><p className="mt-3 whitespace-pre-wrap text-sm leading-[1.65] text-ink-secondary">{replaceSample(setting.bodyText)}</p>{setting.buttonLabel ? <p className="mt-3 min-h-[36px] rounded-v6-control bg-v6-action py-2 text-center text-sm font-bold text-white">{setting.buttonLabel}</p> : null}</div></div>
-    </section>
-  )
-}
-
+/**
+ * NEN配信。★V6 37-6（`z4q1K`）／37-6-A（`u66A0`）。
+ *
+ * 数値カード（今月・先月・開封・注文・届かなかった）は月の範囲で実口から取る。
+ * タブごとに必要なものだけ取り、失敗はそのタブの帯で示す（点検 #512 の中3）。
+ */
 export default function NenCampaignsPage() {
   usePageTitle('NEN配信')
   const { selectedAccountId } = useAccount()
-  const [tab, setTab] = useState<NenTab>('flow')
+  const [tab, setTab] = useState<NenTab>('auto')
   const [settings, setSettings] = useState<NenCampaignSetting[]>([])
   const [columns, setColumns] = useState<NenColumn[]>([])
-  const [pets, setPets] = useState<NenPetProfile[]>([])
   const [friends, setFriends] = useState<FriendOption[]>([])
+  const [kpis, setKpis] = useState<NenKpis | null>(null)
   const [flowMetrics, setFlowMetrics] = useState<NenFlowMetrics | null>(null)
   const [columnMetrics, setColumnMetrics] = useState<NenColumnMetrics | null>(null)
-  const [petMetrics, setPetMetrics] = useState<NenPetMetrics | null>(null)
   const [deliveryList, setDeliveryList] = useState<NenDeliveryList | null>(null)
   const [deliveryDetail, setDeliveryDetail] = useState<NenDeliveryDetail | null>(null)
   const [coupon, setCoupon] = useState<NenCoupon>({ isEnabled: true, codePrefix: 'NENBDAY', benefitLabel: 'お誕生日月限定クーポン', discountAmount: 500, validityDays: 31, leapYearPolicy: 'feb28' })
+  const [couponOpen, setCouponOpen] = useState(false)
+  const [savingCoupon, setSavingCoupon] = useState(false)
   const [saving, setSaving] = useState<string | null>(null)
   const [testing, setTesting] = useState<string | null>(null)
   const [previewCampaignKey, setPreviewCampaignKey] = useState<string | null>(null)
-  const [previewColumnId, setPreviewColumnId] = useState<string | null>(null)
-  const [editingColumnId, setEditingColumnId] = useState<string | null>(null)
+  const [selectedColumnId, setSelectedColumnId] = useState<string | null>(null)
+  const [audienceCount, setAudienceCount] = useState<number | null>(null)
+  const [plan, setPlan] = useState<ColumnDeliveryPlan>(() => ({ when: 'now', scheduledAt: defaultScheduleLocal(new Date()) }))
+  const [introDraft, setIntroDraft] = useState('')
   const [savingColumnId, setSavingColumnId] = useState<string | null>(null)
   const [testFriendId, setTestFriendId] = useState('')
   const [notice, setNotice] = useState<Notice | null>(null)
   const [loading, setLoading] = useState(true)
-  const [tabErrors, setTabErrors] = useState<Record<NenTab, string>>({ flow: '', columns: '', pets: '', history: '' })
-  const [petDraft, setPetDraft] = useState({ friendId: '', name: '', animalType: 'dog', gender: 'unknown', birthday: '' })
+  const [tabErrors, setTabErrors] = useState<Record<NenTab, string>>(EMPTY_ERRORS)
   const loadSequence = useRef(0)
   const loadedTabs = useRef<Set<NenTab>>(new Set())
   const tabRef = useRef<NenTab>(tab)
   tabRef.current = tab
 
   /*
-    開いたタブのぶんだけ取る(点検 #512 の中3)。8件同時取得だと遅く、
-    1件の失敗で画面全体がエラーになる。失敗はそのタブだけの帯で示し、
-    操作後は関係するタブだけ読み直す。
+    数値カード帯はどのタブでも同じ4枚（★V6 37-6）。今月と先月を月の範囲で取る。
+    自動配信・停止中・コラムは同じ取得で足りる。送った履歴だけ別に取る。
   */
   const loadTab = useCallback(async (next: NenTab) => {
     const sequence = ++loadSequence.current
     setLoading(true)
     if (!selectedAccountId) {
-      setSettings([]); setColumns([]); setPets([])
-      setFlowMetrics(null); setColumnMetrics(null); setPetMetrics(null); setDeliveryList(null); setDeliveryDetail(null)
-      setTabErrors({ flow: '', columns: '', pets: '', history: '' })
+      setSettings([]); setColumns([]); setKpis(null)
+      setFlowMetrics(null); setColumnMetrics(null); setDeliveryList(null); setDeliveryDetail(null)
+      setTabErrors(EMPTY_ERRORS)
       loadedTabs.current.clear()
       setLoading(false); return
     }
@@ -103,34 +91,51 @@ export default function NenCampaignsPage() {
       setLoading(false)
     }
     try {
-      if (next === 'flow') {
-        const [settingRes, flowRes] = await Promise.all([
-          api.nenCampaigns.settings(selectedAccountId), api.nenCampaigns.flowMetrics(selectedAccountId),
-        ])
-        if (sequence !== loadSequence.current) return
-        if (!settingRes.success || !flowRes.success) return fail('フォロー配信の情報を読み込めませんでした。')
-        setSettings(settingRes.data); setFlowMetrics(flowRes.data); done()
-      } else if (next === 'columns') {
-        const [columnRes, columnMetricRes] = await Promise.all([
-          api.nenCampaigns.columns(selectedAccountId), api.nenCampaigns.columnMetrics(selectedAccountId, 90),
-        ])
-        if (sequence !== loadSequence.current) return
-        if (!columnRes.success || !columnMetricRes.success) return fail('コラムの情報を読み込めませんでした。')
-        setColumns(columnRes.data); setColumnMetrics(columnMetricRes.data); done()
-      } else if (next === 'pets') {
-        const [petRes, petMetricRes, couponRes] = await Promise.all([
-          api.nenCampaigns.pets(selectedAccountId),
-          api.nenCampaigns.petMetrics(selectedAccountId), api.nenCampaigns.birthdayCoupon(selectedAccountId),
-        ])
-        if (sequence !== loadSequence.current) return
-        if (!petRes.success || !petMetricRes.success || !couponRes.success) return fail('ペットの情報を読み込めませんでした。')
-        setPets(petRes.data); setPetMetrics(petMetricRes.data); setCoupon(couponRes.data); done()
-      } else {
+      if (next === 'history') {
         const deliveryRes = await api.nenCampaigns.deliveries(selectedAccountId, { limit: 20 })
         if (sequence !== loadSequence.current) return
-        if (!deliveryRes.success) return fail('配信履歴を読み込めませんでした。')
+        if (!deliveryRes.success) return fail('送った履歴を読み込めませんでした。')
         setDeliveryList(deliveryRes.data); done()
+        return
       }
+      const now = new Date()
+      const thisMonth = jstMonthRange(now)
+      const lastMonth = jstMonthRange(now, -1)
+      const [settingRes, columnRes, flowRes, columnMetricRes, thisMonthRes, lastMonthRes, couponRes] = await Promise.all([
+        api.nenCampaigns.settings(selectedAccountId),
+        api.nenCampaigns.columns(selectedAccountId),
+        api.nenCampaigns.flowMetrics(selectedAccountId, { from: thisMonth.from, to: thisMonth.to }),
+        api.nenCampaigns.columnMetrics(selectedAccountId, { from: thisMonth.from, to: thisMonth.to }),
+        api.nenCampaigns.deliveries(selectedAccountId, { from: thisMonth.from, to: thisMonth.to, limit: 1 }),
+        api.nenCampaigns.deliveries(selectedAccountId, { from: lastMonth.from, to: lastMonth.to, limit: 1 }),
+        api.nenCampaigns.birthdayCoupon(selectedAccountId),
+      ])
+      if (sequence !== loadSequence.current) return
+      if (!settingRes.success || !columnRes.success || !flowRes.success || !columnMetricRes.success || !thisMonthRes.success || !lastMonthRes.success) {
+        return fail(next === 'columns' ? 'コラムの情報を読み込めませんでした。' : '自動配信の情報を読み込めませんでした。')
+      }
+      setSettings(settingRes.data); setColumns(columnRes.data)
+      setFlowMetrics(flowRes.data); setColumnMetrics(columnMetricRes.data)
+      if (couponRes.success) setCoupon(couponRes.data)
+      const openable = columnMetricRes.data.columns.filter((column) => column.articleOpened.state === 'available' && column.sent > 0)
+      const opened = openable.reduce((sum, column) => sum + (column.articleOpened.value ?? 0), 0)
+      const sentColumns = openable.reduce((sum, column) => sum + column.sent, 0)
+      const unmet = thisMonthRes.data.summary.unmetReasons ?? {}
+      setKpis({
+        monthLabel: thisMonth.label,
+        sentThisMonth: thisMonthRes.data.summary.sent,
+        sentLastMonth: lastMonthRes.data.summary.sent,
+        openRate: sentColumns > 0 ? Math.round((opened / sentColumns) * 100) : null,
+        orders: flowRes.data.summary.associatedConversions,
+        orderAmount: flowRes.data.summary.associatedConversionAmount,
+        undelivered: thisMonthRes.data.summary.failed,
+        blocked: unmet.blocked ?? 0,
+        unfollowed: unmet.unfollowed ?? 0,
+      })
+      // 数値カードは全タブで共通なので、自動配信・停止中・コラムの3つをまとめて読み込み済みにする。
+      for (const shared of ['auto', 'columns', 'paused'] as NenTab[]) loadedTabs.current.add(shared)
+      setTabErrors((current) => ({ ...current, auto: '', columns: '', paused: '' }))
+      done()
     } catch { fail('情報を読み込めませんでした。通信を確認してください。') }
   }, [selectedAccountId])
 
@@ -138,11 +143,12 @@ export default function NenCampaignsPage() {
   loadTabRef.current = loadTab
   useEffect(() => {
     loadedTabs.current.clear()
+    setSelectedColumnId(null)
     void loadTab(tabRef.current)
   }, [loadTab])
   useEffect(() => {
     const requested = new URLSearchParams(window.location.search).get('tab')
-    if (requested === 'columns' || requested === 'pets' || requested === 'history') {
+    if (isTab(requested) && requested !== 'auto') {
       setTab(requested)
       void loadTabRef.current(requested)
     }
@@ -160,18 +166,27 @@ export default function NenCampaignsPage() {
       const loginUsers = loginUserResult.status === 'fulfilled' && loginUserResult.value.success ? loginUserResult.value.data.filter((candidate) => candidate.sameAccount).map((candidate) => ({ id: candidate.id, displayName: candidate.staffName })) : []
       const accountFriends = friendResult.value.data.items.map((friend) => ({ id: friend.id, displayName: friend.displayName }))
       const list = [...new Map([...loginUsers, ...accountFriends].map((friend) => [friend.id, friend])).values()]
-      setFriends(list); setTestFriendId((current) => list.some((friend) => friend.id === current) ? current : list[0]?.id || ''); setPetDraft((current) => ({ ...current, friendId: current.friendId || list[0]?.id || '' }))
+      setFriends(list); setTestFriendId((current) => list.some((friend) => friend.id === current) ? current : list[0]?.id || '')
     }).catch(() => undefined)
     return () => { cancelled = true }
   }, [selectedAccountId])
 
+  // コラムを選ぶと、紹介文の下書きと「送る相手」の人数をそのコラムに合わせる。
+  const selectedColumn = columns.find((column) => column.id === selectedColumnId) ?? null
+  useEffect(() => {
+    setIntroDraft(selectedColumn?.introText ?? '')
+    setAudienceCount(null)
+    if (!selectedAccountId || !selectedColumn) return
+    let cancelled = false
+    api.nenCampaigns.columnAudience(selectedAccountId, selectedColumn.targetMode, selectedColumn.targetTagId)
+      .then((result) => { if (!cancelled && result.success) setAudienceCount(result.data.count) })
+      .catch(() => undefined)
+    return () => { cancelled = true }
+    // 選び直したときだけ取り直す（同じコラムの一覧再読込では人数を取り直さない）。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedAccountId, selectedColumn?.id, selectedColumn?.targetMode, selectedColumn?.targetTagId])
+
   const updateDraft = (key: string, patch: Partial<NenCampaignSetting>) => setSettings((current) => current.map((item) => item.campaignKey === key ? { ...item, ...patch } : item))
-  const saveSetting = async (setting: NenCampaignSetting, override?: Partial<NenCampaignSetting>) => {
-    if (!selectedAccountId) return
-    const next = { ...setting, ...override }; setSaving(setting.campaignKey); setNotice(null)
-    try { await api.nenCampaigns.updateSetting(selectedAccountId, setting.campaignKey, { isEnabled: next.isEnabled, title: next.title, bodyText: next.bodyText, delayDays: next.delayDays, deliveryTime: next.deliveryTime, buttonLabel: next.buttonLabel, buttonUrl: next.buttonUrl, imageUrl: next.imageUrl, dedupWindowDays: next.dedupWindowDays, excludeFormRespondents: next.excludeFormRespondents, afterActions: next.afterActions }); updateDraft(setting.campaignKey, next); setNotice({ tone: 'success', text: `${setting.label}の設定を保存しました。` }) }
-    catch { setNotice({ tone: 'error', text: `${setting.label}を保存できませんでした。` }) } finally { setSaving(null) }
-  }
   // 停止・再開だけは専用の口を使い、本文などは送り直さない。保存済み本文が
   // 上限を超えていても停止は必ずできる必要がある（#659差し戻し2点目）。
   const toggleSetting = async (setting: NenCampaignSetting) => {
@@ -181,7 +196,7 @@ export default function NenCampaignsPage() {
     try {
       await api.nenCampaigns.setEnabled(selectedAccountId, setting.campaignKey, nextEnabled)
       updateDraft(setting.campaignKey, { isEnabled: nextEnabled })
-      setNotice({ tone: 'success', text: `${setting.label}を${nextEnabled ? '再開' : '停止'}しました。` })
+      setNotice({ tone: 'success', text: `${setting.label}を${nextEnabled ? '動かしました' : '止めました'}。` })
     } catch { setNotice({ tone: 'error', text: `${setting.label}を切り替えられませんでした。` }) }
     finally { setSaving(null) }
   }
@@ -193,18 +208,44 @@ export default function NenCampaignsPage() {
   }
   const deliverColumn = async (column: NenColumn, scheduledAt?: string) => {
     if (!selectedAccountId) return
-    try { const result = await api.nenCampaigns.deliverColumn(column.id, { accountId: selectedAccountId, scheduledAt }); if (!result.success) throw new Error(result.error); setNotice({ tone: 'success', text: `${result.data.queued}人分のコラム配信を予約しました。` }); await loadTab('columns') }
-    catch { setNotice({ tone: 'error', text: 'コラムを配信予約できませんでした。' }) }
+    try {
+      const result = await api.nenCampaigns.deliverColumn(column.id, { accountId: selectedAccountId, scheduledAt })
+      if (!result.success) throw new Error(result.error)
+      setNotice({ tone: 'success', text: scheduledAt ? `「${column.title}」を${result.data.queued}人分 予約しました。` : `「${column.title}」を${result.data.queued}人分 配信待ちに入れました。` })
+      await loadTab('columns')
+    } catch { setNotice({ tone: 'error', text: 'コラムを配信予約できませんでした。コラムの配信が停止中でないか確認してください。' }) }
   }
   const saveColumnMessage = async (column: NenColumn) => {
-    if (!selectedAccountId || !column.introText.trim()) { setNotice({ tone: 'error', text: '紹介文を入力してください。' }); return }
+    if (!selectedAccountId || !introDraft.trim()) { setNotice({ tone: 'error', text: '紹介文を入力してください。' }); return }
     setSavingColumnId(column.id)
-    try { await api.nenCampaigns.updateColumnMessage(selectedAccountId, column.id, column.introText); setNotice({ tone: 'success', text: `「${column.title}」の配信文を保存しました。` }); setEditingColumnId(null) }
-    catch { setNotice({ tone: 'error', text: 'コラムの配信文を保存できませんでした。' }) } finally { setSavingColumnId(null) }
+    try {
+      await api.nenCampaigns.updateColumnMessage(selectedAccountId, column.id, introDraft)
+      setColumns((current) => current.map((item) => item.id === column.id ? { ...item, introText: introDraft } : item))
+      setNotice({ tone: 'success', text: `「${column.title}」の紹介文を保存しました。` })
+    } catch { setNotice({ tone: 'error', text: 'コラムの紹介文を保存できませんでした。' }) } finally { setSavingColumnId(null) }
+  }
+  /*
+    ★V6 37-6-A「ECのコラムを取り込む」。EC で保存されたコラムは Webhook で自動的に届く。
+    ここでは、宛先（LINEアカウント）が決まらずに未割り当てのまま残っている分を、
+    選択中のアカウントへ割り当てて一覧に出す。
+  */
+  const [importing, setImporting] = useState(false)
+  const importColumns = async () => {
+    if (!selectedAccountId || importing) return
+    setImporting(true); setNotice(null)
+    try {
+      const result = await api.nenCampaigns.importColumns(selectedAccountId)
+      if (!result.success) throw new Error(result.error)
+      setNotice({ tone: 'success', text: result.data.imported > 0
+        ? `ECのコラムを${result.data.imported}本 取り込みました。`
+        : '新しいコラムはありません。ECでコラムを保存すると自動でここに届きます。' })
+      await loadTab('columns')
+    } catch { setNotice({ tone: 'error', text: 'ECのコラムを取り込めませんでした。通信の状態を確認して、もう一度お試しください。' }) }
+    finally { setImporting(false) }
   }
   const duplicateColumn = async (column: NenColumn) => {
     if (!selectedAccountId) return
-    try { const result = await api.nenCampaigns.duplicateColumn(column.id, selectedAccountId); if (!result.success) throw new Error(); setNotice({ tone: 'success', text: `「${column.title}」を下書きへ複製しました。` }); await loadTab('columns') }
+    try { const result = await api.nenCampaigns.duplicateColumn(column.id, selectedAccountId); if (!result.success) throw new Error(); setNotice({ tone: 'success', text: `「${column.title}」を下書きへ複製しました。` }); await loadTab('columns'); setSelectedColumnId(result.data.id) }
     catch { setNotice({ tone: 'error', text: 'コラムを複製できませんでした。' }) }
   }
   const testColumn = async (column: NenColumn) => {
@@ -228,17 +269,6 @@ export default function NenCampaignsPage() {
     }
     catch { setNotice({ tone: 'error', text: '待っている配信の件数が変わりました。読み直して確認してください。' }) }
   }
-  const addPet = async () => {
-    if (!selectedAccountId || !petDraft.friendId || !petDraft.name.trim()) { setNotice({ tone: 'error', text: 'LINEユーザーとペットのお名前を入力してください。' }); return }
-    try { await api.nenCampaigns.createPet(selectedAccountId, { ...petDraft, birthday: petDraft.birthday || undefined }); setPetDraft((current) => ({ ...current, name: '', birthday: '', gender: 'unknown' })); setNotice({ tone: 'success', text: 'ペット情報を登録しました。' }); await loadTab('pets') }
-    catch { setNotice({ tone: 'error', text: 'ペット情報を登録できませんでした。' }) }
-  }
-  const deletePet = async (pet: NenPetProfile) => {
-    if (!selectedAccountId) return
-    try { await api.nenCampaigns.deletePet(selectedAccountId, pet.id); setNotice({ tone: 'success', text: `${pet.name}の登録を外しました。` }); await loadTab('pets') }
-    catch { setNotice({ tone: 'error', text: 'ペット情報を外せませんでした。' }) }
-  }
-  const [savingCoupon, setSavingCoupon] = useState(false)
   const saveCoupon = async () => {
     if (!selectedAccountId || savingCoupon) return
     // 空欄は 0 になるので、汎用エラー(400)になる前に具体的な直し方を出す。
@@ -255,7 +285,7 @@ export default function NenCampaignsPage() {
       return
     }
     setSavingCoupon(true)
-    try { await api.nenCampaigns.updateBirthdayCoupon(selectedAccountId, coupon); setNotice({ tone: 'success', text: 'お誕生日クーポン設定を保存しました。' }) }
+    try { await api.nenCampaigns.updateBirthdayCoupon(selectedAccountId, coupon); setNotice({ tone: 'success', text: 'お誕生日クーポン設定を保存しました。' }); setCouponOpen(false) }
     catch { setNotice({ tone: 'error', text: 'クーポン設定を保存できませんでした。' }) }
     finally { setSavingCoupon(false) }
   }
@@ -274,7 +304,7 @@ export default function NenCampaignsPage() {
       const result = await api.nenCampaigns.deliveries(selectedAccountId, { limit: 20, status, cursor })
       if (!result.success) throw new Error()
       setDeliveryList(result.data); setDeliveryDetail(null)
-    } catch { setNotice({ tone: 'error', text: '配信履歴を更新できませんでした。' }) }
+    } catch { setNotice({ tone: 'error', text: '送った履歴を更新できませんでした。' }) }
   }
   const retryDelivery = async (id: string, expectedVersion: number, reason: string) => {
     if (!selectedAccountId || !reason.trim()) { setNotice({ tone: 'error', text: '再送する理由を入力してください。' }); return }
@@ -286,16 +316,20 @@ export default function NenCampaignsPage() {
   }
   const changeTab = (next: NenTab) => {
     setTab(next)
-    window.history.replaceState(window.history.state, '', next === 'flow' ? '/nen-campaigns' : `/nen-campaigns?tab=${next}`)
-    void loadTab(next)
+    setNotice(null)
+    window.history.replaceState(window.history.state, '', next === 'auto' ? '/nen-campaigns' : `/nen-campaigns?tab=${next}`)
+    if (!loadedTabs.current.has(next)) void loadTab(next)
   }
 
   if (loading && loadedTabs.current.size === 0) return <main className="p-6"><ListState kind="loading" /></main>
 
-  const headerAction = tab === 'columns' ? <Button href="/nen-campaigns/columns/new" variant="primary">コラムを書く</Button>
-    : tab === 'pets' ? <Button href="/form-submissions" variant="primary">聞きとりフォームを開く</Button>
-      : tab === 'history' ? <Button disabled={!deliveryList?.summary.pending} onClick={() => void sendPendingNow()}>待っているものを今すぐ送る</Button>
-        : <Button onClick={() => document.getElementById('nen-test-send')?.scrollIntoView({ behavior: 'smooth' })}>テスト送信</Button>
+  /*
+    ヘッダー操作。★V6 37-6 の「配信を追加」は、自動配信の種類が実キー固定（追加口が無い）
+    ため置かない。コラムは ★V6 37-6-A どおり「ECのコラムを取り込む」（未割り当て分の割り当て）。
+  */
+  const headerAction = tab === 'columns' ? <Button type="button" variant="primary" disabled={importing || !selectedAccountId} onClick={() => void importColumns()}>{importing ? '取り込んでいます…' : 'ECのコラムを取り込む'}</Button>
+    : tab === 'history' ? <Button type="button" disabled={!deliveryList?.summary.pending} onClick={() => void sendPendingNow()}>待っているものを今すぐ送る</Button>
+      : null
 
   return (
     <>
@@ -303,7 +337,7 @@ export default function NenCampaignsPage() {
         <div className="mx-auto w-full px-4 pt-4 sm:px-6" style={{ maxWidth: 1600 }}>
           <NoteBar
             tone="danger"
-            action={<Button onClick={() => void loadTab(tab)}>もう一度読み込む</Button>}
+            action={<Button type="button" onClick={() => void loadTab(tab)}>もう一度読み込む</Button>}
           >
             {tabErrors[tab]}
           </NoteBar>
@@ -311,20 +345,21 @@ export default function NenCampaignsPage() {
       ) : null}
       <NenOverview
         topAction={headerAction}
-        tab={tab} onTabChange={changeTab} settings={settings} columns={columns} pets={pets} friends={friends} coupon={coupon}
-        flowMetrics={flowMetrics} columnMetrics={columnMetrics} petMetrics={petMetrics} deliveryList={deliveryList} deliveryDetail={deliveryDetail}
-        testFriendId={testFriendId} previewCampaignKey={previewCampaignKey} previewColumnId={previewColumnId} editingColumnId={editingColumnId}
-        saving={saving} testing={testing} savingColumnId={savingColumnId} petDraft={petDraft} notice={notice}
-        onTestFriendChange={setTestFriendId} onPreviewCampaign={setPreviewCampaignKey} onPreviewColumn={setPreviewColumnId} onEditColumn={setEditingColumnId}
-        onUpdateColumn={(id, introText) => setColumns((current) => current.map((column) => column.id === id ? { ...column, introText } : column))}
-        onSaveColumn={(column) => void saveColumnMessage(column)} onDeliverColumn={(column, scheduledAt) => void deliverColumn(column, scheduledAt)}
-        onDuplicateColumn={(column) => void duplicateColumn(column)} onTestColumn={(column) => void testColumn(column)}
+        tab={tab} onTabChange={changeTab} settings={settings} columns={columns} kpis={kpis}
+        flowMetrics={flowMetrics} columnMetrics={columnMetrics} deliveryList={deliveryList} deliveryDetail={deliveryDetail}
+        friends={friends} testFriendId={testFriendId} onTestFriendChange={setTestFriendId}
+        loading={loading} notice={notice}
+        saving={saving} testing={testing}
+        previewCampaignKey={previewCampaignKey} onPreviewCampaign={setPreviewCampaignKey}
         onToggleSetting={(setting) => void toggleSetting(setting)} onTestSend={(setting) => void testSend(setting)}
-        onPetDraftChange={setPetDraft} onAddPet={() => void addPet()} onDeletePet={(pet) => void deletePet(pet)} onCouponChange={setCoupon} onSaveCoupon={() => void saveCoupon()} savingCoupon={savingCoupon}
+        coupon={coupon} couponOpen={couponOpen} onCouponOpenChange={setCouponOpen} onCouponChange={setCoupon} onSaveCoupon={() => void saveCoupon()} savingCoupon={savingCoupon}
+        selectedColumnId={selectedColumnId} onSelectColumn={setSelectedColumnId} audienceCount={audienceCount}
+        plan={plan} onPlanChange={setPlan}
+        introDraft={introDraft} onIntroChange={setIntroDraft} onSaveIntro={(column) => void saveColumnMessage(column)} savingColumnId={savingColumnId}
+        onDeliverColumn={(column, scheduledAt) => void deliverColumn(column, scheduledAt)}
+        onDuplicateColumn={(column) => void duplicateColumn(column)} onTestColumn={(column) => void testColumn(column)}
         onShowDelivery={(id) => void showDelivery(id)} onRetryDelivery={(id, version, reason) => void retryDelivery(id, version, reason)}
         onChangeDeliveryView={(status, cursor) => void changeDeliveryView(status, cursor)}
-        renderCampaignPreview={(setting) => <CampaignLinePreview setting={setting} onClose={() => setPreviewCampaignKey(null)} />}
-        renderColumnPreview={(column) => <ColumnLinePreview column={column} onClose={() => setPreviewColumnId(null)} />}
       />
     </>
   )

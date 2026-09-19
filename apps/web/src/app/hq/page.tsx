@@ -9,6 +9,7 @@ import HqAccountList from '@/components/hq/account-list'
 import AccountEditModal from '@/components/accounts/account-edit-modal'
 import SummaryCard from '@/components/shared/summary-card'
 import OperatorHistory from '@/components/hq/operator-history'
+import PlatformNotices from '@/components/hq/platform-notices'
 
 export default function HqPage() {
   const router = useRouter()
@@ -96,6 +97,7 @@ export default function HqPage() {
 
   return (
     <div data-design-node="MjMCg">
+      <PlatformNotices />
       <div data-design="Actions" data-design-node="x5Tkb6" className="mb-4 flex flex-wrap justify-end gap-2">
         <Button
           type="button"
