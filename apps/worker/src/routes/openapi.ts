@@ -2512,6 +2512,180 @@ const spec = {
         responses: { '200': { description: 'Health summary' } },
       },
     },
+    // ── Webhooks (外部連携) ──────────────────────────────────────────────────
+    '/api/webhooks/outgoing/{id}': {
+      get: {
+        tags: ['Webhook'],
+        summary: '送信Webhookの詳細',
+        description: '編集画面が現在値を読むための口(#939 N-363)。secret は返さない。',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'lineAccountId', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        responses: { '200': { description: '詳細' }, '404': { description: 'Not found' } },
+      },
+    },
+    '/api/webhooks/incoming/{id}/unmatched': {
+      get: {
+        tags: ['Webhook'],
+        summary: '人が見つからなかった届物の一覧',
+        description: '受信Webhookの「未照合時の扱い」で unmatched_box / create_candidate を選んだ口に'
+          + '届いた未確認の一覧(#939 N-367)。照合に使った値と形だけの見本を返し、生の本文は返さない。',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'lineAccountId', in: 'query', required: true, schema: { type: 'string' } },
+          { name: 'status', in: 'query', required: false, schema: { type: 'string', enum: ['pending', 'resolved', 'dismissed'] } },
+        ],
+        responses: { '200': { description: '一覧' }, '404': { description: 'Not found' } },
+      },
+    },
+    '/api/webhooks/unmatched/{id}/resolve': {
+      post: {
+        tags: ['Webhook'],
+        summary: '未照合の届物を閉じる',
+        description: 'dismiss で何もせず閉じる、link で既存の友だちへ結び付けて閉じる(#939 N-367)。',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'lineAccountId', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['action'],
+                properties: {
+                  action: { type: 'string', enum: ['dismiss', 'link'] },
+                  friendId: { type: 'string' },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          '200': { description: '閉じた' },
+          '400': { description: 'Invalid request' },
+          '404': { description: 'Not found' },
+          '409': { description: 'すでに処理済み' },
+        },
+      },
+    },
+    '/api/webhooks/api-tokens': {
+      get: {
+        tags: ['Webhook'],
+        summary: '公開APIトークンの一覧',
+        description: '外部システムが /api/public/v1/* を呼ぶための合言葉の台帳(#939 N-380)。'
+          + 'hash・平文は返さず、失効済みは除く。',
+        parameters: [
+          { name: 'lineAccountId', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        responses: { '200': { description: '一覧' } },
+      },
+      post: {
+        tags: ['Webhook'],
+        summary: '公開APIトークンの発行',
+        description: '平文のトークンはこの応答に1回だけ返す。台帳には SHA-256 hash だけを残す(#939 N-380)。',
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['lineAccountId', 'name', 'scopes'],
+                properties: {
+                  lineAccountId: { type: 'string' },
+                  name: { type: 'string', minLength: 1, maxLength: 120 },
+                  scopes: { type: 'array', items: { type: 'string', enum: ['tags:read', 'tags:write'] } },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          '201': { description: '発行した。data.token に平文が1回だけ入る' },
+          '400': { description: 'Invalid request' },
+          '403': { description: 'Forbidden' },
+        },
+      },
+    },
+    '/api/webhooks/api-tokens/{id}/revoke': {
+      post: {
+        tags: ['Webhook'],
+        summary: '公開APIトークンの失効',
+        description: '行は消さず revoked_at に時刻を残す。失効したトークンは即座に使えなくなる(#939 N-380)。',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'lineAccountId', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        responses: { '200': { description: '失効した' }, '404': { description: 'Not found' } },
+      },
+    },
+    '/api/webhooks/api-tokens/{id}/rotate': {
+      post: {
+        tags: ['Webhook'],
+        summary: '公開APIトークンの再発行',
+        description: '旧トークンを即座に失効させ、同じ名前・範囲の新しいトークンを発行する(#939 N-380)。'
+          + '新しい平文はこの応答に1回だけ返す。',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'lineAccountId', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': { description: '再発行した。data.token に新しい平文が1回だけ入る' },
+          '404': { description: 'Not found' },
+        },
+      },
+    },
+    '/api/public/v1/tags': {
+      get: {
+        tags: ['Webhook'],
+        summary: 'タグ一覧（公開API）',
+        description: '外部システム向け公開API(#939 N-380)。管理画面の認証境界の外にあるため'
+          + ' security は空。route が `Authorization: Bearer lhp_…` の公開APIトークンを'
+          + '自分で照合し、scope tags:read が必要。トークンのアカウントのタグと'
+          + '共通タグだけを返す。',
+        security: [],
+        responses: {
+          '200': { description: 'タグ一覧' },
+          '401': { description: 'トークンが無いか無効' },
+          '403': { description: 'scope 不足' },
+        },
+      },
+    },
+    '/api/public/v1/friends/{friendId}/tags': {
+      post: {
+        tags: ['Webhook'],
+        summary: '友だちへのタグ付与（公開API）',
+        description: '外部システム向け公開API(#939 N-380)。管理画面の認証境界の外にあるため'
+          + ' security は空。route が `Authorization: Bearer lhp_…` の公開APIトークンを'
+          + '自分で照合し、scope tags:write が必要。'
+          + '友だちはトークンのアカウント所属、タグは同じアカウントか共通で、'
+          + '手動付与が禁じられたタグは付けない。管理画面の付与と同じ効果を持つ。',
+        security: [],
+        parameters: [{ name: 'friendId', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['tagId'],
+                properties: { tagId: { type: 'string' } },
+              },
+            },
+          },
+        },
+        responses: {
+          '200': { description: 'すでに付いていた' },
+          '201': { description: '付けた' },
+          '400': { description: 'Invalid request' },
+          '401': { description: 'トークンが無いか無効' },
+          '403': { description: 'scope 不足' },
+          '404': { description: 'Not found' },
+        },
+      },
+    },
     // ── Webhooks (保守) ──────────────────────────────────────────────────────
     '/api/webhooks/maintenance/secret-backfill': {
       post: {

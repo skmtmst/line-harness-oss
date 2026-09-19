@@ -764,7 +764,7 @@ export async function listCommonActionResources(
     ).bind(input.lineAccountId).all<{ id: string; name: string }>(),
     db.prepare(
       `SELECT id, name FROM outgoing_webhooks
-        WHERE line_account_id = ? AND is_active = 1 ORDER BY name ASC`,
+        WHERE line_account_id = ? AND is_active = 1 AND deleted_at IS NULL ORDER BY name ASC`,
     ).bind(input.lineAccountId).all<{ id: string; name: string }>(),
     db.prepare(
       `SELECT p.id, g.name || ' / ' || p.name AS name

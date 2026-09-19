@@ -1,6 +1,7 @@
-import type {
-  IncomingWebhookActionRef,
-  IncomingWebhookIdentityMatch,
+import {
+  recordIncomingWebhookUnmatched,
+  type IncomingWebhookActionRef,
+  type IncomingWebhookIdentityMatch,
 } from '@line-crm/db';
 import type { ActionDefinition, AutomationActionContext } from './automation-engine.js';
 import { stableWebhookStepId, type IncomingWebhookExecution } from './incoming-webhook-receipts.js';
@@ -14,6 +15,40 @@ type ActionRunResult = {
   executed: number;
   failed: number;
 };
+
+function jsonPathSegment(key: string): string {
+  return /^[A-Za-z_][A-Za-z0-9_-]*$/.test(key) ? `.${key}` : `[${JSON.stringify(key)}]`;
+}
+
+/**
+ * 届いた本文の「形」だけの見本。値はすべて •••• に伏せる。
+ * 受け取り口の詳細画面の最新見本と、未照合の届物(#939 N-367)の両方で使う。
+ */
+export function maskedPayloadShape(payload: unknown) {
+  const fields: Array<{ path: string; type: string; maskedValue: '••••' }> = [];
+  let truncated = false;
+  const visit = (value: unknown, path: string, depth: number) => {
+    if (fields.length >= 50) {
+      truncated = true;
+      return;
+    }
+    if (depth >= 6 || value === null || typeof value !== 'object') {
+      const type = value === null ? 'null' : Array.isArray(value) ? 'array' : typeof value;
+      fields.push({ path, type, maskedValue: '••••' });
+      return;
+    }
+    if (Array.isArray(value)) {
+      if (value.length === 0) fields.push({ path, type: 'array', maskedValue: '••••' });
+      else visit(value[0], `${path}[0]`, depth + 1);
+      return;
+    }
+    const entries = Object.entries(value as Record<string, unknown>);
+    if (entries.length === 0) fields.push({ path, type: 'object', maskedValue: '••••' });
+    for (const [key, child] of entries) visit(child, `${path}${jsonPathSegment(key)}`, depth + 1);
+  };
+  visit(payload, '$', 0);
+  return { fields, truncated };
+}
 
 function valueAtPath(payload: unknown, path: string): unknown {
   if (path === '$') return payload;
@@ -96,6 +131,49 @@ async function commonActionPlan(
   return parsed as ActionDefinition[];
 }
 
+/**
+ * N-367 (#939): 人が見つからなかった届物を「確認する箱」へ置く。
+ *
+ * unmatched_box / create_candidate はどちらも同じ箱の1行で、
+ * 違いは kind だけ（「未照合として確認」か「友だち候補として残す」か）。
+ * 自動で友だちは作らない。外部から届いた名乗りをそのまま友だちに
+ * すると成り済ませられるため、人が確かめてから結び付ける。
+ * 同じ受信の再送は台帳側の UNIQUE で増えない。
+ */
+async function recordNotFound(
+  db: D1Database,
+  input: {
+    webhookId: string;
+    lineAccountId: string;
+    sourceEventId: string;
+    payload: unknown;
+    identityMatching: IncomingWebhookIdentityMatch;
+    execution?: IncomingWebhookExecution;
+  },
+): Promise<void> {
+  const onNotFound = input.identityMatching.onNotFound;
+  if (onNotFound === 'do_nothing') return;
+  const attempts = input.identityMatching.methods
+    .map((method) => {
+      const raw = valueAtPath(input.payload, method.path);
+      const value = typeof raw === 'string' ? raw.trim()
+        : typeof raw === 'number' ? String(raw) : '';
+      return { kind: method.kind, path: method.path, value: value.slice(0, 200) };
+    })
+    .filter((attempt) => attempt.value !== '');
+  const record = () => recordIncomingWebhookUnmatched(db, {
+    webhookId: input.webhookId,
+    lineAccountId: input.lineAccountId,
+    sourceEventId: input.sourceEventId,
+    kind: onNotFound === 'create_candidate' ? 'candidate' : 'unmatched',
+    identityAttempts: attempts,
+    maskedShape: maskedPayloadShape(input.payload),
+    receivedAt: input.execution?.occurredAt,
+  });
+  if (input.execution) await input.execution.step('unmatched', record);
+  else await record();
+}
+
 export async function executeIncomingWebhookActions(
   db: D1Database,
   input: {
@@ -110,10 +188,21 @@ export async function executeIncomingWebhookActions(
   },
 ): Promise<ActionRunResult> {
   db = input.execution?.db ?? db;
-  if (input.actions.length === 0) return { matchedFriendId: null, executed: 0, failed: 0 };
+  /*
+   * 処理も未照合時の扱いも無いなら、照合そのものを省く(従来どおり)。
+   * 「見つからなかったら箱へ置く」が選ばれているときは、処理が0件でも
+   * 照合だけは行い、見つからなければ箱へ置く。
+   */
+  if (input.actions.length === 0 && input.identityMatching.onNotFound === 'do_nothing') {
+    return { matchedFriendId: null, executed: 0, failed: 0 };
+  }
   const resolve = () => resolveFriendId(db, input.lineAccountId, input.payload, input.identityMatching);
   const friendId = input.execution ? await input.execution.step('matched-friend', resolve) : await resolve();
-  if (!friendId) return { matchedFriendId: null, executed: 0, failed: 0 };
+  if (!friendId) {
+    await recordNotFound(db, input);
+    return { matchedFriendId: null, executed: 0, failed: 0 };
+  }
+  if (input.actions.length === 0) return { matchedFriendId: friendId, executed: 0, failed: 0 };
 
   const executors = createAutomationActionExecutors(input.dependencies);
   let executed = 0;
