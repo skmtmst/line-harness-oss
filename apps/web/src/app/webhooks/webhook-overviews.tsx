@@ -1,10 +1,11 @@
 'use client'
 
 import Link from 'next/link'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { IncomingWebhook, WebhookInteractionSummary } from '@line-crm/shared'
 import { api, type IncomingWebhookDetail, type IncomingWebhookUnmatchedItem, type OutgoingWebhookOverview } from '@/lib/api'
 import Button from '@/components/shared/button'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
 import ListToolbar from '@/components/shared/list-toolbar'
 import Notice, { type NoticeTone } from '@/components/shared/notice'
@@ -179,7 +180,17 @@ export function OutgoingOverview({
     「onClick で開き直す」が続けて起きて、閉じられなくなるのを避けるため。
   */
   const settingsRef = useRef<HTMLDivElement | null>(null)
+  /** 開いている設定メニューの箱。キー操作の対象をここから拾う。 */
+  const settingsMenuRef = useRef<HTMLDivElement | null>(null)
   const [testingId, setTestingId] = useState<string | null>(null)
+  /**
+   * 「1回 試してみる」の確認中の送り先(N-388)。
+   *
+   * 試し送信は登録した**本物のURL**へ届く。押した瞬間に送るのではなく、
+   * どこへ送るかを省略せず見せてから送る。確認画面で URL を伏せると
+   * 確認の意味がないので、一覧の maskedUrl ではなく設定値をそのまま出す。
+   */
+  const [testTarget, setTestTarget] = useState<OutgoingWebhookOverview | null>(null)
   /**
    * 「1回 試してみる」の結果(#506 中)。
    *
@@ -190,6 +201,7 @@ export function OutgoingOverview({
 
   const runTest = async (item: OutgoingWebhookOverview) => {
     if (!lineAccountId || testingId !== null) return
+    setTestTarget(null)
     setTestingId(item.id)
     setTestNotice(null)
     try {
@@ -239,25 +251,41 @@ export function OutgoingOverview({
 
   /*
     操作の吹き出しを、外側を押したときと Escape で閉じる(#705)。
+    N-385: さらにキーボードだけで開いて選べるようにする。
 
     ここは以前「設定」をもう一度押すまで閉じなかった。応答が返っても、
     画面の他の場所を押しても、Escape でも閉じない。この家の他の一覧
     (`reminders`・`tags-page-v4` が使う `components/shared/action-menu.tsx`、
     自前の `components/shared/folder-panel.tsx`)はどれも閉じる仕掛けを
     持っていて、**webhooks だけが持っていなかった。**同じ形に揃える。
+    N-385 ではメニュー作法（role=menu、最初の項目へフォーカス、矢印キーで
+    移動、Escape で閉じて「設定」ボタンへ戻る）も揃える。
 
     「選んだら閉じる」は入れない。押した瞬間に「止める」が消えると
     二重押しそのものが起こせなくなり、二重押し防止(page.tsx の
     togglingIdsRef)を見張っている試験の当て先が消えるため。送信中の
     見え方は #707 で別に扱う。
   */
+  const settingsMenuItems = useCallback((): HTMLElement[] => {
+    // 押せない項目（disabled / aria-disabled）は移動先に含めない。
+    return Array.from(
+      settingsMenuRef.current?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? [],
+    ).filter((el) => !el.hasAttribute('disabled') && el.getAttribute('aria-disabled') !== 'true')
+  }, [])
+
   useEffect(() => {
     if (settingsId === null) return
+    // 開いたら最初の項目へフォーカスを移す。マウスで開いたときも同じで、
+    // 矢印キーを押せばすぐ移動できる（menu の一般的な作法）。
+    settingsMenuItems()[0]?.focus()
     const onPointerDown = (event: PointerEvent) => {
       if (!settingsRef.current?.contains(event.target as Node)) setSettingsId(null)
     }
     const onKeyDown = (event: globalThis.KeyboardEvent) => {
-      if (event.key === 'Escape') setSettingsId(null)
+      if (event.key !== 'Escape') return
+      setSettingsId(null)
+      // 閉じたあとフォーカスが本文へ落ちないよう、開いた「設定」ボタンへ戻す。
+      settingsRef.current?.querySelector('button')?.focus()
     }
     document.addEventListener('pointerdown', onPointerDown)
     document.addEventListener('keydown', onKeyDown)
@@ -265,7 +293,26 @@ export function OutgoingOverview({
       document.removeEventListener('pointerdown', onPointerDown)
       document.removeEventListener('keydown', onKeyDown)
     }
-  }, [settingsId])
+  }, [settingsId, settingsMenuItems])
+
+  const onSettingsMenuKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    const items = settingsMenuItems()
+    if (items.length === 0) return
+    const currentIndex = items.indexOf(document.activeElement as HTMLElement)
+    if (event.key === 'ArrowDown' || event.key === 'ArrowRight') {
+      event.preventDefault()
+      items[(currentIndex + 1 + items.length) % items.length]?.focus()
+    } else if (event.key === 'ArrowUp' || event.key === 'ArrowLeft') {
+      event.preventDefault()
+      items[(currentIndex - 1 + items.length) % items.length]?.focus()
+    } else if (event.key === 'Home') {
+      event.preventDefault()
+      items[0]?.focus()
+    } else if (event.key === 'End') {
+      event.preventDefault()
+      items[items.length - 1]?.focus()
+    }
+  }
 
   return (
     <section aria-label="こちらから送る一覧">
@@ -393,11 +440,12 @@ export function OutgoingOverview({
                       <Button
                         variant="secondary"
                         disabled={!lineAccountId || testingId !== null || !item.isActive}
-                        onClick={() => void runTest(item)}
+                        onClick={() => setTestTarget(item)}
                       >{testingId === item.id ? '試しています…' : '1回 試してみる'}</Button>
                       <div className="relative" ref={settingsId === item.id ? settingsRef : null}>
                         <Button
                           variant="secondary"
+                          aria-haspopup="menu"
                           aria-expanded={settingsId === item.id}
                           onClick={() => setSettingsId((current) => current === item.id ? null : item.id)}
                         >
@@ -418,7 +466,13 @@ export function OutgoingOverview({
                             置けば他の行へはみ出さない。応答が返るまで開いたままでも、
                             奪うのは自分の行の中だけになる。
                           */
-                          <div className="bg-canvas border-hairline rounded-card absolute top-1/2 right-full z-10 mr-2 flex min-w-max -translate-y-1/2 gap-2 border p-2 shadow-lg">
+                          <div
+                            ref={settingsMenuRef}
+                            role="menu"
+                            aria-label={`「${item.name}」の設定`}
+                            onKeyDown={onSettingsMenuKeyDown}
+                            className="bg-canvas border-hairline rounded-card absolute top-1/2 right-full z-10 mr-2 flex min-w-max -translate-y-1/2 gap-2 border p-2 shadow-lg"
+                          >
                           {/*
                             送信中でも**押せる状態のまま**にする(#707)。
 
@@ -446,6 +500,7 @@ export function OutgoingOverview({
                           */}
                           <Button
                             variant="secondary"
+                            role="menuitem"
                             className="min-w-36"
                             onClick={() => onToggle(item.id, item.isActive)}
                             disabled={!item.isActive && !canActivate}
@@ -458,9 +513,9 @@ export function OutgoingOverview({
                               : (item.isActive ? '止める' : '動かす')}
                           </Button>
                           {/* N-363: 名前・URL・いつ送るか・送り直す回数を直す画面へ。 */}
-                          <Button variant="secondary" href={`/webhooks/edit?id=${item.id}`}>直す</Button>
-                          <Button variant="secondary" onClick={() => onRotate(item)}>合言葉</Button>
-                          <Button variant="secondary" onClick={() => onDelete(item)}>削除</Button>
+                          <Button variant="secondary" role="menuitem" href={`/webhooks/edit?id=${item.id}`}>直す</Button>
+                          <Button variant="secondary" role="menuitem" onClick={() => onRotate(item)}>合言葉</Button>
+                          <Button variant="secondary" role="menuitem" onClick={() => onDelete(item)}>削除</Button>
                           </div>
                         ) : null}
                       </div>
@@ -479,6 +534,35 @@ export function OutgoingOverview({
         </p>
         <Pagination page={page} pageCount={pageCount} onPageChange={setPage} />
       </div>
+
+      {/*
+        N-388: 試し送信は登録した本物のURLへ届く。ボタンを押しただけでは
+        送らず、どこへ何を送るかを確かめてから送る。URLは確認のために
+        省略せずそのまま出す。
+      */}
+      <ConfirmDialog
+        open={testTarget !== null}
+        title="試し送信をします"
+        description={
+          testTarget
+            ? `「${testTarget.name}」へ、試し用のデータを1回だけ送ります。実際の連携先へ届きます。`
+            : ''
+        }
+        confirmLabel="この送り先へ送る"
+        cancelLabel="やめる"
+        busy={testingId !== null}
+        onConfirm={() => {
+          if (testTarget) void runTest(testTarget)
+        }}
+        onCancel={() => setTestTarget(null)}
+      >
+        {testTarget ? (
+          <div className="bg-canvas-sunken rounded-control p-3">
+            <p className="text-ink-faint text-xs">送り先のURL</p>
+            <code className="text-ink mt-1 block break-all text-sm">{testTarget.url}</code>
+          </div>
+        ) : null}
+      </ConfirmDialog>
     </section>
   )
 }

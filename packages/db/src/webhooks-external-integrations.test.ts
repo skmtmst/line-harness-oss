@@ -142,7 +142,7 @@ describe('Webhookの論理削除 (N-368)', () => {
 
     expect(await getOutgoingWebhookById(db, created.id, 'account-a')).toBeNull();
     expect(await getOutgoingWebhooks(db, 'account-a')).toEqual([]);
-    expect(await getActiveOutgoingWebhooksByEvent(db, 'account-a', 'message')).toEqual([]);
+    expect(await getActiveOutgoingWebhooksByEvent(db, 'message', 'account-a')).toEqual([]);
     expect(await getOutgoingWebhookDeliverySummaries(db, 'account-a')).toEqual([]);
   });
 

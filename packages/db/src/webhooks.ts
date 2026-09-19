@@ -339,6 +339,22 @@ export async function listFailedWebhookInteractionsForRetry(
   return result.results ?? [];
 }
 
+/**
+ * まとめて再試行の対象になる失敗記録の総数。
+ * 1リクエストの外部通信上限で一部しか処理できないとき、残り件数を
+ * 画面へ明示するために使う（N-387: 対象外を黙って残さない）。
+ */
+export async function countFailedWebhookInteractionsForRetry(
+  db: D1Database,
+  lineAccountId: string,
+): Promise<number> {
+  const row = await db.prepare(
+    `SELECT COUNT(*) AS count FROM webhook_interaction_logs
+      WHERE line_account_id=? AND direction='outgoing' AND status='failed'`,
+  ).bind(lineAccountId).first<{ count: number }>();
+  return Number(row?.count ?? 0);
+}
+
 export async function getOutgoingWebhookDeliverySummaries(
   db: D1Database,
   lineAccountId: string,
@@ -1023,10 +1039,28 @@ export async function getActiveOutgoingWebhooksByEvent(
     `)
     .bind(lineAccountId)
     .all<OutgoingWebhookRow>();
-  return all.results.filter((w) => {
-    const types: string[] = JSON.parse(w.event_types);
-    return types.includes(eventType) || types.includes('*');
-  });
+  // N-376: event_types が壊れた1行で配送全体を止めない。壊れた行だけを
+  // 構造化ログで記録して除外し、健全な行への配送は継続する。
+  const matched: OutgoingWebhookRow[] = [];
+  for (const w of all.results) {
+    let types: unknown;
+    try {
+      types = JSON.parse(w.event_types);
+    } catch {
+      console.error(
+        JSON.stringify({ event: 'outgoing_webhook_event_types_broken', webhookId: w.id, reason: 'malformed_json' }),
+      );
+      continue;
+    }
+    if (!Array.isArray(types)) {
+      console.error(
+        JSON.stringify({ event: 'outgoing_webhook_event_types_broken', webhookId: w.id, reason: 'event_types_not_array' }),
+      );
+      continue;
+    }
+    if (types.includes(eventType) || types.includes('*')) matched.push(w);
+  }
+  return matched;
 }
 
 // --- 人が見つからなかった届物（#939 N-367） ---
