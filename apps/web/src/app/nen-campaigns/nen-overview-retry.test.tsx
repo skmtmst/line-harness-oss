@@ -89,6 +89,7 @@ function renderHistory(rows: NenDelivery[], detail: NenDeliveryDetail | null, on
         friends={[]}
         testFriendId=""
         onTestFriendChange={noop}
+        accountId={null}
         loading={false}
         notice={null}
         saving={null}

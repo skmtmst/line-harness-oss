@@ -19,6 +19,8 @@ interface DueRow {
   channel_access_token: string;
   channel_access_token_encrypted: string | null;
   line_user_id: string;
+  /** 店舗設定の当日お知らせオフセット。NULL = 既定 (params.reminderHoursBefore)。 */
+  reminder_hours_before: number | null;
 }
 
 export interface ProcessRemindersParams {
@@ -48,13 +50,15 @@ export async function processDueReminders(
               s.display_name AS staff_name,
               la.channel_access_token,
               la.channel_access_token_encrypted,
-              f.line_user_id
+              f.line_user_id,
+              bs.reminder_hours_before
          FROM booking_reminders r
          INNER JOIN bookings b ON b.id = r.booking_id
          INNER JOIN menus m ON m.id = b.menu_id
          INNER JOIN staff s ON s.id = b.staff_id
          INNER JOIN line_accounts la ON la.id = b.line_account_id
          INNER JOIN friends f ON f.id = b.friend_id
+          LEFT JOIN booking_settings bs ON bs.line_account_id = b.line_account_id
         WHERE r.status IN ('pending','failed')
           AND r.scheduled_at <= ?
           AND b.status = 'confirmed'
@@ -117,7 +121,9 @@ export async function processDueReminders(
           menuName: row.menu_name,
           staffName: row.staff_name,
           startsAtJst: startsAtJst(row.starts_at),
-          hoursBefore: params.reminderHoursBefore,
+          // N-395: 店舗設定のオフセットを文面にも反映する。
+          // 未設定の店舗は呼び出し側の既定値 (2時間前) のまま。
+          hoursBefore: row.reminder_hours_before ?? params.reminderHoursBefore,
         },
       });
       await db

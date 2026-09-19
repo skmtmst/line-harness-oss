@@ -1124,6 +1124,22 @@ CREATE TABLE billing_events (
   received_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 );
 
+CREATE TABLE booking_audit_logs (
+  id              TEXT PRIMARY KEY,
+  booking_id      TEXT NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
+  line_account_id TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
+  action          TEXT NOT NULL,
+  before_json     TEXT CHECK (before_json IS NULL OR json_valid(before_json)),
+  after_json      TEXT CHECK (after_json IS NULL OR json_valid(after_json)),
+  reason          TEXT,
+  actor_type      TEXT NOT NULL CHECK (actor_type IN ('customer', 'staff', 'system')),
+  actor_id        TEXT,
+  actor_name      TEXT,
+  occurred_at     TEXT NOT NULL,   -- UTC ISO8601。Worker が書く
+  request_id      TEXT,
+  created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
+);
+
 CREATE TABLE booking_availability_exceptions (
   id TEXT PRIMARY KEY,
   line_account_id TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
@@ -1262,7 +1278,12 @@ CREATE TABLE booking_settings (
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 , business_hours_configured INTEGER NOT NULL DEFAULT 0
-  CHECK (business_hours_configured IN (0, 1)));
+  CHECK (business_hours_configured IN (0, 1)), reminder_day_before_time TEXT
+  CHECK (reminder_day_before_time IS NULL
+         OR (reminder_day_before_time GLOB '[0-2][0-9]:[0-5][0-9]'
+             AND substr(reminder_day_before_time, 1, 2) <= '23')), reminder_hours_before INTEGER
+  CHECK (reminder_hours_before IS NULL
+         OR reminder_hours_before BETWEEN 1 AND 72));
 
 CREATE TABLE "bookings" (
   id                           TEXT PRIMARY KEY,
@@ -6419,6 +6440,9 @@ CREATE INDEX idx_banner_usage_tenant_created
 
 CREATE INDEX idx_billing_events_tenant
   ON billing_events(tenant_id, received_at DESC);
+
+CREATE INDEX idx_booking_audit_logs_booking
+  ON booking_audit_logs(line_account_id, booking_id, occurred_at);
 
 CREATE INDEX idx_booking_business_hours_setting_weekday
   ON booking_business_hours(booking_settings_id, weekday, start_time);

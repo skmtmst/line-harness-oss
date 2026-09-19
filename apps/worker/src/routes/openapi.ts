@@ -3257,6 +3257,97 @@ const spec = {
         },
       },
     },
+    // ── Booking detail edit / retry / audit (N-389〜N-394 #932) ─────────────
+    '/api/booking/admin/bookings/{id}': {
+      patch: {
+        tags: ['Booking'], summary: '予約内容を版付きで変更',
+        description: 'requested/confirmed の予約だけ変更できる。lock_version 必須の楽観ロックで、日時・担当・メニュー・料金・メモ・通知方針を変える。変更対象の予約自身は重なり・席数・資源ガードから外す。LINE未連携の予約へ送信系方針をオンにはできない。',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        requestBody: { required: true, content: { 'application/json': { schema: {
+          type: 'object', required: ['lock_version'],
+          properties: {
+            lock_version: { type: 'integer', minimum: 0 },
+            menu_id: { type: 'string' },
+            staff_id: { type: 'string' },
+            starts_at: { type: 'string', format: 'date-time' },
+            price: { type: 'integer', minimum: 0, maximum: 100000000 },
+            customer_note: { type: ['string', 'null'], maxLength: 2000 },
+            internal_note: { type: ['string', 'null'], maxLength: 2000 },
+            notification_policy: {
+              type: 'object',
+              description: 'この予約だけの通知可否。変更したいキーだけ送る。',
+              properties: {
+                send_line_confirmation: { type: 'boolean' },
+                day_before: { type: 'boolean' },
+                hours_before: { type: 'boolean' },
+              },
+            },
+            send_change_notification: { type: 'boolean', description: 'false で今回の変更案内を送らない' },
+            reason: { type: 'string', maxLength: 200, description: '変更履歴に残す理由' },
+          },
+        } } } },
+        responses: {
+          '200': { description: '変更後の版・カレンダー同期・通知・リマインダの実績' },
+          '400': { description: 'JSON不備または lock_version 未指定' },
+          '404': { description: '予約または担当が対象アカウントに存在しない' },
+          '409': { description: '版競合・変更不可の状態・枠の衝突' },
+          '422': { description: 'メニュー未提供・過去日時・料金不備・方針不備・未連携への送信指定' },
+        },
+      },
+    },
+    '/api/booking/admin/bookings/{id}/audit-logs': {
+      get: {
+        tags: ['Booking'], summary: '予約の変更履歴を新しい順に取得',
+        description: '誰が・いつ・何を変えたかのappend-only履歴。対象アカウントの予約だけ返す。',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+          { name: 'limit', in: 'query', required: false, schema: { type: 'integer', minimum: 1, maximum: 200, default: 100 } },
+        ],
+        responses: {
+          '200': { description: '変更履歴の一覧' },
+          '400': { description: 'account_id 未指定' },
+          '404': { description: '予約が対象アカウントに存在しない' },
+        },
+      },
+    },
+    '/api/booking/admin/bookings/{id}/sync/retry': {
+      post: {
+        tags: ['Booking'], summary: '失敗したGoogleカレンダー反映を現在の予約状態で再試行',
+        description: 'retry_wait / permanent_failed の google_calendar 台帳行だけを対象に、同じ行を再利用して再実行する。確定予約は反映、取消・期限切れは削除、未設定は skipped で閉じる。実行中（queued）は409。',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': { description: '再試行の結果状態' },
+          '400': { description: 'account_id 未指定' },
+          '404': { description: '予約が対象アカウントに存在しない' },
+          '409': { description: '再試行できる失敗が無い、または実行中' },
+        },
+      },
+    },
+    '/api/booking/admin/bookings/{id}/notifications/{runId}/retry': {
+      post: {
+        tags: ['Booking'], summary: '失敗したLINE通知を同じ台帳行のまま再送',
+        description: 'confirmation_line の失敗行だけを対象に再送する。成功済み・取消済みは409、未連携の予約は422。再送の成否は台帳行へ error_code と共に残し、変更履歴にも記録する。',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'runId', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': { description: '再送の結果と台帳の状態' },
+          '400': { description: 'account_id 未指定' },
+          '404': { description: '予約または台帳行が対象アカウントに存在しない' },
+          '409': { description: '成功済み・取消済み・実行中' },
+          '422': { description: 'LINE未連携の予約' },
+        },
+      },
+    },
     // ── Booking staff breaks (N-405 #655) ────────────────────────────────────
     '/api/booking/admin/staff/{id}/breaks': {
       get: {

@@ -10,10 +10,14 @@ const editor = readFileSync(join(directory, 'edit/campaign-editor.tsx'), 'utf8')
 const api = readFileSync(join(directory, '../../lib/api.ts'), 'utf8');
 
 describe('NEN配信のテスト送信先', () => {
-  test('100件制限に埋もれるログインユーザーを候補の先頭へ統合する', () => {
-    expect(page).toContain('api.accountSettings.getTestRecipientLoginUsers(selectedAccountId)');
-    expect(page).toContain('.filter((candidate) => candidate.sameAccount)');
-    expect(page).toContain('new Map([...loginUsers, ...accountFriends]');
+  test('候補は「設定 › アカウント › テスト送信先」に登録した人だけ（実口 getTestRecipient と同じ範囲）', () => {
+    // 登録されていない友だちを候補に並べると、押しても届かず理由も分からない（2026-09-19 検証環境で発生）。
+    expect(page).toContain('api.accountSettings.getTestRecipients(selectedAccountId)');
+    expect(page).not.toContain('api.friends.list({ accountId: selectedAccountId, limit: 100');
+    expect(overview).toContain('テスト送信先が未登録です');
+    expect(overview).toContain('/accounts/detail?id=');
+    // 送信先の問題（未登録・友だち解除）は直し方まで言う。
+    expect(page).toContain("caught.code === 'test_recipient_unavailable'");
   });
 
   test('編集画面でもLINE連携済みログインユーザーを最初から選べる', () => {

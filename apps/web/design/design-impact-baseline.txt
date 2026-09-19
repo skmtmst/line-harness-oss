@@ -16,6 +16,7 @@ shared-button-importer app/automations/new/page.tsx
 shared-button-importer app/automations/page.tsx
 shared-button-importer app/automations/runs/page.tsx
 shared-button-importer app/booking/bookings/booking-calendar.tsx
+shared-button-importer app/booking/bookings/detail/page.tsx
 shared-button-importer app/booking/bookings/new/page.tsx
 shared-button-importer app/booking/menus/new/page.tsx
 shared-button-importer app/booking/bookings/page.tsx

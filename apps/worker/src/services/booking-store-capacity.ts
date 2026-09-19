@@ -59,3 +59,30 @@ export const STORE_CAPACITY_GUARD_SQL = `AND NOT EXISTS (
 export const STORE_SETTINGS_VERSION_GUARD_SQL = `AND COALESCE((
   SELECT version FROM booking_settings WHERE line_account_id = ?
 ), 0) = ?`;
+
+/**
+ * 予約変更 (PATCH) 版の席数ガード。変更対象そのものを占有率の数から外す。
+ * 自予約を含めると、同じ枠のまま料金だけ直す変更が「自分で満席」になる。
+ * Bind: clipped windows JSON, account, excludeBookingId, account, excludeBookingId.
+ */
+export const STORE_CAPACITY_GUARD_EXCLUDE_SQL = `AND NOT EXISTS (
+  SELECT 1 FROM json_each(?) AS store_window
+   WHERE EXISTS (
+     SELECT 1 FROM (
+       SELECT julianday(json_extract(store_window.value, '$.start')) AS point
+       UNION ALL
+       SELECT julianday(starts_at) AS point FROM bookings
+        WHERE line_account_id = ? AND status IN ('requested','confirmed')
+          AND id != ?
+          AND julianday(starts_at) > julianday(json_extract(store_window.value, '$.start'))
+          AND julianday(starts_at) < julianday(json_extract(store_window.value, '$.end'))
+     ) AS points
+     WHERE (
+       SELECT COUNT(*) FROM bookings
+        WHERE line_account_id = ? AND status IN ('requested','confirmed')
+          AND id != ?
+          AND julianday(starts_at) <= points.point
+          AND julianday(block_ends_at) > points.point
+     ) >= json_extract(store_window.value, '$.capacity')
+   )
+)`;
