@@ -100,6 +100,14 @@ function FriendsPageInner({
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const selectedFriendIds = useMemo(() => [...selectedIds], [selectedIds])
   const loadRequestRef = useRef(0)
+  /*
+   * 応答が「どのアカウント・どのページのものか」を照合する現在値。
+   * 要求IDだけでは同じ並びで発行した別対象の応答を区別できない。
+   * 切替直後に遅れて届いた別アカウント・別ページの応答を捨てる(#964)。
+   * 描画のたびに同期する(chats画面の listFilterKeyRef と同じ型)。
+   */
+  const loadContextRef = useRef({ accountId: selectedAccountId, page, pageSize })
+  loadContextRef.current = { accountId: selectedAccountId, page, pageSize }
 
   /*
     **URLから来る絞り込みも数える。** 行動スコアの「この帯の人を見る」は
@@ -130,15 +138,20 @@ function FriendsPageInner({
   }, [])
 
   const loadOptions = useCallback(async () => {
+    // 要求が向かったアカウントを固定する(#964)。シナリオ・対応マークの
+    // 候補はアカウントごとの中身なので、切替後に届いた前のアカウントの
+    // 応答で絞り込みの選択肢を上書きしない。
+    const requestedAccountId = selectedAccountId
     try {
       const [tagResponse, operatorResponse, scenarioResponse, markResponse] = await Promise.all([
         api.tags.list(),
         api.operators.list(),
-        api.scenarios.list(selectedAccountId ? { accountId: selectedAccountId } : undefined),
-        selectedAccountId && marksEnabled
-          ? api.supportMarks.list(selectedAccountId, { suppressFeatureDisabledEvent: true })
+        api.scenarios.list(requestedAccountId ? { accountId: requestedAccountId } : undefined),
+        requestedAccountId && marksEnabled
+          ? api.supportMarks.list(requestedAccountId, { suppressFeatureDisabledEvent: true })
           : Promise.resolve({ success: true as const, data: [] }),
       ])
+      if (loadContextRef.current.accountId !== requestedAccountId) return
       if (tagResponse.success) setAllTags(tagResponse.data)
       if (operatorResponse.success) setOperators(operatorResponse.data)
       if (scenarioResponse.success) setScenarios(scenarioResponse.data)
@@ -153,6 +166,11 @@ function FriendsPageInner({
 
   const loadFriends = useCallback(async () => {
     const requestId = ++loadRequestRef.current
+    // 要求が向かった対象を固定する。応答時に現在値と照合し、
+    // 別アカウント・別ページへ切り替わったあとの遅い応答は捨てる(#964)。
+    const requestedAccountId = selectedAccountId
+    const requestedPage = page
+    const requestedPageSize = pageSize
     setLoadStatus('loading')
     setFriends([])
     setTotal(0)
@@ -177,6 +195,10 @@ function FriendsPageInner({
         scoreMax,
       })
       if (requestId !== loadRequestRef.current) return
+      const context = loadContextRef.current
+      if (context.accountId !== requestedAccountId
+        || context.page !== requestedPage
+        || context.pageSize !== requestedPageSize) return
       if (response.success) {
         setFriends(response.data.items)
         setTotal(response.data.total)
@@ -189,6 +211,10 @@ function FriendsPageInner({
       }
     } catch {
       if (requestId !== loadRequestRef.current) return
+      const context = loadContextRef.current
+      if (context.accountId !== requestedAccountId
+        || context.page !== requestedPage
+        || context.pageSize !== requestedPageSize) return
       setFriends([])
       setTotal(0)
       setLoadStatus('error')
