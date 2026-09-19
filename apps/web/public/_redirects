@@ -15,7 +15,6 @@
 /duplicates      /friends?tab=duplicates     308
 /users           /friends?tab=merged         308
 /support         /chats?channel=email        308
-/notifications   /webhooks?tab=notify        308
 /updates         /emergency?tab=history      308
 /pools           /accounts?tab=pools         308
 /affiliates      /conversions?tab=affiliates 308
