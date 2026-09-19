@@ -16,6 +16,7 @@ import { requirePhotoPermission } from './nen-photo-operations.js';
 import { verifyCallerLineIdentity } from '../services/liff-auth.js';
 import { pushViaHarnessProxy } from '../services/line-proxy-send.js';
 import { dispatchLineProxyLocally } from '../services/local-line-proxy.js';
+import { imageDimensions, stripImageMetadata } from '../services/media-metadata.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 import { installNenRichMenu } from '../services/nen-rich-menu.js';
 import {
@@ -184,15 +185,29 @@ export type ReviewPhotoRow = Record<string, unknown> & {
   channel_access_token_encrypted: string | null;
 };
 
+/*
+ * 投稿者へ届く審査結果の文面。
+ *
+ * `pointsQueued` は EC 会員とつながっていて付与アウトボックスへ
+ * 実際に積んだときだけ true。つながっていない採用に
+ * 「ポイントを付ける手続きを始めました」と届けるのは、
+ * できていない約束を本人へ伝えることになる（#931 N-307）。
+ *
+ * `resubmitInvite` は差戻し画面の「もう一度送ってもらえるようお願いする」。
+ * チェックを外して保存した分には案内を添えない（#931 N-312）。
+ */
 function photoReviewMessage(
   status: 'adopted' | 'rejected',
   reasonCode: PhotoReviewReasonCode | null,
   reasonNote: string | null,
+  options: { pointsQueued: boolean; resubmitInvite: boolean },
 ): string {
   if (status === 'adopted') {
     return [
       'お写真をご投稿いただきありがとうございます。',
-      '今回のお写真を採用し、5ポイントを付ける手続きを始めました。',
+      options.pointsQueued
+        ? '今回のお写真を採用し、5ポイントを付ける手続きを始めました。'
+        : '今回のお写真を採用しました。',
       '公開への同意をいただいている場合だけ、公開ギャラリーへ掲載します。',
     ].join('\n');
   }
@@ -201,7 +216,9 @@ function photoReviewMessage(
     'お写真をご投稿いただきありがとうございます。',
     `今回は「${reason}」のため、掲載を見送らせていただきました。`,
     ...(reasonNote ? [reasonNote] : []),
-    '内容をご確認のうえ、よろしければ別のお写真をご投稿ください。',
+    ...(options.resubmitInvite
+      ? ['内容をご確認のうえ、よろしければ別のお写真をご投稿ください。']
+      : []),
   ].join('\n');
 }
 
@@ -212,6 +229,7 @@ export async function sendPhotoReviewNotification(
   reasonCode: PhotoReviewReasonCode | null,
   reasonNote: string | null,
   decisionId: string,
+  options: { pointsQueued: boolean; resubmitInvite: boolean },
 ): Promise<void> {
   if (!photo.is_following) throw new Error('LINEの友だちではないため通知できません');
   const accessToken = await resolveLineCredential(
@@ -219,7 +237,7 @@ export async function sendPhotoReviewNotification(
     photo.channel_access_token,
     { lineAccountId: photo.line_account_id, field: 'channel_access_token' },
   );
-  const message = photoReviewMessage(status, reasonCode, reasonNote);
+  const message = photoReviewMessage(status, reasonCode, reasonNote, options);
   // X-Line-Retry-Key はLINE仕様でUUID形式が必須のため、UUIDのdecisionIdをそのまま使う。
   // `nen-photo-review:` 接頭辞を付けると実送信が400で失敗する。
   await pushViaHarnessProxy(
@@ -289,6 +307,8 @@ export async function deliverPhotoReviewNotification(
     reasonCode: PhotoReviewReasonCode | null;
     reasonNote: string | null;
     decisionId: string;
+    /** 差戻しメッセージへ再投稿の案内を添えるか（#931 N-312）。省略時は添える。 */
+    resubmitInvite?: boolean;
   },
 ): Promise<{ notificationStatus: 'sent' | 'failed'; notificationError: string | null; busy: boolean; relayed: boolean }> {
   const now = new Date().toISOString();
@@ -324,6 +344,11 @@ export async function deliverPhotoReviewNotification(
   try {
     await sendPhotoReviewNotification(
       c, recipient, input.status, input.reasonCode, input.reasonNote, input.decisionId,
+      {
+        // EC 会員とつながっている投稿者へだけ「手続きを始めた」と伝える（#931 N-307）。
+        pointsQueued: input.status === 'adopted' && Boolean(recipient.customer_id),
+        resubmitInvite: input.resubmitInvite !== false,
+      },
     );
     relayed = true;
   } catch (error) {
@@ -754,7 +779,8 @@ nenMembers.post('/api/liff/nen/pets/:id/photo', async (c) => {
   const bytes = decodeJpegData(body?.data);
   if (!bytes) return c.json({ success: false, error: 'ペット写真を確認してください' }, 400);
   const key = `nen-pet-profiles/${friend.id}/${pet.id}-${crypto.randomUUID()}.jpg`;
-  await c.env.IMAGES.put(key, bytes, { httpMetadata: { contentType: 'image/jpeg' }, customMetadata: { friendId: friend.id, petId: pet.id } });
+  // 公開配信される画像なので、撮影場所などの付帯メタデータは外して保存する（#931 N-310）。
+  await c.env.IMAGES.put(key, stripImageMetadata(bytes, 'image/jpeg'), { httpMetadata: { contentType: 'image/jpeg' }, customMetadata: { friendId: friend.id, petId: pet.id } });
   const imageUrl = `${c.env.WORKER_PUBLIC_URL || new URL(c.req.url).origin}/images/${key}`;
   await c.env.DB.prepare(`UPDATE nen_pet_profiles SET image_r2_key=?, image_url=?, updated_at=? WHERE id=? AND friend_id=?`)
     .bind(key, imageUrl, jstNow(), pet.id, friend.id).run();
@@ -856,25 +882,44 @@ nenMembers.post('/api/liff/nen/photos', async (c) => {
   if (detectedImageMime(bytes) !== body.mimeType) {
     return c.json({ success: false, error: '画像の内容と形式が一致しません' }, 400);
   }
+  /*
+   * 実寸法をヘッダから測る（#931 N-310）。申告の mimeType と実体の一致までは
+   * 見ているが、寸法までは見ていなかった。読み取れない壊れた画像と、
+   * 展開時に過大になる巨大寸法は投稿経路で止める。
+   */
+  const dimensions = imageDimensions(bytes, body.mimeType);
+  if (!dimensions) {
+    return c.json({ success: false, error: '画像の寸法を確認できませんでした' }, 400);
+  }
+  if (dimensions.width > 20000 || dimensions.height > 20000) {
+    return c.json({ success: false, error: '画像の寸法が大きすぎます（20000px以内にしてください）' }, 400);
+  }
   const id = crypto.randomUUID();
   const extension = IMAGE_TYPES[body.mimeType];
   const key = `nen-photo-originals/${friend.id}/${id}.${extension}`;
   const reviewKey = `nen-photo-review/${friend.id}/${id}-v1.${extension}`;
   const metadata = { friendId: friend.id, petId: body.petId || '', photoId: id };
+  /*
+   * 公開配信される審査用画像は付帯メタデータを外して保存する（#931 N-310）。
+   * 撮影場所・端末情報が /images/* から誰でも取れる状態を止める。
+   * 原本は二段階認証つきの取得だけに限る証跡として、そのまま残す。
+   */
+  const reviewBytes = stripImageMetadata(bytes, body.mimeType);
   await Promise.all([
     c.env.IMAGES.put(key, bytes, { httpMetadata: { contentType: body.mimeType }, customMetadata: metadata }),
-    c.env.IMAGES.put(reviewKey, bytes, { httpMetadata: { contentType: body.mimeType }, customMetadata: { ...metadata, derivative: 'review-v1' } }),
+    c.env.IMAGES.put(reviewKey, reviewBytes, { httpMetadata: { contentType: body.mimeType }, customMetadata: { ...metadata, derivative: 'review-v1' } }),
   ]);
   const reviewImageUrl = `${c.env.WORKER_PUBLIC_URL || new URL(c.req.url).origin}/images/${reviewKey}`;
   const now = jstNow();
   await c.env.DB.prepare(`INSERT INTO nen_photo_submissions
     (id, friend_id, pet_id, r2_key, image_url, content_type, caption, status,
-     created_at, updated_at, line_account_id, review_image_url, image_byte_size)
-    VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?)`)
+     created_at, updated_at, line_account_id, review_image_url,
+     image_width, image_height, image_byte_size)
+    VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?)`)
     .bind(
       id, friend.id, body.petId, key, reviewImageUrl, body.mimeType,
       String(body.caption || '').trim().slice(0, 300), now, now, friend.line_account_id,
-      reviewImageUrl, bytes.byteLength,
+      reviewImageUrl, dimensions.width, dimensions.height, bytes.byteLength,
     ).run();
   await syncNenPhotoTags(c.env.DB, friend.id);
   return c.json({ success: true, data: { id, imageUrl: reviewImageUrl, status: 'pending' } }, 201);
@@ -1107,13 +1152,23 @@ nenMembers.get('/api/nen-members/photos', requirePhotoPermission('photo.submissi
    */
   const limit = photoPageSize(c.req.query('limit'));
   const offset = photoPageOffset(c.req.query('offset'));
+  /*
+   * 名前・ペット名・コメントの部分一致で絞る（#931 N-308）。
+   * 200 枚ずつの区切りでしか見られない一覧だと、目的の1枚を探すのに
+   * 全部を読み進めるしかなかった。%・_・\ は LIKE の記号なので逃がす。
+   */
+  const q = (c.req.query('q') ?? '').trim().slice(0, 100);
+  const like = `%${q.replace(/[\\%_]/g, (ch) => `\\${ch}`)}%`;
   const rows = await c.env.DB.prepare(
     `SELECT ps.id, ps.friend_id, ps.pet_id, ps.review_image_url AS image_url,
             ps.caption, ps.status, ps.awarded_points, ps.created_at, ps.reviewed_at,
             ps.updated_at, ps.review_version, ps.publication_consent_at,
             ps.publication_withdrawn_at, ps.public_pet_name, ps.review_reason_code,
             ps.review_reason_note, ps.review_notification_status,
+            ps.display_rotation, f.photo_watch_required AS submitter_watch,
             p.name pet_name, f.display_name owner_name,
+            (SELECT o.status FROM nen_photo_reward_outbox o
+              WHERE o.photo_id = ps.id AND o.line_account_id = ps.line_account_id) AS point_sync_status,
             (SELECT r.flag FROM nen_photo_risk_assessments r
               WHERE r.photo_id = ps.id AND r.line_account_id = ps.line_account_id
               ORDER BY r.created_at DESC, r.id DESC LIMIT 1) AS latest_risk_flag,
@@ -1128,8 +1183,9 @@ nenMembers.get('/api/nen-members/photos', requirePhotoPermission('photo.submissi
        JOIN nen_pet_profiles p ON p.id = ps.pet_id
        JOIN friends f ON f.id = ps.friend_id
       WHERE ps.line_account_id = ? AND f.line_account_id = ?
+        ${q ? `AND (ps.caption LIKE ? ESCAPE '\\' OR p.name LIKE ? ESCAPE '\\' OR f.display_name LIKE ? ESCAPE '\\')` : ''}
       ORDER BY ps.created_at DESC, ps.id DESC LIMIT ? OFFSET ?`,
-  ).bind(accountId, accountId, limit, offset).all<Record<string, unknown>>();
+  ).bind(...(q ? [accountId, accountId, like, like, like] : [accountId, accountId]), limit, offset).all<Record<string, unknown>>();
   return c.json({ success: true, data: rows.results });
 });
 
@@ -1203,7 +1259,9 @@ nenMembers.get(
   },
 );
 
-nenMembers.put('/api/nen-members/photos/publications/:id/withdraw', requireRole('owner', 'admin', 'staff'), requirePhotoPermission('photo.submission.review'), async (c) => {
+// 公開の撤回・掲載先の変更は、審査とは別の上位権限だけでできるようにする（#931 N-311）。
+// 「審査できる人なら公開範囲も変えられる」状態を止め、掲載管理の権限を明示的に分ける。
+nenMembers.put('/api/nen-members/photos/publications/:id/withdraw', requireRole('owner', 'admin', 'staff'), requirePhotoPermission('photo.publication.manage'), async (c) => {
   const body = await c.req.json<{ accountId?: string; expectedVersion?: number }>().catch(() => null);
   const accountId = body?.accountId?.trim();
   const idempotencyKey = c.req.header('Idempotency-Key')?.trim().slice(0, 120);
@@ -1250,7 +1308,7 @@ nenMembers.put('/api/nen-members/photos/publications/:id/withdraw', requireRole(
   return c.json({ success: true, data: { status: 'withdrawn', version: publication.version + 1 } });
 });
 
-nenMembers.put('/api/nen-members/photos/publications/:id/placements', requireRole('owner', 'admin', 'staff'), requirePhotoPermission('photo.submission.review'), async (c) => {
+nenMembers.put('/api/nen-members/photos/publications/:id/placements', requireRole('owner', 'admin', 'staff'), requirePhotoPermission('photo.publication.manage'), async (c) => {
   const body = await c.req.json<{
     accountId?: string;
     expectedVersion?: number;
@@ -1319,7 +1377,9 @@ nenMembers.get('/api/nen-members/photos/:id', requirePhotoPermission('photo.subm
     `SELECT ps.id, ps.review_image_url AS image_url, ps.caption, ps.status,
             ps.image_width, ps.image_height, ps.image_byte_size, ps.captured_device,
             ps.review_version, ps.created_at, ps.publication_consent_at,
-            ps.publication_withdrawn_at, p.name AS pet_name, p.animal_type, p.breed,
+            ps.publication_withdrawn_at, ps.display_rotation,
+            f.photo_watch_required AS submitter_watch,
+            p.name AS pet_name, p.animal_type, p.breed,
             p.birthday, f.display_name AS owner_name,
             (SELECT COUNT(*) FROM nen_photo_submissions prior
               WHERE prior.friend_id = ps.friend_id AND prior.created_at <= ps.created_at) AS submission_count,
@@ -1346,9 +1406,16 @@ nenMembers.put('/api/nen-members/photos/:id/review', requireRole('owner', 'admin
     reasonCode?: string;
     reasonNote?: string;
     expectedVersion?: number;
+    resubmitInvite?: boolean;
+    watchSubmitter?: boolean;
   }>().catch(() => null);
   const accountId = body?.accountId?.trim();
-  if (!accountId) return c.json({ success: false, error: 'accountId is required' }, 400);
+  // 再実行キー。連打・応答ロストのやり直しが「別の担当者が更新しました」に
+  // 化けないよう、一括審査や派生画像処理と同じく必須にする（#931 N-313）。
+  const key = c.req.header('Idempotency-Key')?.trim() ?? '';
+  if (!accountId || key.length < 8 || key.length > 200) {
+    return c.json({ success: false, error: '対象アカウントと再実行キーを確認してください' }, 400);
+  }
   if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
     return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
   }
@@ -1363,10 +1430,45 @@ nenMembers.put('/api/nen-members/photos/:id/review', requireRole('owner', 'admin
   if (status === 'rejected' && reasonCode === 'other' && !reasonNote) {
     return c.json({ success: false, error: 'そのほかの理由を入力してください' }, 400);
   }
+  // 「もう一度送ってもらえるようお願いする」（#931 N-312）。採用には関係しない。
+  const resubmitInvite = status !== 'rejected' || body?.resubmitInvite !== false;
+  const watchSubmitter = status === 'rejected' && body?.watchSubmitter === true;
   const photo = await loadPhotoReviewRecipient(
     c.env.DB, { photoId: c.req.param('id'), lineAccountId: accountId },
   );
   if (!photo) return c.json({ success: false, error: 'Not found' }, 404);
+  /*
+   * 同じ再実行キーの判断は、保存済みの結果をそのまま返す。
+   * キーだけ合って中身が違うときは、別の操作の取り違えなので衝突として止める。
+   */
+  const previous = await c.env.DB.prepare(
+    `SELECT to_status, reason_code, reason_note, awarded_points, notification_status
+       FROM nen_photo_review_events
+      WHERE photo_id = ? AND line_account_id = ? AND idempotency_key = ?`,
+  ).bind(c.req.param('id'), accountId, key).first<{
+    to_status: string; reason_code: string | null; reason_note: string | null;
+    awarded_points: number; notification_status: string;
+  }>();
+  if (previous) {
+    const same = previous.to_status === status
+      && (previous.reason_code ?? null) === (status === 'rejected' ? reasonCode : null)
+      && (previous.reason_note ?? null) === (status === 'rejected' ? (reasonNote || null) : null);
+    if (!same) {
+      return c.json({ success: false, error: '同じ再実行キーが別の入力に使われています', code: 'IDEMPOTENCY_CONFLICT' }, 409);
+    }
+    return c.json({
+      success: true,
+      duplicate: true,
+      data: {
+        awardedPoints: Number(previous.awarded_points),
+        pointBalance: null,
+        pointSync: Number(previous.awarded_points) > 0
+          ? (photo.customer_id ? 'pending' : 'needs_attention')
+          : 'not_required',
+        notificationStatus: previous.notification_status === 'sent' ? 'sent' : 'failed',
+      },
+    });
+  }
   if (photo.status !== 'pending' || Number(photo.review_version) !== body!.expectedVersion) {
     return c.json({ success: false, error: 'Already reviewed' }, 409);
   }
@@ -1382,13 +1484,15 @@ nenMembers.put('/api/nen-members/photos/:id/review', requireRole('owner', 'admin
       c.env.DB.prepare(
         `INSERT INTO nen_photo_review_events
           (id, photo_id, line_account_id, from_status, to_status, reason_code, reason_note,
-           awarded_points, reviewed_by, reviewed_by_name, notification_status, created_at, updated_at)
-         SELECT ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, 'pending', ?, ?
+           awarded_points, reviewed_by, reviewed_by_name, notification_status,
+           idempotency_key, resubmit_invite, created_at, updated_at)
+         SELECT ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?
            FROM nen_photo_submissions
           WHERE id = ? AND line_account_id = ? AND status = 'pending' AND review_version = ?`,
       ).bind(
         decisionId, c.req.param('id'), accountId, status, reasonCode || null, reasonNote || null,
-        awarded, reviewer.id, reviewer.name, now, now, c.req.param('id'), accountId, body!.expectedVersion,
+        awarded, reviewer.id, reviewer.name, key, resubmitInvite ? 1 : 0, now, now,
+        c.req.param('id'), accountId, body!.expectedVersion,
       ),
       c.env.DB.prepare(
         `UPDATE nen_photo_submissions
@@ -1409,6 +1513,12 @@ nenMembers.put('/api/nen-members/photos/:id/review', requireRole('owner', 'admin
         crypto.randomUUID(), photo.id, accountId, photo.friend_id, photo.customer_id,
         `nen-photo:${String(photo.id)}`, awarded, now, now, now,
       )] : []),
+      // 「この人の次の投稿は、必ず人が見る」（#931 N-312）。確認対象の印を
+      // 友だちへ残し、次に届く写真の一覧へ出す。
+      ...(watchSubmitter ? [c.env.DB.prepare(
+        `UPDATE friends SET photo_watch_required = 1, updated_at = ?
+          WHERE id = ? AND line_account_id = ?`,
+      ).bind(now, photo.friend_id, accountId)] : []),
     ]);
     if (!results[0]?.meta.changes || !results[1]?.meta.changes) {
       return c.json({ success: false, error: 'Already reviewed' }, 409);
@@ -1427,6 +1537,7 @@ nenMembers.put('/api/nen-members/photos/:id/review', requireRole('owner', 'admin
     reasonCode: reasonCode ? reasonCode as PhotoReviewReasonCode : null,
     reasonNote: reasonNote || null,
     decisionId,
+    resubmitInvite,
   });
   return c.json({
     success: true,
@@ -1439,12 +1550,100 @@ nenMembers.put('/api/nen-members/photos/:id/review', requireRole('owner', 'admin
   });
 });
 
+/*
+ * 詳細画面で直した写真の向きを版つきで保存する（#931 N-309）。
+ * 「回す」が見た目だけだと、向きを直して通したつもりが元の向きで残る。
+ * 版（expectedVersion）を要求するのは、審査と同じく並行する直しと
+ * 通しの順序ずれを「別の担当者が更新しました」として気づけるようにするため。
+ */
+nenMembers.put('/api/nen-members/photos/:id/rotation', requireRole('owner', 'admin', 'staff'), requirePhotoPermission('photo.submission.review'), async (c) => {
+  const body = await c.req.json<{
+    accountId?: string;
+    rotation?: number;
+    expectedVersion?: number;
+  }>().catch(() => null);
+  const accountId = body?.accountId?.trim();
+  const key = c.req.header('Idempotency-Key')?.trim() ?? '';
+  if (!accountId || key.length < 8 || key.length > 200) {
+    return c.json({ success: false, error: '対象アカウントと再実行キーを確認してください' }, 400);
+  }
+  if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
+    return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
+  }
+  const rotation = Number(body?.rotation);
+  if (![0, 90, 180, 270].includes(rotation)) {
+    return c.json({ success: false, error: '向きは0・90・180・270のいずれかです' }, 400);
+  }
+  if (!Number.isInteger(body?.expectedVersion)) {
+    return c.json({ success: false, error: 'expectedVersion is required' }, 400);
+  }
+  const photo = await c.env.DB.prepare(
+    `SELECT id, status, review_version, display_rotation, rotation_idempotency_key
+       FROM nen_photo_submissions WHERE id = ? AND line_account_id = ?`,
+  ).bind(c.req.param('id'), accountId).first<{
+    id: string; status: string; review_version: number;
+    display_rotation: number; rotation_idempotency_key: string | null;
+  }>();
+  if (!photo) return c.json({ success: false, error: 'Not found' }, 404);
+  // 同じ再実行キーは保存済みの結果を返す。キーだけ合って向きが違うのは取り違え。
+  if (photo.rotation_idempotency_key === key) {
+    if (photo.display_rotation !== rotation) {
+      return c.json({ success: false, error: '同じ再実行キーが別の入力に使われています', code: 'IDEMPOTENCY_CONFLICT' }, 409);
+    }
+    return c.json({
+      success: true, duplicate: true,
+      data: { rotation: photo.display_rotation, reviewVersion: Number(photo.review_version) },
+    });
+  }
+  if (Number(photo.review_version) !== body!.expectedVersion) {
+    return c.json({ success: false, error: '同じ写真がほかの担当者により更新されました', code: 'VERSION_CONFLICT' }, 409);
+  }
+  // 向きの保存も版を進める。直しているあいだに通された版を
+  // 上書きすると、通した版と審査した見た目がずれるため。
+  const updated = await c.env.DB.prepare(
+    `UPDATE nen_photo_submissions
+        SET display_rotation = ?, rotation_idempotency_key = ?,
+            review_version = review_version + 1, updated_at = ?
+      WHERE id = ? AND line_account_id = ? AND review_version = ?`,
+  ).bind(rotation, key, jstNow(), c.req.param('id'), accountId, body!.expectedVersion).run();
+  if (!updated.meta.changes) {
+    return c.json({ success: false, error: '同じ写真がほかの担当者により更新されました', code: 'VERSION_CONFLICT' }, 409);
+  }
+  return c.json({
+    success: true,
+    data: { rotation, reviewVersion: body!.expectedVersion + 1 },
+  });
+});
+
 nenMembers.post('/api/nen-members/photos/:id/notification/retry', requireRole('owner', 'admin', 'staff'), requirePhotoPermission('photo.submission.review'), async (c) => {
   const body = await c.req.json<{ accountId?: string }>().catch(() => null);
   const accountId = body?.accountId?.trim();
-  if (!accountId) return c.json({ success: false, error: 'accountId is required' }, 400);
+  // 再実行キー（#931 N-313）。送達が確定した再送を、同じキーのやり直しが
+  // もう一度送らないよう、使ったキーを写真へ記録する。
+  const key = c.req.header('Idempotency-Key')?.trim() ?? '';
+  if (!accountId || key.length < 8 || key.length > 200) {
+    return c.json({ success: false, error: '対象アカウントと再実行キーを確認してください' }, 400);
+  }
   if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
     return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
+  }
+  const photoMeta = await c.env.DB.prepare(
+    `SELECT id, review_notification_status, notification_retry_key
+       FROM nen_photo_submissions WHERE id = ? AND line_account_id = ?`,
+  ).bind(c.req.param('id'), accountId).first<{
+    id: string; review_notification_status: string | null; notification_retry_key: string | null;
+  }>();
+  if (!photoMeta) return c.json({ success: false, error: 'Not found' }, 404);
+  if (photoMeta.notification_retry_key === key) {
+    // 同じ再実行キーは送らず、記録済みの結果だけを返す。
+    return c.json({
+      success: true,
+      duplicate: true,
+      data: {
+        notificationStatus: photoMeta.review_notification_status === 'sent' ? 'sent' : 'failed',
+        resent: false,
+      },
+    });
   }
   const now = new Date().toISOString();
   // 拾い上げる状態は claimPhotoNotificationDelivery の送信権条件と揃える。
@@ -1453,11 +1652,13 @@ nenMembers.post('/api/nen-members/photos/:id/notification/retry', requireRole('o
   const row = await c.env.DB.prepare(
     `SELECT ps.id, ps.friend_id, f.line_user_id, f.line_account_id, f.is_following,
             a.channel_access_token, a.channel_access_token_encrypted,
-            e.id decision_id, e.to_status, e.reason_code, e.reason_note
+            e.id decision_id, e.to_status, e.reason_code, e.reason_note, e.resubmit_invite,
+            s.customer_id
        FROM nen_photo_submissions ps
        JOIN friends f ON f.id = ps.friend_id
        JOIN line_accounts a ON a.id = f.line_account_id
        JOIN nen_photo_review_events e ON e.photo_id = ps.id
+       LEFT JOIN nen_ec_member_snapshots s ON s.friend_id = ps.friend_id
       WHERE ps.id = ? AND ps.line_account_id = ? AND f.line_account_id = ?
         AND (e.notification_status IN ('pending', 'failed')
           OR (e.notification_status = 'sending'
@@ -1468,6 +1669,7 @@ nenMembers.post('/api/nen-members/photos/:id/notification/retry', requireRole('o
     to_status: 'adopted' | 'rejected';
     reason_code: PhotoReviewReasonCode | null;
     reason_note: string | null;
+    resubmit_invite: number;
   }>();
   if (!row) {
     const settled = await c.env.DB.prepare(
@@ -1488,8 +1690,14 @@ nenMembers.post('/api/nen-members/photos/:id/notification/retry', requireRole('o
     reasonCode: row.reason_code,
     reasonNote: row.reason_note,
     decisionId: row.decision_id,
+    // 差戻し時に選んだ再投稿案内の有無を、審査イベントから復元する（#931 N-312）。
+    resubmitInvite: row.resubmit_invite !== 0,
   });
   if (delivery.notificationStatus === 'sent') {
+    // 送達できた再送に限りキーを記録する。失敗した試行は同じキーでやり直せる。
+    await c.env.DB.prepare(
+      `UPDATE nen_photo_submissions SET notification_retry_key = ? WHERE id = ? AND line_account_id = ?`,
+    ).bind(key, row.id, accountId).run();
     return c.json({ success: true, data: { notificationStatus: 'sent', resent: delivery.relayed } });
   }
   if (delivery.busy) {

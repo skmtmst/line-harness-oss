@@ -190,14 +190,14 @@ describe('一括審査の本人通知（実D1・LINE mock）', () => {
 
   it('本文が単票審査とまったく同じ（承認・見送りとも）', async () => {
     const app = harness(db);
-    // 単票（承認）
+    // 単票（承認）。単票審査も再実行キーが必須（#931 N-313）。
     await app.fetch(new Request('https://worker.test/api/nen-members/photos/photo-a/review', {
-      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      method: 'PUT', headers: { 'Content-Type': 'application/json', 'Idempotency-Key': 'single-approve-1' },
       body: JSON.stringify({ accountId: ACCOUNT, status: 'adopted', expectedVersion: 1 }),
     }));
     // 単票（見送り）
     await app.fetch(new Request('https://worker.test/api/nen-members/photos/photo-b/review', {
-      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      method: 'PUT', headers: { 'Content-Type': 'application/json', 'Idempotency-Key': 'single-reject-1' },
       body: JSON.stringify({
         accountId: ACCOUNT, status: 'rejected', expectedVersion: 1, reasonCode: 'privacy',
       }),
@@ -278,7 +278,8 @@ describe('一括審査の本人通知（実D1・LINE mock）', () => {
     const retry = await app.fetch(new Request(
       'https://worker.test/api/nen-members/photos/photo-b/notification/retry',
       {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Idempotency-Key': 'retry-photo-b-1' },
         body: JSON.stringify({ accountId: ACCOUNT }),
       },
     ));
@@ -329,7 +330,8 @@ describe('一括審査の本人通知（実D1・LINE mock）', () => {
     const retry = await harness(db).fetch(new Request(
       'https://worker.test/api/nen-members/photos/photo-b/notification/retry',
       {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Idempotency-Key': 'retry-photo-b-2' },
         body: JSON.stringify({ accountId: ACCOUNT }),
       },
     ));
