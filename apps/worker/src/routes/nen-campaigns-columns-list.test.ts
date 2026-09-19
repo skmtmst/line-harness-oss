@@ -7,8 +7,9 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('../services/account-access.js', () => ({ canAccessAllLineAccounts: mocks.canAccess }));
+const dbMocks = vi.hoisted(() => ({ getLineAccountById: vi.fn() }));
 vi.mock('@line-crm/db', () => ({
-  getLineAccountById: vi.fn(),
+  getLineAccountById: dbMocks.getLineAccountById,
   jstNow: vi.fn(() => '2026-08-25 12:00:00'),
 }));
 vi.mock('../services/nen-engagement.js', () => ({
@@ -55,6 +56,7 @@ beforeEach(() => {
     const statement = {
       bind: (...args: unknown[]) => { binds = args; return statement; },
       first: vi.fn(async () => ({ total: ALL_ROWS.length })),
+      run: vi.fn(async () => ({ success: true, meta: { changes: sql.includes('line_account_id IS NULL') ? 2 : 0 } })),
       all: vi.fn(async () => {
         if (sql.includes('LIMIT ? OFFSET ?')) {
           const limit = Number(binds[binds.length - 2]);
@@ -96,6 +98,29 @@ describe('NENコラム一覧の上限(点検 #512 の中6)', () => {
   test('他アカウントは 403 で遮る', async () => {
     mocks.canAccess.mockResolvedValue(false);
     const res = await app().request('/api/nen-campaigns/columns?lineAccountId=other');
+    expect(res.status).toBe(403);
+  });
+});
+
+describe('未割り当てのECコラムを取り込む（★V6 37-6-A「ECのコラムを取り込む」）', () => {
+  test('line_account_id が NULL のコラムを選択中のアカウントへ割り当て、件数を返す', async () => {
+    dbMocks.getLineAccountById.mockResolvedValue({ id: 'account-a' });
+    const res = await app().request('/api/nen-campaigns/columns/import?lineAccountId=account-a', { method: 'POST' });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ success: true, data: { imported: 2 } });
+    const updateSql = mocks.prepare.mock.calls.map((call) => String(call[0])).find((sql) => sql.includes('UPDATE nen_columns'));
+    expect(updateSql).toContain('WHERE line_account_id IS NULL');
+  });
+
+  test('存在しないアカウントには割り当てない', async () => {
+    dbMocks.getLineAccountById.mockResolvedValue(null);
+    const res = await app().request('/api/nen-campaigns/columns/import?lineAccountId=ghost', { method: 'POST' });
+    expect(res.status).toBe(404);
+  });
+
+  test('他アカウントは 403 で遮る', async () => {
+    mocks.canAccess.mockResolvedValue(false);
+    const res = await app().request('/api/nen-campaigns/columns/import?lineAccountId=other', { method: 'POST' });
     expect(res.status).toBe(403);
   });
 });

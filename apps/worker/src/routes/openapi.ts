@@ -2025,6 +2025,8 @@ const spec = {
         parameters: [
           { name: 'lineAccountId', in: 'query', required: true, schema: { type: 'string' } },
           { name: 'days', in: 'query', schema: { type: 'integer', minimum: 1, maximum: 365, default: 30 } },
+          { name: 'from', in: 'query', description: 'to と両方指定で days の代わりに期間を決める（ISO 8601）', schema: { type: 'string', format: 'date-time' } },
+          { name: 'to', in: 'query', schema: { type: 'string', format: 'date-time' } },
         ],
         responses: { '200': { description: 'Flow metrics' }, '403': { description: 'Account access denied' } },
       },
@@ -2037,6 +2039,8 @@ const spec = {
         parameters: [
           { name: 'lineAccountId', in: 'query', required: true, schema: { type: 'string' } },
           { name: 'days', in: 'query', schema: { type: 'integer', minimum: 1, maximum: 365, default: 30 } },
+          { name: 'from', in: 'query', description: 'to と両方指定で days の代わりに期間を決める（ISO 8601）', schema: { type: 'string', format: 'date-time' } },
+          { name: 'to', in: 'query', schema: { type: 'string', format: 'date-time' } },
         ],
         responses: { '200': { description: 'Column metrics' }, '403': { description: 'Account access denied' } },
       },
@@ -2078,6 +2082,19 @@ const spec = {
           { name: 'lineAccountId', in: 'query', required: true, schema: { type: 'string' } },
         ],
         responses: { '200': { description: 'Delivery detail' }, '404': { description: 'Not found in account scope' } },
+      },
+    },
+    '/api/nen-campaigns/columns/import': {
+      post: {
+        tags: ['NEN delivery'],
+        summary: '未割り当てのECコラムを選択中のLINEアカウントへ取り込む',
+        description: 'EC-CUBE から届いたが宛先が決まらなかったコラム（line_account_id が NULL）を、lineAccountId のアカウントへ割り当てます。',
+        parameters: [{ name: 'lineAccountId', in: 'query', required: true, schema: { type: 'string' } }],
+        responses: {
+          '200': { description: '{ imported: number }' },
+          '403': { description: 'Owner or admin role required' },
+          '404': { description: 'LINE account not found' },
+        },
       },
     },
     '/api/nen-campaigns/deliveries/{id}/retry': {

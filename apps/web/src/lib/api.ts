@@ -3795,6 +3795,14 @@ export type NenUnavailableMetric = {
 }
 
 export type NenMetricsRange = { days: number; from: string; to: string }
+export type NenMetricsQueryRange = { from: string; to: string }
+
+function nenMetricsQuery(accountId: string, range: number | NenMetricsQueryRange): string {
+  const query = new URLSearchParams({ lineAccountId: accountId })
+  if (typeof range === 'number') query.set('days', String(range))
+  else { query.set('from', range.from); query.set('to', range.to) }
+  return query.toString()
+}
 
 export type NenFlowMetrics = {
   range: NenMetricsRange
@@ -8524,17 +8532,20 @@ export const api = {
       ),
   },
   nenCampaigns: {
-    flowMetrics: (accountId: string, days = 30) => fetchApi<ApiResponse<NenFlowMetrics>>(
-      `/api/nen-campaigns/metrics/flows?lineAccountId=${encodeURIComponent(accountId)}&days=${days}`,
+    /** 期間は日数か、★V6 37-6 の「今月・先月」のための from/to（ISO 8601）。 */
+    flowMetrics: (accountId: string, range: number | NenMetricsQueryRange = 30) => fetchApi<ApiResponse<NenFlowMetrics>>(
+      `/api/nen-campaigns/metrics/flows?${nenMetricsQuery(accountId, range)}`,
     ),
-    columnMetrics: (accountId: string, days = 30) => fetchApi<ApiResponse<NenColumnMetrics>>(
-      `/api/nen-campaigns/metrics/columns?lineAccountId=${encodeURIComponent(accountId)}&days=${days}`,
+    columnMetrics: (accountId: string, range: number | NenMetricsQueryRange = 30) => fetchApi<ApiResponse<NenColumnMetrics>>(
+      `/api/nen-campaigns/metrics/columns?${nenMetricsQuery(accountId, range)}`,
     ),
     petMetrics: (accountId: string, days = 30) => fetchApi<ApiResponse<NenPetMetrics>>(
       `/api/nen-campaigns/metrics/pets?lineAccountId=${encodeURIComponent(accountId)}&days=${days}`,
     ),
-    deliveries: (accountId: string, options: { days?: number; status?: string; cursor?: string; limit?: number } = {}) => {
+    deliveries: (accountId: string, options: { days?: number; from?: string; to?: string; status?: string; cursor?: string; limit?: number } = {}) => {
       const query = new URLSearchParams({ lineAccountId: accountId, days: String(options.days ?? 30), limit: String(options.limit ?? 50) })
+      // from/to を両方渡すと days の代わりにその期間で数える（実口 nenDeliveryRange と同じ決めごと）。
+      if (options.from && options.to) { query.delete('days'); query.set('from', options.from); query.set('to', options.to) }
       if (options.status) query.set('status', options.status)
       if (options.cursor) query.set('cursor', options.cursor)
       return fetchApi<ApiResponse<NenDeliveryList>>(`/api/nen-campaigns/deliveries?${query}`)
@@ -8589,6 +8600,11 @@ export const api = {
         `/api/nen-campaigns/columns-preview?${query}`,
       )
     },
+    /** ★V6 37-6-A「ECのコラムを取り込む」。宛先が決まらず未割り当てになっているECコラムを、このアカウントへ割り当てる。 */
+    importColumns: (accountId: string) => fetchApi<ApiResponse<{ imported: number }>>(
+      `/api/nen-campaigns/columns/import?lineAccountId=${encodeURIComponent(accountId)}`,
+      { method: 'POST' },
+    ),
     duplicateColumn: (id: string, accountId: string) => fetchApi<ApiResponse<{ id: string; sourceColumnId: string }>>(
       `/api/nen-campaigns/columns/${encodeURIComponent(id)}/duplicate`,
       { method: 'POST', body: JSON.stringify({ accountId }) },

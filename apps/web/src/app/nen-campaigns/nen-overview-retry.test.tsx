@@ -81,45 +81,43 @@ function renderHistory(rows: NenDelivery[], detail: NenDeliveryDetail | null, on
         onTabChange={noop}
         settings={[]}
         columns={[]}
-        pets={[]}
+        kpis={null}
         flowMetrics={null}
         columnMetrics={null}
-        petMetrics={null}
         deliveryList={listWith(rows)}
         deliveryDetail={detail}
-        coupon={{ isEnabled: false, codePrefix: '', benefitLabel: '', discountAmount: 0, validityDays: 0, leapYearPolicy: 'feb28' }}
         friends={[]}
         testFriendId=""
-        previewCampaignKey={null}
-        previewColumnId={null}
-        editingColumnId={null}
+        onTestFriendChange={noop}
+        loading={false}
+        notice={null}
         saving={null}
         testing={null}
-        savingColumnId={null}
-        petDraft={{ friendId: '', name: '', animalType: '', gender: '', birthday: '' }}
-        notice={null}
-        onTestFriendChange={noop}
+        previewCampaignKey={null}
         onPreviewCampaign={noop}
-        onPreviewColumn={noop}
-        onEditColumn={noop}
-        onUpdateColumn={noop}
-        onSaveColumn={noop}
-        onDeliverColumn={noop}
-        onDuplicateColumn={noop}
-        onTestColumn={noop}
         onToggleSetting={noop}
         onTestSend={noop}
-        onPetDraftChange={noop}
-        onAddPet={noop}
-        onDeletePet={noop}
+        coupon={{ isEnabled: false, codePrefix: '', benefitLabel: '', discountAmount: 0, validityDays: 0, leapYearPolicy: 'feb28' }}
+        couponOpen={false}
+        onCouponOpenChange={noop}
         onCouponChange={noop}
         onSaveCoupon={noop}
         savingCoupon={false}
+        selectedColumnId={null}
+        onSelectColumn={noop}
+        audienceCount={null}
+        plan={{ when: 'now', scheduledAt: '' }}
+        onPlanChange={noop}
+        introDraft=""
+        onIntroChange={noop}
+        onSaveIntro={noop}
+        savingColumnId={null}
+        onDeliverColumn={noop}
+        onDuplicateColumn={noop}
+        onTestColumn={noop}
         onShowDelivery={noop}
         onRetryDelivery={onRetry}
         onChangeDeliveryView={noop}
-        renderCampaignPreview={() => null}
-        renderColumnPreview={() => null}
       />,
     )
   })

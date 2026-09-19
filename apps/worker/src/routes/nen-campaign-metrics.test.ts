@@ -84,6 +84,28 @@ describe('NEN campaign V6 metric routes', () => {
     );
   });
 
+  // ★V6 37-6: 数値カードの「今月・先月」は from/to の月の範囲で取る。
+  it('flows・columns の実績は from/to の期間指定を受け付ける', async () => {
+    const flows = await app('staff').request(
+      '/api/nen-campaigns/metrics/flows?lineAccountId=account-a&from=2026-08-31T15:00:00.000Z&to=2026-09-30T15:00:00.000Z',
+    );
+    expect(flows.status).toBe(200);
+    expect(metricsMocks.getNenFlowMetrics).toHaveBeenCalledWith(
+      expect.anything(), 'account-a', expect.objectContaining({ days: 30, from: '2026-08-31T15:00:00.000Z' }),
+    );
+    const columns = await app('staff').request(
+      '/api/nen-campaigns/metrics/columns?lineAccountId=account-a&from=2026-08-31T15:00:00.000Z&to=2026-09-30T15:00:00.000Z',
+    );
+    expect(columns.status).toBe(200);
+    expect(metricsMocks.getNenColumnMetrics).toHaveBeenCalledWith(
+      expect.anything(), 'account-a', expect.objectContaining({ days: 30, to: '2026-09-30T15:00:00.000Z' }),
+    );
+    const invalid = await app('staff').request(
+      '/api/nen-campaigns/metrics/flows?lineAccountId=account-a&from=2026-09-30T15:00:00.000Z&to=2026-08-31T15:00:00.000Z',
+    );
+    expect(invalid.status).toBe(400);
+  });
+
   // #727: 「これから」チップの pending,processing を複数状態のまま service へ渡す。
   it('複数状態の絞り込みをそのままserviceへ渡す', async () => {
     const response = await app('staff').request(

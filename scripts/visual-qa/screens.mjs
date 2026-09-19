@@ -2354,32 +2354,23 @@ export const SCREENS = [
   { ...ANALYTICS, node: 'dfwD4', name: '20-2-C 保存した分析', route: '/analytics?tab=saved', verdict: 'match', verdictNote: '**2026-09-06、台帳 #233・PR #974、撮影HEAD d7fe26794で設計画像と比較し一致。** 固定データを接続し、KPI4枚、保存分析6件、定義版・期間・状態・結果件数、選択した分析の結果履歴3件を実値で確認した。定期レポートは対象外の `URqOA` が未実装のため「なし」と明記する。1440px・1920pxとも横スクロール0。', verdictSource: 'analytics-v6/dfwD4.txt + dfwD4-1440.png + dfwD4-1920.png', verdictHead: 'd7fe26794' },
 
   // ── 機能21 NEN配信 ──────────────────────────────────────
-  /* タブ4本は設計とそろっている（配信フロー／NENコラム／ペット／配信履歴）。 */
-  { ...NEN, node: 'VLMGH', name: '21-1 NEN配信', mode: 'viewport', height: 1081,
+  /*
+    2026-09-18 に ★V6 37-6（`z4q1K`）／37-6-A（`u66A0`）へ作り直した。
+    タブは 自動配信／コラム／送った履歴／停止中。旧4面（VLMGH／DEX0k／q4lajm／WeXbL）は
+    正本から外れたので台帳からも外す。判定は次の撮影で付ける（空欄＝未判定）。
+  */
+  { ...NEN, node: 'z4q1K', name: '37-6 NEN配信（自動配信）', mode: 'viewport', height: 1081,
     /* 失敗を空として出していないかを見る。読込・空・失敗の3つ。 */
     states: {
       apis: ['**/api/nen-campaigns/**', '**/api/nen-campaigns'],
       kinds: ['loading', 'empty', 'error'],
     },
-    verdict: "match",
-    verdictNote: '**2026-09-07、Issue #483で固定フレームをページ全体として撮っていた差を直し、設計高1081px・高さ差0px・画素差4.9576%で再判定。** 本文側に旧見出しはなく、パンくず・作成操作・タブ・4指標へ続くPencil V6の順序を維持。1440/1920pxとも横はみ出し0。',
-    verdictSource: 'nen-v6/VLMGH.txt + VLMGH-1440.png + VLMGH-1920.png + VLMGH-loading/empty/error screenshots',
+    variants: [
+      { suffix: '-history', route: '/nen-campaigns?tab=history' },
+      { suffix: '-paused', route: '/nen-campaigns?tab=paused' },
+    ],
   },
-  { ...NEN, node: 'DEX0k', name: '21-1-A NENコラム', route: '/nen-campaigns?tab=columns',
-    verdict: 'match',
-    verdictNote: '**2026-09-07、Issue #483でPencil V6と同じ1080pxの撮影状態を確認し、高さ差0px・画素差5.0110%で再判定。** 成果金額、記事の読了人数、コラム複製、テスト送信、24本の集計・絞り込み・ページ情報を維持し、1440/1920pxとも横はみ出し0。',
-    verdictSource: 'nen-v6/DEX0k.txt + DEX0k-1440.png + DEX0k-1920.png',
-  },
-  { ...NEN, node: 'q4lajm', name: '21-1-B ペット・記念日', route: '/nen-campaigns?tab=pets', mode: 'viewport', height: 1137,
-    verdict: 'match',
-    verdictNote: '**2026-09-07、Issue #483で固定フレームをページ全体として撮っていた差を直し、設計高1137px・高さ差0px・画素差7.5896%で再判定。** 誕生日配信の到達率94.6%とクリック率38.2%を別カードで表示し、1440/1920pxとも横はみ出し0。',
-    verdictSource: 'nen-v6/q4lajm.txt + q4lajm-1440.png + q4lajm-1920.png',
-  },
-  { ...NEN, node: 'WeXbL', name: '21-1-C NEN配信の履歴', route: '/nen-campaigns?tab=history', mode: 'viewport', height: 1081,
-    verdict: "match",
-    verdictNote: '**2026-09-07、Issue #483で固定フレームをページ全体として撮っていた差を直し、設計高1081px・高さ差0px・画素差5.0225%で再判定。** 到達率・クリック率は取得不可と明示し、未達6通の内訳と待機中を今すぐ送る操作を維持。1440/1920pxとも横はみ出し0。',
-    verdictSource: 'nen-v6/WeXbL.txt + WeXbL-1440.png + WeXbL-1920.png',
-  },
+  { ...NEN, node: 'u66A0', name: '37-6-A NEN配信（コラム）', route: '/nen-campaigns?tab=columns', mode: 'viewport', height: 1081 },
   {
     ...NEN, node: 'HpKyF', name: '21-1-D NEN配信の中身を編集する',
     /*
