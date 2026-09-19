@@ -78,6 +78,7 @@ export type AuditAction =
   | 'photo.asset.request'
   | 'photo.review.bulk'
   | 'media.download'
+  | 'media.replace_usages'
   | 'common_var_export.download'
   | 'photo.original.issue'
   | 'photo.original.download'
