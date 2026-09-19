@@ -42,6 +42,11 @@ function harness(options: {
   permissionKeys?: string[];
   retryRow?: boolean;
   settledState?: Record<string, unknown> | null;
+  notificationRetryKey?: string | null;
+  previousDecision?: Record<string, unknown> | null;
+  resubmitInvite?: number;
+  savedRotation?: number;
+  rotationKey?: string | null;
 } = {}) {
   const statements: Entry[] = [];
   const batches: Entry[][] = [];
@@ -75,6 +80,19 @@ function harness(options: {
           if (query.includes('SELECT e.notification_status')) {
             return options.settledState ?? null;
           }
+          // 再送口の写真メタ（再実行キー照合。 #931 N-313）。
+          if (query.includes('notification_retry_key')) {
+            if (entry.bindings[1] !== photoAccount) return null;
+            return {
+              id: 'photo-1',
+              review_notification_status: 'failed',
+              notification_retry_key: options.notificationRetryKey ?? null,
+            };
+          }
+          // 単票審査の再実行キー照合（#931 N-313）。同じキーの判断があれば返す。
+          if (query.includes('idempotency_key = ?') && query.includes('nen_photo_review_events')) {
+            return options.previousDecision ?? null;
+          }
           if (query.includes('JOIN nen_photo_review_events')) {
             if (options.retryRow === false) return null;
             if (entry.bindings[1] !== photoAccount || entry.bindings[2] !== photoAccount) return null;
@@ -83,6 +101,17 @@ function harness(options: {
               is_following: 1, channel_access_token: 'token', channel_access_token_encrypted: null,
               decision_id: 'decision-1', to_status: 'rejected', reason_code: 'privacy',
               reason_note: '顔が写っていない写真をお願いします。',
+              resubmit_invite: options.resubmitInvite ?? 1,
+              customer_id: null,
+            };
+          }
+          // 向き保存口の写真（#931 N-309）。
+          if (query.includes('display_rotation') && query.includes('rotation_idempotency_key')) {
+            if (entry.bindings[1] !== photoAccount) return null;
+            return {
+              id: 'photo-1', status: 'pending', review_version: 1,
+              display_rotation: options.savedRotation ?? 0,
+              rotation_idempotency_key: options.rotationKey ?? null,
             };
           }
           if (query.includes('FROM nen_photo_submissions ps') && query.includes('JOIN line_accounts')) {
@@ -215,7 +244,8 @@ describe('NEN photo review', () => {
   });
 
   it('withdraws every placement with account scope, version and idempotency', async () => {
-    const { app, batches } = harness();
+    // 公開の撤回は審査権限ではなく掲載管理の上位権限が要る（#931 N-311）。
+    const { app, batches } = harness({ permissionKeys: ['photo.publication.manage'] });
     const response = await app.request('/api/nen-members/photos/publications/publication-1/withdraw', {
       method: 'PUT',
       headers: { 'content-type': 'application/json', 'Idempotency-Key': 'withdraw-once' },
@@ -228,7 +258,7 @@ describe('NEN photo review', () => {
   });
 
   it('replaces publication placements with account scope, version and idempotency', async () => {
-    const { app, batches } = harness();
+    const { app, batches } = harness({ permissionKeys: ['photo.publication.manage'] });
     const response = await app.request('/api/nen-members/photos/publications/publication-1/placements', {
       method: 'PUT',
       headers: { 'content-type': 'application/json', 'Idempotency-Key': 'placements-once' },
@@ -246,7 +276,7 @@ describe('NEN photo review', () => {
   it('requires a user-facing rejection reason', async () => {
     const { app, batches } = harness();
     const response = await app.request('/api/nen-members/photos/photo-1/review', {
-      method: 'PUT', headers: { 'content-type': 'application/json' },
+      method: 'PUT', headers: { 'content-type': 'application/json', 'Idempotency-Key': 'reject-no-reason' },
       body: JSON.stringify({ accountId: 'account-a', status: 'rejected', expectedVersion: 1 }),
     });
     expect(response.status).toBe(400);
@@ -256,7 +286,7 @@ describe('NEN photo review', () => {
   it('stores the decision and sends the same reason to the submitter', async () => {
     const { app, batches } = harness();
     const response = await app.request('/api/nen-members/photos/photo-1/review', {
-      method: 'PUT', headers: { 'content-type': 'application/json' },
+      method: 'PUT', headers: { 'content-type': 'application/json', 'Idempotency-Key': 'reject-privacy-1' },
       body: JSON.stringify({
         accountId: 'account-a', status: 'rejected', expectedVersion: 1, reasonCode: 'privacy',
         reasonNote: '顔が写っていない写真をお願いします。',
@@ -265,9 +295,11 @@ describe('NEN photo review', () => {
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({ data: { notificationStatus: 'sent' } });
     const decision = batches[0].find((entry) => entry.query.includes('INSERT INTO nen_photo_review_events'));
+    // 再実行キーと「再投稿の案内を添えるか」も判断へ残す（#931 N-312/N-313）。
     expect(decision?.bindings).toEqual([
       expect.any(String), 'photo-1', 'account-a', 'rejected', 'privacy',
       '顔が写っていない写真をお願いします。', 0, 'staff-a', '担当者',
+      'reject-privacy-1', 1,
       '2026-08-28 03:00:00', '2026-08-28 03:00:00', 'photo-1', 'account-a', 1,
     ]);
     expect(mocks.push).toHaveBeenCalledWith(
@@ -305,7 +337,7 @@ describe('NEN photo review', () => {
   it('does not review a photo owned by another account', async () => {
     const { app, batches } = harness({ photoAccount: 'account-b' });
     const response = await app.request('/api/nen-members/photos/photo-1/review', {
-      method: 'PUT', headers: { 'content-type': 'application/json' },
+      method: 'PUT', headers: { 'content-type': 'application/json', 'Idempotency-Key': 'reject-other-1' },
       body: JSON.stringify({ accountId: 'account-a', status: 'rejected', expectedVersion: 1, reasonCode: 'quality' }),
     });
     expect(response.status).toBe(404);
@@ -315,7 +347,7 @@ describe('NEN photo review', () => {
   it('rejects inherited object property names as reason codes', async () => {
     const { app, batches } = harness();
     const response = await app.request('/api/nen-members/photos/photo-1/review', {
-      method: 'PUT', headers: { 'content-type': 'application/json' },
+      method: 'PUT', headers: { 'content-type': 'application/json', 'Idempotency-Key': 'reject-tostring-1' },
       body: JSON.stringify({ accountId: 'account-a', status: 'rejected', expectedVersion: 1, reasonCode: 'toString' }),
     });
     expect(response.status).toBe(400);
@@ -326,7 +358,7 @@ describe('NEN photo review', () => {
     mocks.push.mockRejectedValueOnce(new Error('LINE unavailable'));
     const { app, batches, runs } = harness();
     const response = await app.request('/api/nen-members/photos/photo-1/review', {
-      method: 'PUT', headers: { 'content-type': 'application/json' },
+      method: 'PUT', headers: { 'content-type': 'application/json', 'Idempotency-Key': 'reject-line-fail-1' },
       body: JSON.stringify({ accountId: 'account-a', status: 'rejected', expectedVersion: 1, reasonCode: 'quality' }),
     });
     expect(response.status).toBe(200);
@@ -342,7 +374,7 @@ describe('NEN photo review', () => {
   it('returns a conflict when another reviewer decided first', async () => {
     const { app } = harness({ duplicate: true });
     const response = await app.request('/api/nen-members/photos/photo-1/review', {
-      method: 'PUT', headers: { 'content-type': 'application/json' },
+      method: 'PUT', headers: { 'content-type': 'application/json', 'Idempotency-Key': 'reject-conflict-1' },
       body: JSON.stringify({ accountId: 'account-a', status: 'rejected', expectedVersion: 1, reasonCode: 'duplicate' }),
     });
     expect(response.status).toBe(409);
@@ -351,7 +383,7 @@ describe('NEN photo review', () => {
   it('commits approval and a single reward outbox entry before external EC processing', async () => {
     const { app, batches } = harness({ customerId: 'customer-1' });
     const response = await app.request('/api/nen-members/photos/photo-1/review', {
-      method: 'PUT', headers: { 'content-type': 'application/json' },
+      method: 'PUT', headers: { 'content-type': 'application/json', 'Idempotency-Key': 'approve-customer-1' },
       body: JSON.stringify({ accountId: 'account-a', status: 'adopted', expectedVersion: 1 }),
     });
     expect(response.status).toBe(200);
@@ -369,7 +401,7 @@ describe('NEN photo review', () => {
   it('retries a failed notification with the recorded decision text', async () => {
     const { app, runs } = harness();
     const response = await app.request('/api/nen-members/photos/photo-1/notification/retry', {
-      method: 'POST', headers: { 'content-type': 'application/json' },
+      method: 'POST', headers: { 'content-type': 'application/json', 'Idempotency-Key': 'retry-once-1' },
       body: JSON.stringify({ accountId: 'account-a' }),
     });
     expect(response.status).toBe(200);
@@ -396,7 +428,7 @@ describe('NEN photo review', () => {
       settledState: { notification_status: 'sent' },
     });
     const response = await app.request('/api/nen-members/photos/photo-1/notification/retry', {
-      method: 'POST', headers: { 'content-type': 'application/json' },
+      method: 'POST', headers: { 'content-type': 'application/json', 'Idempotency-Key': 'retry-settled-1' },
       body: JSON.stringify({ accountId: 'account-a' }),
     });
     expect(response.status).toBe(200);
@@ -430,7 +462,8 @@ describe('NEN photo review', () => {
     }));
     const { app } = harness();
     const body = JSON.stringify({ accountId: 'account-a' });
-    const headers = { 'content-type': 'application/json' };
+    // 連打・再試行は同じ再実行キーで届く想定（#931 N-313）。
+    const headers = { 'content-type': 'application/json', 'Idempotency-Key': 'retry-race-1' };
     const first = app.request('/api/nen-members/photos/photo-1/notification/retry', { method: 'POST', headers, body });
     const second = app.request('/api/nen-members/photos/photo-1/notification/retry', { method: 'POST', headers, body });
     await Promise.resolve();
@@ -459,7 +492,7 @@ describe('NEN photo review', () => {
     }));
     const { app, runs } = harness();
     const response = await app.request('/api/nen-members/photos/photo-1/notification/retry', {
-      method: 'POST', headers: { 'content-type': 'application/json' },
+      method: 'POST', headers: { 'content-type': 'application/json', 'Idempotency-Key': 'retry-late-1' },
       body: JSON.stringify({ accountId: 'account-a' }),
     });
     expect(response.status).toBe(200);
@@ -479,11 +512,205 @@ describe('NEN photo review', () => {
     const { app } = harness();
     // 再送口のSELECTは失敗行を返すが、claimで負ける想定にする。
     const response = await app.request('/api/nen-members/photos/photo-1/notification/retry', {
-      method: 'POST', headers: { 'content-type': 'application/json' },
+      method: 'POST', headers: { 'content-type': 'application/json', 'Idempotency-Key': 'retry-busy-1' },
       body: JSON.stringify({ accountId: 'account-a' }),
     });
     expect(response.status).toBe(409);
     expect(await response.json()).toMatchObject({ error: expect.stringContaining('実行中') });
     expect(mocks.push).not.toHaveBeenCalled();
+  });
+
+  /*
+   * #931 N-313: 単体審査と通知再送は再実行キー必須。連打・応答ロストの
+   * やり直しが「別の担当者が更新しました」に化けないようにする。
+   */
+  it('requires an idempotency key for the individual review', async () => {
+    const { app, batches } = harness();
+    const response = await app.request('/api/nen-members/photos/photo-1/review', {
+      method: 'PUT', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ accountId: 'account-a', status: 'adopted', expectedVersion: 1 }),
+    });
+    expect(response.status).toBe(400);
+    expect(batches).toHaveLength(0);
+  });
+
+  it('replays the stored decision for the same idempotency key instead of erroring', async () => {
+    const { app, batches } = harness({
+      previousDecision: {
+        to_status: 'adopted', reason_code: null, reason_note: null,
+        awarded_points: 5, notification_status: 'sent',
+      },
+    });
+    const response = await app.request('/api/nen-members/photos/photo-1/review', {
+      method: 'PUT', headers: { 'content-type': 'application/json', 'Idempotency-Key': 'same-key-1' },
+      body: JSON.stringify({ accountId: 'account-a', status: 'adopted', expectedVersion: 2 }),
+    });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      success: true, duplicate: true,
+      data: { awardedPoints: 5, notificationStatus: 'sent' },
+    });
+    // すでに保存済みの判断を、新しい判断として重ねて書かない。
+    expect(batches).toHaveLength(0);
+    expect(mocks.push).not.toHaveBeenCalled();
+  });
+
+  it('rejects a reused idempotency key bound to a different decision', async () => {
+    const { app, batches } = harness({
+      previousDecision: {
+        to_status: 'adopted', reason_code: null, reason_note: null,
+        awarded_points: 5, notification_status: 'sent',
+      },
+    });
+    const response = await app.request('/api/nen-members/photos/photo-1/review', {
+      method: 'PUT', headers: { 'content-type': 'application/json', 'Idempotency-Key': 'same-key-1' },
+      body: JSON.stringify({ accountId: 'account-a', status: 'rejected', expectedVersion: 2, reasonCode: 'quality' }),
+    });
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({ code: 'IDEMPOTENCY_CONFLICT' });
+    expect(batches).toHaveLength(0);
+  });
+
+  it('records the submitter watch flag on the friend when asked (#931 N-312)', async () => {
+    const { app, batches } = harness();
+    const response = await app.request('/api/nen-members/photos/photo-1/review', {
+      method: 'PUT', headers: { 'content-type': 'application/json', 'Idempotency-Key': 'watch-sub-1' },
+      body: JSON.stringify({
+        accountId: 'account-a', status: 'rejected', expectedVersion: 1,
+        reasonCode: 'privacy', watchSubmitter: true,
+      }),
+    });
+    expect(response.status).toBe(200);
+    const watch = batches[0].find((entry) => entry.query.includes('photo_watch_required'));
+    expect(watch?.query).toContain('UPDATE friends');
+    expect(watch?.bindings).toEqual(['2026-08-28 03:00:00', 'friend-1', 'account-a']);
+  });
+
+  it('omits the resubmission invite when unchecked (#931 N-312)', async () => {
+    const { app, batches } = harness();
+    const response = await app.request('/api/nen-members/photos/photo-1/review', {
+      method: 'PUT', headers: { 'content-type': 'application/json', 'Idempotency-Key': 'no-invite-1' },
+      body: JSON.stringify({
+        accountId: 'account-a', status: 'rejected', expectedVersion: 1,
+        reasonCode: 'quality', resubmitInvite: false,
+      }),
+    });
+    expect(response.status).toBe(200);
+    const decision = batches[0].find((entry) => entry.query.includes('INSERT INTO nen_photo_review_events'));
+    // resubmit_invite は判断へ 0 で残る。
+    expect(decision?.bindings).toContain(0);
+    const sentText = mocks.push.mock.calls[0]?.[3]?.[0]?.text as string;
+    expect(sentText).not.toContain('別のお写真をご投稿ください');
+  });
+
+  it('does not tell an unconnected submitter that the point procedure started (#931 N-307)', async () => {
+    const { app } = harness({ customerId: null });
+    const response = await app.request('/api/nen-members/photos/photo-1/review', {
+      method: 'PUT', headers: { 'content-type': 'application/json', 'Idempotency-Key': 'approve-no-ec' },
+      body: JSON.stringify({ accountId: 'account-a', status: 'adopted', expectedVersion: 1 }),
+    });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ data: { pointSync: 'needs_attention' } });
+    const sentText = mocks.push.mock.calls[0]?.[3]?.[0]?.text as string;
+    expect(sentText).toContain('お写真を採用しました');
+    expect(sentText).not.toContain('ポイントを付ける手続きを始めました');
+  });
+
+  it('requires an idempotency key for the notification retry', async () => {
+    const { app } = harness();
+    const response = await app.request('/api/nen-members/photos/photo-1/notification/retry', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ accountId: 'account-a' }),
+    });
+    expect(response.status).toBe(400);
+    expect(mocks.push).not.toHaveBeenCalled();
+  });
+
+  it('does not resend a retry that already delivered with the same key', async () => {
+    const { app } = harness({ notificationRetryKey: 'retry-done-1' });
+    const response = await app.request('/api/nen-members/photos/photo-1/notification/retry', {
+      method: 'POST', headers: { 'content-type': 'application/json', 'Idempotency-Key': 'retry-done-1' },
+      body: JSON.stringify({ accountId: 'account-a' }),
+    });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      success: true, duplicate: true, data: { resent: false },
+    });
+    expect(mocks.push).not.toHaveBeenCalled();
+    expect(mocks.claim).not.toHaveBeenCalled();
+  });
+
+  /*
+   * #931 N-309: 詳細で直した向きを版つきで保存する。見た目だけの「回す」
+   * は、通したあと元の向きへ戻ってしまうため。
+   */
+  it('saves the corrected rotation with version and idempotency', async () => {
+    const { app, runs } = harness();
+    const response = await app.request('/api/nen-members/photos/photo-1/rotation', {
+      method: 'PUT', headers: { 'content-type': 'application/json', 'Idempotency-Key': 'rotate-1' },
+      body: JSON.stringify({ accountId: 'account-a', rotation: 90, expectedVersion: 1 }),
+    });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ data: { rotation: 90, reviewVersion: 2 } });
+    const update = runs.find((entry) => entry.query.includes('display_rotation = ?'));
+    expect(update?.bindings).toEqual([90, 'rotate-1', '2026-08-28 03:00:00', 'photo-1', 'account-a', 1]);
+  });
+
+  it('rejects invalid rotation values and missing keys', async () => {
+    const { app, runs } = harness();
+    const bad = await app.request('/api/nen-members/photos/photo-1/rotation', {
+      method: 'PUT', headers: { 'content-type': 'application/json', 'Idempotency-Key': 'rotate-bad' },
+      body: JSON.stringify({ accountId: 'account-a', rotation: 45, expectedVersion: 1 }),
+    });
+    expect(bad.status).toBe(400);
+    const noKey = await app.request('/api/nen-members/photos/photo-1/rotation', {
+      method: 'PUT', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ accountId: 'account-a', rotation: 90, expectedVersion: 1 }),
+    });
+    expect(noKey.status).toBe(400);
+    expect(runs).toHaveLength(0);
+  });
+
+  it('replays a stored rotation for the same key and conflicts on reuse with different input', async () => {
+    const { app, runs } = harness({ savedRotation: 90, rotationKey: 'rotate-done' });
+    const replay = await app.request('/api/nen-members/photos/photo-1/rotation', {
+      method: 'PUT', headers: { 'content-type': 'application/json', 'Idempotency-Key': 'rotate-done' },
+      body: JSON.stringify({ accountId: 'account-a', rotation: 90, expectedVersion: 3 }),
+    });
+    expect(replay.status).toBe(200);
+    expect(await replay.json()).toMatchObject({ duplicate: true, data: { rotation: 90 } });
+    const conflict = await app.request('/api/nen-members/photos/photo-1/rotation', {
+      method: 'PUT', headers: { 'content-type': 'application/json', 'Idempotency-Key': 'rotate-done' },
+      body: JSON.stringify({ accountId: 'account-a', rotation: 180, expectedVersion: 3 }),
+    });
+    expect(conflict.status).toBe(409);
+    expect(await conflict.json()).toMatchObject({ code: 'IDEMPOTENCY_CONFLICT' });
+    expect(runs).toHaveLength(0);
+  });
+
+  /*
+   * #931 N-308: 一覧は名前・ペット名・コメントの部分一致で絞れる。
+   * LIKE の記号（% _ \）は逃がして、検索語そのものにだけ当てる。
+   */
+  it('filters the photo list by owner, pet name and caption with escaped LIKE', async () => {
+    const { app, statements } = harness();
+    const response = await app.request('/api/nen-members/photos?accountId=account-a&q=50%25_%5C');
+    expect(response.status).toBe(200);
+    const list = statements.find((entry) => entry.query.includes('ORDER BY ps.created_at'));
+    expect(list?.query).toContain("ps.caption LIKE ? ESCAPE '\\'");
+    expect(list?.query).toContain("p.name LIKE ? ESCAPE '\\'");
+    expect(list?.query).toContain("f.display_name LIKE ? ESCAPE '\\'");
+    expect(list?.bindings).toEqual([
+      'account-a', 'account-a', '%50\\%\\_\\\\%', '%50\\%\\_\\\\%', '%50\\%\\_\\\\%', 200, 0,
+    ]);
+  });
+
+  it('keeps the list query unchanged when no search term is given', async () => {
+    const { app, statements } = harness();
+    const response = await app.request('/api/nen-members/photos?accountId=account-a');
+    expect(response.status).toBe(200);
+    const list = statements.find((entry) => entry.query.includes('ORDER BY ps.created_at'));
+    expect(list?.query).not.toContain('LIKE');
+    expect(list?.bindings).toEqual(['account-a', 'account-a', 200, 0]);
   });
 });

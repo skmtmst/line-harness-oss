@@ -726,7 +726,7 @@ const ALLOWLIST = new Set<string>([
   'PUT /api/automations/{id}',
   'PUT /api/common-actions/{id}/draft',
 
-  // 機能「photo_review」の管理画面用API（OpenAPI未記載・順次記載）（23件）
+  // 機能「photo_review」の管理画面用API（OpenAPI未記載・順次記載）（24件）
   'GET /api/nen-members/care-flags',
   'GET /api/nen-members/consultations',
   'GET /api/nen-members/friends/{friendId}',
@@ -750,6 +750,7 @@ const ALLOWLIST = new Set<string>([
   'PUT /api/nen-members/photos/publications/{id}/placements',
   'PUT /api/nen-members/photos/publications/{id}/withdraw',
   'PUT /api/nen-members/photos/{id}/review',
+  'PUT /api/nen-members/photos/{id}/rotation',
 
   // 機能「broadcasts」の管理画面用API（OpenAPI未記載・順次記載）（20件）
   'DELETE /api/broadcast-message-assets/{id}',

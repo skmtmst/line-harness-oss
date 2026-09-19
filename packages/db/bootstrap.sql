@@ -2687,7 +2687,7 @@ CREATE TABLE friends (
   unfollow_count   INTEGER NOT NULL DEFAULT 0,
   created_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
-, ref_code TEXT, metadata TEXT NOT NULL DEFAULT '{}', line_account_id TEXT REFERENCES line_accounts(id), first_tracked_link_id TEXT REFERENCES tracked_links (id) ON DELETE SET NULL, support_mark_id TEXT REFERENCES support_marks(id) ON DELETE SET NULL, is_hidden INTEGER NOT NULL DEFAULT 0, real_name TEXT, system_display_name TEXT, private_memo TEXT);
+, ref_code TEXT, metadata TEXT NOT NULL DEFAULT '{}', line_account_id TEXT REFERENCES line_accounts(id), first_tracked_link_id TEXT REFERENCES tracked_links (id) ON DELETE SET NULL, support_mark_id TEXT REFERENCES support_marks(id) ON DELETE SET NULL, is_hidden INTEGER NOT NULL DEFAULT 0, real_name TEXT, system_display_name TEXT, private_memo TEXT, photo_watch_required INTEGER NOT NULL DEFAULT 0);
 
 CREATE TABLE funnel_steps (
   id         TEXT PRIMARY KEY,
@@ -4024,7 +4024,7 @@ CREATE TABLE "nen_photo_review_events" (
   notification_generation INTEGER NOT NULL DEFAULT 0
     CHECK (notification_generation >= 0),
   created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL, idempotency_key TEXT, resubmit_invite INTEGER NOT NULL DEFAULT 1,
   UNIQUE(photo_id, from_status)
 );
 
@@ -4076,7 +4076,8 @@ CREATE TABLE nen_photo_submissions (
 , line_account_id TEXT REFERENCES line_accounts(id), publication_consent_version TEXT, publication_consent_at TEXT, publication_withdrawn_at TEXT, public_pet_name INTEGER NOT NULL DEFAULT 0
   CHECK (public_pet_name IN (0, 1)), review_reason_code TEXT
   CHECK (review_reason_code IS NULL OR review_reason_code IN ('quality', 'privacy', 'unrelated', 'duplicate', 'other')), review_reason_note TEXT, reviewed_by TEXT, reviewed_by_name TEXT, review_notification_status TEXT NOT NULL DEFAULT 'not_required'
-  CHECK (review_notification_status IN ('not_required', 'pending', 'sent', 'failed')), review_image_url TEXT, public_image_url TEXT, image_width INTEGER CHECK (image_width IS NULL OR image_width > 0), image_height INTEGER CHECK (image_height IS NULL OR image_height > 0), image_byte_size INTEGER CHECK (image_byte_size IS NULL OR image_byte_size >= 0), captured_device TEXT, review_version INTEGER NOT NULL DEFAULT 1 CHECK (review_version > 0));
+  CHECK (review_notification_status IN ('not_required', 'pending', 'sent', 'failed')), review_image_url TEXT, public_image_url TEXT, image_width INTEGER CHECK (image_width IS NULL OR image_width > 0), image_height INTEGER CHECK (image_height IS NULL OR image_height > 0), image_byte_size INTEGER CHECK (image_byte_size IS NULL OR image_byte_size >= 0), captured_device TEXT, review_version INTEGER NOT NULL DEFAULT 1 CHECK (review_version > 0), display_rotation INTEGER NOT NULL DEFAULT 0
+  CHECK (display_rotation IN (0, 90, 180, 270)), rotation_idempotency_key TEXT, notification_retry_key TEXT);
 
 CREATE TABLE nen_point_ledger (
   id TEXT PRIMARY KEY,
@@ -7185,6 +7186,10 @@ CREATE INDEX idx_nen_photo_review_events_v352_account_created
 CREATE INDEX idx_nen_photo_review_events_v352_notification
   ON nen_photo_review_events(notification_status, created_at)
   WHERE notification_status IN ('pending', 'sending', 'failed');
+
+CREATE INDEX idx_nen_photo_review_events_v428_idempotency
+  ON nen_photo_review_events(line_account_id, photo_id, idempotency_key)
+  WHERE idempotency_key IS NOT NULL;
 
 CREATE INDEX idx_nen_photo_reward_outbox_pending
   ON nen_photo_reward_outbox(status, next_attempt_at, created_at)
