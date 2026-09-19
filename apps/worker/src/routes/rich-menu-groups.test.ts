@@ -31,12 +31,36 @@ const dbMocks = {
   createRichMenuScheduleAtomic: vi.fn((): Promise<any> => Promise.resolve({ outcome: 'created', id: 'new-schedule' })),
   createRichMenuManualPublishRequestAtomic: vi.fn(),
   getRichMenuManualPublishRequest: vi.fn(),
+  getRichMenuManualPublishRequestById: vi.fn(),
+  listRichMenuManualPublishRequests: vi.fn(),
   getRichMenuManualPublishShells: vi.fn(),
   markRichMenuManualPublishFailed: vi.fn(),
   markRichMenuManualPublishSucceeded: vi.fn(),
   recordRichMenuManualPublishShells: vi.fn(),
   claimRichMenuManualPublishRequest: vi.fn(),
   restartRichMenuManualPublishRequest: vi.fn(),
+  markRichMenuGroupUnpublished: vi.fn(),
+  getTrackedLinkById: vi.fn(),
+  // N-163: 検索語の正規化は route 側でも使うので実装をそのまま置く。
+  normalizeRichMenuSearchText: (value: string) => value.toLowerCase().replace(/[\s　]+/g, ''),
+  listRichMenuGroupIdsByAreaLabel: vi.fn(async () => new Set<string>()),
+  duplicateRichMenuGroupAtomic: vi.fn(),
+  createRichMenuTestApplyAtomic: vi.fn(),
+  getActiveRichMenuTestApply: vi.fn(),
+  getRichMenuTestApplyById: vi.fn(),
+  listRichMenuTestApplies: vi.fn(),
+  captureRichMenuTestApplyPrevious: vi.fn(),
+  recordRichMenuTestApplyShells: vi.fn(),
+  markRichMenuTestApplyApplied: vi.fn(),
+  markRichMenuTestApplyFailed: vi.fn(),
+  beginRichMenuTestApplyRevert: vi.fn(),
+  markRichMenuTestApplyReverted: vi.fn(),
+  markRichMenuTestApplyRevertFailed: vi.fn(),
+  getStaffById: vi.fn(),
+  getMediaById: vi.fn(),
+  recordAuditEvent: vi.fn(),
+  maskAuditIp: vi.fn(() => null),
+  auditDeviceFamily: vi.fn(() => 'unknown'),
 };
 vi.mock('@line-crm/db', () => dbMocks);
 
@@ -107,7 +131,11 @@ function setupApp(opts: {
 }
 
 beforeEach(() => {
-  for (const fn of Object.values(dbMocks)) fn.mockReset();
+  for (const fn of Object.values(dbMocks)) {
+    // 素の関数（正規化など実装を共有するもの）は mockReset を持たない。
+    if (typeof (fn as { mockReset?: unknown }).mockReset === 'function') (fn as ReturnType<typeof vi.fn>).mockReset();
+  }
+  dbMocks.listRichMenuGroupIdsByAreaLabel.mockImplementation(async () => new Set<string>());
   accountAccessMocks.canAccessAllLineAccounts.mockReset();
   accountAccessMocks.canAccessAllLineAccounts.mockImplementation(
     async (_db, staff) => Boolean(staff),
@@ -1151,7 +1179,9 @@ describe('POST /api/rich-menu-groups/:groupId/publish', () => {
   test('404 when group missing', async () => {
     dbMocks.getRichMenuGroupWithPages.mockResolvedValue(null);
     const app = setupApp();
-    const res = await app.request('/api/rich-menu-groups/missing/publish', { method: 'POST' });
+    const res = await app.request('/api/rich-menu-groups/missing/publish', {
+      method: 'POST', headers: { 'Idempotency-Key': 'manual-publish-missing' },
+    });
     expect(res.status).toBe(404);
   });
 
