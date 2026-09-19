@@ -190,7 +190,7 @@ type CustomerMutationApi = {
   updateDraft: typeof api.lineNotifications.updateDraft
   publishDefinition: typeof api.lineNotifications.publishDefinition
   stopDefinition: typeof api.lineNotifications.stopDefinition
-  updateSetting: typeof api.ecCommerce.updateSetting
+  createDefinition: typeof api.lineNotifications.createDefinition
 }
 
 /**
@@ -335,15 +335,48 @@ async function saveCustomerNotification(args: {
         message: `${setting.label}を保存しました。`, contentSaved: false, settleDraft: false,
       }
     }
-    await args.api.updateSetting(args.accountId, setting.eventType, {
-      // 見出しは呼び出し側で入力済みを確かめている。型の上の null だけをここで畳む。
-      isEnabled: enabled, title: setting.title ?? '', introText: setting.introText, outroText: setting.outroText,
-      buttonLabel: setting.buttonLabel, buttonUrl: setting.buttonUrl, imageUrl: setting.imageUrl,
+    /*
+     * N-330 (#943): 正本の定義が無い従来設定は、ここで定義を1回だけ作る。
+     * 作ったあとは更新・公開・停止すべて定義側のAPIだけを使い、旧設定
+     * テーブルへの二重書き込みをやめる。`key` はイベントごとに固定し、
+     * 同じ設定から定義が2つ生えないようにする。
+     */
+    const created = await args.api.createDefinition({
+      lineAccountId: args.accountId,
+      key: `ec:${setting.eventType}`,
+      name: setting.title || setting.label,
+      category: setting.category,
+      sourceEventType: setting.eventType,
+      draft: {
+        title: setting.title,
+        introText: setting.introText,
+        outroText: setting.outroText,
+        buttonLabel: setting.buttonLabel,
+        buttonUrl: setting.buttonUrl,
+        imageUrl: setting.imageUrl,
+        fixedFields: setting.fixedFields,
+      },
     })
+    if (!created.success) throw new Error('create failed')
+    if (isStale(guard)) return { kind: 'stale', contentSaved: true, settleDraft: false }
+    if (!enabled) {
+      // 止める側は、作った下書きをそのまま置く。公開しない限り送られない。
+      const settleDraft = canSettleDraft(guard, true)
+      return {
+        kind: 'applied', definition: created.data, enabled: false, tone: 'success',
+        message: savedNotice(`${setting.label}を保存しました。`, settleDraft),
+        contentSaved: true, settleDraft,
+      }
+    }
+    const published = await args.api.publishDefinition(created.data.id, {
+      lineAccountId: args.accountId,
+      expectedVersion: created.data.version,
+    })
+    if (!published.success) throw new Error('publish failed')
     if (isStale(guard)) return { kind: 'stale', contentSaved: true, settleDraft: false }
     const settleDraft = canSettleDraft(guard, true)
     return {
-      kind: 'applied', definition: null, enabled, tone: 'success',
+      kind: 'applied', definition: published.data, enabled: true, tone: 'success',
       message: savedNotice(`${setting.label}を保存しました。`, settleDraft),
       contentSaved: true, settleDraft,
     }
@@ -616,7 +649,7 @@ function LineNotificationsPage() {
     const stale = () => generation !== loadGeneration.current || selectedAccountId !== selectedAccountRef.current
     // N-341: 運用者タブの件数だけ先に実数で取る。顧客タブの成否とは切り分ける。
     try {
-      const operatorRes = await api.notifications.operatorRules.list(selectedAccountId)
+      const operatorRes = await api.lineNotifications.operatorRules.list(selectedAccountId)
       if (stale()) return
       if (!operatorRes.success) throw new Error('operator count failed')
       setOperatorCount(operatorRes.data.summary.total)
@@ -813,7 +846,7 @@ function LineNotificationsPage() {
     updateDraft: api.lineNotifications.updateDraft,
     publishDefinition: api.lineNotifications.publishDefinition,
     stopDefinition: api.lineNotifications.stopDefinition,
-    updateSetting: api.ecCommerce.updateSetting,
+    createDefinition: api.lineNotifications.createDefinition,
   }
   const guardFor = (setting: EcNotificationSetting): CustomerMutationGuard => ({
     generation: loadGeneration.current,
@@ -838,7 +871,10 @@ function LineNotificationsPage() {
     if (outcome.kind === 'stale' || generation !== loadGeneration.current) return
     if (outcome.kind === 'failed') { setNotice({ tone: 'error', text: outcome.message }); return }
     const saved = outcome.definition
-    if (saved) setDefinitions((current) => current.map((item) => item.id === saved.id ? saved : item))
+    // N-330: 従来設定から作った新しい定義は、一覧に無いので足す。
+    if (saved) setDefinitions((current) => current.some((item) => item.id === saved.id)
+      ? current.map((item) => item.id === saved.id ? saved : item)
+      : [...current, saved])
     update(setting.eventType, { isEnabled: outcome.enabled })
     if (!outcome.contentSaved) {
       // 出す・止めるの切替は文面を送っていない。戻し先の出・止めだけを直し、文面は触らない。

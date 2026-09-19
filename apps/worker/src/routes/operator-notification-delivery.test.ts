@@ -333,3 +333,141 @@ describe('運用者へのお知らせの送信と実行記録', () => {
     });
   });
 });
+
+
+describe('N-342 (#943): 正本名 /api/line-notifications 配下の運用者通知API', () => {
+  let testDb: SqliteD1;
+
+  beforeEach(() => {
+    pushMessageWithRequestId.mockReset();
+    pushMessageWithRequestId.mockResolvedValue({ data: {}, requestId: 'line-request-1' });
+    sendOperationEmail.mockReset();
+    sendOperationEmail.mockResolvedValue(undefined);
+    canAccessAllLineAccounts.mockReset();
+    canAccessAllLineAccounts.mockResolvedValue(true);
+    testDb = createTestD1();
+    seed(testDb);
+  });
+
+  const patch = (body: unknown) => ({
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+
+  it('一覧・1件・作成・下書き・プレビューを正本名で通す', async () => {
+    const instance = app(testDb.db);
+
+    const created = await instance.request(
+      '/api/line-notifications/operator-rules',
+      json({
+        lineAccountId: 'account-1', name: '新しい予約(正本)', eventType: 'booking_created',
+        conditions: { importance: 'normal', recipientIds: ['owner-1'], recipientLabel: 'オーナー', message: '新しい予約が入りました', dedupeMinutes: 0 },
+        channels: ['dashboard', 'line'],
+      }),
+    );
+    expect(created.status).toBe(201);
+    const createdBody = await created.json() as { data: { id: string; isActive: boolean } };
+    const ruleId = createdBody.data.id;
+    expect(createdBody.data.isActive).toBe(false);
+
+    const list = await instance.request(
+      '/api/line-notifications/operator-rules?lineAccountId=account-1',
+    );
+    expect(list.status).toBe(200);
+    await expect(list.json()).resolves.toMatchObject({
+      data: { summary: { total: 3 } },
+    });
+
+    const detail = await instance.request(
+      `/api/line-notifications/operator-rules/${ruleId}?lineAccountId=account-1`,
+    );
+    expect(detail.status).toBe(200);
+    await expect(detail.json()).resolves.toMatchObject({ data: { name: '新しい予約(正本)' } });
+
+    // 下書きは正本名の draft 口。公開・停止はここでは受け付けない。
+    const drafted = await instance.request(
+      `/api/line-notifications/operator-rules/${ruleId}/draft`,
+      patch({ lineAccountId: 'account-1', name: '新しい予約(正本・改)' }),
+    );
+    expect(drafted.status).toBe(200);
+    await expect(drafted.json()).resolves.toMatchObject({ data: { name: '新しい予約(正本・改)' } });
+
+    const rejected = await instance.request(
+      `/api/line-notifications/operator-rules/${ruleId}/draft`,
+      patch({ lineAccountId: 'account-1', isActive: true }),
+    );
+    expect(rejected.status).toBe(409);
+    await expect(rejected.json()).resolves.toMatchObject({ code: 'use_publish_or_stop' });
+
+    const collectionPreview = await instance.request(
+      '/api/line-notifications/operator-rules/recipients-preview',
+      json({ lineAccountId: 'account-1', channels: ['line'] }),
+    );
+    expect(collectionPreview.status).toBe(200);
+
+    const rulePreview = await instance.request(
+      `/api/line-notifications/operator-rules/${ruleId}/recipients-preview`,
+      json({ lineAccountId: 'account-1' }),
+    );
+    expect(rulePreview.status).toBe(200);
+    // ルールの受け取る人(owner-1)だけを見る。全スタッフではない。
+    await expect(rulePreview.json()).resolves.toMatchObject({
+      data: { summary: { staff: 1, canReceive: 1 } },
+    });
+  });
+
+  it('公開・停止・テスト・きっかけ・手動発火・回収・CSVを正本名で通す', async () => {
+    const instance = app(testDb.db);
+
+    const published = await instance.request(
+      '/api/line-notifications/operator-rules/rule-1/publish',
+      json({ lineAccountId: 'account-1' }),
+    );
+    expect(published.status).toBe(200);
+    await expect(published.json()).resolves.toMatchObject({ data: { isActive: true } });
+
+    const eventTypes = await instance.request(
+      '/api/line-notifications/operator-event-types?lineAccountId=account-1',
+    );
+    expect(eventTypes.status).toBe(200);
+    await expect(eventTypes.json()).resolves.toMatchObject({
+      data: { items: expect.any(Array) },
+    });
+
+    const dispatched = await instance.request(
+      '/api/line-notifications/operator-events',
+      json({ lineAccountId: 'account-1', eventType: 'booking_created', sourceEventId: 'booking-canonical' }),
+    );
+    expect(dispatched.status).toBe(200);
+    await expect(dispatched.json()).resolves.toMatchObject({
+      // 管理画面+LINEの2経路で受理する。
+      data: { rules: [{ ruleId: 'rule-1', accepted: 2 }] },
+    });
+
+    const tested = await instance.request(
+      '/api/line-notifications/operator-rules/rule-1/test',
+      json({ lineAccountId: 'account-1' }),
+    );
+    expect(tested.status).toBe(200);
+
+    const swept = await instance.request(
+      '/api/line-notifications/operator-outbox/sweep',
+      json({ lineAccountId: 'account-1' }),
+    );
+    expect(swept.status).toBe(200);
+
+    const csv = await instance.request(
+      '/api/line-notifications/operator-deliveries.csv?lineAccountId=account-1&reason=正本名確認',
+    );
+    expect(csv.status).toBe(200);
+    expect(await csv.text()).toContain('新しい予約');
+
+    const stopped = await instance.request(
+      '/api/line-notifications/operator-rules/rule-1/stop',
+      json({ lineAccountId: 'account-1' }),
+    );
+    expect(stopped.status).toBe(200);
+    await expect(stopped.json()).resolves.toMatchObject({ data: { isActive: false } });
+  });
+});

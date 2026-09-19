@@ -31,7 +31,8 @@ describe('点検・中: LINE通知の画面契約', () => {
 
   it('中6: 新規作成は保存し直せて、公開前に最新を保存する', () => {
     expect(OPERATOR_NEW).toContain('保存し直す')
-    expect(OPERATOR_NEW).toContain('rules.update(savedRuleId')
+    // N-342 (#943): 正本APIの下書き口。作り直さず書き換える。
+    expect(OPERATOR_NEW).toContain('operatorRules.updateDraft(savedRuleId')
     expect(OPERATOR_NEW).not.toContain('savedRuleId ?? await saveDraft()')
   })
 

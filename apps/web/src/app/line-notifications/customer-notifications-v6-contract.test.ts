@@ -86,8 +86,12 @@ describe('V6 顧客へのお知らせの寸法', () => {
 
   it('EC通知の既定設定も選択中のLINEアカウントに限定して読み書きする', () => {
     expect(PAGE).toContain('api.ecCommerce.settings(selectedAccountId)')
-    // 書き込みは呼び出し口へ渡したアカウントだけに向ける。渡す側は選択中のアカウントを掴む。
-    expect(PAGE).toContain('args.api.updateSetting(args.accountId, setting.eventType')
+    // N-330 (#943): 書き込みの正本は顧客通知定義。従来設定だけの行は定義を
+    // 1回だけ作り、旧設定APIへの二重書き込みはしない。
+    expect(PAGE).toContain('await args.api.createDefinition({')
+    expect(PAGE).toContain('lineAccountId: args.accountId')
+    expect(PAGE).not.toContain('args.api.updateSetting(')
+    expect(PAGE).not.toContain('api.ecCommerce.updateSetting')
     expect(PAGE).toContain('const accountId = selectedAccountId')
   })
 

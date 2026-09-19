@@ -55,9 +55,10 @@ export default function OperatorNotificationRules({ lineAccountId }: { lineAccou
     }
     setState('loading')
     try {
-      const result = await api.notifications.rules.list(lineAccountId)
+      // N-342 (#943): 運用者通知の正本API。一覧は items+summary の形で返る。
+      const result = await api.lineNotifications.operatorRules.list(lineAccountId)
       if (!result.success) throw new Error('load failed')
-      setRules(result.data)
+      setRules(result.data.items)
       setState('ready')
     } catch (error) {
       setRules([])

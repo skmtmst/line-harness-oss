@@ -90,10 +90,11 @@ const accounts = [
   { id: 'account-b', channelId: 'channel-b', name: 'B店', displayName: 'B店', isActive: true, country: 'JP', role: null, displayOrder: 1 },
 ]
 
-const EVENT_TYPE = 'ec_order.confirmed'
+// ECイベントの正名。worker の event_type・定義の source_event_type と同じ値。
+const EVENT_TYPE = 'ec.order.confirmed'
 
 const ACCOUNT_LOAD_PATHS = new Set([
-  '/api/notifications/operator-rules',
+  '/api/line-notifications/operator-rules',
   '/api/ec-commerce/settings',
   '/api/ec-commerce/overview',
   '/api/line-notifications/customer-definitions',
@@ -186,7 +187,7 @@ async function openHarness(browser) {
     if (path === '/api/settings/features') {
       return json({ success: true, data: { features: {}, sidebarOrder: null, sidebarItemOrder: null, parentChildMode: false, specializedFeatureKeys: [], version: 1 } })
     }
-    if (path === '/api/notifications/operator-rules') {
+    if (path === '/api/line-notifications/operator-rules') {
       return json({ success: true, data: { items: [], summary: { total: 7, published: 7, stopped: 0, missingRecipients: 0, recipients: 3, acceptedToday: 0, excludedToday: 0 } } })
     }
     if (path === '/api/ec-commerce/settings') return json({ success: true, data: [notificationSetting(accountId)] })
