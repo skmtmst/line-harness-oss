@@ -2641,7 +2641,7 @@ export type AutomationTemplateSummary = {
 }
 export type AutomationDraftAction = {
   id: string
-  type: 'add_tag' | 'start_scenario' | 'send_message'
+  type: 'add_tag' | 'start_scenario' | 'send_message' | 'common_action'
   params: Record<string, unknown>
   onFailure: 'stop'
 }
@@ -2656,6 +2656,48 @@ export type AutomationDraftDetail = {
   triggerConfig: Record<string, unknown>
   conditions: Record<string, unknown>
   actions: AutomationDraftAction[]
+}
+
+/** #942 N-354: 実行記録1件の詳細。処理ごとの結果と試行数を持つ。 */
+export type AutomationRunStep = {
+  stepKey: string
+  actionType: string
+  actionLabel: string
+  status: 'queued' | 'running' | 'waiting' | 'success' | 'failed' | 'skipped' | 'cancelled'
+  attemptNumber: number
+  errorCode: string | null
+  errorMessage: string | null
+  commonActionVersionId: string | null
+  startedAt: string | null
+  completedAt: string | null
+}
+export type AutomationRunDetail = {
+  id: string
+  automationId: string
+  automationName: string
+  automationVersionId: string
+  /** 実行時に固定された版番号。 */
+  versionNumber: number
+  /** 1人テストの実行か。 */
+  isTest: boolean
+  /** 取りやめられるのは、まだ終わっていない実行だけ。 */
+  canCancel: boolean
+  canRetry: boolean
+  occurredAt: string
+  subject: string | null
+  accountLabel: string | null
+  triggerLabel: string
+  status: 'queued' | 'claimed' | 'succeeded' | 'skipped' | 'retry_wait' | 'permanent_failed' | 'cancelled'
+  domainStatus: string
+  detail: string | null
+  durationMs: number | null
+  failureReason: string | null
+  successfulActions: string[]
+  skippedActions: string[]
+  failedAction: string | null
+  friendId: string | null
+  friendName: string | null
+  steps: AutomationRunStep[]
 }
 export type ActionScoreBand = 'high' | 'normal' | 'low'
 export type ActionScoreFilter = 'all' | ActionScoreBand | 'decreased'
@@ -8089,6 +8131,8 @@ export const api = {
       fetchApi<ApiResponse<{
         tags: Array<{ id: string; name: string }>
         scenarios: Array<{ id: string; name: string }>
+        /** 呼び出せるのは公開済みだけ（#942 N-356）。 */
+        commonActions: Array<{ id: string; name: string }>
       }>>(`/api/automation-draft-resources?account_id=${encodeURIComponent(accountId)}`),
     updateDraft: (id: string, accountId: string, data: {
       expectedDraftVersionId: string
@@ -8105,6 +8149,42 @@ export const api = {
       fetchApi<ApiResponse<{ id: string; versionId: string; versionNumber: number; status: 'active' | 'stopped' }>>(
         `/api/automation-drafts/${encodeURIComponent(id)}/publish?account_id=${encodeURIComponent(accountId)}`,
         { method: 'POST', body: JSON.stringify({ expectedDraftVersionId, activate }) },
+      ),
+    // #942 N-352: 一覧の「編集」。公開済みの定義に改訂用の下書きをぶら下げる。
+    // すでに下書きがあればそれを返す（何度押しても1件）。
+    createDraftFromAutomation: (id: string) =>
+      fetchApi<ApiResponse<{ id: string; draftVersionId: string }>>(
+        `/api/automations/${encodeURIComponent(id)}/draft`,
+        { method: 'POST', body: '{}' },
+      ),
+    // #942 N-352: 一覧の「複製」。いま見えている版を写した新しい下書き。
+    duplicate: (id: string) =>
+      fetchApi<ApiResponse<{ id: string; draftVersionId: string }>>(
+        `/api/automations/${encodeURIComponent(id)}/duplicate`,
+        { method: 'POST', body: '{}' },
+      ),
+    // #942 N-352: 稼働切替と「保管」。保管は一方通行。実行記録は残る。
+    setStatus: (id: string, status: 'active' | 'stopped' | 'archived') =>
+      fetchApi<ApiResponse<{ id: string; status: 'active' | 'stopped' | 'archived' }>>(
+        `/api/automations/${encodeURIComponent(id)}/status`,
+        { method: 'POST', body: JSON.stringify({ status }) },
+      ),
+    // #942 N-354: 実行記録1件の詳細（版番号・テスト印・処理ごとの結果）。
+    getRun: (id: string) =>
+      fetchApi<ApiResponse<AutomationRunDetail>>(`/api/automation-runs/${encodeURIComponent(id)}`),
+    // #942 N-353: 実行記録のCSV書き出し口。画面の絞り込みと同じ条件を渡す。
+    runsCsvUrl: (params?: { accountId?: string; search?: string; status?: string }) => {
+      const query = new URLSearchParams({ format: 'csv' })
+      if (params?.accountId) query.set('lineAccountId', params.accountId)
+      if (params?.search) query.set('search', params.search)
+      if (params?.status) query.set('status', params.status)
+      return `${API_URL}/api/automation-runs?${query}`
+    },
+    // #942 N-353: まだ終わっていない実行を取りやめる。取消済みはそのまま成功。
+    cancelRun: (id: string) =>
+      fetchApi<ApiResponse<{ runId: string; status: 'cancelled'; alreadyCancelled: boolean; cancelledStepCount: number }>>(
+        `/api/automation-runs/${encodeURIComponent(id)}/cancel`,
+        { method: 'POST', body: '{}' },
       ),
   },
   commonActions: {

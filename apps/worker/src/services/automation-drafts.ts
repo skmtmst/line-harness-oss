@@ -1,6 +1,10 @@
 import { parseCondition } from './segment-query.js';
 
-export type AutomationDraftActionType = 'add_tag' | 'start_scenario' | 'send_message';
+export type AutomationDraftActionType =
+  | 'add_tag'
+  | 'start_scenario'
+  | 'send_message'
+  | 'common_action';
 export type AutomationDraftTriggerType =
   | 'friend_add'
   | 'tag_change'
@@ -106,6 +110,8 @@ export function parseAutomationRevision(value: unknown): { versionId: string; fi
 export interface AutomationDraftResources {
   tags: Array<{ id: string; name: string }>;
   scenarios: Array<{ id: string; name: string }>;
+  /** 呼び出せるのは公開済みだけ。下書き・保管済みは実行計画へ固定できない。 */
+  commonActions: Array<{ id: string; name: string }>;
 }
 
 export class AutomationDraftError extends Error {
@@ -343,7 +349,7 @@ export async function listAutomationDraftResources(
   db: D1Database,
   lineAccountId: string,
 ): Promise<AutomationDraftResources> {
-  const [tags, scenarios] = await Promise.all([
+  const [tags, scenarios, commonActions] = await Promise.all([
     db.prepare(
       'SELECT id, name FROM tags WHERE line_account_id = ? ORDER BY name ASC',
     ).bind(lineAccountId).all<{ id: string; name: string }>(),
@@ -351,8 +357,18 @@ export async function listAutomationDraftResources(
       `SELECT id, name FROM scenarios
         WHERE line_account_id = ? AND is_active = 1 ORDER BY name ASC`,
     ).bind(lineAccountId).all<{ id: string; name: string }>(),
+    db.prepare(
+      `SELECT id, name FROM common_actions
+        WHERE line_account_id = ? AND status = 'published'
+          AND current_published_version_id IS NOT NULL
+        ORDER BY name ASC`,
+    ).bind(lineAccountId).all<{ id: string; name: string }>(),
   ]);
-  return { tags: tags.results ?? [], scenarios: scenarios.results ?? [] };
+  return {
+    tags: tags.results ?? [],
+    scenarios: scenarios.results ?? [],
+    commonActions: commonActions.results ?? [],
+  };
 }
 
 /**
@@ -459,21 +475,32 @@ interface AutomationDraftRow extends AutomationVersionContent {
   current_draft_version_id: string;
   trigger_type: AutomationDraftDetail['eventType'];
   created_by: string | null;
+  /** 定義の状態。公開済みの定義にも下書きをぶら下げられる（#942 N-352）。
+      保管済みは読み取り側の WHERE で除くため、ここには現れない。 */
+  definition_status: 'draft' | 'active' | 'stopped';
 }
 
-/** 下書きを、保存されている生の文字列のまま読む。突き合わせはこの値で行う。 */
+/**
+ * 下書きを、保存されている生の文字列のまま読む。突き合わせはこの値で行う。
+ *
+ * 定義の状態は問わない。新規の下書き（`status='draft'`）だけでなく、
+ * 動いている・止めている定義にぶら下がった改訂用の下書きも読む
+ * （一覧の「編集」→ `createAutomationDraftFromDefinition` が作る）。
+ * 保管済み（`archived`）は一覧から消えているので、ここでも開かせない。
+ */
 async function readAutomationDraftRow(
   db: D1Database,
   input: { id: string; lineAccountId: string },
 ): Promise<AutomationDraftRow> {
   const row = await db.prepare(
-    `SELECT d.id, d.name, d.description, d.current_draft_version_id, v.created_by,
+    `SELECT d.id, d.name, d.description, d.status AS definition_status,
+            d.current_draft_version_id, v.created_by,
             v.trigger_type, v.trigger_config, v.condition_config, v.action_config
        FROM automation_definitions d
        JOIN automation_versions v
          ON v.id = d.current_draft_version_id
         AND v.automation_id = d.id AND v.status = 'draft'
-      WHERE d.id = ? AND d.line_account_id = ? AND d.status = 'draft'`,
+      WHERE d.id = ? AND d.line_account_id = ? AND d.status IN ('draft', 'active', 'stopped')`,
   ).bind(input.id, input.lineAccountId).first<AutomationDraftRow>();
   if (!row) throw new AutomationDraftError('not_found', '編集中の下書きが見つかりません');
   return row;
@@ -551,9 +578,19 @@ export async function updateAutomationDraft(
   }
   const actions: AutomationDraftAction[] = [];
   const ids = new Set<string>();
+  /*
+   * 共通アクションの呼び出し束（N-356）。
+   *
+   * 版は実行計画へ焼き付けるとき `common_action_bindings` から引く
+   * （`automation-engine.ts` の `resolveCommonActionVersion`）。
+   * `consumer_path` には処理の番号（action.id）を使うので、ここで
+   * （このオートメーション, この処理番号, この共通アクション）へ
+   * いま公開中の版を束ねておく。
+   */
+  const commonActionBindings: Array<{ path: string; commonActionId: string; versionId: string }> = [];
   for (const [index, candidate] of input.actions.entries()) {
     const raw = candidate as Partial<AutomationDraftAction>;
-    if (!raw || !new Set(['add_tag', 'start_scenario', 'send_message']).has(String(raw.type))) {
+    if (!raw || !new Set(['add_tag', 'start_scenario', 'send_message', 'common_action']).has(String(raw.type))) {
       throw new AutomationDraftError('action_unsupported', 'この処理はまだ実行まで接続されていません', `actions.${index}`);
     }
     const params = raw.params && typeof raw.params === 'object' && !Array.isArray(raw.params)
@@ -567,6 +604,27 @@ export async function updateAutomationDraft(
       const scenarioId = requiredString(params.scenarioId, `actions.${index}.scenarioId`, '始めるシナリオ');
       await requireResource(db, 'scenarios', scenarioId, input.lineAccountId, `actions.${index}.scenarioId`, '始めるシナリオ');
       params.scenarioId = scenarioId;
+    } else if (raw.type === 'common_action') {
+      const commonActionId = requiredString(
+        params.commonActionId, `actions.${index}.commonActionId`, '使う共通アクション',
+      );
+      const commonAction = await db.prepare(
+        `SELECT id, current_published_version_id FROM common_actions
+          WHERE id = ? AND line_account_id = ? AND status = 'published'`,
+      ).bind(commonActionId, input.lineAccountId)
+        .first<{ id: string; current_published_version_id: string | null }>();
+      if (!commonAction?.current_published_version_id) {
+        throw new AutomationDraftError(
+          'resource_not_found', '公開済みの共通アクションを選び直してください',
+          `actions.${index}.commonActionId`,
+        );
+      }
+      params.commonActionId = commonActionId;
+      commonActionBindings.push({
+        path: typeof raw.id === 'string' && raw.id.trim() ? raw.id.trim() : `step-${index + 1}`,
+        commonActionId,
+        versionId: commonAction.current_published_version_id,
+      });
     } else {
       params.messageType = 'text';
       params.content = requiredString(params.content, `actions.${index}.content`, '送る文面');
@@ -604,7 +662,7 @@ export async function updateAutomationDraft(
    * 古い版の行は残す。実行記録（`automation_runs.automation_version_id`）が
    * 指していることがあり、実行記録は消せない決まりだからである。
    */
-  const results = await db.batch([
+  const statements = [
     db.prepare(
       `INSERT INTO automation_versions
          (id, automation_id, version_number, status, trigger_type, trigger_config,
@@ -615,7 +673,8 @@ export async function updateAutomationDraft(
         WHERE EXISTS (
           SELECT 1 FROM automation_definitions d
             JOIN automation_versions v ON v.id = d.current_draft_version_id
-           WHERE d.id = ? AND d.line_account_id = ? AND d.status = 'draft'
+           WHERE d.id = ? AND d.line_account_id = ?
+             AND d.status IN ('draft', 'active', 'stopped')
              AND d.current_draft_version_id = ?
              AND v.trigger_type = ? AND v.trigger_config = ?
              AND v.condition_config = ? AND v.action_config = ?
@@ -635,7 +694,8 @@ export async function updateAutomationDraft(
       // 新しい版が本当にできたときだけ差し替える。
       `UPDATE automation_definitions
           SET name = ?, updated_at = ?, current_draft_version_id = ?
-        WHERE id = ? AND line_account_id = ? AND status = 'draft'
+        WHERE id = ? AND line_account_id = ?
+          AND status IN ('draft', 'active', 'stopped')
           AND current_draft_version_id = ?
           AND EXISTS (
             SELECT 1 FROM automation_versions WHERE id = ? AND automation_id = ?
@@ -644,7 +704,26 @@ export async function updateAutomationDraft(
       name, now, nextVersionId, current.id, input.lineAccountId, expectedVersionId,
       nextVersionId, current.id,
     ),
-  ]);
+    /*
+     * 共通アクションの束は「処理の番号 → 版」の対応表。下書きに載っている
+     * 呼び出しだけを足す（INSERT OR IGNORE）。
+     *
+     * **消したり版を上げたりしない。** 同じ定義にぶら下がる公開済みの版が
+     * 同じ束を見て動いている。下書きの保存で勝手に版を上げると、公開中の
+     * ルールが見ていない新版を呼び始める。束の更新・削除は共通アクション側の
+     * 利用先管理に委ねる。
+     */
+    ...commonActionBindings.map((binding) => db.prepare(
+      `INSERT OR IGNORE INTO common_action_bindings
+         (id, line_account_id, common_action_id, common_action_version_id,
+          consumer_type, consumer_id, consumer_path, created_by, created_at, updated_at)
+       VALUES (?, ?, ?, ?, 'automation', ?, ?, ?, ?, ?)`,
+    ).bind(
+      crypto.randomUUID(), input.lineAccountId, binding.commonActionId, binding.versionId,
+      current.id, binding.path, current.created_by ?? null, now, now,
+    )),
+  ];
+  const results = await db.batch(statements);
   if ((results[0].meta?.changes ?? 0) !== 1 || (results[1].meta?.changes ?? 0) !== 1) {
     throw new AutomationDraftError('version_conflict', '編集中の下書きが変わりました。再読み込みしてください');
   }
@@ -672,7 +751,14 @@ export async function publishAutomationDraft(
       WHERE id = ? AND automation_id = ? AND status = 'draft'`,
   ).bind(expectedVersionId, current.id).first<{ version_number: number }>();
   if (!version) throw new AutomationDraftError('not_found', '公開する下書きが見つかりません');
-  const status = input.activate === false ? 'stopped' : 'active';
+  /*
+   * 新規の下書き（定義が draft）は `activate` で動かすか止めたままかを選ぶ。
+   * **動いている・止めている定義の改訂下書きは、いまの稼働状態を保つ。**
+   * 止めているルールを直して公開したら勝手に動き出す、を防ぐ。
+   */
+  const status: 'active' | 'stopped' = current.definition_status === 'draft'
+    ? (input.activate === false ? 'stopped' : 'active')
+    : current.definition_status;
   const now = new Date().toISOString();
   const results = await db.batch([
     db.prepare(
@@ -688,7 +774,8 @@ export async function publishAutomationDraft(
     db.prepare(
       `UPDATE automation_definitions
           SET status = ?, current_published_version_id = ?, current_draft_version_id = NULL, updated_at = ?
-        WHERE id = ? AND line_account_id = ? AND status = 'draft'
+        WHERE id = ? AND line_account_id = ?
+          AND status IN ('draft', 'active', 'stopped')
           AND current_draft_version_id = ?`,
     ).bind(status, expectedVersionId, now, current.id, input.lineAccountId, expectedVersionId),
   ]);
@@ -696,4 +783,178 @@ export async function publishAutomationDraft(
     throw new AutomationDraftError('version_conflict', '公開する前に下書きが変わりました。再読み込みしてください');
   }
   return { id: current.id, versionId: expectedVersionId, versionNumber: Number(version.version_number), status };
+}
+
+/**
+ * 動いている・止めている定義に「改訂用の下書き」をぶら下げる（#942 N-352）。
+ *
+ * 公開済みの版は不変（`trg_automation_published_version_immutable`）なので、
+ * 直すには **公開版を写した下書き**を作ってから `publishAutomationDraft` で
+ * 差し替える。一覧の「編集」はここへ来る。
+ *
+ * **何度呼んでも1件。** すでに下書きがぶら下がっていれば新しく作らず
+ * それを返す（2つのタブで同時に押しても下書きは1つ）。
+ */
+export async function createAutomationDraftFromDefinition(
+  db: D1Database,
+  input: { id: string; lineAccountId: string; createdBy?: string | null },
+): Promise<{ id: string; draftVersionId: string }> {
+  const definition = await db.prepare(
+    `SELECT id, status, current_draft_version_id, current_published_version_id
+       FROM automation_definitions
+      WHERE id = ? AND line_account_id = ? AND status IN ('draft', 'active', 'stopped')`,
+  ).bind(input.id, input.lineAccountId).first<{
+    id: string;
+    status: 'draft' | 'active' | 'stopped';
+    current_draft_version_id: string | null;
+    current_published_version_id: string | null;
+  }>();
+  if (!definition) throw new AutomationDraftError('not_found', '編集するオートメーションが見つかりません');
+
+  if (definition.current_draft_version_id) {
+    // 既にある下書きをそのまま返す（冪等）。
+    const existing = await readAutomationDraftRow(db, input);
+    return {
+      id: existing.id,
+      draftVersionId: await automationRevisionToken(existing.current_draft_version_id, existing),
+    };
+  }
+  if (!definition.current_published_version_id) {
+    throw new AutomationDraftError('not_found', '編集できる公開済みの版がありません');
+  }
+  const source = await db.prepare(
+    `SELECT trigger_type, trigger_config, condition_config, action_config
+       FROM automation_versions
+      WHERE id = ? AND automation_id = ? AND status = 'published'`,
+  ).bind(definition.current_published_version_id, definition.id)
+    .first<AutomationVersionContent>();
+  if (!source) throw new AutomationDraftError('not_found', '公開済みの版を読み込めませんでした');
+
+  const nextVersionId = crypto.randomUUID();
+  const now = new Date().toISOString();
+  await db.batch([
+    db.prepare(
+      `INSERT INTO automation_versions
+         (id, automation_id, version_number, status, trigger_type, trigger_config,
+          condition_config, action_config, created_by, created_at)
+       SELECT ?, ?,
+              COALESCE((SELECT MAX(version_number) FROM automation_versions WHERE automation_id = ?), 0) + 1,
+              'draft', ?, ?, ?, ?, ?, ?
+        WHERE EXISTS (
+          SELECT 1 FROM automation_definitions
+           WHERE id = ? AND line_account_id = ? AND status IN ('active', 'stopped')
+             AND current_draft_version_id IS NULL
+        )`,
+    ).bind(
+      nextVersionId, definition.id, definition.id,
+      source.trigger_type, source.trigger_config, source.condition_config, source.action_config,
+      input.createdBy ?? null, now,
+      definition.id, input.lineAccountId,
+    ),
+    db.prepare(
+      // 先に下書きがぶら下がった側を守る。指し替えは1回だけ。
+      `UPDATE automation_definitions SET current_draft_version_id = ?, updated_at = ?
+        WHERE id = ? AND line_account_id = ? AND status IN ('active', 'stopped')
+          AND current_draft_version_id IS NULL
+          AND EXISTS (SELECT 1 FROM automation_versions WHERE id = ? AND automation_id = ?)`,
+    ).bind(nextVersionId, now, definition.id, input.lineAccountId, nextVersionId, definition.id),
+  ]);
+  const row = await readAutomationDraftRow(db, input);
+  return {
+    id: row.id,
+    draftVersionId: await automationRevisionToken(row.current_draft_version_id, row),
+  };
+}
+
+/**
+ * 一覧の「複製」（#942 N-352）。いま見えている版を写した **新しい下書き** を作る。
+ *
+ * 同名のままだと一覧で見分けられないので「のコピー」を付ける。
+ * 共通アクションの束は利用先（consumer_id）ごとに張られているため、
+ * 新しい定義へ写さないと呼び出し版を固定できずに失敗する。
+ */
+export async function duplicateAutomationDefinition(
+  db: D1Database,
+  input: { id: string; lineAccountId: string; createdBy?: string | null },
+): Promise<{ id: string; draftVersionId: string }> {
+  const definition = await db.prepare(
+    `SELECT id, current_draft_version_id, current_published_version_id, name, description, priority
+       FROM automation_definitions
+      WHERE id = ? AND line_account_id = ? AND status IN ('draft', 'active', 'stopped')`,
+  ).bind(input.id, input.lineAccountId).first<{
+    id: string;
+    current_draft_version_id: string | null;
+    current_published_version_id: string | null;
+    name: string;
+    description: string | null;
+    priority: number;
+  }>();
+  if (!definition) throw new AutomationDraftError('not_found', '複製するオートメーションが見つかりません');
+  const versionId = definition.current_draft_version_id ?? definition.current_published_version_id;
+  if (!versionId) {
+    throw new AutomationDraftError('not_found', '写せる版がありません');
+  }
+  const source = await db.prepare(
+    `SELECT trigger_type, trigger_config, condition_config, action_config
+       FROM automation_versions
+      WHERE id = ? AND automation_id = ?`,
+  ).bind(versionId, definition.id).first<AutomationVersionContent>();
+  if (!source) throw new AutomationDraftError('not_found', '写す版を読み込めませんでした');
+
+  // 共通アクションの束も写す。consumer_id を新しい定義へ付け替えるだけで、
+  // 版の固定は元の束と同じものを引き継ぐ。
+  // **1件ずつ新しいidを振る。** INSERT...SELECT で1つのUUIDを束ねると、
+  // 元の定義に束が2件以上あるとき全行同じidでPRIMARY KEY衝突になる。
+  const sourceBindings = await db.prepare(
+    `SELECT line_account_id, common_action_id, common_action_version_id, consumer_path
+       FROM common_action_bindings
+      WHERE line_account_id = ? AND consumer_type = 'automation' AND consumer_id = ?`,
+  ).bind(input.lineAccountId, definition.id).all<{
+    line_account_id: string;
+    common_action_id: string;
+    common_action_version_id: string;
+    consumer_path: string;
+  }>();
+
+  const newId = crypto.randomUUID();
+  const nextVersionId = crypto.randomUUID();
+  const now = new Date().toISOString();
+  const name = `${definition.name} のコピー`;
+  const results = await db.batch([
+    db.prepare(
+      `INSERT INTO automation_definitions
+         (id, line_account_id, name, description, status, priority, created_by, created_at, updated_at)
+       VALUES (?, ?, ?, ?, 'draft', ?, ?, ?, ?)`,
+    ).bind(newId, input.lineAccountId, name, definition.description, definition.priority,
+      input.createdBy ?? null, now, now),
+    db.prepare(
+      `INSERT INTO automation_versions
+         (id, automation_id, version_number, status, trigger_type, trigger_config,
+          condition_config, action_config, created_by, created_at)
+       VALUES (?, ?, 1, 'draft', ?, ?, ?, ?, ?, ?)`,
+    ).bind(nextVersionId, newId, source.trigger_type, source.trigger_config,
+      source.condition_config, source.action_config, input.createdBy ?? null, now),
+    db.prepare(
+      `UPDATE automation_definitions SET current_draft_version_id = ?, updated_at = ?
+        WHERE id = ? AND status = 'draft'
+          AND EXISTS (SELECT 1 FROM automation_versions WHERE id = ? AND automation_id = ?)`,
+    ).bind(nextVersionId, now, newId, nextVersionId, newId),
+    ...(sourceBindings.results ?? []).map((binding) =>
+      db.prepare(
+        `INSERT INTO common_action_bindings
+           (id, line_account_id, common_action_id, common_action_version_id,
+            consumer_type, consumer_id, consumer_path, created_by, created_at, updated_at)
+         VALUES (?, ?, ?, ?, 'automation', ?, ?, ?, ?, ?)`,
+      ).bind(crypto.randomUUID(), binding.line_account_id, binding.common_action_id,
+        binding.common_action_version_id, newId, binding.consumer_path,
+        input.createdBy ?? null, now, now),
+    ),
+  ]);
+  if ((results[0].meta?.changes ?? 0) !== 1 || (results[2].meta?.changes ?? 0) !== 1) {
+    throw new AutomationDraftError('duplicate_failed', '複製できませんでした。もう一度お試しください');
+  }
+  return {
+    id: newId,
+    draftVersionId: await automationRevisionToken(nextVersionId, source),
+  };
 }

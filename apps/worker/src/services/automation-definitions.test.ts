@@ -5,6 +5,7 @@ import {
   listAutomationDefinitions,
   previewAutomationAudience,
   runAutomationTest,
+  updateAutomationDefinitionStatus,
 } from './automation-definitions';
 import { automationRevisionToken } from './automation-drafts';
 
@@ -355,5 +356,101 @@ describe('V6オートメーションの一覧・対象見込み・1人テスト'
     })).rejects.toMatchObject({ code: 'not_found' });
     expect(testDb.raw.prepare(`SELECT COUNT(*) AS count FROM automation_runs`).get())
       .toEqual({ count: 0 });
+  });
+});
+
+/*
+ * #942 N-352: 一覧の稼働切替と「保管」。
+ * active / stopped / archived の一方通行の状態遷移。保管は戻せない
+ * （複製して作り直す）。実行記録は消えない。
+ */
+describe('定義の状態遷移（#942 N-352）', () => {
+  let testDb: SqliteD1;
+
+  beforeEach(() => {
+    testDb = createTestD1();
+    addAccount(testDb.raw, 'account-1');
+    addAccount(testDb.raw, 'account-2');
+  });
+
+  it('動かす・止める・保管するを順に切り替え、同じ状態への再送はそのまま返す', async () => {
+    addDefinition(testDb.raw, { id: 'auto-1', status: 'active' });
+
+    expect(await updateAutomationDefinitionStatus(testDb.db, {
+      id: 'auto-1', lineAccountId: 'account-1', status: 'stopped',
+    })).toEqual({ id: 'auto-1', status: 'stopped' });
+    // すでにその状態なら何もしない（冪等）。
+    expect(await updateAutomationDefinitionStatus(testDb.db, {
+      id: 'auto-1', lineAccountId: 'account-1', status: 'stopped',
+    })).toEqual({ id: 'auto-1', status: 'stopped' });
+    expect(await updateAutomationDefinitionStatus(testDb.db, {
+      id: 'auto-1', lineAccountId: 'account-1', status: 'active',
+    })).toEqual({ id: 'auto-1', status: 'active' });
+    expect(await updateAutomationDefinitionStatus(testDb.db, {
+      id: 'auto-1', lineAccountId: 'account-1', status: 'archived',
+    })).toEqual({ id: 'auto-1', status: 'archived' });
+    expect(testDb.raw.prepare(
+      `SELECT status FROM automation_definitions WHERE id = 'auto-1'`,
+    ).get()).toEqual({ status: 'archived' });
+  });
+
+  it('保管した定義はどの状態にも戻せない', async () => {
+    addDefinition(testDb.raw, { id: 'auto-1', status: 'archived' });
+    for (const status of ['active', 'stopped'] as const) {
+      await expect(updateAutomationDefinitionStatus(testDb.db, {
+        id: 'auto-1', lineAccountId: 'account-1', status,
+      })).rejects.toMatchObject({ code: 'status_invalid' });
+    }
+    // 保管済みのまま残る。
+    expect(testDb.raw.prepare(
+      `SELECT status FROM automation_definitions WHERE id = 'auto-1'`,
+    ).get()).toEqual({ status: 'archived' });
+  });
+
+  it('公開済みの版が無い定義は動かせない', async () => {
+    addDefinition(testDb.raw, { id: 'auto-1', status: 'draft' });
+    await expect(updateAutomationDefinitionStatus(testDb.db, {
+      id: 'auto-1', lineAccountId: 'account-1', status: 'active',
+    })).rejects.toMatchObject({ code: 'not_published' });
+  });
+
+  it('保管しても実行記録は残る', async () => {
+    addDefinition(testDb.raw, { id: 'auto-1', status: 'active' });
+    addRun(testDb.raw, { id: 'run-1', automationId: 'auto-1', status: 'success' });
+    await updateAutomationDefinitionStatus(testDb.db, {
+      id: 'auto-1', lineAccountId: 'account-1', status: 'archived',
+    });
+    expect(testDb.raw.prepare(
+      `SELECT id, status FROM automation_runs WHERE id = 'run-1'`,
+    ).get()).toEqual({ id: 'run-1', status: 'success' });
+  });
+
+  it('無い定義と別アカウントの定義は not_found', async () => {
+    addDefinition(testDb.raw, { id: 'auto-1', status: 'active' });
+    await expect(updateAutomationDefinitionStatus(testDb.db, {
+      id: 'no-such', lineAccountId: 'account-1', status: 'stopped',
+    })).rejects.toMatchObject({ code: 'not_found' });
+    await expect(updateAutomationDefinitionStatus(testDb.db, {
+      id: 'auto-1', lineAccountId: 'account-2', status: 'stopped',
+    })).rejects.toMatchObject({ code: 'not_found' });
+  });
+
+  it('読んだあと・書く直前に状態が変わっていたら409相当で止まる', async () => {
+    /*
+     * 2つのタブが同時に切り替えた競合。呼び出しが最初の読み取りで
+     * 止まる隙に別接続が先に状態を変えると、条件付きUPDATEが当たらず
+     * version_conflict で止まる。
+     */
+    addDefinition(testDb.raw, { id: 'auto-1', status: 'active' });
+    const pending = updateAutomationDefinitionStatus(testDb.db, {
+      id: 'auto-1', lineAccountId: 'account-1', status: 'stopped',
+    });
+    testDb.raw.prepare(
+      `UPDATE automation_definitions SET status = 'archived' WHERE id = 'auto-1'`,
+    ).run();
+    await expect(pending).rejects.toMatchObject({ code: 'version_conflict' });
+    expect(testDb.raw.prepare(
+      `SELECT status FROM automation_definitions WHERE id = 'auto-1'`,
+    ).get()).toEqual({ status: 'archived' });
   });
 });

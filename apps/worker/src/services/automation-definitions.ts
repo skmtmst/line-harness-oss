@@ -394,3 +394,62 @@ export async function runAutomationTest(
   }
   return { runId: started.runId, versionId: started.automationVersionId, status };
 }
+
+/**
+ * 定義の稼働状態を切り替える（#942 N-352：一覧の「保管」と稼働切替）。
+ *
+ * - `active`：公開済みの版がある定義だけ動かせる。下書きだけの定義は
+ *   先に `publishAutomationDraft` で公開する。
+ * - `stopped`：動いている定義を止める。
+ * - `archived`：一覧から外す。**実行記録は消えない**
+ *   （`automation_runs` は定義を参照して残る）。
+ *
+ * 保管済みは元に戻せない。誤って隠した定義を動かし直す穴を開けないための
+ * 一方通行で、複製して作り直す形にする。
+ */
+export async function updateAutomationDefinitionStatus(
+  db: D1Database,
+  input: {
+    id: string;
+    lineAccountId: string;
+    status: 'active' | 'stopped' | 'archived';
+  },
+): Promise<{ id: string; status: 'active' | 'stopped' | 'archived' }> {
+  const definition = await db.prepare(
+    `SELECT id, status, current_published_version_id
+       FROM automation_definitions
+      WHERE id = ? AND line_account_id = ?`,
+  ).bind(input.id, input.lineAccountId).first<{
+    id: string;
+    status: 'draft' | 'active' | 'stopped' | 'archived';
+    current_published_version_id: string | null;
+  }>();
+  if (!definition) {
+    throw new AutomationDefinitionError('not_found', 'オートメーションが見つかりません');
+  }
+  // すでにその状態なら何もしない（何度押しても同じ結果）。
+  if (definition.status === input.status) {
+    return { id: definition.id, status: input.status };
+  }
+  if (definition.status === 'archived') {
+    throw new AutomationDefinitionError(
+      'status_invalid', '保管したオートメーションは戻せません。複製して作り直してください',
+    );
+  }
+  if (input.status === 'active' && !definition.current_published_version_id) {
+    throw new AutomationDefinitionError(
+      'not_published', '公開してから動かしてください', 'status',
+    );
+  }
+  const updated = await db.prepare(
+    `UPDATE automation_definitions SET status = ?, updated_at = ?
+      WHERE id = ? AND line_account_id = ? AND status = ?`,
+  ).bind(
+    input.status, new Date().toISOString(),
+    definition.id, input.lineAccountId, definition.status,
+  ).run();
+  if ((updated.meta?.changes ?? 0) !== 1) {
+    throw new AutomationDefinitionError('version_conflict', '状態が変わりました。再読み込みしてください');
+  }
+  return { id: definition.id, status: input.status };
+}

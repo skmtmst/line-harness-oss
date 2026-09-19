@@ -5,7 +5,9 @@ import {
   updateAutomation,
   deleteAutomation,
   getAutomationLogs,
+  getAutomationExecutionRun,
   getAutomationExecutionRuns,
+  getAutomationExecutionRunSteps,
   type AutomationRunDomainStatus,
 } from '@line-crm/db';
 import type { Env } from '../index.js';
@@ -13,7 +15,9 @@ import { requireRole } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 import {
   AutomationDraftError,
+  createAutomationDraftFromDefinition,
   createAutomationDraftFromTemplate,
+  duplicateAutomationDefinition,
   getAutomationDraft,
   listAutomationDraftResources,
   listAutomationTemplates,
@@ -25,9 +29,12 @@ import {
   listAutomationDefinitions,
   previewAutomationAudience,
   runAutomationTest,
+  updateAutomationDefinitionStatus,
 } from '../services/automation-definitions.js';
 import {
+  AutomationRunCancelError,
   AutomationRunRetryError,
+  cancelAutomationRun,
   retryAutomationRun,
 } from '../services/automation-engine.js';
 import { listLimit } from './list-pagination.js';
@@ -153,6 +160,12 @@ interface AutomationExecutionRun {
   automationId: string;
   automationName: string;
   automationVersionId: string;
+  /** 実行時に固定された版番号（#942 N-354）。 */
+  versionNumber: number;
+  /** 1人テストの実行か（#942 N-354：テスト実行の印）。 */
+  isTest: boolean;
+  /** 取りやめられるのは、まだ終わっていない実行だけ（#942 N-353）。 */
+  canCancel: boolean;
   friendId: string | null;
   friendName: string | null;
   sourceEventId: string;
@@ -217,6 +230,129 @@ function defaultWindow() {
   return { from: from.toISOString(), to: to.toISOString() };
 }
 
+/** DB行 → 台帳・詳細・CSVで共通の実行記録の形。 */
+function mapExecutionRun(row: {
+  id: string;
+  line_account_id: string;
+  account_name: string | null;
+  automation_id: string;
+  automation_name: string;
+  automation_version_id: string;
+  version_number: number;
+  is_test: number;
+  friend_id: string | null;
+  friend_name: string | null;
+  source_event_id: string;
+  trigger_type: string;
+  status: AutomationRunDomainStatus;
+  started_at: string | null;
+  completed_at: string | null;
+  created_at: string;
+  duration_ms: number | null;
+  successful_actions: string | null;
+  skipped_actions: string | null;
+  failed_action: string | null;
+  failure_code: string | null;
+}): AutomationExecutionRun {
+  const successfulActions = actionLabels(row.successful_actions);
+  const skippedActions = actionLabels(row.skipped_actions);
+  const failedAction = row.failed_action ? automationActionLabel(row.failed_action) : null;
+  const failureReason = safeFailureReason(row.failure_code, failedAction);
+  const statusLabel = DOMAIN_STATUS_TO_COMMON[row.status];
+  const detail = row.status === 'skipped_condition'
+    ? '条件に合わなかったため、何もしていません'
+    : row.status === 'failed'
+      ? failureReason
+      : row.status === 'partial'
+        ? [successfulActions.join('／'), skippedActions.length ? `${skippedActions.join('／')}は見送り` : null, failedAction ? failureReason : null].filter(Boolean).join('。') || null
+        : successfulActions.join('／') || null;
+  return {
+    id: row.id,
+    ownerKind: 'automation',
+    ownerId: row.automation_id,
+    lineAccountId: row.line_account_id,
+    occurredAt: row.completed_at ?? row.started_at ?? row.created_at,
+    subject: row.friend_name,
+    accountLabel: row.account_name,
+    triggerLabel: automationTriggerLabel(row.trigger_type),
+    reference: null,
+    status: statusLabel,
+    detail,
+    durationMs: row.duration_ms,
+    // 失敗 step だけを戻すため、成功済みの処理は二重に動かさない。
+    canRetry: (row.status === 'failed' || row.status === 'partial') && failedAction !== null,
+    automationId: row.automation_id,
+    automationName: row.automation_name,
+    automationVersionId: row.automation_version_id,
+    versionNumber: Number(row.version_number),
+    isTest: row.is_test === 1,
+    canCancel: row.status === 'queued' || row.status === 'running' || row.status === 'waiting',
+    friendId: row.friend_id,
+    friendName: row.friend_name,
+    sourceEventId: row.source_event_id,
+    domainStatus: row.status,
+    startedAt: row.started_at,
+    completedAt: row.completed_at,
+    successfulActions,
+    skippedActions,
+    failedAction,
+    failureReason: row.status === 'failed'
+      ? failureReason
+      : row.status === 'partial' && (row.failed_action || row.failure_code)
+        ? failureReason
+        : null,
+  };
+}
+
+const RUN_STATUS_LABEL_CSV: Record<AutomationRunDomainStatus, string> = {
+  queued: '待機中',
+  running: '実行中',
+  waiting: '再試行待ち',
+  success: '成功',
+  partial: '一部失敗',
+  failed: '失敗',
+  cancelled: '取消',
+  skipped_condition: '条件に合わず',
+};
+
+function csvCell(value: string | number | null | undefined): string {
+  let text = value === null || value === undefined ? '' : String(value);
+  // Excel/表計算で数式として実行されないよう、= + - @ で始まる外部入力値へ
+  // 引用符を前置する（common-actions.ts の正本と同じ対策）。
+  if (/^[=+\-@]/.test(text)) text = `'${text}`;
+  return `"${text.replaceAll('"', '""')}"`;
+}
+
+/**
+ * 台帳の絞り込み結果をCSVにする（#942 N-353）。
+ *
+ * 画面の検索・状態・期間の絞り込みと同じ行を出す。先頭の BOM は
+ * Excelで開いたときに日本語が化けないための目印。
+ */
+function executionRunsCsv(items: AutomationExecutionRun[]): string {
+  const header = [
+    '実行日時', 'LINE公式アカウント', 'オートメーション', '版', '対象',
+    'きっかけ', '状態', '処理結果', 'テスト実行', '所要時間(ミリ秒)', '実行ID',
+  ];
+  const lines = [header.map(csvCell).join(',')];
+  for (const item of items) {
+    lines.push([
+      item.occurredAt,
+      item.accountLabel,
+      item.automationName,
+      `v${item.versionNumber}`,
+      item.friendName,
+      item.triggerLabel,
+      RUN_STATUS_LABEL_CSV[item.domainStatus],
+      item.detail,
+      item.isTest ? 'テスト' : '',
+      item.durationMs,
+      item.id,
+    ].map(csvCell).join(','));
+  }
+  return `﻿${lines.join('\r\n')}`;
+}
+
 function boundedInteger(raw: string | undefined, fallback: number, max: number): number {
   const value = Number(raw);
   if (!Number.isInteger(value) || value < 0) return fallback;
@@ -224,7 +360,20 @@ function boundedInteger(raw: string | undefined, fallback: number, max: number):
 }
 
 async function requireVisibleAutomation(c: Context<Env>, next: () => Promise<void>) {
-  const item = await getAutomationById(c.env.DB, c.req.param('id')!);
+  const id = c.req.param('id')!;
+  // #942: 一覧が返すidは V6 の automation_definitions。旧 automations 表の
+  // 行だけを見ると、V6の定義への操作が全部 404 になる。先にV6を見る。
+  const definition = await c.env.DB.prepare(
+    `SELECT line_account_id FROM automation_definitions WHERE id = ?`,
+  ).bind(id).first<{ line_account_id: string }>();
+  if (definition) {
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [definition.line_account_id])) {
+      return c.json({ success: false, error: 'Automation not found' }, 404);
+    }
+    await next();
+    return;
+  }
+  const item = await getAutomationById(c.env.DB, id);
   if (!item || !await canAccessAllLineAccounts(
     c.env.DB,
     c.get('staff'),
@@ -249,10 +398,13 @@ automations.get(
   },
 );
 
+// #942 N-351: 下書きの作成・保存は「オートメーションを触れる人」= 権限キー
+// `/automations` を持つスタッフも通す。入口の絞り込みは
+// requireAutomationPermission が既に担うので、role で二度絞らない。
 automations.get(
   '/api/automation-draft-resources',
   requireAutomationPermission,
-  requireRole('owner', 'admin'),
+  requireRole('owner', 'admin', 'staff'),
   async (c) => {
     const accountId = await requireDraftAccount(c);
     if (typeof accountId !== 'string') return accountId;
@@ -263,7 +415,7 @@ automations.get(
 automations.post(
   '/api/automation-templates/:key/drafts',
   requireAutomationPermission,
-  requireRole('owner', 'admin'),
+  requireRole('owner', 'admin', 'staff'),
   async (c) => {
     const accountId = await requireDraftAccount(c);
     if (typeof accountId !== 'string') return accountId;
@@ -278,7 +430,7 @@ automations.post(
 automations.get(
   '/api/automation-drafts/:id',
   requireAutomationPermission,
-  requireRole('owner', 'admin'),
+  requireRole('owner', 'admin', 'staff'),
   async (c) => {
     const accountId = await requireDraftAccount(c);
     if (typeof accountId !== 'string') return accountId;
@@ -292,7 +444,7 @@ automations.get(
 automations.put(
   '/api/automation-drafts/:id',
   requireAutomationPermission,
-  requireRole('owner', 'admin'),
+  requireRole('owner', 'admin', 'staff'),
   async (c) => {
     const accountId = await requireDraftAccount(c);
     if (typeof accountId !== 'string') return accountId;
@@ -325,7 +477,7 @@ automations.put(
 automations.post(
   '/api/automation-drafts/:id/publish',
   requireAutomationPermission,
-  requireRole('owner', 'admin'),
+  requireRole('owner', 'admin', 'staff'),
   async (c) => {
     const accountId = await requireDraftAccount(c);
     if (typeof accountId !== 'string') return accountId;
@@ -444,8 +596,12 @@ automations.get(
         : rawStatus && COMMON_STATUS_TO_DOMAIN[rawStatus]
           ? COMMON_STATUS_TO_DOMAIN[rawStatus]
           : undefined;
-    const limit = Math.max(1, boundedInteger(c.req.query('limit'), 20, 100));
-    const offset = boundedInteger(c.req.query('offset'), 0, 1_000_000);
+    const wantsCsv = c.req.query('format') === 'csv';
+    // CSVは画面の1頁ではなく絞り込み全体を出す。暴走だけ上限で留める。
+    const limit = wantsCsv
+      ? 5_000
+      : Math.max(1, boundedInteger(c.req.query('limit'), 20, 100));
+    const offset = wantsCsv ? 0 : boundedInteger(c.req.query('offset'), 0, 1_000_000);
     const defaults = defaultWindow();
     const from = c.req.query('from') || defaults.from;
     const to = c.req.query('to') || defaults.to;
@@ -460,53 +616,15 @@ automations.get(
       offset,
     });
 
-    const items: AutomationExecutionRun[] = result.rows.map((row) => {
-      const successfulActions = actionLabels(row.successful_actions);
-      const skippedActions = actionLabels(row.skipped_actions);
-      const failedAction = row.failed_action ? automationActionLabel(row.failed_action) : null;
-      const failureReason = safeFailureReason(row.failure_code, failedAction);
-      const statusLabel = DOMAIN_STATUS_TO_COMMON[row.status];
-      const detail = row.status === 'skipped_condition'
-        ? '条件に合わなかったため、何もしていません'
-        : row.status === 'failed'
-          ? failureReason
-          : row.status === 'partial'
-            ? [successfulActions.join('／'), skippedActions.length ? `${skippedActions.join('／')}は見送り` : null, failedAction ? failureReason : null].filter(Boolean).join('。') || null
-            : successfulActions.join('／') || null;
-      return {
-        id: row.id,
-        ownerKind: 'automation',
-        ownerId: row.automation_id,
-        lineAccountId: row.line_account_id,
-        occurredAt: row.completed_at ?? row.started_at ?? row.created_at,
-        subject: row.friend_name,
-        accountLabel: row.account_name,
-        triggerLabel: automationTriggerLabel(row.trigger_type),
-        reference: null,
-        status: statusLabel,
-        detail,
-        durationMs: row.duration_ms,
-        // 失敗 step だけを戻すため、成功済みの処理は二重に動かさない。
-        canRetry: (row.status === 'failed' || row.status === 'partial') && failedAction !== null,
-        automationId: row.automation_id,
-        automationName: row.automation_name,
-        automationVersionId: row.automation_version_id,
-        friendId: row.friend_id,
-        friendName: row.friend_name,
-        sourceEventId: row.source_event_id,
-        domainStatus: row.status,
-        startedAt: row.started_at,
-        completedAt: row.completed_at,
-        successfulActions,
-        skippedActions,
-        failedAction,
-        failureReason: row.status === 'failed'
-          ? failureReason
-          : row.status === 'partial' && (row.failed_action || row.failure_code)
-            ? failureReason
-            : null,
-      };
-    });
+    const items: AutomationExecutionRun[] = result.rows.map(mapExecutionRun);
+    if (wantsCsv) {
+      return new Response(executionRunsCsv(items), {
+        headers: {
+          'Content-Type': 'text/csv; charset=utf-8',
+          'Content-Disposition': 'attachment; filename="automation-runs.csv"',
+        },
+      });
+    }
     const body: AutomationExecutionRunsResponse = {
       summary: {
         total: result.summary.total,
@@ -563,8 +681,162 @@ automations.post(
   },
 );
 
+/**
+ * #942 N-354: 1件の実行記録の詳細。
+ *
+ * 版番号・テスト実行の印・処理ごとの結果（状態と試行数）を返す。
+ * step の input/output は友だちの情報を含みうるため出さない。
+ */
+automations.get(
+  '/api/automation-runs/:id',
+  requireAutomationPermission,
+  requireRole('owner', 'admin', 'staff'),
+  async (c) => {
+    try {
+      const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+      const row = await getAutomationExecutionRun(c.env.DB, {
+        runId: c.req.param('id'),
+        allowedAccountIds: scope.allowedAccountIds,
+      });
+      if (!row) return c.json({ success: false, error: '実行記録が見つかりません' }, 404);
+      const steps = await getAutomationExecutionRunSteps(c.env.DB, row.id);
+      return c.json({
+        success: true,
+        data: {
+          ...mapExecutionRun(row),
+          steps: steps.map((step) => ({
+            stepKey: step.step_key,
+            actionType: step.action_type,
+            actionLabel: automationActionLabel(step.action_type),
+            status: step.status,
+            attemptNumber: Number(step.attempt_number),
+            errorCode: step.error_code,
+            // 生の error_message ではなく、画面と同じ言い方に揃える。
+            errorMessage: step.error_code
+              ? safeFailureReason(step.error_code, automationActionLabel(step.action_type))
+              : null,
+            commonActionVersionId: step.common_action_version_id,
+            startedAt: step.started_at,
+            completedAt: step.completed_at,
+          })),
+        },
+      });
+    } catch (err) {
+      console.error('GET /api/automation-runs/:id error:', err);
+      return c.json({ success: false, error: '実行記録を読み込めませんでした' }, 500);
+    }
+  },
+);
+
+/**
+ * #942 N-353: 実行の取りやめ。
+ *
+ * 待機中・実行中・再試行待ちの実行を cancelled で閉じる。
+ * 終わった実行は 409、無い・範囲外は 404、取消済みはそのまま成功。
+ */
+automations.post(
+  '/api/automation-runs/:id/cancel',
+  requireAutomationPermission,
+  requireRole('owner', 'admin', 'staff'),
+  async (c) => {
+    try {
+      const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+      const result = await cancelAutomationRun(c.env.DB, {
+        runId: c.req.param('id'),
+        allowedAccountIds: scope.allowedAccountIds,
+      });
+      return c.json({ success: true, data: result });
+    } catch (error) {
+      if (error instanceof AutomationRunCancelError) {
+        const status = error.code === 'not_found' ? 404 : 409;
+        return c.json({ success: false, error: error.message, code: error.code }, status);
+      }
+      console.error(JSON.stringify({
+        event: 'automation_run_cancel_failed',
+        path: c.req.path,
+        reason: error instanceof Error ? error.message : String(error),
+      }));
+      return c.json({ success: false, error: '実行を取りやめられませんでした' }, 500);
+    }
+  },
+);
+
 automations.use('/api/automations/:id', requireVisibleAutomation);
 automations.use('/api/automations/:id/*', requireVisibleAutomation);
+
+/** V6定義のアカウントを引く（requireVisibleAutomation が範囲を確かめ済み）。 */
+async function definitionAccountId(c: Context<Env>): Promise<string | Response> {
+  const row = await c.env.DB.prepare(
+    `SELECT line_account_id FROM automation_definitions WHERE id = ?`,
+  ).bind(c.req.param('id')).first<{ line_account_id: string }>();
+  if (!row) {
+    return c.json({ success: false, error: 'オートメーションが見つかりません' }, 404);
+  }
+  return row.line_account_id;
+}
+
+/** #942 N-352: 一覧の「編集」。公開済みの定義に改訂用の下書きをぶら下げる。 */
+automations.post(
+  '/api/automations/:id/draft',
+  requireAutomationPermission,
+  requireRole('owner', 'admin', 'staff'),
+  async (c) => {
+    const accountId = await definitionAccountId(c);
+    if (typeof accountId !== 'string') return accountId;
+    return draftEndpoint(c, () => createAutomationDraftFromDefinition(c.env.DB, {
+      id: c.req.param('id'),
+      lineAccountId: accountId,
+      createdBy: c.get('staff')?.id,
+    }), 201);
+  },
+);
+
+/** #942 N-352: 一覧の「複製」。いま見えている版を写した新しい下書きを作る。 */
+automations.post(
+  '/api/automations/:id/duplicate',
+  requireAutomationPermission,
+  requireRole('owner', 'admin', 'staff'),
+  async (c) => {
+    const accountId = await definitionAccountId(c);
+    if (typeof accountId !== 'string') return accountId;
+    return draftEndpoint(c, () => duplicateAutomationDefinition(c.env.DB, {
+      id: c.req.param('id'),
+      lineAccountId: accountId,
+      createdBy: c.get('staff')?.id,
+    }), 201);
+  },
+);
+
+/**
+ * #942 N-352: 一覧の稼働切替と「保管」。
+ *
+ * body は `{ status: 'active' | 'stopped' | 'archived' }`。
+ * 保管は一方通行（戻すときは複製）。実行記録は残る。
+ */
+automations.post(
+  '/api/automations/:id/status',
+  requireAutomationPermission,
+  requireRole('owner', 'admin', 'staff'),
+  async (c) => {
+    const accountId = await definitionAccountId(c);
+    if (typeof accountId !== 'string') return accountId;
+    const body = await c.req.json<{ status?: unknown }>()
+      .catch((): { status?: unknown } => ({}));
+    const status = body.status;
+    if (status !== 'active' && status !== 'stopped' && status !== 'archived') {
+      return c.json({
+        success: false,
+        error: 'status は active / stopped / archived のどれかで送ってください',
+      }, 400);
+    }
+    return definitionEndpoint(c, () => updateAutomationDefinitionStatus(c.env.DB, {
+      id: c.req.param('id'),
+      lineAccountId: accountId,
+      status,
+    }));
+  },
+);
+
 // 詳細・ログは一覧より機微度が高い（friendId・eventDataを含む）ため、
 // アカウント範囲の検査に加えて機能の権限キー検査も直接付ける。
 automations.get(

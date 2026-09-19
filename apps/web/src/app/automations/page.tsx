@@ -2,6 +2,7 @@
 
 import SelectField from '@/components/shared/select-field'
 import React, { useState, useEffect, useCallback, useRef } from 'react'
+import { useRouter } from 'next/navigation'
 import { api } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import Button from '@/components/shared/button'
@@ -64,7 +65,7 @@ const eventTypeBadgeColor: Record<AutomationEventType, string> = {
  * 知らせて選び直させる。黙って閉じると「押したのに何も起きない」になる。
  */
 type PendingAction = {
-  kind: 'toggle' | 'delete'
+  kind: 'toggle' | 'archive'
   automation: Automation
   accountId: string | null
 }
@@ -124,23 +125,34 @@ async function performAutomationAction({
 }
 
 function AutomationRowActions({
-  automationId,
-  automationName,
+  automation,
   canManage,
+  busy,
   onToggle,
+  onEdit,
+  onDuplicate,
+  onArchive,
 }: {
-  automationId: string
-  automationName: string
+  automation: Automation
   canManage: boolean | null
+  busy: boolean
   onToggle: () => void
+  onEdit: () => void
+  onDuplicate: () => void
+  onArchive: () => void
 }) {
   return (
     <div className="flex flex-wrap items-center justify-end gap-2">
-      <Button href={`/automations/runs?search=${encodeURIComponent(automationName)}`} className="whitespace-nowrap">動いた記録を見る</Button>
+      <Button href={`/automations/runs?search=${encodeURIComponent(automation.name)}`} className="whitespace-nowrap">動いた記録を見る</Button>
       {canManage ? (
         <>
-          <Button href={`/automations/drafts?id=${encodeURIComponent(automationId)}`} className="whitespace-nowrap">中身を見る</Button>
-          <Button onClick={onToggle} className="whitespace-nowrap">止める・動かす</Button>
+          {/* #942 N-352: 編集・複製・保管を行から直接開けるようにする。 */}
+          <Button onClick={onEdit} disabled={busy} className="whitespace-nowrap">編集する</Button>
+          <Button onClick={onDuplicate} disabled={busy} className="whitespace-nowrap">複製する</Button>
+          {automation.status === 'draft' ? null : (
+            <Button onClick={onToggle} disabled={busy} className="whitespace-nowrap">止める・動かす</Button>
+          )}
+          <Button onClick={onArchive} disabled={busy} className="whitespace-nowrap">保管する</Button>
         </>
       ) : canManage === false ? (
         <span className="text-xs text-ink-faint">操作する権限がありません</span>
@@ -173,6 +185,7 @@ const MERGED_TABS = [
 const AUTOMATION_PAGE_SIZE = 6
 
 export default function AutomationsPage() {
+  const router = useRouter()
   const { selectedAccountId, loading: accountLoading } = useAccount()
   const tab = useMergedTab(MERGED_TABS)
   usePageTitle(tab === 'templates' ? '見本から作る' : 'オートメーション')
@@ -197,6 +210,8 @@ export default function AutomationsPage() {
    */
   const [pending, setPending] = useState<PendingAction | null>(null)
   const [working, setWorking] = useState(false)
+  /** 編集・複製で画面を抜ける最中の行。連打で2回呼ばないための表示用。 */
+  const [rowBusyId, setRowBusyId] = useState<string | null>(null)
   const [actionError, setActionError] = useState('')
   const [automaticRuns, setAutomaticRuns] = useState<number | null>(null)
   const [failedRuns, setFailedRuns] = useState<number | null>(null)
@@ -275,7 +290,9 @@ export default function AutomationsPage() {
 
   /** 稼働の入れ替えそのもの。返事を確かめてから呼び出し元に戻す。 */
   const applyToggle = async (target: Automation) => {
-    const res = await api.automations.update(target.id, { isActive: !target.isActive })
+    // #942 N-352: V6の定義の状態を直接切り替える。旧 automations 表への
+    // PUT では V6 の行に届かないため、定義の状態遷移の口を使う。
+    const res = await api.automations.setStatus(target.id, target.isActive ? 'stopped' : 'active')
     if (!res.success) throw new Error(res.error)
   }
 
@@ -292,9 +309,61 @@ export default function AutomationsPage() {
     setPending({ kind: 'toggle', automation: target, accountId: selectedAccountId })
   }
 
-  const handleDelete = (target: Automation) => {
+  /**
+   * #942 N-352: 「保管」は削除の代わり。実行記録は残し、一覧から隠すだけ。
+   * 元に戻せない一方通行なので、稼働切替と同じく確認窓を経由する。
+   */
+  const handleArchive = (target: Automation) => {
     setActionError('')
-    setPending({ kind: 'delete', automation: target, accountId: selectedAccountId })
+    setPending({ kind: 'archive', automation: target, accountId: selectedAccountId })
+  }
+
+  /**
+   * 「編集」は確認なしで進めてよい。公開版を写した改訂用の下書きを
+   * ぶら下げて（すでにあればそれを使う）、その下書きの編集面を開く。
+   */
+  const handleEdit = async (target: Automation) => {
+    if (rowBusyId) return
+    setActionError('')
+    setError('')
+    setRowBusyId(target.id)
+    const accountId = selectedAccountId
+    try {
+      const res = await api.automations.createDraftFromAutomation(target.id)
+      if (!res.success) throw new Error(res.error)
+      if (selectedAccountIdRef.current !== accountId) return
+      router.push(`/automations/drafts?id=${encodeURIComponent(res.data.id)}`)
+    } catch {
+      if (selectedAccountIdRef.current === accountId) {
+        setError('編集用の下書きを作れませんでした。状態を読み直してから、もう一度お試しください。')
+      }
+    } finally {
+      setRowBusyId(null)
+    }
+  }
+
+  /**
+   * 「複製」も確認なしで進める。新しい下書きとして増えるだけで、
+   * 元のルールも実行記録も変わらない。できた複製の編集面を開く。
+   */
+  const handleDuplicate = async (target: Automation) => {
+    if (rowBusyId) return
+    setActionError('')
+    setError('')
+    setRowBusyId(target.id)
+    const accountId = selectedAccountId
+    try {
+      const res = await api.automations.duplicate(target.id)
+      if (!res.success) throw new Error(res.error)
+      if (selectedAccountIdRef.current !== accountId) return
+      router.push(`/automations/drafts?id=${encodeURIComponent(res.data.id)}`)
+    } catch {
+      if (selectedAccountIdRef.current === accountId) {
+        setError('複製できませんでした。状態を読み直してから、もう一度お試しください。')
+      }
+    } finally {
+      setRowBusyId(null)
+    }
   }
 
   /**
@@ -314,8 +383,8 @@ export default function AutomationsPage() {
         actionAccountId: action.accountId,
         getSelectedAccountId: () => selectedAccountIdRef.current,
         request: async () => {
-          if (action.kind === 'delete') {
-            const res = await api.automations.delete(action.automation.id)
+          if (action.kind === 'archive') {
+            const res = await api.automations.setStatus(action.automation.id, 'archived')
             if (!res.success) throw new Error(res.error)
           } else {
             await applyToggle(action.automation)
@@ -332,8 +401,8 @@ export default function AutomationsPage() {
       setPending(null)
     } catch {
       setActionError(
-        action.kind === 'delete'
-          ? 'このルールを削除できませんでした。状態を読み直してから、もう一度お試しください。'
+        action.kind === 'archive'
+          ? 'このルールを保管できませんでした。状態を読み直してから、もう一度お試しください。'
           : '稼働を切り替えられませんでした。状態を読み直してから、もう一度お試しください。',
       )
     }
@@ -575,10 +644,13 @@ export default function AutomationsPage() {
               <span className={automation.isActive ? 'font-semibold text-accent-deep' : 'font-semibold text-ink-faint'}>{automation.isActive ? '動いています' : '止めています'}</span>
               {/* 見るだけの導線は閲覧のみにも出す。検索語にこの行の名前を載せて実対象を引き継ぐ（#677で承認されたN-352の導線部分）。 */}
               <AutomationRowActions
-                automationId={automation.id}
-                automationName={automation.name}
+                automation={automation}
                 canManage={canManageAutomations}
+                busy={rowBusyId !== null}
                 onToggle={() => handleToggleActive(automation)}
+                onEdit={() => void handleEdit(automation)}
+                onDuplicate={() => void handleDuplicate(automation)}
+                onArchive={() => handleArchive(automation)}
               />
             </div>
           ))}
@@ -600,8 +672,8 @@ export default function AutomationsPage() {
         title={
           pending === null
             ? ''
-            : pending.kind === 'delete'
-              ? `「${pending.automation.name}」を削除しますか？`
+            : pending.kind === 'archive'
+              ? `「${pending.automation.name}」を保管しますか？`
               : pending.automation.isActive
                 ? `「${pending.automation.name}」を止めますか？`
                 : `「${pending.automation.name}」を動かしますか？`
@@ -609,8 +681,8 @@ export default function AutomationsPage() {
         description={
           pending === null
             ? ''
-            : pending.kind === 'delete'
-              ? 'このルールの設定が消えます。すでに動いたぶん（付けたタグ・送ったメッセージ）はそのまま残り、取り消せません。この操作は取り消せません。'
+            : pending.kind === 'archive'
+              ? '一覧から隠します。動いた記録と設定は残りますが、この画面からは元に戻せません。必要なら複製して作り直してください。'
               : pending.automation.isActive
                 ? '止めているあいだ、このきっかけでは何も動きません。ルールの設定は残るので、あとから動かし直せます。'
                 : 'これから起きるきっかけで動き始めます。止めているあいだに起きたぶんは、さかのぼって動きません。あとから止められます。'
@@ -618,15 +690,15 @@ export default function AutomationsPage() {
         confirmLabel={
           pending === null
             ? '実行する'
-            : pending.kind === 'delete'
-              ? '削除する'
+            : pending.kind === 'archive'
+              ? '保管する'
               : pending.automation.isActive
                 ? '止める'
                 : '動かす'
         }
-        /* 取り消せるのは稼働の切り替えだけ。赤は本当に戻せない削除に取っておく。
+        /* 取り消せるのは稼働の切り替えだけ。赤は本当に戻せない保管に取っておく。
            戻せる操作にも赤を付けると、赤が「危ない」を意味しなくなる。 */
-        destructive={pending?.kind === 'delete'}
+        destructive={pending?.kind === 'archive'}
         busy={working}
         error={actionError}
         /* アカウントが変わっているあいだは実行のボタンそのものを出さない
@@ -647,8 +719,8 @@ export default function AutomationsPage() {
             {pending.automation.lineAccountId === null && (
               <p className="text-warning font-medium">
                 全アカウント共通のルールです。
-                {pending.kind === 'delete'
-                  ? 'すべてのアカウントから消えます。'
+                {pending.kind === 'archive'
+                  ? 'すべてのアカウントの一覧から隠れます。'
                   : 'すべてのアカウントに効きます。'}
               </p>
             )}
