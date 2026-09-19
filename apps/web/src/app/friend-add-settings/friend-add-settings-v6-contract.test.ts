@@ -147,3 +147,56 @@ describe('V6 友だち追加時配信の保存の取りこぼし防止(#501 重�
     expect(EDITOR).toContain('setRule((current) => ({ ...current, version: savedVersion }))')
   })
 })
+
+describe('V6 友だち追加時配信の監査修正(#946)', () => {
+  const REQUIREMENTS = fs.readFileSync(
+    path.join(__dirname, '../../../../../docs/v6-requirements/v6-09-friend-add-delivery-requirements-draft.md'),
+    'utf8',
+  )
+
+  it('N-107: 「その他操作」は実画面へつなぐメニューを開く', () => {
+    // 押しても何も起きないボタンにしない。テスト・有効化・実行結果は実在する画面。
+    expect(LIST_PAGE).toContain('setOpenMenuId')
+    expect(LIST_PAGE).toContain('<ActionMenu')
+    expect(LIST_PAGE).toContain("label: 'テストを実行'")
+    expect(LIST_PAGE).toContain("label: '最終確認・有効化へ進む'")
+    expect(LIST_PAGE).toContain("label: 'この設定の実行結果'")
+    expect(LIST_PAGE).toContain('step=preview')
+    expect(LIST_PAGE).toContain('/friend-add-settings/publish?id=')
+  })
+
+  it('N-107: 確認段のサマリーにも行き先のないボタンを置かない', () => {
+    // 実テスト送信はStickyBarのボタンが受け持つ。飾りの複製は撤去。
+    expect(EDITOR).not.toContain('案内イメージを見る')
+    expect(EDITOR).not.toContain('friend-add-editor-previewActions')
+  })
+
+  it('N-108: テスト確認面に固定の人名・方法を出さない', () => {
+    expect(EDITOR).not.toContain('Kenta Kawano')
+    expect(EDITOR).not.toContain('待機時間を10秒へ短縮')
+    // dry-runなので「誰にも送らない」ことを実態どおりに書く
+    expect(EDITOR).toContain('送信しません（条件の確認のみ）')
+    expect(EDITOR).toContain('保存済みの設定で判定を確認')
+    expect(EDITOR).toContain('0通（実際には送信しません）')
+    // 固定の案内文ではなく設定済みの内容をプレビューする
+    expect(EDITOR).not.toContain('［テスト］ご登録ありがとうございます。')
+  })
+
+  it('N-109: 「二重送信」は再送防止の設定値を出し、テスト実施状態と分ける', () => {
+    expect(EDITOR).toContain('<span>二重送信防止</span>')
+    expect(EDITOR).toContain('resendSuppressionText(definition.resendSuppressionHours)')
+    expect(EDITOR).toContain("<span>テスト</span><strong>{rule.lastTestStatus === 'succeeded' ? '成功'")
+    expect(EDITOR).not.toContain("<span>二重送信</span><strong>{rule.lastTestStatus")
+  })
+
+  it('N-110: 要件書のルート表は実在する画面だけを指す', () => {
+    // 静的エクスポートではパス型の {id} ルートを持てないため、
+    // 表はクエリ付きルートと「独立ルートなし」の注記にそろえる。
+    expect(REQUIREMENTS).toContain('`/friend-add-settings?view=new`')
+    expect(REQUIREMENTS).toContain('`/friend-add-settings?view=edit&id={id}`')
+    expect(REQUIREMENTS).toContain('`/friend-add-settings/publish?id={id}`')
+    expect(REQUIREMENTS).not.toContain('`/friend-add-settings/new`')
+    expect(REQUIREMENTS).not.toContain('`/friend-add-settings/conflicts`')
+    expect(REQUIREMENTS).not.toContain('`/friend-add-settings/test`')
+  })
+})

@@ -396,7 +396,18 @@ function FriendAddPublishInner() {
             <div className={styles.rows}>
               <Row label="状態" value="有効化前" />
               <Row label="過去28日の該当" value={audienceText(matchedLast28Days)} />
-              <Row label="二重送信" value={validation?.conflicts.length === 0 ? '重なりなし・確認済み' : `${validation?.conflicts.length ?? 0}件・要確認`} />
+              {/*
+               * 「二重送信」は経路の重なり (conflicts) ではなく、再送防止の
+               * 確認結果 (duplicate_prevention) を出す(#946 N-109)。
+               */}
+              <Row
+                label="二重送信"
+                value={(() => {
+                  const check = validation?.checks.find((item) => item.key === 'duplicate_prevention')
+                  if (!check) return NOT_AVAILABLE
+                  return check.status === 'passed' ? '防止・有効' : '制限なし・要確認'
+                })()}
+              />
               <Row label="監視" value={ruleDetail?.staffNotification?.status === 'connected' ? 'Slack通知・接続済み' : ruleDetail?.staffNotification?.status == null ? NOT_AVAILABLE : 'Slack通知・未接続'} />
             </div>
             <p className="text-xs leading-5 text-ink-secondary">未送信・二重送信・シナリオ開始失敗を監視します。</p>
