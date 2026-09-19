@@ -5,8 +5,17 @@ import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { api } from '@/lib/api'
 import { usePageTitle } from '@/components/shell/page-chrome'
+import StepTrail, { type StepTrailItem } from '@/components/shared/step-trail'
 import EditDialog, { toVersionDraft, type AutoReplyDraft } from '@/components/auto-replies/edit-dialog'
 import './issue481-height.css'
+
+/*
+ * 作成の手順。ウェビナー作成・イベント作成などと同じ共通部品で出す
+ * （U049: 画面ごとに違う手順表示を1つのStepperへ寄せる）。
+ * この部品を編集ダイアログの内側に置くと、手順を持たない一覧画面にも
+ * 「Steps」の節が混入するため、ページ側で描く。
+ */
+const STEP_LABELS = ['基本設定', 'どんなときに動くか', '何を返すか', '優先順位', '確認'] as const
 
 /**
  * 自動応答の編集を、URL で開けるようにする。
@@ -20,6 +29,7 @@ function AutoReplyEditInner() {
   const id = params.get('id')
   const requestedStep = params.get('step')
   const step = requestedStep === 'trigger' || requestedStep === 'response' ? requestedStep : 'basic'
+  const currentStep = step === 'basic' ? 0 : step === 'trigger' ? 1 : 2
   const stepLabel = step === 'basic' ? '基本設定' : step === 'trigger' ? 'どんなときに動くか' : '何を返すか'
   usePageTitle(`自動応答ルールを作成・${stepLabel}`)
 
@@ -110,6 +120,16 @@ function AutoReplyEditInner() {
           読み込み中...
         </div>
       ) : draft ? (
+        <>
+        <StepTrail
+          label="自動応答を作る進み方"
+          items={STEP_LABELS.map(
+            (label, index): StepTrailItem => ({
+              label,
+              state: index < currentStep ? 'done' : index === currentStep ? 'current' : 'todo',
+            }),
+          )}
+        />
         <EditDialog
           page
           step={step}
@@ -124,6 +144,7 @@ function AutoReplyEditInner() {
             router.replace(`/auto-replies/edit?${query.toString()}`)
           }}
         />
+        </>
       ) : null}
     </div>
   )
