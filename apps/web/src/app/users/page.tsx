@@ -165,26 +165,17 @@ export default function UsersPage() {
 
       <SummaryBar rows={rows} />
 
+      {/*
+        U018: 390pxでは作成・CSV・検索・絞り込みが同じ帯に入り、検索欄が
+        細線まで潰れていた。操作（作成・CSV・再計算）の行と、検索・絞り込みの
+        行を縦に分ける。検索欄は常に全幅の独立行にし、絞り込みは収まらない
+        幅だけ折り返す。共通部品の形は変えず、画面側の scoped style で効かせる。
+      */}
       <div className="flex flex-wrap items-center gap-2" data-users-actions="true">
         <Button href="/friends/identity-candidates" variant="primary">
           ＋ 統合ユーザーを作成
         </Button>
-        <div className="min-w-0 flex-1">
-          <UsersFilters
-            q={q}
-            onlyDups={onlyDups}
-            account={account}
-            uid={uid}
-            accountOptions={accountOptions}
-            onChange={(next) => {
-              if (next.q !== undefined) setQ(next.q)
-              if (next.onlyDups !== undefined) setOnlyDups(next.onlyDups)
-              if (next.account !== undefined) setAccount(next.account)
-              if (next.uid !== undefined) setUid(next.uid)
-            }}
-          />
-        </div>
-        <Button type="button" onClick={exportCsv}>CSVで書き出す</Button>
+        <Button type="button" onClick={exportCsv} className="ml-auto">CSVで書き出す</Button>
         <Button
           type="button"
           onClick={() => setPendingForceRefresh(true)}
@@ -194,7 +185,32 @@ export default function UsersPage() {
           {refreshing ? '再計算中…' : '再計算'}
         </Button>
       </div>
+      <div data-users-filters>
+        <UsersFilters
+          q={q}
+          onlyDups={onlyDups}
+          account={account}
+          uid={uid}
+          accountOptions={accountOptions}
+          onChange={(next) => {
+            if (next.q !== undefined) setQ(next.q)
+            if (next.onlyDups !== undefined) setOnlyDups(next.onlyDups)
+            if (next.account !== undefined) setAccount(next.account)
+            if (next.uid !== undefined) setUid(next.uid)
+          }}
+        />
+      </div>
+      <style>{`
+        [data-users-filters] > div { flex-wrap: wrap; }
+        [data-users-filters] input[type="search"] { flex: 1 1 100%; }
+        /* U041: 7列の表は狭い幅で見出しが衝突する。列同士の比較が要る表なので、
+           収まらない幅では枠の内側だけ横へ動かして見出しの形を保つ。 */
+        [data-scroll-table] > div { overflow-x: auto; }
+        [data-scroll-table] table { min-width: 860px; }
+      `}</style>
 
+      {/* U041: 見出し同士の衝突を、枠の内側の横移動で避ける。 */}
+      <div data-scroll-table>
       <UsersTable
         rows={visibleRows}
         total={uid ? visibleRows.length : total}
@@ -206,6 +222,7 @@ export default function UsersPage() {
         onPageChange={setPage}
         onOpenMergedPerson={setOpenedPersonId}
       />
+      </div>
     </div>
   )
 }

@@ -148,6 +148,8 @@ shared-button-importer components/automations/common-action-editor.tsx
 shared-button-importer components/broadcasts/broadcast-asset-manager.tsx
 shared-button-importer components/broadcasts/broadcast-detail.tsx
 shared-button-importer components/broadcasts/broadcast-form.tsx
+# #973: 狭い幅向けの簡略手順表示で「前へ／次へ」に共通ボタンを使う。
+shared-button-importer components/broadcasts/broadcast-step-rail.tsx
 shared-button-importer components/broadcasts/broadcast-stop-controls.tsx
 shared-button-importer components/broadcasts/segment-builder.tsx
 shared-button-importer components/broadcasts/segment-preset-controls.tsx

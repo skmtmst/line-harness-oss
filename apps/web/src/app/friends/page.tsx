@@ -517,6 +517,36 @@ function FriendsPageInner({
           }
           [data-friends-advanced-search] > div > div {
             max-height: min(944px, calc(100vh - 32px)) !important;
+            /* U011-U013: パネルをコンテナにして、内側の組み換えをパネル幅で切り替える。
+               「内幅672px未満」= パネル幅720px（左右の余白48pxを含む）未満。 */
+            container-type: inline-size;
+          }
+          @container (max-width: 720px) {
+            /* U011: 条件ブロックを1列にし、友だち情報の「項目・比較方法・値」を各1行・全幅にする。 */
+            [data-friends-advanced-search] section.grid { grid-template-columns: minmax(0, 1fr); }
+            [data-friends-advanced-search] section.grid > * { grid-column: 1 / -1; }
+            [data-friends-advanced-search] section.grid > button { justify-self: end; }
+            [data-friends-advanced-search] div:has(> input[list="friend-field-names"]) > input,
+            [data-friends-advanced-search] div:has(> input[list="friend-field-names"]) > select {
+              flex: 1 1 100%;
+            }
+            /* U012: タグ選択を全幅にして「付いている／付いていない」は次の行へ。
+               選んだタグは複数行に折り返して全文読めるようにする。 */
+            [data-friends-advanced-search] select[aria-label="タグ名を選ぶ"] { flex: 1 1 100%; }
+            [data-friends-advanced-search] span.rounded-pill:has(> button) {
+              max-width: 100%;
+              overflow-wrap: anywhere;
+            }
+            /* U013: 補助操作（読み込む・リセット・条件を保存）を上の行に残し、
+               確定操作（キャンセル＋この条件で表示）を下の行に固定する。 */
+            [data-friends-advanced-search] > div > div > div:last-child::before {
+              content: '';
+              flex-basis: 100%;
+              order: 1;
+              height: 0;
+            }
+            [data-friends-advanced-search] > div > div > div:last-child > button.ml-auto { order: 2; }
+            [data-friends-advanced-search] > div > div > div:last-child > :last-child { order: 3; }
           }
         `}</style>
       ) : null}
@@ -580,7 +610,7 @@ function FriendsPageHost() {
         重複させない（Pencil `PhxG6` / トップバー `cBSCb`）。
         操作は独立した見出し行にせず、タブ `JB0Ki` の右端へ置く。
       */}
-      <div className="mb-4" data-design="V6Tabs" data-design-node="JB0Ki">
+      <div className="mb-4" data-design="V6Tabs" data-design-node="JB0Ki" data-tabs-row>
         <MergedTabs
           basePath="/friends"
           paramName="tab"
@@ -594,6 +624,17 @@ function FriendsPageHost() {
           )}
         />
       </div>
+      {/*
+        U028/U033: 390pxではタブの並びが右端の「CSVで書き出す」「UID移行」に
+        重なってラベルを隠していた（友だち一覧・重複検出・統合ユーザーの全タブ）。
+        共通タブの形は変えず、この画面のタブ行だけ「収まらないとき折り返す」にする。
+        収まる幅では1行のままで見た目は変わらない。
+      */}
+      <style>{`
+        [data-tabs-row] nav:has(> span) { height: auto; flex-wrap: wrap; row-gap: 8px; }
+        [data-tabs-row] nav:has(> span) > span { flex-wrap: wrap; row-gap: 0; }
+        [data-tabs-row] nav:has(> span) > span + span { margin-left: auto; }
+      `}</style>
       {tab === 'list' ? <FriendsPageInner onNotice={setNotice} onExportReady={registerExporter} /> : null}
       {tab === 'duplicates' ? <EmbeddedPageProvider><DuplicatesPage /></EmbeddedPageProvider> : null}
       {tab === 'merged' ? <EmbeddedPageProvider><MergedUsersPage /></EmbeddedPageProvider> : null}
