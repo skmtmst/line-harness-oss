@@ -9,6 +9,7 @@ import {
   getChatByFriendId,
   createChat,
   updateChat,
+  isOperationCapabilityStopped,
   jstNow,
 } from '@line-crm/db';
 import type { Friend, LineAccount } from '@line-crm/db';
@@ -58,6 +59,16 @@ const MESSAGE_SEND_PATHS = new Set([
   '/v2/bot/message/multicast',
   '/v2/bot/message/broadcast',
   '/v2/bot/message/reply',
+  '/v2/bot/message/narrowcast',
+]);
+
+// broadcast_dispatch の緊急停止 (#960) で止める送信パス。
+// 例外は2系統: reply (replyToken 前提の1:1返信) と、push に
+// X-Line-Harness-Source: manual を付けた担当者の個別返信。自動 push
+// (manual 指定なし) は一斉送信と同じく停止対象。
+const BULK_DISPATCH_PATHS = new Set([
+  '/v2/bot/message/broadcast',
+  '/v2/bot/message/multicast',
   '/v2/bot/message/narrowcast',
 ]);
 
@@ -225,13 +236,18 @@ async function getFriendsByLineUserIds(
       for (const row of scoped.results ?? []) found.set(row.line_user_id, row);
     }
 
-    // C-2bで複合一意制約へ移行したら、この無指定フォールバックを削除する。
-    // 今回は既存の未割当行・他アカウント行を見失わず、挙動を維持する。
+    // 別アカウント所有の行には触れない (Issue #961)。拾うのは未割当
+    // (line_account_id IS NULL) の行だけ。他アカウントの友だちへ送信を
+    // 記録する場合は、行を移す代わりにこのアカウント用の行を作る側へ回す。
     const unresolved = chunk.filter((lineUserId) => !found.has(lineUserId));
     if (unresolved.length > 0) {
       const unresolvedPlaceholders = unresolved.map(() => '?').join(',');
       const fallback = await db
-        .prepare(`SELECT * FROM friends WHERE line_user_id IN (${unresolvedPlaceholders})`)
+        .prepare(
+          `SELECT * FROM friends
+            WHERE line_account_id IS NULL
+              AND line_user_id IN (${unresolvedPlaceholders})`,
+        )
         .bind(...unresolved)
         .all<Friend>();
       for (const row of fallback.results ?? []) found.set(row.line_user_id, row);
@@ -534,6 +550,28 @@ function proxyHandler(prefix: string, upstreamBase: string, logSends: boolean) {
     if (contentType) headers['Content-Type'] = contentType;
     const retryKey = c.req.header('X-Line-Retry-Key');
     if (retryKey) headers['X-Line-Retry-Key'] = retryKey;
+
+    /*
+     * 緊急停止の判定は副作用 (上流fetch) の直前に置く (#960)。
+     * broadcast/multicast/narrowcast と manual 指定なしの自動 push は、
+     * broadcast_dispatch が止まっている間は上流へ一切出さない。
+     * 例外は reply と X-Line-Harness-Source: manual の push —— 人間が
+     * 相手を見て送る1:1返信は一斉送信の停止対象ではない。
+     * アカウント単位の停止とグローバル (*) の停止の両方が効く。
+     */
+    const isBulkDispatch =
+      method === 'POST' &&
+      (BULK_DISPATCH_PATHS.has(path) ||
+        (path === '/v2/bot/message/push' && logSource !== 'manual'));
+    if (
+      isBulkDispatch &&
+      (await isOperationCapabilityStopped(c.env.DB, caller.lineAccountId, 'broadcast_dispatch'))
+    ) {
+      return c.json(
+        { message: 'Message dispatch is stopped by emergency operation control' },
+        409,
+      );
+    }
 
     let upstream: Response;
     try {
