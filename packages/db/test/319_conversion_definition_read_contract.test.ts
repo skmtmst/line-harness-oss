@@ -36,7 +36,26 @@ function setup(): Database.Database {
       count_repeat INTEGER NOT NULL DEFAULT 1, attribution_days INTEGER,
       line_account_id TEXT REFERENCES line_accounts(id), tenant_id TEXT,
       status TEXT NOT NULL DEFAULT 'active',
-      stopped_at TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+      stopped_at TEXT,
+      -- N-270: 外部受信の鍵(暗号化)と受け口の停止時刻。
+      ingest_secret_encrypted TEXT, ingest_disabled_at TEXT,
+      created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+    );
+    -- N-265: 経路別の母数は ref_tracking を見る。最小構成だけ用意する。
+    CREATE TABLE friends (
+      id TEXT PRIMARY KEY, line_user_id TEXT, line_account_id TEXT,
+      created_at TEXT, updated_at TEXT
+    );
+    CREATE TABLE ref_tracking (
+      id TEXT PRIMARY KEY, ref_code TEXT NOT NULL, friend_id TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    );
+    -- N-270: 外部受信の成否台帳。
+    CREATE TABLE conversion_ingestion_events (
+      id TEXT PRIMARY KEY, conversion_point_id TEXT NOT NULL,
+      result TEXT NOT NULL, reason TEXT, source_event_id TEXT,
+      friend_id TEXT, payload_shape_json TEXT, signature_sha256 TEXT,
+      created_at TEXT NOT NULL
     );
     -- N-258: 利用先の実在確認が参照する表。IDとアカウントだけを用意する。
     CREATE TABLE scenarios (id TEXT PRIMARY KEY, line_account_id TEXT);
