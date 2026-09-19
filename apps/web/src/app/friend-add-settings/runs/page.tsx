@@ -428,28 +428,34 @@ export default function FriendAddRunsPage() {
                       ? `${item.actions.total}件の処理を実行`
                       : routingAction(item.status, item.errorCode)
                 return (
-                  <div key={item.id} className="flex min-w-0 items-center gap-3 py-3">
-                    <span className="grid size-9 shrink-0 place-items-center rounded-full bg-status-success-soft text-xs font-bold text-status-success-deep" aria-hidden="true">
-                      {displayName.slice(0, 1)}
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      {item.friend.redacted ? (
-                        <span className="block truncate text-sm font-bold" title={displayName}>{displayName}</span>
-                      ) : (
-                        <Link className="block truncate text-sm font-bold hover:underline" href={`/friends/detail?id=${encodeURIComponent(item.friend.id)}`} title={displayName}>{displayName}</Link>
-                      )}
-                      <p className="truncate text-xs text-ink-faint" title={`流入：${routeName}`}>流入：{routeName}</p>
-                      {item.rule && <p className="truncate text-xs text-ink-faint" title={`${item.rule.name ?? '名前は未取得'} 第${item.rule.versionNumber ?? '—'}版`}>{item.rule.name ?? '名前は未取得'}・第{item.rule.versionNumber ?? '—'}版</p>}
+                  // #973 U045: 1行目は名前と結果、2行目は時刻と詳細。1行に
+                  // すべて並べると狭い幅で右端が切れる。
+                  <div key={item.id} className="min-w-0 py-3">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <span className="grid size-9 shrink-0 place-items-center rounded-full bg-status-success-soft text-xs font-bold text-status-success-deep" aria-hidden="true">
+                        {displayName.slice(0, 1)}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        {item.friend.redacted ? (
+                          <span className="block truncate text-sm font-bold" title={displayName}>{displayName}</span>
+                        ) : (
+                          <Link className="block truncate text-sm font-bold hover:underline" href={`/friends/detail?id=${encodeURIComponent(item.friend.id)}`} title={displayName}>{displayName}</Link>
+                        )}
+                        <p className="truncate text-xs text-ink-faint" title={`流入：${routeName}`}>流入：{routeName}</p>
+                        {item.rule && <p className="truncate text-xs text-ink-faint" title={`${item.rule.name ?? '名前は未取得'} 第${item.rule.versionNumber ?? '—'}版`}>{item.rule.name ?? '名前は未取得'}・第{item.rule.versionNumber ?? '—'}版</p>}
+                      </div>
+                      <div className="hidden min-w-0 flex-1 text-right text-sm font-bold lg:block">{action}</div>
+                      <StatusBadge tone={status.tone} size="compact">{status.label}</StatusBadge>
                     </div>
-                    <div className="hidden min-w-0 flex-1 text-right text-sm font-bold lg:block">{action}</div>
-                    <StatusBadge tone={status.tone} size="compact">{status.label}</StatusBadge>
-                    <Link
-                      className="shrink-0 text-xs font-bold text-accent hover:underline"
-                      href={`/friend-add-settings/runs/detail?id=${encodeURIComponent(item.id)}`}
-                    >
-                      詳細
-                    </Link>
-                    <time className="w-12 shrink-0 text-right text-xs text-ink-secondary" dateTime={item.receivedAt} title={formatJstDateTime(item.receivedAt)}>{formatJstTime(item.receivedAt)}</time>
+                    <div className="mt-1.5 flex items-center justify-between gap-3 pl-12">
+                      <time className="min-w-0 text-xs text-ink-secondary" dateTime={item.receivedAt}>{formatJstDateTime(item.receivedAt)}</time>
+                      <Link
+                        className="shrink-0 text-xs font-bold text-accent hover:underline"
+                        href={`/friend-add-settings/runs/detail?id=${encodeURIComponent(item.id)}`}
+                      >
+                        詳細
+                      </Link>
+                    </div>
                   </div>
                 )
               })}

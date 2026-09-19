@@ -83,7 +83,7 @@ describe('f0zn6 一覧の未読表示', () => {
 })
 
 describe('H3lAOB / xGLVe トーク見出しの操作', () => {
-  const header = region(PAGE, '<div className="ml-auto flex flex-nowrap items-center justify-end gap-2">', '{/* Messages')
+  const header = region(PAGE, '<div className="ml-auto flex flex-wrap items-center justify-end gap-2 sm:flex-nowrap">', '{/* Messages')
 
   it('設計の並び（★ → 担当 → 対応マーク → 顧客情報）で置く', () => {
     const star = header.indexOf('aria-pressed={chatDetail.isAttention}')
@@ -105,7 +105,9 @@ describe('H3lAOB / xGLVe トーク見出しの操作', () => {
   })
 
   it('顧客情報を開いても操作列を1行・高さ40pxで保つ', () => {
-    expect(header).toContain('flex flex-nowrap')
+    // U008/U010(#969): 390px では2行目へ落として右に切らないため、
+    // 折り返しは sm 未満だけ。sm 以上では従来どおり1行を保つ。
+    expect(header).toContain('sm:flex-nowrap')
     expect(header).toContain('className="inline-flex h-10 shrink-0')
     expect(PAGE).toContain("showFriendInfo ? 'xl:min-w-xl")
     expect(header).toContain('compact={showFriendInfo}')
