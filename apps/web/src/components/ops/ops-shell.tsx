@@ -10,10 +10,12 @@ import {
   LifeBuoy,
   LogOut,
   Megaphone,
+  Menu,
   ScrollText,
   ShieldCheck,
   UserRound,
   Users,
+  X,
 } from 'lucide-react'
 import { api, type OpsMe } from '@/lib/api'
 import Button from '@/components/shared/button'
@@ -44,6 +46,23 @@ export default function OpsShell({ children }: { children: ReactNode }) {
   const [me, setMe] = useState<OpsMe | null>(null)
   const [checked, setChecked] = useState(false)
   const [loadError, setLoadError] = useState('')
+  const [navOpen, setNavOpen] = useState(false)
+
+  /*
+   * 狭い画面のメニューは開閉式。画面を移ったら閉じ、開いている間は
+   * Escape と背面のスクロール停止に対応する。
+   */
+  useEffect(() => { setNavOpen(false) }, [pathname])
+  useEffect(() => {
+    if (!navOpen) return
+    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') setNavOpen(false) }
+    document.addEventListener('keydown', onKey)
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.removeEventListener('keydown', onKey)
+      document.body.style.overflow = ''
+    }
+  }, [navOpen])
 
   const load = useCallback(async () => {
     const apiUrl = process.env.NEXT_PUBLIC_API_URL
@@ -107,24 +126,60 @@ export default function OpsShell({ children }: { children: ReactNode }) {
       <OpsEnvBar />
       {me.impersonation ? <ImpersonationBar initial={me.impersonation} onChange={() => void load()} /> : null}
       <div className="flex flex-1">
-        <OpsSidebar me={me} pathname={pathname} />
+        <OpsSidebar me={me} pathname={pathname} open={navOpen} onClose={() => setNavOpen(false)} />
         <main className="min-w-0 flex-1">
-          <div className="mx-auto max-w-screen-2xl px-10 pb-8 pt-4">{children}</div>
+          {/*
+           * 1280px未満ではナビを常設しない。256pxの帯が残ると本文が潰れて
+           * 検索や操作が画面外へ出る（U094）。開く操作だけ本文の上に置く。
+           */}
+          <div className="flex h-12 items-center border-b border-hairline bg-canvas px-4 xl:hidden">
+            <button
+              type="button"
+              aria-expanded={navOpen}
+              onClick={() => setNavOpen(true)}
+              className="flex min-h-11 items-center gap-2 rounded-md px-2 text-label font-bold text-ink hover:bg-canvas-sunken"
+            >
+              <Menu aria-hidden="true" className="h-5 w-5" />
+              メニュー
+            </button>
+          </div>
+          <div className="mx-auto max-w-screen-2xl px-4 pb-8 pt-4 xl:px-10">{children}</div>
         </main>
       </div>
     </div>
   )
 }
 
-function OpsSidebar({ me, pathname }: { me: OpsMe; pathname: string }) {
+function OpsSidebar({ me, pathname, open, onClose }: { me: OpsMe; pathname: string; open: boolean; onClose: () => void }) {
   return (
-    <aside className="flex w-64 shrink-0 flex-col border-r border-hairline bg-canvas">
+    <>
+      {/* 狭い画面でメニューを開いたときの暗幕。押すと閉じる。 */}
+      {open ? (
+        <button
+          type="button"
+          aria-label="メニューを閉じる"
+          onClick={onClose}
+          className="fixed inset-0 z-40 cursor-default bg-ink/40 xl:hidden"
+        />
+      ) : null}
+      <aside
+        aria-label="運営メニュー"
+        className={`${open ? 'flex' : 'hidden'} fixed inset-y-0 left-0 z-50 w-64 shrink-0 flex-col overflow-y-auto border-r border-hairline bg-canvas shadow-xl xl:static xl:z-auto xl:flex xl:shadow-none`}
+      >
       <div className="flex items-center gap-3 px-4 py-4">
         <span className="flex h-9 w-9 items-center justify-center rounded-md bg-accent-deep text-lg font-bold text-on-accent">m</span>
         <div className="min-w-0">
           <p className="truncate text-label font-bold text-ink">musubo</p>
           <p className="truncate text-nano text-ink-faint">運営コンソール</p>
         </div>
+        <button
+          type="button"
+          aria-label="メニューを閉じる"
+          onClick={onClose}
+          className="ml-auto flex min-h-11 min-w-11 items-center justify-center rounded-md text-ink-secondary hover:bg-canvas-sunken xl:hidden"
+        >
+          <X aria-hidden="true" className="h-5 w-5" />
+        </button>
       </div>
       <div className="h-px bg-hairline" />
       <nav className="flex-1 px-3 pt-3">
@@ -150,7 +205,8 @@ function OpsSidebar({ me, pathname }: { me: OpsMe; pathname: string }) {
       </nav>
       <div className="h-px bg-hairline" />
       <OpsAccountMenu me={me} />
-    </aside>
+      </aside>
+    </>
   )
 }
 
