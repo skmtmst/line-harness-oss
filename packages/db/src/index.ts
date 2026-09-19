@@ -24,6 +24,7 @@ export * from './conversion-definitions';
 export * from './conversion-event-sources';
 export * from './affiliates';
 export * from './webhooks';
+export * from './booking-audit';
 export * from './booking-settings';
 export * from './booking-resources';
 export * from './booking-menu-resources';
