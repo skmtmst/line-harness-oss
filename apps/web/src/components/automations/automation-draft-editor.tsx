@@ -70,8 +70,10 @@ export default function AutomationDraftEditor({ draftId }: { draftId: string }) 
   const [actionTagId, setActionTagId] = useState('')
   const [actionScenarioId, setActionScenarioId] = useState('')
   const [actionMessage, setActionMessage] = useState('')
+  const [actionCommonActionId, setActionCommonActionId] = useState('')
   const [tags, setTags] = useState<Array<{ id: string; name: string }>>([])
   const [scenarios, setScenarios] = useState<Array<{ id: string; name: string }>>([])
+  const [commonActions, setCommonActions] = useState<Array<{ id: string; name: string }>>([])
   const [loadState, setLoadState] = useState<'loading' | 'ready' | 'error'>('loading')
 
   useEffect(() => {
@@ -91,6 +93,7 @@ export default function AutomationDraftEditor({ draftId }: { draftId: string }) 
       const action = draft.actions[0]
       setTags(resourceResult.data.tags)
       setScenarios(resourceResult.data.scenarios)
+      setCommonActions(resourceResult.data.commonActions ?? [])
       setDraftVersionId(draft.draftVersionId)
       setName(draft.name)
       setEventType(draft.eventType)
@@ -108,6 +111,7 @@ export default function AutomationDraftEditor({ draftId }: { draftId: string }) 
         setActionTagId(stringParam(action.params.tagId))
         setActionScenarioId(stringParam(action.params.scenarioId))
         setActionMessage(stringParam(action.params.content))
+        setActionCommonActionId(stringParam(action.params.commonActionId))
       }
       setLoadState('ready')
     }).catch(() => {
@@ -145,7 +149,9 @@ export default function AutomationDraftEditor({ draftId }: { draftId: string }) 
       ? { tagId: actionTagId }
       : actionType === 'start_scenario'
         ? { scenarioId: actionScenarioId }
-        : { messageType: 'text', content: actionMessage.trim() },
+        : actionType === 'common_action'
+          ? { commonActionId: actionCommonActionId }
+          : { messageType: 'text', content: actionMessage.trim() },
     onFailure: 'stop',
   }
 
@@ -196,6 +202,7 @@ export default function AutomationDraftEditor({ draftId }: { draftId: string }) 
         if (eventType === 'weekly' && !triggerWeekdays.trim()) return '曜日を入力してください'
         if (actionType === 'add_tag' && !actionTagId) return '付けるタグを選んでください'
         if (actionType === 'start_scenario' && !actionScenarioId) return '始めるシナリオを選んでください'
+        if (actionType === 'common_action' && !actionCommonActionId) return '使う共通アクションを選んでください'
         if (actionType === 'send_message' && !actionMessage.trim()) return '送る文面を入力してください'
         return null
       }}
@@ -388,6 +395,25 @@ export default function AutomationDraftEditor({ draftId }: { draftId: string }) 
             value={actionScenarioId}
             onChange={setActionScenarioId}
             options={[{ value: '', label: '— 選んでください —' }, ...scenarios.map((scenario) => ({ value: scenario.id, label: scenario.name }))]}
+          />
+        </Field>
+      ) : actionType === 'common_action' ? (
+        <Field
+          label="使う共通アクション"
+          htmlFor="au-common-action"
+          required
+          note="公開済みのものだけ選べます。実行するときの版が記録に残ります。"
+        >
+          <Select
+            id="au-common-action"
+            aria-label="使う共通アクション"
+            size="full"
+            value={actionCommonActionId}
+            onChange={setActionCommonActionId}
+            options={[
+              { value: '', label: commonActions.length === 0 ? '公開済みの共通アクションがありません' : '— 選んでください —' },
+              ...commonActions.map((item) => ({ value: item.id, label: item.name })),
+            ]}
           />
         </Field>
       ) : (

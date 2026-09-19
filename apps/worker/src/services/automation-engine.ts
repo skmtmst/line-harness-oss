@@ -134,6 +134,16 @@ export class AutomationRunRetryError extends Error {
   }
 }
 
+export class AutomationRunCancelError extends Error {
+  constructor(
+    public readonly code: 'not_found' | 'not_cancellable',
+    message: string,
+  ) {
+    super(message);
+    this.name = 'AutomationRunCancelError';
+  }
+}
+
 function addMinutes(value: string, minutes: number): string {
   const date = new Date(value);
   date.setMinutes(date.getMinutes() + minutes);
@@ -699,6 +709,15 @@ export async function processAutomationRun(
 
   for (let index = run.current_step; index < actions.length; index += 1) {
     const action = actions[index];
+    /*
+     * 取消（cancelAutomationRun）は step と step の境目で効かせる。
+     * 走っている途中で取りやめられたら、これ以降の処理へ進まず
+     * `cancelled` で返す。走り中の step 自体は取消側で閉じている。
+     */
+    const latest = await db.prepare(`SELECT status FROM automation_runs WHERE id = ?`)
+      .bind(run.id).first<{ status: RunStatus }>();
+    if (!latest) return 'not_found';
+    if (latest.status === 'cancelled') return 'cancelled';
     let step = await getStep(db, run.id, action.id);
     if (!step) {
       await precreateSteps(db, run, [action]);
@@ -922,6 +941,76 @@ export async function retryAutomationRun(
     throw new AutomationRunRetryError('retry_conflict', '実行記録の状態が変わりました。再読み込みしてください');
   }
   return { runId: run.id, retryStepCount: failed.results.length, status: 'waiting' };
+}
+
+/**
+ * 実行の取りやめ（#942 N-353）。
+ *
+ * **実行記録は消せない**（`trg_automation_runs_no_delete`）。だから取りやめは
+ * `cancelled` への状態遷移にする。
+ *
+ * - `queued` / `running` / `waiting` の実行だけ止められる。
+ * - 終わった実行（success / partial / failed / skipped_condition）は
+ *   `not_cancellable` で断る。取りやめても結果は変わらない。
+ * - すでに `cancelled` なら何もせず成功で返す（**何度押しても同じ結果**）。
+ *
+ * 走り途中（running）の実行は、`processAutomationRun` が処理と処理の境目で
+ * 実行の状態を見直すので、次の処理へ進まずに止まる。進行中だった step も
+ * `cancelled` にして「どこまで動いたか」が記録から読める形に残す。
+ */
+export async function cancelAutomationRun(
+  db: D1Database,
+  input: { runId: string; allowedAccountIds: string[]; now?: string },
+): Promise<{ runId: string; status: 'cancelled'; alreadyCancelled: boolean; cancelledStepCount: number }> {
+  if (input.allowedAccountIds.length === 0) {
+    throw new AutomationRunCancelError('not_found', '実行記録が見つかりません');
+  }
+  const run = await db.prepare(
+    `SELECT id, status FROM automation_runs
+      WHERE id = ? AND line_account_id IN (${input.allowedAccountIds.map(() => '?').join(',')})`,
+  ).bind(input.runId, ...input.allowedAccountIds).first<{ id: string; status: RunStatus }>();
+  if (!run) throw new AutomationRunCancelError('not_found', '実行記録が見つかりません');
+  if (run.status === 'cancelled') {
+    return { runId: run.id, status: 'cancelled', alreadyCancelled: true, cancelledStepCount: 0 };
+  }
+  if (['success', 'partial', 'failed', 'skipped_condition'].includes(run.status)) {
+    throw new AutomationRunCancelError(
+      'not_cancellable', 'すでに終わった実行は取りやめられません',
+    );
+  }
+  const now = nowIso(input.now);
+  // 状態を見てから閉じるまでに終わってしまう競合は、WHERE で防ぐ。
+  // **先に実行そのものを閉じる。** step だけ先に閉じると、直前に失敗で
+  // 確定した実行（再実行で残り step を動かせるもの）の queued step まで
+  // 潰してしまう。
+  const closed = await db.prepare(
+    `UPDATE automation_runs
+        SET status = 'cancelled', completed_at = ?, resume_at = NULL, lease_expires_at = NULL
+      WHERE id = ? AND status IN ('queued', 'running', 'waiting')`,
+  ).bind(now, run.id).run();
+  if ((closed.meta?.changes ?? 0) !== 1) {
+    // 競合で閉じられなかった＝もう終わったか、先に取りやめられた。
+    const latest = await db.prepare(`SELECT status FROM automation_runs WHERE id = ?`)
+      .bind(run.id).first<{ status: RunStatus }>();
+    if (latest?.status === 'cancelled') {
+      return { runId: run.id, status: 'cancelled', alreadyCancelled: true, cancelledStepCount: 0 };
+    }
+    throw new AutomationRunCancelError('not_cancellable', 'すでに終わった実行は取りやめられません');
+  }
+  // まだ動いていない・待っている・走り途中の step も閉じる。
+  // 成功・失敗・見送りで確定した step は結果として残す。
+  const steps = await db.prepare(
+    `UPDATE automation_run_steps
+        SET status = 'cancelled', completed_at = COALESCE(completed_at, ?),
+            retry_at = NULL, lease_expires_at = NULL
+      WHERE automation_run_id = ? AND status IN ('queued', 'running', 'waiting')`,
+  ).bind(now, run.id).run();
+  return {
+    runId: run.id,
+    status: 'cancelled',
+    alreadyCancelled: false,
+    cancelledStepCount: steps.meta?.changes ?? 0,
+  };
 }
 
 export async function processDueAutomationRuns(

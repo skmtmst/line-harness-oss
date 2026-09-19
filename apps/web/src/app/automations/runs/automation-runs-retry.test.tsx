@@ -12,7 +12,15 @@ import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const fetchApi = vi.hoisted(() => vi.fn())
-vi.mock('@/lib/api', () => ({ fetchApi }))
+const api = vi.hoisted(() => ({
+  automations: {
+    // #942 N-353/N-354: 詳細の読み直し・CSV口・取りやめ。
+    getRun: vi.fn(async () => ({ success: true as const, data: null })),
+    cancelRun: vi.fn(),
+    runsCsvUrl: vi.fn(() => 'http://worker.test/api/automation-runs?format=csv'),
+  },
+}))
+vi.mock('@/lib/api', () => ({ fetchApi, api }))
 
 vi.mock('next/navigation', () => ({
   usePathname: () => '/automations/runs',
@@ -40,6 +48,9 @@ function runRow() {
     durationMs: 1200,
     automationName: '予約案内',
     canRetry: true,
+    versionNumber: 3,
+    isTest: false,
+    canCancel: false,
   }
 }
 

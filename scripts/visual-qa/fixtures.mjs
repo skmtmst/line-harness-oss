@@ -4783,6 +4783,11 @@ const automationRun = ({
   automationId,
   automationName,
   automationVersionId: `${automationId}-version-3`,
+  // #942 N-354: 実行時に固定された版番号とテスト印。
+  versionNumber: 3,
+  isTest: false,
+  // #942 N-353: 終わっていない実行だけ取りやめられる。見本の行は終了済み。
+  canCancel: false,
   friendId: `friend-${id}`,
   friendName: subject,
   sourceEventId: `event-${id}`,

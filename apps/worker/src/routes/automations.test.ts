@@ -1,6 +1,7 @@
 import { describe, expect, test, beforeEach, vi } from 'vitest';
 import { Hono } from 'hono';
 import type { AuthenticatedStaff } from '../middleware/auth.js';
+import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite';
 
 // We assert on the SQL/binds the route forwards to D1. The DB-helper path
 // (no lineAccountId query) is mocked separately on @line-crm/db.
@@ -12,6 +13,8 @@ const dbMocks = {
   deleteAutomation: vi.fn(),
   getAutomationLogs: vi.fn(),
   getAutomationExecutionRuns: vi.fn(),
+  getAutomationExecutionRun: vi.fn(),
+  getAutomationExecutionRunSteps: vi.fn(),
   getLineAccounts: vi.fn(),
   getLineAccountScopeEntries: vi.fn(),
   getStaffById: vi.fn(),
@@ -20,6 +23,25 @@ const dbMocks = {
 vi.mock('@line-crm/db', () => dbMocks);
 
 const { automations } = await import('./automations.js');
+
+/*
+ * #942: requireVisibleAutomation は先に V6 の automation_definitions を
+ * db.prepare で引く。旧テストは `{}` を渡していたため prepare が無く 500
+ * になった。ここでは「V6には無い」= null を返す最小のD1を用意し、
+ * 旧 automations 表のモック（getAutomationById）へ落ちる経路を残す。
+ */
+const fakeD1 = () => ({
+  prepare: () => ({
+    bind: () => ({
+      first: async () => null,
+      all: async () => ({ results: [] }),
+      run: async () => ({ meta: { changes: 0 } }),
+    }),
+    first: async () => null,
+    all: async () => ({ results: [] }),
+    run: async () => ({ meta: { changes: 0 } }),
+  }),
+}) as unknown as D1Database;
 
 function setupApp(db: D1Database, staff?: Partial<AuthenticatedStaff>) {
   const app = new Hono<{
@@ -87,7 +109,7 @@ describe('GET /api/automation-runs', () => {
       summary: { total: 2, executed: 1, skipped: 1, failed: 0, most_run_name: '予約案内', most_run_count: 1 },
     });
 
-    const res = await setupApp({} as D1Database).request('/api/automation-runs?lineAccountId=acc-1&status=executed&limit=20&offset=0');
+    const res = await setupApp(fakeD1()).request('/api/automation-runs?lineAccountId=acc-1&status=executed&limit=20&offset=0');
     expect(res.status).toBe(200);
     const body = await res.json() as { data: { items: Array<Record<string, unknown>> } };
     expect(body.data.items[0]).toMatchObject({
@@ -107,7 +129,7 @@ describe('GET /api/automation-runs', () => {
   });
 
   test('閲覧できないLINEアカウントは空表示にせず403で止める', async () => {
-    const res = await setupApp({} as D1Database).request('/api/automation-runs?lineAccountId=outside');
+    const res = await setupApp(fakeD1()).request('/api/automation-runs?lineAccountId=outside');
     expect(res.status).toBe(403);
     expect(dbMocks.getAutomationExecutionRuns).not.toHaveBeenCalled();
   });
@@ -128,7 +150,7 @@ describe('GET /api/automation-runs', () => {
       summary: { total: 1, executed: 1, skipped: 0, failed: 1, most_run_name: '予約案内', most_run_count: 1 },
     });
 
-    const res = await setupApp({} as D1Database).request('/api/automation-runs?lineAccountId=acc-1');
+    const res = await setupApp(fakeD1()).request('/api/automation-runs?lineAccountId=acc-1');
     const body = await res.json() as { data: { items: Array<Record<string, unknown>> } };
     expect(body.data.items[0]).toMatchObject({
       status: 'permanent_failed',
@@ -146,7 +168,7 @@ describe('GET /api/automations/:id/logs', () => {
   ])('limit=%s を最大200件以内へ直す', async (raw, expected) => {
     dbMocks.getAutomationById.mockResolvedValue({ id: 'automation-1', line_account_id: null });
     dbMocks.getAutomationLogs.mockResolvedValue([]);
-    const res = await setupApp({} as D1Database).request(`/api/automations/automation-1/logs?limit=${raw}`);
+    const res = await setupApp(fakeD1()).request(`/api/automations/automation-1/logs?limit=${raw}`);
     expect(res.status).toBe(200);
     expect(dbMocks.getAutomationLogs).toHaveBeenCalledWith(
       expect.anything(),
@@ -158,7 +180,7 @@ describe('GET /api/automations/:id/logs', () => {
 
 describe('旧作成口の削除（#554 点検#519中6）', () => {
   test('POST /api/automations は404を返し、何も作らない', async () => {
-    const res = await setupApp({} as D1Database).request('/api/automations', {
+    const res = await setupApp(fakeD1()).request('/api/automations', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name: 'x', eventType: 'message_received', actions: [] }),
@@ -170,7 +192,7 @@ describe('旧作成口の削除（#554 点検#519中6）', () => {
 
 describe('権限キー検査（#554 点検#519中4・中5）', () => {
   test('実行記録の一覧は権限キーのないstaffに403を返す', async () => {
-    const res = await setupApp({} as D1Database, STAFF_WITHOUT_KEY)
+    const res = await setupApp(fakeD1(), STAFF_WITHOUT_KEY)
       .request('/api/automation-runs?lineAccountId=acc-1');
     expect(res.status).toBe(403);
     expect(dbMocks.getAutomationExecutionRuns).not.toHaveBeenCalled();
@@ -182,21 +204,21 @@ describe('権限キー検査（#554 点検#519中4・中5）', () => {
       total: 0,
       summary: { total: 0, executed: 0, skipped: 0, failed: 0, most_run_name: null, most_run_count: null },
     });
-    const res = await setupApp({} as D1Database, STAFF_WITH_KEY)
+    const res = await setupApp(fakeD1(), STAFF_WITH_KEY)
       .request('/api/automation-runs?lineAccountId=acc-1');
     expect(res.status).toBe(200);
   });
 
   test('詳細は権限キーのないstaffに403を返す（アカウント範囲内でも）', async () => {
     dbMocks.getAutomationById.mockResolvedValue({ id: 'automation-1', line_account_id: 'acc-1' });
-    const res = await setupApp({} as D1Database, STAFF_WITHOUT_KEY)
+    const res = await setupApp(fakeD1(), STAFF_WITHOUT_KEY)
       .request('/api/automations/automation-1');
     expect(res.status).toBe(403);
   });
 
   test('ログは権限キーのないstaffに403を返す', async () => {
     dbMocks.getAutomationById.mockResolvedValue({ id: 'automation-1', line_account_id: 'acc-1' });
-    const res = await setupApp({} as D1Database, STAFF_WITHOUT_KEY)
+    const res = await setupApp(fakeD1(), STAFF_WITHOUT_KEY)
       .request('/api/automations/automation-1/logs');
     expect(res.status).toBe(403);
     expect(dbMocks.getAutomationLogs).not.toHaveBeenCalled();
@@ -205,8 +227,366 @@ describe('権限キー検査（#554 点検#519中4・中5）', () => {
   test('ログは権限キーを持つstaffに200を返す', async () => {
     dbMocks.getAutomationById.mockResolvedValue({ id: 'automation-1', line_account_id: 'acc-1' });
     dbMocks.getAutomationLogs.mockResolvedValue([]);
-    const res = await setupApp({} as D1Database, STAFF_WITH_KEY)
+    const res = await setupApp(fakeD1(), STAFF_WITH_KEY)
       .request('/api/automations/automation-1/logs');
     expect(res.status).toBe(200);
+  });
+});
+
+/** getAutomationExecutionRuns が返す行の、台帳・CSV共通の最小形。 */
+function runRow(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 'run-1', line_account_id: 'acc-1', account_name: '本店',
+    automation_id: 'auto-1', automation_name: '予約案内', automation_version_id: 'ver-1',
+    version_number: 3, is_test: 0,
+    friend_id: 'friend-1', friend_name: '田中さん', source_event_id: 'event-1',
+    trigger_type: 'friend_add', status: 'success',
+    started_at: '2026-08-28T01:00:00.000Z', completed_at: '2026-08-28T01:00:01.000Z',
+    created_at: '2026-08-28T01:00:00.000Z', duration_ms: 1000,
+    successful_actions: 'add_tag', skipped_actions: null,
+    failed_action: null, failure_code: null,
+    ...overrides,
+  };
+}
+
+describe('GET /api/automation-runs/:id（#942 N-354 実行の詳細）', () => {
+  test('版番号・テスト印・取消可否と、処理ごとの結果・試行数を返す', async () => {
+    dbMocks.getAutomationExecutionRun.mockResolvedValue(runRow({
+      status: 'waiting', version_number: 4, is_test: 1,
+      successful_actions: null, completed_at: null, duration_ms: null,
+    }));
+    dbMocks.getAutomationExecutionRunSteps.mockResolvedValue([
+      {
+        step_key: 'shared', action_type: 'common_action_marker',
+        common_action_version_id: 'cv-9', status: 'success', attempt_number: 1,
+        error_code: null, error_message: null,
+        started_at: '2026-08-28T01:00:00.000Z', completed_at: '2026-08-28T01:00:00.500Z',
+      },
+      {
+        step_key: 'send', action_type: 'send_message',
+        common_action_version_id: null, status: 'failed', attempt_number: 3,
+        error_code: 'line_api_error', error_message: 'raw provider detail',
+        started_at: '2026-08-28T01:00:00.500Z', completed_at: null,
+      },
+    ]);
+
+    const res = await setupApp(fakeD1()).request('/api/automation-runs/run-1');
+    expect(res.status).toBe(200);
+    const body = await res.json() as {
+      data: Record<string, unknown> & { steps: Array<Record<string, unknown>> };
+    };
+    expect(body.data).toMatchObject({
+      versionNumber: 4, isTest: true, canCancel: true, status: 'retry_wait',
+    });
+    expect(body.data.steps).toEqual([
+      {
+        stepKey: 'shared', actionType: 'common_action_marker',
+        actionLabel: expect.any(String), status: 'success', attemptNumber: 1,
+        errorCode: null, errorMessage: null, commonActionVersionId: 'cv-9',
+        startedAt: '2026-08-28T01:00:00.000Z', completedAt: '2026-08-28T01:00:00.500Z',
+      },
+      {
+        stepKey: 'send', actionType: 'send_message',
+        actionLabel: expect.any(String), status: 'failed', attemptNumber: 3,
+        errorCode: 'line_api_error',
+        // 生のerror_messageではなく画面と同じ言い方に揃える。
+        errorMessage: 'LINEへの送信を完了できませんでした',
+        commonActionVersionId: null,
+        startedAt: '2026-08-28T01:00:00.500Z', completedAt: null,
+      },
+    ]);
+    // 友だちの情報を含みうる入力・出力は出さない。
+    for (const step of body.data.steps) {
+      expect(Object.keys(step).sort()).toEqual([
+        'actionLabel', 'actionType', 'attemptNumber', 'commonActionVersionId',
+        'completedAt', 'errorCode', 'errorMessage', 'startedAt', 'status', 'stepKey',
+      ]);
+    }
+    expect(dbMocks.getAutomationExecutionRun).toHaveBeenCalledWith(expect.anything(), {
+      runId: 'run-1', allowedAccountIds: ['acc-1', 'acc-2'],
+    });
+  });
+
+  test('見えない・無い実行は404、権限キーのないstaffは403', async () => {
+    dbMocks.getAutomationExecutionRun.mockResolvedValue(null);
+    const missing = await setupApp(fakeD1()).request('/api/automation-runs/run-9');
+    expect(missing.status).toBe(404);
+    const denied = await setupApp(fakeD1(), STAFF_WITHOUT_KEY)
+      .request('/api/automation-runs/run-1');
+    expect(denied.status).toBe(403);
+    expect(dbMocks.getAutomationExecutionRun).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('CSV書き出し（#942 N-353）', () => {
+  test('絞り込み全体をCSVで返し、値は必ず囲んで引用符を重ねる', async () => {
+    dbMocks.getAutomationExecutionRuns.mockResolvedValue({
+      rows: [
+        runRow({
+          automation_name: '初回, "特別" 案内',
+          friend_name: '改行\n含む',
+          is_test: 1,
+        }),
+        runRow({ id: 'run-2', status: 'cancelled', friend_name: null, detail: null }),
+      ],
+      total: 2,
+      summary: { total: 2, executed: 1, skipped: 0, failed: 0, most_run_name: '初回案内', most_run_count: 1 },
+    });
+
+    const res = await setupApp(fakeD1())
+      .request('/api/automation-runs?lineAccountId=acc-1&format=csv');
+    expect(res.status).toBe(200);
+    expect(res.headers.get('Content-Type')).toBe('text/csv; charset=utf-8');
+    expect(res.headers.get('Content-Disposition')).toContain('automation-runs.csv');
+    // Excelで日本語が化けない先頭の目印（BOM）は生のバイト列で確かめる
+    // （Response.text() はUTF-8のBOMを読み飛ばすため）。
+    const bytes = new Uint8Array(await res.arrayBuffer());
+    expect(Array.from(bytes.slice(0, 3))).toEqual([0xEF, 0xBB, 0xBF]);
+    const lines = new TextDecoder().decode(bytes.subarray(3)).split('\r\n');
+    expect(lines[0]).toBe(
+      '"実行日時","LINE公式アカウント","オートメーション","版","対象","きっかけ","状態","処理結果","テスト実行","所要時間(ミリ秒)","実行ID"',
+    );
+    expect(lines[1]).toContain('"初回, ""特別"" 案内"');
+    expect(lines[1]).toContain('"v3"');
+    expect(lines[1]).toContain('"テスト"');
+    expect(lines[1]).toContain('"改行\n含む"');
+    expect(lines[2]).toContain('"取消"');
+    // CSVは画面の1頁ではなく絞り込み全体を出す。
+    expect(dbMocks.getAutomationExecutionRuns).toHaveBeenCalledWith(expect.anything(),
+      expect.objectContaining({ limit: 5000, offset: 0 }));
+  });
+
+  test('= + - @ で始まる値は引用符を前置し、Excelの数式として実行させない', async () => {
+    // 友だち表示名・自動化名・アカウント名は外部入力。表計算ソフトで開いたとき
+    // 数式として実行されないよう、common-actionsのCSVと同じ対策を固定する。
+    dbMocks.getAutomationExecutionRuns.mockResolvedValue({
+      rows: [runRow({
+        automation_name: '=1+1',
+        friend_name: '+SUM(1,2)',
+        account_name: '-cmd',
+      })],
+      total: 1,
+      summary: { total: 1, executed: 1, skipped: 0, failed: 0, most_run_name: null, most_run_count: null },
+    });
+
+    const res = await setupApp(fakeD1())
+      .request('/api/automation-runs?lineAccountId=acc-1&format=csv');
+    expect(res.status).toBe(200);
+    const bytes = new Uint8Array(await res.arrayBuffer());
+    const lines = new TextDecoder().decode(bytes.subarray(3)).split('\r\n');
+    expect(lines[1]).toContain(`"'=1+1"`);
+    expect(lines[1]).toContain(`"'+SUM(1,2)"`);
+    expect(lines[1]).toContain(`"'-cmd"`);
+    // 数式そのままのセルが残っていないこと。
+    expect(lines[1]).not.toContain('"=1+1"');
+  });
+
+  test('権限キーのないstaffは403', async () => {
+    const res = await setupApp(fakeD1(), STAFF_WITHOUT_KEY)
+      .request('/api/automation-runs?lineAccountId=acc-1&format=csv');
+    expect(res.status).toBe(403);
+    expect(dbMocks.getAutomationExecutionRuns).not.toHaveBeenCalled();
+  });
+});
+
+/*
+ * 以下は本物のSQLiteへ向ける直接試験。実行の取りやめと定義の編集・
+ * 複製・状態切替はサービス層がD1へSQLを書くため、モックではなく
+ * 実スキーマの行を見て固定する。
+ */
+function realAutomationDb(): SqliteD1 {
+  const testDb = createTestD1();
+  testDb.raw.prepare(
+    `INSERT INTO line_accounts
+       (id, channel_id, name, channel_access_token, channel_secret, is_active)
+     VALUES ('acc-1', 'ch-1', '本店', '', '', 1)`,
+  ).run();
+  testDb.raw.prepare(
+    `INSERT INTO automation_definitions
+       (id, line_account_id, name, status, current_published_version_id)
+     VALUES ('auto-1', 'acc-1', '予約案内', 'active', 'ver-1')`,
+  ).run();
+  testDb.raw.prepare(
+    `INSERT INTO automation_versions
+       (id, automation_id, version_number, status, trigger_type, trigger_config,
+        action_config, published_at)
+     VALUES ('ver-1', 'auto-1', 1, 'published', 'friend_add', '{}',
+             '[{"id":"step-1","type":"add_tag","params":{"tagId":"tag-1"},"onFailure":"stop"}]',
+             '2026-08-28T00:00:00.000Z')`,
+  ).run();
+  return testDb;
+}
+
+function addRun(raw: SqliteD1['raw'], input: { id: string; status: string }): void {
+  raw.prepare(
+    `INSERT INTO automation_runs
+       (id, line_account_id, automation_id, automation_version_id, source_event_id,
+        idempotency_key, status, input_event_json, created_at)
+     VALUES (?, 'acc-1', 'auto-1', 'ver-1', ?, ?, ?, '{}', '2026-08-28T01:00:00.000Z')`,
+  ).run(input.id, `event-${input.id}`, `key-${input.id}`, input.status);
+}
+
+describe('POST /api/automation-runs/:id/cancel（#942 N-353）', () => {
+  test('待機中の実行を取りやめ、残りの処理も取消で閉じる', async () => {
+    const testDb = realAutomationDb();
+    addRun(testDb.raw, { id: 'run-1', status: 'queued' });
+    testDb.raw.prepare(
+      `INSERT INTO automation_run_steps
+         (id, automation_run_id, step_key, action_type, idempotency_key, status)
+       VALUES ('s1', 'run-1', 'step-1', 'add_tag', 's1', 'queued')`,
+    ).run();
+
+    const res = await setupApp(testDb.db).request('/api/automation-runs/run-1/cancel', { method: 'POST' });
+    expect(res.status).toBe(200);
+    const body = await res.json() as { data: { status: string; alreadyCancelled: boolean } };
+    expect(body.data).toMatchObject({ status: 'cancelled', alreadyCancelled: false });
+    expect(testDb.raw.prepare(
+      `SELECT status FROM automation_runs WHERE id = 'run-1'`,
+    ).get()).toEqual({ status: 'cancelled' });
+    expect(testDb.raw.prepare(
+      `SELECT status FROM automation_run_steps WHERE id = 's1'`,
+    ).get()).toEqual({ status: 'cancelled' });
+  });
+
+  test('終わった実行は409、取消済みはそのまま200、無い実行は404', async () => {
+    const testDb = realAutomationDb();
+    addRun(testDb.raw, { id: 'run-done', status: 'success' });
+    addRun(testDb.raw, { id: 'run-cancelled', status: 'cancelled' });
+    const app = setupApp(testDb.db);
+
+    const done = await app.request('/api/automation-runs/run-done/cancel', { method: 'POST' });
+    expect(done.status).toBe(409);
+    const cancelled = await app.request('/api/automation-runs/run-cancelled/cancel', { method: 'POST' });
+    expect(cancelled.status).toBe(200);
+    const missing = await app.request('/api/automation-runs/no-such/cancel', { method: 'POST' });
+    expect(missing.status).toBe(404);
+  });
+
+  test('権限キーのないstaffは403、持つstaffは取りやめられる', async () => {
+    const testDb = realAutomationDb();
+    addRun(testDb.raw, { id: 'run-1', status: 'waiting' });
+    const denied = await setupApp(testDb.db, STAFF_WITHOUT_KEY)
+      .request('/api/automation-runs/run-1/cancel', { method: 'POST' });
+    expect(denied.status).toBe(403);
+    const allowed = await setupApp(testDb.db, STAFF_WITH_KEY)
+      .request('/api/automation-runs/run-1/cancel', { method: 'POST' });
+    expect(allowed.status).toBe(200);
+  });
+});
+
+describe('POST /api/automations/:id/draft・duplicate・status（#942 N-352）', () => {
+  test('「編集」は公開版を写した改訂用下書きをぶら下げ、再押しは同じ下書きを返す', async () => {
+    const testDb = realAutomationDb();
+    const app = setupApp(testDb.db);
+
+    const first = await app.request('/api/automations/auto-1/draft', { method: 'POST' });
+    expect(first.status).toBe(201);
+    const firstBody = await first.json() as { data: { id: string; draftVersionId: string } };
+    expect(firstBody.data.id).toBe('auto-1');
+
+    const second = await app.request('/api/automations/auto-1/draft', { method: 'POST' });
+    const secondBody = await second.json() as { data: { draftVersionId: string } };
+    expect(secondBody.data.draftVersionId).toBe(firstBody.data.draftVersionId);
+    expect(testDb.raw.prepare(
+      `SELECT COUNT(*) AS count FROM automation_versions WHERE automation_id = 'auto-1'`,
+    ).get()).toEqual({ count: 2 });
+  });
+
+  test('「複製」は「のコピー」の新しい下書きを作り、共通アクションの束も写す', async () => {
+    const testDb = realAutomationDb();
+    testDb.raw.prepare(
+      `INSERT INTO common_actions (id, line_account_id, name, status)
+       VALUES ('ca-1', 'acc-1', '共通処理', 'published')`,
+    ).run();
+    testDb.raw.prepare(
+      `INSERT INTO common_action_versions
+         (id, common_action_id, version_number, status, action_config, published_at)
+       VALUES ('cv-1', 'ca-1', 1, 'published', '[]', '2026-08-28T00:00:00.000Z')`,
+    ).run();
+    testDb.raw.prepare(
+      `INSERT INTO common_action_bindings
+         (id, line_account_id, common_action_id, common_action_version_id,
+          consumer_type, consumer_id, consumer_path)
+       VALUES ('bind-1', 'acc-1', 'ca-1', 'cv-1', 'automation', 'auto-1', 'step-1'),
+              ('bind-2', 'acc-1', 'ca-1', 'cv-1', 'automation', 'auto-1', 'step-2')`,
+    ).run();
+
+    const res = await setupApp(testDb.db).request('/api/automations/auto-1/duplicate', { method: 'POST' });
+    expect(res.status).toBe(201);
+    const body = await res.json() as { data: { id: string } };
+    expect(body.data.id).not.toBe('auto-1');
+    expect(testDb.raw.prepare(
+      `SELECT name, status FROM automation_definitions WHERE id = ?`,
+    ).get(body.data.id)).toEqual({ name: '予約案内 のコピー', status: 'draft' });
+    // 束が2件あっても500にならず、新しい定義へ1件ずつ一意のidで写る。
+    const bindings = testDb.raw.prepare(
+      `SELECT id, consumer_id, common_action_version_id, consumer_path
+         FROM common_action_bindings
+        WHERE consumer_type = 'automation' AND consumer_id = ?
+        ORDER BY consumer_path`,
+    ).all(body.data.id) as Array<{
+      id: string; consumer_id: string; common_action_version_id: string; consumer_path: string;
+    }>;
+    expect(bindings).toEqual([
+      { id: expect.any(String), consumer_id: body.data.id,
+        common_action_version_id: 'cv-1', consumer_path: 'step-1' },
+      { id: expect.any(String), consumer_id: body.data.id,
+        common_action_version_id: 'cv-1', consumer_path: 'step-2' },
+    ]);
+    expect(new Set(bindings.map((row) => row.id)).size).toBe(2);
+  });
+
+  test('「保管」は一方通行。戻す依頼は422、変な状態名は400', async () => {
+    const testDb = realAutomationDb();
+    const app = setupApp(testDb.db);
+
+    const archived = await app.request('/api/automations/auto-1/status', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: 'archived' }),
+    });
+    expect(archived.status).toBe(200);
+    expect(testDb.raw.prepare(
+      `SELECT status FROM automation_definitions WHERE id = 'auto-1'`,
+    ).get()).toEqual({ status: 'archived' });
+
+    const restore = await app.request('/api/automations/auto-1/status', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: 'active' }),
+    });
+    expect(restore.status).toBe(422);
+    const bad = await app.request('/api/automations/auto-1/status', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: 'paused' }),
+    });
+    expect(bad.status).toBe(400);
+  });
+
+  test('見えない・無い定義は404、権限キーのないstaffは403', async () => {
+    const testDb = realAutomationDb();
+    testDb.raw.prepare(
+      `INSERT INTO automation_definitions
+         (id, line_account_id, name, status)
+       VALUES ('auto-outside', 'acc-outside', '見えない店', 'active')`,
+    ).run();
+    const app = setupApp(testDb.db);
+
+    const outside = await app.request('/api/automations/auto-outside/draft', { method: 'POST' });
+    expect(outside.status).toBe(404);
+    const missing = await app.request('/api/automations/no-such/duplicate', { method: 'POST' });
+    expect(missing.status).toBe(404);
+
+    const deniedDraft = await setupApp(testDb.db, STAFF_WITHOUT_KEY)
+      .request('/api/automations/auto-1/draft', { method: 'POST' });
+    expect(deniedDraft.status).toBe(403);
+    const deniedStatus = await setupApp(testDb.db, STAFF_WITHOUT_KEY)
+      .request('/api/automations/auto-1/status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'stopped' }),
+      });
+    expect(deniedStatus.status).toBe(403);
   });
 });
