@@ -1248,25 +1248,25 @@ function Editor({
 
       {/* N-154: 複製は消える操作ではないので、危険な操作とは分けて置く。 */}
       {canOperate ? (
-        <section className="mt-10 bg-white border border-gray-200 rounded-lg shadow-sm p-5">
+        <section className="mt-10 bg-canvas border border-hairline rounded-lg shadow-sm p-5">
           <div className="flex items-start justify-between gap-4">
             <div className="flex-1">
-              <div className="text-sm font-medium text-gray-900">このメニューを複製</div>
-              <div className="text-xs text-gray-600 mt-0.5">
+              <div className="text-sm font-medium text-ink">このメニューを複製</div>
+              <div className="text-xs text-ink-secondary mt-0.5">
                 名前・ページ・ボタン・画像・出し分けの設定を写した下書きを新しく作ります。LINE上の表示は変わりません。
               </div>
             </div>
-            <button
+            <Button
               type="button"
               onClick={() => {
                 setConfirmError('')
                 setConfirmKind('duplicate')
               }}
               disabled={saving || publishing || unpublishing || busy || duplicating}
-              className="shrink-0 px-3 py-2 text-sm font-medium border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 transition-colors"
+              className="shrink-0"
             >
               複製する
-            </button>
+            </Button>
           </div>
         </section>
       ) : null}

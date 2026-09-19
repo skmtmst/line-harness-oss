@@ -13,6 +13,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { api, ApiError } from '@/lib/api'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
 
 type PublishRun = {
   id: string
@@ -39,10 +40,10 @@ const STATUS_LABEL: Record<PublishRun['status'], string> = {
   failed: '失敗',
 }
 
-const STATUS_CLASS: Record<PublishRun['status'], string> = {
-  running: 'bg-status-info-soft text-status-info',
-  succeeded: 'bg-success-bg text-success',
-  failed: 'bg-danger-bg text-danger',
+const STATUS_TONE: Record<PublishRun['status'], StatusBadgeTone> = {
+  running: 'info',
+  succeeded: 'success',
+  failed: 'danger',
 }
 
 function formatAt(iso: string): string {
@@ -170,9 +171,9 @@ export function PublishHistorySection({
           {runs.map((run) => (
             <li key={run.id} className="border-hairline flex flex-wrap items-center justify-between gap-2 rounded border px-3 py-2 text-xs">
               <span className="text-ink">
-                <span className={`rounded-pill mr-2 px-2 py-0.5 text-micro font-semibold ${STATUS_CLASS[run.status]}`}>
+                <StatusBadge tone={STATUS_TONE[run.status]} size="compact" className="mr-2">
                   {STATUS_LABEL[run.status]}
-                </span>
+                </StatusBadge>
                 {formatAt(run.createdAt)}
                 {run.version.name ? ` ・ 「${run.version.name}」` : ''}
                 {run.version.pageCount !== null ? ` ・ ${run.version.pageCount}ページ` : ''}
