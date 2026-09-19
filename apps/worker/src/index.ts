@@ -153,6 +153,8 @@ import { authEmail } from './routes/auth-email.js';
 import { opsInvite } from './routes/ops-invite.js';
 import { opsSupport } from './routes/ops-support.js';
 import { opsDashboard } from './routes/ops-dashboard.js';
+import { opsAnnouncements } from './routes/ops-announcements.js';
+import { hqNotices } from './routes/hq-notices.js';
 import { codexSlackEvents } from './routes/codex-slack-events.js';
 import { aiLoopSlackReports } from './routes/ai-loop-slack-reports.js';
 import { clientErrors } from './routes/client-errors.js';
@@ -511,6 +513,8 @@ app.route('/', authEmail);
 app.route('/', opsInvite);
 app.route('/', opsSupport);
 app.route('/', opsDashboard);
+app.route('/', opsAnnouncements);
+app.route('/', hqNotices);
 app.route('/', codexSlackEvents);
 app.route('/', aiLoopSlackReports);
 app.route('/', clientErrors);
@@ -1311,6 +1315,15 @@ async function runFrequentHeavyJobs(
         if (result.claimed > 0) {
           console.log(JSON.stringify({ event: 'scheduled_chat_sends', ...result }));
         }
+      },
+    },
+    {
+      // 運営からのお知らせの予約配信（★V6 37-7）。claim で 1 件ずつ sending にしてから送る。
+      name: 'platform announcements',
+      run: async () => {
+        const { processDueAnnouncements } = await import('./services/platform-announcements.js');
+        const result = await processDueAnnouncements(env, { now: new Date(event.scheduledTime + 9 * 60 * 60 * 1000).toISOString().replace('Z', '+09:00') });
+        if (result.sent > 0) console.log(JSON.stringify({ event: 'platform_announcements_cron', ...result }));
       },
     },
     {

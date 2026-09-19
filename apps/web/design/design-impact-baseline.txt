@@ -94,6 +94,7 @@ shared-button-importer app/nen-campaigns/page.tsx
 shared-button-importer app/nen-members/page.tsx
 shared-button-importer app/nen-members/photo-publications.tsx
 shared-button-importer app/nen-members/photo-review-detail.tsx
+shared-button-importer app/ops/announcements/page.tsx
 shared-button-importer app/ops/audit/page.tsx
 shared-button-importer app/ops/dashboard/page.tsx
 shared-button-importer app/ops/invite/page.tsx
@@ -178,6 +179,8 @@ shared-button-importer components/hq/banners/projects-section.tsx
 shared-button-importer components/hq/banners/upload-button.tsx
 shared-button-importer components/hq/banners/upload-target-dialog.tsx
 shared-button-importer components/hq/banners/reference-picker-dialog.tsx
+shared-button-importer components/hq/notice-line-register-dialog.tsx
+shared-button-importer components/hq/platform-notices.tsx
 shared-button-importer components/identity/identity-decision-dialog.tsx
 shared-button-importer components/inflow-links/site-script.tsx
 shared-button-importer components/line-notifications/notification-run-list.tsx
@@ -186,6 +189,7 @@ shared-button-importer components/merged-person/merged-delivery-dialog.tsx
 shared-button-importer components/merged-person/merged-person-detail.tsx
 shared-button-importer components/merged-person/merged-person-sections.tsx
 shared-button-importer components/merged-person/merged-profile-dialog.tsx
+shared-button-importer components/ops/notice-line-account-card.tsx
 shared-button-importer components/ops/ops-shell.tsx
 shared-button-importer components/reminders/reminder-publish-flow.tsx
 shared-button-importer components/reminders/reminder-v6-ui.tsx

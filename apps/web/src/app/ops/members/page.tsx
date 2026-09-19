@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { api, type OpsMember, type OpsMemberSummary } from '@/lib/api'
 import OpsPageHeader from '@/components/ops/ops-page-header'
 import { formatDateTime, opsCall } from '@/components/ops/ops-ui'
+import NoticeLineAccountCard from '@/components/ops/notice-line-account-card'
 import Button from '@/components/shared/button'
 import Chip from '@/components/shared/chip'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -184,9 +185,12 @@ export default function OpsMembersPage() {
           </DataTable>
         )
       ) : (
-        <div className="rounded-card border border-hairline bg-canvas px-5 py-4 text-label text-ink-secondary">
-          運営メンバーは <code className="rounded bg-canvas-sunken px-1">platform_admins</code> で管理しています。
-          LINE でログインする場合は、各メンバーの権限者アカウントに LINE を紐づけてください。
+        <div className="grid gap-4">
+          <NoticeLineAccountCard />
+          <div className="rounded-card border border-hairline bg-canvas px-5 py-4 text-label text-ink-secondary">
+            運営メンバーは <code className="rounded bg-canvas-sunken px-1">platform_admins</code> で管理しています。
+            LINE でログインする場合は、各メンバーの権限者アカウントに LINE を紐づけてください。
+          </div>
         </div>
       )}
 
