@@ -31,7 +31,10 @@ describe('送信Webhookのアカウント・統括分離', () => {
         last_failed_at TEXT,
         line_account_id TEXT,
         created_at TEXT NOT NULL,
-        updated_at TEXT NOT NULL
+        updated_at TEXT NOT NULL,
+        /* #939 N-368（移行437）: 削除は履歴を残す印。読み取りは印の無い行だけ。 */
+        deleted_at TEXT,
+        deleted_by_staff_id TEXT
       );
 
       INSERT INTO line_accounts (id, tenant_id) VALUES

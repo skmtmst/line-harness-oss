@@ -131,7 +131,6 @@ describe('Webhookの論理削除 (N-368)', () => {
       url: 'https://example.com/hook',
       eventTypes: ['message'],
       maxRetries: 2,
-      isActive: true,
     });
 
     await deleteOutgoingWebhook(db, created.id, 'account-a', 'staff-1');
