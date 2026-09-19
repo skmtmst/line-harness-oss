@@ -10,6 +10,7 @@ const dbMocks = {
   deleteTag: vi.fn(),
   updateTagMileageSettings: vi.fn(),
   enqueueHistoricTagMileage: vi.fn(),
+  getTagRetroactiveMileagePreview: vi.fn(),
   getTagGroups: vi.fn(),
   createTagGroup: vi.fn(),
   updateTagGroup: vi.fn(),
@@ -550,11 +551,32 @@ describe('PATCH /api/tags/:id/mileage', () => {
     mileage_multiplier_bps: 15000,
     mileage_multiplier_priority: 1,
   };
+  // サーバー側の事前計算の固定値（N-047）。token はこの結果から発行される。
+  const PREVIEW = {
+    tagId: 'tag-1',
+    lineAccountId: null,
+    friendIds: ['f-1', 'f-2', 'f-3'],
+    selfTargetIds: ['f-1', 'f-2'],
+    selfExcludedIds: ['f-3'],
+    referralTargetIds: ['f-1'],
+    referralExcludedIds: [],
+  };
+
+  async function previewTokenFor(mileage: { self: number; referrer: number }) {
+    const res = await post('/api/tags/tag-1/retroactive-preview', { mileage });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { data: { previewToken: string } };
+    return body.data.previewToken;
+  }
 
   beforeEach(() => {
     for (const fn of Object.values(dbMocks)) if ('mockReset' in fn) fn.mockReset();
     dbMocks.updateTagMileageSettings.mockResolvedValue(storedTag);
     dbMocks.enqueueHistoricTagMileage.mockResolvedValue(12);
+    dbMocks.getTagRetroactiveMileagePreview.mockResolvedValue(PREVIEW);
+    accountAccessMocks.getVisibleLineAccountScope.mockResolvedValue({
+      allowedAccountIds: ['a1'], ids: ['a1'], canSeeUnassigned: true, isAccountScoped: false, accounts: [],
+    });
   });
 
   test('通常の保存では既存ユーザーへ遡及しない', async () => {
@@ -570,18 +592,138 @@ describe('PATCH /api/tags/:id/mileage', () => {
     await expect(res.json()).resolves.toMatchObject({ success: true, data: { queued: 0 } });
   });
 
-  test('遡及を明示した場合だけ既存ユーザーをキューへ登録する', async () => {
+  test('遡及はサーバーの事前計算(previewToken)付きでキューへ登録する', async () => {
+    const previewToken = await previewTokenFor({ self: 100, referrer: 20 });
     const res = await patch('/api/tags/tag-1/mileage', {
       rewardMiles: 100,
       referralRewardMiles: 20,
       multiplierBps: 15000,
       multiplierPriority: 1,
       applyToExisting: true,
+      previewToken,
     });
 
     expect(res.status).toBe(200);
     expect(dbMocks.enqueueHistoricTagMileage).toHaveBeenCalledWith(expect.anything(), 'tag-1');
     await expect(res.json()).resolves.toMatchObject({ success: true, data: { queued: 12 } });
+  });
+
+  test('previewToken なしの遡及は422で保存も遡及もしない', async () => {
+    const res = await patch('/api/tags/tag-1/mileage', {
+      rewardMiles: 100,
+      referralRewardMiles: 20,
+      multiplierBps: null,
+      applyToExisting: true,
+    });
+
+    expect(res.status).toBe(422);
+    await expect(res.json()).resolves.toMatchObject({ code: 'RETROACTIVE_PREVIEW_REQUIRED' });
+    expect(dbMocks.updateTagMileageSettings).not.toHaveBeenCalled();
+    expect(dbMocks.enqueueHistoricTagMileage).not.toHaveBeenCalled();
+  });
+
+  test('確認時と違うマイルで実行すると409で止める', async () => {
+    const previewToken = await previewTokenFor({ self: 100, referrer: 20 });
+    const res = await patch('/api/tags/tag-1/mileage', {
+      rewardMiles: 200,
+      referralRewardMiles: 20,
+      multiplierBps: null,
+      applyToExisting: true,
+      previewToken,
+    });
+
+    expect(res.status).toBe(409);
+    await expect(res.json()).resolves.toMatchObject({ code: 'RETROACTIVE_PREVIEW_STALE' });
+    expect(dbMocks.enqueueHistoricTagMileage).not.toHaveBeenCalled();
+  });
+
+  test('確認後に対象が変わったら409で止める', async () => {
+    const previewToken = await previewTokenFor({ self: 100, referrer: 20 });
+    // 確認後に f-4 がタグ付きになった想定。実行時の再計算でズレる。
+    dbMocks.getTagRetroactiveMileagePreview.mockResolvedValue({
+      ...PREVIEW,
+      friendIds: [...PREVIEW.friendIds, 'f-4'],
+      selfTargetIds: [...PREVIEW.selfTargetIds, 'f-4'],
+    });
+    const res = await patch('/api/tags/tag-1/mileage', {
+      rewardMiles: 100,
+      referralRewardMiles: 20,
+      multiplierBps: null,
+      applyToExisting: true,
+      previewToken,
+    });
+
+    expect(res.status).toBe(409);
+    await expect(res.json()).resolves.toMatchObject({ code: 'RETROACTIVE_PREVIEW_STALE' });
+    expect(dbMocks.enqueueHistoricTagMileage).not.toHaveBeenCalled();
+  });
+});
+
+describe('POST /api/tags/:id/retroactive-preview（N-047）', () => {
+  const PREVIEW = {
+    tagId: 'tag-1',
+    lineAccountId: 'a1',
+    friendIds: ['f-1', 'f-2', 'f-3'],
+    selfTargetIds: ['f-1', 'f-2'],
+    selfExcludedIds: ['f-3'],
+    referralTargetIds: ['f-1'],
+    referralExcludedIds: [],
+  };
+
+  beforeEach(() => {
+    for (const fn of Object.values(dbMocks)) if ('mockReset' in fn) fn.mockReset();
+    dbMocks.getTagRetroactiveMileagePreview.mockResolvedValue(PREVIEW);
+    accountAccessMocks.getVisibleLineAccountScope.mockResolvedValue({
+      allowedAccountIds: ['a1'], ids: ['a1'], canSeeUnassigned: true, isAccountScoped: false, accounts: [],
+    });
+  });
+
+  test('対象人数・除外・合計マイル・previewToken を返す', async () => {
+    const res = await post('/api/tags/tag-1/retroactive-preview', {
+      mileage: { self: 100, referrer: 20 },
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      data: Record<string, unknown> & { previewToken: string; selfMiles: number; totalMiles: number };
+    };
+    expect(body.data).toMatchObject({
+      friendCount: 3,
+      selfTargets: 2,
+      selfExcluded: 1,
+      referralTargets: 1,
+      referralExcluded: 0,
+      selfMiles: 200,
+      referralMiles: 20,
+      totalMiles: 220,
+      lineAccountId: 'a1',
+    });
+    expect(typeof body.data.previewToken).toBe('string');
+    expect(body.data.previewToken.startsWith('rtv1.')).toBe(true);
+    // 事前計算だけではキューへ積まない
+    expect(dbMocks.enqueueHistoricTagMileage).not.toHaveBeenCalled();
+  });
+
+  test('マイルを送らなければ保存済みの値で数える', async () => {
+    // DBスタブは mileage_reward: 0 の TAG_ROW を返す
+    const res = await post('/api/tags/tag-1/retroactive-preview', {});
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { data: { selfMiles: number; totalMiles: number } };
+    expect(body.data.selfMiles).toBe(0);
+    expect(body.data.totalMiles).toBe(0);
+  });
+
+  test('staff は呼べない', async () => {
+    const res = await post('/api/tags/tag-1/retroactive-preview', {}, 'staff');
+    expect(res.status).toBe(403);
+    expect(dbMocks.getTagRetroactiveMileagePreview).not.toHaveBeenCalled();
+  });
+
+  test('タグの所属と違うアカウントを指定すると404', async () => {
+    const res = await post('/api/tags/tag-1/retroactive-preview', {
+      lineAccountId: 'a-other',
+    });
+    // DBスタブのタグは line_account_id: null。requested と一致しない。
+    expect(res.status).toBe(404);
   });
 });
 

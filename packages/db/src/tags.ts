@@ -1257,6 +1257,130 @@ export async function enqueueHistoricTagMileage(
   return (inserted.meta?.changes ?? 0) + (reset.meta?.changes ?? 0);
 }
 
+// ─── 既存友だちへの遡及マイル：実行前の事前計算 ──────────────────
+//
+// N-047: 遡及実行の前に「何人に何マイル付くか」をサーバー側で確定させ、
+// 実行時はこの結果と照合して、ズレていれば止める（プレビュー照合）。
+// enqueueHistoricTagMileage が実際にキューへ積む対象と同じ条件で
+// 数えるので、確認画面の数字と実際の付与が一致する。
+export interface TagRetroactiveMileagePreview {
+  tagId: string;
+  lineAccountId: string | null;
+  /** タグが付いている友だちの合計 */
+  friendIds: string[];
+  /** 本人マイルをまだ受け取っていない友だち */
+  selfTargetIds: string[];
+  /** 本人マイルをすでに受け取っている友だち */
+  selfExcludedIds: string[];
+  /** 紹介者マイルの対象になる友だち（まだ紹介者側へ付与されていないもの） */
+  referralTargetIds: string[];
+  /** 紹介者マイルの対象だが、すでに紹介者側へ付与済みの友だち */
+  referralExcludedIds: string[];
+}
+
+export async function getTagRetroactiveMileagePreview(
+  db: D1Database,
+  tagId: string,
+): Promise<TagRetroactiveMileagePreview | null> {
+  const tag = await db
+    .prepare('SELECT line_account_id FROM tags WHERE id = ?')
+    .bind(tagId)
+    .first<{ line_account_id: string | null }>();
+  if (!tag) return null;
+
+  const tagged = await db
+    .prepare(
+      `SELECT ft.friend_id
+       FROM friend_tags ft
+       JOIN friends f ON f.id = ft.friend_id
+       WHERE ft.tag_id = ?`,
+    )
+    .bind(tagId)
+    .all<{ friend_id: string }>();
+  const friendIds = tagged.results.map((row) => row.friend_id);
+
+  // 本人分: 実行側と同じ冪等キー(tag-reward:identity:...)で既付与を除く
+  const selfRows = await db
+    .prepare(
+      `SELECT t.friend_id, EXISTS (
+         SELECT 1 FROM mileage_ledger ml
+         WHERE ml.entry_type = 'grant' AND ml.status != 'void' AND ml.source = 'tag'
+           AND ml.idempotency_key = 'tag-reward:identity:'
+             || CASE WHEN t.user_id IS NOT NULL THEN 'user:' || t.user_id ELSE 'friend:' || t.friend_id END
+             || ':tag:' || ?
+       ) AS already_granted
+       FROM (
+         SELECT ft.friend_id, f.user_id
+         FROM friend_tags ft JOIN friends f ON f.id = ft.friend_id
+         WHERE ft.tag_id = ?
+       ) t`,
+    )
+    .bind(tagId, tagId)
+    .all<{ friend_id: string; already_granted: number }>();
+  const selfTargetIds = selfRows.results
+    .filter((row) => row.already_granted === 0)
+    .map((row) => row.friend_id);
+  const selfExcludedIds = selfRows.results
+    .filter((row) => row.already_granted !== 0)
+    .map((row) => row.friend_id);
+
+  // 紹介者分: 実行側(resolveReferralMileageBeneficiary)と同じ解決をSQLで再現。
+  // 同一人物(user_id)を持つ行もまとめて紹介追跡を探し、±1日以内に
+  // 同一人物でないアフィリエイター行が見つかった友だちだけを対象にする。
+  const referralRows = await db
+    .prepare(
+      `SELECT t.friend_id, EXISTS (
+         SELECT 1 FROM mileage_ledger ml
+         WHERE ml.entry_type = 'grant' AND ml.status != 'void' AND ml.source = 'tag_referral'
+           AND ml.idempotency_key LIKE 'tag-referral:referrer:%:referred:'
+             || CASE WHEN t.actor_user_id IS NOT NULL THEN 'user:' || t.actor_user_id ELSE 'friend:' || t.friend_id END
+             || ':tag:' || ?
+       ) AS already_granted
+       FROM (
+         SELECT DISTINCT t0.friend_id
+         FROM (
+           SELECT ft.friend_id, f.user_id AS actor_user_id
+           FROM friend_tags ft JOIN friends f ON f.id = ft.friend_id
+           WHERE ft.tag_id = ?
+         ) t0
+         JOIN friends rf ON rf.id = t0.friend_id
+            OR (t0.actor_user_id IS NOT NULL AND rf.user_id = t0.actor_user_id)
+         JOIN ref_tracking rt ON rt.friend_id = rf.id
+         JOIN affiliate_links al ON al.ref_code = rt.ref_code
+         JOIN affiliates a ON a.id = al.affiliate_id
+         JOIN friends referrer ON referrer.id = a.friend_id
+         WHERE julianday(rt.created_at) >= julianday(rf.created_at) - 1
+           AND julianday(rt.created_at) <= julianday(rf.created_at) + 1
+           AND a.friend_id != rf.id
+           AND (rf.user_id IS NULL OR referrer.user_id IS NULL
+                OR referrer.user_id != rf.user_id)
+       ) matched
+       JOIN (
+         SELECT ft.friend_id, f.user_id AS actor_user_id
+         FROM friend_tags ft JOIN friends f ON f.id = ft.friend_id
+         WHERE ft.tag_id = ?
+       ) t ON t.friend_id = matched.friend_id`,
+    )
+    .bind(tagId, tagId, tagId)
+    .all<{ friend_id: string; already_granted: number }>();
+  const referralTargetIds = referralRows.results
+    .filter((row) => row.already_granted === 0)
+    .map((row) => row.friend_id);
+  const referralExcludedIds = referralRows.results
+    .filter((row) => row.already_granted !== 0)
+    .map((row) => row.friend_id);
+
+  return {
+    tagId,
+    lineAccountId: tag.line_account_id,
+    friendIds,
+    selfTargetIds,
+    selfExcludedIds,
+    referralTargetIds,
+    referralExcludedIds,
+  };
+}
+
 export async function removeTagFromFriend(
   db: D1Database,
   friendId: string,

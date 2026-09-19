@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { GripVertical, LockKeyhole, Trash2 } from 'lucide-react'
+import { LockKeyhole, Trash2 } from 'lucide-react'
+import ReorderGrip from './reorder-grip'
 import type { FriendField, FriendFieldListSummary, FriendFieldType } from '@line-crm/shared'
 import { api, ApiError } from '@/lib/api'
 import Button from '@/components/shared/button'
@@ -88,6 +89,18 @@ export default function FriendFieldList({ accountId }: { accountId: string | nul
     return true
   }), [items, query, type])
 
+  // 並び替えの保存。ドラッグとキーボード（N-049）で同じ経路を使う。
+  const applyOrder = async (next: FriendField[]) => {
+    if (!accountId) return
+    setItems(next)
+    try {
+      await Promise.all(next.filter((field) => !field.isInherited).map((field, index) => api.friendFields.update(field.id, accountId, { displayOrder: index })))
+      await load()
+    } catch {
+      setError('並び順を保存できませんでした'); await load()
+    }
+  }
+
   const move = async (targetId: string) => {
     if (!accountId || !dragId || dragId === targetId) return setDragId(null)
     const order = visible.map((field) => field.id)
@@ -96,13 +109,18 @@ export default function FriendFieldList({ accountId }: { accountId: string | nul
     if (from < 0 || to < 0) return
     order.splice(to, 0, ...order.splice(from, 1))
     const next = order.map((id) => items.find((field) => field.id === id)).filter(Boolean) as FriendField[]
-    setItems(next)
-    try {
-      await Promise.all(next.filter((field) => !field.isInherited).map((field, index) => api.friendFields.update(field.id, accountId, { displayOrder: index })))
-      await load()
-    } catch {
-      setError('並び順を保存できませんでした'); await load()
-    }
+    await applyOrder(next)
+  }
+
+  /** つまみにフォーカスして ↑/↓。表示中の並びで1つ動かす（N-049）。 */
+  const keyboardMove = async (id: string, direction: -1 | 1) => {
+    const order = visible.map((field) => field.id)
+    const from = order.indexOf(id)
+    const to = from + direction
+    if (from < 0 || to < 0 || to >= order.length) return
+    order.splice(to, 0, ...order.splice(from, 1))
+    const next = order.map((i) => items.find((field) => field.id === i)).filter(Boolean) as FriendField[]
+    await applyOrder(next)
   }
 
   const remove = async (field: FriendField) => {
@@ -201,7 +219,7 @@ export default function FriendFieldList({ accountId }: { accountId: string | nul
               : items.length === 0 ? <tr><td colSpan={7} className="p-0"><ListState kind="empty" title="まだ友だち情報欄がありません" description="「＋ 項目を追加」から最初の項目を作ってください。" /></td></tr>
               : visible.length === 0 ? <tr><td colSpan={7} className="p-0"><ListState kind="empty" title="条件に合う項目はありません" description="項目名か種類を変えてください。" /></td></tr>
               : visible.map((field) => <tr key={field.id} className="hover:bg-canvas-sunken">
-                  <td draggable={!field.isInherited} onDragStart={() => setDragId(field.id)} onDragOver={(event) => event.preventDefault()} onDrop={() => void move(field.id)} className={`${field.isInherited ? 'cursor-not-allowed' : 'cursor-grab'} px-3 py-3 text-hairline`} title={field.isInherited ? '共通項目は移行後に並び替えできます' : 'ドラッグして並び替え'}><GripVertical size={16} aria-hidden="true" /></td>
+                  <td draggable={!field.isInherited} onDragStart={() => setDragId(field.id)} onDragOver={(event) => event.preventDefault()} onDrop={() => void move(field.id)} className={`${field.isInherited ? 'cursor-not-allowed' : 'cursor-grab'} px-3 py-3 text-hairline`}><ReorderGrip label={field.name} disabled={field.isInherited} disabledReason="共通項目は移行後に並び替えできます" onMove={(direction) => void keyboardMove(field.id, direction)} /></td>
                   <td className="px-3 py-3"><p className="truncate font-semibold text-accent" title={field.name}>{field.name}</p><p className="truncate font-mono text-caption text-ink-faint" title={`{{field.${field.fieldKey}}}`}>{`{{field.${field.fieldKey}}}`}</p></td>
                   <td className="px-3 py-3 text-ink">{FIELD_TYPE_LABELS[field.type] ?? field.type}</td>
                   <td className="px-3 py-3 tabular-nums text-ink">{knownUsageCount(field) ?? '—'}{knownUsageCount(field) === null ? '' : '人'}</td>

@@ -1111,8 +1111,8 @@ const spec = {
         tags: ['Tags'],
         summary: 'タグ設定と同じ共通アクション下書きを連動更新',
         parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
-        requestBody: { content: { 'application/json': { schema: { type: 'object', required: ['lineAccountId', 'expectedVersion'], properties: { lineAccountId: { type: 'string' }, expectedVersion: { type: 'integer', minimum: 1 }, automationId: { type: ['string', 'null'] }, automationDraftVersion: { type: ['string', 'null'] }, actions: { type: 'array' }, applyToExisting: { type: 'boolean', default: false } } } } } },
-        responses: { '200': { description: 'Updated' }, '404': { description: 'Not found in account scope' }, '409': { description: 'Tag or action draft version conflict' } },
+        requestBody: { content: { 'application/json': { schema: { type: 'object', required: ['lineAccountId', 'expectedVersion'], properties: { lineAccountId: { type: 'string' }, expectedVersion: { type: 'integer', minimum: 1 }, automationId: { type: ['string', 'null'] }, automationDraftVersion: { type: ['string', 'null'] }, actions: { type: 'array' }, applyToExisting: { type: 'boolean', default: false }, previewToken: { type: 'string', description: 'applyToExisting の実行に必須。POST /api/tags/{id}/retroactive-preview が返す引き換え券（N-047）' } } } } } },
+        responses: { '200': { description: 'Updated' }, '404': { description: 'Not found in account scope' }, '409': { description: 'Tag or action draft version conflict / stale retroactive preview' }, '422': { description: 'Retroactive preview token required' } },
       },
       delete: {
         tags: ['Tags'],
@@ -1164,6 +1164,70 @@ const spec = {
           '200': { description: 'Tag dependency impact', content: { 'application/json': { schema: { $ref: '#/components/schemas/TagDependencyImpact' } } } },
           '403': { description: 'Owner or admin role required' },
           '404': { description: 'Not found in account scope' },
+        },
+      },
+    },
+    '/api/tags/{id}/retroactive-preview': {
+      post: {
+        tags: ['Tags'],
+        summary: '既存友だちへの遡及マイルの対象を事前計算（N-047）',
+        description:
+          'applyToExisting の実行前に、対象人数・付与済み除外・紹介者対象・合計マイルをサーバー側で数える。返す previewToken を PATCH /api/tags/{id} または /api/tags/{id}/mileage の遡及実行へそのまま渡す。実行時に同じ計算をやり直し、一致しない・期限切れの token は止める。',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: {
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                properties: {
+                  lineAccountId: { type: 'string' },
+                  mileage: {
+                    type: 'object',
+                    properties: {
+                      self: { type: 'integer', minimum: 0 },
+                      referrer: { type: 'integer', minimum: 0 },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          '200': {
+            description: '遡及対象の事前計算と previewToken',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  required: ['success', 'data'],
+                  properties: {
+                    success: { type: 'boolean', const: true },
+                    data: {
+                      type: 'object',
+                      properties: {
+                        tagId: { type: 'string' },
+                        lineAccountId: { type: ['string', 'null'] },
+                        friendCount: { type: 'integer' },
+                        selfTargets: { type: 'integer' },
+                        selfExcluded: { type: 'integer' },
+                        referralTargets: { type: 'integer' },
+                        referralExcluded: { type: 'integer' },
+                        selfMiles: { type: 'integer' },
+                        referralMiles: { type: 'integer' },
+                        totalMiles: { type: 'integer' },
+                        expiresAt: { type: 'string', format: 'date-time' },
+                        previewToken: { type: 'string' },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          '403': { description: 'Owner or admin role required' },
+          '404': { description: 'Not found in account scope' },
+          '422': { description: 'Invalid mileage values' },
         },
       },
     },
