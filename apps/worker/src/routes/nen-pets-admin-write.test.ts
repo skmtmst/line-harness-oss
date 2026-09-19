@@ -6,8 +6,9 @@
  */
 import type Database from 'better-sqlite3';
 import { Hono } from 'hono';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createTestD1 } from '../test-utils/d1-sqlite.js';
+import { enqueueBirthdayCoupons } from '../services/nen-engagement.js';
 
 const { nenCampaigns } = await import('./nen-campaigns.js');
 
@@ -114,6 +115,50 @@ describe('NEN ペット編集（PUT /api/nen-campaigns/pets/:id）', () => {
     const sent = sql.prepare(`SELECT status FROM nen_delivery_jobs WHERE id = 'job-sent'`).get() as {  status: string  } | undefined;
     expect(pending?.status).toBe('cancelled');
     expect(sent?.status).toBe('sent');
+  });
+
+  it('一部だけのPUTは他項目を現値のまま保ち、誕生日配信も取消さない', async () => {
+    // {name} だけの更新で種別・性別・誕生日が既定値へ戻り、
+    // 誕生日が「変わった」判定になって予約まで消える退行を防ぐ。
+    const res = await harness().request(`/api/nen-campaigns/pets/pet-1?lineAccountId=${ACCOUNT}`, json({
+      name: 'モモ改',
+    }, 'PUT'));
+    expect(res.status).toBe(200);
+    const row = sql.prepare(`SELECT animal_type, gender, birthday FROM nen_pet_profiles WHERE id = 'pet-1'`).get() as { animal_type: string; gender: string; birthday: string } | undefined;
+    expect(row).toEqual({ animal_type: 'dog', gender: 'female', birthday: '2020-03-15' });
+    const pending = sql.prepare(`SELECT status FROM nen_delivery_jobs WHERE id = 'job-pending'`).get() as { status: string } | undefined;
+    expect(pending?.status).toBe('pending');
+  });
+
+  it('誕生日を変えると、次の日次走査で発行済みクーポンが新しい日付へ予約し直される', async () => {
+    // 発行済み（issue行あり）＋pending job の状態から誕生日を変えると、
+    // PUTがjobを取消す。次の走査は UNIQUE 競合で新規発行しない代わりに、
+    // 発行済みの同じクーポンを新しい日付へ予約し直す。
+    sql.exec(`
+      INSERT INTO nen_birthday_coupon_settings
+        (id, is_enabled, code_prefix, benefit_label, discount_amount, validity_days, updated_at)
+      VALUES ('default', 1, 'NENBDAY', 'お誕生日クーポン', 500, 31, '2026-01-01');
+      INSERT INTO nen_coupon_issues
+        (id, pet_id, friend_id, issue_year, coupon_code, benefit_label, expires_at, issued_at)
+      VALUES ('issue-1', 'pet-1', 'friend-a', 2026, 'NENBDAY-26-TEST01', 'お誕生日クーポン', '2026-04-15 10:00:00', '2026-03-12 10:00:00')
+    `);
+    const res = await harness().request(`/api/nen-campaigns/pets/pet-1?lineAccountId=${ACCOUNT}`, json({
+      name: 'モモ', animalType: 'dog', gender: 'female', birthday: '06-20',
+    }, 'PUT'));
+    expect(res.status).toBe(200);
+    expect((sql.prepare(`SELECT status FROM nen_delivery_jobs WHERE id = 'job-pending'`).get() as { status: string } | undefined)?.status).toBe('cancelled');
+
+    // 新しい誕生日（06-20）の3日前＝06-17 が配信日になる走査。
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('{}', { status: 201 })));
+    const result = await enqueueBirthdayCoupons(db, new Date('2026-06-17T00:00:00+09:00'));
+    expect(result).toEqual({ queued: 1, failed: 0 });
+    const job = sql.prepare(`SELECT status, scheduled_at, payload FROM nen_delivery_jobs WHERE id = 'job-pending'`).get() as { status: string; scheduled_at: string; payload: string } | undefined;
+    expect(job?.status).toBe('pending');
+    expect(job?.scheduled_at).toBe('2026-06-17 01:00:00'); // JST 10:00 = UTC 01:00
+    // クーポンは新規発行されず、発行済みの同じコードを使い回す。
+    expect(JSON.parse(job!.payload)).toMatchObject({ coupon: { code: 'NENBDAY-26-TEST01' } });
+    expect((sql.prepare(`SELECT COUNT(*) AS n FROM nen_coupon_issues`).get() as { n: number }).n).toBe(1);
+    vi.unstubAllGlobals();
   });
 
   it('誕生日を変えない更新は予約をそのまま残す', async () => {

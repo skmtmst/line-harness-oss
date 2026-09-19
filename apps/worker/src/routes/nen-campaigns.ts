@@ -729,13 +729,25 @@ nenCampaigns.put('/api/nen-campaigns/pets/:id', requireRole('owner', 'admin'), a
   const accountId = await requireAccount(c);
   if (typeof accountId !== 'string') return accountId;
   const body = await c.req.json<Record<string, unknown>>().catch(() => null);
-  const input = petWriteBody(body ?? {});
-  if ('error' in input) return c.json({ success: false, error: input.error }, 400);
-  const pet = await c.env.DB.prepare(`SELECT p.friend_id, p.birthday, f.line_account_id FROM nen_pet_profiles p JOIN friends f ON f.id = p.friend_id WHERE p.id = ?`)
-    .bind(c.req.param('id')).first<{ friend_id: string; birthday: string | null; line_account_id: string | null }>();
+  const pet = await c.env.DB.prepare(
+    `SELECT p.friend_id, p.name, p.animal_type, p.gender, p.birthday, p.breed, p.weight_kg, f.line_account_id
+     FROM nen_pet_profiles p JOIN friends f ON f.id = p.friend_id WHERE p.id = ?`,
+  ).bind(c.req.param('id')).first<{
+    friend_id: string; name: string; animal_type: string; gender: string;
+    birthday: string | null; breed: string | null; weight_kg: number | null;
+    line_account_id: string | null;
+  }>();
   if (!pet || pet.line_account_id !== accountId) {
     return c.json({ success: false, error: 'Pet not found' }, 404);
   }
+  // 送られてこなかった項目は現値を保つ部分更新（LIFF PUT と同じ意味づけ）。
+  // 既定値で上書きすると、名前だけ直す更新で他項目まで消えてしまう。
+  const input = petWriteBody({
+    name: pet.name, animalType: pet.animal_type, gender: pet.gender,
+    birthday: pet.birthday, breed: pet.breed, weightKg: pet.weight_kg,
+    ...(body ?? {}),
+  });
+  if ('error' in input) return c.json({ success: false, error: input.error }, 400);
   await c.env.DB.prepare(
     `UPDATE nen_pet_profiles SET name = ?, animal_type = ?, gender = ?, birthday = ?, breed = ?, weight_kg = ?, updated_at = ? WHERE id = ?`,
   ).bind(input.name, input.animalType, input.gender, input.birthday, input.breed, input.weightKg, jstNow(), c.req.param('id')).run();

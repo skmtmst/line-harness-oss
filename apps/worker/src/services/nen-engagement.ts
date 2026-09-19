@@ -731,7 +731,44 @@ export async function enqueueBirthdayCoupons(
           (id, pet_id, friend_id, issue_year, coupon_code, benefit_label, expires_at, issued_at)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       ).bind(issueId, pet.id, pet.friend_id, issueYear, code, setting.benefit_label, sqliteDate(expires), issuedAt).run();
-      if (!issue.meta.changes) continue;
+      if (!issue.meta.changes) {
+        // 今年分のクーポンは発行済み。ここで終わるのが通常だが、予約jobだけが
+        // 取消済み（誕生日の変更など）になっているときは、発行済みの同じクーポンを
+        // 新しい日付へ予約し直す。UNIQUE衝突でこの分岐へ来る経路（job取消・
+        // job行欠落）を問わずここで収束させる。
+        const issued = await db.prepare(
+          `SELECT coupon_code, expires_at FROM nen_coupon_issues WHERE pet_id = ? AND issue_year = ?`,
+        ).bind(pet.id, issueYear).first<{ coupon_code: string; expires_at: string }>();
+        if (issued) {
+          const jobKey = `birthday:${pet.id}:${issueYear}`;
+          const payload = JSON.stringify({
+            pet: { id: pet.id, name: pet.name },
+            coupon: { code: issued.coupon_code, expires_at: issued.expires_at, benefit_label: setting.benefit_label },
+          });
+          const snapshot = campaignSnapshot(campaign);
+          const revived = await db.prepare(
+            `UPDATE nen_delivery_jobs
+             SET status = 'pending', attempts = 0, scheduled_at = ?, payload = ?, campaign_snapshot = ?, updated_at = ?
+             WHERE campaign_key = 'birthday_coupon' AND source_key = ? AND status = 'cancelled'`,
+          ).bind(sqliteDate(deliveryAt), payload, snapshot, issuedAt, jobKey).run();
+          if (revived.meta.changes) {
+            queued++;
+          } else {
+            // job行自体が無い経路でも、発行済みクーポンの予約を立て直す。
+            const requeued = await db.prepare(
+              `INSERT OR IGNORE INTO nen_delivery_jobs
+                (id, campaign_key, friend_id, line_account_id, source_key, payload, campaign_snapshot,
+                 scheduled_at, status, attempts, created_at, updated_at)
+               VALUES (?, 'birthday_coupon', ?, ?, ?, ?, ?, ?, 'pending', 0, ?, ?)`,
+            ).bind(
+              crypto.randomUUID(), pet.friend_id, pet.line_account_id, jobKey, payload, snapshot,
+              sqliteDate(deliveryAt), issuedAt, issuedAt,
+            ).run();
+            if (requeued.meta.changes) queued++;
+          }
+        }
+        continue;
+      }
       if (ecommerce) {
         try {
           await createEccubeCoupon(ecommerce.baseUrl, ecommerce.secret, {
