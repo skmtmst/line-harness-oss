@@ -17,6 +17,102 @@ import {
   type WebhookKeyInput,
 } from '@line-crm/db';
 import { EXTERNAL_DELIVERY_RETRY_AFTER_MAX_MINUTES } from './external-delivery-retry.js';
+import { signHarnessEvent } from './operations-signature.js';
+
+// ============================================================
+// 共通封筒と署名ヘッダ（要件26 §6-2 / §6-5、N-371 / N-372）
+// ============================================================
+//
+// 送信Webhookへ届く本文とヘッダは、どの経路（イベント通知・自動化の
+// send_webhook・旧式の直書きURL・管理画面の試し送信）からでも同じ形に
+// する。経路ごとの差は封筒の data の中身だけに寄せ、形はここで一元化する。
+//
+//   { id, type, occurred_at, account_id, data, attempt }
+//
+//   id          … 再送しても変わらない出来事のID。X-Harness-Event-Id と
+//                 同じ値で、受け手はこれで冪等に捌く。
+//   type        … 出来事の種類（例: booking.confirmed.v1）。
+//   occurred_at … 出来事が起きた時刻。送信時刻とは分ける。
+//   account_id  … 発生したLINE公式アカウント。
+//   data        … 経路ごとの明細。秘密値・アクセストークン・
+//                 replyToken・内部メモは絶対に入れない。
+//   attempt     … 何回目の配送か（初回は 1）。
+//
+// 署名ヘッダ（要件26 §6-5）:
+//   X-Harness-Event-Id   … 封筒の id と同じ値。冪等キーとしても使う。
+//   X-Harness-Timestamp  … 送信時刻（Unix秒）。
+//   X-Harness-Signature  … v1=<HMAC-SHA256 hex>。
+//                          署名入力は「タイムスタンプ.イベントID.本文」。
+// secret が未設定の行は署名なしで送る（従来どおり）。secret が設定済みで
+// 読めないときは呼び出し側が送らずに止める。
+
+/** 封筒のイベントIDを運ぶヘッダ名。 */
+export const HARNESS_EVENT_ID_HEADER = 'X-Harness-Event-Id';
+/** 送信時刻（Unix秒）を運ぶヘッダ名。 */
+export const HARNESS_TIMESTAMP_HEADER = 'X-Harness-Timestamp';
+/** 署名を運ぶヘッダ名。値は `v1=<hex>`。 */
+export const HARNESS_SIGNATURE_HEADER = 'X-Harness-Signature';
+
+export interface OutgoingWebhookEnvelope {
+  id: string;
+  type: string;
+  occurred_at: string;
+  account_id: string | null;
+  data: unknown;
+  attempt: number;
+}
+
+export interface OutgoingWebhookEnvelopeInput {
+  /** 再送・再試行で変わらない出来事のID。冪等キーと同じ値を渡す。 */
+  eventId: string;
+  eventType: string;
+  /** 出来事が起きた時刻（ISO 8601）。分からなければ送信時刻を渡す。 */
+  occurredAt: string;
+  accountId: string | null;
+  /** 秘密値・トークン・内部メモを含まない明細。 */
+  data: unknown;
+  /** 何回目の配送か。省略時は 1。 */
+  attempt?: number;
+}
+
+/** 共通封筒を組み立てる。 */
+export function buildOutgoingWebhookEnvelope(input: OutgoingWebhookEnvelopeInput): OutgoingWebhookEnvelope {
+  return {
+    id: input.eventId,
+    type: input.eventType,
+    occurred_at: input.occurredAt,
+    account_id: input.accountId,
+    data: input.data,
+    attempt: Math.max(1, Math.floor(input.attempt ?? 1)),
+  };
+}
+
+/** 共通封筒を JSON 本文へする。 */
+export function buildOutgoingWebhookBody(input: OutgoingWebhookEnvelopeInput): string {
+  return JSON.stringify(buildOutgoingWebhookEnvelope(input));
+}
+
+/**
+ * 送信ヘッダを組み立てる。secret があるときだけ署名を付ける。
+ * タイムスタンプは呼び出し1回につき1つで、封筒・署名と同じ材料を使う。
+ */
+export async function buildOutgoingWebhookHeaders(input: {
+  eventId: string;
+  body: string;
+  secret?: string | null;
+  now?: Date;
+}): Promise<Record<string, string>> {
+  const timestamp = String(Math.floor((input.now ?? new Date()).getTime() / 1000));
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    [HARNESS_EVENT_ID_HEADER]: input.eventId,
+    [HARNESS_TIMESTAMP_HEADER]: timestamp,
+  };
+  if (input.secret) {
+    headers[HARNESS_SIGNATURE_HEADER] = `v1=${await signHarnessEvent(input.secret, timestamp, input.eventId, input.body)}`;
+  }
+  return headers;
+}
 
 /** 送り直しまでの待ち時間（ミリ秒）。 */
 export function retryDelayMs(attempt: number): number {
@@ -116,20 +212,7 @@ export interface WebhookRow {
   max_retries: number | null;
 }
 
-async function sign(secret: string, body: string): Promise<string> {
-  const encoder = new TextEncoder();
-  const key = await crypto.subtle.importKey(
-    'raw',
-    encoder.encode(secret),
-    { name: 'HMAC', hash: 'SHA-256' },
-    false,
-    ['sign'],
-  );
-  const signature = await crypto.subtle.sign('HMAC', key, encoder.encode(body));
-  return Array.from(new Uint8Array(signature))
-    .map((b) => b.toString(16).padStart(2, '0'))
-    .join('');
-}
+
 
 /**
  * 送信直前の SSRF 再検査 (N-366)。
@@ -460,9 +543,14 @@ function sameWebhookOrigin(a: string, b: string): boolean {
 }
 
 // 別の送り先へ持ち越さない頭。署名・冪等・本文に関するものだけ落とす。
+// 旧名（x-webhook-*、idempotency-key）も残す。経路によっては呼び出し側が
+// 直接組み立てた頭が渡ることがあり、旧名が残っていても漏らさないため。
 const CROSS_ORIGIN_DROPPED_HEADERS = new Set([
   'content-type',
   'content-length',
+  'x-harness-event-id',
+  'x-harness-timestamp',
+  'x-harness-signature',
   'x-webhook-signature',
   'x-webhook-delivery-id',
   'idempotency-key',
@@ -600,13 +688,14 @@ export async function deliverWebhook(
   const sleep = opts.sleep ?? ((ms: number) => new Promise((r) => setTimeout(r, ms)));
   const maxRetries = Math.max(0, Math.min(5, webhook.max_retries ?? 0));
 
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-  if (opts.idempotencyKey) headers['X-Webhook-Delivery-Id'] = opts.idempotencyKey;
-  // 署名はここで組み立てる。secret が暗号文で入っている行(#650 以降の正本)は
-  // ここで復号する。呼び出し側に復号を任せると、忘れた経路が黙って署名なしで
-  // 送ってしまう。設定済みの secret を読めないときは送らない(fail-open 禁止)。
+  // イベントIDは冪等キーと同じ値。封筒の id と X-Harness-Event-Id が
+  // 一致するので、受け手は1つの値で冪等に捌ける（N-372）。
+  const eventId = opts.idempotencyKey ?? crypto.randomUUID();
+  // secret が暗号文で入っている行(#650 以降の正本)はここで復号する。
+  // 呼び出し側に復号を任せると、忘れた経路が黙って署名なしで送ってしまう。
+  // 設定済みの secret を読めないときは送らない(fail-open 禁止)。
+  let sendSecret: string | null = null;
   if (webhook.secret_encrypted || webhook.secret) {
-    let sendSecret: string | null = null;
     try {
       sendSecret = await resolveWebhookSecret(webhook, opts.credentialKeys);
     } catch {
@@ -619,8 +708,8 @@ export async function deliverWebhook(
       }));
       return { ok: false, attempts: 0, lastStatus: null, secretUnavailable: true };
     }
-    headers['X-Webhook-Signature'] = await sign(sendSecret, body);
   }
+  const headers = await buildOutgoingWebhookHeaders({ eventId, body, secret: sendSecret });
 
   let lastStatus: number | null = null;
   let lastRetryAfterMs: number | null = null;
@@ -771,7 +860,7 @@ export async function recordDeliveryOutcome(
 //   finishOutgoingDelivery          … 結果で行を確定する。
 //   sweepOutgoingWebhookDeliveries  … 送り残しを回収する cron 側。
 //
-// 配送は at-least-once。受け手は X-Webhook-Delivery-Id で冪等に捌く前提。
+// 配送は at-least-once。受け手は X-Harness-Event-Id で冪等に捌く前提。
 
 /** 接続ごとの再送上限（再送回数）。合計試行は最大8回（要件26 §6-4）。 */
 export const OUTGOING_WEBHOOK_MAX_RESENDS = 7;
