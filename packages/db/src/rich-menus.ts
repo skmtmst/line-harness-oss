@@ -123,6 +123,14 @@ export interface CreateRichMenuGroupInput {
   pages: RichMenuPageInput[];
   /** 作成直後のフォルダ。#502中: 作成後の付け直し2口目をなくし1口で決める。 */
   folderId?: string | null;
+  /** N-161: 最初に見せるページの orderIndex。未指定なら先頭ページ。 */
+  defaultPageIndex?: number | null;
+  /** N-161: 「すべての友だちの既定にする」か。 */
+  isDefaultForAll?: boolean;
+  /** N-161: 出し分け設定。有効にするなら targetingCondition が必須。 */
+  targetingEnabled?: boolean;
+  targetingCondition?: string | null;
+  targetingPriority?: number;
 }
 
 export interface UpdateRichMenuGroupMetaInput {
@@ -590,8 +598,12 @@ export async function createRichMenuGroup(
     aliasId: buildRichMenuAliasId(groupId, p.orderIndex),
     areas: p.areas,
   }));
-  // 1 ページ目を default にしておく (削除されるまで暫定)。
-  const defaultPageId = pageRecords[0]?.id ?? null;
+  // N-161: 既定ページは作成時に決められる。未指定なら先頭ページ（従来どおり）。
+  const defaultPage =
+    (input.defaultPageIndex !== undefined && input.defaultPageIndex !== null
+      ? pageRecords.find((p) => p.orderIndex === input.defaultPageIndex)
+      : undefined) ?? pageRecords[0];
+  const defaultPageId = defaultPage?.id ?? null;
 
   const stmts: D1PreparedStatement[] = [];
   stmts.push(
@@ -599,8 +611,10 @@ export async function createRichMenuGroup(
       .prepare(
         `INSERT INTO rich_menu_groups
            (id, account_id, name, chat_bar_text, size, default_page_id,
-            folder_id, is_default_for_all, status, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, 0, 'draft', ?, ?)`,
+            folder_id, is_default_for_all, status,
+            targeting_condition, targeting_priority, targeting_enabled,
+            created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'draft', ?, ?, ?, ?, ?)`,
       )
       .bind(
         groupId,
@@ -610,6 +624,10 @@ export async function createRichMenuGroup(
         input.size,
         defaultPageId,
         input.folderId ?? null,
+        input.isDefaultForAll ? 1 : 0,
+        input.targetingCondition ?? null,
+        input.targetingPriority ?? 0,
+        input.targetingEnabled ? 1 : 0,
         now,
         now,
       ),
@@ -625,7 +643,21 @@ export async function createRichMenuGroup(
         .bind(p.id, groupId, p.orderIndex, p.name, p.aliasId, now, now),
     );
     for (const a of p.areas) {
-      stmts.push(buildAreaInsert(db, crypto.randomUUID(), p.id, a, now));
+      // N-161: 作成時の richmenuswitch はまだ page.id が無いので、画面からは
+      // actionData.targetPageIndex (orderIndex) で受け、ここで実IDへ解決する。
+      // 解決しても1 batch 内なので、失敗時に半分だけ残ることはない。
+      let area = a;
+      if (a.actionType === 'richmenuswitch' && a.actionData) {
+        const rawIndex = a.actionData.targetPageIndex;
+        if (typeof rawIndex === 'number' && Number.isInteger(rawIndex)) {
+          const target = pageRecords.find((page) => page.orderIndex === rawIndex);
+          if (target) {
+            const { targetPageIndex: _drop, ...rest } = a.actionData;
+            area = { ...a, actionData: { ...rest, targetPageId: target.id } };
+          }
+        }
+      }
+      stmts.push(buildAreaInsert(db, crypto.randomUUID(), p.id, area, now));
     }
   }
   await db.batch(stmts);
@@ -1714,4 +1746,239 @@ export async function countRichMenuTargetingRules(
     .bind(accountId)
     .first<{ n: number }>();
   return row?.n ?? 0;
+}
+
+// =============================================================================
+// N-163: ボタン名（area.label）まで届く一覧検索
+// =============================================================================
+
+/**
+ * 一覧検索の比較形。大小文字と空白（半角・全角）を揃えてから部分一致させる。
+ * メニュー名・トークバー文言（TS側で includes 比較）とボタン名（SQL側で
+ * 同じ正規化を再現）が同じ基準で当たるように、ここ1か所で決める。
+ */
+export function normalizeRichMenuSearchText(value: string): string {
+  return value.toLowerCase().replace(/[\s　]+/g, '');
+}
+
+/** LIKE のワイルドカードを持ち込まないよう、検索語をリテラル扱いにする。 */
+function escapeLikePattern(value: string): string {
+  return value.replace(/[\\%_]/g, (ch) => `\\${ch}`);
+}
+
+/**
+ * ボタン名（area.label）が正規化クエリに部分一致する group の id 一覧。
+ * account の境目はここで絞る。別アカウントのボタン名が検索に混ざらない。
+ */
+export async function listRichMenuGroupIdsByAreaLabel(
+  db: D1Database,
+  accountId: string,
+  normalizedQuery: string,
+): Promise<Set<string>> {
+  if (!normalizedQuery) return new Set();
+  const rows = await db
+    .prepare(
+      `SELECT DISTINCT p.group_id AS group_id
+         FROM rich_menu_areas a
+         JOIN rich_menu_pages  p ON p.id = a.page_id
+         JOIN rich_menu_groups g ON g.id = p.group_id
+        WHERE g.account_id = ?
+          AND a.label IS NOT NULL
+          AND REPLACE(REPLACE(LOWER(a.label), ' ', ''), '　', '')
+              LIKE '%' || ? || '%' ESCAPE '\\'`,
+    )
+    .bind(accountId, escapeLikePattern(normalizedQuery))
+    .all<{ group_id: string }>();
+  return new Set((rows.results ?? []).map((row) => row.group_id));
+}
+
+// =============================================================================
+// N-154: 下書き複製（同じ鍵のやり直しを1回に数える台帳つき）
+// =============================================================================
+
+export interface RichMenuDuplicateRequest {
+  id: string;
+  account_id: string;
+  source_group_id: string;
+  created_group_id: string;
+  idempotency_key: string;
+  created_at: string;
+}
+
+export async function getRichMenuDuplicateByKey(
+  db: D1Database,
+  accountId: string,
+  idempotencyKey: string,
+): Promise<RichMenuDuplicateRequest | null> {
+  return (await db
+    .prepare(
+      `SELECT * FROM rich_menu_duplicate_requests
+        WHERE account_id = ? AND idempotency_key = ?`,
+    )
+    .bind(accountId, idempotencyKey)
+    .first<RichMenuDuplicateRequest>()) ?? null;
+}
+
+export type DuplicateRichMenuGroupOutcome =
+  | { outcome: 'created'; groupId: string }
+  | { outcome: 'existing'; groupId: string }
+  | { outcome: 'conflict' };
+
+/**
+ * 複製を「台帳への記録」と「内容のコピー」を1つの batch で確定する。
+ * 途中で止まっても半分だけ残る形は無い。
+ *
+ * コピーする: 名前（指定または「○○ のコピー」）、トークバー文言、サイズ、
+ *   フォルダ、出し分け条件・優先度・有効フラグ、全ページ（名前・順番・画像参照）、
+ *   全ボタン（領域・intent・ラベル・タグ・スコア・参照先）。ページ内の
+ *   切替ボタンの行き先は新しいページIDへ張り替える。
+ * コピーしない: 公開状態（常に draft）、全員既定フラグ、公開lease、
+ *   LINE richMenu ID、公開・予約・複製の各台帳。
+ */
+export async function duplicateRichMenuGroupAtomic(
+  db: D1Database,
+  input: {
+    requestId: string;
+    accountId: string;
+    sourceGroupId: string;
+    idempotencyKey: string;
+    /** 省略時は「<元の名前> のコピー」。 */
+    name?: string;
+    now?: string;
+  },
+): Promise<DuplicateRichMenuGroupOutcome> {
+  const existing = await getRichMenuDuplicateByKey(db, input.accountId, input.idempotencyKey);
+  if (existing) {
+    return existing.source_group_id === input.sourceGroupId
+      ? { outcome: 'existing', groupId: existing.created_group_id }
+      : { outcome: 'conflict' };
+  }
+
+  const source = await getRichMenuGroupWithPages(db, input.sourceGroupId);
+  if (!source || source.account_id !== input.accountId) {
+    throw new Error('source group not found');
+  }
+
+  const now = input.now ?? jstNow();
+  const newGroupId = crypto.randomUUID();
+  const name = input.name?.trim() || `${source.name} のコピー`;
+
+  // 旧ページID → 新ページID。ページ内の切替ボタンの行き先だけを張り替える。
+  const pageIdMap = new Map<string, string>();
+  const newPages = source.pages.map((page) => {
+    const newId = crypto.randomUUID();
+    pageIdMap.set(page.id, newId);
+    return { source: page, newId };
+  });
+  const newDefaultPageId = source.default_page_id && pageIdMap.has(source.default_page_id)
+    ? pageIdMap.get(source.default_page_id)!
+    : (newPages.find((p) => p.source.order_index === 0)?.newId ?? newPages[0]?.newId ?? null);
+
+  const stmts: D1PreparedStatement[] = [];
+  stmts.push(
+    db
+      .prepare(
+        `INSERT INTO rich_menu_groups
+           (id, account_id, name, chat_bar_text, size, default_page_id,
+            is_default_for_all, status, targeting_condition, targeting_priority,
+            targeting_enabled, folder_id, display_order, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, 0, 'draft', ?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .bind(
+        newGroupId,
+        input.accountId,
+        name,
+        source.chat_bar_text,
+        source.size,
+        newDefaultPageId,
+        source.targeting_condition,
+        source.targeting_priority,
+        source.targeting_enabled,
+        source.folder_id,
+        source.display_order,
+        now,
+        now,
+      ),
+  );
+  for (const { source: page, newId } of newPages) {
+    stmts.push(
+      db
+        .prepare(
+          `INSERT INTO rich_menu_pages
+             (id, group_id, order_index, name, alias_id,
+              image_r2_key, image_content_type, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        )
+        .bind(
+          newId,
+          newGroupId,
+          page.order_index,
+          page.name,
+          buildRichMenuAliasId(newGroupId, page.order_index),
+          // 画像は同じ保管物を参照する。複製側を消しても原本の画像を消さない
+          // 設計なので、キーの共有でよい。
+          page.image_r2_key,
+          page.image_content_type,
+          now,
+          now,
+        ),
+    );
+    for (const area of page.areas) {
+      const actionData = { ...(area.actionData ?? {}) } as Record<string, unknown>;
+      if (
+        area.action_type === 'richmenuswitch'
+        && typeof actionData.targetPageId === 'string'
+        && pageIdMap.has(actionData.targetPageId)
+      ) {
+        actionData.targetPageId = pageIdMap.get(actionData.targetPageId)!;
+      }
+      stmts.push(
+        buildAreaInsert(
+          db,
+          crypto.randomUUID(),
+          newId,
+          {
+            boundsX: area.bounds_x,
+            boundsY: area.bounds_y,
+            boundsWidth: area.bounds_width,
+            boundsHeight: area.bounds_height,
+            actionType: area.action_type,
+            actionData,
+            intent: area.intent,
+            label: area.label,
+            tagIds: area.tagIds,
+            scoreChange: area.score_change,
+            templateId: area.template_id,
+            formId: area.form_id,
+            trackedLinkId: area.tracked_link_id,
+          },
+          now,
+        ),
+      );
+    }
+  }
+  stmts.push(
+    db
+      .prepare(
+        `INSERT INTO rich_menu_duplicate_requests
+           (id, account_id, source_group_id, created_group_id, idempotency_key, created_at)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+      )
+      .bind(input.requestId, input.accountId, input.sourceGroupId, newGroupId, input.idempotencyKey, now),
+  );
+
+  try {
+    await db.batch(stmts);
+  } catch (error) {
+    // 同時に来た同じ鍵の片方だけが通る。負けた側は台帳を読み直して
+    // 既存の作成物を返す（別groupへの鍵違いなら conflict）。
+    const raced = await getRichMenuDuplicateByKey(db, input.accountId, input.idempotencyKey);
+    if (raced) {
+      return raced.source_group_id === input.sourceGroupId
+        ? { outcome: 'existing', groupId: raced.created_group_id }
+        : { outcome: 'conflict' };
+    }
+    throw error;
+  }
+  return { outcome: 'created', groupId: newGroupId };
 }

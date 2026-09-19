@@ -112,6 +112,13 @@ export interface LineRichMenuClient {
   // bulk link: 指定 richMenuId を userIds (最大 500 件 / リクエスト) に link。
   // 500 超は呼出側で chunk して順次呼ぶ。
   linkRichMenuBulk(richMenuId: string, userIds: string[]): Promise<void>;
+  // ----- N-152: 本人LINEへのテスト適用で使う個人宛て操作（必要な経路だけが使う任意口） -----
+  linkRichMenuToUser?(userId: string, richMenuId: string): Promise<void>;
+  unlinkRichMenuFromUser?(userId: string): Promise<void>;
+  /** その人に今出ている richMenuId。未設定なら null。 */
+  getRichMenuIdOfUser?(userId: string): Promise<string | null>;
+  /** alias → richMenuId の現在割当一覧。テスト用 alias の掃除に使う。 */
+  listRichMenuAliases?(): Promise<Array<{ richMenuAliasId: string; richMenuId: string }>>;
 }
 
 export interface R2Like {
