@@ -9,7 +9,6 @@ import {
   stopConversionPoint,
   trackConversion,
   getConversionEvents,
-  getConversionReport,
   getConversionApprovalQueue,
   decideConversionApproval,
   getConversionApprovalNotifyInfo,
@@ -29,6 +28,13 @@ import {
   replaceConversionDefinitionUsages,
   reviseConversionDefinition,
   deleteUnusedConversionDefinition,
+  publishConversionDefinition,
+  issueConversionIngestSecret,
+  setConversionIngestDisabled,
+  getConversionPointForIngest,
+  resolveConversionIngestSecret,
+  recordConversionIngestionEvent,
+  listConversionIngestionEvents,
   getConversionDefinitionReport,
   listConversionDefinitionsForExport,
   ConversionDefinitionError,
@@ -43,6 +49,9 @@ import { requireRole } from '../middleware/role-guard.js';
 import type { AuthenticatedStaff } from '../middleware/auth.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 import { listLimit, listOffset } from './list-pagination.js';
+import { computeHmacSha256Hex, safeEqualHex } from '../lib/hmac.js';
+import { maskedPayloadShape } from '../services/incoming-webhook-actions.js';
+import { sha256Hex } from '../middleware/auth.js';
 
 import type {
   ConversionOfferActionPlan,
@@ -51,6 +60,7 @@ import type {
   ConversionDefinitionRange,
   ConversionDefinitionSort,
   ConversionDefinitionStatus,
+  ConversionDefinitionFilter,
   ConversionDefinitionUsageKind,
   ConversionDeduplicationMode,
   ConversionValueMode,
@@ -89,14 +99,6 @@ const requireVisibleConversionEvent: MiddlewareHandler<Env> = async (c, next) =>
   }
   await next();
 };
-
-async function visibleConversionPointIds(c: Context<Env>) {
-  const { scope, where } = await adminAccountScope(c, 'cp.');
-  const rows = await c.env.DB.prepare(`SELECT cp.id AS id FROM conversion_points cp WHERE ${where}`)
-    .bind(...scope.allowedAccountIds)
-    .all<{ id: string }>();
-  return new Set(rows.results.map((row) => row.id));
-}
 
 const MEASURE_METHODS: ConversionMeasureMethod[] = ['url_reach', 'webhook', 'manual'];
 
@@ -196,7 +198,11 @@ function conversionRange(c: Context<Env>):
   };
 }
 
-const DEFINITION_STATUSES = new Set<ConversionDefinitionStatus>(['active', 'stopped']);
+const DEFINITION_STATUSES = new Set<ConversionDefinitionStatus>(['active', 'stopped', 'draft']);
+// N-268: 導出状態での絞り込み。status 列そのものよりこちらが正確。
+const DEFINITION_STATES = new Set<ConversionDefinitionFilter>([
+  'active', 'draft', 'stopped', 'invalid', 'sourceStopped', 'unused',
+]);
 const DEFINITION_SORTS = new Set<ConversionDefinitionSort>([
   'count_desc', 'value_desc', 'updated_desc', 'name_asc',
 ]);
@@ -275,9 +281,17 @@ function readDefinitionInput(body: Record<string, unknown>, options: { requireAc
 
 function definitionFilters(c: Context<Env>) {
   const status = c.req.query('status');
+  const state = c.req.query('state');
   const sort = c.req.query('sort') ?? 'count_desc';
   if (status && !DEFINITION_STATUSES.has(status as ConversionDefinitionStatus)) {
     return { ok: false as const, response: c.json({ success: false, error: 'status が正しくありません' }, 400) };
+  }
+  if (state && !DEFINITION_STATES.has(state as ConversionDefinitionFilter)) {
+    return { ok: false as const, response: c.json({ success: false, error: 'state が正しくありません' }, 400) };
+  }
+  if (state && status) {
+    // 導出状態と素の status の両方が来たら意味が曖昧になるため弾く。
+    return { ok: false as const, response: c.json({ success: false, error: 'state と status は同時に指定できません' }, 400) };
   }
   if (!DEFINITION_SORTS.has(sort as ConversionDefinitionSort)) {
     return { ok: false as const, response: c.json({ success: false, error: 'sort が正しくありません' }, 400) };
@@ -288,6 +302,7 @@ function definitionFilters(c: Context<Env>) {
       lineAccountId: c.req.query('lineAccountId'),
       query: c.req.query('q'),
       status: status as ConversionDefinitionStatus | undefined,
+      state: state as ConversionDefinitionFilter | undefined,
       sourceType: c.req.query('sourceType'),
       sort: sort as ConversionDefinitionSort,
     },
@@ -460,6 +475,8 @@ conversions.post('/api/conversions/definitions', conversionPermission('edit'), a
       ...definition,
       usages: usages.filter((usage): usage is NonNullable<typeof usage> => usage !== null),
       staffId: c.get('staff')!.id,
+      // N-268: 下書きで保存すると公開まで計測しない。
+      draft: body.draft === true,
     });
     auditLog(c, 'conversion.definition.create', { kind: 'conversion_definition', id: data!.id });
     return c.json({ success: true, data }, 201);
@@ -651,7 +668,314 @@ conversions.delete('/api/conversions/definitions/:id', conversionPermission('edi
   }
 });
 
-// POST /api/conversions/definitions/:id/usages - bind one published version to a consumer
+/*
+ * POST /api/conversions/definitions/:id/publish — 下書きを計測中へ(N-268)。
+ *
+ * 下書きは保存だけの状態で、どの計測経路にも乗らない。公開すると
+ * status='active' になり、内部起点・外部受信の両方で数え始める。
+ */
+conversions.post('/api/conversions/definitions/:id/publish', conversionPermission('edit'), async (c) => {
+  try {
+    const body = await c.req.json<Record<string, unknown>>().catch(() => null);
+    const expectedVersion = positiveVersion(body?.expectedVersion);
+    if (!body || expectedVersion === null) {
+      return c.json({ success: false, error: 'expectedVersionを正しく指定してください' }, 400);
+    }
+    const scope = await conversionDefinitionScope(c);
+    if (!scope.ok) return scope.response;
+    const data = await publishConversionDefinition(c.env.DB, {
+      id: c.req.param('id'), scope: scope.value, expectedVersion,
+      staffId: c.get('staff')!.id,
+    });
+    auditLog(c, 'conversion.definition.publish', { kind: 'conversion_definition', id: c.req.param('id') });
+    return c.json({ success: true, data });
+  } catch (error) {
+    return conversionContractError(c, error);
+  }
+});
+
+// ── 外部受信 (N-270) ─────────────────────────────────────────────────────────
+//
+// 地点ごとの受信鍵で HMAC-SHA256 を照合する。受信の成否は
+// conversion_ingestion_events に残す(秘密値・署名・本文は残さない)。
+
+/**
+ * POST /api/conversions/definitions/:id/ingest-secret — 受信鍵の発行・再発行。
+ * 平文はこの応答でだけ返す。再発行は古い鍵をその場で無効にする。
+ */
+conversions.post('/api/conversions/definitions/:id/ingest-secret', conversionPermission('edit'), async (c) => {
+  try {
+    const body = await c.req.json<Record<string, unknown>>().catch(() => null);
+    const expectedVersion = positiveVersion(body?.expectedVersion);
+    if (!body || expectedVersion === null) {
+      return c.json({ success: false, error: 'expectedVersionを正しく指定してください' }, 400);
+    }
+    const scope = await conversionDefinitionScope(c);
+    if (!scope.ok) return scope.response;
+    const data = await issueConversionIngestSecret(c.env.DB, {
+      id: c.req.param('id'), scope: scope.value, expectedVersion,
+      staffId: c.get('staff')!.id,
+      keys: {
+        current: c.env.LINE_CREDENTIAL_ENCRYPTION_KEY,
+        previous: typeof (c.env as unknown as Record<string, unknown>).LINE_CREDENTIAL_PREVIOUS_KEYS === 'string'
+          ? (c.env as unknown as Record<string, string>).LINE_CREDENTIAL_PREVIOUS_KEYS
+          : undefined,
+      },
+    });
+    auditLog(c, 'conversion.definition.ingest_secret.issue', {
+      kind: 'conversion_definition', id: c.req.param('id'),
+    });
+    return c.json({
+      success: true,
+      data: {
+        ...data,
+        endpoint: `/api/conversions/ingest/${encodeURIComponent(c.req.param('id'))}`,
+      },
+    });
+  } catch (error) {
+    return conversionContractError(c, error);
+  }
+});
+
+/** POST /api/conversions/definitions/:id/ingest-disable — 外部受信を止める(起点停止)。 */
+conversions.post('/api/conversions/definitions/:id/ingest-disable', conversionPermission('edit'), async (c) => {
+  try {
+    const body = await c.req.json<Record<string, unknown>>().catch(() => null);
+    const expectedVersion = positiveVersion(body?.expectedVersion);
+    if (!body || expectedVersion === null) {
+      return c.json({ success: false, error: 'expectedVersionを正しく指定してください' }, 400);
+    }
+    const scope = await conversionDefinitionScope(c);
+    if (!scope.ok) return scope.response;
+    const data = await setConversionIngestDisabled(c.env.DB, {
+      id: c.req.param('id'), scope: scope.value, expectedVersion,
+      disabled: true,
+      staffId: c.get('staff')!.id,
+    });
+    auditLog(c, 'conversion.definition.ingest.disable', {
+      kind: 'conversion_definition', id: c.req.param('id'),
+    });
+    return c.json({ success: true, data });
+  } catch (error) {
+    return conversionContractError(c, error);
+  }
+});
+
+/** POST /api/conversions/definitions/:id/ingest-enable — 止めた外部受信を再開する。 */
+conversions.post('/api/conversions/definitions/:id/ingest-enable', conversionPermission('edit'), async (c) => {
+  try {
+    const body = await c.req.json<Record<string, unknown>>().catch(() => null);
+    const expectedVersion = positiveVersion(body?.expectedVersion);
+    if (!body || expectedVersion === null) {
+      return c.json({ success: false, error: 'expectedVersionを正しく指定してください' }, 400);
+    }
+    const scope = await conversionDefinitionScope(c);
+    if (!scope.ok) return scope.response;
+    const data = await setConversionIngestDisabled(c.env.DB, {
+      id: c.req.param('id'), scope: scope.value, expectedVersion,
+      disabled: false,
+      staffId: c.get('staff')!.id,
+    });
+    auditLog(c, 'conversion.definition.ingest.enable', {
+      kind: 'conversion_definition', id: c.req.param('id'),
+    });
+    return c.json({ success: true, data });
+  } catch (error) {
+    return conversionContractError(c, error);
+  }
+});
+
+/** GET /api/conversions/definitions/:id/ingest-events — 受信の成否履歴。 */
+conversions.get('/api/conversions/definitions/:id/ingest-events', conversionPermission('view'), async (c) => {
+  try {
+    const scope = await conversionDefinitionScope(c);
+    if (!scope.ok) return scope.response;
+    const data = await listConversionIngestionEvents(c.env.DB, {
+      id: c.req.param('id'), scope: scope.value, limit: listLimit(c.req.query('limit'), 50),
+    });
+    if (!data) return c.json({ success: false, error: '成果地点が見つかりません' }, 404);
+    return c.json({ success: true, data: { items: data } });
+  } catch (error) {
+    return conversionContractError(c, error);
+  }
+});
+
+const MAX_INGEST_BODY_BYTES = 64 * 1024;
+const INGEST_SIGNATURE_HEADER = 'X-Conversion-Signature';
+const INGEST_EVENT_ID_HEADER = 'X-Conversion-Event-Id';
+
+/**
+ * POST /api/conversions/ingest/:id — 外部システムからの成果受信(N-270)。
+ *
+ * 管理認証を通さない公開口(isPublicApiBoundary で公開境界に登録済み)。
+ * 地点ごとの受信鍵で HMAC-SHA256 を照合する。友だちは friendId または
+ * lineUserId で指定し、sourceEventId で再送を冪等に捌く。
+ *
+ * 成否は conversion_ingestion_events に残す。台帳の失敗で受信そのものを
+ * 止めないよう、台帳への書き込みは握りつぶしてログだけ残す。
+ */
+conversions.post('/api/conversions/ingest/:id', async (c) => {
+  const pointId = c.req.param('id');
+  const log = async (
+    entry: Omit<Parameters<typeof recordConversionIngestionEvent>[1], 'conversionPointId'>,
+  ) => {
+    try {
+      await recordConversionIngestionEvent(c.env.DB, { conversionPointId: pointId, ...entry });
+    } catch (logError) {
+      console.error('conversion ingestion log failed:', logError);
+    }
+  };
+  try {
+    // 巨大な本文を署名計算の前に止める(受信Webhookと同じ手順)。
+    const declaredLength = Number(c.req.header('content-length') ?? '');
+    if (Number.isFinite(declaredLength) && declaredLength > MAX_INGEST_BODY_BYTES) {
+      return c.json({ success: false, error: 'Payload too large' }, 413);
+    }
+
+    const point = await getConversionPointForIngest(c.env.DB, pointId);
+    if (!point) {
+      await log({ result: 'rejected', reason: 'point_not_found' });
+      return c.json({ success: false, error: 'Conversion point not found' }, 404);
+    }
+    if (point.status !== 'active') {
+      await log({
+        result: 'rejected',
+        reason: point.status === 'draft' ? 'point_draft' : 'point_stopped',
+      });
+      return c.json({ success: false, error: 'Conversion point is not measuring' }, 409);
+    }
+    if (point.ingest_disabled_at) {
+      await log({ result: 'rejected', reason: 'ingest_disabled' });
+      return c.json({ success: false, error: 'External ingestion is disabled for this point' }, 403);
+    }
+
+    // 照合の直前に復号する。鍵不足・復号失敗は fail-closed。
+    let verifySecret: string | null;
+    try {
+      verifySecret = await resolveConversionIngestSecret(point, {
+        current: c.env.LINE_CREDENTIAL_ENCRYPTION_KEY,
+        previous: typeof (c.env as unknown as Record<string, unknown>).LINE_CREDENTIAL_PREVIOUS_KEYS === 'string'
+          ? (c.env as unknown as Record<string, string>).LINE_CREDENTIAL_PREVIOUS_KEYS
+          : undefined,
+      });
+    } catch {
+      verifySecret = null;
+    }
+    if (!verifySecret) {
+      await log({ result: 'rejected', reason: 'secret_not_issued' });
+      return c.json({ success: false, error: 'Ingestion key is not issued for this point' }, 503);
+    }
+
+    const signature = (c.req.header(INGEST_SIGNATURE_HEADER) ?? '').trim().toLowerCase();
+    if (!signature) {
+      await log({ result: 'rejected', reason: 'signature_missing' });
+      return c.json({ success: false, error: `${INGEST_SIGNATURE_HEADER} header is required` }, 401);
+    }
+
+    const rawBody = await c.req.text();
+    if (new TextEncoder().encode(rawBody).byteLength > MAX_INGEST_BODY_BYTES) {
+      return c.json({ success: false, error: 'Payload too large' }, 413);
+    }
+    const expected = await computeHmacSha256Hex(verifySecret, rawBody);
+    const signatureHash = await sha256Hex(signature);
+    if (!safeEqualHex(signature, expected)) {
+      await log({ result: 'rejected', reason: 'signature_mismatch', signatureSha256: signatureHash });
+      return c.json({ success: false, error: 'Invalid signature' }, 401);
+    }
+
+    let payload: Record<string, unknown> | null;
+    try {
+      const parsed: unknown = JSON.parse(rawBody);
+      payload = plainObject(parsed);
+    } catch {
+      payload = null;
+    }
+    if (!payload) {
+      await log({ result: 'rejected', reason: 'invalid_json', signatureSha256: signatureHash });
+      return c.json({ success: false, error: 'Invalid JSON body' }, 400);
+    }
+    const payloadShape = maskedPayloadShape(payload);
+    const sourceEventId = (c.req.header(INGEST_EVENT_ID_HEADER) ?? '')
+      || (typeof payload.sourceEventId === 'string' ? payload.sourceEventId : '');
+    if (!sourceEventId.trim()) {
+      await log({
+        result: 'rejected', reason: 'source_event_id_missing',
+        payloadShape, signatureSha256: signatureHash,
+      });
+      return c.json({
+        success: false,
+        error: `${INGEST_EVENT_ID_HEADER} header or sourceEventId is required`,
+      }, 400);
+    }
+
+    const friendId = typeof payload.friendId === 'string' ? payload.friendId.trim() : '';
+    const lineUserId = typeof payload.lineUserId === 'string' ? payload.lineUserId.trim() : '';
+    let resolvedFriendId = friendId;
+    if (!resolvedFriendId && lineUserId) {
+      const friend = await c.env.DB.prepare('SELECT id FROM friends WHERE line_user_id = ?')
+        .bind(lineUserId).first<{ id: string }>();
+      resolvedFriendId = friend?.id ?? '';
+    }
+    if (!resolvedFriendId) {
+      await log({
+        result: 'rejected', reason: 'friend_missing',
+        sourceEventId: sourceEventId.trim().slice(0, 200),
+        payloadShape, signatureSha256: signatureHash,
+      });
+      return c.json({ success: false, error: 'friendId or lineUserId is required' }, 400);
+    }
+    const value = payload.value === null || payload.value === undefined
+      ? null : Number(payload.value);
+
+    try {
+      const outcome: { deduplicated?: boolean } = {};
+      const event = await trackConversion(c.env.DB, {
+        conversionPointId: pointId,
+        friendId: resolvedFriendId,
+        metadata: JSON.stringify({
+          source: 'external_ingest',
+          sourceEventId: sourceEventId.trim().slice(0, 200),
+          ...(plainObject(payload.metadata) ?? {}),
+        }),
+        // 同じイベントの再送は地点ごとの冪等キーで1件にする。
+        idempotencyKey: `cvingest:${pointId}:${sourceEventId.trim().slice(0, 120)}`,
+        value,
+      }, undefined, outcome);
+      await log({
+        result: outcome.deduplicated ? 'duplicate' : 'recorded',
+        sourceEventId: sourceEventId.trim().slice(0, 200),
+        friendId: resolvedFriendId,
+        payloadShape, signatureSha256: signatureHash,
+      });
+      return c.json({
+        success: true,
+        data: { received: true, duplicated: outcome.deduplicated === true, eventId: event.id },
+      });
+    } catch (trackError) {
+      const message = trackError instanceof Error ? trackError.message : '';
+      if (message === 'conversion_idempotency_conflict') {
+        await log({
+          result: 'rejected', reason: 'idempotency_conflict',
+          sourceEventId: sourceEventId.trim().slice(0, 200),
+          friendId: resolvedFriendId, payloadShape, signatureSha256: signatureHash,
+        });
+        return c.json({ success: false, error: 'Same event id with different payload' }, 409);
+      }
+      if (message === 'conversion_friend_not_found' || message === 'conversion_account_mismatch') {
+        await log({
+          result: 'rejected', reason: message.replace('conversion_', ''),
+          sourceEventId: sourceEventId.trim().slice(0, 200),
+          friendId: resolvedFriendId, payloadShape, signatureSha256: signatureHash,
+        });
+        return c.json({ success: false, error: 'Friend not found or out of scope' }, 422);
+      }
+      throw trackError;
+    }
+  } catch (error) {
+    console.error('POST /api/conversions/ingest/:id error:', error);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
 conversions.post('/api/conversions/definitions/:id/usages', conversionPermission('edit'), async (c) => {
   try {
     const body = await c.req.json<{
@@ -706,14 +1030,14 @@ conversions.get('/api/conversions/export', conversionPermission('export'), async
     if (!filters.ok) return filters.response;
     const scope = await conversionDefinitionScope(c, filters.value.lineAccountId);
     if (!scope.ok) return scope.response;
-    const items = await listConversionDefinitionsForExport(c.env.DB, {
+    const { items, truncated } = await listConversionDefinitionsForExport(c.env.DB, {
       scope: scope.value,
       ...filters.value,
       range: range.range,
     });
     const headers = [
       '期間開始', '期間終了', 'タイムゾーン', '純額定義', '成果地点ID', '成果地点名',
-      '起点', '状態', '成果件数', '純成果件数', '取消件数', '純金額', '利用先数', '更新日時',
+      '起点', '状態', '状態詳細', '成果件数', '純成果件数', '取消件数', '純金額', '利用先数', '更新日時',
     ];
     const rows = items.map((item) => [
       range.range.from,
@@ -724,6 +1048,7 @@ conversions.get('/api/conversions/export', conversionPermission('export'), async
       item.name,
       item.sourceType,
       item.status,
+      item.stateReason ?? '',
       item.metrics.recordedCount,
       item.metrics.netCount,
       item.metrics.reversedCount,
@@ -731,7 +1056,11 @@ conversions.get('/api/conversions/export', conversionPermission('export'), async
       item.usageCount,
       item.updatedAt,
     ]);
-    const csv = `\uFEFF${[headers, ...rows].map((row) => row.map(csvCell).join(',')).join('\r\n')}\r\n`;
+    // N-267: 件数で切ったCSVが全件に見えないよう、先頭行で打ち切りを明記する。
+    const headerNote = truncated
+      ? '# 成果地点の書出し…先頭10000件まで。続きは期間や絞り込みを分けて出してください。'
+      : '# 成果地点の書出し…最大10000件まで';
+    const csv = `\uFEFF${headerNote}\r\n${[headers, ...rows].map((row) => row.map(csvCell).join(',')).join('\r\n')}\r\n`;
     auditLog(c, 'conversion.report.export', {
       kind: 'conversion_definition_export', id: String(items.length),
     });
@@ -1063,11 +1392,42 @@ conversions.get('/api/conversions/events', conversionPermission('view'), async (
 conversions.get('/api/conversions/report', conversionPermission('view'), async (c) => {
   try {
     if (c.req.query('startDate') !== undefined || c.req.query('endDate') !== undefined) {
-      const visibleIds = await visibleConversionPointIds(c);
-      const report = (await getConversionReport(c.env.DB, {
-        startDate: c.req.query('startDate'),
-        endDate: c.req.query('endDate'),
-      })).filter((row) => visibleIds.has(row.conversionPointId));
+      /*
+       * N-269: 旧応答形(startDate/endDate→地点別行)もV6の集計
+       * (getConversionDefinitionReport)から作る。暦日の解釈・
+       * スナップショット固定・取消控除を新レポートと一致させ、
+       * 2系統の集計で数値がずれる状態を解消する。
+       *
+       * 旧形の totalCount/totalValue は取消を含む総数だったので、
+       * 純数へ取消分を戻して同じ意味に写す。
+       */
+      const startDate = c.req.query('startDate');
+      const endDate = c.req.query('endDate');
+      if ((startDate !== undefined && !parseDate(startDate))
+        || (endDate !== undefined && !parseDate(endDate))) {
+        return c.json({ success: false, error: 'startDate と endDate は YYYY-MM-DD で指定してください' }, 400);
+      }
+      const scope = await conversionDefinitionScope(c);
+      if (!scope.ok) return scope.response;
+      const data = await getConversionDefinitionReport(c.env.DB, {
+        scope: scope.value,
+        range: {
+          from: startDate ? `${startDate} 00:00:00` : '0001-01-01 00:00:00',
+          to: endDate ? `${endDate} 23:59:59` : '9999-12-31 23:59:59',
+          timeZone: 'Asia/Tokyo',
+        },
+        // 旧形に前期間は無い。成立しない範囲を渡して0件にする。
+        previousRange: { from: '9999-01-01 00:00:00', to: '0001-01-01 00:00:00', timeZone: 'Asia/Tokyo' },
+      });
+      const report = data.byDefinition
+        .map((row) => ({
+          conversionPointId: row.conversionPointId,
+          conversionPointName: row.conversionPointName,
+          eventType: row.sourceType,
+          totalCount: row.netCount + (row.cancellationCount ?? 0),
+          totalValue: row.netValue + (row.cancellationValue ?? 0),
+        }))
+        .sort((a, b) => b.totalCount - a.totalCount);
       return c.json({ success: true, data: report });
     }
 
