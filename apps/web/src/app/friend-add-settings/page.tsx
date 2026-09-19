@@ -2,9 +2,10 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { MoreHorizontal, Plus, Trash2 } from 'lucide-react'
+import { FlaskConical, History, MoreHorizontal, Plus, Rocket, Trash2 } from 'lucide-react'
 import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
+import ActionMenu from '@/components/shared/action-menu'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import IconButton from '@/components/shared/icon-button'
@@ -68,6 +69,7 @@ function FriendAddSettingsList() {
   const [appliedSearch, setAppliedSearch] = useState('')
   const [folder, setFolder] = useState<string | null>(null)
   const { cursor, page: cursorPage, canPrev, reset: resetCursor, goPrev, goNext } = useCursorStack()
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null)
   const [folderBusy, setFolderBusy] = useState(false)
   const [folderDialogOpen, setFolderDialogOpen] = useState(false)
   const [folderName, setFolderName] = useState('')
@@ -272,7 +274,42 @@ function FriendAddSettingsList() {
                         <div className="flex items-center gap-1">
                           <Button href={`/friend-add-settings?view=edit&id=${encodeURIComponent(rule.id)}`} variant="secondary">編集</Button>
                           {!rule.isFallback && <IconButton aria-label={`${rule.name}を削除`} onClick={() => setDeleting(rule)}><Trash2 size={16} /></IconButton>}
-                          <IconButton aria-label={`${rule.name}のその他操作`}><MoreHorizontal size={18} /></IconButton>
+                          {/*
+                            その他操作は実画面へつなぐメニューを開く。行き先のない
+                            ボタンを置くと、押しても何も起きない死に操作になる。
+                          */}
+                          <div className="relative inline-flex items-center justify-center">
+                            <IconButton
+                              aria-label={`${rule.name}のその他操作`}
+                              aria-expanded={openMenuId === rule.id}
+                              onClick={() => setOpenMenuId((current) => (current === rule.id ? null : rule.id))}
+                            ><MoreHorizontal size={18} /></IconButton>
+                            <ActionMenu
+                              open={openMenuId === rule.id}
+                              ariaLabel={`${rule.name}の操作`}
+                              onClose={() => setOpenMenuId(null)}
+                              items={[
+                                {
+                                  id: 'test',
+                                  label: 'テストを実行',
+                                  icon: <FlaskConical size={16} />,
+                                  onSelect: () => router.push(`/friend-add-settings?view=edit&id=${encodeURIComponent(rule.id)}&step=preview`),
+                                },
+                                ...(rule.status === 'draft' ? [{
+                                  id: 'publish',
+                                  label: '最終確認・有効化へ進む',
+                                  icon: <Rocket size={16} />,
+                                  onSelect: () => router.push(`/friend-add-settings/publish?id=${encodeURIComponent(rule.id)}`),
+                                }] : []),
+                                {
+                                  id: 'runs',
+                                  label: 'この設定の実行結果',
+                                  icon: <History size={16} />,
+                                  onSelect: () => router.push(`/friend-add-settings/runs?rule_id=${encodeURIComponent(rule.id)}`),
+                                },
+                              ]}
+                            />
+                          </div>
                         </div>
                       </ActionCell>
                     </Tr>
