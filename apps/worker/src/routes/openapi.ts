@@ -779,6 +779,31 @@ const spec = {
     '/api/ops/members/{staffId}': {
       patch: { tags: ['Ops Console'], summary: '運営メンバーの停止・再開', parameters: [{ name: 'staffId', in: 'path', required: true, schema: { type: 'string' } }], requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['isActive'], properties: { isActive: { type: 'boolean' } } } } } }, responses: { '200': { description: 'Updated' }, '400': { description: 'Self or last member' }, '404': { description: 'Staff not found' } } },
     },
+    // ── HQ Notices / Ops Announcements（★V6 37-7） ────────────────────────
+    '/api/hq/notices': {
+      get: { tags: ['HQ Support'], summary: '運営からの未読のお知らせ（画面のお知らせ）', responses: { '200': { description: 'Unread notices for the caller' } } },
+    },
+    '/api/hq/notices/{id}/read': {
+      post: { tags: ['HQ Support'], summary: 'お知らせを既読にする', parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }], responses: { '200': { description: 'Marked' } } },
+    },
+    '/api/hq/notices/line-registration': {
+      get: { tags: ['HQ Support'], summary: '契約者専用LINEの登録案内（友だち追加 URL と本人の確認コード）', responses: { '200': { description: 'Registration info' } } },
+    },
+    '/api/ops/notice-line-account': {
+      get: { tags: ['Ops Console'], summary: '契約者専用LINEに使うアカウントと候補', responses: { '200': { description: 'Current and candidates' } } },
+      put: { tags: ['Ops Console'], summary: '契約者専用LINEに使うアカウントを指定する', requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', properties: { lineAccountId: { type: 'string', nullable: true } } } } } }, responses: { '200': { description: 'Saved' }, '400': { description: 'Not an ops account' } } },
+    },
+    '/api/ops/announcements': {
+      get: { tags: ['Ops Console'], summary: 'お知らせの一覧（下書き・予約・配信済み）', responses: { '200': { description: 'Announcements' } } },
+      post: { tags: ['Ops Console'], summary: 'お知らせを作る（下書き／予約／今すぐ送る）', requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['subject', 'body', 'channels'], properties: { subject: { type: 'string' }, body: { type: 'string' }, audienceKind: { type: 'string', enum: ['all', 'plan', 'tenants'] }, audiencePlans: { type: 'array', items: { type: 'string' } }, audienceTenantIds: { type: 'array', items: { type: 'string' } }, channels: { type: 'array', items: { type: 'string', enum: ['line', 'screen', 'email'] } }, publishAt: { type: 'string' }, mode: { type: 'string', enum: ['draft', 'schedule', 'send'] } } } } } }, responses: { '201': { description: 'Created' }, '400': { description: 'Validation error' }, '409': { description: 'Notice LINE account missing' } } },
+    },
+    '/api/ops/announcements/preview': {
+      post: { tags: ['Ops Console'], summary: '宛先の見積もり（契約先数・権限者数・LINE登録済み数）', responses: { '200': { description: 'Audience preview' } } },
+    },
+    '/api/ops/announcements/{id}': {
+      put: { tags: ['Ops Console'], summary: '下書き・予約のお知らせを変える（今すぐ送るも可）', parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }], responses: { '200': { description: 'Updated' }, '404': { description: 'Not found' }, '409': { description: 'Already sent' } } },
+      delete: { tags: ['Ops Console'], summary: '下書き・予約のお知らせを消す', parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }], responses: { '200': { description: 'Deleted' }, '404': { description: 'Not found' }, '409': { description: 'Already sent' } } },
+    },
     // ── Ops Console: ダッシュボード（★V6 37-2） ────────────────────────────
     '/api/ops/dashboard': {
       get: { tags: ['Ops Console'], summary: '運営ダッシュボード（MRR は定価ベース・契約数・月ごとの売上・要対応・チケット・LINE登録・使用量）', parameters: [
@@ -2000,6 +2025,8 @@ const spec = {
         parameters: [
           { name: 'lineAccountId', in: 'query', required: true, schema: { type: 'string' } },
           { name: 'days', in: 'query', schema: { type: 'integer', minimum: 1, maximum: 365, default: 30 } },
+          { name: 'from', in: 'query', description: 'to と両方指定で days の代わりに期間を決める（ISO 8601）', schema: { type: 'string', format: 'date-time' } },
+          { name: 'to', in: 'query', schema: { type: 'string', format: 'date-time' } },
         ],
         responses: { '200': { description: 'Flow metrics' }, '403': { description: 'Account access denied' } },
       },
@@ -2012,6 +2039,8 @@ const spec = {
         parameters: [
           { name: 'lineAccountId', in: 'query', required: true, schema: { type: 'string' } },
           { name: 'days', in: 'query', schema: { type: 'integer', minimum: 1, maximum: 365, default: 30 } },
+          { name: 'from', in: 'query', description: 'to と両方指定で days の代わりに期間を決める（ISO 8601）', schema: { type: 'string', format: 'date-time' } },
+          { name: 'to', in: 'query', schema: { type: 'string', format: 'date-time' } },
         ],
         responses: { '200': { description: 'Column metrics' }, '403': { description: 'Account access denied' } },
       },
@@ -2053,6 +2082,19 @@ const spec = {
           { name: 'lineAccountId', in: 'query', required: true, schema: { type: 'string' } },
         ],
         responses: { '200': { description: 'Delivery detail' }, '404': { description: 'Not found in account scope' } },
+      },
+    },
+    '/api/nen-campaigns/columns/import': {
+      post: {
+        tags: ['NEN delivery'],
+        summary: '未割り当てのECコラムを選択中のLINEアカウントへ取り込む',
+        description: 'EC-CUBE から届いたが宛先が決まらなかったコラム（line_account_id が NULL）を、lineAccountId のアカウントへ割り当てます。',
+        parameters: [{ name: 'lineAccountId', in: 'query', required: true, schema: { type: 'string' } }],
+        responses: {
+          '200': { description: '{ imported: number }' },
+          '403': { description: 'Owner or admin role required' },
+          '404': { description: 'LINE account not found' },
+        },
       },
     },
     '/api/nen-campaigns/deliveries/{id}/retry': {

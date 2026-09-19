@@ -354,10 +354,14 @@ const STAFF_EXPLICIT_ALLOW: Array<[method: string, path: string]> = [
   ['POST', '/api/restaurant-test/stores/selection/clear'],
   ['GET', '/api/restaurant-test/snapshot'],
   ['POST', '/api/restaurant-test/reservations/manual'],
+  // 運営からのお知らせ（★V6 37-7）は本人宛て。担当者でも読んで既読にできる。
+  ['GET', '/api/hq/notices'],
+  ['GET', '/api/hq/notices/line-registration'],
 ];
 
 const STAFF_EXPLICIT_ALLOW_PATTERNS: Array<[method: string, pattern: RegExp]> = [
   ['POST', /^\/api\/restaurant-test\/stores\/[^/]+\/select$/],
+  ['POST', /^\/api\/hq\/notices\/[^/]+\/read$/],
 ];
 
 export function isStaffExplicitAllow(method: string, path: string): boolean {

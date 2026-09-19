@@ -170,6 +170,11 @@ export const FEATURE_JOB_MANIFEST: readonly FeatureJobMetadata[] = [
     enforcement: { mode: 'exempt', reason: '運用の問い合わせ受信で、アカウント機能に属さない' },
   },
   {
+    name: 'platform announcements',
+    classification: { kind: 'core', reason: '運営からのお知らせ配信（★V6 37-7）' },
+    enforcement: { mode: 'exempt', reason: '運営が契約先の権限者へ送るお知らせで、アカウント機能に属さない' },
+  },
+  {
     name: 'friend field reminders',
     classification: { kind: 'feature', featureId: 'friend_fields' },
     enforcement: {

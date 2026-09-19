@@ -386,7 +386,8 @@
     "425_media_upload_metadata.sql",
     "426_nen_feeding_kind_treat_limit.sql",
     "427_common_var_export_jobs.sql",
-    "428_nen_photo_review_audit_fixes.sql"
+    "428_nen_photo_review_audit_fixes.sql",
+    "429_platform_announcements.sql"
   ],
-  "migrationCount": 387
+  "migrationCount": 388
 }

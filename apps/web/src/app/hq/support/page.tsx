@@ -6,6 +6,7 @@ import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'rea
 import type { LineAccount, StaffMember } from '@line-crm/shared'
 import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
+import NoticeLineRegisterDialog from '@/components/hq/notice-line-register-dialog'
 import NoteBar from '@/components/shared/note-bar'
 import SelectField from '@/components/shared/select-field'
 import StickyBar from '@/components/shared/sticky-bar'
@@ -49,6 +50,7 @@ export default function HqSupportPage() {
   const [sending, setSending] = useState(false)
   const [error, setError] = useState('')
   const [sent, setSent] = useState<HqSupportRequest | null>(null)
+  const [lineGuide, setLineGuide] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -150,8 +152,14 @@ export default function HqSupportPage() {
       <div data-design-node="kcTeV">
         <NoteBar tone="info">
           使い方の質問、不具合、料金の相談はここから送れます。返信は登録メールアドレスに届きます（平日 2営業日以内）。
+          <button type="button" onClick={() => setLineGuide(true)} className="ml-2 text-accent-deep underline-offset-2 hover:underline">
+            運営からの大事なお知らせを LINE で受け取る（契約者専用LINEの登録案内）
+          </button>
         </NoteBar>
       </div>
+
+      {/* 契約者専用LINEの登録案内（2026-09-18 決定: 登録直後の案内を、ここからもいつでも開ける） */}
+      <NoticeLineRegisterDialog open={lineGuide} onClose={() => setLineGuide(false)} quietWhenUnavailable={false} />
 
       {/* 送信完了の知らせ（2026-09-18 決定: 帯だけでは気づきにくいので、窓で止めて伝える） */}
       <Dialog

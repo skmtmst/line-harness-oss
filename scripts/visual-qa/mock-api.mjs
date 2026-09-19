@@ -3354,6 +3354,10 @@ const server = createServer((req, res) => {
       res.writeHead(NEN_COLUMN_CREATE.success.status).end(JSON.stringify(NEN_COLUMN_CREATE.success.body))
       return
     }
+    if (method === 'POST' && url.pathname === '/api/nen-campaigns/columns/import') {
+      res.writeHead(200).end(JSON.stringify({ success: true, data: { imported: 0 } }))
+      return
+    }
     const nenDuplicate = /^\/api\/nen-campaigns\/columns\/[^/]+\/duplicate$/.test(url.pathname)
     if (method === 'POST' && nenDuplicate) {
       res.writeHead(201).end(JSON.stringify({ success: true, data: NEN_COLUMN_OPERATIONS.duplicate }))
