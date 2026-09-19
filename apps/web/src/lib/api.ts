@@ -6037,10 +6037,14 @@ export const api = {
       fetchApi<ApiResponse<MediaReplacementImpact>>(
         `/api/media/${id}/replacement-impact?accountId=${encodeURIComponent(accountId)}&replacementId=${encodeURIComponent(replacementId)}`,
       ),
+    /**
+     * 使用先の差し替え。scope 'all' は全使用先（置換不可が1件でもあれば409）、
+     * 'replaceable' は影響確認で置換可能と判定された使用先だけの部分実行。
+     */
     replaceUsages: (
       id: string,
       accountId: string,
-      input: { replacementMediaId: string; expectedRevision: string },
+      input: { replacementMediaId: string; expectedRevision: string; scope?: 'all' | 'replaceable' },
     ) => fetchApi<ApiResponse<MediaReplacementResult>>(
       `/api/media/${id}/replace-usages?accountId=${encodeURIComponent(accountId)}`,
       { method: 'POST', body: JSON.stringify(input) },
