@@ -163,8 +163,13 @@ export default function NewRestaurantStorePage() {
     <div className="mb-5 flex justify-end">
       <Link href="/hq" className="text-sm font-semibold text-action">統括へ戻る</Link>
     </div>
-    <div className="grid items-start gap-5 xl:grid-cols-[220px_minmax(0,1fr)]">
-      <ol className="rounded-card border border-hairline bg-canvas p-4">{steps.map(([title, description], index) => {
+    {/*
+     * グリッドの子は既定で内容の最小幅までしか縮まない。1列のときも
+     * minmax(0,1fr) と子の min-w-0 をそろえないと、規約・手順パネルの
+     * 右側が画面外へ出る（U095）。
+     */}
+    <div className="grid grid-cols-1 items-start gap-5 xl:grid-cols-[220px_minmax(0,1fr)]">
+      <ol className="min-w-0 rounded-card border border-hairline bg-canvas p-4">{steps.map(([title, description], index) => {
         const number = index + 1
         const complete = number === STEP.TERMS
           ? Boolean(termsAgreedAt) || Boolean(created)
@@ -179,8 +184,8 @@ export default function NewRestaurantStorePage() {
         </li>
       })}</ol>
 
-      <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_280px]">
-        <main className="rounded-card border border-hairline bg-canvas p-5 sm:p-7">
+      <div className="grid min-w-0 grid-cols-1 items-start gap-5 lg:grid-cols-[minmax(0,1fr)_280px]">
+        <main className="min-w-0 rounded-card border border-hairline bg-canvas p-5 sm:p-7">
           <p className="text-xs font-semibold text-ink-faint">ステップ {step} / 5</p>
           <h2 className="mt-2 text-xl font-bold text-ink">{steps[step - 1][0]}</h2>
           <p className="mt-2 text-sm leading-6 text-ink-secondary">{steps[step - 1][1]}</p>
@@ -225,14 +230,14 @@ export default function NewRestaurantStorePage() {
                 ? <button type="button" disabled={saving} onClick={() => void enterStore()} className="mt-5 rounded-control bg-accent-deep px-5 py-2.5 text-sm font-semibold text-on-accent disabled:opacity-50">この店舗の管理画面へ</button>
                 : <Link href="/hq" className="mt-5 inline-flex text-sm font-semibold text-action">統括の店舗一覧へ</Link>}
             </div> : <>
-              <div className="rounded-card bg-canvas-sunken p-5 text-sm leading-6 text-ink-secondary"><p className="font-semibold text-ink">以下のLINE公式アカウントのセットアップを行います。</p><p className="mt-1">トークンとボット表示名を取得できた場合だけ、店舗とLINE公式アカウントをまとめて登録します。</p><dl className="mt-4 grid gap-2"><div><dt className="text-xs text-ink-faint">店舗名</dt><dd className="font-semibold text-ink">{name}</dd></div><div><dt className="text-xs text-ink-faint">店舗の略称</dt><dd className="font-semibold text-ink">{alias || name}</dd></div></dl></div>
+              <div className="rounded-card bg-canvas-sunken p-5 text-sm leading-6 text-ink-secondary"><p className="font-semibold text-ink">以下のLINE公式アカウントのセットアップを行います。</p><p className="mt-1">トークンとボット表示名を取得できた場合だけ、店舗とLINE公式アカウントをまとめて登録します。</p><dl className="mt-4 grid gap-2"><div><dt className="text-xs text-ink-faint">店舗名</dt><dd className="break-words font-semibold text-ink">{name}</dd></div><div><dt className="text-xs text-ink-faint">店舗の略称</dt><dd className="break-words font-semibold text-ink">{alias || name}</dd></div></dl></div>
               {connectionError && <div role="alert" className="mt-4 rounded-control border border-danger bg-danger-bg px-4 py-3 text-sm leading-6 text-danger">{connectionError}</div>}
               <StickyBar className="mt-5" actions={<><button type="button" disabled={saving} onClick={() => setStep(STEP.CREDENTIALS)} className="rounded-control border border-hairline px-4 py-2.5 text-sm font-semibold text-ink disabled:opacity-40">戻る</button><button type="button" disabled={saving} onClick={() => void connect()} className="rounded-control bg-accent-deep px-5 py-2.5 text-sm font-semibold text-on-accent disabled:cursor-not-allowed disabled:opacity-40">{saving ? '接続を確認中…' : 'アカウントセットアップ実行'}</button></>} />
             </>}
           </div>}
         </main>
 
-        <aside className="rounded-card border border-hairline bg-canvas p-5">
+        <aside className="min-w-0 rounded-card border border-hairline bg-canvas p-5">
           <h2 className="font-bold text-ink">わからないときは</h2>
           <p className="mt-2 text-xs leading-5 text-ink-secondary">今の手順に対応するマニュアルを確認できます。</p>
           <div className="mt-4 space-y-3">{step === STEP.TERMS ? <><p className="text-xs leading-5 text-ink-secondary">同意する前に、利用規約と個人情報の取扱いを最後まで確認してください。</p><Link href="/restaurant-test/terms" className="inline-flex rounded-control border border-action px-3 py-2 text-xs font-semibold text-action">利用規約を別画面で読む</Link></>
