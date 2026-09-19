@@ -221,9 +221,14 @@ export default function WebhookInteractions() {
       const response = await api.webhooks.interactions.retryFailed(requestAccountId)
       if (selectedAccountIdRef.current !== requestAccountId) return
       if (!response.success) throw new Error(response.error)
+      // N-387: 1回に送り直せる件数には上限がある。残った分は黙って置き去りに
+      // せず、残件数と「もう一度押すと続きをやり直す」ことを明示する。
+      const remainingNote = response.data.remaining > 0
+        ? `まだ失敗のまま残っているものが${response.data.remaining}件あります。もう一度押すと続きをやり直します。`
+        : ''
       setNotice({
-        tone: response.data.failed > 0 || response.data.skipped > 0 ? 'error' : 'success',
-        message: `${response.data.requested}件を確認し、${response.data.succeeded}件が届きました。届かなかったもの ${response.data.failed}件、対象外 ${response.data.skipped}件です。`,
+        tone: response.data.failed > 0 || response.data.skipped > 0 || response.data.remaining > 0 ? 'error' : 'success',
+        message: `${response.data.requested}件を確認し、${response.data.succeeded}件が届きました。届かなかったもの ${response.data.failed}件、対象外 ${response.data.skipped}件です。${remainingNote}`,
       })
       await load()
     } catch {
@@ -302,17 +307,23 @@ export default function WebhookInteractions() {
           {data.items.length === 0 ? (
             <ListState kind="empty" title="条件に合うやり取りはありません" description="期間や絞り込みを変えて確認してください。" />
           ) : (
+            /*
+              N-386: 狭い幅では重要度の低い列を隠す。隠した列の中身は
+              「中身を見る」の詳細ダイアログで全部見られるので情報は失われない。
+                - 1180px以下: 「かかった時間」を隠す（詳細で見られる）
+                - 760px以下:  さらに「送った・届いた中身」を隠す
+            */
             <DataTable className={styles.table}>
-              <colgroup><col /><col /><col /><col /><col /><col /></colgroup>
-              <thead><TableHeadRow><Th>いつ・どちら向き</Th><Th>つなぎ先</Th><Th>送った・届いた中身</Th><Th>返事</Th><Th>かかった時間</Th><Th><span className="sr-only">操作</span></Th></TableHeadRow></thead>
+              <colgroup><col /><col /><col className={styles.contentCol} /><col /><col className={styles.durationCol} /><col /></colgroup>
+              <thead><TableHeadRow><Th>いつ・どちら向き</Th><Th>つなぎ先</Th><Th className={styles.contentCol}>送った・届いた中身</Th><Th>返事</Th><Th className={styles.durationCol}>かかった時間</Th><Th><span className="sr-only">操作</span></Th></TableHeadRow></thead>
               <tbody>
                 {data.items.map((item) => (
                   <Tr key={item.id}>
                     <Td><div className={styles.primary}>{formatJst(item.startedAt)} ／ {directionLabel(item.direction)}</div><div className={styles.secondary} title={eventLabel(item)}>{eventLabel(item)}</div></Td>
                     <Td><div className={`${styles.primary} ${item.status === 'failed' ? styles.danger : ''}`} title={item.webhookName}>{item.webhookName}</div></Td>
-                    <Td><div className={styles.primary} title={item.triggerSummary}>{item.triggerSummary}</div><div className={styles.secondary}>安全のため本文と接続情報は一覧に表示しません</div></Td>
+                    <Td className={styles.contentCol}><div className={styles.primary} title={item.triggerSummary}>{item.triggerSummary}</div><div className={styles.secondary}>安全のため本文と接続情報は一覧に表示しません</div></Td>
                     <Td><StatusBadge tone={item.status === 'succeeded' ? 'success' : item.status === 'failed' ? 'danger' : 'info'}>{item.responseLabel}</StatusBadge></Td>
-                    <Td>{item.durationMs == null ? '—' : `${Math.round(item.durationMs / 100) / 10}秒`}</Td>
+                    <Td className={styles.durationCol}>{item.durationMs == null ? '—' : `${Math.round(item.durationMs / 100) / 10}秒`}</Td>
                     <ActionCell><div className={styles.rowActions}><Button onClick={() => setSelected(item)}>中身を見る</Button>{canRetry && item.canRetry ? <Button onClick={() => void retry(item)} disabled={retrying === item.id}>{retrying === item.id ? 'やり直し中' : 'やり直す'}</Button> : null}</div></ActionCell>
                   </Tr>
                 ))}

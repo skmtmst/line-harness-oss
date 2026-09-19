@@ -9779,7 +9779,8 @@ export const api = {
           { method: 'POST', body: '{}' },
         ),
       retryFailed: (lineAccountId: string) =>
-        fetchApi<ApiResponse<{ requested: number; succeeded: number; failed: number; skipped: number }>>(
+        // remaining: 1回の外部通信上限で今回やり直せず残った失敗の件数(N-387)。
+        fetchApi<ApiResponse<{ requested: number; succeeded: number; failed: number; skipped: number; remaining: number }>>(
           `/api/webhooks/interactions/retry-failed?lineAccountId=${encodeURIComponent(lineAccountId)}`,
           { method: 'POST', body: '{}' },
         ),
