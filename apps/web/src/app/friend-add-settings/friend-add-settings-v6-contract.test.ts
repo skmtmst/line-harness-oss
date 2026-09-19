@@ -149,11 +149,6 @@ describe('V6 友だち追加時配信の保存の取りこぼし防止(#501 重�
 })
 
 describe('V6 友だち追加時配信の監査修正(#946)', () => {
-  const REQUIREMENTS = fs.readFileSync(
-    path.join(__dirname, '../../../../../docs/v6-requirements/v6-09-friend-add-delivery-requirements-draft.md'),
-    'utf8',
-  )
-
   it('N-107: 「その他操作」は実画面へつなぐメニューを開く', () => {
     // 押しても何も起きないボタンにしない。テスト・有効化・実行結果は実在する画面。
     expect(LIST_PAGE).toContain('setOpenMenuId')
@@ -189,14 +184,18 @@ describe('V6 友だち追加時配信の監査修正(#946)', () => {
     expect(EDITOR).not.toContain("<span>二重送信</span><strong>{rule.lastTestStatus")
   })
 
-  it('N-110: 要件書のルート表は実在する画面だけを指す', () => {
+  it('N-110: 画面遷移は実在するクエリ付きルートだけを使う', () => {
     // 静的エクスポートではパス型の {id} ルートを持てないため、
-    // 表はクエリ付きルートと「独立ルートなし」の注記にそろえる。
-    expect(REQUIREMENTS).toContain('`/friend-add-settings?view=new`')
-    expect(REQUIREMENTS).toContain('`/friend-add-settings?view=edit&id={id}`')
-    expect(REQUIREMENTS).toContain('`/friend-add-settings/publish?id={id}`')
-    expect(REQUIREMENTS).not.toContain('`/friend-add-settings/new`')
-    expect(REQUIREMENTS).not.toContain('`/friend-add-settings/conflicts`')
-    expect(REQUIREMENTS).not.toContain('`/friend-add-settings/test`')
+    // 作成・編集・テストはクエリ付きの同一ページで切り替える。
+    // 要件書(v6-09)のルート表の整合は司令塔所有領域のため別PRで実施する。
+    const screens = `${LIST_PAGE}\n${EDITOR}`
+    expect(LIST_PAGE).toContain('href="/friend-add-settings?view=new"')
+    expect(LIST_PAGE).toContain('view=edit&id=')
+    expect(LIST_PAGE).toContain('step=preview')
+    expect(LIST_PAGE).toContain('/friend-add-settings/publish?id=')
+    expect(LIST_PAGE).toContain('/friend-add-settings/runs?rule_id=')
+    expect(screens).not.toContain('/friend-add-settings/new')
+    expect(screens).not.toContain('/friend-add-settings/conflicts')
+    expect(screens).not.toContain('/friend-add-settings/test')
   })
 })
