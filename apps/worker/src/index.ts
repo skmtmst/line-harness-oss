@@ -1650,6 +1650,34 @@ async function scheduled(
     console.error('operator notification sweep error:', error);
   }
 
+  // N-369/N-370 (#938): 送信Webhookの送り残しを回収する。
+  //
+  // 初回の送信はイベント発火の側で同期に行う。ここが拾うのは、そこで
+  // 落ちて retry_wait に入った行と、Worker が途中で止まって
+  // pending/sending のまま残った行だけ。再送時刻は台帳の
+  // next_retry_at が持つので、5分のレーンで十分である。
+  // 1件の失敗で他の回収を止めないよう、例外はここで止める。
+  try {
+    const { sweepOutgoingWebhookDeliveries, OUTGOING_WEBHOOK_SWEEP_LIMIT } =
+      await import('./services/outgoing-webhook-delivery.js');
+    const result = await sweepOutgoingWebhookDeliveries(env.DB, {
+      limit: OUTGOING_WEBHOOK_SWEEP_LIMIT,
+      now: new Date(event.scheduledTime),
+    });
+    if (result.swept > 0) {
+      console.log(JSON.stringify({
+        event: 'outgoing_webhook_delivery_sweep',
+        swept: result.swept,
+        delivered: result.delivered,
+        failed: result.failed,
+        retryWait: result.retryWait,
+        skipped: result.skipped,
+      }));
+    }
+  } catch (error) {
+    console.error('outgoing webhook delivery sweep error:', error);
+  }
+
   const defaultLineClient = new LineClient(env.LINE_CHANNEL_ACCESS_TOKEN);
   const dispatchObservedAt = new Date(event.scheduledTime).toISOString();
   const observeDispatch = <T>(jobName: string, run: () => Promise<T>) =>

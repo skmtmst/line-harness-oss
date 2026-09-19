@@ -36,6 +36,24 @@ export function BannerTabs({
         ]}
         actions={actions}
       />
+      {/*
+        U032: 狭い幅ではタブと右端の操作（プロジェクトを作る・
+        アーカイブを見る）を別行にする。共通の Tabs は横1行・高さ44で
+        固定なので、この画面だけの規格外変更にならないよう、
+        設計Nodeの中の nav にだけメディアクエリで折り返しを足す。
+      */}
+      <style jsx global>{`
+        @media (width < 768px) {
+          [data-design-node='jGeAF'] > nav,
+          [data-design-node='bpdek'] > nav {
+            height: auto;
+            min-height: 44px;
+            flex-wrap: wrap;
+            row-gap: 4px;
+            padding-bottom: 8px;
+          }
+        }
+      `}</style>
     </div>
   )
 }

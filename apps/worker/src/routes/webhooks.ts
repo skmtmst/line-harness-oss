@@ -171,13 +171,14 @@ function readIncomingConfig(body: unknown):
 /**
  * 送り直しの回数を検証する。
  *
- * 上限を5にしているのは、待ち時間を倍にしていくと6回目以降は
- * Worker の実行時間に収まらなくなるため。相手が長時間落ちている場合まで
- * 面倒を見るなら、キューに積む別の設計が要る。
+ * #938 以降、再送はリクエスト内の sleep ではなく配送台帳の
+ * next_retry_at（1分→5分→30分…の指数待ち）で行う。待ち時間が
+ * Worker の実行時間を食わなくなったため、上限は要件26 §6-4 の
+ * 送信Webhook上限（最大8試行 = 初回 + 再送7回）にそろえる。
  */
 function readMaxRetries(raw: unknown): { ok: true; value: number } | { ok: false } {
   const n = Number(raw);
-  if (!Number.isInteger(n) || n < 0 || n > 5) return { ok: false };
+  if (!Number.isInteger(n) || n < 0 || n > 7) return { ok: false };
   return { ok: true, value: n };
 }
 
@@ -791,7 +792,7 @@ webhooks.post('/api/webhooks/outgoing', requireRole('owner'), async (c) => {
     if (body.maxRetries !== undefined) {
       const parsed = readMaxRetries(body.maxRetries);
       if (!parsed.ok) {
-        return c.json({ success: false, error: 'maxRetries must be an integer between 0 and 5' }, 400);
+        return c.json({ success: false, error: 'maxRetries must be an integer between 0 and 7' }, 400);
       }
       maxRetries = parsed.value;
     }
@@ -859,7 +860,7 @@ webhooks.put('/api/webhooks/outgoing/:id', requireRole('owner'), async (c) => {
     if (body.maxRetries !== undefined) {
       const parsed = readMaxRetries(body.maxRetries);
       if (!parsed.ok) {
-        return c.json({ success: false, error: 'maxRetries must be an integer between 0 and 5' }, 400);
+        return c.json({ success: false, error: 'maxRetries must be an integer between 0 and 7' }, 400);
       }
       maxRetries = parsed.value;
     }

@@ -424,6 +424,14 @@ function buildInboxUrl(channel: 'all' | 'line' | 'email', savedViewId: string | 
   return text ? `/chats?${text}` : '/chats'
 }
 
+/*
+ * 下書きの保管キー(#962 F06)。同じ会話IDが別アカウントにもあり得るので、
+ * アカウントと会話の両方で区切る。`\u001f` はIDに出ない区切り。
+ */
+function draftKeyOf(accountId: string | null | undefined, chatId: string | null | undefined): string {
+  return `${accountId ?? ''}\u001f${chatId ?? ''}`
+}
+
 function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
   const router = useRouter()
   const params = useSearchParams()
@@ -592,11 +600,17 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
   // N-025: 送信予約。JSTの datetime-local 値をそのまま口へ渡し、
   // 保存はサーバー側でUTCへ正規化される。
   const [scheduledSends, setScheduledSends] = useState<ScheduledChatSend[]>([])
+  // 予約一覧の取得失敗は「予約なし」と分けて持つ。0件のまま黙ると、
+  // 消えたわけではない予約を送り忘れる(#962 F07)。
+  const [scheduledSendsFailed, setScheduledSendsFailed] = useState(false)
   const [scheduleInput, setScheduleInput] = useState('')
   const [showSchedulePanel, setShowSchedulePanel] = useState(false)
   const [scheduling, setScheduling] = useState(false)
   const sendLockRef = useRef(false)
   const sendKeysRef = useRef(new IdempotencyKeyStore())
+  // 予約送信の多重実行ロック。state の scheduling は描画を待つため、
+  // 同じ tick の二度押しを止めるには ref が要る(sendLockRef と同じ型・#965)。
+  const scheduleLockRef = useRef(false)
   const [isMessageInputFocused, setIsMessageInputFocused] = useState(false)
   const isComposingRef = useRef(false)
   const messagesScrollRef = useRef<HTMLDivElement | null>(null)
@@ -610,6 +624,27 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
   // 上書きしない。注目操作が別の友だちへ向く事故もここで防ぐ。
   const detailRequestIdRef = useRef(0)
   const detailAccountRef = useRef(selectedAccountId)
+  /*
+   * いま画面で開いている会話ID。通信の応答が「どの会話へ向けたものか」を
+   * 照合するために描画のたびに同期する（listFilterKeyRef と同じ型）。
+   * 切替後に届いた古い応答の履歴マージ・入力欄クリア・予約一覧反映を
+   * 止める(#962 F03/F06/F07)。
+   */
+  const selectedChatIdRef = useRef<string | null>(selectedChatId)
+  selectedChatIdRef.current = selectedChatId
+  /*
+   * 入力中の下書き(本文・添付画像)は「アカウント＋会話」ごとに預かる
+   * (#962 F06)。切替のたびに消すと、送信応答を待つ間に別の会話を
+   * 開いただけで書きかけが消える。預かった下書きは送信した版だけを
+   * 破棄し、追記・差し替えされた版は残す(dropSentDraft)。
+   */
+  const messageContentRef = useRef(messageContent)
+  messageContentRef.current = messageContent
+  const pendingImageRef = useRef(pendingImage)
+  pendingImageRef.current = pendingImage
+  const messageDraftsRef = useRef(new Map<string, string>())
+  const imageDraftsRef = useRef(new Map<string, ImageUploaderValue>())
+  const draftOwnerKeyRef = useRef(draftKeyOf(selectedAccountId, selectedChatId))
   // 保存検索一覧の取得がどのアカウントに向けたものか。切替中に遅れて届いた
   // 旧アカウントの応答で、新しいアカウントの一覧を上書きしない(N-021)。
   const savedViewsRequestAccountRef = useRef<string | null>(null)
@@ -1067,29 +1102,38 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
       setMessagesHasMore(false)
       return
     }
+    /*
+     * 取得の起点となった会話とアカウントを固定する(#962 F03)。
+     * 応答が遅れて別の会話・アカウントへ切り替わったあとに届いても、
+     * そこへ前の会話の履歴を混ぜない。
+     */
+    const requestedChatId = selectedChatId
+    const requestedAccountId = selectedAccountId
     setLoadingOlderMessages(true)
     try {
-      const res = await api.chats.get(selectedChatId, {
+      const res = await api.chats.get(requestedChatId, {
         limit: CHAT_MESSAGE_PAGE_SIZE,
         beforeAt: oldest.createdAt,
         beforeId: oldest.id,
       })
+      if (selectedChatIdRef.current !== requestedChatId || detailAccountRef.current !== requestedAccountId) return
       if (res.success) {
         const detail = res.data
         const rows = detail.messages ?? []
         setChatDetail((prev) => {
-          if (!prev) return prev
+          if (!prev || prev.id !== requestedChatId) return prev
           const seen = new Set((prev.messages ?? []).map((m) => m.id))
           return { ...prev, messages: [...rows.filter((m) => !seen.has(m.id)), ...(prev.messages ?? [])] }
         })
         setMessagesHasMore(detail.hasMoreMessages === true)
       }
     } catch {
+      if (selectedChatIdRef.current !== requestedChatId || detailAccountRef.current !== requestedAccountId) return
       setError('前のメッセージを読み込めませんでした。')
     } finally {
       setLoadingOlderMessages(false)
     }
-  }, [loadingOlderMessages, selectedChatId, chatDetail?.messages])
+  }, [loadingOlderMessages, selectedChatId, selectedAccountId, chatDetail?.messages])
 
   // 同じ会話IDが別アカウントにも存在していても、切替前の遅い応答を表示しない。
   // 初回表示では深いリンクを消さず、実際にアカウントが変わったときだけ外す。
@@ -1215,20 +1259,32 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
   // N-025: 会話を開いた/変えたとき、その会話の送信予約を読む。
   // 予約はfriend単位なので会話IDはそのまま使える。失敗しても画面は止めない。
   const loadScheduledSends = useCallback(async (chatId: string) => {
+    // 取得の起点となったアカウントを固定する。切替後に届いた応答は捨てる。
+    const requestedAccountId = detailAccountRef.current
     try {
       const res = await api.chats.scheduled(chatId)
+      if (selectedChatIdRef.current !== chatId || detailAccountRef.current !== requestedAccountId) return
       // 口の形が変わったり古い環境の応答でも、一覧は必ず配列を保つ。
-      if (res.success) setScheduledSends(Array.isArray(res.data?.scheduled) ? res.data.scheduled : [])
+      if (res.success) {
+        setScheduledSendsFailed(false)
+        setScheduledSends(Array.isArray(res.data?.scheduled) ? res.data.scheduled : [])
+      } else {
+        setScheduledSendsFailed(true)
+      }
     } catch {
-      setScheduledSends([])
+      if (selectedChatIdRef.current !== chatId || detailAccountRef.current !== requestedAccountId) return
+      // 失敗を「予約なし」にしない。一覧は空に戻さず、失敗だけを知らせる(#962)。
+      setScheduledSendsFailed(true)
     }
   }, [])
 
   useEffect(() => {
+    // 会話を切り替えたら前の会話の予約を残さない。応答が遅れても
+    // その間に前の会話の行が見える事故を防ぐ(#962 F07)。
+    setScheduledSends([])
+    setScheduledSendsFailed(false)
     if (selectedChatId) {
       void loadScheduledSends(selectedChatId)
-    } else {
-      setScheduledSends([])
     }
   }, [selectedChatId, loadScheduledSends])
 
@@ -1246,6 +1302,26 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
     setShowSchedulePanel(false)
     setScheduleInput('')
   }, [selectedChatId])
+
+  /*
+   * 会話・アカウントを切り替えたら、いまの下書きを前の会話の鍵で預け、
+   * 次の会話に預けてあった下書きを戻す(#962 F06)。切り替えただけで
+   * 書きかけの文面や添付が消えないようにする。
+   */
+  useEffect(() => {
+    const nextKey = draftKeyOf(selectedAccountId, selectedChatId)
+    const prevKey = draftOwnerKeyRef.current
+    if (prevKey === nextKey) return
+    draftOwnerKeyRef.current = nextKey
+    const stashedText = messageContentRef.current
+    if (stashedText) messageDraftsRef.current.set(prevKey, stashedText)
+    else messageDraftsRef.current.delete(prevKey)
+    setMessageContent(messageDraftsRef.current.get(nextKey) ?? '')
+    const stashedImage = pendingImageRef.current
+    if (stashedImage) imageDraftsRef.current.set(prevKey, stashedImage)
+    else imageDraftsRef.current.delete(prevKey)
+    setPendingImage(imageDraftsRef.current.get(nextKey) ?? null)
+  }, [selectedAccountId, selectedChatId])
 
   // Surface deep-linked chats in the sidebar even when the current account
   // filter or status filter would exclude them — otherwise the user replies
@@ -1358,8 +1434,27 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
      * メール側は逆にLINEの選択を外していたので、片側だけ抜けていた。
      */
     setSelectedThreadId(null)
-    setMessageContent('')
-    setPendingImage(null)
+    // 下書きは会話ごとの預かりに移した(#962 F06)。ここで消すと、
+    // 切り替えただけで書きかけが消える。預け・戻しは上の効果が担う。
+  }
+
+  /*
+   * 送信・予約に使った版の下書きだけを預かりから外す(#962 F06)。
+   * 応答を待つ間に文面へ追記したり画像を付け替えたりしていれば、
+   * それは別の版なので残す。
+   */
+  const dropSentDraft = (
+    chatId: string,
+    accountId: string | null,
+    sent: { content?: string; image?: ImageUploaderValue | null },
+  ) => {
+    const key = draftKeyOf(accountId, chatId)
+    if (sent.content !== undefined && messageDraftsRef.current.get(key)?.trim() === sent.content) {
+      messageDraftsRef.current.delete(key)
+    }
+    if (sent.image && imageDraftsRef.current.get(key) === sent.image) {
+      imageDraftsRef.current.delete(key)
+    }
   }
 
   const handleSendMessage = async () => {
@@ -1396,8 +1491,16 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
         )
         if (sendResult.success) currentRevision = sendResult.data.revision
         sendKeysRef.current.clear(signature)
-        setPendingImage(null)
-        setMessageContent('')
+        /*
+         * 送信した版だけを消す(#962 F06)。応答を待つ間に別の会話・別
+         * アカウントへ切り替わっていたり、同じ会話でも送信中に追記・
+         * 付け替えされていれば、その下書きと添付は残す。
+         */
+        dropSentDraft(sendingChatId, sendingAccountId, { content, image: pendingImage })
+        if (selectedChatIdRef.current === sendingChatId && detailAccountRef.current === sendingAccountId) {
+          setPendingImage((prev) => (prev === pendingImage ? null : prev))
+          setMessageContent((prev) => (prev.trim() === content ? '' : prev))
+        }
         const staffName = sendResult.success ? sendResult.data.sentByStaffName : '自分'
         const combinedMessages = [
           buildOutgoingMessage({ messageType: 'image', content: imgPayload, sentByStaffName: staffName, sentAt: now }),
@@ -1436,7 +1539,11 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
         )
         if (sendResult.success) currentRevision = sendResult.data.revision
         sendKeysRef.current.clear(signature)
-        setPendingImage(null)
+        dropSentDraft(sendingChatId, sendingAccountId, { image: pendingImage })
+        // 送信した会話が開かれたまま、かつ添付が送った版のままのときだけ外す(#962 F06)。
+        if (selectedChatIdRef.current === sendingChatId && detailAccountRef.current === sendingAccountId) {
+          setPendingImage((prev) => (prev === pendingImage ? null : prev))
+        }
         // Optimistic update for image
         const imageMessage = buildOutgoingMessage({
           messageType: 'image',
@@ -1475,7 +1582,15 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
         )
         if (sendResult.success) currentRevision = sendResult.data.revision
         sendKeysRef.current.clear(signature)
-        setMessageContent('')
+        /*
+         * 送信した版だけを消す(#962 F06)。応答を待つ間に別の会話・別
+         * アカウントへ切り替わっていたり、送信中に追記されていれば、
+         * その下書きは残す。
+         */
+        dropSentDraft(sendingChatId, sendingAccountId, { content })
+        if (selectedChatIdRef.current === sendingChatId && detailAccountRef.current === sendingAccountId) {
+          setMessageContent((prev) => (prev.trim() === content ? '' : prev))
+        }
         // Optimistic update: append message locally instead of refetching (prevents scroll jump / full reload feel)
         // Only mutate chatDetail if it still corresponds to the chat we just sent to
         const textMessage = buildOutgoingMessage({
@@ -1512,7 +1627,10 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
       // 手動返信で未対応が 1 件減るので、サイドバーのバッジを即時更新させる
       window.dispatchEvent(new Event(UNANSWERED_REFRESH_EVENT))
       // 引用は1回の送信で使い切る。残すと次の返信にも同じ引用が付く。
-      setQuotedMessage(null)
+      // 送信した会話が開かれたまま、かつ引用が送った版のままのときだけ外す(#962 F06)。
+      if (selectedChatIdRef.current === sendingChatId && detailAccountRef.current === sendingAccountId) {
+        setQuotedMessage((prev) => (prev === quotedMessage ? null : prev))
+      }
     } catch (sendError) {
       // アカウントを切り替えたあとの古い応答は、新しいアカウントの画面へ出さない。
       if (detailAccountRef.current === sendingAccountId) {
@@ -1529,7 +1647,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
    * 成功したら入力と引用をクリアし、予約一覧を読み直す。
    */
   const handleScheduleSend = async () => {
-    if (!selectedChatId || scheduling) return
+    if (!selectedChatId || scheduling || scheduleLockRef.current) return
     const content = messageContent.trim()
     if (!content) return
     if (!scheduleInput) {
@@ -1541,24 +1659,47 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
       return
     }
     const schedulingChatId = selectedChatId
+    const schedulingAccountId = selectedAccountId
     setScheduling(true)
+    scheduleLockRef.current = true
     try {
+      /*
+       * 同じ送信版には同じ操作キーを使い回す(#965)。通信中の二度押しや
+       * 失敗後の再試行で毎回新しいキーを生やすと、処理待ちの予約行が
+       * 二重に登録される。成功した版は消して、次の予約を別操作にする。
+       */
+      const signature = JSON.stringify({
+        kind: 'schedule',
+        chatId: schedulingChatId,
+        content,
+        scheduledAt: scheduleInput,
+        quotedMessageId: quotedMessage?.id ?? null,
+      })
       const res = await api.chats.schedule(schedulingChatId, {
         content,
         scheduledAt: scheduleInput,
         quotedMessageId: quotedMessage?.id,
-      }, crypto.randomUUID())
+      }, sendKeysRef.current.get(signature))
       if (res.success) {
-        setMessageContent('')
-        setQuotedMessage(null)
-        setScheduleInput('')
-        setShowSchedulePanel(false)
+        sendKeysRef.current.clear(signature)
+        // 予約した版だけを消す。切替先の下書きや開いたパネルは触らない(#962 F06)。
+        dropSentDraft(schedulingChatId, schedulingAccountId, { content })
+        if (selectedChatIdRef.current === schedulingChatId && detailAccountRef.current === schedulingAccountId) {
+          setMessageContent((prev) => (prev.trim() === content ? '' : prev))
+          setQuotedMessage((prev) => (prev === quotedMessage ? null : prev))
+          setScheduleInput((prev) => (prev === scheduleInput ? '' : prev))
+          setShowSchedulePanel(false)
+        }
         await loadScheduledSends(schedulingChatId)
       }
     } catch (scheduleError) {
-      setError(describeSendFailure(scheduleError))
+      // アカウントを切り替えたあとの古い失敗は、新しいアカウントの画面へ出さない。
+      if (detailAccountRef.current === schedulingAccountId) {
+        setError(describeSendFailure(scheduleError))
+      }
     } finally {
       setScheduling(false)
+      scheduleLockRef.current = false
     }
   }
 
@@ -2948,6 +3089,19 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                       </Button>
                       <span className="text-ink-faint text-xs">入力した日時は日本時間です</span>
                     </div>
+                    {scheduledSendsFailed && (
+                      <p className="mt-2 text-xs text-danger">
+                        予約の一覧を読み込めませんでした。
+                        <button
+                          type="button"
+                          data-inbox-v6="scheduled-retry"
+                          onClick={() => { if (selectedChatId) void loadScheduledSends(selectedChatId) }}
+                          className="ml-1 font-semibold underline"
+                        >
+                          再読み込み
+                        </button>
+                      </p>
+                    )}
                     {scheduledSends.length > 0 && (
                       <ul className="mt-2 space-y-1.5">
                         {scheduledSends.map((row) => (

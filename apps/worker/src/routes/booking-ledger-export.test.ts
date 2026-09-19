@@ -300,6 +300,57 @@ describe('GET /api/booking/admin/bookings.csv (N-397)', () => {
     expect(text).not.toContain('"=HYPERLINK');
   });
 
+  test('タブや空白で始まる表示名も式にならないよう \' を頭に付ける (#959)', async () => {
+    sqlite
+      .prepare("UPDATE friends SET display_name = ? WHERE id = 'f1'")
+      .run('\t=SUM(1,1)');
+    sqlite
+      .prepare("UPDATE booking_customers SET display_name = ? WHERE id = 'customer-1'")
+      .run(' =1+1');
+    insertBooking(sqlite, { id: 'B1', friend: 'f1' });
+    insertBooking(sqlite, { id: 'B2', customer: 'customer-1' });
+    const { app, env } = makeApp(db);
+    const res = await app.request(
+      '/api/booking/admin/bookings.csv?account_id=acc1&status=all', {}, env,
+    );
+    const text = await res.text();
+    expect(text).toContain('"\'\t=SUM(1,1)"');
+    expect(text).toContain('"\' =1+1"');
+    expect(text).not.toContain('"\t=SUM');
+    expect(text).not.toContain('" =1+1');
+  });
+
+  test('注記行: 改行を仕込んだ絞り込み値は生のCSV行として混入しない (#959)', async () => {
+    insertBooking(sqlite, { id: 'B1', friend: 'f1', status: 'confirmed' });
+    const { app, env } = makeApp(db);
+    // status は trim されず、menu_name/query は途中の改行が trim を生き残る。
+    const res = await app.request(
+      '/api/booking/admin/bookings.csv?account_id=acc1' +
+        '&status=%0D%0A%3D1%2B1' +
+        '&menu_name=x%0D%0A%3DHYPERLINK(%22http://evil%22)' +
+        '&query=y%0D%0A%2B2%2B5' +
+        '&from=z%0D%0A%40cmd',
+      {}, env,
+    );
+    expect(res.status).toBe(200);
+    const text = await res.text();
+    const lines = text.split('\r\n');
+    // 細工値は絞り込み条件にも流れるのでデータ行は0件。改行注入が効いて
+    // いれば式の行がここに生えるが、注記行+見出し+末尾空行の3つだけ。
+    expect(lines).toHaveLength(3);
+    expect(lines[0]).toContain('予約台帳の書出し');
+    expect(lines[1]).toContain('予約ID');
+    expect(lines[2]).toBe('');
+    // どの行も式接頭辞やタブで始まらず、行の中に改行・制御文字も残らない。
+    for (const line of lines) {
+      expect(line).not.toMatch(/^[\t =+\-@]/);
+      expect(line).not.toMatch(/[\r\n\x00-\x1F\x7F]/);
+    }
+    // 値そのものは消さず改行だけ潰れて注記行に残る（状態==1+1 = 「状態=」+「=1+1」）。
+    expect(lines[0]).toContain('状態==1+1');
+    expect(lines[0]).toContain('メニュー=x=HYPERLINK');
+  });
+
   test('所属外アカウントは403（CSVも中身を出さない）', async () => {
     accountAccessMocks.canAccessAllLineAccounts.mockResolvedValue(false);
     insertBooking(sqlite, { id: 'B9', account: 'acc2', friend: 'f9', staff: 's9', menu: 'm9' });

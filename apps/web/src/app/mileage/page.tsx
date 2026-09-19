@@ -473,7 +473,7 @@ function MileagePageInner() {
   return (
     <div data-mileage-design="v6" data-design-node={tab === 'balances' ? 's98Vfw' : tab === 'earning-rules' ? 'N46cQ' : tab === 'rewards' ? 'qlVLJ' : tab === 'history' ? 'MvZm5' : 'z3PB2'}>
       <Breadcrumb items={[{ label: '成果と分析' }, { label: 'マイル' }, ...(tab === 'balances' ? [] : [{ label: TABS.find((item) => item.key === tab)?.label ?? 'マイル' }])]} className="mb-3" />
-      <div data-design="Tabs">
+      <div data-design="Tabs" data-tabs-row>
         <MergedTabs
           basePath="/mileage"
           tabs={displayTabs}
@@ -486,6 +486,21 @@ function MileagePageInner() {
               : undefined}
         />
       </div>
+      {/*
+        #972 U030: 390pxではタブの並びが右端の操作ボタンに重なっていた。
+        共通タブの形は変えず、この画面のタブ行だけ「収まらないとき折り返す」
+        にする。収まる幅では1行のままで見た目は変わらない。
+        U040 の表の側の印（data-mileage-table）もここでまとめて面倒を見る。
+      */}
+      <style>{`
+        [data-tabs-row] nav:has(> span) { height: auto; flex-wrap: wrap; row-gap: 8px; }
+        [data-tabs-row] nav:has(> span) > span { flex-wrap: wrap; row-gap: 0; }
+        [data-tabs-row] nav:has(> span) > span + span { margin-left: auto; }
+        /* U040: 決めごとの表は列が多い。狭い幅では見出しが潰れて列と
+           値の対応が読めなくなるので、枠の内側で横に動かせるようにする。 */
+        [data-mileage-table] { overflow-x: auto; }
+        [data-mileage-table] > table { min-width: 920px; }
+      `}</style>
 
       {!selectedAccountId && !accountLoading ? (
         <ListState
@@ -656,7 +671,7 @@ function MileagePageInner() {
             description="絞り込みの札を外すと表示されます。"
           />
         ) : (
-        <div className="bg-canvas rounded-card border-hairline overflow-hidden border">
+        <div className="bg-canvas rounded-card border-hairline overflow-hidden border" data-mileage-table="earning-rules">
           <table className="w-full table-fixed">
             <thead>
               <TableHeadRow>
@@ -784,6 +799,41 @@ function MileagePageInner() {
           />
         ) : (
           <div>
+            {/*
+              #972 U040: 390pxでは7列の表が潰れ、見出しと数値が別の行と
+              結び付いて読めた。狭い幅では表をやめ、友だち・残高・変動を
+              1枚の札にまとめる。表は lg 以上で出す。
+            */}
+            <div className="divide-y divide-hairline lg:hidden">
+              {members.map((member) => {
+                const displayRank = rankLabel(member.rank)
+                return (
+                  <div key={member.friendId} className="px-4 py-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold text-ink" title={member.displayName}>{member.displayName}</p>
+                        <p className="mt-0.5 truncate text-xs text-ink-faint" title={member.lineAccount.name}>{member.lineAccount.name}</p>
+                      </div>
+                      <p className="shrink-0 text-right">
+                        <span className="block font-bold tabular-nums text-accent-hover">{formatMileageNumber(member.available)}<span className="text-xs font-normal text-ink-faint"> マイル</span></span>
+                        {member.pending > 0 && <span className="block text-[10px] text-warning">保留 {formatMileageNumber(member.pending)}</span>}
+                      </p>
+                    </div>
+                    <dl className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-ink-secondary">
+                      <div><dt className="inline text-ink-faint">ランク：</dt><dd className="inline" title={member.rankReason}>{displayRank ?? '未設定'}</dd></div>
+                      <div><dt className="inline text-ink-faint">今月の増減：</dt><dd className={`inline font-semibold tabular-nums ${member.monthChange < 0 ? 'text-danger' : 'text-accent-hover'}`}>{member.monthChange > 0 ? '+' : ''}{formatMileageNumber(member.monthChange)}</dd></div>
+                      <div><dt className="inline text-ink-faint">消える予定：</dt><dd className="inline">{member.expiringMiles30d == null ? 'なし' : `${formatMileageNumber(member.expiringMiles30d)} マイル`}</dd></div>
+                      <div><dt className="inline text-ink-faint">最終変動：</dt><dd className="inline">{formatMileageDate(member.lastChangedAt)}</dd></div>
+                    </dl>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      <Button href={`/mileage/friends/detail?id=${encodeURIComponent(member.friendId)}`}>明細を見る</Button>
+                      {canAdjustMileage ? <Button href={`/mileage/friends/detail?id=${encodeURIComponent(member.friendId)}&adjust=1`}>増やす・減らす</Button> : null}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+            <div className="hidden lg:block">
             <table className="w-full table-fixed">
               <thead>
                 <TableHeadRow>
@@ -824,6 +874,7 @@ function MileagePageInner() {
                 })}
               </tbody>
             </table>
+            </div>
           </div>
         )}
 
