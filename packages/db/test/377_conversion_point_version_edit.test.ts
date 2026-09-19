@@ -41,6 +41,9 @@ beforeEach(() => {
       VALUES ('acc-a','ch-a','店A','t','s'), ('acc-b','ch-b','店B','t','s');
     INSERT INTO friends (id, line_user_id, display_name, line_account_id, created_at, updated_at)
       VALUES ('fr-1','U1','友1','acc-a','2026-01-01T00:00:00.000+09:00','2026-01-01T00:00:00.000+09:00');
+    -- N-258: 利用先は実在するIDだけが通る。試験で使う auto-1 を用意する。
+    INSERT INTO automations (id, name, event_type, line_account_id)
+      VALUES ('auto-1','自動化1','conversion_recorded','acc-a');
   `);
   db = asD1(sqlite);
 });

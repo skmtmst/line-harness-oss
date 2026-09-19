@@ -1682,7 +1682,7 @@ CREATE TABLE conversion_events (
   value_snapshot       REAL,
   idempotency_key      TEXT,
   created_at           TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
-, point_version_snapshot INTEGER);
+, point_version_snapshot INTEGER, tenant_id TEXT REFERENCES tenants(id));
 
 CREATE TABLE conversion_points (
   id         TEXT PRIMARY KEY,
@@ -1700,7 +1700,7 @@ CREATE TABLE conversion_points (
   CHECK (deduplication_mode IN ('every', 'once_per_friend', 'window')), deduplication_window_days INTEGER
   CHECK (deduplication_window_days IS NULL OR deduplication_window_days BETWEEN 1 AND 365), value_mode TEXT NOT NULL DEFAULT 'fixed'
   CHECK (value_mode IN ('source', 'fixed', 'none')), reversal_policy TEXT NOT NULL DEFAULT 'manual'
-  CHECK (reversal_policy IN ('source_cancelled', 'manual', 'none')));
+  CHECK (reversal_policy IN ('source_cancelled', 'manual', 'none')), tenant_id TEXT REFERENCES tenants(id));
 
 CREATE TABLE customer_notification_definitions (
   id                    TEXT PRIMARY KEY,
@@ -6613,7 +6613,13 @@ CREATE UNIQUE INDEX idx_conversion_events_point_idempotency
   ON conversion_events(conversion_point_id, idempotency_key)
   WHERE idempotency_key IS NOT NULL;
 
+CREATE INDEX idx_conversion_events_tenant
+  ON conversion_events(tenant_id);
+
 CREATE INDEX idx_conversion_points_status ON conversion_points(status, created_at DESC);
+
+CREATE INDEX idx_conversion_points_tenant
+  ON conversion_points(tenant_id);
 
 CREATE INDEX idx_customer_notification_definitions_account
   ON customer_notification_definitions(line_account_id, status, category, name, id);
