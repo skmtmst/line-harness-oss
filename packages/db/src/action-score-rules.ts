@@ -122,6 +122,13 @@ const DEFAULT_RULES: ActionScoreRule[] = [
     operation: 'set', value: 0, frequency: { kind: 'unlimited', limit: 1 },
     sameSourceEventOnce: true, validFrom: null, validUntil: null, enabled: true,
   },
+  // N-239: 友だち追加はLINE webhookから実際に届く出来事。新規作成時の
+  // 初期ルールにも入れておく（再フォロー時にも同じだけ加点される）。
+  {
+    id: 'friend-joined', name: '友だちになった', eventType: 'friend_add', source: 'line_webhook',
+    operation: 'delta', value: 3, frequency: { kind: 'unlimited', limit: 1 },
+    sameSourceEventOnce: true, validFrom: null, validUntil: null, enabled: true,
+  },
 ];
 
 export function defaultActionScoreRuleBundle(): ActionScoreRuleBundle {
@@ -653,6 +660,198 @@ export async function applyPublishedActionScoreRules(
     });
   }
   return { configured: true, status: owner.status, applications };
+}
+
+export interface ActionScoreManualAdjustmentResult {
+  historyId: string;
+  scoreBefore: number;
+  scoreAfter: number;
+  appliedChange: number;
+  bandBefore: 'low' | 'normal' | 'high';
+  bandAfter: 'low' | 'normal' | 'high';
+  replayed: boolean;
+}
+
+type ManualAdjustmentRow = {
+  id: string;
+  friend_id: string;
+  score_change: number;
+  reason: string | null;
+  score_before: number | null;
+  score_after: number | null;
+};
+
+function manualAdjustmentResult(
+  row: ManualAdjustmentRow,
+  bands: ActionScoreBands,
+  replayed: boolean,
+): ActionScoreManualAdjustmentResult {
+  return {
+    historyId: row.id,
+    scoreBefore: Number(row.score_before ?? 0),
+    scoreAfter: Number(row.score_after ?? 0),
+    appliedChange: Number(row.score_change),
+    bandBefore: actionScoreBand(Number(row.score_before ?? 0), bands),
+    bandAfter: actionScoreBand(Number(row.score_after ?? 0), bands),
+    replayed,
+  };
+}
+
+/**
+ * 担当者が理由つきで点数を1人分手で直す。履歴は追記だけで、過去の行は書き換えない。
+ *
+ * 点数は帯の下限〜上限の中に収まる場合だけ受け付ける。範囲をまたぐ依頼は
+ * 静かに丸めず `score_out_of_range` で止める（依頼した変化量と実際に動いた量が
+ * 食い違うと、冪等キーの再送を「別内容」と誤判定してしまうため）。
+ * `friends.score` の更新は `trg_friend_scores_v6_snapshot` トリガーが同じ文の中で行う。
+ */
+export async function postActionScoreManualAdjustment(
+  db: D1Database,
+  input: {
+    lineAccountId: string;
+    friendId: string;
+    scoreChange: number;
+    reason: string;
+    idempotencyKey: string;
+    executedByStaffId: string | null;
+    executedByStaffName: string | null;
+    occurredAt?: string;
+  },
+): Promise<ActionScoreManualAdjustmentResult> {
+  if (!input.lineAccountId || !input.friendId) {
+    throw new ActionScoreRuleValidationError('friend_not_found', '対象の友だちが見つかりません');
+  }
+  if (!Number.isInteger(input.scoreChange) || input.scoreChange === 0) {
+    throw new ActionScoreRuleValidationError('score_change_invalid', '増やす・減らす点数を確認してください', 'amount');
+  }
+  const reason = input.reason.trim();
+  if (!reason || reason.length > 500) {
+    throw new ActionScoreRuleValidationError('reason_required', '理由を入力してください', 'reason');
+  }
+  if (!input.idempotencyKey || input.idempotencyKey.length > 255) {
+    throw new ActionScoreRuleValidationError('idempotency_key_required', '冪等キーを確認してください');
+  }
+
+  const bands = await getActionScoreBands(db, input.lineAccountId);
+  const existing = await db.prepare(
+    `SELECT id, friend_id, score_change, reason, score_before, score_after
+       FROM friend_scores WHERE line_account_id = ? AND idempotency_key = ?`,
+  ).bind(input.lineAccountId, input.idempotencyKey).first<ManualAdjustmentRow>();
+  if (existing) {
+    if (existing.friend_id === input.friendId
+      && Number(existing.score_change) === input.scoreChange
+      && existing.reason === reason) {
+      return manualAdjustmentResult(existing, bands, true);
+    }
+    throw new ActionScoreRuleValidationError('idempotency_conflict', '同じ冪等キーが別の内容で使われています');
+  }
+
+  const friend = await db.prepare(
+    `SELECT id, COALESCE(score, 0) AS score FROM friends WHERE id = ? AND line_account_id = ?`,
+  ).bind(input.friendId, input.lineAccountId).first<{ id: string; score: number }>();
+  if (!friend) {
+    throw new ActionScoreRuleValidationError('friend_not_found', '対象の友だちが見つかりません');
+  }
+  const scoreBefore = friend.score;
+  const scoreAfter = scoreBefore + input.scoreChange;
+  if (scoreAfter < bands.min || scoreAfter > bands.max) {
+    throw new ActionScoreRuleValidationError(
+      'score_out_of_range',
+      `点数は${bands.min}〜${bands.max}点の範囲でしか動かせません（現在${scoreBefore}点）`,
+      'amount',
+    );
+  }
+
+  const historyId = crypto.randomUUID();
+  const occurredAt = input.occurredAt ?? new Date().toISOString();
+  const write = await db.prepare(
+    `INSERT OR IGNORE INTO friend_scores
+       (id, friend_id, scoring_rule_id, score_change, reason, created_at,
+        line_account_id, event_type, source, idempotency_key,
+        operation, score_before, score_after, occurred_at,
+        executed_by_staff_id, executed_by_staff_name)
+     VALUES (?, ?, NULL, ?, ?, ?, ?, 'manual_adjustment', 'staff', ?,
+             'manual_adjustment', ?, ?, ?, ?, ?)`,
+  ).bind(
+    historyId, input.friendId, input.scoreChange, reason, occurredAt,
+    input.lineAccountId, input.idempotencyKey,
+    scoreBefore, scoreAfter, occurredAt,
+    input.executedByStaffId, input.executedByStaffName,
+  ).run();
+
+  const row = await db.prepare(
+    `SELECT id, friend_id, score_change, reason, score_before, score_after
+       FROM friend_scores WHERE line_account_id = ? AND idempotency_key = ?`,
+  ).bind(input.lineAccountId, input.idempotencyKey).first<ManualAdjustmentRow>();
+  if (!row) {
+    throw new ActionScoreRuleValidationError('score_write_failed', 'スコア履歴を保存できませんでした');
+  }
+  // 同時実行で別内容の行が先に入った場合、無視されたこちらを成功とは返さない。
+  if (row.friend_id !== input.friendId
+    || Number(row.score_change) !== input.scoreChange
+    || row.reason !== reason) {
+    throw new ActionScoreRuleValidationError('idempotency_conflict', '同じ冪等キーが別の内容で使われています');
+  }
+  return manualAdjustmentResult(row, bands, (write.meta?.changes ?? 0) === 0);
+}
+
+export interface ActionScoreBandPreview {
+  bands: ActionScoreBands;
+  counts: { low: number; normal: number; high: number };
+  totalFriends: number;
+  measuredAt: string;
+}
+
+function validateBandPreviewInput(value: unknown): ActionScoreBands {
+  if (!value || typeof value !== 'object') {
+    throw new ActionScoreRuleValidationError('bands_invalid', '帯の分けかたを確認してください', 'bands');
+  }
+  const raw = value as Record<string, unknown>;
+  const bands = {
+    min: Number(raw.min ?? 0),
+    max: Number(raw.max),
+    normalMin: Number(raw.normalMin),
+    highMin: Number(raw.highMin),
+  };
+  const integers = Object.values(bands).every((item) => Number.isInteger(item));
+  if (!integers || bands.min < 0 || bands.max <= bands.min
+    || bands.normalMin <= bands.min || bands.normalMin >= bands.highMin || bands.highMin >= bands.max) {
+    throw new ActionScoreRuleValidationError('bands_invalid', '帯の分けかたを確認してください', 'bands');
+  }
+  return bands;
+}
+
+/**
+ * 編集中の帯の分けかたで、今いる友だちがどの帯に何人入るかだけ数える。
+ * 公開版も友だちの点数も書き換えない読み取り専用のプレビュー。
+ */
+export async function previewActionScoreBandDistribution(
+  db: D1Database,
+  input: { lineAccountId: string; bands: unknown },
+): Promise<ActionScoreBandPreview> {
+  const bands = validateBandPreviewInput(input.bands);
+  // 「点数が付いた友だち」の母集団は /api/action-scores/friends の一覧と
+  // そろえる（score が 0 以外、または履歴が1行でもある人）。まだ一度も
+  // 点数が付いていない人は帯の内訳に含めない。
+  const rows = await db.prepare(
+    `SELECT CASE WHEN score >= ? THEN 'high' WHEN score >= ? THEN 'normal' ELSE 'low' END AS band,
+            COUNT(*) AS friend_count
+       FROM friends f
+      WHERE f.line_account_id = ?
+        AND (f.score != 0 OR EXISTS (SELECT 1 FROM friend_scores any_score WHERE any_score.friend_id = f.id))
+      GROUP BY band`,
+  ).bind(bands.highMin, bands.normalMin, input.lineAccountId)
+    .all<{ band: 'low' | 'normal' | 'high'; friend_count: number }>();
+  const counts = { low: 0, normal: 0, high: 0 };
+  for (const row of rows.results) {
+    counts[row.band] = Number(row.friend_count);
+  }
+  return {
+    bands,
+    counts,
+    totalFriends: counts.low + counts.normal + counts.high,
+    measuredAt: new Date().toISOString(),
+  };
 }
 
 export async function processActionScoreInactivity(

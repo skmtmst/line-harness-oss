@@ -2,7 +2,8 @@
 
 import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Ban, CalendarCheck, Clock3, ClipboardList, EyeOff, MailX, MessageCircle, MousePointerClick, Pencil, Plus, RefreshCw, ShoppingBag, Trash2, WalletCards } from 'lucide-react'
+import { Ban, CalendarCheck, Clock3, ClipboardList, EyeOff, MailX, MessageCircle, MousePointerClick, Pencil, Plus, RefreshCw, ShoppingBag, Trash2, UserPlus, WalletCards } from 'lucide-react'
+import { EC_EVENT_LABELS, EC_EVENT_TYPES } from '@line-crm/shared'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import Breadcrumb from '@/components/shared/breadcrumb'
 import Button from '@/components/shared/button'
@@ -16,6 +17,7 @@ import { useAccount } from '@/contexts/account-context'
 import {
   ApiError,
   api,
+  type ActionScoreBandPreview,
   type ActionScoreBands,
   type ActionScoreFrequencyKind,
   type ActionScoreRule,
@@ -27,14 +29,30 @@ import { localDateTime, utcDateTime } from '@/lib/presentation'
 
 type ConfirmAction = { kind: 'publish'; draftVersionId: string } | { kind: 'stop' } | null
 
+/*
+ * N-239: ここに出せるきっかけは、実際にスコアへ届く出来事だけ。
+ * `イベントの種類|発生元` の値は発火側（LINE webhook・予約・決済・EC連携・
+ * 受信箱）と1つずつ対応させた。発生元が複数ある出来事（予約）や、スコアへ
+ * 届かない出来事（タグ付与・ウェビナー視聴などマイル専用）は出さない。
+ */
 const EVENT_OPTIONS = [
   { value: 'message_received|line_webhook', label: 'メッセージに返信した' },
+  { value: 'postback_received|line_webhook', label: 'リッチメニューなどのボタンを押した' },
+  { value: 'friend_add|line_webhook', label: '友だちになった' },
+  { value: 'friend_unfollow|line_webhook', label: 'ブロックした' },
   { value: 'link_clicked|tracked_link', label: '配信のURLを押した' },
   { value: 'form_submitted|form', label: '回答フォームに答えた' },
   { value: 'booking_created|', label: '予約した' },
   { value: 'purchase_completed|stripe', label: '購入した' },
+  { value: 'cv_fire|stripe', label: '購入の成果が計測された' },
+  { value: 'staff_assigned|inbox_assignment', label: '受信箱で担当者が付いた' },
+  { value: 'manual_reply_sent|manual_reply', label: '担当者が個別に返信した' },
   { value: 'inactivity_30d|scheduler', label: '30日間反応がない' },
-  { value: 'friend_unfollow|line_webhook', label: 'ブロックした' },
+  // EC連携から届く出来事。発生元はすべてEC-CUBE本体（source: eccube）。
+  ...EC_EVENT_TYPES.map((eventType) => ({
+    value: `${eventType}|eccube`,
+    label: `EC：${EC_EVENT_LABELS[eventType]}`,
+  })),
 ] as const
 
 const FREQUENCY_OPTIONS: Array<{ value: ActionScoreFrequencyKind; label: string }> = [
@@ -66,11 +84,12 @@ function ruleFrequencyLabel(rule: ActionScoreRule) {
 }
 
 function RuleIcon({ eventType }: { eventType: string }) {
-  if (eventType === 'link_clicked') return <MousePointerClick className="h-4 w-4 shrink-0" aria-hidden="true" />
-  if (eventType === 'message_received') return <MessageCircle className="h-4 w-4 shrink-0" aria-hidden="true" />
+  if (eventType === 'link_clicked' || eventType === 'postback_received') return <MousePointerClick className="h-4 w-4 shrink-0" aria-hidden="true" />
+  if (eventType === 'message_received' || eventType === 'manual_reply_sent' || eventType === 'staff_assigned') return <MessageCircle className="h-4 w-4 shrink-0" aria-hidden="true" />
+  if (eventType === 'friend_add') return <UserPlus className="h-4 w-4 shrink-0" aria-hidden="true" />
   if (eventType === 'form_submitted') return <ClipboardList className="h-4 w-4 shrink-0" aria-hidden="true" />
   if (eventType === 'booking_created') return <CalendarCheck className="h-4 w-4 shrink-0" aria-hidden="true" />
-  if (eventType === 'purchase_completed') return <ShoppingBag className="h-4 w-4 shrink-0" aria-hidden="true" />
+  if (eventType === 'purchase_completed' || eventType === 'cv_fire' || eventType.startsWith('ec.')) return <ShoppingBag className="h-4 w-4 shrink-0" aria-hidden="true" />
   if (eventType === 'inactivity_30d') return <Clock3 className="h-4 w-4 shrink-0" aria-hidden="true" />
   return <Ban className="h-4 w-4 shrink-0" aria-hidden="true" />
 }
@@ -126,6 +145,13 @@ export default function ActionScoreRulesPage() {
   const [testScore, setTestScore] = useState('30')
   const [testEvent, setTestEvent] = useState<string>(EVENT_OPTIONS[0].value)
   const [testResult, setTestResult] = useState<ActionScoreRuleTestResult | null>(null)
+  /*
+   * N-235: 帯の分けかたを変えたとき「何人がどの帯へ入るか」を先に数える
+   * 読み取り専用の試算。公開版も友だちの点数も動かさない。
+   * 分けかたを編集したら古い結果は捨てる（`updateBands` で null）。
+   */
+  const [bandPreview, setBandPreview] = useState<ActionScoreBandPreview | null>(null)
+  const [bandPreviewBusy, setBandPreviewBusy] = useState(false)
 
   useEffect(() => {
     let current = true
@@ -183,7 +209,31 @@ export default function ActionScoreRulesPage() {
   const updateBands = (updates: Partial<ActionScoreBands>) => {
     setNotice('')
     setTestResult(null)
+    setBandPreview(null)
     setBundle((current) => current ? { ...current, bands: { ...current.bands, ...updates } } : current)
+  }
+
+  /*
+   * 編集中の分けかたで、いまの友だちの点数がどの帯へ分かれるかだけ数える。
+   * 書き込みは一切しない（`POST /api/action-scores/bands/preview` は読み取り専用）。
+   */
+  const previewBands = async () => {
+    if (!selectedAccountId || !bundle || bandPreviewBusy) return
+    setBandPreviewBusy(true)
+    setActionError('')
+    try {
+      const response = await api.actionScores.previewBands({
+        accountId: selectedAccountId,
+        bands: bundle.bands,
+      })
+      if (!response.success) throw new Error(response.error)
+      setBandPreview(response.data)
+    } catch (error) {
+      setBandPreview(null)
+      setActionError(fieldError(error))
+    } finally {
+      setBandPreviewBusy(false)
+    }
   }
 
   const addRule = () => {
@@ -375,6 +425,17 @@ export default function ActionScoreRulesPage() {
                 <Field label="ふつう（以上）" htmlFor="score-normal"><TextInput id="score-normal" type="number" value={bundle.bands.normalMin} disabled={!canEdit} onChange={(event) => updateBands({ normalMin: Number(event.target.value) })} /></Field>
                 <Field label="点の上限" htmlFor="score-max"><TextInput id="score-max" type="number" value={bundle.bands.max} disabled={!canEdit} onChange={(event) => updateBands({ max: Number(event.target.value) })} /></Field>
               </div>
+              <div className="mt-3 flex flex-wrap items-center gap-3">
+                <Button onClick={() => void previewBands()} disabled={!canEdit || bandPreviewBusy}>
+                  {bandPreviewBusy ? '数えています' : 'この分けかただと何人入るか見る'}
+                </Button>
+                {bandPreview ? (
+                  <p className="text-xs text-ink-secondary" role="status">
+                    高い {bandPreview.counts.high.toLocaleString('ja-JP')}人・ふつう {bandPreview.counts.normal.toLocaleString('ja-JP')}人・低い {bandPreview.counts.low.toLocaleString('ja-JP')}人
+                    <span className="text-ink-faint">（全{bandPreview.totalFriends.toLocaleString('ja-JP')}人・{bandPreview.measuredAt.slice(0, 10)}時点・点数は変わりません）</span>
+                  </p>
+                ) : null}
+              </div>
             </section>
           </div>
 
@@ -386,6 +447,7 @@ export default function ActionScoreRulesPage() {
                 <div className="flex gap-2"><WalletCards className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" /><p><strong>マイル残高は動きません</strong><br />点が下がっても、マイルは減りません</p></div>
                 <div className="flex gap-2"><RefreshCw className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" /><p><strong>過去の点数は書き換えません</strong><br />新しいできごとから新しいルールが動きます</p></div>
                 <div className="flex gap-2"><MailX className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" /><p><strong>「メッセージを開いた」は使えません</strong><br />LINEは既読を返さないため、ルールにできません</p></div>
+                <div className="flex gap-2"><Ban className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" /><p><strong>マイル専用のきっかけは出しません</strong><br />タグ付与・ウェビナー視聴・継続フォロー日数・紹介成果などは、マイルの決めごとから選べます</p></div>
               </div>
             </section>
 

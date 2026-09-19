@@ -2773,6 +2773,21 @@ export type ActionScoreRuleTestResult = {
   bandAfter: ActionScoreBand
   matched: Array<{ ruleId: string; ruleName: string; scoreBefore: number; scoreAfter: number }>
 }
+export type ActionScoreAdjustmentResult = {
+  historyId: string
+  scoreBefore: number
+  scoreAfter: number
+  appliedChange: number
+  bandBefore: ActionScoreBand
+  bandAfter: ActionScoreBand
+  replayed: boolean
+}
+export type ActionScoreBandPreview = {
+  bands: ActionScoreBands
+  counts: { low: number; normal: number; high: number }
+  totalFriends: number
+  measuredAt: string
+}
 /** Friend list items, optionally hydrated with chat status (when ?includeChatStatus=true) */
 export type FriendListItem = FriendWithTags & Partial<{
   latestIncomingMessage: { content: string; messageType: string; createdAt: string } | null
@@ -9276,6 +9291,15 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({ accountId }),
       }),
+    /*
+      止めた使い道を、止める前と同じ公開版でもう一度出す（N-236）。
+      下書きの公開ではなく公開済み版の再掲なので、確認ヘッダは要らない。
+    */
+    resumeReward: (id: string, accountId: string) =>
+      fetchApi<ApiResponse<MileageRewardSummary>>(`/api/mileage/rewards/${encodeURIComponent(id)}/status`, {
+        method: 'POST',
+        body: JSON.stringify({ accountId, status: 'published' }),
+      }),
     rewards: (accountId: string) =>
       fetchApi<ApiResponse<MileageRewardAdminOverview>>(
         `/api/mileage/rewards?accountId=${encodeURIComponent(accountId)}`,
@@ -9479,6 +9503,37 @@ export const api = {
       fetchApi<ApiResponse<ActionScoreRuleConfiguration>>('/api/action-scores/rules/stop', {
         method: 'POST',
         body: JSON.stringify({ accountId }),
+      }),
+    /*
+      担当者が理由つきで1人分の点数を手で直す（N-235）。
+      不可逆なので確認ヘッダを必須にし、同じ操作の再送は同じ冪等キーで潰す。
+    */
+    adjust: (
+      data: {
+        accountId: string
+        friendId: string
+        direction: 'increase' | 'decrease'
+        amount: number
+        reason: string
+      },
+      idempotencyKey: string,
+    ) =>
+      fetchApi<ApiResponse<ActionScoreAdjustmentResult>>('/api/action-scores/adjustments', {
+        method: 'POST',
+        headers: {
+          'X-Confirm-Irreversible': 'action-score-adjustment',
+          'Idempotency-Key': idempotencyKey,
+        },
+        body: JSON.stringify(data),
+      }),
+    /*
+      編集中の帯の分けかたで各帯の人数だけを数える読み取り専用プレビュー。
+      公開版も友だちの点数も動かさない。
+    */
+    previewBands: (data: { accountId: string; bands: ActionScoreBands }) =>
+      fetchApi<ApiResponse<ActionScoreBandPreview>>('/api/action-scores/bands/preview', {
+        method: 'POST',
+        body: JSON.stringify(data),
       }),
   },
   webhooks: {
