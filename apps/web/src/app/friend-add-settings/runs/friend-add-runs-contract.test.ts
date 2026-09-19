@@ -121,9 +121,29 @@ describe('V6 友だち追加時配信・実行結果の契約', () => {
     expect(PAGE).toContain('await loadRuleState()')
   })
 
-  it('CSV書き出しは式として動かない形にし、範囲を明記する', () => {
+  it('CSV書き出しは式として動かない形にし、範囲を明記する(#946 N-111)', () => {
     expect(PAGE).toContain("import { csvCell } from './csv'")
-    expect(PAGE).toContain('CSVの書き出しもこのページに表示中の記録だけです')
+    /*
+     * 表示中の20件だけではなく、今の絞り込みに合う記録をカーソルで
+     * 全頁読んで書き出す。上限で切れたときは画面へ断る。
+     */
+    expect(PAGE).toContain('limit: CSV_EXPORT_PAGE_SIZE')
+    expect(PAGE).toContain('exportCursor = response.data.nextCursor ?? undefined')
+    expect(PAGE).toContain('CSV_EXPORT_MAX_PAGES')
+    expect(PAGE).toContain('それより古い記録は含まれていません')
+    expect(PAGE).toContain('CSVは絞り込みに合う記録を新しい順にすべて書き出します')
+    expect(PAGE).not.toContain('CSVの書き出しもこのページに表示中の記録だけです')
+    // 書き出しの絞りは一覧と同じ条件をサーバへ送る（一覧取得とCSV取得の2か所）
+    expect(PAGE.match(/ruleId: ruleIdFilter \?\? undefined/g)?.length).toBe(2)
+    expect(PAGE.match(/status: routing === 'all' \? undefined : routing/g)?.length).toBe(2)
+  })
+
+  it('設定別の実行結果は rule_id をサーバ側の絞り込みへ渡す(#946 N-107)', () => {
+    // 一覧の「その他操作」→「この設定の実行結果」の行き先。
+    expect(PAGE).toContain("searchParams.get('rule_id')")
+    expect(PAGE).toContain('ruleId: ruleIdFilter ?? undefined')
+    expect(PAGE).toContain('この設定の実行結果だけを表示しています')
+    expect(SETTINGS).toContain('`/friend-add-settings/runs?rule_id=${encodeURIComponent(rule.id)}`')
   })
 
   it('固定IDの導線を持たない', () => {

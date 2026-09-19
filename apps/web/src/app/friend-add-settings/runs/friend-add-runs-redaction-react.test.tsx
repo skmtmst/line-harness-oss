@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const state = vi.hoisted(() => ({ redacted: true }))
 vi.mock('next/link', () => ({ default: ({ href, children, ...props }: any) => <a href={href} {...props}>{children}</a> }))
+vi.mock('next/navigation', () => ({ useSearchParams: () => new URLSearchParams() }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'account-1', accounts: [{ id: 'account-1' }], loading: false }) }))
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => undefined }))
 vi.mock('@/components/shared/button', () => ({ default: ({ href, children, ...props }: any) => href ? <a href={href} {...props}>{children}</a> : <button {...props}>{children}</button> }))

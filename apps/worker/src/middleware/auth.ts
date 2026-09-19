@@ -252,6 +252,12 @@ const STAFF_API_PERMISSION_OVERRIDES: Array<[RegExp, string]> = [
   [/^\/api\/friends\/[^/]+\/fields(?:\/|$)/, '/tags'],
   [/^\/api\/friends\/[^/]+\/support-mark(?:\/|$)/, '/tags'],
   [/^\/api\/friends\/support-mark\/bulk(?:\/|$)/, '/tags'],
+  // 友だち単位の購読操作（#949 N-054 / 機能05 §7）は操作ごとの個別鍵で
+  // 委譲する。失敗の再送だけを任された staff（scenario.step_run.retry）が
+  // 購読の操作権限なしで retry へ届くよう、第一関門も操作単位の鍵を見る。
+  // route 側の requirePermission が最終判定を握る。
+  [/^\/api\/scenario-subscriptions\/[^/]+\/retry(?:\/|$)/, 'scenario.step_run.retry'],
+  [/^\/api\/scenario-subscriptions(?:\/|$)/, 'scenario.subscription.edit'],
 ];
 
 export function permissionForApiPath(path: string): string | null {

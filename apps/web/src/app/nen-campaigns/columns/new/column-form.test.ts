@@ -4,6 +4,7 @@ import {
   canSubmit,
   EMPTY_DRAFT,
   failureOf,
+  isPastScheduledAt,
   publishedAtIso,
   titleNotice,
   toCreateInput,
@@ -139,6 +140,36 @@ describe('公開日時', () => {
   it('日付だけ・時刻だけでは送らない', () => {
     expect(publishedAtIso('2026-08-31')).toBeNull()
     expect(validateDraft(draft({ publishedAt: '2026-08-31' })).map((e) => e.field)).toContain('publishedAt')
+  })
+})
+
+describe('配信日時（#935 N-304）', () => {
+  it('過去の配信日時を止める', () => {
+    /*
+      過去を通すとWorkerの次のtickで即送され、「予約した」のに「今届いた」になる。
+      Workerも断るが、入力中に先に気づけるようにする。
+    */
+    const errors = validateDraft(draft({ scheduledAt: '2000-01-01T00:00' }))
+    const hit = errors.find((e) => e.field === 'scheduledAt')
+    expect(hit?.message).toContain('いまより先')
+  })
+
+  it('未来の配信日時は通す', () => {
+    expect(validateDraft(draft({ scheduledAt: '2099-05-01T10:30' })).length).toBe(0)
+    expect(toCreateInput(draft({ scheduledAt: '2099-05-01T10:30' })).scheduledAt)
+      .toBe('2099-05-01T10:30:00+09:00')
+  })
+
+  it('空や形の足りない入力を「過去」と間違えない', () => {
+    expect(isPastScheduledAt('')).toBe(false)
+    expect(isPastScheduledAt('2000-01-01')).toBe(false)
+    // 「いま」より1分前だけ過去扱いにする（基準時刻を渡せる）。
+    expect(isPastScheduledAt('2000-01-01T00:00', Date.parse('2000-01-01T00:01:00+09:00'))).toBe(true)
+    expect(isPastScheduledAt('2099-01-01T00:00')).toBe(false)
+  })
+
+  it('Workerの past_datetime を画面の言葉にする', () => {
+    expect(failureOf({ status: 400, code: 'past_datetime' }).message).toContain('いまより先')
   })
 })
 

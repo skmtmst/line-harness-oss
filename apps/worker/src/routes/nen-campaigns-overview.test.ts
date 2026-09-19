@@ -68,4 +68,38 @@ describe('overview の待ち件数(点検 #512 の中2)', () => {
     // 一覧の窓付き集計ではなく、未来ぶんだけを数える。
     expect(jobsSql).toContain("status = 'pending' AND datetime(scheduled_at) > datetime('now')");
   });
+
+  test('pendingByCampaign は配信ごとの未来ぶんを返す(#935 N-299)', async () => {
+    mocks.prepare.mockImplementation((sql: string) => {
+      const statement = {
+        bind: (..._args: unknown[]) => statement,
+        first: vi.fn(async () => {
+          if (sql.includes('FROM nen_delivery_jobs')) return { total: 10, pending: 4, sent: 5, failed: 1 };
+          return { count: 0 };
+        }),
+        all: vi.fn(async () => {
+          if (sql.includes('GROUP BY campaign_key')) {
+            return { results: [
+              { campaign_key: 'arrival_check', count: 3 },
+              { campaign_key: 'column', count: 1 },
+            ] };
+          }
+          return { results: [] };
+        }),
+      };
+      return statement;
+    });
+    const res = await app().request('/api/nen-campaigns/overview?lineAccountId=account-a');
+    expect(res.status).toBe(200);
+    const body = await res.json() as {
+      success: boolean;
+      data: { jobs: { pending: number; pendingByCampaign: Record<string, number> } };
+    };
+    expect(body.data.jobs.pendingByCampaign).toEqual({ arrival_check: 3, column: 1 });
+    const sql = mocks.prepare.mock.calls
+      .map((call) => String(call[0]))
+      .find((entry) => entry.includes('GROUP BY campaign_key'));
+    // 全体の pending と同じ決めごと（未来ぶんだけ）で配信ごとに分ける。
+    expect(sql).toContain("status = 'pending' AND datetime(scheduled_at) > datetime('now')");
+  });
 });

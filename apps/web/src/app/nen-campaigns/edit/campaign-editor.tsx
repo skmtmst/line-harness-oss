@@ -8,6 +8,8 @@ import { checkNenCampaignBodyLength, NEN_CAMPAIGN_BODY_MAX_LENGTH } from '@line-
 import { useAccount } from '@/contexts/account-context'
 import { Field, inputClass } from '@/components/shared/form-controls'
 import Button from '@/components/shared/button'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import ListState from '@/components/shared/list-state'
 import StickyBar from '@/components/shared/sticky-bar'
 import InsertToolbar from '@/components/scenarios/insert-toolbar'
@@ -56,6 +58,11 @@ export default function CampaignEditor({ campaignKey }: { campaignKey: string })
   const [testCandidates, setTestCandidates] = useState<Array<{ id: string; displayName: string | null }>>([])
   const [testLoginUsers, setTestLoginUsers] = useState<Array<{ id: string; displayName: string }>>([])
   const [testing, setTesting] = useState(false)
+  /*
+   * #935 N-299: 「これから届く◯通」は実数で言う。取れなければ件数を言わない
+   * 文に切り替える（数字をでたらめに出さない）。
+   */
+  const [pendingCount, setPendingCount] = useState<number | null>(null)
   const bodyRef = useRef<HTMLTextAreaElement>(null)
   const { selectedAccountId, selectedAccount } = useAccount()
 
@@ -86,6 +93,12 @@ export default function CampaignEditor({ campaignKey }: { campaignKey: string })
     }).finally(() => {
       if (!cancelled) setLoading(false)
     })
+    // 待ち件数の取得だけ失敗しても編集画面は開けるように、別の取りこぼし扱いにする。
+    void api.nenCampaigns.overview(selectedAccountId)
+      .then((res) => {
+        if (!cancelled && res.success) setPendingCount(res.data.jobs.pendingByCampaign?.[campaignKey] ?? 0)
+      })
+      .catch(() => undefined)
     return () => { cancelled = true }
   }, [campaignKey, selectedAccountId])
 
@@ -108,6 +121,13 @@ export default function CampaignEditor({ campaignKey }: { campaignKey: string })
   }, [selectedAccountId])
 
   const merged = { ...setting, ...draft } as NenCampaignSetting
+  /*
+   * #935 N-301: 本文などを書きかけのまま離れると消えていた。
+   * 読み込み後の値と違う間だけ、ブラウザ離脱・画面内リンク・戻る操作を止めて確認する。
+   * 保存成功で setting が更新されdirtyが外れ、保存失敗では入力を残したままdirtyのまま。
+   */
+  const dirty = setting !== null && JSON.stringify(draft) !== JSON.stringify(setting)
+  const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty, busy: saving })
   const actions = merged.afterActions ?? []
   const formAction = actions.find((action) => action.kind === 'open_form')
   const mileageAction = actions.find((action) => action.kind === 'award_mileage')
@@ -222,7 +242,8 @@ export default function CampaignEditor({ campaignKey }: { campaignKey: string })
       <div className="flex flex-wrap items-center gap-2">
         <nav data-design="Crumb" className="text-ink-faint flex min-w-0 flex-1 items-center gap-2 text-xs" aria-label="パンくず">
           <Link href="/nen-campaigns" className="text-accent hover:underline">NEN配信</Link><span>›</span>
-          <Link href="/nen-campaigns?tab=flows" className="text-accent hover:underline">配信フロー</Link><span>›</span><span>{setting.label}</span>
+          {/* #935 N-305: 以前は実在しないタブ名を指していた。設計の語「配信フロー」は残し、行き先を実在するタブへ直す。 */}
+          <Link href="/nen-campaigns?tab=auto" className="text-accent hover:underline">配信フロー</Link><span>›</span><span>{setting.label}</span>
         </nav>
         <Button onClick={() => setTestSearchOpen((open) => !open)} className="h-10"><FlaskConical aria-hidden size={17} />自分にテスト送信</Button>
       </div>
@@ -296,7 +317,26 @@ export default function CampaignEditor({ campaignKey }: { campaignKey: string })
         </aside>
       </div>
 
-      <StickyBar status={merged.isEnabled ? '動いています。保存すると、これから届く42通に新しい中身が使われます。' : '停止中です。保存しても新しい配信は始まりません。'} actions={<><Button href="/nen-campaigns">キャンセル</Button><Button onClick={() => setTestSearchOpen(true)}><FlaskConical aria-hidden size={16} />自分にテスト送信</Button><Button variant="primary" onClick={() => void save()} disabled={saving || !bodyCheck.fits}>{saving ? '保存中…' : '配信内容を保存'}</Button></>} />
+      {/*
+        #935 N-299: 以前は固定の数字を書いていたのでたらめだった。実際は配信待ちの分が
+        予約したときの中身（スナップショット）のまま届き、保存した新しい中身は
+        これから新しく始まる配信にだけ使われる。件数が取れたときだけ実数で言う。
+      */}
+      <StickyBar status={merged.isEnabled
+        ? pendingCount !== null && pendingCount > 0
+          ? `動いています。配信待ちの${pendingCount.toLocaleString('ja-JP')}通は予約したときの中身のまま届きます。保存した新しい中身は、次のきっかけからの配信に使われます。`
+          : '動いています。保存した新しい中身は、次のきっかけからの配信に使われます。すでに配信待ちの分は、予約したときの中身のまま届きます。'
+        : '停止中です。保存しても新しい配信は始まりません。'} actions={<><Button href="/nen-campaigns">キャンセル</Button><Button onClick={() => setTestSearchOpen(true)}><FlaskConical aria-hidden size={16} />自分にテスト送信</Button><Button variant="primary" onClick={() => void save()} disabled={saving || !bodyCheck.fits}>{saving ? '保存中…' : '配信内容を保存'}</Button></>} />
+      {/* #935 N-301: 書きかけのまま離れるときの確認。 */}
+      <ConfirmDialog
+        open={leaveTarget !== null}
+        title="入力中の内容があります"
+        description="このまま移動すると、入力した内容は保存されません。移動しますか？"
+        confirmLabel="保存せずに移動"
+        cancelLabel="編集を続ける"
+        onConfirm={confirmLeave}
+        onCancel={cancelLeave}
+      />
     </div>
   )
 }

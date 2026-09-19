@@ -21,6 +21,7 @@ import {
   idempotencyKeyFor,
   monitoringLink,
   NOT_AVAILABLE,
+  suppressionNote,
 } from './publish-flow'
 import styles from './publish.module.css'
 
@@ -348,7 +349,11 @@ function FriendAddPublishInner() {
               <Row label="初回案内" value={ruleDetail?.rule.scenarioName ?? (draft.routing.firstTime.scenarioId ? '選択済みのシナリオ' : NOT_AVAILABLE)} />
               <Row label="アクション" value={ruleDetail ? ruleActionSummary(ruleDetail.rule) : actionSummary(draft)} />
             </div>
-            <p className={styles.note}>24時間に1回だけ実行し、LINE公式のあいさつとの二重送信を防ぎます。</p>
+            {/*
+             * 再追加時の制限は設定値をそのまま出す。固定で「24時間に1回」と
+             * 書くと、制限しない・7日に1回の設定と食い違う(#946 N-109 同类)。
+             */}
+            <p className={styles.note}>{suppressionNote(ruleDetail?.rule.definition.resendSuppressionHours)}</p>
           </Card>
 
           <Card layout="vertical" className={styles.section} data-friend-add-part="test">
@@ -396,7 +401,18 @@ function FriendAddPublishInner() {
             <div className={styles.rows}>
               <Row label="状態" value="有効化前" />
               <Row label="過去28日の該当" value={audienceText(matchedLast28Days)} />
-              <Row label="二重送信" value={validation?.conflicts.length === 0 ? '重なりなし・確認済み' : `${validation?.conflicts.length ?? 0}件・要確認`} />
+              {/*
+               * 「二重送信」は経路の重なり (conflicts) ではなく、再送防止の
+               * 確認結果 (duplicate_prevention) を出す(#946 N-109)。
+               */}
+              <Row
+                label="二重送信"
+                value={(() => {
+                  const check = validation?.checks.find((item) => item.key === 'duplicate_prevention')
+                  if (!check) return NOT_AVAILABLE
+                  return check.status === 'passed' ? '防止・有効' : '制限なし・要確認'
+                })()}
+              />
               <Row label="監視" value={ruleDetail?.staffNotification?.status === 'connected' ? 'Slack通知・接続済み' : ruleDetail?.staffNotification?.status == null ? NOT_AVAILABLE : 'Slack通知・未接続'} />
             </div>
             <p className="text-xs leading-5 text-ink-secondary">未送信・二重送信・シナリオ開始失敗を監視します。</p>
