@@ -356,6 +356,31 @@ describe('CSV書き出し（#942 N-353）', () => {
       expect.objectContaining({ limit: 5000, offset: 0 }));
   });
 
+  test('= + - @ で始まる値は引用符を前置し、Excelの数式として実行させない', async () => {
+    // 友だち表示名・自動化名・アカウント名は外部入力。表計算ソフトで開いたとき
+    // 数式として実行されないよう、common-actionsのCSVと同じ対策を固定する。
+    dbMocks.getAutomationExecutionRuns.mockResolvedValue({
+      rows: [runRow({
+        automation_name: '=1+1',
+        friend_name: '+SUM(1,2)',
+        account_name: '-cmd',
+      })],
+      total: 1,
+      summary: { total: 1, executed: 1, skipped: 0, failed: 0, most_run_name: null, most_run_count: null },
+    });
+
+    const res = await setupApp(fakeD1())
+      .request('/api/automation-runs?lineAccountId=acc-1&format=csv');
+    expect(res.status).toBe(200);
+    const bytes = new Uint8Array(await res.arrayBuffer());
+    const lines = new TextDecoder().decode(bytes.subarray(3)).split('\r\n');
+    expect(lines[1]).toContain(`"'=1+1"`);
+    expect(lines[1]).toContain(`"'+SUM(1,2)"`);
+    expect(lines[1]).toContain(`"'-cmd"`);
+    // 数式そのままのセルが残っていないこと。
+    expect(lines[1]).not.toContain('"=1+1"');
+  });
+
   test('権限キーのないstaffは403', async () => {
     const res = await setupApp(fakeD1(), STAFF_WITHOUT_KEY)
       .request('/api/automation-runs?lineAccountId=acc-1&format=csv');
@@ -482,7 +507,8 @@ describe('POST /api/automations/:id/draft・duplicate・status（#942 N-352）',
       `INSERT INTO common_action_bindings
          (id, line_account_id, common_action_id, common_action_version_id,
           consumer_type, consumer_id, consumer_path)
-       VALUES ('bind-1', 'acc-1', 'ca-1', 'cv-1', 'automation', 'auto-1', 'step-1')`,
+       VALUES ('bind-1', 'acc-1', 'ca-1', 'cv-1', 'automation', 'auto-1', 'step-1'),
+              ('bind-2', 'acc-1', 'ca-1', 'cv-1', 'automation', 'auto-1', 'step-2')`,
     ).run();
 
     const res = await setupApp(testDb.db).request('/api/automations/auto-1/duplicate', { method: 'POST' });
@@ -492,10 +518,22 @@ describe('POST /api/automations/:id/draft・duplicate・status（#942 N-352）',
     expect(testDb.raw.prepare(
       `SELECT name, status FROM automation_definitions WHERE id = ?`,
     ).get(body.data.id)).toEqual({ name: '予約案内 のコピー', status: 'draft' });
-    expect(testDb.raw.prepare(
-      `SELECT consumer_id, common_action_version_id FROM common_action_bindings
-        WHERE consumer_type = 'automation' AND consumer_id = ?`,
-    ).get(body.data.id)).toEqual({ consumer_id: body.data.id, common_action_version_id: 'cv-1' });
+    // 束が2件あっても500にならず、新しい定義へ1件ずつ一意のidで写る。
+    const bindings = testDb.raw.prepare(
+      `SELECT id, consumer_id, common_action_version_id, consumer_path
+         FROM common_action_bindings
+        WHERE consumer_type = 'automation' AND consumer_id = ?
+        ORDER BY consumer_path`,
+    ).all(body.data.id) as Array<{
+      id: string; consumer_id: string; common_action_version_id: string; consumer_path: string;
+    }>;
+    expect(bindings).toEqual([
+      { id: expect.any(String), consumer_id: body.data.id,
+        common_action_version_id: 'cv-1', consumer_path: 'step-1' },
+      { id: expect.any(String), consumer_id: body.data.id,
+        common_action_version_id: 'cv-1', consumer_path: 'step-2' },
+    ]);
+    expect(new Set(bindings.map((row) => row.id)).size).toBe(2);
   });
 
   test('「保管」は一方通行。戻す依頼は422、変な状態名は400', async () => {

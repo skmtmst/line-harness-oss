@@ -455,6 +455,55 @@ describe('公開済み定義の編集・複製（#942 N-352）', () => {
     ).get(created.id)).toEqual({ consumer_id: created.id, common_action_version_id: 'cv-1' });
   });
 
+  it('束が2件以上ある定義も複製でき、束は新しい定義へ1件ずつ写る', async () => {
+    /*
+     * 同じidで束をまとめてINSERTすると PRIMARY KEY 衝突で500になった。
+     * 束ごとに新しいidを振る回帰を固定する。
+     */
+    addActiveDefinition(testDb.raw);
+    testDb.raw.prepare(
+      `INSERT INTO common_actions (id, line_account_id, name, status)
+       VALUES ('ca-1', 'account-1', '会員向け一式', 'published'),
+              ('ca-2', 'account-1', '来店後の案内', 'published')`,
+    ).run();
+    testDb.raw.prepare(
+      `INSERT INTO common_action_versions
+         (id, common_action_id, version_number, status, action_config, published_at)
+       VALUES ('cv-1', 'ca-1', 1, 'published', '[]', datetime('now')),
+              ('cv-2', 'ca-2', 2, 'published', '[]', datetime('now'))`,
+    ).run();
+    testDb.raw.prepare(
+      `INSERT INTO common_action_bindings
+         (id, line_account_id, common_action_id, common_action_version_id,
+          consumer_type, consumer_id, consumer_path)
+       VALUES ('bind-1', 'account-1', 'ca-1', 'cv-1', 'automation', 'auto-1', 'step-1'),
+              ('bind-2', 'account-1', 'ca-2', 'cv-2', 'automation', 'auto-1', 'step-2')`,
+    ).run();
+
+    const created = await duplicateAutomationDefinition(testDb.db, {
+      id: 'auto-1', lineAccountId: 'account-1', createdBy: 'staff-1',
+    });
+    const bindings = testDb.raw.prepare(
+      `SELECT id, consumer_id, common_action_id, common_action_version_id, consumer_path
+         FROM common_action_bindings
+        WHERE consumer_type = 'automation' AND consumer_id = ?
+        ORDER BY consumer_path`,
+    ).all(created.id) as Array<{
+      id: string; consumer_id: string; common_action_id: string;
+      common_action_version_id: string; consumer_path: string;
+    }>;
+    expect(bindings).toEqual([
+      { id: expect.any(String), consumer_id: created.id, common_action_id: 'ca-1',
+        common_action_version_id: 'cv-1', consumer_path: 'step-1' },
+      { id: expect.any(String), consumer_id: created.id, common_action_id: 'ca-2',
+        common_action_version_id: 'cv-2', consumer_path: 'step-2' },
+    ]);
+    // 写された束のidは元と別で、互いにも重ならない。
+    expect(new Set(bindings.map((row) => row.id)).size).toBe(2);
+    expect(bindings.map((row) => row.id)).not.toContain('bind-1');
+    expect(bindings.map((row) => row.id)).not.toContain('bind-2');
+  });
+
   it('保管済みと別アカウントの定義は複製できない', async () => {
     addActiveDefinition(testDb.raw, { id: 'archived-one', status: 'archived' });
     await expect(duplicateAutomationDefinition(testDb.db, {

@@ -316,7 +316,10 @@ const RUN_STATUS_LABEL_CSV: Record<AutomationRunDomainStatus, string> = {
 };
 
 function csvCell(value: string | number | null | undefined): string {
-  const text = value === null || value === undefined ? '' : String(value);
+  let text = value === null || value === undefined ? '' : String(value);
+  // Excel/表計算で数式として実行されないよう、= + - @ で始まる外部入力値へ
+  // 引用符を前置する（common-actions.ts の正本と同じ対策）。
+  if (/^[=+\-@]/.test(text)) text = `'${text}`;
   return `"${text.replaceAll('"', '""')}"`;
 }
 

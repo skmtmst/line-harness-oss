@@ -901,6 +901,21 @@ export async function duplicateAutomationDefinition(
   ).bind(versionId, definition.id).first<AutomationVersionContent>();
   if (!source) throw new AutomationDraftError('not_found', '写す版を読み込めませんでした');
 
+  // 共通アクションの束も写す。consumer_id を新しい定義へ付け替えるだけで、
+  // 版の固定は元の束と同じものを引き継ぐ。
+  // **1件ずつ新しいidを振る。** INSERT...SELECT で1つのUUIDを束ねると、
+  // 元の定義に束が2件以上あるとき全行同じidでPRIMARY KEY衝突になる。
+  const sourceBindings = await db.prepare(
+    `SELECT line_account_id, common_action_id, common_action_version_id, consumer_path
+       FROM common_action_bindings
+      WHERE line_account_id = ? AND consumer_type = 'automation' AND consumer_id = ?`,
+  ).bind(input.lineAccountId, definition.id).all<{
+    line_account_id: string;
+    common_action_id: string;
+    common_action_version_id: string;
+    consumer_path: string;
+  }>();
+
   const newId = crypto.randomUUID();
   const nextVersionId = crypto.randomUUID();
   const now = new Date().toISOString();
@@ -924,19 +939,16 @@ export async function duplicateAutomationDefinition(
         WHERE id = ? AND status = 'draft'
           AND EXISTS (SELECT 1 FROM automation_versions WHERE id = ? AND automation_id = ?)`,
     ).bind(nextVersionId, now, newId, nextVersionId, newId),
-    // 共通アクションの束も写す。consumer_id を新しい定義へ付け替えるだけで、
-    // 版の固定は元の束と同じものを引き継ぐ。
-    db.prepare(
-      `INSERT INTO common_action_bindings
-         (id, line_account_id, common_action_id, common_action_version_id,
-          consumer_type, consumer_id, consumer_path, created_by, created_at, updated_at)
-       SELECT ?, b.line_account_id, b.common_action_id, b.common_action_version_id,
-              'automation', ?, b.consumer_path, ?, ?, ?
-         FROM common_action_bindings b
-        WHERE b.line_account_id = ? AND b.consumer_type = 'automation'
-          AND b.consumer_id = ?`,
-    ).bind(crypto.randomUUID(), newId, input.createdBy ?? null, now, now,
-      input.lineAccountId, definition.id),
+    ...(sourceBindings.results ?? []).map((binding) =>
+      db.prepare(
+        `INSERT INTO common_action_bindings
+           (id, line_account_id, common_action_id, common_action_version_id,
+            consumer_type, consumer_id, consumer_path, created_by, created_at, updated_at)
+         VALUES (?, ?, ?, ?, 'automation', ?, ?, ?, ?, ?)`,
+      ).bind(crypto.randomUUID(), binding.line_account_id, binding.common_action_id,
+        binding.common_action_version_id, newId, binding.consumer_path,
+        input.createdBy ?? null, now, now),
+    ),
   ]);
   if ((results[0].meta?.changes ?? 0) !== 1 || (results[2].meta?.changes ?? 0) !== 1) {
     throw new AutomationDraftError('duplicate_failed', '複製できませんでした。もう一度お試しください');
