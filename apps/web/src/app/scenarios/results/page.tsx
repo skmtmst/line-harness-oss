@@ -1,6 +1,6 @@
 'use client'
 
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import type { Scenario, ScenarioStats, ScenarioStep } from '@line-crm/shared'
@@ -9,10 +9,13 @@ import { IdempotencyKeyStore } from '@/lib/idempotency-key-store'
 import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import Button from '@/components/shared/button'
+import Dialog from '@/components/shared/dialog'
 import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
-import SummaryCard from '@/components/shared/summary-card'
 import SelectField from '@/components/shared/select-field'
+import StatusBadge from '@/components/shared/status-badge'
+import SummaryCard from '@/components/shared/summary-card'
+import { ActionCell, DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import styles from './scenario-results.module.css'
 import { scenarioReferenceData } from '@/components/scenarios/scenario-reference-data'
 
@@ -49,6 +52,19 @@ function messagePreview(step: ScenarioStep | undefined): string {
 
 function csvCell(value: unknown): string {
   return `"${String(value ?? '').replaceAll('"', '""')}"`
+}
+
+/** この画面のパネル。見出しと説明文の組を毎回同じ構造で置く。 */
+function Panel({ title, lead, children }: { title: string; lead: string; children: ReactNode }) {
+  return (
+    <section className={styles.panel}>
+      <div className={styles.panelHead}>
+        <h2>{title}</h2>
+        <p>{lead}</p>
+      </div>
+      {children}
+    </section>
+  )
 }
 
 function ResultsInner() {
@@ -229,22 +245,14 @@ function ResultsInner() {
       {!loading && !error && scenario && stats ? (
         <div className={styles.columns}>
           <main className={styles.main}>
-            <section className={styles.panel}>
-              <div className={styles.panelHead}>
-                <h2>配信結果</h2>
-                <p>開始・完了・どの通まで届いたかを確認します。</p>
-              </div>
+            <Panel title="配信結果" lead="開始・完了・どの通まで届いたかを確認します。">
               <div className={styles.resultSummary}>
                 <SummaryCard variant="v6" title="開始" value={stats.enrolledTotal} unit="人" detail="このシナリオに参加した人数" />
                 <SummaryCard variant="v6" title="完了" value={stats.completed} unit="人" detail={percentLabel(stats.completed, stats.enrolledTotal)} />
               </div>
-            </section>
+            </Panel>
 
-            <section className={styles.panel}>
-              <div className={styles.panelHead}>
-                <h2>ステップ別の反応</h2>
-                <p>到達人数と、前の通から減った場所を確認できます。</p>
-              </div>
+            <Panel title="ステップ別の反応" lead="到達人数と、前の通から減った場所を確認できます。">
               <NoteBar tone="info">LINEでは通ごとの開封・クリック・失敗をすべて取得できません。取得できない指標は「—」で表示します。</NoteBar>
               {sortedSteps.length === 0 ? (
                 <ListState kind="empty" title="配信内容がまだありません" description="シナリオ編集からメッセージを追加してください。" />
@@ -269,18 +277,14 @@ function ResultsInner() {
                   })}
                 </ol>
               )}
-            </section>
+            </Panel>
 
             {/*
               友だち単位の購読操作（#949 N-054）。止める・再開・失敗を再送・
               別のシナリオへ移す。止まり方（pauseReason）で「再開」と
               「失敗を再送」を出し分ける。
             */}
-            <section className={styles.panel}>
-              <div className={styles.panelHead}>
-                <h2>参加中の友だち</h2>
-                <p>届いている・止まっている購読を友だちごとに操作します。</p>
-              </div>
+            <Panel title="参加中の友だち" lead="届いている・止まっている購読を友だちごとに操作します。">
               {opError ? <NoteBar tone="warn">{opError}</NoteBar> : null}
               {!runs || runs.subscriptions.length === 0 ? (
                 <ListState
@@ -289,97 +293,102 @@ function ResultsInner() {
                   description="開始条件に一致した友だちがここに並びます。"
                 />
               ) : (
-                <div className={styles.tableWrap}>
-                  <table className={styles.table}>
-                    <thead>
-                      <tr>
-                        <th>友だち</th>
-                        <th>状態</th>
-                        <th>次の配信</th>
-                        <th aria-label="操作" />
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {runs.subscriptions.map((sub) => {
-                        const pausedByFailure = sub.status === 'paused' && sub.pauseReason === 'delivery_failed'
-                        const stateLabel =
-                          sub.status === 'active'
-                            ? '配信中'
-                            : sub.status === 'delivering'
-                              ? '送信中'
-                              : sub.status === 'completed'
-                                ? '完了'
-                                : pausedByFailure
-                                  ? '配信失敗で停止中'
-                                  : '停止中'
-                        return (
-                          <tr key={sub.id}>
-                            <td className={styles.friendCell}>{sub.friendName}</td>
-                            <td>
-                              <span className={`${styles.stateBadge} ${pausedByFailure ? styles.stateBadgeWarn : ''}`}>
-                                {stateLabel}
-                              </span>
-                            </td>
-                            <td className={styles.nowrap}>
-                              {sub.status === 'completed'
-                                ? '—'
-                                : sub.nextDeliveryAt ?? '—'}
-                            </td>
-                            <td>
-                              <div className={styles.rowActions}>
-                                {sub.status === 'active' ? (
+                <DataTable>
+                  <thead>
+                    <TableHeadRow>
+                      <Th>友だち</Th>
+                      <Th className="w-32">状態</Th>
+                      <Th className="w-44">次の配信</Th>
+                      <Th className="w-72" align="right">操作</Th>
+                    </TableHeadRow>
+                  </thead>
+                  <tbody>
+                    {runs.subscriptions.map((sub) => {
+                      const pausedByFailure = sub.status === 'paused' && sub.pauseReason === 'delivery_failed'
+                      const stateLabel =
+                        sub.status === 'active'
+                          ? '配信中'
+                          : sub.status === 'delivering'
+                            ? '送信中'
+                            : sub.status === 'completed'
+                              ? '完了'
+                              : pausedByFailure
+                                ? '配信失敗で停止中'
+                                : '停止中'
+                      return (
+                        <Tr key={sub.id}>
+                          <Td>
+                            <span className="block max-w-56 truncate text-label text-ink" title={sub.friendName}>
+                              {sub.friendName}
+                            </span>
+                          </Td>
+                          <Td>
+                            <StatusBadge tone={pausedByFailure ? 'warning' : 'neutral'} size="compact">
+                              {stateLabel}
+                            </StatusBadge>
+                          </Td>
+                          <Td className="whitespace-nowrap">
+                            {sub.status === 'completed'
+                              ? '—'
+                              : sub.nextDeliveryAt ?? '—'}
+                          </Td>
+                          <ActionCell>
+                            <div className="flex flex-wrap items-center justify-end gap-3">
+                              {sub.status === 'active' ? (
+                                <button
+                                  type="button"
+                                  className="text-caption font-semibold text-accent-deep hover:underline disabled:cursor-not-allowed disabled:text-ink-faint"
+                                  disabled={opBusy !== null}
+                                  onClick={() => void runSubscriptionOp(sub, 'pause')}
+                                >
+                                  {opBusy === `${sub.id}:pause` ? '停止中…' : '止める'}
+                                </button>
+                              ) : null}
+                              {sub.status === 'paused' ? (
+                                <>
                                   <button
                                     type="button"
+                                    className="text-caption font-semibold text-accent-deep hover:underline disabled:cursor-not-allowed disabled:text-ink-faint"
                                     disabled={opBusy !== null}
-                                    onClick={() => void runSubscriptionOp(sub, 'pause')}
+                                    onClick={() => void runSubscriptionOp(sub, 'resume')}
                                   >
-                                    {opBusy === `${sub.id}:pause` ? '停止中…' : '止める'}
+                                    {opBusy === `${sub.id}:resume` ? '再開中…' : '再開'}
                                   </button>
-                                ) : null}
-                                {sub.status === 'paused' ? (
-                                  <>
+                                  {pausedByFailure ? (
                                     <button
                                       type="button"
+                                      className="text-caption font-semibold text-accent-deep hover:underline disabled:cursor-not-allowed disabled:text-ink-faint"
                                       disabled={opBusy !== null}
-                                      onClick={() => void runSubscriptionOp(sub, 'resume')}
+                                      onClick={() => void runSubscriptionOp(sub, 'retry')}
                                     >
-                                      {opBusy === `${sub.id}:resume` ? '再開中…' : '再開'}
+                                      {opBusy === `${sub.id}:retry` ? '再送中…' : '失敗を再送'}
                                     </button>
-                                    {pausedByFailure ? (
-                                      <button
-                                        type="button"
-                                        disabled={opBusy !== null}
-                                        onClick={() => void runSubscriptionOp(sub, 'retry')}
-                                      >
-                                        {opBusy === `${sub.id}:retry` ? '再送中…' : '失敗を再送'}
-                                      </button>
-                                    ) : null}
-                                  </>
-                                ) : null}
-                                {sub.status === 'active' || sub.status === 'paused' ? (
-                                  <button
-                                    type="button"
-                                    disabled={opBusy !== null}
-                                    onClick={() => void openMoveDialog(sub)}
-                                  >
-                                    別のシナリオへ移す
-                                  </button>
-                                ) : null}
-                              </div>
-                            </td>
-                          </tr>
-                        )
-                      })}
-                    </tbody>
-                  </table>
-                </div>
+                                  ) : null}
+                                </>
+                              ) : null}
+                              {sub.status === 'active' || sub.status === 'paused' ? (
+                                <button
+                                  type="button"
+                                  className="text-caption font-semibold text-accent-deep hover:underline disabled:cursor-not-allowed disabled:text-ink-faint"
+                                  disabled={opBusy !== null}
+                                  onClick={() => void openMoveDialog(sub)}
+                                >
+                                  別のシナリオへ移す
+                                </button>
+                              ) : null}
+                            </div>
+                          </ActionCell>
+                        </Tr>
+                      )
+                    })}
+                  </tbody>
+                </DataTable>
               )}
-            </section>
+            </Panel>
           </main>
 
           <aside className={styles.side}>
-            <section className={styles.panel}>
-              <div className={styles.panelHead}><h2>設定サマリー</h2><p>現在の参加状況です。</p></div>
+            <Panel title="設定サマリー" lead="現在の参加状況です。">
               <dl className={styles.summaryList}>
                 <div><dt>参加中</dt><dd>{(runs ? runs.summary.active + runs.summary.delivering : stats.activeNow).toLocaleString('ja-JP')}人</dd></div>
                 <div><dt>完了</dt><dd>{(runs?.summary.completed ?? stats.completed).toLocaleString('ja-JP')}人</dd></div>
@@ -389,72 +398,75 @@ function ResultsInner() {
               <p className={styles.unavailable}>
                 {runs?.steps[0]?.failed.reason ?? '配信失敗数は、この集計からは取得できません。'}
               </p>
-            </section>
+            </Panel>
 
-            <section className={styles.panel}>
-              <div className={styles.panelHead}><h2>メッセージプレビュー</h2><p>1通目に登録されている内容です。</p></div>
+            <Panel title="メッセージプレビュー" lead="1通目に登録されている内容です。">
               <div className={styles.preview}>{messagePreview(sortedSteps[0])}</div>
-            </section>
+            </Panel>
           </aside>
         </div>
       ) : null}
 
       {/* 「別のシナリオへ移す」の窓。移し先は稼働中の別シナリオだけ選べる。 */}
-      {moveTarget ? (
-        <div className={styles.modalBackdrop} role="dialog" aria-modal="true" aria-labelledby="move-dialog-title">
-          <div className={styles.modal}>
-            <h2 id="move-dialog-title" className={styles.modalTitle}>
-              {moveTarget.friendName} を別のシナリオへ移す
-            </h2>
-            <p className={styles.modalLead}>
-              いまのシナリオはここで終わり、選んだシナリオの最初から届き始めます。
-            </p>
-            <SelectField
-              value={moveScenarioId}
-              title={moveOptions === null
+      <Dialog
+        open={moveTarget !== null}
+        title={moveTarget ? `${moveTarget.friendName} を別のシナリオへ移す` : ''}
+        description="いまのシナリオはここで終わり、選んだシナリオの最初から届き始めます。"
+        busy={opBusy !== null}
+        error={moveTarget ? opError : ''}
+        onCancel={() => {
+          if (opBusy) return
+          setMoveTarget(null)
+          setOpError('')
+        }}
+        footer={(
+          <div className="border-hairline flex flex-wrap items-center justify-end gap-2 border-t pt-4">
+            <Button
+              type="button"
+              onClick={() => {
+                if (opBusy) return
+                setMoveTarget(null)
+                setOpError('')
+              }}
+              disabled={opBusy !== null}
+            >
+              キャンセル
+            </Button>
+            <Button
+              type="button"
+              variant="primary"
+              disabled={!moveScenarioId || opBusy !== null}
+              onClick={() => void confirmMove()}
+            >
+              {opBusy ? '移しています…' : 'このシナリオへ移す'}
+            </Button>
+          </div>
+        )}
+      >
+        <SelectField
+          value={moveScenarioId}
+          title={moveOptions === null
+            ? '読み込んでいます'
+            : moveChoices.length === 0
+              ? '移せるシナリオがありません'
+              : '移し先のシナリオを選んでください'}
+          disabled={moveOptions === null || moveChoices.length === 0 || opBusy !== null}
+          onChange={(event) => setMoveScenarioId(event.target.value)}
+          aria-label="移し先のシナリオ"
+          className="w-full"
+          options={[
+            {
+              value: '',
+              label: moveOptions === null
                 ? '読み込んでいます'
                 : moveChoices.length === 0
-                  ? '移せるシナリオがありません'
-                  : '移し先のシナリオを選んでください'}
-              disabled={moveOptions === null || moveChoices.length === 0 || opBusy !== null}
-              onChange={(event) => setMoveScenarioId(event.target.value)}
-              aria-label="移し先のシナリオ"
-              className={styles.select}
-              options={[
-                {
-                  value: '',
-                  label: moveOptions === null
-                    ? '読み込んでいます'
-                    : moveChoices.length === 0
-                      ? '稼働中の他のシナリオがありません'
-                      : 'シナリオを選んでください',
-                },
-                ...moveChoices.map((item) => ({ value: item.id, label: item.name })),
-              ]}
-            />
-            {opError ? <p className={styles.modalError}>{opError}</p> : null}
-            <div className={styles.modalActions}>
-              <Button
-                onClick={() => {
-                  if (opBusy) return
-                  setMoveTarget(null)
-                  setOpError('')
-                }}
-                disabled={opBusy !== null}
-              >
-                キャンセル
-              </Button>
-              <Button
-                variant="primary"
-                disabled={!moveScenarioId || opBusy !== null}
-                onClick={() => void confirmMove()}
-              >
-                {opBusy ? '移しています…' : 'このシナリオへ移す'}
-              </Button>
-            </div>
-          </div>
-        </div>
-      ) : null}
+                  ? '稼働中の他のシナリオがありません'
+                  : 'シナリオを選んでください',
+            },
+            ...moveChoices.map((item) => ({ value: item.id, label: item.name })),
+          ]}
+        />
+      </Dialog>
     </div>
   )
 }
