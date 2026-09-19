@@ -3106,6 +3106,26 @@ CREATE TABLE incoming_webhook_steps (
   PRIMARY KEY (source_event_id, step_key)
 );
 
+CREATE TABLE incoming_webhook_unmatched_events (
+  id                    TEXT PRIMARY KEY,
+  webhook_id            TEXT NOT NULL REFERENCES incoming_webhooks(id),
+  line_account_id       TEXT NOT NULL REFERENCES line_accounts(id),
+  source_event_id       TEXT NOT NULL,
+  kind                  TEXT NOT NULL CHECK (kind IN ('unmatched', 'candidate')),
+  status                TEXT NOT NULL DEFAULT 'pending'
+                        CHECK (status IN ('pending', 'resolved', 'dismissed')),
+  identity_attempts_json TEXT NOT NULL DEFAULT '[]'
+                        CHECK (json_valid(identity_attempts_json)),
+  masked_shape_json     TEXT CHECK (masked_shape_json IS NULL OR json_valid(masked_shape_json)),
+  resolved_friend_id    TEXT REFERENCES friends(id),
+  resolved_by           TEXT,
+  resolved_at           TEXT,
+  received_at           TEXT NOT NULL,
+  created_at            TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  updated_at            TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  UNIQUE (webhook_id, source_event_id)
+);
+
 CREATE TABLE incoming_webhooks (
   id          TEXT PRIMARY KEY,
   name        TEXT NOT NULL,
@@ -3117,7 +3137,24 @@ CREATE TABLE incoming_webhooks (
   updated_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 , version INTEGER NOT NULL DEFAULT 1
   CHECK (version > 0), identity_match_json TEXT NOT NULL DEFAULT
-  '{"methods":[],"onNotFound":"do_nothing"}', action_refs_json TEXT NOT NULL DEFAULT '[]', latest_masked_sample_json TEXT, latest_received_at TEXT, secret_encrypted TEXT);
+  '{"methods":[],"onNotFound":"do_nothing"}', action_refs_json TEXT NOT NULL DEFAULT '[]', latest_masked_sample_json TEXT, latest_received_at TEXT, secret_encrypted TEXT, deleted_at TEXT, deleted_by_staff_id TEXT);
+
+CREATE TABLE integration_api_tokens (
+  id              TEXT PRIMARY KEY,
+  line_account_id TEXT NOT NULL REFERENCES line_accounts(id),
+  name            TEXT NOT NULL,
+  token_hash      TEXT NOT NULL UNIQUE,
+  -- 一覧で「どれか」見分けるための先頭部分だけ。照合には使わない。
+  token_prefix    TEXT NOT NULL,
+  scopes          TEXT NOT NULL DEFAULT '[]' CHECK (json_valid(scopes)),
+  created_by      TEXT,
+  last_used_at    TEXT,
+  revoked_at      TEXT,
+  revoked_by      TEXT,
+  rotated_from_id TEXT REFERENCES integration_api_tokens(id),
+  created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  updated_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
+);
 
 CREATE TABLE line_account_connection_checks (
   id                TEXT PRIMARY KEY,
@@ -4519,7 +4556,7 @@ CREATE TABLE outgoing_webhooks (
   is_active   INTEGER NOT NULL DEFAULT 1,
   created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
-, max_retries INTEGER NOT NULL DEFAULT 0, consecutive_failures INTEGER NOT NULL DEFAULT 0, last_failed_at TEXT, line_account_id TEXT REFERENCES line_accounts(id), secret_encrypted TEXT);
+, max_retries INTEGER NOT NULL DEFAULT 0, consecutive_failures INTEGER NOT NULL DEFAULT 0, last_failed_at TEXT, line_account_id TEXT REFERENCES line_accounts(id), secret_encrypted TEXT, deleted_at TEXT, deleted_by_staff_id TEXT);
 
 CREATE TABLE pii_reveal_logs (
   id                        TEXT PRIMARY KEY,
@@ -7028,7 +7065,13 @@ CREATE INDEX idx_inbox_staff_reads_conversation
 CREATE INDEX idx_incoming_webhook_receipts_received
   ON incoming_webhook_receipts (received_at);
 
+CREATE INDEX idx_incoming_webhook_unmatched_account_status
+  ON incoming_webhook_unmatched_events (line_account_id, status, received_at);
+
 CREATE INDEX idx_incoming_webhooks_line_account ON incoming_webhooks (line_account_id);
+
+CREATE INDEX idx_integration_api_tokens_account
+  ON integration_api_tokens (line_account_id, revoked_at);
 
 CREATE INDEX idx_line_account_connection_checks_correlation
   ON line_account_connection_checks(correlation_id);

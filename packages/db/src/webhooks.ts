@@ -56,6 +56,9 @@ export interface IncomingWebhookRow {
   action_refs_json: string;
   latest_masked_sample_json: string | null;
   latest_received_at: string | null;
+  /** #939 N-368: 履歴保持の削除印。NULL 以外の行は読み取り・実行から外す。 */
+  deleted_at?: string | null;
+  deleted_by_staff_id?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -90,6 +93,9 @@ export interface OutgoingWebhookRow {
   /** 最後に失敗した時刻。成功すると NULL に戻る */
   last_failed_at: string | null;
   line_account_id?: string | null;
+  /** #939 N-368: 履歴保持の削除印。NULL 以外の行は読み取り・実行から外す。 */
+  deleted_at?: string | null;
+  deleted_by_staff_id?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -371,7 +377,7 @@ export async function getOutgoingWebhookDeliverySummaries(
       FROM outgoing_webhooks ow
  LEFT JOIN totals t ON t.webhook_id = ow.id
  LEFT JOIN latest l ON l.webhook_id = ow.id AND l.row_number = 1
-     WHERE ow.line_account_id = ?
+     WHERE ow.line_account_id = ? AND ow.deleted_at IS NULL
      ORDER BY ow.created_at DESC, ow.id ASC
   `).bind(lineAccountId, cutoff, lineAccountId).all<OutgoingWebhookDeliverySummaryRow>();
   return result.results ?? [];
@@ -751,7 +757,7 @@ export async function getIncomingWebhooks(
   lineAccountId: string,
 ): Promise<IncomingWebhookRow[]> {
   const result = await db
-    .prepare(`SELECT * FROM incoming_webhooks WHERE line_account_id = ? ORDER BY created_at DESC`)
+    .prepare(`SELECT * FROM incoming_webhooks WHERE line_account_id = ? AND deleted_at IS NULL ORDER BY created_at DESC`)
     .bind(lineAccountId)
     .all<IncomingWebhookRow>();
   return result.results;
@@ -763,10 +769,10 @@ export async function getIncomingWebhookById(
   lineAccountId?: string,
 ): Promise<IncomingWebhookRow | null> {
   if (lineAccountId === undefined) {
-    return db.prepare(`SELECT * FROM incoming_webhooks WHERE id = ?`).bind(id).first<IncomingWebhookRow>();
+    return db.prepare(`SELECT * FROM incoming_webhooks WHERE id = ? AND deleted_at IS NULL`).bind(id).first<IncomingWebhookRow>();
   }
   return db
-    .prepare(`SELECT * FROM incoming_webhooks WHERE id = ? AND line_account_id = ?`)
+    .prepare(`SELECT * FROM incoming_webhooks WHERE id = ? AND line_account_id = ? AND deleted_at IS NULL`)
     .bind(id, lineAccountId)
     .first<IncomingWebhookRow>();
 }
@@ -801,7 +807,7 @@ export async function updateIncomingWebhookConfig(
 > {
   const result = await db.prepare(`UPDATE incoming_webhooks
     SET identity_match_json = ?, action_refs_json = ?, version = version + 1, updated_at = ?
-    WHERE id = ? AND line_account_id = ? AND version = ?`)
+    WHERE id = ? AND line_account_id = ? AND version = ? AND deleted_at IS NULL`)
     .bind(
       JSON.stringify(input.identityMatching),
       JSON.stringify(input.actions),
@@ -832,7 +838,7 @@ export async function updateIncomingWebhookMaskedSample(
 ): Promise<void> {
   await db.prepare(`UPDATE incoming_webhooks
     SET latest_masked_sample_json = ?, latest_received_at = ?
-    WHERE id = ? AND line_account_id = ?`)
+    WHERE id = ? AND line_account_id = ? AND deleted_at IS NULL`)
     .bind(JSON.stringify(maskedSample), receivedAt, id, lineAccountId)
     .run();
 }
@@ -878,17 +884,26 @@ export async function updateIncomingWebhook(
   values.push(jstNow());
   values.push(id);
   values.push(lineAccountId);
-  await db.prepare(`UPDATE incoming_webhooks SET ${sets.join(', ')} WHERE id = ? AND line_account_id = ?`)
+  await db.prepare(`UPDATE incoming_webhooks SET ${sets.join(', ')} WHERE id = ? AND line_account_id = ? AND deleted_at IS NULL`)
     .bind(...values).run();
 }
 
+/**
+ * N-368 (#939): 削除は行を消さず印を付ける。届いた・送った記録と
+ * 「いつ誰が止めたか」の履歴を残すため。返り値は印を付けられたか。
+ * 既に印のある行や別アカウントの行は false。
+ */
 export async function deleteIncomingWebhook(
   db: D1Database,
   id: string,
   lineAccountId: string,
-): Promise<void> {
-  await db.prepare(`DELETE FROM incoming_webhooks WHERE id = ? AND line_account_id = ?`)
-    .bind(id, lineAccountId).run();
+  deletedByStaffId?: string,
+): Promise<boolean> {
+  const result = await db.prepare(`UPDATE incoming_webhooks
+    SET deleted_at = ?, deleted_by_staff_id = ?, is_active = 0, updated_at = ?
+    WHERE id = ? AND line_account_id = ? AND deleted_at IS NULL`)
+    .bind(jstNow(), deletedByStaffId ?? null, jstNow(), id, lineAccountId).run();
+  return (result.meta.changes ?? 0) > 0;
 }
 
 // --- 送信Webhook ---
@@ -897,7 +912,7 @@ export async function getOutgoingWebhooks(
   lineAccountId: string,
 ): Promise<OutgoingWebhookRow[]> {
   const result = await db
-    .prepare(`SELECT * FROM outgoing_webhooks WHERE line_account_id = ? ORDER BY created_at DESC`)
+    .prepare(`SELECT * FROM outgoing_webhooks WHERE line_account_id = ? AND deleted_at IS NULL ORDER BY created_at DESC`)
     .bind(lineAccountId)
     .all<OutgoingWebhookRow>();
   return result.results;
@@ -909,7 +924,7 @@ export async function getOutgoingWebhookById(
   lineAccountId: string,
 ): Promise<OutgoingWebhookRow | null> {
   return db
-    .prepare(`SELECT * FROM outgoing_webhooks WHERE id = ? AND line_account_id = ?`)
+    .prepare(`SELECT * FROM outgoing_webhooks WHERE id = ? AND line_account_id = ? AND deleted_at IS NULL`)
     .bind(id, lineAccountId)
     .first<OutgoingWebhookRow>();
 }
@@ -964,17 +979,22 @@ export async function updateOutgoingWebhook(
   values.push(jstNow());
   values.push(id);
   values.push(lineAccountId);
-  await db.prepare(`UPDATE outgoing_webhooks SET ${sets.join(', ')} WHERE id = ? AND line_account_id = ?`)
+  await db.prepare(`UPDATE outgoing_webhooks SET ${sets.join(', ')} WHERE id = ? AND line_account_id = ? AND deleted_at IS NULL`)
     .bind(...values).run();
 }
 
+/** N-368 (#939): 受信側と同じく、削除は履歴を残す印。返り値は印を付けられたか。 */
 export async function deleteOutgoingWebhook(
   db: D1Database,
   id: string,
   lineAccountId: string,
-): Promise<void> {
-  await db.prepare(`DELETE FROM outgoing_webhooks WHERE id = ? AND line_account_id = ?`)
-    .bind(id, lineAccountId).run();
+  deletedByStaffId?: string,
+): Promise<boolean> {
+  const result = await db.prepare(`UPDATE outgoing_webhooks
+    SET deleted_at = ?, deleted_by_staff_id = ?, is_active = 0, updated_at = ?
+    WHERE id = ? AND line_account_id = ? AND deleted_at IS NULL`)
+    .bind(jstNow(), deletedByStaffId ?? null, jstNow(), id, lineAccountId).run();
+  return (result.meta.changes ?? 0) > 0;
 }
 
 /** 指定イベントタイプに一致するアクティブな送信Webhookを取得 */
@@ -988,7 +1008,7 @@ export async function getActiveOutgoingWebhooksByEvent(
     .prepare(`
       SELECT *
       FROM outgoing_webhooks
-      WHERE is_active = 1 AND line_account_id = ?
+      WHERE is_active = 1 AND line_account_id = ? AND deleted_at IS NULL
     `)
     .bind(lineAccountId)
     .all<OutgoingWebhookRow>();
@@ -996,4 +1016,140 @@ export async function getActiveOutgoingWebhooksByEvent(
     const types: string[] = JSON.parse(w.event_types);
     return types.includes(eventType) || types.includes('*');
   });
+}
+
+// --- 人が見つからなかった届物（#939 N-367） ---
+//
+// 受信Webhookの「未照合時の扱い」で unmatched_box / create_candidate を
+// 選んだとき、見つからなかった届物をここへ置く。どちらも「あとで人が
+// 確かめる箱」の1行で、kind だけが違う。
+//   unmatched_box      … 未照合として確認する
+//   create_candidate   … 友だち候補として残す（自動で友だちは作らない。
+//                        相手の名乗りをそのまま友だちにすると成り済ませるため）
+// 同じ受信の再送は (webhook_id, source_event_id) の UNIQUE で増やさない。
+
+export type IncomingWebhookUnmatchedKind = 'unmatched' | 'candidate';
+export type IncomingWebhookUnmatchedStatus = 'pending' | 'resolved' | 'dismissed';
+
+export interface IncomingWebhookUnmatchedEventRow {
+  id: string;
+  webhook_id: string;
+  line_account_id: string;
+  source_event_id: string;
+  kind: IncomingWebhookUnmatchedKind;
+  status: IncomingWebhookUnmatchedStatus;
+  /** 照合に使おうとした {kind, path, value} の並び。値は運用者が照合するためのもの。 */
+  identity_attempts_json: string;
+  /** 届いた本文の形だけの見本。値は •••• に伏せる。 */
+  masked_shape_json: string | null;
+  resolved_friend_id: string | null;
+  resolved_by: string | null;
+  resolved_at: string | null;
+  received_at: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export async function recordIncomingWebhookUnmatched(
+  db: D1Database,
+  input: {
+    webhookId: string;
+    lineAccountId: string;
+    sourceEventId: string;
+    kind: IncomingWebhookUnmatchedKind;
+    identityAttempts: Array<{ kind: string; path: string; value: string }>;
+    maskedShape?: unknown;
+    receivedAt?: string;
+  },
+): Promise<IncomingWebhookUnmatchedEventRow> {
+  const id = crypto.randomUUID();
+  const now = jstNow();
+  await db.prepare(`INSERT OR IGNORE INTO incoming_webhook_unmatched_events
+      (id, webhook_id, line_account_id, source_event_id, kind, status,
+       identity_attempts_json, masked_shape_json, received_at, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?)`)
+    .bind(
+      id,
+      input.webhookId,
+      input.lineAccountId,
+      input.sourceEventId,
+      input.kind,
+      JSON.stringify(input.identityAttempts),
+      input.maskedShape === undefined ? null : JSON.stringify(input.maskedShape),
+      input.receivedAt ?? now,
+      now,
+      now,
+    )
+    .run();
+  return (await db.prepare(`SELECT * FROM incoming_webhook_unmatched_events
+      WHERE webhook_id = ? AND source_event_id = ?`)
+    .bind(input.webhookId, input.sourceEventId)
+    .first<IncomingWebhookUnmatchedEventRow>())!;
+}
+
+export async function listIncomingWebhookUnmatched(
+  db: D1Database,
+  webhookId: string,
+  lineAccountId: string,
+  status: IncomingWebhookUnmatchedStatus = 'pending',
+  limit = 50,
+): Promise<IncomingWebhookUnmatchedEventRow[]> {
+  const result = await db.prepare(`SELECT * FROM incoming_webhook_unmatched_events
+      WHERE webhook_id = ? AND line_account_id = ? AND status = ?
+      ORDER BY received_at DESC LIMIT ?`)
+    .bind(webhookId, lineAccountId, status, Math.min(100, Math.max(1, limit)))
+    .all<IncomingWebhookUnmatchedEventRow>();
+  return result.results ?? [];
+}
+
+export async function countIncomingWebhookUnmatched(
+  db: D1Database,
+  webhookId: string,
+  lineAccountId: string,
+): Promise<number> {
+  const row = await db.prepare(`SELECT COUNT(*) AS count FROM incoming_webhook_unmatched_events
+      WHERE webhook_id = ? AND line_account_id = ? AND status = 'pending'`)
+    .bind(webhookId, lineAccountId)
+    .first<{ count: number }>();
+  return row?.count ?? 0;
+}
+
+export async function getIncomingWebhookUnmatchedById(
+  db: D1Database,
+  id: string,
+  lineAccountId: string,
+): Promise<IncomingWebhookUnmatchedEventRow | null> {
+  return db.prepare(`SELECT * FROM incoming_webhook_unmatched_events
+      WHERE id = ? AND line_account_id = ?`)
+    .bind(id, lineAccountId)
+    .first<IncomingWebhookUnmatchedEventRow>();
+}
+
+/**
+ * 箱の中の届物を「処理済み」にする。
+ * dismiss … 何もしないで閉じる / link … 指定の友だちに結び付けて閉じる。
+ * 返り値は状態を動かせたか（pending の行だけが動く）。
+ */
+export async function resolveIncomingWebhookUnmatched(
+  db: D1Database,
+  id: string,
+  lineAccountId: string,
+  resolution: { action: 'dismiss' } | { action: 'link'; friendId: string },
+  resolvedBy?: string,
+): Promise<boolean> {
+  const now = jstNow();
+  const result = await db.prepare(`UPDATE incoming_webhook_unmatched_events
+      SET status = ?, resolved_friend_id = ?, resolved_by = ?, resolved_at = ?, updated_at = ?
+      WHERE id = ? AND line_account_id = ? AND status = 'pending'`)
+    .bind(
+      resolution.action === 'link' ? 'resolved' : 'dismissed',
+      resolution.action === 'link' ? resolution.friendId : null,
+      resolvedBy ?? null,
+      now,
+      now,
+      id,
+      lineAccountId,
+    )
+    .run();
+  return (result.meta.changes ?? 0) > 0;
 }
