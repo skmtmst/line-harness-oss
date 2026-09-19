@@ -651,7 +651,7 @@ export default function NewProxyBookingPage() {
                   {!notification.send_line_confirmation
                     && reminderPreview.filter((r) => notification[r.kind === 'day_before' ? 'day_before' : 'hours_before']).length === 0 ? (
                       <p className="text-ink-faint text-xs">
-                        お知らせは全て送らない設定です。登録だけを行います。
+                        お知らせはすべて送らない設定です。登録だけを行います。
                       </p>
                     ) : null}
                 </>

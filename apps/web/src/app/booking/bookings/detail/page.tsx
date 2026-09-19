@@ -14,7 +14,9 @@ import {
   type BookingNotificationPolicy,
 } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
+import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import SelectField from '@/components/shared/select-field'
 import { usePageTitle } from '@/components/shell/page-chrome'
 
 type BookingAction = 'approve' | 'reject' | 'cancel' | 'complete' | 'no_show'
@@ -148,7 +150,9 @@ function auditLine(log: BookingAuditLog): string {
     .map((key) => AUDIT_FIELD_LABELS[key] ?? key)
   switch (log.action) {
     case 'created':
-      return `${actor}が予約を記録しました`
+      return log.actorType === 'customer'
+        ? 'お客様が予約を申し込みました'
+        : `${actor}が予約を記録しました`
     case 'updated':
       return changed.length > 0
         ? `${actor}が${changed.join('・')}を変更しました`
@@ -532,26 +536,20 @@ function BookingDetailInner() {
                 <h2 className="text-ink mb-3 text-sm font-semibold">予約内容を変更する</h2>
                 <div className="grid gap-3 md:grid-cols-2">
                   <EditField label="予約メニュー">
-                    <select
+                    <SelectField
                       value={editMenuId}
                       onChange={(event) => { setEditMenuId(event.target.value); setEditTime('') }}
-                      className="border-hairline rounded-control w-full border px-3 py-2 text-sm"
-                    >
-                      {editMenus.map((item) => (
-                        <option key={item.id} value={item.id}>{item.name}</option>
-                      ))}
-                    </select>
+                      className="w-full"
+                      options={editMenus.map((item) => ({ value: item.id, label: item.name }))}
+                    />
                   </EditField>
                   <EditField label="担当者">
-                    <select
+                    <SelectField
                       value={editStaffId}
                       onChange={(event) => { setEditStaffId(event.target.value); setEditTime('') }}
-                      className="border-hairline rounded-control w-full border px-3 py-2 text-sm"
-                    >
-                      {editStaff.map((item) => (
-                        <option key={item.id} value={item.id}>{item.display_name}</option>
-                      ))}
-                    </select>
+                      className="w-full"
+                      options={editStaff.map((item) => ({ value: item.id, label: item.display_name }))}
+                    />
                   </EditField>
                   <EditField label="日付">
                     <input
@@ -562,20 +560,23 @@ function BookingDetailInner() {
                     />
                   </EditField>
                   <EditField label="時間">
-                    <select
+                    <SelectField
                       value={editTime}
                       onChange={(event) => setEditTime(event.target.value)}
                       disabled={editSlotsLoading}
-                      className="border-hairline rounded-control w-full border px-3 py-2 text-sm disabled:opacity-50"
-                    >
-                      <option value="">{editSlotsLoading ? '確認中です' : '選択してください'}</option>
-                      {editSlots.map((slot) => (
-                        <option key={`${slot.date}-${slot.start}`} value={slot.start}>
-                          {slot.start}〜{slot.end}
-                          {slot.date === jstDate(detail.startsAt) && slot.start === jstHHMM(detail.startsAt) ? '（現在）' : ''}
-                        </option>
-                      ))}
-                    </select>
+                      className="w-full"
+                      options={[
+                        { value: '', label: editSlotsLoading ? '確認中です' : '選択してください' },
+                        ...editSlots.map((slot) => ({
+                          value: slot.start,
+                          label: `${slot.start}〜${slot.end}${
+                            slot.date === jstDate(detail.startsAt) && slot.start === jstHHMM(detail.startsAt)
+                              ? '（現在）'
+                              : ''
+                          }`,
+                        })),
+                      ]}
+                    />
                   </EditField>
                   <EditField label="料金（円・税込）">
                     <input
@@ -646,22 +647,21 @@ function BookingDetailInner() {
                   </p>
                 )}
                 <div className="mt-4 flex gap-2">
-                  <button
+                  <Button
+                    variant="primary"
                     type="button"
                     onClick={() => void saveEdit()}
                     disabled={saving}
-                    className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control px-4 py-2 text-sm font-medium disabled:opacity-40"
                   >
                     {saving ? '保存しています' : 'この内容で変更する'}
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     type="button"
                     onClick={() => { setEditing(false); setError('') }}
                     disabled={saving}
-                    className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-4 py-2 text-sm font-medium disabled:opacity-40"
                   >
                     やめる
-                  </button>
+                  </Button>
                 </div>
               </section>
             ) : (
@@ -738,20 +738,19 @@ function BookingDetailInner() {
               <div className="flex flex-col gap-2">
                 {status === 'requested' && (
                   <>
-                    <button
+                    <Button
+                      variant="primary"
                       onClick={() => setDecideTarget('approve')}
                       disabled={acting}
-                      className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control px-4 py-2 text-sm font-medium disabled:opacity-40"
                     >
                       承認する
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                       onClick={() => void startEdit()}
                       disabled={acting}
-                      className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-4 py-2 text-sm font-medium disabled:opacity-40"
                     >
                       内容を変更する
-                    </button>
+                    </Button>
                     <button
                       onClick={() => setDecideTarget('reject')}
                       disabled={acting}
@@ -763,27 +762,25 @@ function BookingDetailInner() {
                 )}
                 {status === 'confirmed' && (
                   <>
-                    <button
+                    <Button
+                      variant="primary"
                       onClick={() => setDecideTarget('complete')}
                       disabled={acting}
-                      className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control px-4 py-2 text-sm font-medium disabled:opacity-40"
                     >
                       完了にする
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                       onClick={() => void startEdit()}
                       disabled={acting}
-                      className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-4 py-2 text-sm font-medium disabled:opacity-40"
                     >
                       内容を変更する
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                       onClick={() => setDecideTarget('no_show')}
                       disabled={acting}
-                      className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-4 py-2 text-sm font-medium disabled:opacity-40"
                     >
                       来店なし
-                    </button>
+                    </Button>
                     <button
                       onClick={() => setDecideTarget('cancel')}
                       disabled={acting}
@@ -850,7 +847,7 @@ function BookingDetailInner() {
 
             {isLineLinked && detail.notificationPolicy.send_line_confirmation ? (
               <section className="bg-canvas rounded-card border-hairline border p-5">
-                <h2 className="text-ink mb-1 text-sm font-semibold">確定のときの通知</h2>
+                <h2 className="text-ink mb-1 text-sm font-semibold">承認したときの通知</h2>
                 <p className="text-ink-faint mb-3 text-xs">お客様に届く内容</p>
                 <div className="bg-canvas-sunken rounded-card p-3">
                   <p className="text-ink-faint mb-1 text-xs">然-NEN-</p>
@@ -891,7 +888,10 @@ function BookingDetailInner() {
               <h2 className="text-ink mb-3 text-sm font-semibold">この予約の記録</h2>
               {detail.auditLogs.length === 0 ? (
                 <ol className="space-y-3">
-                  <LogRow at={jpStamp(detail.requestedAt)} text="予約を受け付けました" />
+                  <LogRow at={jpStamp(detail.requestedAt)} text="お客様が予約を申し込みました" />
+                  {isLineLinked ? (
+                    <LogRow at={jpStamp(detail.requestedAt)} text="受付のお知らせを自動送信しました" />
+                  ) : null}
                 </ol>
               ) : (
                 <ol className="space-y-3">
