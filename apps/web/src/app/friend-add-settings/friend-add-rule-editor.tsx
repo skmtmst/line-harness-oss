@@ -24,6 +24,7 @@ import type {
 import type { SegmentCondition } from '@/lib/segment-condition'
 import { pruneCondition } from '@/lib/segment-condition'
 import { api } from '@/lib/api'
+import { resendSuppressionText } from './friend-add-text'
 import './friend-add-rule-editor.css'
 
 type Step = 'basic' | 'routes' | 'message' | 'actions' | 'preview'
@@ -469,18 +470,6 @@ function Summary({ step, rule, definition, options, matchedLast28Days, pendingAc
 
 function unknownRouteSummary(definition: FriendAddRuleDefinition) {
   return definition.unknownRouteAction?.sendCommonGuidance === false ? '何もしない' : '質問'
-}
-
-/*
- * 「再追加時の制限」の選択肢と同じ言葉で出す。保存値は時間数 (0/24/168)。
- * テスト実施状態 (lastTestStatus) をここへ混ぜない(#946 N-109)。
- */
-function resendSuppressionText(hours: number | null | undefined): string {
-  const value = hours ?? 24
-  if (value <= 0) return '制限しない'
-  if (value === 24) return '24時間に1回'
-  if (value % 24 === 0) return `${value / 24}日に1回`
-  return `${value}時間に1回`
 }
 
 function Section({ title, description, children }: { title: string; description: string; children: React.ReactNode }) {

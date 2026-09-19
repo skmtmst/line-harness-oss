@@ -21,6 +21,7 @@ import {
   idempotencyKeyFor,
   monitoringLink,
   NOT_AVAILABLE,
+  suppressionNote,
 } from './publish-flow'
 import styles from './publish.module.css'
 
@@ -348,7 +349,11 @@ function FriendAddPublishInner() {
               <Row label="初回案内" value={ruleDetail?.rule.scenarioName ?? (draft.routing.firstTime.scenarioId ? '選択済みのシナリオ' : NOT_AVAILABLE)} />
               <Row label="アクション" value={ruleDetail ? ruleActionSummary(ruleDetail.rule) : actionSummary(draft)} />
             </div>
-            <p className={styles.note}>24時間に1回だけ実行し、LINE公式のあいさつとの二重送信を防ぎます。</p>
+            {/*
+             * 再追加時の制限は設定値をそのまま出す。固定で「24時間に1回」と
+             * 書くと、制限しない・7日に1回の設定と食い違う(#946 N-109 同类)。
+             */}
+            <p className={styles.note}>{suppressionNote(ruleDetail?.rule.definition.resendSuppressionHours)}</p>
           </Card>
 
           <Card layout="vertical" className={styles.section} data-friend-add-part="test">
