@@ -240,7 +240,11 @@ webhook.post('/webhook', async (c) => {
     db,
     events: body.events,
     lineAccountId: matchedAccountId,
-    handle: (event) => handleEvent(
+    handle: async (event) => {
+      // 契約者専用LINE（★V6 37-7）: 6 桁の確認コードなら権限者の紐づけとして受ける。
+      // 対象アカウント以外・コード以外は何もしないので、店舗のアカウントには影響しない。
+      if (await handleNoticeLinkCode(c.env, db, lineClient, event, matchedAccountId)) return;
+      return handleEvent(
       db,
       lineClient,
       event,
@@ -253,13 +257,40 @@ webhook.post('/webhook', async (c) => {
       c.env.NEN_EC_BASE_URL && c.env.ECCUBE_WEBHOOK_SECRET
         ? { baseUrl: c.env.NEN_EC_BASE_URL, secret: c.env.ECCUBE_WEBHOOK_SECRET }
         : undefined,
-    ),
+      );
+    },
   });
 
   c.executionCtx.waitUntil(processingPromise);
 
   return c.json({ status: 'ok' }, 200);
 });
+
+/** 契約者専用LINEへ届いた 6 桁の確認コードを権限者の紐づけとして処理する。処理したら true。 */
+async function handleNoticeLinkCode(
+  env: Env['Bindings'],
+  db: D1Database,
+  lineClient: LineClient,
+  event: WebhookEvent,
+  lineAccountId: string | null,
+): Promise<boolean> {
+  if (event.type !== 'message' || event.message.type !== 'text' || !lineAccountId) return false;
+  const text = (event.message as TextEventMessage).text.trim();
+  if (!/^\d{6}$/.test(text)) return false;
+  const userId = event.source.type === 'user' ? event.source.userId : undefined;
+  if (!userId) return false;
+  const { tryLinkStaffByCode } = await import('../services/platform-announcements.js');
+  const friend = await ensureFriendFromWebhookUser(db, lineClient, userId, lineAccountId);
+  if (!friend) return false;
+  return tryLinkStaffByCode(env, {
+    lineAccountId,
+    friendId: friend.id,
+    text,
+    reply: async (message) => {
+      if (event.replyToken) await lineClient.replyMessage(event.replyToken, [{ type: 'text', text: message }]);
+    },
+  });
+}
 
 async function handleEvent(
   db: D1Database,

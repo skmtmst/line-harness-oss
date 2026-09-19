@@ -127,5 +127,40 @@ SQL を流さない手順（推奨）: `platform_admins` が空の間は、既�
 - 過去の月の売上は「その月末に契約中だった契約先」を、いまの契約先と解約日（`billing_events` の `customer.subscription.deleted`）から逆算した概算。
 - 解約数は同じ出来事を期間で数え、解約率は期間はじめの契約数で割る。
 - 要対応: 決済失敗（`past_due`）／トライアル期限 3 日以内／LINE トークン期限 14 日以内（`line_accounts.token_expires_at`）／未返信のお問い合わせ（`stage = 'new'`）。
-- 「契約者専用LINEの登録」は、いまは権限者の `line_user_id` の有無で数える。「未登録の N 人へ案内」は対象の一覧を出すまで。案内の送信は 37-7 の LINE の口ができてから。
+- 「契約者専用LINEの登録」は権限者の `notice_friend_id`（37-7 の確認コードで紐づいた友だち）の有無で数える。「未登録の N 人へ案内」は対象の一覧を出すまで。案内の一斉送信は 37-7 のお知らせ（メール）で代用できる。
 - 使用量: 今月の配信通数（`messages_log` の outgoing）・バナー生成（`banner_usage_ledger`）・メディア容量（`media.size_bytes`）を、プランの上限と比べて使用率の高い順に 5 件。
+
+## 第 3 段：お知らせ配信と契約者専用LINE（37-7）
+
+| 場所 | 内容 |
+|---|---|
+| `packages/db/migrations/429_platform_announcements.sql` | `platform_settings`・`platform_announcements`・`platform_announcement_recipients`・`staff_line_link_codes`、`staff_members.notice_friend_id / notice_linked_at`（追加のみ） |
+| `packages/db/src/platform-announcements.ts` | お知らせの読み書き、宛先の解決、予約の claim、既読、確認コードの発行と消費 |
+| `apps/worker/src/services/platform-announcements.ts` | 配信本体（LINE push・メール・画面）、予約配信（cron）、確認コードでの紐づけ |
+| `apps/worker/src/routes/ops-announcements.ts` | `GET/PUT /api/ops/notice-line-account`、`GET/POST /api/ops/announcements`、`POST /api/ops/announcements/preview`、`PUT/DELETE /api/ops/announcements/:id` |
+| `apps/worker/src/routes/hq-notices.ts` | `GET /api/hq/notices`、`POST /api/hq/notices/:id/read`、`GET /api/hq/notices/line-registration` |
+| `apps/worker/src/routes/webhook.ts` | 契約者専用LINEに届いた 6 桁のテキストを確認コードとして先に処理する（`handleNoticeLinkCode`） |
+| `apps/worker/src/index.ts` | cron `platform announcements`（予約の時刻を過ぎたものを 1 件ずつ送る） |
+| `apps/web/src/app/ops/announcements/page.tsx` | 運営の画面（宛先・件名・本文・送り方・公開日時、一覧に LINE送達／画面で既読） |
+| `apps/web/src/components/ops/notice-line-account-card.tsx` | メンバー管理「運営の情報」で契約者専用LINEのアカウントを指定する |
+| `apps/web/src/components/hq/platform-notices.tsx` | 統括コンソール上部の「運営からのお知らせ」（「読みました」で消える） |
+| `apps/web/src/components/hq/notice-line-register-dialog.tsx` | 契約者専用LINEの登録案内（QR・確認コード・友だち追加リンク） |
+
+決まりごと（決定 2026-09-18）:
+
+- **契約者専用LINEは「musubo 運営（契約者専用）」の公式アカウント**。運営会社（既定の統括）のアカウントとして `/accounts/new` で通常どおり登録し、メンバー管理「運営の情報」で指定する（`platform_settings.notice_line_account_id`）。未指定の間は LINE の送り方が使えない（API は 409）。
+- **登録の必須化はしない**。統括が LINE アカウント登録の手順 5 を終えた直後に案内の窓を一度だけ出す。ログインは止めない。案内は `/hq/support` の帯からもいつでも開ける。
+- **紐づけは 6 桁の確認コード**（24 時間有効、同じ人は再表示で同じコードを返す）。統括が契約者専用LINEを友だち追加してコードをトークで送ると、`staff_members.notice_friend_id` に友だちが入る。コードは契約者専用LINEに届いたときだけ処理し、他のアカウントでは通常のメッセージとして扱う。
+- 送り方は LINE（登録済みの権限者へ push）・画面（統括コンソール上部に出て「読みました」で消える）・メール（登録メールアドレス）。**LINE は送達（push が通ったか）まで**。Messaging API に既読はないので「LINE送達」と表示する。
+- 宛先は 全契約先／プラン（ライト・スタンダード・プロ・トライアル）／契約先を選ぶ。運営会社と `archived` の契約先は常に外す。
+- 送り方は 下書き／今すぐ送る／配信を予約する（日本時間）。送信済みは直せず消せない。予約は cron が `publish_at` を過ぎたものを `sending` に claim してから送るので二重送信しない。
+- 本文に共通情報（`{{var.x}}`）は展開しない（契約先の権限者宛ての固定文）。
+- 監査: `announcement.create / update / delete / send`、`notice_line_account.change` を `platform_audit_logs` に残す。
+
+検証環境で確かめること:
+
+1. `/accounts/new` で「musubo 運営（契約者専用）」を運営会社のアカウントとして登録する（Masato）。
+2. `/ops/members` の「運営の情報」でそのアカウントを指定する。
+3. 統括の権限者として `/hq/support` の帯から登録案内を開き、QR で友だち追加 → 6 桁をトークで送る → 「紐づきました」の返事。
+4. `/ops/announcements` で LINE＋画面＋メールを選んで「今すぐ送る」→ LINE に届く、`/hq` の上部に出る、登録メールに届く。
+5. 公開日時を入れて「配信を予約する」→ 5 分以内に送られ、一覧の状態が「送信済み」になる。

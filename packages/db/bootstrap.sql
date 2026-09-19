@@ -4521,6 +4521,47 @@ CREATE TABLE platform_admins (
 , activation_state TEXT NOT NULL DEFAULT 'active'
   CHECK (activation_state IN ('invited', 'awaiting_totp', 'active')), invited_by TEXT, invited_at TEXT, activated_at TEXT);
 
+CREATE TABLE platform_announcement_recipients (
+  id               TEXT PRIMARY KEY,
+  announcement_id  TEXT NOT NULL REFERENCES platform_announcements(id) ON DELETE CASCADE,
+  tenant_id        TEXT NOT NULL,
+  staff_id         TEXT NOT NULL,
+  channels         TEXT NOT NULL DEFAULT '[]',
+  line_sent_at     TEXT,
+  line_error       TEXT,
+  mail_sent_at     TEXT,
+  mail_error       TEXT,
+  screen_read_at   TEXT,
+  created_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  UNIQUE(announcement_id, staff_id)
+);
+
+CREATE TABLE platform_announcements (
+  id                   TEXT PRIMARY KEY,
+  subject              TEXT NOT NULL,
+  body                 TEXT NOT NULL,
+  audience_kind        TEXT NOT NULL DEFAULT 'all' CHECK (audience_kind IN ('all', 'plan', 'tenants')),
+  -- プラン別のときのプラン（JSON 配列: light/standard/pro/trial）、契約先を選ぶときの tenants.id（JSON 配列）
+  audience_plans       TEXT NOT NULL DEFAULT '[]',
+  audience_tenant_ids  TEXT NOT NULL DEFAULT '[]',
+  -- 送り方（JSON 配列: line / screen / email）
+  channels             TEXT NOT NULL DEFAULT '["screen"]',
+  status               TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'scheduled', 'sending', 'sent', 'failed')),
+  -- 公開日時（JST の ISO）。NULL の下書きは予約しない。scheduled はこの時刻以降に cron が送る
+  publish_at           TEXT,
+  sent_at              TEXT,
+  recipients_total     INTEGER NOT NULL DEFAULT 0,
+  line_sent            INTEGER NOT NULL DEFAULT 0,
+  line_failed          INTEGER NOT NULL DEFAULT 0,
+  mail_sent            INTEGER NOT NULL DEFAULT 0,
+  mail_failed          INTEGER NOT NULL DEFAULT 0,
+  last_error           TEXT,
+  created_by_staff_id  TEXT NOT NULL,
+  created_by_name      TEXT NOT NULL DEFAULT '',
+  created_at           TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  updated_at           TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
+);
+
 CREATE TABLE platform_audit_logs (
   id                 TEXT PRIMARY KEY,
   staff_id           TEXT NOT NULL,
@@ -4538,6 +4579,13 @@ CREATE TABLE platform_audit_logs (
 CREATE TABLE platform_counters (
   name   TEXT PRIMARY KEY,
   value  INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE TABLE platform_settings (
+  key         TEXT PRIMARY KEY,
+  value       TEXT NOT NULL,
+  updated_by  TEXT,
+  updated_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 );
 
 CREATE TABLE pool_accounts (
@@ -5427,6 +5475,14 @@ CREATE TABLE staff_breaks (
   FOREIGN KEY (staff_id) REFERENCES staff(id)
 );
 
+CREATE TABLE staff_line_link_codes (
+  code        TEXT PRIMARY KEY,
+  staff_id    TEXT NOT NULL,
+  expires_at  TEXT NOT NULL,
+  used_at     TEXT,
+  created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
+);
+
 CREATE TABLE staff_members (
   id         TEXT PRIMARY KEY,
   name       TEXT NOT NULL,
@@ -5445,7 +5501,7 @@ CREATE TABLE staff_members (
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 , line_user_id TEXT, totp_secret_enc TEXT, totp_pending_secret_enc TEXT, totp_enabled_at TEXT, totp_last_used_step INTEGER, assigned_line_account_id TEXT REFERENCES line_accounts(id) ON DELETE SET NULL, can_access_descendant_accounts INTEGER NOT NULL DEFAULT 0, tenant_id TEXT REFERENCES tenants(id), account_scope TEXT NOT NULL DEFAULT 'all'
-  CHECK (account_scope IN ('all', 'accounts')), policy_version INTEGER NOT NULL DEFAULT 1, password_hash TEXT, password_updated_at TEXT, role_bundle TEXT, view_permission_keys TEXT, email_mask TEXT);
+  CHECK (account_scope IN ('all', 'accounts')), policy_version INTEGER NOT NULL DEFAULT 1, password_hash TEXT, password_updated_at TEXT, role_bundle TEXT, view_permission_keys TEXT, email_mask TEXT, notice_friend_id TEXT, notice_linked_at TEXT);
 
 CREATE TABLE staff_menus (
   staff_id                  TEXT NOT NULL,
@@ -7291,6 +7347,12 @@ CREATE INDEX idx_pii_reveal_logs_tenant
 
 CREATE INDEX idx_platform_admin_invites_staff ON platform_admin_invites(staff_id, created_at DESC);
 
+CREATE INDEX idx_platform_announcement_recipients_staff
+  ON platform_announcement_recipients(staff_id, screen_read_at);
+
+CREATE INDEX idx_platform_announcements_status
+  ON platform_announcements(status, publish_at);
+
 CREATE INDEX idx_platform_audit_logs_action
   ON platform_audit_logs(action, created_at DESC);
 
@@ -7521,6 +7583,9 @@ CREATE INDEX idx_staff_break_dates_staff
 
 CREATE INDEX idx_staff_breaks_staff
   ON staff_breaks (staff_id, weekday);
+
+CREATE INDEX idx_staff_line_link_codes_staff
+  ON staff_line_link_codes(staff_id, expires_at);
 
 CREATE INDEX idx_staff_member_link ON staff (staff_member_id);
 

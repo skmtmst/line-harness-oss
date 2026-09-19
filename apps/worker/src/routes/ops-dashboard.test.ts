@@ -53,7 +53,7 @@ beforeEach(() => {
   }
   testDb.raw.prepare(`INSERT INTO staff_members (id, name, role, api_key, tenant_id) VALUES ('master-1', '坂本 真人', 'owner', 'k1', NULL)`).run();
   testDb.raw.prepare(`INSERT INTO platform_admins (staff_id, is_active) VALUES ('master-1', 1)`).run();
-  testDb.raw.prepare(`INSERT INTO staff_members (id, name, role, api_key, tenant_id, line_user_id, email) VALUES ('owner-1', '山田 太郎', 'owner', 'k2', 'tenant-a', 'U1', 'a@example.com')`).run();
+  testDb.raw.prepare(`INSERT INTO staff_members (id, name, role, api_key, tenant_id, line_user_id, notice_friend_id, email) VALUES ('owner-1', '山田 太郎', 'owner', 'k2', 'tenant-a', 'U1', 'notice-friend-1', 'a@example.com')`).run();
   testDb.raw.prepare(`INSERT INTO staff_members (id, name, role, api_key, tenant_id, email) VALUES ('owner-2', '木下 花', 'owner', 'k3', 'tenant-b', 'b@example.com')`).run();
   testDb.raw.prepare(`INSERT INTO line_accounts (id, name, channel_id, channel_secret, channel_access_token, tenant_id, token_expires_at) VALUES ('la-1', '店舗1', 'c1', 's1', 't1', 'tenant-a', ?)`).run(iso(5));
   void now;
