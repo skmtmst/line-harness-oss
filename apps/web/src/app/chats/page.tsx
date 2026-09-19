@@ -313,14 +313,17 @@ function DirectMessagePanel({ friendId, friend, onBack, onSent }: {
           </svg>
         </button>
         {friend?.pictureUrl ? (
-          <img src={friend.pictureUrl} alt="" className="w-8 h-8 rounded-full" />
+          <img src={friend.pictureUrl} alt="" className="w-8 h-8 shrink-0 rounded-full" />
         ) : (
-          <div className="w-8 h-8 rounded-full bg-hairline flex items-center justify-center">
+          <div className="w-8 h-8 shrink-0 rounded-full bg-hairline flex items-center justify-center">
             <span className="text-ink-faint text-xs">{(friend?.displayName || '?').charAt(0)}</span>
           </div>
         )}
-        <div>
-          <p className="text-sm font-bold text-ink">{friend?.displayName || '不明'}</p>
+        {/* U008: 長い名前は1行で省略し、全文は title で読めるようにする。 */}
+        <div className="min-w-0">
+          <p className="truncate text-sm font-bold text-ink" title={friend?.displayName || '不明'}>
+            {friend?.displayName || '不明'}
+          </p>
           <p className="text-xs text-ink-faint">メッセージ履歴</p>
         </div>
       </div>
@@ -371,7 +374,7 @@ function DirectMessagePanel({ friendId, friend, onBack, onSent }: {
           <button
             onClick={handleSend}
             disabled={!message.trim() || sending}
- className="bg-accent-deep text-on-accent transition-colors hover:brightness-92 px-4 py-2 rounded-control text-sm font-medium disabled:opacity-50"
+ className="bg-accent-deep text-on-accent shrink-0 whitespace-nowrap transition-colors hover:brightness-92 px-4 py-2 rounded-control text-sm font-medium disabled:opacity-50"
           >
             {sending ? '...' : '送信'}
           </button>
@@ -2610,8 +2613,14 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
           ) : chatDetail ? (
             <>
               {/* Chat Header */}
-              <div className="flex min-h-[66px] items-center justify-between gap-2 border-b border-[#E5E7EB] bg-canvas px-4 py-3">
-                <div className="flex items-center gap-2 min-w-0">
+              {/*
+                U008: 狭い幅では「戻る・顔・名前」を1行目いっぱいに取り、
+                操作（注目・担当・対応・顧客情報）は2行目へ折り返す。
+                操作が同じ行にいると 390px で宛先の名前が潰れて、
+                誰への返信か読めなかった。640px 以上では従来どおり1行。
+              */}
+              <div className="flex min-h-[66px] flex-wrap items-center gap-x-2 gap-y-2 border-b border-[#E5E7EB] bg-canvas px-4 py-3 sm:flex-nowrap">
+                <div className="flex min-w-0 basis-full items-center gap-2 sm:basis-auto sm:flex-1">
                   <button
                     onClick={() => setSelectedChatId(null)}
                     className="lg:hidden flex-shrink-0 p-1 -ml-1 text-ink-faint hover:text-ink-secondary"
@@ -2649,8 +2658,11 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                   探す必要があった。返信しながら状態を動かすので、
                   同じ場所に置く。
                 */}
-                {/* 右へ寄せる。名前は左、操作は右。目で追う向きがそろう。 */}
-                <div className="ml-auto flex flex-nowrap items-center justify-end gap-2">
+                {/* 右へ寄せる。名前は左、操作は右。目で追う向きがそろう。
+                    U008/U010: 狭い幅で2行目へ落ちたときも右端で切れないよう、
+                    sm 未満では中でも折り返せるようにする（320pxでは3行目まで使う）。
+                    sm 以上では従来どおり1行・高さ40pxを保つ。 */}
+                <div className="ml-auto flex flex-wrap items-center justify-end gap-2 sm:flex-nowrap">
                   <button
                     type="button"
                     aria-label={chatDetail.isAttention ? '注目から外す' : '注目にする'}
@@ -2916,8 +2928,13 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
               */}
               <div data-inbox-v4="composer" className="sticky bottom-0 z-10 border-t border-[#E5E7EB] bg-canvas px-4 py-3 relative">
                 {/* 上段 */}
+                {/*
+                  U010: テンプレート・送信の設定・内部メモは横に収まらなければ
+                  次の行へ折り返す。1行に固定したままだと 390px では右の
+                  「内部メモ」が画面外へ切れて、存在自体に気づけない。
+                */}
                 <div className="mb-2 flex items-center gap-2">
-                  <div className="flex min-w-0 flex-nowrap items-center gap-2">
+                  <div className="flex min-w-0 flex-wrap items-center gap-2">
                     {/* 設計 2-1-1。選ぶと本文が入力欄に入る。 */}
                     <button
                       type="button"
@@ -3162,13 +3179,18 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                   </p>
 
                   {/* 下段 */}
-                  <div className="mt-1 flex items-center justify-between gap-2">
+                  {/*
+                    U009: 画像案内・予約・送信が同じ行に詰まると 390px で
+                    「送信」が送／信に割れていた。行自体を折り返せるようにし、
+                    長い画像エラーが出ても右の操作を圧迫しない。
+                  */}
+                  <div className="mt-1 flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
                   {/*
                     画像はここから。以前は「送信の設定」の中に投入枠を出しっぱなし
                     にしていて、入力欄が縦に伸びてトークが読めなかった。
                     アイコンを押すとファイルを選ぶ窓が開く。
                   */}
-                  <span className="flex items-center gap-2">
+                  <span className="flex min-w-0 items-center gap-2">
                     <input
                       ref={imageInputRef}
                       type="file"
@@ -3197,7 +3219,10 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                         </svg>
                       )}
                     </button>
-                    <span className="text-ink-faint text-xs">
+                    <span
+                      className="text-ink-faint min-w-0 text-xs"
+                      title={imageError || (pendingImage ? '画像を1枚 添付中' : '画像は JPEG / PNG、1枚 1MB まで')}
+                    >
                       {imageError
                         ? imageError
                         : pendingImage
@@ -3214,7 +3239,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                       </button>
                     )}
                   </span>
-                  <span className="flex items-center gap-2">
+                  <span className="ml-auto flex shrink-0 items-center gap-2">
                     <Button
                       size="field"
                       data-inbox-v6="schedule-toggle"
@@ -3226,7 +3251,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                     <button
                       onClick={handleSendMessage}
                       disabled={sending || (!messageContent.trim() && !pendingImage)}
-                      className="rounded-lg bg-accent-deep px-5 py-2 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-deep/90 disabled:cursor-not-allowed disabled:opacity-50"
+                      className="shrink-0 whitespace-nowrap rounded-lg bg-accent-deep px-5 py-2 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-deep/90 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       {sending ? '送信中...' : '送信'}
                     </button>
