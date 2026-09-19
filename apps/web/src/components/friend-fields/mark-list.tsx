@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { GripVertical, LockKeyhole, Trash2 } from 'lucide-react'
+import { LockKeyhole, Trash2 } from 'lucide-react'
+import ReorderGrip from './reorder-grip'
 import { api, ApiError, type SupportMarkArchiveImpact, type SupportMarkListItem } from '@/lib/api'
 import Button from '@/components/shared/button'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
@@ -151,6 +152,23 @@ export default function SupportMarkList({ accountId }: { accountId: string | nul
     return true
   }), [items, query, usage])
 
+  // 並び替えの保存。ドラッグとキーボード（N-049）で同じ経路を使う。
+  const applyOrder = async (next: MarkRow[]) => {
+    if (!accountId) return
+    setItems(next)
+    try {
+      await Promise.all(
+        next.map((mark, index) =>
+          api.supportMarks.update(mark.id, accountId, { displayOrder: index }),
+        ),
+      )
+      await load()
+    } catch {
+      setError('並び順を保存できませんでした')
+      await load()
+    }
+  }
+
   const move = async (targetId: string) => {
     if (!accountId || !dragId || dragId === targetId) return setDragId(null)
     const dragged = items.find((mark) => mark.id === dragId)
@@ -167,18 +185,22 @@ export default function SupportMarkList({ accountId }: { accountId: string | nul
     if (from < 0 || to < 0) return
     order.splice(to, 0, ...order.splice(from, 1))
     const next = order.map((id) => items.find((mark) => mark.id === id)).filter(Boolean) as MarkRow[]
-    setItems(next)
-    try {
-      await Promise.all(
-        next.map((mark, index) =>
-          api.supportMarks.update(mark.id, accountId, { displayOrder: index }),
-        ),
-      )
-      await load()
-    } catch {
-      setError('並び順を保存できませんでした')
-      await load()
+    await applyOrder(next)
+  }
+
+  /** つまみにフォーカスして ↑/↓。共有マークに隣接する方向には動かさない（N-049）。 */
+  const keyboardMove = async (id: string, direction: -1 | 1) => {
+    const order = visible.map((mark) => mark.id)
+    const from = order.indexOf(id)
+    const to = from + direction
+    if (from < 0 || to < 0 || to >= order.length) return
+    if (items.find((mark) => mark.id === order[to])?.isInherited) {
+      setError('共有マークは、編集してこのアカウント専用にしてから並び替えてください')
+      return
     }
+    order.splice(to, 0, ...order.splice(from, 1))
+    const next = order.map((i) => items.find((mark) => mark.id === i)).filter(Boolean) as MarkRow[]
+    await applyOrder(next)
   }
 
   const openArchive = async (mark: MarkRow) => {
@@ -313,8 +335,8 @@ export default function SupportMarkList({ accountId }: { accountId: string | nul
                 <tr><td colSpan={7} className="p-0"><ListState kind="empty" title="条件に合う対応マークはありません" description="検索語か利用状態を変えてください。" /></td></tr>
               ) : visible.map((mark) => (
                 <tr key={mark.id} className="hover:bg-canvas-sunken">
-                  <td draggable={!mark.isInherited} onDragStart={() => setDragId(mark.id)} onDragOver={(event) => event.preventDefault()} onDrop={() => void move(mark.id)} className={`${mark.isInherited ? 'cursor-not-allowed' : 'cursor-grab'} px-3 py-3 text-hairline`} aria-label={mark.isInherited ? `${mark.name}は編集後に並び替えできます` : `${mark.name}をドラッグして並び替え`} title={mark.isInherited ? '共有マークは編集後に並び替えできます' : undefined}>
-                    <GripVertical size={16} aria-hidden="true" />
+                  <td draggable={!mark.isInherited} onDragStart={() => setDragId(mark.id)} onDragOver={(event) => event.preventDefault()} onDrop={() => void move(mark.id)} className={`${mark.isInherited ? 'cursor-not-allowed' : 'cursor-grab'} px-3 py-3 text-hairline`} title={mark.isInherited ? '共有マークは編集後に並び替えできます' : undefined}>
+                    <ReorderGrip label={mark.name} disabled={mark.isInherited} disabledReason="共有マークは編集後に並び替えできます" onMove={(direction) => void keyboardMove(mark.id, direction)} />
                   </td>
                   <td className="px-3 py-3">
                     <Link href={`/tags/marks/edit?id=${encodeURIComponent(mark.id)}`} className="inline-flex max-w-full items-center rounded-pill px-2.5 py-1 text-xs font-bold hover:opacity-80" style={{ backgroundColor: `${mark.color}1A`, color: mark.color }} title={mark.name}>
