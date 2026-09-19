@@ -21,6 +21,7 @@ export default function HqPage() {
   const [checkingConnections, setCheckingConnections] = useState(false)
   const [connectionProgress, setConnectionProgress] = useState('')
   const [connectionResult, setConnectionResult] = useState('')
+  const [reloadKey, setReloadKey] = useState(0)
 
   const load = useCallback(async () => {
     setError('')
@@ -39,7 +40,7 @@ export default function HqPage() {
         if (!cancelled) setLoading(false)
       })
     return () => { cancelled = true }
-  }, [load])
+  }, [load, reloadKey])
 
   const reloadAfterSave = async () => {
     await Promise.all([load(), refreshAccounts()])
@@ -115,7 +116,19 @@ export default function HqPage() {
       {connectionProgress ? <p className="mb-4 text-sm text-ink-secondary" role="status">{connectionProgress}</p> : null}
       {connectionResult ? <p className="mb-4 rounded-card bg-accent-soft p-4 text-sm text-ink" role="status">{connectionResult}</p> : null}
 
-      {error ? <div className="rounded-card bg-danger-bg p-4 text-sm text-danger" role="alert">{error}</div> : null}
+      {error ? (
+        <div className="rounded-card bg-danger-bg p-4 text-sm text-danger" role="alert">
+          <p>{error}</p>
+          <Button
+            type="button"
+            variant="secondary"
+            className="mt-3"
+            onClick={() => { setLoading(true); setReloadKey((key) => key + 1) }}
+          >
+            再読み込み
+          </Button>
+        </div>
+      ) : null}
 
       {!error && loading ? (
         <div className="flex min-h-64 items-center justify-center" role="status" aria-label="アカウントを読み込み中">

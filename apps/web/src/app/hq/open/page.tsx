@@ -15,6 +15,7 @@ export default function HqOpenPage() {
   const [accounts, setAccounts] = useState<AccountWithStats[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [reloadKey, setReloadKey] = useState(0)
 
   useEffect(() => {
     const resolved = resolveHqOpenTarget(new URLSearchParams(window.location.search).get('target'))
@@ -41,7 +42,7 @@ export default function HqOpenPage() {
         if (!cancelled) setLoading(false)
       })
     return () => { cancelled = true }
-  }, [target])
+  }, [target, reloadKey])
 
   const openStorePage = (accountId: string) => {
     if (!target) return
@@ -68,7 +69,19 @@ export default function HqOpenPage() {
         <Button href="/hq" variant="secondary" className="shrink-0">アカウント管理へ戻る</Button>
       </header>
 
-      {error ? <div className="rounded-card bg-danger-bg p-4 text-sm text-danger" role="alert">{error}</div> : null}
+      {error ? (
+        <div className="rounded-card bg-danger-bg p-4 text-sm text-danger" role="alert">
+          <p>{error}</p>
+          <Button
+            type="button"
+            variant="secondary"
+            className="mt-3"
+            onClick={() => { setError(''); setLoading(true); setReloadKey((key) => key + 1) }}
+          >
+            再読み込み
+          </Button>
+        </div>
+      ) : null}
       {!error && loading ? (
         <div className="flex min-h-64 items-center justify-center" role="status" aria-label="アカウントを読み込み中">
           <div className="h-8 w-8 animate-spin rounded-full border-4 border-hairline border-t-accent" />
