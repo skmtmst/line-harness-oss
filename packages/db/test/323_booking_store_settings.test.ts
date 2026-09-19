@@ -26,6 +26,12 @@ const businessHoursConfiguredMigration = readFileSync(
   join(import.meta.dirname, '..', 'migrations', '391_booking_business_hours_configured.sql'),
   'utf8',
 );
+// 430 で booking_settings にリマインダ時刻の列が足された。
+// saveBookingAdminSettings がその列を書くので、fixture も現行スキーマへ追従させる。
+const auditAndReminderMigration = readFileSync(
+  join(import.meta.dirname, '..', 'migrations', '430_booking_audit_and_reminder_settings.sql'),
+  'utf8',
+);
 
 describe('migration 323 店舗共通の予約設定', () => {
   let sqlite: Database.Database;
@@ -74,6 +80,7 @@ describe('migration 323 店舗共通の予約設定', () => {
     sqlite.exec(migration);
     sqlite.exec(capacityMigration);
     sqlite.exec(businessHoursConfiguredMigration);
+    sqlite.exec(auditAndReminderMigration);
     sqlite.exec(`
       INSERT INTO booking_business_hours
         (id, booking_settings_id, weekday, start_time, end_time)

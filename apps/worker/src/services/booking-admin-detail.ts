@@ -1,10 +1,13 @@
-import { listBookingOperations } from './booking-operation-runs.js';
+import { listBookingOperations, type BookingOperationRun } from './booking-operation-runs.js';
+import { listBookingAuditLogs } from '@line-crm/db';
 
 interface BookingDetailRow {
   id: string;
   line_account_id: string;
   friend_id: string | null;
   booking_customer_id: string | null;
+  staff_id: string;
+  menu_id: string;
   starts_at: string;
   ends_at: string;
   status: string;
@@ -16,6 +19,8 @@ interface BookingDetailRow {
   source: string;
   created_by_staff_id: string | null;
   external_event_id: string | null;
+  lock_version: number;
+  notification_policy_snapshot: string | null;
   menu_name: string;
   staff_name: string;
   customer_name: string;
@@ -157,9 +162,11 @@ export async function getBookingAdminDetail(
 ) {
   const row = await db.prepare(
     `SELECT b.id, b.line_account_id, b.friend_id, b.booking_customer_id,
+            b.staff_id, b.menu_id,
             b.starts_at, b.ends_at, b.status, b.customer_note, b.internal_note,
             b.price_at_booking, b.requested_at, b.decided_at, b.source,
-            b.created_by_staff_id, b.external_event_id,
+            b.created_by_staff_id, b.external_event_id, b.lock_version,
+            b.notification_policy_snapshot,
             m.name AS menu_name, s.display_name AS staff_name,
             COALESCE(f.display_name, bc.display_name, '名前未設定') AS customer_name,
             bc.phone_last4 AS customer_phone_last4,
@@ -173,7 +180,7 @@ export async function getBookingAdminDetail(
       WHERE b.id = ? AND b.line_account_id = ?`,
   ).bind(input.id, input.lineAccountId).first<BookingDetailRow>();
   if (!row) return null;
-  const [profile, history, reminders, operations] = await Promise.all([
+  const [profile, history, reminders, operations, auditLogs] = await Promise.all([
     friendProfile(db, row.friend_id),
     historyForCustomer(db, {
       lineAccountId: input.lineAccountId,
@@ -188,10 +195,43 @@ export async function getBookingAdminDetail(
       id: string; kind: string; scheduled_at: string; sent_at: string | null; status: string; retry_count: number;
     }>(),
     listBookingOperations(db, { bookingId: row.id, lineAccountId: input.lineAccountId }),
+    listBookingAuditLogs(db, { bookingId: row.id, lineAccountId: input.lineAccountId, limit: 100 }),
   ]);
   const previousHandover = history.find((item) => item.internal_note?.trim())?.internal_note ?? null;
+  let notificationPolicy: Record<string, boolean> = {
+    send_line_confirmation: true,
+    day_before: true,
+    hours_before: true,
+  };
+  try {
+    const parsed = row.notification_policy_snapshot
+      ? JSON.parse(row.notification_policy_snapshot) as Record<string, unknown>
+      : {};
+    notificationPolicy = {
+      send_line_confirmation: parsed.send_line_confirmation !== false,
+      day_before: parsed.day_before !== false,
+      hours_before: parsed.hours_before !== false,
+    };
+  } catch {
+    /* 壊れた snapshot は既定値へ倒す */
+  }
+  // Google 同期の実態はイベントIDだけでは分からない。最新の台帳行の
+  // 状態を優先し、失敗・再試行中を「同期失敗」として見せる (N-392/N-393)。
+  const latestCalendarOp: BookingOperationRun | undefined = operations
+    .filter((op) => op.kind === 'google_calendar')
+    .pop();
+  const calendarSync = latestCalendarOp && (latestCalendarOp.status === 'retry_wait' || latestCalendarOp.status === 'permanent_failed')
+    ? 'failed'
+    : latestCalendarOp && latestCalendarOp.status === 'queued'
+      ? 'pending'
+      : row.external_event_id
+        ? 'synced'
+        : 'not_configured';
   return {
     id: row.id,
+    staffId: row.staff_id,
+    menuId: row.menu_id,
+    lockVersion: Number(row.lock_version),
     startsAt: row.starts_at,
     endsAt: row.ends_at,
     status: row.status,
@@ -202,7 +242,8 @@ export async function getBookingAdminDetail(
     decidedAt: row.decided_at,
     source: row.source,
     createdByStaffId: row.created_by_staff_id,
-    calendarSync: row.external_event_id ? 'synced' : 'not_configured',
+    calendarSync,
+    notificationPolicy,
     menuName: row.menu_name,
     staffName: row.staff_name,
     customer: {
@@ -226,5 +267,16 @@ export async function getBookingAdminDetail(
       retryCount: Number(item.retry_count),
     })),
     operations,
+    auditLogs: auditLogs.map((log) => ({
+      id: log.id,
+      action: log.action,
+      before: log.before,
+      after: log.after,
+      reason: log.reason,
+      actorType: log.actorType,
+      actorId: log.actorId,
+      actorName: log.actorName,
+      occurredAt: log.occurredAt,
+    })),
   };
 }

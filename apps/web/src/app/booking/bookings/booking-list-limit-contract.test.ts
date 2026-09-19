@@ -20,8 +20,23 @@ describe('予約管理の一覧上限', () => {
 
   it('LINE未連携の電話予約をnullとして扱いリンクを作らない', () => {
     expect(API).toContain('friend_id: string | null')
-    expect(DETAIL).toContain('booking.friend_id ? (')
+    expect(DETAIL).toContain('detail.customer.friendId ? (')
     expect(LIST).toContain('b.friend_id ? <Button')
+  })
+
+  it('LINE未連携の予約に「届きます」系文言を出さない (N-390 独立審査必修2)', () => {
+    // 一覧ドロワー・確定窓は「連携済みか」で文言を分ける。
+    expect(LIST).toContain('const isLinked = detail?.customer.isLineLinked ?? Boolean(b.friend_id)')
+    expect(LIST).toContain('LINEと結びついていないため、お客様への自動連絡はありません')
+    // 未連携でも無条件に出る文言が残っていないこと
+    expect(LIST).not.toContain('>ここでの状態変更は、お客様のLINEにも自動で知らせます。<')
+    expect(LIST).toContain("isLinked ? 'LINEから入りました。' : '電話・店頭で受け付けました。'")
+  })
+
+  it('「準備中」の変更ボタンを残さず詳細ページの変更フォームへ誘導する (N-389 独立審査必修2)', () => {
+    expect(LIST).not.toContain('日時変更は準備中です')
+    expect(LIST).not.toContain('disabled>変更を保存する')
+    expect(LIST).toContain('href={`/booking/bookings/detail?id=${encodeURIComponent(b.id)}`} variant="secondary">時間や担当を変える')
   })
 
   it('集計の失敗は0表示と分け、理由と再試行を出す(点検#516の中2)', () => {

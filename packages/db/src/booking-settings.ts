@@ -50,6 +50,10 @@ export interface BookingAdminSettings {
   approvalMode: 'automatic' | 'manual';
   holdMinutes: number;
   slotGranularityMinutes: 5 | 10 | 15 | 30 | 60;
+  /** 前日お知らせの送信時刻（店舗タイムゾーンの壁時刻）。null は予約24時間前。 */
+  reminderDayBeforeTime: string | null;
+  /** 当日お知らせを開始の何時間前に送るか。未設定の店舗は既定値。 */
+  reminderHoursBefore: number;
   menuCount: number;
   activeMenuCount: number;
   inactiveMenuCount: number;
@@ -68,6 +72,8 @@ export interface BookingAdminSettingsInput {
   approvalMode: 'automatic' | 'manual';
   holdMinutes: number;
   slotGranularityMinutes: 5 | 10 | 15 | 30 | 60;
+  reminderDayBeforeTime: string | null;
+  reminderHoursBefore: number | null;
   businessHours?: Array<{ weekday: number; intervals: BookingInterval[] }>;
 }
 
@@ -100,6 +106,8 @@ const DEFAULT_SETTINGS = {
   approvalMode: 'automatic' as const,
   holdMinutes: 15,
   slotGranularityMinutes: 15 as const,
+  reminderDayBeforeTime: null as string | null,
+  reminderHoursBefore: 2,
 };
 
 function parseIntervals(raw: string): BookingInterval[] {
@@ -159,6 +167,8 @@ export async function getBookingAdminSettings(
         approval_mode: 'automatic' | 'manual';
         hold_minutes: number;
         slot_granularity_minutes: 5 | 10 | 15 | 30 | 60;
+        reminder_day_before_time: string | null;
+        reminder_hours_before: number | null;
         business_hours_configured: number;
         version: number;
         updated_at: string;
@@ -208,6 +218,10 @@ export async function getBookingAdminSettings(
     approvalMode: setting?.approval_mode ?? DEFAULT_SETTINGS.approvalMode,
     holdMinutes: Number(setting?.hold_minutes ?? DEFAULT_SETTINGS.holdMinutes),
     slotGranularityMinutes: setting?.slot_granularity_minutes ?? DEFAULT_SETTINGS.slotGranularityMinutes,
+    reminderDayBeforeTime: setting?.reminder_day_before_time ?? DEFAULT_SETTINGS.reminderDayBeforeTime,
+    reminderHoursBefore: Number(
+      setting?.reminder_hours_before ?? DEFAULT_SETTINGS.reminderHoursBefore,
+    ),
     menuCount,
     activeMenuCount,
     inactiveMenuCount: Math.max(0, menuCount - activeMenuCount),
@@ -244,9 +258,10 @@ export async function saveBookingAdminSettings(
     const create = db.prepare(`INSERT INTO booking_settings
       (id, line_account_id, timezone, booking_window_days, cutoff_minutes_before,
        cancel_deadline_minutes_before, max_active_bookings_per_friend,
-       approval_mode, hold_minutes, slot_granularity_minutes, business_hours_configured,
+       approval_mode, hold_minutes, slot_granularity_minutes,
+       reminder_day_before_time, reminder_hours_before, business_hours_configured,
        created_at, updated_at)
-      SELECT ?, id, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+      SELECT ?, id, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
       FROM line_accounts
       WHERE id = ?
       ON CONFLICT(line_account_id) DO NOTHING`)
@@ -260,6 +275,8 @@ export async function saveBookingAdminSettings(
         input.approvalMode,
         input.holdMinutes,
         input.slotGranularityMinutes,
+        input.reminderDayBeforeTime,
+        input.reminderHoursBefore,
         input.businessHours === undefined ? 0 : 1,
         now,
         now,
@@ -308,6 +325,7 @@ export async function saveBookingAdminSettings(
       SET timezone = ?, booking_window_days = ?, cutoff_minutes_before = ?,
           cancel_deadline_minutes_before = ?, max_active_bookings_per_friend = ?,
           approval_mode = ?, hold_minutes = ?, slot_granularity_minutes = ?,
+          reminder_day_before_time = ?, reminder_hours_before = ?,
           business_hours_configured = 1, version = version + 1, updated_at = ?
       WHERE line_account_id = ? AND version = ?`)
       .bind(
@@ -319,6 +337,8 @@ export async function saveBookingAdminSettings(
         input.approvalMode,
         input.holdMinutes,
         input.slotGranularityMinutes,
+        input.reminderDayBeforeTime,
+        input.reminderHoursBefore,
         now,
         input.lineAccountId,
         input.expectedVersion,
@@ -330,6 +350,7 @@ export async function saveBookingAdminSettings(
       SET timezone = ?, booking_window_days = ?, cutoff_minutes_before = ?,
           cancel_deadline_minutes_before = ?, max_active_bookings_per_friend = ?,
           approval_mode = ?, hold_minutes = ?, slot_granularity_minutes = ?,
+          reminder_day_before_time = ?, reminder_hours_before = ?,
           version = version + 1, updated_at = ?
       WHERE line_account_id = ? AND version = ?`)
       .bind(
@@ -341,6 +362,8 @@ export async function saveBookingAdminSettings(
         input.approvalMode,
         input.holdMinutes,
         input.slotGranularityMinutes,
+        input.reminderDayBeforeTime,
+        input.reminderHoursBefore,
         now,
         input.lineAccountId,
         input.expectedVersion,

@@ -10625,6 +10625,10 @@ export interface BookingSettings {
   approvalMode: 'automatic' | 'manual';
   holdMinutes: number;
   slotGranularityMinutes: 5 | 10 | 15 | 30 | 60;
+  /** 前日お知らせの送信時刻（店舗タイムゾーン）。null は予約24時間前。 */
+  reminderDayBeforeTime: string | null;
+  /** 当日お知らせを開始の何時間前に送るか。 */
+  reminderHoursBefore: number;
   menuCount: number;
   activeMenuCount: number;
   inactiveMenuCount: number;
@@ -10649,6 +10653,10 @@ export type SaveBookingSettings = Pick<
   | 'slotGranularityMinutes'
 > & {
   expectedVersion: number;
+  /** 前日お知らせの送信時刻（HH:MM）。null で従来の24時間前。 */
+  reminderDayBeforeTime: string | null;
+  /** 当日お知らせを何時間前に送るか（1〜72）。null で従来の2時間前。 */
+  reminderHoursBefore: number | null;
   businessHours?: BookingSettings['businessHours'];
 };
 
@@ -10861,8 +10869,32 @@ export interface BookingCustomerContext {
   recentBookings: BookingHistorySummary[];
 }
 
+/** 予約ごとに固定される通知方針（作成・変更で確定する）。 */
+export interface BookingNotificationPolicy {
+  send_line_confirmation: boolean;
+  day_before: boolean;
+  hours_before: boolean;
+}
+
+/** 予約の変更履歴1件（append-only）。 */
+export interface BookingAuditLog {
+  id: string;
+  action: string;
+  before: Record<string, unknown> | null;
+  after: Record<string, unknown> | null;
+  reason: string | null;
+  actorType: 'customer' | 'staff' | 'system';
+  actorId: string | null;
+  actorName: string | null;
+  occurredAt: string;
+}
+
 export interface BookingAdminDetail {
   id: string;
+  staffId: string;
+  menuId: string;
+  /** 楽観ロックの現在版。PATCH にはこの値を送る。 */
+  lockVersion: number;
   startsAt: string;
   endsAt: string;
   status: string;
@@ -10873,7 +10905,9 @@ export interface BookingAdminDetail {
   decidedAt: string | null;
   source: string;
   createdByStaffId: string | null;
-  calendarSync: 'synced' | 'not_configured';
+  calendarSync: 'synced' | 'not_configured' | 'failed' | 'pending';
+  /** この予約へ送る通知の固定方針。アカウント設定の現行値ではない。 */
+  notificationPolicy: BookingNotificationPolicy;
   menuName: string;
   staffName: string;
   customer: {
@@ -10897,6 +10931,42 @@ export interface BookingAdminDetail {
     retryCount: number;
   }>;
   operations: BookingOperationResult[];
+  auditLogs: BookingAuditLog[];
+}
+
+/** PATCH /bookings/:id の入力。lock_version は detail.lockVersion から送る。 */
+export interface UpdateBookingInput {
+  lock_version: number;
+  menu_id?: string;
+  staff_id?: string;
+  starts_at?: string;
+  price?: number;
+  customer_note?: string | null;
+  internal_note?: string | null;
+  notification_policy?: Partial<BookingNotificationPolicy>;
+  send_change_notification?: boolean;
+  reason?: string;
+}
+
+export interface UpdateBookingResult {
+  booking_id: string;
+  lock_version: number;
+  status: string;
+  calendar_sync: 'synced' | 'failed' | 'not_configured' | 'not_applicable';
+  change_notification: 'queued' | 'not_applicable';
+  reminders: BookingReminderResult[];
+  reminders_created: number;
+  operations: BookingOperationResult[];
+}
+
+export interface BookingSyncRetryResult {
+  status: 'succeeded' | 'skipped' | 'retry_wait' | 'not_applicable';
+}
+
+export interface BookingNotificationRetryResult {
+  status: 'succeeded' | 'failed';
+  operation_status: string | null;
+  error_code: string | null;
 }
 
 export interface BookingConflictAlternatives {
@@ -11020,7 +11090,7 @@ export const bookingApi = {
     ),
   getAvailability: (
     accountId: string,
-    params: { menuId: string; staffId?: string; from: string; to: string },
+    params: { menuId: string; staffId?: string; from: string; to: string; excludeBookingId?: string },
   ) => {
     const query = new URLSearchParams({
       account_id: accountId,
@@ -11029,6 +11099,7 @@ export const bookingApi = {
       to: params.to,
     });
     if (params.staffId) query.set('staff_id', params.staffId);
+    if (params.excludeBookingId) query.set('exclude_booking_id', params.excludeBookingId);
     return fetchApi<BookingAvailabilityResponse>(`/api/booking/admin/availability?${query}`);
   },
   createProxyBooking: (
@@ -11040,6 +11111,10 @@ export const bookingApi = {
       staff_id: string;
       starts_at: string;
       customer_note?: string;
+      /** 確認メッセージを送るか（旧キー。notification_policy が優先）。 */
+      send_line_confirmation?: boolean;
+      /** N-391: 確認・前日・当日のお知らせを個別に切る。 */
+      notification_policy?: Partial<BookingNotificationPolicy>;
     },
     idempotencyKey: string,
   ) =>
@@ -11048,6 +11123,27 @@ export const bookingApi = {
       headers: { 'Idempotency-Key': idempotencyKey },
       body: JSON.stringify(body),
     }),
+  /** N-389: 予約内容の変更。lock_version で楽観ロックする。 */
+  updateBooking: (accountId: string, id: string, body: UpdateBookingInput) =>
+    fetchApi<UpdateBookingResult>(withAccount(`/api/booking/admin/bookings/${id}`, accountId), {
+      method: 'PATCH', body: JSON.stringify(body),
+    }),
+  /** N-392: 失敗した Google 同期の手動再試行。 */
+  retryCalendarSync: (accountId: string, id: string) =>
+    fetchApi<BookingSyncRetryResult>(withAccount(`/api/booking/admin/bookings/${id}/sync/retry`, accountId), {
+      method: 'POST', body: '{}',
+    }),
+  /** N-393: 失敗した LINE 通知の手動再試行。runId は operations 行の id。 */
+  retryNotification: (accountId: string, id: string, runId: string) =>
+    fetchApi<BookingNotificationRetryResult>(
+      withAccount(`/api/booking/admin/bookings/${id}/notifications/${runId}/retry`, accountId),
+      { method: 'POST', body: '{}' },
+    ),
+  /** N-394: 変更履歴の取得（detail 応答にも auditLogs として同梱される）。 */
+  getAuditLogs: (accountId: string, id: string, limit = 100) =>
+    fetchApi<{ audit_logs: BookingAuditLog[] }>(
+      withAccount(`/api/booking/admin/bookings/${id}/audit-logs`, accountId) + `&limit=${limit}`,
+    ),
   createMenu: (accountId: string, body: Partial<BookingMenu>) =>
     fetchApi<{ id: string }>(withAccount('/api/booking/admin/menus', accountId), {
       method: 'POST',

@@ -387,7 +387,8 @@
     "426_nen_feeding_kind_treat_limit.sql",
     "427_common_var_export_jobs.sql",
     "428_nen_photo_review_audit_fixes.sql",
-    "429_platform_announcements.sql"
+    "429_platform_announcements.sql",
+    "430_booking_audit_and_reminder_settings.sql"
   ],
-  "migrationCount": 388
+  "migrationCount": 389
 }

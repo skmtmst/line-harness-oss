@@ -11,6 +11,8 @@ interface DueRow {
   staff_name: string;
   channel_access_token: string;
   line_user_id: string;
+  /** 店舗設定の当日お知らせオフセット。JOIN した行が来る想定。 */
+  reminder_hours_before?: number | null;
 }
 
 function stubDB(due: DueRow[]) {
@@ -118,6 +120,45 @@ describe('processDueReminders', () => {
     expect(failedUpdate).toBeTruthy();
     expect(failedUpdate!.bound[0]).toBe('failed');
     expect(failedUpdate!.bound[1]).toBe(1); // retry_count
+  });
+
+  test('店舗設定のオフセットを文面に使う (N-395)', async () => {
+    const due: DueRow[] = [
+      {
+        id: 'R1',
+        booking_id: 'B1',
+        kind: 'hours_before',
+        retry_count: 0,
+        starts_at: '2026-05-10T09:00:00Z',
+        menu_name: 'カット',
+        staff_name: '山田',
+        channel_access_token: 'tok',
+        line_user_id: 'U',
+        reminder_hours_before: 4,
+      },
+      {
+        id: 'R2',
+        booking_id: 'B2',
+        kind: 'hours_before',
+        retry_count: 0,
+        starts_at: '2026-05-10T09:00:00Z',
+        menu_name: 'カット',
+        staff_name: '山田',
+        channel_access_token: 'tok',
+        line_user_id: 'U',
+        reminder_hours_before: null, // 未設定店舗は既定値
+      },
+    ];
+    const { db } = stubDB(due);
+    const sender = vi.fn().mockResolvedValue(undefined);
+    await processDueReminders(db, {
+      now: NOW,
+      sender,
+      reminderHoursBefore: REMINDER_HOURS_BEFORE,
+    });
+    expect(sender).toHaveBeenCalledTimes(2);
+    expect(sender.mock.calls[0][0].ctx.hoursBefore).toBe(4);
+    expect(sender.mock.calls[1][0].ctx.hoursBefore).toBe(REMINDER_HOURS_BEFORE);
   });
 
   test('送信失敗 3 回目: failed_permanent', async () => {
