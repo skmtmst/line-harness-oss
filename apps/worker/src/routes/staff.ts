@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import {
   activatePlatformAdminIfAwaitingTotp,
-  getStaffMembers, getStaffById, getStaffByInviteTokenHash,
+  getStaffMembers, getStaffById, getStaffByInviteTokenHash, getStaffByEmailChangeTokenHash,
   createStaffMember, updateStaffMember, deleteStaffMember, countLoginAudit, getLastLoginByStaff,
   getStaffAccountScopeIds, getStaffAccountScopeMap, replaceStaffAccountScopes, revokeStaffAuthentication,
   reserveTwoFactorSetupAttempt, clearTwoFactorSetupAttempts, consumeStepUpGrant,
@@ -9,7 +9,10 @@ import {
 import type { StaffMember } from '@line-crm/db';
 import { requireRole } from '../middleware/role-guard.js';
 import { sha256Hex } from '../middleware/auth.js';
-import { sendStaffInviteEmail, sendStaffLineLinkEmail } from '../services/staff-invite.js';
+import {
+  sendStaffInviteEmail, sendStaffLineLinkEmail,
+  sendStaffEmailChangeConfirmEmail, sendStaffEmailChangeNoticeEmail, sendStaffEmailChangeCompletedEmail,
+} from '../services/staff-invite.js';
 import { buildTotpUri, decryptTotpSecret, encryptTotpSecret, generateTotpSecret, verifyTotp } from '../lib/totp.js';
 import type { Env } from '../index.js';
 import { getLineAccounts } from '@line-crm/db';
@@ -23,6 +26,8 @@ import {
 const staff = new Hono<Env>();
 // 招待の有効期限は7日。要件 v6-30 §9-2・§17(既存の48時間招待はその期限のまま守り、新規・再送から7日)。
 const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+/* 本人のメール変更の確認リンクは24時間。招待より短く、放置された変更申し込みが残らないようにする(N-433)。 */
+const EMAIL_CHANGE_TTL_MS = 24 * 60 * 60 * 1000;
 const TWO_FACTOR_ATTEMPT_LIMIT_ERROR = '入力回数を超えました。しばらく待ってからやり直してください';
 
 /**
@@ -46,6 +51,14 @@ function invitationConfirmationUrl(c: { env: Env['Bindings']; req: { url: string
   const url = new URL('/staff/invite', base);
   // fragment はHTTPリクエストやアクセスログへ送られない。確認画面が読み取ったら即座に消す。
   url.hash = new URLSearchParams({ invite: token }).toString();
+  return url.toString();
+}
+
+/** N-433: メール変更の確認画面。招待と同じく秘密の値は fragment に置き、アクセスログへ残さない。 */
+function emailChangeConfirmationUrl(c: { env: Env['Bindings']; req: { url: string } }, token: string): string {
+  const base = c.env.ADMIN_PUBLIC_URL?.trim() || new URL(c.req.url).origin;
+  const url = new URL('/staff/email-change', base);
+  url.hash = new URLSearchParams({ token }).toString();
   return url.toString();
 }
 
@@ -622,6 +635,24 @@ staff.patch('/api/staff/:id', async (c) => {
     if (duplicate) return c.json({ success: false, error: 'このメールアドレスは登録済みです' }, 409);
     body.email = email;
   }
+  if (body.email === null && id === current.id) {
+    // 自分のメールを空にすると連絡口と確認口の両方が消えるので、本人からの空書き込みは受けない。
+    return c.json({ success: false, error: '自分のメールアドレスは空にできません' }, 400);
+  }
+
+  /*
+   * N-433: 本人が自分のメールを変えるときは、その場では切り替えない。
+   * 新しい宛先へ確認リンクを送り、開かれてはじめて確定する。旧アドレスへも
+   * 知らせを送り、覚えのない変更に気づけるようにする（セッションを盗まれた
+   * ときの静かな乗っ取りを防ぐ）。確認待ちの間、email 列は変えない。
+   */
+  const selfEmailChange = id === current.id
+    && body.email !== undefined
+    && body.email !== null
+    && body.email !== (target.email?.toLowerCase() ?? null)
+    ? { next: body.email, token: randomToken() }
+    : null;
+  if (selfEmailChange) body.email = undefined;
 
   // bundle指定のときも「管理者が0人になる」判定が効くよう実効roleへ写す。
   const effectiveRole = bundle !== undefined
@@ -738,7 +769,82 @@ staff.patch('/api/staff/:id', async (c) => {
   if (updated && authenticationPolicyChanged) {
     await revokeStaffAuthentication(c.env.DB, id);
   }
+  if (updated && selfEmailChange) {
+    await updateStaffMember(c.env.DB, id, {
+      email_change_new: selfEmailChange.next,
+      email_change_token_hash: await sha256Hex(selfEmailChange.token),
+      email_change_expires_at: new Date(Date.now() + EMAIL_CHANGE_TTL_MS).toISOString(),
+    });
+    try {
+      await sendStaffEmailChangeConfirmEmail(c.env, {
+        name: updated.name,
+        email: selfEmailChange.next,
+        confirmUrl: emailChangeConfirmationUrl(c, selfEmailChange.token),
+      });
+      if (target.email) {
+        await sendStaffEmailChangeNoticeEmail(c.env, {
+          name: updated.name, email: target.email, next: selfEmailChange.next,
+        });
+      }
+    } catch (error) {
+      console.error('PATCH /api/staff/:id email-change mail error:', error);
+      return c.json({ success: false, error: '確認メールを送信できませんでした。時間をおいて、もう一度変更してください。' }, 500);
+    }
+    const data = await serializeStaff(c.env.DB, updated, staffEmailVisibility(c, updated.id));
+    return c.json({ success: true, data: { ...data, emailChangePending: true, pendingEmail: selfEmailChange.next } });
+  }
   return updated ? c.json({ success: true, data: await serializeStaff(c.env.DB, updated, staffEmailVisibility(c, updated.id)) }) : c.json({ success: false, error: 'Staff member not found' }, 404);
+});
+
+/*
+ * N-433: メール変更の確定。メール内リンクは fragment にトークンを乗せて
+ * 管理画面の確認ページ(/staff/email-change)を直接開き、確定はその画面からの
+ * POST だけが行う。GET だけでは確定しないので、メールの先読みで勝手に
+ * 変わることはない。
+ */
+staff.post('/api/staff/email-change/confirm', async (c) => {
+  try {
+    const body = await c.req.json<{ token?: string }>().catch(() => ({} as { token?: string }));
+    const token = body.token?.trim() ?? '';
+    if (!token || token.length > 512) {
+      return c.json({ success: false, error: '確認情報が正しくありません' }, 400);
+    }
+    const member = await getStaffByEmailChangeTokenHash(c.env.DB, await sha256Hex(token));
+    if (!member || !member.email_change_new || !member.email_change_expires_at || Date.parse(member.email_change_expires_at) < Date.now()) {
+      return c.json({ success: false, error: 'この確認リンクは無効または期限切れです。管理画面からもう一度変更してください。' }, 410);
+    }
+    const nextEmail = member.email_change_new;
+    // 申し込みのあとで別の人が同じメールを取ったかもしれないので、確定の直前にもう一度確かめる。
+    const duplicate = (await getStaffMembers(c.env.DB, member.tenant_id ?? DEFAULT_TENANT_ID))
+      .some((item) => item.id !== member.id && item.email?.toLowerCase() === nextEmail);
+    if (duplicate) {
+      await updateStaffMember(c.env.DB, member.id, {
+        email_change_new: null, email_change_token_hash: null, email_change_expires_at: null,
+      });
+      return c.json({ success: false, error: 'このメールアドレスは登録済みです' }, 409);
+    }
+    const oldEmail = member.email;
+    await updateStaffMember(c.env.DB, member.id, {
+      email: nextEmail,
+      email_verified_at: new Date().toISOString(),
+      // 使い切り: 確定したら確認済みの申し込みは消し、同じリンクを二度使えなくする。
+      email_change_new: null, email_change_token_hash: null, email_change_expires_at: null,
+    });
+    if (oldEmail && oldEmail.toLowerCase() !== nextEmail) {
+      try {
+        await sendStaffEmailChangeCompletedEmail(c.env, {
+          name: member.name, email: oldEmail, next: nextEmail,
+        });
+      } catch (error) {
+        // 確定そのものは済んでいる。知らせの失敗で確定を取り消すと二重の不整合になるので、記録だけ残す。
+        console.error('POST /api/staff/email-change/confirm notice mail error:', error);
+      }
+    }
+    return c.json({ success: true, data: { email: nextEmail } });
+  } catch (error) {
+    console.error('POST /api/staff/email-change/confirm error:', error);
+    return c.json({ success: false, error: 'メールアドレスの変更を確定できませんでした' }, 500);
+  }
 });
 
 function canEditMember(c: { get: (key: 'staff') => Env['Variables']['staff'] }, id: string): boolean {

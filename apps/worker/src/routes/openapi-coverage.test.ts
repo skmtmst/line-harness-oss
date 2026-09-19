@@ -386,6 +386,7 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'POST /api/scenarios/{id}/simulate',
   'POST /api/scenarios/{id}/steps',
   'POST /api/settings/features/impact',
+  'POST /api/staff/email-change/confirm',
   'POST /api/staff/{id}/resend-invite',
   'POST /api/staff/{id}/resend-invitation',
   'POST /api/tags',

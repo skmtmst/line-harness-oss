@@ -2345,6 +2345,24 @@ const spec = {
         },
       },
     },
+    '/api/staff/email-change/confirm': {
+      post: {
+        tags: ['Staff'],
+        summary: 'メールアドレス変更を確定',
+        description: '確認画面からの POST で確定する。トークンは24時間・使い切り。確定後は旧アドレスへ完了の知らせを送る（N-433）。',
+        requestBody: { required: true, content: { 'application/json': { schema: {
+          type: 'object',
+          required: ['token'],
+          properties: { token: { type: 'string', minLength: 1, maxLength: 512 } },
+        } } } },
+        responses: {
+          '200': { description: 'Email change confirmed and applied' },
+          '400': { description: 'Missing or malformed token' },
+          '409': { description: 'The new address is already registered' },
+          '410': { description: 'Token invalid or expired' },
+        },
+      },
+    },
     // ── Users (UUID Cross-Account) ──────────────────────────────────────────
     '/api/users': {
       get: { tags: ['Users'], summary: '内部ユーザー一覧取得', responses: { '200': { description: 'All users' } } },

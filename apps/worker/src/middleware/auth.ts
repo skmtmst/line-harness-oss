@@ -419,6 +419,8 @@ export function isPublicApiBoundary(method: string, path: string): boolean {
     // 会員登録・メールログイン・パスワード再設定。Turnstile と回数制限で守る。
     /^\/api\/auth\/(register|password|ops-invite)\//.test(path) ||
     /^\/api\/staff\/invitations\/[^/]+\/verify$/.test(path) ||
+    // N-433: メール変更の確定。トークン自体が資格情報で、ログイン状態に依らない。
+    path === '/api/staff/email-change/confirm' ||
     path.startsWith('/auth/') ||
     path === '/setup' ||
     path === '/api/integrations/stripe/webhook' ||
