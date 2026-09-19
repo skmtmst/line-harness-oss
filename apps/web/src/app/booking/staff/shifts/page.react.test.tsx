@@ -13,6 +13,8 @@ const fixture = vi.hoisted(() => ({
   updateResource: vi.fn(),
   deleteResource: vi.fn(),
   getAvailability: vi.fn(),
+  updateException: vi.fn(),
+  deleteException: vi.fn(),
 }))
 
 const accountSetters = new Set<(id: string | null) => void>()
@@ -62,6 +64,8 @@ vi.mock('@/lib/api', () => {
       deleteResource: (...args: unknown[]) => fixture.deleteResource(...args),
       getAvailability: (...args: unknown[]) => fixture.getAvailability(...args),
       createException: vi.fn(),
+      updateException: (...args: unknown[]) => fixture.updateException(...args),
+      deleteException: (...args: unknown[]) => fixture.deleteException(...args),
       // N-411: staff ロールの入口は本人の予約スタッフ解決。未紐づけを既定にする。
       listMyStaff: vi.fn(async () => ({ staff: [] })),
     },
@@ -150,7 +154,32 @@ beforeEach(() => {
   }))
   fixture.deleteResource.mockResolvedValue({ data: { id: 'resource-a' } })
   fixture.getAvailability.mockResolvedValue({ by_staff: [] })
+  fixture.updateException.mockImplementation(async (_accountId: string, _id: string, body: Record<string, unknown>) => ({
+    success: true,
+    data: exception({ ...body, version: (body.expectedVersion as number) + 1 }),
+  }))
+  fixture.deleteException.mockResolvedValue({ success: true, data: { id: 'exception-a' } })
 })
+
+function exception(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 'exception-a',
+    lineAccountId: 'account-a',
+    scopeKind: 'store',
+    scopeId: null,
+    date: null,
+    dateFrom: '2026-12-30',
+    dateTo: '2026-12-30',
+    kind: 'closed',
+    intervals: [],
+    reason: '年末休業',
+    note: null,
+    version: 2,
+    createdAt: '2026-09-01T00:00:00+09:00',
+    updatedAt: '2026-09-01T00:00:00+09:00',
+    ...overrides,
+  }
+}
 
 afterEach(() => {
   cleanup()
@@ -350,5 +379,70 @@ describe('予約設備の編集', () => {
       await Promise.resolve()
     })
     await screen.findByLabelText('新個室の設備名')
+  })
+})
+
+describe('登録済みの休業日の修正・削除 (#953 E-09)', () => {
+  async function renderWithException(exceptions = [exception()]) {
+    fixture.getSettings.mockImplementation(async (accountId: string) => ({
+      success: true,
+      data: settings(accountId, { exceptions }),
+    }))
+    await renderEditor()
+    await screen.findByText('年末休業')
+  }
+
+  test('修正するで入力に切り替え、expectedVersion付きで保存して一覧へ反映する', async () => {
+    await renderWithException()
+    fireEvent.click(screen.getByRole('button', { name: '修正する' }))
+
+    fireEvent.change(screen.getByLabelText('休業日の終了日'), { target: { value: '2027-01-03' } })
+    fireEvent.change(screen.getByLabelText('休業日の理由'), { target: { value: '年末年始' } })
+    fireEvent.click(screen.getByRole('button', { name: '休業日を保存' }))
+
+    await waitFor(() => expect(fixture.updateException).toHaveBeenCalledWith('account-a', 'exception-a', expect.objectContaining({
+      expectedVersion: 2,
+      dateFrom: '2026-12-30',
+      dateTo: '2027-01-03',
+      reason: '年末年始',
+    })))
+    await screen.findByText('年末年始')
+  })
+
+  test('削除は確認を1枚挟み、expectedVersion付きで送って一覧から消す', async () => {
+    await renderWithException()
+    fireEvent.click(screen.getByRole('button', { name: '削除する' }))
+
+    // 確認するまでAPIは呼ばない。
+    expect(await screen.findByText('この休業日を消しますか？')).toBeTruthy()
+    expect(fixture.deleteException).not.toHaveBeenCalled()
+
+    fireEvent.click(screen.getByRole('button', { name: '休業日を消す' }))
+    await waitFor(() => expect(fixture.deleteException).toHaveBeenCalledWith('account-a', 'exception-a', 2))
+    await waitFor(() => expect(screen.queryByText('年末休業')).toBeNull())
+  })
+
+  test('削除の版競合は上書きせず、読み直しを案内する', async () => {
+    fixture.deleteException.mockRejectedValueOnce(new ApiError(409, 'version_conflict', 'version_conflict'))
+    await renderWithException()
+    fireEvent.click(screen.getByRole('button', { name: '削除する' }))
+    fireEvent.click(screen.getByRole('button', { name: '休業日を消す' }))
+
+    expect((await screen.findByRole('alert')).textContent).toContain('ほかの担当者が先にこの休業日を変更しました')
+    // 一覧は消さず、確認をやり直せる状態のままにする。
+    expect(screen.getByText('年末休業')).toBeTruthy()
+  })
+
+  test('閲覧のみの人には修正・削除の入口を出さない', async () => {
+    window.localStorage.setItem('lh_staff_role', 'staff')
+    window.localStorage.setItem('lh_staff_view_permissions', '["/booking/bookings"]')
+    fixture.getSettings.mockImplementation(async (accountId: string) => ({
+      success: true,
+      data: settings(accountId, { exceptions: [exception()] }),
+    }))
+    await renderEditor(true)
+    await screen.findByText('年末休業')
+    expect(screen.queryByRole('button', { name: '修正する' })).toBeNull()
+    expect(screen.queryByRole('button', { name: '削除する' })).toBeNull()
   })
 })

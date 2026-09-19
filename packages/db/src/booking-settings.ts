@@ -603,6 +603,39 @@ export async function updateBookingAvailabilityException(
     : { status: 'conflict', currentVersion: Number(current.version) };
 }
 
+/**
+ * 例外日を版付きで消す。
+ *
+ * 消す直前に別の変更が入っていたら上書きせず conflict を返し、
+ * 呼び出し側へ最新版を読み直してもらう。別アカウントのIDは
+ * line_account_id が一致しないため not_found として隠す。
+ */
+export async function deleteBookingAvailabilityException(
+  db: D1Database,
+  input: {
+    id: string;
+    lineAccountId: string;
+    expectedVersion: number;
+  },
+): Promise<
+  | { status: 'deleted' }
+  | { status: 'conflict'; currentVersion: number }
+  | { status: 'not_found' }
+> {
+  const result = await db.prepare(`DELETE FROM booking_availability_exceptions
+    WHERE id = ? AND line_account_id = ? AND version = ?`)
+    .bind(input.id, input.lineAccountId, input.expectedVersion)
+    .run();
+  if ((result.meta.changes ?? 0) > 0) return { status: 'deleted' };
+  const current = await db.prepare(`SELECT version FROM booking_availability_exceptions
+    WHERE id = ? AND line_account_id = ?`)
+    .bind(input.id, input.lineAccountId)
+    .first<{ version: number }>();
+  return current
+    ? { status: 'conflict', currentVersion: Number(current.version) }
+    : { status: 'not_found' };
+}
+
 export async function updateBookingMenuSettings(
   db: D1Database,
   input: {

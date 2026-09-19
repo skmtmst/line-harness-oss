@@ -130,6 +130,7 @@ const ALLOWLIST_MAX = 773;
 const BASELINE_DOCUMENTED = new Set<string>([
   'DELETE /api/affiliates/{id}',
   'DELETE /api/auth/sessions/{tokenHash}',
+  'DELETE /api/booking/admin/exceptions/{id}',
   'DELETE /api/booking/admin/resources/{id}',
   'DELETE /api/broadcasts/{id}',
   'DELETE /api/chats/{id}/scheduled/{scheduleId}',

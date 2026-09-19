@@ -3512,6 +3512,29 @@ const spec = {
         },
       },
     },
+    '/api/booking/admin/exceptions/{id}': {
+      delete: {
+        tags: ['Booking'],
+        summary: '予約の例外日（休業日・臨時営業）を版付きで削除',
+        description: '消す直前の版を expectedVersion で確認し、先に別の変更が入っていたら409で止める。別アカウントのIDは404として隠す。',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        requestBody: { required: true, content: { 'application/json': { schema: {
+          type: 'object', additionalProperties: false, required: ['expectedVersion'],
+          properties: { expectedVersion: { type: 'integer', minimum: 1 } },
+        } } } },
+        responses: {
+          '200': { description: 'Deleted' },
+          '400': { description: 'Invalid request' },
+          '403': { description: 'Owner or admin role required, or account is outside access scope' },
+          '404': { description: '例外日が存在しない' },
+          '409': { description: '版競合' },
+          '503': { description: '例外日を削除できない' },
+        },
+      },
+    },
     '/api/booking/admin/resources': {
       get: {
         tags: ['Booking'], summary: '予約設備を利用状況と版付きで一覧取得',

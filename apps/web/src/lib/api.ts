@@ -11324,6 +11324,30 @@ export const bookingApi = {
     withAccount('/api/booking/admin/exceptions', accountId),
     { method: 'POST', body: JSON.stringify(body) },
   ),
+  /** #953 E-09: 登録済みの例外日を画面から直す。送った項目だけが変わる。 */
+  updateException: (
+    accountId: string,
+    id: string,
+    body: {
+      expectedVersion: number;
+      scopeKind?: 'store' | 'staff' | 'resource';
+      scopeId?: string | null;
+      dateFrom?: string;
+      dateTo?: string;
+      kind?: 'open' | 'closed' | 'custom_hours';
+      intervals?: Array<{ start: string; end: string }>;
+      reason?: string | null;
+    },
+  ) => fetchApi<ApiResponse<BookingException>>(
+    withAccount(`/api/booking/admin/exceptions/${encodeURIComponent(id)}`, accountId),
+    { method: 'PATCH', body: JSON.stringify(body) },
+  ),
+  /** #953 E-09: 例外日を版付きで消す。古い版は 409 で止まる。 */
+  deleteException: (accountId: string, id: string, expectedVersion: number) =>
+    fetchApi<ApiResponse<{ id: string }>>(
+      withAccount(`/api/booking/admin/exceptions/${encodeURIComponent(id)}`, accountId),
+      { method: 'DELETE', body: JSON.stringify({ expectedVersion }) },
+    ),
   // Menus
   listMenus: (accountId: string) =>
     fetchApi<{ menus: BookingMenu[] }>(withAccount('/api/booking/admin/menus', accountId)),
