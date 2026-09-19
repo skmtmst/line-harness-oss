@@ -4,7 +4,7 @@ import type { BookingNotificationSender } from './booking-notifier.js';
 import { purgeExpiredIdempotency } from './booking-idempotency.js';
 import { REQUEST_TTL_HOURS } from './booking-types.js';
 import { cancelByTrigger } from './reminder-trigger.js';
-import { resolveLineCredential } from '@line-crm/db';
+import { recordBookingAudit, resolveLineCredential } from '@line-crm/db';
 import { featureJobCanRun } from './feature-enforcement.js';
 
 interface StaleRow {
@@ -70,6 +70,17 @@ export async function runExpirer(
       .bind(params.now.toISOString(), row.id)
       .run();
     if ((upd.meta?.changes ?? 0) === 0) continue;
+    // N-394: 期限切れも状態遷移として監査へ残す。誰がではなく system。
+    await recordBookingAudit(db, {
+      bookingId: row.id,
+      lineAccountId: row.line_account_id,
+      action: 'status_changed',
+      before: { status: 'requested' },
+      after: { status: 'expired' },
+      reason: 'request_ttl_expired',
+      actorType: 'system',
+      occurredAt: params.now.toISOString(),
+    }).catch((error) => console.error('booking audit (expire) failed:', error));
     await db
       .prepare(
         `UPDATE booking_reminders SET status='cancelled' WHERE booking_id = ? AND status IN ('pending','failed')`,

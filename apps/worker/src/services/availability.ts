@@ -250,6 +250,12 @@ export interface GetAvailabilityParams {
   now: Date;
   minLeadTimeMinutes: number;
   googleCredentials?: GoogleServiceAccountCredentials;
+  /**
+   * 予約内容の変更で、変更対象そのものを空き枠計算から外す。
+   * 自予約の古い枠が重なり判定に残ると、同じ担当のまま少しずらす
+   * 変更が「自分自身と競合」で通らなくなる。
+   */
+  excludeBookingId?: string;
 }
 
 export interface CalendarSyncState {
@@ -538,9 +544,16 @@ export async function getAvailability(
         WHERE line_account_id = ?
           AND status IN ('requested','confirmed')
           AND julianday(starts_at) < julianday(?)
-          AND julianday(block_ends_at) > julianday(?)`,
+          AND julianday(block_ends_at) > julianday(?)
+          AND (? IS NULL OR id != ?)`,
     )
-    .bind(params.lineAccountId, rangeEnd.toISOString(), rangeStart.toISOString())
+    .bind(
+      params.lineAccountId,
+      rangeEnd.toISOString(),
+      rangeStart.toISOString(),
+      params.excludeBookingId ?? null,
+      params.excludeBookingId ?? null,
+    )
     .all<{ staff_id: string; menu_id: string; starts_at: string; block_ends_at: string }>();
 
   // 現在のメニューが必要とする資源について、予約時点のsnapshot消費を
@@ -557,12 +570,15 @@ export async function getAvailability(
         WHERE brc.line_account_id = ?
           AND b.status IN ('requested', 'confirmed')
           AND julianday(b.starts_at) < julianday(?)
-          AND julianday(b.block_ends_at) > julianday(?)`,
+          AND julianday(b.block_ends_at) > julianday(?)
+          AND (? IS NULL OR b.id != ?)`,
     ).bind(
       params.menuId,
       params.lineAccountId,
       rangeEnd.toISOString(),
       rangeStart.toISOString(),
+      params.excludeBookingId ?? null,
+      params.excludeBookingId ?? null,
     ).all<{ resource_id: string; quantity: number; starts_at: string; block_ends_at: string }>();
 
   const menuForCalc = {

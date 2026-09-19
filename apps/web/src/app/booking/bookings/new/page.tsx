@@ -111,6 +111,12 @@ export default function NewProxyBookingPage() {
   // 確認へ進む直前に読み直した枠。ここから先の表示・送信はこれだけを使う。
   const [confirmedSlot, setConfirmedSlot] = useState<BookingAvailabilitySlot | null>(null)
   const [reminderPreview, setReminderPreview] = useState<Array<{ kind: 'day_before' | 'hours_before'; scheduledAt: string }>>([])
+  // N-391: 予約ごとに選べる通知の可否。LINEと結びついた予約だけ意味を持つ。
+  const [notification, setNotification] = useState({
+    send_line_confirmation: true,
+    day_before: true,
+    hours_before: true,
+  })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const slotRequest = useRef(0)
@@ -134,6 +140,9 @@ export default function NewProxyBookingPage() {
     : selectedStaff?.duration_minutes ?? 0
   const confirmationOperation = result?.operations.find((item) => item.kind === 'confirmation_line') ?? null
   const automaticOperations = result?.operations.filter((item) => ['conversion', 'mileage', 'automation'].includes(item.kind)) ?? []
+  // N-390: LINEと結びついているか。友だち選択か、台帳上で連携済みの顧客か。
+  // 新しく作る電話客（customer 未保存）は必ず未連携。
+  const isLineLinked = friend != null || customer?.is_line_linked === true
 
   useEffect(() => {
     setStep('input')
@@ -152,6 +161,7 @@ export default function NewProxyBookingPage() {
     setCustomerContext(null)
     setConflictAlternatives(null)
     setReminderPreview([])
+    setNotification({ send_line_confirmation: true, day_before: true, hours_before: true })
     setIdempotencyKey('')
     setLoading(false)
     setError('')
@@ -380,6 +390,11 @@ export default function NewProxyBookingPage() {
         staff_id: selectedStaff.id,
         starts_at: startsAtIso,
         customer_note: customerNote.trim() || undefined,
+        // N-391: 選んだ通知可否を予約へ固定する。未連携は明示的に全OFFで
+        // 送る（指定を残すと「実は送れない予約」が分からなくなる）。
+        notification_policy: isLineLinked
+          ? notification
+          : { send_line_confirmation: false, day_before: false, hours_before: false },
       }, key)
       if (latestSelectionKey.current !== requestKey) return
       setResult(created)
@@ -527,35 +542,57 @@ export default function NewProxyBookingPage() {
               <textarea value={customerNote} onChange={(event) => setCustomerNote(event.target.value)} rows={4} className="border-hairline rounded-control w-full border px-3 py-2 text-sm" placeholder="予約時に確認した内容を入力" />
             </Card>
 
-            <Card title="お客様に何を送りますか" note="LINEと結びついている方には、予約後の案内を送ります。">
-              <div className="space-y-3">
-                <div className="flex gap-3">
-                  <span className="text-success font-bold">✓</span>
-                  <div><p className="text-ink text-sm font-medium">予約を受け付けたことを、いますぐLINEに送る</p><p className="text-ink-faint mt-0.5 text-xs">日時・メニュー・担当を書いた案内が届きます。</p></div>
+            <Card title="お客様に何を送りますか" note="LINEと結びついている方には、予約後の案内を送ります。送らない選択もできます。">
+              {isLineLinked || (!phoneCustomer && !friend) ? (
+                <div className="space-y-3">
+                  <NotificationToggle
+                    checked={notification.send_line_confirmation}
+                    onChange={(checked) => setNotification((prev) => ({ ...prev, send_line_confirmation: checked }))}
+                    title="予約を受け付けたことを、いますぐLINEに送る"
+                    detail="日時・メニュー・担当を書いた案内が届きます。"
+                  />
+                  <NotificationToggle
+                    checked={notification.day_before}
+                    onChange={(checked) => setNotification((prev) => ({ ...prev, day_before: checked }))}
+                    title="前日に思い出してもらう"
+                    detail="予約設定から計算した時刻に送ります。"
+                  />
+                  <NotificationToggle
+                    checked={notification.hours_before}
+                    onChange={(checked) => setNotification((prev) => ({ ...prev, hours_before: checked }))}
+                    title="当日のお知らせを送る"
+                    detail="開始まで十分な時間がある場合だけ送ります。"
+                  />
                 </div>
-                <div className="flex gap-3">
-                  <span className="text-success font-bold">✓</span>
-                  <div><p className="text-ink text-sm font-medium">前日に思い出してもらう</p><p className="text-ink-faint mt-0.5 text-xs">予約設定から計算した時刻に送ります。</p></div>
-                </div>
-                <div className="flex gap-3">
-                  <span className="text-success font-bold">✓</span>
-                  <div><p className="text-ink text-sm font-medium">当日のお知らせを送る</p><p className="text-ink-faint mt-0.5 text-xs">開始まで十分な時間がある場合だけ送ります。</p></div>
-                </div>
-              </div>
+              ) : (
+                // N-390: LINEと結びつかない電話客には送信UIを見せない。
+                <p className="text-ink-faint text-sm">
+                  LINEと結びついていないため、自動のお知らせは届きません。
+                  連絡は電話などで直接行ってください。
+                </p>
+              )}
             </Card>
           </div>
 
           <div data-design="Right" className="w-full space-y-4 xl:flex-none" style={{ maxWidth: 390 }}>
             <Card title={friend ? `${friend.displayName}さんにはこう届きます` : 'お客様にはこう届きます'}>
-              <div className="rounded-card bg-action-soft p-3">
-                <p className="text-action mb-2 text-center text-xs font-semibold">LINEプレビュー</p>
-                <div className="rounded-card bg-canvas p-4 text-sm leading-6">
-                  <p>{friend?.displayName ?? 'お客様'}さま</p>
-                  <p className="font-semibold">ご予約を承りました。</p>
-                  <p className="mt-3">{slotStartIso ? dateLabel(slotStartIso, slotTimeZone) : '日時を選ぶと表示されます'}</p>
-                  <p>{menu?.name ?? 'メニューを選ぶと表示されます'} ／ 担当 {selectedStaff?.display_name ?? '—'}</p>
+              {phoneCustomer && !isLineLinked ? (
+                // N-390: 未連携の電話客へLINEプレビューを見せると
+                // 「送れる」と誤解させる。実態をそのまま伝える。
+                <p className="text-ink-faint rounded-card bg-canvas-sunken p-4 text-sm">
+                  LINEと結びついていないため、LINEのお知らせは届きません。
+                </p>
+              ) : (
+                <div className="rounded-card bg-action-soft p-3">
+                  <p className="text-action mb-2 text-center text-xs font-semibold">LINEプレビュー</p>
+                  <div className="rounded-card bg-canvas p-4 text-sm leading-6">
+                    <p>{friend?.displayName ?? 'お客様'}さま</p>
+                    <p className="font-semibold">ご予約を承りました。</p>
+                    <p className="mt-3">{slotStartIso ? dateLabel(slotStartIso, slotTimeZone) : '日時を選ぶと表示されます'}</p>
+                    <p>{menu?.name ?? 'メニューを選ぶと表示されます'} ／ 担当 {selectedStaff?.display_name ?? '—'}</p>
+                  </div>
                 </div>
-              </div>
+              )}
             </Card>
             <Card title="この方について">
               {customerContext ? (
@@ -597,11 +634,28 @@ export default function NewProxyBookingPage() {
               <Summary label="お客様からのご希望" value={customerNote.trim() || '記入なし'} />
             </Card>
             <Card title="お客様に送るもの">
-              <NoticeRow title="いますぐ LINE に送る" detail="日時・メニュー・担当を書いた案内が届きます" />
-              {reminderPreview.map((reminder) => (
-                <NoticeRow key={reminder.kind} title={`${scheduleLabel(reminder.scheduledAt, slotTimeZone)} に思い出してもらう`} detail="予約設定から計算した実際の送信予定です" />
-              ))}
-              {reminderPreview.length === 0 ? <p className="text-ink-faint text-xs">予約開始までの時間が短いため、今後のリマインダはありません。</p> : null}
+              {!isLineLinked ? (
+                <p className="text-ink-faint text-sm">
+                  LINEと結びついていないため、自動のお知らせは届きません。
+                </p>
+              ) : (
+                <>
+                  {notification.send_line_confirmation ? (
+                    <NoticeRow title="いますぐ LINE に送る" detail="日時・メニュー・担当を書いた案内が届きます" />
+                  ) : null}
+                  {reminderPreview
+                    .filter((reminder) => notification[reminder.kind === 'day_before' ? 'day_before' : 'hours_before'])
+                    .map((reminder) => (
+                      <NoticeRow key={reminder.kind} title={`${scheduleLabel(reminder.scheduledAt, slotTimeZone)} に思い出してもらう`} detail="予約設定から計算した実際の送信予定です" />
+                    ))}
+                  {!notification.send_line_confirmation
+                    && reminderPreview.filter((r) => notification[r.kind === 'day_before' ? 'day_before' : 'hours_before']).length === 0 ? (
+                      <p className="text-ink-faint text-xs">
+                        お知らせはすべて送らない設定です。登録だけを行います。
+                      </p>
+                    ) : null}
+                </>
+              )}
             </Card>
             <p data-booking-slot-check="available" className="border-success bg-success-bg text-success rounded-card border px-4 py-3 text-xs">
               この日時は、確認画面を開く直前に空きを再確認しました。
@@ -609,7 +663,7 @@ export default function NewProxyBookingPage() {
           </div>
           <aside data-design="Right" className="space-y-4">
             <Card title={`${customerLabel}さんにはこう届きます`} note="送る前に、文面をそのまま確かめられます。">
-              <LinePreview friendName={customerLabel} menuName={menu.name} staffName={selectedStaff.display_name} timeZone={slotTimeZone} startUtc={slotStartIso} deliveryStatus="not_sent" />
+              <LinePreview friendName={customerLabel} menuName={menu.name} staffName={selectedStaff.display_name} timeZone={slotTimeZone} startUtc={slotStartIso} deliveryStatus={isLineLinked ? 'not_sent' : 'not_applicable'} />
             </Card>
             <WarningCard title="気をつけること" lines={['LINEと結びついていない方には、自動のお知らせは届きません', 'あとで時間を変えたときは、もう一度お知らせを送ってください']} />
             <RelatedLinks includeConversion={false} />
@@ -748,6 +802,29 @@ function NoticeRow({ title, detail }: { title: string; detail: string }) {
       <span className="text-success font-bold">✓</span>
       <div><p className="text-ink text-sm font-medium">{title}</p><p className="text-ink-faint mt-0.5 text-xs">{detail}</p></div>
     </div>
+  )
+}
+
+/** N-391: 通知の送る／送らないを予約ごとに選ぶトグル。 */
+function NotificationToggle({ checked, onChange, title, detail }: {
+  checked: boolean
+  onChange: (checked: boolean) => void
+  title: string
+  detail: string
+}) {
+  return (
+    <label className="flex cursor-pointer gap-3">
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(event) => onChange(event.target.checked)}
+        className="accent-accent-deep mt-1 h-4 w-4"
+      />
+      <div>
+        <p className="text-ink text-sm font-medium">{title}</p>
+        <p className="text-ink-faint mt-0.5 text-xs">{detail}</p>
+      </div>
+    </label>
   )
 }
 

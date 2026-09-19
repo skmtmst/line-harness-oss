@@ -561,6 +561,8 @@ function BookingRulesEditor({ accountId, initial, canEdit, onRetry, onSaved }: {
         approvalMode: draft.approvalMode,
         holdMinutes: draft.holdMinutes,
         slotGranularityMinutes: draft.slotGranularityMinutes,
+        reminderDayBeforeTime: draft.reminderDayBeforeTime || null,
+        reminderHoursBefore: draft.reminderHoursBefore,
       })
       if (!response.success) throw new Error('booking_settings_save_failed')
       setDraft(response.data)
@@ -609,6 +611,21 @@ function BookingRulesEditor({ accountId, initial, canEdit, onRetry, onSaved }: {
             options={[5, 10, 15, 30, 60].map((value) => ({ value: String(value), label: `${value}分` }))}
           />
         </Field>
+        {/* N-395: 前日・当日のお知らせ時刻を店舗ごとに変えられるようにする。
+            空欄にすると従来どおり（前日=24時間前、当日=2時間前）。 */}
+        <Field label="前日のお知らせを送る時刻">
+          <div className="flex items-center gap-2">
+            <input
+              aria-label="前日のお知らせを送る時刻"
+              type="time"
+              value={draft.reminderDayBeforeTime ?? ''}
+              onChange={(event) => set('reminderDayBeforeTime', event.target.value || null)}
+              className="border-hairline rounded-control focus:ring-accent w-full border px-3 py-2 text-sm tabular-nums focus:outline-none focus:ring-2"
+            />
+            <span className="text-ink-faint whitespace-nowrap text-xs">空欄は24時間前</span>
+          </div>
+        </Field>
+        <RuleNumberField label="当日のお知らせを送るタイミング" unit="時間前" min={1} max={72} value={draft.reminderHoursBefore} onChange={(value) => set('reminderHoursBefore', value)} />
       </div>
       <p className="text-ink-faint mt-4 text-xs">0分前は、開始直前まで受け付ける・キャンセルできる設定です。</p>
       {saveError && (

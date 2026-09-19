@@ -62,6 +62,8 @@ const common = {
   approvalMode: 'automatic' as const,
   holdMinutes: 15,
   slotGranularityMinutes: 15 as const,
+  reminderDayBeforeTime: null,
+  reminderHoursBefore: null,
 };
 
 test('実D1で週全体保存・古い版拒否・途中失敗rollbackを保つ', async () => {

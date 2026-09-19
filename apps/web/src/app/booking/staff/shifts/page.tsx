@@ -135,6 +135,9 @@ function BusinessHoursEditor({ accountId, settings, canEdit, onSaved, onReload }
         approvalMode: settings.approvalMode,
         holdMinutes: settings.holdMinutes,
         slotGranularityMinutes: settings.slotGranularityMinutes,
+        // 営業時間の保存で上書きしないよう、現在のリマインダ設定をそのまま送る。
+        reminderDayBeforeTime: settings.reminderDayBeforeTime,
+        reminderHoursBefore: settings.reminderHoursBefore,
         businessHours: draft,
       })
       if (!activeRef.current) return
