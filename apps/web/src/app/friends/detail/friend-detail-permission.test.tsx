@@ -9,6 +9,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
  *   N-037: PUT /api/friends/:id/fields はオーナー・管理者専用なのに、
  *          staff にも編集欄と「保存」ボタンが出て押すと403になった。
  *          staff には値を読ませるだけにし、保存の口を出さないことを固定する。
+ *   N-045: 個人情報の項目は attribute.personal_info.edit を持つ staff が
+ *          変更できる。個人情報でない項目の編集・項目の新規登録は従来どおり
+ *          オーナー・管理者専用で、押すと403になる口を staff には出さない。
  *   N-035: 担当・対応状況を変える口が友だち側に無かった。
  *          '/chats' 編集キーを持つ人だけが「対応」の編集を開き、
  *          PUT /api/chats/:id へ友だちIDで届くことを固定する。
@@ -35,6 +38,24 @@ const fixtures = vi.hoisted(() => ({
     createdAt: '2026-09-01T00:00:00.000Z',
     updatedAt: '2026-09-01T00:00:00.000Z',
     value: '既存の値',
+  },
+  personalField: {
+    id: 'field-personal',
+    folderId: null,
+    name: '電話番号',
+    fieldKey: 'phone',
+    type: 'text' as const,
+    options: null,
+    defaultValue: null,
+    source: 'manual' as const,
+    ecFieldPath: null,
+    ecIsMaster: false,
+    isPersonal: true,
+    isStarred: false,
+    displayOrder: 1,
+    createdAt: '2026-09-01T00:00:00.000Z',
+    updatedAt: '2026-09-01T00:00:00.000Z',
+    value: '090-0000-0000',
   },
   friendDetail: {
     id: 'friend-1',
@@ -71,6 +92,12 @@ const net = vi.hoisted(() => ({
   calls: [] as { name: string; args: unknown[] }[],
 }))
 
+// forFriend が返す項目。試験ごとに差し替えられるよう hoisted に置く。
+const state = vi.hoisted(() => ({
+  fieldItems: [] as unknown[],
+  hiddenCount: 0,
+}))
+
 const routing = vi.hoisted(() => ({
   params: new URLSearchParams('id=friend-1&tab=info'),
 }))
@@ -105,8 +132,12 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
         forFriend: () =>
           Promise.resolve({
             success: true,
-            data: { items: [fixtures.textField], hiddenPersonalCount: 0 },
+            data: { items: state.fieldItems, hiddenPersonalCount: state.hiddenCount },
           }),
+        saveForFriend: (...args: unknown[]) => {
+          net.calls.push({ name: 'friendFields.saveForFriend', args })
+          return Promise.resolve({ success: true, data: { updated: 1 }, warnings: [] })
+        },
       },
       chats: {
         ...actual.api.chats,
@@ -142,15 +173,18 @@ let root: Root
 let FriendDetailPage: typeof import('./page').default
 const storage = new Map<string, string>()
 
-function setRole(role: string | null, permissions: string[] = []) {
+function setRole(role: string | null, permissions: string[] = [], viewPermissions: string[] = []) {
   if (role === null) storage.delete('lh_staff_role')
   else storage.set('lh_staff_role', role)
   storage.set('lh_staff_permissions', JSON.stringify(permissions))
+  storage.set('lh_staff_view_permissions', JSON.stringify(viewPermissions))
 }
 
 beforeEach(async () => {
   ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
   net.calls.length = 0
+  state.fieldItems = [fixtures.textField]
+  state.hiddenCount = 0
   routing.params = new URLSearchParams('id=friend-1&tab=info')
   // 権限の正本は auth-guard が保存する localStorage。試験では Map で同じ形を用意する。
   storage.clear()
@@ -226,7 +260,7 @@ describe('N-037 staffの情報欄は読み取り専用（403と画面を一致�
     expect(input!.disabled).toBe(false)
     expect(buttonsByText('保存')).toHaveLength(1)
     expect(linksByText('項目を追加').length).toBeGreaterThan(0)
-    expect(host.textContent).not.toContain('情報欄の値を保存できるのはオーナーと管理者です。')
+    expect(host.textContent).not.toContain('情報欄の値を保存できるのは')
   })
 
   it('staffは値を読めるが、編集欄・保存・項目追加は出ない', async () => {
@@ -240,7 +274,77 @@ describe('N-037 staffの情報欄は読み取り専用（403と画面を一致�
     // 押すと403になる口は出さない
     expect(buttonsByText('保存')).toHaveLength(0)
     expect(linksByText('項目を追加')).toHaveLength(0)
-    expect(host.textContent).toContain('情報欄の値を保存できるのはオーナーと管理者です。')
+    expect(host.textContent).toContain('情報欄の値を保存できるのはオーナー・管理者、または個人情報の編集権限を持つスタッフです。')
+  })
+})
+
+describe('N-045 個人情報の項目は個別権限で編集する', () => {
+  beforeEach(() => {
+    state.fieldItems = [fixtures.textField, fixtures.personalField]
+  })
+
+  function inputs(): HTMLInputElement[] {
+    return Array.from(host.querySelectorAll<HTMLInputElement>('input[type="text"]'))
+  }
+
+  it('edit キーを持つ staff は個人情報の項目だけ編集でき、保存口が出る', async () => {
+    setRole('staff', ['/tags', 'attribute.personal_info.edit'])
+    await render('info')
+    const [text, personal] = inputs()
+    // 個人情報でない項目はサーバーも受けないため、入力欄を閉じる
+    expect(text.disabled).toBe(true)
+    expect(text.value).toBe('既存の値')
+    // 個人情報の項目は編集できる
+    expect(personal.disabled).toBe(false)
+    expect(personal.value).toBe('090-0000-0000')
+    expect(buttonsByText('保存')).toHaveLength(1)
+    // 項目の定義を足す口はオーナー・管理者専用のまま
+    expect(linksByText('項目を追加')).toHaveLength(0)
+    expect(host.textContent).toContain('個人情報')
+  })
+
+  it('edit キーを持つ staff が個人情報を変えて保存すると saveForFriend へ届く', async () => {
+    setRole('staff', ['/tags', 'attribute.personal_info.edit'])
+    await render('info')
+    const [, personal] = inputs()
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!
+    await act(async () => {
+      setter.call(personal, '080-1111-2222')
+      personal.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    await act(async () => {
+      buttonsByText('保存')[0].click()
+    })
+    await eventually(() => {
+      const call = net.calls.find((c) => c.name === 'friendFields.saveForFriend')
+      expect(call).toBeTruthy()
+      expect(call!.args[0]).toBe('friend-1')
+      expect(call!.args[1]).toEqual({ 'field-personal': '080-1111-2222' })
+    })
+  })
+
+  it('view キーだけの staff は個人情報を読めるが編集・保存の口は出ない', async () => {
+    setRole('staff', ['/tags'], ['attribute.personal_info.view'])
+    await render('info')
+    const [text, personal] = inputs()
+    expect(text.disabled).toBe(true)
+    expect(personal.disabled).toBe(true)
+    // 値は読める
+    expect(personal.value).toBe('090-0000-0000')
+    expect(buttonsByText('保存')).toHaveLength(0)
+    expect(linksByText('項目を追加')).toHaveLength(0)
+  })
+
+  it('鍵の無い staff はサーバーが個人情報を返さない前提で、読み取り専用のまま', async () => {
+    // サーバーは個人情報の項目を items に含めず hiddenPersonalCount で知らせる。
+    state.fieldItems = [fixtures.textField]
+    state.hiddenCount = 1
+    setRole('staff', ['/tags'])
+    await render('info')
+    expect(inputs()).toHaveLength(1)
+    expect(host.textContent).toContain('個人情報の項目が 1 件あります。')
+    expect(host.textContent).toContain('表示には個人情報の閲覧権限が要ります。')
+    expect(buttonsByText('保存')).toHaveLength(0)
   })
 })
 

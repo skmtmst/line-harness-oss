@@ -522,6 +522,28 @@ export type SaveTagDefinition = {
   applyToExisting?: boolean
 }
 
+/** 遡及マイル実行の前にサーバーが数えた対象（N-047）。 */
+export type TagRetroactivePreview = {
+  tagId: string
+  lineAccountId: string | null
+  /** タグが付いている友だちの合計 */
+  friendCount: number
+  /** 本人マイルをまだ受け取っていない人数 */
+  selfTargets: number
+  /** 本人マイルをすでに受け取っている人数 */
+  selfExcluded: number
+  /** 紹介者マイルの対象人数（まだ紹介者へ付与されていない） */
+  referralTargets: number
+  /** 紹介者マイルがすでに付与済みの人数 */
+  referralExcluded: number
+  selfMiles: number
+  referralMiles: number
+  totalMiles: number
+  expiresAt: string
+  /** 実行時の引き換え券。PATCH へそのまま渡す。 */
+  previewToken: string
+}
+
 export type TagDependencies = {
   tag: { id: string; name: string; version: number; status: 'active' | 'archived' }
   friendCount: number
@@ -5022,7 +5044,12 @@ export const api = {
       id: string,
       accountId: string,
       expectedVersion: number,
-      data: SaveTagDefinition & { automationId?: string | null; automationDraftVersion?: string | null },
+      data: SaveTagDefinition & {
+        automationId?: string | null
+        automationDraftVersion?: string | null
+        /** 遡及実行の前に /retroactive-preview で受け取った引き換え券（N-047）。 */
+        previewToken?: string
+      },
     ) => fetchApi<ApiResponse<TagDefinition & { queued: number }>>(`/api/tags/${id}`, {
       method: 'PATCH',
       body: JSON.stringify({ lineAccountId: accountId, expectedVersion, ...data }),
@@ -5077,11 +5104,25 @@ export const api = {
       multiplierPriority: number
       /** true のときだけ、すでにこのタグが付いている人へ遡及する。 */
       applyToExisting?: boolean
+      /** 遡及実行の前に /retroactive-preview で受け取った引き換え券（N-047）。 */
+      previewToken?: string
     }) =>
       fetchApi<ApiResponse<{ tag: Tag; queued: number }>>(`/api/tags/${id}/mileage`, {
         method: 'PATCH',
         body: JSON.stringify(data),
       }),
+    /**
+     * 遡及実行の前に対象をサーバー側で数える（N-047）。
+     * 返す previewToken を applyToExisting の実行へそのまま渡す。
+     */
+    retroactivePreview: (id: string, accountId: string, mileage?: { self?: number; referrer?: number }) =>
+      fetchApi<ApiResponse<TagRetroactivePreview>>(
+        `/api/tags/${id}/retroactive-preview`,
+        {
+          method: 'POST',
+          body: JSON.stringify({ lineAccountId: accountId, ...(mileage ? { mileage } : {}) }),
+        },
+      ),
     delete: (id: string) =>
       fetchApi<ApiResponse<null>>(`/api/tags/${id}`, { method: 'DELETE' }),
     archive: (id: string, accountId: string, data: {
@@ -5344,7 +5385,7 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({ name: data.name, conditions: data.conditions, isShared: data.isShared }),
       }),
-    update: (id: string, accountId: string, data: { name?: string; conditions?: unknown; isShared?: boolean; expectedRevision?: number }) =>
+    update: (id: string, accountId: string, data: { name?: string; conditions?: unknown; isShared?: boolean; expectedRevision?: number; displayOrder?: number }) =>
       fetchApi<ApiResponse<SavedSearch>>(`/api/saved-searches/${id}?lineAccountId=${encodeURIComponent(accountId)}`, {
         method: 'PATCH',
         body: JSON.stringify(data),

@@ -70,10 +70,15 @@ const { friendFields } = await import('./friend-fields.js');
 const { validateFriendFieldValue: realValidateFriendFieldValue } =
   await vi.importActual<typeof import('@line-crm/db')>('@line-crm/db');
 
-function makeApp(role: 'owner' | 'admin' | 'staff' = 'owner', tenantId: string | null = 'tenant-1') {
+function makeApp(
+  role: 'owner' | 'admin' | 'staff' = 'owner',
+  tenantId: string | null = 'tenant-1',
+  permissionKeys: string[] = [],
+  viewPermissionKeys: string[] = [],
+) {
   const app = new Hono<Env>();
   app.use('*', async (c, next) => {
-    c.set('staff', { id: 'u-1', name: 'テスト', role, readOnly: false, tenantId });
+    c.set('staff', { id: 'u-1', name: 'テスト', role, readOnly: false, tenantId, permissionKeys, viewPermissionKeys });
     return next();
   });
   app.route('/', friendFields);
@@ -966,6 +971,129 @@ describe('値の型検証（N-042 一括）', () => {
     const res = await req(makeApp('owner', null), '/api/friend-fields/bulk', 'POST', bulk('ff-1', 'ポチ'));
     expect(res.status).toBe(403);
     expect(mocks.setFriendFieldValue).not.toHaveBeenCalled();
+    expect(mocks.setFriendFieldValuesBulk).not.toHaveBeenCalled();
+  });
+});
+
+describe('個人情報の個別権限（N-045）', () => {
+  const personal = { ...FIELD, id: 'ff-2', name: '電話番号', field_key: 'phone', is_personal: 1, value: '090' };
+
+  it('view キーを持つ staff は個人情報を読め、見たことが記録される', async () => {
+    mocks.getFriendFieldsWithValues.mockResolvedValue([{ ...personal, updated_by: null }]);
+    const res = await req(
+      makeApp('staff', 'tenant-1', [], ['attribute.personal_info.view']),
+      '/api/friends/f-1/fields', 'GET',
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { data: { items: Array<{ id: string }>; hiddenPersonalCount: number } };
+    expect(body.data.items.map((i) => i.id)).toEqual(['ff-2']);
+    expect(body.data.hiddenPersonalCount).toBe(0);
+    expect(mocks.recordLoginAudit).toHaveBeenCalledWith(
+      env.DB,
+      expect.objectContaining({ action: 'view_personal', adminUserId: 'u-1' }),
+    );
+  });
+
+  it('edit キーだけを持つ staff も個人情報を読める（読めないのに書ける状態にしない）', async () => {
+    mocks.getFriendFieldsWithValues.mockResolvedValue([
+      { ...FIELD, value: null, updated_by: null },
+      { ...personal, updated_by: null },
+    ]);
+    const res = await req(
+      makeApp('staff', 'tenant-1', ['attribute.personal_info.edit']),
+      '/api/friends/f-1/fields', 'GET',
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { data: { items: Array<{ id: string }> } };
+    expect(body.data.items.map((i) => i.id).sort()).toEqual(['ff-1', 'ff-2']);
+  });
+
+  it('鍵の無い staff は個人情報を読めない', async () => {
+    mocks.getFriendFieldsWithValues.mockResolvedValue([
+      { ...FIELD, value: null, updated_by: null },
+      { ...personal, updated_by: null },
+    ]);
+    const res = await req(makeApp('staff'), '/api/friends/f-1/fields', 'GET');
+    const body = (await res.json()) as { data: { items: Array<{ id: string }>; hiddenPersonalCount: number } };
+    expect(body.data.items.map((i) => i.id)).toEqual(['ff-1']);
+    expect(body.data.hiddenPersonalCount).toBe(1);
+  });
+
+  it('鍵の無い staff は値を保存できない', async () => {
+    const res = await req(makeApp('staff'), '/api/friends/f-1/fields', 'PUT', {
+      values: { 'ff-1': 'ポチ' },
+    });
+    expect(res.status).toBe(403);
+    expect(mocks.setFriendFieldValue).not.toHaveBeenCalled();
+  });
+
+  it('view キーだけでは保存できない', async () => {
+    const res = await req(
+      makeApp('staff', 'tenant-1', [], ['attribute.personal_info.view']),
+      '/api/friends/f-1/fields', 'PUT',
+      { values: { 'ff-2': '080' } },
+    );
+    expect(res.status).toBe(403);
+    expect(mocks.setFriendFieldValue).not.toHaveBeenCalled();
+  });
+
+  it('edit キーを持つ staff は個人情報の項目を保存できる', async () => {
+    mocks.getFriendFields.mockResolvedValue([FIELD, personal]);
+    const res = await req(
+      makeApp('staff', 'tenant-1', ['attribute.personal_info.edit']),
+      '/api/friends/f-1/fields', 'PUT',
+      { values: { 'ff-2': '080-0000-0000' } },
+    );
+    expect(res.status).toBe(200);
+    expect(mocks.setFriendFieldValue).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+      friendId: 'f-1',
+      fieldId: 'ff-2',
+      value: '080-0000-0000',
+    }));
+  });
+
+  it('edit キーを持つ staff が個人情報でない項目を送っても保存せず理由を返す', async () => {
+    mocks.getFriendFields.mockResolvedValue([FIELD, personal]);
+    const res = await req(
+      makeApp('staff', 'tenant-1', ['attribute.personal_info.edit']),
+      '/api/friends/f-1/fields', 'PUT',
+      { values: { 'ff-1': 'ポチ', 'ff-2': '080-0000-0000' } },
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { data: { updated: number }; warnings: string[] };
+    expect(body.data.updated).toBe(1);
+    expect(body.warnings[0]).toContain('ペットの名前');
+    expect(mocks.setFriendFieldValue).toHaveBeenCalledTimes(1);
+    expect(mocks.setFriendFieldValue).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ fieldId: 'ff-2' }));
+  });
+
+  it('一括変更: edit キーを持つ staff は個人情報の項目だけ実行できる', async () => {
+    mocks.getFriendFieldByIdForScope.mockResolvedValue({ ...personal, line_account_id: 'account-1', tenant_id: 'tenant-1', is_inherited: 0 });
+    const res = await req(
+      makeApp('staff', 'tenant-1', ['attribute.personal_info.edit']),
+      '/api/friend-fields/bulk', 'POST',
+      { lineAccountId: 'account-1', friendIds: ['f-1'], fieldId: 'ff-2', value: '080' },
+    );
+    expect(res.status).toBe(200);
+    expect(mocks.setFriendFieldValuesBulk).toHaveBeenCalledTimes(1);
+  });
+
+  it('一括変更: staff は個人情報でない項目を変えられない', async () => {
+    mocks.getFriendFieldByIdForScope.mockResolvedValue({ ...FIELD, line_account_id: 'account-1', tenant_id: 'tenant-1', is_inherited: 0 });
+    const res = await req(
+      makeApp('staff', 'tenant-1', ['attribute.personal_info.edit']),
+      '/api/friend-fields/bulk', 'POST',
+      { lineAccountId: 'account-1', friendIds: ['f-1'], fieldId: 'ff-1', value: 'ポチ' },
+    );
+    expect(res.status).toBe(403);
+    expect(mocks.setFriendFieldValuesBulk).not.toHaveBeenCalled();
+  });
+
+  it('一括変更: 鍵の無い staff は403', async () => {
+    const res = await req(makeApp('staff'), '/api/friend-fields/bulk', 'POST', {
+      lineAccountId: 'account-1', friendIds: ['f-1'], fieldId: 'ff-1', value: 'ポチ',
+    });
+    expect(res.status).toBe(403);
     expect(mocks.setFriendFieldValuesBulk).not.toHaveBeenCalled();
   });
 });

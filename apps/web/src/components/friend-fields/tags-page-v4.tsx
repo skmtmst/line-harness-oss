@@ -18,6 +18,7 @@ import { Tabs } from '@/components/shared/tabs'
 import FriendFieldList from './field-list'
 import SupportMarkList from './mark-list'
 import SavedSearchList from './saved-search-list'
+import ReorderGrip from './reorder-grip'
 import TagCsvImportDialog from './tag-csv-import-dialog'
 import { FeatureDisabledScreen } from '@/components/feature-disabled-gate'
 import { useFeatureVisibility } from '@/lib/use-feature-visibility'
@@ -717,6 +718,19 @@ export default function TagsPageV4({
     if (!result.success) { setError(result.error); void load() }
   }
 
+  /** つまみにフォーカスして ↑/↓。表示中の並びで1つ動かす（N-049）。 */
+  const keyboardMove = async (id: string, direction: -1 | 1) => {
+    const order = filtered.map((tag) => tag.id)
+    const from = order.indexOf(id)
+    const to = from + direction
+    if (from < 0 || to < 0 || to >= order.length) return
+    order.splice(to, 0, ...order.splice(from, 1))
+    const rank = new Map(order.map((tid, index) => [tid, index]))
+    setItems((current) => [...current].sort((a, b) => (rank.get(a.id) ?? 9999) - (rank.get(b.id) ?? 9999)))
+    const result = await api.tags.reorder(order)
+    if (!result.success) { setError(result.error); void load() }
+  }
+
   /** 友だち一覧への表示（★）。設計 `zMlMX`。押した瞬間に切り替える。版付き(#715)。 */
   const toggleStar = async (tag: Tag) => {
     const next = !tag.isStarred
@@ -935,9 +949,8 @@ export default function TagsPageV4({
                           onDragOver={(event) => event.preventDefault()}
                           onDrop={() => void move(tag.id)}
                           className="cursor-grab px-2 py-3 text-center text-hairline"
-                          aria-label="ドラッグして並び替え"
                         >
-                          <GripIcon />
+                          <ReorderGrip label={tag.name} onMove={(direction) => void keyboardMove(tag.id, direction)}><GripIcon /></ReorderGrip>
                         </td>
                         <td className="px-3 py-3">
                           <div className="flex min-w-0 items-center gap-2">
