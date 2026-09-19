@@ -116,8 +116,12 @@ export default function SupportMarkEditor({ markId }: { markId?: string }) {
 
       {error ? <p role="alert" className="mb-4 rounded-control border border-danger/20 bg-danger-bg p-3 text-sm text-danger">{error}</p> : null}
 
+      {/*
+        グリッド子は `min-w-0` で縮める（#973 U020）。無いと中身の
+        最小幅がそのまま段の最小幅になり、狭い幅でカードの右端が切れる。
+      */}
       <div className="grid items-start gap-4 xl:grid-cols-3">
-        <Card padding="default">
+        <Card padding="default" className="min-w-0">
           <h2 className="mb-4 text-sm font-bold text-ink">基本情報</h2>
           <label className="mb-4 block">
             <span className="mb-1.5 block text-xs font-semibold text-ink-secondary">マーク名</span>
@@ -133,38 +137,52 @@ export default function SupportMarkEditor({ markId }: { markId?: string }) {
             <span className="mb-1.5 block text-xs font-semibold text-ink-secondary">並び順</span>
             <input type="number" min={0} value={displayOrder} onChange={(event) => setDisplayOrder(Number(event.target.value))} className="h-10 w-28 rounded-control border border-hairline px-3 text-sm outline-none focus:border-accent" />
           </label>
-          <label className="flex items-center justify-between gap-3 border-t border-hairline pt-4 text-sm font-semibold text-ink">
-            <span>新しい友だちに最初から付ける<small className="mt-1 block font-normal text-ink-faint">最初から付けるマークは1つだけ選べます</small></span>
-            <input type="checkbox" checked={isDefault} disabled={selected?.isDefault} onChange={(event) => setIsDefault(event.target.checked)} className="h-5 w-5 accent-accent" />
-          </label>
+          {/*
+            説明文とチェックは別行にする（#973 U020）。1行に押し込むと
+            狭い幅でチェック欄がカードの外へ切れる。
+          */}
+          <div className="border-t border-hairline pt-4">
+            <label className="flex items-center gap-2 text-sm font-semibold text-ink">
+              <input type="checkbox" checked={isDefault} disabled={selected?.isDefault} onChange={(event) => setIsDefault(event.target.checked)} className="h-5 w-5 shrink-0 accent-accent" />
+              新しい友だちに最初から付ける
+            </label>
+            <p className="mt-1 text-xs font-normal leading-relaxed text-ink-faint">最初から付けるマークは1つだけ選べます</p>
+          </div>
         </Card>
 
         {/* 設計 GMvBd は基本情報と自動変更を横並びで比較できる。 */}
         {editing ? (
-          <Card padding="default">
+          <Card padding="default" className="min-w-0">
             <SupportMarkRulesPanel accountId={selectedAccountId} markId={markId ?? null} markName={name} />
           </Card>
         ) : (
-          <Card padding="default">
+          <Card padding="default" className="min-w-0">
             <h2 className="mb-2 text-sm font-bold text-ink">自動変更ルール</h2>
             <p className="text-xs leading-relaxed text-ink-faint">受信・返信・担当割当・期限超過などをきっかけに自動変更できます。</p>
-            <div className="mt-4 flex items-center justify-between gap-3">
+            <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
               <p className="text-xs font-semibold text-ink-secondary">このマークを作るときに登録するルール</p>
               <Button type="button" onClick={() => setCreateRule(true)}>＋ ルールを追加</Button>
             </div>
             {createRule ? (
-              <div className="mt-3 flex items-center gap-2 rounded-control border border-hairline p-3 text-sm">
-                <select aria-label="きっかけ" value={ruleEvent} onChange={(event) => setRuleEvent(event.target.value as SupportMarkAutomationEvent)} className="v6-select h-10 min-w-0 flex-1 rounded-control border border-hairline bg-canvas px-3 text-sm font-semibold">
-                  {EVENT_LABELS.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
-                </select>
-                <span className="shrink-0 text-ink-faint">→</span>
-                <span className="min-w-0 flex-1 rounded-control bg-surface-soft px-3 py-2.5 font-semibold text-ink">「{name || 'このマーク'}」に変更</span>
+              /*
+                きっかけと変更先は縦に並べる（#973 U021）。横並びだと
+                狭い幅で選択肢も変更先も切れる。矢印は向きを示す飾り。
+              */
+              <div className="mt-3 rounded-control border border-hairline p-3 text-sm">
+                <label className="block text-xs font-semibold text-ink-secondary">
+                  きっかけ
+                  <select aria-label="きっかけ" value={ruleEvent} onChange={(event) => setRuleEvent(event.target.value as SupportMarkAutomationEvent)} className="v6-select mt-1 h-10 w-full rounded-control border border-hairline bg-canvas px-3 text-sm font-semibold text-ink">
+                    {EVENT_LABELS.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
+                  </select>
+                </label>
+                <p aria-hidden="true" className="my-1 text-center text-ink-faint">↓</p>
+                <p className="min-w-0 break-words rounded-control bg-surface-soft px-3 py-2.5 font-semibold text-ink">「{name || 'このマーク'}」に変更</p>
               </div>
             ) : null}
           </Card>
         )}
 
-        <Card padding="default">
+        <Card padding="default" className="min-w-0">
           <h2 className="mb-3 text-sm font-bold text-ink">どこで使われるか</h2>
           <ul className="space-y-2 text-xs text-ink">
             {DESTINATIONS.map((label) => <li key={label} className="flex items-start gap-2"><Circle size={6} fill="currentColor" className="mt-1 shrink-0 text-accent" aria-hidden="true" /><span>{label}</span></li>)}
