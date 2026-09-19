@@ -321,6 +321,47 @@ export default function ScenariosPage() {
     }
   }
 
+  /** 畳んだ帯に出す、いま選んでいるフォルダ名（U027）。 */
+  const activeFolderLabel =
+    folderFilter === ''
+      ? 'すべて'
+      : folderFilter === UNFILED
+        ? '未分類'
+        : folders.find((f) => f.id === folderFilter)?.name ?? 'フォルダ'
+
+  /*
+   * フォルダの帯はスマホで畳むため2か所へ出す（U027）。中身は同じなので、
+   * 要素を1つ作って使い回す。
+   */
+  const folderPanel = (
+    <FolderPanel
+      total={`${scenarioList.total} 件`}
+      activeId={folderFilter}
+      onSelect={setFolderFilter}
+      onAddFolder={() => setFolderDialogOpen(true)}
+      rows={[
+        { id: '', label: 'すべて', count: scenarioList.total },
+        ...folders.map((f) => ({
+          id: f.id,
+          label: f.name,
+          // #631: フォルダ件数はAPI(itemCount)をそのまま出す。現在ページの
+          // 行だけを数えるフォールバックは、ページングで実数と食い違うため廃止。
+          count: f.itemCount ?? null,
+          color: f.color,
+        })),
+        {
+          id: UNFILED,
+          label: '未分類',
+          count: unfiledCount,
+        },
+      ]}
+    >
+      <p className="text-ink-faint text-xs leading-relaxed">
+        フォルダを消しても、入っていたシナリオは未分類として残ります。
+      </p>
+    </FolderPanel>
+  )
+
   const handleDelete = async (id: string) => {
     try {
       /*
@@ -434,32 +475,20 @@ export default function ScenariosPage() {
         なったらここに並ぶ。
       */}
       <div style={FOLDER_RAIL_STYLE} className="grid gap-4 lg:grid-cols-[var(--folder-rail-width)_minmax(0,1fr)]">
-        <FolderPanel
-          total={`${scenarioList.total} 件`}
-          activeId={folderFilter}
-          onSelect={setFolderFilter}
-          onAddFolder={() => setFolderDialogOpen(true)}
-          rows={[
-            { id: '', label: 'すべて', count: scenarioList.total },
-            ...folders.map((f) => ({
-              id: f.id,
-              label: f.name,
-              // #631: フォルダ件数はAPI(itemCount)をそのまま出す。現在ページの
-              // 行だけを数えるフォールバックは、ページングで実数と食い違うため廃止。
-              count: f.itemCount ?? null,
-              color: f.color,
-            })),
-            {
-              id: UNFILED,
-              label: '未分類',
-              count: unfiledCount,
-            },
-          ]}
-        >
-          <p className="text-ink-faint text-xs leading-relaxed">
-            フォルダを消しても、入っていたシナリオは未分類として残ります。
-          </p>
-        </FolderPanel>
+        {/*
+          スマホではフォルダを畳む（U027）。開いたまま置くと、フォルダが
+          増えたとき検索とシナリオ行まで長く送ることになり、390px では
+          領域が右へはみ出していた。開閉は <details> に任せ、PCでは
+          今までどおり左の帯へ出す。
+        */}
+        <details className="lg:hidden">
+          <summary className="bg-canvas border-hairline rounded-card text-ink-secondary cursor-pointer list-none border px-4 py-3 text-sm">
+            フォルダ：{activeFolderLabel}
+            <span className="text-ink-faint ml-2 text-xs">タップで開く</span>
+          </summary>
+          <div className="mt-2">{folderPanel}</div>
+        </details>
+        <div className="hidden lg:block">{folderPanel}</div>
 
         <div>
       <ListToolbar
