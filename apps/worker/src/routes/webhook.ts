@@ -102,6 +102,17 @@ async function recordWebhookAnalyticsEvent(
   }
 }
 
+/**
+ * friends.line_user_id はグローバル UNIQUE のため (C-2b までは1ユーザー1行)、
+ * 別アカウント所有の行があるとこのアカウント用の行は INSERT できない。
+ * その場合は相手の行に触れず「このアカウントでは友だちを解決できない」
+ * として扱う (Issue #961)。
+ */
+function isFriendScopeConflict(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return /unique constraint failed: friends\.line_user_id/i.test(message);
+}
+
 async function ensureFriendFromWebhookUser(
   db: D1Database,
   lineClient: LineClient,
@@ -121,19 +132,31 @@ async function ensureFriendFromWebhookUser(
       logWebhookStepFailure('unknown_user_profile', err, lineAccountId);
     }
 
-    friend = await upsertFriend(db, {
-      lineUserId: userId,
-      lineAccountId,
-      displayName: profile?.displayName ?? null,
-      pictureUrl: profile?.pictureUrl ?? null,
-      statusMessage: profile?.statusMessage ?? null,
-    });
+    try {
+      friend = await upsertFriend(db, {
+        lineUserId: userId,
+        lineAccountId,
+        displayName: profile?.displayName ?? null,
+        pictureUrl: profile?.pictureUrl ?? null,
+        statusMessage: profile?.statusMessage ?? null,
+      });
+    } catch (err) {
+      if (!isFriendScopeConflict(err)) throw err;
+      // 同一 line_user_id が別アカウント所有。C-2b まではこのアカウント用の
+      // friend 行を作れないので、相手の行に触れずイベントを諦める。
+      console.warn({
+        event: 'line_webhook_friend_scope_conflict',
+        line_account_id: lineAccountId,
+      });
+      return null;
+    }
     console.log({ event: 'line_webhook_friend_registered', line_account_id: lineAccountId });
   }
 
   if (lineAccountId && friend.line_account_id !== lineAccountId) {
-    // C-2b: UNIQUE(line_account_id, line_user_id) へ移行したら、別アカウントの
-    // 行を「移動」せず、このアカウント用のfriend行を新規作成する。
+    // lookup は同一アカウントか未割当 (NULL) の行しか返さないので、ここで
+    // line_account_id が違うのは未割当行だけ。それを受信アカウントへ引き当てる。
+    // 別アカウントの行を「移動」する経路は Issue #961 で廃止した。
     const now = jstNow();
     await db
       .prepare('UPDATE friends SET line_account_id = ?, is_following = 1, updated_at = ? WHERE id = ?')
@@ -334,13 +357,27 @@ async function handleEvent(
       logWebhookStepFailure('follow_profile', err, lineAccountId, event);
     }
 
-    const friend = await upsertFriend(db, {
-      lineUserId: userId,
-      lineAccountId,
-      displayName: profile?.displayName ?? null,
-      pictureUrl: profile?.pictureUrl ?? null,
-      statusMessage: profile?.statusMessage ?? null,
-    });
+    let friend: Friend;
+    try {
+      friend = await upsertFriend(db, {
+        lineUserId: userId,
+        lineAccountId,
+        displayName: profile?.displayName ?? null,
+        pictureUrl: profile?.pictureUrl ?? null,
+        statusMessage: profile?.statusMessage ?? null,
+      });
+    } catch (err) {
+      if (!isFriendScopeConflict(err)) throw err;
+      // 同一 line_user_id が別アカウント所有。friend 行なしではフォロー処理を
+      // 進められないので、相手の行に触れずこのイベントを諦める (Issue #961)。
+      console.warn({
+        event: 'line_webhook_friend_scope_conflict',
+        webhook_event_id: event.webhookEventId,
+        line_account_id: lineAccountId,
+        event_type: event.type,
+      });
+      return;
+    }
     const friendKind = (friend.unfollow_count ?? 0) > 0 ? 'returning' : 'first_time';
 
     // V6台帳はWebhookイベント単位。初回流入 friends.ref_code とは分離し、
@@ -372,17 +409,9 @@ async function handleEvent(
       }
     }
 
-    // Set line_account_id for multi-account tracking (always update on follow)
-    if (lineAccountId) {
-      await db.prepare('UPDATE friends SET line_account_id = ?, updated_at = ? WHERE id = ?')
-        .bind(lineAccountId, jstNow(), friend.id).run();
-      console.log({
-        event: 'line_webhook_friend_account_linked',
-        webhook_event_id: event.webhookEventId,
-        line_account_id: lineAccountId,
-        event_type: event.type,
-      });
-    }
+    // line_account_id の紐づけは upsertFriend 内で行う（新規行は受信アカウント
+    // で作り、未割当行だけを引き当てる）。ここで別アカウントの行を
+    // 「移動」する経路は Issue #961 で廃止した。
 
     // 新規・再フォローのどちらでも、最初の友だち登録マイルを同じキーで非同期投入する。
     // first_followed_at を使うため再フォローやWebhook再送では二重加算されない。
