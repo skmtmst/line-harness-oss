@@ -8747,7 +8747,14 @@ export const api = {
       ),
     overview: (accountId: string) => fetchApi<ApiResponse<{
       activeCampaigns: number
-      jobs: { total: number; pending: number; sent: number; failed: number }
+      jobs: {
+        total: number
+        pending: number
+        sent: number
+        failed: number
+        /** 配信ごとの「これから送る」待ち件数（編集画面の表示用）。 */
+        pendingByCampaign: Record<string, number>
+      }
       columns: number
       pets: number
       coupons: number
@@ -8771,9 +8778,18 @@ export const api = {
       id: string; campaignKey: string; label: string; friendName: string | null
       scheduledAt: string; status: string; attempts: number; lastError: string | null; sentAt: string | null
     }>>>(`/api/nen-campaigns/jobs?lineAccountId=${encodeURIComponent(accountId)}`),
-    columns: (accountId: string) => fetchApi<ApiResponse<NenColumn[]>>(
-      `/api/nen-campaigns/columns?lineAccountId=${encodeURIComponent(accountId)}`,
-    ),
+    /*
+     * 口は既定200件で打ち切り、pagination.total に全体件数を返す。
+     * 呼び出し側は data.length と pagination.total を比べて打ち切りを画面へ出す（#935 N-300）。
+     */
+    columns: (accountId: string, options?: { limit?: number; offset?: number }) => {
+      const params = new URLSearchParams({ lineAccountId: accountId })
+      if (options?.limit !== undefined) params.set('limit', String(options.limit))
+      if (options?.offset !== undefined) params.set('offset', String(options.offset))
+      return fetchApi<ApiResponse<NenColumn[]> & {
+        pagination?: { total: number; limit: number; offset: number }
+      }>(`/api/nen-campaigns/columns?${params}`)
+    },
     /** NENコラムの管理画面下書き。本文・slug・アカウントIDはWorkerで受け取らない。 */
     createColumn: (accountId: string, data: NenColumnCreateInput) =>
       fetchApi<ApiResponse<{ id: string; queued: number }>>(

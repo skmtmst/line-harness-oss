@@ -133,7 +133,7 @@ async function verifyEccubeSignature(secret: string, timestamp: string, signatur
 nenCampaigns.get('/api/nen-campaigns/overview', async (c) => {
   const accountId = await requireAccount(c);
   if (typeof accountId !== 'string') return accountId;
-  const [settings, jobs, columns, pets, coupons] = await Promise.all([
+  const [settings, jobs, pendingByCampaignRows, columns, pets, coupons] = await Promise.all([
     Promise.all([...CAMPAIGN_KEYS].map((key) => getNenCampaign(c.env.DB, key, accountId))),
     c.env.DB.prepare(
       `SELECT COUNT(*) AS total,
@@ -142,6 +142,17 @@ nenCampaigns.get('/api/nen-campaigns/overview', async (c) => {
               SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) AS failed
          FROM nen_delivery_jobs WHERE line_account_id = ?`,
     ).bind(accountId).first<{ total: number; pending: number; sent: number; failed: number }>(),
+    /*
+     * #935 N-299: 編集画面が「これから届く◯通」を実数で言うため、
+     * 上の pending と同じ決めごと（未来ぶんだけ数える）で配信ごとに分ける。
+     */
+    c.env.DB.prepare(
+      `SELECT campaign_key, COUNT(*) AS count
+         FROM nen_delivery_jobs
+        WHERE line_account_id = ?
+          AND status = 'pending' AND datetime(scheduled_at) > datetime('now')
+        GROUP BY campaign_key`,
+    ).bind(accountId).all<{ campaign_key: string; count: number }>(),
     c.env.DB.prepare(`SELECT COUNT(*) AS count FROM nen_columns WHERE line_account_id = ?`).bind(accountId).first<{ count: number }>(),
     c.env.DB.prepare(
       `SELECT COUNT(*) AS count FROM nen_pet_profiles p JOIN friends f ON f.id = p.friend_id WHERE f.line_account_id = ?`,
@@ -154,7 +165,15 @@ nenCampaigns.get('/api/nen-campaigns/overview', async (c) => {
   // 同じ決めごとにする(点検 #512 の中2)。一覧の窓付き集計とは別物。
   return c.json({ success: true, data: {
     activeCampaigns: settings.filter((setting) => setting?.is_enabled === 1).length,
-    jobs: { total: jobs?.total ?? 0, pending: jobs?.pending ?? 0, sent: jobs?.sent ?? 0, failed: jobs?.failed ?? 0 },
+    jobs: {
+      total: jobs?.total ?? 0,
+      pending: jobs?.pending ?? 0,
+      sent: jobs?.sent ?? 0,
+      failed: jobs?.failed ?? 0,
+      pendingByCampaign: Object.fromEntries(
+        (pendingByCampaignRows?.results ?? []).map((row) => [row.campaign_key, Number(row.count)]),
+      ),
+    },
     columns: columns?.count ?? 0,
     pets: pets?.count ?? 0,
     coupons: coupons?.count ?? 0,
@@ -627,9 +646,24 @@ nenCampaigns.post('/api/nen-campaigns/columns/:id/deliver', requireRole('owner',
   if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [body.accountId])) {
     return c.json({ success: false, error: ACCOUNT_ACCESS_ERROR }, 403);
   }
-  const when = body.scheduledAt && Number.isFinite(Date.parse(body.scheduledAt))
-    ? new Date(body.scheduledAt).toISOString().slice(0, 19).replace('T', ' ')
-    : new Date().toISOString().slice(0, 19).replace('T', ' ');
+  /*
+   * #935 N-304: 予約日時を先に確かめる。解釈できない文字列をnowへ潰さず断り、
+   * 過去の日時は「予約」の約束を守れない（次のtickで即送になる）ため断る。
+   * 予約作成(POST /columns)と同じくDBを触る前に落とす。
+   */
+  let when: string;
+  if (body.scheduledAt) {
+    const parsed = Date.parse(body.scheduledAt);
+    if (!Number.isFinite(parsed)) {
+      return c.json({ success: false, error: 'scheduled_at_invalid' }, 400);
+    }
+    if (parsed <= Date.now()) {
+      return c.json({ success: false, error: 'past_datetime' }, 400);
+    }
+    when = new Date(parsed).toISOString().slice(0, 19).replace('T', ' ');
+  } else {
+    when = new Date().toISOString().slice(0, 19).replace('T', ' ');
+  }
   const queued = await queueColumnDelivery(c.env.DB, c.req.param('id'), body.accountId, when);
   return c.json({ success: true, data: { queued } });
 });

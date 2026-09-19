@@ -13,6 +13,7 @@ export type NenColumnCreateError =
   | 'published_at_invalid'
   | 'target_invalid'
   | 'scheduled_at_invalid'
+  | 'past_datetime'
   | 'completion_invalid';
 
 export type NenColumnCreateInput = {
@@ -210,6 +211,13 @@ export function validateNenColumnCreateBody(body: Record<string, unknown>): Vali
   if (body.scheduledAt != null && body.scheduledAt !== ''
     && (typeof body.scheduledAt !== 'string' || !Number.isFinite(Date.parse(body.scheduledAt)))) {
     return { ok: false, error: 'scheduled_at_invalid' };
+  }
+  /*
+   * #935 N-304: 過去の予約日時は断る。通すと次のtickで即送され、
+   * 「予約した」のに「今届いた」と画面の約束が崩れる（予約画面と同じ決めごと）。
+   */
+  if (scheduledAt && Date.parse(scheduledAt) <= Date.now()) {
+    return { ok: false, error: 'past_datetime' };
   }
   const completionEventName = typeof body.completionEventName === 'string' && body.completionEventName.trim()
     ? body.completionEventName.trim() : null;
