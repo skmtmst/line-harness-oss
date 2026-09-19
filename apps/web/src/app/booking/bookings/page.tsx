@@ -160,6 +160,14 @@ export default function BookingsPage() {
   const [decideTarget, setDecideTarget] = useState<{ id: string; action: 'approve' | 'reject' | 'cancel' | 'no_show' | 'complete' } | null>(null)
   const [deciding, setDeciding] = useState(false)
   const [decideError, setDecideError] = useState('')
+  /*
+   * 一覧取得の応答が「どのアカウント・どの条件へ向けたものか」を照合する。
+   * アカウントを切り替えたあとに遅れて届いた前のアカウントの応答で、
+   * いま見ている一覧を上書きしない(#963)。
+   */
+  const listRequestRef = useRef(0)
+  const listAccountRef = useRef<string | null>(selectedAccountId)
+  listAccountRef.current = selectedAccountId
   // N-401: 閲覧のみの人には操作ボタンを見せない。読み込めるまでは隠す
   // （権限のある人に一瞬見せて消すより、静かに出すほうが誤操作を防ぐ）。
   const [canOperate, setCanOperate] = useState(false)
@@ -221,13 +229,17 @@ export default function BookingsPage() {
 
   const load = useCallback(async () => {
     if (!selectedAccountId) return
+    // 要求が向かったアカウントを固定する(#963)。応答時に現在値と照合し、
+    // 別アカウントへ切り替わったあとの遅い応答は一覧へ反映しない。
+    const requestedAccountId = selectedAccountId
+    const requestId = ++listRequestRef.current
     setLoading(true)
     setError(null)
     // タブ/アカウント切り替えで先に list をクリア。fetch 失敗時に前タブの行が
     // 残ってしまい、誤って別ステータスの予約を操作してしまう事故を防ぐ。
     setItems([])
     try {
-      const r = await bookingApi.listRequests(selectedAccountId, tab, {
+      const r = await bookingApi.listRequests(requestedAccountId, tab, {
         limit: PAGE_SIZE,
         offset: (page - 1) * PAGE_SIZE,
         query: query.trim() || undefined,
@@ -236,18 +248,53 @@ export default function BookingsPage() {
         source: sourceFilter === 'all' ? undefined : sourceFilter,
         ...rangeFilterParams(),
       })
+      if (requestId !== listRequestRef.current || listAccountRef.current !== requestedAccountId) return
       setItems(r.requests)
       setTotal(r.total)
     } catch (e) {
+      if (requestId !== listRequestRef.current || listAccountRef.current !== requestedAccountId) return
       setError(e instanceof Error ? e.message : String(e))
     } finally {
-      setLoading(false)
+      if (requestId === listRequestRef.current && listAccountRef.current === requestedAccountId) setLoading(false)
     }
   }, [menuFilter, page, query, rangeFilterParams, selectedAccountId, sourceFilter, staffFilter, tab])
 
   useEffect(() => {
     load()
+    // 条件が変わった時点で走っている要求を無効化し、遅い応答が
+    // 新しい条件の一覧へ紛れ込まないようにする(#963)。
+    return () => {
+      listRequestRef.current += 1
+    }
   }, [load])
+
+  /*
+   * アカウントを切り替えたら、前のアカウントの行・詳細・候補を残さない(#963)。
+   * 詳細パネルは id だけを持つので、一覧が入れ替わる間に前のアカウントの
+   * 行を引いて別アカウントの画面へ出さない。候補(メニュー棚・担当)も
+   * 取り直しが届くまで前のアカウントの選択肢を見せない。
+   */
+  useEffect(() => {
+    setItems([])
+    setTotal(0)
+    setCalendarItems([])
+    setDetailId(null)
+    // 確定操作の確認窓・失敗表示も前のアカウントのものは残さない。
+    // 残すと、別アカウントの予約へ向けた操作を新しいアカウントで
+    // 確定してしまう(#963)。
+    setDecideTarget(null)
+    setDecideError('')
+    setError(null)
+    setMenus([])
+    setStaffList([])
+    setCopiedUrl(null)
+    setSummaryError(false)
+    setSummary({
+      total: 0, requested: 0, monthTotal: 0, monthConfirmed: 0,
+      monthCancelled: 0, lastMonthTotal: 0, todayTotal: 0, weekTotal: 0,
+      byMenu: [],
+    })
+  }, [selectedAccountId])
 
   // N-397: 今見えている絞り込みのまま台帳CSVを出す。上限・範囲の断りは
   // CSV先頭の注記行にサーバが書く。
@@ -265,27 +312,30 @@ export default function BookingsPage() {
   // KPIとメニュー棚は集計口から読む。一覧全件をブラウザへ運ばない。
   useEffect(() => {
     if (!selectedAccountId) return
+    // 要求が向かったアカウントを固定する(#963)。集計・メニュー棚・担当の
+    // 候補も、切替後に届いた前のアカウントの応答では更新しない。
+    const requestedAccountId = selectedAccountId
     let alive = true
     setSummaryError(false)
     void (async () => {
       try {
         const today = jstDay(new Date().toISOString())
         const [counts, menuList, staffResult] = await Promise.all([
-          bookingApi.requestsSummary(selectedAccountId, {
+          bookingApi.requestsSummary(requestedAccountId, {
             month: monthKey(0), lastMonth: monthKey(-1), today,
             weekTo: jstDay(new Date(Date.now() + 6 * 86_400_000).toISOString()),
           }),
-          bookingApi.listMenus(selectedAccountId),
-          bookingApi.listStaff(selectedAccountId),
+          bookingApi.listMenus(requestedAccountId),
+          bookingApi.listStaff(requestedAccountId),
         ])
-        if (!alive) return
+        if (!alive || listAccountRef.current !== requestedAccountId) return
         setSummary(counts)
         setMenus(menuList.menus)
         setStaffList(staffResult.staff.filter((item) => item.is_active === 1))
       } catch {
         // KPI が出ないだけで一覧は使える。ここで画面全体を止めない。
         // ただし0のまま黙ると気づけないので、KPI欄の上に理由と再試行を出す。
-        if (alive) setSummaryError(true)
+        if (alive && listAccountRef.current === requestedAccountId) setSummaryError(true)
       }
     })()
     return () => {
@@ -296,14 +346,17 @@ export default function BookingsPage() {
   // カレンダーは今日/今週の範囲だけをページごとに読み、200件を越えても欠落させない。
   useEffect(() => {
     if (!selectedAccountId || (view !== 'day' && view !== 'week')) return
+    // 要求が向かったアカウントを固定する(#963)。ページをまたぐ取得の途中で
+    // 切り替わっても、前のアカウントの行を集め続けない。
+    const requestedAccountId = selectedAccountId
     let alive = true
     void (async () => {
       const today = jstDay(new Date().toISOString())
       const endDay = jstDay(new Date(Date.now() + (view === 'day' ? 1 : 7) * 86_400_000).toISOString())
       const collected: BookingRequest[] = []
       let offset = 0
-      while (alive) {
-        const response = await bookingApi.listRequests(selectedAccountId, 'all', {
+      while (alive && listAccountRef.current === requestedAccountId) {
+        const response = await bookingApi.listRequests(requestedAccountId, 'all', {
           limit: 100, offset,
           from: new Date(`${today}T00:00:00+09:00`).toISOString(),
           to: new Date(`${endDay}T00:00:00+09:00`).toISOString(),
@@ -312,8 +365,10 @@ export default function BookingsPage() {
         offset += response.requests.length
         if (offset >= response.total || response.requests.length === 0) break
       }
-      if (alive) setCalendarItems(collected)
-    })().catch(() => { if (alive) setError('カレンダーの読み込みに失敗しました') })
+      if (alive && listAccountRef.current === requestedAccountId) setCalendarItems(collected)
+    })().catch(() => {
+      if (alive && listAccountRef.current === requestedAccountId) setError('カレンダーの読み込みに失敗しました')
+    })
     return () => { alive = false }
   }, [selectedAccountId, view])
 
@@ -328,14 +383,19 @@ export default function BookingsPage() {
    */
   async function runDecide(id: string, action: BookingAction) {
     if (!selectedAccountId) return
+    // 操作が向かったアカウントを固定する(#963)。応答を待つ間に
+    // 切り替わっていても、新しいアカウントの確認窓・失敗表示を触らない。
+    const decideAccountId = selectedAccountId
     setDeciding(true)
     setDecideError('')
     try {
-      await bookingApi.decideRequest(selectedAccountId, id, action)
-      setDecideTarget(null)
+      await bookingApi.decideRequest(decideAccountId, id, action)
+      if (listAccountRef.current === decideAccountId) setDecideTarget(null)
       await load()
     } catch (e) {
-      setDecideError(`操作に失敗しました: ${e instanceof Error ? e.message : String(e)}`)
+      if (listAccountRef.current === decideAccountId) {
+        setDecideError(`操作に失敗しました: ${e instanceof Error ? e.message : String(e)}`)
+      }
     } finally {
       setDeciding(false)
     }
