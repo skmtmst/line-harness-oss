@@ -274,6 +274,8 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'PATCH /api/ops/tenants/{id}/status',
   'PATCH /api/reminders/{id}/registrants/{enrollmentId}',
   'PATCH /api/tags/{id}',
+  'POST /api/action-scores/adjustments',
+  'POST /api/action-scores/bands/preview',
   'POST /api/affiliates',
   'POST /api/affiliates/click',
   'POST /api/auth/password/forgot',

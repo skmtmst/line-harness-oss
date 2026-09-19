@@ -8,6 +8,8 @@ const dbMocks = {
   getStaffByApiKey: vi.fn().mockResolvedValue(null),
   getActionScoreBandOverview: vi.fn(),
   getActionScoreRuleConfiguration: vi.fn(),
+  postActionScoreManualAdjustment: vi.fn(),
+  previewActionScoreBandDistribution: vi.fn(),
   publishActionScoreRuleDraft: vi.fn(),
   saveActionScoreRuleDraft: vi.fn(),
   stopActionScoreRules: vi.fn(),
@@ -74,6 +76,16 @@ beforeEach(() => {
   dbMocks.publishActionScoreRuleDraft.mockResolvedValue({ status: 'published' });
   dbMocks.stopActionScoreRules.mockResolvedValue({ status: 'stopped' });
   dbMocks.testActionScoreRuleBundle.mockReturnValue({ scoreBefore: 20, scoreAfter: 28, matched: [] });
+  dbMocks.postActionScoreManualAdjustment.mockResolvedValue({
+    historyId: 'history-1', scoreBefore: 0, scoreAfter: 12, appliedChange: 12,
+    bandBefore: 'low', bandAfter: 'low', replayed: false,
+  });
+  dbMocks.previewActionScoreBandDistribution.mockResolvedValue({
+    bands: configuration.bands,
+    counts: { low: 1, normal: 2, high: 3 },
+    totalFriends: 6,
+    measuredAt: '2026-09-07T00:00:00.000Z',
+  });
 });
 
 describe('V6 action score rule API', () => {
@@ -227,5 +239,93 @@ describe('V6 action score rule API', () => {
       success: false,
       error: 'スコアのルールを処理できませんでした',
     });
+  });
+
+  // N-235: 手で直す口は、不可逆確認・冪等キー・権限・アカウント範囲を全部通す。
+  it('requires confirmation, an idempotency key and owner/admin role before adjusting', async () => {
+    const body = JSON.stringify({
+      accountId: 'account-1', friendId: 'friend-1', direction: 'increase', amount: 12, reason: '問い合わせ対応',
+    });
+    const noConfirm = await call('/api/action-scores/adjustments', {
+      method: 'POST', body, headers: { 'Idempotency-Key': '00000000-0000-4000-8000-0000000000a1' },
+    });
+    expect(noConfirm.status).toBe(428);
+
+    const noKey = await call('/api/action-scores/adjustments', {
+      method: 'POST', body, headers: { 'X-Confirm-Irreversible': 'action-score-adjustment' },
+    });
+    expect(noKey.status).toBe(400);
+
+    dbMocks.getStaffByApiKey.mockResolvedValue({
+      id: 'staff-1', name: '担当者', role: 'staff', access_level: 'full', permission_keys: '["/mileage"]',
+    });
+    const denied = await callAs('staff-key', '/api/action-scores/adjustments', {
+      method: 'POST', body,
+      headers: { 'X-Confirm-Irreversible': 'action-score-adjustment', 'Idempotency-Key': '00000000-0000-4000-8000-0000000000a1' },
+    });
+    expect(denied.status).toBe(403);
+    expect(dbMocks.postActionScoreManualAdjustment).not.toHaveBeenCalled();
+  });
+
+  it('appends a manual adjustment with staff identity and returns 201, 200 on replay', async () => {
+    const body = JSON.stringify({
+      accountId: 'account-1', friendId: 'friend-1', direction: 'decrease', amount: 12, reason: '間違いの訂正',
+    });
+    const headers = { 'X-Confirm-Irreversible': 'action-score-adjustment', 'Idempotency-Key': '00000000-0000-4000-8000-0000000000a1' };
+    const created = await call('/api/action-scores/adjustments', { method: 'POST', body, headers });
+    expect(created.status).toBe(201);
+    expect(dbMocks.postActionScoreManualAdjustment).toHaveBeenCalledWith(env.DB, expect.objectContaining({
+      lineAccountId: 'account-1', friendId: 'friend-1', scoreChange: -12,
+      reason: '間違いの訂正', idempotencyKey: '00000000-0000-4000-8000-0000000000a1',
+      executedByStaffId: 'env-owner', executedByStaffName: expect.anything(),
+    }));
+
+    dbMocks.postActionScoreManualAdjustment.mockResolvedValueOnce({
+      historyId: 'history-1', scoreBefore: 0, scoreAfter: -12, appliedChange: -12,
+      bandBefore: 'low', bandAfter: 'low', replayed: true,
+    });
+    const replay = await call('/api/action-scores/adjustments', { method: 'POST', body, headers });
+    expect(replay.status).toBe(200);
+  });
+
+  it('rejects malformed adjustment bodies and hidden accounts', async () => {
+    const headers = { 'X-Confirm-Irreversible': 'action-score-adjustment', 'Idempotency-Key': '00000000-0000-4000-8000-0000000000a1' };
+    const badAmount = await call('/api/action-scores/adjustments', {
+      method: 'POST', headers,
+      body: JSON.stringify({ accountId: 'account-1', friendId: 'f', direction: 'increase', amount: 0, reason: '理由' }),
+    });
+    expect(badAmount.status).toBe(400);
+    const noReason = await call('/api/action-scores/adjustments', {
+      method: 'POST', headers,
+      body: JSON.stringify({ accountId: 'account-1', friendId: 'f', direction: 'increase', amount: 5, reason: ' ' }),
+    });
+    expect(noReason.status).toBe(400);
+    const hidden = await call('/api/action-scores/adjustments', {
+      method: 'POST', headers,
+      body: JSON.stringify({ accountId: 'hidden', friendId: 'f', direction: 'increase', amount: 5, reason: '理由' }),
+    });
+    expect(hidden.status).toBe(404);
+    expect(dbMocks.postActionScoreManualAdjustment).not.toHaveBeenCalled();
+  });
+
+  it('previews the band distribution read-only for the selected account', async () => {
+    const hidden = await call('/api/action-scores/bands/preview', {
+      method: 'POST', body: JSON.stringify({ accountId: 'hidden', bands: configuration.bands }),
+    });
+    expect(hidden.status).toBe(404);
+
+    const response = await call('/api/action-scores/bands/preview', {
+      method: 'POST', body: JSON.stringify({ accountId: 'account-1', bands: configuration.bands }),
+    });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      success: true,
+      data: { counts: { low: 1, normal: 2, high: 3 }, totalFriends: 6 },
+    });
+    expect(dbMocks.previewActionScoreBandDistribution).toHaveBeenCalledWith(env.DB, {
+      lineAccountId: 'account-1', bands: configuration.bands,
+    });
+    expect(dbMocks.saveActionScoreRuleDraft).not.toHaveBeenCalled();
+    expect(dbMocks.postActionScoreManualAdjustment).not.toHaveBeenCalled();
   });
 });

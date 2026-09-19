@@ -9,6 +9,8 @@ import {
   defaultActionScoreRuleBundle,
   getActionScoreReconciliationIssues,
   getActionScoreRuleConfiguration,
+  postActionScoreManualAdjustment,
+  previewActionScoreBandDistribution,
   processActionScoreInactivity,
   publishActionScoreRuleDraft,
   saveActionScoreRuleDraft,
@@ -74,7 +76,9 @@ describe('V6 action score rule versions', () => {
   it('returns a non-persisted safe draft and excludes unavailable LINE read scoring', async () => {
     const config = await getActionScoreRuleConfiguration(db, 'account-1');
     expect(config).toMatchObject({ configured: false, status: 'not_configured' });
-    expect(config.editableVersion.rules).toHaveLength(7);
+    // N-239: friend_add（友だち追加）は実際に届く出来事なので初期ルールに入る。
+    expect(config.editableVersion.rules).toHaveLength(8);
+    expect(config.editableVersion.rules.some((rule) => rule.eventType === 'friend_add' && rule.source === 'line_webhook')).toBe(true);
     expect(config.editableVersion.rules.some((rule) => rule.eventType === 'message_opened')).toBe(false);
     expect(sqlite.prepare(`SELECT COUNT(*) AS count FROM action_score_rule_sets`).get()).toEqual({ count: 0 });
   });
@@ -210,5 +214,106 @@ describe('V6 action score rule versions', () => {
     const issues = await getActionScoreReconciliationIssues(db, 'account-1');
     expect(issues).toEqual([expect.objectContaining({ friendId: 'friend-1', currentScore: 99, expectedScore: 8 })]);
     expect(sqlite.prepare(`SELECT score FROM friends WHERE id = 'friend-1'`).get()).toEqual({ score: 99 });
+  });
+
+  // N-239: 選べるようになった出来事（friend_add）は公開ルールからそのまま加点される。
+  it('applies the newly selectable friend_add event from the published defaults', async () => {
+    await publishDefaults(db);
+    const result = await applyPublishedActionScoreRules(db, {
+      lineAccountId: 'account-1', friendId: 'friend-1', eventType: 'friend_add',
+      source: 'line_webhook', sourceEventId: 'follow-1', occurredAt: NOW,
+    });
+    expect(result.applications[0]).toMatchObject({ scoreBefore: 0, scoreAfter: 3, replayed: false });
+    expect(sqlite.prepare(`SELECT score FROM friends WHERE id = 'friend-1'`).get()).toEqual({ score: 3 });
+  });
+
+  // N-235: 手で直した点数は、履歴の追記だけで表す（過去の行は書き換えない）。
+  it('appends a manual adjustment with staff identity and replays without double-applying', async () => {
+    const adjusted = await postActionScoreManualAdjustment(db, {
+      lineAccountId: 'account-1', friendId: 'friend-1', scoreChange: 12,
+      reason: '問い合わせ対応', idempotencyKey: 'adjust-1',
+      executedByStaffId: 'staff-9', executedByStaffName: '担当者九', occurredAt: NOW,
+    });
+    expect(adjusted).toMatchObject({
+      scoreBefore: 0, scoreAfter: 12, appliedChange: 12,
+      bandBefore: 'low', bandAfter: 'low', replayed: false,
+    });
+    expect(sqlite.prepare(`SELECT score FROM friends WHERE id = 'friend-1'`).get()).toEqual({ score: 12 });
+    const history = sqlite.prepare(
+      `SELECT operation, source, event_type, score_before, score_after,
+              executed_by_staff_id, executed_by_staff_name, line_account_id
+         FROM friend_scores WHERE idempotency_key = 'adjust-1'`,
+    ).get();
+    expect(history).toMatchObject({
+      operation: 'manual_adjustment', source: 'staff', event_type: 'manual_adjustment',
+      score_before: 0, score_after: 12,
+      executed_by_staff_id: 'staff-9', executed_by_staff_name: '担当者九',
+      line_account_id: 'account-1',
+    });
+
+    const replay = await postActionScoreManualAdjustment(db, {
+      lineAccountId: 'account-1', friendId: 'friend-1', scoreChange: 12,
+      reason: '問い合わせ対応', idempotencyKey: 'adjust-1',
+      executedByStaffId: 'staff-9', executedByStaffName: '担当者九', occurredAt: NOW,
+    });
+    expect(replay).toMatchObject({ scoreAfter: 12, replayed: true });
+    expect(sqlite.prepare(`SELECT COUNT(*) AS count FROM friend_scores`).get()).toEqual({ count: 1 });
+    expect(sqlite.prepare(`SELECT score FROM friends WHERE id = 'friend-1'`).get()).toEqual({ score: 12 });
+  });
+
+  it('rejects a manual adjustment outside the band range, a conflicting key, and wrong accounts', async () => {
+    await publishDefaults(db); // bands: 0..100
+    await expect(postActionScoreManualAdjustment(db, {
+      lineAccountId: 'account-1', friendId: 'friend-1', scoreChange: 150,
+      reason: '上限超え', idempotencyKey: 'adjust-big',
+      executedByStaffId: null, executedByStaffName: null,
+    })).rejects.toMatchObject({ code: 'score_out_of_range' });
+
+    await postActionScoreManualAdjustment(db, {
+      lineAccountId: 'account-1', friendId: 'friend-1', scoreChange: 5,
+      reason: '最初の調整', idempotencyKey: 'adjust-same',
+      executedByStaffId: null, executedByStaffName: null,
+    });
+    await expect(postActionScoreManualAdjustment(db, {
+      lineAccountId: 'account-1', friendId: 'friend-1', scoreChange: 9,
+      reason: '別内容', idempotencyKey: 'adjust-same',
+      executedByStaffId: null, executedByStaffName: null,
+    })).rejects.toMatchObject({ code: 'idempotency_conflict' });
+
+    // 別アカウントの友だちには書けない。
+    await expect(postActionScoreManualAdjustment(db, {
+      lineAccountId: 'account-1', friendId: 'friend-2', scoreChange: 5,
+      reason: '別店', idempotencyKey: 'adjust-x',
+      executedByStaffId: null, executedByStaffName: null,
+    })).rejects.toMatchObject({ code: 'friend_not_found' });
+  });
+
+  // N-235: 帯の分けかたの試算は人数だけを返し、点数も履歴も動かさない。
+  it('previews the band distribution without mutating scores or history', async () => {
+    await postActionScoreManualAdjustment(db, {
+      lineAccountId: 'account-1', friendId: 'friend-1', scoreChange: 50,
+      reason: '事前調整', idempotencyKey: 'adjust-pre',
+      executedByStaffId: null, executedByStaffName: null,
+    });
+    // friend-2 は account-2 にいて score=40（このアカウントには数えない）。
+    sqlite.prepare(
+      `INSERT INTO friends (id, line_user_id, line_account_id, display_name, score, created_at, updated_at)
+       VALUES ('friend-3', 'U33333333333333333333333333333333', 'account-1', '友だちC', 80,
+               '2026-08-01T00:00:00.000Z', '2026-08-01T00:00:00.000Z')`,
+    ).run();
+
+    const preview = await previewActionScoreBandDistribution(db, {
+      lineAccountId: 'account-1',
+      bands: { min: 0, max: 100, normalMin: 30, highMin: 70 },
+    });
+    expect(preview.counts).toEqual({ low: 0, normal: 1, high: 1 });
+    expect(preview.totalFriends).toBe(2);
+    expect(sqlite.prepare(`SELECT score FROM friends WHERE id = 'friend-1'`).get()).toEqual({ score: 50 });
+    expect(sqlite.prepare(`SELECT COUNT(*) AS count FROM friend_scores`).get()).toEqual({ count: 1 });
+
+    await expect(previewActionScoreBandDistribution(db, {
+      lineAccountId: 'account-1',
+      bands: { min: 0, max: 100, normalMin: 70, highMin: 30 },
+    })).rejects.toMatchObject({ code: 'bands_invalid' });
   });
 });

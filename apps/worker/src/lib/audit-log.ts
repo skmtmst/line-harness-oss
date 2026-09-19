@@ -27,6 +27,7 @@ export type AuditAction =
   | 'action_score.rules.draft.save'
   | 'action_score.rules.publish'
   | 'action_score.rules.stop'
+  | 'action_score.adjustment.create'
   | 'mileage.reward.create'
   | 'mileage.reward.update'
   | 'mileage.reward.publish'

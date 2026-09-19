@@ -1714,6 +1714,31 @@ const spec = {
         responses: { '200': { description: 'Mileage redemptions with failure reason, attempts, and timestamps' }, '400': { description: 'Status is invalid' }, '403': { description: 'Staff role required' }, '404': { description: 'LINE account not found in account scope' } },
       },
     },
+    // ── Action Scores ────────────────────────────────────────────────────────
+    '/api/action-scores/adjustments': {
+      post: {
+        tags: ['Mileage'], summary: '担当者が理由つきで1人分の行動スコアを手で直す（N-235。追記台帳・確認ヘッダ必須）',
+        parameters: [{ name: 'Idempotency-Key', in: 'header', required: true, schema: { type: 'string' } }],
+        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['accountId', 'friendId', 'direction', 'amount', 'reason'], properties: { accountId: { type: 'string' }, friendId: { type: 'string' }, direction: { type: 'string', enum: ['increase', 'decrease'] }, amount: { type: 'integer', minimum: 1 }, reason: { type: 'string', minLength: 1, maxLength: 500 } } } } } },
+        responses: {
+          '200': { description: 'Idempotent replay of the recorded adjustment' },
+          '201': { description: 'Score adjustment appended to history' },
+          '400': { description: 'Idempotency-Key or required fields are invalid' },
+          '403': { description: 'Owner or admin role required' },
+          '404': { description: 'LINE account or friend not found in account scope' },
+          '409': { description: 'Same idempotency key was used with different content' },
+          '422': { description: 'Score would leave the configured band range' },
+          '428': { description: 'Irreversible confirmation required' },
+        },
+      },
+    },
+    '/api/action-scores/bands/preview': {
+      post: {
+        tags: ['Mileage'], summary: '編集中の帯の分けかたで各帯の人数だけを数える読み取り専用プレビュー（N-235。公開版・点数は不変）',
+        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['accountId', 'bands'], properties: { accountId: { type: 'string' }, bands: { type: 'object', required: ['min', 'max', 'normalMin', 'highMin'], properties: { min: { type: 'integer', minimum: 0 }, max: { type: 'integer' }, normalMin: { type: 'integer' }, highMin: { type: 'integer' } } } } } } } },
+        responses: { '200': { description: 'Band distribution preview' }, '400': { description: 'LINE account is required' }, '403': { description: 'Staff role required' }, '404': { description: 'LINE account not found in account scope' }, '422': { description: 'Band boundaries are invalid' } },
+      },
+    },
     // ── Scenarios ────────────────────────────────────────────────────────────
     '/api/scenarios': {
       get: {

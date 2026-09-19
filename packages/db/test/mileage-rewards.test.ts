@@ -136,6 +136,33 @@ describe('V6 mileage rewards', () => {
     ).run(published.currentPublishedVersionId)).toThrow(/immutable/);
   });
 
+  // N-236: 止めた使い道は、止める前と同じ公開版のまままた出せる
+  // （削除して作り直すのではなく、状態だけを戻す）。
+  it('restores a stopped reward to published with the same published version', async () => {
+    const draft = await createMileageRewardDraft(db, {
+      lineAccountId: 'account-1',
+      draft: { name: '復帰特典', rewardKind: 'coupon', requiredMiles: 300 },
+    });
+    await importMileageRewardCodes(db, {
+      rewardId: draft.id, lineAccountId: 'account-1',
+      codes: [{ ciphertext: 'code-restore', fingerprint: 'code-restore' }],
+    });
+    const published = await publishMileageReward(db, { id: draft.id, lineAccountId: 'account-1' });
+    await setMileageRewardStatus(db, { id: draft.id, lineAccountId: 'account-1', status: 'stopped' });
+
+    const restored = await setMileageRewardStatus(db, {
+      id: draft.id, lineAccountId: 'account-1', status: 'published',
+    });
+    expect(restored.status).toBe('published');
+    expect(restored.currentPublishedVersionId).toBe(published.currentPublishedVersionId);
+    expect(restored.currentVersion).toMatchObject({ status: 'published', requiredMiles: 300 });
+
+    // 公開版の行も交換コードも、止めて戻しても増えも減りもしない。
+    expect(sqlite.prepare(
+      `SELECT COUNT(*) AS count FROM mileage_reward_versions WHERE reward_id = ?`,
+    ).get(draft.id)).toEqual({ count: 1 });
+  });
+
   it('deducts mileage once, reserves one code, and returns the same redemption on retry', async () => {
     const draft = await createMileageRewardDraft(db, {
       lineAccountId: 'account-1',
