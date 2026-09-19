@@ -8728,11 +8728,12 @@ export const api = {
     petMetrics: (accountId: string, days = 30) => fetchApi<ApiResponse<NenPetMetrics>>(
       `/api/nen-campaigns/metrics/pets?lineAccountId=${encodeURIComponent(accountId)}&days=${days}`,
     ),
-    deliveries: (accountId: string, options: { days?: number; from?: string; to?: string; status?: string; cursor?: string; limit?: number } = {}) => {
+    deliveries: (accountId: string, options: { days?: number; from?: string; to?: string; status?: string; q?: string; cursor?: string; limit?: number } = {}) => {
       const query = new URLSearchParams({ lineAccountId: accountId, days: String(options.days ?? 30), limit: String(options.limit ?? 50) })
       // from/to を両方渡すと days の代わりにその期間で数える（実口 nenDeliveryRange と同じ決めごと）。
       if (options.from && options.to) { query.delete('days'); query.set('from', options.from); query.set('to', options.to) }
       if (options.status) query.set('status', options.status)
+      if (options.q) query.set('q', options.q)
       if (options.cursor) query.set('cursor', options.cursor)
       return fetchApi<ApiResponse<NenDeliveryList>>(`/api/nen-campaigns/deliveries?${query}`)
     },
@@ -8816,9 +8817,9 @@ export const api = {
       if (search) query.set('search', search)
       return fetchApi<ApiResponse<NenPetProfile[]>>(`/api/nen-campaigns/pets?${query}`)
     },
-    createPet: (accountId: string, data: { friendId: string; customerId?: string; name: string; animalType: string; gender: string; birthday?: string }) =>
+    createPet: (accountId: string, data: { friendId: string; customerId?: string; name: string; animalType: string; gender: string; birthday?: string; breed?: string; weightKg?: number | null }) =>
       fetchApi<ApiResponse<{ id: string }>>(`/api/nen-campaigns/pets?lineAccountId=${encodeURIComponent(accountId)}`, { method: 'POST', body: JSON.stringify(data) }),
-    updatePet: (accountId: string, id: string, data: { name: string; animalType: string; gender: string; birthday?: string }) =>
+    updatePet: (accountId: string, id: string, data: { name: string; animalType: string; gender: string; birthday?: string; breed?: string; weightKg?: number | null }) =>
       fetchApi<{ success: boolean }>(`/api/nen-campaigns/pets/${encodeURIComponent(id)}?lineAccountId=${encodeURIComponent(accountId)}`, { method: 'PUT', body: JSON.stringify(data) }),
     deletePet: (accountId: string, id: string) => fetchApi<{ success: boolean }>(
       `/api/nen-campaigns/pets/${encodeURIComponent(id)}?lineAccountId=${encodeURIComponent(accountId)}`,

@@ -308,12 +308,16 @@ export default function NenCampaignsPage() {
       setDeliveryDetail(result.data)
     } catch { setNotice({ tone: 'error', text: '配信時の内容を表示できませんでした。' }) }
   }
-  const changeDeliveryView = async (status?: string, cursor?: string) => {
+  // 検索語はサーバー側の履歴全体へ効く。ページ送り・状態チップの切替でも消えないよう
+  // ここに保持し、新しい検索(q を明示)が来たときだけ差し替える。
+  const [historyQuery, setHistoryQuery] = useState('')
+  const changeDeliveryView = async (status?: string, cursor?: string, q?: string) => {
     if (!selectedAccountId) return
+    const effectiveQuery = q === undefined ? historyQuery : q
     try {
-      const result = await api.nenCampaigns.deliveries(selectedAccountId, { limit: 20, status, cursor })
+      const result = await api.nenCampaigns.deliveries(selectedAccountId, { limit: 20, status, q: effectiveQuery || undefined, cursor })
       if (!result.success) throw new Error()
-      setDeliveryList(result.data); setDeliveryDetail(null)
+      setDeliveryList(result.data); setDeliveryDetail(null); setHistoryQuery(effectiveQuery)
     } catch { setNotice({ tone: 'error', text: '送った履歴を更新できませんでした。' }) }
   }
   const retryDelivery = async (id: string, expectedVersion: number, reason: string) => {
@@ -369,7 +373,7 @@ export default function NenCampaignsPage() {
         onDeliverColumn={(column, scheduledAt) => void deliverColumn(column, scheduledAt)}
         onDuplicateColumn={(column) => void duplicateColumn(column)} onTestColumn={(column) => void testColumn(column)}
         onShowDelivery={(id) => void showDelivery(id)} onRetryDelivery={(id, version, reason) => void retryDelivery(id, version, reason)}
-        onChangeDeliveryView={(status, cursor) => void changeDeliveryView(status, cursor)}
+        onChangeDeliveryView={(status, cursor, q) => void changeDeliveryView(status, cursor, q)}
       />
     </>
   )

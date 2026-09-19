@@ -117,7 +117,7 @@ function formatKeys(keys: string[]): string {
  * 後続票で記載済みにした分はここから消す（残っているとテストが落とす）。
  */
 /** 未記載負債はこの件数より増やせない。 */
-const ALLOWLIST_MAX = 775;
+const ALLOWLIST_MAX = 773;
 
 /**
  * 記載済み operation の完全な基準一覧。
@@ -335,7 +335,9 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'POST /api/hq/templates/{id}/distribute',
   'POST /api/hq/templates/{id}/preflight',
   'POST /api/integrations/ai-loop/reports',
+  'POST /api/integrations/eccube/coupon-usages',
   'POST /api/liff/events/waitlist/{token}/accept',
+  'POST /api/nen-campaigns/pets',
   'POST /api/ops/announcements',
   'POST /api/ops/announcements/preview',
   'POST /api/ops/impersonation/end',
@@ -409,6 +411,7 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'PUT /api/line-accounts/{id}',
   'PUT /api/mileage/earning-rules-order',
   'PUT /api/mileage/rules/{id}',
+  'PUT /api/nen-campaigns/pets/{id}',
   'PUT /api/scenarios/{id}',
   'PUT /api/scenarios/{id}/draft',
   'PUT /api/scenarios/{id}/steps/{stepId}',
@@ -810,7 +813,7 @@ const ALLOWLIST = new Set<string>([
   'PUT /api/broadcast-message-assets/{id}',
   'PUT /api/broadcasts/notification-settings',
 
-  // 機能「nen_campaigns」の管理画面用API（OpenAPI未記載・順次記載）（21件）
+  // 機能「nen_campaigns」の管理画面用API（OpenAPI未記載・順次記載）（19件）
   'DELETE /api/nen-campaigns/pets/{id}',
   'GET /api/nen-campaigns/birthday-coupon',
   'GET /api/nen-campaigns/columns',
@@ -825,11 +828,9 @@ const ALLOWLIST = new Set<string>([
   'POST /api/nen-campaigns/columns/{id}/read-events',
   'POST /api/nen-campaigns/columns/{id}/test-send',
   'POST /api/nen-campaigns/deliveries/pending-now',
-  'POST /api/nen-campaigns/pets',
   'POST /api/nen-campaigns/test-send',
   'PUT /api/nen-campaigns/birthday-coupon',
   'PUT /api/nen-campaigns/columns/{id}/message',
-  'PUT /api/nen-campaigns/pets/{id}',
   'PUT /api/nen-campaigns/settings/{campaignKey}',
   'PUT /api/nen-campaigns/settings/{campaignKey}/enabled',
 

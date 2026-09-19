@@ -411,7 +411,7 @@ describe('nen campaign off gates', () => {
       `);
       await disableFeature(db, 'account-1', 'nen_campaigns');
 
-      const queued = await enqueueBirthday(db.db, new Date());
+      const { queued } = await enqueueBirthday(db.db, new Date());
       expect(queued).toBe(0);
       expect(db.raw.prepare('SELECT COUNT(*) AS n FROM nen_coupon_issues').get()).toEqual({ n: 0 });
       expect(db.raw.prepare('SELECT COUNT(*) AS n FROM nen_delivery_jobs').get()).toEqual({ n: 0 });

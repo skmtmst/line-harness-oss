@@ -236,7 +236,7 @@ export type NenOverviewProps = {
   // 送った履歴
   onShowDelivery: (id: string) => void
   onRetryDelivery: (id: string, version: number, reason: string) => void
-  onChangeDeliveryView: (status?: string, cursor?: string) => void
+  onChangeDeliveryView: (status?: string, cursor?: string, q?: string) => void
 }
 
 export function NenOverview({
@@ -345,6 +345,9 @@ export function NenOverview({
           onDuplicate={onDuplicateColumn}
           onTest={onTestColumn}
           columnEnabled={columnSetting?.isEnabled ?? true}
+          columnSetting={columnSetting}
+          onToggleCampaign={onToggleSetting}
+          savingCampaignKey={saving}
           buttonLabel={columnSetting?.buttonLabel || 'コラムを読む'}
           friends={friends}
           testFriendId={testFriendId}
@@ -615,6 +618,9 @@ function ColumnsPanel({
   onDuplicate,
   onTest,
   columnEnabled,
+  columnSetting,
+  onToggleCampaign,
+  savingCampaignKey,
   buttonLabel,
   friends,
   testFriendId,
@@ -639,6 +645,10 @@ function ColumnsPanel({
   onDuplicate: (column: NenColumn) => void
   onTest: (column: NenColumn) => void
   columnEnabled: boolean
+  /** コラム配信の決めごと（nen_campaign_settings の 'column' 行）。停止・再開の制御に使う。 */
+  columnSetting: NenCampaignSetting | null
+  onToggleCampaign: (setting: NenCampaignSetting) => void
+  savingCampaignKey: string | null
   buttonLabel: string
   friends: FriendOption[]
   testFriendId: string
@@ -790,6 +800,18 @@ function ColumnsPanel({
 
           <section className="flex flex-col gap-3 rounded-card border border-hairline bg-canvas p-4">
             <h2 className="text-label font-bold text-ink">誰に・いつ送るか</h2>
+            {/* #934 N-295: コラム配信の停止・再開は自動配信タブに出ないため、ここに置く。 */}
+            <div className="flex items-center justify-between gap-3">
+              <span className="flex items-center gap-2">
+                {columnEnabled ? <StatusBadge tone="success" size="compact">配信中</StatusBadge> : <StatusBadge tone="warning" size="compact">停止中</StatusBadge>}
+                <span className="text-micro font-normal text-ink-faint">コラム配信の決めごと</span>
+              </span>
+              {columnSetting ? (
+                <Button type="button" size="field" disabled={savingCampaignKey === columnSetting.campaignKey} onClick={() => onToggleCampaign(columnSetting)}>
+                  {columnEnabled ? '止める' : '動かす'}
+                </Button>
+              ) : null}
+            </div>
             <div className="flex flex-col gap-1 text-caption font-semibold text-ink">
               送る相手
               <span className="rounded-control border border-hairline bg-canvas-sunken px-3 py-2 text-label font-normal text-ink">
@@ -811,7 +833,7 @@ function ColumnsPanel({
             </div>
             <p className="text-micro text-ink-faint">
               {selected && audienceCount != null ? `送信数 約${num(audienceCount)}通。` : ''}
-              {columnEnabled ? '' : 'コラムの配信が停止中のため、いまは送れません。「自動配信」タブで動かしてください。'}
+              {columnEnabled ? '' : 'コラムの配信が停止中のため、いまは送れません。上の「動かす」で再開できます。'}
             </p>
             {selected ? (
               <div className="flex flex-wrap gap-2">
@@ -862,13 +884,15 @@ function HistoryPanel({ deliveryList, detail, loading, onShowDetail, onRetry, on
   loading: boolean
   onShowDetail: (id: string) => void
   onRetry: (id: string, version: number, reason: string) => void
-  onChangeView: (status?: string, cursor?: string) => void
+  onChangeView: (status?: string, cursor?: string, q?: string) => void
 }) {
-  const [search, setSearch] = useState('')
+  const [draft, setDraft] = useState('')
+  // 確定した検索語。絞り込みチップやページ送りにも引き継ぐ（入力途中の文字は渡さない）。
+  const [appliedQuery, setAppliedQuery] = useState('')
   const [filter, setFilter] = useState<HistoryFilter>('all')
   const [retryReasons, setRetryReasons] = useState<Record<string, string>>({})
-  const deliveries = useMemo(() => deliveryList?.deliveries ?? [], [deliveryList])
-  const shown = useMemo(() => deliveries.filter((delivery) => `${delivery.friendName ?? ''} ${delivery.label}`.toLowerCase().includes(search.trim().toLowerCase())), [deliveries, search])
+  // 検索はサーバー側で履歴全体へ効く。画面に読み込んでいる20件だけの絞り込みではない。
+  const shown = useMemo(() => deliveryList?.deliveries ?? [], [deliveryList])
   const summary = deliveryList?.summary
   const cursor = Number(deliveryList?.pagination.cursor ?? 0)
   const limit = deliveryList?.pagination.limit ?? 20
@@ -884,9 +908,12 @@ function HistoryPanel({ deliveryList, detail, loading, onShowDetail, onRetry, on
       </div>
 
       <div data-design="ListControls" data-design-node="nen-history-controls" className="flex flex-wrap items-center gap-3">
-        <div className="min-w-64 flex-1">
-          <TextField aria-label="友だちの名前・配信の名前で検索" placeholder="友だちの名前・配信の名前で検索" value={search} onChange={(event) => setSearch(event.target.value)} />
-        </div>
+        <form
+          className="min-w-64 flex-1"
+          onSubmit={(event) => { event.preventDefault(); const q = draft.trim(); setAppliedQuery(q); onChangeView(deliveryViewStatus(filter), undefined, q) }}
+        >
+          <TextField aria-label="友だちの名前・配信の名前で検索" placeholder="友だちの名前・配信の名前で検索" value={draft} onChange={(event) => setDraft(event.target.value)} />
+        </form>
         <span className="text-caption text-ink-faint">{rangeLabel}・送った日が新しい順</span>
       </div>
       {/* #727: チップに出ている数を押したら、その数だけ並ぶ。failed と skipped は
@@ -901,7 +928,7 @@ function HistoryPanel({ deliveryList, detail, loading, onShowDetail, onRetry, on
           ['failed', `届きませんでした ${summary?.failed ?? '—'}`],
           ['skipped', `送りませんでした ${summary?.skipped ?? '—'}`],
         ] as Array<[HistoryFilter, string]>).map(([value, label]) => (
-          <FilterChip key={value} selected={filter === value} onChange={(selected) => { const next = selected ? value : 'all'; setFilter(next); onChangeView(deliveryViewStatus(next)) }}>{label}</FilterChip>
+          <FilterChip key={value} selected={filter === value} onChange={(selected) => { const next = selected ? value : 'all'; setFilter(next); onChangeView(deliveryViewStatus(next), undefined, appliedQuery) }}>{label}</FilterChip>
         ))}
       </div>
 
@@ -978,8 +1005,8 @@ function HistoryPanel({ deliveryList, detail, loading, onShowDetail, onRetry, on
         <p className="text-caption text-ink-faint">記録 {deliveryList?.pagination.total ?? 0}件中 {shown.length === 0 ? 0 : cursor + 1}〜{cursor + shown.length}件を表示</p>
         {deliveryList && (cursor > 0 || deliveryList.pagination.nextCursor) ? (
           <div className="flex gap-2" aria-label="送った履歴のページ送り">
-            <Button type="button" disabled={cursor === 0} onClick={() => onChangeView(deliveryViewStatus(filter), String(Math.max(0, cursor - limit)))}>前へ</Button>
-            <Button type="button" disabled={!deliveryList.pagination.nextCursor} onClick={() => onChangeView(deliveryViewStatus(filter), deliveryList.pagination.nextCursor ?? undefined)}>次へ</Button>
+            <Button type="button" disabled={cursor === 0} onClick={() => onChangeView(deliveryViewStatus(filter), String(Math.max(0, cursor - limit)), appliedQuery)}>前へ</Button>
+            <Button type="button" disabled={!deliveryList.pagination.nextCursor} onClick={() => onChangeView(deliveryViewStatus(filter), deliveryList.pagination.nextCursor ?? undefined, appliedQuery)}>次へ</Button>
           </div>
         ) : null}
       </div>
