@@ -108,6 +108,13 @@ function NewNenColumnInner() {
 
   return (
     <div className={styles.screen} data-design-node="ymXJK">
+      {/*
+        #972 U036: 390pxでは右の「前のコラムを下敷きにする」が幅を取り、
+        パンくずと見出し・説明が細い列に潰れていた。共通の PageHeader の
+        形は変えず、この画面の見出し帯だけ「収まらないとき操作を次の行へ
+        下げる」にする。収まる幅では1行のままで見た目は変わらない。
+      */}
+      <div data-page-header-wrap>
       <PageHeader
         breadcrumb={[
           { label: 'NEN配信', href: '/nen-campaigns' },
@@ -122,6 +129,11 @@ function NewNenColumnInner() {
           </Button>
         )}
       />
+      <style>{`
+        [data-page-header-wrap] > div { flex-wrap: wrap; }
+        [data-page-header-wrap] > div > div + div { flex-wrap: wrap; max-width: 100%; margin-left: auto; }
+      `}</style>
+      </div>
 
       {failure ? (
         <p

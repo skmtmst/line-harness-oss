@@ -1,6 +1,7 @@
 'use client'
 
 import SelectField from '@/components/shared/select-field'
+import SearchField from '@/components/shared/search-field'
 import { useDeferredValue, useEffect, useState, useCallback, useRef } from 'react'
 import Link from 'next/link'
 import { useAccount } from '@/contexts/account-context'
@@ -612,44 +613,54 @@ export default function RichMenusListPage() {
 
       <div
         data-design="Bar"
-        className="bg-canvas rounded-card border-hairline mb-3 flex flex-wrap items-center gap-2 border p-3"
+        className="bg-canvas rounded-card border-hairline mb-3 border p-3"
       >
-        <Link
-          href="/rich-menus/new"
-          className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control inline-flex items-center gap-1 px-4 py-2 text-sm font-medium transition-colors"
-        >
-          メニューを作る
-        </Link>
-        <Button
-          onClick={() => {
-            // 並べ替え中は、実際の出し分け判定と同じ順番で全件を見せる。
-            setSortKey('priority')
-            setPage(1)
-            setReordering((v) => !v)
-          }}
-          aria-pressed={reordering}
-          variant={reordering ? 'primary' : 'secondary'}
-        >
-          {reordering ? '並び替えを終える' : '出す順番を変える'}
-        </Button>
-        <input
-          type="search"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="メニュー名・ボタン名で検索"
-          aria-label="メニュー名・ボタン名で検索"
-          className="border-hairline rounded-control focus:ring-accent min-w-0 flex-1 border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
-        />
-        <span className="text-ink-faint text-xs whitespace-nowrap">並び順</span>
-        <SelectField value={sortKey} onChange={(e) => setSortKey(e.target.value as SortKey)} aria-label="並び順" options={[{ value: "priority", label: "出す順番（自分で決めた順）" }, { value: "taps", label: "タップ数が多い順" }, { value: "updated", label: "更新が新しい順" }, { value: "name", label: "名前順" }]} className="border-hairline rounded-control focus:ring-accent border px-2 py-2 text-sm focus:ring-2 focus:outline-none" />
-        <span className="text-ink-faint text-xs whitespace-nowrap">表示</span>
-        <SelectField
-          size="compact"
-          value={pageSize}
-          onChange={(e) => setPageSize(Number(e.target.value))}
-          aria-label="表示件数"
-          options={[{ value: '20', label: '20件表示' }, { value: '50', label: '50件表示' }, { value: '100', label: '100件表示' }]}
-        />
+        <div className="flex flex-wrap items-center gap-2">
+          <Link
+            href="/rich-menus/new"
+            className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control inline-flex items-center gap-1 px-4 py-2 text-sm font-medium transition-colors"
+          >
+            メニューを作る
+          </Link>
+          <Button
+            onClick={() => {
+              // 並べ替え中は、実際の出し分け判定と同じ順番で全件を見せる。
+              setSortKey('priority')
+              setPage(1)
+              setReordering((v) => !v)
+            }}
+            aria-pressed={reordering}
+            variant={reordering ? 'primary' : 'secondary'}
+          >
+            {reordering ? '並び替えを終える' : '出す順番を変える'}
+          </Button>
+        </div>
+        {/*
+          検索は独立した全幅の行にする（U015）。作成操作・並び順と
+          同じ行に押し込むと、狭い幅で入力した語が読めないほど潰れる。
+        */}
+        <div data-search-row className="mt-2">
+          <SearchField
+            value={query}
+            onChange={setQuery}
+            onClear={() => setQuery('')}
+            placeholder="メニュー名・ボタン名で検索"
+            aria-label="メニュー名・ボタン名で検索"
+            className="w-full"
+          />
+        </div>
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <span className="text-ink-faint text-xs whitespace-nowrap">並び順</span>
+          <SelectField value={sortKey} onChange={(e) => setSortKey(e.target.value as SortKey)} aria-label="並び順" options={[{ value: "priority", label: "出す順番（自分で決めた順）" }, { value: "taps", label: "タップ数が多い順" }, { value: "updated", label: "更新が新しい順" }, { value: "name", label: "名前順" }]} className="border-hairline rounded-control focus:ring-accent border px-2 py-2 text-sm focus:ring-2 focus:outline-none" />
+          <span className="text-ink-faint text-xs whitespace-nowrap">表示</span>
+          <SelectField
+            size="compact"
+            value={pageSize}
+            onChange={(e) => setPageSize(Number(e.target.value))}
+            aria-label="表示件数"
+            options={[{ value: '20', label: '20件表示' }, { value: '50', label: '50件表示' }, { value: '100', label: '100件表示' }]}
+          />
+        </div>
       </div>
 
       <div className="bg-accent-soft text-ink-secondary mb-3 rounded-control px-3 py-2 text-xs leading-relaxed">

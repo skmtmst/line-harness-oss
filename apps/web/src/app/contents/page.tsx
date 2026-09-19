@@ -821,7 +821,11 @@ function MediaLibraryInner() {
 
         <div className="min-w-0">
 
-      <div className="mb-3 flex flex-wrap items-center gap-3">
+      {/*
+        検索は独立した全幅の行にする（U016）。表示切替・並び順・件数と
+        同じ行に押し込むと、狭い幅で入力文が読めないほど潰れる。
+      */}
+      <div data-search-row className="mb-3">
         <SearchField
           value={query}
           onChange={(value) => {
@@ -834,51 +838,7 @@ function MediaLibraryInner() {
           }}
           placeholder="ファイル名で検索"
           aria-label="ファイル名で検索"
-          className="min-w-64 max-w-[420px] flex-1"
-        />
-        {/* 設計 `g89Tc` の表示切替: 枠 高さ40・角丸8、各44幅、アイコン16。 */}
-        <div
-          role="group"
-          aria-label="並べ方"
-          className="border-hairline rounded-control flex h-10 items-center overflow-hidden border"
-        >
-          {([
-            ['grid', '格子で並べる', LayoutGrid],
-            ['list', '一覧で並べる', ListIcon],
-          ] as Array<[MediaView, string, typeof LayoutGrid]>).map(([value, label, Icon]) => (
-            <button
-              key={value}
-              type="button"
-              onClick={() => setView(value)}
-              aria-pressed={view === value}
-              aria-label={label}
-              title={label}
-              className={`flex h-full w-11 items-center justify-center ${
-                view === value ? 'bg-accent-soft text-accent-deep' : 'text-ink-faint hover:bg-canvas-sunken'
-              }`}
-            >
-              <Icon aria-hidden="true" size={16} />
-            </button>
-          ))}
-        </div>
-        <Select
-          aria-label="並び順"
-          value={sort}
-          options={SORT_OPTIONS}
-          onChange={(value) => {
-            setSort(value as MediaSort)
-            setPage(1)
-          }}
-        />
-        <Select
-          aria-label="表示件数"
-          value={String(pageSize)}
-          options={PAGE_SIZE_OPTIONS}
-          onChange={(value) => {
-            setPageSize(Number(value))
-            setPage(1)
-          }}
-          size="page-size"
+          className="w-full"
         />
       </div>
 
@@ -947,6 +907,57 @@ function MediaLibraryInner() {
         >
           アーカイブ済み
         </FilterChip>
+      </div>
+
+      {/*
+        表示の切り替え・並び順・件数は結果の見出し側へまとめる（U016）。
+        検索と同じ行にすると、狭い幅で検索欄が潰れる。
+      */}
+      <div className="mb-3 flex flex-wrap items-center justify-end gap-3">
+        {/* 設計 `g89Tc` の表示切替: 枠 高さ40・角丸8、各44幅、アイコン16。 */}
+        <div
+          role="group"
+          aria-label="並べ方"
+          className="border-hairline rounded-control flex h-10 items-center overflow-hidden border"
+        >
+          {([
+            ['grid', '格子で並べる', LayoutGrid],
+            ['list', '一覧で並べる', ListIcon],
+          ] as Array<[MediaView, string, typeof LayoutGrid]>).map(([value, label, Icon]) => (
+            <button
+              key={value}
+              type="button"
+              onClick={() => setView(value)}
+              aria-pressed={view === value}
+              aria-label={label}
+              title={label}
+              className={`flex h-full w-11 items-center justify-center ${
+                view === value ? 'bg-accent-soft text-accent-deep' : 'text-ink-faint hover:bg-canvas-sunken'
+              }`}
+            >
+              <Icon aria-hidden="true" size={16} />
+            </button>
+          ))}
+        </div>
+        <Select
+          aria-label="並び順"
+          value={sort}
+          options={SORT_OPTIONS}
+          onChange={(value) => {
+            setSort(value as MediaSort)
+            setPage(1)
+          }}
+        />
+        <Select
+          aria-label="表示件数"
+          value={String(pageSize)}
+          options={PAGE_SIZE_OPTIONS}
+          onChange={(value) => {
+            setPageSize(Number(value))
+            setPage(1)
+          }}
+          size="page-size"
+        />
       </div>
 
       <div data-design-node="h8pBZr">

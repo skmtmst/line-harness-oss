@@ -85,8 +85,9 @@ describe('V6 登録メディア一覧の契約', () => {
     expect(UPLOAD).toContain('data-design-node="eXAJP"')
     expect(UPLOAD).toContain('ここにファイルをドラッグ、または押して選ぶ')
     expect(UPLOAD).toContain('LINEで送れる大きさ（超えると入れられません）')
-    // 検索: 幅420まで。表示切替: 枠40・各44。
-    expect(PAGE).toContain('min-w-64 max-w-[420px] flex-1')
+    // 検索: 独立した全幅の行（U014系の一括修正）。表示切替: 枠40・各44。
+    expect(PAGE).toContain('data-search-row')
+    expect(PAGE).toContain('className="w-full"')
     expect(PAGE).toContain('rounded-control flex h-10 items-center overflow-hidden border')
     expect(PAGE).toContain('flex h-full w-11 items-center justify-center')
     // カード: サムネイル112、ファイル名12/700、形式・容量10/600、使用状況10/700。

@@ -353,7 +353,7 @@ function FeatureSection({ group, features, ordering, usageByItemId, usageByFeatu
             type="button"
             aria-disabled={total === 0}
             onClick={() => total > 0 && onGroupToggle(group, !allEnabled)}
-            className={`text-action focus-visible:outline-info text-[11px] font-bold focus-visible:outline-2 focus-visible:outline-offset-2 ${total === 0 ? 'cursor-default' : 'cursor-pointer'}`}
+            className={`text-action focus-visible:outline-info whitespace-nowrap text-[11px] font-bold focus-visible:outline-2 focus-visible:outline-offset-2 ${total === 0 ? 'cursor-default' : 'cursor-pointer'}`}
           >
             まとめて切替
           </button>
@@ -977,6 +977,13 @@ export default function SettingsPage() {
 
   return (
     <div>
+      {/*
+        U034: 390px・768pxでは右の操作（並び替え・保存など）が見出しを
+        押しつぶし、題が1文字ずつ縦に割れていた。共通の PageHeader の形は
+        変えず、この画面の見出し帯だけ「収まらないとき操作を次の行へ
+        下げる」にする。収まる幅では1行のままで見た目は変わらない。
+      */}
+      <div data-page-header-wrap>
       <PageHeader
         className="mb-5"
         breadcrumb={[{ label: '設定' }, { label: '機能設定' }]}
@@ -1021,6 +1028,11 @@ export default function SettingsPage() {
           </>
         )}
       />
+      <style>{`
+        [data-page-header-wrap] > div { flex-wrap: wrap; }
+        [data-page-header-wrap] > div > div + div { flex-wrap: wrap; max-width: 100%; margin-left: auto; }
+      `}</style>
+      </div>
 
       <div className="bg-info-bg text-ink-secondary mb-4 flex items-start gap-3 rounded-card px-5 py-2.5 text-xs leading-relaxed">
         <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" className="mt-px h-4 w-4 shrink-0 text-info">

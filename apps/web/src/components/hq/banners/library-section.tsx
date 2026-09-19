@@ -164,18 +164,21 @@ export default function LibrarySection({
   return (
     <>
       <section data-design-node="QEWug" className="flex flex-col rounded-card border border-hairline bg-canvas">
-        <div className="flex flex-wrap items-center gap-2.5 p-4">
+        {/*
+          検索は独立した全幅の行にする（U017・プロジェクト一覧と同じ形）。
+          同じ行に注記を置くと、狭い幅で欄が潰れる。
+        */}
+        <div data-search-row className="p-4 pb-0">
           <SearchField
             placeholder="テキスト・指示・プロジェクト名で検索"
             aria-label="テキスト・指示・プロジェクト名で検索"
             value={query}
             onChange={setQuery}
             onClear={() => setQuery('')}
-            className="min-w-0 flex-1"
+            className="w-full"
           />
-          <span className="text-caption text-ink-faint">並び順: 作成が新しい順</span>
         </div>
-        <div className="flex flex-wrap items-center gap-2 px-4 pb-4">
+        <div className="flex flex-wrap items-center gap-2 p-4">
           <FilterChip selected={filter === 'all'} onChange={() => setFilter('all')}>すべて</FilterChip>
           <FilterChip selected={filter === 'favorite'} onChange={(on) => setFilter(on ? 'favorite' : 'all')}>お気に入り</FilterChip>
           <FilterChip selected={filter === 'delivered'} onChange={(on) => setFilter(on ? 'delivered' : 'all')}>アカウントへ渡し済み</FilterChip>
@@ -188,6 +191,7 @@ export default function LibrarySection({
             </FilterChip>
           ))}
           <span className="flex-1" />
+          <span className="text-caption text-ink-faint">並び順: 作成が新しい順</span>
           {status === 'ready' ? (
             <span className="text-micro text-ink-faint">
               {visible.length === images.length ? `${images.length}枚を表示中` : `読み込んだ ${images.length}枚のうち ${visible.length}枚`}

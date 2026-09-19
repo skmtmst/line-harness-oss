@@ -106,18 +106,19 @@ export default function AccountsPage() {
       </div>
 
       <div className="bg-canvas rounded-card border-hairline mb-3 border p-3">
-        <div className="flex flex-wrap items-center gap-2">
+        {/*
+          検索は独立した全幅の行にする（U019）。件数の札を隣に置くと、
+          狭い幅でプレースホルダーが途中までしか見えなくなる。
+        */}
+        <div data-search-row>
           <SearchField
             placeholder="アカウント名・チャネルIDで検索"
             aria-label="アカウント名・チャネルIDで検索"
             value={query}
             onChange={setQuery}
             onClear={() => setQuery('')}
-            className="min-w-64 flex-1"
+            className="w-full"
           />
-          <span className="border-hairline rounded-control border px-3 py-2 text-sm text-ink-secondary">
-            20件表示
-          </span>
         </div>
         <div className="mt-3 flex flex-wrap items-center gap-2">
           {ACCOUNT_FILTERS.map((item) => (
@@ -130,7 +131,9 @@ export default function AccountsPage() {
               {item.label}
             </Button>
           ))}
-          <span className="text-ink-faint ml-auto text-xs">{shown.length}件を表示</span>
+          {/* 件数は検索の横ではなく、結果の件数とまとめて置く。 */}
+          <span className="text-ink-faint ml-auto text-xs whitespace-nowrap">20件表示</span>
+          <span className="text-ink-faint text-xs whitespace-nowrap">{shown.length}件を表示</span>
         </div>
       </div>
 
