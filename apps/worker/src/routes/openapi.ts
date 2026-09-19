@@ -3454,6 +3454,27 @@ const spec = {
       },
     },
     // ── Booking detail edit / retry / audit (N-389〜N-394 #932) ─────────────
+    '/api/booking/admin/bookings.csv': {
+      get: {
+        tags: ['Booking'], summary: '予約台帳をCSVで書き出す',
+        description: '一覧（/api/booking/admin/requests）と同じ絞り込み（status・query・menu_name・staff_id・source・from・to）を受け付け、画面に見えている分だけをCSVで返す。最大5000件までで、打ち切ったときは先頭の注記行に件数上限を明記する。UTF-8 BOM付きCRLF。',
+        parameters: [
+          { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+          { name: 'status', in: 'query', required: false, schema: { type: 'string', default: 'requested' } },
+          { name: 'query', in: 'query', required: false, schema: { type: 'string' } },
+          { name: 'menu_name', in: 'query', required: false, schema: { type: 'string' } },
+          { name: 'staff_id', in: 'query', required: false, schema: { type: 'string' } },
+          { name: 'source', in: 'query', required: false, schema: { type: 'string', enum: ['liff', 'phone', 'counter', 'operator', 'import'] } },
+          { name: 'from', in: 'query', required: false, schema: { type: 'string' } },
+          { name: 'to', in: 'query', required: false, schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': { description: '予約台帳CSV（text/csv、BOM付き、最大5000件）' },
+          '400': { description: 'account_id 未指定' },
+          '403': { description: '台帳の閲覧権限がない、または担当外アカウント' },
+        },
+      },
+    },
     '/api/booking/admin/bookings/{id}': {
       patch: {
         tags: ['Booking'], summary: '予約内容を版付きで変更',
