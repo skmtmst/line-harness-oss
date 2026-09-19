@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
-import { GripVertical, Trash2 } from 'lucide-react'
+import { Trash2 } from 'lucide-react'
+import ReorderGrip from './reorder-grip'
 import type { SavedSearch, SavedSearchCondition, Tag } from '@line-crm/shared'
 import { api, ApiError, type SavedSearchSummary } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
@@ -133,6 +134,35 @@ export default function SavedSearchList({ accountId }: { accountId: string | nul
       void load()
     } catch (reason) {
       setError(reason instanceof ApiError ? reason.message : '削除に失敗しました')
+    }
+  }
+
+  /**
+   * つまみにフォーカスして ↑/↓ で1つ動かす（N-049）。
+   * 保存は各検索の displayOrder を並び順に合わせて PATCH する。
+   * 自分以外が作った検索はサーバーが404で断るので、
+   * 失敗したら並びを戻して理由を出す。
+   */
+  const keyboardMove = async (id: string, direction: -1 | 1) => {
+    if (!accountId) return
+    const order = visible.map((search) => search.id)
+    const from = order.indexOf(id)
+    const to = from + direction
+    if (from < 0 || to < 0 || to >= order.length) return
+    order.splice(to, 0, ...order.splice(from, 1))
+    const rank = new Map(order.map((sid, index) => [sid, index]))
+    const next = [...items].sort((a, b) => (rank.get(a.id) ?? 9999) - (rank.get(b.id) ?? 9999))
+    setItems(next)
+    try {
+      await Promise.all(
+        next.map((search, index) =>
+          api.savedSearches.update(search.id, accountId, { displayOrder: index }),
+        ),
+      )
+      void load()
+    } catch {
+      setError('並び順を保存できませんでした')
+      void load()
     }
   }
 
@@ -268,7 +298,8 @@ export default function SavedSearchList({ accountId }: { accountId: string | nul
               >
                 <td className="px-3 py-3 align-top">
                   <div className="flex min-w-0 items-center gap-2">
-                    <GripVertical aria-hidden="true" size={15} className="shrink-0 text-ink-faint" />
+                    {/* つまみは装飾ではなく ↑/↓ で並び替えられる（N-049）。 */}
+                    <ReorderGrip label={search.name} onMove={(direction) => void keyboardMove(search.id, direction)} />
                   {search.lineAccountId ? (
                     <Link
                       href={`/tags/searches/edit?id=${encodeURIComponent(search.id)}`}
