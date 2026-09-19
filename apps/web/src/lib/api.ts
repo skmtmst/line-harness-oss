@@ -10087,6 +10087,16 @@ export const api = {
       size: 'large' | 'compact';
       /** #502中: 作成直後のフォルダ付け2口目をなくすため作成口で決める。 */
       folderId?: string | null;
+      /** N-161: 最初に見せるページの orderIndex。 */
+      defaultPageIndex?: number;
+      /** N-161: 「すべての友だちの既定にする」か。 */
+      isDefaultForAll?: boolean;
+      /** N-161: 出し分け。有効にするなら targetingCondition が必須。 */
+      targetingEnabled?: boolean;
+      targetingCondition?: string | null;
+      targetingPriority?: number;
+      /** N-164: 登録メディアを既定ページの画像として使う。 */
+      imageMediaId?: string;
       pages: Array<{
         id?: string;
         name: string;
@@ -10159,6 +10169,103 @@ export const api = {
         pages: Array<{ pageId: string; clearedRichMenuId: string | null }>;
         warnings: string[];
       }>>(`/api/rich-menu-groups/${groupId}/unpublish`, { method: 'POST' }),
+
+    /** N-151: 公開runの履歴。版・状態・試行・最終エラー・LINE IDを返す。 */
+    publishRuns: (groupId: string) =>
+      fetchApi<ApiResponse<Array<{
+        id: string;
+        status: 'running' | 'succeeded' | 'failed';
+        lastErrorCode: string | null;
+        idempotencyKey: string;
+        requestedByStaffId: string;
+        createdAt: string;
+        updatedAt: string;
+        version: { name: string | null; chatBarText: string | null; pageCount: number | null };
+        pages: Array<{
+          pageId: string;
+          orderIndex: number;
+          newRichMenuId: string;
+          oldRichMenuId: string | null;
+        }>;
+      }>>>(`/api/rich-menu-groups/${groupId}/publish-runs`),
+
+    /** N-151: 失敗したrunだけを、保存された版のまま再試行する。 */
+    retryPublishRun: (groupId: string, requestId: string) =>
+      fetchApi<ApiResponse<{ pages: Array<{ pageId: string; newRichMenuId: string }> }>>(
+        `/api/rich-menu-groups/${groupId}/publish-runs/${requestId}/retry`,
+        { method: 'POST' },
+      ),
+
+    /** N-151: DBとLINEのずれを点検（dryRun）し、明示したときだけ直す。 */
+    reconcile: (groupId: string, dryRun: boolean) =>
+      fetchApi<ApiResponse<{
+        dryRun: boolean;
+        diffs: Array<{ kind: string; detail: string; pageId?: string; richMenuId?: string }>;
+        applied?: number;
+        failed?: Array<{ diff: { kind: string; detail: string }; error: string }>;
+      }>>(`/api/rich-menu-groups/${groupId}/reconcile`, {
+        method: 'POST',
+        body: JSON.stringify({ dryRun }),
+      }),
+
+    /** N-154: メニュー全体を別IDの下書きとして複製する。 */
+    duplicate: (groupId: string, idempotencyKey: string, input?: { name?: string }) =>
+      fetchApi<ApiResponse<{ id: string }>>(
+        `/api/rich-menu-groups/${groupId}/duplicate`,
+        {
+          method: 'POST',
+          headers: { 'Idempotency-Key': idempotencyKey },
+          body: JSON.stringify(input ?? {}),
+        },
+      ),
+
+    /** N-156: staffでも読める影響人数。合計だけを返し、個人や条件は含まない。 */
+    audienceSummary: (groupId: string) =>
+      fetchApi<ApiResponse<{
+        total: { value: number; state: 'available' | 'unavailable'; reason: string | null };
+        targeted: { value: number; state: 'available' | 'unavailable'; reason: string | null };
+        excluded: { value: number | null; state: 'available' | 'unavailable'; reason: string | null };
+        effective: { value: number | null; state: 'available' | 'unavailable'; reason: string | null };
+      }>>(`/api/rich-menu-groups/${groupId}/audience-summary`),
+
+    /** N-152: 本人LINEへのテスト適用の状態。連携済みか・適用中かを返す。 */
+    testApplyState: (groupId: string) =>
+      fetchApi<ApiResponse<{
+        linked: boolean;
+        linkGuidance: string | null;
+        active: {
+          id: string; status: string; previousRichMenuId: string | null;
+          appliedRichMenuId: string | null; lastErrorCode: string | null;
+          createdAt: string; updatedAt: string;
+        } | null;
+        recent: Array<{
+          id: string; status: string; previousRichMenuId: string | null;
+          appliedRichMenuId: string | null; lastErrorCode: string | null;
+          createdAt: string; updatedAt: string;
+        }>;
+      }>>(`/api/rich-menu-groups/${groupId}/test-apply`),
+
+    /** N-152: 本人確認済みLINEへテスト適用する。confirm: true が必須。 */
+    testApply: (groupId: string, idempotencyKey: string) =>
+      fetchApi<ApiResponse<{ id: string; status: string }>>(
+        `/api/rich-menu-groups/${groupId}/test-apply`,
+        {
+          method: 'POST',
+          headers: { 'Idempotency-Key': idempotencyKey },
+          body: JSON.stringify({ confirm: true }),
+        },
+      ),
+
+    /** N-152: テスト適用を取り消して適用前のメニューへ戻す。冪等。 */
+    testApplyRevert: (groupId: string, idempotencyKey: string, applyId?: string) =>
+      fetchApi<ApiResponse<{ id: string; status: string }>>(
+        `/api/rich-menu-groups/${groupId}/test-apply/revert`,
+        {
+          method: 'POST',
+          headers: { 'Idempotency-Key': idempotencyKey },
+          body: JSON.stringify({ confirm: true, ...(applyId ? { applyId } : {}) }),
+        },
+      ),
 
     external: (accountId: string) =>
       fetchApi<ApiResponse<{

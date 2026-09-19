@@ -50,6 +50,11 @@ vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccount: fixture.selectedAccount }),
 }))
 
+// 複製後の編集画面への遷移に使う。KPIの試験では遷移しない。
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ push: () => {}, replace: () => {}, back: () => {} }),
+}))
+
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => undefined }))
 
 vi.mock('@/lib/api', () => ({
