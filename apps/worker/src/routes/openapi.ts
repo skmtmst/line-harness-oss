@@ -1946,6 +1946,87 @@ const spec = {
         },
       },
     },
+    // ── 友だち単位の購読操作（#949 N-054 / 機能05）─────────────────────────
+    '/api/scenario-subscriptions/{subscriptionId}/pause': {
+      post: {
+        tags: ['Scenarios'],
+        summary: '購読の手動停止',
+        parameters: [
+          { name: 'subscriptionId', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'Idempotency-Key', in: 'header', required: true, schema: { type: 'string' }, description: '操作の確認キー。同じキーの再送は同じ結果を返し、別の購読・別操作への使い回しは409。' },
+        ],
+        responses: {
+          '200': { description: 'Paused' },
+          '400': { description: '確認キー不足・不正' },
+          '403': { description: '権限不足（scenario.subscription.edit）' },
+          '404': { description: '購読なし・他アカウント' },
+          '409': { description: '配信処理中・終了済み・確認キーの使い回し' },
+        },
+      },
+    },
+    '/api/scenario-subscriptions/{subscriptionId}/resume': {
+      post: {
+        tags: ['Scenarios'],
+        summary: '購読の再開',
+        parameters: [
+          { name: 'subscriptionId', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'Idempotency-Key', in: 'header', required: true, schema: { type: 'string' }, description: '操作の確認キー。' },
+        ],
+        responses: {
+          '200': { description: 'Resumed' },
+          '400': { description: '確認キー不足・不正' },
+          '403': { description: '権限不足（scenario.subscription.edit）' },
+          '404': { description: '購読なし・他アカウント' },
+          '409': { description: '配信処理中・終了済み・再開不可・確認キーの使い回し' },
+        },
+      },
+    },
+    '/api/scenario-subscriptions/{subscriptionId}/retry': {
+      post: {
+        tags: ['Scenarios'],
+        summary: '配信失敗で止まった購読の再送',
+        parameters: [
+          { name: 'subscriptionId', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'Idempotency-Key', in: 'header', required: true, schema: { type: 'string' }, description: '操作の確認キー。' },
+        ],
+        responses: {
+          '200': { description: '再送待ちにした' },
+          '400': { description: '確認キー不足・不正' },
+          '403': { description: '権限不足（scenario.step_run.retry）' },
+          '404': { description: '購読なし・他アカウント' },
+          '409': { description: '配信失敗以外・再送不可・確認キーの使い回し' },
+        },
+      },
+    },
+    '/api/scenario-subscriptions/{subscriptionId}/move': {
+      post: {
+        tags: ['Scenarios'],
+        summary: '購読を別のシナリオへ移す',
+        parameters: [
+          { name: 'subscriptionId', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'Idempotency-Key', in: 'header', required: true, schema: { type: 'string' }, description: '操作の確認キー。' },
+        ],
+        requestBody: {
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                properties: { targetScenarioId: { type: 'string' } },
+                required: ['targetScenarioId'],
+              },
+            },
+          },
+        },
+        responses: {
+          '200': { description: '移した（新しい購読を返す）' },
+          '400': { description: '確認キー不足・不正・移し先未指定' },
+          '403': { description: '権限不足（scenario.subscription.edit）' },
+          '404': { description: '購読なし・移し先なし・他アカウント' },
+          '409': { description: '配信処理中・終了済み・移し先に登録済み・確認キーの使い回し' },
+          '422': { description: '移し先が停止中・アカウント不一致' },
+        },
+      },
+    },
     // ── Broadcasts ───────────────────────────────────────────────────────────
     '/api/broadcasts': {
       get: { tags: ['Broadcasts'], summary: '配信一覧取得', responses: { '200': { description: 'All broadcasts' } } },

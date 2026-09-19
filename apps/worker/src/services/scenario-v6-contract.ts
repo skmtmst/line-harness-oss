@@ -591,7 +591,7 @@ export async function getScenarioRuns(
   );
   const subscriptions = await db.prepare(
     `SELECT fs.id, fs.friend_id, f.display_name, fs.status, fs.current_step_order,
-            fs.started_at, fs.next_delivery_at, fs.updated_at
+            fs.started_at, fs.next_delivery_at, fs.updated_at, fs.pause_reason
        FROM friend_scenarios fs
        JOIN friends f ON f.id = fs.friend_id AND f.line_account_id = ?
       WHERE fs.scenario_id = ?${statusSql}
@@ -599,6 +599,7 @@ export async function getScenarioRuns(
   ).bind(input.lineAccountId, input.scenarioId, ...statusBinds, limit, offset).all<{
     id: string; friend_id: string; display_name: string; status: string;
     current_step_order: number; started_at: string; next_delivery_at: string | null; updated_at: string;
+    pause_reason: string | null;
   }>();
   const testSends = await db.prepare(
     `SELECT MIN(ml.id) AS id, ml.friend_id, f.display_name,
@@ -665,6 +666,9 @@ export async function getScenarioRuns(
       currentStepOrder: row.current_step_order,
       startedAt: row.started_at,
       nextDeliveryAt: row.next_delivery_at,
+      // なぜ止まっているか（432）。画面はこれで「再開」と「失敗を再送」を
+      // 出し分ける。止まっていない行・列より前の行は null。
+      pauseReason: row.pause_reason ?? null,
       updatedAt: row.updated_at,
     })),
     pagination: {

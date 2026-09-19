@@ -1818,8 +1818,15 @@ export default function ScenarioDetailClient({
             タイミング・種別・到達人数を上下で見比べられなかった。
             桁をそろえると、上から下へ人数が減っていくのがそのまま見える。
           */
+          /*
+            幅は中身に任せる（#949 N-058）。1040px で固定すると、
+            サイドメニューを引いた残りが 1040px 未満の画面でページ全体が
+            横スクロールした。桁のほうは「内容」列だけ truncate で縮み、
+            操作列は折り返すので、狭い画面でも読める。どうしても収まら
+            ない幅だけ overflow-x-auto で表の内側に逃がす。
+          */
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[1040px]">
+            <table className="w-full">
               <thead>
                 {/* 見出しは共通の Th（Pencil `tPTMp`）。直書きの見出しを7個
                     置いていたので、表の桁の高さ・色・太さがこの画面だけ他と
@@ -1970,8 +1977,13 @@ export default function ScenarioDetailClient({
                             )
                           })()}
                         </td>
-                        <td className="px-3 py-3 text-right align-top whitespace-nowrap">
-                          <div className="flex items-center justify-end gap-2 text-xs">
+                        <td className="px-3 py-3 text-right align-top">
+                          {/*
+                            操作は6つある。1行に並べ切れない幅では折り返す
+                            （#949 N-058）。無理に1行へ押さえると、表全体が
+                            その幅ぶん広がって横スクロールの元になる。
+                          */}
+                          <div className="flex flex-wrap items-center justify-end gap-x-2 gap-y-1 text-xs">
                             <button
                               type="button"
                               onClick={() =>

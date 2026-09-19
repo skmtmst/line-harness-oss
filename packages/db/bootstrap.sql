@@ -2645,6 +2645,14 @@ CREATE TABLE friend_reminders (
   updated_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 , reminder_version_id TEXT REFERENCES reminder_versions(id), source_kind TEXT NOT NULL DEFAULT 'manual', source_id TEXT, source_event_id TEXT, timezone TEXT NOT NULL DEFAULT 'Asia/Tokyo', cancel_reason TEXT, completed_at TEXT, lock_version INTEGER NOT NULL DEFAULT 0);
 
+CREATE TABLE friend_scenario_op_keys (
+  op_idempotency_key TEXT PRIMARY KEY,
+  friend_scenario_id TEXT NOT NULL,
+  op TEXT NOT NULL,
+  response_json TEXT NOT NULL,
+  created_at TEXT NOT NULL
+, request_fingerprint TEXT);
+
 CREATE TABLE "friend_scenarios" (
   id                 TEXT PRIMARY KEY,
   friend_id          TEXT NOT NULL REFERENCES friends (id) ON DELETE CASCADE,
@@ -2654,7 +2662,7 @@ CREATE TABLE "friend_scenarios" (
   started_at         TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   next_delivery_at   TEXT,
   updated_at         TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
-, previous_scenario_id TEXT, published_version_id TEXT REFERENCES scenario_versions (id));
+, previous_scenario_id TEXT, published_version_id TEXT REFERENCES scenario_versions (id), pause_reason TEXT);
 
 CREATE TABLE friend_scores (
   id              TEXT PRIMARY KEY,
@@ -5326,6 +5334,11 @@ CREATE TABLE "scenario_steps" (
   question_json   TEXT,
   is_draft        INTEGER NOT NULL DEFAULT 0,
   UNIQUE (scenario_id, step_order)
+);
+
+CREATE TABLE scenario_test_send_claims (
+  claim_key TEXT PRIMARY KEY,
+  claimed_at TEXT NOT NULL
 );
 
 CREATE TABLE "scenario_triggers" (

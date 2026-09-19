@@ -114,6 +114,23 @@ describe('bV5Vs シナリオ編集', () => {
     expect(card).toContain('action="設定"')
     expect(card).toContain('onAction={() => setTriggerOpen(true)}')
   })
+
+  it('通一覧は固定の最小幅を持たない（#949 N-058）', () => {
+    /*
+     * min-w-[1040px] で表の幅を固定していたため、サイドメニューを引いた
+     * 残りがそれより狭い画面ではページ全体が横スクロールした。
+     * 表は中身の幅に任せ、「内容」列だけ truncate で縮める。
+     */
+    const table = slice(detail, 'overflow-x-auto', '</table>')
+    expect(table).not.toMatch(/min-w-\[\d+px\]/)
+    expect(table).toContain('<table className="w-full">')
+    /*
+     * 操作は6つある。1行へ押さえる（whitespace-nowrap だけの列）と
+     * 表の幅がそのぶん広がるので、狭い幅では折り返す。
+     */
+    const actions = slice(detail, 'text-right align-top', '</td>')
+    expect(actions).toContain('flex-wrap')
+  })
 })
 
 describe('配信対象の言い表し方', () => {
