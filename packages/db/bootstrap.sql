@@ -2651,7 +2651,7 @@ CREATE TABLE friend_scenario_op_keys (
   op TEXT NOT NULL,
   response_json TEXT NOT NULL,
   created_at TEXT NOT NULL
-);
+, request_fingerprint TEXT);
 
 CREATE TABLE "friend_scenarios" (
   id                 TEXT PRIMARY KEY,

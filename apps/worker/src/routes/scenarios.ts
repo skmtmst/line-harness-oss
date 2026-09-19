@@ -44,6 +44,7 @@ import type {
 } from '@line-crm/db';
 import type { Env } from '../index.js';
 import { requireRole, requirePermission } from '../middleware/role-guard.js';
+import { sha256Hex } from '../middleware/auth.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 import { resolveRequestBoundary } from '../services/request-boundary.js';
 import { validateTemplateMessage } from '../services/template-message-validation.js';
@@ -1989,8 +1990,8 @@ scenarios.delete(
 // 指す。友だちの所属アカウントが見える範囲外なら 404 で存在を隠す。
 //
 // 全部で Idempotency-Key を必須にする。同じキーの再送は残っている結果を
-// そのまま返し、別の購読・別の操作への使い回しは 409 にする
-// （friend_scenario_op_keys / 432）。
+// そのまま返し、別の購読・別の操作・別の本体への使い回しは 409 にする
+// （friend_scenario_op_keys / 432・434）。
 // ============================================================
 
 type FriendScenarioOp = 'pause' | 'resume' | 'move' | 'retry';
@@ -2006,9 +2007,10 @@ interface FriendOpOutcome {
  * 1. 確認キー（Idempotency-Key）の形を見る。無ければ 400。
  * 2. 購読行と友だちを読み、友だちの所属アカウントが範囲外なら 404。
  * 3. 台帳へキーを予約する（INSERT OR IGNORE）。先に入っているなら、
- *    同じ購読・同じ操作の結果をそのまま返し、別の使い回しは 409。
- * 4. 操作を走らせ、結果を台帳へ残す。失敗で pin しないよう、
- *    500 系の例外時は予約を外してから投げ直す。
+ *    同じ購読・同じ操作・同じ本体の結果をそのまま返し、別の使い回しは 409。
+ * 4. 操作を走らせ、**成功した結果だけ**を台帳へ残す。一時的な失敗
+ *    （配信中の 409 や検証の 422 など）を残すと、Web は失敗時にキーを
+ *    回さないため同じ応答が永遠に返り続ける。失敗時と例外時は予約を外す。
  */
 async function runFriendScenarioOp(
   c: Context<Env>,
@@ -2022,6 +2024,13 @@ async function runFriendScenarioOp(
   const db = c.env.DB;
   const subscriptionId = c.req.param('subscriptionId') ?? '';
 
+  // 操作本体（リクエスト）の写し。move の移し先のように本体に引数を持つ
+  // 操作は、同じキーでも本体が違えば別操作として 409 にするため台帳へ残す
+  // （scenario_publish_keys の content_snapshot と同じ考え方）。
+  // Hono は読んだ本体を写しとして持つので、handler 側の c.req.json() は
+  // このあとも普通に動く。
+  const requestFingerprint = await sha256Hex(await c.req.text());
+
   const subscription = await getFriendScenarioById(db, subscriptionId);
   if (!subscription) {
     return c.json({ success: false, error: '購読が見つかりません' }, 404);
@@ -2034,16 +2043,30 @@ async function runFriendScenarioOp(
 
   const claimed = await db.prepare(
     `INSERT OR IGNORE INTO friend_scenario_op_keys
-       (op_idempotency_key, friend_scenario_id, op, response_json, created_at)
-     VALUES (?, ?, ?, 'PENDING', ?)`,
-  ).bind(key, subscriptionId, op, jstNow()).run();
+       (op_idempotency_key, friend_scenario_id, op, request_fingerprint, response_json, created_at)
+     VALUES (?, ?, ?, ?, 'PENDING', ?)`,
+  ).bind(key, subscriptionId, op, requestFingerprint, jstNow()).run();
 
   if ((claimed.meta.changes ?? 0) === 0) {
     const existing = await db.prepare(
-      `SELECT friend_scenario_id, op, response_json FROM friend_scenario_op_keys
+      `SELECT friend_scenario_id, op, request_fingerprint, response_json
+        FROM friend_scenario_op_keys
         WHERE op_idempotency_key = ?`,
-    ).bind(key).first<{ friend_scenario_id: string; op: string; response_json: string }>();
-    if (!existing || existing.friend_scenario_id !== subscriptionId || existing.op !== op) {
+    ).bind(key).first<{
+      friend_scenario_id: string;
+      op: string;
+      request_fingerprint: string | null;
+      response_json: string;
+    }>();
+    // 本体の写しが違う同キー再送（例: move の移し先だけ変えた再送）も
+    // 別操作への使い回しとして 409 にする。既存行の写しが NULL（434 より
+    // 前に残った行）なら不一致に倒す。
+    if (
+      !existing
+      || existing.friend_scenario_id !== subscriptionId
+      || existing.op !== op
+      || existing.request_fingerprint !== requestFingerprint
+    ) {
       return c.json(
         { success: false, error: '同じ確認キーが別の操作で使われています' },
         409,
@@ -2061,10 +2084,19 @@ async function runFriendScenarioOp(
 
   try {
     const outcome = await run(subscription);
-    await db.prepare(
-      `UPDATE friend_scenario_op_keys SET response_json = ?
-        WHERE op_idempotency_key = ?`,
-    ).bind(JSON.stringify(outcome), key).run();
+    if (outcome.status >= 200 && outcome.status < 300) {
+      // 成功した結果だけを pin する。同じキーの再送はこの応答を再生する。
+      await db.prepare(
+        `UPDATE friend_scenario_op_keys SET response_json = ?
+          WHERE op_idempotency_key = ?`,
+      ).bind(JSON.stringify(outcome), key).run();
+    } else {
+      // 失敗応答は pin しない。予約を外して、同じキーでも新しいキーでも
+      // やり直せるようにする。
+      await db.prepare(
+        `DELETE FROM friend_scenario_op_keys WHERE op_idempotency_key = ?`,
+      ).bind(key).run();
+    }
     return c.json(outcome.body, outcome.status);
   } catch (err) {
     // 台帳に失敗を pin しない。予約だけ外して例外を上へ返す。

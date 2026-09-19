@@ -391,7 +391,8 @@
     "430_booking_audit_and_reminder_settings.sql",
     "431_auto_reply_stop_and_soft_delete.sql",
     "432_friend_scenario_pause_reason.sql",
-    "433_scenario_test_send_claims.sql"
+    "433_scenario_test_send_claims.sql",
+    "434_friend_scenario_op_request_fingerprint.sql"
   ],
-  "migrationCount": 392
+  "migrationCount": 393
 }

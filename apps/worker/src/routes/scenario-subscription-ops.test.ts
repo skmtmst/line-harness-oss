@@ -13,6 +13,7 @@ import { Hono } from 'hono';
 import { createTestD1, insertFriend, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 import type { Env } from '../index.js';
 import type { AuthenticatedStaff } from '../middleware/auth.js';
+import { authMiddleware } from '../middleware/auth.js';
 
 const { scenarios } = await import('./scenarios.js');
 
@@ -132,6 +133,7 @@ function seed(): void {
     ['f-failed', 'acc-1'],
     ['f-completed', 'acc-1'],
     ['f-move', 'acc-1'],
+    ['f-delivering', 'acc-1'],
     ['f-acc2', 'acc-2'],
   ] as const) {
     insertFriend(raw, friendId, { line_account_id: accountId });
@@ -143,6 +145,7 @@ function seed(): void {
     ['sub-failed', 'f-failed', 'sc-1', 'paused', 'delivery_failed', 0],
     ['sub-completed', 'f-completed', 'sc-1', 'completed', null, 1],
     ['sub-move', 'f-move', 'sc-1', 'active', null, 0],
+    ['sub-delivering', 'f-delivering', 'sc-1', 'delivering', null, 0],
     ['sub-acc2', 'f-acc2', 'sc-2', 'active', null, 0],
   ];
   for (const [subId, friendId, scenarioId, status, pauseReason, stepOrder] of subs) {
@@ -263,5 +266,98 @@ describe('友だち単位の購読操作（#949 N-054）', () => {
         WHERE friend_id = 'f-move' AND scenario_id = 'sc-move' AND status != 'completed'`,
     ).get() as { n: number };
     expect(count.n).toBe(1);
+  });
+
+  test('move は同じキーでも移し先が違えば409（古い成功応答を再生しない）', async () => {
+    const shared = key();
+    const first = await post('sub-move', 'move', owner, { targetScenarioId: 'sc-move' }, shared);
+    expect(first.status).toBe(200);
+    // 同じ購読・同じ操作・同じキーでも、本体（移し先）が違えば使い回し。
+    // 直す前は台帳が購読+操作だけを照合していたため、保存済みの 200 が返った。
+    const different = await post('sub-move', 'move', owner, { targetScenarioId: 'sc-2' }, shared);
+    expect(different.status).toBe(409);
+    // 同じ本体の再送は従来どおり保存済みの結果を返す
+    const same = await post('sub-move', 'move', owner, { targetScenarioId: 'sc-move' }, shared);
+    expect(same.status).toBe(200);
+  });
+
+  test('一時的な409は台帳へ残らず、同じキーでも新しいキーでもやり直せる', async () => {
+    const shared = key();
+    // 配信中の購読は止められない（一時的409）
+    const busy = await post('sub-delivering', 'pause', owner, {}, shared);
+    expect(busy.status).toBe(409);
+    // 失敗は pin されないので予約も残らない
+    const ledger = sqlite.raw.prepare(
+      `SELECT COUNT(*) AS n FROM friend_scenario_op_keys WHERE op_idempotency_key = ?`,
+    ).get(shared) as { n: number };
+    expect(ledger.n).toBe(0);
+    // 配信が済んで active へ戻ったあと、同じキーでやり直せる
+    // （直す前は 409 が pin され、Web がキーを回さないため永遠に止められなかった）
+    sqlite.raw.prepare(
+      `UPDATE friend_scenarios SET status = 'active' WHERE id = 'sub-delivering'`,
+    ).run();
+    const retried = await post('sub-delivering', 'pause', owner, {}, shared);
+    expect(retried.status).toBe(200);
+    expect(sub('sub-delivering')!.status).toBe('paused');
+  });
+
+  test('失敗した操作は予約が外れるので、同じキーで本体を直してやり直せる', async () => {
+    const shared = key();
+    // 移し先が無い 404 は失敗なので台帳へ残らない
+    expect(
+      (await post('sub-move', 'move', owner, { targetScenarioId: 'nope' }, shared)).status,
+    ).toBe(404);
+    // 同じキーで正しい移し先へ送り直せる（成功すれば新たに pin される）
+    const redo = await post('sub-move', 'move', owner, { targetScenarioId: 'sc-move' }, shared);
+    expect(redo.status).toBe(200);
+    const again = await post('sub-move', 'move', owner, { targetScenarioId: 'sc-move' }, shared);
+    expect(again.status).toBe(200);
+  });
+});
+
+describe('友だち単位の購読操作の認証経路（#949 監査: 権限対応表への登録）', () => {
+  // authMiddleware の実物を通す。Bearer APIキー → staff_members → 役割・
+  // permission_keys・account境界まで本番通り。/api/scenario-subscriptions が
+  // 権限対応表に無いと、route の requirePermission へ届く前に staff は 403 になる。
+  function authedApp() {
+    const instance = new Hono<Env>();
+    instance.use('*', authMiddleware);
+    instance.route('/', scenarios);
+    return instance;
+  }
+
+  function authedPost(
+    subscriptionId: string,
+    op: string,
+    apiKey: string,
+    body?: unknown,
+    idemKey: string | null = key(),
+  ) {
+    return authedApp().request(`/api/scenario-subscriptions/${subscriptionId}/${op}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+        ...(idemKey ? { 'Idempotency-Key': idemKey } : {}),
+      },
+      body: JSON.stringify(body ?? {}),
+    }, { DB: sqlite.db } as unknown as Env['Bindings']);
+  }
+
+  test('個別権限を持つstaffは第一関門を通って操作できる', async () => {
+    // scenario.subscription.edit を持つ staff は停止できる
+    expect((await authedPost('sub-active', 'pause', 'key-sub')).status).toBe(200);
+    // scenario.step_run.retry を持つ staff は失敗再送できる
+    // （購読の操作権限を持たなくても retry へ届く = 個別権限での委譲）
+    expect((await authedPost('sub-failed', 'retry', 'key-retry')).status).toBe(200);
+  });
+
+  test('権限の無いstaffは403、再送だけの委譲では停止できない', async () => {
+    // 再送だけを任された staff が購読を止めると第一関門で 403
+    expect((await authedPost('sub-paused', 'pause', 'key-retry')).status).toBe(403);
+    // 権限を一切持たない staff も 403
+    expect((await authedPost('sub-paused', 'resume', 'key-none')).status).toBe(403);
+    // owner/admin は従来どおり通す
+    expect((await authedPost('sub-paused', 'resume', 'key-owner')).status).toBe(200);
   });
 });
