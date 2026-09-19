@@ -150,10 +150,11 @@ export const TAG_USAGE_BLOCKING_REFERENCE_SELECTS = [
   `SELECT CAST(j.value AS TEXT) AS tag_id FROM scenario_actions a,
      json_tree(CASE WHEN json_valid(a.condition_json) THEN a.condition_json ELSE 'null' END) j WHERE j.type = 'text'`,
   `SELECT CAST(j.value AS TEXT) AS tag_id FROM auto_replies a,
-     json_tree(CASE WHEN json_valid(a.actions_json) THEN a.actions_json ELSE 'null' END) j WHERE j.type = 'text'`,
+     json_tree(CASE WHEN json_valid(a.actions_json) THEN a.actions_json ELSE 'null' END) j
+    WHERE j.type = 'text' AND a.deleted_at IS NULL`,
   `SELECT CAST(j.value AS TEXT) AS tag_id FROM auto_replies a,
      json_tree(CASE WHEN json_valid(a.friend_conditions_json) THEN a.friend_conditions_json ELSE 'null' END) j
-    WHERE j.type = 'text'`,
+    WHERE j.type = 'text' AND a.deleted_at IS NULL`,
   `SELECT CAST(j.value AS TEXT) AS tag_id FROM saved_searches s,
      json_tree(CASE WHEN json_valid(s.conditions_json) THEN s.conditions_json ELSE 'null' END) j WHERE j.type = 'text'`,
   ...[
@@ -366,13 +367,13 @@ export async function getTagsWithUsage(
            FROM auto_replies a,
                 json_tree(CASE WHEN json_valid(a.actions_json)
                                THEN a.actions_json ELSE 'null' END) j
-          WHERE j.type = 'text'
+          WHERE j.type = 'text' AND a.deleted_at IS NULL
          UNION
          SELECT CAST(j.value AS TEXT), a.id
            FROM auto_replies a,
                 json_tree(CASE WHEN json_valid(a.friend_conditions_json)
                                THEN a.friend_conditions_json ELSE 'null' END) j
-          WHERE j.type = 'text'
+          WHERE j.type = 'text' AND a.deleted_at IS NULL
        )`,
     used_in_saved_searches: `WITH refs(tag_id, entity_id) AS (
          SELECT CAST(j.value AS TEXT), s.id
@@ -698,7 +699,7 @@ export async function getTagDeleteImpact(
                 )
              )) AS forms,
             (SELECT COUNT(*) FROM scenario_refs) AS scenarios,
-            (SELECT COUNT(*) FROM auto_replies a WHERE EXISTS (
+            (SELECT COUNT(*) FROM auto_replies a WHERE a.deleted_at IS NULL AND (EXISTS (
               SELECT 1 FROM json_tree(CASE WHEN json_valid(a.actions_json)
                                            THEN a.actions_json ELSE 'null' END) j
                WHERE j.type = 'text' AND CAST(j.value AS TEXT) = t.id
@@ -706,7 +707,7 @@ export async function getTagDeleteImpact(
               SELECT 1 FROM json_tree(CASE WHEN json_valid(a.friend_conditions_json)
                                            THEN a.friend_conditions_json ELSE 'null' END) j
                WHERE j.type = 'text' AND CAST(j.value AS TEXT) = t.id
-            )) AS auto_replies,
+            ))) AS auto_replies,
             (SELECT COUNT(*) FROM saved_searches s WHERE EXISTS (
               SELECT 1 FROM json_tree(CASE WHEN json_valid(s.conditions_json)
                                            THEN s.conditions_json ELSE 'null' END) j

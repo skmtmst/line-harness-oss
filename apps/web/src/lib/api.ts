@@ -7926,6 +7926,23 @@ export const api = {
       headers: { 'Idempotency-Key': idempotencyKey },
       body: JSON.stringify(body),
     }),
+    /*
+     * 機能08 点検 E-01: 専用の停止口。理由（任意）を添えて止めると、
+     * いつ・誰が・なぜ止めたかが残る。確認キーは呼び出し側で都度振る。
+     */
+    stop: (id: string, body: { reason?: string | null }, idempotencyKey: string) =>
+      fetchApi<ApiResponse<{
+        id: string;
+        isActive: boolean;
+        stoppedAt: string | null;
+        stoppedByStaffId: string | null;
+        stoppedByStaffName: string | null;
+        stopReason: string | null;
+      }>>(`/api/auto-replies/${id}/stop`, {
+        method: 'POST',
+        headers: { 'Idempotency-Key': idempotencyKey },
+        body: JSON.stringify(body),
+      }),
     list: (params?: { accountId?: string }) => {
       const query = params?.accountId ? '?accountId=' + encodeURIComponent(params.accountId) : ''
       return fetchApi<ApiResponse<Array<{
@@ -7958,6 +7975,13 @@ export const api = {
         keywordMatchMode: string;
         /** フォルダ。分けていなければ null。 */
         folderId: string | null;
+        /** 273: 'draft'（未公開）| 'published' | 'stopped'。 */
+        lifecycleStatus: string;
+        /** 機能08 点検 E-01: 最後に停止した記録。止めたことが無ければ null。 */
+        stoppedAt: string | null;
+        stoppedByStaffId: string | null;
+        stoppedByStaffName: string | null;
+        stopReason: string | null;
         /** 152: 当たった回数（今月・累計）。一覧でだけ入る。 */
         hits?: { period: number; total: number };
         /** 実行台帳で成功を確認できた後続処理の累計。 */
@@ -8001,6 +8025,13 @@ export const api = {
         keywordMatchMode: string;
         /** フォルダ。分けていなければ null。 */
         folderId: string | null;
+        /** 273: 'draft'（未公開）| 'published' | 'stopped'。 */
+        lifecycleStatus: string;
+        /** 機能08 点検 E-01: 最後に停止した記録。 */
+        stoppedAt: string | null;
+        stoppedByStaffId: string | null;
+        stoppedByStaffName: string | null;
+        stopReason: string | null;
         createdAt: string;
       }>>(`/api/auto-replies/${id}`),
     create: (body: {
@@ -8697,11 +8728,12 @@ export const api = {
     petMetrics: (accountId: string, days = 30) => fetchApi<ApiResponse<NenPetMetrics>>(
       `/api/nen-campaigns/metrics/pets?lineAccountId=${encodeURIComponent(accountId)}&days=${days}`,
     ),
-    deliveries: (accountId: string, options: { days?: number; from?: string; to?: string; status?: string; cursor?: string; limit?: number } = {}) => {
+    deliveries: (accountId: string, options: { days?: number; from?: string; to?: string; status?: string; q?: string; cursor?: string; limit?: number } = {}) => {
       const query = new URLSearchParams({ lineAccountId: accountId, days: String(options.days ?? 30), limit: String(options.limit ?? 50) })
       // from/to を両方渡すと days の代わりにその期間で数える（実口 nenDeliveryRange と同じ決めごと）。
       if (options.from && options.to) { query.delete('days'); query.set('from', options.from); query.set('to', options.to) }
       if (options.status) query.set('status', options.status)
+      if (options.q) query.set('q', options.q)
       if (options.cursor) query.set('cursor', options.cursor)
       return fetchApi<ApiResponse<NenDeliveryList>>(`/api/nen-campaigns/deliveries?${query}`)
     },
@@ -8785,9 +8817,9 @@ export const api = {
       if (search) query.set('search', search)
       return fetchApi<ApiResponse<NenPetProfile[]>>(`/api/nen-campaigns/pets?${query}`)
     },
-    createPet: (accountId: string, data: { friendId: string; customerId?: string; name: string; animalType: string; gender: string; birthday?: string }) =>
+    createPet: (accountId: string, data: { friendId: string; customerId?: string; name: string; animalType: string; gender: string; birthday?: string; breed?: string; weightKg?: number | null }) =>
       fetchApi<ApiResponse<{ id: string }>>(`/api/nen-campaigns/pets?lineAccountId=${encodeURIComponent(accountId)}`, { method: 'POST', body: JSON.stringify(data) }),
-    updatePet: (accountId: string, id: string, data: { name: string; animalType: string; gender: string; birthday?: string }) =>
+    updatePet: (accountId: string, id: string, data: { name: string; animalType: string; gender: string; birthday?: string; breed?: string; weightKg?: number | null }) =>
       fetchApi<{ success: boolean }>(`/api/nen-campaigns/pets/${encodeURIComponent(id)}?lineAccountId=${encodeURIComponent(accountId)}`, { method: 'PUT', body: JSON.stringify(data) }),
     deletePet: (accountId: string, id: string) => fetchApi<{ success: boolean }>(
       `/api/nen-campaigns/pets/${encodeURIComponent(id)}?lineAccountId=${encodeURIComponent(accountId)}`,

@@ -212,6 +212,14 @@ export function autoReplyRowFromDraftSettings(
     respond_to_all: settings.respondToAll ? 1 : 0,
     name: settings.name,
     keyword_match_mode: settings.keywordMatchMode,
+    /* 下書き設定から作った仮の行。停止・削除の記録はまだ無い。 */
+    lifecycle_status: 'draft',
+    stopped_at: null,
+    stopped_by_staff_id: null,
+    stop_reason: null,
+    stop_idempotency_key: null,
+    deleted_at: null,
+    deleted_by_staff_id: null,
     created_at: createdAt,
   };
 }
@@ -233,7 +241,7 @@ export async function getAutoReplyDraftVersion(
     `SELECT arv.*
        FROM auto_replies ar
        JOIN auto_reply_versions arv ON arv.id = ar.current_draft_version_id
-      WHERE ar.id = ? AND arv.status = 'draft'`,
+      WHERE ar.id = ? AND ar.deleted_at IS NULL AND arv.status = 'draft'`,
   ).bind(autoReplyId).first<AutoReplyVersionRow>();
 }
 
@@ -245,7 +253,7 @@ export async function getAutoReplyPublishedVersion(
     `SELECT arv.*
        FROM auto_replies ar
        JOIN auto_reply_versions arv ON arv.id = ar.current_published_version_id
-      WHERE ar.id = ? AND arv.status = 'published'`,
+      WHERE ar.id = ? AND ar.deleted_at IS NULL AND arv.status = 'published'`,
   ).bind(autoReplyId).first<AutoReplyVersionRow>();
 }
 
@@ -324,7 +332,7 @@ export async function saveAutoReplyDraftVersion(
   autoReplyId: string,
   settings: AutoReplyDraftSettings,
 ): Promise<AutoReplyVersionRow> {
-  const rule = await db.prepare(`SELECT * FROM auto_replies WHERE id = ?`)
+  const rule = await db.prepare(`SELECT * FROM auto_replies WHERE id = ? AND deleted_at IS NULL`)
     .bind(autoReplyId)
     .first<AutoReply>();
   if (!rule) throw new Error('AUTO_REPLY_NOT_FOUND');

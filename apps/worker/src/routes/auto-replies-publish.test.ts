@@ -85,6 +85,13 @@ function rowFromSettings(
     respond_to_all: value.respondToAll ? 1 : 0,
     name: value.name,
     keyword_match_mode: value.keywordMatchMode,
+    lifecycle_status: 'published',
+    stopped_at: null,
+    stopped_by_staff_id: null,
+    stop_reason: null,
+    stop_idempotency_key: null,
+    deleted_at: null,
+    deleted_by_staff_id: null,
     created_at: createdAt,
   };
 }

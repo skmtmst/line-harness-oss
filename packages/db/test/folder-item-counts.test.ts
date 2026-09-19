@@ -181,6 +181,32 @@ describe('getFolderItemCounts(#631)', () => {
     expect(counts!.unfiled).toBe(2)
     expect(counts!.unfiled).not.toBe(3)
   })
+
+  /**
+   * 自動応答も reminder と同じ不変条件。一覧（packages/db/src/
+   * auto-replies.ts:76、GET /api/auto-replies が使う getAutoReplies）は
+   * `deleted_at IS NULL` で論理削除済みを除くため、件数側にも同じ絞りが要る。
+   * ここを付け忘れると、消した自動応答がフォルダ件数にだけ残る。
+   */
+  it('一覧が除く論理削除済み(deleted_at)の自動応答は、フォルダ件数に入らない', async () => {
+    sqlite.prepare(`INSERT INTO folders (id, kind, name, display_order, created_at, updated_at)
+      VALUES ('folder-ar', 'auto_reply', '自動応答フォルダ', 0, '2026-01-01', '2026-01-01')`).run()
+    const insertAutoReply = sqlite.prepare(
+      `INSERT INTO auto_replies (id, keyword, response_content, folder_id, line_account_id, deleted_at)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+    )
+    // folder-ar: 生きた1件 + 消した1件。一覧に出るのは1件だけ。
+    insertAutoReply.run('ar-live', '生きている', '応答文', 'folder-ar', 'account-a', null)
+    insertAutoReply.run('ar-deleted', '消した', '応答文', 'folder-ar', 'account-a', '2026-02-01')
+
+    const counts = await getFolderItemCounts(db, 'auto_reply', {
+      allowedAccountIds: ['account-a'],
+      canSeeUnassigned: false,
+    })
+    expect(counts!.byFolderId['folder-ar']).toBe(1)
+    // 消した行を含めた2にはならない。
+    expect(counts!.byFolderId['folder-ar']).not.toBe(2)
+  })
 })
 
 describe('FOLDER_ITEM_COUNT_TABLES(#631)', () => {

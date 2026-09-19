@@ -516,7 +516,8 @@ export async function matchAndReply(
    */
   const autoReplies = await db
     .prepare(
-      `SELECT * FROM auto_replies WHERE is_active = 1 AND (line_account_id IS NULL OR line_account_id = ?)
+      `SELECT * FROM auto_replies WHERE is_active = 1 AND deleted_at IS NULL
+        AND (line_account_id IS NULL OR line_account_id = ?)
         ORDER BY CASE WHEN line_account_id = ? THEN 0 ELSE 1 END,
                  priority ASC, respond_to_all ASC, created_at ASC`,
     )

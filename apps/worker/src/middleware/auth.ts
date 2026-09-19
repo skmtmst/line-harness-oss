@@ -420,6 +420,8 @@ export function isPublicApiBoundary(method: string, path: string): boolean {
     path === '/api/hq/billing/webhook' ||
     path === '/api/integrations/eccube/events' ||
     path === '/api/integrations/eccube/columns' ||
+    // ECから届く誕生日クーポンの利用記録。route 内で同じHMAC署名を確かめる。
+    path === '/api/integrations/eccube/coupon-usages' ||
     path === '/api/internal/deployments/events' ||
     path === '/api/integrations/codex-slack/events' ||
     path === '/api/integrations/ai-loop/reports' ||

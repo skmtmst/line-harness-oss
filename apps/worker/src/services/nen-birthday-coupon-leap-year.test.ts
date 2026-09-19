@@ -57,7 +57,7 @@ describe('NEN誕生日クーポン: 2月29日生まれの扱い', () => {
     await savePolicy(db, 'feb28');
 
     // 2026-02-28（平年）が誕生日扱い → 3日前の 02-25 に走査
-    const queued = await enqueueBirthdayCoupons(db.db, new Date(daysBefore('2026-02-28')));
+    const { queued } = await enqueueBirthdayCoupons(db.db, new Date(daysBefore('2026-02-28')));
     expect(queued).toBe(1);
     expect(await issues(db)).toEqual([{ issue_year: 2026 }]);
   });
@@ -67,8 +67,8 @@ describe('NEN誕生日クーポン: 2月29日生まれの扱い', () => {
     seed(db);
     await savePolicy(db, 'mar1');
 
-    expect(await enqueueBirthdayCoupons(db.db, new Date(daysBefore('2026-02-28')))).toBe(0);
-    expect(await enqueueBirthdayCoupons(db.db, new Date(daysBefore('2026-03-01')))).toBe(1);
+    expect((await enqueueBirthdayCoupons(db.db, new Date(daysBefore('2026-02-28')))).queued).toBe(0);
+    expect((await enqueueBirthdayCoupons(db.db, new Date(daysBefore('2026-03-01')))).queued).toBe(1);
     expect(await issues(db)).toEqual([{ issue_year: 2026 }]);
   });
 
@@ -77,11 +77,11 @@ describe('NEN誕生日クーポン: 2月29日生まれの扱い', () => {
     seed(db);
     await savePolicy(db, 'skip');
 
-    expect(await enqueueBirthdayCoupons(db.db, new Date(daysBefore('2026-02-28')))).toBe(0);
-    expect(await enqueueBirthdayCoupons(db.db, new Date(daysBefore('2026-03-01')))).toBe(0);
+    expect((await enqueueBirthdayCoupons(db.db, new Date(daysBefore('2026-02-28')))).queued).toBe(0);
+    expect((await enqueueBirthdayCoupons(db.db, new Date(daysBefore('2026-03-01')))).queued).toBe(0);
     expect(await issues(db)).toEqual([]);
 
-    expect(await enqueueBirthdayCoupons(db.db, new Date(daysBefore('2028-02-29')))).toBe(1);
+    expect((await enqueueBirthdayCoupons(db.db, new Date(daysBefore('2028-02-29')))).queued).toBe(1);
     expect(await issues(db)).toEqual([{ issue_year: 2028 }]);
   });
 
@@ -100,9 +100,9 @@ describe('NEN誕生日クーポン: 2月29日生まれの扱い', () => {
     const stored = await getNenBirthdayCouponSetting(db.db, 'account-1');
     expect(stored?.leap_year_policy).toBeUndefined();
 
-    expect(await enqueueBirthdayCoupons(db.db, new Date(daysBefore('2026-02-28')))).toBe(0);
-    expect(await enqueueBirthdayCoupons(db.db, new Date(daysBefore('2026-03-01')))).toBe(0);
-    expect(await enqueueBirthdayCoupons(db.db, new Date(daysBefore('2028-02-29')))).toBe(1);
+    expect((await enqueueBirthdayCoupons(db.db, new Date(daysBefore('2026-02-28')))).queued).toBe(0);
+    expect((await enqueueBirthdayCoupons(db.db, new Date(daysBefore('2026-03-01')))).queued).toBe(0);
+    expect((await enqueueBirthdayCoupons(db.db, new Date(daysBefore('2028-02-29')))).queued).toBe(1);
   });
 
   it('壊れた方針値の入った設定は未設定として安全側（skip）に落ちる', async () => {
@@ -117,6 +117,6 @@ describe('NEN誕生日クーポン: 2月29日生まれの扱い', () => {
 
     const stored = await getNenBirthdayCouponSetting(db.db, 'account-1');
     expect(stored?.leap_year_policy).toBeUndefined();
-    expect(await enqueueBirthdayCoupons(db.db, new Date(daysBefore('2026-02-28')))).toBe(0);
+    expect((await enqueueBirthdayCoupons(db.db, new Date(daysBefore('2026-02-28')))).queued).toBe(0);
   });
 });
