@@ -1,6 +1,8 @@
 'use client'
 
 import SelectField from '@/components/shared/select-field'
+import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
+import { MoreAction } from '@/components/shared/row-actions'
 import StatusBadge from '@/components/shared/status-badge'
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { api, ApiError, type BroadcastAssetKind, type TemplateQuestion } from '@/lib/api'
@@ -173,6 +175,8 @@ export default function TemplatesPage() {
   const [pendingDelete, setPendingDelete] = useState<
     { id: string; name: string; usageCount: number } | null
   >(null)
+  /** U043: 行の「…」メニュー。開いている行は1つだけ。 */
+  const [openRowMenuId, setOpenRowMenuId] = useState<string | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState('')
   const [blockedDelete, setBlockedDelete] = useState<
@@ -196,6 +200,7 @@ export default function TemplatesPage() {
     setDrawerId(null)
     setShowCreate(false)
     setPendingDelete(null)
+    setOpenRowMenuId(null)
     setBlockedDelete(null)
     setDeleteError('')
     // フォルダはアカウント単位。切り替えたら前のアカウントの帯も
@@ -512,6 +517,36 @@ export default function TemplatesPage() {
     } finally {
       setDeleting(false)
     }
+  }
+
+  /*
+   * U043: 行の主操作は「編集」。それ以外（一斉配信・使用先・削除）は
+   * 行の「…」メニューへ。文字の操作を何個も横へ並べると、1440pxでも
+   * 3段に折れて行高が揃わなかった。
+   */
+  const rowMenuItems = (template: Template): ActionMenuItem[] => {
+    const items: ActionMenuItem[] = [
+      {
+        id: 'broadcast',
+        label: '一斉配信で使う',
+        onSelect: () =>
+          window.location.assign(`/broadcasts/new?templateId=${encodeURIComponent(template.id)}`),
+      },
+    ]
+    if (canMutateTemplates) {
+      items.push(
+        template.usageCount > 0
+          ? { id: 'usage', label: '使用先を見る', onSelect: () => handleDelete(template) }
+          : {
+              id: 'delete',
+              label: 'テンプレートを削除',
+              tone: 'danger',
+              dividerBefore: true,
+              onSelect: () => handleDelete(template),
+            },
+      )
+    }
+    return items
   }
 
   // 一覧に何を出すか。**読込中・取得失敗・権限不足・空・0件を混ぜない。**
@@ -907,7 +942,11 @@ export default function TemplatesPage() {
         />
       ) : (
         <div className="bg-canvas rounded-card border border-hairline overflow-hidden">
-          <div className="overflow-x-auto">
+          {/* U044: 767px以下は data-template-list 宛の畳み込みCSSで
+              1件ずつのカードに変わる（templates-v6.module.css）。
+              右端が画面外へ逃げる表をそのまま小さくしても、項目と操作を
+              同時に読めないため。 */}
+          <div className="overflow-x-auto" data-template-list>
             <table className="w-full min-w-[640px]">
               <thead>
                 <TableHeadRow>
@@ -978,28 +1017,35 @@ export default function TemplatesPage() {
                     </td>
                     <td className="px-4 py-3 text-xs text-ink-faint">{formatDate(t.updatedAt)}</td>
                     <td className="px-4 py-3 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                      <a
-                        href={`/broadcasts/new?templateId=${encodeURIComponent(t.id)}`}
+                      {/* 行のクリック（詳細を開く）へ伝えない。 */}
+                      <div
+                        className="relative flex items-center justify-end gap-1 whitespace-nowrap"
                         onClick={(e) => e.stopPropagation()}
-                        className="rounded-md border border-hairline px-2.5 py-1 text-xs font-bold text-accent hover:bg-accent-soft"
                       >
-                        一斉配信で使う
-                      </a>
-                      {canMutateTemplates && (t.usageCount > 0 ? (
-                        <Button
-                          onClick={(e) => { e.stopPropagation(); handleDelete(t) }}
-                        >
-                          使用先を見る
-                        </Button>
-                      ) : (
-                        <button
-                          onClick={(e) => { e.stopPropagation(); handleDelete(t) }}
-                          className="hover:bg-danger-bg rounded-md px-2.5 py-1 text-xs font-medium text-red-500"
-                        >
-                          テンプレートを削除
-                        </button>
-                      ))}
+                        {canMutateTemplates && (
+                          <Button
+                            href={
+                              t.question
+                                ? `/templates/questions/new?id=${encodeURIComponent(t.id)}`
+                                : `/templates/edit?id=${encodeURIComponent(t.id)}`
+                            }
+                          >
+                            編集
+                          </Button>
+                        )}
+                        <MoreAction
+                          label={`${t.name}のその他操作`}
+                          aria-expanded={openRowMenuId === t.id}
+                          onClick={() =>
+                            setOpenRowMenuId((current) => (current === t.id ? null : t.id))
+                          }
+                        />
+                        <ActionMenu
+                          open={openRowMenuId === t.id}
+                          ariaLabel={`${t.name}の操作`}
+                          onClose={() => setOpenRowMenuId(null)}
+                          items={rowMenuItems(t)}
+                        />
                       </div>
                     </td>
                   </tr>

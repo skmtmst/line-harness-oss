@@ -65,7 +65,6 @@ function QuestionTemplatePageInner() {
   // 編集時はテンプレートが属するアカウント。選択中と食い違うことがある（N-147）。
   const [templateAccountId, setTemplateAccountId] = useState<string | null>(null)
   const [question, setQuestion] = useState<ScenarioQuestion>(() => emptyQuestion())
-  const [categories, setCategories] = useState<string[]>([])
   const [usageCount, setUsageCount] = useState(0)
   const [loading, setLoading] = useState(Boolean(id))
   const [saving, setSaving] = useState(false)
@@ -76,19 +75,16 @@ function QuestionTemplatePageInner() {
     typeof window === 'undefined' ? true : isOwnerOrAdmin())
   usePageTitle(canMutateTemplates ? '質問を作る' : '質問テンプレート')
 
-  // 分類名の候補は置き場の一覧から取る。テンプレ全件を引くと件数が増えるほど重くなる。
   // 置き場は「編集しているテンプレートのアカウント」のものだけを出す。
   // 読み替えるまで前のアカウントの帯は残さない（N-147）。
   const folderAccountId = id ? templateAccountId : selectedAccountId
   useEffect(() => {
     setFolders([])
-    setCategories([])
     if (!folderAccountId) return
     let cancelled = false
     void api.folders.list('template', folderAccountId).then((res) => {
       if (cancelled || !res.success) return
       setFolders(res.data)
-      setCategories([...new Set(res.data.map((item) => item.name).filter(Boolean))])
     })
     return () => { cancelled = true }
   }, [folderAccountId])
@@ -221,24 +217,22 @@ function QuestionTemplatePageInner() {
                 placeholder="例：継続の意思をうかがう"
               />
             </label>
-            <label className="text-label font-semibold text-ink-secondary">
-              フォルダ
-              <TextField
-                value={category}
-                onChange={(event) => setCategory(event.target.value)}
-                list="question-template-folders"
-                className="mt-2"
-              />
-              <datalist id="question-template-folders">
-                {categories.map((item) => <option key={item} value={item} />)}
-              </datalist>
-            </label>
+            {/*
+              U057: 置き場はこの1か所だけ。以前は「フォルダ」の自由記入欄が
+              別にあり、そこへ名前を打ち込んでも一覧の帯には載らず、
+              置き場を選んだつもりになる失敗があった。category（保存値）は
+              選んだ置き場の名前をそのまま入れて、ずれないようにする。
+            */}
             <label className="text-label font-semibold text-ink-secondary">
               置き場
               <SelectField
                 aria-label="置き場"
                 value={folderId ?? ''}
-                onChange={(event) => setFolderId(event.target.value || null)}
+                onChange={(event) => {
+                  const next = event.target.value || null
+                  setFolderId(next)
+                  setCategory(folders.find((folder) => folder.id === next)?.name ?? '未分類')
+                }}
                 options={[{ value: '', label: '未分類' }, ...folders.map((folder) => ({ value: folder.id, label: folder.name }))]}
                 className="mt-2"
               />
