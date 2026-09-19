@@ -35,17 +35,20 @@ describe('N-385: 設定メニューはキーボードだけで開いて選べ、
 
 describe('N-386: 狭い幅では重要度の低い列を隠し、情報は詳細で見られる', () => {
   it('1180px以下で「かかった時間」を、760px以下で「送った・届いた中身」を隠す', () => {
+    // 見出し・列定義・セルを nth-child で一括に畳む（列のズレ漏れを防ぐ）。
     expect(STYLES).toContain('@media (max-width: 1180px)')
-    expect(STYLES).toContain('.durationCol { display: none; }')
+    expect(STYLES).toContain('.table th:nth-child(5)')
+    expect(STYLES).toContain('.table td:nth-child(5)')
+    expect(STYLES).toContain('.table col:nth-child(5) { display: none; }')
     expect(STYLES).toContain('@media (max-width: 760px)')
-    expect(STYLES).toContain('.contentCol { display: none; }')
+    expect(STYLES).toContain('.table th:nth-child(3)')
+    expect(STYLES).toContain('.table td:nth-child(3)')
+    expect(STYLES).toContain('.table col:nth-child(3) { display: none; }')
   })
 
-  it('隠す列は見出し・列定義・セルの3箇所に同じ印を付ける', () => {
-    expect(INTERACTIONS).toContain('className={styles.durationCol}')
-    expect(INTERACTIONS).toContain('className={styles.contentCol}')
-    // 隠した値は詳細ダイアログに残る（情報欠落なし）
+  it('隠した値は詳細ダイアログに残る（情報欠落なし）', () => {
     expect(INTERACTIONS).toContain('かかった時間')
+    expect(INTERACTIONS).toContain('きっかけ')
   })
 })
 

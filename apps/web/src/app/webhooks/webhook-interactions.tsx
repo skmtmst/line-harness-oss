@@ -314,16 +314,16 @@ export default function WebhookInteractions() {
                 - 760px以下:  さらに「送った・届いた中身」を隠す
             */
             <DataTable className={styles.table}>
-              <colgroup><col /><col /><col className={styles.contentCol} /><col /><col className={styles.durationCol} /><col /></colgroup>
-              <thead><TableHeadRow><Th>いつ・どちら向き</Th><Th>つなぎ先</Th><Th className={styles.contentCol}>送った・届いた中身</Th><Th>返事</Th><Th className={styles.durationCol}>かかった時間</Th><Th><span className="sr-only">操作</span></Th></TableHeadRow></thead>
+              <colgroup><col /><col /><col /><col /><col /><col /></colgroup>
+              <thead><TableHeadRow><Th>いつ・どちら向き</Th><Th>つなぎ先</Th><Th>送った・届いた中身</Th><Th>返事</Th><Th>かかった時間</Th><Th><span className="sr-only">操作</span></Th></TableHeadRow></thead>
               <tbody>
                 {data.items.map((item) => (
                   <Tr key={item.id}>
                     <Td><div className={styles.primary}>{formatJst(item.startedAt)} ／ {directionLabel(item.direction)}</div><div className={styles.secondary} title={eventLabel(item)}>{eventLabel(item)}</div></Td>
                     <Td><div className={`${styles.primary} ${item.status === 'failed' ? styles.danger : ''}`} title={item.webhookName}>{item.webhookName}</div></Td>
-                    <Td className={styles.contentCol}><div className={styles.primary} title={item.triggerSummary}>{item.triggerSummary}</div><div className={styles.secondary}>安全のため本文と接続情報は一覧に表示しません</div></Td>
+                    <Td><div className={styles.primary} title={item.triggerSummary}>{item.triggerSummary}</div><div className={styles.secondary}>安全のため本文と接続情報は一覧に表示しません</div></Td>
                     <Td><StatusBadge tone={item.status === 'succeeded' ? 'success' : item.status === 'failed' ? 'danger' : 'info'}>{item.responseLabel}</StatusBadge></Td>
-                    <Td className={styles.durationCol}>{item.durationMs == null ? '—' : `${Math.round(item.durationMs / 100) / 10}秒`}</Td>
+                    <Td>{item.durationMs == null ? '—' : `${Math.round(item.durationMs / 100) / 10}秒`}</Td>
                     <ActionCell><div className={styles.rowActions}><Button onClick={() => setSelected(item)}>中身を見る</Button>{canRetry && item.canRetry ? <Button onClick={() => void retry(item)} disabled={retrying === item.id}>{retrying === item.id ? 'やり直し中' : 'やり直す'}</Button> : null}</div></ActionCell>
                   </Tr>
                 ))}
