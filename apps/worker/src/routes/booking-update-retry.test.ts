@@ -377,12 +377,84 @@ describe('PATCH /api/booking/admin/bookings/:id (N-389)', () => {
       });
   });
 
+  test('開始の過ぎた予約でも料金・メモは変更できる (独立審査必修1)', async () => {
+    const past = new Date(Date.now() - 24 * 3600_000).toISOString();
+    insertBooking(sqlite, { id: 'B-past', friend: 'f1', startsAt: past });
+    const { app, env } = makeApp(db);
+    const res = await patchBooking(app, env, 'B-past', {
+      lock_version: 0,
+      price: 6000,
+      internal_note: '当日割引で対応',
+    });
+    expect(res.status).toBe(200);
+    expect(sqlite.prepare(`SELECT price_at_booking, internal_note FROM bookings
+      WHERE id = 'B-past'`).get()).toEqual({
+      price_at_booking: 6000,
+      internal_note: '当日割引で対応',
+    });
+  });
+
+  test('過去の日時へ動かす指定は422のまま塞ぐ', async () => {
+    insertBooking(sqlite, { id: 'B1', friend: 'f1' });
+    const { app, env } = makeApp(db);
+    const res = await patchBooking(app, env, 'B1', {
+      lock_version: 0,
+      starts_at: new Date(Date.now() - 3600_000).toISOString(),
+    });
+    expect(res.status).toBe(422);
+    await expect(res.json()).resolves.toEqual({ error: 'past_datetime' });
+  });
+
   test('別店舗のスタッフへは変えられない (404)', async () => {
     insertBooking(sqlite, { id: 'B1', friend: 'f1' });
     const { app, env } = makeApp(db);
     const res = await patchBooking(app, env, 'B1', { lock_version: 0, staff_id: 's9' });
     expect(res.status).toBe(404);
     await expect(res.json()).resolves.toEqual({ error: 'staff_not_found' });
+  });
+});
+
+describe('PATCH /api/booking/admin/requests/:id approve (N-392 独立審査必修3)', () => {
+  let sqlite: Database.Database;
+  let db: D1Database;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    availabilityMocks.calls.length = 0;
+    availabilityMocks.computeSlots.mockReturnValue([{ start: '11:00', end: '12:00' }]);
+    accountAccessMocks.canAccessAllLineAccounts.mockResolvedValue(true);
+    sqlite = new Database(':memory:');
+    sqlite.pragma('foreign_keys = ON');
+    seed(sqlite);
+    db = asD1(sqlite);
+  });
+
+  afterEach(() => sqlite.close());
+
+  test('LIFF予約の承認でもGoogle同期が台帳に載る', async () => {
+    insertBooking(sqlite, { id: 'B1', friend: 'f1', status: 'requested' });
+    const { app, env } = makeApp(db);
+    const res = await app.request(
+      '/api/booking/admin/requests/B1?account_id=acc1',
+      {
+        method: 'PATCH',
+        body: JSON.stringify({ action: 'approve' }),
+        headers: { 'Content-Type': 'application/json' },
+      },
+      env as never,
+      execCtx,
+    );
+    expect(res.status).toBe(200);
+    // 接続未設定でも「裸のconsole.error」ではなく台帳行が残る。
+    // 失敗時はこの行が retry_wait になり /sync/retry と詳細画面から見える。
+    const op = sqlite.prepare(`SELECT kind, status FROM booking_operation_runs
+      WHERE booking_id = 'B1' AND kind = 'google_calendar'`).get() as
+      { kind: string; status: string } | undefined;
+    expect(op).toBeTruthy();
+    expect(op!.status).toBe('skipped'); // Google未接続 → skipped（失敗なら retry_wait）
+    const audit = sqlite.prepare(`SELECT action FROM booking_audit_logs
+      WHERE booking_id = 'B1'`).get() as { action: string } | undefined;
+    expect(audit?.action).toBe('status_changed');
   });
 });
 
@@ -495,6 +567,18 @@ describe('POST /api/booking/admin/bookings/:id/notifications/:runId/retry (N-393
     env as never,
     execCtx,
   );
+
+  test('実行中(queued)の行は二重送信を防いで409', async () => {
+    insertBooking(sqlite, { id: 'B1', friend: 'f1' });
+    sqlite.prepare(`INSERT INTO booking_operation_runs
+      (id, booking_id, line_account_id, kind, status, idempotency_key)
+      VALUES ('op-q','B1','acc1','confirmation_line','queued','nq1')`).run();
+    const { app, env } = makeApp(db);
+    const res = await retry(app, env, 'B1', 'op-q');
+    expect(res.status).toBe(409);
+    await expect(res.json()).resolves.toEqual({ error: 'operation_in_progress' });
+    expect(notifierMocks.sendBookingNotification).not.toHaveBeenCalled();
+  });
 
   test('成功ずみは409、対象外の種別は404、未連携予約は422', async () => {
     insertBooking(sqlite, { id: 'B1', friend: 'f1' });

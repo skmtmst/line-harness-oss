@@ -2425,7 +2425,12 @@ booking.patch('/api/booking/admin/bookings/:id', requireRole('owner', 'admin', '
   if (Number.isNaN(newStartsAt.getTime())) {
     return c.json({ error: 'invalid_starts_at' }, 422);
   }
-  if (newStartsAt.getTime() < Date.now()) {
+  // 過去チェックは「日時を実際に動かす指定」があるときだけ適用する。
+  // 開始時刻の過ぎた予約でも料金・メモ・担当修正は必要になるため、
+  // starts_at 未指定・同値指定の変更は塞がない (独立審査 必修1)。
+  const startsAtMoved = body.starts_at !== undefined
+    && newStartsAt.toISOString() !== row.starts_at;
+  if (startsAtMoved && newStartsAt.getTime() < Date.now()) {
     return c.json({ error: 'past_datetime' }, 422);
   }
   const newEndsAt = new Date(newStartsAt.getTime() + menuRow.dur * 60_000);
@@ -2484,7 +2489,9 @@ booking.patch('/api/booking/admin/bookings/:id', requireRole('owner', 'admin', '
 
   // 枠・担当・メニューが変わるときだけ空きを再照合する。
   // 変更対象の予約自身は照合から外す（同じ枠のままの変更も通せる）。
-  if (timingChanged && !(await reverifyLatestSlot(c.env.DB, c.env, {
+  // 開始時刻の過ぎた予約は、過去の空き照合が意味を持たないため
+  // 再照合を飛ばす（実施済み予約の担当修正などを塞がない）。
+  if (timingChanged && newStartsAt.getTime() >= Date.now() && !(await reverifyLatestSlot(c.env.DB, c.env, {
     lineAccountId: accountId,
     menuId: newMenuId,
     staffId: newStaffId,
@@ -2873,6 +2880,11 @@ booking.post(
     }
     if (op.status === 'skipped' || op.status === 'cancelled') {
       return c.json({ error: 'not_retryable' }, 409);
+    }
+    // 実行中（queued）の行へ手動再送すると二重送信になり得る。
+    // Google 側と同じく 409 で引く。
+    if (op.status === 'queued') {
+      return c.json({ error: 'operation_in_progress' }, 409);
     }
     let notificationKind: NotificationKind = 'approved';
     try {
@@ -4699,9 +4711,31 @@ booking.patch('/api/booking/admin/requests/:id', requireRole('owner', 'admin', '
         console.error('booking conversion record failed (approve):', error);
       }
     }
+    // N-392: LIFF予約の承認でも Google 同期を台帳へ乗せる。
+    // 裸呼び出しだと失敗がログだけに消えて /sync/retry から回収できない。
+    const approveGoogleOpId = await queueBookingOperation(c.env.DB, {
+      bookingId: id,
+      lineAccountId: accountId,
+      kind: 'google_calendar',
+      idempotencyKey: `${id}:google-calendar:create`,
+    });
     try {
-      await syncConfirmedBookingToGoogle(c.env.DB, googleCredentials(c.env), id);
+      const synced = await syncConfirmedBookingToGoogle(c.env.DB, googleCredentials(c.env), id);
+      await finishBookingOperation(c.env.DB, {
+        id: approveGoogleOpId,
+        status: synced.synced ? 'succeeded' : 'skipped',
+        completedAt: new Date().toISOString(),
+        result: { calendarSync: synced.synced ? 'synced' : 'not_configured' },
+      });
     } catch (error) {
+      // 失敗は retry_wait で台帳に残し、詳細画面・/sync/retry から回収する。
+      await finishBookingOperation(c.env.DB, {
+        id: approveGoogleOpId,
+        status: 'retry_wait',
+        completedAt: new Date().toISOString(),
+        errorCode: error instanceof Error ? error.name : 'calendar_sync_failed',
+        result: { calendarSync: 'failed' },
+      });
       console.error('Google Calendar sync (approve) failed:', error);
     }
     if (row.friend_id && approvedPolicy.send_line_confirmation) {
