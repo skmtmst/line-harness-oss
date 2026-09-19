@@ -467,14 +467,17 @@ export default function ActionScoreRulesPage() {
         {notice ? <p className="rounded-v6-control border border-v6-accent/25 bg-v6-accent-soft px-4 py-3 text-sm text-v6-accent-hover" role="status">{notice}</p> : null}
         {actionError ? <p className="rounded-v6-control border border-v6-danger/25 bg-v6-danger-bg px-4 py-3 text-sm text-v6-danger" role="alert">{actionError}</p> : null}
 
-        <div className="sticky bottom-0 z-20 mt-auto grid min-h-16 grid-cols-4 items-center rounded-v6-card border border-hairline bg-canvas/95 px-4 py-3 shadow-v6-card backdrop-blur">
+        {/*
+          #973 U046: 4列固定はやめ、上に状態文を全幅、下に押し口を折り返しで
+          並べる。狭い幅でも押し口が文を潰さない。
+        */}
+        <div className="sticky bottom-0 z-20 mt-auto rounded-v6-card border border-hairline bg-canvas/95 px-4 py-3 shadow-v6-card backdrop-blur">
           <p className="text-xs text-v6-ink-faint">{versionLabel}。公開後に起きたことから新しい点数が付きます。</p>
-          <div className="col-span-2 flex items-center justify-center gap-3">
+          <div className="mt-2 flex flex-wrap items-center justify-end gap-3">
           {configuration.currentPublishedVersionId ? <Button onClick={() => setConfirmAction({ kind: 'stop' })} disabled={!canEdit || busy}>公開中のルールを停止</Button> : null}
           <Button onClick={() => void saveDraft()} disabled={!canEdit || busy}>下書きに保存</Button>
           <Button variant="primary" onClick={() => void preparePublish()} disabled={!canEdit || busy || bundle.rules.every((rule) => !rule.enabled)}>スコアのルールを公開</Button>
           </div>
-          <span aria-hidden="true" />
         </div>
       </> : null}
 

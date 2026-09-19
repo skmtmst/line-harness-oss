@@ -854,7 +854,11 @@ export default function NewAutomationPage() {
                     </button>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-3">
+                  {/*
+                    「すること」と対象の設定は狭い幅では縦に並べる（#973 U023）。
+                    2列のままだと390pxで処理名・タグ名が読めないほど潰れる。
+                  */}
+                  <div className="grid gap-3 lg:grid-cols-2">
                   <div className={styles.field}>
                     <label className={styles.label} htmlFor={`au-action-${row.key}`}>
                       すること<span className={styles.required}>必須</span>
