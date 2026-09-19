@@ -262,7 +262,7 @@ export default function NewOperatorNotificationPage() {
         actions={<>
           <Button href="/line-notifications?tab=operator" variant="secondary">やめる</Button>
           <Button onClick={() => void saveDraft()} disabled={saving}>{saving ? '保存中…' : savedRuleId ? '保存し直す' : '下書きに保存'}</Button>
-          <Button onClick={() => void publish()} disabled={saving} variant="primary">出す</Button>
+          <Button onClick={() => void publish()} disabled={saving} variant="primary">運用者へのお知らせを公開</Button>
         </>}
       />
     </div>
