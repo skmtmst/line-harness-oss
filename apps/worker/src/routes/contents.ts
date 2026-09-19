@@ -1247,6 +1247,8 @@ contents.get('/api/media/:id/replacement-impact', requireRole('owner', 'admin'),
 });
 
 // 画面で読んだ影響は信用せず、同じ7種類を実行直前にも読み直す。
+// scope=replaceable は「置換可能な使用先だけ」を明示選択した部分実行。
+// 置き忘れ防止に、scope の省略・不正値は全件実行として扱わず 400/409 で止める。
 contents.post('/api/media/:id/replace-usages', requireRole('owner', 'admin'), async (c) => {
   try {
     const accountId = c.req.query('accountId')?.trim();
@@ -1264,6 +1266,15 @@ contents.post('/api/media/:id/replace-usages', requireRole('owner', 'admin'), as
     if (!replacementId || !expectedRevision) {
       return c.json({ success: false, error: '差し替え先と、確認した版が必要です' }, 400);
     }
+    if (body.scope !== undefined && body.scope !== null
+      && (typeof body.scope !== 'string'
+        || (body.scope.trim() !== 'all' && body.scope.trim() !== 'replaceable'))) {
+      return c.json({ success: false, error: 'scope は all か replaceable を指定してください' }, 400);
+    }
+    const scope: 'all' | 'replaceable' =
+      typeof body.scope === 'string' && body.scope.trim() === 'replaceable'
+        ? 'replaceable'
+        : 'all';
 
     const current = await replacementImpact(c, c.req.param('id'), replacementId, accountId);
     if (!current) return c.json({ success: false, error: 'Not found' }, 404);
@@ -1275,16 +1286,30 @@ contents.post('/api/media/:id/replace-usages', requireRole('owner', 'admin'), as
         data: current.impact,
       }, 409);
     }
-    if (!current.impact.canReplace || !current.plan) {
+    // 全件実行は従来どおり全使用先が置換可能なときだけ。部分実行は
+    // 置換可能な使用先が1件以上あり、かつ差し替え元・先の組み合わせが
+    // 正しいときだけ受け付ける（利用者が明示的に選んだ範囲だけを替える）。
+    const allowed = scope === 'all'
+      ? current.impact.canReplace
+      : current.impact.canPartiallyReplace;
+    if (!allowed || !current.plan) {
       return c.json({
         success: false,
         code: 'media_replacement_blocked',
-        error: '一括で差し替えられない使用先があります。表示された使用先を個別に確認してください。',
+        error: scope === 'all'
+          ? '一括で差し替えられない使用先があります。差し替え可能な箇所だけの実行を選ぶか、表示された使用先を個別に確認してください。'
+          : '差し替えられる使用先がありません。表示された使用先を個別に確認してください。',
         data: current.impact,
       }, 409);
     }
 
-    const replacedUsageCount = await applyMediaReplacementPlan(c.env.DB, current.plan, accountId);
+    const applied = await applyMediaReplacementPlan(
+      c.env.DB, current.plan, accountId, { scope },
+    );
+    auditLog(c, 'media.replace_usages', { kind: 'media', id: current.plan.source.id }, {
+      result: 'success',
+      lineAccountId: accountId,
+    });
     let remainingUsageCount: number | null = null;
     let verification: 'verified' | 'partial' | 'unavailable' = 'unavailable';
     const verifiedAt = jstNow();
@@ -1300,8 +1325,11 @@ contents.post('/api/media/:id/replace-usages', requireRole('owner', 'admin'), as
         }),
       ]);
       remainingUsageCount = (await getMediaUsages(c.env.DB, current.plan.source.id)).length;
-      verification = remainingUsageCount === 0
-        && replacedUsageCount === current.impact.replaceableCount
+      // 残るはずの件数は「置換不可として残した分」ちょうど。全件実行なら0、
+      // 部分実行なら置換不可の件数。多くても少なくても曖昧にしない。
+      const expectedRemaining = current.impact.usageCount - applied.appliedUsageCount;
+      verification = remainingUsageCount === expectedRemaining
+        && applied.changedRows === current.impact.replaceableCount
         ? 'verified'
         : 'partial';
     } catch (verifyError) {
@@ -1314,7 +1342,9 @@ contents.post('/api/media/:id/replace-usages', requireRole('owner', 'admin'), as
       data: {
         sourceId: current.plan.source.id,
         replacementId: current.plan.replacement.id,
-        replacedUsageCount,
+        mode: applied.mode,
+        replacedUsageCount: applied.changedRows,
+        skippedUsageCount: applied.skippedUsageCount,
         remainingUsageCount,
         verification,
         checkedAt: verifiedAt,
