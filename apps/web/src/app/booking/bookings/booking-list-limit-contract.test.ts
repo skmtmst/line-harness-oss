@@ -20,7 +20,7 @@ describe('予約管理の一覧上限', () => {
 
   it('LINE未連携の電話予約をnullとして扱いリンクを作らない', () => {
     expect(API).toContain('friend_id: string | null')
-    expect(DETAIL).toContain('booking.friend_id ? (')
+    expect(DETAIL).toContain('detail.customer.friendId ? (')
     expect(LIST).toContain('b.friend_id ? <Button')
   })
 
