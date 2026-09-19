@@ -777,7 +777,7 @@ export default function AutoRepliesPage() {
                         {r.isActive ? '有効' : '停止中'}
                       </span>
                       {!r.isActive && r.stopReason && (
-                        <span className="text-ink-faint mt-1 block truncate text-[10px]" title={stopNote(r) ?? ''}>
+                        <span className="text-ink-faint mt-1 block truncate text-nano" title={stopNote(r) ?? ''}>
                           {r.stopReason}
                         </span>
                       )}
