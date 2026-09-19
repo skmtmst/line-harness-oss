@@ -10,8 +10,9 @@ import Select from '@/components/shared/select'
 import SummaryCard from '@/components/shared/summary-card'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { TextField } from '@/components/shared/text-field'
-import { ApiError } from '@/lib/api'
+import { ApiError, api } from '@/lib/api'
 import { nenPetsApi, type NenPetListData, type NenPetRow, type NenPetSort, type NenPetWeightFilter } from '@/lib/nen-pets-api'
+import PetEditor from './pet-editor'
 
 type ListStatus = 'loading' | 'ready' | 'error' | 'forbidden'
 
@@ -39,6 +40,17 @@ export default function PetsTab({
   const [data, setData] = useState<NenPetListData | null>(null)
   const [draft, setDraft] = useState(query.q)
   const [page, setPage] = useState(1)
+  const [editing, setEditing] = useState<NenPetRow | null>(null)
+  // 編集口（PUT）は owner/admin だけ。staff は一覧の閲覧まで。
+  const [canEdit, setCanEdit] = useState(false)
+  useEffect(() => {
+    let active = true
+    void api.staff.me().then((response) => {
+      if (!active) return
+      setCanEdit(response.success && (response.data.role === 'owner' || response.data.role === 'admin'))
+    }).catch(() => undefined)
+    return () => { active = false }
+  }, [])
 
   const load = useCallback(async () => {
     setStatus('loading')
@@ -73,7 +85,7 @@ export default function PetsTab({
 
       <div data-design="Note" data-design-node="pets-note">
         <NoteBar tone="info">
-          「今日の目安」は 体重・年齢・避妊去勢・運動量 から公的な指針（NRC／FEDIAF）の式で計算し、「主食のカロリー」タブの kcal でグラムにします。「鹿肉」は然の商品（おやつ）の1日の目安です。ペットの登録・変更はお客様がマイページで行います。
+          「今日の目安」は 体重・年齢・避妊去勢・運動量 から公的な指針（NRC／FEDIAF）の式で計算し、「主食のカロリー」タブの kcal でグラムにします。「鹿肉」は然の商品（おやつ）の1日の目安です。ペットはお客様のマイページからも登録・変更できます。
         </NoteBar>
       </div>
 
@@ -93,7 +105,7 @@ export default function PetsTab({
           aria-label="種別で絞り込む"
           value={query.species}
           onChange={(value) => change({ species: value })}
-          options={[{ value: '', label: '種別：すべて' }, { value: 'dog', label: '種別：犬' }, { value: 'cat', label: '種別：猫' }]}
+          options={[{ value: '', label: '種別：すべて' }, { value: 'dog', label: '種別：犬' }, { value: 'cat', label: '種別：猫' }, { value: 'other', label: '種別：その他' }]}
         />
         <Select
           aria-label="主食で絞り込む"
@@ -154,20 +166,21 @@ export default function PetsTab({
                 </TableHeadRow>
               </thead>
               <tbody>
-                {data.items.map((pet) => <PetRow key={pet.id} pet={pet} />)}
+                {data.items.map((pet) => <PetRow key={pet.id} pet={pet} canEdit={canEdit} onEdit={() => setEditing(pet)} />)}
               </tbody>
             </DataTable>
             {pageCount > 1 ? <Pagination page={data.page} pageCount={pageCount} onPageChange={setPage} /> : null}
           </>
         ) : null}
       </section>
+      <PetEditor accountId={accountId} pet={editing} onClose={() => setEditing(null)} onSaved={() => void load()} />
     </>
   )
 }
 
-function PetRow({ pet }: { pet: NenPetRow }) {
+function PetRow({ pet, canEdit, onEdit }: { pet: NenPetRow; canEdit: boolean; onEdit: () => void }) {
   const initial = (pet.name || '?').slice(0, 1)
-  const kind = pet.animalType === 'cat' ? '猫' : '犬'
+  const kind = pet.animalType === 'cat' ? '猫' : pet.animalType === 'other' ? 'その他' : '犬'
   return (
     <Tr>
       <Td>
@@ -219,7 +232,10 @@ function PetRow({ pet }: { pet: NenPetRow }) {
         )}
       </Td>
       <Td align="right">
-        <Link href={`/friends/detail?id=${encodeURIComponent(pet.owner.friendId)}`} className="text-label font-semibold text-accent-deep">詳細</Link>
+        <span className="inline-flex items-center gap-3">
+          {canEdit ? <button type="button" onClick={onEdit} className="text-label font-semibold text-accent-deep">編集</button> : null}
+          <Link href={`/friends/detail?id=${encodeURIComponent(pet.owner.friendId)}`} className="text-label font-semibold text-accent-deep">詳細</Link>
+        </span>
       </Td>
     </Tr>
   )
