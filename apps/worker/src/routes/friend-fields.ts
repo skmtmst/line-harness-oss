@@ -34,7 +34,7 @@ import {
 } from '@line-crm/db';
 import { recordLoginAudit } from '@line-crm/db';
 import type { Env } from '../index.js';
-import { requireRole } from '../middleware/role-guard.js';
+import { hasStaffPermission, requireRole } from '../middleware/role-guard.js';
 import { requireVisibleFriend } from './friends.js';
 import { getVisibleLineAccountScope } from '../services/account-access.js';
 
@@ -729,7 +729,8 @@ friendFields.delete('/api/friend-fields/:id', requireRole('owner', 'admin'), asy
 
 // GET /api/friends/:id/fields
 //
-// 個人情報の項目は役割で絞る。閲覧できる人が開いたときは記録を残す。
+// 個人情報の項目は attribute.personal_info.view（またはedit）の個別権限で
+// 絞る（N-045。owner/adminは常に通る）。閲覧できる人が開いたときは記録を残す。
 friendFields.get(
   '/api/friends/:id/fields',
   requireRole('owner', 'admin', 'staff'),
@@ -738,7 +739,11 @@ friendFields.get(
     try {
       const friendId = c.req.param('id');
       const staff = c.get('staff');
-      const canSeePersonal = !!staff && (staff.role === 'owner' || staff.role === 'admin');
+      // 編集キーだけを持つ人は「読めないのに書ける」にならないよう、
+      // edit でも閲覧を認める。deny-by-defaultは鍵を持たないstaff。
+      const canSeePersonal = !!staff
+        && (hasStaffPermission(c, 'attribute.personal_info.view')
+          || hasStaffPermission(c, 'attribute.personal_info.edit'));
 
       const rows = await getFriendFieldsWithValues(c.env.DB, friendId);
       const visible = rows.filter((r) => r.is_personal === 0 || canSeePersonal);
@@ -784,10 +789,20 @@ friendFields.get(
 //
 // まとめて更新する。EC を正としている項目は書き換えず、理由を warnings で返す。
 // 黙って無視すると「保存したのに戻る」という形で表に出る。
-friendFields.put('/api/friends/:id/fields', requireRole('owner', 'admin'), requireVisibleFriend, async (c) => {
+//
+// N-045: 個人情報の項目だけ attribute.personal_info.edit を持つ staff に
+// 開ける。それ以外の項目は owner/admin のみ。staff が個人情報以外の項目を
+// 送ってきた分は保存せず warnings で返す。
+friendFields.put('/api/friends/:id/fields', requireRole('owner', 'admin', 'staff'), requireVisibleFriend, async (c) => {
   try {
     const friendId = c.req.param('id');
     const staff = c.get('staff');
+    if (!hasStaffPermission(c, 'attribute.personal_info.edit')) {
+      return c.json(
+        { success: false, error: 'この操作を実行する権限がありません' },
+        403,
+      );
+    }
     const body = await c.req.json<{ values?: Record<string, unknown> }>();
     const values = body.values ?? {};
 
@@ -803,6 +818,10 @@ friendFields.put('/api/friends/:id/fields', requireRole('owner', 'admin'), requi
       const field = byId.get(fieldId);
       if (!field) {
         warnings.push(`知らない項目が含まれていたため無視しました（${fieldId}）`);
+        continue;
+      }
+      if (staff?.role === 'staff' && field.is_personal !== 1) {
+        warnings.push(`「${field.name}」は個人情報ではないため、スタッフ権限では変更できません`);
         continue;
       }
       if (field.ec_is_master === 1) {
@@ -843,7 +862,9 @@ friendFields.put('/api/friends/:id/fields', requireRole('owner', 'admin'), requi
 // POST /api/friend-fields/bulk
 //
 // 選んだ友だち全員に同じ値を入れる。人数が多いので、上限を置く。
-friendFields.post('/api/friend-fields/bulk', requireRole('owner', 'admin'), async (c) => {
+// N-045: staff も個人情報の項目だけ、attribute.personal_info.edit を
+// 持っていれば実行できる。個人情報以外の項目は従来どおり owner/admin のみ。
+friendFields.post('/api/friend-fields/bulk', requireRole('owner', 'admin', 'staff'), async (c) => {
   try {
     const staff = c.get('staff');
     const body = await c.req.json<{ friendIds?: unknown; fieldId?: unknown; value?: unknown; lineAccountId?: unknown }>();
@@ -871,6 +892,14 @@ friendFields.post('/api/friend-fields/bulk', requireRole('owner', 'admin'), asyn
     }
     const field = await getFriendFieldByIdForScope(c.env.DB, String(body.fieldId), scope);
     if (!field) return c.json({ success: false, error: '項目が見つかりません' }, 404);
+    if (staff?.role === 'staff') {
+      if (!hasStaffPermission(c, 'attribute.personal_info.edit')) {
+        return c.json({ success: false, error: 'この操作を実行する権限がありません' }, 403);
+      }
+      if (field.is_personal !== 1) {
+        return c.json({ success: false, error: 'この項目を変更する権限がありません' }, 403);
+      }
+    }
     if (field.ec_is_master === 1) {
       return c.json(
         { success: false, error: `「${field.name}」はEC側が正のため変更できません` },

@@ -216,12 +216,18 @@ function FriendDetailInner() {
   const [richMenu, setRichMenu] = useState<{ name: string | null; isDefault: boolean } | null>(null)
   const [richMenuFailed, setRichMenuFailed] = useState(false)
   /*
-    N-037: PUT /api/friends/:id/fields はオーナー・管理者専用
-    （requireRole('owner','admin')）。staff は押すと403になるので、
-    入力欄と保存ボタンを出さず読むだけにする。localStorage の役割は
-    auth-guard が /api/auth/session から保存したもの。
+    N-045: PUT /api/friends/:id/fields はオーナー・管理者、または
+    attribute.personal_info.edit を持つ staff が個人情報の項目だけ
+    変更できる。鍵の無い staff に押すと403になる口は出さない。
+    項目の新規登録（POST /api/friend-fields）は従来どおり
+    オーナー・管理者専用。localStorage の役割は auth-guard が
+    /api/auth/session から保存したもの。
   */
-  const [canSaveFields] = useState(() => typeof window === 'undefined' ? true : isOwnerOrAdmin())
+  const [canSaveFields] = useState(() => typeof window === 'undefined' ? true : isOwnerOrAdmin() || canEditFeature('attribute.personal_info.edit'))
+  const [canManageFieldDefs] = useState(() => typeof window === 'undefined' ? true : isOwnerOrAdmin())
+  // staff は個人情報の項目だけ書ける。それ以外はサーバも受けない。
+  const canEditField = (field: FriendField) =>
+    canManageFieldDefs || (field.isPersonal && canSaveFields)
   /*
     N-035: 担当・対応状況は PUT /api/chats/:id で変えられる
     （owner/admin/staff + '/chats' 編集キー）。友だち詳細にも同じ権限で
@@ -755,7 +761,7 @@ function FriendDetailInner() {
                       ? '情報欄の項目がまだありません。'
                       : 'この分類の項目はまだありません。'}
                     {/* 項目の新規登録もオーナー・管理者専用（POST /api/friend-fields）。 */}
-                    {canSaveFields ? (
+                    {canManageFieldDefs ? (
                       <Link
                         href={`/tags/fields/new?back=/friends/detail?id=${friendId}`}
                         className="text-accent ml-1 hover:underline"
@@ -784,7 +790,7 @@ function FriendDetailInner() {
                           field={field}
                           value={values[field.id] ?? ''}
                           onChange={(v) => setValues((prev) => ({ ...prev, [field.id]: v }))}
-                          disabled={!canSaveFields}
+                          disabled={!canEditField(field)}
                         />
                         {field.ecIsMaster && (
                           <p className="text-ink-faint mt-1 text-xs">
@@ -797,7 +803,7 @@ function FriendDetailInner() {
                     {hiddenPersonalCount > 0 && (
                       <p className="text-ink-faint bg-canvas-sunken rounded-control mb-4 px-3 py-2 text-xs">
                         個人情報の項目が {hiddenPersonalCount} 件あります。
-                        表示にはオーナーまたは管理者の権限が要ります。
+                        表示には個人情報の閲覧権限が要ります。
                       </p>
                     )}
 
@@ -811,9 +817,10 @@ function FriendDetailInner() {
                     {notice && <p className="text-success mb-3 text-sm">{notice}</p>}
 
                     {/*
-                      N-037: 保存はオーナー・管理者専用。staff に編集できる
-                      見た目と押せるボタンを出すと、押した時点で403になる。
-                      値は読めるので、読み取り専用と分かる一言だけ置く。
+                      N-045: 保存はオーナー・管理者、または個人情報の編集権限を
+                      持つ staff（個人情報の項目だけ）。押すと403になる口は
+                      出さない。項目の新規登録は定義の変更なので
+                      オーナー・管理者専用のまま。
                     */}
                     {canSaveFields ? (
                       <div className="flex flex-wrap items-center gap-2">
@@ -824,16 +831,18 @@ function FriendDetailInner() {
                         >
                           {saving ? '保存中...' : '保存'}
                         </button>
-                        <Link
-                          href={`/tags/fields/new?back=/friends/detail?id=${friendId}`}
-                          className="border-hairline text-ink-secondary rounded-control hover:bg-canvas-sunken border px-4 py-2 text-sm font-medium"
-                        >
-                          項目を追加
-                        </Link>
+                        {canManageFieldDefs && (
+                          <Link
+                            href={`/tags/fields/new?back=/friends/detail?id=${friendId}`}
+                            className="border-hairline text-ink-secondary rounded-control hover:bg-canvas-sunken border px-4 py-2 text-sm font-medium"
+                          >
+                            項目を追加
+                          </Link>
+                        )}
                       </div>
                     ) : (
                       <p className="text-ink-faint text-xs">
-                        情報欄の値を保存できるのはオーナーと管理者です。
+                        情報欄の値を保存できるのはオーナー・管理者、または個人情報の編集権限を持つスタッフです。
                       </p>
                     )}
                   </>
