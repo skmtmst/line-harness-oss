@@ -7926,6 +7926,23 @@ export const api = {
       headers: { 'Idempotency-Key': idempotencyKey },
       body: JSON.stringify(body),
     }),
+    /*
+     * 機能08 点検 E-01: 専用の停止口。理由（任意）を添えて止めると、
+     * いつ・誰が・なぜ止めたかが残る。確認キーは呼び出し側で都度振る。
+     */
+    stop: (id: string, body: { reason?: string | null }, idempotencyKey: string) =>
+      fetchApi<ApiResponse<{
+        id: string;
+        isActive: boolean;
+        stoppedAt: string | null;
+        stoppedByStaffId: string | null;
+        stoppedByStaffName: string | null;
+        stopReason: string | null;
+      }>>(`/api/auto-replies/${id}/stop`, {
+        method: 'POST',
+        headers: { 'Idempotency-Key': idempotencyKey },
+        body: JSON.stringify(body),
+      }),
     list: (params?: { accountId?: string }) => {
       const query = params?.accountId ? '?accountId=' + encodeURIComponent(params.accountId) : ''
       return fetchApi<ApiResponse<Array<{
@@ -7958,6 +7975,13 @@ export const api = {
         keywordMatchMode: string;
         /** フォルダ。分けていなければ null。 */
         folderId: string | null;
+        /** 273: 'draft'（未公開）| 'published' | 'stopped'。 */
+        lifecycleStatus: string;
+        /** 機能08 点検 E-01: 最後に停止した記録。止めたことが無ければ null。 */
+        stoppedAt: string | null;
+        stoppedByStaffId: string | null;
+        stoppedByStaffName: string | null;
+        stopReason: string | null;
         /** 152: 当たった回数（今月・累計）。一覧でだけ入る。 */
         hits?: { period: number; total: number };
         /** 実行台帳で成功を確認できた後続処理の累計。 */
@@ -8001,6 +8025,13 @@ export const api = {
         keywordMatchMode: string;
         /** フォルダ。分けていなければ null。 */
         folderId: string | null;
+        /** 273: 'draft'（未公開）| 'published' | 'stopped'。 */
+        lifecycleStatus: string;
+        /** 機能08 点検 E-01: 最後に停止した記録。 */
+        stoppedAt: string | null;
+        stoppedByStaffId: string | null;
+        stoppedByStaffName: string | null;
+        stopReason: string | null;
         createdAt: string;
       }>>(`/api/auto-replies/${id}`),
     create: (body: {

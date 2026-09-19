@@ -840,7 +840,7 @@ CREATE TABLE auto_replies (
 , active_from TEXT, active_until TEXT, cooldown_minutes INTEGER, skip_when_operator_active INTEGER NOT NULL DEFAULT 0, folder_id TEXT REFERENCES folders(id) ON DELETE SET NULL, display_order INTEGER NOT NULL DEFAULT 0, priority INTEGER NOT NULL DEFAULT 0, message_kinds_json TEXT
   CHECK (message_kinds_json IS NULL OR json_valid(message_kinds_json)), friend_conditions_json TEXT
   CHECK (friend_conditions_json IS NULL OR json_valid(friend_conditions_json)), lifecycle_status TEXT NOT NULL DEFAULT 'published'
-  CHECK (lifecycle_status IN ('draft', 'published', 'stopped')), current_draft_version_id TEXT, current_published_version_id TEXT, created_from_recipe_id TEXT REFERENCES recipes(id), recipe_clone_run_id TEXT REFERENCES recipe_clone_runs(id));
+  CHECK (lifecycle_status IN ('draft', 'published', 'stopped')), current_draft_version_id TEXT, current_published_version_id TEXT, created_from_recipe_id TEXT REFERENCES recipes(id), recipe_clone_run_id TEXT REFERENCES recipe_clone_runs(id), stopped_at TEXT, stopped_by_staff_id TEXT, stop_reason TEXT, stop_idempotency_key TEXT, deleted_at TEXT, deleted_by_staff_id TEXT);
 
 CREATE TABLE auto_reply_action_runs (
   id                  TEXT PRIMARY KEY,

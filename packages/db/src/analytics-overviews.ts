@@ -841,7 +841,8 @@ async function collectUsageReferenceHealth(
          (SELECT COUNT(*) FROM auto_replies ar
             LEFT JOIN templates t ON t.id = ar.template_id
              AND (t.line_account_id = ar.line_account_id OR t.line_account_id IS NULL)
-           WHERE ar.line_account_id = ? AND ar.template_id IS NOT NULL AND t.id IS NULL)
+           WHERE ar.line_account_id = ? AND ar.template_id IS NOT NULL AND t.id IS NULL
+             AND ar.deleted_at IS NULL)
          + (SELECT COUNT(*) FROM scenario_steps ss
               JOIN scenarios s ON s.id = ss.scenario_id
               LEFT JOIN templates t ON t.id = ss.template_id
@@ -1440,7 +1441,8 @@ export async function getAnalyticsUsageOverview(
               SUM(CASE WHEN EXISTS (SELECT 1 FROM messages_log m
                     WHERE m.template_id_at_send = t.id AND m.line_account_id = ?) OR
                   EXISTS (SELECT 1 FROM auto_replies a
-                    WHERE a.template_id = t.id AND a.line_account_id = ?) OR
+                    WHERE a.template_id = t.id AND a.line_account_id = ?
+                      AND a.deleted_at IS NULL) OR
                   EXISTS (SELECT 1 FROM scenario_steps ss JOIN scenarios s ON s.id = ss.scenario_id
                     WHERE ss.template_id = t.id AND s.line_account_id = ?)
                 THEN 1 ELSE 0 END) AS in_use,

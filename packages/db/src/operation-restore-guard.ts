@@ -162,7 +162,7 @@ async function listActiveDefinitions(
         `SELECT id, updated_at AS version, NULL AS expires_at,
                 CAST(is_active AS TEXT) AS status
            FROM auto_replies
-          WHERE is_active = 1
+          WHERE is_active = 1 AND deleted_at IS NULL
           ${accountId ? 'AND (line_account_id = ? OR line_account_id IS NULL)' : ''}`,
       );
       const result = accountId
