@@ -1657,10 +1657,22 @@ export default function ScenarioDetailClient({
                       ? '配信を一時停止する'
                       : '配信を再開する'}
                 </p>
+                {/*
+                  現在値とヘルプを一致させる（U007）。以前は許可中でも
+                  「別シナリオを開始すると停止」と固定で、実挙動（他の
+                  シナリオが動いている人は登録しない、の逆）と食い違って
+                  いた。編集フォームの文言（「他のシナリオが動いている人は
+                  登録しない」）と同じ意味で、今の状態と切り替え後の影響を
+                  分けて書く。
+                */}
                 <button
                   type="button"
                   onClick={() => void handleConcurrentChange(!(scenario.allowConcurrent ?? true))}
-                  title="別のシナリオを開始すると、いま流れているシナリオは停止します。あとで戻すと、止まった続きから再開します。複数の流れを同時に届けたい場合は、1つのシナリオ内で分岐させてください。"
+                  title={
+                    (scenario.allowConcurrent ?? true)
+                      ? 'いまは同時購読を許しています。他のシナリオが動いている人にも、このシナリオを並行して流します。押すと「同時に1つだけ」へ変わり、他のシナリオが動いている人はこのシナリオに入らなくなります。'
+                      : 'いまは同時に1つだけです。他のシナリオが動いている人はこのシナリオに入りません。すでに入っている人には影響しません。押すと同時購読を許すようになります。'
+                  }
                   className="text-info mt-1 text-left text-xs hover:underline"
                 >
                   {(scenario.allowConcurrent ?? true)
