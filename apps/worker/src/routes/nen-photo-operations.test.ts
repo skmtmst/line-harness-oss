@@ -65,10 +65,16 @@ function harness(options: { permissions?: string[]; role?: 'owner' | 'admin' | '
 
 type BulkEntry = { query: string; bindings: unknown[] };
 
-function bulkHarness(options: { recipients?: string[]; failRun?: (query: string) => boolean } = {}) {
+function bulkHarness(options: {
+  recipients?: string[];
+  /** nen_ec_member_snapshots 経由で customer_id が返る写真（EC連携あり）。 */
+  ecLinked?: string[];
+  failRun?: (query: string) => boolean;
+} = {}) {
   const batches: BulkEntry[][] = [];
   const runs: BulkEntry[] = [];
   const known = new Set(options.recipients ?? []);
+  const ecLinked = new Set(options.ecLinked ?? []);
   const db = {
     prepare(query: string) {
       const entry: BulkEntry = { query, bindings: [] };
@@ -84,6 +90,8 @@ function bulkHarness(options: { recipients?: string[]; failRun?: (query: string)
             id: photoId, friend_id: 'friend-1', line_user_id: 'U1',
             line_account_id: 'account-a', is_following: 1,
             channel_access_token: 'token', channel_access_token_encrypted: null,
+            // EC会員スナップショットの customer_id（LEFT JOIN）。未連携は null。
+            customer_id: ecLinked.has(photoId) ? 'customer-1' : null,
           };
         },
         async run() {
@@ -267,7 +275,8 @@ describe('photo review operations API', () => {
         ],
       },
     });
-    const { app, runs } = bulkHarness({ recipients: ['photo-1', 'photo-2'] });
+    // EC連携ありの投稿者へはポイント手続き開始を届ける（単票と同じ文面）。
+    const { app, runs } = bulkHarness({ recipients: ['photo-1', 'photo-2'], ecLinked: ['photo-1'] });
     const response = await app.request('/api/nen-members/photos/decisions/bulk', {
       method: 'POST', headers: { 'content-type': 'application/json', 'Idempotency-Key': 'bulk-notify-1' },
       body: JSON.stringify({
@@ -309,6 +318,35 @@ describe('photo review operations API', () => {
     expect(mocks.recordBulk).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
       lineAccountId: 'account-a', actorId: 'staff-a', idempotencyKey: 'bulk-notify-1',
     }));
+  });
+
+  /*
+   * #931 N-307: EC会員とつながっていない採用はポイント手続きを始めない。
+   * 届ける文面にも「5ポイント」を書かない。一括でも単票と同じ規則。
+   */
+  it('EC未連携の採用通知はポイント文言を添えない(#931 N-307)', async () => {
+    mocks.bulk.mockResolvedValue({
+      kind: 'created',
+      result: {
+        updatedCount: 1,
+        items: [{ photoId: 'photo-1', decision: 'approve', reviewVersion: 2, decisionId: 'decision-1' }],
+      },
+    });
+    // ecLinked を渡さないので recipient.customer_id は null。
+    const { app } = bulkHarness({ recipients: ['photo-1'] });
+    const response = await app.request('/api/nen-members/photos/decisions/bulk', {
+      method: 'POST', headers: { 'content-type': 'application/json', 'Idempotency-Key': 'bulk-notify-noec' },
+      body: JSON.stringify({
+        lineAccountId: 'account-a',
+        decisions: [{ photoId: 'photo-1', decision: 'approve', expectedVersion: 1 }],
+      }),
+    });
+    expect(response.status).toBe(201);
+    expect(mocks.push).toHaveBeenCalledTimes(1);
+    const messages = mocks.push.mock.calls[0][3] as Array<{ type: string; text: string }>;
+    expect(messages[0].text).toContain('採用しました');
+    expect(messages[0].text).not.toContain('ポイント');
+    expect(messages[0].text).toContain('公開ギャラリーへ掲載します');
   });
 
   it('一部送信失敗でも残りを送り、失敗分だけ再試行対象にする', async () => {

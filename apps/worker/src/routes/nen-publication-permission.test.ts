@@ -32,8 +32,25 @@ describe('写真の掲載変更権限', () => {
     })
   })
 
-  it.each(['withdraw', 'placements'])('審査権限があると %s の入力検査まで進む', async (operation) => {
+  /*
+   * #931 N-311: 公開の撤回・掲載先の変更は、審査権限ではなく掲載管理の
+   * 上位権限（photo.publication.manage）だけでできる。審査できる人が
+   * 公開範囲まで変えられる状態を止める。
+   */
+  it.each(['withdraw', 'placements'])('審査権限だけでは %s を変更できない', async (operation) => {
     const response = await app(['photo.submission.review']).request(
+      `/api/nen-members/photos/publications/publication-1/${operation}`,
+      { method: 'PUT', headers: { 'content-type': 'application/json' }, body: '{}' },
+    )
+    expect(response.status).toBe(403)
+    await expect(response.json()).resolves.toMatchObject({
+      success: false,
+      error: 'この写真審査操作を行う権限がありません',
+    })
+  })
+
+  it.each(['withdraw', 'placements'])('掲載管理権限があると %s の入力検査まで進む', async (operation) => {
+    const response = await app(['photo.publication.manage']).request(
       `/api/nen-members/photos/publications/publication-1/${operation}`,
       { method: 'PUT', headers: { 'content-type': 'application/json' }, body: '{}' },
     )
