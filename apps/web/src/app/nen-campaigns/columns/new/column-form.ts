@@ -99,6 +99,8 @@ export function validateDraft(draft: ColumnDraft): FieldError[] {
   }
   if (draft.scheduledAt.trim() && publishedAtIso(draft.scheduledAt) === null) {
     errors.push({ field: 'scheduledAt', message: '配信日時は日付と時刻の両方を選んでください。' })
+  } else if (draft.scheduledAt.trim() && isPastScheduledAt(draft.scheduledAt)) {
+    errors.push({ field: 'scheduledAt', message: '配信日時はいまより先の日時を選んでください。' })
   }
   return errors
 }
@@ -121,6 +123,17 @@ export function publishedAtIso(value: string): string | null {
   const match = /^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})(:\d{2})?$/.exec(raw)
   if (!match) return null
   return `${match[1]}T${match[2]}${match[3] ?? ':00'}+09:00`
+}
+
+/*
+ * #935 N-304: 配信予約の日時は「いまより先」だけを通す。
+ * 過去を通すとWorkerの次のtickで即送され、「予約した」のに「今届いた」になる。
+ * Worker側の新規作成口・予約口も同じ判定で断る（ここは入力中の早い知らせ）。
+ */
+export function isPastScheduledAt(value: string, now = Date.now()): boolean {
+  const iso = publishedAtIso(value)
+  if (!iso) return false
+  return Date.parse(iso) <= now
 }
 
 export function toCreateInput(draft: ColumnDraft): NenColumnCreateInput {
@@ -149,6 +162,7 @@ const CODE_MESSAGE: Record<string, string> = {
   published_at_invalid: '公開日時をタイムゾーン付きで入力してください。',
   target_invalid: '配信対象のタグを選んでください。',
   scheduled_at_invalid: '配信日時を日本時間で入力してください。',
+  past_datetime: '配信日時はいまより先の日時を選んでください。',
   completion_invalid: '読了後の設定を確認してください。',
   payload_too_large: '入力内容が大きすぎます。本文は入力せず、外部記事のURLを指定してください。',
   column_already_exists: '同じ記事のコラムがすでにあります。一覧を読み直してください。',

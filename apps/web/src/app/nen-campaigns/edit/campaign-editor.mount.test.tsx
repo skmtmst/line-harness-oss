@@ -21,10 +21,21 @@ import { NEN_CAMPAIGN_BODY_MAX_LENGTH } from '@line-crm/shared'
 const lineAccountsListApi = vi.hoisted(() => vi.fn())
 const settingsApi = vi.hoisted(() => vi.fn())
 const updateSettingApi = vi.hoisted(() => vi.fn())
+const overviewApi = vi.hoisted(() => vi.fn())
 const formsListApi = vi.hoisted(() => vi.fn())
 const testRecipientLoginUsersApi = vi.hoisted(() => vi.fn())
 const friendFieldsListApi = vi.hoisted(() => vi.fn())
 const commonVarsListApi = vi.hoisted(() => vi.fn())
+const navigation = vi.hoisted(() => ({ push: vi.fn() }))
+
+vi.mock('next/link', () => ({
+  default: ({ href, children, ...rest }: { href: string; children?: React.ReactNode }) => (
+    <a href={href} {...rest}>{children}</a>
+  ),
+}))
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ push: navigation.push }),
+}))
 
 vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/api')>) => {
   const actual = await importOriginal()
@@ -33,7 +44,7 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
     api: {
       ...actual.api,
       lineAccounts: { ...actual.api.lineAccounts, list: lineAccountsListApi },
-      nenCampaigns: { ...actual.api.nenCampaigns, settings: settingsApi, updateSetting: updateSettingApi },
+      nenCampaigns: { ...actual.api.nenCampaigns, settings: settingsApi, updateSetting: updateSettingApi, overview: overviewApi },
       forms: { ...actual.api.forms, list: formsListApi },
       accountSettings: { ...actual.api.accountSettings, getTestRecipientLoginUsers: testRecipientLoginUsersApi },
       // InsertToolbar（差し込みツールバー）が読む。ここでは差し込みの中身は
@@ -147,6 +158,14 @@ beforeEach(() => {
     data: [{ id: ACCOUNT_ID, channelId: 'ch-1', name: 'テスト店', isActive: true, country: 'JP', role: 'owner', displayOrder: 0 }],
   })
   settingsApi.mockResolvedValue({ success: true, data: [baseSetting()] })
+  overviewApi.mockResolvedValue({
+    success: true,
+    data: {
+      activeCampaigns: 1,
+      jobs: { total: 0, pending: 0, sent: 0, failed: 0, pendingByCampaign: {} },
+      columns: 0, pets: 0, coupons: 0,
+    },
+  })
   formsListApi.mockResolvedValue({ success: true, data: [] })
   testRecipientLoginUsersApi.mockResolvedValue({ success: true, data: [] })
   updateSettingApi.mockResolvedValue({ success: true })
@@ -210,5 +229,56 @@ describe('NEN配信本文の上限4500字（実mount・Issue #659）', () => {
 
     expect(saveButton().disabled).toBe(false)
     expect(container.textContent).toContain('差し込む名前が長いと、送るときに長すぎる場合があります。')
+  })
+})
+
+describe('文言と実態の一致・書きかけの保護（実mount・#935）', () => {
+  it('N-299: 配信待ちの実数と、スナップショットの実態を言う', async () => {
+    overviewApi.mockResolvedValue({
+      success: true,
+      data: {
+        activeCampaigns: 1,
+        jobs: { total: 7, pending: 7, sent: 0, failed: 0, pendingByCampaign: { [CAMPAIGN_KEY]: 7 } },
+        columns: 0, pets: 0, coupons: 0,
+      },
+    })
+    await mount()
+
+    expect(container.textContent).toContain('配信待ちの7通は予約したときの中身のまま届きます')
+    expect(container.textContent).not.toContain('42通')
+  })
+
+  it('N-301: 書きかけで画面内リンクを押すと確認し、確認後に移動する', async () => {
+    await mount()
+    await setBody('書きかけの本文')
+
+    const link = Array.from(container.querySelectorAll('a[href]'))
+      .find((a) => a.getAttribute('href') === '/nen-campaigns?tab=auto')
+    expect(link).toBeDefined()
+    await click(link!)
+
+    // 確認対話は document.body へ portal される。
+    expect(document.body.textContent).toContain('入力中の内容があります')
+    expect(navigation.push).not.toHaveBeenCalled()
+
+    const leave = Array.from(document.body.querySelectorAll('button'))
+      .find((b) => b.textContent === '保存せずに移動')
+    await click(leave!)
+    expect(navigation.push).toHaveBeenCalledWith('/nen-campaigns?tab=auto')
+  })
+
+  it('N-301: 書きかけでブラウザを閉じる操作を止め、保存後は止めない', async () => {
+    await mount()
+    await setBody('書きかけの本文')
+
+    const leaving = new Event('beforeunload', { cancelable: true })
+    window.dispatchEvent(leaving)
+    expect(leaving.defaultPrevented).toBe(true)
+
+    await click(saveButton())
+    await settle()
+    const afterSave = new Event('beforeunload', { cancelable: true })
+    window.dispatchEvent(afterSave)
+    expect(afterSave.defaultPrevented).toBe(false)
   })
 })

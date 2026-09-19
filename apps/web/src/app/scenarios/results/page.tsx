@@ -1,16 +1,21 @@
 'use client'
 
-import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import type { Scenario, ScenarioStats, ScenarioStep } from '@line-crm/shared'
 import { api, type ScenarioRuns } from '@/lib/api'
+import { IdempotencyKeyStore } from '@/lib/idempotency-key-store'
 import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import Button from '@/components/shared/button'
+import Dialog from '@/components/shared/dialog'
 import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
+import SelectField from '@/components/shared/select-field'
+import StatusBadge from '@/components/shared/status-badge'
 import SummaryCard from '@/components/shared/summary-card'
+import { ActionCell, DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import styles from './scenario-results.module.css'
 import { scenarioReferenceData } from '@/components/scenarios/scenario-reference-data'
 
@@ -49,6 +54,19 @@ function csvCell(value: unknown): string {
   return `"${String(value ?? '').replaceAll('"', '""')}"`
 }
 
+/** この画面のパネル。見出しと説明文の組を毎回同じ構造で置く。 */
+function Panel({ title, lead, children }: { title: string; lead: string; children: ReactNode }) {
+  return (
+    <section className={styles.panel}>
+      <div className={styles.panelHead}>
+        <h2>{title}</h2>
+        <p>{lead}</p>
+      </div>
+      {children}
+    </section>
+  )
+}
+
 function ResultsInner() {
   const params = useSearchParams()
   const id = params.get('id') ?? ''
@@ -58,6 +76,18 @@ function ResultsInner() {
   const [runs, setRuns] = useState<ScenarioRuns | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  /*
+   * 友だち単位の操作（#949 N-054）。止める・再開・失敗を再送・移す。
+   * busy は「購読ID:操作」で持ち、押した行だけを止める。
+   * 確認キーは署名ごとに持ち、成功した操作だけクリアする——失敗した
+   * 再試行は同じキーで送り、サーバ側で同じ操作として処理される。
+   */
+  const [opBusy, setOpBusy] = useState<string | null>(null)
+  const [opError, setOpError] = useState('')
+  const [moveTarget, setMoveTarget] = useState<{ subscriptionId: string; friendName: string } | null>(null)
+  const [moveScenarioId, setMoveScenarioId] = useState('')
+  const [moveOptions, setMoveOptions] = useState<Scenario[] | null>(null)
+  const opKeys = useRef(new IdempotencyKeyStore())
 
   usePageTitle(scenario ? `シナリオ結果：${scenario.name}` : null)
 
@@ -134,6 +164,65 @@ function ResultsInner() {
     URL.revokeObjectURL(url)
   }
 
+  /** 購読1行への操作。成功したら runs を読み直して行の表示を新しい状態へ揃える。 */
+  const runSubscriptionOp = async (
+    subscription: { id: string; friendName: string },
+    op: 'pause' | 'resume' | 'retry',
+  ) => {
+    const signature = `${subscription.id}:${op}`
+    const key = opKeys.current.get(signature)
+    setOpBusy(signature)
+    setOpError('')
+    try {
+      const res = await api.scenarios.subscriptionOps[op](subscription.id, key)
+      if (!res.success) {
+        setOpError(`${subscription.friendName} への操作を完了できませんでした。${res.error}`)
+        return
+      }
+      opKeys.current.clear(signature)
+      await load()
+    } catch {
+      setOpError(`${subscription.friendName} への操作を完了できませんでした。時間を置いてもう一度お試しください。`)
+    } finally {
+      setOpBusy(null)
+    }
+  }
+
+  /** 「移す」の窓を開く。移し先の候補は、いま配っているシナリオ以外の稼働中だけ。 */
+  const openMoveDialog = async (subscription: { id: string; friendName: string }) => {
+    setMoveTarget({ subscriptionId: subscription.id, friendName: subscription.friendName })
+    setMoveScenarioId('')
+    setOpError('')
+    if (moveOptions === null) {
+      const res = await api.scenarios.list({ accountId: selectedAccountId || undefined }).catch(() => null)
+      setMoveOptions(res?.success ? res.data : [])
+    }
+  }
+
+  const confirmMove = async () => {
+    if (!moveTarget || !moveScenarioId) return
+    const signature = `${moveTarget.subscriptionId}:move:${moveScenarioId}`
+    const key = opKeys.current.get(signature)
+    setOpBusy(signature)
+    setOpError('')
+    try {
+      const res = await api.scenarios.subscriptionOps.move(moveTarget.subscriptionId, moveScenarioId, key)
+      if (!res.success) {
+        setOpError(res.error)
+        return
+      }
+      opKeys.current.clear(signature)
+      setMoveTarget(null)
+      await load()
+    } catch {
+      setOpError('移し替えを完了できませんでした。時間を置いてもう一度お試しください。')
+    } finally {
+      setOpBusy(null)
+    }
+  }
+
+  const moveChoices = (moveOptions ?? []).filter((item) => item.id !== id && item.isActive)
+
   return (
     <div className={styles.page} data-design-node="M2b2B">
       <div className={styles.actions}>
@@ -156,22 +245,14 @@ function ResultsInner() {
       {!loading && !error && scenario && stats ? (
         <div className={styles.columns}>
           <main className={styles.main}>
-            <section className={styles.panel}>
-              <div className={styles.panelHead}>
-                <h2>配信結果</h2>
-                <p>開始・完了・どの通まで届いたかを確認します。</p>
-              </div>
+            <Panel title="配信結果" lead="開始・完了・どの通まで届いたかを確認します。">
               <div className={styles.resultSummary}>
                 <SummaryCard variant="v6" title="開始" value={stats.enrolledTotal} unit="人" detail="このシナリオに参加した人数" />
                 <SummaryCard variant="v6" title="完了" value={stats.completed} unit="人" detail={percentLabel(stats.completed, stats.enrolledTotal)} />
               </div>
-            </section>
+            </Panel>
 
-            <section className={styles.panel}>
-              <div className={styles.panelHead}>
-                <h2>ステップ別の反応</h2>
-                <p>到達人数と、前の通から減った場所を確認できます。</p>
-              </div>
+            <Panel title="ステップ別の反応" lead="到達人数と、前の通から減った場所を確認できます。">
               <NoteBar tone="info">LINEでは通ごとの開封・クリック・失敗をすべて取得できません。取得できない指標は「—」で表示します。</NoteBar>
               {sortedSteps.length === 0 ? (
                 <ListState kind="empty" title="配信内容がまだありません" description="シナリオ編集からメッセージを追加してください。" />
@@ -196,12 +277,118 @@ function ResultsInner() {
                   })}
                 </ol>
               )}
-            </section>
+            </Panel>
+
+            {/*
+              友だち単位の購読操作（#949 N-054）。止める・再開・失敗を再送・
+              別のシナリオへ移す。止まり方（pauseReason）で「再開」と
+              「失敗を再送」を出し分ける。
+            */}
+            <Panel title="参加中の友だち" lead="届いている・止まっている購読を友だちごとに操作します。">
+              {opError ? <NoteBar tone="warn">{opError}</NoteBar> : null}
+              {!runs || runs.subscriptions.length === 0 ? (
+                <ListState
+                  kind="empty"
+                  title="購読している友だちはまだいません"
+                  description="開始条件に一致した友だちがここに並びます。"
+                />
+              ) : (
+                <DataTable>
+                  <thead>
+                    <TableHeadRow>
+                      <Th>友だち</Th>
+                      <Th className="w-32">状態</Th>
+                      <Th className="w-44">次の配信</Th>
+                      <Th className="w-72" align="right">操作</Th>
+                    </TableHeadRow>
+                  </thead>
+                  <tbody>
+                    {runs.subscriptions.map((sub) => {
+                      const pausedByFailure = sub.status === 'paused' && sub.pauseReason === 'delivery_failed'
+                      const stateLabel =
+                        sub.status === 'active'
+                          ? '配信中'
+                          : sub.status === 'delivering'
+                            ? '送信中'
+                            : sub.status === 'completed'
+                              ? '完了'
+                              : pausedByFailure
+                                ? '配信失敗で停止中'
+                                : '停止中'
+                      return (
+                        <Tr key={sub.id}>
+                          <Td>
+                            <span className="block max-w-56 truncate text-label text-ink" title={sub.friendName}>
+                              {sub.friendName}
+                            </span>
+                          </Td>
+                          <Td>
+                            <StatusBadge tone={pausedByFailure ? 'warning' : 'neutral'} size="compact">
+                              {stateLabel}
+                            </StatusBadge>
+                          </Td>
+                          <Td className="whitespace-nowrap">
+                            {sub.status === 'completed'
+                              ? '—'
+                              : sub.nextDeliveryAt ?? '—'}
+                          </Td>
+                          <ActionCell>
+                            <div className="flex flex-wrap items-center justify-end gap-3">
+                              {sub.status === 'active' ? (
+                                <button
+                                  type="button"
+                                  className="text-caption font-semibold text-accent-deep hover:underline disabled:cursor-not-allowed disabled:text-ink-faint"
+                                  disabled={opBusy !== null}
+                                  onClick={() => void runSubscriptionOp(sub, 'pause')}
+                                >
+                                  {opBusy === `${sub.id}:pause` ? '停止中…' : '止める'}
+                                </button>
+                              ) : null}
+                              {sub.status === 'paused' ? (
+                                <>
+                                  <button
+                                    type="button"
+                                    className="text-caption font-semibold text-accent-deep hover:underline disabled:cursor-not-allowed disabled:text-ink-faint"
+                                    disabled={opBusy !== null}
+                                    onClick={() => void runSubscriptionOp(sub, 'resume')}
+                                  >
+                                    {opBusy === `${sub.id}:resume` ? '再開中…' : '再開'}
+                                  </button>
+                                  {pausedByFailure ? (
+                                    <button
+                                      type="button"
+                                      className="text-caption font-semibold text-accent-deep hover:underline disabled:cursor-not-allowed disabled:text-ink-faint"
+                                      disabled={opBusy !== null}
+                                      onClick={() => void runSubscriptionOp(sub, 'retry')}
+                                    >
+                                      {opBusy === `${sub.id}:retry` ? '再送中…' : '失敗を再送'}
+                                    </button>
+                                  ) : null}
+                                </>
+                              ) : null}
+                              {sub.status === 'active' || sub.status === 'paused' ? (
+                                <button
+                                  type="button"
+                                  className="text-caption font-semibold text-accent-deep hover:underline disabled:cursor-not-allowed disabled:text-ink-faint"
+                                  disabled={opBusy !== null}
+                                  onClick={() => void openMoveDialog(sub)}
+                                >
+                                  別のシナリオへ移す
+                                </button>
+                              ) : null}
+                            </div>
+                          </ActionCell>
+                        </Tr>
+                      )
+                    })}
+                  </tbody>
+                </DataTable>
+              )}
+            </Panel>
           </main>
 
           <aside className={styles.side}>
-            <section className={styles.panel}>
-              <div className={styles.panelHead}><h2>設定サマリー</h2><p>現在の参加状況です。</p></div>
+            <Panel title="設定サマリー" lead="現在の参加状況です。">
               <dl className={styles.summaryList}>
                 <div><dt>参加中</dt><dd>{(runs ? runs.summary.active + runs.summary.delivering : stats.activeNow).toLocaleString('ja-JP')}人</dd></div>
                 <div><dt>完了</dt><dd>{(runs?.summary.completed ?? stats.completed).toLocaleString('ja-JP')}人</dd></div>
@@ -211,15 +398,75 @@ function ResultsInner() {
               <p className={styles.unavailable}>
                 {runs?.steps[0]?.failed.reason ?? '配信失敗数は、この集計からは取得できません。'}
               </p>
-            </section>
+            </Panel>
 
-            <section className={styles.panel}>
-              <div className={styles.panelHead}><h2>メッセージプレビュー</h2><p>1通目に登録されている内容です。</p></div>
+            <Panel title="メッセージプレビュー" lead="1通目に登録されている内容です。">
               <div className={styles.preview}>{messagePreview(sortedSteps[0])}</div>
-            </section>
+            </Panel>
           </aside>
         </div>
       ) : null}
+
+      {/* 「別のシナリオへ移す」の窓。移し先は稼働中の別シナリオだけ選べる。 */}
+      <Dialog
+        open={moveTarget !== null}
+        title={moveTarget ? `${moveTarget.friendName} を別のシナリオへ移す` : ''}
+        description="いまのシナリオはここで終わり、選んだシナリオの最初から届き始めます。"
+        busy={opBusy !== null}
+        error={moveTarget ? opError : ''}
+        onCancel={() => {
+          if (opBusy) return
+          setMoveTarget(null)
+          setOpError('')
+        }}
+        footer={(
+          <div className="border-hairline flex flex-wrap items-center justify-end gap-2 border-t pt-4">
+            <Button
+              type="button"
+              onClick={() => {
+                if (opBusy) return
+                setMoveTarget(null)
+                setOpError('')
+              }}
+              disabled={opBusy !== null}
+            >
+              キャンセル
+            </Button>
+            <Button
+              type="button"
+              variant="primary"
+              disabled={!moveScenarioId || opBusy !== null}
+              onClick={() => void confirmMove()}
+            >
+              {opBusy ? '移しています…' : 'このシナリオへ移す'}
+            </Button>
+          </div>
+        )}
+      >
+        <SelectField
+          value={moveScenarioId}
+          title={moveOptions === null
+            ? '読み込んでいます'
+            : moveChoices.length === 0
+              ? '移せるシナリオがありません'
+              : '移し先のシナリオを選んでください'}
+          disabled={moveOptions === null || moveChoices.length === 0 || opBusy !== null}
+          onChange={(event) => setMoveScenarioId(event.target.value)}
+          aria-label="移し先のシナリオ"
+          className="w-full"
+          options={[
+            {
+              value: '',
+              label: moveOptions === null
+                ? '読み込んでいます'
+                : moveChoices.length === 0
+                  ? '稼働中の他のシナリオがありません'
+                  : 'シナリオを選んでください',
+            },
+            ...moveChoices.map((item) => ({ value: item.id, label: item.name })),
+          ]}
+        />
+      </Dialog>
     </div>
   )
 }

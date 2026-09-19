@@ -21,6 +21,44 @@ export interface TestSendResult {
   error?: string
   /** 実際に送った通の数。 */
   sent: number
+  /** 送信先単位の間隔制限（N-057）で控えたとき true。 */
+  deduped?: boolean
+}
+
+/**
+ * 同じ送信先へのテスト送信を短い間隔で繰り返させない上限（N-057）。
+ *
+ * 連打・複数タブ・同時リクエストで実送信が重なるのを防ぐためのもので、
+ * 通常の「確認→修正→再送」の間隔（分単位）は邪魔しない。
+ */
+export const TEST_SEND_DEBOUNCE_MS = 60_000
+
+/**
+ * 送信先（友だち）× 送る対象で claim を取る。取れれば true。
+ *
+ * scenario_test_send_claims（433）へ INSERT … ON CONFLICT で1文だけ実行し、
+ * 前回の claim から debounce 窓が過ぎているときだけ claimed_at を更新する。
+ * 同時リクエストは UNIQUE 制約で片方しか通らない。
+ */
+async function claimScenarioTestSend(
+  db: D1Database,
+  friendId: string,
+  dedupeKey: string,
+): Promise<boolean> {
+  const now = new Date(Date.now() + 9 * 60 * 60_000)
+  const cutoff = new Date(now.getTime() - TEST_SEND_DEBOUNCE_MS)
+  const fmt = (d: Date) => d.toISOString().slice(0, -1) + '+09:00'
+  const result = await db
+    .prepare(
+      `INSERT INTO scenario_test_send_claims (claim_key, claimed_at)
+       VALUES (?, ?)
+       ON CONFLICT(claim_key) DO UPDATE
+         SET claimed_at = excluded.claimed_at
+         WHERE scenario_test_send_claims.claimed_at < ?`,
+    )
+    .bind(`${friendId}:${dedupeKey}`, fmt(now), fmt(cutoff))
+    .run()
+  return (result.meta.changes ?? 0) > 0
 }
 
 /**
@@ -90,11 +128,30 @@ export async function testSendSteps(
   friendId: string,
   scenarioAccountId: string | null,
   workerUrl?: string,
+  /**
+   * 送信先単位のデバウンス用キー（N-057）。呼び出し側は
+   * 「シナリオ+通」単位のキーを渡す。省略時は従来どおり制限しない
+   * （非routeの利用箇所向け後方互換）。
+   */
+  options?: { dedupeKey?: string },
 ): Promise<TestSendResult> {
   const friend = await getFriendById(db, friendId)
   if (!friend) return { ok: false, error: '送り先の友だちが見つかりません。', sent: 0 }
   if (!friend.is_following) {
     return { ok: false, error: 'この友だちはブロック中のため送れません。', sent: 0 }
+  }
+
+  // 送信前に claim を取る。取れなければ実送信も記録もしない。
+  if (options?.dedupeKey) {
+    const claimed = await claimScenarioTestSend(db, friendId, options.dedupeKey)
+    if (!claimed) {
+      return {
+        ok: false,
+        error: '同じ送信先へのテスト送信は、しばらく間をあけてから実行してください。',
+        sent: 0,
+        deduped: true,
+      }
+    }
   }
 
   // 独立審査(指摘5): 送り先の持ち主では送らない。口で決めた持ち主だけで送る。

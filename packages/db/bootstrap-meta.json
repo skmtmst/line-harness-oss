@@ -389,7 +389,10 @@
     "428_nen_photo_review_audit_fixes.sql",
     "429_platform_announcements.sql",
     "430_booking_audit_and_reminder_settings.sql",
-    "431_auto_reply_stop_and_soft_delete.sql"
+    "431_auto_reply_stop_and_soft_delete.sql",
+    "432_friend_scenario_pause_reason.sql",
+    "433_scenario_test_send_claims.sql",
+    "434_friend_scenario_op_request_fingerprint.sql"
   ],
-  "migrationCount": 390
+  "migrationCount": 393
 }

@@ -62,6 +62,9 @@ export const FEATURE_ROUTE_MANIFEST: readonly FeatureRouteMetadata[] = [
   feature('/api/support-marks', 'support_marks'),
   feature('/api/saved-searches', 'saved_searches'),
   feature('/api/scenarios', 'scenarios'),
+  // 購読1本への操作（止める・再開・失敗を再送・移す）。アカウントは
+  // requestAccountIds が購読→友だちから引く。
+  feature('/api/scenario-subscriptions', 'scenarios'),
   feature('/api/broadcasts', 'broadcasts'),
   feature('/api/broadcast-message-assets', 'broadcasts'),
   feature('/api/dedup-preview', 'broadcasts'),
@@ -369,6 +372,18 @@ async function requestAccountIds(c: Context<Env>): Promise<string[]> {
     const row = await dbFor(c.env).prepare(
       'SELECT line_account_id FROM friends WHERE id = ?',
     ).bind(decodeURIComponent(friend[1]!)).first<{ line_account_id: string | null }>();
+    if (row?.line_account_id) return [row.line_account_id];
+  }
+  // /api/scenario-subscriptions/:id/... は本体に account を載せない。
+  // 購読の友だちが属するアカウントで機能設定を見る（#949 N-054）。
+  const subscription = /^\/api\/scenario-subscriptions\/([^/]+)/.exec(c.req.path);
+  if (subscription) {
+    const row = await dbFor(c.env).prepare(
+      `SELECT f.line_account_id
+         FROM friend_scenarios fs
+         JOIN friends f ON f.id = fs.friend_id
+        WHERE fs.id = ?`,
+    ).bind(decodeURIComponent(subscription[1]!)).first<{ line_account_id: string | null }>();
     if (row?.line_account_id) return [row.line_account_id];
   }
   const staff = c.get('staff');

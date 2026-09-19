@@ -8,15 +8,17 @@ import type { DeliveryMode, Folder, Scenario } from '@line-crm/shared'
 import { ApiError, api } from '@/lib/api'
 import SelectField from '@/components/shared/select-field'
 import { usePageTitle } from '@/components/shell/page-chrome'
+import { useAccount } from '@/contexts/account-context'
 import { scenarioReferenceData } from '@/components/scenarios/scenario-reference-data'
 import './scenario-mode.css'
 
 /**
  * 配信方式の選択（設計）。
  *
- * 「＋ シナリオを作成」で名前を決めたあと、ここへ来る。**この時点で
- * シナリオは作られている**（緑の帯がそう言っている）ので、ここでは
- * 方式を選んで保存するだけ。
+ * `id` ありで来たときは既存のシナリオの方式を保存する。`id` なし
+ * （一覧の「＋ シナリオを作成」から来たとき）は**まだ行を作らず**、
+ * 名前とフォルダを決めて方式を選んだ時点ではじめて作成する
+ * （#949 N-055）。途中で閉じても一覧に空の行は残らない。
  *
  * 以前はモーダルの中で方式と名前をまとめて決めていた。並べた具体例が
  * 入りきらず、どちらを選ぶと何が変わるのかを読まずに押していた。
@@ -34,8 +36,12 @@ function ScenarioModeContent() {
   const router = useRouter()
   const params = useSearchParams()
   const id = params.get('id') ?? ''
+  const { selectedAccountId } = useAccount()
   const [scenario, setScenario] = useState<Scenario | null>(null)
-  const [scenarioState, setScenarioState] = useState<'loading' | 'ready' | 'error'>('loading')
+  // id なしは「これから作る」。読み込む行が無いので最初から入力できる。
+  const [scenarioState, setScenarioState] = useState<'loading' | 'ready' | 'error'>(
+    id ? 'loading' : 'ready',
+  )
   const [saving, setSaving] = useState<DeliveryMode | null>(null)
   const [error, setError] = useState('')
   const [name, setName] = useState('')
@@ -45,12 +51,18 @@ function ScenarioModeContent() {
   const [detailsSaving, setDetailsSaving] = useState(false)
   const detailsSavePromise = useRef<Promise<boolean> | null>(null)
 
-  /** 名前とフォルダを先に保存する。方式を選ぶ前に閉じても、分類は残る。 */
+  /**
+   * 名前とフォルダを先に保存する。方式を選ぶ前に閉じても、分類は残る。
+   *
+   * **id なし（これから作る）のときは保存先が無い**ので、入力は画面の
+   * 中に持つだけで何もしない。作るのは方式を確定したとき（#949 N-055）。
+   */
   const saveDetails = (nextFolderId = folderId): Promise<boolean> => {
+    if (!id) return Promise.resolve(true)
     if (detailsSavePromise.current) return detailsSavePromise.current
     const trimmed = name.trim()
     const nextFolder = nextFolderId || null
-    if (!id || !scenario || !trimmed) return Promise.resolve(false)
+    if (!scenario || !trimmed) return Promise.resolve(false)
     if (trimmed === scenario.name && nextFolder === (scenario.folderId ?? null)) {
       return Promise.resolve(true)
     }
@@ -86,8 +98,9 @@ function ScenarioModeContent() {
   }
 
   useEffect(() => {
-    if (!id) return
     let active = true
+    // id があるときだけ既存の行を読む。新規（id なし）は読む行が無い。
+    if (id) {
     setScenarioState('loading')
     void scenarioReferenceData.scenario(id)
       .then((res) => {
@@ -108,6 +121,7 @@ function ScenarioModeContent() {
           setScenarioState('error')
         }
       })
+    }
     setFolderState('loading')
     void api.folders.list('scenario')
       .then((res) => {
@@ -125,8 +139,37 @@ function ScenarioModeContent() {
     return () => { active = false }
   }, [id])
 
+  /**
+   * 行をまだ作っていない（id なし）ときの作成。方式を確定したこの瞬間に
+   * 初めて作るので、途中で閉じても空の行は残らない（#949 N-055）。
+   */
+  const createNew = async (mode: DeliveryMode): Promise<string | null> => {
+    const trimmed = name.trim()
+    if (!trimmed) {
+      setError('シナリオ名を入力してください')
+      return null
+    }
+    const res = await api.scenarios.create({
+      name: trimmed,
+      description: null,
+      triggerType: 'friend_add',
+      triggerTagId: null,
+      lineAccountId: selectedAccountId,
+      isActive: true,
+      deliveryMode: mode,
+      folderId: folderId || null,
+    })
+    if (!res.success) {
+      // APIの内部エラー文はそのまま出さない（画面は決まった言葉で断る）。
+      setError('シナリオを作成できませんでした。時間をおいてもう一度お試しください。')
+      return null
+    }
+    return res.data.id
+  }
+
   const choose = async (mode: DeliveryMode) => {
-    if (!id || !scenario || saving) return
+    if (saving) return
+    if (id && !scenario) return
     if (detailsSavePromise.current) {
       const saved = await detailsSavePromise.current
       if (!saved) return
@@ -139,8 +182,18 @@ function ScenarioModeContent() {
       setSaving(null)
       return
     }
-    // 名前と方式は同じ受け口で一度に保存する。
     try {
+      if (!id) {
+        // 新規。名前・フォルダ・方式をまとめて1回で作る。
+        const createdId = await createNew(mode)
+        if (!createdId) {
+          setSaving(null)
+          return
+        }
+        router.push(`/scenarios/first-step?id=${encodeURIComponent(createdId)}`)
+        return
+      }
+      // 名前と方式は同じ受け口で一度に保存する。
       const res = await api.scenarios.update(id, {
         name: trimmed,
         folderId: folderId || null,
@@ -155,26 +208,29 @@ function ScenarioModeContent() {
       // 3段目へ。設計の帯が3段なので、2段で編集画面へ放り出さない。
       router.push(`/scenarios/first-step?id=${encodeURIComponent(id)}`)
     } catch (cause) {
-      setError(scenarioModeError(cause))
+      setError(id ? scenarioModeError(cause) : 'シナリオを作成できませんでした。時間をおいてもう一度お試しください。')
       setSaving(null)
     }
   }
 
   const continueAsDraft = async () => {
-    if (!scenario || saving || detailsSaving) return
+    if (saving || detailsSaving) return
+    if (id && !scenario) return
+    if (!id) {
+      // 新規で「あとで決める」も、行を作る確定操作。方式は暫定で
+      // 「時刻で指定」（設計でおすすめの方。通が0のあいだは変えられる）。
+      setDetailsSaving(true)
+      setError('')
+      try {
+        const createdId = await createNew('absolute_time')
+        if (createdId) router.push(`/scenarios/first-step?id=${encodeURIComponent(createdId)}`)
+      } finally {
+        setDetailsSaving(false)
+      }
+      return
+    }
     const saved = await saveDetails()
     if (saved) router.push(`/scenarios/first-step?id=${encodeURIComponent(id)}`)
-  }
-
-  if (!id) {
-    return (
-      <div className="text-ink-faint py-12 text-center text-sm">
-        シナリオが指定されていません。
-        <Link href="/scenarios" className="text-accent ml-2 underline">
-          シナリオ一覧へ
-        </Link>
-      </div>
-    )
   }
 
   const selectedFolderName = folderState === 'loading'
@@ -206,7 +262,8 @@ function ScenarioModeContent() {
       <StepTrail
         label="シナリオ作成の進み方"
         items={[
-          { label: 'シナリオ情報', state: 'done' },
+          // id なしは「これから作る」。名前と方式をこの画面でまとめて決める。
+          { label: 'シナリオ情報', state: id ? 'done' : 'current' },
           { label: '配信方式', state: 'current' },
           { label: '1通目を設定', state: 'todo' },
         ]}
@@ -223,6 +280,12 @@ function ScenarioModeContent() {
             「{scenario.name}」の下書きを作成しました。続けて配信方式を選んでください。
           </p>
         )}
+        {/* id なしはまだ作っていない。確定するまで行は作らない（#949 N-055）。 */}
+        {!id && (
+          <p className="bg-info-bg text-info rounded-card px-4 py-3 text-sm">
+            シナリオ名と配信方式を決めると作成されます。途中で閉じても一覧には残りません。
+          </p>
+        )}
         {error && <p className="bg-danger-bg text-danger rounded-card px-4 py-3 text-sm">{error}</p>}
       </div>
 
@@ -236,7 +299,7 @@ function ScenarioModeContent() {
             <input
               type="text"
               value={name}
-              disabled={!scenario || detailsSaving || saving !== null}
+              disabled={(Boolean(id) && !scenario) || detailsSaving || saving !== null}
               onChange={(e) => setName(e.target.value)}
               onBlur={() => void saveDetails()}
               placeholder="例: 友だち追加ウェルカム"
@@ -249,7 +312,7 @@ function ScenarioModeContent() {
             <SelectField
               value={folderId}
               title={selectedFolderName}
-              disabled={!scenario || folderState !== 'ready' || detailsSaving || saving !== null}
+              disabled={(Boolean(id) && !scenario) || folderState !== 'ready' || detailsSaving || saving !== null}
               onChange={(event) => {
                 const nextFolderId = event.target.value
                 setFolderId(nextFolderId)
@@ -291,7 +354,7 @@ function ScenarioModeContent() {
           ]}
           heads={['当日 15:00', '翌日 20:00']}
           saving={saving}
-          disabled={!scenario || detailsSaving}
+          disabled={(Boolean(id) && !scenario) || detailsSaving}
           onChoose={choose}
           cta="時刻で作成"
         />
@@ -308,7 +371,7 @@ function ScenarioModeContent() {
             { who: '友だち B', start: '4/1 14:00 に購読開始', first: '4/1 17:00', second: '4/2 22:00', gaps: ['+3時間', '+1日と8時間'] },
           ]}
           saving={saving}
-          disabled={!scenario || detailsSaving}
+          disabled={(Boolean(id) && !scenario) || detailsSaving}
           onChoose={choose}
           cta="経過時間で作成"
         />
@@ -321,7 +384,7 @@ function ScenarioModeContent() {
         </p>
         <button
           type="button"
-          disabled={!scenario || saving !== null || detailsSaving}
+          disabled={(Boolean(id) && !scenario) || saving !== null || detailsSaving}
           onClick={() => void continueAsDraft()}
           className="text-accent ml-auto text-sm font-medium hover:underline disabled:cursor-not-allowed disabled:opacity-50"
         >

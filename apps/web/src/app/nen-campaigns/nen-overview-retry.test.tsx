@@ -81,6 +81,7 @@ function renderHistory(rows: NenDelivery[], detail: NenDeliveryDetail | null, on
         onTabChange={noop}
         settings={[]}
         columns={[]}
+        columnsTotal={0}
         kpis={null}
         flowMetrics={null}
         columnMetrics={null}
