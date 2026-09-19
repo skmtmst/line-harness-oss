@@ -342,7 +342,7 @@ const COMMON_VAR_USAGE_QUERIES: Array<{
                       THEN ar.response_content ELSE coalesce(ar.actions_json, '') END AS source_content,
                  0 AS is_historical
             FROM auto_replies ar
-           WHERE ar.line_account_id = ?
+           WHERE ar.line_account_id = ? AND ar.deleted_at IS NULL
              AND (instr(coalesce(ar.response_content, ''), ?) > 0
                OR instr(coalesce(ar.actions_json, ''), ?) > 0
                OR EXISTS (
@@ -931,7 +931,7 @@ const COMMON_VAR_REPLACEMENT_SOURCES: ReplacementSource[] = [
   { table: 'scenario_steps', kind: 'scenario', columns: ['message_content', 'message_bubbles_json', 'question_json'], sql: `SELECT ss.id, ss.message_content, ss.message_bubbles_json, ss.question_json FROM scenario_steps ss JOIN scenarios s ON s.id = ss.scenario_id WHERE s.line_account_id = ?` },
   { table: 'scenario_actions', kind: 'scenario', columns: ['config_json'], sql: `SELECT sa.id, sa.config_json FROM scenario_actions sa JOIN scenarios s ON s.id = sa.scenario_id WHERE s.line_account_id = ? AND sa.action_type = 'common_var'` },
   { table: 'reminder_steps', kind: 'reminder', columns: ['message_content'], sql: `SELECT rs.id, rs.message_content FROM reminder_steps rs JOIN reminders r ON r.id = rs.reminder_id WHERE r.line_account_id = ?` },
-  { table: 'auto_replies', kind: 'auto_reply', columns: ['response_content', 'actions_json'], sql: `SELECT id, response_content, actions_json FROM auto_replies WHERE line_account_id = ?` },
+  { table: 'auto_replies', kind: 'auto_reply', columns: ['response_content', 'actions_json'], sql: `SELECT id, response_content, actions_json FROM auto_replies WHERE line_account_id = ? AND deleted_at IS NULL` },
   { table: 'forms', kind: 'form', columns: ['on_submit_message_content', 'fields', 'layout'], sql: `SELECT DISTINCT f.id, f.on_submit_message_content, f.fields, f.layout, pv.on_submit_message_content AS published_on_submit_message_content, pv.fields AS published_fields, pv.layout AS published_layout FROM forms f JOIN form_accounts fa ON fa.form_id = f.id LEFT JOIN form_versions pv ON pv.id = f.current_published_version_id WHERE fa.line_account_id = ?` },
   { table: 'automations', kind: 'automation', columns: ['conditions', 'actions'], sql: `SELECT id, conditions, actions FROM automations WHERE line_account_id = ?` },
   { table: 'automation_versions', kind: 'automation', columns: ['trigger_config', 'condition_config', 'action_config'], sql: `SELECT v.id, v.trigger_config, v.condition_config, v.action_config FROM automation_versions v JOIN automation_definitions d ON d.id = v.automation_id WHERE d.line_account_id = ? AND v.id IN (d.current_draft_version_id, d.current_published_version_id)` },
