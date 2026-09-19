@@ -182,7 +182,9 @@ export default function CreatePage({
         <div
           data-design="Left"
           className={`bg-canvas border-hairline border ${
-            v6 ? 'rounded-card space-y-3 p-[18px]' : 'rounded-card space-y-5 p-6'
+            /* U054: 外側16pxにカード内24pxを重ねると、スマホで左右40px
+               削られる。狭い画面ではカード内も16pxにそろえる。 */
+            v6 ? 'rounded-card space-y-3 p-4 sm:p-[18px]' : 'rounded-card space-y-5 p-4 sm:p-6'
           } ${aside ? 'min-w-0 flex-1' : 'max-w-2xl'}`}
         >
           {children}

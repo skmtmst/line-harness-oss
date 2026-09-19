@@ -183,13 +183,13 @@ export default function NewOperatorNotificationPage() {
             <h2 className="mb-4 text-sm font-semibold text-ink">どんなときに知らせるか</h2>
             <div className="grid gap-4 lg:grid-cols-3">
               <Field label="きっかけ" htmlFor="operator-event" required>
-                <SelectField id="operator-event" className="w-full" value={eventType} onChange={(event) => setEventType(event.target.value)} options={[...OPERATOR_EVENT_OPTIONS]} />
+                <SelectField id="operator-event" size="full" value={eventType} onChange={(event) => setEventType(event.target.value)} options={[...OPERATOR_EVENT_OPTIONS]} />
               </Field>
               <Field label="どれくらいたまったら" htmlFor="operator-threshold">
-                <SelectField id="operator-threshold" className="w-full" value={threshold} onChange={(event) => setThreshold(event.target.value)} options={THRESHOLD_OPTIONS} />
+                <SelectField id="operator-threshold" size="full" value={threshold} onChange={(event) => setThreshold(event.target.value)} options={THRESHOLD_OPTIONS} />
               </Field>
               <Field label="重要度" htmlFor="operator-importance">
-                <SelectField id="operator-importance" className="w-full" value={importance} onChange={(event) => setImportance(event.target.value)} options={IMPORTANCE_OPTIONS} />
+                <SelectField id="operator-importance" size="full" value={importance} onChange={(event) => setImportance(event.target.value)} options={IMPORTANCE_OPTIONS} />
               </Field>
             </div>
             <div className="mt-4 max-w-xl">
@@ -202,7 +202,7 @@ export default function NewOperatorNotificationPage() {
           <section className="border-hairline bg-canvas rounded-card border p-5">
             <h2 className="text-sm font-semibold text-ink">だれが受け取るか</h2>
             <p className="mt-1 text-xs text-ink-faint">LINEログイン済みの人にだけ届きます。担当が決まっていないと届きません。</p>
-            <div className="mt-4 grid max-w-3xl gap-3 sm:grid-cols-2"><Field label="送り先" htmlFor="operator-recipient-kind"><SelectField id="operator-recipient-kind" className="w-full" value="staff" onChange={() => undefined} options={[{ value: 'staff', label: 'スタッフ' }]} /></Field><Field label="チーム" htmlFor="operator-recipient-team"><SelectField id="operator-recipient-team" className="w-full" value="all" onChange={() => undefined} options={[{ value: 'all', label: `選択中のスタッフ（${recipientIds.length}人）` }]} /></Field></div>
+            <div className="mt-4 grid max-w-3xl gap-3 sm:grid-cols-2"><Field label="送り先" htmlFor="operator-recipient-kind"><SelectField id="operator-recipient-kind" size="full" value="staff" onChange={() => undefined} options={[{ value: 'staff', label: 'スタッフ' }]} /></Field><Field label="チーム" htmlFor="operator-recipient-team"><SelectField id="operator-recipient-team" size="full" value="all" onChange={() => undefined} options={[{ value: 'all', label: `選択中のスタッフ（${recipientIds.length}人）` }]} /></Field></div>
             <div className="mt-3 flex flex-wrap gap-2">
               {recipients ? recipients.items.map((recipient) => { const selected = recipientIds.includes(recipient.id); return <label key={recipient.id} className="cursor-pointer"><input type="checkbox" className="peer sr-only" checked={selected} onChange={(event) => setRecipientIds((current) => event.target.checked ? [...current, recipient.id] : current.filter((id) => id !== recipient.id))} /><span className="inline-flex rounded-pill border border-hairline bg-canvas px-3 py-1 text-xs font-semibold text-ink-secondary peer-checked:border-accent peer-checked:bg-accent-soft peer-checked:text-accent">{recipient.name}{recipient.channels.line ? '' : '（LINE未連携）'}</span></label> }) : <p className="text-sm text-ink-faint">受け取る人を読み込んでいます…</p>}
             </div>
@@ -213,10 +213,10 @@ export default function NewOperatorNotificationPage() {
             <h2 className="mb-4 text-sm font-semibold text-ink">いつ送るか・重ならないか</h2>
             <div className="grid gap-4 sm:grid-cols-2">
               <Field label="送る時間" htmlFor="operator-schedule">
-                <SelectField id="operator-schedule" className="w-full" value={schedule} onChange={(event) => setSchedule(event.target.value)} options={SCHEDULE_OPTIONS} />
+                <SelectField id="operator-schedule" size="full" value={schedule} onChange={(event) => setSchedule(event.target.value)} options={SCHEDULE_OPTIONS} />
               </Field>
               <Field label="同じ知らせを重ねない" htmlFor="operator-dedupe">
-                <SelectField id="operator-dedupe" className="w-full" value={dedupeMinutes} onChange={(event) => setDedupeMinutes(event.target.value)} options={DEDUPE_OPTIONS} />
+                <SelectField id="operator-dedupe" size="full" value={dedupeMinutes} onChange={(event) => setDedupeMinutes(event.target.value)} options={DEDUPE_OPTIONS} />
               </Field>
             </div>
             <label className="mt-4 flex items-start gap-3 text-sm text-ink-secondary">

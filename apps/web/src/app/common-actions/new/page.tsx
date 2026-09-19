@@ -165,7 +165,9 @@ export default function NewCommonActionPage() {
               {resources.commonActions.length > 0 ? (
                 <label className="text-ink-secondary flex items-center gap-2 text-sm">
                   <span>見本から受け渡す</span>
-                  <SelectField className="min-w-48" defaultValue="" onChange={(event) => addExample(event.target.value)} options={[{ value: '', label: '選ぶ' }, ...resources.commonActions.map((item) => ({ value: item.id, label: `${item.name} v${item.version}` }))]} />
+                  {/* U063: 「名前 v版」の長い選択肢が176pxの既定幅で
+                      切れるので、行の残りを全部使う。 */}
+                  <SelectField size="full" className="min-w-48" defaultValue="" onChange={(event) => addExample(event.target.value)} options={[{ value: '', label: '選ぶ' }, ...resources.commonActions.map((item) => ({ value: item.id, label: `${item.name} v${item.version}` }))]} />
                 </label>
               ) : null}
             </div>

@@ -365,7 +365,7 @@ export default function QuestionEditor({
                     <CharCount value={choice.reply ?? ''} max={4500} />
                   </div>
                   <textarea
-                    rows={2}
+                    rows={3}
                     value={choice.reply ?? ''}
                     onChange={(e) => setChoice(index, { reply: e.target.value })}
                     placeholder="「〇〇」ですね。わかりました！"
@@ -409,7 +409,7 @@ export default function QuestionEditor({
                         <CharCount value={choice.repeatReply ?? ''} max={4500} />
                       </div>
                       <textarea
-                        rows={2}
+                        rows={3}
                         value={choice.repeatReply ?? ''}
                         onChange={(e) => setChoice(index, { repeatReply: e.target.value })}
                         placeholder="すでに押されています！"

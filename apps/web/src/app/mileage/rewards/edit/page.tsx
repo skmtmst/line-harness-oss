@@ -380,9 +380,11 @@ function MileageRewardEditorInner() {
                 : '共通アクションの版を指定します'}
               error={touched && errors.includes('交換後に渡すものを選んでください') ? '交換後に渡すものを選んでください' : undefined}
             >
+              {/* U063: 公開版の名前は長い。既定の176pxだと切れるので欄いっぱいに。 */}
               <Select
                 id="reward-action"
                 aria-label="交換後に渡すもの"
+                size="full"
                 value={form.commonActionVersionId}
                 onChange={(value) => set('commonActionVersionId', value)}
                 options={[
@@ -428,6 +430,7 @@ function MileageRewardEditorInner() {
             <Select
               id="reward-failure"
               aria-label="渡せなかったときにどうするか"
+              size="full"
               value={form.failurePolicy}
               onChange={(value) => set('failurePolicy', value as MileageRewardFailurePolicy)}
               options={FAILURE_POLICIES.map((item) => ({ value: item.value, label: item.label }))}
