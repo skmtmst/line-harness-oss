@@ -1,4 +1,5 @@
 import {
+  canRecordConversion,
   createChat,
   createFriendBulkRun,
   FriendBulkIdempotencyConflictError,
@@ -799,16 +800,35 @@ async function executeOperation(
       // なお一括ダイアログに成果タイルは無く通常はUIから到達不能だが、
       // API直接呼び出しでは実行できるため凍結は必要。
       const point = await db.prepare(
-        `SELECT name, event_type, value, version FROM conversion_points WHERE id = ?`,
+        `SELECT name, event_type, value, version, tenant_id, line_account_id FROM conversion_points WHERE id = ?`,
       ).bind(operation.conversionPointId).first<{
         name: string; event_type: string; value: number | null; version: number;
+        tenant_id: string | null; line_account_id: string | null;
       }>();
       if (!point) throw new ItemExecutionError('conversion_point_not_found', '成果地点が見つかりません', false);
+      /*
+       * N-263: 主経路(trackConversion)と同じ境界をここでも閉じる。
+       * 一括操作はAPIの直接呼び出しで任意の地点×友だちを結べるため、
+       * アカウントも統括も一致しない組合せでは成果を書かない。
+       */
+      const friendAccount = friend.line_account_id
+        ? await db.prepare(`SELECT tenant_id FROM line_accounts WHERE id = ?`)
+            .bind(friend.line_account_id).first<{ tenant_id: string | null }>()
+        : null;
+      if (!canRecordConversion(
+        point.line_account_id,
+        friend.line_account_id,
+        point.tenant_id,
+        friendAccount?.tenant_id ?? null,
+      )) {
+        throw new ItemExecutionError('conversion_account_mismatch', '成果地点と友だちの所属が違うため記録できません', false);
+      }
       await db.prepare(
         `INSERT INTO conversion_events
            (id, conversion_point_id, friend_id, metadata, created_at, approval_status,
-            point_name_snapshot, event_type_snapshot, value_snapshot, point_version_snapshot)
-         VALUES (?, ?, ?, ?, ?, 'approved', ?, ?, ?, ?)`,
+            point_name_snapshot, event_type_snapshot, value_snapshot, point_version_snapshot,
+            tenant_id)
+         VALUES (?, ?, ?, ?, ?, 'approved', ?, ?, ?, ?, ?)`,
       ).bind(
         id,
         operation.conversionPointId,
@@ -819,6 +839,7 @@ async function executeOperation(
         point.event_type,
         Number(point.value ?? 0),
         point.version,
+        point.tenant_id,
       ).run();
       return { status: 'success', before: null, after: { id } };
     }

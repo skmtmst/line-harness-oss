@@ -7440,6 +7440,8 @@ export const api = {
       deduplicationWindowDays?: number | null
       valueMode: ConversionValueMode
       fixedValue?: number | null
+      /** N-257: 取消の扱いも試算の条件に含める。 */
+      reversalPolicy?: ConversionReversalPolicy
     }, options?: { signal?: AbortSignal }) => fetchApi<ApiResponse<ConversionDefinitionPreview>>('/api/conversions/definitions/preview', {
       method: 'POST', body: JSON.stringify(data), signal: options?.signal,
     }),

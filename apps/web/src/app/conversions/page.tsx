@@ -101,6 +101,7 @@ const EVENT_TYPE_LABELS: Record<string, string> = {
 }
 
 import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
+import { useSearchParams } from 'next/navigation'
 import { AffiliatorsTab, OffersTab, ApprovalQueue } from '@/app/affiliates/tabs'
 import AffiliatePaymentTab from '@/app/affiliates/payment-tab'
 import { useAccount } from '@/contexts/account-context'
@@ -223,6 +224,13 @@ const SORT_TO_API: Record<PointSort, 'count_desc' | 'value_desc' | 'name_asc'> =
 }
 
 function ConversionsPageInner({ accountId }: { accountId: string | null }) {
+  /*
+   * N-264: 作成画面が `?highlight=<作った行のID>` で戻ってくる。
+   * 読み込んだ一覧の中でその行を見つけ、帯を出し・その頁へ移し・
+   * 行を目立たせて、どれが作ったばかりの行か分かるようにする。
+   */
+  const highlightId = useSearchParams().get('highlight')
+  const highlightRowRef = useRef<HTMLTableRowElement | null>(null)
   const [definitions, setDefinitions] = useState<ConversionDefinitionList | null>(null)
   const [summaryReport, setSummaryReport] = useState<ConversionDefinitionReport | null>(null)
   // 5000 件の安全弁で止まったときだけ KPI に注記を出す。通常は false。
@@ -526,6 +534,23 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
     if (page > pageCount) setPage(pageCount)
   }, [page, pageCount])
 
+  const highlightedPoint = useMemo(
+    () => (highlightId ? points.find((point) => point.id === highlightId) ?? null : null),
+    [points, highlightId],
+  )
+
+  // N-264: 作ったばかりの行が写っている頁へ移し、その行へ視線を運ぶ。
+  // 状態の絞り込みで外れているときは帯だけ出す(行を無理に混ぜない)。
+  useEffect(() => {
+    if (!highlightedPoint) return
+    const index = shown.findIndex((point) => point.id === highlightedPoint.id)
+    if (index >= 0) setPage(Math.floor(index / PAGE_SIZE) + 1)
+  }, [highlightedPoint, shown])
+
+  useEffect(() => {
+    highlightRowRef.current?.scrollIntoView({ block: 'center' })
+  }, [highlightedPoint, current])
+
   return (
     <div data-conversion-points-design="v6">
 
@@ -570,6 +595,15 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
       <p className="bg-info-bg text-info mb-4 rounded-control px-4 py-3 text-sm font-semibold">
         成果地点は「数え方の決めごと」です。ここで決めたものを、案件・自動応答・分析などから呼び出して使います。
       </p>
+
+      {highlightedPoint ? (
+        <p
+          role="status"
+          className="border-info bg-info-bg text-info mb-4 rounded-control border px-4 py-3 text-sm font-semibold"
+        >
+          「{highlightedPoint.name}」を保存しました。色の付いた行です。
+        </p>
+      ) : null}
 
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <Button href="/conversions/new" variant="primary">＋ 成果地点をつくる</Button>
@@ -671,7 +705,11 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
             </thead>
             <tbody className="divide-hairline divide-y">
               {current.map((point) => (
-                <tr key={point.id} className="hover:bg-canvas-sunken">
+                <tr
+                  key={point.id}
+                  ref={point.id === highlightId ? highlightRowRef : null}
+                  className={point.id === highlightId ? 'bg-accent-soft' : 'hover:bg-canvas-sunken'}
+                >
                   <td className="text-ink w-1/5 px-4 py-3 text-sm font-medium">
                     {point.name}
                     <p className="text-ink-faint mt-0.5 text-xs">{EVENT_TYPE_LABELS[point.sourceType] ?? 'その他'}</p>
@@ -699,7 +737,7 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
                     <div className="flex justify-end gap-2">
                       <Button onClick={() => setDetailTarget(point)}>中身を見る</Button>
                       <Button
-                        href={`/analytics?conversionPointId=${encodeURIComponent(point.id)}`}
+                        href={`/analytics?tab=funnel&conversionPointId=${encodeURIComponent(point.id)}&conversionPointName=${encodeURIComponent(point.name)}`}
                         variant="primary"
                       >
                         使う場所を足す
