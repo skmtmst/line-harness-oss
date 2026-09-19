@@ -9,6 +9,8 @@ import {
   deleteTag,
   updateTagMileageSettings,
   enqueueHistoricTagMileage,
+  getTagRetroactiveMileagePreview,
+  type TagRetroactiveMileagePreview,
   getTagGroups,
   getFolderById,
   deleteFolder,
@@ -256,6 +258,97 @@ function tagDefinitionResponse(detail: Awaited<ReturnType<typeof getTagDefinitio
     tag,
     automation: detail.automation,
   };
+}
+
+// ─── 既存友だちへの遡及マイル：事前計算と照合（N-047）──────────────
+//
+// 「既存の友だちにも適用する」を付けて保存するとき、クライアントが数えた
+// 人数・合計マイルではなくサーバー側で数えた結果を画面に出し、その結果と
+// 引き換えの previewToken を発行する。実行時に同じ計算をやり直して、
+// 対象やマイルがズレていたら 409 で止め、もう一度確認させる。
+const RETROACTIVE_PREVIEW_TTL_MS = 15 * 60 * 1000;
+const RETROACTIVE_TOKEN_PREFIX = 'rtv1';
+
+async function sha256Hex(text: string): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+  return Array.from(new Uint8Array(digest))
+    .map((byte) => byte.toString(16).padStart(2, '0'))
+    .join('');
+}
+
+function retroactiveSnapshot(
+  preview: TagRetroactiveMileagePreview,
+  self: number,
+  referrer: number,
+  expiresAtMs: number,
+): string {
+  return [
+    RETROACTIVE_TOKEN_PREFIX,
+    preview.tagId,
+    self,
+    referrer,
+    expiresAtMs,
+    [...preview.selfTargetIds].sort().join(','),
+    [...preview.referralTargetIds].sort().join(','),
+  ].join('|');
+}
+
+async function issueRetroactivePreviewToken(
+  preview: TagRetroactiveMileagePreview,
+  self: number,
+  referrer: number,
+): Promise<{ token: string; expiresAtMs: number }> {
+  const expiresAtMs = Date.now() + RETROACTIVE_PREVIEW_TTL_MS;
+  const token = `${RETROACTIVE_TOKEN_PREFIX}.${expiresAtMs}.${await sha256Hex(
+    retroactiveSnapshot(preview, self, referrer, expiresAtMs),
+  )}`;
+  return { token, expiresAtMs };
+}
+
+/**
+ * applyToExisting の実行を previewToken で守る。
+ * 返すのは「止めるための Response」。null なら続けてよい。
+ */
+async function requireRetroactivePreviewMatch(
+  c: Context<Env>,
+  tagId: string,
+  mileage: { self: number; referrer: number },
+  token: unknown,
+): Promise<Response | null> {
+  if (typeof token !== 'string' || token.trim() === '') {
+    return c.json({
+      success: false,
+      code: 'RETROACTIVE_PREVIEW_REQUIRED',
+      error: '遡及の前に対象と合計マイルを再計算して確認してください。',
+    }, 422);
+  }
+  const parts = token.split('.');
+  const expiresAtMs = Number(parts[1]);
+  if (parts.length !== 3 || parts[0] !== RETROACTIVE_TOKEN_PREFIX || !Number.isFinite(expiresAtMs)) {
+    return c.json({
+      success: false,
+      code: 'RETROACTIVE_PREVIEW_REQUIRED',
+      error: '遡及の前に対象と合計マイルを再計算して確認してください。',
+    }, 422);
+  }
+  if (expiresAtMs < Date.now()) {
+    return c.json({
+      success: false,
+      code: 'RETROACTIVE_PREVIEW_STALE',
+      error: '確認してから時間が経ちました。もう一度対象と合計を確認してください。',
+    }, 409);
+  }
+  const preview = await getTagRetroactiveMileagePreview(c.env.DB, tagId);
+  if (!preview) return c.json({ success: false, error: 'タグが見つかりません' }, 404);
+  const expected = await sha256Hex(retroactiveSnapshot(preview, mileage.self, mileage.referrer, expiresAtMs));
+  if (expected !== parts[2]) {
+    return c.json({
+      success: false,
+      code: 'RETROACTIVE_PREVIEW_STALE',
+      error: '確認した時点から対象や条件が変わりました。もう一度対象と合計を確認してください。',
+    }, 409);
+  }
+  return null;
 }
 
 function serializeTagGroup(row: DbTagGroup) {
@@ -825,6 +918,59 @@ tags.patch('/api/tags/reorder', requireRole('owner', 'admin'), async (c) => {
 });
 
 /**
+ * POST /api/tags/:id/retroactive-preview — 遡及実行の前に対象を数える。
+ *
+ * N-047: 「既存の友だちにも適用」を付ける前に、対象人数・付与済み除外・
+ * 紹介者対象・合計マイルをサーバー側で計算して返す。返す previewToken は
+ * PATCH /api/tags/:id や /mileage で applyToExisting を実行するときの
+ * 引き換え券で、実行時に同じ計算をやり直して一致しないと止める。
+ */
+tags.post('/api/tags/:id/retroactive-preview', requireRole('owner', 'admin'), async (c) => {
+  try {
+    const body = await c.req.json<Record<string, unknown>>().catch(() => ({} as Record<string, unknown>));
+    const detail = await visibleTag(c, c.req.param('id'));
+    if (detail instanceof Response) return detail;
+    // 所属をbodyで送った場合も、タグの所属と一致しなければ404で伏せる。
+    const requested = requestedLineAccountId(c, body);
+    if (requested && detail.line_account_id !== requested) {
+      return c.json({ success: false, error: 'Not found' }, 404);
+    }
+    // マイルを送らなければ保存済みの値で数える。画面は入力中の値を送る。
+    const mileage = parseMileage(body.mileage, false);
+    const self = mileage?.self ?? Number(detail.mileage_reward ?? 0);
+    const referrer = mileage?.referrer ?? Number(detail.referral_mileage_reward ?? 0);
+    const preview = await getTagRetroactiveMileagePreview(c.env.DB, detail.id);
+    if (!preview) return c.json({ success: false, error: 'タグが見つかりません' }, 404);
+    const { token, expiresAtMs } = await issueRetroactivePreviewToken(preview, self, referrer);
+    return c.json({
+      success: true,
+      data: {
+        tagId: preview.tagId,
+        lineAccountId: preview.lineAccountId,
+        friendCount: preview.friendIds.length,
+        selfTargets: preview.selfTargetIds.length,
+        selfExcluded: preview.selfExcludedIds.length,
+        referralTargets: preview.referralTargetIds.length,
+        referralExcluded: preview.referralExcludedIds.length,
+        selfMiles: preview.selfTargetIds.length * self,
+        referralMiles: preview.referralTargetIds.length * referrer,
+        totalMiles:
+          preview.selfTargetIds.length * self
+          + preview.referralTargetIds.length * referrer,
+        expiresAt: new Date(expiresAtMs).toISOString(),
+        previewToken: token,
+      },
+    });
+  } catch (err) {
+    // mileage の値が不正なら422で返す（PATCHと同じ扱い）。
+    const handled = tagDefinitionError(c, err);
+    if (handled) return handled;
+    console.error('POST /api/tags/:id/retroactive-preview error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+/**
  * PATCH /api/tags/:id — 名前と色を変える。
  *
  * 一覧の表からマイルの列を外して編集画面へ移したときに要るようになった。
@@ -884,6 +1030,17 @@ tags.patch('/api/tags/:id', requireRole('owner', 'admin'), async (c) => {
         body.actions ?? (body.automationDraft as Record<string, unknown> | undefined)?.actions,
       );
       if (actions) await validateTagAddedActionResources(c.env.DB, lineAccountId, actions);
+      // 遡及実行は事前計算の照合を必須にする(N-047)。確認画面で出した
+      // 対象・合計とズレていれば保存も遡及もせず409で止める。
+      const applyToExisting = body.applyToExisting === true;
+      const mileage = body.mileage === undefined ? null : parseMileage(body.mileage, true)!;
+      if (applyToExisting && mileage && (mileage.self > 0 || mileage.referrer > 0)) {
+        const blocked = await requireRetroactivePreviewMatch(
+          c, c.req.param('id'), { self: mileage.self, referrer: mileage.referrer },
+          body.previewToken,
+        );
+        if (blocked) return blocked;
+      }
       const detail = await updateTagDefinition(c.env.DB, {
         tagId: c.req.param('id'),
         lineAccountId,
@@ -909,8 +1066,6 @@ tags.patch('/api/tags/:id', requireRole('owner', 'admin'), async (c) => {
         actions,
         actorId: c.get('staff')?.id ?? null,
       });
-      const applyToExisting = body.applyToExisting === true;
-      const mileage = body.mileage === undefined ? null : parseMileage(body.mileage, true)!;
       const queued = applyToExisting && mileage && (mileage.self > 0 || mileage.referrer > 0)
         ? await enqueueHistoricTagMileage(c.env.DB, detail.tag.id)
         : 0;
@@ -940,6 +1095,7 @@ tags.patch('/api/tags/:id/mileage', requireRole('owner', 'admin'), async (c) => 
       multiplierBps?: unknown;
       multiplierPriority?: unknown;
       applyToExisting?: unknown;
+      previewToken?: unknown;
     }>();
     const rewardMiles = Number(body.rewardMiles ?? 0);
     const referralRewardMiles = Number(body.referralRewardMiles ?? 0);
@@ -965,6 +1121,15 @@ tags.patch('/api/tags/:id/mileage', requireRole('owner', 'admin'), async (c) => 
 
     const current = await visibleTag(c, c.req.param('id'));
     if (current instanceof Response) return current;
+    // 遡及実行は事前計算の照合を必須にする(N-047)。確認画面で出した
+    // 対象・合計とズレていれば保存も遡及もせず止める。
+    if (applyToExisting && (rewardMiles > 0 || referralRewardMiles > 0)) {
+      const blocked = await requireRetroactivePreviewMatch(
+        c, c.req.param('id'), { self: rewardMiles, referrer: referralRewardMiles },
+        body.previewToken,
+      );
+      if (blocked) return blocked;
+    }
     const tag = await updateTagMileageSettings(c.env.DB, c.req.param('id'), {
       rewardMiles,
       referralRewardMiles,

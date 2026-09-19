@@ -391,6 +391,7 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'POST /api/tags',
   'POST /api/tags/import',
   'POST /api/tags/import/preview',
+  'POST /api/tags/{id}/retroactive-preview',
   'POST /api/templates/{id}/publish',
   'POST /api/rich-menu-groups/{groupId}/schedule',
   'GET /api/rich-menu-groups/{groupId}/schedules',
