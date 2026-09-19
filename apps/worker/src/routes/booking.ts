@@ -37,18 +37,21 @@ import {
 import { parseBookingStaffInput, BOOKING_SETTINGS_KEY, BOOKING_STAFF_OWN_KEY, BOOKING_MENUS_KEY } from '@line-crm/shared';
 import type { Env } from '../index.js';
 import { requireRole, requirePermission, hasStaffPermission } from '../middleware/role-guard.js';
-import { cancelByTrigger, enrollByTrigger } from '../services/reminder-trigger.js';
+import { cancelByTrigger, enrollByTrigger, rescheduleByTrigger } from '../services/reminder-trigger.js';
 import { canTransition, nextStatus, type BookingAction } from '../services/booking-state.js';
 import { getAccountTimeZone, getAvailability, getStoreCapacitySnapshot, tzDateStr, tzHHMM } from '../services/availability.js';
-import { STORE_CAPACITY_GUARD_SQL, STORE_SETTINGS_VERSION_GUARD_SQL } from '../services/booking-store-capacity.js';
+import { STORE_CAPACITY_GUARD_EXCLUDE_SQL, STORE_CAPACITY_GUARD_SQL, STORE_SETTINGS_VERSION_GUARD_SQL } from '../services/booking-store-capacity.js';
 import {
+  BOOKING_RESOURCE_CAPACITY_GUARD_EXCLUDE_SQL,
   BOOKING_RESOURCE_CAPACITY_GUARD_SQL,
   bookingResourceGuardBindings,
+  bookingResourceGuardExcludeBindings,
   insertBookingWithResourceSnapshot,
 } from '../services/booking-resource-capacity.js';
 import {
   enqueueCalendarDeleteOperation,
   removeBookingFromGoogle,
+  runBookingGoogleSync,
   runCalendarDeleteOperation,
   syncConfirmedBookingToGoogle,
   verifyStaffCalendarConnection,
@@ -60,10 +63,11 @@ import {
   reserveIdempotencyResponse,
   saveIdempotencyResponse,
 } from '../services/booking-idempotency.js';
-import { sendBookingNotification } from '../services/booking-notifier.js';
+import { sendBookingNotification, type NotificationKind } from '../services/booking-notifier.js';
 import { dispatchOperatorEvent } from '../services/operator-notification-dispatch.js';
 import {
   buildConfirmationReminderSchedule,
+  getReminderTiming,
   insertConfirmationReminders,
 } from '../services/booking-confirm.js';
 import { attachTagAndFireSideEffects } from '../services/friend-tag-attach.js';
@@ -75,7 +79,11 @@ import {
 import { awardActivityMileage } from '../services/activity-mileage.js';
 import { dispatchAutomationEventWithLogging } from '../services/automation-triggers.js';
 import { applyActionScoreEvent } from '../services/action-score-events.js';
-import { recordConversionSourceEvent } from '@line-crm/db';
+import {
+  listBookingAuditLogs,
+  recordBookingAudit,
+  recordConversionSourceEvent,
+} from '@line-crm/db';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
 import {
   finishBookingOperation,
@@ -174,6 +182,8 @@ async function reverifyLatestSlot(
     staffId: string;
     startsAt: Date;
     minLeadTimeMinutes: number;
+    /** 予約変更時は変更対象を重なり判定から外す（自予約と衝突しないように）。 */
+    excludeBookingId?: string;
   },
 ): Promise<boolean> {
   const timeZone = await getAccountTimeZone(db, input.lineAccountId);
@@ -187,6 +197,7 @@ async function reverifyLatestSlot(
     now: new Date(),
     minLeadTimeMinutes: input.minLeadTimeMinutes,
     googleCredentials: googleCredentials(env),
+    excludeBookingId: input.excludeBookingId,
   });
   const slots = latest.by_staff.find((item) => item.staff_id === input.staffId)?.slots;
   return findLatestSlotForInstant(slots, input.startsAt) !== null;
@@ -442,7 +453,7 @@ async function resolveFriendId(
 async function notifyForBooking(
   db: D1Database,
   bookingId: string,
-  kind: 'requested' | 'approved' | 'rejected',
+  kind: NotificationKind,
   existingOperationId?: string,
 ): Promise<void> {
   const row = await db
@@ -762,6 +773,23 @@ booking.post('/api/liff/booking/requests', async (c) => {
     });
     return c.json(err, 409);
   }
+
+  // N-394: お客様が自分で入れた予約も履歴の起点として残す。
+  await recordBookingAudit(c.env.DB, {
+    bookingId,
+    lineAccountId: accountId,
+    action: 'created',
+    after: {
+      status: 'requested',
+      staff_id: body.staff_id,
+      menu_id: body.menu_id,
+      starts_at: startsAt.toISOString(),
+      source: 'liff',
+    },
+    actorType: 'customer',
+    actorId: friendId,
+    occurredAt: nowIso,
+  });
 
   c.executionCtx.waitUntil(
     awardActivityMileage(c.env.DB, {
@@ -1083,6 +1111,8 @@ function readBookingAdminSettings(input: Record<string, unknown>):
       approvalMode: 'automatic' | 'manual';
       holdMinutes: number;
       slotGranularityMinutes: 5 | 10 | 15 | 30 | 60;
+      reminderDayBeforeTime: string | null;
+      reminderHoursBefore: number | null;
       businessHours?: BookingBusinessHours;
     };
   }
@@ -1099,6 +1129,16 @@ function readBookingAdminSettings(input: Record<string, unknown>):
   const businessHours = Object.hasOwn(input, 'businessHours')
     ? readBookingBusinessHours(input.businessHours)
     : null;
+  // N-395: リマインダの送信時刻。null / 未指定は従来の既定
+  // (前日=24時間前、当日=2時間前)。明示するなら正しい形だけを受ける。
+  const reminderDayBeforeTime = input.reminderDayBeforeTime === undefined || input.reminderDayBeforeTime === null
+    ? null
+    : typeof input.reminderDayBeforeTime === 'string' && isClockTime(input.reminderDayBeforeTime)
+      ? input.reminderDayBeforeTime
+      : 'invalid';
+  const reminderHoursBefore = input.reminderHoursBefore === undefined || input.reminderHoursBefore === null
+    ? null
+    : integerInRange(input.reminderHoursBefore, 1, 72);
 
   if (expectedVersion === null) return { ok: false, error: 'expectedVersionが正しくありません' };
   if (!isValidTimeZone(timeZone)) return { ok: false, error: 'タイムゾーンが正しくありません' };
@@ -1114,6 +1154,12 @@ function readBookingAdminSettings(input: Record<string, unknown>):
     || !BOOKING_SLOT_GRANULARITIES.has(slotGranularityMinutes as 5 | 10 | 15 | 30 | 60)) {
     return { ok: false, error: '予約枠の間隔が正しくありません' };
   }
+  if (reminderDayBeforeTime === 'invalid') {
+    return { ok: false, error: '前日のお知らせ時刻はHH:MMで指定してください' };
+  }
+  if (input.reminderHoursBefore !== undefined && input.reminderHoursBefore !== null && reminderHoursBefore === null) {
+    return { ok: false, error: '当日のお知らせは1〜72時間前で指定してください' };
+  }
   if (businessHours && !businessHours.ok) return businessHours;
   return {
     ok: true,
@@ -1127,6 +1173,8 @@ function readBookingAdminSettings(input: Record<string, unknown>):
       approvalMode: approvalMode as 'automatic' | 'manual',
       holdMinutes,
       slotGranularityMinutes: slotGranularityMinutes as 5 | 10 | 15 | 30 | 60,
+      reminderDayBeforeTime: reminderDayBeforeTime === 'invalid' ? null : reminderDayBeforeTime,
+      reminderHoursBefore,
       ...(businessHours ? { businessHours: businessHours.value } : {}),
     },
   };
@@ -2175,8 +2223,16 @@ booking.get('/api/booking/admin/reminder-preview', async (c) => {
   if (!accountId) return c.json({ error: 'missing_account_id' }, 400);
   const startsAt = new Date(c.req.query('starts_at') ?? '');
   if (Number.isNaN(startsAt.getTime())) return c.json({ error: 'invalid_starts_at' }, 400);
+  // N-395: 店舗ごとの設定時刻で予定を出す。設定が無い店舗は従来の既定値。
+  const timing = await getReminderTiming(c.env.DB, accountId);
   return c.json({
-    reminders: buildConfirmationReminderSchedule({ startsAt, now: new Date() }),
+    reminders: buildConfirmationReminderSchedule({
+      startsAt,
+      now: new Date(),
+      reminderHoursBefore: timing.reminderHoursBefore,
+      dayBeforeTime: timing.dayBeforeTime,
+      timeZone: timing.timeZone,
+    }),
   });
 });
 
@@ -2190,6 +2246,672 @@ booking.get('/api/booking/admin/bookings/:id', async (c) => {
   if (!bookingDetail) return c.json({ error: 'booking_not_found' }, 404);
   return c.json({ booking: bookingDetail });
 });
+
+// ---- 予約の変更履歴 (N-394) ----
+
+interface BookingNotificationPolicy {
+  send_line_confirmation: boolean;
+  day_before: boolean;
+  hours_before: boolean;
+}
+
+const NOTIFICATION_POLICY_KEYS = ['send_line_confirmation', 'day_before', 'hours_before'] as const;
+
+/**
+ * 保存ずみの通知方針を読む。未保存の旧予約 (snapshot='{}') は
+ * 「連携済みなら全部送る」従来挙動に合わせて全て true とみなす。
+ */
+function readNotificationPolicySnapshot(raw: string | null): BookingNotificationPolicy {
+  let parsed: Record<string, unknown> = {};
+  try {
+    const value = raw ? JSON.parse(raw) : {};
+    if (value && typeof value === 'object' && !Array.isArray(value)) {
+      parsed = value as Record<string, unknown>;
+    }
+  } catch {
+    /* 壊れた snapshot は既定値へ倒す */
+  }
+  return {
+    send_line_confirmation: parsed.send_line_confirmation !== false,
+    day_before: parsed.day_before !== false,
+    hours_before: parsed.hours_before !== false,
+  };
+}
+
+/** 通知方針の変更分だけを受け取る。不明なキー・非booleanは拒否する。 */
+function readNotificationPolicyPatch(raw: unknown):
+  | { ok: true; value: Partial<BookingNotificationPolicy> }
+  | { ok: false } {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return { ok: false };
+  const input = raw as Record<string, unknown>;
+  const unknown = Object.keys(input).find(
+    (key) => !(NOTIFICATION_POLICY_KEYS as readonly string[]).includes(key),
+  );
+  if (unknown) return { ok: false };
+  const out: Partial<BookingNotificationPolicy> = {};
+  for (const key of NOTIFICATION_POLICY_KEYS) {
+    if (Object.hasOwn(input, key)) {
+      if (typeof input[key] !== 'boolean') return { ok: false };
+      out[key] = input[key] as boolean;
+    }
+  }
+  return { ok: true, value: out };
+}
+
+/** 監査行の actor を操作者 (管理画面のスタッフ) から作る。 */
+function staffAuditActor(c: Context<Env>) {
+  const staff = c.get('staff');
+  return {
+    actorType: 'staff' as const,
+    actorId: staff?.id ?? null,
+    actorName: staff?.name ?? null,
+  };
+}
+
+booking.get('/api/booking/admin/bookings/:id/audit-logs', async (c) => {
+  const accountId = await resolveAccountIdAdmin(c);
+  if (!accountId) return c.json({ error: 'missing_account_id' }, 400);
+  const bookingId = c.req.param('id');
+  const exists = await c.env.DB
+    .prepare(`SELECT 1 AS ok FROM bookings WHERE id = ? AND line_account_id = ?`)
+    .bind(bookingId, accountId)
+    .first<{ ok: number }>();
+  if (!exists) return c.json({ error: 'booking_not_found' }, 404);
+  const limit = Math.min(200, Math.max(1, Number.parseInt(c.req.query('limit') || '100', 10) || 100));
+  const logs = await listBookingAuditLogs(c.env.DB, { bookingId, lineAccountId: accountId, limit });
+  return c.json({ audit_logs: logs });
+});
+
+/**
+ * 予約内容の変更 (N-389)。日時・担当・メニュー・料金・メモ・通知方針を変える。
+ *
+ * - `lock_version` 必須。版が古い・状態が変わっていれば 409。
+ * - 新しい枠の確保と旧枠の解放は同じ UPDATE のガードで一体化する。
+ *   変更対象そのものは重なり判定・席数・資源の各ガードから外す
+ *   （自予約と衝突して全部の変更が通らなくなるため）。
+ * - 外部反映（Google・変更通知・リマインダ再作成）の失敗で予約は
+ *   巻き戻さない。台帳に retry_wait/failed を残し、再試行口から回収する。
+ */
+booking.patch('/api/booking/admin/bookings/:id', requireRole('owner', 'admin', 'staff'), async (c) => {
+  const accountId = await resolveAccountIdAdmin(c);
+  if (!accountId) return c.json({ error: 'missing_account_id' }, 400);
+  const bookingId = c.req.param('id');
+  const body = await c.req.json<{
+    lock_version?: unknown;
+    menu_id?: string;
+    staff_id?: string;
+    starts_at?: string;
+    price?: unknown;
+    customer_note?: unknown;
+    internal_note?: unknown;
+    notification_policy?: unknown;
+    send_change_notification?: unknown;
+    reason?: unknown;
+  }>().catch(() => null);
+  if (!body) return c.json({ error: 'invalid_json' }, 400);
+  if (!Number.isInteger(body.lock_version) || Number(body.lock_version) < 0) {
+    return c.json({ error: 'missing_lock_version' }, 400);
+  }
+  const expectedVersion = Number(body.lock_version);
+  const row = await c.env.DB
+    .prepare(
+      `SELECT id, status, friend_id, booking_customer_id, staff_id, menu_id,
+              starts_at, price_at_booking, customer_note, internal_note,
+              lock_version, notification_policy_snapshot
+         FROM bookings WHERE id = ? AND line_account_id = ?`,
+    )
+    .bind(bookingId, accountId)
+    .first<{
+      id: string;
+      status: BookingStatus;
+      friend_id: string | null;
+      booking_customer_id: string | null;
+      staff_id: string;
+      menu_id: string;
+      starts_at: string;
+      price_at_booking: number;
+      customer_note: string | null;
+      internal_note: string | null;
+      lock_version: number;
+      notification_policy_snapshot: string | null;
+    }>();
+  if (!row) return c.json({ error: 'booking_not_found' }, 404);
+  if (row.status !== 'requested' && row.status !== 'confirmed') {
+    return c.json({ error: 'not_editable' }, 409);
+  }
+  if (Number(row.lock_version) !== expectedVersion) {
+    return c.json({ error: 'version_conflict' }, 409);
+  }
+  const editable = ['menu_id', 'staff_id', 'starts_at', 'price', 'customer_note', 'internal_note', 'notification_policy'];
+  if (!editable.some((key) => Object.hasOwn(body, key))) {
+    return c.json({ error: 'nothing_to_update' }, 400);
+  }
+
+  const newStaffId = typeof body.staff_id === 'string' && body.staff_id.trim()
+    ? body.staff_id.trim()
+    : row.staff_id;
+  const newMenuId = typeof body.menu_id === 'string' && body.menu_id.trim()
+    ? body.menu_id.trim()
+    : row.menu_id;
+  if (!(await assertStaffInAccount(c.env.DB, newStaffId, accountId))) {
+    return c.json({ error: 'staff_not_found' }, 404);
+  }
+  const menuRow = await c.env.DB
+    .prepare(
+      `SELECT m.id, m.duration_minutes, m.buffer_after_minutes, m.base_price,
+              m.concurrent_capacity,
+              COALESCE(sm.override_duration_minutes, m.duration_minutes) AS dur,
+              COALESCE(sm.override_price, m.base_price) AS price,
+              sm.is_offered
+         FROM menus m
+         LEFT JOIN staff_menus sm ON sm.menu_id = m.id AND sm.staff_id = ?2
+        WHERE m.id = ?1 AND m.line_account_id = ?3
+          AND m.deleted_at IS NULL AND m.is_active = 1`,
+    )
+    .bind(newMenuId, newStaffId, accountId)
+    .first<{
+      duration_minutes: number;
+      buffer_after_minutes: number;
+      concurrent_capacity: number;
+      dur: number;
+      price: number;
+      is_offered: number | null;
+    }>();
+  if (!menuRow || menuRow.is_offered !== 1) {
+    return c.json({ error: 'menu_not_offered' }, 422);
+  }
+
+  const newStartsAt = body.starts_at !== undefined ? new Date(String(body.starts_at)) : new Date(row.starts_at);
+  if (Number.isNaN(newStartsAt.getTime())) {
+    return c.json({ error: 'invalid_starts_at' }, 422);
+  }
+  if (newStartsAt.getTime() < Date.now()) {
+    return c.json({ error: 'past_datetime' }, 422);
+  }
+  const newEndsAt = new Date(newStartsAt.getTime() + menuRow.dur * 60_000);
+  const newBlockEndsAt = new Date(newEndsAt.getTime() + menuRow.buffer_after_minutes * 60_000);
+
+  let newPrice = Number(row.price_at_booking);
+  if (body.price !== undefined) {
+    if (!Number.isInteger(body.price) || Number(body.price) < 0 || Number(body.price) > 100_000_000) {
+      return c.json({ error: 'invalid_price' }, 422);
+    }
+    newPrice = Number(body.price);
+  } else if (newMenuId !== row.menu_id) {
+    // メニューを変えて料金の指定が無いときは、その担当の提示価格へ付け替える。
+    // 旧メニューの価格を残すと請求とメニューが食い違う。
+    newPrice = Number(menuRow.price);
+  }
+
+  const newCustomerNote = body.customer_note === undefined
+    ? row.customer_note
+    : body.customer_note === null ? null : String(body.customer_note).slice(0, 2_000);
+  const newInternalNote = body.internal_note === undefined
+    ? row.internal_note
+    : body.internal_note === null ? null : String(body.internal_note).slice(0, 2_000);
+
+  const prevPolicy = readNotificationPolicySnapshot(row.notification_policy_snapshot);
+  let policyPatch: Partial<BookingNotificationPolicy> = {};
+  if (body.notification_policy !== undefined) {
+    const parsed = readNotificationPolicyPatch(body.notification_policy);
+    if (!parsed.ok) return c.json({ error: 'invalid_notification_policy' }, 422);
+    policyPatch = parsed.value;
+  }
+  const newPolicy: BookingNotificationPolicy = {
+    send_line_confirmation: policyPatch.send_line_confirmation ?? prevPolicy.send_line_confirmation,
+    day_before: policyPatch.day_before ?? prevPolicy.day_before,
+    hours_before: policyPatch.hours_before ?? prevPolicy.hours_before,
+  };
+  // LINE未連携の予約へ送信を明示的にオンにはできない (作成時と同じ422)。
+  // 指定が無いまま残った旧値も、この時点で実態に合わせて畳む。
+  if (!row.friend_id) {
+    if (policyPatch.send_line_confirmation === true
+      || policyPatch.day_before === true
+      || policyPatch.hours_before === true) {
+      return c.json({ error: 'line_notification_unavailable' }, 422);
+    }
+    newPolicy.send_line_confirmation = false;
+    newPolicy.day_before = false;
+    newPolicy.hours_before = false;
+  }
+  const newPolicyJson = JSON.stringify(newPolicy);
+
+  const timingChanged = newStartsAt.toISOString() !== row.starts_at
+    || newStaffId !== row.staff_id
+    || newMenuId !== row.menu_id;
+  const policyChanged = newPolicyJson !== (row.notification_policy_snapshot ?? '{}')
+    && JSON.stringify(prevPolicy) !== newPolicyJson;
+
+  // 枠・担当・メニューが変わるときだけ空きを再照合する。
+  // 変更対象の予約自身は照合から外す（同じ枠のままの変更も通せる）。
+  if (timingChanged && !(await reverifyLatestSlot(c.env.DB, c.env, {
+    lineAccountId: accountId,
+    menuId: newMenuId,
+    staffId: newStaffId,
+    startsAt: newStartsAt,
+    minLeadTimeMinutes: 0,
+    excludeBookingId: bookingId,
+  }))) {
+    const alternatives = await bookingConflictAlternatives(c.env.DB, c.env, {
+      lineAccountId: accountId,
+      menuId: newMenuId,
+      staffId: newStaffId,
+      startsAt: newStartsAt,
+      durationMinutes: menuRow.dur,
+    });
+    return c.json({ error: 'slot_not_available', data: alternatives }, 409);
+  }
+  const storeCapacity = await getStoreCapacitySnapshot(c.env.DB, accountId, newStartsAt, newBlockEndsAt);
+
+  const nowIso = new Date().toISOString();
+  const newVersion = expectedVersion + 1;
+  // 新しい枠の確保と旧枠の解放を1文で行う。lock_version + 状態 + 重なり +
+  // 席数 + 営業時間版 + 資源を同時に確かめ、どれか外れれば 0 行更新になる。
+  const update = c.env.DB.prepare(
+    `UPDATE bookings SET
+        staff_id = ?, menu_id = ?, starts_at = ?, ends_at = ?, block_ends_at = ?,
+        price_at_booking = ?, customer_note = ?, internal_note = ?,
+        notification_policy_snapshot = ?, updated_by_staff_id = ?,
+        lock_version = lock_version + 1,
+        updated_at = strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')
+      WHERE id = ? AND line_account_id = ?
+        AND lock_version = ? AND status IN ('requested','confirmed')
+        AND NOT EXISTS (
+          -- 別メニューの予約は、定員に関係なく1件でも塞ぐ。
+          SELECT 1 FROM bookings
+           WHERE staff_id = ?
+             AND status IN ('requested','confirmed')
+             AND starts_at < ?
+             AND block_ends_at > ?
+             AND menu_id != ?
+             AND id != ?
+        )
+        AND (
+          -- 同じメニューは同時受付数まで重ねられる（自予約は数えない）。
+          SELECT COUNT(*) FROM bookings
+           WHERE staff_id = ?
+             AND status IN ('requested','confirmed')
+             AND starts_at < ?
+             AND block_ends_at > ?
+             AND menu_id = ?
+             AND id != ?
+        ) < ?
+        ${STORE_CAPACITY_GUARD_EXCLUDE_SQL}
+        ${STORE_SETTINGS_VERSION_GUARD_SQL}
+        ${BOOKING_RESOURCE_CAPACITY_GUARD_EXCLUDE_SQL}`,
+  ).bind(
+    newStaffId,
+    newMenuId,
+    newStartsAt.toISOString(),
+    newEndsAt.toISOString(),
+    newBlockEndsAt.toISOString(),
+    newPrice,
+    newCustomerNote,
+    newInternalNote,
+    newPolicyJson,
+    c.get('staff').id,
+    bookingId,
+    accountId,
+    expectedVersion,
+    // 別メニューの重なりを見る副問い合わせ
+    newStaffId,
+    newBlockEndsAt.toISOString(),
+    newStartsAt.toISOString(),
+    newMenuId,
+    bookingId,
+    // 同じメニューの件数を数える副問い合わせ
+    newStaffId,
+    newBlockEndsAt.toISOString(),
+    newStartsAt.toISOString(),
+    newMenuId,
+    bookingId,
+    Math.max(1, menuRow.concurrent_capacity ?? 1),
+    // 席数ガード（自予約除外版）
+    JSON.stringify(storeCapacity.windows), accountId, bookingId, accountId, bookingId,
+    // 営業時間版ガード
+    accountId, storeCapacity.settingsVersion,
+    ...bookingResourceGuardExcludeBindings({
+      menuId: newMenuId,
+      lineAccountId: accountId,
+      excludeBookingId: bookingId,
+      startsAt: newStartsAt.toISOString(),
+      blockEndsAt: newBlockEndsAt.toISOString(),
+    }),
+  );
+  const statements: D1PreparedStatement[] = [update];
+  if (newMenuId !== row.menu_id) {
+    // メニューが変わったときだけ資源消費のsnapshotを取り直す。
+    // UPDATE が 0 行 (競合・版ずれ) のときは EXISTS が不成立になり、
+    // 古い snapshot を消さない。
+    statements.push(
+      c.env.DB.prepare(
+        `DELETE FROM booking_resource_consumptions
+          WHERE booking_id = ?
+            AND EXISTS (
+              SELECT 1 FROM bookings b
+               WHERE b.id = ? AND b.menu_id = ? AND b.lock_version = ?
+            )`,
+      ).bind(bookingId, bookingId, newMenuId, newVersion),
+      c.env.DB.prepare(
+        `INSERT INTO booking_resource_consumptions (
+            booking_id, line_account_id, resource_id, quantity, snapshot_source)
+         SELECT ?, ?, mr.resource_id, mr.quantity, 'booking'
+           FROM booking_menu_resources mr
+           INNER JOIN booking_resources r ON r.id = mr.resource_id
+          WHERE mr.menu_id = ?
+            AND r.line_account_id = ?
+            AND r.is_active = 1
+            AND EXISTS (
+              SELECT 1 FROM bookings b
+               WHERE b.id = ? AND b.menu_id = ? AND b.lock_version = ?
+            )`,
+      ).bind(bookingId, accountId, newMenuId, accountId, bookingId, newMenuId, newVersion),
+    );
+  }
+  const results = await c.env.DB.batch(statements);
+  if ((results[0]?.meta?.changes ?? 0) === 0) {
+    const current = await c.env.DB
+      .prepare(`SELECT lock_version, status FROM bookings WHERE id = ? AND line_account_id = ?`)
+      .bind(bookingId, accountId)
+      .first<{ lock_version: number; status: string }>();
+    if (!current) return c.json({ error: 'booking_not_found' }, 404);
+    if (Number(current.lock_version) !== expectedVersion
+      || (current.status !== 'requested' && current.status !== 'confirmed')) {
+      return c.json({ error: 'version_conflict' }, 409);
+    }
+    const alternatives = await bookingConflictAlternatives(c.env.DB, c.env, {
+      lineAccountId: accountId,
+      menuId: newMenuId,
+      staffId: newStaffId,
+      startsAt: newStartsAt,
+      durationMinutes: menuRow.dur,
+    });
+    return c.json({ error: 'slot_conflict', data: alternatives }, 409);
+  }
+
+  // ---- 監査履歴 (N-394): 変わった項目だけ before/after で残す ----
+  const before: Record<string, unknown> = {};
+  const after: Record<string, unknown> = {};
+  const diff = (key: string, oldValue: unknown, newValue: unknown) => {
+    if (oldValue !== newValue) {
+      before[key] = oldValue;
+      after[key] = newValue;
+    }
+  };
+  diff('starts_at', row.starts_at, newStartsAt.toISOString());
+  diff('staff_id', row.staff_id, newStaffId);
+  diff('menu_id', row.menu_id, newMenuId);
+  diff('price', Number(row.price_at_booking), newPrice);
+  diff('customer_note', row.customer_note, newCustomerNote);
+  diff('internal_note', row.internal_note, newInternalNote);
+  if (JSON.stringify(prevPolicy) !== newPolicyJson) {
+    before.notification_policy = prevPolicy;
+    after.notification_policy = newPolicy;
+  }
+  await recordBookingAudit(c.env.DB, {
+    bookingId,
+    lineAccountId: accountId,
+    action: 'updated',
+    before,
+    after,
+    reason: typeof body.reason === 'string' ? body.reason.slice(0, 200) : null,
+    ...staffAuditActor(c),
+    occurredAt: nowIso,
+  });
+
+  // ---- リマインダ再作成: 未送信だけ止めて新しい予定を作る ----
+  // 日時・担当・メニューが変わったか、通知方針が変わったとき。
+  // 送信済みの履歴は残す。LINE未連携の予約では行を作らない
+  // (送信クエリが friends INNER JOIN のため、未連携行は宙に浮く)。
+  let remindersCreated = 0;
+  if (timingChanged || policyChanged) {
+    await cancelLegacyBookingReminders(c.env.DB, bookingId);
+    const friendId = row.friend_id;
+    if (friendId) {
+      const timing = await getReminderTiming(c.env.DB, accountId);
+      remindersCreated = await insertConfirmationReminders(c.env.DB, {
+        bookingId,
+        startsAt: newStartsAt,
+        now: new Date(),
+        reminderHoursBefore: timing.reminderHoursBefore,
+        dayBeforeTime: timing.dayBeforeTime,
+        timeZone: timing.timeZone,
+        kinds: { dayBefore: newPolicy.day_before, hoursBefore: newPolicy.hours_before },
+      });
+      // V6 トリガ連動。変更は「新しい起点へ移す」ので cancel ではなく
+      // reschedule を使う。失敗しても予約変更は成立済みなので落とさない。
+      if (newPolicy.day_before || newPolicy.hours_before) {
+        if (newStartsAt.toISOString() !== row.starts_at) {
+          c.executionCtx.waitUntil(
+            rescheduleByTrigger(c.env.DB, {
+              triggerType: 'booking',
+              sourceId: bookingId,
+              sourceEventId: bookingId,
+              friendId,
+              oldStartsAtIso: row.starts_at,
+              newStartsAtIso: newStartsAt.toISOString(),
+              lineAccountId: accountId,
+            }).catch((error) => console.error('reminder reschedule (booking update) failed:', error)),
+          );
+        }
+      } else {
+        c.executionCtx.waitUntil(
+          cancelByTrigger(c.env.DB, {
+            triggerType: 'booking',
+            sourceId: bookingId,
+            sourceEventId: bookingId,
+            friendId,
+            startsAtIso: newStartsAt.toISOString(),
+            lineAccountId: accountId,
+            cancelReason: `booking_updated_notifications_off:${bookingId}:by:${c.get('staff')?.id ?? 'admin'}`,
+          }).catch((error) => console.error('reminder cancel (booking update) failed:', error)),
+        );
+      }
+    } else {
+      // 未連携へ切り替わった・または未連携のままの変更では、
+      // 将来分を作らないだけでなく既存の未送信も止める（上で済み）。
+    }
+  }
+
+  // ---- Google カレンダー同期 (N-392) ----
+  // 新版 (lock_version) をキーに台帳へ載せ、現在の予約状態を反映する。
+  // confirmed は delete+create、requested は touched せず skipped。
+  // 失敗は retry_wait で残し、/sync/retry または次の変更で回収する。
+  const googleSync = await runBookingGoogleSync(c.env.DB, {
+    bookingId,
+    lineAccountId: accountId,
+    credentials: googleCredentials(c.env),
+  });
+
+  // ---- 変更案内の LINE 通知 ----
+  // 明示的に送らない指定が無い限り、連携済みの予約には変更を知らせる。
+  // 未連携の予約では送らない (operation 行も作らない)。
+  const wantsChangeNotice = Boolean(row.friend_id) && body.send_change_notification !== false;
+  let changeOperationId: string | null = null;
+  if (wantsChangeNotice) {
+    changeOperationId = await queueBookingOperation(c.env.DB, {
+      bookingId,
+      lineAccountId: accountId,
+      kind: 'confirmation_line',
+      idempotencyKey: `${bookingId}:confirmation-line:changed:v${newVersion}`,
+      result: { notificationKind: 'changed' },
+    });
+    c.executionCtx.waitUntil(
+      notifyForBooking(c.env.DB, bookingId, 'changed', changeOperationId).catch((err) =>
+        console.error('booking notify (changed) failed:', err),
+      ),
+    );
+  }
+
+  const [reminderRows, operationRows] = await Promise.all([
+    c.env.DB.prepare(
+      `SELECT id, kind, scheduled_at, sent_at, status
+         FROM booking_reminders WHERE booking_id = ? ORDER BY scheduled_at ASC`,
+    ).bind(bookingId).all<{
+      id: string; kind: string; scheduled_at: string; sent_at: string | null; status: string;
+    }>(),
+    listBookingOperations(c.env.DB, { bookingId, lineAccountId: accountId }),
+  ]);
+  return c.json({
+    booking_id: bookingId,
+    lock_version: newVersion,
+    status: row.status,
+    calendar_sync: googleSync === 'succeeded' ? 'synced'
+      : googleSync === 'retry_wait' ? 'failed'
+      : googleSync === 'skipped' ? 'not_configured' : 'not_applicable',
+    change_notification: wantsChangeNotice ? 'queued' : 'not_applicable',
+    reminders: (reminderRows.results ?? []).map((reminder) => ({
+      id: reminder.id,
+      kind: reminder.kind,
+      scheduled_at: reminder.scheduled_at,
+      sent_at: reminder.sent_at,
+      status: reminder.status,
+    })),
+    reminders_created: remindersCreated,
+    operations: operationRows,
+  });
+});
+
+/**
+ * Google カレンダー同期の手動再試行 (N-392)。
+ *
+ * 失敗行 (retry_wait/permanent_failed) だけを対象にする。成功・取消ずみの
+ * 行は触らず 409、実行中 (queued) は二重実行を避けて 409。
+ * confirmed は delete+create の再同期、cancelled/expired は削除の再実行。
+ */
+booking.post('/api/booking/admin/bookings/:id/sync/retry', requireRole('owner', 'admin', 'staff'), async (c) => {
+  const accountId = await resolveAccountIdAdmin(c);
+  if (!accountId) return c.json({ error: 'missing_account_id' }, 400);
+  const bookingId = c.req.param('id');
+  const row = await c.env.DB
+    .prepare(`SELECT id, status FROM bookings WHERE id = ? AND line_account_id = ?`)
+    .bind(bookingId, accountId)
+    .first<{ id: string; status: string }>();
+  if (!row) return c.json({ error: 'booking_not_found' }, 404);
+
+  const failed = await c.env.DB
+    .prepare(
+      `SELECT id, status FROM booking_operation_runs
+        WHERE booking_id = ? AND line_account_id = ? AND kind = 'google_calendar'
+          AND status IN ('retry_wait','permanent_failed')
+        ORDER BY created_at DESC LIMIT 1`,
+    )
+    .bind(bookingId, accountId)
+    .first<{ id: string; status: string }>();
+  const inFlight = await c.env.DB
+    .prepare(
+      `SELECT id FROM booking_operation_runs
+        WHERE booking_id = ? AND line_account_id = ? AND kind = 'google_calendar'
+          AND status = 'queued' LIMIT 1`,
+    )
+    .bind(bookingId, accountId)
+    .first<{ id: string }>();
+  if (inFlight) return c.json({ error: 'operation_in_progress' }, 409);
+  if (!failed) return c.json({ error: 'no_retryable_operation' }, 409);
+
+  let outcome: 'succeeded' | 'skipped' | 'retry_wait' | 'not_applicable';
+  if (row.status === 'cancelled' || row.status === 'expired') {
+    // 取消済み予約の削除再試行。安定キー台帳へ集めてから同じ実行口を通す。
+    await enqueueCalendarDeleteOperation(c.env.DB, { bookingId, lineAccountId: accountId });
+    outcome = await runCalendarDeleteOperation(c.env.DB, {
+      bookingId,
+      lineAccountId: accountId,
+      remove: () => removeBookingFromGoogle(c.env.DB, googleCredentials(c.env), bookingId),
+    });
+  } else {
+    outcome = await runBookingGoogleSync(c.env.DB, {
+      bookingId,
+      lineAccountId: accountId,
+      credentials: googleCredentials(c.env),
+      operationId: failed.id,
+    });
+  }
+  await recordBookingAudit(c.env.DB, {
+    bookingId,
+    lineAccountId: accountId,
+    action: 'sync_retried',
+    before: { operation_id: failed.id, operation_status: failed.status },
+    after: { outcome },
+    ...staffAuditActor(c),
+    occurredAt: new Date().toISOString(),
+  });
+  return c.json({ status: outcome });
+});
+
+/**
+ * LINE 通知の手動再試行 (N-393)。
+ *
+ * 対象は confirmation_line 台帳の未成功行。成功ずみは二重送信を避けて 409。
+ * 失敗しても行に error_code を残したまま 200 で実状態を返す。
+ */
+booking.post(
+  '/api/booking/admin/bookings/:id/notifications/:runId/retry',
+  requireRole('owner', 'admin', 'staff'),
+  async (c) => {
+    const accountId = await resolveAccountIdAdmin(c);
+    if (!accountId) return c.json({ error: 'missing_account_id' }, 400);
+    const bookingId = c.req.param('id');
+    const runId = c.req.param('runId');
+    const bookingRow = await c.env.DB
+      .prepare(`SELECT id, friend_id FROM bookings WHERE id = ? AND line_account_id = ?`)
+      .bind(bookingId, accountId)
+      .first<{ id: string; friend_id: string | null }>();
+    if (!bookingRow) return c.json({ error: 'booking_not_found' }, 404);
+    if (!bookingRow.friend_id) return c.json({ error: 'line_notification_unavailable' }, 422);
+    const op = await c.env.DB
+      .prepare(
+        `SELECT id, kind, status, result_json FROM booking_operation_runs
+          WHERE id = ? AND booking_id = ? AND line_account_id = ?`,
+      )
+      .bind(runId, bookingId, accountId)
+      .first<{ id: string; kind: string; status: string; result_json: string | null }>();
+    if (!op || op.kind !== 'confirmation_line') {
+      return c.json({ error: 'operation_not_found' }, 404);
+    }
+    if (op.status === 'succeeded') {
+      return c.json({ error: 'already_succeeded' }, 409);
+    }
+    if (op.status === 'skipped' || op.status === 'cancelled') {
+      return c.json({ error: 'not_retryable' }, 409);
+    }
+    let notificationKind: NotificationKind = 'approved';
+    try {
+      const parsed = op.result_json ? JSON.parse(op.result_json) as Record<string, unknown> : {};
+      const raw = parsed.notificationKind;
+      if (raw === 'requested' || raw === 'approved' || raw === 'rejected'
+        || raw === 'expired' || raw === 'changed') {
+        notificationKind = raw;
+      }
+    } catch {
+      /* 壊れた result_json は既定の approved で送る */
+    }
+    let outcome: 'succeeded' | 'failed' = 'succeeded';
+    try {
+      await notifyForBooking(c.env.DB, bookingId, notificationKind, op.id);
+    } catch (error) {
+      outcome = 'failed';
+      console.error('booking notification retry failed:', error);
+    }
+    const refreshed = await c.env.DB
+      .prepare(`SELECT status, error_code FROM booking_operation_runs WHERE id = ?`)
+      .bind(op.id)
+      .first<{ status: string; error_code: string | null }>();
+    await recordBookingAudit(c.env.DB, {
+      bookingId,
+      lineAccountId: accountId,
+      action: 'notification_retried',
+      before: { operation_id: op.id, kind: notificationKind, status: op.status },
+      after: { status: refreshed?.status ?? outcome },
+      ...staffAuditActor(c),
+      occurredAt: new Date().toISOString(),
+    });
+    return c.json({
+      status: outcome === 'succeeded' ? 'succeeded' : 'failed',
+      operation_status: refreshed?.status ?? null,
+      error_code: refreshed?.error_code ?? null,
+    });
+  },
+);
 
 booking.get('/api/booking/admin/alternatives', async (c) => {
   const accountId = await resolveAccountIdAdmin(c);
@@ -2235,6 +2957,9 @@ booking.get('/api/booking/admin/availability', async (c) => {
   if ((toD.getTime() - fromD.getTime()) / 86400_000 > 28) {
     return c.json({ error: 'range_too_wide' }, 400);
   }
+  // 予約変更の枠選びでは変更対象を空き判定から外す。
+  // 外さないと今の予約が自分と重なって「空きなし」に見える。
+  const excludeBookingId = c.req.query('exclude_booking_id') || undefined;
   const result = await getAvailability(c.env.DB, {
     lineAccountId: accountId,
     menuId,
@@ -2244,6 +2969,7 @@ booking.get('/api/booking/admin/availability', async (c) => {
     now: new Date(),
     minLeadTimeMinutes: 0,
     googleCredentials: googleCredentials(c.env),
+    excludeBookingId,
   });
   return c.json(result);
 });
@@ -2265,6 +2991,8 @@ booking.post('/api/booking/admin/bookings', requireRole('owner', 'admin', 'staff
     starts_at: string; // UTC ISO8601
     customer_note?: string;
     send_line_confirmation?: boolean;
+    /** N-391: 確認・前日・当日のお知らせを個別に切る。未指定は従来どおり全て送る。 */
+    notification_policy?: unknown;
     party_size?: unknown;
   }>();
   if (body.party_size !== undefined && body.party_size !== 1) return c.json({ error: 'unsupported_party_size' }, 422);
@@ -2309,10 +3037,27 @@ booking.post('/api/booking/admin/bookings', requireRole('owner', 'admin', 'staff
       if (!friend || friend.is_following === 0) return c.json({ error: 'cannot_book' }, 403);
     }
   }
-  if (!friendId && body.send_line_confirmation === true) {
-    return c.json({ error: 'line_notification_unavailable' }, 422);
+  // N-391: 通知方針。send_line_confirmation は旧キー、notification_policy は新しい器。
+  // 両方あるときは notification_policy が勝つ。未連携で明示オンは 422。
+  let policyPatch: Partial<BookingNotificationPolicy> = {};
+  if (body.notification_policy !== undefined) {
+    const parsed = readNotificationPolicyPatch(body.notification_policy);
+    if (!parsed.ok) return c.json({ error: 'invalid_notification_policy' }, 422);
+    policyPatch = parsed.value;
   }
-  const sendLineConfirmation = Boolean(friendId) && body.send_line_confirmation !== false;
+  if (!friendId) {
+    const wantsNotification = body.send_line_confirmation === true
+      || policyPatch.send_line_confirmation === true
+      || policyPatch.day_before === true
+      || policyPatch.hours_before === true;
+    if (wantsNotification) {
+      return c.json({ error: 'line_notification_unavailable' }, 422);
+    }
+  }
+  const sendLineConfirmation = Boolean(friendId)
+    && (policyPatch.send_line_confirmation ?? body.send_line_confirmation ?? true);
+  const sendDayBefore = Boolean(friendId) && (policyPatch.day_before ?? true);
+  const sendHoursBefore = Boolean(friendId) && (policyPatch.hours_before ?? true);
   const idempotencySubject = friendId ?? `booking-customer:${bookingCustomerId}`;
 
   const cached = await findIdempotencyResponse(c.env.DB, {
@@ -2441,10 +3186,12 @@ booking.post('/api/booking/admin/bookings', requireRole('owner', 'admin', 'staff
     return c.json({ error: raced ? 'request_in_progress' : 'idempotency_key_conflict' }, 409);
   }
   const nowIso = new Date().toISOString();
+  // N-391: 選んだ方針を予約へ固定する。後から設定を変えても
+  // この予約へ送るものは変わらない。
   const notificationPolicy = JSON.stringify({
     send_line_confirmation: sendLineConfirmation,
-    day_before: sendLineConfirmation,
-    hours_before: sendLineConfirmation,
+    day_before: sendDayBefore,
+    hours_before: sendHoursBefore,
   });
   const bookingInsert = c.env.DB.prepare(
       `INSERT INTO bookings
@@ -2567,12 +3314,36 @@ booking.post('/api/booking/admin/bookings', requireRole('owner', 'admin', 'staff
     }
   }
 
+  // N-394: 作成も履歴の起点として残す。操作者 (代理登録したスタッフ) を記録する。
+  await recordBookingAudit(c.env.DB, {
+    bookingId,
+    lineAccountId: accountId,
+    action: 'created',
+    after: {
+      status: 'confirmed',
+      staff_id: body.staff_id,
+      menu_id: body.menu_id,
+      starts_at: startsAt.toISOString(),
+      price: Number(menuRow.price),
+      source: bookingCustomerId ? 'phone' : 'operator',
+    },
+    ...staffAuditActor(c),
+    occurredAt: nowIso,
+  });
+
   let confirmationOperationId: string | null = null;
-  if (sendLineConfirmation && friendId) {
+  if (friendId && (sendDayBefore || sendHoursBefore)) {
+    // N-395: 前日・当日のお知らせはアカウントの設定時刻で作る。
+    // 確認メッセージの可否とは独立して作れる（確認なし＋リマインダありも選べる）。
+    const timing = await getReminderTiming(c.env.DB, accountId);
     await insertConfirmationReminders(c.env.DB, {
       bookingId,
       startsAt,
       now: new Date(),
+      reminderHoursBefore: timing.reminderHoursBefore,
+      dayBeforeTime: timing.dayBeforeTime,
+      timeZone: timing.timeZone,
+      kinds: { dayBefore: sendDayBefore, hoursBefore: sendHoursBefore },
     });
     c.executionCtx.waitUntil(
       enrollByTrigger(c.env.DB, {
@@ -2584,6 +3355,8 @@ booking.post('/api/booking/admin/bookings', requireRole('owner', 'admin', 'staff
         lineAccountId: accountId,
       }).catch((err) => console.error('reminder enroll (proxy-create) failed:', err)),
     );
+  }
+  if (sendLineConfirmation && friendId) {
     confirmationOperationId = await queueBookingOperation(c.env.DB, {
       bookingId,
       lineAccountId: accountId,
@@ -3812,7 +4585,7 @@ booking.patch('/api/booking/admin/requests/:id', requireRole('owner', 'admin', '
       id: string;
       status: BookingStatus;
       starts_at: string;
-      friend_id: string;
+      friend_id: string | null;
       menu_id: string;
       staff_id: string;
       decided_at: string | null;
@@ -3877,13 +4650,40 @@ booking.patch('/api/booking/admin/requests/:id', requireRole('owner', 'admin', '
   if ((updateResult.meta?.changes ?? 0) === 0) {
     return c.json({ error: 'concurrent_update' }, 409);
   }
+  // N-394: 状態遷移も監査へ残す。誰が・いつ・何へ変えたかを後から追えるようにする。
+  await recordBookingAudit(c.env.DB, {
+    bookingId: id,
+    lineAccountId: accountId,
+    action: 'status_changed',
+    before: { status: row.status },
+    after: { status: next },
+    reason: b.action,
+    ...staffAuditActor(c),
+    occurredAt: new Date().toISOString(),
+  });
 
   if (next === 'confirmed') {
-    await insertConfirmationReminders(c.env.DB, {
-      bookingId: id,
-      startsAt: new Date(row.starts_at),
-      now: new Date(),
-    });
+    // N-395: 承認で作る前日・当日のお知らせも店舗設定の時刻を使う。
+    // 予約時に選んだ通知方針（snapshot）の ON の種別だけ作る。
+    const approvedPolicy = await c.env.DB
+      .prepare(`SELECT notification_policy_snapshot FROM bookings WHERE id = ?`)
+      .bind(id)
+      .first<{ notification_policy_snapshot: string | null }>()
+      .then((found) => readNotificationPolicySnapshot(found?.notification_policy_snapshot ?? null));
+    const timing = await getReminderTiming(c.env.DB, accountId);
+    if (row.friend_id && (approvedPolicy.day_before || approvedPolicy.hours_before)) {
+      // 未連携の予約は行を作らない（friends JOIN で誰にも送れない行が残る）。
+      // 連携済みでも snapshot で OFF の種別は作らない (N-391)。
+      await insertConfirmationReminders(c.env.DB, {
+        bookingId: id,
+        startsAt: new Date(row.starts_at),
+        now: new Date(),
+        reminderHoursBefore: timing.reminderHoursBefore,
+        dayBeforeTime: timing.dayBeforeTime,
+        timeZone: timing.timeZone,
+        kinds: { dayBefore: approvedPolicy.day_before, hoursBefore: approvedPolicy.hours_before },
+      });
+    }
     // 承認による確定も同じ起点として数える(#648)。冪等キーは予約IDなので、
     // 代理登録側と同じ予約を二重に数えることはない。
     if (row.friend_id) {
@@ -3904,11 +4704,14 @@ booking.patch('/api/booking/admin/requests/:id', requireRole('owner', 'admin', '
     } catch (error) {
       console.error('Google Calendar sync (approve) failed:', error);
     }
-    c.executionCtx.waitUntil(
-      notifyForBooking(c.env.DB, id, 'approved').catch((err) =>
-        console.error('booking notify (approved) failed:', err),
-      ),
-    );
+    if (row.friend_id && approvedPolicy.send_line_confirmation) {
+      // N-391: 予約時に確認通知を切った予約には、承認通知も送らない。
+      c.executionCtx.waitUntil(
+        notifyForBooking(c.env.DB, id, 'approved').catch((err) =>
+          console.error('booking notify (approved) failed:', err),
+        ),
+      );
+    }
     c.executionCtx.waitUntil(
       dispatchAutomationEventWithLogging(c.env.DB, {
         lineAccountId: accountId,

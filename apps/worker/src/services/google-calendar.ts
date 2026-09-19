@@ -106,8 +106,10 @@ export class GoogleCalendarClient {
       },
     });
 
-    // 204 = success, 410 = already deleted — both are acceptable
-    if (!res.ok && res.status !== 410) {
+    // 204 = success, 404/410 = already gone — all acceptable for idempotent delete.
+    // 変更の delete+create では、前回作成が失敗していた予約や相手側で消えた
+    // 予定が 404 を返す。それを失敗と数えると再試行が永久に通らない。
+    if (!res.ok && res.status !== 410 && res.status !== 404) {
       const text = await res.text().catch(() => '');
       throw new Error(`Google Calendar deleteEvent error ${res.status}: ${text}`);
     }

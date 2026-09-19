@@ -210,6 +210,63 @@ describe('店舗共通の予約設定API', () => {
     });
   });
 
+  test('リマインダの送信時刻を店舗ごとに保存できる (N-395)', async () => {
+    const { app, env } = makeApp(db);
+    const body = {
+      expectedVersion: 0,
+      timeZone: 'Asia/Tokyo',
+      bookingWindowDays: 60,
+      cutoffMinutesBefore: 1440,
+      cancelDeadlineMinutesBefore: 1440,
+      maxActiveBookingsPerFriend: 1,
+      approvalMode: 'automatic',
+      holdMinutes: 15,
+      slotGranularityMinutes: 15,
+      reminderDayBeforeTime: '18:30',
+      reminderHoursBefore: 4,
+    };
+    const created = await app.request('/api/booking/admin/settings?account_id=account-empty', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    }, env);
+    expect(created.status).toBe(201);
+    await expect(created.json()).resolves.toMatchObject({
+      success: true,
+      data: { reminderDayBeforeTime: '18:30', reminderHoursBefore: 4 },
+    });
+    expect(sqlite.prepare(`SELECT reminder_day_before_time, reminder_hours_before
+      FROM booking_settings WHERE line_account_id = 'account-empty'`).get())
+      .toEqual({ reminder_day_before_time: '18:30', reminder_hours_before: 4 });
+  });
+
+  test('リマインダ時刻の形が違う入力は400で保存しない (N-395)', async () => {
+    const { app, env } = makeApp(db);
+    const base = {
+      expectedVersion: 0,
+      timeZone: 'Asia/Tokyo',
+      bookingWindowDays: 60,
+      cutoffMinutesBefore: 1440,
+      cancelDeadlineMinutesBefore: 1440,
+      maxActiveBookingsPerFriend: 1,
+      approvalMode: 'automatic',
+      holdMinutes: 15,
+      slotGranularityMinutes: 15,
+    };
+    const badTime = await app.request('/api/booking/admin/settings?account_id=account-empty', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...base, reminderDayBeforeTime: '25:00' }),
+    }, env);
+    expect(badTime.status).toBe(400);
+
+    const badHours = await app.request('/api/booking/admin/settings?account_id=account-empty', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...base, reminderHoursBefore: 99 }),
+    }, env);
+    expect(badHours.status).toBe(400);
+    expect(sqlite.prepare(`SELECT COUNT(*) AS count FROM booking_settings
+      WHERE line_account_id = 'account-empty'`).get()).toEqual({ count: 0 });
+  });
+
   test('週全体の営業時間を初回作成し、0行曜日を明示した休業として返す', async () => {
     const { app, env } = makeApp(db, 'admin');
     const res = await app.request('/api/booking/admin/settings?account_id=account-empty', {
