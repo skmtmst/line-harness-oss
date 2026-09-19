@@ -2414,6 +2414,7 @@ interface AffiliateConversionMileageContext {
   subject_user_id: string | null;
   beneficiary_friend_id: string | null;
   beneficiary_user_id: string | null;
+  beneficiary_line_account_id: string | null;
   offer_id: string | null;
   offer_name: string | null;
   reward_miles: number | null;
@@ -2440,6 +2441,7 @@ export async function syncAffiliateConversionMileage(
               subject.user_id AS subject_user_id,
               a.friend_id AS beneficiary_friend_id,
               beneficiary.user_id AS beneficiary_user_id,
+              beneficiary.line_account_id AS beneficiary_line_account_id,
               off.id AS offer_id,
               off.name AS offer_name,
               off.reward_miles,
@@ -2478,6 +2480,29 @@ export async function syncAffiliateConversionMileage(
     metadata: { offerId: context.offer_id, offerName: context.offer_name },
     occurredAt,
   });
+
+  // N-238: 承認された紹介成果は「たまる決めごと」のきっかけとしても選べるよう、
+  // 共通イベントキューへも乗せる。行動した側（受益者=紹介者）へルールが効く。
+  // sourceEventId に決定版を含めるのは、却下→再承認を別の出来事として
+  // 再度ルールに通すため（初回承認のイベントへ冪等吸収されないようにする）。
+  // 成果の受益者が友だちとして解決できないイベントは、付与の相手がいないため
+  // キューへ入れない。
+  if (status === 'approved' && context.beneficiary_friend_id) {
+    await enqueueMileageEvent(db, {
+      eventType: 'affiliate_conversion_approved',
+      source: 'affiliate_conversion',
+      sourceEventId: `${eventId}:${decisionVersion}`,
+      friendId: context.beneficiary_friend_id,
+      subjectKey: eventId,
+      metadata: {
+        offerId: context.offer_id,
+        offerName: context.offer_name,
+        conversionEventId: eventId,
+        decisionVersion,
+      },
+      occurredAt,
+    });
+  }
 
   if (status === 'approved') {
     const rewardMiles = context.reward_miles ?? 0;

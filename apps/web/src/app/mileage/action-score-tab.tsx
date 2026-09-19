@@ -9,6 +9,7 @@ import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
 import SummaryCard from '@/components/shared/summary-card'
 import { ActionCell, DataTable, Td, Th, TableHeadRow, Tr } from '@/components/shared/table'
+import ActionScoreAdjustmentDialog from './action-score-adjustment-dialog'
 import {
   api,
   type ActionScoreBand,
@@ -108,6 +109,23 @@ export default function ActionScoreTab({ accountId }: { accountId: string }) {
   const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  /*
+   * 点数を手で直す操作はowner/adminだけに出す（N-235）。
+   * 操作権限はWorker側でも同じ条件で落とす。ここでは出し分けだけをする。
+   */
+  const [canAdjust, setCanAdjust] = useState(false)
+  const [adjustTarget, setAdjustTarget] = useState<ActionScoreOverview['items'][number] | null>(null)
+
+  useEffect(() => {
+    let current = true
+    void api.staff.me().then((response) => {
+      if (!current || !response.success) return
+      setCanAdjust(response.data.role === 'owner' || response.data.role === 'admin')
+    }).catch(() => {
+      if (current) setCanAdjust(false)
+    })
+    return () => { current = false }
+  }, [])
 
   const load = useCallback(async () => {
     const accountAtRequest = accountId
@@ -295,7 +313,12 @@ export default function ActionScoreTab({ accountId }: { accountId: string }) {
                       <p className="truncate text-xs text-ink-secondary" title={safeReason(scoreReason(item))}>{safeReason(scoreReason(item))}</p>
                       <p className="mt-0.5 text-xs text-ink-faint">{formatMileageDate(scoreChangedAt(item))}</p>
                     </Td>
-                    <ActionCell><Button href={`/friends/detail?id=${encodeURIComponent(item.friendId)}`}>この人を見る</Button></ActionCell>
+                    <ActionCell>
+                      <div className="flex flex-wrap justify-end gap-2">
+                        {canAdjust ? <Button onClick={() => setAdjustTarget(item)}>点数を直す</Button> : null}
+                        <Button href={`/friends/detail?id=${encodeURIComponent(item.friendId)}`}>この人を見る</Button>
+                      </div>
+                    </ActionCell>
                   </Tr>
                 ))}
               </tbody>
@@ -309,6 +332,17 @@ export default function ActionScoreTab({ accountId }: { accountId: string }) {
           </div>
         ) : null}
       </div>
+      {adjustTarget ? (
+        <ActionScoreAdjustmentDialog
+          open={adjustTarget !== null}
+          accountId={accountId}
+          friendId={adjustTarget.friendId}
+          friendName={adjustTarget.displayName}
+          currentScore={scoreValue(adjustTarget)}
+          onCancel={() => setAdjustTarget(null)}
+          onCompleted={async () => { await load() }}
+        />
+      ) : null}
     </section>
   )
 }
