@@ -470,7 +470,8 @@ function OverviewStep({
             id="ev-desc"
             value={draft.description ?? ''}
             onChange={(e) => update('description', e.target.value || null)}
-            rows={2}
+            // U056: 長文欄ははじめから3行分の高さで出す。
+            rows={3}
             placeholder="例：開催趣旨、注意事項、持ち物などを記載…"
             className={inputClass}
           />

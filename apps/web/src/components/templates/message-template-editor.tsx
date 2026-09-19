@@ -286,16 +286,18 @@ export function MessageTemplateEditor({
           <SelectField id="tp-type" aria-label="メッセージ形式" value={value.messageType} disabled={disabled} onChange={(event) => onChange({ ...value, messageType: event.target.value })} options={[...typeOptions]} />
         </Field>
         {afterType}
-        <div>
-          <p className="text-ink-secondary mb-1 text-sm font-medium">差し込む</p>
-          <TemplateInsertControls accountId={referenceAccountId} state={referenceState} accountLabel={referenceAccountLabel} targetDate={targetDate} disabled={disabled} unavailableHint={referenceUnavailableHint} onTargetDateChange={onTargetDateChange} friendFields={references.friendFields} commonVars={references.commonVars} onInsert={insert} />
-        </div>
+        {/*
+          U058: 本文の欄を先に出す。差し込みの操作群を上に置くと、
+          狭い画面で本文が段の下まで押し出されて見えなくなる。
+          本文のすぐ下にまとめて置けば、書きながら下へ手を伸ばして
+          差し込める。
+        */}
         <Field
           label={contentLabel}
           htmlFor="tp-content"
           required
           note={<>
-            差し込みは上の選択肢から入れられます。名前と友だち情報は受け取る人ごと、共通情報と配信日は送る時点の値に置き換わります。
+            差し込みは下の選択肢から入れられます。名前と友だち情報は受け取る人ごと、共通情報と配信日は送る時点の値に置き換わります。
             {carouselHref && <><br />カルーセルを作るときは <Link href={carouselHref} className="text-accent hover:underline">カルーセルの編集</Link> を使ってください。</>}
           </>}
         >
@@ -306,6 +308,10 @@ export function MessageTemplateEditor({
           )}
           <p className="text-ink-faint mt-1 text-xs tabular-nums">{value.messageContent.length} 文字{value.messageContent.length > splitAt ? ` ・ 約${splitAt}文字を超えると複数のメッセージに分割されます` : ' ・ 分割なし'}</p>
         </Field>
+        <div>
+          <p className="text-ink-secondary mb-1 text-sm font-medium">差し込む</p>
+          <TemplateInsertControls accountId={referenceAccountId} state={referenceState} accountLabel={referenceAccountLabel} targetDate={targetDate} disabled={disabled} unavailableHint={referenceUnavailableHint} onTargetDateChange={onTargetDateChange} friendFields={references.friendFields} commonVars={references.commonVars} onInsert={insert} />
+        </div>
         <section aria-label="本文内のURL" className="border-hairline rounded-card border p-4">
           <div className="flex items-center justify-between gap-3"><p className="text-ink text-sm font-semibold">本文に入れたURLの扱い</p><span className="text-accent-deep text-xs font-semibold">短縮して、クリックを数える</span></div>
           <div className="border-hairline mt-3 overflow-hidden rounded-control border text-xs">
