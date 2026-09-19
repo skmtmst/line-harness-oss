@@ -151,15 +151,25 @@ export default function ProjectsSection({
     <>
       <LimitState usage={usage} />
       <section data-design-node="CkmC8" className="flex flex-col rounded-card border border-hairline bg-canvas">
-        <div className="flex flex-wrap items-center gap-2.5 p-4">
+        {/*
+          検索は独立した全幅の行にする（U017）。並び順を同じ行に置くと、
+          狭い幅で欄がほぼ四角形まで潰れ、プロジェクト名を読みながら
+          検索できなくなる。
+        */}
+        <div data-search-row className="p-4 pb-0">
           <SearchField
             placeholder="プロジェクト名・説明で検索"
             aria-label="プロジェクト名・説明で検索"
             value={query}
             onChange={setQuery}
             onClear={() => setQuery('')}
-            className="min-w-0 flex-1"
+            className="w-full"
           />
+        </div>
+        <div className="flex flex-wrap items-center gap-2 p-4">
+          <FilterChip selected={filter === 'all'} onChange={() => setFilter('all')}>すべて</FilterChip>
+          <FilterChip selected={filter === 'favorite'} onChange={(on) => setFilter(on ? 'favorite' : 'all')}>お気に入り</FilterChip>
+          <FilterChip selected={filter === 'running'} onChange={(on) => setFilter(on ? 'running' : 'all')}>生成中</FilterChip>
           <label className="flex items-center gap-2 text-caption text-ink-faint">
             並び順
             <SelectField
@@ -169,11 +179,6 @@ export default function ProjectsSection({
               options={SORT_OPTIONS}
             />
           </label>
-        </div>
-        <div className="flex flex-wrap items-center gap-2 px-4 pb-4">
-          <FilterChip selected={filter === 'all'} onChange={() => setFilter('all')}>すべて</FilterChip>
-          <FilterChip selected={filter === 'favorite'} onChange={(on) => setFilter(on ? 'favorite' : 'all')}>お気に入り</FilterChip>
-          <FilterChip selected={filter === 'running'} onChange={(on) => setFilter(on ? 'running' : 'all')}>生成中</FilterChip>
           <span className="flex-1" />
           {status === 'ready' ? (
             <span className="text-micro text-ink-faint">
