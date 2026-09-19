@@ -290,7 +290,10 @@ nenCampaigns.post('/api/nen-campaigns/test-send', requireRole('owner', 'admin'),
     getLineAccountById(c.env.DB, body.accountId),
     getTestRecipient(c, body.accountId, body.friendId),
   ]);
-  if (!campaign || !account || !friend) return c.json({ success: false, error: 'Test target not found' }, 404);
+  // テスト送信先は「設定 › アカウント › テスト送信先」に登録され、かつ友だち追加中の人だけ。
+  // 画面が理由を言えるよう、送信先の問題は code で分ける。
+  if (!friend) return c.json({ success: false, code: 'test_recipient_unavailable', error: 'テスト送信先が登録されていないか、友だち追加されていません' }, 404);
+  if (!campaign || !account) return c.json({ success: false, error: 'Test target not found' }, 404);
   const sample = {
     event: {
       event_id: `test-${crypto.randomUUID()}`, event_type: 'ec.order.shipped', occurred_at: new Date().toISOString(),
@@ -558,7 +561,8 @@ nenCampaigns.post('/api/nen-campaigns/columns/:id/test-send', requireRole('owner
         WHERE id = ? AND line_account_id = ?`,
     ).bind(c.req.param('id'), body.accountId).first<Record<string, unknown>>(),
   ]);
-  if (!campaign || !account || !friend || !column) {
+  if (!friend) return c.json({ success: false, code: 'test_recipient_unavailable', error: 'テスト送信先が登録されていないか、友だち追加されていません' }, 404);
+  if (!campaign || !account || !column) {
     return c.json({ success: false, error: 'Test target not found' }, 404);
   }
   const { pushViaHarnessProxy } = await import('../services/line-proxy-send.js');

@@ -8,6 +8,7 @@ import { usePageTitle } from '@/components/shell/page-chrome'
 import { useAccount } from '@/contexts/account-context'
 import {
   api,
+  ApiError,
   type NenCampaignSetting,
   type NenColumn,
   type NenColumnMetrics,
@@ -22,6 +23,14 @@ type Notice = { tone: 'success' | 'error'; text: string }
 
 const TABS: NenTab[] = ['auto', 'columns', 'history', 'paused']
 const EMPTY_ERRORS: Record<NenTab, string> = { auto: '', columns: '', history: '', paused: '' }
+
+/** テスト送信の失敗理由。送信先の問題（未登録・友だち解除）は直し方まで言う。 */
+function testSendFailureText(caught: unknown, fallback: string): string {
+  if (caught instanceof ApiError && (caught.code === 'test_recipient_unavailable' || caught.status === 404)) {
+    return 'テスト送信先が登録されていないか、友だち追加されていません。「設定 › アカウント」の「テスト送信先」で登録し、そのLINEで友だち追加されているか確認してください。'
+  }
+  return `${fallback}通信の状態を確認して、もう一度お試しください。`
+}
 
 function isTab(value: string | null): value is NenTab {
   return value !== null && (TABS as string[]).includes(value)
@@ -154,18 +163,18 @@ export default function NenCampaignsPage() {
     }
     // 初回だけURLの指定タブを開く。loadTabはref経由で最新のものを使う。
   }, [])
+  /*
+    テスト送信先の候補。実口（getTestRecipient）は「設定 › アカウント › テスト送信先」に登録され、
+    かつ友だち追加中の人にしか送らない。登録されていない友だちを候補に並べると、押しても届かず
+    理由も分からないので、登録済みの人だけを出す。ログインユーザーも登録していれば含まれる。
+  */
   useEffect(() => {
     setFriends([]); setTestFriendId('')
     if (!selectedAccountId) return
     let cancelled = false
-    void Promise.allSettled([
-      api.friends.list({ accountId: selectedAccountId, limit: 100, includeTags: false }),
-      api.accountSettings.getTestRecipientLoginUsers(selectedAccountId),
-    ]).then(([friendResult, loginUserResult]) => {
-      if (cancelled || friendResult.status !== 'fulfilled' || !friendResult.value.success) return
-      const loginUsers = loginUserResult.status === 'fulfilled' && loginUserResult.value.success ? loginUserResult.value.data.filter((candidate) => candidate.sameAccount).map((candidate) => ({ id: candidate.id, displayName: candidate.staffName })) : []
-      const accountFriends = friendResult.value.data.items.map((friend) => ({ id: friend.id, displayName: friend.displayName }))
-      const list = [...new Map([...loginUsers, ...accountFriends].map((friend) => [friend.id, friend])).values()]
+    api.accountSettings.getTestRecipients(selectedAccountId).then((result) => {
+      if (cancelled || !result.success) return
+      const list = result.data.map((friend) => ({ id: friend.id, displayName: friend.displayName }))
       setFriends(list); setTestFriendId((current) => list.some((friend) => friend.id === current) ? current : list[0]?.id || '')
     }).catch(() => undefined)
     return () => { cancelled = true }
@@ -203,8 +212,8 @@ export default function NenCampaignsPage() {
   const testSend = async (setting: NenCampaignSetting) => {
     if (!selectedAccountId || !testFriendId) { setNotice({ tone: 'error', text: 'テスト送信先を選択してください。' }); return }
     setTesting(setting.campaignKey)
-    try { await api.nenCampaigns.testSend({ campaignKey: setting.campaignKey, accountId: selectedAccountId, friendId: testFriendId }); setNotice({ tone: 'success', text: `${setting.label}をテスト送信しました。` }) }
-    catch { setNotice({ tone: 'error', text: 'テスト送信できませんでした。' }) } finally { setTesting(null) }
+    try { await api.nenCampaigns.testSend({ campaignKey: setting.campaignKey, accountId: selectedAccountId, friendId: testFriendId }); setNotice({ tone: 'success', text: `${setting.label}をテスト送信しました。LINEを確認してください。` }) }
+    catch (caught) { setNotice({ tone: 'error', text: testSendFailureText(caught, 'テスト送信できませんでした。') }) } finally { setTesting(null) }
   }
   const deliverColumn = async (column: NenColumn, scheduledAt?: string) => {
     if (!selectedAccountId) return
@@ -250,8 +259,9 @@ export default function NenCampaignsPage() {
   }
   const testColumn = async (column: NenColumn) => {
     if (!selectedAccountId || !testFriendId) { setNotice({ tone: 'error', text: 'テスト送信先を選択してください。' }); return }
-    try { await api.nenCampaigns.testColumn(column.id, selectedAccountId, testFriendId); setNotice({ tone: 'success', text: `「${column.title}」をテスト送信しました。` }) }
-    catch { setNotice({ tone: 'error', text: 'コラムをテスト送信できませんでした。' }) }
+    setTesting(column.id)
+    try { await api.nenCampaigns.testColumn(column.id, selectedAccountId, testFriendId); setNotice({ tone: 'success', text: `「${column.title}」をテスト送信しました。LINEを確認してください。` }) }
+    catch (caught) { setNotice({ tone: 'error', text: testSendFailureText(caught, 'コラムをテスト送信できませんでした。') }) } finally { setTesting(null) }
   }
   const sendPendingNow = async () => {
     if (!selectedAccountId) return
@@ -347,7 +357,7 @@ export default function NenCampaignsPage() {
         topAction={headerAction}
         tab={tab} onTabChange={changeTab} settings={settings} columns={columns} kpis={kpis}
         flowMetrics={flowMetrics} columnMetrics={columnMetrics} deliveryList={deliveryList} deliveryDetail={deliveryDetail}
-        friends={friends} testFriendId={testFriendId} onTestFriendChange={setTestFriendId}
+        friends={friends} testFriendId={testFriendId} onTestFriendChange={setTestFriendId} accountId={selectedAccountId}
         loading={loading} notice={notice}
         saving={saving} testing={testing}
         previewCampaignKey={previewCampaignKey} onPreviewCampaign={setPreviewCampaignKey}

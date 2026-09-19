@@ -35,6 +35,7 @@ function renderCoupon(coupon: NenCoupon, onCouponChange: (coupon: NenCoupon) => 
         friends={[]}
         testFriendId=""
         onTestFriendChange={noop}
+        accountId={null}
         loading={false}
         notice={null}
         saving={null}
