@@ -6,6 +6,7 @@ import {
   createAutoReply,
   updateAutoReply,
   deleteAutoReply,
+  stopAutoReply,
   getAutoReplyHitCounts,
   getAutoReplyHitCountSince,
   getFriendById,
@@ -146,6 +147,13 @@ interface SerializedAutoReply {
   keywordMatchMode: string;
   /** フォルダ。分けていなければ null。 */
   folderId: string | null;
+  /** 273: 'draft'（未公開）| 'published' | 'stopped'。一覧が再開の可否を分けるのに使う。 */
+  lifecycleStatus: string;
+  /** 機能08 点検 E-01: 最後に停止した日時・担当者・理由。止めたことが無ければ null。 */
+  stoppedAt: string | null;
+  stoppedByStaffId: string | null;
+  stoppedByStaffName: string | null;
+  stopReason: string | null;
   /** 152: 当たった回数。一覧でだけ入る。 */
   hits?: { period: number; total: number };
   /** 実行台帳で成功を確認できた後続処理の累計。 */
@@ -673,7 +681,8 @@ async function activeRulesWithDraft(
 ): Promise<DbAutoReply[]> {
   const active = await db.prepare(
     `SELECT * FROM auto_replies
-      WHERE is_active = 1 AND (line_account_id IS NULL OR line_account_id = ?)
+      WHERE is_active = 1 AND deleted_at IS NULL
+        AND (line_account_id IS NULL OR line_account_id = ?)
       ORDER BY priority ASC, respond_to_all ASC, created_at ASC`,
   ).bind(settings.lineAccountId).all<DbAutoReply>();
   const existing = await getAutoReplyById(db, autoReplyId);
@@ -838,8 +847,38 @@ function serializeAutoReply(row: DbAutoReply): SerializedAutoReply {
     name: row.name,
     keywordMatchMode: row.keyword_match_mode ?? 'any',
     folderId: row.folder_id,
+    lifecycleStatus: row.lifecycle_status ?? 'published',
+    stoppedAt: row.stopped_at ?? null,
+    stoppedByStaffId: row.stopped_by_staff_id ?? null,
+    stoppedByStaffName: null,
+    stopReason: row.stop_reason ?? null,
     createdAt: row.created_at,
   };
+}
+
+/** 停止した担当者の表示名を引く。止めた記録が無い一覧では1問も投げない。 */
+async function resolveStoppedByNames(
+  db: D1Database,
+  items: SerializedAutoReply[],
+): Promise<void> {
+  const ids = [...new Set(
+    items.map((item) => item.stoppedByStaffId).filter((id): id is string => Boolean(id)),
+  )];
+  if (ids.length === 0) return;
+  try {
+    const rows = await db.prepare(
+      `SELECT id, name FROM staff_members WHERE id IN (${ids.map(() => '?').join(',')})`,
+    ).bind(...ids).all<{ id: string; name: string }>();
+    const nameById = new Map((rows.results ?? []).map((row) => [row.id, row.name]));
+    for (const item of items) {
+      item.stoppedByStaffName = item.stoppedByStaffId
+        ? nameById.get(item.stoppedByStaffId) ?? null
+        : null;
+    }
+  } catch (err) {
+    // 名前が引けなくても一覧は出す。ID そのものは画面に出さず null のままにする。
+    console.error('resolveStoppedByNames — failed to load staff names', err);
+  }
 }
 
 /**
@@ -971,6 +1010,7 @@ autoReplies.get('/api/auto-replies', requireRole('owner', 'admin', 'staff'), asy
         return base;
       }),
     );
+    await resolveStoppedByNames(c.env.DB, data);
 
     // 共通一覧契約。page/limit を付けたときだけ新形（items/total/limit/sort）で返す。
     // 画面はまだ旧形（配列）を読むため、付けない限り形を変えない。
@@ -1060,7 +1100,9 @@ autoReplies.get('/api/auto-replies/:id', async (c) => {
     if (!item) {
       return c.json({ success: false, error: 'Auto-reply not found' }, 404);
     }
-    return c.json({ success: true, data: serializeAutoReply(item) });
+    const data = serializeAutoReply(item);
+    await resolveStoppedByNames(c.env.DB, [data]);
+    return c.json({ success: true, data });
   } catch (err) {
     console.error('GET /api/auto-replies/:id error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
@@ -1553,7 +1595,60 @@ autoReplies.put('/api/auto-replies/:id', requireRole('owner', 'admin'), async (c
   }
 });
 
+/** 停止の理由は任意。長文は理由というよりメモなので上限を付ける。 */
+const AUTO_REPLY_STOP_REASON_MAX = 500;
+
+/**
+ * POST /api/auto-replies/:id/stop — 専用の停止口（機能08 点検 E-01）。
+ *
+ * isActive の素のトグルでは「いつ・誰が・なぜ止めたか」が残らない。
+ * 停止は運用の判断なので、理由（任意）・担当者・日時を記録する。
+ * 確認キー（Idempotency-Key）必須。同じキーの再送は新しい停止として残さない。
+ */
+autoReplies.post('/api/auto-replies/:id/stop', requireRole('owner', 'admin'), async (c) => {
+  try {
+    const requestKey = c.req.header('Idempotency-Key');
+    if (!validIdempotencyKey(requestKey)) {
+      return c.json({ success: false, error: '停止操作の確認キーが必要です' }, 400);
+    }
+    const body: { reason?: unknown } = await c.req
+      .json<{ reason?: unknown }>()
+      .catch(() => ({}));
+    let reason: string | null = null;
+    if (body.reason !== undefined && body.reason !== null) {
+      if (typeof body.reason !== 'string') {
+        return c.json({ success: false, error: '停止の理由は文字列で入力してください' }, 400);
+      }
+      const trimmed = body.reason.trim();
+      if ([...trimmed].length > AUTO_REPLY_STOP_REASON_MAX) {
+        return c.json({
+          success: false,
+          error: `停止の理由は${AUTO_REPLY_STOP_REASON_MAX}文字以内で入力してください`,
+        }, 400);
+      }
+      reason = trimmed === '' ? null : trimmed;
+    }
+    const stopped = await stopAutoReply(c.env.DB, {
+      id: c.req.param('id'),
+      staffId: c.get('staff')?.id ?? null,
+      reason,
+      idempotencyKey: requestKey,
+    });
+    if (!stopped) {
+      return c.json({ success: false, error: 'Auto-reply not found' }, 404);
+    }
+    const data = serializeAutoReply(stopped);
+    await resolveStoppedByNames(c.env.DB, [data]);
+    return c.json({ success: true, data });
+  } catch (err) {
+    console.error('POST /api/auto-replies/:id/stop error:', err);
+    return c.json({ success: false, error: '自動応答を停止できませんでした' }, 500);
+  }
+});
+
 // DELETE /api/auto-replies/:id
+// 物理削除ではなく履歴を残す方式（機能08 点検 N-085）。設定と担当者を残し、
+// 一覧・評価・集計からは外れる。過去の一致記録と実行台帳はそのまま残る。
 autoReplies.delete('/api/auto-replies/:id', requireRole('owner', 'admin'), async (c) => {
   try {
     const id = c.req.param('id');
@@ -1561,7 +1656,7 @@ autoReplies.delete('/api/auto-replies/:id', requireRole('owner', 'admin'), async
     if (!item) {
       return c.json({ success: false, error: 'Auto-reply not found' }, 404);
     }
-    await deleteAutoReply(c.env.DB, id);
+    await deleteAutoReply(c.env.DB, id, c.get('staff')?.id ?? null);
     return c.json({ success: true, data: null });
   } catch (err) {
     console.error('DELETE /api/auto-replies/:id error:', err);

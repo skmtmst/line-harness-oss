@@ -1632,6 +1632,14 @@ const spec = {
         responses: { '200': { description: 'Visible auto replies' }, '403': { description: 'Staff role required' }, '404': { description: 'LINE account not found in account scope' } },
       },
     },
+    '/api/auto-replies/{id}/stop': {
+      post: {
+        tags: ['Auto replies'], summary: '自動応答を停止し、理由・担当者・日時を記録（E-01）',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: { required: false, content: { 'application/json': { schema: { type: 'object', properties: { reason: { type: 'string' } } } } } },
+        responses: { '200': { description: 'Auto reply stopped; stop record returned' }, '400': { description: 'Idempotency-Key header required or invalid reason' }, '403': { description: 'Owner or admin role required' }, '404': { description: 'Auto reply not found in account scope' } },
+      },
+    },
     '/api/auto-reply-runs/{id}/retry': {
       post: {
         tags: ['Auto replies'], summary: '恒久失敗した後続処理だけを保存済みの内容でやり直す（LINEへの返信は送り直さない）（N-081）',

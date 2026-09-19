@@ -286,6 +286,7 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'POST /api/auth/step-up',
   'POST /api/auth/two-factor/setup',
   'POST /api/auth/two-factor/setup/confirm',
+  'POST /api/auto-replies/{id}/stop',
   'POST /api/auto-reply-runs/{id}/retry',
   'POST /api/automation-runs/{id}/cancel',
   'POST /api/automations/{id}/draft',

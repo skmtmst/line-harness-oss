@@ -177,12 +177,13 @@ export async function getOperationImpactPreview(
       ? db.prepare(
         `SELECT COUNT(*) AS item_count, NULL AS friend_count
            FROM auto_replies
-          WHERE is_active = 1 AND (line_account_id = ? OR line_account_id IS NULL)`,
+          WHERE is_active = 1 AND deleted_at IS NULL
+            AND (line_account_id = ? OR line_account_id IS NULL)`,
       ).bind(accountId).first<CountRow>()
       : db.prepare(
         `SELECT COUNT(*) AS item_count, NULL AS friend_count
            FROM auto_replies
-          WHERE is_active = 1`,
+          WHERE is_active = 1 AND deleted_at IS NULL`,
       ).first<CountRow>(),
   ]);
 
