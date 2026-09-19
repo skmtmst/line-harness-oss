@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
+import Link from 'next/link'
 import type { BookingRequest } from '@/lib/api'
 import Button from '@/components/shared/button'
 
@@ -104,8 +105,30 @@ function BookingCard({ booking, compact = false, onOpen }: {
   )
 }
 
-function EmptyCell() {
-  return <span className="text-ink-faint text-xs opacity-50">あき</span>
+function EmptyCell({ href }: { href?: string }) {
+  // N-399: 空きセルが代理予約の入口になる。操作権限がない人・遷移先が
+  // 組み立てられないセルには「あき」の文字だけを残し、押せる形に見せない。
+  if (!href) return <span className="text-ink-faint text-xs opacity-50">あき</span>
+  return (
+    <Link
+      href={href}
+      aria-label="この空き枠に予約を入れる"
+      title="この空き枠に予約を入れる"
+      className="text-ink-faint hover:bg-accent-soft hover:text-accent inline-block rounded-control px-2 py-0.5 text-xs opacity-60 transition hover:opacity-100"
+    >
+      あき ＋
+    </Link>
+  )
+}
+
+/** 空きセル→代理予約のURL。日付・時刻・担当（分かるとき）を渡して事前入力する。 */
+function newBookingHref(input: { day: string; hour: number; staffName?: string }): string {
+  const params = new URLSearchParams({
+    date: input.day,
+    time: `${String(input.hour).padStart(2, '0')}:00`,
+  })
+  if (input.staffName) params.set('staff', input.staffName)
+  return `/booking/bookings/new?${params.toString()}`
 }
 
 function CalendarFrame({
@@ -139,9 +162,12 @@ function CalendarFrame({
   )
 }
 
-function DayGrid({ items, staff, onOpen }: {
+function DayGrid({ items, staff, day, canCreate, onOpen }: {
   items: BookingRequest[]
   staff: string[]
+  day: string
+  /** N-399: 操作できる人だけ空きセルを代理予約の入口にする。 */
+  canCreate: boolean
   onOpen: (id: string) => void
 }) {
   const columns = `64px repeat(${Math.max(staff.length, 1)}, minmax(0, 1fr))`
@@ -171,7 +197,7 @@ function DayGrid({ items, staff, onOpen }: {
               <div key={name} className="border-hairline flex min-w-0 items-center border-l p-1">
                 {cell.length > 0
                   ? <div className="w-full space-y-1">{cell.map((booking) => <BookingCard key={booking.id} booking={booking} onOpen={onOpen} />)}</div>
-                  : <div className="w-full text-center"><EmptyCell /></div>}
+                  : <div className="w-full text-center"><EmptyCell href={canCreate ? newBookingHref({ day, hour, staffName: name }) : undefined} /></div>}
               </div>
             )
           })}
@@ -181,9 +207,10 @@ function DayGrid({ items, staff, onOpen }: {
   )
 }
 
-function WeekGrid({ days, items, onOpen }: {
+function WeekGrid({ days, items, canCreate, onOpen }: {
   days: string[]
   items: BookingRequest[]
+  canCreate: boolean
   onOpen: (id: string) => void
 }) {
   const columns = '64px repeat(7, minmax(0, 1fr))'
@@ -229,7 +256,7 @@ function WeekGrid({ days, items, onOpen }: {
               <div key={day} className="border-hairline flex min-w-0 items-center border-l p-1">
                 {cell.length > 0
                   ? <div className="w-full space-y-1">{cell.map((booking) => <BookingCard key={booking.id} booking={booking} compact onOpen={onOpen} />)}</div>
-                  : <div className="w-full text-center"><EmptyCell /></div>}
+                  : <div className="w-full text-center"><EmptyCell href={canCreate ? newBookingHref({ day, hour }) : undefined} /></div>}
               </div>
             )
           })}
@@ -248,10 +275,14 @@ function SidePanel({ title, children, tone = 'plain' }: { title: string; childre
   )
 }
 
-export default function BookingCalendar({ mode, items, onOpen }: {
+export default function BookingCalendar({ mode, items, onOpen, staffNames, canCreate = false }: {
   mode: 'day' | 'week'
   items: BookingRequest[]
   onOpen: (id: string) => void
+  /** 稼働中の担当者名。予約がまだ無い担当も列に出す（その空きへ予約を入れられる）。 */
+  staffNames?: string[]
+  /** N-399/N-401: 操作できる人だけ空きセルを代理予約の入口にする。 */
+  canCreate?: boolean
 }) {
   const [anchorDay, setAnchorDay] = useState(todayKey)
   const weekStart = startOfWeek(anchorDay)
@@ -260,9 +291,13 @@ export default function BookingCalendar({ mode, items, onOpen }: {
   const weekItems = useMemo(() => items.filter((booking) => days.includes(jstDay(booking.starts_at))), [days, items])
   const visible = mode === 'day' ? dayItems : weekItems
   const staff = useMemo(() => {
-    const names = new Set(items.map((booking) => booking.staff_name).filter(Boolean))
+    // まだ予約の入っていない担当も列に出す。空き列が代理予約の入口になる。
+    const names = new Set(staffNames?.filter(Boolean) ?? [])
+    for (const booking of items) {
+      if (booking.staff_name) names.add(booking.staff_name)
+    }
     return Array.from(names)
-  }, [items])
+  }, [items, staffNames])
   const phoneCount = visible.filter(isPhoneBooking).length
   const lineCount = visible.length - phoneCount
   const sales = visible.reduce((sum, booking) => sum + booking.price_at_booking, 0)
@@ -295,7 +330,7 @@ export default function BookingCalendar({ mode, items, onOpen }: {
               onNext={() => setAnchorDay((day) => moveDay(day, 1))}
               onToday={() => setAnchorDay(todayKey())}
             >
-              <DayGrid items={dayItems} staff={staff} onOpen={onOpen} />
+              <DayGrid items={dayItems} staff={staff} day={anchorDay} canCreate={canCreate} onOpen={onOpen} />
             </CalendarFrame>
           ) : (
             <CalendarFrame
@@ -305,7 +340,7 @@ export default function BookingCalendar({ mode, items, onOpen }: {
               onNext={() => setAnchorDay((day) => moveDay(day, 7))}
               onToday={() => setAnchorDay(todayKey())}
             >
-              <WeekGrid days={days} items={weekItems} onOpen={onOpen} />
+              <WeekGrid days={days} items={weekItems} canCreate={canCreate} onOpen={onOpen} />
             </CalendarFrame>
           )}
         </div>

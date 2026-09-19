@@ -10878,6 +10878,9 @@ export interface BookingRequest {
   requested_at: string;
   decided_at: string | null;
   external_event_id: string | null;
+  /** 担当者・種別の絞り込み用 (#933 N-398)。`SELECT b.*` で返る実列。 */
+  staff_id: string;
+  source: 'liff' | 'phone' | 'counter' | 'operator' | 'import';
 }
 
 export interface BookingAvailabilityRule {
@@ -11488,6 +11491,8 @@ export const bookingApi = {
     offset?: number
     query?: string
     menuName?: string
+    staffId?: string
+    source?: string
     from?: string
     to?: string
   }) => {
@@ -11496,11 +11501,37 @@ export const bookingApi = {
     if (params?.offset) query.set('offset', String(params.offset))
     if (params?.query) query.set('query', params.query)
     if (params?.menuName) query.set('menu_name', params.menuName)
+    if (params?.staffId) query.set('staff_id', params.staffId)
+    if (params?.source) query.set('source', params.source)
     if (params?.from) query.set('from', params.from)
     if (params?.to) query.set('to', params.to)
     return fetchApi<{ requests: BookingRequest[]; total: number }>(
       withAccount(`/api/booking/admin/requests?${query.toString()}`, accountId),
     )
+  },
+  /**
+   * 予約台帳CSVの書出しURL (#933 N-397)。一覧と同じ絞り込みをそのまま受ける。
+   * サーバ側は最大5000件までで、範囲の断りはCSV先頭の注記行に入る。
+   */
+  ledgerCsvUrl: (accountId: string, params?: {
+    status?: string
+    query?: string
+    menuName?: string
+    staffId?: string
+    source?: string
+    from?: string
+    to?: string
+  }) => {
+    const query = new URLSearchParams()
+    if (params?.status) query.set('status', params.status)
+    if (params?.query) query.set('query', params.query)
+    if (params?.menuName) query.set('menu_name', params.menuName)
+    if (params?.staffId) query.set('staff_id', params.staffId)
+    if (params?.source) query.set('source', params.source)
+    if (params?.from) query.set('from', params.from)
+    if (params?.to) query.set('to', params.to)
+    const suffix = query.toString() ? `&${query.toString()}` : ''
+    return `${API_URL}/api/booking/admin/bookings.csv?account_id=${encodeURIComponent(accountId)}${suffix}`
   },
   requestsSummary: (accountId: string, params: {
     month: string

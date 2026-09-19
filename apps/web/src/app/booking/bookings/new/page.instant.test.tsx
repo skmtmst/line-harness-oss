@@ -31,13 +31,21 @@ const api = vi.hoisted(() => ({
 }))
 
 const friendsList = vi.hoisted(() => vi.fn())
+// N-401: 画面は本人の権限で操作ボタンを出す。ここでは操作できる人として通す。
+const staffMe = vi.hoisted(() =>
+  vi.fn(async () => ({ success: true as const, data: { role: 'admin' as const, permissionKeys: [] } })),
+)
 
 vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/api')>) => {
   const actual = await importOriginal()
   return {
     ...actual,
     bookingApi: api,
-    api: { ...actual.api, friends: { ...actual.api.friends, list: friendsList } },
+    api: {
+      ...actual.api,
+      friends: { ...actual.api.friends, list: friendsList },
+      staff: { ...actual.api.staff, me: staffMe },
+    },
   }
 })
 
@@ -162,6 +170,8 @@ async function fillInput() {
 describe('代理予約: 店舗タイムゾーンの instant で確定する（実React・NY店舗）', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    // N-400: 下書きが試験をまたいで残らないよう毎回捨てる。
+    window.sessionStorage.clear()
     api.listMenus.mockResolvedValue({
       menus: [{
         id: 'menu-ny', name: '相談', category_label: null, description: null,
