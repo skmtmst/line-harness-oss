@@ -700,6 +700,51 @@ function petWriteBody(body: Record<string, unknown> | null):
   };
 }
 
+/**
+ * PUTの部分更新用。送られた項目だけ検証して返し、欠落項目は呼び出し側で現値を保つ。
+ * 検証はDBを読む前に済ませるため、ここは入力だけを見る（無効入力でDBを叩かない）。
+ */
+function petPatchBody(body: Record<string, unknown> | null):
+  { error: string } | {
+    name?: string; animalType?: string; gender?: string; birthday?: string | null;
+    breed?: string | null; weightKg?: number | null;
+  } {
+  const patch: {
+    name?: string; animalType?: string; gender?: string; birthday?: string | null;
+    breed?: string | null; weightKg?: number | null;
+  } = {};
+  if (!body) return patch;
+  if (body.name !== undefined) {
+    if (typeof body.name !== 'string' || !body.name.trim()) return { error: 'name is required' };
+    if (countNenCampaignBodyLength(body.name.trim()) > NEN_PET_NAME_MAX_LENGTH) {
+      return { error: `ペットのお名前は${NEN_PET_NAME_MAX_LENGTH}字以内で入力してください` };
+    }
+    patch.name = body.name.trim();
+  }
+  if (body.animalType !== undefined) {
+    patch.animalType = ['dog', 'cat', 'other'].includes(String(body.animalType)) ? String(body.animalType) : 'dog';
+  }
+  if (body.gender !== undefined) {
+    patch.gender = ['male', 'female', 'unknown'].includes(String(body.gender)) ? String(body.gender) : 'unknown';
+  }
+  if (body.birthday !== undefined) {
+    const birthday = normalizeNenPetBirthday(body.birthday);
+    if (birthday === 'invalid') return { error: '誕生日は YYYY-MM-DD か MM-DD で入力してください' };
+    patch.birthday = birthday;
+  }
+  if (body.breed !== undefined) {
+    patch.breed = typeof body.breed === 'string' && body.breed.trim() ? body.breed.trim().slice(0, 80) : null;
+  }
+  if (body.weightKg !== undefined) {
+    const weightKg = body.weightKg === null || body.weightKg === '' ? null : Number(body.weightKg);
+    if (weightKg !== null && (!Number.isFinite(weightKg) || weightKg < 0.1 || weightKg > 200)) {
+      return { error: '体重は 0.1〜200kg で入力してください' };
+    }
+    patch.weightKg = weightKg;
+  }
+  return patch;
+}
+
 nenCampaigns.post('/api/nen-campaigns/pets', requireRole('owner', 'admin'), async (c) => {
   const accountId = await requireAccount(c);
   if (typeof accountId !== 'string') return accountId;
@@ -729,6 +774,9 @@ nenCampaigns.put('/api/nen-campaigns/pets/:id', requireRole('owner', 'admin'), a
   const accountId = await requireAccount(c);
   if (typeof accountId !== 'string') return accountId;
   const body = await c.req.json<Record<string, unknown>>().catch(() => null);
+  // 入力検証はDBを読む前に済ませる。無効な入力ではDBへ一切行かない。
+  const patch = petPatchBody(body ?? {});
+  if ('error' in patch) return c.json({ success: false, error: patch.error }, 400);
   const pet = await c.env.DB.prepare(
     `SELECT p.friend_id, p.name, p.animal_type, p.gender, p.birthday, p.breed, p.weight_kg, f.line_account_id
      FROM nen_pet_profiles p JOIN friends f ON f.id = p.friend_id WHERE p.id = ?`,
@@ -742,18 +790,20 @@ nenCampaigns.put('/api/nen-campaigns/pets/:id', requireRole('owner', 'admin'), a
   }
   // 送られてこなかった項目は現値を保つ部分更新（LIFF PUT と同じ意味づけ）。
   // 既定値で上書きすると、名前だけ直す更新で他項目まで消えてしまう。
-  const input = petWriteBody({
-    name: pet.name, animalType: pet.animal_type, gender: pet.gender,
-    birthday: pet.birthday, breed: pet.breed, weightKg: pet.weight_kg,
-    ...(body ?? {}),
-  });
-  if ('error' in input) return c.json({ success: false, error: input.error }, 400);
+  const input = {
+    name: patch.name ?? pet.name,
+    animalType: patch.animalType ?? pet.animal_type,
+    gender: patch.gender ?? pet.gender,
+    birthday: patch.birthday === undefined ? pet.birthday : patch.birthday,
+    breed: patch.breed === undefined ? pet.breed : patch.breed,
+    weightKg: patch.weightKg === undefined ? pet.weight_kg : patch.weightKg,
+  };
   await c.env.DB.prepare(
     `UPDATE nen_pet_profiles SET name = ?, animal_type = ?, gender = ?, birthday = ?, breed = ?, weight_kg = ?, updated_at = ? WHERE id = ?`,
   ).bind(input.name, input.animalType, input.gender, input.birthday, input.breed, input.weightKg, jstNow(), c.req.param('id')).run();
-  // 誕生日が変わったら、古い日付へ予約済みの誕生日クーポン配信を取消し、
-  // 次の日次走査で新しい誕生日から組み直させる。すでに発行済みの今年分は残る。
-  if ((pet.birthday ?? null) !== input.birthday) {
+  // 誕生日を明示して変えたときだけ、古い日付へ予約済みの誕生日クーポン配信を
+  // 取消し、次の日次走査で新しい誕生日から組み直させる。発行済みの今年分は残る。
+  if (patch.birthday !== undefined && (pet.birthday ?? null) !== patch.birthday) {
     await c.env.DB.prepare(
       `UPDATE nen_delivery_jobs SET status = 'cancelled', updated_at = ?
        WHERE campaign_key = 'birthday_coupon' AND status = 'pending' AND source_key LIKE ?`,
