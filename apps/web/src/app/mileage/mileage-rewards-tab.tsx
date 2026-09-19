@@ -240,20 +240,30 @@ export default function MileageRewardsTab({ accountId }: { accountId: string | n
     }
   }
 
+  /*
+   * N-236: 「止めています」の使い道は、止める前と同じ公開版で
+   * もう一度出せる。片づけた（archived）ものだけは、間違って戻さないよう
+   * ここでは操作を出さない。
+   */
   const changePublishedState = async (reward: MileageRewardSummary) => {
-    if (!accountId || (reward.status !== 'published' && reward.status !== 'draft')) return
+    if (!accountId
+      || (reward.status !== 'published' && reward.status !== 'draft' && reward.status !== 'stopped')) return
     setBusyRewardId(reward.id)
     setActionError('')
     try {
       const response = reward.status === 'published'
         ? await api.mileage.stopReward(reward.id, accountId)
-        : await api.mileage.publishReward(reward.id, accountId)
+        : reward.status === 'stopped'
+          ? await api.mileage.resumeReward(reward.id, accountId)
+          : await api.mileage.publishReward(reward.id, accountId)
       if (!response.success) throw new Error(response.error)
       await load()
     } catch {
       setActionError(reward.status === 'published'
         ? '使い道を止められませんでした。もう一度お試しください。'
-        : '使い道を公開できませんでした。内容を確認してもう一度お試しください。')
+        : reward.status === 'stopped'
+          ? '使い道をまた出せませんでした。もう一度お試しください。'
+          : '使い道を公開できませんでした。内容を確認してもう一度お試しください。')
     } finally {
       setBusyRewardId(null)
     }
@@ -395,12 +405,18 @@ export default function MileageRewardsTab({ accountId }: { accountId: string | n
                         <Td align="right">
                           <div className="flex justify-end gap-2">
                             <Button aria-label="内容を編集" href={`/mileage/rewards/edit?id=${encodeURIComponent(reward.id)}`}>中身を見る</Button>
-                            {reward.status === 'published' || reward.status === 'draft' ? (
+                            {reward.status === 'published' || reward.status === 'draft' || reward.status === 'stopped' ? (
                               <Button
                                 disabled={busyRewardId === reward.id}
                                 onClick={() => void changePublishedState(reward)}
                               >
-                                {busyRewardId === reward.id ? '反映しています' : reward.status === 'published' ? '止める' : '出す'}
+                                {busyRewardId === reward.id
+                                  ? '反映しています'
+                                  : reward.status === 'published'
+                                    ? '止める'
+                                    : reward.status === 'stopped'
+                                      ? 'また出す'
+                                      : '出す'}
                               </Button>
                             ) : null}
                           </div>

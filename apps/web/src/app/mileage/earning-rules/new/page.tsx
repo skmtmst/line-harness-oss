@@ -37,7 +37,8 @@ import ConditionBuilder, {
  */
 
 /**
- * きっかけ。実際に awardActivityMileage が呼ばれている行動だけを並べる。
+ * きっかけ。実際に awardActivityMileage / enqueueMileageEvent が呼ばれている
+ * 行動だけを並べる（N-238: 届かない出来事を選べる見せかけにしない）。
  * source を指定すると、その経路から来たものだけが対象になる。
  */
 const EVENT_TYPES = [
@@ -45,7 +46,10 @@ const EVENT_TYPES = [
     value: 'message_received',
     label: 'メッセージを受け取った',
     note: '友だちからトークが届いたとき',
-    sources: [['', 'すべて']],
+    sources: [
+      ['', 'すべて'],
+      ['line', 'LINEのトーク'],
+    ],
   },
   {
     value: 'link_clicked',
@@ -85,6 +89,69 @@ const EVENT_TYPES = [
     ],
   },
   {
+    value: 'friend_following_7d',
+    label: '7日つづけてフォローしてくれた',
+    note: 'フォローが7日つづいたとき',
+    sources: [
+      ['', 'すべて'],
+      ['line_relationship', 'LINEの友だち関係'],
+    ],
+  },
+  {
+    value: 'friend_following_30d',
+    label: '30日つづけてフォローしてくれた',
+    note: 'フォローが30日つづいたとき',
+    sources: [
+      ['', 'すべて'],
+      ['line_relationship', 'LINEの友だち関係'],
+    ],
+  },
+  {
+    value: 'friend_following_90d',
+    label: '90日つづけてフォローしてくれた',
+    note: 'フォローが90日つづいたとき',
+    sources: [
+      ['', 'すべて'],
+      ['line_relationship', 'LINEの友だち関係'],
+    ],
+  },
+  {
+    value: 'friend_following_180d',
+    label: '180日つづけてフォローしてくれた',
+    note: 'フォローが180日つづいたとき',
+    sources: [
+      ['', 'すべて'],
+      ['line_relationship', 'LINEの友だち関係'],
+    ],
+  },
+  {
+    value: 'friend_following_365d',
+    label: '1年つづけてフォローしてくれた',
+    note: 'フォローが1年つづいたとき',
+    sources: [
+      ['', 'すべて'],
+      ['line_relationship', 'LINEの友だち関係'],
+    ],
+  },
+  {
+    value: 'webinar_watch_5m',
+    label: 'ウェビナーを5分見た',
+    note: '再生位置が5分を超えたとき',
+    sources: [
+      ['', 'すべて'],
+      ['webinar', 'ウェビナー'],
+    ],
+  },
+  {
+    value: 'webinar_watch_15m',
+    label: 'ウェビナーを15分見た',
+    note: '再生位置が15分を超えたとき',
+    sources: [
+      ['', 'すべて'],
+      ['webinar', 'ウェビナー'],
+    ],
+  },
+  {
     value: 'webinar_completed',
     label: 'ウェビナーを見終えた',
     note: '9割まで見たとき',
@@ -118,6 +185,51 @@ const EVENT_TYPES = [
     sources: [
       ['', 'すべて'],
       ['instagram', 'Instagram'],
+    ],
+  },
+  {
+    value: 'instagram_dm_received',
+    label: 'InstagramのDMが届いた',
+    note: 'Instagram連携からDMが届いたとき',
+    sources: [
+      ['', 'すべて'],
+      ['instagram', 'Instagram'],
+    ],
+  },
+  {
+    value: 'instagram_comment_created',
+    label: 'Instagramにコメントされた',
+    note: '投稿にコメントが付いたとき',
+    sources: [
+      ['', 'すべて'],
+      ['instagram', 'Instagram'],
+    ],
+  },
+  {
+    value: 'instagram_story_mentioned',
+    label: 'Instagramのストーリーで言及された',
+    note: 'ストーリーでメンションされたとき',
+    sources: [
+      ['', 'すべて'],
+      ['instagram', 'Instagram'],
+    ],
+  },
+  {
+    value: 'tag_added',
+    label: 'タグが付いた',
+    note: '担当者や自動処理でタグが付いたとき',
+    sources: [
+      ['', 'すべて'],
+      ['tag', 'タグ'],
+    ],
+  },
+  {
+    value: 'affiliate_conversion_approved',
+    label: '紹介の成果が承認された',
+    note: '紹介の成果を管理者が承認したとき。行動した人は紹介者です',
+    sources: [
+      ['', 'すべて'],
+      ['affiliate_conversion', '紹介成果'],
     ],
   },
 ] as const
@@ -339,7 +451,7 @@ export default function NewMileageRulePage() {
                 <li>・付与マイルは1以上でないと保存できません。</li>
                 <li>・確定待ちの確定操作は、まだ画面にありません。</li>
                 <li>・複数のルールが当たると、それぞれ加算されます。</li>
-                <li>・「タグが付いた」は、まだきっかけに選べません。</li>
+                <li>・「紹介の成果が承認された」は紹介者が行動した人になります。却下された成果はきっかけに選べません。</li>
               </ul>
             </details>
           </AsideCard>
