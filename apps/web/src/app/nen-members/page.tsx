@@ -23,7 +23,7 @@ import { PhotoPublications } from './photo-publications'
 import { safePhotoSrc } from './photo-src'
 import { photoPetDisplayName } from '@/components/shared/photo-display-name'
 import { photoNoticeFor } from './photo-notice'
-import { photoReviewEntryFrom } from './photo-review-query'
+import { photoReviewEntryFrom, photoReviewSearch } from './photo-review-query'
 import { reviewVersionOf, text } from './photo-text'
 import styles from './photo-review.module.css'
 
@@ -33,9 +33,10 @@ type PhotoStatus = 'pending' | 'adopted' | 'rejected'
  * きたら、まだ先がある可能性があるので「さらに読み込む」を出す。
  */
 const PHOTO_PAGE_SIZE = 200
-function photoPagePath(accountId: string, offset: number): string {
+function photoPagePath(accountId: string, offset: number, q = ''): string {
   const params = new URLSearchParams({ accountId, limit: String(PHOTO_PAGE_SIZE) })
   if (offset > 0) params.set('offset', String(offset))
+  if (q) params.set('q', q)
   return `/api/nen-members/photos?${params.toString()}`
 }
 type PhotoPageResponse = ApiResponse<Array<Record<string, unknown>>>
@@ -84,6 +85,26 @@ export default function PhotoReviewsPage() {
   const [bulkReturnOpen, setBulkReturnOpen] = useState(false)
   const [bulkReviewing, setBulkReviewing] = useState(false)
   const [bulkFailed, setBulkFailed] = useState<Array<{ photoId: string; petName: string; error: string }>>([])
+  /*
+   * 一覧の絞り込み語（#931 N-308）。入力中と確定した語を分ける。
+   * 確定した語だけが一覧の再取得とURLへ写る。
+   */
+  const [searchInput, setSearchInput] = useState('')
+  const [searchQuery, setSearchQuery] = useState('')
+  /*
+   * 差戻し画面の2つの約束（#931 N-312）。「再投稿をお願いする」は
+   * 届く文面へ、「次の投稿は必ず人が見る」は投稿者の印へ保存する。
+   */
+  const [resubmitInvite, setResubmitInvite] = useState(true)
+  const [watchSubmitter, setWatchSubmitter] = useState(false)
+  /*
+   * 写真ごとの審査・再送の再実行キー（#931 N-313）。同じ写真への
+   * やり直しは同じキーで送り、連打や応答ロストの再試行が
+   * 「別の担当者が更新しました」にならないようにする。
+   * 審査が確定したら消して、次の操作は新しいキーにする。
+   */
+  const reviewKeys = useRef(new Map<string, string>())
+  const retryKeys = useRef(new Map<string, string>())
   const loadSequence = useRef(0)
   /*
    * 操作を始めたときのLINEアカウント世代。Aの審査・再送の応答が遅れて
@@ -108,7 +129,7 @@ export default function PhotoReviewsPage() {
     setLoadForbidden(false)
     setHasMorePhotos(false)
     const [photosResult, metricsResult] = await Promise.allSettled([
-      fetchApi<PhotoPageResponse>(photoPagePath(selectedAccountId, 0)),
+      fetchApi<PhotoPageResponse>(photoPagePath(selectedAccountId, 0, searchQuery)),
       api.nenMembers.photoReviewMetrics(selectedAccountId),
     ])
     if (sequence !== loadSequence.current) return
@@ -136,7 +157,7 @@ export default function PhotoReviewsPage() {
     } finally {
       if (sequence === loadSequence.current) setLoading(false)
     }
-  }, [selectedAccountId])
+  }, [selectedAccountId, searchQuery])
   useEffect(() => { void load() }, [load])
   /*
    * 続きを取る。ダッシュボードの「確認待ち N件」に対して、ここが 200 枚で
@@ -148,7 +169,7 @@ export default function PhotoReviewsPage() {
     const sequence = loadSequence.current
     setLoadingMore(true)
     try {
-      const response = await fetchApi<PhotoPageResponse>(photoPagePath(selectedAccountId, photos.length))
+      const response = await fetchApi<PhotoPageResponse>(photoPagePath(selectedAccountId, photos.length, searchQuery))
       if (sequence !== loadSequence.current) return
       if (!response.success) throw new Error('load_failed')
       setPhotos((current) => [...current, ...response.data])
@@ -160,7 +181,7 @@ export default function PhotoReviewsPage() {
     } finally {
       if (sequence === loadSequence.current) setLoadingMore(false)
     }
-  }, [hasMorePhotos, loadingMore, photos.length, selectedAccountId])
+  }, [hasMorePhotos, loadingMore, photos.length, selectedAccountId, searchQuery])
   useEffect(() => {
     accountGeneration.current += 1
     setNotice('')
@@ -174,21 +195,108 @@ export default function PhotoReviewsPage() {
     setDetailAssetStatus(null)
     setDetailDerivatives(null)
     setDetailAssetsFailed(false)
-    setSelectedPhotoIds([])
     setBulkApproveOpen(false)
     setBulkReturnOpen(false)
     setBulkFailed([])
+    setSearchInput('')
+    setSearchQuery('')
+    /*
+     * アカウントごとの選択を復元する（#931 N-314）。切り替え前の
+     * アカウントの選択が残ると、別アカウントの写真をまとめて処理
+     * しようとして見つからず黙って外れる。保存はキーを分ける。
+     */
+    if (selectedAccountId && typeof window !== 'undefined') {
+      try {
+        const saved = window.sessionStorage.getItem(`nen-photo-review:selection:${selectedAccountId}`)
+        setSelectedPhotoIds(saved ? JSON.parse(saved) as string[] : [])
+      } catch {
+        setSelectedPhotoIds([])
+      }
+    } else {
+      setSelectedPhotoIds([])
+    }
   }, [selectedAccountId])
+  /*
+   * 選択の保存先はアカウントごとの sessionStorage（#931 N-314）。
+   * 再読込しても「選んだもの」が残る。タブを閉じれば消える。
+   */
+  useEffect(() => {
+    if (!selectedAccountId || typeof window === 'undefined') return
+    try {
+      window.sessionStorage.setItem(
+        `nen-photo-review:selection:${selectedAccountId}`,
+        JSON.stringify(selectedPhotoIds),
+      )
+    } catch {
+      // 保存できなくても画面の選択はそのまま動く。
+    }
+  }, [selectedAccountId, selectedPhotoIds])
+  /*
+   * 開いている画面・札・詳細の写真・絞り込み語をURLへ写す（#931 N-314）。
+   * ブラウザの戻る・進む・再読込で同じ場所へ戻れるようにする。
+   * 遷移のたびに履歴へ積む（pushState）。一覧で札を替えても戻れる。
+   */
+  const writeEntryToUrl = (entry: { view: 'list' | 'detail' | 'publications'; status: PhotoStatus; photoId?: string; q?: string }, mode: 'push' | 'replace' = 'push') => {
+    const search = photoReviewSearch(entry)
+    const url = `${window.location.pathname}?${search}`
+    if (mode === 'push') window.history.pushState(null, '', url)
+    else window.history.replaceState(null, '', url)
+  }
+  /*
+   * 初回のURLを覚えておく。アカウントが決まるまで詳細は開けないため、
+   * URLに `view=detail&photo=` があっても、読み込み後に開き直す。
+   */
+  const initialEntry = useRef<ReturnType<typeof photoReviewEntryFrom> | null>(null)
+  const appliedInitialEntry = useRef(false)
+  /*
+   * popstate の中から使う最新の値。一度だけ登録する listener は
+   * 初回描画の値を掴むため、毎描画で入れ替える（#931 N-314）。
+   */
+  const accountRef = useRef(selectedAccountId)
+  accountRef.current = selectedAccountId
+  const openDetailRef = useRef<((id: string, options?: { syncUrl?: boolean }) => Promise<void>) | null>(null)
   /*
    * ダッシュボードから `?tab=photos&status=pending_review` で来たときに、
    * その札を開く。読まないと押した理由（審査待ちだけ見たい）が消える。
    * 出来上がった画面で1度だけ読む（サーバ側描画では window がない）。
+   * 詳細・絞り込み語・ブラウザの戻るもここで復元する（#931 N-314）。
    */
   useEffect(() => {
-    const entry = photoReviewEntryFrom(window.location.search)
-    setStatus(entry.status)
-    setView(entry.view)
+    initialEntry.current = photoReviewEntryFrom(window.location.search)
+    const onPopState = () => {
+      const entry = photoReviewEntryFrom(window.location.search)
+      setStatus(entry.status)
+      setSearchQuery(entry.q ?? '')
+      setSearchInput(entry.q ?? '')
+      setDetailPhoto(null)
+      if (entry.view === 'detail' && entry.photoId && accountRef.current) {
+        void openDetailRef.current?.(entry.photoId, { syncUrl: false })
+      } else {
+        setView(entry.view === 'detail' ? 'list' : entry.view)
+      }
+    }
+    window.addEventListener('popstate', onPopState)
+    return () => window.removeEventListener('popstate', onPopState)
+    // listener は1度だけ登録する。最新の値は ref 経由で見る。
   }, [])
+  /*
+   * アカウントが決まってから初回のURLを適用する。アカウントが変わる
+   * たびに画面状態が消えるため、初回分だけここで入れる。
+   */
+  useEffect(() => {
+    if (!selectedAccountId || appliedInitialEntry.current || !initialEntry.current) return
+    appliedInitialEntry.current = true
+    const entry = initialEntry.current
+    setStatus(entry.status)
+    setSearchQuery(entry.q ?? '')
+    setSearchInput(entry.q ?? '')
+    if (entry.view === 'detail' && entry.photoId) {
+      void openDetail(entry.photoId, { syncUrl: false })
+    } else if (entry.view === 'publications') {
+      setView('publications')
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedAccountId])
 
   const counts = useMemo(() => ({
     all: photos.length,
@@ -254,9 +362,13 @@ export default function PhotoReviewsPage() {
   // 詳細表示の世代。一覧の loadSequence と同じく、「前・次」を連打したとき
   // 遅い応答が新しい写真を上書きしないようにする。
   const detailSequence = useRef(0)
-  const openDetail = async (id: string) => {
+  const openDetail = async (id: string, options: { syncUrl?: boolean } = {}) => {
     if (!selectedAccountId) return
     const sequence = ++detailSequence.current
+    // 詳細の位置もURLへ残す（#931 N-314）。戻る・再読込で同じ写真を開く。
+    if (options.syncUrl !== false) {
+      writeEntryToUrl({ view: 'detail', status, photoId: id, q: searchQuery || undefined })
+    }
     setView('detail')
     setDetailPhoto(null)
     setDetailAssetStatus(null)
@@ -283,6 +395,7 @@ export default function PhotoReviewsPage() {
       if (sequence === detailSequence.current) setDetailLoading(false)
     }
   }
+  openDetailRef.current = openDetail
 
   const openRejectDialog = async (id: string, knownPhoto?: Record<string, unknown>) => {
     setRejectingPhotoId(id)
@@ -290,6 +403,10 @@ export default function PhotoReviewsPage() {
     setReasonCode('privacy')
     setReasonNote('')
     setReasonError('')
+    // 差戻しの約束は毎回えらび直す（#931 N-312）。
+    // 案内は既定で添え、確認対象の印は毎回明示的に選ぶ。
+    setResubmitInvite(true)
+    setWatchSubmitter(false)
     if (!selectedAccountId || knownPhoto) return
     try {
       const response = await api.nenMembers.photo(id, selectedAccountId)
@@ -312,13 +429,17 @@ export default function PhotoReviewsPage() {
   const review = async (
     id: string,
     nextStatus: 'adopted' | 'rejected',
-    rejection?: { reasonCode: ReviewReasonCode; reasonNote: string },
+    rejection?: { reasonCode: ReviewReasonCode; reasonNote: string; resubmitInvite: boolean; watchSubmitter: boolean },
   ) => {
     if (!selectedAccountId) {
       setNotice('LINEアカウントを選んでください。')
       return
     }
     const generation = accountGeneration.current
+    // 写真ごとに1つの再実行キー。連打・応答ロストのやり直しは同じキーで
+    // 送り、サーバが保存済みの結果を返す（#931 N-313）。
+    const idempotencyKey = reviewKeys.current.get(id) ?? crypto.randomUUID()
+    reviewKeys.current.set(id, idempotencyKey)
     setReviewing(id)
     try {
       const response = await api.nenMembers.reviewPhoto(id, {
@@ -328,15 +449,33 @@ export default function PhotoReviewsPage() {
           photos.find((photo) => text(photo.id) === id)
           ?? (text(detailPhoto?.id) === id ? detailPhoto : null),
         ),
-        ...(rejection ?? {}),
-      })
+        ...(rejection
+          ? {
+              reasonCode: rejection.reasonCode,
+              reasonNote: rejection.reasonNote,
+              resubmitInvite: rejection.resubmitInvite,
+              watchSubmitter: rejection.watchSubmitter,
+            }
+          : {}),
+      }, idempotencyKey)
       if (generation !== accountGeneration.current) return
       if (!response.success) throw new Error(response.error)
+      reviewKeys.current.delete(id)
       const notification = response.data.notificationStatus === 'sent'
         ? '投稿者へLINEで通知しました。'
         : '審査結果は保存しましたが、LINE通知は送れませんでした。一覧から再送できます。'
+      /*
+       * ポイントの手続きは EC 会員とつながっている採用だけで始まる。
+       * つながっていない採用に「手続きを始めました」と伝えるのは、
+       * できていない約束をすることになる（#931 N-307）。
+       */
+      const adoptedNote = response.data.pointSync === 'pending'
+        ? `ECへ${response.data.awardedPoints}ポイントを付ける手続きを始めました。`
+        : response.data.pointSync === 'needs_attention'
+          ? 'EC会員とつながっていないため、ポイントの手続きはまだ始まっていません。'
+          : ''
       setNotice(nextStatus === 'adopted'
-        ? `写真を通し、ECへ${response.data.awardedPoints}ポイントを付ける手続きを始めました。公開は本人の同意がある場合だけ行います。${notification}`
+        ? `写真を通しました。${adoptedNote}公開は本人の同意がある場合だけ行います。${notification}`
         : `戻す理由を保存しました。${notification}`)
       setRejectingPhotoId(null)
       setRejectingPhotoDetail(null)
@@ -344,6 +483,7 @@ export default function PhotoReviewsPage() {
       setReasonNote('')
       setReasonError('')
       await load()
+      writeEntryToUrl({ view: 'list', status, q: searchQuery || undefined })
       setView('list')
     } catch (error) {
       if (generation === accountGeneration.current) {
@@ -430,6 +570,46 @@ export default function PhotoReviewsPage() {
     }
   }
 
+  /*
+   * 詳細で直した写真の向きを保存する（#931 N-309）。
+   * 保存してから通すことで、直した向きのまま残る。
+   */
+  const rotationKeys = useRef(new Map<string, string>())
+  const [rotationSaving, setRotationSaving] = useState(false)
+  const saveRotation = async (rotation: 0 | 90 | 180 | 270) => {
+    if (!selectedAccountId || !detailPhoto) return
+    const id = text(detailPhoto.id)
+    const generation = accountGeneration.current
+    const idempotencyKey = rotationKeys.current.get(id) ?? crypto.randomUUID()
+    rotationKeys.current.set(id, idempotencyKey)
+    setRotationSaving(true)
+    try {
+      const response = await api.nenMembers.savePhotoRotation(id, {
+        accountId: selectedAccountId,
+        rotation,
+        expectedVersion: reviewVersionOf(detailPhoto),
+      }, idempotencyKey)
+      if (generation !== accountGeneration.current) return
+      if (!response.success) throw new Error(response.error)
+      rotationKeys.current.delete(id)
+      const nextVersion = response.data.reviewVersion
+      // 画面が持つ写真の向き・版を同時に進める。一覧のカードにも出す。
+      setDetailPhoto((current) => current && text(current.id) === id
+        ? { ...current, display_rotation: rotation, review_version: nextVersion }
+        : current)
+      setPhotos((current) => current.map((photo) => text(photo.id) === id
+        ? { ...photo, display_rotation: rotation, review_version: nextVersion }
+        : photo))
+      setNotice('写真の向きを保存しました。')
+    } catch (error) {
+      if (generation === accountGeneration.current) {
+        setNotice(error instanceof Error ? error.message : '写真の向きを保存できませんでした。')
+      }
+    } finally {
+      setRotationSaving(false)
+    }
+  }
+
   const downloadOriginal = async (code: string) => {
     if (!selectedAccountId || !detailPhoto) throw new Error('写真を読み直してください。')
     let grant
@@ -459,7 +639,10 @@ export default function PhotoReviewsPage() {
   }
 
   if (view === 'publications' && selectedAccountId) {
-    return <PhotoPublications accountId={selectedAccountId} onBack={() => setView('list')} />
+    return <PhotoPublications accountId={selectedAccountId} onBack={() => {
+      writeEntryToUrl({ view: 'list', status, q: searchQuery || undefined })
+      setView('list')
+    }} />
   }
 
   if (view === 'detail') {
@@ -478,7 +661,11 @@ export default function PhotoReviewsPage() {
         if (selectedAccountId && detailPhoto) void refreshDetailAssets(text(detailPhoto.id), selectedAccountId)
       }}
       assetProcessing={assetProcessing}
-      onBack={() => setView('list')}
+      rotationSaving={rotationSaving}
+      onBack={() => {
+        writeEntryToUrl({ view: 'list', status, q: searchQuery || undefined })
+        setView('list')
+      }}
       onMove={(direction) => {
         const next = visiblePhotos[detailPosition + direction]
         if (next) void openDetail(text(next.id))
@@ -486,10 +673,12 @@ export default function PhotoReviewsPage() {
       onApprove={() => { if (detailPhoto) void review(text(detailPhoto.id), 'adopted') }}
       onReturn={() => {
         if (!detailPhoto) return
+        writeEntryToUrl({ view: 'list', status, q: searchQuery || undefined })
         setView('list')
         void openRejectDialog(text(detailPhoto.id), detailPhoto)
       }}
       onProcessReviewAsset={() => processReviewAsset()}
+      onSaveRotation={(rotation) => saveRotation(rotation)}
       onDownloadOriginal={downloadOriginal}
     />
   }
@@ -497,11 +686,16 @@ export default function PhotoReviewsPage() {
   const retryNotification = async (id: string) => {
     if (!selectedAccountId) return
     const generation = accountGeneration.current
+    // 審査と同じく写真ごとに1つの再実行キー（#931 N-313）。
+    // 連打・応答ロストのやり直しが2通届かないよう、同じキーで送る。
+    const idempotencyKey = retryKeys.current.get(id) ?? crypto.randomUUID()
+    retryKeys.current.set(id, idempotencyKey)
     setReviewing(id)
     try {
-      const response = await api.nenMembers.retryPhotoReviewNotification(id, selectedAccountId)
+      const response = await api.nenMembers.retryPhotoReviewNotification(id, selectedAccountId, idempotencyKey)
       if (generation !== accountGeneration.current) return
       if (!response.success) throw new Error(response.error)
+      retryKeys.current.delete(id)
       setNotice('審査結果を投稿者へLINEで再送しました。')
       setBulkFailed((current) => current.filter((item) => item.photoId !== id))
       await load()
@@ -557,13 +751,17 @@ export default function PhotoReviewsPage() {
             current: status === value,
             onClick: () => {
               setStatus(value)
+              writeEntryToUrl({ view: 'list', status: value, q: searchQuery || undefined })
               // まとめて処理できるのは審査待ちだけ。札を変えたら選び直す。
               setSelectedPhotoIds([])
               setBulkApproveOpen(false)
               setBulkReturnOpen(false)
             },
           })),
-          { label: '出しているもの', current: false, onClick: () => setView('publications') },
+          { label: '出しているもの', current: false, onClick: () => {
+            writeEntryToUrl({ view: 'publications', status })
+            setView('publications')
+          } },
         ]}
       />
 
@@ -600,6 +798,38 @@ export default function PhotoReviewsPage() {
         通す・戻すを押した時点で、投稿者へお礼や直してほしい点が届きます。戻すときは理由を選び、送る文章を確認できます。
       </div>
 
+      {/*
+        * 名前・ペット名・コメントの絞り込み（#931 N-308）。
+        * 200枚ずつの区切りだけでは、目的の1枚へ辿り着くまで全部を
+        * 読み進めるしかなかった。
+        */}
+      <form
+        className="flex flex-wrap items-center gap-2"
+        onSubmit={(event) => {
+          event.preventDefault()
+          const q = searchInput.trim().slice(0, 100)
+          setSearchQuery(q)
+          writeEntryToUrl({ view: 'list', status, q: q || undefined })
+        }}
+      >
+        <label className="min-w-0 flex-1 sm:max-w-md">
+          <span className="sr-only">写真を探す</span>
+          <input
+            value={searchInput}
+            onChange={(event) => setSearchInput(event.target.value)}
+            placeholder="名前・ペット名・コメントで探す"
+            className="w-full rounded-control border border-hairline bg-canvas px-3 py-2 text-sm font-normal text-ink"
+          />
+        </label>
+        <Button variant="secondary" type="submit">探す</Button>
+        {searchQuery && <Button variant="secondary" type="button" onClick={() => {
+          setSearchInput('')
+          setSearchQuery('')
+          writeEntryToUrl({ view: 'list', status })
+        }}>絞り込みをやめる</Button>}
+        {searchQuery && <span className="text-xs font-semibold text-ink-faint">「{searchQuery}」で絞り込んでいます</span>}
+      </form>
+
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2">
           <span className="rounded-control bg-accent-soft px-3 py-2 text-sm font-semibold text-accent">{selectedPendingPhotos.length}枚を選択中</span>
@@ -630,15 +860,32 @@ export default function PhotoReviewsPage() {
           return <article key={photoId} className="overflow-hidden rounded-card border border-hairline bg-canvas shadow-card" style={selected ? { borderColor: 'var(--color-accent)', boxShadow: '0 0 0 1px var(--color-accent)' } : undefined}>
           <div className="relative h-40 overflow-hidden bg-canvas-sunken">
             {imageSrc
-              ? <img src={imageSrc} alt={`${photoPetDisplayName(photo.pet_name)}の投稿写真`} loading="lazy" className="h-full w-full object-cover" />
+              ? <img
+                src={imageSrc}
+                alt={`${photoPetDisplayName(photo.pet_name)}の投稿写真`}
+                loading="lazy"
+                className="h-full w-full object-cover"
+                // 詳細で保存した向きを一覧にも出す（#931 N-309）。
+                style={Number(photo.display_rotation) ? { transform: `rotate(${Number(photo.display_rotation)}deg)` } : undefined}
+              />
               : <div className="grid h-full w-full place-items-center text-xs font-bold text-ink-faint">画像を表示できません</div>}
             <label className="absolute left-2 top-2 flex cursor-pointer items-center gap-1.5 rounded-control border border-hairline bg-canvas px-2 py-1 text-xs font-semibold text-ink-secondary"><input type="checkbox" checked={selected} onChange={() => togglePhotoSelection(photoId)} className="accent-accent" /><span>選ぶ</span></label>
           </div>
           <div className="p-4">
             <div className="flex items-start justify-between gap-3"><div><p className="font-bold text-ink">{photoPetDisplayName(photo.pet_name)}</p><p className="mt-1 text-xs text-ink-faint">{text(photo.owner_name) || '名前未取得'}・{formatPhotoReceivedAt(photo.created_at)}</p></div><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${photo.status === 'pending' ? 'bg-status-warn-soft text-status-warn-deep' : photo.status === 'adopted' ? 'bg-accent-soft text-accent-hover' : 'bg-canvas-sunken text-ink-faint'}`}>{photo.status === 'pending' ? '審査待ち' : photo.status === 'adopted' ? '通しました' : '戻しました'}</span></div>
             <p className="mt-2 min-h-5 truncate text-sm text-ink-secondary" title={text(photo.caption) || 'コメントなし'}>{text(photo.caption) || 'コメントなし'}</p>
+            {/*
+             * 「この人の次の投稿は、必ず人が見る」を付けた方の写真。
+             * 差戻しで付けた印が届いた写真へ出る（#931 N-312）。
+             */}
+            {Number(photo.submitter_watch) === 1 && <p className="mt-2 rounded-control bg-status-warn-soft px-3 py-2 text-xs font-semibold text-status-warn-deep">確認対象：この方の投稿は必ず人が見ます</p>}
             {text(photo.latest_risk_flag) && !['safe', 'none', 'low'].includes(text(photo.latest_risk_flag)) && <p className="mt-2 rounded-control bg-status-warn-soft px-3 py-2 text-xs font-semibold text-status-warn-deep">注意候補：{photoRiskLabel(text(photo.latest_risk_flag))}</p>}
-            {photo.status === 'adopted' && <p className="mt-3 rounded-control bg-accent-soft px-3 py-2 text-xs font-semibold text-accent-hover">5ポイント付与済み・{photo.publication_consent_at && !photo.publication_withdrawn_at ? '公開中' : '公開は未同意'}</p>}
+            {/*
+             * ポイントの表記は付与の実状態に合わせる（#931 N-307）。
+             * ECとつながっていない採用に「付与済み」と出すのは、
+             * できていない約束を画面へ書くことになる。
+             */}
+            {photo.status === 'adopted' && <p className="mt-3 rounded-control bg-accent-soft px-3 py-2 text-xs font-semibold text-accent-hover">{pointStatusLabel(photo.point_sync_status)}・{photo.publication_consent_at && !photo.publication_withdrawn_at ? '公開中' : '公開は未同意'}</p>}
             {photo.status === 'rejected' && <div className="mt-3 rounded-control bg-surface-pearl px-3 py-2 text-xs text-ink-secondary"><span className="font-semibold">見送った理由：</span>{REVIEW_REASONS.find((reason) => reason.value === photo.review_reason_code)?.label ?? '理由未記録'}{text(photo.review_reason_note) && <p className="mt-1 text-ink-faint">{text(photo.review_reason_note)}</p>}</div>}
             {photo.review_notification_status === 'failed' && <div className="mt-2 flex items-center justify-between gap-3 rounded-control bg-status-warn-soft px-3 py-2 text-xs font-semibold text-status-warn-deep"><span>投稿者へのLINE通知を送れませんでした</span><Button variant="secondary" disabled={reviewing === photo.id} onClick={() => void retryNotification(text(photo.id))} className="shrink-0">{reviewing === photo.id ? '再送中...' : 'LINE通知を再送'}</Button></div>}
             {photo.status === 'pending' && <div className="mt-3 grid grid-cols-2 gap-2"><Button variant="primary" disabled={reviewing === photo.id} onClick={() => void review(text(photo.id), 'adopted')}>{reviewing === photo.id ? '処理中...' : '通す'}</Button><Button data-qa-open={photoId === text(visiblePhotos[0]?.id) && status === 'pending' ? 'N2J629' : undefined} variant="secondary" disabled={reviewing === photo.id} onClick={() => void openRejectDialog(photoId)}>戻す</Button></div>}
@@ -705,7 +952,7 @@ export default function PhotoReviewsPage() {
     </Dialog>
     {rejectingPhoto && <Dialog open designNode="N2J629" title="この写真を戻しますか？" description="理由をえらぶと、お客様への文章が自動でつくられます。" busy={Boolean(reviewing)} error={reasonError} confirmLabel="戻して、この文章を送る" cancelLabel="やめる" onCancel={() => { setRejectingPhotoId(null); setRejectingPhotoDetail(null); setReasonError('') }} onConfirm={() => {
       if (reasonCode === 'other' && !reasonNote.trim()) { setReasonError('そのほかの理由を入力してください'); return }
-      void review(text(rejectingPhoto.id), 'rejected', { reasonCode, reasonNote: reasonNote.trim() })
+      void review(text(rejectingPhoto.id), 'rejected', { reasonCode, reasonNote: reasonNote.trim(), resubmitInvite, watchSubmitter })
     }}>
         <div className="space-y-4">
             <div className="grid grid-cols-[64px_1fr] items-center gap-3 rounded-control bg-surface-pearl px-3 py-2 text-sm text-ink-secondary">
@@ -728,8 +975,8 @@ export default function PhotoReviewsPage() {
             </fieldset>
             <label className="block text-sm font-semibold text-ink">お客様に届く補足（直せます）<textarea value={reasonNote} onChange={(event) => { setReasonNote(event.target.value.slice(0, 500)); setReasonError('') }} rows={2} placeholder={reasonCode === 'other' ? 'お客様に送る文章を書いてください' : '必要な場合だけ補足します'} className="mt-2 w-full rounded-control border border-hairline bg-canvas px-3 py-2 text-sm font-normal text-ink" /></label>
             <div className="rounded-control border border-accent-border bg-accent-soft p-3 text-sm text-ink-secondary"><p className="font-semibold text-ink">お客様にはこう届きます（直せます）</p><p className="mt-1 whitespace-pre-line">{photoPetDisplayName(rejectingPhoto.pet_name)}の写真をありがとうございます。{reasonCode === 'other' ? reasonNote || 'お客様に送る文章を入力してください。' : selectedReasonMessage}{reasonNote && reasonCode !== 'other' ? `\n${reasonNote}` : ''}{`\n`}お手数をおかけします。</p></div>
-            <label className="flex items-start gap-2 text-sm text-ink-secondary"><input type="checkbox" checked readOnly disabled className="mt-0.5 opacity-100" /><span><span className="font-semibold text-ink">もう一度 送ってもらえるようお願いする</span><span className="block text-xs text-ink-faint">写真を送るボタンの保存先はまだ接続されていません。</span></span></label>
-            <label className="flex items-start gap-2 text-sm text-ink-secondary"><input type="checkbox" readOnly disabled className="mt-0.5 opacity-100" /><span><span className="font-semibold text-ink">この人の次の投稿は、必ず人が見る</span><span className="block text-xs text-ink-faint">要注意投稿者の保存先はまだ接続されていません。</span></span></label>
+            <label className="flex cursor-pointer items-start gap-2 text-sm text-ink-secondary"><input type="checkbox" checked={resubmitInvite} onChange={(event) => setResubmitInvite(event.target.checked)} className="mt-0.5 opacity-100" /><span><span className="font-semibold text-ink">もう一度 送ってもらえるようお願いする</span><span className="block text-xs text-ink-faint">チェックを付けると、戻すお知らせに別のお写真をお願いする案内を添えます。</span></span></label>
+            <label className="flex cursor-pointer items-start gap-2 text-sm text-ink-secondary"><input type="checkbox" checked={watchSubmitter} onChange={(event) => setWatchSubmitter(event.target.checked)} className="mt-0.5 opacity-100" /><span><span className="font-semibold text-ink">この人の次の投稿は、必ず人が見る</span><span className="block text-xs text-ink-faint">この方に印を付け、次に届く写真を一覧で「確認対象」として表示します。</span></span></label>
             <p className="text-xs font-semibold text-ink-faint">戻しても、この方のマイルは減りません。</p>
         </div>
     </Dialog>}
@@ -751,6 +998,20 @@ function formatAverageReviewTime(minutes: number | null | undefined) {
   if (minutes == null || !Number.isFinite(minutes)) return '—'
   if (minutes < 1) return `平均 ${Math.max(1, Math.round(minutes * 60))}秒`
   return `平均 ${Math.round(minutes)}分`
+}
+
+/*
+ * ポイント付与の実状態（アウトボックスの status）を画面の言葉へ。
+ * 手続きの行がない採用は EC 未接続（#931 N-307）。
+ */
+function pointStatusLabel(status: unknown) {
+  switch (text(status)) {
+    case 'synced': return '5ポイントを付けました'
+    case 'pending':
+    case 'processing': return '5ポイントを付ける手続き中'
+    case 'failed': return 'ポイントの手続きで確認が必要'
+    default: return 'EC未接続・ポイント対象外'
+  }
 }
 
 function photoRiskLabel(flag: string) {

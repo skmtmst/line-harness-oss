@@ -8636,16 +8636,39 @@ export const api = {
       expectedVersion: number
       reasonCode?: 'quality' | 'privacy' | 'unrelated' | 'duplicate' | 'other'
       reasonNote?: string
-    }) => fetchApi<ApiResponse<{
+      // 差戻し画面の2つの約束（#931 N-312）。省略時は従来どおり案内あり・印なし。
+      resubmitInvite?: boolean
+      watchSubmitter?: boolean
+    }, idempotencyKey: string) => fetchApi<ApiResponse<{
       awardedPoints: number
       pointBalance: number | null
       pointSync: string
       notificationStatus: 'sent' | 'failed'
-    }>>(`/api/nen-members/photos/${encodeURIComponent(id)}/review`, { method: 'PUT', body: JSON.stringify(data) }),
-    retryPhotoReviewNotification: (id: string, accountId: string) => fetchApi<ApiResponse<{
-      notificationStatus: 'sent'
+    }>>(`/api/nen-members/photos/${encodeURIComponent(id)}/review`, {
+      method: 'PUT',
+      headers: { 'Idempotency-Key': idempotencyKey },
+      body: JSON.stringify(data),
+    }),
+    retryPhotoReviewNotification: (id: string, accountId: string, idempotencyKey: string) => fetchApi<ApiResponse<{
+      notificationStatus: 'sent' | 'failed'
+      resent?: boolean
     }>>(`/api/nen-members/photos/${encodeURIComponent(id)}/notification/retry`, {
-      method: 'POST', body: JSON.stringify({ accountId }),
+      method: 'POST',
+      headers: { 'Idempotency-Key': idempotencyKey },
+      body: JSON.stringify({ accountId }),
+    }),
+    // 詳細画面で直した写真の向きを版つきで保存する（#931 N-309）。
+    savePhotoRotation: (id: string, data: {
+      accountId: string
+      rotation: 0 | 90 | 180 | 270
+      expectedVersion: number
+    }, idempotencyKey: string) => fetchApi<ApiResponse<{
+      rotation: number
+      reviewVersion: number
+    }>>(`/api/nen-members/photos/${encodeURIComponent(id)}/rotation`, {
+      method: 'PUT',
+      headers: { 'Idempotency-Key': idempotencyKey },
+      body: JSON.stringify(data),
     }),
     friendOverview: (friendId: string) => fetchApi<ApiResponse<NenFriendOverview>>(`/api/nen-members/friends/${encodeURIComponent(friendId)}`),
     ranks: () => fetchApi<ApiResponse<Array<Record<string, unknown>>>>('/api/nen-members/ranks'),

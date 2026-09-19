@@ -7,13 +7,20 @@
  *
  * 画面の中の呼び名（pending/adopted/rejected）と、URLに書く呼び名は別。
  * URL側は API と同じ `pending_review` などの言い方も受ける。
+ *
+ * #931 N-314: 開いている札・詳細の写真・検索語もURLへ写す。
+ * ブラウザの戻る・再読込で「どこを見ていたか」が残るようにする。
  */
 
 export type PhotoReviewStatus = 'pending' | 'adopted' | 'rejected'
 
 export interface PhotoReviewEntry {
-  view: 'list' | 'publications'
+  view: 'list' | 'detail' | 'publications'
   status: PhotoReviewStatus
+  /** view が detail のときだけ。開く写真のID。 */
+  photoId?: string
+  /** 一覧の絞り込み語。未指定は undefined（#931 N-308）。 */
+  q?: string
 }
 
 const STATUS_ALIASES: Record<string, PhotoReviewStatus> = {
@@ -38,14 +45,41 @@ export function photoReviewStatusFrom(raw: string | null | undefined): PhotoRevi
 /**
  * `?tab=...&status=...` を読んで、開く画面と札を決める。
  * 知らない値・空のときは、今までどおり一覧の「見ていないもの」。
+ * `view=detail&photo=<id>` は詳細を開く。`q=` は一覧の絞り込み語。
  */
 export function photoReviewEntryFrom(search: string | null | undefined): PhotoReviewEntry {
   if (!search) return DEFAULT_ENTRY
   const params = new URLSearchParams(search.startsWith('?') ? search.slice(1) : search)
   const tab = params.get('tab')?.trim().toLowerCase() ?? ''
   const status = photoReviewStatusFrom(params.get('status'))
+  const q = params.get('q')?.trim().slice(0, 100) || undefined
   if (tab === 'publications' || tab === 'published') {
-    return { view: 'publications', status: status ?? DEFAULT_ENTRY.status }
+    return { view: 'publications', status: status ?? DEFAULT_ENTRY.status, q }
   }
-  return { view: 'list', status: status ?? DEFAULT_ENTRY.status }
+  const view = params.get('view')?.trim().toLowerCase() ?? ''
+  const photoId = params.get('photo')?.trim() || undefined
+  if (view === 'detail' && photoId) {
+    return { view: 'detail', status: status ?? DEFAULT_ENTRY.status, photoId, q }
+  }
+  return { view: 'list', status: status ?? DEFAULT_ENTRY.status, q }
+}
+
+/**
+ * 画面の状態からURLの検索部分を作る。`tab` は既存の深掘りと揃えて
+ * `photos` / `publications` を使う。詳細は `view=detail&photo=` を足す。
+ */
+export function photoReviewSearch(entry: PhotoReviewEntry): string {
+  const params = new URLSearchParams()
+  if (entry.view === 'publications') {
+    params.set('tab', 'publications')
+  } else {
+    params.set('tab', 'photos')
+    params.set('status', entry.status)
+    if (entry.view === 'detail' && entry.photoId) {
+      params.set('view', 'detail')
+      params.set('photo', entry.photoId)
+    }
+    if (entry.q) params.set('q', entry.q)
+  }
+  return params.toString()
 }
