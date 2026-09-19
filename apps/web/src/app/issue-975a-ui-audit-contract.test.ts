@@ -55,10 +55,14 @@ describe('U054: 作成画面の余白を二重に取らない', () => {
     const page = read('analytics/reports/new/page.tsx')
     expect(page).not.toContain('max-w-screen-2xl px-6')
   })
-  it('CreatePage のカード内余白は狭い画面で16pxに落とす', () => {
+  it('analytics/reports/new のカード内余白は狭い画面で16pxに落とす', () => {
+    const page = read('analytics/reports/new/page.tsx')
+    expect(page).toContain('rounded-card border p-4 sm:p-6')
+  })
+  it('U054の解決に共有部品（CreatePage）は触らない', () => {
+    // shared/ は Claude 所有領域。画面側の局所解決だけで直す。
     const shared = read('../components/shared/create-page.tsx')
-    expect(shared).toContain('p-4 sm:p-6')
-    expect(shared).toContain('p-4 sm:p-[18px]')
+    expect(shared).toContain("'rounded-card space-y-5 p-6'")
   })
 })
 
@@ -118,19 +122,21 @@ describe('U058: 差し込み操作は本文の欄より後に置く', () => {
 })
 
 describe('U063: 長い選択肢のプルダウンは欄いっぱいに広げる', () => {
-  it('SelectField に full サイズがある（w-fullは部品のCSSに負ける）', () => {
-    const styles = read('../components/shared/select-field.module.css')
+  it('共有部品の SelectField には触らず、画面側の属性スコープで幅を上書きする', () => {
+    // shared/ は Claude 所有領域。size="full" のような部品改変はしない。
     const component = read('../components/shared/select-field.tsx')
-    expect(styles).toMatch(/\.full \{\s*width: 100%/)
-    expect(component).toContain("| 'full'")
+    expect(component).not.toContain("'full'")
+    const operator = read('line-notifications/operator/new/page.tsx')
+    expect(operator).not.toContain('size="full"')
+    expect(operator).toContain('data-selects-wide')
+    expect(operator).toContain('[data-selects-wide] select { width: 100%; }')
   })
-  it('運用通知の作成は固定幅で潰さない', () => {
-    const page = read('line-notifications/operator/new/page.tsx')
-    expect(page).not.toContain('<SelectField id="operator-event" className="w-full"')
-    expect(page).toContain('<SelectField id="operator-event" size="full"')
+  it('共通アクションの見本選択は内容に合わせて広がる', () => {
+    const page = read('common-actions/new/page.tsx')
+    expect(page).toContain('data-example-select')
+    expect(page).toContain('[data-example-select] select { width: auto; max-width: 100%; }')
   })
-  it('共通アクションと特典の選択も欄いっぱい', () => {
-    expect(read('common-actions/new/page.tsx')).toContain('<SelectField size="full"')
+  it('特典の選択は部品が持つ full 指定を使う（Select側は既存のprop）', () => {
     const rewards = read('mileage/rewards/edit/page.tsx')
     expect(rewards.match(/size="full"/g)?.length).toBeGreaterThanOrEqual(2)
   })

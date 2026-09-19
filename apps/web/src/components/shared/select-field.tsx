@@ -14,9 +14,6 @@ export interface SelectOption {
  *
  * 幅を画面ごとに決めたいときは `className="w-full"` などを渡す。
  * その場合 `size` の既定幅は上書きされる。
- * …と書きたいところだが、Tailwind の幅系はレイヤ付きで、この
- * 部品のCSS（レイヤなし）より弱い。欄いっぱいに広げたいときは
- * `className` ではなく `size="full"` を渡す（U063）。
  */
 export default function SelectField({
   options,
@@ -25,7 +22,7 @@ export default function SelectField({
   ...rest
 }: {
   options: SelectOption[]
-  size?: 'default' | 'compact' | 'full'
+  size?: 'default' | 'compact'
   className?: string
 } & Omit<SelectHTMLAttributes<HTMLSelectElement>, 'className' | 'children' | 'size'>) {
   return (

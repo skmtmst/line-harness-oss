@@ -162,12 +162,13 @@ export default function NewCommonActionPage() {
             <div className="mt-3 flex flex-wrap gap-2">
               <Button onClick={() => setActions((current) => [...current, newBranchStep()])}>条件で分ける</Button>
               <Button onClick={() => setActions((current) => [...current, newCommonActionStep('wait')])}>待ち時間を入れる</Button>
+              {/* U063: 「名前 v版」の長い選択肢が176pxの既定幅で切れる。
+                  部品側の幅はレイヤなしCSSなので w-full では上書きできず、
+                  下の style ブロックで属性スコープに auto 幅を当てる。 */}
               {resources.commonActions.length > 0 ? (
-                <label className="text-ink-secondary flex items-center gap-2 text-sm">
+                <label className="text-ink-secondary flex items-center gap-2 text-sm" data-example-select>
                   <span>見本から受け渡す</span>
-                  {/* U063: 「名前 v版」の長い選択肢が176pxの既定幅で
-                      切れるので、行の残りを全部使う。 */}
-                  <SelectField size="full" className="min-w-48" defaultValue="" onChange={(event) => addExample(event.target.value)} options={[{ value: '', label: '選ぶ' }, ...resources.commonActions.map((item) => ({ value: item.id, label: `${item.name} v${item.version}` }))]} />
+                  <SelectField className="min-w-48" defaultValue="" onChange={(event) => addExample(event.target.value)} options={[{ value: '', label: '選ぶ' }, ...resources.commonActions.map((item) => ({ value: item.id, label: `${item.name} v${item.version}` }))]} />
                 </label>
               ) : null}
             </div>
@@ -225,6 +226,8 @@ export default function NewCommonActionPage() {
         .compact-common-action-editor section { background: var(--color-canvas-sunken); padding: 12px; }
         .compact-common-action-editor section > div:first-child { margin-bottom: 8px; }
         .compact-common-action-editor textarea { min-height: 64px; }
+        /* U063: 選択肢の長さに合わせる。共有部品には触らない。 */
+        [data-example-select] select { width: auto; max-width: 100%; }
       `}</style>
     </div>
   )
