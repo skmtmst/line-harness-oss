@@ -1658,6 +1658,11 @@ export type AnalyticsCrossAxis =
   | { kind: 'booking_status' }
   | { kind: 'purchase_status' }
 
+// 集計の物差し。events は packages/db の AnalyticsEventType をサーバ側が検査する。
+export type AnalyticsCrossMeasure =
+  | { kind: 'unique_friends' }
+  | { kind: 'events'; eventType: string }
+
 export type AnalyticsCrossResult = {
   lineAccountId: string
   timeZone: string
@@ -5483,7 +5488,7 @@ export const api = {
     runCross: (accountId: string, data: {
       rowAxis: AnalyticsCrossAxis
       columnAxis: AnalyticsCrossAxis
-      measure: { kind: 'unique_friends' }
+      measure: AnalyticsCrossMeasure
       filters: []
       periodFrom: string
       periodTo: string

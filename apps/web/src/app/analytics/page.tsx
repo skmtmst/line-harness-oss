@@ -127,12 +127,15 @@ const WEEKDAY_JP = ['日', '月', '火', '水', '木', '金', '土']
 
 function RangePicker({ days, onChange }: { days: number; onChange: (days: number) => void }) {
   return (
-    <div className="flex gap-1" aria-label="集計期間">
+    // どの期間が選ばれているかは見た目の色だけだった。role="group"と
+    // aria-pressedで、読み上げにも同じ選択状態を伝える。
+    <div className="flex gap-1" role="group" aria-label="集計期間">
       {RANGES.map((range) => (
         <button
           type="button"
           key={range}
           onClick={() => onChange(range)}
+          aria-pressed={days === range}
           className={`rounded-control px-3 py-2 text-xs font-medium ${days === range ? 'bg-accent-deep text-on-accent' : 'bg-canvas-sunken text-ink-secondary'}`}
         >
           {range}日
@@ -347,10 +350,25 @@ function clearStoredCrossRun(accountId: string): void {
   try { window.sessionStorage.removeItem(crossRunStorageKey(accountId)) } catch { /* storage unavailable */ }
 }
 
+// 「イベントの回数」で数えられる種類は、記録の接続(analytics_event_coverage)が
+// 「取得可能」なものだけ。選べるのに必ず未取得、という選択肢は置かない。
+// 正本: apps/worker/src/services/analytics-projection.ts の ensureAnalyticsEventCoverage。
+const CROSS_MEASURE_EVENT_OPTIONS = [
+  { value: 'message_received', label: '友だちから届いたメッセージの回数' },
+  { value: 'postback_received', label: 'ボタン・メニューを押した回数' },
+  { value: 'friend_add', label: '友だち追加の回数' },
+  { value: 'friend_unfollow', label: 'ブロック・友だち解除の回数' },
+]
+
 function CrossTab({ accountId, canManage }: { accountId: string; canManage: boolean }) {
   const [fields, setFields] = useState<FriendField[]>([])
   // 友だち情報欄が取れないのに空表示のままにすると、項目を作り直す事故になる。
   const [fieldsError, setFieldsError] = useState('')
+  // 読み込み中と「項目がまだありません」を分ける。取り直し中に空の主張を出さない。
+  const [fieldsLoading, setFieldsLoading] = useState(true)
+  const [fieldsReload, setFieldsReload] = useState(0)
+  const [measureKind, setMeasureKind] = useState<'unique_friends' | 'events'>('unique_friends')
+  const [measureEventType, setMeasureEventType] = useState(CROSS_MEASURE_EVENT_OPTIONS[0].value)
   const [fieldId, setFieldId] = useState('')
   const [rowKind, setRowKind] = useState<'tag' | 'route' | 'score_band' | 'conversion_point' | 'booking_status' | 'purchase_status'>('tag')
   const [crossResult, setCrossResult] = useState<AnalyticsCrossResult | null>(null)
@@ -372,6 +390,7 @@ function CrossTab({ accountId, canManage }: { accountId: string; canManage: bool
     rowKey: string
     columnKey: string
     count: number
+    uniqueFriends: number
   } | null>(null)
   // いま表示してよい応答の世代。アカウント切替・画面破棄で進む。
   const viewGeneration = useRef(0)
@@ -380,6 +399,7 @@ function CrossTab({ accountId, canManage }: { accountId: string; canManage: bool
 
   useEffect(() => {
     let active = true
+    setFieldsLoading(true)
     setFieldsError('')
     void api.friendFields.list(accountId, undefined, { suppressFeatureDisabledEvent: true }).then((res) => {
       if (!active) return
@@ -391,11 +411,13 @@ function CrossTab({ accountId, canManage }: { accountId: string; canManage: bool
       }
     }).catch(() => {
       if (active) setFieldsError('友だち情報欄を読み込めませんでした')
+    }).finally(() => {
+      if (active) setFieldsLoading(false)
     })
     return () => {
       active = false
     }
-  }, [accountId])
+  }, [accountId, fieldsReload])
 
   // 親はaccountIdをkeyにも使うため、切替時はCrossTab自体が作り直される。
   // 初期HTMLとhydration時の表示を同じに保ったうえで、同じアカウントのrunだけを復元する。
@@ -562,7 +584,9 @@ function CrossTab({ accountId, canManage }: { accountId: string; canManage: bool
       const response = await api.analytics.runCross(accountId, {
         rowAxis,
         columnAxis: { kind: 'field_choice', fieldId },
-        measure: { kind: 'unique_friends' },
+        measure: measureKind === 'events'
+          ? { kind: 'events', eventType: measureEventType }
+          : { kind: 'unique_friends' },
         filters: [],
         periodFrom: from.toISOString(),
         periodTo: now.toISOString(),
@@ -610,6 +634,7 @@ function CrossTab({ accountId, canManage }: { accountId: string; canManage: bool
     rowKey: cell.rowKey,
     columnKey: cell.columnKey,
     count: cell.value,
+    uniqueFriends: cell.uniqueFriends,
   })), [crossResult])
 
   const rows = crossResult?.rowValues ?? []
@@ -702,11 +727,22 @@ function CrossTab({ accountId, canManage }: { accountId: string; canManage: bool
     ])
   }
 
+  if (fieldsLoading) {
+    return (
+      <p className="text-ink-faint bg-canvas rounded-card border-hairline border p-8 text-center text-sm" role="status">
+        友だち情報欄を読み込んでいます
+      </p>
+    )
+  }
+
   if (fieldsError) {
     return (
-      <p className="text-danger bg-danger-bg border-danger rounded-card border p-8 text-center text-sm" role="alert">
-        友だち情報欄を読み込めませんでした。開き直してください。
-      </p>
+      <div className="text-danger bg-danger-bg border-danger rounded-card border p-8 text-center text-sm" role="alert">
+        <p>友だち情報欄を読み込めませんでした。</p>
+        <div className="mt-3 flex justify-center">
+          <Button variant="secondary" onClick={() => setFieldsReload((n) => n + 1)}>もう一度読み込む</Button>
+        </div>
+      </div>
     )
   }
 
@@ -725,7 +761,7 @@ function CrossTab({ accountId, canManage }: { accountId: string; canManage: bool
     <div data-design-node="f5HsX" className="space-y-4">
       <div className="flex justify-end"><AnalyticsExportButton onClick={exportCross} disabled={!crossResult} /></div>
       <AnalyticsNotice>数えているのは、こちらで観測できたことだけです。LINEで開かれたかどうかは取れないため、この画面には出しません。</AnalyticsNotice>
-      <p className="text-sm text-ink-secondary">タグや友だち情報を掛け合わせて、友だちが何人いるかを表にします。数字を押すとその人たちを抽出でき、そのまま配信できます。</p>
+      <p className="text-sm text-ink-secondary">タグや友だち情報を掛け合わせて、友だちの人数やイベントの回数を表にします。数字を押すとその人たちを抽出でき、そのまま配信できます。</p>
 
       <section className="bg-canvas rounded-card border-hairline border p-4">
         <h3 className="text-ink mb-3 text-sm font-semibold">何を掛け合わせるか</h3>
@@ -755,7 +791,32 @@ function CrossTab({ accountId, canManage }: { accountId: string; canManage: bool
           </Button>
         </div>
         <dl className="mt-3 grid gap-3 border-t border-hairline pt-3 sm:grid-cols-2">
-          <div><dt className="text-xs font-medium text-ink-secondary">数えるもの</dt><dd className="mt-1 text-sm text-ink">友だちの人数（重複なし）</dd></div>
+          <div>
+            <dt className="mb-1 text-xs font-medium text-ink-secondary"><label htmlFor="cross-measure">数えるもの</label></dt>
+            <dd className="grid gap-1">
+              <SelectField
+                id="cross-measure"
+                value={measureKind}
+                onChange={(e) => setMeasureKind(e.target.value as 'unique_friends' | 'events')}
+                aria-label="数えるもの"
+                className="v6-select w-full"
+                options={[
+                  { value: 'unique_friends', label: '友だちの人数（重複なし）' },
+                  { value: 'events', label: 'イベントの回数' },
+                ]}
+              />
+              {measureKind === 'events' && (
+                <SelectField
+                  id="cross-measure-event"
+                  value={measureEventType}
+                  onChange={(e) => setMeasureEventType(e.target.value)}
+                  aria-label="数えるイベント"
+                  className="v6-select w-full"
+                  options={CROSS_MEASURE_EVENT_OPTIONS}
+                />
+              )}
+            </dd>
+          </div>
           <div><dt className="mb-1 text-xs font-medium text-ink-secondary">期間</dt><dd><RangePicker days={crossDays} onChange={setCrossDays} /></dd></div>
         </dl>
         <p className="text-ink-faint mt-2 text-xs">
@@ -772,7 +833,7 @@ function CrossTab({ accountId, canManage }: { accountId: string; canManage: bool
         <KpiCard
           title="いちばん多い組み合わせ"
           value={summary?.top.count ?? null}
-          unit="人"
+          unit={measureKind === 'events' ? '回' : '人'}
           detail={summary ? `${summary.top.row} × ${summary.top.col}` : '—'}
           loading={loading}
         />
@@ -875,6 +936,7 @@ function CrossTab({ accountId, canManage }: { accountId: string; canManage: bool
                                 rowKey: source.rowKey,
                                 columnKey: source.columnKey,
                                 count: n,
+                                uniqueFriends: source.uniqueFriends,
                               } : null)
                             }}
                             disabled={n === 0}
@@ -930,7 +992,7 @@ function CrossTab({ accountId, canManage }: { accountId: string; canManage: bool
               <div className="space-y-2">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <p className="text-ink text-sm">
-                    「{picked.row} × {picked.col}」の {picked.count}人 を選択中
+                    「{picked.row} × {picked.col}」の {measureKind === 'events' ? `${picked.count}回（${picked.uniqueFriends}人）` : `${picked.count}人`} を選択中
                   </p>
                   {canManage && <Button onClick={() => void prepareCrossAudience()} variant="secondary">友だち一覧で見る</Button>}
                 </div>
@@ -1004,6 +1066,9 @@ function FunnelTab({ accountId, canManage }: { accountId: string; canManage: boo
   // 一覧の取得失敗は空表示と分ける。失敗したまま「まだありません」と出すと、
   // あるものを無いと勘違いして作り直す(点検#508の中3)。
   const [listError, setListError] = useState('')
+  // 一覧・最新結果の取り直し用。読み直しだけで条件は変えない。
+  const [funnelsReload, setFunnelsReload] = useState(0)
+  const [runReload, setRunReload] = useState(0)
   const [creating, setCreating] = useState(false)
   const [picked, setPicked] = useState<number | null>(null)
   const [funnelDays, setFunnelDays] = useState(30)
@@ -1051,7 +1116,7 @@ function FunnelTab({ accountId, canManage }: { accountId: string; canManage: boo
     return () => {
       active = false
     }
-  }, [accountId])
+  }, [accountId, funnelsReload])
 
   useEffect(() => {
     if (!selected) return
@@ -1074,7 +1139,7 @@ function FunnelTab({ accountId, canManage }: { accountId: string; canManage: boo
     return () => {
       active = false
     }
-  }, [accountId, selected])
+  }, [accountId, selected, runReload])
 
   // 条件切替後は、前の世代のfinallyに表示状態を任せない。前の通信が後から
   // 終わっても新しい条件で再集計できるよう、現世代のボタンを必ず戻す。
@@ -1309,9 +1374,12 @@ function FunnelTab({ accountId, canManage }: { accountId: string; canManage: boo
           }}
         />
       ) : listError ? (
-        <p className="text-danger bg-danger-bg rounded-card border-danger border p-8 text-center text-sm" role="alert">
-          ファネルを読み込めませんでした。開き直してください。
-        </p>
+        <div className="text-danger bg-danger-bg rounded-card border-danger border p-8 text-center text-sm" role="alert">
+          <p>ファネルを読み込めませんでした。</p>
+          <div className="mt-3 flex justify-center">
+            <Button variant="secondary" onClick={() => setFunnelsReload((n) => n + 1)}>もう一度読み込む</Button>
+          </div>
+        </div>
       ) : funnels.length === 0 ? (
         <p className="text-ink-faint bg-canvas rounded-card border-hairline border p-8 text-center text-sm">
           ファネルがまだありません。段を2つ以上つないで、どこで離れているかを見られます。
@@ -1461,7 +1529,15 @@ function FunnelTab({ accountId, canManage }: { accountId: string; canManage: boo
               集計期間 {new Date(run.cohortFrom).toLocaleDateString('ja-JP')}〜{new Date(run.cohortTo).toLocaleDateString('ja-JP')}
               ／データ締切 {formatAnalyticsDateTime(run.dataCutoffAt)}
             </p>}
-            {runError && <p className="text-danger mt-2 text-xs">{runError}</p>}
+            {runError && (
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <p className="text-danger text-xs">{runError}</p>
+                {/* 最新結果の読み取りに失敗しただけなら、再集計せず読み直せる */}
+                {!run && !noRun && !running && (
+                  <Button variant="secondary" onClick={() => setRunReload((n) => n + 1)}>最新の結果をもう一度読む</Button>
+                )}
+              </div>
+            )}
             {noRun && !run && <p className="text-ink-faint mt-2 text-xs">まだ集計がありません。「この{funnelDays}日を再集計」を押してください</p>}
             {run?.stateReason && <p className="text-warning mt-2 text-xs">{run.stateReason}</p>}
             {run && run.groups.length > 1 && (
@@ -1533,7 +1609,7 @@ function FunnelTab({ accountId, canManage }: { accountId: string; canManage: boo
                         <p className="text-ink text-sm font-medium">
                           {i + 1}. {step.label}
                         </p>
-                        <p className="text-ink-secondary text-sm tabular-nums">
+                        <p className="text-ink-secondary text-sm tabular-nums" id={`funnel-step-${step.stepOrder}-value`}>
                           {step.reached.toLocaleString('ja-JP')} 人
                           {i > 0 && (
                             <span className="text-ink-faint ml-2 text-xs">
@@ -1542,6 +1618,8 @@ function FunnelTab({ accountId, canManage }: { accountId: string; canManage: boo
                           )}
                         </p>
                       </div>
+                      {/* 棒は押すとその段を選ぶ。段名だけでは人数が読めないので、
+                          上の数値行をaria-describedbyで紐づける。 */}
                       <button
                         onClick={() => {
                           setFunnelAudience(null)
@@ -1549,6 +1627,7 @@ function FunnelTab({ accountId, canManage }: { accountId: string; canManage: boo
                         }}
                         className="bg-canvas-sunken block h-6 w-full overflow-hidden rounded text-left"
                         aria-label={`${step.label}の段`}
+                        aria-describedby={`funnel-step-${step.stepOrder}-value`}
                       >
                         <span
                           className={`block h-full ${isWorst ? 'bg-warning' : 'bg-accent'}`}
@@ -1996,6 +2075,8 @@ function useOverview<T>(load: () => Promise<OverviewResult<T>>, key: string) {
   const [data, setData] = useState<T | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  // 再試行用の数え直し。条件は変えず、同じ読み込みをもう一度だけ行う。
+  const [reloadSeq, setReloadSeq] = useState(0)
   useEffect(() => {
     let active = true
     setLoading(true)
@@ -2017,8 +2098,8 @@ function useOverview<T>(load: () => Promise<OverviewResult<T>>, key: string) {
     // 契約: loaderはkeyに含まれる値だけに依存すること。キーに含まれない値をloaderが読んだらキーを足す。
     // loaderはkeyが表すアカウント・期間が変わった時だけ実行する。
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key])
-  return { data, loading, error }
+  }, [key, reloadSeq])
+  return { data, loading, error, retry: () => setReloadSeq((n) => n + 1) }
 }
 
 function metricText(
@@ -2068,9 +2149,21 @@ function DateTimeMetricCell({ metric }: { metric: AnalyticsMetric<string> }) {
   </span>
 }
 
-function OverviewState({ loading, error }: { loading: boolean; error: string }) {
+function OverviewState({ loading, error, onRetry }: { loading: boolean; error: string; onRetry?: () => void }) {
   if (loading) return <div className="bg-canvas rounded-card border-hairline text-ink-faint border p-10 text-center text-sm">分析を読み込んでいます</div>
-  if (error) return <div className="bg-danger-bg rounded-card border-danger text-danger border p-6 text-sm">{error}</div>
+  // 一時的な取得失敗は開き直すしかなかった。同じ条件で読み直す導線をここに出す。
+  if (error) {
+    return (
+      <div className="bg-danger-bg rounded-card border-danger text-danger border p-6 text-sm" role="alert">
+        {error}
+        {onRetry && (
+          <div className="mt-3">
+            <Button variant="secondary" onClick={onRetry}>もう一度読み込む</Button>
+          </div>
+        )}
+      </div>
+    )
+  }
   return null
 }
 
@@ -2082,7 +2175,7 @@ function RouteBreakdown({ accountId, from, to }: { accountId: string; from: stri
     () => api.analytics.routesOverview(accountId, { from, to }),
     `${accountId}:${from}:${to}:friends-routes`,
   )
-  if (!routeState.data) return <OverviewState loading={routeState.loading} error={routeState.error} />
+  if (!routeState.data) return <OverviewState loading={routeState.loading} error={routeState.error} onRetry={routeState.retry} />
   return <table className="w-full table-fixed"><thead><TableHeadRow><Th>経路</Th><Th align="right">増えた友だち</Th><Th align="right">現在つながっている</Th><Th align="right">1人追加あたり費用</Th></TableHeadRow></thead><tbody className="divide-y divide-hairline">{routeState.data.data.routes.map((route) => <tr key={route.id} className="text-sm"><td className="px-4 py-3"><p className="truncate font-medium" title={route.name}>{route.name}</p><p className="mt-1 truncate text-xs text-ink-faint">{route.refCode ? `ref=${route.refCode}` : '参照コードなし'}</p></td><td className="px-4 py-3 text-right"><MetricCell metric={route.friendAdds} /></td><td className="px-4 py-3 text-right"><MetricCell metric={route.currentFriends} /></td><td className="px-4 py-3 text-right"><MetricCell metric={route.costPerFriend} currency /></td></tr>)}</tbody></table>
 }
 
@@ -2094,7 +2187,7 @@ function FriendsOverviewTab({ accountId }: { accountId: string }) {
     () => api.analytics.friendsOverview(accountId, range),
     `${accountId}:${range.from}:${range.to}:friends`,
   )
-  if (!state.data) return <div className="space-y-4"><AnalyticsPeriodControl days={days} onChange={setDays} /><OverviewState loading={state.loading} error={state.error} /></div>
+  if (!state.data) return <div className="space-y-4"><AnalyticsPeriodControl days={days} onChange={setDays} /><OverviewState loading={state.loading} error={state.error} onRetry={state.retry} /></div>
   const overview = state.data.data
   const addedValue = shownValue(overview.metrics.added)
   const removedValue = shownValue(overview.metrics.removed)
@@ -2133,7 +2226,9 @@ function FriendsOverviewTab({ accountId }: { accountId: string }) {
           {overview.days.map((day, index) => {
             const max = Math.max(1, ...overview.days.flatMap((item) => [item.added, item.removed]))
             const campaigns = overview.campaigns.filter((item) => item.date === day.date)
-            return <button type="button" key={day.date} onClick={() => setSelectedDate(day.date)} className={`relative flex h-full flex-col justify-center ${selectedDate === day.date ? 'ring-2 ring-accent ring-offset-1' : ''}`} title={`${day.date} 増加${day.added}・減少${day.removed}${campaigns.length ? `・${campaigns.map((item) => item.name).join('、')}` : ''}`}>
+            // 棒は押すとその日の内訳を下へ出す。titleだけでは読み上げに届かないため、
+            // 同じ内容をaria-labelとaria-pressedでも伝える。
+            return <button type="button" key={day.date} onClick={() => setSelectedDate(day.date)} aria-pressed={selectedDate === day.date} className={`relative flex h-full flex-col justify-center ${selectedDate === day.date ? 'ring-2 ring-accent ring-offset-1' : ''}`} title={`${day.date} 増加${day.added}・減少${day.removed}${campaigns.length ? `・${campaigns.map((item) => item.name).join('、')}` : ''}`} aria-label={`${day.date} 増加${day.added}・減少${day.removed}${campaigns.length ? `・${campaigns.map((item) => item.name).join('、')}` : ''}`}>
               <div className="flex h-1/2 items-end"><span className="block w-full rounded-t bg-accent" style={{ height: `${Math.max(3, day.added / max * 100)}%` }} /></div>
               <div className="border-t border-hairline" />
               <div className="flex h-1/2 items-start"><span className="block w-full rounded-b bg-danger" style={{ height: `${Math.max(3, day.removed / max * 100)}%` }} /></div>
@@ -2159,7 +2254,7 @@ function ReactionsOverviewTab({ accountId }: { accountId: string }) {
     () => api.analytics.reactionsOverview(accountId, range),
     `${accountId}:${range.from}:${range.to}:reactions`,
   )
-  if (!state.data) return <div className="space-y-4"><AnalyticsPeriodControl days={days} onChange={setDays} /><OverviewState loading={state.loading} error={state.error} /></div>
+  if (!state.data) return <div className="space-y-4"><AnalyticsPeriodControl days={days} onChange={setDays} /><OverviewState loading={state.loading} error={state.error} onRetry={state.retry} /></div>
   const overview = state.data.data
   const delivered = shownValue(overview.metrics.delivered)
   const clicked = shownValue(overview.metrics.lineClicked)
@@ -2204,7 +2299,8 @@ function ReactionsOverviewTab({ accountId }: { accountId: string }) {
       <div className="mt-4 flex h-28 items-end gap-2">
         {Array.from({ length: 24 }, (_, hour) => {
           const clicks = overview.trackedClickHours.find((item) => item.hour === hour)?.clicks ?? 0
-          return <div key={hour} className="flex min-w-0 flex-1 flex-col items-center gap-1" title={`${hour}時台 ${clicks}回`}><span className="w-full rounded-t bg-accent" style={{ height: `${Math.max(2, clicks / maxHourly * 96)}px` }} />{hour % 3 === 0 && <span className="whitespace-nowrap text-[10px] text-ink-faint">{hour}時</span>}</div>
+          // 高さだけの棒は読み上げに届かない。1本ごとに時間と回数を名前にする。
+          return <div key={hour} role="img" aria-label={`${hour}時台 ${clicks}回`} className="flex min-w-0 flex-1 flex-col items-center gap-1" title={`${hour}時台 ${clicks}回`}><span className="w-full rounded-t bg-accent" style={{ height: `${Math.max(2, clicks / maxHourly * 96)}px` }} />{hour % 3 === 0 && <span className="whitespace-nowrap text-[10px] text-ink-faint">{hour}時</span>}</div>
         })}
       </div>
     </section>
@@ -2223,7 +2319,7 @@ function RoutesOverviewTab({ accountId }: { accountId: string }) {
     () => api.analytics.routesOverview(accountId, range),
     `${accountId}:${range.from}:${range.to}:routes`,
   )
-  if (!state.data) return <div className="space-y-4"><AnalyticsPeriodControl days={days} onChange={setDays} /><OverviewState loading={state.loading} error={state.error} /></div>
+  if (!state.data) return <div className="space-y-4"><AnalyticsPeriodControl days={days} onChange={setDays} /><OverviewState loading={state.loading} error={state.error} onRetry={state.retry} /></div>
   const overview = state.data.data
   const clicks = metricSum(overview.routes.map((item) => item.clicks))
   const friends = metricSum(overview.routes.map((item) => item.friendAdds))
@@ -2264,6 +2360,7 @@ function UsageOverviewTab({ accountId }: { accountId: string }) {
   const range = useMemo(() => rangeFor(days - 1), [days])
   const [menuFeatures, setMenuFeatures] = useState<{ enabled: number; total: number } | null>(null)
   const [menuFeaturesError, setMenuFeaturesError] = useState('')
+  const [menuReload, setMenuReload] = useState(0)
   const state = useOverview<AnalyticsUsageOverview>(
     () => api.analytics.usageOverview(accountId, range),
     `${accountId}:${range.from}:${range.to}:usage`,
@@ -2283,8 +2380,8 @@ function UsageOverviewTab({ accountId }: { accountId: string }) {
       if (active) setMenuFeaturesError('メニューに出している機能を確認できません')
     })
     return () => { active = false }
-  }, [accountId])
-  if (!state.data) return <div className="space-y-4"><AnalyticsPeriodControl days={days} onChange={setDays} /><OverviewState loading={state.loading} error={state.error} /></div>
+  }, [accountId, menuReload])
+  if (!state.data) return <div className="space-y-4"><AnalyticsPeriodControl days={days} onChange={setDays} /><OverviewState loading={state.loading} error={state.error} onRetry={state.retry} /></div>
   const overview = state.data.data
   const estimatedHoursSavedValue = overview.summary.estimatedHoursSaved.state === 'available'
     || overview.summary.estimatedHoursSaved.state === 'partial'
@@ -2326,6 +2423,12 @@ function UsageOverviewTab({ accountId }: { accountId: string }) {
       />
     </div>
     {overview.stateReason ? <div className="bg-warning-bg border-warning rounded-card border px-4 py-3 text-sm">{overview.stateReason}</div> : <AnalyticsNotice>項目が多いほど良い、ではありません。使っていないものは使用先を確かめてから、下の「片づける」で整理できます。</AnalyticsNotice>}
+    {menuFeaturesError && (
+      <div className="border-hairline bg-canvas flex flex-wrap items-center justify-between gap-2 rounded-card border px-4 py-2 text-xs text-ink-secondary" role="alert">
+        <span>{menuFeaturesError}</span>
+        <Button variant="secondary" onClick={() => setMenuReload((n) => n + 1)}>もう一度確認</Button>
+      </div>
+    )}
     <div id="usage-items" className="bg-canvas rounded-card border-hairline overflow-hidden border"><table className="w-full table-fixed">
       <thead><TableHeadRow><Th>機能</Th><Th align="right">作成</Th><Th align="right">利用中</Th><Th align="right">未使用</Th><Th>気づいたこと</Th><Th align="right">操作</Th></TableHeadRow></thead>
       <tbody className="divide-hairline divide-y">{overview.categories.map((item) => {
@@ -2348,7 +2451,7 @@ function UrlClicksOverviewTab({ accountId }: { accountId: string }) {
     () => api.analytics.urlClicksOverview(accountId, { ...range, limit: 200 }),
     `${accountId}:${range.from}:${range.to}:url-clicks`,
   )
-  if (!state.data) return <div className="space-y-4"><AnalyticsPeriodControl days={days} onChange={setDays} /><OverviewState loading={state.loading} error={state.error} /></div>
+  if (!state.data) return <div className="space-y-4"><AnalyticsPeriodControl days={days} onChange={setDays} /><OverviewState loading={state.loading} error={state.error} onRetry={state.retry} /></div>
   const overview = state.data.data
   const visibleLinks = overview.links.filter((item) => `${item.name} ${item.originalUrl} ${item.usageLocations.join(' ')}`.toLowerCase().includes(query.trim().toLowerCase()))
   const clicks = metricSum(overview.links.map((item) => item.clicks))
@@ -2430,6 +2533,9 @@ function SavedAnalyticsTab({ accountId, onCountChange, canManage }: {
   const [schedulesLoading, setSchedulesLoading] = useState(true)
   const [schedulesError, setSchedulesError] = useState('')
   const [scheduleBusyId, setScheduleBusyId] = useState('')
+  // 一覧・履歴の取り直し用。選んだ分析や検索語はそのままに、同じ取得だけをやり直す。
+  const [savedReload, setSavedReload] = useState(0)
+  const [snapshotReload, setSnapshotReload] = useState(0)
   const [archiveTarget, setArchiveTarget] = useState<AnalyticsReportSchedule | null>(null)
 
   useEffect(() => {
@@ -2460,7 +2566,7 @@ function SavedAnalyticsTab({ accountId, onCountChange, canManage }: {
     return () => {
       active = false
     }
-  }, [accountId])
+  }, [accountId, savedReload])
 
   const schedulesAlive = useRef(true)
   useEffect(() => () => {
@@ -2558,7 +2664,7 @@ function SavedAnalyticsTab({ accountId, onCountChange, canManage }: {
     return () => {
       active = false
     }
-  }, [accountId, selectedId])
+  }, [accountId, selectedId, snapshotReload])
 
   const selected = items.find((item) => item.id === selectedId) ?? null
   const visibleItems = items.filter((item) => `${item.name} ${item.createdByName}`.toLowerCase().includes(query.trim().toLowerCase()))
@@ -2599,7 +2705,15 @@ function SavedAnalyticsTab({ accountId, onCountChange, canManage }: {
             {canManage && <Button href="/analytics/reports/new" variant="secondary">定期レポートを作る</Button>}
           </div>
         </div>
-        {schedulesError && <p className="text-danger border-hairline border-b px-4 py-2 text-xs">{schedulesError}</p>}
+        {schedulesError && (
+          <div className="text-danger border-hairline flex items-center justify-between gap-2 border-b px-4 py-2 text-xs" role="alert">
+            <span>{schedulesError}</span>
+            {/* 読み直しの失敗ではエラーを上書きしてもよいが、版ずれの通知は
+                reloadSchedules内で消すと「別の画面で先に更新されました」が
+                一瞬で消えてしまう。消すのは手でやり直したこの入口だけ。 */}
+            <Button variant="secondary" disabled={schedulesLoading} onClick={() => { setSchedulesError(''); reloadSchedules() }}>もう一度確認</Button>
+          </div>
+        )}
         {schedulesLoading ? (
           <p className="text-ink-faint p-8 text-center text-sm">定期レポートを読み込んでいます</p>
         ) : schedules.length === 0 ? (
@@ -2689,7 +2803,12 @@ function SavedAnalyticsTab({ accountId, onCountChange, canManage }: {
           保存した分析を読み込んでいます
         </div>
       ) : error && items.length === 0 ? (
-        <div className="bg-danger-bg rounded-card border-danger text-danger border p-6 text-sm">{error}</div>
+        <div className="bg-danger-bg rounded-card border-danger text-danger border p-6 text-sm" role="alert">
+          {error}
+          <div className="mt-3">
+            <Button variant="secondary" onClick={() => setSavedReload((n) => n + 1)}>もう一度読み込む</Button>
+          </div>
+        </div>
       ) : items.length === 0 ? (
         <div className="bg-canvas rounded-card border-hairline border p-10 text-center">
           <p className="text-ink font-medium">保存した分析はまだありません</p>
@@ -2762,7 +2881,12 @@ function SavedAnalyticsTab({ accountId, onCountChange, canManage }: {
                 {selected.name} ／ 定期レポート {schedulesLoading ? '確認中' : schedulesError ? '—' : `${schedules.filter((schedule) => schedule.savedAnalysisIds.includes(selected.id)).length}件`}
               </p>
             )}
-            {error && items.length > 0 && <p className="text-danger mt-3 text-xs">{error}</p>}
+            {error && items.length > 0 && (
+              <div className="text-danger mt-3 flex items-center justify-between gap-2 text-xs" role="alert">
+                <span>{error}</span>
+                <Button variant="secondary" onClick={() => setSnapshotReload((n) => n + 1)}>もう一度読み込む</Button>
+              </div>
+            )}
             {snapshotLoading ? (
               <p className="text-ink-faint mt-4 text-sm">結果を読み込んでいます</p>
             ) : snapshots.length === 0 ? (
