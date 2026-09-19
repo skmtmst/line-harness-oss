@@ -52,11 +52,15 @@ V6を採用する。はじめて／以前から・ブロック解除を分け、
 | 画面 | ルート |
 |---|---|
 | ルール一覧 | `/friend-add-settings` |
-| ルールを作る | `/friend-add-settings/new` |
-| ルールを編集 | `/friend-add-settings/{id}` |
-| 競合と優先順位 | `/friend-add-settings/conflicts` |
-| 配信をテスト | `/friend-add-settings/test` |
-| 実行結果 | `/friend-add-settings/runs` |
+| ルールを作る | `/friend-add-settings?view=new` |
+| ルールを編集 | `/friend-add-settings?view=edit&id={id}`（`step` で各段を直接開く: `basic` / `routes` / `message` / `actions` / `preview`） |
+| 競合と優先順位 | 独立ルートなし。優先順位は編集の基本設定段、競合の確認は最終確認で行う |
+| 配信をテスト | 編集の確認段 `/friend-add-settings?view=edit&id={id}&step=preview` |
+| 最終確認・有効化 | `/friend-add-settings/publish?id={id}` |
+| 実行結果 | `/friend-add-settings/runs`（`?rule_id={id}` で設定別に絞れる） |
+| 実行結果の詳細 | `/friend-add-settings/runs/detail?id={id}` |
+
+注: 静的エクスポート構成のため `/friend-add-settings/{id}` のようなパス型ルートは持たず、作成・編集・テストはクエリ付きの同一ページで切り替える。
 
 V6実Node ID 10画面を確認した。実装PRでは全状態の設計画像とともに次を固定する。
 
