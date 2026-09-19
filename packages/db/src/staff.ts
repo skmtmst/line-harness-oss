@@ -33,6 +33,10 @@ export interface StaffMember {
   view_permission_keys?: string | null;
   /** N-424: スタッフのメール表示。'full'|'masked'|'none'、NULL は従来判定。 */
   email_mask?: string | null;
+  /** N-433: 確認待ちの新しいメールアドレス。確認するまで email は変えない。 */
+  email_change_new?: string | null;
+  email_change_token_hash?: string | null;
+  email_change_expires_at?: string | null;
   tenant_id: string | null;
   created_at: string;
   updated_at: string;
@@ -85,6 +89,9 @@ export interface UpdateStaffInput {
   role_bundle?: string | null;
   view_permission_keys?: string[];
   email_mask?: string | null;
+  email_change_new?: string | null;
+  email_change_token_hash?: string | null;
+  email_change_expires_at?: string | null;
 }
 
 function generateApiKey(): string {
@@ -222,6 +229,9 @@ export async function updateStaffMember(
   if (input.role_bundle !== undefined) { sets.push('role_bundle = ?'); values.push(input.role_bundle); }
   if (input.view_permission_keys !== undefined) { sets.push('view_permission_keys = ?'); values.push(JSON.stringify(input.view_permission_keys)); }
   if (input.email_mask !== undefined) { sets.push('email_mask = ?'); values.push(input.email_mask); }
+  if (input.email_change_new !== undefined) { sets.push('email_change_new = ?'); values.push(input.email_change_new); }
+  if (input.email_change_token_hash !== undefined) { sets.push('email_change_token_hash = ?'); values.push(input.email_change_token_hash); }
+  if (input.email_change_expires_at !== undefined) { sets.push('email_change_expires_at = ?'); values.push(input.email_change_expires_at); }
 
   values.push(id);
   await db
@@ -279,6 +289,11 @@ export async function replaceStaffAccountScopes(
 
 export async function getStaffByInviteTokenHash(db: D1Database, tokenHash: string): Promise<StaffMember | null> {
   return db.prepare('SELECT * FROM staff_members WHERE invite_token_hash = ?').bind(tokenHash).first<StaffMember>();
+}
+
+/** N-433: メール変更の確認リンクから本人の行を引く。トークンは指紋で照合する。 */
+export async function getStaffByEmailChangeTokenHash(db: D1Database, tokenHash: string): Promise<StaffMember | null> {
+  return db.prepare('SELECT * FROM staff_members WHERE email_change_token_hash = ?').bind(tokenHash).first<StaffMember>();
 }
 
 export async function deleteStaffMember(db: D1Database, id: string): Promise<void> {

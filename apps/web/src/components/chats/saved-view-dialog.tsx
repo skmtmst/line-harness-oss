@@ -25,9 +25,12 @@ export type SavedViewSaveResult =
 export type SavedViewDraft = {
   name: string
   status: 'all' | 'unread' | 'in_progress' | 'on_hold' | 'resolved'
-  due: 'all' | 'overdue'
+  /** 一覧上部の「すべて／要返信／期限超過」。N-020 で期限の2値から3値へ。 */
+  quickFilter: 'all' | 'reply' | 'overdue'
   channel: 'all' | 'line' | 'email'
   assignee: string
+  /** 絞り込みパネルの「未読だけ表示」。 */
+  unreadOnly: boolean
   favorite: boolean
 }
 
@@ -54,9 +57,10 @@ export default function SavedViewDialog({
   const [error, setError] = useState('')
   const [done, setDone] = useState(false)
   const [status, setStatus] = useState(initialValue.status)
-  const [due, setDue] = useState(initialValue.due)
+  const [quickFilter, setQuickFilter] = useState(initialValue.quickFilter)
   const [channel, setChannel] = useState(initialValue.channel)
   const [assignee, setAssignee] = useState(initialValue.assignee)
+  const [unreadOnly, setUnreadOnly] = useState(initialValue.unreadOnly)
   const [favorite, setFavorite] = useState(initialValue.favorite)
 
   useEffect(() => {
@@ -65,11 +69,12 @@ export default function SavedViewDialog({
     setError('')
     setDone(false)
     setStatus(initialValue.status)
-    setDue(initialValue.due)
+    setQuickFilter(initialValue.quickFilter)
     setChannel(initialValue.channel)
     setAssignee(initialValue.assignee)
+    setUnreadOnly(initialValue.unreadOnly)
     setFavorite(initialValue.favorite)
-  }, [open, initialValue.status, initialValue.due, initialValue.channel, initialValue.assignee, initialValue.favorite])
+  }, [open, initialValue.status, initialValue.quickFilter, initialValue.channel, initialValue.assignee, initialValue.unreadOnly, initialValue.favorite])
 
   useEffect(() => {
     if (!open) return
@@ -106,7 +111,7 @@ export default function SavedViewDialog({
       return
     }
     setError('')
-    const result = await onSave({ name: trimmed, status, due, channel, assignee, favorite })
+    const result = await onSave({ name: trimmed, status, quickFilter, channel, assignee, unreadOnly, favorite })
     if (!result.success) {
       setError(result.error)
       return
@@ -183,11 +188,21 @@ export default function SavedViewDialog({
                   </dd>
                 </div>
                 <div className="flex items-center justify-between gap-3 px-3 py-2.5 text-sm">
-                  <dt className="text-ink-secondary text-xs">期限</dt>
+                  <dt className="text-ink-secondary text-xs">絞り込み</dt>
                   <dd>
-                    <select aria-label="保存する期限" value={due} onChange={(event) => setDue(event.target.value as SavedViewDraft['due'])} className="border-hairline rounded-control bg-canvas text-ink h-9 w-40 border px-2 text-xs font-medium">
+                    <select aria-label="保存する絞り込み" value={quickFilter} onChange={(event) => setQuickFilter(event.target.value as SavedViewDraft['quickFilter'])} className="border-hairline rounded-control bg-canvas text-ink h-9 w-40 border px-2 text-xs font-medium">
                       <option value="all">すべて</option>
+                      <option value="reply">要返信</option>
                       <option value="overdue">期限超過</option>
+                    </select>
+                  </dd>
+                </div>
+                <div className="flex items-center justify-between gap-3 px-3 py-2.5 text-sm">
+                  <dt className="text-ink-secondary text-xs">未読</dt>
+                  <dd>
+                    <select aria-label="保存する未読条件" value={unreadOnly ? 'unread' : 'all'} onChange={(event) => setUnreadOnly(event.target.value === 'unread')} className="border-hairline rounded-control bg-canvas text-ink h-9 w-40 border px-2 text-xs font-medium">
+                      <option value="all">すべて</option>
+                      <option value="unread">未読だけ</option>
                     </select>
                   </dd>
                 </div>

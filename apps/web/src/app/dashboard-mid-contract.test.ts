@@ -34,7 +34,8 @@ describe('ダッシュボード点検・中の契約(#491)', () => {
   })
 
   it('中5:出荷予定の失敗は決まった文と読み直しを出す', () => {
-    expect(code(SHIPMENT)).toContain("setError('出荷予定を取得できませんでした')")
+    // N-008: 「取得できませんでした」は禁止文言。共通の読み直し文に揃える。
+    expect(code(SHIPMENT)).toContain("setError('通信状況を確認して、もう一度お試しください')")
     expect(SHIPMENT).toContain('もう一度読み込む')
     expect(SHIPMENT).toContain('setAttempt((count) => count + 1)')
     expect(code(SHIPMENT)).not.toContain('e.message')

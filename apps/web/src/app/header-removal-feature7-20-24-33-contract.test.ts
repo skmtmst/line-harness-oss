@@ -20,8 +20,9 @@ describe('機能7・20・24・33の本文上部', () => {
     expect(page).not.toContain('<Header')
   })
 
-  it('未対応インボックスの画面名はトップバーへ渡す', () => {
-    expect(source('notifications/page.tsx')).toContain("usePageTitle('未対応インボックス')")
+  it('通知一覧の画面名はトップバーへ渡す', () => {
+    // N-009: /notifications は未対応インボックスではなく通知の全件一覧になった。
+    expect(source('notifications/page.tsx')).toContain("usePageTitle('通知')")
   })
 
   it('Search Consoleの操作は分析タブの後に残す', () => {

@@ -62,4 +62,24 @@ describe('ダッシュボードの言葉を設計にそろえる', () => {
     expect(CODE, '「優先度順」のまま').not.toContain('>優先度順<')
     expect(CODE).toContain('優先度が高い順')
   })
+
+  /*
+   * N-008。画面に出る字で「取得できません」「読み込み中」を使わない。
+   * 状態の言葉は STATE_TEXT（components/shared/not-connected.tsx）に
+   * そろえる。注釈は落としてから見る（直した理由を書いた文が残るため）。
+   */
+  it('禁止文言は STATE_TEXT に統一する（N-008）', () => {
+    const targets = [
+      PAGE,
+      fs.readFileSync(path.join(__dirname, '..', 'components', 'dashboard', 'shipment-panel.tsx'), 'utf8'),
+      fs.readFileSync(path.join(__dirname, '..', 'components', 'support', 'pending-inbox-card.tsx'), 'utf8'),
+    ]
+    for (const [i, raw] of targets.entries()) {
+      const source = code(raw)
+      expect(source, `ファイル${i} に「取得できません」が残っている`).not.toContain('取得できません')
+      expect(source, `ファイル${i} に「読み込み中」が残っている`).not.toContain('読み込み中')
+    }
+    expect(CODE).toContain('STATE_TEXT.error')
+    expect(CODE).toContain('STATE_TEXT.loading')
+  })
 })

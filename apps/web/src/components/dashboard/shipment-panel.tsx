@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { api, type EcShipmentList } from '@/lib/api'
 import Card, { CardHeader } from '@/components/shared/card'
 import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
+import { STATE_TEXT } from '@/components/shared/not-connected'
 
 /**
  * 出荷予定。
@@ -66,7 +67,7 @@ export default function ShipmentPanel({
       .catch(() => {
         if (cancelled) return
         /* 生の例外文(通信機器の応答など)を出さない。決まった文と読み直しを出す。 */
-        setError('出荷予定を取得できませんでした')
+        setError('通信状況を確認して、もう一度お試しください')
         onSummaryChange?.(null)
       })
       .finally(() => {
@@ -89,7 +90,7 @@ export default function ShipmentPanel({
       />
       <div className="px-[18px] pb-[18px]">
         {loading ? (
-          <p className="py-6 text-center text-sm text-ink-faint">読み込み中…</p>
+          <p className="py-6 text-center text-sm text-ink-faint">{STATE_TEXT.loading}…</p>
         ) : error ? (
           <div className="rounded-lg border border-danger/20 bg-danger-bg p-3 text-xs text-danger">
             <p>出荷予定を読み込めませんでした。{error}</p>
