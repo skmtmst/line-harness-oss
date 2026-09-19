@@ -1087,7 +1087,15 @@ export type ConversionApprovalItem = {
   lineAccountName: string | null
 }
 
-export type ConversionDefinitionStatus = 'active' | 'stopped'
+export type ConversionDefinitionStatus = 'active' | 'stopped' | 'draft'
+/**
+ * N-268: 画面で区別する導出状態。status 列そのものではなく、
+ * 設定の壊れ(入力不良)や外部受信の停止(起点停止)も含める。
+ */
+export type ConversionDefinitionState =
+  | 'active' | 'draft' | 'stopped' | 'invalid' | 'sourceStopped'
+/** `state` クエリで追加で受ける、状態と直交する絞り込み。 */
+export type ConversionDefinitionFilter = ConversionDefinitionState | 'unused'
 export type ConversionDeduplicationMode = 'every' | 'once_per_friend' | 'window'
 export type ConversionValueMode = 'source' | 'fixed' | 'none'
 export type ConversionReversalPolicy = 'source_cancelled' | 'manual' | 'none'
@@ -1111,6 +1119,12 @@ export type ConversionDefinitionListItem = {
   reversalPolicy: ConversionReversalPolicy
   lineAccountId: string | null
   status: ConversionDefinitionStatus
+  /** N-268: 画面表示用の導出状態。 */
+  state: ConversionDefinitionState
+  /** 入力不良・起点停止のとき、直すべき中身を運用者の言葉で返す。 */
+  stateReason: string | null
+  /** N-270: 外部受信の設定状況。秘密値そのものは返らない。 */
+  ingest: { configured: boolean; disabledAt: string | null }
   version: number
   usageCount: number
   usageNames: string[]
@@ -1166,6 +1180,19 @@ export type ConversionDefinitionPreview = {
   deduplicationWindowDays: number | null
 }
 
+/** N-270: 外部受信の成否1件。署名・本文の中身は含まない。 */
+export type ConversionIngestionEvent = {
+  id: string
+  conversionPointId: string
+  result: 'recorded' | 'duplicate' | 'rejected'
+  reason: string | null
+  sourceEventId: string | null
+  friendId: string | null
+  payloadShape: Record<string, unknown> | null
+  signatureSha256: string | null
+  createdAt: string
+}
+
 export type ConversionDefinitionDeleteImpact = {
   definition: ConversionDefinitionDetail
   usages: ConversionDefinitionUsage[]
@@ -1183,6 +1210,8 @@ export type ConversionDefinitionList = {
     stopped: number
     invalid: number
     sourceStopped: number
+    /** N-267: どこからも使われていない地点の数(絞り込み全体の正確な件数)。 */
+    unused: number
   }
   range: { from: string; to: string; timeZone: 'Asia/Tokyo' }
   pagination: { total: number; limit: number; cursor: string; nextCursor: string | null }
@@ -7484,6 +7513,7 @@ export const api = {
       lineAccountId?: string
       q?: string
       status?: ConversionDefinitionStatus
+      state?: ConversionDefinitionFilter
       sourceType?: string
       sort?: 'count_desc' | 'value_desc' | 'updated_desc' | 'name_asc'
       cursor?: string
@@ -7511,6 +7541,8 @@ export const api = {
       reversalPolicy: ConversionReversalPolicy
       attributionDays?: number | null
       usages: Array<{ refKind: ConversionDefinitionUsageKind; refId: string; refVersionId?: string | null }>
+      /** N-268: true のとき下書きで保存し、公開するまで計測しない。 */
+      draft?: boolean
     }) => fetchApi<ApiResponse<ConversionDefinitionDetail>>('/api/conversions/definitions', {
       method: 'POST', body: JSON.stringify(data),
     }),
@@ -7574,6 +7606,32 @@ export const api = {
       fetchApi<ApiResponse<{ id: string; deleted: true }>>(
         `/api/conversions/definitions/${encodeURIComponent(id)}`,
         { method: 'DELETE', body: JSON.stringify(data) },
+      ),
+    /** N-268: 下書きを計測中へ公開する。 */
+    publishDefinition: (id: string, data: { expectedVersion: number }) =>
+      fetchApi<ApiResponse<{ id: string; status: 'active'; version: number }>>(
+        `/api/conversions/definitions/${encodeURIComponent(id)}/publish`,
+        { method: 'POST', body: JSON.stringify(data) },
+      ),
+    /**
+     * N-270: 外部受信の鍵を発行・再発行する。
+     * 平文の鍵はこの応答でだけ返る。画面は一度だけ表示して保存させる。
+     */
+    issueIngestSecret: (id: string, data: { expectedVersion: number }) =>
+      fetchApi<ApiResponse<{ id: string; secret: string; endpoint: string; version: number }>>(
+        `/api/conversions/definitions/${encodeURIComponent(id)}/ingest-secret`,
+        { method: 'POST', body: JSON.stringify(data) },
+      ),
+    /** N-270: 外部受信を止める/再開する。 */
+    setIngestDisabled: (id: string, data: { expectedVersion: number; disabled: boolean }) =>
+      fetchApi<ApiResponse<{ id: string; disabledAt: string | null; version: number }>>(
+        `/api/conversions/definitions/${encodeURIComponent(id)}/${data.disabled ? 'ingest-disable' : 'ingest-enable'}`,
+        { method: 'POST', body: JSON.stringify({ expectedVersion: data.expectedVersion }) },
+      ),
+    /** N-270: 受信の成否履歴。 */
+    ingestionEvents: (id: string, limit = 50) =>
+      fetchApi<ApiResponse<{ items: ConversionIngestionEvent[] }>>(
+        `/api/conversions/definitions/${encodeURIComponent(id)}/ingest-events?limit=${limit}`,
       ),
     definitionReport: (params: { from: string; to: string; lineAccountId?: string }) => {
       const query = Object.fromEntries(

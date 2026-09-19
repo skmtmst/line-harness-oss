@@ -26,6 +26,27 @@ describe('382の参照退避表だけを同一ファイル内で片付ける', (
   });
 });
 
+describe('440のCASCADE子退避表だけを同一ファイル内で片付ける(#937)', () => {
+  const file = '440_conversion_draft_and_ingest.sql';
+  const sql = readFileSync(new URL('../packages/db/migrations/440_conversion_draft_and_ingest.sql', import.meta.url), 'utf8');
+  it('実migrationの退避表cleanupを許可する', () => {
+    expect(checkMigration(sql, file)).toEqual({ ok: true });
+  });
+  it('他ファイル・印なし・任意のbackup表のDROPは拒否する', () => {
+    expect(checkMigration(sql, '441_other.sql').ok).toBe(false);
+    expect(checkMigration(sql.replace('-- migration-policy: table-rebuild', ''), file).ok).toBe(false);
+    expect(checkMigration(`${sql}\nCREATE TABLE migration_440_unlisted_backup(id TEXT);\nDROP TABLE migration_440_unlisted_backup;`, file).ok).toBe(false);
+  });
+  it('作成されない表、DROP後のCREATE、別名の退避表も拒否する', () => {
+    const create = 'CREATE TABLE migration_440_conversion_events_backup AS SELECT * FROM conversion_events;';
+    expect(checkMigration(sql.replace(create, ''), file).ok).toBe(false);
+    expect(checkMigration(`${sql.replace(create, '')}\n${create}`, file).ok).toBe(false);
+    // 許可名は「440」のファイル名とペア。別ファイルへ同名を忍ばせても通さない。
+    expect(checkMigration(sql, '439_staff_email_change.sql').ok).toBe(false);
+    expect(checkMigration(`${sql}\nDROP TABLE friends;`, file).ok).toBe(false);
+  });
+});
+
 describe('checkMigration', () => {
   it('allows CREATE TABLE', () => {
     const sql = `CREATE TABLE foo (id INTEGER PRIMARY KEY, name TEXT);`;

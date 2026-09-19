@@ -48,6 +48,9 @@ const DEFINITION = {
   reversalPolicy: 'manual',
   lineAccountId: 'account-a',
   status: 'active',
+  state: 'active',
+  stateReason: null,
+  ingest: { configured: false, disabledAt: null },
   version: 3,
   usageCount: 1,
   usageNames: ['シナリオA'],
@@ -65,7 +68,7 @@ function listBody() {
     success: true,
     data: {
       items: [DEFINITION],
-      stateCounts: { active: 1, draft: 0, stopped: 0, invalid: 0, sourceStopped: 0 },
+      stateCounts: { active: 1, draft: 0, stopped: 0, invalid: 0, sourceStopped: 0, unused: 0 },
       range: { from: '2026-09-01 00:00:00', to: '2026-09-30 23:59:59', timeZone: 'Asia/Tokyo' },
       pagination: { total: 1, limit: 50, cursor: '0', nextCursor: null },
     },

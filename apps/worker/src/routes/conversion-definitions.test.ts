@@ -86,7 +86,7 @@ const json = (body: unknown) => ({
 
 const LIST_RESULT = {
   items: [],
-  stateCounts: { active: 0, draft: 0, stopped: 0, invalid: 0, sourceStopped: 0 },
+  stateCounts: { active: 0, draft: 0, stopped: 0, invalid: 0, sourceStopped: 0, unused: 0 },
   range: { from: '2026-09-01 00:00:00', to: '2026-09-07 23:59:59', timeZone: 'Asia/Tokyo' },
   pagination: { total: 0, limit: 50, cursor: '0', nextCursor: null },
 };
@@ -102,7 +102,7 @@ beforeEach(() => {
   dbMocks.getConversionDefinitionReport.mockResolvedValue({
     kpis: { netCount: 0 }, daily: [], byDefinition: [], byRoute: [],
   });
-  dbMocks.listConversionDefinitionsForExport.mockResolvedValue([]);
+  dbMocks.listConversionDefinitionsForExport.mockResolvedValue({ items: [], truncated: false });
   dbMocks.createConversionDefinition.mockResolvedValue({ id: 'point-new', name: '動画完了' });
   dbMocks.previewConversionDefinition.mockResolvedValue({ estimatedCount: 214, estimatedValue: 402800 });
   dbMocks.getConversionDefinitionDeleteImpact.mockResolvedValue({
@@ -138,9 +138,21 @@ describe('conversion definition V6 routes', () => {
 
   it('日付・状態・cursorの入力不良を400で拒否する', async () => {
     expect((await app().request('/api/conversions/definitions?from=2026-09-07&to=2026-09-01')).status).toBe(400);
-    expect((await app().request('/api/conversions/definitions?status=draft')).status).toBe(400);
+    // N-268: draft は有効な状態になった。無効な値だけを弾く。
+    expect((await app().request('/api/conversions/definitions?status=paused')).status).toBe(400);
     expect((await app().request('/api/conversions/definitions?cursor=-1')).status).toBe(400);
     expect(dbMocks.listConversionDefinitions).not.toHaveBeenCalled();
+  });
+
+  it('N-268: state 絞り込みを受け付け、stateとstatusの併用は400にする', async () => {
+    const response = await app().request('/api/conversions/definitions?state=sourceStopped');
+    expect(response.status).toBe(200);
+    expect(dbMocks.listConversionDefinitions).toHaveBeenCalledWith(
+      expect.anything(), expect.objectContaining({ state: 'sourceStopped' }),
+    );
+    dbMocks.listConversionDefinitions.mockClear();
+    expect((await app().request('/api/conversions/definitions?state=draft&status=active')).status).toBe(400);
+    expect((await app().request('/api/conversions/definitions?state=unknown-state')).status).toBe(400);
   });
 
   it('閲覧権限の無いstaffを403で拒否する', async () => {
@@ -209,10 +221,17 @@ describe('conversion definition V6 routes', () => {
     expect(report.status).toBe(200);
     expect(await report.json()).toMatchObject({ success: true, data: { kpis: { netCount: 0 }, daily: [] } });
 
-    dbMocks.getConversionReport.mockResolvedValueOnce([]);
+    // N-269: 旧日付クエリも同じ集計(getConversionDefinitionReport)から形だけ写す。
+    dbMocks.getConversionDefinitionReport.mockResolvedValueOnce({ byDefinition: [] });
     const legacy = await app('staff').request('/api/conversions/report?startDate=2026-09-01&endDate=2026-09-07');
     expect(legacy.status).toBe(200);
     expect(await legacy.json()).toEqual({ success: true, data: [] });
+    expect(dbMocks.getConversionDefinitionReport).toHaveBeenLastCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        range: { from: '2026-09-01 00:00:00', to: '2026-09-07 23:59:59', timeZone: 'Asia/Tokyo' },
+      }),
+    );
   });
 
   it('CSVは専用権限と一覧同条件を使い、空でも定義ヘッダーを返す', async () => {

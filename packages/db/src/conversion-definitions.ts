@@ -1,8 +1,22 @@
 import { DEFAULT_TENANT_ID } from '@line-crm/shared';
 import { jstNow } from './utils.js';
 import { resolveConversionPointTenantId } from './conversions.js';
+import { encryptWebhookSecret, resolveWebhookSecret, type WebhookKeyInput } from './webhooks.js';
 
-export type ConversionDefinitionStatus = 'active' | 'stopped';
+export type ConversionDefinitionStatus = 'active' | 'stopped' | 'draft';
+/**
+ * N-268: 画面で区別する成果地点の状態。status 列そのものではなく、
+ * 設定の壊れ(入力不良)や外部受信の停止(起点停止)も含めて導出する。
+ *
+ * - draft          : 作成だけして公開していない。計測には乗らない。
+ * - stopped        : 運用者が止めた。
+ * - invalid        : 計測中扱いだが設定が足りず、実際には数えられない。
+ * - sourceStopped  : 地点は計測中だが、外部からの受信(起点)を止めている。
+ * - active         : 上のどれにも当たらない、実際に計測できる状態。
+ */
+export type ConversionDefinitionState = 'active' | 'draft' | 'stopped' | 'invalid' | 'sourceStopped';
+/** `state` クエリで追加で受ける、状態と直交する絞り込み。 */
+export type ConversionDefinitionFilter = ConversionDefinitionState | 'unused';
 export type ConversionDefinitionSort = 'count_desc' | 'value_desc' | 'updated_desc' | 'name_asc';
 export type ConversionDeduplicationMode = 'every' | 'once_per_friend' | 'window';
 export type ConversionValueMode = 'source' | 'fixed' | 'none';
@@ -44,6 +58,8 @@ export type ConversionDefinitionListInput = {
   lineAccountId?: string;
   query?: string;
   status?: ConversionDefinitionStatus;
+  /** N-268: 導出した状態での絞り込み。status よりこちらが正確。 */
+  state?: ConversionDefinitionFilter;
   sourceType?: string;
   range: ConversionDefinitionRange;
   cursor: number;
@@ -82,6 +98,12 @@ export type ConversionDefinitionListItem = {
   reversalPolicy: ConversionReversalPolicy;
   lineAccountId: string | null;
   status: ConversionDefinitionStatus;
+  /** N-268: 画面表示用の導出状態。 */
+  state: ConversionDefinitionState;
+  /** 入力不良・起点停止のとき、直すべき中身を運用者の言葉で返す。 */
+  stateReason: string | null;
+  /** N-270: 外部受信の設定状況。秘密値そのものは絶対に返さない。 */
+  ingest: { configured: boolean; disabledAt: string | null };
   version: number;
   usageCount: number;
   usageNames: string[];
@@ -120,6 +142,8 @@ type DefinitionRow = {
   stopped_at: string | null;
   created_at: string;
   updated_at: string;
+  ingest_secret_encrypted: string | null;
+  ingest_disabled_at: string | null;
   recorded_count: number;
   net_value: number;
   usage_count: number;
@@ -214,9 +238,45 @@ function accountWhere(
   return { sql: scope.includeUnassigned ? `${column} IS NULL` : '1 = 0', values: [] };
 }
 
+/**
+ * N-268: 「入力不良」の SQL 条件。作成口では弾いているが、旧口
+ * (/api/conversions/points) や途中の版で欠けた設定が残り得る。
+ * ここで導出しないと「計測中」と出ながら実際には数えられない行が
+ * 埋もれる。
+ */
+const INVALID_CONFIG_SQL = `(
+  (cp.measure_method = 'url_reach' AND (cp.target_url IS NULL OR cp.target_url = ''))
+  OR (cp.value_mode = 'fixed' AND cp.value IS NULL)
+  OR (cp.deduplication_mode = 'window' AND (cp.deduplication_window_days IS NULL
+    OR cp.deduplication_window_days < 1 OR cp.deduplication_window_days > 365))
+)`;
+
+/** N-270: 「起点停止」= 地点は動いているが外部受信を明示的に止めている。 */
+const SOURCE_STOPPED_SQL = `(cp.measure_method = 'webhook' AND cp.ingest_disabled_at IS NOT NULL)`;
+
+/** N-267: 「どこからも使われていない」は利用先台帳の不存在で判定する。 */
+const UNUSED_SQL = `NOT EXISTS (SELECT 1 FROM conversion_definition_usages u WHERE u.conversion_point_id = cp.id)`;
+
+/**
+ * N-268: state 絞り込みを SQL へそのまま落とす。導出状態の並びは
+ * serializeDefinition 側の deriveDefinitionState と必ず一致させる。
+ */
+function stateFilterSql(state: ConversionDefinitionFilter): string {
+  switch (state) {
+    case 'draft': return `cp.status = 'draft'`;
+    case 'stopped': return `cp.status = 'stopped'`;
+    case 'invalid': return `cp.status = 'active' AND ${INVALID_CONFIG_SQL}`;
+    case 'sourceStopped': return `cp.status = 'active' AND ${SOURCE_STOPPED_SQL}`;
+    case 'unused': return UNUSED_SQL;
+    default:
+      // 「動いている」は入力不良・起点停止を除いた実際に計測できる行だけ。
+      return `cp.status = 'active' AND NOT ${INVALID_CONFIG_SQL} AND NOT ${SOURCE_STOPPED_SQL}`;
+  }
+}
+
 function definitionWhere(
-  input: Pick<ConversionDefinitionListInput, 'scope' | 'lineAccountId' | 'query' | 'status' | 'sourceType'>,
-  includeStatus = true,
+  input: Pick<ConversionDefinitionListInput, 'scope' | 'lineAccountId' | 'query' | 'status' | 'sourceType' | 'state'>,
+  includeState = true,
 ): { sql: string; values: unknown[] } {
   const account = accountWhere('cp.', input.scope, input.lineAccountId);
   const clauses = [account.sql];
@@ -226,7 +286,9 @@ function definitionWhere(
     clauses.push('cp.name LIKE ? ESCAPE \'\\\'');
     values.push(`%${query.replaceAll('\\', '\\\\').replaceAll('%', '\\%').replaceAll('_', '\\_')}%`);
   }
-  if (includeStatus && input.status) {
+  if (includeState && input.state) {
+    clauses.push(stateFilterSql(input.state));
+  } else if (includeState && input.status) {
     clauses.push('cp.status = ?');
     values.push(input.status);
   }
@@ -244,14 +306,18 @@ function metricsCte(range: ConversionDefinitionRange): { sql: string; values: un
              COUNT(*) AS recorded_count,
              COALESCE(SUM(COALESCE(value_snapshot, 0)), 0) AS net_value
         FROM conversion_events
-       WHERE created_at >= ? AND created_at <= ?
+       -- N-269: created_at は JST ISO(T付き)と datetime() 書式が混在する。
+       -- 文字列の大小比較だと 'T' > ' ' で期間末のISO行が抜けるため、
+       -- 保存されたJST暦日の先頭10文字で日単位に比較する。
+       WHERE substr(created_at, 1, 10) >= ? AND substr(created_at, 1, 10) <= ?
        GROUP BY conversion_point_id
     ), usage_counts AS (
       SELECT conversion_point_id, COUNT(*) AS usage_count
         FROM conversion_definition_usages
        GROUP BY conversion_point_id
     )`,
-    values: [range.from, range.to],
+    // 暦日の先頭10文字(YYYY-MM-DD)で比較する。時刻・書式差を含めない。
+    values: [range.from.slice(0, 10), range.to.slice(0, 10)],
   };
 }
 
@@ -261,6 +327,7 @@ function selectDefinitionsSql(): string {
                  cp.deduplication_mode, cp.deduplication_window_days, cp.value_mode,
                  cp.reversal_policy, cp.line_account_id, cp.status,
                  cp.version, cp.stopped_at, cp.created_at, cp.updated_at,
+                 cp.ingest_secret_encrypted, cp.ingest_disabled_at,
                  COALESCE(pm.recorded_count, 0) AS recorded_count,
                  COALESCE(pm.net_value, 0) AS net_value,
                  COALESCE(uc.usage_count, 0) AS usage_count
@@ -287,12 +354,45 @@ async function cancellationMetrics(db: D1Database, from: string, to: string): Pr
     FROM affiliate_adjustments aa
     JOIN affiliate_reward_entries re ON re.id = aa.source_entry_id
     JOIN conversion_events ce ON ce.id = re.conversion_event_id
-    WHERE aa.reason_type = 'cancel' AND aa.created_at >= ? AND aa.created_at <= ?
-    GROUP BY ce.conversion_point_id`).bind(from, to).all<{ conversion_point_id: string; cancellation_count: number; cancellation_value: number }>();
+    WHERE aa.reason_type = 'cancel'
+      AND substr(aa.created_at, 1, 10) >= ? AND substr(aa.created_at, 1, 10) <= ?
+    GROUP BY ce.conversion_point_id`).bind(from.slice(0, 10), to.slice(0, 10)).all<{ conversion_point_id: string; cancellation_count: number; cancellation_value: number }>();
   return new Map(rows.results.map((row) => [row.conversion_point_id, { count: Number(row.cancellation_count), value: Number(row.cancellation_value) }]));
 }
 
+/**
+ * N-268: 表示状態の導出。stateFilterSql と同じ優先順で決める。
+ * 入力不良は「何が足りないか」を reason へ入れて、詳細画面がそのまま
+ * 直す場所を示せるようにする。
+ */
+export function deriveDefinitionState(row: Pick<DefinitionRow,
+  'status' | 'measure_method' | 'target_url' | 'value' | 'value_mode'
+  | 'deduplication_mode' | 'deduplication_window_days' | 'ingest_disabled_at'>
+): { state: ConversionDefinitionState; stateReason: string | null } {
+  if (row.status === 'draft') {
+    return { state: 'draft', stateReason: 'まだ公開していません。公開するまで計測しません' };
+  }
+  if (row.status === 'stopped') {
+    return { state: 'stopped', stateReason: null };
+  }
+  if (row.measure_method === 'url_reach' && !row.target_url) {
+    return { state: 'invalid', stateReason: '到達URLが決まっていません' };
+  }
+  if (row.value_mode === 'fixed' && row.value === null) {
+    return { state: 'invalid', stateReason: '1件あたりの金額が決まっていません' };
+  }
+  if (row.deduplication_mode === 'window'
+    && (row.deduplication_window_days === null || row.deduplication_window_days < 1 || row.deduplication_window_days > 365)) {
+    return { state: 'invalid', stateReason: '数えない日数が正しくありません' };
+  }
+  if (row.measure_method === 'webhook' && row.ingest_disabled_at) {
+    return { state: 'sourceStopped', stateReason: '外部からの受信を止めています' };
+  }
+  return { state: 'active', stateReason: null };
+}
+
 function serializeDefinition(row: DefinitionRow, cancellation?: CancellationMetric): ConversionDefinitionListItem {
+  const derived = deriveDefinitionState(row);
   return {
     id: row.id,
     name: row.name,
@@ -309,6 +409,12 @@ function serializeDefinition(row: DefinitionRow, cancellation?: CancellationMetr
     reversalPolicy: row.reversal_policy,
     lineAccountId: row.line_account_id,
     status: row.status,
+    state: derived.state,
+    stateReason: derived.stateReason,
+    ingest: {
+      configured: row.ingest_secret_encrypted !== null && row.ingest_secret_encrypted !== undefined,
+      disabledAt: row.ingest_disabled_at,
+    },
     version: row.version,
     usageCount: Number(row.usage_count),
     usageNames: [],
@@ -362,17 +468,30 @@ export async function listConversionDefinitions(db: D1Database, input: Conversio
     db.prepare(`SELECT COUNT(*) AS total FROM conversion_points cp WHERE ${where.sql}`)
       .bind(...where.values)
       .first<{ total: number }>(),
-    db.prepare(`SELECT cp.status, COUNT(*) AS total
+    /*
+     * N-267/N-268: 状態の内訳は「絞り込み全体」から導出する。表示頁の行だけ
+     * 数えると打ち切りでずれるため、状態判定に足りる列だけを全件ぶん引いて
+     * JS で数える(件数は成果地点数なので実用上の上限内に収まる)。
+     */
+    db.prepare(`SELECT cp.status, cp.measure_method, cp.target_url, cp.value,
+                       cp.value_mode, cp.deduplication_mode, cp.deduplication_window_days,
+                       cp.ingest_disabled_at,
+                       EXISTS(SELECT 1 FROM conversion_definition_usages u
+                               WHERE u.conversion_point_id = cp.id) AS has_usage
                   FROM conversion_points cp
-                 WHERE ${stateWhere.sql}
-                 GROUP BY cp.status`)
+                 WHERE ${stateWhere.sql}`)
       .bind(...stateWhere.values)
-      .all<{ status: ConversionDefinitionStatus; total: number }>(),
+      .all<Pick<DefinitionRow, 'status' | 'measure_method' | 'target_url' | 'value' | 'value_mode'
+        | 'deduplication_mode' | 'deduplication_window_days' | 'ingest_disabled_at'>
+        & { has_usage: number }>(),
   ]);
   const total = Number(totalRow?.total ?? 0);
   const cancellations = await cancellationMetrics(db, input.range.from, input.range.to);
-  const stateCounts = { active: 0, draft: 0, stopped: 0, invalid: 0, sourceStopped: 0 };
-  for (const row of stateRows.results) stateCounts[row.status] = Number(row.total);
+  const stateCounts = { active: 0, draft: 0, stopped: 0, invalid: 0, sourceStopped: 0, unused: 0 };
+  for (const row of stateRows.results) {
+    stateCounts[deriveDefinitionState(row).state] += 1;
+    if (!row.has_usage) stateCounts.unused += 1;
+  }
   const usages = rows.results.length === 0 ? [] : (await db.prepare(`SELECT * FROM conversion_definition_usages WHERE conversion_point_id IN (${rows.results.map(() => '?').join(',')}) ORDER BY created_at DESC, id ASC`).bind(...rows.results.map((row) => row.id)).all<UsageRow>()).results;
   const namesByPoint = new Map<string, string[]>();
   for (const usage of usages) {
@@ -570,6 +689,8 @@ export type CreateConversionDefinitionInput = {
   lineAccountId: string;
   usages: Array<Pick<AddConversionDefinitionUsageInput, 'refKind' | 'refId' | 'refVersionId'>>;
   staffId: string;
+  /** N-268: true のとき下書きで保存し、公開するまで計測しない。 */
+  draft?: boolean;
 };
 
 export async function createConversionDefinition(
@@ -595,8 +716,8 @@ export async function createConversionDefinition(
     db.prepare(`INSERT INTO conversion_points
       (id, name, event_type, value, measure_method, target_url, count_repeat,
        attribution_days, line_account_id, tenant_id, source_config_json, deduplication_mode,
-       deduplication_window_days, value_mode, reversal_policy, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+       deduplication_window_days, value_mode, reversal_policy, status, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
       .bind(
         id, input.name, input.sourceType, value, input.measureMethod,
         input.measureMethod === 'url_reach' ? input.targetUrl ?? null : null,
@@ -604,7 +725,7 @@ export async function createConversionDefinition(
         input.attributionDays ?? null, input.lineAccountId, tenantId, JSON.stringify(input.sourceConfig),
         input.deduplicationMode, input.deduplicationMode === 'window'
           ? input.deduplicationWindowDays ?? null : null,
-        input.valueMode, input.reversalPolicy, now, now,
+        input.valueMode, input.reversalPolicy, input.draft ? 'draft' : 'active', now, now,
       ),
     ...input.usages.map((usage) => db.prepare(`INSERT INTO conversion_definition_usages
       (id, conversion_point_id, definition_version, line_account_id, ref_kind, ref_id,
@@ -685,9 +806,10 @@ async function estimateCancellationCount(
     JOIN affiliate_reward_entries re ON re.id = aa.source_entry_id
     JOIN conversion_events ce ON ce.id = re.conversion_event_id
     JOIN conversion_points cp ON cp.id = ce.conversion_point_id
-    WHERE aa.reason_type = 'cancel' AND aa.created_at >= ? AND aa.created_at <= ?
+    WHERE aa.reason_type = 'cancel'
+      AND substr(aa.created_at, 1, 10) >= ? AND substr(aa.created_at, 1, 10) <= ?
       AND ${conditionsSql}`)
-    .bind(from, to, ...conditionValues)
+    .bind(from.slice(0, 10), to.slice(0, 10), ...conditionValues)
     .first<{ total: number }>();
   return Number(row?.total ?? 0);
 }
@@ -706,8 +828,10 @@ export async function previewConversionDefinition(
    * - それ以外の起点: 対象URLを持たない地点の成果だけを数える
    *   (URL条件のある地点の成果を混ぜない)。
    */
-  const conditions = [`cp.event_type = ?`, `ce.created_at >= ?`, `ce.created_at <= ?`];
-  const values: unknown[] = [input.sourceType, input.range.from, input.range.to];
+  // N-269: 暦日は先頭10文字で比較する(ISOの'T'が空白より大きく、
+  // 文字列の大小比較だと期間末の行が抜けるため)。
+  const conditions = [`cp.event_type = ?`, `substr(ce.created_at, 1, 10) >= ?`, `substr(ce.created_at, 1, 10) <= ?`];
+  const values: unknown[] = [input.sourceType, input.range.from.slice(0, 10), input.range.to.slice(0, 10)];
   if (input.measureMethod === 'url_reach' || input.targetUrl) {
     conditions.push(`cp.target_url = ?`);
     values.push(input.targetUrl ?? '');
@@ -855,13 +979,17 @@ async function currentDefinitionForMutation(
 function requireExpectedDefinition(
   row: { version: number; status: ConversionDefinitionStatus } | null,
   expectedVersion: number,
+  options?: { allowDraft?: boolean },
 ) {
   if (!row) throw new ConversionDefinitionError('not_found', '成果地点が見つかりません', 404);
   if (Number(row.version) !== expectedVersion) {
     throw new ConversionDefinitionError('version_conflict', '成果地点が更新されています。読み直してください', 409);
   }
-  if (row.status !== 'active') {
+  if (row.status === 'stopped') {
     throw new ConversionDefinitionError('definition_stopped', '成果地点はすでに停止しています', 409);
+  }
+  if (row.status === 'draft' && !options?.allowDraft) {
+    throw new ConversionDefinitionError('definition_draft', '成果地点はまだ下書きです。公開してから操作してください', 409);
   }
 }
 
@@ -870,7 +998,7 @@ export async function stopConversionDefinition(
   input: { id: string; scope: ConversionDefinitionScope; expectedVersion: number; reason?: string | null; staffId: string },
 ) {
   const current = await currentDefinitionForMutation(db, input.id, input.scope);
-  requireExpectedDefinition(current, input.expectedVersion);
+  requireExpectedDefinition(current, input.expectedVersion, { allowDraft: true });
   const now = jstNow();
   const usageRow = await db.prepare('SELECT COUNT(*) AS total FROM conversion_definition_usages WHERE conversion_point_id = ?')
     .bind(input.id).first<{ total: number }>();
@@ -879,7 +1007,7 @@ export async function stopConversionDefinition(
   // ときだけログを作るため、競合したbatchは副作用0のまま終わる。
   const results = await db.batch([
     db.prepare(`UPDATE conversion_points SET status = 'stopped', stopped_at = ?,
-      updated_at = ?, version = version + 1 WHERE id = ? AND version = ? AND status = 'active'`)
+      updated_at = ?, version = version + 1 WHERE id = ? AND version = ? AND status IN ('active', 'draft')`)
       .bind(now, now, input.id, input.expectedVersion),
     db.prepare(`INSERT INTO conversion_definition_operations
       (id, conversion_point_id, action, replacement_id, affected_usages, reason, performed_by, created_at)
@@ -979,7 +1107,8 @@ export async function reviseConversionDefinition(
     FROM conversion_points cp WHERE cp.id = ? AND ${account.sql}`)
     .bind(input.id, ...account.values)
     .first<RevisionRow>();
-  requireExpectedDefinition(current, input.expectedVersion);
+  // N-268: 下書きも編集できる。版を進めても status は draft のまま。
+  requireExpectedDefinition(current, input.expectedVersion, { allowDraft: true });
   const row = current!;
 
   const name = input.name.trim();
@@ -1078,7 +1207,8 @@ export async function replaceConversionDefinitionUsages(
     currentDefinitionForMutation(db, input.id, input.scope),
     currentDefinitionForMutation(db, input.replacementId, input.scope),
   ]);
-  requireExpectedDefinition(source, input.expectedVersion);
+  // 差し替え元が下書きでも利用先を逃がせる。差し替え先は計測中に限る。
+  requireExpectedDefinition(source, input.expectedVersion, { allowDraft: true });
   requireExpectedDefinition(replacement, input.replacementExpectedVersion);
   if (source!.line_account_id !== replacement!.line_account_id) {
     throw new ConversionDefinitionError('account_mismatch', '同じLINEアカウントの成果地点を選んでください', 409);
@@ -1114,7 +1244,7 @@ export async function replaceConversionDefinitionUsages(
   const results = await db.batch([
     db.prepare(`UPDATE conversion_points AS source SET status = 'stopped', stopped_at = ?,
       updated_at = ?, version = version + 1
-      WHERE source.id = ? AND source.version = ? AND source.status = 'active'
+      WHERE source.id = ? AND source.version = ? AND source.status IN ('active', 'draft')
         AND EXISTS (
           SELECT 1 FROM conversion_points AS replacement
           WHERE replacement.id = ? AND replacement.version = ?
@@ -1176,7 +1306,7 @@ export async function deleteUnusedConversionDefinition(
   input: { id: string; scope: ConversionDefinitionScope; expectedVersion: number; reason?: string | null; staffId: string },
 ) {
   const current = await currentDefinitionForMutation(db, input.id, input.scope);
-  requireExpectedDefinition(current, input.expectedVersion);
+  requireExpectedDefinition(current, input.expectedVersion, { allowDraft: true });
   const impact = await getConversionDefinitionDeleteImpact(db, input.id, input.scope);
   if (!impact?.canDelete) {
     throw new ConversionDefinitionError('definition_in_use', '成果または利用先があるため、削除せず停止してください', 409);
@@ -1200,6 +1330,209 @@ export async function deleteUnusedConversionDefinition(
   return { id: input.id, deleted: true as const };
 }
 
+/**
+ * N-268: 下書きを計測中へ。設定は変えずに status だけ進める。
+ * 版は他操作と同じく +1 して、同時操作の競合を版の一致で検出する。
+ */
+export async function publishConversionDefinition(
+  db: D1Database,
+  input: { id: string; scope: ConversionDefinitionScope; expectedVersion: number; staffId: string },
+) {
+  const current = await currentDefinitionForMutation(db, input.id, input.scope);
+  if (!current) throw new ConversionDefinitionError('not_found', '成果地点が見つかりません', 404);
+  if (Number(current.version) !== input.expectedVersion) {
+    throw new ConversionDefinitionError('version_conflict', '成果地点が更新されています。読み直してください', 409);
+  }
+  if (current.status !== 'draft') {
+    throw new ConversionDefinitionError('not_draft', '下書きではありません', 409);
+  }
+  const now = jstNow();
+  const result = await db
+    .prepare(`UPDATE conversion_points SET status = 'active', updated_at = ?, version = version + 1
+      WHERE id = ? AND version = ? AND status = 'draft'`)
+    .bind(now, input.id, input.expectedVersion)
+    .run();
+  if ((result.meta.changes ?? 0) !== 1) {
+    throw new ConversionDefinitionError('version_conflict', '成果地点が更新されています。読み直してください', 409);
+  }
+  return { id: input.id, status: 'active' as const, version: input.expectedVersion + 1 };
+}
+
+// ── 外部受信 (N-270) ─────────────────────────────────────────────────────────
+//
+// 外部システムが POST /api/conversions/ingest/:id へ成果を送るときの
+// 地点ごとの受信鍵と受信台帳。鍵は受信Webhookと同じ暗号化形式で保存し、
+// 平文を返すのは発行の1回だけ。
+
+type IngestPointRow = {
+  id: string;
+  status: ConversionDefinitionStatus;
+  ingest_secret_encrypted: string | null;
+  ingest_disabled_at: string | null;
+};
+
+/** 受信鍵の発行・再発行。再発行は古い鍵をその場で無効にする。 */
+export async function issueConversionIngestSecret(
+  db: D1Database,
+  input: {
+    id: string;
+    scope: ConversionDefinitionScope;
+    expectedVersion: number;
+    staffId: string;
+    keys?: WebhookKeyInput;
+  },
+) {
+  const current = await currentDefinitionForMutation(db, input.id, input.scope);
+  requireExpectedDefinition(current, input.expectedVersion);
+  const plaintext = `cvwhk_${crypto.randomUUID().replaceAll('-', '')}${crypto.randomUUID().replaceAll('-', '').slice(0, 16)}`;
+  const encrypted = await encryptWebhookSecret(plaintext, input.keys);
+  const now = jstNow();
+  const result = await db
+    .prepare(`UPDATE conversion_points SET ingest_secret_encrypted = ?, ingest_disabled_at = NULL,
+      updated_at = ?, version = version + 1
+      WHERE id = ? AND version = ? AND status = 'active'`)
+    .bind(encrypted, now, input.id, input.expectedVersion)
+    .run();
+  if ((result.meta.changes ?? 0) !== 1) {
+    throw new ConversionDefinitionError('version_conflict', '成果地点が更新されています。読み直してください', 409);
+  }
+  return { id: input.id, secret: plaintext, version: input.expectedVersion + 1 };
+}
+
+/**
+ * 外部受信の停止・再開。鍵は消さないので、再開すると同じ鍵でまた受けられる。
+ * 「止める」は status ではなく ingest_disabled_at で表す。地点自体は
+ * 内部起点からの計測を続けられるため。
+ */
+export async function setConversionIngestDisabled(
+  db: D1Database,
+  input: {
+    id: string;
+    scope: ConversionDefinitionScope;
+    expectedVersion: number;
+    disabled: boolean;
+    staffId: string;
+  },
+) {
+  const current = await currentDefinitionForMutation(db, input.id, input.scope);
+  requireExpectedDefinition(current, input.expectedVersion);
+  const now = jstNow();
+  const result = await db
+    .prepare(`UPDATE conversion_points SET ingest_disabled_at = ?, updated_at = ?, version = version + 1
+      WHERE id = ? AND version = ? AND status = 'active'`)
+    .bind(input.disabled ? now : null, now, input.id, input.expectedVersion)
+    .run();
+  if ((result.meta.changes ?? 0) !== 1) {
+    throw new ConversionDefinitionError('version_conflict', '成果地点が更新されています。読み直してください', 409);
+  }
+  return { id: input.id, disabledAt: input.disabled ? now : null, version: input.expectedVersion + 1 };
+}
+
+/** 公開受信口が使う地点の最小限の行。スコープ検査は署名の後で行う。 */
+export async function getConversionPointForIngest(
+  db: D1Database,
+  id: string,
+): Promise<IngestPointRow | null> {
+  return db.prepare(`SELECT id, status, ingest_secret_encrypted, ingest_disabled_at
+    FROM conversion_points WHERE id = ?`).bind(id).first<IngestPointRow>();
+}
+
+/**
+ * 保存した受信鍵を復号する。照合の直前だけ呼ぶ。
+ * 鍵不足・復号失敗は例外(fail-closed)。未設定なら null。
+ */
+export async function resolveConversionIngestSecret(
+  row: IngestPointRow,
+  keys?: WebhookKeyInput,
+): Promise<string | null> {
+  return resolveWebhookSecret(
+    { id: row.id, secret: null, secret_encrypted: row.ingest_secret_encrypted },
+    keys,
+  );
+}
+
+export type ConversionIngestionEvent = {
+  id: string;
+  conversionPointId: string;
+  result: 'recorded' | 'duplicate' | 'rejected';
+  reason: string | null;
+  sourceEventId: string | null;
+  friendId: string | null;
+  payloadShape: Record<string, unknown> | null;
+  signatureSha256: string | null;
+  createdAt: string;
+};
+
+type IngestionEventRow = {
+  id: string;
+  conversion_point_id: string;
+  result: 'recorded' | 'duplicate' | 'rejected';
+  reason: string | null;
+  source_event_id: string | null;
+  friend_id: string | null;
+  payload_shape_json: string | null;
+  signature_sha256: string | null;
+  created_at: string;
+};
+
+/** 受信の成否を1件残す。台帳の失敗で受信処理そのものを止めないよう呼び側で握る。 */
+export async function recordConversionIngestionEvent(
+  db: D1Database,
+  input: {
+    conversionPointId: string;
+    result: 'recorded' | 'duplicate' | 'rejected';
+    reason?: string | null;
+    sourceEventId?: string | null;
+    friendId?: string | null;
+    payloadShape?: Record<string, unknown> | null;
+    signatureSha256?: string | null;
+  },
+): Promise<void> {
+  await db.prepare(`INSERT INTO conversion_ingestion_events
+    (id, conversion_point_id, result, reason, source_event_id, friend_id,
+     payload_shape_json, signature_sha256, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+    .bind(
+      crypto.randomUUID(),
+      input.conversionPointId,
+      input.result,
+      input.reason ?? null,
+      input.sourceEventId ?? null,
+      input.friendId ?? null,
+      input.payloadShape ? JSON.stringify(input.payloadShape) : null,
+      input.signatureSha256 ?? null,
+      jstNow(),
+    )
+    .run();
+}
+
+/** 詳細画面・診断用の受信履歴。新しい順。 */
+export async function listConversionIngestionEvents(
+  db: D1Database,
+  input: { id: string; scope: ConversionDefinitionScope; limit?: number },
+): Promise<ConversionIngestionEvent[] | null> {
+  const current = await currentDefinitionForMutation(db, input.id, input.scope);
+  if (!current) return null;
+  const limit = Math.min(100, Math.max(1, input.limit ?? 50));
+  const rows = await db.prepare(`SELECT * FROM conversion_ingestion_events
+    WHERE conversion_point_id = ? ORDER BY created_at DESC, id DESC LIMIT ?`)
+    .bind(input.id, limit)
+    .all<IngestionEventRow>();
+  return rows.results.map((row) => ({
+    id: row.id,
+    conversionPointId: row.conversion_point_id,
+    result: row.result,
+    reason: row.reason,
+    sourceEventId: row.source_event_id,
+    friendId: row.friend_id,
+    payloadShape: row.payload_shape_json
+      ? JSON.parse(row.payload_shape_json) as Record<string, unknown>
+      : null,
+    signatureSha256: row.signature_sha256,
+    createdAt: row.created_at,
+  }));
+}
+
 type ReportRow = {
   conversion_point_id: string;
   conversion_point_name: string;
@@ -1210,25 +1543,61 @@ type ReportRow = {
 
 async function reportRows(
   db: D1Database,
-  scope: ConversionDefinitionScope,
+  scope: ConversionDefinitionScope | null,
   lineAccountId: string | undefined,
   from: string,
   to: string,
 ): Promise<ReportRow[]> {
-  const account = accountWhere('cp.', scope, lineAccountId);
+  const account = scope ? accountWhere('cp.', scope, lineAccountId) : { sql: '1 = 1', values: [] as unknown[] };
   const rows = await db.prepare(`SELECT cp.id AS conversion_point_id,
       cp.name AS conversion_point_name, cp.event_type,
       COUNT(ce.id) AS total_count,
       COALESCE(SUM(CASE WHEN ce.id IS NULL THEN 0 ELSE COALESCE(ce.value_snapshot, 0) END), 0) AS total_value
     FROM conversion_points cp
     LEFT JOIN conversion_events ce ON ce.conversion_point_id = cp.id
-      AND ce.created_at >= ? AND ce.created_at <= ?
+      AND substr(ce.created_at, 1, 10) >= ? AND substr(ce.created_at, 1, 10) <= ?
     WHERE ${account.sql}
     GROUP BY cp.id
     ORDER BY total_count DESC, cp.id ASC`)
-    .bind(from, to, ...account.values)
+    .bind(from.slice(0, 10), to.slice(0, 10), ...account.values)
     .all<ReportRow>();
   return rows.results;
+}
+
+export interface ConversionReport {
+  conversionPointId: string;
+  conversionPointName: string;
+  eventType: string;
+  totalCount: number;
+  totalValue: number;
+}
+
+/**
+ * N-269: 旧来の地点別集計(startDate/endDate→地点別行)の薄い互換口。
+ *
+ * 集計は新レポートと同じ `reportRows` を使うため、暦日の解釈
+ * (先頭10文字のJST暦日)とスナップショット固定は新レポートと一致する。
+ * `total_*` は取消を引く前の総数で、旧形の「全件数えた値」と同じ意味。
+ * scope を省略したときはアカウント絞りを掛けない(旧口の呼び出し互換)。
+ */
+export async function getConversionReport(
+  db: D1Database,
+  opts: { startDate?: string; endDate?: string; scope?: ConversionDefinitionScope } = {},
+): Promise<ConversionReport[]> {
+  const rows = await reportRows(
+    db,
+    opts.scope ?? null,
+    undefined,
+    opts.startDate ? `${opts.startDate} 00:00:00` : '0001-01-01 00:00:00',
+    opts.endDate ? `${opts.endDate} 23:59:59` : '9999-12-31 23:59:59',
+  );
+  return rows.map((row) => ({
+    conversionPointId: row.conversion_point_id,
+    conversionPointName: row.conversion_point_name,
+    eventType: row.event_type,
+    totalCount: Number(row.total_count),
+    totalValue: Number(row.total_value),
+  }));
 }
 
 export async function getConversionDefinitionReport(
@@ -1258,29 +1627,55 @@ export async function getConversionDefinitionReport(
     value: sum.value + Number(row.total_value) - (previousCancellations.get(row.conversion_point_id)?.value ?? 0),
   }), { count: 0, value: 0 });
   const account = accountWhere('cp.', input.scope, input.lineAccountId);
-  const [dailyRows, routeRows] = await Promise.all([
+  // N-265: 経路別の母数。ref_tracking に残る「その経路を踏んだ友だち数」を
+  // 分母にする。created_at は JST ISO(+09:00)と datetime() 書式が混在するため、
+  // 保存された暦日の先頭10文字で日単位に比較する(N-269 と同じ扱い)。
+  const friendAccount = accountWhere('f.', input.scope, input.lineAccountId);
+  const [dailyRows, routeRows, audienceRows] = await Promise.all([
     db.prepare(`SELECT substr(ce.created_at, 1, 10) AS day, cp.id AS conversion_point_id,
                        cp.name AS conversion_point_name, COUNT(*) AS total_count,
                        COALESCE(SUM(COALESCE(ce.value_snapshot, 0)), 0) AS total_value
                   FROM conversion_events ce
                   JOIN conversion_points cp ON cp.id = ce.conversion_point_id
-                 WHERE ce.created_at >= ? AND ce.created_at <= ? AND ${account.sql}
+                 WHERE substr(ce.created_at, 1, 10) >= ? AND substr(ce.created_at, 1, 10) <= ? AND ${account.sql}
                  GROUP BY day, cp.id ORDER BY day ASC, cp.id ASC`)
-      .bind(input.range.from, input.range.to, ...account.values)
+      .bind(input.range.from.slice(0, 10), input.range.to.slice(0, 10), ...account.values)
       .all<{ day: string; conversion_point_id: string; conversion_point_name: string; total_count: number; total_value: number }>(),
     db.prepare(`SELECT ce.conversion_point_id, COALESCE(ce.attributed_ref_code, 'unattributed') AS route_key,
                        COUNT(*) AS total_count,
                        COALESCE(SUM(COALESCE(ce.value_snapshot, 0)), 0) AS total_value
                   FROM conversion_events ce
                   JOIN conversion_points cp ON cp.id = ce.conversion_point_id
-                 WHERE ce.created_at >= ? AND ce.created_at <= ? AND ${account.sql}
+                 WHERE substr(ce.created_at, 1, 10) >= ? AND substr(ce.created_at, 1, 10) <= ? AND ${account.sql}
                  GROUP BY ce.conversion_point_id, route_key ORDER BY total_count DESC, route_key ASC`)
-      .bind(input.range.from, input.range.to, ...account.values)
+      .bind(input.range.from.slice(0, 10), input.range.to.slice(0, 10), ...account.values)
       .all<{ conversion_point_id: string; route_key: string; total_count: number; total_value: number }>(),
+    db.prepare(`SELECT rt.ref_code, COUNT(DISTINCT rt.friend_id) AS audience
+                  FROM ref_tracking rt
+                  JOIN friends f ON f.id = rt.friend_id
+                 WHERE substr(rt.created_at, 1, 10) >= ? AND substr(rt.created_at, 1, 10) <= ?
+                   AND ${friendAccount.sql}
+                 GROUP BY rt.ref_code`)
+      .bind(input.range.from.slice(0, 10), input.range.to.slice(0, 10), ...friendAccount.values)
+      .all<{ ref_code: string; audience: number }>(),
   ]);
+  const audienceByRoute = new Map(audienceRows.results.map((row) => [row.ref_code, Number(row.audience)]));
+  const routeMetric = (routeKey: string, netCount: number) => {
+    // 未帰属には母数が無い。帰属ありでも期間内の記録がなければ null のまま
+    // 返し、画面が「母数の記録なし」と理由を出せるようにする。
+    if (routeKey === 'unattributed') return { audience: null, conversionRate: null };
+    const audience = audienceByRoute.get(routeKey) ?? null;
+    return {
+      audience,
+      conversionRate: audience !== null && audience > 0
+        ? Math.round((netCount / audience) * 1000) / 10
+        : null,
+    };
+  };
   const routesByDefinition = new Map<string, Array<{ routeKey: string; label: string; attributionState: 'attributed' | 'unattributed'; netCount: number; netValue: number; audience: number | null; conversionRate: number | null }>>();
   for (const row of routeRows.results) {
-    const route = { routeKey: row.route_key, label: row.route_key === 'unattributed' ? '未帰属' : row.route_key, attributionState: row.route_key === 'unattributed' ? 'unattributed' as const : 'attributed' as const, netCount: Number(row.total_count), netValue: Number(row.total_value), audience: null, conversionRate: null };
+    const netCount = Number(row.total_count);
+    const route = { routeKey: row.route_key, label: row.route_key === 'unattributed' ? '未帰属' : row.route_key, attributionState: row.route_key === 'unattributed' ? 'unattributed' as const : 'attributed' as const, netCount, netValue: Number(row.total_value), ...routeMetric(row.route_key, netCount) };
     routesByDefinition.set(row.conversion_point_id, [...(routesByDefinition.get(row.conversion_point_id) ?? []), route]);
   }
   const byDefinition = current.map((row) => {
@@ -1332,15 +1727,22 @@ export async function getConversionDefinitionReport(
     byDefinition,
     byRoute: [...routeRows.results].reduce((all, row) => {
       const existing = all.find((item) => item.routeKey === row.route_key);
-      if (existing) { existing.netCount += Number(row.total_count); existing.netValue += Number(row.total_value); return all; }
+      if (existing) {
+        existing.netCount += Number(row.total_count);
+        existing.netValue += Number(row.total_value);
+        const metric = routeMetric(row.route_key, existing.netCount);
+        existing.audience = metric.audience;
+        existing.conversionRate = metric.conversionRate;
+        return all;
+      }
+      const netCount = Number(row.total_count);
       all.push({
       routeKey: row.route_key,
       label: row.route_key === 'unattributed' ? '未帰属' : row.route_key,
       attributionState: row.route_key === 'unattributed' ? 'unattributed' : 'attributed',
-      netCount: Number(row.total_count),
+      netCount,
       netValue: Number(row.total_value),
-      audience: null,
-      conversionRate: null,
+      ...routeMetric(row.route_key, netCount),
       });
       return all;
     }, [] as Array<{ routeKey: string; label: string; attributionState: 'attributed' | 'unattributed'; netCount: number; netValue: number; audience: number | null; conversionRate: number | null }>),
@@ -1350,15 +1752,19 @@ export async function getConversionDefinitionReport(
 export async function listConversionDefinitionsForExport(
   db: D1Database,
   input: Omit<ConversionDefinitionListInput, 'cursor' | 'limit'>,
-) {
+): Promise<{ items: ConversionDefinitionListItem[]; truncated: boolean }> {
   const cte = metricsCte(input.range);
   const where = definitionWhere(input);
+  // N-267: 上限そのもの(10000)ではなく +1 件まで読み、切れたことを確実に
+  // 検出して呼び出し側へ返す。黙って切るとCSVが未完の一覧に見える。
   const rows = await db.prepare(`${cte.sql}
     ${selectDefinitionsSql()}
      WHERE ${where.sql}
      ORDER BY ${orderBy(input.sort)}
-     LIMIT 10000`)
+     LIMIT 10001`)
     .bind(...cte.values, ...where.values)
     .all<DefinitionRow>();
-  return rows.results.map((row) => serializeDefinition(row));
+  const truncated = rows.results.length > 10000;
+  const items = truncated ? rows.results.slice(0, 10000) : rows.results;
+  return { items: items.map((row) => serializeDefinition(row)), truncated };
 }
