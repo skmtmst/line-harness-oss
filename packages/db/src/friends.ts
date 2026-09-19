@@ -98,10 +98,19 @@ export async function getFollowingLineUserIdsByTag(
 }
 
 /**
- * アカウントスコープ優先の friend 解決。同一プロバイダー配下の複数アカウント
- * では line_user_id が同一になるため、無指定の先頭一致だと別アカウントの
- * friend 行に吸われて通知アカウントがズレる。指定アカウントの行を優先し、
- * 無ければ従来どおり先頭一致にフォールバックする。
+ * アカウントスコープの friend 解決。同一プロバイダー配下の複数アカウントでは
+ * line_user_id が同一になるため、無指定の先頭一致だと別アカウントの friend 行に
+ * 吸われて「friend=別アカウント・送信元=受信アカウント」の履歴が作られる
+ * (Issue #961)。
+ *
+ * - lineAccountId 指定時: そのアカウントの行か、まだどのアカウントにも
+ *   紐づいていない未割当 (NULL) の行だけを返す。**別アカウント所有の行は
+ *   絶対に返さない**（跨ぎフォールバックは廃止）。
+ * - lineAccountId が null の場合: アカウント文脈を持たないレガシー呼出として
+ *   従来どおり line_user_id の先頭一致を返す。
+ *
+ * 未割当行を受信アカウントへ引き当てるかは各呼出側の明示的な判断に委ねる
+ * （例: webhook は受信時に NULL 行を自アカウントへ引き当てる）。
  */
 export async function getFriendByLineUserIdForAccount(
   db: D1Database,
@@ -109,24 +118,20 @@ export async function getFriendByLineUserIdForAccount(
   lineAccountId: string | null,
 ): Promise<Friend | null> {
   if (lineAccountId) {
-    const scoped = await db
-      .prepare(`SELECT * FROM friends WHERE line_user_id = ? AND line_account_id = ?`)
-      .bind(lineUserId, lineAccountId)
+    // C-2b で UNIQUE(line_account_id, line_user_id) へ移行すると同一スコープと
+    // 未割当の行が並存し得るため、厳密一致の行を優先して返す。
+    return db
+      .prepare(
+        `SELECT * FROM friends
+          WHERE line_user_id = ?
+            AND (line_account_id = ? OR line_account_id IS NULL)
+          ORDER BY (line_account_id = ?) DESC
+          LIMIT 1`,
+      )
+      .bind(lineUserId, lineAccountId, lineAccountId)
       .first<Friend>();
-    if (scoped) return scoped;
   }
-  // C-2b: UNIQUE(line_account_id, line_user_id) へ移行したら、この無指定
-  // フォールバックを削除する。移行前は既存の未割当行を見失わないために残す。
-  const fallback = await getFriendByLineUserId(db, lineUserId);
-  if (fallback && lineAccountId) {
-    console.warn({
-      event: 'friend_lookup_account_fallback',
-      line_account_id: lineAccountId,
-      found_line_account_id: fallback.line_account_id,
-      path: 'getFriendByLineUserIdForAccount',
-    });
-  }
-  return fallback;
+  return getFriendByLineUserId(db, lineUserId);
 }
 
 export async function getFriendByLineUserId(
@@ -211,108 +216,136 @@ function isMissingFollowLifecycleColumn(error: unknown): boolean {
   return /(?:no such column:|has no column named) (first_followed_at|current_follow_started_at|last_followed_at|last_unfollowed_at|unfollow_count)/i.test(message);
 }
 
+/**
+ * friends.line_user_id のグローバル UNIQUE 違反。C-2b の
+ * UNIQUE(line_account_id, line_user_id) 移行前は、別アカウント所有の行が
+ * あるとこのスコープ用の行を INSERT できない (Issue #961)。呼出側は
+ * 「このアカウントでは友だち行を作れない」として扱う。相手アカウントの行を
+ * 更新したり返したりして履歴を混線させてはいけない。
+ */
+export function isFriendLineUserIdConflict(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return /unique constraint failed: friends\.line_user_id/i.test(message);
+}
+
 export async function upsertFriend(
   db: D1Database,
   input: UpsertFriendInput,
 ): Promise<Friend> {
   const now = jstNow();
-  const existing = await getFriendByLineUserIdForAccount(
+  let existing = await getFriendByLineUserIdForAccount(
     db,
     input.lineUserId,
     input.lineAccountId ?? null,
   );
 
-  if (existing) {
+  if (!existing) {
+    const id = crypto.randomUUID();
     try {
-      await db.prepare(
-        `UPDATE friends
-         SET display_name = ?,
-             picture_url = ?,
-             status_message = ?,
-             first_followed_at = COALESCE(first_followed_at, created_at),
-             current_follow_started_at = CASE
-               WHEN is_following = 0 OR current_follow_started_at IS NULL THEN ?
-               ELSE current_follow_started_at
-             END,
-             last_followed_at = CASE
-               WHEN is_following = 0 THEN ?
-               ELSE COALESCE(last_followed_at, created_at)
-             END,
-             is_following = 1,
-             updated_at = ?
-         WHERE id = ?`,
-      ).bind(
-        'displayName' in input ? (input.displayName ?? null) : existing.display_name,
-        'pictureUrl' in input ? (input.pictureUrl ?? null) : existing.picture_url,
-        'statusMessage' in input ? (input.statusMessage ?? null) : existing.status_message,
-        now,
-        now,
-        now,
-        existing.id,
-      ).run();
+      try {
+        await db.prepare(
+          `INSERT INTO friends
+             (id, line_user_id, line_account_id, display_name, picture_url, status_message, is_following,
+              first_followed_at, current_follow_started_at, last_followed_at,
+              created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?)`,
+        ).bind(
+          id,
+          input.lineUserId,
+          input.lineAccountId ?? null,
+          input.displayName ?? null,
+          input.pictureUrl ?? null,
+          input.statusMessage ?? null,
+          now,
+          now,
+          now,
+          now,
+          now,
+        ).run();
+      } catch (error) {
+        if (!isMissingFollowLifecycleColumn(error)) throw error;
+        await db.prepare(
+          `INSERT INTO friends
+             (id, line_user_id, line_account_id, display_name, picture_url, status_message, is_following,
+              created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?)`,
+        ).bind(
+          id,
+          input.lineUserId,
+          input.lineAccountId ?? null,
+          input.displayName ?? null,
+          input.pictureUrl ?? null,
+          input.statusMessage ?? null,
+          now,
+          now,
+        ).run();
+      }
+      return (await getFriendById(db, id))!;
     } catch (error) {
-      if (!isMissingFollowLifecycleColumn(error)) throw error;
-      // Deployments can briefly run newer Worker code before migration 065 is
-      // applied. Preserve the friend-add/OAuth path using the legacy columns;
-      // the lifecycle fields are backfilled when the migration is applied.
-      await db.prepare(
-        `UPDATE friends
-         SET display_name = ?, picture_url = ?, status_message = ?,
-             is_following = 1, updated_at = ?
-         WHERE id = ?`,
-      ).bind(
-        'displayName' in input ? (input.displayName ?? null) : existing.display_name,
-        'pictureUrl' in input ? (input.pictureUrl ?? null) : existing.picture_url,
-        'statusMessage' in input ? (input.statusMessage ?? null) : existing.status_message,
-        now,
-        existing.id,
-      ).run();
+      if (!isFriendLineUserIdConflict(error)) throw error;
+      // UNIQUE(line_user_id) に当たった = 別アカウント所有の行が占有しているか、
+      // 並行して同じ行が作られた。同一スコープ(または未割当)の行だけを拾い直し、
+      // 見つからなければこのスコープでは作れないので元のエラーを投げる。
+      existing = await getFriendByLineUserIdForAccount(
+        db,
+        input.lineUserId,
+        input.lineAccountId ?? null,
+      );
+      if (!existing) throw error;
     }
-
-    return (await getFriendById(db, existing.id))!;
   }
 
-  const id = crypto.randomUUID();
   try {
     await db.prepare(
-      `INSERT INTO friends
-         (id, line_user_id, line_account_id, display_name, picture_url, status_message, is_following,
-          first_followed_at, current_follow_started_at, last_followed_at,
-          created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?)`,
+      `UPDATE friends
+       SET display_name = ?,
+           picture_url = ?,
+           status_message = ?,
+           line_account_id = COALESCE(line_account_id, ?),
+           first_followed_at = COALESCE(first_followed_at, created_at),
+           current_follow_started_at = CASE
+             WHEN is_following = 0 OR current_follow_started_at IS NULL THEN ?
+             ELSE current_follow_started_at
+           END,
+           last_followed_at = CASE
+             WHEN is_following = 0 THEN ?
+             ELSE COALESCE(last_followed_at, created_at)
+           END,
+           is_following = 1,
+           updated_at = ?
+       WHERE id = ?`,
     ).bind(
-      id,
-      input.lineUserId,
+      'displayName' in input ? (input.displayName ?? null) : existing.display_name,
+      'pictureUrl' in input ? (input.pictureUrl ?? null) : existing.picture_url,
+      'statusMessage' in input ? (input.statusMessage ?? null) : existing.status_message,
       input.lineAccountId ?? null,
-      input.displayName ?? null,
-      input.pictureUrl ?? null,
-      input.statusMessage ?? null,
       now,
       now,
       now,
-      now,
-      now,
+      existing.id,
     ).run();
   } catch (error) {
     if (!isMissingFollowLifecycleColumn(error)) throw error;
+    // Deployments can briefly run newer Worker code before migration 065 is
+    // applied. Preserve the friend-add/OAuth path using the legacy columns;
+    // the lifecycle fields are backfilled when the migration is applied.
     await db.prepare(
-      `INSERT INTO friends
-         (id, line_user_id, line_account_id, display_name, picture_url, status_message, is_following,
-          created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?)`,
+      `UPDATE friends
+       SET display_name = ?, picture_url = ?, status_message = ?,
+           line_account_id = COALESCE(line_account_id, ?),
+           is_following = 1, updated_at = ?
+       WHERE id = ?`,
     ).bind(
-      id,
-      input.lineUserId,
+      'displayName' in input ? (input.displayName ?? null) : existing.display_name,
+      'pictureUrl' in input ? (input.pictureUrl ?? null) : existing.picture_url,
+      'statusMessage' in input ? (input.statusMessage ?? null) : existing.status_message,
       input.lineAccountId ?? null,
-      input.displayName ?? null,
-      input.pictureUrl ?? null,
-      input.statusMessage ?? null,
       now,
-      now,
+      existing.id,
     ).run();
   }
 
-  return (await getFriendById(db, id))!;
+  return (await getFriendById(db, existing.id))!;
 }
 
 export async function updateFriendFollowStatus(

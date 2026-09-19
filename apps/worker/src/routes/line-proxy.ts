@@ -236,13 +236,18 @@ async function getFriendsByLineUserIds(
       for (const row of scoped.results ?? []) found.set(row.line_user_id, row);
     }
 
-    // C-2bで複合一意制約へ移行したら、この無指定フォールバックを削除する。
-    // 今回は既存の未割当行・他アカウント行を見失わず、挙動を維持する。
+    // 別アカウント所有の行には触れない (Issue #961)。拾うのは未割当
+    // (line_account_id IS NULL) の行だけ。他アカウントの友だちへ送信を
+    // 記録する場合は、行を移す代わりにこのアカウント用の行を作る側へ回す。
     const unresolved = chunk.filter((lineUserId) => !found.has(lineUserId));
     if (unresolved.length > 0) {
       const unresolvedPlaceholders = unresolved.map(() => '?').join(',');
       const fallback = await db
-        .prepare(`SELECT * FROM friends WHERE line_user_id IN (${unresolvedPlaceholders})`)
+        .prepare(
+          `SELECT * FROM friends
+            WHERE line_account_id IS NULL
+              AND line_user_id IN (${unresolvedPlaceholders})`,
+        )
         .bind(...unresolved)
         .all<Friend>();
       for (const row of fallback.results ?? []) found.set(row.line_user_id, row);
