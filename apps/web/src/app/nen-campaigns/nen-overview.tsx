@@ -155,6 +155,27 @@ function CampaignIcon({ campaignKey }: { campaignKey: string }) {
   )
 }
 
+/**
+ * テスト送信先の選択。候補は「設定 › アカウント › テスト送信先」に登録した人だけ。
+ * 誰も登録されていなければ、選ばせる代わりに登録先へ案内する（押しても届かない状態を作らない）。
+ */
+function TestRecipientPicker({ friends, value, onChange, accountId }: {
+  friends: FriendOption[]
+  value: string
+  onChange: (id: string) => void
+  accountId: string | null
+}) {
+  if (friends.length === 0) {
+    return (
+      <span className="flex items-center gap-2 text-caption text-ink-secondary">
+        テスト送信先が未登録です
+        {accountId ? <Button href={`/accounts/detail?id=${encodeURIComponent(accountId)}`} size="field">テスト送信先を登録</Button> : null}
+      </span>
+    )
+  }
+  return <Select aria-label="テスト送信先" value={value} onChange={onChange} options={friends.map((friend) => ({ value: friend.id, label: friend.displayName || '名前未取得' }))} />
+}
+
 function Kpis({ kpis, loading }: { kpis: NenKpis | null; loading: boolean }) {
   const month = kpis?.monthLabel ?? '今月'
   return (
@@ -181,6 +202,8 @@ export type NenOverviewProps = {
   friends: FriendOption[]
   testFriendId: string
   onTestFriendChange: (id: string) => void
+  /** 選択中の LINE アカウント。テスト送信先の登録画面へ案内するために使う。 */
+  accountId: string | null
   loading: boolean
   notice: { tone: 'success' | 'error'; text: string } | null
   // 自動配信・停止中
@@ -230,6 +253,7 @@ export function NenOverview({
   friends,
   testFriendId,
   onTestFriendChange,
+  accountId,
   loading,
   notice,
   saving,
@@ -287,7 +311,7 @@ export function NenOverview({
         />
       </div>
       <Kpis kpis={kpis} loading={loading && kpis === null} />
-      {notice ? <NoteBar tone={notice.tone === 'success' ? 'info' : 'danger'}>{notice.text}</NoteBar> : null}
+      {notice && tab !== 'columns' ? <NoteBar tone={notice.tone === 'success' ? 'info' : 'danger'}>{notice.text}</NoteBar> : null}
       {tab === 'auto' || tab === 'paused' ? (
         <AutoPanel
           settings={tab === 'paused' ? pausedSettings : autoSettings}
@@ -325,6 +349,9 @@ export function NenOverview({
           friends={friends}
           testFriendId={testFriendId}
           onTestFriendChange={onTestFriendChange}
+          accountId={accountId}
+          testing={testing}
+          notice={notice}
         />
       ) : null}
       {tab === 'history' ? (
@@ -338,7 +365,7 @@ export function NenOverview({
         onClose={() => onPreviewCampaign(null)}
         footer={previewSetting ? (
           <div className="flex flex-wrap items-center justify-end gap-2">
-            <Select aria-label="テスト送信先" size="standard" value={testFriendId} onChange={onTestFriendChange} options={[{ value: '', label: '送信先：未設定' }, ...friends.map((friend) => ({ value: friend.id, label: friend.displayName || '名前未取得' }))]} />
+            <TestRecipientPicker friends={friends} value={testFriendId} onChange={onTestFriendChange} accountId={accountId} />
             <Button type="button" variant="primary" disabled={!testFriendId || testing === previewSetting.campaignKey} onClick={() => onTestSend(previewSetting)}>{testing === previewSetting.campaignKey ? '送信中…' : '自分にテスト送信'}</Button>
           </div>
         ) : undefined}
@@ -347,7 +374,7 @@ export function NenOverview({
           <div className="flex flex-col gap-3">
             <p className="text-caption text-ink-secondary">{formatCampaignTiming(previewSetting)}に、{formatCampaignAudience(previewSetting)}へ届きます。</p>
             <CampaignLinePreview setting={previewSetting} />
-            <p className="text-micro text-ink-faint">テスト送信は同じLINEアカウントの確認用ユーザーだけに送ります。</p>
+            <p className="text-micro text-ink-faint">テスト送信は「設定 › アカウント › テスト送信先」に登録した、友だち追加中の人にだけ送ります。</p>
           </div>
         ) : null}
       </Drawer>
@@ -592,6 +619,9 @@ function ColumnsPanel({
   friends,
   testFriendId,
   onTestFriendChange,
+  accountId,
+  testing,
+  notice,
 }: {
   columns: NenColumn[]
   metrics: NenColumnMetrics | null
@@ -613,6 +643,9 @@ function ColumnsPanel({
   friends: FriendOption[]
   testFriendId: string
   onTestFriendChange: (id: string) => void
+  accountId: string | null
+  testing: string | null
+  notice: { tone: 'success' | 'error'; text: string } | null
 }) {
   const [search, setSearch] = useState('')
   const [category, setCategory] = useState('')
@@ -790,12 +823,14 @@ function ColumnsPanel({
         </aside>
       </div>
 
+      {/* 操作の結果は、押した場所（下部追従バー）のすぐ上に出す。画面の上に出しても見えない。 */}
+      {notice ? <NoteBar tone={notice.tone === 'success' ? 'info' : 'danger'}>{notice.text}</NoteBar> : null}
       <StickyBar
         status={planLabel}
         actions={(
           <>
-            <Select aria-label="テスト送信先" value={testFriendId} onChange={onTestFriendChange} options={[{ value: '', label: '送信先：未設定' }, ...friends.map((friend) => ({ value: friend.id, label: friend.displayName || '名前未取得' }))]} />
-            <Button type="button" disabled={!selected || !testFriendId} onClick={() => selected && onTest(selected)}>自分にテスト送信</Button>
+            <TestRecipientPicker friends={friends} value={testFriendId} onChange={onTestFriendChange} accountId={accountId} />
+            <Button type="button" disabled={!selected || !testFriendId || testing !== null} onClick={() => selected && onTest(selected)}>{selected && testing === selected.id ? '送信中…' : '自分にテスト送信'}</Button>
             <Button type="button" variant="primary" disabled={!selected || !columnEnabled || scheduleInvalid} onClick={() => selected && setConfirmDeliver({ column: selected, scheduledAt: scheduledIso ?? undefined })}>
               {plan.when === 'now' ? 'この内容で送る' : 'この内容で予約する'}
             </Button>
