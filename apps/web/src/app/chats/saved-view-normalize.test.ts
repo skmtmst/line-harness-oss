@@ -54,6 +54,16 @@ describe('古い形の保存した検索でも落ちない', () => {
     expect(conditions.unread).toBe('mine')
     expect(conditions.sort).toBe('waiting_desc')
     expect(conditions.due).toBe('overdue')
+    // quickFilter を持たない古い行は due から復元する（N-020）。
+    expect(conditions.quickFilter).toBe('overdue')
+  })
+
+  it('quickFilter は保存された値をそのまま戻す（N-020）', () => {
+    // 「要返信」が「すべて」へ潰れていた不具合の回帰。
+    expect(normalizeSavedViewConditions({ version: 1, quickFilter: 'reply' }).quickFilter).toBe('reply')
+    expect(normalizeSavedViewConditions({ version: 1, quickFilter: 'overdue' }).quickFilter).toBe('overdue')
+    expect(normalizeSavedViewConditions({ version: 1, quickFilter: 'bogus', due: 'overdue' }).quickFilter).toBe('overdue')
+    expect(normalizeSavedViewConditions({}).quickFilter).toBe('all')
   })
 
   it('知らない値は捨てる（そのまま画面へ流さない）', () => {

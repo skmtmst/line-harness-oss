@@ -882,7 +882,13 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
     setNameQuery(conditions.query ?? '')
     setStatusFilter(conditions.statuses.length === 1 ? conditions.statuses[0] : 'all')
     setAssigneeFilter(conditions.assignees.length === 1 ? conditions.assignees[0] : 'all')
-    setQuickFilter(conditions.due === 'overdue' ? 'overdue' : 'all')
+    /*
+      N-020: 保存時の絞り込みをそのまま戻す。以前は due だけを見て
+      「要返信」が「すべて」へ潰れ、未読だけ表示も落ちていた。
+      古い行の quickFilter は normalizeSavedViewConditions が due から復元済み。
+    */
+    setQuickFilter(conditions.quickFilter)
+    setUnreadOnly(conditions.unread === 'mine')
     return conditions.channels.length === 1 ? conditions.channels[0] : 'all'
   }, [])
 
@@ -980,23 +986,32 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
     }
   }, [savedViewParam, savedViews, savedViewsAccountId, selectedAccountId, accountsLoading, channel, params, router, applySavedViewConditions, dropSavedViewParam])
 
-  const currentSavedViewConditions = (draft?: Omit<SavedViewDraft, 'name' | 'favorite'>): InboxSavedViewConditions => ({
-    version: 1,
-    query: nameQuery.trim(),
-    channels: (draft?.channel ?? channel) === 'all'
-      ? ['line', 'email']
-      : [(draft?.channel ?? channel) as 'line' | 'email'],
-    statuses: (draft?.status ?? statusFilter) === 'all'
-      ? ['unread', 'in_progress', 'on_hold', 'resolved']
-      : [(draft?.status ?? statusFilter) as Exclude<StatusFilter, 'all'>],
-    assignees: (draft?.assignee ?? assigneeFilter) === 'all' ? [] : [draft?.assignee ?? assigneeFilter],
-    unread: 'all',
-    messageTypes: [],
-    receivedFrom: null,
-    receivedTo: null,
-    sort: 'newest',
-    due: draft?.due ?? (quickFilter === 'overdue' ? 'overdue' : 'all'),
-  })
+  const currentSavedViewConditions = (draft?: Omit<SavedViewDraft, 'name' | 'favorite'>): InboxSavedViewConditions => {
+    /*
+      N-020: 「未読だけ表示」とクイック絞り込み（要返信／期限超過）も保存する。
+      quickFilter の overdue は旧軸 due にも写して、古いWorkerの件数計算が
+      同じ条件で数えられるようにする。
+    */
+    const savedQuickFilter = draft?.quickFilter ?? quickFilter
+    return {
+      version: 1,
+      query: nameQuery.trim(),
+      channels: (draft?.channel ?? channel) === 'all'
+        ? ['line', 'email']
+        : [(draft?.channel ?? channel) as 'line' | 'email'],
+      statuses: (draft?.status ?? statusFilter) === 'all'
+        ? ['unread', 'in_progress', 'on_hold', 'resolved']
+        : [(draft?.status ?? statusFilter) as Exclude<StatusFilter, 'all'>],
+      assignees: (draft?.assignee ?? assigneeFilter) === 'all' ? [] : [draft?.assignee ?? assigneeFilter],
+      unread: (draft?.unreadOnly ?? unreadOnly) ? 'mine' : 'all',
+      quickFilter: savedQuickFilter,
+      messageTypes: [],
+      receivedFrom: null,
+      receivedTo: null,
+      sort: 'newest',
+      due: savedQuickFilter === 'overdue' ? 'overdue' : 'all',
+    }
+  }
 
   const createSavedView = async (draft?: SavedViewDraft): Promise<SavedViewSaveResult> => {
     if (savingView) return { success: false, error: '保存処理が終わるまでお待ちください' }
@@ -2112,9 +2127,10 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
           open={saveDialogOpen}
           initialValue={{
             status: statusFilter,
-            due: quickFilter === 'overdue' ? 'overdue' : 'all',
+            quickFilter,
             channel,
             assignee: assigneeFilter,
+            unreadOnly,
             favorite: true,
           }}
           operators={operators}
