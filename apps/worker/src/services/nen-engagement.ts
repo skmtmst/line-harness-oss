@@ -637,16 +637,45 @@ export function birthdayDeliveryTarget(now: Date): {
   };
 }
 
+export type NenCouponIssueFailure = {
+  petId: string;
+  friendId: string;
+  lineAccountId: string | null;
+  issueYear: number;
+  couponCode: string;
+  reason: string;
+};
+
+/**
+ * ECに出すクーポンコードは pet×年 で決定的にする。再試行が同じコードを名乗るので、
+ * EC側の「作成済み」（409）は成功と同じ意味で受け取れる。前回の走査で作成が
+ * 届いたか分からなくても、次の走査が同じ行へ収束する（部分成功を誤って成功扱いしない）。
+ */
+async function deterministicCouponCode(secret: string, petId: string, issueYear: number, prefix: string): Promise<string> {
+  const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+  const digest = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(`${petId}:${issueYear}`));
+  const suffix = Array.from(new Uint8Array(digest)).slice(0, 4).map((b) => b.toString(16).padStart(2, '0')).join('').toUpperCase();
+  return `${prefix}-${String(issueYear).slice(-2)}-${suffix}`;
+}
+
+/**
+ * cron が 1日1回呼ぶ。対象ペットへ誕生日クーポンを1年に1枚発行し、
+ * 送信jobを「3日前の朝10時」に予約する（同じ job キーなので再実行は冪等）。
+ * EC側の作成に失敗した子はローカル発行行を残さず次の走査へ回し、他の子と
+ * 通常のNEN配信処理を止めない（部分成功を全体失敗にしない）。
+ */
 export async function enqueueBirthdayCoupons(
   db: D1Database,
   now = new Date(),
   ecommerce?: { baseUrl: string; secret: string },
-): Promise<number> {
+  onIssueFailed?: (failure: NenCouponIssueFailure) => Promise<void> | void,
+): Promise<{ queued: number; failed: number }> {
   const { issueYear, monthDay, deliveryAt } = birthdayDeliveryTarget(now);
+  // 誕生日は月日だけ（MM-DD）でもよいので、最後5桁で合わせる。
   const pets = await db.prepare(
     `SELECT p.id, p.friend_id, p.name, p.birthday, f.line_account_id
        FROM nen_pet_profiles p JOIN friends f ON f.id = p.friend_id
-      WHERE p.birthday IS NOT NULL AND substr(p.birthday, 6, 5) IN (?, '02-29') AND f.is_following = 1`,
+      WHERE p.birthday IS NOT NULL AND substr(p.birthday, -5) IN (?, '02-29') AND f.is_following = 1`,
   ).bind(monthDay).all<{ id: string; friend_id: string; name: string; birthday: string; line_account_id: string | null }>();
   const issuedAt = jstNow();
   const accountConfiguration = new Map<string, {
@@ -654,67 +683,99 @@ export async function enqueueBirthdayCoupons(
     campaign: CampaignRow;
   } | null>();
   let queued = 0;
+  let failed = 0;
+  const report = async (failure: NenCouponIssueFailure) => {
+    console.error(JSON.stringify({ event: 'nen_birthday_coupon_issue_failed', ...failure }));
+    try {
+      await onIssueFailed?.(failure);
+    } catch (notifyError) {
+      console.error('nen birthday coupon failure notify error:', notifyError);
+    }
+  };
   for (const pet of pets.results) {
-    if (!pet.line_account_id) continue;
-    // 機能オフ中は発行も予約もしない。再オン後の誕生日から再開する。
-    if (!await featureJobCanRun(db, { accountId: pet.line_account_id, featureId: 'nen_campaigns', job: 'birthday coupon enqueue' })) {
-      continue;
-    }
-    if (!accountConfiguration.has(pet.line_account_id)) {
-      const [setting, campaign] = await Promise.all([
-        getNenBirthdayCouponSetting(db, pet.line_account_id),
-        getNenCampaign(db, 'birthday_coupon', pet.line_account_id),
-      ]);
-      accountConfiguration.set(
-        pet.line_account_id,
-        setting?.is_enabled === 1 && campaign?.is_enabled === 1 ? { setting, campaign } : null,
-      );
-    }
-    const configuration = accountConfiguration.get(pet.line_account_id);
-    if (!configuration) continue;
-    const { setting, campaign } = configuration;
-    // 2月29日生まれ: うるう年はそのまま2/29に当たる。平年はアカウントの
-    // 方針（2/28・3/1・送らない）に従う。機能07リマインダと同じ共有規則（419）。
-    const petMonthDay = pet.birthday.slice(5);
-    if (petMonthDay !== monthDay) {
-      const effective = effectiveAnniversaryMonthDay(2, 29, issueYear, setting.leap_year_policy ?? 'skip');
-      if (effective !== monthDay) continue;
-    }
-    const expires = new Date(deliveryAt.getTime() + setting.validity_days * 86_400_000);
-    const existing = await db.prepare(
-      `SELECT id FROM nen_coupon_issues WHERE pet_id = ? AND issue_year = ?`,
-    ).bind(pet.id, issueYear).first<{ id: string }>();
-    if (existing) continue;
-    const issueId = crypto.randomUUID();
-    const code = `${setting.code_prefix.replace(/-/g, '').slice(0, 8)}-${String(issueYear).slice(-2)}-${crypto.randomUUID().replace(/-/g, '').slice(0, 8).toUpperCase()}`;
-    if (ecommerce) {
-      await createEccubeCoupon(ecommerce.baseUrl, ecommerce.secret, {
-        code,
-        name: `${pet.name} ${setting.benefit_label}`.slice(0, 50),
-        discountAmount: setting.discount_amount,
-        validFrom: deliveryAt.toISOString(),
-        validTo: expires.toISOString(),
+    try {
+      if (!pet.line_account_id) continue;
+      // 機能オフ中は発行も予約もしない。再オン後の誕生日から再開する。
+      if (!await featureJobCanRun(db, { accountId: pet.line_account_id, featureId: 'nen_campaigns', job: 'birthday coupon enqueue' })) {
+        continue;
+      }
+      if (!accountConfiguration.has(pet.line_account_id)) {
+        const [setting, campaign] = await Promise.all([
+          getNenBirthdayCouponSetting(db, pet.line_account_id),
+          getNenCampaign(db, 'birthday_coupon', pet.line_account_id),
+        ]);
+        accountConfiguration.set(
+          pet.line_account_id,
+          setting?.is_enabled === 1 && campaign?.is_enabled === 1 ? { setting, campaign } : null,
+        );
+      }
+      const configuration = accountConfiguration.get(pet.line_account_id);
+      if (!configuration) continue;
+      const { setting, campaign } = configuration;
+      // 2月29日生まれ: うるう年はそのまま2/29に当たる。平年はアカウントの
+      // 方針（2/28・3/1・送らない）に従う。機能07リマインダと同じ共有規則（419）。
+      const petMonthDay = pet.birthday.slice(-5);
+      if (petMonthDay !== monthDay) {
+        const effective = effectiveAnniversaryMonthDay(2, 29, issueYear, setting.leap_year_policy ?? 'skip');
+        if (effective !== monthDay) continue;
+      }
+      const expires = new Date(deliveryAt.getTime() + setting.validity_days * 86_400_000);
+      const code = ecommerce
+        ? await deterministicCouponCode(ecommerce.secret, pet.id, issueYear, setting.code_prefix.replace(/-/g, '').slice(0, 8))
+        : `${setting.code_prefix.replace(/-/g, '').slice(0, 8)}-${String(issueYear).slice(-2)}-${crypto.randomUUID().replace(/-/g, '').slice(0, 8).toUpperCase()}`;
+      // 先に発行行を予約してから EC へ出す。EC が失敗したときに行だけ残ると
+      // 使えないクーポンが「発行済み」に見えるので、失敗時は行を消して次回に回す。
+      const issueId = crypto.randomUUID();
+      const issue = await db.prepare(
+        `INSERT OR IGNORE INTO nen_coupon_issues
+          (id, pet_id, friend_id, issue_year, coupon_code, benefit_label, expires_at, issued_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      ).bind(issueId, pet.id, pet.friend_id, issueYear, code, setting.benefit_label, sqliteDate(expires), issuedAt).run();
+      if (!issue.meta.changes) continue;
+      if (ecommerce) {
+        try {
+          await createEccubeCoupon(ecommerce.baseUrl, ecommerce.secret, {
+            code,
+            name: `${pet.name} ${setting.benefit_label}`.slice(0, 50),
+            discountAmount: setting.discount_amount,
+            validFrom: deliveryAt.toISOString(),
+            validTo: expires.toISOString(),
+          });
+        } catch (error) {
+          // ECに届かなかった（届いたか分からない）ので発行をなかったことにして
+          // 次回へ持ち越す。コードが決定的なため、重複作成（409）でも同じコードに収束する。
+          await db.prepare(`DELETE FROM nen_coupon_issues WHERE id = ?`).bind(issueId).run();
+          failed++;
+          await report({
+            petId: pet.id, friendId: pet.friend_id, lineAccountId: pet.line_account_id,
+            issueYear, couponCode: code,
+            reason: error instanceof Error ? error.message : String(error),
+          });
+          continue;
+        }
+      }
+      await db.prepare(
+        `INSERT OR IGNORE INTO nen_delivery_jobs
+          (id, campaign_key, friend_id, line_account_id, source_key, payload, campaign_snapshot,
+           scheduled_at, status, attempts, created_at, updated_at)
+         VALUES (?, 'birthday_coupon', ?, ?, ?, ?, ?, ?, 'pending', 0, ?, ?)`,
+      ).bind(
+        crypto.randomUUID(), pet.friend_id, pet.line_account_id, `birthday:${pet.id}:${issueYear}`,
+        JSON.stringify({ pet: { id: pet.id, name: pet.name }, coupon: { code, expires_at: sqliteDate(expires), benefit_label: setting.benefit_label } }),
+        campaignSnapshot(campaign), sqliteDate(deliveryAt), issuedAt, issuedAt,
+      ).run();
+      queued++;
+    } catch (error) {
+      // 1匹の失敗で残りの子と通常配信を止めない。行は残ったまま台帳に記録される。
+      failed++;
+      await report({
+        petId: pet.id, friendId: pet.friend_id, lineAccountId: pet.line_account_id,
+        issueYear, couponCode: '',
+        reason: error instanceof Error ? error.message : String(error),
       });
     }
-    const issue = await db.prepare(
-      `INSERT OR IGNORE INTO nen_coupon_issues
-        (id, pet_id, friend_id, issue_year, coupon_code, benefit_label, expires_at, issued_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    ).bind(issueId, pet.id, pet.friend_id, issueYear, code, setting.benefit_label, sqliteDate(expires), issuedAt).run();
-    if (!issue.meta.changes) continue;
-    await db.prepare(
-      `INSERT OR IGNORE INTO nen_delivery_jobs
-        (id, campaign_key, friend_id, line_account_id, source_key, payload, campaign_snapshot,
-         scheduled_at, status, attempts, created_at, updated_at)
-       VALUES (?, 'birthday_coupon', ?, ?, ?, ?, ?, ?, 'pending', 0, ?, ?)`,
-    ).bind(
-      crypto.randomUUID(), pet.friend_id, pet.line_account_id, `birthday:${pet.id}:${issueYear}`,
-      JSON.stringify({ pet: { id: pet.id, name: pet.name }, coupon: { code, expires_at: sqliteDate(expires), benefit_label: setting.benefit_label } }),
-      campaignSnapshot(campaign), sqliteDate(deliveryAt), issuedAt, issuedAt,
-    ).run();
-    queued++;
   }
-  return queued;
+  return { queued, failed };
 }
 
 export async function syncNenPetProfiles(

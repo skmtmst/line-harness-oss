@@ -325,7 +325,7 @@ export async function getNenPetMetrics(
               SUM(CASE WHEN birthday IS NOT NULL AND birthday != '' THEN 1 ELSE 0 END) AS birthday_registered,
               SUM(CASE WHEN birthday IS NULL OR birthday = '' THEN 1 ELSE 0 END) AS birthday_missing,
               COUNT(DISTINCT CASE
-                WHEN strftime('%m', p.birthday) = strftime('%m', 'now', '+9 hours') THEN p.id
+                WHEN substr(p.birthday, -5, 2) = strftime('%m', 'now', '+9 hours') THEN p.id
               END) AS birthday_this_month
          FROM nen_pet_profiles p
          JOIN friends f ON f.id = p.friend_id
@@ -507,6 +507,8 @@ export async function listNenDeliveries(
     lineAccountId: string;
     range: NenMetricsRange;
     status?: string;
+    /** 宛先名・配信名で絞る。画面の読み込み済み行だけでなく履歴全体を探す。 */
+    q?: string;
     cursor: number;
     limit: number;
   },
@@ -518,6 +520,12 @@ export async function listNenDeliveries(
     ? ` AND j.status IN (${statuses.map(() => '?').join(', ')})`
     : '';
   const statusBinds = statuses;
+  const query = (input.q ?? '').trim();
+  const like = `%${query.replace(/[\\%_]/g, '\\$&')}%`;
+  const qSql = query
+    ? ` AND (f.display_name LIKE ? ESCAPE '\\' OR s.label LIKE ? ESCAPE '\\')`
+    : '';
+  const qBinds = query ? [like, like] : [];
   const baseBinds = [input.lineAccountId, input.range.fromSql, input.range.toSql, ...statusBinds];
   const summaryRows = await db.prepare(
     `SELECT j.status, COUNT(*) AS total FROM nen_delivery_jobs j
@@ -560,9 +568,11 @@ export async function listNenDeliveries(
     .all<{ reason: string; total: number }>();
   const totalRow = await db.prepare(
     `SELECT COUNT(*) AS total FROM nen_delivery_jobs j
+       JOIN nen_campaign_settings s ON s.campaign_key = j.campaign_key
+       JOIN friends f ON f.id = j.friend_id
       WHERE j.line_account_id = ?
-        AND datetime(j.scheduled_at) >= datetime(?) AND datetime(j.scheduled_at) < datetime(?)${statusSql}`,
-  ).bind(...baseBinds).first<{ total: number }>();
+        AND datetime(j.scheduled_at) >= datetime(?) AND datetime(j.scheduled_at) < datetime(?)${statusSql}${qSql}`,
+  ).bind(...baseBinds, ...qBinds).first<{ total: number }>();
   const rows = await db.prepare(
     `SELECT j.id, j.campaign_key, s.label, j.friend_id, f.display_name AS friend_name,
             la.name AS account_name, j.scheduled_at, j.status, j.attempts, j.last_error,
@@ -572,11 +582,11 @@ export async function listNenDeliveries(
        JOIN friends f ON f.id = j.friend_id AND f.line_account_id = ?
        JOIN line_accounts la ON la.id = j.line_account_id
       WHERE j.line_account_id = ?
-        AND datetime(j.scheduled_at) >= datetime(?) AND datetime(j.scheduled_at) < datetime(?)${statusSql}
+        AND datetime(j.scheduled_at) >= datetime(?) AND datetime(j.scheduled_at) < datetime(?)${statusSql}${qSql}
       ORDER BY j.scheduled_at DESC, j.id DESC LIMIT ? OFFSET ?`,
   ).bind(
     input.lineAccountId, input.lineAccountId, input.range.fromSql, input.range.toSql,
-    ...statusBinds, input.limit, input.cursor,
+    ...statusBinds, ...qBinds, input.limit, input.cursor,
   ).all<DeliveryListRow>();
   const summary = { pending: 0, processing: 0, sent: 0, skipped: 0, failed: 0, cancelled: 0 };
   for (const row of summaryRows.results ?? []) {
