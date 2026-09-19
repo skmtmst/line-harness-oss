@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { Coins, Copy, Trash2 } from 'lucide-react'
 import type { Tag, TagGroup } from '@line-crm/shared'
-import { api, type CommonActionResources, type TagDefinitionAction } from '@/lib/api'
+import { api, type CommonActionResources, type TagDefinitionAction, type TagRetroactivePreview } from '@/lib/api'
 import Breadcrumb from '@/components/layout/breadcrumb'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import Button from '@/components/shared/button'
@@ -260,24 +260,56 @@ function ActionDrawer({ accountId, suppliedResources, allowedActionTypes, onClos
   )
 }
 
-function RetroactiveDialog({ values, count, onCancel, onSave, referenceState = false }: { values: TagEditorValues; count: number; onCancel: () => void; onSave: () => void; referenceState?: boolean }) {
+/**
+ * 遡及実行の確認窓（N-047）。
+ *
+ * 人数・合計マイルはサーバーが数えたもの（/retroactive-preview）を出す。
+ * 画面で勝手に数えた値を見せると、実際に付与される対象と食い違う。
+ * 確認ボタンはサーバーの計算が返ってくるまで押せない。実行時は
+ * previewToken を保存APIへ渡し、サーバー側で対象の再計算と照合する。
+ */
+function RetroactiveDialog({ values, count, tagId, accountId, onCancel, onSave, referenceState = false }: { values: TagEditorValues; count: number; tagId: string | null; accountId: string | null; onCancel: () => void; onSave: (previewToken: string) => void; referenceState?: boolean }) {
   const [accepted, setAccepted] = useState(referenceState)
-  const referralTargets = Math.min(count, 34)
-  const rewardTotal = count * values.rewardMiles
-  const referralTotal = referralTargets * values.referralRewardMiles
+  const [preview, setPreview] = useState<TagRetroactivePreview | null>(null)
+  const [previewError, setPreviewError] = useState('')
+
+  const fetchPreview = () => {
+    if (!tagId || !accountId) return
+    setPreviewError('')
+    void api.tags.retroactivePreview(tagId, accountId, {
+      self: values.rewardMiles,
+      referrer: values.referralRewardMiles,
+    }).then((res) => {
+      if (res.success) setPreview(res.data)
+      else setPreviewError(res.error || '対象を再計算できませんでした')
+    }).catch(() => setPreviewError('対象を再計算できませんでした'))
+  }
+
+  useEffect(() => {
+    // 固定表示（visual-qa）はAPIを呼ばず、設計確認用の固定数を出す。
+    if (referenceState) return
+    fetchPreview()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [referenceState, tagId, accountId, values.rewardMiles, values.referralRewardMiles])
+
+  const loading = !referenceState && !preview && !previewError
+  const selfTargets = preview ? preview.selfTargets : count
+  const referralTargets = preview ? preview.referralTargets : Math.min(count, 34)
+  const rewardTotal = preview ? preview.selfMiles : selfTargets * values.rewardMiles
+  const referralTotal = preview ? preview.referralMiles : referralTargets * values.referralRewardMiles
   return (
     <div className="fixed inset-0 z-[90] flex items-center justify-center bg-ink/35 p-4">
       <section className="w-full max-w-[670px] -translate-y-7 rounded-card border border-hairline bg-canvas p-7 shadow-2xl" role="alertdialog" aria-modal="true">
         <span className="mb-4 flex h-10 w-10 items-center justify-center rounded-full bg-warning-bg text-warning" aria-hidden="true">
           <Coins size={21} strokeWidth={2} />
         </span>
-        <h2 className="text-xl font-bold text-ink">{count + referralTargets}人にさかのぼってマイルを積みますか？</h2>
-        <p className="mt-2 text-sm leading-6 text-ink-secondary">「NEN会員（定期）」の変更を、いまこのタグが付いている人にも適用します。</p>
+        <h2 className="text-xl font-bold text-ink">{selfTargets + referralTargets}人にさかのぼってマイルを積みますか？</h2>
+        <p className="mt-2 text-sm leading-6 text-ink-secondary">「{values.name || 'このタグ'}」の変更を、いまこのタグが付いている人にも適用します。人数はサーバーで再計算した値です。</p>
         <div className="mt-4 overflow-hidden rounded-control border border-hairline">
           <dl className="divide-y divide-hairline text-sm">
-            <div className="grid grid-cols-[1fr_165px_130px] px-4 py-2.5"><dt>本人マイル</dt><dd>+{values.rewardMiles} mile × {count}人</dd><dd className="text-right font-semibold text-success">+{rewardTotal.toLocaleString()} mile</dd></div>
-            <div className="grid grid-cols-[1fr_165px_130px] px-4 py-2.5"><dt>紹介者マイル</dt><dd>+{values.referralRewardMiles} mile × {referralTargets}人</dd><dd className="text-right font-semibold text-success">+{referralTotal.toLocaleString()} mile</dd></div>
-            <div className="grid grid-cols-[1fr_165px_130px] bg-success-bg/40 px-4 py-2.5 font-bold"><dt>合計</dt><dd>{count + referralTargets}人が対象</dd><dd className="text-right text-success">+{(rewardTotal + referralTotal).toLocaleString()} mile</dd></div>
+            <div className="grid grid-cols-[1fr_165px_130px] px-4 py-2.5"><dt>本人マイル</dt><dd>+{values.rewardMiles} mile × {selfTargets}人{preview && preview.selfExcluded > 0 ? `（付与済み${preview.selfExcluded}人を除く）` : ''}</dd><dd className="text-right font-semibold text-success">+{rewardTotal.toLocaleString()} mile</dd></div>
+            <div className="grid grid-cols-[1fr_165px_130px] px-4 py-2.5"><dt>紹介者マイル</dt><dd>+{values.referralRewardMiles} mile × {referralTargets}人{preview && preview.referralExcluded > 0 ? `（付与済み${preview.referralExcluded}人を除く）` : ''}</dd><dd className="text-right font-semibold text-success">+{referralTotal.toLocaleString()} mile</dd></div>
+            <div className="grid grid-cols-[1fr_165px_130px] bg-success-bg/40 px-4 py-2.5 font-bold"><dt>合計</dt><dd>{selfTargets + referralTargets}人が対象</dd><dd className="text-right text-success">+{(rewardTotal + referralTotal).toLocaleString()} mile</dd></div>
             <div className="grid grid-cols-[1fr_165px_130px] px-4 py-2.5"><dt>倍率 {values.multiplierBps ? `${values.multiplierBps / 10000}倍` : 'なし'}</dt><dd>さかのぼりません</dd><dd className="text-right">次回付与から</dd></div>
             <div className="grid grid-cols-[1fr_165px_130px] px-4 py-2.5"><dt>連動アクションの送信</dt><dd>さかのぼって送りません</dd><dd className="text-right">送信0件</dd></div>
           </dl>
@@ -286,10 +318,16 @@ function RetroactiveDialog({ values, count, onCancel, onSave, referenceState = f
           <p className="font-bold">この操作は取り消せません</p>
           <p>さかのぼって積んだマイルは自動では戻せません。取り消すにはマイル画面から手動で調整が必要です。</p>
         </div>
+        {previewError && (
+          <p role="alert" className="mt-3 rounded-control border border-danger/25 bg-danger-bg p-3 text-xs leading-5 text-danger">
+            {previewError}
+            <button type="button" onClick={fetchPreview} className="ml-2 font-semibold underline">再計算する</button>
+          </p>
+        )}
         <label className="mt-3 flex items-start gap-2 text-sm font-semibold text-ink"><input type="checkbox" checked={accepted} onChange={(event) => setAccepted(event.target.checked)} className="mt-1 accent-accent" />人数と合計マイルを確認しました</label>
         <div className="mt-4 flex justify-end gap-2">
           <button type="button" onClick={onCancel} className="rounded-control border border-hairline px-4 py-2.5 text-sm font-medium text-ink-secondary">反映しないで保存</button>
-          <button type="button" disabled={!accepted} onClick={onSave} className="rounded-control bg-accent-deep px-4 py-2.5 text-sm font-bold text-on-accent disabled:opacity-40">さかのぼって反映して保存</button>
+          <button type="button" disabled={!accepted || loading || Boolean(previewError)} onClick={() => onSave(preview?.previewToken ?? '')} className="rounded-control bg-accent-deep px-4 py-2.5 text-sm font-bold text-on-accent disabled:opacity-40">{loading ? '対象を計算中…' : 'さかのぼって反映して保存'}</button>
         </div>
         <p className="mt-3 whitespace-nowrap text-xs leading-4 text-ink-faint">新規作成のときはこのダイアログは出ません。まだ誰にもタグが付いていないため、送信やマイル付与も起きません。</p>
       </section>
@@ -334,7 +372,7 @@ export default function TagEditorV4({
   error?: string
   notice?: string
   onCancel: () => void
-  onSave: (values: TagEditorValues, andAnother: boolean, applyRetroactive: boolean) => Promise<void>
+  onSave: (values: TagEditorValues, andAnother: boolean, applyRetroactive: boolean, previewToken?: string) => Promise<void>
   onDelete?: () => void
   /** Hide store breadcrumbs/actions when the canonical editor is embedded in HQ. */
   embedded?: boolean
@@ -372,6 +410,24 @@ export default function TagEditorV4({
     reapplyPolicy: reapplyMode === 'every' ? 'every_time' : 'first_only',
     actions: linked ? actions : [],
   }), [name, groupId, isStarred, linked, reward, referralReward, multiplier, priority, applyToExisting, reapplyMode, actions])
+
+  /*
+   * N-047: 「いま付いている人への反映」の人数はサーバー側の事前計算で
+   * 出す。入力中のマイルで debounce しつつ数え直す。失敗しても保存は
+   * 止めない——実行前の確認窓で必ずもう一度計算する。
+   */
+  const [retroPreview, setRetroPreview] = useState<TagRetroactivePreview | null>(null)
+  useEffect(() => {
+    if (referenceRetroactiveState) return
+    if (mode !== 'edit' || !tag?.id || !accountId) { setRetroPreview(null); return }
+    const timer = setTimeout(() => {
+      void api.tags.retroactivePreview(tag.id, accountId, {
+        self: values.rewardMiles,
+        referrer: values.referralRewardMiles,
+      }).then((res) => { if (res.success) setRetroPreview(res.data) }).catch(() => {})
+    }, 400)
+    return () => clearTimeout(timer)
+  }, [mode, tag?.id, accountId, values.rewardMiles, values.referralRewardMiles, referenceRetroactiveState])
 
   const requestSave = (andAnother: boolean) => {
     if (mode === 'edit' && applyToExisting && (tag?.friendCount ?? 0) > 0 && (values.rewardMiles > 0 || values.referralRewardMiles > 0)) {
@@ -474,7 +530,11 @@ export default function TagEditorV4({
           {mode === 'edit' && (
             <section className={cardClass}>
               <div className="flex items-start justify-between gap-4"><StepTitle number={4} title="すでに付いている人への反映" note="既存の友だちにも、今回のマイル設定をさかのぼって反映できます。" /><Toggle checked={applyToExisting} onChange={setApplyToExisting} label="遡及反映" /></div>
-              <div className="grid grid-cols-2 gap-3 lg:grid-cols-4"><div className="rounded-control bg-canvas-sunken p-3"><p className="text-xs text-ink-faint">現在の対象者</p><p className="mt-1 text-xl font-bold">{tag?.friendCount ?? 0}<span className="ml-1 text-xs font-normal">人</span></p></div><div className="rounded-control bg-canvas-sunken p-3"><p className="text-xs text-ink-faint">本人マイル対象</p><p className="mt-1 text-xl font-bold">{tag?.friendCount ?? 0}<span className="ml-1 text-xs font-normal">人</span></p></div><div className="rounded-control bg-canvas-sunken p-3"><p className="text-xs text-ink-faint">紹介者対象</p><p className="mt-1 text-xl font-bold">{Math.min(tag?.friendCount ?? 0, 34)}<span className="ml-1 text-xs font-normal">人</span></p></div><div className="rounded-control bg-canvas-sunken p-3"><p className="text-xs text-ink-faint">倍率</p><p className="mt-1 text-sm font-bold">次回付与から</p></div></div>
+              {/* N-047: 対象人数はサーバーの事前計算。未計算の間は「—」で誤読させない（固定表示=visual-qaは従来の数）。 */}
+              <div className="grid grid-cols-2 gap-3 lg:grid-cols-4"><div className="rounded-control bg-canvas-sunken p-3"><p className="text-xs text-ink-faint">現在の対象者</p><p className="mt-1 text-xl font-bold">{tag?.friendCount ?? 0}<span className="ml-1 text-xs font-normal">人</span></p></div><div className="rounded-control bg-canvas-sunken p-3"><p className="text-xs text-ink-faint">本人マイル対象</p><p className="mt-1 text-xl font-bold">{retroPreview ? retroPreview.selfTargets : referenceRetroactiveState ? (tag?.friendCount ?? 0) : '—'}<span className="ml-1 text-xs font-normal">人</span></p></div><div className="rounded-control bg-canvas-sunken p-3"><p className="text-xs text-ink-faint">紹介者対象</p><p className="mt-1 text-xl font-bold">{retroPreview ? retroPreview.referralTargets : referenceRetroactiveState ? Math.min(tag?.friendCount ?? 0, 34) : '—'}<span className="ml-1 text-xs font-normal">人</span></p></div><div className="rounded-control bg-canvas-sunken p-3"><p className="text-xs text-ink-faint">倍率</p><p className="mt-1 text-sm font-bold">次回付与から</p></div></div>
+              {retroPreview && (retroPreview.selfExcluded > 0 || retroPreview.referralExcluded > 0) && (
+                <p className="mt-3 text-xs leading-5 text-ink-faint">すでに付与済みの人（本人{retroPreview.selfExcluded}人・紹介者{retroPreview.referralExcluded}人）は対象から外れています。</p>
+              )}
               {applyToExisting && <p className="mt-4 rounded-control border border-warning/30 bg-warning-bg p-3 text-xs leading-5 text-warning">保存すると確認画面が開きます。確認を完了するまで既存の友だちへは反映されません。</p>}
             </section>
           )}
@@ -515,7 +575,7 @@ export default function TagEditorV4({
       />
 
       {drawerOpen && <ActionDrawer accountId={accountId} suppliedResources={resources} allowedActionTypes={allowedActionTypes} referenceState={referenceDrawerState} onClose={() => setDrawerOpen(false)} onAdd={(action) => { setActions((current) => [...current, action]); setDrawerOpen(false) }} />}
-      {retroactiveOpen && <RetroactiveDialog referenceState={referenceRetroactiveState} values={values} count={tag?.friendCount ?? 0} onCancel={() => { setRetroactiveOpen(false); void onSave({ ...values, applyToExisting: false }, false, false) }} onSave={() => { setRetroactiveOpen(false); void onSave(values, false, true) }} />}
+      {retroactiveOpen && <RetroactiveDialog referenceState={referenceRetroactiveState} values={values} count={tag?.friendCount ?? 0} tagId={tag?.id ?? null} accountId={accountId} onCancel={() => { setRetroactiveOpen(false); void onSave({ ...values, applyToExisting: false }, false, false) }} onSave={(previewToken) => { setRetroactiveOpen(false); void onSave(values, false, true, previewToken) }} />}
     </div>
   )
 }

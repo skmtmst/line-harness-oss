@@ -181,7 +181,7 @@ export default function EditTagPageV4() {
 
   useEffect(() => { void load() }, [load])
 
-  const save = async (values: TagEditorValues, _andAnother: boolean, applyRetroactive: boolean) => {
+  const save = async (values: TagEditorValues, _andAnother: boolean, applyRetroactive: boolean, previewToken?: string) => {
     if (!tag || !definition || !selectedAccountId || saving) return
     setSaving(true)
     setError('')
@@ -197,6 +197,8 @@ export default function EditTagPageV4() {
         mileage: { self: values.rewardMiles, referrer: values.referralRewardMiles, multiplier: values.multiplierBps, priority: values.multiplierPriority },
         actions: definitionsForSave(values.actions),
         applyToExisting: applyRetroactive && values.applyToExisting,
+        // 遡及は事前計算（確認窓）の結果と引き換え。ズレたらサーバーが止める。
+        ...(previewToken ? { previewToken } : {}),
         automationId: definition.automation?.id ?? null,
         automationDraftVersion: definition.automation?.draftVersion?.id ?? null,
       })
