@@ -2,12 +2,14 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
-import { bookingApi, type BookingAdminDetail, type BookingMenu, type BookingRequest } from '@/lib/api'
+import { api, bookingApi, type BookingAdminDetail, type BookingMenu, type BookingRequest, type BookingStaff } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Button from '@/components/shared/button'
+import Select from '@/components/shared/select'
 import FolderPanel, { FOLDER_RAIL_WIDTH } from '@/components/shared/folder-panel'
 import { usePageTitle } from '@/components/shell/page-chrome'
+import { canOperateBookings } from '../lib/booking-permissions'
 import BookingCalendar from './booking-calendar'
 
 /**
@@ -24,10 +26,23 @@ import BookingCalendar from './booking-calendar'
 const STATUS_TABS: Array<{ key: string; label: string }> = [
   { key: 'requested', label: '未承認' },
   { key: 'confirmed', label: '確定' },
+  // N-398: 完了・来店なしも台帳の状態として絞れるようにする。
+  { key: 'completed', label: '完了' },
+  { key: 'no_show', label: '来店なし' },
   { key: 'rejected', label: '拒否' },
   { key: 'expired', label: '期限切れ' },
   { key: 'cancelled', label: 'キャンセル' },
   { key: 'all', label: '全件' },
+]
+
+/** 種別（予約経路）の絞り込み。bookings.source の CHECK 制約と同じ語彙。 */
+const SOURCE_FILTERS: Array<{ key: string; label: string }> = [
+  { key: 'all', label: '経路: すべて' },
+  { key: 'liff', label: 'LINE' },
+  { key: 'phone', label: '電話' },
+  { key: 'counter', label: '店頭' },
+  { key: 'operator', label: 'スタッフ入力' },
+  { key: 'import', label: '取り込み' },
 ]
 
 const statusBadgeColor: Record<string, string> = {
@@ -113,6 +128,10 @@ export default function BookingsPage() {
   /** 「今日」「今週」の絞り込み。設計の「よく使う」にある。 */
   const [range, setRange] = useState<'all' | 'today' | 'week'>('all')
   const [menuFilter, setMenuFilter] = useState<string>('all')
+  // N-398: 担当者・予約経路の絞り込み。一覧の取得とCSV書出しの両方に渡す。
+  const [staffFilter, setStaffFilter] = useState<string>('all')
+  const [sourceFilter, setSourceFilter] = useState<string>('all')
+  const [staffList, setStaffList] = useState<BookingStaff[]>([])
   const [query, setQuery] = useState('')
   const [page, setPage] = useState(1)
   const [items, setItems] = useState<BookingRequest[]>([])
@@ -141,6 +160,16 @@ export default function BookingsPage() {
   const [decideTarget, setDecideTarget] = useState<{ id: string; action: 'approve' | 'reject' | 'cancel' | 'no_show' | 'complete' } | null>(null)
   const [deciding, setDeciding] = useState(false)
   const [decideError, setDecideError] = useState('')
+  // N-401: 閲覧のみの人には操作ボタンを見せない。読み込めるまでは隠す
+  // （権限のある人に一瞬見せて消すより、静かに出すほうが誤操作を防ぐ）。
+  const [canOperate, setCanOperate] = useState(false)
+  useEffect(() => {
+    let active = true
+    void api.staff.me()
+      .then((response) => { if (active) setCanOperate(response.success && canOperateBookings(response.data)) })
+      .catch(() => { if (active) setCanOperate(false) })
+    return () => { active = false }
+  }, [])
   // 詳細パネルは行の実体ではなく id を保持する。承認などで再読み込みしたあとも
   // 最新の行を引き直せるので、パネルに古い状態が残らない。
   const [detailId, setDetailId] = useState<string | null>(null)
@@ -155,7 +184,13 @@ export default function BookingsPage() {
     workerBase && liffId
       ? `${workerBase}/o?liffId=${encodeURIComponent(liffId)}&page=salon-book`
       : null
-  const copied = copiedUrl !== null && copiedUrl === shareUrl
+  // N-396: お客さま自身の予約履歴を開くURL。LIFF側は page=salon-book&view=history で
+  // 履歴画面を開く。/o は view を salon-book の history だけ通す。
+  const historyUrl =
+    workerBase && liffId
+      ? `${workerBase}/o?liffId=${encodeURIComponent(liffId)}&page=salon-book&view=history`
+      : null
+  const isCopied = (url: string | null) => url !== null && copiedUrl === url
 
   async function copyUrl(url: string | null) {
     if (!url) return
@@ -171,6 +206,19 @@ export default function BookingsPage() {
     }
   }
 
+  // 一覧とCSVで同じ期間になるよう、from/to の計算は1か所にする (N-397)。
+  const rangeFilterParams = useCallback((): { from?: string; to?: string } => {
+    if (range === 'all') return {}
+    const today = jstDay(new Date().toISOString())
+    const weekTo = jstDay(new Date(Date.now() + 7 * 86_400_000).toISOString())
+    return {
+      from: new Date(`${today}T00:00:00+09:00`).toISOString(),
+      to: range === 'today'
+        ? new Date(`${jstDay(new Date(Date.now() + 86_400_000).toISOString())}T00:00:00+09:00`).toISOString()
+        : new Date(`${weekTo}T00:00:00+09:00`).toISOString(),
+    }
+  }, [range])
+
   const load = useCallback(async () => {
     if (!selectedAccountId) return
     setLoading(true)
@@ -179,17 +227,14 @@ export default function BookingsPage() {
     // 残ってしまい、誤って別ステータスの予約を操作してしまう事故を防ぐ。
     setItems([])
     try {
-      const today = jstDay(new Date().toISOString())
-      const weekTo = jstDay(new Date(Date.now() + 7 * 86_400_000).toISOString())
       const r = await bookingApi.listRequests(selectedAccountId, tab, {
         limit: PAGE_SIZE,
         offset: (page - 1) * PAGE_SIZE,
         query: query.trim() || undefined,
         menuName: menuFilter === 'all' ? undefined : menuFilter,
-        from: range === 'all' ? undefined : new Date(`${today}T00:00:00+09:00`).toISOString(),
-        to: range === 'today'
-          ? new Date(`${jstDay(new Date(Date.now() + 86_400_000).toISOString())}T00:00:00+09:00`).toISOString()
-          : range === 'week' ? new Date(`${weekTo}T00:00:00+09:00`).toISOString() : undefined,
+        staffId: staffFilter === 'all' ? undefined : staffFilter,
+        source: sourceFilter === 'all' ? undefined : sourceFilter,
+        ...rangeFilterParams(),
       })
       setItems(r.requests)
       setTotal(r.total)
@@ -198,11 +243,24 @@ export default function BookingsPage() {
     } finally {
       setLoading(false)
     }
-  }, [menuFilter, page, query, range, selectedAccountId, tab])
+  }, [menuFilter, page, query, rangeFilterParams, selectedAccountId, sourceFilter, staffFilter, tab])
 
   useEffect(() => {
     load()
   }, [load])
+
+  // N-397: 今見えている絞り込みのまま台帳CSVを出す。上限・範囲の断りは
+  // CSV先頭の注記行にサーバが書く。
+  const csvUrl = selectedAccountId
+    ? bookingApi.ledgerCsvUrl(selectedAccountId, {
+        status: tab,
+        query: query.trim() || undefined,
+        menuName: menuFilter === 'all' ? undefined : menuFilter,
+        staffId: staffFilter === 'all' ? undefined : staffFilter,
+        source: sourceFilter === 'all' ? undefined : sourceFilter,
+        ...rangeFilterParams(),
+      })
+    : null
 
   // KPIとメニュー棚は集計口から読む。一覧全件をブラウザへ運ばない。
   useEffect(() => {
@@ -212,16 +270,18 @@ export default function BookingsPage() {
     void (async () => {
       try {
         const today = jstDay(new Date().toISOString())
-        const [counts, menuList] = await Promise.all([
+        const [counts, menuList, staffResult] = await Promise.all([
           bookingApi.requestsSummary(selectedAccountId, {
             month: monthKey(0), lastMonth: monthKey(-1), today,
             weekTo: jstDay(new Date(Date.now() + 6 * 86_400_000).toISOString()),
           }),
           bookingApi.listMenus(selectedAccountId),
+          bookingApi.listStaff(selectedAccountId),
         ])
         if (!alive) return
         setSummary(counts)
         setMenus(menuList.menus)
+        setStaffList(staffResult.staff.filter((item) => item.is_active === 1))
       } catch {
         // KPI が出ないだけで一覧は使える。ここで画面全体を止めない。
         // ただし0のまま黙ると気づけないので、KPI欄の上に理由と再試行を出す。
@@ -302,7 +362,7 @@ export default function BookingsPage() {
   // 「該当なし」に見えてしまう。
   useEffect(() => {
     setPage(1)
-  }, [tab, menuFilter, query, range])
+  }, [tab, menuFilter, query, range, staffFilter, sourceFilter])
 
   // タブ切替やアカウント切替で items が入れ替わったとき、開いていた予約が
   // 一覧から消えることがある。その場合はパネルを閉じる。
@@ -326,12 +386,15 @@ export default function BookingsPage() {
           <span className="mx-1.5">/</span>
           <span>予約管理</span>
         </nav>
-        <Link
-          href="/booking/bookings/new"
-          className="bg-accent-deep text-on-accent rounded-control px-4 py-2 text-sm font-medium"
-        >
-          電話の予約を入れる
-        </Link>
+        {/* N-401: 閲覧のみの人には代理予約の入口を出さない */}
+        {canOperate ? (
+          <Link
+            href="/booking/bookings/new"
+            className="bg-accent-deep text-on-accent rounded-control px-4 py-2 text-sm font-medium"
+          >
+            電話の予約を入れる
+          </Link>
+        ) : null}
       </div>
       <nav aria-label="予約の表示" className="border-hairline mb-4 flex items-center gap-7 border-b">
         {([
@@ -361,6 +424,7 @@ export default function BookingsPage() {
         <BookingDetailPanel
           booking={detail}
           accountId={selectedAccountId}
+          canOperate={canOperate}
           onClose={() => setDetailId(null)}
           onAction={(a) => handleDecide(detail.id, a)}
         />
@@ -393,7 +457,13 @@ export default function BookingsPage() {
             {error}
           </div>
         )}
-        <BookingCalendar mode={view} items={calendarItems} onOpen={setDetailId} />
+        <BookingCalendar
+          mode={view}
+          items={calendarItems}
+          onOpen={setDetailId}
+          staffNames={staffList.map((item) => item.display_name)}
+          canCreate={canOperate}
+        />
         {dialogs}
       </div>
     )
@@ -474,18 +544,26 @@ export default function BookingsPage() {
               aria-label="お客さま名で検索"
               className="border-hairline rounded-control focus:ring-accent min-w-0 flex-1 border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
             />
-            <span className="text-ink-faint text-xs whitespace-nowrap">並び順</span>
-            {/*
-              **押しても何も起きない選び口を出さない**（`v6-common-rules` §5-5
-              「動くまで描かない」）。押せない形で位置だけ見せても、いつ使える
-              ようになるのか読む人には分からない。
-            */}
-            <span className="text-ink-faint text-xs whitespace-nowrap">表示</span>
-            {/*
-              **押しても何も起きない選び口を出さない**（`v6-common-rules` §5-5
-              「動くまで描かない」）。押せない形で位置だけ見せても、いつ使える
-              ようになるのか読む人には分からない。
-            */}
+            {/* N-398: 担当者と種別（予約経路）の絞り込み。一覧と件数の両方に効く。 */}
+            <Select
+              aria-label="担当者で絞り込む"
+              value={staffFilter}
+              onChange={setStaffFilter}
+              options={[
+                { value: 'all', label: '担当: すべて' },
+                ...staffList.map((item) => ({ value: item.id, label: item.display_name })),
+              ]}
+            />
+            <Select
+              aria-label="予約経路で絞り込む"
+              value={sourceFilter}
+              onChange={setSourceFilter}
+              options={SOURCE_FILTERS.map((item) => ({ value: item.key, label: item.label }))}
+            />
+            {/* N-397: 今の絞り込みのままCSVへ。範囲の断りはCSV先頭行に入る。 */}
+            {csvUrl ? (
+              <Button href={csvUrl} variant="secondary">CSVで書き出す</Button>
+            ) : null}
             <button
               disabled
               title="保存した条件は準備中です"
@@ -609,10 +687,13 @@ export default function BookingsPage() {
                             >
                               詳細
                             </button>
-                            <ActionButtons
-                              status={b.status}
-                              onAction={(a) => handleDecide(b.id, a)}
-                            />
+                            {/* N-401: 閲覧のみの人には状態を変えるボタンを出さない */}
+                            {canOperate ? (
+                              <ActionButtons
+                                status={b.status}
+                                onAction={(a) => handleDecide(b.id, a)}
+                              />
+                            ) : null}
                           </div>
                         </td>
                       </tr>
@@ -628,22 +709,44 @@ export default function BookingsPage() {
               友だち予約URLと、友だちが自分の予約履歴を見るURLをそれぞれ発行できます。予約履歴URLを配ると「自分の予約を確認したい」という問い合わせを減らせます。
             </p>
             {shareUrl ? (
-              <div className="mt-2 flex flex-wrap items-center gap-2">
-                <input
-                  readOnly
-                  value={shareUrl}
-                  aria-label="友だち予約URL"
-                  onFocus={(e) => e.currentTarget.select()}
-                  className="border-hairline bg-canvas rounded-control min-w-0 flex-1 border px-3 py-2 font-mono text-xs"
-                />
-                <button
-                  type="button"
-                  onClick={() => copyUrl(shareUrl)}
-                  className="bg-accent-deep text-on-accent rounded-control px-4 py-2 text-sm font-medium"
-                >
-                  {copied ? 'コピー済' : 'コピー'}
-                </button>
-                <span className="text-ink-faint text-xs">予約履歴URLは準備中です</span>
+              <div className="mt-2 space-y-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <input
+                    readOnly
+                    value={shareUrl}
+                    aria-label="友だち予約URL"
+                    onFocus={(e) => e.currentTarget.select()}
+                    className="border-hairline bg-canvas rounded-control min-w-0 flex-1 border px-3 py-2 font-mono text-xs"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => copyUrl(shareUrl)}
+                    className="bg-accent-deep text-on-accent rounded-control px-4 py-2 text-sm font-medium"
+                  >
+                    {isCopied(shareUrl) ? 'コピー済' : 'コピー'}
+                  </button>
+                  <span className="text-ink-faint text-xs">お客さまが新しく予約を入れるURL</span>
+                </div>
+                {/* N-396: 履歴URLは別画面を開く。両方発行できることを注記と揃える。 */}
+                {historyUrl ? (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <input
+                      readOnly
+                      value={historyUrl}
+                      aria-label="予約履歴URL"
+                      onFocus={(e) => e.currentTarget.select()}
+                      className="border-hairline bg-canvas rounded-control min-w-0 flex-1 border px-3 py-2 font-mono text-xs"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => copyUrl(historyUrl)}
+                      className="bg-accent-deep text-on-accent rounded-control px-4 py-2 text-sm font-medium"
+                    >
+                      {isCopied(historyUrl) ? 'コピー済' : 'コピー'}
+                    </button>
+                    <span className="text-ink-faint text-xs">お客さまが自分の予約履歴を見るURL</span>
+                  </div>
+                ) : null}
               </div>
             ) : !workerBase ? (
               // 配信先のURLが作れないのは、LIFF未設定ではなくAPI接続先の欠落(点検#516軽4)。
@@ -734,11 +837,14 @@ function DetailRow({ label, children }: { label: string; children: React.ReactNo
 function BookingDetailPanel({
   booking: b,
   accountId,
+  canOperate,
   onClose,
   onAction,
 }: {
   booking: BookingRequest
   accountId: string | null
+  /** N-401: 閲覧のみの人には状態を変える操作を出さない。 */
+  canOperate: boolean
   onClose: () => void
   onAction: (a: 'approve' | 'reject' | 'cancel' | 'no_show' | 'complete') => void
 }) {
@@ -775,9 +881,14 @@ function BookingDetailPanel({
           <div className="flex shrink-0 items-center gap-2">
             <span className={`rounded-pill px-3 py-1 text-xs font-semibold ${statusBadgeColor[b.status] ?? 'bg-canvas-sunken'}`}>{statusLabel[b.status] ?? b.status}</span>
             {b.friend_id ? <Button href={`/chats?friend=${b.friend_id}`} variant="primary">この人と話す</Button> : null}
-            {/* N-389: 変更は詳細ページの変更フォームで行う。「準備中」のまま残さない。 */}
-            <Button href={`/booking/bookings/detail?id=${encodeURIComponent(b.id)}`} variant="secondary">時間や担当を変える</Button>
-            <Button onClick={() => onAction('cancel')} className="border-danger text-danger">予約を取り消す</Button>
+            {/* N-389: 変更は詳細ページの変更フォームで行う。「準備中」のまま残さない。
+                N-401: 閲覧のみの人には変更・取消の入口を出さない。 */}
+            {canOperate ? (
+              <>
+                <Button href={`/booking/bookings/detail?id=${encodeURIComponent(b.id)}`} variant="secondary">時間や担当を変える</Button>
+                <Button onClick={() => onAction('cancel')} className="border-danger text-danger">予約を取り消す</Button>
+              </>
+            ) : null}
             <Button onClick={onClose}>閉じる</Button>
           </div>
         </div>
@@ -850,7 +961,7 @@ function BookingDetailPanel({
                 ? '承認するとお客様のLINEに確定のお知らせが届きます。'
                 : 'LINEと結びついていないため、お客様への自動連絡はありません。'}
             </p>
-            <ActionButtons status={b.status} onAction={onAction} />
+            {canOperate ? <ActionButtons status={b.status} onAction={onAction} /> : null}
             <Link
               href={`/booking/bookings/detail?id=${encodeURIComponent(b.id)}`}
               data-qa-open="TnDbq"
@@ -862,7 +973,9 @@ function BookingDetailPanel({
           </div>
           </aside>
         </div>
-        <div className="border-hairline sticky bottom-0 z-10 flex items-center justify-between gap-4 border-t bg-canvas px-6 py-3"><p className="text-ink-faint text-xs">{isLinked ? 'ここでの状態変更は、お客様のLINEにも自動で知らせます。' : 'LINEと結びついていないため、お客様への自動連絡はありません。'}</p><div className="flex gap-2"><Button onClick={() => onAction('cancel')}>キャンセル</Button><Button onClick={() => onAction('complete')}>来ていただきました にする</Button></div></div>
+        {canOperate ? (
+          <div className="border-hairline sticky bottom-0 z-10 flex items-center justify-between gap-4 border-t bg-canvas px-6 py-3"><p className="text-ink-faint text-xs">{isLinked ? 'ここでの状態変更は、お客様のLINEにも自動で知らせます。' : 'LINEと結びついていないため、お客様への自動連絡はありません。'}</p><div className="flex gap-2"><Button onClick={() => onAction('cancel')}>キャンセル</Button><Button onClick={() => onAction('complete')}>来ていただきました にする</Button></div></div>
+        ) : null}
       </aside>
     </div>
   )

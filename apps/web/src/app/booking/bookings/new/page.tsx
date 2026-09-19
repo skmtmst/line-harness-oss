@@ -19,8 +19,35 @@ import {
   type FriendListItem,
   type ProxyBookingResult,
 } from '@/lib/api'
+import { canOperateBookings } from '../../lib/booking-permissions'
 
 type Step = 'input' | 'confirm' | 'done' | 'conflict'
+
+/**
+ * N-400: 再読み込みで入力が消えないよう、アカウント別に sessionStorage へ
+ * 置く下書きの形。友だちは表示に使う最小限（id と表示名）だけを持つ。
+ * 完了・破棄で消す。別タブを汚さないよう sessionStorage（タブ単位）を使う。
+ */
+interface ProxyBookingDraft {
+  phoneCustomer: boolean
+  customerName: string
+  customerPhone: string
+  petName: string
+  friend: { id: string; displayName: string } | null
+  customer: BookingCustomerSummary | null
+  menuId: string
+  staffId: string
+  date: string
+  time: string
+  customerNote: string
+  notification: {
+    send_line_confirmation: boolean
+    day_before: boolean
+    hours_before: boolean
+  }
+}
+
+const DRAFT_KEY_PREFIX = 'booking:new-draft:'
 
 const NODE_BY_STEP: Record<Step, string> = {
   input: 'cpdDi',
@@ -91,6 +118,9 @@ export default function NewProxyBookingPage() {
   const [menus, setMenus] = useState<BookingMenu[]>([])
   const [staff, setStaff] = useState<BookingMenuStaff[]>([])
   const [slots, setSlots] = useState<BookingAvailabilitySlot[]>([])
+  // 空き枠を実際に取り終えたか。URL・下書きの時刻指定は、到着前の空配列で
+  // 捨てないようこの旗を見てから判断する。
+  const [slotsReady, setSlotsReady] = useState(false)
   const [friends, setFriends] = useState<FriendListItem[]>([])
   const [friendQuery, setFriendQuery] = useState('')
   const [friend, setFriend] = useState<FriendListItem | null>(null)
@@ -120,6 +150,23 @@ export default function NewProxyBookingPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const slotRequest = useRef(0)
+  // N-401: 閲覧のみの人には予約を入れる操作を出さない。読み込めるまでは隠す。
+  const [canOperate, setCanOperate] = useState(false)
+  // 権限を読み終わるまで案内バナーも出さない（操作できる人へ一瞬見せない）。
+  const [staffResolved, setStaffResolved] = useState(false)
+  useEffect(() => {
+    let active = true
+    void api.staff.me()
+      .then((response) => { if (active) setCanOperate(response.success && canOperateBookings(response.data)) })
+      .catch(() => { if (active) setCanOperate(false) })
+      .finally(() => { if (active) setStaffResolved(true) })
+    return () => { active = false }
+  }, [])
+  // N-399/N-400: URL 指定・下書きの「担当者・時刻」は、担当一覧や空き枠が
+  // 届いてから存在を確かめて選ぶ。到着を待つ分だけこの ref に預ける。
+  const pendingSelect = useRef<{ staffId?: string; staffName?: string; date?: string; time?: string }>({})
+  const restoredAccount = useRef<string | null>(null)
+  const [draftRestored, setDraftRestored] = useState(false)
 
   const selectionKey = [selectedAccountId ?? '', friend?.id ?? customer?.id ?? '', menuId, staffId, date, time].join('\u001f')
   const latestSelectionKey = useRef(selectionKey)
@@ -144,7 +191,7 @@ export default function NewProxyBookingPage() {
   // 新しく作る電話客（customer 未保存）は必ず未連携。
   const isLineLinked = friend != null || customer?.is_line_linked === true
 
-  useEffect(() => {
+  function resetForm() {
     setStep('input')
     setFriend(null)
     setCustomer(null)
@@ -165,7 +212,130 @@ export default function NewProxyBookingPage() {
     setIdempotencyKey('')
     setLoading(false)
     setError('')
+    pendingSelect.current = {}
+  }
+
+  useEffect(() => {
+    resetForm()
+    setDraftRestored(false)
+    // アカウントが確定した最初の1回だけ下書きとURL指定を読む。それ以降の
+    // 入力途中に再読み込みしても同じ下書きが戻る。別アカウントに切り替えた
+    // ときはそのアカウントの下書きを読む（前のアカウントの入力は持ち越さない）。
+    if (!selectedAccountId || restoredAccount.current === selectedAccountId) return
+    restoredAccount.current = selectedAccountId
+    // N-400: 書きかけの下書きを戻す。壊れた JSON は捨てて初期状態で始める。
+    try {
+      const raw = window.sessionStorage.getItem(`${DRAFT_KEY_PREFIX}${selectedAccountId}`)
+      if (raw) {
+        const draft = JSON.parse(raw) as Partial<ProxyBookingDraft>
+        if (draft.friend?.id) setFriend({ id: draft.friend.id, displayName: String(draft.friend.displayName ?? '') } as FriendListItem)
+        if (draft.customer?.id) setCustomer(draft.customer as BookingCustomerSummary)
+        setPhoneCustomer(draft.phoneCustomer === true)
+        setCustomerName(typeof draft.customerName === 'string' ? draft.customerName : '')
+        setCustomerPhone(typeof draft.customerPhone === 'string' ? draft.customerPhone : '')
+        setPetName(typeof draft.petName === 'string' ? draft.petName : '')
+        setMenuId(typeof draft.menuId === 'string' ? draft.menuId : '')
+        setDate(typeof draft.date === 'string' ? draft.date : '')
+        setCustomerNote(typeof draft.customerNote === 'string' ? draft.customerNote : '')
+        if (draft.notification && typeof draft.notification === 'object') {
+          setNotification({
+            send_line_confirmation: draft.notification.send_line_confirmation !== false,
+            day_before: draft.notification.day_before !== false,
+            hours_before: draft.notification.hours_before !== false,
+          })
+        }
+        // 担当・時刻は一覧の到着後に存在を確かめてから選ぶ。
+        pendingSelect.current = {
+          staffId: typeof draft.staffId === 'string' && draft.staffId ? draft.staffId : undefined,
+          date: typeof draft.date === 'string' ? draft.date : undefined,
+          time: typeof draft.time === 'string' ? draft.time : undefined,
+        }
+        setDraftRestored(true)
+      }
+    } catch {
+      // 壊れた下書きは捨てる
+    }
+    // N-399: カレンダーの空きセルから来たURL指定は下書きより優先する。
+    const params = new URLSearchParams(window.location.search)
+    const paramDate = params.get('date')
+    const paramTime = params.get('time')
+    const paramStaff = params.get('staff')
+    const paramMenu = params.get('menu') ?? params.get('menu_id')
+    if (paramDate && /^\d{4}-\d{2}-\d{2}$/.test(paramDate)) {
+      setDate(paramDate)
+      pendingSelect.current.date = paramDate
+    }
+    if (paramMenu) setMenuId(paramMenu)
+    if (paramStaff) pendingSelect.current.staffName = paramStaff
+    if (paramTime && /^\d{2}:\d{2}$/.test(paramTime)) pendingSelect.current.time = paramTime
   }, [selectedAccountId])
+
+  // N-399/N-400: メニューを選ぶと担当者一覧が届く。下書き・URLの担当が
+  // 一覧にあれば選び直す。URLの担当は名前で来るので display_name で照合する。
+  useEffect(() => {
+    const pending = pendingSelect.current
+    if (pending.staffId) {
+      if (staff.some((item) => item.id === pending.staffId)) {
+        setStaffId(pending.staffId)
+        delete pending.staffId
+      }
+    } else if (pending.staffName) {
+      const match = staff.find((item) => item.display_name === pending.staffName)
+      if (match) {
+        setStaffId(match.id)
+        delete pending.staffName
+      } else if (staff.length > 0) {
+        // 一覧が届いたのに居ない担当名（改名・非担当）は捨てる。
+        // 空の一覧は「まだ届いていない」だけなので残す。
+        delete pending.staffName
+      }
+    }
+  }, [staff])
+
+  // N-399/N-400: 空き枠が届いたら、指定の開始時刻が実際に取れるときだけ選ぶ。
+  // 取れない時刻（埋まった・営業時間外）は黙って捨て、選び直しに委ねる。
+  // slotsReady が立つ前の空配列は「まだ読み込み中」なので時刻指定を捨てない。
+  useEffect(() => {
+    const pending = pendingSelect.current
+    if (!pending.time || pending.date !== date || !slotsReady) return
+    if (slots.some((slot) => slot.date === date && slot.start === pending.time)) {
+      setTime(pending.time)
+    }
+    delete pending.time
+  }, [slots, slotsReady, date])
+
+  // N-400: 入力中の内容をアカウント別に sessionStorage へ書く。
+  // 完了・破棄で消す。書き込みに失敗しても入力自体は止めない。
+  useEffect(() => {
+    if (!selectedAccountId || step === 'done') return
+    const draft: ProxyBookingDraft = {
+      phoneCustomer,
+      customerName,
+      customerPhone,
+      petName,
+      friend: friend ? { id: friend.id, displayName: friend.displayName } : null,
+      customer,
+      menuId,
+      staffId,
+      date,
+      time,
+      customerNote,
+      notification,
+    }
+    try {
+      window.sessionStorage.setItem(`${DRAFT_KEY_PREFIX}${selectedAccountId}`, JSON.stringify(draft))
+    } catch {
+      // 容量超過などは無視する
+    }
+  }, [selectedAccountId, step, phoneCustomer, customerName, customerPhone, petName, friend, customer, menuId, staffId, date, time, customerNote, notification])
+
+  function discardDraft() {
+    if (selectedAccountId) {
+      try { window.sessionStorage.removeItem(`${DRAFT_KEY_PREFIX}${selectedAccountId}`) } catch { /* noop */ }
+    }
+    setDraftRestored(false)
+    resetForm()
+  }
 
   // 選択（アカウント・客・メニュー・担当・日時）が変わったら、確認済みの
   // 枠を捨てる。前の選択の instant がそのまま次の確定に乗ると、画面の
@@ -227,20 +397,26 @@ export default function NewProxyBookingPage() {
     const requestId = ++slotRequest.current
     if (!selectedAccountId || !menuId || !staffId || !date) {
       setSlots([])
+      setSlotsReady(false)
       return
     }
     setLoading(true)
     setError('')
+    // 取り直し中は前回の枠で時刻指定を判定しないよう一度落とす。
+    setSlotsReady(false)
     try {
       const response = await bookingApi.getAvailability(selectedAccountId, {
         menuId, staffId, from: date, to: date,
       })
       if (requestId === slotRequest.current) {
         setSlots(response.by_staff.find((item) => item.staff_id === staffId)?.slots ?? [])
+        setSlotsReady(true)
       }
     } catch {
       if (requestId === slotRequest.current) {
         setSlots([])
+        // 読み込み自体は終わったので「指定時刻は取れない」として捨てる側に回す。
+        setSlotsReady(true)
         setError('空き時間を確認できませんでした')
       }
     } finally {
@@ -399,6 +575,10 @@ export default function NewProxyBookingPage() {
       if (latestSelectionKey.current !== requestKey) return
       setResult(created)
       setCustomerContext(created.customer_context)
+      // N-400: 入った予約の下書きは消す。残すと次回「書きかけ」として
+      // 同じ予約が戻り、二重に入れる事故になる。
+      try { window.sessionStorage.removeItem(`${DRAFT_KEY_PREFIX}${selectedAccountId}`) } catch { /* noop */ }
+      setDraftRestored(false)
       setStep('done')
     } catch (cause) {
       if (latestSelectionKey.current !== requestKey) return
@@ -440,6 +620,21 @@ export default function NewProxyBookingPage() {
           {error}
         </div>
       )}
+
+      {staffResolved && !canOperate ? (
+        <div className="border-warning bg-warning-bg text-warning rounded-card border px-4 py-3 text-sm">
+          予約を入れられるのは、予約の操作権限を持つ人だけです。閲覧のみの権限では操作ボタンは出ません。
+        </div>
+      ) : null}
+
+      {draftRestored && step === 'input' ? (
+        <div className="border-hairline bg-canvas-sunken text-ink-secondary rounded-card flex flex-wrap items-center justify-between gap-2 border px-4 py-2 text-xs">
+          <span>書きかけの入力を戻しました。</span>
+          <button type="button" onClick={discardDraft} className="text-accent font-semibold">
+            破棄して最初から入れ直す
+          </button>
+        </div>
+      ) : null}
 
       {step === 'input' && (
         <div data-design="Body" className="grid gap-4 xl:flex">
@@ -761,7 +956,8 @@ export default function NewProxyBookingPage() {
         </>
       )}
 
-      {(step === 'input' || step === 'confirm' || step === 'conflict') && (
+      {/* N-401: 閲覧のみの人には確認・登録の操作バーを出さない */}
+      {canOperate && (step === 'input' || step === 'confirm' || step === 'conflict') && (
         <StickyBar
           status={step === 'input' ? 'まだ入っていません。保存すると台帳に並び、お客様にもお知らせします。' : step === 'confirm' ? 'まだ入っていません。「予約を入れる」を押すと台帳に並びます。' : '直すところがあります。時間を選び直すまで台帳には入りません。'}
           actions={(
