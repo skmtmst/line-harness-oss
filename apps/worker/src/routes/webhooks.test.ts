@@ -21,6 +21,7 @@ vi.mock('@line-crm/db', async (importOriginal) => {
   finishWebhookInteraction: vi.fn(),
   getWebhookInteractionById: vi.fn(),
   listFailedWebhookInteractionsForRetry: vi.fn(),
+  countFailedWebhookInteractionsForRetry: vi.fn().mockResolvedValue(0),
   listWebhookInteractions: vi.fn(),
   getOutgoingWebhookDeliverySummaries: vi.fn(),
   updateIncomingWebhookConfig: vi.fn(),
@@ -74,9 +75,15 @@ vi.mock('../services/incoming-webhook-actions.js', async (importOriginal) => {
   };
 });
 
-vi.mock('../services/outgoing-webhook-delivery.js', () => ({
-  deliverWebhook: vi.fn().mockResolvedValue({ ok: true, attempts: 1, lastStatus: 204 }),
-}));
+vi.mock('../services/outgoing-webhook-delivery.js', async (importOriginal) => {
+  // 封筒の組み立ては純粋関数なので実物を通し、実際に外へ出る本文の形を
+  // この試験でも確かめられるようにする（N-371）。
+  const actual = await importOriginal<typeof import('../services/outgoing-webhook-delivery.js')>();
+  return {
+    ...actual,
+    deliverWebhook: vi.fn().mockResolvedValue({ ok: true, attempts: 1, lastStatus: 204 }),
+  };
+});
 
 vi.mock('../services/account-access.js', () => ({
   canAccessAllLineAccounts: vi.fn().mockResolvedValue(true),
@@ -97,6 +104,7 @@ import {
   finishWebhookInteraction,
   getWebhookInteractionById,
   listFailedWebhookInteractionsForRetry,
+  countFailedWebhookInteractionsForRetry,
   listWebhookInteractions,
   getOutgoingWebhookDeliverySummaries,
   updateIncomingWebhookConfig,
@@ -1151,11 +1159,23 @@ describe('POST /api/webhooks/outgoing/:id/test', () => {
       baseEnv,
     );
     expect(res.status).toBe(200);
-    expect(deliverWebhook).toHaveBeenCalledWith(
-      expect.objectContaining({ id: 'wh-1' }),
-      expect.stringContaining('webhook.test'),
-      { idempotencyKey: 'interaction-1', credentialKeys: { current: undefined, previous: undefined } },
-    );
+    // N-371: 試し送信も共通封筒 {id,type,occurred_at,account_id,data,attempt}
+    // で送る。封筒の id と冪等キーは同じ値（再送しても同じ出来事）。
+    const call = vi.mocked(deliverWebhook).mock.calls[0];
+    expect(call?.[0]).toMatchObject({ id: 'wh-1' });
+    const sentBody = JSON.parse(call?.[1] ?? '{}') as Record<string, unknown>;
+    expect(sentBody).toMatchObject({
+      type: 'webhook.test',
+      account_id: ACCOUNT_ID,
+      attempt: 1,
+      data: { test: true, source: 'line-harness-admin' },
+    });
+    expect(typeof sentBody.id).toBe('string');
+    expect(typeof sentBody.occurred_at).toBe('string');
+    expect(call?.[2]).toMatchObject({
+      idempotencyKey: sentBody.id,
+      credentialKeys: { current: undefined, previous: undefined },
+    });
     expect(finishWebhookInteraction).toHaveBeenCalledWith(
       baseEnv.DB, 'interaction-1', ACCOUNT_ID,
       expect.objectContaining({ status: 'succeeded', responseStatus: 204 }),
@@ -1232,6 +1252,42 @@ describe('Webhookやり取り記録', () => {
     expect(retryWebhookInteraction).toHaveBeenCalledWith(keyedEnv.DB, failedRow, { current: TEST_KEY, previous: undefined });
     const retryBody = (await res.json()) as { error: string };
     expect(retryBody.error).toBe('secret を確認できないため送り直しを止めました');
+  });
+
+  // N-387: 1回で処理できるのは5件まで。残りを黙って置き去りにせず、
+  // 残件数(remaining)を応答へ入れて画面が明示できるようにする。
+  test('まとめてやり直しは上限を超えた分を remaining として返す', async () => {
+    const items = Array.from({ length: 5 }, (_, index) => ({
+      ...failedRow, id: `run-${index}`,
+    }));
+    vi.mocked(listFailedWebhookInteractionsForRetry).mockResolvedValue(items);
+    vi.mocked(countFailedWebhookInteractionsForRetry).mockResolvedValue(8);
+    vi.mocked(retryWebhookInteraction).mockResolvedValue({ ...failedRow, status: 'succeeded' });
+    const res = await setupApp().request(
+      `/api/webhooks/interactions/retry-failed?lineAccountId=${ACCOUNT_ID}`,
+      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' },
+      baseEnv,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      data: { requested: number; succeeded: number; failed: number; skipped: number; remaining: number };
+    };
+    expect(body.data).toMatchObject({ requested: 5, succeeded: 5, failed: 0, skipped: 0, remaining: 3 });
+    expect(retryWebhookInteraction).toHaveBeenCalledTimes(5);
+  });
+
+  test('まとめてやり直しは残りが無いとき remaining=0 を返す', async () => {
+    vi.mocked(listFailedWebhookInteractionsForRetry).mockResolvedValue([failedRow]);
+    vi.mocked(countFailedWebhookInteractionsForRetry).mockResolvedValue(1);
+    vi.mocked(retryWebhookInteraction).mockResolvedValue({ ...failedRow, status: 'succeeded' });
+    const res = await setupApp().request(
+      `/api/webhooks/interactions/retry-failed?lineAccountId=${ACCOUNT_ID}`,
+      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' },
+      baseEnv,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { data: { remaining: number } };
+    expect(body.data.remaining).toBe(0);
   });
 });
 
@@ -1691,11 +1747,18 @@ describe('#650 fail-closed: 鍵不足・復号失敗は安全に止める', () =
     // 署名用の復号は deliverWebhook が行う。ここでは鍵がそのまま渡ることを見る。
     // 呼び出し元で復号した値を詰め替える形に戻すと、鍵を渡し忘れた経路が
     // 黙って署名なしで送るので、鍵の受け渡しの方を固定する(#650 再審査)。
+    // N-371/N-372(#940): 本文は共通封筒で、冪等キーは封筒の id と同じ値。
+    const testCall = vi.mocked(deliverWebhook).mock.calls[0]!;
+    const sentBody = testCall[1] as string;
+    const sendOptions = testCall[2] as { idempotencyKey?: string };
     expect(deliverWebhook).toHaveBeenCalledWith(
       expect.objectContaining({ id: 'wh-1', secret_encrypted: 'v1-enc-abc' }),
       expect.stringContaining('webhook.test'),
-      { idempotencyKey: 'interaction-1', credentialKeys: { current: TEST_KEY, previous: undefined } },
+      expect.objectContaining({ credentialKeys: { current: TEST_KEY, previous: undefined } }),
     );
+    const testEnvelope = JSON.parse(sentBody) as Record<string, unknown>;
+    expect(testEnvelope).toMatchObject({ type: 'webhook.test', attempt: 1 });
+    expect(sendOptions.idempotencyKey).toBe(testEnvelope.id);
 
     vi.mocked(canAccessAllLineAccounts).mockResolvedValueOnce(false);
     const forbidden = await setupApp().request(

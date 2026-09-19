@@ -80,7 +80,11 @@ async function holdOutgoingUpdates(page: Page): Promise<PendingUpdate[]> {
 async function toggleRow(page: Page, name: string) {
   const row = page.getByRole('row').filter({ hasText: name })
   await row.getByRole('button', { name: '設定', exact: true }).click()
-  await row.getByRole('button', { name: '止める', exact: true }).click()
+  /*
+    N-385(#941) で設定メニューは role=menu の項目へ変わった。
+    「止める」は role=menuitem で探す（getByRole('button') には出ない）。
+  */
+  await row.getByRole('menuitem', { name: '止める', exact: true }).click()
 }
 
 /*
@@ -120,7 +124,8 @@ test('同じ行を素早く二重押ししても更新は1回だけ送る', asyn
   await openWebhooks(page)
   const row = page.getByRole('row').filter({ hasText: 'Googleスプレッドシート ／ 顧客台帳' })
   await row.getByRole('button', { name: '設定', exact: true }).click()
-  const toggle = row.getByRole('button', { name: '止める', exact: true })
+  // 設定メニューの項目は role=menuitem（N-385）。button では拾えない。
+  const toggle = row.getByRole('menuitem', { name: '止める', exact: true })
   /*
     押す前の箱を控える(#707)。`dblclick` は2発とも**同じ座標**へ落ちるので、
     1発目のあとにボタンが動くのは危ない。動きをゼロにしてあるかを下で見る。

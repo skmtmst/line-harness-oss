@@ -69,4 +69,15 @@ describe('受付枠と休業日のV6契約', () => {
     expect(PAGE).not.toContain('function breakHours(')
     expect(PAGE).not.toContain('function shortDate(')
   })
+
+  it('登録済みの休業日は版付きで修正・削除でき、削除は確認を挟む (#953 E-09)', () => {
+    expect(PAGE).toContain('bookingApi.updateException(selectedAccountId')
+    expect(PAGE).toContain('bookingApi.deleteException(selectedAccountId')
+    expect(PAGE).toContain('expectedVersion: item.version')
+    expect(PAGE).toContain('修正する')
+    expect(PAGE).toContain('削除する')
+    expect(PAGE).toContain('この休業日を消しますか？')
+    // 閲覧のみの人には入口を出さない。
+    expect(PAGE).toContain('canEditSettings')
+  })
 })

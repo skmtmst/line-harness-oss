@@ -1,9 +1,12 @@
 /**
- * #650 再審査: 自動配信(event-bus)の外向きWebhookに署名が必ず付くこと。
+ * #650 再審査 + #940(N-371/N-372): 自動配信(event-bus)の外向きWebhookに
+ * 署名が必ず付き、本文が共通封筒であること。
  *
  * 退行の中身: secret を暗号文だけで保存するようにしたのに、この経路は行を
  * そのまま deliverWebhook へ渡していた。平文列が NULL なので
  * X-Webhook-Signature が付かないまま送られ、しかも成功として記録されていた。
+ * #940 では署名の名前と入力も統一する（X-Harness-Event-Id / Timestamp /
+ * Signature、署名入力は「時刻.イベントID.本文」）。
  *
  * ここでは差し替えなしの deliverWebhook と実際の復号を通し、送信ヘッダを
  * 直接見て署名を固定する。鍵は Worker の bindings 経由で読ませる。
@@ -96,7 +99,7 @@ describe('#650 event-bus の外向きWebhookは暗号文でも署名する', () 
   beforeEach(() => vi.clearAllMocks());
   afterEach(() => vi.unstubAllGlobals());
 
-  it('平文列がNULLで暗号文だけの行でも X-Webhook-Signature が付く', async () => {
+  it('平文列がNULLで暗号文だけの行でも X-Harness-Signature が付き、本文は共通封筒', async () => {
     const encrypted = await encryptWebhookSecret(SECRET, { current: KEY });
     const seen = captureFetch();
     await fireEvent(
@@ -107,9 +110,19 @@ describe('#650 event-bus の外向きWebhookは暗号文でも署名する', () 
       ACCOUNT,
     );
     expect(seen.calls()).toBe(1);
-    const signature = seen.headers()['X-Webhook-Signature'];
-    expect(signature).toBeDefined();
-    expect(signature).toBe(await hmacHex(SECRET, seen.body()));
+    const headers = seen.headers();
+    // 署名入力は「時刻.イベントID.生の本文」。封筒の id とヘッダの値は一致する。
+    expect(headers['X-Harness-Event-Id']).toBeDefined();
+    expect(headers['X-Harness-Timestamp']).toMatch(/^\d{10}$/);
+    expect(headers['X-Harness-Signature']).toBe(
+      `v1=${await hmacHex(SECRET, `${headers['X-Harness-Timestamp']}.${headers['X-Harness-Event-Id']}.${seen.body()}`)}`,
+    );
+    const envelope = JSON.parse(seen.body()) as Record<string, unknown>;
+    expect(envelope).toMatchObject({ type: 'friend_added', account_id: ACCOUNT, attempt: 1 });
+    expect(envelope.id).toBe(headers['X-Harness-Event-Id']);
+    expect(typeof envelope.occurred_at).toBe('string');
+    // 内部の会話資材（replyToken など）は封筒に入れない。
+    expect(seen.body()).not.toContain('replyToken');
   });
 
   it('復号できない行は署名なしで送らず、失敗として記録する(fail-closed)', async () => {
@@ -145,6 +158,9 @@ describe('#650 event-bus の外向きWebhookは暗号文でも署名する', () 
       ACCOUNT,
     );
     expect(seen.calls()).toBe(1);
-    expect(seen.headers()['X-Webhook-Signature']).toBe(await hmacHex(SECRET, seen.body()));
+    const headers = seen.headers();
+    expect(headers['X-Harness-Signature']).toBe(
+      `v1=${await hmacHex(SECRET, `${headers['X-Harness-Timestamp']}.${headers['X-Harness-Event-Id']}.${seen.body()}`)}`,
+    );
   });
 });

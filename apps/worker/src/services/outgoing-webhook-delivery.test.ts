@@ -132,26 +132,34 @@ describe('配送', () => {
 
   it('シークレットがあれば署名を付ける', async () => {
     stubFetch([200]);
-    await deliverWebhook({ ...WEBHOOK, secret: 'a'.repeat(32) }, '{}', { sleep: noSleep, lookupHost: publicOnlyLookup });
+    await deliverWebhook({ ...WEBHOOK, secret: 'a'.repeat(32) }, '{"a":1}', { sleep: noSleep, idempotencyKey: 'event-1', lookupHost: publicOnlyLookup });
     const call = vi.mocked(fetch).mock.calls[0];
     const headers = (call[1] as RequestInit).headers as Record<string, string>;
-    expect(headers['X-Webhook-Signature']).toMatch(/^[0-9a-f]{64}$/);
+    // N-372: 共通契約は X-Harness-Event-Id / X-Harness-Timestamp /
+    // X-Harness-Signature(v1=…)。署名入力は「時刻.イベントID.本文」。
+    expect(headers['X-Harness-Event-Id']).toBe('event-1');
+    expect(headers['X-Harness-Timestamp']).toMatch(/^\d{10}$/);
+    expect(headers['X-Harness-Signature']).toBe(
+      `v1=${await hmacHex('a'.repeat(32), `${headers['X-Harness-Timestamp']}.event-1.${'{"a":1}'}`)}`,
+    );
   });
 
-  it('シークレットが無ければ署名は付けない', async () => {
+  it('シークレットが無ければ署名は付けないがイベントIDと時刻は付く', async () => {
     stubFetch([200]);
-    await deliverWebhook(WEBHOOK, '{}', { sleep: noSleep, lookupHost: publicOnlyLookup });
+    await deliverWebhook(WEBHOOK, '{}', { sleep: noSleep, idempotencyKey: 'event-2', lookupHost: publicOnlyLookup });
     const call = vi.mocked(fetch).mock.calls[0];
     const headers = (call[1] as RequestInit).headers as Record<string, string>;
-    expect(headers['X-Webhook-Signature']).toBeUndefined();
+    expect(headers['X-Harness-Signature']).toBeUndefined();
+    expect(headers['X-Harness-Event-Id']).toBe('event-2');
+    expect(headers['X-Harness-Timestamp']).toMatch(/^\d{10}$/);
   });
 
-  it('同じ出来事を送り直しても受け手が二重処理を防げる配送IDを付ける', async () => {
+  it('同じ出来事を送り直しても受け手が二重処理を防げるイベントIDを付ける', async () => {
     stubFetch([200]);
     await deliverWebhook(WEBHOOK, '{}', { sleep: noSleep, idempotencyKey: 'delivery-1', lookupHost: publicOnlyLookup });
     const call = vi.mocked(fetch).mock.calls[0];
     const headers = (call[1] as RequestInit).headers as Record<string, string>;
-    expect(headers['X-Webhook-Delivery-Id']).toBe('delivery-1');
+    expect(headers['X-Harness-Event-Id']).toBe('delivery-1');
   });
 });
 
@@ -354,9 +362,10 @@ describe('送信直前の再検査', () => {
     expect(calls.map((c) => c.url)).toEqual(['https://example.com/hook', 'https://other.example/next']);
     const first = calls[0].init.headers as Record<string, string>;
     const second = calls[1].init.headers as Record<string, string>;
-    expect(first['X-Webhook-Signature']).toMatch(/^[0-9a-f]{64}$/);
-    expect(second['X-Webhook-Signature']).toBeUndefined();
-    expect(second['X-Webhook-Delivery-Id']).toBeUndefined();
+    expect(first['X-Harness-Signature']).toMatch(/^v1=[0-9a-f]{64}$/);
+    expect(second['X-Harness-Signature']).toBeUndefined();
+    expect(second['X-Harness-Event-Id']).toBeUndefined();
+    expect(second['X-Harness-Timestamp']).toBeUndefined();
     expect(second['Content-Type']).toBeUndefined();
   });
 
@@ -394,7 +403,7 @@ describe('送信直前の再検査', () => {
     );
     expect(res).toMatchObject({ ok: true, lastStatus: 200 });
     const second = calls[1].init.headers as Record<string, string>;
-    expect(second['X-Webhook-Signature']).toMatch(/^[0-9a-f]{64}$/);
+    expect(second['X-Harness-Signature']).toMatch(/^v1=[0-9a-f]{64}$/);
   });
 
   it('同一hopでpeerが分岐すれば送らない(分岐の再現)', async () => {
@@ -773,17 +782,21 @@ describe('#650 暗号文で保存されたsecretでも署名する', () => {
     return { headers: () => seen, calls: () => count };
   }
 
-  it('平文列がNULLで暗号文だけの行でも X-Webhook-Signature が付く', async () => {
+  it('平文列がNULLで暗号文だけの行でも X-Harness-Signature が付く', async () => {
     const { encryptWebhookSecret } = await import('@line-crm/db');
     const encrypted = await encryptWebhookSecret(SECRET, { current: KEY });
     const seen = captureFetch();
     const res = await deliverWebhook(
       { ...WEBHOOK, secret: null, secret_encrypted: encrypted },
       '{"a":1}',
-      { sleep: noSleep, lookupHost: publicOnlyLookup, credentialKeys: { current: KEY } },
+      { sleep: noSleep, idempotencyKey: 'event-enc-1', lookupHost: publicOnlyLookup, credentialKeys: { current: KEY } },
     );
     expect(res.ok).toBe(true);
-    expect(seen.headers()['X-Webhook-Signature']).toBe(await hmacHex(SECRET, '{"a":1}'));
+    const headers = seen.headers();
+    // 署名入力は「時刻.イベントID.本文」（要件26 §6-5）。
+    expect(headers['X-Harness-Signature']).toBe(
+      `v1=${await hmacHex(SECRET, `${headers['X-Harness-Timestamp']}.event-enc-1.${'{"a":1}'}`)}`,
+    );
   });
 
   it('復号できないときは署名なしで送らず、失敗として返す(fail-closed)', async () => {
@@ -821,7 +834,7 @@ describe('#650 暗号文で保存されたsecretでも署名する', () => {
     );
     expect(res.ok).toBe(true);
     expect(seen.calls()).toBe(1);
-    expect(seen.headers()['X-Webhook-Signature']).toBeUndefined();
+    expect(seen.headers()['X-Harness-Signature']).toBeUndefined();
   });
 });
 

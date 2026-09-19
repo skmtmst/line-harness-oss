@@ -79,6 +79,7 @@ export const INBOX_SAVED_VIEW_STATUSES = ['unread', 'in_progress', 'on_hold', 'r
 export const INBOX_SAVED_VIEW_CHANNELS = ['line', 'email'] as const;
 export const INBOX_SAVED_VIEW_SORTS = ['newest', 'waiting_desc'] as const;
 export const INBOX_SAVED_VIEW_DUE = ['all', 'overdue'] as const;
+export const INBOX_SAVED_VIEW_QUICK_FILTERS = ['all', 'reply', 'overdue'] as const;
 
 /** 受信箱専用。友だち検索の AND/OR 条件と混ぜず、版を持って移行できる形にする。 */
 export interface InboxSavedViewConditions {
@@ -88,6 +89,11 @@ export interface InboxSavedViewConditions {
   statuses: Array<(typeof INBOX_SAVED_VIEW_STATUSES)[number]>;
   assignees: string[];
   unread: 'all' | 'mine';
+  /**
+   * 一覧上部の「すべて／要返信／期限超過」。N-020 で追加。
+   * 持たない古い行は due から復元する（overdue → 'overdue'）。
+   */
+  quickFilter: (typeof INBOX_SAVED_VIEW_QUICK_FILTERS)[number];
   messageTypes: string[];
   receivedFrom: string | null;
   receivedTo: string | null;
@@ -308,6 +314,16 @@ export function validateInboxSavedViewConditions(
   if (!(INBOX_SAVED_VIEW_DUE as readonly unknown[]).includes(due)) {
     return { ok: false, error: '期限条件が正しくありません' };
   }
+  /*
+    quickFilter は N-020 で追加した軸。持たない古い行は due から復元する。
+    'overdue' は due='overdue' と同じ条件なので、保存時は両方を揃えて書く。
+  */
+  const quickFilter = input.quickFilter === undefined
+    ? (due === 'overdue' ? 'overdue' : 'all')
+    : input.quickFilter;
+  if (!(INBOX_SAVED_VIEW_QUICK_FILTERS as readonly unknown[]).includes(quickFilter)) {
+    return { ok: false, error: '絞り込み条件が正しくありません' };
+  }
   const query = typeof input.query === 'string' ? input.query.trim().slice(0, 200) : '';
   const receivedFrom = input.receivedFrom === null || typeof input.receivedFrom === 'string'
     ? input.receivedFrom as string | null
@@ -324,6 +340,7 @@ export function validateInboxSavedViewConditions(
       statuses: statuses as InboxSavedViewConditions['statuses'],
       assignees,
       unread: input.unread,
+      quickFilter: quickFilter as InboxSavedViewConditions['quickFilter'],
       messageTypes,
       receivedFrom,
       receivedTo,

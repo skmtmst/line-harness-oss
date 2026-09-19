@@ -64,7 +64,10 @@ export function savedViewSummary(
     parts.push(`対応状況：${conditions.statuses.map((s) => STATUS_LABELS[s] ?? s).join('・')}`)
   }
 
-  if (conditions.due === 'overdue') parts.push('期限：超過')
+  // 「要返信」は N-020 で保存対象になった軸。期限超過は due（旧軸）と
+  // quickFilter のどちらが立っていても出す。
+  if (conditions.quickFilter === 'reply') parts.push('要返信')
+  if (conditions.due === 'overdue' || conditions.quickFilter === 'overdue') parts.push('期限：超過')
 
   // 設計 `ASsb3` は「未読のみ」。「自分の」は担当者の軸が言っている。
   if (conditions.unread === 'mine') parts.push('未読のみ')

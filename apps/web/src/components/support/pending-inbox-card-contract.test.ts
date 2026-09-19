@@ -34,7 +34,8 @@ describe('対応が必要な受信の読込失敗', () => {
 
   it('取れていないときは読み直しを出し、再試行は既存の読込を呼ぶだけ', () => {
     const body = code(CARD)
-    expect(body).toContain('データを取得できませんでした。')
+    // N-008: 「取得できませんでした」は禁止文言。共通の読み込み失敗文言に揃える。
+    expect(body).toContain('データを{STATE_TEXT.error}。')
     expect(body).toContain('もう一度読み込む')
     expect(body).toContain('onClick={() => void load()}')
   })

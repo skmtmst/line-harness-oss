@@ -4922,6 +4922,16 @@ CREATE TABLE rich_menu_assignments (
   UNIQUE (line_account_id, friend_id)
 );
 
+CREATE TABLE rich_menu_duplicate_requests (
+  id                TEXT PRIMARY KEY,
+  account_id        TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
+  source_group_id   TEXT NOT NULL,
+  created_group_id  TEXT NOT NULL,
+  idempotency_key   TEXT NOT NULL,
+  created_at        TEXT NOT NULL,
+  UNIQUE (account_id, idempotency_key)
+);
+
 CREATE TABLE rich_menu_groups (
   id                 TEXT PRIMARY KEY,
   account_id         TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
@@ -5016,6 +5026,30 @@ CREATE TABLE rich_menu_schedules (
   updated_at            TEXT NOT NULL, attempt_count INTEGER NOT NULL DEFAULT 0 CHECK (attempt_count >= 0), next_retry_at TEXT, lease_expires_at TEXT, restore_default_state TEXT
   CHECK (restore_default_state IN ('captured', 'no_default')), restore_default_line_id TEXT,
   CHECK (mode = 'scheduled' OR ends_at IS NOT NULL),
+  UNIQUE (account_id, idempotency_key)
+);
+
+CREATE TABLE rich_menu_test_applies (
+  id                    TEXT PRIMARY KEY,
+  group_id              TEXT NOT NULL REFERENCES rich_menu_groups(id) ON DELETE CASCADE,
+  account_id            TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
+  staff_id              TEXT NOT NULL,
+  line_user_id          TEXT NOT NULL,
+  /** 適用前にその人へ出ていたLINEメニュー。無ければ NULL。戻す時の行き先。 */
+  previous_richmenu_id  TEXT,
+  /** previous を読み終えた印。0のままなら再開時に読み直す。 */
+  previous_captured     INTEGER NOT NULL DEFAULT 0,
+  /** 本人へ割り当てたメニュー(既定ページ)。公開済みなら既存ID、下書きなら lht: メニュー。 */
+  applied_richmenu_id   TEXT,
+  /** 下書きテストで作ったLINEメニューIDのJSON配列。戻す時に消す。 */
+  test_shell_ids        TEXT,
+  status                TEXT NOT NULL DEFAULT 'running'
+    CHECK (status IN ('running','applied','reverting','reverted','failed')),
+  last_error_code       TEXT,
+  idempotency_key       TEXT NOT NULL,
+  revert_idempotency_key TEXT,
+  created_at            TEXT NOT NULL,
+  updated_at            TEXT NOT NULL,
   UNIQUE (account_id, idempotency_key)
 );
 
@@ -5600,7 +5634,7 @@ CREATE TABLE staff_members (
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 , line_user_id TEXT, totp_secret_enc TEXT, totp_pending_secret_enc TEXT, totp_enabled_at TEXT, totp_last_used_step INTEGER, assigned_line_account_id TEXT REFERENCES line_accounts(id) ON DELETE SET NULL, can_access_descendant_accounts INTEGER NOT NULL DEFAULT 0, tenant_id TEXT REFERENCES tenants(id), account_scope TEXT NOT NULL DEFAULT 'all'
-  CHECK (account_scope IN ('all', 'accounts')), policy_version INTEGER NOT NULL DEFAULT 1, password_hash TEXT, password_updated_at TEXT, role_bundle TEXT, view_permission_keys TEXT, email_mask TEXT, notice_friend_id TEXT, notice_linked_at TEXT);
+  CHECK (account_scope IN ('all', 'accounts')), policy_version INTEGER NOT NULL DEFAULT 1, password_hash TEXT, password_updated_at TEXT, role_bundle TEXT, view_permission_keys TEXT, email_mask TEXT, notice_friend_id TEXT, notice_linked_at TEXT, email_change_new TEXT, email_change_token_hash TEXT, email_change_expires_at TEXT);
 
 CREATE TABLE staff_menus (
   staff_id                  TEXT NOT NULL,
@@ -7555,6 +7589,9 @@ CREATE INDEX idx_rich_menu_assignment_runs_monthly
 CREATE INDEX idx_rich_menu_assignments_group
   ON rich_menu_assignments (line_account_id, group_id);
 
+CREATE INDEX idx_rich_menu_duplicate_requests_source
+  ON rich_menu_duplicate_requests(source_group_id);
+
 CREATE INDEX idx_rich_menu_groups_account ON rich_menu_groups(account_id, status);
 
 CREATE INDEX idx_rich_menu_manual_publish_requests_group
@@ -7573,6 +7610,9 @@ CREATE INDEX idx_rich_menu_schedules_lease
 
 CREATE INDEX idx_rich_menu_schedules_retry
   ON rich_menu_schedules (status, next_retry_at);
+
+CREATE INDEX idx_rich_menu_test_applies_group
+  ON rich_menu_test_applies(group_id, staff_id, status);
 
 CREATE INDEX idx_rt_approvals_queue ON rt_approval_requests(organization_id, status, created_at DESC);
 

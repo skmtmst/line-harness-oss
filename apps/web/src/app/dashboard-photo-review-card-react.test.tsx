@@ -33,6 +33,7 @@ vi.mock('next/link', () => ({
 }))
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), refresh: vi.fn() }),
+  useSearchParams: () => new URLSearchParams(),
 }))
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({
@@ -152,8 +153,10 @@ describe('ダッシュボードの写真審査カード(#666)', () => {
     net.photos = () => Promise.resolve({ status: 500, body: { success: false, error: 'boom' } })
     await render()
     const text = photoCard().textContent ?? ''
-    expect(text).toContain('取得できません')
+    // N-008: 共通の読み込み失敗文言（STATE_TEXT.error）に揃える。
+    expect(text).toContain('読み込めませんでした')
     expect(text).not.toContain('読み込み中')
+    expect(text).not.toContain('取得できません')
   })
 
   it('勘定を切り替えたら前の勘定の件数を残さない', async () => {

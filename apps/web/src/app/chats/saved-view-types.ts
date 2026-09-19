@@ -12,6 +12,11 @@ export type InboxSavedViewConditions = {
   statuses: Array<'unread' | 'in_progress' | 'on_hold' | 'resolved'>
   assignees: string[]
   unread: 'all' | 'mine'
+  /**
+   * 一覧上部の「すべて／要返信／期限超過」。N-020 で追加。
+   * この値を持たない古い行は due から復元する（overdue → 'overdue'）。
+   */
+  quickFilter: 'all' | 'reply' | 'overdue'
   messageTypes: string[]
   receivedFrom: string | null
   receivedTo: string | null
@@ -27,6 +32,7 @@ const NOTHING_FILTERED: InboxSavedViewConditions = {
   statuses: [],
   assignees: [],
   unread: 'all',
+  quickFilter: 'all',
   messageTypes: [],
   receivedFrom: null,
   receivedTo: null,
@@ -64,6 +70,10 @@ export function normalizeSavedViewConditions(raw: unknown): InboxSavedViewCondit
     statuses: pick('statuses', ['unread', 'in_progress', 'on_hold', 'resolved'] as const),
     assignees: isStringArray(source.assignees) ? source.assignees : [],
     unread: source.unread === 'mine' ? 'mine' : 'all',
+    // 古い行は quickFilter を持たない。その場合は due から復元する。
+    quickFilter: source.quickFilter === 'reply' || source.quickFilter === 'overdue' || source.quickFilter === 'all'
+      ? source.quickFilter
+      : source.due === 'overdue' ? 'overdue' : 'all',
     messageTypes: isStringArray(source.messageTypes) ? source.messageTypes : [],
     receivedFrom: typeof source.receivedFrom === 'string' ? source.receivedFrom : null,
     receivedTo: typeof source.receivedTo === 'string' ? source.receivedTo : null,

@@ -192,7 +192,8 @@ function countFetches() {
   const fetch = async (url: unknown, init?: { headers?: Record<string, string> }) => {
     if (isDohRequest(url)) return dohResponse(url);
     count += 1;
-    seenKeys.push(init?.headers?.['Idempotency-Key'] ?? null);
+    // N-372: 外部連携Webhookの冪等キーは X-Harness-Event-Id に統一した。
+    seenKeys.push(init?.headers?.['X-Harness-Event-Id'] ?? null);
     return new Response('{}', { status: 200 });
   };
   return { fetch: fetch as typeof globalThis.fetch, count: () => count, keys: () => seenKeys };

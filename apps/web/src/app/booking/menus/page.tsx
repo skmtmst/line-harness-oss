@@ -387,14 +387,17 @@ function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuC
                       {menuPriceLabel(m)}
                     </td>
                     <td className="px-4 py-3 text-sm text-ink-secondary">
-                      {!m.is_active ? (
-                        <span className="text-warning text-xs">だれもいません</span>
-                      ) : supportingLoadState !== 'ready' ? (
+                      {/*
+                       * #953 E-05: 休止中でも担当の割当は残る。is_active を先に見て
+                       * 「だれもいません」と出すと、割当済みなのに未割当に見える。
+                       * 実際の割当をそのまま出し、0人のときだけ「担当なし」と書く。
+                       */}
+                      {supportingLoadState !== 'ready' ? (
                         <span className="text-ink-faint text-xs">—（未取得）</span>
                       ) : (menuStaff.get(m.id) ?? []).length === 0 ? (
                         // 担当が0人だと、公開していても予約フォームに枠が出ない。
                         // 「-」だと設定漏れなのか読み取れないので、はっきり書く。
-                        <span className="text-warning text-xs">担当なし</span>
+                        <span className={`${m.is_active ? 'text-warning' : 'text-ink-faint'} text-xs`}>担当なし</span>
                       ) : (
                         <span className="text-xs">{(menuStaff.get(m.id) ?? []).join('・')}</span>
                       )}

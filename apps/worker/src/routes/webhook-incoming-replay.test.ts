@@ -503,10 +503,10 @@ describe('N-365 #746 受信Webhookの再送を弾く', () => {
     ).get() as { id: string; status: string; idempotency_key: string };
     expect(queued.status).toBe('retry_wait');
 
-    // sweep が同じ冪等キー（X-Webhook-Delivery-Id）で送り直して確定する。
+    // sweep が同じ冪等キー（X-Harness-Event-Id）で送り直して確定する。
     const sentKeys: string[] = [];
     const fetchImpl = (async (_input: unknown, init?: { headers?: unknown }) => {
-      sentKeys.push(new Headers(init?.headers as HeadersInit).get('X-Webhook-Delivery-Id') ?? '');
+      sentKeys.push(new Headers(init?.headers as HeadersInit).get('X-Harness-Event-Id') ?? '');
       return new Response('', { status: 200 });
     }) as unknown as typeof fetch;
     const { sweepOutgoingWebhookDeliveries } = await import('../services/outgoing-webhook-delivery.js');

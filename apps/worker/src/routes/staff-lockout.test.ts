@@ -30,6 +30,9 @@ vi.mock('@line-crm/db', () => dbMocks);
 const inviteMocks = {
   sendStaffInviteEmail: vi.fn(),
   sendStaffLineLinkEmail: vi.fn(),
+  sendStaffEmailChangeConfirmEmail: vi.fn(),
+  sendStaffEmailChangeNoticeEmail: vi.fn(),
+  sendStaffEmailChangeCompletedEmail: vi.fn(),
 };
 vi.mock('../services/staff-invite.js', () => inviteMocks);
 
@@ -88,6 +91,9 @@ beforeEach(() => {
   dbMocks.getLineAccounts.mockResolvedValue([]);
   inviteMocks.sendStaffInviteEmail.mockResolvedValue(undefined);
   inviteMocks.sendStaffLineLinkEmail.mockResolvedValue(undefined);
+  inviteMocks.sendStaffEmailChangeConfirmEmail.mockResolvedValue(undefined);
+  inviteMocks.sendStaffEmailChangeNoticeEmail.mockResolvedValue(undefined);
+  inviteMocks.sendStaffEmailChangeCompletedEmail.mockResolvedValue(undefined);
 });
 
 describe('スタッフの店舗権限範囲', () => {
@@ -302,11 +308,30 @@ describe('スタッフ経路の統括分離', () => {
     }, 'tenant-b-staff-key');
 
     expect(res.status).toBe(200);
+    /*
+     * メール以外の本人設定(通知の好みなど)はこれまでどおり即時に書き込む。
+     * 本人のメール変更だけは N-433 の確認フローへ載る。email 列はこの場では
+     * 変えず、保留分(email_change_*)を書いて新アドレスへ確認メールを送る。
+     */
+    const { data } = await res.json() as { data: { emailChangePending?: boolean; pendingEmail?: string } };
+    expect(data.emailChangePending).toBe(true);
+    expect(data.pendingEmail).toBe('self@example.test');
     expect(dbMocks.updateStaffMember).toHaveBeenCalledWith(
       env.DB,
       'tenant-b-staff',
-      expect.objectContaining({ email: 'self@example.test' }),
+      expect.objectContaining({ notification_preferences: { security: { email: true, line: false } } }),
     );
+    expect(dbMocks.updateStaffMember).toHaveBeenCalledWith(
+      env.DB,
+      'tenant-b-staff',
+      expect.objectContaining({ email_change_new: 'self@example.test' }),
+    );
+    // email 列そのものは確定前に書き換えない。
+    for (const call of dbMocks.updateStaffMember.mock.calls) {
+      expect((call[2] as { email?: string }).email).not.toBe('self@example.test');
+    }
+    expect(inviteMocks.sendStaffEmailChangeConfirmEmail).toHaveBeenCalledOnce();
+    expect(inviteMocks.sendStaffEmailChangeNoticeEmail).toHaveBeenCalledOnce();
   });
 });
 

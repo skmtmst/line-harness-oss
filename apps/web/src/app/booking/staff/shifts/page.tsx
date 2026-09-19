@@ -9,12 +9,14 @@ import {
   ApiError,
   bookingApi,
   type BookingAvailabilitySlot,
+  type BookingException,
   type BookingResource,
   type BookingSettings,
 } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import { canEditFeature, canViewFeature } from '@/lib/staff-capability'
 import Button from '@/components/shared/button'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
 import { shortDate } from '../../lib/format-time'
 
@@ -484,6 +486,15 @@ function StoreShiftsView() {
   const [closedReason, setClosedReason] = useState('')
   const [savingClosed, setSavingClosed] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
+  // #953 E-09: 登録済みの休業日を直す・消す口。修正はカード内の小さい
+  // 入力に切り替え、削除は確認ダイアログを挟む。どちらも版付きで送る。
+  const [editingExceptionId, setEditingExceptionId] = useState<string | null>(null)
+  const [editFrom, setEditFrom] = useState('')
+  const [editTo, setEditTo] = useState('')
+  const [editReason, setEditReason] = useState('')
+  const [deleteTarget, setDeleteTarget] = useState<BookingException | null>(null)
+  const [exceptionBusy, setExceptionBusy] = useState(false)
+  const [exceptionError, setExceptionError] = useState<string | null>(null)
   const [canManageResources, setCanManageResources] = useState(false)
   // N-411: 受付枠・休業日・設備の変更はすべて 'booking.settings' の実効permission。
   // 閲覧のみの人には入力を無効化し、保存ボタンを出さない（API側も403で拒否）。
@@ -618,6 +629,70 @@ function StoreShiftsView() {
     }
   }
 
+  function exceptionFailureMessage(error: unknown, action: '保存' | '削除'): string {
+    if (error instanceof ApiError && error.status === 409) {
+      return 'ほかの担当者が先にこの休業日を変更しました。読み直してからもう一度お試しください。'
+    }
+    return action === '削除'
+      ? '休業日を消せませんでした。もう一度お試しください。'
+      : '休業日を保存できませんでした。入力内容を確かめて、もう一度お試しください。'
+  }
+
+  function startEditException(item: BookingException) {
+    setEditingExceptionId(item.id)
+    setEditFrom(item.dateFrom || item.date || '')
+    setEditTo(item.dateTo || item.date || '')
+    setEditReason(item.reason ?? item.note ?? '')
+    setExceptionError(null)
+  }
+
+  async function saveExceptionEdit(item: BookingException) {
+    if (!selectedAccountId || exceptionBusy) return
+    if (!editFrom || !editTo || editFrom > editTo) {
+      setExceptionError('開始日と終了日を正しく入れてください。')
+      return
+    }
+    setExceptionBusy(true)
+    setExceptionError(null)
+    try {
+      const response = await bookingApi.updateException(selectedAccountId, item.id, {
+        expectedVersion: item.version,
+        dateFrom: editFrom,
+        dateTo: editTo,
+        reason: editReason.trim() || null,
+      })
+      if (!response.success) throw new Error(response.error)
+      setSettings((current) => current ? {
+        ...current,
+        exceptions: current.exceptions.map((entry) => entry.id === item.id ? response.data : entry),
+      } : current)
+      setEditingExceptionId(null)
+    } catch (error) {
+      setExceptionError(exceptionFailureMessage(error, '保存'))
+    } finally {
+      setExceptionBusy(false)
+    }
+  }
+
+  async function removeException() {
+    const target = deleteTarget
+    if (!selectedAccountId || !target || exceptionBusy) return
+    setExceptionBusy(true)
+    setExceptionError(null)
+    try {
+      await bookingApi.deleteException(selectedAccountId, target.id, target.version)
+      setSettings((current) => current ? {
+        ...current,
+        exceptions: current.exceptions.filter((entry) => entry.id !== target.id),
+      } : current)
+      setDeleteTarget(null)
+    } catch (error) {
+      setExceptionError(exceptionFailureMessage(error, '削除'))
+    } finally {
+      setExceptionBusy(false)
+    }
+  }
+
   return (
     <div data-design-node="tksPc" className="space-y-4 pb-8">
       <div data-design="Head" className="flex flex-wrap items-center gap-3">
@@ -704,8 +779,38 @@ function StoreShiftsView() {
                   const to = item.dateTo || item.date || ''
                   return (
                     <div key={item.id || `${from}-${to}`} className="border-hairline rounded-control border p-3">
-                      <p className="text-ink font-semibold tabular-nums">{shortDate(from)}{from !== to ? `〜${shortDate(to)}` : ''}</p>
-                      <p className="text-ink-secondary mt-1 text-sm">{item.reason || item.note || '休業日'}</p>
+                      {editingExceptionId === item.id ? (
+                        <div className="space-y-2">
+                          <label className="text-ink-secondary block text-xs">
+                            開始日
+                            <input aria-label="休業日の開始日" type="date" value={editFrom} onChange={(event) => setEditFrom(event.target.value)} disabled={exceptionBusy} className="border-hairline rounded-control mt-1 w-full border bg-canvas px-3 py-2 text-sm" />
+                          </label>
+                          <label className="text-ink-secondary block text-xs">
+                            終了日
+                            <input aria-label="休業日の終了日" type="date" value={editTo} onChange={(event) => setEditTo(event.target.value)} disabled={exceptionBusy} className="border-hairline rounded-control mt-1 w-full border bg-canvas px-3 py-2 text-sm" />
+                          </label>
+                          <label className="text-ink-secondary block text-xs">
+                            理由
+                            <input aria-label="休業日の理由" value={editReason} onChange={(event) => setEditReason(event.target.value)} disabled={exceptionBusy} placeholder="例: お盆" className="border-hairline rounded-control mt-1 w-full border bg-canvas px-3 py-2 text-sm" />
+                          </label>
+                          {exceptionError ? <p className="text-danger text-xs" role="alert">{exceptionError}</p> : null}
+                          <div className="flex flex-wrap gap-2">
+                            <Button variant="primary" onClick={() => void saveExceptionEdit(item)} disabled={exceptionBusy}>{exceptionBusy ? '保存中…' : '休業日を保存'}</Button>
+                            <Button onClick={() => { setEditingExceptionId(null); setExceptionError(null) }} disabled={exceptionBusy}>やめる</Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          <p className="text-ink font-semibold tabular-nums">{shortDate(from)}{from !== to ? `〜${shortDate(to)}` : ''}</p>
+                          <p className="text-ink-secondary mt-1 text-sm">{item.reason || item.note || '休業日'}</p>
+                          {canEditSettings ? (
+                            <div className="mt-2 flex gap-3 text-xs">
+                              <button type="button" className="text-accent font-semibold underline" onClick={() => startEditException(item)}>修正する</button>
+                              <button type="button" className="text-danger font-semibold underline" onClick={() => { setDeleteTarget(item); setExceptionError(null) }}>削除する</button>
+                            </div>
+                          ) : null}
+                        </>
+                      )}
                     </div>
                   )
                 })}
@@ -815,6 +920,22 @@ function StoreShiftsView() {
           </aside>
         </div>
       )}
+      {/* #953 E-09: 休業日の削除は元に戻せないため、確認を1枚挟む。 */}
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        title="この休業日を消しますか？"
+        description="消すと、その期間は曜日の決めごとどおりの受付に戻ります。すでに入っている予約はそのまま残ります。"
+        confirmLabel="休業日を消す"
+        destructive
+        busy={exceptionBusy}
+        error={exceptionError ?? undefined}
+        onCancel={() => {
+          if (exceptionBusy) return
+          setDeleteTarget(null)
+          setExceptionError(null)
+        }}
+        onConfirm={() => void removeException()}
+      />
     </div>
   )
 }

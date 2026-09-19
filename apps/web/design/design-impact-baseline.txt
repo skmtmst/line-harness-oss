@@ -95,6 +95,7 @@ shared-button-importer app/nen-campaigns/page.tsx
 shared-button-importer app/nen-members/page.tsx
 shared-button-importer app/nen-members/photo-publications.tsx
 shared-button-importer app/nen-members/photo-review-detail.tsx
+shared-button-importer app/notifications/page.tsx
 shared-button-importer app/ops/announcements/page.tsx
 shared-button-importer app/ops/audit/page.tsx
 shared-button-importer app/ops/dashboard/page.tsx
@@ -117,11 +118,15 @@ shared-button-importer app/reminders/new/page.tsx
 shared-button-importer app/reminders/page.tsx
 shared-button-importer app/rich-menus/connections/page.tsx
 shared-button-importer app/rich-menus/edit/page.tsx
+# #356 (board #898-#904): 公開履歴の再試行・照合、テスト適用の操作に共通Buttonを使う。
+shared-button-importer app/rich-menus/edit/publish-history.tsx
+shared-button-importer app/rich-menus/edit/test-apply-section.tsx
 shared-button-importer app/rich-menus/new/page.tsx
 shared-button-importer app/rich-menus/page.tsx
 shared-button-importer app/scenarios/detail/scenario-detail-client.tsx
 shared-button-importer app/scenarios/page.tsx
 shared-button-importer app/scenarios/results/page.tsx
+shared-button-importer app/staff/email-change/page.tsx
 shared-button-importer app/staff/invite/page.tsx
 shared-button-importer app/staff/page.tsx
 shared-button-importer app/settings/manual-links/page.tsx

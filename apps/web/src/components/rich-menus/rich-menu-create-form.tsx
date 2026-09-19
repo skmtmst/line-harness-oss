@@ -4,6 +4,7 @@ import { useMemo, useState, type ReactNode } from 'react'
 import Button from '@/components/shared/button'
 import SelectField from '@/components/shared/select-field'
 import StepTrail from '@/components/shared/step-trail'
+import ConditionBuilder from '@/components/shared/condition-builder'
 import { AreaProperties } from './area-properties'
 import type { Area } from './canvas-editor'
 import {
@@ -13,6 +14,7 @@ import {
   unsetAreaLabels,
 } from './action-drafts'
 import { SIZE_DIMENSIONS, TEMPLATES, type RichMenuTemplate } from '@/lib/rich-menu-templates'
+import type { SegmentCondition } from '@/lib/segment-condition'
 import type { RichMenuAreaIntent } from '@line-crm/shared'
 
 export type RichMenuOption = { id: string; name: string }
@@ -26,10 +28,36 @@ export type RichMenuCreateValue = {
   templateKey: string
   folderId: string
   areaDraftsByTemplate: Record<string, Area[]>
+  /**
+   * N-161: 作成の時点で決める「どのページを最初に見せるか」。
+   * ページの orderIndex（0 がトップ）。タブを増やしたあとで減らしたときは
+   * 範囲内へ丸める。
+   */
+  defaultPageIndex: number
+  /**
+   * N-161: 「公開したら全員の既定メニューにする」か。
+   * 出し分け（targetingEnabled）と両立しないため、出し分けを選んだらOFF固定。
+   */
+  isDefaultForAll: boolean
+  /** N-161: 出す相手の条件。有効にするなら targetingCondition が必須。 */
+  targetingEnabled: boolean
+  targetingCondition: SegmentCondition | null
+  /** N-161: 複数の条件に当てはまったときの優先順（0 がいちばん先）。 */
+  targetingPriority: number
 }
 
 export const STORE_NEW_MENU_INTENTS: RichMenuAreaIntent[] = [
   'url', 'text', 'template', 'form', 'tel', 'postback',
+]
+
+/**
+ * N-161: 新規作成ではページ切替もここで決める。
+ * 統括ひな形（STORE_NEW_MENU_INTENTS）には switch を足さない。
+ * 配布形式が切替を保持できないため（hq-rich-menu-create.ts で保存時に断る）。
+ */
+export const NEW_MENU_INTENTS_WITH_SWITCH: RichMenuAreaIntent[] = [
+  ...STORE_NEW_MENU_INTENTS,
+  'switch',
 ]
 
 export function freshRichMenuCreateValue(): RichMenuCreateValue {
@@ -41,6 +69,11 @@ export function freshRichMenuCreateValue(): RichMenuCreateValue {
     templateKey: TEMPLATES[0].key,
     folderId: '',
     areaDraftsByTemplate: {},
+    defaultPageIndex: 0,
+    isDefaultForAll: false,
+    targetingEnabled: false,
+    targetingCondition: null,
+    targetingPriority: 0,
   }
 }
 
@@ -93,6 +126,12 @@ type Props = {
   disabled?: boolean
   compatibilityError?: string | null
   validationError?: string | null
+  /**
+   * N-161: 「最初に見せるページ・出す相手・全員既定」の入力を出すか。
+   * 統括ひな形（HQ）はこの3つを保存できないため、そこでは付けない。
+   * 出したまま保存先に無いと、入力が黙って捨てられる。
+   */
+  audienceSetup?: boolean
   imageAction?: ReactNode
   footer?: ReactNode
 }
@@ -109,6 +148,7 @@ export default function RichMenuCreateForm({
   disabled = false,
   compatibilityError,
   validationError,
+  audienceSetup = false,
   imageAction,
   footer,
 }: Props) {
@@ -127,6 +167,19 @@ export default function RichMenuCreateForm({
   const unsetLabels = unsetAreaLabels(currentAreas)
   const locked = disabled || Boolean(compatibilityError)
   const patch = (next: Partial<RichMenuCreateValue>) => onChange({ ...value, ...next })
+
+  /*
+   * N-161: 作成前はページに実IDがない。切替ボタンの行き先と既定ページは
+   * orderIndex（= ここでは文字列化した番号）で持ち、送信時に
+   * actionData.targetPageIndex / defaultPageIndex へ写す。
+   */
+  const createPages = useMemo(
+    () => Array.from({ length: value.tabCount + 1 }, (_, index) => ({
+      id: String(index),
+      name: index === 0 ? 'トップ' : `タブ ${String.fromCharCode(65 + index - 1)}`,
+    })),
+    [value.tabCount],
+  )
 
   function changeSize(size: 'large' | 'compact') {
     const first = TEMPLATES.find((item) => item.size === size)
@@ -198,7 +251,7 @@ export default function RichMenuCreateForm({
           <div>
             <span className="text-ink-secondary mb-1 block text-sm font-medium">切替タブの数</span>
             <p className="text-ink-faint mb-2 text-xs">タブでほかのメニューへ移れます。切り替えが要らないときは「なし」。</p>
-            <div className="flex flex-wrap gap-2">{[0, 1, 2, 3].map((count) => <button key={count} type="button" disabled={locked} aria-pressed={value.tabCount === count} onClick={() => patch({ tabCount: count })} className={`rounded-control border px-4 py-2 text-xs font-semibold ${value.tabCount === count ? 'border-accent bg-accent-soft text-accent' : 'border-transparent bg-canvas text-ink-secondary'}`}>{count === 0 ? 'なし' : `${count}つ`}</button>)}</div>
+            <div className="flex flex-wrap gap-2">{[0, 1, 2, 3].map((count) => <button key={count} type="button" disabled={locked} aria-pressed={value.tabCount === count} onClick={() => patch({ tabCount: count, defaultPageIndex: Math.min(value.defaultPageIndex, count) })} className={`rounded-control border px-4 py-2 text-xs font-semibold ${value.tabCount === count ? 'border-accent bg-accent-soft text-accent' : 'border-transparent bg-canvas text-ink-secondary'}`}>{count === 0 ? 'なし' : `${count}つ`}</button>)}</div>
           </div>
 
           <div>
@@ -209,14 +262,102 @@ export default function RichMenuCreateForm({
             </div>
           </div>
 
+          {/*
+            N-161: 切替・既定・出し分けを作成の時点で決める。
+            ここで決めないと「下書きを作ったのに公開できる形になっていない」
+            未完の作業が編集画面へ隠れてしまう。
+          */}
+          <section className="border-hairline rounded-card space-y-4 border p-4" hidden={!audienceSetup}>
+            <h2 className="text-ink text-sm font-bold">最初に見せるページと、出す相手</h2>
+            <div className="grid gap-4 sm:grid-cols-2">
+              {value.tabCount > 0 ? (
+                <div>
+                  <label className="text-ink-secondary mb-1 block text-sm font-medium" htmlFor="rich-menu-default-page">最初に見せるページ</label>
+                  <SelectField
+                    id="rich-menu-default-page"
+                    aria-label="最初に見せるページ"
+                    value={String(value.defaultPageIndex)}
+                    disabled={locked}
+                    onChange={(event) => patch({ defaultPageIndex: Number(event.target.value) })}
+                    options={createPages.map((page) => ({ value: page.id, label: page.name }))}
+                  />
+                  <p className="text-ink-faint mt-1 text-xs">タブを切り替えていない人が最初に見るページです。</p>
+                </div>
+              ) : null}
+              <div>
+                <span className="text-ink-secondary mb-1 block text-sm font-medium">出す相手</span>
+                <div className="space-y-2">
+                  <label className="flex items-start gap-2 text-sm">
+                    <input type="radio" name="create-audience" className="mt-1" checked={!value.targetingEnabled} disabled={locked} onChange={() => patch({ targetingEnabled: false })} />
+                    <span><span className="text-ink font-medium">すべての友だち</span><span className="text-ink-faint block text-xs">ほかの出し分けに当てはまらなかった人へ出ます</span></span>
+                  </label>
+                  <label className="flex items-start gap-2 text-sm">
+                    <input type="radio" name="create-audience" className="mt-1" checked={value.targetingEnabled} disabled={locked} onChange={() => patch({ targetingEnabled: true, isDefaultForAll: false })} />
+                    <span><span className="text-ink font-medium">条件に当てはまる友だちだけ</span><span className="text-ink-faint block text-xs">当てはまらない人には、これより下のメニューが出ます</span></span>
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            {value.targetingEnabled ? (
+              <div className="border-hairline grid gap-4 rounded-control border p-3 sm:grid-cols-2">
+                <div>
+                  <span className="text-ink-secondary text-xs font-medium">条件</span>
+                  <div className="mt-1">
+                    <ConditionBuilder
+                      value={value.targetingCondition}
+                      onChange={(condition) => patch({ targetingCondition: condition })}
+                      label="条件"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="text-ink-secondary text-xs font-medium" htmlFor="create-targeting-priority">出す順番</label>
+                  <div className="mt-1 flex items-center gap-2">
+                    <input
+                      id="create-targeting-priority"
+                      aria-label="出す順番"
+                      type="number"
+                      min={1}
+                      disabled={locked}
+                      value={value.targetingPriority + 1}
+                      onChange={(event) => patch({ targetingPriority: Math.max(0, Number(event.target.value) - 1) })}
+                      className="border-hairline rounded-control w-20 border px-3 py-2 text-sm"
+                    />
+                    <span className="text-ink-secondary text-xs">番目</span>
+                  </div>
+                  <p className="text-ink-faint mt-1 text-xs">ほかの出し分けにも当てはまる人には、順番が早いメニューが出ます。</p>
+                </div>
+              </div>
+            ) : null}
+
+            <label className={`flex items-start gap-2 text-sm ${value.targetingEnabled ? 'opacity-50' : ''}`}>
+              <input
+                type="checkbox"
+                className="mt-1"
+                checked={value.isDefaultForAll}
+                disabled={locked || value.targetingEnabled}
+                onChange={(event) => patch({ isDefaultForAll: event.target.checked })}
+              />
+              <span>
+                <span className="text-ink font-medium">公開したら「すべての友だち」の既定メニューにする</span>
+                <span className="text-ink-faint block text-xs">
+                  {value.targetingEnabled
+                    ? '出し分けを選んだメニューは全員の既定にはできません。'
+                    : '公開のときにLINEの既定へ設定します。ほかに既定のメニューがある場合は入れ替わります。'}
+                </span>
+              </span>
+            </label>
+          </section>
+
           <div className="grid gap-4 sm:grid-cols-2">
             <section><h2 className="text-ink-secondary text-sm font-medium">トークを開いたとき</h2><p className="text-ink-faint mt-2 text-xs leading-5">メニューを開いた状態・閉じた状態の指定は、下書き保存後の編集画面で設定します。</p></section>
-            <section><h2 className="text-ink-secondary text-sm font-medium">画像</h2>{imageAction ?? <Button href="/contents" className="mt-2">登録メディアから選ぶ</Button>}<p className="text-ink-faint mt-2 text-xs">{SIZE_DIMENSIONS.large.width} × {SIZE_DIMENSIONS.large.height}px ／ 1MBまで・JPG・PNG</p><p className="text-ink-faint mt-1 text-micro">選んだ画像は下書き保存後の編集画面で登録します。</p></section>
+            <section><h2 className="text-ink-secondary text-sm font-medium">画像</h2>{imageAction ?? <Button href="/contents" className="mt-2">登録メディアから選ぶ</Button>}<p className="text-ink-faint mt-2 text-xs">{SIZE_DIMENSIONS.large.width} × {SIZE_DIMENSIONS.large.height}px ／ 1MBまで・JPG・PNG</p><p className="text-ink-faint mt-1 text-micro">選んだ画像は下書きの最初に見せるページへ登録します。</p></section>
           </div>
 
           <section className="border-hairline bg-canvas-sunken rounded-card border p-4">
             <h2 className="text-ink mb-3 text-sm font-bold">押した面ごとの動き</h2>
-            <div className="space-y-2">{currentAreas.map((area, index) => <div key={area.id}><div className="border-hairline bg-canvas flex items-center gap-3 rounded-control border px-3 py-2 text-xs"><strong className="text-ink flex h-6 w-6 items-center justify-center rounded-control border border-hairline">{String.fromCharCode(65 + index)}</strong><span className="text-ink-secondary">{isAreaActionConfigured(area) ? area.label || 'アクション設定済み' : 'アクションを実行'}</span><button type="button" disabled={locked} onClick={() => openAreaEditor(index)} className={`ml-auto font-semibold ${isAreaActionConfigured(area) ? 'text-accent' : 'text-danger'}`}>{isAreaActionConfigured(area) ? '設定を変更する' : 'アクションを設定する'}</button></div>{editingAreaIndex === index && editingArea ? <div className="border-hairline bg-canvas mt-2 rounded-control border p-4"><AreaProperties area={editingArea} pages={[]} tags={tags} templates={templates} forms={forms} trackedLinks={trackedLinks} taps={null} showManagementDetails={false} allowedIntents={allowedIntents} onUpdate={(areaPatch) => setEditingArea((current) => current ? { ...current, ...areaPatch } : current)} /><div className="mt-4 flex justify-end gap-2"><Button type="button" onClick={() => { setEditingAreaIndex(null); setEditingArea(null) }}>キャンセル</Button><Button type="button" variant="primary" onClick={saveEditingArea}>この面の設定を保存</Button></div></div> : null}</div>)}</div>
+            <div className="space-y-2">{currentAreas.map((area, index) => <div key={area.id}><div className="border-hairline bg-canvas flex items-center gap-3 rounded-control border px-3 py-2 text-xs"><strong className="text-ink flex h-6 w-6 items-center justify-center rounded-control border border-hairline">{String.fromCharCode(65 + index)}</strong><span className="text-ink-secondary">{isAreaActionConfigured(area) ? area.label || 'アクション設定済み' : 'アクションを実行'}</span><button type="button" disabled={locked} onClick={() => openAreaEditor(index)} className={`ml-auto font-semibold ${isAreaActionConfigured(area) ? 'text-accent' : 'text-danger'}`}>{isAreaActionConfigured(area) ? '設定を変更する' : 'アクションを設定する'}</button></div>{editingAreaIndex === index && editingArea ? <div className="border-hairline bg-canvas mt-2 rounded-control border p-4"><AreaProperties area={editingArea} pages={createPages} tags={tags} templates={templates} forms={forms} trackedLinks={trackedLinks} taps={null} showManagementDetails={false} allowedIntents={allowedIntents} onUpdate={(areaPatch) => setEditingArea((current) => current ? { ...current, ...areaPatch } : current)} /><div className="mt-4 flex justify-end gap-2"><Button type="button" onClick={() => { setEditingAreaIndex(null); setEditingArea(null) }}>キャンセル</Button><Button type="button" variant="primary" onClick={saveEditingArea}>この面の設定を保存</Button></div></div> : null}</div>)}</div>
             <p className={`mt-3 text-xs font-semibold ${unsetLabels.length > 0 ? 'text-danger' : 'text-success'}`}>{currentAreas.length === 0 ? '面を追加し、公開前にそれぞれのアクションを設定してください。' : unsetLabels.length > 0 ? `面 ${unsetLabels.join('、')} のアクションが未設定です。公開すると、その場所を押しても何も起きません。` : 'すべての面にアクションが設定されています。'}</p>
           </section>
         </div>

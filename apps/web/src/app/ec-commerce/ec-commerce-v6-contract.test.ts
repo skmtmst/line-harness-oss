@@ -71,12 +71,17 @@ describe('V6 EC integration screens', () => {
     expect(connector).not.toContain('inbound_secret_encrypted')
   })
 
-  it('shows connector impact without a retry policy line (matches the null production value)', () => {
+  it('shows connector impact scoped to EC triggers plus an always-visible retry note', () => {
     // #517 中5b: つなぎ先単位のやり直し方針は本番で常に null。モックだけが
     // 別の文言を返していたので、モックを null に揃え、画面の死に分岐を消した。
+    // #948 N-320: 影響件数はEC起点の設定だけを数え、行ごとに範囲を添える。
+    // やり直しかたは値に依存せず常時表示する(実行単位の手動やり直しへの行き先)。
     const mockApi = readFileSync(join(import.meta.dirname, '..', '..', '..', '..', '..', 'scripts', 'visual-qa', 'mock-api.mjs'), 'utf8')
     expect(connector).toContain('Object.values(data?.impact ?? {})')
-    expect(connector).toContain('このつなぎ先を止めると影響する設定・集計です。NEN配信・マイル・友だち属性は全体の件数です。')
+    expect(connector).toContain('「ECの出来事がきっかけ」とあるものは、このつなぎ先を止めると止まります。コンバージョンと分析はアカウント全体の記録数です。')
+    expect(connector).toContain("'ECの出来事がきっかけ'")
+    expect(connector).toContain("'アカウント全体'")
+    expect(connector).toContain('失敗した処理のやり直しは「取り込みの記録」タブで一件ずつ「もう一度やる」から行います。')
     expect(connector).not.toContain('data?.retryPolicy')
     expect(connector).not.toContain('やり直しの決めごと')
     expect(connector).not.toContain('いま影響件数を数える口は未接続です')
