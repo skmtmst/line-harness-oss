@@ -21,6 +21,7 @@ import {
   createFunnelResultAudience,
   createAnalyticsCrossRun,
   getAnalyticsCrossRun,
+  addConversionDefinitionUsage,
   createAnalyticsCrossAudience,
   getCurrentFunnelVersion,
   getAnalyticsFriendsOverview,
@@ -814,6 +815,64 @@ analytics.get('/api/funnels', async (c) => {
 });
 
 // V6: 作成時点の段・期間・比較条件を第1版として固定する。
+/**
+ * N-256/N-258: 段に「成果」が入ったファネルを保存したら、成果地点側の
+ * 「使う場所」台帳へこのファネルを実IDで記す。
+ *
+ * 段の中の conversionPointId は作る側で確かめ済み(同じアカウントの
+ * 実在する地点のみ通る)。台帳への記録は成果地点の版でCASするので、
+ * 途中で地点が編集されていたら版を読み直して1回だけやり直す。
+ * ここが失敗してもファネル自体は作れているので、ログを残して
+ * 作成の成功は変えない。
+ */
+async function registerFunnelConversionUsages(
+  db: D1Database,
+  lineAccountId: string,
+  funnelId: string,
+  refVersionId: string | null,
+  steps: ReadonlyArray<{ kind: string; match?: Record<string, string> }> | undefined,
+  staffId: string,
+): Promise<void> {
+  const pointIds = [...new Set(
+    (steps ?? [])
+      .filter((step) => step.kind === 'conversion' && typeof step.match?.conversionPointId === 'string')
+      .map((step) => step.match!.conversionPointId),
+  )];
+  for (const pointId of pointIds) {
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      try {
+        const point = await db
+          .prepare('SELECT version FROM conversion_points WHERE id = ?')
+          .bind(pointId)
+          .first<{ version: number }>();
+        if (!point) break;
+        await addConversionDefinitionUsage(db, {
+          conversionPointId: pointId,
+          lineAccountId,
+          expectedVersion: Number(point.version),
+          refKind: 'analytics',
+          refId: funnelId,
+          refVersionId,
+          staffId,
+        });
+        break;
+      } catch (error) {
+        // instanceof ではなく code を見る。テストでモジュールごと差し替わる
+        // 経路でも、版競合のやり直し1回だけが働く形にする。
+        const code = (error as { code?: string } | null)?.code;
+        if (code === 'version_conflict' && attempt === 0) {
+          continue;
+        }
+        console.error('conversion usage registration failed:', {
+          funnelId, conversionPointId: pointId,
+          reason: error instanceof Error ? error.message : String(error),
+        });
+        break;
+      }
+    }
+  }
+}
+
 analytics.get('/api/analytics/funnels', async (c) => {
   try {
     const account = await resolveAccount(c);
@@ -865,6 +924,14 @@ analytics.post('/api/analytics/funnels', requireRole('owner', 'admin'), async (c
       createdBy: c.get('staff').id,
       createdAt: new Date().toISOString(),
     });
+    await registerFunnelConversionUsages(
+      c.env.DB,
+      account.accountId,
+      created.funnelId,
+      created.version.id,
+      created.version.steps,
+      c.get('staff').id,
+    );
     return c.json({ success: true, data: created }, 201);
   } catch (error) {
     const status = funnelErrorStatus(error);
@@ -919,6 +986,14 @@ analytics.post('/api/analytics/funnels/:id/versions', requireRole('owner', 'admi
       createdBy: c.get('staff').id,
       createdAt: new Date().toISOString(),
     });
+    await registerFunnelConversionUsages(
+      c.env.DB,
+      account.accountId,
+      c.req.param('id'),
+      version.id,
+      version.steps,
+      c.get('staff').id,
+    );
     return c.json({ success: true, data: version }, 201);
   } catch (error) {
     const status = funnelErrorStatus(error);

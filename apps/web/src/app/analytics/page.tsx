@@ -22,6 +22,7 @@ import {
 } from '@/lib/api'
 import KpiCard from '@/components/shared/kpi-card'
 import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
+import { useSearchParams } from 'next/navigation'
 import Button from '@/components/shared/button'
 import Breadcrumb from '@/components/shared/breadcrumb'
 import Chip, { type ChipTone } from '@/components/shared/chip'
@@ -981,7 +982,16 @@ function CrossTab({ accountId, canManage }: { accountId: string; canManage: bool
   )
 }
 
-function FunnelTab({ accountId, canManage }: { accountId: string; canManage: boolean }) {
+function FunnelTab({ accountId, canManage, presetConversion }: {
+  accountId: string
+  canManage: boolean
+  /*
+   * N-256: 「使う場所を足す」から渡された成果地点。指定があれば新規作成を
+   * 開き、その地点を「成果」段へ入れた状態にする。IDは実IDなので、
+   * 保存すればそのまま参照として使える。
+   */
+  presetConversion?: { id: string; name: string } | null
+}) {
   const [funnels, setFunnels] = useState<
     Array<{
       id: string
@@ -1005,6 +1015,10 @@ function FunnelTab({ accountId, canManage }: { accountId: string; canManage: boo
   // あるものを無いと勘違いして作り直す(点検#508の中3)。
   const [listError, setListError] = useState('')
   const [creating, setCreating] = useState(false)
+  // N-256: 成果地点一覧からの受け渡し。作れる権限があるときだけ作成を開く。
+  useEffect(() => {
+    if (presetConversion?.id && canManage) setCreating(true)
+  }, [presetConversion?.id, canManage])
   const [picked, setPicked] = useState<number | null>(null)
   const [funnelDays, setFunnelDays] = useState(30)
   const [audienceSelection, setAudienceSelection] = useState<'reached' | 'stopped' | 'in_progress'>('stopped')
@@ -1298,6 +1312,7 @@ function FunnelTab({ accountId, canManage }: { accountId: string; canManage: boo
         <FunnelForm
           accountId={accountId}
           edit={editTarget ?? undefined}
+          presetConversion={editTarget ? null : presetConversion}
           onCancel={() => {
             setCreating(false)
             setEditTarget(null)
@@ -1748,6 +1763,7 @@ function FunnelForm({
   onCancel,
   onCreated,
   edit,
+  presetConversion,
 }: {
   accountId: string
   onCancel: () => void
@@ -1764,6 +1780,11 @@ function FunnelForm({
     segment: unknown
     comparisonGroups: unknown[]
   }
+  /*
+   * N-256: 成果地点の一覧から「使う場所を足す」で飛んできたとき、
+   * その地点を2段目の「成果」段へ実IDで入れておく。
+   */
+  presetConversion?: { id: string; name: string } | null
 }) {
   const [name, setName] = useState(edit?.name ?? '')
   // 何日以内の通過で数えるか(点検#508軽11)。裏は1〜365日を受け付ける。
@@ -1776,7 +1797,11 @@ function FunnelForm({
   }>>(
     edit?.steps.map((s) => ({ label: s.label, kind: s.kind, value: s.value, matchBase: s.match })) ?? [
       { label: '', kind: 'tag', value: '' },
-      { label: '', kind: 'conversion', value: '' },
+      {
+        label: presetConversion?.name ?? '',
+        kind: 'conversion',
+        value: presetConversion?.id ?? '',
+      },
     ],
   )
   const [saving, setSaving] = useState(false)
@@ -1859,6 +1884,11 @@ function FunnelForm({
 
   return (
     <div className="bg-canvas rounded-card border-hairline mb-5 space-y-4 border p-5">
+      {presetConversion && !edit ? (
+        <p className="border-info bg-info-bg text-info rounded-control border px-3 py-2 text-xs font-semibold" role="status">
+          成果地点「{presetConversion.name}」を2段目に入れています。このまま段を組んで作成すると、その成果地点を使う分析として登録されます。
+        </p>
+      ) : null}
       <div>
         <label htmlFor="fn-name" className="text-ink-secondary mb-1 block text-sm font-medium">
           名前
@@ -2806,6 +2836,16 @@ function SavedAnalyticsTab({ accountId, onCountChange, canManage }: {
 
 function AnalyticsInner() {
   const tab = useMergedTab(TABS)
+  /*
+   * N-256: 成果地点の一覧から「使う場所を足す」で渡された地点を
+   * ファネル作成へ引き渡す。`?tab=funnel&conversionPointId=…` が入口。
+   */
+  const params = useSearchParams()
+  const presetConversionId = params.get('conversionPointId')
+  const presetConversionName = params.get('conversionPointName') ?? ''
+  const presetConversion = presetConversionId
+    ? { id: presetConversionId, name: presetConversionName }
+    : null
   const { selectedAccountId, loading: accountLoading } = useAccount()
   const [canManage, setCanManage] = useState(false)
   const [savedCount, setSavedCount] = useState<number | null>(null)
@@ -2855,7 +2895,9 @@ function AnalyticsInner() {
       {tab === 'cross' && (
         <CrossTab key={selectedAccountId} accountId={selectedAccountId} canManage={canManage} />
       )}
-      {tab === 'funnel' && <FunnelTab accountId={selectedAccountId} canManage={canManage} />}
+      {tab === 'funnel' && (
+        <FunnelTab accountId={selectedAccountId} canManage={canManage} presetConversion={presetConversion} />
+      )}
       {tab === 'url-clicks' && <UrlClicksOverviewTab accountId={selectedAccountId} />}
       {tab === 'saved' && <SavedAnalyticsTab accountId={selectedAccountId} onCountChange={setSavedCount} canManage={canManage} />}
     </div>

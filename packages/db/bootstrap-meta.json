@@ -392,7 +392,9 @@
     "431_auto_reply_stop_and_soft_delete.sql",
     "432_friend_scenario_pause_reason.sql",
     "433_scenario_test_send_claims.sql",
-    "434_friend_scenario_op_request_fingerprint.sql"
+    "434_friend_scenario_op_request_fingerprint.sql",
+    "435_conversion_tenant_boundary.sql",
+    "436_outgoing_webhook_deliveries.sql"
   ],
-  "migrationCount": 393
+  "migrationCount": 395
 }

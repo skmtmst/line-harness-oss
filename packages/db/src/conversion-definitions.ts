@@ -1,4 +1,6 @@
+import { DEFAULT_TENANT_ID } from '@line-crm/shared';
 import { jstNow } from './utils.js';
+import { resolveConversionPointTenantId } from './conversions.js';
 
 export type ConversionDefinitionStatus = 'active' | 'stopped';
 export type ConversionDefinitionSort = 'count_desc' | 'value_desc' | 'updated_desc' | 'name_asc';
@@ -152,6 +154,42 @@ export class ConversionDefinitionError extends Error {
   ) {
     super(message);
     this.name = 'ConversionDefinitionError';
+  }
+}
+
+/**
+ * 利用先の実在確認(N-258)。
+ *
+ * `ref_kind` ごとの参照表を決め打ちし、存在しないIDや別アカウントの
+ * オブジェクトを利用先として保存させない。画面が出す候補と同じ台帳を
+ * サーバー側でも確かめる。アカウント列を持たない参照(NEN配信)は
+ * アカウントに属さない共通設定なので、存在だけを見る。
+ */
+const USAGE_REF_CHECKS: Record<ConversionDefinitionUsageKind, { sql: string; accountScoped: boolean }> = {
+  affiliate_offer: { sql: `SELECT id FROM affiliate_offers WHERE id = ? AND (line_account_id IS NULL OR line_account_id = ?)`, accountScoped: true },
+  analytics: { sql: `SELECT id FROM funnels WHERE id = ? AND (line_account_id IS NULL OR line_account_id = ?)`, accountScoped: true },
+  auto_reply: { sql: `SELECT id FROM auto_replies WHERE id = ? AND (line_account_id IS NULL OR line_account_id = ?)`, accountScoped: true },
+  scenario: { sql: `SELECT id FROM scenarios WHERE id = ? AND (line_account_id IS NULL OR line_account_id = ?)`, accountScoped: true },
+  nen_campaign: { sql: `SELECT campaign_key AS id FROM nen_campaign_settings WHERE campaign_key = ?`, accountScoped: false },
+  mileage_rule: { sql: `SELECT id FROM mileage_rules WHERE id = ? AND (line_account_id IS NULL OR line_account_id = ?)`, accountScoped: true },
+  automation: { sql: `SELECT id FROM automations WHERE id = ? AND (line_account_id IS NULL OR line_account_id = ?)`, accountScoped: true },
+  ad_platform: { sql: `SELECT id FROM ad_platforms WHERE id = ? AND (line_account_id IS NULL OR line_account_id = ?)`, accountScoped: true },
+};
+
+async function assertUsageRefExists(
+  db: D1Database,
+  usage: { refKind: ConversionDefinitionUsageKind; refId: string },
+  lineAccountId: string,
+): Promise<void> {
+  const check = USAGE_REF_CHECKS[usage.refKind];
+  const binds = check.accountScoped ? [usage.refId, lineAccountId] : [usage.refId];
+  const found = await db.prepare(check.sql).bind(...binds).first<{ id: string }>();
+  if (!found) {
+    throw new ConversionDefinitionError(
+      'usage_ref_not_found',
+      '利用先が見つかりません。消えた・別のアカウントの利用先は選べません。一覧を読み直してください',
+      400,
+    );
   }
 }
 
@@ -471,6 +509,9 @@ export async function addConversionDefinitionUsage(
     return { created: false, usage: serializeUsage(existing), currentVersion: Number(point.version) };
   }
 
+  // N-258: 実在しない・別アカウントの利用先は保存しない。
+  await assertUsageRefExists(db, input, input.lineAccountId);
+
   const id = crypto.randomUUID();
   const now = jstNow();
   let result: D1Result<unknown>;
@@ -542,20 +583,25 @@ export async function createConversionDefinition(
   if (duplicate) {
     throw new ConversionDefinitionError('duplicate_name', '同じ名前の成果地点があります', 409);
   }
+  // N-258: 実在しない・別アカウントの利用先を仮IDのまま保存しない。
+  for (const usage of input.usages) {
+    await assertUsageRefExists(db, usage, input.lineAccountId);
+  }
   const id = crypto.randomUUID();
   const now = jstNow();
+  const tenantId = await resolveConversionPointTenantId(db, input.lineAccountId);
   const value = input.valueMode === 'fixed' ? input.fixedValue ?? null : null;
   const statements = [
     db.prepare(`INSERT INTO conversion_points
       (id, name, event_type, value, measure_method, target_url, count_repeat,
-       attribution_days, line_account_id, source_config_json, deduplication_mode,
+       attribution_days, line_account_id, tenant_id, source_config_json, deduplication_mode,
        deduplication_window_days, value_mode, reversal_policy, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
       .bind(
         id, input.name, input.sourceType, value, input.measureMethod,
         input.measureMethod === 'url_reach' ? input.targetUrl ?? null : null,
         input.deduplicationMode === 'every' ? 1 : 0,
-        input.attributionDays ?? null, input.lineAccountId, JSON.stringify(input.sourceConfig),
+        input.attributionDays ?? null, input.lineAccountId, tenantId, JSON.stringify(input.sourceConfig),
         input.deduplicationMode, input.deduplicationMode === 'window'
           ? input.deduplicationWindowDays ?? null : null,
         input.valueMode, input.reversalPolicy, now, now,
@@ -579,29 +625,150 @@ export type PreviewConversionDefinitionInput = {
   scope: ConversionDefinitionScope;
   lineAccountId: string;
   sourceType: string;
+  /** 保存される起点設定。url_reach のURL一致など、試算にも同じ条件を使う(N-257)。 */
+  sourceConfig?: Record<string, unknown>;
+  measureMethod?: 'url_reach' | 'webhook' | 'manual';
+  targetUrl?: string | null;
   deduplicationMode: ConversionDeduplicationMode;
   deduplicationWindowDays?: number | null;
   valueMode: ConversionValueMode;
   fixedValue?: number | null;
+  reversalPolicy?: ConversionReversalPolicy;
   range: ConversionDefinitionRange;
 };
+
+/**
+ * window方式の「数える」回数を、記録時と同じ規則で過去データへあてはめる。
+ *
+ * trackConversion の窓は「直近 windowDays 以内に記録済みがあれば書かない」。
+ * 試算では過去の成果列を時系列に読み、最後に数えた時刻から
+ * windowDays 経ったものだけを数える(先に数えたものが基準になる
+ * greedy方式。前の生イベントではなく前の「数えた」イベントとの差で決まる)。
+ */
+function estimateWindowDedupCount(
+  rows: ReadonlyArray<{ friend_id: string; created_at: string }>,
+  windowDays: number,
+): number {
+  const windowMs = windowDays * 86_400_000;
+  const lastCounted = new Map<string, number>();
+  let count = 0;
+  for (const row of rows) {
+    const at = new Date(`${row.created_at.replace(' ', 'T')}+09:00`).getTime();
+    if (Number.isNaN(at)) continue;
+    const last = lastCounted.get(row.friend_id);
+    if (last === undefined || at - last > windowMs) {
+      lastCounted.set(row.friend_id, at);
+      count += 1;
+    }
+  }
+  return count;
+}
+
+/**
+ * 取消の試算(N-257)。reversalPolicy = source_cancelled のときだけ、
+ * 同じ起点条件の過去成果に対する取消台帳の件数を数える。
+ * 台帳(affiliate_adjustments 系)が無い環境では 0 を返す。
+ */
+async function estimateCancellationCount(
+  db: D1Database,
+  conditionsSql: string,
+  conditionValues: unknown[],
+  from: string,
+  to: string,
+): Promise<number> {
+  const tables = await db
+    .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name IN ('affiliate_adjustments','affiliate_reward_entries')")
+    .all<{ name: string }>();
+  if (tables.results.length < 2) return 0;
+  const row = await db.prepare(`SELECT COUNT(*) AS total
+    FROM affiliate_adjustments aa
+    JOIN affiliate_reward_entries re ON re.id = aa.source_entry_id
+    JOIN conversion_events ce ON ce.id = re.conversion_event_id
+    JOIN conversion_points cp ON cp.id = ce.conversion_point_id
+    WHERE aa.reason_type = 'cancel' AND aa.created_at >= ? AND aa.created_at <= ?
+      AND ${conditionsSql}`)
+    .bind(from, to, ...conditionValues)
+    .first<{ total: number }>();
+  return Number(row?.total ?? 0);
+}
 
 export async function previewConversionDefinition(
   db: D1Database,
   input: PreviewConversionDefinitionInput,
 ) {
   const account = accountWhere('cp.', input.scope, input.lineAccountId);
+  /*
+   * N-257: 試算は「保存したときと同じ条件」で数える。
+   *
+   * 直す前は起点種別・期間・アカウントだけを見ていたため、url_reach の
+   * 対象URLや窓つき重複除外を変えても同じ数字が返っていた。
+   * - url_reach: 同じ対象URLを見ていた地点の成果だけを数える。
+   * - それ以外の起点: 対象URLを持たない地点の成果だけを数える
+   *   (URL条件のある地点の成果を混ぜない)。
+   */
+  const conditions = [`cp.event_type = ?`, `ce.created_at >= ?`, `ce.created_at <= ?`];
+  const values: unknown[] = [input.sourceType, input.range.from, input.range.to];
+  if (input.measureMethod === 'url_reach' || input.targetUrl) {
+    conditions.push(`cp.target_url = ?`);
+    values.push(input.targetUrl ?? '');
+  } else {
+    conditions.push(`(cp.target_url IS NULL OR cp.target_url = '')`);
+  }
+  conditions.push(account.sql);
+  values.push(...account.values);
+  const where = conditions.join(' AND ');
+
   const row = await db.prepare(`SELECT COUNT(ce.id) AS matched_count,
       COUNT(DISTINCT ce.friend_id) AS unique_friends,
       COALESCE(SUM(COALESCE(ce.value_snapshot, 0)), 0) AS source_value
     FROM conversion_events ce
     JOIN conversion_points cp ON cp.id = ce.conversion_point_id
-    WHERE cp.event_type = ? AND ce.created_at >= ? AND ce.created_at <= ? AND ${account.sql}`)
-    .bind(input.sourceType, input.range.from, input.range.to, ...account.values)
+    WHERE ${where}`)
+    .bind(...values)
     .first<{ matched_count: number; unique_friends: number; source_value: number }>();
   const matchedCount = Number(row?.matched_count ?? 0);
   const uniqueFriends = Number(row?.unique_friends ?? 0);
-  const estimatedCount = input.deduplicationMode === 'every' ? matchedCount : uniqueFriends;
+
+  let estimatedCount: number;
+  if (input.deduplicationMode === 'every') {
+    estimatedCount = matchedCount;
+  } else if (input.deduplicationMode === 'window'
+    && Number.isInteger(input.deduplicationWindowDays)
+    && (input.deduplicationWindowDays as number) >= 1) {
+    // 窓つきは「友だちごと」のまとめではなく時系列が要るので生の行を読む。
+    const rows = await db.prepare(`SELECT ce.friend_id, ce.created_at
+      FROM conversion_events ce
+      JOIN conversion_points cp ON cp.id = ce.conversion_point_id
+      WHERE ${where}
+      ORDER BY ce.friend_id ASC, ce.created_at ASC, ce.id ASC`)
+      .bind(...values)
+      .all<{ friend_id: string; created_at: string }>();
+    estimatedCount = estimateWindowDedupCount(rows.results, input.deduplicationWindowDays as number);
+  } else {
+    estimatedCount = uniqueFriends;
+  }
+
+  const cancellationCount = input.reversalPolicy === 'source_cancelled'
+    ? await estimateCancellationCount(
+        db,
+        `cp.event_type = ? AND ${input.measureMethod === 'url_reach' || input.targetUrl ? `cp.target_url = ?` : `(cp.target_url IS NULL OR cp.target_url = '')`} AND ${account.sql}`,
+        input.measureMethod === 'url_reach' || input.targetUrl
+          ? [input.sourceType, input.targetUrl ?? '', ...account.values]
+          : [input.sourceType, ...account.values],
+        input.range.from,
+        input.range.to,
+      )
+    : 0;
+
+  const excludedReasons: string[] = [];
+  if (matchedCount === 0) excludedReasons.push('選んだ起点の過去データがありません');
+  // 除外条件は人が読む注記で、記録条件ではない。過去データへ適用できない
+  // ことを隠さず画面へ返す(入力したのに試算へ反映されないと見えない)。
+  if (typeof input.sourceConfig?.excludedCondition === 'string'
+    && input.sourceConfig.excludedCondition.trim()) {
+    excludedReasons.push('「数えない条件」は保存後の記録に効く注記のため、試算では全件を対象にしています');
+  }
+
   const sourceAverage = matchedCount > 0 ? Number(row?.source_value ?? 0) / matchedCount : 0;
   const unitValue = input.valueMode === 'fixed'
     ? Number(input.fixedValue ?? 0)
@@ -612,8 +779,8 @@ export async function previewConversionDefinition(
     estimatedCount,
     estimatedValue: Math.round(estimatedCount * unitValue),
     duplicateExcludedCount: Math.max(0, matchedCount - estimatedCount),
-    cancellationCount: 0,
-    excludedReasons: matchedCount === 0 ? ['選んだ起点の過去データがありません'] : [],
+    cancellationCount,
+    excludedReasons,
     dailyAverage: Math.round((estimatedCount / 30) * 10) / 10,
     deduplicationWindowDays: input.deduplicationMode === 'window'
       ? input.deduplicationWindowDays ?? null : null,
@@ -630,11 +797,26 @@ export async function getConversionDefinitionDeleteImpact(
   const eventRow = await db.prepare('SELECT COUNT(*) AS total FROM conversion_events WHERE conversion_point_id = ?')
     .bind(id).first<{ total: number }>();
   const account = accountWhere('cp.', scope, undefined);
+  /*
+   * N-261: 差替え候補は同じ種類の成果地点だけを出す。
+   * 起点の種類・計測方法・対象URLが違う地点へ利用先を移すと、
+   * 利用先が見ているものと別の意味の成果を数え始める。
+   * 候補一覧が本実行と同じ条件で絞られていれば、画面で違う種類を
+   * 選ぶこと自体が起きない。
+   */
   const replacements = await db.prepare(`SELECT cp.id, cp.name, cp.version
     FROM conversion_points cp
-    WHERE cp.id <> ? AND cp.status = 'active' AND ${account.sql}
+    WHERE cp.id <> ? AND cp.status = 'active'
+      AND cp.event_type = ? AND cp.measure_method = ? AND cp.target_url IS ?
+      AND ${account.sql}
     ORDER BY cp.name ASC LIMIT 20`)
-    .bind(id, ...account.values)
+    .bind(
+      id,
+      definition.sourceType,
+      definition.measureMethod,
+      definition.targetUrl,
+      ...account.values,
+    )
     .all<{ id: string; name: string; version: number }>();
   const eventCount = Number(eventRow?.total ?? 0);
   return {
@@ -657,9 +839,14 @@ async function currentDefinitionForMutation(
   db: D1Database,
   id: string,
   scope: ConversionDefinitionScope,
-): Promise<{ id: string; version: number; status: ConversionDefinitionStatus; line_account_id: string | null } | null> {
+): Promise<{
+  id: string; version: number; status: ConversionDefinitionStatus;
+  line_account_id: string | null;
+  event_type: string; measure_method: string; target_url: string | null;
+} | null> {
   const account = accountWhere('cp.', scope, undefined);
-  return db.prepare(`SELECT cp.id, cp.version, cp.status, cp.line_account_id
+  return db.prepare(`SELECT cp.id, cp.version, cp.status, cp.line_account_id,
+      cp.event_type, cp.measure_method, cp.target_url
     FROM conversion_points cp WHERE cp.id = ? AND ${account.sql}`)
     .bind(id, ...account.values)
     .first();
@@ -896,6 +1083,25 @@ export async function replaceConversionDefinitionUsages(
   if (source!.line_account_id !== replacement!.line_account_id) {
     throw new ConversionDefinitionError('account_mismatch', '同じLINEアカウントの成果地点を選んでください', 409);
   }
+  /*
+   * N-261: 種類の違う成果地点へは差し替えられない。
+   * 起点の種類・計測方法・対象URLが一致する地点だけを置き換え先にする。
+   * 違う種類へ利用先を移すと、「注文が確定した成果」を見ていた分析が
+   * いきなり「ページを見た成果」を数え始めるような取り違えになる。
+   * 事前検査だけでは同時更新に負けることがあるので、同じ条件は後段の
+   * CAS文の EXISTS にも入れてある。
+   */
+  if (
+    source!.event_type !== replacement!.event_type
+    || source!.measure_method !== replacement!.measure_method
+    || source!.target_url !== replacement!.target_url
+  ) {
+    throw new ConversionDefinitionError(
+      'incompatible_source_type',
+      '同じ種類の成果地点を選んでください。起点・計測方法・対象ページが同じ地点にだけ差し替えられます',
+      409,
+    );
+  }
   const usageRow = await db.prepare('SELECT COUNT(*) AS total FROM conversion_definition_usages WHERE conversion_point_id = ?')
     .bind(input.id).first<{ total: number }>();
   const affectedUsages = Number(usageRow?.total ?? 0);
@@ -915,8 +1121,18 @@ export async function replaceConversionDefinitionUsages(
             AND replacement.status = 'active' AND replacement.id <> source.id
             AND (replacement.line_account_id = source.line_account_id
               OR (replacement.line_account_id IS NULL AND source.line_account_id IS NULL))
+            -- N-263: 統括も同じ1文で確かめる。アカウントが一致すれば統括も
+            -- 一致するのが筋だが、移行前の行や手直しでズレた行を置換先に
+            -- しないよう、ここでも閉じておく。
+            AND COALESCE(replacement.tenant_id, ?) = COALESCE(source.tenant_id, ?)
+            -- N-261: 種類の一致も同じ1文で確かめる。事前検査とCASの間で
+            -- 置換先が別種へ編集されても、ここで0件に倒れて移らない。
+            AND replacement.event_type = source.event_type
+            AND replacement.measure_method = source.measure_method
+            AND replacement.target_url IS source.target_url
         )`)
-      .bind(now, now, input.id, input.expectedVersion, input.replacementId, input.replacementExpectedVersion),
+      .bind(now, now, input.id, input.expectedVersion, input.replacementId, input.replacementExpectedVersion,
+        DEFAULT_TENANT_ID, DEFAULT_TENANT_ID),
     db.prepare(`INSERT INTO conversion_definition_operations
       (id, conversion_point_id, action, replacement_id, affected_usages, reason, performed_by, created_at)
       SELECT ?, ?, 'replace', ?, ?, ?, ?, ? WHERE changes() = 1`)

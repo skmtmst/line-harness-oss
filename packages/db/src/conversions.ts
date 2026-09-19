@@ -1,3 +1,4 @@
+import { DEFAULT_TENANT_ID } from '@line-crm/shared';
 import { boundedListLimit, jstNow, nonNegativeListOffset, toJstString } from './utils.js';
 import { resolveAffiliateAttribution } from './affiliate-attribution.js';
 // =============================================================================
@@ -21,6 +22,11 @@ export interface ConversionPoint {
   attribution_days: number | null;
   /** 集計対象を1アカウントに絞る場合。NULL なら全アカウント */
   line_account_id: string | null;
+  /**
+   * 所属する統括(N-263)。アカウントを絞っていない地点も必ずどこかの
+   * 統括に属する。移行435より前の行は既定の統括へ寄せてある。
+   */
+  tenant_id: string | null;
   /** 画面からの更新・利用先追加で使う楽観ロック版。 */
   version: number;
   /** 重複の数え方。window のときだけ deduplication_window_days を見る。 */
@@ -52,6 +58,8 @@ export interface ConversionEvent {
   /** 計測したときの成果地点の版（N-252）。移行377より前の行は NULL。 */
   point_version_snapshot: number | null;
   idempotency_key: string | null;
+  /** 計測したときの地点の統括(N-263)。移行435より前の行は既定の統括。 */
+  tenant_id: string | null;
 }
 
 // ── Conversion Points CRUD ──────────────────────────────────────────────────
@@ -105,19 +113,39 @@ export interface CreateConversionPointInput extends ConversionPointOptions {
   value?: number | null;
 }
 
+/**
+ * 地点の統括を決める(N-263)。
+ *
+ * アカウントを絞る地点はそのアカウントの統括に従う。絞らない地点は
+ * 既定の統括に属する——未割当行を見られるのが既定の統括だけという
+ * 画面側の決めごとと同じ帰結にして、「どこにも属さない地点」を作らない。
+ */
+export async function resolveConversionPointTenantId(
+  db: D1Database,
+  lineAccountId: string | null | undefined,
+): Promise<string> {
+  if (!lineAccountId) return DEFAULT_TENANT_ID;
+  const account = await db
+    .prepare('SELECT tenant_id FROM line_accounts WHERE id = ?')
+    .bind(lineAccountId)
+    .first<{ tenant_id: string | null }>();
+  return account?.tenant_id ?? DEFAULT_TENANT_ID;
+}
+
 export async function createConversionPoint(
   db: D1Database,
   input: CreateConversionPointInput,
 ): Promise<ConversionPoint> {
   const id = crypto.randomUUID();
   const now = jstNow();
+  const tenantId = await resolveConversionPointTenantId(db, input.lineAccountId);
 
   await db
     .prepare(
       `INSERT INTO conversion_points
          (id, name, event_type, value, measure_method, target_url,
-          count_repeat, attribution_days, line_account_id, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          count_repeat, attribution_days, line_account_id, tenant_id, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       id,
@@ -129,6 +157,7 @@ export async function createConversionPoint(
       input.countRepeat === false ? 0 : 1,
       input.attributionDays ?? null,
       input.lineAccountId ?? null,
+      tenantId,
       now,
       now,
     )
@@ -196,7 +225,12 @@ export async function updateConversionPoint(
   if ('targetUrl' in input) put('target_url', input.targetUrl ?? null);
   if (input.countRepeat !== undefined) put('count_repeat', input.countRepeat ? 1 : 0);
   if ('attributionDays' in input) put('attribution_days', input.attributionDays ?? null);
-  if ('lineAccountId' in input) put('line_account_id', input.lineAccountId ?? null);
+  if ('lineAccountId' in input) {
+    put('line_account_id', input.lineAccountId ?? null);
+    // N-263: 所属アカウントを移したら統括も移す。古い統括のまま残すと、
+    // 移管先の統括の友だちへ記録できず、元の統括へは記録し続ける穴になる。
+    put('tenant_id', await resolveConversionPointTenantId(db, input.lineAccountId));
+  }
   if (sets.length === 0) return getConversionPointById(db, id);
   sets.push('version = version + 1');
   put('updated_at', jstNow());
@@ -238,6 +272,10 @@ export async function getUrlReachConversionPoints(
   url: string,
   lineAccountId: string | null,
 ): Promise<ConversionPoint[]> {
+  // N-263: 統括も一致条件にする。アカウントを絞っていない地点でも
+  // tenant_id を持つので、リンクのアカウントの統括と同じ地点だけを返せば、
+  // 「全アカウント対象の地点が別の統括のリンクで反応する」ことがない。
+  // アカウントが取れないリンクは既定の統括に倒す(fail-closed)。
   const result = await db
     .prepare(
       `SELECT * FROM conversion_points
@@ -246,9 +284,11 @@ export async function getUrlReachConversionPoints(
           AND target_url IS NOT NULL
           AND target_url != ''
           AND ? LIKE target_url || '%'
-          AND (line_account_id IS NULL OR line_account_id = ?)`,
+          AND (line_account_id IS NULL OR line_account_id = ?)
+          AND COALESCE(tenant_id, ?) = COALESCE(
+            (SELECT tenant_id FROM line_accounts WHERE id = ?), ?)`,
     )
-    .bind(url, lineAccountId)
+    .bind(url, lineAccountId, DEFAULT_TENANT_ID, lineAccountId, DEFAULT_TENANT_ID)
     .all<ConversionPoint>();
   return result.results;
 }
@@ -338,13 +378,24 @@ const JST_DAY_MS = 86_400_000;
  * (全アカウント対象)のときだけ交差を許可する。それ以外は地点と
  * 友だちが同じアカウントのときだけ記録できる。両方を見られる職員でも
  * 交差記録はできない。
+ *
+ * N-263: 統括を渡したときは統括の一致も条件にする。NULL(未割当)は
+ * 既定の統括に倒すので、「どこにも属さない」側がすり抜けない。
+ * 統括を渡さない呼び出しは従来どおりアカウント一致だけを見る。
  */
 export function canRecordConversion(
   pointLineAccountId: string | null,
   friendLineAccountId: string | null,
+  pointTenantId?: string | null,
+  friendTenantId?: string | null,
 ): boolean {
-  if (pointLineAccountId === null) return true;
-  return pointLineAccountId === friendLineAccountId;
+  if (pointLineAccountId !== null && pointLineAccountId !== friendLineAccountId) {
+    return false;
+  }
+  if (pointTenantId !== undefined || friendTenantId !== undefined) {
+    return (pointTenantId ?? DEFAULT_TENANT_ID) === (friendTenantId ?? DEFAULT_TENANT_ID);
+  }
+  return true;
 }
 
 /**
@@ -438,16 +489,24 @@ export async function trackConversion(
 
   const [point, friend] = await Promise.all([
     getConversionPointById(db, input.conversionPointId),
-    db.prepare('SELECT line_account_id FROM friends WHERE id = ?')
+    db.prepare(`SELECT f.line_account_id, la.tenant_id
+      FROM friends f LEFT JOIN line_accounts la ON la.id = f.line_account_id
+      WHERE f.id = ?`)
       .bind(input.friendId)
-      .first<{ line_account_id: string | null }>(),
+      .first<{ line_account_id: string | null; tenant_id: string | null }>(),
   ]);
   if (!point) throw new Error('conversion_point_not_found');
   if (!friend) throw new Error('conversion_friend_not_found');
   if (point.status === 'stopped') throw new Error('conversion_point_stopped');
   // 管理API・公開 /t/:linkId・将来のcallerすべてに同じ境界を適用する。
-  // 地点が全アカウント対象(NULL)の場合だけ、別accountの友だちを許可する。
-  if (!canRecordConversion(point.line_account_id, friend.line_account_id)) {
+  // アカウントの一致に加えて統括の一致も見る(N-263)。地点が全アカウント
+  // 対象(NULL)でも、別の統括の友だちへは記録しない。
+  if (!canRecordConversion(
+    point.line_account_id,
+    friend.line_account_id,
+    point.tenant_id,
+    friend.tenant_id,
+  )) {
     throw new Error('conversion_account_mismatch');
   }
 
@@ -488,14 +547,17 @@ export async function trackConversion(
     measuredValue(point),
     point.version,
     input.idempotencyKey ?? null,
+    // 記録時点の地点の統括を写す(N-263)。後で地点が編集・移管されても
+    // 計測当時の所属が分かるようにする。
+    point.tenant_id ?? DEFAULT_TENANT_ID,
   ];
   try {
     if (policy.kind === 'every') {
       await db.prepare(`INSERT INTO conversion_events
         (id, conversion_point_id, friend_id, user_id, affiliate_code, metadata, created_at,
          affiliate_id, attributed_ref_code, approval_status, point_name_snapshot,
-         event_type_snapshot, value_snapshot, point_version_snapshot, idempotency_key)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+         event_type_snapshot, value_snapshot, point_version_snapshot, idempotency_key, tenant_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
         .bind(...eventValues)
         .run();
     } else {
@@ -546,8 +608,8 @@ export async function trackConversion(
       const insertIfClaimed = db.prepare(`INSERT INTO conversion_events
           (id, conversion_point_id, friend_id, user_id, affiliate_code, metadata, created_at,
            affiliate_id, attributed_ref_code, approval_status, point_name_snapshot,
-           event_type_snapshot, value_snapshot, point_version_snapshot, idempotency_key)
-        SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+           event_type_snapshot, value_snapshot, point_version_snapshot, idempotency_key, tenant_id)
+        SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
          WHERE EXISTS (
            SELECT 1 FROM conversion_event_dedup_claims
             WHERE conversion_point_id = ? AND friend_id = ? AND last_event_id = ?

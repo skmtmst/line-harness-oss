@@ -89,6 +89,11 @@ export interface OutgoingWebhookRow {
   consecutive_failures: number;
   /** 最後に失敗した時刻。成功すると NULL に戻る */
   last_failed_at: string | null;
+  /**
+   * 連続失敗で自動停止した時刻(#938)。手動停止(NULL)と区別する。
+   * 運用者が再有効化すると NULL に戻る。
+   */
+  auto_stopped_at?: string | null;
   line_account_id?: string | null;
   created_at: string;
   updated_at: string;
@@ -957,7 +962,13 @@ export async function updateOutgoingWebhook(
     values.push(await encryptWebhookSecret(updates.secret, keys));
     sets.push('secret = NULL');
   }
-  if (updates.isActive !== undefined) { sets.push('is_active = ?'); values.push(updates.isActive ? 1 : 0); }
+  if (updates.isActive !== undefined) {
+    sets.push('is_active = ?');
+    values.push(updates.isActive ? 1 : 0);
+    // 再有効化は「自動停止の記録」を消す。止まった事実は連続失敗数と
+    // 通知センターの履歴に残る(#938)。
+    if (updates.isActive) sets.push('auto_stopped_at = NULL');
+  }
   if (updates.maxRetries !== undefined) { sets.push('max_retries = ?'); values.push(updates.maxRetries); }
   if (sets.length === 0) return;
   sets.push('updated_at = ?');

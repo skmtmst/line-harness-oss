@@ -21,6 +21,7 @@ import {
   CONVERSION_SOURCE_TYPES,
   recordConversionSourceEvent,
 } from '../src/conversion-event-sources.js';
+import { DEFAULT_TENANT_ID } from '@line-crm/shared';
 import { asD1 } from './d1-test-helper.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -43,14 +44,16 @@ beforeEach(() => {
   sqlite = new Database(SCHEMA_TEMPLATE);
   sqlite.pragma('foreign_keys = OFF');
   sqlite.exec(`
-    INSERT OR IGNORE INTO tenants (id, name) VALUES ('tenant-1', 'T1');
+    INSERT OR IGNORE INTO tenants (id, name) VALUES ('tenant-1', 'T1'), ('${DEFAULT_TENANT_ID}', '既定');
     INSERT INTO line_accounts
       (id, channel_id, name, channel_access_token, channel_secret, tenant_id, is_active)
     VALUES ('account-1', 'ch-1', 'A店', 'tok-1', 'sec-1', 'tenant-1', 1),
-           ('account-9', 'ch-9', 'B店', 'tok-9', 'sec-9', 'tenant-1', 1);
+           ('account-9', 'ch-9', 'B店', 'tok-9', 'sec-9', 'tenant-1', 1),
+           ('account-d', 'ch-d', '既定統括の店', 'tok-d', 'sec-d', '${DEFAULT_TENANT_ID}', 1);
     INSERT INTO friends (id, line_user_id, line_account_id, display_name, is_following)
     VALUES ('friend-1', 'U-1', 'account-1', '一郎', 1),
-           ('friend-9', 'U-9', 'account-9', '別店の人', 1);
+           ('friend-9', 'U-9', 'account-9', '別店の人', 1),
+           ('friend-d', 'U-d', 'account-d', '既定の人', 1);
   `);
   db = asD1(sqlite);
 });
@@ -63,21 +66,25 @@ afterEach(() => {
 function addPoint(
   id: string,
   eventType: string,
-  over: { status?: string; accountId?: string | null } = {},
+  over: { status?: string; accountId?: string | null; tenantId?: string | null } = {},
 ): void {
+  const accountId = over.accountId === undefined ? 'account-1' : over.accountId;
+  /*
+   * 実装は地点作成時に tenant_id を必ず埋める(N-263)。試験データも同じ形にする:
+   * アカウントを絞る地点はそのアカウントの統括、絞らない地点は既定の統括。
+   */
+  const tenantId = over.tenantId !== undefined
+    ? over.tenantId
+    : accountId === null || accountId === 'account-d'
+      ? DEFAULT_TENANT_ID
+      : 'tenant-1';
   sqlite
     .prepare(
       `INSERT INTO conversion_points
-         (id, name, event_type, value, status, measure_method, count_repeat, line_account_id)
-       VALUES (?, ?, ?, 1000, ?, 'webhook', 1, ?)`,
+         (id, name, event_type, value, status, measure_method, count_repeat, line_account_id, tenant_id)
+       VALUES (?, ?, ?, 1000, ?, 'webhook', 1, ?, ?)`,
     )
-    .run(
-      id,
-      id,
-      eventType,
-      over.status ?? 'active',
-      over.accountId === undefined ? 'account-1' : over.accountId,
-    );
+    .run(id, id, eventType, over.status ?? 'active', accountId, tenantId);
 }
 
 function eventsFor(pointId: string): number {
@@ -103,9 +110,8 @@ describe('コンバージョン起点の実イベント接続', () => {
     }
   });
 
-  it('ほかのアカウントの地点は数えず全店共通の地点は拾う', async () => {
+  it('ほかのアカウントの地点は数えない', async () => {
     addPoint('point-other', 'form_submitted', { accountId: 'account-9' });
-    addPoint('point-common', 'form_submitted', { accountId: null });
     addPoint('point-mine', 'form_submitted');
 
     const result = await recordConversionSourceEvent(db, {
@@ -115,10 +121,33 @@ describe('コンバージョン起点の実イベント接続', () => {
       sourceEventId: 'sub-1',
     });
 
-    expect(result.matched).toBe(2);
+    expect(result.matched).toBe(1);
     expect(eventsFor('point-mine')).toBe(1);
-    expect(eventsFor('point-common')).toBe(1);
     expect(eventsFor('point-other')).toBe(0);
+  });
+
+  it('全店共通の地点は同じ統括の友だちだけを拾い、別統括をまたがない', async () => {
+    // アカウントを絞らない地点は既定の統括に属する(N-263)。
+    // tenant-1 の友だちには反応せず、既定統括の友だちには反応する。
+    addPoint('point-common', 'form_submitted', { accountId: null });
+
+    const crossTenant = await recordConversionSourceEvent(db, {
+      sourceType: 'form_submitted',
+      lineAccountId: 'account-1',
+      friendId: 'friend-1',
+      sourceEventId: 'sub-cross',
+    });
+    expect(crossTenant.matched).toBe(0);
+    expect(eventsFor('point-common')).toBe(0);
+
+    const sameTenant = await recordConversionSourceEvent(db, {
+      sourceType: 'form_submitted',
+      lineAccountId: 'account-d',
+      friendId: 'friend-d',
+      sourceEventId: 'sub-same',
+    });
+    expect(sameTenant.matched).toBe(1);
+    expect(eventsFor('point-common')).toBe(1);
   });
 
   it('申告アカウントと友だちの所属が違えば数えない', async () => {

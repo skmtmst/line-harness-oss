@@ -13,11 +13,12 @@ const migration = readFileSync(
 function setup(): Database.Database {
   const sqlite = new Database(':memory:');
   sqlite.exec(`
+    CREATE TABLE line_accounts (id TEXT PRIMARY KEY, tenant_id TEXT);
     CREATE TABLE conversion_points (
       id TEXT PRIMARY KEY, name TEXT NOT NULL, event_type TEXT NOT NULL, value REAL,
       measure_method TEXT NOT NULL DEFAULT 'manual', target_url TEXT,
       count_repeat INTEGER NOT NULL DEFAULT 1, attribution_days INTEGER,
-      line_account_id TEXT, version INTEGER NOT NULL DEFAULT 1,
+      line_account_id TEXT, tenant_id TEXT, version INTEGER NOT NULL DEFAULT 1,
       created_at TEXT NOT NULL
     );
     CREATE TABLE conversion_events (

@@ -361,9 +361,11 @@ describe('一括の成果登録は主経路と同じ4つのsnapshotを凍結す�
     testDb = createTestD1();
     addAccount(testDb.raw, 'account-1');
     insertFriend(testDb.raw, 'friend-1', { line_account_id: 'account-1', is_following: 1 });
+    // N-263: 実装は地点作成時にアカウントの統括を tenant_id へ写す。
+    // 試験データも同じ形にする(account-1 は統括 'default')。
     testDb.raw.prepare(
-      `INSERT INTO conversion_points (id, name, event_type, value, line_account_id, version)
-       VALUES ('point-718', '成約', 'manual', 5000, 'account-1', 3)`,
+      `INSERT INTO conversion_points (id, name, event_type, value, line_account_id, version, tenant_id)
+       VALUES ('point-718', '成約', 'manual', 5000, 'account-1', 3, 'default')`,
     ).run();
   });
 
@@ -378,7 +380,7 @@ describe('一括の成果登録は主経路と同じ4つのsnapshotを凍結す�
 
     const row = testDb.raw.prepare(
       `SELECT point_name_snapshot, event_type_snapshot, value_snapshot,
-              point_version_snapshot, affiliate_id
+              point_version_snapshot, affiliate_id, tenant_id
          FROM conversion_events WHERE conversion_point_id = 'point-718'`,
     ).get() as {
       point_name_snapshot: string | null;
@@ -386,6 +388,7 @@ describe('一括の成果登録は主経路と同じ4つのsnapshotを凍結す�
       value_snapshot: number | null;
       point_version_snapshot: number | null;
       affiliate_id: string | null;
+      tenant_id: string | null;
     };
     expect(row).toEqual({
       point_name_snapshot: '成約',
@@ -393,6 +396,8 @@ describe('一括の成果登録は主経路と同じ4つのsnapshotを凍結す�
       value_snapshot: 5000,
       point_version_snapshot: 3,
       affiliate_id: null,
+      // N-263: 記録した成果にも計測時の統括を写す。
+      tenant_id: 'default',
     });
 
     const total = testDb.raw.prepare(
@@ -400,6 +405,25 @@ describe('一括の成果登録は主経路と同じ4つのsnapshotを凍結す�
          FROM conversion_events WHERE conversion_point_id = 'point-718'`,
     ).get() as { netCount: number; netValue: number };
     expect(total).toEqual({ netCount: 1, netValue: 5000 });
+  });
+
+  it('統括の違う地点と友だちの組合せでは成果を書かない(N-263)', async () => {
+    // 直接INSERTで来る経路なので、行を作る側の境界だけでなく
+    // 書き込み側でも閉じる。地点の統括が友だちの所属と違えば失敗にする。
+    testDb.raw.prepare(
+      `INSERT INTO conversion_points (id, name, event_type, value, line_account_id, version, tenant_id)
+       VALUES ('point-cross', '越境', 'manual', 100, 'account-1', 1, 'other-tenant')`,
+    ).run();
+    const created = await startFriendBulkRun(testDb.db, staff, {
+      selection: { kind: 'explicit', friendIds: ['friend-1'] },
+      operation: { kind: 'add_conversion', conversionPointId: 'point-cross' },
+      idempotencyKey: crypto.randomUUID(), now: NOW,
+    });
+    expect(await processFriendBulkRun(testDb.db, created.run.id, { now: NOW }))
+      .toMatchObject({ status: 'failed' });
+    expect(testDb.raw.prepare(
+      `SELECT COUNT(*) AS n FROM conversion_events WHERE conversion_point_id = 'point-cross'`,
+    ).get()).toEqual({ n: 0 });
   });
 });
 

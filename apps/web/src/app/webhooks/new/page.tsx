@@ -113,14 +113,14 @@ export default function NewWebhookPage() {
       <Field
         label="失敗したときの送り直し"
         htmlFor="wh-retries"
-        note="相手が 5xx を返したときや、つながらなかったときに送り直します。0.5秒・1秒・2秒…と間隔を空け、上限は5回です。相手が 4xx を返した場合は送り直しません。"
+        note="相手が 5xx を返したときや、つながらなかったときに送り直します。1分・5分・30分…と間隔を空け、上限は7回です。相手が 4xx を返した場合は送り直しません。"
       >
         <div className="flex items-center gap-1.5">
           <input
             id="wh-retries"
             type="number"
             min={0}
-            max={5}
+            max={7}
             value={maxRetries}
             onChange={(event) => setMaxRetries(event.target.value)}
             className={`${inputClass} w-24 tabular-nums`}

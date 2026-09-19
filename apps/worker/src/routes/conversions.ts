@@ -486,10 +486,15 @@ conversions.post('/api/conversions/definitions/preview', conversionPermission('e
       scope: scope.value,
       lineAccountId: definition.lineAccountId,
       sourceType: definition.sourceType,
+      // N-257: 保存と同じ一式を渡し、URL・窓・取消条件も試算へ反映する。
+      sourceConfig: definition.sourceConfig,
+      measureMethod: definition.measureMethod,
+      targetUrl: definition.targetUrl,
       deduplicationMode: definition.deduplicationMode,
       deduplicationWindowDays: definition.deduplicationWindowDays,
       valueMode: definition.valueMode,
       fixedValue: definition.fixedValue,
+      reversalPolicy: definition.reversalPolicy,
       range: range.range,
     });
     return c.json({ success: true, data });

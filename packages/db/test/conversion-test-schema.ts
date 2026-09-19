@@ -8,7 +8,8 @@ export function applyConversionTestSchema(db: Database.Database): void {
   db.exec(`
     CREATE TABLE line_accounts (
       id TEXT PRIMARY KEY, channel_id TEXT NOT NULL UNIQUE, name TEXT NOT NULL,
-      channel_access_token TEXT NOT NULL, channel_secret TEXT NOT NULL
+      channel_access_token TEXT NOT NULL, channel_secret TEXT NOT NULL,
+      tenant_id TEXT
     );
     CREATE TABLE friends (
       id TEXT PRIMARY KEY, line_user_id TEXT UNIQUE NOT NULL, display_name TEXT,
@@ -30,7 +31,7 @@ export function applyConversionTestSchema(db: Database.Database): void {
       id TEXT PRIMARY KEY, name TEXT NOT NULL, event_type TEXT NOT NULL, value REAL,
       measure_method TEXT NOT NULL DEFAULT 'manual', target_url TEXT,
       count_repeat INTEGER NOT NULL DEFAULT 1, attribution_days INTEGER,
-      line_account_id TEXT, version INTEGER NOT NULL DEFAULT 1,
+      line_account_id TEXT, tenant_id TEXT, version INTEGER NOT NULL DEFAULT 1,
       status TEXT NOT NULL DEFAULT 'active', stopped_at TEXT,
       source_config_json TEXT NOT NULL DEFAULT '{}',
       deduplication_mode TEXT NOT NULL DEFAULT 'every',
@@ -46,7 +47,8 @@ export function applyConversionTestSchema(db: Database.Database): void {
       approval_status TEXT, approved_at TEXT,
       point_name_snapshot TEXT, event_type_snapshot TEXT, value_snapshot REAL,
       point_version_snapshot INTEGER,
-      idempotency_key TEXT, created_at TEXT NOT NULL
+      idempotency_key TEXT, created_at TEXT NOT NULL,
+      tenant_id TEXT
     );
     CREATE TABLE conversion_event_dedup_claims (
       conversion_point_id TEXT NOT NULL, friend_id TEXT NOT NULL,
@@ -72,6 +74,23 @@ export function applyConversionTestSchema(db: Database.Database): void {
       id TEXT PRIMARY KEY, conversion_point_id TEXT NOT NULL, action TEXT NOT NULL,
       replacement_id TEXT, affected_usages INTEGER NOT NULL DEFAULT 0,
       reason TEXT, performed_by TEXT NOT NULL, created_at TEXT NOT NULL
+    );
+    -- N-258: 利用先の実在確認が見る参照表。本番と同じ列名だけを用意する。
+    CREATE TABLE affiliate_offers (id TEXT PRIMARY KEY, line_account_id TEXT);
+    CREATE TABLE funnels (id TEXT PRIMARY KEY, line_account_id TEXT);
+    CREATE TABLE auto_replies (id TEXT PRIMARY KEY, line_account_id TEXT);
+    CREATE TABLE scenarios (id TEXT PRIMARY KEY, line_account_id TEXT);
+    CREATE TABLE nen_campaign_settings (campaign_key TEXT PRIMARY KEY, label TEXT);
+    CREATE TABLE mileage_rules (id TEXT PRIMARY KEY, line_account_id TEXT);
+    CREATE TABLE automations (id TEXT PRIMARY KEY, line_account_id TEXT);
+    CREATE TABLE ad_platforms (id TEXT PRIMARY KEY, line_account_id TEXT);
+    -- N-257: 取消試算が見る台帳(件数だけ分かればよい最小構成)。
+    CREATE TABLE affiliate_reward_entries (
+      id TEXT PRIMARY KEY, conversion_event_id TEXT
+    );
+    CREATE TABLE affiliate_adjustments (
+      id TEXT PRIMARY KEY, source_entry_id TEXT, reason_type TEXT,
+      amount_minor INTEGER, created_at TEXT
     );
     CREATE UNIQUE INDEX idx_conversion_events_point_idempotency
       ON conversion_events(conversion_point_id, idempotency_key) WHERE idempotency_key IS NOT NULL;

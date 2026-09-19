@@ -1682,7 +1682,7 @@ CREATE TABLE conversion_events (
   value_snapshot       REAL,
   idempotency_key      TEXT,
   created_at           TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
-, point_version_snapshot INTEGER);
+, point_version_snapshot INTEGER, tenant_id TEXT REFERENCES tenants(id));
 
 CREATE TABLE conversion_points (
   id         TEXT PRIMARY KEY,
@@ -1700,7 +1700,7 @@ CREATE TABLE conversion_points (
   CHECK (deduplication_mode IN ('every', 'once_per_friend', 'window')), deduplication_window_days INTEGER
   CHECK (deduplication_window_days IS NULL OR deduplication_window_days BETWEEN 1 AND 365), value_mode TEXT NOT NULL DEFAULT 'fixed'
   CHECK (value_mode IN ('source', 'fixed', 'none')), reversal_policy TEXT NOT NULL DEFAULT 'manual'
-  CHECK (reversal_policy IN ('source_cancelled', 'manual', 'none')));
+  CHECK (reversal_policy IN ('source_cancelled', 'manual', 'none')), tenant_id TEXT REFERENCES tenants(id));
 
 CREATE TABLE customer_notification_definitions (
   id                    TEXT PRIMARY KEY,
@@ -4510,6 +4510,33 @@ CREATE TABLE "outbound_send_requests" (
   CHECK (status != 'unknown' OR retryable = 0)
 );
 
+CREATE TABLE outgoing_webhook_deliveries (
+  id                   TEXT PRIMARY KEY,
+  line_account_id      TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
+  webhook_id           TEXT NOT NULL REFERENCES outgoing_webhooks(id) ON DELETE CASCADE,
+  event_type           TEXT NOT NULL,
+  body_json            TEXT NOT NULL,
+  idempotency_key      TEXT NOT NULL,
+  status               TEXT NOT NULL DEFAULT 'pending'
+    CHECK (status IN ('pending', 'sending', 'retry_wait', 'delivered', 'failed')),
+  attempts             INTEGER NOT NULL DEFAULT 0 CHECK (attempts >= 0),
+  /** 初回を含む試行の上限。1 + min(max_retries, 7)（要件26 §6-4 の最大8回）。 */
+  max_attempts         INTEGER NOT NULL CHECK (max_attempts >= 1),
+  next_retry_at        TEXT,
+  /** sweep の引き取り証。取り掛かったまま止まった行を lease_until で見放す。 */
+  lease_token          TEXT,
+  lease_until          TEXT,
+  last_response_status INTEGER,
+  error_code           TEXT,
+  /** 相手の応答本文や秘密値は残さない。運用者が次の行動を選べる文だけ。 */
+  error_message_safe   TEXT,
+  queued_at            TEXT NOT NULL,
+  delivered_at         TEXT,
+  failed_at            TEXT,
+  updated_at           TEXT NOT NULL,
+  UNIQUE (webhook_id, idempotency_key)
+);
+
 CREATE TABLE outgoing_webhooks (
   id          TEXT PRIMARY KEY,
   name        TEXT NOT NULL,
@@ -4519,7 +4546,7 @@ CREATE TABLE outgoing_webhooks (
   is_active   INTEGER NOT NULL DEFAULT 1,
   created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
-, max_retries INTEGER NOT NULL DEFAULT 0, consecutive_failures INTEGER NOT NULL DEFAULT 0, last_failed_at TEXT, line_account_id TEXT REFERENCES line_accounts(id), secret_encrypted TEXT);
+, max_retries INTEGER NOT NULL DEFAULT 0, consecutive_failures INTEGER NOT NULL DEFAULT 0, last_failed_at TEXT, line_account_id TEXT REFERENCES line_accounts(id), secret_encrypted TEXT, auto_stopped_at TEXT);
 
 CREATE TABLE pii_reveal_logs (
   id                        TEXT PRIMARY KEY,
@@ -6613,7 +6640,13 @@ CREATE UNIQUE INDEX idx_conversion_events_point_idempotency
   ON conversion_events(conversion_point_id, idempotency_key)
   WHERE idempotency_key IS NOT NULL;
 
+CREATE INDEX idx_conversion_events_tenant
+  ON conversion_events(tenant_id);
+
 CREATE INDEX idx_conversion_points_status ON conversion_points(status, created_at DESC);
+
+CREATE INDEX idx_conversion_points_tenant
+  ON conversion_points(tenant_id);
 
 CREATE INDEX idx_customer_notification_definitions_account
   ON customer_notification_definitions(line_account_id, status, category, name, id);
@@ -7380,6 +7413,12 @@ CREATE INDEX idx_outbound_send_requests_active_lease
 
 CREATE INDEX idx_outbound_send_requests_created
   ON outbound_send_requests(created_at);
+
+CREATE INDEX idx_outgoing_webhook_deliveries_due
+  ON outgoing_webhook_deliveries(status, next_retry_at);
+
+CREATE INDEX idx_outgoing_webhook_deliveries_webhook
+  ON outgoing_webhook_deliveries(webhook_id, queued_at DESC);
 
 CREATE INDEX idx_outgoing_webhooks_line_account
   ON outgoing_webhooks(line_account_id, is_active, updated_at DESC);

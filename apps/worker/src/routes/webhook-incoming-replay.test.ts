@@ -475,28 +475,53 @@ describe('N-365 #746 受信Webhookの再送を弾く', () => {
     expect(db.raw.prepare(`SELECT COUNT(*) AS n FROM friend_scores`).get()).toEqual({ n: 1 });
   });
 
-  it('実event busの一部送り先だけ失敗したら成功した送り先へは再送しない', async () => {
+  it('実event busの一部送り先だけ失敗したら、失敗分は配送台帳が同じ鍵で送り直す', async () => {
     const actual = await vi.importActual<typeof import('../services/event-bus.js')>('../services/event-bus.js');
     fireEvent.mockImplementation((...args) => actual.fireEvent(...args as Parameters<typeof actual.fireEvent>));
-    for (const id of ['out-1', 'out-2']) {
-      db.raw.prepare(`INSERT INTO outgoing_webhooks (id,name,url,event_types,secret,line_account_id)
-        VALUES (?,?,?,'["incoming_webhook.custom"]',?,'account-1')`).run(id, id, `https://${id}.example.test`, SECRET);
-    }
-    let fail = true;
+    // out-2 には再送予算を付ける（max_retries=2）。失敗した配送は
+    // 台帳へ retry_wait で残り、sweep が同じ冪等キーで送り直す(#938)。
+    db.raw.prepare(`INSERT INTO outgoing_webhooks (id,name,url,event_types,secret,line_account_id,max_retries)
+      VALUES ('out-1','out-1','https://out-1.example.test','["incoming_webhook.custom"]',?,'account-1',0)`).run(SECRET);
+    db.raw.prepare(`INSERT INTO outgoing_webhooks (id,name,url,event_types,secret,line_account_id,max_retries)
+      VALUES ('out-2','out-2','https://out-2.example.test','["incoming_webhook.custom"]',?,'account-1',2)`).run(SECRET);
     delivery.mockImplementation(async (webhook) => {
-      const ok = (webhook as { id: string }).id !== 'out-2' || !fail;
-      if (!ok) fail = false;
+      const ok = (webhook as { id: string }).id !== 'out-2';
       return { ok, attempts: 1, lastStatus: ok ? 200 : 500 };
     });
     const body = JSON.stringify({ order: 'outgoing-partial' });
-    expect((await receive(body)).status).toBe(500);
+    // 配送の失敗は台帳が持つので、受信のイベント処理自体は成功で返る。
+    expect((await receive(body)).status).toBe(200);
+    // 同じ本文・同じ署名の再受信は重複で弾かれ、成功分も失敗分も増えない。
     expect((await receive(body)).status).toBe(200);
     const calls = delivery.mock.calls;
     expect(calls.filter(([wh]) => (wh as { id: string }).id === 'out-1')).toHaveLength(1);
-    const retried = calls.filter(([wh]) => (wh as { id: string }).id === 'out-2');
-    expect(retried).toHaveLength(2);
-    expect(retried[0]![1]).toBe(retried[1]![1]);
-    expect(retried[0]![2]).toEqual(retried[1]![2]);
+    expect(calls.filter(([wh]) => (wh as { id: string }).id === 'out-2')).toHaveLength(1);
+
+    // 失敗した out-2 の配送は台帳に retry_wait で残っている。
+    const queued = db.raw.prepare(
+      `SELECT * FROM outgoing_webhook_deliveries WHERE webhook_id='out-2'`,
+    ).get() as { id: string; status: string; idempotency_key: string };
+    expect(queued.status).toBe('retry_wait');
+
+    // sweep が同じ冪等キー（X-Webhook-Delivery-Id）で送り直して確定する。
+    const sentKeys: string[] = [];
+    const fetchImpl = (async (_input: unknown, init?: { headers?: unknown }) => {
+      sentKeys.push(new Headers(init?.headers as HeadersInit).get('X-Webhook-Delivery-Id') ?? '');
+      return new Response('', { status: 200 });
+    }) as unknown as typeof fetch;
+    const { sweepOutgoingWebhookDeliveries } = await import('../services/outgoing-webhook-delivery.js');
+    const result = await sweepOutgoingWebhookDeliveries(db.db, {
+      now: new Date(Date.now() + 10 * 60_000),
+      fetchImpl,
+      lookupHost: async () => ['93.184.216.34'],
+    });
+    expect(result.delivered).toBe(1);
+    expect(sentKeys).toEqual([queued.idempotency_key]);
+    expect(
+      (db.raw.prepare(
+        `SELECT status FROM outgoing_webhook_deliveries WHERE id = ?`,
+      ).get(queued.id) as { status: string }).status,
+    ).toBe('delivered');
   });
 
   it('実event busの旧自動処理も失敗後に回復し、完了した行動を繰り返さない', async () => {
