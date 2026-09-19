@@ -24,6 +24,17 @@ import {
   isKnownOutgoingEventType,
   KNOWN_OUTGOING_EVENT_TYPES,
   WEBHOOK_SECRET_MIN_LENGTH as MIN_SECRET_LENGTH,
+  listIncomingWebhookUnmatched,
+  countIncomingWebhookUnmatched,
+  getIncomingWebhookUnmatchedById,
+  resolveIncomingWebhookUnmatched,
+  listIntegrationApiTokens,
+  getIntegrationApiTokenById,
+  createIntegrationApiToken,
+  revokeIntegrationApiToken,
+  rotateIntegrationApiToken,
+  INTEGRATION_API_SCOPES,
+  type IntegrationApiTokenRow,
   type WebhookInteractionRow,
   type IncomingWebhookIdentityMatch,
   type IncomingWebhookActionRef,
@@ -33,13 +44,14 @@ import { sha256Hex } from '../middleware/auth.js';
 import { reserveIncomingWebhook, type IncomingWebhookExecution } from '../services/incoming-webhook-receipts.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
+import { auditLog } from '../lib/audit-log.js';
 import {
   retryWebhookInteraction,
   webhookFailureLabel,
   webhookResponseLabel,
 } from '../services/webhook-interactions.js';
 import { deliverWebhook } from '../services/outgoing-webhook-delivery.js';
-import { executeIncomingWebhookActions } from '../services/incoming-webhook-actions.js';
+import { executeIncomingWebhookActions, maskedPayloadShape } from '../services/incoming-webhook-actions.js';
 
 const webhooks = new Hono<Env>();
 
@@ -87,41 +99,14 @@ async function incomingActionDisplayName(db: D1Database, action: IncomingWebhook
   } as Record<string, string>)[action.refKind];
   if (!table) return '保存済みの設定';
   try {
-    const row = await db.prepare(`SELECT name FROM ${table} WHERE id = ?`).bind(action.refId).first<{ name: string }>();
+    // #939 N-368: 送信Webhookの削除は履歴を残す印なので、印のある行は
+    // 名づけの参照先としても使わない。他の表に deleted_at は無い。
+    const notDeleted = table === 'outgoing_webhooks' ? ' AND deleted_at IS NULL' : '';
+    const row = await db.prepare(`SELECT name FROM ${table} WHERE id = ?${notDeleted}`).bind(action.refId).first<{ name: string }>();
     return row?.name?.trim() || '保存済みの設定';
   } catch {
     return '保存済みの設定';
   }
-}
-
-function jsonPathSegment(key: string): string {
-  return /^[A-Za-z_][A-Za-z0-9_-]*$/.test(key) ? `.${key}` : `[${JSON.stringify(key)}]`;
-}
-
-function maskedPayloadShape(payload: unknown) {
-  const fields: Array<{ path: string; type: string; maskedValue: '••••' }> = [];
-  let truncated = false;
-  const visit = (value: unknown, path: string, depth: number) => {
-    if (fields.length >= 50) {
-      truncated = true;
-      return;
-    }
-    if (depth >= 6 || value === null || typeof value !== 'object') {
-      const type = value === null ? 'null' : Array.isArray(value) ? 'array' : typeof value;
-      fields.push({ path, type, maskedValue: '••••' });
-      return;
-    }
-    if (Array.isArray(value)) {
-      if (value.length === 0) fields.push({ path, type: 'array', maskedValue: '••••' });
-      else visit(value[0], `${path}[0]`, depth + 1);
-      return;
-    }
-    const entries = Object.entries(value as Record<string, unknown>);
-    if (entries.length === 0) fields.push({ path, type: 'object', maskedValue: '••••' });
-    for (const [key, child] of entries) visit(child, `${path}${jsonPathSegment(key)}`, depth + 1);
-  };
-  visit(payload, '$', 0);
-  return { fields, truncated };
 }
 
 function readIncomingConfig(body: unknown):
@@ -364,6 +349,9 @@ webhooks.get('/api/webhooks/incoming/:id', requireRole('owner', 'admin', 'staff'
     const sample = safeJson<{ fields: Array<{ path: string; type: string; maskedValue: string }>; truncated: boolean } | null>(
       item.latest_masked_sample_json, null,
     );
+    // N-367 (#939): 「未照合として確認する」「友だち候補を作る」を選んだ口が
+    // 溜めている未確認の件数。箱の中身は /unmatched で見せる。
+    const pendingUnmatched = await countIncomingWebhookUnmatched(c.env.DB, item.id, lineAccountId);
     return c.json({
       success: true,
       data: {
@@ -375,6 +363,7 @@ webhooks.get('/api/webhooks/incoming/:id', requireRole('owner', 'admin', 'staff'
         version: Number(item.version ?? 1),
         identityMatching,
         actions: namedActions,
+        pendingUnmatched,
         actionExecution: {
           state: actions.length > 0 ? 'connected' : 'not_configured',
           reason: null,
@@ -425,6 +414,7 @@ webhooks.patch('/api/webhooks/incoming/:id/config', requireRole('owner'), async 
         data: { currentVersion: result.currentVersion },
       }, 409);
     }
+    auditLog(c, 'webhook.incoming.config.update', { kind: 'incoming_webhook', id: result.item.id });
     return c.json({ success: true, data: { id: result.item.id, version: result.item.version } });
   } catch {
     console.error(JSON.stringify({
@@ -457,6 +447,7 @@ webhooks.post('/api/webhooks/incoming', requireRole('owner'), async (c) => {
       secret: body.secret as string,
       lineAccountId,
     }, webhookKeysOf(c));
+    auditLog(c, 'webhook.incoming.create', { kind: 'incoming_webhook', id: item.id }, { lineAccountId });
     return c.json(
       {
         success: true,
@@ -535,6 +526,17 @@ webhooks.put('/api/webhooks/incoming/:id', requireRole('owner'), async (c) => {
     await updateIncomingWebhook(c.env.DB, id, lineAccountId, body, webhookKeysOf(c));
     const updated = await getIncomingWebhookById(c.env.DB, id, lineAccountId);
     if (!updated) return c.json({ success: false, error: 'Not found' }, 404);
+    // N-379 (#939): 動かす/止める・合言葉の入れ直し・その他の変更を分けて記録する。
+    if (body.isActive !== undefined) {
+      auditLog(c, body.isActive ? 'webhook.incoming.activate' : 'webhook.incoming.deactivate',
+        { kind: 'incoming_webhook', id }, { lineAccountId });
+    }
+    if (body.secret !== undefined) {
+      auditLog(c, 'webhook.incoming.secret.rotate', { kind: 'incoming_webhook', id }, { lineAccountId });
+    }
+    if (body.name !== undefined || body.sourceType !== undefined) {
+      auditLog(c, 'webhook.incoming.update', { kind: 'incoming_webhook', id }, { lineAccountId });
+    }
     return c.json({
       success: true,
       data: {
@@ -564,10 +566,101 @@ webhooks.delete('/api/webhooks/incoming/:id', requireRole('owner'), async (c) =>
     }
     const existing = await getIncomingWebhookById(c.env.DB, id, lineAccountId);
     if (!existing) return c.json({ success: false, error: 'Not found' }, 404);
-    await deleteIncomingWebhook(c.env.DB, id, lineAccountId);
+    await deleteIncomingWebhook(c.env.DB, id, lineAccountId, c.get('staff')?.id);
+    auditLog(c, 'webhook.incoming.delete', { kind: 'incoming_webhook', id }, { lineAccountId });
     return c.json({ success: true, data: null });
   } catch (err) {
     console.error('DELETE /api/webhooks/incoming/:id error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+// ========== 人が見つからなかった届物（#939 N-367） ==========
+
+/**
+ * 未照合の箱の中身。届物1件ごとに「照合に使った値」と
+ * 「形だけの見本」を返す。生の本文は保存していないので返せない。
+ */
+webhooks.get('/api/webhooks/incoming/:id/unmatched', requireRole('owner', 'admin', 'staff'), async (c) => {
+  try {
+    const lineAccountId = c.req.query('lineAccountId')?.trim();
+    if (!lineAccountId) return c.json({ success: false, error: 'LINEアカウントを選択してください' }, 400);
+    const staff = c.get('staff');
+    if (staff?.role === 'staff' && !staff.permissionKeys?.includes('/webhooks')) {
+      return c.json({ success: false, error: 'この機能を表示する権限がありません' }, 403);
+    }
+    if (!await canAccessAllLineAccounts(c.env.DB, staff, [lineAccountId])) {
+      return c.json({ success: false, error: 'Not found' }, 404);
+    }
+    const webhook = await getIncomingWebhookById(c.env.DB, c.req.param('id'), lineAccountId);
+    if (!webhook) return c.json({ success: false, error: 'Not found' }, 404);
+    const status = c.req.query('status');
+    const items = await listIncomingWebhookUnmatched(
+      c.env.DB, webhook.id, lineAccountId,
+      status === 'resolved' || status === 'dismissed' ? status : 'pending',
+    );
+    return c.json({
+      success: true,
+      data: items.map((item) => ({
+        id: item.id,
+        kind: item.kind,
+        status: item.status,
+        identityAttempts: safeJson<Array<{ kind: string; path: string; value: string }>>(
+          item.identity_attempts_json, [],
+        ),
+        maskedShape: safeJson<unknown>(item.masked_shape_json, null),
+        resolvedFriendId: item.resolved_friend_id,
+        resolvedAt: item.resolved_at,
+        receivedAt: item.received_at,
+      })),
+    });
+  } catch (err) {
+    console.error('GET /api/webhooks/incoming/:id/unmatched error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+/**
+ * 箱の中の届物を閉じる。`{action:'dismiss'}` は何もしないで閉じる、
+ * `{action:'link', friendId}` は既存の友だちに結び付けて閉じる。
+ * 友だちの所属はアカウント境界で確かめる。
+ */
+webhooks.post('/api/webhooks/unmatched/:id/resolve', requireRole('owner', 'admin'), async (c) => {
+  try {
+    const lineAccountId = c.req.query('lineAccountId')?.trim();
+    if (!lineAccountId) return c.json({ success: false, error: 'LINEアカウントを選択してください' }, 400);
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
+      return c.json({ success: false, error: 'Not found' }, 404);
+    }
+    const body = await c.req.json<{ action?: unknown; friendId?: unknown }>().catch(() => null);
+    const action = body?.action;
+    if (action !== 'dismiss' && action !== 'link') {
+      return c.json({ success: false, error: 'action は dismiss か link を指定してください' }, 400);
+    }
+    const item = await getIncomingWebhookUnmatchedById(c.env.DB, c.req.param('id'), lineAccountId);
+    if (!item) return c.json({ success: false, error: 'Not found' }, 404);
+    let friendId: string | undefined;
+    if (action === 'link') {
+      if (typeof body?.friendId !== 'string' || !body.friendId.trim()) {
+        return c.json({ success: false, error: '結び付ける友だちを指定してください' }, 400);
+      }
+      friendId = body.friendId.trim();
+      const friend = await c.env.DB.prepare(
+        'SELECT id FROM friends WHERE id = ? AND line_account_id = ?',
+      ).bind(friendId, lineAccountId).first<{ id: string }>();
+      if (!friend) return c.json({ success: false, error: 'その友だちはこのLINEアカウントにいません' }, 404);
+    }
+    const resolved = await resolveIncomingWebhookUnmatched(
+      c.env.DB, item.id, lineAccountId,
+      action === 'link' ? { action: 'link', friendId: friendId! } : { action: 'dismiss' },
+      c.get('staff')?.id,
+    );
+    if (!resolved) return c.json({ success: false, error: 'すでに処理済みです' }, 409);
+    auditLog(c, 'webhook.incoming.unmatched.resolve',
+      { kind: 'incoming_webhook_unmatched', id: item.id }, { lineAccountId });
+    return c.json({ success: true, data: { id: item.id, status: action === 'link' ? 'resolved' : 'dismissed' } });
+  } catch (err) {
+    console.error('POST /api/webhooks/unmatched/:id/resolve error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -633,6 +726,42 @@ webhooks.get('/api/webhooks/outgoing', requireRole('owner', 'admin', 'staff'), a
   }
 });
 
+// N-363 (#939): 編集画面が現在値を読むための詳細口。secret は出さない。
+webhooks.get('/api/webhooks/outgoing/:id', requireRole('owner', 'admin', 'staff'), async (c) => {
+  try {
+    const lineAccountId = c.req.query('lineAccountId')?.trim();
+    if (!lineAccountId) return c.json({ success: false, error: 'LINEアカウントを選択してください' }, 400);
+    const staff = c.get('staff');
+    if (staff?.role === 'staff' && !staff.permissionKeys?.includes('/webhooks')) {
+      return c.json({ success: false, error: 'この機能を表示する権限がありません' }, 403);
+    }
+    if (!await canAccessAllLineAccounts(c.env.DB, staff, [lineAccountId])) {
+      return c.json({ success: false, error: 'Not found' }, 404);
+    }
+    const item = await getOutgoingWebhookById(c.env.DB, c.req.param('id'), lineAccountId);
+    if (!item) return c.json({ success: false, error: 'Not found' }, 404);
+    return c.json({
+      success: true,
+      data: {
+        id: item.id,
+        name: item.name,
+        url: item.url,
+        eventTypes: outgoingEventTypes(item.event_types, item.id),
+        hasSecret: hasWebhookSecret(item),
+        isActive: Boolean(item.is_active),
+        maxRetries: item.max_retries ?? 0,
+        consecutiveFailures: item.consecutive_failures ?? 0,
+        lastFailedAt: item.last_failed_at ?? null,
+        createdAt: item.created_at,
+        updatedAt: item.updated_at,
+      },
+    });
+  } catch (err) {
+    console.error('GET /api/webhooks/outgoing/:id error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
 webhooks.post('/api/webhooks/outgoing', requireRole('owner'), async (c) => {
   try {
     const body = await c.req.json<{
@@ -680,6 +809,7 @@ webhooks.post('/api/webhooks/outgoing', requireRole('owner'), async (c) => {
       maxRetries,
       lineAccountId,
     }, webhookKeysOf(c));
+    auditLog(c, 'webhook.outgoing.create', { kind: 'outgoing_webhook', id: item.id }, { lineAccountId });
     return c.json(
       {
         success: true,
@@ -799,6 +929,18 @@ webhooks.put('/api/webhooks/outgoing/:id', requireRole('owner'), async (c) => {
     }, webhookKeysOf(c));
     const updated = await getOutgoingWebhookById(c.env.DB, id, lineAccountId);
     if (!updated) return c.json({ success: false, error: 'Not found' }, 404);
+    // N-379 (#939): 動かす/止める・合言葉の入れ直し・その他の変更を分けて記録する。
+    if (body.isActive !== undefined) {
+      auditLog(c, body.isActive ? 'webhook.outgoing.activate' : 'webhook.outgoing.deactivate',
+        { kind: 'outgoing_webhook', id }, { lineAccountId });
+    }
+    if (body.secret !== undefined) {
+      auditLog(c, 'webhook.outgoing.secret.rotate', { kind: 'outgoing_webhook', id }, { lineAccountId });
+    }
+    if (body.name !== undefined || body.url !== undefined
+      || body.eventTypes !== undefined || body.maxRetries !== undefined) {
+      auditLog(c, 'webhook.outgoing.update', { kind: 'outgoing_webhook', id }, { lineAccountId });
+    }
     return c.json({
       success: true,
       data: {
@@ -868,6 +1010,7 @@ webhooks.post('/api/webhooks/outgoing/:id/test', requireRole('owner', 'admin'), 
       durationMs: Date.now() - started,
       failureReason: result.ok ? null : 'processing_failed',
     });
+    auditLog(c, 'webhook.outgoing.test', { kind: 'outgoing_webhook', id: webhook.id }, { lineAccountId });
     return c.json({ success: true, data: { delivered: result.ok, responseStatus: result.lastStatus ?? null } });
   } catch (err) {
     console.error('POST /api/webhooks/outgoing/:id/test error:', err);
@@ -885,7 +1028,8 @@ webhooks.delete('/api/webhooks/outgoing/:id', requireRole('owner'), async (c) =>
     }
     const existing = await getOutgoingWebhookById(c.env.DB, id, lineAccountId);
     if (!existing) return c.json({ success: false, error: 'Not found' }, 404);
-    await deleteOutgoingWebhook(c.env.DB, id, lineAccountId);
+    await deleteOutgoingWebhook(c.env.DB, id, lineAccountId, c.get('staff')?.id);
+    auditLog(c, 'webhook.outgoing.delete', { kind: 'outgoing_webhook', id }, { lineAccountId });
     return c.json({ success: true, data: null });
   } catch (err) {
     console.error('DELETE /api/webhooks/outgoing/:id error:', err);
@@ -962,6 +1106,8 @@ webhooks.post('/api/webhooks/interactions/:id/retry', requireRole('owner', 'admi
     const original = await getWebhookInteractionById(c.env.DB, c.req.param('id'), access.lineAccountId);
     if (!original) return c.json({ success: false, error: 'Not found' }, 404);
     const retried = await retryWebhookInteraction(c.env.DB, original, webhookKeysOf(c));
+    auditLog(c, 'webhook.interaction.retry',
+      { kind: 'webhook_interaction', id: original.id }, { lineAccountId: access.lineAccountId });
     return c.json({ success: true, data: serializeInteraction(retried) });
   } catch (err) {
     const code = err instanceof Error ? err.message : 'retry_failed';
@@ -998,6 +1144,10 @@ webhooks.post('/api/webhooks/interactions/retry-failed', requireRole('owner', 'a
         skipped++;
       }
     }));
+    if (failed.length > 0) {
+      auditLog(c, 'webhook.interaction.retry_failed',
+        { kind: 'outgoing_webhook' }, { lineAccountId: access.lineAccountId });
+    }
     return c.json({
       success: true,
       data: { requested: failed.length, succeeded, failed: failedAgain, skipped },
@@ -1261,6 +1411,128 @@ webhooks.post('/api/webhooks/incoming/:id/receive', async (c) => {
       try { await execution.fail(); } catch { /* The lease lets a later retry recover even during a DB outage. */ }
     }
     console.error('POST /api/webhooks/incoming/:id/receive error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+// ========== 公開APIトークン（#939 N-380） ==========
+//
+// 外部システムが /api/public/v1/* を呼ぶための合言葉。管理画面の認証とは
+// 別の台帳で、ここで作ったトークンは公開APIだけに効く。
+// 平文は保存しない。発行・再発行の応答にだけ1回だけ乗せる。
+
+function serializeApiToken(row: IntegrationApiTokenRow) {
+  return {
+    id: row.id,
+    name: row.name,
+    tokenPrefix: row.token_prefix,
+    scopes: safeJson<string[]>(row.scopes, []),
+    createdBy: row.created_by,
+    lastUsedAt: row.last_used_at,
+    rotatedFromId: row.rotated_from_id,
+    createdAt: row.created_at,
+  };
+}
+
+webhooks.get('/api/webhooks/api-tokens', requireRole('owner', 'admin', 'staff'), async (c) => {
+  try {
+    const lineAccountId = c.req.query('lineAccountId')?.trim();
+    if (!lineAccountId) return c.json({ success: false, error: 'LINEアカウントを選択してください' }, 400);
+    const staff = c.get('staff');
+    if (staff?.role === 'staff' && !staff.permissionKeys?.includes('/webhooks')) {
+      return c.json({ success: false, error: 'この機能を表示する権限がありません' }, 403);
+    }
+    if (!await canAccessAllLineAccounts(c.env.DB, staff, [lineAccountId])) {
+      return c.json({ success: false, error: 'このLINEアカウントを表示する権限がありません' }, 403);
+    }
+    const items = await listIntegrationApiTokens(c.env.DB, lineAccountId);
+    return c.json({ success: true, data: items.map(serializeApiToken) });
+  } catch (err) {
+    console.error('GET /api/webhooks/api-tokens error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+webhooks.post('/api/webhooks/api-tokens', requireRole('owner'), async (c) => {
+  try {
+    const body = await c.req.json<{ name?: unknown; scopes?: unknown; lineAccountId?: unknown }>()
+      .catch(() => null);
+    const name = typeof body?.name === 'string' ? body.name.trim() : '';
+    if (!name || name.length > MAX_WEBHOOK_NAME_LENGTH) {
+      return c.json({ success: false, error: `name must be 1-${MAX_WEBHOOK_NAME_LENGTH} characters` }, 400);
+    }
+    if (!Array.isArray(body?.scopes) || body.scopes.length === 0
+      || body.scopes.some((scope) => !INTEGRATION_API_SCOPES.includes(scope as never))) {
+      return c.json({
+        success: false,
+        error: `scopes must be a non-empty subset of: ${INTEGRATION_API_SCOPES.join(', ')}`,
+      }, 400);
+    }
+    const lineAccountId = typeof body?.lineAccountId === 'string' ? body.lineAccountId.trim() : '';
+    if (!lineAccountId) return c.json({ success: false, error: 'LINEアカウントを選択してください' }, 400);
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
+      return c.json({ success: false, error: 'このLINEアカウントを変更する権限がありません' }, 403);
+    }
+    const { row, token } = await createIntegrationApiToken(c.env.DB, {
+      lineAccountId,
+      name,
+      scopes: body.scopes.map(String),
+      createdBy: c.get('staff')?.id,
+    });
+    auditLog(c, 'webhook.api_token.create', { kind: 'integration_api_token', id: row.id }, { lineAccountId });
+    return c.json({
+      success: true,
+      data: {
+        ...serializeApiToken(row),
+        // 平文はこの応答の1回だけ。台帳には hash だけが残る。
+        token,
+      },
+    }, 201);
+  } catch (err) {
+    console.error('POST /api/webhooks/api-tokens error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+webhooks.post('/api/webhooks/api-tokens/:id/revoke', requireRole('owner'), async (c) => {
+  try {
+    const lineAccountId = c.req.query('lineAccountId')?.trim();
+    if (!lineAccountId) return c.json({ success: false, error: 'LINEアカウントを選択してください' }, 400);
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
+      return c.json({ success: false, error: 'このLINEアカウントを変更する権限がありません' }, 403);
+    }
+    const id = c.req.param('id');
+    const revoked = await revokeIntegrationApiToken(c.env.DB, id, lineAccountId, c.get('staff')?.id);
+    if (!revoked) return c.json({ success: false, error: 'Not found' }, 404);
+    auditLog(c, 'webhook.api_token.revoke', { kind: 'integration_api_token', id }, { lineAccountId });
+    return c.json({ success: true, data: { id } });
+  } catch (err) {
+    console.error('POST /api/webhooks/api-tokens/:id/revoke error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+webhooks.post('/api/webhooks/api-tokens/:id/rotate', requireRole('owner'), async (c) => {
+  try {
+    const lineAccountId = c.req.query('lineAccountId')?.trim();
+    if (!lineAccountId) return c.json({ success: false, error: 'LINEアカウントを選択してください' }, 400);
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
+      return c.json({ success: false, error: 'このLINEアカウントを変更する権限がありません' }, 403);
+    }
+    const id = c.req.param('id');
+    const rotated = await rotateIntegrationApiToken(c.env.DB, id, lineAccountId, c.get('staff')?.id);
+    if (!rotated) return c.json({ success: false, error: 'Not found' }, 404);
+    auditLog(c, 'webhook.api_token.rotate', { kind: 'integration_api_token', id: rotated.row.id }, { lineAccountId });
+    return c.json({
+      success: true,
+      data: {
+        ...serializeApiToken(rotated.row),
+        // 新しい平文はこの応答の1回だけ。旧トークンは即座に使えなくなる。
+        token: rotated.token,
+      },
+    });
+  } catch (err) {
+    console.error('POST /api/webhooks/api-tokens/:id/rotate error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });

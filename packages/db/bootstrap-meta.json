@@ -395,7 +395,8 @@
     "434_friend_scenario_op_request_fingerprint.sql",
     "435_conversion_tenant_boundary.sql",
     "436_outgoing_webhook_deliveries.sql",
+    "437_external_integration_config.sql",
     "438_staff_email_change.sql"
   ],
-  "migrationCount": 396
+  "migrationCount": 397
 }

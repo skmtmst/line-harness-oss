@@ -33,7 +33,10 @@ describe('migration 321 外部連携の接続別集計と受信口詳細', () =>
         is_active INTEGER NOT NULL DEFAULT 1,
         line_account_id TEXT,
         created_at TEXT NOT NULL,
-        updated_at TEXT NOT NULL
+        updated_at TEXT NOT NULL,
+        /* #939 N-368（移行437）: 削除は履歴を残す印。読み取りは印の無い行だけ。 */
+        deleted_at TEXT,
+        deleted_by_staff_id TEXT
       );
       CREATE TABLE outgoing_webhooks (
         id TEXT PRIMARY KEY,
@@ -47,7 +50,10 @@ describe('migration 321 外部連携の接続別集計と受信口詳細', () =>
         last_failed_at TEXT,
         line_account_id TEXT,
         created_at TEXT NOT NULL,
-        updated_at TEXT NOT NULL
+        updated_at TEXT NOT NULL,
+        /* #939 N-368（移行437）: 同上 */
+        deleted_at TEXT,
+        deleted_by_staff_id TEXT
       );
       CREATE TABLE webhook_interaction_logs (
         id TEXT PRIMARY KEY,
