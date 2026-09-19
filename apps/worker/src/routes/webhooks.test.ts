@@ -26,6 +26,17 @@ vi.mock('@line-crm/db', async (importOriginal) => {
   updateIncomingWebhookConfig: vi.fn(),
   updateIncomingWebhookMaskedSample: vi.fn(),
   backfillWebhookSecrets: vi.fn(),
+  // #939: 未照合の箱と公開APIトークンの台帳。
+  listIncomingWebhookUnmatched: vi.fn().mockResolvedValue([]),
+  countIncomingWebhookUnmatched: vi.fn().mockResolvedValue(0),
+  getIncomingWebhookUnmatchedById: vi.fn(),
+  resolveIncomingWebhookUnmatched: vi.fn(),
+  listIntegrationApiTokens: vi.fn().mockResolvedValue([]),
+  getIntegrationApiTokenById: vi.fn(),
+  createIntegrationApiToken: vi.fn(),
+  revokeIntegrationApiToken: vi.fn(),
+  rotateIntegrationApiToken: vi.fn(),
+  INTEGRATION_API_SCOPES: actual.INTEGRATION_API_SCOPES,
   hasWebhookSecret: vi.fn((row: { secret?: unknown; secret_encrypted?: unknown }) =>
     Boolean(row?.secret_encrypted) ||
     (typeof row?.secret === 'string' && row.secret.length >= 32)),
@@ -52,11 +63,16 @@ vi.mock('../services/event-bus.js', () => ({
   fireEvent: vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock('../services/incoming-webhook-actions.js', () => ({
-  executeIncomingWebhookActions: vi.fn().mockResolvedValue({
-    matchedFriendId: null, executed: 0, failed: 0,
-  }),
-}));
+vi.mock('../services/incoming-webhook-actions.js', async (importOriginal) => {
+  // maskedPayloadShape は純粋関数で、route が届物の見本を作るのに実物を使う(#939)。
+  const actual = await importOriginal<typeof import('../services/incoming-webhook-actions.js')>();
+  return {
+    ...actual,
+    executeIncomingWebhookActions: vi.fn().mockResolvedValue({
+      matchedFriendId: null, executed: 0, failed: 0,
+    }),
+  };
+});
 
 vi.mock('../services/outgoing-webhook-delivery.js', () => ({
   deliverWebhook: vi.fn().mockResolvedValue({ ok: true, attempts: 1, lastStatus: 204 }),

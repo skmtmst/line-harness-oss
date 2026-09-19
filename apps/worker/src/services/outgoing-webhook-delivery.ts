@@ -1180,7 +1180,9 @@ export async function sweepOutgoingWebhookDeliveries(
     }
     result.swept += 1;
     const webhook = await db
-      .prepare(`SELECT * FROM outgoing_webhooks WHERE id = ? AND line_account_id = ?`)
+      // #939 N-368: 削除は履歴を残す印。印のある送り先は「無い」として
+      // 滞留分を webhook_not_found で閉じる。
+      .prepare(`SELECT * FROM outgoing_webhooks WHERE id = ? AND line_account_id = ? AND deleted_at IS NULL`)
       .bind(row.webhook_id, row.line_account_id)
       .first<WebhookRow & { is_active: number; name: string }>();
     const started = Date.now();

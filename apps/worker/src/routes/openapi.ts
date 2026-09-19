@@ -2641,10 +2641,11 @@ const spec = {
       get: {
         tags: ['Webhook'],
         summary: 'タグ一覧（公開API）',
-        description: '外部システム向け公開API(#939 N-380)。`Authorization: Bearer lhp_…` の'
-          + '公開APIトークンで照合し、scope tags:read が必要。トークンのアカウントのタグと'
+        description: '外部システム向け公開API(#939 N-380)。管理画面の認証境界の外にあるため'
+          + ' security は空。route が `Authorization: Bearer lhp_…` の公開APIトークンを'
+          + '自分で照合し、scope tags:read が必要。トークンのアカウントのタグと'
           + '共通タグだけを返す。',
-        security: [{ bearerAuth: [] }],
+        security: [],
         responses: {
           '200': { description: 'タグ一覧' },
           '401': { description: 'トークンが無いか無効' },
@@ -2656,10 +2657,12 @@ const spec = {
       post: {
         tags: ['Webhook'],
         summary: '友だちへのタグ付与（公開API）',
-        description: '外部システム向け公開API(#939 N-380)。scope tags:write が必要。'
+        description: '外部システム向け公開API(#939 N-380)。管理画面の認証境界の外にあるため'
+          + ' security は空。route が `Authorization: Bearer lhp_…` の公開APIトークンを'
+          + '自分で照合し、scope tags:write が必要。'
           + '友だちはトークンのアカウント所属、タグは同じアカウントか共通で、'
           + '手動付与が禁じられたタグは付けない。管理画面の付与と同じ効果を持つ。',
-        security: [{ bearerAuth: [] }],
+        security: [],
         parameters: [{ name: 'friendId', in: 'path', required: true, schema: { type: 'string' } }],
         requestBody: {
           required: true,
