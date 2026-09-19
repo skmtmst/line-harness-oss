@@ -29,6 +29,9 @@ vi.mock('next/link', () => ({
     <a href={href}>{children}</a>
   ),
 }))
+vi.mock('next/navigation', () => ({
+  useSearchParams: () => new URLSearchParams(),
+}))
 
 vi.mock('@/components/layout/merged-tabs', () => ({
   default: () => null,
