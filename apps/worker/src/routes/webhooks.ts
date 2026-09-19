@@ -42,6 +42,7 @@ import {
 } from '@line-crm/db';
 import type { Env } from '../index.js';
 import { sha256Hex } from '../middleware/auth.js';
+import { computeHmacSha256Hex, safeEqualHex } from '../lib/hmac.js';
 import { reserveIncomingWebhook, type IncomingWebhookExecution } from '../services/incoming-webhook-receipts.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
@@ -267,30 +268,7 @@ function webhookKeysOf(c: Context<Env>): { current?: string; previous?: string }
   };
 }
 
-// Constant-time hex-string compare to avoid timing oracles.
-function safeEqualHex(a: string, b: string): boolean {
-  if (a.length !== b.length) return false;
-  let diff = 0;
-  for (let i = 0; i < a.length; i++) {
-    diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
-  }
-  return diff === 0;
-}
 
-async function computeHmacSha256Hex(secret: string, body: string): Promise<string> {
-  const encoder = new TextEncoder();
-  const key = await crypto.subtle.importKey(
-    'raw',
-    encoder.encode(secret),
-    { name: 'HMAC', hash: 'SHA-256' },
-    false,
-    ['sign'],
-  );
-  const signature = await crypto.subtle.sign('HMAC', key, encoder.encode(body));
-  return Array.from(new Uint8Array(signature))
-    .map((b) => b.toString(16).padStart(2, '0'))
-    .join('');
-}
 
 // ========== 受信Webhook ==========
 

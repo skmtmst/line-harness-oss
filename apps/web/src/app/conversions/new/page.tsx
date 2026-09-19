@@ -104,6 +104,8 @@ export default function NewConversionPointPage() {
   const [reversalPolicy, setReversalPolicy] = useState<ConversionReversalPolicy>('source_cancelled')
   const [attributionDays, setAttributionDays] = useState('')
   const [lineAccountId, setLineAccountId] = useState('')
+  /** N-268: チェックすると下書きで保存し、公開するまで計測しない。 */
+  const [saveAsDraft, setSaveAsDraft] = useState(false)
   const [points, setPoints] = useState<ConversionPoint[]>([])
   const [usageTargets, setUsageTargets] = useState<UsageTarget[]>([])
   const [usageTargetsLoaded, setUsageTargetsLoaded] = useState(false)
@@ -268,7 +270,7 @@ export default function NewConversionPointPage() {
       description="「申込」「購入」など、成果として数えたい行動を登録します。"
       parent={['コンバージョン', '/conversions?tab=points']}
       successHref={(id) => `/conversions?tab=points${id ? `&highlight=${encodeURIComponent(id)}` : ''}`}
-      saveLabel="つくって数えはじめる"
+      saveLabel={saveAsDraft ? '下書きとして保存する' : 'つくって数えはじめる'}
       designNode="GtylA"
       variant="v6"
       validate={() => {
@@ -316,6 +318,8 @@ export default function NewConversionPointPage() {
           usages: usageTargets
             .filter((target) => selectedUsageKeys.has(usageKey(target)))
             .map(({ kind, refId, refVersionId }) => ({ refKind: kind, refId, refVersionId })),
+          // N-268: 下書きで保存すると、一覧の「計測をはじめる」で公開するまで数えない。
+          draft: saveAsDraft,
         })
         if (!res.success) throw new Error(res.error)
         return res.data.id
@@ -541,6 +545,20 @@ export default function NewConversionPointPage() {
             )
           })}
         </div>
+        <label className="border-hairline rounded-control mt-3 flex cursor-pointer items-start gap-3 border p-3">
+          <input
+            type="checkbox"
+            checked={saveAsDraft}
+            onChange={(event) => setSaveAsDraft(event.target.checked)}
+            className="mt-0.5"
+          />
+          <span>
+            <span className="text-ink block text-sm font-semibold">まだ計測せず、下書きとして保存する</span>
+            <span className="text-ink-faint mt-0.5 block text-xs">
+              一覧の「下書き」に入ります。数えはじめるには一覧から公開します。
+            </span>
+          </span>
+        </label>
         <details className="border-hairline rounded-control border px-3 py-2">
           <summary className="text-ink-secondary cursor-pointer text-xs font-semibold">詳細設定（帰属期間・集計対象）</summary>
           <div className="mt-3 grid gap-3 md:grid-cols-2">

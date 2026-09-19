@@ -38,7 +38,16 @@ export function applyConversionTestSchema(db: Database.Database): void {
       deduplication_window_days INTEGER,
       value_mode TEXT NOT NULL DEFAULT 'fixed',
       reversal_policy TEXT NOT NULL DEFAULT 'manual',
+      -- N-270: 外部受信の鍵(暗号化)と受け口の停止時刻。
+      ingest_secret_encrypted TEXT, ingest_disabled_at TEXT,
       created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+    );
+    -- N-270: 外部受信の成否台帳。
+    CREATE TABLE conversion_ingestion_events (
+      id TEXT PRIMARY KEY, conversion_point_id TEXT NOT NULL,
+      result TEXT NOT NULL, reason TEXT, source_event_id TEXT,
+      friend_id TEXT, payload_shape_json TEXT, signature_sha256 TEXT,
+      created_at TEXT NOT NULL
     );
     CREATE TABLE conversion_events (
       id TEXT PRIMARY KEY, conversion_point_id TEXT NOT NULL, friend_id TEXT NOT NULL,

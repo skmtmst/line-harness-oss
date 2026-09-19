@@ -2838,6 +2838,167 @@ const spec = {
         },
       },
     },
+    '/api/conversions/definitions/{id}/publish': {
+      post: {
+        tags: ['Conversions'],
+        summary: '下書きの成果地点を公開して計測をはじめる',
+        description: '下書き(status=draft)の成果地点だけを計測中(active)へ進める。'
+          + '公開前の下書きは成果を数えない。過去の記録を失う変更ではない。',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['expectedVersion'],
+                properties: { expectedVersion: { type: 'integer', minimum: 1 } },
+              },
+            },
+          },
+        },
+        responses: {
+          '200': { description: '計測中になった' },
+          '400': { description: 'expectedVersion が不正' },
+          '404': { description: '見えない・存在しない成果地点' },
+          '409': { description: '版が進んでいる・下書きではない' },
+        },
+      },
+    },
+    '/api/conversions/definitions/{id}/ingest-secret': {
+      post: {
+        tags: ['Conversions'],
+        summary: '外部受信の鍵を発行・再発行する',
+        description: 'POST /api/conversions/ingest/{id} で使う HMAC 署名の鍵を発行する。'
+          + '平文の鍵はこの応答でだけ返り、DBには暗号化して保存する。'
+          + '再発行は古い鍵をその場で無効にする。',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['expectedVersion'],
+                properties: { expectedVersion: { type: 'integer', minimum: 1 } },
+              },
+            },
+          },
+        },
+        responses: {
+          '200': { description: '発行した鍵(平文はこの応答のみ)と受信URL' },
+          '400': { description: 'expectedVersion が不正' },
+          '404': { description: '見えない・存在しない成果地点' },
+          '409': { description: '版が進んでいる' },
+        },
+      },
+    },
+    '/api/conversions/definitions/{id}/ingest-disable': {
+      post: {
+        tags: ['Conversions'],
+        summary: '外部からの成果受信を止める(起点停止)',
+        description: '受信鍵は消さずに受け口だけ止める。再開は ingest-enable。'
+          + '止めている間の受信は拒否として受信履歴に残る。',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['expectedVersion'],
+                properties: { expectedVersion: { type: 'integer', minimum: 1 } },
+              },
+            },
+          },
+        },
+        responses: {
+          '200': { description: '外部受信を止めた' },
+          '400': { description: 'expectedVersion が不正' },
+          '404': { description: '見えない・存在しない成果地点' },
+          '409': { description: '版が進んでいる' },
+        },
+      },
+    },
+    '/api/conversions/definitions/{id}/ingest-enable': {
+      post: {
+        tags: ['Conversions'],
+        summary: '止めた外部受信を再開する',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['expectedVersion'],
+                properties: { expectedVersion: { type: 'integer', minimum: 1 } },
+              },
+            },
+          },
+        },
+        responses: {
+          '200': { description: '外部受信を再開した' },
+          '400': { description: 'expectedVersion が不正' },
+          '404': { description: '見えない・存在しない成果地点' },
+          '409': { description: '版が進んでいる' },
+        },
+      },
+    },
+    '/api/conversions/definitions/{id}/ingest-events': {
+      get: {
+        tags: ['Conversions'],
+        summary: '外部受信の成否履歴',
+        description: '受け取った/再送/拒否の記録。署名・本文・秘密値は含まず、'
+          + '署名のSHA-256と本文の項目名だけ残す。',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'limit', in: 'query', required: false, schema: { type: 'integer', minimum: 1, maximum: 200, default: 50 } },
+        ],
+        responses: {
+          '200': { description: '受信の成否履歴(新しい順)' },
+          '404': { description: '見えない・存在しない成果地点' },
+        },
+      },
+    },
+    '/api/conversions/ingest/{id}': {
+      post: {
+        tags: ['Conversions'],
+        summary: '外部システムからの成果受信(公開口・HMAC署名)',
+        description: '管理認証を通さない公開口。X-Conversion-Signature ヘッダに'
+          + '本文のHMAC-SHA256(hex)を、X-Conversion-Event-Id または本文の sourceEventId に'
+          + '再送を捌くイベントIDを入れる。成否は受信履歴に残る。',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                properties: {
+                  sourceEventId: { type: 'string', description: 'ヘッダの代わりに本文で渡せる' },
+                  friendId: { type: 'string' },
+                  lineUserId: { type: 'string' },
+                  value: { type: ['number', 'null'] },
+                  metadata: { type: 'object' },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          '200': { description: '受け取った。duplicated=true なら同じイベントの再送' },
+          '400': { description: 'JSONが壊れている・sourceEventIdや友だち特定情報が無い' },
+          '401': { description: '署名が無い・違う' },
+          '403': { description: '外部受信が止められている' },
+          '404': { description: '成果地点が存在しない' },
+          '409': { description: '計測中でない・同IDの別内容' },
+          '413': { description: '本文が大きすぎる(64KB超)' },
+          '422': { description: '友だちが見つからない・対象外' },
+          '503': { description: '受信鍵が未発行' },
+        },
+      },
+    },
     '/api/conversions/approvals/bulk': {
       post: {
         tags: ['Conversions'],

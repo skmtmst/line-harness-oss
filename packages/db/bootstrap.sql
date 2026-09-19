@@ -1684,23 +1684,50 @@ CREATE TABLE conversion_events (
   created_at           TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 , point_version_snapshot INTEGER, tenant_id TEXT REFERENCES tenants(id));
 
-CREATE TABLE conversion_points (
+CREATE TABLE conversion_ingestion_events (
+  id                  TEXT PRIMARY KEY,
+  conversion_point_id TEXT NOT NULL,
+  result              TEXT NOT NULL
+                      CHECK (result IN ('recorded', 'duplicate', 'rejected')),
+  reason              TEXT,
+  source_event_id     TEXT,
+  friend_id           TEXT,
+  payload_shape_json  TEXT,
+  signature_sha256    TEXT,
+  created_at          TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
+);
+
+CREATE TABLE "conversion_points" (
   id         TEXT PRIMARY KEY,
   name       TEXT NOT NULL,
   event_type TEXT NOT NULL,
   value      REAL,
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
-  status     TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'stopped')),
+  status     TEXT NOT NULL DEFAULT 'active'
+             CHECK (status IN ('active', 'stopped', 'draft')),
   stopped_at TEXT,
-  updated_at TEXT
-, measure_method TEXT NOT NULL DEFAULT 'manual'
-  CHECK (measure_method IN ('url_reach', 'webhook', 'manual')), target_url TEXT, count_repeat INTEGER NOT NULL DEFAULT 1, attribution_days INTEGER, line_account_id TEXT REFERENCES line_accounts(id) ON DELETE SET NULL, version INTEGER NOT NULL DEFAULT 1
-  CHECK (version > 0), source_config_json TEXT NOT NULL DEFAULT '{}'
-  CHECK (json_valid(source_config_json)), deduplication_mode TEXT NOT NULL DEFAULT 'every'
-  CHECK (deduplication_mode IN ('every', 'once_per_friend', 'window')), deduplication_window_days INTEGER
-  CHECK (deduplication_window_days IS NULL OR deduplication_window_days BETWEEN 1 AND 365), value_mode TEXT NOT NULL DEFAULT 'fixed'
-  CHECK (value_mode IN ('source', 'fixed', 'none')), reversal_policy TEXT NOT NULL DEFAULT 'manual'
-  CHECK (reversal_policy IN ('source_cancelled', 'manual', 'none')), tenant_id TEXT REFERENCES tenants(id));
+  updated_at TEXT,
+  measure_method TEXT NOT NULL DEFAULT 'manual'
+             CHECK (measure_method IN ('url_reach', 'webhook', 'manual')),
+  target_url TEXT,
+  count_repeat INTEGER NOT NULL DEFAULT 1,
+  attribution_days INTEGER,
+  line_account_id TEXT REFERENCES line_accounts(id) ON DELETE SET NULL,
+  version    INTEGER NOT NULL DEFAULT 1 CHECK (version > 0),
+  source_config_json TEXT NOT NULL DEFAULT '{}'
+             CHECK (json_valid(source_config_json)),
+  deduplication_mode TEXT NOT NULL DEFAULT 'every'
+             CHECK (deduplication_mode IN ('every', 'once_per_friend', 'window')),
+  deduplication_window_days INTEGER
+             CHECK (deduplication_window_days IS NULL OR deduplication_window_days BETWEEN 1 AND 365),
+  value_mode TEXT NOT NULL DEFAULT 'fixed'
+             CHECK (value_mode IN ('source', 'fixed', 'none')),
+  reversal_policy TEXT NOT NULL DEFAULT 'manual'
+             CHECK (reversal_policy IN ('source_cancelled', 'manual', 'none')),
+  tenant_id  TEXT REFERENCES tenants(id),
+  ingest_secret_encrypted TEXT,
+  ingest_disabled_at TEXT
+);
 
 CREATE TABLE customer_notification_definitions (
   id                    TEXT PRIMARY KEY,
@@ -6714,10 +6741,15 @@ CREATE UNIQUE INDEX idx_conversion_events_point_idempotency
 CREATE INDEX idx_conversion_events_tenant
   ON conversion_events(tenant_id);
 
+CREATE INDEX idx_conversion_ingestion_events_point
+  ON conversion_ingestion_events(conversion_point_id, created_at DESC);
+
+CREATE INDEX idx_conversion_points_ingest ON conversion_points(id)
+  WHERE ingest_secret_encrypted IS NOT NULL;
+
 CREATE INDEX idx_conversion_points_status ON conversion_points(status, created_at DESC);
 
-CREATE INDEX idx_conversion_points_tenant
-  ON conversion_points(tenant_id);
+CREATE INDEX idx_conversion_points_tenant ON conversion_points(tenant_id);
 
 CREATE INDEX idx_customer_notification_definitions_account
   ON customer_notification_definitions(line_account_id, status, category, name, id);
