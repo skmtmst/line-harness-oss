@@ -77,6 +77,9 @@ describe('Cron Trigger設定', () => {
       // N-327 (#663): 運用者通知の送り残しの回収。cron から外すと
       // retry_wait の行を誰も汲まなくなるので、ここで見張る。
       'sweepOperatorNotifications',
+      // N-369/N-370 (#938): 送信Webhookの送り残しの回収。同じく外すと
+      // retry_wait に積んだ再送が誰にも送られなくなる。
+      'sweepOutgoingWebhookDeliveries',
     ];
 
     for (const call of frequentHeavyCalls) expect(frequentHeavy).toContain(call);
