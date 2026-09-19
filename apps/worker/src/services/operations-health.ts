@@ -76,7 +76,7 @@ async function collectChecks(
         `SELECT COUNT(*) AS active_count,
                 COALESCE(SUM(CASE WHEN consecutive_failures > 0 THEN 1 ELSE 0 END), 0) AS failing_count,
                 COALESCE(MAX(consecutive_failures), 0) AS max_failures
-           FROM outgoing_webhooks WHERE line_account_id = ? AND is_active = 1`,
+           FROM outgoing_webhooks WHERE line_account_id = ? AND is_active = 1 AND deleted_at IS NULL`,
       ).bind(account.id).first<{ active_count: number; failing_count: number; max_failures: number }>();
       const failing = Number(row?.failing_count ?? 0);
       const maxFailures = Number(row?.max_failures ?? 0);

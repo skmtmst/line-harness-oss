@@ -657,7 +657,7 @@ export async function recordDeliveryOutcome(
       .prepare(
         `UPDATE outgoing_webhooks
             SET consecutive_failures = 0, last_failed_at = NULL
-          WHERE id = ? AND consecutive_failures != 0`,
+          WHERE id = ? AND consecutive_failures != 0 AND deleted_at IS NULL`,
       )
       .bind(webhookId)
       .run();
@@ -668,7 +668,7 @@ export async function recordDeliveryOutcome(
       `UPDATE outgoing_webhooks
           SET consecutive_failures = consecutive_failures + 1,
               last_failed_at = strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')
-        WHERE id = ?`,
+        WHERE id = ? AND deleted_at IS NULL`,
     )
     .bind(webhookId)
     .run();
