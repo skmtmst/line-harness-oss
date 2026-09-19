@@ -248,6 +248,195 @@ export async function stopCustomerNotificationDefinition(
   return saved;
 }
 
+/**
+ * N-330 (#943): 送信に使う顧客通知の正本を決める。
+ *
+ * その業務イベントに顧客通知定義がある場合は、定義だけが正本になる。
+ * `published` のときだけ送り、送る文面は確定済み版(`current_version_id`)の
+ * config から取る。`draft`・`stopped` は送らない。定義が無いイベントだけ、
+ * 呼び出し側は従来の `ec_notification_settings` を見る(未移行の互換)。
+ * 定義が1つでもあれば旧設定へ戻らない——読み書きの正本を1系統にするため。
+ */
+export interface CustomerNotificationSource {
+  definitionId: string;
+  name: string;
+  status: CustomerNotificationStatus;
+  versionId: string | null;
+  versionNumber: number | null;
+  config: Record<string, unknown>;
+}
+
+export async function getCustomerNotificationSource(
+  db: D1Database,
+  lineAccountId: string,
+  sourceEventType: string,
+): Promise<CustomerNotificationSource | null> {
+  const row = await db.prepare(`
+    SELECT d.id, d.name, d.status, d.current_version_id,
+           v.version_number, v.config_json
+      FROM customer_notification_definitions d
+      LEFT JOIN customer_notification_versions v ON v.id = d.current_version_id
+     WHERE d.line_account_id = ? AND d.source_event_type = ?
+     ORDER BY CASE WHEN d.status = 'published' THEN 0 ELSE 1 END,
+              d.updated_at DESC, d.id
+     LIMIT 1
+  `).bind(lineAccountId, sourceEventType).first<{
+    id: string; name: string; status: CustomerNotificationStatus;
+    current_version_id: string | null;
+    version_number: number | null; config_json: string | null;
+  }>();
+  if (!row) return null;
+  let config: Record<string, unknown> = {};
+  if (row.config_json) {
+    try {
+      const parsed = JSON.parse(row.config_json) as unknown;
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        config = parsed as Record<string, unknown>;
+      }
+    } catch {
+      config = {};
+    }
+  }
+  return {
+    definitionId: row.id,
+    name: row.name,
+    status: row.status,
+    versionId: row.current_version_id,
+    versionNumber: row.version_number == null ? null : Number(row.version_number),
+    config,
+  };
+}
+
+export type CustomerEcDeliveryFinish =
+  | { kind: 'accepted'; providerRequestId?: string | null }
+  | { kind: 'excluded'; errorCode: string; errorMessage: string }
+  | { kind: 'failed'; errorCode: string; errorMessage: string };
+
+/**
+ * N-328 (#943): EC取引イベントからの顧客送信を共通送信台帳へ書く。
+ *
+ * 同一外部イベントは `(line_account_id, dedupe_key)` の通知1件、
+ * `(line_account_id, idempotency_key)` の送達1件へ畳む。EC側の再送や
+ * イベント処理のやり直しで台帳の行が増えない。送達の冪等キーには
+ * LINE へ渡す固定 retry key をそのまま使うので、再試行は新しい送達行を
+ * 作らず同じ行を確定する。
+ *
+ * `attemptedSend` のときだけ試行履歴を足し、送達の `attempts` を進める。
+ * 送信対象外・送信済みの記録直し(自己復旧)は「この処理では送っていない」
+ * ため試行を増やさない。一度 `provider_accepted` になった送達は、
+ * 後から来る失敗・対象外の記録で戻さない。
+ */
+export async function recordCustomerEcDelivery(
+  db: D1Database,
+  input: {
+    lineAccountId: string;
+    sourceEventType: string;
+    /** EC側の外部イベントID。再送でも変わらない。 */
+    sourceEventId: string;
+    /** 友だちID。友だち未確定のときは届け先の LINE user id を入れる。 */
+    recipientId: string;
+    /** 送信に使った固定 retry key(X-Line-Retry-Key と同じ値)。 */
+    idempotencyKey: string;
+    metadata?: Record<string, unknown>;
+    definitionId?: string | null;
+    definitionVersionId?: string | null;
+    /** この処理で実際にLINE送信を試みたか。試行履歴と回数を足すかの印。 */
+    attemptedSend: boolean;
+    finish: CustomerEcDeliveryFinish;
+  },
+): Promise<void> {
+  const now = jstNow();
+  const dedupeKey = `ec:${input.sourceEventId}`;
+  const instanceStatus = input.finish.kind === 'accepted'
+    ? 'completed'
+    : input.finish.kind === 'excluded' ? 'excluded' : 'failed';
+  const metadata = input.metadata ? JSON.stringify(input.metadata) : null;
+  await db.prepare(`
+    INSERT INTO notification_instances
+      (id, line_account_id, audience_type, definition_id, definition_version_id,
+       source_event_type, source_event_id, source_metadata_json, dedupe_key,
+       status, created_at, updated_at)
+    VALUES (?, ?, 'customer', ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(line_account_id, dedupe_key) DO UPDATE SET
+      status = CASE WHEN notification_instances.status = 'completed'
+                    THEN 'completed' ELSE excluded.status END,
+      definition_id = COALESCE(notification_instances.definition_id, excluded.definition_id),
+      definition_version_id = COALESCE(
+        notification_instances.definition_version_id, excluded.definition_version_id),
+      source_metadata_json = COALESCE(
+        notification_instances.source_metadata_json, excluded.source_metadata_json),
+      updated_at = excluded.updated_at
+  `).bind(
+    crypto.randomUUID(), input.lineAccountId,
+    input.definitionId ?? null, input.definitionVersionId ?? null,
+    input.sourceEventType, input.sourceEventId, metadata, dedupeKey,
+    instanceStatus, now, now,
+  ).run();
+  const instance = await db.prepare(`
+    SELECT id FROM notification_instances
+     WHERE line_account_id = ? AND dedupe_key = ?
+  `).bind(input.lineAccountId, dedupeKey).first<{ id: string }>();
+  if (!instance) throw new Error('notification instance was not recorded');
+
+  const deliveryStatus = input.finish.kind === 'accepted'
+    ? 'provider_accepted'
+    : input.finish.kind === 'excluded' ? 'excluded' : 'failed';
+  const attemptDelta = input.attemptedSend ? 1 : 0;
+  const providerRequestId = input.finish.kind === 'accepted'
+    ? input.finish.providerRequestId ?? null
+    : null;
+  const errorCode = input.finish.kind === 'accepted' ? null : input.finish.errorCode;
+  const errorMessage = input.finish.kind === 'accepted' ? null : input.finish.errorMessage;
+  await db.prepare(`
+    INSERT INTO notification_deliveries
+      (id, line_account_id, instance_id, audience_type, recipient_type, recipient_id,
+       channel, idempotency_key, status, retryable, attempts, provider_request_id,
+       provider_status, error_code, error_message_safe, queued_at, accepted_at,
+       failed_at, execution_mode, version, updated_at)
+    VALUES (?, ?, ?, 'customer', 'friend', ?, 'line', ?, ?, 0, ?, ?, ?, ?, ?,
+            ?, ?, ?, 'automatic', 1, ?)
+    ON CONFLICT(line_account_id, idempotency_key) DO UPDATE SET
+      status = excluded.status,
+      attempts = notification_deliveries.attempts + excluded.attempts,
+      provider_request_id = COALESCE(
+        excluded.provider_request_id, notification_deliveries.provider_request_id),
+      provider_status = excluded.provider_status,
+      error_code = excluded.error_code,
+      error_message_safe = excluded.error_message_safe,
+      accepted_at = COALESCE(excluded.accepted_at, notification_deliveries.accepted_at),
+      failed_at = CASE WHEN excluded.status = 'failed'
+                       THEN excluded.failed_at ELSE notification_deliveries.failed_at END,
+      version = notification_deliveries.version + 1,
+      updated_at = excluded.updated_at
+    WHERE notification_deliveries.status != 'provider_accepted'
+  `).bind(
+    crypto.randomUUID(), input.lineAccountId, instance.id, input.recipientId,
+    input.idempotencyKey, deliveryStatus, attemptDelta, providerRequestId,
+    deliveryStatus, errorCode, errorMessage, now,
+    deliveryStatus === 'provider_accepted' ? now : null,
+    deliveryStatus === 'failed' ? now : null,
+    now,
+  ).run();
+
+  if (!input.attemptedSend) return;
+  const delivery = await db.prepare(`
+    SELECT id, attempts FROM notification_deliveries
+     WHERE line_account_id = ? AND idempotency_key = ?
+  `).bind(input.lineAccountId, input.idempotencyKey).first<{ id: string; attempts: number }>();
+  if (!delivery) throw new Error('notification delivery was not recorded');
+  await db.prepare(`
+    INSERT OR IGNORE INTO notification_delivery_attempts
+      (id, delivery_id, attempt_number, retry_key, outcome,
+       provider_request_id, error_code, error_message_safe, attempted_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).bind(
+    crypto.randomUUID(), delivery.id, Number(delivery.attempts) || 1,
+    input.idempotencyKey,
+    deliveryStatus === 'provider_accepted' ? 'provider_accepted' : 'failed',
+    providerRequestId, errorCode, errorMessage, now,
+  ).run();
+}
+
 export interface NotificationDeliveryListRow {
   id: string;
   audience_type: 'customer' | 'operator';

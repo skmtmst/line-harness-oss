@@ -63,7 +63,7 @@ export default function NewOperatorNotificationPage() {
   useEffect(() => {
     let active = true
     if (!selectedAccountId) { setRecipients(null); setRecipientIds([]); return }
-    void api.notifications.operatorRules.previewRecipients({
+    void api.lineNotifications.operatorRules.previewRecipients({
       lineAccountId: selectedAccountId,
       channels: ['dashboard', 'line'],
     }).then((result) => {
@@ -117,8 +117,8 @@ export default function NewOperatorNotificationPage() {
       }
       // 2回目以降は作り直さず書き換える。作り直すと同じお知らせが増える。
       const result = savedRuleId
-        ? await api.notifications.rules.update(savedRuleId, selectedAccountId, payload)
-        : await api.notifications.rules.create({ lineAccountId: selectedAccountId, ...payload })
+        ? await api.lineNotifications.operatorRules.updateDraft(savedRuleId, selectedAccountId, payload)
+        : await api.lineNotifications.operatorRules.create({ lineAccountId: selectedAccountId, ...payload })
       if (!result.success) throw new Error('save failed')
       setSavedRuleId(result.data.id)
       setError('')
@@ -144,7 +144,7 @@ export default function NewOperatorNotificationPage() {
     if (!ruleId) return
     setSaving(true); setError('')
     try {
-      await api.notifications.operatorRules.publish(ruleId, selectedAccountId)
+      await api.lineNotifications.operatorRules.publish(ruleId, selectedAccountId)
       router.push(`/line-notifications?tab=operator&highlight=${encodeURIComponent(ruleId)}`)
     } catch (caught) {
       setError(caught instanceof ApiError ? caught.message : '公開できませんでした。')
@@ -157,7 +157,7 @@ export default function NewOperatorNotificationPage() {
     if (!ruleId) return
     setSaving(true); setError(''); setNotice('')
     try {
-      const result = await api.notifications.operatorRules.test(ruleId, selectedAccountId)
+      const result = await api.lineNotifications.operatorRules.test(ruleId, selectedAccountId)
       if (!result.success) throw new Error(result.error)
       // 成功は緑の枠で出す。赤い失敗枠には入れない。
       setNotice(result.data.accepted > 0 ? '自分へのテスト送信を受け付けました。' : '受け取れる通知方法がありません。受信設定を確認してください。')
@@ -262,7 +262,7 @@ export default function NewOperatorNotificationPage() {
         actions={<>
           <Button href="/line-notifications?tab=operator" variant="secondary">やめる</Button>
           <Button onClick={() => void saveDraft()} disabled={saving}>{saving ? '保存中…' : savedRuleId ? '保存し直す' : '下書きに保存'}</Button>
-          <Button onClick={() => void publish()} disabled={saving} variant="primary">出す</Button>
+          <Button onClick={() => void publish()} disabled={saving} variant="primary">運用者へのお知らせを公開</Button>
         </>}
       />
     </div>

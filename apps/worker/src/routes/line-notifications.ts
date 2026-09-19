@@ -273,7 +273,11 @@ lineNotifications.post(
     const draft = jsonObject(current.definition.draft_config_json) as CustomerDraft;
     const draftError = validateCustomerDraft(draft);
     if (draftError) return c.json({ success: false, error: draftError }, 400);
-    if (!Array.isArray(draft.lineTemplate) || draft.lineTemplate.length === 0) {
+    // N-330 (#943): ECイベントがきっかけの定義は、送信文面をイベント内容
+    // から組み立てる(ecFlexMessage)ので、静的なLINEテンプレートは要らない。
+    // それ以外の定義は、送る中身が無いまま公開できないようテンプレートを必須にする。
+    if (!current.definition.source_event_type.startsWith('ec.')
+        && (!Array.isArray(draft.lineTemplate) || draft.lineTemplate.length === 0)) {
       return c.json({ success: false, code: 'incomplete_draft', error: 'LINEで送る内容を設定してください' }, 409);
     }
     try {

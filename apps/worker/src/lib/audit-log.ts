@@ -69,6 +69,7 @@ export type AuditAction =
   | 'nen.column.import'
   | 'nen.delivery.pending_now'
   | 'operator_notification.rule.publish'
+  | 'operator_notification.rule.stop'
   | 'operator_notification.rule.test'
   | 'operator_notification.delivery.export'
   | 'nen.delivery.retry'

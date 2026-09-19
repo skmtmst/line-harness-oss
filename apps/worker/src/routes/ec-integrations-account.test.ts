@@ -9,12 +9,16 @@ const mocks = vi.hoisted(() => ({
   upsertReadModels: vi.fn(),
   attachOrderFriend: vi.fn(),
   setActionStatus: vi.fn(),
+  getCustomerSource: vi.fn(),
+  recordEcDelivery: vi.fn(),
 }));
 vi.mock('@line-crm/db', () => ({
   attachEcOrderFriend: mocks.attachOrderFriend,
+  getCustomerNotificationSource: mocks.getCustomerSource,
   getLineAccountById: mocks.getAccount,
   getFriendByLineUserIdForAccount: mocks.getFriend,
   jstNow: vi.fn(() => '2026-08-28 02:00:00'),
+  recordCustomerEcDelivery: mocks.recordEcDelivery,
   setEcActionExecutionStatus: mocks.setActionStatus,
   upsertEcEventReadModels: mocks.upsertReadModels,
 }));
@@ -86,6 +90,9 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.getAccount.mockResolvedValue({ id: 'account-a', is_active: 1, channel_access_token: 'account-token' });
   mocks.getFriend.mockResolvedValue(null);
+  // 顧客通知定義が無い＝従来設定を見る既定の形。
+  mocks.getCustomerSource.mockResolvedValue(null);
+  mocks.recordEcDelivery.mockResolvedValue(undefined);
 });
 
 describe('EC-CUBE event account and identity boundary', () => {
