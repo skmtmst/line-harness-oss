@@ -52,6 +52,7 @@ beforeEach(() => {
   );
   insert.run('friend-a', 'U-shared', '店舗A', 'account-a');
   insert.run('friend-b', 'U-shared', '店舗B', 'account-b');
+  insert.run('friend-u', 'U-free', '未割当', null);
   db = asD1(sqlite);
 });
 
@@ -61,37 +62,39 @@ afterEach(() => {
 });
 
 describe('getFriendByLineUserIdForAccount', () => {
-  test('指定アカウントの行を優先し、警告を出さない', async () => {
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
-
+  test('指定アカウントの行を優先する', async () => {
     const friend = await getFriendByLineUserIdForAccount(db, 'U-shared', 'account-b');
 
     expect(friend?.id).toBe('friend-b');
-    expect(warn).not.toHaveBeenCalled();
   });
 
-  test('指定アカウントに無い場合は従来検索へフォールバックし、安全な警告だけを出す', async () => {
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
-
+  test('他アカウント所有の行しか無い場合は null を返す（跨ぎフォールバック廃止）', async () => {
+    // Issue #961: account-missing に該当者が無くても account-a/b の行を
+    // 返してはいけない。返すと「friend=別アカウント・送信元=受信アカウント」の
+    // 履歴が作られる。
     const friend = await getFriendByLineUserIdForAccount(db, 'U-shared', 'account-missing');
 
-    expect(friend?.id).toBe('friend-a');
-    expect(warn).toHaveBeenCalledWith({
-      event: 'friend_lookup_account_fallback',
-      line_account_id: 'account-missing',
-      found_line_account_id: 'account-a',
-      path: 'getFriendByLineUserIdForAccount',
-    });
-    expect(JSON.stringify(warn.mock.calls)).not.toContain('U-shared');
+    expect(friend).toBeNull();
   });
 
-  test('指定アカウントにも従来検索にも無い場合は警告を出さない', async () => {
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+  test('未割当 (line_account_id IS NULL) の行は指定アカウントの解決に含める', async () => {
+    // 未割当行は「どのアカウントのものでもない」ため、アカウントスコープの
+    // 解決対象に含める。引き当てるかは呼出側の判断（webhook は受信時に引き当てる）。
+    const friend = await getFriendByLineUserIdForAccount(db, 'U-free', 'account-a');
 
+    expect(friend?.id).toBe('friend-u');
+  });
+
+  test('lineAccountId 未指定はアカウント文脈なしのレガシー呼出として先頭一致を返す', async () => {
+    const friend = await getFriendByLineUserIdForAccount(db, 'U-shared', null);
+
+    expect(friend).not.toBeNull();
+  });
+
+  test('同一アカウントにも未割当にも無い場合は null を返す', async () => {
     const friend = await getFriendByLineUserIdForAccount(db, 'U-new', 'account-a');
 
     expect(friend).toBeNull();
-    expect(warn).not.toHaveBeenCalled();
   });
 });
 
