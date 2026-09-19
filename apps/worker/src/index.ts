@@ -1003,6 +1003,10 @@ app.get('/o', async (c) => {
   if (id) liffParams.set('id', id);
   const slug = c.req.query('slug');
   if (slug) liffParams.set('slug', slug);
+  // N-396: 管理画面が発行する「予約履歴URL」は salon-book の view=history を
+  // 指す。任意の view を通すと未定義画面へ誘導できてしまうので、履歴だけを通す。
+  const view = c.req.query('view');
+  if (page === 'salon-book' && view === 'history') liffParams.set('view', view);
   const liffTarget = `https://liff.line.me/${liffId}?${liffParams.toString()}`;
 
   const ua = (c.req.header('user-agent') || '').toLowerCase();
