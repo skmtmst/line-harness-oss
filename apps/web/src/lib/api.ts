@@ -3176,6 +3176,24 @@ export type ScenarioMeasuredMetric = {
   reason?: string
 }
 
+/**
+ * 友だち単位の購読1行（#949 N-054 の操作対象）。
+ * `pauseReason` で「手動停止」「この通を送ったら止める」「配信失敗」を
+ * 区別し、画面は「再開」と「失敗を再送」を出し分ける。
+ */
+export type FriendScenarioSubscription = {
+  id: string
+  friendId: string
+  scenarioId: string
+  currentStepOrder: number
+  status: 'active' | 'paused' | 'completed' | 'delivering' | string
+  startedAt: string
+  nextDeliveryAt: string | null
+  publishedVersionId: string | null
+  pauseReason: 'manual' | 'after_send' | 'delivery_failed' | string | null
+  updatedAt: string
+}
+
 /** 購読・テスト送信・送信枠・通別結果をまとめた機能5 V6の読取結果。 */
 export type ScenarioRuns = {
   summary: { active: number; paused: number; completed: number; delivering: number }
@@ -3187,6 +3205,8 @@ export type ScenarioRuns = {
     currentStepOrder: number
     startedAt: string
     nextDeliveryAt: string | null
+    /** なぜ止まっているか（432）。止まっていない行・古い行は null。 */
+    pauseReason?: string | null
     updatedAt: string
   }>
   pagination: { total: number; limit: number; cursor: string; nextCursor: string | null }
@@ -6317,6 +6337,42 @@ export const api = {
         `/api/scenarios/${scenarioId}/enroll/${friendId}`,
         { method: 'POST' },
       ),
+    /*
+     * 友だち単位の購読操作（#949 N-054）。
+     * どれも確認キー（Idempotency-Key）が要る。二度押し・再送で
+     * 同じ操作が2回走らないように、呼び出し側は IdempotencyKeyStore で
+     * 同じ署名へ同じキーを当てる。
+     */
+    subscriptionOps: {
+      /** 進行中の購読を手動で止める。 */
+      pause: (subscriptionId: string, idempotencyKey: string) =>
+        fetchApi<ApiResponse<FriendScenarioSubscription>>(
+          `/api/scenario-subscriptions/${subscriptionId}/pause`,
+          { method: 'POST', headers: { 'Idempotency-Key': idempotencyKey } },
+        ),
+      /** 止まっている購読を続きから再開する。 */
+      resume: (subscriptionId: string, idempotencyKey: string) =>
+        fetchApi<ApiResponse<FriendScenarioSubscription>>(
+          `/api/scenario-subscriptions/${subscriptionId}/resume`,
+          { method: 'POST', headers: { 'Idempotency-Key': idempotencyKey } },
+        ),
+      /** 配信失敗で止まった購読を、失敗した通から送り直す。 */
+      retry: (subscriptionId: string, idempotencyKey: string) =>
+        fetchApi<ApiResponse<FriendScenarioSubscription>>(
+          `/api/scenario-subscriptions/${subscriptionId}/retry`,
+          { method: 'POST', headers: { 'Idempotency-Key': idempotencyKey } },
+        ),
+      /** 購読を別のシナリオへ移す。返るのは移し先でできた新しい購読。 */
+      move: (subscriptionId: string, targetScenarioId: string, idempotencyKey: string) =>
+        fetchApi<ApiResponse<FriendScenarioSubscription>>(
+          `/api/scenario-subscriptions/${subscriptionId}/move`,
+          {
+            method: 'POST',
+            headers: { 'Idempotency-Key': idempotencyKey },
+            body: JSON.stringify({ targetScenarioId }),
+          },
+        ),
+    },
     stats: (id: string) =>
       fetchApi<ApiResponse<{
         enrolledTotal: number

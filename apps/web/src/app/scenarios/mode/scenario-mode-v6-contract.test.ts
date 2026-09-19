@@ -25,7 +25,9 @@ describe('V6 シナリオ作成・配信方式 cCB7r', () => {
     */
     expect(page).toContain("import StepTrail from '@/components/shared/step-trail'")
     expect(page).toContain('label="シナリオ作成の進み方"')
-    expect(page).toContain("{ label: 'シナリオ情報', state: 'done' }")
+    // id なし（新規）は名前と方式をこの画面でまとめて決めるので1段目は current。
+    // id あり（既存の下書きを開いた）は1段目は済んでいる（#949 N-055）。
+    expect(page).toContain("{ label: 'シナリオ情報', state: id ? 'done' : 'current' }")
     expect(page).toContain("{ label: '配信方式', state: 'current' }")
     expect(page).toContain("{ label: '1通目を設定', state: 'todo' }")
   })
@@ -43,8 +45,8 @@ describe('V6 シナリオ作成・配信方式 cCB7r', () => {
   })
 
   it('フォルダを取得できないとき未分類と決めつけず変更を止める', () => {
-    expect(page).toContain("useState<'loading' | 'ready' | 'error'>('loading')")
-    expect(page).toContain("disabled={!scenario || folderState !== 'ready' || detailsSaving || saving !== null}")
+    expect(page).toContain("useState<'loading' | 'ready' | 'error'>(\n    id ? 'loading' : 'ready',\n  )")
+    expect(page).toContain("disabled={(Boolean(id) && !scenario) || folderState !== 'ready' || detailsSaving || saving !== null}")
     expect(page).toContain('フォルダを確認できないため、いまは変更できません。')
     expect(page).toContain("folderState === 'error'")
     expect(page).toContain("? '確認できません'")
@@ -54,20 +56,26 @@ describe('V6 シナリオ作成・配信方式 cCB7r', () => {
 
   it('選んだ配信方式とフォルダを保存してから3段目へ進む', () => {
     const choose = page.slice(page.indexOf('const choose = async'), page.indexOf('const continueAsDraft'))
+    // 既存（id あり）は保存してから進む。保存呼び出しは既存側の push より前。
     expect(choose.indexOf('api.scenarios.update(id, {')).toBeGreaterThan(-1)
     expect(choose.indexOf('api.scenarios.update(id, {')).toBeLessThan(
-      choose.indexOf('router.push(`/scenarios/first-step'),
+      choose.lastIndexOf('router.push(`/scenarios/first-step'),
     )
     expect(choose).toContain('folderId: folderId || null')
     expect(choose).toContain('deliveryMode: mode')
     expect(choose).toContain('router.push(`/scenarios/first-step?id=${encodeURIComponent(id)}`)')
+    // 新規（id なし）はこの確定で初めて行を作り、できた id で3段目へ進む。
+    expect(choose).toContain('const createdId = await createNew(mode)')
+    expect(choose).toContain('router.push(`/scenarios/first-step?id=${encodeURIComponent(createdId)}`)')
   })
 
   it('下書きで続ける場合も名前とフォルダの保存成功後だけ進む', () => {
     const start = page.indexOf('const continueAsDraft')
-    const draft = page.slice(start, page.indexOf("if (!id) {", start))
+    const draft = page.slice(start, page.indexOf('const selectedFolderName', start))
+    // id あり（既存）は保存してから進む。id なし（新規）はこの確定で初めて作る。
     expect(draft).toContain('const saved = await saveDetails()')
     expect(draft).toContain('if (saved) router.push(`/scenarios/first-step')
+    expect(draft).toContain("createNew('absolute_time')")
     expect(page).not.toContain('href={`/scenarios/first-step')
   })
 
@@ -78,11 +86,25 @@ describe('V6 シナリオ作成・配信方式 cCB7r', () => {
   })
 
   it('シナリオ読込中・失敗時に作成済みと表示せず方式の確定を止める', () => {
-    expect(page).toContain("useState<'loading' | 'ready' | 'error'>('loading')")
     expect(page).toContain('data-list-state={scenarioState}')
     expect(page).toContain("scenarioState === 'loading'")
     expect(page).toContain("scenarioState === 'ready' && scenario")
-    expect(page).toContain('disabled={!scenario || detailsSaving}')
+    expect(page).toContain('disabled={(Boolean(id) && !scenario) || detailsSaving}')
     expect(page).toContain('disabled={disabled || saving !== null}')
+  })
+
+  it('一覧の「作成」は行を作らず、この画面が確定の時点で初めて作る（#949 N-055）', () => {
+    /*
+     * 以前は一覧のボタンで POST /api/scenarios を打ち、方式選択や1通目の
+     * 設定を放り出されると名前も通も無い空の行が残った。作るのは
+     * この画面で方式（または「あとで決める」）を確定したときだけ。
+     */
+    expect(page).toContain('api.scenarios.create({')
+    const create = page.slice(page.indexOf('const createNew = async'), page.indexOf('const choose = async'))
+    expect(create).toContain('deliveryMode: mode')
+    expect(create).toContain('folderId: folderId || null')
+    expect(create).toContain('シナリオ名を入力してください')
+    // 途中で閉じても残らないことを画面でも断る。
+    expect(page).toContain('途中で閉じても一覧には残りません。')
   })
 })

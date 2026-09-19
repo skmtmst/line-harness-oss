@@ -9,7 +9,13 @@ import {
   updateScenarioStep,
   deleteScenarioStep,
   enrollFriendInScenario,
+  getFriendScenarioById,
+  pauseFriendScenarioManual,
+  resumeFriendScenarioById,
+  retryFailedFriendScenario,
+  moveFriendScenarioTo,
   getFriendById,
+  jstNow,
   getScenarioPublishedVersion,
   publishScenarioVersion,
   computeNextDeliveryAt,
@@ -37,7 +43,7 @@ import type {
   DeliveryMode,
 } from '@line-crm/db';
 import type { Env } from '../index.js';
-import { requireRole } from '../middleware/role-guard.js';
+import { requireRole, requirePermission } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 import { resolveRequestBoundary } from '../services/request-boundary.js';
 import { validateTemplateMessage } from '../services/template-message-validation.js';
@@ -364,6 +370,9 @@ function serializeFriendScenario(row: DbFriendScenario) {
     nextDeliveryAt: row.next_delivery_at,
     // 開始時に固定した公開版。null は版より前の購読。
     publishedVersionId: row.published_version_id ?? null,
+    // なぜ止まっているか（432）。画面はこれで「再開」と「失敗を再送」を
+    // 出し分ける。止まっていない行・古い行は null。
+    pauseReason: row.pause_reason ?? null,
     updatedAt: row.updated_at,
   };
 }
@@ -557,6 +566,7 @@ scenarios.post('/api/scenarios', requireRole('owner', 'admin'), async (c) => {
       lineAccountId?: string | null;
       deliveryMode?: string;
       allowConcurrent?: boolean;
+      folderId?: string | null;
     }>();
 
     if (!body.name || !body.triggerType) {
@@ -593,6 +603,13 @@ scenarios.post('/api/scenarios', requireRole('owner', 'admin'), async (c) => {
     // createScenario() always sets is_active=1; override if the caller requested inactive
     if (body.isActive === false) {
       const updated = await updateScenario(c.env.DB, scenario.id, { is_active: 0 });
+      if (updated) scenario = updated;
+    }
+
+    // フォルダは create の中身に入っていないので、指定があればここで付ける
+    // （#949 N-055: 新規作成画面が名前・フォルダ・方式をまとめて送る）。
+    if (body.folderId !== undefined) {
+      const updated = await updateScenario(c.env.DB, scenario.id, { folder_id: body.folderId });
       if (updated) scenario = updated;
     }
 
@@ -1841,8 +1858,15 @@ async function runTestSend(
       friendId,
       scenario.line_account_id,
       c.env.WORKER_URL || new URL(c.req.url).origin,
+      // N-057: 送信先×対象（全通 or 1通）で短い間隔の重複実送信を止める。
+      { dedupeKey: `${scenarioId}:${stepId ?? 'all'}` },
     );
-    if (!result.ok) return c.json({ success: false, error: result.error }, 400);
+    if (!result.ok) {
+      return c.json(
+        { success: false, error: result.error },
+        result.deduped ? 409 : 400,
+      );
+    }
     return c.json({ success: true, data: { sent: result.sent } });
   } catch (err) {
     console.error('scenario test-send error:', err);
@@ -1952,6 +1976,281 @@ scenarios.delete(
       return c.json({ success: true });
     } catch (err) {
       console.error('DELETE /api/scenarios/:id/triggers/:triggerId error:', err);
+      return c.json({ success: false, error: 'Internal server error' }, 500);
+    }
+  },
+);
+
+// ============================================================
+// 友だち単位の購読操作（#949 N-054 / 機能05）
+//
+// 画面は「いま届いている・止まっている購読1行」に対して止める・再開する・
+// 別のシナリオへ移す・失敗を再送する。対象は friend_scenarios の id で
+// 指す。友だちの所属アカウントが見える範囲外なら 404 で存在を隠す。
+//
+// 全部で Idempotency-Key を必須にする。同じキーの再送は残っている結果を
+// そのまま返し、別の購読・別の操作への使い回しは 409 にする
+// （friend_scenario_op_keys / 432）。
+// ============================================================
+
+type FriendScenarioOp = 'pause' | 'resume' | 'move' | 'retry';
+
+interface FriendOpOutcome {
+  status: 200 | 201 | 400 | 404 | 409 | 422;
+  body: { success: boolean; data?: unknown; error?: string };
+}
+
+/**
+ * 購読操作の共通骨組み。
+ *
+ * 1. 確認キー（Idempotency-Key）の形を見る。無ければ 400。
+ * 2. 購読行と友だちを読み、友だちの所属アカウントが範囲外なら 404。
+ * 3. 台帳へキーを予約する（INSERT OR IGNORE）。先に入っているなら、
+ *    同じ購読・同じ操作の結果をそのまま返し、別の使い回しは 409。
+ * 4. 操作を走らせ、結果を台帳へ残す。失敗で pin しないよう、
+ *    500 系の例外時は予約を外してから投げ直す。
+ */
+async function runFriendScenarioOp(
+  c: Context<Env>,
+  op: FriendScenarioOp,
+  run: (subscription: DbFriendScenario) => Promise<FriendOpOutcome>,
+): Promise<Response> {
+  const key = c.req.header('Idempotency-Key');
+  if (!validScenarioPublishKey(key)) {
+    return c.json({ success: false, error: '操作の確認キーが必要です' }, 400);
+  }
+  const db = c.env.DB;
+  const subscriptionId = c.req.param('subscriptionId') ?? '';
+
+  const subscription = await getFriendScenarioById(db, subscriptionId);
+  if (!subscription) {
+    return c.json({ success: false, error: '購読が見つかりません' }, 404);
+  }
+  const friend = await getFriendById(db, subscription.friend_id);
+  const friendAccountId = (friend as { line_account_id?: string | null } | null)?.line_account_id ?? null;
+  if (!friend || !await canAccessAllLineAccounts(db, c.get('staff'), [friendAccountId])) {
+    return c.json({ success: false, error: '購読が見つかりません' }, 404);
+  }
+
+  const claimed = await db.prepare(
+    `INSERT OR IGNORE INTO friend_scenario_op_keys
+       (op_idempotency_key, friend_scenario_id, op, response_json, created_at)
+     VALUES (?, ?, ?, 'PENDING', ?)`,
+  ).bind(key, subscriptionId, op, jstNow()).run();
+
+  if ((claimed.meta.changes ?? 0) === 0) {
+    const existing = await db.prepare(
+      `SELECT friend_scenario_id, op, response_json FROM friend_scenario_op_keys
+        WHERE op_idempotency_key = ?`,
+    ).bind(key).first<{ friend_scenario_id: string; op: string; response_json: string }>();
+    if (!existing || existing.friend_scenario_id !== subscriptionId || existing.op !== op) {
+      return c.json(
+        { success: false, error: '同じ確認キーが別の操作で使われています' },
+        409,
+      );
+    }
+    if (existing.response_json === 'PENDING') {
+      return c.json(
+        { success: false, error: '同じ操作を処理中です。しばらく待ってからやり直してください' },
+        409,
+      );
+    }
+    const stored = JSON.parse(existing.response_json) as FriendOpOutcome;
+    return c.json(stored.body, stored.status);
+  }
+
+  try {
+    const outcome = await run(subscription);
+    await db.prepare(
+      `UPDATE friend_scenario_op_keys SET response_json = ?
+        WHERE op_idempotency_key = ?`,
+    ).bind(JSON.stringify(outcome), key).run();
+    return c.json(outcome.body, outcome.status);
+  } catch (err) {
+    // 台帳に失敗を pin しない。予約だけ外して例外を上へ返す。
+    await db.prepare(
+      `DELETE FROM friend_scenario_op_keys WHERE op_idempotency_key = ?`,
+    ).bind(key).run();
+    throw err;
+  }
+}
+
+// POST /api/scenario-subscriptions/:subscriptionId/pause — 手動で止める
+scenarios.post(
+  '/api/scenario-subscriptions/:subscriptionId/pause',
+  requirePermission('scenario.subscription.edit'),
+  async (c) => {
+    try {
+      return await runFriendScenarioOp(c, 'pause', async (subscription) => {
+        if (subscription.status === 'paused') {
+          return {
+            status: 200,
+            body: { success: true, data: serializeFriendScenario(subscription) },
+          };
+        }
+        if (subscription.status === 'delivering') {
+          return {
+            status: 409,
+            body: { success: false, error: 'いま配信を処理中です。少し待ってから止めてください' },
+          };
+        }
+        const paused = await pauseFriendScenarioManual(c.env.DB, subscription.id);
+        if (!paused) {
+          return {
+            status: 409,
+            body: { success: false, error: 'すでに終わっている購読は止められません' },
+          };
+        }
+        const row = await getFriendScenarioById(c.env.DB, subscription.id);
+        return {
+          status: 200,
+          body: { success: true, data: serializeFriendScenario(row ?? subscription) },
+        };
+      });
+    } catch (err) {
+      console.error('POST /api/scenario-subscriptions/:id/pause error:', err);
+      return c.json({ success: false, error: 'Internal server error' }, 500);
+    }
+  },
+);
+
+// POST /api/scenario-subscriptions/:subscriptionId/resume — 止まっている購読を再開する
+scenarios.post(
+  '/api/scenario-subscriptions/:subscriptionId/resume',
+  requirePermission('scenario.subscription.edit'),
+  async (c) => {
+    try {
+      return await runFriendScenarioOp(c, 'resume', async (subscription) => {
+        if (subscription.status === 'active') {
+          return {
+            status: 200,
+            body: { success: true, data: serializeFriendScenario(subscription) },
+          };
+        }
+        if (subscription.status === 'delivering') {
+          return {
+            status: 409,
+            body: { success: false, error: 'いま配信を処理中です。少し待ってから再開してください' },
+          };
+        }
+        if (subscription.status === 'completed') {
+          return {
+            status: 409,
+            body: { success: false, error: '終わった購読は再開できません' },
+          };
+        }
+        const resumed = await resumeFriendScenarioById(c.env.DB, subscription.id);
+        if (!resumed) {
+          return {
+            status: 409,
+            body: { success: false, error: 'この購読は再開できません（シナリオ停止・続きの通なし）' },
+          };
+        }
+        return { status: 200, body: { success: true, data: serializeFriendScenario(resumed) } };
+      });
+    } catch (err) {
+      console.error('POST /api/scenario-subscriptions/:id/resume error:', err);
+      return c.json({ success: false, error: 'Internal server error' }, 500);
+    }
+  },
+);
+
+// POST /api/scenario-subscriptions/:subscriptionId/retry — 配信失敗で止まった購読を失敗した通から送り直す
+scenarios.post(
+  '/api/scenario-subscriptions/:subscriptionId/retry',
+  requirePermission('scenario.step_run.retry'),
+  async (c) => {
+    try {
+      return await runFriendScenarioOp(c, 'retry', async (subscription) => {
+        if (subscription.status === 'active') {
+          return {
+            status: 200,
+            body: { success: true, data: serializeFriendScenario(subscription) },
+          };
+        }
+        if (subscription.pause_reason !== 'delivery_failed') {
+          return {
+            status: 409,
+            body: { success: false, error: '配信失敗で止まっている購読だけを再送できます' },
+          };
+        }
+        const retried = await retryFailedFriendScenario(c.env.DB, subscription.id);
+        if (!retried) {
+          return {
+            status: 409,
+            body: { success: false, error: 'この購読は再送できません' },
+          };
+        }
+        return { status: 200, body: { success: true, data: serializeFriendScenario(retried) } };
+      });
+    } catch (err) {
+      console.error('POST /api/scenario-subscriptions/:id/retry error:', err);
+      return c.json({ success: false, error: 'Internal server error' }, 500);
+    }
+  },
+);
+
+// POST /api/scenario-subscriptions/:subscriptionId/move — 別のシナリオへ移す
+scenarios.post(
+  '/api/scenario-subscriptions/:subscriptionId/move',
+  requirePermission('scenario.subscription.edit'),
+  async (c) => {
+    try {
+      return await runFriendScenarioOp(c, 'move', async (subscription) => {
+        const body = await c.req.json<{ targetScenarioId?: unknown }>().catch(() => null);
+        const targetScenarioId = typeof body?.targetScenarioId === 'string'
+          ? body.targetScenarioId.trim()
+          : '';
+        if (!targetScenarioId) {
+          return {
+            status: 400,
+            body: { success: false, error: '移し先のシナリオを選んでください' },
+          };
+        }
+        if (subscription.status === 'delivering') {
+          return {
+            status: 409,
+            body: { success: false, error: 'いま配信を処理中です。少し待ってから移してください' },
+          };
+        }
+        if (subscription.status === 'completed') {
+          return {
+            status: 409,
+            body: { success: false, error: '終わった購読は移せません' },
+          };
+        }
+
+        const target = await getScenarioById(c.env.DB, targetScenarioId);
+        const targetAccountId = (target as { line_account_id?: string | null } | null)?.line_account_id ?? null;
+        if (!target || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [targetAccountId])) {
+          return { status: 404, body: { success: false, error: '移し先のシナリオが見つかりません' } };
+        }
+        if (!target.is_active) {
+          return {
+            status: 422,
+            body: { success: false, error: '停止中のシナリオには移せません' },
+          };
+        }
+        const friend = await getFriendById(c.env.DB, subscription.friend_id);
+        const friendAccountId = (friend as { line_account_id?: string | null } | null)?.line_account_id ?? null;
+        if (targetAccountId && friendAccountId !== targetAccountId) {
+          return {
+            status: 422,
+            body: { success: false, error: '移し先と同じLINEアカウントの友だちにだけ移せます' },
+          };
+        }
+
+        const moved = await moveFriendScenarioTo(c.env.DB, subscription.id, targetScenarioId);
+        if (!moved) {
+          return {
+            status: 409,
+            body: { success: false, error: 'この友だちは移し先にすでに入っているか、移し先が受け付けません' },
+          };
+        }
+        return { status: 200, body: { success: true, data: serializeFriendScenario(moved) } };
+      });
+    } catch (err) {
+      console.error('POST /api/scenario-subscriptions/:id/move error:', err);
       return c.json({ success: false, error: 'Internal server error' }, 500);
     }
   },
