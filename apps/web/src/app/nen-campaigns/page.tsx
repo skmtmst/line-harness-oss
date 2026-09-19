@@ -224,6 +224,25 @@ export default function NenCampaignsPage() {
       setNotice({ tone: 'success', text: `「${column.title}」の紹介文を保存しました。` })
     } catch { setNotice({ tone: 'error', text: 'コラムの紹介文を保存できませんでした。' }) } finally { setSavingColumnId(null) }
   }
+  /*
+    ★V6 37-6-A「ECのコラムを取り込む」。EC で保存されたコラムは Webhook で自動的に届く。
+    ここでは、宛先（LINEアカウント）が決まらずに未割り当てのまま残っている分を、
+    選択中のアカウントへ割り当てて一覧に出す。
+  */
+  const [importing, setImporting] = useState(false)
+  const importColumns = async () => {
+    if (!selectedAccountId || importing) return
+    setImporting(true); setNotice(null)
+    try {
+      const result = await api.nenCampaigns.importColumns(selectedAccountId)
+      if (!result.success) throw new Error(result.error)
+      setNotice({ tone: 'success', text: result.data.imported > 0
+        ? `ECのコラムを${result.data.imported}本 取り込みました。`
+        : '新しいコラムはありません。ECでコラムを保存すると自動でここに届きます。' })
+      await loadTab('columns')
+    } catch { setNotice({ tone: 'error', text: 'ECのコラムを取り込めませんでした。通信の状態を確認して、もう一度お試しください。' }) }
+    finally { setImporting(false) }
+  }
   const duplicateColumn = async (column: NenColumn) => {
     if (!selectedAccountId) return
     try { const result = await api.nenCampaigns.duplicateColumn(column.id, selectedAccountId); if (!result.success) throw new Error(); setNotice({ tone: 'success', text: `「${column.title}」を下書きへ複製しました。` }); await loadTab('columns'); setSelectedColumnId(result.data.id) }
@@ -306,9 +325,9 @@ export default function NenCampaignsPage() {
 
   /*
     ヘッダー操作。★V6 37-6 の「配信を追加」は、自動配信の種類が実キー固定（追加口が無い）
-    ため置かない。コラムはECの公開で自動的に届くので、手で書く口だけを出す。
+    ため置かない。コラムは ★V6 37-6-A どおり「ECのコラムを取り込む」（未割り当て分の割り当て）。
   */
-  const headerAction = tab === 'columns' ? <Button href="/nen-campaigns/columns/new" variant="primary">コラムを書く</Button>
+  const headerAction = tab === 'columns' ? <Button type="button" variant="primary" disabled={importing || !selectedAccountId} onClick={() => void importColumns()}>{importing ? '取り込んでいます…' : 'ECのコラムを取り込む'}</Button>
     : tab === 'history' ? <Button type="button" disabled={!deliveryList?.summary.pending} onClick={() => void sendPendingNow()}>待っているものを今すぐ送る</Button>
       : null
 

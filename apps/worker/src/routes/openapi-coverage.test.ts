@@ -215,6 +215,7 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'GET /api/nen-campaigns/metrics/columns',
   'GET /api/nen-campaigns/metrics/flows',
   'GET /api/nen-campaigns/metrics/pets',
+  'POST /api/nen-campaigns/columns/import',
   'GET /api/notifications/operator-event-types',
   'GET /api/operations/alerts',
   'GET /api/ops/audit',

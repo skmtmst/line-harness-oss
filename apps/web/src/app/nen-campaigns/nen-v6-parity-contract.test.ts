@@ -75,6 +75,9 @@ describe('V6 37-6 NEN配信の画面契約', () => {
     expect(PREVIEW).toContain("COLUMN_PET_NAME_FALLBACK = '大切なご家族'")
     // 送る相手の人数は実口 columns-preview から。
     expect(PAGE).toContain('api.nenCampaigns.columnAudience(')
+    // ヘッダーは ★V6 37-6-A どおり「ECのコラムを取り込む」（未割り当てのECコラムを割り当てる実口）。
+    expect(PAGE).toContain('ECのコラムを取り込む')
+    expect(PAGE).toContain('api.nenCampaigns.importColumns(')
     // LINE配信の状態は日本語で（内部値をそのまま出さない）。
     expect(OVERVIEW).toContain("draft: '未配信'")
     expect(OVERVIEW).toContain("sent: '配信済み'")

@@ -14,6 +14,8 @@ type DbState = {
   existing: { id: string; line_account_id: string | null } | null;
   insertBinds: unknown[] | null;
   preparedSql: string[];
+  /** 動いている LINE アカウント（`SELECT id FROM line_accounts ...` の答え）。 */
+  activeAccounts?: Array<{ id: string }>;
 };
 
 function database(state: DbState): D1Database {
@@ -34,7 +36,10 @@ function database(state: DbState): D1Database {
           if (sql.includes('INSERT INTO nen_columns')) state.insertBinds = values;
           return { success: true, meta: { changes: 1 } };
         },
-        async all() { return { success: true, results: [] }; },
+        async all() {
+          if (sql.includes('FROM line_accounts')) return { success: true, results: state.activeAccounts ?? [] };
+          return { success: true, results: [] };
+        },
       };
       return statement as unknown as D1PreparedStatement;
     },
@@ -112,5 +117,28 @@ describe('POST /api/integrations/eccube/columns の title 長さ検証（#711司
     expect(response.status).toBe(200);
     expect(consoleError).not.toHaveBeenCalled();
     consoleError.mockRestore();
+  });
+});
+
+describe('POST /api/integrations/eccube/columns の宛先（line_account_id が無いとき）', () => {
+  // EC-CUBE の LineColumnSyncService は line_account_id を送らない。NULL のまま保存すると
+  // 管理画面の一覧（WHERE line_account_id = ?）に出ず、「自動で取り込まれない」ように見える。
+  it('動いているアカウントが1つだけなら、そのアカウントへ入れる', async () => {
+    const state = { ...freshState(), activeAccounts: [{ id: 'account-only' }] };
+    const response = await post(state, {
+      slug: 'auto-account', title: '秋の鹿肉', article_url: 'https://example.com/journal/auto-account',
+    });
+    expect(response.status).toBe(200);
+    // INSERT の bind: ..., published_at, line_account_id, created_at, updated_at
+    expect(state.insertBinds?.[state.insertBinds.length - 3]).toBe('account-only');
+  });
+
+  it('アカウントが複数あるときは未割り当て（NULL）のまま保存する', async () => {
+    const state = { ...freshState(), activeAccounts: [{ id: 'account-a' }, { id: 'account-b' }] };
+    const response = await post(state, {
+      slug: 'unassigned', title: '秋の鹿肉', article_url: 'https://example.com/journal/unassigned',
+    });
+    expect(response.status).toBe(200);
+    expect(state.insertBinds?.[state.insertBinds.length - 3]).toBeNull();
   });
 });

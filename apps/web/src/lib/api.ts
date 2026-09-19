@@ -8531,6 +8531,11 @@ export const api = {
         `/api/nen-campaigns/columns-preview?${query}`,
       )
     },
+    /** ★V6 37-6-A「ECのコラムを取り込む」。宛先が決まらず未割り当てになっているECコラムを、このアカウントへ割り当てる。 */
+    importColumns: (accountId: string) => fetchApi<ApiResponse<{ imported: number }>>(
+      `/api/nen-campaigns/columns/import?lineAccountId=${encodeURIComponent(accountId)}`,
+      { method: 'POST' },
+    ),
     duplicateColumn: (id: string, accountId: string) => fetchApi<ApiResponse<{ id: string; sourceColumnId: string }>>(
       `/api/nen-campaigns/columns/${encodeURIComponent(id)}/duplicate`,
       { method: 'POST', body: JSON.stringify({ accountId }) },

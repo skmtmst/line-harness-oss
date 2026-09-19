@@ -2059,6 +2059,19 @@ const spec = {
         responses: { '200': { description: 'Delivery detail' }, '404': { description: 'Not found in account scope' } },
       },
     },
+    '/api/nen-campaigns/columns/import': {
+      post: {
+        tags: ['NEN delivery'],
+        summary: '未割り当てのECコラムを選択中のLINEアカウントへ取り込む',
+        description: 'EC-CUBE から届いたが宛先が決まらなかったコラム（line_account_id が NULL）を、lineAccountId のアカウントへ割り当てます。',
+        parameters: [{ name: 'lineAccountId', in: 'query', required: true, schema: { type: 'string' } }],
+        responses: {
+          '200': { description: '{ imported: number }' },
+          '403': { description: 'Owner or admin role required' },
+          '404': { description: 'LINE account not found' },
+        },
+      },
+    },
     '/api/nen-campaigns/deliveries/{id}/retry': {
       post: {
         tags: ['NEN delivery'],

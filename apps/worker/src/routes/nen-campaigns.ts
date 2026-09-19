@@ -788,6 +788,37 @@ nenCampaigns.put('/api/nen-campaigns/birthday-coupon', requireRole('owner', 'adm
 });
 
 // EC-CUBEのコラム保存時に自動同期する公開エンドポイント。管理者認証ではなくHMACで検証する。
+/**
+ * EC-CUBE が `line_account_id` を送らないときの宛先（`/events` の resolveAccountIdWithoutHeader と同じ2番目の決まり）。
+ * 動いている LINE アカウントが 1 つだけならそのアカウント。決まらなければ null（未割り当てのまま保存し、
+ * 管理画面の「ECのコラムを取り込む」で割り当てる）。
+ */
+async function resolveSoleActiveAccountId(db: D1Database): Promise<string | null> {
+  const rows = await db.prepare(
+    `SELECT id FROM line_accounts WHERE is_active = 1 AND archived_at IS NULL ORDER BY id LIMIT 2`,
+  ).all<{ id: string }>();
+  const ids = (rows.results ?? []).map((row) => String(row.id));
+  return ids.length === 1 ? ids[0] : null;
+}
+
+/**
+ * 未割り当て（line_account_id IS NULL）の EC コラムを、選択中の LINE アカウントへ割り当てる。
+ * ★V6 37-6-A「ECのコラムを取り込む」。EC で保存されたコラムは Webhook で自動的に届くが、
+ * 宛先が決められなかった分（アカウントが複数ある・古いコラム）がここに残る。
+ */
+nenCampaigns.post('/api/nen-campaigns/columns/import', requireRole('owner', 'admin'), async (c) => {
+  const accountId = await requireAccount(c);
+  if (typeof accountId !== 'string') return accountId;
+  const account = await getLineAccountById(c.env.DB, accountId);
+  if (!account) return c.json({ success: false, error: 'LINE account not found' }, 404);
+  const result = await c.env.DB.prepare(
+    `UPDATE nen_columns SET line_account_id = ?, updated_at = ? WHERE line_account_id IS NULL`,
+  ).bind(accountId, jstNow()).run();
+  const imported = result.meta.changes ?? 0;
+  if (imported > 0) auditLog(c, 'nen.column.import', { kind: 'line_account', id: accountId }, { lineAccountId: accountId });
+  return c.json({ success: true, data: { imported } });
+});
+
 nenCampaigns.post('/api/integrations/eccube/columns', async (c) => {
   const secret = c.env.ECCUBE_WEBHOOK_SECRET;
   if (!secret || secret.length < 32) return c.json({ success: false, error: 'Integration is not configured' }, 503);
@@ -822,10 +853,14 @@ nenCampaigns.post('/api/integrations/eccube/columns', async (c) => {
     }));
     return c.json({ success: false, error: 'title_invalid' }, 400);
   }
-  const lineAccountId = typeof body.line_account_id === 'string' ? body.line_account_id : null;
-  if (lineAccountId && !await getLineAccountById(c.env.DB, lineAccountId)) {
+  const requestedLineAccountId = typeof body.line_account_id === 'string' ? body.line_account_id : null;
+  if (requestedLineAccountId && !await getLineAccountById(c.env.DB, requestedLineAccountId)) {
     return c.json({ success: false, error: 'LINE account not found' }, 404);
   }
+  // EC-CUBE 標準（LineColumnSyncService）は line_account_id を送らない。アカウントが 1 つなら
+  // そこへ入れる。NULL のままだと管理画面の一覧（WHERE line_account_id = ?）に出ず、
+  // 「自動で取り込まれない」ように見える。
+  const lineAccountId = requestedLineAccountId ?? await resolveSoleActiveAccountId(c.env.DB);
   const now = jstNow();
   const existing = await c.env.DB.prepare(
     `SELECT id, line_account_id FROM nen_columns WHERE slug = ?`,
