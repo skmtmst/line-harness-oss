@@ -37,6 +37,7 @@ type PhotoPermission =
   | 'photo.submission.view'
   | 'photo.submission.review'
   | 'photo.submission.bulk_review'
+  | 'photo.publication.manage'
   | 'photo.original.download';
 
 export function requirePhotoPermission(permission: PhotoPermission) {

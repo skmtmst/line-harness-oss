@@ -118,7 +118,11 @@ describe('A-7 tenant scope', () => {
     mocks.canAccess.mockResolvedValue(false);
     const response = await app().instance.request(
       '/api/nen-members/photos/photo-1/review',
-      json('PUT', { accountId: 'other-account', status: 'rejected', reasonCode: 'quality' }),
+      {
+        method: 'PUT',
+        headers: { 'content-type': 'application/json', 'Idempotency-Key': 'scope-deny-1' },
+        body: JSON.stringify({ accountId: 'other-account', status: 'rejected', reasonCode: 'quality' }),
+      },
     );
     expect(response.status).toBe(403);
   });

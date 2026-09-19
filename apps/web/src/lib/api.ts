@@ -8314,6 +8314,17 @@ export const api = {
     definitions: (lineAccountId: string) => fetchApi<ApiResponse<LineNotificationDefinition[]>>(
       `/api/line-notifications/customer-definitions?lineAccountId=${encodeURIComponent(lineAccountId)}`,
     ),
+    createDefinition: (data: {
+      lineAccountId: string
+      key: string
+      name: string
+      category: string
+      sourceEventType: string
+      draft: Record<string, unknown>
+    }) => fetchApi<ApiResponse<LineNotificationDefinition>>(
+      '/api/line-notifications/customer-definitions',
+      { method: 'POST', body: JSON.stringify(data) },
+    ),
     updateDraft: (id: string, data: {
       lineAccountId: string
       expectedVersion: number
@@ -8356,6 +8367,55 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(data),
     }),
+    // N-342 (#943): 運用者通知の正本API。要件の名前(/api/line-notifications)で置く。
+    operatorRules: {
+      list: (lineAccountId: string) =>
+        fetchApi<ApiResponse<{
+          items: OperatorNotificationRule[]
+          summary: { total: number; published: number; stopped: number; missingRecipients: number; recipients: number; acceptedToday: number; excludedToday: number }
+        }>>(
+          `/api/line-notifications/operator-rules?lineAccountId=${encodeURIComponent(lineAccountId)}`,
+        ),
+      get: (id: string, lineAccountId: string) =>
+        fetchApi<ApiResponse<NotificationRule>>(
+          `/api/line-notifications/operator-rules/${encodeURIComponent(id)}?lineAccountId=${encodeURIComponent(lineAccountId)}`,
+        ),
+      create: (data: { lineAccountId: string; name: string; eventType: string; conditions?: Record<string, unknown>; channels?: string[] }) =>
+        fetchApi<ApiResponse<NotificationRule>>('/api/line-notifications/operator-rules', {
+          method: 'POST',
+          body: JSON.stringify(data),
+        }),
+      updateDraft: (id: string, lineAccountId: string, data: { name?: string; eventType?: string; conditions?: Record<string, unknown>; channels?: string[] }) =>
+        fetchApi<ApiResponse<NotificationRule>>(`/api/line-notifications/operator-rules/${encodeURIComponent(id)}/draft`, {
+          method: 'PATCH',
+          body: JSON.stringify({ ...data, lineAccountId }),
+        }),
+      previewRecipients: (data: {
+        lineAccountId: string
+        recipientIds?: string[]
+        channels: string[]
+      }) => fetchApi<ApiResponse<OperatorRecipientPreview>>(
+        '/api/line-notifications/operator-rules/recipients-preview',
+        { method: 'POST', body: JSON.stringify(data) },
+      ),
+      publish: (id: string, lineAccountId: string) =>
+        fetchApi<ApiResponse<NotificationRule>>(
+          `/api/line-notifications/operator-rules/${encodeURIComponent(id)}/publish`,
+          { method: 'POST', body: JSON.stringify({ lineAccountId }) },
+        ),
+      stop: (id: string, lineAccountId: string) =>
+        fetchApi<ApiResponse<NotificationRule>>(
+          `/api/line-notifications/operator-rules/${encodeURIComponent(id)}/stop`,
+          { method: 'POST', body: JSON.stringify({ lineAccountId }) },
+        ),
+      test: (id: string, lineAccountId: string, message?: string) =>
+        fetchApi<ApiResponse<OperatorDeliveryResult>>(
+          `/api/line-notifications/operator-rules/${encodeURIComponent(id)}/test`,
+          { method: 'POST', body: JSON.stringify({ lineAccountId, message }) },
+        ),
+      exportCsv: (lineAccountId: string, reason: string) =>
+        fetchApiBlob(`/api/line-notifications/operator-deliveries.csv?${new URLSearchParams({ lineAccountId, reason })}`),
+    },
   },
   ecCommerce: {
     overview: (lineAccountId?: string) =>
@@ -8801,16 +8861,39 @@ export const api = {
       expectedVersion: number
       reasonCode?: 'quality' | 'privacy' | 'unrelated' | 'duplicate' | 'other'
       reasonNote?: string
-    }) => fetchApi<ApiResponse<{
+      // 差戻し画面の2つの約束（#931 N-312）。省略時は従来どおり案内あり・印なし。
+      resubmitInvite?: boolean
+      watchSubmitter?: boolean
+    }, idempotencyKey: string) => fetchApi<ApiResponse<{
       awardedPoints: number
       pointBalance: number | null
       pointSync: string
       notificationStatus: 'sent' | 'failed'
-    }>>(`/api/nen-members/photos/${encodeURIComponent(id)}/review`, { method: 'PUT', body: JSON.stringify(data) }),
-    retryPhotoReviewNotification: (id: string, accountId: string) => fetchApi<ApiResponse<{
-      notificationStatus: 'sent'
+    }>>(`/api/nen-members/photos/${encodeURIComponent(id)}/review`, {
+      method: 'PUT',
+      headers: { 'Idempotency-Key': idempotencyKey },
+      body: JSON.stringify(data),
+    }),
+    retryPhotoReviewNotification: (id: string, accountId: string, idempotencyKey: string) => fetchApi<ApiResponse<{
+      notificationStatus: 'sent' | 'failed'
+      resent?: boolean
     }>>(`/api/nen-members/photos/${encodeURIComponent(id)}/notification/retry`, {
-      method: 'POST', body: JSON.stringify({ accountId }),
+      method: 'POST',
+      headers: { 'Idempotency-Key': idempotencyKey },
+      body: JSON.stringify({ accountId }),
+    }),
+    // 詳細画面で直した写真の向きを版つきで保存する（#931 N-309）。
+    savePhotoRotation: (id: string, data: {
+      accountId: string
+      rotation: 0 | 90 | 180 | 270
+      expectedVersion: number
+    }, idempotencyKey: string) => fetchApi<ApiResponse<{
+      rotation: number
+      reviewVersion: number
+    }>>(`/api/nen-members/photos/${encodeURIComponent(id)}/rotation`, {
+      method: 'PUT',
+      headers: { 'Idempotency-Key': idempotencyKey },
+      body: JSON.stringify(data),
     }),
     friendOverview: (friendId: string) => fetchApi<ApiResponse<NenFriendOverview>>(`/api/nen-members/friends/${encodeURIComponent(friendId)}`),
     ranks: () => fetchApi<ApiResponse<Array<Record<string, unknown>>>>('/api/nen-members/ranks'),

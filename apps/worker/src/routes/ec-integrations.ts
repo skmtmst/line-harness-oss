@@ -1,9 +1,11 @@
 import { Hono } from 'hono';
 import {
   attachEcOrderFriend,
+  getCustomerNotificationSource,
   getFriendByLineUserIdForAccount,
   getLineAccountById,
   jstNow,
+  recordCustomerEcDelivery,
   setEcActionExecutionStatus,
   upsertEcEventReadModels,
 } from '@line-crm/db';
@@ -14,6 +16,7 @@ import type { Env } from '../index.js';
 import { fireEvent, logOutgoingMessage } from '../services/event-bus.js';
 import { buildEcV6Event, ecDispatchIdempotencyKey, ecNotificationRetryKey } from '../services/ec-event-publish.js';
 import { dispatchOperatorEvent } from '../services/operator-notification-dispatch.js';
+import { classifyExternalDeliveryError } from '../services/external-delivery-retry.js';
 
 export type EcDispatchSubscriber = 'notification' | 'v6';
 
@@ -258,6 +261,11 @@ function itemSummary(items: EcItem[] | undefined): string {
   const visible = items.slice(0, 4).map((item) => `${item.name.slice(0, 80)} × ${item.quantity}`);
   if (items.length > visible.length) visible.push(`ほか${items.length - visible.length}点`);
   return visible.join('\n');
+}
+
+/** 定義の公開版configから文面項目を取る。文字列以外・未設定は null へ畳む。 */
+function notificationText(value: unknown): string | null {
+  return typeof value === 'string' && value.trim() ? value : null;
 }
 
 function memberRank(_count: number, amount: number): string {
@@ -614,6 +622,20 @@ ecIntegrations.post('/api/integrations/eccube/events', async (c) => {
   if (!claim.meta.changes) return c.json({ success: true, duplicate: true, status: 'processing' }, 202);
 
   try {
+    // N-330 (#943): 顧客通知定義があるイベントは定義だけが正本。published の
+    // ときだけ送り、文面は確定済み版の config から取る。定義が無いイベント
+    // だけ従来の ec_notification_settings を見る(未移行の互換)。
+    const notificationSource = await getCustomerNotificationSource(
+      c.env.DB, lineAccountId, event.event_type,
+    );
+    const ledgerBase = {
+      lineAccountId,
+      sourceEventType: event.event_type,
+      sourceEventId: event.event_id,
+      metadata: { orderNumber: event.order?.number ?? null },
+      definitionId: notificationSource?.definitionId ?? null,
+      definitionVersionId: notificationSource?.versionId ?? null,
+    } as const;
     const friend = await getFriendByLineUserIdForAccount(c.env.DB, event.line_user_id, lineAccountId);
     if (!friend || !friend.is_following) {
       await c.env.DB.prepare(
@@ -625,6 +647,21 @@ ecIntegrations.post('/api/integrations/eccube/events', async (c) => {
         now,
         row.id,
       ).run();
+      // N-328 (#943): 送れなかった結果も共通送信台帳へ残す。プロフィール同期は
+      // 顧客通知を出さないので台帳へは書かない。
+      if (event.event_type !== 'ec.customer.profile_updated') {
+        await recordCustomerEcDelivery(c.env.DB, {
+          ...ledgerBase,
+          recipientId: friend?.id ?? event.line_user_id,
+          idempotencyKey: await ecNotificationRetryKey(lineAccountId, event.event_id),
+          attemptedSend: false,
+          finish: {
+            kind: 'excluded',
+            errorCode: friend ? 'friend_not_following' : 'line_identity_unmatched',
+            errorMessage: friend ? 'LINEの友だちが現在フォローしていません' : 'LINEの友だちが見つかりません',
+          },
+        });
+      }
       await setEcActionExecutionStatus(c.env.DB, {
         eventId: row.id, lineAccountId, status: 'skipped',
         errorCode: friend ? 'friend_not_following' : 'line_identity_unmatched',
@@ -680,22 +717,33 @@ ecIntegrations.post('/api/integrations/eccube/events', async (c) => {
       return c.json({ success: true, status: 'processed' });
     }
 
-    const setting = await c.env.DB.prepare(
-      `SELECT COALESCE(a.is_enabled, s.is_enabled) AS is_enabled,
-              CASE WHEN a.line_account_id IS NULL THEN s.title_override ELSE a.title_override END AS title_override,
-              CASE WHEN a.line_account_id IS NULL THEN s.intro_text ELSE a.intro_text END AS intro_text,
-              CASE WHEN a.line_account_id IS NULL THEN s.outro_text ELSE a.outro_text END AS outro_text,
-              CASE WHEN a.line_account_id IS NULL THEN s.button_label ELSE a.button_label END AS button_label,
-              CASE WHEN a.line_account_id IS NULL THEN s.button_url ELSE a.button_url END AS button_url,
-              CASE WHEN a.line_account_id IS NULL THEN s.image_url ELSE a.image_url END AS image_url
-         FROM ec_notification_settings s
-         LEFT JOIN ec_notification_account_settings a
-           ON a.event_type = s.event_type AND a.line_account_id = ?
-        WHERE s.event_type = ?`,
-    ).bind(lineAccountId, event.event_type).first<{
-      is_enabled: number; title_override: string | null; intro_text: string | null; outro_text: string | null;
-      button_label: string | null; button_url: string | null; image_url: string | null;
-    }>();
+    const setting = notificationSource
+      ? {
+          // 正本の定義があるときは、公開中の版だけを送る。下書き・停止は送らない。
+          is_enabled: notificationSource.status === 'published' ? 1 : 0,
+          title_override: notificationText(notificationSource.config.title) ?? notificationSource.name,
+          intro_text: notificationText(notificationSource.config.introText),
+          outro_text: notificationText(notificationSource.config.outroText),
+          button_label: notificationText(notificationSource.config.buttonLabel),
+          button_url: notificationText(notificationSource.config.buttonUrl),
+          image_url: notificationText(notificationSource.config.imageUrl),
+        }
+      : await c.env.DB.prepare(
+          `SELECT COALESCE(a.is_enabled, s.is_enabled) AS is_enabled,
+                  CASE WHEN a.line_account_id IS NULL THEN s.title_override ELSE a.title_override END AS title_override,
+                  CASE WHEN a.line_account_id IS NULL THEN s.intro_text ELSE a.intro_text END AS intro_text,
+                  CASE WHEN a.line_account_id IS NULL THEN s.outro_text ELSE a.outro_text END AS outro_text,
+                  CASE WHEN a.line_account_id IS NULL THEN s.button_label ELSE a.button_label END AS button_label,
+                  CASE WHEN a.line_account_id IS NULL THEN s.button_url ELSE a.button_url END AS button_url,
+                  CASE WHEN a.line_account_id IS NULL THEN s.image_url ELSE a.image_url END AS image_url
+             FROM ec_notification_settings s
+             LEFT JOIN ec_notification_account_settings a
+               ON a.event_type = s.event_type AND a.line_account_id = ?
+            WHERE s.event_type = ?`,
+        ).bind(lineAccountId, event.event_type).first<{
+          is_enabled: number; title_override: string | null; intro_text: string | null; outro_text: string | null;
+          button_label: string | null; button_url: string | null; image_url: string | null;
+        }>();
 
     if (event.event_type === 'ec.order.shipped') {
       await enqueuePostShippingFollowUps(
@@ -709,6 +757,19 @@ ecIntegrations.post('/api/integrations/eccube/events', async (c) => {
       await c.env.DB.prepare(
         `UPDATE ec_events SET friend_id = ?, status = 'skipped', error_message = 'notification_disabled', processed_at = ?, updated_at = ? WHERE id = ?`,
       ).bind(friend.id, now, now, row.id).run();
+      // N-328 (#943): 通知停止(定義の draft/stopped、旧設定のOFF)も共通台帳へ
+      // 「対象外」として残す。この処理では送っていないので試行は増やさない。
+      await recordCustomerEcDelivery(c.env.DB, {
+        ...ledgerBase,
+        recipientId: friend.id,
+        idempotencyKey: await ecNotificationRetryKey(lineAccountId, event.event_id),
+        attemptedSend: false,
+        finish: {
+          kind: 'excluded',
+          errorCode: 'notification_disabled',
+          errorMessage: 'この通知は設定で停止されています',
+        },
+      });
       await fireEcV6Event(c.env.DB, {
         eventId: row.id, lineAccountId, externalEventId: event.event_id,
         event, friendId: friend.id, accessToken, now,
@@ -746,15 +807,19 @@ ecIntegrations.post('/api/integrations/eccube/events', async (c) => {
     // - pending(送達不明: 送信後に台帳書込が落ちた) → 同じ固定keyで送り直す。
     //   LINE側がキーで重複を抑える(X-Line-Retry-Key、受理済みは409)ため安全。
     const lineClient = new LineClient(accessToken);
+    // N-328 (#943): 共通台帳の冪等キーはLINEへ渡す固定retry keyと同じ値。
+    // イベント再送や再試行で新しい送達行を作らず同じ行を確定する。
+    const retryKey = await ecNotificationRetryKey(lineAccountId, event.event_id);
     if (await getEcDispatchStatus(c.env.DB, row.id, 'notification') !== 'sent') {
       const notificationKey = ecDispatchIdempotencyKey(lineAccountId, event.event_id, 'notification');
-      const retryKey = await ecNotificationRetryKey(lineAccountId, event.event_id);
       await markEcDispatch(c.env.DB, {
         eventId: row.id, subscriber: 'notification', status: 'pending',
         idempotencyKey: notificationKey, now,
       });
+      let providerRequestId: string | null = null;
       try {
-        await lineClient.pushMessage(event.line_user_id, [message], retryKey);
+        const pushed = await lineClient.pushMessageWithRequestId(event.line_user_id, [message], retryKey);
+        providerRequestId = pushed.requestId;
       } catch (pushError) {
         try {
           await markEcDispatch(c.env.DB, {
@@ -765,8 +830,28 @@ ecIntegrations.post('/api/integrations/eccube/events', async (c) => {
         } catch (markError) {
           console.error(`[ec-event] notification ledger failed event=${event.event_id}`, markError);
         }
+        // N-328: 送れなかった結果も共通送信台帳へ残す。秘密値を含まない
+        // 安全な分類だけ書く。
+        const classified = classifyExternalDeliveryError(pushError);
+        await recordCustomerEcDelivery(c.env.DB, {
+          ...ledgerBase,
+          recipientId: friend.id,
+          idempotencyKey: retryKey,
+          attemptedSend: true,
+          finish: { kind: 'failed', errorCode: classified.code, errorMessage: classified.message },
+        });
         throw pushError;
       }
+      // N-328: 共通台帳を先に確定してから購読台帳を sent にする。台帳の
+      // 書込が落ちた場合はイベントごと失敗へ回り、再処理で同じ冪等キーの
+      // 行を復旧する(既に受理済みなら送達状態は戻らない)。
+      await recordCustomerEcDelivery(c.env.DB, {
+        ...ledgerBase,
+        recipientId: friend.id,
+        idempotencyKey: retryKey,
+        attemptedSend: true,
+        finish: { kind: 'accepted', providerRequestId },
+      });
       await markEcDispatch(c.env.DB, {
         eventId: row.id, subscriber: 'notification', status: 'sent',
         idempotencyKey: notificationKey, now,
@@ -778,6 +863,16 @@ ecIntegrations.post('/api/integrations/eccube/events', async (c) => {
         deliveryType: 'push',
         source: 'ec_transactional',
         lineAccountId: account.id,
+      });
+    } else {
+      // 送信済みだが共通台帳への書込だけ落ちていた分をここで復旧する。
+      // 冪等キーが同じため、既に行があれば状態は変わらない。
+      await recordCustomerEcDelivery(c.env.DB, {
+        ...ledgerBase,
+        recipientId: friend.id,
+        idempotencyKey: retryKey,
+        attemptedSend: false,
+        finish: { kind: 'accepted' },
       });
     }
 

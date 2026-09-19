@@ -14,20 +14,27 @@ const mocks = vi.hoisted(() => ({
   upsertReadModels: vi.fn(),
   attachOrderFriend: vi.fn(),
   setActionStatus: vi.fn(),
+  getCustomerSource: vi.fn(),
+  recordEcDelivery: vi.fn(),
   syncEcTags: vi.fn(),
   enqueueFollowUps: vi.fn(),
   syncPetProfiles: vi.fn(),
 }));
 vi.mock('@line-crm/db', () => ({
   attachEcOrderFriend: mocks.attachOrderFriend,
+  getCustomerNotificationSource: mocks.getCustomerSource,
   getLineAccountById: mocks.getAccount,
   getFriendByLineUserIdForAccount: mocks.getFriend,
   jstNow: vi.fn(() => '2026-09-10 02:00:00'),
+  recordCustomerEcDelivery: mocks.recordEcDelivery,
   setEcActionExecutionStatus: mocks.setActionStatus,
   upsertEcEventReadModels: mocks.upsertReadModels,
 }));
 vi.mock('@line-crm/line-sdk', () => ({
-  LineClient: vi.fn().mockImplementation(() => ({ pushMessage: mocks.pushMessage })),
+  LineClient: vi.fn().mockImplementation(() => ({
+    pushMessage: mocks.pushMessage,
+    pushMessageWithRequestId: mocks.pushMessage,
+  })),
 }));
 vi.mock('../services/event-bus.js', () => ({
   fireEvent: vi.fn(),
@@ -148,7 +155,11 @@ beforeEach(() => {
   mocks.syncPetProfiles.mockResolvedValue(undefined);
   mocks.getAccount.mockResolvedValue({ id: 'account-a', is_active: 1, channel_access_token: 'account-token' });
   mocks.getFriend.mockResolvedValue({ id: 'friend-1', line_account_id: 'account-a', is_following: 1 });
-  mocks.pushMessage.mockResolvedValue(undefined);
+  mocks.getCustomerSource.mockResolvedValue(null);
+  mocks.recordEcDelivery.mockResolvedValue(undefined);
+  // pushMessageWithRequestId は { requestId } を返すので、呼び出し回数だけを
+  // 見る試験は同じ mock を共有する。
+  mocks.pushMessage.mockResolvedValue({ data: {}, requestId: 'req-1' });
 });
 
 describe('EC受注から運用者通知を自動発火する (N-327 #663)', () => {

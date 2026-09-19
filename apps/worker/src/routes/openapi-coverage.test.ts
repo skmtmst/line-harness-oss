@@ -200,6 +200,10 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'GET /api/hq/operator-history',
   'GET /api/line-accounts',
   'GET /api/line-accounts/{id}',
+  'GET /api/line-notifications/operator-deliveries.csv',
+  'GET /api/line-notifications/operator-event-types',
+  'GET /api/line-notifications/operator-rules',
+  'GET /api/line-notifications/operator-rules/{id}',
   'GET /api/media/{id}',
   'GET /api/media/{id}/content',
   'GET /api/media/{id}/download',
@@ -262,6 +266,7 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'PATCH /api/hq/templates/{id}',
   'PATCH /api/line-accounts/{id}',
   'PATCH /api/line-accounts/order',
+  'PATCH /api/line-notifications/operator-rules/{id}/draft',
   'PATCH /api/ops/members/{staffId}',
   'PATCH /api/ops/support/tickets/{id}',
   'PATCH /api/ops/tenants/{id}/status',
@@ -343,6 +348,14 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'POST /api/line-accounts',
   'POST /api/line-accounts/connect',
   'POST /api/line-accounts/connect/check',
+  'POST /api/line-notifications/operator-events',
+  'POST /api/line-notifications/operator-outbox/sweep',
+  'POST /api/line-notifications/operator-rules',
+  'POST /api/line-notifications/operator-rules/recipients-preview',
+  'POST /api/line-notifications/operator-rules/{id}/publish',
+  'POST /api/line-notifications/operator-rules/{id}/recipients-preview',
+  'POST /api/line-notifications/operator-rules/{id}/stop',
+  'POST /api/line-notifications/operator-rules/{id}/test',
   'POST /api/mileage/earning-rules/{id}/publish',
   'POST /api/mileage/rules',
   'POST /api/nen/rank-settings/resync',
@@ -742,7 +755,7 @@ const ALLOWLIST = new Set<string>([
   'PUT /api/automations/{id}',
   'PUT /api/common-actions/{id}/draft',
 
-  // 機能「photo_review」の管理画面用API（OpenAPI未記載・順次記載）（23件）
+  // 機能「photo_review」の管理画面用API（OpenAPI未記載・順次記載）（24件）
   'GET /api/nen-members/care-flags',
   'GET /api/nen-members/consultations',
   'GET /api/nen-members/friends/{friendId}',
@@ -766,6 +779,7 @@ const ALLOWLIST = new Set<string>([
   'PUT /api/nen-members/photos/publications/{id}/placements',
   'PUT /api/nen-members/photos/publications/{id}/withdraw',
   'PUT /api/nen-members/photos/{id}/review',
+  'PUT /api/nen-members/photos/{id}/rotation',
 
   // 機能「broadcasts」の管理画面用API（OpenAPI未記載・順次記載）（20件）
   'DELETE /api/broadcast-message-assets/{id}',

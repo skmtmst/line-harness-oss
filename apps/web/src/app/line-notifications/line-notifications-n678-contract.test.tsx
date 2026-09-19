@@ -32,6 +32,7 @@ const fixture = vi.hoisted(() => ({
   metrics: vi.fn(),
   quota: vi.fn(),
   updateDraft: vi.fn(),
+  createDefinition: vi.fn(),
   publishDefinition: vi.fn(),
   stopDefinition: vi.fn(),
 }))
@@ -103,8 +104,11 @@ vi.mock('@/lib/api', () => {
         definitions: fixture.definitions,
         metrics: fixture.metrics,
         updateDraft: fixture.updateDraft,
+        createDefinition: fixture.createDefinition,
         publishDefinition: fixture.publishDefinition,
         stopDefinition: fixture.stopDefinition,
+        // N-342 (#943): 運用者件数も正本APIの一覧口から取る。
+        operatorRules: { list: fixture.operatorList },
       },
     },
   }
@@ -250,7 +254,7 @@ function mutationApi(overrides: Partial<MutationApi> = {}): MutationApi {
     updateDraft: fixture.updateDraft,
     publishDefinition: fixture.publishDefinition,
     stopDefinition: fixture.stopDefinition,
-    updateSetting: fixture.updateSetting,
+    createDefinition: fixture.createDefinition,
     ...overrides,
   } as MutationApi
 }
@@ -274,6 +278,7 @@ beforeEach(() => {
     },
   })
   fixture.updateSetting.mockResolvedValue({ success: true, data: {} })
+  fixture.createDefinition.mockResolvedValue({ success: true, data: definition() })
   fixture.testSend.mockResolvedValue({ success: true, data: { sent: 1 } })
   // vitest は esbuild の既定で古い JSX 変換になる。画面側は React を import
   // しない書き方なので、実物の React を大域に置いて実描画させる。
@@ -596,7 +601,7 @@ describe('#678 Bを選んだ直後・Bのload未発火でも、旧Aの応答か�
       throw new Error('releaseA が呼ばれる前に保存応答を解放しようとした')
     }
     const heldA = new Promise<{ success: boolean }>((resolve) => { releaseA = resolve })
-    fixture.updateSetting.mockReturnValue(heldA)
+    fixture.createDefinition.mockReturnValue(heldA)
 
     let committedToB = false
     let releaseLayoutCommitted: () => void = () => {}
@@ -924,10 +929,12 @@ describe('#678 出す・止めるの切替は編集中の文面を巻き込ま�
   it('定義がないお知らせ（EC既定設定）の保存も、押したあとの入力は消さない', async () => {
     const sent = setting()
     const editor = editorState(sent)
-    const slowUpdate = deferred<{ success: boolean }>()
-    const updateSetting = vi.fn().mockReturnValue(slowUpdate.promise)
+    const slowCreate = deferred<{ success: boolean; data: LineNotificationDefinition }>()
+    const createDefinition = vi.fn().mockReturnValue(slowCreate.promise)
+    const publishDefinition = vi.fn()
+      .mockResolvedValue({ success: true, data: definition({ status: 'published', version: 5 }) })
     const running = saveCustomerNotification({
-      api: mutationApi({ updateSetting } as Partial<MutationApi>),
+      api: mutationApi({ createDefinition, publishDefinition } as Partial<MutationApi>),
       accountId: 'account-a',
       setting: sent,
       definition: null,
@@ -935,9 +942,16 @@ describe('#678 出す・止めるの切替は編集中の文面を巻き込ま�
       guard: editor.guard(sent),
     })
     editor.type(setting({ introText: 'あとから足した一文' }))
-    slowUpdate.resolve({ success: true })
+    slowCreate.resolve({ success: true, data: definition() })
     await expect(running).resolves.toMatchObject({ kind: 'applied', contentSaved: true, settleDraft: false })
-    expect(updateSetting).toHaveBeenCalledWith('account-a', 'order.confirmed', expect.objectContaining({ isEnabled: true }))
+    // N-330 (#943): 従来設定への保存は旧設定APIを叩かず、正本の定義を作って公開する。
+    expect(createDefinition).toHaveBeenCalledWith(expect.objectContaining({
+      lineAccountId: 'account-a',
+      key: 'ec:order.confirmed',
+      sourceEventType: 'order.confirmed',
+      draft: expect.objectContaining({ introText: sent.introText }),
+    }))
+    expect(publishDefinition).toHaveBeenCalledWith('definition-a', { lineAccountId: 'account-a', expectedVersion: 4 })
   })
 })
 
@@ -1178,7 +1192,8 @@ describe('#678 実DOMへマウントした画面全体', () => {
     fixture.settings.mockResolvedValue({ success: true, data: [setting()] })
     fixture.overview.mockResolvedValue({ success: true, data: { last24h: 0, failed: 0, byType: [] } })
     fixture.operatorList.mockResolvedValue({ success: true, data: { summary: { total: 0 } } })
-    fixture.updateSetting.mockResolvedValue({ success: true, data: {} })
+    fixture.createDefinition.mockResolvedValue({ success: true, data: definition() })
+    fixture.publishDefinition.mockResolvedValue({ success: true, data: definition({ status: 'published', version: 5 }) })
 
     render(<LineNotificationsPage />)
     await waitFor(() => expect(screen.getByText('注文を受け付けました')).toBeTruthy())
@@ -1198,10 +1213,16 @@ describe('#678 実DOMへマウントした画面全体', () => {
     expect(JSON.parse(stored!).introText).toBe(longIntro)
 
     fireEvent.click(screen.getByRole('button', { name: 'お知らせを保存' }))
-    await waitFor(() => expect(fixture.updateSetting).toHaveBeenCalledTimes(1))
+    await waitFor(() => expect(fixture.createDefinition).toHaveBeenCalledTimes(1))
     // 保存APIへ渡した中身も、打ち込んだ長文のまま欠けたり切れたりしない。
-    expect(fixture.updateSetting).toHaveBeenCalledWith(
-      'account-a', 'order.confirmed', expect.objectContaining({ introText: longIntro }),
+    // N-330: 旧設定APIではなく、正本の定義を作る口へ送る。
+    expect(fixture.createDefinition).toHaveBeenCalledWith(
+      expect.objectContaining({
+        lineAccountId: 'account-a',
+        key: 'ec:order.confirmed',
+        sourceEventType: 'order.confirmed',
+        draft: expect.objectContaining({ introText: longIntro }),
+      }),
     )
     await waitFor(() => expect(screen.queryByText('未保存の変更があります')).toBeNull())
   })

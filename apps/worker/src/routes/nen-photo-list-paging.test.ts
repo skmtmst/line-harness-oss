@@ -167,4 +167,66 @@ describe('写真一覧のページング(#666 N-004)', () => {
     );
     expect(response.status).toBe(403);
   });
+
+  /*
+   * #931 N-308: q= は実SQLに当てて確かめる。ESCAPE 句が実際に動くこと、
+   * LIKE の記号を含む語が記号として効かないこと、アカウント境界が
+   * 検索でも崩れないことをここで固定する。
+   */
+  describe('q= 絞り込み(#931 N-308)', () => {
+    beforeEach(() => {
+      // 仕込みは全写真が pet-a（'ハナ'）なので、別名のペットを1頭足して
+      // photo-000 だけをそれに付け替える。ペット名検索が一意になる。
+      sql.prepare(
+        `INSERT INTO nen_pet_profiles (id, friend_id, name, created_at, updated_at)
+         VALUES ('pet-momo', 'friend-a', 'モモ', '2026-01-01', '2026-01-01')`,
+      ).run();
+      sql.prepare(
+        `UPDATE nen_photo_submissions SET pet_id = 'pet-momo' WHERE id = 'photo-000'`,
+      ).run();
+      sql.prepare(
+        `UPDATE nen_photo_submissions SET caption = ? WHERE id = 'photo-000'`,
+      ).run('うちのハナが庭で遊ぶ');
+      sql.prepare(
+        `UPDATE nen_photo_submissions SET caption = ? WHERE id = 'photo-001'`,
+      ).run('50% off sale photo');
+    });
+
+    it('ペット名・投稿者名・コメントの部分一致で絞る', async () => {
+      const byPet = await page(`&q=${encodeURIComponent('モモ')}`);
+      expect(byPet.map((row) => row.id)).toEqual(['photo-000']);
+      const byOwner = await page(`&q=${encodeURIComponent('Aさん')}`);
+      // 全件が投稿者名に当たる。1ページ目は口と同じく 200 で打ち切り。
+      expect(byOwner).toHaveLength(200);
+      const byCaption = await page(`&q=${encodeURIComponent('庭で遊ぶ')}`);
+      expect(byCaption.map((row) => row.id)).toEqual(['photo-000']);
+    });
+
+    it('LIKEの記号は検索語として扱い、ワイルドカードとして効かない', async () => {
+      // "50%" がワイルドカードなら 245 件全部に当たる。記号として解釈
+      // されるなら caption に "50%" を含む photo-001 だけが返る。
+      const rows = await page(`&q=${encodeURIComponent('50%')}`);
+      expect(rows.map((row) => row.id)).toEqual(['photo-001']);
+    });
+
+    it('検索しても別アカウントの写真は返らない', async () => {
+      sql.prepare(
+        `UPDATE nen_photo_submissions SET caption = 'shared-secret-word' WHERE id = 'photo-other'`,
+      ).run();
+      sql.prepare(
+        `UPDATE nen_photo_submissions SET caption = 'shared-secret-word' WHERE id = 'photo-002'`,
+      ).run();
+      const rows = await page('&q=shared-secret-word');
+      expect(rows.map((row) => row.id)).toEqual(['photo-002']);
+      expect(rows.map((row) => row.id)).not.toContain('photo-other');
+    });
+
+    it('絞り込みの中でもページングは続く', async () => {
+      // Aさんの写真全部が "Aさん" に当たるので、検索中も offset は効く。
+      const first = await page(`&q=${encodeURIComponent('Aさん')}&limit=200`);
+      expect(first).toHaveLength(200);
+      const rest = await page(`&q=${encodeURIComponent('Aさん')}&limit=200&offset=200`);
+      expect(rest).toHaveLength(TOTAL - 200);
+    });
+  });
 });

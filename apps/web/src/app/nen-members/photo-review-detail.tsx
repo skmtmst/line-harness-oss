@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Button from '@/components/shared/button'
 import Card from '@/components/shared/card'
 import Dialog from '@/components/shared/dialog'
@@ -17,8 +17,8 @@ import { text } from './photo-text'
 const numberOrDash = (value: unknown) => Number.isFinite(Number(value)) ? Number(value).toLocaleString('ja-JP') : '—'
 
 export function PhotoReviewDetail({
-  photo, position, total, loading, loadKind, reviewing, notice, assetStatus, derivatives, assetsFailed, onReloadAssets, assetProcessing,
-  onBack, onMove, onApprove, onReturn, onProcessReviewAsset, onDownloadOriginal,
+  photo, position, total, loading, loadKind, reviewing, notice, assetStatus, derivatives, assetsFailed, onReloadAssets, assetProcessing, rotationSaving,
+  onBack, onMove, onApprove, onReturn, onProcessReviewAsset, onSaveRotation, onDownloadOriginal,
 }: {
   photo: Record<string, unknown> | null
   position: number
@@ -32,15 +32,28 @@ export function PhotoReviewDetail({
   assetsFailed: boolean
   onReloadAssets: () => void
   assetProcessing: boolean
+  rotationSaving: boolean
   onBack: () => void
   onMove: (direction: -1 | 1) => void
   onApprove: () => void
   onReturn: () => void
   onProcessReviewAsset: () => void
+  onSaveRotation: (rotation: 0 | 90 | 180 | 270) => void
   onDownloadOriginal: (code: string) => Promise<void>
 }) {
   const [scale, setScale] = useState(1)
-  const [rotation, setRotation] = useState(0)
+  const [rotation, setRotation] = useState<0 | 90 | 180 | 270>(0)
+  /*
+   * 保存済みの向き。写真が変わる・保存が確定するたびに表示へ戻す。
+   * 「回す」は見た目だけでなく、保存ボタンで残る（#931 N-309）。
+   */
+  const savedRotation = ([0, 90, 180, 270].includes(Number(photo?.display_rotation))
+    ? Number(photo?.display_rotation)
+    : 0) as 0 | 90 | 180 | 270
+  useEffect(() => {
+    setRotation(savedRotation)
+    setScale(1)
+  }, [photo?.id, savedRotation])
   const [downloadOpen, setDownloadOpen] = useState(false)
   const [downloadCode, setDownloadCode] = useState('')
   const [downloadBusy, setDownloadBusy] = useState(false)
@@ -87,7 +100,16 @@ export function PhotoReviewDetail({
         <div className="flex flex-wrap items-center gap-2 px-4 pb-2 pt-3">
           <Button onClick={() => setScale((value) => Math.min(1.5, value + 0.1))}>大きく</Button>
           <Button onClick={() => setScale((value) => Math.max(0.7, value - 0.1))}>小さく</Button>
-          <Button onClick={() => setRotation((value) => value + 90)}>回す</Button>
+          <Button onClick={() => setRotation((value) => ((value + 90) % 360) as 0 | 90 | 180 | 270)}>回す</Button>
+          {/*
+           * 直した向きは保存ボタンで残す（#931 N-309）。見た目だけだと、
+           * 通したあと元の向きへ戻ってしまう。保存するまで元の向き。
+           */}
+          <Button
+            disabled={rotation === savedRotation || rotationSaving}
+            onClick={() => onSaveRotation(rotation)}
+            title={rotation === savedRotation ? '回したあとに保存できます' : '回した向きをこの写真へ保存します'}
+          >{rotationSaving ? '保存中...' : '向きを保存'}</Button>
           <Button disabled title="切り取りは派生画像の生成口を接続後に使えます">切り取る</Button>
           <Button disabled={assetProcessing} onClick={onProcessReviewAsset}>{assetProcessing ? '作成中...' : '審査用画像を作り直す'}</Button>
           <Button onClick={() => { setDownloadOpen(true); setDownloadCode(''); setDownloadError('') }}>もとの画像を保存</Button>
@@ -113,7 +135,7 @@ export function PhotoReviewDetail({
           </div>)}
         </Card>
         <FeatureLinkCard items={[
-          { label: 'ECポイント', note: '通したら5ポイントの手続きを始める' },
+          { label: 'ECポイント', note: 'ECとつながっていれば、通したとき5ポイントの手続きを始める' },
           { label: 'LINE通知', note: '審査結果を本人へ送る' },
           { label: '登録メディア', note: '公開用画像の置き場' },
         ]} />
