@@ -386,9 +386,13 @@
   gap: 12px;
 }
 
+/*
+ * #973 U023: 固定最小幅の2列（190px+260px）は390pxで必ずはみ出す。
+ * 狭い幅では1列に潰れ、広い幅だけ自動で2列になる形にする。
+ */
 .actionFields {
   display: grid;
-  grid-template-columns: minmax(190px, 0.8fr) minmax(260px, 1.2fr);
+  grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr));
   gap: 12px;
 }
 
@@ -419,8 +423,7 @@
 
 @media (max-width: 1100px) {
   .eventCards,
-  .summaryBar,
-  .actionFields {
+  .summaryBar {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 

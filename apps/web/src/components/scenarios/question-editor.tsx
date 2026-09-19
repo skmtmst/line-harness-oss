@@ -67,8 +67,13 @@ export function emptyQuestion(): ScenarioQuestion {
  */
 const inputClass =
   'border-hairline rounded-control bg-canvas text-ink focus:ring-accent w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none'
+/*
+ * ネイティブの select は最長の option の幅まで広がる。#973 U022:
+ * 詳しい設定を開いたとき、長いタグ名・項目名でカードごと右へはみ出さないよう、
+ * コンテナ幅を上限にし、狭い行では縮められるようにする。
+ */
 const selectClass =
-  'border-hairline rounded-control bg-canvas text-ink focus:ring-accent border px-3 py-2 text-sm focus:ring-2 focus:outline-none'
+  'border-hairline rounded-control bg-canvas text-ink focus:ring-accent min-w-0 max-w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none'
 const areaClass =
   'border-hairline rounded-control bg-canvas text-ink focus:ring-accent w-full resize-y border px-3 py-2 text-sm focus:ring-2 focus:outline-none'
 
@@ -428,7 +433,11 @@ export default function QuestionEditor({
                       onChange={(ids) => setChoice(index, { removeTagIds: ids })}
                     />
 
-                    <div className="flex flex-wrap items-center gap-2">
+                    {/*
+                      #973 U022: 友だち情報欄は全幅の縦配置にする。選択と
+                      書き込む値を同じ行に押し込むと、狭い幅で右側が切れる。
+                    */}
+                    <div>
                       <span className="text-ink-secondary text-xs font-medium">友だち情報欄</span>
                       <select
                         value={choice.field?.fieldId ?? ''}
@@ -439,7 +448,7 @@ export default function QuestionEditor({
                               : undefined,
                           })
                         }
-                        className={selectClass}
+                        className={`${selectClass} mt-1.5 w-full`}
                       >
                         <option value="">設定しない</option>
                         {fields.map((f) => (
@@ -457,7 +466,7 @@ export default function QuestionEditor({
                             })
                           }
                           placeholder="セットする値（既存の値は上書き）"
-                          className="border-hairline rounded-control text-ink h-9 min-w-0 flex-1 border px-3 text-sm"
+                          className="border-hairline rounded-control text-ink mt-2 h-9 w-full border px-3 text-sm"
                         />
                       )}
                     </div>
@@ -532,13 +541,15 @@ function TagPicker({
           </button>
         ))}
         {tags.length > 0 ? (
+          /* #973 U022: タグの選択は全幅の独立行にする。長いタグ名でも
+             カードを広げず、選んだタグの行と重ならない。 */
           <select
             aria-label={label}
             value=""
             onChange={(event) => {
               if (event.target.value) onChange([...selected, event.target.value])
             }}
-            className="border-hairline rounded-control bg-canvas text-ink focus:ring-accent border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
+            className="border-hairline rounded-control bg-canvas text-ink focus:ring-accent w-full max-w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
           >
             <option value="">{selected.length > 0 ? 'ほかのタグを選ぶ' : 'タグを選ぶ'}</option>
             {availableTags.map((tag) => (

@@ -14,6 +14,7 @@ import FolderPanel, { FOLDER_RAIL_STYLE } from '@/components/shared/folder-panel
 import { formatStamp } from '@/lib/common-vars'
 import Pagination from '@/components/shared/pagination'
 import Button from '@/components/shared/button'
+import SearchField from '@/components/shared/search-field'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
 import { TableHeadRow, Th } from '@/components/shared/table'
@@ -541,6 +542,61 @@ function VarsPageInner() {
 
   const allOnPageSelected = current.length > 0 && current.every((item) => selected.has(item.id))
 
+  /*
+   * フォルダ新設の入力欄（#973 U026）。狭い幅では縦パネルを畳んで選択欄に
+   * するため、縦パネルと選択欄の両方から同じ形を使う。
+   */
+  const folderForm = (
+    <div className="space-y-2">
+      <input
+        type="text"
+        autoFocus
+        value={folderName}
+        onChange={(e) => setFolderName(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') void addFolder()
+          if (e.key === 'Escape') setAddingFolder(false)
+        }}
+        placeholder="フォルダ名を入力"
+        aria-label="フォルダ名"
+        className="border-hairline rounded-control focus:ring-accent w-full border px-2 py-1.5 text-sm focus:ring-2 focus:outline-none"
+      />
+      <div className="flex justify-end gap-2">
+        <button
+          onClick={() => {
+            setAddingFolder(false)
+            setFolderName('')
+          }}
+          className="border-hairline text-ink-secondary rounded-control border px-3 py-1 text-xs"
+        >
+          キャンセル
+        </button>
+        <button
+          onClick={() => void addFolder()}
+          disabled={!folderName.trim() || savingFolder}
+          className="bg-accent-deep text-on-accent rounded-control px-3 py-1 text-xs font-medium disabled:opacity-40"
+        >
+          決定
+        </button>
+      </div>
+    </div>
+  )
+
+  /*
+   * 狭い幅で出すフォルダの選択欄（#973 U026）。縦パネルは長い一覧が
+   * 本文の前に来て、親グリッドの右へはみ出す元にもなっていた。
+   */
+  const folderOptions = [
+    { value: '', label: `すべて（${items.length}件）` },
+    { value: UNGROUPED, label: `未分類（${unfiledCount === null ? '—' : `${unfiledCount}件`}）` },
+    ...folders.map((folder) => ({
+      value: folder.id,
+      label: folder.itemCount === null || folder.itemCount === undefined
+        ? folder.name
+        : `${folder.name}（${folder.itemCount}件）`,
+    })),
+  ]
+
   return (
     <div data-design-node="WuKzU">
       {!selectedAccountId && !accountLoading && (
@@ -579,8 +635,32 @@ function VarsPageInner() {
         </div>
       ) : null}
 
+      {/*
+        #973 U026: グリッド子は `min-w-0` で縮める。無いと中身（820pxの表を
+        抱える一覧側）の最小幅がそのまま段の最小幅になり、ページ全体が
+        右へはみ出す。
+      */}
       <div style={FOLDER_RAIL_STYLE} className="grid gap-4 lg:grid-cols-[var(--folder-rail-width)_minmax(0,1fr)]">
-        <div className="space-y-3">
+        {/* 狭い幅では縦パネルの代わりに1行の選択欄を出す（#973 U026）。 */}
+        <div className="space-y-2 lg:hidden">
+          <label className="text-ink-secondary block text-xs font-semibold" htmlFor="vars-folder-filter">
+            フォルダ
+          </label>
+          <SelectField
+            id="vars-folder-filter"
+            aria-label="フォルダ"
+            value={folderFilter}
+            onChange={(event) => setFolderFilter(event.target.value)}
+            className="w-full"
+            options={folderOptions}
+          />
+          {addingFolder ? (
+            folderForm
+          ) : (
+            <Button type="button" onClick={() => setAddingFolder(true)}>フォルダを追加</Button>
+          )}
+        </div>
+        <div className="hidden space-y-3 lg:block">
           <FolderPanel
             total={`${items.length} 件`}
             activeId={folderFilter}
@@ -606,39 +686,7 @@ function VarsPageInner() {
             ]}
           >
             {addingFolder ? (
-              <div className="space-y-2">
-                <input
-                  type="text"
-                  autoFocus
-                  value={folderName}
-                  onChange={(e) => setFolderName(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') void addFolder()
-                    if (e.key === 'Escape') setAddingFolder(false)
-                  }}
-                  placeholder="フォルダ名を入力"
-                  aria-label="フォルダ名"
-                  className="border-hairline rounded-control focus:ring-accent w-full border px-2 py-1.5 text-sm focus:ring-2 focus:outline-none"
-                />
-                <div className="flex justify-end gap-2">
-                  <button
-                    onClick={() => {
-                      setAddingFolder(false)
-                      setFolderName('')
-                    }}
-                    className="border-hairline text-ink-secondary rounded-control border px-3 py-1 text-xs"
-                  >
-                    キャンセル
-                  </button>
-                  <button
-                    onClick={() => void addFolder()}
-                    disabled={!folderName.trim() || savingFolder}
-                    className="bg-accent-deep text-on-accent rounded-control px-3 py-1 text-xs font-medium disabled:opacity-40"
-                  >
-                    決定
-                  </button>
-                </div>
-              </div>
+              folderForm
             ) : (
               <p className="text-ink-faint text-xs leading-relaxed">
                 フォルダを消しても、入っていた共通情報は未分類として残ります。
@@ -647,19 +695,28 @@ function VarsPageInner() {
           </FolderPanel>
         </div>
 
-        <div>
-          <div className="mb-3 flex flex-wrap items-center gap-2">
-            <input
-              type="search"
+        <div className="min-w-0">
+          {/*
+            検索は独立した全幅の行にする（#973 U026）。表示件数と同じ行に
+            押し込むと、狭い幅で入力文が読めないほど潰れる。
+          */}
+          <div data-search-row className="mb-3">
+            <SearchField
               value={query}
-              onChange={(e) => {
-                setQuery(e.target.value)
+              onChange={(value) => {
+                setQuery(value)
+                setPage(1)
+              }}
+              onClear={() => {
+                setQuery('')
                 setPage(1)
               }}
               placeholder="名前・差し込みキー・中身で検索"
               aria-label="共通情報を検索"
-              className="border-hairline rounded-control focus:ring-accent min-w-64 flex-1 border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
             />
+          </div>
+
+          <div className="mb-3 flex flex-wrap items-center gap-2">
             <SelectField
               size="compact"
               value={String(pageSize)}
@@ -670,9 +727,6 @@ function VarsPageInner() {
               aria-label="表示件数"
               options={[20, 50, 100].map((value) => ({ value: String(value), label: `${value}件表示` }))}
             />
-          </div>
-
-          <div className="mb-3 flex flex-wrap items-center gap-2">
             {([
               ['all', 'すべて'],
               ['empty', '空のまま'],
@@ -707,6 +761,30 @@ function VarsPageInner() {
           </div>
 
           <div className="bg-canvas rounded-card border-hairline overflow-hidden border">
+            {/*
+              #973 U026: 読み込み・空の状態は820pxの表の外へ出す。
+              表のセルに入れると、空状態の主操作まで横スクロールの奥へ切れる。
+            */}
+            {loading ? (
+              <div className="text-ink-faint px-4 py-8 text-center text-sm">
+                <ListState kind="loading" title="共通情報を読み込んでいます" />
+              </div>
+            ) : current.length === 0 ? (
+              <div className="text-ink-faint px-4 py-8 text-center text-sm">
+                <ListState
+                  kind="empty"
+                  title={items.length === 0
+                    ? 'まだ共通情報がありません'
+                    : '条件に合う共通情報はありません'}
+                  description={items.length === 0
+                    ? '何度も使う営業時間や会社名を登録できます。'
+                    : '検索語やフォルダを変えてください。'}
+                  action={items.length === 0
+                    ? <Button href="/contents/vars/new" variant="primary">共通情報を作る</Button>
+                    : undefined}
+                />
+              </div>
+            ) : (
             <div className="overflow-x-auto">
               <table className="w-full min-w-[820px] table-fixed">
                 <thead>
@@ -746,31 +824,7 @@ function VarsPageInner() {
                   </TableHeadRow>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
-                  {loading ? (
-                    <tr>
-                      <td colSpan={7} className="text-ink-faint px-4 py-8 text-center text-sm">
-                        <ListState kind="loading" title="共通情報を読み込んでいます" />
-                      </td>
-                    </tr>
-                  ) : current.length === 0 ? (
-                    <tr>
-                      <td colSpan={7} className="text-ink-faint px-4 py-8 text-center text-sm">
-                        <ListState
-                          kind="empty"
-                          title={items.length === 0
-                            ? 'まだ共通情報がありません'
-                            : '条件に合う共通情報はありません'}
-                          description={items.length === 0
-                            ? '何度も使う営業時間や会社名を登録できます。'
-                            : '検索語やフォルダを変えてください。'}
-                          action={items.length === 0
-                            ? <Button href="/contents/vars/new" variant="primary">共通情報を作る</Button>
-                            : undefined}
-                        />
-                      </td>
-                    </tr>
-                  ) : (
-                    current.map((item) => {
+                  {current.map((item) => {
                       const pending = item.nextSchedule
                       return (
                         <tr key={item.id} className="hover:bg-canvas-sunken">
@@ -843,11 +897,11 @@ function VarsPageInner() {
                           </td>
                         </tr>
                       )
-                    })
-                  )}
+                    })}
                 </tbody>
               </table>
             </div>
+            )}
           </div>
 
           <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
