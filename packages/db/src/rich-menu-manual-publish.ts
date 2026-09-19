@@ -97,6 +97,31 @@ export async function getRichMenuManualPublishRequest(
   ).bind(accountId, idempotencyKey).first<RichMenuManualPublishRequest>();
 }
 
+/** N-151: 公開履歴の詳細・失敗再試行の起点。request の id で1件引く。 */
+export async function getRichMenuManualPublishRequestById(
+  db: D1Database,
+  requestId: string,
+): Promise<RichMenuManualPublishRequest | null> {
+  return db.prepare(
+    `SELECT * FROM rich_menu_manual_publish_requests WHERE id = ?`,
+  ).bind(requestId).first<RichMenuManualPublishRequest>();
+}
+
+/** N-151: 公開履歴の一覧。新しい順。版（定義スナップショット）・状態・最終エラーを返す。 */
+export async function listRichMenuManualPublishRequests(
+  db: D1Database,
+  groupId: string,
+  limit = 50,
+): Promise<RichMenuManualPublishRequest[]> {
+  const result = await db.prepare(
+    `SELECT * FROM rich_menu_manual_publish_requests
+      WHERE group_id = ?
+      ORDER BY created_at DESC
+      LIMIT ?`,
+  ).bind(groupId, limit).all<RichMenuManualPublishRequest>();
+  return result.results ?? [];
+}
+
 export async function getRichMenuManualPublishShells(
   db: D1Database,
   requestId: string,
