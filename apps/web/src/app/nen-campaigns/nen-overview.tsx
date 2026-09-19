@@ -28,7 +28,7 @@ import type {
   NenFlowMetrics,
 } from '@/lib/api'
 import { campaignTriggerLabel, formatCampaignAudience, formatCampaignTiming, formatNenJobDateTime } from './campaign-display'
-import { publishedAtIso } from './columns/new/column-form'
+import { isPastScheduledAt, publishedAtIso } from './columns/new/column-form'
 import { CampaignLinePreview, COLUMN_PET_NAME_FALLBACK, ColumnLinePreview } from './line-preview'
 import { jstLongDateTime, jstShortDate, jstShortDateTime } from './nen-period'
 
@@ -194,6 +194,8 @@ export type NenOverviewProps = {
   onTabChange: (tab: NenTab) => void
   settings: NenCampaignSetting[]
   columns: NenColumn[]
+  /** コラムの全体件数（口は既定200件で打ち切る）。一覧より多ければ打ち切りを出す（#935 N-300）。 */
+  columnsTotal: number | null
   kpis: NenKpis | null
   flowMetrics: NenFlowMetrics | null
   columnMetrics: NenColumnMetrics | null
@@ -245,6 +247,7 @@ export function NenOverview({
   onTabChange,
   settings,
   columns,
+  columnsTotal,
   kpis,
   flowMetrics,
   columnMetrics,
@@ -330,6 +333,7 @@ export function NenOverview({
       {tab === 'columns' ? (
         <ColumnsPanel
           columns={columns}
+          columnsTotal={columnsTotal}
           metrics={columnMetrics}
           loading={loading}
           selectedColumnId={selectedColumnId}
@@ -603,6 +607,7 @@ function columnDeliveryBadge(column: NenColumn) {
 
 function ColumnsPanel({
   columns,
+  columnsTotal,
   metrics,
   loading,
   selectedColumnId,
@@ -630,6 +635,8 @@ function ColumnsPanel({
   notice,
 }: {
   columns: NenColumn[]
+  /** 口が返す全体件数。一覧より多いとき打ち切りを示す（#935 N-300）。 */
+  columnsTotal: number | null
   metrics: NenColumnMetrics | null
   loading: boolean
   selectedColumnId: string | null
@@ -676,11 +683,24 @@ function ColumnsPanel({
   const categories = [...new Set(columns.map((column) => column.category).filter((value): value is string => Boolean(value)))]
   const selected = columns.find((column) => column.id === selectedColumnId) ?? null
   const scheduledIso = plan.when === 'schedule' ? publishedAtIso(plan.scheduledAt) : null
-  const scheduleInvalid = plan.when === 'schedule' && !scheduledIso
+  /*
+   * #935 N-304: 過去の予約日時はWorkerの次のtickで即送されるため「予約」にならない。
+   * Worker側も断るが、ここで先に止めて「いまより先を選ぶ」と言う。
+   */
+  const schedulePast = plan.when === 'schedule' && isPastScheduledAt(plan.scheduledAt)
+  const scheduleInvalid = plan.when === 'schedule' && (!scheduledIso || schedulePast)
   const planLabel = selected
-    ? plan.when === 'now' ? `「${selected.title}」を今すぐ送る` : scheduledIso ? `「${selected.title}」を ${jstShortDateTime(scheduledIso)} に予約` : `「${selected.title}」の予約日時を入れてください`
+    ? plan.when === 'now'
+      ? `「${selected.title}」を今すぐ送る`
+      : !scheduledIso
+        ? `「${selected.title}」の予約日時を入れてください`
+        : schedulePast
+          ? `「${selected.title}」の予約日時はいまより先を選んでください`
+          : `「${selected.title}」を ${jstShortDateTime(scheduledIso)} に予約`
     : 'コラムを選ぶと、ここに予定が出ます'
   const introDirty = selected !== null && introDraft !== selected.introText
+  // 口は既定200件で打ち切る。一覧より全体が多いなら、黙って切らない（#935 N-300）。
+  const columnsTruncated = columnsTotal !== null && columnsTotal > columns.length
 
   return (
     <>
@@ -708,8 +728,17 @@ function ColumnsPanel({
               onChange={(value) => { setDelivery(value === 'draft' || value === 'scheduled' || value === 'sent' ? value : ''); setPage(1) }}
               options={[{ value: '', label: '配信：すべて' }, { value: 'draft', label: '配信：未配信' }, { value: 'scheduled', label: '配信：予約' }, { value: 'sent', label: '配信：配信済み' }]}
             />
-            <span className="ml-auto text-caption font-semibold text-ink-faint">{shown.length}本</span>
+            <span className="ml-auto text-caption font-semibold text-ink-faint">
+              {columnsTruncated ? `${shown.length}本（全体 ${num(columnsTotal)}本）` : `${shown.length}本`}
+            </span>
           </div>
+
+          {/* #935 N-300: 口の既定200件で一覧が打ち切られるとき、そのことを黙らせない。 */}
+          {columnsTruncated ? (
+            <p role="status" className="text-caption font-normal text-warning">
+              コラムは全部で{num(columnsTotal)}本あります。一覧には新しい{num(columns.length)}本までを表示しています。それ以前のコラムはEC側でご確認ください。
+            </p>
+          ) : null}
 
           <section data-design="Table" data-design-node="nen-columns-table">
             {loading && columns.length === 0 ? (
@@ -828,7 +857,12 @@ function ColumnsPanel({
                 <Button type="button" role="radio" aria-checked={plan.when === 'schedule'} variant={plan.when === 'schedule' ? 'primary' : 'secondary'} onClick={() => onPlanChange({ ...plan, when: 'schedule' })}>日時を予約</Button>
               </div>
               {plan.when === 'schedule' ? (
-                <TextField type="datetime-local" aria-label="予約日時（日本時間）" value={plan.scheduledAt} invalid={scheduleInvalid} onChange={(event) => onPlanChange({ ...plan, scheduledAt: event.target.value })} />
+                <>
+                  <TextField type="datetime-local" aria-label="予約日時（日本時間）" value={plan.scheduledAt} invalid={scheduleInvalid} onChange={(event) => onPlanChange({ ...plan, scheduledAt: event.target.value })} />
+                  {schedulePast ? (
+                    <span className="text-micro font-normal text-danger">予約日時が過去になっています。いまより先の日時を選んでください。</span>
+                  ) : null}
+                </>
               ) : null}
             </div>
             <p className="text-micro text-ink-faint">
@@ -862,7 +896,9 @@ function ColumnsPanel({
 
       <ConfirmDialog
         open={confirmDeliver !== null}
-        title={`「${confirmDeliver?.column.title ?? ''}」を配信予約しますか？`}
+        title={confirmDeliver?.scheduledAt
+          ? `「${confirmDeliver.column.title}」を配信予約しますか？`
+          : `「${confirmDeliver?.column.title ?? ''}」を今すぐ配信しますか？`}
         description={confirmDeliver?.scheduledAt
           ? `${jstLongDateTime(confirmDeliver.scheduledAt)}（日本時間）に、${audienceCount == null ? '対象' : `約${num(audienceCount)}人`}の友だちへ送ります。`
           : `すぐに配信待ちに入り、${audienceCount == null ? '対象' : `約${num(audienceCount)}人`}の友だちへ送られます。`}

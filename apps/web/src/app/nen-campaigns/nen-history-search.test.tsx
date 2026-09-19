@@ -56,6 +56,7 @@ function renderHistory(list: NenDeliveryList, onChangeDeliveryView: (status?: st
         onTabChange={noop}
         settings={[]}
         columns={[]}
+        columnsTotal={0}
         kpis={null}
         flowMetrics={null}
         columnMetrics={null}
