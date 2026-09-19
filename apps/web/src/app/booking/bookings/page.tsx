@@ -368,7 +368,12 @@ export default function BookingsPage() {
       <ConfirmDialog
         open={decideTarget !== null}
         title={`この予約を「${decideTarget ? actionLabel[decideTarget.action] : ''}」にしますか？`}
-        description="予約した人へ、この結果がLINEで届きます。取り消すには、もう一度状態を変える必要があります。"
+        description={
+          // N-390: LINE未連携の予約へ「届きます」と出すと事実と違う。
+          decideTarget && (calendarItems.find((b) => b.id === decideTarget.id) ?? items.find((b) => b.id === decideTarget.id))?.friend_id
+            ? '予約した人へ、この結果がLINEで届きます。取り消すには、もう一度状態を変える必要があります。'
+            : 'LINEと結びついていないため、お客様への自動連絡はありません。取り消すには、もう一度状態を変える必要があります。'
+        }
         confirmLabel={decideTarget ? actionLabel[decideTarget.action] : '実行する'}
         destructive={decideTarget?.action === 'reject' || decideTarget?.action === 'cancel' || decideTarget?.action === 'no_show'}
         busy={deciding}
@@ -751,6 +756,8 @@ function BookingDetailPanel({
   }, [accountId, b.id])
 
   const lineOperation = detail?.operations.find((item) => item.kind === 'confirmation_line') ?? null
+  // N-390: LINEと結びついていない電話予約では「届きます」系の文言を畳む。
+  const isLinked = detail?.customer.isLineLinked ?? Boolean(b.friend_id)
   return (
     <div data-design-node="TnDbq" className="fixed inset-y-0 right-0 left-0 z-50 flex justify-end xl:left-64">
       <button
@@ -768,7 +775,8 @@ function BookingDetailPanel({
           <div className="flex shrink-0 items-center gap-2">
             <span className={`rounded-pill px-3 py-1 text-xs font-semibold ${statusBadgeColor[b.status] ?? 'bg-canvas-sunken'}`}>{statusLabel[b.status] ?? b.status}</span>
             {b.friend_id ? <Button href={`/chats?friend=${b.friend_id}`} variant="primary">この人と話す</Button> : null}
-            <Button disabled title="日時変更は準備中です">時間や担当を変える</Button>
+            {/* N-389: 変更は詳細ページの変更フォームで行う。「準備中」のまま残さない。 */}
+            <Button href={`/booking/bookings/detail?id=${encodeURIComponent(b.id)}`} variant="secondary">時間や担当を変える</Button>
             <Button onClick={() => onAction('cancel')} className="border-danger text-danger">予約を取り消す</Button>
             <Button onClick={onClose}>閉じる</Button>
           </div>
@@ -779,7 +787,7 @@ function BookingDetailPanel({
           {detailError ? <p className="border-danger bg-danger-bg text-danger mb-4 rounded-card border px-4 py-3 text-sm">{detailError}</p> : null}
           <section className="mb-6">
             <div className="bg-success-bg text-success mb-3 w-fit rounded-pill px-3 py-1 text-xs font-semibold">予約が入っています</div>
-            <p className="text-ink-secondary mb-3 text-sm">{formatJpDateTime(b.starts_at)}〜{formatJpTime(b.ends_at)} ／ 担当 {b.staff_name} ／ LINEから入りました。</p>
+            <p className="text-ink-secondary mb-3 text-sm">{formatJpDateTime(b.starts_at)}〜{formatJpTime(b.ends_at)} ／ 担当 {b.staff_name} ／ {isLinked ? 'LINEから入りました。' : '電話・店頭で受け付けました。'}</p>
             <div className="bg-canvas rounded-card border-hairline border p-5">
             <h3 className="text-ink mb-1 text-base font-semibold">予約の中身</h3>
             <DetailRow label="メニュー">{b.menu_name}</DetailRow>
@@ -814,7 +822,7 @@ function BookingDetailPanel({
               {b.decided_at ? <p>✓ {formatJpDateTime(b.decided_at)} 予約を「{statusLabel[b.status] ?? b.status}」にしました</p> : null}
               {lineOperation ? <p>{lineOperation.status === 'succeeded' ? '✓' : '…'} 予約確認LINE: {lineOperation.status === 'succeeded' ? '送信済み' : lineOperation.status === 'queued' ? '送信中' : lineOperation.status === 'retry_wait' ? '再試行中' : lineOperation.status === 'permanent_failed' ? '失敗' : '送信なし'}</p> : null}
               {detail?.reminders.map((reminder) => <p key={reminder.id}>{reminder.status === 'sent' ? '✓' : '…'} {formatJpDateTime(reminder.scheduledAt)} リマインダ: {reminder.status}</p>)}
-              <p className="text-ink-faint">お知らせの開封状況は、受信箱で確認できます。</p>
+              {isLinked ? <p className="text-ink-faint">お知らせの開封状況は、受信箱で確認できます。</p> : null}
             </div>
           </section>
           </main>
@@ -838,7 +846,9 @@ function BookingDetailPanel({
           </section>
           <div className="bg-canvas rounded-card border-hairline border p-5">
             <p className="text-ink-faint mb-2 text-xs">
-              承認するとお客様のLINEに確定のお知らせが届きます。
+              {isLinked
+                ? '承認するとお客様のLINEに確定のお知らせが届きます。'
+                : 'LINEと結びついていないため、お客様への自動連絡はありません。'}
             </p>
             <ActionButtons status={b.status} onAction={onAction} />
             <Link
@@ -852,7 +862,7 @@ function BookingDetailPanel({
           </div>
           </aside>
         </div>
-        <div className="border-hairline sticky bottom-0 z-10 flex items-center justify-between gap-4 border-t bg-canvas px-6 py-3"><p className="text-ink-faint text-xs">ここでの状態変更は、お客様のLINEにも自動で知らせます。</p><div className="flex gap-2"><Button onClick={() => onAction('cancel')}>キャンセル</Button><Button onClick={() => onAction('complete')}>来ていただきました にする</Button><Button variant="primary" disabled>変更を保存する</Button></div></div>
+        <div className="border-hairline sticky bottom-0 z-10 flex items-center justify-between gap-4 border-t bg-canvas px-6 py-3"><p className="text-ink-faint text-xs">{isLinked ? 'ここでの状態変更は、お客様のLINEにも自動で知らせます。' : 'LINEと結びついていないため、お客様への自動連絡はありません。'}</p><div className="flex gap-2"><Button onClick={() => onAction('cancel')}>キャンセル</Button><Button onClick={() => onAction('complete')}>来ていただきました にする</Button></div></div>
       </aside>
     </div>
   )
