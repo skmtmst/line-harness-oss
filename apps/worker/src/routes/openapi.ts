@@ -4032,6 +4032,76 @@ const spec = {
         responses: { '200': { description: 'Cancelled' }, '404': { description: 'Not found' }, '409': { description: 'Already started' } },
       },
     },
+    // ── Rich Menus (運用: 履歴・再試行・照合・複製・集計・テスト適用) ──────
+    '/api/rich-menu-groups/{groupId}/publish-runs': {
+      get: {
+        tags: ['Rich Menus'],
+        summary: 'リッチメニューの公開履歴を取得（版・状態・最終エラー・LINE ID）',
+        parameters: [{ name: 'groupId', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { '200': { description: 'Publish runs newest first' }, '403': { description: 'Owner or admin role required' }, '404': { description: 'Not found or not visible' } },
+      },
+    },
+    '/api/rich-menu-groups/{groupId}/publish-runs/{requestId}/retry': {
+      post: {
+        tags: ['Rich Menus'],
+        summary: '失敗した公開runだけを保存された版のまま再試行（owner/admin）',
+        parameters: [
+          { name: 'groupId', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'requestId', in: 'path', required: true, schema: { type: 'string' } },
+        ],
+        responses: { '200': { description: 'Retry result or replayed success' }, '403': { description: 'Owner or admin role required' }, '404': { description: 'Not found' }, '409': { description: 'Run still in progress' } },
+      },
+    },
+    '/api/rich-menu-groups/{groupId}/reconcile': {
+      post: {
+        tags: ['Rich Menus'],
+        summary: 'DBとLINEのずれを点検（dryRun）し、明示したときだけ修復（owner/admin）',
+        parameters: [{ name: 'groupId', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: { content: { 'application/json': { schema: { type: 'object', properties: { dryRun: { type: 'boolean' } } } } } },
+        responses: { '200': { description: 'Diffs listed or repaired' }, '403': { description: 'Owner or admin role required' }, '404': { description: 'Not found or not visible' }, '502': { description: 'LINE state unreadable' } },
+      },
+    },
+    '/api/rich-menu-groups/{groupId}/duplicate': {
+      post: {
+        tags: ['Rich Menus'],
+        summary: 'メニュー全体（ページ・ボタン・画像参照・出し分け）を下書きとして複製（owner/admin）',
+        parameters: [{ name: 'groupId', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: { content: { 'application/json': { schema: { type: 'object', properties: { name: { type: 'string' } } } } } },
+        responses: { '201': { description: 'Duplicated as a new draft' }, '200': { description: 'Same Idempotency-Key replayed' }, '400': { description: 'Idempotency-Key header required' }, '403': { description: 'Owner or admin role required' }, '404': { description: 'Not found or not visible' }, '409': { description: 'Idempotency-Key used with different content' } },
+      },
+    },
+    '/api/rich-menu-groups/{groupId}/audience-summary': {
+      get: {
+        tags: ['Rich Menus'],
+        summary: 'このメニューが実際に出る人数の集計だけを返す（staff可・個人情報なし）',
+        parameters: [{ name: 'groupId', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { '200': { description: 'Aggregate counts only' }, '404': { description: 'Not found or not visible' }, '503': { description: 'Counts unavailable' } },
+      },
+    },
+    '/api/rich-menu-groups/{groupId}/test-apply': {
+      get: {
+        tags: ['Rich Menus'],
+        summary: '本人LINEへのテスト適用の状態を取得（連携済みか・適用中か）',
+        parameters: [{ name: 'groupId', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { '200': { description: 'Link state and active apply' }, '404': { description: 'Not found or not visible' } },
+      },
+      post: {
+        tags: ['Rich Menus'],
+        summary: '本人確認済みのLINEだけへテスト適用（owner/admin・confirm必須）',
+        parameters: [{ name: 'groupId', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: { content: { 'application/json': { schema: { type: 'object', required: ['confirm'], properties: { confirm: { type: 'boolean', const: true } } } } } },
+        responses: { '200': { description: 'Applied to operator LINE' }, '400': { description: 'Not linked or confirm missing' }, '403': { description: 'Owner or admin role required' }, '404': { description: 'Not found or not visible' }, '409': { description: 'Another apply in progress or key conflict' } },
+      },
+    },
+    '/api/rich-menu-groups/{groupId}/test-apply/revert': {
+      post: {
+        tags: ['Rich Menus'],
+        summary: 'テスト適用を取り消し、適用前のメニューへ戻す（冪等・owner/admin）',
+        parameters: [{ name: 'groupId', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: { content: { 'application/json': { schema: { type: 'object', required: ['confirm'], properties: { confirm: { type: 'boolean', const: true }, applyId: { type: 'string' } } } } } },
+        responses: { '200': { description: 'Reverted (idempotent)' }, '400': { description: 'confirm required' }, '403': { description: 'Owner or admin role required' }, '404': { description: 'No active apply' }, '409': { description: 'Conflicting revert in progress' } },
+      },
+    },
     // ── Common Vars (audited async CSV export, N-192) ─────────────────────
     '/api/common-vars/exports': {
       get: {

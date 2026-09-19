@@ -102,20 +102,32 @@ export default function MediaReplacementDialog({
     }
   }
 
-  async function replace() {
-    if (!source || !accountId || !impact || !impact.canReplace || busy) return
+  /**
+   * 差し替えの実行。'all' は全使用先、'partial' は影響確認で
+   * 「差し替えられます」と出た箇所だけ（#918）。
+   * 部分実行は専用ボタンの文言で明示確認してから呼ばれる。
+   */
+  async function replace(mode: 'all' | 'partial') {
+    if (!source || !accountId || !impact || busy) return
+    if (mode === 'all' && !impact.canReplace) return
+    if (mode === 'partial' && !impact.canPartiallyReplace) return
     setBusy(true)
     setError('')
     try {
       const response = await api.media.replaceUsages(source.id, accountId, {
         replacementMediaId: impact.replacement.id,
         expectedRevision: impact.revision,
+        scope: mode === 'partial' ? 'replaceable' : 'all',
       })
       if (!response.success) throw new Error(response.error)
       const verification = response.data.verification === 'verified'
         ? '差し替え後の使用先も確認できました。'
         : '差し替えは完了しましたが、残りの使用先は確認中です。'
-      onComplete(`${response.data.replacedUsageCount}か所を「${impact.replacement.filename}」へ差し替えました。${verification}`)
+      const skipped = response.data.skippedUsageCount ?? 0
+      const remaining = skipped > 0
+        ? `差し替えられなかった${skipped}か所は、元のメディアを使い続けます。`
+        : ''
+      onComplete(`${response.data.replacedUsageCount}か所を「${impact.replacement.filename}」へ差し替えました。${remaining}${verification}`)
     } catch (caught) {
       const message = caught instanceof ApiError || caught instanceof Error
         ? caught.message
@@ -140,9 +152,15 @@ export default function MediaReplacementDialog({
       footer={(
         <div className="flex flex-wrap items-center justify-end gap-2">
           <Button type="button" onClick={onClose} disabled={busy}>閉じる</Button>
-          <Button type="button" variant="primary" onClick={() => void replace()} disabled={busy || !impact?.canReplace}>
-            {busy ? '差し替えています…' : '使用先を差し替える'}
-          </Button>
+          {impact?.canPartiallyReplace && !impact.canReplace ? (
+            <Button type="button" variant="primary" onClick={() => void replace('partial')} disabled={busy}>
+              {busy ? '差し替えています…' : `差し替え可能な${impact.replaceableCount}か所だけ差し替える`}
+            </Button>
+          ) : (
+            <Button type="button" variant="primary" onClick={() => void replace('all')} disabled={busy || !impact?.canReplace}>
+              {busy ? '差し替えています…' : '使用先を差し替える'}
+            </Button>
+          )}
         </div>
       )}
     >
@@ -213,8 +231,18 @@ export default function MediaReplacementDialog({
             <div className={`rounded-control p-3 text-xs ${impact.canReplace ? 'bg-accent-soft text-accent-deep' : 'bg-danger-bg text-danger'}`}>
               {impact.canReplace
                 ? `${impact.replaceableCount}か所すべてを差し替えられます。`
-                : `${impact.usageCount}か所のうち${impact.replaceableCount}か所だけ差し替えられます。一括操作は実行しません。`}
+                : impact.canPartiallyReplace
+                  ? `${impact.usageCount}か所のうち${impact.replaceableCount}か所を差し替えられます。残り${impact.blockedCount}か所は元のメディアを使い続けます。`
+                  : 'この画面からは差し替えられる使用先がありません。'}
             </div>
+            {impact.blockedCount > 0 ? (
+              <p className="text-ink-faint text-xs">
+                差し替えられない使用先：
+                {Object.entries(impact.blockedByKind)
+                  .map(([kind, count]) => `${referenceKindText(kind as Parameters<typeof referenceKindText>[0])}${count}件`)
+                  .join('・')}
+              </p>
+            ) : null}
             <ul className="max-h-64 space-y-2 overflow-y-auto">
               {impact.references.map((reference, index) => (
                 <li key={`${reference.kind}-${index}`} className="border-hairline rounded-control border p-3 text-xs">

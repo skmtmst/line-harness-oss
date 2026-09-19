@@ -449,11 +449,23 @@ describe('V6オートメーションの既存処理接続', () => {
     });
 
     expect(result.status).toBe('waiting');
-    const headers = fetchMock.mock.calls[0]?.[1]?.headers as Record<string, string>;
+    const init = fetchMock.mock.calls[0]?.[1] as { headers: Record<string, string>; body: string };
+    const headers = init.headers;
     const step = testDb.raw.prepare(
       `SELECT id FROM automation_run_steps WHERE automation_run_id = ? AND step_key = 'webhook'`,
     ).get(result.runId) as { id: string };
-    expect(headers['Idempotency-Key']).toBe(step.id);
+    // N-371/N-372: 冪等キーは共通契約の X-Harness-Event-Id で渡し、
+    // 本文は共通封筒 {id,type,occurred_at,account_id,data,attempt}。
+    expect(headers['X-Harness-Event-Id']).toBe(step.id);
+    expect(headers['X-Harness-Timestamp']).toMatch(/^\d{10}$/);
+    const envelope = JSON.parse(init.body) as Record<string, unknown>;
+    expect(envelope).toMatchObject({
+      id: step.id,
+      type: 'friend_add',
+      account_id: 'account-1',
+      attempt: 1,
+    });
+    expect(typeof envelope.occurred_at).toBe('string');
   });
 
   it('暗号化された送り先は復号して署名し、鍵なしでは送らず止める(#650)', async () => {
@@ -479,7 +491,14 @@ describe('V6オートメーションの既存処理接続', () => {
     });
     expect(ok.status).toBe('success');
     const sent = fetchMock.mock.calls[0]?.[1] as { headers: Record<string, string>; body: string };
-    expect(sent.headers['X-Webhook-Signature']).toBe(await hmacHex(secret, sent.body));
+    const okStep = testDb.raw.prepare(
+      `SELECT id FROM automation_run_steps WHERE automation_run_id = ? AND step_key = 'webhook'`,
+    ).get(ok.runId) as { id: string };
+    // N-372: 署名入力は「時刻.イベントID.生の本文」、名前は v1=<hex>。
+    expect(sent.headers['X-Harness-Event-Id']).toBe(okStep.id);
+    expect(sent.headers['X-Harness-Signature']).toBe(
+      `v1=${await hmacHex(secret, `${sent.headers['X-Harness-Timestamp']}.${okStep.id}.${sent.body}`)}`,
+    );
 
     const fetchBlocked = vi.fn();
     const ng = await execute(testDb, {

@@ -399,9 +399,19 @@ export interface MediaReplacementImpact {
   replacement: MediaDeleteImpact["media"];
   usageCount: number;
   replaceableCount: number;
+  /** この画面からは差し替えられない使用先の件数。usageCount - replaceableCount と同じ。 */
+  blockedCount: number;
+  /** 差し替えられない使用先の種類別件数（ウェビナー何件・共有配信何件…）。 */
+  blockedByKind: Partial<Record<MediaDeleteImpactReferenceKind, number>>;
   references: MediaReplacementReference[];
   blockers: MediaReplacementBlocker[];
+  /** 全使用先をまとめて差し替えられるときだけ true。 */
   canReplace: boolean;
+  /**
+   * 差し替え可能な使用先だけを選んで実行できるとき true。
+   * 差し替え元と先の組み合わせ自体が不正（同一・種類違い）な場合は false。
+   */
+  canPartiallyReplace: boolean;
   checkedAt: string;
   /** 影響確認後に使用先が変わっていないことを、実行直前に照合する値。 */
   revision: string;
@@ -410,7 +420,11 @@ export interface MediaReplacementImpact {
 export interface MediaReplacementResult {
   sourceId: string;
   replacementId: string;
+  /** 全使用先を替えたか（all）、差し替え可能な箇所だけを替えたか（partial）。 */
+  mode: "all" | "partial";
   replacedUsageCount: number;
+  /** 置換不可として元メディアを指したまま残した使用先の件数。 */
+  skippedUsageCount: number;
   remainingUsageCount: number | null;
   verification: "verified" | "partial" | "unavailable";
   checkedAt: string;

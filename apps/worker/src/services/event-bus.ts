@@ -31,6 +31,8 @@ import {
   type WebhookInteractionFailureReason,
 } from '@line-crm/db';
 import {
+  buildOutgoingWebhookBody,
+  buildOutgoingWebhookHeaders,
   claimOutgoingDelivery,
   deliverWebhook,
   enqueueOutgoingWebhookDelivery,
@@ -268,18 +270,24 @@ async function fireOutgoingWebhooks(
       let interactionId: string | null = null;
       const started = Date.now();
       try {
-        const body = JSON.stringify({
-          event: eventType,
-          timestamp: execution?.occurredAt ?? jstNow(),
-          data: payload,
-        });
         const idempotencyKey = payload.sourceEventId
           ? `outgoing_webhook:${wh.id}:${payload.sourceKind ?? eventType}:${payload.sourceEventId}`
           : crypto.randomUUID();
+        // N-371/N-372: 本文は共通封筒（要件26 §6-2）で組み立てる。
+        // 冪等キー＝封筒の id＝X-Harness-Event-Id で、再送しても同じ出来事と
+        // 判定できる。replyToken・変換測定用の値など内部情報は data に入れない。
+        const deliveryAccountId = wh.line_account_id ?? lineAccountId;
+        const body = buildOutgoingWebhookBody({
+          eventId: idempotencyKey,
+          eventType,
+          occurredAt: payload.occurredAt ?? execution?.occurredAt ?? new Date().toISOString(),
+          accountId: deliveryAccountId ?? null,
+          data: { friendId: payload.friendId ?? null, ...payload.eventData },
+          attempt: 1,
+        });
         // N-370: 配送は台帳(outgoing_webhook_deliveries)へ先に積んでから送る。
         // 同じ出来事の再発火は (webhook_id, idempotency_key) の UNIQUE で
         // 積み増さず、Worker中断・cron再実行の送り残しは sweep が回収する。
-        const deliveryAccountId = wh.line_account_id ?? lineAccountId;
         if (!deliveryAccountId) {
           // 台帳は所属必須。アカウント不明の旧行（getActive… が通常返さない
           // 分）は従来どおりその場で送り、成否だけ記録する。
@@ -453,7 +461,7 @@ async function processAutomations(
           await replayStep(execution, `event:legacy:${automation.id}:${index}`, async () => {
             const idempotencyKey = execution
               ? await stableWebhookStepId(execution.sourceEventId, `legacy:${automation.id}:${index}`) : undefined;
-            await executeAction(db, action, payload, lineAccessToken, lineAccountId, idempotencyKey, automation.id);
+            await executeAction(db, action, payload, lineAccessToken, lineAccountId, idempotencyKey, automation.id, eventType);
           });
           results.push({ action: action.type, success: true });
         } catch (err) {
@@ -528,6 +536,7 @@ async function executeAction(
   lineAccountId?: string | null,
   idempotencyKey?: string,
   automationId?: string,
+  eventType?: string,
 ): Promise<void> {
   const friendId = payload.friendId;
   if (!friendId && action.type !== 'send_webhook') {
@@ -643,11 +652,21 @@ async function executeAction(
     case 'send_webhook': {
       const url = action.params.url;
       if (url) {
-        // 旧式の直書きURLも共通の安全送信へ通す。検査を迂回する直 fetch は置かない。
-        const outcome = await postWebhookSafely(url, {
-          headers: { 'Content-Type': 'application/json', ...(idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : {}) },
-          body: JSON.stringify({ friendId, ...payload.eventData }),
+        // N-371/N-372: 旧式の直書きURL経路でも共通封筒と X-Harness-* の
+        // ヘッダを使う。secret を持たない経路なので署名は付かないが、
+        // イベントIDと時刻は他経路と同じ名前で渡す。
+        const eventId = idempotencyKey ?? crypto.randomUUID();
+        const body = buildOutgoingWebhookBody({
+          eventId,
+          eventType: eventType ?? 'legacy_automation.send_webhook',
+          occurredAt: payload.occurredAt ?? new Date().toISOString(),
+          accountId: lineAccountId ?? null,
+          data: { friendId: friendId ?? null, ...payload.eventData },
+          attempt: 1,
         });
+        const headers = await buildOutgoingWebhookHeaders({ eventId, body });
+        // 共通の安全送信へ通す。検査を迂回する直 fetch は置かない。
+        const outcome = await postWebhookSafely(url, { headers, body });
         if ('blocked' in outcome) {
           throw new Error(`send_webhook_url_unsafe: ${outcome.blocked}`);
         }

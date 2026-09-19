@@ -221,9 +221,14 @@ export default function WebhookInteractions() {
       const response = await api.webhooks.interactions.retryFailed(requestAccountId)
       if (selectedAccountIdRef.current !== requestAccountId) return
       if (!response.success) throw new Error(response.error)
+      // N-387: 1回に送り直せる件数には上限がある。残った分は黙って置き去りに
+      // せず、残件数と「もう一度押すと続きをやり直す」ことを明示する。
+      const remainingNote = response.data.remaining > 0
+        ? `まだ失敗のまま残っているものが${response.data.remaining}件あります。もう一度押すと続きをやり直します。`
+        : ''
       setNotice({
-        tone: response.data.failed > 0 || response.data.skipped > 0 ? 'error' : 'success',
-        message: `${response.data.requested}件を確認し、${response.data.succeeded}件が届きました。届かなかったもの ${response.data.failed}件、対象外 ${response.data.skipped}件です。`,
+        tone: response.data.failed > 0 || response.data.skipped > 0 || response.data.remaining > 0 ? 'error' : 'success',
+        message: `${response.data.requested}件を確認し、${response.data.succeeded}件が届きました。届かなかったもの ${response.data.failed}件、対象外 ${response.data.skipped}件です。${remainingNote}`,
       })
       await load()
     } catch {
@@ -302,6 +307,12 @@ export default function WebhookInteractions() {
           {data.items.length === 0 ? (
             <ListState kind="empty" title="条件に合うやり取りはありません" description="期間や絞り込みを変えて確認してください。" />
           ) : (
+            /*
+              N-386: 狭い幅では重要度の低い列を隠す。隠した列の中身は
+              「中身を見る」の詳細ダイアログで全部見られるので情報は失われない。
+                - 1180px以下: 「かかった時間」を隠す（詳細で見られる）
+                - 760px以下:  さらに「送った・届いた中身」を隠す
+            */
             <DataTable className={styles.table}>
               <colgroup><col /><col /><col /><col /><col /><col /></colgroup>
               <thead><TableHeadRow><Th>いつ・どちら向き</Th><Th>つなぎ先</Th><Th>送った・届いた中身</Th><Th>返事</Th><Th>かかった時間</Th><Th><span className="sr-only">操作</span></Th></TableHeadRow></thead>

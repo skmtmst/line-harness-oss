@@ -748,9 +748,13 @@ async function describeMediaReplacementUsage(
 /**
  * 使用中メディアを別の登録メディアへ差し替える前の計画。
  *
- * source / replacement は同じLINEアカウントで引き、参照不明・共有参照・
- * ウェビナー動画を1件でも含むと全体を止める。途中だけ変えると、利用者が
- * 「全部替わった」と誤認するためである。
+ * source / replacement は同じLINEアカウントで引く。参照不明・共有参照・
+ * ウェビナー動画を含む場合、以前は計画全体を止めていたが（全部替わったと
+ * 誤認させないため）、#918 からは「置換できる箇所だけ」を選べる。
+ * そのため影響には、差し替えられない使用先の件数と種類別内訳も載せる。
+ * `canReplace` は全件一括、`canPartiallyReplace` は部分実行の可否。
+ * 差し替え元と先の組み合わせ自体が不正な場合（同一・種類違い）は
+ * 部分実行も認めない。
  */
 export async function getMediaReplacementPlan(
   db: D1Database,
@@ -776,6 +780,14 @@ export async function getMediaReplacementPlan(
   if (source.kind !== replacement.kind) blockers.add('different_kind');
   for (const reference of references) if (reference.blocker) blockers.add(reference.blocker);
 
+  const replaceableCount = references.filter((reference) => reference.replaceable).length;
+  const blockedByKind: Partial<Record<MediaDeleteImpactReferenceKind, number>> = {};
+  for (const reference of references) {
+    if (reference.replaceable) continue;
+    blockedByKind[reference.kind] = (blockedByKind[reference.kind] ?? 0) + 1;
+  }
+  const mediaPairBlocked = blockers.has('same_media') || blockers.has('different_kind');
+
   const mediaSummary = (media: Media): MediaReplacementImpact['source'] => ({
     id: media.id,
     filename: media.filename,
@@ -789,10 +801,13 @@ export async function getMediaReplacementPlan(
       source: mediaSummary(source),
       replacement: mediaSummary(replacement),
       usageCount: references.length,
-      replaceableCount: references.filter((reference) => reference.replaceable).length,
+      replaceableCount,
+      blockedCount: references.length - replaceableCount,
+      blockedByKind,
       references,
       blockers: [...blockers],
       canReplace: blockers.size === 0,
+      canPartiallyReplace: !mediaPairBlocked && replaceableCount > 0,
       checkedAt: input.checkedAt,
     },
   };
@@ -866,13 +881,116 @@ function usageReplaceStatements(
   return statements;
 }
 
-/** 影響確認済みの使用先をD1の1回のbatchで差し替える。 */
+/** 差し替えの実行範囲。'all' は全使用先、'replaceable' は置換可能な使用先だけ。 */
+export type MediaReplacementApplyScope = 'all' | 'replaceable';
+
+export interface MediaReplacementApplyResult {
+  /** 使用先の本文を書き換えた行数の合計。 */
+  changedRows: number;
+  /** 差し替えた使用台帳の件数（snapshot上の対象数）。 */
+  appliedUsageCount: number;
+  /** 置換不可として元メディアを指したまま残した使用台帳の件数。 */
+  skippedUsageCount: number;
+  /** 実際に実行した範囲。'all' は全件、'partial' は置換可能分だけ。 */
+  mode: 'all' | 'partial';
+}
+
+/**
+ * 使用先の書き換え対象（種類ごとの表・列・アカウント境界）。
+ * 共有される配信・イベントはこの画面から書き換えない決まりなので、
+ * 単一アカウント所有の行だけを対象にする条件を含む。
+ */
+const REPLACEMENT_TARGET_KINDS: Record<MediaRefKind, {
+  table: string;
+  columns: string[];
+  scopeSql: string;
+} | null> = {
+  template: { table: 'templates', columns: ['message_content'], scopeSql: 'line_account_id = ?' },
+  broadcast: {
+    table: 'broadcasts',
+    columns: ['message_content', 'message_bubbles_json'],
+    scopeSql: 'line_account_id = ? AND (account_ids IS NULL OR json_array_length(account_ids) <= 1)',
+  },
+  rich_menu: {
+    table: 'rich_menu_pages',
+    columns: ['image_r2_key'],
+    scopeSql: `EXISTS (SELECT 1 FROM rich_menu_groups g
+      WHERE g.id = rich_menu_pages.group_id AND g.account_id = ?)`,
+  },
+  scenario_step: {
+    table: 'scenario_steps',
+    columns: ['message_content', 'message_bubbles_json'],
+    scopeSql: `EXISTS (SELECT 1 FROM scenarios s
+      WHERE s.id = scenario_steps.scenario_id AND s.line_account_id = ?)`,
+  },
+  nen_column: { table: 'nen_columns', columns: ['image_url'], scopeSql: 'line_account_id = ?' },
+  event: {
+    table: 'events',
+    columns: ['image_url', 'og_image_url'],
+    scopeSql: 'line_account_id = ? AND (account_ids IS NULL OR json_array_length(account_ids) <= 1)',
+  },
+  // ウェビナー動画は配信用の一式を持つため対象外（describeMediaReplacementUsage
+  // が必ず unsupported_reference を付けるので、ここへは到達しない）。
+  webinar: null,
+};
+
+/**
+ * 1文あたりの対象使用先IDの上限。
+ * 版数が多いと本文置き換え文のbindが 48(置換対) + 24(LIKE) + scope に
+ * なるため、IDは20件ずつに分けても最悪ケースで100 bindを超えない。
+ */
+const USAGE_TARGET_ID_CHUNK = 20;
+/** 台帳の付け替え条件は (ref_kind, ref_id) の組をORで並べる。2 bind/件。 */
+const USAGE_LEDGER_PAIR_CHUNK = 40;
+
+/**
+ * 影響確認済みの使用先をD1の1回のbatchで差し替える。
+ *
+ * 対象は計画時点のsnapshotに固定する。影響確認と実行のあいだに台帳へ
+ * 増えた使用先を暗黙に含めない（含めると「確認した範囲だけ替えた」と
+ * 言えなくなる）。増えた分は元メディアを指し続け、残存件数として報告する。
+ *
+ * `scope: 'replaceable'` は置換可能な使用先だけを替える部分実行。
+ * 置換不可の使用先の本文と台帳行には一切触れない。
+ */
 export async function applyMediaReplacementPlan(
   db: D1Database,
   plan: MediaReplacementPlan,
   lineAccountId: string,
-): Promise<number> {
-  if (!plan.impact.canReplace) throw new Error('media_replacement_blocked');
+  opts: { scope?: MediaReplacementApplyScope } = {},
+): Promise<MediaReplacementApplyResult> {
+  const scope = opts.scope ?? 'all';
+  // 差し替え元と先の組み合わせ自体が不正なら、全件・部分のどちらでも止める。
+  if (plan.impact.blockers.includes('same_media')
+    || plan.impact.blockers.includes('different_kind')) {
+    throw new Error('media_replacement_blocked');
+  }
+  if (scope === 'all' && !plan.impact.canReplace) {
+    throw new Error('media_replacement_blocked');
+  }
+
+  // references は usages と同じ順で作っている（getMediaReplacementPlan）。
+  // 置換可否は計画時点の判定をそのまま使い、実行時に再判定しない。
+  const targets = plan.usages.filter((usage, index) => (
+    scope === 'all' ? true : plan.impact.references[index]?.replaceable === true
+  ));
+  if (scope === 'replaceable' && targets.length === 0) {
+    throw new Error('media_replacement_blocked');
+  }
+
+  const idsByKind = new Map<MediaRefKind, string[]>();
+  for (const usage of targets) {
+    const kind = usage.ref_kind as MediaRefKind;
+    if (!REPLACEMENT_TARGET_KINDS[kind]) {
+      // 書き換え先の表が決まっていない種類を黙って残すと「替えた」と
+      // 誤認する。計画側の判定と食い違う場合は実行しない。
+      throw new Error('media_replacement_blocked');
+    }
+    const list = idsByKind.get(kind) ?? [];
+    if (!list.includes(usage.ref_id)) list.push(usage.ref_id);
+    idsByKind.set(kind, list);
+  }
+
   const sourceId = plan.source.id;
   // 現行版だけでなく旧版を指す固定参照とライブ参照も同じ使用先なので、
   // 版の全r2_keyとライブ参照パスをまとめて差し替え先へ置き換える。
@@ -883,48 +1001,56 @@ export async function applyMediaReplacementPlan(
     ]),
   ].filter((key) => key.length > 0);
   const pairs = mediaReferenceReplacePairs(sourceId, sourceKeys, plan.replacement);
-  const usageIds = (kind: MediaRefKind) =>
-    `SELECT ref_id FROM media_usages WHERE media_id = ? AND ref_kind = '${kind}'`;
-  const scoped = (scopeSql: string, scopeBinds: unknown[], kind: MediaRefKind, columns: string[], table: string) =>
-    usageReplaceStatements(db, {
-      table,
-      columns,
-      scopeSql,
-      scopeBinds,
-      idSubquery: usageIds(kind),
-      idSubqueryBinds: [sourceId],
-      pairs,
-    });
-  const statements: D1PreparedStatement[] = [
-    ...scoped('line_account_id = ?', [lineAccountId], 'template', ['message_content'], 'templates'),
-    ...scoped(
-      'line_account_id = ? AND (account_ids IS NULL OR json_array_length(account_ids) <= 1)',
-      [lineAccountId], 'broadcast', ['message_content', 'message_bubbles_json'], 'broadcasts',
-    ),
-    ...scoped(
-      `EXISTS (SELECT 1 FROM rich_menu_groups g
-        WHERE g.id = rich_menu_pages.group_id AND g.account_id = ?)`,
-      [lineAccountId], 'rich_menu', ['image_r2_key'], 'rich_menu_pages',
-    ),
-    ...scoped(
-      `EXISTS (SELECT 1 FROM scenarios s
-        WHERE s.id = scenario_steps.scenario_id AND s.line_account_id = ?)`,
-      [lineAccountId], 'scenario_step', ['message_content', 'message_bubbles_json'], 'scenario_steps',
-    ),
-    ...scoped('line_account_id = ?', [lineAccountId], 'nen_column', ['image_url'], 'nen_columns'),
-    ...scoped(
-      'line_account_id = ? AND (account_ids IS NULL OR json_array_length(account_ids) <= 1)',
-      [lineAccountId], 'event', ['image_url', 'og_image_url'], 'events',
-    ),
-    db.prepare(`INSERT OR IGNORE INTO media_usages (media_id, ref_kind, ref_id, scanned_at)
-      SELECT ?, ref_kind, ref_id, ? FROM media_usages WHERE media_id = ?`)
-      .bind(plan.replacement.id, plan.impact.checkedAt, sourceId),
-    db.prepare(`DELETE FROM media_usages WHERE media_id = ?`).bind(sourceId),
-  ];
+
+  const statements: D1PreparedStatement[] = [];
+  for (const [kind, refIds] of idsByKind) {
+    const target = REPLACEMENT_TARGET_KINDS[kind]!;
+    for (let index = 0; index < refIds.length; index += USAGE_TARGET_ID_CHUNK) {
+      const chunk = refIds.slice(index, index + USAGE_TARGET_ID_CHUNK);
+      // 台帳に行が残っていることも条件にする。snapshot確定後に使用先から
+      // 外れた行まで書き換えると、外したはずの本文が戻る。
+      const idSubquery = `SELECT ref_id FROM media_usages
+        WHERE media_id = ? AND ref_kind = '${kind}'
+          AND ref_id IN (${chunk.map(() => '?').join(',')})`;
+      statements.push(...usageReplaceStatements(db, {
+        table: target.table,
+        columns: target.columns,
+        scopeSql: target.scopeSql,
+        scopeBinds: [lineAccountId],
+        idSubquery,
+        idSubqueryBinds: [sourceId, ...chunk],
+        pairs,
+      }));
+    }
+  }
+  const contentStatementCount = statements.length;
+
+  // 台帳の付け替えも対象だけに絞る。置換不可の使用先は元メディアを
+  // 指し続けるので、ここで消したり移したりしない。
+  for (let index = 0; index < targets.length; index += USAGE_LEDGER_PAIR_CHUNK) {
+    const chunk = targets.slice(index, index + USAGE_LEDGER_PAIR_CHUNK);
+    const condition = chunk.map(() => '(ref_kind = ? AND ref_id = ?)').join(' OR ');
+    const binds = chunk.flatMap((usage) => [usage.ref_kind, usage.ref_id]);
+    statements.push(db.prepare(
+      `INSERT OR IGNORE INTO media_usages (media_id, ref_kind, ref_id, scanned_at)
+       SELECT ?, ref_kind, ref_id, ? FROM media_usages
+        WHERE media_id = ? AND (${condition})`,
+    ).bind(plan.replacement.id, plan.impact.checkedAt, sourceId, ...binds));
+    statements.push(db.prepare(
+      `DELETE FROM media_usages WHERE media_id = ? AND (${condition})`,
+    ).bind(sourceId, ...binds));
+  }
+
   const results = await db.batch(statements);
-  // 末尾2件はmedia_usagesの付け替えなので、本文を書き換えた件数だけ数える。
-  return results.slice(0, results.length - 2)
+  // 末尾はmedia_usagesの付け替えなので、本文を書き換えた件数だけ数える。
+  const changedRows = results.slice(0, contentStatementCount)
     .reduce((sum, result) => sum + Number(result.meta?.changes ?? 0), 0);
+  return {
+    changedRows,
+    appliedUsageCount: targets.length,
+    skippedUsageCount: plan.usages.length - targets.length,
+    mode: scope === 'all' ? 'all' : 'partial',
+  };
 }
 
 /**

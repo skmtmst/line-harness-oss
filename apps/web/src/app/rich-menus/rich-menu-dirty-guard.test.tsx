@@ -66,8 +66,11 @@ vi.mock('@/lib/api', () => ({
       list: () => Promise.resolve({ success: true, data: [] }),
       listSchedules: () => Promise.resolve({ success: true, data: [] }),
       previewTargets: () => Promise.resolve({ success: true, data: null }),
+      audienceSummary: () => Promise.resolve({ success: true, data: { total: { value: 0, state: 'available', reason: null }, targeted: { value: 0, state: 'available', reason: null }, excluded: { value: 0, state: 'available', reason: null }, effective: { value: 0, state: 'available', reason: null } } }),
       imageUrl: (key: string) => `/img/${key}`,
     },
+    // N-152/N-156: 編集画面は操作者の役割を読んで staff には集計だけを出す。
+    staff: { me: () => Promise.resolve({ success: true, data: { role: 'owner' } }) },
   },
 }))
 
