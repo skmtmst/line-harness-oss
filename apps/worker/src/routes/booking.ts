@@ -4577,9 +4577,20 @@ const BOOKING_CSV_SOURCE_LABEL: Record<string, string> = {
 
 function csvCell(value: unknown): string {
   let text = value === null || value === undefined ? '' : String(value);
-  // CSVを開いた表計算ソフトで式として実行させない。
-  if (/^[=+\-@]/.test(text)) text = `'${text}`;
+  // CSVを開いた表計算ソフトで式として実行させない。先頭のタブ・空白も
+  // 一部のソフトでは式と解釈されるため危険接頭辞に含める (#959)。
+  if (/^[\s=+\-@]/.test(text)) text = `'${text}`;
   return `"${text.replaceAll('"', '""')}"`;
+}
+
+/**
+ * 注記行へ埋め込む値の改行・制御文字を落とす。注記行はクォートなしの
+ * 生テキストなので、クエリ値に %0D%0A=… を仕込まれるとそのまま別の
+ * CSV行として混入し、式注入防御を迂回する (#959)。
+ */
+function csvNoteValue(value: string): string {
+  // eslint-disable-next-line no-control-regex
+  return value.replace(/[\x00-\x1F\x7F]/g, '');
 }
 
 function csvTimestamp(iso: string | null): string {
@@ -4627,14 +4638,14 @@ booking.get('/api/booking/admin/bookings.csv', async (c) => {
   const truncated = all.length > BOOKING_CSV_EXPORT_LIMIT;
   const exportRows = truncated ? all.slice(0, BOOKING_CSV_EXPORT_LIMIT) : all;
 
-  const status = c.req.query('status') || 'requested';
+  const status = csvNoteValue(c.req.query('status') || 'requested');
   const filterNote = [
     `状態=${status === 'all' ? 'すべて' : (BOOKING_CSV_STATUS_LABEL[status] ?? status)}`,
     c.req.query('staff_id')?.trim() ? `担当者=指定` : null,
-    c.req.query('source')?.trim() ? `種別=${BOOKING_CSV_SOURCE_LABEL[c.req.query('source')!.trim()] ?? c.req.query('source')!.trim()}` : null,
-    c.req.query('menu_name')?.trim() ? `メニュー=${c.req.query('menu_name')!.trim()}` : null,
-    c.req.query('query')?.trim() ? `検索語=${c.req.query('query')!.trim()}` : null,
-    `期間=${c.req.query('from')?.trim() || '指定なし'}〜${c.req.query('to')?.trim() || '指定なし'}`,
+    c.req.query('source')?.trim() ? `種別=${BOOKING_CSV_SOURCE_LABEL[c.req.query('source')!.trim()] ?? csvNoteValue(c.req.query('source')!.trim())}` : null,
+    c.req.query('menu_name')?.trim() ? `メニュー=${csvNoteValue(c.req.query('menu_name')!.trim())}` : null,
+    c.req.query('query')?.trim() ? `検索語=${csvNoteValue(c.req.query('query')!.trim())}` : null,
+    `期間=${csvNoteValue(c.req.query('from')?.trim() || '指定なし')}〜${csvNoteValue(c.req.query('to')?.trim() || '指定なし')}`,
   ].filter(Boolean).join(' / ');
   const headerNote = truncated
     ? `# 予約台帳の書出し（${filterNote}）…先頭${BOOKING_CSV_EXPORT_LIMIT}件まで。続きは期間や絞り込みを分けて出してください。`
