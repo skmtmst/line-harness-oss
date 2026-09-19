@@ -49,7 +49,7 @@ export default function OperatorNotificationRules({ lineAccountId }: { lineAccou
     if (!lineAccountId) { setRules([]); setSummary(null); setState('ready'); return }
     setState('loading')
     try {
-      const result = await api.notifications.operatorRules.list(lineAccountId)
+      const result = await api.lineNotifications.operatorRules.list(lineAccountId)
       if (!result.success) throw new Error('load failed')
       setRules(result.data.items)
       setSummary(result.data.summary)
@@ -78,7 +78,7 @@ export default function OperatorNotificationRules({ lineAccountId }: { lineAccou
     if (!lineAccountId || busy) return
     setBusy(rule.id); setNotice('')
     try {
-      await api.notifications.operatorRules.publish(rule.id, lineAccountId)
+      await api.lineNotifications.operatorRules.publish(rule.id, lineAccountId)
       setNotice(`「${rule.name}」を公開しました。`)
       await load()
     } catch (error) {
@@ -90,7 +90,7 @@ export default function OperatorNotificationRules({ lineAccountId }: { lineAccou
     if (!lineAccountId || busy) return
     setBusy(rule.id); setNotice('')
     try {
-      const result = await api.notifications.operatorRules.test(rule.id, lineAccountId)
+      const result = await api.lineNotifications.operatorRules.test(rule.id, lineAccountId)
       if (!result.success) throw new Error(result.error)
       setNotice(result.data.accepted > 0 ? '自分へのテスト送信を受け付けました。' : '受け取れる通知方法がありません。受信設定を確認してください。')
       await load()
@@ -103,7 +103,7 @@ export default function OperatorNotificationRules({ lineAccountId }: { lineAccou
     if (!lineAccountId || busy) return
     setBusy(rule.id); setNotice('')
     try {
-      await api.notifications.rules.update(rule.id, lineAccountId, { isActive: false })
+      await api.lineNotifications.operatorRules.stop(rule.id, lineAccountId)
       setNotice(`「${rule.name}」を止めました。`)
       await load()
     } catch (error) {
@@ -115,7 +115,7 @@ export default function OperatorNotificationRules({ lineAccountId }: { lineAccou
     if (!lineAccountId || !exportReason.trim() || busy) return
     setBusy('csv'); setNotice('')
     try {
-      const blob = await api.notifications.operatorRules.exportCsv(lineAccountId, exportReason.trim())
+      const blob = await api.lineNotifications.operatorRules.exportCsv(lineAccountId, exportReason.trim())
       const url = URL.createObjectURL(blob)
       const anchor = document.createElement('a')
       anchor.href = url

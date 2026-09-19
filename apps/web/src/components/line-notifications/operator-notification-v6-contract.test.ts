@@ -20,7 +20,8 @@ describe('V6 運用者へのお知らせ — 宛先・送信・実行記録の�
   })
 
   it('一覧はアカウント別の実行記録APIを読み、未取得を0件にしない', () => {
-    expect(list).toContain('api.notifications.operatorRules.list(lineAccountId)')
+    // N-342 (#943): 運用者通知の正本APIは /api/line-notifications 配下。
+    expect(list).toContain('api.lineNotifications.operatorRules.list(lineAccountId)')
     expect(list).toContain("state === 'ready' ? summary?.published ?? null : null")
     expect(list).toContain("summary?.total ?? '—'")
     expect(list).toContain('kind="error"')
@@ -47,7 +48,10 @@ describe('V6 運用者へのお知らせ — 宛先・送信・実行記録の�
   })
 
   it('公開は専用APIだけで宛先を再検証し、実行記録を重複させない', () => {
+    // N-342 (#943): 正本名は /api/line-notifications。旧 /api/notifications は互換として残る。
+    expect(route).toContain("notifications.post('/api/line-notifications/operator-rules/:id/publish'")
     expect(route).toContain("notifications.post('/api/notifications/operator-rules/:id/publish'")
+    expect(route).toContain("notifications.post('/api/line-notifications/operator-rules/:id/stop'")
     expect(route).toContain("code: 'recipient_required'")
     expect(dispatch).toContain('claimOperatorDelivery')
     expect(dispatch).toContain('idempotency_key')
