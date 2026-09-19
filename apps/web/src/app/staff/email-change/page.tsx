@@ -28,7 +28,7 @@ export default function StaffEmailChangePage() {
     setView(changeToken ? 'ready' : 'invalid')
   }, [])
 
-  const confirm = async () => {
+  const applyChange = async () => {
     if (!token || view === 'submitting') return
     setView('submitting')
     setError('')
@@ -66,7 +66,7 @@ export default function StaffEmailChangePage() {
             </p>
             {error && <p role="alert" className="mt-4 rounded-control bg-danger-bg p-4 text-sm text-danger">{error}</p>}
             <div className="mt-6">
-              <Button type="button" variant="primary" disabled={view === 'submitting'} onClick={() => void confirm()}>
+              <Button type="button" variant="primary" disabled={view === 'submitting'} onClick={() => void applyChange()}>
                 {view === 'submitting' ? '確定中…' : '変更を確定する'}
               </Button>
             </div>

@@ -78,7 +78,7 @@ const ALLOWED_H1: Record<string, string> = {
 
 describe('画面名を本文とトップバーで2回出さない', () => {
   it('全ページを読めている', () => {
-    expect(PAGES.length).toBe(181)  // 2026-09-20: 外部連携の送り先を直す画面（webhooks/edit、#939）を足した後の実測値。
+    expect(PAGES.length).toBe(182)  // 2026-10-05: メール変更の確認画面（staff/email-change、#957）を足した後の実測値。
   })
 
   it('page.tsx が h1 を直接持たない', () => {

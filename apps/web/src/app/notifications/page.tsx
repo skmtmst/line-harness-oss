@@ -17,6 +17,7 @@ import { usePageTitle } from '@/components/shell/page-chrome'
 import Card from '@/components/shared/card'
 import Button from '@/components/shared/button'
 import { STATE_TEXT } from '@/components/shared/not-connected'
+import { Tabs } from '@/components/shared/tabs'
 import {
   dashboardNotificationDestination,
   isDashboardNotificationData,
@@ -125,20 +126,14 @@ function NotificationsPageInner() {
   return (
     <div className="mx-auto max-w-3xl space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex gap-2" role="tablist" aria-label="通知の種類">
-          {filters.map((entry) => (
-            <button
-              key={entry.id}
-              type="button"
-              role="tab"
-              aria-selected={filter === entry.id}
-              onClick={() => selectFilter(entry.id)}
-              className={`rounded-pill border px-4 py-2 text-xs font-medium transition-colors ${filter === entry.id ? 'border-accent bg-accent text-on-accent' : 'border-hairline bg-canvas text-ink-secondary hover:bg-canvas-sunken'}`}
-            >
-              {entry.label}{entry.count !== null ? ` ${entry.count}` : ''}
-            </button>
-          ))}
-        </div>
+        <Tabs
+          items={filters.map((entry) => ({
+            label: entry.label,
+            count: entry.count ?? undefined,
+            current: filter === entry.id,
+            onClick: () => selectFilter(entry.id),
+          }))}
+        />
         <div className="flex items-center gap-2">
           <Button variant="secondary" onClick={() => { void markAllRead() }} disabled={!counts || counts.unread === 0}>
             すべて既読にする
