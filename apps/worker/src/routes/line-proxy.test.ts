@@ -13,6 +13,7 @@ vi.mock('@line-crm/db', () => ({
   getChatByFriendId: vi.fn(),
   createChat: vi.fn(),
   updateChat: vi.fn(),
+  isOperationCapabilityStopped: vi.fn(async () => false),
   getStaffById: vi.fn(async () => ({ account_scope: 'all' })),
   getStaffAccountScopeIds: vi.fn(async () => []),
   jstNow: vi.fn(() => '2026-08-02T12:00:00.000'),
@@ -47,6 +48,7 @@ import {
   getChatByFriendId,
   createChat,
   updateChat,
+  isOperationCapabilityStopped,
   getStaffById,
   getStaffAccountScopeIds,
 } from '@line-crm/db';
@@ -177,6 +179,8 @@ beforeEach(() => {
   vi.mocked(getChatByFriendId).mockResolvedValue({ id: 'chat-1', status: 'unread' } as never);
   vi.mocked(updateChat).mockResolvedValue(undefined as never);
   vi.mocked(authenticateApiToken).mockResolvedValue(null as never);
+  // clearAllMocks は実装を戻さないので、停止状態は各テストで明示的に立てる。
+  vi.mocked(isOperationCapabilityStopped).mockResolvedValue(false as never);
 });
 
 afterEach(() => {
@@ -751,5 +755,124 @@ describe('reply and passthrough', () => {
     );
     expect(res.status).toBe(413);
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+/*
+ * #960 — broadcast_dispatch 緊急停止はプロキシ送信経路にも効く。
+ * 停止中の一斉送信系 (broadcast/multicast/narrowcast/自動push) は上流へ
+ * fetch しない。例外は reply と manual 明示の 1:1 push。
+ */
+describe('emergency stop (broadcast_dispatch)', () => {
+  function sendRequest(path: string, extraHeaders: Record<string, string> = {}) {
+    return new Request(`http://worker.test/line-api${path}`, {
+      method: 'POST',
+      headers: {
+        Authorization: 'Bearer acc-token',
+        'Content-Type': 'application/json',
+        ...extraHeaders,
+      },
+      body: JSON.stringify({ to: USER_A, messages: [{ type: 'text', text: 'hi' }] }),
+    });
+  }
+
+  test.each([
+    '/v2/bot/message/broadcast',
+    '/v2/bot/message/multicast',
+    '/v2/bot/message/narrowcast',
+  ])('stopped: POST %s returns 409 and never reaches upstream', async (path) => {
+    vi.mocked(isOperationCapabilityStopped).mockResolvedValue(true as never);
+    const { db, executed } = fakeDb();
+    const res = await setupApp().request(sendRequest(path), {}, env(db));
+
+    expect(res.status).toBe(409);
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(loggedRows(executed)).toHaveLength(0);
+    expect(isOperationCapabilityStopped).toHaveBeenCalledWith(
+      db,
+      'acc-1',
+      'broadcast_dispatch',
+    );
+  });
+
+  test('stopped: automatic push (no manual source) is also blocked', async () => {
+    vi.mocked(isOperationCapabilityStopped).mockResolvedValue(true as never);
+    const { db, executed } = fakeDb();
+    const res = await setupApp().request(pushRequest('acc-token'), {}, env(db));
+
+    expect(res.status).toBe(409);
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(loggedRows(executed)).toHaveLength(0);
+  });
+
+  test('stopped: manual push (X-Line-Harness-Source: manual) still goes through', async () => {
+    vi.mocked(isOperationCapabilityStopped).mockResolvedValue(true as never);
+    const { db, executed } = fakeDb();
+    const res = await setupApp().request(
+      pushRequest('acc-token', undefined, { 'X-Line-Harness-Source': 'manual' }),
+      {},
+      env(db),
+    );
+
+    expect(res.status).toBe(200);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(loggedRows(executed)[0].source).toBe('manual');
+  });
+
+  test('stopped: reply still forwarded (1:1 reply is not dispatch)', async () => {
+    vi.mocked(isOperationCapabilityStopped).mockResolvedValue(true as never);
+    const { db } = fakeDb();
+    const res = await setupApp().request(
+      new Request('http://worker.test/line-api/v2/bot/message/reply', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer acc-token', 'Content-Type': 'application/json' },
+        body: JSON.stringify({ replyToken: 'rt', messages: [{ type: 'text', text: 'hi' }] }),
+      }),
+      {},
+      env(db),
+    );
+
+    expect(res.status).toBe(200);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  test('running: broadcast forwards upstream and checks the capability first', async () => {
+    const { db } = fakeDb();
+    const res = await setupApp().request(
+      sendRequest('/v2/bot/message/broadcast'),
+      {},
+      env(db),
+    );
+
+    expect(res.status).toBe(200);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(isOperationCapabilityStopped).toHaveBeenCalledWith(
+      db,
+      'acc-1',
+      'broadcast_dispatch',
+    );
+  });
+
+  test('stopped: unrelated proxy calls are unaffected', async () => {
+    vi.mocked(isOperationCapabilityStopped).mockResolvedValue(true as never);
+    fetchMock.mockResolvedValue(
+      new Response('{"displayName":"X"}', {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      }),
+    );
+    const { db } = fakeDb();
+    const res = await setupApp().request(
+      new Request(`http://worker.test/line-api/v2/bot/profile/${USER_A}`, {
+        method: 'GET',
+        headers: { Authorization: 'Bearer acc-token' },
+      }),
+      {},
+      env(db),
+    );
+
+    expect(res.status).toBe(200);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(isOperationCapabilityStopped).not.toHaveBeenCalled();
   });
 });
