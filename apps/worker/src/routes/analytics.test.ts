@@ -448,6 +448,19 @@ describe('V6クロス分析API', () => {
     expect(mocks.createAnalyticsCrossRun).not.toHaveBeenCalled();
   });
 
+  // #951 N-276: 「数えるもの」は人数固定ではなく、イベントの回数も選べる。
+  // ルートは種類をこねず検証層へそのまま渡す。検証と集計は packages/db の
+  // 実SQLite試験(analytics-cross.test.ts)が担う。
+  it('イベントの回数を数えるmeasureも検証層へそのまま渡す', async () => {
+    const eventsBody = { ...body, measure: { kind: 'events', eventType: 'postback_received' } };
+    const res = await req(`/api/analytics/cross/query?${ACCOUNT}`, 'POST', eventsBody);
+    expect(res.status).toBe(202);
+    expect(mocks.createAnalyticsCrossRun).toHaveBeenCalledWith(
+      env.DB,
+      expect.objectContaining({ query: eventsBody }),
+    );
+  });
+
   it('選択中アカウント内の結果だけを返す', async () => {
     const res = await req(`/api/analytics/cross/results/cross-1?${ACCOUNT}`);
     expect(res.status).toBe(200);

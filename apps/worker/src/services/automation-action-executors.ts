@@ -95,8 +95,11 @@ async function requireScopedResource(
   context: AutomationActionContext,
   input: { table: 'tags' | 'templates' | 'outgoing_webhooks'; id: string; code: string; label: string },
 ): Promise<void> {
+  // #939 N-368: 送信Webhookの削除は履歴を残す印なので、印のある行は
+  // 「見つからない」として扱う。他の表に deleted_at は無い。
+  const notDeleted = input.table === 'outgoing_webhooks' ? ' AND deleted_at IS NULL' : '';
   const row = await context.db.prepare(
-    `SELECT id FROM ${input.table} WHERE id = ? AND line_account_id = ?`,
+    `SELECT id FROM ${input.table} WHERE id = ? AND line_account_id = ?${notDeleted}`,
   ).bind(input.id, context.lineAccountId).first<{ id: string }>();
   if (!row) throw invalid(input.code, `${input.label}が見つからないか、別のLINE公式アカウントにあります`);
 }
@@ -484,7 +487,7 @@ async function webhookExecutor(
   });
   const webhook = await context.db.prepare(
     `SELECT id, url, secret, secret_encrypted FROM outgoing_webhooks
-      WHERE id = ? AND line_account_id = ? AND is_active = 1`,
+      WHERE id = ? AND line_account_id = ? AND is_active = 1 AND deleted_at IS NULL`,
   ).bind(webhookId, context.lineAccountId).first<{ id: string; url: string; secret: string | null; secret_encrypted?: string | null }>();
   if (!webhook) throw invalid('webhook_not_active', '動作中の送信Webhookが見つかりません');
   // 送り先の安全確認はpostWebhookSafelyが送信直前と転送先の各段で行う。

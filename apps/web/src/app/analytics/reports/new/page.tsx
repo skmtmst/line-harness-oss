@@ -17,13 +17,63 @@ import {
   type AnalyticsReportSection,
 } from '@/lib/api'
 
-const SECTION_CHOICES: Array<{ id: AnalyticsReportSection; title: string; detail: string }> = [
+const SECTION_CHOICES: Array<{ id: AnalyticsReportSection; title: string; detail: string; unavailable?: string }> = [
   { id: 'friends', title: '友だちの増減', detail: '増えた・減った・残っている割合' },
   { id: 'reactions', title: '配信の反応', detail: '押された割合・ブロックされた割合' },
   { id: 'routes', title: '経路と成果', detail: 'どこから来た人がいくらになったか／成果地点ごとの件数／前の期間との比べ' },
   { id: 'usage', title: '使われ方', detail: '作ったのに使っていないもの' },
-  { id: 'mileage', title: 'マイルと紹介', detail: 'たまった・使われた・払った' },
+  // マイルの期間別集計は未接続で、入れてもレポートは「未取得」になるだけ。
+  // 新たに選ばせず、既に入っている既存レポートからは外せるようにする。
+  { id: 'mileage', title: 'マイルと紹介', detail: 'たまった・使われた・払った', unavailable: 'マイルの期間別集計はまだ接続されていません。入れても「未取得」とだけ届きます' },
 ]
+
+type AlertRuleDraft = { enabled: boolean; threshold: string; minimumSample: string }
+
+// 変化を知らせる決めごとの雛形。数値はあとから変えられる。裏側の検査と同じ
+// metric/operator の組だけを出す(正本: apps/worker/src/routes/analytics.ts の
+// parseReportBody と packages/db の AnalyticsReportAlertRule)。
+const ALERT_RULE_DEFS: Array<{
+  id: 'block_rate' | 'friend_adds' | 'conversions'
+  metric: 'block_rate' | 'friend_adds' | 'conversions'
+  operator: 'greater_than' | 'decrease_percent' | 'zero_streak_days'
+  name: string
+  lead: string
+  tail: string
+  detail?: string
+  threshold: string
+  minimumSample: string
+  step: string
+  thresholdLabel: string
+  sampleLabel: string
+}> = [
+  {
+    id: 'block_rate', metric: 'block_rate', operator: 'greater_than',
+    name: 'ブロック増の条件',
+    lead: 'ブロックが ', tail: ' % をこえたら、その場で知らせる',
+    detail: '配信の事故に早く気づけます。',
+    threshold: '0.5', minimumSample: '20', step: '0.1',
+    thresholdLabel: 'ブロック率のしきい値（%）', sampleLabel: 'ブロック条件の判定に必要な最低件数',
+  },
+  {
+    id: 'friend_adds', metric: 'friend_adds', operator: 'decrease_percent',
+    name: '友だち減少の条件',
+    lead: '友だちが前の週より ', tail: ' % 減ったら、その場で知らせる',
+    threshold: '20', minimumSample: '20', step: '1',
+    thresholdLabel: '友だち減少のしきい値（%）', sampleLabel: '友だち減少条件の判定に必要な最低件数',
+  },
+  {
+    id: 'conversions', metric: 'conversions', operator: 'zero_streak_days',
+    name: '成果0件がつづく条件',
+    lead: '成果が0件の日が ', tail: ' 日つづいたら、その場で知らせる',
+    detail: '計測が壊れていることに気づけます。',
+    threshold: '3', minimumSample: '20', step: '1',
+    thresholdLabel: '成果0件がつづく日数のしきい値', sampleLabel: '成果0件条件の判定に必要な最低件数',
+  },
+]
+
+function defaultAlertDrafts(enabled: boolean): Record<string, AlertRuleDraft> {
+  return Object.fromEntries(ALERT_RULE_DEFS.map((def) => [def.id, { enabled, threshold: def.threshold, minimumSample: def.minimumSample }]))
+}
 
 const ROLE_LABEL = { owner: '統括', admin: '管理者', staff: '運用担当' } as const
 
@@ -55,6 +105,11 @@ function AnalyticsReportFormPage() {
   const [emails, setEmails] = useState<string[]>([])
   const [lineEnabled, setLineEnabled] = useState(false)
   const [alertsEnabled, setAlertsEnabled] = useState(true)
+  // 知らせの決めごとは件の条件ごとに on/off と数値を持つ。固定表示だったものを
+  // 編集できるようにする(点検のN-285)。
+  const [alertDrafts, setAlertDrafts] = useState<Record<string, AlertRuleDraft>>(() => defaultAlertDrafts(true))
+  // 画面に出せない決めごと(将来増えた種類など)は、消さずにそのまま保存へ回す。
+  const [extraAlertRules, setExtraAlertRules] = useState<AnalyticsReportSchedule['alertRules']>([])
 
   useEffect(() => {
     let active = true
@@ -105,6 +160,17 @@ function AnalyticsReportFormPage() {
             setEmails(schedule.recipients.filter((item) => item.kind === 'email' && item.email).map((item) => item.email as string))
             setLineEnabled(schedule.channels.includes('line'))
             setAlertsEnabled(schedule.alertRules.length > 0)
+            // 保存済みの決めごとを雛形へ戻す。画面に無い種類は別棚へ避けて、
+            // 保存するときにそのまま付け直す(編集するたびに消えないように)。
+            const drafts = defaultAlertDrafts(false)
+            const extras: AnalyticsReportSchedule['alertRules'] = []
+            for (const rule of schedule.alertRules) {
+              const def = ALERT_RULE_DEFS.find((item) => item.metric === rule.metric && item.operator === rule.operator)
+              if (def) drafts[def.id] = { enabled: true, threshold: String(rule.threshold), minimumSample: String(rule.minimumSample) }
+              else extras.push(rule)
+            }
+            setAlertDrafts(drafts)
+            setExtraAlertRules(extras)
           }
         }
       }
@@ -132,6 +198,27 @@ function AnalyticsReportFormPage() {
       setError('レポートの名前を入力してください')
       return
     }
+    // 画面の数値を裏側が受け取れる形へ直す。変な数はここで止める
+    // (裏側は不備のある条件を捨てるので、黙って無効になる前に知らせる)。
+    const parsedAlertRules: AnalyticsReportSchedule['alertRules'] = []
+    if (alertsEnabled) {
+      for (const def of ALERT_RULE_DEFS) {
+        const draft = alertDrafts[def.id]
+        if (!draft?.enabled) continue
+        const threshold = Number(draft.threshold)
+        const minimumSample = Number(draft.minimumSample)
+        if (!Number.isFinite(threshold) || threshold < 0 || !Number.isInteger(minimumSample) || minimumSample < 1) {
+          setError('知らせる条件は、0以上の数と1以上の件数で入力してください')
+          return
+        }
+        parsedAlertRules.push({ metric: def.metric, operator: def.operator, threshold, minimumSample })
+      }
+      parsedAlertRules.push(...extraAlertRules)
+      if (parsedAlertRules.length === 0) {
+        setError('知らせる条件を1つ以上えらぶか、「大きな変化を知らせる」を外してください')
+        return
+      }
+    }
     setSaving(true)
     setError('')
     setNotice('')
@@ -148,11 +235,7 @@ function AnalyticsReportFormPage() {
       monthDay: cadence === 'monthly' ? Number(monthDay) : null,
       sendTime, timeZone: options.timeZone, periodDays: Number(periodDays), recipients,
       channels: ['dashboard', ...(emailRecipients.length ? ['email' as const] : []), ...(lineEnabled ? ['line' as const] : [])] as AnalyticsReportSchedule['channels'],
-      alertRules: alertsEnabled ? [
-        { metric: 'block_rate' as const, operator: 'greater_than' as const, threshold: 0.5, minimumSample: 20 },
-        { metric: 'friend_adds' as const, operator: 'decrease_percent' as const, threshold: 20, minimumSample: 20 },
-        { metric: 'conversions' as const, operator: 'zero_streak_days' as const, threshold: 3, minimumSample: 20 },
-      ] : [],
+      alertRules: parsedAlertRules,
     }
     try {
       if (editing) {
@@ -224,12 +307,22 @@ function AnalyticsReportFormPage() {
             <h2 className="text-lg font-semibold">何を入れますか</h2>
             <p className="text-ink-secondary mb-4 mt-1 text-sm">チェックしたものが、この順にレポートへ並びます。</p>
             <div className="grid gap-x-8 gap-y-3 md:grid-cols-2">
-              {SECTION_CHOICES.map((choice) => (
-                <label className="flex cursor-pointer items-start gap-3" key={choice.id}>
-                  <input className="accent-accent mt-0.5 size-5" type="checkbox" checked={sections.includes(choice.id)} onChange={() => toggleSection(choice.id)} />
-                  <span className="grid gap-1"><strong className="text-sm">{choice.title}</strong><small className="text-ink-secondary text-xs font-normal">{choice.detail}</small></span>
-                </label>
-              ))}
+              {SECTION_CHOICES.map((choice) => {
+                const checked = sections.includes(choice.id)
+                // 数字を出せない節は新たに選ばせない。既存レポートに入っている
+                // ものは外せる向きだけ残す(点検のN-284)。
+                const locked = Boolean(choice.unavailable) && !checked
+                return (
+                  <label className={`flex items-start gap-3 ${locked ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`} key={choice.id}>
+                    <input className="accent-accent mt-0.5 size-5" type="checkbox" checked={checked} disabled={locked} onChange={() => toggleSection(choice.id)} />
+                    <span className="grid gap-1">
+                      <strong className="text-sm">{choice.title}</strong>
+                      <small className="text-ink-secondary text-xs font-normal">{choice.detail}</small>
+                      {choice.unavailable && <small className="text-ink-faint text-xs font-normal">{choice.unavailable}</small>}
+                    </span>
+                  </label>
+                )
+              })}
             </div>
           </section>
 
@@ -304,10 +397,57 @@ function AnalyticsReportFormPage() {
             <p className="text-ink-secondary mb-4 mt-1 text-sm">数字がふだんと大きくちがうときだけ、待たずに知らせます。</p>
             <label className="mb-3 flex items-center gap-2 text-sm font-semibold"><input className="accent-accent size-5" type="checkbox" checked={alertsEnabled} onChange={(event) => setAlertsEnabled(event.target.checked)} />大きな変化を知らせる</label>
             <ul className="grid list-none gap-3 p-0">
-              <li className="flex items-start gap-2 text-xs"><input type="checkbox" checked readOnly className="accent-accent size-4 shrink-0" /><span className="grid gap-1"><strong>ブロックが 0.5% をこえたら、その場で知らせる</strong><span className="text-ink-secondary">配信の事故に早く気づけます。</span></span></li>
-              <li className="flex items-start gap-2 text-xs"><input type="checkbox" checked readOnly className="accent-accent size-4 shrink-0" /><strong>友だちが前の週より 20% 減ったら、その場で知らせる</strong></li>
-              <li className="flex items-start gap-2 text-xs"><input type="checkbox" checked readOnly className="accent-accent size-4 shrink-0" /><span className="grid gap-1"><strong>成果が0件の日が3日つづいたら、その場で知らせる</strong><span className="text-ink-secondary">計測が壊れていることに気づけます。</span></span></li>
+              {ALERT_RULE_DEFS.map((def) => {
+                const draft = alertDrafts[def.id]
+                const fieldsDisabled = !alertsEnabled || !draft.enabled
+                return (
+                  <li className="flex items-start gap-2 text-xs" key={def.id}>
+                    <input
+                      type="checkbox"
+                      className="accent-accent size-4 shrink-0"
+                      checked={draft.enabled}
+                      disabled={!alertsEnabled}
+                      aria-label={`${def.name}を使う`}
+                      onChange={(event) => setAlertDrafts((current) => ({ ...current, [def.id]: { ...current[def.id], enabled: event.target.checked } }))}
+                    />
+                    <span className="grid gap-1">
+                      <strong>
+                        {def.lead}
+                        <input
+                          type="number"
+                          inputMode="decimal"
+                          min={0}
+                          step={def.step}
+                          aria-label={def.thresholdLabel}
+                          className="border-hairline text-ink bg-canvas mx-1 w-20 rounded-control border px-2 py-0.5 text-xs"
+                          value={draft.threshold}
+                          disabled={fieldsDisabled}
+                          onChange={(event) => setAlertDrafts((current) => ({ ...current, [def.id]: { ...current[def.id], threshold: event.target.value } }))}
+                        />
+                        {def.tail}
+                      </strong>
+                      {def.detail && <span className="text-ink-secondary">{def.detail}</span>}
+                      <span className="text-ink-faint">
+                        集計できた件数が
+                        <input
+                          type="number"
+                          inputMode="numeric"
+                          min={1}
+                          step={1}
+                          aria-label={def.sampleLabel}
+                          className="border-hairline text-ink bg-canvas mx-1 w-16 rounded-control border px-2 py-0.5 text-xs"
+                          value={draft.minimumSample}
+                          disabled={fieldsDisabled}
+                          onChange={(event) => setAlertDrafts((current) => ({ ...current, [def.id]: { ...current[def.id], minimumSample: event.target.value } }))}
+                        />
+                        件以上のときだけ判定します
+                      </span>
+                    </span>
+                  </li>
+                )
+              })}
             </ul>
+            <p className="text-ink-faint mt-3 text-xs">集計待ちや一部だけ取れた期間は比べず、知らせません。</p>
           </section>
         </main>
 

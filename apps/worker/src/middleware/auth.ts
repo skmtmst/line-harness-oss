@@ -434,6 +434,9 @@ export function isPublicApiBoundary(method: string, path: string): boolean {
     path === '/api/integrations/slack/actions' ||
     path === '/api/integrations/slack/events' ||
     /^\/api\/webhooks\/incoming\/[^/]+\/receive$/.test(path) ||
+    // #939 N-380: 外部システム向け公開API。route 内で integration_api_tokens
+    // の Bearer トークンを照合する。管理画面の認証は通さない。
+    path.startsWith('/api/public/v1/') ||
     path === '/api/meet-callback' ||
     path === '/api/qr' ||
     path === '/api/public/brand' ||
