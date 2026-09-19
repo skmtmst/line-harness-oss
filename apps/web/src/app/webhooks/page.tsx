@@ -35,7 +35,9 @@ function isHttpsUrl(value: string): boolean {
 }
 
 /*
-  `notify` というキーは旧URL（/notifications → /webhooks?tab=notify）のために残す。
+  `notify` というキーは旧URL（/notifications → /webhooks?tab=notify）の名残。
+  リダイレクト自体は通知一覧画面の新設（V6 1-1）で外したが、
+  `?tab=notify` の直接リンクは画面内に残っているのでキーは残す。
   中身は通知機能ではなく、下の見本（WebhookSamples）を開く。
   「見本 14」という表示は設計（V6 26-1 ノード k3WxrO）の指定なので変えない。
 */
