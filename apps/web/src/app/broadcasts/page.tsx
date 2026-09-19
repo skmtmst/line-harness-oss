@@ -503,15 +503,22 @@ function BroadcastList() {
 
             <div>
 
-          <div className="mb-3 flex flex-wrap items-center gap-2">
+          {/*
+            検索は独立した全幅の行にする（U014）。保存検索・表示件数と
+            同じ行に押し込むと、狭い幅で欄がほぼ四角形まで潰れて
+            入力した語が読めなくなる。
+          */}
+          <div data-search-row className="mb-3">
             <input
               type="search"
               placeholder="タイトル・内容で検索"
               aria-label="タイトル・内容で検索"
               value={titleQuery}
               onChange={(e) => setTitleQuery(e.target.value)}
-              className="border-hairline rounded-control bg-canvas focus:ring-accent h-10 min-w-0 flex-1 border px-3 text-sm focus:ring-2 focus:outline-none"
+              className="border-hairline rounded-control bg-canvas focus:ring-accent h-10 w-full border px-3 text-sm focus:ring-2 focus:outline-none"
             />
+          </div>
+          <div className="mb-3 flex flex-wrap items-center gap-2">
             <SelectField
               aria-label="保存した検索"
               defaultValue=""
@@ -522,17 +529,6 @@ function BroadcastList() {
               ]}
             />
             <Button type="button" onClick={() => setSavedViewOpen((open) => !open)}>この条件を保存</Button>
-            <SelectField
-              aria-label="表示件数"
-              value={String(pageSize)}
-              size="compact"
-              onChange={(event) => setPageSize(Number(event.target.value) || 20)}
-              options={[
-                { value: '20', label: '20件表示' },
-                { value: '50', label: '50件表示' },
-                { value: '100', label: '100件表示' },
-              ]}
-            />
           </div>
           {savedViewOpen && (
             <div className="border-hairline bg-canvas mb-3 flex flex-wrap items-center gap-2 rounded-control border p-3">
@@ -598,6 +594,25 @@ function BroadcastList() {
           openTemplatePickerInitially={openTemplatePicker}
         />
       )}
+
+      {/*
+        表示件数は検索行ではなく結果の側へ置く（U014）。
+        一覧の直前なので、変えるとこの下の並びに効くと読める。
+      */}
+      <div className="mb-3 flex flex-wrap items-center justify-end gap-2">
+        <span className="text-ink-faint text-xs whitespace-nowrap">表示件数</span>
+        <SelectField
+          aria-label="表示件数"
+          value={String(pageSize)}
+          size="compact"
+          onChange={(event) => setPageSize(Number(event.target.value) || 20)}
+          options={[
+            { value: '20', label: '20件表示' },
+            { value: '50', label: '50件表示' },
+            { value: '100', label: '100件表示' },
+          ]}
+        />
+      </div>
 
       {/* Loading */}
       {loading ? (
