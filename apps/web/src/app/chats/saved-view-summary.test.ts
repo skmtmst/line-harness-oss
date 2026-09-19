@@ -6,7 +6,7 @@ import type { InboxSavedViewConditions } from './saved-view-types'
 function conditions(patch: Partial<InboxSavedViewConditions> = {}): InboxSavedViewConditions {
   return {
     version: 1, query: '', channels: [], statuses: [], assignees: [],
-    unread: 'all', messageTypes: [], receivedFrom: null, receivedTo: null,
+    unread: 'all', quickFilter: 'all', messageTypes: [], receivedFrom: null, receivedTo: null,
     sort: 'newest', due: 'all', ...patch,
   }
 }
@@ -75,6 +75,12 @@ describe('保存した検索の要約', () => {
 
   it('期限超過を保存したときは条件の要約へ出す', () => {
     expect(savedViewSummary(conditions({ due: 'overdue' }))).toBe('期限：超過')
+  })
+
+  it('要返信を保存したときは条件の要約へ出す（N-020）', () => {
+    expect(savedViewSummary(conditions({ quickFilter: 'reply' }))).toBe('要返信')
+    // quickFilter の期限超過も、旧軸 due が無くても出す。
+    expect(savedViewSummary(conditions({ quickFilter: 'overdue' }))).toBe('期限：超過')
   })
 
   it('並び順は、既定でないときだけ出す', () => {

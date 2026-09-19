@@ -3403,8 +3403,8 @@ export type DashboardFriendTrendPoint = {
   active: number
   /** 日次記録が無く、いまの友だちから逆算した日。 */
   estimated: boolean
-  /** 段階配備中の旧Workerでは未返却。 */
-  sources?: Array<{ name: string; count: number }>
+  /** 段階配備中の旧Workerでは未返却。経路不明は name=null。 */
+  sources?: Array<{ name: string | null; count: number }>
 }
 
 /** ダッシュボードが1回で読む数（設計 `V6 1-1 ダッシュボード`）。 */
@@ -3452,7 +3452,8 @@ export type DashboardOverview = {
     scenarios: { active: number; paused: number }
     migrations: { active: number; completed: number }
     bookings: { pending: number; upcoming: number }
-    inflowTop: Array<{ name: string; count: number }>
+    /** 経路不明の塊は name=null。経路名としては出さず `—` で出す。 */
+    inflowTop: Array<{ name: string | null; count: number }>
     funnelAlerts: number
     automationFailures: number
   }
@@ -9838,10 +9839,11 @@ export const api = {
         fetchApiBlob(`/api/notifications/operator-deliveries.csv?${new URLSearchParams({ lineAccountId, reason })}`),
     },
     center: {
-      list: (lineAccountId: string, params?: { category?: 'all' | 'error' | 'update'; limit?: number }) => {
+      list: (lineAccountId: string, params?: { category?: 'all' | 'error' | 'update'; limit?: number; offset?: number }) => {
         const query = new URLSearchParams({ lineAccountId });
         if (params?.category) query.set('category', params.category);
         if (params?.limit !== undefined) query.set('limit', String(params.limit));
+        if (params?.offset !== undefined) query.set('offset', String(params.offset));
         return fetchApi<ApiResponse<NotificationCenterData>>(`/api/notifications/center?${query}`);
       },
       markRead: (id: string, lineAccountId: string) =>
@@ -9917,10 +9919,20 @@ export const api = {
         body: JSON.stringify(data),
       }),
     update: (id: string, data: { name?: string; email?: string | null; role?: string; isActive?: boolean; lineLinked?: false; permissionKeys?: string[]; notificationPreferences?: Record<string, { email: boolean; line: boolean }>; assignedLineAccountId?: string; canAccessDescendantAccounts?: boolean; accountScope?: 'all' | 'accounts'; scopedLineAccountIds?: string[]; managementContext?: 'hq'; roleBundle?: 'administrator' | 'operations' | 'reception' | 'view_only' | 'custom'; permissionScope?: Record<string, 'edit' | 'view' | 'none'>; permissionViewKeys?: string[]; emailMask?: 'full' | 'masked' | 'none' }, stepUpToken?: string) =>
-      fetchApi<ApiResponse<StaffMember>>(`/api/staff/${id}`, {
+      /*
+       * 本人が自分のメールを変えたとき、emailChangePending=true と pendingEmail
+       * が返る（N-433）。その場合メールはまだ切り替わっていない。
+       */
+      fetchApi<ApiResponse<StaffMember & { emailChangePending?: boolean; pendingEmail?: string | null }>>(`/api/staff/${id}`, {
         method: 'PATCH',
         headers: stepUpToken ? { 'X-Step-Up-Token': stepUpToken } : undefined,
         body: JSON.stringify(data),
+      }),
+    /** N-433: メール変更の確認リンクから確定する。トークンは24時間・使い切り。 */
+    confirmEmailChange: (token: string) =>
+      fetchApi<ApiResponse<{ email: string }>>('/api/staff/email-change/confirm', {
+        method: 'POST',
+        body: JSON.stringify({ token }),
       }),
     loginSummary: (id: string) =>
       fetchApi<ApiResponse<{ loginCount: number }>>(`/api/staff/${id}/login-summary`),
@@ -11431,6 +11443,30 @@ export const bookingApi = {
     withAccount('/api/booking/admin/exceptions', accountId),
     { method: 'POST', body: JSON.stringify(body) },
   ),
+  /** #953 E-09: 登録済みの例外日を画面から直す。送った項目だけが変わる。 */
+  updateException: (
+    accountId: string,
+    id: string,
+    body: {
+      expectedVersion: number;
+      scopeKind?: 'store' | 'staff' | 'resource';
+      scopeId?: string | null;
+      dateFrom?: string;
+      dateTo?: string;
+      kind?: 'open' | 'closed' | 'custom_hours';
+      intervals?: Array<{ start: string; end: string }>;
+      reason?: string | null;
+    },
+  ) => fetchApi<ApiResponse<BookingException>>(
+    withAccount(`/api/booking/admin/exceptions/${encodeURIComponent(id)}`, accountId),
+    { method: 'PATCH', body: JSON.stringify(body) },
+  ),
+  /** #953 E-09: 例外日を版付きで消す。古い版は 409 で止まる。 */
+  deleteException: (accountId: string, id: string, expectedVersion: number) =>
+    fetchApi<ApiResponse<{ id: string }>>(
+      withAccount(`/api/booking/admin/exceptions/${encodeURIComponent(id)}`, accountId),
+      { method: 'DELETE', body: JSON.stringify({ expectedVersion }) },
+    ),
   // Menus
   listMenus: (accountId: string) =>
     fetchApi<{ menus: BookingMenu[] }>(withAccount('/api/booking/admin/menus', accountId)),

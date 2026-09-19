@@ -26,7 +26,7 @@ export function dashboardNotificationFilters(
   ]
 }
 
-function notificationTime(createdAt: string): string {
+export function notificationTime(createdAt: string): string {
   const time = new Date(createdAt)
   if (Number.isNaN(time.getTime())) return '日時不明'
   return time.toLocaleString('ja-JP', {

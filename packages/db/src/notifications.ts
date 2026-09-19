@@ -188,6 +188,8 @@ export async function getNotificationCenter(
     staffId: string;
     category?: 'error' | 'update';
     limit?: number;
+    /** 通知一覧画面の「さらに読み込む」用。パネルは0のまま。 */
+    offset?: number;
   },
 ): Promise<NotificationCenterRow[]> {
   const conditions = ['n.line_account_id = ?', "n.channel = 'dashboard'"];
@@ -196,7 +198,7 @@ export async function getNotificationCenter(
     conditions.push('n.category = ?');
     values.push(input.category);
   }
-  values.push(input.limit ?? 20);
+  values.push(input.limit ?? 20, input.offset ?? 0);
   const result = await db.prepare(`
     SELECT n.*, r.read_at
     FROM notifications n
@@ -204,7 +206,7 @@ export async function getNotificationCenter(
       ON r.notification_id = n.id AND r.staff_id = ?
     WHERE ${conditions.join(' AND ')}
     ORDER BY n.created_at DESC, n.id DESC
-    LIMIT ?
+    LIMIT ? OFFSET ?
   `).bind(...values).all<NotificationCenterRow>();
   return result.results;
 }

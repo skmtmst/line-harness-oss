@@ -16,6 +16,17 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vite
  * - G5: 照合ルールを全部外して保存 → 照合側の文面でダイアログが出る
  */
 
+// importOriginal で実物の api.ts を評価するため、API URL を先に立てる。
+vi.hoisted(() => {
+  process.env.NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://worker.test'
+})
+
+// #948 N-322: パネルが未保存ガード(useUnsavedGuard→useRouter)を持つため、
+// App Router の文脈が無い試験環境では useRouter を差し替える。
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ push: vi.fn(), replace: vi.fn(), refresh: vi.fn() }),
+}))
+
 vi.mock('@/lib/api', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/api')>()
   return {

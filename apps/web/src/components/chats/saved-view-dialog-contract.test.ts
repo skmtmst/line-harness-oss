@@ -9,7 +9,7 @@ const PAGE = fs.readFileSync(path.join(__dirname, '..', '..', 'app', 'chats', 'p
 describe('受信箱 保存した検索の完了判定', () => {
   it('保存先の成功を確認してからだけ完了表示へ進む', () => {
     expect(DIALOG).toContain('Promise<SavedViewSaveResult>')
-    expect(DIALOG).toContain('const result = await onSave({ name: trimmed, status, due, channel, assignee, favorite })')
+    expect(DIALOG).toContain('const result = await onSave({ name: trimmed, status, quickFilter, channel, assignee, unreadOnly, favorite })')
     expect(DIALOG).toContain('if (!result.success)')
     expect(DIALOG.indexOf('setDone(true)')).toBeGreaterThan(DIALOG.indexOf('if (!result.success)'))
   })
@@ -66,15 +66,18 @@ describe('受信箱 保存した検索の完了判定', () => {
     expect(PAGE).toContain('現在の条件を保存')
   })
 
-  it('保存する4条件をモーダル内で変更でき、よく使う状態も保存する', () => {
+  it('保存する条件をモーダル内で変更でき、よく使う状態も保存する', () => {
     expect(DIALOG).toContain('aria-label="保存する対応状況"')
-    expect(DIALOG).toContain('aria-label="保存する期限"')
+    expect(DIALOG).toContain('aria-label="保存する絞り込み"')
+    expect(DIALOG).toContain('aria-label="保存する未読条件"')
     expect(DIALOG).toContain('aria-label="保存する受信経路"')
     expect(DIALOG).toContain('aria-label="保存する担当者"')
     expect(DIALOG).toContain('aria-label="よく使うに追加"')
     expect(PAGE).toContain('conditions: currentSavedViewConditions(draft)')
     expect(PAGE).toContain('isFavorite: draft?.favorite ?? false')
-    expect(PAGE).toContain("setQuickFilter(conditions.due === 'overdue' ? 'overdue' : 'all')")
+    // N-020: 「要返信」を「すべて」へ潰さず、保存された絞り込みをそのまま戻す。
+    expect(PAGE).toContain('setQuickFilter(conditions.quickFilter)')
+    expect(PAGE).toContain("setUnreadOnly(conditions.unread === 'mine')")
   })
 
   it('保存内容の注意を入力済みでも残し、設計と同じ濃さで背景を暗くする', () => {

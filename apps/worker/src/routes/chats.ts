@@ -246,7 +246,12 @@ async function countInboxSavedViewMatches(
     )`);
     bindings.push(conditions.receivedTo);
   }
-  if (conditions.due === 'overdue') {
+  // 「要返信」は一覧APIの quickFilter=reply と同じく対応状況=未対応で数える。
+  if (conditions.quickFilter === 'reply') {
+    where.push(`COALESCE(c.status, 'resolved') = 'unread'`);
+  }
+  // quickFilter=overdue と due=overdue は同じ条件。古い行は due だけを持つ。
+  if (conditions.due === 'overdue' || conditions.quickFilter === 'overdue') {
     where.push(`COALESCE(c.status, 'resolved') = 'unread'`);
     where.push(`COALESCE(c.last_customer_message_at, c.last_message_at) < datetime('now', '-1 hour')`);
   }
@@ -303,7 +308,10 @@ async function countInboxSavedViewMatches(
     emailWhere.push('t.last_incoming_at <= ?');
     emailBindings.push(conditions.receivedTo);
   }
-  if (conditions.due === 'overdue') {
+  if (conditions.quickFilter === 'reply') {
+    emailWhere.push(`t.status = 'unread'`);
+  }
+  if (conditions.due === 'overdue' || conditions.quickFilter === 'overdue') {
     emailWhere.push(`t.status = 'unread'`);
     emailWhere.push(`t.last_incoming_at < datetime('now', '-1 hour')`);
   }
@@ -330,6 +338,7 @@ const EMPTY_INBOX_SAVED_VIEW_CONDITIONS: InboxSavedViewConditions = {
   statuses: ['unread', 'in_progress', 'on_hold', 'resolved'],
   assignees: [],
   unread: 'all',
+  quickFilter: 'all',
   messageTypes: [],
   receivedFrom: null,
   receivedTo: null,

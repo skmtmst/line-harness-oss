@@ -396,7 +396,8 @@
     "435_conversion_tenant_boundary.sql",
     "436_outgoing_webhook_deliveries.sql",
     "437_external_integration_config.sql",
-    "438_rich_menu_ops.sql"
+    "438_rich_menu_ops.sql",
+    "439_staff_email_change.sql"
   ],
-  "migrationCount": 397
+  "migrationCount": 398
 }

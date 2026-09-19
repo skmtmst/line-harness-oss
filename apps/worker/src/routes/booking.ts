@@ -24,6 +24,7 @@ import {
   getBookingAvailabilityException,
   listBookingAvailabilityExceptions,
   updateBookingAvailabilityException,
+  deleteBookingAvailabilityException,
   updateBookingMenuSettings,
   createBookingResource,
   deleteBookingResourceSafely,
@@ -1598,6 +1599,42 @@ booking.patch('/api/booking/admin/exceptions/:id', requirePermission(BOOKING_SET
   } catch {
     console.error(JSON.stringify({ event: 'booking_exception_update_failed' }));
     return c.json({ success: false, error: 'booking_exception_save_failed' }, 503);
+  }
+});
+
+/**
+ * 例外日の削除。登録だけできて画面から消せない状態を解消する(#953 E-09)。
+ * 消す直前の版を expectedVersion で確認し、読み違えたまま別の版を
+ * 消さないようにする。別アカウントのIDは not_found として隠す。
+ */
+booking.delete('/api/booking/admin/exceptions/:id', requirePermission(BOOKING_SETTINGS_KEY), async (c) => {
+  const accountId = await resolveAccountIdAdmin(c);
+  if (!accountId) return c.json({ success: false, error: 'missing_account_id' }, 400);
+  try {
+    const body = await c.req.json<Record<string, unknown>>().catch(() => null);
+    const expectedVersion = Number(body?.expectedVersion);
+    if (!body || Object.keys(body).some((key) => key !== 'expectedVersion')
+      || !Number.isInteger(expectedVersion) || expectedVersion < 1) {
+      return c.json({ success: false, error: 'expectedVersionは1以上の整数で指定してください' }, 400);
+    }
+    const result = await deleteBookingAvailabilityException(c.env.DB, {
+      id: c.req.param('id'),
+      lineAccountId: accountId,
+      expectedVersion,
+    });
+    if (result.status === 'not_found') return c.json({ success: false, error: 'not_found' }, 404);
+    if (result.status === 'conflict') {
+      return c.json({
+        success: false,
+        code: 'version_conflict',
+        error: '例外日が更新されています。読み直してください',
+        data: { currentVersion: result.currentVersion },
+      }, 409);
+    }
+    return c.json({ success: true, data: { id: c.req.param('id') } });
+  } catch {
+    console.error(JSON.stringify({ event: 'booking_exception_delete_failed' }));
+    return c.json({ success: false, error: 'booking_exception_delete_failed' }, 503);
   }
 });
 

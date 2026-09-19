@@ -95,6 +95,7 @@ shared-button-importer app/nen-campaigns/page.tsx
 shared-button-importer app/nen-members/page.tsx
 shared-button-importer app/nen-members/photo-publications.tsx
 shared-button-importer app/nen-members/photo-review-detail.tsx
+shared-button-importer app/notifications/page.tsx
 shared-button-importer app/ops/announcements/page.tsx
 shared-button-importer app/ops/audit/page.tsx
 shared-button-importer app/ops/dashboard/page.tsx
@@ -125,6 +126,7 @@ shared-button-importer app/rich-menus/page.tsx
 shared-button-importer app/scenarios/detail/scenario-detail-client.tsx
 shared-button-importer app/scenarios/page.tsx
 shared-button-importer app/scenarios/results/page.tsx
+shared-button-importer app/staff/email-change/page.tsx
 shared-button-importer app/staff/invite/page.tsx
 shared-button-importer app/staff/page.tsx
 shared-button-importer app/settings/manual-links/page.tsx
