@@ -44,6 +44,7 @@ function renderColumns(setting: NenCampaignSetting, onToggleSetting: (s: NenCamp
         onTabChange={noop}
         settings={[setting]}
         columns={[]}
+        columnsTotal={0}
         kpis={null}
         flowMetrics={null}
         columnMetrics={null}

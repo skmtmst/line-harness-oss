@@ -4,7 +4,9 @@ import { Suspense, useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { api, type NenColumn } from '@/lib/api'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
 import StickyBar from '@/components/shared/sticky-bar'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import CampaignEditor from './campaign-editor'
 import { useAccount } from '@/contexts/account-context'
 
@@ -34,6 +36,13 @@ function NenColumnEditInner() {
   const [savingId, setSavingId] = useState<string | null>(null)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
+  /*
+   * #935 N-301: 紹介文を書きかけのまま離れると消えていた。
+   * 保存済みの紹介文と違う間だけ、ブラウザ離脱・画面内リンク・戻る操作を止めて確認する。
+   * hooksは分岐の前に置く（下の早期returnより先に呼ぶ）。
+   */
+  const dirty = columns.some((column) => (drafts[column.id] ?? '') !== (column.introText ?? ''))
+  const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty, busy: savingId !== null })
 
   // ?key= が付いていれば、その配信そのものを編集する（設計 9-1-1）。
   // 付いていないときは、EC側のコラムに添える紹介文の一覧を出す。
@@ -154,6 +163,16 @@ function NenColumnEditInner() {
           ))}
         </div>
       )}
+      {/* #935 N-301: 書きかけのまま離れるときの確認。 */}
+      <ConfirmDialog
+        open={leaveTarget !== null}
+        title="入力した紹介文が保存されていません"
+        description="このまま移動すると、入力した紹介文は保存されません。移動しますか？"
+        confirmLabel="保存せずに移動"
+        cancelLabel="書き続ける"
+        onConfirm={confirmLeave}
+        onCancel={cancelLeave}
+      />
     </div>
   )
 }
