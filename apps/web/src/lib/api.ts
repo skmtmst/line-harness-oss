@@ -8314,6 +8314,17 @@ export const api = {
     definitions: (lineAccountId: string) => fetchApi<ApiResponse<LineNotificationDefinition[]>>(
       `/api/line-notifications/customer-definitions?lineAccountId=${encodeURIComponent(lineAccountId)}`,
     ),
+    createDefinition: (data: {
+      lineAccountId: string
+      key: string
+      name: string
+      category: string
+      sourceEventType: string
+      draft: Record<string, unknown>
+    }) => fetchApi<ApiResponse<LineNotificationDefinition>>(
+      '/api/line-notifications/customer-definitions',
+      { method: 'POST', body: JSON.stringify(data) },
+    ),
     updateDraft: (id: string, data: {
       lineAccountId: string
       expectedVersion: number
@@ -8356,6 +8367,55 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(data),
     }),
+    // N-342 (#943): 運用者通知の正本API。要件の名前(/api/line-notifications)で置く。
+    operatorRules: {
+      list: (lineAccountId: string) =>
+        fetchApi<ApiResponse<{
+          items: OperatorNotificationRule[]
+          summary: { total: number; published: number; stopped: number; missingRecipients: number; recipients: number; acceptedToday: number; excludedToday: number }
+        }>>(
+          `/api/line-notifications/operator-rules?lineAccountId=${encodeURIComponent(lineAccountId)}`,
+        ),
+      get: (id: string, lineAccountId: string) =>
+        fetchApi<ApiResponse<NotificationRule>>(
+          `/api/line-notifications/operator-rules/${encodeURIComponent(id)}?lineAccountId=${encodeURIComponent(lineAccountId)}`,
+        ),
+      create: (data: { lineAccountId: string; name: string; eventType: string; conditions?: Record<string, unknown>; channels?: string[] }) =>
+        fetchApi<ApiResponse<NotificationRule>>('/api/line-notifications/operator-rules', {
+          method: 'POST',
+          body: JSON.stringify(data),
+        }),
+      updateDraft: (id: string, lineAccountId: string, data: { name?: string; eventType?: string; conditions?: Record<string, unknown>; channels?: string[] }) =>
+        fetchApi<ApiResponse<NotificationRule>>(`/api/line-notifications/operator-rules/${encodeURIComponent(id)}/draft`, {
+          method: 'PATCH',
+          body: JSON.stringify({ ...data, lineAccountId }),
+        }),
+      previewRecipients: (data: {
+        lineAccountId: string
+        recipientIds?: string[]
+        channels: string[]
+      }) => fetchApi<ApiResponse<OperatorRecipientPreview>>(
+        '/api/line-notifications/operator-rules/recipients-preview',
+        { method: 'POST', body: JSON.stringify(data) },
+      ),
+      publish: (id: string, lineAccountId: string) =>
+        fetchApi<ApiResponse<NotificationRule>>(
+          `/api/line-notifications/operator-rules/${encodeURIComponent(id)}/publish`,
+          { method: 'POST', body: JSON.stringify({ lineAccountId }) },
+        ),
+      stop: (id: string, lineAccountId: string) =>
+        fetchApi<ApiResponse<NotificationRule>>(
+          `/api/line-notifications/operator-rules/${encodeURIComponent(id)}/stop`,
+          { method: 'POST', body: JSON.stringify({ lineAccountId }) },
+        ),
+      test: (id: string, lineAccountId: string, message?: string) =>
+        fetchApi<ApiResponse<OperatorDeliveryResult>>(
+          `/api/line-notifications/operator-rules/${encodeURIComponent(id)}/test`,
+          { method: 'POST', body: JSON.stringify({ lineAccountId, message }) },
+        ),
+      exportCsv: (lineAccountId: string, reason: string) =>
+        fetchApiBlob(`/api/line-notifications/operator-deliveries.csv?${new URLSearchParams({ lineAccountId, reason })}`),
+    },
   },
   ecCommerce: {
     overview: (lineAccountId?: string) =>
