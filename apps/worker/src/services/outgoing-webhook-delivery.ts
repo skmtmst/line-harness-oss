@@ -704,7 +704,7 @@ export async function recordDeliveryOutcome(
       .prepare(
         `UPDATE outgoing_webhooks
             SET consecutive_failures = 0, last_failed_at = NULL
-          WHERE id = ? AND consecutive_failures != 0`,
+          WHERE id = ? AND consecutive_failures != 0 AND deleted_at IS NULL`,
       )
       .bind(webhookId)
       .run();
@@ -715,7 +715,7 @@ export async function recordDeliveryOutcome(
       `UPDATE outgoing_webhooks
           SET consecutive_failures = consecutive_failures + 1,
               last_failed_at = strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')
-        WHERE id = ?`,
+        WHERE id = ? AND deleted_at IS NULL`,
     )
     .bind(webhookId)
     .run();
@@ -1180,7 +1180,9 @@ export async function sweepOutgoingWebhookDeliveries(
     }
     result.swept += 1;
     const webhook = await db
-      .prepare(`SELECT * FROM outgoing_webhooks WHERE id = ? AND line_account_id = ?`)
+      // #939 N-368: 削除は履歴を残す印。印のある送り先は「無い」として
+      // 滞留分を webhook_not_found で閉じる。
+      .prepare(`SELECT * FROM outgoing_webhooks WHERE id = ? AND line_account_id = ? AND deleted_at IS NULL`)
       .bind(row.webhook_id, row.line_account_id)
       .first<WebhookRow & { is_active: number; name: string }>();
     const started = Date.now();

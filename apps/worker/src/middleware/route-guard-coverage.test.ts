@@ -53,6 +53,9 @@ const PUBLIC_PREFIXES = [
   // 認証が置けない（鍵を置いてもページのソースに出る）。
   // 代わりにレート制限を掛け、受け取る中身を絞り、何も返さない。
   '/api/site/',
+  // #939 N-380: 外部システム向け公開API。管理画面の役割ではなく、
+  // route 内で integration_api_tokens の Bearer トークンを照合する。
+  '/api/public/v1/',
 ];
 
 /**

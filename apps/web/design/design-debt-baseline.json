@@ -427,6 +427,9 @@
   "app/users/page.tsx": {
     "arbitrary-value": 5
   },
+  "app/webhooks/edit/page.tsx": {
+    "unresolved-classname": 4
+  },
   "app/webhooks/new/page.tsx": {
     "unresolved-classname": 5,
     "direct-secondary-button": 1

@@ -90,9 +90,27 @@ describe('V6 機能20 分析', () => {
     expect(PAGE).toContain('attempts < 10 ? 3000 : 10000')
   })
 
-  it('一覧の取得失敗は空表示と分け、実行制限は運用の言葉で出す(点検#508の中3・中4)', () => {
-    expect(PAGE).toContain('友だち情報欄を読み込めませんでした。開き直してください。')
-    expect(PAGE).toContain('ファネルを読み込めませんでした。開き直してください。')
+  it('クロス分析は「数えるもの」を選べ、期間・棒・段は読み上げに届く(#951)', () => {
+    // N-276: 人数だけでなく、記録が「取得可能」なイベントの回数でも数えられる。
+    expect(API).toContain('AnalyticsCrossMeasure')
+    expect(PAGE).toContain("id=\"cross-measure\"")
+    expect(PAGE).toContain("id=\"cross-measure-event\"")
+    expect(PAGE).toContain("kind: 'events'")
+    // N-288: 期間切替は選択状態を持ち、棒・段は名前を持つ。
+    expect(PAGE).toContain('aria-pressed={days === range}')
+    expect(PAGE).toContain('aria-describedby={`funnel-step-')
+  })
+
+  it('一覧の取得失敗は空表示と分け、再読込の導線と実行制限は運用の言葉で出す(点検#508の中3・中4)', () => {
+    expect(PAGE).toContain('友だち情報欄を読み込めませんでした。')
+    expect(PAGE).toContain('ファネルを読み込めませんでした。')
+    // 開き直ししかできなかったエラー面には、同じ条件で読み直す導線を付ける。
+    expect(PAGE).toContain('もう一度読み込む')
+    expect(PAGE).toContain('fieldsReload')
+    expect(PAGE).toContain('funnelsReload')
+    expect(PAGE).toContain('savedReload')
+    expect(PAGE).toContain('snapshotReload')
+    expect(PAGE).toContain('menuReload')
     expect(PAGE).toContain('analytics_cross_busy')
     expect(PAGE).toContain('他の集計が動いています。終わってからもう一度押してください')
     expect(PAGE).toContain('analytics_funnel_too_soon')

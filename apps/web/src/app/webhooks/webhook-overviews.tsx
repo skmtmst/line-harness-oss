@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { IncomingWebhook, WebhookInteractionSummary } from '@line-crm/shared'
-import { api, type IncomingWebhookDetail, type OutgoingWebhookOverview } from '@/lib/api'
+import { api, type IncomingWebhookDetail, type IncomingWebhookUnmatchedItem, type OutgoingWebhookOverview } from '@/lib/api'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import ListToolbar from '@/components/shared/list-toolbar'
@@ -457,6 +457,8 @@ export function OutgoingOverview({
                               ? (item.isActive ? '止めています…' : '動かしています…')
                               : (item.isActive ? '止める' : '動かす')}
                           </Button>
+                          {/* N-363: 名前・URL・いつ送るか・送り直す回数を直す画面へ。 */}
+                          <Button variant="secondary" href={`/webhooks/edit?id=${item.id}`}>直す</Button>
                           <Button variant="secondary" onClick={() => onRotate(item)}>合言葉</Button>
                           <Button variant="secondary" onClick={() => onDelete(item)}>削除</Button>
                           </div>
@@ -515,6 +517,13 @@ export function IncomingOverview({
   const [detail, setDetail] = useState<IncomingWebhookDetail | null>(null)
   const [detailStatus, setDetailStatus] = useState<LoadStatus>('loading')
   const [detailReloadKey, setDetailReloadKey] = useState(0)
+  /*
+    人が見つからなかった届物の箱(#939 N-367)。
+    「未照合として確認する」「友だち候補を作る」を選んだ口だけ使う。
+  */
+  const [unmatched, setUnmatched] = useState<IncomingWebhookUnmatchedItem[]>([])
+  const [unmatchedStatus, setUnmatchedStatus] = useState<LoadStatus>('ready')
+  const [dismissingId, setDismissingId] = useState<string | null>(null)
   const selected = items.find((item) => item.id === selectedId) ?? items[0] ?? null
   const selectedDetailId = selected?.id ?? null
 
@@ -545,6 +554,48 @@ export function IncomingOverview({
       })
     return () => { cancelled = true }
   }, [detailReloadKey, lineAccountId, selectedDetailId])
+
+  /*
+    箱の中身は詳細が読めたときに一緒に読む。「何もしない」を選んでいる口でも、
+    以前の選択で溜まった届物があれば見せる。
+  */
+  useEffect(() => {
+    let cancelled = false
+    setUnmatched([])
+    setUnmatchedStatus('ready')
+    if (!selectedDetailId || !lineAccountId || detailStatus !== 'ready') return
+    setUnmatchedStatus('loading')
+    void api.webhooks.incoming.unmatched(selectedDetailId, lineAccountId)
+      .then((response) => {
+        if (cancelled) return
+        if (!response.success) {
+          setUnmatchedStatus('error')
+          return
+        }
+        setUnmatched(response.data)
+        setUnmatchedStatus('ready')
+      })
+      .catch(() => {
+        if (!cancelled) setUnmatchedStatus('error')
+      })
+    return () => { cancelled = true }
+  }, [detailStatus, lineAccountId, selectedDetailId])
+
+  const dismissUnmatched = async (item: IncomingWebhookUnmatchedItem) => {
+    if (!lineAccountId || dismissingId !== null) return
+    setDismissingId(item.id)
+    try {
+      const res = await api.webhooks.incoming.resolveUnmatched(item.id, lineAccountId, { action: 'dismiss' })
+      if (res.success) {
+        setUnmatched((current) => current.filter((entry) => entry.id !== item.id))
+        setDetail((current) => current
+          ? { ...current, pendingUnmatched: Math.max(0, current.pendingUnmatched - 1) }
+          : current)
+      }
+    } finally {
+      setDismissingId(null)
+    }
+  }
 
   if (status === 'loading') {
     return <ListState kind="loading" title="こちらで受け取る設定を読み込んでいます" />
@@ -662,6 +713,55 @@ export function IncomingOverview({
           </div>
           </section>
 
+          {/*
+            N-367: 「未照合として確認する」「友だち候補を作る」を選んだ口に
+            届いて、人が見つからなかったものをここへ置く。選び方が変わっても
+            溜まった届物は残るので、残っている限り見せる。
+          */}
+          {(detail && (detail.identityMatching.onNotFound !== 'do_nothing' || unmatched.length > 0)) ? (
+            <section className="bg-canvas border-hairline rounded-card border p-5">
+              <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                <h2 className="text-ink text-lg font-bold">人が見つからなかった届物</h2>
+                {(detail.pendingUnmatched ?? 0) > 0 ? (
+                  <StatusBadge tone="warning" size="compact">
+                    未確認 {detail.pendingUnmatched}件
+                  </StatusBadge>
+                ) : null}
+              </div>
+              {unmatchedStatus === 'loading' ? (
+                <p className="text-ink-secondary text-sm">届物を読み込んでいます。</p>
+              ) : unmatchedStatus === 'error' ? (
+                <p className="text-ink-secondary text-sm">届物を表示できませんでした。読み直してください。</p>
+              ) : unmatched.length === 0 ? (
+                <p className="text-ink-secondary text-sm">いま確認が必要な届物はありません。</p>
+              ) : (
+                <ul className="space-y-2">
+                  {unmatched.map((item) => (
+                    <li key={item.id} className="bg-canvas-sunken rounded-control flex flex-wrap items-center justify-between gap-3 px-4 py-2">
+                      <div className="min-w-0">
+                        <strong className="text-ink block text-sm">
+                          {item.kind === 'candidate' ? '友だち候補' : '未照合'}・{formatReceivedAt(item.receivedAt)}
+                        </strong>
+                        <span className="text-ink-secondary mt-1 block text-xs">
+                          {item.identityAttempts.length > 0
+                            ? item.identityAttempts.map((attempt) => `${identityKindLabel(attempt.kind)}：${attempt.value}`).join('、')
+                            : '照合に使える値が届いていません'}
+                        </span>
+                      </div>
+                      <Button
+                        variant="secondary"
+                        disabled={dismissingId !== null}
+                        onClick={() => void dismissUnmatched(item)}
+                      >
+                        {dismissingId === item.id ? '閉じています…' : '確認した'}
+                      </Button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+          ) : null}
+
           <section className="bg-canvas border-hairline rounded-card border p-5">
             <h2 className="text-ink mb-2 text-lg font-bold">届いたデータの見かた</h2>
             {detailStatus === 'loading' ? (
@@ -757,6 +857,15 @@ function notFoundLabel(value: IncomingWebhookDetail['identityMatching']['onNotFo
     unmatched_box: '未照合として確認する',
     create_candidate: '友だち候補を作る',
   } as const)[value ?? 'do_nothing']
+}
+
+function identityKindLabel(kind: string): string {
+  return ({
+    harness_friend_id: '友だちID',
+    external_customer_id: '外部サービスのお客様ID',
+    verified_email: 'メールアドレス',
+    verified_phone: '電話番号',
+  } as Record<string, string>)[kind] ?? kind
 }
 
 function incomingActionLabel(kind: string): string {

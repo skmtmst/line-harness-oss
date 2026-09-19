@@ -174,7 +174,7 @@ async function validateActionResources(
     }
   } else if (action.type === 'send_webhook') {
     const webhookId = requiredString(params.webhookId, `${field}.webhookId`, '送信Webhook');
-    await requireResource(db, 'SELECT id FROM outgoing_webhooks WHERE id = ? AND line_account_id = ? AND is_active = 1', [webhookId, lineAccountId], `${field}.webhookId`, '送信Webhook');
+    await requireResource(db, 'SELECT id FROM outgoing_webhooks WHERE id = ? AND line_account_id = ? AND is_active = 1 AND deleted_at IS NULL', [webhookId, lineAccountId], `${field}.webhookId`, '送信Webhook');
   } else if (action.type === 'switch_rich_menu') {
     const pageId = requiredString(params.richMenuPageId, `${field}.richMenuPageId`, 'リッチメニュー');
     await requireResource(

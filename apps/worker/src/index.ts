@@ -79,6 +79,7 @@ import { affiliateSelfRoutes } from './routes/affiliate-self.js';
 import { affiliatePayouts } from './routes/affiliate-payouts.js';
 // Round 3 ルート
 import { webhooks } from './routes/webhooks.js';
+import { publicApi } from './routes/public-api.js';
 import { calendar } from './routes/calendar.js';
 import { meetConsultations } from './routes/meet-consultations.js';
 import { reminders } from './routes/reminders.js';
@@ -437,6 +438,7 @@ app.route('/', affiliatePayouts);
 
 // Mount route groups — Round 3
 app.route('/', webhooks);
+app.route('/', publicApi);
 app.route('/', calendar);
 app.route('/', meetConsultations);
 app.route('/', reminders);

@@ -30,6 +30,9 @@ describe('受信Webhookと流入経路の統括分離', () => {
         ('route-default', 'default-ref', 'default', 1, '${DEFAULT_TENANT_ID}', '1', '1'),
         ('route-b', 'b-ref', 'B', 1, 'tenant-b', '2', '2'),
         ('route-legacy', 'legacy-ref', 'legacy', 1, NULL, '3', '3');
+      /* #939 N-368（移行437）: 削除は履歴を残す印。位置指定の INSERT の後で列を足す。 */
+      ALTER TABLE incoming_webhooks ADD COLUMN deleted_at TEXT;
+      ALTER TABLE incoming_webhooks ADD COLUMN deleted_by_staff_id TEXT;
     `);
     db = asD1(sqlite);
   });

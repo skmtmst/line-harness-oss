@@ -902,7 +902,7 @@ async function webinarActionReferenceValid(
     case 'send_webhook': {
       const webhookId = ref('webhookId');
       return webhookId !== null && await exists(
-        'SELECT id FROM outgoing_webhooks WHERE id = ? AND line_account_id = ? AND is_active = 1',
+        'SELECT id FROM outgoing_webhooks WHERE id = ? AND line_account_id = ? AND is_active = 1 AND deleted_at IS NULL',
         webhookId,
       );
     }
