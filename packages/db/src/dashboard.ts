@@ -1310,7 +1310,7 @@ export async function getListStats(db: D1Database, scope: AccountStatsScope): Pr
         `SELECT COUNT(DISTINCT template_id) AS n FROM (
            SELECT template_id FROM scenario_steps WHERE template_id IS NOT NULL
            UNION ALL
-           SELECT template_id FROM auto_replies WHERE template_id IS NOT NULL
+           SELECT template_id FROM auto_replies WHERE template_id IS NOT NULL AND deleted_at IS NULL
          )`,
       );
       // テンプレート由来の短縮URLのクリック率（110）。

@@ -698,7 +698,7 @@ export async function getTemplateUsage(
   const arRes = await db
     .prepare(
       `SELECT id, keyword, match_type, line_account_id
-       FROM auto_replies WHERE template_id = ?${scope('line_account_id')} ORDER BY created_at DESC`,
+       FROM auto_replies WHERE template_id = ? AND deleted_at IS NULL${scope('line_account_id')} ORDER BY created_at DESC`,
     )
     .bind(...scopeBinds([templateId]))
     .all<{ id: string; keyword: string; match_type: 'exact' | 'contains'; line_account_id: string | null }>();
@@ -902,7 +902,7 @@ export async function getTemplatesWithUsageCount(
   // （#891 N-135/142/143）。
   const relationalRes = await db.prepare(
     `SELECT template_id, acct FROM (
-       SELECT template_id, line_account_id AS acct FROM auto_replies WHERE template_id IS NOT NULL
+       SELECT template_id, line_account_id AS acct FROM auto_replies WHERE template_id IS NOT NULL AND deleted_at IS NULL
        UNION ALL
        SELECT ss.template_id, s.line_account_id AS acct
          FROM scenario_steps ss JOIN scenarios s ON s.id = ss.scenario_id

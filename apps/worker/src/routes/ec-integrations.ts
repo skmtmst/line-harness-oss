@@ -141,6 +141,8 @@ export type EcEvent = {
     delivery_time?: string | null;
     detail_url?: string | null;
     payment_deadline?: string | null;
+    /** 注文で使われたクーポンコード。誕生日クーポンの利用記録（used_at）へつなげる。 */
+    coupon_code?: string | null;
   };
   order_history?: Array<{
     id?: string;
@@ -687,6 +689,15 @@ ecIntegrations.post('/api/integrations/eccube/events', async (c) => {
     // (台帳 claim をすり抜けた再試行を含む)でも二度数えない。
     // 記録に失敗しても注文処理は続ける(通知を落とさない)。
     if (event.event_type === 'ec.order.confirmed') {
+      // 注文にクーポンが使われていれば、発行台帳の used_at を立てる。
+      // EC側のクーポン利用台帳とは別物なので、ここが記録口の1つになる
+      // （もう1つは /api/integrations/eccube/coupon-usages）。冪等（used_at IS NULL の行だけ）。
+      const couponCode = typeof event.order?.coupon_code === 'string' ? event.order.coupon_code.trim() : '';
+      if (couponCode) {
+        await c.env.DB.prepare(
+          `UPDATE nen_coupon_issues SET used_at = ? WHERE coupon_code = ? AND used_at IS NULL`,
+        ).bind(event.occurred_at.slice(0, 19).replace('T', ' '), couponCode).run();
+      }
       try {
         await recordConversionSourceEvent(c.env.DB, {
           sourceType: 'ec_order_confirmed',

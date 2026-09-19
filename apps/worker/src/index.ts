@@ -1826,20 +1826,33 @@ async function scheduled(
   try {
     await observeDispatch('NEN campaign deliveries', async () => {
       const { processNenDeliveries, enqueueBirthdayCoupons } = await import('./services/nen-engagement.js');
-      const birthdayQueued = await enqueueBirthdayCoupons(
+      const { dispatchOperatorEvent } = await import('./services/operator-notification-dispatch.js');
+      // EC側の発行に失敗しても残りの子と通常配信は止めない。失敗は
+      // 運用通知へ回し、次の日次走査で同じコードへ収束させる（部分成功を成功扱いしない）。
+      const birthday = await enqueueBirthdayCoupons(
         env.DB,
         new Date(),
         env.NEN_EC_BASE_URL && env.ECCUBE_WEBHOOK_SECRET
           ? { baseUrl: env.NEN_EC_BASE_URL, secret: env.ECCUBE_WEBHOOK_SECRET }
           : undefined,
+        async (failure) => {
+          if (!failure.lineAccountId) return;
+          await dispatchOperatorEvent(env.DB, env, {
+            lineAccountId: failure.lineAccountId,
+            eventType: 'nen_birthday_coupon_failed',
+            sourceEventId: `nen_coupon_issue_failed:${failure.petId}:${failure.issueYear}`,
+            message: `誕生日クーポンの発行に失敗しました。次の日次処理でやり直します（コード: ${failure.couponCode || '未発行'}）`,
+            executionMode: 'automatic',
+          });
+        },
       );
       const result = await processNenDeliveries(env.DB, {
         proxyBaseUrl: env.WORKER_PUBLIC_URL ?? 'https://your-worker.your-subdomain.workers.dev',
         defaultAccessToken: env.LINE_CHANNEL_ACCESS_TOKEN,
         proxyDispatch: (request) => Promise.resolve(lineProxy.fetch(request, env, ctx)),
       });
-      if (birthdayQueued + result.sent + result.failed + result.skipped > 0) {
-        console.log(JSON.stringify({ event: 'nen_campaign_tick', birthdayQueued, ...result }));
+      if (birthday.queued + birthday.failed + result.sent + result.failed + result.skipped > 0) {
+        console.log(JSON.stringify({ event: 'nen_campaign_tick', birthdayQueued: birthday.queued, birthdayIssueFailed: birthday.failed, ...result }));
       }
     });
   } catch (e) {

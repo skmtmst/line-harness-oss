@@ -15,7 +15,7 @@ export interface NenPetRow {
   /** 呼び名（男の子＝くん、女の子＝ちゃん） */
   callName: string
   gender: 'male' | 'female' | 'unknown'
-  animalType: 'dog' | 'cat'
+  animalType: 'dog' | 'cat' | 'other'
   breed: string
   birthday: string | null
   ageLabel: string
