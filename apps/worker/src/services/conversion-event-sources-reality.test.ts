@@ -19,6 +19,7 @@ import { Hono } from 'hono';
 import { afterEach, beforeAll, beforeEach, describe, expect, test, vi } from 'vitest';
 
 import type { Env } from '../index.js';
+import { DEFAULT_TENANT_ID } from '@line-crm/shared';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const BOOTSTRAP = readFileSync(
@@ -169,12 +170,14 @@ function env(): Env['Bindings'] {
 /** 起点ごとに計測中の成果地点を1つ置く。 */
 function addPoint(eventType: string, options: { targetUrl?: string } = {}): string {
   const id = `point-${eventType}`;
+  // N-263: 実装は作成時にアカウントの統括を tenant_id へ写す。
+  // 試験データも同じ形にする(account-a は tenant-1)。
   sqlite
     .prepare(
       `INSERT INTO conversion_points
          (id, name, event_type, value, status, measure_method, target_url,
-          count_repeat, line_account_id, deduplication_mode)
-       VALUES (?, ?, ?, 1000, 'active', ?, ?, 1, 'account-a', 'every')`,
+          count_repeat, line_account_id, tenant_id, deduplication_mode)
+       VALUES (?, ?, ?, 1000, 'active', ?, ?, 1, 'account-a', 'tenant-1', 'every')`,
     )
     .run(
       id,
@@ -610,8 +613,8 @@ describe('境界: 起点・アカウント・友だちが合わないものは�
     sqlite
       .prepare(
         `INSERT INTO conversion_points
-           (id, name, event_type, value, status, measure_method, count_repeat, line_account_id)
-         VALUES ('point-b', 'B店の成果', 'tag_added', 1000, 'active', 'webhook', 1, 'account-b')`,
+           (id, name, event_type, value, status, measure_method, count_repeat, line_account_id, tenant_id)
+         VALUES ('point-b', 'B店の成果', 'tag_added', 1000, 'active', 'webhook', 1, 'account-b', 'tenant-1')`,
       )
       .run();
 
@@ -649,8 +652,8 @@ describe('境界: 起点・アカウント・友だちが合わないものは�
     sqlite
       .prepare(
         `INSERT INTO conversion_points
-           (id, name, event_type, value, status, measure_method, count_repeat, line_account_id)
-         VALUES ('point-tag_added', '停止中', 'tag_added', 1000, 'stopped', 'webhook', 1, 'account-a')`,
+           (id, name, event_type, value, status, measure_method, count_repeat, line_account_id, tenant_id)
+         VALUES ('point-tag_added', '停止中', 'tag_added', 1000, 'stopped', 'webhook', 1, 'account-a', 'tenant-1')`,
       )
       .run();
 
@@ -674,21 +677,23 @@ describe('境界: 起点・アカウント・友だちが合わないものは�
 describe('地点の絞り込み(実DB・SQLを直接見る)', () => {
   function point(
     id: string,
-    over: { eventType?: string; status?: string; accountId?: string | null } = {},
+    over: { eventType?: string; status?: string; accountId?: string | null; tenantId?: string | null } = {},
   ) {
+    const accountId = over.accountId === undefined ? 'account-a' : over.accountId;
+    // N-263: 実装と同じく、アカウントを絞る地点はそのアカウントの統括、
+    // 絞らない地点は既定の統括に属する形で置く。
+    const tenantId = over.tenantId !== undefined
+      ? over.tenantId
+      : accountId === null
+        ? DEFAULT_TENANT_ID
+        : 'tenant-1';
     sqlite
       .prepare(
         `INSERT INTO conversion_points
-           (id, name, event_type, value, status, measure_method, count_repeat, line_account_id)
-         VALUES (?, ?, ?, 1000, ?, 'webhook', 1, ?)`,
+           (id, name, event_type, value, status, measure_method, count_repeat, line_account_id, tenant_id)
+         VALUES (?, ?, ?, 1000, ?, 'webhook', 1, ?, ?)`,
       )
-      .run(
-        id,
-        id,
-        over.eventType ?? 'tag_added',
-        over.status ?? 'active',
-        over.accountId === undefined ? 'account-a' : over.accountId,
-      );
+      .run(id, id, over.eventType ?? 'tag_added', over.status ?? 'active', accountId, tenantId);
   }
 
   async function record(friendId = 'friend-1') {
@@ -699,10 +704,13 @@ describe('地点の絞り込み(実DB・SQLを直接見る)', () => {
     });
   }
 
-  test('自分のアカウントの地点と全店共通の地点だけを拾う', async () => {
+  test('自分のアカウントの地点と同じ統括の全店共通地点だけを拾う', async () => {
     point('p-mine');
-    point('p-common', { accountId: null });
+    // 同じ統括の全アカウント対象の地点は拾う。
+    point('p-common', { accountId: null, tenantId: 'tenant-1' });
     point('p-other', { accountId: 'account-b' });
+    // N-263: 既定の統括に属する共通地点は、tenant-1 の友だちを数えない。
+    point('p-default', { accountId: null });
     sqlite.exec(`
       INSERT INTO line_accounts
         (id, channel_id, name, channel_access_token, channel_secret, tenant_id, is_active)
