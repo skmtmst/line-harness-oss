@@ -205,6 +205,43 @@ export type IncomingWebhookDetail = IncomingWebhook & {
     truncated: boolean
   } | null
   templateFields: Array<{ path: string; type: string; token: string }>
+  /** 人が見つからなかった届物の未確認件数(#939 N-367)。 */
+  pendingUnmatched: number
+}
+
+/**
+ * 人が見つからなかった届物(#939 N-367)。生の本文は保存していないので、
+ * 照合に使った値と形だけの見本だけが返る。
+ */
+export interface IncomingWebhookUnmatchedItem {
+  id: string
+  kind: 'unmatched' | 'candidate'
+  status: 'pending' | 'resolved' | 'dismissed'
+  identityAttempts: Array<{ kind: string; path: string; value: string }>
+  maskedShape: { fields: Array<{ path: string; type: string; maskedValue: string }>; truncated: boolean } | null
+  resolvedFriendId: string | null
+  resolvedAt: string | null
+  receivedAt: string
+}
+
+/**
+ * 外部システムが公開APIを呼ぶための鍵(#939 N-380)。
+ * 管理画面の認証とは別の台帳で、平文は一覧には出ない。
+ */
+export interface IntegrationApiTokenInfo {
+  id: string
+  name: string
+  tokenPrefix: string
+  scopes: string[]
+  createdBy: string | null
+  lastUsedAt: string | null
+  rotatedFromId: string | null
+  createdAt: string
+}
+
+/** 発行・入れ替えの応答にだけ1回だけ平文が乗る。 */
+export interface IssuedIntegrationApiToken extends IntegrationApiTokenInfo {
+  token: string
 }
 
 export type AccessUserStatus = 'active' | 'invited' | 'expired' | 'suspended'
@@ -9667,11 +9704,26 @@ export const api = {
           `/api/webhooks/incoming/${id}?lineAccountId=${encodeURIComponent(lineAccountId)}`,
           { method: 'DELETE' },
         ),
+      /* 人が見つからなかった届物の箱(#939 N-367)。 */
+      unmatched: (id: string, lineAccountId: string, status?: 'pending' | 'resolved' | 'dismissed') =>
+        fetchApi<ApiResponse<IncomingWebhookUnmatchedItem[]>>(
+          `/api/webhooks/incoming/${encodeURIComponent(id)}/unmatched?lineAccountId=${encodeURIComponent(lineAccountId)}${status ? `&status=${status}` : ''}`,
+        ),
+      resolveUnmatched: (id: string, lineAccountId: string, data: { action: 'dismiss' } | { action: 'link'; friendId: string }) =>
+        fetchApi<ApiResponse<{ id: string; status: string }>>(
+          `/api/webhooks/unmatched/${encodeURIComponent(id)}/resolve?lineAccountId=${encodeURIComponent(lineAccountId)}`,
+          { method: 'POST', body: JSON.stringify(data) },
+        ),
     },
     outgoing: {
       list: (lineAccountId: string) =>
         fetchApi<ApiResponse<OutgoingWebhookOverview[]>>(
           `/api/webhooks/outgoing?lineAccountId=${encodeURIComponent(lineAccountId)}`,
+        ),
+      /* N-363 (#939): 編集画面が現在値を読む詳細口。secret は返らない。 */
+      detail: (id: string, lineAccountId: string) =>
+        fetchApi<ApiResponse<OutgoingWebhook>>(
+          `/api/webhooks/outgoing/${encodeURIComponent(id)}?lineAccountId=${encodeURIComponent(lineAccountId)}`,
         ),
       create: (data: { lineAccountId: string; name: string; url: string; eventTypes: string[]; secret: string; maxRetries?: number }) =>
         fetchApi<ApiResponse<OutgoingWebhookCreated>>('/api/webhooks/outgoing', {
@@ -9724,6 +9776,28 @@ export const api = {
       retryFailed: (lineAccountId: string) =>
         fetchApi<ApiResponse<{ requested: number; succeeded: number; failed: number; skipped: number }>>(
           `/api/webhooks/interactions/retry-failed?lineAccountId=${encodeURIComponent(lineAccountId)}`,
+          { method: 'POST', body: '{}' },
+        ),
+    },
+    /* 外部システムが公開APIを呼ぶための鍵(#939 N-380)。 */
+    apiTokens: {
+      list: (lineAccountId: string) =>
+        fetchApi<ApiResponse<IntegrationApiTokenInfo[]>>(
+          `/api/webhooks/api-tokens?lineAccountId=${encodeURIComponent(lineAccountId)}`,
+        ),
+      create: (lineAccountId: string, data: { name: string; scopes: string[] }) =>
+        fetchApi<ApiResponse<IssuedIntegrationApiToken>>('/api/webhooks/api-tokens', {
+          method: 'POST',
+          body: JSON.stringify({ ...data, lineAccountId }),
+        }),
+      revoke: (id: string, lineAccountId: string) =>
+        fetchApi<ApiResponse<{ id: string }>>(
+          `/api/webhooks/api-tokens/${encodeURIComponent(id)}/revoke?lineAccountId=${encodeURIComponent(lineAccountId)}`,
+          { method: 'POST', body: '{}' },
+        ),
+      rotate: (id: string, lineAccountId: string) =>
+        fetchApi<ApiResponse<IssuedIntegrationApiToken>>(
+          `/api/webhooks/api-tokens/${encodeURIComponent(id)}/rotate?lineAccountId=${encodeURIComponent(lineAccountId)}`,
           { method: 'POST', body: '{}' },
         ),
     },
