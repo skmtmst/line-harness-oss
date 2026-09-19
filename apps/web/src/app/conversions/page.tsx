@@ -7,6 +7,9 @@ import {
   type ConversionDefinitionListItem,
   type ConversionDefinitionDeleteImpact,
   type ConversionDefinitionReport,
+  type ConversionDefinitionFilter,
+  type ConversionDefinitionState,
+  type ConversionIngestionEvent,
 } from '@/lib/api'
 import type { ConversionPoint } from '@line-crm/shared'
 import KpiCard from '@/components/shared/kpi-card'
@@ -71,6 +74,21 @@ function measureLabel(method: ConversionPoint['measureMethod']): string {
   if (method === 'webhook') return 'EC連携からの通知'
   return '手動で記録'
 }
+
+/**
+ * N-268: 導出状態を運用者の言葉にする。status 列だけでは
+ * 「まだ公開していない」「設定が足りない」「受け口を止めている」が
+ * 全部「動いている」に潰れてしまうので、口が導出した `state` を見る。
+ */
+const STATE_LABELS: Record<ConversionDefinitionState, string> = {
+  active: '動いている',
+  draft: '下書き',
+  stopped: '止めている',
+  invalid: '入力不良',
+  sourceStopped: '起点停止',
+}
+
+type StatusFilter = 'all' | ConversionDefinitionFilter
 
 /**
  * 種別を運用者の言葉にする。
@@ -238,7 +256,7 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
   const [loading, setLoading] = useState(true)
   const [query, setQuery] = useState('')
   const [sort, setSort] = useState<PointSort>('cv-desc')
-  const [status, setStatus] = useState<'all' | 'active' | 'stopped' | 'unused'>('all')
+  const [status, setStatus] = useState<StatusFilter>('all')
   const [page, setPage] = useState(1)
   const [loadFailed, setLoadFailed] = useState(false)
   const [exporting, setExporting] = useState(false)
@@ -283,6 +301,16 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
   const [editForm, setEditForm] = useState<EditForm | null>(null)
   const [editSaving, setEditSaving] = useState(false)
   const [editError, setEditError] = useState('')
+  // N-268: 下書きの公開。版は開いた時点のものを渡し、409は読み直しで返す。
+  const [publishing, setPublishing] = useState(false)
+  /**
+   * N-270: 外部受信の操作状態。平文の鍵は発行の応答でだけ返るため、
+   * 一度だけ表示して閉じると二度と見えない。
+   */
+  const [ingestBusy, setIngestBusy] = useState('')
+  const [issuedSecret, setIssuedSecret] = useState('')
+  const [ingestError, setIngestError] = useState('')
+  const [ingestEvents, setIngestEvents] = useState<ConversionIngestionEvent[]>([])
 
   /**
    * 一覧は検索・並びを口へ渡し、続く頁をすべて読む(#513 M2・M3)。
@@ -416,6 +444,77 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
     }
   }
 
+  /**
+   * N-270: 詳細を開いたら受信履歴も読む。失敗しても詳細自体は開く
+   * （履歴だけ見えない状態にしないため、ここでは握る）。
+   */
+  useEffect(() => {
+    setIssuedSecret('')
+    setIngestError('')
+    setIngestEvents([])
+    if (!detailTarget || detailTarget.measureMethod !== 'webhook') return
+    const id = detailTarget.id
+    void api.conversions.ingestionEvents(id, 5)
+      .then((response) => {
+        if (response.success) setIngestEvents(response.data.items)
+      })
+      .catch(() => undefined)
+  }, [detailTarget])
+
+  /** N-268: 下書きを計測中へ。開いた時点の版を渡す。 */
+  const publishDraft = async (target: ConversionDefinitionListItem) => {
+    if (publishing) return
+    setPublishing(true)
+    setIngestError('')
+    try {
+      const res = await api.conversions.publishDefinition(target.id, { expectedVersion: target.version })
+      if (!res.success) throw new Error(res.error)
+      setDetailTarget(null)
+      await load()
+    } catch {
+      setIngestError('公開できませんでした。画面を閉じて読み直してから、もう一度お試しください。')
+    } finally {
+      setPublishing(false)
+    }
+  }
+
+  /** N-270: 受信鍵の発行・再発行。平文はこの応答でだけ返る。 */
+  const issueIngest = async (target: ConversionDefinitionListItem) => {
+    if (ingestBusy) return
+    setIngestBusy('issue')
+    setIngestError('')
+    try {
+      const res = await api.conversions.issueIngestSecret(target.id, { expectedVersion: target.version })
+      if (!res.success) throw new Error(res.error)
+      setIssuedSecret(res.data.secret)
+      await load()
+    } catch {
+      setIngestError('鍵を発行できませんでした。画面を閉じて読み直してから、もう一度お試しください。')
+    } finally {
+      setIngestBusy('')
+    }
+  }
+
+  /** N-270: 受け口の停止・再開。止めても鍵は残る。 */
+  const toggleIngest = async (target: ConversionDefinitionListItem) => {
+    if (ingestBusy) return
+    setIngestBusy('toggle')
+    setIngestError('')
+    try {
+      const res = await api.conversions.setIngestDisabled(target.id, {
+        expectedVersion: target.version,
+        disabled: !target.ingest.disabledAt,
+      })
+      if (!res.success) throw new Error(res.error)
+      setDetailTarget(null)
+      await load()
+    } catch {
+      setIngestError('受け口を切り替えられませんでした。画面を閉じて読み直してから、もう一度お試しください。')
+    } finally {
+      setIngestBusy('')
+    }
+  }
+
   const openStop = async (target: ConversionDefinitionListItem) => {
     setDetailTarget(null)
     setStopTarget(target)
@@ -507,9 +606,11 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
       currentCount: summaryReport?.kpis.netCount ?? points.reduce((sum, row) => sum + row.metrics.netCount, 0),
       previousCount: summaryReport?.kpis.previousNetCount ?? null,
       currentValue: summaryReport?.kpis.netValue ?? points.reduce((sum, row) => sum + row.metrics.netValue, 0),
-      unusedCount: points.filter((row) => row.usageCount === 0).length,
+      // N-267: 「どこからも使われていない」の件数は口が絞り込み全体から
+      // 数える。読み込んだ行だけで数えると打ち切りの先を数え損ねる。
+      unusedCount: definitions?.stateCounts.unused ?? 0,
     }
-  }, [points, summaryReport])
+  }, [points, summaryReport, definitions])
 
   /**
    * 画面で絞るのは状態だけ(#513 M3)。探す言葉と並びは口が済ませているので、
@@ -519,8 +620,10 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
   const shown = useMemo(() => {
     return points.filter((point) => {
       if (status === 'all') return true
+      // N-267: 「使われていない」は利用先0件で判定。件数は stateCounts.unused が正本。
       if (status === 'unused') return point.usageCount === 0
-      return point.status === status
+      // N-268: 下書き・入力不良・起点停止は導出状態で絞る。
+      return point.state === status
     })
   }, [points, status])
 
@@ -587,7 +690,7 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
           unit="個"
           badge={kpi.unusedCount > 0 ? '確認' : undefined}
           badgeTone={kpi.unusedCount > 0 ? 'neutral' : 'accent'}
-          detail={listTruncated ? '決めたのに使われていません（直近5000件まで）' : '決めたのに使われていません'}
+          detail="決めたのに使われていません"
           loading={loading}
         />
       </div>
@@ -640,8 +743,11 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
           {([
             ['all', `すべて ${definitions?.pagination.total ?? 0}`],
             ['active', `動いている ${definitions?.stateCounts.active ?? 0}`],
+            ['draft', `下書き ${definitions?.stateCounts.draft ?? 0}`],
+            ['invalid', `入力不良 ${definitions?.stateCounts.invalid ?? 0}`],
+            ['sourceStopped', `起点停止 ${definitions?.stateCounts.sourceStopped ?? 0}`],
             ['stopped', `止めている ${definitions?.stateCounts.stopped ?? 0}`],
-            ['unused', `どこからも使われていない ${kpi.unusedCount}`],
+            ['unused', `どこからも使われていない ${definitions?.stateCounts.unused ?? 0}`],
           ] as const).map(([value, label]) => (
             <Button
               key={value}
@@ -666,6 +772,15 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
           />
         </div>
       </div>
+
+      {listTruncated ? (
+        <p
+          role="status"
+          className="border-warning bg-warning-bg text-warning mb-3 rounded-control border px-4 py-3 text-sm font-semibold"
+        >
+          一覧は先頭5000個までを表示しています。これより後ろの成果地点は検索や絞り込みで範囲を分けて確認してください。
+        </p>
+      ) : null}
 
       {loading ? (
         <ListState kind="loading" title="成果地点を読み込んでいます" />
@@ -713,6 +828,18 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
                   <td className="text-ink w-1/5 px-4 py-3 text-sm font-medium">
                     {point.name}
                     <p className="text-ink-faint mt-0.5 text-xs">{EVENT_TYPE_LABELS[point.sourceType] ?? 'その他'}</p>
+                    {point.state !== 'active' ? (
+                      <p
+                        className={`mt-1 inline-block rounded px-1.5 py-0.5 text-xs font-semibold ${
+                          point.state === 'draft' ? 'bg-info-bg text-info'
+                            : point.state === 'invalid' || point.state === 'sourceStopped' ? 'bg-warning-bg text-warning'
+                            : 'bg-canvas-sunken text-ink-faint'
+                        }`}
+                        title={point.stateReason ?? undefined}
+                      >
+                        {STATE_LABELS[point.state]}
+                      </p>
+                    ) : null}
                   </td>
                   <td className="text-ink-secondary w-1/4 px-4 py-3 text-sm">
                     {sourceTriggerLabel(point)}
@@ -770,12 +897,21 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
         footer={detailTarget ? (
           <div className="flex justify-end gap-2">
             <Button onClick={() => setDetailTarget(null)}>閉じる</Button>
-            {detailTarget.status === 'active' ? (
+            {detailTarget.state === 'draft' ? (
+              <Button
+                variant="primary"
+                disabled={publishing}
+                onClick={() => void publishDraft(detailTarget)}
+              >
+                {publishing ? '公開しています' : '計測をはじめる（公開）'}
+              </Button>
+            ) : null}
+            {detailTarget.status !== 'stopped' ? (
               <Button onClick={() => openEdit(detailTarget)}>
                 編集
               </Button>
             ) : null}
-            {detailTarget.status === 'active' ? (
+            {detailTarget.status !== 'stopped' ? (
               <Button onClick={() => void openStop(detailTarget)}>
                 停止・削除
               </Button>
@@ -784,13 +920,74 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
         ) : null}
       >
         {detailTarget ? (
-          <dl className="grid grid-cols-2 gap-3 text-sm">
-            <div><dt className="text-ink-faint">何が起きたら数えるか</dt><dd className="text-ink mt-1 font-semibold">{sourceTriggerLabel(detailTarget)}</dd></div>
-            <div><dt className="text-ink-faint">数え方</dt><dd className="text-ink mt-1 font-semibold">{detailTarget.countRepeat ? '毎回数える' : '1人1回'}</dd></div>
-            <div><dt className="text-ink-faint">この30日</dt><dd className="text-ink mt-1 font-semibold">{detailTarget.metrics.netCount.toLocaleString('ja-JP')}件</dd></div>
-            <div><dt className="text-ink-faint">利用先</dt><dd className="text-ink mt-1 font-semibold">{usageLabel(detailTarget)}</dd></div>
-            <div><dt className="text-ink-faint">取消内訳</dt><dd className="text-ink mt-1 font-semibold">{detailTarget.metrics.cancellationCount == null ? '取消台帳は未接続' : `${detailTarget.metrics.cancellationCount}件・¥${(detailTarget.metrics.cancellationValue ?? 0).toLocaleString('ja-JP')}`}</dd></div>
-          </dl>
+          <div className="space-y-4">
+            <dl className="grid grid-cols-2 gap-3 text-sm">
+              <div><dt className="text-ink-faint">状態</dt><dd className="text-ink mt-1 font-semibold">{STATE_LABELS[detailTarget.state]}</dd></div>
+              <div><dt className="text-ink-faint">何が起きたら数えるか</dt><dd className="text-ink mt-1 font-semibold">{sourceTriggerLabel(detailTarget)}</dd></div>
+              <div><dt className="text-ink-faint">数え方</dt><dd className="text-ink mt-1 font-semibold">{detailTarget.countRepeat ? '毎回数える' : '1人1回'}</dd></div>
+              <div><dt className="text-ink-faint">この30日</dt><dd className="text-ink mt-1 font-semibold">{detailTarget.metrics.netCount.toLocaleString('ja-JP')}件</dd></div>
+              <div><dt className="text-ink-faint">利用先</dt><dd className="text-ink mt-1 font-semibold">{usageLabel(detailTarget)}</dd></div>
+              <div><dt className="text-ink-faint">取消内訳</dt><dd className="text-ink mt-1 font-semibold">{detailTarget.metrics.cancellationCount == null ? '取消台帳は未接続' : `${detailTarget.metrics.cancellationCount}件・¥${(detailTarget.metrics.cancellationValue ?? 0).toLocaleString('ja-JP')}`}</dd></div>
+            </dl>
+            {detailTarget.stateReason ? (
+              <p className="bg-warning-bg text-warning rounded-control px-4 py-3 text-sm font-semibold" role="status">
+                {detailTarget.stateReason}
+              </p>
+            ) : null}
+            {ingestError ? <p className="text-danger text-sm" role="alert">{ingestError}</p> : null}
+            {detailTarget.measureMethod === 'webhook' ? (
+              <section className="border-hairline rounded-control border p-4">
+                <h3 className="text-ink text-sm font-bold">外部からの受信</h3>
+                <p className="text-ink-faint mt-1 text-xs leading-5">
+                  連携先システムがこの成果地点へ成果を送るときの受け口です。
+                  送り側は `POST {detailTarget.id ? `/api/conversions/ingest/${detailTarget.id}` : ''}` に
+                  `X-Conversion-Signature` 署名を付けて送ります。
+                </p>
+                <p className="text-ink-secondary mt-2 text-sm">
+                  {detailTarget.ingest.configured
+                    ? detailTarget.ingest.disabledAt
+                      ? '受け口は止まっています（起点停止）。'
+                      : '受け口は動いています。鍵は発行済みです。'
+                    : 'まだ鍵を発行していません。発行すると連携先へ渡す鍵が一度だけ表示されます。'}
+                </p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <Button
+                    disabled={ingestBusy !== '' || detailTarget.state !== 'active'}
+                    onClick={() => void issueIngest(detailTarget)}
+                  >
+                    {detailTarget.ingest.configured ? '鍵を出し直す' : '鍵を発行する'}
+                  </Button>
+                  {detailTarget.ingest.configured ? (
+                    <Button
+                      disabled={ingestBusy !== ''}
+                      onClick={() => void toggleIngest(detailTarget)}
+                    >
+                      {detailTarget.ingest.disabledAt ? '受け口を再開する' : '受け口を止める'}
+                    </Button>
+                  ) : null}
+                </div>
+                {issuedSecret ? (
+                  <p className="bg-info-bg text-info mt-2 rounded-control px-3 py-2 text-xs font-semibold">
+                    新しい鍵: <code className="break-all">{issuedSecret}</code><br />
+                    この表示は一度だけです。連携先へ渡して保管してください。
+                  </p>
+                ) : null}
+                {ingestEvents.length > 0 ? (
+                  <ul className="mt-3 space-y-1 text-xs">
+                    {ingestEvents.slice(0, 5).map((event) => (
+                      <li key={event.id} className="text-ink-secondary flex justify-between gap-2">
+                        <span className={event.result === 'rejected' ? 'text-danger' : 'text-ink'}>
+                          {event.result === 'recorded' ? '受け取った' : event.result === 'duplicate' ? '同じ受信の再送' : '受け取れなかった'}
+                          {event.reason ? `（${event.reason}）` : ''}
+                        </span>
+                        <span className="text-ink-faint tabular-nums">{event.createdAt.slice(0, 16).replace('T', ' ')}</span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+              </section>
+            ) : null}
+          </div>
         ) : null}
       </Dialog>
 
@@ -880,7 +1077,13 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
       <ConfirmDialog
         open={stopTarget !== null}
         designNode="d8d3Mz"
-        title={stopTarget ? `「${stopTarget.name}」を削除しますか？` : ''}
+        title={stopTarget
+          ? stopAction === 'delete'
+            ? `「${stopTarget.name}」を削除しますか？`
+            : stopAction === 'replace'
+              ? `「${stopTarget.name}」を差し替えて止めますか？`
+              : `「${stopTarget.name}」の計測を止めますか？`
+          : ''}
         description="使っている場所と、止めたあとに残る記録を確認してから操作を選びます。"
         confirmLabel={stopAction === 'replace'
           ? '差し替えて数えるのをやめる'
@@ -1196,6 +1399,51 @@ function ReportTab({ accountId }: { accountId: string | null }) {
             ))}
           </div>
         ) : <p className="text-ink-faint mt-4 text-sm">この期間には日ごとの成果がありません。</p>}
+        {/*
+         * N-266: 棒グラフだけでは値が読み取れない（色と高さに依存する）。
+         * 同じデータの表を畳んで置き、スクリーンリーダーと数値確認の両方を
+         * カバーする。
+         */}
+        {daily && daily.days.length > 0 ? (
+          <details className="mt-4">
+            <summary className="text-ink-secondary cursor-pointer text-sm font-semibold">
+              日ごとの成果を表で見る
+            </summary>
+            <table className="mt-2 w-full text-sm">
+              <thead>
+                <TableHeadRow>
+                  <Th>日付</Th>
+                  <Th align="right">成果件数</Th>
+                  <Th align="right">金額</Th>
+                  <Th>成果地点の内訳</Th>
+                </TableHeadRow>
+              </thead>
+              <tbody className="divide-hairline divide-y">
+                {report.daily
+                  .reduce<Array<{ day: string; count: number; value: number; points: string[] }>>((all, row) => {
+                    const existing = all.find((item) => item.day === row.day)
+                    const label = `${row.conversionPointName} ${row.netCount}件`
+                    if (existing) {
+                      existing.count += row.netCount
+                      existing.value += row.netValue
+                      existing.points.push(label)
+                    } else {
+                      all.push({ day: row.day, count: row.netCount, value: row.netValue, points: [label] })
+                    }
+                    return all
+                  }, [])
+                  .map((row) => (
+                    <tr key={row.day}>
+                      <td className="text-ink px-4 py-2 tabular-nums">{row.day}</td>
+                      <td className="text-ink px-4 py-2 text-right tabular-nums">{row.count.toLocaleString('ja-JP')}件</td>
+                      <td className="text-ink-secondary px-4 py-2 text-right tabular-nums">¥{row.value.toLocaleString('ja-JP')}</td>
+                      <td className="text-ink-secondary px-4 py-2 text-xs">{row.points.join('・')}</td>
+                    </tr>
+                  ))}
+              </tbody>
+            </table>
+          </details>
+        ) : null}
       </section>
 
       {report.byDefinition.length === 0 ? (
@@ -1242,7 +1490,14 @@ function ReportTab({ accountId }: { accountId: string | null }) {
                       {changeRate > 0 ? '+' : changeRate === 0 ? '±' : ''}{changeRate}%
                     </td>
                     <td className="text-ink-secondary px-4 py-3 text-sm">
-                      {row.routes?.length ? row.routes.slice(0, 2).map((route) => `${route.label} ${route.netCount}件`).join('・') : (topRoute ? `全体では ${topRoute.label}` : '経路の記録はありません')}
+                      {row.routes?.length ? row.routes.slice(0, 2).map((route) => (
+                        <span key={route.routeKey} className="mr-2 inline-block">
+                          {route.label} {route.netCount}件
+                          {route.conversionRate !== null && route.audience !== null
+                            ? <span className="text-ink-faint">（{route.audience}人中 {route.conversionRate}%）</span>
+                            : <span className="text-ink-faint">（母数の記録なし）</span>}
+                        </span>
+                      )) : (topRoute ? `全体では ${topRoute.label}` : '経路の記録はありません')}
                       <p className="text-ink-faint mt-1 text-xs">取消: {row.cancellationCount == null ? '台帳未接続' : `${row.cancellationCount}件・¥${(row.cancellationValue ?? 0).toLocaleString('ja-JP')}`}</p>
                     </td>
                     <td className="px-4 py-3 text-right">
