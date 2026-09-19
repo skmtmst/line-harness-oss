@@ -128,6 +128,38 @@ const UNSENDABLE_TYPES: Partial<Record<BroadcastBubbleType, string>> = {
   coupon: 'クーポンは準備中です',
   research: 'リサーチは準備中です',
 }
+
+/** メッセージ形式タブの並び。null は「紹介」（まだ作れない）。 */
+const MESSAGE_TYPE_TABS = [
+  ['text', 'テキスト'], ['image', '画像'], ['video', '動画'], ['audio', '音声'], ['sticker', 'スタンプ'],
+  ['location', '位置情報'], ['carousel', 'カルーセル'], ['rich_message', 'リッチメッセージ'],
+  ['research', '質問'], [null, '紹介'],
+] as const
+
+/*
+ * メッセージ形式タブの矢印キー操作（N-063）。
+ *
+ * タブの作法（WAI-ARIA tabs, 手動起動）に揃える。
+ * ←→↑↓ はフォーカスだけを動かし、Home/End は端へ飛ぶ。
+ * **選ぶのは Enter・スペース・クリック。** 矢印を押しただけで切り替えると、
+ * 書きかけの中身が移るたびに空へ戻ってしまう（切替は bubble の中身を
+ * 作り直す）ので、フォーカスと選択は分ける。
+ */
+export function moveMessageTypeTabFocus(
+  event: { key: string; currentTarget: HTMLElement; preventDefault: () => void },
+  activeElement: Element | null,
+): void {
+  const keys = ['ArrowRight', 'ArrowLeft', 'ArrowDown', 'ArrowUp', 'Home', 'End']
+  if (!keys.includes(event.key)) return
+  const tabs = Array.from(event.currentTarget.querySelectorAll<HTMLElement>('[role="tab"]'))
+  const current = tabs.findIndex((tab) => tab === activeElement)
+  if (current < 0) return
+  event.preventDefault()
+  const next = event.key === 'Home' ? 0
+    : event.key === 'End' ? tabs.length - 1
+      : (current + (event.key === 'ArrowLeft' || event.key === 'ArrowUp' ? -1 : 1) + tabs.length) % tabs.length
+  tabs[next]?.focus()
+}
 const EMOJIS = ['😊', '✨', '🎉', '🐕', '🐈', '🌿', '❤️', '👍']
 
 function formatScheduleTime(iso: string): string {
@@ -1442,26 +1474,39 @@ export default function BroadcastForm({
               テンプレートから選ぶ
             </button>
           </div>
-          <div className="mt-4 flex flex-wrap gap-2" role="tablist" aria-label="メッセージ形式">
-            {([
-              ['text', 'テキスト'], ['image', '画像'], ['video', '動画'], ['audio', '音声'], ['sticker', 'スタンプ'],
-              ['location', '位置情報'], ['carousel', 'カルーセル'], ['rich_message', 'リッチメッセージ'],
-              ['research', '質問'], [null, '紹介'],
-            ] as const).map(([type, label]) => (
-              <button
-                key={label}
-                type="button"
-                role="tab"
-                aria-selected={type !== null && bubbles[0]?.type === type}
-                className="broadcast-message-type"
-                data-active={type !== null && bubbles[0]?.type === type || undefined}
-                aria-disabled={type === null || Boolean(type && UNSENDABLE_TYPES[type])}
-                title={type === null ? '紹介メッセージは現在利用できません' : UNSENDABLE_TYPES[type]}
-                onClick={() => { if (type && !UNSENDABLE_TYPES[type]) updateBubble(0, emptyBubble(type)) }}
-              >
-                {label}
-              </button>
-            ))}
+          <div
+            className="mt-4 flex flex-wrap gap-2"
+            role="tablist"
+            aria-label="メッセージ形式"
+            onKeyDown={(event) => moveMessageTypeTabFocus(event, document.activeElement)}
+          >
+            {MESSAGE_TYPE_TABS.map(([type, label], tabIndex) => {
+              const selected = type !== null && bubbles[0]?.type === type
+              /*
+                ロービング tabindex（WAI-ARIA tabs）: Tab キーで入れるのは
+                選択中のタブだけ。どれも選ばれていない（一覧に無い種類の
+                下書きを開いた等）ときは先頭へ寄せ、キーボードで入れない
+                状態を作らない。
+              */
+              const selectedIndex = MESSAGE_TYPE_TABS.findIndex(([t]) => t !== null && t === bubbles[0]?.type)
+              const focusable = selectedIndex >= 0 ? selected : tabIndex === 0
+              return (
+                <button
+                  key={label}
+                  type="button"
+                  role="tab"
+                  tabIndex={focusable ? 0 : -1}
+                  aria-selected={selected}
+                  className="broadcast-message-type"
+                  data-active={selected || undefined}
+                  aria-disabled={type === null || Boolean(type && UNSENDABLE_TYPES[type])}
+                  title={type === null ? '紹介メッセージは現在利用できません' : UNSENDABLE_TYPES[type]}
+                  onClick={() => { if (type && !UNSENDABLE_TYPES[type]) updateBubble(0, emptyBubble(type)) }}
+                >
+                  {label}
+                </button>
+              )
+            })}
           </div>
         {showTemplatePicker && (
           <section className="mt-4 rounded-card border border-hairline bg-canvas p-5 shadow-sm">

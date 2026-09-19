@@ -101,11 +101,18 @@ export function formatTrendSources(
   sources: DashboardOverview['trend'][number]['sources'],
 ): { full: string; compact: string } {
   const values = sources ?? []
+  /*
+   * 経路不明の塊は name=null で来る。「経路不明」を経路名として出すと
+   * 実在する経路と区別がつかないので `—` にする。内訳自体が無い日も
+   * `—`（経路なし、ではなく「内訳なし」の置き方に揃える）。
+   */
+  const label = (source: { name: string | null; count: number }) =>
+    `${source.name ?? '—'} ${source.count}`
   return {
-    full: values.map((source) => `${source.name} ${source.count}`).join('、'),
+    full: values.map(label).join('、'),
     compact: values.length
-      ? values.slice(0, 2).map((source) => `${source.name} ${source.count}`).join('、')
-      : '経路なし',
+      ? values.slice(0, 2).map(label).join('、')
+      : '—',
   }
 }
 

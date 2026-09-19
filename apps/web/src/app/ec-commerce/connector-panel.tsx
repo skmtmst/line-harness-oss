@@ -8,6 +8,7 @@ import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
 import SummaryCard from '@/components/shared/summary-card'
 import { ApiError, api, type EcConnector, type EcConnectorOverview } from '@/lib/api'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { formatEcDateTimeWithYear as dateTime } from './ec-datetime'
 import styles from './ec-commerce-v6.module.css'
 
@@ -122,6 +123,30 @@ export default function ConnectorPanel({ accountId }: { accountId: string | null
     }
   }
 
+  const connector = data?.connector
+  /*
+   * #948 N-322: 「取り込みを止める」は押した時点ではフォームの状態を変える
+   * だけで、保存するまで止まらない。押したあと離れると「止めたつもり」に
+   * なるため、未保存の差分がある間は警告を出し、画面を離れる操作も止める。
+   */
+  const pendingStatusChange = Boolean(connector) && form.status !== connector?.status
+  const dirty = state === 'ready' && (() => {
+    const { expectedVersion: _ev, inboundSecret: _sec, ...current } = form
+    const { expectedVersion: _ev2, inboundSecret: _sec2, ...baseline } = toForm(connector ?? null)
+    return form.inboundSecret.length > 0
+      || JSON.stringify(current) !== JSON.stringify(baseline)
+  })()
+  const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty, busy: saving })
+  /*
+   * #948 N-326: 保存ボタンが disabled のとき、なぜ押せないかをボタンの隣に
+   * 書く。disabled の条件と同じ順で最初に当たった理由だけを出す。
+   */
+  const saveBlockReason = saving ? null
+    : !form.shopDomain ? 'ショップのアドレスを入れると保存できます。'
+    : !connector?.secretConfigured && form.inboundSecret.length < 32
+      ? 'はじめてつなぐときは、32文字以上の鍵を入れてください。'
+      : null
+
   if (state !== 'ready') {
     return (
       <ListState
@@ -134,12 +159,18 @@ export default function ConnectorPanel({ accountId }: { accountId: string | null
     )
   }
 
-  const connector = data?.connector
   return (
     <>
       <NoteBar tone={connector?.status === 'paused' ? 'warn' : 'info'}>
         {connector?.status === 'paused' ? '取り込みを止めています。保存済みの設定は残っています。' : connector ? `つながっています。最後にデータが届いたのは ${dateTime(data?.health.lastReceivedAt ?? null)} です。` : 'まだつながっていません。下の情報を入れて保存してください。'}
       </NoteBar>
+      {pendingStatusChange ? (
+        <NoteBar tone="warn">
+          {form.status === 'paused'
+            ? '「取り込みを止める」を押しましたが、まだ止まっていません。「設定を保存」を押すと止まります。'
+            : '「取り込みを再開する」を押しましたが、まだ再開していません。「設定を保存」を押すと再開します。'}
+        </NoteBar>
+      ) : null}
       {notice ? <div className={notice.tone === 'success' ? styles.noticeSuccess : styles.noticeError} role="status">{notice.text}</div> : null}
       <div className={styles.connectorGrid}>
         <div className={styles.stack}>
@@ -167,6 +198,7 @@ export default function ConnectorPanel({ accountId }: { accountId: string | null
               {connector ? <Button type="button" onClick={() => setForm({ ...form, status: form.status === 'paused' ? 'connected' : 'paused' })}>{form.status === 'paused' ? '取り込みを再開する' : '取り込みを止める'}</Button> : null}
               <Button type="button" variant="primary" disabled={saving || !form.shopDomain || (!connector?.secretConfigured && form.inboundSecret.length < 32)} onClick={requestSave}>{saving ? '保存しています…' : '設定を保存'}</Button>
             </div>
+            {saveBlockReason ? <p className="mt-1 text-caption leading-relaxed text-ink-faint" role="note">{saveBlockReason}</p> : null}
           </section>
         </div>
 
@@ -183,16 +215,31 @@ export default function ConnectorPanel({ accountId }: { accountId: string | null
           <section className={styles.card}>
             <h2 className={styles.cardTitle}>つながる先</h2>
             {/*
-             * #517 中5b: つなぎ先単位のやり直し方針は口に無い(本番・モックとも
-             * `retryPolicy: null`)。再試行は実行単位で持ち、画面の別箇所
-             * (retryAvailable / もう一度やる)で扱う。根拠の無い分岐を残さない。
+             * #948 N-320: 「止めると影響する数」を明示する。上の3つはECの出来事を
+             * 起点にする設定の数(止めると止まるもの)、下の2つはアカウント全体の
+             * 記録数で、止めても過去の記録は残る。混ぜて出すと、止めても変わらない
+             * ものまで影響に見えてしまう。
              */}
             <p className={styles.cardNote}>
               {Object.values(data?.impact ?? {}).every((value) => typeof value === 'number')
-                ? 'このつなぎ先を止めると影響する設定・集計です。NEN配信・マイル・友だち属性は全体の件数です。'
+                ? '「ECの出来事がきっかけ」とあるものは、このつなぎ先を止めると止まります。コンバージョンと分析はアカウント全体の記録数です。'
                 : '取得できない影響件数は「未取得」と表示します。0件とは限りません。'}
             </p>
-            {[['NEN配信', data?.impact.nenCampaigns], ['コンバージョン', data?.impact.conversions], ['マイル', data?.impact.mileageRules], ['友だち属性', data?.impact.friendFields], ['分析', data?.impact.analytics]].map(([label, value]) => <div className={styles.impactRow} key={String(label)}><span>{label}</span><strong>{typeof value === 'number' ? `${value}件` : '— 未取得'}</strong></div>)}
+            {[
+              ['NEN配信', data?.impact.nenCampaigns, 'ECの出来事がきっかけ'],
+              ['マイル', data?.impact.mileageRules, 'ECの出来事がきっかけ'],
+              ['友だち属性', data?.impact.friendFields, 'ECの出来事がきっかけ'],
+              ['コンバージョン', data?.impact.conversions, 'アカウント全体'],
+              ['分析', data?.impact.analytics, 'アカウント全体'],
+            ].map(([label, value, scope]) => <div className={styles.impactRow} key={String(label)}><span>{label}<small className="mt-0.5 block text-caption font-normal text-ink-faint">{scope}</small></span><strong>{typeof value === 'number' ? `${value}件` : '— 未取得'}</strong></div>)}
+            {/*
+             * #948 N-320: やり直し規定を常時表示する。つなぎ先単位の自動やり直しは
+             * 無い(retryPolicy は常に null、#517)ため、実行単位の手動やり直しへの
+             * 行き先を固定の文で出す。
+             */}
+            <p className="mt-1 text-caption leading-relaxed text-ink-faint">
+              止めたあとも、保存済みの設定と届いたデータは残ります。失敗した処理のやり直しは「取り込みの記録」タブで一件ずつ「もう一度やる」から行います。
+            </p>
           </section>
         </aside>
       </div>
@@ -218,6 +265,20 @@ export default function ConnectorPanel({ accountId }: { accountId: string | null
           if (saving) return
           setEmptyConfirm(null)
         }}
+      />
+      {/* #948 N-322: 止める変更を保存せずに離れるときの確認。 */}
+      <ConfirmDialog
+        open={leaveTarget !== null}
+        title="保存していない変更があります"
+        description={pendingStatusChange
+          ? (form.status === 'paused'
+            ? '「取り込みを止める」はまだ保存されていません。このまま移動すると、取り込みは止まりません。移動しますか？'
+            : '「取り込みを再開する」はまだ保存されていません。このまま移動すると、取り込みは再開しません。移動しますか？')
+          : 'このまま移動すると、入力した内容は保存されません。移動しますか？'}
+        confirmLabel="保存せずに移動"
+        cancelLabel="設定に戻る"
+        onConfirm={confirmLeave}
+        onCancel={cancelLeave}
       />
     </>
   )

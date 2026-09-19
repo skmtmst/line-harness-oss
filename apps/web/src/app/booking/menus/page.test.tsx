@@ -592,3 +592,62 @@ describe('既存メニューの編集窓: 版管理と料金モード', () => {
     expect(within(byName('カット')).getByText('¥8,000')).toBeTruthy()
   })
 })
+
+describe('一覧の担当欄 (#953 E-05)', () => {
+  function menu(overrides: Record<string, unknown> = {}) {
+    return {
+      id: 'menu-1',
+      name: 'カット',
+      category_label: null,
+      description: null,
+      duration_minutes: 60,
+      buffer_after_minutes: 0,
+      base_price: 8000,
+      price_mode: 'fixed',
+      sort_order: 0,
+      is_active: 1,
+      auto_tag_id: null,
+      concurrent_capacity: 1,
+      booking_window_days: null,
+      cutoff_hours_before: null,
+      cancel_deadline_hours_before: null,
+      intake_question: null,
+      assigned_staff: [] as Array<{ id: string; display_name: string }>,
+      version: 1,
+      ...overrides,
+    }
+  }
+
+  test('休止中のメニューでも割当済みの担当を出し、0人なら担当なしと書く', async () => {
+    /*
+     * 以前は is_active を先に見て「だれもいません」と出していたため、
+     * 休止中メニューは割当済みでも未割当に見えていた。
+     */
+    fixture.listMenus = vi.fn(async () => ({
+      menus: [
+        menu({
+          id: 'menu-paused', name: '休止中メニュー', is_active: 0,
+          assigned_staff: [{ id: 'staff-a', display_name: '担当A' }],
+        }),
+        menu({ id: 'menu-paused-empty', name: '休止で未割当', is_active: 0 }),
+        menu({ id: 'menu-active-empty', name: '公開で未割当', is_active: 1 }),
+      ],
+    }))
+    render(<MenusPage />)
+
+    await waitFor(() => {
+      const rows = screen.getAllByRole('row')
+      expect(rows.some((row) => within(row).queryByText(/休止中メニュー/))).toBe(true)
+    })
+    const rows = screen.getAllByRole('row')
+    const byName = (name: RegExp) => rows.find((row) => within(row).queryByText(name)) as HTMLElement
+
+    // 割当済みなら名前が出る。「だれもいません」は一切使わない。
+    expect(within(byName(/休止中メニュー/)).getByText('担当A')).toBeTruthy()
+    expect(screen.queryByText('だれもいません')).toBeNull()
+
+    // 0人は休止中・公開中とも「担当なし」で、設定漏れと分かるようにする。
+    expect(within(byName(/休止で未割当/)).getByText('担当なし')).toBeTruthy()
+    expect(within(byName(/公開で未割当/)).getByText('担当なし')).toBeTruthy()
+  })
+})

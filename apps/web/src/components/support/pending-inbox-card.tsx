@@ -7,6 +7,7 @@ import Card, { CardHeader } from '@/components/shared/card'
 import Pagination from '@/components/shared/pagination'
 import Select from '@/components/shared/select'
 import StatusBadge from '@/components/shared/status-badge'
+import { STATE_TEXT } from '@/components/shared/not-connected'
 
 /**
  * 対応が必要な受信（設計 `V2 1-1 ダッシュボード` の `card 対応が必要な受信`）。
@@ -153,7 +154,7 @@ export default function PendingInboxCard({
 
       {loadFailed && !summary ? (
         <div className="flex min-h-24 flex-col items-center justify-center gap-1 px-5 py-6 text-center">
-          <p className="text-ink-faint text-sm">データを取得できませんでした。</p>
+          <p className="text-ink-faint text-sm">データを{STATE_TEXT.error}。</p>
           <button type="button" onClick={() => void load()} className="text-action text-xs font-medium hover:underline">もう一度読み込む</button>
         </div>
       ) : !summary || summary.total === 0 ? (
