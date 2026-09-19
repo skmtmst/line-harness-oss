@@ -659,13 +659,13 @@ describe('fireEvent — 旧式 send_webhook は共通の安全送信へ通す', 
     expect(result).toEqual([{ action: 'send_webhook', success: false, error: expect.stringContaining('send_webhook_url_unsafe') }]);
   });
 
-  it('公開HTTPSの直書きURLは名前を引き直して送る', async () => {
-    const seen: string[] = [];
+  it('公開HTTPSの直書きURLは名前を引き直して送り、本文も共通封筒', async () => {
+    const seen: Array<{ url: string; init?: RequestInit }> = [];
     vi.stubGlobal(
       'fetch',
-      vi.fn(async (input: unknown) => {
+      vi.fn(async (input: unknown, init?: RequestInit) => {
         const url = String(input);
-        seen.push(url);
+        seen.push({ url, init });
         if (url.startsWith('https://cloudflare-dns.com/dns-query')) {
           const type = new URL(url).searchParams.get('type');
           return new Response(
@@ -687,7 +687,16 @@ describe('fireEvent — 旧式 send_webhook は共通の安全送信へ通す', 
 
     const createAutomationLog = await fireLegacyWebhook('https://hooks.example.com/ping');
 
-    expect(seen).toContain('https://hooks.example.com/ping');
+    const sent = seen.find((entry) => entry.url === 'https://hooks.example.com/ping');
+    expect(sent).toBeDefined();
+    // N-371/N-372: 旧式経路でも共通封筒と X-Harness-* のヘッダを使う。
+    const headers = (sent?.init?.headers ?? {}) as Record<string, string>;
+    expect(headers['X-Harness-Event-Id']).toBeDefined();
+    expect(headers['X-Harness-Timestamp']).toMatch(/^\d{10}$/);
+    const envelope = JSON.parse(String(sent?.init?.body ?? '{}')) as Record<string, unknown>;
+    expect(envelope).toMatchObject({ type: 'message_received', attempt: 1 });
+    expect(envelope.id).toBe(headers['X-Harness-Event-Id']);
+    expect(envelope.data).toMatchObject({ friendId: 'friend-1' });
     expect(createAutomationLog.mock.calls[0]?.[1]).toEqual(expect.objectContaining({ status: 'success' }));
   });
 });

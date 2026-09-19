@@ -62,6 +62,33 @@ function valueAtPath(payload: unknown, path: string): unknown {
   return value;
 }
 
+/** メールアドレスの照合用正規化。大文字小文字と前後の空白だけ揃える。 */
+function normalizeEmailForMatch(value: string): string {
+  return value.trim().toLowerCase();
+}
+
+/**
+ * 電話番号の照合用正規化。数字だけにし、+81 / 81 始まりは国内表記
+ * （0 始まり）へ揃える。どちら側も同じ関数を通すので表記揺れで外れない。
+ */
+function normalizePhoneForMatch(value: string): string {
+  const digits = value.replace(/\D/g, '');
+  if (digits.startsWith('81') && digits.length >= 12) return `0${digits.slice(2)}`;
+  return digits;
+}
+
+/** user_profile_values.value_json の中身を文字列へ戻す。壊れた行は null。 */
+function profileValueText(valueJson: string): string | null {
+  try {
+    const parsed: unknown = JSON.parse(valueJson);
+    if (typeof parsed === 'string') return parsed;
+    if (typeof parsed === 'number') return String(parsed);
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 async function resolveFriendId(
   db: D1Database,
   lineAccountId: string,
@@ -79,14 +106,35 @@ async function resolveFriendId(
       if (row) return row.id;
       continue;
     }
-    const column = method.kind === 'external_customer_id'
-      ? 'external_id'
-      : method.kind === 'verified_email' ? 'email' : 'phone';
+    if (method.kind === 'verified_email' || method.kind === 'verified_phone') {
+      // N-377: users.email / users.phone の値だけでは「検証済み」の裏付けに
+      // ならない。検証済みと名乗る照合は、統合ユーザー機能で運用者が
+      // 「確認済み」と印を付けた採用値（user_profile_values.verified_at が
+      // ある行）にだけ一致させる。裏付けが無い行は一致させず、未照合の
+      // 届物として箱へ送る（黙って結び付けない）。
+      const fieldKey = method.kind === 'verified_email' ? 'email' : 'phone';
+      const normalize = method.kind === 'verified_email' ? normalizeEmailForMatch : normalizePhoneForMatch;
+      const want = normalize(value);
+      if (!want) continue;
+      const candidates = await db.prepare(
+        `SELECT f.id AS friend_id, pv.value_json AS value_json
+           FROM friends f
+           JOIN user_profile_values pv ON pv.user_id = f.user_id
+          WHERE f.line_account_id = ?
+            AND pv.field_key = ? AND pv.is_active = 1 AND pv.verified_at IS NOT NULL
+          ORDER BY f.created_at ASC`,
+      ).bind(lineAccountId, fieldKey).all<{ friend_id: string; value_json: string }>();
+      for (const row of candidates.results ?? []) {
+        const stored = profileValueText(row.value_json);
+        if (stored !== null && normalize(stored) === want) return row.friend_id;
+      }
+      continue;
+    }
     const row = await db.prepare(
       `SELECT f.id
          FROM friends f
          JOIN users u ON u.id = f.user_id
-        WHERE f.line_account_id = ? AND u.${column} = ?
+        WHERE f.line_account_id = ? AND u.external_id = ?
         ORDER BY f.created_at ASC LIMIT 1`,
     ).bind(lineAccountId, value).first<{ id: string }>();
     if (row) return row.id;

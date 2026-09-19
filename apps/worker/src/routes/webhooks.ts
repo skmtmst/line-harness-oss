@@ -14,6 +14,7 @@ import {
   finishWebhookInteraction,
   getWebhookInteractionById,
   listFailedWebhookInteractionsForRetry,
+  countFailedWebhookInteractionsForRetry,
   listWebhookInteractions,
   getOutgoingWebhookDeliverySummaries,
   updateIncomingWebhookConfig,
@@ -50,7 +51,7 @@ import {
   webhookFailureLabel,
   webhookResponseLabel,
 } from '../services/webhook-interactions.js';
-import { deliverWebhook } from '../services/outgoing-webhook-delivery.js';
+import { buildOutgoingWebhookBody, deliverWebhook } from '../services/outgoing-webhook-delivery.js';
 import { executeIncomingWebhookActions, maskedPayloadShape } from '../services/incoming-webhook-actions.js';
 
 const webhooks = new Hono<Env>();
@@ -987,20 +988,27 @@ webhooks.post('/api/webhooks/outgoing/:id/test', requireRole('owner', 'admin'), 
         return c.json({ success: false, error: 'secret を確認できないため試し送信を止めました' }, 503);
       }
     }
-    const body = JSON.stringify({
-      event: 'webhook.test',
-      timestamp: new Date().toISOString(),
+    // N-371: 試し送信も共通封筒で送る。イベントIDと冪等キーは同じ値にし、
+    // 記録のやり直しでも同じ出来事として届く。
+    const eventId = crypto.randomUUID();
+    const body = buildOutgoingWebhookBody({
+      eventId,
+      eventType: 'webhook.test',
+      occurredAt: new Date().toISOString(),
+      accountId: lineAccountId,
       data: { test: true, source: 'line-harness-admin' },
+      attempt: 1,
     });
     const interaction = await createWebhookInteraction(c.env.DB, {
       lineAccountId, direction: 'outgoing', webhookId: webhook.id, webhookName: webhook.name,
       eventType: 'webhook.test', triggerSummary: '管理画面から1回試した', requestBodyJson: body,
+      idempotencyKey: eventId,
     });
     const started = Date.now();
     // 署名用の復号は deliverWebhook が行う。ここは早い段階で 503 を返すための
     // 事前確認だけに使い、鍵はそのまま渡す(#650 再審査)。
     const result = await deliverWebhook(webhook, body, {
-      idempotencyKey: interaction.id,
+      idempotencyKey: eventId,
       credentialKeys: webhookKeysOf(c),
     });
     await finishWebhookInteraction(c.env.DB, interaction.id, lineAccountId, {
@@ -1132,6 +1140,9 @@ webhooks.post('/api/webhooks/interactions/retry-failed', requireRole('owner', 'a
     if ('error' in access) return access.error;
     // 1件につき最大6回の外部通信になる。1リクエストの外部通信上限を越えないよう5件まで。
     const failed = await listFailedWebhookInteractionsForRetry(c.env.DB, access.lineAccountId, 5);
+    // N-387: 対象外に残る件数を先に数えて返す。まとめて操作で黙って残さない。
+    const totalFailed = await countFailedWebhookInteractionsForRetry(c.env.DB, access.lineAccountId);
+    const remaining = Math.max(0, totalFailed - failed.length);
     let succeeded = 0;
     let failedAgain = 0;
     let skipped = 0;
@@ -1150,7 +1161,7 @@ webhooks.post('/api/webhooks/interactions/retry-failed', requireRole('owner', 'a
     }
     return c.json({
       success: true,
-      data: { requested: failed.length, succeeded, failed: failedAgain, skipped },
+      data: { requested: failed.length, succeeded, failed: failedAgain, skipped, remaining },
     });
   } catch (err) {
     console.error('POST /api/webhooks/interactions/retry-failed error:', err);

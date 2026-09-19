@@ -21,6 +21,8 @@ import {
 } from './outbound-idempotency.js';
 import { buildMessage } from './line-message.js';
 import {
+  buildOutgoingWebhookBody,
+  buildOutgoingWebhookHeaders,
   postWebhookSafely,
   recordDeliveryOutcome,
   type SafePostOutcome,
@@ -468,15 +470,6 @@ async function richMenuExecutor(
   }
 }
 
-async function signBody(secret: string, body: string): Promise<string> {
-  const bytes = new TextEncoder();
-  const key = await crypto.subtle.importKey(
-    'raw', bytes.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign'],
-  );
-  const signature = await crypto.subtle.sign('HMAC', key, bytes.encode(body));
-  return Array.from(new Uint8Array(signature), (byte) => byte.toString(16).padStart(2, '0')).join('');
-}
-
 async function webhookExecutor(
   context: AutomationActionContext,
   dependencies: AutomationActionExecutorDependencies,
@@ -503,16 +496,20 @@ async function webhookExecutor(
     if (!sendSecret) throw invalid('webhook_secret_unavailable', '送信Webhookのsecretを確認できませんでした');
   }
 
-  const body = JSON.stringify({
-    eventId: context.sourceEventId,
-    friendId: context.friendId,
-    data: context.inputEvent,
+  // N-371/N-372: 本文は共通封筒（要件26 §6-2）、ヘッダは X-Harness-* の
+  // 共通契約に揃える。イベントIDは冪等キー（step.id）と同じ値なので、
+  // 自動化の再試行で同じ出来事を指し続ける。
+  const body = buildOutgoingWebhookBody({
+    eventId: context.idempotencyKey,
+    eventType: typeof context.inputEvent?.type === 'string' ? context.inputEvent.type : 'automation.send_webhook',
+    occurredAt: typeof context.inputEvent?.occurredAt === 'string'
+      ? context.inputEvent.occurredAt
+      : (dependencies.now?.() ?? new Date().toISOString()),
+    accountId: context.lineAccountId,
+    data: { friendId: context.friendId ?? null, event: context.inputEvent },
+    attempt: context.attemptNumber,
   });
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-    'Idempotency-Key': context.idempotencyKey,
-  };
-  if (sendSecret) headers['X-Webhook-Signature'] = await signBody(sendSecret, body);
+  const headers = await buildOutgoingWebhookHeaders({ eventId: context.idempotencyKey, body, secret: sendSecret });
   // 送信直前の再検査は配送側と共有する。転送先の各段も送る前に確かめる。
   let outcome: SafePostOutcome;
   try {
