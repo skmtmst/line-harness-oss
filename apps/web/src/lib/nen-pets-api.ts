@@ -9,13 +9,24 @@ import type { ApiResponse } from '@line-crm/shared'
 export type PetNeutered = 'yes' | 'no' | 'unknown'
 export type PetActivity = 'low' | 'normal' | 'high'
 
+/**
+ * 動物種別の共通定義（#999 DEEP-24）。
+ * API は dog / cat / other を返す。「その他」を犬へ変換して表示しない。
+ * 見知らぬ値は犬へ倒さず、届いた文字列をそのまま出す。
+ */
+export type PetAnimalType = 'dog' | 'cat' | 'other'
+export const PET_ANIMAL_TYPE_LABELS: Record<PetAnimalType, string> = { dog: '犬', cat: '猫', other: 'その他' }
+export function petAnimalTypeLabel(animalType: string): string {
+  return PET_ANIMAL_TYPE_LABELS[animalType as PetAnimalType] ?? (animalType || 'その他')
+}
+
 export interface NenPetRow {
   id: string
   name: string
   /** 呼び名（男の子＝くん、女の子＝ちゃん） */
   callName: string
   gender: 'male' | 'female' | 'unknown'
-  animalType: 'dog' | 'cat' | 'other'
+  animalType: PetAnimalType
   breed: string
   birthday: string | null
   ageLabel: string
@@ -60,7 +71,7 @@ export interface NenHealthChange {
 }
 
 export interface NenHealthRow {
-  pet: { id: string; name: string; callName: string; animalType: 'dog' | 'cat'; breed: string; ageLabel: string; imageUrl: string | null }
+  pet: { id: string; name: string; callName: string; animalType: PetAnimalType; breed: string; ageLabel: string; imageUrl: string | null }
   owner: { friendId: string; name: string; customerId: string | null }
   lastLoggedOn: string | null
   lastLoggedLabel: string
@@ -97,7 +108,7 @@ export type NenHealthLastFilter = '' | '7' | '30' | 'over30'
 export type NenHealthSort = 'concern' | 'recent' | 'records_desc'
 
 export interface NenHealthSummaryData {
-  pet: { id: string; name: string; callName: string; animalType: 'dog' | 'cat'; breed: string; ageLabel: string; weightKg: number | null }
+  pet: { id: string; name: string; callName: string; animalType: PetAnimalType; breed: string; ageLabel: string; weightKg: number | null }
   owner: { friendId: string; name: string }
   generatedAt: string
   summary: {

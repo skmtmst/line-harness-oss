@@ -5,7 +5,7 @@ import { createPortal } from 'react-dom'
 import Button from '@/components/shared/button'
 import Drawer from '@/components/shared/drawer'
 import ListState from '@/components/shared/list-state'
-import type { NenHealthSummaryData } from '@/lib/nen-pets-api'
+import { petAnimalTypeLabel, type NenHealthSummaryData } from '@/lib/nen-pets-api'
 import type { SummaryStatus } from './page'
 import './print.css'
 
@@ -46,7 +46,7 @@ export default function SummaryDrawer({
     <Drawer
       open={open}
       title="30日のまとめ"
-      description={summary ? `${summary.pet.callName || summary.pet.name}（${summary.pet.animalType === 'cat' ? '猫' : '犬'}${summary.pet.breed ? `・${summary.pet.breed}` : ''}・${summary.pet.ageLabel}）／飼い主 ${summary.owner.name}` : undefined}
+      description={summary ? `${summary.pet.callName || summary.pet.name}（${petAnimalTypeLabel(summary.pet.animalType)}${summary.pet.breed ? `・${summary.pet.breed}` : ''}・${summary.pet.ageLabel}）／飼い主 ${summary.owner.name}` : undefined}
       onClose={onClose}
       footer={ready ? <Button type="button" variant="primary" onClick={onPrint}>印刷・PDFに保存</Button> : undefined}
     >
@@ -109,7 +109,8 @@ export function SummarySheet({ summary }: { summary: NenHealthSummaryData }) {
   useEffect(() => { setMounted(true) }, [])
   if (!mounted) return null
   const s = summary.summary
-  const kind = summary.pet.animalType === 'cat' ? '猫' : '犬'
+  // #999 DEEP-24: 「その他」を犬へ変換して印刷しない（共通の動物種別ラベル）。
+  const kind = petAnimalTypeLabel(summary.pet.animalType)
   return createPortal(
     <div data-print-sheet="" aria-hidden="true">
       <p><strong>健康日記 30日のまとめ</strong></p>

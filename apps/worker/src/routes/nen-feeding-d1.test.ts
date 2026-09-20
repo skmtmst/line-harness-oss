@@ -225,6 +225,32 @@ describe('LIFF：マイペットの登録・変更', () => {
     expect(nothing.status).toBe(400);
   });
 
+  it('「その他」の動物も登録できる。犬・猫専用の目安は計算しない（DEEP-24）', async () => {
+    await saveProducts([{ name: '鹿肉ミンチ', kcalPer100g: 120, isDefault: true }]);
+    const res = await liff('U-b').request('/api/liff/nen/pets', {
+      method: 'POST', headers: auth,
+      body: JSON.stringify({ name: 'ピノ', animalType: 'other', breed: 'うさぎ', birthday: '2023-01-10', weightKg: 2, gender: 'female' }),
+    });
+    expect(res.status).toBe(201);
+    const body = (await res.json()) as any;
+    // 種別は「その他」のまま。犬の係数で出した目安は返さない・保存しない。
+    expect(body.data.animalType).toBe('other');
+    expect(body.data.callName).toBe('ピノちゃん');
+    expect(body.data.feeding).toBeNull();
+    expect(body.data.recommendedDailyGrams).toBeNull();
+    expect(body.data.venisonDailyGrams).toBeNull();
+    const stored = sql.prepare(
+      `SELECT animal_type, recommended_daily_grams, daily_kcal FROM nen_pet_profiles WHERE name = 'ピノ'`,
+    ).get() as any;
+    expect(stored).toEqual({ animal_type: 'other', recommended_daily_grams: null, daily_kcal: null });
+
+    const member = await liff('U-b').request('/api/liff/nen/member', { headers: auth });
+    const pet = ((await member.json()) as any).data.pets[0];
+    expect(pet.animalType).toBe('other');
+    expect(pet.feeding).toBeNull();
+    expect(pet.recommendedDailyGrams).toBeNull();
+  });
+
   it('主食が無いアカウントでは kcal だけ返し、グラムは null。従来の目安は残す', async () => {
     const member = await liff('U-a').request('/api/liff/nen/member', { headers: auth });
     const pet = ((await member.json()) as any).data.pets[0];
