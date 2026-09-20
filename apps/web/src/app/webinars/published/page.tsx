@@ -66,13 +66,33 @@ function PublishedWebinarContent() {
     return <ListState kind="loading" title="公開結果を確認しています" />
   }
 
+  /*
+    U098: 対象未指定のとき「もう一度読み込む」は同じ失敗を繰り返すだけ。
+    一覧へ戻す。通信失敗のときだけ再読み込みを主操作にする。
+  */
+  if (!id) {
+    return (
+      <ListState
+        kind="empty"
+        title="確認するウェビナーが指定されていません"
+        description="一覧から公開したウェビナーを選び直してください。"
+        action={<Button href="/webinars">ウェビナー一覧へ戻る</Button>}
+      />
+    )
+  }
+
   if (error || !webinar || !editor) {
     return (
       <ListState
         kind="error"
         title="公開結果を表示できませんでした"
         description={error || '公開したウェビナーが見つかりませんでした。'}
-        action={<Button onClick={() => void load()}>もう一度読み込む</Button>}
+        action={
+          <>
+            <Button onClick={() => void load()}>もう一度読み込む</Button>
+            <Button href="/webinars">ウェビナー一覧へ戻る</Button>
+          </>
+        }
       />
     )
   }

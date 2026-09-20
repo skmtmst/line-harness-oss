@@ -29,6 +29,11 @@ function MenuStaffMatrixContent() {
   const [staff, setStaff] = useState<BookingStaff[]>([])
   /** staffId → menuId → 設定。 */
   const [grid, setGrid] = useState<Record<string, Record<string, StaffMenuMatrix>>>({})
+  /*
+   * #975 U075: 「変えていない」「変えたが未保存」「保存済み」「失敗」を
+   * 区別するため、最後に読み込み・保存した時点の表を控えておく。
+   */
+  const [savedGrid, setSavedGrid] = useState<Record<string, Record<string, StaffMenuMatrix>> | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -43,6 +48,7 @@ function MenuStaffMatrixContent() {
     setMenus([])
     setStaff([])
     setGrid({})
+    setSavedGrid(null)
     try {
       const [menusRes, staffRes] = await Promise.all([
         bookingApi.listMenus(selectedAccountId),
@@ -69,6 +75,7 @@ function MenuStaffMatrixContent() {
         }),
       )
       setGrid(next)
+      setSavedGrid(next)
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     } finally {
@@ -107,6 +114,8 @@ function MenuStaffMatrixContent() {
           }),
         })),
       )
+      /* #975 U075: 保存できた時点の表を新しい基準にする。以後の差分が未保存。 */
+      setSavedGrid(grid)
       setSavedAt(Date.now())
     } catch (e) {
       // 全件不適用のはずだが、画面の表示とDBの状態が食い違う可能性を
@@ -134,6 +143,26 @@ function MenuStaffMatrixContent() {
   const assigned = [...offeredCounts.values()].reduce((a, b) => a + b, 0)
   const pairs = menus.length * staff.length
 
+  /*
+   * #975 U075: 読み込み直後と同じなら保存は要らない。差分があるときだけ
+   * 「未保存の変更があります」と出し、保存ボタンを押せるようにする。
+   */
+  const dirty = useMemo(
+    () => savedGrid !== null && JSON.stringify(grid) !== JSON.stringify(savedGrid),
+    [grid, savedGrid],
+  )
+  const saveStateLabel = loading
+    ? '読み込み中…'
+    : error
+      ? savedGrid
+        ? '保存できませんでした。画面を再読み込みして確認してください。'
+        : '読み込めませんでした。画面を再読み込みして確認してください。'
+      : !savedGrid
+        ? ''
+        : dirty
+          ? '未保存の変更があります'
+          : '変更はありません'
+
   return (
     <div>
       <nav data-design="Crumb" className="text-ink-faint mb-2 text-xs">
@@ -155,11 +184,16 @@ function MenuStaffMatrixContent() {
             onClick={saveAll}
             // error が出ている間は押させない。読み込みに失敗した状態で
             // 保存すると、空の割り当てで上書きしてしまう。
-            disabled={saving || !selectedAccountId || loading || Boolean(error)}
+            // #975 U075: 差分がないときも押させない（押しても変わらない）。
+            disabled={saving || !selectedAccountId || loading || Boolean(error) || !dirty}
             className="bg-accent-deep text-on-accent rounded-control px-4 py-2 text-sm font-medium disabled:opacity-50"
           >
-            {saving ? '保存中…' : '変更を保存'}
+            {saving ? '保存中…' : dirty ? '変更を保存' : '変更なし'}
           </button>
+          {/* #975 U075: 未保存・保存済み・失敗を色だけでなく文字で出す。 */}
+          <span className="text-ink-faint self-center text-xs" role="status" aria-live="polite">
+            {saveStateLabel}
+          </span>
       </div>
 
       <div data-design="KPIs" className="mb-4 grid grid-cols-2 gap-3 xl:grid-cols-4">

@@ -198,8 +198,13 @@ export default function NewLineAccountPage() {
         />
       </div>
 
+      {/*
+        U050: スマホで全5手順のカードが縦に積まれ、最初の入力欄まで
+        長かった。狭い画面では「いまの手順＋位置」だけを出し、全手順は
+        開いて確認する形にする。640px 以上ではこれまでどおり5段で出す。
+      */}
       <nav data-design="Steps" aria-label="登録の進捗" className="bg-canvas rounded-card border-hairline mb-4 border p-4">
-        <ol className="grid grid-cols-1 gap-2 sm:grid-cols-5">
+        <ol className="hidden gap-2 sm:grid sm:grid-cols-5">
           {WIZARD_STEPS.map((step) => {
             const active = currentStep === step.number
             const complete = currentStep > step.number || Boolean(createdId)
@@ -209,6 +214,25 @@ export default function NewLineAccountPage() {
             </li>
           })}
         </ol>
+        <details className="sm:hidden">
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-3">
+            <span>
+              <span className="text-ink-faint block text-xs">手順 {currentStep} / 5</span>
+              <span className="text-ink mt-0.5 block text-sm font-bold">{WIZARD_STEPS.find((step) => step.number === currentStep)?.label}</span>
+            </span>
+            <span className="text-action shrink-0 text-xs font-semibold">全手順を見る</span>
+          </summary>
+          <ol className="mt-3 grid gap-2">
+            {WIZARD_STEPS.map((step) => {
+              const active = currentStep === step.number
+              const complete = currentStep > step.number || Boolean(createdId)
+              return <li key={step.number} aria-current={active ? 'step' : undefined} className={`rounded-control border px-3 py-2 ${active ? 'border-action bg-action-soft' : 'border-hairline'}`}>
+                <span className="text-ink-faint block text-xs">手順 {step.number} / 5</span>
+                <span className="text-ink mt-0.5 block text-xs font-bold">{step.label}{complete ? '（完了）' : ''}</span>
+              </li>
+            })}
+          </ol>
+        </details>
       </nav>
 
       <form onSubmit={submit} noValidate aria-busy={busyAction ? true : undefined}>

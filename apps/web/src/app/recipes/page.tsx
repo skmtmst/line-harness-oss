@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react'
 import { api, type Recipe } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
+import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import PageHeader from '@/components/shared/page-header'
 import StatusBadge from '@/components/shared/status-badge'
@@ -62,7 +63,15 @@ export default function RecipesPage() {
         <ListState
           kind="empty"
           title="使えるレシピがありません"
-          description="レシピが追加されるまでお待ちください。"
+          description="レシピがなくても、タグ・自動化・シナリオはひとつずつ自分で作れます。レシピを使いたい場合は運営へ依頼してください。"
+          action={(
+            <>
+              {/* #975 U072: 行き止まりにしない。自分で作る入口を出す。 */}
+              <Button href="/automations/new">自動化を自分で作る</Button>
+              <Button href="/scenarios">シナリオを自分で作る</Button>
+              <Button href="/settings">機能設定を確認する</Button>
+            </>
+          )}
         />
       ) : (
         <ul className={styles.list} aria-label="レシピ">

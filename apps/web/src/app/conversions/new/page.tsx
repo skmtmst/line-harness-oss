@@ -374,14 +374,15 @@ export default function NewConversionPointPage() {
       }
     >
       <FormSection step={1} label="何が起きたら数えますか">
-        <div className="grid gap-2 md:grid-cols-3 xl:grid-cols-6">
+        {/* #975 U062: 390pxで6枚の大カードを積まない。短い選択群にし、説明は選択中の1種類だけ下へ出す。 */}
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3" role="radiogroup" aria-label="数えるきっかけ">
           {TRIGGER_CHOICES.map((choice) => {
             const Icon = choice.icon
             const selected = triggerKind === choice.value
             return (
               <label
                 key={choice.value}
-                className={`rounded-card min-w-0 border p-3 text-left transition-colors ${
+                className={`rounded-control flex min-h-11 min-w-0 items-center gap-2 border px-3 py-2 text-left transition-colors ${
                   selected ? 'border-accent bg-accent-soft' : 'border-hairline hover:bg-canvas-sunken'
                 } ${choice.connected ? 'cursor-pointer' : 'cursor-not-allowed opacity-55'}`}
               >
@@ -394,13 +395,20 @@ export default function NewConversionPointPage() {
                   onChange={() => selectTrigger(choice)}
                   className="sr-only"
                 />
-                <Icon className={selected ? 'text-accent' : 'text-ink-faint'} size={18} aria-hidden />
-                <span className="text-ink mt-2 block text-xs font-bold">{choice.label}</span>
-                <span className="text-ink-faint text-micro mt-0.5 block">{choice.note}</span>
+                <Icon className={`shrink-0 ${selected ? 'text-accent' : 'text-ink-faint'}`} size={16} aria-hidden />
+                <span className="text-ink truncate text-xs font-bold" title={choice.label}>{choice.label}</span>
               </label>
             )
           })}
         </div>
+        {(() => {
+          const current = TRIGGER_CHOICES.find((choice) => choice.value === triggerKind)
+          return current ? (
+            <p className="mt-2 text-xs text-ink-secondary" role="status">
+              「{current.label}」… {current.note}の出来事が起きた人を数えます。
+            </p>
+          ) : null
+        })()}
 
         <div className="grid gap-3 md:grid-cols-3">
           <Field

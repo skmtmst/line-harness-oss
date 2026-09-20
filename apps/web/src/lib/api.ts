@@ -2025,12 +2025,23 @@ export type FeatureDisabledEventDetail = {
 
 export function getCsrfToken(): string {
   if (typeof window === 'undefined') return ''
-  return localStorage.getItem(CSRF_STORAGE_KEY) || ''
+  /*
+   * localStorage が無い・触れない環境（Cookie無効のブラウザや一部の試験環境）
+   * ではアクセス自体が投げる。トークン無し＝通常の認証失敗と同じ扱いなので、
+   * ここでは握りつぶして '' を返す。
+   */
+  try {
+    return localStorage.getItem(CSRF_STORAGE_KEY) || ''
+  } catch {
+    return ''
+  }
 }
 
 export function setCsrfToken(token: string | undefined | null): void {
   if (typeof window === 'undefined' || !token) return
-  localStorage.setItem(CSRF_STORAGE_KEY, token)
+  try {
+    localStorage.setItem(CSRF_STORAGE_KEY, token)
+  } catch { /* 保存できなくてもセッション認証自体は動く */ }
 }
 
 const MUTATING_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE'])

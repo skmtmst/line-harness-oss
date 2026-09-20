@@ -3,7 +3,22 @@
 .split { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 16px; align-items: start; }
 .main { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
 .side { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
-@media (max-width: 1100px) { .split { grid-template-columns: minmax(0, 1fr); } }
+/*
+ * #975 U059: 390pxでは「届く形」が入力3枚のあとに来て、保存へ届く前に
+ * 全部をスクロールさせられていた。狭い幅では main/side を平坦化し、
+ * プレビューだけ題名の直後へ上げる。保存は下部追従バーで常に届く。
+ */
+@media (max-width: 1100px) {
+  .split { grid-template-columns: minmax(0, 1fr); }
+  .main, .side { display: contents; }
+  .split [data-nen-part="title"] { order: 1; }
+  .split [data-nen-part="preview"] { order: 2; }
+  .split [data-nen-part="article"] { order: 3; }
+  .split [data-nen-part="publish"] { order: 4; }
+  .split [data-nen-part="tips"] { order: 5; }
+  .split [data-nen-part="links"] { order: 6; }
+  .split [data-nen-part="cannot"] { order: 7; }
+}
 
 .section { display: flex; flex-direction: column; gap: 10px; padding: 16px; }
 

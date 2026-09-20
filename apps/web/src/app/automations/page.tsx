@@ -13,6 +13,7 @@ import { useCanManageAutomations } from '@/components/automations/use-automation
 import ListState from '@/components/shared/list-state'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import FilterChip from '@/components/shared/filter-chip'
+import KpiCollapse from '@/components/ui/kpi-collapse'
 import {
   automationActionLabel,
   automationTriggerLabel,
@@ -525,7 +526,8 @@ export default function AutomationsPage() {
       <p className="mb-4 text-sm text-ink-faint">「〜のとき、〜する」を登録して自動で実行します。友だち一覧から手で実行したり、毎日決まった時刻に動かすこともできます。</p>
       <p className="sr-only">共通アクションは友だち一覧からの手動実行にも使えます。</p>
 
-      <div data-design="KPIs" className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      {/* #975 U060: 390pxでは先頭2件だけ出し、残りは「集計を見る」で開く。 */}
+      <KpiCollapse data-design="KPIs" className="mb-4" gridClassName="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <div className="bg-canvas rounded-card border-hairline border p-4">
           <p className="text-ink-faint text-xs">動いているもの</p>
           <p className="text-ink mt-1 text-2xl font-bold tabular-nums">
@@ -549,7 +551,7 @@ export default function AutomationsPage() {
           <p className="text-ink mt-1 text-2xl font-bold tabular-nums">{estimatedHoursSaved !== null ? `およそ ${estimatedHoursSaved.toLocaleString('ja-JP')}時間` : '—'}</p>
           <p className="text-ink-faint mt-0.5 text-xs">1回30秒として計算しています</p>
         </div>
-      </div>
+      </KpiCollapse>
 
       <div className="mb-4 rounded-control border border-info bg-info-bg px-4 py-3 text-sm font-medium text-info">
         上から順に見て、当てはまったものが動きます。同じきっかけで2本が当てはまると両方が動くため、片方だけにしたいときは条件をずらしてください。

@@ -38,7 +38,50 @@ export default function HqAccountList({
 }) {
   return (
     <section data-design="List" data-design-node="vLMQ5" className="min-w-0 overflow-hidden rounded-card border border-hairline bg-canvas shadow-sm">
-      <div className="w-full overflow-x-auto">
+      {/*
+        U042: 768px 未満では表の右端にある操作（ログイン・設定）へ
+        横スクロールしないと届かなかった。スマホでは名前＋状態＋操作が
+        先に見えるカードにし、数値は開いて確認する形にする。
+      */}
+      <ul className="divide-y divide-hairline md:hidden" data-design="List">
+        {accounts.map((account) => (
+          <li key={account.id} className="p-4">
+            <div className="flex min-w-0 items-center gap-3">
+              <AccountIcon account={account} />
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-semibold text-ink" title={account.displayName || account.name}>{account.displayName || account.name}</p>
+                <p className="mt-0.5 truncate text-xs text-ink-faint" title={account.basicId || ''}>{account.basicId || 'LINE ID未取得'}</p>
+              </div>
+            </div>
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <StatusBadge tone={account.isActive ? 'success' : 'neutral'} size="compact">{account.isActive ? '有効' : '停止中'}</StatusBadge>
+              <ConnectionStatus status={account.connection?.status} />
+            </div>
+            <div className="mt-3 flex gap-2">
+              {onSettings ? <Button type="button" variant="secondary" onClick={() => onSettings(account)}>設定</Button> : null}
+              <Button type="button" variant="primary" onClick={() => onSelect(account.id)}>{selectLabel}</Button>
+            </div>
+            <details className="mt-3">
+              <summary className="cursor-pointer text-xs font-semibold text-ink-secondary">詳しい数値を見る</summary>
+              <dl className="mt-2 grid grid-cols-3 gap-2 text-center">
+                <div className="rounded-control bg-canvas-sunken px-2 py-2">
+                  <dt className="text-nano text-ink-faint">友だち数</dt>
+                  <dd className="mt-0.5 text-sm font-semibold tabular-nums text-ink">{(account.stats?.friendCount ?? 0).toLocaleString('ja-JP')}</dd>
+                </div>
+                <div className="rounded-control bg-canvas-sunken px-2 py-2">
+                  <dt className="text-nano text-ink-faint">今月の配信数</dt>
+                  <dd className="mt-0.5 text-sm font-semibold tabular-nums text-ink">{(account.stats?.messagesThisMonth ?? 0).toLocaleString('ja-JP')}</dd>
+                </div>
+                <div className="rounded-control bg-canvas-sunken px-2 py-2">
+                  <dt className="text-nano text-ink-faint">担当者数</dt>
+                  <dd className="mt-0.5 text-sm font-semibold tabular-nums text-ink">{(account.stats?.staffCount ?? 0).toLocaleString('ja-JP')}人</dd>
+                </div>
+              </dl>
+            </details>
+          </li>
+        ))}
+      </ul>
+      <div className="hidden w-full overflow-x-auto md:block">
         <table className="w-full min-w-max text-left">
           <thead>
             <TableHeadRow>

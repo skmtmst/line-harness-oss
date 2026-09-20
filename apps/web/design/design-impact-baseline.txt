@@ -109,6 +109,7 @@ shared-button-importer app/ops/two-factor/page.tsx
 shared-button-importer app/page.tsx
 shared-button-importer app/password/forgot/page.tsx
 shared-button-importer app/password/reset/page.tsx
+shared-button-importer app/recipes/page.tsx
 shared-button-importer app/register/complete/page.tsx
 shared-button-importer app/register/page.tsx
 shared-button-importer app/register/sent/page.tsx
@@ -191,6 +192,7 @@ shared-button-importer components/hq/notice-line-register-dialog.tsx
 shared-button-importer components/hq/platform-notices.tsx
 shared-button-importer components/identity/identity-decision-dialog.tsx
 shared-button-importer components/inflow-links/site-script.tsx
+shared-button-importer components/layout/scrollable-tabs.tsx
 shared-button-importer components/line-notifications/notification-run-list.tsx
 shared-button-importer components/line-notifications/operator-notification-rules.tsx
 shared-button-importer components/merged-person/merged-delivery-dialog.tsx
@@ -214,6 +216,7 @@ shared-button-importer components/shared/list-state.tsx
 shared-button-importer components/shared/not-connected.tsx
 shared-button-importer components/store-selection-gate.tsx
 shared-button-importer components/templates/message-template-editor.tsx
+shared-button-importer components/ui/kpi-collapse.tsx
 shared-button-importer components/users/user-row.tsx
 shared-button-importer components/webinars/webinar-notifications.tsx
 # 標準Buttonへ移行済みとして、見た目と主要導線を監視する画面本体。

@@ -4,7 +4,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { Suspense, useCallback, useEffect, useState } from 'react'
 import Button from '@/components/shared/button'
 import PageHeader from '@/components/shared/page-header'
-import { Tabs } from '@/components/shared/tabs'
+import ScrollableTabs from '@/components/layout/scrollable-tabs'
 import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { nenPetsApi, type NenHealthKpis, type NenHealthSummaryData } from '@/lib/nen-pets-api'
@@ -74,7 +74,8 @@ function HealthInner() {
         actions={<Button type="button" onClick={() => window.print()} disabled={!canPrint} title={canPrint ? undefined : '一覧の「30日のまとめ」を開くと書き出せます'}>獣医師向けPDFを書き出す</Button>}
       />
       <div data-design="Tabs" data-design-node="health-tabs">
-        <Tabs
+        {/* U091: 右にはみ出すタブへ届くよう、横スクロール＋端の送りボタン付き。 */}
+        <ScrollableTabs
           items={[
             { label: '記録のあるペット', count: kpis?.petsWithRecords, current: tab === 'logs', onClick: () => changeTab('logs') },
             { label: '気になる変化', count: kpis?.concerning, current: tab === 'concern', onClick: () => changeTab('concern') },

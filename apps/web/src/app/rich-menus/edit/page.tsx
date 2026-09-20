@@ -166,6 +166,39 @@ function unpublishWarningText(warning: string): string {
 }
 
 /**
+ * 読み込み失敗を利用者の言葉へ写す（U096）。
+ *
+ * 「見つからない」「権限がない」「通信に失敗した」で運用者の次の手が
+ * 違うので、主文を言い分ける。生のエラー文（`API error: 404` など）は
+ * 別で畳んで出す。
+ */
+function describeLoadFailure(raw: string | null): { title: string; detail: string } {
+  const message = raw ?? ''
+  if (/API error: 404|not found|見つかりません/i.test(message)) {
+    return {
+      title: 'このリッチメニューは見つかりません',
+      detail: '削除されたか、別のLINEアカウントのものか、リンクが古くなっています。一覧から選び直してください。',
+    }
+  }
+  if (/API error: 403|権限|forbidden/i.test(message)) {
+    return {
+      title: 'このリッチメニューを表示する権限がありません',
+      detail: '権限のある人に確認するか、別のLINEアカウントを選んでください。',
+    }
+  }
+  if (/API error: 5\d\d|Failed to fetch|NetworkError|fetch/i.test(message)) {
+    return {
+      title: '通信できませんでした',
+      detail: '通信の状態を確認して、もう一度読み込んでください。',
+    }
+  }
+  return {
+    title: 'リッチメニューを表示できませんでした',
+    detail: '時間をおいて読み込み直すか、一覧から選び直してください。',
+  }
+}
+
+/**
  * 取得結果の形を確かめる。形違いの応答をそのまま `Group` に断定すると、
  * 後の `pages.map` などで落ちる。
  */
@@ -198,11 +231,17 @@ function RichMenuEditPageInner() {
   usePageTitle(editorStep === 'targeting' ? '誰に出すか' : editorStep === 'publish' ? '公開のしかた' : 'メニューを作る')
 
   if (!groupId) {
+    /*
+      U096: 「id クエリパラメータが必要です」は技術の言葉で、何を
+      選び直せばよいかが主文から読めなかった。やることを主文にし、
+      戻る操作をそばに置く。
+    */
     return (
       <main className="p-6 max-w-7xl mx-auto">
-        <p className="text-sm text-red-600">id クエリパラメータが必要です</p>
-        <Link href="/rich-menus" className="text-sm text-blue-600 hover:underline mt-2 inline-block">
-          ← 一覧に戻る
+        <p className="text-sm font-semibold text-danger">編集するリッチメニューが指定されていません</p>
+        <p className="text-sm text-ink-secondary mt-1">一覧から編集するリッチメニューを選び直してください。</p>
+        <Link href="/rich-menus" className="text-sm text-action hover:underline mt-2 inline-block">
+          ← リッチメニュー一覧に戻る
         </Link>
       </main>
     )
@@ -823,12 +862,29 @@ function Editor({
     )
   }
   if (!group) {
+    /*
+      U096: 生の `API error: 404` などを主文にしない。削除済み・権限なし・
+      通信失敗を言い分け、技術情報は補助の詳細へ畳む。
+    */
+    const failure = describeLoadFailure(error)
     return (
       <main className="p-6 max-w-7xl mx-auto">
-        <p className="text-sm text-red-600">{error ?? 'リッチメニューが見つかりません'}</p>
-        <Link href="/rich-menus" className="text-sm text-blue-600 hover:underline mt-2 inline-block">
-          ← 一覧に戻る
-        </Link>
+        <p className="text-sm font-semibold text-danger">{failure.title}</p>
+        <p className="text-sm text-ink-secondary mt-1">{failure.detail}</p>
+        {error ? (
+          <details className="mt-2 text-xs text-ink-faint">
+            <summary className="cursor-pointer">技術情報</summary>
+            <p className="mt-1 break-all">{error}</p>
+          </details>
+        ) : null}
+        <div className="mt-3 flex items-center gap-4">
+          <Link href="/rich-menus" className="text-sm text-action hover:underline inline-block">
+            ← リッチメニュー一覧に戻る
+          </Link>
+          <button type="button" onClick={() => void reload()} className="text-sm text-action hover:underline">
+            もう一度読み込む
+          </button>
+        </div>
       </main>
     )
   }

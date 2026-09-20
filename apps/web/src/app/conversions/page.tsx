@@ -132,6 +132,7 @@ import Select from '@/components/shared/select'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
 import { TextField } from '@/components/shared/text-field'
+import KpiCollapse from '@/components/ui/kpi-collapse'
 
 const DAY_MS = 24 * 60 * 60 * 1000
 
@@ -657,7 +658,8 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
   return (
     <div data-conversion-points-design="v6">
 
-      <div data-design="KPIs" className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      {/* #975 U060: 390pxでは先頭2件だけ出し、残りは「集計を見る」で開く。 */}
+      <KpiCollapse data-design="KPIs" className="mb-4" gridClassName="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <KpiCard
           title="決めてある成果地点"
           value={definitions?.pagination.total ?? null}
@@ -693,7 +695,7 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
           detail="決めたのに使われていません"
           loading={loading}
         />
-      </div>
+      </KpiCollapse>
 
       <p className="bg-info-bg text-info mb-4 rounded-control px-4 py-3 text-sm font-semibold">
         成果地点は「数え方の決めごと」です。ここで決めたものを、案件・自動応答・分析などから呼び出して使います。
@@ -1320,7 +1322,7 @@ function ReportTab({ accountId }: { accountId: string | null }) {
       </div>
       {exportError ? <p className="text-danger text-sm" role="alert">{exportError}</p> : null}
 
-      <div data-design="KPIs" className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <KpiCollapse data-design="KPIs" gridClassName="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <KpiCard
           title={`この${periodDays}日の成果`}
           value={report.kpis.netCount}
@@ -1351,7 +1353,7 @@ function ReportTab({ accountId }: { accountId: string | null }) {
             ? `${fastest.conversionPointName} ${fastest.netCount.toLocaleString('ja-JP')}件（前の${periodDays}日 ${fastest.previousNetCount.toLocaleString('ja-JP')}件）`
             : '比較できる成果はありません'}
         />
-      </div>
+      </KpiCollapse>
 
       <p className="bg-info-bg text-info rounded-control px-4 py-3 text-sm font-semibold">
         成果地点ごとの件数と、どこから来たかです。数え方は「成果地点」で決めます。

@@ -1,19 +1,67 @@
 'use client'
 
 import { useState } from 'react'
+import { EC_EVENT_TYPES, ecEventLabel } from '@line-crm/shared'
 import { api } from '@/lib/api'
 import CreatePage, { Field, inputClass } from '@/components/shared/create-page'
 import { useAccount } from '@/contexts/account-context'
 import { MIN_SECRET_LENGTH, generateSecret } from '../secret'
+
+/**
+ * #975 U067: 送るイベントの正本は `packages/db/src/webhooks.ts` の
+ * KNOWN_OUTGOING_EVENT_TYPES。CSV手入力は打ち間違いをそのまま保存するため、
+ * チェックで選ぶ形にする。ECの表示名は `ecEventLabel` の正本を使う。
+ */
+const WEBHOOK_EVENT_GROUPS: ReadonlyArray<{
+  id: string
+  label: string
+  events: ReadonlyArray<{ value: string; label: string }>
+}> = [
+  {
+    id: 'friends',
+    label: '友だち・メッセージ',
+    events: [
+      { value: 'friend_add', label: '友だちになった' },
+      { value: 'friend_unfollow', label: '友だちを解除された' },
+      { value: 'message_received', label: 'メッセージを受け取った' },
+      { value: 'postback_received', label: 'ボタン操作を受け取った' },
+    ],
+  },
+  {
+    id: 'operation',
+    label: '運用の動き',
+    events: [
+      { value: 'tag_change', label: 'タグが付いた・外れた' },
+      { value: 'staff_assigned', label: '担当が割り当てられた' },
+      { value: 'manual_reply_sent', label: '個別返信を送った' },
+      { value: 'cv_fire', label: '成果地点が起きた' },
+    ],
+  },
+  {
+    id: 'ec',
+    label: 'ECの出来事',
+    events: EC_EVENT_TYPES.map((value) => ({ value, label: ecEventLabel(value) })),
+  },
+]
 
 /** 送信Webhookを作る唯一のフォーム。一覧の追加導線もこの画面へ集約する。 */
 export default function NewWebhookPage() {
   const { selectedAccountId } = useAccount()
   const [name, setName] = useState('')
   const [url, setUrl] = useState('')
-  const [eventTypes, setEventTypes] = useState('')
+  /* #975 U067: CSV手入力ではなく「すべて」かチェック選択で決める。 */
+  const [sendAllEvents, setSendAllEvents] = useState(true)
+  const [selectedEvents, setSelectedEvents] = useState<string[]>([])
+  /* 受信Webhookごとの発火 `incoming_webhook.<種類>` は種類IDで指定する詳細設定。 */
+  const [incomingSources, setIncomingSources] = useState('')
   const [secret, setSecret] = useState(generateSecret)
   const [maxRetries, setMaxRetries] = useState('0')
+
+  const toggleEvent = (value: string) => {
+    setSelectedEvents((current) =>
+      current.includes(value) ? current.filter((item) => item !== value) : [...current, value],
+    )
+  }
 
   return (
     <CreatePage
@@ -27,6 +75,9 @@ export default function NewWebhookPage() {
         if (secret.length < MIN_SECRET_LENGTH) {
           return `シークレットは${MIN_SECRET_LENGTH}文字以上にしてください`
         }
+        if (!sendAllEvents && selectedEvents.length === 0 && !incomingSources.trim()) {
+          return '送るイベントを選ぶか、「すべてのイベントを送る」を選んでください'
+        }
         return null
       }}
       onSave={async () => {
@@ -35,10 +86,16 @@ export default function NewWebhookPage() {
           lineAccountId: selectedAccountId,
           name: name.trim(),
           url: url.trim(),
-          eventTypes: eventTypes
-            .split(',')
-            .map((value) => value.trim())
-            .filter(Boolean),
+          eventTypes: sendAllEvents
+            ? ['*']
+            : [
+                ...selectedEvents,
+                ...incomingSources
+                  .split(',')
+                  .map((value) => value.trim())
+                  .filter(Boolean)
+                  .map((value) => `incoming_webhook.${value}`),
+              ],
           secret,
           maxRetries: Number(maxRetries) || 0,
         })
@@ -75,16 +132,80 @@ export default function NewWebhookPage() {
         />
       </Field>
 
-      <Field label="送るイベント" htmlFor="wh-events" note="カンマ区切り。* を入れると全部のイベントを送ります。">
-        <input
-          id="wh-events"
-          type="text"
-          value={eventTypes}
-          onChange={(event) => setEventTypes(event.target.value)}
-          placeholder="friend.added, message.received"
-          className={inputClass}
-        />
-      </Field>
+      {/* #975 U067: イベントコードのCSV手入力をやめ、チェックで選ぶ。 */}
+      <fieldset className="space-y-3">
+        <legend className="text-ink-secondary text-xs font-bold">
+          送るイベント<span className="text-status-danger ml-1">必須</span>
+        </legend>
+        <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="送るイベントの決め方">
+          <label className="border-hairline flex min-h-9 cursor-pointer items-center gap-2 rounded-control border px-3 py-2 text-sm font-semibold text-ink">
+            <input
+              type="radio"
+              name="wh-event-mode"
+              checked={sendAllEvents}
+              onChange={() => setSendAllEvents(true)}
+            />
+            すべてのイベントを送る
+          </label>
+          <label className="border-hairline flex min-h-9 cursor-pointer items-center gap-2 rounded-control border px-3 py-2 text-sm font-semibold text-ink">
+            <input
+              type="radio"
+              name="wh-event-mode"
+              checked={!sendAllEvents}
+              onChange={() => setSendAllEvents(false)}
+            />
+            送るイベントを選ぶ
+          </label>
+        </div>
+        {!sendAllEvents && (
+          <div className="space-y-3">
+            {WEBHOOK_EVENT_GROUPS.map((group) => (
+              <div key={group.id}>
+                <p className="text-ink-faint text-xs font-bold">{group.label}</p>
+                <ul className="mt-1.5 grid gap-1.5 sm:grid-cols-2">
+                  {group.events.map((event) => (
+                    <li key={event.value}>
+                      <label className="border-hairline hover:bg-canvas-sunken flex cursor-pointer items-start gap-2 rounded-control border px-3 py-2">
+                        <input
+                          type="checkbox"
+                          className="mt-1"
+                          checked={selectedEvents.includes(event.value)}
+                          onChange={() => toggleEvent(event.value)}
+                        />
+                        <span className="min-w-0">
+                          <span className="text-ink block text-sm font-semibold">{event.label}</span>
+                          <span className="text-ink-faint block font-mono text-micro">{event.value}</span>
+                        </span>
+                      </label>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+            <details className="rounded-control border border-hairline px-3 py-2">
+              <summary className="text-action cursor-pointer text-xs font-semibold">
+                受信Webhookごとの出来事を種類IDで指定する（詳細設定）
+              </summary>
+              <div className="mt-3">
+                <Field
+                  label="受信Webhookの種類ID"
+                  htmlFor="wh-incoming"
+                  note="「incoming_webhook.<種類ID>」の形で送ります。カンマ区切りで複数入れられます。"
+                >
+                  <input
+                    id="wh-incoming"
+                    type="text"
+                    value={incomingSources}
+                    onChange={(event) => setIncomingSources(event.target.value)}
+                    placeholder="例: form-source, another-source"
+                    className={`${inputClass} font-mono`}
+                  />
+                </Field>
+              </div>
+            </details>
+          </div>
+        )}
+      </fieldset>
 
       <Field
         label="シークレット"

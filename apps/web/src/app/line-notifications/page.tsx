@@ -24,6 +24,7 @@ import {
   customerNotificationKpis,
   type LineNotificationQuota,
 } from './customer-kpis'
+import KpiCollapse from '@/components/ui/kpi-collapse'
 import styles from './customer-notifications.module.css'
 
 const customerFilters = [
@@ -966,7 +967,8 @@ function LineNotificationsPage() {
       data-list-state={loadState === 'ready' && settings.length === 0 ? 'empty' : loadState}
       className={styles.root}
     >
-    <div data-design="KPIs" className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+    {/* #975 U060: 7指標を390pxで積まない。先頭2件を出し、残りは「集計を見る」で開く。 */}
+    <KpiCollapse data-design="KPIs" gridClassName="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
       {kpis.map((kpi) => {
         const { label, value, unit, note, href } = kpi
         const body = <>
@@ -985,7 +987,7 @@ function LineNotificationsPage() {
             : null}
         </div>
       })}
-    </div>
+    </KpiCollapse>
     <div className="border-info bg-info-bg text-info rounded-control border px-4 py-3 text-sm leading-6">
       これは「お知らせ」であって「売り込みの配信」ではありません。顧客が配信を止めていても、取引に必要な連絡は届きます。
     </div>

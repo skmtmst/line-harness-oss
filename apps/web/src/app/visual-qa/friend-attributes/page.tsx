@@ -16,6 +16,7 @@ import Dialog from '@/components/shared/dialog'
 import Drawer from '@/components/shared/drawer'
 import Notice from '@/components/shared/notice'
 import NotificationPanel, { type NotificationItem } from '@/components/shared/notification-panel'
+import SampleScreenNotice from '@/components/ui/sample-screen-notice'
 
 const EXISTING_TAG = {
   ...FRIEND_ATTRIBUTES_QA_TAGS[2],
@@ -184,5 +185,15 @@ function VisualQaPageInner() {
 }
 
 export default function FriendAttributesVisualQaPage() {
-  return <Suspense fallback={null}><VisualQaPageInner /></Suspense>
+  return (
+    <Suspense fallback={null}>
+      {/* #975 U101: 固定データの検証画面であることを直リンクでも判別できるようにする。 */}
+      <SampleScreenNotice
+        what="友だち属性画面の表示確認"
+        backHref="/tags"
+        backLabel="通常の友だち属性へ戻る"
+      />
+      <VisualQaPageInner />
+    </Suspense>
+  )
 }

@@ -3,6 +3,7 @@
 import type { ReactNode } from 'react'
 import NoteBar from '@/components/shared/note-bar'
 import SummaryCard from '@/components/shared/summary-card'
+import KpiCollapse from '@/components/ui/kpi-collapse'
 import { Tabs } from '@/components/shared/tabs'
 import {
   nextMonthResetLabel,
@@ -73,7 +74,7 @@ export function BannerKpis({
 }) {
   const percent = remainingPercent(usage)
   return (
-    <div data-design-node="jT1tM" className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+    <KpiCollapse data-design-node="jT1tM" gridClassName="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
       <SummaryCard
         variant="v6"
         title="プロジェクト"
@@ -108,7 +109,7 @@ export function BannerKpis({
         detail={stats ? `${stats.deliveredAccounts}アカウント` : '—'}
         loading={loading}
       />
-    </div>
+    </KpiCollapse>
   )
 }
 
