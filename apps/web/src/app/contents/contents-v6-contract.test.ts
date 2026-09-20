@@ -202,7 +202,9 @@ describe('V6 登録メディア一覧の契約', () => {
     expect(API).toContain("q.set('archived', params.archived)")
     // 画面側は必ず理由付きで呼ぶ。staff には押し口を出さない。
     expect(API).toContain('body: JSON.stringify({ accountId, reason })')
-    expect(PAGE).toContain('理由（必須・あとから履歴で確認できます）')
+    // #976 U086: 必須の印は共通の「必須」札。見た目の文は「理由 必須（あとから…）」
+    expect(PAGE).toContain('理由<RequiredBadge />')
+    expect(PAGE).toContain('（あとから履歴で確認できます）')
     expect(PAGE).toContain('{canManageMedia ? (')
     // worker は owner/admin だけを通し、理由なしは 400、二重実行は 409。
     expect(WORKER).toContain("contents.post('/api/media/:id/archive', requireRole('owner', 'admin')")

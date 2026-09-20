@@ -14,7 +14,11 @@
   border-radius: var(--radius-control); /* cornerRadius: $radius-sm */
   background: var(--color-canvas); /* fill: $canvas */
   color: var(--color-ink); /* fill: $ink */
-  font-size: var(--text-label); /* fontSize: $size-label */
+  /*
+   * #976 U079: 入力文字は `$size-body`(14px)。検索欄・プルダウン・ボタンと
+   * 同じ大きさにそろえる（以前は `$size-label` の13pxで小さかった）。
+   */
+  font-size: var(--text-body);
   font-weight: 400; /* fontWeight: normal */
   font-family: inherit;
 }
@@ -51,4 +55,18 @@
 /* 入力が正しくないとき。枠を赤くするだけで、文字色は変えない。 */
 .invalid {
   border-color: var(--color-status-danger);
+}
+
+/*
+ * #976 U079/U083: タッチ端末は入力文字16px・欄の高さ44px。
+ * 16px未満だとiOSがフォーカス時に画面を拡大し、入力中にレイアウトが動く。
+ */
+@media (pointer: coarse) {
+  .field {
+    font-size: var(--text-lead);
+  }
+
+  .single {
+    height: 44px;
+  }
 }

@@ -2,6 +2,7 @@
 
 import { useMemo, useState, type ReactNode } from 'react'
 import Button from '@/components/shared/button'
+import { RequiredBadge } from '@/components/shared/form-controls'
 import SelectField from '@/components/shared/select-field'
 import StepTrail from '@/components/shared/step-trail'
 import ConditionBuilder from '@/components/shared/condition-builder'
@@ -226,7 +227,7 @@ export default function RichMenuCreateForm({
         <div className="border-hairline bg-canvas rounded-card min-w-0 space-y-4 border p-4 shadow-sm lg:col-span-3">
           <div className="grid gap-3 lg:grid-cols-6">
             <div className="lg:col-span-3">
-              <label className="text-ink-secondary mb-1 block text-sm font-medium">メニュー名 <span className="bg-danger-bg text-danger rounded-pill text-micro ml-1 px-1.5 py-0.5">必須</span></label>
+              <label className="text-ink-secondary mb-1 block text-sm font-medium">メニュー名<RequiredBadge /></label>
               <input value={value.name} aria-label="メニュー名" onChange={(event) => patch({ name: event.target.value })} required disabled={locked} className="border-hairline rounded-control focus:ring-accent block w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none" placeholder="例：メインメニュー" />
               <p className="text-ink-faint mt-1 text-xs">管理画面での識別用です。友だちには表示されません。</p>
             </div>

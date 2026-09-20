@@ -15,6 +15,16 @@ import styles from './form-controls.module.css'
  * design-structure.test.ts が誤って落ちる。
  */
 
+/**
+ * 「必須」の札。#976 U086: 画面ごとに `（必須）`・`*`・自前の赤丸が
+ * 混ざっていたので、必須項目の印はすべてこの1形にそろえる。
+ * `<Field required>` を使えば自動で付く。Field を組めない場所
+ * （legend や行内のラベル）ではこの部品を直接置く。
+ */
+export function RequiredBadge() {
+  return <span className={styles.required}>必須</span>
+}
+
 /** 1行の入力欄。ラベルと説明の付け方を全画面でそろえる。 */
 export function Field({
   label,
@@ -37,11 +47,7 @@ export function Field({
         {label}
         {/* 設計は「必須」と字で書いている。* だけだと、色が見えない人には
             何も伝わらない。 */}
-        {required && (
-          <span className={styles.required}>
-            必須
-          </span>
-        )}
+        {required && <RequiredBadge />}
       </label>
       {children}
       {error ? <p className={styles.error} role="alert">{error}</p> : null}

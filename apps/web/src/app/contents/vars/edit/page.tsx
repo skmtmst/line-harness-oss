@@ -19,6 +19,7 @@ import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { NOT_AVAILABLE, STATE_TEXT } from '@/components/shared/not-connected'
 import { checkedAtText, placeholderText } from '../delete-impact'
 import Button from '@/components/shared/button'
+import { RequiredBadge } from '@/components/shared/form-controls'
 import StickyBar from '@/components/shared/sticky-bar'
 import {
   blockingErrors,
@@ -441,7 +442,7 @@ function EditCommonVarInner() {
                 <div className="grid gap-4 md:grid-cols-3">
                   <div>
                     <label htmlFor="cv-name" className="text-ink-secondary mb-1 block text-sm font-medium">
-                      名前 <span className="text-danger">必須</span>
+                      名前<RequiredBadge />
                     </label>
                     <input
                       id="cv-name"
@@ -455,7 +456,7 @@ function EditCommonVarInner() {
                   </div>
                   <div>
                     <p className="text-ink-secondary mb-1 text-sm font-medium">
-                      差し込みキー <span className="text-danger">必須</span>
+                      差し込みキー<RequiredBadge />
                     </p>
                     <code className="bg-canvas-sunken text-ink block rounded-control px-3 py-2 text-sm">{placeholderText(item.name)}</code>
                     <p className="text-ink-faint mt-1 text-xs">本文にこの形で入ります</p>

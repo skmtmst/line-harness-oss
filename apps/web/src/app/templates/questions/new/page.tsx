@@ -13,6 +13,7 @@ import StickyBar from '@/components/shared/sticky-bar'
 import ListState from '@/components/shared/list-state'
 import SelectField from '@/components/shared/select-field'
 import { TextField } from '@/components/shared/text-field'
+import { Field } from '@/components/shared/form-controls'
 import type { Folder } from '@line-crm/shared'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { useAccount } from '@/contexts/account-context'
@@ -205,27 +206,28 @@ function QuestionTemplatePageInner() {
       <div className="grid min-w-0 gap-4 2xl:grid-cols-4">
         <main className="min-w-0 space-y-4 2xl:col-span-3">
           <section className="bg-canvas border-hairline rounded-card shadow-card grid gap-4 border p-4 lg:grid-cols-3">
-            {/* 入力欄は共通部品（高さ40px・文字13px）。ここだけ余白と
-                文字サイズを直に組むと、同じ画面の中で高さが揃わない。 */}
-            <label className="text-label min-w-0 font-semibold text-ink-secondary lg:col-span-2">
-              テンプレート名 <span className="text-danger text-caption">必須</span>
-              <TextField
-                value={name}
-                onChange={(event) => setName(event.target.value)}
-                maxLength={120}
-                className="mt-2"
-                placeholder="例：継続の意思をうかがう"
-              />
-            </label>
+            {/* 入力欄は共通部品。#976 U086: 必須の印は Field の required（
+                「必須」札）にそろえ、独自の赤字テキストは置かない。 */}
+            <div className="min-w-0 lg:col-span-2">
+              <Field label="テンプレート名" htmlFor="tq-name" required>
+                <TextField
+                  id="tq-name"
+                  value={name}
+                  onChange={(event) => setName(event.target.value)}
+                  maxLength={120}
+                  placeholder="例：継続の意思をうかがう"
+                />
+              </Field>
+            </div>
             {/*
               U057: 置き場はこの1か所だけ。以前は「フォルダ」の自由記入欄が
               別にあり、そこへ名前を打ち込んでも一覧の帯には載らず、
               置き場を選んだつもりになる失敗があった。category（保存値）は
               選んだ置き場の名前をそのまま入れて、ずれないようにする。
             */}
-            <label className="text-label font-semibold text-ink-secondary">
-              置き場
+            <Field label="置き場" htmlFor="tq-folder">
               <SelectField
+                id="tq-folder"
                 aria-label="置き場"
                 value={folderId ?? ''}
                 onChange={(event) => {
@@ -234,9 +236,8 @@ function QuestionTemplatePageInner() {
                   setCategory(folders.find((folder) => folder.id === next)?.name ?? '未分類')
                 }}
                 options={[{ value: '', label: '未分類' }, ...folders.map((folder) => ({ value: folder.id, label: folder.name }))]}
-                className="mt-2"
               />
-            </label>
+            </Field>
           </section>
 
           <section className="bg-canvas border-hairline rounded-card shadow-card border p-4">

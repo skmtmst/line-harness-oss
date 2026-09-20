@@ -210,7 +210,7 @@ export function Issue469ReminderStepEditor({ reminderId }: { reminderId: string 
             <Field label="送信可能時間の外になったら"><SelectField className="border-hairline rounded-control focus:ring-accent border px-3 py-2 text-sm focus:ring-2 focus:outline-none" defaultValue="next" options={[{ value: 'next', label: '翌朝 08:00 に繰り越す' }]} /></Field>
           </div>
           <div className="flex flex-wrap gap-2"><Pill tone="success">名前</Pill><Pill>友だち情報</Pill><Pill>共通情報</Pill><Pill>回答フォーム</Pill><Pill>配信日</Pill><Pill>その他</Pill></div>
-          <Field label="本文　必須" note={`${selectedStep.messageContent.length} / 5,000文字`}><TextArea rows={3} className="border-hairline rounded-control focus:ring-accent border px-3 py-2 text-sm focus:ring-2 focus:outline-none" value={selectedStep.messageContent} onChange={(event) => updateStep(selectedStep.stableStepId, { messageContent: event.target.value })} /></Field>
+          <Field label="本文" required note={`${selectedStep.messageContent.length} / 5,000文字`}><TextArea rows={3} className="border-hairline rounded-control focus:ring-accent border px-3 py-2 text-sm focus:ring-2 focus:outline-none" value={selectedStep.messageContent} onChange={(event) => updateStep(selectedStep.stableStepId, { messageContent: event.target.value })} /></Field>
           <div className="border-hairline rounded-lg border px-4 py-3 text-xs"><b>この通知の送信後アクション</b><span className="mt-1 block">対応マークを「確認待ち」に変更</span></div>
         </div>
       </ReminderPanel>
