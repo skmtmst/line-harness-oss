@@ -255,11 +255,12 @@ const SCOPE_ROWS = [
   ['運用状態', '健全性・緊急停止・更新履歴', '操作できる', '見られる', '見られる'],
 ] as const
 
-function PermissionScopeView({ user, memberId, canSave, copyCandidates, onClose, onSaved }: {
+function PermissionScopeView({ user, memberId, canSave, copyCandidates, roleCounts, onClose, onSaved }: {
   user: AccessUserItem
   memberId: string | null
   canSave: boolean
   copyCandidates: CopyableAccessUser[]
+  roleCounts: AccessUserSummary['roleCounts']
   onClose: () => void
   onSaved: () => Promise<void>
 }) {
@@ -327,11 +328,14 @@ function PermissionScopeView({ user, memberId, canSave, copyCandidates, onClose,
       setSaving(false)
     }
   }
+  /*
+   * かたまりごとの人数は固定文をやめ、実データ（roleCounts）から出す（LAY-09）。
+   */
   const bundles = [
-    ['administrator', '管理者', '2人', 'すべての設定と操作'],
-    ['operations', '運用', '4人', '配信と日々の運用'],
-    ['reception', '受付', '1人', '受信箱と予約を担当'],
-    ['view_only', '見るだけ', '2人', '変更せず確認だけ'],
+    ['administrator', '管理者', 'すべての設定と操作'],
+    ['operations', '運用', '配信と日々の運用'],
+    ['reception', '受付', '受信箱と予約を担当'],
+    ['view_only', '見るだけ', '変更せず確認だけ'],
   ] as const
   const copyBundle = (sourceId: string) => {
     const source = copyCandidates.find((candidate) => candidate.id === sourceId)
@@ -341,18 +345,53 @@ function PermissionScopeView({ user, memberId, canSave, copyCandidates, onClose,
     setSaveError('')
     setCopyNotice(`${source.name}の「${ACCESS_ROLE_LABEL[source.roleBundle]}」を下書きに反映しました。保存するまでは変更されません。`)
   }
-  return <div data-design-node="EOTS4" className="pb-24">
+  /*
+   * LAY-09: 右欄の説明は選択中の権限（下書き）から組み立てる。
+   * 「4項目」のような固定文は、実際の設定とずれるので置かない。
+   * 個別設定の人の保存済み内訳はAPIが返さないため、差分は「未確認」と出す。
+   */
+  const featureItems = SCOPE_ITEMS.filter((item) => item.kind === 'feature')
+  const visibleItems = featureItems.filter((item) => (levels[item.id] ?? 'none') !== 'none')
+  const hiddenItems = featureItems.filter((item) => (levels[item.id] ?? 'none') === 'none')
+  const piiLevel = levels.pii ?? 'none'
+  const piiNote = piiLevel === 'edit'
+    ? '個人情報（電話番号・住所・メール）もそのまま見えます'
+    : piiLevel === 'view'
+      ? '電話番号・住所・メールは伏せて表示します'
+      : '電話番号・住所・メールは見せません'
+  const savedLevels = user.roleBundle === 'custom' ? null : BUNDLE_PRESETS[user.roleBundle].levels
+  const changedItems = savedLevels
+    ? SCOPE_ITEMS.filter((item) => (levels[item.id] ?? 'none') !== (savedLevels[item.id] ?? 'none'))
+    : null
+  const dirty = customLevels !== null || bundle !== user.roleBundle
+  return <div data-design-node="EOTS4" className="pb-28">
     <div className="mb-4 flex items-center justify-between"><nav className="text-xs text-ink-faint"><span className="font-bold text-action">ログインユーザー</span>　›　<span className="font-bold text-action">{user.name}</span>　›　見せる範囲</nav><Button variant="secondary" disabled={!canSave || copyCandidates.length === 0} onClick={() => setCopyOpen((current) => !current)}>ほかの人と同じにする</Button></div>
     {copyOpen && <section className="mb-4 rounded-card border border-hairline bg-canvas p-4" aria-label="ほかの人の権限をコピー"><p className="mb-2 text-xs text-ink-secondary">同じ組織の人を選ぶと、その人の権限のかたまりを下書きへ反映します。</p><Select aria-label="コピー元のログインユーザー" value={copySourceId} onChange={copyBundle} size="full" options={[{ value: '', label: 'コピー元を選ぶ', disabled: true }, ...copyCandidates.map((candidate) => ({ value: candidate.id, label: `${candidate.name}（${ACCESS_ROLE_LABEL[candidate.roleBundle]}）` }))]} />{copyNotice && <p className="mt-2 text-xs font-medium text-success" role="status">{copyNotice}</p>}</section>}
-    {/* 右欄390pxは固定値のまま。変えるときは設計の確認が要る(#581)。 */}
-    <div className="grid items-start gap-4" style={{ gridTemplateColumns: 'minmax(0, 1fr) 390px' }}>
+    {/*
+      LAY-07: 狭い幅は1列で「いまの権限→変更項目→影響の確認」の順にする。
+      説明欄（390px）と横に並べるのは、設定欄に十分な幅が残る1024px以上だけ。
+      それ未満では説明欄は設定の下へ回り込む。
+    */}
+    <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,1fr)_390px]">
       <main className="space-y-3">
-        <section className="rounded-card border border-hairline bg-canvas p-4"><h2 className="text-base font-bold text-ink">かたまりから選ぶ</h2><p className="mt-1 text-xs text-ink-faint">よく使う組み合わせを用意しています。選んでから、下で細かく直せます。</p><div className="mt-3 grid grid-cols-4 gap-3">{bundles.map(([value, label, count, note]) => <button key={value} type="button" onClick={() => setBundle(value)} className={`rounded-control border p-3 text-left ${bundle === value ? 'border-accent bg-accent-soft' : 'border-divider-soft bg-canvas'}`}><span className="flex items-center justify-between"><span className="text-sm font-bold text-ink">{label}</span><span className="text-xs text-ink-faint">{count}</span></span><span className={`mt-2 block text-xs ${bundle === value ? 'font-semibold text-success' : 'text-ink-faint'}`}>{note}</span></button>)}</div></section>
-        <section className="overflow-hidden rounded-card border border-hairline bg-canvas"><div className="px-4 py-4"><h2 className="text-base font-bold text-ink">項目ごとに決める</h2><p className="mt-1 text-xs text-ink-faint">「変えられる」「見えるだけ」「出さない」の3つから選びます。</p></div><div className="grid items-center border-y border-hairline bg-canvas-sunken px-4 py-3 text-xs font-bold text-ink-faint" style={{ gridTemplateColumns: '1.45fr repeat(3, 140px) 1.2fr' }}><span>メニューの項目</span><span className="text-center">変えられる</span><span className="text-center">見えるだけ</span><span className="text-center">出さない</span><span>補足</span></div><div className="divide-y divide-hairline">{SCOPE_ROWS.map(([label, note, full, partial, none], index) => { const item = SCOPE_ITEMS[index]; const level = levels[item.id] ?? 'none'; return <div key={label} className="grid items-center px-4" style={{ minHeight: 46, gridTemplateColumns: '1.45fr repeat(3, 140px) 1.2fr' }}><div><p className="text-xs font-bold text-ink">{label}</p><p className="mt-0.5 text-xs text-ink-faint">{note}</p></div>{([full, partial, none] as const).map((text, option) => { const optionLevel: FeatureAccessLevel = option === 0 ? 'edit' : option === 1 ? 'view' : 'none'; const selected = level === optionLevel; return <button key={`${option}:${text}`} type="button" aria-label={`${label}を${text}`} aria-pressed={selected} disabled={!canSave} onClick={() => setLevel(item.id, optionLevel)} className={`mx-auto flex h-5 w-5 items-center justify-center rounded-full border text-xs ${selected ? 'border-accent text-accent' : 'border-divider-soft text-transparent'} ${canSave ? 'cursor-pointer' : 'cursor-not-allowed'}`}>✓</button> })}<p className="text-xs font-semibold text-warning">{item.id === 'pii' ? '電話番号と住所は伏せます' : item.id === 'delivery' ? '誤送信を防ぐためです' : item.id === 'analytics' ? '売上の数字が見えます' : ''}</p></div> })}</div></section>
+        <section className="rounded-card border border-hairline bg-canvas p-4"><h2 className="text-base font-bold text-ink">いまの権限</h2><p className="mt-1 text-xs text-ink-secondary">{user.name}さんはいま「{ACCESS_ROLE_LABEL[user.roleBundle]}」です。{user.roleBundle === 'custom' ? '項目ごとの内訳は取得できていません（未確認）。' : ''}保存すると、対象者はもう一度ログインが必要です。</p></section>
+        <section className="rounded-card border border-hairline bg-canvas p-4"><h2 className="text-base font-bold text-ink">かたまりから選ぶ</h2><p className="mt-1 text-xs text-ink-faint">よく使う組み合わせを用意しています。選んでから、下で細かく直せます。</p><div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">{bundles.map(([value, label, note]) => <button key={value} type="button" onClick={() => setBundle(value)} className={`rounded-control border p-3 text-left ${bundle === value ? 'border-accent bg-accent-soft' : 'border-divider-soft bg-canvas'}`}><span className="flex items-center justify-between"><span className="text-sm font-bold text-ink">{label}</span><span className="text-xs text-ink-faint">{roleCounts[value]}人</span></span><span className={`mt-2 block text-xs ${bundle === value ? 'font-semibold text-success' : 'text-ink-faint'}`}>{note}</span></button>)}</div></section>
+        {/*
+          LAY-07: 機能ごとにカードへ分け、その中に3択を置く。
+          以前の3列140px固定の表形式は狭い幅で潰れていた。
+          各選択肢は触れる高さ（min-h-11）を確保する。
+        */}
+        <section className="overflow-hidden rounded-card border border-hairline bg-canvas"><div className="px-4 py-4"><h2 className="text-base font-bold text-ink">項目ごとに決める</h2><p className="mt-1 text-xs text-ink-faint">「変えられる」「見えるだけ」「出さない」の3つから選びます。</p></div><div className="divide-y divide-hairline border-t border-hairline">{SCOPE_ROWS.map(([label, note, full, partial, none], index) => { const item = SCOPE_ITEMS[index]; const level = levels[item.id] ?? 'none'; return <div key={label} className="px-4 py-3"><div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1"><div className="min-w-0"><p className="text-xs font-bold text-ink">{label}</p><p className="mt-0.5 text-xs text-ink-faint">{note}</p></div>{item.hint ? <p className="text-xs font-semibold text-warning">{item.hint}</p> : null}</div><div className="mt-2 grid grid-cols-3 gap-2" role="group" aria-label={`${label}の見せ方`}>{([full, partial, none] as const).map((text, option) => { const optionLevel: FeatureAccessLevel = option === 0 ? 'edit' : option === 1 ? 'view' : 'none'; const selected = level === optionLevel; const optionLabel = option === 0 ? '変えられる' : option === 1 ? '見えるだけ' : '出さない'; return <button key={`${option}:${text}`} type="button" aria-label={`${label}を${text}`} aria-pressed={selected} disabled={!canSave} onClick={() => setLevel(item.id, optionLevel)} className={`min-h-11 rounded-control border px-2 py-2 text-center text-xs leading-tight ${selected ? 'border-accent bg-accent-soft font-semibold text-accent' : 'border-divider-soft bg-canvas text-ink-secondary'} ${canSave ? 'cursor-pointer' : 'cursor-not-allowed opacity-60'}`}><span className="block font-bold">{optionLabel}</span><span className="mt-0.5 block">{text}</span></button> })}</div></div> })}</div></section>
       </main>
-      <aside className="space-y-3"><section className="rounded-card border border-hairline bg-canvas p-4"><h2 className="text-sm font-bold text-ink">この決め方で、この人にはこう見えます</h2><div className="mt-3 space-y-3 text-xs text-ink-secondary"><p><b className="text-ink">◉　サイドメニューに出るのは4項目</b><br />　　受信箱・友だち・友だち属性・予約管理・コンテンツ</p><p><b className="text-ink">◉　出さない項目はURLを直に打っても開けません</b><br />　　「見る権限がありません」と出ます</p><p><b className="text-ink">◉　電話番号と住所は伏せます</b><br />　　下4桁だけが見えます。コピーもできません</p></div></section><section className="rounded-card border border-hairline bg-canvas p-4"><h2 className="text-sm font-bold text-ink">つながる先</h2><div className="mt-3 space-y-3 text-xs"><p className="font-bold text-action">→ 機能設定</p><p className="font-bold text-action">→ 入った記録</p><p className="font-bold text-action">→ 運用状態</p><p className="font-bold text-action">→ 予約設定</p></div></section><section className="rounded-card border border-warning bg-warning-bg p-4"><h2 className="text-sm font-bold text-warning">気をつけること</h2><p className="mt-2 text-xs font-bold text-warning">配信を出さないと、受信箱からの返信もできません</p><p className="mt-2 text-xs text-warning">保存すると、対象者はもう一度ログインする必要があります。</p></section></aside>
+      <aside className="space-y-3"><section className="rounded-card border border-hairline bg-canvas p-4"><div className="flex flex-wrap items-center justify-between gap-2"><h2 className="text-sm font-bold text-ink">この決め方で、この人にはこう見えます</h2>{dirty ? <span className="rounded-full bg-accent-soft px-2 py-0.5 text-xs font-semibold text-accent">変更後の予定</span> : null}</div><div className="mt-3 space-y-3 text-xs text-ink-secondary"><p><b className="text-ink">◉　メニューに出るのは{visibleItems.length}項目</b><br />　　{visibleItems.length > 0 ? visibleItems.map((item) => item.label).join('・') : '出る項目はありません'}</p><p><b className="text-ink">◉　出さないのは{hiddenItems.length}項目</b><br />　　{hiddenItems.length > 0 ? `${hiddenItems.map((item) => item.label).join('・')}。URLを直に打っても「見る権限がありません」と出ます` : '出さない項目はありません'}</p><p><b className="text-ink">◉　{piiNote}</b></p>{changedItems === null ? <p><b className="text-ink">◉　いまの設定は個別に決められているため、ここから変わる項目の内訳は未確認です</b></p> : changedItems.length > 0 ? <p><b className="text-ink">◉　いまの設定から変わるのは{changedItems.length}項目</b><br />　　{changedItems.map((item) => item.label).join('・')}</p> : <p><b className="text-ink">◉　いまの設定と同じ内容です</b></p>}</div></section><section className="rounded-card border border-hairline bg-canvas p-4"><h2 className="text-sm font-bold text-ink">つながる先</h2>{/* LAY-10: 見た目だけの矢印をやめ、本物のリンクにする。開くと未保存の下書きは捨ててその画面へ移る（キャンセルと同じ扱い）。 */}<div className="mt-3 space-y-3 text-xs"><Link href="/settings" onClick={onClose} className="block font-bold text-action hover:underline">→ 機能設定</Link><Link href="/staff?tab=audit" onClick={onClose} className="block font-bold text-action hover:underline">→ 入った記録</Link><Link href="/emergency" onClick={onClose} className="block font-bold text-action hover:underline">→ 運用状態</Link><Link href="/booking/menus" onClick={onClose} className="block font-bold text-action hover:underline">→ 予約設定</Link></div></section><section className="rounded-card border border-warning bg-warning-bg p-4"><h2 className="text-sm font-bold text-warning">気をつけること</h2><p className="mt-2 text-xs font-bold text-warning">配信を出さないと、受信箱からの返信もできません</p><p className="mt-2 text-xs text-warning">保存すると、対象者はもう一度ログインする必要があります。</p></section></aside>
     </div>
-    <div className="fixed bottom-0 right-0 z-20 flex items-center justify-between gap-3 border-t border-hairline bg-canvas px-8 shadow-lg" style={{ left: 'var(--sidebar-width, 240px)', height: 72 }}>{saveError ? <p className="text-xs font-medium text-danger">{saveError}</p> : <p className="text-xs text-ink-faint">{user.name}さんはいま「{ACCESS_ROLE_LABEL[user.roleBundle]}」です。保存前に、対象者が再ログインすることを確認します。</p>}<div className="flex gap-2"><Button variant="secondary" onClick={onClose}>×　キャンセル</Button><Button disabled={saving} onClick={requestSave}>✓　{saving ? '保存中…' : '見せる範囲を保存'}</Button></div></div>
+    {/*
+      LAY-08: バーはビュー幅に追従する。メニューが無い幅では全幅、
+      PC（1280px以上）は実在するメニュー256pxぶんだけ左を空ける。
+      狭い幅では説明は本文（いまの権限カード）へ移し、下部は操作だけに絞る。
+      高さは固定せず、長いエラー文は折り返してボタンを隠さない。
+    */}
+    <div className="fixed inset-x-0 bottom-0 z-20 flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-t border-hairline bg-canvas px-4 py-3 shadow-lg sm:px-8 xl:left-64">{saveError ? <p className="min-w-0 flex-1 text-xs font-medium text-danger">{saveError}</p> : <p className="hidden min-w-0 flex-1 text-xs text-ink-faint md:block">{user.name}さんはいま「{ACCESS_ROLE_LABEL[user.roleBundle]}」です。保存前に、対象者が再ログインすることを確認します。</p>}<div className="ml-auto flex shrink-0 gap-2"><Button variant="secondary" onClick={onClose}>×　キャンセル</Button><Button disabled={saving} onClick={requestSave}>✓　{saving ? '保存中…' : '見せる範囲を保存'}</Button></div></div>
     <ConfirmDialog
       open={saveConfirmOpen}
       title={`${user.name}さんの見せる範囲を保存しますか？`}
@@ -614,7 +653,7 @@ function StaffPageHost() {
     const copyCandidates = accessUsers.filter((candidate): candidate is CopyableAccessUser => (
       candidate.id !== permissionTarget.id && candidate.roleBundle !== 'custom'
     ))
-    return <PermissionScopeView user={permissionTarget} memberId={memberById.get(permissionTarget.id)?.id ?? null} canSave={administrator} copyCandidates={copyCandidates} onClose={() => setPermissionTarget(null)} onSaved={finishPermissionSave} />
+    return <PermissionScopeView user={permissionTarget} memberId={memberById.get(permissionTarget.id)?.id ?? null} canSave={administrator} copyCandidates={copyCandidates} roleCounts={accessSummary.roleCounts} onClose={() => setPermissionTarget(null)} onSaved={finishPermissionSave} />
   }
   return <div data-design-node="e3jz3"><div className="mb-4" data-tabs-row><MergedTabs basePath="/staff" tabs={staffTabs} active={tab} defaultKey="members" actions={tabAction} /></div>
     {/*
