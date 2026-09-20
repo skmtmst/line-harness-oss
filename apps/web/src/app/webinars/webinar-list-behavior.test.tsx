@@ -201,6 +201,65 @@ describe('ウェビナー一覧の表示状態と操作', () => {
       .toContain('条件に合うウェビナーはありません')
   })
 
+  it('読込・空・失敗は ListState の1枚だけで、一覧の器と二重の面にならない(DETAIL-01)', () => {
+    const common = {
+      accountLoading: false,
+      loading: false,
+      selectedAccountId: 'account-1',
+      accountsCount: 1,
+      loadFailure: null,
+      visibleItems: [] as WebinarListItem[],
+      panelGrand: 0,
+      refreshing: false,
+      onRetry: vi.fn(),
+      onArchive: vi.fn(),
+    }
+    const failure = webinarLoadFailure(new ApiError(500, 'failed'))
+    for (const html of [
+      /* 読込中 */
+      renderToStaticMarkup(<WebinarListContent {...common} loading />),
+      /* 0件 */
+      renderToStaticMarkup(<WebinarListContent {...common} />),
+      /* 検索0件 */
+      renderToStaticMarkup(<WebinarListContent {...common} panelGrand={4} />),
+      /* 失敗(行なし) */
+      renderToStaticMarkup(<WebinarListContent {...common} loadFailure={failure} />),
+    ]) {
+      /*
+       * 白い器(360px)の中に灰色の ListState を置くと、案内の下に
+       * 用途のない余白が残る。状態の1枚は器なしで描く。
+       */
+      expect(html).toContain('data-list-state')
+      expect(html).not.toContain('min-h-[360px]')
+      expect(html).not.toContain('bg-canvas')
+    }
+    /* 行があるときは一覧の器で包む */
+    const withRows = renderToStaticMarkup(
+      <WebinarListContent {...common} visibleItems={[webinar()]} panelGrand={1} />,
+    )
+    expect(withRows).toContain('min-h-[360px]')
+    expect(withRows).toContain('入門ウェビナー')
+  })
+
+  it('新規作成の操作名は画面内で一致する(DETAIL-02)', () => {
+    const html = renderToStaticMarkup(
+      <WebinarListContent
+        accountLoading={false}
+        loading={false}
+        selectedAccountId="account-1"
+        accountsCount={1}
+        loadFailure={null}
+        visibleItems={[]}
+        panelGrand={0}
+        refreshing={false}
+        onRetry={vi.fn()}
+        onArchive={vi.fn()}
+      />,
+    )
+    expect(html).toContain('ウェビナーを作成')
+    expect(html).not.toContain('ウェビナーを作る')
+  })
+
   it('再検索が失敗しても直前の行を残し、再読み込み操作を受け付ける', async () => {
     const list = vi.fn<(accountId: string, params: WebinarListParams) => Promise<{ data: WebinarListResponse }>>()
       .mockRejectedValue(new ApiError(500, 'failed'))
