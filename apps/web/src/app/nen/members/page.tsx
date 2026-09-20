@@ -1,7 +1,7 @@
 'use client'
 
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Suspense, useCallback, useEffect, useState } from 'react'
+import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import PageHeader from '@/components/shared/page-header'
 import ScrollableTabs from '@/components/layout/scrollable-tabs'
 import { useAccount } from '@/contexts/account-context'
@@ -41,17 +41,35 @@ function MembersInner() {
   const tab: MemberTab = tabParam === 'ranks' ? 'ranks' : tabParam === 'lifetime' ? 'lifetime' : 'members'
 
   const [status, setStatus] = useState<LoadStatus>('loading')
-  const [settings, setSettings] = useState<NenRankSettingsData | null>(null)
+  /*
+   * 設定は「どのアカウントのものか」を一緒に持つ対象スナップショット（DEEP-21）。
+   * 遅れて届いたAの応答や、切替前に始めたAの保存応答が、Bの画面へ混ざらないようにする。
+   */
+  const [snapshot, setSnapshot] = useState<{ accountId: string; data: NenRankSettingsData } | null>(null)
+  /** 要求世代。アカウント切替後に届いた古い応答を捨てる。 */
+  const generationRef = useRef(0)
+  /** 表示中のアカウント。切替の瞬間に読み込み表示へ戻す。 */
+  const [viewAccountId, setViewAccountId] = useState(selectedAccountId)
+
+  if (viewAccountId !== selectedAccountId) {
+    setViewAccountId(selectedAccountId)
+    setStatus('loading')
+  }
 
   const load = useCallback(async () => {
     if (!selectedAccountId) return
+    const generation = ++generationRef.current
+    const account = selectedAccountId
     setStatus('loading')
     try {
-      const res = await nenRanksApi.settings(selectedAccountId)
+      const res = await nenRanksApi.settings(account)
       if (!res.success) throw new Error(res.error)
-      setSettings(res.data)
+      // 新しい要求が出ている＝アカウント切替済み。古い応答は捨てる。
+      if (generationRef.current !== generation) return
+      setSnapshot({ accountId: account, data: res.data })
       setStatus('ready')
     } catch (caught) {
+      if (generationRef.current !== generation) return
       setStatus(caught instanceof ApiError && caught.status === 403 ? 'forbidden' : 'error')
     }
   }, [selectedAccountId])
@@ -60,7 +78,18 @@ function MembersInner() {
     void load()
   }, [load])
 
+  /*
+   * 保存応答は、いま持っているスナップショットと同じアカウントのものだけ反映する。
+   * 切替後に届いたAの保存結果をBの画面へ置かない（新しい側は load が取り直す）。
+   */
+  const handleSaved = useCallback((forAccountId: string, next: NenRankSettingsData) => {
+    setSnapshot((current) => (current && current.accountId === forAccountId ? { accountId: forAccountId, data: next } : current))
+  }, [])
+
   const changeTab = (next: MemberTab) => router.replace(next === 'members' ? '/nen/members' : `/nen/members?tab=${next}`)
+
+  // 選択中アカウントの設定だけを下のタブへ渡す。別アカウントのものは渡さない。
+  const settings = snapshot && snapshot.accountId === selectedAccountId ? snapshot.data : null
 
   return (
     <div data-design-node="IqL2Z" className="flex flex-col gap-4">
@@ -78,9 +107,9 @@ function MembersInner() {
       </div>
 
       {!selectedAccountId ? null : tab === 'ranks' ? (
-        <RankSettingsTab accountId={selectedAccountId} status={status} settings={settings} onSaved={setSettings} onRetry={() => void load()} />
+        <RankSettingsTab accountId={selectedAccountId} status={status} settings={settings} onSaved={handleSaved} onRetry={() => void load()} />
       ) : tab === 'lifetime' ? (
-        <LifetimeTab accountId={selectedAccountId} status={status} settings={settings} onSaved={setSettings} onRetry={() => void load()} />
+        <LifetimeTab accountId={selectedAccountId} status={status} settings={settings} onSaved={handleSaved} onRetry={() => void load()} />
       ) : (
         <MembersTab accountId={selectedAccountId} settingsStatus={status} settings={settings} />
       )}
