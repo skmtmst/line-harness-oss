@@ -14,16 +14,24 @@ const PAGE = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'pets-ta
  */
 describe('ペット一覧の操作列（#984 LAY-17）', () => {
   it('表の操作列は先に幅を確保する', () => {
-    // 「編集」「詳細」が横に並べて入る幅。w-16（64px）へは戻さない。
-    expect(PAGE).toContain('w-28')
+    // 「飼い主」「編集」の枠付きボタンが横に並べて入る幅。w-16（64px）へは戻さない。
+    expect(PAGE).toContain('w-40')
     expect(PAGE).not.toContain('<Th className="w-16"')
   })
 
   it('操作は折り返さず縮まない', () => {
-    // 折り返し禁止は共用 ActionCell（white-space: nowrap）で担保する。
+    // 折り返し禁止は共用 ActionCell と RowActions（white-space: nowrap）で担保する。
     expect(PAGE).toContain('<ActionCell>')
-    expect(PAGE).toContain('whitespace-nowrap')
-    expect(PAGE).toContain('shrink-0')
+    expect(PAGE).toContain('<RowActions')
+  })
+
+  it('行の操作は共用 RowActions で「詳細→編集」の順にする（#985 LAY-18）', () => {
+    // 「詳細」の行き先は飼い主の友だち詳細なので「飼い主」と明記する。
+    expect(PAGE).toContain("import { RowActions } from '@/components/shared/row-actions'")
+    expect(PAGE).toContain("detail={{ label: '飼い主'")
+    expect(PAGE).toContain('edit={canEdit ? { onClick: onEdit } : undefined}')
+    // 画面ごとの裸の文字リンク・ボタン装飾へは戻さない。
+    expect(PAGE).not.toContain('text-accent-deep">編集</button>')
   })
 
   it('スマホではカードの下に操作行を置く', () => {

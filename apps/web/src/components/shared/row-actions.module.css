@@ -39,7 +39,8 @@
   outline-offset: 2px;
 }
 
-.icon {
+/* 中のアイコンは18px。ボタンの直下に置くのでクラスは振らない。 */
+.action > svg {
   width: 18px; /* width: 18 */
   height: 18px; /* height: 18 */
 }
@@ -60,4 +61,36 @@
 
 .grip:active {
   cursor: grabbing;
+}
+
+/* ------------------------------------------------------------- LAY-18 */
+
+/*
+ * #985 LAY-18: 一覧行の右端に置く操作の並び。
+ * 「詳細」「編集」の枠付き補助ボタン（共通 Button）と「⋯」を
+ * 同じ順・同じ余白で出す。文字は折り返さず、各操作は縮めない。
+ */
+.rowActions {
+  position: relative; /* 「⋯」メニューの基準位置 */
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+
+.rowActions > * {
+  flex: none;
+}
+
+/* 行の補助ボタンは1行で読める高さを保つ（寸法・色は共通 Button）。 */
+.rowButton {
+  white-space: nowrap;
+}
+
+/* タッチ端末は指の当たり判定のため44pxを確保する（LAY-18）。 */
+@media (pointer: coarse) {
+  .action {
+    width: 44px;
+    height: 44px;
+  }
 }

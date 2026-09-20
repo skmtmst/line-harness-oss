@@ -216,6 +216,8 @@ shared-button-importer components/shared/dialog.tsx
 shared-button-importer components/shared/folder-panel.tsx
 shared-button-importer components/shared/list-state.tsx
 shared-button-importer components/shared/not-connected.tsx
+# #985 LAY-18: 一覧の行の操作（詳細・編集）が共通Buttonを使う。
+shared-button-importer components/shared/row-actions.tsx
 shared-button-importer components/store-selection-gate.tsx
 shared-button-importer components/templates/message-template-editor.tsx
 shared-button-importer components/ui/kpi-collapse.tsx
@@ -251,5 +253,3 @@ shared-button-importer app/nen/members/rank-settings-tab.tsx
 shared-button-importer app/nen/pets/feeding-tab.tsx
 shared-button-importer app/nen/pets/page.tsx
 shared-button-importer app/nen/pets/pet-editor.tsx
-# #984 LAY-17: スマホのペットカード操作行が共通Buttonを使う。
-shared-button-importer app/nen/pets/pets-tab.tsx

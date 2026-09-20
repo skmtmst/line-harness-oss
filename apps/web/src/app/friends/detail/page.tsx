@@ -1248,7 +1248,12 @@ function FriendDetailInner() {
                 */}
                 <section className="bg-canvas rounded-card border-hairline overflow-hidden border shadow-card">
                   <div className="flex items-center justify-between px-4 py-3"><h2 className="text-ink text-sm font-bold">最近の履歴</h2><Link href={`/friends/detail?id=${friendId}&tab=history`} className="text-accent text-xs font-semibold">すべてを見る →</Link></div>
-                  <div className="bg-canvas-sunken border-hairline grid border-y px-4 py-3 text-xs font-semibold text-ink-faint" style={{ gridTemplateColumns: '140px 160px 1fr 140px' }}><span>日時</span><span>種別</span><span>内容</span><span>アカウント</span></div>
+                  {/*
+                    #985 CHK-04: 140+160+140pxの固定列は狭い幅で
+                    親の overflow-hidden に欠ける。md 未満では見出しを
+                    畳み、各行は折り返すカードにする。
+                  */}
+                  <div className="bg-canvas-sunken border-hairline hidden border-y px-4 py-3 text-xs font-semibold text-ink-faint md:grid" style={{ gridTemplateColumns: '140px 160px 1fr 140px' }}><span>日時</span><span>種別</span><span>内容</span><span>アカウント</span></div>
                   {historyStatus === 'loading' ? (
                     <p className="text-ink-faint px-4 py-5 text-xs">履歴を読み込んでいます…</p>
                   ) : historyStatus === 'error' ? (
@@ -1267,12 +1272,12 @@ function FriendDetailInner() {
                       {historyItems.slice(0, 5).map((item) => (
                         <div
                           key={item.id}
-                          className="text-ink-secondary grid px-4 py-3 text-xs"
+                          className="text-ink-secondary flex flex-wrap items-baseline gap-x-3 gap-y-1 border-b border-hairline px-4 py-3 text-xs last:border-b-0 md:grid md:border-b-0"
                           style={{ gridTemplateColumns: '140px 160px 1fr 140px' }}
                         >
                           <span>{new Date(item.occurredAt).toLocaleString('ja-JP')}</span>
                           <span>{timelineTypeLabel(item.type)}</span>
-                          <span>{item.summary}</span>
+                          <span className="min-w-0 flex-1 basis-full md:basis-auto">{item.summary}</span>
                           <span className="truncate">{item.lineAccount?.name ?? '—'}</span>
                         </div>
                       ))}
@@ -1280,7 +1285,7 @@ function FriendDetailInner() {
                         友だち追加の記録は本体の作成日時から出す実データ。
                         活動履歴が0件のときは、この記録だけが履歴になる。
                       */}
-                      <div className="text-ink-secondary border-hairline grid border-t px-4 py-3 text-xs" style={{ gridTemplateColumns: '140px 160px 1fr 140px' }}><span>{friend.createdAt ? new Date(friend.createdAt).toLocaleDateString('ja-JP') : '—'}</span><span>友だち追加</span><span>{friend.firstTrackedLinkName ? `${friend.firstTrackedLinkName}から追加されました` : '友だちに追加されました'}</span><span>システム</span></div>
+                      <div className="text-ink-secondary border-hairline flex flex-wrap items-baseline gap-x-3 gap-y-1 border-t px-4 py-3 text-xs md:grid" style={{ gridTemplateColumns: '140px 160px 1fr 140px' }}><span>{friend.createdAt ? new Date(friend.createdAt).toLocaleDateString('ja-JP') : '—'}</span><span>友だち追加</span><span className="min-w-0 flex-1 basis-full md:basis-auto">{friend.firstTrackedLinkName ? `${friend.firstTrackedLinkName}から追加されました` : '友だちに追加されました'}</span><span>システム</span></div>
                       {historyStatus === 'ready' && historyItems.length === 0 ? (
                         <p className="text-ink-faint px-4 pb-4 text-xs">
                           上の「友だち追加の記録」以外の活動履歴はまだありません。
@@ -1394,7 +1399,8 @@ function FriendDetailInner() {
             */}
             {tab === 'history' && (
               <div className="bg-canvas rounded-card border-hairline overflow-hidden border">
-                <div className="bg-canvas-sunken border-hairline grid border-b px-4 py-3 text-xs font-semibold text-ink-faint" style={{ gridTemplateColumns: '140px 160px 1fr 140px' }}>
+                {/* #985 CHK-04: 概要タブと同じく、狭い幅では見出しを畳みカードにする。 */}
+                <div className="bg-canvas-sunken border-hairline hidden border-b px-4 py-3 text-xs font-semibold text-ink-faint md:grid" style={{ gridTemplateColumns: '140px 160px 1fr 140px' }}>
                   <span>日時</span><span>種別</span><span>内容</span><span>アカウント</span>
                 </div>
                 {historyStatus === 'loading' ? (
@@ -1411,21 +1417,21 @@ function FriendDetailInner() {
                     {historyItems.map((item) => (
                       <div
                         key={item.id}
-                        className="text-ink-secondary border-hairline grid border-b px-4 py-3 text-xs last:border-b-0"
+                        className="text-ink-secondary border-hairline flex flex-wrap items-baseline gap-x-3 gap-y-1 border-b px-4 py-3 text-xs last:border-b-0 md:grid"
                         style={{ gridTemplateColumns: '140px 160px 1fr 140px' }}
                       >
                         <span>{new Date(item.occurredAt).toLocaleString('ja-JP')}</span>
                         <span>{timelineTypeLabel(item.type)}</span>
-                        <span>{item.summary}</span>
+                        <span className="min-w-0 flex-1 basis-full md:basis-auto">{item.summary}</span>
                         <span className="truncate">{item.lineAccount?.name ?? '—'}</span>
                       </div>
                     ))}
                     {/* 最後まで取れたときだけ、いちばん古い記録として友だち追加を末尾に出す。 */}
                     {!historyNextCursor ? (
-                      <div className="text-ink-secondary border-hairline grid border-t px-4 py-3 text-xs" style={{ gridTemplateColumns: '140px 160px 1fr 140px' }}>
+                      <div className="text-ink-secondary border-hairline flex flex-wrap items-baseline gap-x-3 gap-y-1 border-t px-4 py-3 text-xs md:grid" style={{ gridTemplateColumns: '140px 160px 1fr 140px' }}>
                         <span>{friend.createdAt ? new Date(friend.createdAt).toLocaleDateString('ja-JP') : '—'}</span>
                         <span>友だち追加</span>
-                        <span>{friend.firstTrackedLinkName ? `${friend.firstTrackedLinkName}から追加されました` : '友だちに追加されました'}</span>
+                        <span className="min-w-0 flex-1 basis-full md:basis-auto">{friend.firstTrackedLinkName ? `${friend.firstTrackedLinkName}から追加されました` : '友だちに追加されました'}</span>
                         <span>システム</span>
                       </div>
                     ) : null}
