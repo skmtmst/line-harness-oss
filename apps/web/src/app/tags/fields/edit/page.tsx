@@ -120,8 +120,8 @@ function EditFriendFieldForm() {
 
   const locked = field.isInherited === true
 
+  // 編集画面のPencilノードは未定。新規作成の A1ZYeP を仮に名乗ると誤比較されるので付けない。
   return (
-    {/* 編集画面のPencilノードは未定。新規作成の A1ZYeP を仮に名乗ると誤比較されるので付けない。 */}
     <div>
       <div className="mb-4 flex items-center justify-between gap-4">
         <Breadcrumb items={[{ label: '友だち情報欄', href: '/tags?tab=fields' }, { label: field.name }]} />
