@@ -1,16 +1,19 @@
 'use client'
 
-import Link from 'next/link'
 import { useCallback, useEffect, useState } from 'react'
 import type { ApiResponse, LineAccount } from '@line-crm/shared'
 import { api, fetchApi, type UidMigrationItem, type UidMigrationRun } from '@/lib/api'
 import Button from '@/components/shared/button'
+import Breadcrumb from '@/components/shared/breadcrumb'
 import ListState from '@/components/shared/list-state'
 import SelectField from '@/components/shared/select-field'
 import StatusBadge from '@/components/shared/status-badge'
 import SummaryCard from '@/components/shared/summary-card'
 import { TableHeadRow, Th } from '@/components/shared/table'
+import { TextField } from '@/components/shared/text-field'
+import MergedTabs from '@/components/layout/merged-tabs'
 import { usePageTitle } from '@/components/shell/page-chrome'
+import { FRIENDS_MERGED_TABS } from '@/app/friends/friends-tabs'
 
 const STEPS = ['移行の登録', '対応表の取込', '事前確認', '要確認の判断', '本移行と照合'] as const
 
@@ -210,14 +213,28 @@ export default function AccountMigration() {
 
   return (
     <div data-design-node="vtBCu">
-      <nav aria-label="友だち画面" className="border-hairline mb-4 flex min-h-10 items-start gap-5 border-b text-sm">
-        <Link href="/friends" className="text-ink-secondary pb-3">友だち一覧</Link>
-        <Link href="/friends?tab=duplicates" className="text-ink-secondary pb-3">重複検出</Link>
-        <Link href="/friends?tab=merged" className="text-ink-secondary pb-3">統合ユーザー</Link>
-        <span className="border-action text-action border-b-2 pb-3 font-semibold">UID移行</span>
-        <a href="#migration-history" className="text-ink-secondary pb-3">移行履歴</a>
-        <Button href="/friends/migrations" className="ml-auto">CSVで書き出す・取り込む</Button>
-      </nav>
+      {/*
+        #984 LAY-14: 主タブは友だち一覧側と同じ定義・同じ部品・同じ選択色。
+        手書き nav（選択が青の別実装）はやめる。「移行履歴」は主タブに
+        増やさず、ページ内の履歴節へ飛ぶ補助リンクとして右端へ置く。
+      */}
+      <div className="mb-4" data-design="V6Tabs">
+        <MergedTabs
+          basePath="/friends"
+          tabs={FRIENDS_MERGED_TABS}
+          active="uid-migration"
+          actions={(
+            <>
+              <Button href="#migration-history">移行履歴</Button>
+              <Button href="/friends/migrations">CSVで書き出す・取り込む</Button>
+            </>
+          )}
+        />
+      </div>
+      {/* 現在地：UID移行は友だちのタブ。左メニューの選択も友だち（lib/menu.ts）。 */}
+      <div className="mb-4">
+        <Breadcrumb items={[{ label: '友だち', href: '/friends' }, { label: 'UID移行' }]} />
+      </div>
 
       <div className="bg-canvas rounded-card border-hairline mb-4 grid grid-cols-5 border">
         {STEPS.map((step, index) => <div key={step} className="border-hairline border-r px-3 py-3 last:border-r-0">
@@ -227,12 +244,33 @@ export default function AccountMigration() {
       </div>
 
       <div className="bg-success-bg text-success mb-4 rounded-control px-4 py-3 text-sm font-medium">本移行まで、既存ユーザー・配信・シナリオには影響しません。</div>
-      <section className="bg-canvas rounded-card border-hairline mb-4 border p-4">
-        <div className="grid gap-3 lg:grid-cols-3">
-          <label className="text-ink-secondary text-xs font-semibold">移行元<SelectField aria-label="移行元アカウント" value={fromAccountId} onChange={(event) => setFromAccountId(event.target.value)} options={[{ value: '', label: '移行元アカウントを選択' }, ...accounts.map((account) => ({ value: account.id, label: account.name }))]} /></label>
-          <label className="text-ink-secondary text-xs font-semibold">移行先<SelectField aria-label="移行先アカウント" value={toAccountId} onChange={(event) => setToAccountId(event.target.value)} options={[{ value: '', label: '移行先アカウントを選択' }, ...accounts.map((account) => ({ value: account.id, label: account.name }))]} /></label>
-          <label className="text-ink-secondary text-xs font-semibold">利用目的<input value={purpose} onChange={(event) => setPurpose(event.target.value)} className="border-hairline rounded-control mt-1 h-9 w-full border px-3 text-sm" /></label>
+      {/*
+        #984 LAY-13: 段組みと寸法をそろえる。
+        1段目「移行元 → 移行先」は同幅の2欄（狭い幅では1列）、
+        2段目は全幅の利用目的、3段目はCSVとファイル状態、最後は操作行。
+        ラベルと入力の間は8px、入力の高さは40pxでそろえる。
+        プルダウンの既定幅176pxは部品側のCSS（レイヤなし）なので、
+        Tailwind の w-full では上書きできない。共有部品には触らず、
+        U063と同じ属性スコープ（data-selects-wide）でこの画面の
+        select だけを欄いっぱいに広げる。
+      */}
+      <section data-selects-wide className="bg-canvas rounded-card border-hairline mb-4 border p-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+          <label className="text-ink-secondary block min-w-0 flex-1 text-xs font-semibold">
+            <span className="mb-2 block">移行元</span>
+            <SelectField aria-label="移行元アカウント" value={fromAccountId} onChange={(event) => setFromAccountId(event.target.value)} options={[{ value: '', label: '移行元アカウントを選択' }, ...accounts.map((account) => ({ value: account.id, label: account.name }))]} />
+          </label>
+          <span aria-hidden="true" className="text-ink-faint hidden h-10 items-center sm:flex">→</span>
+          <label className="text-ink-secondary block min-w-0 flex-1 text-xs font-semibold">
+            <span className="mb-2 block">移行先</span>
+            <SelectField aria-label="移行先アカウント" value={toAccountId} onChange={(event) => setToAccountId(event.target.value)} options={[{ value: '', label: '移行先アカウントを選択' }, ...accounts.map((account) => ({ value: account.id, label: account.name }))]} />
+          </label>
         </div>
+        <label className="text-ink-secondary mt-3 block text-xs font-semibold">
+          <span className="mb-2 block">利用目的</span>
+          {/* 共通の入力欄（高さ40px・タッチ端末は44pxと16px文字を部品側が持つ）。 */}
+          <TextField value={purpose} onChange={(event) => setPurpose(event.target.value)} />
+        </label>
         <div className="mt-4 flex flex-wrap items-center gap-3">
           <label className="border-hairline rounded-control cursor-pointer border px-4 py-2 text-sm font-semibold">CSVをアップロード<input type="file" accept=".csv,text/csv" className="sr-only" onChange={async (event) => {
             const selected = event.target.files?.[0] ?? null
@@ -247,6 +285,8 @@ export default function AccountMigration() {
               : null)
           }} /></label>
           <span className="text-ink-secondary text-sm">{file ? `${file.name}（${mappings.length.toLocaleString()}行）` : 'ファイルは未選択です'}</span>
+        </div>
+        <div className="mt-4">
           <Button variant="primary" disabled={busy} onClick={() => void createDryRun()}>{busy ? '確認中…' : 'テスト移行を実行'}</Button>
         </div>
         {message && <p role="status" className="text-ink-secondary mt-3 text-sm">{message}</p>}
@@ -274,6 +314,14 @@ export default function AccountMigration() {
       /> : <ListState kind="empty" title="テスト移行はまだありません" description="移行元・移行先と対応表を選び、まず確認だけ実行してください。" />}
 
       <section id="migration-history" className="bg-canvas rounded-card border-hairline border"><div className="border-hairline border-b px-4 py-3"><h2 className="text-ink text-sm font-bold">移行履歴</h2></div>{runs.length === 0 ? <ListState kind="empty" title="移行履歴はまだありません" /> : <div className="divide-hairline divide-y">{runs.map((run) => <button key={run.id} className="hover:bg-canvas-sunken flex w-full items-center justify-between px-4 py-3 text-left" onClick={() => { setPage(0); setClassification(''); setPendingOnly(false); void loadDetail(run.id, 0, '', false) }}><span><span className="text-ink block text-sm font-medium">{run.purpose}</span><span className="text-ink-faint text-xs">{new Date(run.createdAt).toLocaleString('ja-JP')} ・ {run.counts.total.toLocaleString()}件</span></span><StatusBadge tone={run.status === 'completed' ? 'success' : 'neutral'}>{run.status === 'completed' ? '反映ずみ' : '確認中'}</StatusBadge></button>)}</div>}</section>
+      {/*
+        #984 LAY-13: SelectField の既定幅176pxは部品側のCSS（レイヤなし）なので、
+        Tailwind の w-full では上書きできない。共有部品には触らず、
+        U063と同じ属性スコープでこの画面の select へだけ届く全幅指定にする。
+      */}
+      <style jsx global>{`
+        [data-selects-wide] select { width: 100%; }
+      `}</style>
     </div>
   )
 }

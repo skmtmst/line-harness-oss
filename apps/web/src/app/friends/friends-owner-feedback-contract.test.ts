@@ -33,7 +33,14 @@ describe('友だち画面のオーナー指摘契約', () => {
   })
 
   it('重複候補表の見出しを下の表と同じ縦余白にする', () => {
-    expect(DUPLICATES.match(/<Th className="py-3">/g)).toHaveLength(7)
+    /*
+     * #984 LAY-12: セルへの余白直書き（py-3）ではなく、共通の
+     * TableHeadRow/Th（見出し高さ44pxを部品側が持つ）でそろえる。
+     */
+    expect(DUPLICATES).toContain("import { TableHeadRow, Th } from '@/components/shared/table'")
+    expect(DUPLICATES).toContain('<TableHeadRow>')
+    expect(DUPLICATES).not.toMatch(/<th\b/)
+    expect(DUPLICATES).not.toMatch(/<Th className="[^"]*py-/)
   })
 
   it('統合ユーザーの操作行を一重の枠と同じ高さにそろえる', () => {

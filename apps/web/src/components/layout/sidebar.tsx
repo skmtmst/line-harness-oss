@@ -7,7 +7,7 @@ import { useAccount } from '@/contexts/account-context'
 import { UNANSWERED_REFRESH_EVENT } from '@/lib/events'
 import { useBrand } from '@/lib/use-brand'
 import { restaurantTestUiEnabled } from '@/lib/environment-features'
-import { HQ_MENU_SECTIONS, orderedMenuSections, type MenuItem } from '@/lib/menu'
+import { HQ_MENU_SECTIONS, menuOwnerForScreen, orderedMenuSections, type MenuItem } from '@/lib/menu'
 import { usePageChrome } from '@/components/shell/page-chrome'
 import { defaultTitleForPath } from '@/components/shell/app-top-bar'
 import SidebarIdentity from './sidebar-identity'
@@ -116,7 +116,29 @@ export default function Sidebar({
     const sync = () => setCurrentSearch(window.location.search)
     sync()
     window.addEventListener('popstate', sync)
-    return () => window.removeEventListener('popstate', sync)
+    /*
+     * router.push/replace は popstate を出さない（popstate は戻る/進む専用）。
+     * 同じパスでクエリだけ変わる画面（/accounts → /accounts?tab=migration の
+     * UID移行など）でも所属の選択を即時に切り替えられるよう、history の
+     * 2関数だけを薄く包んで再読する。掃除のときは必ず元へ戻す。
+     */
+    const originalPushState = history.pushState
+    const originalReplaceState = history.replaceState
+    history.pushState = function (...args) {
+      const result = originalPushState.apply(this, args)
+      sync()
+      return result
+    }
+    history.replaceState = function (...args) {
+      const result = originalReplaceState.apply(this, args)
+      sync()
+      return result
+    }
+    return () => {
+      window.removeEventListener('popstate', sync)
+      history.pushState = originalPushState
+      history.replaceState = originalReplaceState
+    }
   }, [pathname])
 
   // 表示可否は全roleがstaff向けread-modelから読む。未確認/失敗を「表示可」と
@@ -329,7 +351,21 @@ export default function Sidebar({
     return best
   })()
 
-  const isActive = (href: string) => {
+  /*
+   * #984 LAY-15: URLの置き場とメニュー上の所属が違う画面は、
+   * `SCREEN_MENU_OWNER`（lib/menu.ts が正本）が選ぶ項目を光らせる。
+   * UID移行 `/accounts?tab=migration` は友だちタブの1枚なので、
+   * 「LINEアカウント」ではなく「友だち」が選ばれる。
+   * 宣言先の項目がメニューに無いときは通常のパス一致へ戻す。
+   */
+  const ownerItemId = menuOwnerForScreen(activePathname, currentSearch)
+  const hasOwnerItem = ownerItemId
+    ? sections.some((section) => section.items.some((item) => item.id === ownerItemId))
+    : false
+
+  const isActive = (item: MenuItem) => {
+    const href = item.href
+    if (hasOwnerItem) return item.id === ownerItemId
     if (href === '/') return activePathname === '/'
     const [path, query = ''] = href.split('?')
     if (path !== activeHref) return false
@@ -415,7 +451,7 @@ export default function Sidebar({
               </div>
             )}
             {section.items.map((item) => {
-              const active = isActive(item.href)
+              const active = isActive(item)
               const isDanger = 'danger' in item && item.danger
               const visibleLabel = friendAttributesV2Mode && item.href === '/tags-v2'
                 ? '友だち属性'
