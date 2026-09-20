@@ -13,6 +13,7 @@ import { ApiError } from '@/lib/api'
 import { nenRanksApi, type NenMemberListData, type NenMemberRow, type NenMemberSort, type NenRankSettingsData } from '@/lib/nen-ranks-api'
 import type { LoadStatus } from './page'
 import { RankChip, yen } from './rank-view'
+import KpiCollapse from '@/components/ui/kpi-collapse'
 
 type ListStatus = 'loading' | 'ready' | 'error' | 'forbidden'
 
@@ -63,7 +64,7 @@ export default function MembersTab({
 
   return (
     <>
-      <div data-design="KPIs" data-design-node="THwtN" className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <KpiCollapse data-design="KPIs" data-design-node="THwtN" gridClassName="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <SummaryCard variant="v6" title="LINE連携済みの会員" value={ready ? kpis!.members : null} unit="人" detail="ECの会員と結びついた友だち" loading={!ready && settingsStatus === 'loading'} />
         <SummaryCard variant="v6" title="通年 合計" value={ready ? kpis!.annualTotalYen : null} unit="円" detail="1/1〜今日の購入額" loading={!ready && settingsStatus === 'loading'} />
         <SummaryCard
@@ -75,7 +76,7 @@ export default function MembersTab({
           loading={!ready && settingsStatus === 'loading'}
         />
         <SummaryCard variant="v6" title="マイル残高 合計" value={ready ? kpis!.balanceTotal : null} unit="マイル" detail={ready ? `今月 使われた ${kpis!.usedThisMonth.toLocaleString('ja-JP')}マイル` : '—'} loading={!ready && settingsStatus === 'loading'} />
-      </div>
+      </KpiCollapse>
 
       <div data-design="Note" data-design-node="G9TVE">
         <NoteBar tone="info">

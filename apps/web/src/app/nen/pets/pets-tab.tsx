@@ -8,6 +8,7 @@ import NoteBar from '@/components/shared/note-bar'
 import Pagination from '@/components/shared/pagination'
 import Select from '@/components/shared/select'
 import SummaryCard from '@/components/shared/summary-card'
+import KpiCollapse from '@/components/ui/kpi-collapse'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { TextField } from '@/components/shared/text-field'
 import { ApiError, api } from '@/lib/api'
@@ -76,12 +77,12 @@ export default function PetsTab({
 
   return (
     <>
-      <div data-design="KPIs" data-design-node="pets-kpis" className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <KpiCollapse data-design="KPIs" data-design-node="pets-kpis" gridClassName="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <SummaryCard variant="v6" title="登録ペット" value={ready ? kpis!.total : null} unit="頭" detail={ready ? `犬 ${kpis!.dogs}・猫 ${kpis!.cats}` : '—'} loading={!ready && status === 'loading'} />
         <SummaryCard variant="v6" title="今月の新規登録" value={ready ? kpis!.newThisMonth : null} unit="頭" detail="1日〜今日に登録されたペット" loading={!ready && status === 'loading'} />
         <SummaryCard variant="v6" title="目安を出せるペット" value={ready ? kpis!.computable : null} unit="頭" detail="体重・主食が揃っている" loading={!ready && status === 'loading'} />
         <SummaryCard variant="v6" title="体重が未更新（90日）" value={ready ? kpis!.staleWeight : null} unit="頭" detail="マイページで更新を促す" loading={!ready && status === 'loading'} />
-      </div>
+      </KpiCollapse>
 
       <div data-design="Note" data-design-node="pets-note">
         <NoteBar tone="info">
