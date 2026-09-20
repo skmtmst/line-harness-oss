@@ -10109,6 +10109,8 @@ export const api = {
       q?: string;
       onlyDups?: boolean;
       account?: string;
+      /** FRIEND-09: UID連携の絞り込みは全件へかけるサーバー条件。 */
+      uid?: 'linked' | 'unlinked';
       page?: number;
       pageSize?: number;
       forceRefresh?: boolean;
@@ -10117,6 +10119,7 @@ export const api = {
       if (opts?.q) p.set('q', opts.q);
       if (opts?.onlyDups) p.set('onlyDups', '1');
       if (opts?.account) p.set('account', opts.account);
+      if (opts?.uid) p.set('uid', opts.uid);
       if (opts?.page) p.set('page', String(opts.page));
       if (opts?.pageSize) p.set('pageSize', String(opts.pageSize));
       if (opts?.forceRefresh) p.set('refresh', '1');
@@ -10775,16 +10778,20 @@ export const api = {
   identityCandidates: {
     list: (params: {
       kind: IdentityCandidateKind
-      status?: IdentityCandidateStatus
+      /** 'all' は状態で絞らない（FRIEND-11。「すべて」が pending だけを見せていた）。 */
+      status?: IdentityCandidateStatus | 'all'
       lineAccountId?: string
       limit?: number
       offset?: number
+      /** FRIEND-11: 名前・根拠の検索語。サーバー側で全件へかける。 */
+      q?: string
     }) => {
       const query = new URLSearchParams({ kind: params.kind })
       if (params.status) query.set('status', params.status)
       if (params.lineAccountId) query.set('lineAccountId', params.lineAccountId)
       if (params.limit !== undefined) query.set('limit', String(params.limit))
       if (params.offset !== undefined) query.set('offset', String(params.offset))
+      if (params.q) query.set('q', params.q)
       return fetchApi<ApiResponse<IdentityCandidateList>>(`/api/identity-candidates?${query.toString()}`)
     },
     get: (id: string) =>
