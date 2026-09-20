@@ -25,6 +25,18 @@ import {
 const ACCOUNT_1 = 'account-1';
 const ACCOUNT_2 = 'account-2';
 
+const MINUTE_MS = 60 * 1000;
+const HOUR_MS = 60 * MINUTE_MS;
+const DAY_MS = 24 * HOUR_MS;
+
+// 固定日時は置かない。実行時点 +48h を「予約・個別相談の開始時刻」の基点とし、
+// 実行行の予定・貸出期限・送信済み履歴はすべてこの基点からの相対で作る。
+// 固定日時のままだと日付をまたいだ時点で「未来の予約」「貸出中」の前提が崩れ、
+// 実時刻に依存して失敗する (時限爆弾)。
+const STARTS_AT_MS = Date.now() + 48 * HOUR_MS;
+/** 基点の開始時刻から offsetMs ずらした ISO 文字列を返す。 */
+const at = (offsetMs: number): string => new Date(STARTS_AT_MS + offsetMs).toISOString();
+
 function seedAccount(raw: import('better-sqlite3').Database, id: string): void {
   raw.prepare(
     `INSERT INTO line_accounts (id, channel_id, name, channel_access_token, channel_secret)
@@ -95,8 +107,8 @@ function seedRun(
     `idem-${id}`,
     `retry-${id}`,
     status,
-    '2026-09-01T00:00:00.000Z',
-    '2026-09-01T00:00:00.000Z',
+    at(-19 * DAY_MS),
+    at(-19 * DAY_MS),
   );
 }
 
@@ -107,7 +119,7 @@ describe('予約の取消', () => {
     insertFriend(raw, 'friend-1', { line_account_id: ACCOUNT_1 });
     seedTriggerRule(raw, 'rule-booking-1', 'booking');
 
-    const startsAt = '2026-09-20T01:00:00.000Z';
+    const startsAt = at(0);
     await enrollByTrigger(db, {
       triggerType: 'booking',
       friendId: 'friend-1',
@@ -118,11 +130,11 @@ describe('予約の取消', () => {
     });
     const enrollment = enrollmentId(raw, 'friend-1');
     // 未来の未送信と、送り終えた履歴を用意する。
-    seedRun(raw, 'run-queued', enrollment, 'friend-1', 'rule-booking-1', 'queued', '2026-09-20T00:00:00.000Z');
-    seedRun(raw, 'run-sent', enrollment, 'friend-1', 'rule-booking-1', 'succeeded', '2026-09-19T00:00:00.000Z');
+    seedRun(raw, 'run-queued', enrollment, 'friend-1', 'rule-booking-1', 'queued', at(-HOUR_MS));
+    seedRun(raw, 'run-sent', enrollment, 'friend-1', 'rule-booking-1', 'succeeded', at(-25 * HOUR_MS));
     raw.prepare(
       `INSERT INTO friend_reminder_deliveries (id, friend_reminder_id, reminder_step_id, delivered_at)
-       VALUES ('del-1', ?, 'step-rule-booking-1', '2026-09-19T00:00:00.000Z')`,
+       VALUES ('del-1', ?, 'step-rule-booking-1', '${at(-25 * HOUR_MS)}')`,
     ).run(enrollment);
 
     const result = await cancelByTrigger(db, {
@@ -159,7 +171,7 @@ describe('予約の取消', () => {
     await enrollByTrigger(db, {
       triggerType: 'booking',
       friendId: 'friend-1',
-      startsAtIso: '2026-09-20T01:00:00.000Z',
+      startsAtIso: at(0),
       sourceId: 'bk-1',
       sourceEventId: 'bk-1',
       lineAccountId: ACCOUNT_1,
@@ -169,7 +181,7 @@ describe('予約の取消', () => {
       sourceId: 'bk-1',
       sourceEventId: 'bk-1',
       friendId: 'friend-1',
-      startsAtIso: '2026-09-20T01:00:00.000Z',
+      startsAtIso: at(0),
       lineAccountId: ACCOUNT_1,
       cancelReason: 'booking_cancel:bk-1:by:staff-9',
     };
@@ -190,7 +202,7 @@ describe('予約の取消', () => {
     await enrollByTrigger(db, {
       triggerType: 'booking',
       friendId: 'friend-1',
-      startsAtIso: '2026-09-20T01:00:00.000Z',
+      startsAtIso: at(0),
       sourceId: 'bk-1',
       sourceEventId: 'bk-1',
       lineAccountId: ACCOUNT_1,
@@ -198,7 +210,7 @@ describe('予約の取消', () => {
     await enrollByTrigger(db, {
       triggerType: 'booking',
       friendId: 'friend-2',
-      startsAtIso: '2026-09-20T01:00:00.000Z',
+      startsAtIso: at(0),
       sourceId: 'bk-2',
       sourceEventId: 'bk-2',
       lineAccountId: ACCOUNT_2,
@@ -209,7 +221,7 @@ describe('予約の取消', () => {
       sourceId: 'bk-1',
       sourceEventId: 'bk-1',
       friendId: 'friend-1',
-      startsAtIso: '2026-09-20T01:00:00.000Z',
+      startsAtIso: at(0),
       lineAccountId: ACCOUNT_1,
       cancelReason: 'booking_cancel:bk-1:by:staff-9',
     });
@@ -228,7 +240,7 @@ describe('予約の取消', () => {
     await enrollByTrigger(db, {
       triggerType: 'booking',
       friendId: 'friend-1',
-      startsAtIso: '2026-09-20T01:00:00.000Z',
+      startsAtIso: at(0),
       sourceId: 'bk-1',
       sourceEventId: 'bk-1',
       lineAccountId: ACCOUNT_1,
@@ -236,7 +248,7 @@ describe('予約の取消', () => {
     await enrollByTrigger(db, {
       triggerType: 'booking',
       friendId: 'friend-1',
-      startsAtIso: '2026-09-21T01:00:00.000Z',
+      startsAtIso: at(DAY_MS),
       sourceId: 'bk-2',
       sourceEventId: 'bk-2',
       lineAccountId: ACCOUNT_1,
@@ -247,7 +259,7 @@ describe('予約の取消', () => {
       sourceId: 'bk-1',
       sourceEventId: 'bk-1',
       friendId: 'friend-1',
-      startsAtIso: '2026-09-20T01:00:00.000Z',
+      startsAtIso: at(0),
       lineAccountId: ACCOUNT_1,
       cancelReason: 'booking_cancel:bk-1:by:staff-9',
     });
@@ -266,7 +278,7 @@ describe('予約の取消', () => {
     // N-065 より前の登録には source が無い。
     raw.prepare(
       `INSERT INTO friend_reminders (id, friend_id, reminder_id, target_date, status)
-       VALUES ('legacy-1', 'friend-1', 'rule-booking-1', '2026-09-20T01:00:00.000Z', 'active')`,
+       VALUES ('legacy-1', 'friend-1', 'rule-booking-1', '${at(0)}', 'active')`,
     ).run();
 
     const result = await cancelByTrigger(db, {
@@ -274,7 +286,7 @@ describe('予約の取消', () => {
       sourceId: 'bk-1',
       sourceEventId: 'bk-1',
       friendId: 'friend-1',
-      startsAtIso: '2026-09-20T01:00:00.000Z',
+      startsAtIso: at(0),
       lineAccountId: ACCOUNT_1,
       cancelReason: 'booking_cancel:bk-1:by:staff-9',
     });
@@ -292,8 +304,8 @@ describe('イベントの日程変更', () => {
     insertFriend(raw, 'friend-1', { line_account_id: ACCOUNT_1 });
     seedTriggerRule(raw, 'rule-event-1', 'event');
 
-    const oldStartsAt = '2026-09-20T01:00:00.000Z';
-    const newStartsAt = '2026-09-27T01:00:00.000Z';
+    const oldStartsAt = at(0);
+    const newStartsAt = at(7 * DAY_MS);
     await enrollByTrigger(db, {
       triggerType: 'event',
       friendId: 'friend-1',
@@ -303,8 +315,8 @@ describe('イベントの日程変更', () => {
       lineAccountId: ACCOUNT_1,
     });
     const enrollment = enrollmentId(raw, 'friend-1');
-    seedRun(raw, 'run-future', enrollment, 'friend-1', 'rule-event-1', 'queued', '2026-09-20T00:00:00.000Z');
-    seedRun(raw, 'run-sent', enrollment, 'friend-1', 'rule-event-1', 'succeeded', '2026-09-19T00:00:00.000Z');
+    seedRun(raw, 'run-future', enrollment, 'friend-1', 'rule-event-1', 'queued', at(-HOUR_MS));
+    seedRun(raw, 'run-sent', enrollment, 'friend-1', 'rule-event-1', 'succeeded', at(-25 * HOUR_MS));
 
     const input = {
       triggerType: 'event' as const,
@@ -356,10 +368,10 @@ describe('個別相談の取消・日程変更', () => {
     insertFriend(raw, 'friend-1', { line_account_id: ACCOUNT_1 });
     seedTriggerRule(raw, 'rule-booking-1', 'booking');
 
-    const now = new Date('2026-09-01T00:00:00.000Z');
+    const now = new Date(at(-19 * DAY_MS));
     await registerMeetConsultation(
       db,
-      meetInput('google-event-a', '2026-09-20T01:00:00.000Z', '2026-09-20T01:30:00.000Z'),
+      meetInput('google-event-a', at(0), at(30 * MINUTE_MS)),
       now,
     );
     expect(raw.prepare(`SELECT COUNT(*) AS c FROM friend_reminders`).get()).toEqual({ c: 1 });
@@ -370,14 +382,14 @@ describe('個別相談の取消・日程変更', () => {
     ).toEqual({
       source_kind: 'meet',
       source_event_id: 'google-event-a',
-      target_date: '2026-09-20T01:00:00.000Z',
+      target_date: at(0),
       status: 'active',
     });
 
     // 同じ内容の再送は増やさない。
     await registerMeetConsultation(
       db,
-      meetInput('google-event-a', '2026-09-20T01:00:00.000Z', '2026-09-20T01:30:00.000Z'),
+      meetInput('google-event-a', at(0), at(30 * MINUTE_MS)),
       now,
     );
     expect(raw.prepare(`SELECT COUNT(*) AS c FROM friend_reminders`).get()).toEqual({ c: 1 });
@@ -385,12 +397,12 @@ describe('個別相談の取消・日程変更', () => {
     // 日程変更は行を増やさず新基準日へ移す。
     await registerMeetConsultation(
       db,
-      meetInput('google-event-a', '2026-09-27T01:00:00.000Z', '2026-09-27T01:30:00.000Z'),
+      meetInput('google-event-a', at(7 * DAY_MS), at(7 * DAY_MS + 30 * MINUTE_MS)),
       now,
     );
     expect(raw.prepare(`SELECT COUNT(*) AS c FROM friend_reminders`).get()).toEqual({ c: 1 });
     expect(raw.prepare(`SELECT target_date, status FROM friend_reminders`).get()).toEqual({
-      target_date: '2026-09-27T01:00:00.000Z',
+      target_date: at(7 * DAY_MS),
       status: 'active',
     });
   });
@@ -401,14 +413,14 @@ describe('個別相談の取消・日程変更', () => {
     insertFriend(raw, 'friend-1', { line_account_id: ACCOUNT_1 });
     seedTriggerRule(raw, 'rule-booking-1', 'booking');
 
-    const now = new Date('2026-09-01T00:00:00.000Z');
+    const now = new Date(at(-19 * DAY_MS));
     await registerMeetConsultation(
       db,
-      meetInput('google-event-a', '2026-09-20T01:00:00.000Z', '2026-09-20T01:30:00.000Z'),
+      meetInput('google-event-a', at(0), at(30 * MINUTE_MS)),
       now,
     );
     const enrollment = enrollmentId(raw, 'friend-1');
-    seedRun(raw, 'run-future', enrollment, 'friend-1', 'rule-booking-1', 'queued', '2026-09-20T00:00:00.000Z');
+    seedRun(raw, 'run-future', enrollment, 'friend-1', 'rule-booking-1', 'queued', at(-HOUR_MS));
 
     expect(await cancelMeetConsultation(db, 'google-event-a', now)).toBe(true);
     expect(raw.prepare(`SELECT status, cancel_reason FROM friend_reminders WHERE id = ?`).get(enrollment)).toEqual({
@@ -426,12 +438,12 @@ describe('個別相談の取消・日程変更', () => {
     // 取消後の作り直しは同じ行を起こす (二重登録なし)。
     await registerMeetConsultation(
       db,
-      meetInput('google-event-a', '2026-09-28T01:00:00.000Z', '2026-09-28T01:30:00.000Z'),
+      meetInput('google-event-a', at(8 * DAY_MS), at(8 * DAY_MS + 30 * MINUTE_MS)),
       now,
     );
     expect(raw.prepare(`SELECT COUNT(*) AS c FROM friend_reminders`).get()).toEqual({ c: 1 });
     expect(raw.prepare(`SELECT target_date, status FROM friend_reminders WHERE id = ?`).get(enrollment)).toEqual({
-      target_date: '2026-09-28T01:00:00.000Z',
+      target_date: at(8 * DAY_MS),
       status: 'active',
     });
   });
@@ -450,10 +462,10 @@ describe('個別相談の取消・日程変更', () => {
     seedTriggerRule(raw, 'rule-booking-1', 'booking', ACCOUNT_1);
     seedTriggerRule(raw, 'rule-booking-2', 'booking', ACCOUNT_2);
 
-    const now = new Date('2026-09-01T00:00:00.000Z');
+    const now = new Date(at(-19 * DAY_MS));
     await registerMeetConsultation(
       db,
-      meetInput('google-event-x', '2026-09-20T01:00:00.000Z', '2026-09-20T01:30:00.000Z', 'friend-a'),
+      meetInput('google-event-x', at(0), at(30 * MINUTE_MS), 'friend-a'),
       now,
     );
     const oldEnrollment = enrollmentId(raw, 'friend-a');
@@ -466,7 +478,7 @@ describe('個別相談の取消・日程変更', () => {
     await expect(
       registerMeetConsultation(
         db,
-        meetInput('google-event-x', '2026-09-20T01:00:00.000Z', '2026-09-20T01:30:00.000Z', 'friend-b'),
+        meetInput('google-event-x', at(0), at(30 * MINUTE_MS), 'friend-b'),
         now,
       ),
     ).rejects.toThrow();
@@ -491,7 +503,7 @@ describe('個別相談の取消・日程変更', () => {
     seedTriggerRule(raw, 'rule-booking-x', 'booking', ACCOUNT_2);
 
     // 別店舗のルールに載った移行前の行だけがある。店舗Aの取消で触れない。
-    const startsAt = '2026-09-20T01:00:00.000Z';
+    const startsAt = at(0);
     raw.prepare(
       `INSERT INTO friend_reminders (id, friend_id, reminder_id, target_date, status)
        VALUES ('legacy-other-store', 'friend-1', 'rule-booking-x', ?, 'active')`,
@@ -520,22 +532,22 @@ describe('取消と配信の競合', () => {
     await enrollByTrigger(db, {
       triggerType: 'booking',
       friendId: 'friend-1',
-      startsAtIso: '2026-09-20T01:00:00.000Z',
+      startsAtIso: at(0),
       sourceId: 'bk-1',
       sourceEventId: 'bk-1',
       lineAccountId: ACCOUNT_1,
     });
     const enrollment = enrollmentId(raw, 'friend-1');
     // 送信中 (claimed) と再試行待ちの行が残っていても取消で止める。
-    seedRun(raw, 'run-claimed', enrollment, 'friend-1', 'rule-booking-1', 'claimed', '2026-09-20T00:00:00.000Z');
-    seedRun(raw, 'run-wait', enrollment, 'friend-1', 'rule-booking-1', 'retry_wait', '2026-09-20T00:01:00.000Z');
+    seedRun(raw, 'run-claimed', enrollment, 'friend-1', 'rule-booking-1', 'claimed', at(-HOUR_MS));
+    seedRun(raw, 'run-wait', enrollment, 'friend-1', 'rule-booking-1', 'retry_wait', at(-HOUR_MS + MINUTE_MS));
 
     const result = await cancelByTrigger(db, {
       triggerType: 'booking',
       sourceId: 'bk-1',
       sourceEventId: 'bk-1',
       friendId: 'friend-1',
-      startsAtIso: '2026-09-20T01:00:00.000Z',
+      startsAtIso: at(0),
       lineAccountId: ACCOUNT_1,
       cancelReason: 'booking_cancel:bk-1:by:staff-9',
     });
@@ -562,7 +574,7 @@ describe('部分失敗後の再試行', () => {
     await enrollByTrigger(db, {
       triggerType: 'booking',
       friendId: 'friend-1',
-      startsAtIso: '2026-09-20T01:00:00.000Z',
+      startsAtIso: at(0),
       sourceId: 'bk-1',
       sourceEventId: 'bk-1',
       lineAccountId: ACCOUNT_1,
@@ -572,7 +584,7 @@ describe('部分失敗後の再試行', () => {
       sourceId: 'bk-1',
       sourceEventId: 'bk-1',
       friendId: 'friend-1',
-      startsAtIso: '2026-09-20T01:00:00.000Z',
+      startsAtIso: at(0),
       lineAccountId: ACCOUNT_1,
       cancelReason: 'booking_cancel:bk-1:by:staff-9-retry',
     };
@@ -591,7 +603,7 @@ describe('部分失敗後の再試行', () => {
     await enrollByTrigger(db, {
       triggerType: 'event',
       friendId: 'friend-1',
-      startsAtIso: '2026-09-20T01:00:00.000Z',
+      startsAtIso: at(0),
       sourceId: 'eb-1',
       sourceEventId: 'eb-1',
       lineAccountId: ACCOUNT_1,
@@ -601,7 +613,7 @@ describe('部分失敗後の再試行', () => {
       sourceId: 'eb-1',
       sourceEventId: 'eb-1',
       friendId: 'friend-1',
-      startsAtIso: '2026-09-20T01:00:00.000Z',
+      startsAtIso: at(0),
       lineAccountId: ACCOUNT_1,
       cancelReason: 'event_reject:eb-1:by:admin-retry',
     };
@@ -618,19 +630,19 @@ describe('Meet の友だち変更', () => {
     insertFriend(raw, 'friend-2', { line_account_id: ACCOUNT_1 });
     seedTriggerRule(raw, 'rule-booking-1', 'booking');
 
-    const now = new Date('2026-09-01T00:00:00.000Z');
+    const now = new Date(at(-19 * DAY_MS));
     await registerMeetConsultation(
       db,
-      meetInput('google-event-a', '2026-09-20T01:00:00.000Z', '2026-09-20T01:30:00.000Z', 'friend-1'),
+      meetInput('google-event-a', at(0), at(30 * MINUTE_MS), 'friend-1'),
       now,
     );
     const oldEnrollment = enrollmentId(raw, 'friend-1');
-    seedRun(raw, 'run-old', oldEnrollment, 'friend-1', 'rule-booking-1', 'queued', '2026-09-20T00:00:00.000Z');
+    seedRun(raw, 'run-old', oldEnrollment, 'friend-1', 'rule-booking-1', 'queued', at(-HOUR_MS));
 
     // 同じ相談を別 friend へ変える。
     await registerMeetConsultation(
       db,
-      meetInput('google-event-a', '2026-09-20T01:00:00.000Z', '2026-09-20T01:30:00.000Z', 'friend-2'),
+      meetInput('google-event-a', at(0), at(30 * MINUTE_MS), 'friend-2'),
       now,
     );
 
@@ -655,10 +667,10 @@ describe('Meet の友だち変更', () => {
     insertFriend(raw, 'friend-2', { line_account_id: ACCOUNT_1 });
     seedTriggerRule(raw, 'rule-booking-1', 'booking');
 
-    const now = new Date('2026-09-01T00:00:00.000Z');
+    const now = new Date(at(-19 * DAY_MS));
     await registerMeetConsultation(
       db,
-      meetInput('google-event-a', '2026-09-20T01:00:00.000Z', '2026-09-20T01:30:00.000Z', 'friend-1'),
+      meetInput('google-event-a', at(0), at(30 * MINUTE_MS), 'friend-1'),
       now,
     );
     // 途中失敗を再現: 業務だけ新 friend へ進み、V6 が旧 friend のまま残る。
@@ -667,7 +679,7 @@ describe('Meet の友だち変更', () => {
 
     await registerMeetConsultation(
       db,
-      meetInput('google-event-a', '2026-09-20T01:00:00.000Z', '2026-09-20T01:30:00.000Z', 'friend-2'),
+      meetInput('google-event-a', at(0), at(30 * MINUTE_MS), 'friend-2'),
       now,
     );
 
@@ -687,28 +699,28 @@ describe('日程変更の途中失敗', () => {
     insertFriend(raw, 'friend-1', { line_account_id: ACCOUNT_1 });
     seedTriggerRule(raw, 'rule-booking-1', 'booking');
 
-    const now = new Date('2026-09-01T00:00:00.000Z');
+    const now = new Date(at(-19 * DAY_MS));
     await registerMeetConsultation(
       db,
-      meetInput('google-event-a', '2026-09-20T01:00:00.000Z', '2026-09-20T01:30:00.000Z'),
+      meetInput('google-event-a', at(0), at(30 * MINUTE_MS)),
       now,
     );
     const enrollment = enrollmentId(raw, 'friend-1');
-    seedRun(raw, 'run-old', enrollment, 'friend-1', 'rule-booking-1', 'queued', '2026-09-20T00:00:00.000Z');
+    seedRun(raw, 'run-old', enrollment, 'friend-1', 'rule-booking-1', 'queued', at(-HOUR_MS));
     // 途中失敗を再現: 業務だけ新日へ進み、V6 が旧日のまま残る。
     raw.prepare(`UPDATE meet_consultations SET starts_at = ?, ends_at = ? WHERE external_event_id = ?`)
-      .run('2026-09-27T01:00:00.000Z', '2026-09-27T01:30:00.000Z', 'google-event-a');
+      .run(at(7 * DAY_MS), at(7 * DAY_MS + 30 * MINUTE_MS), 'google-event-a');
 
     await registerMeetConsultation(
       db,
-      meetInput('google-event-a', '2026-09-27T01:00:00.000Z', '2026-09-27T01:30:00.000Z'),
+      meetInput('google-event-a', at(7 * DAY_MS), at(7 * DAY_MS + 30 * MINUTE_MS)),
       now,
     );
 
     // 行を増やさず新起点へ直り、旧 run は止まる。
     expect(raw.prepare(`SELECT COUNT(*) AS c FROM friend_reminders`).get()).toEqual({ c: 1 });
     expect(raw.prepare(`SELECT target_date, status FROM friend_reminders WHERE id = ?`).get(enrollment)).toEqual({
-      target_date: '2026-09-27T01:00:00.000Z',
+      target_date: at(7 * DAY_MS),
       status: 'active',
     });
     expect(raw.prepare(`SELECT status FROM reminder_delivery_runs WHERE id = 'run-old'`).get()).toEqual({
@@ -722,10 +734,10 @@ describe('日程変更の途中失敗', () => {
     insertFriend(raw, 'friend-1', { line_account_id: ACCOUNT_1 });
     seedTriggerRule(raw, 'rule-booking-1', 'booking');
 
-    const now = new Date('2026-09-01T00:00:00.000Z');
+    const now = new Date(at(-19 * DAY_MS));
     await registerMeetConsultation(
       db,
-      meetInput('google-event-a', '2026-09-20T01:00:00.000Z', '2026-09-20T01:30:00.000Z'),
+      meetInput('google-event-a', at(0), at(30 * MINUTE_MS)),
       now,
     );
     // 前日通知は送りずみ (履歴)、1時間前はまだ未来。
@@ -734,11 +746,11 @@ describe('日程変更の途中失敗', () => {
           SET status = 'sent', sent_at = ?, updated_at = ?
         WHERE consultation_id = (SELECT id FROM meet_consultations WHERE external_event_id = ?)
           AND kind = 'day_before'`,
-    ).run('2026-09-19T01:00:00.000Z', '2026-09-19T01:00:00.000Z', 'google-event-a');
+    ).run(at(-DAY_MS), at(-DAY_MS), 'google-event-a');
 
     await registerMeetConsultation(
       db,
-      meetInput('google-event-a', '2026-09-27T01:00:00.000Z', '2026-09-27T01:30:00.000Z'),
+      meetInput('google-event-a', at(7 * DAY_MS), at(7 * DAY_MS + 30 * MINUTE_MS)),
       now,
     );
 
@@ -750,8 +762,8 @@ describe('日程変更の途中失敗', () => {
           ORDER BY kind`,
       ).all('google-event-a'),
     ).toEqual([
-      { status: 'sent', sent_at: '2026-09-19T01:00:00.000Z', scheduled_at: '2026-09-19T01:00:00.000Z' },
-      { status: 'pending', sent_at: null, scheduled_at: '2026-09-27T00:00:00.000Z' },
+      { status: 'sent', sent_at: at(-DAY_MS), scheduled_at: at(-DAY_MS) },
+      { status: 'pending', sent_at: null, scheduled_at: at(7 * DAY_MS - HOUR_MS) },
     ]);
   });
 
@@ -761,10 +773,10 @@ describe('日程変更の途中失敗', () => {
     insertFriend(raw, 'friend-1', { line_account_id: ACCOUNT_1 });
     seedTriggerRule(raw, 'rule-booking-1', 'booking');
 
-    const now = new Date('2026-09-01T00:00:00.000Z');
+    const now = new Date(at(-19 * DAY_MS));
     const registered = await registerMeetConsultation(
       db,
-      meetInput('google-event-b', '2026-09-20T01:00:00.000Z', '2026-09-20T01:30:00.000Z'),
+      meetInput('google-event-b', at(0), at(30 * MINUTE_MS)),
       now,
     );
     const healed = await reconcileV6ToStartsAt(db, {
@@ -773,7 +785,7 @@ describe('日程変更の途中失敗', () => {
       sourceId: registered.id,
       sourceEventId: 'google-event-b',
       friendId: 'friend-1',
-      startsAtIso: '2026-09-20T01:00:00.000Z',
+      startsAtIso: at(0),
     });
     expect(healed).toEqual({ healedEnrollments: 0, cancelledStale: 0, cancelledRuns: 0 });
   });
@@ -788,7 +800,7 @@ describe('同時刻の曖昧さ', () => {
     seedTriggerRule(raw, 'rule-booking-2', 'booking');
     seedRule(raw, 'rule-manual-1', 'manual');
 
-    const startsAt = '2026-09-20T01:00:00.000Z';
+    const startsAt = at(0);
     // 移行前の行 (source 未記録): booking ルールのものだけ止める。
     raw.prepare(
       `INSERT INTO friend_reminders (id, friend_id, reminder_id, target_date, status)
@@ -850,7 +862,7 @@ describe('送信直前の原子的claim', () => {
     await enrollByTrigger(db, {
       triggerType: 'booking',
       friendId: 'friend-1',
-      startsAtIso: '2026-09-20T01:00:00.000Z',
+      startsAtIso: at(0),
       sourceId: 'bk-1',
       sourceEventId: 'bk-1',
       lineAccountId: ACCOUNT_1,
@@ -862,13 +874,13 @@ describe('送信直前の原子的claim', () => {
       friendReminderId: enrollment,
       friendId: 'friend-1',
       reminderStepId: 'step-rule-booking-1',
-      leaseExpiresAt: '2026-09-20T01:05:00.000Z',
+      leaseExpiresAt: at(5 * MINUTE_MS),
     };
     // 先に握った行がある状態で、利用者が登録を取消す。
     const runA = await claimReminderDeliveryRun(db, {
       ...claimInput,
-      scheduledAt: '2026-09-20T00:00:00.000Z',
-      now: '2026-09-20T01:00:00.000Z',
+      scheduledAt: at(-HOUR_MS),
+      now: at(0),
     });
     expect(runA?.status).toBe('claimed');
     raw.prepare(`UPDATE friend_reminders SET status = 'cancelled' WHERE id = ?`).run(enrollment);
@@ -876,8 +888,8 @@ describe('送信直前の原子的claim', () => {
     // 取消後の claim は握らず、作りかけの行だけ止める (先の行には触れない)。
     const runB = await claimReminderDeliveryRun(db, {
       ...claimInput,
-      scheduledAt: '2026-09-20T00:01:00.000Z',
-      now: '2026-09-20T01:00:00.000Z',
+      scheduledAt: at(-HOUR_MS + MINUTE_MS),
+      now: at(0),
     });
     expect(runB).toBeNull();
     expect(
@@ -889,8 +901,8 @@ describe('送信直前の原子的claim', () => {
       await verifyClaimedRunBeforeSend(db, {
         id: runA!.id,
         friendReminderId: enrollment,
-        now: '2026-09-20T01:00:00.000Z',
-        leaseExpiresAt: '2026-09-20T01:05:00.000Z',
+        now: at(0),
+        leaseExpiresAt: at(5 * MINUTE_MS),
       }),
     ).toBe(false);
     expect(
@@ -907,14 +919,14 @@ describe('移行前の行の特定不能は止めない', () => {
     seedTriggerRule(raw, 'rule-booking-1', 'booking');
 
     // 移行前の別予約2件 (どちらも source 未記録・同時刻)。
-    const startsAt = '2026-09-20T01:00:00.000Z';
+    const startsAt = at(0);
     raw.prepare(
       `INSERT INTO friend_reminders (id, friend_id, reminder_id, target_date, status, created_at)
-       VALUES ('legacy-old', 'friend-1', 'rule-booking-1', ?, 'active', '2026-08-01T00:00:00.000Z')`,
+       VALUES ('legacy-old', 'friend-1', 'rule-booking-1', ?, 'active', '${at(-50 * DAY_MS)}')`,
     ).run(startsAt);
     raw.prepare(
       `INSERT INTO friend_reminders (id, friend_id, reminder_id, target_date, status, created_at)
-       VALUES ('legacy-new', 'friend-1', 'rule-booking-1', ?, 'active', '2026-08-02T00:00:00.000Z')`,
+       VALUES ('legacy-new', 'friend-1', 'rule-booking-1', ?, 'active', '${at(-49 * DAY_MS)}')`,
     ).run(startsAt);
 
     // 片方の取消でも、対象行を特定できないため両方残す (誤取消しより残存)。
@@ -938,7 +950,7 @@ describe('移行前の行の特定不能は止めない', () => {
       triggerType: 'booking',
       friendId: 'friend-1',
       oldStartsAtIso: startsAt,
-      newStartsAtIso: '2026-09-27T01:00:00.000Z',
+      newStartsAtIso: at(7 * DAY_MS),
       lineAccountId: ACCOUNT_1,
     });
     expect(moved).toEqual({ movedEnrollments: 0, cancelledRuns: 0 });
@@ -955,7 +967,7 @@ describe('同時刻の別予約の共存', () => {
     insertFriend(raw, 'friend-1', { line_account_id: ACCOUNT_1 });
     seedTriggerRule(raw, 'rule-booking-1', 'booking');
 
-    const startsAt = '2026-09-20T01:00:00.000Z';
+    const startsAt = at(0);
     await enrollByTrigger(db, {
       triggerType: 'booking',
       friendId: 'friend-1',
@@ -1003,10 +1015,10 @@ describe('Meet の友だち変更の失敗時', () => {
     insertFriend(raw, 'friend-2', { line_account_id: ACCOUNT_1 });
     seedTriggerRule(raw, 'rule-booking-1', 'booking');
 
-    const now = new Date('2026-09-01T00:00:00.000Z');
+    const now = new Date(at(-19 * DAY_MS));
     await registerMeetConsultation(
       db,
-      meetInput('google-event-a', '2026-09-20T01:00:00.000Z', '2026-09-20T01:30:00.000Z', 'friend-1'),
+      meetInput('google-event-a', at(0), at(30 * MINUTE_MS), 'friend-1'),
       now,
     );
     const oldEnrollment = enrollmentId(raw, 'friend-1');
@@ -1019,7 +1031,7 @@ describe('Meet の友だち変更の失敗時', () => {
     await expect(
       registerMeetConsultation(
         db,
-        meetInput('google-event-a', '2026-09-20T01:00:00.000Z', '2026-09-20T01:30:00.000Z', 'friend-2'),
+        meetInput('google-event-a', at(0), at(30 * MINUTE_MS), 'friend-2'),
         now,
       ),
     ).rejects.toThrow();
@@ -1036,7 +1048,7 @@ describe('Meet の友だち変更の失敗時', () => {
     // 同じ変更の再送で回復する (新規成功後に旧取消)。
     await registerMeetConsultation(
       db,
-      meetInput('google-event-a', '2026-09-20T01:00:00.000Z', '2026-09-20T01:30:00.000Z', 'friend-2'),
+      meetInput('google-event-a', at(0), at(30 * MINUTE_MS), 'friend-2'),
       now,
     );
     expect(raw.prepare(`SELECT status FROM friend_reminders WHERE id = ?`).get(oldEnrollment)).toEqual({
@@ -1054,10 +1066,10 @@ describe('Meet の友だち変更の失敗時', () => {
     insertFriend(raw, 'friend-2', { line_account_id: ACCOUNT_1 });
     seedTriggerRule(raw, 'rule-booking-1', 'booking');
 
-    const now = new Date('2026-09-01T00:00:00.000Z');
+    const now = new Date(at(-19 * DAY_MS));
     await registerMeetConsultation(
       db,
-      meetInput('google-event-a', '2026-09-20T01:00:00.000Z', '2026-09-20T01:30:00.000Z', 'friend-1'),
+      meetInput('google-event-a', at(0), at(30 * MINUTE_MS), 'friend-1'),
       now,
     );
     const oldEnrollment = enrollmentId(raw, 'friend-1');
@@ -1069,7 +1081,7 @@ describe('Meet の友だち変更の失敗時', () => {
     );
     const changeToFriend2 = () => registerMeetConsultation(
       db,
-      meetInput('google-event-a', '2026-09-20T01:00:00.000Z', '2026-09-20T01:30:00.000Z', 'friend-2'),
+      meetInput('google-event-a', at(0), at(30 * MINUTE_MS), 'friend-2'),
       now,
     );
     await expect(changeToFriend2()).rejects.toThrow();
@@ -1105,7 +1117,7 @@ describe('自動登録のテナント境界', () => {
     seedTriggerRule(raw, 'rule-a', 'booking', ACCOUNT_1);
     seedTriggerRule(raw, 'rule-b', 'booking', ACCOUNT_2);
 
-    const startsAt = '2026-09-20T01:00:00.000Z';
+    const startsAt = at(0);
     expect(await enrollByTrigger(db, {
       triggerType: 'booking',
       friendId: 'friend-a',
@@ -1160,7 +1172,7 @@ describe('送信権と取消の直列化', () => {
     await enrollByTrigger(db, {
       triggerType: 'booking',
       friendId: 'friend-1',
-      startsAtIso: '2026-09-20T01:00:00.000Z',
+      startsAtIso: at(0),
       sourceId: 'bk-1',
       sourceEventId: 'bk-1',
       lineAccountId: ACCOUNT_1,
@@ -1172,24 +1184,24 @@ describe('送信権と取消の直列化', () => {
       friendReminderId: enrollment,
       friendId: 'friend-1',
       reminderStepId: 'step-rule-booking-1',
-      scheduledAt: '2026-09-20T00:00:00.000Z',
-      now: '2026-09-20T01:00:00.000Z',
-      leaseExpiresAt: '2026-09-20T01:05:00.000Z',
+      scheduledAt: at(-HOUR_MS),
+      now: at(0),
+      leaseExpiresAt: at(5 * MINUTE_MS),
     });
     // 送信権の取得と取消の確定は DB 上で直列化される。取得が先なら送れる
     // (取消は残置し、確定は通る)。送り直しはしない。
     expect(await verifyClaimedRunBeforeSend(db, {
       id: run!.id,
       friendReminderId: enrollment,
-      now: '2026-09-20T01:00:00.000Z',
-      leaseExpiresAt: '2026-09-20T01:05:00.000Z',
+      now: at(0),
+      leaseExpiresAt: at(5 * MINUTE_MS),
     })).toBe(true);
     const deferred = await cancelByTrigger(db, {
       triggerType: 'booking',
       sourceId: 'bk-1',
       sourceEventId: 'bk-1',
       friendId: 'friend-1',
-      startsAtIso: '2026-09-20T01:00:00.000Z',
+      startsAtIso: at(0),
       lineAccountId: ACCOUNT_1,
       cancelReason: 'booking_cancel:bk-1:by:staff-9',
     });
@@ -1203,7 +1215,7 @@ describe('送信権と取消の直列化', () => {
       friendReminderId: enrollment,
       lineRequestId: null,
       messageLogId: 'log-1',
-      now: '2026-09-20T01:00:00.000Z',
+      now: at(0),
     }).run();
     expect(Number(completed.meta?.changes ?? 0)).toBe(1);
     expect(raw.prepare(`SELECT status FROM reminder_delivery_runs WHERE id = ?`).get(run!.id)).toEqual({
@@ -1220,7 +1232,7 @@ describe('送信権と取消の直列化', () => {
     await enrollByTrigger(db, {
       triggerType: 'booking',
       friendId: 'friend-1',
-      startsAtIso: '2026-09-20T01:00:00.000Z',
+      startsAtIso: at(0),
       sourceId: 'bk-1',
       sourceEventId: 'bk-1',
       lineAccountId: ACCOUNT_1,
@@ -1232,15 +1244,15 @@ describe('送信権と取消の直列化', () => {
       friendReminderId: enrollment,
       friendId: 'friend-1',
       reminderStepId: 'step-rule-booking-1',
-      scheduledAt: '2026-09-20T00:00:00.000Z',
-      now: '2026-09-20T01:00:00.000Z',
-      leaseExpiresAt: '2026-09-20T01:05:00.000Z',
+      scheduledAt: at(-HOUR_MS),
+      now: at(0),
+      leaseExpiresAt: at(5 * MINUTE_MS),
     });
     expect(await verifyClaimedRunBeforeSend(db, {
       id: run!.id,
       friendReminderId: enrollment,
-      now: '2026-09-20T01:00:00.000Z',
-      leaseExpiresAt: '2026-09-20T01:05:00.000Z',
+      now: at(0),
+      leaseExpiresAt: at(5 * MINUTE_MS),
     })).toBe(true);
 
     // 利用者操作は 409 の元になる投げで返す。何も書かない。
@@ -1249,7 +1261,7 @@ describe('送信権と取消の直列化', () => {
       sourceId: 'bk-1',
       sourceEventId: 'bk-1',
       friendId: 'friend-1',
-      startsAtIso: '2026-09-20T01:00:00.000Z',
+      startsAtIso: at(0),
       lineAccountId: ACCOUNT_1,
       cancelReason: 'booking_cancel:bk-1:by:staff-9',
       failOnSendInFlight: true,
@@ -1265,7 +1277,7 @@ describe('送信権と取消の直列化', () => {
       friendReminderId: enrollment,
       lineRequestId: null,
       messageLogId: 'log-1',
-      now: '2026-09-20T01:00:00.000Z',
+      now: at(0),
     }).run();
     expect(await cancelByTrigger(db, cancelInput)).toEqual({ cancelledEnrollments: 1, cancelledRuns: 0 });
     expect(raw.prepare(`SELECT status FROM friend_reminders WHERE id = ?`).get(enrollment)).toEqual({
@@ -1282,7 +1294,7 @@ describe('送信権と取消の直列化', () => {
     await enrollByTrigger(db, {
       triggerType: 'booking',
       friendId: 'friend-1',
-      startsAtIso: '2026-09-20T01:00:00.000Z',
+      startsAtIso: at(0),
       sourceId: 'bk-1',
       sourceEventId: 'bk-1',
       lineAccountId: ACCOUNT_1,
@@ -1294,9 +1306,9 @@ describe('送信権と取消の直列化', () => {
       friendReminderId: enrollment,
       friendId: 'friend-1',
       reminderStepId: 'step-rule-booking-1',
-      scheduledAt: '2026-09-20T00:00:00.000Z',
-      now: '2026-09-20T01:00:00.000Z',
-      leaseExpiresAt: '2026-09-20T01:05:00.000Z',
+      scheduledAt: at(-HOUR_MS),
+      now: at(0),
+      leaseExpiresAt: at(5 * MINUTE_MS),
     });
     // 利用者の手動取消は登録だけ止め、実行行は claimed のまま残る。
     await cancelFriendReminder(db, enrollment);
@@ -1305,7 +1317,7 @@ describe('送信権と取消の直列化', () => {
       friendReminderId: enrollment,
       lineRequestId: null,
       messageLogId: 'log-1',
-      now: '2026-09-20T01:00:00.000Z',
+      now: at(0),
     }).run();
     expect(Number(completed.meta?.changes ?? 0)).toBe(0);
     expect(raw.prepare(`SELECT status FROM reminder_delivery_runs WHERE id = ?`).get(run!.id)).toEqual({
