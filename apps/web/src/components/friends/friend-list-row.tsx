@@ -278,7 +278,18 @@ export function FriendListCard({
           <p className="mt-0.5 truncate text-nano text-ink-secondary">担当：{friend.operator?.name ?? '未割り当て'}</p>
         </div>
         <div className="flex shrink-0 flex-col items-end gap-1">
-          <span className={`inline-flex whitespace-nowrap rounded-full px-2 py-1 text-nano font-bold ${status.className}`}>{status.label}</span>
+          {/* statusView() の戻り値を className へ入れると静的に読めない。判定をここへ展開する。 */}
+          <span
+            className={`inline-flex whitespace-nowrap rounded-full px-2 py-1 text-nano font-bold ${
+              friend.chatStatus === 'unread'
+                ? 'bg-status-danger-soft text-danger'
+                : friend.chatStatus === 'in_progress' || friend.chatStatus === 'on_hold'
+                  ? 'bg-status-warn-soft text-status-warn-deep'
+                  : 'bg-accent-soft text-accent-hover'
+            }`}
+          >
+            {status.label}
+          </span>
           <span className="text-nano tabular-nums text-ink-faint" title={formatDateTime(lastContact)}>{formatDate(lastContact)}</span>
         </div>
       </div>

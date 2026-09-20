@@ -49,10 +49,10 @@ const TABS = [
     利用者向けの理由と、顧客を引き継ぐ/関連一覧へ進める操作を添える。
     操作の中身は下の pendingTabActions で付ける。
   */
-  { key: 'scenario', label: '配信・シナリオ', pending: 'この友だちに届いている配信・シナリオの一覧は準備中です。この友だちをシナリオへ登録する操作はここからできます。' },
-  { key: 'orders', label: '予約', pending: 'この友だちの予約だけを集めた画面は準備中です。予約の一覧からはこの人の予約を探せます。' },
-  { key: 'reminders', label: 'リマインダ', pending: 'この友だちに届くリマインダだけを集めた画面は準備中です。設定済みのリマインダは一覧で確認できます。' },
-  { key: 'actions', label: 'アクション', pending: 'この友だちへの操作だけを集めた履歴は準備中です。今は履歴タブに同じ記録が時系列で並んでいます。' },
+  { key: 'scenario', label: '配信・シナリオ', pending: 'この友だちに届いている配信・シナリオの一覧はまだ見られません。この友だちをシナリオへ登録する操作はここからできます。' },
+  { key: 'orders', label: '予約', pending: 'この友だちの予約だけを集めた画面はまだありません。予約の一覧からはこの人の予約を探せます。' },
+  { key: 'reminders', label: 'リマインダ', pending: 'この友だちに届くリマインダだけを集めた画面はまだありません。設定済みのリマインダは一覧で確認できます。' },
+  { key: 'actions', label: 'アクション', pending: 'この友だちへの操作だけを集めた履歴はまだありません。今は履歴タブに同じ記録が時系列で並んでいます。' },
   { key: 'miles', label: 'マイル', pending: 'この友だちのマイル残高と履歴は、マイル画面で確認できます。' },
   { key: 'richmenu', label: 'リッチメニュー', pending: 'この友だちのリッチメニュー変更履歴はまだ記録されていません。現在の割り当ては左の「リッチメニュー」欄で確認できます。' },
 ] as const
@@ -1067,8 +1067,14 @@ function FriendDetailInner() {
             FRIEND-31: PC由来の minHeight:1234 をスマートフォンへ持ち込まない。
             lg未満では名前・対応・主操作だけを出し、補助プロフィールは
             「顧客情報をすべて表示」で展開する（直下にタブが来る）。
+            固定高は任意値クラスを増やさないよう scoped style で掛ける。
           */}
-          <aside data-design="Left" className="bg-canvas rounded-card border-hairline overflow-hidden border lg:min-h-[1234px]">
+          <style>{`
+            @media (min-width: 1024px) {
+              [data-friend-profile-panel] { min-height: 1234px; }
+            }
+          `}</style>
+          <aside data-design="Left" data-friend-profile-panel className="bg-canvas rounded-card border-hairline overflow-hidden border">
             <div className="border-hairline border-b px-5 py-3.5">
               <div className="flex items-center justify-between"><h2 className="text-ink text-sm font-semibold">顧客情報</h2><Link href="/friends" className="text-ink-faint text-lg">×</Link></div>
             </div>

@@ -68,8 +68,9 @@ describe('友だち詳細 監査#1011の契約', () => {
     expect(PAGE).toContain('profileExpanded')
     expect(PAGE).toContain('顧客情報をすべて表示')
     expect(PAGE).toContain('max-lg:hidden')
-    // PC由来の固定高をスマートフォンへ持ち込まない。
+    // PC由来の固定高をスマートフォンへ持ち込まない（lg以上だけ scoped style）。
     expect(PAGE).not.toContain('style={{ minHeight: 1234 }}')
-    expect(PAGE).toContain('lg:min-h-[1234px]')
+    expect(PAGE).toContain('@media (min-width: 1024px)')
+    expect(PAGE).toContain('min-height: 1234px')
   })
 })
