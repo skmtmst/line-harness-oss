@@ -31,24 +31,16 @@
   line-height: 1.5;
 }
 
-.basicFields > label:first-child {
-  position: relative;
-}
-
+/*
+ * #996 DEEP-01: 以前は名側カウンターを絶対配置・フォルダ側を別段組みにして
+ * いたため横並び入力の上端がずれていた。共通Fieldの3段構造
+ * （ラベル行／入力行／補足行）へ寄せたので、単発のmargin・絶対配置補正は置かない。
+ * #996 DEEP-03: 社内メモに共通TextAreaの最低120pxを潰す60px固定を
+ * 掛けていたのをやめ、共通ルール（最低3行が読める高さ）に任せる。
+ */
 .basicFieldsGrid {
   display: grid;
   gap: 16px;
-}
-
-.basicFields > label:first-child > small {
-  position: absolute;
-  top: 0;
-  right: 0;
-}
-
-.basicFields textarea {
-  min-height: 60px;
-  height: 60px;
 }
 
 .baseChoices button {

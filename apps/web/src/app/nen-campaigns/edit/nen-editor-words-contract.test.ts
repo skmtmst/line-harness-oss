@@ -39,7 +39,14 @@ describe('V6 NEN配信編集の運用者向け文言契約', () => {
 
   it('本文エディタと回答フォーム・200マイルの送信後アクションを表示して保存する', () => {
     expect(EDITOR).toContain('InsertToolbar')
-    expect(EDITOR).toContain('吹き出しを追加する（あと2つまで）')
+    /*
+     * NEXT-16 (#989): 複数吹き出しはWorkerの保存スキーマに口がない。
+     * 無反応の「差し替える」「消す」「吹き出しを追加する」は出さず、
+     * 1通で届くことを明示する。
+     */
+    expect(EDITOR).not.toContain('吹き出しを追加する')
+    expect(EDITOR).not.toContain('<Button>差し替える</Button>')
+    expect(EDITOR).toContain('この配信は1通で届きます')
     expect(EDITOR).toContain('回答フォーム「{formAction.formName}」を開く')
     expect(EDITOR).toContain("{ kind: 'award_mileage', amount: 200, trigger: 'form_submitted' }")
     expect(EDITOR).toContain('afterActions: actions')
