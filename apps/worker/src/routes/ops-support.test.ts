@@ -248,12 +248,14 @@ describe('下書きと AI', () => {
     expect(res.status).toBe(201);
     const body = await res.json() as { data: { body: string; aiGenerated: boolean; generatedAt: string | null } };
     expect(body.data.aiGenerated).toBe(true);
-    expect(body.data.body).toContain('山田さま');
+    expect(body.data.body).toContain('[匿名]さま');
     expect(body.data.generatedAt).toBeTruthy();
     expect(run).toHaveBeenCalledWith('@cf/meta/llama-3.3-70b-instruct-fp8-fast', expect.objectContaining({ messages: expect.any(Array), max_tokens: 900 }));
     const input = run.mock.calls[0][1] as { messages: Array<{ role: string; content: string }> };
     // 個人のメールアドレスは AI に渡さない
     expect(input.messages.map((m) => m.content).join('\n')).not.toContain('yamada@example.com');
+    expect(input.messages.map((m) => m.content).join('\n')).not.toContain('山田');
+    expect(input.messages.map((m) => m.content).join('\n')).not.toContain('株式会社サンプル');
   });
 
   it('AI が時間内に返らなければ 504 で、下書きは作られない', async () => {

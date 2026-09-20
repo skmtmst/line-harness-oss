@@ -190,6 +190,9 @@ shared-button-importer components/merged-person/merged-delivery-dialog.tsx
 shared-button-importer components/merged-person/merged-person-detail.tsx
 shared-button-importer components/merged-person/merged-person-sections.tsx
 shared-button-importer components/merged-person/merged-profile-dialog.tsx
+shared-button-importer components/ops/knowledge-editor.tsx
+shared-button-importer components/ops/knowledge-list.tsx
+shared-button-importer components/ops/knowledge-ticket.tsx
 shared-button-importer components/ops/notice-line-account-card.tsx
 shared-button-importer components/ops/ops-shell.tsx
 shared-button-importer components/reminders/reminder-publish-flow.tsx

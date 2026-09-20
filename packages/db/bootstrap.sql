@@ -2769,7 +2769,7 @@ CREATE TABLE hq_support_reply_drafts (
   generated_at     TEXT,
   author_staff_id  TEXT,
   updated_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
-);
+, knowledge_references TEXT NOT NULL DEFAULT '[]');
 
 CREATE TABLE hq_support_requests (
   id               TEXT PRIMARY KEY,
@@ -2790,7 +2790,7 @@ CREATE TABLE hq_support_requests (
 , ticket_no INTEGER, stage TEXT NOT NULL DEFAULT 'new'
   CHECK (stage IN ('new', 'in_progress', 'waiting', 'resolved', 'closed')), priority TEXT NOT NULL DEFAULT 'medium'
   CHECK (priority IN ('low', 'medium', 'high')), channel TEXT NOT NULL DEFAULT 'admin'
-  CHECK (channel IN ('admin', 'line', 'ops')), subject_auto INTEGER NOT NULL DEFAULT 0, assignee_staff_id TEXT, first_replied_at TEXT, last_message_at TEXT, resolved_at TEXT, closed_at TEXT);
+  CHECK (channel IN ('admin', 'line', 'ops')), subject_auto INTEGER NOT NULL DEFAULT 0, assignee_staff_id TEXT, first_replied_at TEXT, last_message_at TEXT, resolved_at TEXT, closed_at TEXT, knowledge_revision INTEGER NOT NULL DEFAULT 0);
 
 CREATE TABLE hq_template_distribution_results (
   run_id TEXT NOT NULL,
@@ -4543,6 +4543,17 @@ CREATE TABLE platform_admins (
 , activation_state TEXT NOT NULL DEFAULT 'active'
   CHECK (activation_state IN ('invited', 'awaiting_totp', 'active')), invited_by TEXT, invited_at TEXT, activated_at TEXT);
 
+CREATE TABLE platform_ai_calls (
+  id TEXT PRIMARY KEY,
+  purpose TEXT NOT NULL CHECK (purpose IN ('draft','article')),
+  request_id TEXT NOT NULL REFERENCES hq_support_requests(id),
+  staff_id TEXT REFERENCES staff_members(id),
+  model TEXT NOT NULL,
+  ok INTEGER NOT NULL DEFAULT 0,
+  duration_ms INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL
+);
+
 CREATE TABLE platform_announcement_recipients (
   id               TEXT PRIMARY KEY,
   announcement_id  TEXT NOT NULL REFERENCES platform_announcements(id) ON DELETE CASCADE,
@@ -4601,6 +4612,56 @@ CREATE TABLE platform_audit_logs (
 CREATE TABLE platform_counters (
   name   TEXT PRIMARY KEY,
   value  INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE TABLE platform_knowledge_articles (
+  id TEXT PRIMARY KEY,
+  source_request_id TEXT NOT NULL REFERENCES hq_support_requests(id),
+  source_revision INTEGER NOT NULL,
+  title TEXT NOT NULL DEFAULT '',
+  question TEXT NOT NULL DEFAULT '',
+  answer TEXT NOT NULL DEFAULT '',
+  kind TEXT NOT NULL CHECK (kind IN ('usage','bug','billing','feature','other')),
+  keywords TEXT NOT NULL DEFAULT '[]',
+  visibility TEXT NOT NULL DEFAULT 'ops_only' CHECK (visibility = 'ops_only'),
+  review_state TEXT NOT NULL CHECK (review_state IN ('pending','approved','needs_review','dismissed')),
+  status TEXT NOT NULL DEFAULT 'disabled' CHECK (status IN ('active','disabled')),
+  evidence TEXT NOT NULL DEFAULT '[]',
+  review_reason TEXT NOT NULL DEFAULT '',
+  version INTEGER NOT NULL DEFAULT 1,
+  approved_by_staff_id TEXT REFERENCES staff_members(id),
+  approved_at TEXT,
+  used_count INTEGER NOT NULL DEFAULT 0,
+  helpful_count INTEGER NOT NULL DEFAULT 0,
+  unhelpful_count INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  UNIQUE(source_request_id, source_revision)
+);
+
+CREATE TABLE platform_knowledge_jobs (
+  id TEXT PRIMARY KEY,
+  request_id TEXT NOT NULL REFERENCES hq_support_requests(id),
+  source_revision INTEGER NOT NULL,
+  status TEXT NOT NULL DEFAULT 'queued' CHECK (status IN ('queued','running','done','failed','stale')),
+  attempts INTEGER NOT NULL DEFAULT 0,
+  lease_token TEXT,
+  lease_until TEXT,
+  error_code TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  UNIQUE(request_id, source_revision)
+);
+
+CREATE TABLE platform_knowledge_usage (
+  id TEXT PRIMARY KEY,
+  article_id TEXT NOT NULL REFERENCES platform_knowledge_articles(id),
+  article_version INTEGER NOT NULL,
+  request_id TEXT NOT NULL REFERENCES hq_support_requests(id),
+  staff_id TEXT NOT NULL REFERENCES staff_members(id),
+  feedback TEXT CHECK (feedback IN ('helpful','unhelpful')),
+  created_at TEXT NOT NULL,
+  UNIQUE(article_id, request_id)
 );
 
 CREATE TABLE platform_settings (
@@ -7376,6 +7437,8 @@ CREATE INDEX idx_pii_reveal_logs_tenant
 
 CREATE INDEX idx_platform_admin_invites_staff ON platform_admin_invites(staff_id, created_at DESC);
 
+CREATE INDEX idx_platform_ai_calls_month ON platform_ai_calls(created_at, purpose);
+
 CREATE INDEX idx_platform_announcement_recipients_staff
   ON platform_announcement_recipients(staff_id, screen_read_at);
 
@@ -7390,6 +7453,10 @@ CREATE INDEX idx_platform_audit_logs_created
 
 CREATE INDEX idx_platform_audit_logs_tenant
   ON platform_audit_logs(tenant_id, created_at DESC);
+
+CREATE INDEX idx_platform_knowledge_articles_review ON platform_knowledge_articles(review_state, status, kind);
+
+CREATE INDEX idx_platform_knowledge_jobs_pending ON platform_knowledge_jobs(status, lease_until);
 
 CREATE INDEX idx_recipe_clone_items_v316_run
   ON recipe_clone_items(run_id, created_at, id);

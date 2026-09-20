@@ -388,7 +388,8 @@
     "427_common_var_export_jobs.sql",
     "428_nen_photo_review_audit_fixes.sql",
     "429_platform_announcements.sql",
-    "430_booking_audit_and_reminder_settings.sql"
+    "430_booking_audit_and_reminder_settings.sql",
+    "441_platform_knowledge.sql"
   ],
-  "migrationCount": 389
+  "migrationCount": 390
 }

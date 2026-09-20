@@ -300,6 +300,33 @@
     }
   },
   "parts": {
+    "ops-knowledge": {
+      "name": "V6 運営専用ナレッジ一覧・根拠確認・編集",
+      "pencilNodes": ["P5egpk", "twq67", "MGgKT"],
+      "role": "canonical",
+      "status": "active",
+      "reviewStatus": "confirmed",
+      "code": "src/components/ops/knowledge-list.tsx",
+      "implementationFiles": ["src/components/ops/knowledge-editor.tsx"],
+      "cssModule": "src/components/ops/knowledge.module.css",
+      "cssPrefix": "knowledge",
+      "components": ["KnowledgeList", "KnowledgeEditor"],
+      "lastCheckedAt": "2026-09-19",
+      "note": "唯一の正本 Documents/musubo-design/V6正本.pen。承認済み37-11/A/Bの寸法。画面単位の免除ではなく、実装部品のCSSをビルド成果物まで照合する。",
+      "routes": { "pilot": ["/ops/knowledge"], "impact": "/ops/knowledge、/ops/supportの根拠確認" },
+      "declarations": [
+        { "pencil": "P5egpk content gap 16", "class": "page", "prop": "gap", "source": "16px", "resolved": "16px" },
+        { "pencil": "P5egpk heading height 44", "class": "heading", "prop": "height", "source": "44px", "resolved": "44px" },
+        { "pencil": "P5egpk filters gap 12", "class": "filters", "prop": "gap", "source": "12px", "resolved": "12px" },
+        { "pencil": "P5egpk search width 360", "class": "search", "prop": "width", "source": "360px", "resolved": "360px" },
+        { "pencil": "twq67 body gap 12", "class": "editor", "prop": "gap", "source": "12px", "resolved": "12px" },
+        { "pencil": "twq67 evidence padding 12", "class": "evidence", "prop": "padding", "source": "12px", "resolved": "12px" },
+        { "pencil": "twq67 evidence gap 8", "class": "evidence", "prop": "gap", "source": "8px", "resolved": "8px" },
+        { "pencil": "twq67 field gap 8", "class": "field", "prop": "gap", "source": "8px", "resolved": "8px" },
+        { "pencil": "twq67 kind width 360", "class": "kind", "prop": "width", "source": "360px", "resolved": "360px" },
+        { "pencil": "twq67 footer gap 12", "class": "footer", "prop": "gap", "source": "12px", "resolved": "12px" }
+      ]
+    },
     "summary-card": {
       "name": "共通 サマリーカード",
       "pencilNodes": [

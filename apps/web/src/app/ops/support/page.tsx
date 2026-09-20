@@ -11,8 +11,10 @@ import {
   type OpsSupportSummary,
   type OpsSupportTicket,
   type OpsTenantRow,
+  type OpsKnowledgeReference,
 } from '@/lib/api'
 import OpsPageHeader from '@/components/ops/ops-page-header'
+import { KnowledgeReferences, TicketKnowledge } from '@/components/ops/knowledge-ticket'
 import { formatDateTime, planLabel, PLAN_STATUS_LABEL, ROLE_LABEL, tenantDetailHref, opsCall } from '@/components/ops/ops-ui'
 import Button from '@/components/shared/button'
 import Chip, { type ChipTone } from '@/components/shared/chip'
@@ -96,6 +98,17 @@ export default function OpsSupportPage() {
   const [aiBusy, setAiBusy] = useState(false)
   const [draftSaving, setDraftSaving] = useState(false)
   const aiAbort = useRef<{ cancelled: boolean } | null>(null)
+  const detailRequest = useRef(0)
+  const listRequest = useRef(0)
+  const deepLink = useRef<string | null>(null)
+  const [references, setReferences] = useState<OpsKnowledgeReference[]>([])
+  const [excluded, setExcluded] = useState<string[]>([])
+
+  useEffect(() => {
+    deepLink.current = new URLSearchParams(window.location.search).get('id')
+    if (deepLink.current) { setStage('all'); setSelectedId(deepLink.current) }
+    return () => { detailRequest.current += 1; listRequest.current += 1; if (aiAbort.current) aiAbort.current.cancelled = true }
+  }, [])
 
   const loadSummary = useCallback(async () => {
     const res = await opsCall(api.ops.support.summary())
@@ -103,31 +116,54 @@ export default function OpsSupportPage() {
   }, [])
 
   const loadList = useCallback(async () => {
+    const sequence = ++listRequest.current
     setLoading(true)
     const res = await opsCall(api.ops.support.tickets({ stage, priority: priority || undefined, q: q.trim() || undefined, sort, limit: 50 }))
+    if (sequence !== listRequest.current) return
     setLoading(false)
     if (!res.success) { setError(res.error || '読み込めませんでした'); return }
     setTickets(res.data)
     setTotal(res.total)
-    setSelectedId((current) => (current && res.data.some((t) => t.id === current) ? current : res.data[0]?.id ?? null))
+    setSelectedId((current) => deepLink.current || (current && res.data.some((t) => t.id === current) ? current : res.data[0]?.id ?? null))
   }, [stage, priority, q, sort])
 
   const loadDetail = useCallback(async (id: string) => {
+    const sequence = ++detailRequest.current
     setDetailLoading(true)
     const res = await opsCall(api.ops.support.ticket(id))
+    if (sequence !== detailRequest.current) return
     setDetailLoading(false)
     if (!res.success) { setError(res.error || '内容を読み込めませんでした'); return }
     setDetail(res.data)
     setReply(res.data.draft?.body ?? '')
     setReplyFromAi(res.data.draft?.aiGenerated ? { generatedAt: res.data.draft.generatedAt } : null)
+    setReferences(res.data.draft?.references ?? [])
   }, [])
 
   useEffect(() => { void loadSummary() }, [loadSummary])
   useEffect(() => { void loadList() }, [loadList])
   useEffect(() => {
+    if (aiAbort.current) aiAbort.current.cancelled = true
+    setAiBusy(false); setExcluded([]); setReferences([]); setReply(''); setReplyFromAi(null)
+    detailRequest.current += 1
+    setDetail(null)
     if (!selectedId) { setDetail(null); return }
     void loadDetail(selectedId)
   }, [selectedId, loadDetail])
+
+  // Poll metadata only: never replace an operator's unsent reply while a job finishes.
+  useEffect(() => {
+    const job = detail?.knowledge?.job
+    if (!detail || !job || !['queued', 'running'].includes(job.status)) return
+    let active = true
+    const id = detail.ticket.id
+    const timer = setInterval(() => {
+      void opsCall(api.ops.support.ticket(id)).then(res => {
+        if (active && res.success) setDetail(current => current?.ticket.id === id ? { ...current, knowledge: res.data.knowledge } : current)
+      })
+    }, 15_000)
+    return () => { active = false; clearInterval(timer) }
+  }, [detail?.ticket.id, detail?.knowledge?.job?.status])
 
   useEffect(() => {
     if (!creating || tenants.length > 0) return
@@ -147,7 +183,9 @@ export default function OpsSupportPage() {
     setBusy(false)
     if (!res.success) { setError(res.error || '変更できませんでした'); return }
     setNotice(`${res.data.ticketLabel} を「${res.data.stageLabel}」にしました`)
-    await refreshAll()
+    deepLink.current = res.data.id
+    setStage(next)
+    await Promise.all([loadSummary(), loadDetail(res.data.id)])
   }
 
   const changePriority = async (next: OpsSupportPriority) => {
@@ -165,21 +203,23 @@ export default function OpsSupportPage() {
     setDraftSaving(false)
     if (!res.success) { setError(res.error || '下書きを保存できませんでした'); return }
     setReplyFromAi(null)
+    setReferences([])
     setNotice(res.data ? '下書きを保存しました' : '下書きを消しました')
   }
 
-  const generateAi = async () => {
+  const generateAi = async (excludeIds = excluded) => {
     if (!detail) return
     const token = { cancelled: false }
     aiAbort.current = token
     setAiBusy(true)
     setError('')
-    const res = await opsCall(api.ops.support.aiDraft(detail.ticket.id))
+    const res = await opsCall(api.ops.support.aiDraft(detail.ticket.id, excludeIds))
     if (token.cancelled) return
     setAiBusy(false)
     if (!res.success) { setError(res.error || 'AI の下書きを作れませんでした'); return }
     setReply(res.data.body)
     setReplyFromAi({ generatedAt: res.data.generatedAt })
+    setReferences(res.data.references ?? [])
   }
 
   /** 37-6-B「待たずに手で書く」。作成は続くが、結果は捨てて手書きに戻す。 */
@@ -325,7 +365,7 @@ export default function OpsSupportPage() {
                     <button
                       type="button"
                       aria-current={selected ? 'true' : undefined}
-                      onClick={() => setSelectedId(t.id)}
+                      onClick={() => { deepLink.current = null; if (aiAbort.current) aiAbort.current.cancelled = true; setSelectedId(t.id) }}
                       className={`block w-full px-4 py-3 text-left transition-colors hover:bg-canvas-sunken ${selected ? 'bg-accent-soft' : ''}`}
                     >
                       <span className="flex items-center gap-1.5 text-micro text-ink-secondary">
@@ -388,6 +428,7 @@ export default function OpsSupportPage() {
               </div>
 
               {/* やり取り */}
+              {detail && <TicketKnowledge key={ticket.id} detail={detail} onRefresh={() => void loadDetail(ticket.id)} />}
               <ol className="grid gap-3" aria-label="やり取り">
                 <Message side="left" author={`${ticket.tenantName} ／ ${ticket.staffName || '—'}`} at={ticket.createdAt} body={ticket.body} attachments={ticket.attachments} />
                 {detail?.messages.map((m) => (
@@ -431,6 +472,11 @@ export default function OpsSupportPage() {
                     <span className="text-micro text-ink-faint">{formatDateTime(replyFromAi.generatedAt)} に作成</span>
                   </div>
                 ) : null}
+                {aiBusy ? null : (
+                  <KnowledgeReferences key={ticket.id} references={replyFromAi ? references : []} requestId={ticket.id} busy={busy} onExclude={id => {
+                    const next = [...new Set([...excluded, id])]; setExcluded(next); void generateAi(next)
+                  }} />
+                )}
                 {aiBusy ? null : (
                   <TextArea
                     rows={6}

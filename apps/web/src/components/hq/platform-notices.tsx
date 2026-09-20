@@ -37,7 +37,7 @@ export default function PlatformNotices() {
 
   if (notices.length === 0) return null
   return (
-    <section aria-label="運営からのお知らせ" className="mb-4 grid gap-2">
+    <section data-design-node="EJ6sm" aria-label="運営からのお知らせ" className="mb-4 grid gap-2">
       {notices.map((n) => (
         <div key={n.id} className="flex flex-wrap items-start gap-3 rounded-card border border-accent-border bg-accent-soft px-4 py-3">
           <Megaphone aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0 text-accent-deep" />
