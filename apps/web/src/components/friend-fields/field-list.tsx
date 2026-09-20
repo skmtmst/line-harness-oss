@@ -1,11 +1,12 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { LockKeyhole, Trash2 } from 'lucide-react'
 import ReorderGrip from './reorder-grip'
 import type { FriendField, FriendFieldListSummary, FriendFieldType } from '@line-crm/shared'
 import { api, ApiError } from '@/lib/api'
+import { createResponseGate } from '@/lib/latest-request'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
@@ -60,19 +61,44 @@ export default function FriendFieldList({ accountId }: { accountId: string | nul
   const [dragId, setDragId] = useState<string | null>(null)
   const [pendingDelete, setPendingDelete] = useState<FriendField | null>(null)
 
+  /*
+    ATTR-01: アカウント切替のあとに届いた古い応答で一覧を上書きしない。
+    Aの取得中にBへ切り替えると、A→B→A応答の順でB選択中にAの一覧が
+    残った。要求ごとに世代の印を取り、応答時にアカウントと世代の両方が
+    今のものと一致するときだけ反映する。
+  */
+  const gateRef = useRef(createResponseGate())
+  const accountRef = useRef(accountId)
+  accountRef.current = accountId
+
+  /*
+    切替で残るものは閉じる。別アカウントの削除確認や掴んだままの
+    つまみが残ると、表示と操作対象がずれる。
+  */
+  useEffect(() => {
+    gateRef.current.invalidate()
+    setPendingDelete(null)
+    setDragId(null)
+    setError('')
+  }, [accountId])
+
   const load = useCallback(async () => {
-    if (!accountId) {
+    const account = accountId
+    const token = gateRef.current.begin()
+    if (!account) {
       setItems([]); setSummary(null); setStatus('error'); setError('LINE公式アカウントを選んでください')
       return
     }
     setStatus('loading'); setError('')
     try {
       const [list, stats] = await Promise.all([
-        api.friendFields.list(accountId, { withUsage: true }), api.friendFields.stats(accountId),
+        api.friendFields.list(account, { withUsage: true }), api.friendFields.stats(account),
       ])
+      if (!gateRef.current.current(token) || accountRef.current !== account) return
       if (!list.success || !stats.success) throw new Error('load failed')
       setItems(list.data); setSummary(stats.data); setStatus('ready')
     } catch (reason) {
+      if (!gateRef.current.current(token) || accountRef.current !== account) return
       const forbidden = reason instanceof ApiError && reason.status === 403
       setItems([])
       setStatus(forbidden ? 'forbidden' : 'error')
@@ -220,7 +246,12 @@ export default function FriendFieldList({ accountId }: { accountId: string | nul
               : visible.length === 0 ? <tr><td colSpan={7} className="p-0"><ListState kind="empty" title="条件に合う項目はありません" description="項目名か種類を変えてください。" /></td></tr>
               : visible.map((field) => <tr key={field.id} className="hover:bg-canvas-sunken">
                   <td draggable={!field.isInherited} onDragStart={() => setDragId(field.id)} onDragOver={(event) => event.preventDefault()} onDrop={() => void move(field.id)} className={`${field.isInherited ? 'cursor-not-allowed' : 'cursor-grab'} px-3 py-3 text-hairline`}><ReorderGrip label={field.name} disabled={field.isInherited} disabledReason="共通項目は移行後に並び替えできます" onMove={(direction) => void keyboardMove(field.id, direction)} /></td>
-                  <td className="px-3 py-3"><p className="truncate font-semibold text-accent" title={field.name}>{field.name}</p><p className="truncate font-mono text-caption text-ink-faint" title={`{{field.${field.fieldKey}}}`}>{`{{field.${field.fieldKey}}}`}</p></td>
+                  {/*
+                    ATTR-05: 項目名から編集画面へ進める。以前は文字だけで
+                    行操作は移行/削除しかなく、名前・既定値・保護設定を
+                    変える入口がなかった。種類と差し込み名は編集画面でも固定。
+                  */}
+                  <td className="px-3 py-3"><Link href={`/tags/fields/edit?id=${encodeURIComponent(field.id)}`} className="block truncate font-semibold text-accent hover:underline" title={`${field.name}を編集`}>{field.name}</Link><p className="truncate font-mono text-caption text-ink-faint" title={`{{field.${field.fieldKey}}}`}>{`{{field.${field.fieldKey}}}`}</p></td>
                   <td className="px-3 py-3 text-ink">{FIELD_TYPE_LABELS[field.type] ?? field.type}</td>
                   <td className="px-3 py-3 tabular-nums text-ink">{knownUsageCount(field) ?? '—'}{knownUsageCount(field) === null ? '' : '人'}</td>
                   <td className="px-3 py-3 text-ink-faint" title={field.formUsageCount === undefined ? '回答フォームの使用数を取得できません' : undefined}>{field.formUsageCount === undefined ? '—' : `回答フォーム ${field.formUsageCount}個`}</td>

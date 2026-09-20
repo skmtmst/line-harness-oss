@@ -17,7 +17,8 @@ describe('V6 対応マーク', () => {
     const thead = element(LIST, 'thead')
     for (const label of ['順番', 'マーク', '使用中', '初期値', '自動変更', '表示先', '操作']) expect(thead).toContain(label)
     expect(LIST).toContain('利用状態：すべて')
-    expect(LIST).toContain('api.supportMarks.list(accountId)')
+    // ATTR-01: 取得時のアカウントを退避し、応答が届いた時点の選択と照合する。
+    expect(LIST).toContain('api.supportMarks.list(account)')
   })
 
   it('追加編集画面は本文タイトルを置かず、トップバーへ画面名を渡す', () => {
@@ -50,7 +51,7 @@ describe('V6 対応マーク', () => {
   it('影響確認の版と冪等キーを使い、選んだマークへ置換して保管する', () => {
     expect(LIST).toContain('function isUsed(mark: MarkRow)')
     expect(LIST).toContain('referenceCount(mark) > 0')
-    expect(LIST).toContain('api.supportMarks.archiveImpact(mark.id, accountId)')
+    expect(LIST).toContain('api.supportMarks.archiveImpact(mark.id, account)')
     expect(LIST).toContain('impactRevision: archiveImpact.impactRevision')
     expect(LIST).toContain('expectedVersion: archiveImpact.expectedVersion')
     expect(LIST).toContain('crypto.randomUUID()')

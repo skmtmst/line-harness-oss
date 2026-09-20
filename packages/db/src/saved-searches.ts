@@ -1,4 +1,5 @@
 import { jstNow } from './utils.js';
+import { isSavedSearchOpAllowed } from '@line-crm/shared';
 import type {
   SavedSearchCondition as SearchCondition,
   SavedSearchConditions as SearchConditions,
@@ -153,6 +154,19 @@ export function validateSearchConditions(
       }
       if (typeof c.op !== 'string' || c.op === '') {
         return { ok: false, error: '条件に op がありません' };
+      }
+      /*
+        実行側（saved-search-filter のSQL変換）が解釈できない op を
+        ここで断る。以前は「op が空でない」だけを見ていたため、
+        `field` + `gte` のような保存は通るが検索で拒否される条件が
+        作れた。保存した本人はもう画面を離れているので、形の検査で
+        実行可否まで一致させる（ATTR-13）。
+      */
+      if (!isSavedSearchOpAllowed(String(c.kind), c.op)) {
+        return {
+          ok: false,
+          error: `条件「${String(c.kind)}」では使えない比較方法です（${c.op}）`,
+        };
       }
       list.push(c as unknown as SearchCondition);
     }

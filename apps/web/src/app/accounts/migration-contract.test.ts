@@ -1,7 +1,13 @@
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
+
+vi.hoisted(() => {
+  // migration.tsx が参照する api.ts はモジュール評価時に必須。
+  process.env.NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://worker.test'
+})
+
 import { parseUidCsv, splitUidCsvLine } from './migration'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
@@ -59,8 +65,21 @@ describe('V6 機能3 UID移行の対応表', () => {
 
   it('一致先なしの行に新規作成を選ばせない', () => {
     expect(PAGE).toContain('一致先なし')
-    expect(PAGE).toContain("onDecide(item, 'link')")
     expect(PAGE).not.toContain("item.newUid ? 'link' : 'create'")
+  })
+
+  /*
+    FRIEND-14: 行の操作は読み取り専用の「詳細を見る」だけ。
+    保存は詳細ダイアログ内の「この組合せを承認」「除外する」が担う。
+    「移行内容を確認」という、読むつもりの操作で保存する名前は残さない。
+  */
+  it('行の操作は読み取り専用で、保存はダイアログ内の明示操作だけ', () => {
+    expect(PAGE).toContain('詳細を見る')
+    expect(PAGE).toContain('この組合せを承認')
+    expect(PAGE).toContain('onShowDetail(item)')
+    expect(PAGE).toContain("decide(detailItem, 'link')")
+    expect(PAGE).not.toContain('移行内容を確認</button>')
+    expect(PAGE).not.toContain("onDecide(item, 'link')")
   })
 })
 
@@ -69,6 +88,38 @@ describe('V6 機能3 UID移行の対応表', () => {
  * 主タブは友だち一覧と同じ定義・同じ部品・同じ選択色。
  * 入力は「移行元 → 移行先」の同幅2欄、全幅の利用目的、CSV、操作の順。
  */
+/**
+ * FRIEND-15/16/33/36: 状態表示と実行・復旧の操作構造。
+ */
+describe('UID移行の状態と実行・復旧の導線', () => {
+  it('説明文とバッジは run.status で連動し、完了履歴へ未変更と言わない', () => {
+    expect(PAGE).toContain('runStatusView')
+    expect(PAGE).toContain("'本移行と照合が完了しています。必要な場合はこの履歴から切り戻せます。'")
+    expect(PAGE).toContain("'切り戻し済みです。反映した内容は移行前の状態へ戻しています。'")
+    expect(PAGE).toContain('一部失敗')
+  })
+
+  it('対応表の遅延応答は世代番号で捨てる', () => {
+    expect(PAGE).toContain('detailTicket')
+    expect(PAGE).toContain('ticket !== detailTicket.current')
+  })
+
+  it('本移行は確認画面を挟み、入口クリックだけでは実行しない', () => {
+    expect(PAGE).toContain('本移行を実行')
+    expect(PAGE).toContain('setConfirmExecute(true)')
+    // 「確定して次へ」のような曖昧な名前で直接実行しない。
+    expect(PAGE).not.toContain('対応表を確定して次へ')
+    expect(PAGE).not.toContain('onClick={onExecute}')
+  })
+
+  it('完了・一部失敗の履歴から確認付きの切り戻しへ進める', () => {
+    expect(PAGE).toContain('この移行を切り戻す')
+    expect(PAGE).toContain('api.friendMigrations.rollback')
+    expect(PAGE).toContain('rollbackable')
+    expect(PAGE).toContain('rollbackConflicts')
+  })
+})
+
 describe('UID移行のタブと段組み（#984 LAY-13/14）', () => {
   it('主タブは友だち一覧と同じ定義・同じ部品を使う', () => {
     expect(PAGE).toContain("import { FRIENDS_MERGED_TABS } from '@/app/friends/friends-tabs'")
