@@ -37,6 +37,8 @@ vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: fixture.accountId, loading: false }),
 }))
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => undefined }))
+const emptyList = () => Promise.resolve({ success: true, data: [] })
+
 vi.mock('@/lib/api', () => ({
   api: {
     broadcastMessageAssets: {
@@ -52,6 +54,17 @@ vi.mock('@/lib/api', () => ({
       },
       contentUrl: (id: string, accountId: string) => `/api/media/${id}/content?accountId=${accountId}`,
     },
+    /*
+     * NEXT-17〜19 でアクション編集（InlineActionList / useActionOptions）を
+     * 載せたので、そこが読む候補APIも空で返す。モックしないと実ネットワークへ
+     * 出るか、未定義呼出で落ちる。
+     */
+    tags: { list: emptyList },
+    friendFields: { list: emptyList },
+    supportMarks: { list: emptyList },
+    scenarios: { list: emptyList },
+    commonVars: { list: emptyList },
+    featureSettings: { visibility: () => Promise.resolve({ success: true, data: { features: {} } }) },
   },
 }))
 
@@ -179,11 +192,14 @@ describe('テンプレート作成の「登録メディアから選ぶ」（N-19
     expect(host.querySelector<HTMLInputElement>('input[placeholder="画像URL"]')!.value).toBe('')
 
     // そのまま保存しても、別アカウントのメディアID・種別は保存値へ載らない。
+    // （#989: 画像なしでは保存しない。URL欄へ直接入れて保存する。）
     const nameInput = host.querySelector<HTMLInputElement>('input[type="text"]')!
     const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!
     await act(async () => {
       setter.call(nameInput, '夏のキャンペーン告知')
       nameInput.dispatchEvent(new Event('input', { bubbles: true }))
+      setter.call(host.querySelector<HTMLInputElement>('input[placeholder="画像URL"]')!, 'https://cdn.example.test/other.png')
+      host.querySelector<HTMLInputElement>('input[placeholder="画像URL"]')!.dispatchEvent(new Event('input', { bubbles: true }))
       await settle()
     })
     await act(async () => { buttonByText('テンプレートを保存').click(); await settle() })
