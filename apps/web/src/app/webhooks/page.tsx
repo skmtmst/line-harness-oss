@@ -35,20 +35,6 @@ function isHttpsUrl(value: string): boolean {
 }
 
 /*
-  `notify` というキーは旧URL（/notifications → /webhooks?tab=notify）の名残。
-  リダイレクト自体は通知一覧画面の新設（V6 1-1）で外したが、
-  `?tab=notify` の直接リンクは画面内に残っているのでキーは残す。
-  中身は通知機能ではなく、下の見本（WebhookSamples）を開く。
-  「見本 14」という表示は設計（V6 26-1 ノード k3WxrO）の指定なので変えない。
-*/
-const MERGED_TABS = [
-  { key: 'outgoing', label: 'こちらから送る 6' },
-  { key: 'incoming', label: 'こちらで受け取る 3' },
-  { key: 'interactions', label: 'やり取りの記録' },
-  { key: 'notify', label: '見本 14' },
-]
-
-/*
   受け取る設定の「どこから来るか」を、**見本から選べるようにする**。
 
   設計 `M0Gb7` は「予約サービス」「アンケートツール」のような見本を選んで作る道を
@@ -79,6 +65,26 @@ const OUTGOING_SAMPLES = [
   { event: 'booking.created', when: '予約が入ったとき', payload: '予約日時・メニュー・担当' },
   { event: 'conversion.confirmed', when: '注文が確定したとき', payload: '注文番号・金額・お客様名' },
 ] as const
+
+/*
+  `notify` というキーは旧URL（/notifications → /webhooks?tab=notify）の名残。
+  リダイレクト自体は通知一覧画面の新設（V6 1-1）で外したが、
+  `?tab=notify` の直接リンクは画面内に残っているのでキーは残す。
+  中身は通知機能ではなく、下の見本（WebhookSamples）を開く。
+
+  **タブの件数は直書きしない（#980）。**
+  設計（V6 26-1 ノード k3WxrO）が描いた「6」「3」は作り物の数で、
+  一覧が0件のアカウントでもそのまま出ていた。「送る」「受け取る」の
+  件数は WebhooksPageInner が、選択中アカウントで絞った一覧の取得結果と
+  同じ配列から付ける。取得前・失敗時は数字を出さない。
+  「見本」の件数だけは画面に並べる見本データ（受け取る＋送る）から数える。
+*/
+const MERGED_TABS = [
+  { key: 'outgoing', label: 'こちらから送る' },
+  { key: 'incoming', label: 'こちらで受け取る' },
+  { key: 'interactions', label: 'やり取りの記録' },
+  { key: 'notify', label: `見本 ${SOURCE_PRESETS.length + OUTGOING_SAMPLES.length}` },
+]
 
 /*
   見本タブの中身（N-381）。以前は別機能の通知画面を埋め込んでいたが、
@@ -530,6 +536,23 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
     `${typeof window !== 'undefined' ? window.location.origin : ''}/api/webhooks/incoming/${id}/receive`
   const activeStatus = tab === 'incoming' ? incomingStatus : outgoingStatus
 
+  /*
+    #980: タブの件数は、そのタブの一覧と同じ取得から数える。
+    `incoming` / `outgoing` はこの画面が選択中アカウントで絞って取った配列で、
+    下の一覧（IncomingOverview / OutgoingOverview）とKPI帯がそのまま描く
+    同じ集合。読み込み中・取得失敗・まだ取っていない間は数字を付けない
+    （一覧側も「読み込んでいます」「表示できませんでした」と数を分けている）。
+  */
+  const countedTabs = MERGED_TABS.map((item) => {
+    if (item.key === 'outgoing' && outgoingStatus === 'ready') {
+      return { ...item, label: `${item.label} ${outgoing.length}` }
+    }
+    if (item.key === 'incoming' && incomingStatus === 'ready') {
+      return { ...item, label: `${item.label} ${incoming.length}` }
+    }
+    return item
+  })
+
   return (
     <div>
       <div data-design="Crumb" className="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -549,7 +572,7 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
           )}
         </div>
       </div>
-      <MergedTabs basePath="/webhooks" paramName="tab" tabs={MERGED_TABS} active={tab} />
+      <MergedTabs basePath="/webhooks" paramName="tab" tabs={countedTabs} active={tab} />
 
       {/* Rotate-secret modal — used to recover legacy webhooks or rotate. */}
       {rotateTarget && (
