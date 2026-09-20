@@ -1,12 +1,13 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import Button from '@/components/shared/button'
 import KpiCard from '@/components/shared/kpi-card'
+import Pagination from '@/components/shared/pagination'
 import Select from '@/components/shared/select'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import { api } from '@/lib/api'
-import type { IdentityCandidateListItem } from '@line-crm/shared'
+import type { IdentityCandidateListItem, IdentityCandidateStatus } from '@line-crm/shared'
 import { usePageTitle } from '@/components/shell/page-chrome'
 
 interface PerAccountStat {
@@ -52,6 +53,8 @@ function formatRelative(iso: string): string {
 
 const fmt = new Intl.NumberFormat('ja-JP')
 
+const CANDIDATE_PAGE_SIZE = 50
+
 export default function DuplicatesPage() {
   usePageTitle('重複検出')
   const [data, setData] = useState<DuplicatesStatsData | null>(null)
@@ -60,36 +63,98 @@ export default function DuplicatesPage() {
   const [error, setError] = useState('')
   const [candidates, setCandidates] = useState<IdentityCandidateListItem[]>([])
   const [candidateTotal, setCandidateTotal] = useState(0)
+  const [statusCounts, setStatusCounts] = useState<Partial<Record<IdentityCandidateStatus, number>>>({})
+  const [lowConfidenceCount, setLowConfidenceCount] = useState(0)
   const [query, setQuery] = useState('')
+  // FRIEND-11: 検索はサーバーへ渡して全件へかける。入力中の逐次送信を避けるため debounce。
+  const [debouncedQuery, setDebouncedQuery] = useState('')
   const [status, setStatus] = useState('')
+  const [page, setPage] = useState(1)
+  const [candidatesLoading, setCandidatesLoading] = useState(false)
+  const [candidateError, setCandidateError] = useState('')
+  /*
+   * FRIEND-12: 状態切替で先行した要求の応答が後から届いても採用しない。
+   * 番号の新しい要求だけを採用し、検索キー（状態・検索語・ページ）も
+   * 照合して「選んだ条件」と「出ている結果」がずれないようにする。
+   */
+  const candidatesReqRef = useRef(0)
+  const candidatesKeyRef = useRef('')
+  const statsReqRef = useRef(0)
 
-  const load = useCallback(async (opts?: { forceRefresh?: boolean }) => {
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedQuery(query), 250)
+    return () => clearTimeout(timer)
+  }, [query])
+
+  // 条件を変えたら1ページ目へ戻す（FRIEND-11）。
+  useEffect(() => {
+    setPage(1)
+  }, [debouncedQuery, status])
+
+  const loadStats = useCallback(async (opts?: { forceRefresh?: boolean }) => {
     if (opts?.forceRefresh) setRefreshing(true)
-    setError('')
+    const req = ++statsReqRef.current
     try {
-      const [statsRes, candidatesRes] = await Promise.all([
-        api.duplicates.stats(opts),
-        api.identityCandidates.list({
-          kind: 'friend_duplicate',
-          status: status ? status as 'pending' | 'linked' | 'different' | 'deferred' : undefined,
-          limit: 50,
-          offset: 0,
-        }),
-      ])
-      if (statsRes.success && candidatesRes.success) {
+      const statsRes = await api.duplicates.stats(opts)
+      if (req !== statsReqRef.current) return
+      if (statsRes.success) {
         setData(statsRes.data)
-        setCandidates(candidatesRes.data.items)
-        setCandidateTotal(candidatesRes.data.total)
+        setError('')
       } else {
         setError('読み込めませんでした')
       }
     } catch {
+      if (req !== statsReqRef.current) return
       setError('読み込めませんでした')
     } finally {
-      setLoading(false)
-      setRefreshing(false)
+      if (req === statsReqRef.current) {
+        setLoading(false)
+        setRefreshing(false)
+      }
     }
-  }, [status])
+  }, [])
+
+  const loadCandidates = useCallback(async () => {
+    const req = ++candidatesReqRef.current
+    const key = JSON.stringify({ status, q: debouncedQuery.trim(), page })
+    candidatesKeyRef.current = key
+    setCandidatesLoading(true)
+    setCandidateError('')
+    try {
+      const res = await api.identityCandidates.list({
+        kind: 'friend_duplicate',
+        // FRIEND-11: 「すべて」は本当に全状態を見る（従来は pending だけだった）。
+        status: (status || 'all') as IdentityCandidateStatus | 'all',
+        q: debouncedQuery.trim() || undefined,
+        limit: CANDIDATE_PAGE_SIZE,
+        offset: (page - 1) * CANDIDATE_PAGE_SIZE,
+      })
+      // 古い応答・別条件の応答は捨てる（FRIEND-12）。
+      if (req !== candidatesReqRef.current || candidatesKeyRef.current !== key) return
+      if (res.success) {
+        setCandidates(res.data.items)
+        setCandidateTotal(res.data.total)
+        setStatusCounts(res.data.statusCounts ?? {})
+        setLowConfidenceCount(res.data.lowConfidenceCount ?? 0)
+      } else {
+        // FRIEND-12: 失敗を「新しい条件の0件」と誤認させない。
+        setCandidates([])
+        setCandidateTotal(0)
+        setCandidateError('候補一覧を読み込めませんでした')
+      }
+    } catch {
+      if (req !== candidatesReqRef.current || candidatesKeyRef.current !== key) return
+      setCandidates([])
+      setCandidateTotal(0)
+      setCandidateError('候補一覧を読み込めませんでした')
+    } finally {
+      if (req === candidatesReqRef.current) setCandidatesLoading(false)
+    }
+  }, [status, debouncedQuery, page])
+
+  const load = useCallback(async (opts?: { forceRefresh?: boolean }) => {
+    await Promise.all([loadStats(opts), loadCandidates()])
+  }, [loadStats, loadCandidates])
 
   const detect = async () => {
     setRefreshing(true)
@@ -104,16 +169,17 @@ export default function DuplicatesPage() {
     }
   }
 
-  const visibleCandidates = candidates.filter((candidate) => {
-    const needle = query.trim().toLocaleLowerCase('ja-JP')
-    if (!needle) return true
-    return [candidate.left.label, candidate.right.label, ...candidate.evidenceSummary]
-      .some((value) => value.toLocaleLowerCase('ja-JP').includes(needle))
-  })
+  const candidatePageCount = Math.max(1, Math.ceil(candidateTotal / CANDIDATE_PAGE_SIZE))
+  const rangeStart = candidateTotal === 0 ? 0 : (page - 1) * CANDIDATE_PAGE_SIZE + 1
+  const rangeEnd = Math.min(page * CANDIDATE_PAGE_SIZE, candidateTotal)
 
   useEffect(() => {
-    load()
-  }, [load])
+    loadStats()
+  }, [loadStats])
+
+  useEffect(() => {
+    void loadCandidates()
+  }, [loadCandidates])
 
   // Tick once a minute so the "○分前に計算" label keeps refreshing while
   // the operator leaves the page open. setNow reads Date.now() implicitly
@@ -159,8 +225,13 @@ export default function DuplicatesPage() {
             カード行を補足文の長さで伸ばさない。
           */}
           <section className="grid grid-cols-2 gap-4 lg:grid-cols-5">
-            <KpiCard title="重複候補" value={null} unit="" valueText={`${fmt.format(candidateTotal)}組`} detail={`${fmt.format(candidates.filter((item) => item.status === 'pending').length)}組を確認待ち`} />
-            <KpiCard title="確認済み" value={null} unit="" valueText={`${fmt.format(candidates.filter((item) => item.status === 'linked').length)}組`} detail="統合ユーザーに紐付け済み" />
+            {/*
+              FRIEND-11: 集計カードは読み込んだ1ページ分ではなく、同じ検索条件の
+              全件を数えた statusCounts / lowConfidenceCount で出す。
+              （読み込み50件で頭打ちにならない。）
+            */}
+            <KpiCard title="重複候補" value={null} unit="" valueText={`${fmt.format(Object.values(statusCounts).reduce((sum, n) => sum + (n ?? 0), 0))}組`} detail={`${fmt.format(statusCounts.pending ?? 0)}組を確認待ち`} />
+            <KpiCard title="確認済み" value={null} unit="" valueText={`${fmt.format(statusCounts.linked ?? 0)}組`} detail="統合ユーザーに紐付け済み" />
             {/*
               friendDups は「重複した登録の行数」。送った通数ではない。
               以前はこれを「余分な配信回数」「1配信あたり浪費 ¥X」と言い切り、
@@ -183,7 +254,7 @@ export default function DuplicatesPage() {
               detail={`¥${fmt.format(data.msgUnitYen)}/通の見積り`}
               description="重複している友だち登録の数に1通あたりの単価を掛けた見積りです。実際に送った配信の実績ではありません。"
             />
-            <KpiCard title="根拠不足" value={null} unit="" valueText={`${fmt.format(candidates.filter((item) => item.confidence.label === 'low').length)}組`} detail="名前・画像だけの候補" />
+            <KpiCard title="根拠不足" value={null} unit="" valueText={`${fmt.format(lowConfidenceCount)}組`} detail="名前・画像だけの候補" />
           </section>
 
           <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-[#565F59]">
@@ -220,7 +291,7 @@ export default function DuplicatesPage() {
             </div>
           </div>
 
-          <section className="overflow-hidden rounded-card border border-hairline bg-canvas shadow-card">
+          <section className="overflow-hidden rounded-card border border-hairline bg-canvas shadow-card" aria-busy={candidatesLoading}>
             <table className="w-full table-fixed text-sm">
               <colgroup><col style={{ width: '18%' }}/><col style={{ width: '10%' }}/><col style={{ width: '27%' }}/><col style={{ width: '18%' }}/><col style={{ width: '12%' }}/><col style={{ width: '8%' }}/><col style={{ width: '12%' }}/></colgroup>
               {/*
@@ -230,7 +301,23 @@ export default function DuplicatesPage() {
               */}
               <thead><TableHeadRow><Th>候補</Th><Th>確信度</Th><Th>一致した根拠</Th><Th>所属アカウント</Th><Th>最終更新</Th><Th>状態</Th><Th>操作</Th></TableHeadRow></thead>
               <tbody className="divide-y divide-hairline">
-                {visibleCandidates.length ? visibleCandidates.map((candidate) => (
+                {candidateError ? (
+                  <tr>
+                    <td colSpan={7} className="px-4 py-12 text-center text-sm text-ink-faint">
+                      {candidateError}
+                      <button
+                        type="button"
+                        onClick={() => void loadCandidates()}
+                        className="ml-2 font-semibold text-action hover:underline"
+                      >
+                        再試行
+                      </button>
+                    </td>
+                  </tr>
+                ) : candidatesLoading && candidates.length === 0 ? (
+                  // FRIEND-12: 応答待ちを「0件」と見せない。
+                  <tr><td colSpan={7} className="px-4 py-12 text-center text-sm text-ink-faint">読み込んでいます…</td></tr>
+                ) : candidates.length ? candidates.map((candidate) => (
                   <tr key={candidate.id}>
                     <td className="truncate px-3 py-3 font-semibold text-ink" title={`${candidate.left.label} ↔ ${candidate.right.label}`}>{candidate.left.label} ↔ {candidate.right.label}</td>
                     <td className="px-3 py-3 text-ink-secondary">{candidate.confidence.label === 'very_high' ? '最高' : candidate.confidence.label === 'high' ? '高' : candidate.confidence.label === 'medium' ? '中' : '低'}</td>
@@ -247,10 +334,14 @@ export default function DuplicatesPage() {
               #984 LAY-16: 0件のとき「範囲の先頭が末尾を越える表示」を出していた。
               件数が0なら「0組」だけ、検索で0件なら解除の導線を出す。
             */}
-            <div className="border-t border-hairline px-4 py-3 text-xs text-ink-faint">
-              {candidateTotal === 0 ? (
+            <div className="flex flex-wrap items-center justify-between gap-2 border-t border-hairline px-4 py-3 text-xs text-ink-faint">
+              {/* FRIEND-12: 応待ちは「更新中」と明示し、前の条件の結果と誤認させない。 */}
+              {candidatesLoading ? <span>更新中…</span> : null}
+              {candidateError ? (
+                <span>{candidateError}</span>
+              ) : candidateTotal === 0 && !candidatesLoading ? (
                 '0組'
-              ) : visibleCandidates.length === 0 ? (
+              ) : candidates.length === 0 && !candidatesLoading ? (
                 <span className="inline-flex flex-wrap items-center gap-x-3 gap-y-1">
                   検索条件に合う候補はありません
                   <button
@@ -261,9 +352,19 @@ export default function DuplicatesPage() {
                     検索条件を解除する
                   </button>
                 </span>
-              ) : (
-                `${fmt.format(candidateTotal)}組中 1〜${fmt.format(visibleCandidates.length)}組`
-              )}
+              ) : candidateTotal > 0 ? (
+                <span>
+                  {fmt.format(candidateTotal)}組中 {fmt.format(rangeStart)}〜{fmt.format(rangeEnd)}組
+                </span>
+              ) : null}
+              {/* FRIEND-11: 51件目以降へ進めるページ送り。 */}
+              <Pagination
+                page={page}
+                pageCount={candidatePageCount}
+                onPageChange={setPage}
+                disabled={candidatesLoading}
+                ariaLabel="重複候補のページ"
+              />
             </div>
           </section>
 
