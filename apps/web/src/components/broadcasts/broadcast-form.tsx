@@ -58,6 +58,7 @@ import Button from '@/components/shared/button'
 import { RequiredBadge } from '@/components/shared/form-controls'
 import BroadcastStepRail from '@/components/broadcasts/broadcast-step-rail'
 import { broadcastSteps, type BroadcastStepKey } from '@/components/broadcasts/broadcast-steps'
+import { testSendFailure, testSendResult, type TestSendView } from './test-send-view'
 import { usePageTitle } from '@/components/shell/page-chrome'
 
 interface BroadcastFormProps {
@@ -585,7 +586,17 @@ export default function BroadcastForm({
   const [testRecipients, setTestRecipients] = useState<Array<{ id: string; displayName: string; pictureUrl: string | null }>>([])
   const [testRecipientState, setTestRecipientState] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
   const [testSending, setTestSending] = useState(false)
-  const [testResult, setTestResult] = useState(visualQaAugustCampaign ? 'テスト送信しました（2件）' : '')
+  /*
+   * テスト送信の結果と実行履歴。
+   *
+   * **受信者の設定一覧と履歴は別物。** 登録済みの送信先を並べただけでは
+   * まだ1件も送っていないので、履歴は実際に testSend を呼んで返ってきた
+   * 結果だけから作る（新しい順）。
+   */
+  const [testResult, setTestResult] = useState<TestSendView | null>(
+    visualQaAugustCampaign ? { kind: 'success', message: 'テスト送信しました（2件）' } : null,
+  )
+  const [testHistory, setTestHistory] = useState<TestSendView[]>([])
   const [previewConfirmed, setPreviewConfirmed] = useState(visualQaAugustCampaign)
   const [error, setError] = useState('')
   const [draftSaved, setDraftSaved] = useState(false)
@@ -999,18 +1010,28 @@ export default function BroadcastForm({
     }
     setTestSending(true)
     setError('')
-    setTestResult('')
+    setTestResult(null)
+    const at = new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })
     try {
       const draft = await persistDraft(null, true)
       if (!draft) return
       const res = await api.broadcasts.testSend(draft.id)
-      if (res.success) {
-        setTestResult(`テスト送信しました（${res.sent ?? 0}件）`)
-      } else {
-        setError(res.error ?? 'テスト送信できませんでした')
-      }
+      /*
+       * **HTTPの成功と配信の成功は分ける。** 全員に失敗しても
+       * `success: true` で `sent/failed` が返るので、共通の分類
+       * （全員失敗=エラー、一部失敗=要対応、全員成功=成功）を通す。
+       */
+      const view = res.success
+        ? testSendResult(res.sent ?? 0, res.failed ?? 0, at)
+        : res.error
+          ? { kind: 'error' as const, message: `${at} ${res.error}` }
+          : testSendFailure(at)
+      setTestResult(view)
+      setTestHistory((history) => [view, ...history])
     } catch {
-      setError('テスト送信できませんでした')
+      const view = testSendFailure(at)
+      setTestResult(view)
+      setTestHistory((history) => [view, ...history])
     } finally {
       setTestSending(false)
     }
@@ -1065,7 +1086,7 @@ export default function BroadcastForm({
     : null
   const unconfirmedCount = preflight
     ? preflight.warnings.filter((w) => w.level === 'warning').length
-      + (testResult ? 0 : 1)
+      + (testResult?.kind === 'success' ? 0 : 1)
       + (previewConfirmed ? 0 : 1)
     : null
 
@@ -1144,29 +1165,7 @@ export default function BroadcastForm({
     )}
     <BroadcastStepRail steps={steps} />
     <div className="mt-2.5 grid gap-4 xl:grid-cols-[minmax(0,1fr)_390px]">
-      <div className={`space-y-5 ${testDialogOpen ? 'broadcast-test-page-open' : ''} ${preflightDialogOpen ? 'broadcast-preflight-page-open' : ''}`}>
-        {testDialogOpen ? (
-          <section className="broadcast-test-page space-y-4">
-            <div className="rounded-card border border-hairline bg-canvas p-5">
-              <h3 className="text-lg font-bold text-ink">テスト送信</h3>
-              <p className="mt-1 text-xs text-ink-faint">本番配信前に、実際のLINEアカウントで表示を確認します。</p>
-              <p className="mt-4 rounded-control bg-info-bg p-3 text-xs font-semibold text-info">テスト送信は本番の送信枠を消費しません。</p>
-              <dl className="mt-4 divide-y divide-hairline text-sm">
-                <div className="flex justify-between py-3"><dt className="text-ink-faint">送信内容</dt><dd className="font-bold text-ink">テキスト 1通</dd></div>
-                <div className="flex justify-between py-3"><dt className="text-ink-faint">変数の確認</dt><dd className="font-bold text-ink">Kentaさん</dd></div>
-                <div className="flex justify-between py-3"><dt className="text-ink-faint">リンク計測</dt><dd className="font-bold text-ink">有効</dd></div>
-              </dl>
-              <div className="mt-3 flex gap-2"><Button variant="primary">送信先を選ぶ</Button><Button>自分に送る</Button></div>
-            </div>
-            <section className="rounded-card border border-hairline bg-canvas p-5">
-              <h3 className="text-lg font-bold text-ink">テスト履歴</h3>
-              <p className="mt-1 text-xs text-ink-faint">直近の確認結果を残します。</p>
-              <dl className="mt-3 divide-y divide-hairline text-sm">
-                {testRecipients.map((recipient, index) => <div key={recipient.id} className="flex items-center justify-between py-3"><div><dt className="font-bold text-ink">{recipient.displayName}</dt><dd className="text-xs text-ink-faint">2026/08/23 {index === 0 ? '23:42' : '23:38'}</dd></div><span className="font-bold text-success">成功</span></div>)}
-              </dl>
-            </section>
-          </section>
-        ) : null}
+      <div className={`space-y-5 ${preflightDialogOpen ? 'broadcast-preflight-page-open' : ''}`}>
         {preflightDialogOpen ? (
           <section className="broadcast-preflight-page space-y-3">
             <section className="rounded-card border border-hairline bg-canvas p-5">
@@ -1732,7 +1731,7 @@ export default function BroadcastForm({
         <ul className="mt-4 space-y-2 text-sm">
           <li className="flex items-center gap-2"><span className="text-success">✓</span><span>配信対象が設定されています</span></li>
           <li className="flex items-center gap-2"><span className={scheduledLabel ? 'text-success' : 'text-warning'}>{scheduledLabel ? '✓' : '!'}</span><span>配信日時が設定されています</span></li>
-          <li className="flex items-center gap-2"><span className={testResult ? 'text-success' : 'text-warning'}>{testResult ? '✓' : '!'}</span><span>{testResult ? 'テスト送信が完了しています' : 'テスト送信がまだです'}</span></li>
+          <li className="flex items-center gap-2"><span className={testResult?.kind === 'success' ? 'text-success' : testResult ? 'text-danger' : 'text-warning'}>{testResult?.kind === 'success' ? '✓' : '!'}</span><span>{testResult?.kind === 'success' ? 'テスト送信が完了しています' : testResult ? 'テスト送信で届かなかった宛先があります' : 'テスト送信がまだです'}</span></li>
           <li className="flex items-center gap-2"><span className={quotaInsufficient || lengthNotice.tone === 'error' ? 'text-danger' : quotaAvailable ? 'text-success' : 'text-warning'}>{quotaInsufficient || lengthNotice.tone === 'error' ? '!' : quotaAvailable ? '✓' : '○'}</span><span>{visualQaAugustCampaign ? '送信枠を超えていません' : quotaInsufficient ? `送信枠が${Math.max(0, quota.planned - (quota.remaining ?? 0)).toLocaleString('ja-JP')}通不足しています` : quotaAvailable ? `送信枠は残り${quota.remaining?.toLocaleString('ja-JP')}通です` : '送信枠を確認できません'}</span></li>
         </ul>
         {!visualQaAugustCampaign && <label className="border-hairline mt-4 flex cursor-pointer items-center gap-3 border-t pt-4 text-sm font-semibold text-ink">
@@ -1804,11 +1803,6 @@ export default function BroadcastForm({
               <div className="mt-4 rounded-control bg-canvas-sunken p-4 text-sm text-ink">{selectedTemplate?.messageContent ?? 'テンプレートを選ぶと表示されます'}</div>
             </section>
             <div className="grid grid-cols-2 gap-2"><Button type="button" onClick={() => void openTestDialog()}>テスト送信</Button><Button type="button" disabled>配信イメージを見る</Button></div>
-          </div>
-        ) : testDialogOpen ? (
-          <div className="space-y-3">
-            <section className="broadcast-line-preview rounded-card p-5 text-on-accent"><h3 className="text-center text-sm font-bold">LINEプレビュー</h3><p className="mx-auto mt-4 w-fit rounded-pill bg-ink/25 px-3 py-1 text-xs">2026/08/24 10:00 に届きます</p><div className="mt-4 rounded-control bg-canvas p-4 text-sm text-ink">Kentaさんへ<br />8月限定キャンペーンのお知らせです。<br />詳しくはこちらをご確認ください。<div className="mt-3 rounded-control bg-accent-deep p-2 text-center font-bold text-on-accent">キャンペーンを見る</div></div></section>
-            <section className="rounded-card border border-hairline bg-canvas p-4"><h3 className="font-bold text-ink">確認項目</h3><p className="mt-1 text-xs text-ink-faint">端末で次の内容を確認してください。</p><ul className="mt-3 space-y-2 text-xs text-ink-secondary"><li>○ 改行と文字切れ</li><li>○ 画像・ボタンの表示</li><li>○ 変数の差し込み</li><li>○ リンクの遷移</li></ul></section>
           </div>
         ) : preflightDialogOpen ? (
           <div className="space-y-3">
@@ -2109,7 +2103,7 @@ export default function BroadcastForm({
               {preflight?.warnings.filter((w) => w.level === 'warning').map((w) => (
                 <li key={w.message}>{w.message}</li>
               ))}
-              {testResult ? null : <li>テスト送信がまだです</li>}
+              {testResult?.kind === 'success' ? null : testResult ? <li>テスト送信で届かなかった宛先があります</li> : <li>テスト送信がまだです</li>}
               {previewConfirmed ? null : <li>LINEプレビューが未確認です</li>}
             </ul>
           </div>
@@ -2131,8 +2125,8 @@ export default function BroadcastForm({
 
     <ConfirmDialog
       open={testDialogOpen}
-      title="テスト送信先を選択"
-      description="担当者のLINEへ表示確認用のメッセージを送ります。"
+      title="テスト送信"
+      description="登録済みのテスト送信先全員のLINEへ、表示確認用のメッセージを送ります。"
       confirmLabel={testSending ? '送信中…' : 'テスト送信する'}
       cancelLabel="キャンセル"
       busy={testSending}
@@ -2150,16 +2144,64 @@ export default function BroadcastForm({
             テスト送信先が登録されていません。アカウント設定で、LINE連携済みの担当者を登録してください。
           </p>
         )}
-        {testRecipients.map((recipient, index) => (
-          <div key={recipient.id} className={`flex items-center gap-3 rounded-control border p-3 ${index === 0 ? 'border-accent bg-accent-soft' : 'border-hairline'}`}>
-            {recipient.pictureUrl ? <img src={recipient.pictureUrl} alt="" className="h-9 w-9 rounded-full object-cover" /> : (
-              <span className={`flex h-9 w-9 items-center justify-center rounded-full text-sm font-bold text-on-accent ${index === 0 ? 'bg-accent-deep' : 'bg-ink-secondary'}`}>{recipient.displayName.slice(0, 1)}</span>
-            )}
-            <span className="min-w-0 flex-1"><span className="block text-sm font-bold text-ink">{recipient.displayName}</span><span className="block text-xs text-ink-faint">{recipient.displayName === 'Kenta Kawano' ? '管理者' : '開発担当'}・LINE連携済み</span></span>
-            <span className={`size-4 rounded-full border ${index === 0 ? 'border-accent bg-accent' : 'border-ink-faint'}`} aria-hidden />
-          </div>
-        ))}
-        {testResult && <p className="rounded-control bg-success-bg p-3 text-sm text-success">{testResult}</p>}
+        {testRecipientState === 'ready' && testRecipients.length > 0 && (
+          <>
+            {/*
+              **宛先は選ばない。** 送信APIは宛先を受け取らず、Workerは
+              登録済みのテスト送信先全員へ送る。先頭だけ緑の丸を付けると
+              1人を選んだように見えるので、全員を同じ見た目で並べる。
+              役職はAPIが返さないので、名前から推定して表示しない。
+            */}
+            <p className="rounded-control bg-canvas-sunken p-3 text-sm text-ink-secondary">
+              登録済みのテスト送信先 {testRecipients.length}名全員へ送信します。
+            </p>
+            <ul className="space-y-2">
+              {testRecipients.map((recipient) => (
+                <li key={recipient.id} className="flex items-center gap-3 rounded-control border border-hairline p-3">
+                  {recipient.pictureUrl ? <img src={recipient.pictureUrl} alt="" className="h-9 w-9 rounded-full object-cover" /> : (
+                    <span className="flex h-9 w-9 items-center justify-center rounded-full bg-ink-secondary text-sm font-bold text-on-accent">{recipient.displayName.slice(0, 1)}</span>
+                  )}
+                  <span className="min-w-0 flex-1 truncate text-sm font-bold text-ink">{recipient.displayName}</span>
+                </li>
+              ))}
+            </ul>
+            {/*
+              テスト送信も通常の pushMessage を通すので、LINE公式アカウントの
+              送信枠を使う。「消費しません」と書くと実装と食い違う。
+            */}
+            <p className="rounded-control bg-info-bg p-3 text-xs font-semibold text-info">
+              テスト送信もLINE公式アカウントの送信枠を使用します（見込み {(testRecipients.length * bubbles.length).toLocaleString('ja-JP')}通）。
+            </p>
+          </>
+        )}
+        {testResult && (
+          <p className={
+            testResult.kind === 'success'
+              ? 'rounded-control bg-success-bg p-3 text-sm text-success'
+              : testResult.kind === 'partial'
+                ? 'rounded-control bg-warning-bg p-3 text-sm text-warning'
+                : 'rounded-control bg-danger-bg p-3 text-sm text-danger'
+          }>{testResult.message}</p>
+        )}
+        {testHistory.length > 1 && (
+          <section>
+            <h4 className="text-xs font-bold text-ink-faint">これ以前の実行履歴</h4>
+            <ul className="mt-1 space-y-1">
+              {testHistory.slice(1).map((entry, index) => (
+                <li
+                  key={index}
+                  className={
+                    entry.kind === 'success'
+                      ? 'rounded-control bg-success-bg p-2 text-xs text-success'
+                      : entry.kind === 'partial'
+                        ? 'rounded-control bg-warning-bg p-2 text-xs text-warning'
+                        : 'rounded-control bg-danger-bg p-2 text-xs text-danger'
+                  }
+                >{entry.message}</li>
+              ))}
+            </ul>
+          </section>
+        )}
       </div>
     </ConfirmDialog>
     <style jsx global>{`
@@ -2223,7 +2265,6 @@ export default function BroadcastForm({
       .broadcast-line-preview { background: var(--color-line-preview); min-height: 428px; }
        .broadcast-url-row { display: grid; grid-template-columns: minmax(7rem, .7fr) minmax(0, 1.4fr) 7rem; }
        .broadcast-form-footer { grid-template-columns: minmax(0, 1fr) auto 0; }
-       .broadcast-test-page-open > :not(.broadcast-test-page),
        .broadcast-preflight-page-open > :not(.broadcast-preflight-page) { display: none; }
       @media (min-width: 640px) {
         .broadcast-basic-fields { grid-template-columns: minmax(0, 1fr) 20rem; }

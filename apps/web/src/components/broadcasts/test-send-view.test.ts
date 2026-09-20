@@ -21,6 +21,15 @@ describe('一斉配信のテスト送信結果', () => {
     expect(testSendResult(0, 0, '10:00').kind).toBe('error')
   })
 
+  it('全員に失敗した応答（success:true, sent:0, failed:2）はエラーにする', () => {
+    // APIはHTTP成功で failed を返す。failed を見ずに緑にすると嘘になる。
+    const view = testSendResult(0, 2, '10:00')
+    expect(view.kind).toBe('error')
+    expect(view.message).toContain('2名')
+    expect(view.message).not.toContain('成功')
+  })
+
+
   it('API失敗を運用者の言葉にする', () => {
     expect(testSendFailure('10:00')).toEqual({
       kind: 'error',
