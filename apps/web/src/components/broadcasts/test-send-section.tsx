@@ -128,7 +128,13 @@ export default function TestSendSection({ broadcastId, accountId, disabled }: Te
             {sending ? 'テスト送信中...' : cooldown ? '送信済み' : 'テスト送信する'}
           </button>
           {result && (
-            <p className={`mt-2 text-xs ${result.kind === 'success' ? 'text-success' : 'text-danger'}`}>
+            <p className={
+              result.kind === 'success'
+                ? 'mt-2 rounded-control bg-success-bg p-2 text-xs text-success'
+                : result.kind === 'partial'
+                  ? 'mt-2 rounded-control bg-warning-bg p-2 text-xs text-warning'
+                  : 'mt-2 rounded-control bg-danger-bg p-2 text-xs text-danger'
+            }>
               {result.message}
             </p>
           )}
