@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import Button from '@/components/shared/button'
+import KpiCard from '@/components/shared/kpi-card'
 import Select from '@/components/shared/select'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import { api } from '@/lib/api'
@@ -152,26 +153,37 @@ export default function DuplicatesPage() {
               再計算できませんでした。表示中の数字は前回の集計です。
             </div>
           )}
+          {/*
+            #1005: 独自カードをやめて共通 KpiCard の3段（見出し・数値・短い状態）に
+            揃える。見積りの前提などの長い説明は説明アイコンの中へ移し、
+            カード行を補足文の長さで伸ばさない。
+          */}
           <section className="grid grid-cols-2 gap-4 lg:grid-cols-5">
-            <StatCard label="重複候補" value={`${fmt.format(candidateTotal)}組`} hint={`${fmt.format(candidates.filter((item) => item.status === 'pending').length)}組を確認待ち`} />
-            <StatCard label="確認済み" value={`${fmt.format(candidates.filter((item) => item.status === 'linked').length)}組`} hint="統合ユーザーに紐付け済み" />
+            <KpiCard title="重複候補" value={null} unit="" valueText={`${fmt.format(candidateTotal)}組`} detail={`${fmt.format(candidates.filter((item) => item.status === 'pending').length)}組を確認待ち`} />
+            <KpiCard title="確認済み" value={null} unit="" valueText={`${fmt.format(candidates.filter((item) => item.status === 'linked').length)}組`} detail="統合ユーザーに紐付け済み" />
             {/*
               friendDups は「重複した登録の行数」。送った通数ではない。
               以前はこれを「余分な配信回数」「1配信あたり浪費 ¥X」と言い切り、
               さらに設計にない「月10本配信なら」という前提まで作っていた。
               配信実績が繋がるまでは、数えられる行数だけを行数として出す。
             */}
-            <StatCard
-              label="重複配信の削減"
-              value="—"
-              hint="配信前プレビューの実績を接続後に表示"
+            <KpiCard
+              title="重複配信の削減"
+              value={null}
+              unit=""
+              valueText="—"
+              detail="配信実績の接続を待っています"
+              description="配信前プレビューの実績を接続したあと、重複分を除いた削減の見込みをここに表示します。"
             />
-            <StatCard
-              label="1配信あたりの無駄"
-              value={`¥${fmt.format(data.wastedPerBroadcastYen)}`}
-              hint={`¥${fmt.format(data.msgUnitYen)}/通の見積り`}
+            <KpiCard
+              title="1配信あたりの無駄"
+              value={null}
+              unit=""
+              valueText={`¥${fmt.format(data.wastedPerBroadcastYen)}`}
+              detail={`¥${fmt.format(data.msgUnitYen)}/通の見積り`}
+              description="重複している友だち登録の数に1通あたりの単価を掛けた見積りです。実際に送った配信の実績ではありません。"
             />
-            <StatCard label="根拠不足" value={`${fmt.format(candidates.filter((item) => item.confidence.label === 'low').length)}組`} hint="名前・画像だけの候補" />
+            <KpiCard title="根拠不足" value={null} unit="" valueText={`${fmt.format(candidates.filter((item) => item.confidence.label === 'low').length)}組`} detail="名前・画像だけの候補" />
           </section>
 
           <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-[#565F59]">
@@ -361,24 +373,6 @@ export default function DuplicatesPage() {
           })()}
         </>
       )}
-    </div>
-  )
-}
-
-function StatCard({
-  label,
-  value,
-  hint,
-}: {
-  label: string
-  value: string
-  hint?: string
-}) {
-  return (
-    <div className="rounded-[14px] border border-[#DADDE2] bg-white p-4 shadow-[1px_1px_2px_rgba(29,29,31,0.13)]">
-      <div className="text-xs font-medium text-[#565F59]">{label}</div>
-      <div className="mt-1 text-2xl font-bold tabular-nums text-[#1D1D1F]">{value}</div>
-      {hint ? <div className="mt-1 text-xs text-[#8B938D]">{hint}</div> : null}
     </div>
   )
 }
