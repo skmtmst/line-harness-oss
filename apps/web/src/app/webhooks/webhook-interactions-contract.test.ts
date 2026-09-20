@@ -10,9 +10,25 @@ describe('V6 外部連携・やり取りの記録 KNG00', () => {
   it('実ノードと実ルートを接続する', () => {
     expect(PAGE).toContain('data-design-node="KNG00"')
     expect(HOST).toContain("{ key: 'interactions', label: 'やり取りの記録' }")
-    expect(HOST).toContain("{ key: 'outgoing', label: 'こちらから送る 6' }")
+    expect(HOST).toContain("{ key: 'outgoing', label: 'こちらから送る' }")
     expect(HOST).toContain("tab === 'interactions' && <WebhookInteractions />")
     expect(API).toContain('/api/webhooks/interactions?')
+  })
+
+  it('タブの件数は固定値でなく、一覧の取得結果の総数に接続する(#980)', () => {
+    // 設計が描いた作り物の件数を書かない。一覧0件のアカウントでも
+    // 「こちらから送る 6」「こちらで受け取る 3」と出ていた。
+    expect(HOST).not.toContain("'こちらから送る 6'")
+    expect(HOST).not.toContain("'こちらで受け取る 3'")
+    expect(HOST).not.toContain("'見本 14'")
+    // 「送る」「受け取る」は、選択中アカウントで絞った一覧と同じ配列の
+    // 総数を、取れたとき（status==='ready'）だけ付ける。
+    expect(HOST).toContain("outgoingStatus === 'ready'")
+    expect(HOST).toContain("incomingStatus === 'ready'")
+    expect(HOST).toContain('`${item.label} ${outgoing.length}`')
+    expect(HOST).toContain('`${item.label} ${incoming.length}`')
+    // 「見本」は画面に並べる見本データから別集計する。
+    expect(HOST).toContain('`見本 ${SOURCE_PRESETS.length + OUTGOING_SAMPLES.length}`')
   })
 
   it('読込・空・失敗を分け、未取得を0件と見せない', () => {
