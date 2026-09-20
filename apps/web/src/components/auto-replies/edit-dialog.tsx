@@ -269,6 +269,8 @@ export default function EditDialog({
   const [templateId, setTemplateId] = useState<string | null>(draft.templateId)
   const [responseContent, setResponseContent] = useState(draft.responseContent)
   const [isActive, setIsActive] = useState(draft.isActive)
+  /* #975 U059: 390pxでプレビューが保存操作を遠ざけないよう、狭い幅では折り畳む。 */
+  const [mobilePreviewOpen, setMobilePreviewOpen] = useState(false)
   const [activeFrom, setActiveFrom] = useState(draft.activeFrom ?? '')
   const [activeUntil, setActiveUntil] = useState(draft.activeUntil ?? '')
   const [cooldown, setCooldown] = useState(
@@ -1391,7 +1393,25 @@ export default function EditDialog({
         {!page && <StickyBar className="mx-5 mb-4" actions={stickyActions} />}
       </div>
       {page && (
-        <aside className="flex flex-col gap-3 xl:sticky xl:top-4">
+        /*
+         * #975 U059: 390pxでは、長いプレビューの先に保存があるように見えない
+         * よう、設定確認・プレビューはワンタップで開く折り畳みにする。
+         * 保存は下部追従バーにあり、スクロールなしで届く。
+         * 表示制御は共通部品へ渡せないため、外側の div で xl 以上を隠す。
+         */
+        <div className="xl:hidden">
+          <Button
+            variant="secondary"
+            className="w-full"
+            aria-expanded={mobilePreviewOpen}
+            onClick={() => setMobilePreviewOpen((current) => !current)}
+          >
+            {mobilePreviewOpen ? '届く形と設定の確認を閉じる' : '届く形と設定の確認を見る'}
+          </Button>
+        </div>
+      )}
+      {page && (
+        <aside className={`flex flex-col gap-3 xl:sticky xl:top-4 ${mobilePreviewOpen ? '' : 'max-xl:hidden'}`}>
           <div style={step === 'basic' ? { minHeight: 298 } : undefined} className={`bg-canvas rounded-card border-hairline border p-4 ${step === 'response' ? 'order-2' : 'order-1'}`}>
             <h3 className="text-ink text-sm font-semibold">
               {step === 'trigger' ? 'この条件の判定' : step === 'response' ? '返信の設定' : '設定内容'}
