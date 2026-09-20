@@ -28,4 +28,51 @@ describe('validateSearchConditions', () => {
     });
     expect(result).toEqual({ ok: false, error: '表示件数が正しくありません' });
   });
+
+  /*
+    ATTR-13: 実行側が解釈できない op は保存の時点で断る。
+    以前は「op が空でない」だけを見ていたため、保存は通るのに
+    検索実行で拒否される条件が作れた。
+  */
+  it('その条件の種類で使えない比較方法は保存しない', () => {
+    const cases: Array<[string, string]> = [
+      ['name', 'gte'],          // 名前に大小比較は無い
+      ['mark', 'contains'],     // 対応マークは完全一致だけ
+      ['chat_status', 'ne'],    // 対応状態は一致だけ
+      ['following', 'contains'],// 友だち状態は真偽
+      ['field', 'includes'],    // 友だち情報に includes は無い
+      ['created_at', 'eq'],     // 日付は範囲指定だけ
+      ['memo', 'gte'],          // メモに大小比較は無い
+    ];
+    for (const [kind, op] of cases) {
+      const result = validateSearchConditions({
+        all: [{ kind, op, value: 'x' }],
+      });
+      expect(result.ok, `${kind}+${op} は拒否される`).toBe(false);
+    }
+  });
+
+  it('実行側と同じ演算子表に載る組み合わせは通す', () => {
+    const cases: Array<Record<string, unknown>> = [
+      { kind: 'name', op: 'eq', value: '佐藤' },
+      { kind: 'name', op: 'contains', value: '佐藤' },
+      { kind: 'tag', op: 'includes', value: 'tag-1' },
+      { kind: 'tag', op: 'excludes', value: 'tag-1' },
+      { kind: 'field', op: 'eq', key: 'pet_name', value: 'ポチ' },
+      { kind: 'field', op: 'not_contains', key: 'pet_name', value: 'ポチ' },
+      { kind: 'field', op: 'gte', key: 'weight', value: '5' },
+      { kind: 'field', op: 'exists', key: 'pet_name' },
+      { kind: 'field', op: 'not_exists', key: 'pet_name' },
+      { kind: 'mark', op: 'eq', value: 'mark-1' },
+      { kind: 'assignee', op: 'ne', value: 'staff-1' },
+      { kind: 'created_at', op: 'between', value: { from: '2026-01-01' } },
+      { kind: 'memo', op: 'exists' },
+      { kind: 'form', op: 'exists', formId: 'form-1' },
+      { kind: 'purchase', op: 'not_has' },
+    ];
+    for (const condition of cases) {
+      const result = validateSearchConditions({ all: [condition] });
+      expect(result.ok, `${condition.kind}+${condition.op} は通る`).toBe(true);
+    }
+  });
 });

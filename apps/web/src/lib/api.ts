@@ -596,6 +596,36 @@ export type FriendFieldMigrationPreview = {
   previewExpiresAt: string | null
 }
 
+/** GET /api/field-migrations/:runId の返り値。実行状況と失敗行を画面へ出す。 */
+export type FriendFieldMigrationRun = {
+  runId: string
+  sourceFieldId: string
+  targetFieldId: string
+  status: 'previewed' | 'queued' | 'running' | 'partial' | 'succeeded' | 'failed' | 'stale'
+  summary: {
+    total: number
+    convertible: number
+    review: number
+    invalid: number
+    processed: number
+    succeeded: number
+    failed: number
+  }
+  usageTargets: unknown
+  rows: Array<{
+    friendId: string
+    sourceValue: string
+    convertedValue: string | null
+    status: string
+    reason: string | null
+  }>
+  previewExpiresAt: string | null
+  rollbackDeadline: string | null
+  error: string | null
+  createdAt: string
+  updatedAt: string
+}
+
 export type SupportMarkListItem = SupportMark & {
   friendCount: number
   automationRules: SupportMarkAutomationRule[]
@@ -4325,6 +4355,11 @@ export interface UidMigrationRun {
   completedAt: string | null
   rolledBackAt: string | null
   failureReason: string | null
+  /**
+   * 完了、または一部失敗で反映済みの行がある = 切り戻せる。
+   * 口が返さない古い応答では undefined になるため `=== true` で扱う。
+   */
+  rollbackable?: boolean
   items?: UidMigrationItem[]
 }
 
@@ -5175,11 +5210,34 @@ export const api = {
       fetchApi<ApiResponse<FriendFieldListSummary>>(
         `/api/friend-fields-stats?lineAccountId=${encodeURIComponent(accountId)}`,
       ),
-    /** 値は変更せず、種類を変えた場合に確認が要る友だちだけを返す。 */
-    migrationPreview: (id: string, accountId: string, targetType: FriendFieldType) =>
+    /**
+     * 値は変更せず、種類を変えた場合に確認が要る友だちだけを返す。
+     * targetFieldId を渡すと実行へ使える previewToken・期限が返る
+     * （渡さない場合は件数だけの読み取り専用確認）。
+     */
+    migrationPreview: (id: string, accountId: string, options: { targetType?: FriendFieldType; targetFieldId?: string }) =>
       fetchApi<ApiResponse<FriendFieldMigrationPreview>>(
         `/api/friend-fields/${id}/migration-preview?lineAccountId=${encodeURIComponent(accountId)}`,
-        { method: 'POST', body: JSON.stringify({ targetType }) },
+        { method: 'POST', body: JSON.stringify(options) },
+      ),
+    /**
+     * 事前確認で発行された previewToken で本移行を実行する。
+     * Idempotency-Key は確認ごとに1つだけ発行し、再送・二重実行を
+     * サーバー側で同じ実行に束ねる。
+     */
+    migrationExecute: (id: string, accountId: string, previewToken: string, idempotencyKey: string) =>
+      fetchApi<ApiResponse<{ runId: string }>>(
+        `/api/friend-fields/${id}/migrations?lineAccountId=${encodeURIComponent(accountId)}`,
+        {
+          method: 'POST',
+          headers: { 'Idempotency-Key': idempotencyKey },
+          body: JSON.stringify({ previewToken }),
+        },
+      ),
+    /** 実行の状態と失敗した行を確認する。 */
+    migrationRun: (runId: string, accountId: string) =>
+      fetchApi<ApiResponse<FriendFieldMigrationRun>>(
+        `/api/field-migrations/${runId}?lineAccountId=${encodeURIComponent(accountId)}`,
       ),
     create: (accountId: string, data: {
       name: string
@@ -5207,7 +5265,15 @@ export const api = {
       data: Partial<
         Pick<
           FriendField,
-          'name' | 'folderId' | 'defaultValue' | 'isPersonal' | 'isStarred' | 'displayOrder'
+          | 'name'
+          | 'folderId'
+          | 'defaultValue'
+          | 'isPersonal'
+          | 'isStarred'
+          | 'displayOrder'
+          | 'ecFieldPath'
+          | 'ecIsMaster'
+          | 'version'
         >
       > & { options?: string[] | null },
     ) =>
