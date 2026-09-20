@@ -257,7 +257,12 @@ export default function AdvancedSearchDialog({
       onClick={onClose}
     >
       <div
-        className="flex max-h-[calc(100vh-32px)] w-full max-w-3xl flex-col overflow-hidden rounded-panel border border-hairline bg-canvas shadow-2xl"
+        /*
+         * @container: パネル自身をコンテナにする。中の条件ブロックの
+         * 組み換え（項目・比較方法・値の縦3段化）は、画面の幅ではなく
+         * このパネルの幅で切り替える（#984 U011再）。
+         */
+        className="@container flex max-h-[calc(100vh-32px)] w-full max-w-3xl flex-col overflow-hidden rounded-panel border border-hairline bg-canvas shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-start justify-between gap-3 border-b border-divider-soft px-6 py-5">
@@ -332,10 +337,14 @@ export default function AdvancedSearchDialog({
                   /*
                    * #976 U087: 欄名・比較方法・値に常設ラベルを置く。
                    * placeholder だけだと、入力したあと「何の欄か」が残らない。
-                   * 狭い幅では `basis-full` で1行ずつ縦に積み、潰れないようにする。
+                   *
+                   * #984 U011再: パネル幅が @3xl(768px) 未満では縦3段にして
+                   * 各入力を全幅にする。画面幅ではなくパネル自身の幅で切り替える
+                   * （パネルは直近の @container）。画面幅の sm: だと、狭い
+                   * パネルの中で3列に押し込まれて1〜2文字しか見えなかった。
                    */
-                  <div className="flex flex-wrap items-end gap-2">
-                    <label className="min-w-0 basis-full sm:flex-1 sm:basis-0">
+                  <div className="flex flex-col items-stretch gap-2 @3xl:flex-row @3xl:items-end">
+                    <label className="min-w-0 @3xl:flex-1">
                       <span className="text-caption mb-1 block font-semibold text-ink-secondary">項目</span>
                       <TextInput
                         list="friend-field-names"
@@ -349,18 +358,18 @@ export default function AdvancedSearchDialog({
                         <option key={n} value={n} />
                       ))}
                     </datalist>
-                    <label className="basis-full sm:basis-auto">
+                    <label className="@3xl:shrink-0">
                       <span className="text-caption mb-1 block font-semibold text-ink-secondary">比較方法</span>
                       <select
                         value={b.op}
                         onChange={(e) => patch(i, { ...b, op: e.target.value as 'eq' | 'ne' })}
-                        className="border-hairline rounded-control bg-canvas text-ink w-full border px-3 py-2 text-sm sm:w-auto"
+                        className="border-hairline rounded-control bg-canvas text-ink w-full border px-3 py-2 text-sm @3xl:w-auto"
                       >
                         <option value="eq">等しい</option>
                         <option value="ne">等しくない</option>
                       </select>
                     </label>
-                    <label className="min-w-0 basis-full sm:flex-1 sm:basis-0">
+                    <label className="min-w-0 @3xl:flex-1">
                       <span className="text-caption mb-1 block font-semibold text-ink-secondary">値</span>
                       <TextInput
                         value={b.value}

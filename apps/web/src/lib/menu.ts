@@ -205,6 +205,46 @@ export const MENU_SECTIONS: MenuSection[] = [
 export const MENU_SECTION_BY_ID = new Map(MENU_SECTIONS.map((section) => [section.id, section]))
 
 /**
+ * 画面 → 左メニューの所属の正本（#984 LAY-15）。
+ *
+ * ほとんどの画面は、パスの前方一致で「どの項目の配下か」が決まる。
+ * 例外だけをここへ書く。URL上の置き場と、使う人が属すると感じる
+ * メニューが違う画面があるため。
+ *
+ * 例: UID移行は `/accounts?tab=migration` に置いてあるが、画面の中身は
+ * 友だちの主タブの1枚（友だち一覧／重複検出／統合ユーザー／UID移行）。
+ * LINEアカウント設定の一部ではないので、ここで「友だち」のものと宣言する。
+ *
+ * キーは `パス?クエリ`（クエリが無い画面はパスだけ）。クエリの並びや
+ * 余分なパラメータに左右されないよう、照合は `menuOwnerForScreen` を
+ * 通す（キーのクエリは「この組が揃っていること」の条件として読む）。
+ * 値は所属先の MenuItem.id。値が示す項目がメニューから外れた場合、
+ * 宣言は効かず通常のパス一致へ戻る（サイドバー側でそう扱う）。
+ */
+export const SCREEN_MENU_OWNER: Record<string, string> = {
+  '/accounts?tab=migration': 'friends',
+}
+
+/**
+ * いまの画面が宣言済みの所属を持つなら、その MenuItem.id を返す。
+ *
+ * `?tab=migration&from=sidebar` のように宣言へ無いパラメータが
+ * 増えても、`tab=migration` が揃っている限り同じ画面として扱う。
+ * パラメータの並び順にも依存しない。
+ */
+export function menuOwnerForScreen(pathname: string, search: string): string | undefined {
+  const current = new URLSearchParams(search)
+  for (const [screen, ownerId] of Object.entries(SCREEN_MENU_OWNER)) {
+    const [path, query = ''] = screen.split('?')
+    if (path !== pathname) continue
+    const required = new URLSearchParams(query)
+    const satisfied = Array.from(required.entries()).every(([key, value]) => current.get(key) === value)
+    if (satisfied) return ownerId
+  }
+  return undefined
+}
+
+/**
  * 保存された並び順を当てる。
  *
  * 知らない目印は捨て、保存に無い項目は元の位置のうしろへ残す。こうしないと、
