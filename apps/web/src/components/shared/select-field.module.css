@@ -13,13 +13,15 @@
 .select {
   display: block;
   width: 100%;
-  height: 42px; /* height: 42 */
+  /* #976 U083: 42px だった高さを入力欄と同じ40pxへそろえる */
+  height: 40px;
   padding: 0 34px 0 13px; /* padding: [0, 13] ＋ 矢印のぶん右を空ける */
   border: 1px solid var(--color-hairline); /* stroke: $hairline / strokeWidth: 1 */
   border-radius: var(--radius-control); /* cornerRadius: $radius-sm */
   background-color: var(--color-canvas); /* fill: $canvas */
   color: var(--color-ink); /* fill: $ink */
-  font-size: var(--text-label); /* fontSize: $size-label */
+  /* #976 U079: 選択欄の文字も入力欄と同じ14px */
+  font-size: var(--text-body);
   font-weight: 600; /* fontWeight: 600 */
   appearance: none;
   cursor: pointer;
@@ -48,4 +50,12 @@
 
 .compact {
   width: 128px; /* niGPF width: 128 */
+}
+
+/* #976 U079/U083: タッチ端末は文字16px・高さ44px（入力欄と同じ規定）。 */
+@media (pointer: coarse) {
+  .select {
+    height: 44px;
+    font-size: var(--text-lead);
+  }
 }

@@ -214,6 +214,7 @@ shared-button-importer components/scenarios/scenario-list.tsx
 shared-button-importer components/scenarios/trigger-editor.tsx
 shared-button-importer components/staff/login-audit.tsx
 shared-button-importer components/shared/create-page.tsx
+shared-button-importer components/shared/dialog.tsx
 shared-button-importer components/shared/folder-panel.tsx
 shared-button-importer components/shared/list-state.tsx
 shared-button-importer components/shared/not-connected.tsx
@@ -232,8 +233,12 @@ button-migration-target app/templates/page.tsx
 button-migration-target app/webhooks/webhook-interactions.tsx
 button-migration-target components/friend-fields/tags-page-v4.tsx
 # 標準の表見出しへ移行済みとして監視する画面本体。
+# #984 LAY-14: UID移行の判断表も共通見出しを通しているので監視へ入れる。
+table-header-migration-target app/accounts/migration.tsx
 table-header-migration-target app/affiliates/tabs.tsx
 table-header-migration-target app/conversions/page.tsx
+# #984 LAY-12: 重複検出の3表すべてを共通見出しへ。直書き th は残さない。
+table-header-migration-target app/duplicates/page.tsx
 table-header-migration-target app/inflow-links/page.tsx
 table-header-migration-target app/reminders/page.tsx
 table-header-migration-target app/templates/page.tsx
@@ -248,3 +253,5 @@ shared-button-importer app/nen/members/rank-settings-tab.tsx
 shared-button-importer app/nen/pets/feeding-tab.tsx
 shared-button-importer app/nen/pets/page.tsx
 shared-button-importer app/nen/pets/pet-editor.tsx
+# #984 LAY-17: スマホのペットカード操作行が共通Buttonを使う。
+shared-button-importer app/nen/pets/pets-tab.tsx

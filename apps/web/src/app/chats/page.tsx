@@ -16,6 +16,7 @@ import {
   type ScheduledChatSend,
 } from '@/lib/api'
 import { buildSupportEmailInboxQuery } from './support-email-query'
+import { INBOX_INFO_PANEL_MIN_VIEWPORT } from './inbox-layout'
 import { OperatorDropdown, StatusDropdown, type ChatStatus } from '@/components/chats/inbox-dropdown'
 import { unreadLookup } from '@/components/chats/assignee-unread'
 import InboxFilterPanel from '@/components/chats/inbox-filter-panel'
@@ -221,6 +222,15 @@ function DirectMessagePanel({ friendId, friend, onBack, onSent }: {
   // アカウント切替などでパネルが畳まれたあとの古い応答を書き込まない。
   const aliveRef = useRef(true)
   useEffect(() => () => { aliveRef.current = false }, [])
+  /*
+   * 送信が向かった相手を照合する現在値。同じパネルのまま相手(friendId)が
+   * 切り替わっても state は残るので、応答時に今開いている相手と照合しないと
+   * A宛の失敗表示・送信済みの行がBの会話へ出る(#979 A02-04)。
+   */
+  const friendIdRef = useRef(friendId)
+  friendIdRef.current = friendId
+  // 相手が変わったら前の相手の失敗表示を残さない。
+  useEffect(() => setSendError(''), [friendId])
 
   useEffect(() => {
     const loadMessages = async () => {
@@ -239,18 +249,21 @@ function DirectMessagePanel({ friendId, friend, onBack, onSent }: {
   const handleSend = async () => {
     if (!message.trim() || sending || sendLockRef.current) return
     const content = message.trim()
-    const signature = JSON.stringify({ friendId, messageType: 'text', content })
+    // 送信開始時の相手を固定する。応答を待つ間に別の相手へ
+    // 切り替わっていても、結果を新しい相手の会話へ出さない(#979 A02-04)。
+    const sendFriendId = friendId
+    const signature = JSON.stringify({ friendId: sendFriendId, messageType: 'text', content })
     const idempotencyKey = sendKeysRef.current.get(signature)
     sendLockRef.current = true
     setSending(true)
     try {
-      await fetchApi(`/api/friends/${friendId}/messages`, {
+      await fetchApi(`/api/friends/${sendFriendId}/messages`, {
         method: 'POST',
         headers: { 'Idempotency-Key': idempotencyKey },
         body: JSON.stringify({ content, messageType: 'text' }),
       })
       sendKeysRef.current.clear(signature)
-      if (aliveRef.current) {
+      if (aliveRef.current && friendIdRef.current === sendFriendId) {
         setMessages((prev) => [...prev, {
           id: crypto.randomUUID(),
           direction: 'outgoing',
@@ -264,7 +277,8 @@ function DirectMessagePanel({ friendId, friend, onBack, onSent }: {
     } catch (sendError) {
       // 失敗しても入力は残す。同じ文の再送は同じ冪等キーを使い、
       // LINE・DBへの追加書込は1回だけになる（N-023契約）。
-      if (aliveRef.current) setSendError(describeSendFailure(sendError))
+      // 送信を待つ間に別の相手へ切り替わっていたら、その会話へは出さない。
+      if (aliveRef.current && friendIdRef.current === sendFriendId) setSendError(describeSendFailure(sendError))
     }
     setSending(false)
     sendLockRef.current = false
@@ -522,13 +536,46 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
   const [inboxStats, setInboxStats] = useState<InboxStats | null>(null)
   const [assigneeUnreadStatus, setAssigneeUnreadStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   /*
-   * 友だち詳細を出すか。既定は閉じる。
+   * 顧客情報の開閉(#982 LAY-01/LAY-02)。
    *
-   * トークの上に重ねて出るので、開いたままだと本文が隠れる。開くのは
-   * 相手の素性を確かめたいときで、返信を書いている間ではない。
-   * 見たいときに「友だち詳細」から開く。
+   * 3列に収まる幅（`INBOX_INFO_PANEL_MIN_VIEWPORT`＝1536px〜）では右列と
+   * して常設し、既定は開く。それより狭い幅ではトークの上に重ねる
+   * ドロワーにし、既定は閉じる——開きっぱなしだと返信の本文が隠れる。
+   * 以前は `hidden xl:block` で1280px未満は常に非表示で、開閉ボタンを
+   * 押しても何も出なかった。
+   *
+   * `friendInfoChoice` は運用者が明示的に開閉したときだけ値を持つ。
+   * 未操作のあいだは `wideInfoPanel`（現在の画面幅）に従うので、
+   * 幅を変えても入力中の文章や選択中の相手を失わない。
    */
-  const [showFriendInfo, setShowFriendInfo] = useState(true)
+  const [wideInfoPanel, setWideInfoPanel] = useState(false)
+  const [friendInfoChoice, setFriendInfoChoice] = useState<boolean | null>(null)
+  useEffect(() => {
+    const media = window.matchMedia(`(min-width: ${INBOX_INFO_PANEL_MIN_VIEWPORT}px)`)
+    const sync = () => setWideInfoPanel(media.matches)
+    sync()
+    media.addEventListener('change', sync)
+    return () => media.removeEventListener('change', sync)
+  }, [])
+  const showFriendInfo = friendInfoChoice ?? wideInfoPanel
+  const setShowFriendInfo = (next: boolean | ((current: boolean) => boolean)) => {
+    setFriendInfoChoice((current) => (typeof next === 'function' ? next(current ?? wideInfoPanel) : next))
+  }
+  /*
+   * ドロワーで開いているあいだは Escape で閉じられるようにし、
+   * 開いた時点でフォーカスをパネルへ移す。常設の列（広い幅）では
+   * 開閉ボタンがいつも見えているので、この扱いはドロワーだけにする。
+   */
+  const customerPanelRef = useRef<HTMLElement | null>(null)
+  useEffect(() => {
+    if (!showFriendInfo || wideInfoPanel) return
+    customerPanelRef.current?.focus()
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setFriendInfoChoice(false)
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [showFriendInfo, wideInfoPanel])
   // 送信の細かい設定。既定は畳む。出しっぱなしだと入力欄が縦に伸びて
   // トークが読めなくなる。
   const [showComposerOptions, setShowComposerOptions] = useState(false)
@@ -2183,12 +2230,18 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
       >
         {/* Left Panel: Chat List */}
         {/* 設計 `ListPane` 360px。 */}
+        {/*
+          顧客情報を開いている間は一覧を 288px に留める(#982 LAY-01)。
+          以前は 2xl で 420px へ急拡大し、一覧+トーク+顧客情報の3列が
+          1536px でちょうど収まらなくなっていた。顧客情報を閉じた
+          2列だけのときだけ 420px へ広げる。
+        */}
         {/* 狭い画面では、開いている間は一覧を隠して中央を広く使う。
             メールを開いたときも同じ。ここが LINE だけを見ていたので、
             メールを開いても一覧が残って中央が半分のままだった。 */}
         <div
           data-inbox-v4="conversation-list"
-          className={`w-full border-[#E5E7EB] bg-canvas lg:flex-shrink-0 border-r flex-col overflow-hidden ${showFriendInfo ? 'lg:w-72 2xl:w-[420px]' : 'lg:w-[330px] 2xl:w-[420px]'} ${selectedChatId || selectedThreadId ? 'hidden lg:flex' : 'flex'}`}
+          className={`w-full border-[#E5E7EB] bg-canvas lg:flex-shrink-0 border-r flex-col overflow-hidden ${showFriendInfo ? 'lg:w-72' : 'lg:w-[330px] 2xl:w-[420px]'} ${selectedChatId || selectedThreadId ? 'hidden lg:flex' : 'flex'}`}
         >
           {/* タブ (すべて / 未読 / 対応中 / 対応済み) は意図的に削除。直近メッセージが見やすい LINE 風一覧を優先。 */}
 
@@ -2582,9 +2635,15 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
         </div>
 
         {/* Right Panel: Chat Detail */}
+        {/*
+          `min-w-0 flex-1` だけにして、トーク列は残り幅いっぱいに伸縮させる。
+          以前の `xl:min-w-xl`（576px）は min-w-0 を上書きして 1280〜1536px
+          で右の顧客情報を画面外へ押し出していた(#982 LAY-01)。
+          顧客情報は狭い幅では列ではなくドロワーで開く（下の aside 参照）。
+        */}
         <div
           data-inbox-v4="talk-pane"
-          className={`min-w-0 flex-1 bg-canvas flex-col overflow-hidden ${showFriendInfo ? 'xl:min-w-xl border-r border-[#E5E7EB]' : ''} ${selectedChatId || selectedFriendId || selectedThreadId ? 'flex' : 'hidden lg:flex'}`}
+          className={`min-w-0 flex-1 bg-canvas flex-col overflow-hidden ${showFriendInfo ? 'border-r border-[#E5E7EB]' : ''} ${selectedChatId || selectedFriendId || selectedThreadId ? 'flex' : 'hidden lg:flex'}`}
         >
           {selectedThreadId ? (
             /* メールの往復。LINEのトークと同じ場所に出す。 */
@@ -3290,10 +3349,11 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
         </div>
 
         {/*
-          友だち詳細。トークの上に重ねる。
-          列として並べると、その幅ぶんトークが細くなり、上部の
-          「対応」「担当」や本文が折り返して崩れる。設計は 1910px 前提の
-          3列だが、実際の画面幅はそれより狭いことが多い。
+          友だち詳細。3列に収まる幅（1536px〜）では右列として常設し、
+          それより狭い幅ではトークの上に重ねるドロワーにする(#982)。
+          以前は `hidden xl:block` だけで、1280px未満では開閉ボタンを
+          押しても何も出ず、1280〜1536pxでは `xl:min-w-xl` と固定幅の
+          積み上げで右に切れていた。
 
           friendId は **現在の選択** を優先する。chatDetail の読み込み中は
           一覧にある chat.friendId を使い、読み込み後は同じ会話の
@@ -3309,10 +3369,26 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
           なぜ出ないかが分かる方がよい。
         */}
         {showFriendInfo && (selectedChatId || selectedFriendId || selectedThreadId) && (
-          <aside
-            data-inbox-v4="customer-panel"
-            className="relative hidden h-full w-[300px] shrink-0 overflow-hidden bg-canvas xl:block 2xl:w-[340px]"
-          >
+          <>
+            {/*
+              1536px 未満ではトークの上に重ねるドロワー。背景（暗幕）を
+              押しても閉じる。モバイルヘッダー(z-50)より上に置く。
+              1536px 以上では右列として常設するので暗幕は CSS で消す。
+            */}
+            <div
+              aria-hidden="true"
+              onMouseDown={() => setShowFriendInfo(false)}
+              className="bg-scrim fixed inset-0 z-[60] 2xl:hidden"
+            />
+            <aside
+              ref={customerPanelRef}
+              data-inbox-v4="customer-panel"
+              role={wideInfoPanel ? undefined : 'dialog'}
+              aria-modal={wideInfoPanel ? undefined : true}
+              aria-label="顧客情報"
+              tabIndex={-1}
+              className="fixed inset-y-0 right-0 z-[70] h-full w-[340px] max-w-full shrink-0 overflow-hidden bg-canvas shadow-2xl focus:outline-none 2xl:relative 2xl:z-auto 2xl:w-[300px] 2xl:shadow-none"
+            >
             {/*
               重なりの中にも閉じるボタンを置く。上部のボタンだけだと、
               重なりが上部を覆っている画面幅で閉じられなくなる。
@@ -3396,7 +3472,8 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
               }
             />
             )}
-          </aside>
+            </aside>
+          </>
         )}
       </div>
     </div>

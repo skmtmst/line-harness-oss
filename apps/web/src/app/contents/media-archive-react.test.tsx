@@ -184,7 +184,7 @@ describe('登録メディアの退避と復帰（N-201）', () => {
     await waitForText(MEDIA.filename)
 
     await act(async () => { buttonByLabel(`${MEDIA.filename}をアーカイブ`).click(); await settle() })
-    expect(document.body.textContent).toContain('理由（必須・あとから履歴で確認できます）')
+    expect(document.body.textContent).toContain('理由必須（あとから履歴で確認できます）')
 
     const confirm = [...document.body.querySelectorAll<HTMLButtonElement>('button')]
       .find((candidate) => candidate.textContent === 'アーカイブする')!

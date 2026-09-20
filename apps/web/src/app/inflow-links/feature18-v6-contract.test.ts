@@ -13,13 +13,32 @@ const MOCK = readFileSync(join(ROOT, '..', '..', '..', '..', '..', 'scripts', 'v
 
 describe('V6 機能18の画面契約', () => {
   it('4つの役割を別のタブと画面に分ける', () => {
-    expect(PAGE).toContain("{ key: 'links', label: '流入経路 24' }")
+    expect(PAGE).toContain("{ key: 'links', label: '流入経路' }")
     expect(PAGE).toContain("{ key: 'script', label: 'サイトスクリプト' }")
-    expect(PAGE).toContain("{ key: 'ads', label: '広告連携 3' }")
-    expect(PAGE).toContain("{ key: 'connections', label: '広告とのつなぎ 5' }")
-    expect(PAGE).toContain('<AdIntegration view="metrics" />')
-    expect(PAGE).toContain('<AdIntegration view={adView} />')
+    expect(PAGE).toContain("{ key: 'ads', label: '広告連携' }")
+    expect(PAGE).toContain("{ key: 'connections', label: '広告とのつなぎ' }")
+    expect(PAGE).toContain('<AdIntegration view="metrics" onPlatformCountsChange={handleAdCounts} />')
+    expect(PAGE).toContain('<AdIntegration view={adView} onPlatformCountsChange={handleAdCounts} />')
     expect(ADS).toContain("type AdView = 'metrics' | 'connections' | 'history'")
+  })
+
+  it('タブの件数は固定値でなく、一覧と同じ集計から出す(#980)', () => {
+    // 設計が描いた作り物の件数を書かない。一覧0件のアカウントでも
+    // 「流入経路 24」「広告連携 3」「広告とのつなぎ 5」と出ていた。
+    expect(PAGE).not.toContain("label: '流入経路 24'")
+    expect(PAGE).not.toContain("label: '広告連携 3'")
+    expect(PAGE).not.toContain("label: '広告とのつなぎ 5'")
+    // 「流入経路」は一覧が数える accountFilteredRows（FolderPanel の
+    // 「すべて」と同じ集合）を、読み込めたときだけホストへ渡す。
+    expect(PAGE).toContain('onRouteCountChange?.(routeCountAvailable ? accountFilteredRows.length : null)')
+    // 「広告連携」「広告とのつなぎ」は、広告タブが一覧に使う platforms
+    // と同じ集計（総数・動いている数）をホストへ渡す。
+    expect(ADS).toContain('onPlatformCountsChange?.(')
+    expect(ADS).toContain('total: platforms.length')
+    expect(ADS).toContain('platforms.filter((platform) => platform.isActive).length')
+    // 取得前・失敗時は数字を出さない（null で件数を付けない）。
+    expect(PAGE).toContain('linksCount !== null')
+    expect(PAGE).toContain('adCounts !== null')
   })
 
   it('各画面をPencilの実ノードと結び、未接続値を作らない', () => {

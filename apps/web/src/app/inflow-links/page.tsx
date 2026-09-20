@@ -1,6 +1,6 @@
 'use client'
 
-import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
@@ -108,11 +108,19 @@ const PAGE_SIZE_OPTIONS = [
   { value: '50', label: '50件表示' },
 ]
 
+/*
+  **タブの件数は直書きしない（#980）。**
+  設計が描いた「24」「3」「5」は作り物の数で、一覧が0件のアカウントでも
+  そのまま出ていた。件数は各タブの一覧と同じ集計から InflowLinksPageHost
+  が付ける：「流入経路」は一覧が数える accountFilteredRows、「広告連携」
+  「広告とのつなぎ」は広告タブが取得する ad-platforms の件数。
+  取得前・失敗時は数字を出さない。
+*/
 const MERGED_TABS = [
-  { key: 'links', label: '流入経路 24' },
+  { key: 'links', label: '流入経路' },
   { key: 'script', label: 'サイトスクリプト' },
-  { key: 'ads', label: '広告連携 3' },
-  { key: 'connections', label: '広告とのつなぎ 5' },
+  { key: 'ads', label: '広告連携' },
+  { key: 'connections', label: '広告とのつなぎ' },
 ]
 
 /**
@@ -123,7 +131,15 @@ const TAB_FEATURE: Partial<Record<string, FeatureKey>> = {
   script: 'site_tracking',
 }
 
-function InflowLinksPageInner() {
+function InflowLinksPageInner({
+  onRouteCountChange,
+}: {
+  /**
+   * #980: タブの件数をホストへ渡す。一覧が描くのと同じ集合
+   * （accountFilteredRows）の件数で、読み込み前・失敗時は null。
+   */
+  onRouteCountChange?: (count: number | null) => void
+}) {
   const { selectedAccountId } = useAccount()
   const latestAccountRef = useRef(selectedAccountId)
   latestAccountRef.current = selectedAccountId
@@ -572,6 +588,15 @@ function InflowLinksPageInner() {
     「空・読込・エラーを混ぜない」なので、帯も同じ扱いにする。
   */
   const routeCountAvailable = !loading && !loadFailed
+  /*
+    #980: 「流入経路」タブの件数は一覧と同じ集合から数えてホストへ渡す。
+    フォルダ選択・検索・絞り込みで変わる数ではなく、「このアカウントに
+    見えている流入経路の総数」= accountFilteredRows（FolderPanel の
+    「すべて」と同じ数え方）。読み込み前・失敗時は null を渡して数字を出さない。
+  */
+  useEffect(() => {
+    onRouteCountChange?.(routeCountAvailable ? accountFilteredRows.length : null)
+  }, [onRouteCountChange, routeCountAvailable, accountFilteredRows.length])
   const totalClicks = summary?.totalClicks ?? sortedRows.reduce((sum, r) => sum + (r.stats?.clickCount ?? 0), 0)
   const totalFriends = sortedRows.reduce((sum, r) => sum + (r.stats?.friendCount ?? 0), 0)
   const addRate = summaryAvailable && totalClicks > 0
@@ -1202,7 +1227,41 @@ function InflowLinksPageHost() {
   const tab = useMergedTab(MERGED_TABS)
   const params = useSearchParams()
   const adView = params.get('view') === 'history' ? 'history' : 'connections'
-  const visibleTabs = MERGED_TABS.filter(
+  /*
+    #980: タブの件数。各タブの一覧が実際に取得・表示している集計から
+    報告された値だけを出す。報告が無い（未取得・失敗・そのタブをまだ
+    開いていない）間は数字を付けない。
+  */
+  const [linksCount, setLinksCount] = useState<number | null>(null)
+  const [adCounts, setAdCounts] = useState<{ total: number; connected: number } | null>(null)
+  useEffect(() => {
+    // アカウントを切り替えたら前の件数を捨てる。次の報告が来るまで数字は出ない。
+    setLinksCount(null)
+    setAdCounts(null)
+  }, [selectedAccountId])
+  // 同じ値の再報告で描画を回さないよう、中身が変わったときだけ入れ替える。
+  const handleAdCounts = useCallback((counts: { total: number; connected: number } | null) => {
+    setAdCounts((current) => {
+      if (counts === null) return current === null ? current : null
+      if (current && current.total === counts.total && current.connected === counts.connected) {
+        return current
+      }
+      return counts
+    })
+  }, [])
+  const countedTabs = MERGED_TABS.map((item) => {
+    if (item.key === 'links' && linksCount !== null) {
+      return { ...item, label: `${item.label} ${linksCount}` }
+    }
+    if (item.key === 'ads' && adCounts !== null) {
+      return { ...item, label: `${item.label} ${adCounts.total}` }
+    }
+    if (item.key === 'connections' && adCounts !== null) {
+      return { ...item, label: `${item.label} ${adCounts.connected}` }
+    }
+    return item
+  })
+  const visibleTabs = countedTabs.filter(
     (item) => !TAB_FEATURE[item.key] || visibility.enabled(TAB_FEATURE[item.key]!),
   )
   const tabFeature = TAB_FEATURE[tab]
@@ -1216,13 +1275,13 @@ function InflowLinksPageHost() {
         <FeatureDisabledScreen featureId={tabFeature} />
       ) : (
         <>
-          {tab === 'links' && <InflowLinksPageInner />}
+          {tab === 'links' && <InflowLinksPageInner onRouteCountChange={setLinksCount} />}
           {/* 機能状態が確定するまで SiteScript を載せない。読み込み中の
               一瞬に計測APIを呼ぶと、offのaccountで403が画面全体のゲートを
               起こしてしまう。 */}
           {tab === 'script' && visibility.status === 'ready' && <SiteScript />}
-          {tab === 'ads' && <AdIntegration view="metrics" />}
-          {tab === 'connections' && <AdIntegration view={adView} />}
+          {tab === 'ads' && <AdIntegration view="metrics" onPlatformCountsChange={handleAdCounts} />}
+          {tab === 'connections' && <AdIntegration view={adView} onPlatformCountsChange={handleAdCounts} />}
         </>
       )}
     </div>

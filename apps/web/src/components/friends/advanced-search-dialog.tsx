@@ -253,14 +253,19 @@ export default function AdvancedSearchDialog({
 
   return (
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-[#101828]/45 p-4"
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-scrim p-4"
       onClick={onClose}
     >
       <div
-        className="flex max-h-[calc(100vh-32px)] w-full max-w-[760px] flex-col overflow-hidden rounded-[16px] border border-[#DADDE2] bg-canvas shadow-2xl"
+        /*
+         * @container: パネル自身をコンテナにする。中の条件ブロックの
+         * 組み換え（項目・比較方法・値の縦3段化）は、画面の幅ではなく
+         * このパネルの幅で切り替える（#984 U011再）。
+         */
+        className="@container flex max-h-[calc(100vh-32px)] w-full max-w-3xl flex-col overflow-hidden rounded-panel border border-hairline bg-canvas shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-start justify-between gap-3 border-b border-[#EAEBED] px-6 py-5">
+        <div className="flex items-start justify-between gap-3 border-b border-divider-soft px-6 py-5">
           <div>
             <h2 className="text-ink text-lg font-bold">絞り込み条件を設定</h2>
             <p className="text-ink-secondary mt-0.5 text-xs">
@@ -271,22 +276,22 @@ export default function AdvancedSearchDialog({
             type="button"
             onClick={onClose}
             aria-label="閉じる"
-            className="flex h-8 w-8 items-center justify-center rounded-[8px] text-xl leading-none text-[#8B938D] hover:bg-[#F6F6F8]"
+            className="flex h-8 w-8 items-center justify-center rounded-control text-xl leading-none text-ink-faint hover:bg-canvas-sunken"
           >
             ×
           </button>
         </div>
 
         <div className="space-y-3 overflow-y-auto px-6 py-4">
-          <section className="rounded-[12px] border border-[#A8E9C1] bg-[#E9F9EF] px-4 py-3">
+          <section className="rounded-panel border border-accent-border bg-accent-soft px-4 py-3">
             <div className="flex items-center justify-between gap-4">
               <div>
-                <p className="text-[11px] font-medium text-[#079B45]">現在の条件に一致</p>
-                <p className="mt-0.5 text-xl font-bold tabular-nums text-[#057A37]">
+                <p className="text-micro font-medium text-accent-deep">現在の条件に一致</p>
+                <p className="mt-0.5 text-xl font-bold tabular-nums text-accent-deep">
                   {counting ? '…' : count === null ? '—' : `${count.toLocaleString('ja-JP')}人`}
                 </p>
               </div>
-              <span className="text-[11px] text-[#079B45]">自動で再計算</span>
+              <span className="text-micro text-accent-deep">自動で再計算</span>
             </div>
           </section>
 
@@ -302,7 +307,7 @@ export default function AdvancedSearchDialog({
           {blocks.map((b, i) => (b.kind === 'field' && !fieldsFeatureEnabled ? null : (
             <section
               key={`${b.kind}-${i}`}
-              className="mb-2 grid items-center gap-3 rounded-[9px] bg-[#F6F6F8] p-3 last:mb-0 sm:grid-cols-12"
+              className="mb-2 grid items-center gap-3 rounded-card bg-canvas-sunken p-3 last:mb-0 sm:grid-cols-12"
             >
               <div className="sm:col-span-3">
                 <h3 className="text-ink text-sm font-bold">{BLOCK_LABEL[b.kind]}</h3>
@@ -311,11 +316,11 @@ export default function AdvancedSearchDialog({
 
               <div className="min-w-0 sm:col-span-8">
                 {b.kind === 'name' && (
-                  <input
+                  <TextInput
                     value={b.keyword}
                     onChange={(e) => patch(i, { ...b, keyword: e.target.value })}
                     placeholder="キーワードを入力"
-                    className="border-hairline rounded-control bg-canvas text-ink w-full border px-3 py-2 text-sm"
+                    aria-label="名前のキーワード"
                   />
                 )}
 
@@ -329,42 +334,58 @@ export default function AdvancedSearchDialog({
                 )}
 
                 {b.kind === 'field' && (
-                  <div className="flex flex-wrap items-center gap-2">
-                    <input
-                      list="friend-field-names"
-                      value={b.key}
-                      onChange={(e) => patch(i, { ...b, key: e.target.value })}
-                      placeholder="友だち情報欄名を入力"
-                      className="border-hairline rounded-control bg-canvas text-ink min-w-0 flex-1 border px-3 py-2 text-sm"
-                    />
+                  /*
+                   * #976 U087: 欄名・比較方法・値に常設ラベルを置く。
+                   * placeholder だけだと、入力したあと「何の欄か」が残らない。
+                   *
+                   * #984 U011再: パネル幅が @3xl(768px) 未満では縦3段にして
+                   * 各入力を全幅にする。画面幅ではなくパネル自身の幅で切り替える
+                   * （パネルは直近の @container）。画面幅の sm: だと、狭い
+                   * パネルの中で3列に押し込まれて1〜2文字しか見えなかった。
+                   */
+                  <div className="flex flex-col items-stretch gap-2 @3xl:flex-row @3xl:items-end">
+                    <label className="min-w-0 @3xl:flex-1">
+                      <span className="text-caption mb-1 block font-semibold text-ink-secondary">項目</span>
+                      <TextInput
+                        list="friend-field-names"
+                        value={b.key}
+                        onChange={(e) => patch(i, { ...b, key: e.target.value })}
+                        placeholder="例：誕生日"
+                      />
+                    </label>
                     <datalist id="friend-field-names">
                       {fieldNames.map((n) => (
                         <option key={n} value={n} />
                       ))}
                     </datalist>
-                    <select
-                      value={b.op}
-                      onChange={(e) => patch(i, { ...b, op: e.target.value as 'eq' | 'ne' })}
-                      className="border-hairline rounded-control bg-canvas text-ink border px-3 py-2 text-sm"
-                    >
-                      <option value="eq">等しい</option>
-                      <option value="ne">等しくない</option>
-                    </select>
-                    <input
-                      value={b.value}
-                      onChange={(e) => patch(i, { ...b, value: e.target.value })}
-                      placeholder="値を入力"
-                      className="border-hairline rounded-control bg-canvas text-ink min-w-0 flex-1 border px-3 py-2 text-sm"
-                    />
+                    <label className="@3xl:shrink-0">
+                      <span className="text-caption mb-1 block font-semibold text-ink-secondary">比較方法</span>
+                      <select
+                        value={b.op}
+                        onChange={(e) => patch(i, { ...b, op: e.target.value as 'eq' | 'ne' })}
+                        className="border-hairline rounded-control bg-canvas text-ink w-full border px-3 py-2 text-sm @3xl:w-auto"
+                      >
+                        <option value="eq">等しい</option>
+                        <option value="ne">等しくない</option>
+                      </select>
+                    </label>
+                    <label className="min-w-0 @3xl:flex-1">
+                      <span className="text-caption mb-1 block font-semibold text-ink-secondary">値</span>
+                      <TextInput
+                        value={b.value}
+                        onChange={(e) => patch(i, { ...b, value: e.target.value })}
+                        placeholder="例：1990-01-01"
+                      />
+                    </label>
                   </div>
                 )}
 
                 {b.kind === 'status_message' && (
-                  <input
+                  <TextInput
                     value={b.keyword}
                     onChange={(e) => patch(i, { ...b, keyword: e.target.value })}
                     placeholder="ひとことに含む文字"
-                    className="border-hairline rounded-control bg-canvas text-ink w-full border px-3 py-2 text-sm"
+                    aria-label="ひとことに含む文字"
                   />
                 )}
 
@@ -374,6 +395,7 @@ export default function AdvancedSearchDialog({
                       type="date"
                       value={b.from}
                       onChange={(e) => patch(i, { ...b, from: e.target.value })}
+                      aria-label="友だち登録日の開始"
                       className="border-hairline rounded-control bg-canvas text-ink border px-3 py-2 text-sm"
                     />
                     <span className="text-ink-secondary text-sm">〜</span>
@@ -381,6 +403,7 @@ export default function AdvancedSearchDialog({
                       type="date"
                       value={b.to}
                       onChange={(e) => patch(i, { ...b, to: e.target.value })}
+                      aria-label="友だち登録日の終了"
                       className="border-hairline rounded-control bg-canvas text-ink border px-3 py-2 text-sm"
                     />
                   </div>
@@ -392,6 +415,7 @@ export default function AdvancedSearchDialog({
                     onChange={(e) =>
                       patch(i, { ...b, value: e.target.value as 'unread' | 'in_progress' | 'resolved' })
                     }
+                    aria-label="対応状況"
                     className="border-hairline rounded-control bg-canvas text-ink border px-3 py-2 text-sm"
                   >
                     <option value="unread">未対応</option>
@@ -418,7 +442,7 @@ export default function AdvancedSearchDialog({
                   key={k}
                   type="button"
                   onClick={() => add(k)}
-                  className="text-action rounded-[7px] px-1 py-1 text-xs font-semibold hover:bg-[#F3F8FF]"
+                  className="text-action rounded-control px-1 py-1 text-xs font-semibold hover:bg-action-soft"
                 >
                   ＋ {BLOCK_LABEL[k]}
                 </button>
@@ -426,10 +450,10 @@ export default function AdvancedSearchDialog({
           </div>
           </section>
 
-          <section className="rounded-[12px] border border-[#DADDE2] bg-canvas p-3">
+          <section className="rounded-panel border border-hairline bg-canvas p-3">
             <div className="flex items-center gap-2">
-              <span className="rounded-full bg-[#0067D9] px-2 py-0.5 text-xs font-bold text-on-action">OR</span>
-              <span className="text-sm font-bold text-[#1D1D1F]">いずれか1つ以上満たす条件</span>
+              <span className="rounded-full bg-action px-2 py-0.5 text-xs font-bold text-on-action">OR</span>
+              <span className="text-sm font-bold text-ink">いずれか1つ以上満たす条件</span>
             </div>
             <div className="mt-3 flex flex-wrap gap-3">
               {OR_AXES.filter((item) => item.feature !== 'support_marks' || marksFeatureEnabled).map((item) => {
@@ -440,7 +464,7 @@ export default function AdvancedSearchDialog({
                     type="button"
                     disabled={!condition}
                     onClick={() => condition && setAny((current) => [...current, condition])}
-                    className="w-fit rounded-full border border-[#DADDE2] bg-[#F6F8FB] px-3 py-1.5 text-xs text-[#667085] disabled:opacity-50"
+                    className="w-fit rounded-full border border-divider-soft bg-canvas-sunken px-3 py-1.5 text-xs text-ink-secondary disabled:opacity-50"
                   >
                     ＋ {item.label}
                   </button>
@@ -461,7 +485,7 @@ export default function AdvancedSearchDialog({
             ) : null}
           </section>
 
-          <section className="rounded-[12px] border border-[#DADDE2] bg-canvas p-3">
+          <section className="rounded-panel border border-hairline bg-canvas p-3">
             <div className="flex flex-wrap items-center gap-3">
               <span className="text-sm font-bold text-ink">表示する友だち</span>
               <span className="text-nano text-ink-faint">既定は「表示中」のみ</span>
@@ -493,35 +517,35 @@ export default function AdvancedSearchDialog({
           </section>
 
           <div className="grid gap-2 sm:grid-cols-3">
-            <label className="rounded-[9px] border border-[#DADDE2] bg-canvas px-3 py-2">
-              <span className="text-[10px] text-[#8B938D]">対象</span>
-              <select value={visibility} onChange={(event) => setVisibility(event.target.value as '' | 'following' | 'blocked')} className="mt-0.5 w-full border-0 bg-transparent p-0 text-xs font-semibold text-[#565F59] outline-none">
+            <label className="rounded-card border border-hairline bg-canvas px-3 py-2">
+              <span className="text-nano text-ink-faint">対象</span>
+              <select value={visibility} onChange={(event) => setVisibility(event.target.value as '' | 'following' | 'blocked')} className="mt-0.5 w-full border-0 bg-transparent p-0 text-xs font-semibold text-ink-secondary outline-none">
                 <option value="following">すべての友だち</option>
                 <option value="blocked">ブロックした人</option>
                 <option value="">すべて</option>
               </select>
             </label>
-            <label className="rounded-[9px] border border-[#DADDE2] bg-canvas px-3 py-2">
-              <span className="text-[10px] text-[#8B938D]">並び順</span>
+            <label className="rounded-card border border-hairline bg-canvas px-3 py-2">
+              <span className="text-nano text-ink-faint">並び順</span>
                 <select
                   value={sort}
                   onChange={(e) => setSort(e.target.value as 'recent' | 'oldest')}
-                  className="mt-0.5 w-full border-0 bg-transparent p-0 text-xs font-semibold text-[#565F59] outline-none"
+                  className="mt-0.5 w-full border-0 bg-transparent p-0 text-xs font-semibold text-ink-secondary outline-none"
                 >
                   <option value="recent">友だち追加の新しい順</option>
                   <option value="oldest">友だち追加の古い順</option>
                 </select>
             </label>
-            <label className="rounded-[9px] border border-[#DADDE2] bg-canvas px-3 py-2">
-              <span className="text-[10px] text-[#8B938D]">表示件数</span>
-              <select defaultValue="20" className="mt-0.5 w-full border-0 bg-transparent p-0 text-xs font-semibold text-[#565F59] outline-none">
+            <label className="rounded-card border border-hairline bg-canvas px-3 py-2">
+              <span className="text-nano text-ink-faint">表示件数</span>
+              <select defaultValue="20" className="mt-0.5 w-full border-0 bg-transparent p-0 text-xs font-semibold text-ink-secondary outline-none">
                 {[10, 20, 30, 40, 50].map((size) => <option key={size} value={size}>{size}件</option>)}
               </select>
             </label>
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-3 border-t border-[#EAEBED] px-6 py-4">
+        <div className="flex flex-wrap items-center gap-3 border-t border-divider-soft px-6 py-4">
           {onLoadSaved && savedSearchEnabled ? (
             <Button type="button" onClick={onLoadSaved}>
               保存した検索から読み込む
@@ -534,32 +558,30 @@ export default function AdvancedSearchDialog({
               setAny([])
               setVisibility('')
             }}
-            className="text-xs font-medium text-[#8B938D] hover:text-[#565F59]"
+            className="text-xs font-medium text-ink-faint hover:text-ink-secondary"
           >
             条件をリセット
           </button>
-          <button
-            type="button"
-            onClick={onClose}
-            className="ml-auto rounded-[9px] border border-[#DADDE2] bg-canvas px-4 py-2 text-sm font-semibold text-[#565F59] hover:bg-[#F6F6F8]"
-          >
+          <Button type="button" className="ml-auto" onClick={onClose}>
             キャンセル
-          </button>
-          {savedNotice ? <span className="text-xs font-semibold text-accent">{savedNotice}</span> : null}
+          </Button>
+          {savedNotice ? <span className="text-xs font-semibold text-accent-deep">{savedNotice}</span> : null}
           {savedSearchEnabled ? (
             <Button type="button" onClick={() => { setSaveOpen(true); setSaveError(''); setSavedNotice('') }}>条件を保存</Button>
           ) : null}
-          <button
+          {/* #976 U084: 主操作は共通Buttonの primary（`$accent-deep` + 白文字）。 */}
+          <Button
             type="button"
+            variant="primary"
+            className="px-5"
             onClick={() => onApply({ params, summary })}
-            className="rounded-[9px] bg-[#07C653] px-5 py-2 text-sm font-bold text-on-accent hover:bg-[#079B45]"
           >
             {counting ? '再計算中…' : count === null ? 'この条件で表示' : `${count.toLocaleString('ja-JP')}人を表示`}
-          </button>
+          </Button>
         </div>
       </div>
       {saveOpen ? (
-        <div className="fixed inset-0 z-110 flex items-center justify-center bg-[#101828]/45 p-4" onClick={() => setSaveOpen(false)}>
+        <div className="fixed inset-0 z-110 flex items-center justify-center bg-scrim p-4" onClick={() => setSaveOpen(false)}>
           <section className="w-full max-w-md rounded-panel border border-hairline bg-canvas p-5 shadow-card" onClick={(event) => event.stopPropagation()}>
             <h3 className="text-lg font-bold text-ink">この条件を保存</h3>
             <p className="mt-1 text-xs leading-5 text-ink-faint">保存後は「保存した検索」から何度でも呼び出せます。</p>
@@ -622,6 +644,7 @@ function TagPicker({
         <select
           value={mode}
           onChange={(e) => setMode(e.target.value as 'include' | 'exclude')}
+          aria-label="タグの含め方"
           className="border-hairline rounded-control bg-canvas text-ink border px-3 py-2 text-sm"
         >
           <option value="include">付いている</option>

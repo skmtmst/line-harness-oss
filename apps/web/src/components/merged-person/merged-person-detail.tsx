@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useState } from 'react'
 import type { MergedPersonDeliveryPriority, MergedPersonLinkedFriend } from '@line-crm/shared'
 import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
+import { RequiredBadge } from '@/components/shared/form-controls'
 import ListState from '@/components/shared/list-state'
 import { api, ApiError, type MergedPersonWithCandidates } from '@/lib/api'
 import MergedDeliveryDialog from './merged-delivery-dialog'
@@ -306,7 +307,7 @@ export default function MergedPersonDetailView({
           <span className={styles.personName}>{unlinkTarget?.displayName}</span>
         </label>
         <label className={styles.fieldLabel}>
-          解除する理由（必須）
+          <span>解除する理由<RequiredBadge /></span>
           <textarea className={styles.reason} value={unlinkReason} onChange={(event) => setUnlinkReason(event.target.value)} placeholder="確認した根拠を書いてください" />
         </label>
       </Dialog>

@@ -11,6 +11,7 @@ import NoteBar from '@/components/shared/note-bar'
 import SelectField from '@/components/shared/select-field'
 import StickyBar from '@/components/shared/sticky-bar'
 import { TextArea, TextField } from '@/components/shared/text-field'
+import { RequiredBadge } from '@/components/shared/form-controls'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { api } from '@/lib/api'
 import { readFileAsBase64, shortDateTime } from '@/lib/hq-banners'
@@ -356,7 +357,8 @@ function Field({ label, required, note, htmlFor, children }: { label: string; re
     <div className="flex flex-col gap-1.5">
       <div className="flex items-center gap-2">
         <label htmlFor={htmlFor} className="text-label font-bold text-ink">{label}</label>
-        {required ? <span className="inline-flex h-4.5 items-center rounded-mini bg-status-danger-soft px-1.5 text-nano font-bold text-status-danger">必須</span> : null}
+        {/* #976 U086: 必須の印は共通の「必須」札 */}
+        {required ? <RequiredBadge /> : null}
         {note ? <span className="text-micro text-ink-faint">{note}</span> : null}
       </div>
       {children}

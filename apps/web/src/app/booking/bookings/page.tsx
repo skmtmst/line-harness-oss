@@ -390,8 +390,16 @@ export default function BookingsPage() {
     setDecideError('')
     try {
       await bookingApi.decideRequest(decideAccountId, id, action)
-      if (listAccountRef.current === decideAccountId) setDecideTarget(null)
-      await load()
+      /*
+       * 再読み込みも同じアカウントのときだけ(#979 A27-03)。`load` は
+       * 操作開始時のアカウントを掴んだ古い実体なので、切替後に呼ぶと
+       * 新しいアカウントの一覧を空にしたまま読み込み状態が残る。
+       * 切替済みなら、切替の効果が新しいアカウントの取得を始めている。
+       */
+      if (listAccountRef.current === decideAccountId) {
+        setDecideTarget(null)
+        await load()
+      }
     } catch (e) {
       if (listAccountRef.current === decideAccountId) {
         setDecideError(`操作に失敗しました: ${e instanceof Error ? e.message : String(e)}`)

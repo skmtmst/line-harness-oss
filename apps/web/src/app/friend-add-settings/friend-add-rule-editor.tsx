@@ -6,6 +6,7 @@ import { Check, ChevronRight, Plus, Tag, UserPlus, X } from 'lucide-react'
 import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import Button from '@/components/shared/button'
+import { RequiredBadge } from '@/components/shared/form-controls'
 import ConditionBuilder from '@/components/shared/condition-builder'
 import Dialog from '@/components/shared/dialog'
 import IconButton from '@/components/shared/icon-button'
@@ -477,5 +478,5 @@ function Section({ title, description, children }: { title: string; description:
 }
 
 function Field({ label, required = false, children }: { label: string; required?: boolean; children: React.ReactNode }) {
-  return <label className={'friend-add-editor-field'}><span>{label}{required && <b>必須</b>}</span>{children}</label>
+  return <label className={'friend-add-editor-field'}><span>{label}{required && <RequiredBadge />}</span>{children}</label>
 }

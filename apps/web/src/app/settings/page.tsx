@@ -8,6 +8,7 @@ import ConfirmDialog from '@/components/shared/confirm-dialog'
 import PageHeader from '@/components/shared/page-header'
 import { TextField } from '@/components/shared/text-field'
 import Toggle from '@/components/shared/toggle'
+import { RequiredBadge } from '@/components/shared/form-controls'
 import { useAccount } from '@/contexts/account-context'
 import { api, ApiError, fetchApi, type AnalyticsUsageOverview } from '@/lib/api'
 import { createAccountRequestGuard } from './account-request-guard'
@@ -1056,7 +1057,7 @@ export default function SettingsPage() {
           {dirty && (
             <div className="border-hairline bg-canvas rounded-card mb-4 flex flex-col gap-2 border p-4 sm:flex-row sm:items-center">
               <label htmlFor="feature-settings-reason" className="text-ink shrink-0 text-sm font-bold">
-                変更理由（必須）
+                変更理由<RequiredBadge />
               </label>
               <TextField
                 id="feature-settings-reason"
