@@ -28,7 +28,7 @@ import {
 import type { Env } from '../index.js';
 import { auditLog } from '../lib/audit-log.js';
 import { sha256Hex } from '../middleware/auth.js';
-import { requireRole } from '../middleware/role-guard.js';
+import { hasStaffPermission, requireRole } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
 
 export const nenPhotoOperations = new Hono<Env>();
@@ -42,8 +42,7 @@ type PhotoPermission =
 
 export function requirePhotoPermission(permission: PhotoPermission) {
   return async (c: Context<Env>, next: Next) => {
-    const staff = c.get('staff');
-    if (!staff || (staff.role !== 'owner' && !staff.permissionKeys?.includes(permission))) {
+    if (!hasStaffPermission(c, permission)) {
       return c.json({ success: false, error: 'この写真審査操作を行う権限がありません' }, 403);
     }
     await next();
