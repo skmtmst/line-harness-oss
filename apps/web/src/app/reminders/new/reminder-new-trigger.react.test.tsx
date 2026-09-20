@@ -77,7 +77,7 @@ async function waitFieldOptions(accountId: string) {
 describe('起点の実在候補選択', () => {
   it('友だち情報欄を選ぶと日付型の項目だけが選べる', async () => {
     render(<NewReminderPage />)
-    fireEvent.click(screen.getByRole('button', { name: /友だち情報欄の日付/ }))
+    fireEvent.click(screen.getByRole('radio', { name: /友だち情報欄の日付/ }))
 
     await waitFor(() => expect(fixture.friendFieldsList).toHaveBeenCalledWith('account-1'))
     await waitFor(() => {
@@ -92,7 +92,7 @@ describe('起点の実在候補選択', () => {
   it('情報欄を選ばないままでは作成しない', async () => {
     render(<NewReminderPage />)
     fillName()
-    fireEvent.click(screen.getByRole('button', { name: /友だち情報欄の日付/ }))
+    fireEvent.click(screen.getByRole('radio', { name: /友だち情報欄の日付/ }))
     await waitFieldOptions('account-1')
 
     fireEvent.click(screen.getByRole('button', { name: /対象設定へ/ }))
@@ -103,7 +103,7 @@ describe('起点の実在候補選択', () => {
   it('選んだ情報欄をtriggerFieldIdとして保存する', async () => {
     render(<NewReminderPage />)
     fillName()
-    fireEvent.click(screen.getByRole('button', { name: /友だち情報欄の日付/ }))
+    fireEvent.click(screen.getByRole('radio', { name: /友だち情報欄の日付/ }))
     await waitFieldOptions('account-1')
     fireEvent.change(screen.getByLabelText('基準日に使う情報欄'), { target: { value: 'field-birthday-account-1' } })
 
@@ -121,7 +121,7 @@ describe('起点の実在候補選択', () => {
     render(<NewReminderPage />)
     fillName()
     expect(screen.queryByRole('button', { name: /フォーム回答日/ })).toBeNull()
-    fireEvent.click(screen.getByRole('button', { name: /イベントの予約日時/ }))
+    fireEvent.click(screen.getByRole('radio', { name: /イベントの予約日時/ }))
 
     await waitFor(() => expect(fixture.listEvents).toHaveBeenCalled())
     await waitFor(() => {
@@ -141,7 +141,7 @@ describe('起点の実在候補選択', () => {
   it('イベントを選ばないままでは作成しない', async () => {
     render(<NewReminderPage />)
     fillName()
-    fireEvent.click(screen.getByRole('button', { name: /イベントの予約日時/ }))
+    fireEvent.click(screen.getByRole('radio', { name: /イベントの予約日時/ }))
     await waitFor(() => {
       const select = screen.getByLabelText('基準日にするイベント') as HTMLSelectElement
       expect([...select.options].some((option) => option.value === 'event-1')).toBe(true)
@@ -159,7 +159,7 @@ describe('アカウント切替', () => {
     fixture.account = 'account-A'
     const view = render(<NewReminderPage />)
     fillName('誕生日案内')
-    fireEvent.click(screen.getByRole('button', { name: /友だち情報欄の日付/ }))
+    fireEvent.click(screen.getByRole('radio', { name: /友だち情報欄の日付/ }))
     await waitFieldOptions('account-A')
     fireEvent.change(screen.getByLabelText('基準日に使う情報欄'), { target: { value: 'field-birthday-account-A' } })
 
@@ -193,7 +193,7 @@ describe('アカウント切替', () => {
     )
     fixture.account = 'account-A'
     const view = render(<NewReminderPage />)
-    fireEvent.click(screen.getByRole('button', { name: /友だち情報欄の日付/ }))
+    fireEvent.click(screen.getByRole('radio', { name: /友だち情報欄の日付/ }))
     await waitFor(() => expect(fixture.friendFieldsList).toHaveBeenCalledWith('account-A'))
 
     // Aの応答が届く前にBへ切り替える
@@ -220,7 +220,7 @@ describe('アカウント切替', () => {
     )
     fixture.account = 'account-A'
     const view = render(<NewReminderPage />)
-    fireEvent.click(screen.getByRole('button', { name: /友だち情報欄の日付/ }))
+    fireEvent.click(screen.getByRole('radio', { name: /友だち情報欄の日付/ }))
     await waitFieldOptions('account-A')
     fireEvent.change(screen.getByLabelText('基準日に使う情報欄'), { target: { value: 'field-birthday-account-A' } })
 
@@ -245,7 +245,7 @@ describe('アカウント切替', () => {
     )
     fixture.account = 'account-A'
     const view = render(<NewReminderPage />)
-    fireEvent.click(screen.getByRole('button', { name: /友だち情報欄の日付/ }))
+    fireEvent.click(screen.getByRole('radio', { name: /友だち情報欄の日付/ }))
     await waitFieldOptions('account-A')
 
     fixture.account = 'account-B'
@@ -262,7 +262,7 @@ describe('ひな形から作る', () => {
   it('ひな形を選ばない下書きは本文・送信時刻を確定させない（Meet文面を入れない）', async () => {
     render(<NewReminderPage />)
     fillName('誕生日のお祝い')
-    fireEvent.click(screen.getByRole('button', { name: /友だち情報欄の日付/ }))
+    fireEvent.click(screen.getByRole('radio', { name: /友だち情報欄の日付/ }))
     await waitFieldOptions('account-1')
     fireEvent.change(screen.getByLabelText('基準日に使う情報欄'), { target: { value: 'field-birthday-account-1' } })
 
@@ -325,7 +325,7 @@ describe('ひな形から作る', () => {
   it('すでに起点を選んでいるときは、置き換えるか確認してから適用する', async () => {
     render(<NewReminderPage />)
     fillName('確認つき')
-    fireEvent.click(screen.getByRole('button', { name: /友だち情報欄の日付/ }))
+    fireEvent.click(screen.getByRole('radio', { name: /友だち情報欄の日付/ }))
     await waitFieldOptions('account-1')
     fireEvent.change(screen.getByLabelText('基準日に使う情報欄'), { target: { value: 'field-birthday-account-1' } })
 
@@ -347,7 +347,7 @@ describe('ひな形から作る', () => {
   it('確認をやめれば入力はそのまま残る', async () => {
     render(<NewReminderPage />)
     fillName('確認キャンセル')
-    fireEvent.click(screen.getByRole('button', { name: /友だち情報欄の日付/ }))
+    fireEvent.click(screen.getByRole('radio', { name: /友だち情報欄の日付/ }))
     await waitFieldOptions('account-1')
     fireEvent.change(screen.getByLabelText('基準日に使う情報欄'), { target: { value: 'field-birthday-account-1' } })
 
@@ -383,7 +383,7 @@ describe('保存状態の表示', () => {
 
 describe('2月29日の扱い（3択）', () => {
   async function chooseBirthdayField() {
-    fireEvent.click(screen.getByRole('button', { name: /友だち情報欄の日付/ }))
+    fireEvent.click(screen.getByRole('radio', { name: /友だち情報欄の日付/ }))
     await waitFieldOptions('account-1')
     fireEvent.change(screen.getByLabelText('基準日に使う情報欄'), { target: { value: 'field-birthday-account-1' } })
   }

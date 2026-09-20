@@ -54,6 +54,7 @@ import CarouselPicker, {
   filterSendableTemplates,
 } from '@/components/scenarios/carousel-picker'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Button from '@/components/shared/button'
 import { RequiredBadge } from '@/components/shared/form-controls'
 import BroadcastStepRail from '@/components/broadcasts/broadcast-step-rail'
@@ -1236,31 +1237,39 @@ export default function BroadcastForm({
             <section className="rounded-card border border-hairline bg-canvas p-5 shadow-sm">
               <h3 className="text-lg font-bold text-ink">配信方法</h3>
               <p className="mt-1 text-xs text-ink-faint">新規作成・テンプレート・過去の配信の複製から選べます。</p>
-              <div className="mt-4 grid gap-3 md:grid-cols-3">
+              {/*
+                #999 DEEP-02: 配信方法は1つだけ選ぶ群。●・○の文字を置いた
+                button ではなく、共通 RadioCard（本物の input[type=radio]）を
+                使う。群名は見出しと同じ「配信方法」を legend へ渡す。
+              */}
+              <RadioCardGroup legend="配信方法" className="mt-4 grid gap-3 md:grid-cols-3">
                 {([
                   ['new', '新しいメッセージを作成', 'テキスト・画像・ボタンを組み合わせて一から作ります。'],
                   ['template', 'テンプレートを選択', '保存済みテンプレートを呼び出して手直しします。'],
                   ['duplicate', '過去の配信を複製', '送信済みの配信をそのまま写して作り直します。'],
                 ] as const).map(([value, label, description]) => (
-                  <button
+                  <RadioCard
                     key={value}
-                    type="button"
-                    className="broadcast-delivery-method"
-                    data-active={deliveryMethod === value || undefined}
-                    onClick={() => {
-                      setDeliveryMethod(value)
-                      if (value === 'template') {
+                    name="broadcast-delivery-method"
+                    value={value}
+                    checked={deliveryMethod === value}
+                    title={label}
+                    note={description}
+                    onChange={(next) => {
+                      setDeliveryMethod(next as typeof deliveryMethod)
+                      if (next === 'template') {
                         setShowTemplatePicker(true)
                         goToStep('message')
                       }
                     }}
-                  >
-                    <span className="broadcast-delivery-radio" aria-hidden>{deliveryMethod === value ? '●' : '○'}</span>
-                    <strong>{label}</strong>
-                    <span>{description}</span>
-                  </button>
+                    /* 選択済みの「テンプレートを選択」をもう一度押すと、
+                       一覧を開き直せる（radio の change は発火しないため）。 */
+                    onClick={value === 'template' && deliveryMethod === 'template'
+                      ? () => { setShowTemplatePicker(true); goToStep('message') }
+                      : undefined}
+                  />
                 ))}
-              </div>
+              </RadioCardGroup>
             </section>
 
             <section className="rounded-card border border-hairline bg-canvas p-5 shadow-sm">
@@ -2212,25 +2221,7 @@ export default function BroadcastForm({
         background: transparent;
         padding: 0;
       }
-      .broadcast-delivery-method {
-        min-height: 112px;
-        border: 1px solid var(--color-hairline);
-        border-radius: 8px;
-        background: var(--color-canvas);
-        padding: 14px;
-        text-align: left;
-      }
-      .broadcast-delivery-method[data-active='true'] {
-        border-color: var(--color-accent);
-        background: var(--color-accent-soft);
-      }
-      .broadcast-delivery-method strong,
-      .broadcast-delivery-method span:last-child {
-        display: block;
-      }
-      .broadcast-delivery-method strong { margin-top: 8px; font-size: 14px; }
-      .broadcast-delivery-method span:last-child { margin-top: 8px; color: var(--color-ink-faint); font-size: 12px; line-height: 1.5; }
-      .broadcast-delivery-radio { color: var(--color-accent); }
+      /* #999 DEEP-02: .broadcast-delivery-*（●・○を置いた擬似ラジオカード）は撤去。共通 RadioCard を使う。 */
       .broadcast-message-type {
         min-height: 34px;
         border: 1px solid var(--color-hairline);
