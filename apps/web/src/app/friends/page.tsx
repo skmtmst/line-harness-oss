@@ -26,6 +26,7 @@ import { emptyMessageOf } from './friend-list-empty'
 import { csvExportLine } from './csv-export'
 import BulkRunDialog from '@/components/friends/bulk-run-dialog'
 import { canRunBulk } from '@/components/friends/bulk-run-view'
+import { FRIENDS_MERGED_TABS } from './friends-tabs'
 const PAGE_SIZE_OPTIONS = [10, 20, 30, 40, 50] as const
 /*
   検索行の副操作は設計 `PhxG6` で高さ38px。共通Buttonは36pxなので当てない
@@ -45,12 +46,11 @@ function scoreBoundary(raw: string | null) {
   return Number.isSafeInteger(value) ? value : undefined
 }
 
-const MERGED_TABS = [
-  { key: 'list', label: '友だち一覧' },
-  { key: 'duplicates', label: '重複検出' },
-  { key: 'merged', label: '統合ユーザー' },
-  { key: 'uid-migration', label: 'UID移行', href: '/accounts?tab=migration' },
-]
+/*
+ * #984 LAY-14: 主タブの定義は friends-tabs.ts が正本。
+ * UID移行（/accounts?tab=migration）側も同じ一覧・同じ部品を使う。
+ */
+const MERGED_TABS = FRIENDS_MERGED_TABS
 
 function FriendsPageInner({
   onNotice,
@@ -532,7 +532,7 @@ function FriendsPageInner({
             /* U011: 条件ブロックを1列にする。
                「項目・比較方法・値」の縦3段化は #984 でダイアログ自身の
                コンテナクエリ（@3xl 未満で縦積み）へ移した。ここに残していた
-               `div:has(> input[list=...])` は、入力が label の子なので
+               「div:has(> input[list=...])」は、入力が label の子なので
                実DOMには当たらない規則だった。 */
             [data-friends-advanced-search] section.grid { grid-template-columns: minmax(0, 1fr); }
             [data-friends-advanced-search] section.grid > * { grid-column: 1 / -1; }

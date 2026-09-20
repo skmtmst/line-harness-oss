@@ -8,6 +8,8 @@ const DIALOG = readFileSync(
   join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'components', 'friends', 'advanced-search-dialog.tsx'),
   'utf8',
 )
+/* #984 LAY-14: 主タブの定義は friends-tabs.ts が正本（UID移行側も同じ一覧を使う）。 */
+const TABS = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'friends-tabs.ts'), 'utf8')
 
 /*
  * U011-U013: 詳細検索（絞り込み条件を設定）が狭い幅で潰れていた。
@@ -69,8 +71,8 @@ describe('U028/U033 タブと右側操作の重なり', () => {
   })
 
   it('タブと右側操作そのものは残す', () => {
-    expect(PAGE).toContain("{ key: 'duplicates', label: '重複検出' }")
-    expect(PAGE).toContain("{ key: 'merged', label: '統合ユーザー' }")
+    expect(TABS).toContain("{ key: 'duplicates', label: '重複検出'")
+    expect(TABS).toContain("{ key: 'merged', label: '統合ユーザー'")
     expect(PAGE).toContain('表示中をCSVで書き出す')
     expect(PAGE).toContain('UID移行')
   })

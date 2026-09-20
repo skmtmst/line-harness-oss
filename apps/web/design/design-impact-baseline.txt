@@ -230,6 +230,8 @@ button-migration-target app/templates/page.tsx
 button-migration-target app/webhooks/webhook-interactions.tsx
 button-migration-target components/friend-fields/tags-page-v4.tsx
 # 標準の表見出しへ移行済みとして監視する画面本体。
+# #984 LAY-14: UID移行の判断表も共通見出しを通しているので監視へ入れる。
+table-header-migration-target app/accounts/migration.tsx
 table-header-migration-target app/affiliates/tabs.tsx
 table-header-migration-target app/conversions/page.tsx
 # #984 LAY-12: 重複検出の3表すべてを共通見出しへ。直書き th は残さない。
