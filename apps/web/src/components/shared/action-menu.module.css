@@ -21,13 +21,13 @@
 .item {
   display: flex;
   width: 100%;
-  min-height: 34px;
+  height: 34px;
   align-items: center;
   gap: 9px;
   border: 0;
   border-radius: var(--radius-icon);
   background: transparent;
-  padding: 4px 10px;
+  padding: 0 10px;
   color: var(--color-ink);
   font-size: var(--text-label);
   font-weight: 400;
@@ -35,7 +35,19 @@
   cursor: pointer;
 }
 
-/* LAY-18: ラベルと「押せない理由」を縦に載せる器。 */
+/*
+ * #985 LAY-18: 「押せない理由」を添える項目だけ高さを伸ばす。
+ * 設計 hGpFq の item（34px / padding 0 10px）は据え置き、
+ * 理由のある行はこのクラスで2行にする。
+ */
+.itemWithReason {
+  height: auto;
+  min-height: 34px;
+  padding-top: 6px;
+  padding-bottom: 6px;
+}
+
+/* ラベルと「押せない理由」を縦に載せる器。 */
 .itemBody {
   display: flex;
   min-width: 0;

@@ -77,7 +77,7 @@ export default function ActionMenu({ open, items, note, onClose, ariaLabel = 'æ“
           <button
             type="button"
             role="menuitem"
-            className={`${styles.item} ${item.tone === 'danger' ? styles.danger : ''}`}
+            className={`${styles.item} ${item.disabled && item.disabledReason ? styles.itemWithReason : ''} ${item.tone === 'danger' ? styles.danger : ''}`}
             disabled={item.disabled}
             onClick={() => { item.onSelect(); onClose() }}
           >
