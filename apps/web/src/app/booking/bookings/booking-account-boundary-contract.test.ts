@@ -65,7 +65,23 @@ describe('予約管理のアカウント境界(#963)', () => {
   it('確定操作の結果表示は操作時のアカウントと一致するときだけ触る', () => {
     expect(PAGE).toContain('const decideAccountId = selectedAccountId')
     expect(PAGE).toContain('bookingApi.decideRequest(decideAccountId, id, action)')
-    expect(PAGE).toContain('if (listAccountRef.current === decideAccountId) setDecideTarget(null)')
     expect(PAGE).toContain('if (listAccountRef.current === decideAccountId) {')
+  })
+
+  it('確定後の再読み込みも同じアカウントのときだけ呼ぶ(#979 A27-03)', () => {
+    /*
+     * `load` は操作開始時のアカウントを掴んだ古い実体。切替後に呼ぶと
+     * 新しいアカウントの一覧を空にしたまま読み込み状態が残る。
+     * 確認窓を閉じるのと同じガードの中でだけ呼ばなければならない。
+     */
+    const runDecide = PAGE.match(/async function runDecide[\s\S]*?\n  \}\n/)
+    expect(runDecide).not.toBeNull()
+    const body = runDecide![0]
+    const guarded = body.match(/if \(listAccountRef\.current === decideAccountId\) \{([\s\S]*?)\n      \}/)
+    expect(guarded).not.toBeNull()
+    expect(guarded![1]).toContain('setDecideTarget(null)')
+    expect(guarded![1]).toContain('await load()')
+    // ガードの外で一覧の再読み込みを呼ばない。
+    expect(body.replace(guarded![0], '')).not.toContain('await load()')
   })
 })

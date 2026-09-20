@@ -132,7 +132,19 @@ function safeCsv(logs: AdConversionLog[]): string {
   return ['"日時","成果","クリックの種類","状態"', ...rows].join('\n')
 }
 
-export default function AdIntegration({ view }: { view: AdView }) {
+export default function AdIntegration({
+  view,
+  onPlatformCountsChange,
+}: {
+  view: AdView
+  /**
+   * #980: 「広告連携」「広告とのつなぎ」タブの件数をホストへ渡す。
+   * この画面が一覧に使う `platforms` と同じ集計（選択中アカウントの
+   * 広告設定の総数と、そのうち動いている数）で、読み込み前・失敗時・
+   * アカウント未選択は null。数字を出せないときに0を書かない。
+   */
+  onPlatformCountsChange?: (counts: { total: number; connected: number } | null) => void
+}) {
   const { selectedAccountId } = useAccount()
   const latestAccountRef = useRef(selectedAccountId)
   const loadGenerationRef = useRef(0)
@@ -194,6 +206,21 @@ export default function AdIntegration({ view }: { view: AdView }) {
   }, [load])
 
   const connected = platforms.filter((platform) => platform.isActive)
+  /*
+    #980: タブの件数は、この画面が一覧に使う platforms と同じ集計から出す。
+    「広告連携」は設定の総数、「広告とのつなぎ」は動いているつなぎの数。
+    読み込み前・失敗時は null を渡して数字を出さない。
+  */
+  useEffect(() => {
+    onPlatformCountsChange?.(
+      loading || failed || !selectedAccountId
+        ? null
+        : {
+            total: platforms.length,
+            connected: platforms.filter((platform) => platform.isActive).length,
+          },
+    )
+  }, [onPlatformCountsChange, loading, failed, selectedAccountId, platforms])
   const sentCount = configNumber(platforms, 'sent_count') ?? logs.filter((log) => matchesStatus(log, 'sent')).length
   const pendingCount = configNumber(platforms, 'pending_count') ?? logs.filter((log) => log.status === 'pending').length
   const failedCount = configNumber(platforms, 'failed_count') ?? logs.filter((log) => log.status === 'failed').length

@@ -239,8 +239,15 @@ function FriendsPageInner({
     }
   }, [loadFriends])
   useEffect(() => {
-    if (page > totalPages) setPage(totalPages)
-  }, [page, totalPages])
+    /*
+     * 読み込みの間は loadFriends が total を 0 に落とすので、ここで
+     * クランプを評価すると 2ページ目以降の取得中に totalPages が 1 へ
+     * 下がり、勝手に1ページ目へ戻ってしまう(#979 A03-01)。
+     * 範囲外ページの補正そのものは残し、応答が届いて ready になった
+     * 時点でだけ行う。
+     */
+    if (loadStatus === 'ready' && page > totalPages) setPage(totalPages)
+  }, [loadStatus, page, totalPages])
 
   const resetPageWith = (update: () => void) => {
     update()

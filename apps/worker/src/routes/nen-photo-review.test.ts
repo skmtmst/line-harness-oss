@@ -40,6 +40,9 @@ function harness(options: {
   duplicate?: boolean;
   customerId?: string | null;
   permissionKeys?: string[];
+  viewPermissionKeys?: string[];
+  role?: 'owner' | 'admin' | 'staff';
+  authenticated?: boolean;
   retryRow?: boolean;
   settledState?: Record<string, unknown> | null;
   notificationRetryKey?: string | null;
@@ -157,11 +160,14 @@ function harness(options: {
   };
   const app = new Hono<any>();
   app.use('*', async (c, next) => {
-    c.set('staff', {
-      id: 'staff-a', name: '担当者', role: 'staff', readOnly: false,
-      permissionKeys: options.permissionKeys
-        ?? ['photo.submission.view', 'photo.submission.review'],
-    });
+    if (options.authenticated !== false) {
+      c.set('staff', {
+        id: 'staff-a', name: '担当者', role: options.role ?? 'staff', readOnly: false,
+        permissionKeys: options.permissionKeys
+          ?? ['photo.submission.view', 'photo.submission.review'],
+        viewPermissionKeys: options.viewPermissionKeys ?? [],
+      });
+    }
     c.env = { DB: db, WORKER_PUBLIC_URL: 'https://worker.example' };
     await next();
   });
@@ -181,6 +187,35 @@ beforeEach(() => {
 });
 
 describe('NEN photo review', () => {
+  it('管理者とオーナーは個別キーなしで写真一覧を閲覧できる', async () => {
+    for (const role of ['admin', 'owner'] as const) {
+      const { app } = harness({ role, permissionKeys: [] });
+      expect((await app.request('/api/nen-members/photos?accountId=account-a')).status).toBe(200);
+    }
+  });
+
+  it('スタッフは編集キーまたは閲覧キーで写真一覧を閲覧できる', async () => {
+    const editor = harness({ permissionKeys: ['photo.submission.view'] }).app;
+    const viewer = harness({ permissionKeys: [], viewPermissionKeys: ['photo.submission.view'] }).app;
+    expect((await editor.request('/api/nen-members/photos?accountId=account-a')).status).toBe(200);
+    expect((await viewer.request('/api/nen-members/photos?accountId=account-a')).status).toBe(200);
+  });
+
+  it('未認証と権限なしスタッフは写真一覧を閲覧できない', async () => {
+    const unauthenticated = harness({ authenticated: false }).app;
+    const denied = harness({ permissionKeys: [] }).app;
+    expect((await unauthenticated.request('/api/nen-members/photos?accountId=account-a')).status).toBe(403);
+    expect((await denied.request('/api/nen-members/photos?accountId=account-a')).status).toBe(403);
+  });
+
+  it('管理者でもLINEアカウント範囲外は閲覧できない', async () => {
+    mocks.canAccess.mockResolvedValueOnce(false);
+    const { app, statements } = harness({ role: 'admin', permissionKeys: [] });
+    const response = await app.request('/api/nen-members/photos?accountId=account-b');
+    expect(response.status).toBe(403);
+    expect(statements.some((entry) => entry.query.includes('ORDER BY ps.created_at'))).toBe(false);
+  });
+
   it('requires an explicit LINE account and lists only that account', async () => {
     const { app, statements } = harness();
     expect((await app.request('/api/nen-members/photos')).status).toBe(400);
