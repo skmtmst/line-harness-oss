@@ -185,7 +185,7 @@ type MockDraft = {
   actions: Array<{ id: string; type: string; params: Record<string, unknown>; onFailure: 'stop' }>
 }
 
-async function attachApiMock(page: Page, options: { slowCreate?: boolean; slowTest?: boolean } = {}): Promise<MockApi> {
+async function attachApiMock(page: Page, options: { slowCreate?: boolean; slowTest?: boolean; knownDrafts?: MockDraft[] } = {}): Promise<MockApi> {
   let createNumber = 0
   let revisionNumber = 0
   let releaseCreate = () => {}
@@ -195,6 +195,8 @@ async function attachApiMock(page: Page, options: { slowCreate?: boolean; slowTe
   const state: MockApi = { calls: [], createCalls: [], updateCalls: [], testCalls: [], releaseCreate, releaseTest }
   // 本物の Worker と同じく、更新しても版の番号は変えずに中身だけ書き換える。
   const drafts = new Map<string, MockDraft>()
+  // 「前に保存した下書き」として控えに載っているものを、サーバー側にも用意する。
+  for (const known of options.knownDrafts ?? []) drafts.set(known.id, known)
 
   await page.route(`${API_ORIGIN}/**`, async (route) => {
     const request = route.request()
@@ -464,18 +466,23 @@ async function preparePageIn(context: BrowserContext, options: { storedDrafts?: 
   return page
 }
 
-async function settle(page: Page, describe: () => string): Promise<void> {
-  await page.goto(`${webOrigin}/automations/new`, { waitUntil: 'domcontentloaded' })
+async function settle(page: Page, describe: () => string, path = '/automations/new'): Promise<void> {
+  await page.goto(`${webOrigin}${path}`, { waitUntil: 'domcontentloaded' })
   await waitUntil(
     () => page.locator('#au-name').isVisible({ timeout: 200 }).catch(() => false),
     () => `入力欄が表示されませんでした（URL: ${page.url()}、${describe()}）`,
   )
+  // 再開（?draft=）の読み込み中は保存できないので、押せるようになるまで待つ。
   await waitUntil(
     () => page.getByRole('button', { name: '下書きに保存' }).isEnabled({ timeout: 200 }).catch(() => false),
     () => `保存ボタンが使える状態になりませんでした（URL: ${page.url()}、${describe()}）`,
   )
+  if (path.includes('?draft=')) {
+    // 押せる瞬間と読み込み完了の間に隙間があるので、再開の完了も明示的に待つ。
+    await page.getByText('保存した下書きを読み込みました。続きを直せます。').waitFor()
+  }
   await page.waitForTimeout(500)
-  if (page.url() !== `${webOrigin}/automations/new` || !(await page.locator('#au-name').isVisible())) {
+  if (new URL(page.url()).pathname !== '/automations/new' || !(await page.locator('#au-name').isVisible())) {
     throw new Error(`画面が安定しませんでした（URL: ${page.url()}、${describe()}、本文: ${(await page.locator('body').innerText()).slice(0, 1_000)}）`)
   }
 }
@@ -507,11 +514,11 @@ async function openWorkerPage(
   return { page, context, worker }
 }
 
-/** 同じ下書きを開いた「別タブ」。タブを複製すると sessionStorage も複製される。 */
-async function openSecondTab(context: BrowserContext, worker: WorkerHarness, storedDrafts: StoredDrafts): Promise<Page> {
+/** 同じ下書きを開いた「別タブ」。タブを複製すると sessionStorage も複製される。再開は `?draft=` で明示する。 */
+async function openSecondTab(context: BrowserContext, worker: WorkerHarness, storedDrafts: StoredDrafts, draftId: string): Promise<Page> {
   const page = await preparePageIn(context, { storedDrafts })
   await attachWorkerApi(page, worker)
-  await settle(page, () => `API: ${worker.calls.map((call) => call.pathname).join(', ')}`)
+  await settle(page, () => `API: ${worker.calls.map((call) => call.pathname).join(', ')}`, `/automations/new?draft=${draftId}`)
   return page
 }
 
@@ -568,8 +575,10 @@ describe('V6 ルールを作る（Rv8Jv）の誤操作防止（#679）', () => {
 
     expect((await storedDraftsOf(page))[ACCOUNT_A]?.id).toBe('draft-account-a-1')
 
+    // 保存後はURLに `?draft=` が載る。再読込はその番号で再開し、同じ下書きを更新する。
     await page.reload({ waitUntil: 'domcontentloaded' })
     await page.locator('#au-name').waitFor()
+    await page.getByText('保存した下書きを読み込みました。続きを直せます。').waitFor()
     await fillTagRule(page, '再読込後の更新')
     await saveDraft(page)
     expect(api.createCalls).toHaveLength(1)
@@ -579,6 +588,7 @@ describe('V6 ルールを作る（Rv8Jv）の誤操作防止（#679）', () => {
     await page.waitForURL(`${webOrigin}/automations`)
     await page.goBack({ waitUntil: 'domcontentloaded' })
     await page.locator('#au-name').waitFor()
+    await page.getByText('保存した下書きを読み込みました。続きを直せます。').waitFor()
     await fillTagRule(page, '戻った後の更新')
     await saveDraft(page)
     expect(api.createCalls).toHaveLength(1)
@@ -588,8 +598,26 @@ describe('V6 ルールを作る（Rv8Jv）の誤操作防止（#679）', () => {
   it('遅延保存中に店舗を往復しても、既存下書きと新規下書きを取り違えない', async () => {
     const { page, api } = await openPage({
       storedDrafts: { [ACCOUNT_A]: { id: 'existing-a', draftVersionId: 'existing-version-a' } },
+      knownDrafts: [{
+        id: 'existing-a',
+        draftVersionId: 'existing-version-a',
+        name: '既存Aの下書き',
+        description: null,
+        eventType: 'message_received',
+        triggerConfig: {},
+        conditions: {},
+        actions: [{ id: 'step-1', type: 'add_tag', params: { tagId: 'tag-vip' }, onFailure: 'stop' }],
+      }],
       slowCreate: true,
     })
+
+    /*
+     * DETAIL-13: 素の新規画面は保存済み控えを黙って結び付けない。
+     * 「保存した下書きを開く」で明示して初めて existing-a の再開になる。
+     */
+    await page.getByRole('button', { name: '保存した下書きを開く' }).click()
+    await page.getByText('保存した下書きを読み込みました。続きを直せます。').waitFor()
+    expect(await page.locator('#au-name').inputValue()).toBe('既存Aの下書き')
 
     await page.getByLabel('LINEアカウント').selectOption(ACCOUNT_B)
     await page.waitForTimeout(50)
@@ -680,8 +708,8 @@ describe('V6 ルールを作る（Rv8Jv）を本物のWorkerに繋いだとき�
     expect(await dialog.innerText()).toContain('メッセージ「最初の文面です。」')
     expect(worker.testCalls).toHaveLength(0)
 
-    // 別タブで同じ下書きを書き換える。
-    const other = await openSecondTab(context, worker, stored)
+    // 別タブで同じ下書きを `?draft=` 付きで開き、書き換える。
+    const other = await openSecondTab(context, worker, stored, draftId)
     await fillMessageRule(other, '予約返信', '別タブが書き換えた文面です。')
     await saveDraft(other)
 
