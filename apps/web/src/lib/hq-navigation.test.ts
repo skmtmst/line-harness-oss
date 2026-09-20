@@ -8,6 +8,7 @@ import {
   hqOpenHref,
   resolveHqOpenTarget,
   resolveStoreReturnPath,
+  resetAuthSelectionCleared,
   storeSelectionHref,
 } from './hq-navigation'
 
@@ -65,28 +66,51 @@ describe('統括から店舗画面を開く', () => {
 })
 
 describe('認証後の前回選択解除', () => {
-  it('ログインし直しでは一度だけ保存値を消す', () => {
-    // ログイン画面が印を外したあと（= localStorage に印が無い）、
-    // 次の認証確認で一度だけ前回の店舗選択を捨てる。
+  it('ログインし直しでは一度だけ保存値を消し、印は共有側へ立てる', () => {
+    // ログイン画面が印を外したあと、次の認証確認で一度だけ
+    // 前回の店舗選択を捨てる。
     const local = storage({ [ACCOUNT_SELECTION_KEY]: 'old-account' })
-    expect(clearSelectionAfterAuthentication(local)).toBe(true)
+    const session = storage()
+    expect(clearSelectionAfterAuthentication(local, session)).toBe(true)
     expect(local.getItem(ACCOUNT_SELECTION_KEY)).toBeNull()
     expect(local.getItem(AUTH_SELECTION_CLEARED_KEY)).toBe('1')
 
     local.setItem(ACCOUNT_SELECTION_KEY, 'current-account')
-    expect(clearSelectionAfterAuthentication(local)).toBe(false)
+    expect(clearSelectionAfterAuthentication(local, session)).toBe(false)
     expect(local.getItem(ACCOUNT_SELECTION_KEY)).toBe('current-account')
   })
 
   it('新規タブ・再読込では他タブの選択を消さない', () => {
-    // 印は共有の localStorage に残る。タブごとの sessionStorage が
+    // 印の正本は共有の localStorage。タブごとの sessionStorage が
     // 空になる新規タブでも、印が残っている限り選択を消さない（NEXT-07）。
     const local = storage({
       [ACCOUNT_SELECTION_KEY]: 'account-1',
       [AUTH_SELECTION_CLEARED_KEY]: '1',
     })
-    expect(clearSelectionAfterAuthentication(local)).toBe(false)
+    const freshTabSession = storage()
+    expect(clearSelectionAfterAuthentication(local, freshTabSession)).toBe(false)
     expect(local.getItem(ACCOUNT_SELECTION_KEY)).toBe('account-1')
+  })
+
+  it('sessionStorage にだけ残る旧印でも消さない', () => {
+    // 旧版が置いた印や確認用スクリプトの印は sessionStorage に残る。
+    // 消えた選択は戻せないので、残存印がある側は消さない方向に倒す。
+    const local = storage({ [ACCOUNT_SELECTION_KEY]: 'account-1' })
+    const session = storage({ [AUTH_SELECTION_CLEARED_KEY]: '1' })
+    expect(clearSelectionAfterAuthentication(local, session)).toBe(false)
+    expect(local.getItem(ACCOUNT_SELECTION_KEY)).toBe('account-1')
+  })
+
+  it('ログイン・ログアウトは両方の印を外して次の確認で消せるようにする', () => {
+    const local = storage({ [AUTH_SELECTION_CLEARED_KEY]: '1' })
+    const session = storage({ [AUTH_SELECTION_CLEARED_KEY]: '1' })
+    resetAuthSelectionCleared(local, session)
+    expect(local.getItem(AUTH_SELECTION_CLEARED_KEY)).toBeNull()
+    expect(session.getItem(AUTH_SELECTION_CLEARED_KEY)).toBeNull()
+    // 印が外れたあとの認証確認では前回の選択を一度だけ捨てる。
+    local.setItem(ACCOUNT_SELECTION_KEY, 'old-account')
+    expect(clearSelectionAfterAuthentication(local, session)).toBe(true)
+    expect(local.getItem(ACCOUNT_SELECTION_KEY)).toBeNull()
   })
 })
 

@@ -49,25 +49,45 @@ type StorageLike = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>
 /**
  * ログインし直しにつき一度だけ前回の店舗選択を捨てる。
  *
- * 「もう消した」印は共有の localStorage に置く。タブごとの
- * sessionStorage に置くと、新規タブ・再読込では印が空に見えて
- * 「ログインし直し」と区別がつかず、開いている他タブの店舗選択まで
- * 消してしまう（NEXT-07）。ログイン・招待受諾・登録完了・ログアウトの
- * 各画面がこの印を外し、次に AuthGuard がセッションを確認したとき
- * 一度だけ選択を捨てる。
+ * 「もう消した」印の正本は共有の localStorage に置き、消すときに立てる。
+ * 以前はタブごとの sessionStorage だけを見ていたため、新規タブ・再読込
+ * では印が空に見えて「ログインし直し」と区別がつかず、開いている他タブの
+ * 店舗選択まで消してしまっていた（NEXT-07）。
+ * 読み出しは sessionStorage の印も残存扱いにする。旧版が残した印や、
+ * 確認用スクリプトが置く sessionStorage の印で誤って消さないため。
+ * ログイン・招待受諾・登録完了・ログアウトの各画面は両方の印を外し、
+ * 次に AuthGuard がセッションを確認したとき一度だけ選択を捨てる。
  * AuthGuard は画面遷移ごとにセッションを再確認するため、毎回消すと
  * 同じセッション内の店舗ログインまで解除してしまう。
  * ストレージが使えない環境では消さない（画面を止めない）。
  */
-export function clearSelectionAfterAuthentication(local: StorageLike): boolean {
+export function clearSelectionAfterAuthentication(
+  local: StorageLike,
+  session: StorageLike,
+): boolean {
   try {
     if (local.getItem(AUTH_SELECTION_CLEARED_KEY) === '1') return false
+    if (session.getItem(AUTH_SELECTION_CLEARED_KEY) === '1') return false
     local.removeItem(ACCOUNT_SELECTION_KEY)
     local.setItem(AUTH_SELECTION_CLEARED_KEY, '1')
     return true
   } catch {
     return false
   }
+}
+
+/**
+ * 「次の認証確認で前回の店舗選択を一度だけ捨てる」印を外す。
+ * ログイン・招待受諾・登録完了・ログアウトから呼ぶ。
+ * localStorage（正本）と sessionStorage（旧版や確認用スクリプトが置く残存印）
+ * の両方を外し、片方だけ残った印で消し忘れないようにする。
+ */
+export function resetAuthSelectionCleared(
+  local: StorageLike,
+  session: StorageLike,
+): void {
+  try { local.removeItem(AUTH_SELECTION_CLEARED_KEY) } catch { /* non-essential navigation marker */ }
+  try { session.removeItem(AUTH_SELECTION_CLEARED_KEY) } catch { /* non-essential navigation marker */ }
 }
 
 /**

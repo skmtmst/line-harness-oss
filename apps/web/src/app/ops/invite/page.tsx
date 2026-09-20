@@ -8,7 +8,7 @@ import ListState from '@/components/shared/list-state'
 import { TextField } from '@/components/shared/text-field'
 import { adminSessionHandoffPath, storeAdminSession } from '@/lib/admin-session'
 import { authRequest, passwordError } from '@/lib/auth-email'
-import { AUTH_SELECTION_CLEARED_KEY } from '@/lib/hq-navigation'
+import { resetAuthSelectionCleared } from '@/lib/hq-navigation'
 
 /**
  * 運営メンバーの招待を受ける（★V6 37-10-A `J6KbIg`）。
@@ -69,7 +69,7 @@ export default function OpsInvitePage() {
       setBusy(false)
       return
     }
-    try { localStorage.removeItem(AUTH_SELECTION_CLEARED_KEY) } catch { /* non-essential navigation marker */ }
+    resetAuthSelectionCleared(localStorage, sessionStorage)
     if (res.data.sessionToken) storeAdminSession(res.data.sessionToken, res.csrfToken)
     else if (res.csrfToken) {
       try { localStorage.setItem('lh_csrf', res.csrfToken) } catch { /* Cookie session is sufficient */ }

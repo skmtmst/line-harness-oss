@@ -9,7 +9,7 @@ import Button from '@/components/shared/button'
 import { TextField } from '@/components/shared/text-field'
 import { storeAdminSession } from '@/lib/admin-session'
 import { authRequest, emailError } from '@/lib/auth-email'
-import { AUTH_SELECTION_CLEARED_KEY } from '@/lib/hq-navigation'
+import { resetAuthSelectionCleared } from '@/lib/hq-navigation'
 
 const LINE_LOGIN_FAILURE_CODES = new Set([
   'line_token_failed',
@@ -68,7 +68,7 @@ export default function LoginPage() {
     }
     // 「消した」印は共有の localStorage。外すと次の認証確認で一度だけ
     // 前回の店舗選択を捨てる（NEXT-07）。
-    try { localStorage.removeItem(AUTH_SELECTION_CLEARED_KEY) } catch { /* non-essential navigation marker */ }
+    resetAuthSelectionCleared(localStorage, sessionStorage)
     if (res.data.twoFactorSetup && res.data.challengeToken) {
       window.location.assign(`/login/two-factor/setup#${new URLSearchParams({ lh_2fa: res.data.challengeToken }).toString()}`)
       return
@@ -84,7 +84,7 @@ export default function LoginPage() {
 
   const lineLogin = () => {
     setBusy('line')
-    try { localStorage.removeItem(AUTH_SELECTION_CLEARED_KEY) } catch { /* non-essential navigation marker */ }
+    resetAuthSelectionCleared(localStorage, sessionStorage)
     const apiUrl = process.env.NEXT_PUBLIC_API_URL
     if (!apiUrl) return setBusy(null)
     // 「7日間ログインを保持」の選択をOAuth往復へ持ち越す印（N-434）
