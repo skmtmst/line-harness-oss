@@ -34,7 +34,8 @@ export default function LifetimeTab({
   accountId: string
   status: LoadStatus
   settings: NenRankSettingsData | null
-  onSaved: (next: NenRankSettingsData) => void
+  /** 保存応答の反映先を指定する。別アカウントへ切り替わっていれば親が捨てる。 */
+  onSaved: (forAccountId: string, next: NenRankSettingsData) => void
   onRetry: () => void
 }) {
   const [drafts, setDrafts] = useState<Draft[]>([])
@@ -42,6 +43,22 @@ export default function LifetimeTab({
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
+  /** 下書きがどのアカウントのものか。編集状態はアカウントに固定する（DEEP-21）。 */
+  const [draftAccountId, setDraftAccountId] = useState(accountId)
+
+  /*
+   * アカウントが切り替わった瞬間に編集状態を捨てる。
+   * dirtyのまま残すと、Aの下書き（AのIDと編集内容）がBの保存へ乗る。
+   * 切替前に未保存の変更があったときは、黙って消さず破棄したことを画面へ出す。
+   */
+  if (draftAccountId !== accountId) {
+    const hadUnsaved = dirty
+    setDraftAccountId(accountId)
+    setDrafts([])
+    setDirty(false)
+    setError('')
+    setNotice(hadUnsaved ? 'LINEアカウントを切り替えたため、保存していない変更は破棄しました。' : '')
+  }
 
   const fromSettings = (next: NenRankSettingsData): Draft[] =>
     next.milestones.map((m) => ({ id: m.id, threshold: String(m.thresholdYen), title: m.title, notify: m.notifyOnReach, reachedCount: m.reachedCount }))
@@ -58,6 +75,8 @@ export default function LifetimeTab({
   }
 
   const save = async () => {
+    // 編集元と保存先のアカウントが一致するときだけ送る（DEEP-21）。
+    if (draftAccountId !== accountId) return
     setBusy(true)
     setError('')
     setNotice('')
@@ -67,7 +86,7 @@ export default function LifetimeTab({
       })))
       if (!res.success) throw new Error(res.error)
       setDirty(false)
-      onSaved(res.data)
+      onSaved(accountId, res.data)
       setNotice(res.data.sync?.status === 'synced' ? '節目を保存し、ECへ同期しました。' : '節目を保存しました。ECへの同期は失敗したので、ランク設定の「もう一度同期」で送り直せます。')
     } catch (caught) {
       setError(caught instanceof Error && caught.message ? caught.message : '保存できませんでした。もう一度お試しください。')
@@ -76,9 +95,12 @@ export default function LifetimeTab({
     }
   }
 
-  if (status === 'loading' && !settings) return <ListState kind="loading" title="ライフタイムを読み込んでいます" />
+  const noticeEl = notice ? <p className="text-label text-accent-deep" role="status">{notice}</p> : null
+  if (status === 'loading' && !settings) return <>{noticeEl}<ListState kind="loading" title="ライフタイムを読み込んでいます" /></>
   if (status === 'forbidden') return <ListState kind="forbidden" />
-  if (status === 'error' || !settings) return <ListState kind="error" title="ライフタイムを読み込めませんでした" description="通信の状態を確認して、もう一度お試しください。" onRetry={onRetry} />
+  if (status === 'error') return <ListState kind="error" title="ライフタイムを読み込めませんでした" description="通信の状態を確認して、もう一度お試しください。" onRetry={onRetry} />
+  // アカウント切替直後：settings は選択中アカウントのものだけが来る。次の取得が終わるまで読み込み表示にする。
+  if (!settings) return <>{noticeEl}<ListState kind="loading" title="ライフタイムを読み込んでいます" /></>
 
   const sorted = [...settings.milestones].sort((a, b) => a.thresholdYen - b.thresholdYen)
   const first = sorted[0]

@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import Button from '@/components/shared/button'
 import Chip from '@/components/shared/chip'
 import ListState from '@/components/shared/list-state'
@@ -44,21 +44,48 @@ export default function FeedingTab({ accountId }: { accountId: string }) {
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const [treatLimit, setTreatLimit] = useState('10')
+  /** 表示中データ・下書きがどのアカウントのものか。編集状態はアカウントに固定する（DEEP-22）。 */
+  const [dataAccountId, setDataAccountId] = useState(accountId)
+  /** 要求世代。切替・再取得で進め、遅れて届いた古い応答を捨てる。 */
+  const generationRef = useRef(0)
+
+  /*
+   * アカウントが切り替わった瞬間に、表示データと編集状態をまとめて初期化する。
+   * ここで残すと、Bの読み込み中にAのフォームと保存が有効のままになり、
+   * Aの商品（AのID）をBへ保存できてしまう。世代も進めて飛行中の応答を失効させる。
+   */
+  if (dataAccountId !== accountId) {
+    const hadUnsaved = dirty
+    generationRef.current += 1
+    setDataAccountId(accountId)
+    setData(null)
+    setDrafts([])
+    setTreatLimit('10')
+    setDirty(false)
+    setError('')
+    setNotice(hadUnsaved ? 'LINEアカウントを切り替えたため、保存していない変更は破棄しました。' : '')
+    setStatus('loading')
+  }
 
   const fromData = (next: NenFeedingData): Draft[] =>
     next.products.map((p) => ({ id: p.id, name: p.name, kcal: String(p.kcalPer100g), isDefault: p.isDefault, kind: p.kind === 'nen' ? 'nen' : 'staple' }))
 
   const load = useCallback(async () => {
+    const generation = ++generationRef.current
+    const account = accountId
     setStatus('loading')
     try {
-      const res = await nenRanksApi.feeding(accountId)
+      const res = await nenRanksApi.feeding(account)
       if (!res.success) throw new Error(res.error)
+      // 要求世代を照合する。切替後に届いた別アカウントの応答は捨てる（逆順応答も混ざらない）。
+      if (generationRef.current !== generation) return
       setData(res.data)
       setDrafts(fromData(res.data))
       setTreatLimit(String(res.data.treatLimitPercent ?? 10))
       setDirty(false)
       setStatus('ready')
     } catch (caught) {
+      if (generationRef.current !== generation) return
       setStatus(caught instanceof ApiError && caught.status === 403 ? 'forbidden' : 'error')
     }
   }, [accountId])
@@ -103,14 +130,20 @@ export default function FeedingTab({ accountId }: { accountId: string }) {
   }
 
   const save = async () => {
+    // 取得中や別アカウントの下書きは保存しない。保存先は下書きの載ったアカウントに固定（DEEP-22）。
+    if (status !== 'ready' || dataAccountId !== accountId) return
+    const generation = generationRef.current
+    const account = accountId
     setBusy(true)
     setError('')
     setNotice('')
     try {
-      const res = await nenRanksApi.saveFeeding(accountId, drafts.map((row) => ({
+      const res = await nenRanksApi.saveFeeding(account, drafts.map((row) => ({
         id: row.id, name: row.name.trim(), kcalPer100g: Number(row.kcal.replace(/[,，]/g, '')), isDefault: row.isDefault, kind: row.kind,
       })), Number(treatLimit))
       if (!res.success) throw new Error(res.error)
+      // 保存応答も世代を照合する。切替後に届いたAの応答をBの画面へ置かない。
+      if (generationRef.current !== generation) return
       setData(res.data)
       setDrafts(fromData(res.data))
       setTreatLimit(String(res.data.treatLimitPercent ?? 10))
@@ -125,9 +158,12 @@ export default function FeedingTab({ accountId }: { accountId: string }) {
     }
   }
 
-  if (status === 'loading' && !data) return <ListState kind="loading" title="主食のカロリー表を読み込んでいます" />
+  const noticeEl = notice ? <p className="text-label text-accent-deep" role="status">{notice}</p> : null
+  if (status === 'loading' && !data) return <>{noticeEl}<ListState kind="loading" title="主食のカロリー表を読み込んでいます" /></>
   if (status === 'forbidden') return <ListState kind="forbidden" />
-  if (status === 'error' || !data) return <ListState kind="error" title="主食のカロリー表を読み込めませんでした" description="通信の状態を確認して、もう一度お試しください。" onRetry={() => void load()} />
+  if (status === 'error') return <ListState kind="error" title="主食のカロリー表を読み込めませんでした" description="通信の状態を確認して、もう一度お試しください。" onRetry={() => void load()} />
+  // アカウント切替直後：次の取得が終わるまで読み込み表示にする。旧アカウントの表は出さない。
+  if (!data) return <>{noticeEl}<ListState kind="loading" title="主食のカロリー表を読み込んでいます" /></>
 
   return (
     <>
@@ -208,8 +244,8 @@ export default function FeedingTab({ accountId }: { accountId: string }) {
         status={dirty ? '保存していない変更があります' : undefined}
         actions={(
           <>
-            <Button variant="secondary" onClick={cancel} disabled={busy || !dirty}>キャンセル</Button>
-            <Button variant="primary" onClick={() => void save()} disabled={busy || !dirty}>保存する</Button>
+            <Button variant="secondary" onClick={cancel} disabled={busy || !dirty || status !== 'ready'}>キャンセル</Button>
+            <Button variant="primary" onClick={() => void save()} disabled={busy || !dirty || status !== 'ready' || dataAccountId !== accountId}>保存する</Button>
           </>
         )}
       />
