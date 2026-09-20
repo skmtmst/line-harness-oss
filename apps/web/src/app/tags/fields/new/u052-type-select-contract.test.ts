@@ -16,10 +16,11 @@ describe('友だち情報欄の型選択（#975 U052）', () => {
   })
 
   it('選択中の型の用途は選択欄の下へ出す', () => {
+    // #976: Field の note が欄の下に描くので、hint は Field の note で渡す。
+    const field = PAGE.indexOf('note={FIELD_TYPE_HINTS[type]}')
     const select = PAGE.indexOf('aria-label="友だち情報欄の種類"')
-    const hint = PAGE.indexOf('{FIELD_TYPE_HINTS[type]}')
-    expect(select).toBeGreaterThan(-1)
-    expect(hint).toBeGreaterThan(select)
+    expect(field).toBeGreaterThan(-1)
+    expect(select).toBeGreaterThan(field)
   })
 
   it('全型の名前と用途の一覧を残す', () => {

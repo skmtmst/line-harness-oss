@@ -627,11 +627,11 @@
       },
       "declarations": [
         {
-          "pencil": "nBRKk/uzNEC height: 36",
-          "class": "button",
+          "pencil": "nBRKk/uzNEC height: 36 → #976 U083 でPC標準40pxへ（入力・検索・選択と同一）",
+          "class": "standard",
           "prop": "height",
-          "source": "36px",
-          "resolved": "36px"
+          "source": "40px",
+          "resolved": "40px"
         },
         {
           "pencil": "nBRKk/uzNEC padding: [9, 13]",
@@ -662,11 +662,11 @@
           "resolved": "8px"
         },
         {
-          "pencil": "nBRKk/uzNEC fontSize: $size-label",
+          "pencil": "nBRKk/uzNEC fontSize: $size-label → #976 U079 で $size-body(14px) へ",
           "class": "button",
           "prop": "font-size",
-          "source": "var(--text-label)",
-          "resolved": "13px"
+          "source": "var(--text-body)",
+          "resolved": "14px"
         },
         {
           "pencil": "nBRKk/uzNEC fontWeight: 600",
@@ -716,6 +716,27 @@
           "prop": "color",
           "source": "var(--color-ink)",
           "resolved": "#1d1d1f"
+        },
+        {
+          "pencil": "#976 U077/U084 危険操作 fill: $danger（$status-danger では白文字が 3.4:1 に届かない）",
+          "class": "danger",
+          "prop": "background",
+          "source": "var(--color-danger)",
+          "resolved": "#b3261e"
+        },
+        {
+          "pencil": "#976 U077/U084 危険操作 stroke: $danger",
+          "class": "danger",
+          "prop": "border-color",
+          "source": "var(--color-danger)",
+          "resolved": "#b3261e"
+        },
+        {
+          "pencil": "#976 U077/U084 危険操作ラベル fill: $on-accent",
+          "class": "danger",
+          "prop": "color",
+          "source": "var(--color-on-accent)",
+          "resolved": "#ffffff"
         }
       ]
     },
@@ -1380,18 +1401,18 @@
           "resolved": "500"
         },
         {
-          "pencil": "VPn1F stroke: $accent / bottom 2",
+          "pencil": "VPn1F stroke: $accent / bottom 2（白地の文字・線なので $accent-deep。#976 U084）",
           "class": "selected",
           "prop": "border-bottom-color",
-          "source": "var(--color-accent)",
-          "resolved": "#06c755"
+          "source": "var(--color-accent-deep)",
+          "resolved": "#087a3e"
         },
         {
-          "pencil": "VPn1F fill: $accent",
+          "pencil": "VPn1F fill: $accent（白地の文字・線なので $accent-deep。#976 U084）",
           "class": "selected",
           "prop": "color",
-          "source": "var(--color-accent)",
-          "resolved": "#06c755"
+          "source": "var(--color-accent-deep)",
+          "resolved": "#087a3e"
         },
         {
           "pencil": "VPn1F fontWeight: 700",
@@ -1929,11 +1950,11 @@
           "resolved": "#1d1d1f"
         },
         {
-          "pencil": "ytG7l/keKe3 fontSize: $size-label",
+          "pencil": "ytG7l/keKe3 fontSize: $size-label → #976 U079 で $size-body(14px) へ",
           "class": "control",
           "prop": "font-size",
-          "source": "var(--text-label)",
-          "resolved": "13px"
+          "source": "var(--text-body)",
+          "resolved": "14px"
         },
         {
           "pencil": "ytG7l height: 40",
@@ -2022,11 +2043,11 @@
           "resolved": "flex"
         },
         {
-          "pencil": "phlR1 height: 42",
+          "pencil": "phlR1 height: 42 → #976 U083 で入力欄と同じ40pxへ",
           "class": "search",
           "prop": "height",
-          "source": "42px",
-          "resolved": "42px"
+          "source": "40px",
+          "resolved": "40px"
         },
         {
           "pencil": "phlR1 alignItems: center",
@@ -2099,11 +2120,11 @@
           "resolved": "#1d1d1f"
         },
         {
-          "pencil": "phlR1 fontSize: $size-caption",
+          "pencil": "phlR1 fontSize: $size-caption → #976 U079 で $size-body(14px) へ",
           "class": "input",
           "prop": "font-size",
-          "source": "var(--text-caption)",
-          "resolved": "12px"
+          "source": "var(--text-body)",
+          "resolved": "14px"
         }
       ]
     },
@@ -2161,11 +2182,11 @@
           "resolved": "128px"
         },
         {
-          "pencil": "rpot9 height: 42",
+          "pencil": "rpot9 height: 42 → #976 U083 で入力欄と同じ40pxへ",
           "class": "trigger",
           "prop": "height",
-          "source": "42px",
-          "resolved": "42px"
+          "source": "40px",
+          "resolved": "40px"
         },
         {
           "pencil": "rpot9 padding: [0,13]",
@@ -2196,11 +2217,11 @@
           "resolved": "#ffffff"
         },
         {
-          "pencil": "rpot9 fontSize: $size-label",
+          "pencil": "rpot9 fontSize: $size-label → #976 U079 で $size-body(14px) へ",
           "class": "trigger",
           "prop": "font-size",
-          "source": "var(--text-label)",
-          "resolved": "13px"
+          "source": "var(--text-body)",
+          "resolved": "14px"
         },
         {
           "pencil": "rpot9 fontWeight: 600",
@@ -2287,11 +2308,11 @@
           "resolved": "0 13px"
         },
         {
-          "pencil": "Gfsb4 option fontSize: $size-label",
+          "pencil": "Gfsb4 option fontSize: $size-label → #976 U079 で $size-body(14px) へ",
           "class": "option",
           "prop": "font-size",
-          "source": "var(--text-label)",
-          "resolved": "13px"
+          "source": "var(--text-body)",
+          "resolved": "14px"
         },
         {
           "pencil": "Gfsb4 option fontWeight: 500",
@@ -2599,27 +2620,6 @@
           "prop": "min-width",
           "source": "112px",
           "resolved": "112px"
-        },
-        {
-          "pencil": "J6x4Q button height: 38",
-          "class": "button",
-          "prop": "min-height",
-          "source": "38px",
-          "resolved": "38px"
-        },
-        {
-          "pencil": "J6x4Q button cornerRadius: $radius-sm",
-          "class": "button",
-          "prop": "border-radius",
-          "source": "var(--radius-control)",
-          "resolved": "8px"
-        },
-        {
-          "pencil": "J6x4Q button fontSize: $size-caption",
-          "class": "button",
-          "prop": "font-size",
-          "source": "var(--text-caption)",
-          "resolved": "12px"
         },
         {
           "pencil": "H2S1T4 fill: $status-danger-soft",

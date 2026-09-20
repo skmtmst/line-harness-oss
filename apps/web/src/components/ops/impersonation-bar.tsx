@@ -8,6 +8,7 @@ import { opsCall } from '@/components/ops/ops-ui'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import NoteBar from '@/components/shared/note-bar'
 import { TextArea } from '@/components/shared/text-field'
+import { RequiredBadge } from '@/components/shared/form-controls'
 
 /**
  * 代理ログイン帯（★V6 37 共通 `WXp5T`）。代理ログイン中は全画面の上に常時出す。
@@ -164,7 +165,7 @@ function ReasonDialog({
     >
       <div className="flex flex-col gap-3">
         <label className="block">
-          <span className="mb-1.5 block text-caption font-bold text-ink">理由（必須・4文字以上）</span>
+          <span className="mb-1.5 block text-caption font-bold text-ink">理由<RequiredBadge /><span className="font-normal text-ink-faint">（4文字以上）</span></span>
           <TextArea
             value={reason}
             onChange={(event) => setReason(event.target.value)}

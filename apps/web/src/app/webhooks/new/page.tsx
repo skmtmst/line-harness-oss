@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { EC_EVENT_TYPES, ecEventLabel } from '@line-crm/shared'
 import { api } from '@/lib/api'
 import CreatePage, { Field, inputClass } from '@/components/shared/create-page'
+import { RequiredBadge } from '@/components/shared/form-controls'
 import { useAccount } from '@/contexts/account-context'
 import { MIN_SECRET_LENGTH, generateSecret } from '../secret'
 
@@ -135,7 +136,7 @@ export default function NewWebhookPage() {
       {/* #975 U067: イベントコードのCSV手入力をやめ、チェックで選ぶ。 */}
       <fieldset className="space-y-3">
         <legend className="text-ink-secondary text-xs font-bold">
-          送るイベント<span className="text-status-danger ml-1">必須</span>
+          送るイベント<RequiredBadge />
         </legend>
         <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="送るイベントの決め方">
           <label className="border-hairline flex min-h-9 cursor-pointer items-center gap-2 rounded-control border px-3 py-2 text-sm font-semibold text-ink">

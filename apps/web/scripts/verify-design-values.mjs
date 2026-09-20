@@ -44,8 +44,45 @@ export function normalize(value) {
 
 const stripComments = (css) => css.replace(/\/\*[\s\S]*?\*\//g, '')
 
+/*
+ * `@media`・`@container`・`@scope`・`@keyframes` の中身を取り除く。
+ *
+ * これらは別の状態（タッチ端末・狭い画面）の宣言で、hover と同じく
+ * 基準状態ではない。#976 でタッチ端末向けの `@media (pointer: coarse)`
+ * （高さ44px・文字16px）が部品に入ったとき、内側の宣言が基準状態の
+ * 値として拾われて「不一致」になった。`@layer`/`@supports` は中身が
+ * 基準状態の宣言そのものを持つことがあるので残す。
+ */
+function stripConditionalBlocks(css) {
+  const re = /@(media|container|scope|keyframes)\b/gi
+  let out = ''
+  let last = 0
+  let m
+  while ((m = re.exec(css))) {
+    const open = css.indexOf('{', m.index)
+    if (open === -1) break
+    out += css.slice(last, m.index)
+    let depth = 0
+    let j = open
+    for (; j < css.length; j++) {
+      if (css[j] === '{') depth++
+      else if (css[j] === '}') {
+        depth--
+        if (depth === 0) {
+          j++
+          break
+        }
+      }
+    }
+    last = j
+    re.lastIndex = j
+  }
+  return out + css.slice(last)
+}
+
 /** `.card{...}` の中身を取り出す。クラス名は完全一致。 */
 function ruleBody(css, selector) {
+  css = stripConditionalBlocks(css)
   const re = new RegExp(`\\.${selector}\\s*\\{([^}]*)\\}`, 'g')
   const bodies = []
   let m
@@ -62,8 +99,10 @@ function ruleBody(css, selector) {
  * 「宣言なし」と誤判定するため、カンマ区切りのセレクタも読む。
  */
 export function builtRuleBody(css, prefix, cls) {
-  const escaped = `${prefix}_${cls}__`.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
   // hover・[hidden]・子孫指定は別状態なので、基準状態の完全一致だけを拾う。
+  // @media などの条件付きブロックも同じ理由で先に除く。
+  css = stripConditionalBlocks(css)
+  const escaped = `${prefix}_${cls}__`.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
   const target = new RegExp(`^\\.${escaped}[A-Za-z0-9_-]+$`)
   const re = /([^{}]+)\{([^{}]*)\}/g
   const bodies = []

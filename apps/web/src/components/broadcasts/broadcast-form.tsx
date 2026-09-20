@@ -55,6 +55,7 @@ import CarouselPicker, {
 } from '@/components/scenarios/carousel-picker'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Button from '@/components/shared/button'
+import { RequiredBadge } from '@/components/shared/form-controls'
 import BroadcastStepRail from '@/components/broadcasts/broadcast-step-rail'
 import { broadcastSteps, type BroadcastStepKey } from '@/components/broadcasts/broadcast-steps'
 import { usePageTitle } from '@/components/shell/page-chrome'
@@ -1195,7 +1196,7 @@ export default function BroadcastForm({
           <div className="broadcast-basic-fields grid gap-4">
             <label className="block">
               <span className="flex flex-wrap items-baseline justify-between gap-2">
-                <span className="text-ink text-sm font-bold">配信名 <span className="ml-1 rounded bg-danger-bg px-1.5 py-0.5 text-xs text-danger">必須</span></span>
+                <span className="text-ink text-sm font-bold">配信名<RequiredBadge /></span>
                 {/* 設計 `zZ9fA` の「14 / 60文字」。上限に当たってから気づくと書き直しになる。 */}
                 <span className={`text-xs tabular-nums ${title.trim().length > TITLE_MAX ? 'text-danger' : 'text-ink-faint'}`}>
                   {title.trim().length} / {TITLE_MAX}文字

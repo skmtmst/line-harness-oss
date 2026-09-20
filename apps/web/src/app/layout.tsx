@@ -32,7 +32,8 @@ export default function RootLayout({
 }) {
   return (
     <html lang="ja">
-      <body className="bg-canvas-sunken text-ink antialiased" style={{ fontFamily: "'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', system-ui, sans-serif" }}>
+      {/* 書体は globals.css の --font-sans が正本（#976 U080）。inline style はやめる。 */}
+      <body className="bg-canvas-sunken text-ink antialiased font-sans">
         <ClientErrorReporter />
         <BrandTitle />
         <AppShell>

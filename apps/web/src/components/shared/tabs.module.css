@@ -63,10 +63,12 @@
   opacity: 0.45;
 }
 
-/* VPn1F 共通 ページ内タブ項目（選択中） */
+/* VPn1F 共通 ページ内タブ項目（選択中）
+ * #976 U084: 文字色は `$accent`(#06c755、白地で2.26:1) から
+ * `$accent-deep`(#087a3e、5.44:1) へ。下線も同じ色で揃える。 */
 .current {
-  border-bottom-color: var(--color-accent); /* stroke: $accent */
-  color: var(--color-accent); /* fill: $accent */
+  border-bottom-color: var(--color-accent-deep);
+  color: var(--color-accent-deep);
   font-weight: 700; /* fontWeight: 700 */
   cursor: default;
 }
@@ -80,5 +82,5 @@
 }
 
 .current .count {
-  color: var(--color-accent);
+  color: var(--color-accent-deep);
 }
