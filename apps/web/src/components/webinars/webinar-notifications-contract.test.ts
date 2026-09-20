@@ -94,9 +94,13 @@ describe('読めなかったとき', () => {
 
 describe('編集画面の STEP 4', () => {
   it('段の中身が「まだ繋がっていません」から実物へ変わった', () => {
-    expect(EDIT).toContain('<NotificationDesignStep webinarId={webinar.id} registrations={registrations} />')
+    /* 段は畳まず隠すので、未保存の印と保存操作を親の固定バーへ渡す口がある。 */
+    expect(EDIT).toContain('<NotificationDesignStep webinarId={webinar.id}')
+    expect(EDIT).toContain('onDirtyChange={dirtyReporterFor')
+    expect(EDIT).toContain('registerSave={saveRegistrarFor')
     /* 取得は子の編集タブに一本化し、親は報告を受ける。同じ口を2回叩かない。 */
-    expect(EDIT).toContain('<WebinarNotifications key={notifAttempt} webinarId={webinarId} onLoaded={handleNotificationsLoaded} />')
+    expect(EDIT).toContain('onLoaded={handleNotificationsLoaded}')
+    expect(EDIT).toContain('<WebinarNotifications key={notifAttempt} webinarId={webinarId}')
     expect(EDIT).not.toContain('webinarApi.notifications(webinarId)')
     expect(STEPS, '未接続の印が残っている').not.toContain("notConnected: '通知・リマインドの設定'")
   })
