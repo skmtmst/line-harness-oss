@@ -363,28 +363,41 @@ function AnalyticsReportFormPage() {
 
           <section className="border-hairline bg-canvas rounded-card border p-6">
             <h2 className="mb-4 text-lg font-semibold">だれに送りますか</h2>
-            <div className="flex flex-wrap gap-2">
-              {options.recipients.map((person) => (
-                <label className="border-hairline rounded-pill flex items-center gap-2 border px-3 py-2" key={person.id}>
-                  <input className="accent-accent size-4" type="checkbox" checked={staffIds.includes(person.id)} onChange={() => setStaffIds((current) => current.includes(person.id) ? current.filter((id) => id !== person.id) : [...current, person.id])} />
-                  <strong className="text-xs">{person.name}</strong>
-                  <span className="text-ink-secondary text-xs">ログインユーザー ／ {ROLE_LABEL[person.role]}</span>
-                </label>
-              ))}
+            {/*
+             * #975 U064: 長い氏名・役割を細いチップに押し込まない。
+             * 390pxでも誰を選んだか分かるよう、1人1行の行リストにする。
+             */}
+            <ul className="border-hairline divide-hairline divide-y rounded-card border" aria-label="レポートを受け取る人">
+              {options.recipients.map((person) => {
+                const checked = staffIds.includes(person.id)
+                return (
+                  <li key={person.id}>
+                    <label className={`flex min-h-11 cursor-pointer items-start gap-3 px-4 py-2.5 ${checked ? 'bg-accent-soft' : ''}`}>
+                      <input className="accent-accent mt-1 size-4 shrink-0" type="checkbox" checked={checked} onChange={() => setStaffIds((current) => current.includes(person.id) ? current.filter((id) => id !== person.id) : [...current, person.id])} />
+                      <span className="min-w-0">
+                        <strong className="text-ink block truncate text-sm" title={person.name}>{person.name}</strong>
+                        <span className="text-ink-secondary block text-xs">ログインユーザー ／ {ROLE_LABEL[person.role]}</span>
+                      </span>
+                    </label>
+                  </li>
+                )
+              })}
               {emails.map((email, index) => (
-                <label className="border-hairline rounded-pill flex items-center gap-2 border px-3 py-1.5 text-xs font-semibold" key={index}>
-                  <span className="whitespace-nowrap">メールだけ</span>
-                  <input
-                    className="text-ink bg-transparent text-xs outline-none"
-                    type="email"
-                    value={email}
-                    onChange={(event) => setEmails((current) => current.map((item, itemIndex) => itemIndex === index ? event.target.value : item))}
-                    placeholder="report@example.com"
-                  />
-                </label>
+                <li key={index}>
+                  <label className="flex min-h-11 items-center gap-3 px-4 py-2.5">
+                    <span className="text-ink-secondary shrink-0 text-xs font-semibold">メールだけ</span>
+                    <input
+                      className="text-ink min-w-0 flex-1 bg-transparent text-sm outline-none"
+                      type="email"
+                      value={email}
+                      onChange={(event) => setEmails((current) => current.map((item, itemIndex) => itemIndex === index ? event.target.value : item))}
+                      placeholder="report@example.com"
+                    />
+                  </label>
+                </li>
               ))}
-              <Button variant="secondary" onClick={() => setEmails((current) => [...current, ''])}>宛先を足す</Button>
-            </div>
+            </ul>
+            <div className="mt-2"><Button variant="secondary" onClick={() => setEmails((current) => [...current, ''])}>宛先を足す</Button></div>
             {!hasRecipient && <p className="text-ink-secondary mt-3 text-xs">受け取る人を1人以上選んでください。選ぶまで作れません。</p>}
             <label className="border-hairline mt-5 flex items-start gap-3 border-t pt-4">
               <input className="accent-accent mt-0.5 size-5" type="checkbox" checked={lineEnabled} onChange={(event) => setLineEnabled(event.target.checked)} />

@@ -88,15 +88,24 @@ export default function NewInflowLinkPage() {
 
   const validRef = REF_PATTERN.test(refCode)
   const workerBase = (process.env.NEXT_PUBLIC_API_URL ?? '').replace(/\/$/, '')
-  const issuedUrl = `${workerBase}/r/${refCode || 'summer-ig'}`
+  /*
+   * #975 U065: REFが未入力でも「/r/summer-ig」を出すと発行済みに見える。
+   * 見本URLはREFが決まったときだけ作り、空欄では例示の文字だけを出す。
+   */
+  const previewUrl = validRef ? `${workerBase}/r/${refCode}` : ''
   // #514-7: 短縮 URL(/s/xxxx)は Worker に経路が無い。開けない URL を
   // 印刷物・SMS に載せないよう、表示しない。
   useEffect(() => {
+    // #975 U065: 未入力のQRを作らない。見本QRは「保存前の見本」と分かるURLだけ。
+    if (!previewUrl) {
+      setQrDataUrl('')
+      return
+    }
     // キー入力ごとに作り直すと、遅れて届いた古い QR が表示とずれて残る。
     // 少し待ってから作り、古い解決は捨てる。
     let stale = false
     const timer = window.setTimeout(() => {
-      void QRCode.toDataURL(issuedUrl, { width: 180, margin: 1, color: { dark: '#171717', light: '#ffffff' } }).then((url) => {
+      void QRCode.toDataURL(previewUrl, { width: 180, margin: 1, color: { dark: '#171717', light: '#ffffff' } }).then((url) => {
         if (!stale) setQrDataUrl(url)
       })
     }, 250)
@@ -104,7 +113,7 @@ export default function NewInflowLinkPage() {
       stale = true
       window.clearTimeout(timer)
     }
-  }, [issuedUrl])
+  }, [previewUrl])
 
   return (
     <CreatePage
@@ -202,16 +211,32 @@ export default function NewInflowLinkPage() {
 
       <FormSection step={2} label="発行されるURL">
         <p className="text-xs text-ink-faint">紙にはQRコード、Webにはリンクを使ってください。</p>
-        <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-4">
-          <div className="space-y-2 sm:col-span-3">
-            <div className="rounded-control border border-hairline bg-canvas-sunken px-3 py-3 text-sm text-ink-secondary"><span className="font-semibold">{issuedUrl}</span></div>
+        {previewUrl ? (
+          <div className="mt-3">
+            {/* #975 U065: 保存前は「未発行の見本」と明記する。 */}
+            <p className="inline-flex items-center rounded-pill border border-hairline bg-canvas-sunken px-3 py-1 text-xs font-bold text-ink-secondary">
+              保存前の見本 — まだ発行されていません
+            </p>
+            <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-4">
+              <div className="space-y-2 sm:col-span-3">
+                <div className="rounded-control border border-hairline bg-canvas-sunken px-3 py-3 text-sm text-ink-secondary"><span className="font-semibold">{previewUrl}</span></div>
+                <p className="text-xs text-ink-faint">「発行してURLを受け取る」を押すと、このURLが使えるようになります。押す前に配ると開けません。</p>
+              </div>
+              <div className="text-center">
+                {/* eslint-disable-next-line @next/next/no-img-element -- Workerが撮影用QRを生成する */}
+                {qrDataUrl && <img src={qrDataUrl} alt="発行されるURLのQRコード（保存前の見本）" className="mx-auto h-24 w-24 rounded-control border border-hairline bg-canvas p-1" />}
+                <span className="mt-1 block text-xs text-ink-faint">見本のQR — 保存後に画像で保存できます</span>
+              </div>
+            </div>
           </div>
-          <div className="text-center">
-            {/* eslint-disable-next-line @next/next/no-img-element -- Workerが撮影用QRを生成する */}
-            {qrDataUrl && <img src={qrDataUrl} alt="発行されるURLのQRコード" className="mx-auto h-24 w-24 rounded-control border border-hairline bg-canvas p-1" />}
-            <span className="mt-1 block text-xs text-ink-faint">画像で保存</span>
+        ) : (
+          <div className="mt-3">
+            <div className="rounded-control border border-dashed border-hairline bg-canvas-sunken px-3 py-3 text-sm text-ink-faint">
+              <span className="font-semibold">例: {workerBase}/r/summer-ig</span>
+            </div>
+            <p className="mt-2 text-xs text-ink-faint">まだ発行されていません。上の「REF」を決めると、発行されるURLとQRコードの見本がここに出ます。例のURLは実際には開けないので配らないでください。</p>
           </div>
-        </div>
+        )}
       </FormSection>
 
       <FormSection step={3} label="この経路から友だちになったときにすること" note="設定しないと、ふつうの友だち追加と同じ扱いになります。">
