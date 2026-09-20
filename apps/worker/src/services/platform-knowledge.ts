@@ -78,6 +78,12 @@ export function validateKnowledgeEvidence(value: unknown, sources: KnowledgeSour
     evidence.push({ messageId: source.id, createdAt: source.at, authorKind: source.author, quote: row.quote, role: row.role });
   }
   if (lastAction < 0 || firstResult === sources.length || firstResult <= lastAction) return null;
+  // created_at ties are sorted by random UUID in the conversation query, not
+  // by causal order. Unknown/equal timestamps must never prove resolution.
+  const actionTimes = evidence.filter(item => item.role === 'action').map(item => Date.parse(item.createdAt));
+  const resultTimes = evidence.filter(item => item.role === 'result').map(item => Date.parse(item.createdAt));
+  if ([...actionTimes, ...resultTimes].some(time => !Number.isFinite(time))
+    || Math.max(...actionTimes) >= Math.min(...resultTimes)) return null;
   if (sources.slice(firstResult).some(source => NEGATIVE.test(source.text))) return null;
   return evidence;
 }

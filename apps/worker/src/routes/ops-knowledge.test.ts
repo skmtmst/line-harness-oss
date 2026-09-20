@@ -30,6 +30,10 @@ beforeEach(async () => {
   requestId = ticket.id;
   const first = await addSupportReply(store.db, { requestId, authorStaffId: 'master', authorName: '架空担当者', body: action, aiAssisted: false, deliveredVia: [], nextStage: 'waiting' });
   const last = await addSupportTenantMessage(store.db, { requestId, staffId: 'tenant-owner', staffName: '架空担当者', body: result, attachmentKeys: [] });
+  // Separate real conversation events explicitly; wall-clock speed and random
+  // UUID ordering must not decide whether this fixture has a confirmed result.
+  store.raw.prepare('UPDATE hq_support_messages SET created_at = ? WHERE id = ?').run('2026-09-19T10:00:00.000+09:00', first.id);
+  store.raw.prepare('UPDATE hq_support_messages SET created_at = ? WHERE id = ?').run('2026-09-19T10:01:00.000+09:00', last.id);
   await updateSupportTicket(store.db, requestId, { stage: 'resolved' });
   run = vi.fn().mockResolvedValue({ response: JSON.stringify({ decision: 'confirmed', title: '配信対象の確認', question: '配信対象を直すには', keywords: ['配信'], evidence: [
     { messageId: first.id, quote: action, role: 'action' }, { messageId: last.id, quote: result, role: 'result' },
@@ -38,6 +42,12 @@ beforeEach(async () => {
 afterEach(() => store.raw.close());
 
 describe('運営専用ナレッジ（実SQLite・AIはモック）', () => {
+  it('同時刻の会話はUUIDの並びで解決済みと判断せず要確認にする', async () => {
+    store.raw.prepare('UPDATE hq_support_messages SET created_at = ? WHERE request_id = ?').run('2026-09-19T10:00:00.000+09:00', requestId);
+    await processKnowledgeJob(environment());
+    expect((await knowledgeForTicket(store.db, requestId)).article).toMatchObject({ review_state: 'needs_review', answer: '' });
+    expect(await searchKnowledge(store.db, 'usage', '配信', [])).toEqual([]);
+  });
   it('自動下書き→確認→承認で初めて検索され、編集で承認が失効する', async () => {
     await processKnowledgeJob(environment());
     const article = (await knowledgeForTicket(store.db, requestId)).article!;

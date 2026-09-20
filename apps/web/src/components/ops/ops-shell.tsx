@@ -128,10 +128,16 @@ export default function OpsShell({ children }: { children: ReactNode }) {
   // the sidebar. Existing authentication and account-menu behavior is unchanged.
   if (pathname === '/ops/knowledge') return (
     <div className="flex min-h-svh bg-canvas-sunken" data-design-node="jIZP0">
-      <OpsSidebar me={me} pathname={pathname} />
+      <OpsSidebar me={me} pathname={pathname} open={navOpen} onClose={() => setNavOpen(false)} />
       <main className="min-w-0 flex-1">
         <OpsEnvBar />
         {me.impersonation ? <ImpersonationBar initial={me.impersonation} onChange={() => void load()} /> : null}
+        <div className="flex h-12 items-center border-b border-hairline bg-canvas px-4 xl:hidden">
+          <button type="button" aria-expanded={navOpen} onClick={() => setNavOpen(true)}
+            className="flex min-h-11 items-center gap-2 rounded-md px-2 text-label font-bold text-ink hover:bg-canvas-sunken">
+            <Menu aria-hidden="true" className="h-5 w-5" />メニュー
+          </button>
+        </div>
         <TopBar title="ナレッジ" accounts={[]} selectedAccountId="" onAccountChange={() => {}} showAccountSwitcher={false}
           roleLabel="運営" userName={me.name} onLogout={() => logoutAndGoToLogin('/ops/login')} />
         <div className="px-10 pb-8 pt-3.5">{children}</div>
