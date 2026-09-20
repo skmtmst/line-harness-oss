@@ -15,6 +15,16 @@ const REPO = join(HERE, '..', '..', '..', '..', '..')
 const PAGE = readFileSync(join(HERE, 'page.tsx'), 'utf8')
 const CSS = readFileSync(join(HERE, 'customer-notifications.module.css'), 'utf8')
 
+/**
+ * 注釈を落とした page.tsx。「なぜ消したか」を書いた文が、消したはずの
+ * 字面（例:「自分にテスト送信」）に当たるのを避ける
+ * （notification-event-words-contract.test.ts と同じやり方）。
+ */
+const CODE = PAGE
+  .replace(/\{\/\*[\s\S]*?\*\/\}/g, '')
+  .replace(/\/\*[\s\S]*?\*\//g, '')
+  .replace(/^\s*\/\/.*$/gm, '')
+
 describe('V6 顧客へのお知らせの寸法', () => {
   it('種類の絞り込みは 高さ40 / 角丸8 / 13px / 700', () => {
     expect(CSS).toMatch(/\.category\s*\{[^}]*height: 40px;/)
@@ -126,6 +136,40 @@ describe('V6 顧客へのお知らせの寸法', () => {
     expect(PAGE).toContain("guard.forAccountId !== guard.currentAccountId()")
     expect(PAGE).toContain('currentAccountId: () => selectedAccountRef.current')
     expect(PAGE).toContain("forAccountId: selectedAccountId ?? ''")
+  })
+
+  it('#988 NEXT-05: テスト送信は「テスト受信者に送信」と名付け、宛先を見せる確認を挟む', () => {
+    expect(CODE).toContain('テスト受信者に送信')
+    expect(CODE).not.toContain('自分にテスト送信')
+    // 宛先は登録済みのテスト受信者。開いただけでは送らず、0人・失敗では送信不可。
+    expect(CODE).toContain('api.accountSettings.getTestRecipients(accountId)')
+    expect(CODE).toContain("onConfirm={testRecipients.state === 'ready' && testRecipients.items.length > 0 ? confirmTestSend : undefined}")
+    expect(CODE).toContain('お客さま全員への一斉配信ではありません')
+  })
+
+  it('#988 NEXT-06: 条件説明はイベント別の文で、一斉配信と誤解する表現を置かない', () => {
+    // 表示名を文へそのまま繋いだ壊れた結合へ戻さない。
+    expect(CODE).not.toContain('setting.label}らすぐ')
+    expect(CODE).not.toContain('setting.label}とき')
+    expect(CODE).not.toContain('全員に送る')
+    expect(CODE).not.toContain('送らない相手')
+    // 宛先はその出来事に関わるお客さまだけ。
+    expect(CODE).toContain('その注文のお客さまだけ')
+    expect(CODE).toContain('その定期便のお客さまだけ')
+    expect(CODE).toContain('注文が確定したとき')
+    expect(CODE).toContain('定期便の決済に失敗したとき')
+    // 見本は架空と明記し、実在の人物名を宛先のように見せない。
+    expect(CODE).toContain('架空の注文による表示例')
+    expect(CODE).not.toContain('高橋 直人')
+  })
+
+  it('#988 LAY-10拡張: つながる先はリンク色の p ではなく実リンク', () => {
+    expect(CODE).toContain('<Link href="/ec-commerce"')
+    expect(CODE).toContain('<Link href="/contents/vars"')
+    expect(CODE).toContain('<Link href="/chats"')
+    expect(CODE).toContain('<Link href="/nen-campaigns"')
+    expect(CODE).toContain('<Link href="/webhooks"')
+    expect(CODE).not.toContain('text-accent"><p>EC連携</p>')
   })
 
   it('端末の控えと未保存の印は、送った文面がそのまま画面に残っているときだけ片づける', () => {
