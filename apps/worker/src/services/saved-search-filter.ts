@@ -73,18 +73,47 @@ function compileCondition(condition: SavedSearchCondition): CompiledCondition | 
 
     case 'field': {
       const key = text(condition.key);
-      if (!key || !value) return '友だち情報の条件に項目または値がありません';
-      if (condition.op === 'eq') {
-        return { sql: `json_extract(f.metadata, '$.' || ?) = ?`, binds: [key, value] };
+      if (!key) return '友だち情報の条件に項目がありません';
+      const expr = `json_extract(f.metadata, '$.' || ?)`;
+      /*
+        「登録あり／なし」は値を取らない。先にここへ逃がさないと、
+        値なしで保存した条件が「値がありません」で止まる。
+      */
+      if (condition.op === 'exists') {
+        return { sql: `(${expr} IS NOT NULL AND ${expr} != '')`, binds: [key, key] };
       }
-      if (condition.op === 'ne') {
+      if (condition.op === 'not_exists') {
+        return { sql: `(${expr} IS NULL OR ${expr} = '')`, binds: [key, key] };
+      }
+      if (!value) return '友だち情報の条件に値がありません';
+      if (condition.op === 'eq' || condition.op === 'equals') {
+        return { sql: `${expr} = ?`, binds: [key, value] };
+      }
+      if (condition.op === 'ne' || condition.op === 'not_equals') {
         return {
-          sql: `(json_extract(f.metadata, '$.' || ?) IS NULL OR json_extract(f.metadata, '$.' || ?) != ?)`,
+          sql: `(${expr} IS NULL OR ${expr} != ?)`,
           binds: [key, key, value],
         };
       }
       if (condition.op === 'contains') {
-        return { sql: `json_extract(f.metadata, '$.' || ?) LIKE ?`, binds: [key, `%${value}%`] };
+        return { sql: `${expr} LIKE ?`, binds: [key, `%${value}%`] };
+      }
+      if (condition.op === 'not_contains') {
+        return { sql: `(${expr} IS NULL OR ${expr} NOT LIKE ?)`, binds: [key, key, `%${value}%`] };
+      }
+      /*
+        数値・日付・日時の大小比較。値が数値として読めるときは
+        CAST して数値比較する（TEXT のままだと "10" < "9" になる）。
+        ISO形式の日付・日時は文字列のまま大小比較できるので、
+        数値に読めない値は文字列比較へ回す（ATTR-13）。
+      */
+      const orderedOps: Record<string, string> = { gte: '>=', gt: '>', lte: '<=', lt: '<' };
+      const ordered = orderedOps[condition.op];
+      if (ordered) {
+        const numeric = Number(value);
+        return Number.isFinite(numeric)
+          ? { sql: `CAST(${expr} AS REAL) ${ordered} ?`, binds: [key, numeric] }
+          : { sql: `${expr} ${ordered} ?`, binds: [key, value] };
       }
       return '友だち情報で使えない比較方法が指定されています';
     }
