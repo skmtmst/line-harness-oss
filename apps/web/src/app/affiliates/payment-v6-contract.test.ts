@@ -60,9 +60,22 @@ describe('V6 支払いの追記台帳契約', () => {
     expect(DIALOGS).toContain('periodTo ?? preview.closeDate')
     expect(DIALOGS).toContain('settlement?.bankProfileRegistered')
     expect(DIALOGS).toContain('api.affiliates.createStatement')
-    expect(DIALOGS).toContain('確定したことを、この方のLINEに知らせる')
-    expect(DIALOGS).toContain('支払明細のPDFを作る')
+    /*
+      NEXT-22: 明細作成とLINE通知は createStatement 1本の処理で分けられない。
+      連動する2つのチェックは1つへまとめ、飾りのチェックマークは実状態に
+      連動させる（OFFでもONに見える表示を残さない）。
+    */
+    expect(DIALOGS).toContain('支払明細を作成して、この方のLINEに知らせる')
+    expect((DIALOGS.match(/type="checkbox"/g) ?? []).length).toBe(1)
+    expect(DIALOGS).toContain('{issueStatement ? <Check size={12} /> : null}')
     expect(DIALOGS).toContain('支払いは確定しましたが、支払明細とLINE通知を作れませんでした')
+    /*
+      NEXT-23: プレビューが返さない却下件数・除外金額を固定値で補わない。
+      無反応の「直す」は置かず、本人への依頼導線にする。
+    */
+    expect(DIALOGS).not.toContain('却下した2件')
+    expect(DIALOGS).not.toContain('>直す<')
+    expect(DIALOGS).toContain('本人にLINEで依頼する')
   })
 
   it('読込・通常・空・失敗を分け、失敗を0円にしない', () => {

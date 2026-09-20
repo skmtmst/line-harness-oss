@@ -106,4 +106,16 @@ describe('V6 自動応答一覧の契約', () => {
     expect(PUBLISH).toContain('conflicts.map((conflict, index)')
     expect(PUBLISH).toContain('LINEプレビュー')
   })
+
+  it('有効化完了の一時停止と複製を実口へ接続する（NEXT-20）', () => {
+    // 停止は一覧と同じ共通の確認窓と専用の停止口へ繋ぐ。
+    expect(PUBLISH).toContain("import ConfirmDialog from '@/components/shared/confirm-dialog'")
+    expect(PUBLISH).toContain('api.autoReplies.stop(')
+    expect(PUBLISH).toContain('crypto.randomUUID()')
+    // 複製は対象の設定を写した新しい下書きを作って編集画面へ進む。
+    expect(PUBLISH).toContain('api.autoReplies.createDraft(')
+    expect(PUBLISH).toContain('（複製）')
+    // onClick/href の無い飾りボタンを残さない。
+    expect(PUBLISH).not.toContain('<Button><PauseCircle')
+  })
 })

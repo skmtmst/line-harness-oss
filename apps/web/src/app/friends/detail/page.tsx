@@ -2,15 +2,24 @@
 
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
-import { useSearchParams } from 'next/navigation'
-import type { Chat, FriendField } from '@line-crm/shared'
-import { api, ApiError, type FriendDetail, type MileageSummary } from '@/lib/api'
+import { useRouter, useSearchParams } from 'next/navigation'
+import type { ApiResponse, Chat, FriendField, Scenario } from '@line-crm/shared'
+import {
+  api,
+  ApiError,
+  fetchApi,
+  type FriendDetail,
+  type MileageConnectedAccount,
+  type MileageSelfInsights,
+  type MileageSummary,
+} from '@/lib/api'
 import { canEditFeature, isOwnerOrAdmin } from '@/lib/staff-capability'
 import { useAccount } from '@/contexts/account-context'
 import { useFeatureVisibility } from '@/lib/use-feature-visibility'
 import { FeatureDisabledScreen } from '@/components/feature-disabled-gate'
 import TagBadge from '@/components/friends/tag-badge'
 import { FIELD_TYPE_LABELS } from '@/components/friend-fields/field-list'
+import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
 import Button from '@/components/shared/button'
 import SelectField from '@/components/shared/select-field'
 import { usePageTitle } from '@/components/shell/page-chrome'
@@ -32,7 +41,7 @@ import { usePageTitle } from '@/components/shell/page-chrome'
  */
 const TABS = [
   { key: 'timeline', label: '概要' },
-  { key: 'history', label: '履歴', pending: '全履歴を取得する仕組みがまだありません。' },
+  { key: 'history', label: '履歴' },
   { key: 'info', label: '情報欄' },
   { key: 'forms', label: '回答フォーム' },
   { key: 'scenario', label: '配信・シナリオ', pending: 'この友だちの配信状況を引く口がまだありません。' },
@@ -61,6 +70,55 @@ const BASIC_GROUP = 'basic'
  */
 function inboxHrefForFriend(friendId: string) {
   return `/chats?friend=${encodeURIComponent(friendId)}`
+}
+
+/**
+ * 友だちの履歴1行（GET /api/friends/:id/timeline の形）。
+ * 対応・配信・予約・フォーム回答・名寄せ・計測イベントを時系列で返す。
+ */
+type FriendTimelineItem = {
+  id: string
+  type: string
+  summary: string
+  occurredAt: string
+  lineAccount: { id: string; name: string | null } | null
+}
+
+/** 補助パネルそれぞれの読み込み状態。0件と取り損ねを分けるために持つ。 */
+type PanelStatus = 'idle' | 'loading' | 'ready' | 'error'
+
+/** 履歴の種別列。知らない種別が来ても落とさず「記録」に倒す。 */
+const TIMELINE_TYPE_LABELS: Record<string, string> = {
+  message_received: 'メッセージ受信',
+  message_sent: 'メッセージ送信',
+  form_submitted: 'フォーム回答',
+  booking: '予約',
+  calendar_booking: 'カレンダー予約',
+  event_booking: 'イベント予約',
+  reminder: 'リマインダ',
+  candidate: '重複候補',
+  link: '名寄せ',
+  unlink: '名寄せ解除',
+  profile: 'プロフィール採用',
+  priority: '名寄せ',
+  migration: 'データ移行',
+}
+
+function timelineTypeLabel(type: string) {
+  return TIMELINE_TYPE_LABELS[type] ?? '記録'
+}
+
+/**
+ * 世代・アカウント照合。別の友だち・アカウントへ切り替わったあとに届いた
+ * 遅い応答を捨てるための判定。ref しか見ないのでコンポーネントの外に置く。
+ */
+function responseIsStale(
+  generationRef: { current: number },
+  accountRef: { current: string | null },
+  generation: number,
+  requestedAccountId: string | null,
+) {
+  return generation !== generationRef.current || requestedAccountId !== accountRef.current
 }
 
 function FieldInput({
@@ -212,9 +270,33 @@ function FriendDetailInner() {
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const [warnings, setWarnings] = useState<string[]>([])
+  /*
+    NEXT-11: マイル・リッチメニュー・情報欄・履歴はそれぞれ独立して読み込む。
+    以前は Promise.all で待ち合わせていたため、遅い補助APIが顧客名の表示まで
+    止めていた。各パネルは自分の状態（loading/ready/error）と再試行口を持つ。
+  */
+  const [fieldsStatus, setFieldsStatus] = useState<PanelStatus>('idle')
   const [mileage, setMileage] = useState<MileageSummary | null>(null)
+  const [mileageInsights, setMileageInsights] = useState<MileageSelfInsights | null>(null)
+  const [mileageConnections, setMileageConnections] = useState<MileageConnectedAccount[]>([])
+  const [mileageStatus, setMileageStatus] = useState<PanelStatus>('idle')
   const [richMenu, setRichMenu] = useState<{ name: string | null; isDefault: boolean } | null>(null)
-  const [richMenuFailed, setRichMenuFailed] = useState(false)
+  const [richMenuStatus, setRichMenuStatus] = useState<PanelStatus>('idle')
+  const [historyItems, setHistoryItems] = useState<FriendTimelineItem[]>([])
+  const [historyStatus, setHistoryStatus] = useState<PanelStatus>('idle')
+  const [historyNextCursor, setHistoryNextCursor] = useState<string | null>(null)
+  const [historyLoadingMore, setHistoryLoadingMore] = useState(false)
+  // 上部のメニュー（NEXT-08）。個別操作＝この友だちへの操作、その他＝関連画面。
+  const [actionMenuOpen, setActionMenuOpen] = useState(false)
+  const [moreMenuOpen, setMoreMenuOpen] = useState(false)
+  // シナリオ登録の選択画面（NEXT-09）。選択→確認→登録までここで完結する。
+  const [scenarioPickerOpen, setScenarioPickerOpen] = useState(false)
+  const [scenarioOptions, setScenarioOptions] = useState<Scenario[]>([])
+  const [scenarioListStatus, setScenarioListStatus] = useState<PanelStatus>('idle')
+  const [scenarioPick, setScenarioPick] = useState('')
+  const [scenarioBusy, setScenarioBusy] = useState(false)
+  const [scenarioError, setScenarioError] = useState('')
+  const [scenarioNotice, setScenarioNotice] = useState('')
   /*
     N-045: PUT /api/friends/:id/fields はオーナー・管理者、または
     attribute.personal_info.edit を持つ staff が個人情報の項目だけ
@@ -242,55 +324,228 @@ function FriendDetailInner() {
   const [supportBusy, setSupportBusy] = useState(false)
   const [supportError, setSupportError] = useState('')
   const [supportNotice, setSupportNotice] = useState('')
+  const router = useRouter()
   // ID切替で遅い返事が新しい画面に残らないよう、世代で捨てる(#496-20。一覧側と同型)。
   const loadRequestRef = useRef(0)
+  // 補助パネルごとの番号。同じパネルの再試行が前の応答を上書きしない。
+  const fieldsReqRef = useRef(0)
+  const mileageReqRef = useRef(0)
+  const richMenuReqRef = useRef(0)
+  const historyReqRef = useRef(0)
+  const scenarioReqRef = useRef(0)
   const group = params.get('group') ?? BASIC_GROUP
   // 情報欄タブは friend_fields の画面。オフのaccountではタブごと出さない。
   const { selectedAccountId } = useAccount()
   const fieldsEnabled = useFeatureVisibility(selectedAccountId).enabled('friend_fields')
   const visibleTabs = fieldsEnabled ? TABS : TABS.filter((t) => t.key !== 'info')
+  /*
+    要求が向かったアカウントを固定し、応答時に現在値と照合する。
+    アカウントを切り替えたあとに届いた古い応答は捨てる（一覧側 #964 と同型）。
+  */
+  const accountContextRef = useRef(selectedAccountId)
+  accountContextRef.current = selectedAccountId
+  /** 世代とアカウントの両方が今の画面と合うときだけ応答を採用する。refのみ読むので安定。 */
+  const isStaleResponse = useCallback(
+    (generation: number, requestedAccountId: string | null) =>
+      responseIsStale(loadRequestRef, accountContextRef, generation, requestedAccountId),
+    [],
+  )
 
-  const load = useCallback(async () => {
+  /*
+   * 本体の取得。顧客名・基本情報・戻る導線はこれだけで出せるので、
+   * 補助パネルの遅延・失敗に巻き込まれないよう独立させる（NEXT-11）。
+   */
+  const loadFriend = useCallback(async () => {
     if (!friendId) {
       setLoading(false)
       return
     }
-    const requestId = ++loadRequestRef.current
+    const generation = loadRequestRef.current
+    const requestedAccountId = selectedAccountId
     setLoading(true)
     setError('')
-    setRichMenuFailed(false)
     try {
-      // マイル・リッチメニュー・フォルダは、取れなくても詳細は出す。
-      const [friendRes, fieldsRes, mileageRes, menuRes] = await Promise.all([
-        api.friends.get(friendId),
-        api.friendFields.forFriend(friendId, { suppressFeatureDisabledEvent: true }).catch(() => null),
-        api.friends.mileage(friendId, 1).catch(() => null),
-        api.friends.richMenu(friendId).catch(() => null),
-      ])
-      if (requestId !== loadRequestRef.current) return
-      if (mileageRes?.success) setMileage(mileageRes.data.summary)
-      // 失敗時と「未設定」は出し分ける。失敗を「既定のメニュー」に倒すと誤表示(#496-13)。
-      if (menuRes?.success) setRichMenu(menuRes.data)
-      else setRichMenuFailed(true)
-      if (friendRes.success) setFriend(friendRes.data)
-      if (fieldsRes?.success) {
-        setFields(fieldsRes.data.items)
-        setHiddenPersonalCount(fieldsRes.data.hiddenPersonalCount)
+      const res = await api.friends.get(friendId)
+      if (isStaleResponse(generation, requestedAccountId)) return
+      if (res.success) setFriend(res.data)
+      else setError(res.error)
+    } catch (err) {
+      if (isStaleResponse(generation, requestedAccountId)) return
+      setFriend(null)
+      setError(err instanceof ApiError && err.status === 404
+        ? '友だちが見つかりませんでした'
+        : '読み込みに失敗しました')
+    } finally {
+      if (!isStaleResponse(generation, requestedAccountId)) setLoading(false)
+    }
+  }, [friendId, selectedAccountId, isStaleResponse])
+
+  const loadFields = useCallback(async () => {
+    if (!friendId) return
+    const generation = loadRequestRef.current
+    const requestedAccountId = selectedAccountId
+    const req = ++fieldsReqRef.current
+    setFieldsStatus('loading')
+    try {
+      const res = await api.friendFields.forFriend(friendId, { suppressFeatureDisabledEvent: true })
+      if (req !== fieldsReqRef.current || isStaleResponse(generation, requestedAccountId)) return
+      if (res.success) {
+        setFields(res.data.items)
+        setHiddenPersonalCount(res.data.hiddenPersonalCount)
         const next: Record<string, string> = {}
-        for (const f of fieldsRes.data.items) next[f.id] = f.value ?? ''
+        for (const f of res.data.items) next[f.id] = f.value ?? ''
         setValues(next)
+        setFieldsStatus('ready')
+      } else {
+        setFieldsStatus('error')
       }
     } catch {
-      if (requestId !== loadRequestRef.current) return
-      setError('読み込みに失敗しました')
-    } finally {
-      if (requestId === loadRequestRef.current) setLoading(false)
+      if (req !== fieldsReqRef.current || isStaleResponse(generation, requestedAccountId)) return
+      setFieldsStatus('error')
     }
-  }, [friendId])
+  }, [friendId, selectedAccountId, isStaleResponse])
+
+  const loadMileage = useCallback(async () => {
+    if (!friendId) return
+    const generation = loadRequestRef.current
+    const requestedAccountId = selectedAccountId
+    const req = ++mileageReqRef.current
+    setMileageStatus('loading')
+    try {
+      /*
+        名寄せ件数（insights）と接続アカウント一覧も同じ応答に入る。
+        accountId を渡すと、表示中アカウントと別アカウントの友だちでは
+        404 になる＝アカウント照合をサーバ側でも効かせられる。
+      */
+      const res = await api.friends.mileage(friendId, {
+        limit: 1,
+        accountId: requestedAccountId || undefined,
+      })
+      if (req !== mileageReqRef.current || isStaleResponse(generation, requestedAccountId)) return
+      if (res.success) {
+        setMileage(res.data.summary)
+        setMileageInsights(res.data.insights)
+        setMileageConnections(res.data.connections)
+        setMileageStatus('ready')
+      } else {
+        setMileageStatus('error')
+      }
+    } catch {
+      if (req !== mileageReqRef.current || isStaleResponse(generation, requestedAccountId)) return
+      setMileageStatus('error')
+    }
+  }, [friendId, selectedAccountId, isStaleResponse])
+
+  const loadRichMenu = useCallback(async () => {
+    if (!friendId) return
+    const generation = loadRequestRef.current
+    const requestedAccountId = selectedAccountId
+    const req = ++richMenuReqRef.current
+    setRichMenuStatus('loading')
+    try {
+      const res = await api.friends.richMenu(friendId)
+      if (req !== richMenuReqRef.current || isStaleResponse(generation, requestedAccountId)) return
+      // 失敗時と「未設定」は出し分ける。失敗を「既定のメニュー」に倒すと誤表示(#496-13)。
+      if (res.success) {
+        setRichMenu(res.data)
+        setRichMenuStatus('ready')
+      } else {
+        setRichMenuStatus('error')
+      }
+    } catch {
+      if (req !== richMenuReqRef.current || isStaleResponse(generation, requestedAccountId)) return
+      setRichMenuStatus('error')
+    }
+  }, [friendId, selectedAccountId, isStaleResponse])
+
+  /*
+   * 履歴は「概要の最近の履歴」と「履歴タブ」で共用する。
+   * 必要なタブを開いたときにだけ取りに行く（NEXT-11の表示時取得）。
+   * cursor を渡すと続きを足す（履歴タブの「さらに読み込む」）。
+   */
+  const loadHistory = useCallback(async (cursor?: string) => {
+    if (!friendId) return
+    const generation = loadRequestRef.current
+    const requestedAccountId = selectedAccountId
+    const req = ++historyReqRef.current
+    if (cursor) setHistoryLoadingMore(true)
+    else setHistoryStatus('loading')
+    try {
+      const query = new URLSearchParams({ limit: cursor ? '50' : '8' })
+      if (cursor) query.set('cursor', cursor)
+      const res = await fetchApi<ApiResponse<{
+        items: FriendTimelineItem[]
+        nextCursor: string | null
+      }>>(`/api/friends/${encodeURIComponent(friendId)}/timeline?${query}`, {
+        suppressFeatureDisabledEvent: true,
+      })
+      if (req !== historyReqRef.current || isStaleResponse(generation, requestedAccountId)) return
+      if (res.success) {
+        setHistoryItems((prev) => (cursor ? [...prev, ...res.data.items] : res.data.items))
+        setHistoryNextCursor(res.data.nextCursor)
+        setHistoryStatus('ready')
+      } else {
+        setHistoryStatus('error')
+      }
+    } catch {
+      if (req !== historyReqRef.current || isStaleResponse(generation, requestedAccountId)) return
+      setHistoryStatus('error')
+    } finally {
+      if (req === historyReqRef.current && !isStaleResponse(generation, requestedAccountId)) {
+        setHistoryLoadingMore(false)
+      }
+    }
+  }, [friendId, selectedAccountId, isStaleResponse])
+
+  /*
+   * 友だち・アカウントの切替。本体を取り直し、補助パネルは全部リセットして
+   * それぞれ取り直す。履歴だけは開いているタブに合わせて別のeffectで取る。
+   */
+  const startAll = useCallback(() => {
+    loadRequestRef.current += 1
+    setFriend(null)
+    setError('')
+    setNotice('')
+    setWarnings([])
+    setLoading(!!friendId)
+    setFields([])
+    setHiddenPersonalCount(0)
+    setValues({})
+    setFieldsStatus('idle')
+    setMileage(null)
+    setMileageInsights(null)
+    setMileageConnections([])
+    setMileageStatus('idle')
+    setRichMenu(null)
+    setRichMenuStatus('idle')
+    setHistoryItems([])
+    setHistoryStatus('idle')
+    setHistoryNextCursor(null)
+    setHistoryLoadingMore(false)
+    setScenarioPickerOpen(false)
+    setScenarioOptions([])
+    setScenarioListStatus('idle')
+    setScenarioPick('')
+    setScenarioError('')
+    setScenarioNotice('')
+    setActionMenuOpen(false)
+    setMoreMenuOpen(false)
+    void loadFriend()
+    void loadFields()
+    void loadMileage()
+    void loadRichMenu()
+  }, [friendId, loadFriend, loadFields, loadMileage, loadRichMenu])
 
   useEffect(() => {
-    void load()
-  }, [load])
+    startAll()
+  }, [startAll])
+
+  // 履歴は「概要」「履歴」タブを開いたときにだけ取る（表示時取得）。
+  useEffect(() => {
+    if ((tab === 'timeline' || tab === 'history') && historyStatus === 'idle') {
+      void loadHistory()
+    }
+  }, [tab, historyStatus, loadHistory])
 
   /*
     編集を開くたびに今の担当・対応状況を取り直す。GET /api/chats/:id は
@@ -341,12 +596,12 @@ function FriendDetailInner() {
       }
       setSupportEditing(false)
       setSupportNotice('担当・対応状況を更新しました')
-      void load()
+      void loadFriend()
     } catch (err) {
       if (err instanceof ApiError && err.status === 409) {
         setSupportError('ほかの担当者が先に更新しました。最新の内容を読み直しました')
         setSupportEditing(false)
-        void load()
+        void loadFriend()
       } else {
         setSupportError(err instanceof ApiError ? err.message : '保存に失敗しました')
       }
@@ -380,13 +635,121 @@ function FriendDetailInner() {
       }
       if (res.warnings?.length) setWarnings(res.warnings)
       setNotice(`${res.data.updated} 件を保存しました`)
-      void load()
+      // 値の正本は情報欄の取得口。保存後はそこだけ取り直す。
+      void loadFields()
     } catch {
       setError('保存に失敗しました')
     } finally {
       setSaving(false)
     }
   }
+
+  /*
+   * NEXT-09: 「シナリオを操作」は汎用一覧へ飛ばすのではなく、この友だちを
+   * 対象にした選択画面をここで開く。選べるのは表示中アカウントの
+   * シナリオだけで、選ぶ→確認→登録までこの画面で完結する。
+   * 登録口はサーバ側がオーナー・管理者専用なので、呼び出し口も同じ権限でだけ出す。
+   */
+  const openScenarioPicker = useCallback(async () => {
+    setScenarioPickerOpen(true)
+    setScenarioError('')
+    setScenarioNotice('')
+    setScenarioPick('')
+    const req = ++scenarioReqRef.current
+    const generation = loadRequestRef.current
+    const requestedAccountId = selectedAccountId
+    setScenarioListStatus('loading')
+    try {
+      const res = await api.scenarios.list({ accountId: requestedAccountId || undefined })
+      if (req !== scenarioReqRef.current || isStaleResponse(generation, requestedAccountId)) return
+      if (res.success) {
+        setScenarioOptions(res.data)
+        setScenarioListStatus('ready')
+      } else {
+        setScenarioListStatus('error')
+      }
+    } catch {
+      if (req !== scenarioReqRef.current || isStaleResponse(generation, requestedAccountId)) return
+      setScenarioListStatus('error')
+    }
+  }, [selectedAccountId, isStaleResponse])
+
+  const enrollScenario = async () => {
+    if (scenarioBusy || !scenarioPick) return
+    const scenario = scenarioOptions.find((s) => s.id === scenarioPick)
+    if (!scenario) return
+    setScenarioBusy(true)
+    setScenarioError('')
+    setScenarioNotice('')
+    try {
+      const res = await api.scenarios.enroll(scenario.id, friendId)
+      if (res.success) {
+        setScenarioPickerOpen(false)
+        setScenarioNotice(`「${scenario.name}」に登録しました`)
+        // 登録は履歴に現れうるので、取り済みなら取り直す。
+        if (historyStatus === 'ready') void loadHistory()
+      } else {
+        setScenarioError(res.error)
+      }
+    } catch (err) {
+      setScenarioError(err instanceof ApiError ? err.message : '登録に失敗しました')
+    } finally {
+      setScenarioBusy(false)
+    }
+  }
+
+  /*
+   * NEXT-08: 「個別操作」はこの友だちへ今できる操作、「…」は関連する画面への
+   * 移動。どちらも選んだ先で操作・取消・完了まで辿れるものだけを並べる。
+   */
+  const primaryActions: ActionMenuItem[] = [
+    {
+      id: 'inbox',
+      label: '受信箱で開く',
+      onSelect: () => router.push(inboxHrefForFriend(friendId)),
+    },
+    ...(canEditSupport
+      ? [{
+          id: 'support',
+          label: '対応状況を編集',
+          onSelect: () => void openSupportEditor(),
+        }]
+      : []),
+    ...(fieldsEnabled
+      ? [{
+          id: 'fields',
+          label: '情報欄を編集',
+          onSelect: () =>
+            router.push(`/friends/detail?id=${encodeURIComponent(friendId)}&tab=info`),
+        }]
+      : []),
+    // POST /api/scenarios/:id/enroll/:friendId はオーナー・管理者専用。
+    ...(canManageFieldDefs
+      ? [{
+          id: 'scenario-enroll',
+          label: 'シナリオに登録',
+          onSelect: () => void openScenarioPicker(),
+        }]
+      : []),
+    {
+      id: 'send-template',
+      label: 'テンプレートを送る（受信箱で選択）',
+      onSelect: () => router.push(inboxHrefForFriend(friendId)),
+    },
+  ]
+  const secondaryActions: ActionMenuItem[] = [
+    { id: 'templates', label: 'テンプレート一覧を見る', onSelect: () => router.push('/templates') },
+    { id: 'scenarios', label: 'シナリオ一覧を見る', onSelect: () => router.push('/scenarios') },
+    { id: 'reminders', label: 'リマインダ一覧を見る', onSelect: () => router.push('/reminders') },
+    { id: 'mileage', label: 'マイルを確認', onSelect: () => router.push('/mileage') },
+    { id: 'duplicates', label: '重複候補を確認', onSelect: () => router.push('/duplicates') },
+    {
+      id: 'back-to-list',
+      label: '友だち一覧へ戻る',
+      dividerBefore: true,
+      onSelect: () => router.push('/friends'),
+    },
+  ]
 
   if (!friendId) {
     return (
@@ -431,20 +794,76 @@ function FriendDetailInner() {
           >
             受信箱で開く
           </Link>
-          <Button type="button">個別操作</Button>
-          <Button type="button" aria-label="その他の操作">…</Button>
+          {/*
+            NEXT-08: 押しても何も起きないボタンを共通メニューへ接続する。
+            「個別操作」はこの友だちへの操作、「…」は関連する画面への移動。
+          */}
+          <span className="relative inline-block">
+            <Button
+              type="button"
+              aria-haspopup="menu"
+              aria-expanded={actionMenuOpen}
+              onClick={() => {
+                setActionMenuOpen((v) => !v)
+                setMoreMenuOpen(false)
+              }}
+            >
+              個別操作
+            </Button>
+            <ActionMenu
+              open={actionMenuOpen}
+              items={primaryActions}
+              ariaLabel="この友だちへの個別操作"
+              onClose={() => setActionMenuOpen(false)}
+            />
+          </span>
+          <span className="relative inline-block">
+            <Button
+              type="button"
+              aria-label="その他の操作"
+              aria-haspopup="menu"
+              aria-expanded={moreMenuOpen}
+              onClick={() => {
+                setMoreMenuOpen((v) => !v)
+                setActionMenuOpen(false)
+              }}
+            >
+              …
+            </Button>
+            <ActionMenu
+              open={moreMenuOpen}
+              items={secondaryActions}
+              ariaLabel="関連する画面を開く"
+              onClose={() => setMoreMenuOpen(false)}
+            />
+          </span>
         </div>
       </div>
 
-      {error && (
+      {/* 本体が取れている途中の失敗（保存など）は帯で出す。本体の失敗は下のカードが出す。 */}
+      {error && friend && (
         <div className="bg-danger-bg border-danger-bg text-danger mb-4 rounded-lg border p-4 text-sm">
           {error}
         </div>
       )}
 
+      {/*
+        NEXT-11: 読み込み中・取得失敗は「本体」だけを見る。マイルなどの
+        補助パネルの遅延・失敗ではここに入らない。
+      */}
       {loading ? (
         <div className="bg-canvas rounded-card border-hairline text-ink-faint border p-8 text-center text-sm">
           読み込み中...
+        </div>
+      ) : !friend ? (
+        <div className="bg-canvas rounded-card border-hairline border p-8 text-center text-sm">
+          <p className="text-ink-secondary">{error || '友だちを表示できませんでした'}</p>
+          <div className="mt-4 flex flex-wrap justify-center gap-2">
+            <Button type="button" onClick={() => void loadFriend()}>
+              もう一度読み込む
+            </Button>
+            <Button href="/friends">友だち一覧へ戻る</Button>
+          </div>
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-[23.5rem_1fr]">
@@ -466,7 +885,11 @@ function FriendDetailInner() {
               <Button href={`/friends/detail?id=${friendId}&tab=info`} className="mt-3">♙ 友だち詳細</Button>
             </div>
 
-            {/* マイル。設計どおり、見出しの下に利用可能残高を1行で置く。 */}
+            {/*
+              マイル。設計どおり、見出しの下に利用可能残高を1行で置く。
+              読み込みは独立しているため、遅くても他の表示を止めない。
+              取り損ねは「取得できませんでした」＋再試行で「—」と区別する。
+            */}
             <div className="border-hairline border-b bg-canvas px-5 py-4">
               <div className="flex items-center justify-between"><p className="text-ink text-xs font-bold">マイル</p><Link href="/mileage" className="text-action text-xs">詳細を見る</Link></div>
               <div className="bg-canvas-sunken mt-2 flex items-center justify-between rounded-control px-3 py-3">
@@ -477,10 +900,26 @@ function FriendDetailInner() {
                     : ''}
                 </span>
                 <strong className="text-ink text-base font-bold tabular-nums">
-                  {mileage ? mileage.available.toLocaleString('ja-JP') : '—'}
+                  {mileageStatus === 'loading'
+                    ? '…'
+                    : mileage
+                      ? mileage.available.toLocaleString('ja-JP')
+                      : '—'}
                   <span className="ml-1 text-xs font-semibold">mile</span>
                 </strong>
               </div>
+              {mileageStatus === 'error' ? (
+                <p className="text-ink-faint mt-2 flex items-center justify-between gap-2 text-xs">
+                  マイルを取得できませんでした
+                  <button
+                    type="button"
+                    onClick={() => void loadMileage()}
+                    className="text-accent shrink-0 hover:underline"
+                  >
+                    再試行
+                  </button>
+                </p>
+              ) : null}
             </div>
 
             <div className="space-y-4 p-5">
@@ -642,6 +1081,25 @@ function FriendDetailInner() {
                   </dl>
                 </div>
               )}
+              {/*
+                情報欄の取り損ねは「項目なし」と区別する。
+                成功で0件ならそもそも節を出さない従来どおりの見た目。
+              */}
+              {fieldsStatus === 'error' && (
+                <div>
+                  <p className="text-ink-faint mb-1.5 text-xs font-semibold">友だち情報欄</p>
+                  <p className="text-ink-faint text-xs">
+                    情報欄を取得できませんでした
+                    <button
+                      type="button"
+                      onClick={() => void loadFields()}
+                      className="text-accent ml-1 hover:underline"
+                    >
+                      再試行
+                    </button>
+                  </p>
+                </div>
+              )}
 
               {/* ---- リッチメニュー ---- */}
               <div>
@@ -650,13 +1108,28 @@ function FriendDetailInner() {
                   <div className="flex justify-between gap-2">
                     <dt className="text-ink-faint">現在の設定</dt>
                     <dd className="text-ink-secondary truncate text-right">
-                      {richMenuFailed ? '取得できませんでした' : (richMenu?.name ?? '既定のメニュー')}
-                      {!richMenuFailed && richMenu?.isDefault && (
+                      {richMenuStatus === 'loading'
+                        ? '読み込み中…'
+                        : richMenuStatus === 'error'
+                          ? '取得できませんでした'
+                          : (richMenu?.name ?? '既定のメニュー')}
+                      {richMenuStatus === 'ready' && richMenu?.isDefault && (
                         <span className="text-ink-faint ml-1">（全員に出しているもの）</span>
                       )}
                     </dd>
                   </div>
                 </dl>
+                {richMenuStatus === 'error' ? (
+                  <p className="text-ink-faint mt-1 text-right text-xs">
+                    <button
+                      type="button"
+                      onClick={() => void loadRichMenu()}
+                      className="text-accent hover:underline"
+                    >
+                      再試行
+                    </button>
+                  </p>
+                ) : null}
               </div>
 
               {/* ---- 友だち情報 ---- */}
@@ -726,17 +1199,254 @@ function FriendDetailInner() {
                   </section>
                   <section className="bg-canvas rounded-card border-hairline border p-4 shadow-card">
                     <h2 className="text-ink text-sm font-bold">同じ人としてつながる情報</h2>
-                    <p className="text-ink-secondary mt-3 text-xs">現在は1アカウントのみ</p>
+                    {/*
+                      NEXT-10: 固定の「現在は1アカウントのみ」ではなく、
+                      名寄せの実績（マイル口の応答に含まれる統合情報）から出す。
+                      取り損ねは「未取得」と正直に表示する。
+                    */}
+                    {mileageStatus === 'loading' ? (
+                      <p className="text-ink-faint mt-3 text-xs">つながり情報を読み込んでいます…</p>
+                    ) : mileageStatus === 'error' ? (
+                      <p className="text-ink-faint mt-3 text-xs">
+                        つながり情報を取得できませんでした
+                        <button
+                          type="button"
+                          onClick={() => void loadMileage()}
+                          className="text-accent ml-1 hover:underline"
+                        >
+                          再試行
+                        </button>
+                      </p>
+                    ) : mileageInsights && mileageInsights.accountCount > 1 ? (
+                      <>
+                        <p className="text-ink-secondary mt-3 text-xs">
+                          {mileageInsights.accountCount}件のLINEアカウントで同じ人としてつながっています
+                        </p>
+                        {mileageConnections.length > 0 ? (
+                          <ul className="text-ink-secondary mt-2 space-y-1 text-xs">
+                            {mileageConnections.map((c) => (
+                              <li key={`${c.accountId}-${c.friendId}`} className="truncate">
+                                {c.accountName}
+                              </li>
+                            ))}
+                          </ul>
+                        ) : null}
+                      </>
+                    ) : (
+                      <p className="text-ink-secondary mt-3 text-xs">
+                        このアカウントのみに登録があります（名寄せ済みの他アカウントはありません）
+                      </p>
+                    )}
                     <p className="text-ink-faint mt-3 text-xs">重複候補が見つかると、根拠と確信度を表示します。</p>
                     <Button href="/duplicates" className="mt-3">重複候補を確認</Button>
                   </section>
                 </div>
+                {/*
+                  NEXT-10: 「最近の履歴」は実際の活動履歴（対応・配信・予約・
+                  フォーム回答・名寄せ）を時系列で取ったものを出す。
+                  0件・取得失敗・読み込み中はそれぞれ区別して表示する。
+                */}
                 <section className="bg-canvas rounded-card border-hairline overflow-hidden border shadow-card">
                   <div className="flex items-center justify-between px-4 py-3"><h2 className="text-ink text-sm font-bold">最近の履歴</h2><Link href={`/friends/detail?id=${friendId}&tab=history`} className="text-accent text-xs font-semibold">すべてを見る →</Link></div>
-                  <div className="bg-canvas-sunken border-hairline grid border-y px-4 py-3 text-xs font-semibold text-ink-faint" style={{ gridTemplateColumns: '140px 160px 1fr 140px' }}><span>日時</span><span>種別</span><span>内容</span><span>担当者</span></div>
-                  <div className="text-ink-secondary grid px-4 py-5 text-xs" style={{ gridTemplateColumns: '140px 160px 1fr 140px' }}><span>{friend?.createdAt ? new Date(friend.createdAt).toLocaleDateString('ja-JP') : '—'}</span><span>友だち追加</span><span>{friend?.firstTrackedLinkName ? `${friend.firstTrackedLinkName}から追加されました` : '友だちに追加されました'}</span><span>システム</span></div>
+                  <div className="bg-canvas-sunken border-hairline grid border-y px-4 py-3 text-xs font-semibold text-ink-faint" style={{ gridTemplateColumns: '140px 160px 1fr 140px' }}><span>日時</span><span>種別</span><span>内容</span><span>アカウント</span></div>
+                  {historyStatus === 'loading' ? (
+                    <p className="text-ink-faint px-4 py-5 text-xs">履歴を読み込んでいます…</p>
+                  ) : historyStatus === 'error' ? (
+                    <p className="text-ink-faint px-4 py-5 text-xs">
+                      履歴を取得できませんでした
+                      <button
+                        type="button"
+                        onClick={() => void loadHistory()}
+                        className="text-accent ml-1 hover:underline"
+                      >
+                        再試行
+                      </button>
+                    </p>
+                  ) : (
+                    <>
+                      {historyItems.slice(0, 5).map((item) => (
+                        <div
+                          key={item.id}
+                          className="text-ink-secondary grid px-4 py-3 text-xs"
+                          style={{ gridTemplateColumns: '140px 160px 1fr 140px' }}
+                        >
+                          <span>{new Date(item.occurredAt).toLocaleString('ja-JP')}</span>
+                          <span>{timelineTypeLabel(item.type)}</span>
+                          <span>{item.summary}</span>
+                          <span className="truncate">{item.lineAccount?.name ?? '—'}</span>
+                        </div>
+                      ))}
+                      {/*
+                        友だち追加の記録は本体の作成日時から出す実データ。
+                        活動履歴が0件のときは、この記録だけが履歴になる。
+                      */}
+                      <div className="text-ink-secondary border-hairline grid border-t px-4 py-3 text-xs" style={{ gridTemplateColumns: '140px 160px 1fr 140px' }}><span>{friend.createdAt ? new Date(friend.createdAt).toLocaleDateString('ja-JP') : '—'}</span><span>友だち追加</span><span>{friend.firstTrackedLinkName ? `${friend.firstTrackedLinkName}から追加されました` : '友だちに追加されました'}</span><span>システム</span></div>
+                      {historyStatus === 'ready' && historyItems.length === 0 ? (
+                        <p className="text-ink-faint px-4 pb-4 text-xs">
+                          上の「友だち追加の記録」以外の活動履歴はまだありません。
+                        </p>
+                      ) : null}
+                    </>
+                  )}
                 </section>
-                <section className="bg-canvas rounded-card border-hairline border p-4 shadow-card"><h2 className="text-ink text-sm font-bold">この友だちに行う操作</h2><div className="mt-3 flex flex-wrap gap-2"><Button href={inboxHrefForFriend(friendId)} variant="primary" aria-label="個別トークを開く">受信箱で開く</Button><button type="button" disabled className="border-accent text-accent rounded-control border px-3 py-2 text-xs font-semibold">ϟ アクションを実行</button><Button href="/templates">テンプレートを送信</Button><Button href="/scenarios">シナリオを操作</Button><Button href="/reminders">リマインダを設定</Button></div></section>
+                {/*
+                  NEXT-09: 対象者を引き継ぐ操作と、汎用一覧への移動を分ける。
+                  「シナリオに登録」はこの友だちを対象に選んで実行できる。
+                  一覧へ行くだけのものは名前を「一覧を見る」に変えて混同させない。
+                */}
+                <section className="bg-canvas rounded-card border-hairline border p-4 shadow-card">
+                  <h2 className="text-ink text-sm font-bold">この友だちに行う操作</h2>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <Button href={inboxHrefForFriend(friendId)} variant="primary" aria-label="個別トークを開く">受信箱で開く</Button>
+                    {canManageFieldDefs ? (
+                      <Button
+                        type="button"
+                        onClick={() =>
+                          scenarioPickerOpen ? setScenarioPickerOpen(false) : void openScenarioPicker()
+                        }
+                        aria-expanded={scenarioPickerOpen}
+                      >
+                        シナリオに登録
+                      </Button>
+                    ) : null}
+                    <Button href="/templates">テンプレート一覧を見る</Button>
+                    <Button href="/scenarios">シナリオ一覧を見る</Button>
+                    <Button href="/reminders">リマインダ一覧を見る</Button>
+                  </div>
+                  <p className="text-ink-faint mt-2 text-xs">
+                    この友だちへテンプレートを送るときは、受信箱でテンプレートを選んで送信します。
+                  </p>
+                  {scenarioPickerOpen ? (
+                    <div
+                      className="border-hairline bg-canvas-sunken rounded-control mt-3 space-y-2 border p-3"
+                      data-scenario-picker
+                    >
+                      {scenarioListStatus === 'loading' ? (
+                        <p className="text-ink-faint text-xs">シナリオを読み込んでいます…</p>
+                      ) : scenarioListStatus === 'error' ? (
+                        <p className="text-ink-faint text-xs">
+                          シナリオの選択肢を取得できませんでした
+                          <button
+                            type="button"
+                            onClick={() => void openScenarioPicker()}
+                            className="text-accent ml-1 hover:underline"
+                          >
+                            再試行
+                          </button>
+                        </p>
+                      ) : scenarioOptions.filter((s) => s.isActive).length === 0 ? (
+                        <p className="text-ink-faint text-xs">登録できるシナリオがありません。</p>
+                      ) : (
+                        <>
+                          <SelectField
+                            value={scenarioPick}
+                            disabled={scenarioBusy}
+                            onChange={(e) => setScenarioPick(e.target.value)}
+                            aria-label="登録するシナリオを選ぶ"
+                            className="border-hairline rounded-control bg-canvas text-ink w-full border px-2 py-1.5 text-xs"
+                            options={[
+                              { value: '', label: '— シナリオを選ぶ —' },
+                              ...scenarioOptions
+                                .filter((s) => s.isActive)
+                                .map((s) => ({ value: s.id, label: s.name })),
+                            ]}
+                          />
+                          {scenarioPick ? (
+                            <p className="text-ink-secondary text-xs">
+                              「{scenarioOptions.find((s) => s.id === scenarioPick)?.name}」に
+                              {friend.displayName ?? 'この友だち'}を登録します。
+                            </p>
+                          ) : null}
+                        </>
+                      )}
+                      {scenarioError ? (
+                        <p className="text-danger text-xs" role="alert">{scenarioError}</p>
+                      ) : null}
+                      <div className="flex items-center gap-2">
+                        <Button
+                          type="button"
+                          variant="primary"
+                          onClick={() => void enrollScenario()}
+                          disabled={scenarioBusy || !scenarioPick || scenarioListStatus !== 'ready'}
+                        >
+                          {scenarioBusy ? '登録中…' : 'このシナリオに登録する'}
+                        </Button>
+                        <Button
+                          type="button"
+                          onClick={() => setScenarioPickerOpen(false)}
+                          disabled={scenarioBusy}
+                        >
+                          やめる
+                        </Button>
+                      </div>
+                    </div>
+                  ) : null}
+                  {scenarioNotice ? (
+                    <p className="text-success mt-2 text-xs">{scenarioNotice}</p>
+                  ) : null}
+                </section>
+              </div>
+            )}
+
+            {/*
+              NEXT-10: 履歴タブは実際の活動履歴につなげる。
+              0件・取得失敗・読み込み中を分け、続きは「さらに読み込む」。
+            */}
+            {tab === 'history' && (
+              <div className="bg-canvas rounded-card border-hairline overflow-hidden border">
+                <div className="bg-canvas-sunken border-hairline grid border-b px-4 py-3 text-xs font-semibold text-ink-faint" style={{ gridTemplateColumns: '140px 160px 1fr 140px' }}>
+                  <span>日時</span><span>種別</span><span>内容</span><span>アカウント</span>
+                </div>
+                {historyStatus === 'loading' ? (
+                  <p className="text-ink-faint px-4 py-6 text-center text-sm">履歴を読み込んでいます…</p>
+                ) : historyStatus === 'error' ? (
+                  <div className="px-4 py-6 text-center text-sm">
+                    <p className="text-ink-faint">履歴を取得できませんでした。</p>
+                    <Button type="button" className="mt-3" onClick={() => void loadHistory()}>
+                      もう一度読み込む
+                    </Button>
+                  </div>
+                ) : (
+                  <>
+                    {historyItems.map((item) => (
+                      <div
+                        key={item.id}
+                        className="text-ink-secondary border-hairline grid border-b px-4 py-3 text-xs last:border-b-0"
+                        style={{ gridTemplateColumns: '140px 160px 1fr 140px' }}
+                      >
+                        <span>{new Date(item.occurredAt).toLocaleString('ja-JP')}</span>
+                        <span>{timelineTypeLabel(item.type)}</span>
+                        <span>{item.summary}</span>
+                        <span className="truncate">{item.lineAccount?.name ?? '—'}</span>
+                      </div>
+                    ))}
+                    {/* 最後まで取れたときだけ、いちばん古い記録として友だち追加を末尾に出す。 */}
+                    {!historyNextCursor ? (
+                      <div className="text-ink-secondary border-hairline grid border-t px-4 py-3 text-xs" style={{ gridTemplateColumns: '140px 160px 1fr 140px' }}>
+                        <span>{friend.createdAt ? new Date(friend.createdAt).toLocaleDateString('ja-JP') : '—'}</span>
+                        <span>友だち追加</span>
+                        <span>{friend.firstTrackedLinkName ? `${friend.firstTrackedLinkName}から追加されました` : '友だちに追加されました'}</span>
+                        <span>システム</span>
+                      </div>
+                    ) : null}
+                    {historyItems.length === 0 && !historyNextCursor ? (
+                      <p className="text-ink-faint px-4 py-4 text-xs">
+                        活動履歴はまだありません。上の「友だち追加の記録」がこの友だちの最初の記録です。
+                      </p>
+                    ) : null}
+                    {historyNextCursor ? (
+                      <div className="border-hairline border-t px-4 py-3 text-center">
+                        <Button
+                          type="button"
+                          onClick={() => void loadHistory(historyNextCursor)}
+                          disabled={historyLoadingMore}
+                        >
+                          {historyLoadingMore ? '読み込み中…' : 'さらに読み込む'}
+                        </Button>
+                      </div>
+                    ) : null}
+                  </>
+                )}
               </div>
             )}
 
@@ -755,7 +1465,17 @@ function FriendDetailInner() {
             {tab === 'info' && !fieldsEnabled && <FeatureDisabledScreen featureId="friend_fields" />}
             {tab === 'info' && fieldsEnabled && (
               <div className="bg-canvas rounded-card border-hairline border p-5">
-                {inGroup.length === 0 ? (
+                {/* 情報欄は独立して読み込む。取り損ねは0件と区別して再試行口を出す。 */}
+                {fieldsStatus === 'loading' || fieldsStatus === 'idle' ? (
+                  <p className="text-ink-faint py-6 text-center text-sm">情報欄を読み込んでいます…</p>
+                ) : fieldsStatus === 'error' ? (
+                  <div className="py-6 text-center text-sm">
+                    <p className="text-ink-faint">情報欄を取得できませんでした。</p>
+                    <Button type="button" className="mt-3" onClick={() => void loadFields()}>
+                      もう一度読み込む
+                    </Button>
+                  </div>
+                ) : inGroup.length === 0 ? (
                   <p className="text-ink-faint py-6 text-center text-sm">
                     {group === BASIC_GROUP
                       ? '情報欄の項目がまだありません。'
