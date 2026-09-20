@@ -21,6 +21,7 @@ const modules = [
   'note-bar.module.css',
   'side-cards.module.css',
   'sticky-bar.module.css',
+  'radio-card.module.css',
 ]
 
 describe('V6共通部品のトークン', () => {
@@ -96,6 +97,7 @@ describe('V6共通部品の実装境界', () => {
       'text-field.module.css',
       'row-actions.module.css',
       'side-cards.module.css',
+      'radio-card.module.css',
     ]) {
       expect(read(name), `${name} に :focus-visible がない`).toContain(':focus-visible')
     }
@@ -114,6 +116,7 @@ describe('V6共通部品の実装境界', () => {
       'note-bar.tsx',
       'side-cards.tsx',
       'sticky-bar.tsx',
+      'radio-card.tsx',
     ]) {
       expect(read(name), `${name} に任意値記法がある`).not.toMatch(/className="[^"]*\[/)
     }

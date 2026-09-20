@@ -735,16 +735,23 @@ export const SCREENS = [
   },
   {
     /*
-      **窓は編集画面ではなく一覧に出る。** 行の「停止」「再開」を押すと
-      `ConfirmDialog` が開く（`scenarios/page.tsx:267` の
-      `data-design-node="RUxNf"`）。設計は編集画面からの開始を描いているが、
-      実装は一覧から状態を変える形なので、そこは差として残る。
+      **窓は編集画面ではなく一覧に出る。** 止めている行の「その他」を
+      開き、メニューの「再開する」を押すと確認の窓が開く
+      （`scenarios/page.tsx:537` の `data-design-node="RUxNf"`）。
+      設計は編集画面からの開始を描いているが、実装は一覧から状態を
+      変える形なので、そこは差として残る。
+
+      **#401 で行の直接ボタンは「その他」メニューへ集約された。**
+      押し口の目印（`data-qa-open="RUxNf"`）は「その他」ボタンに
+      付いている（`scenario-list.tsx`）ので、目印でメニューを開いてから
+      「再開する」で確認窓へ進む、2段の操作になる。
     */
     ...SCENARIO, node: 'RUxNf', name: '5-1-I シナリオ・配信開始確認',
     route: '/scenarios', mode: 'viewport', height: 1080,
-    steps: [{ click: '再開' }],
-    /* 押し口は文言でなく Node ID の目印で開く（#590 で付けた）。 */
-    steps: [{ qaOpen: 'RUxNf', after: 900 }],
+    steps: [
+      { qaOpen: 'RUxNf', after: 500 },
+      { click: '再開する', role: 'menuitem', after: 900 },
+    ],
     verdict: "match",
     verdictNote: "**2026-09-07 Issue #463で画素差を切り分け・修正。** (a)(b) 開始確認の高さ・2列カード・4通の試算・警告・確認・下部操作をPencilへ合わせ、一覧から開く撮影状態の背景差を分離した。差分率27.0335%→4.0442%、高さ差0px、横はみ出し0で10%閾値内。試算・開始記録の実API接続は維持した。",
     verdictSource: "scenarios-v6/RUxNf.txt + scenarios-v6/RUxNf-{1440,1920}.png + scenarios-v6/RUxNf-diff-1920.png",
