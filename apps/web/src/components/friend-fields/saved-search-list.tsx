@@ -122,6 +122,14 @@ export default function SavedSearchList({ accountId }: { accountId: string | nul
     void load()
   }, [load])
 
+  /*
+    アカウントが変わったら、前のアカウントの削除確認を閉じる。
+    別アカウントの検索を消す確認が残ると、表示と操作対象がずれる。
+  */
+  useEffect(() => {
+    setPendingDelete(null)
+  }, [accountId])
+
   const remove = (search: SavedSearch) => {
     setPendingDelete(search)
   }
