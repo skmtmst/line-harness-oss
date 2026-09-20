@@ -529,14 +529,14 @@ function FriendsPageInner({
             container-type: inline-size;
           }
           @container (max-width: 720px) {
-            /* U011: 条件ブロックを1列にし、友だち情報の「項目・比較方法・値」を各1行・全幅にする。 */
+            /* U011: 条件ブロックを1列にする。
+               「項目・比較方法・値」の縦3段化は #984 でダイアログ自身の
+               コンテナクエリ（@3xl 未満で縦積み）へ移した。ここに残していた
+               `div:has(> input[list=...])` は、入力が label の子なので
+               実DOMには当たらない規則だった。 */
             [data-friends-advanced-search] section.grid { grid-template-columns: minmax(0, 1fr); }
             [data-friends-advanced-search] section.grid > * { grid-column: 1 / -1; }
             [data-friends-advanced-search] section.grid > button { justify-self: end; }
-            [data-friends-advanced-search] div:has(> input[list="friend-field-names"]) > input,
-            [data-friends-advanced-search] div:has(> input[list="friend-field-names"]) > select {
-              flex: 1 1 100%;
-            }
             /* U012: タグ選択を全幅にして「付いている／付いていない」は次の行へ。
                選んだタグは複数行に折り返して全文読めるようにする。 */
             [data-friends-advanced-search] select[aria-label="タグ名を選ぶ"] { flex: 1 1 100%; }
