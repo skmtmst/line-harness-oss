@@ -1,12 +1,13 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { describeReminderTiming } from '@line-crm/shared'
 import type { ReminderDraftSettings, ReminderDraftVersion, ReminderPreviewResult, ReminderPublishResult, ReminderValidationResult } from '@line-crm/shared'
 import { api } from '@/lib/api'
 import { firstReminderStepMessage, reminderPlaceholders, reminderStepTimings, reminderStopSummary, reminderTriggerLabel } from './reminder-labels'
 import { useReminderTestRecipient, type ReminderTestRecipientView } from './use-reminder-test-recipient'
+import { useReminderTestSend } from './use-reminder-test-send'
 import { TestRecipientGuidance, testRecipientLabel } from './test-recipient-guidance'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -57,21 +58,30 @@ export default function ReminderPublishFlow({ reminderId, stage }: { reminderId:
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [testConfirm, setTestConfirm] = useState(false)
-  const [testRecipientName, setTestRecipientName] = useState<string | null>(null)
   // 送信先はテスト段だけ読む。ほかの段で余計なGETを打たない。
   const testRecipient = useReminderTestRecipient(stage === 'test' ? reminderId : null)
+  // 送信状態・冪等キー・遅い応答の破棄は1か所で持つ（DEEP-09/10/11）。
+  const testSend = useReminderTestSend(stage === 'test' ? reminderId : null)
+  // 読み込み応答は順不同で返る。世代番号で最新の要求だけを状態へ反映する。
+  const requestSeq = useRef(0)
 
   const go = useCallback((next: ReminderPublishStage) => router.push(`/reminders/edit?id=${encodeURIComponent(reminderId)}&stage=${next}`), [reminderId, router])
   const loadDraft = useCallback(async () => {
+    const seq = ++requestSeq.current
     setLoading(true); setError('')
     try {
       const response = await api.reminders.getDraft(reminderId)
+      if (seq !== requestSeq.current) return
       if (!response.success) throw new Error(response.error)
       setDraft(response.data); setSettings(response.data.settings)
-    } catch { setError('下書きを読み込めませんでした。') } finally { setLoading(false) }
+    } catch { if (seq === requestSeq.current) setError('下書きを読み込めませんでした。') } finally { if (seq === requestSeq.current) setLoading(false) }
   }, [reminderId])
 
-  useEffect(() => { void loadDraft() }, [loadDraft])
+  useEffect(() => {
+    // 対象が変わったら前の対象の本文・検査結果・送信結果を持ち越さない。
+    setDraft(null); setSettings(null); setPreview(null); setValidation(null); setPublished(null); setTestConfirm(false)
+    void loadDraft()
+  }, [loadDraft])
   useEffect(() => {
     if (!settings || (stage !== 'preview' && stage !== 'done')) return
     void api.reminders.previewDraft(reminderId).then((response) => { if (response.success) setPreview(response.data); else setError(response.error) }).catch(() => setError('配信予定を確認できませんでした。'))
@@ -88,22 +98,18 @@ export default function ReminderPublishFlow({ reminderId, stage }: { reminderId:
     catch { setError('対象と終了条件を保存できませんでした。') } finally { setBusy(false) }
   }
   async function sendTest() {
-    setBusy(true); setError('')
-    try {
-      const response = await api.reminders.testDraft(reminderId, crypto.randomUUID())
-      if (!response.success) {
-        // 送信先起因の失敗はパネル側の状態も最新へ揃える。
-        if (response.code === 'TEST_RECIPIENT_NOT_CONFIGURED' || response.code === 'TEST_RECIPIENT_NOT_AVAILABLE') {
-          void testRecipient.reload()
-        }
-        setError(response.error || 'テスト送信に失敗しました。LINE連携と通知内容を確認してください。')
-        setTestConfirm(false)
-        return
-      }
-      setDraft((current) => current ? { ...current, lastTestStatus: 'succeeded', lastTestedAt: response.data.testedAt } : current)
-      setTestRecipientName(response.data.recipientName)
+    const outcome = await testSend.send()
+    if (outcome.kind === 'succeeded') {
+      setDraft((current) => current ? { ...current, lastTestStatus: 'succeeded', lastTestedAt: outcome.testedAt } : current)
       setTestConfirm(false)
-    } catch { setError('テスト送信に失敗しました。LINE連携と通知内容を確認してください。') } finally { setBusy(false) }
+      return
+    }
+    if (outcome.kind === 'failed' && outcome.recipientFault) {
+      // 送信先起因の失敗はパネル側の状態も最新へ揃え、窓を閉じて設定導線へ出す。
+      void testRecipient.reload()
+      setTestConfirm(false)
+    }
+    // 確定失敗・結果不明は窓を開いたままにし、エラーは窓の中に出す。
   }
   async function publishDraft() {
     if (!validation?.valid || draft?.lastTestStatus !== 'succeeded') return
@@ -112,20 +118,34 @@ export default function ReminderPublishFlow({ reminderId, stage }: { reminderId:
     catch { setError('リマインダを有効化できませんでした。') } finally { setBusy(false) }
   }
 
+  // 画面に出ている本文の版と送信先の対象が一致しているときだけ送れる。
+  // 切替え直後に前の対象の下書きが残っている間は読み込み中として扱う。
+  const subjectDraft = draft && draft.reminderId === reminderId ? draft : null
+  const subjectSettings = subjectDraft ? settings : null
+
   if (loading) return <ListState kind="loading" title="下書きを読み込んでいます" />
-  if (!draft || !settings) return <ListState kind="error" title="下書きを表示できませんでした" description={error} action={<Button onClick={() => void loadDraft()}>再読み込み</Button>} />
+  if (!subjectDraft || !subjectSettings) {
+    return error
+      ? <ListState kind="error" title="下書きを表示できませんでした" description={error} action={<Button onClick={() => void loadDraft()}>再読み込み</Button>} />
+      : <ListState kind="loading" title="下書きを読み込んでいます" />
+  }
+
+  // 送信の失敗・結果不明は一つの状態で持つ。窓が開いている間は窓の中に出し、
+  // 閉じているときだけページの帯に出す。成功・新しい試行の開始で消える。
+  const testIssue = testSend.phase.kind === 'failed' || testSend.phase.kind === 'unknown' ? testSend.phase.message : ''
+  const sendBusy = testSend.phase.kind === 'sending'
 
   const current = stage === 'target' ? 2 : stage === 'done' ? 6 : stage === 'confirm' ? 5 : 4
   return (
     <div data-reminder-publish-stage={stage}>
       <ReminderWizard current={current} />
-      {error ? <p className="bg-danger-bg text-danger mb-3 rounded-lg p-3 text-sm">{error}</p> : null}
-      {stage === 'target' ? <TargetStage settings={settings} validation={validation} onChange={setSettings} onNext={() => void saveTarget()} busy={busy} /> : null}
-      {stage === 'preview' ? <PreviewStage settings={settings} preview={preview} onNext={() => go('test')} /> : null}
-      {stage === 'test' ? <TestStage draft={draft} recipientName={testRecipientName} recipientView={testRecipient.view} onRecipientRecheck={() => void testRecipient.reload()} onConfirm={() => setTestConfirm(true)} onNext={() => go('confirm')} /> : null}
-      {stage === 'confirm' ? <ConfirmStage draft={draft} settings={settings} validation={validation} onPublish={() => void publishDraft()} busy={busy} /> : null}
-      {stage === 'done' ? <DoneStage draft={draft} published={published} preview={preview} validation={validation} /> : null}
-      <ConfirmDialog open={testConfirm} title="テスト送信しますか？" description="自分のLINEへ確認用メッセージを1通送信します。" confirmLabel="テスト送信" cancelLabel="配信予定へ戻る" busy={busy} onConfirm={() => void sendTest()} onCancel={() => setTestConfirm(false)} />
+      {(error || (!testConfirm && testIssue)) ? <p className="bg-danger-bg text-danger mb-3 rounded-lg p-3 text-sm">{error || testIssue}</p> : null}
+      {stage === 'target' ? <TargetStage settings={subjectSettings} validation={validation} onChange={setSettings} onNext={() => void saveTarget()} busy={busy} /> : null}
+      {stage === 'preview' ? <PreviewStage settings={subjectSettings} preview={preview} onNext={() => go('test')} /> : null}
+      {stage === 'test' ? <TestStage draft={subjectDraft} recipientName={testSend.phase.kind === 'succeeded' ? testSend.phase.recipientName : null} recipientView={testRecipient.view} onRecipientRecheck={() => void testRecipient.reload()} onConfirm={() => { testSend.beginAttempt(); setTestConfirm(true) }} onNext={() => go('confirm')} /> : null}
+      {stage === 'confirm' ? <ConfirmStage draft={subjectDraft} settings={subjectSettings} validation={validation} onPublish={() => void publishDraft()} busy={busy} /> : null}
+      {stage === 'done' ? <DoneStage draft={subjectDraft} published={published} preview={preview} validation={validation} /> : null}
+      <ConfirmDialog open={testConfirm && stage === 'test'} title="テスト送信しますか？" description={testSend.phase.kind === 'unknown' ? '前回の送信結果を確認できていません。再試行しても二重には送られません。' : '自分のLINEへ確認用メッセージを1通送信します。'} confirmLabel={testIssue ? 'もう一度送信' : 'テスト送信'} cancelLabel="配信予定へ戻る" busy={sendBusy} error={testIssue} onConfirm={() => void sendTest()} onCancel={() => setTestConfirm(false)} />
     </div>
   )
 }
@@ -137,7 +157,6 @@ export function TargetStage({ settings, validation, onChange, onNext, busy }: { 
   return <div data-design-node="s7T2dz"><ReminderWorkspace aside={<><SummaryCard rows={[["基準日", '予約日時（Google Meet相談）'], ['対象者', countLabel(audience.matched, '人')], ['通知ステップ', `${settings.steps.length}件`], ['停止条件', `${stopCount}件`]]} /><ReminderPanel title="安全な運用" note="誤送信を防ぐための設定です。"><ul className="text-ink-secondary space-y-2 text-xs"><li>● 基準日が空欄なら開始しない</li><li>● 過去日時の通知は送らない</li><li>● 同じ時刻の重複送信をまとめる</li></ul></ReminderPanel></>}>
     <ReminderPanel title="対象者の条件" note="どの友だちにリマインダを開始するか設定します。"><div className="rounded-lg border border-hairline p-3 text-xs"><b>下書きに保存した対象条件</b><div className="mt-3 grid grid-cols-3 gap-2"><Metric label="条件一致" value={countLabel(audience.total, '人')} /><Metric label="開始予定" value={countLabel(audience.matched, '人')} success /><Metric label="除外" value={countLabel(audience.excluded, '人')} warning /></div><p className="text-info mt-3">{validation ? '公開前チェックの最新結果です。' : '公開前チェックを実行しています。'} 基準日が登録・変更された時点で対象を自動再判定します。</p></div></ReminderPanel>
     <ReminderPanel title="終了・停止条件" note="不要になった通知を自動で止めます。"><div className="divide-y divide-hairline">{[["bookingCancelled",'予約がキャンセルされた','即時停止'],['supportMarkCompleted','対応マークが「完了」になった','残りを停止'],['daysAfterTarget','基準日を過ぎて7日経過','自動終了'],['friendBlocked','友だちがブロックした','即時停止']].map(([key,label,result]) => <label key={key} className="flex items-center gap-3 py-3 text-xs"><input type="checkbox" checked={key === 'daysAfterTarget' ? stop.daysAfterTarget != null : Boolean(stop[key as keyof typeof stop])} onChange={(event) => onChange({ ...settings, stopConditions: { ...stop, [key]: key === 'daysAfterTarget' ? event.target.checked ? 7 : null : event.target.checked } })} /><span className="flex-1 font-medium">{label}</span><Pill tone="success">{result}</Pill></label>)}</div></ReminderPanel>
-    <ReminderPanel title="完了後のアクション"><p className="text-xs">対応マークを「フォロー済み」に変更</p></ReminderPanel>
     <ReminderFooter primary={busy ? '保存中…' : '配信予定へ'} primaryDisabled={busy} onPrimary={onNext} />
   </ReminderWorkspace></div>
 }
