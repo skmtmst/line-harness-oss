@@ -65,11 +65,30 @@ const TRIGGER_CHOICES: TriggerChoice[] = [
   { value: 'tag', label: 'タグが付いた', note: '友だち属性', eventType: 'tag_added', measureMethod: 'webhook', icon: Tag, connected: true },
 ]
 
-const USAGE_CHOICES: Array<{ kind: ConversionDefinitionUsageKind; refId: string; label: string; note: string }> = [
-  { kind: 'analytics', refId: 'conversion-overview', label: '分析', note: 'この成果地点を分析のグラフに出す' },
-  { kind: 'nen_campaign', refId: 'purchase-followup', label: 'NEN配信', note: '購入後のご案内のきっかけにする' },
-  { kind: 'automation', refId: 'conversion-followup', label: '自動化', note: '成果後の処理を動かす' },
+/**
+ * 「使う場所」の種類(N-258)。
+ *
+ * 以前は `conversion-overview` などの**実在しない仮ID**をそのまま保存して
+ * いた。いまは各種類の本物のオブジェクト(ファネル・NEN配信の設定・
+ * オートメーション)をアカウントごとに読み、そのIDだけを保存する。
+ */
+const USAGE_GROUPS: Array<{ kind: ConversionDefinitionUsageKind; label: string; note: string }> = [
+  { kind: 'analytics', label: '分析', note: 'この成果地点を段に使うファネル' },
+  { kind: 'nen_campaign', label: 'NEN配信', note: 'この成果をきっかけにする配信' },
+  { kind: 'automation', label: '自動化', note: 'この成果をきっかけに動く処理' },
 ]
+
+/** 選択できる利用先の1件。refId は必ず実在するオブジェクトのID。 */
+interface UsageTarget {
+  kind: ConversionDefinitionUsageKind
+  refId: string
+  refVersionId?: string | null
+  label: string
+}
+
+function usageKey(target: Pick<UsageTarget, 'kind' | 'refId'>): string {
+  return `${target.kind}:${target.refId}`
+}
 
 export default function NewConversionPointPage() {
   const { accounts, selectedAccountId } = useAccount()
@@ -85,8 +104,12 @@ export default function NewConversionPointPage() {
   const [reversalPolicy, setReversalPolicy] = useState<ConversionReversalPolicy>('source_cancelled')
   const [attributionDays, setAttributionDays] = useState('')
   const [lineAccountId, setLineAccountId] = useState('')
+  /** N-268: チェックすると下書きで保存し、公開するまで計測しない。 */
+  const [saveAsDraft, setSaveAsDraft] = useState(false)
   const [points, setPoints] = useState<ConversionPoint[]>([])
-  const [selectedUsages, setSelectedUsages] = useState<ConversionDefinitionUsageKind[]>(['analytics', 'nen_campaign'])
+  const [usageTargets, setUsageTargets] = useState<UsageTarget[]>([])
+  const [usageTargetsLoaded, setUsageTargetsLoaded] = useState(false)
+  const [selectedUsageKeys, setSelectedUsageKeys] = useState<Set<string>>(new Set())
   const [preview, setPreview] = useState<ConversionDefinitionPreview | null>(null)
   const [previewLoading, setPreviewLoading] = useState(false)
   const [previewFailed, setPreviewFailed] = useState(false)
@@ -107,6 +130,70 @@ export default function NewConversionPointPage() {
     if (selectedAccountId) setLineAccountId(selectedAccountId)
     else if (!lineAccountId && accounts[0]) setLineAccountId(accounts[0].id)
   }, [accounts, lineAccountId, selectedAccountId])
+
+  /*
+   * 「使う場所」の候補を実オブジェクトから読む(N-258)。
+   *
+   * ファネル・NEN配信の設定・オートメーションのそれぞれが持つ本物のIDを
+   * 使う。読めなかった種類は「まだ作っていません」とだけ出し、
+   * 選べない偽物を置かない。
+   */
+  useEffect(() => {
+    if (!lineAccountId) {
+      setUsageTargets([])
+      setUsageTargetsLoaded(false)
+      return
+    }
+    let cancelled = false
+    setUsageTargetsLoaded(false)
+    const load = async (): Promise<UsageTarget[]> => {
+      const [funnels, automations, nenCampaigns] = await Promise.allSettled([
+        api.analytics.v6Funnels.list(lineAccountId),
+        api.automations.list({ accountId: lineAccountId }),
+        api.nenCampaigns.settings(lineAccountId),
+      ])
+      const targets: UsageTarget[] = []
+      if (funnels.status === 'fulfilled' && funnels.value.success) {
+        for (const funnel of funnels.value.data) {
+          targets.push({
+            kind: 'analytics',
+            refId: funnel.id,
+            refVersionId: funnel.currentVersion?.id ?? null,
+            label: funnel.name,
+          })
+        }
+      }
+      if (nenCampaigns.status === 'fulfilled' && nenCampaigns.value.success) {
+        for (const campaign of nenCampaigns.value.data) {
+          targets.push({ kind: 'nen_campaign', refId: campaign.campaignKey, label: campaign.label })
+        }
+      }
+      if (automations.status === 'fulfilled' && automations.value.success) {
+        for (const automation of automations.value.data) {
+          targets.push({
+            kind: 'automation',
+            refId: automation.id,
+            refVersionId: automation.versionId ?? null,
+            label: automation.name,
+          })
+        }
+      }
+      return targets
+    }
+    void load().then((targets) => {
+      if (cancelled) return
+      setUsageTargets(targets)
+      setUsageTargetsLoaded(true)
+      // アカウントを切り替えたとき、前のアカウントの利用先は残さない。
+      setSelectedUsageKeys((current) =>
+        new Set([...current].filter((key) => targets.some((target) => usageKey(target) === key))))
+    }).catch(() => {
+      if (!cancelled) setUsageTargetsLoaded(true)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [lineAccountId])
 
   /*
    * 同じ名前の警告は、同じ集計対象の中だけで出す(#513 L4)。
@@ -142,6 +229,7 @@ export default function NewConversionPointPage() {
         deduplicationWindowDays: deduplicationMode === 'window' ? 30 : null,
         valueMode,
         fixedValue: valueMode === 'fixed' && Number.isFinite(yen) ? yen : null,
+        reversalPolicy,
       }, { signal: request.signal }).then((response) => {
         if (!request?.isCurrent()) return
         if (response.success) setPreview(response.data)
@@ -156,12 +244,16 @@ export default function NewConversionPointPage() {
       window.clearTimeout(timer)
       request?.abort()
     }
-  }, [deduplicationMode, eventType, excludedCondition, lineAccountId, measureMethod, targetUrl, triggerKind, valueMode, yen])
+  }, [deduplicationMode, eventType, excludedCondition, lineAccountId, measureMethod, reversalPolicy, targetUrl, triggerKind, valueMode, yen])
 
-  const toggleUsage = (kind: ConversionDefinitionUsageKind) => {
-    setSelectedUsages((current) => current.includes(kind)
-      ? current.filter((item) => item !== kind)
-      : [...current, kind])
+  const toggleUsage = (target: UsageTarget) => {
+    setSelectedUsageKeys((current) => {
+      const next = new Set(current)
+      const key = usageKey(target)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
   }
 
   const selectTrigger = (choice: TriggerChoice) => {
@@ -178,7 +270,7 @@ export default function NewConversionPointPage() {
       description="「申込」「購入」など、成果として数えたい行動を登録します。"
       parent={['コンバージョン', '/conversions?tab=points']}
       successHref={(id) => `/conversions?tab=points${id ? `&highlight=${encodeURIComponent(id)}` : ''}`}
-      saveLabel="つくって数えはじめる"
+      saveLabel={saveAsDraft ? '下書きとして保存する' : 'つくって数えはじめる'}
       designNode="GtylA"
       variant="v6"
       validate={() => {
@@ -208,6 +300,7 @@ export default function NewConversionPointPage() {
         setExcludedCondition('')
         setDeduplicationMode('once_per_friend')
         setReversalPolicy('source_cancelled')
+        setSelectedUsageKeys(new Set())
       }}
       onSave={async () => {
         const res = await api.conversions.createDefinition({
@@ -222,9 +315,11 @@ export default function NewConversionPointPage() {
           fixedValue: valueMode === 'fixed' ? yen : null,
           reversalPolicy,
           attributionDays: attributionDays ? Number(attributionDays) : null,
-          usages: USAGE_CHOICES
-            .filter((usage) => selectedUsages.includes(usage.kind))
-            .map(({ kind, refId }) => ({ refKind: kind, refId })),
+          usages: usageTargets
+            .filter((target) => selectedUsageKeys.has(usageKey(target)))
+            .map(({ kind, refId, refVersionId }) => ({ refKind: kind, refId, refVersionId })),
+          // N-268: 下書きで保存すると、一覧の「計測をはじめる」で公開するまで数えない。
+          draft: saveAsDraft,
         })
         if (!res.success) throw new Error(res.error)
         return res.data.id
@@ -279,14 +374,15 @@ export default function NewConversionPointPage() {
       }
     >
       <FormSection step={1} label="何が起きたら数えますか">
-        <div className="grid gap-2 md:grid-cols-3 xl:grid-cols-6">
+        {/* #975 U062: 390pxで6枚の大カードを積まない。短い選択群にし、説明は選択中の1種類だけ下へ出す。 */}
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3" role="radiogroup" aria-label="数えるきっかけ">
           {TRIGGER_CHOICES.map((choice) => {
             const Icon = choice.icon
             const selected = triggerKind === choice.value
             return (
               <label
                 key={choice.value}
-                className={`rounded-card min-w-0 border p-3 text-left transition-colors ${
+                className={`rounded-control flex min-h-11 min-w-0 items-center gap-2 border px-3 py-2 text-left transition-colors ${
                   selected ? 'border-accent bg-accent-soft' : 'border-hairline hover:bg-canvas-sunken'
                 } ${choice.connected ? 'cursor-pointer' : 'cursor-not-allowed opacity-55'}`}
               >
@@ -299,13 +395,20 @@ export default function NewConversionPointPage() {
                   onChange={() => selectTrigger(choice)}
                   className="sr-only"
                 />
-                <Icon className={selected ? 'text-accent' : 'text-ink-faint'} size={18} aria-hidden />
-                <span className="text-ink mt-2 block text-xs font-bold">{choice.label}</span>
-                <span className="text-ink-faint text-micro mt-0.5 block">{choice.note}</span>
+                <Icon className={`shrink-0 ${selected ? 'text-accent' : 'text-ink-faint'}`} size={16} aria-hidden />
+                <span className="text-ink truncate text-xs font-bold" title={choice.label}>{choice.label}</span>
               </label>
             )
           })}
         </div>
+        {(() => {
+          const current = TRIGGER_CHOICES.find((choice) => choice.value === triggerKind)
+          return current ? (
+            <p className="mt-2 text-xs text-ink-secondary" role="status">
+              「{current.label}」… {current.note}の出来事が起きた人を数えます。
+            </p>
+          ) : null
+        })()}
 
         <div className="grid gap-3 md:grid-cols-3">
           <Field
@@ -419,21 +522,51 @@ export default function NewConversionPointPage() {
       <FormSection step={4} label="この成果地点を使う場所">
         <p className="text-ink-faint text-xs">ふつうは呼ぶ側から選びます。ここで選んだ場所は作成と同時につながります。</p>
         <div className="grid gap-2 md:grid-cols-3">
-          {USAGE_CHOICES.map((usage) => (
-            <label key={usage.kind} className="border-hairline rounded-control flex cursor-pointer items-start gap-2 border p-3">
-              <input
-                type="checkbox"
-                checked={selectedUsages.includes(usage.kind)}
-                onChange={() => toggleUsage(usage.kind)}
-                className="mt-0.5"
-              />
-              <span>
-                <span className="text-ink block text-sm font-semibold">{usage.label}</span>
-                <span className="text-ink-faint block text-xs">{usage.note}</span>
-              </span>
-            </label>
-          ))}
+          {USAGE_GROUPS.map((group) => {
+            const targets = usageTargets.filter((target) => target.kind === group.kind)
+            return (
+              <div key={group.kind} className="border-hairline rounded-control border p-3">
+                <p className="text-ink text-sm font-semibold">{group.label}</p>
+                <p className="text-ink-faint text-xs">{group.note}</p>
+                {!usageTargetsLoaded ? (
+                  <p className="text-ink-faint mt-2 text-xs">候補を読み込んでいます</p>
+                ) : targets.length === 0 ? (
+                  <p className="text-ink-faint mt-2 text-xs">使える{group.label}がまだありません</p>
+                ) : (
+                  <ul className="mt-2 space-y-1.5">
+                    {targets.map((target) => (
+                      <li key={usageKey(target)}>
+                        <label className="flex cursor-pointer items-start gap-2">
+                          <input
+                            type="checkbox"
+                            checked={selectedUsageKeys.has(usageKey(target))}
+                            onChange={() => toggleUsage(target)}
+                            className="mt-0.5"
+                          />
+                          <span className="text-ink text-xs">{target.label}</span>
+                        </label>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )
+          })}
         </div>
+        <label className="border-hairline rounded-control mt-3 flex cursor-pointer items-start gap-3 border p-3">
+          <input
+            type="checkbox"
+            checked={saveAsDraft}
+            onChange={(event) => setSaveAsDraft(event.target.checked)}
+            className="mt-0.5"
+          />
+          <span>
+            <span className="text-ink block text-sm font-semibold">まだ計測せず、下書きとして保存する</span>
+            <span className="text-ink-faint mt-0.5 block text-xs">
+              一覧の「下書き」に入ります。数えはじめるには一覧から公開します。
+            </span>
+          </span>
+        </label>
         <details className="border-hairline rounded-control border px-3 py-2">
           <summary className="text-ink-secondary cursor-pointer text-xs font-semibold">詳細設定（帰属期間・集計対象）</summary>
           <div className="mt-3 grid gap-3 md:grid-cols-2">

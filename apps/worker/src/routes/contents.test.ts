@@ -278,6 +278,9 @@ const REPLACEMENT_PLAN = {
     }],
     blockers: [],
     canReplace: true,
+    canPartiallyReplace: true,
+    blockedCount: 0,
+    blockedByKind: {},
     checkedAt: '2026-08-31T10:00:00.000+09:00',
   },
 };
@@ -359,7 +362,12 @@ beforeEach(() => {
   mocks.getMediaDeleteImpact.mockResolvedValue(DELETE_IMPACT);
   mocks.getMediaDeleteImpactSnapshot.mockResolvedValue({ impact: DELETE_IMPACT, usages: [] });
   mocks.getMediaReplacementPlan.mockResolvedValue(REPLACEMENT_PLAN);
-  mocks.applyMediaReplacementPlan.mockResolvedValue(1);
+  mocks.applyMediaReplacementPlan.mockResolvedValue({
+    changedRows: 1,
+    appliedUsageCount: 1,
+    skippedUsageCount: 0,
+    mode: 'all',
+  });
   mocks.getMediaStorageQuota.mockResolvedValue(QUOTA);
   mocks.getMediaVersionList.mockResolvedValue([]);
   mocks.getLatestMediaVersion.mockResolvedValue(null);
@@ -1229,14 +1237,162 @@ describe('メディア使用先の一括差し替え', () => {
       expectedRevision: revision,
     });
     expect(response.status).toBe(200);
-    expect(mocks.applyMediaReplacementPlan).toHaveBeenCalledWith(env.DB, REPLACEMENT_PLAN, 'account-1');
+    expect(mocks.applyMediaReplacementPlan).toHaveBeenCalledWith(
+      env.DB, REPLACEMENT_PLAN, 'account-1', { scope: 'all' },
+    );
     expect(await response.json()).toMatchObject({
       data: {
+        mode: 'all',
         replacedUsageCount: 1,
+        skippedUsageCount: 0,
         remainingUsageCount: 0,
         verification: 'verified',
       },
     });
+  });
+
+  it('差し替えを実行したら監査ログへ残す', async () => {
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    try {
+      const revision = await currentRevision();
+      const response = await req('/api/media/md-1/replace-usages?accountId=account-1', 'POST', {
+        replacementMediaId: 'md-2',
+        expectedRevision: revision,
+      });
+      expect(response.status).toBe(200);
+      const audited = logSpy.mock.calls
+        .map((call) => String(call[0]))
+        .filter((line) => line.includes('"tag":"audit"'))
+        .map((line) => JSON.parse(line) as { action: string; targetId: string });
+      expect(audited).toEqual(expect.arrayContaining([
+        expect.objectContaining({ action: 'media.replace_usages', targetId: 'md-1' }),
+      ]));
+    } finally {
+      logSpy.mockRestore();
+    }
+  });
+
+  it('置換可能な箇所だけの部分実行は scope=replaceable で明示して選べる', async () => {
+    const partialPlan = {
+      ...REPLACEMENT_PLAN,
+      usages: [
+        ...REPLACEMENT_PLAN.usages,
+        { media_id: 'md-1', ref_kind: 'webinar', ref_id: 'webinar-1', scanned_at: '2026-08-31T10:00:00.000' },
+      ],
+      impact: {
+        ...REPLACEMENT_PLAN.impact,
+        usageCount: 2,
+        replaceableCount: 1,
+        blockedCount: 1,
+        blockedByKind: { webinar: 1 },
+        canReplace: false,
+        canPartiallyReplace: true,
+        blockers: ['unsupported_reference'],
+        references: [
+          ...REPLACEMENT_PLAN.impact.references,
+          {
+            kind: 'webinar',
+            name: '講座',
+            href: '/webinars/edit?id=webinar-1',
+            state: 'available',
+            scannedAt: '2026-08-31T10:00:00.000',
+            replaceable: false,
+            blocker: 'unsupported_reference',
+            reason: 'ウェビナー動画は配信用の一式を持つため、このファイルだけを差し替えられません。',
+          },
+        ],
+      },
+    };
+    mocks.getMediaReplacementPlan.mockResolvedValue(partialPlan);
+    mocks.applyMediaReplacementPlan.mockResolvedValue({
+      changedRows: 1,
+      appliedUsageCount: 1,
+      skippedUsageCount: 1,
+      mode: 'partial',
+    });
+    // 残存1件（置換不可のウェビナー）が元メディアを指し続ける。
+    mocks.getMediaUsages.mockResolvedValue([
+      { media_id: 'md-1', ref_kind: 'webinar', ref_id: 'webinar-1', scanned_at: '2026-08-31T10:00:00.000' },
+    ]);
+
+    const revision = await currentRevision();
+    const response = await req('/api/media/md-1/replace-usages?accountId=account-1', 'POST', {
+      replacementMediaId: 'md-2',
+      expectedRevision: revision,
+      scope: 'replaceable',
+    });
+    expect(response.status).toBe(200);
+    expect(mocks.applyMediaReplacementPlan).toHaveBeenCalledWith(
+      env.DB, partialPlan, 'account-1', { scope: 'replaceable' },
+    );
+    expect(await response.json()).toMatchObject({
+      data: {
+        mode: 'partial',
+        replacedUsageCount: 1,
+        skippedUsageCount: 1,
+        remainingUsageCount: 1,
+        verification: 'verified',
+      },
+    });
+  });
+
+  it('scopeを付けない従来の要求は全件実行として、置換不可があれば止める', async () => {
+    const blockedPlan = {
+      ...REPLACEMENT_PLAN,
+      impact: {
+        ...REPLACEMENT_PLAN.impact,
+        canReplace: false,
+        canPartiallyReplace: true,
+        replaceableCount: 1,
+        blockedCount: 1,
+        blockedByKind: { webinar: 1 },
+        blockers: ['unsupported_reference'],
+      },
+    };
+    mocks.getMediaReplacementPlan.mockResolvedValue(blockedPlan);
+    const revision = await currentRevision();
+    const response = await req('/api/media/md-1/replace-usages?accountId=account-1', 'POST', {
+      replacementMediaId: 'md-2',
+      expectedRevision: revision,
+    });
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({ code: 'media_replacement_blocked' });
+    expect(mocks.applyMediaReplacementPlan).not.toHaveBeenCalled();
+  });
+
+  it('置換可能な使用先が0件なら部分実行も409で止める', async () => {
+    const blockedPlan = {
+      ...REPLACEMENT_PLAN,
+      impact: {
+        ...REPLACEMENT_PLAN.impact,
+        canReplace: false,
+        canPartiallyReplace: false,
+        replaceableCount: 0,
+        blockedCount: 1,
+        blockedByKind: { webinar: 1 },
+        blockers: ['unsupported_reference'],
+      },
+    };
+    mocks.getMediaReplacementPlan.mockResolvedValue(blockedPlan);
+    const revision = await currentRevision();
+    const response = await req('/api/media/md-1/replace-usages?accountId=account-1', 'POST', {
+      replacementMediaId: 'md-2',
+      expectedRevision: revision,
+      scope: 'replaceable',
+    });
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({ code: 'media_replacement_blocked' });
+    expect(mocks.applyMediaReplacementPlan).not.toHaveBeenCalled();
+  });
+
+  it('scopeの不正値は400で止める', async () => {
+    const response = await req('/api/media/md-1/replace-usages?accountId=account-1', 'POST', {
+      replacementMediaId: 'md-2',
+      expectedRevision: 'rev-1',
+      scope: 'everything',
+    });
+    expect(response.status).toBe(400);
+    expect(mocks.getMediaReplacementPlan).not.toHaveBeenCalled();
   });
 
   it('本文が16KiBを超えたら読む前後の両方で413', async () => {

@@ -27,6 +27,7 @@ function renderCoupon(coupon: NenCoupon, onCouponChange: (coupon: NenCoupon) => 
         onTabChange={noop}
         settings={[]}
         columns={[]}
+        columnsTotal={0}
         kpis={null}
         flowMetrics={null}
         columnMetrics={null}

@@ -3,6 +3,7 @@ import type {
   FriendAddRoutingValidation,
   FriendAddRoutingVersion,
 } from '@line-crm/shared'
+import { resendSuppressionText } from '../friend-add-text'
 
 /**
  * 友だち追加時配信の公開（設計 `ec9vg` 最終確認 ／ `quhg6` 有効化完了）。
@@ -96,6 +97,21 @@ export function testResultText(input: {
   const scenario = input.scenarioName ?? NOT_AVAILABLE
   return `${who}へ「${scenario}」を開始し、アクションを${input.actionCount}件実行します。`
     + '実際の送信・登録・タグ付けはしていません。'
+}
+
+/**
+ * 再追加時の制限の説明。
+ *
+ * **設定値 (0/24/168時間) をそのまま出す。** 「24時間に1回」と固定で
+ * 書くと、制限しない・7日に1回を選んだ設定と確認画面が食い違う。
+ * 制限が無い (0) ときは「防ぎます」と言わない。
+ */
+export function suppressionNote(hours: number | null | undefined): string {
+  const value = hours ?? 24
+  if (value <= 0) {
+    return '再追加時の制限はありません。同じ人へ繰り返し届くことがあります。'
+  }
+  return `再追加は${resendSuppressionText(value)}だけ実行し、LINE公式のあいさつとの二重送信を防ぎます。`
 }
 
 /**

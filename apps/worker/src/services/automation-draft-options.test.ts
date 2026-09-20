@@ -67,7 +67,8 @@ const TRIGGER_CONFIGS: Record<string, Record<string, unknown>> = {
   form_submitted: {},
   link_clicked: {},
   calendar_booked: {},
-  datetime: { at: '2026-09-20T10:00:00+09:00', friendIds: ['friend-1'] },
+  // 固定日時は置かない (実行時点で過去になると下書き保存が「これからの日時」で弾く)。
+  datetime: { at: new Date(Date.now() + 48 * 3600 * 1000).toISOString(), friendIds: ['friend-1'] },
   daily: { time: '10:00', friendIds: ['friend-1'] },
   weekly: { time: '10:00', weekdays: [1, 3], friendIds: ['friend-1'] },
   'ec.order.confirmed': {},

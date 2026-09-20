@@ -1,8 +1,10 @@
 'use client'
 
 import SelectField from '@/components/shared/select-field'
+import SearchField from '@/components/shared/search-field'
 import { useDeferredValue, useEffect, useState, useCallback, useRef } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { useAccount } from '@/contexts/account-context'
 import { api, ApiError } from '@/lib/api'
 import { ApplyToTagModal } from '@/components/rich-menus/apply-to-tag-modal'
@@ -41,6 +43,19 @@ type SortKey = 'taps' | 'updated' | 'name' | 'priority'
 type RichMenuAction = 'load' | 'reorder' | 'delete' | 'unpublish' | 'externalDelete' | 'import'
 
 /** APIや通信の内部表現を、運用者が次の行動を選べる文へ置き換える。 */
+type RichMenuActionAll = RichMenuAction | 'duplicate'
+
+/** APIや通信の内部表現を、運用者が次の行動を選べる文へ置き換える。 */
+function richMenuErrorAll(error: unknown, action: RichMenuActionAll): string {
+  if (action === 'duplicate') {
+    if (error instanceof ApiError && error.status === 409) {
+      return '複製がほかの操作と重なりました。一覧を読み直してから、もう一度お試しください。'
+    }
+    return 'リッチメニューを複製できませんでした。もう一度お試しください。'
+  }
+  return richMenuError(error, action)
+}
+
 function richMenuError(error: unknown, action: RichMenuAction): string {
   if (error instanceof ApiError) {
     if (error.status === 403) return 'このLINEアカウントのリッチメニューを操作する権限がありません。'
@@ -161,6 +176,7 @@ type DeleteTarget =
   | { kind: 'external'; menu: LineMenu }
 
 export default function RichMenusListPage() {
+  const router = useRouter()
   const { selectedAccount } = useAccount()
   const [showExternal, setShowExternal] = useState(false)
   usePageTitle(showExternal ? '管理画面の外のメニューを取り込む' : 'リッチメニュー')
@@ -211,6 +227,10 @@ export default function RichMenusListPage() {
   const [importedMenuName, setImportedMenuName] = useState<string | null>(null)
   const [deleteBusy, setDeleteBusy] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
+  /** N-154: 複製。押した行と実行中・失敗を別に持つ。 */
+  const [duplicateTarget, setDuplicateTarget] = useState<RichMenuGroupListItem | null>(null)
+  const [duplicateBusy, setDuplicateBusy] = useState(false)
+  const [duplicateError, setDuplicateError] = useState<string | null>(null)
   const deferredQuery = useDeferredValue(query.trim())
 
   useEffect(() => {
@@ -396,6 +416,26 @@ export default function RichMenusListPage() {
     void loadImpact(request)
   }
 
+  /*
+   * N-154: 一覧からそのまま複製。鍵は押すたびに新しく振り、
+   * 二度押しはボタンの disabled で防ぐ（サーバ側も同じ鍵なら1回に数える）。
+   */
+  async function confirmDuplicate() {
+    if (!duplicateTarget || duplicateBusy) return
+    setDuplicateBusy(true)
+    setDuplicateError(null)
+    try {
+      const res = await api.richMenuGroups.duplicate(duplicateTarget.id, crypto.randomUUID())
+      if (!res.success) throw new ApiError(500, res.error ?? 'duplicate_failed')
+      setDuplicateTarget(null)
+      router.push(`/rich-menus/edit?id=${res.data.id}`)
+    } catch (e) {
+      setDuplicateError(richMenuErrorAll(e, 'duplicate'))
+    } finally {
+      setDuplicateBusy(false)
+    }
+  }
+
   function handleDeleteExternal(menu: LineMenu) {
     if (!selectedAccount?.id) return
     setDeleteError(null)
@@ -487,8 +527,8 @@ export default function RichMenusListPage() {
     }
   }
 
-  // メニュー名とトークバーの文言を見る。名前だけだと、画面に出ている
-  // 文言（chatBarText）で探せない。
+  // 検索はメニュー名・トークバーの文言・ボタン名（面のラベル）に当たる。
+  // 名前だけだと、画面に出ている文言やボタンの名前で探せない（N-163）。
   // 集計は多い順に並んでいる。先頭がいちばん押されたボタン。
   const topArea = tapStats?.byArea[0] ?? null
   const tapsByGroup = new Map((tapStats?.byGroup ?? []).map((g) => [g.groupId, g.taps]))
@@ -537,7 +577,7 @@ export default function RichMenusListPage() {
 
   return (
     <main data-design-node="GO8RQ" className="mx-auto max-w-[1584px] p-6">
-      <span hidden>メニュー名で検索・保存した条件・公開中のみ</span>
+      <span hidden>メニュー名・ボタン名で検索・保存した条件・公開中のみ</span>
       {showExternal && selectedAccount ? (
         <div className="bg-canvas-sunken fixed top-14 right-0 bottom-0 left-64 z-40 overflow-y-auto p-6">
           <ExternalImportWorkspace
@@ -612,44 +652,54 @@ export default function RichMenusListPage() {
 
       <div
         data-design="Bar"
-        className="bg-canvas rounded-card border-hairline mb-3 flex flex-wrap items-center gap-2 border p-3"
+        className="bg-canvas rounded-card border-hairline mb-3 border p-3"
       >
-        <Link
-          href="/rich-menus/new"
-          className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control inline-flex items-center gap-1 px-4 py-2 text-sm font-medium transition-colors"
-        >
-          メニューを作る
-        </Link>
-        <Button
-          onClick={() => {
-            // 並べ替え中は、実際の出し分け判定と同じ順番で全件を見せる。
-            setSortKey('priority')
-            setPage(1)
-            setReordering((v) => !v)
-          }}
-          aria-pressed={reordering}
-          variant={reordering ? 'primary' : 'secondary'}
-        >
-          {reordering ? '並び替えを終える' : '出す順番を変える'}
-        </Button>
-        <input
-          type="search"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="メニュー名・ボタン名で検索"
-          aria-label="メニュー名・ボタン名で検索"
-          className="border-hairline rounded-control focus:ring-accent min-w-0 flex-1 border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
-        />
-        <span className="text-ink-faint text-xs whitespace-nowrap">並び順</span>
-        <SelectField value={sortKey} onChange={(e) => setSortKey(e.target.value as SortKey)} aria-label="並び順" options={[{ value: "priority", label: "出す順番（自分で決めた順）" }, { value: "taps", label: "タップ数が多い順" }, { value: "updated", label: "更新が新しい順" }, { value: "name", label: "名前順" }]} className="border-hairline rounded-control focus:ring-accent border px-2 py-2 text-sm focus:ring-2 focus:outline-none" />
-        <span className="text-ink-faint text-xs whitespace-nowrap">表示</span>
-        <SelectField
-          size="compact"
-          value={pageSize}
-          onChange={(e) => setPageSize(Number(e.target.value))}
-          aria-label="表示件数"
-          options={[{ value: '20', label: '20件表示' }, { value: '50', label: '50件表示' }, { value: '100', label: '100件表示' }]}
-        />
+        <div className="flex flex-wrap items-center gap-2">
+          <Link
+            href="/rich-menus/new"
+            className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control inline-flex items-center gap-1 px-4 py-2 text-sm font-medium transition-colors"
+          >
+            メニューを作る
+          </Link>
+          <Button
+            onClick={() => {
+              // 並べ替え中は、実際の出し分け判定と同じ順番で全件を見せる。
+              setSortKey('priority')
+              setPage(1)
+              setReordering((v) => !v)
+            }}
+            aria-pressed={reordering}
+            variant={reordering ? 'primary' : 'secondary'}
+          >
+            {reordering ? '並び替えを終える' : '出す順番を変える'}
+          </Button>
+        </div>
+        {/*
+          検索は独立した全幅の行にする（U015）。作成操作・並び順と
+          同じ行に押し込むと、狭い幅で入力した語が読めないほど潰れる。
+        */}
+        <div data-search-row className="mt-2">
+          <SearchField
+            value={query}
+            onChange={setQuery}
+            onClear={() => setQuery('')}
+            placeholder="メニュー名・ボタン名で検索"
+            aria-label="メニュー名・ボタン名で検索"
+            className="w-full"
+          />
+        </div>
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <span className="text-ink-faint text-xs whitespace-nowrap">並び順</span>
+          <SelectField value={sortKey} onChange={(e) => setSortKey(e.target.value as SortKey)} aria-label="並び順" options={[{ value: "priority", label: "出す順番（自分で決めた順）" }, { value: "taps", label: "タップ数が多い順" }, { value: "updated", label: "更新が新しい順" }, { value: "name", label: "名前順" }]} className="border-hairline rounded-control focus:ring-accent border px-2 py-2 text-sm focus:ring-2 focus:outline-none" />
+          <span className="text-ink-faint text-xs whitespace-nowrap">表示</span>
+          <SelectField
+            size="compact"
+            value={pageSize}
+            onChange={(e) => setPageSize(Number(e.target.value))}
+            aria-label="表示件数"
+            options={[{ value: '20', label: '20件表示' }, { value: '50', label: '50件表示' }, { value: '100', label: '100件表示' }]}
+          />
+        </div>
       </div>
 
       <div className="bg-accent-soft text-ink-secondary mb-3 rounded-control px-3 py-2 text-xs leading-relaxed">
@@ -815,6 +865,7 @@ export default function RichMenusListPage() {
                           <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs">
                             {g.status === 'published' ? <button type="button" onClick={() => setApplyTo(g)} className="text-action font-semibold hover:underline">表示先</button> : null}
                             <Link href={`/rich-menus/edit?id=${g.id}`} className="text-action font-semibold hover:underline">編集</Link>
+                            <button type="button" onClick={() => { setDuplicateError(null); setDuplicateTarget(g) }} className="text-action font-semibold hover:underline">複製</button>
                             <Link href={`/rich-menus/connections?id=${encodeURIComponent(g.id)}`} className="text-ink-secondary hover:underline">切替のつながりを見る</Link>
                             <button type="button" onClick={() => handleDelete(g)} data-qa-open={g.status === 'published' ? 'szXsT' : 'szXsT-draft'} className="text-danger hover:underline" title={g.status === 'published' ? 'LINE から取り下げてから削除' : '削除'}>削除</button>
                           </div>
@@ -845,6 +896,26 @@ export default function RichMenusListPage() {
           onClose={() => setApplyTo(null)}
         />
       )}
+
+      {/* N-154: 一覧から複製。名前・ボタン・画像・出し分けを写した下書きを作る。 */}
+      <ConfirmDialog
+        open={duplicateTarget !== null}
+        title={
+          duplicateTarget
+            ? `「${duplicateTarget.name}」を複製しますか？`
+            : 'リッチメニューを複製しますか？'
+        }
+        description="名前・画像・ボタン・出し分けの設定を写した下書きを新しく作ります。LINE上の表示は変わりません。"
+        confirmLabel="下書きとして複製する"
+        busy={duplicateBusy}
+        error={duplicateError ?? undefined}
+        onCancel={() => {
+          if (duplicateBusy) return
+          setDuplicateTarget(null)
+          setDuplicateError(null)
+        }}
+        onConfirm={() => void confirmDuplicate()}
+      />
 
       <ConfirmDialog
         open={importTarget !== null}

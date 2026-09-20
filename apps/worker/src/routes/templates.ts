@@ -400,6 +400,15 @@ function readCarouselOptions(body: Record<string, unknown>):
   return { ok: true, value };
 }
 
+/**
+ * N-146: 空でない文字列か。口を直接叩かれても、空白だけの名前や本文は
+ * 通さない。空欄のまま保存されると一覧に名前の無い行が残り、中身の無い
+ * テンプレートが配信の候補に並ぶ。
+ */
+function isBlankText(value: unknown): boolean {
+  return typeof value !== 'string' || !value.trim();
+}
+
 templates.post('/api/templates', requireRole('owner', 'admin'), async (c) => {
   try {
     const body = await c.req.json<{
@@ -418,7 +427,8 @@ templates.post('/api/templates', requireRole('owner', 'admin'), async (c) => {
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [body.accountId])) {
       return c.json({ success: false, error: 'Template not found' }, 404);
     }
-    if (!body.name || !body.messageType || !body.messageContent) {
+    // N-146: 空白だけの値も「無い」と同じに扱う。
+    if (isBlankText(body.name) || isBlankText(body.messageType) || isBlankText(body.messageContent)) {
       return c.json({ success: false, error: 'name, messageType, messageContent are required' }, 400);
     }
     const message = validateTemplateMessage(body.messageType, body.messageContent);
@@ -483,6 +493,20 @@ templates.put('/api/templates/:id', requireRole('owner', 'admin'), async (c) => 
       c.env.DB, c.get('staff'), [existing.line_account_id],
     )) {
       return c.json({ success: false, error: 'Not found' }, 404);
+    }
+    /*
+     * N-146: 部分更新なので「来なかった項目」はいまのまま残すが、
+     * 来た項目が空・空白だけなら断る。画面側は保存前に止めているが、
+     * 口を直接叩かれたときに空の名前・空の本文へ書き換わるのを防ぐ。
+     */
+    if (body.name !== undefined && isBlankText(body.name)) {
+      return c.json({ success: false, error: '名前を入力してください' }, 400);
+    }
+    if (body.messageType !== undefined && isBlankText(body.messageType)) {
+      return c.json({ success: false, error: 'テンプレートの種別を確認してください' }, 400);
+    }
+    if (body.messageContent !== undefined && isBlankText(body.messageContent)) {
+      return c.json({ success: false, error: '本文を入力してください' }, 400);
     }
     /*
      * 347: 保存は2系統。名前・置き場の整理は live 列へ即時反映し、

@@ -79,12 +79,15 @@ export function AuthField({
 }) {
   return (
     <div className="flex w-full flex-col gap-1.5">
-      <div className="flex items-center gap-1.5">
-        <label htmlFor={htmlFor} className="text-label font-bold text-ink">
-          {label}
-        </label>
-        {hint ? <span className="text-micro text-ink-faint">{hint}</span> : null}
-      </div>
+      {/*
+        U100: ラベルと補足を同じ行に並べると、320pxや200%拡大で
+        補足が幅を取ってラベルが途中で折れる（「メールアド／レス」）。
+        縦に積めば、ラベル→補足→入力→エラーの順でそのまま読める。
+      */}
+      <label htmlFor={htmlFor} className="text-label font-bold text-ink">
+        {label}
+      </label>
+      {hint ? <p className="text-micro text-ink-faint">{hint}</p> : null}
       {children}
       {error ? (
         <p id={`${htmlFor}-error`} className="text-micro text-status-danger" role="alert">

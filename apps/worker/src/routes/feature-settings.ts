@@ -273,7 +273,7 @@ export const FEATURE_IMPACT_COVERAGE: Readonly<Record<FeatureId, FeatureImpactCo
       {
         kind: 'dependent',
         targetType: 'テンプレートを使う自動応答',
-        fromWhere: `FROM auto_replies WHERE template_id IS NOT NULL AND is_active = 1 AND (line_account_id IS NULL OR line_account_id = ?)`,
+        fromWhere: `FROM auto_replies WHERE template_id IS NOT NULL AND is_active = 1 AND deleted_at IS NULL AND (line_account_id IS NULL OR line_account_id = ?)`,
         idColumn: 'auto_replies.id',
         params: 1,
       },
@@ -306,7 +306,7 @@ export const FEATURE_IMPACT_COVERAGE: Readonly<Record<FeatureId, FeatureImpactCo
       {
         kind: 'published',
         targetType: '有効な自動応答',
-        fromWhere: `FROM auto_replies WHERE is_active = 1 AND (line_account_id IS NULL OR line_account_id = ?)`,
+        fromWhere: `FROM auto_replies WHERE is_active = 1 AND deleted_at IS NULL AND (line_account_id IS NULL OR line_account_id = ?)`,
         idColumn: 'auto_replies.id',
         params: 1,
       },
@@ -386,7 +386,7 @@ export const FEATURE_IMPACT_COVERAGE: Readonly<Record<FeatureId, FeatureImpactCo
       {
         kind: 'published',
         targetType: '有効な受信Webhook',
-        fromWhere: `FROM incoming_webhooks WHERE is_active = 1 AND line_account_id = ?`,
+        fromWhere: `FROM incoming_webhooks WHERE is_active = 1 AND line_account_id = ? AND deleted_at IS NULL`,
         idColumn: 'incoming_webhooks.id',
         params: 1,
       },

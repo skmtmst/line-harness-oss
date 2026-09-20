@@ -106,18 +106,19 @@ export default function AccountsPage() {
       </div>
 
       <div className="bg-canvas rounded-card border-hairline mb-3 border p-3">
-        <div className="flex flex-wrap items-center gap-2">
+        {/*
+          検索は独立した全幅の行にする（U019）。件数の札を隣に置くと、
+          狭い幅でプレースホルダーが途中までしか見えなくなる。
+        */}
+        <div data-search-row>
           <SearchField
             placeholder="アカウント名・チャネルIDで検索"
             aria-label="アカウント名・チャネルIDで検索"
             value={query}
             onChange={setQuery}
             onClear={() => setQuery('')}
-            className="min-w-64 flex-1"
+            className="w-full"
           />
-          <span className="border-hairline rounded-control border px-3 py-2 text-sm text-ink-secondary">
-            20件表示
-          </span>
         </div>
         <div className="mt-3 flex flex-wrap items-center gap-2">
           {ACCOUNT_FILTERS.map((item) => (
@@ -130,7 +131,9 @@ export default function AccountsPage() {
               {item.label}
             </Button>
           ))}
-          <span className="text-ink-faint ml-auto text-xs">{shown.length}件を表示</span>
+          {/* 件数は検索の横ではなく、結果の件数とまとめて置く。 */}
+          <span className="text-ink-faint ml-auto text-xs whitespace-nowrap">20件表示</span>
+          <span className="text-ink-faint text-xs whitespace-nowrap">{shown.length}件を表示</span>
         </div>
       </div>
 
@@ -155,7 +158,50 @@ export default function AccountsPage() {
             : '検索の言葉か、表示する状態を変えてください。'}
         />
       ) : (
-        <div className="bg-canvas rounded-card border-hairline overflow-x-auto border">
+        <div className="bg-canvas rounded-card border-hairline border">
+          {/*
+            U042: 768px 未満では表の右端の「詳細」へ横スクロールしないと
+            届かなかった。スマホでは名前＋状態＋操作が先に見えるカードにし、
+            細かい項目は開いて確認する形にする。
+          */}
+          <ul className="divide-hairline divide-y md:hidden" data-design="List">
+            {shown.map((account) => {
+              const connection = connectionLabel(account)
+              const webhook = webhookLabel(account)
+              return (
+                <li key={account.id} className="p-4">
+                  <div className="flex min-w-0 items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-ink truncate text-sm font-medium" title={account.name}>{account.name}</p>
+                      <p className="text-ink-faint mt-0.5 truncate text-xs">
+                        チャネル {account.channelId}
+                        {` ・ ${account.timezone ?? 'Asia/Tokyo'}`}
+                      </p>
+                    </div>
+                    <Link
+                      href={`/accounts/detail?id=${account.id}`}
+                      className="text-action shrink-0 rounded-control px-2 py-1 text-sm font-semibold hover:underline"
+                    >
+                      詳細
+                    </Link>
+                  </div>
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    <StatusBadge tone={connection.tone}>{connection.label}</StatusBadge>
+                    <StatusBadge tone={webhook.tone}>{webhook.label}</StatusBadge>
+                    {account.isDefault ? <StatusBadge tone="success">既定</StatusBadge> : null}
+                  </div>
+                  <details className="mt-3">
+                    <summary className="text-ink-secondary cursor-pointer text-xs font-semibold">詳しい情報を見る</summary>
+                    <dl className="mt-2 space-y-1 text-xs">
+                      <div className="flex justify-between gap-3"><dt className="text-ink-faint">友だち</dt><dd className="text-ink-secondary tabular-nums">{account.stats ? `${account.stats.friendCount.toLocaleString('ja-JP')}人` : '—'}</dd></div>
+                      <div className="flex justify-between gap-3"><dt className="text-ink-faint">親アカウント</dt><dd className="text-ink-secondary truncate" title={parentName(account, accounts)}>{parentName(account, accounts)}</dd></div>
+                    </dl>
+                  </details>
+                </li>
+              )
+            })}
+          </ul>
+          <div className="hidden overflow-x-auto md:block">
           <table className="w-full min-w-[56rem]">
             <thead>
               <TableHeadRow>
@@ -209,6 +255,7 @@ export default function AccountsPage() {
               })}
             </tbody>
           </table>
+          </div>
         </div>
       )}
 

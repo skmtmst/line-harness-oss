@@ -298,7 +298,8 @@ export function derivePetTagIds(pets: Pet[], now = new Date()): Set<string> {
       const age = ageYears(pet.birthday, now);
       if (age !== null) desired.add(age < 1 ? NEN_TAG.petYoung : age >= 7 ? NEN_TAG.petSenior : NEN_TAG.petAdult);
       if (age !== null && age >= 7) desired.add(NEN_TAG.interestSenior);
-      const month = Number(pet.birthday.slice(5, 7));
+      // 誕生日は月日だけ（MM-DD）の形もあるので、最後5桁から月を取る。
+      const month = Number(pet.birthday.slice(-5, -3));
       if (month === currentMonth) desired.add(NEN_TAG.petBirthdayThisMonth);
       if (month === nextMonth) desired.add(NEN_TAG.petBirthdayNextMonth);
     }

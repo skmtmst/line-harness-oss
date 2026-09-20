@@ -252,6 +252,12 @@ const STAFF_API_PERMISSION_OVERRIDES: Array<[RegExp, string]> = [
   [/^\/api\/friends\/[^/]+\/fields(?:\/|$)/, '/tags'],
   [/^\/api\/friends\/[^/]+\/support-mark(?:\/|$)/, '/tags'],
   [/^\/api\/friends\/support-mark\/bulk(?:\/|$)/, '/tags'],
+  // 友だち単位の購読操作（#949 N-054 / 機能05 §7）は操作ごとの個別鍵で
+  // 委譲する。失敗の再送だけを任された staff（scenario.step_run.retry）が
+  // 購読の操作権限なしで retry へ届くよう、第一関門も操作単位の鍵を見る。
+  // route 側の requirePermission が最終判定を握る。
+  [/^\/api\/scenario-subscriptions\/[^/]+\/retry(?:\/|$)/, 'scenario.step_run.retry'],
+  [/^\/api\/scenario-subscriptions(?:\/|$)/, 'scenario.subscription.edit'],
 ];
 
 export function permissionForApiPath(path: string): string | null {
@@ -413,6 +419,8 @@ export function isPublicApiBoundary(method: string, path: string): boolean {
     // 会員登録・メールログイン・パスワード再設定。Turnstile と回数制限で守る。
     /^\/api\/auth\/(register|password|ops-invite)\//.test(path) ||
     /^\/api\/staff\/invitations\/[^/]+\/verify$/.test(path) ||
+    // N-433: メール変更の確定。トークン自体が資格情報で、ログイン状態に依らない。
+    path === '/api/staff/email-change/confirm' ||
     path.startsWith('/auth/') ||
     path === '/setup' ||
     path === '/api/integrations/stripe/webhook' ||
@@ -420,12 +428,20 @@ export function isPublicApiBoundary(method: string, path: string): boolean {
     path === '/api/hq/billing/webhook' ||
     path === '/api/integrations/eccube/events' ||
     path === '/api/integrations/eccube/columns' ||
+    // ECから届く誕生日クーポンの利用記録。route 内で同じHMAC署名を確かめる。
+    path === '/api/integrations/eccube/coupon-usages' ||
     path === '/api/internal/deployments/events' ||
     path === '/api/integrations/codex-slack/events' ||
     path === '/api/integrations/ai-loop/reports' ||
     path === '/api/integrations/slack/actions' ||
     path === '/api/integrations/slack/events' ||
     /^\/api\/webhooks\/incoming\/[^/]+\/receive$/.test(path) ||
+    // N-270: 外部システムからの成果受信。route 内で地点ごとの
+    // 受信鍵をHMAC-SHA256で照合する。管理画面の認証は通さない。
+    (normalizedMethod === 'POST' && /^\/api\/conversions\/ingest\/[^/]+$/.test(path)) ||
+    // #939 N-380: 外部システム向け公開API。route 内で integration_api_tokens
+    // の Bearer トークンを照合する。管理画面の認証は通さない。
+    path.startsWith('/api/public/v1/') ||
     path === '/api/meet-callback' ||
     path === '/api/qr' ||
     path === '/api/public/brand' ||

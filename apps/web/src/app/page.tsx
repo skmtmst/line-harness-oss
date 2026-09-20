@@ -1,8 +1,8 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import type { EntryRoute, NotificationCenterData, NotificationCenterItem } from '@line-crm/shared'
 import { ApiError, api, bookingApi, type BookingRequest, type DashboardOverview } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
@@ -32,7 +32,9 @@ import Card, { CardHeader } from '@/components/shared/card'
 import Button from '@/components/shared/button'
 import IconButton from '@/components/shared/icon-button'
 import NotificationPanel from '@/components/shared/notification-panel'
+import KpiCollapse from '@/components/ui/kpi-collapse'
 import SelectField from '@/components/shared/select-field'
+import { STATE_TEXT } from '@/components/shared/not-connected'
 import {
   hasInboundSupportMark,
   summarizeTwoFactor,
@@ -129,10 +131,32 @@ function FriendAddLinkCard({
   visualQa?: DashboardOverview['visualQa']
 }) {
   const { selectedAccount } = useAccount()
+  const router = useRouter()
+  const params = useSearchParams()
   const [copied, setCopied] = useState(false)
-  const [showQr, setShowQr] = useState(false)
   const [routes, setRoutes] = useState<EntryRoute[]>([])
   const [routeId, setRouteId] = useState('')
+  /*
+   * QRの表示状態はURLに残す（`?qr=base` または `?qr=<routeId>`）。
+   * 印刷前に再読込しても同じQRが開いたままにするため。
+   * 見え方はローカル状態が持ち、URLは初期値と書き戻し先にする。
+   */
+  const qrParam = params.get('qr')
+  const [showQr, setShowQr] = useState(() => qrParam !== null)
+  const [qrRouteId, setQrRouteId] = useState(() => (qrParam !== null && qrParam !== 'base' ? qrParam : ''))
+  useEffect(() => {
+    setShowQr(qrParam !== null)
+    setQrRouteId(qrParam !== null && qrParam !== 'base' ? qrParam : '')
+  }, [qrParam])
+  const writeQr = (value: string | null) => {
+    setShowQr(value !== null)
+    setQrRouteId(value !== null && value !== 'base' ? value : '')
+    const next = new URLSearchParams(params.toString())
+    if (value === null) next.delete('qr')
+    else next.set('qr', value)
+    const text = next.toString()
+    router.replace(text ? `/?${text}` : '/')
+  }
 
   useEffect(() => {
     let cancelled = false
@@ -199,17 +223,18 @@ function FriendAddLinkCard({
         <button type="button" onClick={onCopy} className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control shrink-0 px-5 py-2.5 text-xs font-medium">
           {copied ? 'コピーしました ✓' : 'コピー'}
         </button>
-        <button type="button" onClick={() => setShowQr(true)} className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control shrink-0 border px-5 py-2.5 text-xs font-medium">QRを表示</button>
+        <button type="button" onClick={() => writeQr(routeId || 'base')} className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control shrink-0 border px-5 py-2.5 text-xs font-medium">QRを表示</button>
       </div>
 
       <QrDialog
         open={showQr}
-        onClose={() => setShowQr(false)}
+        onClose={() => writeQr(null)}
         accountName={selectedAccount?.displayName ?? '然-NEN- 公式'}
         officialProfileUrl={visualQa?.officialProfileUrl ?? officialProfileUrl}
         accountBasicId={selectedAccount?.basicId ?? null}
         baseLink={baseLink}
-        initialRouteId={routeId}
+        initialRouteId={showQr ? qrRouteId : routeId}
+        onRouteIdChange={(id) => writeQr(id || 'base')}
         routes={routes}
         visualReferenceQr={visualQa?.referenceQr ?? false}
       />
@@ -263,7 +288,7 @@ function UnavailableDataCard({ title, onRetry, section }: {
     <Card overflow="hidden">
       <CardHeader size="roomy" title={title} />
       <div className="px-5 py-7 text-center">
-        <p className="text-ink-faint text-sm">{partial ? '一部のデータを取得できませんでした。' : 'データを取得できませんでした。'}</p>
+        <p className="text-ink-faint text-sm">{partial ? `一部のデータを${STATE_TEXT.error}` : `データを${STATE_TEXT.error}`}</p>
         <div className="mt-1 flex justify-center">
           <DashboardFreshness freshness={section?.freshness} asOf={section?.asOf} reason={section?.reason} />
         </div>
@@ -384,14 +409,49 @@ function ConnectionStatusCard({ account, risk, activeFriends }: { account: Retur
   </Card>
 }
 
-export default function DashboardPage() {
+function DashboardPageInner() {
   const router = useRouter()
+  const params = useSearchParams()
   const { selectedAccountId, selectedAccount, loading: accountLoading } = useAccount()
-  const [period, setPeriod] = useState<PeriodKey>('today')
+  /*
+   * 期間・編集中・QRの表示状態はURLに残す（`?period=&edit=1&qr=`）。
+   * 再読込や共有リンクで同じ画面が開くようにするため。
+   *
+   * 見え方そのものはローカル状態が持ち、URLは初回の初期値と
+   * 「あとから変わった値」の写し先。replace が返るまでの間にも
+   * 操作が効くように、押した時点でローカルへも書く。
+   */
+  const periodParam = params.get('period')
+  const editParam = params.get('edit')
+  const [period, setPeriodState] = useState<PeriodKey>(() => (
+    PERIODS.some((item) => item.key === periodParam) ? (periodParam as PeriodKey) : 'today'
+  ))
+  const [editorOpen, setEditorOpen] = useState(() => editParam === '1')
+  useEffect(() => {
+    setPeriodState(PERIODS.some((item) => item.key === periodParam) ? (periodParam as PeriodKey) : 'today')
+  }, [periodParam])
+  useEffect(() => { setEditorOpen(editParam === '1') }, [editParam])
+  const updateQuery = useCallback((mutate: (query: URLSearchParams) => void) => {
+    const next = new URLSearchParams(params.toString())
+    mutate(next)
+    const text = next.toString()
+    router.replace(text ? `/?${text}` : '/')
+  }, [params, router])
+  const selectPeriod = useCallback((key: PeriodKey) => {
+    setPeriodState(key)
+    updateQuery((query) => { if (key === 'today') query.delete('period'); else query.set('period', key) })
+  }, [updateQuery])
+  const openEditor = useCallback(() => {
+    setEditorOpen(true)
+    updateQuery((query) => query.set('edit', '1'))
+  }, [updateQuery])
+  const closeEditor = useCallback(() => {
+    setEditorOpen(false)
+    updateQuery((query) => query.delete('edit'))
+  }, [updateQuery])
   const [data, setData] = useState<DashboardOverview | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [editorOpen, setEditorOpen] = useState(false)
   const [preferences, setPreferences] = useState<DashboardPreferences>(defaultDashboardPreferences)
   const [preferenceVersion, setPreferenceVersion] = useState(0)
   const [preferenceSaving, setPreferenceSaving] = useState(false)
@@ -487,7 +547,7 @@ export default function DashboardPage() {
       setPreferenceVersion(response.data.version)
       setError('')
       try { window.localStorage.setItem(dashboardStorageKey(selectedAccountId), JSON.stringify({ version: response.data.version, cards: normalized })) } catch { /* cache unavailable */ }
-      setEditorOpen(false)
+      closeEditor()
     } catch (caught) {
       setError(caught instanceof Error && 'status' in caught && caught.status === 409
         ? '別の画面で配置が更新されました。再読み込みしてください'
@@ -508,7 +568,7 @@ export default function DashboardPage() {
       setPreferenceVersion(0)
       setError('')
       try { window.localStorage.setItem(dashboardStorageKey(selectedAccountId), JSON.stringify({ version: 0, cards: next })) } catch { /* cache unavailable */ }
-      setEditorOpen(false)
+      closeEditor()
     } catch {
       setError('ダッシュボードの配置を初期状態へ戻せませんでした')
     }
@@ -531,7 +591,7 @@ export default function DashboardPage() {
       if (response.success) setData(response.data)
       else setError(response.error)
     } catch {
-      if (requestId === loadRequestId.current) setError('データの読み込みに失敗しました')
+      if (requestId === loadRequestId.current) setError(`データを${STATE_TEXT.error}`)
     } finally {
       if (requestId === loadRequestId.current) setLoading(false)
     }
@@ -717,7 +777,7 @@ export default function DashboardPage() {
     ? `LINE ${inboxSummary.line}・メール ${inboxSummary.email}`
     : data && sectionAvailable('inbox')
       ? `対応中 ${data.inbox.inProgress}`
-      : data ? '取得できません' : '読み込み中'
+      : data ? STATE_TEXT.error : STATE_TEXT.loading
   const renderMainCard = (id: DashboardCardId): ReactNode => {
     if (id === 'pending-inbox') return <PendingInboxCard onSummaryChange={setInboxSummary} />
     if (id === 'friend-trend') return data && !sectionAvailable('trend')
@@ -729,11 +789,11 @@ export default function DashboardPage() {
     />
     if (id === 'scenario-status') {
       const scenarios = sectionAvailable('operations') ? data?.operations?.scenarios : undefined
-      return <LiveDataCard title="シナリオ配信状況" href="/scenarios" linkLabel="シナリオを見る" value={scenarios?.active ?? null} detail={scenarios ? `一時停止 ${scenarios.paused}件` : data ? '取得できません' : '読み込み中'} freshness={data?.sections?.operations} />
+      return <LiveDataCard title="シナリオ配信状況" href="/scenarios" linkLabel="シナリオを見る" value={scenarios?.active ?? null} detail={scenarios ? `一時停止 ${scenarios.paused}件` : data ? STATE_TEXT.error : STATE_TEXT.loading} freshness={data?.sections?.operations} />
     }
     if (id === 'uid-migration') {
       const migrations = sectionAvailable('operations') ? data?.operations?.migrations : undefined
-      return <LiveDataCard title="UID移行状況" href="/health" linkLabel="移行状況を見る" value={migrations?.active ?? null} detail={migrations ? `完了 ${migrations.completed}件` : data ? '取得できません' : '読み込み中'} freshness={data?.sections?.operations} />
+      return <LiveDataCard title="UID移行状況" href="/health" linkLabel="移行状況を見る" value={migrations?.active ?? null} detail={migrations ? `完了 ${migrations.completed}件` : data ? STATE_TEXT.error : STATE_TEXT.loading} freshness={data?.sections?.operations} />
     }
     return null
   }
@@ -746,8 +806,8 @@ export default function DashboardPage() {
       /* 見た目確認用の差し替え値があるときは、読み込みの成否に関わらず出す。 */
       const state = override != null ? 'ready' : pendingPhotosState
       const detail = state === 'forbidden' ? '写真を見る権限がありません'
-        : state === 'error' ? '取得できません'
-          : value === null ? '読み込み中'
+        : state === 'error' ? STATE_TEXT.error
+          : value === null ? STATE_TEXT.loading
             : `確認待ち ${value}件`
       return <TodayTaskCard title="写真審査" href="/nen-members?tab=photos&status=pending_review" action="審査する" value={value} detail={detail} status="ポイント付与あり" />
     }
@@ -776,11 +836,11 @@ export default function DashboardPage() {
       : data ? <FriendStatusCard friends={data.friends} /> : <EmptyDataCard title="友だちの状態" href="/friends" linkLabel="友だちを見る" />
     if (id === 'booking-status') {
       const bookingsStatus = sectionAvailable('operations') ? data?.operations?.bookings : undefined
-      return <LiveDataCard title="予約状況" href="/booking/bookings" linkLabel="予約を見る" value={bookingsStatus?.upcoming ?? null} detail={bookingsStatus ? `承認待ち ${bookingsStatus.pending}件` : data ? '取得できません' : '読み込み中'} freshness={data?.sections?.operations} />
+      return <LiveDataCard title="予約状況" href="/booking/bookings" linkLabel="予約を見る" value={bookingsStatus?.upcoming ?? null} detail={bookingsStatus ? `承認待ち ${bookingsStatus.pending}件` : data ? STATE_TEXT.error : STATE_TEXT.loading} freshness={data?.sections?.operations} />
     }
     if (id === 'inflow-top') {
       const inflowTop = sectionAvailable('operations') ? data?.operations?.inflowTop : undefined
-      return <LiveDataCard title="流入経路TOP3" href="/inflow-links" linkLabel="流入経路を見る" value={inflowTop?.[0]?.count ?? (inflowTop ? 0 : null)} detail={inflowTop ? inflowTop.map((item) => `${item.name} ${item.count}`).join('、') || '期間内の追加なし' : data ? '取得できません' : '読み込み中'} freshness={data?.sections?.operations} />
+      return <LiveDataCard title="流入経路TOP3" href="/inflow-links" linkLabel="流入経路を見る" value={inflowTop?.[0]?.count ?? (inflowTop ? 0 : null)} detail={inflowTop ? inflowTop.map((item) => `${item.name ?? '—'} ${item.count}`).join('、') || '期間内の追加なし' : data ? STATE_TEXT.error : STATE_TEXT.loading} freshness={data?.sections?.operations} />
     }
     if (id === 'funnel-alert') return <LiveDataCard title="ファネル要注意" href="/analytics" linkLabel="分析を見る" value={sectionAvailable('operations') ? data?.operations?.funnelAlerts ?? null : null} detail="3人以上追加・成果0件の経路" freshness={data?.sections?.operations} />
     if (id === 'automation-failures') return <LiveDataCard title="オートメーション失敗" href="/automations" linkLabel="実行状況を見る" value={sectionAvailable('operations') ? data?.operations?.automationFailures ?? null : null} detail="期間内の失敗・一部失敗" freshness={data?.sections?.operations} />
@@ -801,7 +861,7 @@ export default function DashboardPage() {
     <div>
       {/* V6 `vUXKb/vwcM6`: 画面名は共通トップバーだけ。本文には操作だけを置く。 */}
       <div data-design="Head" className="mb-4.5 flex min-h-10 flex-wrap items-center justify-between gap-3">
-        <Button onClick={() => setEditorOpen(true)}>
+        <Button onClick={openEditor}>
           <EditIcon />ダッシュボード編集
         </Button>
         <div className="flex flex-wrap items-center justify-end gap-2.5">
@@ -812,7 +872,7 @@ export default function DashboardPage() {
               <button
                 key={item.key}
                 type="button"
-                onClick={() => setPeriod(item.key)}
+                onClick={() => selectPeriod(item.key)}
                 aria-pressed={period === item.key}
                 className={`rounded-pill border px-4 py-2 text-xs font-medium transition-colors ${period === item.key ? 'border-accent bg-accent text-on-accent' : 'border-hairline bg-canvas text-ink-secondary hover:bg-canvas-sunken'}`}
               >{item.label}</button>
@@ -850,7 +910,9 @@ export default function DashboardPage() {
               onMarkAllRead={() => { void markAllNotificationsRead() }}
               onClose={() => setNotificationsOpen(false)}
               onViewAll={() => {
-                void loadNotificationCenter(100)
+                /* パネル内は先頭100件まで。全件は通知一覧画面へ送る。 */
+                setNotificationsOpen(false)
+                router.push('/notifications')
               }}
               onOpenSettings={() => {
                 setNotificationsOpen(false)
@@ -869,7 +931,7 @@ export default function DashboardPage() {
       )}
       {data?.partialFailures?.length ? (
         <div className="bg-warning-bg text-warning rounded-card mb-5 p-4 text-sm" role="status">
-          一部のデータを取得できませんでした（{data.partialFailures.join('、')}）。0件としては表示していません。
+          一部のデータを{STATE_TEXT.error}（{data.partialFailures.join('、')}）。0件としては表示していません。
         </div>
       ) : null}
 
@@ -878,9 +940,10 @@ export default function DashboardPage() {
           <h2 className="text-ink text-lg font-bold">今日やること</h2>
           <span className="text-ink-faint text-xs">優先度が高い順</span>
         </div>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {/* #975 U060: 390pxでは先頭2件だけ出し、残りは「集計を見る」で開く。 */}
+        <KpiCollapse gridClassName="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {visibleToday.map((item) => <div key={item.id}>{renderTodayCard(item.id)}</div>)}
-        </div>
+        </KpiCollapse>
       </section> : null}
 
       <div data-design="Shipment" className={shipmentVisible ? 'mb-6' : 'hidden'} aria-hidden={!shipmentVisible}>
@@ -896,7 +959,16 @@ export default function DashboardPage() {
         </aside>
       </div>
 
-      <DashboardEditor open={editorOpen} preferences={preferences} saving={preferenceSaving} onCancel={() => setEditorOpen(false)} onApply={applyPreferences} onReset={resetPreferences} />
+      <DashboardEditor open={editorOpen} preferences={preferences} saving={preferenceSaving} onCancel={closeEditor} onApply={applyPreferences} onReset={resetPreferences} />
     </div>
+  )
+}
+
+export default function DashboardPage() {
+  // useSearchParams は Suspense の中でしか使えない（静的書き出しのため）。
+  return (
+    <Suspense fallback={null}>
+      <DashboardPageInner />
+    </Suspense>
   )
 }

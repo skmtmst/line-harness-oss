@@ -21,6 +21,7 @@ import {
   type WebinarListResponse,
   type WebinarOverview,
 } from '@/lib/api'
+import KpiCollapse from '@/components/ui/kpi-collapse'
 import { overviewCards } from './overview-view'
 import { publicationStateLabel } from '@/components/webinars/publication-label'
 
@@ -694,7 +695,7 @@ function WebinarsPage() {
           />
         </div>
       ) : (
-        <div data-design="KPIs" className="mx-auto mb-4 grid max-w-[1600px] grid-cols-1 gap-4 px-6 pt-4 sm:grid-cols-2 xl:grid-cols-4">
+        <KpiCollapse data-design="KPIs" className="mx-auto mb-4 max-w-[1600px] px-6 pt-4" gridClassName="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {overviewCards(visibleOverview).map((card) => (
             <div key={card.key} className="bg-canvas rounded-card border-hairline border p-4">
               <p className="text-ink-faint text-xs">{card.title}</p>
@@ -709,7 +710,7 @@ function WebinarsPage() {
               {card.detail ? <p className="text-ink-faint mt-0.5 text-xs">{card.detail}</p> : null}
             </div>
           ))}
-        </div>
+        </KpiCollapse>
       )}
       <div data-design-node="ZC13r" className="mx-auto max-w-[1600px] px-6 pb-10">
         <div data-design="Head" className="mb-4 flex flex-wrap gap-2">

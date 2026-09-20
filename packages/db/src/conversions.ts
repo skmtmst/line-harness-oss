@@ -1,3 +1,4 @@
+import { DEFAULT_TENANT_ID } from '@line-crm/shared';
 import { boundedListLimit, jstNow, nonNegativeListOffset, toJstString } from './utils.js';
 import { resolveAffiliateAttribution } from './affiliate-attribution.js';
 // =============================================================================
@@ -21,16 +22,23 @@ export interface ConversionPoint {
   attribution_days: number | null;
   /** 集計対象を1アカウントに絞る場合。NULL なら全アカウント */
   line_account_id: string | null;
+  /**
+   * 所属する統括(N-263)。アカウントを絞っていない地点も必ずどこかの
+   * 統括に属する。移行435より前の行は既定の統括へ寄せてある。
+   */
+  tenant_id: string | null;
   /** 画面からの更新・利用先追加で使う楽観ロック版。 */
   version: number;
   /** 重複の数え方。window のときだけ deduplication_window_days を見る。 */
   deduplication_mode: string | null;
   /** window のときの期間日数。NULL なら期間が決まっていない扱い。 */
   deduplication_window_days: number | null;
-  status: 'active' | 'stopped';
+  status: 'active' | 'stopped' | 'draft';
   stopped_at: string | null;
   updated_at: string;
   created_at: string;
+  /** 金額の決め方(N-252)。source のときは起点イベントの申告値を写す。 */
+  value_mode?: 'source' | 'fixed' | 'none' | null;
 }
 
 export interface ConversionEvent {
@@ -52,6 +60,8 @@ export interface ConversionEvent {
   /** 計測したときの成果地点の版（N-252）。移行377より前の行は NULL。 */
   point_version_snapshot: number | null;
   idempotency_key: string | null;
+  /** 計測したときの地点の統括(N-263)。移行435より前の行は既定の統括。 */
+  tenant_id: string | null;
 }
 
 // ── Conversion Points CRUD ──────────────────────────────────────────────────
@@ -105,19 +115,39 @@ export interface CreateConversionPointInput extends ConversionPointOptions {
   value?: number | null;
 }
 
+/**
+ * 地点の統括を決める(N-263)。
+ *
+ * アカウントを絞る地点はそのアカウントの統括に従う。絞らない地点は
+ * 既定の統括に属する——未割当行を見られるのが既定の統括だけという
+ * 画面側の決めごとと同じ帰結にして、「どこにも属さない地点」を作らない。
+ */
+export async function resolveConversionPointTenantId(
+  db: D1Database,
+  lineAccountId: string | null | undefined,
+): Promise<string> {
+  if (!lineAccountId) return DEFAULT_TENANT_ID;
+  const account = await db
+    .prepare('SELECT tenant_id FROM line_accounts WHERE id = ?')
+    .bind(lineAccountId)
+    .first<{ tenant_id: string | null }>();
+  return account?.tenant_id ?? DEFAULT_TENANT_ID;
+}
+
 export async function createConversionPoint(
   db: D1Database,
   input: CreateConversionPointInput,
 ): Promise<ConversionPoint> {
   const id = crypto.randomUUID();
   const now = jstNow();
+  const tenantId = await resolveConversionPointTenantId(db, input.lineAccountId);
 
   await db
     .prepare(
       `INSERT INTO conversion_points
          (id, name, event_type, value, measure_method, target_url,
-          count_repeat, attribution_days, line_account_id, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          count_repeat, attribution_days, line_account_id, tenant_id, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       id,
@@ -129,6 +159,7 @@ export async function createConversionPoint(
       input.countRepeat === false ? 0 : 1,
       input.attributionDays ?? null,
       input.lineAccountId ?? null,
+      tenantId,
       now,
       now,
     )
@@ -196,7 +227,12 @@ export async function updateConversionPoint(
   if ('targetUrl' in input) put('target_url', input.targetUrl ?? null);
   if (input.countRepeat !== undefined) put('count_repeat', input.countRepeat ? 1 : 0);
   if ('attributionDays' in input) put('attribution_days', input.attributionDays ?? null);
-  if ('lineAccountId' in input) put('line_account_id', input.lineAccountId ?? null);
+  if ('lineAccountId' in input) {
+    put('line_account_id', input.lineAccountId ?? null);
+    // N-263: 所属アカウントを移したら統括も移す。古い統括のまま残すと、
+    // 移管先の統括の友だちへ記録できず、元の統括へは記録し続ける穴になる。
+    put('tenant_id', await resolveConversionPointTenantId(db, input.lineAccountId));
+  }
   if (sets.length === 0) return getConversionPointById(db, id);
   sets.push('version = version + 1');
   put('updated_at', jstNow());
@@ -238,6 +274,10 @@ export async function getUrlReachConversionPoints(
   url: string,
   lineAccountId: string | null,
 ): Promise<ConversionPoint[]> {
+  // N-263: 統括も一致条件にする。アカウントを絞っていない地点でも
+  // tenant_id を持つので、リンクのアカウントの統括と同じ地点だけを返せば、
+  // 「全アカウント対象の地点が別の統括のリンクで反応する」ことがない。
+  // アカウントが取れないリンクは既定の統括に倒す(fail-closed)。
   const result = await db
     .prepare(
       `SELECT * FROM conversion_points
@@ -246,9 +286,11 @@ export async function getUrlReachConversionPoints(
           AND target_url IS NOT NULL
           AND target_url != ''
           AND ? LIKE target_url || '%'
-          AND (line_account_id IS NULL OR line_account_id = ?)`,
+          AND (line_account_id IS NULL OR line_account_id = ?)
+          AND COALESCE(tenant_id, ?) = COALESCE(
+            (SELECT tenant_id FROM line_accounts WHERE id = ?), ?)`,
     )
-    .bind(url, lineAccountId)
+    .bind(url, lineAccountId, DEFAULT_TENANT_ID, lineAccountId, DEFAULT_TENANT_ID)
     .all<ConversionPoint>();
   return result.results;
 }
@@ -286,6 +328,12 @@ export interface TrackConversionInput {
   affiliateCode?: string | null;
   metadata?: string | null;
   idempotencyKey?: string | null;
+  /**
+   * N-270: 外部受信など起点側が金額を持つ場合の1件あたりの金額。
+   * value_mode='source' の地点だけに効く。fixed の地点では地点の設定が
+   * 常に勝つ(固定金額の証跡を起点側の申告で上書きしない)。
+   */
+  value?: number | null;
 }
 
 /**
@@ -338,13 +386,24 @@ const JST_DAY_MS = 86_400_000;
  * (全アカウント対象)のときだけ交差を許可する。それ以外は地点と
  * 友だちが同じアカウントのときだけ記録できる。両方を見られる職員でも
  * 交差記録はできない。
+ *
+ * N-263: 統括を渡したときは統括の一致も条件にする。NULL(未割当)は
+ * 既定の統括に倒すので、「どこにも属さない」側がすり抜けない。
+ * 統括を渡さない呼び出しは従来どおりアカウント一致だけを見る。
  */
 export function canRecordConversion(
   pointLineAccountId: string | null,
   friendLineAccountId: string | null,
+  pointTenantId?: string | null,
+  friendTenantId?: string | null,
 ): boolean {
-  if (pointLineAccountId === null) return true;
-  return pointLineAccountId === friendLineAccountId;
+  if (pointLineAccountId !== null && pointLineAccountId !== friendLineAccountId) {
+    return false;
+  }
+  if (pointTenantId !== undefined || friendTenantId !== undefined) {
+    return (pointTenantId ?? DEFAULT_TENANT_ID) === (friendTenantId ?? DEFAULT_TENANT_ID);
+  }
+  return true;
 }
 
 /**
@@ -431,6 +490,12 @@ export async function trackConversion(
   db: D1Database,
   input: TrackConversionInput,
   runtime?: { now?: number },
+  /**
+   * N-270: 既存の1件を返して終わった(重複・冪等)ことを呼び出し側へ
+   * 伝えるだけの出力先。受信台帳が「数えた」と「再送だった」を
+   * 分けて残せるようにする。
+   */
+  out?: { deduplicated?: boolean },
 ): Promise<ConversionEvent> {
   const id = crypto.randomUUID();
   const nowMs = runtime?.now ?? Date.now();
@@ -438,16 +503,27 @@ export async function trackConversion(
 
   const [point, friend] = await Promise.all([
     getConversionPointById(db, input.conversionPointId),
-    db.prepare('SELECT line_account_id FROM friends WHERE id = ?')
+    db.prepare(`SELECT f.line_account_id, la.tenant_id
+      FROM friends f LEFT JOIN line_accounts la ON la.id = f.line_account_id
+      WHERE f.id = ?`)
       .bind(input.friendId)
-      .first<{ line_account_id: string | null }>(),
+      .first<{ line_account_id: string | null; tenant_id: string | null }>(),
   ]);
   if (!point) throw new Error('conversion_point_not_found');
   if (!friend) throw new Error('conversion_friend_not_found');
+  // N-268: 下書き・停止はどちらも「計測しない」。呼び出し側で区別できるよう
+  // 理由は分けて返す。
   if (point.status === 'stopped') throw new Error('conversion_point_stopped');
+  if (point.status === 'draft') throw new Error('conversion_point_draft');
   // 管理API・公開 /t/:linkId・将来のcallerすべてに同じ境界を適用する。
-  // 地点が全アカウント対象(NULL)の場合だけ、別accountの友だちを許可する。
-  if (!canRecordConversion(point.line_account_id, friend.line_account_id)) {
+  // アカウントの一致に加えて統括の一致も見る(N-263)。地点が全アカウント
+  // 対象(NULL)でも、別の統括の友だちへは記録しない。
+  if (!canRecordConversion(
+    point.line_account_id,
+    friend.line_account_id,
+    point.tenant_id,
+    friend.tenant_id,
+  )) {
     throw new Error('conversion_account_mismatch');
   }
 
@@ -455,11 +531,22 @@ export async function trackConversion(
     const existing = await findEventByIdempotencyKey(db, input.conversionPointId, input.idempotencyKey);
     if (existing) {
       requireSameIdempotencyContent(existing, input);
+      if (out) out.deduplicated = true;
       return existing;
     }
   }
 
   const policy = resolveDedupPolicy(point);
+
+  /*
+   * N-270: 金額のスナップショット。
+   * source の地点は起点の申告値を採る(不正値は 0 へ倒す)。fixed/none では
+   * 地点の設定だけを写し、呼び出し側の申告で固定金額を上書きさせない。
+   */
+  const snapshotValue = point.value_mode === 'source'
+    && typeof input.value === 'number' && Number.isFinite(input.value) && input.value >= 0
+    ? input.value
+    : measuredValue(point);
 
   // Resolve last-touch affiliate attribution before inserting the event.
   // 地点ごとに期間を狭めたい場合があるので attribution_days を渡す
@@ -485,17 +572,20 @@ export async function trackConversion(
     approvalStatus,
     point.name,
     point.event_type,
-    measuredValue(point),
+    snapshotValue,
     point.version,
     input.idempotencyKey ?? null,
+    // 記録時点の地点の統括を写す(N-263)。後で地点が編集・移管されても
+    // 計測当時の所属が分かるようにする。
+    point.tenant_id ?? DEFAULT_TENANT_ID,
   ];
   try {
     if (policy.kind === 'every') {
       await db.prepare(`INSERT INTO conversion_events
         (id, conversion_point_id, friend_id, user_id, affiliate_code, metadata, created_at,
          affiliate_id, attributed_ref_code, approval_status, point_name_snapshot,
-         event_type_snapshot, value_snapshot, point_version_snapshot, idempotency_key)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+         event_type_snapshot, value_snapshot, point_version_snapshot, idempotency_key, tenant_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
         .bind(...eventValues)
         .run();
     } else {
@@ -546,8 +636,8 @@ export async function trackConversion(
       const insertIfClaimed = db.prepare(`INSERT INTO conversion_events
           (id, conversion_point_id, friend_id, user_id, affiliate_code, metadata, created_at,
            affiliate_id, attributed_ref_code, approval_status, point_name_snapshot,
-           event_type_snapshot, value_snapshot, point_version_snapshot, idempotency_key)
-        SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+           event_type_snapshot, value_snapshot, point_version_snapshot, idempotency_key, tenant_id)
+        SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
          WHERE EXISTS (
            SELECT 1 FROM conversion_event_dedup_claims
             WHERE conversion_point_id = ? AND friend_id = ? AND last_event_id = ?
@@ -577,15 +667,22 @@ export async function trackConversion(
           );
           if (existingByKey) {
             requireSameIdempotencyContent(existingByKey, input);
+            if (out) out.deduplicated = true;
             return existingByKey;
           }
         }
         const claimed = await findClaimedEvent(db, input.conversionPointId, input.friendId);
-        if (claimed) return claimed;
+        if (claimed) {
+          if (out) out.deduplicated = true;
+          return claimed;
+        }
         // claimを通らずに直接書かれた成果は claim からは辿れない。
         // 数え方の権威である成果表を直接見て、既存の1件を返す。
         const blocking = await findBlockingEvent(db, input.conversionPointId, input.friendId, cutoff);
-        if (blocking) return blocking;
+        if (blocking) {
+          if (out) out.deduplicated = true;
+          return blocking;
+        }
         throw new Error('conversion_dedup_claim_missing');
       }
     }
@@ -597,11 +694,15 @@ export async function trackConversion(
         const existing = await findEventByIdempotencyKey(db, input.conversionPointId, input.idempotencyKey);
         if (existing) {
           requireSameIdempotencyContent(existing, input);
+          if (out) out.deduplicated = true;
           return existing;
         }
       }
       const claimed = await findClaimedEvent(db, input.conversionPointId, input.friendId);
-      if (claimed) return claimed;
+      if (claimed) {
+        if (out) out.deduplicated = true;
+        return claimed;
+      }
       // every地点は何度でも数えるので、既存の成果で置き換えてはいけない。
       if (policy.kind !== 'every') {
         const blocking = await findBlockingEvent(
@@ -612,7 +713,10 @@ export async function trackConversion(
             ? toJstString(new Date(nowMs - policy.windowDays * JST_DAY_MS))
             : null,
         );
-        if (blocking) return blocking;
+        if (blocking) {
+          if (out) out.deduplicated = true;
+          return blocking;
+        }
       }
     }
     throw error;
@@ -688,60 +792,9 @@ export async function getConversionEvents(
   return result.results;
 }
 
-export interface ConversionReport {
-  conversionPointId: string;
-  conversionPointName: string;
-  eventType: string;
-  totalCount: number;
-  totalValue: number;
-}
-
-export async function getConversionReport(
-  db: D1Database,
-  opts: { startDate?: string; endDate?: string } = {},
-): Promise<ConversionReport[]> {
-  const conditions: string[] = [];
-  const values: unknown[] = [];
-
-  if (opts.startDate) {
-    conditions.push('ce.created_at >= ?');
-    values.push(opts.startDate);
-  }
-  if (opts.endDate) {
-    // endDate は暦日なので、当日の成果も拾えるよう翌日0時を排他上限にする。
-    conditions.push(`ce.created_at < date(?, '+1 day')`);
-    values.push(opts.endDate);
-  }
-
-  const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
-
-  const result = await db
-    .prepare(
-      `SELECT
-         cp.id as conversion_point_id,
-         cp.name as conversion_point_name,
-         cp.event_type,
-         COUNT(ce.id) as total_count,
-         COALESCE(SUM(CASE WHEN ce.id IS NULL THEN 0 ELSE COALESCE(ce.value_snapshot, cp.value, 0) END), 0) as total_value
-       FROM conversion_points cp
-       LEFT JOIN conversion_events ce ON ce.conversion_point_id = cp.id ${conditions.length > 0 ? `AND ${conditions.join(' AND ')}` : ''}
-       GROUP BY cp.id
-       ORDER BY total_count DESC`,
-    )
-    .bind(...values)
-    .all<{
-      conversion_point_id: string;
-      conversion_point_name: string;
-      event_type: string;
-      total_count: number;
-      total_value: number;
-    }>();
-
-  return result.results.map((r) => ({
-    conversionPointId: r.conversion_point_id,
-    conversionPointName: r.conversion_point_name,
-    eventType: r.event_type,
-    totalCount: r.total_count,
-    totalValue: r.total_value,
-  }));
-}
+/*
+ * N-269: 旧来の getConversionReport の実装は conversion-definitions 側の
+ * reportRows(新レポートと同じ集計)へ集約した。暦日解釈とスナップショット
+ * 固定は新レポートと一致する。呼び出し互換のため再公開する。
+ */
+export { getConversionReport, type ConversionReport } from './conversion-definitions.js';

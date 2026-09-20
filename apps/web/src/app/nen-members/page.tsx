@@ -25,6 +25,7 @@ import { photoPetDisplayName } from '@/components/shared/photo-display-name'
 import { photoNoticeFor } from './photo-notice'
 import { photoReviewEntryFrom, photoReviewSearch } from './photo-review-query'
 import { reviewVersionOf, text } from './photo-text'
+import KpiCollapse from '@/components/ui/kpi-collapse'
 import styles from './photo-review.module.css'
 
 type PhotoStatus = 'pending' | 'adopted' | 'rejected'
@@ -765,7 +766,8 @@ export default function PhotoReviewsPage() {
         ]}
       />
 
-      <div data-design="KPIs" className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      {/* #975 U060: 390pxでは先頭2件だけ出し、残りは「集計を見る」で開く。 */}
+      <KpiCollapse data-design="KPIs" className="mb-0" gridClassName="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <div className="rounded-card border border-hairline bg-canvas p-4">
           <p className="text-xs font-semibold text-ink-secondary">見ていない写真</p>
           <p className="mt-1 text-2xl font-bold tabular-nums text-ink">
@@ -792,7 +794,7 @@ export default function PhotoReviewsPage() {
           <p className="mt-1 text-2xl font-bold tabular-nums text-ink">{reviewMetrics ? reviewMetrics.attentionCount : '—'}<span className="ml-0.5 text-xs font-normal text-ink-faint">枚</span></p>
           <p className="mt-0.5 text-xs text-ink-faint">自動判定は確認順の補助だけに使います</p>
         </div>
-      </div>
+      </KpiCollapse>
 
       <div className="rounded-control bg-info-bg px-4 py-3 text-sm font-medium text-accent">
         通す・戻すを押した時点で、投稿者へお礼や直してほしい点が届きます。戻すときは理由を選び、送る文章を確認できます。

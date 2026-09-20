@@ -79,6 +79,12 @@ export interface FriendScenario {
   previous_scenario_id: string | null;
   /** 開始時に固定した公開版（351）。配信はこの版だけを読む。 */
   published_version_id: string | null;
+  /**
+   * なぜ止まっているか（432）。'manual'（画面からの停止）・'after_send'
+   * （この通を送ったら止める設定）・'delivery_failed'（配信失敗）。
+   * 止まっていない行・古い行は null。
+   */
+  pause_reason?: string | null;
   updated_at: string;
 }
 
@@ -1647,6 +1653,37 @@ export async function enrollFriendInScenario(
     .first<FriendScenario>())!;
 }
 
+/**
+ * 購読を別のシナリオへ移す（#949 N-054 / 機能05「友だちごとの移動」）。
+ *
+ * いまの購読を completed に閉じ、移し先へ新しい購読を作る。先に移し先へ
+ * 登録してから元を閉じるので、移し先が受け付けない（停止中・未公開・
+ * すでに入っている・並行を許さない）ときは元の購読はそのまま残る。
+ *
+ * 送信中（delivering）の行はここでは動かさない。claim 済みの配信が
+ * 走っている最中に閉じると結果の書き戻しとぶつかるため、呼び出し側で
+ * delivering を断ってから呼ぶこと。
+ *
+ * @returns 移し先で新しくできた購読。条件に合わないときは null。
+ */
+export async function moveFriendScenarioTo(
+  db: D1Database,
+  id: string,
+  targetScenarioId: string,
+): Promise<FriendScenario | null> {
+  const current = await getFriendScenarioById(db, id);
+  if (!current) return null;
+  if (current.status === 'completed' || current.status === 'delivering') return null;
+  if (current.scenario_id === targetScenarioId) return null;
+
+  // 移し先が受け付けないなら元は残す（null）。理由の区別は呼び出し側で
+  // 移し先シナリオの状態を見て返す。
+  const moved = await enrollFriendInScenario(db, current.friend_id, targetScenarioId);
+  if (!moved) return null;
+  await completeFriendScenario(db, id);
+  return moved;
+}
+
 export async function getFriendScenariosDueForDelivery(
   db: D1Database,
   now: string,
@@ -1715,6 +1752,9 @@ export async function recoverStuckDeliveries(db: D1Database): Promise<number> {
  * Stop a claimed delivery without losing its enrollment state.
  * Used for permanent recipient/payload failures and for account-bound
  * scenarios that do not have a safe destination friend for that account.
+ *
+ * pause_reason='delivery_failed' を残す。画面はこれを見て「再開」ではなく
+ * 「失敗を再送」を出す（432 / #949 N-054）。
  */
 export async function pauseFriendScenarioDelivery(
   db: D1Database,
@@ -1722,7 +1762,8 @@ export async function pauseFriendScenarioDelivery(
 ): Promise<void> {
   await db
     .prepare(
-      `UPDATE friend_scenarios SET status = 'paused', updated_at = ?
+      `UPDATE friend_scenarios
+          SET status = 'paused', pause_reason = 'delivery_failed', updated_at = ?
        WHERE id = ? AND status = 'delivering'`,
     )
     .bind(jstNow(), id)
@@ -1748,6 +1789,7 @@ export async function advanceFriendScenario(
        SET current_step_order = ?,
            next_delivery_at = ?,
            status = 'active',
+           pause_reason = NULL,
            updated_at = ?
        WHERE id = ?`,
     )
@@ -1772,6 +1814,7 @@ export async function pauseFriendScenario(
     .prepare(
       `UPDATE friend_scenarios
        SET status = 'paused',
+           pause_reason = 'after_send',
            current_step_order = ?,
            next_delivery_at = NULL,
            updated_at = ?
@@ -1791,6 +1834,7 @@ export async function completeFriendScenario(
       `UPDATE friend_scenarios
        SET status = 'completed',
            next_delivery_at = NULL,
+           pause_reason = NULL,
            updated_at = ?
        WHERE id = ?`,
     )
@@ -1824,17 +1868,31 @@ export async function resumeFriendScenario(
     .bind(friendId, scenarioId)
     .first<FriendScenario>();
   if (!existing) return null;
+  return resumeExistingFriendScenario(db, existing);
+}
+
+/**
+ * 既にある購読行を続きから動かす共通部品。
+ *
+ * active / delivering の行は null（もう流れている・送信中なので、触ると
+ * 二重配信になる）。止まっているシナリオ・版が読めない購読・進める先が
+ * 無い購読も null。
+ */
+async function resumeExistingFriendScenario(
+  db: D1Database,
+  existing: FriendScenario,
+): Promise<FriendScenario | null> {
   if (existing.status === 'active' || existing.status === 'delivering') return null;
 
   // 止めているシナリオは再開しない。起こすと cron が拾って配り始める。
   const scenarioState = await db.prepare(`SELECT is_active FROM scenarios WHERE id = ?`)
-    .bind(scenarioId)
+    .bind(existing.scenario_id)
     .first<{ is_active: number }>();
   if (!scenarioState || scenarioState.is_active === 0) return null;
 
   // 固定した版だけから次を探す（351）。版が無い・欠損しているときは
   // live の表へ戻らず見送る（null）。
-  const source = await getStepsForDelivery(db, scenarioId, existing.published_version_id ?? null);
+  const source = await getStepsForDelivery(db, existing.scenario_id, existing.published_version_id ?? null);
   if (!source) return null;
   const nextStep = source.steps.find(s => s.step_order > existing.current_step_order);
   if (!nextStep) return null;
@@ -1851,7 +1909,7 @@ export async function resumeFriendScenario(
   await db
     .prepare(
       `UPDATE friend_scenarios
-          SET status = 'active', next_delivery_at = ?, updated_at = ?
+          SET status = 'active', next_delivery_at = ?, pause_reason = NULL, updated_at = ?
         WHERE id = ?`,
     )
     .bind(nextDeliveryAt, now, existing.id)
@@ -1861,4 +1919,88 @@ export async function resumeFriendScenario(
     .prepare(`SELECT * FROM friend_scenarios WHERE id = ?`)
     .bind(existing.id)
     .first<FriendScenario>())!;
+}
+
+/** 購読1件を ID で読む。友だち単位の操作（#949 N-054）の入口。 */
+export async function getFriendScenarioById(
+  db: D1Database,
+  id: string,
+): Promise<FriendScenario | null> {
+  return db
+    .prepare(`SELECT * FROM friend_scenarios WHERE id = ?`)
+    .bind(id)
+    .first<FriendScenario>();
+}
+
+/**
+ * 画面からの手動停止（#949 N-054）。
+ *
+ * 進行中（active）の購読だけを止める。送信中（delivering）はここでは
+ * 触らない。直前に claim した配信が走っている最中に書き換えると、
+ * advanceFriendScenario が paused を active へ戻して「止めたのに動く」
+ * になるため、呼び出し側で delivering を断ってから呼ぶこと。
+ *
+ * @returns 状態を paused に変えられたら true。
+ */
+export async function pauseFriendScenarioManual(
+  db: D1Database,
+  id: string,
+): Promise<boolean> {
+  const result = await db
+    .prepare(
+      `UPDATE friend_scenarios
+          SET status = 'paused',
+              pause_reason = 'manual',
+              next_delivery_at = NULL,
+              updated_at = ?
+        WHERE id = ? AND status = 'active'`,
+    )
+    .bind(jstNow(), id)
+    .run();
+  return (result.meta.changes ?? 0) > 0;
+}
+
+/**
+ * 止まっている購読1件を ID 指定で再開する（#949 N-054）。
+ *
+ * 画面は友だちではなく購読行を指して操作するため、friend_id + scenario_id
+ * で「いちばん新しい行」を探す resumeFriendScenario とは別の入口が要る。
+ * paused の行だけを受け付ける。active / delivering / completed は null。
+ */
+export async function resumeFriendScenarioById(
+  db: D1Database,
+  id: string,
+): Promise<FriendScenario | null> {
+  const existing = await getFriendScenarioById(db, id);
+  if (!existing || existing.status !== 'paused') return null;
+  return resumeExistingFriendScenario(db, existing);
+}
+
+/**
+ * 配信失敗で止まった購読を、失敗した通からすぐ送り直す（#949 N-054）。
+ *
+ * pause_reason='delivery_failed' の paused 行だけを受け付ける。
+ * 再開と違い、版の予定を計算し直さず next_delivery_at を「いま」に
+ * 置く。cron が次の tick で拾い、失敗した通をもう一度組み立てて送る。
+ *
+ * @returns 再送待ちにできた購読。条件に合わない行は null。
+ */
+export async function retryFailedFriendScenario(
+  db: D1Database,
+  id: string,
+): Promise<FriendScenario | null> {
+  const now = jstNow();
+  const result = await db
+    .prepare(
+      `UPDATE friend_scenarios
+          SET status = 'active',
+              next_delivery_at = ?,
+              pause_reason = NULL,
+              updated_at = ?
+        WHERE id = ? AND status = 'paused' AND pause_reason = 'delivery_failed'`,
+    )
+    .bind(now, now, id)
+    .run();
+  if ((result.meta.changes ?? 0) === 0) return null;
+  return getFriendScenarioById(db, id);
 }

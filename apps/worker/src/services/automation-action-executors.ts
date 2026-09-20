@@ -21,6 +21,8 @@ import {
 } from './outbound-idempotency.js';
 import { buildMessage } from './line-message.js';
 import {
+  buildOutgoingWebhookBody,
+  buildOutgoingWebhookHeaders,
   postWebhookSafely,
   recordDeliveryOutcome,
   type SafePostOutcome,
@@ -95,8 +97,11 @@ async function requireScopedResource(
   context: AutomationActionContext,
   input: { table: 'tags' | 'templates' | 'outgoing_webhooks'; id: string; code: string; label: string },
 ): Promise<void> {
+  // #939 N-368: 送信Webhookの削除は履歴を残す印なので、印のある行は
+  // 「見つからない」として扱う。他の表に deleted_at は無い。
+  const notDeleted = input.table === 'outgoing_webhooks' ? ' AND deleted_at IS NULL' : '';
   const row = await context.db.prepare(
-    `SELECT id FROM ${input.table} WHERE id = ? AND line_account_id = ?`,
+    `SELECT id FROM ${input.table} WHERE id = ? AND line_account_id = ?${notDeleted}`,
   ).bind(input.id, context.lineAccountId).first<{ id: string }>();
   if (!row) throw invalid(input.code, `${input.label}が見つからないか、別のLINE公式アカウントにあります`);
 }
@@ -465,15 +470,6 @@ async function richMenuExecutor(
   }
 }
 
-async function signBody(secret: string, body: string): Promise<string> {
-  const bytes = new TextEncoder();
-  const key = await crypto.subtle.importKey(
-    'raw', bytes.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign'],
-  );
-  const signature = await crypto.subtle.sign('HMAC', key, bytes.encode(body));
-  return Array.from(new Uint8Array(signature), (byte) => byte.toString(16).padStart(2, '0')).join('');
-}
-
 async function webhookExecutor(
   context: AutomationActionContext,
   dependencies: AutomationActionExecutorDependencies,
@@ -484,7 +480,7 @@ async function webhookExecutor(
   });
   const webhook = await context.db.prepare(
     `SELECT id, url, secret, secret_encrypted FROM outgoing_webhooks
-      WHERE id = ? AND line_account_id = ? AND is_active = 1`,
+      WHERE id = ? AND line_account_id = ? AND is_active = 1 AND deleted_at IS NULL`,
   ).bind(webhookId, context.lineAccountId).first<{ id: string; url: string; secret: string | null; secret_encrypted?: string | null }>();
   if (!webhook) throw invalid('webhook_not_active', '動作中の送信Webhookが見つかりません');
   // 送り先の安全確認はpostWebhookSafelyが送信直前と転送先の各段で行う。
@@ -500,16 +496,20 @@ async function webhookExecutor(
     if (!sendSecret) throw invalid('webhook_secret_unavailable', '送信Webhookのsecretを確認できませんでした');
   }
 
-  const body = JSON.stringify({
-    eventId: context.sourceEventId,
-    friendId: context.friendId,
-    data: context.inputEvent,
+  // N-371/N-372: 本文は共通封筒（要件26 §6-2）、ヘッダは X-Harness-* の
+  // 共通契約に揃える。イベントIDは冪等キー（step.id）と同じ値なので、
+  // 自動化の再試行で同じ出来事を指し続ける。
+  const body = buildOutgoingWebhookBody({
+    eventId: context.idempotencyKey,
+    eventType: typeof context.inputEvent?.type === 'string' ? context.inputEvent.type : 'automation.send_webhook',
+    occurredAt: typeof context.inputEvent?.occurredAt === 'string'
+      ? context.inputEvent.occurredAt
+      : (dependencies.now?.() ?? new Date().toISOString()),
+    accountId: context.lineAccountId,
+    data: { friendId: context.friendId ?? null, event: context.inputEvent },
+    attempt: context.attemptNumber,
   });
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-    'Idempotency-Key': context.idempotencyKey,
-  };
-  if (sendSecret) headers['X-Webhook-Signature'] = await signBody(sendSecret, body);
+  const headers = await buildOutgoingWebhookHeaders({ eventId: context.idempotencyKey, body, secret: sendSecret });
   // 送信直前の再検査は配送側と共有する。転送先の各段も送る前に確かめる。
   let outcome: SafePostOutcome;
   try {

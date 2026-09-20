@@ -4,7 +4,8 @@ import { Suspense, useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { api, type NenColumn } from '@/lib/api'
-import StickyBar from '@/components/shared/sticky-bar'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import CampaignEditor from './campaign-editor'
 import { useAccount } from '@/contexts/account-context'
 
@@ -33,7 +34,19 @@ function NenColumnEditInner() {
   const [loading, setLoading] = useState(true)
   const [savingId, setSavingId] = useState<string | null>(null)
   const [error, setError] = useState('')
-  const [notice, setNotice] = useState('')
+  /*
+   * U102: カードごとの保存状態。保存の成否は「どの紹介文か」と一緒に
+   * 持つ。ページ上端の共通帯に出すと、どのカードの話か見失う。
+   */
+  const [savedId, setSavedId] = useState<string | null>(null)
+  const [saveError, setSaveError] = useState<{ id: string; message: string } | null>(null)
+  /*
+   * #935 N-301: 紹介文を書きかけのまま離れると消えていた。
+   * 保存済みの紹介文と違う間だけ、ブラウザ離脱・画面内リンク・戻る操作を止めて確認する。
+   * hooksは分岐の前に置く（下の早期returnより先に呼ぶ）。
+   */
+  const dirty = columns.some((column) => (drafts[column.id] ?? '') !== (column.introText ?? ''))
+  const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty, busy: savingId !== null })
 
   // ?key= が付いていれば、その配信そのものを編集する（設計 9-1-1）。
   // 付いていないときは、EC側のコラムに添える紹介文の一覧を出す。
@@ -70,17 +83,18 @@ function NenColumnEditInner() {
     if (!selectedAccountId) return
     setSavingId(column.id)
     setError('')
-    setNotice('')
+    setSaveError(null)
+    setSavedId(null)
     try {
       const res = await api.nenCampaigns.updateColumnMessage(selectedAccountId, column.id, drafts[column.id] ?? '')
       if (!res.success) {
-        setError('保存に失敗しました')
+        setSaveError({ id: column.id, message: '保存に失敗しました。時間をおいてもう一度お試しください。' })
         return
       }
-      setNotice(`「${column.title}」の紹介文を保存しました`)
+      setSavedId(column.id)
       void load()
     } catch (e) {
-      setError(e instanceof Error ? e.message : '保存に失敗しました')
+      setSaveError({ id: column.id, message: e instanceof Error ? e.message : '保存に失敗しました。時間をおいてもう一度お試しください。' })
     } finally {
       setSavingId(null)
     }
@@ -107,7 +121,6 @@ function NenColumnEditInner() {
           {error}
         </div>
       )}
-      {notice && <p className="text-success mb-4 text-sm">{notice}</p>}
 
       {loading ? (
         <div className="bg-canvas rounded-card border-hairline text-ink-faint border p-8 text-center text-sm">
@@ -132,28 +145,60 @@ function NenColumnEditInner() {
               <textarea
                 rows={3}
                 value={drafts[column.id] ?? ''}
-                onChange={(e) => setDrafts((prev) => ({ ...prev, [column.id]: e.target.value }))}
+                onChange={(e) => {
+                  setDrafts((prev) => ({ ...prev, [column.id]: e.target.value }))
+                  // 書き直したら、このカードの保存済み・失敗の印は消す。
+                  if (savedId === column.id) setSavedId(null)
+                  if (saveError?.id === column.id) setSaveError(null)
+                }}
                 placeholder="例: 今週のコラムです。よろしければご覧ください。"
                 aria-label={`${column.title}の紹介文`}
                 maxLength={1500}
                 className="border-hairline rounded-control w-full resize-y border px-3 py-2 text-sm"
               />
-              <StickyBar
-                className="mt-2"
-                actions={(
+              {/*
+                U102: 1つの保存ボタンのために72pxの StickyBar を
+                カードごとに繰り返していた。状態と保存を1行の行操作へ
+                まとめ、変更あり・保存中・保存済み・失敗をカード単位で
+                識別できるようにする。
+              */}
+              <div className="mt-2 flex items-center justify-between gap-3">
+                <p
+                  className={`text-xs ${saveError?.id === column.id ? 'text-danger' : savedId === column.id ? 'text-success' : 'text-ink-faint'}`}
+                  role={saveError?.id === column.id ? 'alert' : 'status'}
+                >
+                  {savingId === column.id
+                    ? '保存しています…'
+                    : saveError?.id === column.id
+                      ? saveError.message
+                      : savedId === column.id
+                        ? 'この紹介文を保存しました'
+                        : (drafts[column.id] ?? '') !== (column.introText ?? '')
+                          ? '変更があります。保存するまで反映されません。'
+                          : ''}
+                </p>
                 <button
                   onClick={() => save(column)}
                   disabled={savingId === column.id || (drafts[column.id] ?? '') === (column.introText ?? '')}
-                  className="border-hairline text-ink-secondary rounded-control hover:bg-canvas-sunken border px-3 py-1.5 text-sm font-medium disabled:opacity-40"
+                  className="border-hairline text-ink-secondary rounded-control hover:bg-canvas-sunken shrink-0 border px-3 py-1.5 text-sm font-medium disabled:opacity-40"
                 >
                   {savingId === column.id ? '保存中...' : '保存'}
                 </button>
-                )}
-              />
+              </div>
             </div>
           ))}
         </div>
       )}
+      {/* #935 N-301: 書きかけのまま離れるときの確認。 */}
+      <ConfirmDialog
+        open={leaveTarget !== null}
+        title="入力した紹介文が保存されていません"
+        description="このまま移動すると、入力した紹介文は保存されません。移動しますか？"
+        confirmLabel="保存せずに移動"
+        cancelLabel="書き続ける"
+        onConfirm={confirmLeave}
+        onCancel={cancelLeave}
+      />
     </div>
   )
 }

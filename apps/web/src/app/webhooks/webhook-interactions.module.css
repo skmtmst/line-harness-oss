@@ -66,6 +66,36 @@
 .table col:nth-child(5) { width: 9%; }
 .table col:nth-child(6) { width: 10%; }
 
+/*
+ * N-386: 狭い幅で6列を無理に残すと短い言葉が途中で折れたり横に
+ * はみ出す。重要度の低い列から順に隠し、残った列を読める幅に配り直す。
+ * 隠した値は「中身を見る」の詳細で確認できる（情報欠落なし）。
+ * 列の指定は見出し・列定義・セルを1か所で揃えられるよう nth-child で
+ * 行う（このファイルの列幅指定と同じやり方）。
+ */
+@media (max-width: 1180px) {
+  /* 5列目「かかった時間」を畳む。詳細の「中身を見る」で見られる */
+  .table th:nth-child(5),
+  .table td:nth-child(5),
+  .table col:nth-child(5) { display: none; }
+  .table col:nth-child(1) { width: 32%; }
+  .table col:nth-child(2) { width: 20%; }
+  .table col:nth-child(3) { width: 26%; }
+  .table col:nth-child(4) { width: 12%; }
+  .table col:nth-child(6) { width: 10%; }
+}
+
+@media (max-width: 760px) {
+  /* さらに3列目「送った・届いた中身」を畳む。詳細で全文を見られる */
+  .table th:nth-child(3),
+  .table td:nth-child(3),
+  .table col:nth-child(3) { display: none; }
+  .table col:nth-child(1) { width: 34%; }
+  .table col:nth-child(2) { width: 28%; }
+  .table col:nth-child(4) { width: 20%; }
+  .table col:nth-child(6) { width: 18%; }
+}
+
 .primary,
 .secondary {
   overflow: hidden;
@@ -129,10 +159,7 @@
 
 @media (max-width: 1180px) {
   .cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .table col:nth-child(2) { width: 18%; }
-  .table col:nth-child(3) { width: 24%; }
-  .table col:nth-child(5) { width: 11%; }
-  .table col:nth-child(6) { width: 12%; }
+  /* 表の列の畳み方と幅の配り直しは上の nth-child ブロックで一括管理する */
 }
 
 @media (max-width: 760px) {

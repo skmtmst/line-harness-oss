@@ -24,6 +24,7 @@ import {
   getBookingAvailabilityException,
   listBookingAvailabilityExceptions,
   updateBookingAvailabilityException,
+  deleteBookingAvailabilityException,
   updateBookingMenuSettings,
   createBookingResource,
   deleteBookingResourceSafely,
@@ -1598,6 +1599,42 @@ booking.patch('/api/booking/admin/exceptions/:id', requirePermission(BOOKING_SET
   } catch {
     console.error(JSON.stringify({ event: 'booking_exception_update_failed' }));
     return c.json({ success: false, error: 'booking_exception_save_failed' }, 503);
+  }
+});
+
+/**
+ * 例外日の削除。登録だけできて画面から消せない状態を解消する(#953 E-09)。
+ * 消す直前の版を expectedVersion で確認し、読み違えたまま別の版を
+ * 消さないようにする。別アカウントのIDは not_found として隠す。
+ */
+booking.delete('/api/booking/admin/exceptions/:id', requirePermission(BOOKING_SETTINGS_KEY), async (c) => {
+  const accountId = await resolveAccountIdAdmin(c);
+  if (!accountId) return c.json({ success: false, error: 'missing_account_id' }, 400);
+  try {
+    const body = await c.req.json<Record<string, unknown>>().catch(() => null);
+    const expectedVersion = Number(body?.expectedVersion);
+    if (!body || Object.keys(body).some((key) => key !== 'expectedVersion')
+      || !Number.isInteger(expectedVersion) || expectedVersion < 1) {
+      return c.json({ success: false, error: 'expectedVersionは1以上の整数で指定してください' }, 400);
+    }
+    const result = await deleteBookingAvailabilityException(c.env.DB, {
+      id: c.req.param('id'),
+      lineAccountId: accountId,
+      expectedVersion,
+    });
+    if (result.status === 'not_found') return c.json({ success: false, error: 'not_found' }, 404);
+    if (result.status === 'conflict') {
+      return c.json({
+        success: false,
+        code: 'version_conflict',
+        error: '例外日が更新されています。読み直してください',
+        data: { currentVersion: result.currentVersion },
+      }, 409);
+    }
+    return c.json({ success: true, data: { id: c.req.param('id') } });
+  } catch {
+    console.error(JSON.stringify({ event: 'booking_exception_delete_failed' }));
+    return c.json({ success: false, error: 'booking_exception_delete_failed' }, 503);
   }
 });
 
@@ -4490,12 +4527,22 @@ booking.post('/api/booking/admin/staff/:id/shifts/generate', requireOwnBookingSt
 
 // ---- Bookings (requests) ----
 
-booking.get('/api/booking/admin/requests', async (c) => {
-  const accountId = await resolveAccountIdAdmin(c);
-  if (!accountId) return c.json({ error: 'missing_account_id' }, 400);
+/**
+ * 台帳一覧とCSV書出しで共用する絞り込み条件の組み立て。
+ * 画面の「よく使う」タブ・担当者・種別・期間・検索語が、そのまま WHERE 句に
+ * なる。一覧とCSVで条件がずれると「画面と違うCSVが出た」になるので、
+ * 条件はこの1か所だけで作る (#933 N-398)。
+ */
+const BOOKING_REQUEST_SOURCES = new Set(['liff', 'phone', 'counter', 'operator', 'import']);
+
+const BOOKING_LEDGER_JOINS = `FROM bookings b
+    INNER JOIN menus m ON m.id = b.menu_id
+    INNER JOIN staff s ON s.id = b.staff_id
+    LEFT JOIN friends f ON f.id = b.friend_id
+    LEFT JOIN booking_customers bc ON bc.id = b.booking_customer_id`;
+
+function bookingLedgerFilter(c: Context<Env>, accountId: string): { where: string; values: unknown[] } {
   const status = c.req.query('status') || 'requested';
-  const limit = Math.min(100, Math.max(1, Number.parseInt(c.req.query('limit') || '50', 10) || 50));
-  const offset = Math.max(0, Number.parseInt(c.req.query('offset') || '0', 10) || 0);
   const conditions = ['b.line_account_id = ?'];
   const values: unknown[] = [accountId];
   if (status !== 'all') { conditions.push('b.status = ?'); values.push(status); }
@@ -4506,16 +4553,26 @@ booking.get('/api/booking/admin/requests', async (c) => {
   }
   const menuName = c.req.query('menu_name')?.trim();
   if (menuName) { conditions.push('m.name = ?'); values.push(menuName); }
+  // 担当者は id で絞る。画面の担当者選び口は staff 一覧から id を渡す。
+  const staffId = c.req.query('staff_id')?.trim();
+  if (staffId) { conditions.push('b.staff_id = ?'); values.push(staffId); }
+  // 種別(予約経路)。CHECK 制約と同じ語彙だけ受け付け、それ以外は無視する
+  // （変な値で0件になっても誤解を招くので、無効値は条件にしない）。
+  const source = c.req.query('source')?.trim();
+  if (source && BOOKING_REQUEST_SOURCES.has(source)) { conditions.push('b.source = ?'); values.push(source); }
   const from = c.req.query('from')?.trim();
   const to = c.req.query('to')?.trim();
   if (from) { conditions.push('b.starts_at >= ?'); values.push(from); }
   if (to) { conditions.push('b.starts_at < ?'); values.push(to); }
-  const joins = `FROM bookings b
-    INNER JOIN menus m ON m.id = b.menu_id
-    INNER JOIN staff s ON s.id = b.staff_id
-    LEFT JOIN friends f ON f.id = b.friend_id
-    LEFT JOIN booking_customers bc ON bc.id = b.booking_customer_id`;
-  const where = `WHERE ${conditions.join(' AND ')}`;
+  return { where: `WHERE ${conditions.join(' AND ')}`, values };
+}
+
+booking.get('/api/booking/admin/requests', async (c) => {
+  const accountId = await resolveAccountIdAdmin(c);
+  if (!accountId) return c.json({ error: 'missing_account_id' }, 400);
+  const limit = Math.min(100, Math.max(1, Number.parseInt(c.req.query('limit') || '50', 10) || 50));
+  const offset = Math.max(0, Number.parseInt(c.req.query('offset') || '0', 10) || 0);
+  const { where, values } = bookingLedgerFilter(c, accountId);
   const [rows, count] = await Promise.all([
     c.env.DB.prepare(
       `SELECT b.*, m.name AS menu_name, s.display_name AS staff_name,
@@ -4523,13 +4580,141 @@ booking.get('/api/booking/admin/requests', async (c) => {
               bc.phone_last4 AS customer_phone_last4,
               bc.pet_name AS customer_pet_name,
               CASE WHEN f.id IS NULL THEN 0 ELSE 1 END AS is_line_linked
-         ${joins} ${where}
+         ${BOOKING_LEDGER_JOINS} ${where}
         ORDER BY b.starts_at ASC LIMIT ? OFFSET ?`,
     ).bind(...values, limit, offset).all(),
-    c.env.DB.prepare(`SELECT COUNT(*) AS total ${joins} ${where}`)
+    c.env.DB.prepare(`SELECT COUNT(*) AS total ${BOOKING_LEDGER_JOINS} ${where}`)
       .bind(...values).first<{ total: number }>(),
   ]);
   return c.json({ requests: rows.results, total: Number(count?.total ?? 0), limit, offset });
+});
+
+// CSV の行上限。台帳は日々増えるので、上限を越える分は次の期間へ分けて
+// 出してもらう。先頭の注記行にこの上限と絞り込み条件を書き、範囲が一目で
+// 分かるようにする (#933 N-397)。
+const BOOKING_CSV_EXPORT_LIMIT = 5000;
+
+const BOOKING_CSV_STATUS_LABEL: Record<string, string> = {
+  requested: 'リクエスト',
+  confirmed: '確定',
+  rejected: '拒否',
+  expired: '期限切れ',
+  cancelled: 'キャンセル',
+  completed: '完了',
+  no_show: '無断',
+};
+
+const BOOKING_CSV_SOURCE_LABEL: Record<string, string> = {
+  liff: 'LINE',
+  phone: '電話',
+  counter: '店頭',
+  operator: 'スタッフ入力',
+  import: '取り込み',
+};
+
+function csvCell(value: unknown): string {
+  let text = value === null || value === undefined ? '' : String(value);
+  // CSVを開いた表計算ソフトで式として実行させない。先頭のタブ・空白も
+  // 一部のソフトでは式と解釈されるため危険接頭辞に含める (#959)。
+  if (/^[\s=+\-@]/.test(text)) text = `'${text}`;
+  return `"${text.replaceAll('"', '""')}"`;
+}
+
+/**
+ * 注記行へ埋め込む値の改行・制御文字を落とす。注記行はクォートなしの
+ * 生テキストなので、クエリ値に %0D%0A=… を仕込まれるとそのまま別の
+ * CSV行として混入し、式注入防御を迂回する (#959)。
+ */
+function csvNoteValue(value: string): string {
+  // eslint-disable-next-line no-control-regex
+  return value.replace(/[\x00-\x1F\x7F]/g, '');
+}
+
+function csvTimestamp(iso: string | null): string {
+  if (!iso) return '';
+  const time = new Date(iso).getTime();
+  if (Number.isNaN(time)) return '';
+  // 台帳をExcel等で開いたときに読みやすいよう JST 表記で出す。
+  return new Date(time + 9 * 3600_000).toISOString().slice(0, 16).replace('T', ' ');
+}
+
+/**
+ * 予約台帳のCSV書出し (#933 N-397)。
+ *
+ * 一覧と同じ絞り込み（状態・検索語・メニュー・担当者・種別・期間）を
+ * bookingLedgerFilter で組み立てるので、画面に見えている分だけが出る。
+ * 件数は BOOKING_CSV_EXPORT_LIMIT まで。閲覧権限は一覧と同じでよい
+ * （読み取りの別形式）ため、staff ロールは /booking/bookings の
+ * 閲覧・編集どちらのキーでも通す。所属外アカウントは共通ミドルウェアで403。
+ */
+booking.get('/api/booking/admin/bookings.csv', async (c) => {
+  const accountId = await resolveAccountIdAdmin(c);
+  if (!accountId) return c.json({ error: 'missing_account_id' }, 400);
+  // 閲覧できる人は書き出せる（読み取りの別形式）。owner/admin は常に通し、
+  // staff は編集キーまたは GET なので閲覧キーで通す。一覧と同じ門番。
+  if (!hasStaffPermission(c, '/booking/bookings')) {
+    return c.json({ error: 'permission_denied' }, 403);
+  }
+  const { where, values } = bookingLedgerFilter(c, accountId);
+  const rows = await c.env.DB.prepare(
+    `SELECT b.id, b.status, b.source, b.starts_at, b.ends_at, b.requested_at,
+            b.price_at_booking, b.customer_note, b.internal_note,
+            m.name AS menu_name, s.display_name AS staff_name,
+            COALESCE(f.display_name, bc.display_name) AS friend_name
+       ${BOOKING_LEDGER_JOINS} ${where}
+      ORDER BY b.starts_at ASC LIMIT ?`,
+  ).bind(...values, BOOKING_CSV_EXPORT_LIMIT + 1)
+    .all<{
+      id: string; status: string; source: string | null;
+      starts_at: string; ends_at: string | null; requested_at: string;
+      price_at_booking: number | null;
+      customer_note: string | null; internal_note: string | null;
+      menu_name: string; staff_name: string; friend_name: string | null;
+    }>();
+  const all = rows.results ?? [];
+  const truncated = all.length > BOOKING_CSV_EXPORT_LIMIT;
+  const exportRows = truncated ? all.slice(0, BOOKING_CSV_EXPORT_LIMIT) : all;
+
+  const status = csvNoteValue(c.req.query('status') || 'requested');
+  const filterNote = [
+    `状態=${status === 'all' ? 'すべて' : (BOOKING_CSV_STATUS_LABEL[status] ?? status)}`,
+    c.req.query('staff_id')?.trim() ? `担当者=指定` : null,
+    c.req.query('source')?.trim() ? `種別=${BOOKING_CSV_SOURCE_LABEL[c.req.query('source')!.trim()] ?? csvNoteValue(c.req.query('source')!.trim())}` : null,
+    c.req.query('menu_name')?.trim() ? `メニュー=${csvNoteValue(c.req.query('menu_name')!.trim())}` : null,
+    c.req.query('query')?.trim() ? `検索語=${csvNoteValue(c.req.query('query')!.trim())}` : null,
+    `期間=${csvNoteValue(c.req.query('from')?.trim() || '指定なし')}〜${csvNoteValue(c.req.query('to')?.trim() || '指定なし')}`,
+  ].filter(Boolean).join(' / ');
+  const headerNote = truncated
+    ? `# 予約台帳の書出し（${filterNote}）…先頭${BOOKING_CSV_EXPORT_LIMIT}件まで。続きは期間や絞り込みを分けて出してください。`
+    : `# 予約台帳の書出し（${filterNote}）…最大${BOOKING_CSV_EXPORT_LIMIT}件まで`;
+
+  const headers = [
+    '予約ID', 'お客さま名', 'メニュー', '担当者', '予約経路',
+    '開始日時(JST)', '終了日時(JST)', '状態', '料金', '申込日時(JST)',
+    'お客様からのご希望', '社内メモ',
+  ];
+  const body = exportRows.map((row) => [
+    row.id,
+    row.friend_name ?? '',
+    row.menu_name,
+    row.staff_name,
+    BOOKING_CSV_SOURCE_LABEL[row.source ?? ''] ?? row.source ?? '',
+    csvTimestamp(row.starts_at),
+    csvTimestamp(row.ends_at),
+    BOOKING_CSV_STATUS_LABEL[row.status] ?? row.status,
+    row.price_at_booking ?? '',
+    csvTimestamp(row.requested_at),
+    row.customer_note ?? '',
+    row.internal_note ?? '',
+  ].map(csvCell).join(','));
+  const csv = `${[headerNote, headers.map(csvCell).join(','), ...body].join('\r\n')}\r\n`;
+  const date = new Date().toISOString().slice(0, 10).replaceAll('-', '');
+  return new Response(`\uFEFF${csv}`, {
+    headers: {
+      'Content-Type': 'text/csv; charset=utf-8',
+      'Content-Disposition': `attachment; filename="booking-ledger-${date}.csv"`,
+    },
+  });
 });
 
 booking.get('/api/booking/admin/requests-summary', async (c) => {

@@ -211,7 +211,6 @@ describe('旧ルートのリダイレクト', () => {
     ['/duplicates', '/friends'],
     ['/users', '/friends'],
     ['/support', '/chats'],
-    ['/notifications', '/webhooks'],
     ['/updates', '/emergency'],
     ['/pools', '/accounts'],
     ['/affiliates', '/conversions'],

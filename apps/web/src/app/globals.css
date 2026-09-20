@@ -218,6 +218,14 @@
   --container-shell: 104rem;
 
   /*
+   * 1280px 未満で画面の上に固定されるハンバーガーヘッダーの高さ。
+   * ヘッダー本体（sidebar.module.css）と本文の上余白（app-shell.module.css）が
+   * 同じここを読む。二か所に数字を書くと、片方だけ変わって本文が
+   * ヘッダーに隠れたり空白ができたりする（U037/U038）。
+   */
+  --mobile-header-height: 68px;
+
+  /*
    * カードの影。**1つだけ持つ。**
    *
    * 以前は `--shadow-v6-card`(#1d1d1f21) が `@theme` の中に、

@@ -1,6 +1,7 @@
-import type {
-  IncomingWebhookActionRef,
-  IncomingWebhookIdentityMatch,
+import {
+  recordIncomingWebhookUnmatched,
+  type IncomingWebhookActionRef,
+  type IncomingWebhookIdentityMatch,
 } from '@line-crm/db';
 import type { ActionDefinition, AutomationActionContext } from './automation-engine.js';
 import { stableWebhookStepId, type IncomingWebhookExecution } from './incoming-webhook-receipts.js';
@@ -15,6 +16,40 @@ type ActionRunResult = {
   failed: number;
 };
 
+function jsonPathSegment(key: string): string {
+  return /^[A-Za-z_][A-Za-z0-9_-]*$/.test(key) ? `.${key}` : `[${JSON.stringify(key)}]`;
+}
+
+/**
+ * 届いた本文の「形」だけの見本。値はすべて •••• に伏せる。
+ * 受け取り口の詳細画面の最新見本と、未照合の届物(#939 N-367)の両方で使う。
+ */
+export function maskedPayloadShape(payload: unknown) {
+  const fields: Array<{ path: string; type: string; maskedValue: '••••' }> = [];
+  let truncated = false;
+  const visit = (value: unknown, path: string, depth: number) => {
+    if (fields.length >= 50) {
+      truncated = true;
+      return;
+    }
+    if (depth >= 6 || value === null || typeof value !== 'object') {
+      const type = value === null ? 'null' : Array.isArray(value) ? 'array' : typeof value;
+      fields.push({ path, type, maskedValue: '••••' });
+      return;
+    }
+    if (Array.isArray(value)) {
+      if (value.length === 0) fields.push({ path, type: 'array', maskedValue: '••••' });
+      else visit(value[0], `${path}[0]`, depth + 1);
+      return;
+    }
+    const entries = Object.entries(value as Record<string, unknown>);
+    if (entries.length === 0) fields.push({ path, type: 'object', maskedValue: '••••' });
+    for (const [key, child] of entries) visit(child, `${path}${jsonPathSegment(key)}`, depth + 1);
+  };
+  visit(payload, '$', 0);
+  return { fields, truncated };
+}
+
 function valueAtPath(payload: unknown, path: string): unknown {
   if (path === '$') return payload;
   const segments = path.slice(1).match(/\.[A-Za-z_][A-Za-z0-9_-]*|\[\d+\]/g) ?? [];
@@ -25,6 +60,33 @@ function valueAtPath(payload: unknown, path: string): unknown {
     value = (value as Record<string | number, unknown>)[key];
   }
   return value;
+}
+
+/** メールアドレスの照合用正規化。大文字小文字と前後の空白だけ揃える。 */
+function normalizeEmailForMatch(value: string): string {
+  return value.trim().toLowerCase();
+}
+
+/**
+ * 電話番号の照合用正規化。数字だけにし、+81 / 81 始まりは国内表記
+ * （0 始まり）へ揃える。どちら側も同じ関数を通すので表記揺れで外れない。
+ */
+function normalizePhoneForMatch(value: string): string {
+  const digits = value.replace(/\D/g, '');
+  if (digits.startsWith('81') && digits.length >= 12) return `0${digits.slice(2)}`;
+  return digits;
+}
+
+/** user_profile_values.value_json の中身を文字列へ戻す。壊れた行は null。 */
+function profileValueText(valueJson: string): string | null {
+  try {
+    const parsed: unknown = JSON.parse(valueJson);
+    if (typeof parsed === 'string') return parsed;
+    if (typeof parsed === 'number') return String(parsed);
+    return null;
+  } catch {
+    return null;
+  }
 }
 
 async function resolveFriendId(
@@ -44,14 +106,35 @@ async function resolveFriendId(
       if (row) return row.id;
       continue;
     }
-    const column = method.kind === 'external_customer_id'
-      ? 'external_id'
-      : method.kind === 'verified_email' ? 'email' : 'phone';
+    if (method.kind === 'verified_email' || method.kind === 'verified_phone') {
+      // N-377: users.email / users.phone の値だけでは「検証済み」の裏付けに
+      // ならない。検証済みと名乗る照合は、統合ユーザー機能で運用者が
+      // 「確認済み」と印を付けた採用値（user_profile_values.verified_at が
+      // ある行）にだけ一致させる。裏付けが無い行は一致させず、未照合の
+      // 届物として箱へ送る（黙って結び付けない）。
+      const fieldKey = method.kind === 'verified_email' ? 'email' : 'phone';
+      const normalize = method.kind === 'verified_email' ? normalizeEmailForMatch : normalizePhoneForMatch;
+      const want = normalize(value);
+      if (!want) continue;
+      const candidates = await db.prepare(
+        `SELECT f.id AS friend_id, pv.value_json AS value_json
+           FROM friends f
+           JOIN user_profile_values pv ON pv.user_id = f.user_id
+          WHERE f.line_account_id = ?
+            AND pv.field_key = ? AND pv.is_active = 1 AND pv.verified_at IS NOT NULL
+          ORDER BY f.created_at ASC`,
+      ).bind(lineAccountId, fieldKey).all<{ friend_id: string; value_json: string }>();
+      for (const row of candidates.results ?? []) {
+        const stored = profileValueText(row.value_json);
+        if (stored !== null && normalize(stored) === want) return row.friend_id;
+      }
+      continue;
+    }
     const row = await db.prepare(
       `SELECT f.id
          FROM friends f
          JOIN users u ON u.id = f.user_id
-        WHERE f.line_account_id = ? AND u.${column} = ?
+        WHERE f.line_account_id = ? AND u.external_id = ?
         ORDER BY f.created_at ASC LIMIT 1`,
     ).bind(lineAccountId, value).first<{ id: string }>();
     if (row) return row.id;
@@ -96,6 +179,49 @@ async function commonActionPlan(
   return parsed as ActionDefinition[];
 }
 
+/**
+ * N-367 (#939): 人が見つからなかった届物を「確認する箱」へ置く。
+ *
+ * unmatched_box / create_candidate はどちらも同じ箱の1行で、
+ * 違いは kind だけ（「未照合として確認」か「友だち候補として残す」か）。
+ * 自動で友だちは作らない。外部から届いた名乗りをそのまま友だちに
+ * すると成り済ませられるため、人が確かめてから結び付ける。
+ * 同じ受信の再送は台帳側の UNIQUE で増えない。
+ */
+async function recordNotFound(
+  db: D1Database,
+  input: {
+    webhookId: string;
+    lineAccountId: string;
+    sourceEventId: string;
+    payload: unknown;
+    identityMatching: IncomingWebhookIdentityMatch;
+    execution?: IncomingWebhookExecution;
+  },
+): Promise<void> {
+  const onNotFound = input.identityMatching.onNotFound;
+  if (onNotFound === 'do_nothing') return;
+  const attempts = input.identityMatching.methods
+    .map((method) => {
+      const raw = valueAtPath(input.payload, method.path);
+      const value = typeof raw === 'string' ? raw.trim()
+        : typeof raw === 'number' ? String(raw) : '';
+      return { kind: method.kind, path: method.path, value: value.slice(0, 200) };
+    })
+    .filter((attempt) => attempt.value !== '');
+  const record = () => recordIncomingWebhookUnmatched(db, {
+    webhookId: input.webhookId,
+    lineAccountId: input.lineAccountId,
+    sourceEventId: input.sourceEventId,
+    kind: onNotFound === 'create_candidate' ? 'candidate' : 'unmatched',
+    identityAttempts: attempts,
+    maskedShape: maskedPayloadShape(input.payload),
+    receivedAt: input.execution?.occurredAt,
+  });
+  if (input.execution) await input.execution.step('unmatched', record);
+  else await record();
+}
+
 export async function executeIncomingWebhookActions(
   db: D1Database,
   input: {
@@ -110,10 +236,21 @@ export async function executeIncomingWebhookActions(
   },
 ): Promise<ActionRunResult> {
   db = input.execution?.db ?? db;
-  if (input.actions.length === 0) return { matchedFriendId: null, executed: 0, failed: 0 };
+  /*
+   * 処理も未照合時の扱いも無いなら、照合そのものを省く(従来どおり)。
+   * 「見つからなかったら箱へ置く」が選ばれているときは、処理が0件でも
+   * 照合だけは行い、見つからなければ箱へ置く。
+   */
+  if (input.actions.length === 0 && input.identityMatching.onNotFound === 'do_nothing') {
+    return { matchedFriendId: null, executed: 0, failed: 0 };
+  }
   const resolve = () => resolveFriendId(db, input.lineAccountId, input.payload, input.identityMatching);
   const friendId = input.execution ? await input.execution.step('matched-friend', resolve) : await resolve();
-  if (!friendId) return { matchedFriendId: null, executed: 0, failed: 0 };
+  if (!friendId) {
+    await recordNotFound(db, input);
+    return { matchedFriendId: null, executed: 0, failed: 0 };
+  }
+  if (input.actions.length === 0) return { matchedFriendId: friendId, executed: 0, failed: 0 };
 
   const executors = createAutomationActionExecutors(input.dependencies);
   let executed = 0;

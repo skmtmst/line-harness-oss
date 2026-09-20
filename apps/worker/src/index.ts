@@ -79,6 +79,7 @@ import { affiliateSelfRoutes } from './routes/affiliate-self.js';
 import { affiliatePayouts } from './routes/affiliate-payouts.js';
 // Round 3 ルート
 import { webhooks } from './routes/webhooks.js';
+import { publicApi } from './routes/public-api.js';
 import { calendar } from './routes/calendar.js';
 import { meetConsultations } from './routes/meet-consultations.js';
 import { reminders } from './routes/reminders.js';
@@ -438,6 +439,7 @@ app.route('/', affiliatePayouts);
 
 // Mount route groups — Round 3
 app.route('/', webhooks);
+app.route('/', publicApi);
 app.route('/', calendar);
 app.route('/', meetConsultations);
 app.route('/', reminders);
@@ -1005,6 +1007,10 @@ app.get('/o', async (c) => {
   if (id) liffParams.set('id', id);
   const slug = c.req.query('slug');
   if (slug) liffParams.set('slug', slug);
+  // N-396: 管理画面が発行する「予約履歴URL」は salon-book の view=history を
+  // 指す。任意の view を通すと未定義画面へ誘導できてしまうので、履歴だけを通す。
+  const view = c.req.query('view');
+  if (page === 'salon-book' && view === 'history') liffParams.set('view', view);
   const liffTarget = `https://liff.line.me/${liffId}?${liffParams.toString()}`;
 
   const ua = (c.req.header('user-agent') || '').toLowerCase();
@@ -1653,6 +1659,34 @@ async function scheduled(
     console.error('operator notification sweep error:', error);
   }
 
+  // N-369/N-370 (#938): 送信Webhookの送り残しを回収する。
+  //
+  // 初回の送信はイベント発火の側で同期に行う。ここが拾うのは、そこで
+  // 落ちて retry_wait に入った行と、Worker が途中で止まって
+  // pending/sending のまま残った行だけ。再送時刻は台帳の
+  // next_retry_at が持つので、5分のレーンで十分である。
+  // 1件の失敗で他の回収を止めないよう、例外はここで止める。
+  try {
+    const { sweepOutgoingWebhookDeliveries, OUTGOING_WEBHOOK_SWEEP_LIMIT } =
+      await import('./services/outgoing-webhook-delivery.js');
+    const result = await sweepOutgoingWebhookDeliveries(env.DB, {
+      limit: OUTGOING_WEBHOOK_SWEEP_LIMIT,
+      now: new Date(event.scheduledTime),
+    });
+    if (result.swept > 0) {
+      console.log(JSON.stringify({
+        event: 'outgoing_webhook_delivery_sweep',
+        swept: result.swept,
+        delivered: result.delivered,
+        failed: result.failed,
+        retryWait: result.retryWait,
+        skipped: result.skipped,
+      }));
+    }
+  } catch (error) {
+    console.error('outgoing webhook delivery sweep error:', error);
+  }
+
   const defaultLineClient = new LineClient(env.LINE_CHANNEL_ACCESS_TOKEN);
   const dispatchObservedAt = new Date(event.scheduledTime).toISOString();
   const observeDispatch = <T>(jobName: string, run: () => Promise<T>) =>
@@ -1835,20 +1869,33 @@ async function scheduled(
   try {
     await observeDispatch('NEN campaign deliveries', async () => {
       const { processNenDeliveries, enqueueBirthdayCoupons } = await import('./services/nen-engagement.js');
-      const birthdayQueued = await enqueueBirthdayCoupons(
+      const { dispatchOperatorEvent } = await import('./services/operator-notification-dispatch.js');
+      // EC側の発行に失敗しても残りの子と通常配信は止めない。失敗は
+      // 運用通知へ回し、次の日次走査で同じコードへ収束させる（部分成功を成功扱いしない）。
+      const birthday = await enqueueBirthdayCoupons(
         env.DB,
         new Date(),
         env.NEN_EC_BASE_URL && env.ECCUBE_WEBHOOK_SECRET
           ? { baseUrl: env.NEN_EC_BASE_URL, secret: env.ECCUBE_WEBHOOK_SECRET }
           : undefined,
+        async (failure) => {
+          if (!failure.lineAccountId) return;
+          await dispatchOperatorEvent(env.DB, env, {
+            lineAccountId: failure.lineAccountId,
+            eventType: 'nen_birthday_coupon_failed',
+            sourceEventId: `nen_coupon_issue_failed:${failure.petId}:${failure.issueYear}`,
+            message: `誕生日クーポンの発行に失敗しました。次の日次処理でやり直します（コード: ${failure.couponCode || '未発行'}）`,
+            executionMode: 'automatic',
+          });
+        },
       );
       const result = await processNenDeliveries(env.DB, {
         proxyBaseUrl: env.WORKER_PUBLIC_URL ?? 'https://your-worker.your-subdomain.workers.dev',
         defaultAccessToken: env.LINE_CHANNEL_ACCESS_TOKEN,
         proxyDispatch: (request) => Promise.resolve(lineProxy.fetch(request, env, ctx)),
       });
-      if (birthdayQueued + result.sent + result.failed + result.skipped > 0) {
-        console.log(JSON.stringify({ event: 'nen_campaign_tick', birthdayQueued, ...result }));
+      if (birthday.queued + birthday.failed + result.sent + result.failed + result.skipped > 0) {
+        console.log(JSON.stringify({ event: 'nen_campaign_tick', birthdayQueued: birthday.queued, birthdayIssueFailed: birthday.failed, ...result }));
       }
     });
   } catch (e) {

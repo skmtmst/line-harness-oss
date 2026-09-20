@@ -46,7 +46,7 @@ export default function AppTopBar() {
   const pathname = usePathname() ?? '/'
   const { title, } = usePageChrome()
   const router = useRouter()
-  const { accounts, selectedAccountId, setSelectedAccountId, clearSelectedAccountId } = useAccount()
+  const { accounts, selectedAccountId, setSelectedAccountId, clearSelectedAccountId, loading, error, refreshing, refreshAccounts } = useAccount()
   const [staffName, setStaffName] = useState('')
   const [staffRole, setStaffRole] = useState('')
 
@@ -83,7 +83,24 @@ export default function AppTopBar() {
 
   const logout = () => logoutAndGoToLogin()
 
+  /*
+   * 一覧の取得に失敗したとき、札がただ空になるだけだと「アカウントが
+   * 1件も無い」ように見える（Issue #978）。失敗と再読み込みをバーの
+   * 直下へ出す。統括の画面（/hq）は画面本体が同じ失敗を出すので畳む。
+   */
+  const accountsLoadFailed = !isHq && !loading && Boolean(error) && accounts.length === 0
+
   return (
+    <>
+    {/*
+      1280px 未満では畳む。現在地はモバイルの固定ヘッダーが持つ
+      （U037/U038）。TopBar 自身のクラスではなく無印の div で包む:
+      部品側の display 指定（CSS Module）より utilities の hidden が
+      負ける書き方を避けるため。xl は Tailwind 既定の 1280px。
+      アカウント一覧の失敗帯はこの下に別で出すので、モバイルでも
+      失敗だけは見える。
+    */}
+    <div className="hidden xl:block">
     <TopBar
       title={shownTitle}
       // Masato の確定待ち。空のうちは押せない見た目にする（`docs/v6-common-rules.md` §11-2）。
@@ -97,5 +114,20 @@ export default function AppTopBar() {
       userName={staffName}
       onLogout={logout}
     />
+    </div>
+    {accountsLoadFailed ? (
+      <div role="alert" className="flex items-center justify-center gap-3 border-b border-hairline bg-danger-bg px-4 py-2 text-sm text-danger">
+        <span>LINEアカウントの一覧を読み込めませんでした。</span>
+        <button
+          type="button"
+          onClick={() => { void refreshAccounts() }}
+          disabled={refreshing}
+          className="font-semibold underline underline-offset-2 disabled:opacity-60"
+        >
+          {refreshing ? '読み込んでいます' : '再読み込み'}
+        </button>
+      </div>
+    ) : null}
+    </>
   )
 }

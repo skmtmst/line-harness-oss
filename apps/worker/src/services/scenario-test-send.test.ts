@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createTestD1, insertFriend, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 import { createTemplate, publishTemplate } from '@line-crm/db';
 import { LineClient } from '@line-crm/line-sdk';
@@ -81,5 +81,98 @@ describe('実DB: テスト送信は送る側のアカウントで解決する', 
       null,
     );
     expect(result).toMatchObject({ ok: false, sent: 0 });
+  });
+});
+
+/**
+ * 送信先単位のデバウンス（#949 N-057）。
+ *
+ * 画面の送信中フラグだけでは、連打・別タブ・同時リクエストの重複実送信を
+ * 止められない。送る前にサーバー側で claim を取り、窓の内側では実送信も
+ * 記録もしない。
+ */
+describe('実DB: テスト送信の送信先デバウンス（N-057）', () => {
+  let store: SqliteD1;
+
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    store = createTestD1();
+    store.raw.prepare(
+      `INSERT INTO line_accounts
+         (id, channel_id, name, channel_access_token, channel_secret, is_active)
+       VALUES ('account-1', 'channel-1', 'account-1', '', '', 1)`,
+    ).run();
+    insertFriend(store.raw, 'friend-1', { line_user_id: 'U1', line_account_id: 'account-1' });
+    insertFriend(store.raw, 'friend-2', { line_user_id: 'U2', line_account_id: 'account-1' });
+    vi.spyOn(LineClient.prototype, 'pushMessage').mockResolvedValue(undefined as never);
+  });
+
+  const step = {
+    id: 'step-1',
+    scenario_id: 'scenario-1',
+    step_order: 0,
+    delay_minutes: 0,
+    message_type: 'text',
+    message_content: 'テスト本文',
+    condition_type: null,
+    condition_value: null,
+    next_step_on_false: null,
+    offset_days: null,
+    offset_minutes: null,
+    delivery_time: null,
+    template_id: null,
+    question_json: null,
+  } as never;
+
+  const send = (friendId = 'friend-1', dedupeKey = 'scenario-1:all') =>
+    testSendSteps(
+      store.db,
+      new LineClient('dummy-token'),
+      [step],
+      friendId,
+      'account-1',
+      undefined,
+      { dedupeKey },
+    );
+
+  it('同じ送信先・同じ対象への連続送信は2回目を控える', async () => {
+    const first = await send();
+    expect(first).toMatchObject({ ok: true, sent: 1 });
+    expect(LineClient.prototype.pushMessage).toHaveBeenCalledTimes(1);
+
+    const second = await send();
+    expect(second).toMatchObject({ ok: false, sent: 0, deduped: true });
+    expect(LineClient.prototype.pushMessage).toHaveBeenCalledTimes(1);
+
+    // 控えたぶんは記録にも残さない（scenario_test の行が増えない）。
+    const logs = store.raw.prepare(
+      `SELECT COUNT(*) AS n FROM messages_log WHERE source = 'scenario_test'`,
+    ).get() as { n: number };
+    expect(logs.n).toBe(1);
+  });
+
+  it('別の友だち・別の対象は制限しない', async () => {
+    expect((await send('friend-1')).ok).toBe(true);
+    expect((await send('friend-2')).ok).toBe(true);
+    expect((await send('friend-1', 'scenario-1:step-1')).ok).toBe(true);
+    expect(LineClient.prototype.pushMessage).toHaveBeenCalledTimes(3);
+  });
+
+  it('窓を過ぎると同じ送信先へまた送れる', async () => {
+    expect((await send()).ok).toBe(true);
+    store.raw.prepare(
+      `UPDATE scenario_test_send_claims SET claimed_at = '2020-01-01T00:00:00.000+09:00'`,
+    ).run();
+    expect((await send()).ok).toBe(true);
+    expect(LineClient.prototype.pushMessage).toHaveBeenCalledTimes(2);
+  });
+
+  it('dedupeKey を渡さない呼び出しは従来どおり制限しない', async () => {
+    const plain = () => testSendSteps(
+      store.db, new LineClient('dummy-token'), [step], 'friend-1', 'account-1',
+    );
+    expect((await plain()).ok).toBe(true);
+    expect((await plain()).ok).toBe(true);
+    expect(LineClient.prototype.pushMessage).toHaveBeenCalledTimes(2);
   });
 });

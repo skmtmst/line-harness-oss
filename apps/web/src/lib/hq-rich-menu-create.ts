@@ -67,6 +67,13 @@ export function hqDefinitionToRichMenuCreateValue(definition: RichMenuDefinition
     templateKey: template.key,
     folderId: '',
     areaDraftsByTemplate: { [template.key]: firstPage.areas.map(definitionAreaToDraft) },
+    // N-161: 統括ひな形には既定ページ・出し分け・全員既定の概念がない。
+    // 店舗側で作り直すときの既定値を置く。
+    defaultPageIndex: 0,
+    isDefaultForAll: false,
+    targetingEnabled: false,
+    targetingCondition: null,
+    targetingPriority: 0,
   }
 }
 

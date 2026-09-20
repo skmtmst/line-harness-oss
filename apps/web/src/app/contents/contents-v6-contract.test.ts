@@ -85,8 +85,9 @@ describe('V6 登録メディア一覧の契約', () => {
     expect(UPLOAD).toContain('data-design-node="eXAJP"')
     expect(UPLOAD).toContain('ここにファイルをドラッグ、または押して選ぶ')
     expect(UPLOAD).toContain('LINEで送れる大きさ（超えると入れられません）')
-    // 検索: 幅420まで。表示切替: 枠40・各44。
-    expect(PAGE).toContain('min-w-64 max-w-[420px] flex-1')
+    // 検索: 独立した全幅の行（U014系の一括修正）。表示切替: 枠40・各44。
+    expect(PAGE).toContain('data-search-row')
+    expect(PAGE).toContain('className="w-full"')
     expect(PAGE).toContain('rounded-control flex h-10 items-center overflow-hidden border')
     expect(PAGE).toContain('flex h-full w-11 items-center justify-center')
     // カード: サムネイル112、ファイル名12/700、形式・容量10/600、使用状況10/700。
@@ -145,6 +146,19 @@ describe('V6 登録メディア一覧の契約', () => {
     expect(REPLACEMENT).toContain('api.media.replaceUsages')
     expect(REPLACEMENT).toContain('expectedRevision: impact.revision')
     expect(REPLACEMENT).toContain('disabled={busy || !impact?.canReplace}')
+  })
+
+  it('置換可能な箇所だけの部分実行は明示した範囲で選べる', () => {
+    // #918: ウェビナー等の未対応参照があっても全体を止めない。
+    // 全件・部分・何もしないをボタンで区別し、部分実行は件数入りの
+    // 専用ボタン（明示確認）と scope=replaceable で実行する。
+    expect(REPLACEMENT).toContain('impact?.canPartiallyReplace && !impact.canReplace')
+    expect(REPLACEMENT).toContain("replace('partial')")
+    expect(REPLACEMENT).toContain("scope: mode === 'partial' ? 'replaceable' : 'all'")
+    expect(REPLACEMENT).toContain('差し替え可能な${impact.replaceableCount}か所だけ差し替える')
+    expect(REPLACEMENT).toContain('impact.blockedCount > 0')
+    expect(REPLACEMENT).toContain('impact.blockedByKind')
+    expect(REPLACEMENT).toContain('skippedUsageCount')
   })
 
   it('差し替え候補も一覧の200件上限に依存しない', () => {

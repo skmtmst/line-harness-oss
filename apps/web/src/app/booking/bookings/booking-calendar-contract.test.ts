@@ -60,6 +60,28 @@ describe('V6 予約管理の時間台帳', () => {
     expect(PAGE).toContain('lineOperation.status')
   })
 
+  test('空きセルが代理予約の入口になる (#933 N-399)', () => {
+    // 日・週どちらの格子でも、空きセルから代理予約画面へ日時（と担当）を渡す。
+    expect(CALENDAR).toContain('function newBookingHref')
+    expect(CALENDAR).toContain('`/booking/bookings/new?${params.toString()}`')
+    expect(CALENDAR).toContain("date: input.day")
+    expect(CALENDAR).toContain("params.set('staff', input.staffName)")
+    expect(CALENDAR).toContain('aria-label="この空き枠に予約を入れる"')
+    // 操作できない人（canCreate=false）は「あき」の文字だけ。押せる形に見せない。
+    expect(CALENDAR).toContain('if (!href) return')
+    expect(CALENDAR).toContain('canCreate ? newBookingHref({ day, hour, staffName: name }) : undefined')
+    expect(CALENDAR).toContain('canCreate ? newBookingHref({ day, hour }) : undefined')
+  })
+
+  test('URLの日付・時刻・担当は下書きより優先して事前入力する (#933 N-399)', () => {
+    expect(CREATE).toContain("params.get('date')")
+    expect(CREATE).toContain("params.get('time')")
+    expect(CREATE).toContain("params.get('staff')")
+    // 担当名はメニュー選択後の担当一覧と display_name で照合してから選ぶ
+    expect(CREATE).toContain('pending.staffName')
+    expect(CREATE).toContain('item.display_name === pending.staffName')
+  })
+
   test('確認・完了・競合はV6の左右構造と次の操作を持つ', () => {
     for (const text of [
       'お客様に送るもの',

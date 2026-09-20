@@ -66,6 +66,7 @@ export default function QrDialog({
   accountBasicId,
   baseLink,
   initialRouteId = '',
+  onRouteIdChange,
   visualReferenceQr = false,
   routes: routesProp,
 }: {
@@ -79,6 +80,8 @@ export default function QrDialog({
   baseLink: string
   /** 呼び出し元で選んでいた経路。開いたときの初期値になる。 */
   initialRouteId?: string
+  /** ダイアログ内で経路を変えたときに呼ばれる。呼び出し元はURLへ写す。 */
+  onRouteIdChange?: (routeId: string) => void
   /** 撮影固定応答でだけ使うPencilの簡略見本。通常時は実URLのQRを生成する。 */
   visualReferenceQr?: boolean
   /*
@@ -264,7 +267,10 @@ export default function QrDialog({
               <SelectField
                 id="qr-route"
                 value={routeId}
-                onChange={(e) => setRouteId(e.target.value)}
+                onChange={(e) => {
+                  setRouteId(e.target.value)
+                  onRouteIdChange?.(e.target.value)
+                }}
                 className="w-full"
                 options={[
                   { value: '', label: '基本の追加URL' },

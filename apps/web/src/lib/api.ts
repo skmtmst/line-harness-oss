@@ -205,6 +205,43 @@ export type IncomingWebhookDetail = IncomingWebhook & {
     truncated: boolean
   } | null
   templateFields: Array<{ path: string; type: string; token: string }>
+  /** 人が見つからなかった届物の未確認件数(#939 N-367)。 */
+  pendingUnmatched: number
+}
+
+/**
+ * 人が見つからなかった届物(#939 N-367)。生の本文は保存していないので、
+ * 照合に使った値と形だけの見本だけが返る。
+ */
+export interface IncomingWebhookUnmatchedItem {
+  id: string
+  kind: 'unmatched' | 'candidate'
+  status: 'pending' | 'resolved' | 'dismissed'
+  identityAttempts: Array<{ kind: string; path: string; value: string }>
+  maskedShape: { fields: Array<{ path: string; type: string; maskedValue: string }>; truncated: boolean } | null
+  resolvedFriendId: string | null
+  resolvedAt: string | null
+  receivedAt: string
+}
+
+/**
+ * 外部システムが公開APIを呼ぶための鍵(#939 N-380)。
+ * 管理画面の認証とは別の台帳で、平文は一覧には出ない。
+ */
+export interface IntegrationApiTokenInfo {
+  id: string
+  name: string
+  tokenPrefix: string
+  scopes: string[]
+  createdBy: string | null
+  lastUsedAt: string | null
+  rotatedFromId: string | null
+  createdAt: string
+}
+
+/** 発行・入れ替えの応答にだけ1回だけ平文が乗る。 */
+export interface IssuedIntegrationApiToken extends IntegrationApiTokenInfo {
+  token: string
 }
 
 export type AccessUserStatus = 'active' | 'invited' | 'expired' | 'suspended'
@@ -483,6 +520,28 @@ export type SaveTagDefinition = {
   mileage: { self: number; referrer: number; multiplier: number | null; priority: number }
   actions: TagDefinitionAction[]
   applyToExisting?: boolean
+}
+
+/** 遡及マイル実行の前にサーバーが数えた対象（N-047）。 */
+export type TagRetroactivePreview = {
+  tagId: string
+  lineAccountId: string | null
+  /** タグが付いている友だちの合計 */
+  friendCount: number
+  /** 本人マイルをまだ受け取っていない人数 */
+  selfTargets: number
+  /** 本人マイルをすでに受け取っている人数 */
+  selfExcluded: number
+  /** 紹介者マイルの対象人数（まだ紹介者へ付与されていない） */
+  referralTargets: number
+  /** 紹介者マイルがすでに付与済みの人数 */
+  referralExcluded: number
+  selfMiles: number
+  referralMiles: number
+  totalMiles: number
+  expiresAt: string
+  /** 実行時の引き換え券。PATCH へそのまま渡す。 */
+  previewToken: string
 }
 
 export type TagDependencies = {
@@ -1028,7 +1087,15 @@ export type ConversionApprovalItem = {
   lineAccountName: string | null
 }
 
-export type ConversionDefinitionStatus = 'active' | 'stopped'
+export type ConversionDefinitionStatus = 'active' | 'stopped' | 'draft'
+/**
+ * N-268: 画面で区別する導出状態。status 列そのものではなく、
+ * 設定の壊れ(入力不良)や外部受信の停止(起点停止)も含める。
+ */
+export type ConversionDefinitionState =
+  | 'active' | 'draft' | 'stopped' | 'invalid' | 'sourceStopped'
+/** `state` クエリで追加で受ける、状態と直交する絞り込み。 */
+export type ConversionDefinitionFilter = ConversionDefinitionState | 'unused'
 export type ConversionDeduplicationMode = 'every' | 'once_per_friend' | 'window'
 export type ConversionValueMode = 'source' | 'fixed' | 'none'
 export type ConversionReversalPolicy = 'source_cancelled' | 'manual' | 'none'
@@ -1052,6 +1119,12 @@ export type ConversionDefinitionListItem = {
   reversalPolicy: ConversionReversalPolicy
   lineAccountId: string | null
   status: ConversionDefinitionStatus
+  /** N-268: 画面表示用の導出状態。 */
+  state: ConversionDefinitionState
+  /** 入力不良・起点停止のとき、直すべき中身を運用者の言葉で返す。 */
+  stateReason: string | null
+  /** N-270: 外部受信の設定状況。秘密値そのものは返らない。 */
+  ingest: { configured: boolean; disabledAt: string | null }
   version: number
   usageCount: number
   usageNames: string[]
@@ -1107,6 +1180,19 @@ export type ConversionDefinitionPreview = {
   deduplicationWindowDays: number | null
 }
 
+/** N-270: 外部受信の成否1件。署名・本文の中身は含まない。 */
+export type ConversionIngestionEvent = {
+  id: string
+  conversionPointId: string
+  result: 'recorded' | 'duplicate' | 'rejected'
+  reason: string | null
+  sourceEventId: string | null
+  friendId: string | null
+  payloadShape: Record<string, unknown> | null
+  signatureSha256: string | null
+  createdAt: string
+}
+
 export type ConversionDefinitionDeleteImpact = {
   definition: ConversionDefinitionDetail
   usages: ConversionDefinitionUsage[]
@@ -1124,6 +1210,8 @@ export type ConversionDefinitionList = {
     stopped: number
     invalid: number
     sourceStopped: number
+    /** N-267: どこからも使われていない地点の数(絞り込み全体の正確な件数)。 */
+    unused: number
   }
   range: { from: string; to: string; timeZone: 'Asia/Tokyo' }
   pagination: { total: number; limit: number; cursor: string; nextCursor: string | null }
@@ -1658,6 +1746,11 @@ export type AnalyticsCrossAxis =
   | { kind: 'booking_status' }
   | { kind: 'purchase_status' }
 
+// 集計の物差し。events は packages/db の AnalyticsEventType をサーバ側が検査する。
+export type AnalyticsCrossMeasure =
+  | { kind: 'unique_friends' }
+  | { kind: 'events'; eventType: string }
+
 export type AnalyticsCrossResult = {
   lineAccountId: string
   timeZone: string
@@ -1932,12 +2025,23 @@ export type FeatureDisabledEventDetail = {
 
 export function getCsrfToken(): string {
   if (typeof window === 'undefined') return ''
-  return localStorage.getItem(CSRF_STORAGE_KEY) || ''
+  /*
+   * localStorage が無い・触れない環境（Cookie無効のブラウザや一部の試験環境）
+   * ではアクセス自体が投げる。トークン無し＝通常の認証失敗と同じ扱いなので、
+   * ここでは握りつぶして '' を返す。
+   */
+  try {
+    return localStorage.getItem(CSRF_STORAGE_KEY) || ''
+  } catch {
+    return ''
+  }
 }
 
 export function setCsrfToken(token: string | undefined | null): void {
   if (typeof window === 'undefined' || !token) return
-  localStorage.setItem(CSRF_STORAGE_KEY, token)
+  try {
+    localStorage.setItem(CSRF_STORAGE_KEY, token)
+  } catch { /* 保存できなくてもセッション認証自体は動く */ }
 }
 
 const MUTATING_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE'])
@@ -3176,6 +3280,24 @@ export type ScenarioMeasuredMetric = {
   reason?: string
 }
 
+/**
+ * 友だち単位の購読1行（#949 N-054 の操作対象）。
+ * `pauseReason` で「手動停止」「この通を送ったら止める」「配信失敗」を
+ * 区別し、画面は「再開」と「失敗を再送」を出し分ける。
+ */
+export type FriendScenarioSubscription = {
+  id: string
+  friendId: string
+  scenarioId: string
+  currentStepOrder: number
+  status: 'active' | 'paused' | 'completed' | 'delivering' | string
+  startedAt: string
+  nextDeliveryAt: string | null
+  publishedVersionId: string | null
+  pauseReason: 'manual' | 'after_send' | 'delivery_failed' | string | null
+  updatedAt: string
+}
+
 /** 購読・テスト送信・送信枠・通別結果をまとめた機能5 V6の読取結果。 */
 export type ScenarioRuns = {
   summary: { active: number; paused: number; completed: number; delivering: number }
@@ -3187,6 +3309,8 @@ export type ScenarioRuns = {
     currentStepOrder: number
     startedAt: string
     nextDeliveryAt: string | null
+    /** なぜ止まっているか（432）。止まっていない行・古い行は null。 */
+    pauseReason?: string | null
     updatedAt: string
   }>
   pagination: { total: number; limit: number; cursor: string; nextCursor: string | null }
@@ -3341,8 +3465,8 @@ export type DashboardFriendTrendPoint = {
   active: number
   /** 日次記録が無く、いまの友だちから逆算した日。 */
   estimated: boolean
-  /** 段階配備中の旧Workerでは未返却。 */
-  sources?: Array<{ name: string; count: number }>
+  /** 段階配備中の旧Workerでは未返却。経路不明は name=null。 */
+  sources?: Array<{ name: string | null; count: number }>
 }
 
 /** ダッシュボードが1回で読む数（設計 `V6 1-1 ダッシュボード`）。 */
@@ -3390,7 +3514,8 @@ export type DashboardOverview = {
     scenarios: { active: number; paused: number }
     migrations: { active: number; completed: number }
     bookings: { pending: number; upcoming: number }
-    inflowTop: Array<{ name: string; count: number }>
+    /** 経路不明の塊は name=null。経路名としては出さず `—` で出す。 */
+    inflowTop: Array<{ name: string | null; count: number }>
     funnelAlerts: number
     automationFailures: number
   }
@@ -4941,7 +5066,12 @@ export const api = {
       id: string,
       accountId: string,
       expectedVersion: number,
-      data: SaveTagDefinition & { automationId?: string | null; automationDraftVersion?: string | null },
+      data: SaveTagDefinition & {
+        automationId?: string | null
+        automationDraftVersion?: string | null
+        /** 遡及実行の前に /retroactive-preview で受け取った引き換え券（N-047）。 */
+        previewToken?: string
+      },
     ) => fetchApi<ApiResponse<TagDefinition & { queued: number }>>(`/api/tags/${id}`, {
       method: 'PATCH',
       body: JSON.stringify({ lineAccountId: accountId, expectedVersion, ...data }),
@@ -4996,11 +5126,25 @@ export const api = {
       multiplierPriority: number
       /** true のときだけ、すでにこのタグが付いている人へ遡及する。 */
       applyToExisting?: boolean
+      /** 遡及実行の前に /retroactive-preview で受け取った引き換え券（N-047）。 */
+      previewToken?: string
     }) =>
       fetchApi<ApiResponse<{ tag: Tag; queued: number }>>(`/api/tags/${id}/mileage`, {
         method: 'PATCH',
         body: JSON.stringify(data),
       }),
+    /**
+     * 遡及実行の前に対象をサーバー側で数える（N-047）。
+     * 返す previewToken を applyToExisting の実行へそのまま渡す。
+     */
+    retroactivePreview: (id: string, accountId: string, mileage?: { self?: number; referrer?: number }) =>
+      fetchApi<ApiResponse<TagRetroactivePreview>>(
+        `/api/tags/${id}/retroactive-preview`,
+        {
+          method: 'POST',
+          body: JSON.stringify({ lineAccountId: accountId, ...(mileage ? { mileage } : {}) }),
+        },
+      ),
     delete: (id: string) =>
       fetchApi<ApiResponse<null>>(`/api/tags/${id}`, { method: 'DELETE' }),
     archive: (id: string, accountId: string, data: {
@@ -5263,7 +5407,7 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({ name: data.name, conditions: data.conditions, isShared: data.isShared }),
       }),
-    update: (id: string, accountId: string, data: { name?: string; conditions?: unknown; isShared?: boolean; expectedRevision?: number }) =>
+    update: (id: string, accountId: string, data: { name?: string; conditions?: unknown; isShared?: boolean; expectedRevision?: number; displayOrder?: number }) =>
       fetchApi<ApiResponse<SavedSearch>>(`/api/saved-searches/${id}?lineAccountId=${encodeURIComponent(accountId)}`, {
         method: 'PATCH',
         body: JSON.stringify(data),
@@ -5474,7 +5618,7 @@ export const api = {
     runCross: (accountId: string, data: {
       rowAxis: AnalyticsCrossAxis
       columnAxis: AnalyticsCrossAxis
-      measure: { kind: 'unique_friends' }
+      measure: AnalyticsCrossMeasure
       filters: []
       periodFrom: string
       periodTo: string
@@ -5986,10 +6130,14 @@ export const api = {
       fetchApi<ApiResponse<MediaReplacementImpact>>(
         `/api/media/${id}/replacement-impact?accountId=${encodeURIComponent(accountId)}&replacementId=${encodeURIComponent(replacementId)}`,
       ),
+    /**
+     * 使用先の差し替え。scope 'all' は全使用先（置換不可が1件でもあれば409）、
+     * 'replaceable' は影響確認で置換可能と判定された使用先だけの部分実行。
+     */
     replaceUsages: (
       id: string,
       accountId: string,
-      input: { replacementMediaId: string; expectedRevision: string },
+      input: { replacementMediaId: string; expectedRevision: string; scope?: 'all' | 'replaceable' },
     ) => fetchApi<ApiResponse<MediaReplacementResult>>(
       `/api/media/${id}/replace-usages?accountId=${encodeURIComponent(accountId)}`,
       { method: 'POST', body: JSON.stringify(input) },
@@ -6328,6 +6476,42 @@ export const api = {
         `/api/scenarios/${scenarioId}/enroll/${friendId}`,
         { method: 'POST' },
       ),
+    /*
+     * 友だち単位の購読操作（#949 N-054）。
+     * どれも確認キー（Idempotency-Key）が要る。二度押し・再送で
+     * 同じ操作が2回走らないように、呼び出し側は IdempotencyKeyStore で
+     * 同じ署名へ同じキーを当てる。
+     */
+    subscriptionOps: {
+      /** 進行中の購読を手動で止める。 */
+      pause: (subscriptionId: string, idempotencyKey: string) =>
+        fetchApi<ApiResponse<FriendScenarioSubscription>>(
+          `/api/scenario-subscriptions/${subscriptionId}/pause`,
+          { method: 'POST', headers: { 'Idempotency-Key': idempotencyKey } },
+        ),
+      /** 止まっている購読を続きから再開する。 */
+      resume: (subscriptionId: string, idempotencyKey: string) =>
+        fetchApi<ApiResponse<FriendScenarioSubscription>>(
+          `/api/scenario-subscriptions/${subscriptionId}/resume`,
+          { method: 'POST', headers: { 'Idempotency-Key': idempotencyKey } },
+        ),
+      /** 配信失敗で止まった購読を、失敗した通から送り直す。 */
+      retry: (subscriptionId: string, idempotencyKey: string) =>
+        fetchApi<ApiResponse<FriendScenarioSubscription>>(
+          `/api/scenario-subscriptions/${subscriptionId}/retry`,
+          { method: 'POST', headers: { 'Idempotency-Key': idempotencyKey } },
+        ),
+      /** 購読を別のシナリオへ移す。返るのは移し先でできた新しい購読。 */
+      move: (subscriptionId: string, targetScenarioId: string, idempotencyKey: string) =>
+        fetchApi<ApiResponse<FriendScenarioSubscription>>(
+          `/api/scenario-subscriptions/${subscriptionId}/move`,
+          {
+            method: 'POST',
+            headers: { 'Idempotency-Key': idempotencyKey },
+            body: JSON.stringify({ targetScenarioId }),
+          },
+        ),
+    },
     stats: (id: string) =>
       fetchApi<ApiResponse<{
         enrolledTotal: number
@@ -7368,6 +7552,7 @@ export const api = {
       lineAccountId?: string
       q?: string
       status?: ConversionDefinitionStatus
+      state?: ConversionDefinitionFilter
       sourceType?: string
       sort?: 'count_desc' | 'value_desc' | 'updated_desc' | 'name_asc'
       cursor?: string
@@ -7395,6 +7580,8 @@ export const api = {
       reversalPolicy: ConversionReversalPolicy
       attributionDays?: number | null
       usages: Array<{ refKind: ConversionDefinitionUsageKind; refId: string; refVersionId?: string | null }>
+      /** N-268: true のとき下書きで保存し、公開するまで計測しない。 */
+      draft?: boolean
     }) => fetchApi<ApiResponse<ConversionDefinitionDetail>>('/api/conversions/definitions', {
       method: 'POST', body: JSON.stringify(data),
     }),
@@ -7407,6 +7594,8 @@ export const api = {
       deduplicationWindowDays?: number | null
       valueMode: ConversionValueMode
       fixedValue?: number | null
+      /** N-257: 取消の扱いも試算の条件に含める。 */
+      reversalPolicy?: ConversionReversalPolicy
     }, options?: { signal?: AbortSignal }) => fetchApi<ApiResponse<ConversionDefinitionPreview>>('/api/conversions/definitions/preview', {
       method: 'POST', body: JSON.stringify(data), signal: options?.signal,
     }),
@@ -7456,6 +7645,32 @@ export const api = {
       fetchApi<ApiResponse<{ id: string; deleted: true }>>(
         `/api/conversions/definitions/${encodeURIComponent(id)}`,
         { method: 'DELETE', body: JSON.stringify(data) },
+      ),
+    /** N-268: 下書きを計測中へ公開する。 */
+    publishDefinition: (id: string, data: { expectedVersion: number }) =>
+      fetchApi<ApiResponse<{ id: string; status: 'active'; version: number }>>(
+        `/api/conversions/definitions/${encodeURIComponent(id)}/publish`,
+        { method: 'POST', body: JSON.stringify(data) },
+      ),
+    /**
+     * N-270: 外部受信の鍵を発行・再発行する。
+     * 平文の鍵はこの応答でだけ返る。画面は一度だけ表示して保存させる。
+     */
+    issueIngestSecret: (id: string, data: { expectedVersion: number }) =>
+      fetchApi<ApiResponse<{ id: string; secret: string; endpoint: string; version: number }>>(
+        `/api/conversions/definitions/${encodeURIComponent(id)}/ingest-secret`,
+        { method: 'POST', body: JSON.stringify(data) },
+      ),
+    /** N-270: 外部受信を止める/再開する。 */
+    setIngestDisabled: (id: string, data: { expectedVersion: number; disabled: boolean }) =>
+      fetchApi<ApiResponse<{ id: string; disabledAt: string | null; version: number }>>(
+        `/api/conversions/definitions/${encodeURIComponent(id)}/${data.disabled ? 'ingest-disable' : 'ingest-enable'}`,
+        { method: 'POST', body: JSON.stringify({ expectedVersion: data.expectedVersion }) },
+      ),
+    /** N-270: 受信の成否履歴。 */
+    ingestionEvents: (id: string, limit = 50) =>
+      fetchApi<ApiResponse<{ items: ConversionIngestionEvent[] }>>(
+        `/api/conversions/definitions/${encodeURIComponent(id)}/ingest-events?limit=${limit}`,
       ),
     definitionReport: (params: { from: string; to: string; lineAccountId?: string }) => {
       const query = Object.fromEntries(
@@ -7954,6 +8169,23 @@ export const api = {
       headers: { 'Idempotency-Key': idempotencyKey },
       body: JSON.stringify(body),
     }),
+    /*
+     * 機能08 点検 E-01: 専用の停止口。理由（任意）を添えて止めると、
+     * いつ・誰が・なぜ止めたかが残る。確認キーは呼び出し側で都度振る。
+     */
+    stop: (id: string, body: { reason?: string | null }, idempotencyKey: string) =>
+      fetchApi<ApiResponse<{
+        id: string;
+        isActive: boolean;
+        stoppedAt: string | null;
+        stoppedByStaffId: string | null;
+        stoppedByStaffName: string | null;
+        stopReason: string | null;
+      }>>(`/api/auto-replies/${id}/stop`, {
+        method: 'POST',
+        headers: { 'Idempotency-Key': idempotencyKey },
+        body: JSON.stringify(body),
+      }),
     list: (params?: { accountId?: string }) => {
       const query = params?.accountId ? '?accountId=' + encodeURIComponent(params.accountId) : ''
       return fetchApi<ApiResponse<Array<{
@@ -7986,6 +8218,13 @@ export const api = {
         keywordMatchMode: string;
         /** フォルダ。分けていなければ null。 */
         folderId: string | null;
+        /** 273: 'draft'（未公開）| 'published' | 'stopped'。 */
+        lifecycleStatus: string;
+        /** 機能08 点検 E-01: 最後に停止した記録。止めたことが無ければ null。 */
+        stoppedAt: string | null;
+        stoppedByStaffId: string | null;
+        stoppedByStaffName: string | null;
+        stopReason: string | null;
         /** 152: 当たった回数（今月・累計）。一覧でだけ入る。 */
         hits?: { period: number; total: number };
         /** 実行台帳で成功を確認できた後続処理の累計。 */
@@ -8029,6 +8268,13 @@ export const api = {
         keywordMatchMode: string;
         /** フォルダ。分けていなければ null。 */
         folderId: string | null;
+        /** 273: 'draft'（未公開）| 'published' | 'stopped'。 */
+        lifecycleStatus: string;
+        /** 機能08 点検 E-01: 最後に停止した記録。 */
+        stoppedAt: string | null;
+        stoppedByStaffId: string | null;
+        stoppedByStaffName: string | null;
+        stopReason: string | null;
         createdAt: string;
       }>>(`/api/auto-replies/${id}`),
     create: (body: {
@@ -8725,11 +8971,12 @@ export const api = {
     petMetrics: (accountId: string, days = 30) => fetchApi<ApiResponse<NenPetMetrics>>(
       `/api/nen-campaigns/metrics/pets?lineAccountId=${encodeURIComponent(accountId)}&days=${days}`,
     ),
-    deliveries: (accountId: string, options: { days?: number; from?: string; to?: string; status?: string; cursor?: string; limit?: number } = {}) => {
+    deliveries: (accountId: string, options: { days?: number; from?: string; to?: string; status?: string; q?: string; cursor?: string; limit?: number } = {}) => {
       const query = new URLSearchParams({ lineAccountId: accountId, days: String(options.days ?? 30), limit: String(options.limit ?? 50) })
       // from/to を両方渡すと days の代わりにその期間で数える（実口 nenDeliveryRange と同じ決めごと）。
       if (options.from && options.to) { query.delete('days'); query.set('from', options.from); query.set('to', options.to) }
       if (options.status) query.set('status', options.status)
+      if (options.q) query.set('q', options.q)
       if (options.cursor) query.set('cursor', options.cursor)
       return fetchApi<ApiResponse<NenDeliveryList>>(`/api/nen-campaigns/deliveries?${query}`)
     },
@@ -8743,7 +8990,14 @@ export const api = {
       ),
     overview: (accountId: string) => fetchApi<ApiResponse<{
       activeCampaigns: number
-      jobs: { total: number; pending: number; sent: number; failed: number }
+      jobs: {
+        total: number
+        pending: number
+        sent: number
+        failed: number
+        /** 配信ごとの「これから送る」待ち件数（編集画面の表示用）。 */
+        pendingByCampaign: Record<string, number>
+      }
       columns: number
       pets: number
       coupons: number
@@ -8767,9 +9021,18 @@ export const api = {
       id: string; campaignKey: string; label: string; friendName: string | null
       scheduledAt: string; status: string; attempts: number; lastError: string | null; sentAt: string | null
     }>>>(`/api/nen-campaigns/jobs?lineAccountId=${encodeURIComponent(accountId)}`),
-    columns: (accountId: string) => fetchApi<ApiResponse<NenColumn[]>>(
-      `/api/nen-campaigns/columns?lineAccountId=${encodeURIComponent(accountId)}`,
-    ),
+    /*
+     * 口は既定200件で打ち切り、pagination.total に全体件数を返す。
+     * 呼び出し側は data.length と pagination.total を比べて打ち切りを画面へ出す（#935 N-300）。
+     */
+    columns: (accountId: string, options?: { limit?: number; offset?: number }) => {
+      const params = new URLSearchParams({ lineAccountId: accountId })
+      if (options?.limit !== undefined) params.set('limit', String(options.limit))
+      if (options?.offset !== undefined) params.set('offset', String(options.offset))
+      return fetchApi<ApiResponse<NenColumn[]> & {
+        pagination?: { total: number; limit: number; offset: number }
+      }>(`/api/nen-campaigns/columns?${params}`)
+    },
     /** NENコラムの管理画面下書き。本文・slug・アカウントIDはWorkerで受け取らない。 */
     createColumn: (accountId: string, data: NenColumnCreateInput) =>
       fetchApi<ApiResponse<{ id: string; queued: number }>>(
@@ -8813,9 +9076,9 @@ export const api = {
       if (search) query.set('search', search)
       return fetchApi<ApiResponse<NenPetProfile[]>>(`/api/nen-campaigns/pets?${query}`)
     },
-    createPet: (accountId: string, data: { friendId: string; customerId?: string; name: string; animalType: string; gender: string; birthday?: string }) =>
+    createPet: (accountId: string, data: { friendId: string; customerId?: string; name: string; animalType: string; gender: string; birthday?: string; breed?: string; weightKg?: number | null }) =>
       fetchApi<ApiResponse<{ id: string }>>(`/api/nen-campaigns/pets?lineAccountId=${encodeURIComponent(accountId)}`, { method: 'POST', body: JSON.stringify(data) }),
-    updatePet: (accountId: string, id: string, data: { name: string; animalType: string; gender: string; birthday?: string }) =>
+    updatePet: (accountId: string, id: string, data: { name: string; animalType: string; gender: string; birthday?: string; breed?: string; weightKg?: number | null }) =>
       fetchApi<{ success: boolean }>(`/api/nen-campaigns/pets/${encodeURIComponent(id)}?lineAccountId=${encodeURIComponent(accountId)}`, { method: 'PUT', body: JSON.stringify(data) }),
     deletePet: (accountId: string, id: string) => fetchApi<{ success: boolean }>(
       `/api/nen-campaigns/pets/${encodeURIComponent(id)}?lineAccountId=${encodeURIComponent(accountId)}`,
@@ -9589,11 +9852,26 @@ export const api = {
           `/api/webhooks/incoming/${id}?lineAccountId=${encodeURIComponent(lineAccountId)}`,
           { method: 'DELETE' },
         ),
+      /* 人が見つからなかった届物の箱(#939 N-367)。 */
+      unmatched: (id: string, lineAccountId: string, status?: 'pending' | 'resolved' | 'dismissed') =>
+        fetchApi<ApiResponse<IncomingWebhookUnmatchedItem[]>>(
+          `/api/webhooks/incoming/${encodeURIComponent(id)}/unmatched?lineAccountId=${encodeURIComponent(lineAccountId)}${status ? `&status=${status}` : ''}`,
+        ),
+      resolveUnmatched: (id: string, lineAccountId: string, data: { action: 'dismiss' } | { action: 'link'; friendId: string }) =>
+        fetchApi<ApiResponse<{ id: string; status: string }>>(
+          `/api/webhooks/unmatched/${encodeURIComponent(id)}/resolve?lineAccountId=${encodeURIComponent(lineAccountId)}`,
+          { method: 'POST', body: JSON.stringify(data) },
+        ),
     },
     outgoing: {
       list: (lineAccountId: string) =>
         fetchApi<ApiResponse<OutgoingWebhookOverview[]>>(
           `/api/webhooks/outgoing?lineAccountId=${encodeURIComponent(lineAccountId)}`,
+        ),
+      /* N-363 (#939): 編集画面が現在値を読む詳細口。secret は返らない。 */
+      detail: (id: string, lineAccountId: string) =>
+        fetchApi<ApiResponse<OutgoingWebhook>>(
+          `/api/webhooks/outgoing/${encodeURIComponent(id)}?lineAccountId=${encodeURIComponent(lineAccountId)}`,
         ),
       create: (data: { lineAccountId: string; name: string; url: string; eventTypes: string[]; secret: string; maxRetries?: number }) =>
         fetchApi<ApiResponse<OutgoingWebhookCreated>>('/api/webhooks/outgoing', {
@@ -9644,8 +9922,31 @@ export const api = {
           { method: 'POST', body: '{}' },
         ),
       retryFailed: (lineAccountId: string) =>
-        fetchApi<ApiResponse<{ requested: number; succeeded: number; failed: number; skipped: number }>>(
+        // remaining: 1回の外部通信上限で今回やり直せず残った失敗の件数(N-387)。
+        fetchApi<ApiResponse<{ requested: number; succeeded: number; failed: number; skipped: number; remaining: number }>>(
           `/api/webhooks/interactions/retry-failed?lineAccountId=${encodeURIComponent(lineAccountId)}`,
+          { method: 'POST', body: '{}' },
+        ),
+    },
+    /* 外部システムが公開APIを呼ぶための鍵(#939 N-380)。 */
+    apiTokens: {
+      list: (lineAccountId: string) =>
+        fetchApi<ApiResponse<IntegrationApiTokenInfo[]>>(
+          `/api/webhooks/api-tokens?lineAccountId=${encodeURIComponent(lineAccountId)}`,
+        ),
+      create: (lineAccountId: string, data: { name: string; scopes: string[] }) =>
+        fetchApi<ApiResponse<IssuedIntegrationApiToken>>('/api/webhooks/api-tokens', {
+          method: 'POST',
+          body: JSON.stringify({ ...data, lineAccountId }),
+        }),
+      revoke: (id: string, lineAccountId: string) =>
+        fetchApi<ApiResponse<{ id: string }>>(
+          `/api/webhooks/api-tokens/${encodeURIComponent(id)}/revoke?lineAccountId=${encodeURIComponent(lineAccountId)}`,
+          { method: 'POST', body: '{}' },
+        ),
+      rotate: (id: string, lineAccountId: string) =>
+        fetchApi<ApiResponse<IssuedIntegrationApiToken>>(
+          `/api/webhooks/api-tokens/${encodeURIComponent(id)}/rotate?lineAccountId=${encodeURIComponent(lineAccountId)}`,
           { method: 'POST', body: '{}' },
         ),
     },
@@ -9681,10 +9982,11 @@ export const api = {
         fetchApiBlob(`/api/notifications/operator-deliveries.csv?${new URLSearchParams({ lineAccountId, reason })}`),
     },
     center: {
-      list: (lineAccountId: string, params?: { category?: 'all' | 'error' | 'update'; limit?: number }) => {
+      list: (lineAccountId: string, params?: { category?: 'all' | 'error' | 'update'; limit?: number; offset?: number }) => {
         const query = new URLSearchParams({ lineAccountId });
         if (params?.category) query.set('category', params.category);
         if (params?.limit !== undefined) query.set('limit', String(params.limit));
+        if (params?.offset !== undefined) query.set('offset', String(params.offset));
         return fetchApi<ApiResponse<NotificationCenterData>>(`/api/notifications/center?${query}`);
       },
       markRead: (id: string, lineAccountId: string) =>
@@ -9760,10 +10062,20 @@ export const api = {
         body: JSON.stringify(data),
       }),
     update: (id: string, data: { name?: string; email?: string | null; role?: string; isActive?: boolean; lineLinked?: false; permissionKeys?: string[]; notificationPreferences?: Record<string, { email: boolean; line: boolean }>; assignedLineAccountId?: string; canAccessDescendantAccounts?: boolean; accountScope?: 'all' | 'accounts'; scopedLineAccountIds?: string[]; managementContext?: 'hq'; roleBundle?: 'administrator' | 'operations' | 'reception' | 'view_only' | 'custom'; permissionScope?: Record<string, 'edit' | 'view' | 'none'>; permissionViewKeys?: string[]; emailMask?: 'full' | 'masked' | 'none' }, stepUpToken?: string) =>
-      fetchApi<ApiResponse<StaffMember>>(`/api/staff/${id}`, {
+      /*
+       * 本人が自分のメールを変えたとき、emailChangePending=true と pendingEmail
+       * が返る（N-433）。その場合メールはまだ切り替わっていない。
+       */
+      fetchApi<ApiResponse<StaffMember & { emailChangePending?: boolean; pendingEmail?: string | null }>>(`/api/staff/${id}`, {
         method: 'PATCH',
         headers: stepUpToken ? { 'X-Step-Up-Token': stepUpToken } : undefined,
         body: JSON.stringify(data),
+      }),
+    /** N-433: メール変更の確認リンクから確定する。トークンは24時間・使い切り。 */
+    confirmEmailChange: (token: string) =>
+      fetchApi<ApiResponse<{ email: string }>>('/api/staff/email-change/confirm', {
+        method: 'POST',
+        body: JSON.stringify({ token }),
       }),
     loginSummary: (id: string) =>
       fetchApi<ApiResponse<{ loginCount: number }>>(`/api/staff/${id}/login-summary`),
@@ -10009,6 +10321,16 @@ export const api = {
       size: 'large' | 'compact';
       /** #502中: 作成直後のフォルダ付け2口目をなくすため作成口で決める。 */
       folderId?: string | null;
+      /** N-161: 最初に見せるページの orderIndex。 */
+      defaultPageIndex?: number;
+      /** N-161: 「すべての友だちの既定にする」か。 */
+      isDefaultForAll?: boolean;
+      /** N-161: 出し分け。有効にするなら targetingCondition が必須。 */
+      targetingEnabled?: boolean;
+      targetingCondition?: string | null;
+      targetingPriority?: number;
+      /** N-164: 登録メディアを既定ページの画像として使う。 */
+      imageMediaId?: string;
       pages: Array<{
         id?: string;
         name: string;
@@ -10081,6 +10403,103 @@ export const api = {
         pages: Array<{ pageId: string; clearedRichMenuId: string | null }>;
         warnings: string[];
       }>>(`/api/rich-menu-groups/${groupId}/unpublish`, { method: 'POST' }),
+
+    /** N-151: 公開runの履歴。版・状態・試行・最終エラー・LINE IDを返す。 */
+    publishRuns: (groupId: string) =>
+      fetchApi<ApiResponse<Array<{
+        id: string;
+        status: 'running' | 'succeeded' | 'failed';
+        lastErrorCode: string | null;
+        idempotencyKey: string;
+        requestedByStaffId: string;
+        createdAt: string;
+        updatedAt: string;
+        version: { name: string | null; chatBarText: string | null; pageCount: number | null };
+        pages: Array<{
+          pageId: string;
+          orderIndex: number;
+          newRichMenuId: string;
+          oldRichMenuId: string | null;
+        }>;
+      }>>>(`/api/rich-menu-groups/${groupId}/publish-runs`),
+
+    /** N-151: 失敗したrunだけを、保存された版のまま再試行する。 */
+    retryPublishRun: (groupId: string, requestId: string) =>
+      fetchApi<ApiResponse<{ pages: Array<{ pageId: string; newRichMenuId: string }> }>>(
+        `/api/rich-menu-groups/${groupId}/publish-runs/${requestId}/retry`,
+        { method: 'POST' },
+      ),
+
+    /** N-151: DBとLINEのずれを点検（dryRun）し、明示したときだけ直す。 */
+    reconcile: (groupId: string, dryRun: boolean) =>
+      fetchApi<ApiResponse<{
+        dryRun: boolean;
+        diffs: Array<{ kind: string; detail: string; pageId?: string; richMenuId?: string }>;
+        applied?: number;
+        failed?: Array<{ diff: { kind: string; detail: string }; error: string }>;
+      }>>(`/api/rich-menu-groups/${groupId}/reconcile`, {
+        method: 'POST',
+        body: JSON.stringify({ dryRun }),
+      }),
+
+    /** N-154: メニュー全体を別IDの下書きとして複製する。 */
+    duplicate: (groupId: string, idempotencyKey: string, input?: { name?: string }) =>
+      fetchApi<ApiResponse<{ id: string }>>(
+        `/api/rich-menu-groups/${groupId}/duplicate`,
+        {
+          method: 'POST',
+          headers: { 'Idempotency-Key': idempotencyKey },
+          body: JSON.stringify(input ?? {}),
+        },
+      ),
+
+    /** N-156: staffでも読める影響人数。合計だけを返し、個人や条件は含まない。 */
+    audienceSummary: (groupId: string) =>
+      fetchApi<ApiResponse<{
+        total: { value: number; state: 'available' | 'unavailable'; reason: string | null };
+        targeted: { value: number; state: 'available' | 'unavailable'; reason: string | null };
+        excluded: { value: number | null; state: 'available' | 'unavailable'; reason: string | null };
+        effective: { value: number | null; state: 'available' | 'unavailable'; reason: string | null };
+      }>>(`/api/rich-menu-groups/${groupId}/audience-summary`),
+
+    /** N-152: 本人LINEへのテスト適用の状態。連携済みか・適用中かを返す。 */
+    testApplyState: (groupId: string) =>
+      fetchApi<ApiResponse<{
+        linked: boolean;
+        linkGuidance: string | null;
+        active: {
+          id: string; status: string; previousRichMenuId: string | null;
+          appliedRichMenuId: string | null; lastErrorCode: string | null;
+          createdAt: string; updatedAt: string;
+        } | null;
+        recent: Array<{
+          id: string; status: string; previousRichMenuId: string | null;
+          appliedRichMenuId: string | null; lastErrorCode: string | null;
+          createdAt: string; updatedAt: string;
+        }>;
+      }>>(`/api/rich-menu-groups/${groupId}/test-apply`),
+
+    /** N-152: 本人確認済みLINEへテスト適用する。confirm: true が必須。 */
+    testApply: (groupId: string, idempotencyKey: string) =>
+      fetchApi<ApiResponse<{ id: string; status: string }>>(
+        `/api/rich-menu-groups/${groupId}/test-apply`,
+        {
+          method: 'POST',
+          headers: { 'Idempotency-Key': idempotencyKey },
+          body: JSON.stringify({ confirm: true }),
+        },
+      ),
+
+    /** N-152: テスト適用を取り消して適用前のメニューへ戻す。冪等。 */
+    testApplyRevert: (groupId: string, idempotencyKey: string, applyId?: string) =>
+      fetchApi<ApiResponse<{ id: string; status: string }>>(
+        `/api/rich-menu-groups/${groupId}/test-apply/revert`,
+        {
+          method: 'POST',
+          headers: { 'Idempotency-Key': idempotencyKey },
+          body: JSON.stringify({ confirm: true, ...(applyId ? { applyId } : {}) }),
+        },
+      ),
 
     external: (accountId: string) =>
       fetchApi<ApiResponse<{
@@ -10802,6 +11221,9 @@ export interface BookingRequest {
   requested_at: string;
   decided_at: string | null;
   external_event_id: string | null;
+  /** 担当者・種別の絞り込み用 (#933 N-398)。`SELECT b.*` で返る実列。 */
+  staff_id: string;
+  source: 'liff' | 'phone' | 'counter' | 'operator' | 'import';
 }
 
 export interface BookingAvailabilityRule {
@@ -11164,6 +11586,30 @@ export const bookingApi = {
     withAccount('/api/booking/admin/exceptions', accountId),
     { method: 'POST', body: JSON.stringify(body) },
   ),
+  /** #953 E-09: 登録済みの例外日を画面から直す。送った項目だけが変わる。 */
+  updateException: (
+    accountId: string,
+    id: string,
+    body: {
+      expectedVersion: number;
+      scopeKind?: 'store' | 'staff' | 'resource';
+      scopeId?: string | null;
+      dateFrom?: string;
+      dateTo?: string;
+      kind?: 'open' | 'closed' | 'custom_hours';
+      intervals?: Array<{ start: string; end: string }>;
+      reason?: string | null;
+    },
+  ) => fetchApi<ApiResponse<BookingException>>(
+    withAccount(`/api/booking/admin/exceptions/${encodeURIComponent(id)}`, accountId),
+    { method: 'PATCH', body: JSON.stringify(body) },
+  ),
+  /** #953 E-09: 例外日を版付きで消す。古い版は 409 で止まる。 */
+  deleteException: (accountId: string, id: string, expectedVersion: number) =>
+    fetchApi<ApiResponse<{ id: string }>>(
+      withAccount(`/api/booking/admin/exceptions/${encodeURIComponent(id)}`, accountId),
+      { method: 'DELETE', body: JSON.stringify({ expectedVersion }) },
+    ),
   // Menus
   listMenus: (accountId: string) =>
     fetchApi<{ menus: BookingMenu[] }>(withAccount('/api/booking/admin/menus', accountId)),
@@ -11412,6 +11858,8 @@ export const bookingApi = {
     offset?: number
     query?: string
     menuName?: string
+    staffId?: string
+    source?: string
     from?: string
     to?: string
   }) => {
@@ -11420,11 +11868,37 @@ export const bookingApi = {
     if (params?.offset) query.set('offset', String(params.offset))
     if (params?.query) query.set('query', params.query)
     if (params?.menuName) query.set('menu_name', params.menuName)
+    if (params?.staffId) query.set('staff_id', params.staffId)
+    if (params?.source) query.set('source', params.source)
     if (params?.from) query.set('from', params.from)
     if (params?.to) query.set('to', params.to)
     return fetchApi<{ requests: BookingRequest[]; total: number }>(
       withAccount(`/api/booking/admin/requests?${query.toString()}`, accountId),
     )
+  },
+  /**
+   * 予約台帳CSVの書出しURL (#933 N-397)。一覧と同じ絞り込みをそのまま受ける。
+   * サーバ側は最大5000件までで、範囲の断りはCSV先頭の注記行に入る。
+   */
+  ledgerCsvUrl: (accountId: string, params?: {
+    status?: string
+    query?: string
+    menuName?: string
+    staffId?: string
+    source?: string
+    from?: string
+    to?: string
+  }) => {
+    const query = new URLSearchParams()
+    if (params?.status) query.set('status', params.status)
+    if (params?.query) query.set('query', params.query)
+    if (params?.menuName) query.set('menu_name', params.menuName)
+    if (params?.staffId) query.set('staff_id', params.staffId)
+    if (params?.source) query.set('source', params.source)
+    if (params?.from) query.set('from', params.from)
+    if (params?.to) query.set('to', params.to)
+    const suffix = query.toString() ? `&${query.toString()}` : ''
+    return `${API_URL}/api/booking/admin/bookings.csv?account_id=${encodeURIComponent(accountId)}${suffix}`
   },
   requestsSummary: (accountId: string, params: {
     month: string

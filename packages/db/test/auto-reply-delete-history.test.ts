@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
-import { deleteAutoReply, getAutoReplyHitCountSince } from '../src/auto-replies.js'
+import { deleteAutoReply, getAutoReplyById, getAutoReplyHitCountSince } from '../src/auto-replies.js'
 
 const packageRoot = join(dirname(fileURLToPath(import.meta.url)), '..')
 
@@ -29,7 +29,7 @@ function asD1(sqlite: Database.Database): D1Database {
 }
 
 describe('自動応答を削除した後の実行履歴', () => {
-  it('ルールだけを削除し、過去に当たった記録は残す', async () => {
+  it('削除は行を残して deleted_at を記録し、過去に当たった記録も残す（N-085）', async () => {
     const sqlite = new Database(':memory:')
     sqlite.exec(readFileSync(join(packageRoot, 'bootstrap.sql'), 'utf8'))
     sqlite.prepare(
@@ -41,10 +41,17 @@ describe('自動応答を削除した後の実行履歴', () => {
        VALUES ('hit-1', 'rule-1', '予約')`,
     ).run()
 
-    await deleteAutoReply(asD1(sqlite), 'rule-1')
+    await deleteAutoReply(asD1(sqlite), 'rule-1', 'staff-1')
 
-    expect(sqlite.prepare('SELECT COUNT(*) AS count FROM auto_replies').get()).toEqual({ count: 0 })
+    const row = sqlite.prepare(
+      `SELECT is_active, deleted_at, deleted_by_staff_id FROM auto_replies WHERE id = 'rule-1'`,
+    ).get() as { is_active: number; deleted_at: string | null; deleted_by_staff_id: string | null }
+    expect(row.is_active).toBe(0)
+    expect(row.deleted_at).not.toBeNull()
+    expect(row.deleted_by_staff_id).toBe('staff-1')
     expect(sqlite.prepare('SELECT auto_reply_id FROM auto_reply_hits').get()).toEqual({ auto_reply_id: 'rule-1' })
+    // 削除済みは通常の取得対象から外れる。
+    await expect(getAutoReplyById(asD1(sqlite), 'rule-1')).resolves.toBeNull()
   })
 
   it('公開前確認の一致数は指定日時より後だけを数える', async () => {

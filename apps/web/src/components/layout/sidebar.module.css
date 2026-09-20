@@ -78,11 +78,36 @@
   inset: 0 0 auto;
   z-index: 50;
   display: flex;
+  height: var(--mobile-header-height);
   align-items: center;
   gap: 12px;
   border-bottom: 1px solid var(--color-hairline);
   background: var(--color-canvas);
-  padding: 12px 16px;
+  padding: 0 16px;
+}
+
+/*
+ * モバイルヘッダーの真ん中は「いまの画面名」。
+ * PC の上部バーが持つ現在地をここへ寄せる（U037）。長い名前は
+ * 省略し、全文は `title` で読める。
+ */
+.mobileTitle {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  color: var(--color-ink);
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.3;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 右端の公式アカウントの印。画面名を優先するので、印だけ残す。 */
+.mobileBrand {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
 }
 
 .scrim {

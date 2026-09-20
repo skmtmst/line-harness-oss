@@ -401,14 +401,21 @@ export default function ActionScoreRulesPage() {
               ) : (
                 <div className="grid gap-2">
                   {bundle.rules.map((rule, index) => (
-                    <div key={rule.id} className="grid min-h-10 grid-cols-12 items-center gap-3 rounded-control px-3 py-2" style={{ background: rule.enabled ? 'var(--color-surface-pearl)' : 'var(--color-canvas-sunken)', opacity: rule.enabled ? 1 : 0.72 }}>
-                      <button type="button" disabled={!canEdit} className="col-span-6 flex min-w-0 items-center gap-3 text-left font-semibold text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-default" aria-label={`${rule.name}を編集`} onClick={() => setEditRuleIndex(index)}>
+                    /*
+                     * #975 U047: 390pxでは名前が4文字程度で省略され、頻度の
+                     * 折れと編集・削除が密集していた。狭い幅では名前を1段目の
+                     * 全幅に、点数・頻度・削除を2段目へ下げる。640px以上は
+                     * 従来の1行のまま。点数の向き（増やす・減らす・0にする）は
+                     * 色ではなく「＋」「−」「0にする」の文字で持つ。
+                     */
+                    <div key={rule.id} className="grid min-h-10 grid-cols-12 items-center gap-x-3 gap-y-1 rounded-control px-3 py-2" style={{ background: rule.enabled ? 'var(--color-surface-pearl)' : 'var(--color-canvas-sunken)', opacity: rule.enabled ? 1 : 0.72 }}>
+                      <button type="button" disabled={!canEdit} className="col-span-12 flex min-w-0 items-center gap-3 text-left font-semibold text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-default sm:col-span-6" aria-label={`${rule.name}を編集`} onClick={() => setEditRuleIndex(index)}>
                         <span style={{ color: rule.value < 0 || rule.operation === 'set' ? 'var(--color-status-warn-deep)' : 'var(--color-accent-hover)' }}><RuleIcon eventType={rule.eventType} /></span>
-                        <span className="truncate">{rule.name}</span>
+                        <span className="truncate" title={rule.name}>{rule.name}</span>
                         {canEdit ? <Pencil className="h-3.5 w-3.5 shrink-0 text-ink-faint" aria-hidden="true" /> : null}
                       </button>
-                      <span className="col-span-2 text-right text-sm font-bold" style={{ color: rule.value < 0 || rule.operation === 'set' ? 'var(--color-status-warn-deep)' : 'var(--color-accent-hover)' }}>{rulePointLabel(rule)}</span>
-                      <span className="col-span-3 text-xs text-ink-secondary">{ruleFrequencyLabel(rule)}</span>
+                      <span className="col-span-2 text-left text-sm font-bold sm:text-right" style={{ color: rule.value < 0 || rule.operation === 'set' ? 'var(--color-status-warn-deep)' : 'var(--color-accent-hover)' }}>{rulePointLabel(rule)}</span>
+                      <span className="col-span-9 text-xs text-ink-secondary sm:col-span-3">{ruleFrequencyLabel(rule)}</span>
                       {canEdit ? <button type="button" className="col-span-1 justify-self-end rounded-control p-2 text-status-danger hover:bg-status-danger-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-status-danger" aria-label={`${rule.name}を削除`} onClick={() => removeRule(index)}><Trash2 className="h-4 w-4" aria-hidden="true" /></button> : null}
                     </div>
                   ))}
@@ -467,14 +474,17 @@ export default function ActionScoreRulesPage() {
         {notice ? <p className="rounded-v6-control border border-v6-accent/25 bg-v6-accent-soft px-4 py-3 text-sm text-v6-accent-hover" role="status">{notice}</p> : null}
         {actionError ? <p className="rounded-v6-control border border-v6-danger/25 bg-v6-danger-bg px-4 py-3 text-sm text-v6-danger" role="alert">{actionError}</p> : null}
 
-        <div className="sticky bottom-0 z-20 mt-auto grid min-h-16 grid-cols-4 items-center rounded-v6-card border border-hairline bg-canvas/95 px-4 py-3 shadow-v6-card backdrop-blur">
+        {/*
+          #973 U046: 4列固定はやめ、上に状態文を全幅、下に押し口を折り返しで
+          並べる。狭い幅でも押し口が文を潰さない。
+        */}
+        <div className="sticky bottom-0 z-20 mt-auto rounded-v6-card border border-hairline bg-canvas/95 px-4 py-3 shadow-v6-card backdrop-blur">
           <p className="text-xs text-v6-ink-faint">{versionLabel}。公開後に起きたことから新しい点数が付きます。</p>
-          <div className="col-span-2 flex items-center justify-center gap-3">
+          <div className="mt-2 flex flex-wrap items-center justify-end gap-3">
           {configuration.currentPublishedVersionId ? <Button onClick={() => setConfirmAction({ kind: 'stop' })} disabled={!canEdit || busy}>公開中のルールを停止</Button> : null}
           <Button onClick={() => void saveDraft()} disabled={!canEdit || busy}>下書きに保存</Button>
           <Button variant="primary" onClick={() => void preparePublish()} disabled={!canEdit || busy || bundle.rules.every((rule) => !rule.enabled)}>スコアのルールを公開</Button>
           </div>
-          <span aria-hidden="true" />
         </div>
       </> : null}
 

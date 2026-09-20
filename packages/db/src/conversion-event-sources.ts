@@ -1,3 +1,4 @@
+import { DEFAULT_TENANT_ID } from '@line-crm/shared';
 import { trackConversion } from './conversions.js';
 
 /**
@@ -119,13 +120,18 @@ export async function recordConversionSourceEvent(
       `SELECT f.line_account_id AS friend_account_id,
               cp.id             AS point_id
          FROM friends f
+         LEFT JOIN line_accounts fla ON fla.id = f.line_account_id
          LEFT JOIN conversion_points cp
                 ON cp.event_type = ?
                AND cp.status = 'active'
                AND (cp.line_account_id IS NULL OR cp.line_account_id = f.line_account_id)
+               -- N-263: 統括も一致条件。全アカウント対象の地点が別の統括の
+               -- 友だちへ反応しないように、地点の所属統括と友だちの統括を
+               -- 突き合わせる。所属不明(NULL)は既定の統括に倒す。
+               AND COALESCE(cp.tenant_id, ?) = COALESCE(fla.tenant_id, ?)
         WHERE f.id = ?`,
     )
-    .bind(event.sourceType, event.friendId)
+    .bind(event.sourceType, DEFAULT_TENANT_ID, DEFAULT_TENANT_ID, event.friendId)
     .all<FriendPointRow>();
 
   const found = rows.results;

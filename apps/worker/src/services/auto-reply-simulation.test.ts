@@ -43,6 +43,13 @@ function rule(overrides: Partial<AutoReply> = {}): AutoReply {
     respond_to_all: 0,
     name: '予約問い合わせ',
     keyword_match_mode: 'any',
+    lifecycle_status: 'published',
+    stopped_at: null,
+    stopped_by_staff_id: null,
+    stop_reason: null,
+    stop_idempotency_key: null,
+    deleted_at: null,
+    deleted_by_staff_id: null,
     created_at: '2026-08-01T00:00:00.000Z',
     ...overrides,
   };

@@ -13,6 +13,7 @@ import EditDialog, { type AutoReplyDraft } from '@/components/auto-replies/edit-
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
 import Button from '@/components/shared/button'
+import KpiCollapse from '@/components/ui/kpi-collapse'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import {
   EFFECTIVE_LEGEND,
@@ -20,13 +21,16 @@ import {
   NO_WRITE_PERMISSION,
   UNNAMED_ACCOUNT,
   actionWord,
+  autoReplyMatchesQuery,
+  conditionChips,
   effectiveAccountWord,
   isCurrentAutoReplyLoad,
   matchTypeWord,
-  messageKindWord,
   metricWord,
   responseTypeWord,
+  stopNote,
   templateWord,
+  triggerSummary,
   visibleAutoReplyLoadState,
   type LoadState,
 } from './auto-reply-words'
@@ -69,6 +73,13 @@ interface AutoReply {
   keywordMatchMode: string
   /** フォルダ。分けていなければ null。 */
   folderId: string | null
+  /** 273: 'draft'（未公開）| 'published' | 'stopped'。再開の可否を分けるのに使う。 */
+  lifecycleStatus: string
+  /** 機能08 点検 E-01: 最後に停止した記録。止めたことが無ければ null。 */
+  stoppedAt: string | null
+  stoppedByStaffId: string | null
+  stoppedByStaffName: string | null
+  stopReason: string | null
   /** 152: 当たった回数（今月・累計）。 */
   hits?: { period: number; total: number }
   /** 実行台帳で成功を確認できた後続処理の累計。 */
@@ -82,6 +93,14 @@ interface AutoReply {
 interface PendingDelete {
   item: AutoReply
   /** 削除対象を選んだ時点のアカウント。切替後に古い対象を消さないために固定する。 */
+  accountId: string | null
+}
+
+interface PendingToggle {
+  item: AutoReply
+  /** 'stop' は専用の停止口、'resume' は再開。 */
+  kind: 'stop' | 'resume'
+  /** 対象を選んだ時点のアカウント。切替後に古い対象へ作用しないために固定する。 */
   accountId: string | null
 }
 
@@ -128,24 +147,6 @@ interface TemplateLite {
   messageContent: string
 }
 
-/**
- * 設定してある条件をその場で読める形にする。
- * 条件が無いものは何も出さない。「条件なし」と書くと、条件付きの行が
- * 埋もれてしまう。
- */
-function conditionChips(r: AutoReply) {
-  const chips: string[] = []
-  if (r.activeFrom || r.activeUntil) {
-    chips.push(`${r.activeFrom ?? ''}〜${r.activeUntil ?? ''}`)
-  }
-  if (r.cooldownMinutes) chips.push(`${r.cooldownMinutes}分あけて`)
-  if (r.skipWhenOperatorActive) chips.push('対応中は止める')
-  if (r.messageKinds && r.messageKinds.length > 0) {
-    chips.push(`${r.messageKinds.map(messageKindWord).join('・')}のみ`)
-  }
-  return chips
-}
-
 /** 一覧の副題。設計どおり「一致方法・語数 / 返信＋後続処理」を1行で読む。 */
 function ruleSubtitle(r: AutoReply, templateName: string | null): string {
   const keywordCount = Array.isArray(r.keywords) && r.keywords.length > 0
@@ -186,6 +187,10 @@ export default function AutoRepliesPage() {
   const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState('')
+  const [pendingToggle, setPendingToggle] = useState<PendingToggle | null>(null)
+  const [toggleReason, setToggleReason] = useState('')
+  const [toggling, setToggling] = useState(false)
+  const [toggleError, setToggleError] = useState('')
   const selectedAccountIdRef = useRef(selectedAccountId)
   selectedAccountIdRef.current = selectedAccountId
   const loadGenerationRef = useRef(0)
@@ -385,6 +390,58 @@ export default function AutoRepliesPage() {
     }
   }
 
+  /**
+   * 停止・再開そのもの。確認窓の決定ボタンからだけ呼ぶ。
+   *
+   * 停止は専用の停止口（E-01）へ理由と確認キーを付けて投げ、
+   * いつ・誰が・なぜ止めたかを残す。再開は公開済みの定義を
+   * もう一度動かすだけなので、従来の更新口で戻す。
+   */
+  const handleToggle = async () => {
+    if (!pendingToggle) return
+    if (pendingToggle.accountId !== selectedAccountId) {
+      setToggleError('アカウントが切り替わりました。操作する自動応答を選び直してください。')
+      return
+    }
+    const requestAccountId = pendingToggle.accountId
+    const target = pendingToggle.item
+    const kind = pendingToggle.kind
+    setToggling(true)
+    setToggleError('')
+    try {
+      const result = kind === 'stop'
+        ? await api.autoReplies.stop(
+            target.id,
+            { reason: toggleReason.trim() === '' ? null : toggleReason.trim() },
+            crypto.randomUUID(),
+          )
+        : await api.autoReplies.update(target.id, { isActive: true })
+      if (!result.success) {
+        setToggleError(
+          kind === 'stop'
+            ? '自動応答を停止できませんでした。状態を読み直してからお試しください。'
+            : '自動応答を再開できませんでした。状態を読み直してからお試しください。',
+        )
+        return
+      }
+      setPendingToggle(null)
+      setToggleReason('')
+      // 処理中にアカウントが変わった場合、古いアカウントの一覧で上書きしない。
+      if (selectedAccountIdRef.current === requestAccountId) await load()
+    } catch (reason) {
+      // 権限で断られたときは読み直しても直らない。読み直せとは書かない。
+      setToggleError(
+        reason instanceof ApiError && reason.status === 403
+          ? `${NO_WRITE_PERMISSION.label}。自動応答を止めたり動かしたりするには権限が要ります。`
+          : kind === 'stop'
+            ? '自動応答を停止できませんでした。状態を読み直してからお試しください。'
+            : '自動応答を再開できませんでした。状態を読み直してからお試しください。',
+      )
+    } finally {
+      setToggling(false)
+    }
+  }
+
   /*
     ヒット数の合計（152）。KPI に出す。
 
@@ -419,18 +476,15 @@ export default function AutoRepliesPage() {
    */
   const deleteTargetStale =
     pendingDelete !== null && pendingDelete.accountId !== selectedAccountId
+  const toggleTargetStale =
+    pendingToggle !== null && pendingToggle.accountId !== selectedAccountId
 
-  // キーワードと返す本文の両方を見る。名前を付けていないルールは
-  // キーワードでしか探せない。
-  const q = query.trim()
-  const shown = q
-    ? items.filter(
-        (r) =>
-          r.keyword.includes(q) ||
-          (r.name ?? '').includes(q) ||
-          (r.responseContent ?? '').includes(q),
-      )
-    : items
+  /*
+   * N-087: 大文字小文字を区別しない。名前・先頭の言葉・返す本文に加えて、
+   * 複数言葉の中身も探す。複数言葉だけを設定したルールは、
+   * その言葉で探しても出なかった。
+   */
+  const shown = items.filter((r) => autoReplyMatchesQuery(r, query))
   const inFolder = shown.filter((r) => {
     if (folderFilter === UNFILED) return !r.folderId
     if (folderFilter) return r.folderId === folderFilter
@@ -479,7 +533,8 @@ export default function AutoRepliesPage() {
 
   return (
     <div>
-      <div data-design="KPIs" className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      {/* #975 U060: 390pxでは先頭2件だけ出し、残りは「集計を見る」で開く。 */}
+      <KpiCollapse data-design="KPIs" className="mb-4" gridClassName="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <div className="bg-canvas rounded-card border-hairline border p-4">
           <p className="text-ink-faint text-xs">ルール数</p>
           <p className="text-ink mt-1 text-2xl font-bold tabular-nums">
@@ -528,7 +583,7 @@ export default function AutoRepliesPage() {
               : LOAD_STATE_WORDS[visibleLoadState].label}
           </p>
         </div>
-      </div>
+      </KpiCollapse>
 
       <div data-design="Actions" className="mb-4 flex flex-wrap items-center gap-2">
         <Button
@@ -716,13 +771,23 @@ export default function AutoRepliesPage() {
                       </span>
                     </td>
                     <td className="px-3 py-3">
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium ${r.isActive ? 'bg-success-bg text-green-700' : 'bg-canvas-sunken text-ink-faint'}`}>
+                      {/* E-01: 止めた記録があれば、いつ・誰が・なぜを title で読める */}
+                      <span
+                        className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium ${r.isActive ? 'bg-success-bg text-green-700' : 'bg-canvas-sunken text-ink-faint'}`}
+                        title={stopNote(r) ?? undefined}
+                      >
                         {r.isActive ? '有効' : '停止中'}
                       </span>
+                      {!r.isActive && r.stopReason && (
+                        <span className="text-ink-faint mt-1 block truncate text-nano" title={stopNote(r) ?? ''}>
+                          {r.stopReason}
+                        </span>
+                      )}
                     </td>
                     <td className="px-3 py-3 text-xs text-ink-secondary">
-                      <span className="block truncate" title={r.respondToAll ? 'すべてのメッセージ' : r.keyword}>
-                        {r.respondToAll ? 'すべてのメッセージ' : `「${r.keyword}」`}
+                      {/* N-088: 先頭の1語だけでなく、複数の言葉・まとめ方まで実情報を出す */}
+                      <span className="block truncate" title={triggerSummary(r).title}>
+                        {triggerSummary(r).text}
                       </span>
                       <div className="mt-1 flex flex-wrap gap-1">
                         {conditionChips(r).map((label) => (
@@ -760,6 +825,32 @@ export default function AutoRepliesPage() {
                       >
                         編集
                       </button>
+                      {/* N-086: 行から止められる。下書き（未公開）は公開の前段なので、
+                          動かす口は出さず、公開の流れに任せる。 */}
+                      {r.isActive ? (
+                        <button
+                          aria-label={`自動応答「${r.name || (r.respondToAll ? 'すべてのメッセージ' : r.keyword)}」を停止`}
+                          onClick={() => {
+                            setToggleError('')
+                            setToggleReason('')
+                            setPendingToggle({ item: r, kind: 'stop', accountId: selectedAccountId })
+                          }}
+                          className="ml-1 px-2.5 py-1 text-xs font-medium text-ink-secondary hover:bg-canvas-sunken rounded-md"
+                        >
+                          停止
+                        </button>
+                      ) : r.lifecycleStatus !== 'draft' ? (
+                        <button
+                          aria-label={`自動応答「${r.name || (r.respondToAll ? 'すべてのメッセージ' : r.keyword)}」を再開`}
+                          onClick={() => {
+                            setToggleError('')
+                            setPendingToggle({ item: r, kind: 'resume', accountId: selectedAccountId })
+                          }}
+                          className="ml-1 px-2.5 py-1 text-xs font-medium text-ink-secondary hover:bg-canvas-sunken rounded-md"
+                        >
+                          再開
+                        </button>
+                      ) : null}
                       <button
                         aria-label={`自動応答「${r.name || (r.respondToAll ? 'すべてのメッセージ' : r.keyword)}」を削除`}
                         onClick={() => {
@@ -793,6 +884,59 @@ export default function AutoRepliesPage() {
           onSaved={() => { setEditing(null); load() }}
         />
       )}
+
+      {/*
+        停止・再開の確認窓。止める方は理由（任意）を添えられる。
+        押した瞬間ではなく決定ボタンで実行し、二重押しやアカウント切替後の
+        誤操作を防ぐ。
+      */}
+      <ConfirmDialog
+        open={pendingToggle !== null}
+        title={
+          pendingToggle?.kind === 'resume'
+            ? `自動応答「${pendingToggle.item.name || (pendingToggle.item.respondToAll ? 'すべてのメッセージ' : pendingToggle.item.keyword)}」を再開しますか？`
+            : `自動応答「${pendingToggle?.item.name || (pendingToggle?.item.respondToAll ? 'すべてのメッセージ' : pendingToggle?.item.keyword)}」を停止しますか？`
+        }
+        description={
+          pendingToggle?.kind === 'resume'
+            ? 'これから届くメッセージで動き始めます。止めているあいだに届いた分は、さかのぼって動きません。あとから止め直せます。'
+            : '止めているあいだ、この自動応答は動きません。いつ・誰が・なぜ止めたかが記録に残り、あとから再開できます。'
+        }
+        confirmLabel={pendingToggle?.kind === 'resume' ? '再開する' : '停止する'}
+        busy={toggling}
+        error={toggleError}
+        onCancel={() => {
+          if (toggling) return
+          setToggleError('')
+          setToggleReason('')
+          setPendingToggle(null)
+        }}
+        /* 対象を選んだアカウントが変わっているあいだは実行のボタンを出さない。
+           押せる形で置いておくと、別のアカウントの設定を止めたように読める。 */
+        onConfirm={toggleTargetStale ? undefined : () => void handleToggle()}
+      >
+        {pendingToggle?.kind === 'stop' && (
+          <div>
+            <label htmlFor="auto-reply-stop-reason" className="text-ink-secondary block text-xs font-medium">
+              停止の理由（任意・記録に残ります）
+            </label>
+            <textarea
+              id="auto-reply-stop-reason"
+              value={toggleReason}
+              onChange={(e) => setToggleReason(e.target.value)}
+              maxLength={500}
+              rows={2}
+              placeholder="例: キャンペーンが終わったので"
+              className="border-hairline rounded-control mt-1 w-full border px-3 py-2 text-sm"
+            />
+          </div>
+        )}
+        {toggleTargetStale && (
+          <p className="text-danger text-sm leading-relaxed" role="alert">
+            アカウントが切り替わりました。操作する自動応答を選び直してください。
+          </p>
+        )}
+      </ConfirmDialog>
 
       <div data-design-node="Gy9OK">
         <ConfirmDialog

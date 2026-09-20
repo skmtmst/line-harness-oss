@@ -20,6 +20,8 @@ import { datetimeLocalJstToUtcIso } from '@/lib/jst-datetime'
 import { useScheduleSubmit } from './schedule-submit'
 import { ManualPublishAttempt } from './manual-publish-attempt'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { PublishHistorySection } from './publish-history'
+import { TestApplySection } from './test-apply-section'
 
 /**
  * 保存されている条件を読む。
@@ -164,6 +166,39 @@ function unpublishWarningText(warning: string): string {
 }
 
 /**
+ * 読み込み失敗を利用者の言葉へ写す（U096）。
+ *
+ * 「見つからない」「権限がない」「通信に失敗した」で運用者の次の手が
+ * 違うので、主文を言い分ける。生のエラー文（`API error: 404` など）は
+ * 別で畳んで出す。
+ */
+function describeLoadFailure(raw: string | null): { title: string; detail: string } {
+  const message = raw ?? ''
+  if (/API error: 404|not found|見つかりません/i.test(message)) {
+    return {
+      title: 'このリッチメニューは見つかりません',
+      detail: '削除されたか、別のLINEアカウントのものか、リンクが古くなっています。一覧から選び直してください。',
+    }
+  }
+  if (/API error: 403|権限|forbidden/i.test(message)) {
+    return {
+      title: 'このリッチメニューを表示する権限がありません',
+      detail: '権限のある人に確認するか、別のLINEアカウントを選んでください。',
+    }
+  }
+  if (/API error: 5\d\d|Failed to fetch|NetworkError|fetch/i.test(message)) {
+    return {
+      title: '通信できませんでした',
+      detail: '通信の状態を確認して、もう一度読み込んでください。',
+    }
+  }
+  return {
+    title: 'リッチメニューを表示できませんでした',
+    detail: '時間をおいて読み込み直すか、一覧から選び直してください。',
+  }
+}
+
+/**
  * 取得結果の形を確かめる。形違いの応答をそのまま `Group` に断定すると、
  * 後の `pages.map` などで落ちる。
  */
@@ -196,11 +231,17 @@ function RichMenuEditPageInner() {
   usePageTitle(editorStep === 'targeting' ? '誰に出すか' : editorStep === 'publish' ? '公開のしかた' : 'メニューを作る')
 
   if (!groupId) {
+    /*
+      U096: 「id クエリパラメータが必要です」は技術の言葉で、何を
+      選び直せばよいかが主文から読めなかった。やることを主文にし、
+      戻る操作をそばに置く。
+    */
     return (
       <main className="p-6 max-w-7xl mx-auto">
-        <p className="text-sm text-red-600">id クエリパラメータが必要です</p>
-        <Link href="/rich-menus" className="text-sm text-blue-600 hover:underline mt-2 inline-block">
-          ← 一覧に戻る
+        <p className="text-sm font-semibold text-danger">編集するリッチメニューが指定されていません</p>
+        <p className="text-sm text-ink-secondary mt-1">一覧から編集するリッチメニューを選び直してください。</p>
+        <Link href="/rich-menus" className="text-sm text-action hover:underline mt-2 inline-block">
+          ← リッチメニュー一覧に戻る
         </Link>
       </main>
     )
@@ -269,10 +310,12 @@ function Editor({
    * reload() 経由で署名が更新されるので、保存直後には警告が出ない。
    */
   const [baselineSignature, setBaselineSignature] = useState<string | null>(null)
-  const [confirmKind, setConfirmKind] = useState<'removePage' | 'publish' | 'unpublish' | 'deleteGroup' | null>(null)
+  const [confirmKind, setConfirmKind] = useState<'removePage' | 'publish' | 'unpublish' | 'deleteGroup' | 'duplicate' | null>(null)
   /** 消す前に打ち込んでもらう名前。**打ち間違いを止めるための二重確認。** */
   const [deleteTyped, setDeleteTyped] = useState('')
   const [deleting, setDeleting] = useState(false)
+  /** N-154: 複製の実行中。二度押しで2件作らないよう止める。 */
+  const [duplicating, setDuplicating] = useState(false)
   /** 押した時点のページ。窓を開けたまま別のページに切り替えても、対象は動かさない。 */
   const [removePageTarget, setRemovePageTarget] = useState<Page | null>(null)
   const [confirmError, setConfirmError] = useState('')
@@ -305,6 +348,26 @@ function Editor({
   const [targetPreview, setTargetPreview] = useState<RichMenuTargetPreview | null>(null)
   const [targetPreviewLoading, setTargetPreviewLoading] = useState(false)
   const [targetPreviewError, setTargetPreviewError] = useState('')
+
+  /*
+   * N-156: staff/viewer には人数の合計だけを出す。条件の内訳・上位メニュー名・
+   * 個人の情報を返す preview-targets は owner/admin 専用なので、staff は
+   * audience-summary（集計だけ）へ切り替える。
+   */
+  const [staffRole, setStaffRole] = useState<string | null>(null)
+  useEffect(() => {
+    let cancelled = false
+    void api.staff.me()
+      .then((res) => {
+        if (!cancelled && res.success) setStaffRole(res.data.role)
+      })
+      .catch(() => {
+        // 取れなくても画面は出す。操作側はサーバが 403 で止める。
+      })
+    return () => { cancelled = true }
+  }, [])
+  const aggregateOnly = staffRole === 'staff' || staffRole === 'viewer'
+  const canOperate = staffRole === 'owner' || staffRole === 'admin'
 
   /*
    * N-162: 保存済み署名との差分がある間だけ離脱確認を出す。
@@ -344,7 +407,7 @@ function Editor({
   )
 
   const closeConfirm = () => {
-    if (publishing || unpublishing) return
+    if (publishing || unpublishing || duplicating) return
     setConfirmKind(null)
     setRemovePageTarget(null)
     setConfirmError('')
@@ -411,6 +474,19 @@ function Editor({
     setTargetPreviewLoading(true)
     setTargetPreviewError('')
     try {
+      if (aggregateOnly) {
+        // N-156: staff は集計だけ。保存途中の条件ではなく、保存済みの条件で数える。
+        const response = await api.richMenuGroups.audienceSummary(group.id)
+        if (!response.success) throw new Error(response.error)
+        setTargetPreview({
+          matched: response.data.targeted,
+          overlap: response.data.excluded,
+          effective: response.data.effective,
+          higherMenus: [],
+          priority: targetingPriority,
+        })
+        return
+      }
       const response = await api.richMenuGroups.previewTargets(
         group.id,
         targetingEnabled ? targetingCondition : null,
@@ -423,7 +499,7 @@ function Editor({
     } finally {
       setTargetPreviewLoading(false)
     }
-  }, [group, targetingCondition, targetingEnabled])
+  }, [group, targetingCondition, targetingEnabled, aggregateOnly, targetingPriority])
 
   useEffect(() => {
     if (editorStep !== 'targeting' && editorStep !== 'publish') return
@@ -702,6 +778,28 @@ function Editor({
     }
   }
 
+  /*
+   * N-154: 編集画面からも複製できる。下書きを先に保存してから複製する
+   * と、画面に見えている内容と複製される内容がずれない。
+   */
+  async function runDuplicate() {
+    if (!group || duplicating) return
+    setDuplicating(true)
+    setConfirmError('')
+    try {
+      await persistDraft()
+      const res = await api.richMenuGroups.duplicate(group.id, crypto.randomUUID())
+      if (!res.success) throw new Error(res.error ?? '複製できませんでした')
+      router.push(`/rich-menus/edit?id=${res.data.id}`)
+    } catch (e) {
+      setConfirmError(e instanceof Error && e.message !== '複製できませんでした'
+        ? e.message
+        : '複製できませんでした。しばらくおいてから、もう一度お試しください。')
+    } finally {
+      setDuplicating(false)
+    }
+  }
+
   async function handleImageUpload(pageId: string, file: File) {
     if (pageId.startsWith('tmp-')) {
       // **内部語を出さない。** 押し口の名前は画面に出ている言葉で書く。
@@ -764,12 +862,29 @@ function Editor({
     )
   }
   if (!group) {
+    /*
+      U096: 生の `API error: 404` などを主文にしない。削除済み・権限なし・
+      通信失敗を言い分け、技術情報は補助の詳細へ畳む。
+    */
+    const failure = describeLoadFailure(error)
     return (
       <main className="p-6 max-w-7xl mx-auto">
-        <p className="text-sm text-red-600">{error ?? 'リッチメニューが見つかりません'}</p>
-        <Link href="/rich-menus" className="text-sm text-blue-600 hover:underline mt-2 inline-block">
-          ← 一覧に戻る
-        </Link>
+        <p className="text-sm font-semibold text-danger">{failure.title}</p>
+        <p className="text-sm text-ink-secondary mt-1">{failure.detail}</p>
+        {error ? (
+          <details className="mt-2 text-xs text-ink-faint">
+            <summary className="cursor-pointer">技術情報</summary>
+            <p className="mt-1 break-all">{error}</p>
+          </details>
+        ) : null}
+        <div className="mt-3 flex items-center gap-4">
+          <Link href="/rich-menus" className="text-sm text-action hover:underline inline-block">
+            ← リッチメニュー一覧に戻る
+          </Link>
+          <button type="button" onClick={() => void reload()} className="text-sm text-action hover:underline">
+            もう一度読み込む
+          </button>
+        </div>
       </main>
     )
   }
@@ -803,6 +918,7 @@ function Editor({
         onTargetingCondition={setTargetingCondition}
         onRefresh={() => void reloadTargetPreview()}
         onSave={() => void handleSave()}
+        readOnly={aggregateOnly}
       />
       {leaveConfirmDialog}
       </>
@@ -821,6 +937,8 @@ function Editor({
         onSave={() => void handleSave()}
         onPublishNow={() => void handlePublish()}
         onSchedule={scheduleSubmit}
+        canOperate={canOperate}
+        onChanged={() => void reload()}
       />
       {leaveConfirmDialog}
       </>
@@ -1184,6 +1302,31 @@ function Editor({
         </aside>
       </div>
 
+      {/* N-154: 複製は消える操作ではないので、危険な操作とは分けて置く。 */}
+      {canOperate ? (
+        <section className="mt-10 bg-canvas border border-hairline rounded-lg shadow-sm p-5">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex-1">
+              <div className="text-sm font-medium text-ink">このメニューを複製</div>
+              <div className="text-xs text-ink-secondary mt-0.5">
+                名前・ページ・ボタン・画像・出し分けの設定を写した下書きを新しく作ります。LINE上の表示は変わりません。
+              </div>
+            </div>
+            <Button
+              type="button"
+              onClick={() => {
+                setConfirmError('')
+                setConfirmKind('duplicate')
+              }}
+              disabled={saving || publishing || unpublishing || busy || duplicating}
+              className="shrink-0"
+            >
+              複製する
+            </Button>
+          </div>
+        </section>
+      ) : null}
+
       {/* ─────────── 危険な操作 (画面最下部に分離) ─────────── */}
       <section className="mt-10 bg-red-50 border border-red-200 rounded-lg shadow-sm p-5">
         <h2 className="text-sm font-semibold text-red-700 mb-1">危険な操作</h2>
@@ -1370,6 +1513,24 @@ function Editor({
         </ul>
       </ConfirmDialog>
 
+      {/* N-154: 複製。写すもの・写さないものを読み合わせてから作る。 */}
+      <ConfirmDialog
+        open={confirmKind === 'duplicate'}
+        title={group ? `「${group.name}」を複製しますか？` : ''}
+        description="いまの編集内容を保存してから、下書きとして新しく作ります。"
+        confirmLabel="下書きとして複製する"
+        busy={duplicating}
+        error={confirmError}
+        onConfirm={() => void runDuplicate()}
+        onCancel={closeConfirm}
+      >
+        <ul className="text-ink-secondary space-y-1 text-xs leading-5">
+          <li>・写るもの: 名前・トークバー文言・ページ・ボタン・画像・出し分けの設定・フォルダ</li>
+          <li>・写らないもの: LINEへの登録状態・公開予約・LINE側のメニューID。複製は常に下書きです。</li>
+          <li>・元のメニューは変わりません。</li>
+        </ul>
+      </ConfirmDialog>
+
       {/*
         N-162: 未保存の変更がある間だけ、画面を離れる操作に確認を出す。
         保存成功後は署名が更新されて dirty が外れるので、確認は出ない。
@@ -1480,6 +1641,7 @@ function TargetingStep({
   onTargetingCondition,
   onRefresh,
   onSave,
+  readOnly = false,
 }: {
   group: Group
   targetingEnabled: boolean
@@ -1495,6 +1657,8 @@ function TargetingStep({
   onTargetingCondition: (value: SegmentCondition | null) => void
   onRefresh: () => void
   onSave: () => void
+  /** N-156: staffは集計だけ見る。条件の編集は owner/admin の仕事。 */
+  readOnly?: boolean
 }) {
   // N-162: ステップ移動は画面内の段階移動なので a[href] ではなく router.push で行う。
   const router = useRouter()
@@ -1512,20 +1676,20 @@ function TargetingStep({
         <section className="border-hairline bg-canvas rounded-card border p-6 shadow-sm xl:col-span-2">
           <h2 className="text-ink text-base font-bold">このメニューを出す相手</h2>
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
-            <label className={`rounded-card cursor-pointer border p-4 ${!targetingEnabled ? 'border-accent bg-accent/5' : 'border-hairline'}`}>
-              <span className="flex items-center gap-2 text-sm font-semibold"><input type="radio" name="audience" checked={!targetingEnabled} onChange={() => onTargetingEnabled(false)} />すべての友だち</span>
+            <label className={`rounded-card border p-4 ${readOnly ? 'opacity-70' : 'cursor-pointer'} ${!targetingEnabled ? 'border-accent bg-accent/5' : 'border-hairline'}`}>
+              <span className="flex items-center gap-2 text-sm font-semibold"><input type="radio" name="audience" checked={!targetingEnabled} disabled={readOnly} onChange={() => onTargetingEnabled(false)} />すべての友だち</span>
               <span className="text-ink-faint mt-2 block text-xs leading-5">ほかのメニューに当てはまらなかった人に出る、いちばん下の受け皿になります</span>
             </label>
-            <label className={`rounded-card cursor-pointer border p-4 ${targetingEnabled ? 'border-accent bg-accent/5' : 'border-hairline'}`}>
-              <span className="flex items-center gap-2 text-sm font-semibold"><input type="radio" name="audience" checked={targetingEnabled} onChange={() => onTargetingEnabled(true)} />条件に当てはまる友だちだけ</span>
+            <label className={`rounded-card border p-4 ${readOnly ? 'opacity-70' : 'cursor-pointer'} ${targetingEnabled ? 'border-accent bg-accent/5' : 'border-hairline'}`}>
+              <span className="flex items-center gap-2 text-sm font-semibold"><input type="radio" name="audience" checked={targetingEnabled} disabled={readOnly} onChange={() => onTargetingEnabled(true)} />条件に当てはまる友だちだけ</span>
               <span className="text-ink-faint mt-2 block text-xs leading-5">当てはまらない人には、これより下のメニューが出ます</span>
             </label>
           </div>
 
           {targetingEnabled ? (
             <div className="border-hairline mt-5 rounded-card border p-4">
-              <div className="flex items-center justify-between gap-3"><div><p className="text-ink text-sm font-bold">条件</p><p className="text-ink-secondary mt-1 text-xs">{selectedTagName ? `タグ「${selectedTagName}」を含む` : targetingCondition ? `保存済み条件 ${targetingCondition.rules.length}件` : '条件がまだありません'}</p></div><Button type="button" onClick={() => setConditionEditorOpen((open) => !open)}>{conditionEditorOpen ? '編集を閉じる' : '条件を編集'}</Button></div>
-              {conditionEditorOpen ? <div className="mt-4"><ConditionBuilder value={targetingCondition} onChange={onTargetingCondition} label="条件" /></div> : null}
+              <div className="flex items-center justify-between gap-3"><div><p className="text-ink text-sm font-bold">条件</p><p className="text-ink-secondary mt-1 text-xs">{selectedTagName ? `タグ「${selectedTagName}」を含む` : targetingCondition ? `保存済み条件 ${targetingCondition.rules.length}件` : '条件がまだありません'}</p></div>{readOnly ? null : <Button type="button" onClick={() => setConditionEditorOpen((open) => !open)}>{conditionEditorOpen ? '編集を閉じる' : '条件を編集'}</Button>}</div>
+              {conditionEditorOpen && !readOnly ? <div className="mt-4"><ConditionBuilder value={targetingCondition} onChange={onTargetingCondition} label="条件" /></div> : null}
             </div>
           ) : null}
 
@@ -1533,7 +1697,7 @@ function TargetingStep({
             <div><p className="text-ink-faint text-xs">いま当てはまる人</p><p className="text-ink mt-1 text-2xl font-bold">{previewLoading ? '確認中…' : <MetricValue metric={preview?.matched} />}</p></div>
             <div>
               <label className="text-ink-faint text-xs" htmlFor="targeting-priority">出す順番</label>
-              <div className="mt-1 flex items-center gap-2"><input id="targeting-priority" aria-label="出す順番" type="number" min={1} value={targetingPriority + 1} onChange={(event) => onTargetingPriority(Math.max(0, Number(event.target.value) - 1))} className="border-hairline rounded-control w-20 border px-3 py-2 text-lg font-bold" /><span className="text-ink-secondary text-sm">番目</span></div>
+              <div className="mt-1 flex items-center gap-2"><input id="targeting-priority" aria-label="出す順番" type="number" min={1} value={targetingPriority + 1} disabled={readOnly} onChange={(event) => onTargetingPriority(Math.max(0, Number(event.target.value) - 1))} className="border-hairline rounded-control w-20 border px-3 py-2 text-lg font-bold" /><span className="text-ink-secondary text-sm">番目</span></div>
             </div>
             <div><p className="text-ink-faint text-xs">実際にこのメニューが出る人</p><p className="text-accent mt-1 text-2xl font-bold"><MetricValue metric={preview?.effective} /></p></div>
           </div>
@@ -1555,7 +1719,7 @@ function TargetingStep({
         </aside>
       </div>
 
-      <StickyBar actions={<div className="flex w-full items-center justify-between gap-3"><span className="text-ink-faint text-xs">{group.status === 'published' ? 'LINE登録済み' : '下書き（まだ誰にも出ていません）'}</span><div className="flex gap-2"><Button onClick={() => router.push(`/rich-menus/edit?id=${group.id}`)}>前へ：形とボタン</Button><Button onClick={onSave} disabled={saving}>{saving ? '保存中…' : '下書きに保存'}</Button><Button variant="primary" onClick={() => router.push(`/rich-menus/edit?id=${group.id}&step=publish`)}>次へ：公開のしかた</Button></div></div>} />
+      <StickyBar actions={<div className="flex w-full items-center justify-between gap-3"><span className="text-ink-faint text-xs">{group.status === 'published' ? 'LINE登録済み' : '下書き（まだ誰にも出ていません）'}</span><div className="flex gap-2"><Button onClick={() => router.push(`/rich-menus/edit?id=${group.id}`)}>前へ：形とボタン</Button>{readOnly ? null : <Button onClick={onSave} disabled={saving}>{saving ? '保存中…' : '下書きに保存'}</Button>}<Button variant="primary" onClick={() => router.push(`/rich-menus/edit?id=${group.id}&step=publish`)}>次へ：公開のしかた</Button></div></div>} />
     </main>
   )
 }
@@ -1569,6 +1733,8 @@ function PublishStep({
   onSave,
   onPublishNow,
   onSchedule,
+  canOperate = true,
+  onChanged,
 }: {
   group: Group
   pages: Page[]
@@ -1578,6 +1744,10 @@ function PublishStep({
   onSave: () => void
   onPublishNow: () => void
   onSchedule: (input: RichMenuScheduleInput) => Promise<void>
+  /** N-151/N-152: 履歴・再試行・照合・テスト適用は owner/admin の操作口。 */
+  canOperate?: boolean
+  /** 再試行・修復・テスト適用で状態が変わったとき、親が読み直す。 */
+  onChanged?: () => void
 }) {
   // N-162: ステップ移動は画面内の段階移動なので a[href] ではなく router.push で行う。
   const router = useRouter()
@@ -1713,6 +1883,8 @@ function PublishStep({
         <aside className="space-y-4">
           <section className="border-hairline bg-canvas rounded-card border p-5"><h2 className="text-ink text-sm font-bold">このメニューの設定</h2><dl className="mt-4 space-y-3 text-xs"><div><dt className="text-ink-faint">誰に出るか</dt><dd className="text-ink mt-1 font-semibold"><MetricValue metric={preview?.effective} /></dd></div><div><dt className="text-ink-faint">形</dt><dd className="text-ink mt-1 font-semibold">{group.size === 'large' ? '大' : '小'}・切替あり {pages.length}枚</dd></div><div><dt className="text-ink-faint">終わったら</dt><dd className="text-ink mt-1 font-semibold">{mode === 'period' ? restoreMenus.find((item) => item.id === restoreGroupId)?.name ?? '前のメニューに戻す' : '指定なし'}</dd></div></dl></section>
           <section className="bg-status-info-soft text-status-info rounded-card p-5 text-xs leading-5"><h2 className="text-sm font-bold">公開すると何が変わるか</h2><p className="mt-2"><MetricValue metric={preview?.effective} /> のトーク画面のメニューが入れ替わります。</p><p className="mt-2">LINEへの反映は数分かかることがあります。</p></section>
+          {/* N-152: 全員へ出す前に、自分のLINEだけで見え方を確かめる。 */}
+          {canOperate ? <TestApplySection groupId={group.id} /> : null}
         </aside>
       </div>
       <section aria-label="公開予約の一覧" className="border-hairline bg-canvas rounded-card mt-5 border p-6">
@@ -1753,7 +1925,10 @@ function PublishStep({
           </ul>
         )) : null}
       </section>
-      <StickyBar actions={<div className="flex w-full items-center justify-between gap-3"><Button onClick={() => router.push(`/rich-menus/edit?id=${group.id}&step=targeting`)}>前へ：誰に出すか</Button><div className="flex gap-2"><Button onClick={onSave} disabled={saving || publishing}>下書きに保存</Button><Button variant="primary" onClick={submit} disabled={saving || publishing || (mode !== 'now' && !startsAt) || (mode === 'period' && !endsAt)}>{publishing ? '公開中…' : mode === 'now' ? 'この内容で公開する' : 'この内容で予約する'}</Button></div></div>} />
+      {/* N-151: 公開の履歴・失敗だけの再試行・LINEとの照合修復。 */}
+      {canOperate ? <PublishHistorySection groupId={group.id} onChanged={onChanged} /> : null}
+      {/* N-156: staff は公開・保存を押せない（サーバ側も 403 で止める）。 */}
+      <StickyBar actions={<div className="flex w-full items-center justify-between gap-3"><Button onClick={() => router.push(`/rich-menus/edit?id=${group.id}&step=targeting`)}>前へ：誰に出すか</Button><div className="flex gap-2">{canOperate ? <><Button onClick={onSave} disabled={saving || publishing}>下書きに保存</Button><Button variant="primary" onClick={submit} disabled={saving || publishing || (mode !== 'now' && !startsAt) || (mode === 'period' && !endsAt)}>{publishing ? '公開中…' : mode === 'now' ? 'この内容で公開する' : 'この内容で予約する'}</Button></> : <span className="text-ink-faint text-xs">閲覧のみ（公開・保存は管理者の操作です）</span>}</div></div>} />
     </main>
   )
 }

@@ -22,7 +22,11 @@ import ImageUploader from '@/components/shared/image-uploader'
 import Button from '@/components/shared/button'
 import StickyBar from '@/components/shared/sticky-bar'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
-import { MESSAGE_KIND_WORDS, messageKindWord } from '@/app/auto-replies/auto-reply-words'
+import {
+  MESSAGE_KIND_WORDS,
+  messageKindWord,
+  responseTypeWord,
+} from '@/app/auto-replies/auto-reply-words'
 
 export interface AutoReplyDraft {
   id?: string
@@ -203,6 +207,53 @@ function detectMode(d: AutoReplyDraft): ResponseMode {
   return 'inline-text'
 }
 
+/** LINE送信画像の中身。{originalContentUrl, previewImageUrl} の JSON。 */
+interface LineImageContent {
+  originalContentUrl: string
+  previewImageUrl: string
+}
+
+/**
+ * 画像返信の本文を読む。JSON で無い・URL が無いものは「画像未選択」として null。
+ *
+ * **本文欄の文字列を画像JSONとして保存できないようにするための関門。**
+ * 画像の中身は ImageUploader が JSON で書き込む。直接書いたテキストが
+ * 残っているときに画像形式で保存すると、送信側でテキストとして送られて
+ * しまう（`buildMessage` は parse に失敗するとテキストへ落とす）。
+ */
+function readLineImageContent(content: string): LineImageContent | null {
+  try {
+    const parsed = JSON.parse(content) as {
+      originalContentUrl?: unknown
+      previewImageUrl?: unknown
+    }
+    if (typeof parsed.originalContentUrl === 'string' && parsed.originalContentUrl) {
+      return {
+        originalContentUrl: parsed.originalContentUrl,
+        previewImageUrl:
+          typeof parsed.previewImageUrl === 'string' && parsed.previewImageUrl
+            ? parsed.previewImageUrl
+            : parsed.originalContentUrl,
+      }
+    }
+  } catch {
+    /* JSON でなければ画像の中身ではない */
+  }
+  return null
+}
+
+/*
+ * 選択肢ボタンの見た目（U076）。
+ *
+ * 明るい緑（#06c755）に白い小文字はコントラスト 2.26:1 で読めない。
+ * 曜日チップと同じ「淡い緑＋濃い文字＋枠」に寄せ、太字と `aria-pressed` で
+ * 色以外でも選択状態を伝える。未選択側も透明な枠を持たせて、
+ * 選択時に寸法が動かないようにする。
+ *
+ * ※ className は各ボタンへ直接書く。関数へ逃がすと静的に読めない
+ *   className（design-debt の未解決）として数えられる。
+ */
+
 export default function EditDialog({
   draft,
   templates,
@@ -218,6 +269,8 @@ export default function EditDialog({
   const [templateId, setTemplateId] = useState<string | null>(draft.templateId)
   const [responseContent, setResponseContent] = useState(draft.responseContent)
   const [isActive, setIsActive] = useState(draft.isActive)
+  /* #975 U059: 390pxでプレビューが保存操作を遠ざけないよう、狭い幅では折り畳む。 */
+  const [mobilePreviewOpen, setMobilePreviewOpen] = useState(false)
   const [activeFrom, setActiveFrom] = useState(draft.activeFrom ?? '')
   const [activeUntil, setActiveUntil] = useState(draft.activeUntil ?? '')
   const [cooldown, setCooldown] = useState(
@@ -305,9 +358,23 @@ export default function EditDialog({
       setError('キーワードを入力してください')
       return
     }
-    if (mode === 'template' && !templateId) { setError('template を選んでください'); return }
-    if ((mode === 'inline-text' || mode === 'inline-flex' || mode === 'inline-image') && !responseContent.trim()) {
+    if (mode === 'template' && !templateId) { setError('テンプレートを選んでください'); return }
+    if (mode === 'inline-text' && !responseContent.trim()) {
       setError('内容を入力してください'); return
+    }
+    if (mode === 'inline-flex') {
+      if (!responseContent.trim()) { setError('カードの内容を入力してください'); return }
+      try {
+        JSON.parse(responseContent)
+      } catch {
+        // カード形式なのにJSONでない本文を保存すると、送信側がテキストへ落として
+        // そのまま送ってしまう。ここで止める。
+        setError('カードの内容をJSON形式で入力してください'); return
+      }
+    }
+    if (mode === 'inline-image' && !readLineImageContent(responseContent)) {
+      // テキストのまま画像形式で保存させない（画像選択部品がJSONを書く）。
+      setError('返信する画像を選んでください'); return
     }
     setError('')
     setSaving(true)
@@ -418,7 +485,6 @@ export default function EditDialog({
   const showBasic = !page || step === 'basic'
   const showTrigger = !page || step === 'trigger'
   const showResponse = !page || step === 'response'
-  const currentStep = step === 'basic' ? 0 : step === 'trigger' ? 1 : 2
   const conditionWords = keywordRules.filter((item) => item.keyword.trim()).map((item) => item.keyword.trim())
   const conditionSummary = respondToAll
     ? 'すべての受信メッセージ'
@@ -442,6 +508,20 @@ export default function EditDialog({
     : 'すぐに返信'
   const unmatchedSummary = unmatchedMode === 'notify_operator' ? '担当者へ引き継ぎ' : '何もしない'
   const receiveCount = draft.receiveSourceCounts?.reduce((sum, item) => sum + item.count, 0) ?? null
+  // プレビューは保存される内容と同じものを指す。テンプレートならその中身、
+  // 画像なら選択したURLを出す（U001/U002）。
+  const selectedTemplate =
+    mode === 'template' ? templates.find((t) => t.id === templateId) ?? null : null
+  const imageContent = mode === 'inline-image' ? readLineImageContent(responseContent) : null
+  const flexContentIsJson = (() => {
+    if (mode !== 'inline-flex' || !responseContent.trim()) return false
+    try {
+      JSON.parse(responseContent)
+      return true
+    } catch {
+      return false
+    }
+  })()
   const moveTo = (next: 'basic' | 'trigger' | 'response') => onStepChange?.(next)
   const stickyActions = (
     <>
@@ -474,18 +554,11 @@ export default function EditDialog({
         if (event.target === event.currentTarget) closeOverlay()
       }}
     >
-      {page && (
-        <ol aria-label="自動応答を作る進み方" style={{ minHeight: 55 }} className="mt-4 flex flex-wrap items-center justify-between gap-3 text-xs">
-          {['基本設定', 'どんなときに動くか', '何を返すか', '優先順位', '確認'].map((label, index) => (
-            <li key={label} className="flex items-center gap-2" aria-current={index === currentStep ? 'step' : undefined}>
-              <span className={`rounded-pill flex h-6 w-6 items-center justify-center font-bold ${index < currentStep ? 'bg-accent-deep text-on-accent' : index === currentStep ? 'border-accent text-accent border-2' : 'border-hairline text-ink-faint border'}`}>
-                {index < currentStep ? '✓' : index + 1}
-              </span>
-              <span className={index === currentStep ? 'text-ink font-bold' : 'text-ink-faint'}>{label}</span>
-            </li>
-          ))}
-        </ol>
-      )}
+      {/*
+       * 手順表示（StepTrail）は edit/page.tsx が出す。
+       * この窓は一覧のダイアログとページの両方で使うため、ここに置くと
+       * 手順の無い一覧にも Steps の節が混入する。
+       */}
       <div className={page ? 'grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_390px]' : ''}>
       <div
         ref={dialogRef}
@@ -618,12 +691,13 @@ export default function EditDialog({
           {page ? (
             <>
               <section className="rounded-card border border-hairline p-4">
-                <div className="flex items-center justify-between gap-3">
+                {/* 見出しを全幅で取り、操作は下段へ。横並びだと末尾1文字だけ折り返す（U053）。 */}
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <h2 className="text-ink text-lg font-bold">どんなときに動くか</h2>
                     <p className="text-ink-faint mt-1 text-xs">受信した言葉・時間帯・相手で絞ります。</p>
                   </div>
-                  <Button type="button" onClick={() => moveTo('trigger')}>反応条件を開く</Button>
+                  <Button type="button" className="shrink-0 self-start" onClick={() => moveTo('trigger')}>反応条件を開く</Button>
                 </div>
                 <dl className="mt-4 grid gap-3">
                   <div className="rounded-control bg-canvas-sunken p-3"><dt className="text-ink-faint text-xs">受信メッセージ</dt><dd className="text-ink mt-1 text-sm font-bold">{conditionSummary}</dd></div>
@@ -631,9 +705,9 @@ export default function EditDialog({
                 </dl>
               </section>
               <section className="rounded-card border border-hairline p-4">
-                <div className="flex items-start justify-between gap-3">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div><h2 className="text-ink text-lg font-bold">ひな形から作る</h2><p className="text-ink-faint mt-1 text-xs">よく使う組み合わせです。選ぶと条件と返信がまとめて入ります。</p></div>
-                  <Button href="/templates">ひな形を管理</Button>
+                  <Button href="/templates" className="shrink-0 self-start">ひな形を管理</Button>
                 </div>
                 <div className="mt-4 divide-y divide-hairline rounded-card border border-hairline">
                   {[
@@ -663,15 +737,17 @@ export default function EditDialog({
             <div className="mb-3 flex gap-2">
               <button
                 type="button"
+                aria-pressed={!respondToAll}
                 onClick={() => setRespondToAll(false)}
-                className={`rounded-control px-3 py-1.5 text-xs ${!respondToAll ? 'bg-accent text-on-accent' : 'bg-canvas-sunken text-ink-secondary hover:bg-hairline'}`}
+                className={`rounded-control border px-3 py-1.5 text-xs ${!respondToAll ? 'border-accent bg-accent-soft text-ink font-bold' : 'border-transparent bg-canvas-sunken text-ink-secondary hover:bg-hairline'}`}
               >
                 キーワードで応答
               </button>
               <button
                 type="button"
+                aria-pressed={respondToAll}
                 onClick={() => setRespondToAll(true)}
-                className={`rounded-control px-3 py-1.5 text-xs ${respondToAll ? 'bg-accent text-on-accent' : 'bg-canvas-sunken text-ink-secondary hover:bg-hairline'}`}
+                className={`rounded-control border px-3 py-1.5 text-xs ${respondToAll ? 'border-accent bg-accent-soft text-ink font-bold' : 'border-transparent bg-canvas-sunken text-ink-secondary hover:bg-hairline'}`}
               >
                 一律で応答
               </button>
@@ -708,7 +784,7 @@ export default function EditDialog({
                         setKeywordRules(next)
                         if (index === 0) setKeyword(event.target.value)
                       }}
-                      className={`border-hairline rounded-control focus:ring-accent min-w-0 flex-1 border px-3 py-2 text-sm focus:ring-2 focus:outline-none ${index > 0 ? '' : 'ml-12'}`}
+                      className="border-hairline rounded-control focus:ring-accent min-w-0 flex-1 border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
                       placeholder={index === 0 ? '例：予約変更' : 'キーワードを追加'}
                     />
                     {keywordRules.length > 1 && (
@@ -748,8 +824,9 @@ export default function EditDialog({
                 <button
                   key={o.value}
                   type="button"
+                  aria-pressed={keywordMatchMode === o.value}
                   onClick={() => setKeywordMatchMode(o.value)}
-                  className={`rounded-control px-3 py-1.5 text-xs ${keywordMatchMode === o.value ? 'bg-accent text-on-accent' : 'bg-canvas-sunken text-ink-secondary hover:bg-hairline'}`}
+                  className={`rounded-control border px-3 py-1.5 text-xs ${keywordMatchMode === o.value ? 'border-accent bg-accent-soft text-ink font-bold' : 'border-transparent bg-canvas-sunken text-ink-secondary hover:bg-hairline'}`}
                 >
                   {o.label}
                 </button>
@@ -765,8 +842,10 @@ export default function EditDialog({
               {(['exact', 'contains'] as const).map((mt) => (
                 <button
                   key={mt}
+                  type="button"
+                  aria-pressed={matchType === mt}
                   onClick={() => setMatchType(mt)}
-                  className={`rounded-control px-3 py-1.5 text-xs ${matchType === mt ? 'bg-accent text-on-accent' : 'bg-canvas-sunken text-ink-secondary hover:bg-hairline'}`}
+                  className={`rounded-control border px-3 py-1.5 text-xs ${matchType === mt ? 'border-accent bg-accent-soft text-ink font-bold' : 'border-transparent bg-canvas-sunken text-ink-secondary hover:bg-hairline'}`}
                 >
                   {mt === 'exact' ? '完全一致' : '部分一致'}
                 </button>
@@ -1076,54 +1155,29 @@ export default function EditDialog({
               ] as const).map(({ key, label }) => (
                 <button
                   key={key}
+                  type="button"
+                  aria-pressed={mode === key}
                   onClick={() => setMode(key)}
-                  className={`rounded-control px-3 py-1.5 text-xs ${mode === key ? 'bg-accent text-on-accent' : 'bg-canvas-sunken text-ink-secondary hover:bg-hairline'}`}
+                  className={`rounded-control border px-3 py-1.5 text-xs ${mode === key ? 'border-accent bg-accent-soft text-ink font-bold' : 'border-transparent bg-canvas-sunken text-ink-secondary hover:bg-hairline'}`}
                 >
                   {label}
                 </button>
               ))}
             </div>
           </div>
-          {page && (
-            <div className="rounded-card border-hairline space-y-3 border bg-canvas-sunken p-3">
-              <div className="flex flex-wrap gap-2" aria-label="差し込み項目">
-                {['名前', '友だち情報', '共通情報', '回答フォーム', '配信日', 'その他'].map((label) => (
-                  <Button
-                    key={label}
-                    type="button"
-                    onClick={() => setResponseContent((current) => `${current}{{${label}}}`)}
-                  >
-                    {label}
-                  </Button>
-                ))}
-              </div>
-              <label className="block">
-                <span className="text-ink text-sm font-semibold">返信メッセージ</span>
-                <textarea
-                  rows={5}
-                  value={responseContent}
-                  maxLength={5000}
-                  onChange={(event) => setResponseContent(event.target.value)}
-                  placeholder="返信する内容を入力"
-                  className="border-hairline rounded-control mt-2 w-full resize-y border bg-canvas px-3 py-3 text-sm leading-relaxed"
-                />
-              </label>
-              <div className="flex flex-wrap gap-2" aria-label="返信ボタン">
-                {['予約を確認', '日程を変更', 'キャンセル'].map((label, index) => (
-                  <Button key={label} type="button" variant={index === 0 ? 'primary' : undefined}>
-                    {label}
-                  </Button>
-                ))}
-              </div>
-            </div>
-          )}
-          {!page && mode === 'template' && (
-            <div>
-              <label className="text-ink-secondary mb-1 block text-xs">テンプレート</label>
+          {/*
+           * 返し方ごとの編集部品は、ページ表示・ダイアログ表示で同じものを出す。
+           * ページでは選択欄が !page の内側にあり、テンプレートも画像も
+           * 選べないままだった（U001/U002）。
+           */}
+          {mode === 'template' && (
+            <div className={page ? 'rounded-card border-hairline space-y-3 border bg-canvas-sunken p-3' : ''}>
+              <label htmlFor="auto-reply-template" className="text-ink-secondary mb-1 block text-xs">テンプレート</label>
               <select
+                id="auto-reply-template"
                 value={templateId ?? ''}
                 onChange={(e) => setTemplateId(e.target.value || null)}
-                className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                className="border-hairline rounded-control focus:ring-accent w-full border bg-canvas px-3 py-2 text-sm focus:ring-2 focus:outline-none"
               >
                 <option value="">-- 選択 --</option>
                 {flexTemplates.length > 0 && (
@@ -1149,24 +1203,53 @@ export default function EditDialog({
                 )}
               </select>
               {templates.length === 0 && (
-                <p className="text-[11px] text-amber-600 mt-1">
+                <p className="text-warning mt-1 text-xs">
                   テンプレートがありません。<a href="/templates" className="underline">/templates</a> で作成してください。
                 </p>
               )}
             </div>
           )}
-          {!page && (mode === 'inline-text' || mode === 'inline-flex') && (
-            <div>
-              <label className="block text-xs text-gray-600 mb-1">
-                {mode === 'inline-flex' ? 'カードの内容' : 'テキスト'}
+          {(mode === 'inline-text' || mode === 'inline-flex') && (
+            <div className={page ? 'rounded-card border-hairline space-y-3 border bg-canvas-sunken p-3' : ''}>
+              {/*
+                U058: 返信文の欄を先に出す。差し込みボタンの帯を上に置くと、
+                狭い画面で入力欄が段の下まで押し出される。書く場所を先に
+                見せて、差し込みはその下にまとめる。
+              */}
+              <label className="block">
+                <span className={page ? 'text-ink text-sm font-semibold' : 'text-ink-secondary mb-1 block text-xs'}>
+                  {mode === 'inline-flex' ? 'カードの内容（JSON）' : page ? '返信メッセージ' : 'テキスト'}
+                </span>
+                <textarea
+                  rows={mode === 'inline-flex' ? 8 : page ? 5 : 4}
+                  value={responseContent}
+                  maxLength={5000}
+                  onChange={(e) => setResponseContent(e.target.value)}
+                  placeholder={mode === 'inline-flex' ? '{"type":"bubble", ...}' : '返信する内容を入力'}
+                  className={page
+                    ? 'border-hairline rounded-control mt-2 w-full resize-y border bg-canvas px-3 py-3 text-sm leading-relaxed'
+                    : 'border-hairline rounded-control focus:ring-accent mt-1 w-full resize-y border px-3 py-2 font-mono text-xs focus:ring-2 focus:outline-none'}
+                />
               </label>
-              <textarea
-                rows={mode === 'inline-flex' ? 8 : 4}
-                value={responseContent}
-                onChange={(e) => setResponseContent(e.target.value)}
-                className="w-full border border-gray-300 rounded-md px-3 py-2 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-green-500 resize-y"
-              />
-              {mode === 'inline-text' && (
+              {page && mode === 'inline-text' && (
+                <div className="flex flex-wrap gap-2" aria-label="差し込み項目">
+                  {['名前', '友だち情報', '共通情報', '回答フォーム', '配信日', 'その他'].map((label) => (
+                    <Button
+                      key={label}
+                      type="button"
+                      onClick={() => setResponseContent((current) => `${current}{{${label}}}`)}
+                    >
+                      {label}
+                    </Button>
+                  ))}
+                </div>
+              )}
+              {mode === 'inline-flex' && (
+                <p className="text-ink-faint text-xs leading-relaxed">
+                  LINE のカード型メッセージ（Flex Message）の JSON を入力します。
+                </p>
+              )}
+              {!page && mode === 'inline-text' && (
                 <div className="mt-2 flex flex-wrap gap-2" aria-label="差し込み項目">
                   {['友だち名', '会社名', '担当者名', '予約日時'].map((label) => (
                     <Button
@@ -1181,22 +1264,14 @@ export default function EditDialog({
               )}
             </div>
           )}
-          {!page && mode === 'inline-image' && (
+          {mode === 'inline-image' && (
             <ImageUploader
               mode="line-image"
-              value={(() => {
-                try {
-                  const parsed = JSON.parse(responseContent) as { originalContentUrl?: string; previewImageUrl?: string }
-                  if (parsed.originalContentUrl) {
-                    return {
-                      mode: 'line-image' as const,
-                      originalContentUrl: parsed.originalContentUrl,
-                      previewImageUrl: parsed.previewImageUrl ?? parsed.originalContentUrl,
-                    }
-                  }
-                } catch { /* ignore */ }
-                return null
-              })()}
+              value={
+                imageContent
+                  ? { mode: 'line-image' as const, ...imageContent }
+                  : null
+              }
               onChange={(v) => {
                 if (v?.mode === 'line-image') {
                   setResponseContent(JSON.stringify({
@@ -1209,6 +1284,11 @@ export default function EditDialog({
               }}
               label="返信画像"
             />
+          )}
+          {page && mode === 'silent' && (
+            <p className="rounded-card border-hairline border bg-canvas-sunken p-3 text-ink-faint text-xs leading-relaxed">
+              返信はしません。応答したときに実行する処理だけを下で設定します。
+            </p>
           )}
           {!page && <div>
             <label htmlFor="ar-priority" className="text-ink-faint mb-1 block text-xs">
@@ -1230,37 +1310,31 @@ export default function EditDialog({
           </div>}
 
 
-          {/* 応答したときに、あわせて行うこと */}
-          {page ? (
-            <div className="border-hairline rounded-card border p-4">
-              <div className="flex items-center justify-between gap-3">
-                <p className="text-ink text-sm font-semibold">配信後のアクション</p>
-                <button type="button" className="text-action text-xs font-semibold">＋ アクションを追加</button>
-              </div>
-              <p className="text-ink-secondary mt-3 text-sm">
-                タグ「予約問い合わせ」を追加／担当者「河野」へ通知
+          {/*
+           * 応答したときに、あわせて行うこと。
+           * ページ表示に置いていた見本の文章と処理の無い追加ボタンは、実設定と
+           * 見分けが付かないので、ダイアログと同じ実編集部品へ結び付ける（U003）。
+           */}
+          <div className={page ? 'border-hairline rounded-card space-y-3 border p-4' : 'border-hairline space-y-3 rounded-lg border p-3'}>
+            <div>
+              <p className="text-ink text-sm font-semibold">
+                {page ? '配信後のアクション' : '4. 応答したときに行うこと'}
+              </p>
+              <p className="text-ink-faint mt-0.5 text-xs leading-relaxed">
+                並べた順に実行します。タグを付けてから、そのタグを条件にした次の動きを置く、
+                という書き方ができます。
               </p>
             </div>
-          ) : (
-            <div className="border-hairline space-y-3 rounded-lg border p-3">
-              <div>
-                <p className="text-ink text-sm font-semibold">4. 応答したときに行うこと</p>
-                <p className="text-ink-faint mt-0.5 text-xs leading-relaxed">
-                  並べた順に実行します。タグを付けてから、そのタグを条件にした次の動きを置く、
-                  という書き方ができます。
-                </p>
-              </div>
-              <InlineActionList
-                actions={actions}
-                onChange={setActions}
-                tags={actionOptions.tags}
-                fields={actionOptions.fields}
-                marks={actionOptions.marks}
-                scenarios={actionOptions.scenarios}
-                vars={actionOptions.vars}
-              />
-            </div>
-          )}
+            <InlineActionList
+              actions={actions}
+              onChange={setActions}
+              tags={actionOptions.tags}
+              fields={actionOptions.fields}
+              marks={actionOptions.marks}
+              scenarios={actionOptions.scenarios}
+              vars={actionOptions.vars}
+            />
+          </div>
 
           {page && (
             <div className="border-hairline grid gap-3 rounded-card border p-4 md:grid-cols-2">
@@ -1324,7 +1398,25 @@ export default function EditDialog({
         {!page && <StickyBar className="mx-5 mb-4" actions={stickyActions} />}
       </div>
       {page && (
-        <aside className="flex flex-col gap-3 xl:sticky xl:top-4">
+        /*
+         * #975 U059: 390pxでは、長いプレビューの先に保存があるように見えない
+         * よう、設定確認・プレビューはワンタップで開く折り畳みにする。
+         * 保存は下部追従バーにあり、スクロールなしで届く。
+         * 表示制御は共通部品へ渡せないため、外側の div で xl 以上を隠す。
+         */
+        <div className="xl:hidden">
+          <Button
+            variant="secondary"
+            className="w-full"
+            aria-expanded={mobilePreviewOpen}
+            onClick={() => setMobilePreviewOpen((current) => !current)}
+          >
+            {mobilePreviewOpen ? '届く形と設定の確認を閉じる' : '届く形と設定の確認を見る'}
+          </Button>
+        </div>
+      )}
+      {page && (
+        <aside className={`flex flex-col gap-3 xl:sticky xl:top-4 ${mobilePreviewOpen ? '' : 'max-xl:hidden'}`}>
           <div style={step === 'basic' ? { minHeight: 298 } : undefined} className={`bg-canvas rounded-card border-hairline border p-4 ${step === 'response' ? 'order-2' : 'order-1'}`}>
             <h3 className="text-ink text-sm font-semibold">
               {step === 'trigger' ? 'この条件の判定' : step === 'response' ? '返信の設定' : '設定内容'}
@@ -1363,8 +1455,45 @@ export default function EditDialog({
               <div className="bg-canvas mx-4 mb-4 rounded-card p-4 text-sm leading-relaxed text-ink">
                 {mode === 'silent'
                   ? '返信はせず、設定したアクションだけを実行します。'
-                  : responseContent || '返信内容を入力すると、ここに表示されます。'}
+                  : mode === 'template'
+                    ? selectedTemplate
+                      ? selectedTemplate.messageType === 'text'
+                        ? selectedTemplate.messageContent
+                        : `テンプレート「${selectedTemplate.name}」（${responseTypeWord(selectedTemplate.messageType).label}）を送信します。`
+                      : 'テンプレートを選ぶと、ここに内容が表示されます。'
+                    : mode === 'inline-image'
+                      ? imageContent
+                        ? (
+                          <img
+                            src={imageContent.previewImageUrl}
+                            alt="返信画像のプレビュー"
+                            className="max-h-40 w-full rounded-control object-cover"
+                          />
+                        )
+                        : '画像を選ぶと、ここに表示されます。'
+                      : mode === 'inline-flex'
+                        ? responseContent.trim()
+                          ? flexContentIsJson
+                            ? 'カード型メッセージを送信します。'
+                            : 'JSON として読めません。このままでは保存できません。'
+                          : 'カードの内容（JSON）を入力すると、ここに表示されます。'
+                        : responseContent || '返信内容を入力すると、ここに表示されます。'}
               </div>
+              {step === 'response' && (
+                <div className="mx-4 mb-4 rounded-card bg-canvas p-3">
+                  <p className="text-ink-faint text-micro">表示見本 — ボタン付きメッセージの見え方</p>
+                  <div className="mt-2 space-y-1.5" aria-hidden="true">
+                    {['予約を確認', '日程を変更', 'キャンセル'].map((label) => (
+                      <p
+                        key={label}
+                        className="border-line-answer text-line-answer rounded-control border py-1.5 text-center text-xs font-bold"
+                      >
+                        {label}
+                      </p>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
           <div className="order-3 bg-canvas rounded-card border-hairline border p-4 text-xs">

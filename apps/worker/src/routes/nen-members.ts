@@ -39,6 +39,7 @@ import {
 import { attachTagAndFireSideEffects } from '../services/friend-tag-attach.js';
 import { APPETITE_LABELS, STOOL_LABELS, thirtyDaySummary, type HealthLogRow } from '../services/nen-health-admin.js';
 import { petCallName, petGender } from '../services/nen-pet-name.js';
+import { normalizeNenPetBirthday } from '../lib/nen-pet-birthday.js';
 import {
   refreshAllNenTags,
   syncNenHealthTags,
@@ -648,7 +649,10 @@ nenMembers.post('/api/liff/nen/pets', async (c) => {
   const animalType = body?.animalType === 'cat' ? 'cat' : body?.animalType === 'dog' ? 'dog' : '';
   const breed = typeof body?.breed === 'string' ? body.breed.trim().slice(0, 80) : '';
   const weightKg = Number(body?.weightKg);
-  const birthday = dateOnly(body?.birthday);
+  // 誕生日は月日だけ（MM-DD）でも登録できる。生まれた年が分からない子も
+  // 誕生日配信へ載せるため。年齢は不明のまま出す。
+  const birthdayRaw = normalizeNenPetBirthday(body?.birthday);
+  const birthday = birthdayRaw === 'invalid' ? null : birthdayRaw;
   const concerns = Array.isArray(body?.concerns) ? body.concerns.filter((v): v is string => typeof v === 'string' && CONCERNS.has(v)).slice(0, 10) : [];
   const gender = petGender(body?.gender);
   // 性別は必須（呼び名「くん」「ちゃん」を決めるため。★V6 37-2-A-2）
@@ -723,8 +727,9 @@ nenMembers.put('/api/liff/nen/pets/:id', async (c) => {
     sets.push('gender = ?'); values.push(['male', 'female'].includes(String(body.gender)) ? String(body.gender) : 'unknown');
   }
   if (body.birthday !== undefined) {
-    const birthday = dateOnly(body.birthday);
-    if (!birthday) return c.json({ success: false, error: '誕生日を確認してください' }, 400);
+    // 月日だけ（MM-DD）も受け付ける。年が分からない子も誕生日配信へ載せる。
+    const birthday = normalizeNenPetBirthday(body.birthday);
+    if (birthday === 'invalid') return c.json({ success: false, error: '誕生日を確認してください' }, 400);
     sets.push('birthday = ?'); values.push(birthday);
   }
   if (body.weightKg !== undefined) {
@@ -756,6 +761,18 @@ nenMembers.put('/api/liff/nen/pets/:id', async (c) => {
   const now = jstNow();
   sets.push('updated_at = ?'); values.push(now);
   await c.env.DB.prepare(`UPDATE nen_pet_profiles SET ${sets.join(', ')} WHERE id = ? AND friend_id = ?`).bind(...values, petId, friend.id).run();
+  // 誕生日が変わったら、古い日付へ予約済みの誕生日クーポン配信を取消し、
+  // 次の日次走査で新しい誕生日から組み直させる。すでに発行済みの今年分は残る。
+  if (body.birthday !== undefined) {
+    const previous = (current.birthday as string | null) ?? null;
+    const normalized = normalizeNenPetBirthday(body.birthday);
+    if ((normalized === 'invalid' ? null : normalized) !== previous) {
+      await c.env.DB.prepare(
+        `UPDATE nen_delivery_jobs SET status = 'cancelled', updated_at = ?
+         WHERE campaign_key = 'birthday_coupon' AND status = 'pending' AND source_key LIKE ?`,
+      ).bind(now, `birthday:${petId}:%`).run();
+    }
+  }
   const updated = await c.env.DB.prepare(`SELECT * FROM nen_pet_profiles WHERE id = ?`).bind(petId).first<Record<string, unknown>>();
   if (!updated) return c.json({ success: false, error: 'Pet not found' }, 404);
   const plan = planForPetRow({

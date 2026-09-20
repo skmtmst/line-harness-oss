@@ -476,7 +476,14 @@ function BookingsInner() {
   }, [selectedAccountId, eventId])
 
   if (!eventId) {
-    return <div className="text-danger p-4">イベントを選び直してください</div>
+    /* #975 U070: イベント未指定は行き止まりにしない。一覧へ戻る入口を出す。 */
+    return (
+      <div className="rounded-card border border-hairline bg-canvas p-5">
+        <p className="text-sm font-semibold text-ink">どのイベントの申込かが決まっていません</p>
+        <p className="mt-1 text-xs text-ink-faint">イベントの一覧から選び直してください。</p>
+        <Button href="/events" className="mt-3">イベント一覧へ戻る</Button>
+      </div>
+    )
   }
 
   /*

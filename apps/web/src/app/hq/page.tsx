@@ -8,6 +8,7 @@ import Button from '@/components/shared/button'
 import HqAccountList from '@/components/hq/account-list'
 import AccountEditModal from '@/components/accounts/account-edit-modal'
 import SummaryCard from '@/components/shared/summary-card'
+import KpiCollapse from '@/components/ui/kpi-collapse'
 import OperatorHistory from '@/components/hq/operator-history'
 import PlatformNotices from '@/components/hq/platform-notices'
 
@@ -21,6 +22,7 @@ export default function HqPage() {
   const [checkingConnections, setCheckingConnections] = useState(false)
   const [connectionProgress, setConnectionProgress] = useState('')
   const [connectionResult, setConnectionResult] = useState('')
+  const [reloadKey, setReloadKey] = useState(0)
 
   const load = useCallback(async () => {
     setError('')
@@ -39,7 +41,7 @@ export default function HqPage() {
         if (!cancelled) setLoading(false)
       })
     return () => { cancelled = true }
-  }, [load])
+  }, [load, reloadKey])
 
   const reloadAfterSave = async () => {
     await Promise.all([load(), refreshAccounts()])
@@ -115,7 +117,19 @@ export default function HqPage() {
       {connectionProgress ? <p className="mb-4 text-sm text-ink-secondary" role="status">{connectionProgress}</p> : null}
       {connectionResult ? <p className="mb-4 rounded-card bg-accent-soft p-4 text-sm text-ink" role="status">{connectionResult}</p> : null}
 
-      {error ? <div className="rounded-card bg-danger-bg p-4 text-sm text-danger" role="alert">{error}</div> : null}
+      {error ? (
+        <div className="rounded-card bg-danger-bg p-4 text-sm text-danger" role="alert">
+          <p>{error}</p>
+          <Button
+            type="button"
+            variant="secondary"
+            className="mt-3"
+            onClick={() => { setLoading(true); setReloadKey((key) => key + 1) }}
+          >
+            再読み込み
+          </Button>
+        </div>
+      ) : null}
 
       {!error && loading ? (
         <div className="flex min-h-64 items-center justify-center" role="status" aria-label="アカウントを読み込み中">
@@ -125,12 +139,13 @@ export default function HqPage() {
 
       {!error && !loading ? (
         <>
-          <section data-design="KPIs" data-design-node="w7yY6" className="mb-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          {/* #975 U060: 390pxでは先頭2件だけ出し、残りは「集計を見る」で開く。 */}
+          <KpiCollapse data-design="KPIs" data-design-node="w7yY6" className="mb-4" gridClassName="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <SummaryCard variant="v6" title="アカウント" value={accounts.length} unit="件" detail={`有効 ${totals.active}・停止中 ${accounts.length - totals.active}`} />
             <SummaryCard variant="v6" title="友だち合計" value={totals.friends} unit="人" detail="全アカウントの合計" />
             <SummaryCard variant="v6" title="今月の配信" value={totals.messages} unit="通" detail={`${month}/1 から今日まで`} />
             <SummaryCard variant="v6" title="要確認" value={totals.warnings} unit="件" detail="接続に問題があるアカウント" valueTone="warning" />
-          </section>
+          </KpiCollapse>
         </>
       ) : null}
 

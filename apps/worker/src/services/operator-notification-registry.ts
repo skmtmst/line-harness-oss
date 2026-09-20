@@ -58,6 +58,15 @@ export const OPERATOR_NOTIFICATION_EVENT_TYPES: OperatorEventTypeEntry[] = [
     },
     connected: true,
   },
+  {
+    eventType: 'nen_birthday_coupon_failed',
+    label: '誕生日クーポン発行の失敗',
+    producer: {
+      file: 'apps/worker/src/index.ts',
+      route: 'cron NEN birthday coupon enqueue',
+    },
+    connected: true,
+  },
 ];
 
 export function isKnownOperatorEventType(eventType: string): boolean {

@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import { useSearchParams } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type {
   FriendAddEventAttributionStatus,
@@ -98,9 +99,16 @@ const RULE_STATUS_LABELS: Record<string, string> = {
   archived: 'アーカイブ',
 }
 
+/** CSV書き出しの安全弁。100件×50頁=5,000件で止め、切れたら画面に断る。 */
+const CSV_EXPORT_MAX_PAGES = 50
+const CSV_EXPORT_PAGE_SIZE = 100
+
 export default function FriendAddRunsPage() {
   usePageTitle('新規友だち初回案内・実行結果')
   const { selectedAccountId, accounts, loading: accountLoading } = useAccount()
+  const searchParams = useSearchParams()
+  // 一覧の「この設定の実行結果」から来たとき、その設定の記録だけを見せる。
+  const ruleIdFilter = searchParams.get('rule_id')
   const [kind, setKind] = useState<KindFilter>('all')
   const [attribution, setAttribution] = useState<AttributionFilter>('all')
   const [routing, setRouting] = useState<RoutingFilter>('all')
@@ -108,6 +116,8 @@ export default function FriendAddRunsPage() {
   const [data, setData] = useState<FriendAddRunList | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [csvBusy, setCsvBusy] = useState(false)
+  const [csvNote, setCsvNote] = useState('')
   const [stopBusy, setStopBusy] = useState(false)
   const [stopDialogOpen, setStopDialogOpen] = useState(false)
   const [stopMessage, setStopMessage] = useState('')
@@ -133,6 +143,7 @@ export default function FriendAddRunsPage() {
         status: routing === 'all' ? undefined : routing,
         kind: kind === 'all' ? undefined : kind,
         attribution: attribution === 'all' ? undefined : attribution,
+        ruleId: ruleIdFilter ?? undefined,
       })
       if (requestId !== requestSequence.current) return
       if (!response.success) {
@@ -148,16 +159,16 @@ export default function FriendAddRunsPage() {
     } finally {
       if (requestId === requestSequence.current) setLoading(false)
     }
-  }, [attribution, cursor, kind, routing, selectedAccountId])
+  }, [attribution, cursor, kind, routing, ruleIdFilter, selectedAccountId])
 
   useEffect(() => {
     if (!accountLoading) void load()
   }, [accountLoading, load])
 
-  // アカウントを変えたら古いカーソルで読まないよう巻き戻す。
+  // アカウントや設定の絞りを変えたら古いカーソルで読まないよう巻き戻す。
   useEffect(() => {
     resetCursor()
-  }, [selectedAccountId, resetCursor])
+  }, [selectedAccountId, ruleIdFilter, resetCursor])
 
   /*
    * 絞りの変更はカーソルの巻き戻しと同時に1回だけ読み直す。巻き戻しと取得を
@@ -241,29 +252,69 @@ export default function FriendAddRunsPage() {
     ? `/friend-add-settings?view=edit&id=${encodeURIComponent(activeRuleId)}&step=${step}`
     : null
 
-  const exportCsv = () => {
-    if (!data?.items.length) return
-    const header = ['受信日時', '友だち', '追加の種類', '確定した流入経路', '配信・処理', '処理日時']
-    const rows = data.items.map((item) => {
-      const routeName = item.attribution.status === 'captured'
-        ? item.attribution.routeName || item.attribution.reason || '選択した経路'
-        : '経路は取得できません'
-      return [
-        formatJstDateTime(item.receivedAt),
-        item.friend.displayName || '名前は未取得',
-        item.friendKind === 'first_time' ? 'はじめて' : '再追加・ブロック解除',
-        routeName,
-        routingLabel(item.status, item.errorCode).label,
-        formatJstDateTime(item.processedAt),
-      ]
-    })
-    const csv = `\uFEFF${[header, ...rows].map((row) => row.map(csvCell).join(',')).join('\n')}`
-    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
-    const anchor = document.createElement('a')
-    anchor.href = url
-    anchor.download = 'friend-add-runs.csv'
-    anchor.click()
-    URL.revokeObjectURL(url)
+  /*
+   * CSVは表示中の20件ではなく、今の絞り込み（種類・経路・結果・設定）に
+   * 合う記録を新しい順にすべて書き出す。カーソルを辿って全頁を読み、
+   * 安全弁（5,000件）で切れたときは画面に断る(#946 N-111)。
+   */
+  const exportCsv = async () => {
+    if (!selectedAccountId || csvBusy) return
+    setCsvBusy(true)
+    setCsvNote('')
+    try {
+      const items: FriendAddRunList['items'] = []
+      let exportCursor: string | undefined
+      for (let page = 0; page < CSV_EXPORT_MAX_PAGES; page += 1) {
+        const response = await api.friendAddRules.runs(selectedAccountId, {
+          limit: CSV_EXPORT_PAGE_SIZE,
+          cursor: exportCursor,
+          status: routing === 'all' ? undefined : routing,
+          kind: kind === 'all' ? undefined : kind,
+          attribution: attribution === 'all' ? undefined : attribution,
+          ruleId: ruleIdFilter ?? undefined,
+        })
+        if (!response.success) {
+          setCsvNote('書き出す記録を取得できませんでした。通信を確認して、もう一度お試しください。')
+          return
+        }
+        items.push(...response.data.items)
+        exportCursor = response.data.nextCursor ?? undefined
+        if (!exportCursor) break
+      }
+      if (items.length === 0) {
+        setCsvNote('書き出す記録がありません。')
+        return
+      }
+      const truncated = Boolean(exportCursor)
+      const header = ['受信日時', '友だち', '追加の種類', '確定した流入経路', '配信・処理', '処理日時']
+      const rows = items.map((item) => {
+        const routeName = item.attribution.status === 'captured'
+          ? item.attribution.routeName || item.attribution.reason || '選択した経路'
+          : '経路は取得できません'
+        return [
+          formatJstDateTime(item.receivedAt),
+          item.friend.displayName || '名前は未取得',
+          item.friendKind === 'first_time' ? 'はじめて' : '再追加・ブロック解除',
+          routeName,
+          routingLabel(item.status, item.errorCode).label,
+          formatJstDateTime(item.processedAt),
+        ]
+      })
+      const csv = `\uFEFF${[header, ...rows].map((row) => row.map(csvCell).join(',')).join('\n')}`
+      const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
+      const anchor = document.createElement('a')
+      anchor.href = url
+      anchor.download = 'friend-add-runs.csv'
+      anchor.click()
+      URL.revokeObjectURL(url)
+      setCsvNote(truncated
+        ? `新しい順に${items.length.toLocaleString('ja-JP')}件まで書き出しました。それより古い記録は含まれていません。`
+        : `${items.length.toLocaleString('ja-JP')}件を書き出しました。`)
+    } catch {
+      setCsvNote('書き出す記録を取得できませんでした。通信を確認して、もう一度お試しください。')
+    } finally {
+      setCsvBusy(false)
+    }
   }
 
   return (
@@ -313,9 +364,16 @@ export default function FriendAddRunsPage() {
               <Button onClick={() => void load()} disabled={loading}>一覧を更新</Button>
             </div>
           </details>
-          <Button onClick={exportCsv} disabled={!data?.items.length}>実行結果をCSVで書き出す</Button>
+          <Button onClick={() => void exportCsv()} disabled={!data?.items.length || csvBusy}>{csvBusy ? '書き出し中…' : '実行結果をCSVで書き出す'}</Button>
         </div>
       </div>
+
+      {ruleIdFilter ? (
+        <p className="rounded-control border border-hairline bg-canvas-sunken px-3 py-2 text-xs text-ink-secondary">
+          この設定の実行結果だけを表示しています。
+          <Link href="/friend-add-settings/runs" className="ml-2 font-bold text-accent hover:underline">すべての記録へ戻る</Link>
+        </p>
+      ) : null}
 
       <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
         <SummaryCard variant="v6" title="直近28日の追加" value={summary?.totalRuns ?? null} unit="人" detail="友だち追加の合計" loading={loading} />
@@ -352,7 +410,8 @@ export default function FriendAddRunsPage() {
           <section className="overflow-hidden rounded-card border border-hairline bg-canvas">
             <div className="border-b border-hairline px-4 py-3">
               <h2 className="font-bold">最近の友だち追加</h2>
-              <p className="mt-1 text-xs text-ink-faint">何をきっかけに、何が実行されたかを確認できます。絞り込みはすべての記録に効きます。CSVの書き出しもこのページに表示中の記録だけです。</p>
+              <p className="mt-1 text-xs text-ink-faint">何をきっかけに、何が実行されたかを確認できます。絞り込みはすべての記録に効き、CSVは絞り込みに合う記録を新しい順にすべて書き出します（上限{(CSV_EXPORT_MAX_PAGES * CSV_EXPORT_PAGE_SIZE).toLocaleString('ja-JP')}件）。</p>
+              {csvNote ? <p className="mt-1 text-xs text-ink-faint">{csvNote}</p> : null}
             </div>
             <div className="divide-y divide-hairline px-4">
               {visibleItems.map((item) => {
@@ -369,28 +428,34 @@ export default function FriendAddRunsPage() {
                       ? `${item.actions.total}件の処理を実行`
                       : routingAction(item.status, item.errorCode)
                 return (
-                  <div key={item.id} className="flex min-w-0 items-center gap-3 py-3">
-                    <span className="grid size-9 shrink-0 place-items-center rounded-full bg-status-success-soft text-xs font-bold text-status-success-deep" aria-hidden="true">
-                      {displayName.slice(0, 1)}
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      {item.friend.redacted ? (
-                        <span className="block truncate text-sm font-bold" title={displayName}>{displayName}</span>
-                      ) : (
-                        <Link className="block truncate text-sm font-bold hover:underline" href={`/friends/detail?id=${encodeURIComponent(item.friend.id)}`} title={displayName}>{displayName}</Link>
-                      )}
-                      <p className="truncate text-xs text-ink-faint" title={`流入：${routeName}`}>流入：{routeName}</p>
-                      {item.rule && <p className="truncate text-xs text-ink-faint" title={`${item.rule.name ?? '名前は未取得'} 第${item.rule.versionNumber ?? '—'}版`}>{item.rule.name ?? '名前は未取得'}・第{item.rule.versionNumber ?? '—'}版</p>}
+                  // #973 U045: 1行目は名前と結果、2行目は時刻と詳細。1行に
+                  // すべて並べると狭い幅で右端が切れる。
+                  <div key={item.id} className="min-w-0 py-3">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <span className="grid size-9 shrink-0 place-items-center rounded-full bg-status-success-soft text-xs font-bold text-status-success-deep" aria-hidden="true">
+                        {displayName.slice(0, 1)}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        {item.friend.redacted ? (
+                          <span className="block truncate text-sm font-bold" title={displayName}>{displayName}</span>
+                        ) : (
+                          <Link className="block truncate text-sm font-bold hover:underline" href={`/friends/detail?id=${encodeURIComponent(item.friend.id)}`} title={displayName}>{displayName}</Link>
+                        )}
+                        <p className="truncate text-xs text-ink-faint" title={`流入：${routeName}`}>流入：{routeName}</p>
+                        {item.rule && <p className="truncate text-xs text-ink-faint" title={`${item.rule.name ?? '名前は未取得'} 第${item.rule.versionNumber ?? '—'}版`}>{item.rule.name ?? '名前は未取得'}・第{item.rule.versionNumber ?? '—'}版</p>}
+                      </div>
+                      <div className="hidden min-w-0 flex-1 text-right text-sm font-bold lg:block">{action}</div>
+                      <StatusBadge tone={status.tone} size="compact">{status.label}</StatusBadge>
                     </div>
-                    <div className="hidden min-w-0 flex-1 text-right text-sm font-bold lg:block">{action}</div>
-                    <StatusBadge tone={status.tone} size="compact">{status.label}</StatusBadge>
-                    <Link
-                      className="shrink-0 text-xs font-bold text-accent hover:underline"
-                      href={`/friend-add-settings/runs/detail?id=${encodeURIComponent(item.id)}`}
-                    >
-                      詳細
-                    </Link>
-                    <time className="w-12 shrink-0 text-right text-xs text-ink-secondary" dateTime={item.receivedAt} title={formatJstDateTime(item.receivedAt)}>{formatJstTime(item.receivedAt)}</time>
+                    <div className="mt-1.5 flex items-center justify-between gap-3 pl-12">
+                      <time className="min-w-0 text-xs text-ink-secondary" dateTime={item.receivedAt}>{formatJstDateTime(item.receivedAt)}</time>
+                      <Link
+                        className="shrink-0 text-xs font-bold text-accent hover:underline"
+                        href={`/friend-add-settings/runs/detail?id=${encodeURIComponent(item.id)}`}
+                      >
+                        詳細
+                      </Link>
+                    </div>
                   </div>
                 )
               })}

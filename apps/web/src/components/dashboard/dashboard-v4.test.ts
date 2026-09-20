@@ -136,10 +136,18 @@ describe('ダッシュボードV4の初期表示', () => {
   })
 
   it('旧Workerが友だちの流入元を返さなくても推移表を描画できる', () => {
-    expect(formatTrendSources(undefined)).toEqual({ full: '', compact: '経路なし' })
+    expect(formatTrendSources(undefined)).toEqual({ full: '', compact: '—' })
     expect(formatTrendSources([{ name: '広告', count: 2 }])).toEqual({
       full: '広告 2',
       compact: '広告 2',
+    })
+  })
+
+  it('経路不明の塊は経路名ではなく — で出す（N-013）', () => {
+    // 「経路不明」を経路名として出すと、実在する経路と区別がつかない。
+    expect(formatTrendSources([{ name: null, count: 3 }, { name: '広告', count: 2 }])).toEqual({
+      full: '— 3、広告 2',
+      compact: '— 3、広告 2',
     })
   })
 

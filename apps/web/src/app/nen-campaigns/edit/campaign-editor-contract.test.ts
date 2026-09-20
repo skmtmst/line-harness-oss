@@ -51,3 +51,28 @@ describe('本文の上限統一（#659）', () => {
     expect(EDITOR).toContain('ApiError')
   })
 })
+
+describe('文言と実態の一致・書きかけの保護（#935）', () => {
+  it('N-299: 「これから届く42通」のような固定のでたらめを言わない', () => {
+    expect(EDITOR).not.toContain('42通')
+    expect(EDITOR).not.toMatch(/これから届く\d+通/)
+  })
+
+  it('N-299: 配信待ちは予約時の中身（スナップショット）のまま届くと言う', () => {
+    // 実際の動作: nen_delivery_jobs.campaign_snapshot が配信時の中身を固定する。
+    expect(EDITOR).toContain('予約したときの中身のまま届きます')
+    // 件数は実数（配信ごとの待ち件数）から取る。
+    expect(EDITOR).toContain('pendingByCampaign')
+  })
+
+  it('N-305: パンくずは実在するタブへ戻す（存在しない ?tab=flows を指さない）', () => {
+    expect(EDITOR).not.toContain('tab=flows')
+    expect(EDITOR).toContain('/nen-campaigns?tab=auto')
+  })
+
+  it('N-301: 書きかけのまま離れるとき共通の未保存ガードで止める', () => {
+    expect(EDITOR).toContain('useUnsavedGuard')
+    expect(EDITOR).toContain('ConfirmDialog')
+    expect(EDITOR).toContain('入力中の内容があります')
+  })
+})

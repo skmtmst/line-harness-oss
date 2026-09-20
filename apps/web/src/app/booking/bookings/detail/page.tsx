@@ -4,6 +4,7 @@ import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'rea
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import {
+  api,
   ApiError,
   bookingApi,
   type BookingAdminDetail,
@@ -14,6 +15,7 @@ import {
   type BookingNotificationPolicy,
 } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
+import { canOperateBookings } from '../../lib/booking-permissions'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import SelectField from '@/components/shared/select-field'
@@ -214,6 +216,19 @@ function BookingDetailInner() {
   const [saving, setSaving] = useState(false)
   const [retrying, setRetrying] = useState<string | null>(null)
   const slotRequest = useRef(0)
+  // N-401: 閲覧のみの人には承認・変更・再試行のボタンを見せない。
+  // 読み込めるまでは隠す。最終の可否はサーバ側の403が決める。
+  const [canOperate, setCanOperate] = useState(false)
+  // 権限を読み終わるまで「閲覧のみ」の案内も出さない（操作できる人へ一瞬見せない）。
+  const [staffResolved, setStaffResolved] = useState(false)
+  useEffect(() => {
+    let active = true
+    void api.staff.me()
+      .then((response) => { if (active) setCanOperate(response.success && canOperateBookings(response.data)) })
+      .catch(() => { if (active) setCanOperate(false) })
+      .finally(() => { if (active) setStaffResolved(true) })
+    return () => { active = false }
+  }, [])
 
   const load = useCallback(async () => {
     if (!id || !selectedAccountId) {
@@ -517,14 +532,16 @@ function BookingDetailInner() {
                   : detail.calendarSync === 'failed' ? (
                     <span className="text-danger">
                       反映に失敗しています
-                      <button
-                        type="button"
-                        onClick={() => void retryCalendar()}
-                        disabled={retrying !== null || queuedCalendar}
-                        className="text-accent ml-2 underline disabled:opacity-40"
-                      >
-                        {retrying === 'calendar' ? '再試行中...' : 'もう一度反映する'}
-                      </button>
+                      {canOperate ? (
+                        <button
+                          type="button"
+                          onClick={() => void retryCalendar()}
+                          disabled={retrying !== null || queuedCalendar}
+                          className="text-accent ml-2 underline disabled:opacity-40"
+                        >
+                          {retrying === 'calendar' ? '再試行中...' : 'もう一度反映する'}
+                        </button>
+                      ) : null}
                     </span>
                   ) : detail.calendarSync === 'pending' ? '反映処理中' : '未設定'}
               </Row>
@@ -736,7 +753,13 @@ function BookingDetailInner() {
                   : 'LINEと結びついていないため、お客様への自動連絡はありません。'}
               </p>
               <div className="flex flex-col gap-2">
-                {status === 'requested' && (
+                {/* N-401: 閲覧のみの人には状態を変える操作を出さない */}
+                {staffResolved && !canOperate && editable && (
+                  <p className="text-ink-faint text-sm">
+                    閲覧のみの権限のため、状態の変更はできません。
+                  </p>
+                )}
+                {canOperate && status === 'requested' && (
                   <>
                     <Button
                       variant="primary"
@@ -760,7 +783,7 @@ function BookingDetailInner() {
                     </button>
                   </>
                 )}
-                {status === 'confirmed' && (
+                {canOperate && status === 'confirmed' && (
                   <>
                     <Button
                       variant="primary"
@@ -811,7 +834,7 @@ function BookingDetailInner() {
                       {op.errorCode ? (
                         <p className="text-ink-faint text-xs">原因: {op.errorCode}</p>
                       ) : null}
-                      {isLineLinked ? (
+                      {isLineLinked && canOperate ? (
                         <button
                           type="button"
                           onClick={() => void retryNotification(op.id)}
@@ -831,14 +854,16 @@ function BookingDetailInner() {
                       {op.errorCode ? (
                         <p className="text-ink-faint text-xs">原因: {op.errorCode}</p>
                       ) : null}
-                      <button
-                        type="button"
-                        onClick={() => void retryCalendar()}
-                        disabled={retrying !== null || queuedCalendar}
-                        className="text-accent mt-1 text-xs underline disabled:opacity-40"
-                      >
-                        {retrying === 'calendar' ? '再試行中...' : 'もう一度反映する'}
-                      </button>
+                      {canOperate ? (
+                        <button
+                          type="button"
+                          onClick={() => void retryCalendar()}
+                          disabled={retrying !== null || queuedCalendar}
+                          className="text-accent mt-1 text-xs underline disabled:opacity-40"
+                        >
+                          {retrying === 'calendar' ? '再試行中...' : 'もう一度反映する'}
+                        </button>
+                      ) : null}
                     </li>
                   ))}
                 </ul>

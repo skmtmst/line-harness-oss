@@ -3,6 +3,7 @@
 import type { ReactNode } from 'react'
 import NoteBar from '@/components/shared/note-bar'
 import SummaryCard from '@/components/shared/summary-card'
+import KpiCollapse from '@/components/ui/kpi-collapse'
 import { Tabs } from '@/components/shared/tabs'
 import {
   nextMonthResetLabel,
@@ -36,6 +37,24 @@ export function BannerTabs({
         ]}
         actions={actions}
       />
+      {/*
+        U032: 狭い幅ではタブと右端の操作（プロジェクトを作る・
+        アーカイブを見る）を別行にする。共通の Tabs は横1行・高さ44で
+        固定なので、この画面だけの規格外変更にならないよう、
+        設計Nodeの中の nav にだけメディアクエリで折り返しを足す。
+      */}
+      <style jsx global>{`
+        @media (width < 768px) {
+          [data-design-node='jGeAF'] > nav,
+          [data-design-node='bpdek'] > nav {
+            height: auto;
+            min-height: 44px;
+            flex-wrap: wrap;
+            row-gap: 4px;
+            padding-bottom: 8px;
+          }
+        }
+      `}</style>
     </div>
   )
 }
@@ -55,7 +74,7 @@ export function BannerKpis({
 }) {
   const percent = remainingPercent(usage)
   return (
-    <div data-design-node="jT1tM" className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+    <KpiCollapse data-design-node="jT1tM" gridClassName="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
       <SummaryCard
         variant="v6"
         title="プロジェクト"
@@ -90,7 +109,7 @@ export function BannerKpis({
         detail={stats ? `${stats.deliveredAccounts}アカウント` : '—'}
         loading={loading}
       />
-    </div>
+    </KpiCollapse>
   )
 }
 

@@ -11,6 +11,7 @@ import PageHeader from '@/components/shared/page-header'
 import Pagination from '@/components/shared/pagination'
 import Select from '@/components/shared/select'
 import SummaryCard from '@/components/shared/summary-card'
+import KpiCollapse from '@/components/ui/kpi-collapse'
 import { ActionCell, DataTable, Td, Th, TableHeadRow, Tr } from '@/components/shared/table'
 import { Tabs } from '@/components/shared/tabs'
 import { useAccount } from '@/contexts/account-context'
@@ -285,7 +286,8 @@ function EventsPanel({ accountId }: { accountId: string | null }) {
 
   return (
     <>
-      <div className={styles.kpis}>
+      {/* #975 U060: 390pxでは先頭2件だけ出し、残りは「集計を見る」で開く。 */}
+      <KpiCollapse gridClassName={styles.kpis}>
         <SummaryCard variant="v6" title="今日 取り込んだ" value={overview?.last24h ?? null} unit="件" detail={overview?.byType.map((item) => `${item.label} ${item.count.toLocaleString('ja-JP')}`).join('・') ?? '内訳は未取得'} />
         <SummaryCard variant="v6" title="つながっていない注文" value={overview?.identityPending ?? null} unit="件" detail="LINEの友だちが見つかりません" badge="つき合わせ" />
         <SummaryCard variant="v6" title="取り込みに失敗" value={overview?.failed ?? null} unit="件" detail="3回やり直しても入りませんでした" badge="確認" badgeTone="danger" />
@@ -296,7 +298,7 @@ function EventsPanel({ accountId }: { accountId: string | null }) {
             ? '到着時間は測定できません'
             : `直近24時間の平均 ${overview.averageDeliverySeconds.toLocaleString('ja-JP')}秒（${overview.latencySampleCount.toLocaleString('ja-JP')}件）`}</p>
         </div>
-      </div>
+      </KpiCollapse>
       {overviewState === 'error' || overviewState === 'forbidden' ? (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-control bg-danger-bg px-3 py-2.5 text-sm text-danger" role="status">
           <span>{overviewState === 'forbidden'

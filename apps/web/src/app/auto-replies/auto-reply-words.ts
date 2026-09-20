@@ -199,6 +199,165 @@ export function messageKindWord(kind: string): string {
   return MESSAGE_KIND_WORDS.find((m) => m.key === kind)?.label ?? 'その他のメッセージ'
 }
 
+/** 応答する曜日。0=日 … 6=土。 */
+const WEEKDAY_WORDS = ['日', '月', '火', '水', '木', '金', '土'] as const
+
+/** 反応する言葉の1行。keywords があればその1行、無ければ keyword / matchType。 */
+export interface AutoReplyKeywordRule {
+  keyword: string
+  matchType: 'exact' | 'contains'
+}
+
+/**
+ * 反応する言葉の並び。
+ *
+ * 「どんなときに動くか」が先頭の1語だけを出していたのでは、複数の言葉を
+ * 設定したルールの条件が読めない。keywords があれば全部、無ければ
+ * keyword / matchType を1行として返す。
+ */
+export function keywordRules(rule: {
+  keyword: string
+  matchType: 'exact' | 'contains'
+  keywords: unknown[] | null
+}): AutoReplyKeywordRule[] {
+  if (Array.isArray(rule.keywords) && rule.keywords.length > 0) {
+    const parsed = rule.keywords.flatMap((item): AutoReplyKeywordRule[] => {
+      if (!item || typeof item !== 'object') return []
+      const r = item as Record<string, unknown>
+      if (typeof r.keyword !== 'string' || r.keyword === '') return []
+      return [{ keyword: r.keyword, matchType: r.matchType === 'contains' ? 'contains' : 'exact' }]
+    })
+    if (parsed.length > 0) return parsed
+  }
+  return [{ keyword: rule.keyword, matchType: rule.matchType }]
+}
+
+/**
+ * 「どんなときに動くか」の先頭行と、読める形の全文。
+ *
+ * 先頭行は幅が狭いので「言葉・言葉・ほかN件」まで。全文は title に
+ * 一致方法と「どれか1つ／すべて」のまとめ方まで書く。
+ */
+export function triggerSummary(rule: {
+  keyword: string
+  matchType: 'exact' | 'contains'
+  keywords: unknown[] | null
+  respondToAll: boolean
+  keywordMatchMode: string
+}): { text: string; title: string } {
+  if (rule.respondToAll) {
+    return {
+      text: 'すべてのメッセージ',
+      title: '届いたメッセージすべてに応答します',
+    }
+  }
+  const rules = keywordRules(rule)
+  const details = rules
+    .map((item) => `${matchTypeWord(item.matchType)}「${item.keyword}」`)
+    .join('・')
+  const mode = rules.length > 1
+    ? rule.keywordMatchMode === 'all'
+      ? 'すべてに当たると動きます'
+      : 'どれか1つに当たると動きます'
+    : '当たると動きます'
+  const shown = rules.slice(0, 2).map((item) => `「${item.keyword}」`).join('')
+  const rest = rules.length - 2
+  return {
+    text: rest > 0 ? `${shown}ほか${rest}件` : shown,
+    title: `${details} — ${mode}`,
+  }
+}
+
+/**
+ * 設定してある条件をその場で読める形にする。
+ *
+ * 時間帯・クールダウンだけでなく、曜日・祝日・1人1回・友だち条件・
+ * メッセージ種別も出す。設定が無いものは何も出さない——「条件なし」と
+ * 書くと、条件付きの行が埋もれてしまう。
+ */
+export function conditionChips(r: {
+  activeFrom: string | null
+  activeUntil: string | null
+  responseWeekdays: number[] | null
+  responseHolidayRule: string | null
+  cooldownMinutes: number | null
+  skipWhenOperatorActive: boolean
+  oncePerFriend: boolean
+  messageKinds: string[] | null
+  friendConditions: unknown | null
+}): string[] {
+  const chips: string[] = []
+  if (r.activeFrom || r.activeUntil) {
+    chips.push(`${r.activeFrom ?? ''}〜${r.activeUntil ?? ''}`)
+  }
+  if (r.responseWeekdays && r.responseWeekdays.length > 0) {
+    const days = r.responseWeekdays
+      .filter((d) => Number.isInteger(d) && d >= 0 && d <= 6)
+      .map((d) => WEEKDAY_WORDS[d])
+      .join('・')
+    if (days) chips.push(`${days}曜のみ`)
+  }
+  if (r.responseHolidayRule === 'include') chips.push('祝日も動く')
+  if (r.responseHolidayRule === 'exclude') chips.push('祝日は止める')
+  if (r.cooldownMinutes) chips.push(`${r.cooldownMinutes}分あけて`)
+  if (r.oncePerFriend) chips.push('同じ人に1回だけ')
+  if (r.skipWhenOperatorActive) chips.push('対応中は止める')
+  if (r.friendConditions) chips.push('友だち条件あり')
+  if (r.messageKinds && r.messageKinds.length > 0) {
+    chips.push(`${r.messageKinds.map(messageKindWord).join('・')}のみ`)
+  }
+  return chips
+}
+
+/**
+ * 一覧の検索（機能08 点検 N-087）。
+ *
+ * 大文字小文字を区別しない。名前・先頭の言葉・返す本文に加えて、
+ * 複数言葉の中身も探す——複数言葉だけを設定したルールが、
+ * その言葉で探しても出なかった。
+ */
+export function autoReplyMatchesQuery(
+  rule: {
+    keyword: string
+    name: string | null
+    responseContent: string | null
+    keywords: unknown[] | null
+  },
+  query: string,
+): boolean {
+  const q = query.trim().toLowerCase()
+  if (!q) return true
+  const haystacks = [
+    rule.name,
+    rule.keyword,
+    rule.responseContent,
+    ...keywordRules({ keyword: rule.keyword, matchType: 'exact', keywords: rule.keywords })
+      .map((item) => item.keyword),
+  ]
+  return haystacks.some(
+    (text) => typeof text === 'string' && text.toLowerCase().includes(q),
+  )
+}
+
+/**
+ * 停止の記録を1文で（機能08 点検 E-01）。
+ *
+ * 状態チップの title に出す。止まっていない・記録が無いときは null。
+ * `stoppedAt` は JST の ISO 文字列なので、分までの読める形に直す。
+ */
+export function stopNote(rule: {
+  isActive: boolean
+  stoppedAt: string | null
+  stoppedByStaffName: string | null
+  stopReason: string | null
+}): string | null {
+  if (rule.isActive || !rule.stoppedAt) return null
+  const when = rule.stoppedAt.slice(0, 16).replace('T', ' ')
+  const who = rule.stoppedByStaffName ?? '担当者'
+  const reason = rule.stopReason ? ` — 理由: ${rule.stopReason}` : ''
+  return `${when} に ${who} が停止${reason}`
+}
+
 /**
  * 一覧を出せないときの言い方。
  *

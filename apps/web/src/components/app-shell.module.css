@@ -31,7 +31,6 @@
   flex: 1;
   overflow: auto;
   background: var(--color-shell);
-  padding-top: 72px;
 }
 
 .content {
@@ -55,9 +54,23 @@
   }
 }
 
-@media (min-width: 768px) {
-  .main {
-    padding-top: 0;
+/*
+ * 1280px 未満はモバイルの固定ヘッダーが画面の上に居る。
+ *
+ * - 上部バー（PC の現在地表示）は app-top-bar.tsx 側で畳む。
+ *   モバイルヘッダーが同じ現在地を持つので、2本を同時に占有させない（U037）。
+ * - 本文側はヘッダーの高さ分だけ下げる。高さは `--mobile-header-height`
+ *   1か所で管理し、ヘッダーと余白の二重計上をやめる（U038）。
+ * - `/visual-qa` の比較画面は `.side` を通らないので `.workspace > .main`
+ *   で拾う。`/accounts/new` の専用シェルにはヘッダー自体が無い。
+ */
+@media (max-width: 1279.98px) {
+  .side {
+    padding-top: var(--mobile-header-height);
+  }
+
+  .workspace > .main {
+    padding-top: var(--mobile-header-height);
   }
 }
 

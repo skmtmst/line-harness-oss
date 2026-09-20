@@ -134,6 +134,13 @@ export default function CommonActionsPage() {
 
   return (
     <div data-design-node="xOpDs">
+      {/*
+        U035: 390pxでは右側の操作ボタンが見出し・パンくず・説明を
+        押しつぶし、縦に割れていた。共通の PageHeader の形は変えず、
+        この画面の見出し帯だけ「収まらないとき操作を次の行へ下げる」にする。
+        収まる幅では1行のままで見た目は変わらない。
+      */}
+      <div data-page-header-wrap>
       <PageHeader
         breadcrumb={[
           { label: 'オートメーション', href: '/automations' },
@@ -148,7 +155,18 @@ export default function CommonActionsPage() {
           </>
         )}
       />
+      <style>{`
+        [data-page-header-wrap] > div { flex-wrap: wrap; }
+        [data-page-header-wrap] > div > div + div { flex-wrap: wrap; max-width: 100%; margin-left: auto; }
+        /* 下の5つの画面切替タブも、390pxでは右へはみ出していた。同じ考え方で折り返す。 */
+        [data-tabs-row] nav:has(> span) { height: auto; flex-wrap: wrap; row-gap: 8px; }
+        [data-tabs-row] nav:has(> span) > span { flex-wrap: wrap; row-gap: 0; }
+        [data-scroll-table] > div { overflow-x: auto; }
+        [data-scroll-table] table { min-width: 800px; }
+      `}</style>
+      </div>
 
+      <div data-tabs-row>
       <Tabs items={[
         { label: '動いているもの', count: automationCounts?.active, href: '/automations' },
         { label: '止めているもの', count: automationCounts?.stopped, href: '/automations?tab=stopped' },
@@ -156,6 +174,7 @@ export default function CommonActionsPage() {
         { label: '見本', count: templateCount ?? undefined, href: '/automations?tab=templates' },
         { label: '共通アクション', count: summary?.total, current: true },
       ]} className="mb-4" />
+      </div>
 
       <div className="mb-4 grid grid-cols-2 gap-3 xl:grid-cols-4">
         <SummaryCard variant="v6" title="共通アクション" value={loading ? null : (summary?.total ?? 0)} unit="" detail={loading ? '' : `うち公開中 ${totals.published}`} loading={loading} />
@@ -214,6 +233,9 @@ export default function CommonActionsPage() {
           action={canManage && !query && filter === 'all' ? <Button href="/common-actions/new" variant="primary">共通アクションをつくる</Button> : undefined}
         />
       ) : (
+        /* U035: 390pxでは6列の表が潰れて見出しが重なる。列の比較が要る表なので、
+           枠の内側だけ横へ動かせるようにして見出しの形を保つ。 */
+        <div data-scroll-table>
         <DataTable>
             <thead className="bg-canvas-sunken text-ink-faint text-xs">
               <TableHeadRow>
@@ -278,6 +300,7 @@ export default function CommonActionsPage() {
               ))}
             </tbody>
         </DataTable>
+        </div>
       )}
       {!loading && !error && items.length > 0 ? (
         <div className="border-hairline flex items-center justify-between border-x border-b bg-canvas px-4 py-3 text-xs text-ink-faint">

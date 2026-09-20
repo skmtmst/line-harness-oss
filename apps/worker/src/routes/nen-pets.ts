@@ -82,7 +82,7 @@ function petView(row: PetRow, products: FeedingProductRow[], today: Date, treatL
     name: row.name,
     callName: petCallName(row.name, row.gender),
     gender: petGender(row.gender),
-    animalType: row.animal_type === 'cat' ? 'cat' : 'dog',
+    animalType: row.animal_type === 'cat' ? 'cat' : row.animal_type === 'other' ? 'other' : 'dog',
     breed: row.breed ?? '',
     birthday: row.birthday,
     ageLabel: ageLabel(row.birthday, today),
@@ -140,7 +140,7 @@ nenPets.get('/api/nen/pets', async (c) => {
   const weight = c.req.query('weight') ?? '';
   const sort = c.req.query('sort') ?? 'updated_desc';
   let filtered = views.filter((p, index) => matchesQuery(pets[index], q)
-    && (species === 'dog' || species === 'cat' ? p.animalType === species : true)
+    && (species === 'dog' || species === 'cat' || species === 'other' ? p.animalType === species : true)
     && (product === 'none' ? p.productName == null : product ? pets[index].feeding_product_id === product : true)
     && (weight === 'stale' ? p.weightStale : weight === 'fresh' ? !p.weightStale : true));
   if (sort === 'name') filtered = [...filtered].sort((a, b) => a.name.localeCompare(b.name, 'ja'));

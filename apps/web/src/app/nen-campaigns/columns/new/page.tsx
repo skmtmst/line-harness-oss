@@ -6,12 +6,14 @@ import { useRouter } from 'next/navigation'
 import type { Tag } from '@line-crm/shared'
 import Button from '@/components/shared/button'
 import Card, { CardHeader } from '@/components/shared/card'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { Field as FormField } from '@/components/shared/form-controls'
 import ListState from '@/components/shared/list-state'
 import PageHeader from '@/components/shared/page-header'
 import Select from '@/components/shared/select'
 import StickyBar from '@/components/shared/sticky-bar'
 import { api, ApiError } from '@/lib/api'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { useAccount } from '@/contexts/account-context'
 import {
   CATEGORY_MAX,
@@ -48,6 +50,12 @@ function NewNenColumnInner() {
   const [imageBroken, setImageBroken] = useState(false)
   const [tags, setTags] = useState<Tag[]>([])
   const [audienceCount, setAudienceCount] = useState<number | null>(null)
+  /*
+   * #935 N-301: 入力途中で一覧や他画面へ移ると下書きが消えていた。
+   * 初期の空の状態と違う間だけ、ブラウザ離脱・画面内リンク・戻る操作を止めて確認する。
+   */
+  const dirty = JSON.stringify(draft) !== JSON.stringify(EMPTY_DRAFT)
+  const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty, busy })
 
   useEffect(() => {
     void api.tags.list().then((response) => response.success && setTags(response.data)).catch(() => undefined)
@@ -100,6 +108,13 @@ function NewNenColumnInner() {
 
   return (
     <div className={styles.screen} data-design-node="ymXJK">
+      {/*
+        #972 U036: 390pxでは右の「前のコラムを下敷きにする」が幅を取り、
+        パンくずと見出し・説明が細い列に潰れていた。共通の PageHeader の
+        形は変えず、この画面の見出し帯だけ「収まらないとき操作を次の行へ
+        下げる」にする。収まる幅では1行のままで見た目は変わらない。
+      */}
+      <div data-page-header-wrap>
       <PageHeader
         breadcrumb={[
           { label: 'NEN配信', href: '/nen-campaigns' },
@@ -114,6 +129,11 @@ function NewNenColumnInner() {
           </Button>
         )}
       />
+      <style>{`
+        [data-page-header-wrap] > div { flex-wrap: wrap; }
+        [data-page-header-wrap] > div > div + div { flex-wrap: wrap; max-width: 100%; margin-left: auto; }
+      `}</style>
+      </div>
 
       {failure ? (
         <p
@@ -312,7 +332,7 @@ function NewNenColumnInner() {
             </ul>
           </Card>
 
-          <Card layout="vertical" className={styles.section}>
+          <Card layout="vertical" className={styles.section} data-nen-part="cannot">
             <CardHeader title="この画面でできないこと" />
             <p className={styles.note}>
               記事本文の編集はここでは行いません。本文は外部サイトで管理します。
@@ -344,6 +364,16 @@ function NewNenColumnInner() {
             </Button>
           </>
         )}
+      />
+      {/* #935 N-301: 入力途中で離れるときの確認。 */}
+      <ConfirmDialog
+        open={leaveTarget !== null}
+        title="入力中の内容があります"
+        description="このまま移動すると、入力した内容は保存されません。移動しますか？"
+        confirmLabel="保存せずに移動"
+        cancelLabel="入力を続ける"
+        onConfirm={confirmLeave}
+        onCancel={cancelLeave}
       />
     </div>
   )

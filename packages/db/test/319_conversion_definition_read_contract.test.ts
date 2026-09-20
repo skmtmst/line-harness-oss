@@ -29,14 +29,37 @@ function setup(): Database.Database {
   const sqlite = new Database(':memory:');
   sqlite.exec(`
     PRAGMA foreign_keys = ON;
-    CREATE TABLE line_accounts (id TEXT PRIMARY KEY);
+    CREATE TABLE line_accounts (id TEXT PRIMARY KEY, tenant_id TEXT);
     CREATE TABLE conversion_points (
       id TEXT PRIMARY KEY, name TEXT NOT NULL, event_type TEXT NOT NULL, value REAL,
       measure_method TEXT NOT NULL DEFAULT 'manual', target_url TEXT,
       count_repeat INTEGER NOT NULL DEFAULT 1, attribution_days INTEGER,
-      line_account_id TEXT REFERENCES line_accounts(id), status TEXT NOT NULL DEFAULT 'active',
-      stopped_at TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+      line_account_id TEXT REFERENCES line_accounts(id), tenant_id TEXT,
+      status TEXT NOT NULL DEFAULT 'active',
+      stopped_at TEXT,
+      -- N-270: 外部受信の鍵(暗号化)と受け口の停止時刻。
+      ingest_secret_encrypted TEXT, ingest_disabled_at TEXT,
+      created_at TEXT NOT NULL, updated_at TEXT NOT NULL
     );
+    -- N-265: 経路別の母数は ref_tracking を見る。最小構成だけ用意する。
+    CREATE TABLE friends (
+      id TEXT PRIMARY KEY, line_user_id TEXT, line_account_id TEXT,
+      created_at TEXT, updated_at TEXT
+    );
+    CREATE TABLE ref_tracking (
+      id TEXT PRIMARY KEY, ref_code TEXT NOT NULL, friend_id TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    );
+    -- N-270: 外部受信の成否台帳。
+    CREATE TABLE conversion_ingestion_events (
+      id TEXT PRIMARY KEY, conversion_point_id TEXT NOT NULL,
+      result TEXT NOT NULL, reason TEXT, source_event_id TEXT,
+      friend_id TEXT, payload_shape_json TEXT, signature_sha256 TEXT,
+      created_at TEXT NOT NULL
+    );
+    -- N-258: 利用先の実在確認が参照する表。IDとアカウントだけを用意する。
+    CREATE TABLE scenarios (id TEXT PRIMARY KEY, line_account_id TEXT);
+    CREATE TABLE funnels (id TEXT PRIMARY KEY, line_account_id TEXT);
     CREATE TABLE conversion_events (
       id TEXT PRIMARY KEY, conversion_point_id TEXT NOT NULL REFERENCES conversion_points(id),
       friend_id TEXT NOT NULL, value_snapshot REAL, attributed_ref_code TEXT, created_at TEXT NOT NULL
@@ -46,8 +69,12 @@ function setup(): Database.Database {
       (id, name, event_type, value, line_account_id, status, stopped_at, created_at, updated_at)
     VALUES
       ('point-a', '購入完了', 'purchase', 5000, 'account-a', 'active', NULL, '2026-08-01', '2026-09-02'),
-      ('point-stop', '資料請求', 'form', NULL, 'account-a', 'stopped', '2026-09-01', '2026-08-02', '2026-09-01'),
+      -- N-261: 差替え先は同じ種類(purchase・manual・URLなし)でなければ通らない。
+      ('point-stop', '資料請求', 'purchase', NULL, 'account-a', 'stopped', '2026-09-01', '2026-08-02', '2026-09-01'),
       ('point-b', '担当外', 'purchase', 3000, 'account-b', 'active', NULL, '2026-08-03', '2026-09-03');
+    -- N-258: 試験で使う利用先は実在する行にする。
+    INSERT INTO scenarios (id, line_account_id) VALUES ('scenario-1', 'account-a');
+    INSERT INTO funnels (id, line_account_id) VALUES ('analysis-1', 'account-a'), ('analysis-video', 'account-a');
     INSERT INTO conversion_events (id, conversion_point_id, friend_id, value_snapshot, attributed_ref_code, created_at)
     VALUES
       ('event-current-1', 'point-a', 'friend-1', 5000, 'route-a', '2026-09-02 10:00:00'),

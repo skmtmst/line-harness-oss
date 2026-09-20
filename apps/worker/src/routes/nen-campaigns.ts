@@ -1,5 +1,5 @@
 import { Hono, type Context } from 'hono';
-import { getLineAccountById, jstNow } from '@line-crm/db';
+import { getLineAccountById, jstNow, recordConversionSourceEvent } from '@line-crm/db';
 import {
   checkNenCampaignBodyLength,
   countNenCampaignBodyLength,
@@ -48,6 +48,7 @@ import {
   retryNenDelivery,
 } from '../services/nen-campaign-metrics.js';
 import { auditLog } from '../lib/audit-log.js';
+import { normalizeNenPetBirthday } from '../lib/nen-pet-birthday.js';
 import { listLimit, listOffset } from './list-pagination.js';
 
 const nenCampaigns = new Hono<Env>();
@@ -132,7 +133,7 @@ async function verifyEccubeSignature(secret: string, timestamp: string, signatur
 nenCampaigns.get('/api/nen-campaigns/overview', async (c) => {
   const accountId = await requireAccount(c);
   if (typeof accountId !== 'string') return accountId;
-  const [settings, jobs, columns, pets, coupons] = await Promise.all([
+  const [settings, jobs, pendingByCampaignRows, columns, pets, coupons] = await Promise.all([
     Promise.all([...CAMPAIGN_KEYS].map((key) => getNenCampaign(c.env.DB, key, accountId))),
     c.env.DB.prepare(
       `SELECT COUNT(*) AS total,
@@ -141,6 +142,17 @@ nenCampaigns.get('/api/nen-campaigns/overview', async (c) => {
               SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) AS failed
          FROM nen_delivery_jobs WHERE line_account_id = ?`,
     ).bind(accountId).first<{ total: number; pending: number; sent: number; failed: number }>(),
+    /*
+     * #935 N-299: 編集画面が「これから届く◯通」を実数で言うため、
+     * 上の pending と同じ決めごと（未来ぶんだけ数える）で配信ごとに分ける。
+     */
+    c.env.DB.prepare(
+      `SELECT campaign_key, COUNT(*) AS count
+         FROM nen_delivery_jobs
+        WHERE line_account_id = ?
+          AND status = 'pending' AND datetime(scheduled_at) > datetime('now')
+        GROUP BY campaign_key`,
+    ).bind(accountId).all<{ campaign_key: string; count: number }>(),
     c.env.DB.prepare(`SELECT COUNT(*) AS count FROM nen_columns WHERE line_account_id = ?`).bind(accountId).first<{ count: number }>(),
     c.env.DB.prepare(
       `SELECT COUNT(*) AS count FROM nen_pet_profiles p JOIN friends f ON f.id = p.friend_id WHERE f.line_account_id = ?`,
@@ -153,7 +165,15 @@ nenCampaigns.get('/api/nen-campaigns/overview', async (c) => {
   // 同じ決めごとにする(点検 #512 の中2)。一覧の窓付き集計とは別物。
   return c.json({ success: true, data: {
     activeCampaigns: settings.filter((setting) => setting?.is_enabled === 1).length,
-    jobs: { total: jobs?.total ?? 0, pending: jobs?.pending ?? 0, sent: jobs?.sent ?? 0, failed: jobs?.failed ?? 0 },
+    jobs: {
+      total: jobs?.total ?? 0,
+      pending: jobs?.pending ?? 0,
+      sent: jobs?.sent ?? 0,
+      failed: jobs?.failed ?? 0,
+      pendingByCampaign: Object.fromEntries(
+        (pendingByCampaignRows?.results ?? []).map((row) => [row.campaign_key, Number(row.count)]),
+      ),
+    },
     columns: columns?.count ?? 0,
     pets: pets?.count ?? 0,
     coupons: coupons?.count ?? 0,
@@ -387,6 +407,7 @@ nenCampaigns.get('/api/nen-campaigns/deliveries', requireRole('owner', 'admin', 
         days: c.req.query('days'),
       }),
       status: normalizeDeliveryStatus(c.req.query('status')),
+      q: c.req.query('q'),
       cursor: cursorOffset(c.req.query('cursor')),
       limit: listLimit(c.req.query('limit'), 50, 100),
     });
@@ -625,9 +646,24 @@ nenCampaigns.post('/api/nen-campaigns/columns/:id/deliver', requireRole('owner',
   if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [body.accountId])) {
     return c.json({ success: false, error: ACCOUNT_ACCESS_ERROR }, 403);
   }
-  const when = body.scheduledAt && Number.isFinite(Date.parse(body.scheduledAt))
-    ? new Date(body.scheduledAt).toISOString().slice(0, 19).replace('T', ' ')
-    : new Date().toISOString().slice(0, 19).replace('T', ' ');
+  /*
+   * #935 N-304: 予約日時を先に確かめる。解釈できない文字列をnowへ潰さず断り、
+   * 過去の日時は「予約」の約束を守れない（次のtickで即送になる）ため断る。
+   * 予約作成(POST /columns)と同じくDBを触る前に落とす。
+   */
+  let when: string;
+  if (body.scheduledAt) {
+    const parsed = Date.parse(body.scheduledAt);
+    if (!Number.isFinite(parsed)) {
+      return c.json({ success: false, error: 'scheduled_at_invalid' }, 400);
+    }
+    if (parsed <= Date.now()) {
+      return c.json({ success: false, error: 'past_datetime' }, 400);
+    }
+    when = new Date(parsed).toISOString().slice(0, 19).replace('T', ' ');
+  } else {
+    when = new Date().toISOString().slice(0, 19).replace('T', ' ');
+  }
   const queued = await queueColumnDelivery(c.env.DB, c.req.param('id'), body.accountId, when);
   return c.json({ success: true, data: { queued } });
 });
@@ -667,25 +703,91 @@ nenCampaigns.get('/api/nen-campaigns/pets', requireRole('owner', 'admin', 'staff
   })) });
 });
 
-nenCampaigns.post('/api/nen-campaigns/pets', requireRole('owner', 'admin'), async (c) => {
-  const accountId = await requireAccount(c);
-  if (typeof accountId !== 'string') return accountId;
-  const body = await c.req.json<Record<string, unknown>>().catch(() => null);
-  if (!body || typeof body.friendId !== 'string' || typeof body.name !== 'string' || !body.name.trim()) {
-    return c.json({ success: false, error: 'friendId and name are required' }, 400);
-  }
+// 誕生日の形（YYYY-MM-DD か MM-DD）の判定は lib/nen-pet-birthday.ts の1本。
+
+function petWriteBody(body: Record<string, unknown> | null):
+  { error: string } | {
+    name: string; animalType: string; gender: string; birthday: string | null;
+    breed: string | null; weightKg: number | null;
+  } {
+  if (!body || typeof body.name !== 'string' || !body.name.trim()) return { error: 'name is required' };
   // ペットの名前はNEN配信の本文へ差し込まれる（{{pet_name}}）。無制限だと
   // 差し込み展開後の本文が際限なく膨らみ、保存時の上限判定の前提（#659）が
   // 崩れるため、ここで有限の上限を持たせる。
   if (countNenCampaignBodyLength(body.name.trim()) > NEN_PET_NAME_MAX_LENGTH) {
-    return c.json({
-      success: false,
-      error: `ペットのお名前は${NEN_PET_NAME_MAX_LENGTH}字以内で入力してください`,
-    }, 400);
+    return { error: `ペットのお名前は${NEN_PET_NAME_MAX_LENGTH}字以内で入力してください` };
   }
-  const animalType = ['dog', 'cat', 'other'].includes(String(body.animalType)) ? String(body.animalType) : 'dog';
-  const gender = ['male', 'female', 'unknown'].includes(String(body.gender)) ? String(body.gender) : 'unknown';
-  const birthday = typeof body.birthday === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(body.birthday) ? body.birthday : null;
+  const birthday = normalizeNenPetBirthday(body.birthday);
+  if (birthday === 'invalid') return { error: '誕生日は YYYY-MM-DD か MM-DD で入力してください' };
+  const weightKg = body.weightKg === null || body.weightKg === undefined || body.weightKg === ''
+    ? null : Number(body.weightKg);
+  if (weightKg !== null && (!Number.isFinite(weightKg) || weightKg < 0.1 || weightKg > 200)) {
+    return { error: '体重は 0.1〜200kg で入力してください' };
+  }
+  return {
+    name: body.name.trim(),
+    animalType: ['dog', 'cat', 'other'].includes(String(body.animalType)) ? String(body.animalType) : 'dog',
+    gender: ['male', 'female', 'unknown'].includes(String(body.gender)) ? String(body.gender) : 'unknown',
+    birthday,
+    breed: typeof body.breed === 'string' && body.breed.trim() ? body.breed.trim().slice(0, 80) : null,
+    weightKg,
+  };
+}
+
+/**
+ * PUTの部分更新用。送られた項目だけ検証して返し、欠落項目は呼び出し側で現値を保つ。
+ * 検証はDBを読む前に済ませるため、ここは入力だけを見る（無効入力でDBを叩かない）。
+ */
+function petPatchBody(body: Record<string, unknown> | null):
+  { error: string } | {
+    name?: string; animalType?: string; gender?: string; birthday?: string | null;
+    breed?: string | null; weightKg?: number | null;
+  } {
+  const patch: {
+    name?: string; animalType?: string; gender?: string; birthday?: string | null;
+    breed?: string | null; weightKg?: number | null;
+  } = {};
+  if (!body) return patch;
+  if (body.name !== undefined) {
+    if (typeof body.name !== 'string' || !body.name.trim()) return { error: 'name is required' };
+    if (countNenCampaignBodyLength(body.name.trim()) > NEN_PET_NAME_MAX_LENGTH) {
+      return { error: `ペットのお名前は${NEN_PET_NAME_MAX_LENGTH}字以内で入力してください` };
+    }
+    patch.name = body.name.trim();
+  }
+  if (body.animalType !== undefined) {
+    patch.animalType = ['dog', 'cat', 'other'].includes(String(body.animalType)) ? String(body.animalType) : 'dog';
+  }
+  if (body.gender !== undefined) {
+    patch.gender = ['male', 'female', 'unknown'].includes(String(body.gender)) ? String(body.gender) : 'unknown';
+  }
+  if (body.birthday !== undefined) {
+    const birthday = normalizeNenPetBirthday(body.birthday);
+    if (birthday === 'invalid') return { error: '誕生日は YYYY-MM-DD か MM-DD で入力してください' };
+    patch.birthday = birthday;
+  }
+  if (body.breed !== undefined) {
+    patch.breed = typeof body.breed === 'string' && body.breed.trim() ? body.breed.trim().slice(0, 80) : null;
+  }
+  if (body.weightKg !== undefined) {
+    const weightKg = body.weightKg === null || body.weightKg === '' ? null : Number(body.weightKg);
+    if (weightKg !== null && (!Number.isFinite(weightKg) || weightKg < 0.1 || weightKg > 200)) {
+      return { error: '体重は 0.1〜200kg で入力してください' };
+    }
+    patch.weightKg = weightKg;
+  }
+  return patch;
+}
+
+nenCampaigns.post('/api/nen-campaigns/pets', requireRole('owner', 'admin'), async (c) => {
+  const accountId = await requireAccount(c);
+  if (typeof accountId !== 'string') return accountId;
+  const body = await c.req.json<Record<string, unknown>>().catch(() => null);
+  if (!body || typeof body.friendId !== 'string') {
+    return c.json({ success: false, error: 'friendId and name are required' }, 400);
+  }
+  const input = petWriteBody(body);
+  if ('error' in input) return c.json({ success: false, error: input.error }, 400);
   const friend = await c.env.DB.prepare(`SELECT id, line_account_id FROM friends WHERE id = ?`)
     .bind(body.friendId).first<{ id: string; line_account_id: string | null }>();
   if (!friend || friend.line_account_id !== accountId) {
@@ -694,9 +796,10 @@ nenCampaigns.post('/api/nen-campaigns/pets', requireRole('owner', 'admin'), asyn
   const now = jstNow();
   const id = crypto.randomUUID();
   await c.env.DB.prepare(
-    `INSERT INTO nen_pet_profiles (id, friend_id, customer_id, name, animal_type, gender, birthday, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-  ).bind(id, body.friendId, typeof body.customerId === 'string' ? body.customerId : null, body.name.trim(), animalType, gender, birthday, now, now).run();
+    `INSERT INTO nen_pet_profiles (id, friend_id, customer_id, name, animal_type, gender, birthday, breed, weight_kg, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).bind(id, body.friendId, typeof body.customerId === 'string' ? body.customerId : null,
+    input.name, input.animalType, input.gender, input.birthday, input.breed, input.weightKg, now, now).run();
   await syncNenPetTags(c.env.DB, body.friendId);
   return c.json({ success: true, data: { id } }, 201);
 });
@@ -705,24 +808,41 @@ nenCampaigns.put('/api/nen-campaigns/pets/:id', requireRole('owner', 'admin'), a
   const accountId = await requireAccount(c);
   if (typeof accountId !== 'string') return accountId;
   const body = await c.req.json<Record<string, unknown>>().catch(() => null);
-  if (!body || typeof body.name !== 'string' || !body.name.trim()) return c.json({ success: false, error: 'name is required' }, 400);
-  if (countNenCampaignBodyLength(body.name.trim()) > NEN_PET_NAME_MAX_LENGTH) {
-    return c.json({
-      success: false,
-      error: `ペットのお名前は${NEN_PET_NAME_MAX_LENGTH}字以内で入力してください`,
-    }, 400);
-  }
-  const animalType = ['dog', 'cat', 'other'].includes(String(body.animalType)) ? String(body.animalType) : 'dog';
-  const gender = ['male', 'female', 'unknown'].includes(String(body.gender)) ? String(body.gender) : 'unknown';
-  const birthday = typeof body.birthday === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(body.birthday) ? body.birthday : null;
-  const pet = await c.env.DB.prepare(`SELECT p.friend_id, f.line_account_id FROM nen_pet_profiles p JOIN friends f ON f.id = p.friend_id WHERE p.id = ?`)
-    .bind(c.req.param('id')).first<{ friend_id: string; line_account_id: string | null }>();
+  // 入力検証はDBを読む前に済ませる。無効な入力ではDBへ一切行かない。
+  const patch = petPatchBody(body ?? {});
+  if ('error' in patch) return c.json({ success: false, error: patch.error }, 400);
+  const pet = await c.env.DB.prepare(
+    `SELECT p.friend_id, p.name, p.animal_type, p.gender, p.birthday, p.breed, p.weight_kg, f.line_account_id
+     FROM nen_pet_profiles p JOIN friends f ON f.id = p.friend_id WHERE p.id = ?`,
+  ).bind(c.req.param('id')).first<{
+    friend_id: string; name: string; animal_type: string; gender: string;
+    birthday: string | null; breed: string | null; weight_kg: number | null;
+    line_account_id: string | null;
+  }>();
   if (!pet || pet.line_account_id !== accountId) {
     return c.json({ success: false, error: 'Pet not found' }, 404);
   }
+  // 送られてこなかった項目は現値を保つ部分更新（LIFF PUT と同じ意味づけ）。
+  // 既定値で上書きすると、名前だけ直す更新で他項目まで消えてしまう。
+  const input = {
+    name: patch.name ?? pet.name,
+    animalType: patch.animalType ?? pet.animal_type,
+    gender: patch.gender ?? pet.gender,
+    birthday: patch.birthday === undefined ? pet.birthday : patch.birthday,
+    breed: patch.breed === undefined ? pet.breed : patch.breed,
+    weightKg: patch.weightKg === undefined ? pet.weight_kg : patch.weightKg,
+  };
   await c.env.DB.prepare(
-    `UPDATE nen_pet_profiles SET name = ?, animal_type = ?, gender = ?, birthday = ?, updated_at = ? WHERE id = ?`,
-  ).bind(body.name.trim(), animalType, gender, birthday, jstNow(), c.req.param('id')).run();
+    `UPDATE nen_pet_profiles SET name = ?, animal_type = ?, gender = ?, birthday = ?, breed = ?, weight_kg = ?, updated_at = ? WHERE id = ?`,
+  ).bind(input.name, input.animalType, input.gender, input.birthday, input.breed, input.weightKg, jstNow(), c.req.param('id')).run();
+  // 誕生日を明示して変えたときだけ、古い日付へ予約済みの誕生日クーポン配信を
+  // 取消し、次の日次走査で新しい誕生日から組み直させる。発行済みの今年分は残る。
+  if (patch.birthday !== undefined && (pet.birthday ?? null) !== patch.birthday) {
+    await c.env.DB.prepare(
+      `UPDATE nen_delivery_jobs SET status = 'cancelled', updated_at = ?
+       WHERE campaign_key = 'birthday_coupon' AND status = 'pending' AND source_key LIKE ?`,
+    ).bind(jstNow(), `birthday:${c.req.param('id')}:%`).run();
+  }
   await syncNenPetTags(c.env.DB, pet.friend_id);
   return c.json({ success: true });
 });
@@ -900,6 +1020,82 @@ nenCampaigns.post('/api/integrations/eccube/columns', async (c) => {
     fields.publishedAt, lineAccountId, now, now,
   ).run();
   return c.json({ success: true, data: { id } });
+});
+
+/**
+ * EC-CUBE が注文確定時に呼ぶ「誕生日クーポンが使われた」の記録口。
+ * 管理認証ではなく `/columns` と同じ HMAC で検証する。
+ *
+ * EC側のクーポン利用台帳とこちらの発行台帳は別物なので、ここが唯一の
+ * `used_at` 書き込み口になる。同じコードの再送で利用日時を上書きしない
+ * （冪等）。利用=注文なので成果計測にもつなげるが、計測の失敗で
+ * 記録自体は止めない。
+ */
+nenCampaigns.post('/api/integrations/eccube/coupon-usages', async (c) => {
+  const secret = c.env.ECCUBE_WEBHOOK_SECRET;
+  if (!secret || secret.length < 32) return c.json({ success: false, error: 'Integration is not configured' }, 503);
+  const raw = await c.req.text();
+  if (new TextEncoder().encode(raw).byteLength > MAX_BODY_BYTES) return c.json({ success: false, error: 'Payload too large' }, 413);
+  const valid = await verifyEccubeSignature(
+    secret, c.req.header('x-nen-timestamp') || '', c.req.header('x-nen-signature') || '', raw,
+  );
+  if (!valid) return c.json({ success: false, error: 'Invalid signature' }, 401);
+  let body: Record<string, unknown>;
+  try {
+    body = JSON.parse(raw) as Record<string, unknown>;
+  } catch {
+    return c.json({ success: false, error: 'Invalid JSON' }, 400);
+  }
+  const code = typeof body.code === 'string' ? body.code.trim().slice(0, 64) : '';
+  const usedAt = body.used_at === undefined || body.used_at === null || body.used_at === ''
+    ? null
+    : typeof body.used_at === 'string' && Number.isFinite(Date.parse(body.used_at))
+      // issued_at と同じく日本時間の壁時計で残す（台帳の日付列をそろえる）。
+      ? new Date(Date.parse(body.used_at) + 9 * 3600_000).toISOString().slice(0, 19).replace('T', ' ')
+      : 'invalid';
+  const orderNumber = typeof body.order_number === 'string' && body.order_number.trim()
+    ? body.order_number.trim().slice(0, 64) : null;
+  const eventId = typeof body.event_id === 'string' && body.event_id.trim()
+    ? body.event_id.trim().slice(0, 255) : null;
+  if (!code || usedAt === 'invalid') {
+    return c.json({ success: false, error: 'Invalid coupon usage' }, 400);
+  }
+  const when = usedAt ?? jstNow();
+  // 二重報告で最初の利用日時を上書きしない（used_at IS NULL の行だけ更新）。
+  const updated = await c.env.DB.prepare(
+    `UPDATE nen_coupon_issues SET used_at = ? WHERE coupon_code = ? AND used_at IS NULL`,
+  ).bind(when, code).run();
+  if (!updated.meta.changes) {
+    const known = await c.env.DB.prepare(
+      `SELECT id FROM nen_coupon_issues WHERE coupon_code = ?`,
+    ).bind(code).first<{ id: string }>();
+    // こちらが発行していないコードは拾わない。再送は成功として返して送り止める。
+    if (!known) return c.json({ success: false, error: 'Coupon not found' }, 404);
+    return c.json({ success: true, data: { couponCode: code, alreadyUsed: true } });
+  }
+  const issue = await c.env.DB.prepare(
+    `SELECT ci.friend_id, f.line_account_id
+       FROM nen_coupon_issues ci JOIN friends f ON f.id = ci.friend_id
+      WHERE ci.coupon_code = ?`,
+  ).bind(code).first<{ friend_id: string; line_account_id: string | null }>();
+  if (issue) {
+    try {
+      await recordConversionSourceEvent(c.env.DB, {
+        sourceType: 'ec_order_confirmed',
+        lineAccountId: issue.line_account_id,
+        friendId: issue.friend_id,
+        sourceEventId: eventId ?? `nen_coupon_use:${code}`,
+        metadata: { couponCode: code, orderNumber },
+      });
+    } catch (conversionError) {
+      console.error(JSON.stringify({
+        event: 'nen_coupon_usage_conversion_failed',
+        coupon_code: code,
+        reason: conversionError instanceof Error ? conversionError.message : String(conversionError),
+      }));
+    }
+  }
+  return c.json({ success: true, data: { couponCode: code, usedAt: when } });
 });
 
 export { nenCampaigns };

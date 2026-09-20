@@ -2,9 +2,10 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { MoreHorizontal, Plus, Trash2 } from 'lucide-react'
+import { FlaskConical, History, MoreHorizontal, Plus, Rocket, Trash2 } from 'lucide-react'
 import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
+import ActionMenu from '@/components/shared/action-menu'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import IconButton from '@/components/shared/icon-button'
@@ -68,6 +69,7 @@ function FriendAddSettingsList() {
   const [appliedSearch, setAppliedSearch] = useState('')
   const [folder, setFolder] = useState<string | null>(null)
   const { cursor, page: cursorPage, canPrev, reset: resetCursor, goPrev, goNext } = useCursorStack()
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null)
   const [folderBusy, setFolderBusy] = useState(false)
   const [folderDialogOpen, setFolderDialogOpen] = useState(false)
   const [folderName, setFolderName] = useState('')
@@ -225,7 +227,19 @@ function FriendAddSettingsList() {
         <SummaryCard title="経路が分からなかった人" value={data?.summary.unknownRoute ?? null} unit="人" detail="共通の案内が動いた" badge={(data?.summary.unknownRoute ?? 0) > 0 ? '要確認' : undefined} badgeTone="danger" variant="v6" />
       </section>
 
-      <div data-design="FirstTime">
+      {/*
+        #972: 390pxでは2つの切替タブが右へはみ出し、下の表の見出しも
+        重なって読めなかった。共通部品の形は変えず、この画面だけ
+        「収まらないときタブは折り返す・表は枠の内側で横へ動かす」にする。
+        収まる幅では見た目は変わらない。
+      */}
+      <style>{`
+        [data-tabs-row] nav:has(> span) { height: auto; flex-wrap: wrap; row-gap: 8px; }
+        [data-tabs-row] nav:has(> span) > span { flex-wrap: wrap; row-gap: 0; }
+        [data-scroll-table] > div { overflow-x: auto; }
+        [data-scroll-table] table { min-width: 860px; }
+      `}</style>
+      <div data-design="FirstTime" data-tabs-row>
         <span className="sr-only">開始のタイミング。すぐに配信。あわせて実行すること。</span>
         <Tabs items={(Object.keys(KIND_LABELS) as FriendAddRuleKind[]).map((tab) => ({ label: KIND_LABELS[tab], current: kind === tab, onClick: () => { resetCursor(); router.replace(`/friend-add-settings?kind=${tab}`) } }))} />
         <span data-design="Returning" className="sr-only">以前からの友だち・ブロックを解除した人。配信しない。別のシナリオを配信する。はじめての人と同じものを配信する。開始位置。前回読んだところから。</span>
@@ -258,6 +272,8 @@ function FriendAddSettingsList() {
             )
           ) : (
             <>
+              {/* #972 U039: 狭い幅では見出し同士が重なるため、枠の内側で横へ動かせるようにする。 */}
+              <div data-scroll-table>
               <DataTable>
                 <thead><TableHeadRow><Th>設定名</Th><Th>状態</Th><Th>対象の流入リンク</Th><Th>最初に送るもの</Th><Th>直近7日</Th><Th>操作</Th></TableHeadRow></thead>
                 <tbody>
@@ -272,13 +288,49 @@ function FriendAddSettingsList() {
                         <div className="flex items-center gap-1">
                           <Button href={`/friend-add-settings?view=edit&id=${encodeURIComponent(rule.id)}`} variant="secondary">編集</Button>
                           {!rule.isFallback && <IconButton aria-label={`${rule.name}を削除`} onClick={() => setDeleting(rule)}><Trash2 size={16} /></IconButton>}
-                          <IconButton aria-label={`${rule.name}のその他操作`}><MoreHorizontal size={18} /></IconButton>
+                          {/*
+                            その他操作は実画面へつなぐメニューを開く。行き先のない
+                            ボタンを置くと、押しても何も起きない死に操作になる。
+                          */}
+                          <div className="relative inline-flex items-center justify-center">
+                            <IconButton
+                              aria-label={`${rule.name}のその他操作`}
+                              aria-expanded={openMenuId === rule.id}
+                              onClick={() => setOpenMenuId((current) => (current === rule.id ? null : rule.id))}
+                            ><MoreHorizontal size={18} /></IconButton>
+                            <ActionMenu
+                              open={openMenuId === rule.id}
+                              ariaLabel={`${rule.name}の操作`}
+                              onClose={() => setOpenMenuId(null)}
+                              items={[
+                                {
+                                  id: 'test',
+                                  label: 'テストを実行',
+                                  icon: <FlaskConical size={16} />,
+                                  onSelect: () => router.push(`/friend-add-settings?view=edit&id=${encodeURIComponent(rule.id)}&step=preview`),
+                                },
+                                ...(rule.status === 'draft' ? [{
+                                  id: 'publish',
+                                  label: '最終確認・有効化へ進む',
+                                  icon: <Rocket size={16} />,
+                                  onSelect: () => router.push(`/friend-add-settings/publish?id=${encodeURIComponent(rule.id)}`),
+                                }] : []),
+                                {
+                                  id: 'runs',
+                                  label: 'この設定の実行結果',
+                                  icon: <History size={16} />,
+                                  onSelect: () => router.push(`/friend-add-settings/runs?rule_id=${encodeURIComponent(rule.id)}`),
+                                },
+                              ]}
+                            />
+                          </div>
                         </div>
                       </ActionCell>
                     </Tr>
                   ))}
                 </tbody>
               </DataTable>
+              </div>
               <div className="mt-3 flex items-center justify-end gap-2" aria-label="ページ送り">
                 <Button disabled={!canPrev || loading} onClick={() => goPrev()}>前へ</Button>
                 <Button variant="primary" aria-current="page">{cursorPage}</Button>

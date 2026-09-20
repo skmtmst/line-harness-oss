@@ -1657,10 +1657,22 @@ export default function ScenarioDetailClient({
                       ? '配信を一時停止する'
                       : '配信を再開する'}
                 </p>
+                {/*
+                  現在値とヘルプを一致させる（U007）。以前は許可中でも
+                  「別シナリオを開始すると停止」と固定で、実挙動（他の
+                  シナリオが動いている人は登録しない、の逆）と食い違って
+                  いた。編集フォームの文言（「他のシナリオが動いている人は
+                  登録しない」）と同じ意味で、今の状態と切り替え後の影響を
+                  分けて書く。
+                */}
                 <button
                   type="button"
                   onClick={() => void handleConcurrentChange(!(scenario.allowConcurrent ?? true))}
-                  title="別のシナリオを開始すると、いま流れているシナリオは停止します。あとで戻すと、止まった続きから再開します。複数の流れを同時に届けたい場合は、1つのシナリオ内で分岐させてください。"
+                  title={
+                    (scenario.allowConcurrent ?? true)
+                      ? 'いまは同時購読を許しています。他のシナリオが動いている人にも、このシナリオを並行して流します。押すと「同時に1つだけ」へ変わり、他のシナリオが動いている人はこのシナリオに入らなくなります。'
+                      : 'いまは同時に1つだけです。他のシナリオが動いている人はこのシナリオに入りません。すでに入っている人には影響しません。押すと同時購読を許すようになります。'
+                  }
                   className="text-info mt-1 text-left text-xs hover:underline"
                 >
                   {(scenario.allowConcurrent ?? true)
@@ -1818,8 +1830,15 @@ export default function ScenarioDetailClient({
             タイミング・種別・到達人数を上下で見比べられなかった。
             桁をそろえると、上から下へ人数が減っていくのがそのまま見える。
           */
+          /*
+            幅は中身に任せる（#949 N-058）。1040px で固定すると、
+            サイドメニューを引いた残りが 1040px 未満の画面でページ全体が
+            横スクロールした。桁のほうは「内容」列だけ truncate で縮み、
+            操作列は折り返すので、狭い画面でも読める。どうしても収まら
+            ない幅だけ overflow-x-auto で表の内側に逃がす。
+          */
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[1040px]">
+            <table className="w-full">
               <thead>
                 {/* 見出しは共通の Th（Pencil `tPTMp`）。直書きの見出しを7個
                     置いていたので、表の桁の高さ・色・太さがこの画面だけ他と
@@ -1970,8 +1989,13 @@ export default function ScenarioDetailClient({
                             )
                           })()}
                         </td>
-                        <td className="px-3 py-3 text-right align-top whitespace-nowrap">
-                          <div className="flex items-center justify-end gap-2 text-xs">
+                        <td className="px-3 py-3 text-right align-top">
+                          {/*
+                            操作は6つある。1行に並べ切れない幅では折り返す
+                            （#949 N-058）。無理に1行へ押さえると、表全体が
+                            その幅ぶん広がって横スクロールの元になる。
+                          */}
+                          <div className="flex flex-wrap items-center justify-end gap-x-2 gap-y-1 text-xs">
                             <button
                               type="button"
                               onClick={() =>

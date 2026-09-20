@@ -840,7 +840,7 @@ CREATE TABLE auto_replies (
 , active_from TEXT, active_until TEXT, cooldown_minutes INTEGER, skip_when_operator_active INTEGER NOT NULL DEFAULT 0, folder_id TEXT REFERENCES folders(id) ON DELETE SET NULL, display_order INTEGER NOT NULL DEFAULT 0, priority INTEGER NOT NULL DEFAULT 0, message_kinds_json TEXT
   CHECK (message_kinds_json IS NULL OR json_valid(message_kinds_json)), friend_conditions_json TEXT
   CHECK (friend_conditions_json IS NULL OR json_valid(friend_conditions_json)), lifecycle_status TEXT NOT NULL DEFAULT 'published'
-  CHECK (lifecycle_status IN ('draft', 'published', 'stopped')), current_draft_version_id TEXT, current_published_version_id TEXT, created_from_recipe_id TEXT REFERENCES recipes(id), recipe_clone_run_id TEXT REFERENCES recipe_clone_runs(id));
+  CHECK (lifecycle_status IN ('draft', 'published', 'stopped')), current_draft_version_id TEXT, current_published_version_id TEXT, created_from_recipe_id TEXT REFERENCES recipes(id), recipe_clone_run_id TEXT REFERENCES recipe_clone_runs(id), stopped_at TEXT, stopped_by_staff_id TEXT, stop_reason TEXT, stop_idempotency_key TEXT, deleted_at TEXT, deleted_by_staff_id TEXT);
 
 CREATE TABLE auto_reply_action_runs (
   id                  TEXT PRIMARY KEY,
@@ -1682,25 +1682,52 @@ CREATE TABLE conversion_events (
   value_snapshot       REAL,
   idempotency_key      TEXT,
   created_at           TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
-, point_version_snapshot INTEGER);
+, point_version_snapshot INTEGER, tenant_id TEXT REFERENCES tenants(id));
 
-CREATE TABLE conversion_points (
+CREATE TABLE conversion_ingestion_events (
+  id                  TEXT PRIMARY KEY,
+  conversion_point_id TEXT NOT NULL,
+  result              TEXT NOT NULL
+                      CHECK (result IN ('recorded', 'duplicate', 'rejected')),
+  reason              TEXT,
+  source_event_id     TEXT,
+  friend_id           TEXT,
+  payload_shape_json  TEXT,
+  signature_sha256    TEXT,
+  created_at          TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
+);
+
+CREATE TABLE "conversion_points" (
   id         TEXT PRIMARY KEY,
   name       TEXT NOT NULL,
   event_type TEXT NOT NULL,
   value      REAL,
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
-  status     TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'stopped')),
+  status     TEXT NOT NULL DEFAULT 'active'
+             CHECK (status IN ('active', 'stopped', 'draft')),
   stopped_at TEXT,
-  updated_at TEXT
-, measure_method TEXT NOT NULL DEFAULT 'manual'
-  CHECK (measure_method IN ('url_reach', 'webhook', 'manual')), target_url TEXT, count_repeat INTEGER NOT NULL DEFAULT 1, attribution_days INTEGER, line_account_id TEXT REFERENCES line_accounts(id) ON DELETE SET NULL, version INTEGER NOT NULL DEFAULT 1
-  CHECK (version > 0), source_config_json TEXT NOT NULL DEFAULT '{}'
-  CHECK (json_valid(source_config_json)), deduplication_mode TEXT NOT NULL DEFAULT 'every'
-  CHECK (deduplication_mode IN ('every', 'once_per_friend', 'window')), deduplication_window_days INTEGER
-  CHECK (deduplication_window_days IS NULL OR deduplication_window_days BETWEEN 1 AND 365), value_mode TEXT NOT NULL DEFAULT 'fixed'
-  CHECK (value_mode IN ('source', 'fixed', 'none')), reversal_policy TEXT NOT NULL DEFAULT 'manual'
-  CHECK (reversal_policy IN ('source_cancelled', 'manual', 'none')));
+  updated_at TEXT,
+  measure_method TEXT NOT NULL DEFAULT 'manual'
+             CHECK (measure_method IN ('url_reach', 'webhook', 'manual')),
+  target_url TEXT,
+  count_repeat INTEGER NOT NULL DEFAULT 1,
+  attribution_days INTEGER,
+  line_account_id TEXT REFERENCES line_accounts(id) ON DELETE SET NULL,
+  version    INTEGER NOT NULL DEFAULT 1 CHECK (version > 0),
+  source_config_json TEXT NOT NULL DEFAULT '{}'
+             CHECK (json_valid(source_config_json)),
+  deduplication_mode TEXT NOT NULL DEFAULT 'every'
+             CHECK (deduplication_mode IN ('every', 'once_per_friend', 'window')),
+  deduplication_window_days INTEGER
+             CHECK (deduplication_window_days IS NULL OR deduplication_window_days BETWEEN 1 AND 365),
+  value_mode TEXT NOT NULL DEFAULT 'fixed'
+             CHECK (value_mode IN ('source', 'fixed', 'none')),
+  reversal_policy TEXT NOT NULL DEFAULT 'manual'
+             CHECK (reversal_policy IN ('source_cancelled', 'manual', 'none')),
+  tenant_id  TEXT REFERENCES tenants(id),
+  ingest_secret_encrypted TEXT,
+  ingest_disabled_at TEXT
+);
 
 CREATE TABLE customer_notification_definitions (
   id                    TEXT PRIMARY KEY,
@@ -2645,6 +2672,14 @@ CREATE TABLE friend_reminders (
   updated_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 , reminder_version_id TEXT REFERENCES reminder_versions(id), source_kind TEXT NOT NULL DEFAULT 'manual', source_id TEXT, source_event_id TEXT, timezone TEXT NOT NULL DEFAULT 'Asia/Tokyo', cancel_reason TEXT, completed_at TEXT, lock_version INTEGER NOT NULL DEFAULT 0);
 
+CREATE TABLE friend_scenario_op_keys (
+  op_idempotency_key TEXT PRIMARY KEY,
+  friend_scenario_id TEXT NOT NULL,
+  op TEXT NOT NULL,
+  response_json TEXT NOT NULL,
+  created_at TEXT NOT NULL
+, request_fingerprint TEXT);
+
 CREATE TABLE "friend_scenarios" (
   id                 TEXT PRIMARY KEY,
   friend_id          TEXT NOT NULL REFERENCES friends (id) ON DELETE CASCADE,
@@ -2654,7 +2689,7 @@ CREATE TABLE "friend_scenarios" (
   started_at         TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   next_delivery_at   TEXT,
   updated_at         TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
-, previous_scenario_id TEXT, published_version_id TEXT REFERENCES scenario_versions (id));
+, previous_scenario_id TEXT, published_version_id TEXT REFERENCES scenario_versions (id), pause_reason TEXT);
 
 CREATE TABLE friend_scores (
   id              TEXT PRIMARY KEY,
@@ -3098,6 +3133,26 @@ CREATE TABLE incoming_webhook_steps (
   PRIMARY KEY (source_event_id, step_key)
 );
 
+CREATE TABLE incoming_webhook_unmatched_events (
+  id                    TEXT PRIMARY KEY,
+  webhook_id            TEXT NOT NULL REFERENCES incoming_webhooks(id),
+  line_account_id       TEXT NOT NULL REFERENCES line_accounts(id),
+  source_event_id       TEXT NOT NULL,
+  kind                  TEXT NOT NULL CHECK (kind IN ('unmatched', 'candidate')),
+  status                TEXT NOT NULL DEFAULT 'pending'
+                        CHECK (status IN ('pending', 'resolved', 'dismissed')),
+  identity_attempts_json TEXT NOT NULL DEFAULT '[]'
+                        CHECK (json_valid(identity_attempts_json)),
+  masked_shape_json     TEXT CHECK (masked_shape_json IS NULL OR json_valid(masked_shape_json)),
+  resolved_friend_id    TEXT REFERENCES friends(id),
+  resolved_by           TEXT,
+  resolved_at           TEXT,
+  received_at           TEXT NOT NULL,
+  created_at            TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  updated_at            TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  UNIQUE (webhook_id, source_event_id)
+);
+
 CREATE TABLE incoming_webhooks (
   id          TEXT PRIMARY KEY,
   name        TEXT NOT NULL,
@@ -3109,7 +3164,24 @@ CREATE TABLE incoming_webhooks (
   updated_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 , version INTEGER NOT NULL DEFAULT 1
   CHECK (version > 0), identity_match_json TEXT NOT NULL DEFAULT
-  '{"methods":[],"onNotFound":"do_nothing"}', action_refs_json TEXT NOT NULL DEFAULT '[]', latest_masked_sample_json TEXT, latest_received_at TEXT, secret_encrypted TEXT);
+  '{"methods":[],"onNotFound":"do_nothing"}', action_refs_json TEXT NOT NULL DEFAULT '[]', latest_masked_sample_json TEXT, latest_received_at TEXT, secret_encrypted TEXT, deleted_at TEXT, deleted_by_staff_id TEXT);
+
+CREATE TABLE integration_api_tokens (
+  id              TEXT PRIMARY KEY,
+  line_account_id TEXT NOT NULL REFERENCES line_accounts(id),
+  name            TEXT NOT NULL,
+  token_hash      TEXT NOT NULL UNIQUE,
+  -- 一覧で「どれか」見分けるための先頭部分だけ。照合には使わない。
+  token_prefix    TEXT NOT NULL,
+  scopes          TEXT NOT NULL DEFAULT '[]' CHECK (json_valid(scopes)),
+  created_by      TEXT,
+  last_used_at    TEXT,
+  revoked_at      TEXT,
+  revoked_by      TEXT,
+  rotated_from_id TEXT REFERENCES integration_api_tokens(id),
+  created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  updated_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
+);
 
 CREATE TABLE line_account_connection_checks (
   id                TEXT PRIMARY KEY,
@@ -4502,6 +4574,33 @@ CREATE TABLE "outbound_send_requests" (
   CHECK (status != 'unknown' OR retryable = 0)
 );
 
+CREATE TABLE outgoing_webhook_deliveries (
+  id                   TEXT PRIMARY KEY,
+  line_account_id      TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
+  webhook_id           TEXT NOT NULL REFERENCES outgoing_webhooks(id) ON DELETE CASCADE,
+  event_type           TEXT NOT NULL,
+  body_json            TEXT NOT NULL,
+  idempotency_key      TEXT NOT NULL,
+  status               TEXT NOT NULL DEFAULT 'pending'
+    CHECK (status IN ('pending', 'sending', 'retry_wait', 'delivered', 'failed')),
+  attempts             INTEGER NOT NULL DEFAULT 0 CHECK (attempts >= 0),
+  /** 初回を含む試行の上限。1 + min(max_retries, 7)（要件26 §6-4 の最大8回）。 */
+  max_attempts         INTEGER NOT NULL CHECK (max_attempts >= 1),
+  next_retry_at        TEXT,
+  /** sweep の引き取り証。取り掛かったまま止まった行を lease_until で見放す。 */
+  lease_token          TEXT,
+  lease_until          TEXT,
+  last_response_status INTEGER,
+  error_code           TEXT,
+  /** 相手の応答本文や秘密値は残さない。運用者が次の行動を選べる文だけ。 */
+  error_message_safe   TEXT,
+  queued_at            TEXT NOT NULL,
+  delivered_at         TEXT,
+  failed_at            TEXT,
+  updated_at           TEXT NOT NULL,
+  UNIQUE (webhook_id, idempotency_key)
+);
+
 CREATE TABLE outgoing_webhooks (
   id          TEXT PRIMARY KEY,
   name        TEXT NOT NULL,
@@ -4511,7 +4610,7 @@ CREATE TABLE outgoing_webhooks (
   is_active   INTEGER NOT NULL DEFAULT 1,
   created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
-, max_retries INTEGER NOT NULL DEFAULT 0, consecutive_failures INTEGER NOT NULL DEFAULT 0, last_failed_at TEXT, line_account_id TEXT REFERENCES line_accounts(id), secret_encrypted TEXT);
+, max_retries INTEGER NOT NULL DEFAULT 0, consecutive_failures INTEGER NOT NULL DEFAULT 0, last_failed_at TEXT, line_account_id TEXT REFERENCES line_accounts(id), secret_encrypted TEXT, auto_stopped_at TEXT, deleted_at TEXT, deleted_by_staff_id TEXT);
 
 CREATE TABLE pii_reveal_logs (
   id                        TEXT PRIMARY KEY,
@@ -4911,6 +5010,16 @@ CREATE TABLE rich_menu_assignments (
   UNIQUE (line_account_id, friend_id)
 );
 
+CREATE TABLE rich_menu_duplicate_requests (
+  id                TEXT PRIMARY KEY,
+  account_id        TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
+  source_group_id   TEXT NOT NULL,
+  created_group_id  TEXT NOT NULL,
+  idempotency_key   TEXT NOT NULL,
+  created_at        TEXT NOT NULL,
+  UNIQUE (account_id, idempotency_key)
+);
+
 CREATE TABLE rich_menu_groups (
   id                 TEXT PRIMARY KEY,
   account_id         TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
@@ -5005,6 +5114,30 @@ CREATE TABLE rich_menu_schedules (
   updated_at            TEXT NOT NULL, attempt_count INTEGER NOT NULL DEFAULT 0 CHECK (attempt_count >= 0), next_retry_at TEXT, lease_expires_at TEXT, restore_default_state TEXT
   CHECK (restore_default_state IN ('captured', 'no_default')), restore_default_line_id TEXT,
   CHECK (mode = 'scheduled' OR ends_at IS NOT NULL),
+  UNIQUE (account_id, idempotency_key)
+);
+
+CREATE TABLE rich_menu_test_applies (
+  id                    TEXT PRIMARY KEY,
+  group_id              TEXT NOT NULL REFERENCES rich_menu_groups(id) ON DELETE CASCADE,
+  account_id            TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
+  staff_id              TEXT NOT NULL,
+  line_user_id          TEXT NOT NULL,
+  /** 適用前にその人へ出ていたLINEメニュー。無ければ NULL。戻す時の行き先。 */
+  previous_richmenu_id  TEXT,
+  /** previous を読み終えた印。0のままなら再開時に読み直す。 */
+  previous_captured     INTEGER NOT NULL DEFAULT 0,
+  /** 本人へ割り当てたメニュー(既定ページ)。公開済みなら既存ID、下書きなら lht: メニュー。 */
+  applied_richmenu_id   TEXT,
+  /** 下書きテストで作ったLINEメニューIDのJSON配列。戻す時に消す。 */
+  test_shell_ids        TEXT,
+  status                TEXT NOT NULL DEFAULT 'running'
+    CHECK (status IN ('running','applied','reverting','reverted','failed')),
+  last_error_code       TEXT,
+  idempotency_key       TEXT NOT NULL,
+  revert_idempotency_key TEXT,
+  created_at            TEXT NOT NULL,
+  updated_at            TEXT NOT NULL,
   UNIQUE (account_id, idempotency_key)
 );
 
@@ -5389,6 +5522,11 @@ CREATE TABLE "scenario_steps" (
   UNIQUE (scenario_id, step_order)
 );
 
+CREATE TABLE scenario_test_send_claims (
+  claim_key TEXT PRIMARY KEY,
+  claimed_at TEXT NOT NULL
+);
+
 CREATE TABLE "scenario_triggers" (
   id TEXT PRIMARY KEY,
   scenario_id TEXT NOT NULL REFERENCES scenarios (id) ON DELETE CASCADE,
@@ -5584,7 +5722,7 @@ CREATE TABLE staff_members (
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 , line_user_id TEXT, totp_secret_enc TEXT, totp_pending_secret_enc TEXT, totp_enabled_at TEXT, totp_last_used_step INTEGER, assigned_line_account_id TEXT REFERENCES line_accounts(id) ON DELETE SET NULL, can_access_descendant_accounts INTEGER NOT NULL DEFAULT 0, tenant_id TEXT REFERENCES tenants(id), account_scope TEXT NOT NULL DEFAULT 'all'
-  CHECK (account_scope IN ('all', 'accounts')), policy_version INTEGER NOT NULL DEFAULT 1, password_hash TEXT, password_updated_at TEXT, role_bundle TEXT, view_permission_keys TEXT, email_mask TEXT, notice_friend_id TEXT, notice_linked_at TEXT);
+  CHECK (account_scope IN ('all', 'accounts')), policy_version INTEGER NOT NULL DEFAULT 1, password_hash TEXT, password_updated_at TEXT, role_bundle TEXT, view_permission_keys TEXT, email_mask TEXT, notice_friend_id TEXT, notice_linked_at TEXT, email_change_new TEXT, email_change_token_hash TEXT, email_change_expires_at TEXT);
 
 CREATE TABLE staff_menus (
   staff_id                  TEXT NOT NULL,
@@ -6661,7 +6799,18 @@ CREATE UNIQUE INDEX idx_conversion_events_point_idempotency
   ON conversion_events(conversion_point_id, idempotency_key)
   WHERE idempotency_key IS NOT NULL;
 
+CREATE INDEX idx_conversion_events_tenant
+  ON conversion_events(tenant_id);
+
+CREATE INDEX idx_conversion_ingestion_events_point
+  ON conversion_ingestion_events(conversion_point_id, created_at DESC);
+
+CREATE INDEX idx_conversion_points_ingest ON conversion_points(id)
+  WHERE ingest_secret_encrypted IS NOT NULL;
+
 CREATE INDEX idx_conversion_points_status ON conversion_points(status, created_at DESC);
+
+CREATE INDEX idx_conversion_points_tenant ON conversion_points(tenant_id);
 
 CREATE INDEX idx_customer_notification_definitions_account
   ON customer_notification_definitions(line_account_id, status, category, name, id);
@@ -7070,7 +7219,13 @@ CREATE INDEX idx_inbox_staff_reads_conversation
 CREATE INDEX idx_incoming_webhook_receipts_received
   ON incoming_webhook_receipts (received_at);
 
+CREATE INDEX idx_incoming_webhook_unmatched_account_status
+  ON incoming_webhook_unmatched_events (line_account_id, status, received_at);
+
 CREATE INDEX idx_incoming_webhooks_line_account ON incoming_webhooks (line_account_id);
+
+CREATE INDEX idx_integration_api_tokens_account
+  ON integration_api_tokens (line_account_id, revoked_at);
 
 CREATE INDEX idx_line_account_connection_checks_correlation
   ON line_account_connection_checks(correlation_id);
@@ -7429,6 +7584,12 @@ CREATE INDEX idx_outbound_send_requests_active_lease
 CREATE INDEX idx_outbound_send_requests_created
   ON outbound_send_requests(created_at);
 
+CREATE INDEX idx_outgoing_webhook_deliveries_due
+  ON outgoing_webhook_deliveries(status, next_retry_at);
+
+CREATE INDEX idx_outgoing_webhook_deliveries_webhook
+  ON outgoing_webhook_deliveries(webhook_id, queued_at DESC);
+
 CREATE INDEX idx_outgoing_webhooks_line_account
   ON outgoing_webhooks(line_account_id, is_active, updated_at DESC);
 
@@ -7527,6 +7688,9 @@ CREATE INDEX idx_rich_menu_assignment_runs_monthly
 CREATE INDEX idx_rich_menu_assignments_group
   ON rich_menu_assignments (line_account_id, group_id);
 
+CREATE INDEX idx_rich_menu_duplicate_requests_source
+  ON rich_menu_duplicate_requests(source_group_id);
+
 CREATE INDEX idx_rich_menu_groups_account ON rich_menu_groups(account_id, status);
 
 CREATE INDEX idx_rich_menu_manual_publish_requests_group
@@ -7545,6 +7709,9 @@ CREATE INDEX idx_rich_menu_schedules_lease
 
 CREATE INDEX idx_rich_menu_schedules_retry
   ON rich_menu_schedules (status, next_retry_at);
+
+CREATE INDEX idx_rich_menu_test_applies_group
+  ON rich_menu_test_applies(group_id, staff_id, status);
 
 CREATE INDEX idx_rt_approvals_queue ON rt_approval_requests(organization_id, status, created_at DESC);
 

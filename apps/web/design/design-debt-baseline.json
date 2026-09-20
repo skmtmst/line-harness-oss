@@ -427,6 +427,9 @@
   "app/users/page.tsx": {
     "arbitrary-value": 5
   },
+  "app/webhooks/edit/page.tsx": {
+    "unresolved-classname": 4
+  },
   "app/webhooks/new/page.tsx": {
     "unresolved-classname": 5,
     "direct-secondary-button": 1
@@ -823,6 +826,9 @@
   "components/support/support-inbox.tsx": {
     "arbitrary-value": 15,
     "direct-primary-button": 2
+  },
+  "components/ui/kpi-collapse.tsx": {
+    "unresolved-classname": 3
   },
   "components/ui/notification-switch.tsx": {
     "arbitrary-value": 2,

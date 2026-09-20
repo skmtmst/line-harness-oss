@@ -5,6 +5,8 @@ import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
 import { usePageTitle } from '@/components/shell/page-chrome'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { useAccount } from '@/contexts/account-context'
 import {
   api,
@@ -48,6 +50,8 @@ export default function NenCampaignsPage() {
   const [tab, setTab] = useState<NenTab>('auto')
   const [settings, setSettings] = useState<NenCampaignSetting[]>([])
   const [columns, setColumns] = useState<NenColumn[]>([])
+  // コラム一覧は口の既定200件で打ち切られる。全体件数を保持し、一覧へ出す（#935 N-300）。
+  const [columnsTotal, setColumnsTotal] = useState<number | null>(null)
   const [friends, setFriends] = useState<FriendOption[]>([])
   const [kpis, setKpis] = useState<NenKpis | null>(null)
   const [flowMetrics, setFlowMetrics] = useState<NenFlowMetrics | null>(null)
@@ -82,7 +86,7 @@ export default function NenCampaignsPage() {
     const sequence = ++loadSequence.current
     setLoading(true)
     if (!selectedAccountId) {
-      setSettings([]); setColumns([]); setKpis(null)
+      setSettings([]); setColumns([]); setColumnsTotal(null); setKpis(null)
       setFlowMetrics(null); setColumnMetrics(null); setDeliveryList(null); setDeliveryDetail(null)
       setTabErrors(EMPTY_ERRORS)
       loadedTabs.current.clear()
@@ -124,6 +128,7 @@ export default function NenCampaignsPage() {
         return fail(next === 'columns' ? 'コラムの情報を読み込めませんでした。' : '自動配信の情報を読み込めませんでした。')
       }
       setSettings(settingRes.data); setColumns(columnRes.data)
+      setColumnsTotal(columnRes.pagination?.total ?? columnRes.data.length)
       setFlowMetrics(flowRes.data); setColumnMetrics(columnMetricRes.data)
       if (couponRes.success) setCoupon(couponRes.data)
       const openable = columnMetricRes.data.columns.filter((column) => column.articleOpened.state === 'available' && column.sent > 0)
@@ -195,6 +200,24 @@ export default function NenCampaignsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedAccountId, selectedColumn?.id, selectedColumn?.targetMode, selectedColumn?.targetTagId])
 
+  /*
+   * #935 N-301: 紹介文の入力途中で画面を離れると内容が消えていた。
+   * ブラウザ離脱・画面内リンク・戻る操作・別コラムへの選び直しを止めて確認する。
+   */
+  const introDirty = selectedColumn !== null && introDraft !== (selectedColumn.introText ?? '')
+  const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({
+    dirty: introDirty,
+    busy: savingColumnId !== null,
+  })
+  const [pendingColumnSelect, setPendingColumnSelect] = useState<{ id: string | null } | null>(null)
+  const selectColumn = (id: string | null) => {
+    if (introDirty && id !== selectedColumnId) {
+      setPendingColumnSelect({ id })
+      return
+    }
+    setSelectedColumnId(id)
+  }
+
   const updateDraft = (key: string, patch: Partial<NenCampaignSetting>) => setSettings((current) => current.map((item) => item.campaignKey === key ? { ...item, ...patch } : item))
   // 停止・再開だけは専用の口を使い、本文などは送り直さない。保存済み本文が
   // 上限を超えていても停止は必ずできる必要がある（#659差し戻し2点目）。
@@ -220,9 +243,16 @@ export default function NenCampaignsPage() {
     try {
       const result = await api.nenCampaigns.deliverColumn(column.id, { accountId: selectedAccountId, scheduledAt })
       if (!result.success) throw new Error(result.error)
-      setNotice({ tone: 'success', text: scheduledAt ? `「${column.title}」を${result.data.queued}人分 予約しました。` : `「${column.title}」を${result.data.queued}人分 配信待ちに入れました。` })
+      // #935 N-303: 同じ相手へ二度は入らない。0人なら「入れた」と言わず実態を伝える。
+      setNotice({ tone: 'success', text: result.data.queued === 0
+        ? `「${column.title}」はすでに配信待ちに入っているか、いま送れる相手がいません。`
+        : scheduledAt ? `「${column.title}」を${result.data.queued}人分 予約しました。` : `「${column.title}」を${result.data.queued}人分 配信待ちに入れました。` })
       await loadTab('columns')
-    } catch { setNotice({ tone: 'error', text: 'コラムを配信予約できませんでした。コラムの配信が停止中でないか確認してください。' }) }
+    } catch (caught) {
+      setNotice({ tone: 'error', text: caught instanceof ApiError && caught.code === 'past_datetime'
+        ? '予約日時が過去になっています。いまより先の日時を選び直してください。'
+        : 'コラムを配信予約できませんでした。コラムの配信が停止中でないか確認してください。' })
+    }
   }
   const saveColumnMessage = async (column: NenColumn) => {
     if (!selectedAccountId || !introDraft.trim()) { setNotice({ tone: 'error', text: '紹介文を入力してください。' }); return }
@@ -308,12 +338,16 @@ export default function NenCampaignsPage() {
       setDeliveryDetail(result.data)
     } catch { setNotice({ tone: 'error', text: '配信時の内容を表示できませんでした。' }) }
   }
-  const changeDeliveryView = async (status?: string, cursor?: string) => {
+  // 検索語はサーバー側の履歴全体へ効く。ページ送り・状態チップの切替でも消えないよう
+  // ここに保持し、新しい検索(q を明示)が来たときだけ差し替える。
+  const [historyQuery, setHistoryQuery] = useState('')
+  const changeDeliveryView = async (status?: string, cursor?: string, q?: string) => {
     if (!selectedAccountId) return
+    const effectiveQuery = q === undefined ? historyQuery : q
     try {
-      const result = await api.nenCampaigns.deliveries(selectedAccountId, { limit: 20, status, cursor })
+      const result = await api.nenCampaigns.deliveries(selectedAccountId, { limit: 20, status, q: effectiveQuery || undefined, cursor })
       if (!result.success) throw new Error()
-      setDeliveryList(result.data); setDeliveryDetail(null)
+      setDeliveryList(result.data); setDeliveryDetail(null); setHistoryQuery(effectiveQuery)
     } catch { setNotice({ tone: 'error', text: '送った履歴を更新できませんでした。' }) }
   }
   const retryDelivery = async (id: string, expectedVersion: number, reason: string) => {
@@ -363,13 +397,37 @@ export default function NenCampaignsPage() {
         previewCampaignKey={previewCampaignKey} onPreviewCampaign={setPreviewCampaignKey}
         onToggleSetting={(setting) => void toggleSetting(setting)} onTestSend={(setting) => void testSend(setting)}
         coupon={coupon} couponOpen={couponOpen} onCouponOpenChange={setCouponOpen} onCouponChange={setCoupon} onSaveCoupon={() => void saveCoupon()} savingCoupon={savingCoupon}
-        selectedColumnId={selectedColumnId} onSelectColumn={setSelectedColumnId} audienceCount={audienceCount}
+        selectedColumnId={selectedColumnId} onSelectColumn={selectColumn} audienceCount={audienceCount}
+        columnsTotal={columnsTotal}
         plan={plan} onPlanChange={setPlan}
         introDraft={introDraft} onIntroChange={setIntroDraft} onSaveIntro={(column) => void saveColumnMessage(column)} savingColumnId={savingColumnId}
         onDeliverColumn={(column, scheduledAt) => void deliverColumn(column, scheduledAt)}
         onDuplicateColumn={(column) => void duplicateColumn(column)} onTestColumn={(column) => void testColumn(column)}
         onShowDelivery={(id) => void showDelivery(id)} onRetryDelivery={(id, version, reason) => void retryDelivery(id, version, reason)}
-        onChangeDeliveryView={(status, cursor) => void changeDeliveryView(status, cursor)}
+        onChangeDeliveryView={(status, cursor, q) => void changeDeliveryView(status, cursor, q)}
+      />
+      {/* #935 N-301: 紹介文の入力途中で画面を離れる／別コラムへ移るときの確認。 */}
+      <ConfirmDialog
+        open={leaveTarget !== null}
+        title="入力した紹介文が保存されていません"
+        description="このまま移動すると、入力した紹介文は保存されません。移動しますか？"
+        confirmLabel="保存せずに移動"
+        cancelLabel="書き続ける"
+        onConfirm={confirmLeave}
+        onCancel={cancelLeave}
+      />
+      <ConfirmDialog
+        open={pendingColumnSelect !== null}
+        title="入力した紹介文が保存されていません"
+        description="このまま別のコラムへ移ると、入力した紹介文は消えます。移りますか？"
+        confirmLabel="保存せずに移る"
+        cancelLabel="書き続ける"
+        onConfirm={() => {
+          const target = pendingColumnSelect
+          setPendingColumnSelect(null)
+          if (target) setSelectedColumnId(target.id)
+        }}
+        onCancel={() => setPendingColumnSelect(null)}
       />
     </>
   )

@@ -57,6 +57,10 @@ export type AuditAction =
   | 'conversion.definition.replace'
   | 'conversion.definition.revise'
   | 'conversion.definition.delete'
+  | 'conversion.definition.publish'
+  | 'conversion.definition.ingest_secret.issue'
+  | 'conversion.definition.ingest.disable'
+  | 'conversion.definition.ingest.enable'
   | 'conversion.definition.usage.create'
   | 'conversion.report.export'
   | 'ec.connector.update'
@@ -78,6 +82,7 @@ export type AuditAction =
   | 'photo.asset.request'
   | 'photo.review.bulk'
   | 'media.download'
+  | 'media.replace_usages'
   | 'common_var_export.download'
   | 'photo.original.issue'
   | 'photo.original.download'
@@ -86,7 +91,29 @@ export type AuditAction =
   | 'webinar.pause'
   | 'webinar.duplicate'
   | 'webinar.participant.export'
-  | 'event.applicant.export';
+  | 'event.applicant.export'
+  // #939 N-379: 外部連携の操作履歴。作成・設定変更・動かす/止める・
+  // 合言葉の入れ直し・削除・送り直し・公開APIトークンの発行系。
+  | 'webhook.incoming.create'
+  | 'webhook.incoming.update'
+  | 'webhook.incoming.config.update'
+  | 'webhook.incoming.activate'
+  | 'webhook.incoming.deactivate'
+  | 'webhook.incoming.secret.rotate'
+  | 'webhook.incoming.delete'
+  | 'webhook.incoming.unmatched.resolve'
+  | 'webhook.outgoing.create'
+  | 'webhook.outgoing.update'
+  | 'webhook.outgoing.activate'
+  | 'webhook.outgoing.deactivate'
+  | 'webhook.outgoing.secret.rotate'
+  | 'webhook.outgoing.delete'
+  | 'webhook.outgoing.test'
+  | 'webhook.interaction.retry'
+  | 'webhook.interaction.retry_failed'
+  | 'webhook.api_token.create'
+  | 'webhook.api_token.revoke'
+  | 'webhook.api_token.rotate';
 
 function commonAuditWriter(): typeof recordAuditEvent | null {
   try {

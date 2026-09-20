@@ -110,7 +110,8 @@ describe('V6 成果地点一覧の契約', () => {
     expect(NEW_PAGE).toContain("value: 'source', label: '注文の金額をそのまま使う'")
     expect(NEW_PAGE).toContain("value: 'source_cancelled', label: '返品されたら取り消す'")
     expect(NEW_PAGE).toContain('api.conversions.createDefinition({')
-    expect(NEW_PAGE).toContain('usages: USAGE_CHOICES')
+    // N-258: 送る利用先は実在するオブジェクトの実IDだけ。仮IDの固定一覧はない。
+    expect(NEW_PAGE).toContain('usages: usageTargets')
     expect(NEW_PAGE).not.toContain('保存契約は未接続')
     expect(NEW_PAGE).not.toContain('利用先APIの接続後')
   })

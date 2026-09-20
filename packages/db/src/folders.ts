@@ -230,7 +230,7 @@ export const FOLDER_ITEM_COUNT_TABLES: Partial<Record<FolderKind, {
    * 一覧が既定で掛けている絞り込み。件数も同じ母集団で数えるために要る。
    * ここが無いと、一覧に出ない行がフォルダ件数にだけ残る（独立審査 #631）。
    *
-   * 他の5種別には付けない。いま一覧側が何も絞っていないため、付けると
+   * 残りの種別には付けない。いま一覧側が何も絞っていないため、付けると
    * 逆に母集団がずれる。一覧側の絞り込みが増えたら、そのときここへ足す。
    */
   listFilter?: string;
@@ -240,7 +240,8 @@ export const FOLDER_ITEM_COUNT_TABLES: Partial<Record<FolderKind, {
   scenario: { table: 'scenarios', accountColumn: 'line_account_id' },
   tag: { table: 'tags', accountColumn: 'line_account_id' },
   template: { table: 'templates', accountColumn: 'line_account_id' },
-  auto_reply: { table: 'auto_replies', accountColumn: 'line_account_id' },
+  // 一覧は deleted_at IS NULL で絞る(packages/db/src/auto-replies.ts:76)。
+  auto_reply: { table: 'auto_replies', accountColumn: 'line_account_id', listFilter: 'deleted_at IS NULL' },
   broadcast: { table: 'broadcasts', accountColumn: 'line_account_id' },
   // #730: media / common_var / rich_menu は一覧が単一アカウントに閉じて
   // いるため、単一アカウント方式で数える。common_var は一覧と同じく

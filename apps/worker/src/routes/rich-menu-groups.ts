@@ -1,4 +1,4 @@
-import { Hono } from 'hono';
+import { Hono, type Context } from 'hono';
 import {
   getRichMenuGroups,
   getRichMenuGroupById,
@@ -28,12 +28,33 @@ import {
   cancelRichMenuSchedule,
   createRichMenuManualPublishRequestAtomic,
   getRichMenuManualPublishRequest,
+  getRichMenuManualPublishRequestById,
   getRichMenuManualPublishShells,
+  listRichMenuManualPublishRequests,
   claimRichMenuManualPublishRequest,
   markRichMenuManualPublishFailed,
   markRichMenuManualPublishSucceeded,
   recordRichMenuManualPublishShells,
   restartRichMenuManualPublishRequest,
+  listRichMenuGroupIdsByAreaLabel,
+  normalizeRichMenuSearchText,
+  duplicateRichMenuGroupAtomic,
+  createRichMenuTestApplyAtomic,
+  getActiveRichMenuTestApply,
+  getRichMenuTestApplyById,
+  listRichMenuTestApplies,
+  captureRichMenuTestApplyPrevious,
+  recordRichMenuTestApplyShells,
+  markRichMenuTestApplyApplied,
+  markRichMenuTestApplyFailed,
+  beginRichMenuTestApplyRevert,
+  markRichMenuTestApplyReverted,
+  markRichMenuTestApplyRevertFailed,
+  getStaffById,
+  getMediaById,
+  recordAuditEvent,
+  maskAuditIp,
+  auditDeviceFamily,
   jstNow,
   type RichMenuGroup,
   type RichMenuGroupWithPages,
@@ -69,6 +90,7 @@ import {
   linkRichMenuBulkChunked,
   PublishLeaseLostError,
   RichMenuValidationError,
+  buildAliasId,
   type LineRichMenuClient,
   type R2Like,
   type GroupInput,
@@ -406,15 +428,22 @@ function parsePages(raw: unknown): Parsed<RichMenuPageInput[]> {
   return { ok: true, value: pages };
 }
 
-// create では input.page.id がそのまま DB 投入されない (新 UUID で再生成) ため、
-// area.actionData.targetPageId が input.page.id を指していても publish 時に解決できない。
-// 段階的なフローを促すため、create 時の richmenuswitch action は明示的に拒否する。
-// switcher を組みたい場合は作成後 PATCH で追加する。
-function rejectRichmenuswitchInCreate(pages: RichMenuPageInput[]): string | null {
+// N-161: 新規作成でもページ切替を決められるようにする。
+// 作成前は page.id が決まっていないため、切替ボタンの行き先は
+// `actionData.targetPageIndex`（行き先ページの orderIndex）で受け、
+// createRichMenuGroup が採番した実IDへ解決する。実IDを直接送る形
+// (targetPageId) は誤解を招くので断る。
+function validateRichmenuswitchInCreate(pages: RichMenuPageInput[]): string | null {
+  const orderIndexes = new Set(pages.map((p) => p.orderIndex));
   for (const p of pages) {
     for (const a of p.areas) {
-      if (a.actionType === 'richmenuswitch') {
-        return 'create payload may not include richmenuswitch actions; create the group first, then PATCH with switcher actions';
+      if (a.actionType !== 'richmenuswitch') continue;
+      const raw = a.actionData?.targetPageIndex;
+      if (a.actionData?.targetPageId !== undefined) {
+        return 'create payload must use actionData.targetPageIndex (orderIndex) for richmenuswitch, not targetPageId';
+      }
+      if (typeof raw !== 'number' || !Number.isInteger(raw) || !orderIndexes.has(raw)) {
+        return 'richmenuswitch action requires actionData.targetPageIndex pointing to a page orderIndex in this menu';
       }
     }
   }
@@ -436,6 +465,48 @@ function parseCreateBody(raw: unknown): Parsed<CreateRichMenuGroupInput> {
   if (r.folderId !== undefined && r.folderId !== null && typeof r.folderId !== 'string') {
     return { ok: false, error: 'folderId must be a string or null' };
   }
+  // N-161: 既定ページ・配信対象・全員既定を作成時に決められるようにする。
+  let defaultPageIndex: number | null = null;
+  if (r.defaultPageIndex !== undefined && r.defaultPageIndex !== null) {
+    if (
+      typeof r.defaultPageIndex !== 'number'
+      || !Number.isInteger(r.defaultPageIndex)
+      || !pages.value.some((p) => p.orderIndex === r.defaultPageIndex)
+    ) {
+      return { ok: false, error: 'defaultPageIndex must be an orderIndex of one of the pages' };
+    }
+    defaultPageIndex = r.defaultPageIndex;
+  }
+  if (r.isDefaultForAll !== undefined && typeof r.isDefaultForAll !== 'boolean') {
+    return { ok: false, error: 'isDefaultForAll must be boolean' };
+  }
+  if (r.targetingEnabled !== undefined && typeof r.targetingEnabled !== 'boolean') {
+    return { ok: false, error: 'targetingEnabled must be boolean' };
+  }
+  if (r.targetingPriority !== undefined) {
+    if (typeof r.targetingPriority !== 'number' || !Number.isInteger(r.targetingPriority)) {
+      return { ok: false, error: 'targetingPriority must be an integer' };
+    }
+  }
+  let targetingCondition: string | null = null;
+  if (r.targetingCondition !== undefined && r.targetingCondition !== null) {
+    if (typeof r.targetingCondition !== 'string') {
+      return { ok: false, error: 'targetingCondition must be a JSON string or null' };
+    }
+    try {
+      JSON.parse(r.targetingCondition);
+    } catch {
+      return { ok: false, error: 'targetingCondition must be valid JSON' };
+    }
+    targetingCondition = r.targetingCondition;
+  }
+  // 「条件で出し分ける」を選んだのに条件が空だと、公開しても誰にも出ない
+  // 設定が作れる。入口で断る。
+  if (r.targetingEnabled === true && !targetingCondition) {
+    return { ok: false, error: 'targetingEnabled requires targetingCondition' };
+  }
+  const switcherRejection = validateRichmenuswitchInCreate(pages.value);
+  if (switcherRejection) return { ok: false, error: switcherRejection };
   return {
     ok: true,
     value: {
@@ -445,6 +516,11 @@ function parseCreateBody(raw: unknown): Parsed<CreateRichMenuGroupInput> {
       size: r.size as 'large' | 'compact',
       pages: pages.value,
       folderId: (r.folderId as string | null | undefined) ?? null,
+      defaultPageIndex,
+      isDefaultForAll: r.isDefaultForAll === true,
+      targetingEnabled: r.targetingEnabled === true,
+      targetingCondition,
+      targetingPriority: typeof r.targetingPriority === 'number' ? r.targetingPriority : 0,
     },
   };
 }
@@ -966,6 +1042,13 @@ richMenuGroups.get('/api/rich-menu-groups', async (c) => {
     const audienceByGroup = new Map(audienceStats.map((item) => [item.groupId, item]));
     const tapsByGroup = new Map(tapStats.byGroup.map((item) => [item.groupId, item.taps]));
     const query = (c.req.query('query') ?? '').trim();
+    // N-163: 検索はメニュー名・トークバー文言・ボタン名（面のラベル）の3方向へ
+    // 当たる。大小文字と空白（半角・全角）を揃えて比較する。ボタン名は別表なので
+    // 一致する group の id を先に引き、一覧の絞り込みに合成する。
+    const normalizedQuery = normalizeRichMenuSearchText(query);
+    const labelMatchedGroupIds = wantsPaging && normalizedQuery
+      ? await listRichMenuGroupIdsByAreaLabel(c.env.DB, accountId, normalizedQuery)
+      : new Set<string>();
     const folderId = c.req.query('folderId') ?? '';
     const savedFilter = c.req.query('filter') ?? '';
     const sortKey = c.req.query('sort') ?? 'priority';
@@ -995,7 +1078,12 @@ richMenuGroups.get('/api/rich-menu-groups', async (c) => {
     };
     const filtered = wantsPaging
       ? allItems.filter((item) => {
-          if (query && !item.name.includes(query) && !item.chatBarText.includes(query)) return false;
+          if (
+            normalizedQuery
+            && !normalizeRichMenuSearchText(item.name).includes(normalizedQuery)
+            && !normalizeRichMenuSearchText(item.chatBarText).includes(normalizedQuery)
+            && !labelMatchedGroupIds.has(item.id)
+          ) return false;
           if (folderId === '__unfiled__' && item.folderId) return false;
           if (folderId && folderId !== '__unfiled__' && item.folderId !== folderId) return false;
           if (savedFilter === 'published' && item.status !== 'published') return false;
@@ -1406,9 +1494,65 @@ richMenuGroups.post('/api/rich-menu-groups', requireRole('owner', 'admin'), asyn
   if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [parsed.value.accountId])) {
     return c.json({ success: false, error: 'line account not found' }, 404);
   }
-  const switcherRejection = rejectRichmenuswitchInCreate(parsed.value.pages);
-  if (switcherRejection) return c.json({ success: false, error: switcherRejection }, 400);
   const created = await createRichMenuGroup(c.env.DB, parsed.value);
+  // N-164: 登録メディアを選んで作った場合、既定ページの画像としてここで登録する。
+  // 作成と別口の「画像アップロード」を要しないため、作成画面へ戻った選択が
+  // そのまま下書きへ反映される。失敗しても下書き自体は残し、編集画面で
+  // やり直せることを応答で伝える。
+  const imageMediaId = isJsonRecord(body) && typeof body.imageMediaId === 'string' && body.imageMediaId.length > 0
+    ? body.imageMediaId
+    : null;
+  if (imageMediaId) {
+    try {
+      const media = await getMediaById(c.env.DB, imageMediaId, parsed.value.accountId)
+        ?? await getMediaById(c.env.DB, imageMediaId, null);
+      if (!media || media.kind !== 'image' || media.archived_at) {
+        return c.json(
+          { success: false, error: '選ばれたメディアはこのアカウントの画像として使えません', data: serializeGroupWithPages(created) },
+          400,
+        );
+      }
+      const obj = await c.env.IMAGES.get(media.r2_key);
+      if (!obj) throw new Error('media object not found in storage');
+      const buf = new Uint8Array(await new Response(obj.body).arrayBuffer());
+      const validation = validateRichMenuImage(buf, buf.byteLength);
+      if (!validation.ok) {
+        return c.json(
+          { success: false, error: `選ばれた画像を使えません: ${validation.error}`, data: serializeGroupWithPages(created) },
+          400,
+        );
+      }
+      if (validation.size !== created.size) {
+        return c.json(
+          {
+            success: false,
+            error: `選ばれた画像の大きさ（${validation.size === 'large' ? '大きい' : '小さい'}向け）がメニューの大きさと合いません`,
+            data: serializeGroupWithPages(created),
+          },
+          400,
+        );
+      }
+      const defaultPage = created.pages.find((p) => p.id === created.default_page_id)
+        ?? created.pages[0];
+      const contentType = media.mime_type === 'image/jpeg' ? 'image/jpeg' : 'image/png';
+      const ext = contentType === 'image/png' ? 'png' : 'jpg';
+      const key = `rich-menus/${parsed.value.accountId}/${created.id}/${defaultPage.id}/${Date.now()}.${ext}`;
+      await c.env.IMAGES.put(key, buf, { httpMetadata: { contentType } });
+      await setRichMenuPageImage(c.env.DB, defaultPage.id, key, contentType);
+      const refreshed = await getRichMenuGroupWithPages(c.env.DB, created.id);
+      return c.json({ success: true, data: serializeGroupWithPages(refreshed ?? created) });
+    } catch (error) {
+      console.error('POST /api/rich-menu-groups image apply error:', error);
+      return c.json(
+        {
+          success: false,
+          error: '下書きは作成しましたが、画像の登録に失敗しました。編集画面で画像を登録してください。',
+          data: serializeGroupWithPages(created),
+        },
+        500,
+      );
+    }
+  }
   return c.json({ success: true, data: serializeGroupWithPages(created) });
 });
 
@@ -1779,18 +1923,76 @@ function createLineClient(channelAccessToken: string): LineRichMenuClient {
         throw new Error(`LINE linkRichMenuBulk failed: ${res.status} ${await res.text()}`);
       }
     },
+    // ----- N-152: 本人LINEへのテスト適用で使う個人宛て操作 -----
+    async linkRichMenuToUser(userId, richMenuId) {
+      const res = await fetch(
+        `https://api.line.me/v2/bot/user/${encodeURIComponent(userId)}/richmenu/${encodeURIComponent(richMenuId)}`,
+        { method: 'POST', headers: { Authorization: auth } },
+      );
+      if (!res.ok) {
+        throw new Error(`LINE linkRichMenuToUser failed: ${res.status} ${await res.text()}`);
+      }
+    },
+    async unlinkRichMenuFromUser(userId) {
+      const res = await fetch(
+        `https://api.line.me/v2/bot/user/${encodeURIComponent(userId)}/richmenu`,
+        { method: 'DELETE', headers: { Authorization: auth } },
+      );
+      if (!res.ok && res.status !== 404) {
+        throw new Error(`LINE unlinkRichMenuFromUser failed: ${res.status} ${await res.text()}`);
+      }
+    },
+    async getRichMenuIdOfUser(userId) {
+      const res = await fetch(
+        `https://api.line.me/v2/bot/user/${encodeURIComponent(userId)}/richmenu`,
+        { headers: { Authorization: auth } },
+      );
+      if (res.status === 404) return null;
+      if (!res.ok) {
+        throw new Error(`LINE getRichMenuIdOfUser failed: ${res.status} ${await res.text()}`);
+      }
+      const body = (await res.json()) as { richMenuId?: string };
+      return body.richMenuId ?? null;
+    },
+    async listRichMenuAliases() {
+      const res = await fetch('https://api.line.me/v2/bot/richmenu/alias/list', {
+        headers: { Authorization: auth },
+      });
+      if (!res.ok) {
+        throw new Error(`LINE listRichMenuAliases failed: ${res.status} ${await res.text()}`);
+      }
+      const body = (await res.json()) as {
+        aliases?: Array<{ richMenuAliasId?: string; richMenuId?: string }>;
+      };
+      return (body.aliases ?? []).flatMap((alias) =>
+        typeof alias.richMenuAliasId === 'string' && typeof alias.richMenuId === 'string'
+          ? [{ richMenuAliasId: alias.richMenuAliasId, richMenuId: alias.richMenuId }]
+          : [],
+      );
+    },
   };
 }
 
 richMenuGroups.post('/api/rich-menu-groups/:groupId/publish', requireRole('owner', 'admin'), async (c) => {
-  const groupId = c.req.param('groupId');
-  const group = await getRichMenuGroupWithPages(c.env.DB, groupId);
-  if (!group || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [group.account_id])) {
-    return c.json({ success: false, error: 'not found' }, 404);
-  }
   const idempotencyKey = c.req.header('Idempotency-Key')?.trim();
   if (!idempotencyKey) {
     return c.json({ success: false, error: 'Idempotency-Key header required' }, 400);
+  }
+  return handleManualPublish(c, c.req.param('groupId'), idempotencyKey);
+});
+
+/**
+ * 手動公開の本体。`/publish` と失敗run再試行 `/publish-runs/:requestId/retry` の
+ * 両方がここへ来る。request の存在確定・lease・journal・LINE切替はこの中で行う。
+ */
+async function handleManualPublish(
+  c: Context<Env>,
+  groupId: string,
+  idempotencyKey: string,
+) {
+  const group = await getRichMenuGroupWithPages(c.env.DB, groupId);
+  if (!group || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [group.account_id])) {
+    return c.json({ success: false, error: 'not found' }, 404);
   }
   const fingerprint = manualPublishFingerprint(group);
   const requestResult = await createRichMenuManualPublishRequestAtomic(c.env.DB, {
@@ -1982,7 +2184,303 @@ richMenuGroups.post('/api/rich-menu-groups/:groupId/publish', requireRole('owner
     if (e instanceof RichMenuValidationError) return c.json({ success: false, error: message }, 400);
     return c.json({ success: false, error: message }, 500);
   }
-});
+}
+
+// ----- N-151: 公開履歴・失敗だけの再試行・LINEとの照合修復 -----
+
+/**
+ * 公開履歴の一覧。各runの版（スナップショットの要約）・状態・試行に使った
+ * LINE ID・最終エラーを返す。別アカウントは404で隠す。
+ */
+richMenuGroups.get(
+  '/api/rich-menu-groups/:groupId/publish-runs',
+  requireRole('owner', 'admin'),
+  async (c) => {
+    const group = await getRichMenuGroupById(c.env.DB, c.req.param('groupId'));
+    if (!group || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [group.account_id])) {
+      return c.json({ success: false, error: 'not found' }, 404);
+    }
+    const requests = await listRichMenuManualPublishRequests(c.env.DB, group.id, 50);
+    const runs = [];
+    for (const request of requests) {
+      const shells = await getRichMenuManualPublishShells(c.env.DB, request.id);
+      // 版の要約。スナップショットが読めなくても一覧自体は返す。
+      let version: { name: string | null; chatBarText: string | null; pageCount: number | null } = {
+        name: null, chatBarText: null, pageCount: null,
+      };
+      try {
+        const snapshot = JSON.parse(request.definition_snapshot) as {
+          name?: string; chatBarText?: string; pages?: unknown[];
+        };
+        version = {
+          name: typeof snapshot.name === 'string' ? snapshot.name : null,
+          chatBarText: typeof snapshot.chatBarText === 'string' ? snapshot.chatBarText : null,
+          pageCount: Array.isArray(snapshot.pages) ? snapshot.pages.length : null,
+        };
+      } catch {
+        // 壊れたスナップショットは要約なしで返す。
+      }
+      runs.push({
+        id: request.id,
+        status: request.status,
+        lastErrorCode: request.last_error_code,
+        idempotencyKey: request.idempotency_key,
+        requestedByStaffId: request.requested_by_staff_id,
+        createdAt: request.created_at,
+        updatedAt: request.updated_at,
+        version,
+        pages: shells.map((shell) => ({
+          pageId: shell.page_id,
+          orderIndex: shell.order_index,
+          newRichMenuId: shell.new_richmenu_id,
+          oldRichMenuId: shell.old_richmenu_id,
+        })),
+      });
+    }
+    return c.json({ success: true, data: runs });
+  },
+);
+
+/**
+ * 失敗した公開runだけを、その版の鍵で再試行する。
+ * - succeeded: 保存済みの結果を再生する（LINEを再実行しない）
+ * - running: 409
+ * - failed: 同じ idempotency_key で handleManualPublish へ回し、journal の
+ *   shell から再開する。鍵の中身が最新の下書きとずれていれば中で 409 になる。
+ */
+richMenuGroups.post(
+  '/api/rich-menu-groups/:groupId/publish-runs/:requestId/retry',
+  requireRole('owner', 'admin'),
+  async (c) => {
+    const groupId = c.req.param('groupId');
+    const requestId = c.req.param('requestId');
+    const group = await getRichMenuGroupById(c.env.DB, groupId);
+    if (!group || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [group.account_id])) {
+      return c.json({ success: false, error: 'not found' }, 404);
+    }
+    const request = await getRichMenuManualPublishRequestById(c.env.DB, requestId);
+    if (!request || request.group_id !== groupId || request.account_id !== group.account_id) {
+      return c.json({ success: false, error: 'not found' }, 404);
+    }
+    if (request.status === 'running') {
+      return c.json({ success: false, error: 'この公開はまだ実行中です', status: 'running' }, 409);
+    }
+    if (request.status === 'succeeded') {
+      try {
+        return c.json(
+          { success: true, data: JSON.parse(request.result_json ?? '') },
+          200,
+          { 'Idempotency-Replayed': 'true' },
+        );
+      } catch {
+        return c.json({ success: false, error: '公開結果を再取得できません。最新状態を確認してください。' }, 500);
+      }
+    }
+    return handleManualPublish(c, groupId, request.idempotency_key);
+  },
+);
+
+/**
+ * DBの記録とLINE上の実体の照合。
+ *
+ * dryRun=true（既定）: ずれを列挙するだけで何も変えない。
+ * dryRun=false        : 列挙したずれを明示的に直す。
+ *
+ * 直す内容:
+ *   - page の line_richmenu_id が LINE に無い → そのIDを外す
+ *   - status='published' なのに LINE に実体が1つも無い → draft へ戻す
+ *   - is_default_for_all なのに LINE の既定が別を指す → 既定を張り直す
+ *     （既定ページの実体が LINE に無いときは張り直せないので、フラグを下ろす）
+ *   - 失敗した公開runが残した lhm: メニュー → LINE から消す
+ */
+richMenuGroups.post(
+  '/api/rich-menu-groups/:groupId/reconcile',
+  requireRole('owner', 'admin'),
+  async (c) => {
+    const groupId = c.req.param('groupId');
+    const group = await getRichMenuGroupWithPages(c.env.DB, groupId);
+    if (!group || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [group.account_id])) {
+      return c.json({ success: false, error: 'not found' }, 404);
+    }
+    let body: { dryRun?: unknown } = {};
+    try {
+      body = await c.req.json<{ dryRun?: unknown }>();
+    } catch {
+      // 本文なし = dryRun。
+    }
+    const dryRun = body.dryRun !== false;
+
+    const account = await getLineAccountById(c.env.DB, group.account_id);
+    if (!account) return c.json({ success: false, error: 'line account not found' }, 500);
+    const line = createLineClient(account.channel_access_token);
+
+    let lineMenus: Array<{ richMenuId: string; name: string | null }>;
+    let currentDefault: string | null;
+    try {
+      lineMenus = await line.listRichMenus();
+      currentDefault = await line.getCurrentDefaultRichMenuId();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      return c.json({ success: false, error: `LINEの状態を確認できませんでした: ${message}` }, 502);
+    }
+    const lineIds = new Set(lineMenus.map((menu) => menu.richMenuId));
+
+    type ReconcileDiff = {
+      kind:
+        | 'stale_page_richmenu_id'
+        | 'status_mismatch'
+        | 'default_mismatch'
+        | 'orphan_shell';
+      detail: string;
+      pageId?: string;
+      richMenuId?: string;
+    };
+    const diffs: ReconcileDiff[] = [];
+
+    // 1) ページが指すLINE IDが実在するか。
+    const stalePages = group.pages.filter(
+      (page) => page.line_richmenu_id && !lineIds.has(page.line_richmenu_id),
+    );
+    for (const page of stalePages) {
+      diffs.push({
+        kind: 'stale_page_richmenu_id',
+        pageId: page.id,
+        richMenuId: page.line_richmenu_id ?? undefined,
+        detail: `ページ「${page.name}」が記録するLINEメニュー ${page.line_richmenu_id} はLINE上にありません`,
+      });
+    }
+
+    // 2) 公開中なのにLINEに実体が無い。
+    const livePages = group.pages.filter(
+      (page) => page.line_richmenu_id && lineIds.has(page.line_richmenu_id),
+    );
+    if (group.status === 'published' && livePages.length === 0) {
+      diffs.push({
+        kind: 'status_mismatch',
+        detail: '公開中と記録されていますが、LINE上にこのメニューの実体がありません',
+      });
+    }
+
+    // 3) 全員既定の張り先がずれている。
+    const defaultPage = group.pages.find((page) => page.id === group.default_page_id)
+      ?? [...group.pages].sort((a, b) => a.order_index - b.order_index)[0];
+    const expectedDefault = defaultPage?.line_richmenu_id ?? null;
+    if (group.is_default_for_all === 1 && expectedDefault !== currentDefault) {
+      diffs.push({
+        kind: 'default_mismatch',
+        richMenuId: currentDefault ?? undefined,
+        detail: expectedDefault
+          ? `LINEの全員既定がこのメニューを指していません（現在: ${currentDefault ?? 'なし'}）`
+          : '全員既定と記録されていますが、既定ページにLINEメニューがありません',
+      });
+    }
+
+    // 4) 失敗・中断した公開runが残した孤児メニュー。running のrunのものは触らない。
+    const requests = await listRichMenuManualPublishRequests(c.env.DB, groupId, 50);
+    const orphanShells: Array<{ requestId: string; richMenuId: string }> = [];
+    for (const request of requests) {
+      if (request.status === 'running') continue;
+      const shells = await getRichMenuManualPublishShells(c.env.DB, request.id);
+      for (const shell of shells) {
+        const stillReferenced = group.pages.some(
+          (page) => page.line_richmenu_id === shell.new_richmenu_id,
+        );
+        if (!stillReferenced && lineIds.has(shell.new_richmenu_id)) {
+          orphanShells.push({ requestId: request.id, richMenuId: shell.new_richmenu_id });
+        }
+      }
+    }
+    for (const orphan of orphanShells) {
+      diffs.push({
+        kind: 'orphan_shell',
+        richMenuId: orphan.richMenuId,
+        detail: `完了・失敗した公開runが残したLINEメニュー ${orphan.richMenuId} が残っています`,
+      });
+    }
+
+    if (dryRun) {
+      return c.json({ success: true, data: { dryRun: true, diffs } });
+    }
+
+    // --- 修復 ---
+    const applied: ReconcileDiff[] = [];
+    const failed: Array<{ diff: ReconcileDiff; error: string }> = [];
+
+    if (orphanShells.length > 0) {
+      await deleteRichMenuShells(line, orphanShells.map((o) => o.richMenuId));
+      applied.push(...diffs.filter((d) => d.kind === 'orphan_shell'));
+    }
+
+    const defaultDiff = diffs.find((d) => d.kind === 'default_mismatch');
+    if (defaultDiff) {
+      if (expectedDefault && lineIds.has(expectedDefault)) {
+        try {
+          await line.setDefaultRichMenu(expectedDefault);
+          applied.push(defaultDiff);
+        } catch (error) {
+          failed.push({ diff: defaultDiff, error: error instanceof Error ? error.message : String(error) });
+        }
+      } else {
+        // 既定へ張るべき実体が無い。フラグだけ下ろす。
+        await c.env.DB
+          .prepare(`UPDATE rich_menu_groups SET is_default_for_all = 0, updated_at = ? WHERE id = ?`)
+          .bind(jstNow(), groupId)
+          .run();
+        applied.push(defaultDiff);
+      }
+    }
+
+    const statusDiff = diffs.find((d) => d.kind === 'status_mismatch');
+    if (statusDiff) {
+      await c.env.DB
+        .prepare(
+          `UPDATE rich_menu_groups SET status = 'draft', is_default_for_all = 0, updated_at = ? WHERE id = ?`,
+        )
+        .bind(jstNow(), groupId)
+        .run();
+      applied.push(statusDiff);
+    }
+
+    for (const page of stalePages) {
+      await c.env.DB
+        .prepare(`UPDATE rich_menu_pages SET line_richmenu_id = NULL, updated_at = ? WHERE id = ?`)
+        .bind(jstNow(), page.id)
+        .run();
+    }
+    applied.push(...diffs.filter((d) => d.kind === 'stale_page_richmenu_id'));
+
+    const staff = c.get('staff');
+    c.set('auditRecorded', true);
+    try {
+      await recordAuditEvent(c.env.DB, {
+        tenantId: staff?.tenantId,
+        lineAccountId: group.account_id,
+        category: 'business',
+        actorPrincipalId: staff?.id,
+        actorRole: staff?.role,
+        action: 'rich_menu.reconcile',
+        targetKind: 'rich_menu_group',
+        targetId: groupId,
+        result: failed.length > 0 ? 'failed' : 'success',
+        after: {
+          diffCount: diffs.length,
+          applied: applied.map((d) => d.kind),
+          failed: failed.map((f) => f.diff.kind),
+        },
+        requestTraceId: c.req.header('cf-ray') ?? c.req.header('x-request-id') ?? null,
+        ipPrefix: maskAuditIp(c.req.header('cf-connecting-ip')),
+        deviceFamily: auditDeviceFamily(c.req.header('user-agent')),
+      });
+    } catch (auditError) {
+      console.error('rich_menu.reconcile audit insert failed:', auditError);
+    }
+
+    return c.json({
+      success: failed.length === 0,
+      data: { dryRun: false, diffs, applied: applied.length, failed },
+    });
+  },
+);
 
 // ----- Unpublish -----
 
@@ -2194,3 +2692,563 @@ richMenuGroups.post('/api/rich-menu-groups/:groupId/apply-to-tag', requireRole('
     }, 500);
   }
 });
+
+// ----- N-154: 下書き複製 -----
+
+/**
+ * メニュー全体（ページ・ボタン・画像参照・出し分け条件）を別IDの下書きとして
+ * 複製する。公開状態・予約・LINE richMenu ID・実行台帳は引き継がない。
+ * Idempotency-Key で同じ操作を1回に数える。
+ */
+richMenuGroups.post(
+  '/api/rich-menu-groups/:groupId/duplicate',
+  requireRole('owner', 'admin'),
+  async (c) => {
+    const groupId = c.req.param('groupId');
+    const group = await getRichMenuGroupById(c.env.DB, groupId);
+    if (!group || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [group.account_id])) {
+      return c.json({ success: false, error: 'not found' }, 404);
+    }
+    const idempotencyKey = c.req.header('Idempotency-Key')?.trim();
+    if (!idempotencyKey) {
+      return c.json({ success: false, error: 'Idempotency-Key header required' }, 400);
+    }
+    let body: unknown = {};
+    try {
+      body = await c.req.json();
+    } catch {
+      // 名前の指定が無ければ「○○ のコピー」。本文なしも許す。
+    }
+    const requestedName = isJsonRecord(body) && typeof body.name === 'string' ? body.name : undefined;
+
+    const result = await duplicateRichMenuGroupAtomic(c.env.DB, {
+      requestId: crypto.randomUUID(),
+      accountId: group.account_id,
+      sourceGroupId: groupId,
+      idempotencyKey,
+      name: requestedName,
+    });
+    if (result.outcome === 'conflict') {
+      return c.json(
+        { success: false, error: 'Idempotency-Key is already used with different content' },
+        409,
+      );
+    }
+    const created = await getRichMenuGroupWithPages(c.env.DB, result.groupId);
+    if (!created) return c.json({ success: false, error: 'duplicate target not found' }, 500);
+
+    const staff = c.get('staff');
+    c.set('auditRecorded', true);
+    try {
+      await recordAuditEvent(c.env.DB, {
+        tenantId: staff?.tenantId,
+        lineAccountId: group.account_id,
+        category: 'business',
+        actorPrincipalId: staff?.id,
+        actorRole: staff?.role,
+        action: 'rich_menu.duplicate',
+        targetKind: 'rich_menu_group',
+        targetId: groupId,
+        result: 'success',
+        after: { createdGroupId: result.groupId, replayed: result.outcome === 'existing' },
+        requestTraceId: c.req.header('cf-ray') ?? c.req.header('x-request-id') ?? null,
+        ipPrefix: maskAuditIp(c.req.header('cf-connecting-ip')),
+        deviceFamily: auditDeviceFamily(c.req.header('user-agent')),
+      });
+    } catch (auditError) {
+      console.error('rich_menu.duplicate audit insert failed:', auditError);
+    }
+
+    return c.json(
+      { success: true, data: serializeGroupWithPages(created) },
+      result.outcome === 'existing' ? 200 : 201,
+      result.outcome === 'existing' ? { 'Idempotency-Replayed': 'true' } : undefined,
+    );
+  },
+);
+
+// ----- N-156: staffへは合計だけ見せる影響人数 -----
+
+/**
+ * 「実際にこのメニューが出る人」の集計だけを返す読み取り口。
+ * preview-targets（owner/admin）は友だち条件の内訳や上位メニュー名を返すが、
+ * staff へは件数だけを出す。友だち個人の情報・条件の中身・他メニュー名は
+ * ここには一切載せない。
+ */
+richMenuGroups.get('/api/rich-menu-groups/:groupId/audience-summary', async (c) => {
+  const group = await getRichMenuGroupById(c.env.DB, c.req.param('groupId'));
+  if (!group || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [group.account_id])) {
+    return c.json({ success: false, error: 'not found' }, 404);
+  }
+  try {
+    const condition = group.targeting_enabled === 1
+      ? parseCondition(group.targeting_condition)
+      : null;
+    if (group.targeting_enabled === 1 && group.targeting_condition && !condition) {
+      return c.json({ success: false, error: '保存済みの対象条件を読み取れませんでした' }, 503);
+    }
+    const targetWhere = condition ? buildSegmentWhere(condition) : { sql: '1=1', bindings: [] };
+
+    const [totalRow, matchedRow, higher] = await Promise.all([
+      c.env.DB
+        .prepare(
+          `SELECT COUNT(*) AS count FROM friends f
+            WHERE f.line_account_id = ? AND f.is_following = 1`,
+        )
+        .bind(group.account_id)
+        .first<{ count: number }>(),
+      c.env.DB
+        .prepare(
+          `SELECT COUNT(*) AS count
+             FROM friends f
+            WHERE f.line_account_id = ?
+              AND f.is_following = 1
+              AND (${targetWhere.sql})`,
+        )
+        .bind(group.account_id, ...targetWhere.bindings)
+        .first<{ count: number }>(),
+      c.env.DB
+        .prepare(
+          `SELECT targeting_condition
+             FROM rich_menu_groups
+            WHERE account_id = ?
+              AND id <> ?
+              AND status = 'published'
+              AND targeting_enabled = 1
+              AND targeting_priority < ?`,
+        )
+        .bind(group.account_id, group.id, group.targeting_priority)
+        .all<{ targeting_condition: string | null }>(),
+    ]);
+
+    const higherParts: Array<{ sql: string; bindings: unknown[] }> = [];
+    let unreadableHigher = false;
+    for (const row of higher.results ?? []) {
+      const parsed = parseCondition(row.targeting_condition);
+      if (!parsed) {
+        unreadableHigher = true;
+        continue;
+      }
+      higherParts.push(buildSegmentWhere(parsed));
+    }
+
+    let excluded: number | null = 0;
+    if (!unreadableHigher && higherParts.length > 0) {
+      const higherSql = higherParts.map((part) => `(${part.sql})`).join(' OR ');
+      const result = await c.env.DB
+        .prepare(
+          `SELECT COUNT(*) AS count
+             FROM friends f
+            WHERE f.line_account_id = ?
+              AND f.is_following = 1
+              AND (${targetWhere.sql})
+              AND (${higherSql})`,
+        )
+        .bind(group.account_id, ...targetWhere.bindings, ...higherParts.flatMap((p) => p.bindings))
+        .first<{ count: number }>();
+      excluded = result?.count ?? 0;
+    } else if (unreadableHigher) {
+      excluded = null;
+    }
+
+    const matched = matchedRow?.count ?? 0;
+    return c.json({
+      success: true,
+      data: {
+        // 件数だけ。個人・条件・他メニューの名前は返さない。
+        total: { value: totalRow?.count ?? 0, state: 'available', reason: null },
+        targeted: { value: matched, state: 'available', reason: null },
+        excluded: excluded === null
+          ? { value: null, state: 'unavailable', reason: 'higher_condition_unreadable' }
+          : { value: excluded, state: 'available', reason: null },
+        effective: excluded === null
+          ? { value: null, state: 'unavailable', reason: 'higher_condition_unreadable' }
+          : { value: Math.max(0, matched - excluded), state: 'available', reason: null },
+      },
+    });
+  } catch (error) {
+    console.error('GET /api/rich-menu-groups/:groupId/audience-summary error:', error);
+    return c.json({ success: false, error: '対象人数を確認できませんでした' }, 503);
+  }
+});
+
+// ----- N-152: 本人LINEへのテスト適用 -----
+
+function serializeTestApply(row: {
+  id: string; status: string; previous_richmenu_id: string | null;
+  applied_richmenu_id: string | null; last_error_code: string | null;
+  created_at: string; updated_at: string;
+}) {
+  return {
+    id: row.id,
+    status: row.status,
+    previousRichMenuId: row.previous_richmenu_id,
+    appliedRichMenuId: row.applied_richmenu_id,
+    lastErrorCode: row.last_error_code,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+/** テスト適用の現在状態。本人LINEが連携済みかもここで返す。 */
+richMenuGroups.get('/api/rich-menu-groups/:groupId/test-apply', async (c) => {
+  const group = await getRichMenuGroupById(c.env.DB, c.req.param('groupId'));
+  if (!group || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [group.account_id])) {
+    return c.json({ success: false, error: 'not found' }, 404);
+  }
+  const staff = c.get('staff');
+  const member = await getStaffById(c.env.DB, staff.id);
+  const lineUserId = member?.line_user_id ?? null;
+  const active = lineUserId
+    ? await getActiveRichMenuTestApply(c.env.DB, group.id, staff.id)
+    : null;
+  const recent = await listRichMenuTestApplies(c.env.DB, group.id, 10);
+  return c.json({
+    success: true,
+    data: {
+      linked: Boolean(lineUserId),
+      // 連携方法の案内。未連携のとき画面はこの案内を出して適用ボタンを止める。
+      linkGuidance: lineUserId
+        ? null
+        : 'テスト適用には、あなたのLINEアカウントとの連携が必要です。スタッフ設定からLINE連携を行ってください。',
+      active: active ? serializeTestApply(active) : null,
+      recent: recent
+        .filter((row) => row.staff_id === staff.id)
+        .map(serializeTestApply),
+    },
+  });
+});
+
+/**
+ * 本人確認済みのLINE（スタッフ連携済みの line_user_id）だけへテスト適用する。
+ * 任意の友だちIDや他アカウントのユーザーを指定する口は作らない。
+ *
+ * - published なら既定ページの公開済みメニューをそのまま本人へリンク
+ * - draft なら lht: 名のテスト専用メニューを LINE 上に作り、lhx- alias を
+ *   張って切替が動く状態にしてから本人へリンク。戻す時に消す。
+ */
+richMenuGroups.post(
+  '/api/rich-menu-groups/:groupId/test-apply',
+  requireRole('owner', 'admin'),
+  async (c) => {
+    const groupId = c.req.param('groupId');
+    const group = await getRichMenuGroupWithPages(c.env.DB, groupId);
+    if (!group || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [group.account_id])) {
+      return c.json({ success: false, error: 'not found' }, 404);
+    }
+    const idempotencyKey = c.req.header('Idempotency-Key')?.trim();
+    if (!idempotencyKey) {
+      return c.json({ success: false, error: 'Idempotency-Key header required' }, 400);
+    }
+    let body: { confirm?: unknown } = {};
+    try {
+      body = await c.req.json<{ confirm?: unknown }>();
+    } catch {
+      return c.json({ success: false, error: 'invalid JSON body' }, 400);
+    }
+    // 自分のLINE表示を変える操作なので、明示の確認を必須にする。
+    if (body.confirm !== true) {
+      return c.json({ success: false, error: 'テスト適用には確認（confirm: true）が必要です' }, 400);
+    }
+
+    const staff = c.get('staff');
+    const member = await getStaffById(c.env.DB, staff.id);
+    const lineUserId = member?.line_user_id ?? null;
+    if (!lineUserId) {
+      return c.json(
+        {
+          success: false,
+          code: 'line_not_linked',
+          error: 'あなたのLINEアカウントが連携されていません。スタッフ設定からLINE連携を行ってください。',
+        },
+        400,
+      );
+    }
+
+    const applyResult = await createRichMenuTestApplyAtomic(c.env.DB, {
+      id: crypto.randomUUID(),
+      groupId: group.id,
+      accountId: group.account_id,
+      staffId: staff.id,
+      lineUserId,
+      idempotencyKey,
+    });
+    if (applyResult.outcome === 'conflict') {
+      return c.json({ success: false, error: 'Idempotency-Key is already used with different content' }, 409);
+    }
+    let apply = applyResult.apply;
+    if (apply.status === 'applied') {
+      return c.json(
+        { success: true, data: serializeTestApply(apply) },
+        200,
+        { 'Idempotency-Replayed': 'true' },
+      );
+    }
+    if (apply.status === 'reverted') {
+      return c.json({ success: false, error: 'このテスト適用はすでに取り消されました' }, 409);
+    }
+    if (apply.status === 'reverting') {
+      return c.json({ success: false, error: 'このテスト適用は取り消し処理中です' }, 409);
+    }
+    // 同じ鍵の2本目が走っている途中（running）なら畳む。LINE操作の二重実行を防ぐ。
+    if (apply.status === 'running' && applyResult.outcome === 'existing') {
+      return c.json({ success: false, error: 'テスト適用を実行中です。少し待ってから確認してください。' }, 409);
+    }
+    // running でも、同じ担当者の別の進行中テストがあれば止める（二重適用防止）。
+    if (applyResult.outcome === 'created') {
+      const other = await getActiveRichMenuTestApply(c.env.DB, group.id, staff.id);
+      if (other && other.id !== apply.id) {
+        // 立てたばかりの行を running のまま残さない。
+        await markRichMenuTestApplyFailed(c.env.DB, apply.id, 'superseded by existing active test apply');
+        return c.json(
+          { success: false, error: 'すでにこのメニューのテスト適用が進行中です。先に取り消してください。', data: serializeTestApply(other) },
+          409,
+        );
+      }
+    }
+
+    const account = await getLineAccountById(c.env.DB, group.account_id);
+    if (!account) return c.json({ success: false, error: 'line account not found' }, 500);
+    const line = createLineClient(account.channel_access_token);
+    if (!line.getRichMenuIdOfUser || !line.linkRichMenuToUser) {
+      return c.json({ success: false, error: 'LINE client does not support per-user rich menu operations' }, 500);
+    }
+
+    try {
+      // 1) 適用前の表示を一度だけ記録する。これが無いと戻せない。
+      if (apply.previous_captured !== 1) {
+        const previous = await line.getRichMenuIdOfUser(lineUserId);
+        await captureRichMenuTestApplyPrevious(c.env.DB, apply.id, previous);
+        apply = (await getRichMenuTestApplyById(c.env.DB, apply.id))!;
+      }
+
+      // 2) 出すメニューを決める。
+      let appliedRichMenuId: string;
+      if (group.status === 'published') {
+        const defaultPage = group.pages.find((p) => p.id === group.default_page_id)
+          ?? [...group.pages].sort((a, b) => a.order_index - b.order_index)[0];
+        if (!defaultPage?.line_richmenu_id) {
+          throw new Error('このメニューのLINE上の実体が見つかりません。公開状態を確認してください。');
+        }
+        appliedRichMenuId = defaultPage.line_richmenu_id;
+      } else {
+        // 下書き: テスト専用メニュー（lht:）を作る。画像・切替を含めて実際の見え方を確かめられる。
+        let testShellIds: string[] = [];
+        try {
+          testShellIds = JSON.parse(apply.test_shell_ids ?? '[]') as string[];
+        } catch {
+          testShellIds = [];
+        }
+        const r2Adapter: R2Like = {
+          async get(key) {
+            const obj = await c.env.IMAGES.get(key);
+            if (!obj) return null;
+            return { body: obj.body as ReadableStream };
+          },
+        };
+        const trackedLinkUrls = await resolveTrackedLinkUrls(
+          c.env.DB,
+          () => resolveTrackedLinkBaseUrl(c.env.DB, c.env.WORKER_URL || new URL(c.req.url).origin),
+          group,
+        );
+        const formBaseUrl = account.liff_id ? `https://liff.line.me/${account.liff_id}` : (c.env.LIFF_URL ?? null);
+        const groupInput: GroupInput = {
+          id: group.id,
+          size: group.size,
+          chatBarText: group.chat_bar_text,
+          isDefaultForAll: false,
+          formBaseUrl,
+          pages: group.pages.map((p) => ({
+            id: p.id, orderIndex: p.order_index, name: p.name,
+            imageR2Key: p.image_r2_key, imageContentType: p.image_content_type,
+            lineRichMenuId: null,
+            areas: p.areas.map((a) => ({
+              id: a.id,
+              bounds: { x: a.bounds_x, y: a.bounds_y, width: a.bounds_width, height: a.bounds_height },
+              actionType: a.action_type, actionData: a.actionData, intent: a.intent, label: a.label,
+              tagIds: a.tagIds, scoreChange: a.score_change, templateId: a.template_id, formId: a.form_id,
+              trackedLinkUrl: a.tracked_link_id ? (trackedLinkUrls.get(a.tracked_link_id) ?? null) : null,
+            })),
+          })),
+        };
+        const orderedPages = [...group.pages].sort((a, b) => a.order_index - b.order_index);
+        const existingShells = orderedPages.flatMap((page, index) => {
+          const shellId = testShellIds[index];
+          return shellId ? [{ pageId: page.id, orderIndex: page.order_index, newRichMenuId: shellId }] : [];
+        });
+        const { shells } = await createRichMenuShells(groupInput, line, r2Adapter, undefined, {
+          existingShells,
+          shellName: (page) => `lht:${apply.id}:${page.id}`,
+          onShellCreated: async (shell) => {
+            testShellIds.push(shell.newRichMenuId);
+            await recordRichMenuTestApplyShells(c.env.DB, apply.id, testShellIds);
+          },
+        });
+        // 切替ボタンが参照する lhx- alias をテストメニューへ張る。
+        for (const shell of shells) {
+          await line.upsertRichMenuAlias(buildAliasId(group.id, shell.orderIndex), shell.newRichMenuId);
+        }
+        const defaultShell = shells.find((shell) => shell.pageId === (group.default_page_id ?? orderedPages[0]?.id))
+          ?? shells[0];
+        if (!defaultShell) throw new Error('テスト用メニューを作成できませんでした');
+        appliedRichMenuId = defaultShell.newRichMenuId;
+      }
+
+      // 3) 本人へリンク。ここが最後の外側操作。
+      await line.linkRichMenuToUser(lineUserId, appliedRichMenuId);
+      await markRichMenuTestApplyApplied(c.env.DB, apply.id, appliedRichMenuId);
+
+      const staffForAudit = c.get('staff');
+      c.set('auditRecorded', true);
+      try {
+        await recordAuditEvent(c.env.DB, {
+          tenantId: staffForAudit?.tenantId,
+          lineAccountId: group.account_id,
+          category: 'business',
+          actorPrincipalId: staffForAudit?.id,
+          actorRole: staffForAudit?.role,
+          action: 'rich_menu.test_apply',
+          targetKind: 'rich_menu_group',
+          targetId: group.id,
+          result: 'success',
+          after: { applyId: apply.id, appliedRichMenuId },
+          requestTraceId: c.req.header('cf-ray') ?? c.req.header('x-request-id') ?? null,
+          ipPrefix: maskAuditIp(c.req.header('cf-connecting-ip')),
+          deviceFamily: auditDeviceFamily(c.req.header('user-agent')),
+        });
+      } catch (auditError) {
+        console.error('rich_menu.test_apply audit insert failed:', auditError);
+      }
+
+      const updated = await getRichMenuTestApplyById(c.env.DB, apply.id);
+      return c.json({ success: true, data: serializeTestApply(updated ?? apply) });
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      await markRichMenuTestApplyFailed(c.env.DB, apply.id, message);
+      if (e instanceof RichMenuValidationError) {
+        return c.json({ success: false, error: message }, 400);
+      }
+      return c.json({ success: false, error: message, data: { applyId: apply.id } }, 500);
+    }
+  },
+);
+
+/**
+ * テスト適用を取り消し、適用前のメニューへ戻す。
+ * 何度呼んでも同じ結果になる。戻す必要が無い（すでに戻した）場合も成功。
+ */
+richMenuGroups.post(
+  '/api/rich-menu-groups/:groupId/test-apply/revert',
+  requireRole('owner', 'admin'),
+  async (c) => {
+    const groupId = c.req.param('groupId');
+    const group = await getRichMenuGroupById(c.env.DB, groupId);
+    if (!group || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [group.account_id])) {
+      return c.json({ success: false, error: 'not found' }, 404);
+    }
+    const idempotencyKey = c.req.header('Idempotency-Key')?.trim();
+    if (!idempotencyKey) {
+      return c.json({ success: false, error: 'Idempotency-Key header required' }, 400);
+    }
+    let body: { confirm?: unknown; applyId?: unknown } = {};
+    try {
+      body = await c.req.json<{ confirm?: unknown; applyId?: unknown }>();
+    } catch {
+      return c.json({ success: false, error: 'invalid JSON body' }, 400);
+    }
+    if (body.confirm !== true) {
+      return c.json({ success: false, error: '取り消しには確認（confirm: true）が必要です' }, 400);
+    }
+
+    const staff = c.get('staff');
+    const apply = typeof body.applyId === 'string' && body.applyId
+      ? await getRichMenuTestApplyById(c.env.DB, body.applyId)
+      : await getActiveRichMenuTestApply(c.env.DB, group.id, staff.id);
+    if (!apply || apply.group_id !== group.id || apply.staff_id !== staff.id) {
+      return c.json({ success: false, error: '取り消せるテスト適用がありません' }, 404);
+    }
+
+    const claim = await beginRichMenuTestApplyRevert(c.env.DB, apply.id, idempotencyKey);
+    if (claim === 'already') {
+      const done = await getRichMenuTestApplyById(c.env.DB, apply.id);
+      return c.json(
+        { success: true, data: serializeTestApply(done ?? apply) },
+        200,
+        { 'Idempotency-Replayed': 'true' },
+      );
+    }
+    if (claim === 'conflict' || claim === 'missing') {
+      return c.json({ success: false, error: '取り消し処理が別の操作と重なりました。最新の状態を確認してください。' }, 409);
+    }
+
+    const account = await getLineAccountById(c.env.DB, group.account_id);
+    if (!account) return c.json({ success: false, error: 'line account not found' }, 500);
+    const line = createLineClient(account.channel_access_token);
+    if (!line.linkRichMenuToUser || !line.unlinkRichMenuFromUser) {
+      return c.json({ success: false, error: 'LINE client does not support per-user rich menu operations' }, 500);
+    }
+
+    try {
+      // 1) 本人の表示を適用前へ戻す。
+      if (apply.previous_richmenu_id) {
+        await line.linkRichMenuToUser(apply.line_user_id, apply.previous_richmenu_id);
+      } else {
+        await line.unlinkRichMenuFromUser(apply.line_user_id);
+      }
+
+      // 2) 下書きテストで作ったメニューと、それを指している alias を掃除する。
+      let testShellIds: string[] = [];
+      try {
+        testShellIds = JSON.parse(apply.test_shell_ids ?? '[]') as string[];
+      } catch {
+        testShellIds = [];
+      }
+      if (testShellIds.length > 0 && line.listRichMenuAliases) {
+        const shellSet = new Set(testShellIds);
+        try {
+          const aliases = await line.listRichMenuAliases();
+          for (const alias of aliases) {
+            // 公開済みへ張り替わった alias（別のIDを指す）は消さない。
+            if (shellSet.has(alias.richMenuId) && alias.richMenuAliasId.startsWith(`lhx-${group.id.slice(0, 8)}-`)) {
+              await line.deleteRichMenuAlias(alias.richMenuAliasId);
+            }
+          }
+        } catch (aliasError) {
+          console.warn('[test-apply revert] alias cleanup failed (non-fatal):', aliasError);
+        }
+      }
+      await deleteRichMenuShells(line, testShellIds);
+
+      await markRichMenuTestApplyReverted(c.env.DB, apply.id);
+
+      const staffForAudit = c.get('staff');
+      c.set('auditRecorded', true);
+      try {
+        await recordAuditEvent(c.env.DB, {
+          tenantId: staffForAudit?.tenantId,
+          lineAccountId: group.account_id,
+          category: 'business',
+          actorPrincipalId: staffForAudit?.id,
+          actorRole: staffForAudit?.role,
+          action: 'rich_menu.test_apply_revert',
+          targetKind: 'rich_menu_group',
+          targetId: group.id,
+          result: 'success',
+          after: { applyId: apply.id, restoredRichMenuId: apply.previous_richmenu_id },
+          requestTraceId: c.req.header('cf-ray') ?? c.req.header('x-request-id') ?? null,
+          ipPrefix: maskAuditIp(c.req.header('cf-connecting-ip')),
+          deviceFamily: auditDeviceFamily(c.req.header('user-agent')),
+        });
+      } catch (auditError) {
+        console.error('rich_menu.test_apply_revert audit insert failed:', auditError);
+      }
+
+      const updated = await getRichMenuTestApplyById(c.env.DB, apply.id);
+      return c.json({ success: true, data: serializeTestApply(updated ?? apply) });
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      await markRichMenuTestApplyRevertFailed(c.env.DB, apply.id, message);
+      return c.json({ success: false, error: message, data: { applyId: apply.id } }, 500);
+    }
+  },
+);

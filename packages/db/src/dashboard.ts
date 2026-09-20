@@ -65,7 +65,13 @@ export interface DashboardFriendTrendPoint {
    * 見た人が違いに気づけない。
    */
   estimated: boolean;
-  sources: Array<{ name: string; count: number }>;
+  /**
+   * その日に増えた友だちの経路内訳。多い順。
+   *
+   * `name` が null の行は「経路不明」（中継リンクを踏まずに増えた分）。
+   * 画面は null を経路名ではなく `—`（内訳なしと同じ置き方）で出す。
+   */
+  sources: Array<{ name: string | null; count: number }>;
 }
 
 export interface DashboardOverview {
@@ -138,7 +144,8 @@ export interface DashboardOverview {
     scenarios: { active: number; paused: number };
     migrations: { active: number; completed: number };
     bookings: { pending: number; upcoming: number };
-    inflowTop: Array<{ name: string; count: number }>;
+    /** 経路不明の塊は name=null で返す。経路名「経路不明」として出さない。 */
+    inflowTop: Array<{ name: string | null; count: number }>;
     funnelAlerts: number;
     automationFailures: number;
   };
@@ -567,17 +574,22 @@ async function friendTrend(
     .bind(...binds)
     .all<{ d: string; n: number }>();
   const addedByDate = new Map(addedRows.results.map((r) => [r.d, r.n]));
+  /*
+   * 経路不明（ref_code が経路に結びつかない追加）は name=null で返す。
+   * 「経路不明」を経路名として出すと、実在する経路と区別がつかない。
+   * 画面は null を `—` として出す。
+   */
   const sourceRows = await db.prepare(
     `SELECT substr(f.created_at, 1, 10) AS d,
-            COALESCE(er.name, '経路不明') AS name,
+            er.name AS name,
             COUNT(*) AS n
        FROM friends f
        LEFT JOIN entry_routes er ON er.ref_code = f.ref_code
       WHERE f.created_at >= ? AND ${accountScopeSql(scope, 'f.line_account_id').sql}
       GROUP BY d, name
       ORDER BY n DESC`,
-  ).bind(...binds).all<{ d: string; name: string; n: number }>();
-  const sourcesByDate = new Map<string, Array<{ name: string; count: number }>>();
+  ).bind(...binds).all<{ d: string; name: string | null; n: number }>();
+  const sourcesByDate = new Map<string, Array<{ name: string | null; count: number }>>();
   for (const row of sourceRows.results) {
     const list = sourcesByDate.get(row.d) ?? [];
     list.push({ name: row.name, count: row.n });
@@ -703,11 +715,11 @@ export async function getDashboardOverview(
          FROM bookings WHERE ${bookingAccount.sql}`,
     ).bind(new Date().toISOString(), ...bookingAccount.binds).first<{ pending: number | null; upcoming: number | null }>(),
     db.prepare(
-      `SELECT COALESCE(er.name, '経路不明') name, COUNT(*) count
+      `SELECT er.name name, COUNT(*) count
          FROM friends f LEFT JOIN entry_routes er ON er.ref_code=f.ref_code
         WHERE f.created_at >= ? AND ${friendAccount.sql}
         GROUP BY name ORDER BY count DESC LIMIT 3`,
-    ).bind(start, ...friendAccount.binds).all<{ name: string; count: number }>(),
+    ).bind(start, ...friendAccount.binds).all<{ name: string | null; count: number }>(),
     count(db,
       `WITH funnel AS (
          SELECT f.ref_code, COUNT(DISTINCT f.id) additions, COUNT(ce.id) conversions
@@ -1310,7 +1322,7 @@ export async function getListStats(db: D1Database, scope: AccountStatsScope): Pr
         `SELECT COUNT(DISTINCT template_id) AS n FROM (
            SELECT template_id FROM scenario_steps WHERE template_id IS NOT NULL
            UNION ALL
-           SELECT template_id FROM auto_replies WHERE template_id IS NOT NULL
+           SELECT template_id FROM auto_replies WHERE template_id IS NOT NULL AND deleted_at IS NULL
          )`,
       );
       // テンプレート由来の短縮URLのクリック率（110）。

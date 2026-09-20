@@ -195,7 +195,7 @@ export async function getSupportMarksWithUsage(
              WHERE j.type = 'text' AND CAST(j.value AS TEXT) = sm.id
           )
         )) AS scenarios,
-       (SELECT COUNT(*) FROM auto_replies a WHERE a.line_account_id = ? AND (EXISTS (
+       (SELECT COUNT(*) FROM auto_replies a WHERE a.line_account_id = ? AND a.deleted_at IS NULL AND (EXISTS (
           SELECT 1 FROM json_tree(CASE WHEN json_valid(a.actions_json)
                                        THEN a.actions_json ELSE 'null' END) j
            WHERE j.type = 'text' AND CAST(j.value AS TEXT) = sm.id

@@ -190,7 +190,6 @@ export default function ScenariosPage() {
   const [stoppedOnly, setStoppedOnly] = useState(false)
   const [createdThisMonthOnly, setCreatedThisMonthOnly] = useState(false)
   const [actionError, setActionError] = useState('')
-  const [creating, setCreating] = useState(false)
   const [folders, setFolders] = useState<Folder[]>([])
   /** 「未分類」の件数。`null` は数えていない（#631、#730）。 */
   const [unfiledCount, setUnfiledCount] = useState<number | null>(null)
@@ -247,37 +246,14 @@ export default function ScenariosPage() {
   const loadScenarios = scenarioList.retry
 
   /**
-   * シナリオを作って、配信方式の選択へ送る。
+   * 配信方式の選択へ送るだけ。**ここでは作らない**（#949 N-055）。
    *
-   * **押した時点で作る。** 設計の次の画面に「◯◯を作成しました。続けて
-   * 配信方式を選んでください」と出ているので、そこへ着く前に行が要る。
-   * 名前を聞くモーダルは挟まない（設計にその画面が無い）。
-   *
-   * 名前と開始のきっかけは、この先の編集画面（設計③）で決める。
-   * 配信方式は暫定で「時刻で指定」にしておく。設計でおすすめになっている
-   * 方で、次の画面で選び直せる（通がまだ0なので変えられる）。
+   * 以前は押した時点で空のシナリオ行を作り、方式選択や1通目の設定を
+   * 放り出されると名前も通も無い行が一覧に残った。作るのは方式を
+   * 選んで確定したとき。放り出しても一覧に何も残らない。
    */
-  const handleCreate = async () => {
-    if (creating) return
-    setCreating(true)
-    setActionError('')
-    const res = await api.scenarios.create({
-      // 仮の名前。3段目で必ず聞くが、そこを飛ばした人のぶんが一覧で
-      // 区別できるように日付を足す。
-      name: `新しいシナリオ ${new Date().toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric' })}`,
-      description: null,
-      triggerType: 'friend_add',
-      triggerTagId: null,
-      lineAccountId: selectedAccountId,
-      isActive: true,
-      deliveryMode: 'absolute_time',
-    })
-    if (res.success) {
-      router.push(`/scenarios/mode?id=${res.data.id}`)
-    } else {
-      setActionError('シナリオを作成できませんでした。状態を読み直してから、もう一度お試しください。')
-      setCreating(false)
-    }
+  const handleCreate = () => {
+    router.push('/scenarios/mode')
   }
 
   /**
@@ -344,6 +320,47 @@ export default function ScenariosPage() {
       setActionError('フォルダを変更できませんでした。状態を読み直してから、もう一度お試しください。')
     }
   }
+
+  /** 畳んだ帯に出す、いま選んでいるフォルダ名（U027）。 */
+  const activeFolderLabel =
+    folderFilter === ''
+      ? 'すべて'
+      : folderFilter === UNFILED
+        ? '未分類'
+        : folders.find((f) => f.id === folderFilter)?.name ?? 'フォルダ'
+
+  /*
+   * フォルダの帯はスマホで畳むため2か所へ出す（U027）。中身は同じなので、
+   * 要素を1つ作って使い回す。
+   */
+  const folderPanel = (
+    <FolderPanel
+      total={`${scenarioList.total} 件`}
+      activeId={folderFilter}
+      onSelect={setFolderFilter}
+      onAddFolder={() => setFolderDialogOpen(true)}
+      rows={[
+        { id: '', label: 'すべて', count: scenarioList.total },
+        ...folders.map((f) => ({
+          id: f.id,
+          label: f.name,
+          // #631: フォルダ件数はAPI(itemCount)をそのまま出す。現在ページの
+          // 行だけを数えるフォールバックは、ページングで実数と食い違うため廃止。
+          count: f.itemCount ?? null,
+          color: f.color,
+        })),
+        {
+          id: UNFILED,
+          label: '未分類',
+          count: unfiledCount,
+        },
+      ]}
+    >
+      <p className="text-ink-faint text-xs leading-relaxed">
+        フォルダを消しても、入っていたシナリオは未分類として残ります。
+      </p>
+    </FolderPanel>
+  )
 
   const handleDelete = async (id: string) => {
     try {
@@ -446,11 +463,10 @@ export default function ScenariosPage() {
       <div data-design="Body">
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <button
-          onClick={() => void handleCreate()}
-          disabled={creating}
+          onClick={handleCreate}
           className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control px-4 py-2 text-sm font-medium transition-colors disabled:opacity-50"
         >
-          {creating ? '作成中…' : '＋ シナリオを作成'}
+          ＋ シナリオを作成
         </button>
       </div>
       {/*
@@ -459,32 +475,20 @@ export default function ScenariosPage() {
         なったらここに並ぶ。
       */}
       <div style={FOLDER_RAIL_STYLE} className="grid gap-4 lg:grid-cols-[var(--folder-rail-width)_minmax(0,1fr)]">
-        <FolderPanel
-          total={`${scenarioList.total} 件`}
-          activeId={folderFilter}
-          onSelect={setFolderFilter}
-          onAddFolder={() => setFolderDialogOpen(true)}
-          rows={[
-            { id: '', label: 'すべて', count: scenarioList.total },
-            ...folders.map((f) => ({
-              id: f.id,
-              label: f.name,
-              // #631: フォルダ件数はAPI(itemCount)をそのまま出す。現在ページの
-              // 行だけを数えるフォールバックは、ページングで実数と食い違うため廃止。
-              count: f.itemCount ?? null,
-              color: f.color,
-            })),
-            {
-              id: UNFILED,
-              label: '未分類',
-              count: unfiledCount,
-            },
-          ]}
-        >
-          <p className="text-ink-faint text-xs leading-relaxed">
-            フォルダを消しても、入っていたシナリオは未分類として残ります。
-          </p>
-        </FolderPanel>
+        {/*
+          スマホではフォルダを畳む（U027）。開いたまま置くと、フォルダが
+          増えたとき検索とシナリオ行まで長く送ることになり、390px では
+          領域が右へはみ出していた。開閉は <details> に任せ、PCでは
+          今までどおり左の帯へ出す。
+        */}
+        <details className="lg:hidden">
+          <summary className="bg-canvas border-hairline rounded-card text-ink-secondary cursor-pointer list-none border px-4 py-3 text-sm">
+            フォルダ：{activeFolderLabel}
+            <span className="text-ink-faint ml-2 text-xs">タップで開く</span>
+          </summary>
+          <div className="mt-2">{folderPanel}</div>
+        </details>
+        <div className="hidden lg:block">{folderPanel}</div>
 
         <div>
       <ListToolbar

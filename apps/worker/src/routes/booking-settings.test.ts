@@ -580,6 +580,86 @@ describe('店舗共通の予約設定API', () => {
     expect(hidden.status).toBe(404);
   });
 
+  test('例外日は版付きで削除し、古い版は409、別店舗IDは404 (#953 E-09)', async () => {
+    const { app, env } = makeApp(db);
+
+    // 版を送らない削除は受け付けない（読み違えたまま消せないようにする）。
+    const missingVersion = await app.request(
+      '/api/booking/admin/exceptions/exception-a?account_id=account-a',
+      { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) },
+      env,
+    );
+    expect(missingVersion.status).toBe(400);
+
+    // 先に別の変更が入った版で消そうとすると 409 で止まる。
+    const conflict = await app.request(
+      '/api/booking/admin/exceptions/exception-a?account_id=account-a',
+      {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ expectedVersion: 99 }),
+      },
+      env,
+    );
+    expect(conflict.status).toBe(409);
+    await expect(conflict.json()).resolves.toMatchObject({
+      code: 'version_conflict', data: { currentVersion: 1 },
+    });
+
+    // 別アカウントのIDは存在自体を隠す。
+    const hidden = await app.request(
+      '/api/booking/admin/exceptions/exception-a?account_id=account-b',
+      {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ expectedVersion: 1 }),
+      },
+      env,
+    );
+    expect(hidden.status).toBe(404);
+
+    const deleted = await app.request(
+      '/api/booking/admin/exceptions/exception-a?account_id=account-a',
+      {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ expectedVersion: 1 }),
+      },
+      env,
+    );
+    expect(deleted.status).toBe(200);
+    await expect(deleted.json()).resolves.toMatchObject({ data: { id: 'exception-a' } });
+
+    const listed = await app.request('/api/booking/admin/exceptions?account_id=account-a', {}, env);
+    await expect(listed.json()).resolves.toMatchObject({ data: { items: [] } });
+
+    // 消えたIDをもう一度消しても404。
+    const gone = await app.request(
+      '/api/booking/admin/exceptions/exception-a?account_id=account-a',
+      {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ expectedVersion: 1 }),
+      },
+      env,
+    );
+    expect(gone.status).toBe(404);
+  });
+
+  test('スタッフは例外日を削除できない (#953 E-09)', async () => {
+    const { app, env } = makeApp(db, 'staff');
+    const res = await app.request(
+      '/api/booking/admin/exceptions/exception-a?account_id=account-a',
+      {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ expectedVersion: 1 }),
+      },
+      env,
+    );
+    expect(res.status).toBe(403);
+  });
+
   test('スタッフは例外日を変更できない', async () => {
     const { app, env } = makeApp(db, 'staff');
     const res = await app.request(
