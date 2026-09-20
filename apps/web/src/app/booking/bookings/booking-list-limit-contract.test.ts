@@ -14,7 +14,10 @@ describe('予約管理の一覧上限', () => {
   })
 
   it('詳細は一覧全件から探さず単票APIを使う', () => {
-    expect(DETAIL).toContain('bookingApi.getBooking(selectedAccountId, id)')
+    // DEEP-18: 取得は「要求時のアカウント×予約ID」で固定し、
+    // 世代が古い応答は画面へ反映しない。
+    expect(DETAIL).toContain('bookingApi.getBooking(accountId, bookingId)')
+    expect(DETAIL).toContain('loadGeneration.current !== generation')
     expect(DETAIL).not.toContain("bookingApi.listRequests(selectedAccountId, 'all')")
   })
 
