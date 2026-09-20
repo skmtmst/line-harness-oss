@@ -357,7 +357,13 @@ function FolderList({ groups, items, countsKnown, active, onSelect, onChanged }:
         ]} /> : null}</div>
       })}</nav>
       {menuError ? <Notice className="mx-2 mb-2" tone="error" message={menuError} onClose={() => setMenuError('')} /> : null}
-      <p className="border-t border-hairline px-4 py-3 text-[11px] leading-5 text-ink-faint">フォルダを削除しても、中のタグは未分類として残ります。</p>
+      {/*
+        母集団の説明（#981 A04-02）。件数は一覧と同じものを数える：
+        選択中アカウントのタグで、保管済み（archived）も含む。
+        「保管済み」の印が付いた行が一覧に残るため、それを除くと
+        フォルダの内訳と合計が合わなくなる。
+      */}
+      <p className="border-t border-hairline px-4 py-3 text-[11px] leading-5 text-ink-faint">フォルダを削除しても、中のタグは未分類として残ります。件数には保管済みのタグも含みます。</p>
       <ConfirmDialog
         open={Boolean(deleteGroup)}
         title={deleteGroup ? `「${deleteGroup.name}」を削除しますか？` : 'フォルダを削除しますか？'}
@@ -661,6 +667,23 @@ export default function TagsPageV4({
   }, [fixture, accountId])
   useEffect(() => { void load() }, [load])
 
+  /*
+   * アカウントを切り替えたら、前のアカウントのフォルダ選択と件数を残さない
+   * （シナリオ一覧のリセットと同じ、#981 A04-02）。
+   *
+   * フォルダはアカウントごとのため、選択を残すと新しいアカウントの一覧が
+   * 存在しないフォルダIDで絞られて「条件に合うタグはありません」だけが出る。
+   * 行とフォルダも空に戻す。残すと再取得が終わるまでのあいだ、
+   * 前のアカウントの名前と並びが出続ける。
+   */
+  useEffect(() => {
+    if (fixture) return
+    setItems([])
+    setGroups([])
+    setFolder('')
+    setPage(1)
+  }, [fixture, accountId])
+
   const filtered = useMemo(() => items.filter((tag) => {
     if (query && !tag.name.toLowerCase().includes(query.toLowerCase())) return false
     if (folder === UNGROUPED && tag.groupId) return false
@@ -688,10 +711,18 @@ export default function TagsPageV4({
   useEffect(() => setPage(1), [query, folder, usageFilter, sourceFilter, quick, pageSize])
 
   /**
+   * アカウント切替直後の1フレーム。`load` の effect が走る前は
+   * `loadRequestRef` がまだ前のアカウントを指しているため、status が
+   * 'ready' のまま前のアカウントの行と件数が出てしまう。ref が追いつく
+   * まで「未取得」として扱う（#981、シナリオの activeAccountRef と同じ考え方）。
+   */
+  const staleAccount = !fixture && loadRequestRef.current.accountId !== accountId
+
+  /**
    * 中身を出してよいか。**読み込み中・失敗・権限不足のあいだは数を出さない。**
    * 0件と出すと「登録したものが消えた」ように見える。`—` に留める。
    */
-  const ready = status === 'ready'
+  const ready = status === 'ready' && !staleAccount
 
   /*
     整理候補の数。**未取得は `null`（画面では `—`）、取得できて0件は `0`。**
@@ -829,13 +860,22 @@ export default function TagsPageV4({
         */}
         <div data-design="KPIs">
         <ListKpis
+          // #981 A04-02: 一覧・フォルダ帯と同じアカウント範囲で数える
+          // （シナリオの NEXT-26 と同じ）。未選択＝全アカウント表示は未指定。
+          accountId={accountId ?? undefined}
           titles={['タグ数', '付与済み友だち', '今月の付与', '整理候補']}
           build={(stats) => [
             {
               title: 'タグ数',
-              value: stats.tags.total,
+              /*
+               * `stats.tags.total` はテナント全体の件数で、選択中の
+               * アカウント範囲を見ない（/api/list-stats の tags.total は
+               * スコープ無しの COUNT(*)）。フォルダ帯の「すべて」と同じ
+               * 母集団にそろえるため、一覧そのものの件数を使う（#981）。
+               * 未取得は `—`、0件は `0件`。
+               */
+              value: ready ? items.length : null,
               unit: '件',
-              // 未取得は `—`、取得できて0件なら `0件`。
               detail: `未使用 ${unusedCount === null ? '—' : `${unusedCount}件`}`,
             },
             { title: '付与済み友だち', value: stats.tags.taggedFriends, unit: '人', detail: '1つ以上付与' },
@@ -921,7 +961,7 @@ export default function TagsPageV4({
                     `visible.length === 0` だけを見て「ありません」と出すと、
                     読み込みに失敗したときも同じ文が出る（PR #216 と同じ壊れ方）。
                   */}
-                  {status === 'loading' ? (
+                  {status === 'loading' || staleAccount ? (
                     <tr><td colSpan={10} className="p-0"><ListState kind="loading" /></td></tr>
                   ) : status === 'forbidden' ? (
                     <tr><td colSpan={10} className="p-0"><ListState kind="forbidden" description="タグを見るには権限が要ります。オーナーか管理者に追加を依頼してください。" /></td></tr>

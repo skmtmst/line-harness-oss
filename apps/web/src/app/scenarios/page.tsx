@@ -383,6 +383,23 @@ export default function ScenariosPage() {
     }
   }
 
+  /*
+   * 「すべて」とフォルダ内訳の母集団の差（#981 A05-02）。
+   *
+   * アカウントを1つ選んでいるとき、一覧（＝「すべて」の母集団）には
+   * 全アカウントに共通で適用されるシナリオ（line_account_id IS NULL）も
+   * 出るが、フォルダAPIの件数はそのアカウントの行だけを数える（#730）。
+   * 共通ぶんがあれば、ずれではなく定義の違いとして画面に書く。
+   * 件数が1つでも取れていないときは差を推測しない（0とみなして黙る）。
+   */
+  const folderedTotal = folders.every((f) => f.itemCount !== undefined)
+    ? folders.reduce((sum, f) => sum + (f.itemCount ?? 0), 0)
+    : null
+  const sharedScenarioCount =
+    overallTotal !== null && unfiledCount !== null && folderedTotal !== null
+      ? Math.max(0, overallTotal - folderedTotal - unfiledCount)
+      : 0
+
   /** 畳んだ帯に出す、いま選んでいるフォルダ名（U027）。 */
   const activeFolderLabel =
     folderFilter === ''
@@ -427,6 +444,16 @@ export default function ScenariosPage() {
       <p className="text-ink-faint text-xs leading-relaxed">
         フォルダを消しても、入っていたシナリオは未分類として残ります。
       </p>
+      {/*
+        #981 A05-02: 「すべて」（一覧と同じ母集団）には全アカウント共通の
+        シナリオも入るが、フォルダ別の件数と「未分類」はこのアカウントの
+        ものだけを数える。差があるときだけ理由を書く。
+      */}
+      {sharedScenarioCount > 0 ? (
+        <p className="text-ink-faint text-xs leading-relaxed">
+          全アカウントに共通で適用されるシナリオが{sharedScenarioCount}件あります。「すべて」の件数には含まれますが、フォルダ別の件数と「未分類」には含まれません。
+        </p>
+      ) : null}
     </FolderPanel>
   )
 
@@ -465,7 +492,19 @@ export default function ScenariosPage() {
         accountId={selectedAccountId ?? undefined}
         titles={['シナリオ', '購読中', '読了済', '今週の配信']}
         build={(s) => [
-            { title: 'シナリオ', value: s.scenarios.total, unit: '件', detail: `稼働中 ${s.scenarios.active}` },
+            {
+              title: 'シナリオ',
+              /*
+               * #981 A05-02: 「すべて」と同じ母集団で数える。
+               * `s.scenarios.total` は全アカウント共通のシナリオ
+               * （line_account_id IS NULL）を含まないため、アカウントを
+               * 選んだ表示では一覧・「すべて」とずれる。一覧と同じ口で
+               * 数えた overallTotal を使い、未取得は `—`。
+               */
+              value: overallTotal,
+              unit: '件',
+              detail: `稼働中 ${s.scenarios.active}${sharedScenarioCount > 0 ? `・共通 ${sharedScenarioCount}件を含む` : ''}`,
+            },
             { title: '購読中', value: s.scenarios.subscribers, unit: '人', detail: '現在配信中・重複を含む' },
             {
               title: '読了済',
