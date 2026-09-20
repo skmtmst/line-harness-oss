@@ -11,6 +11,8 @@ import StickyBar from '@/components/shared/sticky-bar'
 import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { webinarApi, type WebinarFolder } from '@/lib/api'
+/* 段の並びは編集画面と同じ定義を使う。作る画面と直す画面で段がずれないようにする。 */
+import { STEPS } from '@/app/webinars/edit/edit-steps'
 
 type DeliveryKind = 'on-demand' | 'scheduled'
 
@@ -62,7 +64,11 @@ export default function NewWebinarPage() {
         deliveryKind: deliveryKind === 'on-demand' ? 'on_demand' : 'scheduled',
         viewingCondition: { kind: 'registered', label: '申込者向け' },
       })
-      router.push(next === 'video' ? `/webinars/edit?id=${created.data.id}` : '/webinars')
+      /*
+        動画設定へ進むときは `pane=video` を付ける。付けないと編集画面は
+        先頭の基本設定で開き、選んだはずの段に着かない。
+      */
+      router.push(next === 'video' ? `/webinars/edit?id=${created.data.id}&pane=video` : '/webinars')
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : '下書きを保存できませんでした。もう一度お試しください。')
       setSaving(false)
@@ -82,13 +88,7 @@ export default function NewWebinarPage() {
 
       <StepTrail
         label="ウェビナー作成の進み方"
-        items={[
-          { label: '基本設定', state: 'current' },
-          { label: '動画', state: 'todo' },
-          { label: 'CTA・フォーム', state: 'todo' },
-          { label: '通知', state: 'todo' },
-          { label: '確認', state: 'todo' },
-        ]}
+        items={STEPS.map((step, index) => ({ label: step.title, state: index === 0 ? 'current' as const : 'todo' as const }))}
       />
 
       {error ? (

@@ -1,0 +1,467 @@
+// @vitest-environment happy-dom
+import React, { act } from 'react'
+import { createRoot, type Root } from 'react-dom/client'
+import { fireEvent } from '@testing-library/react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import EditWebinarPage from './page'
+
+/**
+ * Issue #1002 DETAIL-03/04/05/06/07 の回帰試験。
+ *
+ * 本物のReactで本物の `EditWebinarPage` を mount し、`api.ts` も実物を通す。
+ * 差し替えるのは通信(fetch)・アカウント文脈・ルーティングだけ。
+ *
+ * - DETAIL-04: 段を往復しても未保存の入力が消えない。保存してから段が変わり、
+ *   保存に失敗したら入力も今の段も残る。固定バーの「下書き保存」は実際に保存する。
+ * - DETAIL-05: 「公開ページを見る」「テスト送信」は実際の口へ繋がるか、
+ *   まだ使えない理由を文字で出す。押せるのに何も起きない形にしない。
+ * - DETAIL-06: 参加者一覧は nextCursor を辿って最後の1人まで読める。
+ * - DETAIL-07: コメントの失敗・遅延で参加者一覧が消えない。
+ */
+
+const fixture = vi.hoisted(() => ({
+  params: new URLSearchParams('id=webinar-1'),
+  push: vi.fn(),
+  accountId: 'account-a',
+}))
+
+const net = vi.hoisted(() => ({
+  calls: [] as Array<{ path: string; method: string }>,
+  /** PUT /api/webinars/:id を失敗させる。 */
+  updateFail: false,
+  /** user-comments を 500 にする。 */
+  commentsFail: false,
+  /** 参加者の総数。カーソルは offset として振る舞う。 */
+  participantTotal: 1,
+  /** 参加者の1頁あたり（limit 指定がそのまま効く）。 */
+  webinarStatus: 'draft' as 'draft' | 'active',
+}))
+
+vi.mock('next/link', () => ({
+  default: ({ children, ...props }: React.ComponentProps<'a'>) => <a {...props}>{children}</a>,
+}))
+vi.mock('next/navigation', () => ({
+  useSearchParams: () => fixture.params,
+  useRouter: () => ({ push: fixture.push }),
+}))
+vi.mock('@/contexts/account-context', () => ({
+  useAccount: () => ({ selectedAccountId: fixture.accountId, accounts: [{ id: fixture.accountId, liffId: 'liff' }], loading: false }),
+}))
+vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => undefined }))
+
+/*
+  通知の子タブは別口を持つのでここでは形だけにする。
+  親の固定バーと同じ契約（onLoaded / registerSave / onDirtyChange）を守る。
+*/
+vi.mock('@/components/webinars/webinar-notifications', () => ({
+  default: function NotificationsPaneMock({ onLoaded, registerSave, onDirtyChange }: {
+    onLoaded?: (data: { settings: unknown; overview: unknown } | null) => void
+    registerSave?: (save: (() => Promise<boolean>) | null) => void
+    onDirtyChange?: (dirty: boolean) => void
+  }) {
+    React.useEffect(() => {
+      onLoaded?.({ settings: { registrationEnabled: false, dayBeforeEnabled: false }, overview: null })
+      registerSave?.(() => Promise.resolve(true))
+      onDirtyChange?.(false)
+      return () => registerSave?.(null)
+    }, [onLoaded, registerSave, onDirtyChange])
+    return <div>通知設定</div>
+  },
+}))
+
+/* 確認ダイアログは枠だけにして、確認→実行の流れをそのまま試す。 */
+vi.mock('@/components/shared/confirm-dialog', () => ({
+  default: ({ open, confirmLabel, onConfirm, onCancel, children }: {
+    open: boolean
+    confirmLabel?: string
+    onConfirm?: () => void
+    onCancel: () => void
+    children?: React.ReactNode
+  }) => (open
+    ? <div role="dialog"><div>{children}</div><button type="button" onClick={onConfirm}>{confirmLabel ?? 'OK'}</button><button type="button" onClick={onCancel}>閉じる</button></div>
+    : null),
+}))
+
+vi.mock('@/components/shared/select-field', () => ({
+  default: ({ options, ...props }: React.ComponentProps<'select'> & { options: Array<{ value: string; label: string }> }) => (
+    <select {...props}>{options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select>
+  ),
+}))
+vi.mock('@/components/shared/sticky-bar', () => ({
+  default: ({ actions }: { actions: React.ReactNode }) => <div>{actions}</div>,
+}))
+
+const webinar = {
+  id: 'webinar-1', accountId: 'account-a', title: '採用ウェビナー', slug: 'recruit', status: 'draft' as const,
+  videoPrefix: 'videos/recruit', durationSeconds: 600, schedule: [{ type: 'daily' as const, time: '20:00' }],
+  cta: { label: '相談する', url: 'https://example.test', showAtSeconds: 60 },
+  tagOnAttend: null, tagOnCtaClick: null, createdAt: '2026-09-01T00:00:00Z', updatedAt: '2026-09-01T00:00:00Z',
+}
+
+const editor = {
+  version: 3, deliveryKind: 'on_demand' as const, viewingCondition: { kind: 'all', label: '全員' },
+  publicDescription: '説明', registrationFormId: null, notificationMessages: {}, notificationTest: null,
+  actionPolicy: { templateBody: '', missingResultPolicy: 'escalate' as const },
+  publicPage: { liffId: 'liff', url: 'https://liff.example.test/preview', unavailableReason: null, description: '', test: null, form: null },
+  publication: { status: 'draft' as const, draftVersion: 3, publishedVersion: null, publishedAt: null },
+  monitoring: { notificationFailures: 0, duplicateRegistrations: 0, viewSegmentFailures: 0, actionFailures: 0 },
+}
+
+const analyticsData = {
+  summary: { reservations: 1, viewers: 1, registeredAndJoined: 1, watched5m: 0, watched15m: 0, completed: 0, avgWatchedSeconds: 900, ctaClicks: 1, formSubmissions: 0 },
+  daily: [], sessions: [], dropoff: [], viewSegments: [], participants: [],
+  measurement: { state: 'available' as const, reason: null },
+  formFunnel: { ctaImpressions: 0, ctaClicks: 0, formOpens: 0, formStarts: 0, submitAttempts: 0, submitSuccesses: 0, submitErrors: 0, fieldCompletions: [] },
+}
+
+function participantItem(index: number) {
+  return {
+    friendId: `friend-${index}`, friendName: `参加者 ${index}`, pictureUrl: null, sessions: 1,
+    firstJoinedAt: '2026-09-10T20:00:00Z', latestJoinedAt: '2026-09-10T20:00:00Z',
+    maxWatchedSeconds: 900, ctaClickedAt: null, registered: true,
+    formSubmittedAt: null, actionStatus: null, errorDetail: null, staffIntegrationStatus: 'pending',
+  }
+}
+
+const json = (data: unknown, status = 200) =>
+  new Response(JSON.stringify({ success: status < 400, data }), { status, headers: { 'Content-Type': 'application/json' } })
+
+/** 通信そのものを差し替える。api・fetchApiは実物を通す。 */
+function installFetch() {
+  vi.stubGlobal('fetch', async (input: unknown, init?: RequestInit) => {
+    const raw = typeof input === 'string' ? input : String(input)
+    const url = new URL(raw.startsWith('http') ? raw : `https://test.local${raw}`)
+    const path = url.pathname + url.search
+    const method = init?.method ?? 'GET'
+    net.calls.push({ path, method })
+    if (path.includes('/api/media')) return json({ items: [], nextCursor: null })
+    if (path.includes('/api/webinars/webinar-1/participants')) {
+      /* カーソルは offset。limit 指定があればその数だけ返す。 */
+      const offset = Number(url.searchParams.get('cursor') ?? '0')
+      const limit = Number(url.searchParams.get('limit') ?? '50')
+      const items = Array.from(
+        { length: Math.max(0, Math.min(limit, net.participantTotal - offset)) },
+        (_, i) => participantItem(offset + i + 1),
+      )
+      const nextOffset = offset + items.length
+      return json({ items, nextCursor: nextOffset < net.participantTotal ? String(nextOffset) : null })
+    }
+    if (path.endsWith('/api/webinars/webinar-1/analytics')) return json(analyticsData)
+    if (path.endsWith('/api/webinars/webinar-1/user-comments')) {
+      if (net.commentsFail) return new Response(JSON.stringify({ success: false, error: 'comments unavailable' }), { status: 500 })
+      return json([])
+    }
+    if (path.endsWith('/api/webinars/webinar-1/notifications/test')) return json({ sent: 2, failed: 0 })
+    if (path.endsWith('/api/webinars/webinar-1/editor')) return json(editor)
+    if (path.endsWith('/api/webinars/webinar-1')) {
+      if (method === 'PUT') {
+        if (net.updateFail) return new Response(JSON.stringify({ success: false, error: 'save failed' }), { status: 500 })
+        const body = init?.body ? JSON.parse(String(init.body)) as Partial<typeof webinar> : {}
+        return json({ ...webinar, ...body, status: net.webinarStatus === 'active' ? 'active' : (body.status ?? webinar.status) })
+      }
+      return json({ ...webinar, status: net.webinarStatus })
+    }
+    return json([])
+  })
+}
+
+let host: HTMLDivElement
+let root: Root
+
+beforeEach(() => {
+  fixture.params = new URLSearchParams('id=webinar-1')
+  fixture.push.mockClear()
+  net.calls.length = 0
+  net.updateFail = false
+  net.commentsFail = false
+  net.participantTotal = 1
+  net.webinarStatus = 'draft'
+  installFetch()
+  ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
+  host = document.createElement('div')
+  document.body.appendChild(host)
+  root = createRoot(host)
+})
+
+afterEach(async () => {
+  await act(async () => { root.unmount() })
+  host.remove()
+  vi.unstubAllGlobals()
+  vi.restoreAllMocks()
+})
+
+async function render() {
+  await act(async () => { root.render(<EditWebinarPage />) })
+}
+
+async function flush() {
+  await act(async () => {
+    for (let i = 0; i < 8; i += 1) await Promise.resolve()
+  })
+}
+
+function buttonByText(label: string): HTMLButtonElement {
+  const button = Array.from(host.querySelectorAll('button')).find((b) => b.textContent?.trim() === label)
+  if (!button) throw new Error(`button not found: ${label}`)
+  return button
+}
+
+function buttonContaining(label: string): HTMLButtonElement {
+  const button = Array.from(host.querySelectorAll('button')).find((b) => b.textContent?.includes(label))
+  if (!button) throw new Error(`button not found: ${label}`)
+  return button
+}
+
+function titleInput(): HTMLInputElement {
+  const input = Array.from(host.querySelectorAll('input')).find((el) => el.value === webinar.title || el.placeholder.includes('定期便'))
+  if (!input) throw new Error('title input not found')
+  return input
+}
+
+function paneWrapper(nodeSelector: string): HTMLElement | null {
+  const node = host.querySelector(nodeSelector)
+  return node?.parentElement ?? null
+}
+
+function paneVisible(nodeSelector: string): boolean {
+  const wrapper = paneWrapper(nodeSelector)
+  return wrapper !== null && !wrapper.hasAttribute('hidden')
+}
+
+const putCalls = () => net.calls.filter((call) => call.method === 'PUT' && call.path === '/api/webinars/webinar-1')
+const participantCalls = () => net.calls.filter((call) => call.path.includes('/participants'))
+
+describe('DETAIL-04 未保存の入力を段の往復で消さない', () => {
+  it('タイトルを直して「保存して動画へ」→ 保存してから動画の段へ進み、戻っても新しいタイトルのまま', async () => {
+    await render()
+    await flush()
+
+    const input = titleInput()
+    await act(async () => { fireEvent.change(input, { target: { value: '変更したタイトル' } }) })
+    await flush()
+
+    /* 固定バーの「下書き保存」は飾りではない。押せて、実際に保存する。 */
+    expect(buttonByText('下書き保存').disabled).toBe(false)
+
+    await act(async () => { buttonContaining('動画へ').click() })
+    await flush()
+
+    expect(putCalls()).toHaveLength(1)
+    expect(paneVisible('div[data-design-node="PV1Vh"]')).toBe(true)
+
+    /* STEP 1 へ戻る。保存済みの新しいタイトルがそのまま残る。 */
+    await act(async () => { buttonContaining('STEP 1').click() })
+    await flush()
+
+    expect(paneVisible('div[data-design-node="PV1Vh"]')).toBe(false)
+    expect(Array.from(host.querySelectorAll('input')).some((el) => el.value === '変更したタイトル')).toBe(true)
+  })
+
+  it('段の自由移動でも未保存の入力は残る（画面を畳まない）', async () => {
+    await render()
+    await flush()
+
+    await act(async () => { fireEvent.change(titleInput(), { target: { value: 'まだ保存していない題名' } }) })
+    await flush()
+
+    /* 保存せず STEP 4（通知）へ。戻ると入力は残っている。 */
+    await act(async () => { buttonContaining('STEP 4').click() })
+    await flush()
+    await act(async () => { buttonContaining('STEP 1').click() })
+    await flush()
+
+    expect(Array.from(host.querySelectorAll('input')).some((el) => el.value === 'まだ保存していない題名')).toBe(true)
+    expect(putCalls()).toHaveLength(0)
+    expect(host.textContent).toContain('保存していない変更があります')
+  })
+
+  it('「下書き保存」はその場で保存して段を変えない', async () => {
+    await render()
+    await flush()
+
+    await act(async () => { fireEvent.change(titleInput(), { target: { value: '下書きで保存する題名' } }) })
+    await act(async () => { buttonByText('下書き保存').click() })
+    await flush()
+
+    expect(putCalls()).toHaveLength(1)
+    /* 段は基本設定のまま。保存できたので未保存の印は消える。 */
+    expect(host.querySelector('div[data-design-node="PV1Vh"]')).toBeNull()
+    expect(Array.from(host.querySelectorAll('input')).some((el) => el.value === '下書きで保存する題名')).toBe(true)
+    expect(host.textContent).not.toContain('保存していない変更があります')
+  })
+
+  it('保存に失敗したら段も入力もそのまま残す', async () => {
+    net.updateFail = true
+    await render()
+    await flush()
+
+    await act(async () => { fireEvent.change(titleInput(), { target: { value: '失敗時に残る題名' } }) })
+    await flush()
+    await act(async () => { buttonContaining('動画へ').click() })
+    await flush()
+
+    expect(putCalls()).toHaveLength(1)
+    /* 動画の段へは進まず、入力は消えない。 */
+    expect(host.querySelector('div[data-design-node="PV1Vh"]')).toBeNull()
+    expect(Array.from(host.querySelectorAll('input')).some((el) => el.value === '失敗時に残る題名')).toBe(true)
+    expect(host.textContent).toContain('保存できませんでした')
+  })
+})
+
+describe('DETAIL-05 無反応のボタンを残さない', () => {
+  it('動画の段: 非公開では「公開ページを見る」を押せない形にして理由を出す', async () => {
+    fixture.params = new URLSearchParams('id=webinar-1&pane=video')
+    await render()
+    await flush()
+
+    const button = buttonByText('公開ページを見る')
+    expect(button.disabled).toBe(true)
+    expect(host.textContent).toContain('公開すると、友だちが見るページを確認できます。')
+  })
+
+  it('動画の段: 公開中なら「公開ページを見る」は公開URLへのリンクになる', async () => {
+    net.webinarStatus = 'active'
+    fixture.params = new URLSearchParams('id=webinar-1&pane=video')
+    await render()
+    await flush()
+
+    const link = Array.from(host.querySelectorAll('a')).find((a) => a.textContent?.includes('公開ページを見る'))
+    expect(link?.getAttribute('href')).toBe('https://liff.example.test/preview')
+  })
+
+  it('通知の段: 「テスト送信」は確認を挟んで実際にテスト送信の口を呼ぶ', async () => {
+    fixture.params = new URLSearchParams('id=webinar-1&pane=notifications')
+    await render()
+    await flush()
+
+    await act(async () => { buttonByText('テスト送信').click() })
+    await flush()
+    /* 送信前に相手と文面を確認する。押した瞬間に送らない。 */
+    await act(async () => { buttonByText('テスト送信する').click() })
+    await flush()
+
+    expect(net.calls.some((call) => call.method === 'POST' && call.path.endsWith('/notifications/test'))).toBe(true)
+    expect(host.textContent).toContain('テスト送信しました。成功 2件・失敗 0件')
+  })
+
+  it('通知の段: 非公開では「公開ページを見る」を押せない形にして理由を出す', async () => {
+    fixture.params = new URLSearchParams('id=webinar-1&pane=notifications')
+    await render()
+    await flush()
+
+    const button = buttonByText('公開ページを見る')
+    expect(button.disabled).toBe(true)
+    expect(host.textContent).toContain('公開すると、友だちが見るページを確認できます。')
+  })
+})
+
+describe('DETAIL-06 参加者一覧を最後の1人まで読める', () => {
+  async function openParticipants() {
+    fixture.params = new URLSearchParams('id=webinar-1&pane=participants')
+    await render()
+    await flush()
+  }
+
+  async function loadAllPages() {
+    for (let i = 0; i < 20; i += 1) {
+      const more = Array.from(host.querySelectorAll('button')).find((b) => b.textContent?.trim() === '続きを読み込む')
+      if (!more) return
+      await act(async () => { more.click() })
+      await flush()
+    }
+    throw new Error('ページ送りが終わりませんでした')
+  }
+
+  function renderedNames(): string[] {
+    return Array.from(new Set(host.textContent?.match(/参加者 \d+/g) ?? []))
+  }
+
+  it.each([9, 50])('%i人: 1頁で全員表示され、最後の人まで届く', async (total) => {
+    net.participantTotal = total
+    await openParticipants()
+
+    expect(host.textContent).toContain(`参加者 ${total}`)
+    expect(renderedNames()).toHaveLength(total)
+    /* 続きが無いときは「続きを読み込む」を出さない。 */
+    expect(Array.from(host.querySelectorAll('button')).some((b) => b.textContent?.trim() === '続きを読み込む')).toBe(false)
+  })
+
+  it('201人: nextCursor を辿って全頁読み、201人目まで届く（重複・欠落なし）', async () => {
+    net.participantTotal = 201
+    await openParticipants()
+
+    expect(host.textContent).toContain('参加者 50')
+    expect(host.textContent).not.toContain('参加者 51')
+
+    await loadAllPages()
+
+    expect(host.textContent).toContain('参加者 201')
+    expect(renderedNames()).toHaveLength(201)
+    /* 初回 + カーソル4回 = 5頁。limit と cursor が実際に付く。 */
+    const calls = participantCalls()
+    expect(calls).toHaveLength(5)
+    expect(calls[0].path).toContain('limit=50')
+    expect(calls[1].path).toContain('cursor=50')
+    expect(calls[4].path).toContain('cursor=200')
+  })
+})
+
+describe('DETAIL-07 コメントと参加者の読み込みを分ける', () => {
+  it('コメントの口が500でも参加者一覧は表示され、コメントは取りに行かない', async () => {
+    net.commentsFail = true
+    net.participantTotal = 9
+    fixture.params = new URLSearchParams('id=webinar-1&pane=participants')
+    await render()
+    await flush()
+
+    /* 参加者管理の面ではコメントを取らない。失敗の有無に関わらず一覧は出る。 */
+    expect(net.calls.some((call) => call.path.includes('user-comments'))).toBe(false)
+    expect(host.textContent).toContain('参加者 1')
+    expect(host.textContent).toContain('参加者 9')
+    expect(host.textContent).not.toContain('分析データを読み込めませんでした')
+  })
+
+  it('参加者の口が失敗しても集計側の段はそのまま、失敗部分だけ再読込できる', async () => {
+    let failOnce = true
+    const baseParticipants = net.participantTotal
+    void baseParticipants
+    vi.stubGlobal('fetch', async (input: unknown, init?: RequestInit) => {
+      const raw = typeof input === 'string' ? input : String(input)
+      const url = new URL(raw.startsWith('http') ? raw : `https://test.local${raw}`)
+      const path = url.pathname + url.search
+      const method = init?.method ?? 'GET'
+      net.calls.push({ path, method })
+      if (path.includes('/api/webinars/webinar-1/participants') && failOnce) {
+        failOnce = false
+        return new Response(JSON.stringify({ success: false, error: 'temporary' }), { status: 500 })
+      }
+      if (path.includes('/api/webinars/webinar-1/participants')) {
+        const offset = Number(url.searchParams.get('cursor') ?? '0')
+        const limit = Number(url.searchParams.get('limit') ?? '50')
+        const items = Array.from({ length: Math.max(0, Math.min(limit, 9 - offset)) }, (_, i) => participantItem(offset + i + 1))
+        const nextOffset = offset + items.length
+        return json({ items, nextCursor: nextOffset < 9 ? String(nextOffset) : null })
+      }
+      if (path.includes('/api/media')) return json({ items: [], nextCursor: null })
+      if (path.endsWith('/api/webinars/webinar-1/analytics')) return json(analyticsData)
+      if (path.endsWith('/api/webinars/webinar-1/user-comments')) return json([])
+      if (path.endsWith('/api/webinars/webinar-1/editor')) return json(editor)
+      if (path.endsWith('/api/webinars/webinar-1')) return json({ ...webinar, status: net.webinarStatus })
+      return json([])
+    })
+    net.participantTotal = 9
+    fixture.params = new URLSearchParams('id=webinar-1&pane=participants')
+    await render()
+    await flush()
+
+    expect(host.textContent).toContain('参加者一覧を読み込めませんでした。')
+    /* 失敗したのは参加者だけ。集計のカードは出続ける。 */
+    expect(host.textContent).toContain('申込')
+
+    await act(async () => { buttonByText('もう一度読み込む').click() })
+    await flush()
+
+    expect(host.textContent).toContain('参加者 1')
+    expect(host.textContent).toContain('参加者 9')
+  })
+})
