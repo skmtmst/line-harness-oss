@@ -4,7 +4,7 @@ import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'rea
 import type { ReactNode } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import { api, fetchApi } from '@/lib/api'
+import { ApiError, api, fetchApi } from '@/lib/api'
 import KpiCard from '@/components/shared/kpi-card'
 import { useAccount } from '@/contexts/account-context'
 import type { EntryRoute, EntryRouteGenre, TrafficPool, Scenario, Tag } from '@line-crm/shared'
@@ -22,6 +22,7 @@ import SiteScript from '@/components/inflow-links/site-script'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import Button from '@/components/shared/button'
 import Chip from '@/components/shared/chip'
+import Dialog from '@/components/shared/dialog'
 import FilterChip from '@/components/shared/filter-chip'
 import ListState from '@/components/shared/list-state'
 import FolderPanel, { FOLDER_RAIL_STYLE } from '@/components/shared/folder-panel'
@@ -190,6 +191,13 @@ function InflowLinksPageInner({
   const [poolMembers, setPoolMembers] = useState<Record<string, Set<string>>>({})
   // #514-5: 同じ取得から作るプール別の所属名。編集窓へ渡して取り直しを無くす。
   const [poolMemberNames, setPoolMemberNames] = useState<Record<string, string[]>>({})
+  /*
+    NEXT-21: 「まとめて操作」。表の左のチェックで選んだ登録済み経路へ、
+    件数を確認してから同じ操作を行う。計測専用・未登録の行は
+    entry_routes の口が無いので対象にしない。
+  */
+  const [selectedRouteIds, setSelectedRouteIds] = useState<Set<string>>(() => new Set())
+  const [bulkOpen, setBulkOpen] = useState(false)
 
   const load = async () => {
     const requestGeneration = ++loadRequestRef.current
@@ -229,8 +237,17 @@ function InflowLinksPageInner({
         api.trackedLinks.list().catch(() => ({ success: false, data: null })),
       ])
       if (!isCurrent()) return
-      if (r.success) setRoutes(r.data)
-      else setLoadFailed(true)
+      if (r.success) {
+        setRoutes(r.data)
+        // 消えた経路を「まとめて操作」の対象に残さない。
+        const alive = new Set(r.data.map((route) => route.id))
+        setSelectedRouteIds((current) => {
+          const next = new Set([...current].filter((id) => alive.has(id)))
+          return next.size === current.size ? current : next
+        })
+      } else {
+        setLoadFailed(true)
+      }
       if (genreRes.success) setGenres(genreRes.data)
       if (p.success) setPools(p.data)
       if (s.success) setScenarios(s.data)
@@ -303,6 +320,8 @@ function InflowLinksPageInner({
     setPoolMemberNames({})
     setEditing(null)
     setQrRoute(null)
+    setSelectedRouteIds(new Set())
+    setBulkOpen(false)
     setPage(1)
     void load()
     // サイドバー側でアカウントを切り替えたら、開きっぱなしの「ref 詳細」も
@@ -554,6 +573,13 @@ function InflowLinksPageInner({
   })
   const pageCount = Math.max(1, Math.ceil(sortedRows.length / pageSize))
   const currentRows = sortedRows.slice((page - 1) * pageSize, page * pageSize)
+  /*
+    まとめて操作の対象は、絞り込み済みの行のうち entry_routes に登録が
+    あるものだけ。「計測済」「未登録」の行はこの口では動かせない。
+  */
+  const selectableIds = sortedRows.flatMap((row) => row.entryRouteId ? [row.entryRouteId] : [])
+  const allShownSelected = selectableIds.length > 0 && selectableIds.every((id) => selectedRouteIds.has(id))
+  const selectedRoutes = routes.filter((route) => selectedRouteIds.has(route.id))
   // 絞り込みでページ数が縮んだら、開いているページを最後のページへ寄せる。
   useEffect(() => {
     if (page > pageCount) setPage(pageCount)
@@ -687,7 +713,7 @@ function InflowLinksPageInner({
         ここで発行したURLをいったん通ってもらうことで、はじめて経路が分かります。QRコードも同じURLから作れます。
       </p>
 
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-2"><Button href="/inflow-links/new" variant="primary">＋ 流入リンクをつくる</Button><div className="flex gap-2"><Button onClick={exportCurrentRows} disabled={sortedRows.length === 0}>CSVで書き出す</Button><Button variant="secondary">まとめて操作</Button></div></div>
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-2"><Button href="/inflow-links/new" variant="primary">＋ 流入リンクをつくる</Button><div className="flex gap-2"><Button onClick={exportCurrentRows} disabled={sortedRows.length === 0}>CSVで書き出す</Button><Button variant="secondary" onClick={() => setBulkOpen(true)}>まとめて操作{selectedRouteIds.size > 0 ? `（${selectedRouteIds.size}件選択中）` : ''}</Button></div></div>
 
       <div style={FOLDER_RAIL_STYLE} className="grid gap-5 lg:grid-cols-[var(--folder-rail-width)_minmax(0,1fr)]">
         <FolderPanel
@@ -834,10 +860,11 @@ function InflowLinksPageInner({
         <div className="overflow-hidden rounded-lg border border-hairline bg-canvas">
           <table className="w-full table-fixed text-xs">
             <colgroup>
-              <col className="w-[11%]" />
+              <col className="w-[5%]" />
               <col className="w-[8%]" />
               <col className="w-[8%]" />
-              <col className="w-[14%]" />
+              <col className="w-[8%]" />
+              <col className="w-[12%]" />
               <col className="w-[9%]" />
               <col className="w-[11%]" />
               <col className="w-[9%]" />
@@ -848,6 +875,18 @@ function InflowLinksPageInner({
             </colgroup>
             <thead>
               <TableHeadRow>
+                <Th>
+                  <input
+                    type="checkbox"
+                    aria-label="表示中の登録済み経路をすべて選ぶ"
+                    checked={allShownSelected}
+                    disabled={selectableIds.length === 0}
+                    title={selectableIds.length === 0 ? 'まとめて操作できる登録済みの経路がありません' : undefined}
+                    onChange={(event) => {
+                      setSelectedRouteIds(event.target.checked ? new Set(selectableIds) : new Set())
+                    }}
+                  />
+                </Th>
                 <Th>
                   流入元名
                 </Th>
@@ -900,6 +939,31 @@ function InflowLinksPageInner({
                     refDetail={refDetail}
                     refCode={r.refCode}
                   >
+                    <td className="px-2 py-3" onClick={(e) => e.stopPropagation()}>
+                      {r.entryRouteId ? (
+                        <input
+                          type="checkbox"
+                          aria-label={`${r.name}をまとめて操作の対象にする`}
+                          checked={selectedRouteIds.has(r.entryRouteId)}
+                          onChange={(event) => {
+                            const id = r.entryRouteId!
+                            setSelectedRouteIds((current) => {
+                              const next = new Set(current)
+                              if (event.target.checked) next.add(id)
+                              else next.delete(id)
+                              return next
+                            })
+                          }}
+                        />
+                      ) : (
+                        <span
+                          className="text-ink-faint"
+                          title="まとめて操作は登録済みの流入経路だけに使えます"
+                        >
+                          —
+                        </span>
+                      )}
+                    </td>
                     <td className="px-2 py-3 font-medium text-ink">
                       {r.source === 'entry_route' && r.entryRouteId ? (
                         <Link
@@ -1100,6 +1164,18 @@ function InflowLinksPageInner({
         />
       )}
       {qrRoute && <ReferralQrModal route={qrRoute} onClose={() => setQrRoute(null)} />}
+      {bulkOpen && (
+        <BulkRoutesDialog
+          targets={selectedRoutes}
+          genreOptions={availableGenres.map((genre) => genre.name)}
+          onApplied={(remainingIds) => {
+            // 反映できなかった分だけを選んだ状態に戻す。
+            setSelectedRouteIds(new Set(remainingIds))
+            void load()
+          }}
+          onClose={() => setBulkOpen(false)}
+        />
+      )}
     </div>
   )
 }
@@ -1133,7 +1209,7 @@ function FragmentRow({
       </tr>
       {isExpanded && (
         <tr>
-          <td colSpan={11} className="px-6 py-4 bg-canvas-sunken border-t border-hairline">
+          <td colSpan={12} className="px-6 py-4 bg-canvas-sunken border-t border-hairline">
             {refDetailLoading ? (
               <p className="text-sm text-ink-faint">読み込み中…</p>
             ) : !friends ? (
@@ -1218,6 +1294,216 @@ function ReferralQrModal({
         </div>
       </div>
     </div>
+  )
+}
+
+type BulkRouteAction = 'pause' | 'resume' | 'move'
+
+/**
+ * 「まとめて操作」の窓（NEXT-21）。
+ *
+ * 対象（表のチェックで選んだ登録済み経路）→ できる操作 → 何件に効くか、
+ * の順に見せてから実行する。実行は1件ずつ既存の更新口へ投げ、結果を
+ * 成功・失敗に分けて出す。失敗分だけを残して閉じると、一覧では
+ * 失敗分だけが選ばれた状態に戻る。
+ */
+function BulkRoutesDialog({
+  targets,
+  genreOptions,
+  onApplied,
+  onClose,
+}: {
+  /** entry_routes に登録済みの経路だけが対象。 */
+  targets: EntryRoute[]
+  genreOptions: string[]
+  /** 実行が1回でも終わったら呼ぶ。残った対象のIDを渡す。 */
+  onApplied: (remainingIds: string[]) => void
+  onClose: () => void
+}) {
+  // 失敗した分だけ残して試し直せるよう、対象は窓の中で持ち直す。
+  const [remaining, setRemaining] = useState<EntryRoute[]>(targets)
+  const [action, setAction] = useState<BulkRouteAction | null>(null)
+  const [genre, setGenre] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [result, setResult] = useState<{
+    succeeded: EntryRoute[]
+    failed: Array<{ route: EntryRoute; error: string }>
+  } | null>(null)
+
+  const pauseTargets = remaining.filter((route) => route.isActive)
+  const resumeTargets = remaining.filter((route) => !route.isActive)
+  const moveTargets = remaining.filter((route) => (route.genre ?? '') !== genre)
+  const affected = action === 'pause' ? pauseTargets
+    : action === 'resume' ? resumeTargets
+    : action === 'move' ? moveTargets
+    : []
+
+  const run = async () => {
+    if (!action || busy || affected.length === 0) return
+    setBusy(true)
+    const succeeded: EntryRoute[] = []
+    const failed: Array<{ route: EntryRoute; error: string }> = []
+    for (const route of affected) {
+      try {
+        const res = action === 'move'
+          ? await api.entryRoutes.update(route.id, { genre: genre === '' ? null : genre })
+          : await api.entryRoutes.update(route.id, { isActive: action === 'resume' })
+        if (res.success) succeeded.push(route)
+        else failed.push({ route, error: res.error || '更新できませんでした' })
+      } catch (cause) {
+        failed.push({
+          route,
+          error: cause instanceof ApiError && cause.status === 403
+            ? 'この操作を行う権限がありません'
+            : '通信できませんでした',
+        })
+      }
+    }
+    setResult({ succeeded, failed })
+    setRemaining(failed.map((entry) => entry.route))
+    setAction(null)
+    setBusy(false)
+    onApplied(failed.map((entry) => entry.route.id))
+  }
+
+  const close = () => {
+    if (busy) return
+    onClose()
+  }
+
+  return (
+    <Dialog
+      open
+      title="流入経路をまとめて操作"
+      description="選んだ経路に同じ操作をまとめて行います。実行前に、実際に変わる件数を確認できます。"
+      busy={busy}
+      onCancel={close}
+      footer={(
+        <div className="border-hairline flex flex-wrap items-center justify-end gap-2 border-t pt-4">
+          <Button type="button" onClick={close} disabled={busy}>
+            {result ? '閉じる' : 'キャンセル'}
+          </Button>
+          {!result && action && affected.length > 0 ? (
+            <Button type="button" variant="primary" disabled={busy} onClick={() => { void run() }}>
+              {busy ? '実行中…' : `${affected.length.toLocaleString('ja-JP')}件に実行する`}
+            </Button>
+          ) : null}
+        </div>
+      )}
+    >
+      {result ? (
+        <div className="space-y-3">
+          <p className="text-ink text-sm">
+            {result.succeeded.length.toLocaleString('ja-JP')}件に反映しました。
+          </p>
+          {result.failed.length > 0 ? (
+            <div className="space-y-2">
+              <p className="text-danger text-sm font-semibold">
+                {result.failed.length.toLocaleString('ja-JP')}件は実行できませんでした。
+              </p>
+              <ul className="divide-hairline divide-y rounded-control border border-hairline text-sm">
+                {result.failed.map(({ route, error }) => (
+                  <li key={route.id} className="flex items-center justify-between gap-3 px-3 py-2">
+                    <span className="text-ink min-w-0 truncate">{route.name}</span>
+                    <span className="text-danger shrink-0 text-xs">{error}</span>
+                  </li>
+                ))}
+              </ul>
+              {result.failed.every((entry) => entry.error === 'この操作を行う権限がありません') ? (
+                <p className="text-ink-faint text-xs leading-5">
+                  すべて権限で止められました。統括または管理者に依頼してください。
+                </p>
+              ) : null}
+              <p className="text-ink-faint text-xs leading-5">
+                閉じると、実行できなかった分だけが選ばれた状態に戻ります。
+              </p>
+            </div>
+          ) : null}
+        </div>
+      ) : remaining.length === 0 ? (
+        <p className="text-ink-secondary text-sm leading-6">
+          まとめて操作する流入経路が選ばれていません。
+          一覧の左はしにあるチェックで対象を選んでから、もう一度開いてください。
+          まとめて操作できるのは登録済みの経路だけです（「計測済」「未登録」の行は対象外）。
+        </p>
+      ) : (
+        <div className="space-y-4">
+          <div>
+            <p className="text-ink text-sm font-semibold">
+              対象 {remaining.length.toLocaleString('ja-JP')}件
+            </p>
+            <p className="text-ink-faint mt-1 text-xs leading-5">
+              {remaining.slice(0, 8).map((route) => route.name).join('、')}
+              {remaining.length > 8 ? ` ほか${(remaining.length - 8).toLocaleString('ja-JP')}件` : ''}
+            </p>
+          </div>
+          <fieldset className="space-y-2">
+            <legend className="text-ink mb-1 text-sm font-bold">どの操作をしますか？</legend>
+            {([
+              {
+                value: 'pause' as const,
+                label: 'まとめて停止する',
+                note: `選んだ中の稼働中 ${pauseTargets.length.toLocaleString('ja-JP')}件が対象です。`,
+                count: pauseTargets.length,
+              },
+              {
+                value: 'resume' as const,
+                label: 'まとめて再開する',
+                note: `選んだ中の停止中 ${resumeTargets.length.toLocaleString('ja-JP')}件が対象です。`,
+                count: resumeTargets.length,
+              },
+              {
+                value: 'move' as const,
+                label: 'フォルダをまとめて移動する',
+                note: `選んだ中の ${moveTargets.length.toLocaleString('ja-JP')}件が変わります。`,
+                count: -1,
+              },
+            ]).map((option) => {
+              const unavailable = option.count === 0
+              return (
+                <label
+                  key={option.value}
+                  className={`block rounded-control border p-3 ${unavailable ? 'border-hairline bg-canvas-sunken' : action === option.value ? 'border-accent bg-accent-soft' : 'border-hairline bg-canvas cursor-pointer'}`}
+                >
+                  <span className="flex gap-3">
+                    <input
+                      type="radio"
+                      name="inflow-bulk-action"
+                      value={option.value}
+                      checked={action === option.value}
+                      disabled={unavailable}
+                      onChange={() => setAction(option.value)}
+                    />
+                    <span className="min-w-0 flex-1">
+                      <span className={`block text-sm font-semibold ${unavailable ? 'text-ink-faint' : 'text-ink'}`}>
+                        {option.label}
+                      </span>
+                      <span className="text-ink-faint mt-0.5 block text-xs">
+                        {unavailable ? `${option.note} 今の選択には効きません。` : option.note}
+                      </span>
+                      {option.value === 'move' && action === 'move' ? (
+                        <span className="mt-2 block" onClick={(event) => event.stopPropagation()}>
+                          <Select
+                            aria-label="移動先のフォルダ"
+                            value={genre}
+                            size="full"
+                            onChange={setGenre}
+                            options={[
+                              { value: '', label: '未分類' },
+                              ...genreOptions.map((name) => ({ value: name, label: name })),
+                            ]}
+                          />
+                        </span>
+                      ) : null}
+                    </span>
+                  </span>
+                </label>
+              )
+            })}
+          </fieldset>
+        </div>
+      )}
+    </Dialog>
   )
 }
 
