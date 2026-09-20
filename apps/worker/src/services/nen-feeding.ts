@@ -281,6 +281,18 @@ export function validateFeedingProducts(input: unknown): FeedingProductInput[] {
 export async function saveFeedingProducts(db: D1Database, lineAccountId: string, input: unknown, now: string): Promise<FeedingProductRow[]> {
   const products = validateFeedingProducts(input);
   const existing = await listFeedingProducts(db, lineAccountId);
+  /*
+   * 画面が編集した対象と保存先が一致しているかの最終確認（DEEP-22）。
+   * このアカウントに存在しないidは新規へ黙って変換せず、1件も書き込む前に拒否する。
+   * 別アカウントの商品idが混ざった一覧をそのまま置き換えると、
+   * いまある商品とペットとの関連が消えるため。
+   */
+  const existingIds = new Set(existing.map((row) => row.id));
+  for (const product of products) {
+    if (product.id && !existingIds.has(product.id)) {
+      throw new NenFeedingValidationError('保存する対象が見つかりません。画面を読み直してから保存してください');
+    }
+  }
   const keep = new Set<string>();
   for (const [index, product] of products.entries()) {
     const current = product.id ? existing.find((row) => row.id === product.id) : undefined;

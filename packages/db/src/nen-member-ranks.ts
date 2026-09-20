@@ -204,6 +204,17 @@ export async function saveNenRankSettings(
   validateNenRankInputs(inputs);
   const existing = await getNenRankSettings(db, lineAccountId);
   const byId = new Map(existing.map((row) => [row.id, row]));
+  /*
+   * 画面が編集した対象と保存先が一致しているかの最終確認（DEEP-21）。
+   * このアカウントに存在しないidは新規へ黙って変換せず、1件も書き込む前に拒否する。
+   * 別アカウントのidや、同時編集ですでに消えた行のidが送られてきたときに、
+   * 既存のランクを巻き込んで置き換えないための防御。
+   */
+  for (const input of inputs) {
+    if (input.id && !byId.has(input.id)) {
+      throw new NenRankValidationError('保存する対象が見つかりません。画面を読み直してから保存してください');
+    }
+  }
   const keys = new Set(existing.map((row) => row.rank_key));
   const sorted = [...inputs].sort((a, b) => a.annualThresholdYen - b.annualThresholdYen);
   const keepIds = new Set<string>();
@@ -249,6 +260,12 @@ export async function saveNenLifetimeMilestones(
   validateNenMilestoneInputs(inputs);
   const existing = await getNenLifetimeMilestones(db, lineAccountId);
   const byId = new Map(existing.map((row) => [row.id, row]));
+  // ランクと同じく、存在しないidは新規へ黙って変換せず書き込み前に拒否する（DEEP-21）。
+  for (const input of inputs) {
+    if (input.id && !byId.has(input.id)) {
+      throw new NenRankValidationError('保存する対象が見つかりません。画面を読み直してから保存してください');
+    }
+  }
   const sorted = [...inputs].sort((a, b) => a.thresholdYen - b.thresholdYen);
   const keepIds = new Set<string>();
   for (const [index, input] of sorted.entries()) {
