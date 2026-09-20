@@ -250,3 +250,5 @@ shared-button-importer app/nen/members/rank-settings-tab.tsx
 shared-button-importer app/nen/pets/feeding-tab.tsx
 shared-button-importer app/nen/pets/page.tsx
 shared-button-importer app/nen/pets/pet-editor.tsx
+# #984 LAY-17: スマホのペットカード操作行が共通Buttonを使う。
+shared-button-importer app/nen/pets/pets-tab.tsx

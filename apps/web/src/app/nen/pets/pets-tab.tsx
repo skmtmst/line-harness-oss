@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { useCallback, useEffect, useState } from 'react'
+import Button from '@/components/shared/button'
 import Chip from '@/components/shared/chip'
 import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
@@ -9,7 +10,7 @@ import Pagination from '@/components/shared/pagination'
 import Select from '@/components/shared/select'
 import SummaryCard from '@/components/shared/summary-card'
 import KpiCollapse from '@/components/ui/kpi-collapse'
-import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
+import { ActionCell, DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { TextField } from '@/components/shared/text-field'
 import { ApiError, api } from '@/lib/api'
 import { nenPetsApi, type NenPetListData, type NenPetRow, type NenPetSort, type NenPetWeightFilter } from '@/lib/nen-pets-api'
@@ -151,6 +152,14 @@ export default function PetsTab({
           <ListState kind="empty" emptyPreset="readonly" title="まだペットがいません" description="お客様がマイページでペットを登録すると、ここに並びます。" />
         ) : data ? (
           <>
+            {/*
+              #984 LAY-17: スマホでは細い表の操作列に「編集」「詳細」を
+              押し込まず、カードの下に操作行を持つカードへ切り替える。
+            */}
+            <ul className="divide-hairline divide-y rounded-card border-hairline border bg-canvas md:hidden" data-design="PetCards">
+              {data.items.map((pet) => <PetCard key={pet.id} pet={pet} canEdit={canEdit} onEdit={() => setEditing(pet)} />)}
+            </ul>
+            <div className="hidden md:block">
             <DataTable>
               <thead>
                 <TableHeadRow>
@@ -163,13 +172,15 @@ export default function PetsTab({
                   <Th className="w-20">運動量</Th>
                   <Th>主食</Th>
                   <Th className="w-24">体重の更新</Th>
-                  <Th className="w-16" align="right"><span className="sr-only">操作</span></Th>
+                  {/* 「編集」「詳細」が横に並べて入る幅を先に確保する（LAY-17）。 */}
+                  <Th className="w-28" align="right"><span className="sr-only">操作</span></Th>
                 </TableHeadRow>
               </thead>
               <tbody>
                 {data.items.map((pet) => <PetRow key={pet.id} pet={pet} canEdit={canEdit} onEdit={() => setEditing(pet)} />)}
               </tbody>
             </DataTable>
+            </div>
             {pageCount > 1 ? <Pagination page={data.page} pageCount={pageCount} onPageChange={setPage} /> : null}
           </>
         ) : null}
@@ -232,12 +243,63 @@ function PetRow({ pet, canEdit, onEdit }: { pet: NenPetRow; canEdit: boolean; on
           <span className="text-label text-ink-secondary">{pet.updatedAt.slice(5, 10).replace('-', '/')}</span>
         )}
       </Td>
-      <Td align="right">
-        <span className="inline-flex items-center gap-3">
-          {canEdit ? <button type="button" onClick={onEdit} className="text-label font-semibold text-accent-deep">編集</button> : null}
-          <Link href={`/friends/detail?id=${encodeURIComponent(pet.owner.friendId)}`} className="text-label font-semibold text-accent-deep">詳細</Link>
+      {/*
+        操作列は共用の ActionCell（white-space: nowrap 込み）。各項目に
+        flex-shrink: 0 を付け、「編集」が1文字ずつ縦に折れないようにする。
+      */}
+      <ActionCell>
+        <span className="inline-flex items-center gap-3 whitespace-nowrap">
+          {canEdit ? <button type="button" onClick={onEdit} className="shrink-0 whitespace-nowrap text-label font-semibold text-accent-deep">編集</button> : null}
+          <Link href={`/friends/detail?id=${encodeURIComponent(pet.owner.friendId)}`} className="shrink-0 whitespace-nowrap text-label font-semibold text-accent-deep">詳細</Link>
         </span>
-      </Td>
+      </ActionCell>
     </Tr>
+  )
+}
+
+/**
+ * スマホ幅のカード（#984 LAY-17）。
+ * 表の10列を狭い画面へ並べる代わりに、名まえ・飼い主・今日の目安だけを
+ * 上にまとめ、「編集」「詳細」はカードの下の操作行に置く。
+ */
+function PetCard({ pet, canEdit, onEdit }: { pet: NenPetRow; canEdit: boolean; onEdit: () => void }) {
+  const initial = (pet.name || '?').slice(0, 1)
+  const kind = pet.animalType === 'cat' ? '猫' : pet.animalType === 'other' ? 'その他' : '犬'
+  return (
+    <li className="p-4">
+      <div className="flex min-w-0 items-start gap-3">
+        {pet.imageUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element -- お客様がマイページで登録した写真
+          <img src={pet.imageUrl} alt="" className="h-9 w-9 shrink-0 rounded-pill object-cover" />
+        ) : (
+          <span aria-hidden="true" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-pill bg-accent-soft text-caption font-bold text-accent-deep">{initial}</span>
+        )}
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-semibold text-ink" title={pet.callName}>{pet.callName || pet.name || '（名前なし）'}</p>
+          <p className="mt-0.5 truncate text-xs text-ink-faint">{pet.breed ? `${kind}・${pet.breed}` : kind}</p>
+          <p className="mt-0.5 truncate text-xs text-ink-faint">{pet.owner.name || '（名前なし）'}</p>
+        </div>
+        <div className="shrink-0 text-right text-xs text-ink-secondary">
+          <p>{pet.ageLabel}</p>
+          <p className="tabular-nums">{pet.weightKg == null ? '—' : `${pet.weightKg}kg`}</p>
+        </div>
+      </div>
+      {pet.feeding?.dailyGrams != null ? (
+        <p className="mt-2 text-xs text-ink-secondary">
+          今日の目安 <span className="font-semibold tabular-nums text-ink">{pet.feeding.dailyGrams}g／日</span>
+        </p>
+      ) : null}
+      {/* 操作はカードの下の行。縮まない・折れない。 */}
+      <div className="mt-3 flex items-center gap-2 border-t border-hairline pt-3" data-design="CardActions">
+        {canEdit ? (
+          <Button type="button" onClick={onEdit} className="shrink-0 whitespace-nowrap">
+            編集
+          </Button>
+        ) : null}
+        <Button href={`/friends/detail?id=${encodeURIComponent(pet.owner.friendId)}`} className="shrink-0 whitespace-nowrap">
+          詳細
+        </Button>
+      </div>
+    </li>
   )
 }
