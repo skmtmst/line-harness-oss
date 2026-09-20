@@ -232,7 +232,7 @@ export default function DuplicatesPage() {
               </tbody>
             </table>
             {/*
-              #984 LAY-16: 0件のとき「0組中 1〜0組」と出していた。
+              #984 LAY-16: 0件のとき「範囲の先頭が末尾を越える表示」を出していた。
               件数が0なら「0組」だけ、検索で0件なら解除の導線を出す。
             */}
             <div className="border-t border-hairline px-4 py-3 text-xs text-ink-faint">
