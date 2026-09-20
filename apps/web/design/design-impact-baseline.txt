@@ -44,6 +44,7 @@ shared-button-importer app/contents/vars/export-panel.tsx
 shared-button-importer app/contents/vars/impact-review.tsx
 shared-button-importer app/contents/vars/new/page.tsx
 shared-button-importer app/contents/vars/page.tsx
+shared-button-importer app/conversions/new/page.tsx
 shared-button-importer app/conversions/page.tsx
 shared-button-importer app/duplicates/page.tsx
 shared-button-importer app/ec-commerce/connector-panel.tsx
