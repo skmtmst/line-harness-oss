@@ -123,11 +123,23 @@ const newActionDraft = (): ActionDraft => ({
 })
 
 /**
- * 作りかけの下書きの控え（N-357）。
+ * 作りかけの下書きの控え（N-357 → DETAIL-13）。
  *
  * 保存した下書きの番号は画面の記憶（`savedDraft`）にしか無かったので、
  * 再読込や「戻る」で消え、保存のたびに新しい下書きが増えていた。
  * ブラウザに控えておき、同じ店のときだけ再利用する。
+ *
+ * **ただし控えは「再開の案内」にだけ使う。** 以前はこの番号だけを戻して
+ * 名前・条件・処理は初期値のままだったため、一覧から新規へ来た利用者が
+ * 空の画面へ打った内容で、以前の下書きをまるごと上書きしていた
+ * （DETAIL-13）。いまは
+ *
+ *   - 新規作成（`/automations/new`）…… 必ず新しい下書きを作る
+ *   - 再開（`/automations/new?draft=<番号>`）…… 番号と中身・版を
+ *     一緒に読み込み、読み終わるまで保存できない
+ *
+ * の2導線に分ける。保存に成功したらURLへ番号を載せるので、再読込・
+ * 「戻る」でも同じ下書きの**中身ごと**戻る。
  */
 const DRAFT_STORAGE_KEY = 'lh-automation-new-draft-v1'
 
@@ -230,6 +242,255 @@ const draftFingerprint = (
 })
 
 /**
+ * 画面に入力されている内容の一式（DETAIL-14）。
+ *
+ * **入力はアカウントに結び付ける。** 店を切り替えても前の店の文面が
+ * 残ったままだと、切り替え先の店の下書きとしてA店の内容を保存できて
+ * しまう。切り替え時に前のアカウント分を控え（`formStashRef`）へ退け、
+ * 切り替え先の控え（なければ初期値）を読み直す。
+ */
+interface FormSnapshot {
+  name: string
+  eventType: string
+  keyword: string
+  conditionType: (typeof CONDITION_AXES)[number][0] | ''
+  conditionValue: string
+  triggerConfig: Record<string, unknown>
+  actions: ActionDraft[]
+  testFriendId: string
+  /** このアカウントに結び付いた下書き。無ければ次の保存は新規作成。 */
+  savedDraft: StoredDraft | null
+  /* DETAIL-15: 保存の状態は控えごと持ち、切り替えても正しく戻る。 */
+  savedAt: number | null
+  savedFingerprint: string | null
+  saveOutcome: 'idle' | 'saved' | 'failed'
+  previewCount: number | null
+}
+
+const blankFormSnapshot = (): FormSnapshot => ({
+  name: '',
+  eventType: EVENTS[0].value,
+  keyword: '',
+  conditionType: '',
+  conditionValue: '',
+  triggerConfig: {},
+  actions: [newActionDraft()],
+  testFriendId: '',
+  savedDraft: null,
+  savedAt: null,
+  savedFingerprint: null,
+  saveOutcome: 'idle',
+  previewCount: null,
+})
+
+/** 何か入力されているか。空のまま切り替えただけなら控えを残さない。 */
+const formSnapshotHasContent = (snapshot: FormSnapshot): boolean =>
+  Boolean(
+    snapshot.name.trim()
+      || snapshot.keyword.trim()
+      || snapshot.conditionType
+      || snapshot.conditionValue.trim()
+      || snapshot.testFriendId.trim()
+      || snapshot.eventType !== EVENTS[0].value
+      || Object.keys(snapshot.triggerConfig).length > 0
+      || snapshot.actions.length > 1
+      || snapshot.actions.some(
+        (row) => row.type !== 'add_tag' || row.tagId || row.message.trim() || row.scenarioId || row.commonActionId,
+      ),
+  )
+
+/** 「すること」1行を、保存で送る形へ直す。指紋とも同じ形を使う。 */
+const actionDraftToPayload = (row: ActionDraft, index: number): AutomationDraftAction => (
+  row.type === 'add_tag'
+    ? { id: `step-${index + 1}`, type: 'add_tag' as const, params: { tagId: row.tagId }, onFailure: 'stop' as const }
+    : row.type === 'start_scenario'
+      ? { id: `step-${index + 1}`, type: 'start_scenario' as const, params: { scenarioId: row.scenarioId }, onFailure: 'stop' as const }
+      : row.type === 'common_action'
+        ? { id: `step-${index + 1}`, type: 'common_action' as const, params: { commonActionId: row.commonActionId }, onFailure: 'stop' as const }
+        : {
+            id: `step-${index + 1}`,
+            type: 'send_message' as const,
+            params: { messageType: 'text', content: row.message.trim() },
+            onFailure: 'stop' as const,
+          }
+)
+
+/** 「だれに」の条件1件を、保存で送る形へ直す。 */
+const conditionDraft = (
+  conditionType: FormSnapshot['conditionType'],
+  conditionValue: string,
+): Record<string, unknown> => ({
+  ...(conditionType && conditionValue.trim()
+    ? {
+        operator: 'AND' as const,
+        rules: [{
+          type: conditionType,
+          value: conditionType === 'is_following' || conditionType === 'is_hidden'
+            ? conditionValue.trim() === 'true'
+            : conditionValue.trim(),
+        }],
+      }
+    : {}),
+})
+
+/** きっかけの詳しい設定を、保存で送る形へ直す。 */
+const normalizeTriggerConfigFor = (
+  eventType: AutomationDraftDetail['eventType'],
+  triggerConfig: Record<string, unknown>,
+  keyword: string,
+): Record<string, unknown> => {
+  if (eventType === 'message_received') return keyword.trim() ? { keyword: keyword.trim() } : {}
+  if (eventType === 'tag_change') return {
+    tagId: String(triggerConfig.tagId ?? ''),
+    action: triggerConfig.action === 'remove' ? 'remove' : 'add',
+  }
+  if (eventType === 'datetime') {
+    const local = String(triggerConfig.at ?? '')
+    return { at: local ? new Date(`${local}:00+09:00`).toISOString() : '', friendIds: String(triggerConfig.friendIds ?? '').split(',').map((id) => id.trim()).filter(Boolean) }
+  }
+  if (eventType === 'daily' || eventType === 'weekly') return {
+    time: String(triggerConfig.time ?? ''),
+    friendIds: String(triggerConfig.friendIds ?? '').split(',').map((id) => id.trim()).filter(Boolean),
+    ...(eventType === 'weekly' ? { weekdays: String(triggerConfig.weekdays ?? '').split(',').map(Number).filter((day) => Number.isInteger(day) && day >= 0 && day <= 6) } : {}),
+  }
+  if (eventType === 'link_clicked') {
+    const trackedLinkId = String(triggerConfig.trackedLinkId ?? '').trim()
+    return trackedLinkId ? { trackedLinkId } : {}
+  }
+  if (eventType === 'calendar_booked') {
+    const bookingType = String(triggerConfig.bookingType ?? '')
+    const menuId = String(triggerConfig.menuId ?? '').trim()
+    const eventId = String(triggerConfig.eventId ?? '').trim()
+    return {
+      ...(bookingType === 'salon' || bookingType === 'event' ? { bookingType } : {}),
+      ...(menuId ? { menuId } : {}),
+      ...(eventId ? { eventId } : {}),
+    }
+  }
+  return triggerConfig
+}
+
+/**
+ * 保存ボタンで送る中身そのものの指紋（DETAIL-15）。
+ *
+ * 「保存したあとに変えたか」は版の番号ではなく、送る中身の一致で見る。
+ * 読み込んだ下書き・保存に成功した内容と同じ形で作るので、画面を往復しても
+ * 値が同じなら「変更あり」とは出ない。
+ */
+const draftPayloadFingerprint = (form: {
+  name: string
+  eventType: string
+  keyword: string
+  conditionType: FormSnapshot['conditionType']
+  conditionValue: string
+  triggerConfig: Record<string, unknown>
+  actions: ActionDraft[]
+}): string => canonicalJson({
+  name: form.name.trim(),
+  eventType: form.eventType,
+  triggerConfig: normalizeTriggerConfigFor(
+    form.eventType as AutomationDraftDetail['eventType'], form.triggerConfig, form.keyword,
+  ),
+  conditions: conditionDraft(form.conditionType, form.conditionValue),
+  actions: form.actions.map(actionDraftToPayload),
+})
+
+/** ISOの日時を、画面の datetime-local（日本時間）の文字へ戻す。 */
+const isoToDatetimeLocal = (iso: string): string => {
+  const time = Date.parse(iso)
+  if (!Number.isFinite(time)) return ''
+  // 保存時は `${local}:00+09:00` として送っているので、戻すときも日本時間基準。
+  return new Date(time + 9 * 60 * 60 * 1000).toISOString().slice(0, 16)
+}
+
+/**
+ * 保存済みの下書きを、この画面の入力の形へ戻す（DETAIL-13の再開）。
+ *
+ * 番号だけを戻すのは**しない**。以前はそれで空の画面から上書きしていた。
+ * 再開では名前・きっかけ・条件・することまで全部戻し、保存は読み終わってから。
+ */
+const draftDetailToForm = (detail: AutomationDraftDetail): {
+  name: string
+  eventType: string
+  keyword: string
+  conditionType: FormSnapshot['conditionType']
+  conditionValue: string
+  triggerConfig: Record<string, unknown>
+  actions: ActionDraft[]
+} => {
+  const rules = (detail.conditions as { rules?: unknown }).rules
+  const firstRule = Array.isArray(rules)
+    ? (rules[0] as { type?: unknown; value?: unknown } | undefined)
+    : undefined
+  const conditionType = (
+    typeof firstRule?.type === 'string'
+    && CONDITION_AXES.some(([axis]) => axis === firstRule.type)
+  )
+    ? (firstRule.type as FormSnapshot['conditionType'])
+    : ''
+  const conditionValue = firstRule && firstRule.value !== undefined && firstRule.value !== null
+    ? String(firstRule.value)
+    : ''
+  const config = detail.triggerConfig ?? {}
+  const joinIds = (value: unknown) =>
+    Array.isArray(value) ? value.map((item) => String(item)).join(',') : ''
+  const triggerConfig = ((): Record<string, unknown> => {
+    switch (detail.eventType) {
+      case 'tag_change':
+        return {
+          tagId: String(config.tagId ?? ''),
+          action: config.action === 'remove' ? 'remove' : 'add',
+        }
+      case 'form_submitted':
+        return { formId: String(config.formId ?? '') }
+      case 'link_clicked':
+        return { trackedLinkId: String(config.trackedLinkId ?? '') }
+      case 'calendar_booked':
+        return {
+          bookingType: String(config.bookingType ?? ''),
+          menuId: String(config.menuId ?? ''),
+          eventId: String(config.eventId ?? ''),
+        }
+      case 'datetime':
+        return { at: isoToDatetimeLocal(String(config.at ?? '')), friendIds: joinIds(config.friendIds) }
+      case 'daily':
+        return { time: String(config.time ?? ''), friendIds: joinIds(config.friendIds) }
+      case 'weekly':
+        return {
+          time: String(config.time ?? ''),
+          friendIds: joinIds(config.friendIds),
+          weekdays: Array.isArray(config.weekdays) ? config.weekdays.map((day) => String(day)).join(',') : '',
+        }
+      default:
+        return {}
+    }
+  })()
+  const actions: ActionDraft[] = detail.actions.length === 0
+    ? [newActionDraft()]
+    : detail.actions.map((step) => ({
+        key: ++actionKeySeed,
+        type: step.type,
+        tagId: String(step.params.tagId ?? ''),
+        message: String(step.params.content ?? ''),
+        scenarioId: String(step.params.scenarioId ?? ''),
+        commonActionId: String(step.params.commonActionId ?? ''),
+      }))
+  return {
+    name: detail.name,
+    eventType: detail.eventType,
+    keyword: detail.eventType === 'message_received' ? String(config.keyword ?? '') : '',
+    conditionType,
+    conditionValue,
+    triggerConfig,
+    actions,
+  }
+}
+
+/** 保存した時刻の表示（DETAIL-15）。分まであれば「いつ保存したか」は読める。 */
+const formatClock = (time: number): string =>
+  new Date(time).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })
+
+/**
  * 「この内容で送る」と押したときに送る中身を、押す前に固めた控え（N-358）。
  *
  * 画面の状態ではなく**この控えだけ**を送信に使う。送る直前にサーバーの
@@ -326,12 +587,97 @@ export default function NewAutomationPage() {
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const [existingAutomations, setExistingAutomations] = useState<Automation[]>([])
+  /*
+   * DETAIL-13: 「再開」は `?draft=<番号>` で明示した下書きだけ。
+   * `undefined` はURLをまだ読んでいない（読み終わるまで画面を出さない）。
+   */
+  const [resumeTarget, setResumeTarget] = useState<string | null | undefined>(undefined)
+  const [resumeStatus, setResumeStatus] = useState<'none' | 'loading' | 'ready' | 'failed'>('none')
+  /* このアカウントに前に保存した下書きがある、という案内にだけ使う控え。 */
+  const [storedDraftHint, setStoredDraftHint] = useState<StoredDraft | null>(null)
+  /* DETAIL-15: 未保存・保存中・保存済み・保存後の変更・失敗を1つの状態から出す。 */
+  const [saveOutcome, setSaveOutcome] = useState<'idle' | 'saved' | 'failed'>('idle')
+  const [savedAt, setSavedAt] = useState<number | null>(null)
+  const [savedFingerprint, setSavedFingerprint] = useState<string | null>(null)
   // 画面の描き直しを待たずに二重押しを止める鍵（N-357・N-358）。
   const saveRunningRef = useRef(false)
   const testRunningRef = useRef(false)
   const prepareRunningRef = useRef(false)
   const selectedAccountRef = useRef(selectedAccountId)
   selectedAccountRef.current = selectedAccountId
+  /*
+   * DETAIL-14: アカウントごとの入力の控えと、そのアカウントに結び付いた
+   * 下書き。切り替えのたびに預け・戻し、保存はこの控えにある下書きだけを
+   * 更新する（＝いま選んでいるアカウントのものだけ）。
+   */
+  const formStashRef = useRef<Record<string, FormSnapshot>>({})
+  const draftByAccountRef = useRef<Record<string, StoredDraft>>({})
+  const previousAccountRef = useRef(selectedAccountId)
+  /* 切り替えの直後はURLがまだ前のアカウントの下書きを指している。 */
+  const accountSwitchPendingRef = useRef(false)
+  /* 再開の読み込みを二度走らせないための、読んだ組み合わせの記録。 */
+  const resumedKeyRef = useRef<string | null>(null)
+  /* 再開・復元で eventType を戻すとき、入力のリセットを1回だけ止める。 */
+  const suppressTriggerResetRef = useRef(false)
+
+  /** いま画面に出ている入力一式を、そのアカウントの控えとして取り出す。 */
+  const captureFormSnapshot = (): FormSnapshot => ({
+    name,
+    eventType,
+    keyword,
+    conditionType,
+    conditionValue,
+    triggerConfig,
+    actions,
+    testFriendId,
+    savedDraft,
+    savedAt,
+    savedFingerprint,
+    saveOutcome,
+    previewCount,
+  })
+
+  /** 控えを画面へ戻す。eventType の切替で詳細設定が消えないよう印を付ける。 */
+  const applyFormSnapshot = (snapshot: FormSnapshot) => {
+    if (snapshot.eventType !== eventType) suppressTriggerResetRef.current = true
+    setName(snapshot.name)
+    setEventType(snapshot.eventType)
+    setKeyword(snapshot.keyword)
+    setConditionType(snapshot.conditionType)
+    setConditionValue(snapshot.conditionValue)
+    setTriggerConfig(snapshot.triggerConfig)
+    setActions(snapshot.actions)
+    setTestFriendId(snapshot.testFriendId)
+    setSavedDraft(snapshot.savedDraft)
+    setSavedAt(snapshot.savedAt)
+    setSavedFingerprint(snapshot.savedFingerprint)
+    setSaveOutcome(snapshot.saveOutcome)
+    setPreviewCount(snapshot.previewCount)
+  }
+
+  /*
+   * 「このアカウントに結び付いた下書き」を記録する。保存が走っている途中で
+   * 店が切り替わっても、記録は始めたときの店のものへ入るので、表示中の
+   * 画面を別の店の下書きに結び付けることはない（DETAIL-14）。
+   */
+  const bindAccountDraft = (accountId: string, draft: StoredDraft | null) => {
+    if (draft) draftByAccountRef.current[accountId] = draft
+    else delete draftByAccountRef.current[accountId]
+    const stashed = formStashRef.current[accountId]
+    if (stashed) stashed.savedDraft = draft
+    if (selectedAccountRef.current === accountId) setSavedDraft(draft)
+  }
+
+  /*
+   * URLの `?draft=` を、この画面が覚えている再開先と揃える。
+   * 再読込・「戻る」で同じ下書きへ戻るための唯一の入口（DETAIL-13）。
+   * URLの書き換えだけを担当し、再開要求そのものは `setResumeRequest` が持つ。
+   */
+  const syncResumeUrl = (draftId: string | null, mode: 'push' | 'replace' = 'replace') => {
+    const url = draftId ? `/automations/new?draft=${encodeURIComponent(draftId)}` : '/automations/new'
+    if (mode === 'push') history.pushState(null, '', url)
+    else history.replaceState(null, '', url)
+  }
 
   useEffect(() => {
     let cancelled = false
@@ -386,18 +732,163 @@ export default function NewAutomationPage() {
     }
   }, [selectedAccountId])
 
-  // N-357: 再読込・「戻る」でも同じ下書きを使い回す。店が替わったら
-  // 別の店の下書きを触らないよう、控えが一致するときだけ引き継ぐ。
-  // 店を替えたら、前の店の確認・結果・見込み人数は残さない（N-358）。
-  // 走っている途中の保存・1人テストは、返ってきても自分の店でなければ
-  // 何も書かない（`selectedAccountRef` で見張る）。
+  /*
+   * DETAIL-13: `?draft=` の読み取りは画面が開いてから1回。
+   * 戻る・進むでURLが変わったときも読み直す（popstate）。
+   * 控え（sessionStorage）は「前に保存した下書きがあります」と案内する
+   * ためだけに読み、番号を黙って画面へ結び付けることはしない。
+   */
   useEffect(() => {
-    setPreviewCount(null)
+    const readLocation = () =>
+      setResumeTarget(new URLSearchParams(window.location.search).get('draft'))
+    readLocation()
+    setStoredDraftHint(
+      selectedAccountRef.current ? readStoredDraft(selectedAccountRef.current) : null,
+    )
+    window.addEventListener('popstate', readLocation)
+    return () => window.removeEventListener('popstate', readLocation)
+  }, [])
+
+  /*
+   * DETAIL-14: アカウントを切り替えたら、入力ごと切り替える。
+   *
+   * 前のアカウントの入力はそのアカウントの控えとして残し（戻れば復元）、
+   * 切り替え先は控えか初期値を読み直す。前の店の文面が残ったまま
+   * 別の店の下書きとして保存されることはない。
+   * 走っている途中の保存・1人テストは、返ってきても自分の店でなければ
+   * 何も書かない（`selectedAccountRef` で見張る）。
+   */
+  useEffect(() => {
+    const previous = previousAccountRef.current
+    previousAccountRef.current = selectedAccountId
+    if (previous === selectedAccountId) return
+
+    if (previous === null) {
+      // 初めて店が決まっただけ。URLの `?draft=` はこの店のものとして読む。
+      setStoredDraftHint(selectedAccountId ? readStoredDraft(selectedAccountId) : null)
+      return
+    }
+
+    accountSwitchPendingRef.current = true
+    setError('')
+    setTestConfirmation(null)
+
+    const snapshot = captureFormSnapshot()
+    if (formSnapshotHasContent(snapshot) || snapshot.savedDraft) {
+      formStashRef.current[previous] = snapshot
+    }
+
+    const stashed = selectedAccountId ? formStashRef.current[selectedAccountId] : undefined
+    setStoredDraftHint(selectedAccountId ? readStoredDraft(selectedAccountId) : null)
+    if (stashed) {
+      if (stashed.savedDraft && selectedAccountId) draftByAccountRef.current[selectedAccountId] = stashed.savedDraft
+      applyFormSnapshot(stashed)
+      // URLの再開先も切り替え先の下書き（または無し）へ置き換える。
+      const nextTarget = stashed.savedDraft?.id ?? null
+      setResumeTarget(nextTarget)
+      syncResumeUrl(nextTarget)
+      setNotice('切り替える前にこのアカウントで入力していた内容を戻しました。')
+    } else {
+      applyFormSnapshot(blankFormSnapshot())
+      setResumeTarget(null)
+      syncResumeUrl(null)
+      if (selectedAccountId) {
+        setNotice('LINEアカウントを切り替えました。前のアカウントで入力していた内容は、そのアカウントを選び直すと戻ります。')
+      } else {
+        setNotice('')
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedAccountId])
+
+  /*
+   * DETAIL-13: `?draft=` で示された下書きは、番号・中身・版を一緒に読む。
+   * 読み終わるまで保存はできない（blockedReason で止める）。
+   * 読めない下書き（削除済み・別の店のもの）は、理由を出して新規に戻す。
+   */
+  useEffect(() => {
+    if (accountSwitchPendingRef.current) {
+      /*
+       * 切り替えの直後のURLはまだ前のアカウントの下書きを指している。
+       * 切り替え側のeffectが正しい番号（または無し）へ置き換えるので、
+       * ここでは何もしない。
+       */
+      accountSwitchPendingRef.current = false
+      return
+    }
+    if (!selectedAccountId || resumeTarget === undefined) return
+    if (resumeTarget === null) {
+      setResumeStatus('none')
+      return
+    }
+    const key = `${selectedAccountId}:${resumeTarget}`
+    if (resumedKeyRef.current === key) return
+    /*
+     * そのアカウントの控えがすでにこの下書きを持っているなら読み直さない
+     * （A→B→A と往復しても、未保存の入力を消さないため）。
+     */
+    if (draftByAccountRef.current[selectedAccountId]?.id === resumeTarget) {
+      resumedKeyRef.current = key
+      setResumeStatus('ready')
+      return
+    }
+    resumedKeyRef.current = key
+    const accountId = selectedAccountId
+    const draftId = resumeTarget
+    let cancelled = false
+    setResumeStatus('loading')
     setError('')
     setNotice('')
-    setTestConfirmation(null)
-    setSavedDraft(selectedAccountId ? readStoredDraft(selectedAccountId) : null)
-  }, [selectedAccountId])
+    api.automations
+      .getDraft(draftId, accountId)
+      .then((res) => {
+        if (cancelled || selectedAccountRef.current !== accountId) return
+        if (!res.success) {
+          setResumeStatus('failed')
+          setError(
+            '指定された下書きは読み込めませんでした。削除されたか、ほかのアカウントの下書きの可能性があります。このまま入力すると新しいルールになります。',
+          )
+          return
+        }
+        const restored = draftDetailToForm(res.data)
+        const draft = { id: res.data.id, draftVersionId: res.data.draftVersionId }
+        if (restored.eventType !== eventType) suppressTriggerResetRef.current = true
+        setName(restored.name)
+        setEventType(restored.eventType)
+        setKeyword(restored.keyword)
+        setConditionType(restored.conditionType)
+        setConditionValue(restored.conditionValue)
+        setTriggerConfig(restored.triggerConfig)
+        setActions(restored.actions)
+        const fingerprint = draftPayloadFingerprint(restored)
+        setSavedFingerprint(fingerprint)
+        setSaveOutcome('saved')
+        setSavedAt(null)
+        bindAccountDraft(accountId, draft)
+        writeStoredDraft(accountId, draft)
+        setStoredDraftHint(null)
+        formStashRef.current[accountId] = {
+          ...restored,
+          testFriendId: '',
+          savedDraft: draft,
+          savedAt: null,
+          savedFingerprint: fingerprint,
+          saveOutcome: 'saved',
+          previewCount: null,
+        }
+        setResumeStatus('ready')
+        setNotice('保存した下書きを読み込みました。続きを直せます。')
+      })
+      .catch(() => {
+        if (cancelled || selectedAccountRef.current !== accountId) return
+        setResumeStatus('failed')
+        setError('下書きを読み込めませんでした。通信状態を確かめて、もう一度お試しください。')
+      })
+    return () => {
+      cancelled = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedAccountId, resumeTarget])
 
   const selectedEvent = EVENTS.find((event) => event.value === eventType) ?? EVENTS[0]
   const usesKeyword = KEYWORD_EVENTS.includes(eventType)
@@ -437,20 +928,8 @@ export default function NewAutomationPage() {
   }).join('、')
 
   /** 保存で送る「すること」。確認画面とのずれを見るときも同じ形を使う。 */
-  const draftActions = (): AutomationDraftAction[] => actions.map((row, index) => (
-    row.type === 'add_tag'
-      ? { id: `step-${index + 1}`, type: 'add_tag' as const, params: { tagId: row.tagId }, onFailure: 'stop' as const }
-      : row.type === 'start_scenario'
-        ? { id: `step-${index + 1}`, type: 'start_scenario' as const, params: { scenarioId: row.scenarioId }, onFailure: 'stop' as const }
-        : row.type === 'common_action'
-          ? { id: `step-${index + 1}`, type: 'common_action' as const, params: { commonActionId: row.commonActionId }, onFailure: 'stop' as const }
-          : {
-              id: `step-${index + 1}`,
-              type: 'send_message' as const,
-              params: { messageType: 'text', content: row.message.trim() },
-              onFailure: 'stop' as const,
-            }
-  ))
+  const draftActions = (): AutomationDraftAction[] => actions.map((row, index) =>
+    actionDraftToPayload(row, index))
 
   /**
    * 確認に出す「実際に送られる中身」（N-358）。
@@ -480,6 +959,14 @@ export default function NewAutomationPage() {
   })
 
   useEffect(() => {
+    /*
+     * 再開・控えの復元で eventType と詳細設定を一緒に戻したときは、
+     * この切替で詳細設定を空にしない（戻した直後に消えてしまう）。
+     */
+    if (suppressTriggerResetRef.current) {
+      suppressTriggerResetRef.current = false
+      return
+    }
     setTriggerConfig({})
   }, [eventType])
 
@@ -498,37 +985,8 @@ export default function NewAutomationPage() {
 
   const draftEventType: AutomationDraftDetail['eventType'] =
     selectedEvent.value as AutomationDraftDetail['eventType']
-  const normalizedTriggerConfig = () => {
-    if (draftEventType === 'message_received') return keyword.trim() ? { keyword: keyword.trim() } : {}
-    if (draftEventType === 'tag_change') return {
-      tagId: String(triggerConfig.tagId ?? ''),
-      action: triggerConfig.action === 'remove' ? 'remove' : 'add',
-    }
-    if (draftEventType === 'datetime') {
-      const local = String(triggerConfig.at ?? '')
-      return { at: local ? new Date(`${local}:00+09:00`).toISOString() : '', friendIds: String(triggerConfig.friendIds ?? '').split(',').map((id) => id.trim()).filter(Boolean) }
-    }
-    if (draftEventType === 'daily' || draftEventType === 'weekly') return {
-      time: String(triggerConfig.time ?? ''),
-      friendIds: String(triggerConfig.friendIds ?? '').split(',').map((id) => id.trim()).filter(Boolean),
-      ...(draftEventType === 'weekly' ? { weekdays: String(triggerConfig.weekdays ?? '').split(',').map(Number).filter((day) => Number.isInteger(day) && day >= 0 && day <= 6) } : {}),
-    }
-    if (draftEventType === 'link_clicked') {
-      const trackedLinkId = String(triggerConfig.trackedLinkId ?? '').trim()
-      return trackedLinkId ? { trackedLinkId } : {}
-    }
-    if (draftEventType === 'calendar_booked') {
-      const bookingType = String(triggerConfig.bookingType ?? '')
-      const menuId = String(triggerConfig.menuId ?? '').trim()
-      const eventId = String(triggerConfig.eventId ?? '').trim()
-      return {
-        ...(bookingType === 'salon' || bookingType === 'event' ? { bookingType } : {}),
-        ...(menuId ? { menuId } : {}),
-        ...(eventId ? { eventId } : {}),
-      }
-    }
-    return triggerConfig
-  }
+  const normalizedTriggerConfig = () =>
+    normalizeTriggerConfigFor(draftEventType, triggerConfig, keyword)
 
   const updateAction = (key: number, patch: Partial<ActionDraft>) =>
     setActions((current) => current.map((row) => (row.key === key ? { ...row, ...patch } : row)))
@@ -560,8 +1018,36 @@ export default function NewAutomationPage() {
   const blockedReason = useMemo(() => {
     if (canManage === null) return '権限を確認しています'
     if (!canManage) return '操作する権限がありません'
+    // DETAIL-13: 再開した下書きは、中身を読み終わるまで保存できない。
+    if (resumeStatus === 'loading') return '下書きを読み込んでいます'
     return null
-  }, [canManage])
+  }, [canManage, resumeStatus])
+
+  /*
+   * DETAIL-15: 保存の状態は1本。未保存・保存中・保存済み・保存後の変更・
+   * 失敗をここだけから出すので、「保存しました」と「まだ保存していません」が
+   * 同時に出ることはない。
+   */
+  const currentFingerprint = draftPayloadFingerprint({
+    name,
+    eventType: draftEventType,
+    keyword,
+    conditionType,
+    conditionValue,
+    triggerConfig,
+    actions,
+  })
+  const dirtySinceSave = savedFingerprint !== null && savedFingerprint !== currentFingerprint
+  const saveStatusText = saving
+    ? '保存しています'
+    : blockedReason ?? (
+        saveOutcome === 'failed'
+          ? '保存できませんでした。入力した内容は残っています'
+          : saveOutcome === 'saved'
+            ? dirtySinceSave
+              ? '保存したあとに内容を変更しています'
+              : `下書きに保存しました${savedAt === null ? '' : `（${formatClock(savedAt)}）`}`
+            : 'まだ保存していません')
 
   const save = async (activate: boolean) => {
     // N-357: 連打で下書きが2つできないよう、描き直しより先に鍵をかける。
@@ -578,31 +1064,39 @@ export default function NewAutomationPage() {
     setError('')
     setNotice('')
     const accountId = selectedAccountId
+    /*
+     * 保存直前に「送る中身」と「そのアカウントの入力一式」を固める。
+     * 非同期の途中で店が切り替わっても、送る店・送る中身は押した時点のもの。
+     */
+    const payload = {
+      name: name.trim(),
+      eventType: draftEventType,
+      triggerConfig: normalizedTriggerConfig(),
+      conditions: conditionDraft(conditionType, conditionValue),
+      // すること（アクション）は { type, params } の形で持つ。
+      // params の中身は type ごとに違う。
+      actions: draftActions(),
+    }
+    const fingerprint = canonicalJson(payload)
+    const formAtSave = captureFormSnapshot()
     try {
       if (!accountId) throw new Error('LINE公式アカウントを選んでください')
-      // N-357: 再読込・「戻る」で同じ下書きへ戻す判定は、店を読むところ
-      // （`setSavedDraft(readStoredDraft(...))`）の1か所だけに置く。
-      // ここでもう一度控えを読むと同じ判定を2つ持つことになり、片方だけ
-      // 直したときに食い違う。**逆変異でも落ちない**ので、見張りにもならない。
-      let draft = savedDraft
+      /*
+       * DETAIL-13/14: 更新するのは「いま選んでいるアカウントに結び付いた
+       * 下書き」だけ。画面の記憶ではなくアカウント別の控えを見るので、
+       * 前に保存した別の下書きや、別の店の下書きを上書きすることはない。
+       * 結び付いていなければ新しい下書きを作る（新規作成＝新規ID）。
+       */
+      let draft = draftByAccountRef.current[accountId] ?? null
       if (!draft) {
         const created = await api.automations.createDraftFromTemplate('received-message-tag', accountId)
         if (!created.success) throw new Error(created.error)
         draft = created.data
         writeStoredDraft(accountId, draft)
       }
-      const conditions = {
-        ...(conditionType && conditionValue.trim() ? { operator: 'AND' as const, rules: [{ type: conditionType, value: conditionType === 'is_following' || conditionType === 'is_hidden' ? conditionValue.trim() === 'true' : conditionValue.trim() }] } : {}),
-      }
       const res = await api.automations.updateDraft(draft.id, accountId, {
         expectedDraftVersionId: draft.draftVersionId,
-        name: name.trim(),
-        eventType: draftEventType,
-        triggerConfig: normalizedTriggerConfig(),
-        conditions,
-        // すること（アクション）は { type, params } の形で持つ。
-        // params の中身は type ごとに違う。
-        actions: draftActions(),
+        ...payload,
       })
       if (!res.success) throw new Error(res.error)
       // 保存すると中身が変わるので、版の札も新しくなる。取り直してから
@@ -611,9 +1105,38 @@ export default function NewAutomationPage() {
       if (!saved.success) throw new Error(saved.error)
       draft = { id: draft.id, draftVersionId: saved.data.draftVersionId }
       writeStoredDraft(accountId, draft)
-      if (selectedAccountRef.current === accountId) setSavedDraft(draft)
+      const savedTime = Date.now()
+      /*
+       * 結果の書き込みは「保存を始めたアカウント」の控えへ。いま画面に
+       * 出しているのが別のアカウントでも、そのアカウントへ戻ったときに
+       * 保存済みの状態（版・時刻・指紋）がそのまま戻る。
+       */
+      formStashRef.current[accountId] = {
+        ...formAtSave,
+        savedDraft: draft,
+        savedAt: savedTime,
+        savedFingerprint: fingerprint,
+        saveOutcome: 'saved',
+      }
+      bindAccountDraft(accountId, draft)
+      if (selectedAccountRef.current === accountId) {
+        setSavedAt(savedTime)
+        setSavedFingerprint(fingerprint)
+        setSaveOutcome('saved')
+        setStoredDraftHint(null)
+        // 再読込・「戻る」でこの下書きへ戻れるよう、URLへ番号を載せる。
+        // 再開では番号と中身・版を一緒に読むので、空の画面からの
+        // 上書きにはならない（DETAIL-13）。「戻る」で新規画面へ戻れるよう
+        // 履歴には積む。
+        setResumeTarget(draft.id)
+        syncResumeUrl(draft.id, 'push')
+      }
       const preview = await api.automations.audiencePreview(draft.id, accountId, draft.draftVersionId)
-      if (preview.success && selectedAccountRef.current === accountId) setPreviewCount(preview.data.matched)
+      if (preview.success) {
+        const stashed = formStashRef.current[accountId]
+        if (stashed) stashed.previewCount = preview.data.matched
+        if (selectedAccountRef.current === accountId) setPreviewCount(preview.data.matched)
+      }
       if (!activate) {
         if (selectedAccountRef.current === accountId) {
           setNotice('下書きに保存しました。見込み人数を確認して、1人で試せます。')
@@ -624,6 +1147,7 @@ export default function NewAutomationPage() {
       if (!published.success) throw new Error(published.error)
       // 公開したら下書きは無くなるので控えも捨てる。
       clearStoredDraft(accountId)
+      bindAccountDraft(accountId, null)
       if (selectedAccountRef.current === accountId) router.push(`/automations?highlight=${draft.id}`)
     } catch (caught) {
       // 下書き自体が無くなっていたら控えを捨て、次は作り直す（N-357）。
@@ -631,10 +1155,31 @@ export default function NewAutomationPage() {
         caught instanceof ApiError &&
         (caught.status === 404 || caught.status === 409 || caught.code === 'not_found' || caught.code === 'version_conflict')
       ) {
-        if (accountId) clearStoredDraft(accountId)
-        if (selectedAccountRef.current === accountId) setSavedDraft(null)
+        if (accountId) {
+          clearStoredDraft(accountId)
+          bindAccountDraft(accountId, null)
+          const stashed = formStashRef.current[accountId]
+          if (stashed) {
+            stashed.saveOutcome = 'idle'
+            stashed.savedFingerprint = null
+            stashed.savedAt = null
+          }
+        }
+        if (selectedAccountRef.current === accountId) {
+          setSaveOutcome('idle')
+          setSavedFingerprint(null)
+          setSavedAt(null)
+          // 消えた下書きの番号をURLに残さない。残すと再読込のたびに
+          // 「読み込めません」が出てしまう。
+          setResumeTarget(null)
+          syncResumeUrl(null)
+        }
+      } else if (accountId) {
+        const stashed = formStashRef.current[accountId]
+        if (stashed) stashed.saveOutcome = 'failed'
       }
       if (selectedAccountRef.current === accountId) {
+        setSaveOutcome('failed')
         setError(
           caught instanceof ApiError || caught instanceof Error
             ? caught.message
@@ -678,7 +1223,7 @@ export default function NewAutomationPage() {
       if (detail.data.draftVersionId !== draft.draftVersionId) {
         const refreshed = { id: draft.id, draftVersionId: detail.data.draftVersionId }
         writeStoredDraft(accountId, refreshed)
-        if (selectedAccountRef.current === accountId) setSavedDraft(refreshed)
+        bindAccountDraft(accountId, refreshed)
       }
       if (selectedAccountRef.current !== accountId) return
       const described = describeDraftActions(detail.data.actions)
@@ -763,6 +1308,21 @@ export default function NewAutomationPage() {
     }
   }
 
+  /**
+   * DETAIL-13の再開入口。新規作成はいつも新しい下書きを作るが、
+   * 前に保存した下書きがあるなら「開く」ことをここで選べる。
+   */
+  const openStoredDraft = () => {
+    if (!storedDraftHint || !selectedAccountId) return
+    // 再開は「明示した下書き番号」。URLへ載せて読み込みに行く。
+    router.push(`/automations/new?draft=${encodeURIComponent(storedDraftHint.id)}`)
+    setResumeTarget(storedDraftHint.id)
+  }
+
+  // `?draft=` を読み終わるまで描かない。一瞬だけ空の新規画面が出て、
+  // そのまま保存で以前の下書きを上書きする事故を防ぐ。
+  if (resumeTarget === undefined) return null
+
   return (
     <div data-design-node="Rv8Jv">
       <div data-design="Crumb">
@@ -770,6 +1330,20 @@ export default function NewAutomationPage() {
           items={[{ label: 'オートメーション', href: '/automations' }, { label: 'ルールを作る' }]}
         />
       </div>
+
+      {storedDraftHint && !savedDraft && resumeTarget === null ? (
+        <div
+          className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-control border border-info bg-info-bg px-4 py-3 text-sm font-medium text-info"
+          role="note"
+        >
+          <span>
+            前にこのアカウントで保存した下書きがあります。このまま入力すると、別の新しいルールになります。
+          </span>
+          <Button variant="secondary" onClick={openStoredDraft}>
+            保存した下書きを開く
+          </Button>
+        </div>
+      ) : null}
 
       <div className="mb-3 grid grid-cols-3 gap-3 rounded-card border border-hairline bg-canvas px-5 py-4" aria-label="いまの決めごと">
         <SummaryStep number={1} label="きっかけ" value={selectedEvent.label} />
@@ -1113,7 +1687,7 @@ export default function NewAutomationPage() {
 
       <StickyBar
         className={styles.stickyBar}
-        status={saving ? '保存しています' : (blockedReason ?? 'まだ保存していません')}
+        status={saveStatusText}
         actions={
           <>
             <button

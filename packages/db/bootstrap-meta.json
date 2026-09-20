@@ -398,7 +398,8 @@
     "437_external_integration_config.sql",
     "438_rich_menu_ops.sql",
     "439_staff_email_change.sql",
-    "440_conversion_draft_and_ingest.sql"
+    "440_conversion_draft_and_ingest.sql",
+    "441_event_slot_client_key.sql"
   ],
-  "migrationCount": 399
+  "migrationCount": 400
 }

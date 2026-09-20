@@ -429,7 +429,7 @@ export default function AutomationsPage() {
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <p className="text-sm text-ink-faint">自動化 ＞ オートメーション ＞ 見本</p>
           {/* 作成は owner/admin だけ（N-361）。見本の閲覧と「これで作る」の出し分けは画廊側で行う。 */}
-          {canManageAutomations ? <Button href="/automations/new">はじめから作る</Button> : null}
+          {canManageAutomations ? <Button href="/automations/new">ルールを作成</Button> : null}
         </div>
         <div className="mb-4">
           <MergedTabs basePath="/automations" paramName="tab" tabs={tabs} active={tab} />
@@ -624,7 +624,7 @@ export default function AutomationsPage() {
             ? (tab === 'stopped' ? '止めているオートメーションはありません。' : '動いているオートメーションはありません。')
             : '条件に合うオートメーションはありません。'}
           description={automations.length === 0 ? 'きっかけ・だれに・することの3つを決めると動きます。' : '検索語や絞り込みを変えてください。'}
-          action={tab === 'active' && canManageAutomations ? <Button href="/automations/new" variant="primary">オートメーションをつくる</Button> : undefined}
+          action={tab === 'active' && canManageAutomations ? <Button href="/automations/new" variant="primary">ルールを作成</Button> : undefined}
         />
       ) : (
         <div className="overflow-hidden rounded-card border border-hairline bg-canvas shadow-sm">
