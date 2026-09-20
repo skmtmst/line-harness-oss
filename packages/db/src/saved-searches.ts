@@ -159,15 +159,21 @@ export function validateSearchConditions(
     out[group] = list;
   }
 
-  if ((out.all?.length ?? 0) === 0 && (out.any?.length ?? 0) === 0) {
-    return { ok: false, error: '条件が1つもありません' };
-  }
-
   if (obj.visibility !== undefined) {
     if (!['visible_only', 'hidden_only', 'all'].includes(String(obj.visibility))) {
       return { ok: false, error: '表示状態の指定が正しくありません' };
     }
     out.visibility = obj.visibility as SearchConditions['visibility'];
+  }
+
+  /*
+   * 「表示中のみ」「非表示のみ」はそれだけで意味のある絞り込みなので、
+   * all/any が空でも受け取る（#1010 FRIEND-01）。'all' は絞り込み無しと
+   * 同じなので、それだけの条件はこれまで通り弾く。
+   */
+  if ((out.all?.length ?? 0) === 0 && (out.any?.length ?? 0) === 0
+      && (out.visibility === undefined || out.visibility === 'all')) {
+    return { ok: false, error: '条件が1つもありません' };
   }
 
   if (obj.description !== undefined) {
