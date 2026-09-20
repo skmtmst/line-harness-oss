@@ -29,6 +29,7 @@ import FolderPanel, { FOLDER_RAIL_STYLE } from '@/components/shared/folder-panel
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import SearchField from '@/components/shared/search-field'
+import { RequiredBadge } from '@/components/shared/form-controls'
 import Select from '@/components/shared/select'
 import { useAccount } from '@/contexts/account-context'
 import MediaDetailDialog from './media-detail-dialog'
@@ -1352,7 +1353,7 @@ function MediaLibraryInner() {
         }
       >
         <label className="block space-y-1.5">
-          <span className="text-ink text-xs font-bold">理由（必須・あとから履歴で確認できます）</span>
+          <span className="text-ink text-xs font-bold">理由<RequiredBadge /><span className="font-normal text-ink-faint">（あとから履歴で確認できます）</span></span>
           <input
             type="text"
             autoFocus

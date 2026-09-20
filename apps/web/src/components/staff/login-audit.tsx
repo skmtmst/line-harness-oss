@@ -203,7 +203,7 @@ export default function LoginAudit({ userId }: { userId?: string }) {
     </div>
     <div className="mb-4 rounded-control bg-info-bg px-4 py-3 text-sm font-medium text-accent">だれが、いつ、何をしたかの記録です。いつもと違う場所からのログインは赤く出します。消した・配信した・設定を変えたで絞れます。</div>
     <div className="mb-3 flex flex-wrap items-center gap-3">
-      <SearchField value={query} onChange={setQuery} placeholder="人の名前・操作の内容で検索" className="min-w-64 flex-1" />
+      <SearchField aria-label="人の名前・操作の内容で検索" value={query} onChange={setQuery} placeholder="人の名前・操作の内容で検索" className="min-w-64 flex-1" />
       <Select aria-label="期間で絞り込む" value={periodFilter} onChange={setPeriodFilter} options={PERIOD_OPTIONS} />
       <Select aria-label="表示件数" value={String(pageSize)} onChange={(value) => setPageSize(Number(value))} options={PAGE_SIZE_OPTIONS} />
     </div>

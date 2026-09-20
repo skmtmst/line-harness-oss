@@ -7,7 +7,7 @@ import type { Tag } from '@line-crm/shared'
 import Button from '@/components/shared/button'
 import Card, { CardHeader } from '@/components/shared/card'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
-import { Field as FormField } from '@/components/shared/form-controls'
+import { Field as FormField, RequiredBadge } from '@/components/shared/form-controls'
 import ListState from '@/components/shared/list-state'
 import PageHeader from '@/components/shared/page-header'
 import Select from '@/components/shared/select'
@@ -395,7 +395,7 @@ function Field({
     <label className={styles.field}>
       <span className={styles.fieldLabel}>
         {label}
-        {required ? <span className={styles.required}>必須</span> : null}
+        {required ? <RequiredBadge /> : null}
         {max ? <span className={styles.count}>{value.trim().length} / {max}</span> : null}
       </span>
       <input

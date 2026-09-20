@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } 
 import Image from 'next/image'
 import { api, type FollowerImportState, type LineAccountConnectData } from '@/lib/api'
 import Button from '@/components/shared/button'
+import { RequiredBadge } from '@/components/shared/form-controls'
 import PageHeader from '@/components/shared/page-header'
 import StickyBar from '@/components/shared/sticky-bar'
 import StatusBadge from '@/components/shared/status-badge'
@@ -364,7 +365,7 @@ function Choice({ checked, onChange, label }: { checked: boolean; onChange: () =
 
 function Field({ id, label, value, onChange, placeholder, required = false, type = 'text', inputMode, error }: { id: string; label: string; value: string; onChange: (value: string) => void; placeholder?: string; required?: boolean; type?: 'text' | 'password'; inputMode?: 'text' | 'numeric'; error?: string }) {
   const errorId = `${id}-error`
-  return <label className="block" htmlFor={id}><span className="text-ink-secondary mb-1 block text-xs font-medium">{label}{required && <span className="text-danger ml-1">必須</span>}</span><input id={id} type={type} value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} required={required} inputMode={inputMode} autoComplete={type === 'password' ? 'new-password' : undefined} spellCheck={type === 'password' ? false : undefined} aria-invalid={error ? true : undefined} aria-describedby={error ? errorId : undefined} className="border-hairline rounded-control text-ink w-full border px-3 py-2 text-sm" />{error && <span id={errorId} className="text-danger mt-1 block text-xs">{error}</span>}</label>
+  return <label className="block" htmlFor={id}><span className="text-ink-secondary mb-1 block text-xs font-medium">{label}{required && <RequiredBadge />}</span><input id={id} type={type} value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} required={required} inputMode={inputMode} autoComplete={type === 'password' ? 'new-password' : undefined} spellCheck={type === 'password' ? false : undefined} aria-invalid={error ? true : undefined} aria-describedby={error ? errorId : undefined} className="border-hairline rounded-control text-ink w-full border px-3 py-2 text-sm" />{error && <span id={errorId} className="text-danger mt-1 block text-xs">{error}</span>}</label>
 }
 
 function EndpointRow({ label, value, help }: { label: string; value: string; help: string }) {

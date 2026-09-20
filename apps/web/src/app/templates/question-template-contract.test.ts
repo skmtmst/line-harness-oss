@@ -65,6 +65,9 @@ describe('V6 質問テンプレートの寸法', () => {
 
   it('本文の文字サイズを意味名のトークンで指定する', () => {
     expect(page).toContain('text-label')
-    expect(page).toContain('text-caption')
+    // #976 U086: 「必須」の text-caption 札は共通 RequiredBadge へ寄せたため
+    // このファイルから text-caption は消えた。意味名以外の生サイズが戻らない
+    // ことだけをここで見張る。
+    expect(page).not.toMatch(/text-\[\d+(?:\.\d+)?px\]/)
   })
 })

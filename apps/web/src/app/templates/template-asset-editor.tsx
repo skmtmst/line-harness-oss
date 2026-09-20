@@ -7,6 +7,7 @@ import { api, type BroadcastAssetKind } from '@/lib/api'
 import Button from '@/components/shared/button'
 import StickyBar from '@/components/shared/sticky-bar'
 import { TextField } from '@/components/shared/text-field'
+import { RequiredBadge } from '@/components/shared/form-controls'
 import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import MediaPickerDialog from '@/app/contents/media-picker-dialog'
@@ -19,10 +20,12 @@ const META: Record<AssetKind, { title: string; folder: string }> = {
   research: { title: 'リサーチ', folder: '02_健康フォロー' },
 }
 
-function Field({ label, children, note }: { label: string; children: React.ReactNode; note?: string }) {
+function Field({ label, children, note, required }: { label: string; children: React.ReactNode; note?: string; required?: boolean }) {
   return (
     <label className="text-label block font-semibold text-ink-secondary">
       {label}
+      {/* #976 U086: 「必須」はラベル文に埋めず、共通の札を使う */}
+      {required ? <RequiredBadge /> : null}
       {children}
       {note ? <span className="text-caption mt-1 block font-normal text-ink-faint">{note}</span> : null}
     </label>
@@ -125,7 +128,7 @@ export default function TemplateAssetEditor({ kind, visual = false }: { kind: As
       <div className="flex min-w-0 flex-col gap-4 xl:flex-row">
         <main className="min-w-0 flex-1 space-y-4">
           <section className="bg-canvas border-hairline rounded-card shadow-card grid gap-4 border p-4 md:grid-cols-3">
-            <div className="md:col-span-2"><Field label={`${meta.title}名　必須`}><TextField className="mt-2" value={name} onChange={(event) => setName(event.target.value)} /></Field></div>
+            <div className="md:col-span-2"><Field label={`${meta.title}名`} required><TextField className="mt-2" value={name} onChange={(event) => setName(event.target.value)} /></Field></div>
             <Field label="フォルダ"><TextField className="mt-2" value={folder} onChange={(event) => setFolder(event.target.value)} /></Field>
           </section>
 
@@ -165,7 +168,7 @@ export default function TemplateAssetEditor({ kind, visual = false }: { kind: As
                   {pickedMedia ? <span className="text-success mt-1 block text-xs">選択中: {pickedMedia.filename}</span> : null}
                   <span className="text-caption mt-1 block font-normal text-ink-faint">1029 × 1029px 推奨</span>
                 </Field>
-                <Field label="使える期間　必須"><div className="mt-2 flex items-center gap-2"><input className="border-hairline rounded-control bg-canvas text-ink focus:ring-accent w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none" value="2026/08/25 00:00" readOnly /><span>から</span><input className="border-hairline rounded-control bg-canvas text-ink focus:ring-accent w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none" value="2026/09/30 23:59" readOnly /></div></Field>
+                <Field label="使える期間" required><div className="mt-2 flex items-center gap-2"><input className="border-hairline rounded-control bg-canvas text-ink focus:ring-accent w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none" value="2026/08/25 00:00" readOnly /><span>から</span><input className="border-hairline rounded-control bg-canvas text-ink focus:ring-accent w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none" value="2026/09/30 23:59" readOnly /></div></Field>
                 <Field label="使い方のご案内（お客さまに見えます）"><textarea className="border-hairline rounded-control bg-canvas text-ink focus:ring-accent mt-2 w-full resize-y border px-3 py-2 text-sm focus:ring-2 focus:outline-none" rows={3} value={description} onChange={(event) => setDescription(event.target.value)} /></Field>
                 <div className="grid gap-3 text-sm"><Field label="使える回数"><select className="border-hairline rounded-control bg-canvas text-ink focus:ring-accent mt-2 w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none"><option>1人1回だけ</option><option>期間中なら何回でも</option></select></Field><Field label="だれに見えるか"><select className="border-hairline rounded-control bg-canvas text-ink focus:ring-accent mt-2 w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none"><option>友だちだけ</option><option>リンクを知っている人</option></select></Field></div>
               </section>

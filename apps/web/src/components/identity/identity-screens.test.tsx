@@ -186,7 +186,8 @@ describe('判定窓', () => {
     expect(html).toContain('同じ人として結び付ける')
     expect(html).toContain('別人として記録する')
     expect(html).toContain('保留にする')
-    expect(html).toContain('判定の理由（必須）')
+    // #976 U086: 「（必須）」の文字列ではなく共通の必須札を出す
+    expect(html).toMatch(/判定の理由<span[^>]*>必須<\/span>/)
     expect(html).toContain('別人として記録し、根拠が変わるまで候補へ戻しません。')
     expect(html).toContain('理由を書くと判定できます。')
     // 理由が空のうちは押せない。

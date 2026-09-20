@@ -5,6 +5,7 @@ import Link from 'next/link'
 import Button, { type ButtonProps } from '@/components/shared/button'
 import StatusBadge from '@/components/shared/status-badge'
 import StickyBar from '@/components/shared/sticky-bar'
+import { RequiredBadge } from '@/components/shared/form-controls'
 import styles from './reminder-v6-ui.module.css'
 
 const STEPS = ['基本設定', '対象者', '通知ステップ', '送信設定', '確認']
@@ -102,8 +103,9 @@ export function ReminderStepCard({ selected, number, timing, title, note, onClic
   return <button type="button" className={selected ? styles.stepCardActive : styles.stepCard} onClick={onClick}><span>{number}</span><strong>{timing}</strong><b>{title}</b><small>{note}</small></button>
 }
 
-export function Field({ label, note, children }: { label: string; note?: string; children: ReactNode }) {
-  return <label className={styles.field}><span>{label}</span>{note ? <small>{note}</small> : null}{children}</label>
+export function Field({ label, note, required, children }: { label: string; note?: string; required?: boolean; children: ReactNode }) {
+  // #976 U086: 「必須」はラベル文に埋めず、共通の札を使う
+  return <label className={styles.field}><span>{label}{required ? <RequiredBadge /> : null}</span>{note ? <small>{note}</small> : null}{children}</label>
 }
 
 export function Pill({ tone = 'neutral', children }: { tone?: 'neutral' | 'success' | 'warning' | 'danger'; children: ReactNode }) {

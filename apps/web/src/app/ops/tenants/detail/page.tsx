@@ -23,6 +23,7 @@ import ListState from '@/components/shared/list-state'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { Tabs } from '@/components/shared/tabs'
 import { TextArea, TextField } from '@/components/shared/text-field'
+import { RequiredBadge } from '@/components/shared/form-controls'
 
 /**
  * 契約先アカウント詳細。★V6 37-4 `vhwld`。第 1 段は 概要／店舗／権限者／監査 のタブ。
@@ -299,7 +300,7 @@ function StatusDialog({ tenantId, target, tenantName, onClose, onDone }: { tenan
           </label>
         ) : null}
         <label className="block">
-          <span className="mb-1.5 block text-caption font-bold text-ink">理由（必須・4文字以上）</span>
+          <span className="mb-1.5 block text-caption font-bold text-ink">理由<RequiredBadge /><span className="font-normal text-ink-faint">（4文字以上）</span></span>
           <TextArea value={reason} onChange={(event) => setReason(event.target.value)} rows={3} />
         </label>
       </div>
