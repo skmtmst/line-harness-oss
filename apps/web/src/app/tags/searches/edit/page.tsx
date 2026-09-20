@@ -1,7 +1,11 @@
 'use client'
 
-import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
+import {
+  isSavedSearchOpAllowed,
+  isSavedSearchValueOptionalOp,
+} from '@line-crm/shared'
 import type {
   FriendField,
   SavedSearch,
@@ -13,6 +17,7 @@ import type {
   Tag,
 } from '@line-crm/shared'
 import { api, ApiError, type SavedSearchDetail, type SavedSearchMatchPreview } from '@/lib/api'
+import { createResponseGate } from '@/lib/latest-request'
 import { useAccount } from '@/contexts/account-context'
 import FeatureGate from '@/components/feature-gate'
 import { usePageTitle } from '@/components/shell/page-chrome'
@@ -44,8 +49,16 @@ const USAGE_KIND_LABELS = {
   other: 'そのほか',
 } as const
 
+/*
+  保存前の検査は実行側と同じ演算子表で合わせる（ATTR-13）。
+  ここを通るのに実行で断られる組み合わせがあると、保存した本人が
+  画面を離れたあとに検索が壊れる。
+*/
 function conditionProblem(condition: SavedSearchCondition): string | null {
   if (UNSUPPORTED_KINDS.has(condition.kind)) return '未接続の条件を削除してください'
+  if (!isSavedSearchOpAllowed(condition.kind, condition.op)) {
+    return `${EDITABLE_KINDS.find((item) => item.value === condition.kind)?.label ?? '条件'}では使えない比較方法です`
+  }
   if (condition.kind === 'following') return typeof condition.value === 'boolean' ? null : '友だち状態を選んでください'
   if (condition.kind === 'created_at') {
     const range = condition.value && typeof condition.value === 'object'
@@ -54,6 +67,12 @@ function conditionProblem(condition: SavedSearchCondition): string | null {
     return range && (range.from || range.to) ? null : '友だち追加日を入力してください'
   }
   if (condition.kind === 'field' && !condition.key?.trim()) return '友だち情報の項目名を入力してください'
+  /*
+    「登録あり／なし」は値を取らない。値の必須チェックへ落とさない。
+    ただし値そのものが選択対象になる条件（タグの has 等）では
+    使わないので、値を取らない kind だけに限る。
+  */
+  if ((condition.kind === 'field' || condition.kind === 'memo') && isSavedSearchValueOptionalOp(condition.op)) return null
   return typeof condition.value === 'string' && condition.value.trim()
     ? null
     : `${EDITABLE_KINDS.find((item) => item.value === condition.kind)?.label ?? '条件'}の値を選んでください`
@@ -133,8 +152,34 @@ function ConditionEditor({
             )}
             className="min-w-44 flex-1"
           />
-          <Select aria-label="友だち情報の比較" value={condition.op} onChange={(op) => onChange({ ...condition, op })} options={[{ value: 'eq', label: '等しい' }, { value: 'ne', label: '等しくない' }, { value: 'contains', label: '含む' }]} className="w-32" />
-          <TextInput value={rawValue} onChange={(event) => onChange({ ...condition, value: event.target.value })} placeholder="値" className="min-w-40 flex-1" />
+          {/*
+            実行側が解釈できるものだけを選べるようにする（ATTR-13）。
+            「登録あり／なし」と大小比較は以前は画面から作れず、
+            保存済みの条件に混ざると表示も保存も壊れていた。
+          */}
+          <Select
+            aria-label="友だち情報の比較"
+            value={condition.op}
+            onChange={(op) => onChange({ ...condition, op, value: isSavedSearchValueOptionalOp(op) ? '' : condition.value })}
+            options={[
+              { value: 'eq', label: '等しい' },
+              { value: 'ne', label: '等しくない' },
+              { value: 'contains', label: '含む' },
+              { value: 'not_contains', label: '含まない' },
+              { value: 'gte', label: '以上' },
+              { value: 'gt', label: 'より大きい' },
+              { value: 'lte', label: '以下' },
+              { value: 'lt', label: 'より小さい' },
+              { value: 'exists', label: '登録あり' },
+              { value: 'not_exists', label: '登録なし' },
+            ]}
+            className="w-32"
+          />
+          {isSavedSearchValueOptionalOp(condition.op) ? (
+            <span className="min-w-0 flex-1 text-xs text-ink-faint">値の有無だけで絞ります。入力は不要です。</span>
+          ) : (
+            <TextInput value={rawValue} onChange={(event) => onChange({ ...condition, value: event.target.value })} placeholder="値" className="min-w-40 flex-1" />
+          )}
         </>
       ) : condition.kind === 'mark' ? (
         <Select
@@ -252,6 +297,8 @@ function SavedSearchEditInner() {
   const [previewCount, setPreviewCount] = useState<number | null>(null)
   const [preview, setPreview] = useState<SavedSearchMatchPreview | null>(null)
   const [previewStale, setPreviewStale] = useState(false)
+  /** 計算失敗と「まだ計算していない」を分ける。黙って0扱いしない。 */
+  const [previewError, setPreviewError] = useState('')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -259,16 +306,36 @@ function SavedSearchEditInner() {
 
   usePageTitle('保存した検索を編集')
 
+  /*
+    ATTR-12: 再計算の連打・条件変更・アカウント切替で、古い計算結果が
+    新しい条件の人数を上書きしてはいけない。要求ごとに世代の印を取り、
+    応答時に「いまの条件の要求か」「いまのアカウントか」を照合する。
+  */
+  const gateRef = useRef(createResponseGate())
+  const accountRef = useRef(selectedAccountId)
+  accountRef.current = selectedAccountId
+
+  useEffect(() => {
+    gateRef.current.invalidate()
+  }, [selectedAccountId])
+
   const recount = useCallback(async () => {
     if (!selectedAccountId || !id) return
+    const account = selectedAccountId
+    const token = gateRef.current.begin()
+    setPreviewError('')
     try {
-      const res = await api.savedSearches.preview(selectedAccountId, { savedSearchId: id, conditions, revision: original?.revision })
+      const res = await api.savedSearches.preview(account, { savedSearchId: id, conditions, revision: original?.revision })
+      if (!gateRef.current.current(token) || accountRef.current !== account) return
       setPreviewCount(res.success ? res.data.match.total : null)
       setPreview(res.success ? res.data.match : null)
       setPreviewStale(false)
+      if (!res.success) setPreviewError(res.error)
     } catch {
+      if (!gateRef.current.current(token) || accountRef.current !== account) return
       setPreviewCount(null)
       setPreview(null)
+      setPreviewError('人数を計算できませんでした。条件を確かめて再計算してください。')
     }
   }, [conditions, id, original?.revision, selectedAccountId])
 
@@ -325,6 +392,11 @@ function SavedSearchEditInner() {
   }, [conditions, isShared, name, original])
 
   const patchConditions = (next: SavedSearchConditions) => {
+    /*
+      条件が変わった時点で、飛んでいる再計算は今の条件のものではない。
+      応答が届いても人数を上書きさせない（ATTR-12）。
+    */
+    gateRef.current.invalidate()
     setConditions(next)
     setPreviewStale(true)
   }
@@ -446,7 +518,11 @@ function SavedSearchEditInner() {
           <section className="rounded-card border border-hairline bg-canvas p-4 shadow-card">
             <h2 className="text-base font-bold text-ink">該当プレビュー</h2>
             <p className="mt-3 text-3xl font-bold tabular-nums text-ink">{previewCount === null ? '—' : `${previewCount.toLocaleString('ja-JP')}人`}</p>
-            <p className="mt-2 text-xs text-ink-faint">{previewStale ? '条件を変更しました。再計算してください' : preview ? `LINE ${preview.byChannel.line ?? '—'}人・MAIL ${preview.byChannel.mail ?? '—'}人` : '保存済み条件で集計'}</p>
+            {previewError ? (
+              <p role="alert" className="mt-2 text-xs text-danger">{previewError}</p>
+            ) : (
+              <p className="mt-2 text-xs text-ink-faint">{previewStale ? '条件を変更しました。再計算してください' : preview ? `LINE ${preview.byChannel.line ?? '—'}人・MAIL ${preview.byChannel.mail ?? '—'}人` : '保存済み条件で集計'}</p>
+            )}
             <div className="mt-3 flex flex-wrap gap-2"><Button type="button" onClick={() => void recount()}>人数を再計算</Button><Button href={`/friends?savedSearch=${encodeURIComponent(id)}`} variant="primary">該当者を確認</Button></div>
           </section>
 
