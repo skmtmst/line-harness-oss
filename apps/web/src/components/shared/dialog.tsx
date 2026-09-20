@@ -60,7 +60,13 @@ export default function Dialog({
   const titleId = useId()
   const descriptionId = useId()
   const [mounted, setMounted] = useState(false)
-  const panelRef = useOverlayFocus(open && modal, onCancel, busy)
+  /*
+   * open=true で初回マウントした場合、最初の描画は通常DOMで、effect後に
+   * portal へ移る。フォーカス制御は portal の準備ができてから始める
+   * （DEEP-15）。useOverlayFocus 側もイベント時に ref.current を読むため、
+   * 常時マウントから開く場合も同じ経路で正しい面を掴む。
+   */
+  const panelRef = useOverlayFocus(open && modal && mounted, onCancel, busy)
   const confirmationSizeClass = confirmation && compact
     ? tone === 'destructive'
       ? styles.destructiveConfirmation
