@@ -1,7 +1,13 @@
-/** CSVの式注入を防ぎ、改行・カンマ・引用符があっても1セルに保つ。 */
+/**
+ * CSVの式注入を防ぎ、改行・カンマ・引用符があっても1セルに保つ。
+ *
+ * 先頭が `= + - @` やタブの文字列は表計算ソフトが式として実行し得るので、
+ * `'` を付けて無効化する（OWASP CSV Injection。`=cmd|'/C1 calc'!A0` 系）。
+ * サーバ生成CSVは packages/db の protectCsvCell が同じ方針で守る。
+ */
 export function csvCell(value: unknown): string {
   let text = value == null ? '' : String(value)
-  if (/^[=+\-@]/.test(text)) text = `'${text}`
+  if (/^[=+\-@\t\r]/.test(text)) text = `'${text}`
   return `"${text.replaceAll('"', '""')}"`
 }
 

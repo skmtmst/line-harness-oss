@@ -220,4 +220,31 @@ describe('GET /api/nen/health（★V6 37-4 健康日記）', () => {
     expect((await get(`/api/nen/health/pet-other/summary?accountId=${ACCOUNT}`)).status).toBe(404);
     expect((await get('/api/nen/health/pet-other/summary?accountId=account-other')).status).toBe(403);
   });
+
+  // DEEP-24: 「その他」の動物を犬へ変換しない。登録→一覧→健康まとめで種類を保持し、
+  // 犬・猫専用の給与計算には進めない。
+  it('種別が「その他」のペットは一覧・健康日記・まとめで other のまま返し、給与目安を計算しない', async () => {
+    sql.exec(`
+      INSERT INTO nen_pet_profiles (id, friend_id, name, animal_type, gender, birthday, breed, weight_kg, concerns,
+        neutered, activity_level, feeding_product_id, created_at, updated_at) VALUES
+        ('pet-usa', 'friend-b', 'ウー', 'other', 'female', '2024-01-10', 'うさぎ', 2, '[]', 1, 'normal', 'prod-mince', '${stamp(1)}', '${stamp(1)}')
+    `);
+    sql.prepare(`INSERT INTO nen_health_logs (id, pet_id, friend_id, logged_on, weight_kg, stool_status, appetite, skin_status, tear_stain_status, note, heart_rate_bpm, respiratory_rate_bpm, created_at)
+      VALUES ('log-usa-0', 'pet-usa', 'friend-b', ?, 2.0, 'normal', 'good', 'normal', 'normal', '', NULL, NULL, ?)`)
+      .run(day(0), stamp(0));
+
+    const pets = await get(`/api/nen/pets?accountId=${ACCOUNT}`);
+    const usa = pets.body.data.items.find((p: any) => p.name === 'ウー');
+    expect(usa.animalType).toBe('other');
+    // 体重・主食がそろっていても、犬猫専用の式は回さない（犬の数値を出さない）。
+    expect(usa.feeding).toBeNull();
+
+    const health = await get(`/api/nen/health?accountId=${ACCOUNT}`);
+    const row = health.body.data.items.find((r: any) => r.pet.name === 'ウー');
+    expect(row.pet.animalType).toBe('other');
+
+    const summary = await get(`/api/nen/health/pet-usa/summary?accountId=${ACCOUNT}`);
+    expect(summary.status).toBe(200);
+    expect(summary.body.data.pet.animalType).toBe('other');
+  });
 });

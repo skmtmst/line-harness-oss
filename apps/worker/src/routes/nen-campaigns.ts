@@ -724,9 +724,20 @@ function petWriteBody(body: Record<string, unknown> | null):
   if (weightKg !== null && (!Number.isFinite(weightKg) || weightKg < 0.1 || weightKg > 200)) {
     return { error: '体重は 0.1〜200kg で入力してください' };
   }
+  // DEEP-24: 種別は犬・猫・その他の3値。未指定は従来どおり犬を既定にするが、
+  // 送られてきた値が範囲外なら犬へ黙って倒さず入力エラーにする
+  // （ウサギ等が犬として保存・計算される事故を防ぐ）。
+  const animalTypeRaw = body.animalType;
+  let animalType = 'dog';
+  if (animalTypeRaw !== undefined && animalTypeRaw !== null && animalTypeRaw !== '') {
+    if (!['dog', 'cat', 'other'].includes(String(animalTypeRaw))) {
+      return { error: '種別は 犬・猫・その他 から選んでください' };
+    }
+    animalType = String(animalTypeRaw);
+  }
   return {
     name: body.name.trim(),
-    animalType: ['dog', 'cat', 'other'].includes(String(body.animalType)) ? String(body.animalType) : 'dog',
+    animalType,
     gender: ['male', 'female', 'unknown'].includes(String(body.gender)) ? String(body.gender) : 'unknown',
     birthday,
     breed: typeof body.breed === 'string' && body.breed.trim() ? body.breed.trim().slice(0, 80) : null,
@@ -756,7 +767,11 @@ function petPatchBody(body: Record<string, unknown> | null):
     patch.name = body.name.trim();
   }
   if (body.animalType !== undefined) {
-    patch.animalType = ['dog', 'cat', 'other'].includes(String(body.animalType)) ? String(body.animalType) : 'dog';
+    // DEEP-24: 範囲外の種別を犬へ黙って倒さずエラーにする。
+    if (!['dog', 'cat', 'other'].includes(String(body.animalType))) {
+      return { error: '種別は 犬・猫・その他 から選んでください' };
+    }
+    patch.animalType = String(body.animalType);
   }
   if (body.gender !== undefined) {
     patch.gender = ['male', 'female', 'unknown'].includes(String(body.gender)) ? String(body.gender) : 'unknown';

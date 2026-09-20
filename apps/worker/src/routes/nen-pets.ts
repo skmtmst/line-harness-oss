@@ -3,6 +3,7 @@ import type { Env } from '../index.js';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
 import { ACTIVITY_LABELS, DEFAULT_TREAT_LIMIT_PERCENT, getTreatLimitPercent, listFeedingProducts, planForPetRow, pickProduct, stapleProducts, type FeedingProductRow } from '../services/nen-feeding.js';
 import { petCallName, petGender } from '../services/nen-pet-name.js';
+import { toPetAnimalType } from '../lib/nen-pet-species.js';
 import {
   APPETITE_LABELS, STOOL_LABELS, lastLoggedLabel, summarizePetHealth, thirtyDaySummary, type HealthLogRow,
 } from '../services/nen-health-admin.js';
@@ -82,7 +83,7 @@ function petView(row: PetRow, products: FeedingProductRow[], today: Date, treatL
     name: row.name,
     callName: petCallName(row.name, row.gender),
     gender: petGender(row.gender),
-    animalType: row.animal_type === 'cat' ? 'cat' : row.animal_type === 'other' ? 'other' : 'dog',
+    animalType: toPetAnimalType(row.animal_type),
     breed: row.breed ?? '',
     birthday: row.birthday,
     ageLabel: ageLabel(row.birthday, today),
@@ -195,7 +196,7 @@ nenPets.get('/api/nen/health', async (c) => {
       if (summary.daysSinceLast >= 30 && !summary.changes.some((ch) => ch.key === 'silent')) summary.changes.push({ key: 'silent', label: '30日以上 記録なし', tone: 'faint' });
     }
     return {
-      pet: { id: pet.id, name: pet.name, callName: petCallName(pet.name, pet.gender), animalType: pet.animal_type === 'cat' ? 'cat' : 'dog', breed: pet.breed ?? '', ageLabel: ageLabel(pet.birthday, today), imageUrl: pet.image_url },
+      pet: { id: pet.id, name: pet.name, callName: petCallName(pet.name, pet.gender), animalType: toPetAnimalType(pet.animal_type), breed: pet.breed ?? '', ageLabel: ageLabel(pet.birthday, today), imageUrl: pet.image_url },
       owner: { friendId: pet.friend_id, name: pet.owner_name ?? '', customerId: pet.ec_customer_id ?? pet.customer_id ?? null },
       lastLoggedOn: summary.lastLoggedOn,
       lastLoggedLabel: lastLoggedLabel(summary),
@@ -252,7 +253,7 @@ nenPets.get('/api/nen/health/:petId/summary', async (c) => {
   ).bind(petId, since).all<HealthRow>();
   const today = new Date();
   return c.json({ success: true, data: {
-    pet: { id: pet.id, name: pet.name, callName: petCallName(pet.name, pet.gender), animalType: pet.animal_type === 'cat' ? 'cat' : 'dog', breed: pet.breed ?? '', ageLabel: ageLabel(pet.birthday, today), weightKg: pet.weight_kg },
+    pet: { id: pet.id, name: pet.name, callName: petCallName(pet.name, pet.gender), animalType: toPetAnimalType(pet.animal_type), breed: pet.breed ?? '', ageLabel: ageLabel(pet.birthday, today), weightKg: pet.weight_kg },
     owner: { friendId: pet.friend_id, name: pet.owner_name ?? '' },
     generatedAt: today.toISOString(),
     summary: thirtyDaySummary(logs.results ?? [], today),
