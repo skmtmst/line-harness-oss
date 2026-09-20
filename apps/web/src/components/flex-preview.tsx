@@ -249,27 +249,96 @@ function FlexBubble({ bubble, maxWidth }: { bubble: FlexNode; maxWidth?: number 
   )
 }
 
-export default function FlexPreview({ content, maxWidth }: { content: string; maxWidth?: number }) {
-  try {
-    const parsed = JSON.parse(content)
-
-    if (parsed.type === 'carousel' && Array.isArray(parsed.contents)) {
-      return (
-        <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', padding: '4px 0' }}>
-          {parsed.contents.map((bubble: FlexNode, i: number) => (
-            <FlexBubble key={i} bubble={bubble} maxWidth={maxWidth} />
-          ))}
-        </div>
-      )
-    }
-
-    if (parsed.type === 'bubble') {
-      return <FlexBubble bubble={parsed} maxWidth={maxWidth} />
-    }
-
-    // Unknown type — fallback to text extraction
-    return <pre className="text-xs bg-gray-50 rounded p-2 max-h-40 overflow-auto">{JSON.stringify(parsed, null, 2)}</pre>
-  } catch {
-    return <p className="text-xs text-red-500">Flex JSON パースエラー</p>
+/**
+ * 保存されている Flex 本文から、描画できる容器（bubble / carousel）を
+ * 取り出す。
+ *
+ * 書かれ方は2通りある(#982 LAY-05)：
+ *   - 直接の bubble / carousel …… テンプレート編集で保存した形
+ *   - `{ type:'flex', altText, contents:{...} }` …… LINEメッセージ形。
+ *     送信済み・受信履歴はこちらで保存されることがある。
+ *
+ * 以前は直下の bubble / carousel しか処理せず、flex で包まれた過去の
+ * カードはフォールバックの `pre` に落ちて、送信吹き出しの白文字を
+ * 継承したまま生JSONになっていた。
+ */
+export function normalizeFlexContainer(parsed: unknown): FlexNode | null {
+  let node = parsed as FlexNode | null
+  while (
+    node !== null &&
+    typeof node === 'object' &&
+    node.type === 'flex' &&
+    node.contents
+  ) {
+    node = (Array.isArray(node.contents) ? node.contents[0] : node.contents) as FlexNode
   }
+  if (node && (node.type === 'bubble' || node.type === 'carousel')) return node
+  return null
+}
+
+/** LINEメッセージ形に付く altText。あれば代替文として出す。 */
+function flexAltText(parsed: unknown): string | undefined {
+  if (parsed && typeof parsed === 'object') {
+    const alt = (parsed as { altText?: unknown }).altText
+    if (typeof alt === 'string' && alt.trim()) return alt.trim()
+  }
+  return undefined
+}
+
+/**
+ * 描画できないデータの代替表示。
+ *
+ * 吹き出し（送信=緑・受信=白）のどちらに載っても読めるよう、
+ * 背景と文字色は必ず組で指定する。元のJSONは畳んだ詳細に入れ、
+ * 既定では生データだけが画面に出る形にしない。
+ * 「プレビューできない」ことと「送信に失敗した」ことは別なので、
+ * 失敗を思わせる文言は使わない。
+ */
+function FlexUnavailable({ raw, parsed }: { raw: string; parsed?: unknown }) {
+  const altText = parsed === undefined ? undefined : flexAltText(parsed)
+  return (
+    <div
+      data-flex-preview="unavailable"
+      className="border-hairline bg-canvas text-ink w-full max-w-xs rounded-lg border p-3 text-left text-xs"
+    >
+      <p className="font-semibold">このメッセージはプレビューできません</p>
+      <p className="text-ink-secondary mt-1 whitespace-pre-wrap break-words">
+        {altText ?? 'カード形式のメッセージです。LINEアプリで内容を確認してください。'}
+      </p>
+      <details className="mt-2">
+        <summary className="text-ink-faint cursor-pointer text-micro">元のデータを表示</summary>
+        <pre className="bg-canvas-sunken text-ink-secondary mt-1 max-h-40 overflow-auto whitespace-pre-wrap break-all rounded p-2 text-micro">
+          {raw.length > 4000 ? `${raw.slice(0, 4000)}…` : raw}
+        </pre>
+      </details>
+    </div>
+  )
+}
+
+export default function FlexPreview({ content, maxWidth }: { content: string; maxWidth?: number }) {
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(content)
+  } catch {
+    return <FlexUnavailable raw={content} />
+  }
+
+  const container = normalizeFlexContainer(parsed)
+
+  if (container?.type === 'bubble') {
+    return <FlexBubble bubble={container} maxWidth={maxWidth} />
+  }
+
+  if (container?.type === 'carousel' && Array.isArray(container.contents) && container.contents.length > 0) {
+    return (
+      <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', padding: '4px 0' }}>
+        {container.contents.map((bubble: FlexNode, i: number) => (
+          <FlexBubble key={i} bubble={bubble} maxWidth={maxWidth} />
+        ))}
+      </div>
+    )
+  }
+
+  // 未対応の形・破損データ —— 白文字の生JSONではなく代替文を出す。
+  return <FlexUnavailable raw={content} parsed={parsed} />
 }

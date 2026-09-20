@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useCallback, useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { api, type MileageHistoryItem, type MileageSummary } from '@/lib/api'
 import Button from '@/components/shared/button'
@@ -103,6 +103,62 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
   const [error, setError] = useState<string | null>(null)
   const [showSettings, setShowSettings] = useState(false)
   const [draggedGroupKey, setDraggedGroupKey] = useState<string | null>(null)
+  const settingsButtonRef = useRef<HTMLButtonElement | null>(null)
+  const [settingsPanelPos, setSettingsPanelPos] = useState<{
+    top?: number
+    bottom?: number
+    left: number
+    width: number
+    maxHeight: number
+  } | null>(null)
+
+  /*
+   * 「表示項目」パネルは、押したボタンの下へ開く(#982 LAY-03)。
+   * 以前は `top:430px` 固定で、高さ700pxの画面では「初期状態に戻す」
+   * 「完了」が画面外へ出て届かなかった。
+   * 下に十分な空きがなければボタンの上へ開き、どちらにしても
+   * 最大高さは 100dvh-32px（上下16px余白）までに収める。
+   */
+  const updateSettingsPanelPos = useCallback(() => {
+    const button = settingsButtonRef.current
+    if (!button || typeof window === 'undefined') return
+    const rect = button.getBoundingClientRect()
+    const margin = 16
+    const gap = 8
+    const width = Math.min(360, window.innerWidth - margin * 2)
+    // 右端をボタンに合わせる。はみ出すときだけ左へ寄せる。
+    const left = Math.min(Math.max(margin, rect.right - width), window.innerWidth - width - margin)
+    const belowTop = rect.bottom + gap
+    const belowRoom = window.innerHeight - belowTop - margin
+    const aboveRoom = rect.top - gap - margin
+    const capHeight = (room: number) => Math.max(100, Math.min(room, window.innerHeight - margin * 2))
+    if (belowRoom >= 240 || belowRoom >= aboveRoom) {
+      setSettingsPanelPos({ top: belowTop, left, width, maxHeight: capHeight(belowRoom) })
+    } else {
+      setSettingsPanelPos({ bottom: window.innerHeight - rect.top + gap, left, width, maxHeight: capHeight(aboveRoom) })
+    }
+  }, [])
+
+  /*
+   * 開いているあいだは Escape で閉じ、画面サイズやスクロールで
+   * ボタンの位置が動いたら置き直す（パネルは画面基準の fixed のため
+   * 追従しないとボタンから離れる）。
+   */
+  useEffect(() => {
+    if (!showSettings) return
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setShowSettings(false)
+    }
+    document.addEventListener('keydown', onKey)
+    window.addEventListener('resize', updateSettingsPanelPos)
+    window.addEventListener('scroll', updateSettingsPanelPos, true)
+    return () => {
+      document.removeEventListener('keydown', onKey)
+      window.removeEventListener('resize', updateSettingsPanelPos)
+      window.removeEventListener('scroll', updateSettingsPanelPos, true)
+    }
+  }, [showSettings, updateSettingsPanelPos])
+
   const [sectionOrder, setSectionOrder] = useState<DetailSectionKey[]>(DEFAULT_SECTION_ORDER)
   const [hiddenSections, setHiddenSections] = useState<DetailSectionKey[]>([])
   const [prefsLoaded, setPrefsLoaded] = useState(false)
@@ -265,7 +321,11 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
           </div>
           <button
             type="button"
-            onClick={() => setShowSettings((current) => !current)}
+            ref={settingsButtonRef}
+            onClick={() => {
+              if (!showSettings) updateSettingsPanelPos()
+              setShowSettings(!showSettings)
+            }}
             aria-expanded={showSettings}
             className="mr-14 inline-flex h-8 shrink-0 items-center justify-center whitespace-nowrap rounded-lg border border-[#E5E7EB] bg-white px-3 text-[11px] font-semibold text-[#667085] hover:bg-[#F7F8F6]"
           >
@@ -275,10 +335,12 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
         {showSettings && typeof document !== 'undefined' ? createPortal(
           <div
             data-inbox-v6="detail-sections-panel"
-            style={{ top: 430 }}
-            className="bg-canvas border-hairline rounded-panel shadow-float fixed right-14 z-50 w-[360px] border p-4"
+            role="dialog"
+            aria-label="右パネルの表示項目"
+            style={settingsPanelPos ?? { top: 16, left: 16, right: 16, maxHeight: 'calc(100dvh - 32px)' }}
+            className="bg-canvas border-hairline rounded-panel shadow-float fixed z-[80] flex flex-col overflow-hidden border"
           >
-            <div className="flex items-start justify-between gap-2">
+            <div className="flex shrink-0 items-start justify-between gap-2 px-4 pt-4">
               <div className="min-w-0">
                 <p className="text-ink text-xs font-bold">右パネルの表示項目</p>
                 <p className="text-ink-faint text-micro mt-0.5">ドラッグで順番変更・スイッチで表示切替</p>
@@ -292,7 +354,8 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
                 <X aria-hidden="true" size={16} />
               </button>
             </div>
-            <div className="mt-3 space-y-1.5">
+            {/* 項目の並びはここだけがスクロールする。見出しと操作は常に画面内。 */}
+            <div className="mt-3 min-h-0 flex-1 space-y-1.5 overflow-y-auto px-4">
               {orderedSettingGroups.map((group, index) => {
                 const visible = group.sections.every((key) => !hiddenSections.includes(key))
                 return (
@@ -357,9 +420,10 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
             </div>
             {/*
               **全部隠すと右パネルが空になり、何を隠したのかも画面から読めない。**
-              戻す道をここに置く。
+              戻す道をここに置く。スクロール領域の外に固定して、低い画面でも
+              「初期状態に戻す」「完了」へ届くようにする(#982 LAY-03)。
             */}
-            <div className="mt-3 flex items-center justify-between gap-2">
+            <div className="mt-3 flex shrink-0 items-center justify-between gap-2 border-t border-hairline px-4 py-3">
               {/* 設計 `Xi4x9` の2つは h36。共通ボタンと同値なので部品を使う。 */}
               <Button
                 onClick={() => {

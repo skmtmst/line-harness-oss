@@ -87,7 +87,10 @@ describe('受信箱 保存した検索の完了判定', () => {
   })
 
   it('顧客情報を開いても会話一覧の幅を保つ', () => {
-    expect(PAGE).toContain("showFriendInfo ? 'lg:w-72 2xl:w-[420px]'")
+    // LAY-01(#982): 開いている間は 288px 固定。2xl で 420px へ急拡大すると
+    // 3列が 1536px に収まらなくなる（一覧+トーク+顧客情報）。
+    expect(PAGE).toContain("showFriendInfo ? 'lg:w-72'")
+    expect(PAGE).not.toContain("showFriendInfo ? 'lg:w-72 2xl:w-[420px]'")
   })
 
   it('保存条件ごとの件数が未接続なら0件にせず理由を出す', () => {
