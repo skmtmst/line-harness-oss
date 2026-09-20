@@ -36,6 +36,12 @@ function EditCommonActionInner() {
   const [error, setError] = useState('')
 
   useEffect(() => {
+    // U096: 対象が無いURLでは取りに行かない。無いまま叩くと
+    // 「API error: 404」のような技術の言葉がそのまま画面に出る。
+    if (!id) {
+      setLoading(false)
+      return
+    }
     if (accountLoading || canManage !== true || !selectedAccountId) {
       if (!accountLoading) setLoading(false)
       return
@@ -57,7 +63,20 @@ function EditCommonActionInner() {
       setDraftVersionId(draft.id)
       setResources(resourceResponse.data)
     }).catch((caught) => {
-      if (!cancelled) setError(caught instanceof Error ? caught.message : '下書きを読み込めませんでした')
+      /*
+        U096: 生の `API error: 404` を主文にしない。消えた・権限が無い・
+        通信の失敗を言い分け、直し方を文に入れる。
+      */
+      if (cancelled) return
+      if (caught instanceof ApiError && caught.status === 404) {
+        setError('この共通アクションは削除されたか、別のLINEアカウントのものです。')
+      } else if (caught instanceof ApiError && caught.status === 403) {
+        setError('この共通アクションを編集する権限がありません。')
+      } else {
+        setError(caught instanceof Error && caught.message && !caught.message.startsWith('API error:')
+          ? caught.message
+          : '下書きを読み込めませんでした。通信の状態を確認して、もう一度お試しください。')
+      }
     }).finally(() => {
       if (!cancelled) setLoading(false)
     })
@@ -96,6 +115,25 @@ function EditCommonActionInner() {
     setActions((current) => current.map((step) => step.id === branchId ? updateBranchStep(step, patch) : step))
   }
 
+  // U096: 対象未指定を専用の案内にする。取得に行かず、一覧へ戻す。
+  if (!id) return (
+    <div className="border-hairline rounded-card border bg-canvas p-6">
+      <h2 className="text-ink text-lg font-semibold">編集する共通アクションが指定されていません</h2>
+      <p className="text-ink-secondary mt-2 text-sm">一覧から編集する共通アクションを選び直してください。</p>
+      <Button href="/common-actions" className="mt-4">共通アクション一覧へ戻る</Button>
+    </div>
+  )
+  /*
+    U096: アカウント未選択と「対象が無い」を分ける。未選択のまま描くと
+    空っぽの編集画面が出て、何が足りないか分からない。
+  */
+  if (!accountLoading && !selectedAccountId) return (
+    <div className="border-hairline rounded-card border bg-canvas p-6">
+      <h2 className="text-ink text-lg font-semibold">共通アクションを編集するLINEアカウントを選んでください</h2>
+      <p className="text-ink-secondary mt-2 text-sm">上部の切替でLINEアカウントを選ぶと、その共通アクションの下書きを編集できます。</p>
+      <Button href="/common-actions" className="mt-4">共通アクション一覧へ戻る</Button>
+    </div>
+  )
   if (canManage === null || loading) return <div className="border-hairline rounded-card border bg-canvas p-10 text-center text-sm text-ink-faint" aria-busy="true">下書きを読み込んでいます</div>
   if (!canManage) return (
     <div className="border-hairline rounded-card border bg-canvas p-6">

@@ -8,6 +8,8 @@ import { UNANSWERED_REFRESH_EVENT } from '@/lib/events'
 import { useBrand } from '@/lib/use-brand'
 import { restaurantTestUiEnabled } from '@/lib/environment-features'
 import { HQ_MENU_SECTIONS, orderedMenuSections, type MenuItem } from '@/lib/menu'
+import { usePageChrome } from '@/components/shell/page-chrome'
+import { defaultTitleForPath } from '@/components/shell/app-top-bar'
 import SidebarIdentity from './sidebar-identity'
 import HqAccountMenu from '@/components/hq/account-menu'
 import {
@@ -60,6 +62,13 @@ export default function Sidebar({
   const isHq = pathname === '/hq' || pathname.startsWith('/hq/')
   const { selectedAccountId } = useAccount()
   const brand = useBrand()
+  /*
+   * モバイルの固定ヘッダーに出す現在地（U037）。
+   * PC の上部バーと同じ「ページが渡した名前 → メニューの名前 → アカウント名」。
+   * PageChromeProvider の外（/visual-qa など）では null が返るだけで落ちない。
+   */
+  const { title: chromeTitle } = usePageChrome()
+  const mobileTitle = chromeTitle ?? defaultTitleForPath(pathname ?? '')
   const [isOpen, setIsOpen] = useState(false)
   const [staffName, setStaffName] = useState<string | null>(null)
   const [staffRole, setStaffRole] = useState<string | null>(null)
@@ -470,7 +479,11 @@ export default function Sidebar({
 
   return (
     <>
-      {/* モバイル: ハンバーガーヘッダー */}
+      {/*
+        モバイル: ハンバーガーヘッダー。
+        1280px 未満では PC の上部バー（画面名・アカウント切替）を畳み、
+        現在地はここへ出す（U037）。2本のヘッダーを同時に占有させない。
+      */}
       <div className={`${styles.mobileHeader} ${styles.mobileOnly}`}>
         <button
           onClick={() => setIsOpen(!isOpen)}
@@ -484,17 +497,18 @@ export default function Sidebar({
             }
           </svg>
         </button>
-        {/* 名前とアイコンは公式アカウントのもの。ログイン画面と同じ扱い。 */}
-        <div className="flex items-center gap-2">
+        {/* いま開いている画面の名前。取れない画面はアカウント名で埋める。 */}
+        <p className={styles.mobileTitle} title={mobileTitle || brand.name || undefined}>
+          {mobileTitle || brand.name || '然-NEN- LINE管理システム'}
+        </p>
+        {/* 公式アカウントの印。名前は画面名が持つので、ここはアイコンだけ。 */}
+        <div className={styles.mobileBrand}>
           {brand.iconUrl ? (
             /* eslint-disable-next-line @next/next/no-img-element -- LINE の CDN。静的アセットではない */
             <img src={brand.iconUrl} alt="" className="w-7 h-7 rounded-lg object-cover" />
           ) : (
             <div className="w-7 h-7 rounded-lg flex items-center justify-center text-white font-bold text-xs" style={{ backgroundColor: 'var(--color-accent)' }}>然</div>
           )}
-          <p className="text-sm font-bold leading-tight text-gray-900 truncate">
-            {brand.name ?? '然-NEN- LINE管理システム'}
-          </p>
         </div>
       </div>
 

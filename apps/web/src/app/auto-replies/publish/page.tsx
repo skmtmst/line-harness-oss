@@ -35,7 +35,7 @@ import { ApiError, api, type FriendListItem } from '@/lib/api'
 import { canPublish, conflictTone, publishGates, type PublishStage } from './publish-flow'
 import './publish.css'
 
-type LoadState = 'loading' | 'ready' | 'error' | 'denied'
+type LoadState = 'loading' | 'ready' | 'error' | 'denied' | 'missing'
 type FriendLoadState = 'loading' | 'ready' | 'error'
 
 const PAGE_TITLES: Record<PublishStage, string> = {
@@ -249,7 +249,8 @@ function AutoReplyPublishInner() {
 
   const load = useCallback(async () => {
     if (!autoReplyId) {
-      setLoadState('error')
+      // U098: 対象未指定は失敗と分ける。再読み込みしても対象は増えない。
+      setLoadState('missing')
       return
     }
     setLoadState('loading')
@@ -301,13 +302,32 @@ function AutoReplyPublishInner() {
       />
     )
   }
+  if (loadState === 'missing') {
+    /*
+      U098: 対象未指定のとき「再読み込み」は同じ失敗を繰り返すだけ。
+      一覧へ戻して、公開する下書きを選び直させる。
+    */
+    return (
+      <ListState
+        kind="empty"
+        title="公開する自動応答が指定されていません"
+        description="編集画面から「公開」へ進むか、一覧から自動応答を選び直してください。"
+        action={<Button href="/auto-replies">自動応答の一覧へ戻る</Button>}
+      />
+    )
+  }
   if (loadState === 'error' || !draft) {
     return (
       <ListState
         kind="error"
         title="下書きを表示できませんでした"
         description="保存した下書きは消えていません。状態を読み直して、もう一度お試しください。"
-        action={<Button onClick={() => void load()}>再読み込み</Button>}
+        action={
+          <>
+            <Button onClick={() => void load()}>再読み込み</Button>
+            <Button href="/auto-replies">自動応答の一覧へ戻る</Button>
+          </>
+        }
       />
     )
   }

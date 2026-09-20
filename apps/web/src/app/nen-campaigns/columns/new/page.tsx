@@ -332,7 +332,7 @@ function NewNenColumnInner() {
             </ul>
           </Card>
 
-          <Card layout="vertical" className={styles.section}>
+          <Card layout="vertical" className={styles.section} data-nen-part="cannot">
             <CardHeader title="この画面でできないこと" />
             <p className={styles.note}>
               記事本文の編集はここでは行いません。本文は外部サイトで管理します。

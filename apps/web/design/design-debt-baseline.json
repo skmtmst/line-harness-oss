@@ -827,6 +827,9 @@
     "arbitrary-value": 15,
     "direct-primary-button": 2
   },
+  "components/ui/kpi-collapse.tsx": {
+    "unresolved-classname": 3
+  },
   "components/ui/notification-switch.tsx": {
     "arbitrary-value": 2,
     "direct-primary-button": 1

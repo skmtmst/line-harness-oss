@@ -391,7 +391,14 @@ function SavedSearchEditInner() {
 
   if (loading) return <p className="text-sm text-ink-faint">読み込んでいます</p>
   if (!selectedAccountId) return <p className="rounded-card border border-hairline bg-canvas p-5 text-sm text-ink-secondary">上部でLINE公式アカウントを選んでください。</p>
-  if (!original) return <p className="rounded-card border border-hairline bg-canvas p-5 text-sm text-danger">{error || '保存した検索が見つかりません'}</p>
+  /* #975 U069: 見つからないときも行き止まりにしない。一覧へ戻る道を出す。 */
+  if (!original) return (
+    <div className="rounded-card border border-hairline bg-canvas p-5">
+      <p className="text-sm font-semibold text-danger">{error || '保存した検索が見つかりません'}</p>
+      <p className="mt-1 text-xs text-ink-faint">削除されたか、別のLINEアカウントの検索です。一覧から選び直せます。</p>
+      <Button href="/tags?tab=searches" className="mt-3">保存した検索の一覧へ戻る</Button>
+    </div>
+  )
 
   return (
     <div data-design-node="XBkiQ">

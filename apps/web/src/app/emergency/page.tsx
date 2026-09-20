@@ -7,6 +7,7 @@ import React, { Suspense, useCallback, useEffect, useRef, useState, type ReactNo
 import type { LineAccount } from '@line-crm/shared'
 import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
 import PageHeader from '@/components/shared/page-header'
+import KpiCollapse from '@/components/ui/kpi-collapse'
 import {
   api,
   ApiError,
@@ -1086,12 +1087,13 @@ function HistoryPanel() {
         <SelectField aria-label="表示期間" value={period} onChange={(event) => setPeriod(event.target.value as typeof period)} options={[{ value: 'year', label: 'この1年' }, { value: '30days', label: 'この30日' }]} className="border-hairline rounded-control min-h-9 border bg-canvas px-3 text-xs" />
         <button type="button" onClick={downloadCsv} className="rounded-control min-h-9 px-3 text-xs font-bold text-action hover:bg-action-soft">CSVで書き出す</button>
       </div>
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
+      {/* #975 U060: 390pxでは先頭2件だけ出し、残りは「集計を見る」で開く。 */}
+      <KpiCollapse gridClassName="grid grid-cols-1 gap-3 md:grid-cols-4">
         <SummaryCard label="止めた回数" value={state === 'ready' ? `${entries.length}回${truncated ? '以上' : ''}` : '—'} note={period === '30days' ? 'この30日' : 'この1年'} />
         <SummaryCard label="いちばん長かった停止" value={longestMinutes > 0 ? `${longestMinutes}分` : '—'} note={truncated ? '直近の記録から' : period === '30days' ? 'この30日' : 'この1年'} />
         <SummaryCard label="管理画面の更新" value={`${updateCount}回`} note="この30日" />
         <SummaryCard label="いまの版" value={currentVersion} note="反映済み" />
-      </div>
+      </KpiCollapse>
       <div className="rounded-control bg-info-bg text-info px-4 py-3 text-xs font-semibold">止めた・戻した記録です。だれが、いつ、何を止めたかが残ります。通常の管理者は消せません。</div>
       <div className="flex flex-col items-start gap-4 xl:flex-row">
         <div className="min-w-0 flex-1 space-y-4">

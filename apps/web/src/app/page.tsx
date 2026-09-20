@@ -32,6 +32,7 @@ import Card, { CardHeader } from '@/components/shared/card'
 import Button from '@/components/shared/button'
 import IconButton from '@/components/shared/icon-button'
 import NotificationPanel from '@/components/shared/notification-panel'
+import KpiCollapse from '@/components/ui/kpi-collapse'
 import SelectField from '@/components/shared/select-field'
 import { STATE_TEXT } from '@/components/shared/not-connected'
 import {
@@ -939,9 +940,10 @@ function DashboardPageInner() {
           <h2 className="text-ink text-lg font-bold">今日やること</h2>
           <span className="text-ink-faint text-xs">優先度が高い順</span>
         </div>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {/* #975 U060: 390pxでは先頭2件だけ出し、残りは「集計を見る」で開く。 */}
+        <KpiCollapse gridClassName="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {visibleToday.map((item) => <div key={item.id}>{renderTodayCard(item.id)}</div>)}
-        </div>
+        </KpiCollapse>
       </section> : null}
 
       <div data-design="Shipment" className={shipmentVisible ? 'mb-6' : 'hidden'} aria-hidden={!shipmentVisible}>

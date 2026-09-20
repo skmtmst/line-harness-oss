@@ -228,7 +228,20 @@ function InflowLinkDetailPageContent() {
       </nav>
 
       {error && <p className="text-danger mb-3 text-sm">{error}</p>}
-      {!route ? <div className="rounded-card border border-hairline bg-canvas p-12 text-center text-sm text-ink-faint">{loading ? '読み込み中…' : '流入元を表示できませんでした。'}</div> : <>
+      {/*
+        U097: 「表示できませんでした」のあとに戻る操作が無かった。
+        一覧へ戻るリンクを文のそばに置く。
+      */}
+      {!route ? (
+        <div className="rounded-card border border-hairline bg-canvas p-12 text-center text-sm text-ink-faint">
+          {loading ? '読み込み中…' : (
+            <>
+              <p>流入元を表示できませんでした。削除されたか、リンクが古くなっています。</p>
+              <Link href="/inflow-links" className="text-action mt-3 inline-block font-semibold hover:underline">流入経路の一覧へ戻る</Link>
+            </>
+          )}
+        </div>
+      ) : <>
         <div data-design="Head" className="mb-4 flex flex-wrap items-start justify-between gap-3">
           <div><div className="flex items-center gap-2"><span className="rounded-pill bg-canvas-sunken px-2 py-1 text-xs font-semibold"># {route.refCode}</span><span className="rounded-pill bg-canvas-sunken px-2 py-1 text-xs font-semibold">{route.genre || '未分類'}</span></div><p className="mt-2 text-sm text-ink-faint">{route.createdAt.slice(5, 10).replace('-', '/')} に発行。{url} を通った人の記録です。</p></div>
           <div className="flex gap-2"><Button onClick={copyUrl}>{copied ? 'コピーしました' : 'URLをコピー'}</Button><Button variant="secondary" onClick={() => setEditingRoute(true)}>この経路を編集</Button><Button variant="secondary" aria-label={`${route.name}の${canPermanentlyDelete ? '削除' : '受付停止'}を確認`} onClick={() => { setDeleteError(''); setDeleteChoice('stop'); setDeleteConfirmationName(''); setRedirectTargetId(''); setDeleteOpen(true) }}>{canPermanentlyDelete ? 'この経路を削除' : '受付を止める'}</Button></div>

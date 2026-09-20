@@ -13,6 +13,7 @@ import EditDialog, { type AutoReplyDraft } from '@/components/auto-replies/edit-
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
 import Button from '@/components/shared/button'
+import KpiCollapse from '@/components/ui/kpi-collapse'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import {
   EFFECTIVE_LEGEND,
@@ -532,7 +533,8 @@ export default function AutoRepliesPage() {
 
   return (
     <div>
-      <div data-design="KPIs" className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      {/* #975 U060: 390pxでは先頭2件だけ出し、残りは「集計を見る」で開く。 */}
+      <KpiCollapse data-design="KPIs" className="mb-4" gridClassName="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <div className="bg-canvas rounded-card border-hairline border p-4">
           <p className="text-ink-faint text-xs">ルール数</p>
           <p className="text-ink mt-1 text-2xl font-bold tabular-nums">
@@ -581,7 +583,7 @@ export default function AutoRepliesPage() {
               : LOAD_STATE_WORDS[visibleLoadState].label}
           </p>
         </div>
-      </div>
+      </KpiCollapse>
 
       <div data-design="Actions" className="mb-4 flex flex-wrap items-center gap-2">
         <Button
