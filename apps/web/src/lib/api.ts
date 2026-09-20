@@ -2950,6 +2950,8 @@ export type ListStats = {
     inUse: number
     unanswered: number
     inProgress: number
+    /** 受信箱の「保留」トーク数。未対応割合の母数に入れる（#1014 ATTR-21）。 */
+    onHold: number
     resolved: number
     changedLast7: number
   }
@@ -5281,6 +5283,15 @@ export const api = {
         method: 'PATCH',
         body: JSON.stringify(data),
       }),
+    /**
+     * 動かせる行だけの新しい順を1回で保存する（#1014 ATTR-02/03/04）。
+     * 隠れた行と共通項目の位置はサーバー側で保つ。
+     */
+    reorder: (accountId: string, ids: string[]) =>
+      fetchApi<ApiResponse<{ updated: number }>>(
+        `/api/friend-fields/reorder?lineAccountId=${encodeURIComponent(accountId)}`,
+        { method: 'PATCH', body: JSON.stringify({ ids }) },
+      ),
     /** 値が入っている項目は409。物理削除せず移行する。 */
     delete: (id: string, accountId: string) =>
       fetchApi<ApiResponse<null>>(
@@ -5338,6 +5349,15 @@ export const api = {
         method: 'PATCH',
         body: JSON.stringify(data),
         },
+      ),
+    /**
+     * 動かせる行だけの新しい順を1回で保存する（#1014 ATTR-02/03/04）。
+     * 共有マークへ行ごとのPATCHを送ると複製が起きるため、必ずこちらを使う。
+     */
+    reorder: (accountId: string, ids: string[]) =>
+      fetchApi<ApiResponse<{ updated: number }>>(
+        `/api/support-marks/reorder?lineAccountId=${encodeURIComponent(accountId)}`,
+        { method: 'PATCH', body: JSON.stringify({ ids }) },
       ),
     /** 影響が確認時から変わっていない場合だけ、友だちを置換してマークを保管する。 */
     delete: (id: string, accountId: string, data: {
@@ -5467,6 +5487,15 @@ export const api = {
         method: 'PATCH',
         body: JSON.stringify(data),
       }),
+    /**
+     * 動かせる検索だけの新しい順を1回で保存する（#1014 ATTR-02/03）。
+     * 他人が作った検索や絞り込みで隠れた検索の位置はサーバー側で保つ。
+     */
+    reorder: (accountId: string, ids: string[]) =>
+      fetchApi<ApiResponse<{ updated: number }>>(
+        `/api/saved-searches/reorder?lineAccountId=${encodeURIComponent(accountId)}`,
+        { method: 'PATCH', body: JSON.stringify({ ids }) },
+      ),
     delete: (id: string, accountId: string) =>
       fetchApi<ApiResponse<null>>(`/api/saved-searches/${id}?lineAccountId=${encodeURIComponent(accountId)}`, { method: 'DELETE' }),
   },

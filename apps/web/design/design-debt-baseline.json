@@ -1,7 +1,4 @@
 {
-  "app/accounts/migration.tsx": {
-    "direct-secondary-button": 2
-  },
   "app/accounts/new/page.tsx": {
     "arbitrary-value": 1
   },
@@ -9,7 +6,7 @@
     "arbitrary-value": 1
   },
   "app/affiliate-offers/new/page.tsx": {
-    "unresolved-classname": 8
+    "unresolved-classname": 4
   },
   "app/affiliates/new/page.tsx": {
     "unresolved-classname": 6,
@@ -21,35 +18,30 @@
   },
   "app/analytics/page.tsx": {
     "direct-primary-button": 1,
-    "arbitrary-value": 8,
+    "arbitrary-value": 7,
     "direct-th": 3,
     "direct-secondary-button": 2
   },
   "app/auto-replies/page.tsx": {
     "arbitrary-value": 14,
-    "direct-secondary-button": 2,
-    "direct-primary-button": 1,
+    "direct-secondary-button": 1,
     "direct-th": 10
   },
   "app/auto-replies/runs/page.tsx": {
     "unresolved-classname": 30
   },
   "app/automations/new/page.tsx": {
-    "unresolved-classname": 60
+    "unresolved-classname": 56
   },
   "app/automations/page.tsx": {
-    "arbitrary-value": 3,
-    "direct-primary-button": 1,
-    "unresolved-classname": 1
+    "arbitrary-value": 1
   },
   "app/booking/bookings/detail/page.tsx": {
-    "direct-secondary-button": 3,
-    "direct-primary-button": 3,
     "unresolved-classname": 1
   },
   "app/booking/bookings/page.tsx": {
-    "direct-secondary-button": 5,
     "direct-primary-button": 7,
+    "direct-secondary-button": 3,
     "arbitrary-value": 1,
     "unresolved-classname": 3,
     "direct-th": 1
@@ -60,11 +52,11 @@
   "app/booking/menus/page.tsx": {
     "arbitrary-value": 2,
     "direct-th": 8,
-    "direct-primary-button": 1,
-    "direct-secondary-button": 2
+    "direct-secondary-button": 2,
+    "direct-primary-button": 1
   },
   "app/booking/menus/staff/page.tsx": {
-    "direct-secondary-button": 2,
+    "direct-secondary-button": 1,
     "direct-primary-button": 2,
     "arbitrary-value": 7,
     "direct-th": 4,
@@ -72,7 +64,7 @@
   },
   "app/booking/staff/new/page.tsx": {
     "arbitrary-value": 1,
-    "unresolved-classname": 6,
+    "unresolved-classname": 5,
     "direct-secondary-button": 1
   },
   "app/booking/staff/page.tsx": {
@@ -80,61 +72,52 @@
     "arbitrary-value": 2,
     "direct-th": 6
   },
-  "app/booking/staff/shifts/page.tsx": {
-    "direct-secondary-button": 1,
-    "direct-primary-button": 4,
-    "unresolved-classname": 1,
-    "direct-th": 3
-  },
   "app/broadcasts/detail/page.tsx": {
-    "direct-secondary-button": 3
+    "direct-secondary-button": 2
   },
   "app/broadcasts/page.tsx": {
-    "direct-secondary-button": 7,
     "direct-primary-button": 1,
-    "arbitrary-value": 5,
+    "arbitrary-value": 3,
     "direct-th": 6,
-    "unresolved-classname": 1
+    "unresolved-classname": 1,
+    "direct-secondary-button": 1
   },
   "app/chats/page.tsx": {
-    "arbitrary-value": 102,
+    "arbitrary-value": 100,
     "direct-primary-button": 2,
     "unresolved-classname": 2,
     "direct-secondary-button": 2
   },
   "app/contents/page.tsx": {
-    "arbitrary-value": 9,
+    "arbitrary-value": 8,
     "direct-secondary-button": 4,
     "direct-primary-button": 1
   },
   "app/contents/vars/edit/page.tsx": {
-    "direct-th": 3,
-    "direct-primary-button": 2,
-    "direct-secondary-button": 1
-  },
-  "app/contents/vars/new/page.tsx": {
+    "direct-secondary-button": 1,
     "direct-primary-button": 1
   },
   "app/contents/vars/page.tsx": {
-    "arbitrary-value": 3,
     "direct-secondary-button": 3,
     "direct-primary-button": 1,
-    "direct-th": 6
+    "arbitrary-value": 2
   },
   "app/conversions/new/page.tsx": {
-    "unresolved-classname": 6
-  },
-  "app/conversions/page.tsx": {
-    "arbitrary-value": 8
+    "unresolved-classname": 5
   },
   "app/duplicates/page.tsx": {
-    "arbitrary-value": 42,
-    "direct-th": 6
+    "arbitrary-value": 28
+  },
+  "app/ec-commerce/connector-panel.tsx": {
+    "unresolved-classname": 34
   },
   "app/ec-commerce/identity-candidates/page.tsx": {
     "unresolved-classname": 11
   },
   "app/ec-commerce/page.tsx": {
+    "unresolved-classname": 10
+  },
+  "app/ec-commerce/subscriptions-panel.tsx": {
     "unresolved-classname": 11
   },
   "app/emergency/page.tsx": {
@@ -144,38 +127,34 @@
     "direct-primary-button": 1
   },
   "app/events/bookings/page.tsx": {
-    "direct-secondary-button": 2,
-    "direct-primary-button": 1,
     "direct-th": 6,
-    "unresolved-classname": 1
+    "unresolved-classname": 1,
+    "direct-primary-button": 1,
+    "direct-secondary-button": 1
   },
   "app/events/edit/page.tsx": {
     "arbitrary-value": 1,
     "direct-secondary-button": 1
   },
   "app/events/page.tsx": {
-    "direct-secondary-button": 6,
     "direct-primary-button": 3,
     "arbitrary-value": 1,
+    "direct-secondary-button": 1,
     "unresolved-classname": 1,
     "direct-th": 1
   },
   "app/form-submissions/edit/page.tsx": {
-    "direct-secondary-button": 3,
-    "direct-primary-button": 2,
-    "unresolved-classname": 5,
-    "arbitrary-value": 2
+    "unresolved-classname": 4,
+    "direct-secondary-button": 2,
+    "arbitrary-value": 2,
+    "direct-primary-button": 2
   },
   "app/form-submissions/page.tsx": {
-    "arbitrary-value": 12,
-    "direct-th": 4,
+    "arbitrary-value": 2,
     "direct-primary-button": 1
   },
   "app/friend-add-settings/page.tsx": {
-    "direct-primary-button": 3,
-    "arbitrary-value": 5,
-    "direct-secondary-button": 3,
-    "unresolved-classname": 1
+    "arbitrary-value": 1
   },
   "app/friend-add-settings/publish/page.tsx": {
     "unresolved-classname": 45
@@ -183,16 +162,16 @@
   "app/friends/detail/page.tsx": {
     "unresolved-classname": 4,
     "arbitrary-value": 5,
-    "direct-secondary-button": 4,
-    "direct-primary-button": 2
+    "direct-primary-button": 2,
+    "direct-secondary-button": 2
   },
   "app/friends/identity-candidates/page.tsx": {
     "unresolved-classname": 6
   },
   "app/friends/page.tsx": {
     "unresolved-classname": 2,
-    "direct-primary-button": 3,
-    "direct-secondary-button": 3
+    "direct-primary-button": 1,
+    "direct-secondary-button": 2
   },
   "app/getting-started/page.tsx": {
     "unresolved-classname": 20
@@ -205,8 +184,11 @@
   "app/hq/billing/page.tsx": {
     "unresolved-classname": 1
   },
-  "app/hq/settings/hq-staff-section.tsx": {
-    "direct-th": 6
+  "app/hq/templates/template-console.tsx": {
+    "unresolved-classname": 84
+  },
+  "app/hq/templates/template-definition-editor.tsx": {
+    "unresolved-classname": 6
   },
   "app/inflow-links/_components/create-genre-modal.tsx": {
     "arbitrary-value": 1
@@ -215,59 +197,46 @@
     "arbitrary-value": 1
   },
   "app/inflow-links/ad-integration.tsx": {
-    "direct-secondary-button": 2,
-    "arbitrary-value": 1,
-    "direct-th": 4
+    "arbitrary-value": 1
   },
   "app/inflow-links/detail/page.tsx": {
-    "direct-secondary-button": 2
+    "direct-secondary-button": 1
   },
   "app/inflow-links/new/page.tsx": {
-    "unresolved-classname": 9,
-    "direct-secondary-button": 2
+    "unresolved-classname": 8
   },
   "app/inflow-links/page.tsx": {
-    "unresolved-classname": 1,
     "arbitrary-value": 19,
-    "direct-primary-button": 2,
-    "direct-secondary-button": 3
+    "direct-secondary-button": 3,
+    "direct-primary-button": 1
   },
   "app/line-notifications/page.tsx": {
     "direct-primary-button": 1,
     "arbitrary-value": 8,
-    "unresolved-classname": 5
-  },
-  "app/login/page.tsx": {
-    "arbitrary-value": 1,
-    "direct-primary-button": 1
+    "unresolved-classname": 3
   },
   "app/login/two-factor/page.tsx": {
     "arbitrary-value": 1,
     "direct-primary-button": 1
+  },
+  "app/login/two-factor/setup/page.tsx": {
+    "arbitrary-value": 1
   },
   "app/mileage/earning-rules/new/page.tsx": {
     "direct-th": 3,
     "unresolved-classname": 8
   },
   "app/mileage/page.tsx": {
-    "arbitrary-value": 9,
-    "direct-th": 7,
-    "unresolved-classname": 1
+    "arbitrary-value": 9
   },
   "app/nen-campaigns/columns/new/page.tsx": {
-    "unresolved-classname": 37
+    "unresolved-classname": 35
   },
   "app/nen-campaigns/edit/campaign-editor.tsx": {
-    "direct-secondary-button": 3,
-    "direct-primary-button": 1,
-    "arbitrary-value": 1,
     "unresolved-classname": 7
   },
   "app/nen-campaigns/edit/page.tsx": {
     "direct-secondary-button": 1
-  },
-  "app/nen-campaigns/page.tsx": {
-    "arbitrary-value": 21
   },
   "app/nen-members/page.tsx": {
     "unresolved-classname": 13,
@@ -289,19 +258,13 @@
     "unresolved-classname": 17
   },
   "app/reminders/detail/page.tsx": {
-    "unresolved-classname": 30
-  },
-  "app/reminders/edit/page.tsx": {
-    "unresolved-classname": 9,
-    "arbitrary-value": 7,
-    "direct-secondary-button": 2,
-    "direct-primary-button": 1
+    "unresolved-classname": 29
   },
   "app/reminders/new/page.tsx": {
     "unresolved-classname": 10
   },
   "app/reminders/page.tsx": {
-    "arbitrary-value": 3
+    "arbitrary-value": 2
   },
   "app/restaurant-test/restaurant-console.tsx": {
     "arbitrary-value": 19,
@@ -322,53 +285,46 @@
   "app/rich-menus/edit/page.tsx": {
     "arbitrary-value": 10
   },
-  "app/rich-menus/new/page.tsx": {
-    "arbitrary-value": 3,
-    "direct-secondary-button": 2,
-    "direct-primary-button": 1
-  },
   "app/rich-menus/page.tsx": {
     "unresolved-classname": 1,
-    "direct-primary-button": 2,
-    "direct-secondary-button": 5,
-    "arbitrary-value": 11,
-    "direct-th": 5
+    "arbitrary-value": 9,
+    "direct-primary-button": 1,
+    "direct-secondary-button": 5
   },
   "app/scenarios/detail/scenario-detail-client.tsx": {
-    "arbitrary-value": 6,
+    "arbitrary-value": 5,
     "direct-secondary-button": 8,
     "direct-primary-button": 3
   },
   "app/scenarios/first-step/page.tsx": {
-    "direct-secondary-button": 3,
+    "direct-secondary-button": 2,
     "arbitrary-value": 1,
     "unresolved-classname": 4,
     "direct-primary-button": 1
   },
   "app/scenarios/mode/page.tsx": {
-    "direct-secondary-button": 2,
+    "direct-secondary-button": 1,
     "arbitrary-value": 5,
     "direct-primary-button": 1
   },
   "app/scenarios/page.tsx": {
-    "direct-secondary-button": 3,
     "direct-primary-button": 1,
-    "arbitrary-value": 1
+    "arbitrary-value": 1,
+    "direct-secondary-button": 2
   },
   "app/scenarios/results/page.tsx": {
-    "unresolved-classname": 23
+    "unresolved-classname": 17
   },
   "app/search-console/page.tsx": {
     "arbitrary-value": 11,
     "direct-th": 5
   },
   "app/settings/manual-links/page.tsx": {
-    "unresolved-classname": 5
+    "unresolved-classname": 4
   },
   "app/settings/page.tsx": {
-    "arbitrary-value": 52,
     "unresolved-classname": 1,
-    "direct-primary-button": 1
+    "arbitrary-value": 17
   },
   "app/staff/new/page.tsx": {
     "direct-secondary-button": 1,
@@ -379,53 +335,36 @@
     "direct-primary-button": 4,
     "direct-secondary-button": 4
   },
-  "app/tags/edit/page.tsx": {
-    "direct-secondary-button": 1,
-    "direct-primary-button": 1,
-    "arbitrary-value": 6,
-    "unresolved-classname": 6
-  },
-  "app/tags/fields/new/page.tsx": {
-    "arbitrary-value": 3,
-    "direct-secondary-button": 1,
-    "direct-primary-button": 1
+  "app/tags/fields/migrate/page.tsx": {
+    "arbitrary-value": 1
   },
   "app/tags/folders/new/page.tsx": {
-    "direct-secondary-button": 4,
-    "arbitrary-value": 7,
-    "direct-primary-button": 1
-  },
-  "app/tags/new/page.tsx": {
-    "arbitrary-value": 3,
-    "unresolved-classname": 6
+    "arbitrary-value": 6,
+    "direct-secondary-button": 3
   },
   "app/templates/carousel/page.tsx": {
-    "direct-secondary-button": 4,
     "unresolved-classname": 7,
     "direct-primary-button": 2,
-    "arbitrary-value": 2
+    "arbitrary-value": 2,
+    "direct-secondary-button": 3
   },
   "app/templates/detail/page.tsx": {
     "arbitrary-value": 2,
     "direct-secondary-button": 1
   },
   "app/templates/edit/page.tsx": {
-    "direct-secondary-button": 4,
-    "unresolved-classname": 4,
-    "direct-primary-button": 1
+    "unresolved-classname": 1,
+    "direct-primary-button": 1,
+    "direct-secondary-button": 1
   },
   "app/templates/page.tsx": {
     "unresolved-classname": 6,
     "direct-primary-button": 2,
-    "arbitrary-value": 13,
-    "direct-secondary-button": 1
+    "arbitrary-value": 13
   },
   "app/updates/page.tsx": {
     "direct-th": 4,
     "unresolved-classname": 1
-  },
-  "app/users/page.tsx": {
-    "arbitrary-value": 5
   },
   "app/webhooks/edit/page.tsx": {
     "unresolved-classname": 4
@@ -434,24 +373,19 @@
     "unresolved-classname": 5,
     "direct-secondary-button": 1
   },
-  "app/webhooks/page.tsx": {
-    "arbitrary-value": 6,
-    "direct-th": 15
-  },
   "app/webhooks/webhook-interactions.tsx": {
     "unresolved-classname": 29
   },
   "app/webinars/edit/page.tsx": {
+    "arbitrary-value": 24,
     "direct-th": 13,
     "unresolved-classname": 9,
-    "arbitrary-value": 26,
     "direct-secondary-button": 1
   },
   "app/webinars/page.tsx": {
-    "direct-primary-button": 1,
-    "direct-secondary-button": 2,
-    "unresolved-classname": 2,
-    "arbitrary-value": 9
+    "arbitrary-value": 8,
+    "unresolved-classname": 1,
+    "direct-secondary-button": 1
   },
   "app/webinars/published/page.tsx": {
     "arbitrary-value": 5
@@ -480,9 +414,9 @@
     "arbitrary-value": 1
   },
   "components/auto-replies/edit-dialog.tsx": {
-    "arbitrary-value": 12,
-    "direct-primary-button": 7,
-    "direct-secondary-button": 1
+    "arbitrary-value": 11,
+    "direct-secondary-button": 1,
+    "direct-primary-button": 1
   },
   "components/auto-replies/inline-action-list.tsx": {
     "direct-secondary-button": 1
@@ -498,14 +432,11 @@
   "components/broadcasts/broadcast-form.tsx": {
     "arbitrary-value": 25,
     "direct-primary-button": 2,
-    "direct-secondary-button": 9,
+    "direct-secondary-button": 7,
     "unresolved-classname": 3
   },
   "components/broadcasts/broadcast-kpis.tsx": {
     "arbitrary-value": 1
-  },
-  "components/broadcasts/segment-builder.tsx": {
-    "arbitrary-value": 3
   },
   "components/broadcasts/send-confirm-dialog.tsx": {
     "arbitrary-value": 2,
@@ -515,7 +446,7 @@
     "arbitrary-value": 1
   },
   "components/chats/friend-info-sidebar.tsx": {
-    "arbitrary-value": 52,
+    "arbitrary-value": 51,
     "unresolved-classname": 11,
     "direct-secondary-button": 1
   },
@@ -525,7 +456,7 @@
     "arbitrary-value": 1
   },
   "components/chats/inbox-filter-panel.tsx": {
-    "arbitrary-value": 4,
+    "arbitrary-value": 3,
     "unresolved-classname": 9,
     "direct-secondary-button": 1,
     "direct-primary-button": 1
@@ -543,9 +474,7 @@
     "direct-primary-button": 1
   },
   "components/dashboard/dashboard-editor.tsx": {
-    "arbitrary-value": 17,
-    "direct-secondary-button": 1,
-    "direct-primary-button": 1
+    "arbitrary-value": 17
   },
   "components/dashboard/friend-trend-table.tsx": {
     "direct-th": 6,
@@ -553,7 +482,7 @@
   },
   "components/dashboard/qr-dialog.tsx": {
     "arbitrary-value": 9,
-    "direct-secondary-button": 3
+    "direct-secondary-button": 2
   },
   "components/dashboard/shipment-panel.tsx": {
     "arbitrary-value": 4,
@@ -562,10 +491,6 @@
   "components/dashboard/side-cards.tsx": {
     "unresolved-classname": 1,
     "arbitrary-value": 3
-  },
-  "components/emergency/release-log-panel.tsx": {
-    "arbitrary-value": 3,
-    "unresolved-classname": 1
   },
   "components/events/event-form.tsx": {
     "arbitrary-value": 2,
@@ -597,9 +522,7 @@
     "unresolved-classname": 1
   },
   "components/forms/options-dialog.tsx": {
-    "arbitrary-value": 6,
-    "unresolved-classname": 13,
-    "direct-secondary-button": 1
+    "unresolved-classname": 8
   },
   "components/friend-attributes-v2/tag-list-v2.tsx": {
     "arbitrary-value": 94,
@@ -619,31 +542,31 @@
     "arbitrary-value": 8
   },
   "components/friend-fields/mark-list.tsx": {
-    "arbitrary-value": 9
+    "arbitrary-value": 11
   },
   "components/friend-fields/saved-search-list.tsx": {
-    "arbitrary-value": 7
+    "arbitrary-value": 11
   },
   "components/friend-fields/support-mark-rules-panel.tsx": {
     "unresolved-classname": 42
   },
   "components/friend-fields/tag-csv-import-dialog.tsx": {
-    "unresolved-classname": 55
+    "unresolved-classname": 51
   },
   "components/friend-fields/tag-editor-v4.tsx": {
     "direct-primary-button": 3,
     "direct-secondary-button": 3,
     "unresolved-classname": 17,
-    "arbitrary-value": 16
+    "arbitrary-value": 14
   },
   "components/friend-fields/tags-page-v4.tsx": {
-    "unresolved-classname": 3,
-    "arbitrary-value": 26,
+    "unresolved-classname": 4,
+    "arbitrary-value": 25,
     "direct-secondary-button": 2,
-    "direct-th": 10
+    "direct-th": 9
   },
   "components/friends/advanced-search-dialog.tsx": {
-    "arbitrary-value": 57
+    "arbitrary-value": 2
   },
   "components/friends/bulk-run-dialog.tsx": {
     "unresolved-classname": 54
@@ -673,9 +596,7 @@
     "arbitrary-value": 2
   },
   "components/inflow-links/site-script.tsx": {
-    "direct-secondary-button": 5,
-    "arbitrary-value": 1,
-    "direct-th": 3
+    "arbitrary-value": 1
   },
   "components/layout/sidebar-identity.tsx": {
     "unresolved-classname": 5
@@ -693,14 +614,8 @@
   "components/merged-person/merged-person-sections.tsx": {
     "unresolved-classname": 49
   },
-  "components/reminders/reminder-publish-flow.tsx": {
-    "unresolved-classname": 5
-  },
-  "components/reminders/reminder-step-editor-v6.tsx": {
-    "unresolved-classname": 5
-  },
   "components/reminders/reminder-v6-ui.tsx": {
-    "unresolved-classname": 24
+    "unresolved-classname": 23
   },
   "components/rich-menus/area-properties.tsx": {
     "arbitrary-value": 12,
@@ -708,8 +623,7 @@
   },
   "components/scenarios/action-editor.tsx": {
     "unresolved-classname": 13,
-    "direct-secondary-button": 8,
-    "arbitrary-value": 1,
+    "direct-secondary-button": 4,
     "direct-primary-button": 1
   },
   "components/scenarios/bulk-preview-modal.tsx": {
@@ -732,8 +646,7 @@
   },
   "components/scenarios/question-editor.tsx": {
     "unresolved-classname": 15,
-    "direct-secondary-button": 3,
-    "direct-primary-button": 1
+    "direct-secondary-button": 2
   },
   "components/scenarios/scenario-dialogs.tsx": {
     "direct-secondary-button": 6,
@@ -747,9 +660,6 @@
   },
   "components/scenarios/step-preview.tsx": {
     "unresolved-classname": 3
-  },
-  "components/scenarios/trigger-editor.tsx": {
-    "direct-secondary-button": 3
   },
   "components/session-lost-notice.tsx": {
     "arbitrary-value": 1,
@@ -792,7 +702,7 @@
     "unresolved-classname": 9
   },
   "components/shared/row-actions.tsx": {
-    "unresolved-classname": 4
+    "unresolved-classname": 3
   },
   "components/shared/save-conflict-bar.tsx": {
     "unresolved-classname": 4
@@ -802,6 +712,9 @@
   },
   "components/shared/side-cards.tsx": {
     "unresolved-classname": 14
+  },
+  "components/shared/step-up-dialog.tsx": {
+    "arbitrary-value": 1
   },
   "components/shared/sticky-bar.tsx": {
     "unresolved-classname": 4
@@ -841,35 +754,14 @@
     "unresolved-classname": 1,
     "arbitrary-value": 1
   },
-  "components/users/users-filters.tsx": {
-    "arbitrary-value": 11
-  },
   "components/users/users-table.tsx": {
     "arbitrary-value": 7
   },
   "components/webinars/webinar-form.tsx": {
-    "unresolved-classname": 16,
-    "arbitrary-value": 3
+    "unresolved-classname": 10,
+    "arbitrary-value": 2
   },
   "components/webinars/webinar-line-preview.tsx": {
     "unresolved-classname": 7
-  },
-  "app/ec-commerce/connector-panel.tsx": {
-    "unresolved-classname": 36
-  },
-  "app/ec-commerce/subscriptions-panel.tsx": {
-    "unresolved-classname": 16
-  },
-  "app/hq/templates/template-console.tsx": {
-    "unresolved-classname": 88
-  },
-  "app/hq/templates/template-definition-editor.tsx": {
-    "unresolved-classname": 69
-  },
-  "app/login/two-factor/setup/page.tsx": {
-    "arbitrary-value": 1
-  },
-  "components/shared/step-up-dialog.tsx": {
-    "arbitrary-value": 1
   }
 }

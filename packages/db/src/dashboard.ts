@@ -1189,6 +1189,8 @@ export interface ListStats {
     inUse: number;
     unanswered: number;
     inProgress: number;
+    /** 受信箱の「保留」トーク数。未対応割合の母数を全状態にするため（#1014 ATTR-21）。 */
+    onHold: number;
     resolved: number;
     /** 過去7日でマークを変えた回数（110）。 */
     changedLast7: number;
@@ -1271,6 +1273,20 @@ export async function getListStats(db: D1Database, scope: AccountStatsScope): Pr
         .bind(...markScope.binds, ...friendScope.binds)
         .first<{ total: number; in_use: number }>();
       const inbox = await inboxState(db, scope);
+      /*
+        #1014 ATTR-21: 「未対応◯%」の母数は受信箱全体（unread＋対応中＋
+        保留＋対応済み）にする。保留は inboxState が返していないため、
+        同じアカウント範囲で別に数える。
+      */
+      const onHold = await db
+        .prepare(
+          `SELECT COUNT(*) AS n
+             FROM chats c
+             JOIN friends f ON f.id = c.friend_id
+            WHERE c.status = 'on_hold' AND ${friendScope.sql}`,
+        )
+        .bind(...friendScope.binds)
+        .first<{ n: number }>();
       // 変更履歴も、対象の友だちが属するアカウントで絞る。
       const changed = await db
         .prepare(
@@ -1290,10 +1306,11 @@ export async function getListStats(db: D1Database, scope: AccountStatsScope): Pr
         inUse: row?.in_use ?? 0,
         unanswered: inbox.unanswered,
         inProgress: inbox.inProgress,
+        onHold: onHold?.n ?? 0,
         resolved: inbox.resolved,
         changedLast7,
       };
-    }, { total: 0, inUse: 0, unanswered: 0, inProgress: 0, resolved: 0, changedLast7: 0 }),
+    }, { total: 0, inUse: 0, unanswered: 0, inProgress: 0, onHold: 0, resolved: 0, changedLast7: 0 }),
 
     safe(async () => {
       // 上限50は画面に出すためだけの値。DB側に制約は無い。

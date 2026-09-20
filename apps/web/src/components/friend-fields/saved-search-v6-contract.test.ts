@@ -31,7 +31,13 @@ describe('V6 保存した検索の画面契約', () => {
   it('一覧の適用リンクと編集リンクを分ける', () => {
     expect(list).toContain('/friends?savedSearch=')
     expect(list).toContain('/tags/searches/edit?id=')
-    expect(list).toContain('条件を確認・編集')
+    /*
+      #1014 ATTR-24: 省略した名前のヒントは「条件を確認・編集」の固定文
+      ではなく、名前そのもの（title）と「名前 を編集」の読み上げに分ける。
+    */
+    expect(list).toContain('title={search.name}')
+    expect(list).toContain('aria-label={`${search.name} を編集`}')
+    expect(list).not.toContain('title="条件を確認・編集"')
   })
 
   it('条件は共通の日本語変換を使い、内部の演算子や値を直書きしない', () => {
