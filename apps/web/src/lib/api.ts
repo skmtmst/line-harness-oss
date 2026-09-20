@@ -4325,6 +4325,11 @@ export interface UidMigrationRun {
   completedAt: string | null
   rolledBackAt: string | null
   failureReason: string | null
+  /**
+   * 完了、または一部失敗で反映済みの行がある = 切り戻せる。
+   * 口が返さない古い応答では undefined になるため `=== true` で扱う。
+   */
+  rollbackable?: boolean
   items?: UidMigrationItem[]
 }
 
