@@ -571,7 +571,23 @@ function FriendsPageInner({
             setAdvancedOpen(false)
             setSavedOpen(true)
           }}
-          onApply={(result) => { setAdvanced(result); setAdvancedOpen(false); setPage(1) }}
+          /*
+           * FRIEND-04/32: 条件・並び順・件数を1つの適用結果として受け取り、
+           * 一覧側の選択状態も同じ値へそろえる。ダイアログを再度開いたときは
+           * 適用中の編集状態（applied.editorState）から再開する。
+           */
+          applied={advanced}
+          initialSort={sortMode}
+          initialLimit={pageSize}
+          onApply={(result) => {
+            setAdvanced(result)
+            if (result.params.sort) setSortMode(result.params.sort)
+            if (result.params.limit && PAGE_SIZE_OPTIONS.includes(Number(result.params.limit) as (typeof PAGE_SIZE_OPTIONS)[number])) {
+              setPageSize(Number(result.params.limit) as (typeof PAGE_SIZE_OPTIONS)[number])
+            }
+            setAdvancedOpen(false)
+            setPage(1)
+          }}
           features={{ savedSearch: savedSearchEnabled, marks: marksEnabled, fields: featureVisibility.enabled('friend_fields') }}
         />
       </div>

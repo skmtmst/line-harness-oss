@@ -18,8 +18,13 @@ interface Props {
 }
 
 function statusView(status: FriendListItem['chatStatus']) {
+  /*
+   * FRIEND-06: 固定4状態は受信箱・詳細・検索と同じ名前で出す。
+   * on_hold を対応中へ畳むと、受信箱で保留にした相手が別状態に見える。
+   */
   if (status === 'unread') return { label: '未対応', className: 'bg-status-danger-soft text-danger' }
-  if (status === 'in_progress' || status === 'on_hold') return { label: '対応中', className: 'bg-status-warn-soft text-status-warn-deep' }
+  if (status === 'in_progress') return { label: '対応中', className: 'bg-status-warn-soft text-status-warn-deep' }
+  if (status === 'on_hold') return { label: '保留', className: 'bg-action-soft text-action' }
   return { label: '対応済み', className: 'bg-accent-soft text-accent-hover' }
 }
 
@@ -34,7 +39,15 @@ export default function FriendListRow({
   const router = useRouter()
   const status = statusView(friend.chatStatus)
   const latest = friend.latestIncomingMessage
-  const lastContact = latest?.createdAt ?? friend.latestOutgoingAt ?? friend.createdAt
+  /*
+   * FRIEND-07: 最終接触は受信・送信の新しい方。受信があると送信日時を
+   * 比較していなかったため、直前に送った返信があっても古い受信日が残った。
+   */
+  const incomingAt = latest?.createdAt
+  const outgoingAt = friend.latestOutgoingAt
+  const lastContact = incomingAt && outgoingAt
+    ? (new Date(incomingAt).getTime() >= new Date(outgoingAt).getTime() ? incomingAt : outgoingAt)
+    : incomingAt ?? outgoingAt ?? friend.createdAt
   const attention = String(friend.metadata?.__attention ?? '') === '1'
   const avatarColor = avatarTone(friend.displayName)
 
