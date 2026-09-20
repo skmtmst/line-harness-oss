@@ -14,6 +14,8 @@ const HERE = dirname(fileURLToPath(import.meta.url))
 const PAGE = readFileSync(join(HERE, '..', '..', 'app', 'chats', 'page.tsx'), 'utf8')
 const SIDEBAR = readFileSync(join(HERE, 'friend-info-sidebar.tsx'), 'utf8')
 const INBOX_DROPDOWN = readFileSync(join(HERE, 'inbox-dropdown.tsx'), 'utf8')
+const INBOX_FILTER = readFileSync(join(HERE, 'inbox-filter-panel.tsx'), 'utf8')
+const INBOX_LAYOUT = readFileSync(join(HERE, '..', '..', 'app', 'chats', 'inbox-layout.ts'), 'utf8')
 
 /**
  * `start` から `end` までを切り出す。**印が無ければ落とす。**
@@ -109,7 +111,6 @@ describe('H3lAOB / xGLVe トーク見出しの操作', () => {
     // 折り返しは sm 未満だけ。sm 以上では従来どおり1行を保つ。
     expect(header).toContain('sm:flex-nowrap')
     expect(header).toContain('className="inline-flex h-10 shrink-0')
-    expect(PAGE).toContain("showFriendInfo ? 'xl:min-w-xl")
     expect(header).toContain('compact={showFriendInfo}')
     expect(INBOX_DROPDOWN).toContain('whitespace-nowrap border px-2.5 text-xs')
   })
@@ -125,7 +126,10 @@ describe('#455 受信箱の上端と入力欄', () => {
 
   it('チャネルと並び順は折り返さず、左列を先に縮める', () => {
     expect(PAGE).toContain('mt-2 flex min-w-0 flex-nowrap items-center gap-1 overflow-hidden')
-    expect(PAGE).toContain("showFriendInfo ? 'lg:w-72 2xl:w-[420px]'")
+    // LAY-01(#982): 顧客情報を開いている間は一覧を288pxに留める。
+    // 以前は 2xl で 420px へ急拡大し、3列が 1536px で収まらなくなっていた。
+    expect(PAGE).toContain("showFriendInfo ? 'lg:w-72'")
+    expect(PAGE).not.toContain("showFriendInfo ? 'lg:w-72 2xl:w-[420px]'")
   })
 
   it('改行案内を入力欄の下へ置く', () => {
@@ -193,5 +197,123 @@ describe('Xi4x9 右パネルの表示項目', () => {
     expect(panel).toContain('setSectionOrder(DEFAULT_SECTION_ORDER)')
     expect(panel).toContain('setHiddenSections([])')
     expect(panel).toContain('完了')
+  })
+})
+
+/*
+ * LAY-01/LAY-02(#982): 顧客情報の出し方は「3列が収まる幅」で決める。
+ * クラス名の有無ではなく、「どの幅で列・どの幅でドロワーか」という
+ * 結果が破綻しないことを見る。幅の計算自体は inbox-layout.test.ts が
+ * 実値で検証し、ここでは画面がその判定と同じ境界を使うことを確認する。
+ */
+describe('LAY-01/LAY-02 顧客情報の列とドロワー', () => {
+  const talkPane = region(PAGE, 'data-inbox-v4="talk-pane"', '{selectedThreadId ?')
+  const panel = region(PAGE, 'data-inbox-v4="customer-panel"', '</aside>')
+
+  it('常設する境界は3列が収まる計算と同じ1536px（Tailwind 2xl）にする', () => {
+    expect(INBOX_LAYOUT).toContain('INBOX_INFO_PANEL_MIN_VIEWPORT = 1536')
+    // メディアクエリとCSSの `2xl:` は同じ境界を指す。片方だけ変わると
+    // 「ドロワーのつもりが列になる」ずれが起きる。
+    expect(PAGE).toContain('(min-width: ${INBOX_INFO_PANEL_MIN_VIEWPORT}px)')
+    expect(panel).toContain('2xl:relative')
+  })
+
+  it('トーク列は最低幅で固定せず、残り幅いっぱいに伸縮する', () => {
+    // `xl:min-w-xl`（576px固定）が min-w-0 を上書きして 1280〜1536px で
+    // 右列を画面外へ押し出していた。固定の最小幅は持たせない。
+    expect(talkPane).toContain('min-w-0 flex-1')
+    expect(talkPane).not.toMatch(/min-w-(xs|sm|md|lg|xl|2xl|\[)/)
+  })
+
+  it('顧客情報は狭い幅でも開ける——常時非表示にしない', () => {
+    // `hidden xl:block` は1280px未満で常に非表示＝開く手段がなかった。
+    expect(panel).not.toContain('hidden xl:block')
+    // 狭い幅では fixed のドロワー（背景の暗幕付き）として出す。
+    expect(panel).toContain('fixed inset-y-0 right-0')
+    expect(PAGE).toContain('bg-scrim fixed inset-0 z-[60] 2xl:hidden')
+    // 広い幅では従来どおり列として並ぶ。
+    expect(panel).toContain('2xl:w-[300px]')
+  })
+
+  it('ドロワーは Escape・背景・閉じるボタンで閉じられる', () => {
+    expect(PAGE).toContain("event.key === 'Escape'")
+    expect(PAGE).toContain('onMouseDown={() => setShowFriendInfo(false)}')
+    expect(panel).toContain('aria-label="顧客情報を閉じる"')
+    // 狭い幅では dialog として振る舞う（常設列では aria-modal を付けない）。
+    expect(panel).toContain("role={wideInfoPanel ? undefined : 'dialog'}")
+  })
+
+  it('開閉ボタンの文言・aria-expanded・実表示を一致させる', () => {
+    // 同じ1つのボタンが開閉し、パネルは showFriendInfo だけに従う。
+    // 「開いていないのに閉じると表示する」状態を作らない(#982 LAY-02)。
+    expect(PAGE).toContain('{showFriendInfo && (selectedChatId || selectedFriendId || selectedThreadId)')
+    expect(PAGE).toContain('aria-expanded={showFriendInfo}')
+    expect(PAGE).toContain("showFriendInfo ? '顧客情報を閉じる' : '顧客情報を表示'")
+  })
+})
+
+/*
+ * LAY-03(#982): 「右パネルの表示項目」が top:430px 固定で、
+ * 高さ700pxの画面では下の操作が画面外だった。
+ */
+describe('LAY-03 右パネルの表示項目パネル', () => {
+  const panel = region(SIDEBAR, 'data-inbox-v6="detail-sections-panel"', 'document.body')
+
+  it('固定座標ではなく、押したボタンの位置を基準に置く', () => {
+    expect(SIDEBAR).not.toContain('top: 430')
+    expect(SIDEBAR).toContain('settingsButtonRef')
+    expect(SIDEBAR).toContain('getBoundingClientRect')
+    // 下に収まらなければボタンの上へ開く。
+    expect(SIDEBAR).toContain('belowRoom')
+    expect(SIDEBAR).toContain('aboveRoom')
+  })
+
+  it('最大高さを画面内に収め、項目の並びだけをスクロールする', () => {
+    expect(SIDEBAR).toContain('window.innerHeight - margin * 2')
+    expect(panel).toContain('min-h-0 flex-1')
+    expect(panel).toContain('overflow-y-auto')
+    // 見出しと「初期状態に戻す」「完了」はスクロール領域の外に固定する。
+    expect(panel.indexOf('overflow-y-auto')).toBeGreaterThan(panel.indexOf('右パネルの表示項目'))
+    expect(panel.indexOf('初期状態に戻す')).toBeGreaterThan(panel.indexOf('overflow-y-auto'))
+    expect(panel.indexOf('完了')).toBeGreaterThan(panel.indexOf('overflow-y-auto'))
+  })
+
+  it('開いているあいだは Escape と画面の変化に追従する', () => {
+    expect(SIDEBAR).toContain("event.key === 'Escape'")
+    expect(SIDEBAR).toContain("window.addEventListener('resize', updateSettingsPanelPos)")
+  })
+})
+
+/*
+ * LAY-04(#982): 絞り込みパネルが `right:120px; width:420px` 固定で、
+ * 390pxでは左側が画面外へ消えていた。
+ */
+describe('LAY-04 絞り込みパネル', () => {
+  it('固定の座標・幅・高さを持たない', () => {
+    expect(INBOX_FILTER).not.toContain('right: 120')
+    expect(INBOX_FILTER).not.toContain('width: 420')
+    expect(INBOX_FILTER).not.toContain('top: 238')
+    expect(INBOX_FILTER).not.toContain('maxHeight: 640')
+  })
+
+  it('狭い幅では画面内側16pxの範囲へ置く', () => {
+    const dialog = region(INBOX_FILTER, 'aria-label="絞り込み"', '<header')
+    expect(dialog).toContain('inset-4')
+    // 広い幅でも画面端に張り付かない（幅の上限は 100vw-32px）。
+    expect(dialog).toContain('min(420px,calc(100vw-2rem))')
+    // 高さは残りの画面に連動し、下端を画面外へ出さない。
+    expect(dialog).toContain('max-h-[calc(100dvh-5rem)]')
+  })
+
+  it('ヘッダーとフッターを固定し、条件部分だけをスクロールさせる', () => {
+    const header = region(INBOX_FILTER, '<header', '</header>')
+    expect(header).toContain('shrink-0')
+    const footer = region(INBOX_FILTER, '<footer', '</footer>')
+    expect(footer).toContain('shrink-0')
+    const body = region(INBOX_FILTER, '</header>', '<footer')
+    expect(body).toContain('overflow-y-auto')
+    // 全項目（絞り込みの実行・リセット）がフッター側に残る。
+    expect(footer).toContain('この条件で絞り込む')
+    expect(footer).toContain('リセット')
   })
 })
