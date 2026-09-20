@@ -86,8 +86,22 @@ function MigrateFriendField() {
   }
 
   if (loading) return <div data-design-node="KoT6c" className="p-6 text-sm text-ink-faint">友だち情報欄を読み込んでいます…</div>
-  if (!selectedAccountId) return <div data-design-node="KoT6c" role="alert" className="rounded-control border border-warning/30 bg-warning-bg p-4 text-sm text-warning">LINE公式アカウントを選んでください。</div>
-  if (!source || !target) return <div data-design-node="KoT6c" role="alert" className="rounded-control border border-danger/20 bg-danger-bg p-4 text-sm text-danger">移行元の項目が見つかりません。友だち情報欄の一覧から選び直してください。</div>
+  /*
+    U097: 「一覧から選び直してください」と言うだけの画面に、実際に
+    戻れる操作を置く。直リンク・履歴なしでも画面内だけで復帰できる。
+  */
+  if (!selectedAccountId) return (
+    <div data-design-node="KoT6c" role="alert" className="rounded-control border border-warning/30 bg-warning-bg p-4 text-sm text-warning">
+      LINE公式アカウントを選んでください。
+      <div className="mt-3"><Button href="/tags?tab=fields">友だち情報欄の一覧へ戻る</Button></div>
+    </div>
+  )
+  if (!source || !target) return (
+    <div data-design-node="KoT6c" role="alert" className="rounded-control border border-danger/20 bg-danger-bg p-4 text-sm text-danger">
+      移行元の項目が見つかりません。友だち情報欄の一覧から選び直してください。
+      <div className="mt-3"><Button href="/tags?tab=fields">友だち情報欄の一覧へ戻る</Button></div>
+    </div>
+  )
 
   return (
     <div data-design-node="KoT6c">

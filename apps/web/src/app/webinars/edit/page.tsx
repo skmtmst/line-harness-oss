@@ -1892,10 +1892,18 @@ function EditWebinarInner() {
   }, [id, pane, analyticsId, analyticsState])
 
   if (!id) {
+    /*
+      U097: 「一覧から選び直すと表示できます」と言うだけでは戻れない。
+      一覧へ戻る操作を文のそばに置く。
+    */
     return (
       <>
 
-        <div className="p-6 text-red-700">開き直してください。一覧から選び直すと表示できます。</div>
+        <div className="p-6">
+          <p className="text-danger">編集するウェビナーが指定されていません。</p>
+          <p className="mt-1 text-sm text-ink-secondary">一覧から編集するウェビナーを選び直してください。</p>
+          <Link href="/webinars" className="mt-3 inline-block text-sm font-semibold text-action hover:underline">ウェビナー一覧へ戻る</Link>
+        </div>
       </>
     )
   }
@@ -1911,7 +1919,10 @@ function EditWebinarInner() {
     return (
       <>
 
-        <div className="p-6 text-red-700">{loadError ?? '見つかりませんでした'}</div>
+        <div className="p-6">
+          <p className="text-danger">{loadError ?? 'ウェビナーが見つかりませんでした'}</p>
+          <Link href="/webinars" className="mt-3 inline-block text-sm font-semibold text-action hover:underline">ウェビナー一覧へ戻る</Link>
+        </div>
       </>
     )
   }

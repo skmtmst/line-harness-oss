@@ -35,7 +35,12 @@ export default function HqSupportDetailPage() {
   const router = useRouter()
   const uid = useId()
   const fileRef = useRef<HTMLInputElement>(null)
-  const [id, setId] = useState<string | null>(null)
+  /*
+   * U099: `id` を3値で持つ。`undefined` はまだURLを読んでいない、
+   * `null` はURLにidが無い。前は両方 `null` だったので、id無しの
+   * 画面が「読み込んでいます…」のまま永遠に進まなかった。
+   */
+  const [id, setId] = useState<string | null | undefined>(undefined)
   const [detail, setDetail] = useState<HqSupportDetail | null>(null)
   const [loadError, setLoadError] = useState('')
   const [me, setMe] = useState<StaffMember | null>(null)
@@ -51,6 +56,9 @@ export default function HqSupportDetailPage() {
     setId(new URLSearchParams(window.location.search).get('id'))
   }, [])
 
+  // U099: id が無いことが確定したら、取得には行かず案内へ進む。
+  const idMissing = id === null
+
   const load = useCallback(async (requestId: string) => {
     try {
       const res = await api.hqSupport.detail(requestId)
@@ -62,8 +70,12 @@ export default function HqSupportDetailPage() {
   }, [])
 
   useEffect(() => {
-    if (!id) return
-    void load(id)
+    if (id === undefined) return
+    if (id) void load(id)
+    /*
+      送信者と履歴は id が無くても読む。U099: id 無しで開いた人も、
+      右の「これまでの問い合わせ」から正しい件へ戻れるようにする。
+    */
     void Promise.allSettled([api.staff.me(), api.tenants.me(), api.hqSupport.list()]).then(([meRes, tenantRes, listRes]) => {
       if (meRes.status === 'fulfilled' && meRes.value.success) setMe(meRes.value.data)
       if (tenantRes.status === 'fulfilled' && tenantRes.value.success) setTenantName(tenantRes.value.data.name)
@@ -132,7 +144,13 @@ export default function HqSupportDetailPage() {
 
       <div className="flex flex-col gap-4 xl:flex-row xl:items-start">
         <section data-design-node="h0DgNn" className="flex min-w-0 flex-1 flex-col gap-4 rounded-card border border-hairline bg-canvas p-5">
-          {loadError ? (
+          {idMissing ? (
+            <div role="alert">
+              <p className="text-label font-bold text-ink">開くお問い合わせが指定されていません</p>
+              <p className="text-caption text-ink-secondary mt-1">一覧から開くお問い合わせを選び直してください。</p>
+              <Link href="/hq/support" className="text-action mt-3 inline-block text-label font-semibold hover:underline">問い合わせの一覧へ戻る</Link>
+            </div>
+          ) : loadError ? (
             <p className="text-label text-status-danger" role="alert">{loadError}</p>
           ) : !detail ? (
             <p className="text-caption text-ink-faint">読み込んでいます…</p>
