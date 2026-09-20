@@ -46,11 +46,22 @@ export default function NewBookingMenuPage() {
   const [intakeQuestion, setIntakeQuestion] = useState('')
   const [isActive, setIsActive] = useState(true)
   const [staff, setStaff] = useState<BookingStaff[]>([])
-  /** 担当一覧の取得に失敗したときは「未登録」と混ぜずに文言を分ける。 */
-  const [staffLoadFailed, setStaffLoadFailed] = useState(false)
+  /**
+   * 担当一覧の取得状態。取得中・失敗を「未登録(0人)」と混ぜない。
+   * 取得が終わるまで作成できない（DEEP-17: 候補の無いIDを送らないため）。
+   */
+  const [staffLoadState, setStaffLoadState] = useState<'loading' | 'ready' | 'error'>('loading')
   const [storeSettings, setStoreSettings] = useState<BookingSettings | null>(null)
   const [bookingMileage, setBookingMileage] = useState<number | null>(null)
-  const [createdMenuNeedingStaff, setCreatedMenuNeedingStaff] = useState<string | null>(null)
+  /**
+   * 作成に成功したが担当設定が残っているメニュー（DEEP-16）。
+   * ここにIDがある間は createMenu を二度と呼ばず、残りの担当設定だけを
+   * やり直す。remainingStaffIds はまだ割当が済んでいない担当。
+   */
+  const [createdMenuNeedingStaff, setCreatedMenuNeedingStaff] = useState<{
+    menuId: string
+    remainingStaffIds: string[]
+  } | null>(null)
   /** チェックした担当。保存後に staff_menus へ流し込む。 */
   const [assigned, setAssigned] = useState<Set<string>>(new Set())
   /** 予約後に自動で付けるタグ。null は「付けない」。 */
@@ -60,30 +71,35 @@ export default function NewBookingMenuPage() {
   /** タグ候補の取得状態。失敗・未取得でもタグなしの保存は止めない。 */
   const [tagLoadState, setTagLoadState] = useState<'loading' | 'ready' | 'error'>('loading')
 
+  // 担当一覧と店舗設定は別々に取る。片方の失敗・遅延でもう片方を巻き込まない
+  // （担当が読めているのに設定待ちで作れない、という止まり方をしない）。
   useEffect(() => {
-    if (!selectedAccountId) {
-      setStaff([])
-      setStoreSettings(null)
-      return
-    }
+    setStaff([])
+    setStoreSettings(null)
+    setStaffLoadState('loading')
+    if (!selectedAccountId) return
     let alive = true
-    Promise.all([
-      bookingApi.listStaff(selectedAccountId),
-      bookingApi.getSettings(selectedAccountId),
-    ])
-      .then(([staffResult, settingsResult]) => {
+    bookingApi.listStaff(selectedAccountId)
+      .then((staffResult) => {
         if (!alive) return
         setStaff(staffResult.staff)
-        setStaffLoadFailed(false)
-        setStoreSettings(settingsResult.success ? settingsResult.data : null)
+        setStaffLoadState('ready')
       })
       .catch(() => {
         // 取得失敗は「未登録」と混ぜない。登録作業へ誘導しない。
         if (alive) {
           setStaff([])
-          setStaffLoadFailed(true)
-          setStoreSettings(null)
+          setStaffLoadState('error')
         }
+      })
+    bookingApi.getSettings(selectedAccountId)
+      .then((settingsResult) => {
+        if (!alive) return
+        setStoreSettings(settingsResult.success ? settingsResult.data : null)
+      })
+      .catch(() => {
+        // 店舗設定は空欄時の既定値表示にだけ使う。取れなくても作成は止めない。
+        if (alive) setStoreSettings(null)
       })
     return () => {
       alive = false
@@ -118,6 +134,12 @@ export default function NewBookingMenuPage() {
   useEffect(() => {
     setAutoTagId(null)
     setTagQuery('')
+    // DEEP-17: 担当の選択も前アカウントのIDのまま残さない。チェックが
+    // 画面から消えても集合に残ると、切替先のメニューへ前アカウントの
+    // 担当を割り当ててしまう。作成済みの部分成功状態も、このアカウントの
+    // ものではなくなるので一緒に閉じる。
+    setAssigned(new Set())
+    setCreatedMenuNeedingStaff(null)
   }, [selectedAccountId])
 
   useEffect(() => {
@@ -142,6 +164,11 @@ export default function NewBookingMenuPage() {
       return next
     })
   }
+
+  // DEEP-17: 「選択済み」として数えるのは、今の候補一覧に実在するIDだけ。
+  // 候補の読み直しやアカウント切替で画面から消えた担当を、見えないまま
+  // 新しいメニューへ割り当てない。
+  const assignedIds = [...assigned].filter((id) => staff.some((s) => s.id === id))
 
   // 候補は「今選んでいるアカウントの有効なタグ」だけ。別アカウントのものと
   // 整理済み(archived)は選ばせない。保存側の tag_not_found 検証と二重化する。
@@ -188,18 +215,38 @@ export default function NewBookingMenuPage() {
       title="予約メニューをつくる"
       description="お客様が予約するときに選ぶ内容を登録します。"
       parent={['予約設定', '/booking/menus']}
-      saveLabel={isActive ? 'つくって出す' : '下書きに保存'}
+      saveLabel={
+        createdMenuNeedingStaff
+          ? '担当の設定をやり直す'
+          : isActive
+            ? 'つくって出す'
+            : '下書きに保存'
+      }
       showHeader={false}
       variant="v6"
-      statusLabel={isActive ? 'まだ出していません' : '下書きとして保存'}
+      statusLabel={
+        createdMenuNeedingStaff
+          ? 'メニューは作成済みです。担当の設定が残っています'
+          : isActive
+            ? 'まだ出していません'
+            : '下書きとして保存'
+      }
       validate={() => {
         if (!selectedAccountId) return '先に上部でLINEアカウントを選んでください'
+        // DEEP-17: 担当候補が確定するまで作らせない。取得中・取得失敗のまま
+        // 保存すると「0人のメニュー」か「候補外のIDを持つメニュー」ができる。
+        if (staffLoadState === 'loading') {
+          return '担当スタッフを読み込んでいます。読み込みが終わってから作成してください'
+        }
+        if (staffLoadState === 'error') {
+          return '担当スタッフを読み込めませんでした。開き直してから作成してください'
+        }
         const validationError = bookingMenuError({
           name,
           durationMinutes,
           bufferAfterMinutes,
           sortOrder: 0,
-          assignedStaffCount: assigned.size,
+          assignedStaffCount: assignedIds.length,
         })
         if (validationError) return validationError
         // 候補にないタグ(削除済み・別アカウント)は送らない。入力は残して選び直させる。
@@ -212,7 +259,10 @@ export default function NewBookingMenuPage() {
         }
         return null
       }}
-      onReset={() => {
+      // DEEP-16: 作成済みメニューの担当設定が残っている間は
+      // 「保存して続けて作る」を出さない。続けて作るボタンが別メニューを
+      // 作る導線に見えるため、部分成功の状態では閉じる。
+      onReset={createdMenuNeedingStaff ? undefined : () => {
         setName('')
         setDescription('')
         setAssigned(new Set())
@@ -221,57 +271,78 @@ export default function NewBookingMenuPage() {
         setCreatedMenuNeedingStaff(null)
       }}
       onSave={async () => {
-        let res
-        try {
-          res = await bookingApi.createMenu(selectedAccountId!, {
-          name: name.trim(),
-          category_label: categoryLabel.trim() || null,
-          description: description.trim() || null,
-          duration_minutes: Number(durationMinutes),
-          buffer_after_minutes: Number(bufferAfterMinutes) || 0,
-          base_price: Number(basePrice) || 0,
-          price_mode: priceMode,
-          concurrent_capacity: Number(concurrentCapacity) || 1,
-          booking_window_days: windowDays ? Number(windowDays) : null,
-          cutoff_hours_before: cutoffHours ? Number(cutoffHours) : null,
-          cancel_deadline_hours_before: cancelDeadlineHours
-            ? Number(cancelDeadlineHours)
-            : null,
-          intake_question: intakeQuestion.trim() || null,
-          is_active: isActive ? 1 : 0,
-          auto_tag_id: autoTagId,
-          })
-        } catch (e) {
-          // 選んだ後にタグが消えた場合は Worker が tag_not_found で落とす。
-          // 入力は残る(CreatePage が失敗時に初期化しない)ので選び直せる。
-          if (e instanceof ApiError && e.code === 'tag_not_found') {
-            throw new Error('選んだタグは削除されたため保存できませんでした。タグを選び直してください。')
+        // DEEP-16: メニューが作成済みなら createMenu は二度と呼ばない。
+        // 同名メニューの二重作成を防ぐため、残りの担当設定だけを再開する。
+        let menuId = createdMenuNeedingStaff?.menuId ?? null
+        if (menuId == null) {
+          let res
+          try {
+            res = await bookingApi.createMenu(selectedAccountId!, {
+            name: name.trim(),
+            category_label: categoryLabel.trim() || null,
+            description: description.trim() || null,
+            duration_minutes: Number(durationMinutes),
+            buffer_after_minutes: Number(bufferAfterMinutes) || 0,
+            base_price: Number(basePrice) || 0,
+            price_mode: priceMode,
+            concurrent_capacity: Number(concurrentCapacity) || 1,
+            booking_window_days: windowDays ? Number(windowDays) : null,
+            cutoff_hours_before: cutoffHours ? Number(cutoffHours) : null,
+            cancel_deadline_hours_before: cancelDeadlineHours
+              ? Number(cancelDeadlineHours)
+              : null,
+            intake_question: intakeQuestion.trim() || null,
+            is_active: isActive ? 1 : 0,
+            auto_tag_id: autoTagId,
+            })
+          } catch (e) {
+            // 選んだ後にタグが消えた場合は Worker が tag_not_found で落とす。
+            // 入力は残る(CreatePage が失敗時に初期化しない)ので選び直せる。
+            if (e instanceof ApiError && e.code === 'tag_not_found') {
+              throw new Error('選んだタグは削除されたため保存できませんでした。タグを選び直してください。')
+            }
+            throw e
           }
-          throw e
+          menuId = res.id
+          // 作成に成功した時点でIDを保持する。ここから先の失敗は
+          // 「担当設定だけのやり直し」に閉じ込め、作成を繰り返させない。
+          setCreatedMenuNeedingStaff({ menuId, remainingStaffIds: assignedIds })
         }
-        // 担当の割り当ては staff 側の表に入るので、作ったあとに1人ずつ足す。
-        // ここで失敗しても、メニュー自体は作れている。
-        try {
-          await Promise.all(
-            [...assigned].map(async (staffId) => {
+
+        // 担当の割り当ては staff 側の表に入るので、1人ずつ足す。
+        // PUT は同じ割当を書き直すだけなので再送しても重複しない。
+        // 再開時は「まだ割当が済んでいない担当のうち、今も選ばれている人」
+        // だけを処理する（チェックを外した人は諦めたものとして扱う）。
+        const pendingStaffIds = createdMenuNeedingStaff
+          ? createdMenuNeedingStaff.remainingStaffIds.filter((sid) => assigned.has(sid))
+          : assignedIds
+        const failedStaffIds: string[] = []
+        await Promise.all(
+          pendingStaffIds.map(async (staffId) => {
+            try {
               const { matrix } = await bookingApi.getStaffMenus(selectedAccountId!, staffId)
               await bookingApi.putStaffMenus(
                 selectedAccountId!,
                 staffId,
                 matrix.map((row) => ({
                   menu_id: row.menu_id,
-                  is_offered: row.menu_id === res.id ? true : Boolean(row.is_offered),
+                  is_offered: row.menu_id === menuId ? true : Boolean(row.is_offered),
                   override_duration_minutes: row.override_duration_minutes ?? null,
                   override_price: row.override_price ?? null,
                 })),
               )
-            }),
-          )
-        } catch {
-          setCreatedMenuNeedingStaff(res.id)
-          throw new Error('メニューは作成されましたが、担当スタッフを保存できませんでした。下のボタンから担当を設定してください。')
+            } catch {
+              failedStaffIds.push(staffId)
+            }
+          }),
+        )
+        if (failedStaffIds.length > 0) {
+          // 成功した担当は消さず、失敗した担当だけを残して再開できるようにする。
+          setCreatedMenuNeedingStaff({ menuId, remainingStaffIds: failedStaffIds })
+          throw new Error('メニューは作成済みですが、一部の担当スタッフを保存できませんでした。下の「担当の設定をやり直す」で残りだけを再試行できます。')
         }
-        return res.id
+        setCreatedMenuNeedingStaff(null)
+        return menuId
       }}
       aside={
         <>
@@ -305,10 +376,14 @@ export default function NewBookingMenuPage() {
     >
       {createdMenuNeedingStaff && (
         <div className="border-warning bg-warning-bg text-warning rounded-control border p-3 text-sm">
-          <p>作成済みのメニューに担当スタッフを設定してください。</p>
+          <p>
+            メニューは作成済みです。もう一度押しても新しいメニューは増えません。
+            担当にチェックを付けたまま「担当の設定をやり直す」を押すと、
+            残りの担当設定だけをやり直します。
+          </p>
           <div className="mt-2">
-            <Button href={`/booking/menus?tab=staff&menu=${encodeURIComponent(createdMenuNeedingStaff)}`}>
-              担当スタッフを設定する
+            <Button href={`/booking/menus?tab=staff&menu=${encodeURIComponent(createdMenuNeedingStaff.menuId)}`}>
+              担当スタッフを一覧で設定する
             </Button>
           </div>
         </div>
@@ -480,7 +555,11 @@ export default function NewBookingMenuPage() {
         label="このメニューを担当できる人"
         note="チェックした人だけ、お客様が指名できます。"
       >
-        {staffLoadFailed ? (
+        {staffLoadState === 'loading' ? (
+          <p className="text-ink-faint text-sm">
+            担当を読み込んでいます…
+          </p>
+        ) : staffLoadState === 'error' ? (
           <p className="text-ink-faint text-sm">
             担当を読み込めませんでした。開き直してください。
           </p>

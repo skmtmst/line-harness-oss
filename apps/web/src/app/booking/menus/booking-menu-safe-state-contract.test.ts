@@ -4,11 +4,15 @@ import { describe, expect, it } from 'vitest'
 const PAGE = readFileSync(new URL('./page.tsx', import.meta.url), 'utf8')
 
 describe('V6 予約メニューの取得状態', () => {
-  it('一覧と付随する件数を未取得と実値0に分ける', () => {
+  it('一覧と店舗設定を別々に待ち、一覧は一覧の応答だけで出す (DEEP-26)', () => {
     expect(PAGE).toContain("type SupportingLoadState = 'loading' | 'ready' | 'error'")
-    expect(PAGE).toContain("if (supportingLoadState !== 'ready' || items.length === 0) return null")
+    // 一覧(listMenus)と設定(getSettings)を Promise.all で束ねない。
+    // 設定が遅れても、取れている一覧を隠さない。
+    expect(PAGE).not.toContain('await Promise.all([')
+    expect(PAGE).toContain('settingsLoadState')
+    expect(PAGE).toContain("setSettingsLoadState('ready')")
     expect(PAGE).toContain("value={favorite?.name ?? '—'}")
-    expect(PAGE).toContain("supportingLoadState === 'ready' ? `${bookingCounts.get(m.id) ?? 0} 件` : '—'")
+    expect(PAGE).toContain('`${bookingCounts.get(m.id) ?? 0} 件`')
   })
 
   it('APIの内部エラーを利用者へそのまま出さない', () => {
