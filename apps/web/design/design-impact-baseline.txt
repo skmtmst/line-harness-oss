@@ -232,6 +232,8 @@ button-migration-target components/friend-fields/tags-page-v4.tsx
 # 標準の表見出しへ移行済みとして監視する画面本体。
 table-header-migration-target app/affiliates/tabs.tsx
 table-header-migration-target app/conversions/page.tsx
+# #984 LAY-12: 重複検出の3表すべてを共通見出しへ。直書き th は残さない。
+table-header-migration-target app/duplicates/page.tsx
 table-header-migration-target app/inflow-links/page.tsx
 table-header-migration-target app/reminders/page.tsx
 table-header-migration-target app/templates/page.tsx
