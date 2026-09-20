@@ -1211,19 +1211,11 @@ export default function EditDialog({
           )}
           {(mode === 'inline-text' || mode === 'inline-flex') && (
             <div className={page ? 'rounded-card border-hairline space-y-3 border bg-canvas-sunken p-3' : ''}>
-              {page && mode === 'inline-text' && (
-                <div className="flex flex-wrap gap-2" aria-label="差し込み項目">
-                  {['名前', '友だち情報', '共通情報', '回答フォーム', '配信日', 'その他'].map((label) => (
-                    <Button
-                      key={label}
-                      type="button"
-                      onClick={() => setResponseContent((current) => `${current}{{${label}}}`)}
-                    >
-                      {label}
-                    </Button>
-                  ))}
-                </div>
-              )}
+              {/*
+                U058: 返信文の欄を先に出す。差し込みボタンの帯を上に置くと、
+                狭い画面で入力欄が段の下まで押し出される。書く場所を先に
+                見せて、差し込みはその下にまとめる。
+              */}
               <label className="block">
                 <span className={page ? 'text-ink text-sm font-semibold' : 'text-ink-secondary mb-1 block text-xs'}>
                   {mode === 'inline-flex' ? 'カードの内容（JSON）' : page ? '返信メッセージ' : 'テキスト'}
@@ -1239,6 +1231,19 @@ export default function EditDialog({
                     : 'border-hairline rounded-control focus:ring-accent mt-1 w-full resize-y border px-3 py-2 font-mono text-xs focus:ring-2 focus:outline-none'}
                 />
               </label>
+              {page && mode === 'inline-text' && (
+                <div className="flex flex-wrap gap-2" aria-label="差し込み項目">
+                  {['名前', '友だち情報', '共通情報', '回答フォーム', '配信日', 'その他'].map((label) => (
+                    <Button
+                      key={label}
+                      type="button"
+                      onClick={() => setResponseContent((current) => `${current}{{${label}}}`)}
+                    >
+                      {label}
+                    </Button>
+                  ))}
+                </div>
+              )}
               {mode === 'inline-flex' && (
                 <p className="text-ink-faint text-xs leading-relaxed">
                   LINE のカード型メッセージ（Flex Message）の JSON を入力します。

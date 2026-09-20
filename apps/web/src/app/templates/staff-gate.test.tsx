@@ -172,8 +172,10 @@ describe('テンプレート一覧のstaffゲート (N-144)', () => {
     expect(screen.getByText('テンプレートを作る')).toBeTruthy()
     expect(screen.getByText('質問を作る')).toBeTruthy()
     expect(screen.getByText('フォルダを追加')).toBeTruthy()
-    // tpl-1 は使用数があるので「使用先を見る」形で出る
-    expect(screen.getByText('使用先を見る')).toBeTruthy()
+    // tpl-1 は使用数があるので「…」メニューの中に「使用先を見る」が出る（U043）
+    fireEvent.click(screen.getByLabelText('来店お礼のその他操作'))
+    expect(screen.getByRole('menuitem', { name: '使用先を見る' })).toBeTruthy()
+    fireEvent.keyDown(document.body, { key: 'Escape' })
     // フォルダ行の操作メニューも出る
     expect(screen.getByLabelText('フォルダ「予約」の操作')).toBeTruthy()
 

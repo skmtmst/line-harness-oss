@@ -277,7 +277,9 @@ function AnalyticsReportFormPage() {
   )
 
   return (
-    <div className="text-ink mx-auto max-w-screen-2xl px-6 pb-24" data-design-node="URqOA">
+    // U054: 左右の余白は app-shell が持つ（16px/24px/40px）。
+    // ここで px-6 を重ねるとスマホで入力幅が二重に削られる。
+    <div className="text-ink mx-auto max-w-screen-2xl pb-24" data-design-node="URqOA">
       <PageHeader
         breadcrumb={[{ label: '分析', href: '/analytics' }, { label: editing ? '定期レポートを直す' : '定期レポートをつくる' }]}
         title={editing ? '定期レポートを直す' : '定期レポートをつくる'}
@@ -289,7 +291,7 @@ function AnalyticsReportFormPage() {
 
       <div className="grid items-start gap-6 xl:grid-cols-3">
         <main className="grid gap-4 xl:col-span-2">
-          <section className="border-hairline bg-canvas rounded-card border p-6">
+          <section className="border-hairline bg-canvas rounded-card border p-4 sm:p-6">
             <h2 className="text-lg font-semibold">名前を付けます</h2>
             <p className="text-ink-secondary mb-4 mt-1 text-sm">複数作るときに区別できる名前を付けてください。</p>
             <label className="text-ink-secondary grid gap-2 text-xs font-semibold">レポートの名前
@@ -303,7 +305,7 @@ function AnalyticsReportFormPage() {
             </label>
           </section>
 
-          <section className="border-hairline bg-canvas rounded-card border p-6">
+          <section className="border-hairline bg-canvas rounded-card border p-4 sm:p-6">
             <h2 className="text-lg font-semibold">何を入れますか</h2>
             <p className="text-ink-secondary mb-4 mt-1 text-sm">チェックしたものが、この順にレポートへ並びます。</p>
             <div className="grid gap-x-8 gap-y-3 md:grid-cols-2">
@@ -327,7 +329,7 @@ function AnalyticsReportFormPage() {
           </section>
 
           {options.savedAnalyses.length > 0 && (
-            <section className="border-hairline bg-canvas rounded-card border p-6">
+            <section className="border-hairline bg-canvas rounded-card border p-4 sm:p-6">
               <h2 className="text-lg font-semibold">保存した分析を添えます</h2>
               <p className="text-ink-secondary mb-4 mt-1 text-sm">チェックした分析の最新の結果を、レポートに添えます。無くても作れます。</p>
               <div className="grid gap-x-8 gap-y-3 md:grid-cols-2">
@@ -346,7 +348,7 @@ function AnalyticsReportFormPage() {
             </section>
           )}
 
-          <section className="border-hairline bg-canvas rounded-card border p-6">
+          <section className="border-hairline bg-canvas rounded-card border p-4 sm:p-6">
             <h2 className="mb-4 text-lg font-semibold">いつ送りますか</h2>
             <div className="grid items-end gap-4 md:grid-cols-4">
               <label className="text-ink-secondary grid gap-2 text-xs font-semibold">間かく<SelectField value={cadence} onChange={(event) => setCadence(event.target.value as 'weekly' | 'monthly')} options={[{ value: 'weekly', label: '毎週' }, { value: 'monthly', label: '毎月' }]} /></label>
@@ -361,7 +363,7 @@ function AnalyticsReportFormPage() {
             <p className="text-ink-secondary mb-0 mt-4 text-xs">時刻は {options.timeZone} で計算します。</p>
           </section>
 
-          <section className="border-hairline bg-canvas rounded-card border p-6">
+          <section className="border-hairline bg-canvas rounded-card border p-4 sm:p-6">
             <h2 className="mb-4 text-lg font-semibold">だれに送りますか</h2>
             {/*
              * #975 U064: 長い氏名・役割を細いチップに押し込まない。
@@ -405,7 +407,7 @@ function AnalyticsReportFormPage() {
             </label>
           </section>
 
-          <section className="border-hairline bg-canvas rounded-card border p-6">
+          <section className="border-hairline bg-canvas rounded-card border p-4 sm:p-6">
             <h2 className="text-lg font-semibold">知らせの決めごと</h2>
             <p className="text-ink-secondary mb-4 mt-1 text-sm">数字がふだんと大きくちがうときだけ、待たずに知らせます。</p>
             <label className="mb-3 flex items-center gap-2 text-sm font-semibold"><input className="accent-accent size-5" type="checkbox" checked={alertsEnabled} onChange={(event) => setAlertsEnabled(event.target.checked)} />大きな変化を知らせる</label>
