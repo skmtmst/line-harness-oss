@@ -58,9 +58,20 @@
 .confirm { display: flex; align-items: flex-start; gap: 8px; border-radius: var(--radius-mini); background: var(--color-danger-bg); padding: 10px 12px; color: var(--color-danger); font-size: var(--text-micro); font-weight: 600; line-height: 1.5; }
 .actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; margin-top: 14px; }
 .executionPanel .actions > * { width: 100%; justify-content: center; }
-@media (max-width: 1100px) {
+/*
+ * #985 CHK-05: 左の256pxはPCのメニュー（1280px以上）が実在する間だけ。
+ * 1100pxで畳むと、メニューが消える1101〜1279pxに空白が残っていた。
+ * 見出しバーは画面幅を超えてはみ出さない。
+ */
+@media (max-width: 1279.98px) {
   .backdrop { left: 0; }
-  .screenTitle { left: 0; }
+  .screenTitle { left: 0; width: min(420px, 100vw); }
   .operationLayout { grid-template-columns: 1fr; }
   .ops { grid-template-columns: repeat(2, minmax(150px, 1fr)); }
+}
+
+/* さらに狭い幅では余白を減らし、入りきらなければ操作カードは1列へ。 */
+@media (max-width: 640px) {
+  .backdrop { padding: 16px; }
+  .ops { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
 }

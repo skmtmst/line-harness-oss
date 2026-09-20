@@ -15,7 +15,7 @@ import MergedTabs from '@/components/layout/merged-tabs'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { FRIENDS_MERGED_TABS } from '@/app/friends/friends-tabs'
 
-const STEPS = ['移行の登録', '対応表の取込', '事前確認', '要確認の判断', '本移行と照合'] as const
+const STEPS: readonly string[] = ['移行の登録', '対応表の取込', '事前確認', '要確認の判断', '本移行と照合']
 
 /**
  * CSVの1行を切り分ける。**引用符の中のカンマは区切りにしない。**
@@ -236,12 +236,48 @@ export default function AccountMigration() {
         <Breadcrumb items={[{ label: '友だち', href: '/friends' }, { label: 'UID移行' }]} />
       </div>
 
-      <div className="bg-canvas rounded-card border-hairline mb-4 grid grid-cols-5 border">
-        {STEPS.map((step, index) => <div key={step} className="border-hairline border-r px-3 py-3 last:border-r-0">
-          <p className="text-action text-xs font-bold">{index === 0 ? '✓' : index + 1}　STEP {index + 1}</p>
-          <p className="text-ink mt-1 text-sm font-semibold">{step}</p>
-        </div>)}
-      </div>
+      {/*
+        #985 CHK-06: 5段階は実データから現在位置を出す。以前は先頭だけ
+        常に✓で、テスト移行・要確認・本移行のあとも進まなかった。
+        狭い幅では5列に押し込まず「現在 n/5」＋全手順の展開にする。
+      */}
+      {(() => {
+        const currentStep = !active
+          ? 0
+          : active.status === 'completed'
+            ? STEPS.length
+            : active.status === 'ready' || active.status === 'executing' || unresolved === 0
+              ? 4
+              : 3
+        return (
+          <div className="bg-canvas rounded-card border-hairline mb-4 border">
+            <div className="px-4 py-3 sm:hidden">
+              <p className="text-action text-xs font-bold">
+                {currentStep >= STEPS.length ? 'すべて完了' : `現在 ${currentStep + 1}/${STEPS.length}`}
+              </p>
+              <p className="text-ink mt-1 text-sm font-semibold">
+                {currentStep >= STEPS.length ? '本移行と照合まで済んでいます' : STEPS[currentStep]}
+              </p>
+              <details className="mt-2">
+                <summary className="text-accent cursor-pointer text-xs font-semibold">全手順を見る</summary>
+                <ol className="mt-2 space-y-1">
+                  {STEPS.map((step, index) => (
+                    <li key={step} className={`text-xs ${index < currentStep ? 'text-success font-semibold' : index === currentStep ? 'text-action font-bold' : 'text-ink-faint'}`}>
+                      {index < currentStep ? '✓' : index === currentStep ? '▶' : `${index + 1}.`}　{step}
+                    </li>
+                  ))}
+                </ol>
+              </details>
+            </div>
+            <div className="hidden sm:grid sm:grid-cols-5">
+              {STEPS.map((step, index) => <div key={step} className="border-hairline border-r px-3 py-3 last:border-r-0">
+                <p className={`text-xs font-bold ${index < currentStep ? 'text-success' : index === currentStep ? 'text-action' : 'text-ink-faint'}`}>{index < currentStep ? '✓' : index === currentStep ? '▶' : index + 1}　STEP {index + 1}</p>
+                <p className="text-ink mt-1 text-sm font-semibold">{step}</p>
+              </div>)}
+            </div>
+          </div>
+        )
+      })()}
 
       <div className="bg-success-bg text-success mb-4 rounded-control px-4 py-3 text-sm font-medium">本移行まで、既存ユーザー・配信・シナリオには影響しません。</div>
       {/*

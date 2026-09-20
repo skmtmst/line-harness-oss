@@ -1,12 +1,11 @@
 'use client'
 
-import Link from 'next/link'
 import { useCallback, useEffect, useState } from 'react'
-import Button from '@/components/shared/button'
 import Chip from '@/components/shared/chip'
 import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
 import Pagination from '@/components/shared/pagination'
+import { RowActions } from '@/components/shared/row-actions'
 import Select from '@/components/shared/select'
 import SummaryCard from '@/components/shared/summary-card'
 import KpiCollapse from '@/components/ui/kpi-collapse'
@@ -172,8 +171,11 @@ export default function PetsTab({
                   <Th className="w-20">運動量</Th>
                   <Th>主食</Th>
                   <Th className="w-24">体重の更新</Th>
-                  {/* 「編集」「詳細」が横に並べて入る幅を先に確保する（LAY-17）。 */}
-                  <Th className="w-28" align="right"><span className="sr-only">操作</span></Th>
+                  {/*
+                    「飼い主」「編集」の枠付きボタンが横に並べて入る幅を
+                    先に確保する（LAY-17/18）。
+                  */}
+                  <Th className="w-40" align="right"><span className="sr-only">操作</span></Th>
                 </TableHeadRow>
               </thead>
               <tbody>
@@ -245,14 +247,17 @@ function PetRow({ pet, canEdit, onEdit }: { pet: NenPetRow; canEdit: boolean; on
         )}
       </Td>
       {/*
-        操作列は共用の ActionCell（white-space: nowrap 込み）。各項目に
-        flex-shrink: 0 を付け、「編集」が1文字ずつ縦に折れないようにする。
+        #985 LAY-18: 操作は共用の RowActions。「詳細」が先頭・「編集」が
+        その次の枠付き補助ボタン。文字リンクの直書きへは戻さない。
+        ここの「詳細」の行き先はペットではなく飼い主の友だち詳細なので、
+        監査の指摘どおり行き先が分かる「飼い主」と明記する。
       */}
       <ActionCell>
-        <span className="inline-flex items-center gap-3 whitespace-nowrap">
-          {canEdit ? <button type="button" onClick={onEdit} className="shrink-0 whitespace-nowrap text-label font-semibold text-accent-deep">編集</button> : null}
-          <Link href={`/friends/detail?id=${encodeURIComponent(pet.owner.friendId)}`} className="shrink-0 whitespace-nowrap text-label font-semibold text-accent-deep">詳細</Link>
-        </span>
+        <RowActions
+          subjectName={pet.callName || pet.name || '（名前なし）'}
+          detail={{ label: '飼い主', href: `/friends/detail?id=${encodeURIComponent(pet.owner.friendId)}` }}
+          edit={canEdit ? { onClick: onEdit } : undefined}
+        />
       </ActionCell>
     </Tr>
   )
@@ -293,16 +298,13 @@ function PetCard({ pet, canEdit, onEdit }: { pet: NenPetRow; canEdit: boolean; o
         /* #999 DEEP-24: 犬・猫以外は目安の計算対象外と明示する（犬の数値を見せない）。 */
         <p className="mt-2 text-xs text-ink-faint">今日の目安は犬・猫のみ計算できます</p>
       ) : null}
-      {/* 操作はカードの下の行。縮まない・折れない。 */}
+      {/* 操作はカードの下の行。表と同じ RowActions で順・見た目を揃える。 */}
       <div className="mt-3 flex items-center gap-2 border-t border-hairline pt-3" data-design="CardActions">
-        {canEdit ? (
-          <Button type="button" onClick={onEdit} className="shrink-0 whitespace-nowrap">
-            編集
-          </Button>
-        ) : null}
-        <Button href={`/friends/detail?id=${encodeURIComponent(pet.owner.friendId)}`} className="shrink-0 whitespace-nowrap">
-          詳細
-        </Button>
+        <RowActions
+          subjectName={pet.callName || pet.name || '（名前なし）'}
+          detail={{ label: '飼い主', href: `/friends/detail?id=${encodeURIComponent(pet.owner.friendId)}` }}
+          edit={canEdit ? { onClick: onEdit } : undefined}
+        />
       </div>
     </li>
   )
