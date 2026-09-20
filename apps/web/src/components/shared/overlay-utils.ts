@@ -30,9 +30,16 @@ export function useOverlayFocus(
     const previousOverflow = document.body.style.overflow
     document.body.style.overflow = 'hidden'
 
-    const container = containerRef.current
-    const focusable = () => Array.from(container?.querySelectorAll<HTMLElement>(FOCUSABLE) ?? [])
-    requestAnimationFrame(() => focusable()[0]?.focus())
+    /*
+     * containerRef.current は効果の中で一度だけ読まず、使うたびに読む。
+     * open=true で初回マウントした部品は、最初は通常DOMへ描き、effectで
+     * portal へ移す（shared/dialog.tsx 等）。その切替で ref が別の要素へ
+     * 付け替わるため、掴んだままの要素は外れたDOMを指してしまう（DEEP-15）。
+     */
+    const focusable = () =>
+      Array.from(containerRef.current?.querySelectorAll<HTMLElement>(FOCUSABLE) ?? [])
+    // 初回フォーカスの予約は cleanup で取消せるようにしておく。
+    const initialFocusFrame = requestAnimationFrame(() => focusable()[0]?.focus())
 
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape' && !closeDisabled) {
@@ -44,7 +51,7 @@ export function useOverlayFocus(
       const items = focusable()
       if (items.length === 0) {
         event.preventDefault()
-        container?.focus()
+        containerRef.current?.focus()
         return
       }
       const first = items[0]
@@ -60,6 +67,7 @@ export function useOverlayFocus(
 
     document.addEventListener('keydown', onKeyDown)
     return () => {
+      cancelAnimationFrame(initialFocusFrame)
       document.removeEventListener('keydown', onKeyDown)
       document.body.style.overflow = previousOverflow
       previous?.focus()
