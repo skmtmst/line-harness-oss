@@ -221,6 +221,15 @@ function DirectMessagePanel({ friendId, friend, onBack, onSent }: {
   // アカウント切替などでパネルが畳まれたあとの古い応答を書き込まない。
   const aliveRef = useRef(true)
   useEffect(() => () => { aliveRef.current = false }, [])
+  /*
+   * 送信が向かった相手を照合する現在値。同じパネルのまま相手(friendId)が
+   * 切り替わっても state は残るので、応答時に今開いている相手と照合しないと
+   * A宛の失敗表示・送信済みの行がBの会話へ出る(#979 A02-04)。
+   */
+  const friendIdRef = useRef(friendId)
+  friendIdRef.current = friendId
+  // 相手が変わったら前の相手の失敗表示を残さない。
+  useEffect(() => setSendError(''), [friendId])
 
   useEffect(() => {
     const loadMessages = async () => {
@@ -239,18 +248,21 @@ function DirectMessagePanel({ friendId, friend, onBack, onSent }: {
   const handleSend = async () => {
     if (!message.trim() || sending || sendLockRef.current) return
     const content = message.trim()
-    const signature = JSON.stringify({ friendId, messageType: 'text', content })
+    // 送信開始時の相手を固定する。応答を待つ間に別の相手へ
+    // 切り替わっていても、結果を新しい相手の会話へ出さない(#979 A02-04)。
+    const sendFriendId = friendId
+    const signature = JSON.stringify({ friendId: sendFriendId, messageType: 'text', content })
     const idempotencyKey = sendKeysRef.current.get(signature)
     sendLockRef.current = true
     setSending(true)
     try {
-      await fetchApi(`/api/friends/${friendId}/messages`, {
+      await fetchApi(`/api/friends/${sendFriendId}/messages`, {
         method: 'POST',
         headers: { 'Idempotency-Key': idempotencyKey },
         body: JSON.stringify({ content, messageType: 'text' }),
       })
       sendKeysRef.current.clear(signature)
-      if (aliveRef.current) {
+      if (aliveRef.current && friendIdRef.current === sendFriendId) {
         setMessages((prev) => [...prev, {
           id: crypto.randomUUID(),
           direction: 'outgoing',
@@ -264,7 +276,8 @@ function DirectMessagePanel({ friendId, friend, onBack, onSent }: {
     } catch (sendError) {
       // 失敗しても入力は残す。同じ文の再送は同じ冪等キーを使い、
       // LINE・DBへの追加書込は1回だけになる（N-023契約）。
-      if (aliveRef.current) setSendError(describeSendFailure(sendError))
+      // 送信を待つ間に別の相手へ切り替わっていたら、その会話へは出さない。
+      if (aliveRef.current && friendIdRef.current === sendFriendId) setSendError(describeSendFailure(sendError))
     }
     setSending(false)
     sendLockRef.current = false
