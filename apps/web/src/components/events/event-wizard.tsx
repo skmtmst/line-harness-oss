@@ -3,10 +3,18 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { api, ApiError, eventsApi, type EventDetail, type EventSlot } from '@/lib/api'
+import {
+  api,
+  ApiError,
+  EventSlotsPartialError,
+  eventsApi,
+  type EventDetail,
+  type EventSlot,
+  type EventSlotInput,
+} from '@/lib/api'
 import ImageUploader from '@/components/shared/image-uploader'
 import { AsideCard, ChoiceCard, Field, FormSection, inputClass } from '@/components/shared/create-page'
-import { generateBulkSlots } from './bulk-slot-generator'
+import { BULK_SLOT_LIMIT, generateBulkSlots } from './bulk-slot-generator'
 import { formatSlotJp, jstHHMMToUtcIso, splitBand, todayJst } from './jst'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { TextInput } from '@/components/shared/form-controls'
@@ -60,15 +68,17 @@ const DEFAULT_FIRST_SLOT: FirstSlotDraft = {
 }
 
 function firstSlotPayload(slot: FirstSlotDraft) {
-  const startsAt = jstHHMMToUtcIso(slot.date, slot.startTime)
-  const capacity = Number(slot.capacity)
+  // 検証は日時変換より先に行う。空の日付を先に変換すると
+  // 「Invalid time value」という内部表現が画面に出る(#1000 DETAIL-08)。
   if (!slot.date || !slot.startTime) throw new Error('開催日と開始時刻を入力してください')
   if (!Number.isInteger(slot.durationMinutes) || slot.durationMinutes < 15) {
     throw new Error('開催時間は15分以上で入力してください')
   }
+  const capacity = Number(slot.capacity)
   if (!Number.isInteger(capacity) || capacity < 1) {
     throw new Error('定員は1以上の数で入力してください')
   }
+  const startsAt = jstHHMMToUtcIso(slot.date, slot.startTime)
   return {
     starts_at: startsAt,
     ends_at: new Date(new Date(startsAt).getTime() + slot.durationMinutes * 60_000).toISOString(),
@@ -92,6 +102,12 @@ export default function EventWizard({ accountId, eventId, step }: EventWizardPro
   const [saving, setSaving] = useState(false)
   const [loading, setLoading] = useState(Boolean(eventId))
   const [firstSlot, setFirstSlot] = useState<FirstSlotDraft>(DEFAULT_FIRST_SLOT)
+  /*
+    #1000 DETAIL-09: ①概要の「最初の予約枠」がどの枠を指すかは、概要段階で
+    確定した枠IDに限定する。slots[0] は②で早い日時を足すと別の枠に
+    入れ替わるため、更新対象の識別には使えない。
+  */
+  const [firstSlotId, setFirstSlotId] = useState<string | null>(null)
 
   // ②③は①を保存したあとにしか入れない。URL を直接叩かれても①へ戻す。
   useEffect(() => {
@@ -126,6 +142,9 @@ export default function EventWizard({ accountId, eventId, step }: EventWizardPro
         setDraft(ev)
         setSlots(slotsRes.items)
         const first = slotsRes.items[0]
+        // フォームへ写した枠のIDを記録する。あとで一覧が並び替わっても
+        // 「最初の予約枠」の保存先はこの枠のまま(DETAIL-09)。
+        setFirstSlotId(first?.id ?? null)
         if (first) {
           const startsAt = new Date(first.starts_at)
           const endsAt = new Date(first.ends_at)
@@ -188,6 +207,11 @@ export default function EventWizard({ accountId, eventId, step }: EventWizardPro
   /** 段階をまたぐ保存。goto に進み先の段階、null なら一覧へ戻る。 */
   async function persist(goto: 1 | 2 | 3 | null) {
     if (saving) return
+    /*
+      #1000 DETAIL-08: 通信を始める前に入力を全部検証する。先に
+      createEvent を呼ぶと、日付空・所要時間不正・定員0のような
+      入力エラーでもイベント本体だけが作られてしまう。
+    */
     if (!draft.name.trim()) {
       setError('イベント名は必須です')
       return
@@ -200,8 +224,26 @@ export default function EventWizard({ accountId, eventId, step }: EventWizardPro
       setError('イベント詳細は20,000字以内で入力してください')
       return
     }
+    /*
+      ①概要の「最初の予約枠」は、概要段階で確定した枠ID(firstSlotId)だけを
+      更新対象にする。slots[0] は②で早い日時を足すと別の枠に変わるので、
+      更新対象の識別に使わない(#1000 DETAIL-09)。
+      ②③からの保存では枠を触らない。枠の追加・削除・まとめて作成は
+      ②の各操作に限定し、イベント設定の保存と分離する。
+    */
+    const syncFirstSlot = step === 1
+    let slotPayload: ReturnType<typeof firstSlotPayload> | null = null
+    if (syncFirstSlot) {
+      try {
+        slotPayload = firstSlotPayload(firstSlot)
+      } catch (e) {
+        setError(e instanceof Error ? e.message : String(e))
+        return
+      }
+    }
     setSaving(true)
     setError(null)
+    let eventSaved = false
     try {
       let id = eventId
       if (id) {
@@ -216,11 +258,28 @@ export default function EventWizard({ accountId, eventId, step }: EventWizardPro
         */
         router.replace('/events/new?step=1&id=' + id)
       }
-      const slotPayload = firstSlotPayload(firstSlot)
-      if (slots[0]) {
-        await eventsApi.updateSlot(accountId, id, slots[0].id, slotPayload)
-      } else {
-        await eventsApi.createSlots(accountId, id, [slotPayload])
+      eventSaved = true
+      if (slotPayload && id) {
+        if (firstSlotId && slots.some((s) => s.id === firstSlotId)) {
+          // 概要で確定した枠だけを更新する。ほかの枠の日時・定員は触らない。
+          await eventsApi.updateSlot(accountId, id, firstSlotId, slotPayload)
+        } else {
+          /*
+            まだ枠IDを持たない(新規作成直後・①で消えた)ときだけ作る。
+            client_key はイベントにつき1つの初回枠を表す固定キーで、
+            応答喪失後の再送でもサーバー側が同じ枠へ解決する(DETAIL-11)。
+          */
+          const res = await eventsApi.createSlots(accountId, id, [
+            { ...slotPayload, client_key: `first-slot:${id}` },
+          ])
+          const created = res.items[0]
+          if (created) {
+            setFirstSlotId(created.id)
+            setSlots((cur) =>
+              cur.some((s) => s.id === created.id) ? cur : [...cur, created],
+            )
+          }
+        }
       }
       if (goto === null) {
         router.push(`/events?highlight=${id}`)
@@ -228,10 +287,16 @@ export default function EventWizard({ accountId, eventId, step }: EventWizardPro
       }
       router.replace(`/events/new?step=${goto}&id=${id}`)
     } catch (e) {
-      setError(
+      const reason =
         e instanceof ApiError && e.status === 409 && e.code === 'version_conflict'
           ? '別の画面でイベントが更新されました。開き直してからもう一度保存してください。'
-          : e instanceof Error ? e.message : String(e),
+          : e instanceof Error ? e.message : String(e)
+      // 部分成功のときは何が保存されたかを示し、同じボタンで再開できる
+      // ことを伝える(DETAIL-08)。イベントIDはURLの ?id= に残っている。
+      setError(
+        eventSaved
+          ? `イベント本体は保存しましたが、最初の予約枠を保存できませんでした。もう一度押すと続きから再開します。（${reason}）`
+          : reason,
       )
     } finally {
       setSaving(false)
@@ -753,9 +818,17 @@ function SlotsStep({
     何件できるのか・どの枠が消えるのかを本文で読ませられず、
     画像比較にも写らない。
   */
-  const [bulkPreview, setBulkPreview] = useState<
-    Array<{ starts_at: string; ends_at: string; capacity: number | null }> | null
-  >(null)
+  /*
+    #1000 DETAIL-11: 下見の時点で操作ID(operationId)と枠ごとの再送防止キー
+    (client_key)を確定する。分割送信の途中で失敗・応答を失っても、
+    残りだけを同じキーで再送すればサーバー側が二重登録を吸収する。
+    bulkDone はこの下見のうち作成が確認できた件数。
+  */
+  const [bulkPreview, setBulkPreview] = useState<{
+    operationId: string
+    slots: Array<EventSlotInput & { client_key: string }>
+  } | null>(null)
+  const [bulkDone, setBulkDone] = useState(0)
   const [bulkBusy, setBulkBusy] = useState(false)
   const [bulkError, setBulkError] = useState('')
   const [removeTarget, setRemoveTarget] = useState<EventSlot | null>(null)
@@ -792,6 +865,11 @@ function SlotsStep({
         throw new Error('時間帯と1枠の長さが合いません。長さを短くするか時間帯を広げてください')
       }
       const cap = bulkCapacity === '' ? null : Number(bulkCapacity)
+      /*
+        生成は501件目で打ち切られるので、ここに来るまでに大量の
+        オブジェクトは作られない(DETAIL-12)。超過分は捨てて件数だけで止める。
+        500件超は作る口も受け付けない(点検#520の中9)。
+      */
       const generated = generateBulkSlots({
         start_date: bulkStart,
         end_date: bulkEnd,
@@ -802,13 +880,20 @@ function SlotsStep({
       if (generated.length === 0) {
         throw new Error('条件に合う枠が0件でした。期間と曜日を確かめてください')
       }
-      // 下見の前に件数で止める。500件超は作る口も受け付けない(点検#520の中9)。
-      if (generated.length > 500) {
+      if (generated.length > BULK_SLOT_LIMIT) {
         throw new Error('500件を超える一括作成はできません。期間や曜日を分けて追加してください')
       }
       // 作る前に下見を出す。ここではまだ1件も作っていない。
+      const operationId = crypto.randomUUID()
       setBulkError('')
-      setBulkPreview(generated)
+      setBulkDone(0)
+      setBulkPreview({
+        operationId,
+        slots: generated.map((slot, index) => ({
+          ...slot,
+          client_key: `${operationId}:${index}`,
+        })),
+      })
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e))
     } finally {
@@ -821,13 +906,33 @@ function SlotsStep({
     setBulkBusy(true)
     setBulkError('')
     try {
-      await eventsApi.createSlots(accountId, eventId, bulkPreview)
+      /*
+        確定済みの分は送り直さない(DETAIL-11)。残りは同じ client_key を
+        持つので、応答喪失などで画面の件数と実際がずれていても
+        サーバー側で既存枠へ解決され、総数は増えない。
+      */
+      const remaining = bulkPreview.slots.slice(bulkDone)
+      if (remaining.length === 0) {
+        setBulkPreview(null)
+        setBulkDone(0)
+        await refreshSlots()
+        return
+      }
+      await eventsApi.createSlots(accountId, eventId, remaining)
       setBulkPreview(null)
+      setBulkDone(0)
       await refreshSlots()
-    } catch {
+    } catch (e) {
       // 400件ずつ送るので、途中で切れると一部だけ作られたまま残る。
-      // どこまで作られたかを見せるため、失敗しても一覧を取り直す。
-      setBulkError('枠を作りきれませんでした。途中まで作られていることがあります。一覧を読み直して、足りない分だけ追加してください。')
+      // 作成が確認できた件数を数え、残りだけを次の送信対象にする。
+      const completed = e instanceof EventSlotsPartialError ? e.completed.length : 0
+      const done = bulkDone + completed
+      setBulkDone(done)
+      setBulkError(
+        done > 0
+          ? `${done}件は追加済みです。残り${bulkPreview.slots.length - done}件は、もう一度「まとめて追加する」を押すと続きから再開します。`
+          : '枠を作りきれませんでした。途中まで作られていることがあります。一覧を読み直して、足りない分だけ追加してください。',
+      )
       await refreshSlots()
     } finally {
       setBulkBusy(false)
@@ -1169,8 +1274,12 @@ function SlotsStep({
 
       <ConfirmDialog
         open={bulkPreview !== null}
-        title={`${bulkPreview?.length ?? 0}件の予約枠を追加しますか？`}
-        description={`${bulkPreview && bulkPreview.length > 0 ? formatSlotJp(bulkPreview[0].starts_at, bulkPreview[0].ends_at) : ''}から${bulkPreview && bulkPreview.length > 0 ? formatSlotJp(bulkPreview[bulkPreview.length - 1].starts_at, bulkPreview[bulkPreview.length - 1].ends_at) : ''}までをまとめて追加します。いまある枠は消えません。追加した枠は1件ずつ削除できます（申込が入ったあとは削除できません）。`}
+        title={
+          bulkDone > 0
+            ? `残り${(bulkPreview?.slots.length ?? 0) - bulkDone}件の予約枠を追加しますか？`
+            : `${bulkPreview?.slots.length ?? 0}件の予約枠を追加しますか？`
+        }
+        description={`${bulkPreview && bulkPreview.slots.length > 0 ? formatSlotJp(bulkPreview.slots[0].starts_at, bulkPreview.slots[0].ends_at) : ''}から${bulkPreview && bulkPreview.slots.length > 0 ? formatSlotJp(bulkPreview.slots[bulkPreview.slots.length - 1].starts_at, bulkPreview.slots[bulkPreview.slots.length - 1].ends_at) : ''}までをまとめて追加します。いまある枠は消えません。追加した枠は1件ずつ削除できます（申込が入ったあとは削除できません）。${bulkDone > 0 ? `${bulkDone}件は追加済みで、再送しても二重にはなりません。` : ''}`}
         confirmLabel="まとめて追加する"
         busy={bulkBusy}
         error={bulkError}
@@ -1178,6 +1287,7 @@ function SlotsStep({
         onCancel={() => {
           if (bulkBusy) return
           setBulkError('')
+          setBulkDone(0)
           setBulkPreview(null)
         }}
       />

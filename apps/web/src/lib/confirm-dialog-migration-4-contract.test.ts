@@ -66,7 +66,9 @@ describe('イベント作成の予約枠', () => {
 
   it('まとめて追加は下見を出してから作る', () => {
     expect(src).toContain('async function addBulk()')
-    expect(src).toContain('setBulkPreview(generated)')
+    // #1000: 下見の時点で操作IDと枠ごとの再送防止キーを確定する。
+    expect(src).toContain('setBulkPreview({')
+    expect(src).toContain('client_key')
     expect(src).toContain('件の予約枠を追加しますか？')
     expect(src).toContain('いまある枠は消えません')
     expect(src).toContain('busy={bulkBusy}')
