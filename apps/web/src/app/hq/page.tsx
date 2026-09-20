@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { api, fetchApi } from '@/lib/api'
+import { resolveStoreReturnPath } from '@/lib/hq-navigation'
 import { useAccount, type AccountWithStats } from '@/contexts/account-context'
 import Button from '@/components/shared/button'
 import HqAccountList from '@/components/hq/account-list'
@@ -86,7 +87,10 @@ export default function HqPage() {
 
   const login = (accountId: string) => {
     setSelectedAccountId(accountId)
-    router.push('/')
+    // 店舗未選択ゲートから来たときは、元いた画面（通知の編集など）へ戻す。
+    // `return` はアプリ内の店舗画面パスだけを受け付ける（NEXT-07）。
+    const back = resolveStoreReturnPath(new URLSearchParams(window.location.search).get('return'))
+    router.push(back ?? '/')
   }
 
   const totals = useMemo(() => accounts.reduce((sum, account) => ({

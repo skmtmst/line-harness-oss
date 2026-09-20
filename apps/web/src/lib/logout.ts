@@ -28,7 +28,7 @@ export async function logoutAndGoToLogin(loginPath: string = '/login'): Promise<
     localStorage.removeItem('lh_staff_role')
     localStorage.removeItem('lh_staff_permissions')
     localStorage.removeItem('lh_staff_view_permissions')
-    sessionStorage.removeItem(AUTH_SELECTION_CLEARED_KEY)
+    localStorage.removeItem(AUTH_SELECTION_CLEARED_KEY)
   } catch {
     // ストレージが使えなくても、行き先だけは変える
   }

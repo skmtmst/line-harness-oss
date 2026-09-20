@@ -7,6 +7,8 @@ import {
   decideRootLanding,
   hqOpenHref,
   resolveHqOpenTarget,
+  resolveStoreReturnPath,
+  storeSelectionHref,
 } from './hq-navigation'
 
 function storage(initial: Record<string, string> = {}) {
@@ -63,15 +65,54 @@ describe('統括から店舗画面を開く', () => {
 })
 
 describe('認証後の前回選択解除', () => {
-  it('同じ認証セッションで一度だけ保存値を消す', () => {
+  it('ログインし直しでは一度だけ保存値を消す', () => {
+    // ログイン画面が印を外したあと（= localStorage に印が無い）、
+    // 次の認証確認で一度だけ前回の店舗選択を捨てる。
     const local = storage({ [ACCOUNT_SELECTION_KEY]: 'old-account' })
-    const session = storage()
-    expect(clearSelectionAfterAuthentication(local, session)).toBe(true)
+    expect(clearSelectionAfterAuthentication(local)).toBe(true)
     expect(local.getItem(ACCOUNT_SELECTION_KEY)).toBeNull()
-    expect(session.getItem(AUTH_SELECTION_CLEARED_KEY)).toBe('1')
+    expect(local.getItem(AUTH_SELECTION_CLEARED_KEY)).toBe('1')
 
     local.setItem(ACCOUNT_SELECTION_KEY, 'current-account')
-    expect(clearSelectionAfterAuthentication(local, session)).toBe(false)
+    expect(clearSelectionAfterAuthentication(local)).toBe(false)
     expect(local.getItem(ACCOUNT_SELECTION_KEY)).toBe('current-account')
+  })
+
+  it('新規タブ・再読込では他タブの選択を消さない', () => {
+    // 印は共有の localStorage に残る。タブごとの sessionStorage が
+    // 空になる新規タブでも、印が残っている限り選択を消さない（NEXT-07）。
+    const local = storage({
+      [ACCOUNT_SELECTION_KEY]: 'account-1',
+      [AUTH_SELECTION_CLEARED_KEY]: '1',
+    })
+    expect(clearSelectionAfterAuthentication(local)).toBe(false)
+    expect(local.getItem(ACCOUNT_SELECTION_KEY)).toBe('account-1')
+  })
+})
+
+describe('店舗選択から元の画面へ戻る', () => {
+  it('アプリ内の店舗画面パスだけを戻り先にする', () => {
+    expect(resolveStoreReturnPath('/line-notifications/edit?id=1')).toBe('/line-notifications/edit?id=1')
+    expect(resolveStoreReturnPath('/friends#top')).toBe('/friends#top')
+    expect(resolveStoreReturnPath('/friends')).toBe('/friends')
+  })
+
+  it('外部URL・店舗不要の画面・空は戻り先にしない', () => {
+    expect(resolveStoreReturnPath('https://example.com/x')).toBeNull()
+    expect(resolveStoreReturnPath('//evil.example')).toBeNull()
+    expect(resolveStoreReturnPath('javascript:alert(1)')).toBeNull()
+    expect(resolveStoreReturnPath('/hq')).toBeNull()
+    expect(resolveStoreReturnPath('/hq/open?target=tags')).toBeNull()
+    expect(resolveStoreReturnPath('/login')).toBeNull()
+    expect(resolveStoreReturnPath(null)).toBeNull()
+    expect(resolveStoreReturnPath('')).toBeNull()
+  })
+
+  it('戻り先付きの店舗一覧URLを組み立てる', () => {
+    expect(storeSelectionHref('/line-notifications/edit?id=1'))
+      .toBe(`/hq?return=${encodeURIComponent('/line-notifications/edit?id=1')}`)
+    expect(storeSelectionHref(null)).toBe('/hq')
+    expect(storeSelectionHref('/hq')).toBe('/hq')
+    expect(storeSelectionHref('https://example.com')).toBe('/hq')
   })
 })

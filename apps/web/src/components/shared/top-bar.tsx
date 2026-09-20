@@ -84,7 +84,7 @@ export default function TopBar({
           */}
           <span className={styles.accountPill}>
             <span className={styles.accountMark} aria-hidden="true">{current?.mark ?? current?.label.slice(0, 1) ?? ''}</span>
-            <span className={styles.accountName}>{current?.label ?? ''}</span>
+            <span className={styles.accountName}>{current?.label ?? '店舗を選択'}</span>
             <ChevronIcon />
             <select
               className={styles.accountSelect}
@@ -92,6 +92,12 @@ export default function TopBar({
               onChange={handleAccountChange}
               aria-label="LINEアカウント"
             >
+              {/*
+                未選択を表す option。これが無いと value="" のとき、札の表示は空なのに
+                ブラウザは先頭の店舗を選んだと読み上げて食い違う（NEXT-07）。
+                「未選択へ戻る」は操作として意味を持たないので選べない形にする。
+              */}
+              <option value="" disabled>店舗を選択</option>
               {accounts.map((account) => (
                 <option key={account.id} value={account.id}>{account.label}</option>
               ))}

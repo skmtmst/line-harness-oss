@@ -67,7 +67,7 @@ export default function OpsLoginPage() {
       setBusy(null)
       return
     }
-    try { sessionStorage.removeItem(AUTH_SELECTION_CLEARED_KEY) } catch { /* non-essential navigation marker */ }
+    try { localStorage.removeItem(AUTH_SELECTION_CLEARED_KEY) } catch { /* non-essential navigation marker */ }
     if (res.data.twoFactorSetup && res.data.challengeToken) {
       window.location.assign(`/login/two-factor/setup?next=ops#${new URLSearchParams({ lh_2fa: res.data.challengeToken }).toString()}`)
       return
@@ -105,7 +105,7 @@ export default function OpsLoginPage() {
 
   const lineLogin = () => {
     setBusy('line')
-    try { sessionStorage.removeItem(AUTH_SELECTION_CLEARED_KEY) } catch { /* non-essential navigation marker */ }
+    try { localStorage.removeItem(AUTH_SELECTION_CLEARED_KEY) } catch { /* non-essential navigation marker */ }
     const apiUrl = process.env.NEXT_PUBLIC_API_URL
     if (!apiUrl) return setBusy(null)
     window.location.assign(`${apiUrl}/api/auth/line?next=ops`)

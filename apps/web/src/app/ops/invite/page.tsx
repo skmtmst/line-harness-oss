@@ -69,7 +69,7 @@ export default function OpsInvitePage() {
       setBusy(false)
       return
     }
-    try { sessionStorage.removeItem(AUTH_SELECTION_CLEARED_KEY) } catch { /* non-essential navigation marker */ }
+    try { localStorage.removeItem(AUTH_SELECTION_CLEARED_KEY) } catch { /* non-essential navigation marker */ }
     if (res.data.sessionToken) storeAdminSession(res.data.sessionToken, res.csrfToken)
     else if (res.csrfToken) {
       try { localStorage.setItem('lh_csrf', res.csrfToken) } catch { /* Cookie session is sufficient */ }

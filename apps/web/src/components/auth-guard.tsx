@@ -38,7 +38,10 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
         // N-424: 「見えるだけ」のキーは別枠で持つ。メニュー表示には両方を使う。
         localStorage.setItem('lh_staff_view_permissions', JSON.stringify(data.data.viewPermissionKeys ?? []))
         if (data.csrfToken) localStorage.setItem('lh_csrf', data.csrfToken)
-        clearSelectionAfterAuthentication(localStorage, sessionStorage)
+        // 「消した」印は共有の localStorage にある。新規タブ・再読込では
+        // 印が残るので他タブの店舗選択を消さず、ログインし直しのときだけ
+        // 一度だけ消える（NEXT-07）。
+        clearSelectionAfterAuthentication(localStorage)
         if (!cancelled) setChecked(true)
       } catch {
         if (!cancelled) router.replace('/login')

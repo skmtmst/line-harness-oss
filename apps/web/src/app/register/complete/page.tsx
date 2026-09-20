@@ -82,7 +82,7 @@ function CompleteInner() {
       return
     }
     storeDeviceMarker(res.data.deviceMarker)
-    sessionStorage.removeItem(AUTH_SELECTION_CLEARED_KEY)
+    try { localStorage.removeItem(AUTH_SELECTION_CLEARED_KEY) } catch { /* non-essential navigation marker */ }
     // オーナーは二段階認証が必須（N-426）。設定画面へ進み、完了後にセッションが出る。
     if (res.data.twoFactorSetup && res.data.challengeToken) {
       window.location.assign(`/login/two-factor/setup#${new URLSearchParams({ lh_2fa: res.data.challengeToken }).toString()}`)
