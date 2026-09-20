@@ -860,7 +860,7 @@ function InflowLinksPageInner({
         <div className="overflow-hidden rounded-lg border border-hairline bg-canvas">
           <table className="w-full table-fixed text-xs">
             <colgroup>
-              <col className="w-[5%]" />
+              <col className="w-10" />
               <col className="w-[8%]" />
               <col className="w-[8%]" />
               <col className="w-[8%]" />
