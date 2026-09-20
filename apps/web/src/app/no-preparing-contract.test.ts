@@ -109,7 +109,7 @@ describe('画面に「準備中」を置かない', () => {
     // 数え漏れ（読む場所を間違えて 0 件になる）だけを見張る。
     // ちょうどの枚数は画面が増えるたびに動くので、下限をゆるく取る。
     expect(FILES.length).toBeGreaterThan(300)
-    expect(FILES.filter((f) => /^app\/.*\/page\.tsx$/.test(f.p) || f.p === 'app/page.tsx')).toHaveLength(182)  // 2026-10-05: メール変更の確認画面（staff/email-change、#957）を足した後の実測値。
+    expect(FILES.filter((f) => /^app\/.*\/page\.tsx$/.test(f.p) || f.p === 'app/page.tsx')).toHaveLength(183)  // 2026-10-07: 情報欄の編集画面（tags/fields/edit、#1013 ATTR-05）を足した後の実測値。
   })
 
   it('共通部品に「準備中」が1つも無い', () => {
