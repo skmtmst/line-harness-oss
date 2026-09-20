@@ -443,7 +443,7 @@
   },
   "app/webinars/edit/page.tsx": {
     "direct-th": 13,
-    "unresolved-classname": 10,
+    "unresolved-classname": 9,
     "arbitrary-value": 26,
     "direct-secondary-button": 1
   },

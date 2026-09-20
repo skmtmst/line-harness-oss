@@ -143,7 +143,8 @@ describe('V6 ウェビナー一覧の契約', () => {
     expect(PAGE).toContain('data-design-node="ZC13r"')
     expect(PAGE).toContain('data-design-node="LKuAQ"')
     for (const pane of ['video', 'cta', 'notifications', 'actions', 'preview', 'review', 'participants', 'analytics']) {
-      expect(EDIT).toContain(`pane === '${pane}'`)
+      /* keep-alive した面は `hidden={pane !== '...'}` で畳む。直接開ける面は `pane === '...'` のまま */
+      expect(EDIT.includes(`pane === '${pane}'`) || EDIT.includes(`pane !== '${pane}'`)).toBe(true)
     }
   })
 
@@ -151,7 +152,8 @@ describe('V6 ウェビナー一覧の契約', () => {
     for (const call of [
       'webinarApi.editor(id)',
       'webinarApi.publishValidation(webinar.id)',
-      'webinarApi.participants(webinarId, undefined, 8)',
+      'webinarApi.participants(webinarId, undefined, PARTICIPANTS_PAGE_SIZE)',
+      'webinarApi.participants(webinarId, nextCursor, PARTICIPANTS_PAGE_SIZE)',
       'webinarApi.testPublicPage(webinar.id, editor.version)',
     ]) expect(EDIT).toContain(call)
     for (const call of [
