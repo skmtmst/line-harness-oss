@@ -46,16 +46,24 @@ vi.mock('../services/line-proxy-send.js', () => ({ pushViaHarnessProxy: mocks.pu
 
 const { nenPhotoOperations } = await import('./nen-photo-operations.js');
 
-function harness(options: { permissions?: string[]; role?: 'owner' | 'admin' | 'staff' } = {}) {
+function harness(options: {
+  permissions?: string[];
+  viewPermissions?: string[];
+  role?: 'owner' | 'admin' | 'staff';
+  authenticated?: boolean;
+} = {}) {
   const app = new Hono<any>();
   app.use('*', async (c, next) => {
-    c.set('staff', {
-      id: 'staff-a', name: '担当者', role: options.role ?? 'staff', readOnly: false,
-      permissionKeys: options.permissions ?? [
-        'photo.submission.view', 'photo.submission.review',
-        'photo.submission.bulk_review', 'photo.original.download',
-      ],
-    });
+    if (options.authenticated !== false) {
+      c.set('staff', {
+        id: 'staff-a', name: '担当者', role: options.role ?? 'staff', readOnly: false,
+        permissionKeys: options.permissions ?? [
+          'photo.submission.view', 'photo.submission.review',
+          'photo.submission.bulk_review', 'photo.original.download',
+        ],
+        viewPermissionKeys: options.viewPermissions ?? [],
+      });
+    }
     c.env = { DB: {}, IMAGES: { get: mocks.r2Get } };
     await next();
   });
@@ -154,6 +162,50 @@ beforeEach(() => {
 });
 
 describe('photo review operations API', () => {
+  it('管理者とオーナーは個別キーなしで集計を閲覧できる', async () => {
+    for (const role of ['admin', 'owner'] as const) {
+      const response = await harness({ role, permissions: [] })
+        .request('/api/nen-members/photos/review-metrics?accountId=account-a');
+      expect(response.status).toBe(200);
+    }
+    expect(mocks.metrics).toHaveBeenCalledTimes(2);
+  });
+
+  it('スタッフは編集キーまたは閲覧キーで集計を閲覧できる', async () => {
+    const editor = await harness({ permissions: ['photo.submission.view'] })
+      .request('/api/nen-members/photos/review-metrics?accountId=account-a');
+    const viewer = await harness({ permissions: [], viewPermissions: ['photo.submission.view'] })
+      .request('/api/nen-members/photos/review-metrics?accountId=account-a');
+    expect(editor.status).toBe(200);
+    expect(viewer.status).toBe(200);
+  });
+
+  it('未認証と権限なしスタッフは集計を閲覧できない', async () => {
+    const unauthenticated = await harness({ authenticated: false })
+      .request('/api/nen-members/photos/review-metrics?accountId=account-a');
+    const denied = await harness({ permissions: [] })
+      .request('/api/nen-members/photos/review-metrics?accountId=account-a');
+    expect(unauthenticated.status).toBe(403);
+    expect(denied.status).toBe(403);
+    expect(await denied.json()).toMatchObject({ error: 'この写真審査操作を行う権限がありません' });
+    expect(mocks.metrics).not.toHaveBeenCalled();
+  });
+
+  it('閲覧キーだけのスタッフは読み取れるが更新できない', async () => {
+    const app = harness({
+      permissions: [],
+      viewPermissions: ['photo.submission.view', 'photo.submission.review'],
+    });
+    const read = await app.request('/api/nen-members/photos/review-metrics?accountId=account-a');
+    const write = await app.request('/api/nen-members/photos/photo-1/assessments/re-evaluate', {
+      method: 'POST', headers: { 'content-type': 'application/json', 'Idempotency-Key': 'assessment-key' },
+      body: JSON.stringify({ lineAccountId: 'account-a', expectedVersion: 1 }),
+    });
+    expect(read.status).toBe(200);
+    expect(write.status).toBe(403);
+    expect(mocks.assessment).not.toHaveBeenCalled();
+  });
+
   it('normal: 実集計とnullを保った空集計を返す', async () => {
     const app = harness();
     const normal = await app.request('/api/nen-members/photos/review-metrics?accountId=account-a');
@@ -185,7 +237,8 @@ describe('photo review operations API', () => {
 
   it('アカウント範囲外を404にし、存在を漏らさない', async () => {
     mocks.accountAccess.mockResolvedValueOnce(false);
-    const response = await harness().request('/api/nen-members/photos/review-metrics?accountId=account-b');
+    const response = await harness({ role: 'admin', permissions: [] })
+      .request('/api/nen-members/photos/review-metrics?accountId=account-b');
     expect(response.status).toBe(404);
     expect(mocks.metrics).not.toHaveBeenCalled();
   });
@@ -578,5 +631,16 @@ describe('photo review operations API', () => {
     expect((await harness().request(
       '/api/nen-members/photos/original-download/token?accountId=account-a',
     )).status).toBe(404);
+  });
+
+  it('管理者も原本URL発行には引き続き再認証が必要', async () => {
+    const response = await harness({ role: 'admin', permissions: [] })
+      .request('/api/nen-members/photos/photo-1/original-download', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'Idempotency-Key': 'admin-download-key' },
+        body: JSON.stringify({ lineAccountId: 'account-a', expectedVersion: 1 }),
+      });
+    expect(response.status).toBe(428);
+    expect(mocks.issueDownload).not.toHaveBeenCalled();
   });
 });
