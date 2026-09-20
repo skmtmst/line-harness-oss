@@ -579,7 +579,14 @@ export default function RichMenusListPage() {
     <main data-design-node="GO8RQ" className="mx-auto max-w-[1584px] p-6">
       <span hidden>メニュー名・ボタン名で検索・保存した条件・公開中のみ</span>
       {showExternal && selectedAccount ? (
-        <div className="bg-canvas-sunken fixed top-14 right-0 bottom-0 left-64 z-40 overflow-y-auto p-6">
+        /*
+         * LAY-06: 全幅の作業画面なのに常に左256pxを空けていたため、
+         * 小画面では右の細い帯になっていた。1280px未満では左右いっぱいの
+         * 全画面ビューにし、PCでは実在するメニュー（256px）ぶんだけ左を空ける。
+         * 上端はモバイルの固定ヘッダー（68px）とPCのトップバー（56px）の
+         * 実際の高さに合わせる。
+         */
+        <div className="bg-canvas-sunken fixed inset-x-0 bottom-0 top-[var(--mobile-header-height)] z-40 overflow-y-auto p-4 sm:p-6 xl:left-64 xl:top-14">
           <ExternalImportWorkspace
             external={external}
             loading={loading}
@@ -1138,13 +1145,13 @@ function ExternalImportWorkspace({
                       type="button"
                       aria-pressed={active}
                       onClick={() => setSelectedId(menu.richMenuId)}
-                      className={`border-hairline grid w-full grid-cols-[48px_minmax(0,1fr)_100px_110px_120px] items-center gap-3 rounded-control border p-3 text-left ${active ? 'border-accent bg-accent-soft' : 'bg-canvas hover:bg-canvas-sunken'}`}
+                      className={`border-hairline grid w-full grid-cols-[48px_minmax(0,1fr)_auto] items-center gap-3 rounded-control border p-3 text-left sm:grid-cols-[48px_minmax(0,1fr)_100px_110px_120px] ${active ? 'border-accent bg-accent-soft' : 'bg-canvas hover:bg-canvas-sunken'}`}
                     >
                       <span className="bg-canvas-sunken text-ink-faint flex h-10 items-center justify-center rounded-control">▧</span>
                       <span className="min-w-0"><strong className="text-ink block truncate text-sm">{menu.name || '名前なし'}</strong><span className="text-ink-faint block truncate text-xs">{menu.areasCount}面・切替なし・画像あり</span></span>
-                      <span className="text-ink text-sm font-bold">—<small className="text-ink-faint block text-micro font-normal">今月</small></span>
-                      <span className="text-ink-secondary text-xs">作成日不明</span>
-                      <span className="border-action text-action justify-self-end rounded-control border px-3 py-2 text-xs font-bold">取り込む</span>
+                      <span className="text-ink hidden text-sm font-bold sm:block">—<small className="text-ink-faint block text-micro font-normal">今月</small></span>
+                      <span className="text-ink-secondary hidden text-xs sm:block">作成日不明</span>
+                      <span className="border-action text-action justify-self-end rounded-control border px-3 py-2 text-xs font-bold whitespace-nowrap">取り込む</span>
                     </button>
                   )
                 })}
