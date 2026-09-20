@@ -21,6 +21,17 @@
  * 作り直すタイミングで順に行い、一度に全部は触らない。
  */
 @theme {
+  /*
+   * 書体。管理画面は1系統だけ（#976 U080）。
+   *
+   * 以前は `layout.tsx` の body へ inline style で同じ並びを書いていた。
+   * スタイル属性は検査から見えにくく、友だち属性V2（下の
+   * `.friend-attributes-v2-shell`、検証用にSF系を固定する例外）と
+   * 書き方が違うので「どれが正本か」が分かりにくかった。
+   * 正本をここへ移し、body は `font-sans` で読む。
+   */
+  --font-sans: "Noto Sans JP", "Hiragino Sans", "Yu Gothic", system-ui, sans-serif;
+
   /* --- 色 ---------------------------------------------------------------
    * アクセントはLINEブランドの緑1色。状態色（成功・注意・危険）とは
    * 役割が別で、アクセントを状態表示に使わない。
@@ -244,6 +255,9 @@
  * 友だち属性V2は、Pen.devの1920px画像をそのまま検証する移行面。
  * 旧画面のNoto Sans JPと256pxサイドバーを継承すると、本文だけ合わせても
  * 全体座標と文字幅がずれるため、この画面に限って設計値を固定する。
+ *
+ * 共通の書体は `--font-sans`（@theme）が正本。ここは画像比較の基準を
+ * 維持するための意図的な例外なので、統一対象から外す（#976 U080）。
  */
 .friend-attributes-v2-shell {
   font-family: "SF Pro Text", -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;

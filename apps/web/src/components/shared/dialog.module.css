@@ -72,8 +72,7 @@
   color: var(--color-status-danger);
 }
 
-.panel:focus-visible,
-.button:focus-visible {
+.panel:focus-visible {
   outline: revert;
 }
 
@@ -158,23 +157,11 @@
   gap: 10px;
 }
 
-.button {
-  display: inline-flex;
-  min-width: 112px;
-  width: auto;
-  white-space: nowrap;
-  min-height: 38px;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  border: 1px solid;
-  border-radius: var(--radius-control);
-  padding: 8px 12px;
-  font-size: var(--text-caption);
-  font-weight: 700;
-  cursor: pointer;
-}
-
+/*
+ * 実行・取消ボタンは共通Button（button.tsx）をそのまま使う。
+ * 高さ・文字サイズ・色（副次=secondary／通常実行=primary／危険=danger）は
+ * すべて部品側が持つ（#976 U077/U083/U084）。ここには幅の指定だけ残す。
+ */
 .buttonIcon {
   display: inline-flex;
   flex-shrink: 0;
@@ -188,40 +175,17 @@
   white-space: nowrap;
 }
 
-.button:disabled {
-  cursor: not-allowed;
-  opacity: 0.4;
-}
-
-.cancel {
-  border-color: var(--color-hairline);
-  background: var(--color-canvas);
-  color: var(--color-ink);
-}
-
-/*
- * 確認の実行ボタン。**白文字が乗るので `$accent-deep`。**
- * `$accent`(#06c755) に白文字は 2.26:1 で、13px のラベルが読めない。
- */
-.confirm {
-  border-color: var(--color-accent-deep);
-  background: var(--color-accent-deep);
-  color: var(--color-on-accent);
-}
-
-.danger {
-  border-color: var(--color-status-danger);
-  background: var(--color-status-danger);
-  color: var(--color-on-accent);
-}
-
 @media (max-width: 560px) {
   .panel {
     padding: 16px;
   }
 
-  .actions,
-  .button {
+  .actions {
+    width: 100%;
+  }
+
+  /* 狭い画面ではボタンを縦に積み、指で押せる幅を確保する。 */
+  .designButton {
     width: 100%;
   }
 }

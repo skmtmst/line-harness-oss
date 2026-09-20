@@ -168,12 +168,20 @@ describe('設計の実測値に合わせる', () => {
     expect(token('color-accent')).toBe('#06c755')
   })
 
-  it('共通ボタンは Ai3fq の 36px・角丸8px・13px・600 に合わせる', () => {
-    expect(BUTTON).toMatch(/height:\s*36px/)
+  /*
+   * #976 U079/U083: 共通ボタンは 2026-09-20 の共通デザイン仕様で
+   * **PC標準 40px・文字14px** に改められた。上の「36pxで正しい」の経緯は
+   * 残す（Pencil V5 実測）。監査で入力欄・検索欄と高さをそろえることが
+   * 決まったため、ここもそれに合わせる。タッチ端末は44px。
+   */
+  it('共通ボタンは #976 の規定で 40px・角丸8px・14px・600 に合わせる', () => {
+    expect(BUTTON).toMatch(/\.standard\s*{[^}]*height:\s*40px/s)
     expect(BUTTON).toMatch(/padding:\s*9px 13px/)
     expect(BUTTON).toMatch(/border-radius:\s*var\(--radius-control\)/)
     expect(token('radius-control')).toBe('8px')
-    expect(BUTTON).toMatch(/font-size:\s*var\(--text-label\)/)
+    expect(BUTTON).toMatch(/font-size:\s*var\(--text-body\)/)
     expect(BUTTON).toMatch(/font-weight:\s*600/)
+    // タッチ端末（pointer: coarse）は44pxの当たり判定を確保する
+    expect(BUTTON).toMatch(/@media\s*\(pointer:\s*coarse\)[^{]*\{[^}]*min-height:\s*44px/s)
   })
 })

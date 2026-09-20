@@ -33,9 +33,11 @@
   outline-offset: 2px;
 }
 
+/* #976 U084: 選択中の文字・下線は白地で読める `$accent-deep`。
+ * `$accent`(#06c755) の文字は白地で 2.26:1 しか取れない。 */
 .selected {
-  border-bottom-color: var(--color-accent);
-  color: var(--color-accent);
+  border-bottom-color: var(--color-accent-deep);
+  color: var(--color-accent-deep);
   font-weight: 700;
 }
 
@@ -68,7 +70,7 @@
 .segmentedSelected,
 .segmentedSelected:hover {
   background: var(--color-canvas);
-  color: var(--color-accent);
+  color: var(--color-accent-deep); /* #976 U084: 白地で読める緑 */
   font-weight: 700;
 }
 

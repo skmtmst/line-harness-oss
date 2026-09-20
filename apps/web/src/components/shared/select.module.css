@@ -19,7 +19,8 @@
   box-sizing: border-box;
   display: flex;
   width: 100%;
-  height: 42px;
+  /* #976 U083: 42px だった高さを入力欄・ボタンと同じ40pxへそろえる */
+  height: 40px;
   align-items: center;
   justify-content: space-between;
   gap: 10px;
@@ -28,7 +29,8 @@
   background: var(--color-canvas);
   color: var(--color-ink);
   font-family: inherit;
-  font-size: var(--text-label);
+  /* #976 U079: 選択欄の文字も入力欄と同じ14px */
+  font-size: var(--text-body);
   font-weight: 600;
   cursor: pointer;
 }
@@ -97,10 +99,22 @@
   background: var(--color-canvas);
   color: var(--color-ink);
   font-family: inherit;
-  font-size: var(--text-label);
+  font-size: var(--text-body);
   font-weight: 500;
   text-align: left;
   cursor: pointer;
+}
+
+/* #976 U079/U083: タッチ端末は文字16px・高さ44px（入力欄と同じ規定）。 */
+@media (pointer: coarse) {
+  .trigger {
+    height: 44px;
+    font-size: var(--text-lead);
+  }
+
+  .option {
+    font-size: var(--text-lead);
+  }
 }
 
 .option:hover,

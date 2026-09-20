@@ -2,6 +2,7 @@
 
 import React, { useEffect, useId, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
+import Button from './button'
 import { useOverlayFocus } from './overlay-utils'
 import styles from './dialog.module.css'
 
@@ -101,13 +102,23 @@ export default function Dialog({
       {children ? <div className={styles.content}>{children}</div> : null}
       {error ? <p className={styles.error} role="alert">{error}</p> : null}
       {footer ?? (
+        /*
+         * 実行・取消は共通Buttonの役割（primary/danger/secondary）をそのまま
+         * 使う（#976 U077/U083/U084）。ここで赤や緑を自前で持つと、コントラストが
+         * 画面ごとにずれる。横幅の指定だけ `.designButton` で足す。
+         */
         <div className={styles.actions}>
-          <button type="button" className={`${styles.button} ${styles.designButton} ${styles.cancel}`} onClick={onCancel} disabled={busy}>{cancelLabel}</button>
+          <Button className={styles.designButton} onClick={onCancel} disabled={busy}>{cancelLabel}</Button>
           {onConfirm ? (
-            <button type="button" className={`${styles.button} ${styles.designButton} ${tone === 'destructive' ? styles.danger : styles.confirm}`} onClick={onConfirm} disabled={busy}>
+            <Button
+              variant={tone === 'destructive' ? 'danger' : 'primary'}
+              className={styles.designButton}
+              onClick={onConfirm}
+              disabled={busy}
+            >
               {!busy && confirmIcon ? <span className={styles.buttonIcon} aria-hidden="true">{confirmIcon}</span> : null}
               {busy ? '処理中…' : confirmLabel}
-            </button>
+            </Button>
           ) : null}
         </div>
       )}

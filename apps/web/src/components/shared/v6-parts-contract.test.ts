@@ -53,12 +53,14 @@ describe('V6共通部品の主要寸法', () => {
     const css = read('tabs.module.css')
     expect(css).toContain('height: 44px;')
     expect(css).toContain('border-bottom: 2px solid transparent;')
-    expect(css).toContain('border-bottom-color: var(--color-accent);')
+    /* #976 U084: 選択中の下線は白地で読める accent-deep（accent は 2.26:1） */
+    expect(css).toContain('border-bottom-color: var(--color-accent-deep);')
   })
 
-  it('標準プルダウンは高さ42px、標準176px・件数128px', () => {
+  it('標準プルダウンは高さ40px、標準176px・件数128px', () => {
     const css = read('select-field.module.css')
-    expect(css).toContain('height: 42px;')
+    /* #976 U083: 42px だった高さを入力欄・ボタンと同じ40pxへそろえた */
+    expect(css).toContain('height: 40px;')
     expect(css).toContain('width: 176px;')
     expect(css).toContain('width: 128px;')
   })

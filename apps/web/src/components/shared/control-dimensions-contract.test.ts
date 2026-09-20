@@ -10,14 +10,19 @@ describe('Pencil V6 の入力・選択・押し口規定', () => {
     const select = read('./select-field.module.css')
     const search = read('./search-field.module.css')
 
-    expect(button).toMatch(/\.standard\s*{[^}]*height:\s*36px/s)
+    /*
+     * #976 U083: PC標準の高さは40pxにそろえる（ボタン・入力・検索・選択）。
+     * 以前はボタン36px・選択/検索42pxでずれていた。タッチ端末は44px。
+     * （`@media (pointer: coarse)` の 44px は design-unification の試験が見る）
+     */
+    expect(button).toMatch(/\.standard\s*{[^}]*height:\s*40px/s)
     expect(button).toMatch(/\.field\s*{[^}]*height:\s*40px/s)
     expect(formControls).toMatch(/\.control\s*{[^}]*background:\s*var\(--color-canvas\)/s)
     expect(formControls).toMatch(/\.input\s*{[^}]*height:\s*40px/s)
-    expect(select).toMatch(/\.select\s*{[^}]*height:\s*42px/s)
+    expect(select).toMatch(/\.select\s*{[^}]*height:\s*40px/s)
     expect(select).toMatch(/background-color:\s*var\(--color-canvas\)/)
     expect(select).toMatch(/background-position:\s*right 13px center/)
-    expect(search).toMatch(/\.search\s*{[^}]*height:\s*42px/s)
+    expect(search).toMatch(/\.search\s*{[^}]*height:\s*40px/s)
     expect(search).toMatch(/background:\s*var\(--color-canvas\)/)
   })
 
