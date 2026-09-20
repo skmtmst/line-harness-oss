@@ -94,6 +94,40 @@ describe('共通SummaryCard', () => {
     )
     expect(html).toContain('aria-busy="true"')
   })
+
+  it('長い説明は説明アイコンのポップオーバーへ入れ、カードを伸ばさない（#1005）', () => {
+    const html = renderToStaticMarkup(
+      <SummaryCard
+        title="視聴"
+        value={null}
+        unit="人"
+        detail="未取得"
+        description="視聴区間の記録をまだ集計できないため"
+      />,
+    )
+    /* 実ボタン・読み上げ名・開閉状態。閉じている間は理由全文を描かない。 */
+    expect(html).toContain('<button')
+    expect(html).toContain('aria-label="視聴の説明"')
+    expect(html).toContain('aria-expanded="false"')
+    expect(html).not.toContain('視聴区間の記録をまだ集計できないため')
+    /* 状態自体は隠さない */
+    expect(html).toContain('未取得')
+  })
+
+  it('再試行は短い状態のそばに常時出す', () => {
+    const html = renderToStaticMarkup(
+      <SummaryCard
+        title="配信実績"
+        value={null}
+        unit="件"
+        detail="取得に失敗しました"
+        onRetry={() => undefined}
+        retryLabel="集計を読み直す"
+      />,
+    )
+    expect(html).toContain('集計を読み直す')
+    expect(html).toContain('取得に失敗しました')
+  })
 })
 
 describe('共通表見出し', () => {
