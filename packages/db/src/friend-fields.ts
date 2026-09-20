@@ -546,6 +546,37 @@ export async function getFriendFieldUsageForScope(
   ];
 }
 
+/**
+ * 画面から届いた「動かせる行だけの新しい順」を、届いていない行の位置を
+ * 保ったまま全体の並びへ戻して、1回のバッチで書く（#1014 ATTR-03/04）。
+ *
+ * 行ごとの PATCH だと途中失敗で一部だけ新しい順位が残る。ここでは
+ * 依頼されたIDを動かせる行に限って位置だけ入れ替える。
+ * 共通項目（is_inherited=1）は他のアカウントの並びにも効くため触らない。
+ */
+export async function reorderFriendFields(
+  db: D1Database,
+  scope: FriendFieldScope,
+  ids: string[],
+): Promise<void> {
+  const current = await getFriendFieldsForScope(db, scope);
+  const movable = new Set(
+    current.filter((field) => field.is_inherited !== 1).map((field) => field.id),
+  );
+  const requested = ids.filter((id) => movable.has(id));
+  if (requested.length < 2) return;
+  const requestedSet = new Set(requested);
+  let index = 0;
+  const nextOrder = current.map((field) =>
+    requestedSet.has(field.id) ? requested[index++] : field.id);
+  await db.batch(
+    nextOrder.flatMap((id, position) =>
+      movable.has(id)
+        ? [db.prepare(`UPDATE friend_fields SET display_order = ? WHERE id = ?`).bind(position, id)]
+        : []),
+  );
+}
+
 export async function deleteFriendField(db: D1Database, id: string): Promise<void> {
   await db.prepare(`DELETE FROM friend_fields WHERE id = ?`).bind(id).run();
 }

@@ -403,6 +403,40 @@ export async function getSavedSearchById(
     .first<SavedSearch>();
 }
 
+/**
+ * 画面から届いた「動かせる検索だけの新しい順」を、届いていない行の位置を
+ * 保ったまま全体の並びへ戻して、1回のバッチで書く（#1014 ATTR-03）。
+ *
+ * 動かせる範囲は PATCH と同じ：選択中アカウントの検索で、本人が作った
+ * もの（owner/admin は全部）。行ごとの PATCH だと、他人が作った検索への
+ * 404 で途中までしか並びが変わらない状態が残った。
+ */
+export async function reorderSavedSearches(
+  db: D1Database,
+  access: SavedSearchAccess,
+  ids: string[],
+): Promise<void> {
+  const current = await getSavedSearches(db, 'friends', access, 'search_v1');
+  const movable = new Set(
+    current
+      .filter((row) => row.line_account_id === access.lineAccountId
+        && (access.canManageAll || row.created_by === access.staffId))
+      .map((row) => row.id),
+  );
+  const requested = ids.filter((id) => movable.has(id));
+  if (requested.length < 2) return;
+  const requestedSet = new Set(requested);
+  let index = 0;
+  const nextOrder = current.map((row) =>
+    requestedSet.has(row.id) ? requested[index++] : row.id);
+  await db.batch(
+    nextOrder.flatMap((id, position) =>
+      movable.has(id)
+        ? [db.prepare(`UPDATE saved_searches SET display_order = ? WHERE id = ?`).bind(position, id)]
+        : []),
+  );
+}
+
 export async function countSavedSearches(
   db: D1Database,
   input: {

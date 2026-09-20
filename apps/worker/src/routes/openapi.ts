@@ -1231,6 +1231,83 @@ const spec = {
         },
       },
     },
+    '/api/friend-fields/reorder': {
+      patch: {
+        tags: ['Friend Attributes'],
+        summary: '友だち情報欄の表示順を一括更新（#1014 ATTR-02/03/04）',
+        description:
+          '動かせる行だけの新しい順を ids で受け取り、1回のバッチで書く。共通項目（is_inherited）と指定されなかった行の位置は保つ。',
+        parameters: [{ name: 'lineAccountId', in: 'query', required: true, schema: { type: 'string' } }],
+        requestBody: {
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['ids'],
+                properties: { ids: { type: 'array', items: { type: 'string' } } },
+              },
+            },
+          },
+        },
+        responses: {
+          '200': { description: 'Order updated' },
+          '400': { description: 'ids missing or not an array / lineAccountId missing' },
+          '403': { description: 'Owner or admin role required' },
+          '404': { description: 'Account not in visible scope' },
+        },
+      },
+    },
+    '/api/support-marks/reorder': {
+      patch: {
+        tags: ['Friend Attributes'],
+        summary: '対応マークの表示順を一括更新（#1014 ATTR-02/03/04）',
+        description:
+          '動かせる行だけの新しい順を ids で受け取り、1回のバッチで書く。共有マーク（is_inherited）と指定されなかった行の位置は保つ。共有マークへの行ごと PATCH は複製を起こすため必ずこちらを使う。',
+        parameters: [{ name: 'lineAccountId', in: 'query', required: true, schema: { type: 'string' } }],
+        requestBody: {
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['ids'],
+                properties: { ids: { type: 'array', items: { type: 'string' } } },
+              },
+            },
+          },
+        },
+        responses: {
+          '200': { description: 'Order updated' },
+          '400': { description: 'ids missing or not an array / lineAccountId missing' },
+          '403': { description: 'Owner or admin role required' },
+          '404': { description: 'Account not in visible scope' },
+        },
+      },
+    },
+    '/api/saved-searches/reorder': {
+      patch: {
+        tags: ['Friend Attributes'],
+        summary: '保存した検索の表示順を一括更新（#1014 ATTR-02/03）',
+        description:
+          '動かせる行だけの新しい順を ids で受け取り、1回のバッチで書く。staff は自分が作った検索だけを動かせ、他人が作った検索と指定されなかった行の位置は保つ。',
+        parameters: [{ name: 'lineAccountId', in: 'query', required: true, schema: { type: 'string' } }],
+        requestBody: {
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['ids'],
+                properties: { ids: { type: 'array', items: { type: 'string' } } },
+              },
+            },
+          },
+        },
+        responses: {
+          '200': { description: 'Order updated' },
+          '400': { description: 'ids missing or not an array / lineAccountId missing' },
+          '404': { description: 'Account not in visible scope' },
+        },
+      },
+    },
     '/api/media/{id}': {
       get: {
         tags: ['Contents'],
@@ -4439,6 +4516,7 @@ const spec = {
     { name: 'Friends', description: '友だち管理' },
     { name: 'HQ Templates', description: '統括ひな形の作成・事前検査・店舗配布' },
     { name: 'Tags', description: 'タグ管理' },
+    { name: 'Friend Attributes', description: '友だち情報欄・対応マーク・保存した検索' },
     { name: 'Scenarios', description: 'ステップ配信シナリオ' },
     { name: 'Broadcasts', description: '一斉配信' },
     { name: 'NEN delivery', description: 'NEN専用配信・コラム・ペット実績' },
