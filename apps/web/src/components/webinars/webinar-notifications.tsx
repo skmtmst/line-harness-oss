@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   webinarApi,
   type WebinarNotificationOverview,
@@ -35,15 +35,31 @@ const HOUR_OPTIONS = [15, 30, 60, 120].map((m) => ({
   label: m < 60 ? `${m}分前` : `${m / 60}時間前`,
 }))
 
-export default function WebinarNotifications({ webinarId, onLoaded }: {
+/*
+  未保存の判定に使う欄。サーバーへ送る入力と同じセットで比べる——
+  画面にだけある値で「未保存」と出さない。
+*/
+const SETTINGS_KEYS = [
+  'registrationEnabled', 'dayBeforeEnabled', 'dayBeforeTime',
+  'hourBeforeEnabled', 'hourBeforeMinutes', 'startEnabled',
+  'missedEnabled', 'missedTime', 'completedEnabled',
+] as const
+
+export default function WebinarNotifications({ webinarId, onLoaded, onDirtyChange, registerSave }: {
   webinarId: string
   /*
     親の概要段と子の編集タブで同じ口を2回叩かない。取得はここに一本化し、
     親は報告を受けて概要だけ描く。保存後の取り直しもここが行い、親へ流す。
   */
   onLoaded?: (data: { settings: WebinarNotificationSettings | null; overview: WebinarNotificationOverview | null } | null) => void
+  /** 保存していない変更があるかを親へ伝える（段の固定バーが未保存を出すため）。 */
+  onDirtyChange?: (dirty: boolean) => void
+  /** 親の固定バーから保存を呼べるようにする。true のときだけ保存が完了。 */
+  registerSave?: (save: (() => Promise<boolean>) | null) => void
 }) {
   const [settings, setSettings] = useState<WebinarNotificationSettings | null>(null)
+  /* 最後に読めた・保存できた設定。ここと違う入力が「未保存」。 */
+  const [baseline, setBaseline] = useState<WebinarNotificationSettings | null>(null)
   const [overview, setOverview] = useState<WebinarNotificationOverview | null>(null)
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading')
   const [saving, setSaving] = useState(false)
@@ -61,6 +77,7 @@ export default function WebinarNotifications({ webinarId, onLoaded }: {
       */
       if (!res.data || typeof res.data !== 'object') throw new Error('shape')
       setSettings(res.data.settings)
+      setBaseline(res.data.settings)
       setOverview(res.data.overview ?? null)
       setState('ready')
       onLoaded?.({ settings: res.data.settings, overview: res.data.overview ?? null })
@@ -75,8 +92,20 @@ export default function WebinarNotifications({ webinarId, onLoaded }: {
   const patch = (next: Partial<WebinarNotificationSettingsInput>) =>
     setSettings((prev) => (prev ? { ...prev, ...next } : prev))
 
-  const save = async () => {
-    if (!settings || saving) return
+  /*
+    段を行き来しても入力は残る（親が面を畳まない）。残っている入力が
+    保存済みと違うかどうかを親の固定バーへ伝える。
+  */
+  const dirty = settings !== null && baseline !== null &&
+    SETTINGS_KEYS.some((key) => settings[key] !== baseline[key])
+  useEffect(() => {
+    onDirtyChange?.(dirty)
+  }, [dirty, onDirtyChange])
+  useEffect(() => () => onDirtyChange?.(false), [onDirtyChange])
+
+  /** 保存が完了したら true。失敗したら入力を残したまま false を返す。 */
+  const save = async (): Promise<boolean> => {
+    if (!settings || saving) return false
     setSaving(true)
     setNotice('')
     setError('')
@@ -94,16 +123,30 @@ export default function WebinarNotifications({ webinarId, onLoaded }: {
       }
       const res = await webinarApi.saveNotifications(webinarId, input)
       setSettings(res.data.settings)
+      setBaseline(res.data.settings)
       /* **何が起きたかを数で言う。** 「保存しました」だけでは、予定が
          積まれたのか取り消されたのか分からない。 */
       setNotice(`保存しました。${res.data.queued}件を予定に入れ、${res.data.cancelled}件を取り消しました。`)
       await load()
+      return true
     } catch {
       setError('通知の設定を保存できませんでした。状態を読み直してから、もう一度お試しください。')
+      return false
     } finally {
       setSaving(false)
     }
   }
+
+  /* 親の固定バーから呼べるよう、いちばん新しい保存操作を登録する。 */
+  const saveRef = useRef(save)
+  useEffect(() => {
+    saveRef.current = save
+  })
+  useEffect(() => {
+    if (!registerSave) return
+    registerSave(() => saveRef.current())
+    return () => registerSave(null)
+  }, [registerSave])
 
   if (state === 'loading') return <ListState kind="loading" />
   if (state === 'error') {
