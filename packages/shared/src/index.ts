@@ -23,3 +23,4 @@ export * from "./form-submit-idempotency";
 export * from "./booking-staff";
 export * from "./staff-permissions";
 export * from "./menu-catalog";
+export * from "./dashboard-cards";
