@@ -11991,6 +11991,35 @@ export interface EventSlot {
   is_active: number;
   sort_order: number;
   active_count?: number;
+  /** 一括追加の再送防止キー。サーバーが同じイベント内で一意に扱う(#1000)。 */
+  client_key?: string | null;
+  /** 再送で既存枠に解決された場合 true。新規作成分は false。 */
+  deduplicated?: boolean;
+}
+
+/** createSlots に渡す1枠分の入力。client_key は再送を吸収するための任意キー。 */
+export interface EventSlotInput {
+  starts_at: string;
+  ends_at: string;
+  capacity: number | null;
+  is_active?: number;
+  sort_order?: number;
+  client_key?: string;
+}
+
+/**
+ * 枠の一括作成が途中のチャンクで失敗したときのエラー。
+ * `completed` には作成が確認できた分(失敗したチャンクより前)が入るので、
+ * 画面は残りだけを再送できる(#1000 DETAIL-11)。
+ */
+export class EventSlotsPartialError extends Error {
+  readonly completed: EventSlot[];
+
+  constructor(message: string, completed: EventSlot[], cause?: unknown) {
+    super(message, { cause });
+    this.name = 'EventSlotsPartialError';
+    this.completed = completed;
+  }
 }
 
 export interface EventBookingItem {
@@ -12138,16 +12167,28 @@ export const eventsApi = {
   createSlots: (
     accountId: string,
     eventId: string,
-    slots: Array<{ starts_at: string; ends_at: string; capacity: number | null; is_active?: number; sort_order?: number }>,
+    slots: EventSlotInput[],
+    options?: { operationId?: string },
   ) => (async () => {
     // 誤指定で何千件も作らないよう、総数に上限を置く(点検#520の中9)。
     // 1口400件の分割は裏側の上限に合わせたままにする。
     if (slots.length > 500) {
       throw new Error('500件を超える一括作成はできません。期間や曜日を分けて追加してください')
     }
+    /*
+      #1000 DETAIL-11: 400+1のような分割送信が途中で失敗・応答を失っても、
+      再送で成功済み分を二重登録しないよう、各枠に操作ID由来の client_key を
+      付ける。サーバーは同じイベント内の既存キーを再利用して返す。
+      日時の一意制約は正当な同時開催を壊すので使わない。
+    */
+    const keyed = slots.map((slot, index) =>
+      slot.client_key != null || !options?.operationId
+        ? slot
+        : { ...slot, client_key: `${options.operationId}:${index}` },
+    )
     const items: EventSlot[] = []
-    for (let offset = 0; offset < slots.length; offset += 400) {
-      const chunk = slots.slice(offset, offset + 400)
+    for (let offset = 0; offset < keyed.length; offset += 400) {
+      const chunk = keyed.slice(offset, offset + 400)
       try {
         const response = await fetchApi<{ items: EventSlot[] }>(
           withAccount(`/api/events/admin/events/${eventId}/slots`, accountId),
@@ -12156,7 +12197,11 @@ export const eventsApi = {
         items.push(...response.items)
       } catch (error) {
         const detail = error instanceof Error ? `（${error.message}）` : ''
-        throw new Error(`${items.length}件まで追加されました。残りを確認してから、もう一度追加してください${detail}`, { cause: error })
+        throw new EventSlotsPartialError(
+          `${items.length}件まで追加されました。残りを確認してから、もう一度追加してください${detail}`,
+          [...items],
+          error,
+        )
       }
     }
     return { items }

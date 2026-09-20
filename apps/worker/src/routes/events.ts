@@ -811,6 +811,8 @@ interface SlotInput {
   capacity?: number | null;
   is_active?: number;
   sort_order?: number;
+  /** #1000: 一括追加の再送防止キー。同じイベント内で一意。 */
+  client_key?: string | null;
 }
 
 function validateSlotInput(s: SlotInput, isCreate: boolean): { ok: true } | { ok: false; code: string } {
@@ -834,6 +836,12 @@ function validateSlotInput(s: SlotInput, isCreate: boolean): { ok: true } | { ok
   }
   if (s.sort_order != null && !Number.isInteger(s.sort_order)) {
     return { ok: false, code: 'invalid_sort_order' };
+  }
+  if (
+    s.client_key != null &&
+    (typeof s.client_key !== 'string' || s.client_key.length === 0 || s.client_key.length > 200)
+  ) {
+    return { ok: false, code: 'invalid_client_key' };
   }
   return { ok: true };
 }
@@ -1082,19 +1090,69 @@ events.post('/api/events/admin/events/:id/slots', requireRole('owner', 'admin'),
   if (body.slots.length > 400) {
     return bad(c, '一度に追加できるのは400件までです。400件以下に分けて追加してください', 422);
   }
-
-  const insertStatements: D1PreparedStatement[] = [];
-  const ids: string[] = [];
+  // 入力は挿入前に全部検証する。途中で 422 を返すと、そこまでの分だけ
+  // 残る部分成功になるため。
   for (const s of body.slots) {
     const v = validateSlotInput(s, true);
     if (!v.ok) return bad(c, v.code, 422);
+  }
+
+  /*
+    #1000 DETAIL-11: client_key 付きの枠は、同じイベント内の既存キーを
+    持つ枠をそのまま返し、再送による二重登録を吸収する。日時の一意制約は
+    正当な同時開催を壊すので使わない。応答喪失(作成済みだが結果が届かない)
+    への再送も同じ仕組みで安全になる。
+  */
+  const requestKeys = body.slots
+    .map((s) => s.client_key)
+    .filter((k): k is string => typeof k === 'string');
+  const existingByKey = new Map<string, Record<string, unknown>>();
+  for (let offset = 0; offset < requestKeys.length; offset += 90) {
+    const chunk = requestKeys.slice(offset, offset + 90);
+    const placeholders = chunk.map(() => '?').join(',');
+    const { results } = await c.env.DB
+      .prepare(
+        `SELECT * FROM event_slots
+          WHERE event_id = ? AND deleted_at IS NULL AND client_key IN (${placeholders})`,
+      )
+      .bind(event_id, ...chunk)
+      .all<Record<string, unknown>>();
+    for (const row of results ?? []) existingByKey.set(row.client_key as string, row);
+  }
+
+  const insertStatements: D1PreparedStatement[] = [];
+  const pendingIds: string[] = [];
+  const keyToInputIndex = new Map<string, number>();
+  type Resolution =
+    | { type: 'existing'; row: Record<string, unknown> }
+    | { type: 'insert'; pendingIndex: number }
+    | { type: 'alias'; ref: number };
+  const resolutions: Resolution[] = [];
+  body.slots.forEach((s, index) => {
+    const key = typeof s.client_key === 'string' ? s.client_key : null;
+    if (key) {
+      const earlier = keyToInputIndex.get(key);
+      // 同じリクエスト内のキー重複は、先に解決した枠を指す。
+      if (earlier !== undefined) {
+        resolutions.push({ type: 'alias', ref: earlier });
+        return;
+      }
+      const existing = existingByKey.get(key);
+      if (existing) {
+        keyToInputIndex.set(key, index);
+        resolutions.push({ type: 'existing', row: existing });
+        return;
+      }
+      keyToInputIndex.set(key, index);
+    }
     const id = crypto.randomUUID();
-    ids.push(id);
+    resolutions.push({ type: 'insert', pendingIndex: pendingIds.length });
+    pendingIds.push(id);
     insertStatements.push(c.env.DB
       .prepare(
         `INSERT INTO event_slots
-           (id, event_id, starts_at, ends_at, capacity, is_active, sort_order)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+           (id, event_id, starts_at, ends_at, capacity, is_active, sort_order, client_key)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .bind(
         id,
@@ -1104,13 +1162,14 @@ events.post('/api/events/admin/events/:id/slots', requireRole('owner', 'admin'),
         s.capacity ?? null,
         s.is_active ?? 1,
         s.sort_order ?? 0,
+        key,
       ));
-  }
-  await c.env.DB.batch(insertStatements);
+  });
+  if (insertStatements.length > 0) await c.env.DB.batch(insertStatements);
 
   const rowsById = new Map<string, Record<string, unknown>>();
-  for (let offset = 0; offset < ids.length; offset += 90) {
-    const chunk = ids.slice(offset, offset + 90);
+  for (let offset = 0; offset < pendingIds.length; offset += 90) {
+    const chunk = pendingIds.slice(offset, offset + 90);
     const placeholders = chunk.map(() => '?').join(',');
     const { results } = await c.env.DB
       .prepare(`SELECT * FROM event_slots WHERE id IN (${placeholders})`)
@@ -1118,11 +1177,29 @@ events.post('/api/events/admin/events/:id/slots', requireRole('owner', 'admin'),
       .all<Record<string, unknown>>();
     for (const row of results ?? []) rowsById.set(row.id as string, row);
   }
-  const inserted = ids.flatMap((id) => {
-    const row = rowsById.get(id);
-    return row ? [row] : [];
+  // 入力順を保って返す。再送で既存枠に解決した分は deduplicated: true。
+  const resolvedRows: Array<Record<string, unknown> | null> = new Array(body.slots.length).fill(null);
+  const deduplicated: boolean[] = new Array(body.slots.length).fill(false);
+  resolutions.forEach((r, index) => {
+    if (r.type === 'existing') {
+      resolvedRows[index] = r.row;
+      deduplicated[index] = true;
+    } else if (r.type === 'insert') {
+      resolvedRows[index] = rowsById.get(pendingIds[r.pendingIndex]) ?? null;
+    } else {
+      // alias は必ず先の入力を指すので、ここでは解決済み。
+      resolvedRows[index] = resolvedRows[r.ref];
+      deduplicated[index] = true;
+    }
   });
-  return c.json({ items: inserted }, 201);
+  const items = resolvedRows.flatMap((row, index) =>
+    row ? [{ ...row, deduplicated: deduplicated[index] }] : [],
+  );
+  const deduplicatedCount = items.filter((item) => item.deduplicated).length;
+  return c.json(
+    { items, created_count: items.length - deduplicatedCount, deduplicated_count: deduplicatedCount },
+    201,
+  );
 });
 
 events.put('/api/events/admin/events/:id/slots/:slotId', requireRole('owner', 'admin'), async (c) => {
