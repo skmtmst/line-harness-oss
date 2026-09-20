@@ -38,6 +38,10 @@ describe('V6 テスト送信（h0kahp）', () => {
       'text-on-action',
       'text-danger',
       'text-success',
+      'text-warning',
+      'bg-danger-bg',
+      'bg-success-bg',
+      'bg-warning-bg',
     ]) {
       expect(section, `${token} を使っていない`).toContain(token)
     }
