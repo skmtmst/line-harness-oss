@@ -5,6 +5,8 @@ import type { Scenario, DeliveryMode, Folder } from '@line-crm/shared'
 import Button from '@/components/shared/button'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
+import { MoreAction } from '@/components/shared/row-actions'
 
 type ScenarioRow = Scenario & {
   stepCount?: number
@@ -15,18 +17,12 @@ type ScenarioRow = Scenario & {
 /**
  * 配信方式。設計の一覧は「時刻」「日付」のように短く出す。
  * relative は 028 以前の作り方で、いまは新しく作れない。
+ * 一覧では名前の下の補足行に出す（列としては持たない。NEXT-25）。
  */
 const deliveryModeLabels: Record<DeliveryMode, string> = {
   relative: '経過時間（旧）',
   elapsed: '経過時間',
   absolute_time: '時刻',
-}
-
-/** 最終コンテンツを配り終えたあとどうするか（121）。 */
-const ON_COMPLETE_LABELS: Record<string, string> = {
-  pause: '一時停止',
-  resume_previous: '1つ前を再開',
-  move: '別のシナリオへ',
 }
 
 interface ScenarioListProps {
@@ -41,7 +37,17 @@ interface ScenarioListProps {
    */
   onDelete: (id: string) => void | Promise<void>
   folders?: Folder[]
-  onMoveFolder?: (id: string, folderId: string) => void
+  /** 1件だけフォルダを移す受け口。一括は `onMoveFolders` を使う。 */
+  onMoveFolder?: (id: string, folderId: string) => void | Promise<void>
+  /**
+   * 複数件をまとめてフォルダへ移す受け口。
+   *
+   * 行ごとの select（幅176px）を名前列の下の短い札に畳んだ代わりに、
+   * 移す操作は行の「その他」→「フォルダを移動」と、複数選択したときの
+   * 一括操作へ集約した（NEXT-25）。失敗したら例外を投げてほしい。
+   * 窓の中に「移動できませんでした」を出して開けたままにする。
+   */
+  onMoveFolders?: (ids: string[], folderId: string) => void | Promise<void>
   /** 掴んで並べ替えたときに、見えている順で呼ばれる。 */
   onReorder?: (ids: string[]) => void
   loading?: boolean
@@ -54,6 +60,16 @@ interface ScenarioListProps {
  * 設計（V2 4-1）は表。以前は札を3列に並べていたが、シナリオが増えると
  * 縦に伸びて、購読中の人数どうしを見比べられなかった。数を並べて読む
  * 画面なので、列で揃える。
+ *
+ * **列は固定の6列だけ（NEXT-25）。** 以前はウインドウ幅 1536px を境に
+ * 3列を増やしていたが、フォルダの帯を引いた表の実幅では名前列が
+ * 潰れて見出しが重なり、右端の操作も切れていた。いまは
+ * - 配信方式・通数・フォルダ … 名前の下の補足行
+ * - 購読中・読了済 … 1列にまとめた「購読 / 読了」
+ * - 終了後 … 詳細画面で見る
+ * - 操作 … 「編集」＋「その他（…）」へ集約
+ * に絞り、幅の条件分岐を持たない。狭い容器では名前列が縮むだけで、
+ * 見出しや操作が欠けることはない。
  */
 export default function ScenarioList({
   scenarios,
@@ -61,21 +77,94 @@ export default function ScenarioList({
   onDelete,
   folders = [],
   onMoveFolder,
+  onMoveFolders,
   onReorder,
   loading,
   onCreate,
 }: ScenarioListProps) {
   /** いま掴んでいるシナリオ。落とした先と入れ替える。 */
   const [dragId, setDragId] = useState<string | null>(null)
-  const [showSecondaryColumns, setShowSecondaryColumns] = useState(false)
 
+  /** フォルダを移せるなら、選択と「その他→フォルダを移動」を出す。 */
+  const canMove = Boolean(onMoveFolder || onMoveFolders)
+
+  /*
+   * 複数選択。フォルダの一括移動だけに使う。
+   *
+   * 選択状態はIDで持ち、一覧が読み直されたときに居なくなった行は
+   * そのまま外す（アカウント切替・削除・検索で外れた行を数え続けない）。
+   */
+  const [selectedIds, setSelectedIds] = useState<ReadonlySet<string>>(new Set())
   useEffect(() => {
-    const media = window.matchMedia('(min-width: 1536px)')
-    const syncColumns = () => setShowSecondaryColumns(media.matches)
-    syncColumns()
-    media.addEventListener('change', syncColumns)
-    return () => media.removeEventListener('change', syncColumns)
-  }, [])
+    setSelectedIds((current) => {
+      if (current.size === 0) return current
+      const listed = new Set(scenarios.map((s) => s.id))
+      const next = new Set([...current].filter((id) => listed.has(id)))
+      return next.size === current.size ? current : next
+    })
+  }, [scenarios])
+
+  const allOnPageSelected =
+    scenarios.length > 0 && scenarios.every((s) => selectedIds.has(s.id))
+  const selectedCount = selectedIds.size
+
+  const toggleAllOnPage = () => {
+    setSelectedIds((current) => {
+      const next = new Set(current)
+      if (allOnPageSelected) scenarios.forEach((s) => next.delete(s.id))
+      else scenarios.forEach((s) => next.add(s.id))
+      return next
+    })
+  }
+  const toggleOne = (id: string) => {
+    setSelectedIds((current) => {
+      const next = new Set(current)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  /** 行の「その他」メニュー。開いている行のID。 */
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null)
+
+  /*
+   * フォルダ移動の窓。対象は1件（行のその他）または選択した複数件。
+   * `null` は閉じている。
+   */
+  const [moveIds, setMoveIds] = useState<string[] | null>(null)
+  const [moveDraft, setMoveDraft] = useState('')
+  const [moving, setMoving] = useState(false)
+  const [moveError, setMoveError] = useState('')
+
+  const openMove = (ids: string[]) => {
+    if (ids.length === 0) return
+    setMoveDraft('')
+    setMoveError('')
+    setMoveIds(ids)
+  }
+
+  const runMove = async () => {
+    if (!moveIds || moveIds.length === 0 || moving) return
+    setMoving(true)
+    setMoveError('')
+    try {
+      if (onMoveFolders) {
+        await onMoveFolders(moveIds, moveDraft)
+      } else if (onMoveFolder) {
+        for (const id of moveIds) await onMoveFolder(id, moveDraft)
+      }
+      // 移した行は選択から外す。絞り込み中に移すと一覧から消えるため、
+      // 「選んだまま見えない」状態を残さない。
+      const moved = new Set(moveIds)
+      setSelectedIds((current) => new Set([...current].filter((id) => !moved.has(id))))
+      setMoveIds(null)
+    } catch {
+      setMoveError('フォルダを移動できませんでした。状態を読み直してから、もう一度お試しください。')
+    } finally {
+      setMoving(false)
+    }
+  }
 
   /*
    * **ブラウザの `confirm()` を使わない。**
@@ -134,6 +223,37 @@ export default function ScenarioList({
     onReorder(order)
   }
 
+  /** 行の「その他」の中身。操作はここへ集約する（NEXT-25）。 */
+  const rowMenuItems = (s: ScenarioRow): ActionMenuItem[] => {
+    const items: ActionMenuItem[] = [
+      {
+        id: 'toggle',
+        label: s.isActive ? '停止する' : '再開する',
+        disabled: loading,
+        onSelect: () => onToggleActive(s.id, s.isActive),
+      },
+    ]
+    if (canMove) {
+      items.push({
+        id: 'move',
+        label: 'フォルダを移動',
+        onSelect: () => openMove([s.id]),
+      })
+    }
+    items.push({
+      id: 'delete',
+      label: '削除する',
+      tone: 'danger',
+      dividerBefore: true,
+      disabled: loading,
+      onSelect: () => {
+        setDeleteError('')
+        setDeleteTarget(s)
+      },
+    })
+    return items
+  }
+
   /*
    * 窓は一覧が空になっても出したままにする。アカウントを切り替えて一覧が
    * 空になった瞬間に窓ごと消えると、押したはずの確認がどこへ行ったのか
@@ -183,6 +303,48 @@ export default function ScenarioList({
     </ConfirmDialog>
   )
 
+  /*
+   * フォルダ移動の窓。1件でも複数件でも同じ形にして、
+   * 「1件だけの特別な窓」と「一括だけの窓」の2種類を持たない。
+   */
+  const moveDialog = (
+    <ConfirmDialog
+      open={moveIds !== null}
+      title={
+        moveIds && moveIds.length === 1
+          ? `「${scenarios.find((s) => s.id === moveIds[0])?.name ?? 'シナリオ'}」のフォルダを移動`
+          : `${moveIds?.length ?? 0}件のシナリオのフォルダを移動`
+      }
+      description="移動先のフォルダを選んでください。「未分類」を選ぶとフォルダから外れます。"
+      confirmLabel={moving ? '移動中…' : '移動する'}
+      busy={moving}
+      error={moveError}
+      onConfirm={() => void runMove()}
+      onCancel={() => {
+        if (moving) return
+        setMoveIds(null)
+        setMoveError('')
+      }}
+    >
+      <label className="block">
+        <span className="text-ink-secondary mb-1 block text-xs font-medium">移動先のフォルダ</span>
+        <select
+          value={moveDraft}
+          onChange={(event) => setMoveDraft(event.target.value)}
+          disabled={moving}
+          className="v6-select h-9 w-full rounded-control border border-hairline bg-canvas pl-3 text-sm font-semibold text-ink"
+        >
+          <option value="">未分類</option>
+          {folders.map((folder) => (
+            <option key={folder.id} value={folder.id}>
+              {folder.name}
+            </option>
+          ))}
+        </select>
+      </label>
+    </ConfirmDialog>
+  )
+
   if (scenarios.length === 0) {
     return (
       <>
@@ -200,6 +362,7 @@ export default function ScenarioList({
             </Button>
           ) : null}
         </div>
+        {moveDialog}
         {confirmDialog}
       </>
     )
@@ -207,63 +370,108 @@ export default function ScenarioList({
 
   return (
     <div className="bg-canvas rounded-card border-hairline overflow-hidden border">
+      {/*
+        複数選択の一括操作は、選んでいる間だけ表の上に出す帯。
+        フォルダ移動の受け口はここと行の「その他」だけに絞る（NEXT-25）。
+      */}
+      {canMove && selectedCount > 0 && (
+        <div className="border-hairline bg-accent-soft flex flex-wrap items-center gap-x-4 gap-y-1 border-b px-4 py-2">
+          <span className="text-ink text-sm font-medium tabular-nums">
+            {selectedCount}件を選択中
+          </span>
+          <button
+            type="button"
+            onClick={() => openMove([...selectedIds])}
+            className="text-accent text-sm font-medium hover:underline"
+          >
+            フォルダを移動
+          </button>
+          <button
+            type="button"
+            onClick={() => setSelectedIds(new Set())}
+            className="text-ink-faint text-xs hover:underline"
+          >
+            選択を解除
+          </button>
+        </div>
+      )}
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[720px] table-fixed">
-          {/*
-            名前列だけが残り幅を受け取り、短い値の列は幅を固定する。
-            名前列に `w-full` を付けると自動レイアウト時に見出しが潰れ、
-            1440px で「シナリオ名」と「配信方式」が重なっていた。
-          */}
+        {/*
+          名前だけが残り幅を受け取り、ほかの列は内容に合わせて固定する。
+          `table-fixed` + `min-w-[640px]` で、フォルダの帯を引いた実幅でも
+          名前列に最低 240px 残る。ウインドウ幅ではなく列の合計で決める
+          （NEXT-25：1536px のメディアクエリで列を増やす方式は、
+          フォルダの帯がある実幅では名前列を潰していた）。
+        */}
+        <table className="w-full min-w-[640px] table-fixed">
           <colgroup>
+            {canMove && <col className="w-10" />}
             <col className="w-10" />
             <col />
             <col className="w-28" />
-            <col className="w-44" />
             <col className="w-24" />
-            <col hidden={!showSecondaryColumns} className="w-24" />
-            <col hidden={!showSecondaryColumns} className="w-16" />
-            <col hidden={!showSecondaryColumns} className="w-28" />
-            <col className="w-24" />
-            <col className="w-36" />
+            <col className="w-28" />
           </colgroup>
           <thead>
             <TableHeadRow>
+              {canMove && (
+                <Th className="w-10 px-2" aria-label="選択">
+                  <input
+                    type="checkbox"
+                    checked={allOnPageSelected}
+                    ref={(el) => {
+                      if (el) el.indeterminate = !allOnPageSelected && selectedCount > 0
+                    }}
+                    onChange={toggleAllOnPage}
+                    aria-label="このページのシナリオをすべて選択"
+                    className="h-4 w-4 align-middle"
+                  />
+                </Th>
+              )}
               <Th className="w-10 px-2" aria-label="並び替え" />
               <Th>
                 シナリオ名
               </Th>
               <Th>
-                配信方式
-              </Th>
-              <Th>
-                フォルダ
-              </Th>
-              <Th>
-                購読中
-              </Th>
-              <Th hidden={!showSecondaryColumns}>
-                読了済
-              </Th>
-              <Th hidden={!showSecondaryColumns}>
-                通数
-              </Th>
-              {/* 配り終えた人をどうするか。一覧で見えないと、シナリオを
-                  つないだつもりが繋がっていないことに気づけない。 */}
-              <Th hidden={!showSecondaryColumns}>
-                終了後
+                購読 / 読了
               </Th>
               <Th>
                 状態
               </Th>
-              <Th aria-label="操作" />
+              <Th aria-label="操作" align="right" />
             </TableHeadRow>
           </thead>
           <tbody className="divide-hairline divide-y">
-            {scenarios.map((s) => (
+            {scenarios.map((s) => {
+              /*
+               * 名前の下の補足行。配信方式・通数・フォルダを短く並べる。
+               * フォルダの札は「移す操作」ではなく「いまどこに居るか」だけ。
+               */
+              const folderName = s.folderId
+                ? folders.find((f) => f.id === s.folderId)?.name ?? 'フォルダ'
+                : '未分類'
+              const showFolder = folders.length > 0 || s.folderId
+              const meta = [
+                deliveryModeLabels[s.deliveryMode ?? 'relative'],
+                s.stepCount === undefined ? '—通' : `${s.stepCount}通`,
+                ...(showFolder ? [folderName] : []),
+              ].join('・')
+              return (
               <tr key={s.id} className="hover:bg-canvas-sunken">
+                {canMove && (
+                  <td className="w-10 px-2 py-3 text-center align-top">
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.has(s.id)}
+                      onChange={() => toggleOne(s.id)}
+                      aria-label={`${s.name}を選択`}
+                      className="mt-0.5 h-4 w-4"
+                    />
+                  </td>
+                )}
                 {/* 掴んで上下に入れ替える。よく使うものを上に置くための操作。 */}
                 <td
-                  className="text-ink-faint w-10 cursor-grab px-2 py-3 text-center select-none active:cursor-grabbing"
+                  className="text-ink-faint w-10 cursor-grab px-2 py-3 text-center align-top select-none active:cursor-grabbing"
                   draggable={Boolean(onReorder)}
                   onDragStart={() => setDragId(s.id)}
                   onDragOver={(e) => e.preventDefault()}
@@ -277,12 +485,14 @@ export default function ScenarioList({
                   説明が長いと、表そのものが横に伸びて横スクロールが出る。
                   桁の幅に上限を付けて、はみ出すぶんは畳む。上限を付けずに
                   line-clamp だけ当てても、桁は中身に合わせて広がる。
+                  名前・補足・説明はどれも1行省略で、全文は title で読める。
                 */}
                 <td className="px-4 py-3">
                   <div className="min-w-0">
                     <div className="flex min-w-0 items-center gap-2">
                       <Link
                         href={`/scenarios/detail?id=${s.id}`}
+                        title={s.name}
                         className="text-info min-w-0 truncate text-sm font-medium hover:underline"
                       >
                         {s.name}
@@ -299,6 +509,9 @@ export default function ScenarioList({
                         </span>
                       )}
                     </div>
+                    <p className="text-ink-faint mt-0.5 truncate text-xs" title={meta}>
+                      {meta}
+                    </p>
                     {s.description && (
                       <p className="text-ink-faint mt-0.5 truncate text-xs" title={s.description}>
                         {s.description}
@@ -306,28 +519,18 @@ export default function ScenarioList({
                     )}
                   </div>
                 </td>
-                <td className="text-ink-secondary px-4 py-3 text-sm whitespace-nowrap">
-                  {deliveryModeLabels[s.deliveryMode ?? 'relative']}
-                </td>
+                {/*
+                  購読中と読了済は1列にまとめる（NEXT-25）。
+                  1行目が「いま流れている人」、2行目が「最後まで届いた人」。
+                */}
                 <td className="px-4 py-3 whitespace-nowrap">
-                  <select
-                    value={s.folderId ?? ''}
-                    onChange={(event) => onMoveFolder?.(s.id, event.target.value)}
-                    aria-label={`${s.name}のフォルダ`}
-                    disabled={!onMoveFolder}
-                    className="v6-select h-9 w-36 rounded-control border border-hairline bg-canvas pl-3 text-xs font-semibold text-ink"
-                  >
-                    <option value="">未分類</option>
-                    {folders.map((folder) => (
-                      <option key={folder.id} value={folder.id}>
-                        {folder.name}
-                      </option>
-                    ))}
-                  </select>
-                </td>
-                <td className="text-ink px-4 py-3 text-sm tabular-nums whitespace-nowrap">
-                  {s.subscriberCount === undefined ? '—' : s.subscriberCount.toLocaleString('ja-JP')}
-                  <span className="text-ink-faint ml-0.5 text-xs">人</span>
+                  <div className="text-ink text-sm tabular-nums">
+                    {s.subscriberCount === undefined ? '—' : s.subscriberCount.toLocaleString('ja-JP')}
+                    <span className="text-ink-faint ml-0.5 text-xs">人</span>
+                  </div>
+                  <div className="text-ink-faint text-xs tabular-nums">
+                    読了 {(s.completedCount ?? 0).toLocaleString('ja-JP')}人
+                  </div>
                   {/*
                     0人のとき、作っただけでは配信されないことに気づけない。
                     始め方への導線をその場に出す。
@@ -341,19 +544,6 @@ export default function ScenarioList({
                     </Link>
                   )}
                 </td>
-                <td hidden={!showSecondaryColumns} className="text-ink px-4 py-3 text-sm tabular-nums whitespace-nowrap">
-                  {(s.completedCount ?? 0).toLocaleString('ja-JP')}
-                  <span className="text-ink-faint ml-0.5 text-xs">人</span>
-                </td>
-                <td hidden={!showSecondaryColumns} className="text-ink-secondary px-4 py-3 text-sm tabular-nums whitespace-nowrap">
-                  {s.stepCount ?? '—'}
-                  {s.stepCount !== undefined && (
-                    <span className="text-ink-faint ml-0.5 text-xs">通</span>
-                  )}
-                </td>
-                <td hidden={!showSecondaryColumns} className="text-ink-secondary px-4 py-3 text-sm whitespace-nowrap">
-                  {ON_COMPLETE_LABELS[s.onCompleteMode ?? 'pause']}
-                </td>
                 {/* 列が狭いと「配信可」が「配信 / 可」の2行になる。
                     札の中で折り返させない。 */}
                 <td className="px-4 py-3 whitespace-nowrap">
@@ -365,46 +555,51 @@ export default function ScenarioList({
                     {s.isActive ? '配信可' : '停止中'}
                   </span>
                 </td>
+                {/*
+                  操作は「編集」＋「その他（…）」の2口だけ（NEXT-25）。
+                  停止・再開・フォルダ移動・削除は「その他」の中へ集約して、
+                  右端の列を狭く保つ。
+                */}
                 <td className="px-4 py-3 text-right whitespace-nowrap">
-                  <button
-                    /*
+                  <div className="relative inline-flex items-center justify-end gap-1">
+                    <Link
+                      href={`/scenarios/detail?id=${s.id}`}
+                      className="text-accent px-2.5 py-1 text-xs font-medium hover:underline"
+                    >
+                      編集
+                    </Link>
+                    {/*
                       **撮影の入口。**文言（「停止」「再開」）で探すと、言葉を
                       変えたときに撮影が黙って空振りする。Node ID を付ける。
-                      止めているものだけが「再開」＝配信開始の確認へ進む。
-                    */
-                    data-qa-open={s.isActive ? undefined : 'RUxNf'}
-                    onClick={() => {
-                      onToggleActive(s.id, s.isActive)
-                    }}
-                    disabled={loading}
-                    className="text-ink-secondary hover:bg-canvas-sunken rounded-md px-2.5 py-1 text-xs font-medium disabled:opacity-40"
-                  >
-                    {s.isActive ? '停止' : '再開'}
-                  </button>
-                  <Link
-                    href={`/scenarios/detail?id=${s.id}`}
-                    className="text-accent mx-1 px-2.5 py-1 text-xs font-medium hover:underline"
-                  >
-                    編集
-                  </Link>
-                  <button
-                    onClick={() => {
-                      setDeleteError('')
-                      setDeleteTarget(s)
-                    }}
-                    disabled={loading}
-                    className="text-danger hover:bg-danger-bg rounded-md px-2.5 py-1 text-xs font-medium disabled:opacity-40"
-                  >
-                    削除
-                  </button>
+                      止めている行の「その他」が、配信開始の確認（RUxNf）への
+                      入口になる。押すとメニューが開き、「再開する」が確認へ進む。
+                    */}
+                    <MoreAction
+                      label={`${s.name}のその他操作`}
+                      data-qa-open={s.isActive ? undefined : 'RUxNf'}
+                      aria-expanded={openMenuId === s.id}
+                      disabled={loading}
+                      onClick={() =>
+                        setOpenMenuId((current) => (current === s.id ? null : s.id))
+                      }
+                    />
+                    <ActionMenu
+                      open={openMenuId === s.id}
+                      ariaLabel={`${s.name}の操作`}
+                      onClose={() => setOpenMenuId(null)}
+                      items={rowMenuItems(s)}
+                    />
+                  </div>
                 </td>
               </tr>
-            ))}
+              )
+            })}
           </tbody>
         </table>
       </div>
 
       {confirmDialog}
+      {moveDialog}
     </div>
   )
 }
