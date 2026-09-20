@@ -37,8 +37,17 @@ export default function SupportMarkEditor({ markId }: { markId?: string }) {
   const [color, setColor] = useState<string>(COLORS[0].value)
   const [displayOrder, setDisplayOrder] = useState(4)
   const [isDefault, setIsDefault] = useState(false)
-  const [createRule, setCreateRule] = useState(true)
+  /*
+    ATTR-06: 自動変更ルールは「作るだけで有効」にしない。
+    以前は初期値が true で、追加ボタンを押さなくても保存時に
+    isActive=true のルールと保護時間0分が黙って送られていた。
+    利用者が「＋ ルールを追加」を押したときだけ登録し、
+    外す・無効化する操作を同じ場所に置く。
+  */
+  const [createRule, setCreateRule] = useState(false)
   const [ruleEvent, setRuleEvent] = useState<SupportMarkAutomationEvent>('staff_assigned')
+  const [ruleActive, setRuleActive] = useState(true)
+  const [ruleProtectionMinutes, setRuleProtectionMinutes] = useState(0)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const selected = useMemo(() => items.find((mark) => mark.id === markId), [items, markId])
@@ -94,7 +103,7 @@ export default function SupportMarkEditor({ markId }: { markId?: string }) {
         ? await api.supportMarks.update(markId, selectedAccountId, { name: name.trim(), color, displayOrder, isDefault, autoOnInbound: selected?.autoOnInbound ?? false })
         : await api.supportMarks.create(selectedAccountId, {
             name: name.trim(), color, displayOrder, isDefault, autoOnInbound: false,
-            automationRules: createRule ? [{ name: `${name.trim()}：${eventLabel(ruleEvent)}`, event: ruleEvent, condition: null, priority: 0, manualProtectionMinutes: 0, isActive: true } satisfies SaveSupportMarkAutomationRule] : [],
+            automationRules: createRule ? [{ name: `${name.trim()}：${eventLabel(ruleEvent)}`, event: ruleEvent, condition: null, priority: 0, manualProtectionMinutes: ruleProtectionMinutes, isActive: ruleActive } satisfies SaveSupportMarkAutomationRule] : [],
           })
       if (!result.success) throw new Error(result.error)
       router.push('/tags?tab=marks')
@@ -161,12 +170,14 @@ export default function SupportMarkEditor({ markId }: { markId?: string }) {
             <p className="text-xs leading-relaxed text-ink-faint">受信・返信・担当割当・期限超過などをきっかけに自動変更できます。</p>
             <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
               <p className="text-xs font-semibold text-ink-secondary">このマークを作るときに登録するルール</p>
-              <Button type="button" onClick={() => setCreateRule(true)}>＋ ルールを追加</Button>
+              {createRule ? null : <Button type="button" onClick={() => setCreateRule(true)}>＋ ルールを追加</Button>}
             </div>
             {createRule ? (
               /*
                 きっかけと変更先は縦に並べる（#973 U021）。横並びだと
                 狭い幅で選択肢も変更先も切れる。矢印は向きを示す飾り。
+                追加したあとは外せる。保存前に、いつ・何へ・どう守るかを
+                このカードで確認する（ATTR-06）。
               */
               <div className="mt-3 rounded-control border border-hairline p-3 text-sm">
                 <label className="block text-xs font-semibold text-ink-secondary">
@@ -177,8 +188,26 @@ export default function SupportMarkEditor({ markId }: { markId?: string }) {
                 </label>
                 <p aria-hidden="true" className="my-1 text-center text-ink-faint">↓</p>
                 <p className="min-w-0 break-words rounded-control bg-surface-soft px-3 py-2.5 font-semibold text-ink">「{name || 'このマーク'}」に変更</p>
+                <label className="mt-3 block text-xs font-semibold text-ink-secondary">
+                  手動で変更した直後の保護
+                  <select aria-label="手動変更の保護時間" value={String(ruleProtectionMinutes)} onChange={(event) => setRuleProtectionMinutes(Number(event.target.value))} className="v6-select mt-1 h-10 w-full rounded-control border border-hairline bg-canvas px-3 text-sm font-semibold text-ink">
+                    <option value="0">保護しない（次のきっかけですぐ変更）</option>
+                    <option value="30">30分は手動の変更を守る</option>
+                    <option value="60">1時間は手動の変更を守る</option>
+                    <option value="1440">1日は手動の変更を守る</option>
+                  </select>
+                </label>
+                <label className="mt-3 flex items-center gap-2 text-sm font-semibold text-ink">
+                  <input type="checkbox" checked={ruleActive} onChange={(event) => setRuleActive(event.target.checked)} className="h-5 w-5 shrink-0 accent-accent" />
+                  このルールを有効にして登録する
+                </label>
+                <div className="mt-3 flex justify-end">
+                  <Button type="button" onClick={() => setCreateRule(false)}>ルールを外す</Button>
+                </div>
               </div>
-            ) : null}
+            ) : (
+              <p className="mt-3 text-xs leading-relaxed text-ink-faint">今は自動変更しません。必要なときだけルールを追加してください。</p>
+            )}
           </Card>
         )}
 
