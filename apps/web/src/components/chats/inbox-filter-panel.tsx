@@ -74,17 +74,25 @@ export default function InboxFilterPanel({
   const set = (patch: Partial<InboxFilterValue>) => onChange({ ...value, ...patch })
 
   return (
-    <div className="fixed inset-0 z-40" role="presentation" onMouseDown={(event) => {
+    <div className="fixed inset-0 z-50" role="presentation" onMouseDown={(event) => {
       if (event.target === event.currentTarget) onClose()
     }}>
       <div className="bg-ink/20 absolute inset-0" aria-hidden="true" />
+      {/*
+        狭い幅では画面の内側16pxいっぱいのシートにする(#982 LAY-04)。
+        以前は top/right/width を固定していたため、390pxでは右120pxの
+        余白込みで左側が画面外へ消え、下の「この条件で絞り込む」も
+        切れていた。
+        広い幅では右上寄りのポップオーバーにするが、幅は
+        min(420px, 100vw-32px)、高さは 100dvh-80px までに収め、
+        ヘッダーとフッターは固定・条件部分だけがスクロールする。
+      */}
       <section
         ref={ref}
         role="dialog"
         aria-modal="true"
         aria-label="絞り込み"
-        style={{ top: 238, right: 120, width: 420, maxHeight: 640 }}
-        className="bg-canvas rounded-panel fixed flex max-w-[calc(100vw-2rem)] flex-col overflow-hidden shadow-2xl"
+        className="bg-canvas rounded-panel fixed inset-4 flex w-auto flex-col overflow-hidden shadow-2xl sm:inset-auto sm:top-16 sm:right-6 sm:w-[min(420px,calc(100vw-2rem))] sm:max-h-[calc(100dvh-5rem)] lg:right-10"
       >
         <header className="border-hairline flex h-14 shrink-0 items-center gap-2 border-b px-5">
           <Filter aria-hidden="true" size={18} className="text-ink" />
@@ -143,7 +151,7 @@ export default function InboxFilterPanel({
             <select aria-label="期限で絞り込む" className={fieldClass} disabled defaultValue="all">
               <option value="all">すべて</option>
             </select>
-            <p className="text-ink-faint mt-1 text-[11px]">期限はまだ記録していないため、絞り込めません</p>
+            <p className="text-ink-faint mt-1 text-micro">期限はまだ記録していないため、絞り込めません</p>
           </div>
 
           <div>
@@ -156,7 +164,7 @@ export default function InboxFilterPanel({
                 </label>
               ))}
             </div>
-            <p className="text-ink-faint mt-1 text-[11px]">種別で絞る読み口がまだ無いため、選んでも一覧は変わりません</p>
+            <p className="text-ink-faint mt-1 text-micro">種別で絞る読み口がまだ無いため、選んでも一覧は変わりません</p>
           </div>
 
           <label className="border-hairline flex h-10 items-center justify-between border-t pt-3 text-sm">
