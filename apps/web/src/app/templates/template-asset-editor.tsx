@@ -678,7 +678,7 @@ export default function TemplateAssetEditor({ kind, visual = false }: { kind: As
                       style={{ left: `${area.x}%`, top: `${area.y}%`, width: `${area.width}%`, height: `${area.height}%` }}
                     >
                       <span>{area.label}</span>
-                      <span className="text-ink-faint text-[10px] font-normal">{areaSummary(areaDrafts[area.label])}</span>
+                      <span className="text-ink-faint text-micro font-normal">{areaSummary(areaDrafts[area.label])}</span>
                     </div>
                   ))}
                 </div>
