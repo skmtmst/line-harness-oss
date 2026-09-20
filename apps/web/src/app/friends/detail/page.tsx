@@ -1,9 +1,9 @@
 'use client'
 
-import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
+import { Suspense, useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import type { ApiResponse, Chat, FriendField, Scenario } from '@line-crm/shared'
+import type { ApiResponse, Chat, Folder, FriendField, Scenario } from '@line-crm/shared'
 import {
   api,
   ApiError,
@@ -44,12 +44,17 @@ const TABS = [
   { key: 'history', label: '履歴' },
   { key: 'info', label: '情報欄' },
   { key: 'forms', label: '回答フォーム' },
-  { key: 'scenario', label: '配信・シナリオ', pending: 'この友だちの配信状況を引く口がまだありません。' },
-  { key: 'orders', label: '予約', pending: 'この友だちの予約を引く口がまだありません。' },
-  { key: 'reminders', label: 'リマインダ', pending: 'この友だちのリマインダを引く口がまだありません。' },
-  { key: 'actions', label: 'アクション', pending: '操作の履歴を残す仕組みがまだありません。' },
-  { key: 'miles', label: 'マイル', pending: 'マイル履歴はマイル画面で確認できます。' },
-  { key: 'richmenu', label: 'リッチメニュー', pending: 'リッチメニューの履歴を引く口がまだありません。' },
+  /*
+    FRIEND-27: pending は開発者向けの「口が無い」説明で終わらせず、
+    利用者向けの理由と、顧客を引き継ぐ/関連一覧へ進める操作を添える。
+    操作の中身は下の pendingTabActions で付ける。
+  */
+  { key: 'scenario', label: '配信・シナリオ', pending: 'この友だちに届いている配信・シナリオの一覧は準備中です。この友だちをシナリオへ登録する操作はここからできます。' },
+  { key: 'orders', label: '予約', pending: 'この友だちの予約だけを集めた画面は準備中です。予約の一覧からはこの人の予約を探せます。' },
+  { key: 'reminders', label: 'リマインダ', pending: 'この友だちに届くリマインダだけを集めた画面は準備中です。設定済みのリマインダは一覧で確認できます。' },
+  { key: 'actions', label: 'アクション', pending: 'この友だちへの操作だけを集めた履歴は準備中です。今は履歴タブに同じ記録が時系列で並んでいます。' },
+  { key: 'miles', label: 'マイル', pending: 'この友だちのマイル残高と履歴は、マイル画面で確認できます。' },
+  { key: 'richmenu', label: 'リッチメニュー', pending: 'この友だちのリッチメニュー変更履歴はまだ記録されていません。現在の割り当ては左の「リッチメニュー」欄で確認できます。' },
 ] as const
 type TabKey = (typeof TABS)[number]['key']
 
@@ -61,6 +66,8 @@ type TabKey = (typeof TABS)[number]['key']
  * 延々と巻かないと届かない。分類でまとめて出す。
  */
 const BASIC_GROUP = 'basic'
+/** FRIEND-21: 「すべて」は分類をまたいだ全項目。URLの group 値として使う。 */
+const ALL_GROUP = 'all'
 
 /**
  * 受信箱への深いリンク。友だちIDはURL状態として安全に渡す。
@@ -126,12 +133,21 @@ function FieldInput({
   value,
   onChange,
   disabled = false,
+  id,
+  labelId,
 }: {
   field: FriendField
   value: string
   onChange: (v: string) => void
   /** N-037: 保存権限が無い人には値を読ませるだけにする（PUTは403になる）。 */
   disabled?: boolean
+  /*
+    FRIEND-22: 項目名ラベルと入力欄を結び付けるための一意ID。
+    labelId は <input> と結び付かない表示型（複数選択）が
+    aria-labelledby で項目名へ戻るための参照。
+  */
+  id?: string
+  labelId?: string
 }) {
   const readOnly = disabled || field.ecIsMaster
   const base =
@@ -140,6 +156,7 @@ function FieldInput({
   if (field.type === 'textarea') {
     return (
       <textarea
+        id={id}
         rows={3}
         value={value}
         disabled={readOnly}
@@ -152,7 +169,7 @@ function FieldInput({
     // 複数選択を単一選択で保存すると、既存の複数値が1値で黙って上書きされる
     // (#496-16)。複数選択UIと区切りの持ち方を決めるまで、読み取り専用にする。
     return (
-      <div>
+      <div aria-labelledby={labelId}>
         <p className="border-hairline bg-canvas-sunken text-ink-secondary rounded-control border px-3 py-2 text-sm">
           {value || '未入力'}
         </p>
@@ -163,6 +180,7 @@ function FieldInput({
   if (field.type === 'select') {
     return (
       <SelectField
+        id={id}
         value={value}
         disabled={readOnly}
         onChange={(e) => onChange(e.target.value)}
@@ -179,6 +197,7 @@ function FieldInput({
     return (
       <label className="flex cursor-pointer items-center gap-2">
         <input
+          id={id}
           type="checkbox"
           checked={value === '1'}
           disabled={readOnly}
@@ -203,6 +222,7 @@ function FieldInput({
               : 'text'
   return (
     <input
+      id={id}
       type={inputType}
       value={value}
       disabled={readOnly}
@@ -276,6 +296,18 @@ function FriendDetailInner() {
     止めていた。各パネルは自分の状態（loading/ready/error）と再試行口を持つ。
   */
   const [fieldsStatus, setFieldsStatus] = useState<PanelStatus>('idle')
+  /*
+    FRIEND-21: 情報欄の分類（フォルダ）名。項目だけでは分類の名前が
+    分からないため、friend_field 種別のフォルダ一覧から引く。
+    取り損ねても項目自体は見せられるよう、状態は fields とは分ける。
+  */
+  const [fieldFolders, setFieldFolders] = useState<Folder[]>([])
+  const [fieldFoldersStatus, setFieldFoldersStatus] = useState<PanelStatus>('idle')
+  /*
+    FRIEND-25: 保存に送った版。応答待ちの間に利用者が追記した欄を、
+    保存後の再取得で上書きしないために保持する。保存成功の確認まで残す。
+  */
+  const saveSnapshotRef = useRef<Record<string, string> | null>(null)
   const [mileage, setMileage] = useState<MileageSummary | null>(null)
   const [mileageInsights, setMileageInsights] = useState<MileageSelfInsights | null>(null)
   const [mileageConnections, setMileageConnections] = useState<MileageConnectedAccount[]>([])
@@ -286,6 +318,18 @@ function FriendDetailInner() {
   const [historyStatus, setHistoryStatus] = useState<PanelStatus>('idle')
   const [historyNextCursor, setHistoryNextCursor] = useState<string | null>(null)
   const [historyLoadingMore, setHistoryLoadingMore] = useState(false)
+  /*
+    FRIEND-26: 「さらに読み込む」の失敗は末尾だけに出す。
+    初回の失敗（historyStatus='error'）と分けないと、読めていた履歴まで
+    エラー画面に巻き込まれる。
+  */
+  const [historyMoreError, setHistoryMoreError] = useState(false)
+  /*
+    FRIEND-31: スマートフォンでは長いプロフィールがタブを下へ追いやる。
+    氏名・対応状況・主操作の下にタブが来るよう、補助プロフィールは
+    lg未満では折りたたむ。lg以上では常時展開。
+  */
+  const [profileExpanded, setProfileExpanded] = useState(false)
   // 上部のメニュー（NEXT-08）。個別操作＝この友だちへの操作、その他＝関連画面。
   const [actionMenuOpen, setActionMenuOpen] = useState(false)
   const [moreMenuOpen, setMoreMenuOpen] = useState(false)
@@ -329,6 +373,7 @@ function FriendDetailInner() {
   const loadRequestRef = useRef(0)
   // 補助パネルごとの番号。同じパネルの再試行が前の応答を上書きしない。
   const fieldsReqRef = useRef(0)
+  const foldersReqRef = useRef(0)
   const mileageReqRef = useRef(0)
   const richMenuReqRef = useRef(0)
   const historyReqRef = useRef(0)
@@ -392,9 +437,31 @@ function FriendDetailInner() {
       if (res.success) {
         setFields(res.data.items)
         setHiddenPersonalCount(res.data.hiddenPersonalCount)
-        const next: Record<string, string> = {}
-        for (const f of res.data.items) next[f.id] = f.value ?? ''
-        setValues(next)
+        /*
+          FRIEND-25: 保存の応答を待つ間に追記された欄は、再取得値で
+          上書きしない。送信した版（saveSnapshotRef）から変わっていない
+          欄だけ最新の値へ置き換える。再取得失敗時は setValues に
+          触らないので、下書きはそのまま残る。
+        */
+        const sentSnapshot = saveSnapshotRef.current
+        saveSnapshotRef.current = null
+        setValues((prev) => {
+          const next: Record<string, string> = {}
+          for (const f of res.data.items) {
+            const serverValue = f.value ?? ''
+            if (
+              sentSnapshot
+              && prev[f.id] !== undefined
+              && prev[f.id] !== sentSnapshot[f.id]
+            ) {
+              // 保存待ちの間に利用者が書き換えた欄。下書きを優先する。
+              next[f.id] = prev[f.id]
+            } else {
+              next[f.id] = serverValue
+            }
+          }
+          return next
+        })
         setFieldsStatus('ready')
       } else {
         setFieldsStatus('error')
@@ -404,6 +471,31 @@ function FriendDetailInner() {
       setFieldsStatus('error')
     }
   }, [friendId, selectedAccountId, isStaleResponse])
+
+  /*
+    FRIEND-21: 分類の切替に必要なフォルダ名一覧。項目の読み込みとは
+    独立させ、ここが失敗しても情報欄自体は使える（分類名は「分類」と
+    だけ出す縮退表示にする）。
+  */
+  const loadFieldFolders = useCallback(async () => {
+    const generation = loadRequestRef.current
+    const requestedAccountId = selectedAccountId
+    const req = ++foldersReqRef.current
+    setFieldFoldersStatus('loading')
+    try {
+      const res = await api.folders.list('friend_field')
+      if (req !== foldersReqRef.current || isStaleResponse(generation, requestedAccountId)) return
+      if (res.success) {
+        setFieldFolders(res.data)
+        setFieldFoldersStatus('ready')
+      } else {
+        setFieldFoldersStatus('error')
+      }
+    } catch {
+      if (req !== foldersReqRef.current || isStaleResponse(generation, requestedAccountId)) return
+      setFieldFoldersStatus('error')
+    }
+  }, [selectedAccountId, isStaleResponse])
 
   const loadMileage = useCallback(async () => {
     if (!friendId) return
@@ -468,8 +560,13 @@ function FriendDetailInner() {
     const generation = loadRequestRef.current
     const requestedAccountId = selectedAccountId
     const req = ++historyReqRef.current
-    if (cursor) setHistoryLoadingMore(true)
-    else setHistoryStatus('loading')
+    if (cursor) {
+      setHistoryLoadingMore(true)
+      setHistoryMoreError(false)
+    } else {
+      setHistoryStatus('loading')
+      setHistoryMoreError(false)
+    }
     try {
       const query = new URLSearchParams({ limit: cursor ? '50' : '8' })
       if (cursor) query.set('cursor', cursor)
@@ -484,12 +581,20 @@ function FriendDetailInner() {
         setHistoryItems((prev) => (cursor ? [...prev, ...res.data.items] : res.data.items))
         setHistoryNextCursor(res.data.nextCursor)
         setHistoryStatus('ready')
+      } else if (cursor) {
+        /*
+          FRIEND-26: 続きの取り損ねは末尾の再試行だけに留め、
+          取得済みの行とカーソルは消さない。historyStatus は
+          'ready' のままなので一覧はそのまま残る。
+        */
+        setHistoryMoreError(true)
       } else {
         setHistoryStatus('error')
       }
     } catch {
       if (req !== historyReqRef.current || isStaleResponse(generation, requestedAccountId)) return
-      setHistoryStatus('error')
+      if (cursor) setHistoryMoreError(true)
+      else setHistoryStatus('error')
     } finally {
       if (req === historyReqRef.current && !isStaleResponse(generation, requestedAccountId)) {
         setHistoryLoadingMore(false)
@@ -512,6 +617,10 @@ function FriendDetailInner() {
     setHiddenPersonalCount(0)
     setValues({})
     setFieldsStatus('idle')
+    saveSnapshotRef.current = null
+    setFieldFolders([])
+    setFieldFoldersStatus('idle')
+    setProfileExpanded(false)
     setMileage(null)
     setMileageInsights(null)
     setMileageConnections([])
@@ -522,6 +631,7 @@ function FriendDetailInner() {
     setHistoryStatus('idle')
     setHistoryNextCursor(null)
     setHistoryLoadingMore(false)
+    setHistoryMoreError(false)
     setScenarioPickerOpen(false)
     setScenarioOptions([])
     setScenarioListStatus('idle')
@@ -532,9 +642,10 @@ function FriendDetailInner() {
     setMoreMenuOpen(false)
     void loadFriend()
     void loadFields()
+    void loadFieldFolders()
     void loadMileage()
     void loadRichMenu()
-  }, [friendId, loadFriend, loadFields, loadMileage, loadRichMenu])
+  }, [friendId, loadFriend, loadFields, loadFieldFolders, loadMileage, loadRichMenu])
 
   useEffect(() => {
     startAll()
@@ -628,8 +739,16 @@ function FriendDetailInner() {
         setNotice('変更はありません')
         return
       }
+      /*
+        FRIEND-25: 送信した版を記録しておく。応答待ちの間に別の欄へ
+        追記しても、保存後の再取得で「送った版から変わっていない欄」
+        だけが新しい値に置き換わり、追記は消えない。失敗時は記録を
+        残さないので、画面の下書きがそのまま保持される。
+      */
+      saveSnapshotRef.current = { ...values }
       const res = await api.friendFields.saveForFriend(friendId, changed)
       if (!res.success) {
+        saveSnapshotRef.current = null
         setError(res.error)
         return
       }
@@ -751,6 +870,37 @@ function FriendDetailInner() {
     },
   ]
 
+  /*
+   * FRIEND-27: 準備中タブに置く代替操作。説明文だけで行き止まりにせず、
+   * この友だちを引き継ぐ操作（シナリオ登録・マイル明細）か、
+   * 関連する一覧への移動を添える。
+   */
+  const pendingTabActions: Partial<Record<TabKey, ReactNode>> = {
+    scenario: (
+      <>
+        {canManageFieldDefs ? (
+          <Button type="button" variant="primary" onClick={() => void openScenarioPicker()}>
+            この友だちをシナリオに登録
+          </Button>
+        ) : null}
+        <Button href="/scenarios">シナリオ一覧を見る</Button>
+      </>
+    ),
+    orders: <Button href="/booking/bookings">予約一覧を見る</Button>,
+    reminders: <Button href="/reminders">リマインダ一覧を見る</Button>,
+    actions: (
+      <Button href={`/friends/detail?id=${encodeURIComponent(friendId)}&tab=history`}>
+        履歴タブを見る
+      </Button>
+    ),
+    miles: (
+      <Button href={`/mileage/friends/detail?id=${encodeURIComponent(friendId)}`}>
+        この人のマイルを見る
+      </Button>
+    ),
+    richmenu: <Button href="/rich-menus">リッチメニュー一覧を見る</Button>,
+  }
+
   if (!friendId) {
     return (
       <div>
@@ -766,14 +916,58 @@ function FriendDetailInner() {
 
   /*
    * 上のタブで選んだグループの項目だけを編集の対象にする。「基本」は
-   * 分類のない項目。★つきは基本のときだけ先頭へ寄せる。グループを
-   * 開いているときは、その分類の中の並び順のほうが読みやすい。
+   * 分類のない項目、「すべて」は分類をまたいだ全項目（FRIEND-21）。
+   * ★つきは基本のときだけ先頭へ寄せる。グループを開いているときは、
+   * その分類の中の並び順のほうが読みやすい。
    */
   const inGroup =
-    group === BASIC_GROUP ? fields.filter((f) => !f.folderId) : fields.filter((f) => f.folderId === group)
+    group === ALL_GROUP
+      ? fields
+      : group === BASIC_GROUP
+        ? fields.filter((f) => !f.folderId)
+        : fields.filter((f) => f.folderId === group)
   const starred = fields.filter((f) => f.isStarred)
   const groupStarred = group === BASIC_GROUP ? inGroup.filter((f) => f.isStarred) : []
   const rest = group === BASIC_GROUP ? inGroup.filter((f) => !f.isStarred) : inGroup
+
+  /*
+    FRIEND-21: 分類チップに出す名前と件数。件数はこの友だちへ
+    見せられる項目で数える（個人情報の非表示分は母数に入れない）。
+    定義済みだが項目が無い分類も並べ、「分類はあるが空」と
+    「情報欄自体が未作成」を分けて案内できるようにする。
+    フォルダ一覧の取得に失敗・未完了のときは、項目が実際に
+    持っている folderId だけを「分類」として出す。
+  */
+  const folderNameById = new Map(fieldFolders.map((f) => [f.id, f.name]))
+  const folderCountById = new Map<string, number>()
+  let unfiledFieldCount = 0
+  for (const f of fields) {
+    if (!f.folderId) {
+      unfiledFieldCount += 1
+    } else {
+      folderCountById.set(f.folderId, (folderCountById.get(f.folderId) ?? 0) + 1)
+    }
+  }
+  const fieldFolderIds = new Set(fieldFolders.map((f) => f.id))
+  // 定義一覧に無いが項目が属している分類（一覧取得失敗・削除途中など）。
+  const orphanFolderIds = [...folderCountById.keys()].filter((id) => !fieldFolderIds.has(id))
+  const groupChips: Array<{ id: string; label: string; count: number }> = [
+    { id: ALL_GROUP, label: 'すべて', count: fields.length },
+    { id: BASIC_GROUP, label: '基本', count: unfiledFieldCount },
+    ...fieldFolders.map((f) => ({ id: f.id, label: f.name, count: folderCountById.get(f.id) ?? 0 })),
+    ...orphanFolderIds.map((id) => ({ id, label: '分類', count: folderCountById.get(id) ?? 0 })),
+  ]
+  /*
+    URL直指定・分類削除後も「選択中」と「出ている内容」が一致するようにする。
+    フォルダ一覧が取れたあとで、どの分類にも当たらない group は
+    「削除された分類」として案内し、基本へ戻す導線を出す。
+  */
+  const groupIsKnown =
+    group === BASIC_GROUP
+    || group === ALL_GROUP
+    || fieldFolderIds.has(group)
+    || folderCountById.has(group)
+    || fieldFoldersStatus !== 'ready'
   /** 設計の「本名」。友だち情報欄に同じ名前の項目があればそれを使う。 */
   const realName = fields.find((f) => f.name === '本名')?.value ?? ''
 
@@ -869,7 +1063,12 @@ function FriendDetailInner() {
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-[23.5rem_1fr]">
           {/* 左：プロフィール（設計の並び：マイル → 対応 → 名前 → タグ →
               ★つき友だち情報 → リッチメニュー → 友だち情報 → フォーム回答） */}
-          <aside data-design="Left" className="bg-canvas rounded-card border-hairline overflow-hidden border" style={{ minHeight: 1234 }}>
+          {/*
+            FRIEND-31: PC由来の minHeight:1234 をスマートフォンへ持ち込まない。
+            lg未満では名前・対応・主操作だけを出し、補助プロフィールは
+            「顧客情報をすべて表示」で展開する（直下にタブが来る）。
+          */}
+          <aside data-design="Left" className="bg-canvas rounded-card border-hairline overflow-hidden border lg:min-h-[1234px]">
             <div className="border-hairline border-b px-5 py-3.5">
               <div className="flex items-center justify-between"><h2 className="text-ink text-sm font-semibold">顧客情報</h2><Link href="/friends" className="text-ink-faint text-lg">×</Link></div>
             </div>
@@ -884,6 +1083,17 @@ function FriendDetailInner() {
               <div className="mt-3 flex flex-wrap justify-center gap-1.5"><SupportMarkBadge status={friend?.support?.status} /><span className="bg-canvas-sunken text-ink-secondary rounded-pill px-2 py-0.5 text-micro">{friend?.support?.operatorName ?? '未割り当て'}</span><span className="bg-accent-soft text-accent rounded-pill px-2 py-0.5 text-micro">表示中</span></div>
               <Button href={`/friends/detail?id=${friendId}&tab=info`} className="mt-3">♙ 友だち詳細</Button>
             </div>
+
+            {/* FRIEND-31: lg未満ではここから下（マイル以降の補助プロフィール）を畳む。 */}
+            <button
+              type="button"
+              onClick={() => setProfileExpanded((v) => !v)}
+              aria-expanded={profileExpanded}
+              className="text-accent w-full px-5 py-2.5 text-center text-xs font-semibold hover:bg-canvas-sunken lg:hidden"
+            >
+              {profileExpanded ? '顧客情報を閉じる' : '顧客情報をすべて表示'}
+            </button>
+            <div className={profileExpanded ? '' : 'max-lg:hidden'}>
 
             {/*
               マイル。設計どおり、見出しの下に利用可能残高を1行で置く。
@@ -1167,6 +1377,7 @@ function FriendDetailInner() {
                 </p>
               </div>
             </div>
+            </div>
           </aside>
 
           {/* 右：タブ */}
@@ -1442,12 +1653,22 @@ function FriendDetailInner() {
                     ) : null}
                     {historyNextCursor ? (
                       <div className="border-hairline border-t px-4 py-3 text-center">
+                        {/*
+                          FRIEND-26: 続きの取り損ねはここだけに出す。
+                          取得済みの行とカーソルは残るので、同じ続きから
+                          やり直せる（重複・欠落なし）。
+                        */}
+                        {historyMoreError ? (
+                          <p className="text-danger mb-2 text-xs" role="alert">
+                            続きを読み込めませんでした。同じところから試せます。
+                          </p>
+                        ) : null}
                         <Button
                           type="button"
                           onClick={() => void loadHistory(historyNextCursor)}
                           disabled={historyLoadingMore}
                         >
-                          {historyLoadingMore ? '読み込み中…' : 'さらに読み込む'}
+                          {historyLoadingMore ? '読み込み中…' : historyMoreError ? 'もう一度試す' : 'さらに読み込む'}
                         </Button>
                       </div>
                     ) : null}
@@ -1456,14 +1677,25 @@ function FriendDetailInner() {
               </div>
             )}
 
-            {/* 出す先のデータを取る口が無いもの。何が足りないかを書く。 */}
+            {/*
+              出す先のデータを取る口が無いもの（FRIEND-27）。
+              開発者向けの説明で行き止まりにせず、利用者向けの理由と
+              代替操作（この友だちを引き継ぐか、関連一覧へ進む）を出す。
+            */}
             {TABS.map((t) =>
               'pending' in t && t.pending && tab === t.key ? (
                 <div
                   key={t.key}
-                  className="bg-canvas rounded-card border-hairline text-ink-faint border p-8 text-center text-sm"
+                  className="bg-canvas rounded-card border-hairline border p-8 text-center"
                 >
-                  {t.pending}
+                  <p className="text-ink-secondary mx-auto max-w-md text-sm leading-6">
+                    {t.pending}
+                  </p>
+                  {pendingTabActions[t.key] ? (
+                    <div className="mt-4 flex flex-wrap justify-center gap-2">
+                      {pendingTabActions[t.key]}
+                    </div>
+                  ) : null}
                 </div>
               ) : null,
             )}
@@ -1481,26 +1713,90 @@ function FriendDetailInner() {
                       もう一度読み込む
                     </Button>
                   </div>
-                ) : inGroup.length === 0 ? (
-                  <p className="text-ink-faint py-6 text-center text-sm">
-                    {group === BASIC_GROUP
-                      ? '情報欄の項目がまだありません。'
-                      : 'この分類の項目はまだありません。'}
-                    {/* 項目の新規登録もオーナー・管理者専用（POST /api/friend-fields）。 */}
-                    {canManageFieldDefs ? (
-                      <Link
-                        href={`/tags/fields/new?back=/friends/detail?id=${friendId}`}
-                        className="text-accent ml-1 hover:underline"
-                      >
-                        項目を追加
-                      </Link>
-                    ) : null}
-                  </p>
                 ) : (
                   <>
-                    {[...groupStarred, ...rest].map((field) => (
+                    {/*
+                      FRIEND-21: 分類の切替。これまでは URL の group を
+                      直接書き換えないとフォルダ内の項目へ辿れなかった。
+                      現在位置は aria-current、件数はこの友だちへ
+                      見せられる項目で数える。
+                    */}
+                    <div className="mb-4 flex flex-wrap items-center gap-1.5" role="group" aria-label="情報欄の分類">
+                      {groupChips.map((chip) => {
+                        const active = group === chip.id
+                        const href = `/friends/detail?id=${encodeURIComponent(friendId)}&tab=info${
+                          chip.id === BASIC_GROUP ? '' : `&group=${encodeURIComponent(chip.id)}`
+                        }`
+                        return (
+                          <Link
+                            key={chip.id}
+                            href={href}
+                            aria-current={active ? 'true' : undefined}
+                            className={`rounded-pill border px-3 py-1.5 text-xs font-medium transition-colors ${
+                              active
+                                ? 'border-accent bg-accent-soft text-accent'
+                                : 'border-hairline text-ink-secondary hover:bg-canvas-sunken'
+                            }`}
+                          >
+                            {chip.label}
+                            <span className="ml-1 text-ink-faint">{chip.count}</span>
+                          </Link>
+                        )
+                      })}
+                    </div>
+                    {!groupIsKnown ? (
+                  /*
+                    FRIEND-21: 削除済み・URL直指定の分類は「項目なし」ではなく
+                    「分類が見つからない」と正直に出し、基本へ戻す導線を置く。
+                  */
+                  <p className="text-ink-faint py-6 text-center text-sm">
+                    この分類は削除されたか、見つかりません。
+                    <Link
+                      href={`/friends/detail?id=${encodeURIComponent(friendId)}&tab=info`}
+                      className="text-accent ml-1 hover:underline"
+                    >
+                      基本の項目を見る
+                    </Link>
+                  </p>
+                ) : inGroup.length === 0 ? (
+                  <div className="py-6 text-center text-sm">
+                    {/*
+                      FRIEND-23: 権限で全項目が隠れている応答
+                      （items空・hiddenPersonalCount>0）を「項目なし」と
+                      誤案内しない。真の0件・権限による非表示・空の分類を
+                      分けて出す。
+                    */}
+                    {hiddenPersonalCount > 0 ? (
+                      <p className="text-ink-faint bg-canvas-sunken rounded-control mx-auto max-w-md px-3 py-2 text-xs">
+                        個人情報の項目が {hiddenPersonalCount} 件あります。
+                        表示には個人情報の閲覧権限が要ります。
+                      </p>
+                    ) : null}
+                    <p className="text-ink-faint mt-2">
+                      {fields.length === 0 && hiddenPersonalCount === 0
+                        ? '情報欄の項目がまだありません。'
+                        : group === BASIC_GROUP || group === ALL_GROUP
+                          ? '表示できる項目がありません。'
+                          : 'この分類の項目はまだありません。'}
+                      {/* 項目の新規登録もオーナー・管理者専用（POST /api/friend-fields）。 */}
+                      {canManageFieldDefs && hiddenPersonalCount === 0 ? (
+                        <Link
+                          href={`/tags/fields/new?back=/friends/detail?id=${friendId}`}
+                          className="text-accent ml-1 hover:underline"
+                        >
+                          項目を追加
+                        </Link>
+                      ) : null}
+                    </p>
+                  </div>
+                ) : (
+                  <>
+                    {[...groupStarred, ...rest].map((field) => {
+                      // FRIEND-22: 項目名ラベルと入力欄を結び付ける一意ID。
+                      const inputId = `ff-${field.id}`
+                      return (
                       <div key={field.id} className="mb-4">
-                        <label className="text-ink-secondary mb-1 block text-sm font-medium">
+                        <label htmlFor={inputId} id={`${inputId}-label`} className="text-ink-secondary mb-1 block text-sm font-medium">
                           {field.isStarred && <span className="text-warning mr-1">★</span>}
                           {field.name}
                           <span className="text-ink-faint ml-1.5 text-xs font-normal">
@@ -1513,6 +1809,8 @@ function FriendDetailInner() {
                           )}
                         </label>
                         <FieldInput
+                          id={inputId}
+                          labelId={`${inputId}-label`}
                           field={field}
                           value={values[field.id] ?? ''}
                           onChange={(v) => setValues((prev) => ({ ...prev, [field.id]: v }))}
@@ -1524,7 +1822,8 @@ function FriendDetailInner() {
                           </p>
                         )}
                       </div>
-                    ))}
+                      )
+                    })}
 
                     {hiddenPersonalCount > 0 && (
                       <p className="text-ink-faint bg-canvas-sunken rounded-control mb-4 px-3 py-2 text-xs">
@@ -1573,6 +1872,8 @@ function FriendDetailInner() {
                     )}
                   </>
                 )}
+                  </>
+                )}
               </div>
             )}
 
@@ -1584,7 +1885,26 @@ function FriendDetailInner() {
                   </p>
                 ) : (
                   <ul className="divide-hairline divide-y">
-                    {friend.formSubmissions.map((s) => (
+                    {friend.formSubmissions.map((s) => {
+                      /*
+                        FRIEND-24: data のキー（q_xxx の内部名）をそのまま
+                        見出しにしない。回答時点の質問定義（fields）の label
+                        を表示し、定義に無いキー（削除・改名済みの質問）は
+                        原キーを併記して意味を残す。
+                      */
+                      const namedFields = (s.fields ?? []).filter(
+                        (f) => f && typeof f.name === 'string' && typeof f.label === 'string',
+                      )
+                      const labelByName = new Map(namedFields.map((f) => [f.name, f.label]))
+                      const orderedKeys = namedFields
+                        .map((f) => f.name)
+                        .filter((name) => name in (s.data ?? {}))
+                      const orphanKeys = Object.keys(s.data ?? {}).filter(
+                        (key) => !labelByName.has(key),
+                      )
+                      const renderValue = (v: unknown) =>
+                        Array.isArray(v) ? v.join(', ') : String(v ?? '')
+                      return (
                       <li key={s.id} className="py-3 first:pt-0 last:pb-0">
                         <div className="flex items-baseline justify-between gap-2">
                           <p className="text-ink text-sm font-medium">{s.formName}</p>
@@ -1593,17 +1913,25 @@ function FriendDetailInner() {
                           </p>
                         </div>
                         <dl className="mt-1.5 space-y-0.5">
-                          {Object.entries(s.data ?? {}).map(([k, v]) => (
+                          {orderedKeys.map((k) => (
                             <div key={k} className="flex gap-2 text-xs">
-                              <dt className="text-ink-faint shrink-0">{k}</dt>
-                              <dd className="text-ink-secondary break-all">
-                                {Array.isArray(v) ? v.join(', ') : String(v ?? '')}
-                              </dd>
+                              <dt className="text-ink-faint shrink-0">{labelByName.get(k)}</dt>
+                              <dd className="text-ink-secondary break-all">{renderValue(s.data[k])}</dd>
+                            </div>
+                          ))}
+                          {orphanKeys.map((k) => (
+                            <div key={k} className="flex gap-2 text-xs">
+                              <dt className="text-ink-faint shrink-0" title={`項目キー: ${k}`}>
+                                {k}
+                                <span className="ml-1">（現在は使われていない項目）</span>
+                              </dt>
+                              <dd className="text-ink-secondary break-all">{renderValue(s.data[k])}</dd>
                             </div>
                           ))}
                         </dl>
                       </li>
-                    ))}
+                      )
+                    })}
                   </ul>
                 )}
               </div>
