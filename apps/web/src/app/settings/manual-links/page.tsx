@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { ApiError, api, type ManualLink } from '@/lib/api'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
@@ -48,31 +48,39 @@ export default function ManualLinksPage() {
   /** 「確かめる」「保存」の失敗。無言にせず、やり直しの手がかりと一緒に残す。 */
   const [actionError, setActionError] = useState('')
 
+  /*
+   * #975 U071: 初回の読み込み失敗にも再試行を付ける。
+   * useEffect からもエラー状態のボタンからも同じ入口で読み直す。
+   */
+  const loadInitial = useCallback(async (alive: () => boolean) => {
+    setStatus('loading')
+    try {
+      const [staffResponse, manualLinks] = await Promise.all([api.staff.me(), api.manualLinks.list()])
+      if (!alive()) return
+      if (!staffResponse.success || !manualLinks.success) {
+        setStatus('error')
+        return
+      }
+      setStaff({
+        id: staffResponse.data?.id ?? '',
+        role: staffResponse.data?.role ?? null,
+        permissionKeys: staffResponse.data?.permissionKeys ?? [],
+      })
+      setLinks(manualLinks.data.items)
+      setTotal(manualLinks.data.total)
+      setStatus('ready')
+    } catch {
+      if (alive()) setStatus('error')
+    }
+  }, [])
+
   useEffect(() => {
     let alive = true
-    void Promise.all([api.staff.me(), api.manualLinks.list()])
-      .then(([staffResponse, manualLinks]) => {
-        if (!alive) return
-        if (!staffResponse.success || !manualLinks.success) {
-          setStatus('error')
-          return
-        }
-        setStaff({
-          id: staffResponse.data?.id ?? '',
-          role: staffResponse.data?.role ?? null,
-          permissionKeys: staffResponse.data?.permissionKeys ?? [],
-        })
-        setLinks(manualLinks.data.items)
-        setTotal(manualLinks.data.total)
-        setStatus('ready')
-      })
-      .catch(() => {
-        if (alive) setStatus('error')
-      })
+    void loadInitial(() => alive)
     return () => {
       alive = false
     }
-  }, [])
+  }, [loadInitial])
 
   const rows = useMemo(() => links.map(manualLinkRow), [links])
   const shown = rows.filter((r) => matchesStatus(r, filter) && matchesQuery(r, query))
@@ -152,7 +160,14 @@ export default function ManualLinksPage() {
   }
 
   if (status !== 'ready') {
-    return <ListState kind={status === 'error' ? 'error' : 'loading'} />
+    return (
+      <ListState
+        kind={status === 'error' ? 'error' : 'loading'}
+        title={status === 'error' ? '正本表を読み込めませんでした' : undefined}
+        description={status === 'error' ? '通信状態を確認して、もう一度読み込んでください。' : undefined}
+        onRetry={status === 'error' ? () => void loadInitial(() => true) : undefined}
+      />
+    )
   }
 
   if (!canEditTable(staff)) {
