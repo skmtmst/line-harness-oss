@@ -836,8 +836,13 @@ function WebinarsPage() {
 }
 
 function ArchiveReviewBackdrop({ target }: { target: WebinarListItem }) {
+  /*
+   * #985 CHK-02: 左の256pxと上の56pxはPCのメニュー・ヘッダーが
+   * 実在する幅（1280px以上）だけ空ける。狭い幅では全幅を使い、
+   * overflow-hidden で説明と戻る操作を切り捨てず、縦に読めるようにする。
+   */
   return (
-    <div className="bg-canvas-sunken fixed inset-y-14 left-64 right-0 z-10 overflow-hidden px-10 py-5" data-design-node="LKuAQ">
+    <div className="bg-canvas-sunken fixed inset-x-0 bottom-0 top-[var(--mobile-header-height)] z-10 overflow-y-auto px-4 py-5 sm:px-10 xl:left-64 xl:top-14" data-design-node="LKuAQ">
       <div className="mx-auto max-w-screen-2xl">
         <p className="text-accent text-xs font-bold">← ウェビナー一覧</p>
         <div className="mt-5 grid gap-4 xl:grid-cols-4">

@@ -596,8 +596,13 @@ export function TestSendDialog({
   }
 
   if (confirming) {
+    /*
+     * #985 CHK-01: 左の空きはPCのメニュー（1280px以上で256px）が
+     * 実在するときだけ取る。狭い幅では全幅にしないと、確認の本文と
+     * 操作が残った細い帯に潰れて読めない。
+     */
     return (
-      <div className="fixed inset-y-0 right-0 z-50 overflow-y-auto bg-canvas" style={{ left: 255 }} data-design-node="g2UNV">
+      <div className="fixed inset-y-0 right-0 left-0 z-50 overflow-y-auto bg-canvas xl:left-[255px]" data-design-node="g2UNV">
         <div className="border-hairline flex items-center justify-between border-b px-6" style={{ height: 76, background: 'var(--color-canvas)' }}><h1 className="text-ink text-2xl font-bold">シナリオをテスト送信</h1><Button onClick={onClose}>シナリオ編集へ戻る</Button></div>
         <main className="ml-6 mr-10 p-8">
           <p className="text-accent text-sm">シナリオ編集へ戻る</p>
@@ -627,7 +632,12 @@ export function TestSendDialog({
               </div></aside>
           </div>
         </main>
-        <div className="fixed inset-0 z-10 flex items-start justify-center px-6" style={{ paddingTop: 265, background: 'color-mix(in srgb, var(--color-ink) 35%, transparent)' }}>
+        {/*
+          #985 CHK-01: 上の空き265pxは高さのあるPCの値。低い画面では
+          残りの高さに合わせて縮め、下へはみ出した分はスクロールして
+          「戻る」「テスト送信を開始」へ必ず到達できるようにする。
+        */}
+        <div className="fixed inset-0 z-10 flex items-start justify-center overflow-y-auto px-6 pb-6" style={{ paddingTop: 'min(265px, 30vh)', background: 'color-mix(in srgb, var(--color-ink) 35%, transparent)' }}>
           <div className="w-full rounded-panel shadow-xl" style={{ maxWidth: 672, background: 'var(--color-canvas)' }}><div className="border-hairline border-b px-6 py-5"><h2 className="text-lg font-bold">選択した1名へ実際に送信しますか？</h2><p className="text-ink-secondary mt-1 text-sm">{friendName}さん（{recipientLabel}）へ{confirmSteps.length}通をテスト送信します。実際のLINEメッセージとして届きます。</p></div><div className="space-y-3 px-6 py-5 text-sm">{requiredConfirmations.map((label, index) => (<label key={label} className="flex items-center gap-2"><input type="checkbox" checked={confirmChecks[index] === true} disabled={sending || result?.ok === true} onChange={(e) => setConfirmChecks((prev) => prev.map((v, i) => (i === index ? e.target.checked : v)))} />{label}</label>))}<p className="text-ink-faint text-xs">購読の登録は増えません。配信予定も作りません。</p>
             {sending && <p className="rounded-panel bg-info-bg text-ink-secondary px-4 py-3 text-sm">送信中です。完了までこの画面のまま待ってください。</p>}
             {result && (

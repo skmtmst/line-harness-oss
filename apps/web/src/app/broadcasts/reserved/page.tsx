@@ -265,7 +265,11 @@ function ReservedBroadcastContent() {
         { key: 'confirm', order: 5, label: '確認', anchor: 'reservation-summary', state: 'done' },
       ]} />
 
-      <div style={{ gridTemplateColumns: 'minmax(0, 1fr) 390px' }} className="grid items-start gap-4">
+      {/*
+        #985 CHK-03: 右の390pxは「次にできること」欄。狭い幅では
+        固定の右列で本文が潰れるので、1列に畳んで下へ並べる。
+      */}
+      <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,1fr)_390px]">
         <section id="reservation-summary" style={{ minHeight: 760 }} className="bg-canvas border-hairline rounded-card border px-6 py-8 text-center shadow-sm">
           <span className="bg-accent-soft text-accent mx-auto flex h-14 w-14 items-center justify-center rounded-full">
             <CalendarCheck2 size={28} aria-hidden="true" />
