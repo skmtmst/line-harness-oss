@@ -103,9 +103,12 @@ describe('重複検出で取れない数を作らない契約', () => {
   })
 
   it('取れない数は「—」と未接続の説明にする', () => {
-    expect(DUPLICATES_BODY).toContain('label="重複配信の削減"')
-    expect(DUPLICATES_BODY).toContain('value="—"')
-    expect(DUPLICATES_BODY).toContain('配信前プレビューの実績を接続後に表示')
+    /* #1005: 独自カードをやめて共通 KpiCard の3段へ揃えた。値の「—」と
+       短い状態は常時表示、接続待ちの説明は説明アイコンの中へ。 */
+    expect(DUPLICATES_BODY).toContain("import KpiCard from '@/components/shared/kpi-card'")
+    expect(DUPLICATES_BODY).toContain('title="重複配信の削減"')
+    expect(DUPLICATES_BODY).toContain('valueText="—"')
+    expect(DUPLICATES_BODY).toContain('配信前プレビューの実績')
   })
 
   it('読込中と取得失敗を状態の言葉でそろえる', () => {

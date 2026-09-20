@@ -23,6 +23,7 @@ import {
   type WebinarOverview,
 } from '@/lib/api'
 import KpiCollapse from '@/components/ui/kpi-collapse'
+import KpiCard from '@/components/shared/kpi-card'
 import { overviewCards } from './overview-view'
 import { publicationStateLabel } from '@/components/webinars/publication-label'
 
@@ -712,19 +713,22 @@ function WebinarsPage() {
         </div>
       ) : (
         <KpiCollapse data-design="KPIs" className="mx-auto mb-4 max-w-[1600px] px-6 pt-4" gridClassName="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          {/*
+            #1005: カードは共通KpiCardの3段（見出し・数値・短い状態）で出す。
+            取得できない詳しい理由は description として説明アイコンの中へ渡し、
+            長文で行全体の高さを伸ばさない。状態自体は detail に残す。
+          */}
           {overviewCards(visibleOverview).map((card) => (
-            <div key={card.key} className="bg-canvas rounded-card border-hairline border p-4">
-              <p className="text-ink-faint text-xs">{card.title}</p>
-              <p
-                className={`mt-1 text-2xl font-bold tabular-nums ${
-                  card.view.available ? 'text-ink' : 'text-ink-faint'
-                }`}
-              >
-                {card.view.text}
-              </p>
-              {card.view.note ? <p className="text-ink-faint mt-0.5 text-xs">{card.view.note}</p> : null}
-              {card.detail ? <p className="text-ink-faint mt-0.5 text-xs">{card.detail}</p> : null}
-            </div>
+            <KpiCard
+              key={card.key}
+              title={card.title}
+              value={null}
+              unit=""
+              valueText={card.view.text}
+              valueTone={card.view.available ? 'default' : 'faint'}
+              detail={[card.status, card.detail].filter(Boolean).join('・')}
+              description={card.description ?? undefined}
+            />
           ))}
         </KpiCollapse>
       )}
