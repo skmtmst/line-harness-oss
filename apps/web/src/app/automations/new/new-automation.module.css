@@ -201,13 +201,6 @@
   font-weight: 700;
 }
 
-.required {
-  margin-left: 6px;
-  color: var(--color-status-danger);
-  font-size: var(--text-micro);
-  font-weight: 700;
-}
-
 .note {
   margin-top: 4px;
   color: var(--color-ink-faint);

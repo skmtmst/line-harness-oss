@@ -12,6 +12,7 @@ import Drawer from '@/components/shared/drawer'
 import IconButton from '@/components/shared/icon-button'
 import Notice from '@/components/shared/notice'
 import StickyBar from '@/components/shared/sticky-bar'
+import { RequiredBadge } from '@/components/shared/form-controls'
 
 export type LinkedAction = {
   id: string
@@ -462,7 +463,7 @@ export default function TagEditorV4({
             <StepTitle number={1} title="どのタグか" />
             <div className="grid gap-4 md:grid-cols-[320px_minmax(0,1fr)]">
               <label><span className="mb-1.5 block text-xs font-semibold text-ink-secondary">所属フォルダ</span><select value={groupId} onChange={(event) => setGroupId(event.target.value)} className={inputClass}><option value="">未分類</option>{groups.map((group) => <option key={group.id} value={group.id}>{group.name}</option>)}</select></label>
-              <label><span className="mb-1.5 block text-xs font-semibold text-ink-secondary">タグ名 <span className="rounded bg-danger-bg px-1.5 py-0.5 text-[10px] text-danger">必須</span></span><input value={name} onChange={(event) => setName(event.target.value)} placeholder="例: 定期購入者" className={inputClass} /></label>
+              <label><span className="mb-1.5 block text-xs font-semibold text-ink-secondary">タグ名 <RequiredBadge /></span><input value={name} onChange={(event) => setName(event.target.value)} placeholder="例: 定期購入者" className={inputClass} /></label>
             </div>
             <p className="mt-3 text-xs leading-5 text-ink-faint">どの分類に入れるかを選びます。未選択なら「未分類」になります。フォルダの色がタグの印になります。</p>
             <label className="mt-4 flex items-start gap-3"><input type="checkbox" checked={isStarred} onChange={(event) => setIsStarred(event.target.checked)} className="mt-1 accent-accent" /><span className="text-sm font-medium text-ink">友だち一覧に表示する（★）<span className="mt-0.5 block text-xs font-normal text-ink-faint">このスイッチ、またはタグ一覧の星をクリックして、友だち一覧への表示をON／OFFできます。</span></span></label>

@@ -24,7 +24,7 @@
 
 .field { display: flex; flex-direction: column; gap: 4px; }
 .fieldLabel { display: flex; align-items: center; gap: 8px; color: var(--color-ink); font-size: var(--text-micro); font-weight: 700; }
-.required { border-radius: var(--radius-pill); background: var(--color-status-danger-soft); padding: 1px 6px; color: var(--color-status-danger); font-size: var(--text-nano); }
+
 .count { margin-left: auto; color: var(--color-ink-faint); font-size: var(--text-nano); font-variant-numeric: tabular-nums; font-weight: 400; }
 .input {
   border: 1px solid var(--color-hairline); border-radius: var(--radius-control);

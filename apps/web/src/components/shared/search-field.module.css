@@ -2,7 +2,8 @@
   box-sizing: border-box;
   display: flex;
   min-width: 0;
-  height: 42px;
+  /* #976 U083: 42px だった高さを入力欄・ボタンと同じ40pxへそろえる */
+  height: 40px;
   align-items: center;
   gap: 10px;
   padding: 0 14px;
@@ -29,7 +30,8 @@
   background: transparent;
   color: var(--color-ink);
   font-family: inherit;
-  font-size: var(--text-caption);
+  /* #976 U079: 検索欄の文字も入力欄と同じ14px（以前は12pxで最小だった） */
+  font-size: var(--text-body);
 }
 
 .input::placeholder {
@@ -79,6 +81,17 @@
 @keyframes search-spin {
   to {
     transform: rotate(360deg);
+  }
+}
+
+/* #976 U079/U083: タッチ端末は文字16px・高さ44px（入力欄と同じ規定）。 */
+@media (pointer: coarse) {
+  .search {
+    height: 44px;
+  }
+
+  .input {
+    font-size: var(--text-lead);
   }
 }
 

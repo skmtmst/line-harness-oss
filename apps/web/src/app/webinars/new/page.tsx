@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import Button from '@/components/shared/button'
 import SelectField from '@/components/shared/select-field'
+import { RequiredBadge } from '@/components/shared/form-controls'
 import StepTrail from '@/components/shared/step-trail'
 import StickyBar from '@/components/shared/sticky-bar'
 import { useAccount } from '@/contexts/account-context'
@@ -102,7 +103,7 @@ export default function NewWebinarPage() {
             <div className="mt-4 grid gap-3 lg:grid-cols-3">
               <div className="lg:col-span-2">
                 <label htmlFor="webinar-title" className="text-ink-secondary mb-1 block text-sm font-medium">
-                  ウェビナー名 <span className="bg-danger-bg text-danger rounded-pill ml-1 px-1.5 py-0.5 text-micro">必須</span>
+                  ウェビナー名 <RequiredBadge />
                 </label>
                 <input
                   id="webinar-title"
