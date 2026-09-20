@@ -62,7 +62,8 @@ function CommonActionVersionsInner() {
   const [pendingBindingId, setPendingBindingId] = useState<string | null>(null)
 
   const load = useCallback(async () => {
-    if (!selectedAccountId) {
+    // U096: 対象が無いURLでは取りに行かない。案内は描画側で出す。
+    if (!selectedAccountId || !id) {
       setDetail(null)
       setLoading(false)
       return
@@ -80,7 +81,16 @@ function CommonActionVersionsInner() {
       setSummary(listResponse.success ? listResponse.data.find((item) => item.id === id) ?? null : null)
     } catch (caught) {
       setSummary(null)
-      setError(caught instanceof Error ? caught.message : '版と利用先を読み込めませんでした')
+      // U096: 生の `API error: 404` を主文にしない。原因別の言葉に写す。
+      if (caught instanceof ApiError && caught.status === 404) {
+        setError('この共通アクションは削除されたか、別のLINEアカウントのものです。')
+      } else if (caught instanceof ApiError && caught.status === 403) {
+        setError('この共通アクションを表示する権限がありません。')
+      } else {
+        setError(caught instanceof Error && caught.message && !caught.message.startsWith('API error:')
+          ? caught.message
+          : '版と利用先を読み込めませんでした。通信の状態を確認してください。')
+      }
     } finally {
       setLoading(false)
     }
@@ -128,6 +138,17 @@ function CommonActionVersionsInner() {
     }
   }
 
+  // U096: 対象未指定を専用の案内にする。「アカウントを選んでください」と
+  // 混ぜると、直すべきもの（選ぶ対象）が違って見える。
+  if (!id) {
+    return (
+      <div role="alert" className="border-danger bg-danger-bg text-danger rounded-card border p-6">
+        <p className="font-semibold">版を確認する共通アクションが指定されていません</p>
+        <p className="mt-1 text-sm">一覧から共通アクションを選び直してください。</p>
+        <Button href="/common-actions" className="mt-4">共通アクション一覧へ戻る</Button>
+      </div>
+    )
+  }
   if (loading) {
     return <div className="border-hairline rounded-card border bg-canvas p-10 text-center text-sm text-ink-faint" aria-busy="true">版と利用先を読み込んでいます</div>
   }

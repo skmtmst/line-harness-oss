@@ -4,6 +4,7 @@ import ReminderPublishFlow, {
   type ReminderPublishStage,
 } from '@/components/reminders/reminder-publish-flow'
 import { Suspense } from 'react'
+import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { Issue469ReminderStepEditor, Issue469ReminderTestStage } from './issue469-reminder-screens'
 
@@ -26,6 +27,22 @@ import { Issue469ReminderStepEditor, Issue469ReminderTestStage } from './issue46
  */
 const PUBLISH_STAGES = new Set<ReminderPublishStage>(['target', 'preview', 'test', 'confirm', 'done'])
 
+/*
+ * U097: 「指定されていません」と言うだけでは戻れない。一覧へ戻る
+ * 操作を文のそばに置く。
+ */
+function MissingReminder() {
+  return (
+    <div className="p-6">
+      <p className="text-danger text-sm">編集するリマインダが指定されていません。</p>
+      <p className="text-ink-secondary mt-1 text-sm">一覧から編集するリマインダを選び直してください。</p>
+      <Link href="/reminders" className="text-action mt-3 inline-block text-sm font-semibold hover:underline">
+        リマインダ一覧へ戻る
+      </Link>
+    </div>
+  )
+}
+
 function ReminderEditInner() {
   const params = useSearchParams()
   const id = params.get('id') ?? ''
@@ -35,12 +52,12 @@ function ReminderEditInner() {
   }
   if (rawStage && PUBLISH_STAGES.has(rawStage as ReminderPublishStage)) {
     if (!id) {
-      return <p className="text-danger p-6 text-sm">リマインダが指定されていません。</p>
+      return <MissingReminder />
     }
     return <ReminderPublishFlow reminderId={id} stage={rawStage as ReminderPublishStage} />
   }
   if (!id) {
-    return <p className="text-danger p-6 text-sm">リマインダが指定されていません。</p>
+    return <MissingReminder />
   }
   return <Issue469ReminderStepEditor reminderId={id} />
 }

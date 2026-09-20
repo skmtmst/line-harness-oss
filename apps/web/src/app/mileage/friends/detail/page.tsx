@@ -128,6 +128,22 @@ function FriendMileageInner() {
   if (accountLoading || loading) {
     return <div data-design-node="HIU5O"><ListState kind="loading" title="マイル明細を読み込んでいます" /></div>
   }
+  /*
+    U098: 対象未指定のとき「再読み込み」は同じ失敗を繰り返すだけ。
+    友だちの一覧へ戻して選び直させる。アカウント未選択より先に言う。
+  */
+  if (!friendId) {
+    return (
+      <div data-design-node="HIU5O">
+        <ListState
+          kind="empty"
+          title="マイル明細を見る友だちが指定されていません"
+          description="友だちの一覧から、明細を見る人を選び直してください。"
+          action={<Button href="/friends">友だち一覧へ戻る</Button>}
+        />
+      </div>
+    )
+  }
   if (!selectedAccountId) {
     return <div data-design-node="HIU5O"><ListState kind="empty" title="LINEアカウントを選択してください" description="共通トップバーでLINEアカウントを選ぶと、友だちのマイル明細を確認できます。" /></div>
   }
@@ -138,7 +154,12 @@ function FriendMileageInner() {
           kind="error"
           title="マイル明細を表示できませんでした"
           description="友だちが選択中のLINEアカウントにいるか確認して、再読み込みしてください。"
-          action={<Button onClick={() => void load()}>マイル明細を再読み込み</Button>}
+          action={
+            <>
+              <Button onClick={() => void load()}>マイル明細を再読み込み</Button>
+              <Button href="/friends">友だち一覧へ戻る</Button>
+            </>
+          }
         />
       </div>
     )

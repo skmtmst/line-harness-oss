@@ -281,10 +281,14 @@ function FormResponsesInner() {
   }
 
   if (accountLoading || loading) return <ListState kind="loading" title="集まった回答を読み込んでいます" />
-  if (!formId) return <ListState kind="empty" title="回答フォームが指定されていません" />
+  /*
+    U097: 対象未指定・見つからない画面には、文で案内するだけでなく
+    一覧へ戻る操作を置く。
+  */
+  if (!formId) return <ListState kind="empty" title="回答フォームが指定されていません" description="一覧から回答を見るフォームを選び直してください。" action={<Button href="/form-submissions">回答フォーム一覧へ戻る</Button>} />
   if (!selectedAccountId) return <ListState kind="empty" title="LINE公式アカウントを選んでください" />
   if (error) return <ListState kind="error" title={error} description="通信状態を確認して、もう一度読み込んでください。" onRetry={() => void load(page, pageSize)} />
-  if (!form) return <ListState kind="empty" title="回答フォームが見つかりません" />
+  if (!form) return <ListState kind="empty" title="回答フォームが見つかりません" description="削除されたか、リンクが古くなっています。一覧から選び直してください。" action={<Button href="/form-submissions">回答フォーム一覧へ戻る</Button>} />
 
   const pageCount = Math.max(1, Math.ceil((total ?? 0) / pageSize))
   const destinationWriteCount = completedDestinationWrites(summary)

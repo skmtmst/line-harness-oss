@@ -97,8 +97,37 @@ export default function FriendAddRunDetailPage() {
   }
 
   if (accountLoading || loading) return <ListState kind="loading" title="実行詳細を読み込んでいます" />
+  /*
+    U098: 対象未指定・アカウント未選択・読み込み失敗を分ける。
+    「もう一度読み込む」だけだと、対象が無いまま同じ失敗を繰り返す。
+  */
+  if (!runId) {
+    return (
+      <ListState
+        kind="empty"
+        title="見る実行詳細が指定されていません"
+        description="実行履歴の一覧から、見る記録を選び直してください。"
+        action={<Button href="/friend-add-settings/runs">実行履歴の一覧へ戻る</Button>}
+      />
+    )
+  }
+  if (!selectedAccountId) {
+    return <ListState kind="empty" title="LINEアカウントを選んでください" description="上部でLINEアカウントを選ぶと、その実行詳細を表示できます。" />
+  }
   if (error || !detail) {
-    return <ListState kind="error" title="実行詳細を表示できませんでした" description={error || '対象の記録が見つかりません。'} action={<Button onClick={() => void load()}>もう一度読み込む</Button>} />
+    return (
+      <ListState
+        kind="error"
+        title="実行詳細を表示できませんでした"
+        description={error || '対象の記録が見つかりません。削除されたか、一覧から選び直してください。'}
+        action={
+          <>
+            <Button onClick={() => void load()}>もう一度読み込む</Button>
+            <Button href="/friend-add-settings/runs">実行履歴の一覧へ戻る</Button>
+          </>
+        }
+      />
+    )
   }
 
   const failed = detail.actionRuns.filter((action) => action.status === 'failed')
