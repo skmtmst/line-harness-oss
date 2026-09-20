@@ -148,6 +148,142 @@ describe('リマインダ テスト送信段 (N-070)', () => {
     expect(screen.getAllByText(/テスト済み/).length).toBeGreaterThanOrEqual(1)
   })
 
+  /*
+   * DEEP-09: AのgetDraftが遅れている間にBへ切り替えると、遅れて届いたAの
+   * 本文で画面を上書きしてはいけない。表示・宛先・送信APIの対象は常にB。
+   */
+  it('遅れて届いた別リマインダの本文で画面を上書きせず、送信も今の対象へ行く', async () => {
+    const draftB: ReminderDraftVersion = {
+      ...DRAFT,
+      reminderId: 'rem-2',
+      settings: { ...DRAFT.settings, steps: [{ ...DRAFT.settings.steps[0], messageContent: 'Bの実本文' }] },
+    }
+    const slowA = deferred<{ success: true; data: ReminderDraftVersion }>()
+    apiMocks.getDraft.mockImplementation((id: string) => (id === 'rem-1' ? slowA.promise : ok(draftB)))
+    apiMocks.getTestRecipient.mockImplementation((id: string) =>
+      ok({ state: 'ready', recipient: { id: `f-${id}`, displayName: id === 'rem-1' ? 'Aの送信先' : 'Bの送信先', pictureUrl: null } }),
+    )
+    apiMocks.testDraft.mockReturnValue(ok({ sent: 1, recipientName: 'Bの送信先', replayed: false, requestId: 'r1', testedAt: '2026-09-10T03:00:00.000Z' }))
+
+    const { rerender } = render(<Issue469ReminderTestStage reminderId="rem-1" />)
+    rerender(<Issue469ReminderTestStage reminderId="rem-2" />)
+    await flush()
+    expect(screen.getByText('Bの実本文')).toBeTruthy()
+    expect(screen.getAllByText('Bの送信先').length).toBeGreaterThanOrEqual(1)
+
+    // 遅れて届いたAの応答は捨てる。本文も送信先もBのまま。
+    await act(async () => {
+      slowA.resolve({ success: true, data: DRAFT })
+      await Promise.resolve()
+    })
+    expect(screen.queryByText('本文です')).toBeNull()
+    expect(screen.queryByText('Aの送信先')).toBeNull()
+    expect(screen.getByText('Bの実本文')).toBeTruthy()
+
+    fireEvent.click(screen.getAllByRole('button', { name: 'テスト送信' })[0])
+    await flush()
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'テスト送信' }))
+    await flush()
+    expect(apiMocks.testDraft.mock.calls[0][0]).toBe('rem-2')
+  })
+
+  it('連続して対象を切り替えても、最後の対象の本文だけを出す', async () => {
+    const slowA = deferred<{ success: true; data: ReminderDraftVersion }>()
+    const draftB: ReminderDraftVersion = {
+      ...DRAFT,
+      reminderId: 'rem-2',
+      settings: { ...DRAFT.settings, steps: [{ ...DRAFT.settings.steps[0], messageContent: 'Bの実本文' }] },
+    }
+    const draftC: ReminderDraftVersion = {
+      ...DRAFT,
+      reminderId: 'rem-3',
+      settings: { ...DRAFT.settings, steps: [{ ...DRAFT.settings.steps[0], messageContent: 'Cの実本文' }] },
+    }
+    apiMocks.getDraft.mockImplementation((id: string) =>
+      id === 'rem-1' ? slowA.promise : id === 'rem-2' ? ok(draftB) : ok(draftC),
+    )
+    apiMocks.getTestRecipient.mockImplementation(() =>
+      ok({ state: 'ready', recipient: { id: 'f1', displayName: '田中 太郎', pictureUrl: null } }),
+    )
+
+    const { rerender } = render(<Issue469ReminderTestStage reminderId="rem-1" />)
+    rerender(<Issue469ReminderTestStage reminderId="rem-2" />)
+    rerender(<Issue469ReminderTestStage reminderId="rem-3" />)
+    await flush()
+    expect(screen.getByText('Cの実本文')).toBeTruthy()
+    // Bは応答済みだが、最終対象ではないので表示に残らない。
+    expect(screen.queryByText('Bの実本文')).toBeNull()
+  })
+
+  /*
+   * DEEP-10: 応答喪失（通信例外）の再試行は同じ冪等キーで送る。Worker側の
+   * 重複防止とLINEのリトライキーが効くのは同じキーのときだけ。
+   * 明示的な「別のテスト」を送るときだけ新しいキーになる。
+   */
+  it('応答を失った再試行は同じ冪等キーで送り、明示的な別送信だけ新しいキーになる', async () => {
+    apiMocks.getDraft.mockReturnValue(ok(DRAFT))
+    apiMocks.getTestRecipient.mockReturnValue(ok({ state: 'ready', recipient: { id: 'f1', displayName: '田中 太郎', pictureUrl: null } }))
+    apiMocks.testDraft
+      .mockRejectedValueOnce(new Error('network lost'))
+      .mockResolvedValue({ success: true, data: { sent: 1, recipientName: '田中 太郎', replayed: true, requestId: null, testedAt: '2026-09-10T03:00:00.000Z' } })
+
+    render(<Issue469ReminderTestStage reminderId="rem-1" />)
+    await flush()
+
+    // 1回目: 通信例外。窓は開いたまま、エラーは窓の中。
+    fireEvent.click(screen.getAllByRole('button', { name: 'テスト送信' })[0])
+    await flush()
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'テスト送信' }))
+    await flush()
+    expect(apiMocks.testDraft).toHaveBeenCalledTimes(1)
+
+    // 2回目: 同じ窓からの再試行は同じ冪等キー。
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'もう一度送信' }))
+    await flush()
+    expect(apiMocks.testDraft).toHaveBeenCalledTimes(2)
+    expect(apiMocks.testDraft.mock.calls[1][1]).toBe(apiMocks.testDraft.mock.calls[0][1])
+
+    // 成功後に「別のテストをもう一度送る」ときだけ新しいキー。
+    fireEvent.click(screen.getAllByRole('button', { name: 'テスト送信' })[0])
+    await flush()
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'テスト送信' }))
+    await flush()
+    expect(apiMocks.testDraft).toHaveBeenCalledTimes(3)
+    expect(apiMocks.testDraft.mock.calls[2][1]).not.toBe(apiMocks.testDraft.mock.calls[0][1])
+  })
+
+  /*
+   * DEEP-11: 通信例外のエラーは確認窓の中に出す。背面に残さず、
+   * 再試行が成功したあとも古い失敗文が残らない。結果表示は常に一つ。
+   */
+  it('通信例外のエラーは確認窓の中に出し、成功で消す', async () => {
+    apiMocks.getDraft.mockReturnValue(ok(DRAFT))
+    apiMocks.getTestRecipient.mockReturnValue(ok({ state: 'ready', recipient: { id: 'f1', displayName: '田中 太郎', pictureUrl: null } }))
+    apiMocks.testDraft
+      .mockRejectedValueOnce(new Error('network lost'))
+      .mockResolvedValue({ success: true, data: { sent: 1, recipientName: '田中 太郎', replayed: false, requestId: 'r1', testedAt: '2026-09-10T03:00:00.000Z' } })
+
+    render(<Issue469ReminderTestStage reminderId="rem-1" />)
+    await flush()
+    fireEvent.click(screen.getAllByRole('button', { name: 'テスト送信' })[0])
+    await flush()
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'テスト送信' }))
+    await flush()
+
+    // 窓は開いたまま、エラーは窓の中にあり、背面には出ない。
+    const dialog = screen.getByRole('dialog')
+    expect(within(dialog).getByText(/送信結果を確認できませんでした/)).toBeTruthy()
+    expect(screen.queryByText('テスト送信に失敗しました。LINE連携と通知内容を確認してください。')).toBeNull()
+
+    // 同じ窓から再試行して成功 → 窓が閉じ、失敗文はどこにも残らない。
+    fireEvent.click(within(dialog).getByRole('button', { name: 'もう一度送信' }))
+    await flush()
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(screen.queryByText(/送信結果を確認できませんでした/)).toBeNull()
+    expect(screen.queryByText(/テスト送信に失敗/)).toBeNull()
+    expect(screen.getByText('直近のテストは成功')).toBeTruthy()
+  })
+
   it('遅れて届いた別リマインダの送信先で画面を上書きしない', async () => {
     const draftB: ReminderDraftVersion = { ...DRAFT, reminderId: 'rem-2' }
     apiMocks.getDraft.mockImplementation((id: string) => ok(id === 'rem-1' ? DRAFT : draftB))
