@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import Button from '@/components/shared/button'
 import Select from '@/components/shared/select'
-import { Th } from '@/components/shared/table'
+import { TableHeadRow, Th } from '@/components/shared/table'
 import { api } from '@/lib/api'
 import type { IdentityCandidateListItem } from '@line-crm/shared'
 import { usePageTitle } from '@/components/shell/page-chrome'
@@ -211,7 +211,12 @@ export default function DuplicatesPage() {
           <section className="overflow-hidden rounded-card border border-hairline bg-canvas shadow-card">
             <table className="w-full table-fixed text-sm">
               <colgroup><col style={{ width: '18%' }}/><col style={{ width: '10%' }}/><col style={{ width: '27%' }}/><col style={{ width: '18%' }}/><col style={{ width: '12%' }}/><col style={{ width: '8%' }}/><col style={{ width: '12%' }}/></colgroup>
-              <thead className="border-b border-hairline bg-canvas-sunken text-left text-micro font-semibold text-ink-secondary"><tr><Th className="py-3">候補</Th><Th className="py-3">確信度</Th><Th className="py-3">一致した根拠</Th><Th className="py-3">所属アカウント</Th><Th className="py-3">最終更新</Th><Th className="py-3">状態</Th><Th className="py-3">操作</Th></tr></thead>
+              {/*
+                #984 LAY-12: 見出しは共通の TableHeadRow（高さ44px・
+                背景・罫線を部品側で持つ）。セルの外付け余白で高さを
+                作らない。ページ内のほかの表と同じ見出し規則にそろえる。
+              */}
+              <thead><TableHeadRow><Th>候補</Th><Th>確信度</Th><Th>一致した根拠</Th><Th>所属アカウント</Th><Th>最終更新</Th><Th>状態</Th><Th>操作</Th></TableHeadRow></thead>
               <tbody className="divide-y divide-hairline">
                 {visibleCandidates.length ? visibleCandidates.map((candidate) => (
                   <tr key={candidate.id}>
@@ -226,7 +231,28 @@ export default function DuplicatesPage() {
                 )) : <tr><td colSpan={7} className="px-4 py-12 text-center text-sm text-ink-faint">条件に合う重複候補はありません</td></tr>}
               </tbody>
             </table>
-            <div className="border-t border-hairline px-4 py-3 text-xs text-ink-faint">{fmt.format(candidateTotal)}組中 1〜{fmt.format(visibleCandidates.length)}組</div>
+            {/*
+              #984 LAY-16: 0件のとき「範囲の先頭が末尾を越える表示」を出していた。
+              件数が0なら「0組」だけ、検索で0件なら解除の導線を出す。
+            */}
+            <div className="border-t border-hairline px-4 py-3 text-xs text-ink-faint">
+              {candidateTotal === 0 ? (
+                '0組'
+              ) : visibleCandidates.length === 0 ? (
+                <span className="inline-flex flex-wrap items-center gap-x-3 gap-y-1">
+                  検索条件に合う候補はありません
+                  <button
+                    type="button"
+                    onClick={() => { setQuery(''); setStatus('') }}
+                    className="font-semibold text-action hover:underline"
+                  >
+                    検索条件を解除する
+                  </button>
+                </span>
+              ) : (
+                `${fmt.format(candidateTotal)}組中 1〜${fmt.format(visibleCandidates.length)}組`
+              )}
+            </div>
           </section>
 
           <section className="rounded-card border border-hairline bg-canvas p-4 shadow-card">
@@ -237,13 +263,13 @@ export default function DuplicatesPage() {
             ) : (
               <div className="mt-3 overflow-hidden rounded-[14px] border border-[#DADDE2] bg-white shadow-[1px_1px_2px_rgba(29,29,31,0.13)]">
                 <table className="w-full table-fixed text-sm">
-                  <thead className="border-b border-[#DADDE2] bg-[#F6F6F8] text-left text-[11px] font-semibold text-[#565F59]">
-                    <tr>
-                      <th className="px-4 py-4">アカウント</th>
-                      <th className="px-4 py-4 text-right">友だち数</th>
-                      <th className="px-4 py-4 text-right">うち重複</th>
-                      <th className="px-4 py-4 text-right">重複率</th>
-                    </tr>
+                  <thead>
+                    <TableHeadRow>
+                      <Th>アカウント</Th>
+                      <Th align="right">友だち数</Th>
+                      <Th align="right">うち重複</Th>
+                      <Th align="right">重複率</Th>
+                    </TableHeadRow>
                   </thead>
                   <tbody className="divide-y divide-[#EAEBED] bg-white text-[#565F59]">
                     {data.perAccount.map((row) => (
@@ -274,19 +300,20 @@ export default function DuplicatesPage() {
               </p>
               <div className="mt-3 overflow-hidden rounded-[14px] border border-[#DADDE2] bg-white shadow-[1px_1px_2px_rgba(29,29,31,0.13)]">
                 <table className="w-full table-fixed text-sm">
-                  <thead className="border-b border-[#DADDE2] bg-[#F6F6F8] text-left text-[11px] font-semibold text-[#565F59]">
-                    <tr>
-                      <th className="px-4 py-4">行 \ 列</th>
+                  <thead>
+                    <TableHeadRow>
+                      <Th>行 \ 列</Th>
                       {data.perAccount.map((col) => (
-                        <th
+                        <Th
                           key={col.accountId}
                           title={col.accountName}
-                          className="truncate px-2 py-4 text-right"
+                          align="right"
+                          className="truncate"
                         >
                           {col.accountName}
-                        </th>
+                        </Th>
                       ))}
-                    </tr>
+                    </TableHeadRow>
                   </thead>
                   <tbody className="divide-y divide-[#EAEBED] bg-white text-[#565F59]">
                     {data.perAccount.map((row) => (

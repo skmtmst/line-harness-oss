@@ -16,7 +16,7 @@
 import React from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor, cleanup, within } from '@testing-library/react'
 import { act } from 'react'
 
 const fixture = vi.hoisted(() => ({
@@ -28,6 +28,7 @@ const fixture = vi.hoisted(() => ({
   overview: vi.fn(),
   updateSetting: vi.fn(),
   testSend: vi.fn(),
+  getTestRecipients: vi.fn(),
   definitions: vi.fn(),
   metrics: vi.fn(),
   quota: vi.fn(),
@@ -64,7 +65,11 @@ function commitAccountSwitch(id: string | null): void {
 }
 
 vi.mock('@/contexts/account-context', () => ({
-  useAccount: () => ({ selectedAccountId: useControllableAccount() }),
+  useAccount: () => {
+    const id = useControllableAccount()
+    // #988 NEXT-05: テスト送信の確認にはアカウント名を出す。
+    return { selectedAccountId: id, selectedAccount: id ? { id, name: `${id}のLINEアカウント` } : null }
+  },
 }))
 
 vi.mock('@/components/layout/merged-tabs', () => ({
@@ -99,6 +104,9 @@ vi.mock('@/lib/api', () => {
         overview: fixture.overview,
         updateSetting: fixture.updateSetting,
         testSend: fixture.testSend,
+      },
+      accountSettings: {
+        getTestRecipients: fixture.getTestRecipients,
       },
       lineNotifications: {
         definitions: fixture.definitions,
@@ -280,6 +288,13 @@ beforeEach(() => {
   fixture.updateSetting.mockResolvedValue({ success: true, data: {} })
   fixture.createDefinition.mockResolvedValue({ success: true, data: definition() })
   fixture.testSend.mockResolvedValue({ success: true, data: { sent: 1 } })
+  fixture.getTestRecipients.mockResolvedValue({
+    success: true,
+    data: [
+      { id: 'friend-t1', displayName: 'テスト 一郎', pictureUrl: null },
+      { id: 'friend-t2', displayName: 'テスト 二郎', pictureUrl: null },
+    ],
+  })
   // vitest は esbuild の既定で古い JSX 変換になる。画面側は React を import
   // しない書き方なので、実物の React を大域に置いて実描画させる。
   vi.stubGlobal('React', React)
@@ -723,10 +738,15 @@ describe('#678 Bを選んだ直後・Bのload未発火でも、旧Aの応答か�
     render(<LineNotificationsPage />)
     await waitFor(() => expect(screen.getByText('A店の注文受付')).toBeTruthy())
 
-    // A で編集を開き、テスト送信を投げる（応答はまだ返さない）。
+    // A で編集を開き、テスト送信の確認を開いて送信する（応答はまだ返さない）。
+    // #988 NEXT-05: ボタン名は「テスト受信者に送信」。確認を開いただけでは
+    // 送らず、宛先の読み込みが済んでから確認の中の送信ボタンを押す。
     fireEvent.click(screen.getByRole('button', { name: '内容を編集' }))
     await screen.findByLabelText('ご案内文')
-    fireEvent.click(screen.getAllByRole('button', { name: '自分にテスト送信' })[0])
+    fireEvent.click(screen.getAllByRole('button', { name: 'テスト受信者に送信' })[0])
+    expect(fixture.testSend).not.toHaveBeenCalled()
+    const confirmSend = await screen.findByRole('button', { name: 'テスト受信者 2名へ送信' })
+    fireEvent.click(confirmSend)
     expect(fixture.testSend).toHaveBeenCalledTimes(1)
     expect(fixture.testSend.mock.calls[0][0]).toMatchObject({ accountId: 'account-a' })
 
@@ -1240,5 +1260,147 @@ describe('#678 一覧の並び順', () => {
       (eventType) => counts.get(eventType) ?? null,
     )
     expect(sorted.map((item) => item.eventType)).toEqual(['order.shipped', 'order.confirmed', 'order.canceled'])
+  })
+})
+
+/*
+ * #988 NEXT-05: 以前の「自分にテスト送信」は、クリックからAPIを直接呼び、
+ * 実際にはアカウントの test_recipients（最大20名）全員へ送っていた。
+ * いまは「テスト受信者に送信」→ 宛先と人数を見せる確認 → 送信の2段階。
+ * 開いただけでは送らず、0人・読み込み失敗では送信ボタンを出さない。
+ */
+describe('#988 テスト送信は宛先を見せる確認を挟む', () => {
+  afterEach(cleanup)
+
+  async function openEditor() {
+    fixture.settings.mockResolvedValue({ success: true, data: [setting()] })
+    fixture.overview.mockResolvedValue({ success: true, data: { last24h: 0, failed: 0, byType: [] } })
+    fixture.operatorList.mockResolvedValue({ success: true, data: { summary: { total: 0 } } })
+    render(<LineNotificationsPage />)
+    await waitFor(() => expect(screen.getByText('注文を受け付けました')).toBeTruthy())
+    fireEvent.click(screen.getByRole('button', { name: '内容を編集' }))
+    await screen.findByLabelText('ご案内文')
+  }
+
+  it('確認にはアカウント・お知らせ・宛先・人数を出し、送信ボタンを押すまで送らない', async () => {
+    await openEditor()
+    fireEvent.click(screen.getAllByRole('button', { name: 'テスト受信者に送信' })[0])
+
+    // 開いただけでは送らない。宛先は実API口から読む。
+    expect(fixture.testSend).not.toHaveBeenCalled()
+    await waitFor(() => expect(fixture.getTestRecipients).toHaveBeenCalledWith('account-a'))
+    expect(await screen.findByText('account-aのLINEアカウント')).toBeTruthy()
+    expect(screen.getByText('「注文を受け付けました」')).toBeTruthy()
+    expect(await screen.findByText('テスト 一郎・テスト 二郎（2名）')).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('button', { name: 'テスト受信者 2名へ送信' }))
+    await waitFor(() => expect(fixture.testSend).toHaveBeenCalledTimes(1))
+    await waitFor(() => expect(screen.getByText('テスト受信者 1名へ送信しました。')).toBeTruthy())
+  })
+
+  it('テスト受信者が0人なら送信ボタンを出さず、登録画面への道筋を出す', async () => {
+    fixture.getTestRecipients.mockResolvedValue({ success: true, data: [] })
+    await openEditor()
+    fireEvent.click(screen.getAllByRole('button', { name: 'テスト受信者に送信' })[0])
+
+    expect(await screen.findByText(/テスト受信者が登録されていません/)).toBeTruthy()
+    // 宛先が数えられていないのに送らせない（ConfirmDialog は onConfirm 無しで実行ボタンを出さない）。
+    expect(screen.queryByRole('button', { name: /名へ送信/ })).toBeNull()
+    expect(screen.getByRole('link', { name: 'アカウント設定' })).toBeTruthy()
+    expect(fixture.testSend).not.toHaveBeenCalled()
+  })
+
+  it('宛先の読み込みに失敗したら送信ボタンを出さない', async () => {
+    fixture.getTestRecipients.mockRejectedValue(new Error('network down'))
+    await openEditor()
+    fireEvent.click(screen.getAllByRole('button', { name: 'テスト受信者に送信' })[0])
+
+    expect(await screen.findByText(/テスト受信者を読み込めませんでした/)).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /名へ送信/ })).toBeNull()
+    expect(fixture.testSend).not.toHaveBeenCalled()
+  })
+
+  it('確認をキャンセルしたら送らない', async () => {
+    await openEditor()
+    fireEvent.click(screen.getAllByRole('button', { name: 'テスト受信者に送信' })[0])
+    const dialog = await screen.findByRole('dialog')
+    await within(dialog).findByRole('button', { name: 'テスト受信者 2名へ送信' })
+
+    // 編集画面のフッターにも「キャンセル」があるので、確認の中のものを押す。
+    fireEvent.click(within(dialog).getByRole('button', { name: 'キャンセル' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    expect(fixture.testSend).not.toHaveBeenCalled()
+  })
+})
+
+/*
+ * #988 NEXT-06: 「注文完了らすぐ」「なし（全員に送る）」「高橋 直人さんには
+ * こう届きます」を、実際の動作に合わせた説明へ直す。宛先は一斉配信ではなく、
+ * その出来事に関わるお客さまだけ。見本は架空の注文による表示例と明記する。
+ */
+describe('#988 条件説明と表示例は実際の意味に合わせる', () => {
+  afterEach(cleanup)
+
+  async function openEditorFor(eventType: string, category: EcNotificationSetting['category'], label: string) {
+    fixture.settings.mockResolvedValue({
+      success: true,
+      data: [setting({ eventType, category, label })],
+    })
+    fixture.overview.mockResolvedValue({ success: true, data: { last24h: 0, failed: 0, byType: [] } })
+    fixture.operatorList.mockResolvedValue({ success: true, data: { summary: { total: 0 } } })
+    render(<LineNotificationsPage />)
+    await waitFor(() => expect(screen.getByText('注文を受け付けました')).toBeTruthy())
+    fireEvent.click(screen.getByRole('button', { name: '内容を編集' }))
+    await screen.findByLabelText('ご案内文')
+  }
+
+  it('注文のお知らせは「注文が確定したとき／確定のあとすぐ／その注文のお客さまだけ」', async () => {
+    await openEditorFor('ec.order.confirmed', 'order', '注文完了')
+    expect(screen.getByText('注文が確定したとき ／ EC連携から')).toBeTruthy()
+    expect(screen.getByText('確定のあとすぐ')).toBeTruthy()
+    expect(screen.getByText('その注文のお客さまだけ')).toBeTruthy()
+    // 全友だちへの一斉配信と誤解する表現は出さない。
+    expect(screen.queryByText(/全員に送る/)).toBeNull()
+    expect(screen.queryByText(/送らない相手/)).toBeNull()
+    // 見本は架空だと明記し、実在の人物名を宛先のように見せない。
+    expect(screen.getByText('架空の注文による表示例')).toBeTruthy()
+    expect(screen.queryByText(/高橋 直人/)).toBeNull()
+  })
+
+  it('入金・発送・キャンセル・定期便でも文法と対象範囲が正しい', async () => {
+    const cases: Array<[string, EcNotificationSetting['category'], string, string, string]> = [
+      ['ec.order.payment_received', 'payment', '入金確認完了', '入金を確認したとき ／ EC連携から', 'その注文のお客さまだけ'],
+      ['ec.order.shipped', 'shipping', '発送完了', '商品を発送したとき ／ EC連携から', 'その注文のお客さまだけ'],
+      ['ec.order.cancelled', 'support', '注文キャンセル', '注文がキャンセルされたとき ／ EC連携から', 'その注文のお客さまだけ'],
+      ['ec.subscription.upcoming', 'subscription', '次回定期便', '次回定期便の発送日が近づいたとき ／ EC連携から', 'その定期便のお客さまだけ'],
+      ['ec.subscription.payment_failed', 'subscription', '定期便の決済失敗', '定期便の決済に失敗したとき ／ EC連携から', 'その定期便のお客さまだけ'],
+    ]
+    for (const [eventType, category, label, trigger, audience] of cases) {
+      cleanup()
+      await openEditorFor(eventType, category, label)
+      expect(screen.getByText(trigger), `${eventType} のきっかけ`).toBeTruthy()
+      expect(screen.getByText(audience), `${eventType} の送る相手`).toBeTruthy()
+    }
+  })
+
+  it('表に無いイベントも、壊れた結合ではなく文として通る説明に落とす', async () => {
+    await openEditorFor('ec.future.event', 'order', '将来の出来事')
+    expect(screen.getByText('「将来の出来事」が起きたとき ／ EC連携から')).toBeTruthy()
+    expect(screen.getByText('その出来事に関わるお客さまだけ')).toBeTruthy()
+  })
+
+  it('つながる先はリンク色の文字ではなく実リンクにする（LAY-10拡張）', async () => {
+    await openEditorFor('ec.order.confirmed', 'order', '注文完了')
+    const expected: Array<[string, string]> = [
+      ['→ EC連携', '/ec-commerce'],
+      ['→ 共通情報', '/contents/vars'],
+      ['→ 受信箱', '/chats'],
+      ['→ NEN配信', '/nen-campaigns'],
+      ['→ 外部連携', '/webhooks'],
+    ]
+    for (const [name, href] of expected) {
+      const link = screen.getByRole('link', { name })
+      expect(link.getAttribute('href')).toBe(href)
+    }
   })
 })

@@ -314,6 +314,45 @@ export interface TestSendStep {
   kind: string
 }
 
+/*
+ * #987 NEXT-01〜04：最終確認の虚偽を直す。
+ *
+ * 旧版は「自分のLINE」「本番の友だちへは届きません」「ステップ1から」
+ * 「約2分」「待機10秒に短縮」と固定で書いていたが、実際は選んだ任意の
+ * 友だちへ実送信し、Worker は待機を挟まず各通を順に push するだけ。
+ * 確認は選んだ通・実本文・送信先から組み立てる。
+ */
+
+/**
+ * 確認画面に出す本文の差し込み。Worker は name 以外にも多くの変数を
+ * 埋めるが、ここでは選んだ相手から確実に分かる値だけを埋め、残りは
+ * そのまま見せる（架空の値で埋めて「本物どおり」に見せない）。
+ */
+function expandTestPreviewBody(
+  content: string,
+  friend: { id: string; displayName: string | null } | null,
+): string {
+  if (!friend) return content
+  return content
+    .replace(/\{\{name\}\}/g, friend.displayName || '')
+    .replace(/\{\{friend_id\}\}/g, friend.id)
+}
+
+/** メッセージ種別の表示名（呼び出し側の kind が無い fallback 用）。 */
+const TEST_MESSAGE_TYPE_LABEL: Record<string, string> = {
+  text: 'テキスト',
+  image: '画像',
+  flex: 'Flex（カードタイプ）',
+  sticker: 'スタンプ',
+  location: '位置情報',
+  video: '動画',
+  audio: '音声',
+  carousel: 'カルーセル',
+}
+
+/** 最終確認で本当に必要なチェックの数。文言は選択した相手の名前を含めて組み立てる。 */
+const REQUIRED_CONFIRMATION_COUNT = 2
+
 export function TestSendDialog({
   scenarioId,
   lineAccountId,
@@ -332,17 +371,30 @@ export function TestSendDialog({
   steps?: readonly TestSendStep[]
   onClose: () => void
 }) {
-  const { selectedAccountId } = useAccount()
+  const { selectedAccountId, accounts } = useAccount()
   const [search, setSearch] = useState('')
   const [friends, setFriends] = useState<{ id: string; displayName: string | null }[]>([])
   const [friendsStatus, setFriendsStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   const [selected, setSelected] = useState<string | null>(null)
   const [confirming, setConfirming] = useState(false)
   const [sending, setSending] = useState(false)
-  const [result, setResult] = useState<{ ok: boolean; message: string } | null>(null)
+  const [result, setResult] = useState<{ ok: boolean; partial?: boolean; message: string } | null>(null)
   const [lastTest, setLastTest] = useState<{ sentAt: string; messageCount: number } | null>(null)
+  // NEXT-02: 送信可否に結ぶ確認。未チェックから始め、相手が変わればやり直す。
+  const [confirmChecks, setConfirmChecks] = useState<boolean[]>(() =>
+    Array(REQUIRED_CONFIRMATION_COUNT).fill(false),
+  )
+  // NEXT-01: 送信先が本人連携・テスト受信者・一般のどれかを直前に固定表示する。
+  const [recipientClass, setRecipientClass] = useState<
+    'loading' | 'staff' | 'test' | 'general' | 'error'
+  >('loading')
+  const [staffName, setStaffName] = useState<string | null>(null)
+  // NEXT-04: 実本文は preview 口から取る（配信と同じテンプレート解決を通る）。
+  const [stepBodies, setStepBodies] = useState<
+    Record<number, { messageType: string; content: string }>
+  >({})
+  const [bodiesStatus, setBodiesStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
   const resolvedAccountId = lineAccountId ?? selectedAccountId ?? null
-  const testStepCount = steps.length
 
   const loadTestHistory = useCallback(async () => {
     if (!resolvedAccountId) {
@@ -396,21 +448,143 @@ export function TestSendDialog({
     }
   }, [lineAccountId, search, selectedAccountId])
 
+  /*
+   * NEXT-02: 送信先や対象の通が変わったら確認はやり直し。付けっぱなしの
+   * チェックを別の相手へ持ち越すと「確認しました」が嘘になる。
+   * （確認画面を開いているあいだは送信先を選び直せないので、ここは
+   * 防御的なリセット。実際のリセットは openConfirm でも行う。）
+   */
+  useEffect(() => {
+    setConfirmChecks(Array(REQUIRED_CONFIRMATION_COUNT).fill(false))
+  }, [selected, stepId])
+
+  /*
+   * NEXT-01/NEXT-04: 最終確認を開いたとき、送信先の区分と実本文を取る。
+   * 区分は「スタッフ連携（本人など）→ テスト受信者 → 一般の友だち」の順で
+   * 判定し、取れなければ取れなかったと書く。
+   */
+  useEffect(() => {
+    if (!confirming) return
+    let cancelled = false
+    setRecipientClass('loading')
+    setStaffName(null)
+    setBodiesStatus('loading')
+    void (async () => {
+      try {
+        if (resolvedAccountId && selected) {
+          const [loginUsers, testRecipients] = await Promise.all([
+            api.accountSettings.getTestRecipientLoginUsers(resolvedAccountId),
+            api.accountSettings.getTestRecipients(resolvedAccountId),
+          ])
+          if (!cancelled) {
+            if (!loginUsers.success || !testRecipients.success) {
+              setRecipientClass('error')
+            } else {
+              const staff = loginUsers.data.find((u) => u.id === selected)
+              if (staff) {
+                setStaffName(staff.staffName)
+                setRecipientClass('staff')
+              } else if (testRecipients.data.some((r) => r.id === selected)) {
+                setRecipientClass('test')
+              } else {
+                setRecipientClass('general')
+              }
+            }
+          }
+        } else if (!cancelled) {
+          setRecipientClass('error')
+        }
+      } catch {
+        if (!cancelled) setRecipientClass('error')
+      }
+      try {
+        const res = await api.scenarios.preview(scenarioId)
+        if (cancelled) return
+        if (!res.success) {
+          setBodiesStatus('error')
+          return
+        }
+        const map: Record<number, { messageType: string; content: string }> = {}
+        for (const s of res.data.steps) {
+          map[s.stepOrder] = { messageType: s.messageType, content: s.messageContent }
+        }
+        setStepBodies(map)
+        setBodiesStatus('ready')
+      } catch {
+        if (!cancelled) setBodiesStatus('error')
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [confirming, selected, resolvedAccountId, scenarioId])
+
   const selectedFriend = friends.find((friend) => friend.id === selected) ?? null
+  const friendName = selectedFriend?.displayName || '（名前なし）'
+  const accountName =
+    (resolvedAccountId ? (accounts ?? []).find((a) => a.id === resolvedAccountId)?.name : null) ??
+    null
+  const allConfirmed =
+    confirmChecks.length === REQUIRED_CONFIRMATION_COUNT && confirmChecks.every(Boolean)
+  // 最終確認で本当に必要なチェックだけ。人数や日時はテスト送信に無いので
+  // チェック項目にしない（確認文としては残す）。
+  const requiredConfirmations = [
+    `送信先が「${friendName}」さんで間違いないことを確認しました`,
+    '届くメッセージの内容を確認しました',
+  ]
+  const recipientLabel =
+    recipientClass === 'staff'
+      ? `スタッフ連携のLINE（${staffName ?? '担当者'}）`
+      : recipientClass === 'test'
+        ? 'テスト受信者'
+        : recipientClass === 'general'
+          ? '一般の友だち'
+          : recipientClass === 'error'
+            ? '区分を確認できませんでした'
+            : '確認しています'
+  // 送る通。呼び出し側から steps が来ないときは preview の実データで組み立てる。
+  const confirmSteps =
+    steps.length > 0
+      ? steps.map((row) => ({ stepOrder: row.stepOrder, timing: row.timing, kind: row.kind }))
+      : Object.entries(stepBodies)
+          .map(([order, body]) => ({
+            stepOrder: Number(order),
+            timing: '',
+            kind: TEST_MESSAGE_TYPE_LABEL[body.messageType] ?? body.messageType,
+          }))
+          .sort((a, b) => a.stepOrder - b.stepOrder)
+
+  const openConfirm = () => {
+    setConfirmChecks(Array(REQUIRED_CONFIRMATION_COUNT).fill(false))
+    setResult(null)
+    setConfirming(true)
+  }
+
   const sendTest = async () => {
-    if (!selected) return
+    if (!selected || sending) return
     setSending(true)
     setResult(null)
     try {
       const res = stepId
         ? await api.scenarios.testSendStep(scenarioId, stepId, selected)
         : await api.scenarios.testSend(scenarioId, selected)
-      setResult(
-        res.success
-          ? { ok: true, message: `${res.data.sent} 通を送りました。` }
-          : { ok: false, message: res.error },
-      )
-      if (res.success) await loadTestHistory()
+      if (res.success) {
+        // sent は「通」ではなくLINEメッセージ数。選んだ通より少ないときは
+        // 一部しか届いていない可能性として扱う。
+        const partial = res.data.sent < Math.max(confirmSteps.length, 1)
+        setResult(
+          partial
+            ? {
+                ok: false,
+                partial: true,
+                message: `${res.data.sent} 件のメッセージだけ届きました。残りは送れていない可能性があります。`,
+              }
+            : { ok: true, message: `${res.data.sent} 件のメッセージを送りました。` },
+        )
+        if (!partial) await loadTestHistory()
+      } else {
+        setResult({ ok: false, message: res.error })
+      }
     } catch (sendError) {
       setResult({
         ok: false,
@@ -428,15 +602,44 @@ export function TestSendDialog({
         <main className="ml-6 mr-10 p-8">
           <p className="text-accent text-sm">シナリオ編集へ戻る</p>
           <div className="mt-5 grid gap-6" style={{ gridTemplateColumns: '1.5fr 0.8fr' }}>
-            <section><h2 className="text-ink text-xl font-bold">テストを開始</h2><p className="text-ink-secondary mt-1 text-sm">実際の配信を開始せず、自分のLINEで確認します。</p>
-              <div className="border-hairline mt-5 rounded-panel border p-5"><h3 className="font-bold">テスト対象</h3><dl className="mt-4 space-y-4 text-sm"><div className="flex justify-between"><dt className="text-ink-faint">送信先</dt><dd className="font-medium">{selectedFriend?.displayName || 'Kenta Kawano'}</dd></div><div className="flex justify-between"><dt className="text-ink-faint">開始ステップ</dt><dd className="font-medium">ステップ1から</dd></div></dl></div>
-              <div className="border-hairline mt-4 rounded-panel border p-5"><h3 className="font-bold">テスト内容</h3><p className="text-ink-secondary mt-2 text-sm">待機時間を短縮し、全ステップを順番に送信します。</p><p className="mt-4 text-sm font-bold">全{testStepCount}ステップ</p><p className="text-ink-faint mt-2 text-xs">待機時間はテスト用に10秒へ短縮</p><p className="text-ink-faint mt-2 text-xs">アクション　タグ・情報欄の変更は実行しない</p></div>
+            <section><h2 className="text-ink text-xl font-bold">選択した1名へ実際に送信</h2><p className="text-ink-secondary mt-1 text-sm">選んだ友だちのLINEへ、実際のメッセージが届きます。操作者専用の宛先ではありません。</p>
+              <div className="border-hairline mt-5 rounded-panel border p-5"><h3 className="font-bold">テスト対象</h3><dl className="mt-4 space-y-4 text-sm"><div className="flex justify-between"><dt className="text-ink-faint">LINEアカウント</dt><dd className="font-medium">{accountName ?? '取得できていません'}</dd></div><div className="flex justify-between"><dt className="text-ink-faint">送信先</dt><dd className="font-medium">{selectedFriend?.displayName || '（名前なし）'}</dd></div><div className="flex justify-between"><dt className="text-ink-faint">区分</dt><dd className="font-medium">{recipientLabel}</dd></div></dl></div>
+              <div className="border-hairline mt-4 rounded-panel border p-5"><h3 className="font-bold">テスト内容</h3><p className="text-ink-secondary mt-2 text-sm">{confirmSteps.length > 1 ? `選択した${confirmSteps.length}通を、通と通のあいだの待機を省略して順番に送信します。` : 'この1通だけを送信します。'}</p>
+                <ul className="mt-4 space-y-2 text-sm">{confirmSteps.map((row) => (<li key={row.stepOrder} className="flex flex-wrap items-baseline gap-x-3"><span className="text-ink shrink-0 font-medium tabular-nums">{row.stepOrder}通目</span>{row.timing ? <span className="text-ink-secondary shrink-0">{row.timing}</span> : null}<span className="text-ink-secondary min-w-0 flex-1 truncate">{row.kind}</span></li>))}</ul>
+                <p className="text-ink-faint mt-2 text-xs">タグ・情報欄の変更などのアクションは実行しません。購読の登録も増えません。</p></div>
             </section>
-            <aside className="space-y-4"><div className="border-hairline rounded-panel border p-5"><h3 className="font-bold">設定サマリー</h3><p className="text-ink-faint mt-1 text-xs">テスト送信の内容を確認します。本番の友だちへは届きません。</p><dl className="mt-4 space-y-3 text-sm"><div className="flex justify-between"><dt>送信先</dt><dd>{selectedFriend?.displayName || 'Kenta Kawano'}</dd></div><div className="flex justify-between"><dt>所要時間</dt><dd>約2分</dd></div><div className="flex justify-between"><dt>本番影響</dt><dd>なし</dd></div></dl></div><div className="border-hairline rounded-panel border p-5"><h3 className="font-bold">メッセージプレビュー</h3><p className="text-ink-faint mt-1 text-xs">実際のLINE表示に近い確認用プレビューです。</p><div className="bg-info-bg mt-4 rounded-panel p-4 text-sm">［テスト］ご登録ありがとうございます。</div></div></aside>
+            <aside className="space-y-4"><div className="border-hairline rounded-panel border p-5"><h3 className="font-bold">設定サマリー</h3><p className="text-ink-faint mt-1 text-xs">テスト送信の内容を確認します。選んだ相手のLINEへ実際に届きます。</p><dl className="mt-4 space-y-3 text-sm"><div className="flex justify-between"><dt>送信先</dt><dd>{selectedFriend?.displayName || '（名前なし）'}</dd></div><div className="flex justify-between"><dt>送る通</dt><dd>{confirmSteps.length}通</dd></div></dl></div><div className="border-hairline rounded-panel border p-5"><h3 className="font-bold">メッセージプレビュー</h3><p className="text-ink-faint mt-1 text-xs">{friendName}さんへの表示例。名前などの差し込みは送信時に実値へ置き換わります。</p>
+                {bodiesStatus === 'loading' && <p className="text-ink-faint mt-4 text-sm">本文を読み込んでいます。</p>}
+                {bodiesStatus === 'error' && <p className="text-danger mt-4 text-sm">本文を読み込めませんでした。送る通と種類は左の一覧どおりです。</p>}
+                {bodiesStatus === 'ready' && confirmSteps.map((row) => {
+                  const body = stepBodies[row.stepOrder]
+                  return (
+                    <div key={row.stepOrder} className="mt-4">
+                      <p className="text-ink-faint text-xs">{row.stepOrder}通目</p>
+                      <div className="bg-info-bg mt-1 whitespace-pre-wrap rounded-panel p-4 text-sm">
+                        {body && body.messageType === 'text'
+                          ? expandTestPreviewBody(body.content, selectedFriend)
+                          : `${row.kind}（登録済みの内容をそのまま送ります）`}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div></aside>
           </div>
         </main>
         <div className="fixed inset-0 z-10 flex items-start justify-center px-6" style={{ paddingTop: 265, background: 'color-mix(in srgb, var(--color-ink) 35%, transparent)' }}>
-          <div className="w-full rounded-panel shadow-xl" style={{ maxWidth: 672, background: 'var(--color-canvas)' }}><div className="border-hairline border-b px-6 py-5"><h2 className="text-lg font-bold">テスト送信を開始しますか？</h2><p className="text-ink-secondary mt-1 text-sm">自分のLINEへ{testStepCount}ステップをテスト送信します。本番の友だちデータは変更されません。</p></div><div className="space-y-3 px-6 py-5 text-sm"><label className="flex items-center gap-2"><input type="checkbox" defaultChecked />対象人数を確認しました</label><label className="flex items-center gap-2"><input type="checkbox" defaultChecked />メッセージ表示を確認しました</label><label className="flex items-center gap-2"><input type="checkbox" defaultChecked />配信日時を確認しました</label></div><div className="border-hairline flex justify-end gap-2 border-t px-6 py-4"><Button onClick={() => setConfirming(false)}>戻る</Button><Button variant="primary" disabled={!selected || sending} onClick={() => void sendTest()}>{sending ? '送信中…' : 'テストを開始'}</Button></div></div>
+          <div className="w-full rounded-panel shadow-xl" style={{ maxWidth: 672, background: 'var(--color-canvas)' }}><div className="border-hairline border-b px-6 py-5"><h2 className="text-lg font-bold">選択した1名へ実際に送信しますか？</h2><p className="text-ink-secondary mt-1 text-sm">{friendName}さん（{recipientLabel}）へ{confirmSteps.length}通をテスト送信します。実際のLINEメッセージとして届きます。</p></div><div className="space-y-3 px-6 py-5 text-sm">{requiredConfirmations.map((label, index) => (<label key={label} className="flex items-center gap-2"><input type="checkbox" checked={confirmChecks[index] === true} disabled={sending || result?.ok === true} onChange={(e) => setConfirmChecks((prev) => prev.map((v, i) => (i === index ? e.target.checked : v)))} />{label}</label>))}<p className="text-ink-faint text-xs">購読の登録は増えません。配信予定も作りません。</p>
+            {sending && <p className="rounded-panel bg-info-bg text-ink-secondary px-4 py-3 text-sm">送信中です。完了までこの画面のまま待ってください。</p>}
+            {result && (
+              <div role="status" className={`rounded-panel px-4 py-3 text-sm ${result.ok ? 'bg-success-bg text-success' : 'bg-danger-bg text-danger'}`}>
+                <p className="font-bold">{result.ok ? '送信が完了しました' : result.partial ? '一部だけ届いた可能性があります' : '送信できませんでした'}</p>
+                <p className="mt-1">{result.message}</p>
+                {!result.ok && (
+                  <p className="mt-1 text-xs">途中で止まった場合、それまでの通は届いています。同じ送信先への連続した送信は短い間隔では実行できません。原因を解決してから、もう一度実行してください。</p>
+                )}
+              </div>
+            )}
+          </div><div className="border-hairline flex justify-end gap-2 border-t px-6 py-4">{result?.ok ? (<><Button onClick={() => setConfirming(false)}>別の相手へ送る</Button><Button variant="primary" onClick={onClose}>完了</Button></>) : (<><Button onClick={() => setConfirming(false)} disabled={sending}>戻る</Button><Button variant="primary" disabled={!selected || sending || !allConfirmed} onClick={() => void sendTest()}>{sending ? '送信中…' : result ? 'もう一度送信' : 'テスト送信を開始'}</Button></>)}</div></div>
         </div>
       </div>
     )
@@ -449,39 +652,26 @@ export function TestSendDialog({
       // 送り先を選んでいないあいだは送れない。押せる形で置くと、
       // 誰に届くか決まっていないまま本物のLINEが飛ぶ。
       onClose={onClose}
+      // confirming 中は上の early return で別画面へ切り替わるので、
+      // ここに確認中のフッターは要らない。
       footer={
-        confirming ? (
-          <>
-            <Button onClick={() => setConfirming(false)} disabled={sending}>
-              戻る
-            </Button>
-            <Button
-              variant="primary"
-              disabled={!selected || sending}
-              onClick={() => void sendTest()}
-            >
-              {sending ? '送信中…' : 'テスト送信を開始'}
-            </Button>
-          </>
-        ) : (
-          <>
-          <button
-            type="button"
-            onClick={onClose}
-            className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control h-10 border px-5 text-sm"
-          >
-            閉じる
-          </button>
-          <button
-            type="button"
-            disabled={!selected || sending}
-            onClick={() => setConfirming(true)}
-            className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control h-10 px-5 text-sm font-medium disabled:opacity-50"
-          >
-            内容を確認
-          </button>
-          </>
-        )
+        <>
+        <button
+          type="button"
+          onClick={onClose}
+          className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control h-10 border px-5 text-sm"
+        >
+          閉じる
+        </button>
+        <button
+          type="button"
+          disabled={!selected || sending}
+          onClick={openConfirm}
+          className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control h-10 px-5 text-sm font-medium disabled:opacity-50"
+        >
+          内容を確認
+        </button>
+        </>
       }
     >
       <>

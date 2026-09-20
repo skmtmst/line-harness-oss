@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
@@ -70,13 +71,46 @@ function isIncomplete(setting: EcNotificationSetting): boolean {
   return !setting.title?.trim() || !setting.introText.trim() || !setting.outroText.trim()
 }
 
+/*
+ * #988 NEXT-06: 「いつ・誰に送るか」の説明は、イベント別に文のかたちを
+ * 決め打ちする。表示名（label）を文に繋ぐと「注文完了らすぐ」のような
+ * 壊れた文になる。宛先は一斉配信ではなく、その出来事に関わるお客さま
+ * だけ（Workerは出来事の line_user_id に結び付く友だち1人へ送る）なので、
+ * 「全員に送る」のような表現は使わない。
+ */
+const eventDeliveryWords: Record<string, { trigger: string; timing: string; audience: string }> = {
+  'ec.order.confirmed': { trigger: '注文が確定したとき', timing: '確定のあとすぐ', audience: 'その注文のお客さまだけ' },
+  'ec.order.payment_received': { trigger: '入金を確認したとき', timing: '確認のあとすぐ', audience: 'その注文のお客さまだけ' },
+  'ec.order.bank_transfer_reminder': { trigger: '振込の期限が近づいたとき', timing: '期限が近づいたらすぐ', audience: 'その注文のお客さまだけ' },
+  'ec.order.shipped': { trigger: '商品を発送したとき', timing: '発送のあとすぐ', audience: 'その注文のお客さまだけ' },
+  'ec.order.cancelled': { trigger: '注文がキャンセルされたとき', timing: 'キャンセルのあとすぐ', audience: 'その注文のお客さまだけ' },
+  'ec.order.refunded': { trigger: '返金が完了したとき', timing: '返金のあとすぐ', audience: 'その注文のお客さまだけ' },
+  'ec.subscription.upcoming': { trigger: '次回定期便の発送日が近づいたとき', timing: '設定した日時', audience: 'その定期便のお客さまだけ' },
+  'ec.subscription.payment_failed': { trigger: '定期便の決済に失敗したとき', timing: '失敗のあとすぐ', audience: 'その定期便のお客さまだけ' },
+  'ec.subscription.card_updated': { trigger: 'カード変更・再決済の結果が出たとき', timing: '結果が出たあとすぐ', audience: 'その定期便のお客さまだけ' },
+  'ec.subscription.cancelled': { trigger: '定期便が解約されたとき', timing: '解約のあとすぐ', audience: 'その定期便のお客さまだけ' },
+  'ec.customer.profile_updated': { trigger: 'ペット情報が更新されたとき', timing: '更新のあとすぐ', audience: '情報を更新したお客さまだけ' },
+}
+
+function deliveryWords(setting: EcNotificationSetting) {
+  return eventDeliveryWords[setting.eventType] ?? {
+    // 表に無いイベントは、表示名を文の部品としてではなく引用して置く。
+    trigger: `「${setting.label}」が起きたとき`,
+    timing: '起きたあとすぐ',
+    audience: 'その出来事に関わるお客さまだけ',
+  }
+}
+
 function triggerLabel(setting: EcNotificationSetting): string {
-  return `${setting.label}とき ／ EC連携から`
+  return `${deliveryWords(setting).trigger} ／ EC連携から`
 }
 
 function timingLabel(setting: EcNotificationSetting): string {
-  if (setting.category === 'subscription') return '設定した日時'
-  return `${setting.label}らすぐ`
+  return deliveryWords(setting).timing
+}
+
+function audienceLabel(setting: EcNotificationSetting): string {
+  return deliveryWords(setting).audience
 }
 
 /**
@@ -504,7 +538,7 @@ function CustomerNotificationEditor({
         <p className="mt-1 text-xs text-ink-faint">{definition ? `公開版 ${definition.currentVersionNumber ? `v${definition.currentVersionNumber}` : 'なし'} ／ 編集中の下書き` : '公開中の内容を編集します。保存した内容は次の通知から使われます。'}</p>
         {hasUnsaved ? <p className="mt-1 text-xs font-semibold text-warning">未保存の変更があります</p> : null}
       </div>
-      <Button onClick={onTestSend} disabled={busy}>自分にテスト送信</Button>
+      <Button onClick={onTestSend} disabled={busy}>テスト受信者に送信</Button>
     </div>
     {notice && <div role={notice.tone === 'success' ? 'status' : 'alert'} aria-live={notice.tone === 'success' ? 'polite' : 'assertive'} className={`rounded-control border px-4 py-3 text-sm ${notice.tone === 'success' ? 'border-success bg-success-bg text-success' : 'border-danger bg-danger-bg text-danger'}`}>{notice.text}</div>}
 
@@ -516,7 +550,7 @@ function CustomerNotificationEditor({
           <div className="mt-3 grid gap-3 md:grid-cols-3">
             <div><p className="text-xs font-semibold text-ink-faint">きっかけ</p><p className="mt-1 rounded-control border border-hairline px-3 py-2.5 text-sm text-ink">{triggerLabel(setting)}</p></div>
             <div><p className="text-xs font-semibold text-ink-faint">送りかた</p><p className="mt-1 rounded-control border border-hairline px-3 py-2.5 text-sm text-ink">{timingLabel(setting)}</p></div>
-            <div><p className="text-xs font-semibold text-ink-faint">送らない相手</p><p className="mt-1 rounded-control border border-hairline px-3 py-2.5 text-sm text-ink">なし（全員に送る）</p></div>
+            <div><p className="text-xs font-semibold text-ink-faint">送る相手</p><p className="mt-1 rounded-control border border-hairline px-3 py-2.5 text-sm text-ink">{audienceLabel(setting)}</p></div>
           </div>
         </section>
 
@@ -550,7 +584,9 @@ function CustomerNotificationEditor({
 
       <aside className="min-w-0 space-y-3">
         <section className="rounded-card border border-hairline bg-canvas p-4">
-          <p className="mb-2 text-xs font-semibold text-ink-faint">高橋 直人さんにはこう届きます</p>
+          {/* #988 NEXT-06: 実在の人物名を出すと「この人に届く」と誤読される。
+              実際の送信先（テスト受信者／注文のお客さま）とは別物の見本だと明記する。 */}
+          <p className="mb-2 text-xs font-semibold text-ink-faint">架空の注文による表示例</p>
           <CardPreview setting={setting} />
         </section>
         <section className="rounded-card border border-warning bg-warning-bg p-4 text-sm text-warning">
@@ -559,7 +595,14 @@ function CustomerNotificationEditor({
         </section>
         <section className="rounded-card border border-hairline bg-canvas p-4 text-sm">
           <h2 className="font-bold text-ink">つながる先</h2>
-          <div className="mt-2 space-y-2 text-accent"><p>EC連携</p><p>共通情報</p><p>受信箱</p><p>NEN配信</p><p>外部連携</p></div>
+          {/* #988 LAY-10拡張: リンク色だけの p をやめ、実際に移動できる Link にする。 */}
+          <div className="mt-2 space-y-2">
+            <Link href="/ec-commerce" className="block font-bold text-action hover:underline">→ EC連携</Link>
+            <Link href="/contents/vars" className="block font-bold text-action hover:underline">→ 共通情報</Link>
+            <Link href="/chats" className="block font-bold text-action hover:underline">→ 受信箱</Link>
+            <Link href="/nen-campaigns" className="block font-bold text-action hover:underline">→ NEN配信</Link>
+            <Link href="/webhooks" className="block font-bold text-action hover:underline">→ 外部連携</Link>
+          </div>
         </section>
       </aside>
     </div>
@@ -572,7 +615,7 @@ function CustomerNotificationEditor({
     <div data-design="editor-footer" className="fixed bottom-0 left-0 right-0 z-20 min-w-0 border-t border-hairline bg-canvas px-4 py-3 shadow-lg sm:px-6">
       <div className="ml-auto flex min-w-0 flex-wrap items-center justify-between gap-3" style={{ maxWidth: 1584 }}>
         <p className="min-w-0 text-xs text-ink-faint">{definition ? '下書きの保存だけでは公開中の内容は変わりません。確認後に公開してください。' : '出しています。保存すると、次のお知らせから新しい文面が使われます。'}</p>
-        <div data-design="editor-footer-actions" className="flex min-w-0 flex-wrap justify-end gap-2"><Button onClick={onClose}>キャンセル</Button><Button onClick={onTestSend} disabled={busy}>自分にテスト送信</Button><Button onClick={onSave} disabled={busy}>{definition ? '下書きを保存' : 'お知らせを保存'}</Button>{definition ? <Button variant="primary" onClick={onPublish} disabled={busy}>顧客へのお知らせを公開</Button> : null}</div>
+        <div data-design="editor-footer-actions" className="flex min-w-0 flex-wrap justify-end gap-2"><Button onClick={onClose}>キャンセル</Button><Button onClick={onTestSend} disabled={busy}>テスト受信者に送信</Button><Button onClick={onSave} disabled={busy}>{definition ? '下書きを保存' : 'お知らせを保存'}</Button>{definition ? <Button variant="primary" onClick={onPublish} disabled={busy}>顧客へのお知らせを公開</Button> : null}</div>
       </div>
     </div>
   </main>
@@ -580,7 +623,7 @@ function CustomerNotificationEditor({
 
 function LineNotificationsPage() {
   const router = useRouter()
-  const { selectedAccountId } = useAccount()
+  const { selectedAccountId, selectedAccount } = useAccount()
   /*
    * N-340: `loadGeneration` は load() の useEffect の中でしか進まない。
    * アカウント切替の描画コミットと、その useEffect が実際に発火する瞬間の
@@ -605,6 +648,17 @@ function LineNotificationsPage() {
   const [busy, setBusy] = useState<string | null>(null)
   const [notice, setNotice] = useState<{ tone: 'success' | 'error'; text: string } | null>(null)
   const [closeConfirmOpen, setCloseConfirmOpen] = useState(false)
+  /*
+   * #988 NEXT-05: 「自分にテスト送信」は実際にはアカウントの test_recipients
+   * （最大20名）へ送る。クリック即APIではなく、宛先と人数を見せる確認を挟む。
+   * 開いただけでは送らない。宛先が0人・読み込み失敗のときは送信ボタンを出さない。
+   */
+  const [testSendDraft, setTestSendDraft] = useState<EcNotificationSetting | null>(null)
+  const [testRecipients, setTestRecipients] = useState<{
+    state: 'loading' | 'ready' | 'error'
+    items: Array<{ id: string; displayName: string; pictureUrl: string | null }>
+  }>({ state: 'loading', items: [] })
+  const testRecipientGeneration = useRef(0)
   // N-341: 運用者タブの件数は実データで出す。子部品とは別に親で取る。
   const [operatorCount, setOperatorCount] = useState<number | null>(null)
   const [operatorState, setOperatorState] = useState<OperatorTabState>('loading')
@@ -629,6 +683,9 @@ function LineNotificationsPage() {
     setQuota(null)
     setNotice(null)
     setCloseConfirmOpen(false)
+    // アカウントを切り替えたら、前のアカウント宛の確認は残さない。
+    setTestSendDraft(null)
+    testRecipientGeneration.current += 1
     setOperatorCount(null)
     setOperatorState('loading')
     setDirtyEvents([])
@@ -915,6 +972,37 @@ function LineNotificationsPage() {
     if (guard.generation === loadGeneration.current) setBusy(null)
   }
 
+  /*
+   * #988 NEXT-05: ボタンを押してもまだ送らない。アカウントに登録された
+   * テスト受信者を取り、宛先・人数を見せる確認を開く。確認の中で
+   * 「送信」を押して初めて testSend が走る。
+   */
+  const openTestSendConfirm = (setting: EcNotificationSetting) => {
+    if (!selectedAccountId) { setNotice({ tone: 'error', text: 'LINEアカウントを選択してください。' }); return }
+    const accountId = selectedAccountId
+    const generation = ++testRecipientGeneration.current
+    setTestSendDraft(setting)
+    setTestRecipients({ state: 'loading', items: [] })
+    api.accountSettings.getTestRecipients(accountId).then((result) => {
+      // 閉じた・開き直した・アカウント切替のあとに返った古い応答は捨てる。
+      if (generation !== testRecipientGeneration.current || accountId !== selectedAccountRef.current) return
+      if (result.success) setTestRecipients({ state: 'ready', items: result.data })
+      else setTestRecipients({ state: 'error', items: [] })
+    }).catch(() => {
+      if (generation !== testRecipientGeneration.current || accountId !== selectedAccountRef.current) return
+      setTestRecipients({ state: 'error', items: [] })
+    })
+  }
+  const closeTestSendConfirm = () => {
+    setTestSendDraft(null)
+    testRecipientGeneration.current += 1
+  }
+  const confirmTestSend = () => {
+    const target = testSendDraft
+    closeTestSendConfirm()
+    if (target) void testSend(target)
+  }
+
   const testSend = async (setting: EcNotificationSetting) => {
     if (!selectedAccountId) { setNotice({ tone: 'error', text: 'LINEアカウントを選択してください。' }); return }
     const accountId = selectedAccountId
@@ -947,7 +1035,7 @@ function LineNotificationsPage() {
         onClose={() => closeEditor(expandedSetting)}
         onPublish={() => void publish(expandedSetting)}
         onSave={() => void save(expandedSetting)}
-        onTestSend={() => void testSend(expandedSetting)}
+        onTestSend={() => openTestSendConfirm(expandedSetting)}
         notice={notice}
         hasUnsaved={dirtyEvents.includes(expandedSetting.eventType)}
       />
@@ -961,6 +1049,40 @@ function LineNotificationsPage() {
         onConfirm={() => discardEditorChanges(expandedSetting)}
         onCancel={() => setCloseConfirmOpen(false)}
       />
+      {/*
+        * #988 NEXT-05: 送信前に「どのアカウントの・何を・誰に・何人へ」送るかを
+        * 確認させる。宛先が読めていない・0人のときは onConfirm を渡さず、
+        * 送信ボタンそのものを出さない（ConfirmDialog の作り）。
+        */}
+      <ConfirmDialog
+        open={testSendDraft !== null}
+        title="テスト受信者に送信しますか？"
+        description="編集中の文面を、テスト受信者として登録されている人へ送ります。お客さま全員への一斉配信ではありません。"
+        confirmLabel={testRecipients.items.length > 0 ? `テスト受信者 ${testRecipients.items.length}名へ送信` : 'テスト受信者に送信'}
+        onConfirm={testRecipients.state === 'ready' && testRecipients.items.length > 0 ? confirmTestSend : undefined}
+        onCancel={closeTestSendConfirm}
+      >
+        <dl className="space-y-3 text-sm">
+          <div>
+            <dt className="text-xs font-semibold text-ink-faint">アカウント</dt>
+            <dd className="mt-0.5 text-ink">{selectedAccount?.name ?? '選択中のアカウント'}</dd>
+          </div>
+          <div>
+            <dt className="text-xs font-semibold text-ink-faint">送るお知らせ</dt>
+            <dd className="mt-0.5 text-ink">「{testSendDraft?.title?.trim() || testSendDraft?.label}」</dd>
+          </div>
+          <div>
+            <dt className="text-xs font-semibold text-ink-faint">宛先</dt>
+            <dd className="mt-0.5 text-ink">
+              {testRecipients.state === 'loading' ? 'テスト受信者を読み込んでいます…'
+                : testRecipients.state === 'error' ? 'テスト受信者を読み込めませんでした。時間をおいて、もう一度お試しください。'
+                : testRecipients.items.length === 0
+                  ? <>テスト受信者が登録されていません。<Link href={`/accounts/detail?id=${encodeURIComponent(selectedAccountId ?? '')}`} className="text-action hover:underline">アカウント設定</Link>で登録してください。</>
+                  : `${testRecipients.items.map((item) => item.displayName).join('・')}（${testRecipients.items.length}名）`}
+            </dd>
+          </div>
+        </dl>
+      </ConfirmDialog>
     </> : null}
     {tab === 'customer' && !expandedSetting ? <main
       data-design-node="festr"
