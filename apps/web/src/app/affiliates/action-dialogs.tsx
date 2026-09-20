@@ -196,11 +196,19 @@ export function AffiliatePaymentConfirmDialog({
   const [idempotencyKey, setIdempotencyKey] = useState('')
   const [issueStatement, setIssueStatement] = useState(false)
   const [statementKey, setStatementKey] = useState('')
+  /*
+    NEXT-23: 振込先の登録・修正は本人が自分のLINEから行うので、運用者に
+    できるのは本人への依頼だけ。依頼の手段（LINEの友だち・連絡先）は
+    紹介者の情報から読む。読めなかったときは null のままにし、
+    押しても何も起きないボタンは置かない。
+  */
+  const [contact, setContact] = useState<{ friendId: string | null; email: string | null } | null>(null)
 
   const load = useCallback(async () => {
     if (!target) return
     setPhase('loading')
     setPreview(null)
+    setContact(null)
     setError('')
     try {
       const response = await api.affiliates.paymentPreview(target.id, accountId)
@@ -209,6 +217,17 @@ export function AffiliatePaymentConfirmDialog({
       setPhase(response.data.conversionCount === 0 ? 'empty' : 'ready')
     } catch {
       setPhase('error')
+      return
+    }
+    // 依頼先の連絡手段は別口。ここが落ちても確定の画面自体は止めない。
+    try {
+      const detail = await api.affiliates.get(target.id)
+      const row = detail.success && detail.data
+        ? (detail.data as typeof detail.data & { friendId?: string | null })
+        : null
+      setContact(row ? { friendId: row.friendId ?? null, email: row.email ?? null } : null)
+    } catch {
+      setContact(null)
     }
   }, [accountId, target])
 
@@ -312,33 +331,79 @@ export function AffiliatePaymentConfirmDialog({
                 {preview.breakdown.map((line) => (
                   <tr key={line.offerName}><td className="text-ink px-3 py-2 font-medium">{line.offerName}</td><td className="text-ink-secondary px-3 py-2 text-right">{line.conversions.toLocaleString('ja-JP')}件</td><td className="text-ink-secondary px-3 py-2 text-right">{line.unitReward == null ? '—' : yen(line.unitReward)}</td><td className="text-ink px-3 py-2 text-right font-semibold">{yen(line.subtotal)}</td></tr>
                 ))}
-                <tr><td className="text-ink-secondary px-3 py-2">（却下した2件は入れていません）</td><td className="text-ink-secondary px-3 py-2 text-right">2件</td><td className="text-ink-secondary px-3 py-2 text-right">—</td><td className="text-ink px-3 py-2 text-right font-semibold">¥0</td></tr>
               </tbody>
             </table>
           </div>
+          {/*
+            NEXT-23: 固定の「却下2件／¥0」の行は消す。このプレビューの口は
+            認めた成果だけを返し、却下・保留中の件数は返さない。取れない数を
+            作り物で足さず、内訳の範囲だけを言葉で示す。
+          */}
+          <p className="text-ink-faint text-xs">
+            この内訳には、認めて保留期間を過ぎた成果だけが入っています。却下した成果と保留期間中の成果は含まれません。
+          </p>
 
           <div className="flex items-center gap-3 rounded-control border border-hairline bg-canvas-sunken px-4 py-3 text-sm">
             <Landmark size={18} className="shrink-0 text-ink-faint" aria-hidden="true" />
             <div className="min-w-0 flex-1">
               <p className="font-semibold text-ink">振込先　{settlement?.bankProfileRegistered ? '登録済み' : '登録されていません'}</p>
-              <p className="mt-0.5 text-xs text-ink-faint">口座番号は本人だけに表示します。本人の登録内容を使います。</p>
+              <p className="mt-0.5 text-xs text-ink-faint">
+                口座番号は本人だけに表示します。登録と修正は、本人が自分のLINEから行います。
+              </p>
             </div>
-            <Button type="button">直す</Button>
+            {/*
+              未登録のときは「直す」ではなく、本人へ依頼する実際の導線だけを出す。
+              連絡手段が無い・読めなかったときは、押せる形の飾りは置かない。
+            */}
+            {!settlement?.bankProfileRegistered ? (
+              contact?.friendId ? (
+                <Button href={`/chats?friend=${encodeURIComponent(contact.friendId)}`}>
+                  本人にLINEで依頼する
+                </Button>
+              ) : contact?.email ? (
+                <Button href={`mailto:${contact.email}?subject=${encodeURIComponent('振込先の登録について')}`}>
+                  メールで依頼する
+                </Button>
+              ) : contact ? (
+                <span className="text-ink-faint shrink-0 text-xs">
+                  連絡先がありません。紹介者の管理画面で登録してください。
+                </span>
+              ) : (
+                <span className="text-ink-faint shrink-0 text-xs">
+                  連絡先を確認できませんでした。紹介者の管理画面で確認してください。
+                </span>
+              )
+            ) : null}
           </div>
           <p className="flex items-start gap-2 rounded-control border border-warning bg-warning-bg px-4 py-3 text-xs font-semibold leading-5 text-warning">
             <TriangleAlert size={16} className="mt-0.5 shrink-0" aria-hidden="true" />
             確定したあとに成果を却下しても、この支払いからは外れません。次の未確定期間へマイナス調整として残します。
           </p>
+          {/*
+            NEXT-22: 明細の作成とLINE通知は `createStatement` 1本の処理で、
+            別々に止められない。連動する2つのチェックを、実際の動作どおり
+            1つのチェックへまとめる。飾りのチェックマークは実状態に連動させる
+            （OFFなのにONに見える見た目を残さない）。
+          */}
           <div className="space-y-2">
-            <label className="flex items-start gap-3 text-xs text-ink-secondary">
-              <input type="checkbox" className="sr-only" checked={issueStatement} onChange={(event) => setIssueStatement(event.target.checked)} />
-              <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center border border-accent-deep bg-accent-deep text-on-accent" style={{ borderRadius: 3 }}><Check size={12} /></span>
-              <span><strong className="block text-sm text-ink">確定したことを、この方のLINEに知らせる</strong>「{dateLabel(preview.paymentDate)} に {yen(preview.amount)} をお振込みします」と届きます。</span>
-            </label>
-            <label className="flex items-start gap-3 text-xs text-ink-secondary">
-              <input type="checkbox" className="sr-only" checked={issueStatement} onChange={(event) => setIssueStatement(event.target.checked)} />
-              <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center border border-accent-deep bg-accent-deep text-on-accent" style={{ borderRadius: 3 }}><Check size={12} /></span>
-              <span><strong className="block text-sm text-ink">支払明細のPDFを作る</strong>内訳が入った明細を作ります。メールでも送れます。</span>
+            <label className="flex items-start gap-3 text-xs text-ink-secondary cursor-pointer">
+              <input
+                type="checkbox"
+                className="sr-only"
+                checked={issueStatement}
+                onChange={(event) => setIssueStatement(event.target.checked)}
+              />
+              <span
+                aria-hidden="true"
+                className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center border ${issueStatement ? 'border-accent-deep bg-accent-deep text-on-accent' : 'border-hairline bg-canvas'}`}
+                style={{ borderRadius: 3 }}
+              >
+                {issueStatement ? <Check size={12} /> : null}
+              </span>
+              <span>
+                <strong className="block text-sm text-ink">支払明細を作成して、この方のLINEに知らせる</strong>
+                内訳が入った明細を作り、「{dateLabel(preview.paymentDate)} に {yen(preview.amount)} をお振込みします」と届きます。
+              </span>
             </label>
           </div>
         </div>

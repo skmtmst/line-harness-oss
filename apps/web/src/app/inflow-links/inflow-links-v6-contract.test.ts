@@ -104,6 +104,16 @@ describe('V6 流入経路一覧の契約', () => {
     expect(PAGE).not.toContain('// silent')
   })
 
+  it('まとめて操作は対象選択→操作→影響件数の確認へ接続する（NEXT-21）', () => {
+    expect(PAGE).toContain('setBulkOpen(true)')
+    expect(PAGE).toContain('type="checkbox"')
+    expect(PAGE).toContain('selectedRouteIds')
+    // 実行は既存の更新口へ、1件ずつ結果を分けて出す。
+    expect(PAGE).toContain('api.entryRoutes.update(route.id')
+    expect(PAGE).toContain('件に実行する')
+    expect(PAGE).toContain('は実行できませんでした')
+  })
+
   it('素のTailwind色を残さず、V6トークンで塗る', () => {
     for (const raw of [
       'emerald-600',
