@@ -10,7 +10,11 @@ const MOCK = fs.readFileSync(path.join(__dirname, '..', '..', '..', '..', '..', 
 
 describe('V6 ウェビナー公開前確認と公開完了の契約', () => {
   it('下書きから公開へ変えるときだけ確認を挟む', () => {
-    expect(FORM).toContain("const isPublishing = status === 'active' && initial?.status !== 'active'")
+    /*
+      未保存判定の正本は「最後に保存できた内容」（baseline）。
+      段を往復しても入力が残るので、公開の確認は baseline との差で決める。
+    */
+    expect(FORM).toContain("const isPublishing = status === 'active' && baseline.status !== 'active'")
     expect(FORM).toContain('<ConfirmDialog')
     /*
       題は**ウェビナーの名前**を出す。「このウェビナーを」だと、2枚開いて
@@ -18,7 +22,7 @@ describe('V6 ウェビナー公開前確認と公開完了の契約', () => {
     */
     expect(FORM).toContain("title={`「${title || '無題のウェビナー'}」を公開しますか？`}")
     expect(FORM).toContain('この内容で公開する')
-    expect(FORM).toContain('onClick={requestSave}')
+    expect(FORM).toContain('requestSave()')
   })
 
   it('動画・配信枠・動画時間が無い状態では公開させない', () => {

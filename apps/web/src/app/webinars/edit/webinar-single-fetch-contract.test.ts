@@ -15,7 +15,11 @@ describe('V6 ウェビナー通知・CTAの取得一本化の契約', () => {
     expect(PAGE).not.toContain('webinarApi.notifications(')
     expect(NOTIFICATIONS.match(/webinarApi\.notifications\(/g)).toHaveLength(1)
     expect(NOTIFICATIONS).toContain('onLoaded?.({ settings:')
-    expect(PAGE).toContain('<WebinarNotifications key={notifAttempt} webinarId={webinarId} onLoaded={handleNotificationsLoaded} />')
+    expect(PAGE).toContain('<WebinarNotifications key={notifAttempt} webinarId={webinarId}')
+    expect(PAGE).toContain('onLoaded={handleNotificationsLoaded}')
+    /* 段を畳まないので、未保存の印と保存操作を親の固定バーへ渡す。 */
+    expect(PAGE).toContain('onDirtyChange={onDirtyChange}')
+    expect(PAGE).toContain('registerSave={registerSave}')
   })
 
   it('CTAの取得口は子の編集タブの1か所だけ', () => {

@@ -1,9 +1,10 @@
 'use client'
 
 import SelectField from '@/components/shared/select-field'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   api,
+  ApiError,
   type ConversionDeduplicationMode,
   type ConversionDefinitionPreview,
   type ConversionDefinitionUsageKind,
@@ -27,6 +28,7 @@ import CreatePage, {
   FormSection,
   inputClass,
 } from '@/components/shared/create-page'
+import Button from '@/components/shared/button'
 import { useAccount } from '@/contexts/account-context'
 import { createLatestPreviewRequestGate, type LatestPreviewRequest } from './latest-preview-request'
 
@@ -72,7 +74,9 @@ const TRIGGER_CHOICES: TriggerChoice[] = [
  * いた。いまは各種類の本物のオブジェクト(ファネル・NEN配信の設定・
  * オートメーション)をアカウントごとに読み、そのIDだけを保存する。
  */
-const USAGE_GROUPS: Array<{ kind: ConversionDefinitionUsageKind; label: string; note: string }> = [
+type UsageGroupKind = 'analytics' | 'nen_campaign' | 'automation'
+
+const USAGE_GROUPS: Array<{ kind: UsageGroupKind; label: string; note: string }> = [
   { kind: 'analytics', label: '分析', note: 'この成果地点を段に使うファネル' },
   { kind: 'nen_campaign', label: 'NEN配信', note: 'この成果をきっかけにする配信' },
   { kind: 'automation', label: '自動化', note: 'この成果をきっかけに動く処理' },
@@ -90,8 +94,55 @@ function usageKey(target: Pick<UsageTarget, 'kind' | 'refId'>): string {
   return `${target.kind}:${target.refId}`
 }
 
+/**
+ * 「使う場所」1種類ぶんの候補の取得状態(DETAIL-16)。
+ *
+ * - idle: 集計対象が未選択で、まだ読んでいない
+ * - loading / ok: 読込中と取得成功(0件もここ。「まだありません」と出せる)
+ * - error: 500や通信失敗など。再試行できる
+ * - forbidden: 403。再試行しても変わらないので再読み込みは出さない
+ */
+type UsageKindState = 'idle' | 'loading' | 'ok' | 'error' | 'forbidden'
+
+interface UsageKindResult {
+  state: UsageKindState
+  targets: UsageTarget[]
+}
+
+const EMPTY_USAGE_KINDS: Record<UsageGroupKind, UsageKindResult> = {
+  analytics: { state: 'idle', targets: [] },
+  nen_campaign: { state: 'idle', targets: [] },
+  automation: { state: 'idle', targets: [] },
+}
+
+/**
+ * 種類ごとに候補を読む。1種類の失敗を他の種類へ伝えないため、
+ * 全部まとめて待つのではなく種類ごとの結果を返す。
+ * 応答が success:false のときも失敗として投げ、呼び出し側で
+ * 403(権限不足)とそれ以外を分けられるようにする。
+ */
+async function fetchUsageTargets(kind: UsageGroupKind, accountId: string): Promise<UsageTarget[]> {
+  if (kind === 'analytics') {
+    const res = await api.analytics.v6Funnels.list(accountId)
+    if (!res.success) throw new Error(res.error)
+    return res.data.map((funnel) => ({
+      kind, refId: funnel.id, refVersionId: funnel.currentVersion?.id ?? null, label: funnel.name,
+    }))
+  }
+  if (kind === 'nen_campaign') {
+    const res = await api.nenCampaigns.settings(accountId)
+    if (!res.success) throw new Error(res.error)
+    return res.data.map((campaign) => ({ kind, refId: campaign.campaignKey, label: campaign.label }))
+  }
+  const res = await api.automations.list({ accountId })
+  if (!res.success) throw new Error(res.error)
+  return res.data.map((automation) => ({
+    kind, refId: automation.id, refVersionId: automation.versionId ?? null, label: automation.name,
+  }))
+}
+
 export default function NewConversionPointPage() {
-  const { accounts, selectedAccountId } = useAccount()
+  const { selectedAccountId, selectedAccount } = useAccount()
   const [name, setName] = useState('')
   const [triggerKind, setTriggerKind] = useState<TriggerKind>('order')
   const [eventType, setEventType] = useState('ec_order_confirmed')
@@ -103,12 +154,10 @@ export default function NewConversionPointPage() {
   const [deduplicationMode, setDeduplicationMode] = useState<ConversionDeduplicationMode>('once_per_friend')
   const [reversalPolicy, setReversalPolicy] = useState<ConversionReversalPolicy>('source_cancelled')
   const [attributionDays, setAttributionDays] = useState('')
-  const [lineAccountId, setLineAccountId] = useState('')
   /** N-268: チェックすると下書きで保存し、公開するまで計測しない。 */
   const [saveAsDraft, setSaveAsDraft] = useState(false)
   const [points, setPoints] = useState<ConversionPoint[]>([])
-  const [usageTargets, setUsageTargets] = useState<UsageTarget[]>([])
-  const [usageTargetsLoaded, setUsageTargetsLoaded] = useState(false)
+  const [usageKinds, setUsageKinds] = useState<Record<UsageGroupKind, UsageKindResult>>(EMPTY_USAGE_KINDS)
   const [selectedUsageKeys, setSelectedUsageKeys] = useState<Set<string>>(new Set())
   const [preview, setPreview] = useState<ConversionDefinitionPreview | null>(null)
   const [previewLoading, setPreviewLoading] = useState(false)
@@ -126,74 +175,62 @@ export default function NewConversionPointPage() {
     }
   }, [])
 
-  useEffect(() => {
-    if (selectedAccountId) setLineAccountId(selectedAccountId)
-    else if (!lineAccountId && accounts[0]) setLineAccountId(accounts[0].id)
-  }, [accounts, lineAccountId, selectedAccountId])
+  /*
+   * 集計対象アカウントは画面上部の選択に固定する(DETAIL-17)。
+   *
+   * 以前は詳細設定に別の選択欄があり、そこでB店や「すべて」を選んでも
+   * lineAccountId の変更を監視する effect が毎回ヘッダー選択へ戻していた。
+   * 案件作成(#686)と同じ決めごとにそろえ、作成先はヘッダーのアカウントに
+   * 固定して詳細欄では選ばせない。保存側はアカウント必須で、権限外の
+   * アカウントを送ってもサーバーが404で拒否する(conversions.ts)。
+   */
+  const lineAccountId = selectedAccountId ?? ''
 
   /*
-   * 「使う場所」の候補を実オブジェクトから読む(N-258)。
+   * 「使う場所」の候補を実オブジェクトから読む(N-258 / DETAIL-16)。
    *
    * ファネル・NEN配信の設定・オートメーションのそれぞれが持つ本物のIDを
-   * 使う。読めなかった種類は「まだ作っていません」とだけ出し、
-   * 選べない偽物を置かない。
+   * 使う。種類ごとに読み、失敗した種類だけを「読み込めません＋再読み込み」
+   * にする。読めた種類は使えるままにし、空の成功と取得失敗を区別する。
+   * 選べない偽物は置かない。
    */
+  const usageRequestIds = useRef<Record<UsageGroupKind, number>>({ analytics: 0, nen_campaign: 0, automation: 0 })
+  const requestUsageKind = useCallback((kind: UsageGroupKind, accountId: string) => {
+    const requestId = ++usageRequestIds.current[kind]
+    setUsageKinds((current) => ({ ...current, [kind]: { ...current[kind], state: 'loading' } }))
+    void fetchUsageTargets(kind, accountId).then((targets) => {
+      if (usageRequestIds.current[kind] !== requestId) return
+      setUsageKinds((current) => ({ ...current, [kind]: { state: 'ok', targets } }))
+      // 読み直せた種類の中でだけ、実在しない選択を外す。失敗した種類の
+      // 選択は残し、再試行で候補が戻ったときチェックも戻る(DETAIL-16)。
+      setSelectedUsageKeys((current) =>
+        new Set([...current].filter((key) =>
+          !key.startsWith(`${kind}:`) || targets.some((target) => usageKey(target) === key))))
+    }).catch((error: unknown) => {
+      if (usageRequestIds.current[kind] !== requestId) return
+      setUsageKinds((current) => ({
+        ...current,
+        [kind]: {
+          state: error instanceof ApiError && error.status === 403 ? 'forbidden' : 'error',
+          // 読めなかった種類の古い候補は保存に送らない。選択自体は残す。
+          targets: [],
+        },
+      }))
+    })
+  }, [])
+
   useEffect(() => {
     if (!lineAccountId) {
-      setUsageTargets([])
-      setUsageTargetsLoaded(false)
+      setUsageKinds(EMPTY_USAGE_KINDS)
       return
     }
-    let cancelled = false
-    setUsageTargetsLoaded(false)
-    const load = async (): Promise<UsageTarget[]> => {
-      const [funnels, automations, nenCampaigns] = await Promise.allSettled([
-        api.analytics.v6Funnels.list(lineAccountId),
-        api.automations.list({ accountId: lineAccountId }),
-        api.nenCampaigns.settings(lineAccountId),
-      ])
-      const targets: UsageTarget[] = []
-      if (funnels.status === 'fulfilled' && funnels.value.success) {
-        for (const funnel of funnels.value.data) {
-          targets.push({
-            kind: 'analytics',
-            refId: funnel.id,
-            refVersionId: funnel.currentVersion?.id ?? null,
-            label: funnel.name,
-          })
-        }
-      }
-      if (nenCampaigns.status === 'fulfilled' && nenCampaigns.value.success) {
-        for (const campaign of nenCampaigns.value.data) {
-          targets.push({ kind: 'nen_campaign', refId: campaign.campaignKey, label: campaign.label })
-        }
-      }
-      if (automations.status === 'fulfilled' && automations.value.success) {
-        for (const automation of automations.value.data) {
-          targets.push({
-            kind: 'automation',
-            refId: automation.id,
-            refVersionId: automation.versionId ?? null,
-            label: automation.name,
-          })
-        }
-      }
-      return targets
-    }
-    void load().then((targets) => {
-      if (cancelled) return
-      setUsageTargets(targets)
-      setUsageTargetsLoaded(true)
-      // アカウントを切り替えたとき、前のアカウントの利用先は残さない。
-      setSelectedUsageKeys((current) =>
-        new Set([...current].filter((key) => targets.some((target) => usageKey(target) === key))))
-    }).catch(() => {
-      if (!cancelled) setUsageTargetsLoaded(true)
-    })
-    return () => {
-      cancelled = true
-    }
-  }, [lineAccountId])
+    for (const group of USAGE_GROUPS) requestUsageKind(group.kind, lineAccountId)
+  }, [lineAccountId, requestUsageKind])
+
+  const usageTargets = useMemo(
+    () => USAGE_GROUPS.flatMap((group) => usageKinds[group.kind].targets),
+    [usageKinds],
+  )
 
   /*
    * 同じ名前の警告は、同じ集計対象の中だけで出す(#513 L4)。
@@ -279,7 +316,7 @@ export default function NewConversionPointPage() {
         if (measureMethod === 'url_reach' && !targetUrl.trim()) {
           return '指定ページへの到達で数えるときは、対象のURLが要ります'
         }
-        if (!lineAccountId) return '集計対象のLINEアカウントを選んでください'
+        if (!lineAccountId) return '集計対象のLINEアカウントを選んでください（画面上部で選べます）'
         // 保存側(400)と同じ条件を先に言う。素通りすると汎用失敗文になる(#513 L3)。
         if (valueMode === 'fixed' && (yen === null || !Number.isFinite(yen) || yen < 0)) {
           return '固定で付ける金額は0以上の数値で入力してください'
@@ -523,13 +560,36 @@ export default function NewConversionPointPage() {
         <p className="text-ink-faint text-xs">ふつうは呼ぶ側から選びます。ここで選んだ場所は作成と同時につながります。</p>
         <div className="grid gap-2 md:grid-cols-3">
           {USAGE_GROUPS.map((group) => {
-            const targets = usageTargets.filter((target) => target.kind === group.kind)
+            const kindResult = usageKinds[group.kind]
+            const targets = kindResult.targets
             return (
               <div key={group.kind} className="border-hairline rounded-control border p-3">
                 <p className="text-ink text-sm font-semibold">{group.label}</p>
                 <p className="text-ink-faint text-xs">{group.note}</p>
-                {!usageTargetsLoaded ? (
+                {kindResult.state === 'idle' ? (
+                  <p className="text-ink-faint mt-2 text-xs">集計対象のアカウントを選ぶと候補が出ます</p>
+                ) : kindResult.state === 'loading' ? (
                   <p className="text-ink-faint mt-2 text-xs">候補を読み込んでいます</p>
+                ) : kindResult.state === 'forbidden' ? (
+                  // 403は再読み込みしても変わらないので、再試行は出さない。
+                  <p className="text-warning mt-2 text-xs" role="status">
+                    このアカウントの{group.label}を見る権限がありません
+                  </p>
+                ) : kindResult.state === 'error' ? (
+                  <div className="mt-2">
+                    <p className="text-danger text-xs" role="alert">
+                      使える{group.label}を読み込めませんでした
+                    </p>
+                    <Button
+                      variant="secondary"
+                      size="field"
+                      className="mt-1.5"
+                      disabled={!lineAccountId}
+                      onClick={() => requestUsageKind(group.kind, lineAccountId)}
+                    >
+                      {group.label}を再読み込み
+                    </Button>
+                  </div>
                 ) : targets.length === 0 ? (
                   <p className="text-ink-faint mt-2 text-xs">使える{group.label}がまだありません</p>
                 ) : (
@@ -576,14 +636,14 @@ export default function NewConversionPointPage() {
                 <span className="text-ink-faint text-xs">日</span>
               </div>
             </Field>
-            <Field label="集計対象アカウント" htmlFor="cv-account">
-              <SelectField
-                id="cv-account"
-                value={lineAccountId}
-                onChange={(e) => setLineAccountId(e.target.value)}
-                options={[{ value: '', label: 'すべてのアカウント' }, ...accounts.map((a) => ({ value: a.id, label: a.name }))]}
-                className="w-full"
-              />
+            <Field
+              label="集計対象アカウント"
+              htmlFor="cv-account"
+              note="画面上部で選んでいるLINEアカウントに固定されます。他のアカウントに作りたいときは、先に上部で切り替えてください。"
+            >
+              <p id="cv-account" className="bg-canvas-sunken text-ink rounded-control px-3 py-2 text-sm">
+                {selectedAccount ? selectedAccount.name : '未選択（画面上部で選んでください）'}
+              </p>
             </Field>
           </div>
         </details>

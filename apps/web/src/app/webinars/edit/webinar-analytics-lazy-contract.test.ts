@@ -16,10 +16,17 @@ describe('V6 ウェビナー編集の集計の遅延読み込みの契約', () =
     expect(PAGE.match(/analytics=\{analytics\} analyticsState=\{analyticsState\}/g)).toHaveLength(2)
   })
 
-  it('子の独自取得はコメントと参加者だけ', () => {
-    // 参加者口は staff には 403 が返る(N-118)。403 を個別に捌くため
-    // 変数へ切り出してあるが、取る口はコメントと参加者の2つのまま。
-    expect(PAGE).toContain('webinarApi.participants(webinarId, undefined, 8)')
-    expect(PAGE).toContain('Promise.all([webinarApi.userComments(webinarId), participantsRequest])')
+  it('参加者一覧はカーソルで最後まで読め、コメントとは取り口を分ける', () => {
+    // 参加者口は staff には 403 が返る(N-118)。403 を個別に捌く。
+    // 一覧は nextCursor を辿って全員分まで読める。8件どまりに戻さない。
+    expect(PAGE).toContain('webinarApi.participants(webinarId, undefined, PARTICIPANTS_PAGE_SIZE)')
+    expect(PAGE).toContain('webinarApi.participants(webinarId, nextCursor, PARTICIPANTS_PAGE_SIZE)')
+    expect(PAGE).toContain('loadMoreParticipants')
+    /*
+      コメントは参加者・集計と一緒に取らない。片方の失敗でもう片方が
+      消えないよう、Promise.all で束ねた取り方は無い（DETAIL-07）。
+    */
+    expect(PAGE).not.toContain('Promise.all([webinarApi.userComments')
+    expect(PAGE.match(/webinarApi\.userComments\(/g)).toHaveLength(1)
   })
 })
