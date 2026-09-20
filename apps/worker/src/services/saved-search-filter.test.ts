@@ -59,4 +59,51 @@ describe('compileSavedSearch', () => {
       error: '存在確認で使えない比較方法が指定されています',
     });
   });
+
+  /*
+    ATTR-13: 画面で選べる友だち情報の比較方法はすべて実行できる。
+    「登録あり／なし」は値を取らず、大小比較は数値ならCASTする。
+  */
+  it('友だち情報の全演算子を実行できるSQLへ変換する', () => {
+    const ops = [
+      'eq', 'equals', 'ne', 'not_equals', 'contains', 'not_contains',
+      'exists', 'not_exists', 'gte', 'gt', 'lte', 'lt',
+    ];
+    for (const op of ops) {
+      const result = compileSavedSearch({
+        all: [{ kind: 'field', key: 'pet_name', op, value: op === 'exists' || op === 'not_exists' ? undefined : 'ポチ' }],
+      });
+      expect(result.ok, `${op} は変換できる`).toBe(true);
+    }
+  });
+
+  it('友だち情報の「登録あり／なし」は値なしで動く', () => {
+    const exists = compileSavedSearch({ all: [{ kind: 'field', key: 'pet_name', op: 'exists' }] });
+    expect(exists).toEqual({
+      ok: true,
+      value: expect.objectContaining({ binds: ['pet_name', 'pet_name'] }),
+    });
+    if (exists.ok) expect(exists.value.sql).toContain('IS NOT NULL');
+
+    const notExists = compileSavedSearch({ all: [{ kind: 'field', key: 'pet_name', op: 'not_exists' }] });
+    if (notExists.ok) expect(notExists.value.sql).toContain('IS NULL');
+  });
+
+  it('数値の大小比較はCASTして、日付などは文字列のまま比べる', () => {
+    const numeric = compileSavedSearch({ all: [{ kind: 'field', key: 'weight', op: 'gte', value: '5' }] });
+    if (numeric.ok) {
+      expect(numeric.value.sql).toContain('CAST');
+      expect(numeric.value.binds).toEqual(['weight', 5]);
+    }
+    const isoDate = compileSavedSearch({ all: [{ kind: 'field', key: 'birthday', op: 'lt', value: '2020-01-01' }] });
+    if (isoDate.ok) {
+      expect(isoDate.value.sql).not.toContain('CAST');
+      expect(isoDate.value.binds).toEqual(['birthday', '2020-01-01']);
+    }
+  });
+
+  it('表に無い友だち情報の演算子は断る', () => {
+    const result = compileSavedSearch({ all: [{ kind: 'field', key: 'pet_name', op: 'includes', value: 'x' }] });
+    expect(result).toEqual({ ok: false, error: '友だち情報で使えない比較方法が指定されています' });
+  });
 });

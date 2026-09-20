@@ -1,10 +1,11 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { LockKeyhole, Trash2 } from 'lucide-react'
 import ReorderGrip from './reorder-grip'
 import { api, ApiError, type SupportMarkArchiveImpact, type SupportMarkListItem } from '@/lib/api'
+import { createResponseGate } from '@/lib/latest-request'
 import Button from '@/components/shared/button'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import ListKpis from '@/components/shared/list-kpis'
@@ -122,8 +123,28 @@ export default function SupportMarkList({ accountId }: { accountId: string | nul
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState('')
 
+  /*
+    ATTR-01: アカウント切替のあとに届いた古い応答で一覧を上書きしない。
+    情報欄一覧と同じく、要求世代とアカウントの両方を応答時に照合する。
+  */
+  const gateRef = useRef(createResponseGate())
+  const accountRef = useRef(accountId)
+  accountRef.current = accountId
+
+  /* 切替時は別アカウントの保管確認・掴み中の行を残さない。 */
+  useEffect(() => {
+    gateRef.current.invalidate()
+    setPendingDelete(null)
+    setArchiveImpact(null)
+    setDragId(null)
+    setError('')
+    setDeleteError('')
+  }, [accountId])
+
   const load = useCallback(async () => {
-    if (!accountId) {
+    const account = accountId
+    const token = gateRef.current.begin()
+    if (!account) {
       setItems([])
       setStatus('error')
       setError('LINE公式アカウントを選んでください')
@@ -132,11 +153,13 @@ export default function SupportMarkList({ accountId }: { accountId: string | nul
     setStatus('loading')
     setError('')
     try {
-      const res = await api.supportMarks.list(accountId)
+      const res = await api.supportMarks.list(account)
+      if (!gateRef.current.current(token) || accountRef.current !== account) return
       if (!res.success) throw new Error(res.error)
       setItems(res.data)
       setStatus('ready')
     } catch (reason) {
+      if (!gateRef.current.current(token) || accountRef.current !== account) return
       setStatus(reason instanceof ApiError && reason.status === 403 ? 'forbidden' : 'error')
     }
   }, [accountId])
@@ -204,20 +227,27 @@ export default function SupportMarkList({ accountId }: { accountId: string | nul
   }
 
   const openArchive = async (mark: MarkRow) => {
-    if (!accountId) return
+    const account = accountId
+    if (!account) return
+    const token = gateRef.current.begin()
     setPendingDelete(mark)
     setArchiveImpact(null)
     setReplacementMarkId('')
     setDeleteError('')
     setImpactLoading(true)
     try {
-      const res = await api.supportMarks.archiveImpact(mark.id, accountId)
+      const res = await api.supportMarks.archiveImpact(mark.id, account)
+      if (!gateRef.current.current(token) || accountRef.current !== account) return
       if (!res.success) throw new Error(res.error)
       setArchiveImpact(res.data)
       setReplacementMarkId(res.data.replacementOptions.find((option) => option.isDefault)?.id ?? res.data.replacementOptions[0]?.id ?? '')
     } catch {
-      setDeleteError('保管の影響を確認できませんでした。画面を閉じて、もう一度お試しください。')
-    } finally { setImpactLoading(false) }
+      if (gateRef.current.current(token) && accountRef.current === account) {
+        setDeleteError('保管の影響を確認できませんでした。画面を閉じて、もう一度お試しください。')
+      }
+    } finally {
+      if (gateRef.current.current(token) && accountRef.current === account) setImpactLoading(false)
+    }
   }
 
   const confirmRemove = async (mark: MarkRow) => {

@@ -171,25 +171,27 @@ export default function TagCsvImportDialog({
             <h2 id="tag-csv-title" className={styles.title}>CSVでタグを一括登録</h2>
             <p className={styles.description}>タグ名とフォルダ名をCSVからまとめて読み込みます。最大500件まで確認できます。</p>
           </header>
-          <ol className={styles.steps}>
-            <li>1列目に「タグ名」、2列目に「フォルダ名」を入れます。</li>
-            <li>先頭行は「タグ名,フォルダ」の見出しにできます。</li>
-            <li>確認画面で、新規・見送り・入力確認を確かめてから登録します。</li>
-          </ol>
-          <label className={styles.fileField}>
-            <input
-              key={fileInputKey}
-              className={styles.fileInput}
-              aria-label="登録するCSV"
-              type="file"
-              accept=".csv,text/csv"
-              onChange={(event) => void pickFile(event.target.files?.[0])}
-            />
-            <span className={styles.fileButton}>CSVを選ぶ</span>
-            <span className={`${styles.muted} ${styles.fileName}`} title={fileName || undefined}>{fileName || 'ファイル未選択'}</span>
-            <span className={`${styles.muted} ${styles.fileRule}`}>UTF-8・最大500件</span>
-          </label>
-          <div className={styles.note}><Info aria-hidden="true" size={18} /><span>フォルダが見つからない行は、確認画面で知らせたうえで未分類として登録します。</span></div>
+          <div className={styles.body}>
+            <ol className={styles.steps}>
+              <li>1列目に「タグ名」、2列目に「フォルダ名」を入れます。</li>
+              <li>先頭行は「タグ名,フォルダ」の見出しにできます。</li>
+              <li>確認画面で、新規・見送り・入力確認を確かめてから登録します。</li>
+            </ol>
+            <label className={styles.fileField}>
+              <input
+                key={fileInputKey}
+                className={styles.fileInput}
+                aria-label="登録するCSV"
+                type="file"
+                accept=".csv,text/csv"
+                onChange={(event) => void pickFile(event.target.files?.[0])}
+              />
+              <span className={styles.fileButton}>CSVを選ぶ</span>
+              <span className={`${styles.muted} ${styles.fileName}`} title={fileName || undefined}>{fileName || 'ファイル未選択'}</span>
+              <span className={`${styles.muted} ${styles.fileRule}`}>UTF-8・最大500件</span>
+            </label>
+            <div className={styles.note}><Info aria-hidden="true" size={18} /><span>フォルダが見つからない行は、確認画面で知らせたうえで未分類として登録します。</span></div>
+          </div>
           {error ? <p className={styles.error} role="alert">{error}</p> : null}
           <div className={styles.actions}>
             <Button type="button" onClick={close}>キャンセル</Button>
@@ -210,6 +212,7 @@ export default function TagCsvImportDialog({
               登録するとどうなるかを、行ごとに確かめてください。
             </p>
           </header>
+          <div className={styles.body}>
           {preview ? <>
             {/* 設計 `sfTEW` は4枚とも「その数が何なのか」を1行添える。 */}
             <div className={styles.summary}>
@@ -271,6 +274,7 @@ export default function TagCsvImportDialog({
               </div>
             </div>
           </> : null}
+          </div>
           {error ? <p className={styles.error} role="alert">{error}</p> : null}
           <div className={styles.footerRow}>
             <div className={styles.actions}>
@@ -283,41 +287,45 @@ export default function TagCsvImportDialog({
         </> : null}
 
         {phase === 'success' && result ? <>
-          <div className={styles.resultBanner}>
-            <CircleCheck aria-hidden="true" size={20} />
-            <h2 id="tag-csv-title" className={styles.resultTitle}>{result.summary.created}件を登録しました</h2>
-          </div>
-          <div className={styles.breakdown}>
-            <strong>フォルダの内訳</strong>
-            <p>{Object.entries(result.rows.filter((row) => row.status === 'created').reduce<Record<string, number>>((counts, row) => {
-              const key = row.folderName || '未分類'
-              counts[key] = (counts[key] ?? 0) + 1
-              return counts
-            }, {})).map(([name, count]) => `${name} ${count}件`).join(' ・ ')}</p>
-            {result.summary.skipped > 0 ? <p>同じ名前だった{result.summary.skipped}件は、上書きせずに飛ばしました。</p> : null}
+          <div className={styles.body}>
+            <div className={styles.resultBanner}>
+              <CircleCheck aria-hidden="true" size={20} />
+              <h2 id="tag-csv-title" className={styles.resultTitle}>{result.summary.created}件を登録しました</h2>
+            </div>
+            <div className={styles.breakdown}>
+              <strong>フォルダの内訳</strong>
+              <p>{Object.entries(result.rows.filter((row) => row.status === 'created').reduce<Record<string, number>>((counts, row) => {
+                const key = row.folderName || '未分類'
+                counts[key] = (counts[key] ?? 0) + 1
+                return counts
+              }, {})).map(([name, count]) => `${name} ${count}件`).join(' ・ ')}</p>
+              {result.summary.skipped > 0 ? <p>同じ名前だった{result.summary.skipped}件は、上書きせずに飛ばしました。</p> : null}
+            </div>
           </div>
           <div className={styles.actions}><Button type="button" variant="primary" onClick={close}>一覧へ戻る</Button></div>
         </> : null}
 
         {phase === 'partial' && result ? <>
-          <div className={`${styles.resultBanner} ${styles.warningBanner}`}>
-            <TriangleAlert aria-hidden="true" size={20} />
-            <h2 id="tag-csv-title" className={styles.resultTitle}>
-              {result.summary.created > 0
-                ? `${result.summary.created}件を登録し、${result.summary.invalid + result.summary.failed}件は入りませんでした`
-                : 'タグを登録できませんでした'}
-            </h2>
-          </div>
-          <p className={styles.partialDescription}>入らなかった行だけを下に出しています。直して取り込み直せば、この{result.summary.invalid + result.summary.failed}件だけが登録されます。すでに登録した{result.summary.created}件は二重になりません（同じ名前は飛ばすため）。</p>
-          <div className={styles.tableFrame}>
-            <table className={styles.table}>
-              <colgroup><col style={{ width: '9%' }} /><col style={{ width: '32%' }} /><col /></colgroup>
-              <thead><TableHeadRow><Th>行</Th><Th>タグ名</Th><Th>入らなかった理由</Th></TableHeadRow></thead>
-              <tbody>{result.rows.filter((row) => row.status === 'invalid' || row.status === 'failed').slice(0, 5).map((row) => <tr key={`${row.line}-${row.name}`}>
-                <td>{row.line}</td><td className={styles.truncate} title={row.name}>{row.name || '（空欄）'}</td>
-                <td>{row.message}</td>
-              </tr>)}</tbody>
-            </table>
+          <div className={styles.body}>
+            <div className={`${styles.resultBanner} ${styles.warningBanner}`}>
+              <TriangleAlert aria-hidden="true" size={20} />
+              <h2 id="tag-csv-title" className={styles.resultTitle}>
+                {result.summary.created > 0
+                  ? `${result.summary.created}件を登録し、${result.summary.invalid + result.summary.failed}件は入りませんでした`
+                  : 'タグを登録できませんでした'}
+              </h2>
+            </div>
+            <p className={styles.partialDescription}>入らなかった行だけを下に出しています。直して取り込み直せば、この{result.summary.invalid + result.summary.failed}件だけが登録されます。すでに登録した{result.summary.created}件は二重になりません（同じ名前は飛ばすため）。</p>
+            <div className={styles.tableFrame}>
+              <table className={styles.table}>
+                <colgroup><col style={{ width: '9%' }} /><col style={{ width: '32%' }} /><col /></colgroup>
+                <thead><TableHeadRow><Th>行</Th><Th>タグ名</Th><Th>入らなかった理由</Th></TableHeadRow></thead>
+                <tbody>{result.rows.filter((row) => row.status === 'invalid' || row.status === 'failed').slice(0, 5).map((row) => <tr key={`${row.line}-${row.name}`}>
+                  <td>{row.line}</td><td className={styles.truncate} title={row.name}>{row.name || '（空欄）'}</td>
+                  <td>{row.message}</td>
+                </tr>)}</tbody>
+              </table>
+            </div>
           </div>
           <div className={styles.actions}>
             <Button className={styles.exportButton} type="button" onClick={() => downloadCsv(failedTagRowsCsv(result.rows), `タグ一括登録-要修正-${todayInJapan()}.csv`)}>
