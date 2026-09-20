@@ -286,8 +286,12 @@ export default function AdvancedSearchDialog({
 
   const summary = useMemo(() => {
     const out: string[] = []
-    /* 対象（表示中/非表示/すべて）は常に見せる。条件と件数が食い違わないように。 */
-    out.push(`対象：${describeSavedVisibility(params.conditions ?? {})}`)
+    /*
+     * 対象（表示中/非表示/すべて）は常に見せる。条件と件数が食い違わないように。
+     * 保存検索の無変更再適用では params が savedSearchId だけになるので、
+     * params ではなく編集状態から説明を作る（FRIEND-32）。
+     */
+    out.push(`対象：${describeSavedVisibility(editorStateToConditions(editorState, { sort, limit }))}`)
     for (const b of blocks) {
       if (b.kind === 'name' && b.keyword.trim()) out.push(`名前に「${b.keyword.trim()}」`)
       if (b.kind === 'tag') {
@@ -314,7 +318,7 @@ export default function AdvancedSearchDialog({
     for (const condition of extraAll) out.push(describeSavedCondition(condition, tags, labels))
     for (const condition of any) out.push(`OR: ${describeSavedCondition(condition, tags, labels)}`)
     return out
-  }, [params, blocks, extraAll, any, tags, labels])
+  }, [blocks, extraAll, any, tags, labels, editorState, sort, limit])
 
   /** 該当件数。押す前に何人になるかが分からないと、条件を組み立てられない。 */
   const recount = useCallback(async () => {
