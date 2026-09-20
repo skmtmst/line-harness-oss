@@ -9,6 +9,11 @@ export type ActionMenuItem = {
   icon?: ReactNode
   tone?: 'default' | 'danger'
   disabled?: boolean
+  /**
+   * #985 LAY-18: 押せない理由（使用中・公開中など）。無効な項目の下に
+   * 小さく出す。理由が書けない操作は無効のまま黙って置かない。
+   */
+  disabledReason?: string
   dividerBefore?: boolean
   onSelect: () => void
 }
@@ -77,7 +82,12 @@ export default function ActionMenu({ open, items, note, onClose, ariaLabel = '�
             onClick={() => { item.onSelect(); onClose() }}
           >
             {item.icon ? <span className={styles.icon} aria-hidden="true">{item.icon}</span> : null}
-            {item.label}
+            <span className={styles.itemBody}>
+              {item.label}
+              {item.disabled && item.disabledReason ? (
+                <span className={styles.reason}>{item.disabledReason}</span>
+              ) : null}
+            </span>
           </button>
         </div>
       ))}
