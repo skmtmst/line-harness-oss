@@ -132,11 +132,19 @@ async function typeText(input: HTMLInputElement, value: string): Promise<void> {
   })
 }
 
+async function clickButton(el: HTMLElement, text: string): Promise<void> {
+  const button = Array.from(el.querySelectorAll('button')).find((node) => node.textContent === text)
+  if (!button) throw new Error(`ボタンが見つかりません: ${text}`)
+  await act(async () => { (button as HTMLButtonElement).click() })
+}
+
 describe('新規作成の選択可能一覧(#734)', () => {
   it('N1: きっかけの行が共有の全件と一致する', async () => {
     // #942 N-355: 以前は設計の6種だけで、残りは下書き編集でしか作れなかった。
     // 共有へ無い値を足す・共有から値が消える逆変異はここで赤になる。
+    // #975 U061: 初回は代表3件だけを出すため、「すべて見る」を開いてから拾う。
     const el = await mountPage()
+    await clickButton(el, `ほかのきっかけもすべて見る（あと${AUTOMATION_DRAFT_TRIGGER_OPTIONS.length - 3}件）`)
     // きっかけは押しボタン群(ラベル+説明の2段)。説明spanを持つボタンを拾う。
     const labels = Array.from(el.querySelectorAll('span.line-clamp-2')).map(
       (note) => note.parentElement?.querySelector('span')?.textContent ?? '',
@@ -163,8 +171,10 @@ describe('新規作成の選択可能一覧(#734)', () => {
     await chooseOption(actionSelect, 'start_scenario')
     const scenarioSelect = el.querySelector('[aria-label="自動化で始めるシナリオ"]') as HTMLSelectElement
     await chooseOption(scenarioSelect, 'scenario-1')
-    const save = Array.from(el.querySelectorAll('button')).find((node) => node.textContent === 'つくって動かす')
-    await act(async () => { (save as HTMLButtonElement).click() })
+    // #975 U073: 動かし始める前に確認ダイアログを挟む。
+    await clickButton(el, 'つくって動かす')
+    await act(async () => { await drainMicrotasks() })
+    await clickButton(document.body, '保存して動かし始める')
     await act(async () => { await drainMicrotasks() })
     expect(mockUpdate).toHaveBeenCalled()
     const sent = mockUpdate.mock.calls[0][2] as { actions: Array<{ type: string; params: Record<string, string> }> }

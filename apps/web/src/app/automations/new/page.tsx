@@ -9,6 +9,7 @@ import { AUTOMATION_DRAFT_ACTION_OPTIONS, AUTOMATION_DRAFT_TRIGGER_OPTIONS } fro
 import { api, ApiError, type AutomationDraftAction, type AutomationDraftDetail } from '@/lib/api'
 import Breadcrumb from '@/components/shared/breadcrumb'
 import StickyBar from '@/components/shared/sticky-bar'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { TextArea, TextField } from '@/components/shared/text-field'
 import { CareCard, FeatureLinkCard } from '@/components/shared/side-cards'
 import { usePageTitle } from '@/components/shell/page-chrome'
@@ -63,6 +64,18 @@ const EVENTS: ReadonlyArray<{ value: Automation['eventType']; label: string; not
     label: option.label,
     note: EVENT_NOTES[option.value] ?? '',
   }))
+
+/**
+ * #975 U061: きっかけを「人の動き」と「決めた時刻」に分け、
+ * よく使う3件だけを最初に出す。残りは検索または「すべてを見る」で届く。
+ */
+/* 並びは共有の正本 `AUTOMATION_DRAFT_TRIGGER_OPTIONS` と同じ順を保つ。 */
+const TRIGGER_EVENT_GROUPS: ReadonlyArray<{ id: string; label: string; values: readonly string[] }> = [
+  { id: 'people', label: '友だちやお客さんの動き', values: ['friend_add', 'message_received', 'tag_change', 'form_submitted', 'link_clicked', 'calendar_booked'] },
+  { id: 'schedule', label: '決めた時刻・曜日', values: ['datetime', 'daily', 'weekly'] },
+  { id: 'ec', label: 'ECの出来事', values: ['ec.order.confirmed'] },
+]
+const REPRESENTATIVE_TRIGGER_EVENTS: readonly string[] = ['friend_add', 'message_received', 'tag_change']
 
 /** 言葉で絞れるきっかけ。ほかは本文を持たないので条件欄を出さない。 */
 const KEYWORD_EVENTS: ReadonlyArray<string> = ['message_received']
@@ -287,6 +300,9 @@ export default function NewAutomationPage() {
   const canManage = useCanManageCommonActions()
   const [name, setName] = useState('')
   const [eventType, setEventType] = useState<string>(EVENTS[0].value)
+  /* #975 U061: 10件を一度に並べない。代表＋絞り込み＋「すべてを見る」。 */
+  const [eventQuery, setEventQuery] = useState('')
+  const [showAllEvents, setShowAllEvents] = useState(false)
   const [keyword, setKeyword] = useState('')
   const [conditionType, setConditionType] = useState<(typeof CONDITION_AXES)[number][0] | ''>('')
   const [conditionValue, setConditionValue] = useState('')
@@ -301,6 +317,8 @@ export default function NewAutomationPage() {
   const [scenarios, setScenarios] = useState<Array<{ id: string; name: string }>>([])
   const [commonActions, setCommonActions] = useState<Array<{ id: string; name: string }>>([])
   const [saving, setSaving] = useState(false)
+  /* #975 U073: 作成（下書き保存）と動かし始めることを分け、動かす前に内容を確認する。 */
+  const [activateConfirmOpen, setActivateConfirmOpen] = useState(false)
   const [testing, setTesting] = useState(false)
   const [preparingTest, setPreparingTest] = useState(false)
   const [testConfirmation, setTestConfirmation] = useState<TestConfirmation | null>(null)
@@ -382,6 +400,21 @@ export default function NewAutomationPage() {
 
   const selectedEvent = EVENTS.find((event) => event.value === eventType) ?? EVENTS[0]
   const usesKeyword = KEYWORD_EVENTS.includes(eventType)
+  /* #975 U061: 検索中は一致したものだけ。それ以外は代表3件、選択中が代表外なら全件を出す。 */
+  const normalizedEventQuery = eventQuery.trim().toLowerCase()
+  const matchedEvents = normalizedEventQuery
+    ? EVENTS.filter((event) => `${event.label} ${event.note}`.toLowerCase().includes(normalizedEventQuery))
+    : null
+  const expandedEvents = showAllEvents || !REPRESENTATIVE_TRIGGER_EVENTS.includes(eventType)
+  const triggerEventGroups = matchedEvents
+    ? [{ id: 'search', label: `「${eventQuery.trim()}」に合うきっかけ`, events: matchedEvents }]
+    : TRIGGER_EVENT_GROUPS.map((group) => ({
+        ...group,
+        events: group.values
+          .filter((value) => expandedEvents || REPRESENTATIVE_TRIGGER_EVENTS.includes(value))
+          .map((value) => EVENTS.find((event) => event.value === value))
+          .filter((event): event is (typeof EVENTS)[number] => Boolean(event)),
+      }))
   const hasSameTrigger = existingAutomations.some((item) => item.eventType === selectedEvent.value)
   const targetSummary = usesKeyword && keyword.trim()
     ? `「${keyword.trim()}」を含む内容を送った人に`
@@ -751,19 +784,44 @@ export default function NewAutomationPage() {
             title="どんなときに動かしますか"
             note="何が起きたら動かすか。ここで選んだ出来事が起きた人だけが対象になります。"
           >
-            <div className="grid grid-cols-2 gap-3 xl:grid-cols-6">
-              {EVENTS.map((event) => (
-                <button
-                  key={event.value}
-                  type="button"
-                  className={`${styles.eventCard} ${eventType === event.value ? styles.eventCardSelected : ''}`}
-                  onClick={() => setEventType(event.value)}
-                >
-                  <span className="text-sm font-bold text-ink">{event.label}</span>
-                  <span className="line-clamp-2 text-xs leading-5 text-ink-faint">{event.note}</span>
-                </button>
-              ))}
+            {/* #975 U061: 10件を最初から並べない。検索→代表3件→「すべてを見る」の順で絞る。 */}
+            <div className="mb-3">
+              <TextField
+                aria-label="きっかけを探す"
+                type="search"
+                value={eventQuery}
+                onChange={(e) => setEventQuery(e.target.value)}
+                placeholder="きっかけを言葉で探す（例: 予約・タグ・時刻）"
+              />
             </div>
+            {triggerEventGroups.map((group) =>
+              group.events.length === 0 ? null : (
+                <div key={group.id} className="mb-3">
+                  <p className="mb-2 text-xs font-bold text-ink-faint">{group.label}</p>
+                  <div className="grid grid-cols-2 gap-3 xl:grid-cols-6">
+                    {group.events.map((event) => (
+                      <button
+                        key={event.value}
+                        type="button"
+                        className={`${styles.eventCard} ${eventType === event.value ? styles.eventCardSelected : ''}`}
+                        onClick={() => setEventType(event.value)}
+                      >
+                        <span className="text-sm font-bold text-ink">{event.label}</span>
+                        <span className="line-clamp-2 text-xs leading-5 text-ink-faint">{event.note}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ),
+            )}
+            {matchedEvents && matchedEvents.length === 0 ? (
+              <p className="mb-3 text-xs text-ink-faint">合うきっかけがありません。言葉を変えるか、すべてのきっかけから選んでください。</p>
+            ) : null}
+            {!normalizedEventQuery && !expandedEvents ? (
+              <Button variant="secondary" onClick={() => setShowAllEvents(true)}>
+                ほかのきっかけもすべて見る（あと{EVENTS.length - REPRESENTATIVE_TRIGGER_EVENTS.length}件）
+              </Button>
+            ) : null}
 
             <div className="mt-4 grid items-center gap-3 lg:grid-cols-3">
               <label className={styles.label} htmlFor="au-name">
@@ -1076,13 +1134,69 @@ export default function NewAutomationPage() {
               type="button"
               className={`${styles.action} ${styles.actionPrimary}`}
               disabled={saving || Boolean(blockedReason)}
-              onClick={() => void save(true)}
+              onClick={() => {
+                const invalid = validate()
+                if (invalid) {
+                  setError(invalid)
+                  setNotice('')
+                  return
+                }
+                setActivateConfirmOpen(true)
+              }}
             >
               {saving ? '作成中...' : 'つくって動かす'}
             </button>
           </>
         }
       />
+
+      {/* #975 U073: 動かし始める前に、対象・きっかけ・最初の実行・止め方を読み合わせる。 */}
+      <ConfirmDialog
+        open={activateConfirmOpen}
+        title="この内容で動かし始めますか"
+        description="下書きを保存して、そのまま動かし始めます。内容を確認してください。"
+        confirmLabel="保存して動かし始める"
+        cancelLabel="戻って直す"
+        busy={saving}
+        onConfirm={() => {
+          setActivateConfirmOpen(false)
+          void save(true)
+        }}
+        onCancel={() => setActivateConfirmOpen(false)}
+      >
+        <dl className="space-y-2 text-sm">
+          <div>
+            <dt className="text-xs font-bold text-ink-faint">名前</dt>
+            <dd className="font-semibold text-ink">{name.trim()}</dd>
+          </div>
+          <div>
+            <dt className="text-xs font-bold text-ink-faint">きっかけ</dt>
+            <dd className="text-ink">{selectedEvent.label}（{triggerConfigSummary}）</dd>
+          </div>
+          <div>
+            <dt className="text-xs font-bold text-ink-faint">だれに</dt>
+            <dd className="text-ink">
+              {targetSummary}
+              {previewCount !== null ? ` 見込み ${previewCount.toLocaleString('ja-JP')}人` : ''}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-xs font-bold text-ink-faint">すること</dt>
+            <dd className="text-ink">{actionSummary || '未設定'}</dd>
+          </div>
+          <div>
+            <dt className="text-xs font-bold text-ink-faint">最初に動くのは</dt>
+            <dd className="text-ink">
+              {['datetime', 'daily', 'weekly'].includes(eventType)
+                ? `次の決めた時刻（${triggerConfigSummary}）`
+                : '次にきっかけが起きたとき'}
+            </dd>
+          </div>
+        </dl>
+        <p className="mt-3 rounded-control bg-canvas-sunken px-3 py-2 text-xs text-ink-secondary">
+          止め方：動かし始めたあとも「オートメーション」の一覧からいつでも止められます。先に確かめたい場合は「下書きに保存」して、1人で試すこともできます。
+        </p>
+      </ConfirmDialog>
     </div>
   )
 }
