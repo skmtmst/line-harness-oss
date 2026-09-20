@@ -87,6 +87,36 @@ describe('V6 ウェビナー一覧の契約', () => {
     expect(PAGE).toContain('if (visibleItems.length === 0)')
   })
 
+  it('固定の絞り込みは「よく使う絞り込み」と呼び、保存検索と混ぜない(DETAIL-20)', () => {
+    /* 公開中のみ・下書きのみはコード固定の切替で、利用者の保存検索ではない。 */
+    expect(PAGE).toContain('よく使う絞り込み')
+    expect(PAGE).not.toContain('保存した条件')
+  })
+
+  it('同じ /webinars/new への操作名は「ウェビナーを作成」で一致する(DETAIL-02)', () => {
+    expect(PAGE).toContain('href="/webinars/new">ウェビナーを作成')
+    expect(PAGE).not.toContain('ウェビナーを作る')
+  })
+
+  it('動画欄は実メディア名を出し、slug.mp4 の偽名を作らない(DETAIL-18)', () => {
+    expect(EDIT).not.toContain('webinar.slug}.mp4')
+    expect(EDIT).toContain('設定済みの動画')
+    expect(EDIT).toContain('api.media')
+    expect(EDIT).toContain('media.filename')
+  })
+
+  it('通知概要の状態は1つの定義から描き、成功色に固定しない(DETAIL-19)', () => {
+    expect(EDIT).toContain('NOTIFICATION_ROW_STATE')
+    expect(EDIT).toContain('NotificationStateBadge')
+    /* 文言だけ変えて緑固定だった欠陥形は残さない */
+    expect(EDIT).not.toContain('text-success text-xs font-semibold">{enabled(')
+    expect(EDIT).not.toContain('const enabled = ')
+  })
+
+  it('使っていない計算・状態を残さない(DETAIL-21)', () => {
+    expect(EDIT).not.toContain('completionRate')
+  })
+
   it('物理削除ではなく履歴を残すアーカイブ確認を使う', () => {
     expect(PAGE).toContain('ウェビナーをアーカイブしますか？')
     expect(PAGE).toContain('申込者・視聴履歴・CTA・分析結果は消えません')

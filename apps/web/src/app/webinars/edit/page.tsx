@@ -21,8 +21,11 @@ import { useAccount } from '@/contexts/account-context'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import StickyBar from '@/components/shared/sticky-bar'
+import { CheckCircle2, Circle, LoaderCircle, TriangleAlert } from 'lucide-react'
+import type { MediaItem } from '@line-crm/shared'
 import {
   ApiError,
+  api,
   fetchApi,
   webinarApi,
   type WebinarCtaCard,
@@ -1030,6 +1033,59 @@ function parseMinSec(v: string): number | null {
   return Number.isFinite(n) && n >= 0 ? Math.floor(n) : null
 }
 
+const MEDIA_KIND_LABEL: Record<MediaItem['kind'], string> = {
+  image: '画像',
+  video: '動画',
+  audio: '音声',
+  file: 'ファイル',
+}
+
+/*
+  動画欄の表示名。**URL識別子から `<slug>.mp4` という存在しない
+  ファイル名を作らない**(監査 DETAIL-18)。
+  ライブラリのメディアを選んでいれば実ファイル名・種別・長さを出す。
+  prefix だけの旧形式や、ライブラリで名前を取れないときは
+  「設定済みの動画」とだけ書く。
+*/
+function VideoMediaLabel({ webinar }: { webinar: Webinar }) {
+  const mediaId = webinar.videoMediaId ?? null
+  const accountId = webinar.accountId ?? null
+  const [media, setMedia] = useState<MediaItem | null>(null)
+
+  useEffect(() => {
+    setMedia(null)
+    if (!mediaId || !accountId) return
+    let cancelled = false
+    api.media
+      .detail(mediaId, accountId)
+      .then((res) => {
+        if (!cancelled && res.success) setMedia(res.data.item)
+      })
+      .catch(() => {
+        /* 名前が取れなくても偽名は出さない。「設定済みの動画」に落ちる。 */
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [mediaId, accountId])
+
+  if (!webinar.videoPrefix && !mediaId) return <span>—（未設定）</span>
+  if (!media) return <span>設定済みの動画</span>
+  return (
+    <span className="block min-w-0">
+      <span className="block truncate" title={media.filename}>
+        {media.filename}
+      </span>
+      <span className="text-ink-faint mt-0.5 block text-xs font-normal">
+        {MEDIA_KIND_LABEL[media.kind]}
+        {media.durationMs !== null && media.durationMs > 0
+          ? `・${fmtSec(Math.round(media.durationMs / 1000))}`
+          : ''}
+      </span>
+    </span>
+  )
+}
+
 function VideoDesignStep({ webinar, editor, registrations, publicUrl, canOpenPublicPage, publicPageReason, onWebinarSaved, onDirtyChange, registerSave }: { webinar: Webinar; editor: WebinarEditor; registrations: number | null; publicUrl: string | null; canOpenPublicPage: boolean; publicPageReason: string; onWebinarSaved: (next: Webinar) => void; onDirtyChange?: (dirty: boolean) => void; registerSave?: (save: (() => Promise<boolean>) | null) => void }) {
   return (
     <div className="flex flex-col gap-4 xl:flex-row" data-design-node="PV1Vh">
@@ -1038,7 +1094,7 @@ function VideoDesignStep({ webinar, editor, registrations, publicUrl, canOpenPub
           <h2 className="text-ink text-base font-bold">動画設定</h2>
           <p className="text-ink-faint mt-1 text-xs">動画ファイルまたは外部動画URLを設定します。</p>
           <div className="mt-4 grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(240px,1fr)]">
-            <div><p className="text-ink-faint text-xs font-semibold">動画</p><div className="border-hairline text-ink mt-1 rounded-control border px-3 py-3 text-sm font-semibold">{webinar.videoPrefix ? `${webinar.slug}.mp4` : '—（未設定）'}</div></div>
+            <div><p className="text-ink-faint text-xs font-semibold">動画</p><div className="border-hairline text-ink mt-1 rounded-control border px-3 py-3 text-sm font-semibold"><VideoMediaLabel webinar={webinar} /></div></div>
             <div><p className="text-ink-faint text-xs font-semibold">再生時間</p><div className="border-hairline text-ink mt-1 rounded-control border px-3 py-3 text-sm font-semibold">{durationLabel(webinar.durationSeconds)}</div></div>
           </div>
         </section>
@@ -1062,6 +1118,59 @@ function VideoDesignStep({ webinar, editor, registrations, publicUrl, canOpenPub
         {!(canOpenPublicPage && publicUrl) && publicPageReason ? <p className="text-ink-faint text-xs">{publicPageReason}</p> : null}
       </SummaryAside>
     </div>
+  )
+}
+
+/*
+  通知概要の状態は1つの定義から描く。文字だけ変えて成功色のままにすると、
+  未設定・確認中・取得失敗まで設定済みと同じ緑になる(監査 DETAIL-19)。
+  色が見分けにくくてもアイコンと文字で区別できるようにする。
+*/
+type NotificationRowState = 'configured' | 'unset' | 'pending' | 'failed'
+
+const NOTIFICATION_ROW_STATE: Record<
+  NotificationRowState,
+  { label: string; icon: typeof CheckCircle2; tone: 'success' | 'neutral' | 'pending' | 'danger' }
+> = {
+  configured: { label: '設定済み', icon: CheckCircle2, tone: 'success' },
+  unset: { label: '未設定', icon: Circle, tone: 'neutral' },
+  pending: { label: '—（確認中）', icon: LoaderCircle, tone: 'pending' },
+  failed: { label: '取得できません', icon: TriangleAlert, tone: 'danger' },
+}
+
+function notificationRowState(
+  value: boolean | undefined,
+  ready: boolean,
+  failed: boolean,
+): NotificationRowState {
+  if (!ready) return 'pending'
+  if (failed) return 'failed'
+  return value ? 'configured' : 'unset'
+}
+
+function NotificationStateBadge({ state }: { state: NotificationRowState }) {
+  const view = NOTIFICATION_ROW_STATE[state]
+  const Icon = view.icon
+  /*
+    className は静的に読める字面だけで書く（design-debt 計測が識別子を
+    追えないため）。色の対応は NOTIFICATION_ROW_STATE の tone が持ち、
+    ここはその言い換えに留める。
+  */
+  return (
+    <span
+      className={
+        view.tone === 'success'
+          ? 'inline-flex items-center gap-1.5 text-xs font-semibold text-success'
+          : view.tone === 'neutral'
+            ? 'inline-flex items-center gap-1.5 text-xs font-semibold text-ink-faint'
+            : view.tone === 'pending'
+              ? 'inline-flex items-center gap-1.5 text-xs font-semibold text-ink-secondary'
+              : 'inline-flex items-center gap-1.5 text-xs font-semibold text-danger'
+      }
+    >
+      <Icon aria-hidden="true" size={14} />
+      {view.label}
+    </span>
   )
 }
 
@@ -1124,11 +1233,14 @@ function NotificationDesignStep({ webinarId, webinarTitle, registrations, public
     }
   }
 
-  const enabled = (value: boolean | undefined) => {
-    if (!settingsReady) return '—（確認中）'
-    if (settingsFailed) return '取得できません'
-    return value ? '設定済み' : '未設定'
-  }
+
+  const registrationState = notificationRowState(settings?.registrationEnabled, settingsReady, settingsFailed)
+  const dayBeforeState = notificationRowState(settings?.dayBeforeEnabled, settingsReady, settingsFailed)
+  const reminderState = notificationRowState(
+    Boolean(settings?.dayBeforeEnabled || settings?.hourBeforeEnabled),
+    settingsReady,
+    settingsFailed,
+  )
 
   return (
     <div className="flex flex-col gap-4 xl:flex-row" data-design-node="Ho8z4">
@@ -1137,8 +1249,8 @@ function NotificationDesignStep({ webinarId, webinarTitle, registrations, public
           <h2 className="text-ink text-base font-bold">事前案内</h2>
           <p className="text-ink-faint mt-1 text-xs">申込直後・前日・1時間前の案内を設定します。</p>
           <dl className="divide-hairline mt-4 divide-y rounded-control border border-hairline">
-            <div className="flex items-center justify-between gap-4 px-4 py-4"><div><dt className="text-ink text-sm font-bold">申込完了</dt><dd className="text-ink-faint mt-1 text-xs">申込完了直後に案内を送信</dd></div><span className="text-success text-xs font-semibold">{enabled(settings?.registrationEnabled)}</span></div>
-            <div className="flex items-center justify-between gap-4 px-4 py-4"><div><dt className="text-ink text-sm font-bold">開催前日</dt><dd className="text-ink-faint mt-1 text-xs">LINEでリマインド</dd></div><span className="text-success text-xs font-semibold">{enabled(settings?.dayBeforeEnabled)}</span></div>
+            <div className="flex items-center justify-between gap-4 px-4 py-4"><div><dt className="text-ink text-sm font-bold">申込完了</dt><dd className="text-ink-faint mt-1 text-xs">申込完了直後に案内を送信</dd></div><NotificationStateBadge state={registrationState} /></div>
+            <div className="flex items-center justify-between gap-4 px-4 py-4"><div><dt className="text-ink text-sm font-bold">開催前日</dt><dd className="text-ink-faint mt-1 text-xs">LINEでリマインド</dd></div><NotificationStateBadge state={dayBeforeState} /></div>
           </dl>
         </section>
         <section className="border-hairline bg-canvas rounded-card border p-4 shadow-card">
@@ -1161,8 +1273,8 @@ function NotificationDesignStep({ webinarId, webinarTitle, registrations, public
         <EditorDetails label="通知ごとの送信設定を編集する"><WebinarNotifications key={notifAttempt} webinarId={webinarId} onLoaded={handleNotificationsLoaded} onDirtyChange={onDirtyChange} registerSave={registerSave} /></EditorDetails>
       </div>
       <SummaryAside rows={[
-        ['申込完了', enabled(settings?.registrationEnabled)],
-        ['リマインド', settings?.dayBeforeEnabled || settings?.hourBeforeEnabled ? 'リマインド中' : !settingsReady ? '—（確認中）' : settingsFailed ? '取得できません' : '未設定'],
+        ['申込完了', NOTIFICATION_ROW_STATE[registrationState].label],
+        ['リマインド', reminderState === 'configured' ? 'リマインド中' : NOTIFICATION_ROW_STATE[reminderState].label],
         ['対象', registrations === null ? '—（未取得）' : `${registrations.toLocaleString('ja-JP')}人`],
       ]} previewBody={editor?.notificationMessages.registration || notificationPreview(null).empty}>
         <div className="flex gap-2"><Button disabled={testing || notificationTestDone || testDisabledReason !== null} title={notificationTestDone ? 'テスト済みです' : testDisabledReason ?? undefined} onClick={() => setTestConfirmOpen(true)}>{testing ? '送信中…' : notificationTestDone ? 'テスト送信済み' : 'テスト送信'}</Button>{canOpenPublicPage && publicUrl ? <Button href={publicUrl} target="_blank" rel="noreferrer">公開ページを見る</Button> : <Button disabled title={publicPageReason}>公開ページを見る</Button>}</div>
@@ -2315,7 +2427,7 @@ function EditWebinarInner() {
   )
 }
 
-export default function EditWebinarPage() {
+function EditWebinarPage() {
   return (
     <Suspense
       fallback={
@@ -2329,3 +2441,14 @@ export default function EditWebinarPage() {
     </Suspense>
   )
 }
+
+const EditWebinarPageWithTestSupport = Object.assign(EditWebinarPage, {
+  __testing: {
+    NOTIFICATION_ROW_STATE,
+    NotificationStateBadge,
+    VideoMediaLabel,
+    notificationRowState,
+  },
+})
+
+export default EditWebinarPageWithTestSupport

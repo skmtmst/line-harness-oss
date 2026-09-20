@@ -57,7 +57,6 @@ export default function EventForm({ accountId, eventId }: EventFormProps) {
   const [saving, setSaving] = useState(false)
   const [loading, setLoading] = useState(true)
   const [toast, setToast] = useState<string | null>(null)
-  const [copied, setCopied] = useState(false)
   const [copiedValue, setCopiedValue] = useState<string | null>(null)
   const [tags, setTags] = useState<Array<{ id: string; name: string }>>([])
 
@@ -206,18 +205,6 @@ export default function EventForm({ accountId, eventId }: EventFormProps) {
       )
     } finally {
       setSaving(false)
-    }
-  }
-
-  async function copyLiffUrl() {
-    if (!liffUrl) return
-    try {
-      await navigator.clipboard.writeText(liffUrl)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
-    } catch {
-      // 予約URL欄が隣に読取専用で置いてあるので何も出さない(点検#520の軽15)。
-      // 書けない環境では欄を押して範囲選択し、手でコピーできる。
     }
   }
 
