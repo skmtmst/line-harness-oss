@@ -1,5 +1,5 @@
 import { adminSessionHeaders, clearAdminSession } from './admin-session'
-import { AUTH_SELECTION_CLEARED_KEY } from './hq-navigation'
+import { resetAuthSelectionCleared } from './hq-navigation'
 
 /**
  * ログアウト。共通トップバーと、統括の左下アカウントメニューが同じものを呼ぶ。
@@ -28,7 +28,7 @@ export async function logoutAndGoToLogin(loginPath: string = '/login'): Promise<
     localStorage.removeItem('lh_staff_role')
     localStorage.removeItem('lh_staff_permissions')
     localStorage.removeItem('lh_staff_view_permissions')
-    sessionStorage.removeItem(AUTH_SELECTION_CLEARED_KEY)
+    resetAuthSelectionCleared(localStorage, sessionStorage)
   } catch {
     // ストレージが使えなくても、行き先だけは変える
   }

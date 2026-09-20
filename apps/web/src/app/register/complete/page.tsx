@@ -10,7 +10,7 @@ import ListState from '@/components/shared/list-state'
 import { TextField } from '@/components/shared/text-field'
 import { storeAdminSession } from '@/lib/admin-session'
 import { authRequest, confirmError, passwordError, readDeviceMarker, storeDeviceMarker } from '@/lib/auth-email'
-import { AUTH_SELECTION_CLEARED_KEY } from '@/lib/hq-navigation'
+import { resetAuthSelectionCleared } from '@/lib/hq-navigation'
 
 /**
  * 会員登録の本登録。★V6 36-4-B（`jk88n`、カード `oVX3x`）。
@@ -82,7 +82,7 @@ function CompleteInner() {
       return
     }
     storeDeviceMarker(res.data.deviceMarker)
-    sessionStorage.removeItem(AUTH_SELECTION_CLEARED_KEY)
+    resetAuthSelectionCleared(localStorage, sessionStorage)
     // オーナーは二段階認証が必須（N-426）。設定画面へ進み、完了後にセッションが出る。
     if (res.data.twoFactorSetup && res.data.challengeToken) {
       window.location.assign(`/login/two-factor/setup#${new URLSearchParams({ lh_2fa: res.data.challengeToken }).toString()}`)

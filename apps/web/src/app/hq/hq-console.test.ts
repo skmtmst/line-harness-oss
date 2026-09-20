@@ -52,9 +52,12 @@ describe('統括コンソール', () => {
     expect(accountList).toContain('設定')
   })
 
-  it('ログインは選択中アカウントを保存して識別子なしのトップへ移動する', () => {
+  it('ログインは選択中アカウントを保存し、戻り先があれば元の画面へ戻る', () => {
     expect(page).toContain('setSelectedAccountId(accountId)')
-    expect(page).toContain("router.push('/')")
+    // 店舗未選択ゲートから来たときは return の画面へ戻す（NEXT-07）。
+    // 外部URLなどを受け付けないよう、検証は resolveStoreReturnPath 1か所。
+    expect(page).toContain('resolveStoreReturnPath')
+    expect(page).toContain("router.push(back ?? '/')")
     expect(page).not.toContain('?account')
     expect(page).not.toContain('?store')
   })
