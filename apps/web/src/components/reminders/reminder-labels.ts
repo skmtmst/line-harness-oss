@@ -7,7 +7,9 @@ export function reminderTriggerLabel(triggerType: ReminderDraftSettings['trigger
     case 'booking':
       return '予約日時'
     case 'event':
-      return 'イベント'
+      // #996 DEEP-04: event起点は「イベントへの予約の開始日時」。回答フォームの
+      // 回答日ではないので、保存される意味と同じ名前にそろえる。
+      return 'イベントの予約日時'
     case 'friend_field':
       return '友だち情報欄の日付'
     default:

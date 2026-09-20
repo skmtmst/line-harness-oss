@@ -454,7 +454,22 @@ function CarouselEditorInner() {
                   {(panels[1]?.actions || panels[0]?.actions || []).map((action, index) => <p key={index} className="border-hairline mt-2 rounded-control border p-2 text-center text-sm text-accent">{action.label}</p>)}
                 </div>
               </div>
-              <button type="button" className="bg-canvas text-ink rounded-control mt-4 w-full px-4 py-2 text-sm font-semibold">自分に送って確かめる</button>
+              {/*
+                NEXT-24: テンプレートのテスト送信口はまだ無い。押せる見た目の
+                まま置くと「送れた」と誤解するので、押せない形にして理由と
+                代替の手順を添える。
+              */}
+              <button
+                type="button"
+                disabled
+                title="この画面からのテスト送信にはまだ対応していません"
+                className="bg-canvas text-ink rounded-control mt-4 w-full px-4 py-2 text-sm font-semibold opacity-50"
+              >
+                自分に送って確かめる
+              </button>
+              <p className="text-on-accent/80 mt-2 text-xs leading-relaxed">
+                この画面からのテスト送信にはまだ対応していません。保存して一斉配信に組み込むと、配信の画面からテスト送信できます。
+              </p>
             </section>
           </aside>
           <div className="bg-canvas rounded-card border-hairline border p-5">
