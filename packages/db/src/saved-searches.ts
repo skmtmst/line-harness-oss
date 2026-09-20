@@ -1,4 +1,5 @@
 import { jstNow } from './utils.js';
+import { isSavedSearchOpAllowed } from '@line-crm/shared';
 import type {
   SavedSearchCondition as SearchCondition,
   SavedSearchConditions as SearchConditions,
@@ -154,13 +155,22 @@ export function validateSearchConditions(
       if (typeof c.op !== 'string' || c.op === '') {
         return { ok: false, error: '条件に op がありません' };
       }
+      /*
+        実行側（saved-search-filter のSQL変換）が解釈できない op を
+        ここで断る。以前は「op が空でない」だけを見ていたため、
+        `field` + `gte` のような保存は通るが検索で拒否される条件が
+        作れた。保存した本人はもう画面を離れているので、形の検査で
+        実行可否まで一致させる（ATTR-13）。
+      */
+      if (!isSavedSearchOpAllowed(String(c.kind), c.op)) {
+        return {
+          ok: false,
+          error: `条件「${String(c.kind)}」では使えない比較方法です（${c.op}）`,
+        };
+      }
       list.push(c as unknown as SearchCondition);
     }
     out[group] = list;
-  }
-
-  if ((out.all?.length ?? 0) === 0 && (out.any?.length ?? 0) === 0) {
-    return { ok: false, error: '条件が1つもありません' };
   }
 
   if (obj.visibility !== undefined) {
@@ -168,6 +178,16 @@ export function validateSearchConditions(
       return { ok: false, error: '表示状態の指定が正しくありません' };
     }
     out.visibility = obj.visibility as SearchConditions['visibility'];
+  }
+
+  /*
+   * 「表示中のみ」「非表示のみ」はそれだけで意味のある絞り込みなので、
+   * all/any が空でも受け取る（#1010 FRIEND-01）。'all' は絞り込み無しと
+   * 同じなので、それだけの条件はこれまで通り弾く。
+   */
+  if ((out.all?.length ?? 0) === 0 && (out.any?.length ?? 0) === 0
+      && (out.visibility === undefined || out.visibility === 'all')) {
+    return { ok: false, error: '条件が1つもありません' };
   }
 
   if (obj.description !== undefined) {
