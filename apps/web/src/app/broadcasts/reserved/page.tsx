@@ -269,8 +269,8 @@ function ReservedBroadcastContent() {
         #985 CHK-03: 右の390pxは「次にできること」欄。狭い幅では
         固定の右列で本文が潰れるので、1列に畳んで下へ並べる。
       */}
-      <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,1fr)_390px]">
-        <section id="reservation-summary" style={{ minHeight: 760 }} className="bg-canvas border-hairline rounded-card border px-6 py-8 text-center shadow-sm">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
+        <section id="reservation-summary" style={{ minHeight: 760 }} className="bg-canvas border-hairline rounded-card min-w-0 flex-1 border px-6 py-8 text-center shadow-sm">
           <span className="bg-accent-soft text-accent mx-auto flex h-14 w-14 items-center justify-center rounded-full">
             <CalendarCheck2 size={28} aria-hidden="true" />
           </span>
@@ -307,7 +307,7 @@ function ReservedBroadcastContent() {
           </div>
         </section>
 
-        <aside className="bg-canvas border-hairline rounded-card border p-4 shadow-sm">
+        <aside className="bg-canvas border-hairline rounded-card shrink-0 border p-4 shadow-sm lg:w-97.5">
           <h2 className="text-ink text-base font-bold">次にできること</h2>
           <p className="text-ink-faint mt-1 text-xs">予約後も開始前まで確認・取消できます。</p>
           <div className="mt-4 grid gap-2">

@@ -38,7 +38,7 @@ function IconButton({
 export function DragHandle({ label = '並び替える', ...rest }: Base & { label?: string }) {
   return (
     <IconButton label={label} grip {...rest}>
-      <svg className={styles.icon} viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+      <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden>
         <circle cx="9" cy="6" r="1.6" />
         <circle cx="15" cy="6" r="1.6" />
         <circle cx="9" cy="12" r="1.6" />
@@ -58,7 +58,7 @@ export function DragHandle({ label = '並び替える', ...rest }: Base & { labe
 export function DeleteAction({ label = '削除する', ...rest }: Base & { label?: string }) {
   return (
     <IconButton label={label} tone="danger" {...rest}>
-      <svg className={styles.icon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden>
         <path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
     </IconButton>
@@ -71,7 +71,7 @@ export function DeleteAction({ label = '削除する', ...rest }: Base & { label
 export function MoreAction({ label = 'そのほかの操作', ...rest }: Base & { label?: string }) {
   return (
     <IconButton label={label} {...rest}>
-      <svg className={styles.icon} viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+      <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden>
         <circle cx="5" cy="12" r="1.8" />
         <circle cx="12" cy="12" r="1.8" />
         <circle cx="19" cy="12" r="1.8" />
@@ -128,15 +128,12 @@ export type RowActionsProps = {
 
 function RowActionButton({ action, defaultLabel }: { action: RowAction; defaultLabel: string }) {
   const label = action.label ?? defaultLabel
-  if ('href' in action && action.href !== undefined) {
-    return (
-      <Button href={action.href} className={styles.rowButton}>
-        {label}
-      </Button>
-    )
-  }
+  const props =
+    'href' in action && action.href !== undefined
+      ? { href: action.href }
+      : { onClick: action.onClick, disabled: action.disabled }
   return (
-    <Button onClick={action.onClick} disabled={action.disabled} className={styles.rowButton}>
+    <Button {...props} className={styles.rowButton}>
       {label}
     </Button>
   )

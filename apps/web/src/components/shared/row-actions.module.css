@@ -39,7 +39,8 @@
   outline-offset: 2px;
 }
 
-.icon {
+/* 中のアイコンは18px。ボタンの直下に置くのでクラスは振らない。 */
+.action > svg {
   width: 18px; /* width: 18 */
   height: 18px; /* height: 18 */
 }
