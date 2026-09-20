@@ -12,6 +12,8 @@
  * ペットの正本は LINE 側（nen_pet_profiles）。主食のカロリーは nen_feeding_products。
  */
 
+import { isFeedingSupportedAnimal, toPetAnimalType } from '../lib/nen-pet-species.js';
+
 export type AnimalType = 'dog' | 'cat';
 export type ActivityLevel = 'low' | 'normal' | 'high';
 export type LifeStage = 'young' | 'adult' | 'senior';
@@ -327,7 +329,13 @@ export type PetFeedingRow = {
 export function planForPetRow(row: PetFeedingRow, products: FeedingProductRow[], today: Date = new Date(), treatLimitPercent = DEFAULT_TREAT_LIMIT_PERCENT): FeedingPlan | null {
   const weightKg = Number(row.weight_kg);
   if (!Number.isFinite(weightKg) || weightKg <= 0) return null;
-  const animalType: AnimalType = row.animal_type === 'cat' ? 'cat' : 'dog';
+  /*
+   * DEEP-24: NRC／FEDIAF の係数は犬・猫専用。「その他」の動物へ犬の式を
+   * 暗黙に当てない（計算対象外として null を返し、画面側で理由を出す）。
+   */
+  const species = toPetAnimalType(row.animal_type);
+  if (!isFeedingSupportedAnimal(species)) return null;
+  const animalType: AnimalType = species;
   return feedingPlan({
     animalType, weightKg, birthday: row.birthday ?? null,
     neutered: neuteredFromRow(row.neutered),

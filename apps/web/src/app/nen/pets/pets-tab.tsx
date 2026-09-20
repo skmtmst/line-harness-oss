@@ -13,7 +13,7 @@ import KpiCollapse from '@/components/ui/kpi-collapse'
 import { ActionCell, DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { TextField } from '@/components/shared/text-field'
 import { ApiError, api } from '@/lib/api'
-import { nenPetsApi, type NenPetListData, type NenPetRow, type NenPetSort, type NenPetWeightFilter } from '@/lib/nen-pets-api'
+import { nenPetsApi, petAnimalTypeLabel, type NenPetListData, type NenPetRow, type NenPetSort, type NenPetWeightFilter } from '@/lib/nen-pets-api'
 import PetEditor from './pet-editor'
 
 type ListStatus = 'loading' | 'ready' | 'error' | 'forbidden'
@@ -192,7 +192,7 @@ export default function PetsTab({
 
 function PetRow({ pet, canEdit, onEdit }: { pet: NenPetRow; canEdit: boolean; onEdit: () => void }) {
   const initial = (pet.name || '?').slice(0, 1)
-  const kind = pet.animalType === 'cat' ? '猫' : pet.animalType === 'other' ? 'その他' : '犬'
+  const kind = petAnimalTypeLabel(pet.animalType)
   return (
     <Tr>
       <Td>
@@ -229,7 +229,8 @@ function PetRow({ pet, canEdit, onEdit }: { pet: NenPetRow; canEdit: boolean; on
         ) : (
           <>
             <span className="block text-label text-ink-secondary">—</span>
-            <span className="block text-micro text-ink-faint">{pet.weightKg == null ? '体重が未登録' : '誕生日が未登録'}</span>
+            {/* #999 DEEP-24: 犬・猫以外はNRC/FEDIAFの計算対象外。犬の式で出した数値を見せない。 */}
+            <span className="block text-micro text-ink-faint">{pet.animalType === 'other' ? '犬・猫以外は目安の計算対象外' : pet.weightKg == null ? '体重が未登録' : '誕生日が未登録'}</span>
           </>
         )}
       </Td>
@@ -264,7 +265,7 @@ function PetRow({ pet, canEdit, onEdit }: { pet: NenPetRow; canEdit: boolean; on
  */
 function PetCard({ pet, canEdit, onEdit }: { pet: NenPetRow; canEdit: boolean; onEdit: () => void }) {
   const initial = (pet.name || '?').slice(0, 1)
-  const kind = pet.animalType === 'cat' ? '猫' : pet.animalType === 'other' ? 'その他' : '犬'
+  const kind = petAnimalTypeLabel(pet.animalType)
   return (
     <li className="p-4">
       <div className="flex min-w-0 items-start gap-3">
@@ -288,6 +289,9 @@ function PetCard({ pet, canEdit, onEdit }: { pet: NenPetRow; canEdit: boolean; o
         <p className="mt-2 text-xs text-ink-secondary">
           今日の目安 <span className="font-semibold tabular-nums text-ink">{pet.feeding.dailyGrams}g／日</span>
         </p>
+      ) : pet.animalType === 'other' ? (
+        /* #999 DEEP-24: 犬・猫以外は目安の計算対象外と明示する（犬の数値を見せない）。 */
+        <p className="mt-2 text-xs text-ink-faint">今日の目安は犬・猫のみ計算できます</p>
       ) : null}
       {/* 操作はカードの下の行。縮まない・折れない。 */}
       <div className="mt-3 flex items-center gap-2 border-t border-hairline pt-3" data-design="CardActions">

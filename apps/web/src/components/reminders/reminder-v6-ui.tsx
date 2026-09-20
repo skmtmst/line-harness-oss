@@ -91,9 +91,11 @@ export function ReminderFooter({ status = '下書き保存', secondary, primary,
   )
 }
 
-export function Choice({ selected, title, note, onClick }: { selected: boolean; title: string; note?: string; onClick: () => void }) {
-  return <button type="button" className={selected ? styles.choiceActive : styles.choice} onClick={onClick}><span>{selected ? '●' : '○'}</span><strong>{title}</strong>{note ? <small>{note}</small> : null}</button>
-}
+/*
+ * #999 DEEP-02: 1つだけ選ぶ選択カードは共通の RadioCard / RadioCardGroup
+ * （components/shared/radio-card）を使う。ここにあった ●・○ の文字を
+ * 置いた button は、radio の役割・選択状態を支援技術へ伝えなかったため撤去。
+ */
 
 export function ReminderButton(props: ButtonProps) {
   return <Button {...props} className={[styles.smallButton, props.className].filter(Boolean).join(' ')} />

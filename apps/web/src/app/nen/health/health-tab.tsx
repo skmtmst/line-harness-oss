@@ -12,7 +12,7 @@ import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { TextField } from '@/components/shared/text-field'
 import { ApiError } from '@/lib/api'
 import {
-  nenPetsApi, type NenHealthChangeFilter, type NenHealthKpis, type NenHealthLastFilter, type NenHealthListData, type NenHealthRow, type NenHealthSort,
+  nenPetsApi, petAnimalTypeLabel, type NenHealthChangeFilter, type NenHealthKpis, type NenHealthLastFilter, type NenHealthListData, type NenHealthRow, type NenHealthSort,
 } from '@/lib/nen-pets-api'
 
 type ListStatus = 'loading' | 'ready' | 'error' | 'forbidden'
@@ -190,7 +190,8 @@ function WeightBars({ series, warn }: { series: Array<number | null>; warn: bool
 
 function HealthRow({ row, onOpenSummary }: { row: NenHealthRow; onOpenSummary: (petId: string) => void }) {
   const initial = (row.pet.name || '?').slice(0, 1)
-  const kind = row.pet.animalType === 'cat' ? '猫' : '犬'
+  // #999 DEEP-24: 「その他」を犬へ変換しない（共通の動物種別ラベル）。
+  const kind = petAnimalTypeLabel(row.pet.animalType)
   const weightWarn = row.changes.some((c) => c.key === 'weight_drop' || c.key === 'weight_gain')
   return (
     <Tr>

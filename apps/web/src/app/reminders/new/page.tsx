@@ -11,7 +11,8 @@ import SelectField from '@/components/shared/select-field'
 import { TextArea, TextInput } from '@/components/shared/form-controls'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import { useAccount } from '@/contexts/account-context'
-import { Choice, Field, LinePreview, ReminderFooter, ReminderPanel, ReminderWizard, ReminderWorkspace, SummaryCard } from '@/components/reminders/reminder-v6-ui'
+import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
+import { Field, LinePreview, ReminderFooter, ReminderPanel, ReminderWizard, ReminderWorkspace, SummaryCard } from '@/components/reminders/reminder-v6-ui'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import styles from './page.module.css'
 
@@ -368,7 +369,16 @@ export default function NewReminderPage() {
         </ReminderPanel>
         {/* #996 DEEP-04: 「フォーム回答日」は実際にはイベント予約の開始日時を保存する。表示を実装に合わせる。 */}
         <ReminderPanel title="基準日の選択" note="予約日時・友だち情報欄の日付・イベントの予約日時から選べます。">
-          <div className={`${styles.baseChoices} grid gap-2 md:grid-cols-3`}><Choice selected={triggerType === 'booking'} title="予約日時を基準にする" note="予約管理・Google Meet相談の日時に連動します。" onClick={() => chooseTriggerType('booking')} /><Choice selected={triggerType === 'friend_field'} title="友だち情報欄の日付" note="誕生日・契約終了日など、日付型の情報欄を選びます。" onClick={() => chooseTriggerType('friend_field')} /><Choice selected={triggerType === 'event'} title="イベントの予約日時" note="イベントへの予約が入った開始日時を起点にします。" onClick={() => chooseTriggerType('event')} /></div>
+          {/*
+            #999 DEEP-02: 1つだけ選ぶ群は共通のラジオカード（本物の input[type=radio]）。
+            ●・○の文字を置いた button は選択状態を支援技術へ伝えなかった。
+            群名はパネルの見出しと同じ「基準日の選択」を legend へ渡す。
+          */}
+          <RadioCardGroup legend="基準日の選択" className={`${styles.baseChoices} grid gap-2 md:grid-cols-3`}>
+            <RadioCard name="reminder-trigger-type" value="booking" checked={triggerType === 'booking'} title="予約日時を基準にする" note="予約管理・Google Meet相談の日時に連動します。" onChange={() => chooseTriggerType('booking')} />
+            <RadioCard name="reminder-trigger-type" value="friend_field" checked={triggerType === 'friend_field'} title="友だち情報欄の日付" note="誕生日・契約終了日など、日付型の情報欄を選びます。" onChange={() => chooseTriggerType('friend_field')} />
+            <RadioCard name="reminder-trigger-type" value="event" checked={triggerType === 'event'} title="イベントの予約日時" note="イベントへの予約が入った開始日時を起点にします。" onChange={() => chooseTriggerType('event')} />
+          </RadioCardGroup>
           {triggerType === 'friend_field' ? (
             <div className="mt-3">
               <Field label="基準日に使う情報欄" required note="日付・日時型の項目だけを表示しています">
