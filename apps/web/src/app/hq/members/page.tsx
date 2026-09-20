@@ -12,7 +12,7 @@ import NoteBar from '@/components/shared/note-bar'
 import StickyBar from '@/components/shared/sticky-bar'
 import SummaryCard from '@/components/shared/summary-card'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
-import { Tabs } from '@/components/shared/tabs'
+import ScrollableTabs from '@/components/layout/scrollable-tabs'
 import { TextField } from '@/components/shared/text-field'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { api, ApiError } from '@/lib/api'
@@ -173,7 +173,8 @@ function MembersInner() {
   return (
     <div data-design-node="CRL4w" className="flex flex-col gap-4">
       <div data-design="Tabs" data-design-node="oGWXI">
-        <Tabs
+        {/* U091: 右にはみ出すタブへ届くよう、横スクロール＋端の送りボタン付き。 */}
+        <ScrollableTabs
           items={[
             { label: '権限者', current: tab === 'members', onClick: () => changeTab('members') },
             { label: '統括の情報', current: tab === 'tenant', onClick: () => changeTab('tenant') },
@@ -219,6 +220,93 @@ function MembersInner() {
             ) : restricted ? (
               <ListState kind="forbidden" title="全アカウントの担当者だけが権限者を管理できます" description="担当アカウントが限定されているため、権限者の一覧と変更はできません。" />
             ) : (
+              <>
+              {/*
+                U042: 768px 未満では表の右端の「変更」へ横スクロールしないと
+                届かなかった。スマホでは名前＋役割・状態＋操作が先に見える
+                カードにし、メールや最終ログインは開いて確認する形にする。
+              */}
+              <ul className="divide-y divide-hairline rounded-card border border-hairline bg-canvas md:hidden" data-design="Table">
+                {rows.map((member) => {
+                  const state = memberStatus(member)
+                  const isSelf = member.id === me?.id
+                  return (
+                    <li key={member.id} className="p-4">
+                      <div className="flex min-w-0 items-center gap-2.5">
+                        <span
+                          aria-hidden="true"
+                          className={
+                            isSelf
+                              ? 'flex h-7 w-7 shrink-0 items-center justify-center rounded-pill bg-ink text-caption font-bold text-on-accent'
+                              : 'flex h-7 w-7 shrink-0 items-center justify-center rounded-pill bg-accent-soft text-caption font-bold text-accent-deep'
+                          }
+                        >
+                          {(member.name || '?').slice(0, 1).toUpperCase()}
+                        </span>
+                        <span className="min-w-0 flex-1 truncate text-label font-semibold text-ink" title={member.name}>
+                          {member.name}
+                          {isSelf ? '（あなた）' : ''}
+                        </span>
+                      </div>
+                      <div className="mt-2 flex flex-wrap items-center gap-2">
+                        <span
+                          className={
+                            member.role === 'owner' || member.role === 'admin'
+                              ? 'inline-flex h-5.5 items-center rounded-pill bg-status-info-soft px-2 text-nano font-bold text-status-info'
+                              : 'inline-flex h-5.5 items-center rounded-pill bg-shell px-2 text-nano font-bold text-ink-secondary'
+                          }
+                        >
+                          {ROLE_LABELS[member.role]}
+                        </span>
+                        <span
+                          className={
+                            state === 'active'
+                              ? 'inline-flex h-5.5 items-center rounded-pill bg-accent-soft px-2 text-nano font-bold text-accent-deep'
+                              : state === 'invited'
+                                ? 'inline-flex h-5.5 items-center rounded-pill bg-status-warn-soft px-2 text-nano font-bold text-status-warn-deep'
+                                : state === 'expired'
+                                  ? 'inline-flex h-5.5 items-center rounded-pill bg-status-danger-soft px-2 text-nano font-bold text-status-danger'
+                                  : 'inline-flex h-5.5 items-center rounded-pill bg-step-idle px-2 text-nano font-bold text-ink-secondary'
+                          }
+                        >
+                          {STATUS_LABELS[state]}
+                        </span>
+                      </div>
+                      {canManage ? (
+                        <div className="mt-3 flex items-center gap-4">
+                          {canResendInvite(member) ? (
+                            <button
+                              type="button"
+                              disabled={resendingId === member.id}
+                              onClick={() => void resend(member)}
+                              className="text-label font-semibold text-accent-deep hover:underline disabled:opacity-50"
+                            >
+                              {resendingId === member.id ? '送信中…' : '招待メールを再送'}
+                            </button>
+                          ) : null}
+                          <button
+                            type="button"
+                            onClick={() => { setDialogError(''); setDialog({ open: true, member }) }}
+                            aria-label={`${member.name}さんの権限を変更`}
+                            className="text-label font-semibold text-accent-deep hover:underline"
+                          >
+                            権限を変更
+                          </button>
+                        </div>
+                      ) : null}
+                      <details className="mt-3">
+                        <summary className="cursor-pointer text-xs font-semibold text-ink-secondary">詳しい情報を見る</summary>
+                        <dl className="mt-2 space-y-1 text-xs">
+                          <div className="flex justify-between gap-3"><dt className="text-ink-faint">メールアドレス</dt><dd className="min-w-0 truncate text-ink-secondary" title={member.email ?? ''}>{member.email ?? '—'}</dd></div>
+                          <div className="flex justify-between gap-3"><dt className="text-ink-faint">担当範囲</dt><dd className="min-w-0 truncate text-ink" title={scopeLabel(member, accountNames)}>{scopeLabel(member, accountNames)}</dd></div>
+                          <div className="flex justify-between gap-3"><dt className="text-ink-faint">最終ログイン</dt><dd className="text-ink-faint">{lastLoginLabel(lastLogins[member.id])}</dd></div>
+                        </dl>
+                      </details>
+                    </li>
+                  )
+                })}
+              </ul>
+              <div className="hidden md:block">
               <DataTable>
                 <thead>
                   <TableHeadRow>
@@ -314,6 +402,8 @@ function MembersInner() {
                   })}
                 </tbody>
               </DataTable>
+              </div>
+              </>
             )}
           </section>
 

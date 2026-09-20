@@ -2,7 +2,7 @@
 
 import { useRouter, useSearchParams } from 'next/navigation'
 import type { ReactNode } from 'react'
-import { Tabs } from '../shared/tabs'
+import ScrollableTabs from './scrollable-tabs'
 import styles from './merged-tabs.module.css'
 
 /**
@@ -64,10 +64,14 @@ export default function MergedTabs({
   }
 
   if (variant === 'underline') {
+    /*
+      右にはみ出す分は横スクロール＋端の送りボタンで届くようにする（U091）。
+      見た目は共通の Tabs のまま。
+    */
     return (
-      <Tabs
+      <div className={styles.shared}>
+      <ScrollableTabs
         actions={actions}
-        className={styles.shared}
         items={tabs.map((tab) => ({
           label: tab.label,
           current: active === tab.key,
@@ -75,6 +79,7 @@ export default function MergedTabs({
           onClick: () => goTo(tab),
         }))}
       />
+      </div>
     )
   }
 

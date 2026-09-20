@@ -3,7 +3,7 @@
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Suspense, useCallback, useEffect, useState } from 'react'
 import PageHeader from '@/components/shared/page-header'
-import { Tabs } from '@/components/shared/tabs'
+import ScrollableTabs from '@/components/layout/scrollable-tabs'
 import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { ApiError } from '@/lib/api'
@@ -66,7 +66,8 @@ function MembersInner() {
     <div data-design-node="IqL2Z" className="flex flex-col gap-4">
       <PageHeader breadcrumb={[{ label: '専用機能' }, { label: '会員' }]} title="会員" description="" />
       <div data-design="Tabs" data-design-node="AG3tX">
-        <Tabs
+        {/* U091: 右にはみ出すタブへ届くよう、横スクロール＋端の送りボタン付き。 */}
+        <ScrollableTabs
           items={[
             { label: '会員一覧', count: settings?.kpis.members, current: tab === 'members', onClick: () => changeTab('members') },
             { label: 'ランク設定', current: tab === 'ranks', onClick: () => changeTab('ranks') },

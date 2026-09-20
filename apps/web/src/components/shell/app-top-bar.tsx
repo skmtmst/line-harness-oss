@@ -92,6 +92,15 @@ export default function AppTopBar() {
 
   return (
     <>
+    {/*
+      1280px 未満では畳む。現在地はモバイルの固定ヘッダーが持つ
+      （U037/U038）。TopBar 自身のクラスではなく無印の div で包む:
+      部品側の display 指定（CSS Module）より utilities の hidden が
+      負ける書き方を避けるため。xl は Tailwind 既定の 1280px。
+      アカウント一覧の失敗帯はこの下に別で出すので、モバイルでも
+      失敗だけは見える。
+    */}
+    <div className="hidden xl:block">
     <TopBar
       title={shownTitle}
       // Masato の確定待ち。空のうちは押せない見た目にする（`docs/v6-common-rules.md` §11-2）。
@@ -105,6 +114,7 @@ export default function AppTopBar() {
       userName={staffName}
       onLogout={logout}
     />
+    </div>
     {accountsLoadFailed ? (
       <div role="alert" className="flex items-center justify-center gap-3 border-b border-hairline bg-danger-bg px-4 py-2 text-sm text-danger">
         <span>LINEアカウントの一覧を読み込めませんでした。</span>
