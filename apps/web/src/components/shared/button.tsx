@@ -9,7 +9,12 @@ import type {
 import styles from './button.module.css'
 
 type CommonProps = {
-  variant?: 'primary' | 'secondary'
+  /**
+   * `danger` は確定ダイアログの削除・解除などに使う赤。
+   * `#976` U077/U084: 危険操作は共通ボタンの1役割として持ち、
+   * 画面ごとの直書き赤（濃さがバラバラだった）を1本にする。
+   */
+  variant?: 'primary' | 'secondary' | 'danger'
   size?: 'standard' | 'field'
   className?: string
   children: ReactNode

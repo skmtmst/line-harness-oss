@@ -11,7 +11,7 @@ import SelectField from '@/components/shared/select-field'
 import StatusBadge from '@/components/shared/status-badge'
 import StickyBar from '@/components/shared/sticky-bar'
 import { TextField } from '@/components/shared/text-field'
-import { Field } from '@/components/shared/form-controls'
+import { Field, RequiredBadge } from '@/components/shared/form-controls'
 import { CareCard } from '@/components/shared/side-cards'
 import {
   CARE_ITEMS,
@@ -128,7 +128,7 @@ function RecipeClone() {
                   」のようになります。同じレシピを何度も使うとき、どれがどれか分かりやすくなります。
                 </p>
                 <label className={styles.accountLabel} htmlFor="recipe-clone-account">
-                  どのLINEアカウントに作るか（必須）
+                  どのLINEアカウントに作るか<RequiredBadge />
                 </label>
                 <SelectField
                   id="recipe-clone-account"

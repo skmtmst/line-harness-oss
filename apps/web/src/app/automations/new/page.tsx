@@ -11,6 +11,7 @@ import Breadcrumb from '@/components/shared/breadcrumb'
 import StickyBar from '@/components/shared/sticky-bar'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { TextArea, TextField } from '@/components/shared/text-field'
+import { RequiredBadge } from '@/components/shared/form-controls'
 import { CareCard, FeatureLinkCard } from '@/components/shared/side-cards'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { useAccount } from '@/contexts/account-context'
@@ -267,7 +268,7 @@ function ResourcePickRow(props: {
   return (
     <div className={styles.field}>
       <label className={styles.label} htmlFor={id}>
-        {title}<span className={styles.required}>必須</span>
+        {title}<RequiredBadge />
       </label>
       <div className={styles.field}>
         <SelectField
@@ -825,7 +826,7 @@ export default function NewAutomationPage() {
 
             <div className="mt-4 grid items-center gap-3 lg:grid-cols-3">
               <label className={styles.label} htmlFor="au-name">
-                名前（あとで見分けるため）<span className={styles.required}>必須</span>
+                名前（あとで見分けるため）<RequiredBadge />
                 <span className="mt-1 block text-xs font-normal text-ink-faint">どのルールか。一覧に表示される名前です。</span>
               </label>
               <div className="lg:col-span-2">
@@ -919,7 +920,7 @@ export default function NewAutomationPage() {
                   <div className="grid gap-3 lg:grid-cols-2">
                   <div className={styles.field}>
                     <label className={styles.label} htmlFor={`au-action-${row.key}`}>
-                      すること<span className={styles.required}>必須</span>
+                      すること<RequiredBadge />
                     </label>
                     <div className={styles.field}>
                       <SelectField
@@ -973,7 +974,7 @@ export default function NewAutomationPage() {
                   ) : (
                     <div className={styles.field}>
                       <label className={styles.label} htmlFor={`au-message-${row.key}`}>
-                        送る文面<span className={styles.required}>必須</span>
+                        送る文面<RequiredBadge />
                       </label>
                       <div className={styles.field}>
                         <TextArea

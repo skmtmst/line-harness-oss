@@ -485,6 +485,7 @@ function RuleEditor({ rule, onChange, tags, fields, marks, scenarios }: RuleEdit
               value={String(v.text ?? '')}
               onChange={(e) => onChange({ type: rule.type, value: { ...v, text: e.target.value } })}
               placeholder="半角スペースで区切るといずれかに一致"
+              aria-label="名前に含む文字"
               className={inputClass}
             />
           </div>
@@ -531,6 +532,7 @@ function RuleEditor({ rule, onChange, tags, fields, marks, scenarios }: RuleEdit
           <input
             value={String(rule.value ?? '')}
             onChange={(e) => onChange({ type: rule.type, value: e.target.value })}
+            aria-label={rule.type === 'private_memo' ? '個別メモに含む文字' : 'ステータスメッセージに含む文字'}
             className={inputClass}
           />
         </div>
@@ -547,6 +549,7 @@ function RuleEditor({ rule, onChange, tags, fields, marks, scenarios }: RuleEdit
             type="date"
             value={String(v.from ?? '')}
             onChange={(e) => onChange({ type: rule.type, value: { ...v, from: e.target.value } })}
+            aria-label={rule.type === 'registered_at' ? '友だち登録日の開始' : '最終反応日の開始'}
             className={selectClass}
           />
           <span className="text-ink-faint text-sm">〜</span>
@@ -554,6 +557,7 @@ function RuleEditor({ rule, onChange, tags, fields, marks, scenarios }: RuleEdit
             type="date"
             value={String(v.to ?? '')}
             onChange={(e) => onChange({ type: rule.type, value: { ...v, to: e.target.value } })}
+            aria-label={rule.type === 'registered_at' ? '友だち登録日の終了' : '最終反応日の終了'}
             className={selectClass}
           />
         </div>
@@ -631,6 +635,7 @@ function RuleEditor({ rule, onChange, tags, fields, marks, scenarios }: RuleEdit
             <input
               value={String(v.text ?? '')}
               onChange={(e) => onChange({ type: rule.type, value: { ...v, text: e.target.value } })}
+              aria-label="比べる値"
               className={inputClass}
             />
           )}
@@ -680,6 +685,7 @@ function RuleEditor({ rule, onChange, tags, fields, marks, scenarios }: RuleEdit
             value={String(rule.value ?? '')}
             onChange={(e) => onChange({ type: rule.type, value: e.target.value })}
             placeholder="フォームID（空ならどれかに回答した人）"
+            aria-label="回答フォームのID"
             className={inputClass}
           />
         </div>
@@ -709,6 +715,7 @@ function RuleEditor({ rule, onChange, tags, fields, marks, scenarios }: RuleEdit
             value={typeof v.min === 'number' ? v.min : ''}
             onChange={(e) => onChange({ type: rule.type, value: { ...v, min: e.target.value === '' ? null : Number(e.target.value) } })}
             placeholder="下限なし"
+            aria-label="行動スコアの下限"
           />
           <span className="text-ink-faint text-sm">点以上〜</span>
           <TextField
@@ -717,6 +724,7 @@ function RuleEditor({ rule, onChange, tags, fields, marks, scenarios }: RuleEdit
             value={typeof v.max === 'number' ? v.max : ''}
             onChange={(e) => onChange({ type: rule.type, value: { ...v, max: e.target.value === '' ? null : Number(e.target.value) } })}
             placeholder="上限なし"
+            aria-label="行動スコアの上限"
           />
           <span className="text-ink-faint text-sm">点以下</span>
         </div>

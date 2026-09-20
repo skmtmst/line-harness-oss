@@ -9,6 +9,7 @@ import type {
 } from '@line-crm/shared'
 import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
+import { RequiredBadge } from '@/components/shared/form-controls'
 import {
   canSubmitDecision,
   decisionNote,
@@ -200,7 +201,7 @@ export default function IdentityDecisionDialog({
 
         <div className={styles.field}>
           <label className={styles.fieldLabel} htmlFor="identity-reason">
-            判定の理由（必須）
+            判定の理由<RequiredBadge />
           </label>
           <textarea
             id="identity-reason"

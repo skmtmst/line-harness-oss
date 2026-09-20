@@ -7,6 +7,7 @@ import type { MediaItem } from '@line-crm/shared'
 import { useAccount } from '@/contexts/account-context'
 import StickyBar from '@/components/shared/sticky-bar'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { RequiredBadge } from '@/components/shared/form-controls'
 import { webinarErrorText } from './webinar-error-text'
 
 const DAYS = ['日', '月', '火', '水', '木', '金', '土']
@@ -193,9 +194,7 @@ export default function WebinarForm({ initial }: WebinarFormProps) {
         <div>
           <label className={labelClass}>
             タイトル
-            <span className="bg-danger-bg text-danger rounded-pill ml-1.5 px-1.5 py-0.5 text-[10px]">
-              必須
-            </span>
+            <RequiredBadge />
           </label>
           <input
             value={title}

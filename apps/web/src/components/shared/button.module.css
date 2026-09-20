@@ -3,24 +3,39 @@
   align-items: center;
   justify-content: center;
   gap: 6px;
-  height: 36px;
   padding: 9px 13px;
   border: 1px solid;
   border-radius: var(--radius-control);
-  font-size: var(--text-label);
+  /*
+   * #976 U079/U083: ボタンの文字は入力欄と同じ `$size-body`(14px)。
+   * 以前は `$size-label`(13px) で、同じ行に並ぶ入力欄より小さかった。
+   */
+  font-size: var(--text-body);
   font-weight: 600;
   white-space: nowrap;
   cursor: pointer;
   transition: background-color 120ms ease-out, border-color 120ms ease-out, filter 120ms ease-out;
 }
 
-/* Pencilの通常ボタンは36px。選択欄として使う押し口だけ入力欄と同じ40px。 */
+/*
+ * #976 U083: PC標準は40pxにそろえる（入力欄・検索欄と同じ高さ）。
+ * Pencil V5の実測は36pxだったが、共通デザイン仕様（監査 #976）で
+ * 「主要ボタン・入力・検索・選択はPC 40px」と決め直した。
+ */
 .standard {
-  height: 36px;
+  height: 40px;
 }
 
 .field {
   height: 40px;
+}
+
+/* タッチ端末は指の当たり判定のため44pxを確保する（#976 U083）。 */
+@media (pointer: coarse) {
+  .standard,
+  .field {
+    min-height: 44px;
+  }
 }
 
 .button[hidden] {
@@ -71,4 +86,23 @@
 
 .secondary:hover:not(:disabled) {
   background: var(--color-canvas-sunken);
+}
+
+/*
+ * 危険操作（削除・解除）。`$danger`(#b3261e) + 白文字。
+ *
+ * #976 U077/U084: 以前は `$status-danger`(#e5484d) の画面が多く、
+ * 白文字で 3.4:1 しか取れなかった。`$danger` なら 5.9:1。
+ * `$status-danger` は小さな印（チップ・バッジの文字）用の色で、
+ * 白文字が乗る面には使わない——主ボタンの `$accent` → `$accent-deep`
+ * と同じ考え方。
+ */
+.danger {
+  border-color: var(--color-danger);
+  background: var(--color-danger);
+  color: var(--color-on-accent);
+}
+
+.danger:hover:not(:disabled) {
+  filter: brightness(0.92);
 }
