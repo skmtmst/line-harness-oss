@@ -69,6 +69,12 @@ function MigrateFriendField() {
   const [checking, setChecking] = useState(false)
   const [executing, setExecuting] = useState(false)
   const [error, setError] = useState('')
+  /*
+    ATTR-11: 一覧の取得失敗は「移行元が見つかりません」とは別の状態。
+    読み込みに失敗しただけで項目が消えたわけではないので、
+    再試行できる失敗として出す。
+  */
+  const [loadError, setLoadError] = useState('')
 
   /*
     ATTR-10: 確認中に種類・名前・移行先を変えても、古い確認結果が
@@ -80,6 +86,7 @@ function MigrateFriendField() {
   accountRef.current = selectedAccountId
   const pollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
+  const [reloadTick, setReloadTick] = useState(0)
   useEffect(() => {
     if (!selectedAccountId) {
       setLoading(false)
@@ -87,10 +94,11 @@ function MigrateFriendField() {
     }
     let active = true
     setLoading(true)
+    setLoadError('')
     void api.friendFields.list(selectedAccountId, { withUsage: true })
       .then((res) => {
         if (!active) return
-        if (!res.success) throw new Error(res.error)
+        if (!res.success) throw new ApiError(0, res.error, 'load_failed')
         setFields(res.data)
         const source = res.data.find((item) => item.id === sourceId)
         if (source) {
@@ -99,10 +107,13 @@ function MigrateFriendField() {
           setTargetType(source.type)
         }
       })
-      .catch((reason) => { if (active) setError(reason instanceof ApiError ? reason.message : '項目を読み込めませんでした') })
+      .catch((reason) => {
+        // ATTR-11: 失敗は loadError へ。項目未発見（!source）と混ぜない。
+        if (active) setLoadError(reason instanceof ApiError && reason.status === 403 ? '友だち情報欄を見る権限がありません。オーナーか管理者に確認してください。' : '項目を読み込めませんでした')
+      })
       .finally(() => { if (active) setLoading(false) })
     return () => { active = false }
-  }, [selectedAccountId, sourceId])
+  }, [selectedAccountId, sourceId, reloadTick])
 
   /*
     アカウント・移行元が変わったら、確認結果・実行状態・作った項目の
@@ -115,6 +126,13 @@ function MigrateFriendField() {
     setIdempotencyKey(null)
     setRun(null)
     setCreatedTarget(null)
+    /*
+      TECH-07: 飛んでいる確認・実行を捨てたら、ボタンの「確認中…
+      実行中…」も捨てる。世代を止めてもフラグが残ると、
+      いつまでも押せない画面になる。
+    */
+    setChecking(false)
+    setExecuting(false)
     if (pollTimerRef.current) { clearTimeout(pollTimerRef.current); pollTimerRef.current = null }
   }, [selectedAccountId, sourceId])
 
@@ -218,6 +236,20 @@ function MigrateFriendField() {
       <div className="mt-3"><Button href="/tags?tab=fields">友だち情報欄の一覧へ戻る</Button></div>
     </div>
   )
+  /*
+    ATTR-11: 「読み込めなかった」と「移行元が無い」を分ける。
+    通信失敗は再試行でき、項目が本当に無い（消された・URLが古い）
+    ときだけ一覧へ戻す導線を出す。
+  */
+  if (loadError) return (
+    <div data-design-node="KoT6c" role="alert" className="rounded-control border border-danger/20 bg-danger-bg p-4 text-sm text-danger">
+      {loadError}
+      <div className="mt-3 flex gap-2">
+        <Button type="button" onClick={() => setReloadTick((tick) => tick + 1)}>もう一度読み込む</Button>
+        <Button href="/tags?tab=fields">友だち情報欄の一覧へ戻る</Button>
+      </div>
+    </div>
+  )
   if (!source) return (
     <div data-design-node="KoT6c" role="alert" className="rounded-control border border-danger/20 bg-danger-bg p-4 text-sm text-danger">
       移行元の項目が見つかりません。友だち情報欄の一覧から選び直してください。
@@ -240,9 +272,17 @@ function MigrateFriendField() {
       </div>
       {error ? <p role="alert" className="mb-4 rounded-control border border-danger/20 bg-danger-bg p-3 text-sm text-danger">{error}</p> : null}
 
-      <div data-design="Fields" className="grid gap-4 xl:grid-cols-3 xl:items-stretch">
+      {/*
+        ATTR-25: 比較は「元 1fr ／ 矢印 44px ／ 先 1fr」。
+        以前は3等分で矢印がカードと同じ幅を食い、1280未満では矢印が
+        横のまま潰れていた。狭い画面では下向き矢印で縦に読む。
+      */}
+      <div data-design="Fields" className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_44px_minmax(0,1fr)] xl:items-stretch">
         <FieldSummary title="いま使っている項目" field={source} kind="source" />
-        <div className="flex items-center justify-center text-2xl text-ink-faint" aria-hidden="true">→</div>
+        <div className="flex items-center justify-center text-2xl text-ink-faint" aria-hidden="true">
+          <span className="xl:hidden">↓</span>
+          <span className="hidden xl:block">→</span>
+        </div>
         <section className="rounded-card border border-accent/30 bg-canvas p-5 shadow-sm">
           <p className="text-xs font-semibold text-accent">移行先の項目</p>
           {target ? (

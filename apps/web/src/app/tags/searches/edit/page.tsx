@@ -214,10 +214,21 @@ function ConditionEditor({
       ) : condition.kind === 'chat_status' ? (
         <Select aria-label="対応状況" value={rawValue} onChange={(value) => onChange({ ...condition, value })} options={[{ value: '', label: '対応状況を選ぶ' }, { value: 'unread', label: '未対応' }, { value: 'in_progress', label: '対応中' }, { value: 'on_hold', label: '保留' }, { value: 'resolved', label: '対応済み' }]} className="min-w-44 flex-1" />
       ) : condition.kind === 'created_at' ? (
-        <div className="flex min-w-80 flex-1 items-center gap-2">
-          <TextInput type="date" value={typeof condition.value === 'object' && condition.value ? String((condition.value as { from?: string }).from ?? '') : ''} onChange={(event) => onChange({ ...condition, op: 'between', value: { ...(typeof condition.value === 'object' ? condition.value : {}), from: event.target.value } })} className="flex-1" />
-          <span className="text-ink-faint">〜</span>
-          <TextInput type="date" value={typeof condition.value === 'object' && condition.value ? String((condition.value as { to?: string }).to ?? '') : ''} onChange={(event) => onChange({ ...condition, op: 'between', value: { ...(typeof condition.value === 'object' ? condition.value : {}), to: event.target.value } })} className="flex-1" />
+        /*
+          ATTR-16: 390pxでは開始/終了を縦に積み、それぞれラベルを付ける。
+          以前の `min-w-80` はカードの最小幅を押し広げて、条件名・共有範囲
+          まで画面の外へはみ出していた。
+        */
+        <div className="flex min-w-0 flex-1 flex-wrap items-end gap-2">
+          <label className="min-w-40 flex-1 text-xs font-semibold text-ink-faint">
+            開始日
+            <TextInput type="date" value={typeof condition.value === 'object' && condition.value ? String((condition.value as { from?: string }).from ?? '') : ''} onChange={(event) => onChange({ ...condition, op: 'between', value: { ...(typeof condition.value === 'object' ? condition.value : {}), from: event.target.value } })} className="mt-1 w-full" />
+          </label>
+          <span className="pb-2 text-ink-faint" aria-hidden="true">〜</span>
+          <label className="min-w-40 flex-1 text-xs font-semibold text-ink-faint">
+            終了日
+            <TextInput type="date" value={typeof condition.value === 'object' && condition.value ? String((condition.value as { to?: string }).to ?? '') : ''} onChange={(event) => onChange({ ...condition, op: 'between', value: { ...(typeof condition.value === 'object' ? condition.value : {}), to: event.target.value } })} className="mt-1 w-full" />
+          </label>
         </div>
       ) : (
         <TextInput value={rawValue} onChange={(event) => onChange({ ...condition, value: event.target.value })} placeholder="値を入力" className="min-w-44 flex-1" />
@@ -481,8 +492,12 @@ function SavedSearchEditInner() {
 
       {error ? <p role="alert" className="mb-4 rounded-control border border-status-danger-border bg-status-danger-soft p-3 text-sm text-danger">{error}</p> : null}
 
-      <div className="grid gap-4 xl:grid-cols-4">
-        <div className="space-y-4 xl:col-span-3">
+      {/*
+        ATTR-16: グリッド子は `min-w-0` で縮める。無いと中身の最小幅が
+        そのまま段の最小幅になり、390pxで右端が画面の外へ出る。
+      */}
+      <div className="grid min-w-0 gap-4 xl:grid-cols-4">
+        <div className="min-w-0 space-y-4 xl:col-span-3">
           <section className="rounded-card border border-hairline bg-canvas p-4 shadow-card">
             <h2 className="text-base font-bold text-ink">条件名・説明</h2>
             <div className="mt-3 grid gap-3">
@@ -491,7 +506,8 @@ function SavedSearchEditInner() {
             </div>
             <fieldset className="mt-4">
               <legend className="text-xs font-semibold text-ink-faint">共有範囲</legend>
-              <div className="mt-2 flex gap-6 text-sm text-ink-secondary">
+              {/* ATTR-16: 狭い画面では縦に折り返す。横に伸ばして画面をはみ出させない。 */}
+              <div className="mt-2 flex flex-wrap gap-x-6 gap-y-2 text-sm text-ink-secondary">
                 <label className="flex items-center gap-2"><input type="radio" checked={isShared} onChange={() => setIsShared(true)} /> 全員（他の担当者からも使えます）</label>
                 <label className="flex items-center gap-2"><input type="radio" checked={!isShared} onChange={() => setIsShared(false)} /> 自分だけ</label>
               </div>
@@ -514,7 +530,7 @@ function SavedSearchEditInner() {
           <ConditionGroup title="いずれか1つ以上満たす" operator="OR" items={conditions.any ?? []} tags={tags} marks={marks} scenarios={scenarios} fields={fields} referenceErrors={referenceErrors} onChange={(any) => patchConditions({ ...conditions, any })} />
         </div>
 
-        <aside className="space-y-4">
+        <aside className="min-w-0 space-y-4">
           <section className="rounded-card border border-hairline bg-canvas p-4 shadow-card">
             <h2 className="text-base font-bold text-ink">該当プレビュー</h2>
             <p className="mt-3 text-3xl font-bold tabular-nums text-ink">{previewCount === null ? '—' : `${previewCount.toLocaleString('ja-JP')}人`}</p>

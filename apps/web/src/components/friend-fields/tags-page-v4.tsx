@@ -19,6 +19,7 @@ import FriendFieldList from './field-list'
 import SupportMarkList from './mark-list'
 import SavedSearchList from './saved-search-list'
 import ReorderGrip from './reorder-grip'
+import { mergeVisibleOrder } from './reorder-utils'
 import TagCsvImportDialog from './tag-csv-import-dialog'
 import { FeatureDisabledScreen } from '@/components/feature-disabled-gate'
 import { useFeatureVisibility } from '@/lib/use-feature-visibility'
@@ -736,6 +737,22 @@ export default function TagsPageV4({
     ? cleanupItems.filter((tag) => tag.cleanupReasons?.includes('unused')).length
     : null
 
+  /*
+    タグの並び替えも残り3一覧と同じ考え方（#1014 ATTR-02/03）。
+    - 絞り込み中は見えている行だけを入れ替え、隠れた行の位置を保つ
+      （以前の `?? 9999` ソートは、見えない行を全部末尾へ飛ばしていた）
+    - 失敗した並びは元に戻す。`void load()` で読み直すと `load` の
+      先頭で `error` が消え、失敗が成功に見えた
+  */
+  const applyTagOrder = async (order: string[]) => {
+    const previous = items
+    const result = await api.tags.reorder(order)
+    if (!result.success) {
+      setItems(previous)
+      setError(`並び順を保存できませんでした（${result.error}）`)
+    }
+  }
+
   const move = async (targetId: string) => {
     if (!dragId || dragId === targetId) return setDragId(null)
     const order = filtered.map((tag) => tag.id)
@@ -743,10 +760,9 @@ export default function TagsPageV4({
     setDragId(null)
     if (from < 0 || to < 0) return
     order.splice(to, 0, ...order.splice(from, 1))
-    const rank = new Map(order.map((id, index) => [id, index]))
-    setItems((current) => [...current].sort((a, b) => (rank.get(a.id) ?? 9999) - (rank.get(b.id) ?? 9999)))
-    const result = await api.tags.reorder(order)
-    if (!result.success) { setError(result.error); void load() }
+    const visibleNext = order.map((id) => items.find((tag) => tag.id === id)).filter(Boolean) as Tag[]
+    setItems(mergeVisibleOrder(items, visibleNext))
+    await applyTagOrder(order)
   }
 
   /** つまみにフォーカスして ↑/↓。表示中の並びで1つ動かす（N-049）。 */
@@ -756,10 +772,9 @@ export default function TagsPageV4({
     const to = from + direction
     if (from < 0 || to < 0 || to >= order.length) return
     order.splice(to, 0, ...order.splice(from, 1))
-    const rank = new Map(order.map((tid, index) => [tid, index]))
-    setItems((current) => [...current].sort((a, b) => (rank.get(a.id) ?? 9999) - (rank.get(b.id) ?? 9999)))
-    const result = await api.tags.reorder(order)
-    if (!result.success) { setError(result.error); void load() }
+    const visibleNext = order.map((tid) => items.find((tag) => tag.id === tid)).filter(Boolean) as Tag[]
+    setItems(mergeVisibleOrder(items, visibleNext))
+    await applyTagOrder(order)
   }
 
   /** 友だち一覧への表示（★）。設計 `zMlMX`。押した瞬間に切り替える。版付き(#715)。 */
@@ -811,15 +826,23 @@ export default function TagsPageV4({
         }))}
         actions={currentTabBlocked ? undefined : tab === 'tags' && status !== 'forbidden' ? (
           /*
-            設計 `Sn86o` はここに CSV だけ。作る操作は KPI の下（`HWP5R`）。
+            設計 `Sn86o` はここに CSV。「＋ タグを追加」は ATTR-22 で
+            他のタブと同じくタブ行の右端へ寄せた（`HWP5R` との2箇所を
+            やめ、主要作成はどのタブでも同じ位置・同じ見た目にする）。
             `H374MR` から確認 `sfTEW`、完了 `op1rh`、一部失敗 `QzRsJ`
             まで同じ操作の中で進む。
           */
-          <Button type="button" onClick={() => setCsvOpen(true)}>CSVで一括登録</Button>
+          <span className="flex items-center gap-2">
+            <Button type="button" onClick={() => setCsvOpen(true)}>CSVで一括登録</Button>
+            <Button href="/tags/new" variant="primary">＋ タグを追加</Button>
+          </span>
         ) : tab === 'marks' ? (
           <Button href="/tags/marks/new" variant="primary">＋ マークを追加</Button>
         ) : tab === 'fields' ? (
           <Button href="/tags/fields/new" variant="primary">＋ 項目を追加</Button>
+        ) : tab === 'searches' ? (
+          /* 検索の作成は友だち一覧の絞り込みから保存する（#1014 ATTR-23）。 */
+          <Button href="/friends" variant="primary">友だち一覧で条件を作る</Button>
         ) : undefined}
       />
         </div>
@@ -893,14 +916,34 @@ export default function TagsPageV4({
         {status === 'forbidden' ? null : (
           <div className="mb-4 flex items-center gap-2">
             <Button href="/tags/folders/new">フォルダを追加</Button>
-            <Button href="/tags/new" variant="primary">＋ タグを追加</Button>
+            {/* 「＋ タグを追加」はタブ行の右端へ移動した（#1014 ATTR-22）。 */}
           </div>
         )}
         {notice && <Notice className="mb-4" tone="success" message={notice} onClose={() => setNotice('')} />}
         {error && <p className="mb-4 rounded-control border border-danger/20 bg-danger-bg p-3 text-sm text-danger">{error}</p>}
         {/* 設計 `HrwyW` は gap 14、フォルダは 240 固定（`DgeL8`）。 */}
         <div className="grid min-w-0 gap-[14px] xl:grid-cols-[240px_minmax(0,1fr)]">
-          <FolderList groups={groups} items={items} countsKnown={ready} active={folder} onSelect={setFolder} onChanged={() => void load()} />
+          {/*
+            ATTR-20: 1280px未満ではフォルダ帯を折り畳む。中身を隠すのではなく、
+            同じ絞り込みをセレクトで受け、帯は「開く」まで畳んでおく。
+          */}
+          <div className="xl:hidden">
+            <select
+              aria-label="フォルダで絞る"
+              value={folder}
+              onChange={(event) => setFolder(event.target.value)}
+              className="v6-select h-10 w-full rounded-control border border-hairline bg-canvas pl-3 text-label font-semibold text-ink"
+            >
+              <option value="">フォルダ：すべて（{ready ? items.length : '—'}件）</option>
+              {groups.map((group) => (
+                <option key={group.id} value={group.id}>{group.name}</option>
+              ))}
+              <option value={UNGROUPED}>未分類</option>
+            </select>
+          </div>
+          <div className="hidden xl:block">
+            <FolderList groups={groups} items={items} countsKnown={ready} active={folder} onSelect={setFolder} onChanged={() => void load()} />
+          </div>
           <main className="min-w-0">
             {/*
               検索・選択は最長の表示内容と矢印余白を確保し、残る幅は検索欄へ渡す。
@@ -937,19 +980,24 @@ export default function TagsPageV4({
               出さない」を破る。逃がす先を表の中に閉じる。
             */}
             <div className={`overflow-hidden rounded-card border border-hairline bg-canvas ${cardShadow}`}>
+              {/*
+                ATTR-20: 1024pxで9列がつぶれて横スクロールになっていた。
+                「登録日」はタグ名の下へ折り畳み、列を1つ減らす。
+                狭い画面では表だけが横に逃げる（情報を落とさないための例外）。
+              */}
               <div className="overflow-x-auto">
-              <table className="w-full min-w-[1040px] table-fixed text-sm">
+              {/* 960px以上は表。それ未満は縦に重ねたカードへ（#1014 ATTR-20）。 */}
+              <table className="hidden w-full min-w-[880px] table-fixed text-sm md:table">
                 {/* 設計 `HrwyW` の見出し。「表示」は★、「操作」はゴミ箱だけ。 */}
                 <thead className="border-b border-hairline bg-canvas-sunken text-[11px] text-ink-faint">
                   <tr>
                     <th className="w-9 px-2 py-3" />
-                    <th className="w-[19%] px-3 py-3 text-left">タグ</th>
-                    <th className="w-[10%] px-3 py-3 text-left">フォルダ</th>
+                    <th className="w-[22%] px-3 py-3 text-left">タグ</th>
+                    <th className="w-[11%] px-3 py-3 text-left">フォルダ</th>
                     <th className="w-[7%] px-3 py-3 text-left">付与人数</th>
                     <th className="w-[11%] px-3 py-3 text-left">自動付与のもと</th>
-                    <th className="w-[20%] px-3 py-3 text-left">連動（マイル・アクション）</th>
-                    <th className="w-[12%] px-3 py-3 text-left">使用先</th>
-                    <th className="w-[9%] px-3 py-3 text-left">登録日</th>
+                    <th className="w-[19%] px-3 py-3 text-left">連動（マイル・アクション）</th>
+                    <th className="px-3 py-3 text-left">使用先</th>
                     <th className="w-[6%] px-3 py-3 text-left">表示</th>
                     <th className="w-[6%] px-3 py-3 text-left">操作</th>
                   </tr>
@@ -962,17 +1010,17 @@ export default function TagsPageV4({
                     読み込みに失敗したときも同じ文が出る（PR #216 と同じ壊れ方）。
                   */}
                   {status === 'loading' || staleAccount ? (
-                    <tr><td colSpan={10} className="p-0"><ListState kind="loading" /></td></tr>
+                    <tr><td colSpan={9} className="p-0"><ListState kind="loading" /></td></tr>
                   ) : status === 'forbidden' ? (
-                    <tr><td colSpan={10} className="p-0"><ListState kind="forbidden" description="タグを見るには権限が要ります。オーナーか管理者に追加を依頼してください。" /></td></tr>
+                    <tr><td colSpan={9} className="p-0"><ListState kind="forbidden" description="タグを見るには権限が要ります。オーナーか管理者に追加を依頼してください。" /></td></tr>
                   ) : status === 'error' ? (
-                    <tr><td colSpan={10} className="p-0"><ListState kind="error" description="タグを読み込めませんでした。再読み込みしても直らない場合はエラー報告へ。" onRetry={() => void load()} /></td></tr>
+                    <tr><td colSpan={9} className="p-0"><ListState kind="error" description="タグを読み込めませんでした。再読み込みしても直らない場合はエラー報告へ。" onRetry={() => void load()} /></td></tr>
                   ) : items.length === 0 ? (
                     // まだ1件も作っていない。「条件を変える」は言えない。
-                    <tr><td colSpan={10} className="p-0"><ListState kind="empty" title="まだタグがありません" description="「＋ タグを追加」から最初の1つを作ると、ここに並びます。" /></td></tr>
+                    <tr><td colSpan={9} className="p-0"><ListState kind="empty" title="まだタグがありません" description="「＋ タグを追加」から最初の1つを作ると、ここに並びます。" /></td></tr>
                   ) : visible.length === 0 ? (
                     // 作ってはあるが、いまの絞り込みに合うものが無い。
-                    <tr><td colSpan={10} className="p-0"><ListState kind="empty" title="条件に合うタグはありません" description="検索語・フォルダ・絞り込みを変えてください。" /></td></tr>
+                    <tr><td colSpan={9} className="p-0"><ListState kind="empty" title="条件に合うタグはありません" description="検索語・フォルダ・絞り込みを変えてください。" /></td></tr>
                   ) : visible.map((tag) => {
                     const group = groups.find((item) => item.id === tag.groupId)
                     const chips = linkChips(tag)
@@ -1000,6 +1048,8 @@ export default function TagsPageV4({
                             {/* 保管済みは一覧に出続けるが、開くと名前と説明しか直せない(#710)。 */}
                             {tag.status === 'archived' && <span className="shrink-0 rounded-pill bg-canvas-sunken px-2 py-0.5 text-micro font-bold text-ink-faint">保管済み</span>}
                           </div>
+                          {/* ATTR-20: 登録日は名前の下へ畳む。独立した列にすると1024pxでつぶれる。 */}
+                          <p className="mt-0.5 pl-4 text-[11px] text-ink-faint">{formatDate(tag.createdAt)} 登録</p>
                         </td>
                         <td className="px-3 py-3">
                           <FolderSelect tag={tag} groups={groups} onItemsChange={setItems} onError={setError} />
@@ -1016,7 +1066,6 @@ export default function TagsPageV4({
                           </div>
                         </td>
                         <td className="truncate px-3 py-3 text-label text-ink">{usageLabel(tag)}</td>
-                        <td className="px-3 py-3 text-label text-ink">{formatDate(tag.createdAt)}</td>
                         <td className="px-3 py-3">
                           {/* 設計 `zMlMX`。押すと友だち一覧への表示を切り替える。 */}
                           <button
@@ -1040,6 +1089,69 @@ export default function TagsPageV4({
                   })}
                 </tbody>
               </table>
+              </div>
+              {/*
+                960px未満は縦に重ねたカード（#1014 ATTR-20）。
+                表をそのまま小さくすると名前と操作が両立しない。
+                読込・失敗・0件の案内は表と同じ言葉で出す。
+              */}
+              <div className="md:hidden">
+                {status === 'loading' || staleAccount ? (
+                  <ListState kind="loading" />
+                ) : status === 'forbidden' ? (
+                  <ListState kind="forbidden" description="タグを見るには権限が要ります。オーナーか管理者に追加を依頼してください。" />
+                ) : status === 'error' ? (
+                  <ListState kind="error" description="タグを読み込めませんでした。再読み込みしても直らない場合はエラー報告へ。" onRetry={() => void load()} />
+                ) : items.length === 0 ? (
+                  <ListState kind="empty" title="まだタグがありません" description="「＋ タグを追加」から最初の1つを作ると、ここに並びます。" />
+                ) : visible.length === 0 ? (
+                  <ListState kind="empty" title="条件に合うタグはありません" description="検索語・フォルダ・絞り込みを変えてください。" />
+                ) : (
+                  <ul className="divide-y divide-hairline">
+                    {visible.map((tag) => {
+                      const group = groups.find((item) => item.id === tag.groupId)
+                      const chips = linkChips(tag)
+                      return (
+                        <li key={tag.id} className="px-3 py-3">
+                          <div className="flex items-start gap-2">
+                            <span className="pt-1 text-hairline">
+                              <ReorderGrip label={tag.name} onMove={(direction) => void keyboardMove(tag.id, direction)}><GripIcon /></ReorderGrip>
+                            </span>
+                            <div className="min-w-0 flex-1">
+                              <div className="flex min-w-0 items-center gap-2">
+                                <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: group?.color ?? '#8b938d' }} />
+                                <Link href={`/tags/edit?id=${tag.id}`} className="truncate text-label font-semibold text-status-info hover:underline" title={tag.name}>{tag.name}</Link>
+                                {tag.status === 'archived' && <span className="shrink-0 rounded-pill bg-canvas-sunken px-2 py-0.5 text-micro font-bold text-ink-faint">保管済み</span>}
+                              </div>
+                              <p className="mt-0.5 text-[11px] text-ink-faint">{formatDate(tag.createdAt)} 登録・{sourceLabel(tag)}</p>
+                              {chips.length > 0 ? (
+                                <p className="mt-1 flex flex-wrap gap-1.5">
+                                  {chips.map((chip) => <span key={chip.label} className={`rounded-mini px-[7px] py-[2px] text-micro font-semibold ${chip.tone}`}>{chip.label}</span>)}
+                                </p>
+                              ) : null}
+                              <p className="mt-1 text-xs text-ink-secondary">{tag.friendCount ?? 0}人・{usageLabel(tag)}</p>
+                              <div className="mt-2"><FolderSelect tag={tag} groups={groups} onItemsChange={setItems} onError={setError} /></div>
+                            </div>
+                            <div className="flex shrink-0 items-center gap-2 pt-1">
+                              <button
+                                type="button"
+                                aria-pressed={Boolean(tag.isStarred)}
+                                aria-label={tag.isStarred ? '友だち一覧に表示しない' : '友だち一覧に表示する'}
+                                onClick={() => void toggleStar(tag)}
+                                className={tag.isStarred ? 'text-status-warn-deep' : 'text-hairline hover:text-status-warn-deep'}
+                              >
+                                <StarIcon filled={Boolean(tag.isStarred)} />
+                              </button>
+                              <button type="button" onClick={() => setDeleteTarget(tag)} aria-label={`${tag.name} を削除`} className="text-danger hover:opacity-70">
+                                <TrashIcon />
+                              </button>
+                            </div>
+                          </div>
+                        </li>
+                      )
+                    })}
+                  </ul>
+                )}
               </div>
               {/*
                 設計 `Blot6`。共通部品を使う。ここで自前に組むと、
