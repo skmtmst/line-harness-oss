@@ -308,6 +308,14 @@ describe('分析の対象者種別・期間選択(#835)', () => {
     expect(host.textContent).toContain('参照切れ 1（一部のみ）: 未対応種別を除外')
     expect(host.textContent).toContain('参照切れ 取得失敗: 照合失敗')
     expect(host.textContent).toContain('確認できた参照切れ')
+    /*
+     * #1005: 理由の長文はカードを伸ばさないよう説明アイコンの中へ。
+     * 閉じている間は短い状態だけが見え、開くと全文が読める。
+     */
+    expect(host.textContent).not.toContain('確認できた参照だけの合計です')
+    const descriptionButton = host.querySelector('button[aria-label="確認できた参照切れの説明"]') as HTMLButtonElement | null
+    expect(descriptionButton, '説明アイコンが無い').not.toBeNull()
+    await act(async () => { descriptionButton!.click(); await Promise.resolve() })
     expect(host.textContent).toContain('確認できた参照だけの合計です')
 
     late.resolve(usageOverview('account-a', [
