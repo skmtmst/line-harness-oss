@@ -29,6 +29,29 @@ describe('validateSearchConditions', () => {
     expect(result).toEqual({ ok: false, error: '表示件数が正しくありません' });
   });
 
+  it('対象だけの条件も受け取る（#1010 FRIEND-01）', () => {
+    // 「非表示のみ」はそれだけで意味のある絞り込み。all/any が空でも弾かない。
+    expect(validateSearchConditions({ all: [], any: [], visibility: 'hidden_only' })).toEqual({
+      ok: true,
+      value: { all: [], any: [], visibility: 'hidden_only' },
+    });
+    expect(validateSearchConditions({ visibility: 'visible_only' })).toEqual({
+      ok: true,
+      value: { visibility: 'visible_only' },
+    });
+  });
+
+  it('条件も対象も無い入力はこれまで通り弾く', () => {
+    // 'all'（すべて）は絞り込み無しと同じなので、それだけでは受け取らない。
+    expect(validateSearchConditions({ all: [], any: [] })).toEqual({
+      ok: false,
+      error: '条件が1つもありません',
+    });
+    expect(validateSearchConditions({ all: [], any: [], visibility: 'all' })).toEqual({
+      ok: false,
+      error: '条件が1つもありません',
+    });
+  });
   /*
     ATTR-13: 実行側が解釈できない op は保存の時点で断る。
     以前は「op が空でない」だけを見ていたため、保存は通るのに
