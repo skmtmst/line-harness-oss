@@ -1,9 +1,19 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { SavedSearchCondition, Scenario, Tag } from '@line-crm/shared'
 import { api, type FriendListParams } from '@/lib/api'
-import { friendParamsToSavedConditions, savedSearchSummary } from './saved-search-utils'
+import {
+  conditionsToEditorState,
+  describeSavedCondition,
+  describeSavedVisibility,
+  editorStateToConditions,
+  hasSavedSearchFilter,
+  type FriendSearchBlock,
+  type FriendSearchEditorState,
+  type FriendVisibilityChoice,
+  type SavedSearchConditionLabels,
+} from './saved-search-utils'
 import { TextInput } from '@/components/shared/form-controls'
 import Button from '@/components/shared/button'
 
@@ -19,13 +29,7 @@ import Button from '@/components/shared/button'
  */
 
 /** 絞り込みの1ブロック。設計の「条件」1つぶん。 */
-type Block =
-  | { kind: 'name'; keyword: string }
-  | { kind: 'tag'; include: string[]; exclude: string[] }
-  | { kind: 'field'; key: string; op: 'eq' | 'ne'; value: string }
-  | { kind: 'status_message'; keyword: string }
-  | { kind: 'created_at'; from: string; to: string }
-  | { kind: 'chat_status'; value: 'unread' | 'in_progress' | 'resolved' }
+type Block = FriendSearchBlock
 
 const BLOCK_LABEL: Record<Block['kind'], string> = {
   name: '名前',
@@ -45,23 +49,39 @@ const BLOCK_HELP: Record<Block['kind'], string> = {
   chat_status: '固定の4状態',
 }
 
-/** 新契約が受け取る OR 条件。選択肢が必要な軸だけ、取得前は無効にする。 */
+const PAGE_SIZE_OPTIONS = [10, 20, 30, 40, 50] as const
+
+const VISIBILITY_OPTIONS: Array<{ value: FriendVisibilityChoice; label: string }> = [
+  { value: 'visible', label: '表示中' },
+  { value: 'hidden', label: '非表示のみ' },
+  { value: 'blocked', label: 'ブロックした人' },
+  { value: 'all', label: 'すべて' },
+]
+
+/*
+ * FRIEND-03: ORの軸は「項目→比較方法→値」を自分で選ぶ。
+ * 先頭の候補や固定の日付を勝手に使うと、選んだ覚えのない条件で
+ * 絞り込まれる。値が要る軸は入力が揃うまで「追加」を押せない。
+ */
+type OrAxisInput = 'mark' | 'scenario' | 'date' | 'text' | null
 const OR_AXES: Array<{
   label: string
   feature?: 'support_marks'
-  make: (options: { markId?: string; scenarioId?: string }) => SavedSearchCondition | null
+  input: OrAxisInput
+  placeholder?: string
+  make: (value: string) => SavedSearchCondition | null
 }> = [
-  { label: '対応マーク', feature: 'support_marks', make: ({ markId }) => markId ? { kind: 'mark', op: 'eq', value: markId } : null },
-  { label: 'シナリオ', make: ({ scenarioId }) => scenarioId ? { kind: 'scenario', op: 'eq', value: scenarioId } : null },
-  { label: 'イベント予約', make: () => ({ kind: 'event_booking', op: 'exists' }) },
-  { label: 'カレンダー予約', make: () => ({ kind: 'calendar_booking', op: 'exists' }) },
-  { label: '回答フォーム', make: () => ({ kind: 'form', op: 'exists' }) },
-  { label: '最終反応日', make: () => ({ kind: 'last_activity', op: 'after', value: '2026-01-01' }) },
-  { label: 'リマインダ', make: () => ({ kind: 'reminder', op: 'exists' }) },
-  { label: '個別メモ', make: () => ({ kind: 'memo', op: 'exists' }) },
-  { label: 'ステータスメッセージ', make: () => ({ kind: 'status_message', op: 'contains', value: '登録' }) },
-  { label: '友だち登録日', make: () => ({ kind: 'created_at', op: 'after', value: '2026-01-01' }) },
-  { label: 'その他', make: () => ({ kind: 'common_event', op: 'exists', value: 'conversion' }) },
+  { label: '対応マーク', feature: 'support_marks', input: 'mark', make: (value) => value ? { kind: 'mark', op: 'eq', value } : null },
+  { label: 'シナリオ', input: 'scenario', make: (value) => value ? { kind: 'scenario', op: 'eq', value } : null },
+  { label: 'イベント予約', input: null, make: () => ({ kind: 'event_booking', op: 'exists' }) },
+  { label: 'カレンダー予約', input: null, make: () => ({ kind: 'calendar_booking', op: 'exists' }) },
+  { label: '回答フォーム', input: null, make: () => ({ kind: 'form', op: 'exists' }) },
+  { label: '最終反応日', input: 'date', make: (value) => value ? { kind: 'last_activity', op: 'after', value } : null },
+  { label: 'リマインダ', input: null, make: () => ({ kind: 'reminder', op: 'exists' }) },
+  { label: '個別メモ', input: null, make: () => ({ kind: 'memo', op: 'exists' }) },
+  { label: 'ステータスメッセージ', input: 'text', placeholder: '含む文字', make: (value) => value.trim() ? { kind: 'status_message', op: 'contains', value: value.trim() } : null },
+  { label: '友だち登録日', input: 'date', make: (value) => value ? { kind: 'created_at', op: 'after', value } : null },
+  { label: 'その他', input: 'text', placeholder: 'イベント種別（例：conversion）', make: (value) => value.trim() ? { kind: 'common_event', op: 'exists', value: value.trim() } : null },
 ]
 
 export interface AdvancedSearchResult {
@@ -84,6 +104,21 @@ export interface AdvancedSearchResult {
   >
   /** 画面に「絞り込み中」を出すための、人が読める形 */
   summary: string[]
+  /**
+   * 詳細条件をもう一度開いたとき、この編集状態から再開する（FRIEND-32）。
+   * URL直指定の保存検索など実条件が手元に無い適用では未設定のままにし、
+   * 開いたときに保存済み一覧から引き直す。
+   */
+  editorState?: FriendSearchEditorState
+}
+
+function defaultBlocks(fieldsEnabled: boolean): Block[] {
+  const blocks: Block[] = [
+    { kind: 'name', keyword: '' },
+    { kind: 'tag', include: [], exclude: [] },
+  ]
+  if (fieldsEnabled) blocks.push({ kind: 'field', key: '', op: 'eq', value: '' })
+  return blocks
 }
 
 export default function AdvancedSearchDialog({
@@ -97,6 +132,9 @@ export default function AdvancedSearchDialog({
   onLoadSaved,
   onApply,
   features,
+  applied,
+  initialSort,
+  initialLimit,
 }: {
   open: boolean
   accountId: string | null
@@ -110,30 +148,110 @@ export default function AdvancedSearchDialog({
   onApply: (result: AdvancedSearchResult) => void
   /** 機能設定でオフの入口は出さない。未指定は従来どおり全部出す。 */
   features?: { savedSearch?: boolean; marks?: boolean; fields?: boolean }
+  /**
+   * 現在適用中の条件。開いたときこの編集状態から再開する。
+   * 保存した検索の適用後は、保存された実条件を復元した状態が入る。
+   */
+  applied?: AdvancedSearchResult | null
+  /** 一覧の現在の並び順・表示件数。開いたときの初期値にする。 */
+  initialSort: 'recent' | 'oldest'
+  initialLimit: number
 }) {
   const savedSearchEnabled = features?.savedSearch !== false
   const marksFeatureEnabled = features?.marks !== false
   const fieldsFeatureEnabled = features?.fields !== false
-  const [blocks, setBlocks] = useState<Block[]>([
-    { kind: 'name', keyword: '' },
-    { kind: 'tag', include: [], exclude: [] },
-    { kind: 'field', key: '', op: 'eq', value: '' },
-  ])
-
-  const [visibility, setVisibility] = useState<'' | 'following' | 'blocked'>('following')
+  const [blocks, setBlocks] = useState<Block[]>(() => defaultBlocks(fieldsFeatureEnabled))
+  const [visibility, setVisibility] = useState<FriendVisibilityChoice>('visible')
   const [any, setAny] = useState<SavedSearchCondition[]>([])
-  const [sort, setSort] = useState<'recent' | 'oldest'>('recent')
+  const [extraAll, setExtraAll] = useState<SavedSearchCondition[]>([])
+  const [sort, setSort] = useState<'recent' | 'oldest'>(initialSort)
+  const [limit, setLimit] = useState<number>(initialLimit)
   const [count, setCount] = useState<number | null>(null)
   const [counting, setCounting] = useState(false)
+  const [countFailed, setCountFailed] = useState(false)
+  const countRequestRef = useRef(0)
   const [saveOpen, setSaveOpen] = useState(false)
   const [saveName, setSaveName] = useState('')
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState('')
   const [savedNotice, setSavedNotice] = useState('')
 
+  /** IDや内部名を画面へ出さないための、ID→表示名の辞書。 */
+  const labels = useMemo<SavedSearchConditionLabels>(() => ({
+    marks: Object.fromEntries(marks.map((mark) => [mark.id, mark.name])),
+    scenarios: Object.fromEntries(scenarios.map((scenario) => [scenario.id, scenario.name])),
+  }), [marks, scenarios])
+
+  const editorState = useMemo<FriendSearchEditorState>(
+    () => ({ blocks, any, extraAll, visibility }),
+    [blocks, any, extraAll, visibility],
+  )
+
+  /*
+   * FRIEND-32: 開くたびに「今適用されている条件」から再開する。
+   * 保存した検索の適用直後に開いても、保存条件がブロックへ復元される。
+   * 開いている途中で props が変わっても入力中の状態を捨てないよう、
+   * 閉→開の切り替わりの時だけ初期化する。
+   */
+  const wasOpenRef = useRef(false)
+  useEffect(() => {
+    if (open && !wasOpenRef.current) {
+      const state = applied?.editorState
+      setBlocks(state?.blocks ?? defaultBlocks(fieldsFeatureEnabled))
+      setAny(state?.any ?? [])
+      setExtraAll(state?.extraAll ?? [])
+      setVisibility(state?.visibility ?? 'visible')
+      setSort(initialSort)
+      setLimit(PAGE_SIZE_OPTIONS.includes(initialLimit as (typeof PAGE_SIZE_OPTIONS)[number]) ? initialLimit : 20)
+      setSavedNotice('')
+      setCountFailed(false)
+    }
+    wasOpenRef.current = open
+  }, [open, applied, fieldsFeatureEnabled, initialSort, initialLimit])
+
+  /*
+   * ?savedSearch= の直URLなど、IDだけ分かって実条件が手元に無い適用は、
+   * 開いたときに保存済み一覧から同じIDの条件を引いて復元する。
+   * 見つからなければ空の編集画面のままにし、黙って別条件にしない。
+   */
+  useEffect(() => {
+    const savedId = applied?.params.savedSearchId
+    if (!open || !savedId || applied?.editorState || !accountId || !savedSearchEnabled) return
+    let cancelled = false
+    void api.friendSavedViews.list(accountId, { suppressFeatureDisabledEvent: true }).then((res) => {
+      if (cancelled || !res.success) return
+      const found = res.data.items.find((view) => view.id === savedId)
+      if (!found) return
+      const state = conditionsToEditorState(found.conditions)
+      setBlocks(state.blocks)
+      setAny(state.any)
+      setExtraAll(state.extraAll)
+      setVisibility(state.visibility)
+    }).catch(() => {})
+    return () => { cancelled = true }
+  }, [open, applied, accountId, savedSearchEnabled])
+
   const params = useMemo<AdvancedSearchResult['params']>(() => {
-    const p: AdvancedSearchResult['params'] = { sort }
-    if (visibility) p.visibility = visibility
+    /*
+     * FRIEND-32: 保存した検索から開いて何も変えずに適用し直すときは、
+     * savedSearchId をそのまま残す。条件の中身とIDの同時送信は受け口が
+     * 拒否する。平たい引数も混ぜない —— ?search= は並び順を検索順位へ
+     * 切り替えるので、保存検索の「新しい順/古い順」と食い違う。
+     */
+    const appliedSavedId = applied?.params.savedSearchId
+    if (appliedSavedId
+        && applied?.editorState !== undefined
+        && JSON.stringify(editorState) === JSON.stringify(applied.editorState)) {
+      return { savedSearchId: appliedSavedId, sort, limit }
+    }
+    const p: AdvancedSearchResult['params'] = { sort, limit }
+    /*
+     * 対象は2軸ある。一覧の ?visibility= は is_following（友だち中/ブロック）、
+     * conditions.visibility は is_hidden（表示中/非表示）。1つの選択から
+     * 両方へ意味の通る値だけを出す（FRIEND-01）。
+     */
+    if (visibility === 'visible') p.visibility = 'following'
+    else if (visibility === 'blocked') p.visibility = 'blocked'
     for (const b of blocks) {
       if (b.kind === 'name' && b.keyword.trim()) p.search = b.keyword.trim()
       if (b.kind === 'tag') {
@@ -151,48 +269,76 @@ export default function AdvancedSearchDialog({
       }
       if (b.kind === 'chat_status') p.chatStatus = b.value
     }
-    p.conditions = {
-      ...friendParamsToSavedConditions(p),
-      any,
-      visibility: visibility === 'following' ? 'visible_only' : visibility === '' ? 'hidden_only' : 'all',
+    /*
+     * FRIEND-02: 同じ項目の条件が複数あっても全て残す。
+     * 上の平たい引数（search 等）は1つしか入らない旧い受け口なので、
+     * 実際の絞り込みは conditions が正本。画面・保存・件数は全部これを使う。
+     *
+     * FRIEND-01: 「すべて」で条件も無いときは conditions 自体を送らない。
+     * 空の条件は受け口が弾くので、送らないことが「全員を見る」の正しい形。
+     */
+    const conditions = editorStateToConditions(editorState, { sort, limit })
+    if (hasSavedSearchFilter(conditions)) {
+      p.conditions = conditions
     }
     return p
-  }, [any, blocks, visibility, sort, fieldsFeatureEnabled])
+  }, [blocks, editorState, visibility, sort, limit, fieldsFeatureEnabled, applied])
 
   const summary = useMemo(() => {
     const out: string[] = []
-    if (params.search) out.push(`名前に「${params.search}」`)
-    if (params.tagIds?.length) {
-      out.push(`タグ ${params.tagIds.map((id) => tags.find((t) => t.id === id)?.name ?? id).join('・')}`)
+    /* 対象（表示中/非表示/すべて）は常に見せる。条件と件数が食い違わないように。 */
+    out.push(`対象：${describeSavedVisibility(params.conditions ?? {})}`)
+    for (const b of blocks) {
+      if (b.kind === 'name' && b.keyword.trim()) out.push(`名前に「${b.keyword.trim()}」`)
+      if (b.kind === 'tag') {
+        if (b.include.length) {
+          out.push(`タグ ${b.include.map((id) => tags.find((t) => t.id === id)?.name ?? id).join('・')}`)
+        }
+        if (b.exclude.length) {
+          out.push(`タグ以外 ${b.exclude.map((id) => tags.find((t) => t.id === id)?.name ?? id).join('・')}`)
+        }
+      }
+      if (b.kind === 'field' && b.key.trim() && b.value.trim()) {
+        out.push(`${b.key.trim()} が ${b.value.trim()}${b.op === 'ne' ? ' 以外' : ''}`)
+      }
+      if (b.kind === 'status_message' && b.keyword.trim()) out.push(`ひとこと「${b.keyword.trim()}」`)
+      if (b.kind === 'created_at' && (b.from || b.to)) {
+        out.push(`登録日 ${b.from || '…'} 〜 ${b.to || '…'}`)
+      }
+      if (b.kind === 'chat_status') {
+        out.push(
+          `対応状況 ${{ unread: '未対応', in_progress: '対応中', on_hold: '保留', resolved: '対応済み' }[b.value]}`,
+        )
+      }
     }
-    if (params.excludeTagIds?.length) {
-      out.push(
-        `タグ以外 ${params.excludeTagIds.map((id) => tags.find((t) => t.id === id)?.name ?? id).join('・')}`,
-      )
-    }
-    for (const [k, v] of Object.entries(params.metadata ?? {})) out.push(`${k} が ${v}`)
-    for (const [k, v] of Object.entries(params.metadataNot ?? {})) out.push(`${k} が ${v} 以外`)
-    if (params.statusMessage) out.push(`ひとこと「${params.statusMessage}」`)
-    if (params.createdFrom || params.createdTo) {
-      out.push(`登録日 ${params.createdFrom || '…'} 〜 ${params.createdTo || '…'}`)
-    }
-    if (params.chatStatus) {
-      out.push(
-        `対応状況 ${{ unread: '未対応', in_progress: '対応中', on_hold: '保留', resolved: '対応済み' }[params.chatStatus]}`,
-      )
-    }
-    if (params.visibility === 'blocked') out.push('ブロックした人')
-    out.push(...savedSearchSummary(params.conditions ?? {}, tags).filter((item) => item.startsWith('OR: ')))
+    for (const condition of extraAll) out.push(describeSavedCondition(condition, tags, labels))
+    for (const condition of any) out.push(`OR: ${describeSavedCondition(condition, tags, labels)}`)
     return out
-  }, [params, tags])
+  }, [params, blocks, extraAll, any, tags, labels])
 
   /** 該当件数。押す前に何人になるかが分からないと、条件を組み立てられない。 */
   const recount = useCallback(async () => {
+    /*
+     * A03-02: 応答の世代を照合する。条件A→Bと素早く変えてAの応答が
+     * 後から届いても、Bの件数をAで上書きしない。失敗は0件扱いせず
+     * 「確認できません」と再試行を出す。
+     */
+    const requestId = ++countRequestRef.current
     setCounting(true)
-    // 件数だけ欲しいので1件だけ取る。total は絞り込み後の総数が返る。
-    const res = await api.friends.list({ ...params, accountId: accountId ?? undefined, limit: 1, includeTags: false })
-    setCounting(false)
-    setCount(res.success ? res.data.total : null)
+    setCountFailed(false)
+    try {
+      // 件数だけ欲しいので1件だけ取る。total は絞り込み後の総数が返る。
+      const res = await api.friends.list({ ...params, accountId: accountId ?? undefined, limit: 1, includeTags: false })
+      if (requestId !== countRequestRef.current) return
+      setCount(res.success ? res.data.total : null)
+      setCountFailed(!res.success)
+    } catch {
+      if (requestId !== countRequestRef.current) return
+      setCount(null)
+      setCountFailed(true)
+    } finally {
+      if (requestId === countRequestRef.current) setCounting(false)
+    }
   }, [accountId, params])
 
   useEffect(() => {
@@ -222,6 +368,14 @@ export default function AdvancedSearchDialog({
                 : { kind: 'chat_status', value: 'unread' },
     ])
 
+  const resetConditions = () => {
+    /* FRIEND-01: リセットは初期状態（表示中・空の条件）へ戻す。 */
+    setBlocks(defaultBlocks(fieldsFeatureEnabled))
+    setAny([])
+    setExtraAll([])
+    setVisibility('visible')
+  }
+
   const save = async () => {
     if (!accountId) {
       setSaveError('LINE公式アカウントを選んでください')
@@ -234,8 +388,15 @@ export default function AdvancedSearchDialog({
     setSaving(true)
     setSaveError('')
     try {
+      /*
+       * 保存は編集状態から直接 conditions を組み立てる。
+       * 平たい引数へのフォールバックは「すべて」を visible_only へ
+       * 書き換えてしまうので使わない（FRIEND-01/32）。
+       */
       const res = await api.friendSavedViews.create(accountId, {
-        name: saveName.trim(), conditions: friendParamsToSavedConditions(params), isShared: false,
+        name: saveName.trim(),
+        conditions: editorStateToConditions(editorState, { sort, limit }),
+        isShared: false,
       })
       if (!res.success) {
         setSaveError(res.error)
@@ -291,7 +452,20 @@ export default function AdvancedSearchDialog({
                   {counting ? '…' : count === null ? '—' : `${count.toLocaleString('ja-JP')}人`}
                 </p>
               </div>
-              <span className="text-micro text-accent-deep">自動で再計算</span>
+              {countFailed ? (
+                <span className="flex items-center gap-2 text-micro text-danger">
+                  件数を確認できません
+                  <button
+                    type="button"
+                    onClick={() => void recount()}
+                    className="font-semibold text-action underline"
+                  >
+                    再試行
+                  </button>
+                </span>
+              ) : (
+                <span className="text-micro text-accent-deep">自動で再計算</span>
+              )}
             </div>
           </section>
 
@@ -413,13 +587,15 @@ export default function AdvancedSearchDialog({
                   <select
                     value={b.value}
                     onChange={(e) =>
-                      patch(i, { ...b, value: e.target.value as 'unread' | 'in_progress' | 'resolved' })
+                      patch(i, { ...b, value: e.target.value as 'unread' | 'in_progress' | 'on_hold' | 'resolved' })
                     }
                     aria-label="対応状況"
                     className="border-hairline rounded-control bg-canvas text-ink border px-3 py-2 text-sm"
                   >
+                    {/* FRIEND-05: 説明どおり固定4状態。保留も検索できる。 */}
                     <option value="unread">未対応</option>
                     <option value="in_progress">対応中</option>
+                    <option value="on_hold">保留</option>
                     <option value="resolved">対応済み</option>
                   </select>
                 )}
@@ -448,6 +624,24 @@ export default function AdvancedSearchDialog({
                 </button>
               ))}
           </div>
+
+          {/* 編集画面で組み直せない保存済み条件。黙って落とさず外せる形で残す（FRIEND-32）。 */}
+          {extraAll.length > 0 ? (
+            <div className="mt-2 space-y-2 px-1">
+              <p className="text-nano text-ink-faint">保存されていたその他の条件</p>
+              {extraAll.map((condition, index) => (
+                <div key={`extra-${index}`} className="flex items-center justify-between rounded-control bg-canvas-sunken px-3 py-2 text-xs text-ink-secondary">
+                  <span>{describeSavedCondition(condition, tags, labels)}</span>
+                  <button
+                    type="button"
+                    onClick={() => setExtraAll((current) => current.filter((_, i) => i !== index))}
+                  >
+                    外す
+                  </button>
+                </div>
+              ))}
+            </div>
+          ) : null}
           </section>
 
           <section className="rounded-panel border border-hairline bg-canvas p-3">
@@ -456,28 +650,22 @@ export default function AdvancedSearchDialog({
               <span className="text-sm font-bold text-ink">いずれか1つ以上満たす条件</span>
             </div>
             <div className="mt-3 flex flex-wrap gap-3">
-              {OR_AXES.filter((item) => item.feature !== 'support_marks' || marksFeatureEnabled).map((item) => {
-                const condition = item.make({ markId: marks[0]?.id, scenarioId: scenarios[0]?.id })
-                return (
-                <div key={item.label} className="flex max-w-xs flex-col gap-1">
-                  <button
-                    type="button"
-                    disabled={!condition}
-                    onClick={() => condition && setAny((current) => [...current, condition])}
-                    className="w-fit rounded-full border border-divider-soft bg-canvas-sunken px-3 py-1.5 text-xs text-ink-secondary disabled:opacity-50"
-                  >
-                    ＋ {item.label}
-                  </button>
-                  {!condition ? <span className="text-ink-faint text-nano leading-tight">選択肢を読み込むと使えます</span> : null}
-                </div>
-                )
-              })}
+              {OR_AXES.filter((item) => item.feature !== 'support_marks' || marksFeatureEnabled).map((item) => (
+                <OrAxisPicker
+                  key={item.label}
+                  axis={item}
+                  marks={marks}
+                  scenarios={scenarios}
+                  onAdd={(condition) => setAny((current) => [...current, condition])}
+                />
+              ))}
             </div>
             {any.length > 0 ? (
               <div className="mt-3 space-y-2">
-                {savedSearchSummary({ any }, tags).map((label, index) => (
-                  <div key={`${label}-${index}`} className="flex items-center justify-between rounded-control bg-action-soft px-3 py-2 text-xs text-action">
-                    <span>{label.replace(/^OR: /, '')}</span>
+                {/* FRIEND-03: 条件チップは実際の名前・日付を表示する。 */}
+                {any.map((condition, index) => (
+                  <div key={`${index}-${condition.kind}`} className="flex items-center justify-between rounded-control bg-action-soft px-3 py-2 text-xs text-action">
+                    <span>{describeSavedCondition(condition, tags, labels)}</span>
                     <button type="button" onClick={() => setAny((current) => current.filter((_, itemIndex) => itemIndex !== index))}>外す</button>
                   </div>
                 ))}
@@ -490,17 +678,19 @@ export default function AdvancedSearchDialog({
               <span className="text-sm font-bold text-ink">表示する友だち</span>
               <span className="text-nano text-ink-faint">既定は「表示中」のみ</span>
             </div>
-            <div className="mt-2 flex flex-wrap gap-4 text-xs font-semibold text-ink-secondary">
-              {[
-                { value: 'following', label: '表示中' },
-                { value: '', label: '非表示' },
-                { value: 'blocked', label: 'ブロックした人' },
-              ].map((item) => (
-                <label key={item.label} className="flex items-center gap-2">
+            {/*
+              FRIEND-01: 対象は1か所で選ぶ。以前はチェックボックスと
+              「対象」プルダウンの2か所が同じ変数へ別の意味で書き込み、
+              「すべて」が非表示だけを検索していた。
+            */}
+            <div className="mt-2 flex flex-wrap gap-4 text-xs font-semibold text-ink-secondary" role="radiogroup" aria-label="表示する友だち">
+              {VISIBILITY_OPTIONS.map((item) => (
+                <label key={item.value} className="flex items-center gap-2">
                   <input
-                    type="checkbox"
+                    type="radio"
+                    name="friend-search-visibility"
                     checked={visibility === item.value}
-                    onChange={() => setVisibility(item.value as '' | 'following' | 'blocked')}
+                    onChange={() => setVisibility(item.value)}
                     className="h-4 w-4 accent-accent"
                   />
                   {item.label}
@@ -516,15 +706,7 @@ export default function AdvancedSearchDialog({
             </label>
           </section>
 
-          <div className="grid gap-2 sm:grid-cols-3">
-            <label className="rounded-card border border-hairline bg-canvas px-3 py-2">
-              <span className="text-nano text-ink-faint">対象</span>
-              <select value={visibility} onChange={(event) => setVisibility(event.target.value as '' | 'following' | 'blocked')} className="mt-0.5 w-full border-0 bg-transparent p-0 text-xs font-semibold text-ink-secondary outline-none">
-                <option value="following">すべての友だち</option>
-                <option value="blocked">ブロックした人</option>
-                <option value="">すべて</option>
-              </select>
-            </label>
+          <div className="grid gap-2 sm:grid-cols-2">
             <label className="rounded-card border border-hairline bg-canvas px-3 py-2">
               <span className="text-nano text-ink-faint">並び順</span>
                 <select
@@ -536,10 +718,15 @@ export default function AdvancedSearchDialog({
                   <option value="oldest">友だち追加の古い順</option>
                 </select>
             </label>
+            {/* FRIEND-04: 表示件数も条件の一部として適用する。 */}
             <label className="rounded-card border border-hairline bg-canvas px-3 py-2">
               <span className="text-nano text-ink-faint">表示件数</span>
-              <select defaultValue="20" className="mt-0.5 w-full border-0 bg-transparent p-0 text-xs font-semibold text-ink-secondary outline-none">
-                {[10, 20, 30, 40, 50].map((size) => <option key={size} value={size}>{size}件</option>)}
+              <select
+                value={limit}
+                onChange={(e) => setLimit(Number(e.target.value))}
+                className="mt-0.5 w-full border-0 bg-transparent p-0 text-xs font-semibold text-ink-secondary outline-none"
+              >
+                {PAGE_SIZE_OPTIONS.map((size) => <option key={size} value={size}>{size}件</option>)}
               </select>
             </label>
           </div>
@@ -553,11 +740,7 @@ export default function AdvancedSearchDialog({
           ) : null}
           <button
             type="button"
-            onClick={() => {
-              setBlocks([])
-              setAny([])
-              setVisibility('')
-            }}
+            onClick={resetConditions}
             className="text-xs font-medium text-ink-faint hover:text-ink-secondary"
           >
             条件をリセット
@@ -574,7 +757,7 @@ export default function AdvancedSearchDialog({
             type="button"
             variant="primary"
             className="px-5"
-            onClick={() => onApply({ params, summary })}
+            onClick={() => onApply({ params, summary, editorState })}
           >
             {counting ? '再計算中…' : count === null ? 'この条件で表示' : `${count.toLocaleString('ja-JP')}人を表示`}
           </Button>
@@ -597,6 +780,81 @@ export default function AdvancedSearchDialog({
           </section>
         </div>
       ) : null}
+    </div>
+  )
+}
+
+/**
+ * ORの軸1つぶん。値が要る軸は入力が揃うまで追加できない（FRIEND-03）。
+ * 先頭の候補・固定の日付を勝手に使うことはない。
+ */
+function OrAxisPicker({
+  axis,
+  marks,
+  scenarios,
+  onAdd,
+}: {
+  axis: (typeof OR_AXES)[number]
+  marks: Array<{ id: string; name: string }>
+  scenarios: Scenario[]
+  onAdd: (condition: SavedSearchCondition) => void
+}) {
+  const [draft, setDraft] = useState('')
+  const options = axis.input === 'mark' ? marks : axis.input === 'scenario' ? scenarios : []
+  const waitingForOptions = (axis.input === 'mark' || axis.input === 'scenario') && options.length === 0
+  const condition = axis.make(draft)
+  const addable = !waitingForOptions && (axis.input === null || condition !== null)
+
+  return (
+    <div className="flex max-w-xs flex-col gap-1">
+      <span className="text-xs font-semibold text-ink-secondary">{axis.label}</span>
+      <div className="flex items-center gap-1.5">
+        {axis.input === 'mark' || axis.input === 'scenario' ? (
+          <select
+            value={draft}
+            onChange={(event) => setDraft(event.target.value)}
+            disabled={waitingForOptions}
+            aria-label={`${axis.label}を選ぶ`}
+            className="border-hairline rounded-control bg-canvas text-ink min-w-0 flex-1 border px-2 py-1.5 text-xs disabled:opacity-50"
+          >
+            <option value="">選ぶ</option>
+            {options.map((option) => (
+              <option key={option.id} value={option.id}>{option.name}</option>
+            ))}
+          </select>
+        ) : axis.input === 'date' ? (
+          <input
+            type="date"
+            value={draft}
+            onChange={(event) => setDraft(event.target.value)}
+            aria-label={`${axis.label}の日付（この日以降）`}
+            className="border-hairline rounded-control bg-canvas text-ink min-w-0 flex-1 border px-2 py-1.5 text-xs"
+          />
+        ) : axis.input === 'text' ? (
+          <input
+            type="text"
+            value={draft}
+            onChange={(event) => setDraft(event.target.value)}
+            placeholder={axis.placeholder}
+            aria-label={`${axis.label}の値`}
+            className="border-hairline rounded-control bg-canvas text-ink min-w-0 flex-1 border px-2 py-1.5 text-xs"
+          />
+        ) : null}
+        <button
+          type="button"
+          disabled={!addable}
+          onClick={() => {
+            if (!condition) return
+            onAdd(condition)
+            setDraft('')
+          }}
+          className="shrink-0 rounded-full border border-divider-soft bg-canvas-sunken px-3 py-1.5 text-xs text-ink-secondary disabled:opacity-50"
+        >
+          ＋ 追加
+        </button>
+      </div>
+      {waitingForOptions ? <span className="text-ink-faint text-nano leading-tight">選択肢を読み込むと使えます</span> : null}
+      {axis.input === 'date' ? <span className="text-ink-faint text-nano leading-tight">指定した日以降</span> : null}
     </div>
   )
 }

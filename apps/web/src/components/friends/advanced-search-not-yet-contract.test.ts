@@ -53,14 +53,20 @@ describe('詳細条件のORの軸は、黙って消えない', () => {
 
   it('固定4状態と自由分類の対応マークを別の軸にする', () => {
     expect(DIALOG).toContain("chat_status: '対応状況'")
-    expect(DIALOG).toContain("{ label: '対応マーク', feature: 'support_marks', make:")
+    expect(DIALOG).toContain("{ label: '対応マーク', feature: 'support_marks',")
   })
 
-  it('選択肢待ちの軸だけ無効にし、理由を画面に出す', () => {
+  it('FRIEND-03: 値が要る軸は利用者が選ぶまで追加できず、固定値を勝手に使わない', () => {
     const section = orSection()
     expect(section, 'OR節が見つからない').not.toBe('')
-    expect(section).toContain('disabled={!condition}')
-    expect(section).toContain('選択肢を読み込むと使えます')
+    expect(section).toContain('OrAxisPicker')
+    /* 先頭の候補・固定日付を自動採用しない。入力が揃うまで追加は押せない。 */
+    expect(DIALOG).toContain('disabled={!addable}')
+    expect(DIALOG).toContain('waitingForOptions')
+    expect(DIALOG).toContain('選択肢を読み込むと使えます')
+    expect(DIALOG).not.toContain("value: '2026-01-01'")
+    expect(DIALOG).not.toContain('marks[0]?.id')
+    expect(DIALOG).not.toContain('scenarios[0]?.id')
     expect(section).not.toContain('title=')
   })
 
