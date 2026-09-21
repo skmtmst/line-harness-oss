@@ -650,7 +650,8 @@
   },
   "components/scenarios/scenario-dialogs.tsx": {
     "direct-secondary-button": 6,
-    "direct-primary-button": 3
+    "direct-primary-button": 3,
+    "arbitrary-value": 1
   },
   "components/scenarios/scenario-list.tsx": {
     "arbitrary-value": 3
