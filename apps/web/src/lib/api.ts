@@ -1044,6 +1044,61 @@ export type RichMenuScheduleInput = {
   restoreGroupId?: string | null
 }
 
+/** 公開run1件。版の要約・状態・試行に使ったLINE ID・最終エラー。 */
+export type RichMenuPublishRun = {
+  id: string
+  status: 'running' | 'succeeded' | 'failed'
+  lastErrorCode: string | null
+  idempotencyKey: string
+  requestedByStaffId: string
+  createdAt: string
+  updatedAt: string
+  version: {
+    name: string | null
+    chatBarText: string | null
+    pageCount: number | null
+    /** その版が「誰に出る版」だったか。読めないスナップショットでは null。 */
+    isDefaultForAll: boolean | null
+    targetingEnabled: boolean | null
+  }
+  pages: Array<{
+    pageId: string
+    orderIndex: number
+    newRichMenuId: string
+    oldRichMenuId: string | null
+  }>
+}
+
+/**
+ * 公開履歴の応答。`published` はいま対象へ出ている版（最後に成功したrun）、
+ * `draftDiffersFromPublished` は編集中の下書きが公開版と違うか。
+ */
+export type RichMenuPublishRunsResponse = {
+  runs: RichMenuPublishRun[]
+  published: RichMenuPublishRun | null
+  draftDiffersFromPublished: boolean | null
+}
+
+/** 本人LINEへのテスト適用1件。 */
+export type RichMenuTestApplyItem = {
+  id: string
+  status: string
+  previousRichMenuId: string | null
+  /** 適用前の表示を記録できたか。false の失敗は本人の表示を変えていない。 */
+  previousCaptured: boolean
+  appliedRichMenuId: string | null
+  lastErrorCode: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+/** revert が本人の表示に何をしたか。 */
+export type RichMenuTestApplyUserMenuAction =
+  | 'restored'
+  | 'already_restored'
+  | 'left_as_is'
+  | 'untouched'
+
 /**
  * 対応マークの自動変更ルール（設計 `GMvBd` 4-3-A）。
  *
@@ -10496,24 +10551,11 @@ export const api = {
         warnings: string[];
       }>>(`/api/rich-menu-groups/${groupId}/unpublish`, { method: 'POST' }),
 
-    /** N-151: 公開runの履歴。版・状態・試行・最終エラー・LINE IDを返す。 */
+    /** N-151: 公開runの履歴と「いま出ている版」。下書きとの差分フラグも返す。 */
     publishRuns: (groupId: string) =>
-      fetchApi<ApiResponse<Array<{
-        id: string;
-        status: 'running' | 'succeeded' | 'failed';
-        lastErrorCode: string | null;
-        idempotencyKey: string;
-        requestedByStaffId: string;
-        createdAt: string;
-        updatedAt: string;
-        version: { name: string | null; chatBarText: string | null; pageCount: number | null };
-        pages: Array<{
-          pageId: string;
-          orderIndex: number;
-          newRichMenuId: string;
-          oldRichMenuId: string | null;
-        }>;
-      }>>>(`/api/rich-menu-groups/${groupId}/publish-runs`),
+      fetchApi<ApiResponse<RichMenuPublishRunsResponse>>(
+        `/api/rich-menu-groups/${groupId}/publish-runs`,
+      ),
 
     /** N-151: 失敗したrunだけを、保存された版のまま再試行する。 */
     retryPublishRun: (groupId: string, requestId: string) =>
@@ -10554,21 +10596,15 @@ export const api = {
         effective: { value: number | null; state: 'available' | 'unavailable'; reason: string | null };
       }>>(`/api/rich-menu-groups/${groupId}/audience-summary`),
 
-    /** N-152: 本人LINEへのテスト適用の状態。連携済みか・適用中かを返す。 */
+    /** N-152: 本人LINEへのテスト適用の状態。連携済みか・適用中か・宛先を返す。 */
     testApplyState: (groupId: string) =>
       fetchApi<ApiResponse<{
         linked: boolean;
         linkGuidance: string | null;
-        active: {
-          id: string; status: string; previousRichMenuId: string | null;
-          appliedRichMenuId: string | null; lastErrorCode: string | null;
-          createdAt: string; updatedAt: string;
-        } | null;
-        recent: Array<{
-          id: string; status: string; previousRichMenuId: string | null;
-          appliedRichMenuId: string | null; lastErrorCode: string | null;
-          createdAt: string; updatedAt: string;
-        }>;
+        /** 宛先の明示。連携済みの本人LINEだけ。未連携なら null。 */
+        destination: { staffName: string | null; lineUserIdMasked: string } | null;
+        active: RichMenuTestApplyItem | null;
+        recent: RichMenuTestApplyItem[];
       }>>(`/api/rich-menu-groups/${groupId}/test-apply`),
 
     /** N-152: 本人確認済みLINEへテスト適用する。confirm: true が必須。 */
@@ -10584,7 +10620,9 @@ export const api = {
 
     /** N-152: テスト適用を取り消して適用前のメニューへ戻す。冪等。 */
     testApplyRevert: (groupId: string, idempotencyKey: string, applyId?: string) =>
-      fetchApi<ApiResponse<{ id: string; status: string }>>(
+      fetchApi<ApiResponse<
+        RichMenuTestApplyItem & { userMenuAction?: RichMenuTestApplyUserMenuAction }
+      >>(
         `/api/rich-menu-groups/${groupId}/test-apply/revert`,
         {
           method: 'POST',
