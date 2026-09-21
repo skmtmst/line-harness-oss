@@ -2,7 +2,7 @@
 
 import { useCallback, useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { api, type MileageHistoryItem, type MileageSummary } from '@/lib/api'
+import { api, type FriendUpcoming, type MileageHistoryItem, type MileageSummary } from '@/lib/api'
 import type { FriendField } from '@line-crm/shared'
 import Button from '@/components/shared/button'
 import { GripVertical, X } from 'lucide-react'
@@ -144,6 +144,23 @@ function ExpandableText({ value, className = '', empty = '未登録' }: {
       {value}
     </button>
   )
+}
+
+/*
+ * IDEA-02: 「次の予定」の行から詳細へ進む先。
+ * kind ごとに専用の画面へ。個別相談は専用の一覧・詳細画面がまだ無いので、
+ * 友だち詳細（相談の履歴が出る側）へ誘導する。
+ */
+function upcomingBookingHref(booking: NonNullable<FriendUpcoming['nextBooking']>, friendId: string): string {
+  if (booking.kind === 'booking') return `/booking/bookings/detail?id=${booking.id}`
+  if (booking.kind === 'event_booking') return `/events/bookings?id=${booking.id}`
+  return `/friends/detail?id=${friendId}`
+}
+
+function upcomingDeliveryHref(delivery: NonNullable<FriendUpcoming['nextAutoDelivery']>): string {
+  return delivery.kind === 'scenario'
+    ? `/scenarios/detail?id=${delivery.id}`
+    : `/reminders/detail?id=${delivery.id}`
 }
 
 export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }: Props) {
@@ -295,6 +312,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
   const [mileageRetry, setMileageRetry] = useState(0)
   const [richMenuRetry, setRichMenuRetry] = useState(0)
   const [fieldsRetry, setFieldsRetry] = useState(0)
+  const [upcomingRetry, setUpcomingRetry] = useState(0)
 
   useEffect(() => {
     if (!friendId) {
@@ -400,6 +418,38 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
     })
     return () => { cancelled = true }
   }, [friendId, richMenuRetry])
+
+  /*
+   * IDEA-02: 次回予約と次の確定した自動配信。
+   * サーバーは確定した予定だけを返す（動的条件の将来配信は含まない）。
+   * 「予定なし」(null) と「未取得」(error / *_Error) を分けて出し、
+   * 失敗はこのパネル内の再試行でやり直せるようにする。
+   */
+  type UpcomingState =
+    | { kind: 'loading' }
+    | { kind: 'error' }
+    | { kind: 'data'; data: FriendUpcoming }
+  const [upcoming, setUpcoming] = useState<UpcomingState>({ kind: 'loading' })
+
+  useEffect(() => {
+    if (!friendId) {
+      setUpcoming({ kind: 'loading' })
+      return
+    }
+    let cancelled = false
+    setUpcoming({ kind: 'loading' })
+    api.friends.upcoming(friendId).then((res) => {
+      if (cancelled) return
+      if (res.success && res.data) {
+        setUpcoming({ kind: 'data', data: res.data })
+      } else {
+        setUpcoming({ kind: 'error' })
+      }
+    }).catch(() => {
+      if (!cancelled) setUpcoming({ kind: 'error' })
+    })
+    return () => { cancelled = true }
+  }, [friendId, upcomingRetry])
 
   /*
    * 友だち情報（metadata）のキーを、画面に出す項目名へ写す対応表。
@@ -721,6 +771,62 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
                 <p className="text-xs text-gray-700 whitespace-pre-wrap break-words mt-1">
                   {chatStatus?.notes || <span className="text-gray-400">まだありません</span>}
                 </p>
+              </div>
+              {/*
+                IDEA-02: 次回予約と次の確定した自動配信。
+                「読み込めませんでした」(未取得) と「予定なし」は別の状態。
+                値がある行は詳細画面へのリンクにする。
+                色と文字サイズは生のTailwindではなくトークンで書く
+                （raw-colors / design-debt の基準を増やさない）。
+              */}
+              <div className="space-y-1.5 border-t border-hairline pt-2">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-ink-faint text-micro shrink-0">次回予約</span>
+                  {upcoming.kind === 'loading' ? (
+                    <span className="text-ink-faint text-caption">読み込み中…</span>
+                  ) : upcoming.kind === 'error' || upcoming.data.nextBookingError ? (
+                    <span className="text-danger text-micro">読み込めませんでした</span>
+                  ) : upcoming.data.nextBooking ? (
+                    <a
+                      href={upcomingBookingHref(upcoming.data.nextBooking, friend.id)}
+                      title={`${upcoming.data.nextBooking.title} ${formatDate(upcoming.data.nextBooking.startsAt)}`}
+                      className="text-action text-caption min-w-0 truncate hover:underline"
+                    >
+                      {formatDate(upcoming.data.nextBooking.startsAt)} {upcoming.data.nextBooking.title}
+                    </a>
+                  ) : (
+                    <span className="text-ink-faint text-caption">予定なし</span>
+                  )}
+                </div>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-ink-faint text-micro shrink-0">次の自動配信</span>
+                  {upcoming.kind === 'loading' ? (
+                    <span className="text-ink-faint text-caption">読み込み中…</span>
+                  ) : upcoming.kind === 'error' || upcoming.data.nextAutoDeliveryError ? (
+                    <span className="text-danger text-micro">読み込めませんでした</span>
+                  ) : upcoming.data.nextAutoDelivery ? (
+                    <a
+                      href={upcomingDeliveryHref(upcoming.data.nextAutoDelivery)}
+                      title={`${upcoming.data.nextAutoDelivery.name} ${formatDate(upcoming.data.nextAutoDelivery.scheduledAt)}`}
+                      className="text-action text-caption min-w-0 truncate hover:underline"
+                    >
+                      {formatDate(upcoming.data.nextAutoDelivery.scheduledAt)} {upcoming.data.nextAutoDelivery.name}
+                    </a>
+                  ) : (
+                    <span className="text-ink-faint text-caption">予定なし</span>
+                  )}
+                </div>
+                {/* 片方だけの失敗でもここからまとめて取り直せる(INBOX-08 と同じ型)。 */}
+                {(upcoming.kind === 'error'
+                  || (upcoming.kind === 'data' && (upcoming.data.nextBookingError || upcoming.data.nextAutoDeliveryError))) && (
+                  <button
+                    type="button"
+                    onClick={() => setUpcomingRetry((key) => key + 1)}
+                    className="text-action text-micro font-semibold underline underline-offset-2"
+                  >
+                    再試行する
+                  </button>
+                )}
               </div>
             </div>
 
