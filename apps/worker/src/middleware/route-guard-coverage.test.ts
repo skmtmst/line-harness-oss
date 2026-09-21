@@ -272,6 +272,7 @@ const STAFF_FAIL_CLOSED_SNAPSHOT: string[] = [
     'GET /api/operations/health',
     'GET /api/operations/history',
     'GET /api/operations/incidents/:id',
+    'GET /api/operations/send-paths',
     'GET /api/ops/announcements',
     'GET /api/ops/audit',
     'GET /api/ops/dashboard',

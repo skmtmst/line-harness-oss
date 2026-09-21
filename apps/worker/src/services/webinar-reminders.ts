@@ -10,6 +10,7 @@ import {
   markWebinarRegistrationNotified,
   getFriendById,
   getLineAccountById,
+  isOperationCapabilityStopped,
   type Webinar,
 } from '@line-crm/db';
 import { addJitter, sleep } from './stealth.js';
@@ -88,6 +89,11 @@ export async function processWebinarReminders(
       })) {
         continue;
       }
+      // 緊急停止 (#1050): reminder_dispatch が止まっている統括は通知済みにせず
+      // 未送信のまま残す。復旧すれば LEAD_SECONDS 内の予約が届く。
+      if (await isOperationCapabilityStopped(db, reg.account_id, 'reminder_dispatch')) {
+        continue;
+      }
       if (i > 0) await sleep(addJitter(50, 200));
       const friend = await getFriendById(db, reg.friend_id);
       if (!friend || !friend.is_following) {
@@ -110,7 +116,7 @@ export async function processWebinarReminders(
             `こちらから参加してください👇\n${buildWebinarUrl(liffId, reg.slug, reg.session_start_at)}` +
             `\n\n※この専用リンクは、閉じた後も何度でも開けます。`,
         },
-      ], reg.id, options.proxyDispatch);
+      ], reg.id, options.proxyDispatch, 'reminder_dispatch');
       // 実送信が成功した後だけ通知済みにする。失敗時は NULL のままなので次 tick で再試行。
       await markWebinarRegistrationNotified(db, reg.id);
       sent++;
@@ -133,6 +139,11 @@ export async function sendWebinarRegistrationConfirmation(
   followupLabel = '開始5分前',
 ): Promise<void> {
   try {
+    // 緊急停止 (#1050): reminder_dispatch 停止中は受付確認も送らない。
+    if (webinar.account_id &&
+        await isOperationCapabilityStopped(db, webinar.account_id, 'reminder_dispatch')) {
+      return;
+    }
     const friend = await getFriendById(db, friendId);
     if (!friend || !friend.is_following) return;
     const { accessToken, liffId } = await resolveDeliveryConfig(db, webinar.account_id, options);
@@ -148,7 +159,7 @@ export async function sendWebinarRegistrationConfirmation(
           `${followupLabel}にも同じリンクをお送りします。` +
           `閉じた後も何度でも開けます。`,
       },
-    ], retryKey, options.proxyDispatch);
+    ], retryKey, options.proxyDispatch, 'reminder_dispatch');
   } catch (err) {
     console.error('webinar registration confirmation error:', err);
   }

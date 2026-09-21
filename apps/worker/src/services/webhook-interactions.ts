@@ -3,6 +3,7 @@ import {
   createWebhookInteraction,
   finishWebhookInteraction,
   getOutgoingWebhookById,
+  isOperationCapabilityStopped,
   resolveWebhookSecret,
   restoreWebhookInteractionFailure,
   type WebhookInteractionFailureReason,
@@ -58,6 +59,10 @@ export async function retryWebhookInteraction(
   if (!webhook) throw new Error('webhook_not_found');
   if (!webhook.is_active) throw new Error('webhook_inactive');
   if (!original.request_body_json) throw new Error('payload_unavailable');
+  // 緊急停止 (#1050): webhook_outgoing 停止中は手動再送も受け付けない。
+  if (await isOperationCapabilityStopped(db, original.line_account_id, 'webhook_outgoing')) {
+    throw new Error('emergency_stopped');
+  }
   // 署名は送信直前に復号した値で付ける。secretが設定済みで読めない
   // (鍵不足・復号失敗)ときだけ送らずに止める(#650)。未設定の旧行は従来どおり送る。
   let sendSecret: string | null = null;

@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const dbMocks = vi.hoisted(() => ({
   getFriendById: vi.fn(),
+  isOperationCapabilityStopped: vi.fn(async () => false),
   getLineAccountById: vi.fn(),
   jstNow: vi.fn(() => '2026-08-28 01:00:00'),
   // 取り出しのSQLに混ぜる「機能オフのアカウントを外す」条件式。

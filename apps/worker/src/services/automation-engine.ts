@@ -7,6 +7,7 @@
 
 import { matchesCondition, type SegmentCondition } from './segment-query.js';
 import { featureJobCanRun } from './feature-enforcement.js';
+import { isOperationCapabilityStopped } from '@line-crm/db';
 
 const DEFAULT_LEASE_MINUTES = 5;
 const RETRY_DELAYS_MINUTES = [1, 5, 30] as const;
@@ -685,6 +686,11 @@ export async function processAutomationRun(
   if (ownerRow?.line_account_id && !await featureJobCanRun(db, { accountId: ownerRow.line_account_id, featureId: 'automations', job: 'automation runs' })) {
     return 'busy';
   }
+  // 緊急停止 (#1050): automation_actions が止まっている統括は claim せず
+  // queued のまま残す。停止中の実行は外部へ何も出さない。
+  if (await isOperationCapabilityStopped(db, ownerRow?.line_account_id ?? null, 'automation_actions')) {
+    return 'busy';
+  }
   if (!(await claimRun(db, runId, now, leaseMinutes))) {
     const existing = await getRun(db, runId);
     if (!existing) return 'not_found';
@@ -718,6 +724,19 @@ export async function processAutomationRun(
       .bind(run.id).first<{ status: RunStatus }>();
     if (!latest) return 'not_found';
     if (latest.status === 'cancelled') return 'cancelled';
+    /*
+     * 緊急停止 (#1050) も step の境目で効かせる。claim 後に止まった分は
+     * run を queued へ戻し、現在の step から再開できるようにする。
+     * 停止を理由に failed / skipped にはしない。
+     */
+    if (await isOperationCapabilityStopped(db, run.line_account_id, 'automation_actions')) {
+      await db.prepare(
+        `UPDATE automation_runs
+            SET status = 'queued', lease_expires_at = NULL
+          WHERE id = ? AND status = 'running'`,
+      ).bind(run.id).run();
+      return 'busy';
+    }
     let step = await getStep(db, run.id, action.id);
     if (!step) {
       await precreateSteps(db, run, [action]);

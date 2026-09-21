@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, test, vi } from 'vitest';
 
 const dbMocks = vi.hoisted(() => ({
   getFriendById: vi.fn(),
+  isOperationCapabilityStopped: vi.fn(async () => false),
   getLineAccountById: vi.fn(),
   jstNow: vi.fn(() => '2026-08-10T20:00:00+09:00'),
 }));

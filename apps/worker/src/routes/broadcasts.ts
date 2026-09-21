@@ -39,6 +39,7 @@ import { processSegmentSend } from '../services/segment-send.js';
 import type { SegmentCondition } from '../services/segment-query.js';
 import { assertAnalyticsAudiencesUsable, BroadcastAudienceError } from '../services/segment-audience-guard.js';
 import { getLineAccountById } from '@line-crm/db';
+import { isOperationCapabilityStopped } from '@line-crm/db';
 import type { Env } from '../index.js';
 import { resolveLineToken } from '../services/line-token.js';
 import { requireIrreversibleConfirmation, requireRole } from '../middleware/role-guard.js';
@@ -2155,6 +2156,11 @@ broadcasts.post('/api/broadcasts/:id/send', requireIrreversibleConfirmation('bro
     // N-062: 即時送信も LINE 送信の直前に枠と後続アクション版を見直す。
     // ここで止めれば status は draft のまま。確認後の競合は claim と台帳境界が防ぐ。
     const sendAccountId = (broadcastAccountId as string | null) ?? null;
+    // 緊急停止 (#1050): broadcast_dispatch が止まっている統括の今すぐ送信は
+    // 受け付けない。claim 前に止めるので draft/scheduled のまま残る。
+    if (await isOperationCapabilityStopped(c.env.DB, sendAccountId, 'broadcast_dispatch')) {
+      return c.json({ success: false, error: '緊急停止中のため送信できません' }, 409);
+    }
     const afterActionCheck = await checkSendableAfterActionVersion(
       c.env.DB,
       sendAccountId,

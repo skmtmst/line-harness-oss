@@ -18,6 +18,8 @@ import {
   type OperationHealthSnapshot,
   type OperationHistoryEntry,
   type OperationImpactPreview,
+  type OperationSendPath,
+  type OperationSendPathsResponse,
 } from '@/lib/api'
 import { formatOperationDate, type OperationSeverity } from '@/lib/operation-status'
 import { operationImpactText, type EmergencyStopTarget } from '@/lib/operation-impact'
@@ -321,6 +323,45 @@ const ALERT_ACTION_LABEL: Record<OperationAlert['events'][number]['action'], str
   opened: '検知', escalated: '悪化', acknowledged: '受領', resolved: '解消', reopened: '再発',
 }
 
+/*
+ * 異常が出たとき、運用者が最初に知りたい3つ (#1050)。
+ *
+ * お客さまへの影響 → 担当 → 直し方、の順で通知の技術的な詳細より先に出す。
+ * 文言は画面側が持ち、口の checkKey と1対1に対応する。
+ */
+const ALERT_RESPONSE_FIRST: Record<OperationHealthCheckKey, { impact: string; recovery: string; href: string }> = {
+  line_connection: {
+    impact: 'LINEへの返信や配信が止まっている可能性があります。',
+    recovery: 'アカウント設定でLINE接続を確認し直してください。',
+    href: '/accounts',
+  },
+  message_quota: {
+    impact: '配信が途中で止まる可能性があります。',
+    recovery: '配信数を減らすか、月の更新を待ってください。',
+    href: '/broadcasts',
+  },
+  external_integrations: {
+    impact: 'EC連携など外部とのやり取りが止まっている可能性があります。',
+    recovery: '連携設定を確認し、止まっている連携を再設定してください。',
+    href: '/ec-commerce',
+  },
+  webhook: {
+    impact: '外部システムへの通知が届いていません。',
+    recovery: '合言葉と送信先を確認し、失敗した通知を再送してください。',
+    href: '/webhooks',
+  },
+  dispatch_jobs: {
+    impact: '予約した配信が時刻どおりに出ていません。',
+    recovery: '緊急コントロールで止めたままになっていないか確認してください。',
+    href: '/emergency?tab=control',
+  },
+  friend_change: {
+    impact: '友だちが急に減っています。誤配信やブロックの可能性があります。',
+    recovery: '直近の配信内容を確認し、必要なら緊急停止してください。',
+    href: '/emergency?tab=control',
+  },
+}
+
 /** 異常なしと「通知を読めない」を混同しない、健全性チェックの受領・再送欄。 */
 function OperationAlertsPanel({
   alerts,
@@ -352,8 +393,15 @@ function OperationAlertsPanel({
           : alert.notification.queued + alert.notification.sending > 0
             ? '通知を送っています。'
             : `${alert.notification.sent}件の通知を送信しました。`
+      const response = ALERT_RESPONSE_FIRST[alert.checkKey]
       return <div key={alert.id} className="space-y-3 px-4 py-4">
         <div className="flex flex-wrap items-start justify-between gap-3"><div className="min-w-0"><div className="flex items-center gap-2"><StatusPill severity={alert.severity} /><p className="text-sm font-bold text-ink">{CHECK_DEFINITIONS.find((item) => HEALTH_CHECK_ID[alert.checkKey] === item.id)?.label ?? alert.checkKey}</p>{alert.status === 'acknowledged' && <span className="rounded-pill bg-info-bg px-2 py-1 text-xs font-bold text-info">受領済み</span>}{alert.status === 'resolved' && <span className="rounded-pill bg-success-bg px-2 py-1 text-xs font-bold text-success">解消済み</span>}</div><p className="mt-2 text-xs text-ink-secondary">{alert.summary}</p><p className="mt-1 text-xs text-ink-faint">{lastEvent ? `${ALERT_ACTION_LABEL[lastEvent.action]}：${formatOperationDate(lastEvent.createdAt)}` : formatOperationDate(alert.lastDetectedAt)}</p></div><p className={`text-xs font-bold ${alert.notification.failed + alert.notification.unconfigured > 0 ? 'text-danger' : 'text-ink-faint'}`}>{notification}</p></div>
+        {/* #1050: お客さまへの影響→担当→直し方を、通知の内訳より先に出す。 */}
+        {alert.status !== 'resolved' && response && <dl className="rounded-control grid gap-3 bg-canvas-sunken px-4 py-3 text-xs sm:grid-cols-3">
+          <div><dt className="font-bold text-ink-faint">お客さまへの影響</dt><dd className="mt-1 leading-relaxed text-ink-secondary">{response.impact}</dd></div>
+          <div><dt className="font-bold text-ink-faint">担当</dt><dd className="mt-1 leading-relaxed text-ink-secondary">{alert.acknowledgedById ?? 'まだ受領されていません。下の「受領する」で担当が記録されます。'}</dd></div>
+          <div><dt className="font-bold text-ink-faint">直し方</dt><dd className="mt-1 leading-relaxed text-ink-secondary">{response.recovery} <Link href={response.href} className="font-bold text-action">対象画面へ</Link></dd></div>
+        </dl>}
         {alert.status === 'open' && <div className="flex flex-wrap items-end gap-2"><label className="min-w-56 flex-1 text-xs font-bold text-ink-secondary" htmlFor={`operation-alert-note-${alert.id}`}>受領メモ（任意）<input id={`operation-alert-note-${alert.id}`} value={notes[alert.id] ?? ''} maxLength={500} onChange={(event) => setNotes((current) => ({ ...current, [alert.id]: event.target.value }))} disabled={busy} className="border-hairline rounded-control mt-1 block min-h-9 w-full border bg-canvas px-3 text-sm font-normal text-ink" /></label><Button variant="primary" disabled={busy} onClick={() => void onAcknowledge(alert, notes[alert.id] ?? '')}>{busy ? '保存中…' : '受領する'}</Button></div>}
         {alert.notification.failed + alert.notification.unconfigured > 0 && <button type="button" disabled={busy} onClick={() => void onRetry(alert)} className="rounded-control min-h-9 border border-danger px-3 text-xs font-bold text-danger disabled:opacity-50">{busy ? '処理しています…' : alert.notification.unconfigured > 0 ? '通知先を再確認する' : '失敗した通知を再送する'}</button>}
       </div>
@@ -616,6 +664,89 @@ function HealthPanel({
       </div>
     </div>
   )
+}
+
+const SEND_PATH_KIND_LABEL: Record<OperationSendPath['kind'], string> = {
+  manual: '手の操作',
+  auto: '自動',
+  scheduled: '予約',
+  proxy: 'プロキシ経由',
+  external: '外部へ送信',
+}
+
+/*
+ * 停止ボタンが届く経路の一覧 (#1050)。
+ *
+ * 「止める」と押したとき実際にどの送信経路が止まるか、口が返す台帳
+ * (`GET /api/operations/send-paths`) をそのまま見せる。対象外の経路も
+ * 理由付きで出し、「表示されているのに止まらない」事故を防ぐ。
+ * 台帳と実装がずれているとき(problems)は警告として先頭に出す。
+ */
+function SendPathCoveragePanel({ accountId, revision }: { accountId: string | null; revision: number }) {
+  const [data, setData] = useState<OperationSendPathsResponse | null>(null)
+  const [failed, setFailed] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+    setData(null)
+    setFailed(false)
+    api.operations.sendPaths(accountId)
+      .then((response) => {
+        if (cancelled) return
+        if (response.success) setData(response.data)
+        else setFailed(true)
+      })
+      .catch(() => { if (!cancelled) setFailed(true) })
+    return () => { cancelled = true }
+  }, [accountId, revision])
+
+  if (failed) {
+    return <section className="rounded-card border border-warning bg-warning-bg px-4 py-3 text-xs font-medium text-warning" role="alert">
+      送信経路の台帳を取得できませんでした。停止の届く範囲が確認できないため、経路の網羅は保証できません。時間をおいて読み直してください。
+    </section>
+  }
+  if (!data) {
+    return <section className="border-hairline rounded-card border bg-canvas px-4 py-3 text-xs text-ink-faint">送信経路の台帳を読み込んでいます…</section>
+  }
+
+  const groups: Array<{ title: string; stopped: boolean; excluded: boolean; paths: OperationSendPath[] }> = []
+  for (const capability of data.capabilities) {
+    const paths = data.paths.filter((path) => path.capability === capability)
+    if (paths.length === 0) continue
+    groups.push({
+      title: CAPABILITY_LABEL[capability],
+      stopped: paths.some((path) => path.state === 'stopped'),
+      excluded: false,
+      paths,
+    })
+  }
+  const excluded = data.paths.filter((path) => path.capability === null)
+  if (excluded.length > 0) groups.push({ title: '対象外（止まりません）', stopped: false, excluded: true, paths: excluded })
+
+  return <section className="border-hairline rounded-card overflow-hidden border bg-canvas">
+    <div className="border-hairline border-b px-4 py-3">
+      <h2 className="text-base font-bold text-ink">停止が届く送信経路</h2>
+      <p className="mt-0.5 text-xs text-ink-faint">緊急停止が実際に届く経路と、対象外の経路の一覧です。{formatOperationDate(data.evaluatedAt)}時点</p>
+      {data.problems.length > 0 && <p className="mt-2 rounded-control bg-warning-bg px-3 py-2 text-xs font-bold text-warning" role="alert">台帳と実装がずれています: {data.problems.join(' / ')}</p>}
+    </div>
+    <div className="divide-y divide-hairline">
+      {groups.map((group) => <div key={group.title} className="px-4 py-3">
+        <p className={`text-xs font-bold ${group.excluded ? 'text-ink-faint' : group.stopped ? 'text-danger' : 'text-ink-secondary'}`}>
+          {group.title}{group.stopped ? '（停止中）' : ''}
+        </p>
+        <ul className="mt-2 space-y-1.5">
+          {group.paths.map((path) => <li key={path.id} className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 text-xs">
+            <span className={`shrink-0 rounded-pill px-2 py-0.5 font-bold ${path.state === 'stopped' ? 'bg-danger-bg text-danger' : path.state === 'running' ? 'bg-success-bg text-success' : 'bg-canvas-sunken text-ink-faint'}`}>
+              {path.state === 'stopped' ? '停止中' : path.state === 'running' ? '稼働中' : '対象外'}
+            </span>
+            <span className="min-w-0 font-bold text-ink">{path.label}</span>
+            <span className="text-ink-faint">{SEND_PATH_KIND_LABEL[path.kind]}</span>
+            <span className="min-w-0 flex-1 text-ink-faint" title={path.excludedReason ?? path.note ?? undefined}>{path.excludedReason ?? path.note}</span>
+          </li>)}
+        </ul>
+      </div>)}
+    </div>
+  </section>
 }
 
 function EmergencyControlPanel({ accounts }: { accounts: LineAccount[] }) {
@@ -939,6 +1070,8 @@ function EmergencyControlPanel({ accounts }: { accounts: LineAccount[] }) {
           <section className={`rounded-card border p-4 ${isStopped ? 'border-info bg-info-bg' : impactFailed ? 'border-warning bg-warning-bg' : 'border-info bg-info-bg'}`}>
             <div className="flex flex-wrap items-center justify-between gap-4"><div><h2 className={`text-base font-bold ${impactFailed ? 'text-warning' : 'text-info'}`}>復旧</h2><p className={`mt-1 text-xs ${impactFailed ? 'text-warning' : 'text-info'}`}>{isStopped ? '停止前に動いていたものだけを戻します。期限を過ぎた予約配信は安全のため再開しません。' : impactFailed ? '停止状態を確認できないため、停止・復旧を実行できません。' : `いまは止めていません。復旧できるものはありません。${calculatedAt ? `${formatOperationDate(calculatedAt)}に確認しました。` : ''}`}</p></div>{isStopped && <button onClick={() => { setConfirmWord(''); setStepUpCode(''); setRequestKey(crypto.randomUUID()); setConfirmMode('restore') }} disabled={mutationLocked || !canControl} className="rounded-control border border-info bg-canvas px-4 py-2 text-xs font-bold text-info hover:bg-info-bg disabled:opacity-50">復旧する</button>}</div>
           </section>
+
+          <SendPathCoveragePanel accountId={targetAccountId === 'all' ? null : targetAccountId} revision={control?.version ?? 0} />
         </div>
 
         <aside className="w-full space-y-4 xl:w-96 xl:shrink-0">

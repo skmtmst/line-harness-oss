@@ -3475,6 +3475,19 @@ const spec = {
         },
       },
     },
+    '/api/operations/send-paths': {
+      get: {
+        tags: ['Operations'],
+        summary: '緊急停止が届く送信経路の台帳を一覧する',
+        description: '外部へ届く送信経路ごとに、どの停止対象で止まるか・現在の状態・対象外の理由を返す。台帳と実装の食い違いはproblemsとして返す。',
+        parameters: [{ name: 'account_id', in: 'query', required: false, schema: { type: 'string' } }],
+        responses: {
+          '200': { description: '経路一覧・停止対象ごとの状態・台帳の検査結果' },
+          '403': { description: 'owner/adminではない、またはアカウント範囲外' },
+          '500': { description: '一覧取得失敗' },
+        },
+      },
+    },
     // ── AI development reports ──────────────────────────────────────────────
     '/api/integrations/ai-loop/reports': {
       post: {

@@ -22,6 +22,7 @@ vi.mock('@line-crm/db', () => ({
   updateBroadcast: mocks.updateBroadcast,
   deleteBroadcast: mocks.deleteBroadcast,
   getLineAccountById: vi.fn(),
+  isOperationCapabilityStopped: vi.fn(async () => false),
 }));
 vi.mock('../services/account-access.js', () => ({
   getVisibleLineAccountScope: mocks.scope,

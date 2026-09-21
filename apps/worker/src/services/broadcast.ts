@@ -14,6 +14,7 @@ import {
   buildBroadcastSettleStatements,
   settleBroadcastRecipients,
   isBroadcastStopped,
+  isOperationCapabilityStopped,
 } from '@line-crm/db';
 import type { Broadcast } from '@line-crm/db';
 import type { LineClient } from '@line-crm/line-sdk';
@@ -346,6 +347,11 @@ export async function processBroadcastSend(
 
   try {
     if (broadcast.target_type === 'all') {
+      // 緊急停止 (#1050): 送る直前に broadcast_dispatch を確かめる。
+      // 停止中は status='sending' のまま戻り、完了とは書かない。
+      if (await isOperationCapabilityStopped(db, broadcastAccountId, 'broadcast_dispatch')) {
+        return (await getBroadcastById(db, broadcastId))!;
+      }
       // Use LINE broadcast API (sends to all followers)
       const retryKey = await createBroadcastRetryKey(
         broadcast.id,
@@ -399,7 +405,9 @@ export async function processBroadcastSend(
       for (let i = 0; i < followingFriends.length; i += MULTICAST_BATCH_SIZE) {
         // 次の束へ進む前に停止を読み直す。送り終えた束は取り消せないので、
         // **新しい束を始めないことで止める**。
-        if (await isBroadcastStopped(db, broadcastId)) break;
+        // 緊急停止 (#1050) の broadcast_dispatch も同じ止めどころで読む。
+        if (await isBroadcastStopped(db, broadcastId) ||
+            await isOperationCapabilityStopped(db, broadcastAccountId, 'broadcast_dispatch')) break;
         const batchIndex = Math.floor(i / MULTICAST_BATCH_SIZE);
         const batch = followingFriends.slice(i, i + MULTICAST_BATCH_SIZE);
         const sendable = batch.filter((f) => !blocked.has(f.id));
@@ -472,7 +480,9 @@ export async function processBroadcastSend(
 
     // 停止で束の途中を抜けた配信を「送信済み」にしない（#662）。送り残した
     // 相手がいるのに完了と書くと、再開も失敗分の再送もできなくなる。
-    if (await isBroadcastStopped(db, broadcastId)) {
+    // 緊急停止 (#1050) の broadcast_dispatch も同じく完了にしない。
+    if (await isBroadcastStopped(db, broadcastId) ||
+        await isOperationCapabilityStopped(db, broadcastAccountId, 'broadcast_dispatch')) {
       return (await getBroadcastById(db, broadcastId))!;
     }
     await createBroadcastInsight(db, broadcast.id);
@@ -596,6 +606,12 @@ export async function processScheduledBroadcasts(
       const ownerAccountId = (broadcast as unknown as Record<string, unknown>).line_account_id as string | null;
       // 機能オフ中はclaimせず予約のまま残す。再オンで再開する。
       if (ownerAccountId && !await featureJobCanRun(db, { accountId: ownerAccountId, featureId: 'broadcasts', job: 'broadcast deliveries' })) {
+        continue;
+      }
+      // 緊急停止 (#1050): broadcast_dispatch が止まっている統括は claim せず
+      // 予約のまま残す。停止中に時刻を過ぎた分は、復旧の検査
+      // (holdExpiredBroadcasts) が下書きへ戻し、まとめて追い送りしない。
+      if (await isOperationCapabilityStopped(db, ownerAccountId, 'broadcast_dispatch')) {
         continue;
       }
       // Optimistic lock: claim this broadcast (scheduled → sending)
@@ -724,6 +740,11 @@ export async function processQueuedBroadcasts(
     // 機能オフ中は送信中の続きも止める。行は残るため再オンで再開する。
     const ownerAccountId = (broadcast as unknown as Record<string, unknown>).line_account_id as string | null;
     if (ownerAccountId && !await featureJobCanRun(db, { accountId: ownerAccountId, featureId: 'broadcasts', job: 'broadcast deliveries' })) {
+      continue;
+    }
+    // 緊急停止 (#1050): broadcast_dispatch 停止中はロックを取らず、
+    // 送信中の続きも送らない。行は残るため復旧後に続きから送れる。
+    if (await isOperationCapabilityStopped(db, ownerAccountId, 'broadcast_dispatch')) {
       continue;
     }
     // アカウント別のlineClientを解決
