@@ -29,22 +29,37 @@
   width: min(620px, calc(100vw - 32px));
 }
 
+/*
+  高さは上限だけ決め、本文は .body が中でスクロールする。
+  固定 height + overflow:hidden だと、390px幅など中身が収まらないときに
+  キャンセル/次へボタンごと切れて、どうやっても押せなくなる（ATTR-18）。
+*/
 .selectPanel {
-  height: min(455px, calc(100vh - 32px));
+  max-height: min(455px, calc(100vh - 32px));
 }
 
 .successPanel {
-  height: min(245px, calc(100vh - 32px));
+  max-height: min(245px, calc(100vh - 32px));
 }
 
 .previewPanel {
   width: min(1200px, calc(100vw - 32px));
-  height: min(696px, calc(100vh - 32px));
+  max-height: min(696px, calc(100vh - 32px));
 }
 
 .partialPanel {
   width: min(1000px, calc(100vw - 32px));
-  height: min(511px, calc(100vh - 32px));
+  max-height: min(511px, calc(100vh - 32px));
+}
+
+/* 見出しとボタン列のあいだ。ここだけが縦にスクロールする。 */
+.body {
+  display: flex;
+  min-height: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 18px;
+  overflow-y: auto;
 }
 
 .header {

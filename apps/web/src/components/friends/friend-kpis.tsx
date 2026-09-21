@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { api, type FriendStats } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import SummaryCard from '@/components/shared/summary-card'
@@ -10,24 +10,42 @@ export default function FriendKpis() {
   const { selectedAccountId } = useAccount()
   const [stats, setStats] = useState<FriendStats | null>(null)
   const [loading, setLoading] = useState(true)
+  const [failed, setFailed] = useState(false)
+  /*
+   * FRIEND-08: 応答の世代を照合する。アカウント切替や再試行で
+   * 新しい要求を出したあとに、古い要求の応答が届いても捨てる。
+   */
+  const requestRef = useRef(0)
+
+  const load = useCallback(async (accountId: string | null) => {
+    const requestId = ++requestRef.current
+    const current = () => requestRef.current === requestId
+    /*
+     * 切替直後に前のアカウントの人数を残さない。取り直す前に必ず
+     * 空へ戻し、失敗は0件や前の値で代用せず「取れなかった」と
+     * 再試行を出す。
+     */
+    setStats(null)
+    setFailed(false)
+    setLoading(true)
+    try {
+      const res = await api.friendStats.get(accountId ?? undefined)
+      if (!current()) return
+      if (res.success) {
+        setStats(res.data)
+      } else {
+        setFailed(true)
+      }
+    } catch {
+      if (current()) setFailed(true)
+    } finally {
+      if (current()) setLoading(false)
+    }
+  }, [])
 
   useEffect(() => {
-    let cancelled = false
-    ;(async () => {
-      setLoading(true)
-      try {
-        const res = await api.friendStats.get(selectedAccountId ?? undefined)
-        if (!cancelled && res.success) setStats(res.data)
-      } catch {
-        // 数が出ないだけで一覧は使える。
-      } finally {
-        if (!cancelled) setLoading(false)
-      }
-    })()
-    return () => {
-      cancelled = true
-    }
-  }, [selectedAccountId])
+    void load(selectedAccountId)
+  }, [selectedAccountId, load])
 
   const diff = stats ? stats.addedThisMonth - stats.addedLastMonth : 0
 
@@ -67,10 +85,24 @@ export default function FriendKpis() {
   ]
 
   return (
-    <div className="grid grid-cols-2 gap-3.5 xl:grid-cols-4" data-design="V6FriendKpis" data-design-node="zZMNG">
-      {cards.map((card) => (
-        <SummaryCard key={card.title} {...card} loading={loading} variant="v6" className="!min-h-25 !gap-1 !px-4 !py-3.5" />
-      ))}
+    <div data-design="V6FriendKpis" data-design-node="zZMNG">
+      {failed && !loading ? (
+        <div className="mb-3.5 flex items-center justify-between rounded-card border border-status-danger-border bg-status-danger-soft px-4 py-2.5 text-xs text-danger">
+          <span>友だち集計を読み込めませんでした。</span>
+          <button
+            type="button"
+            onClick={() => void load(selectedAccountId)}
+            className="font-semibold text-action underline"
+          >
+            再読み込み
+          </button>
+        </div>
+      ) : null}
+      <div className="grid grid-cols-2 gap-3.5 xl:grid-cols-4">
+        {cards.map((card) => (
+          <SummaryCard key={card.title} {...card} loading={loading} variant="v6" className="!min-h-25 !gap-1 !px-4 !py-3.5" />
+        ))}
+      </div>
     </div>
   )
 }

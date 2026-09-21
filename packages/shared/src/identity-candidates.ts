@@ -105,6 +105,14 @@ export interface IdentityCandidateList {
   total: number;
   limit: number;
   offset: number;
+  /**
+   * FRIEND-11: 同じ検索条件（状態の絞り込みは除く）で数えた状態別件数。
+   * 一覧が1ページ分しか載らなくても、集計カードは全件の母数を指せる。
+   * 古い worker とのローリング中は省かれることがある（optional）。
+   */
+  statusCounts?: Partial<Record<IdentityCandidateStatus, number>>;
+  /** 同じ検索条件で数えた「根拠が弱い（confidence < 50）」候補の件数。 */
+  lowConfidenceCount?: number;
 }
 
 export interface DetectIdentityCandidatesResult {

@@ -104,8 +104,20 @@ describe('友だち属性 V4 contract', () => {
     expect(migrate).toContain('api.friendFields.migrationPreview(')
     expect(migrate).toContain('事前確認する')
     expect(migrate).not.toContain('dry-run')
-    expect(migrate).toContain('友だちの値や既存の項目は変更しません')
-    expect(migrate).not.toContain('migrationExecute')
+    expect(migrate).toContain('事前確認では値を1件も変更しません')
+    /*
+      ATTR-09: 事前確認で止まらず、確認済みの内容で実行までつなぐ。
+      実行には previewToken と冪等キーが要る（ATTR-10）。
+      以前は `not.toContain('migrationExecute')` で「実行口を持たない」
+      ことを固定していた。それが監査で指摘した欠陥そのものだった。
+    */
+    expect(migrate).toContain('api.friendFields.migrationExecute(')
+    expect(migrate).toContain('移行を実行する')
+    expect(migrate).toContain('previewToken')
+    expect(migrate).toContain('crypto.randomUUID()')
+    // ATTR-10: 確認中に条件を変えたら、飛んでいる確認の応答を捨てる。
+    expect(migrate).toContain('createResponseGate')
+    expect(migrate).toContain('resetConfirmation')
     // 回答フォームはまだアカウント所属を持たない。全体件数を0件と偽らない。
     // **見るのは「口が無いときに数を作らないか」。言い方の字面は固定しない。**
     // 「未取得」の一語だけでは、待てば出るのか・壊れているのかが分からないので、
@@ -122,8 +134,16 @@ describe('友だち属性 V4 contract', () => {
     const empty = source.indexOf('まだ友だち情報欄がありません')
     expect(empty).toBeGreaterThan(-1)
     expect(source.slice(0, empty).lastIndexOf("status === 'error'")).toBeGreaterThan(-1)
-    expect(source).toContain("status === 'ready' ? <Button href=\"/tags/fields/new\"")
-    expect(source).toContain('status === \'ready\' && error')
+    /*
+      #1014 ATTR-22: 「＋ 項目を追加」はタブ行の右に1個だけ。
+      一覧部品は作成ボタンを持たない。
+      #1014 ATTR-02: 操作の失敗は読み込みの失敗（error）とは別の
+      actionError に載せる。再読込で消えて「成功に見える」を防ぐ。
+    */
+    const tabsPage = read('components/friend-fields/tags-page-v4.tsx')
+    expect(tabsPage).toContain('href="/tags/fields/new"')
+    expect(source).not.toContain('href="/tags/fields/new"')
+    expect(source).toContain('status === \'ready\' && actionError')
     expect(source).toContain('onRetry={() => void load()}')
     expect(source).toContain("setError(forbidden ? '' : '再読み込みしても直らない場合はエラー報告へ。')")
     expect(source).toContain('setItems([])')

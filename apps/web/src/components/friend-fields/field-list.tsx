@@ -1,12 +1,13 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { LockKeyhole, Trash2 } from 'lucide-react'
 import ReorderGrip from './reorder-grip'
+import { mergeVisibleOrder, movableIds } from './reorder-utils'
 import type { FriendField, FriendFieldListSummary, FriendFieldType } from '@line-crm/shared'
 import { api, ApiError } from '@/lib/api'
-import Button from '@/components/shared/button'
+import { createResponseGate } from '@/lib/latest-request'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
@@ -55,24 +56,58 @@ export default function FriendFieldList({ accountId }: { accountId: string | nul
   const [summary, setSummary] = useState<FriendFieldListSummary | null>(null)
   const [status, setStatus] = useState<LoadStatus>('loading')
   const [error, setError] = useState('')
+  /*
+    操作の失敗は読み込みの失敗とは別の状態にする（#1014 ATTR-02）。
+    load() の先頭で error を消すので、ここに載せないと「保存に失敗した」
+    が再読込ですぐ消えてしまう。再試行できるのは並び替えだけ。
+  */
+  const [actionError, setActionError] = useState('')
+  const [retryOrder, setRetryOrder] = useState<FriendField[] | null>(null)
   const [query, setQuery] = useState('')
   const [type, setType] = useState<'all' | FriendFieldType>('all')
   const [dragId, setDragId] = useState<string | null>(null)
   const [pendingDelete, setPendingDelete] = useState<FriendField | null>(null)
 
+  /*
+    ATTR-01: アカウント切替のあとに届いた古い応答で一覧を上書きしない。
+    Aの取得中にBへ切り替えると、A→B→A応答の順でB選択中にAの一覧が
+    残った。要求ごとに世代の印を取り、応答時にアカウントと世代の両方が
+    今のものと一致するときだけ反映する。
+  */
+  const gateRef = useRef(createResponseGate())
+  const accountRef = useRef(accountId)
+  accountRef.current = accountId
+
+  /*
+    切替で残るものは閉じる。別アカウントの削除確認や掴んだままの
+    つまみが残ると、表示と操作対象がずれる。
+  */
+  useEffect(() => {
+    gateRef.current.invalidate()
+    setPendingDelete(null)
+    setDragId(null)
+    setError('')
+    setActionError('')
+    setRetryOrder(null)
+  }, [accountId])
+
   const load = useCallback(async () => {
-    if (!accountId) {
+    const account = accountId
+    const token = gateRef.current.begin()
+    if (!account) {
       setItems([]); setSummary(null); setStatus('error'); setError('LINE公式アカウントを選んでください')
       return
     }
     setStatus('loading'); setError('')
     try {
       const [list, stats] = await Promise.all([
-        api.friendFields.list(accountId, { withUsage: true }), api.friendFields.stats(accountId),
+        api.friendFields.list(account, { withUsage: true }), api.friendFields.stats(account),
       ])
+      if (!gateRef.current.current(token) || accountRef.current !== account) return
       if (!list.success || !stats.success) throw new Error('load failed')
       setItems(list.data); setSummary(stats.data); setStatus('ready')
     } catch (reason) {
+      if (!gateRef.current.current(token) || accountRef.current !== account) return
       const forbidden = reason instanceof ApiError && reason.status === 403
       setItems([])
       setStatus(forbidden ? 'forbidden' : 'error')
@@ -89,15 +124,31 @@ export default function FriendFieldList({ accountId }: { accountId: string | nul
     return true
   }), [items, query, type])
 
-  // 並び替えの保存。ドラッグとキーボード（N-049）で同じ経路を使う。
+  /*
+    並び替えの保存。ドラッグとキーボード（N-049）で同じ経路を使う。
+
+    **行ごとの PATCH ではなく /api/friend-fields/reorder へ1回で渡す**
+    （#1014 ATTR-02/03/04）。行ごとだと途中失敗で一部だけ新しい順位が
+    残り、絞り込みで隠れた行や共通項目にも順位が衝突した。サーバーは
+    「動かせる行だけの新しい順」を受け取り、隠れた行と共通項目の位置を
+    保ったまま原子的に書く。
+  */
   const applyOrder = async (next: FriendField[]) => {
     if (!accountId) return
+    const account = accountId
+    const previous = items
     setItems(next)
+    setActionError('')
+    setRetryOrder(null)
     try {
-      await Promise.all(next.filter((field) => !field.isInherited).map((field, index) => api.friendFields.update(field.id, accountId, { displayOrder: index })))
+      const res = await api.friendFields.reorder(account, movableIds(next, (field) => !field.isInherited))
+      if (!res.success) throw new Error(res.error)
       await load()
-    } catch {
-      setError('並び順を保存できませんでした'); await load()
+    } catch (reason) {
+      // 失敗した並びは保存済みと見せず元に戻す。理由と再試行は次の操作まで残す。
+      setItems(previous)
+      setActionError(reason instanceof ApiError ? `並び順を保存できませんでした（${reason.message}）` : '並び順を保存できませんでした')
+      setRetryOrder(next)
     }
   }
 
@@ -108,8 +159,9 @@ export default function FriendFieldList({ accountId }: { accountId: string | nul
     setDragId(null)
     if (from < 0 || to < 0) return
     order.splice(to, 0, ...order.splice(from, 1))
-    const next = order.map((id) => items.find((field) => field.id === id)).filter(Boolean) as FriendField[]
-    await applyOrder(next)
+    const visibleNext = order.map((id) => items.find((field) => field.id === id)).filter(Boolean) as FriendField[]
+    // 絞り込み中は見えている行だけを入れ替え、隠れた行・共通項目の位置を保つ。
+    await applyOrder(mergeVisibleOrder(items, visibleNext, (field) => field.isInherited === true))
   }
 
   /** つまみにフォーカスして ↑/↓。表示中の並びで1つ動かす（N-049）。 */
@@ -119,20 +171,20 @@ export default function FriendFieldList({ accountId }: { accountId: string | nul
     const to = from + direction
     if (from < 0 || to < 0 || to >= order.length) return
     order.splice(to, 0, ...order.splice(from, 1))
-    const next = order.map((i) => items.find((field) => field.id === i)).filter(Boolean) as FriendField[]
-    await applyOrder(next)
+    const visibleNext = order.map((i) => items.find((field) => field.id === i)).filter(Boolean) as FriendField[]
+    await applyOrder(mergeVisibleOrder(items, visibleNext, (field) => field.isInherited === true))
   }
 
   const remove = async (field: FriendField) => {
     if (!accountId) return
     const blockedReason = fieldDeletionBlockedReason(field)
     if (blockedReason) {
-      setError(blockedReason)
+      setActionError(blockedReason)
       return
     }
-    setError('')
+    setActionError('')
     try { await api.friendFields.delete(field.id, accountId); await load() }
-    catch (reason) { setError(reason instanceof ApiError ? reason.message : '削除できませんでした') }
+    catch (reason) { setActionError(reason instanceof ApiError ? reason.message : '削除できませんでした') }
   }
 
   /*
@@ -202,13 +254,31 @@ export default function FriendFieldList({ accountId }: { accountId: string | nul
           {Object.entries(FIELD_TYPE_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
         </select>
         <span className="flex-1" />
-        {status === 'ready' ? <Button href="/tags/fields/new" variant="primary">＋ 項目を追加</Button> : null}
+        {/* 追加ボタンはタブの右に1個だけ（#1014 ATTR-22）。一覧の中には置かない。 */}
       </div>
 
-      {status === 'ready' && error ? <p role="alert" className="mb-4 rounded-control border border-danger/20 bg-danger-bg p-3 text-sm text-danger">{error}</p> : null}
+      {status === 'ready' && actionError ? (
+        <p role="alert" className="mb-4 rounded-control border border-danger/20 bg-danger-bg p-3 text-sm text-danger">
+          {actionError}
+          {retryOrder ? (
+            <button
+              type="button"
+              className="ml-2 font-semibold underline underline-offset-2"
+              onClick={() => {
+                const next = retryOrder
+                setRetryOrder(null)
+                if (next) void applyOrder(next)
+              }}
+            >
+              再試行
+            </button>
+          ) : null}
+        </p>
+      ) : null}
 
       <div className="overflow-hidden rounded-card border border-hairline bg-canvas [box-shadow:1px_1px_2px_rgba(15,23,42,0.10)]">
-        <table className="w-full table-fixed text-sm">
+        {/* 960px以上は表。それ未満は縦に重ねたカード（#1014 ATTR-14）。 */}
+        <table className="hidden w-full table-fixed text-sm md:table">
           <thead className="border-b border-hairline bg-canvas-sunken text-caption text-ink-faint"><tr>
             <Th className="w-14 px-3 py-3">順番</Th><Th className="w-[18%] px-3 py-3">項目名</Th><Th className="w-[13%] px-3 py-3">種類</Th><Th className="w-[10%] px-3 py-3">使用中</Th><Th className="w-[14%] px-3 py-3">回答フォーム</Th><Th className="px-3 py-3">表示先</Th><Th className="w-24 px-3 py-3">操作</Th>
           </tr></thead>
@@ -220,7 +290,12 @@ export default function FriendFieldList({ accountId }: { accountId: string | nul
               : visible.length === 0 ? <tr><td colSpan={7} className="p-0"><ListState kind="empty" title="条件に合う項目はありません" description="項目名か種類を変えてください。" /></td></tr>
               : visible.map((field) => <tr key={field.id} className="hover:bg-canvas-sunken">
                   <td draggable={!field.isInherited} onDragStart={() => setDragId(field.id)} onDragOver={(event) => event.preventDefault()} onDrop={() => void move(field.id)} className={`${field.isInherited ? 'cursor-not-allowed' : 'cursor-grab'} px-3 py-3 text-hairline`}><ReorderGrip label={field.name} disabled={field.isInherited} disabledReason="共通項目は移行後に並び替えできます" onMove={(direction) => void keyboardMove(field.id, direction)} /></td>
-                  <td className="px-3 py-3"><p className="truncate font-semibold text-accent" title={field.name}>{field.name}</p><p className="truncate font-mono text-caption text-ink-faint" title={`{{field.${field.fieldKey}}}`}>{`{{field.${field.fieldKey}}}`}</p></td>
+                  {/*
+                    ATTR-05: 項目名から編集画面へ進める。以前は文字だけで
+                    行操作は移行/削除しかなく、名前・既定値・保護設定を
+                    変える入口がなかった。種類と差し込み名は編集画面でも固定。
+                  */}
+                  <td className="px-3 py-3"><Link href={`/tags/fields/edit?id=${encodeURIComponent(field.id)}`} className="block truncate font-semibold text-accent hover:underline" title={`${field.name}を編集`}>{field.name}</Link><p className="truncate font-mono text-caption text-ink-faint" title={`{{field.${field.fieldKey}}}`}>{`{{field.${field.fieldKey}}}`}</p></td>
                   <td className="px-3 py-3 text-ink">{FIELD_TYPE_LABELS[field.type] ?? field.type}</td>
                   <td className="px-3 py-3 tabular-nums text-ink">{knownUsageCount(field) ?? '—'}{knownUsageCount(field) === null ? '' : '人'}</td>
                   <td className="px-3 py-3 text-ink-faint" title={field.formUsageCount === undefined ? '回答フォームの使用数を取得できません' : undefined}>{field.formUsageCount === undefined ? '—' : `回答フォーム ${field.formUsageCount}個`}</td>
@@ -232,6 +307,47 @@ export default function FriendFieldList({ accountId }: { accountId: string | nul
                 </tr>)}
           </tbody>
         </table>
+        {/*
+          960px未満では表がつぶれて操作列まで届かないので、縦に重ねた
+          カードに切り替える。並び替えはキーボードの ↑/↓ が使える。
+        */}
+        {/* 狭い画面でも、読込・失敗・0件の案内は表と同じ言葉で出す。 */}
+        {status !== 'ready' || items.length === 0 || visible.length === 0 ? (
+          <div className="md:hidden">
+            {status === 'loading' ? <ListState kind="loading" />
+              : status === 'forbidden' ? <ListState kind="forbidden" description="友だち情報欄を見る権限がありません。オーナーか管理者に確認してください。" />
+              : status === 'error' ? <ListState kind="error" description={error || '友だち情報欄を読み込めませんでした。'} onRetry={() => void load()} />
+              : items.length === 0 ? <ListState kind="empty" title="まだ友だち情報欄がありません" description="「＋ 項目を追加」から最初の項目を作ってください。" />
+              : <ListState kind="empty" title="条件に合う項目はありません" description="項目名か種類を変えてください。" />}
+          </div>
+        ) : null}
+        {status === 'ready' && visible.length > 0 ? (
+          <ul className="divide-y divide-hairline md:hidden">
+            {visible.map((field) => (
+              <li key={field.id} className="px-3 py-3">
+                <div className="flex items-start gap-2">
+                  <span className="pt-1 text-hairline">
+                    <ReorderGrip label={field.name} disabled={field.isInherited} disabledReason="共通項目は移行後に並び替えできます" onMove={(direction) => void keyboardMove(field.id, direction)} />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <Link href={`/tags/fields/edit?id=${encodeURIComponent(field.id)}`} className="block truncate font-semibold text-accent hover:underline" title={`${field.name}を編集`}>{field.name}</Link>
+                    <p className="truncate font-mono text-caption text-ink-faint">{`{{field.${field.fieldKey}}}`}</p>
+                    <p className="mt-1 text-xs text-ink-secondary">
+                      {FIELD_TYPE_LABELS[field.type] ?? field.type}・使用中 {knownUsageCount(field) ?? '—'}{knownUsageCount(field) === null ? '' : '人'}
+                    </p>
+                    <p className="text-xs text-ink-faint">
+                      {field.formUsageCount === undefined ? '回答フォーム —' : `回答フォーム ${field.formUsageCount}個`}・{destinationLabel(field)}
+                    </p>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-2 pt-1">
+                    {(knownUsageCount(field) ?? 0) > 0 ? <Link href={`/tags/fields/migrate?id=${encodeURIComponent(field.id)}`} className="text-caption font-semibold text-accent hover:underline">移行</Link> : null}
+                    {field.isInherited ? <span title="共通項目は直接削除できません" className="text-ink-faint"><LockKeyhole size={18} aria-label="共通項目のため削除できません" /></span> : <button type="button" disabled={fieldDeletionBlockedReason(field) !== null} onClick={() => setPendingDelete(field)} aria-label={`${field.name}を削除`} title={fieldDeletionBlockedReason(field) ?? '項目を削除'} className="text-danger hover:opacity-70 disabled:cursor-not-allowed disabled:opacity-30"><Trash2 size={18} /></button>}
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ul>
+        ) : null}
       </div>
 
       <section className="mt-4 rounded-card border border-hairline bg-canvas px-5 py-4 [box-shadow:1px_1px_2px_rgba(15,23,42,0.10)]"><h2 className="text-sm font-bold text-ink">既定値・種類・削除の安全確認</h2><p className="mt-1 text-xs leading-relaxed text-ink-faint">既定値は空欄送信事故を防ぎます。種類は新規登録後に変更不可とし、値が入っている項目は削除せず新しい項目へ移行します。</p></section>

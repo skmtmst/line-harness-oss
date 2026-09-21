@@ -17,7 +17,8 @@ describe('V6 対応マーク', () => {
     const thead = element(LIST, 'thead')
     for (const label of ['順番', 'マーク', '使用中', '初期値', '自動変更', '表示先', '操作']) expect(thead).toContain(label)
     expect(LIST).toContain('利用状態：すべて')
-    expect(LIST).toContain('api.supportMarks.list(accountId)')
+    // ATTR-01: 取得時のアカウントを退避し、応答が届いた時点の選択と照合する。
+    expect(LIST).toContain('api.supportMarks.list(account)')
   })
 
   it('追加編集画面は本文タイトルを置かず、トップバーへ画面名を渡す', () => {
@@ -50,7 +51,7 @@ describe('V6 対応マーク', () => {
   it('影響確認の版と冪等キーを使い、選んだマークへ置換して保管する', () => {
     expect(LIST).toContain('function isUsed(mark: MarkRow)')
     expect(LIST).toContain('referenceCount(mark) > 0')
-    expect(LIST).toContain('api.supportMarks.archiveImpact(mark.id, accountId)')
+    expect(LIST).toContain('api.supportMarks.archiveImpact(mark.id, account)')
     expect(LIST).toContain('impactRevision: archiveImpact.impactRevision')
     expect(LIST).toContain('expectedVersion: archiveImpact.expectedVersion')
     expect(LIST).toContain('crypto.randomUUID()')
@@ -63,9 +64,17 @@ describe('V6 対応マーク', () => {
     expect(LIST).toContain('data-design-node="zGZMA"')
     expect(LIST).toContain('保管後は新しく選べません')
     expect(LIST).toContain('{impact.friendCount}人を「{selected.name}」へ置き換えます。')
-    expect(LIST).toContain("[data-design-part='archive-position']")
-    expect(LIST).toContain('margin-top: 310px')
-    expect(LIST).toContain('max-width: 680px')
+    /*
+      #1014 ATTR-17: 上から310px固定はやめる。390×480では下部の
+      「やめる」「置き換えて保管する」が画面外に出て、スクロールでも
+      届かなかった。画面の中に収め、中身が溢れたら内側だけを流す。
+      見出しと操作は常に見える。
+    */
+    expect(LIST).toContain('data-design-part="archive-position"')
+    expect(LIST).toContain('items-center')
+    expect(LIST).toContain('max-h-[calc(100dvh-2rem)]')
+    expect(LIST).toContain('overflow-y-auto')
+    expect(LIST).not.toContain('margin-top: 310px')
   })
 
   it('タブ行から追加画面へ進める', () => {

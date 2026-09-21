@@ -2393,9 +2393,49 @@ events.get('/api/events/admin/events/:id/bookings', async (c) => {
         LIMIT ? OFFSET ?`,
     )
     .bind(...params, paging.limit, paging.offset)
-    .all();
+    .all<{ id: string } & Record<string, unknown>>();
+  // IDEA-07: 各予約に紐づく通知予定 (前日・開始前) を同じ応答で返す。
+  // 開催回の移動や取消で止まった分も status で返し、変更前後と残存を
+  // 画面から確かめられるようにする。表示中のページ分だけを1回で取る。
+  const bookingIds = (results ?? []).map((row) => row.id);
+  const remindersByBooking = new Map<string, Array<{
+    kind: string;
+    scheduled_at: string;
+    sent_at: string | null;
+    status: string;
+  }>>();
+  if (bookingIds.length > 0) {
+    const reminderRows = await c.env.DB
+      .prepare(
+        `SELECT booking_id, kind, scheduled_at, sent_at, status
+           FROM event_booking_reminders
+          WHERE booking_id IN (${bookingIds.map(() => '?').join(',')})
+          ORDER BY scheduled_at ASC`,
+      )
+      .bind(...bookingIds)
+      .all<{
+        booking_id: string;
+        kind: string;
+        scheduled_at: string;
+        sent_at: string | null;
+        status: string;
+      }>();
+    for (const reminder of reminderRows.results ?? []) {
+      const list = remindersByBooking.get(reminder.booking_id) ?? [];
+      list.push({
+        kind: reminder.kind,
+        scheduled_at: reminder.scheduled_at,
+        sent_at: reminder.sent_at,
+        status: reminder.status,
+      });
+      remindersByBooking.set(reminder.booking_id, list);
+    }
+  }
   return c.json(buildOffsetListResponse({
-    items: results ?? [],
+    items: (results ?? []).map((row) => ({
+      ...row,
+      reminders: remindersByBooking.get(row.id) ?? [],
+    })),
     total: counted?.c ?? 0,
     paging,
     sort: [

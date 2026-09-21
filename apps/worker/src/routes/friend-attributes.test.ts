@@ -19,6 +19,7 @@ const marks = {
   getDefaultSupportMark: vi.fn(),
   setFriendSupportMark: vi.fn(),
   setFriendSupportMarkBulk: vi.fn(),
+  reorderSupportMarks: vi.fn(),
 };
 const searches = {
   getSavedSearches: vi.fn(),
@@ -31,6 +32,7 @@ const searches = {
   getSavedSearchReferences: vi.fn(),
   getSavedSearchUsageCounts: vi.fn(),
   getSavedSearchReferenceUsageCounts: vi.fn(),
+  reorderSavedSearches: vi.fn(),
   SAVED_SEARCH_LIMIT: 50,
   SAVED_SEARCH_SCOPES: ['friends', 'chats', 'bookings'],
   validateSearchConditions: (raw: unknown) => {
@@ -200,6 +202,7 @@ beforeEach(() => {
   });
   marks.setFriendSupportMark.mockResolvedValue(true);
   marks.setFriendSupportMarkBulk.mockResolvedValue(2);
+  marks.reorderSupportMarks.mockResolvedValue(undefined);
   supportMarkAutomation.listSupportMarkAutomationRules.mockResolvedValue([]);
   supportMarkAutomation.listSupportMarkAutomationRulesForAccount.mockResolvedValue([]);
   supportMarkAutomation.createSupportMarkAutomationRule.mockResolvedValue({
@@ -221,6 +224,7 @@ beforeEach(() => {
   searches.getSavedSearchReferences.mockResolvedValue([]);
   searches.getSavedSearchUsageCounts.mockResolvedValue(new Map([['s-1', 4]]));
   searches.getSavedSearchReferenceUsageCounts.mockResolvedValue(new Map());
+  searches.reorderSavedSearches.mockResolvedValue(undefined);
   savedSearchInsights.getSavedSearchMatchInsights.mockResolvedValue(new Map([
     ['s-1', { matchCount: 7, matchCountError: null }],
   ]));
@@ -1183,5 +1187,57 @@ describe('フォルダ', () => {
   it('知らない種類での絞り込みは弾く', async () => {
     const res = await req('/api/folders?kind=planets', 'GET');
     expect(res.status).toBe(400);
+  });
+});
+
+describe('並び替え（#1014 ATTR-02/03/04）', () => {
+  it('対応マークの並び替えは1回の呼び出しで保存される', async () => {
+    const res = await req('/api/support-marks/reorder?lineAccountId=account-1', 'PATCH', { ids: ['m-2', 'm-1'] });
+    expect(res.status).toBe(200);
+    expect(marks.reorderSupportMarks).toHaveBeenCalledTimes(1);
+    expect(marks.reorderSupportMarks).toHaveBeenCalledWith(env.DB,
+      expect.objectContaining({ tenantId: 'tenant-1', lineAccountId: 'account-1' }),
+      ['m-2', 'm-1']);
+  });
+
+  it('対応マークの並び替えはidsが配列でなければ400', async () => {
+    const res = await req('/api/support-marks/reorder?lineAccountId=account-1', 'PATCH', { ids: 'm-1' });
+    expect(res.status).toBe(400);
+    expect(marks.reorderSupportMarks).not.toHaveBeenCalled();
+  });
+
+  it('見えないアカウントの対応マークは並び替えられない', async () => {
+    const res = await req('/api/support-marks/reorder?lineAccountId=account-other', 'PATCH', { ids: ['m-1', 'm-2'] });
+    expect(res.status).toBe(404);
+    expect(marks.reorderSupportMarks).not.toHaveBeenCalled();
+  });
+
+  it('staffは対応マークを並び替えられない', async () => {
+    const res = await req('/api/support-marks/reorder?lineAccountId=account-1', 'PATCH', { ids: ['m-1', 'm-2'] }, 'staff');
+    expect(res.status).toBe(403);
+    expect(marks.reorderSupportMarks).not.toHaveBeenCalled();
+  });
+
+  it('保存した検索の並び替えは1回の呼び出しで保存される', async () => {
+    const res = await req('/api/saved-searches/reorder?lineAccountId=account-1', 'PATCH', { ids: ['s-2', 's-1'] });
+    expect(res.status).toBe(200);
+    expect(searches.reorderSavedSearches).toHaveBeenCalledTimes(1);
+    expect(searches.reorderSavedSearches).toHaveBeenCalledWith(env.DB,
+      expect.objectContaining({ lineAccountId: 'account-1', staffId: 'u-1', canManageAll: true }),
+      ['s-2', 's-1']);
+  });
+
+  it('staffが並び替えても自分が作った検索だけに限るのはdb側の責務', async () => {
+    const res = await req('/api/saved-searches/reorder?lineAccountId=account-1', 'PATCH', { ids: ['s-2', 's-1'] }, 'staff');
+    expect(res.status).toBe(200);
+    expect(searches.reorderSavedSearches).toHaveBeenCalledWith(env.DB,
+      expect.objectContaining({ canManageAll: false }),
+      ['s-2', 's-1']);
+  });
+
+  it('保存した検索の並び替えはidsが配列でなければ400', async () => {
+    const res = await req('/api/saved-searches/reorder?lineAccountId=account-1', 'PATCH', {});
+    expect(res.status).toBe(400);
+    expect(searches.reorderSavedSearches).not.toHaveBeenCalled();
   });
 });

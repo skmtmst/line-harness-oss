@@ -48,6 +48,16 @@ export interface SegmentRule {
     | 'reaction_state'
     | 'score_range'
     /**
+     * 対応状況（chats.status）。友だち一覧の「対応」絞り込みの引継ぎ用。
+     * 画面の条件ビルダーには出さない。
+     */
+    | 'chat_status'
+    /**
+     * 対応の担当者（chats.operator_id）。友だち一覧の「担当者」絞り込みの
+     * 引継ぎ用。画面の条件ビルダーには出さない。
+     */
+    | 'operator_id'
+    /**
      * 分析画面で作った一時対象者（analytics_result_audiences）。friend ID を
      * 条件へ埋めず audience ID だけを持ち、評価のたびに所属・期限を見直す。
      * 画面の条件ビルダーには出さない。
@@ -80,6 +90,10 @@ const NAME_COLUMNS: Record<string, string> = {
 /** 反応状態。messages_log の incoming をどう数えるか。 */
 const REACTION_STATES = ['any', 'reply_or_postback', 'reply', 'postback', 'none'] as const
 export type ReactionState = (typeof REACTION_STATES)[number]
+
+/** 対応状況。chats.status の値。友だち一覧・受信箱の状態名とそろえる。 */
+const CHAT_STATUSES = ['unread', 'in_progress', 'on_hold', 'resolved'] as const
+export type ChatStatus = (typeof CHAT_STATUSES)[number]
 
 function asString(value: unknown, ruleType: string): string {
   if (typeof value !== 'string') {
@@ -270,6 +284,38 @@ function buildRuleClause(rule: SegmentRule): { sql: string; bindings: unknown[] 
       }
       bindings.push(rule.value ? 1 : 0)
       return { sql: `f.is_hidden = ?`, bindings }
+    }
+
+    /*
+     * 対応状況（chats.status）。友だち一覧の「対応」絞り込みと同じ台帳を
+     * 見る。行が無い人は chats 一覧の決まりどおり 'resolved' 扱い。
+     * 友だち一覧からの条件引継ぎで使う。画面の条件ビルダーには出さない。
+     */
+    case 'chat_status': {
+      const v = asString(rule.value, 'chat_status')
+      if (!CHAT_STATUSES.includes(v as ChatStatus)) {
+        throw new Error(`Unknown chat_status: ${v}`)
+      }
+      bindings.push(v)
+      return {
+        sql: `COALESCE((SELECT c.status FROM chats c WHERE c.friend_id = f.id), 'resolved') = ?`,
+        bindings,
+      }
+    }
+
+    /*
+     * 対応の担当者（chats.operator_id）。友だち一覧の「担当者」絞り込みと
+     * 同じ EXISTS 条件。友だち一覧からの条件引継ぎで使う。
+     * 画面の条件ビルダーには出さない。
+     */
+    case 'operator_id': {
+      const v = asString(rule.value, 'operator_id')
+      if (v === '') throw new Error('operator_id rule requires a non-empty value')
+      bindings.push(v)
+      return {
+        sql: `EXISTS (SELECT 1 FROM chats c WHERE c.friend_id = f.id AND c.operator_id = ?)`,
+        bindings,
+      }
     }
 
     /*

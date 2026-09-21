@@ -136,6 +136,29 @@ describe('V6 ウェビナー一覧の契約', () => {
     expect(EDIT).toContain('data-design-node="yxyzQ"')
   })
 
+  it('アーカイブ確認の背景はPCメニューのある幅だけ左を空け、狭い幅は全幅で縦に読める（#985 CHK-02）', () => {
+    const backdrop = PAGE.slice(
+      PAGE.indexOf('function ArchiveReviewBackdrop'),
+      PAGE.indexOf('const WebinarsPageWithTestSupport'),
+    )
+    // 左256pxと上56pxはPCのメニュー・上部バー（1280px以上）が実在する間だけ。
+    expect(backdrop).toContain('xl:left-64 xl:top-14')
+    // 狭い幅は縦に読めるよう切り捨てない。
+    expect(backdrop).toContain('overflow-y-auto')
+    // コメント文ではなく className 属性の中に overflow-hidden が無いこと。
+    expect(backdrop.match(/className="[^"]*overflow-hidden/g) ?? []).toHaveLength(0)
+    // 全幅で左を空ける `left-64` 単独指定へは戻さない。
+    expect(backdrop).not.toContain(' left-64 ')
+  })
+
+  it('アーカイブの失敗は対象を失わず同じ窓で伝える（#985 CHK-02）', () => {
+    expect(PAGE).toContain('setArchiveError')
+    // 成功したときだけ対象を閉じる。
+    expect(PAGE).toContain('setArchiveTarget(null)')
+    // 処理中にキャンセルで閉じない。
+    expect(PAGE).toContain('if (!archiving) setArchiveTarget(null)')
+  })
+
   it('残り12画面を実ノードと直接開ける面に分ける', () => {
     for (const node of ['PV1Vh', 'd3rFGD', 'Ho8z4', 'Xjk8q', 'GB0NR', 'D6yO7e', 'Q8sHa', 'yxyzQ']) {
       expect(EDIT).toContain(`data-design-node="${node}"`)

@@ -901,8 +901,13 @@ export const FRIEND_ADD_CONDITION_MAX_NODES = 200;
  * `analytics_audience` は、友だち追加時の条件として保存させない。
  * イベント申込者・分析対象者へ送る固定snapshotを別の導線から
  * 作れてしまうと、条件ビルダーの権限境界を迂回するためである。
+ * `chat_status` / `operator_id` は友だち一覧→配信の引継ぎ専用で、
+ * 友だち追加時の条件としては保存させない（条件ビルダーにも出ない）。
  */
-type FriendAddSegmentRuleType = Exclude<SegmentRule['type'], 'friend_id_in' | 'analytics_audience'>;
+type FriendAddSegmentRuleType = Exclude<
+  SegmentRule['type'],
+  'friend_id_in' | 'analytics_audience' | 'chat_status' | 'operator_id'
+>;
 
 const SEGMENT_RULE_TYPE_MAP: Record<FriendAddSegmentRuleType, true> = {
   tag_exists: true,

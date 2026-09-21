@@ -251,6 +251,32 @@ export async function countUidMigrationItems(
   return result?.count ?? 0;
 }
 
+export interface UidMigrationDecisionCounts {
+  pending: number;
+  link: number;
+  create: number;
+  exclude: number;
+}
+
+/**
+ * 判断別の件数を1回の集計で返す。
+ * 本移行前の確認画面が「結び付け n 件・除外 m 件」を出すために使う
+ * （FRIEND-33）。表示中のページだけでは全件を数えられないため。
+ */
+export async function countUidMigrationItemDecisions(
+  db: D1Database,
+  runId: string,
+): Promise<UidMigrationDecisionCounts> {
+  const result = await db.prepare(`SELECT decision, COUNT(*) AS count
+    FROM uid_migration_items WHERE run_id = ? GROUP BY decision`)
+    .bind(runId).all<{ decision: UidMigrationDecision; count: number }>();
+  const counts: UidMigrationDecisionCounts = { pending: 0, link: 0, create: 0, exclude: 0 };
+  for (const row of result.results) {
+    if (row.decision in counts) counts[row.decision] = row.count;
+  }
+  return counts;
+}
+
 export function protectCsvCell(value: string | null | undefined): string {
   const raw = value ?? '';
   const safe = /^[=+\-@]/.test(raw) ? `'${raw}` : raw;

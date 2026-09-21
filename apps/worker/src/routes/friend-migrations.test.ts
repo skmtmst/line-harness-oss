@@ -5,6 +5,7 @@ import type { AuthenticatedStaff } from '../middleware/auth.js';
 
 const db = {
   UID_EVIDENCE_TYPES: ['same_provider', 'line_login', 'signed_customer_id', 'verified_contact', 'operator_csv', 'manual'],
+  countUidMigrationItemDecisions: vi.fn(),
   countUidMigrationItems: vi.fn(),
   createUidMigrationRun: vi.fn(),
   getUidMigrationRun: vi.fn(),
@@ -20,7 +21,7 @@ vi.mock('../services/account-access.js', () => accountAccess);
 const { friendMigrations } = await import('./friend-migrations.js');
 const run = vi.fn();
 const first = vi.fn();
-const all = vi.fn(async () => ({ results: [] }));
+const all = vi.fn(async (): Promise<{ results: Array<Record<string, unknown>> }> => ({ results: [] }));
 const bind = vi.fn(() => ({ run, first, all }));
 const prepare = vi.fn((_sql: string) => ({ bind }));
 const env = { DB: { prepare, batch: vi.fn() } as unknown as D1Database };
@@ -54,8 +55,11 @@ beforeEach(() => {
   db.getUidMigrationRun.mockResolvedValue(RUN);
   db.listUidMigrationItems.mockResolvedValue([]);
   db.countUidMigrationItems.mockResolvedValue(0);
+  db.countUidMigrationItemDecisions.mockResolvedValue({ pending: 0, link: 0, create: 0, exclude: 0 });
   db.listUidMigrationRuns.mockResolvedValue([RUN]);
   db.createUidMigrationRun.mockResolvedValue(RUN);
+  run.mockResolvedValue({ meta: { changes: 1 } });
+  vi.mocked(env.DB.batch).mockResolvedValue([]);
 });
 
 describe('UID移行API', () => {
@@ -212,5 +216,163 @@ describe('取り込みの競合検出と実行', () => {
     const response = await appFor().fetch(post('/api/friends/imports/job-3/execute', {}), env);
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({ data: { status: 'completed' } });
+  });
+});
+
+/**
+ * Issue #1012 FRIEND-34/35/36: 一部失敗の切り戻し・移行後変更の照合・
+ * 二重実行の抑止。実Honoルートに模擬DBを当てる。
+ */
+const APPLIED_ITEM = {
+  id: 'item-1', run_id: 'run-1', old_uid: 'UOLD-1', new_uid: 'UNEW-1',
+  old_friend_id: 'f-old', new_friend_id: 'f-new', candidate_name: '候補',
+  evidence_type: 'operator_csv', evidence_json: '{}', classification: 'auto',
+  conflict_reason: null, decision: 'link', decided_by: 'owner-1', decided_at: '2026-09-20T01:00:00Z',
+  result: 'applied',
+  before_json: JSON.stringify({ oldUserId: 'user-a', newUserId: null }),
+  after_json: JSON.stringify({ userId: 'user-merged' }),
+  error_message: null, created_at: '2026-09-20T00:00:00Z', updated_at: '2026-09-20T02:00:00Z',
+};
+
+describe('切り戻しの可否と照合（FRIEND-34/35/36）', () => {
+  it('実行前の移行は切り戻せない', async () => {
+    db.getUidMigrationRun.mockResolvedValue({ ...RUN, status: 'review' });
+    const response = await appFor().fetch(post('/api/friends/migrations/run-1/rollback', {}), env);
+    expect(response.status).toBe(409);
+    expect(prepare.mock.calls.some(([sql]) => /UPDATE\s+friends/i.test(String(sql)))).toBe(false);
+  });
+
+  it('切り戻し済みへの二重実行は何も書かない', async () => {
+    db.getUidMigrationRun.mockResolvedValue({ ...RUN, status: 'rolled_back' });
+    const response = await appFor().fetch(post('/api/friends/migrations/run-1/rollback', {}), env);
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({ error: expect.stringContaining('すでに切り戻し済み') });
+    expect(prepare.mock.calls.some(([sql]) => /UPDATE\s+friends/i.test(String(sql)))).toBe(false);
+    expect(env.DB.batch).not.toHaveBeenCalled();
+  });
+
+  it('失敗0件の移行は切り戻せない', async () => {
+    db.getUidMigrationRun.mockResolvedValue({ ...RUN, status: 'failed', applied_count: 0, failed_count: 2 });
+    const response = await appFor().fetch(post('/api/friends/migrations/run-1/rollback', {}), env);
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({ error: expect.stringContaining('切り戻す対象がありません') });
+  });
+
+  it('一部失敗（failed かつ applied>0）でも反映済みの行だけ切り戻せる', async () => {
+    const partial = { ...RUN, status: 'failed', applied_count: 1, failed_count: 1 };
+    db.getUidMigrationRun.mockResolvedValueOnce(partial).mockResolvedValue({ ...partial, status: 'rolled_back' });
+    db.listUidMigrationItems.mockResolvedValue([
+      APPLIED_ITEM,
+      { ...APPLIED_ITEM, id: 'item-2', result: 'failed', before_json: null, after_json: null },
+    ]);
+    all.mockResolvedValue({ results: [
+      { id: 'f-old', user_id: 'user-merged' },
+      { id: 'f-new', user_id: 'user-merged' },
+    ] });
+    vi.mocked(env.DB.batch).mockResolvedValue([{ meta: { changes: 1 } }, { meta: { changes: 1 } }] as never);
+    const response = await appFor().fetch(post('/api/friends/migrations/run-1/rollback', {}), env);
+    expect(response.status).toBe(200);
+    const body = await response.json() as { data: { status: string; rolledBack: number; rollbackable: boolean } };
+    expect(body.data.status).toBe('rolled_back');
+    expect(body.data.rolledBack).toBe(1);
+    expect(body.data.rollbackable).toBe(false);
+    // FRIEND-35: 現在値をWHERE条件に含む書き戻し（照合と書込みの二重防御）。
+    const sqls = prepare.mock.calls.map(([sql]) => String(sql));
+    expect(sqls.some((sql) => /UPDATE friends SET user_id = \?, updated_at = \? WHERE id = \? AND user_id = \?/.test(sql))).toBe(true);
+    // 失敗行（item-2）へは何も書かない。
+    expect(env.DB.batch).toHaveBeenCalledTimes(1);
+  });
+
+  it('移行後に統合ユーザーが変わった行は1件も書き戻さず競合を返す', async () => {
+    db.getUidMigrationRun.mockResolvedValue({ ...RUN, status: 'completed', applied_count: 1 });
+    db.listUidMigrationItems.mockResolvedValue([APPLIED_ITEM]);
+    all.mockResolvedValue({ results: [
+      { id: 'f-old', user_id: 'user-other' },
+      { id: 'f-new', user_id: 'user-merged' },
+    ] });
+    const response = await appFor().fetch(post('/api/friends/migrations/run-1/rollback', {}), env);
+    expect(response.status).toBe(409);
+    const body = await response.json() as { data: { conflicts: Array<{ itemId: string; reason: string }> } };
+    expect(body.data.conflicts).toHaveLength(1);
+    expect(body.data.conflicts[0].itemId).toBe('item-1');
+    expect(prepare.mock.calls.some(([sql]) => /UPDATE\s+friends/i.test(String(sql)))).toBe(false);
+    expect(env.DB.batch).not.toHaveBeenCalled();
+  });
+
+  it('前回の切り戻しが途中で止まった行は冪等に rolled_back へ寄せる', async () => {
+    db.getUidMigrationRun.mockResolvedValueOnce({ ...RUN, status: 'completed', applied_count: 1 })
+      .mockResolvedValue({ ...RUN, status: 'rolled_back', applied_count: 1 });
+    db.listUidMigrationItems.mockResolvedValue([APPLIED_ITEM]);
+    // friends はすでに移行前の状態（user-a / null）へ戻っている。
+    all.mockResolvedValue({ results: [
+      { id: 'f-old', user_id: 'user-a' },
+      { id: 'f-new', user_id: null },
+    ] });
+    const response = await appFor().fetch(post('/api/friends/migrations/run-1/rollback', {}), env);
+    expect(response.status).toBe(200);
+    const body = await response.json() as { data: { status: string; rolledBack: number } };
+    expect(body.data.status).toBe('rolled_back');
+    expect(body.data.rolledBack).toBe(1);
+    // friends への UPDATE は発行せず、項目の result だけ寄せる。
+    expect(prepare.mock.calls.some(([sql]) => /UPDATE\s+friends/i.test(String(sql)))).toBe(false);
+    const sqls = prepare.mock.calls.map(([sql]) => String(sql));
+    expect(sqls.some((sql) => /UPDATE uid_migration_items SET result = 'rolled_back'/.test(sql))).toBe(true);
+  });
+
+  it('staffは切り戻せない', async () => {
+    const response = await appFor({ id: 'staff-1', name: '担当者', role: 'staff', readOnly: false })
+      .fetch(post('/api/friends/migrations/run-1/rollback', {}), env);
+    expect(response.status).toBe(403);
+  });
+});
+
+describe('一部失敗からの再実行（FRIEND-34）', () => {
+  it('未判断の残っていない失敗履歴は再実行でき、反映済みの行は触らない', async () => {
+    const partial = { ...RUN, status: 'failed', applied_count: 1, failed_count: 1 };
+    db.getUidMigrationRun.mockResolvedValueOnce(partial).mockResolvedValue({ ...partial, status: 'completed' });
+    db.countUidMigrationItems.mockResolvedValue(0);
+    db.listUidMigrationItems.mockResolvedValue([
+      APPLIED_ITEM,
+      { ...APPLIED_ITEM, id: 'item-2', result: 'failed', old_friend_id: 'f-o2', new_friend_id: 'f-n2' },
+    ]);
+    all.mockResolvedValue({ results: [
+      { id: 'f-o2', user_id: null, display_name: '旧2' },
+      { id: 'f-n2', user_id: 'user-x', display_name: '新2' },
+    ] });
+    // recountMigrationResults の集計。
+    first.mockResolvedValue({ applied: 2, failed: 0 });
+    const response = await appFor({ id: 'owner-2', name: '別のowner', role: 'owner', readOnly: false })
+      .fetch(post('/api/friends/migrations/run-1/execute', {}), env);
+    expect(response.status).toBe(200);
+    const body = await response.json() as { data: { status: string } };
+    expect(body.data.status).toBe('completed');
+    // applied 済みの item-1 は再適用しない。書き込みは item-2 の1件分だけ。
+    expect(env.DB.batch).toHaveBeenCalledTimes(1);
+  });
+
+  it('完了済みの移行は再実行しない', async () => {
+    db.getUidMigrationRun.mockResolvedValue({ ...RUN, status: 'completed' });
+    const response = await appFor({ id: 'owner-2', name: '別のowner', role: 'owner', readOnly: false })
+      .fetch(post('/api/friends/migrations/run-1/execute', {}), env);
+    expect(response.status).toBe(409);
+  });
+
+  it('失敗した移行でも判断を直せる', async () => {
+    db.getUidMigrationRun.mockResolvedValue({ ...RUN, status: 'failed', applied_count: 1, failed_count: 1 });
+    first.mockReset();
+    first.mockResolvedValueOnce({ id: 'item-2', run_id: 'run-1', old_friend_id: 'f-o2', new_friend_id: 'f-n2', decision: 'link' })
+      .mockResolvedValue({ count: 0 });
+    const response = await appFor().fetch(new Request('https://example.com/api/friends/migrations/run-1/items/item-2', {
+      method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ decision: 'exclude' }),
+    }), env);
+    expect(response.status).toBe(200);
+  });
+
+  it('判断別の件数を対応表の応答へ載せる（FRIEND-33）', async () => {
+    db.countUidMigrationItemDecisions.mockResolvedValue({ pending: 0, link: 3, create: 0, exclude: 2 });
+    const response = await appFor().fetch(new Request('https://example.com/api/friends/migrations/run-1'), env);
+    expect(response.status).toBe(200);
+    const body = await response.json() as { data: { decisionCounts: { link: number; exclude: number } } };
+    expect(body.data.decisionCounts).toMatchObject({ link: 3, exclude: 2 });
   });
 });

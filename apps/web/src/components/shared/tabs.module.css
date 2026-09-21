@@ -84,3 +84,25 @@
 .current .count {
   color: var(--color-accent-deep);
 }
+
+/*
+ * #1014 U029: 390pxではタブ4個と右端の操作が44pxの1行に入らず、
+ * 重なって読めなかった。狭い画面ではタブ行を折り返し、タブは横に
+ * 流せる（スクロール）、操作は次の行へ下ろす。高さ固定も外す。
+ */
+@media (max-width: 767px) {
+  .list {
+    flex-wrap: wrap;
+    height: auto;
+    padding-bottom: 8px;
+  }
+
+  .items {
+    flex: 1 1 100%;
+    overflow-x: auto;
+  }
+
+  .actions {
+    padding-bottom: 0;
+  }
+}

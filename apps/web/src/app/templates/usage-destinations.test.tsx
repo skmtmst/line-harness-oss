@@ -75,6 +75,13 @@ vi.mock('@/lib/api', () => ({
     tags: { list: () => Promise.resolve({ success: true, data: [] }) },
     supportMarks: { list: () => Promise.resolve({ success: true, data: [] }) },
     scenarios: { list: () => Promise.resolve({ success: true, data: [] }) },
+    // 編集画面の差し込み口が読む機能のオン／オフ。全部 on に固定する。
+    featureSettings: {
+      visibility: () => Promise.resolve({
+        success: true,
+        data: { features: { friend_fields: true, common_vars: true } },
+      }),
+    },
   },
 }))
 
@@ -95,6 +102,7 @@ vi.mock('next/link', () => ({
 import TemplatesPage from './page'
 import TemplateDetailPage from './detail/page'
 import QuestionTemplatePage from './questions/new/page'
+import TemplateEditPage from './edit/page'
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -219,6 +227,51 @@ describe('テンプレート一覧の差し替え導線 (#891 N-135)', () => {
     const automationText = screen.getByText('オートメーション: 予約後フォロー', { exact: false })
     expect(automationText.closest('a')).toBeNull()
     expect(automationText.textContent).toContain('旧形式')
+  })
+})
+
+describe('テンプレート編集の利用先表示 (IDEA-11)', () => {
+  async function renderEditAndWait(usedBy = USED_BY) {
+    stubTemplateGet(usedBy)
+    searchParams.value = new URLSearchParams('id=tpl-1')
+    render(<TemplateEditPage />)
+    await act(async () => { await Promise.resolve() })
+    await act(async () => { await Promise.resolve() })
+    await act(async () => { await Promise.resolve() })
+    await screen.findByText('この変更が使われる場所（6か所）')
+  }
+
+  test('使用中のテンプレートは、保存の手前に利用先と予告が出る', async () => {
+    await renderEditAndWait()
+
+    // 保存すると利用先へそのまま届くことが、保存の手前で分かる。
+    expect(screen.getByText(/新しい内容がそのまま使われます/)).toBeTruthy()
+    expect(screen.getByText('シナリオ「来店後」2通目').closest('a')?.getAttribute('href'))
+      .toBe('/scenarios/detail?id=sc-1')
+    expect(screen.getByText('自動応答「予約」の返信').closest('a')?.getAttribute('href'))
+      .toBe('/auto-replies/edit?id=ar-1')
+    expect(screen.getByText('リマインダ「前日案内」').closest('a')?.getAttribute('href'))
+      .toBe('/reminders/edit?id=re-1')
+    expect(screen.getByText('リッチメニュー「基本」表').closest('a')?.getAttribute('href'))
+      .toBe('/rich-menus/edit?id=rg-1')
+    expect(screen.getByText('流入リンク「広告A」').closest('a')?.getAttribute('href'))
+      .toBe('/inflow-links/detail?id=tl-1')
+    // 旧形式オートメーションはリンクにしない
+    const automation = screen.getByText(/オートメーション「予約後フォロー」/)
+    expect(automation.closest('a')).toBeNull()
+    expect(automation.textContent).toContain('旧形式')
+  })
+
+  test('使われていないテンプレートは「どこからも呼ばれていません」と出る', async () => {
+    stubTemplateGet(EMPTY_USED_BY)
+    searchParams.value = new URLSearchParams('id=tpl-1')
+    render(<TemplateEditPage />)
+    await act(async () => { await Promise.resolve() })
+    await act(async () => { await Promise.resolve() })
+    await act(async () => { await Promise.resolve() })
+    await screen.findByText('この変更が使われる場所（0か所）')
+
+    expect(screen.getByText('このテンプレートはまだどこからも呼ばれていません。')).toBeTruthy()
   })
 })
 

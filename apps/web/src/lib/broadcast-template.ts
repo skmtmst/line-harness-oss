@@ -15,6 +15,10 @@ export interface BroadcastTemplateOption {
   category: string
   messageType: string
   messageContent: string
+  /** 置き場。未分類は null。選択窓のフォルダ絞り込みに使う（IDEA-11）。 */
+  folderId?: string | null
+  /** 持ち主のLINEアカウント。アカウント切替で持ち主を追跡するために残す。 */
+  accountId?: string | null
   usageCount?: number
   updatedAt?: string
 }

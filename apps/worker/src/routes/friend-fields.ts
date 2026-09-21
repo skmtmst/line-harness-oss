@@ -5,6 +5,7 @@ import {
   getFriendFieldByIdForScope,
   createFriendFieldForScope,
   updateFriendField,
+  reorderFriendFields,
   deleteFriendField,
   countFriendFieldValuesForScope,
   countFriendFieldValuesForScopes,
@@ -595,6 +596,36 @@ friendFields.post('/api/friend-fields', requireRole('owner', 'admin'), async (c)
 // 種類と差し込み名はここでは変えられない。種類を変えると既に入っている値の
 // 意味が変わり（「犬」が数値項目になる等）、差し込み名を変えると
 // テンプレートの差し込みが黙って空になる。どちらも作り直してもらう。
+/**
+ * PATCH /api/friend-fields/reorder — 並び順をまとめて書く（#1014 ATTR-02/03/04）。
+ *
+ * /api/friend-fields/:id より前に置く。:id に "reorder" として
+ * 食われないようにするため（/api/tags/reorder と同じ並び）。
+ * 画面は「動かせる行だけの新しい順」を送り、隠れた行と共通項目の
+ * 位置はサーバー側で保つ。
+ */
+friendFields.patch('/api/friend-fields/reorder', requireRole('owner', 'admin'), async (c) => {
+  try {
+    const scope = await friendFieldAccess(c);
+    if (scope instanceof Response) return scope;
+    const body = await c.req.json<{ ids?: unknown }>();
+    if (!Array.isArray(body.ids) || body.ids.some((id) => typeof id !== 'string')) {
+      return c.json({ success: false, error: 'ids must be an array of field ids' }, 400);
+    }
+    if (body.ids.length > 500) {
+      return c.json({ success: false, error: 'too many ids' }, 400);
+    }
+    if (new Set(body.ids).size !== body.ids.length) {
+      return c.json({ success: false, error: 'ids must not contain duplicates' }, 400);
+    }
+    await reorderFriendFields(c.env.DB, scope, body.ids as string[]);
+    return c.json({ success: true, data: { updated: body.ids.length } });
+  } catch (err) {
+    console.error('PATCH /api/friend-fields/reorder error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
 friendFields.patch('/api/friend-fields/:id', requireRole('owner', 'admin'), async (c) => {
   try {
     const scope = await friendFieldAccess(c);

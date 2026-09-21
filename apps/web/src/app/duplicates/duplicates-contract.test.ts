@@ -31,3 +31,39 @@ describe('重複検出の表見出しと0件表示（#984 LAY-12/16）', () => {
     expect(PAGE).toContain("setQuery(''); setStatus('')")
   })
 })
+
+/**
+ * #1011 FRIEND-11/12: 候補は51件目以降へも辿れるように、ページ送りと
+ * サーバー側検索を持つ。「すべて」は全状態を見る。失敗は0件と区別し、
+ * 状態切替の先行応答が後から届いても採用しない。
+ */
+describe('重複候補の全件到達と応答の新旧管理（#1011 FRIEND-11/12）', () => {
+  it('ページ送りとサーバー側の検索・状態絞り込みを持つ', () => {
+    expect(PAGE).toContain("import Pagination from '@/components/shared/pagination'")
+    expect(PAGE).toContain('offset: (page - 1) * CANDIDATE_PAGE_SIZE')
+    expect(PAGE).toContain('q: debouncedQuery.trim() || undefined')
+    // 「すべて」は status を送って全状態を見る（pending固定ではない）。
+    expect(PAGE).toContain("status: (status || 'all')")
+  })
+
+  it('集計は読み込んだ1ページ分ではなく全件の件数を出す', () => {
+    expect(PAGE).toContain('statusCounts')
+    expect(PAGE).toContain('lowConfidenceCount')
+  })
+
+  it('条件を変えたら1ページ目へ戻り、検索入力はdebounceする', () => {
+    expect(PAGE).toContain('setPage(1)')
+    expect(PAGE).toContain('[debouncedQuery, status]')
+    expect(PAGE).toContain('setDebouncedQuery(query)')
+  })
+
+  it('失敗を0件と区別し、古い応答を採用しない', () => {
+    expect(PAGE).toContain('candidateError')
+    expect(PAGE).toContain('候補一覧を読み込めませんでした')
+    // 世代番号と条件キーの両方で応答を照合する。
+    expect(PAGE).toContain('candidatesReqRef.current')
+    expect(PAGE).toContain('candidatesKeyRef.current !== key')
+    // 失敗時は件数表示へ進まず、読み込み待ちを0件と誤認させない。
+    expect(PAGE.indexOf('candidateError ?')).toBeLessThan(PAGE.indexOf('candidateTotal === 0 && !candidatesLoading'))
+  })
+})

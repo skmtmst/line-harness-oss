@@ -3,7 +3,7 @@
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import { Bookmark, Check, Circle, SlidersHorizontal, Star } from 'lucide-react'
+import { Bookmark, Check, Circle, Megaphone, SlidersHorizontal, Star } from 'lucide-react'
 import type { Scenario, Tag } from '@line-crm/shared'
 import { api, ApiError, fetchApi, type FriendListItem, type SupportMarkListItem } from '@/lib/api'
 import FriendKpis from '@/components/friends/friend-kpis'
@@ -27,6 +27,8 @@ import { csvExportLine } from './csv-export'
 import BulkRunDialog from '@/components/friends/bulk-run-dialog'
 import { canRunBulk } from '@/components/friends/bulk-run-view'
 import { FRIENDS_MERGED_TABS } from './friends-tabs'
+import { buildBroadcastHandoff } from '@/lib/friends-broadcast-condition'
+import { readFriendsListSnapshot, writeFriendsListSnapshot } from './list-state'
 const PAGE_SIZE_OPTIONS = [10, 20, 30, 40, 50] as const
 /*
   検索行の副操作は設計 `PhxG6` で高さ38px。共通Buttonは36pxなので当てない
@@ -59,7 +61,7 @@ function FriendsPageInner({
   onNotice: (notice: Notice) => void
   onExportReady: (exporter: (() => void) | null) => void
 }) {
-  const { selectedAccountId, selectedAccount } = useAccount()
+  const { selectedAccountId, selectedAccount, loading: accountLoading } = useAccount()
   /*
     保存した検索・対応マークは任意機能。オフのaccountではAPIを呼ばず、
     入口も出さない（呼ぶと 403 で画面全体が共通ゲートへ切り替わる）。
@@ -110,6 +112,55 @@ function FriendsPageInner({
   loadContextRef.current = { accountId: selectedAccountId, page, pageSize }
 
   /*
+   * IDEA-03「3ページ以上の移動と戻る操作で条件・位置を保持」。
+   * 一覧 → 詳細 → 戻る で React 状態は消えるので、絞り込みとページを
+   * sessionStorage へ写し、戻ってきた mount で復元する。
+   * URL 直指定の絞り込み（?scoreMin= ?audienceId= ?savedSearch=）が
+   * あるときはそちらを優先し、保存値で上書きしない。
+   */
+  const restoredRef = useRef(false)
+  const [restored, setRestored] = useState(false)
+  const hasExplicitUrlFilters = hasScoreRange || audienceId !== '' || Boolean(directSavedSearchId)
+  useEffect(() => {
+    if (restoredRef.current || accountLoading) return
+    restoredRef.current = true
+    if (!hasExplicitUrlFilters && selectedAccountId) {
+      const snapshot = readFriendsListSnapshot(selectedAccountId)
+      if (snapshot) {
+        setSearchInput(snapshot.searchInput)
+        setSearchSubmitted(snapshot.searchSubmitted)
+        setSelectedTagId(snapshot.selectedTagId)
+        setResponseFilter(snapshot.responseFilter)
+        setOperatorId(snapshot.operatorId)
+        setScenarioId(snapshot.scenarioId)
+        setAttentionOnly(snapshot.attentionOnly)
+        setSortMode(snapshot.sortMode)
+        setPageSize(snapshot.pageSize as (typeof PAGE_SIZE_OPTIONS)[number])
+        setPage(snapshot.page)
+        setAdvanced(snapshot.advanced)
+      }
+    }
+    setRestored(true)
+  }, [accountLoading, selectedAccountId, hasExplicitUrlFilters])
+
+  useEffect(() => {
+    if (!restored || !selectedAccountId) return
+    writeFriendsListSnapshot(selectedAccountId, {
+      searchInput,
+      searchSubmitted,
+      selectedTagId,
+      responseFilter,
+      operatorId,
+      scenarioId,
+      attentionOnly,
+      sortMode,
+      page,
+      pageSize,
+      advanced,
+    })
+  }, [restored, selectedAccountId, searchInput, searchSubmitted, selectedTagId, responseFilter, operatorId, scenarioId, attentionOnly, sortMode, page, pageSize, advanced])
+
+  /*
     **URLから来る絞り込みも数える。** 行動スコアの「この帯の人を見る」は
     `?scoreMin=` で開く。数え落とすと、その帯に誰もいないときに
     「まだ友だちがいません」と出て、絞り込んだ結果だと分からなくなる。
@@ -127,6 +178,33 @@ function FriendsPageInner({
   })
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize))
+
+  /*
+   * IDEA-03「検索から配信等へ進むときは対象条件を引き継ぐ」。
+   * 条件そのものを配信作成へ渡し、人数は配信側が最新の友だちへ
+   * 再評価する（表示中の友だちのID一覧を対象にはしない）。
+   * 引き継げない条件が混ざるときは出さない（対象が広がって誤配信になる）。
+   */
+  const broadcastHandoff = useMemo(
+    () =>
+      buildBroadcastHandoff({
+        searchSubmitted,
+        selectedTagId,
+        responseFilter,
+        operatorId,
+        scenarioId,
+        attentionOnly,
+        scoreMin,
+        scoreMax,
+        audienceId,
+        advanced,
+      }),
+    [searchSubmitted, selectedTagId, responseFilter, operatorId, scenarioId, attentionOnly, scoreMin, scoreMax, audienceId, advanced],
+  )
+  const broadcastHandoffHref =
+    broadcastHandoff.kind === 'ready' && canRunBulk(selectedAccount?.role)
+      ? `/broadcasts/new?condition=${encodeURIComponent(JSON.stringify(broadcastHandoff.condition))}`
+      : null
 
   const toggleSelect = useCallback((id: string) => {
     setSelectedIds((previous) => {
@@ -233,11 +311,14 @@ function FriendsPageInner({
     setPage(1)
   }, [directSavedSearchId, savedSearchEnabled])
   useEffect(() => {
+    // 復元を評価するまでは読まない。既定条件で一度読んでから
+    // 保存条件で読み直すと、一瞬別の一覧が見えて条件を2回取る。
+    if (!restored) return
     void loadFriends()
     return () => {
       loadRequestRef.current += 1
     }
-  }, [loadFriends])
+  }, [loadFriends, restored])
   useEffect(() => {
     /*
      * 読み込みの間は loadFriends が total を 0 に落とすので、ここで
@@ -388,7 +469,7 @@ function FriendsPageInner({
           </div>
         ) : null}
 
-        <div className="mt-2.5 flex min-w-0 items-center gap-2.5">
+        <div className="mt-2.5 flex min-w-0 flex-wrap items-center gap-2.5">
           <span className="shrink-0 text-sm font-semibold text-ink-secondary">絞り込み</span>
           {/*
             絞り込み4つは共通 Select（設計 h42 / r8 / 文字13・600）。
@@ -451,6 +532,17 @@ function FriendsPageInner({
             注目のみ
           </button>
           <span className="shrink-0 whitespace-nowrap text-xs text-ink-faint">{loadStatus === 'ready' ? `${total.toLocaleString('ja-JP')}件` : '—'}</span>
+          {broadcastHandoffHref ? (
+            <Link
+              href={broadcastHandoffHref}
+              data-broadcast-handoff
+              className="ml-auto inline-flex h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-control border border-accent-border bg-accent-soft px-3 text-xs font-bold text-accent-hover hover:brightness-95"
+              title="今の絞り込み条件を対象に一斉配信を作ります。人数は送信時に最新の友だちへ計算し直します。"
+            >
+              <Megaphone aria-hidden="true" className="h-3.5 w-3.5" />
+              この条件で配信を作成
+            </Link>
+          ) : null}
         </div>
         {optionsFailed ? (
           <p className="mt-2 text-xs text-ink-secondary">
@@ -571,7 +663,23 @@ function FriendsPageInner({
             setAdvancedOpen(false)
             setSavedOpen(true)
           }}
-          onApply={(result) => { setAdvanced(result); setAdvancedOpen(false); setPage(1) }}
+          /*
+           * FRIEND-04/32: 条件・並び順・件数を1つの適用結果として受け取り、
+           * 一覧側の選択状態も同じ値へそろえる。ダイアログを再度開いたときは
+           * 適用中の編集状態（applied.editorState）から再開する。
+           */
+          applied={advanced}
+          initialSort={sortMode}
+          initialLimit={pageSize}
+          onApply={(result) => {
+            setAdvanced(result)
+            if (result.params.sort) setSortMode(result.params.sort)
+            if (result.params.limit && PAGE_SIZE_OPTIONS.includes(Number(result.params.limit) as (typeof PAGE_SIZE_OPTIONS)[number])) {
+              setPageSize(Number(result.params.limit) as (typeof PAGE_SIZE_OPTIONS)[number])
+            }
+            setAdvancedOpen(false)
+            setPage(1)
+          }}
           features={{ savedSearch: savedSearchEnabled, marks: marksEnabled, fields: featureVisibility.enabled('friend_fields') }}
         />
       </div>

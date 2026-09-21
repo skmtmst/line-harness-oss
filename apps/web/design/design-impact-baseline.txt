@@ -133,6 +133,7 @@ shared-button-importer app/staff/invite/page.tsx
 shared-button-importer app/staff/page.tsx
 shared-button-importer app/settings/manual-links/page.tsx
 shared-button-importer app/settings/page.tsx
+shared-button-importer app/tags/fields/edit/page.tsx
 shared-button-importer app/tags/fields/migrate/page.tsx
 shared-button-importer app/tags/fields/new/page.tsx
 shared-button-importer app/tags/folders/new/page.tsx
@@ -167,7 +168,6 @@ shared-button-importer components/dashboard/qr-dialog.tsx
 shared-button-importer components/feature-disabled-gate.tsx
 shared-button-importer components/forms/hq-form-definition-editor.tsx
 shared-button-importer components/friend-fields/edit-tag-page-v4.tsx
-shared-button-importer components/friend-fields/field-list.tsx
 shared-button-importer components/friend-fields/mark-list.tsx
 shared-button-importer components/friend-fields/saved-search-list.tsx
 shared-button-importer components/friend-fields/support-mark-editor.tsx
