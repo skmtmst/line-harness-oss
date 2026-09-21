@@ -213,10 +213,15 @@ export type CommonVarUsageKind =
 
 export interface CommonVarUsageImpact {
   total: number;
-  /** 過去に送り終わった配信を除き、削除すると現在の設定が壊れる件数。 */
+  /**
+   * 過去に送り終わった配信と、送信開始時の値で固定済みの配信中を除き、
+   * 削除すると現在の設定が壊れる件数。
+   */
   blockingTotal: number;
   /** 送信済みで、共通情報を削除しても過去の配信内容が変わらない件数。 */
   historicalTotal: number;
+  /** 配信中で、送信開始時に固定した値の写しがある件数。保存・削除で変わらない。 */
+  sendingFixedTotal: number;
   /** LINEアカウントへの所属が無く、名前や本文を安全に返せない古いフォーム。 */
   unscopedFormTotal: number;
   byKind: Record<CommonVarUsageKind, number>;
@@ -261,8 +266,14 @@ const COMMON_VAR_USAGE_QUERIES: Array<{
   },
   {
     kind: 'broadcast',
+    // IDEA-14: 送信を始めた配信は、使う共通情報の値を送信開始時点の
+    // スナップショットで固定する（common-var-snapshot.ts）。固定済みのものは
+    // 共通情報を直してももう変わらないので、予約中とは別の状態名で返す。
+    // snapshot がまだ無い sending（開始直後の短い隙間・失敗からの再開待ち）は
+    // 再開時にいまの値を読むため、変わる側に残す。
     sql: `SELECT b.id AS source_id, NULL AS source_parent_id, b.title AS source_name,
-                 b.status AS source_status,
+                 CASE WHEN b.status = 'sending' AND b.common_var_snapshot IS NOT NULL
+                      THEN 'sending_fixed' ELSE b.status END AS source_status,
                  CASE WHEN instr(coalesce(b.message_content, ''), ?) > 0
                       THEN b.message_content ELSE coalesce(b.message_bubbles_json, '') END AS source_content,
                  CASE WHEN b.status = 'sent' THEN 1 ELSE 0 END AS is_historical
@@ -631,11 +642,18 @@ export async function getCommonVarUsageImpact(
     (sum, item) => sum + (item.is_historical === 1 ? 1 : 0),
     0,
   );
+  // 送信開始時の値で固定済みの配信中は、値を変えても消してもその配信は
+  // 変わらない（写しを持つ）。変わる・壊れる件数には入れない。
+  const sendingFixedTotal = items.reduce(
+    (sum, item) => sum + (item.source_status === 'sending_fixed' ? 1 : 0),
+    0,
+  );
   const total = items.length + unscopedFormTotal;
   return {
     total,
-    blockingTotal: total - historicalTotal,
+    blockingTotal: total - historicalTotal - sendingFixedTotal,
     historicalTotal,
+    sendingFixedTotal,
     unscopedFormTotal,
     byKind,
     items,

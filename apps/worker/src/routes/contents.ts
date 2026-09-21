@@ -1498,6 +1498,7 @@ function emptyCommonVarUsageImpact(): CommonVarUsageImpact {
     total: 0,
     blockingTotal: 0,
     historicalTotal: 0,
+    sendingFixedTotal: 0,
     unscopedFormTotal: 0,
     byKind: Object.fromEntries(
       Object.keys(COMMON_VAR_USAGE_KIND_LABELS).map((kind) => [kind, 0]),
@@ -1556,13 +1557,29 @@ function commonVarUsageHref(item: CommonVarUsageItem): string {
   }
 }
 
+/*
+ * 使用先の状態の呼び名。画面はこの語彙だけを信用するため、処理と違う
+ * 言い方をしない（IDEA-14）。
+ *
+ * - sending_fixed: 送信を始めた配信。値は送信開始時点の写しで固定済みで、
+ *   共通情報を直してもその配信は変わらない。
+ * - scheduled: 配信予約中。送信を始めるときに、その時点の値で送られる。
+ * - published: 公開版。次に送る・実行されるときから新しい値が入る。
+ */
 function commonVarUsageStatus(item: CommonVarUsageItem): string {
   if (item.is_historical === 1) return '送信済み・変わりません';
+  if (item.source_status === 'sending_fixed') return '配信中（送信開始時の値で固定済み）';
   if (item.source_status === 'scheduled') return '配信予約中';
   if (item.source_status === 'sending') return '配信中';
   if (item.source_status === 'draft') return '下書き';
+  if (item.source_status === 'published') return '公開中';
   if (item.source_status === 'stopped') return '停止中';
   return '使われています';
+}
+
+/** 保存・削除でこの使用先が変わるか。送信済みと値が固定済みの配信中は変わらない。 */
+function commonVarUsageChangesOnSave(item: CommonVarUsageItem): boolean {
+  return item.is_historical !== 1 && item.source_status !== 'sending_fixed';
 }
 
 function serializeCommonVarDeleteImpact(
@@ -1579,13 +1596,17 @@ function serializeCommonVarDeleteImpact(
     unscopedFormTotal: impact.unscopedFormTotal,
     canDelete,
     byKind: impact.byKind,
+    // sending_fixed は「配信中だが値が固定済み」。消してもその配信は壊れない。
+    sendingFixedTotal: impact.items.filter(
+      (item) => item.source_status === 'sending_fixed',
+    ).length,
     items: impact.items.map((item) => ({
       kind: item.kind,
       kindLabel: COMMON_VAR_USAGE_KIND_LABELS[item.kind],
       name: item.source_name,
       status: commonVarUsageStatus(item),
       href: commonVarUsageHref(item),
-      blocksDeletion: item.is_historical !== 1,
+      blocksDeletion: commonVarUsageChangesOnSave(item),
       currentPreview: readableCommonVarUsage(item.source_content, token)
         .replaceAll(token, variable.value),
     })),
@@ -1623,7 +1644,7 @@ function serializeCommonVarChangeImpact(
     const currentPreview = previewAvailable
       ? safeSource.replaceAll(token, variable.value)
       : (base.items.at(index)?.currentPreview ?? safeSource);
-    const changesOnSave = item.is_historical !== 1;
+    const changesOnSave = commonVarUsageChangesOnSave(item);
     const nextPreview = !changesOnSave
       ? currentPreview
       : previewAvailable
@@ -2090,7 +2111,11 @@ contents.post('/api/common-vars/:id/impact-preview', requireRole('owner', 'admin
         usageByKind: impact.byKind,
         scheduledUsageCount: impact.items.filter((item) => item.source_status === 'scheduled').length,
         publishedUsageCount: impact.items.filter((item) =>
-          item.source_status === 'active' || item.source_status === 'sending').length,
+          item.source_status === 'active' || item.source_status === 'sending'
+            || item.source_status === 'published').length,
+        // 送信開始時の値で固定済みの配信中。保存しても変わらない側へ数える。
+        sendingFixedUsageCount: impact.items.filter(
+          (item) => item.source_status === 'sending_fixed').length,
         usageRevision: usageHex,
         // N-185: 保存口へ添える確認値。対象ID・版・使用先集合の写しで使い回し不可。
         impactProof: buildCommonVarImpactProof(existing.id, existing.version, usageHex),
