@@ -1,6 +1,7 @@
 'use client'
 
 import { Fragment, useMemo, useState, type ReactNode } from 'react'
+import Link from 'next/link'
 import { Gift, MessageSquare, Newspaper, Package, RotateCw, Send } from 'lucide-react'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -100,6 +101,9 @@ const skippedReasonLabel: Record<string, string> = {
   campaign_snapshot_missing: '予約時の配信内容を確認できません',
   campaign_disabled: '配信の決めごとが停止中です',
   campaign_form_already_submitted: 'すでに回答済みのため送りません',
+  frequency_suppressed: '近い時期に同じ配信があるため送りません',
+  order_cancelled: '注文が取り消されたため送りません',
+  order_refunded: '注文が返金になったため送りません',
   unknown: '理由を確認できません',
 }
 
@@ -121,6 +125,8 @@ const skippedNoRetryNote: Record<string, string> = {
   line_account_mismatch: 'アカウントが一致しないため、この記録は再送できません。',
   campaign_form_already_submitted: 'すでに回答済みのため、この記録は再送しません。',
   frequency_suppressed: '近い時期の同じ配信を代表1件にまとめたため、この記録は再送しません。',
+  order_cancelled: '注文が取り消されたため、この記録は再送しません。注文の状態は「EC連携」の取り込みの記録で確認できます。',
+  order_refunded: '注文が返金になったため、この記録は再送しません。注文の状態は「EC連携」の取り込みの記録で確認できます。',
 }
 
 function skippedReasonsDetail(skippedReasons: Record<string, number> | undefined): string | null {
@@ -441,7 +447,13 @@ function AutoPanel({
         <NoteBar tone="info">
           {pausedOnly
             ? '止めている配信です。「動かす」を押すと、次のきっかけから自動で送ります。止めている間のきっかけは送りません。'
-            : '然の出来事（注文・発送・ペット登録・記録・誕生日）をきっかけに、決めた日数後に自動で送ります。文面にはペット名・クーポンを差し込めます。取引の通知（注文受付・発送）は「設定 › LINE通知」で管理します。'}
+            : (
+              <>
+                然の出来事（注文・発送・ペット登録・記録・誕生日）をきっかけに、決めた日数後に自動で送ります。文面にはペット名・クーポンを差し込めます。取引の通知（注文受付・発送）は「設定 › LINE通知」で管理します。注文が取り消し・返金になったあとの案内は自動で止まります。きっかけの記録と定期便の次の発送は{' '}
+                <Link href="/ec-commerce?tab=subscriptions" className="font-semibold underline">EC連携</Link>
+                {' '}で確認できます。
+              </>
+            )}
         </NoteBar>
       </div>
 
@@ -1017,6 +1029,12 @@ function HistoryPanel({ deliveryList, detail, loading, onShowDetail, onRetry, on
                             <h3 className="mt-1 text-label font-bold text-ink">{detail.content.title || detail.label}</h3>
                             <p className="mt-2 whitespace-pre-wrap text-caption leading-6 text-ink-secondary">{detail.content.bodyText || detail.content.reason}</p>
                             {detail.content.buttonLabel ? <p className="mt-2 text-caption font-bold text-accent-deep">{detail.content.buttonLabel}</p> : null}
+                            {/* IDEA-21: 案内の送り先を友だち詳細へつなぐ。注文・定期便の状況はそこで追える。 */}
+                            <p className="mt-2">
+                              <Link href={`/friends/detail?id=${encodeURIComponent(delivery.friendId)}`} className="text-micro font-semibold text-accent-deep hover:underline">
+                                {delivery.friendName || 'この友だち'}の記録を見る
+                              </Link>
+                            </p>
                           </div>
                           {canRetryDelivery(delivery) ? (
                             <div className="flex flex-col gap-2">

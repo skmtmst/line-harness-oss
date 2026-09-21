@@ -3843,6 +3843,8 @@ export type EcSubscription = {
   statusLabel: string
   riskReason: string | null
   nextShippingAt: string | null
+  /** ECが契約ごとに渡す定期便の変更ページ（httpsのみ）。無い契約は null。 */
+  manageUrl: string | null
   cycle: string | null
   items: string | null
   amount: number | null
@@ -4177,7 +4179,7 @@ export type NenDelivery = {
   version: number; updatedAt: string
 }
 
-export type NenSkippedReasonCode = 'friend_unavailable' | 'line_account_unavailable' | 'line_account_mismatch' | 'campaign_snapshot_missing' | 'campaign_disabled' | 'campaign_form_already_submitted' | 'unknown'
+export type NenSkippedReasonCode = 'friend_unavailable' | 'line_account_unavailable' | 'line_account_mismatch' | 'campaign_snapshot_missing' | 'campaign_disabled' | 'campaign_form_already_submitted' | 'frequency_suppressed' | 'order_cancelled' | 'order_refunded' | 'unknown'
 
 export type NenDeliveryList = {
   range: NenMetricsRange
