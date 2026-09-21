@@ -6,6 +6,7 @@ import { api, type EcShipmentList } from '@/lib/api'
 import Card, { CardHeader } from '@/components/shared/card'
 import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
 import { STATE_TEXT } from '@/components/shared/not-connected'
+import { dashboardLocalUpdatedAt } from '@/components/dashboard/freshness'
 
 /**
  * 出荷予定。
@@ -41,11 +42,16 @@ export type ShipmentSummary = {
 }
 
 export default function ShipmentPanel({
+  accountId,
   onSummaryChange,
 }: {
-  onSummaryChange?: (summary: ShipmentSummary | null) => void
+  /** 選択中アカウント。指定時はそのアカウントの出荷だけを数える。 */
+  accountId?: string | null
+  /* 失敗・0件・読込中を区別するため、状態も一緒に知らせる（IDEA-01）。 */
+  onSummaryChange?: (summary: ShipmentSummary | null, state?: 'loading' | 'ready' | 'error') => void
 }) {
   const [data, setData] = useState<EcShipmentList | null>(null)
+  const [fetchedAt, setFetchedAt] = useState<Date | null>(null)
   const [bucket, setBucket] = useState<Bucket>('soon')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -53,14 +59,29 @@ export default function ShipmentPanel({
 
   useEffect(() => {
     let cancelled = false
+    /*
+     * アカウント切替で前のアカウントの件数・行を残さない（IDEA-01）。
+     * 上部の小カード「出荷予定」も同じ口から数えるため、先に null へ戻す。
+     */
+    setData(null)
+    setFetchedAt(null)
     setLoading(true)
     setError(null)
+    onSummaryChange?.(null, 'loading')
+    /*
+     * null は「アカウント未選択」。その場合は取りに行かず待機する。
+     * 全アカウントの数を黙って出すと、選択中アカウントの数と取り違える。
+     */
+    if (accountId === null) {
+      return () => { cancelled = true }
+    }
     api.ecCommerce
-      .shipments({ limit: 10 })
+      .shipments({ limit: 10, accountId: accountId || undefined })
       .then((r) => {
         if (cancelled) return
         if (!r.success) throw new Error(r.error)
         setData(r.data)
+        setFetchedAt(new Date())
         onSummaryChange?.({
           /*
            * 「今日の出荷」は表示する10件ではなく、走査した全イベントからの
@@ -72,13 +93,13 @@ export default function ShipmentPanel({
           later: r.data.laterCount,
           scanLimited: r.data.scanned >= r.data.scanLimit,
           scanLimit: r.data.scanLimit,
-        })
+        }, 'ready')
       })
       .catch(() => {
         if (cancelled) return
         /* 生の例外文(通信機器の応答など)を出さない。決まった文と読み直しを出す。 */
         setError('通信状況を確認して、もう一度お試しください')
-        onSummaryChange?.(null)
+        onSummaryChange?.(null, 'error')
       })
       .finally(() => {
         if (!cancelled) setLoading(false)
@@ -86,7 +107,7 @@ export default function ShipmentPanel({
     return () => {
       cancelled = true
     }
-  }, [onSummaryChange, attempt])
+  }, [accountId, onSummaryChange, attempt])
 
   const rows = data ? (bucket === 'soon' ? data.soon : data.later) : []
 
@@ -95,6 +116,8 @@ export default function ShipmentPanel({
       <CardHeader
         size="roomy"
         title="出荷予定"
+        /* 今日・明日以降の予定を、最後に取れた時刻と一緒に示す（IDEA-01）。 */
+        meta={dashboardLocalUpdatedAt(fetchedAt) ?? undefined}
         action={<Link href="/ec-commerce" className="hover:underline">すべて見る →</Link>}
         actionTone="info"
       />
