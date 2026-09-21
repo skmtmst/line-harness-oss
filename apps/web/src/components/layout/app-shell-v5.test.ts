@@ -102,10 +102,22 @@ describe('Pen.dev V6を共通レイアウトの正本にする', () => {
   })
 
   it('推定の説明は表の下ではなく各日のヘルプに表示する', () => {
-    expect(friendTrend).toContain('role="tooltip"')
-    expect(friendTrend).toContain('group-hover:block')
+    /*
+      DASH-17: ホバーだけの absolute 吹き出しは表のスクロール領域で切れる
+      ため、押してその行の中に本文を開く形に変えた。ホバー専用に戻さない。
+    */
+    expect(friendTrend).toContain('aria-expanded={open}')
+    expect(friendTrend).toContain('の推定値について')
     expect(friendTrend).not.toContain('border-t px-5 py-3')
     expect(friendTrend).toContain('Date.UTC(year, month - 1, day)')
+  })
+
+  it('推移表の見出しは狭い画面でも折り返さない（DASH-27）', () => {
+    const body = friendTrend.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+    expect(body).toContain('whitespace-nowrap">日付')
+    expect(body).toContain('whitespace-nowrap">ブロック')
+    expect(body).toContain('表は横にスクロールできます')
+    expect(body).toContain('すべて表示')
   })
 
   it('ダッシュボードの名前からLINE・メールそれぞれの受信内容を開く', () => {

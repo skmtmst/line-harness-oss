@@ -230,16 +230,20 @@ export function UpcomingCard({
 }) {
   const upcoming = bookings ? activeUpcomingBookings(bookings) : []
   return (
-    <SideCard title="今後の予定" action={{ label: 'すべて見る →', href: '/booking/bookings' }}>
+    /*
+      このカードが載せるのは予約だけ（DASH-10）。「今後の予定」「配信・予約は
+      ありません」と書くと、配信が無いことにも読めてしまう。
+    */
+    <SideCard title="今後の予約" action={{ label: 'すべて見る →', href: '/booking/bookings' }}>
       {loading ? (
         <div className="space-y-2">
           <div className="bg-canvas-sunken h-5 animate-pulse rounded" />
           <div className="bg-canvas-sunken h-5 animate-pulse rounded" />
         </div>
       ) : bookings === null ? (
-        <p className="text-ink-faint text-xs leading-relaxed">予定を読み込めませんでした。</p>
+        <p className="text-ink-faint text-xs leading-relaxed">予約を読み込めませんでした。</p>
       ) : upcoming.length === 0 ? (
-        <p className="text-ink-faint text-xs leading-relaxed">予定されている配信・予約はありません。</p>
+        <p className="text-ink-faint text-xs leading-relaxed">今後の予約はありません。</p>
       ) : (
         <div className="space-y-3">
           {upcoming.slice(0, 3).map((booking) => (

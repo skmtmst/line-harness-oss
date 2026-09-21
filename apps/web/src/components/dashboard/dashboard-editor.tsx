@@ -70,7 +70,8 @@ const CARD_META: Record<DashboardCardId, { label: string; description: string; d
   'connection-status': { label: '接続状態', description: '右サイド', defaultVisible: true },
   'support-mark-status': { label: '現在の対応状況', description: '右サイド', defaultVisible: true },
   'friend-status': { label: '友だちの状態', description: '右サイド｜有効数・ブロック率', defaultVisible: false },
-  'upcoming': { label: '今後の予定', description: '右サイド', defaultVisible: true },
+  /* カードの実表題は「今後の予約」。載せるのは予約だけなので、編集パネルの名前も揃える（DASH-10）。 */
+  'upcoming': { label: '今後の予約', description: '右サイド', defaultVisible: true },
   'monthly-delivery': { label: '今月の配信', description: '右サイド', defaultVisible: true },
   'recent-results': { label: '最近の成果', description: '右サイド', defaultVisible: true },
   'booking-status': { label: '予約状況', description: '右サイド｜本日・変更・キャンセル', defaultVisible: false },
