@@ -13,6 +13,52 @@ import type { BroadcastStepKey } from '@/components/broadcasts/broadcast-steps'
 
 const BROADCAST_STEPS = new Set<BroadcastStepKey>(['basic', 'audience', 'message', 'schedule', 'confirm'])
 
+/**
+ * `?condition=<JSON>` から渡される絞り込み条件（IDEA-03）。
+ * 友だち一覧の「この条件で配信を作成」が付ける。
+ * 形が壊れているものは採用しない —— 壊れた条件を黙って全員扱いにすると
+ * 誤配信になる。'invalid' を返して画面に理由を出す。
+ */
+const CONDITION_PARAM_MAX_LENGTH = 20000
+
+function isSegmentConditionShape(value: unknown, depth = 0): value is SegmentCondition {
+  if (depth > 4 || !value || typeof value !== 'object' || Array.isArray(value)) return false
+  const condition = value as Record<string, unknown>
+  if (condition.operator !== 'AND' && condition.operator !== 'OR') return false
+  if (!Array.isArray(condition.rules)) return false
+  for (const rule of condition.rules) {
+    if (!rule || typeof rule !== 'object' || typeof (rule as { type?: unknown }).type !== 'string') {
+      return false
+    }
+  }
+  if (condition.groups !== undefined) {
+    if (!Array.isArray(condition.groups)) return false
+    if (!condition.groups.every((group: unknown) => isSegmentConditionShape(group, depth + 1))) {
+      return false
+    }
+  }
+  /*
+   * ルールもグループも空の条件はサーバーで「全員一致」(1=1) に展開される。
+   * 引き継ぎは必ず何かで絞るので、空の条件は壊れた値として採用しない。
+   */
+  if (depth === 0 && condition.rules.length === 0 && (!condition.groups || condition.groups.length === 0)) {
+    return false
+  }
+  return true
+}
+
+function conditionParam(params: URLSearchParams): SegmentCondition | 'invalid' | null {
+  const raw = params.get('condition')
+  if (raw === null) return null
+  if (raw.length === 0 || raw.length > CONDITION_PARAM_MAX_LENGTH) return 'invalid'
+  try {
+    const parsed: unknown = JSON.parse(raw)
+    return isSegmentConditionShape(parsed) ? parsed : 'invalid'
+  } catch {
+    return 'invalid'
+  }
+}
+
 function scoreRangeCondition(params: URLSearchParams): SegmentCondition | null {
   const parse = (key: 'scoreMin' | 'scoreMax') => {
     const raw = params.get(key)
@@ -63,8 +109,12 @@ function NewBroadcastPageContent() {
   const audienceCondition: SegmentCondition | null = effectiveAudienceId
     ? { operator: 'AND', rules: [{ type: 'analytics_audience', value: { audienceId: effectiveAudienceId } }] }
     : null
+  const urlSearch = new URLSearchParams(searchParams.toString())
+  const handedCondition = conditionParam(urlSearch)
+  const conditionParamInvalid = handedCondition === 'invalid'
   const initialCondition = audienceCondition
-    ?? scoreRangeCondition(new URLSearchParams(searchParams.toString()))
+    ?? (handedCondition && handedCondition !== 'invalid' ? handedCondition : null)
+    ?? scoreRangeCondition(urlSearch)
   const requestedStep = searchParams.get('step') as BroadcastStepKey | null
   const currentStep: BroadcastStepKey = requestedStep && BROADCAST_STEPS.has(requestedStep) ? requestedStep : 'basic'
   const scheduledDateParam = searchParams.get('scheduledDate') ?? ''
@@ -173,8 +223,14 @@ function NewBroadcastPageContent() {
           </div>
         </div>
       ) : (
-        <BroadcastForm
-          tags={tags}
+        <>
+          {conditionParamInvalid ? (
+            <p className="bg-canvas rounded-card border-hairline text-ink-secondary mb-3 border px-4 py-3 text-xs">
+              引き継がれた絞り込み条件を読めませんでした。条件なしの作成画面を開いています。
+            </p>
+          ) : null}
+          <BroadcastForm
+            tags={tags}
           onSuccess={(broadcast) => router.push(
             broadcast.status === 'scheduled'
               ? `/broadcasts/reserved?id=${encodeURIComponent(broadcast.id)}`
@@ -192,6 +248,7 @@ function NewBroadcastPageContent() {
           onStepChange={changeStep}
           visualQaAugustCampaign={searchParams.get('visualQa') === 'august-campaign'}
         />
+        </>
       )}
     </div>
   )
