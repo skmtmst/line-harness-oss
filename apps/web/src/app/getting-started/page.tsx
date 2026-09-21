@@ -17,6 +17,7 @@ import {
   progressHeadline,
   stoppedReasons,
 } from './getting-started-view'
+import { FeatureSetCard } from './feature-set-card'
 import styles from './getting-started.module.css'
 
 /** 段の状態の見え方。**色だけに頼らず、必ず文字で言う。** */
@@ -76,6 +77,13 @@ export default function GettingStartedPage() {
               全部終わると、ダッシュボードの帯は出なくなります
             </span>
           </div>
+
+          {/*
+            IDEA-31: 初回案内で業種・担当業務に合う初期セットを選べるようにする。
+            順路の段には含めない（段はサーバ判定の5段で固定）。保存済みの設定や
+            メニューの並びをここからリセットしないのは FeatureSetCard が守る。
+          */}
+          <FeatureSetCard accountId={selectedAccountId} />
 
           <div className={styles.columns}>
             <ol className={styles.steps} aria-label="はじめの設定の順路">
