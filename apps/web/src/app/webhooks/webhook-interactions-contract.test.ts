@@ -36,7 +36,45 @@ describe('V6 外部連携・やり取りの記録 KNG00', () => {
     expect(PAGE).toContain('kind="empty"')
     expect(PAGE).toContain('kind="error"')
     expect(PAGE).toContain('value={data.summary.averageDurationMs == null ? null')
-    expect(PAGE).toContain("if (averageDurationMs == null) return '未取得'")
+    expect(PAGE).toContain('日は未取得')
+  })
+
+  it('遅れと成功率に対象期間を書く(IDEA-26)', () => {
+    // 「いつからの数字か」が分からないと遅い・悪いの判断が付かない。
+    // 成功・返事までの時間・未取得の各補足に選択中の期間を入れる。
+    expect(PAGE).toContain('この${periodDays}日で ${successRate.toLocaleString')
+    expect(PAGE).toContain('この${periodDays}日でいちばん遅くて')
+    expect(PAGE).toContain('この${periodDays}日は未取得')
+    expect(PAGE).toContain('この${periodDays}日の送受信の処理時間')
+  })
+
+  it('結果が分からない失敗を無条件に再送しない(IDEA-26)', () => {
+    // 単体: 相手先で確かめた確認を挟んでから confirmed=true で送る。
+    expect(PAGE).toContain("item.failureReasonCode === 'unknown'")
+    expect(PAGE).toContain('setConfirmingRetry(item)')
+    expect(PAGE).toContain('確かめたので送り直す')
+    expect(PAGE).toContain('void retry(confirmingRetry, true)')
+    // まとめて: 結果不明は送らず件数だけ返し、1件ずつの復旧を案内する。
+    expect(PAGE).toContain('response.data.needsReview')
+    expect(PAGE).toContain('確かめてから、一覧で1件ずつやり直してください')
+    expect(API).toContain('JSON.stringify({ confirmed: options?.confirmed === true })')
+  })
+
+  it('やり直せる範囲とやり直し済みのつながりを業務の言葉で示す(IDEA-26)', () => {
+    expect(PAGE).toContain('retryabilityText(selected, canRetry)')
+    expect(PAGE).toContain('前の失敗をやり直した記録')
+    expect(PAGE).toContain('送り直せるのは管理者です')
+    expect(PAGE).toContain('相手側でもう一度送ってもらってください')
+    expect(PAGE).toContain('data.summary.resultUnknown')
+  })
+
+  it('技術的な記録は必要なときだけ開き、秘密情報はそこにも出さない(IDEA-26)', () => {
+    expect(PAGE).toContain('技術的な記録を開く')
+    expect(PAGE).toContain('{selected.eventType}')
+    expect(PAGE).toContain('{selected.responseStatus')
+    expect(PAGE).toContain('{selected.retryOfId')
+    expect(PAGE).not.toContain('request_body_json')
+    expect(PAGE).not.toContain('requestBodyJson')
   })
 
   it('URL・シークレット・本文を画面へ出さず、内部エラーも表示しない', () => {

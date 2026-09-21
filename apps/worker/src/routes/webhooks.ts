@@ -15,6 +15,7 @@ import {
   getWebhookInteractionById,
   listFailedWebhookInteractionsForRetry,
   countFailedWebhookInteractionsForRetry,
+  countUnverifiedWebhookInteractions,
   listWebhookInteractions,
   getOutgoingWebhookDeliverySummaries,
   updateIncomingWebhookConfig,
@@ -1036,7 +1037,12 @@ function serializeInteraction(row: WebhookInteractionRow) {
     attemptCount: row.attempt_count,
     durationMs: row.duration_ms,
     failureReason: webhookFailureLabel(row.failure_reason),
-    canRetry: row.direction === 'outgoing' && row.status === 'failed' && Boolean(row.webhook_id),
+    // 判定用の記号も返す(IDEA-26)。'unknown' は無条件に再送せず、
+    // 相手先で確かめてからの1件ずつ復旧として画面が扱う。
+    failureReasonCode: row.failure_reason,
+    // つなぎ先が消えたもの・送った内容が残っていないものは送り直せない。
+    canRetry: row.direction === 'outgoing' && row.status === 'failed'
+      && Boolean(row.webhook_id) && row.request_body_json != null,
     startedAt: row.started_at,
     completedAt: row.completed_at,
     retryOfId: row.retry_of_id,
@@ -1091,6 +1097,24 @@ webhooks.post('/api/webhooks/interactions/:id/retry', requireRole('owner', 'admi
     if ('error' in access) return access.error;
     const original = await getWebhookInteractionById(c.env.DB, c.req.param('id'), access.lineAccountId);
     if (!original) return c.json({ success: false, error: 'Not found' }, 404);
+    /*
+      IDEA-26: 「届いたか分からない」失敗を無条件で再送しない。
+      相手先で同じ処理が記録されていないか確かめた、という運用者の確認
+      (confirmed=true)が無い要求は 409 で止める。確認後の再送は同じ
+      冪等キーで行うので、届いていても相手先で二重処理されない。
+    */
+    if (original.failure_reason === 'unknown') {
+      let confirmed = false;
+      try {
+        const body = await c.req.json<{ confirmed?: unknown }>();
+        confirmed = body?.confirmed === true;
+      } catch {
+        confirmed = false;
+      }
+      if (!confirmed) {
+        return c.json({ success: false, error: 'result_unknown_needs_check' }, 409);
+      }
+    }
     const retried = await retryWebhookInteraction(c.env.DB, original, webhookKeysOf(c));
     auditLog(c, 'webhook.interaction.retry',
       { kind: 'webhook_interaction', id: original.id }, { lineAccountId: access.lineAccountId });
@@ -1117,10 +1141,14 @@ webhooks.post('/api/webhooks/interactions/retry-failed', requireRole('owner', 'a
     const access = await requireInteractionAccount(c);
     if ('error' in access) return access.error;
     // 1件につき最大6回の外部通信になる。1リクエストの外部通信上限を越えないよう5件まで。
+    // 結果不明(届いたか分からない)の記録はここには含まれない(IDEA-26)。
     const failed = await listFailedWebhookInteractionsForRetry(c.env.DB, access.lineAccountId, 5);
     // N-387: 対象外に残る件数を先に数えて返す。まとめて操作で黙って残さない。
     const totalFailed = await countFailedWebhookInteractionsForRetry(c.env.DB, access.lineAccountId);
     const remaining = Math.max(0, totalFailed - failed.length);
+    // IDEA-26: 結果不明の失敗は無条件に再送しない代わりに、件数を返して
+    // 「相手先で確かめてから1件ずつやり直す」ことを画面へ伝える。
+    const needsReview = await countUnverifiedWebhookInteractions(c.env.DB, access.lineAccountId);
     let succeeded = 0;
     let failedAgain = 0;
     let skipped = 0;
@@ -1139,7 +1167,7 @@ webhooks.post('/api/webhooks/interactions/retry-failed', requireRole('owner', 'a
     }
     return c.json({
       success: true,
-      data: { requested: failed.length, succeeded, failed: failedAgain, skipped, remaining },
+      data: { requested: failed.length, succeeded, failed: failedAgain, skipped, remaining, needsReview },
     });
   } catch (err) {
     console.error('POST /api/webhooks/interactions/retry-failed error:', err);
