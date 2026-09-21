@@ -11,7 +11,7 @@ import {
   type Tag,
   type Template,
 } from '@line-crm/shared'
-import { api } from '@/lib/api'
+import { api, ApiError } from '@/lib/api'
 import { scenarioReferenceData } from '@/components/scenarios/scenario-reference-data'
 import ImageUploader, { type ImageUploaderValue } from '@/components/shared/image-uploader'
 import MessageTypeTabs, { type StepMessageKind } from '@/components/scenarios/message-type-tabs'
@@ -32,8 +32,14 @@ import StepPreview from '@/components/scenarios/step-preview'
 import CharCounter, { LINE_TEXT_LIMIT, isOverCharLimit } from '@/components/scenarios/char-counter'
 import styles from './first-step.module.css'
 import type { SegmentCondition } from '@/components/shared/condition-builder'
+import { pruneCondition } from '@/lib/segment-condition'
 import SelectField from '@/components/shared/select-field'
+import Button from '@/components/shared/button'
 import { usePageTitle } from '@/components/shell/page-chrome'
+import {
+  restoreFirstStep,
+  scheduleToPayload,
+} from './first-step-form'
 
 /**
  * ステップの作成（設計の3段目）。
@@ -62,6 +68,11 @@ const modeLabel: Record<DeliveryMode, string> = {
   relative: '経過時間で指定（旧）',
 }
 
+/** シナリオ取得の状態。確定するまで保存はできない（SCENARIO-04）。 */
+type LoadState = 'idle' | 'loading' | 'ready' | 'error'
+
+const TIME_RE = /^\d{2}:\d{2}$/
+
 function FirstStepContent() {
   usePageTitle('1通目を設定')
   const router = useRouter()
@@ -69,7 +80,18 @@ function FirstStepContent() {
   const id = params.get('id') ?? ''
 
   const [scenario, setScenario] = useState<(Scenario & { steps: ScenarioStep[] }) | null>(null)
+  const [loadState, setLoadState] = useState<LoadState>('idle')
+  /** 失敗したあとの「再読み込み」で effect を回し直すための番号。 */
+  const [reloadKey, setReloadKey] = useState(0)
+  /**
+   * 取得の世代番号。id が切り替わったあとに古い応答が解決しても、
+   * 別のシナリオの本文やstepIdを新しい画面へ流し込まないための番兵
+   * （SCENARIO-11 の1通目側）。
+   */
+  const loadSeq = useRef(0)
   const [existingStepId, setExistingStepId] = useState<string | null>(null)
+  /** 復元元の1通目。テンプレ一覧が読めていないときの内容保持に使う。 */
+  const [restoredStep, setRestoredStep] = useState<ScenarioStep | null>(null)
   const [tags, setTags] = useState<Tag[]>([])
   const [body, setBody] = useState('')
   /** 差し込みをカーソルの位置に入れるために、入力欄そのものを持つ。 */
@@ -102,58 +124,112 @@ function FirstStepContent() {
   const [templates, setTemplates] = useState<Template[]>([])
   const [templateId, setTemplateId] = useState('')
   const [image, setImage] = useState<ImageUploaderValue | null>(null)
+  /**
+   * この画面で読めない保存値（Flexや壊れたJSON）。入力を触らずに保存すると
+   * この中身をそのまま送り返す。欄を空にしたまま上書きすると元データが
+   * 消えるので、空欄保存にはしない（SCENARIO-02）。
+   */
+  const [preserved, setPreserved] = useState<{
+    messageType: string
+    messageContent: string
+  } | null>(null)
+  const [restoreNotice, setRestoreNotice] = useState<string | null>(null)
   // 予定。配信方式ごとに使う欄が違う（worker の validateStepSchedule）。
   const [offsetDays, setOffsetDays] = useState(0)
   const [deliveryTime, setDeliveryTime] = useState('10:00')
   const [offsetHours, setOffsetHours] = useState(0)
+  /*
+   * 時間に入りきらない分（SCENARIO-01）。
+   *
+   * 分を持たず「時間」だけで往復させると、90分が1時間（60分）へ丸められて
+   * 再保存のたびに予定がずれる。日・時間・分は分けて持ち、触っていない
+   * 値を丸めない。
+   */
+  const [offsetMinutesRemainder, setOffsetMinutesRemainder] = useState(0)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
+  /** 別のシナリオへ切り替わったとき、前のシナリオの入力を持ち越さない。 */
+  const resetForm = () => {
+    setExistingStepId(null)
+    setRestoredStep(null)
+    setBody('')
+    setTargetMode('all')
+    setTargetTagId('')
+    setTargetCondition(null)
+    setConditionOpen(false)
+    setContentMode('compose')
+    setKind('text')
+    setQuestion(emptyQuestion())
+    setKindState(emptyMessageKindState())
+    setTemplateId('')
+    setImage(null)
+    setOffsetDays(0)
+    setOffsetHours(0)
+    setOffsetMinutesRemainder(0)
+    setDeliveryTime('10:00')
+    setPreserved(null)
+    setRestoreNotice(null)
+  }
+
   useEffect(() => {
     if (!id) return
-    void scenarioReferenceData.scenario(id).then(res => {
-      if (!res.success) {
-        setError(res.error)
-        return
-      }
-      setScenario(res.data)
-      const first = [...res.data.steps].sort((a, b) => a.stepOrder - b.stepOrder)[0]
-      if (first) {
-        // 作成フローを途中で閉じて戻った場合は、既存の1通目を再表示する。
-        // 空のフォームへ戻すと、保存時に同じ「1通目」が増えてしまう。
-        setExistingStepId(first.id)
-        setOffsetDays(first.offsetDays ?? Math.floor(first.delayMinutes / 1440))
-        setOffsetHours(
-          res.data.deliveryMode === 'relative'
-            ? Math.floor((first.delayMinutes % 1440) / 60)
-            : Math.floor((first.offsetMinutes ?? 0) / 60),
-        )
-        setDeliveryTime(first.deliveryTime ?? '10:00')
-        setTargetCondition((first.targetCondition as SegmentCondition | null) ?? null)
-        setTargetMode(first.targetCondition ? 'advanced' : 'all')
-        setQuestion((first.question as ScenarioQuestion | null) ?? emptyQuestion())
-
-        if (first.templateId) {
-          setContentMode('template')
-          setTemplateId(first.templateId)
-        } else {
-          setContentMode('compose')
-          if (first.question) {
-            setKind('question')
-          } else {
-            setKind(first.messageType as StepMessageKind)
-            if (first.messageType === 'text') setBody(first.messageContent)
-          }
+    const seq = ++loadSeq.current
+    setScenario(null)
+    setLoadState('loading')
+    setError('')
+    resetForm()
+    void (async () => {
+      try {
+        const res = await scenarioReferenceData.scenario(id)
+        if (seq !== loadSeq.current) return
+        if (!res.success) {
+          // 失敗の応答がキャッシュに残ると、再読み込みでも同じ失敗が返る。
+          scenarioReferenceData.invalidateScenario(id)
+          setError(res.error)
+          setLoadState('error')
+          return
         }
+        setScenario(res.data)
+        const first = [...res.data.steps].sort((a, b) => a.stepOrder - b.stepOrder)[0]
+        if (first) {
+          // 作成フローを途中で閉じて戻った場合は、既存の1通目を再表示する。
+          // 空のフォームへ戻すと、保存時に同じ「1通目」が増えてしまう。
+          const restored = restoreFirstStep(first, res.data.deliveryMode ?? 'relative')
+          setExistingStepId(restored.existingStepId)
+          setRestoredStep(first)
+          setOffsetDays(restored.schedule.offsetDays)
+          setOffsetHours(restored.schedule.offsetHours)
+          setOffsetMinutesRemainder(restored.schedule.offsetMinutesRemainder)
+          setDeliveryTime(restored.schedule.deliveryTime)
+          setTargetMode(restored.targetMode)
+          setTargetTagId(restored.targetTagId)
+          setTargetCondition(restored.targetCondition)
+          setContentMode(restored.contentMode)
+          setKind(restored.kind)
+          setBody(restored.body)
+          setImage(restored.image)
+          setKindState(restored.kindState)
+          setTemplateId(restored.templateId)
+          if (restored.question) setQuestion(restored.question)
+          setPreserved(restored.preserved)
+          setRestoreNotice(restored.restoreNotice)
+        }
+        setLoadState('ready')
+      } catch {
+        if (seq !== loadSeq.current) return
+        scenarioReferenceData.invalidateScenario(id)
+        setError('シナリオを読み込めませんでした。通信状態を確認して、もう一度お試しください。')
+        setLoadState('error')
       }
-    })
+    })()
     void scenarioReferenceData.tags().then(res => {
       if (res.success) setTags(res.data)
     })
     void scenarioReferenceData.templates().then(res => {
       if (res.success) setTemplates(res.data as unknown as Template[])
     })
-  }, [id])
+  }, [id, reloadKey])
 
   const mode: DeliveryMode = scenario?.deliveryMode ?? 'absolute_time'
 
@@ -162,6 +238,7 @@ function FirstStepContent() {
    *
    * タグを選ぶだけの場合も、詳細条件と同じ形（SegmentCondition）で持つ。
    * 持ち方を分けると、あとから「タグ＋もう1条件」にしたいときに作り直しになる。
+   * 詳細条件は書きかけの行を落としてから送る（保存にも数え上げにも同じ形）。
    */
   const stepTargetCondition = (): SegmentCondition | null => {
     if (targetMode === 'all') return null
@@ -170,7 +247,7 @@ function FirstStepContent() {
         ? { operator: 'AND', rules: [{ type: 'tag_exists', value: targetTagId }] }
         : null
     }
-    return targetCondition
+    return pruneCondition(targetCondition)
   }
 
   const goDetail = () => router.push(`/scenarios/detail?id=${encodeURIComponent(id)}`)
@@ -185,73 +262,143 @@ function FirstStepContent() {
   const bodyOverLimit =
     contentMode === 'compose' && kind === 'text' && isOverCharLimit(bodyLength, LINE_TEXT_LIMIT)
 
+  /*
+   * 内容の入力を書き換えたら「保存値をそのまま保持する」はやめる。
+   * 触ったあとも元の中身を送り続けると、書いたつもりの内容が保存されない。
+   */
+  const changeKind = (next: StepMessageKind) => {
+    setPreserved(null)
+    setRestoreNotice(null)
+    setKind(next)
+  }
+  const changeContentMode = (next: 'compose' | 'template') => {
+    setPreserved(null)
+    setRestoreNotice(null)
+    setContentMode(next)
+  }
+  const editBody = (next: string) => {
+    setPreserved(null)
+    setBody(next)
+  }
+  const editImage = (next: ImageUploaderValue | null) => {
+    setPreserved(null)
+    setImage(next)
+  }
+  const editQuestion = (next: ScenarioQuestion) => {
+    setPreserved(null)
+    setQuestion(next)
+  }
+  const editKindState = (next: MessageKindState) => {
+    setPreserved(null)
+    setKindState(next)
+  }
+  const editTemplateId = (next: string) => {
+    setPreserved(null)
+    setTemplateId(next)
+  }
+
   const submit = async () => {
     // ボタンの disabled だけに頼らない。別の呼び出し経路が増えても、
-    // 上限を超えた本文を保存処理へ渡さない。
-    if (saving || bodyOverLimit) return
+    // 上限を超えた本文や、シナリオ未取得のままの保存を通さない。
+    if (saving || bodyOverLimit || loadState !== 'ready' || !scenario) return
     setSaving(true)
     setError('')
-    if (targetMode === 'tag' && !targetTagId) {
-      setError('絞り込むタグを選んでください')
-      setSaving(false)
-      return
-    }
-    const hasContent =
-      contentMode === 'template'
-        ? templateId !== ''
-        : kind === 'text'
-          ? body.trim() !== ''
-          : kind === 'image'
-            ? image !== null
-            : kind === 'question'
-              ? question.text.trim() !== ''
-              : kind === 'carousel'
-                ? templateId !== ''
-                : serializeMessageKind(kind as MessageKind, kindState) !== null
-    if (hasContent) {
+    try {
+      if (targetMode === 'tag' && !targetTagId) {
+        setError('絞り込むタグを選んでください')
+        return
+      }
+      if (targetMode === 'advanced' && !pruneCondition(targetCondition)) {
+        /*
+         * 「詳細条件で絞り込む」を選んだのに条件が無いまま保存すると、
+         * 画面の「未設定」と配信側の「条件なし＝全員」が食い違う
+         * （SCENARIO-03）。全員へ送るのは「全員に配信する」を選んだときだけ。
+         */
+        setError(
+          '詳細条件がまだ設定されていません。「絞り込み」から条件を設定するか、「シナリオ購読中の全員に配信する」を選び直してください。',
+        )
+        return
+      }
+      if (mode === 'absolute_time' && !TIME_RE.test(deliveryTime)) {
+        setError('配信する時刻を選んでください')
+        return
+      }
+      const hasContent =
+        preserved !== null ||
+        (contentMode === 'template'
+          ? templateId !== ''
+          : kind === 'text'
+            ? body.trim() !== ''
+            : kind === 'image'
+              ? image !== null
+              : kind === 'question'
+                ? question.text.trim() !== ''
+                : kind === 'carousel'
+                  ? templateId !== ''
+                  : serializeMessageKind(kind as MessageKind, kindState) !== null)
+      if (!hasContent) {
+        /*
+         * 空のまま保存を押しても何も言わず編集へ進むと、書いたつもりが
+         * 保存されていないのか区別できない（点検 #495 中7）。
+         * 書かずに進む道は「1通目はあとで書く」ボタンに寄せ、保存ボタンは
+         * 空なら理由を出して止める。
+         */
+        setError('内容を入力してください。あとで書く場合は「1通目はあとで書く」を押してください。')
+        return
+      }
       // 予定の欄は方式ごとに違う。余計な欄を送ると worker が弾く。
-      const schedule =
-        mode === 'relative'
-          ? { delayMinutes: offsetDays * 1440 + offsetHours * 60 }
-          : mode === 'elapsed'
-            ? { offsetDays, offsetMinutes: offsetHours * 60 }
-            : { offsetDays, deliveryTime }
+      const schedule = scheduleToPayload(mode, {
+        offsetDays,
+        offsetHours,
+        offsetMinutesRemainder,
+        deliveryTime,
+      })
       // 種別ごとに、送る中身の作りが違う。
       //   テンプレート … templateId を渡す。本文は参照先が持つ
       //   画像         … LINE が要る2つのURLをJSONで入れる
+      //   保持         … この画面で読めない保存値は、そのまま送り返す
       const picked = templates.find((t) => t.id === templateId)
-      const carouselTpl = kind === 'carousel' ? templates.find((t) => t.id === templateId) : undefined
-      const payload =
-        kind === 'carousel' && contentMode === 'compose'
+      const carouselTpl = kind === 'carousel' ? picked : undefined
+      const payload = preserved
+        ? {
+            messageType: preserved.messageType as ScenarioStep['messageType'],
+            messageContent: preserved.messageContent,
+          }
+        : kind === 'carousel' && contentMode === 'compose'
           ? {
               messageType: 'carousel' as const,
-              messageContent: carouselTpl?.messageContent ?? '[]',
+              // テンプレ一覧に無い・まだ読めていない選択を空で上書きしない。
+              messageContent:
+                carouselTpl?.messageContent ??
+                (restoredStep && restoredStep.templateId === templateId
+                  ? restoredStep.messageContent
+                  : '[]'),
               templateId,
             }
           : contentMode === 'template'
-          ? {
-              messageType: (picked?.messageType ?? 'text') as 'text' | 'image' | 'flex',
-              messageContent: picked?.messageContent ?? '',
-              templateId,
-            }
-          : kind === 'image' && image?.mode === 'line-image'
             ? {
-                messageType: 'image' as const,
-                messageContent: JSON.stringify({
-                  originalContentUrl: image.originalContentUrl,
-                  previewImageUrl: image.previewImageUrl,
-                }),
+                messageType: (picked?.messageType ?? 'text') as 'text' | 'image' | 'flex',
+                messageContent: picked?.messageContent ?? '',
+                templateId,
               }
-            : kind === 'question'
-              // 質問は本文を持たない。中身は question に入る。
-              ? { messageType: 'text' as const, messageContent: '' }
-              : kind === 'text'
-                ? { messageType: 'text' as const, messageContent: body.trim() }
-                : {
-                    // 位置情報・動画・音声・スタンプ。中身は JSON 1つ。
-                    messageType: kind as 'location' | 'video' | 'audio' | 'sticker',
-                    messageContent: serializeMessageKind(kind as MessageKind, kindState) ?? '',
-                  }
+            : kind === 'image' && image?.mode === 'line-image'
+              ? {
+                  messageType: 'image' as const,
+                  messageContent: JSON.stringify({
+                    originalContentUrl: image.originalContentUrl,
+                    previewImageUrl: image.previewImageUrl,
+                  }),
+                }
+              : kind === 'question'
+                // 質問は本文を持たない。中身は question に入る。
+                ? { messageType: 'text' as const, messageContent: '' }
+                : kind === 'text'
+                  ? { messageType: 'text' as const, messageContent: body.trim() }
+                  : {
+                      // 位置情報・動画・音声・スタンプ。中身は JSON 1つ。
+                      messageType: kind as 'location' | 'video' | 'audio' | 'sticker',
+                      messageContent: serializeMessageKind(kind as MessageKind, kindState) ?? '',
+                    }
 
       const stepPayload = {
         stepOrder: 1,
@@ -265,22 +412,24 @@ function FirstStepContent() {
         : await api.scenarios.addStep(id, stepPayload)
       if (!res.success) {
         setError(res.error)
-        setSaving(false)
         return
       }
-    } else {
+      scenarioReferenceData.invalidateScenario(id)
+      goDetail()
+    } catch (submitError) {
       /*
-       * 空のまま保存を押しても何も言わず編集へ進むと、書いたつもりが
-       * 保存されていないのか区別できない（点検 #495 中7）。
-       * 書かずに進む道は「1通目はあとで書く」ボタンに寄せ、保存ボタンは
-       * 空なら理由を出して止める。
+       * HTTPエラーや通信切断で例外が出ても「保存中」のままにしない
+       * （SCENARIO-05）。入力は残し、同じ場所からやり直せる。
        */
-      setError('内容を入力してください。あとで書く場合は「1通目はあとで書く」を押してください。')
+      const detail = submitError instanceof ApiError ? submitError.message : ''
+      setError(
+        detail
+          ? `保存できませんでした（${detail}）。入力内容は残っています。もう一度お試しください。`
+          : '保存できませんでした。通信状態を確認して、もう一度お試しください。',
+      )
+    } finally {
       setSaving(false)
-      return
     }
-    scenarioReferenceData.invalidateScenario(id)
-    goDetail()
   }
 
   const skip = () => {
@@ -335,7 +484,30 @@ function FirstStepContent() {
         {error && <p className="bg-danger-bg text-danger rounded-card px-4 py-3 text-sm">{error}</p>}
       </div>
 
-
+      {loadState !== 'ready' ? (
+        /*
+         * シナリオが確定するまでフォームは出さない（SCENARIO-04）。
+         * 取得前に入力を許すと、届いた既存の1通目が入力を上書きするか、
+         * まだ知らない既存通へ重ねて保存してしまう。失敗したときは
+         * 理由と「再読み込み」を同じ場所に出す。
+         */
+        <div className="bg-canvas rounded-card border-hairline mt-4 border p-8 text-center">
+          {loadState === 'error' ? (
+            <>
+              <p className="text-ink text-sm font-bold">シナリオを読み込めませんでした</p>
+              <p className="text-ink-secondary mt-1 text-xs leading-relaxed">
+                1通目の作成・保存はできません。通信状態を確認して、もう一度読み込んでください。
+              </p>
+              <Button onClick={() => setReloadKey(k => k + 1)} className="mt-4">
+                再読み込み
+              </Button>
+            </>
+          ) : (
+            <p className="text-ink-faint text-sm">シナリオを読み込んでいます…</p>
+          )}
+        </div>
+      ) : (
+        <>
       {/*
         左に入力、右にプレビュー。プレビューは付いてくる（sticky）ので、
         下の選択肢を書いているあいだも、届く形と時刻が視界に残る。
@@ -455,7 +627,18 @@ function FirstStepContent() {
                     }
                     className={`${styles.smallField} border-hairline rounded-control bg-canvas text-ink border px-3 text-caption font-semibold`}
                   />
-                  <span className="text-ink-secondary text-sm">時間後</span>
+                  <span className="text-ink-secondary text-sm">時間</span>
+                  <input
+                    type="number"
+                    min={0}
+                    max={59}
+                    value={offsetMinutesRemainder}
+                    onChange={e =>
+                      setOffsetMinutesRemainder(Math.min(59, Math.max(0, Number(e.target.value))))
+                    }
+                    className={`${styles.smallField} border-hairline rounded-control bg-canvas text-ink border px-3 text-caption font-semibold`}
+                  />
+                  <span className="text-ink-secondary text-sm">分後</span>
                 </div>
               </label>
             )}
@@ -479,25 +662,31 @@ function FirstStepContent() {
                     type="radio"
                     name="contentMode"
                     checked={contentMode === o.value}
-                    onChange={() => setContentMode(o.value)}
+                    onChange={() => changeContentMode(o.value)}
                   />
                   {o.label}
                 </label>
               ))}
             </div>
 
+            {preserved && restoreNotice && (
+              <p className="bg-warning-bg text-ink-secondary rounded-card mb-3 px-4 py-3 text-xs leading-relaxed">
+                {restoreNotice}
+              </p>
+            )}
+
             {contentMode === 'compose' ? (
-              <MessageTypeTabs value={kind} onChange={setKind}>
+              <MessageTypeTabs value={kind} onChange={changeKind}>
                 {kind === 'text' && (
                   <div>
                     <span className="text-ink-secondary mb-1 block text-xs font-medium">本文</span>
                     <div className="mb-2">
-                      <InsertToolbar targetRef={bodyRef} value={body} onChange={setBody} />
+                      <InsertToolbar targetRef={bodyRef} value={body} onChange={editBody} />
                     </div>
                     <textarea
                       ref={bodyRef}
                       value={body}
-                      onChange={e => setBody(e.target.value)}
+                      onChange={e => editBody(e.target.value)}
                       placeholder="はじめまして。友だち追加ありがとうございます。"
                       className={`${styles.bodyField} border-hairline rounded-control bg-canvas text-ink focus:ring-accent w-full resize-none border px-3 py-2 text-sm focus:ring-2 focus:outline-none`}
                     />
@@ -510,18 +699,18 @@ function FirstStepContent() {
                     <ImageUploader
                       mode="line-image"
                       value={image}
-                      onChange={setImage}
+                      onChange={editImage}
                       label="送る画像"
                     />
                   </div>
                 )}
 
                 {kind === 'question' && (
-                  <QuestionEditor value={question} onChange={setQuestion} />
+                  <QuestionEditor value={question} onChange={editQuestion} />
                 )}
 
                 {(kind === 'location' || kind === 'video' || kind === 'audio' || kind === 'sticker') && (
-                  <MessageKindFields kind={kind} value={kindState} onChange={setKindState} />
+                  <MessageKindFields kind={kind} value={kindState} onChange={editKindState} />
                 )}
 
                 {/*
@@ -529,7 +718,7 @@ function FirstStepContent() {
                   （組み立てが重く、編集画面を2つ持つと片方だけ直して食い違う）。
                 */}
                 {kind === 'carousel' && (
-                  <CarouselPicker value={templateId} onChange={(id) => setTemplateId(id)} />
+                  <CarouselPicker value={templateId} onChange={editTemplateId} />
                 )}
               </MessageTypeTabs>
             ) : (
@@ -538,7 +727,7 @@ function FirstStepContent() {
                   <span className="text-ink-secondary mb-1 block text-xs font-medium">テンプレート</span>
                   <SelectField
                     value={templateId}
-                    onChange={e => setTemplateId(e.target.value)}
+                    onChange={e => editTemplateId(e.target.value)}
                     aria-label="配信するテンプレート"
                     className="border-hairline rounded-control bg-canvas text-ink w-full max-w-md border px-3 py-2 text-sm"
                     options={[
@@ -571,6 +760,7 @@ function FirstStepContent() {
             offsetDays={offsetDays}
             deliveryTime={deliveryTime}
             offsetHours={offsetHours}
+            offsetMinutes={offsetMinutesRemainder}
             kind={contentMode === 'template' ? 'text' : kind}
             templateName={
               // テンプレート参照（テンプレートから選ぶ／カルーセル）のときだけ名前を出す。
@@ -614,7 +804,7 @@ function FirstStepContent() {
         <button
           type="button"
           onClick={() => void submit()}
-          disabled={saving || bodyOverLimit}
+          disabled={saving || bodyOverLimit || loadState !== 'ready'}
           className="bg-accent-deep hover:brightness-92 text-on-accent rounded-control px-5 py-3 text-sm font-bold transition-colors disabled:opacity-50"
         >
           {saving ? '保存中…' : '作成して編集へ →'}
@@ -628,6 +818,8 @@ function FirstStepContent() {
           1通目はあとで書く
         </button>
       </div>
+        </>
+      )}
 
       {/* 詳細条件。中身はシナリオ編集と同じ部品を使う。 */}
       {conditionOpen && (

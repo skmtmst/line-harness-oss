@@ -103,17 +103,34 @@ describe('V6 1通目設定の契約', () => {
   })
 
   it('作成途中へ戻ったときは既存の1通目を表示し、重複追加せず更新する', () => {
-    expect(PAGE).toContain('setExistingStepId(first.id)')
-    expect(PAGE).toContain('setBody(first.messageContent)')
+    expect(PAGE).toContain('restoreFirstStep(first')
+    expect(PAGE).toContain('setExistingStepId(restored.existingStepId)')
     expect(PAGE).toContain('api.scenarios.updateStep(id, existingStepId, stepPayload)')
     expect(PAGE).toContain('api.scenarios.addStep(id, stepPayload)')
+  })
+
+  it('シナリオが確定するまで保存できない', () => {
+    // SCENARIO-04：取得待ち・取得失敗のまま保存を押せると、まだ知らない
+    // 既存の1通目へ重ねて追加してしまう。
+    expect(PAGE).toContain("useState<LoadState>('idle')")
+    expect(PAGE).toContain("setLoadState('ready')")
+    expect(PAGE).toContain("setLoadState('error')")
+    expect(PAGE).toContain('loadState !== \'ready\'')
+    expect(PAGE).toContain('再読み込み')
+  })
+
+  it('保存の失敗・切断で「保存中」のままにしない', () => {
+    // SCENARIO-05：例外でも finally で busy を戻し、入力を残して再試行できる。
+    expect(PAGE).toContain('} catch (submitError) {')
+    expect(PAGE).toContain('setSaving(false)')
+    expect(PAGE).toContain('入力内容は残っています')
   })
 
   it('上限を超えた本文では保存を押せなくし、理由を本文に出す', () => {
     expect(PAGE).toContain('const bodyOverLimit =')
     expect(PAGE).toContain('isOverCharLimit(bodyLength, LINE_TEXT_LIMIT)')
-    expect(PAGE).toContain('disabled={saving || bodyOverLimit}')
-    expect(PAGE).toContain('if (saving || bodyOverLimit) return')
+    expect(PAGE).toContain("disabled={saving || bodyOverLimit || loadState !== 'ready'}")
+    expect(PAGE).toContain("if (saving || bodyOverLimit || loadState !== 'ready' || !scenario) return")
     expect(PAGE).toContain('LINEが受け付けないため、この状態では保存できません。')
   })
 })
