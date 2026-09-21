@@ -5,7 +5,7 @@ import { Fragment, useState, useEffect, useCallback, useRef } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import type { Scenario, ScenarioStep, ScenarioTriggerType, MessageType, DeliveryMode, Folder } from '@line-crm/shared'
-import { api, type ScenarioRuns, type ScenarioSimulation } from '@/lib/api'
+import { api, type ScenarioRuns } from '@/lib/api'
 import Header from '@/components/layout/header'
 import Button from '@/components/shared/button'
 import FlexPreviewComponent from '@/components/flex-preview'
@@ -58,6 +58,11 @@ import {
   scenarioReachPercentLabel,
 } from './scenario-reach-display'
 import { describeAfterSend, describeStepAudience } from './scenario-step-audience'
+import {
+  scenarioSimulationKey,
+  simulationForKey,
+  type ScenarioSimulationResult,
+} from './scenario-simulation-refresh'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { useAccount } from '@/contexts/account-context'
 import { scenarioReferenceData } from '@/components/scenarios/scenario-reference-data'
@@ -444,7 +449,12 @@ export default function ScenarioDetailClient({
   const [previewOpen, setPreviewOpen] = useState(false)
 
   const [stats, setStats] = useState<ScenarioStats | null>(null)
-  const [simulation, setSimulation] = useState<ScenarioSimulation | null>(null)
+  /*
+   * SCENARIO-15: 試算は「いま保存されている設定」に対する結果。
+   * 結果は計算した設定の鍵と一緒に持ち、設定が変わって鍵が合わなく
+   * なった旧値は確定値として出さない（取り直し中は計算中と出す）。
+   */
+  const [simulationResult, setSimulationResult] = useState<ScenarioSimulationResult | null>(null)
   const [runs, setRuns] = useState<ScenarioRuns | null>(null)
   const [templates, setTemplates] = useState<TemplateOpt[]>([])
   const [tags, setTags] = useState<TagOpt[]>([])
@@ -545,30 +555,54 @@ export default function ScenarioDetailClient({
     if (id) reloadActionCounts()
   }, [id, reloadActionCounts])
 
+  /*
+   * SCENARIO-15: 試算の元になる設定を1つの鍵にまとめる。
+   * 対象条件・同時購読・開始のきっかけ・各通の順番/時刻/絞り込みが
+   * 変わると鍵が変わり、下の effect が取り直す。保存後の再読込では
+   * id と lineAccountId が変わらないので、鍵を見ないと古い人数が
+   * 残り続ける（以前の挙動）。
+   */
+  const simulationKey = scenarioSimulationKey(scenario, triggerCount)
+  /** 今の設定に対する試算。旧鍵の結果は確定値として出さない。 */
+  const simulation = simulationForKey(simulationResult, simulationKey)
+  /** 設定が変わって取り直し中か（初回の取得中も true）。 */
+  const simulationRefreshing =
+    Boolean(simulationKey && scenario?.lineAccountId) &&
+    simulationResult?.key !== simulationKey
+
   /**
    * 機能5 V6の開始前試算と運用記録。互いに独立した読取なので並列で取得する。
    * 失敗時は旧集計を残し、0件とは表示しない。
+   *
+   * SCENARIO-15: 依存に simulationKey を含める。設定を保存し直すと
+   * scenario が読み直されて鍵が変わり、試算を取り直す。世代の掃除
+   * （cancelled）で遅れて届いた旧応答は捨てるので、遅い旧試算が
+   * 新しい版を上書きしない。
    */
   useEffect(() => {
     const lineAccountId = scenario?.lineAccountId
-    if (!id || !lineAccountId) {
-      setSimulation(null)
+    if (!id || !lineAccountId || !simulationKey) {
+      setSimulationResult(null)
       setRuns(null)
       return
     }
     let cancelled = false
+    const key = simulationKey
     void Promise.all([
       api.scenarios.simulate(id, lineAccountId).catch(() => null),
       api.scenarios.runs(id, lineAccountId, { limit: 50 }).catch(() => null),
     ]).then(([simulationResponse, runsResponse]) => {
       if (cancelled) return
-      setSimulation(simulationResponse?.success ? simulationResponse.data : null)
+      setSimulationResult({
+        key,
+        value: simulationResponse?.success ? simulationResponse.data : null,
+      })
       setRuns(runsResponse?.success ? runsResponse.data : null)
     })
     return () => {
       cancelled = true
     }
-  }, [id, scenario?.lineAccountId])
+  }, [id, scenario?.lineAccountId, simulationKey])
 
   useEffect(() => {
     if (!id) return
@@ -1724,9 +1758,11 @@ export default function ScenarioDetailClient({
         >
           <p className="font-semibold">
             配信を開始しました。
-            {simulation
-              ? `新規開始予定${simulation.audience.newStartPlanned.toLocaleString('ja-JP')}人へ、条件を満たした時点から順に配信します。`
-              : '条件を満たした友だちから順に配信します。'}
+            {simulationRefreshing
+              ? '開始予定の人数を計算しています…'
+              : simulation
+                ? `新規開始予定${simulation.audience.newStartPlanned.toLocaleString('ja-JP')}人へ、条件を満たした時点から順に配信します。`
+                : '条件を満たした友だちから順に配信します。'}
           </p>
           <Link href={`/scenarios/results?id=${encodeURIComponent(id)}`} className="font-semibold underline underline-offset-2">
             開始履歴を確認
@@ -1964,11 +2000,17 @@ export default function ScenarioDetailClient({
                         : `${triggerCount} 件`}
                   </span>
                   <span className="text-ink-faint mt-0.5 block text-xs">
-                    {simulation
-                      ? `新規開始予定 ${simulation.audience.newStartPlanned.toLocaleString('ja-JP')}人`
-                      : triggerCount === 0
-                        ? 'アクションなどから開始できます'
-                        : '押すと足せます'}
+                    {/*
+                      SCENARIO-15: 設定を変えて取り直しているあいだは、
+                      古い人数を確定値として出さず「計算しています」と出す。
+                    */}
+                    {simulationRefreshing
+                      ? '新規開始予定を計算しています…'
+                      : simulation
+                        ? `新規開始予定 ${simulation.audience.newStartPlanned.toLocaleString('ja-JP')}人`
+                        : triggerCount === 0
+                          ? 'アクションなどから開始できます'
+                          : '押すと足せます'}
                   </span>
                 </button>
                 <button
@@ -2114,7 +2156,14 @@ export default function ScenarioDetailClient({
                   <Th>配信対象</Th>
                   <Th>到達人数</Th>
                   <Th>配信後</Th>
-                  <Th aria-label="操作" />
+                  {/*
+                    SCENARIO-23: 操作列に幅の下限となる希望幅を持たせる。
+                    指定が無いと「内容」列（w-full）へ全部持っていかれて
+                    36px まで潰れ、操作名が1文字ずつ縦に折れた。
+                    幅が足りない画面ではセルは希望幅より縮み、中のボタンが
+                    flex-wrap でボタン単位に折り返す。
+                  */}
+                  <Th className="w-80" aria-label="操作" />
                 </tr>
               </thead>
               <tbody>
@@ -2256,6 +2305,11 @@ export default function ScenarioDetailClient({
                             操作は6つある。1行に並べ切れない幅では折り返す
                             （#949 N-058）。無理に1行へ押さえると、表全体が
                             その幅ぶん広がって横スクロールの元になる。
+
+                            SCENARIO-23: 各ボタンは whitespace-nowrap で
+                            単語の途中では折らない。折り返すのはボタン単位
+                            まで。日本語は文字のどこでも折れるため、印が
+                            無いと「プレビュー」が1文字ずつ縦に並んだ。
                           */}
                           <div className="flex flex-wrap items-center justify-end gap-x-2 gap-y-1 text-xs">
                             <button
@@ -2263,14 +2317,14 @@ export default function ScenarioDetailClient({
                               onClick={() =>
                                 editingStepId === step.id ? closeStepForm() : openEditStep(step)
                               }
-                              className="text-info hover:underline"
+                              className="text-info whitespace-nowrap hover:underline"
                             >
                               {editingStepId === step.id ? '閉じる' : '編集'}
                             </button>
                             <button
                               type="button"
                               onClick={() => setPreviewStepId(previewStepId === step.id ? null : step.id)}
-                              className="text-info hover:underline"
+                              className="text-info whitespace-nowrap hover:underline"
                             >
                               プレビュー
                             </button>
@@ -2279,7 +2333,7 @@ export default function ScenarioDetailClient({
                               onClick={() =>
                                 setTestSend({ stepId: step.id, label: `${step.stepOrder}通目` })
                               }
-                              className="text-info hover:underline"
+                              className="text-info whitespace-nowrap hover:underline"
                             >
                               テスト
                             </button>
@@ -2295,7 +2349,7 @@ export default function ScenarioDetailClient({
                                   title: `${step.stepOrder}通目を送ったあと`,
                                 })
                               }
-                              className="text-info hover:underline"
+                              className="text-info whitespace-nowrap hover:underline"
                             >
                               アクション
                               {actionCounts[step.id] ? ` ${actionCounts[step.id]}` : ''}
@@ -2306,7 +2360,7 @@ export default function ScenarioDetailClient({
                               disabled={duplicatingStepId === step.id}
                               title="この通を複製する"
                               aria-label="この通を複製する"
-                              className="text-ink-faint hover:text-ink-secondary disabled:opacity-40"
+                              className="text-ink-faint whitespace-nowrap hover:text-ink-secondary disabled:opacity-40"
                             >
                               複製
                             </button>
@@ -2318,7 +2372,7 @@ export default function ScenarioDetailClient({
                               }}
                               title="この通を削除する"
                               aria-label="この通を削除する"
-                              className="text-ink-faint hover:text-danger"
+                              className="text-ink-faint whitespace-nowrap hover:text-danger"
                             >
                               削除
                             </button>

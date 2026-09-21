@@ -33,7 +33,11 @@ describe('V6 シナリオ作成・配信方式 cCB7r', () => {
   })
 
   it('既存のシナリオ用フォルダを読み、名前と分類を同じ受け口へ保存する', () => {
-    expect(page).toContain("api.folders.list('scenario')")
+    /*
+     * SCENARIO-20: フォルダはシナリオ所属（共通なら選択中）のアカウントで
+     * 絞って取る。無指定だと別アカウントの候補が混ざる。
+     */
+    expect(page).toContain("api.folders.list('scenario', folderAccountId ?? undefined)")
     expect(page).toContain('folderId: nextFolder')
     expect(page).toContain('folderId: folderId || null')
     expect(page).toContain("setFolderId(res.data.folderId ?? '')")

@@ -197,15 +197,72 @@ export function OnCompleteDialog({
   const [scenarios, setScenarios] = useState<{ id: string; name: string }[]>([])
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
+  const { selectedAccountId } = useAccount()
+  /*
+   * SCENARIO-14: 移動先の候補は対象シナリオのアカウントで絞る。
+   * 無指定で全権限範囲を取ると別アカウントのシナリオが候補に混ざり、
+   * 200件の打ち切りで本命が見えなくなる。
+   * 状態は loading/ready/error で持ち、失敗を0件扱いしない。
+   */
+  const [candidatesState, setCandidatesState] = useState<'loading' | 'ready' | 'error'>('loading')
+  /** 保存済みの移動先が候補に無いとき、名前だけでも示すための取得結果。 */
+  const [savedTargetName, setSavedTargetName] = useState<string | null>(null)
+  const [savedTargetMissing, setSavedTargetMissing] = useState(false)
+
+  const loadCandidates = useCallback(async (isStale: () => boolean) => {
+    setCandidatesState('loading')
+    setSavedTargetMissing(false)
+    try {
+      /*
+       * まず対象シナリオのアカウントを知る。共通シナリオ
+       * （lineAccountId が null）では、いま選んでいるアカウントの
+       * 候補を出す（意図的な仕様：共通シナリオの移動先は
+       * 閲覧中アカウントの範囲で選ぶ）。
+       */
+      const me = await scenarioReferenceData.scenario(scenarioId)
+      if (!me.success) throw new Error('scenario fetch failed')
+      const accountId = me.data.lineAccountId ?? selectedAccountId ?? undefined
+
+      // 200件を超える分も全ページ取る。打ち切りで候補が欠けないように。
+      const items: { id: string; name: string }[] = []
+      let page = 1
+      let total = Number.POSITIVE_INFINITY
+      while (items.length < total && page <= 50) {
+        const res = await api.scenarios.listPage({ accountId, page, limit: 200 })
+        if (!res.success) throw new Error(res.error)
+        items.push(...res.data.items.map((s) => ({ id: s.id, name: s.name })))
+        total = res.data.total
+        if (res.data.items.length === 0) break
+        page += 1
+      }
+      if (isStale()) return
+      const candidates = items.filter((s) => s.id !== scenarioId)
+      setScenarios(candidates)
+
+      /*
+       * 保存済みの移動先が候補に無い（別アカウント・削除済み・権限外）
+       * ことがある。黙って選択を外すと保存値が消えたように見えるので、
+       * 個別に取って「現在の保存値」として選択肢へ足す。
+       */
+      if (targetScenarioId && !candidates.some((s) => s.id === targetScenarioId)) {
+        const saved = await api.scenarios.get(targetScenarioId).catch(() => null)
+        if (isStale()) return
+        setSavedTargetMissing(true)
+        setSavedTargetName(saved?.success ? saved.data.name : null)
+      }
+      setCandidatesState('ready')
+    } catch {
+      if (!isStale()) setCandidatesState('error')
+    }
+  }, [scenarioId, selectedAccountId, targetScenarioId])
 
   useEffect(() => {
-    void (async () => {
-      const res = await scenarioReferenceData.scenarios()
-      if (res.success) {
-        setScenarios(res.data.filter((s) => s.id !== scenarioId).map((s) => ({ id: s.id, name: s.name })))
-      }
-    })()
-  }, [scenarioId])
+    let stale = false
+    void loadCandidates(() => stale)
+    return () => {
+      stale = true
+    }
+  }, [loadCandidates])
 
   return (
     <Shell
@@ -308,19 +365,55 @@ export function OnCompleteDialog({
 
       {draftMode === 'move' && (
         <div className="mt-4">
-          <label className="text-ink text-sm font-medium">移動先のシナリオ</label>
-          <select
-            value={draftTarget ?? ''}
-            onChange={(e) => setDraftTarget(e.target.value || null)}
-            className="border-hairline rounded-control text-ink mt-1.5 h-10 w-full border bg-white px-3 text-sm"
-          >
-            <option value="">選んでください</option>
-            {scenarios.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-              </option>
-            ))}
-          </select>
+          <label className="text-ink text-sm font-medium" htmlFor="on-complete-move-target">
+            移動先のシナリオ
+          </label>
+          {/*
+            SCENARIO-14: 候補の取得失敗は「0件」と分けて再試行を出す。
+            保存済みの移動先が候補に無いときは、現在の保存値として
+            選択肢に残し、理由を脇に書く。
+          */}
+          {candidatesState === 'error' ? (
+            <p className="text-danger mt-1.5 flex flex-wrap items-center gap-3 text-sm" role="alert">
+              移動先の候補を読み込めませんでした。
+              <button
+                type="button"
+                className="text-info font-medium hover:underline"
+                onClick={() => void loadCandidates(() => false)}
+              >
+                もう一度読み込む
+              </button>
+            </p>
+          ) : (
+            <>
+              <select
+                id="on-complete-move-target"
+                value={draftTarget ?? ''}
+                onChange={(e) => setDraftTarget(e.target.value || null)}
+                disabled={candidatesState === 'loading'}
+                className="border-hairline rounded-control text-ink mt-1.5 h-10 w-full border bg-white px-3 text-sm"
+              >
+                <option value="">
+                  {candidatesState === 'loading' ? '候補を読み込んでいます' : '選んでください'}
+                </option>
+                {scenarios.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
+                ))}
+                {savedTargetMissing && targetScenarioId ? (
+                  <option value={targetScenarioId}>
+                    {savedTargetName ?? '現在の保存値（名前を取得できません）'}
+                  </option>
+                ) : null}
+              </select>
+              {savedTargetMissing ? (
+                <p className="text-warning mt-1.5 text-xs">
+                  保存されている移動先はこのアカウントの候補にありません（別アカウント・削除済み・権限外の可能性）。そのまま保存すると現在の値が維持されます。
+                </p>
+              ) : null}
+            </>
+          )}
         </div>
       )}
     </Shell>
