@@ -3647,6 +3647,11 @@ export type DashboardOverview = {
       used: number | null
       limit: number | null
       remaining: number | null
+      /**
+       * LINE が「上限なし」（type=none）を返した契約。limit=null の
+       * 取得失敗・未接続と区別する（DASH-08）。段階配備中の旧Workerでは未返却。
+       */
+      unlimited?: boolean
     }>
     friendTrend: DashboardMetric<DashboardFriendTrendPoint[]>
     officialProfileUrl: DashboardMetric<string>
@@ -3978,6 +3983,11 @@ export type EcShipmentList = {
   later: EcShipment[]
   soonCount: number
   laterCount: number
+  /**
+   * 今日が出荷予定の総数。明細の limit で切る前の走査全件から数える（DASH-22）。
+   * 段階配備中の旧Workerでは未返却。その場合は画面側が返った明細から数える。
+   */
+  todayCount?: number
   scanned: number
   scanLimit: number
 }
@@ -12062,6 +12072,11 @@ export const bookingApi = {
       monthCancelled: number
       lastMonthTotal: number
       todayTotal: number
+      /**
+       * 取消・完了・無断を除いた「今日対応する予約」の総数（A01-04）。
+       * 明細取得の上限100件に引っ張られない。段階配備中の旧Workerでは未返却。
+       */
+      todayActiveTotal?: number
       weekTotal: number
       byMenu: Array<{ name: string; total: number }>
     }>(withAccount(`/api/booking/admin/requests-summary?${query.toString()}`, accountId))
