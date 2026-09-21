@@ -234,7 +234,12 @@ function NewBroadcastPageContent() {
           onSuccess={(broadcast) => router.push(
             broadcast.status === 'scheduled'
               ? `/broadcasts/reserved?id=${encodeURIComponent(broadcast.id)}`
-              : '/broadcasts',
+              /*
+               * 「今すぐ配信」はここで送らない。下書きとして保存したあと、
+               * 送信ボタンのある詳細画面へ進める（IDEA-06: 保存と送信を
+               * ひとつの操作に見せない）。
+               */
+              : `/broadcasts?id=${encodeURIComponent(broadcast.id)}`,
           )}
           onCancel={() => router.push('/broadcasts')}
           openTemplatePickerInitially={searchParams.get('templatePicker') === '1'}
