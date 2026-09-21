@@ -311,3 +311,20 @@ select:not([multiple]):not(.appearance-none) {
   background-size: 16px 16px;
   appearance: none;
 }
+
+/*
+ * 通知パネルは画面の下端を越えて伸びない（DASH-12）。
+ * 未読が多いとき、パネルがビューポートより長くなり末尾の通知と
+ * 「すべて見る」が画面外へ出ていた。パネル自体に上限を設け、
+ * 一覧部分だけをスクロールさせる。ヘッダ・絞り込み・フッタは固定のまま。
+ */
+[data-design-part="notification-panel"] {
+  display: flex;
+  flex-direction: column;
+  max-height: min(560px, calc(100dvh - 96px));
+}
+
+[data-design-part="notification-panel"] > ul {
+  min-height: 0;
+  overflow-y: auto;
+}
