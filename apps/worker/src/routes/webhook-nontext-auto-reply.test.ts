@@ -17,6 +17,7 @@ const lineClientMocks = vi.hoisted(() => ({
 const seenAutoReplyEvents = vi.hoisted(() => ({ ids: new Set<string>() }));
 
 vi.mock('@line-crm/db', () => ({
+  isOperationCapabilityStopped: vi.fn(async () => false),
   upsertFriend: vi.fn(),
   updateFriendFollowStatus: vi.fn(),
   getFriendByLineUserIdForAccount: vi.fn(),

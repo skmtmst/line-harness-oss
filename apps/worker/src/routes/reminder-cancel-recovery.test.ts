@@ -1076,7 +1076,7 @@ describe('取消後に外部送信が走らない (自主検証)', () => {
         },
       });
       expect(pushes).toEqual([]);
-      expect(result).toEqual({ succeeded: 0, skipped: 1, retrying: 0, failed: 0 });
+      expect(result).toEqual({ succeeded: 0, skipped: 1, retrying: 0, failed: 0, held: 0 });
       expect(dual.raw1.prepare(
         `SELECT status FROM reminder_delivery_runs WHERE friend_reminder_id = 'FR-d1'`,
       ).get()).toEqual({ status: 'cancelled' });
@@ -1103,7 +1103,7 @@ describe('部分失敗の再実行で二重送信にならない (自主検証)'
         pause: noPause,
         resolveClient: async () => client,
       });
-      expect(first).toEqual({ succeeded: 0, skipped: 0, retrying: 1, failed: 0 });
+      expect(first).toEqual({ succeeded: 0, skipped: 0, retrying: 1, failed: 0, held: 0 });
       expect(dual.raw1.prepare(
         `SELECT status FROM reminder_delivery_runs WHERE friend_reminder_id = 'FR-d1'`,
       ).get()).toEqual({ status: 'retry_wait' });
@@ -1114,7 +1114,7 @@ describe('部分失敗の再実行で二重送信にならない (自主検証)'
         pause: noPause,
         resolveClient: async () => client,
       });
-      expect(second).toEqual({ succeeded: 1, skipped: 0, retrying: 0, failed: 0 });
+      expect(second).toEqual({ succeeded: 1, skipped: 0, retrying: 0, failed: 0, held: 0 });
       expect(pushes).toHaveLength(2);
       expect(pushes[0].retryKey).toBeTruthy();
       expect(pushes[1].retryKey).toBe(pushes[0].retryKey);
@@ -1367,7 +1367,7 @@ describe('取消チェックの各層を個別に見張る (自主検証)', () =
       });
 
       expect(pushes.map((p) => p.userId)).toEqual(['U1']);
-      expect(result).toEqual({ succeeded: 1, skipped: 1, retrying: 0, failed: 0 });
+      expect(result).toEqual({ succeeded: 1, skipped: 1, retrying: 0, failed: 0, held: 0 });
       // 取消ずみの登録は残りの通へ進まない (実行行を増やさない)。
       expect(dual.raw1.prepare(
         `SELECT COUNT(*) AS c FROM reminder_delivery_runs WHERE friend_reminder_id = 'FR-d2'`,

@@ -13,7 +13,7 @@ import {
   validateSendPathRegistry,
 } from './operation-send-paths.js';
 
-const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
+const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', '..');
 
 /*
  * 送信経路の台帳の契約テスト (#1050)。

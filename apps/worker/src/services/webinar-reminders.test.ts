@@ -2,6 +2,7 @@ import { describe, expect, test, beforeEach, vi } from 'vitest';
 
 const dbMocks = {
   getDueWebinarRegistrations: vi.fn(),
+  isOperationCapabilityStopped: vi.fn(async () => false),
   markWebinarRegistrationNotified: vi.fn(),
   getFriendById: vi.fn(),
   getLineAccountById: vi.fn(),

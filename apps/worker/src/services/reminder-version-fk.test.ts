@@ -69,7 +69,7 @@ describe('版管理リマインダの外部キー整合', () => {
       pause: async () => undefined,
       resolveClient: async (_accountId, fallback) => fallback,
     });
-    expect(result).toEqual({ succeeded: 1, skipped: 0, retrying: 0, failed: 0 });
+    expect(result).toEqual({ succeeded: 1, skipped: 0, retrying: 0, failed: 0, held: 0 });
     expect(pushes).toEqual(['U-vfk-1']);
 
     // 保存された通 ID は旧 reminder_steps に存在する (FK が保たれる)。
@@ -120,7 +120,7 @@ describe('版管理リマインダの外部キー整合', () => {
       pause: async () => undefined,
       resolveClient: async (_accountId, fallback) => fallback,
     });
-    expect(again).toEqual({ succeeded: 0, skipped: 0, retrying: 0, failed: 0 });
+    expect(again).toEqual({ succeeded: 0, skipped: 0, retrying: 0, failed: 0, held: 0 });
     expect(pushes).toEqual(['U-vfk-1']);
   });
 });
