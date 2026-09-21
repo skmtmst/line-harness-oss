@@ -10187,14 +10187,18 @@ export const api = {
         if (params?.limit) query.set('limit', String(params.limit))
         return fetchApi<ApiResponse<WebhookInteractionList>>(`/api/webhooks/interactions?${query}`)
       },
-      retry: (id: string, lineAccountId: string) =>
+      retry: (id: string, lineAccountId: string, options?: { confirmed?: boolean }) =>
+        // IDEA-26: 「届いたか分からない」失敗は、相手先で確かめた旨
+        // (confirmed)を添えないと口側が409で止める。無条件の再送を防ぐ。
         fetchApi<ApiResponse<WebhookInteraction>>(
           `/api/webhooks/interactions/${id}/retry?lineAccountId=${encodeURIComponent(lineAccountId)}`,
-          { method: 'POST', body: '{}' },
+          { method: 'POST', body: JSON.stringify({ confirmed: options?.confirmed === true }) },
         ),
       retryFailed: (lineAccountId: string) =>
         // remaining: 1回の外部通信上限で今回やり直せず残った失敗の件数(N-387)。
-        fetchApi<ApiResponse<{ requested: number; succeeded: number; failed: number; skipped: number; remaining: number }>>(
+        // needsReview: 届いたか分からず、相手先で確かめてから1件ずつ
+        // やり直す必要がある件数。まとめて再送には乗らない(IDEA-26)。
+        fetchApi<ApiResponse<{ requested: number; succeeded: number; failed: number; skipped: number; remaining: number; needsReview: number }>>(
           `/api/webhooks/interactions/retry-failed?lineAccountId=${encodeURIComponent(lineAccountId)}`,
           { method: 'POST', body: '{}' },
         ),
@@ -11705,6 +11709,8 @@ export interface BookingAdminDetail {
     retryCount: number;
   }>;
   operations: BookingOperationResult[];
+  /** 変更履歴の総数。auditLogs は直近の要点分だけ。残りは getAuditLogs で追加取得する。 */
+  auditLogTotal: number;
   auditLogs: BookingAuditLog[];
 }
 

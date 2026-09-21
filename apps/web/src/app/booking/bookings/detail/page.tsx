@@ -321,6 +321,15 @@ function BookingDetailInner() {
   const [editReason, setEditReason] = useState('')
   const [saving, setSaving] = useState(false)
   const [retrying, setRetrying] = useState<string | null>(null)
+  /**
+   * IDEA-27: 変更履歴の初回応答は要点分だけ。残りは「あとN件を読み込む」で
+   * audit-logs 口から追加取得し、詳細の要点分と id で重複を潰して繋げる。
+   */
+  const [extraAuditLogs, setExtraAuditLogs] = useState<BookingAuditLog[] | null>(null)
+  const [auditLoading, setAuditLoading] = useState(false)
+  const [auditError, setAuditError] = useState('')
+  /** これまでの予約の内訳。初期表示は件数だけ（要点）にし、開いてから一覧を見せる。 */
+  const [historyOpen, setHistoryOpen] = useState(false)
   const slotRequest = useRef(0)
   /** DEEP-18: 遅れて返った古い取得が、今の対象を上書きしないよう要求の世代を数える。 */
   const loadGeneration = useRef(0)
@@ -383,6 +392,11 @@ function BookingDetailInner() {
     setDecideTarget(null)
     setError('')
     setNotice('')
+    // IDEA-27: 追加取得した履歴・開いた内訳も前の対象のものを残さない。
+    setExtraAuditLogs(null)
+    setAuditLoading(false)
+    setAuditError('')
+    setHistoryOpen(false)
   }, [id, selectedAccountId])
 
   const status = detail?.status ?? ''
@@ -411,6 +425,98 @@ function BookingDetailInner() {
     () => (detail?.operations ?? []).filter((op) => op.kind === 'confirmation_line'),
     [detail],
   )
+
+  /**
+   * IDEA-27: 変更履歴は「詳細の要点分（直近）＋追加取得分」を id で重複排除して
+   * 新しい順に繋ぐ。操作後の再読み込みで要点分が新しくなっても、
+   * 追加取得済みの古い記録はそのまま残る。
+   */
+  const shownAuditLogs = useMemo(() => {
+    if (!detail) return [] as BookingAuditLog[]
+    const byId = new Map<string, BookingAuditLog>()
+    for (const log of [...(extraAuditLogs ?? []), ...detail.auditLogs]) {
+      if (!byId.has(log.id)) byId.set(log.id, log)
+    }
+    return [...byId.values()].sort((a, b) => b.occurredAt.localeCompare(a.occurredAt))
+  }, [detail, extraAuditLogs])
+  const auditTotal = detail?.auditLogTotal ?? shownAuditLogs.length
+  const auditRemaining = Math.max(0, auditTotal - shownAuditLogs.length)
+  // audit-logs 口は最大200件。取り切っても残るなら「古い記録は省略」と伝える。
+  const auditTruncated = extraAuditLogs !== null && auditRemaining > 0
+
+  /**
+   * IDEA-27: 未確認・要対応のまとめ。予約・カレンダー・通知・顧客の
+   * 「まだ確認していない／失敗している」ことを1か所に集める。
+   */
+  const attentionItems = useMemo(() => {
+    if (!detail) return [] as Array<{ key: string; text: string; href?: string }>
+    const items: Array<{ key: string; text: string; href?: string }> = []
+    if (detail.status === 'requested') {
+      items.push({
+        key: 'pending',
+        text: 'まだ承認・お断りの判断をしていません',
+        href: '#sec-actions',
+      })
+      if (detail.customerNote?.trim()) {
+        items.push({
+          key: 'customer-note',
+          text: 'お客様からの要望があります。確認してから判断してください',
+          href: '#sec-answer',
+        })
+      }
+    }
+    if (detail.previousHandover?.trim()) {
+      items.push({
+        key: 'handover',
+        text: '前回の来店時の申し送りがあります',
+        href: '#sec-customer',
+      })
+    }
+    if (detail.calendarSync === 'failed') {
+      items.push({
+        key: 'calendar',
+        text: 'Googleカレンダーに反映できていません',
+        href: '#sec-failures',
+      })
+    }
+    if (failedNotificationOps.length > 0) {
+      items.push({
+        key: 'notification',
+        text: `届いていないお知らせが${failedNotificationOps.length}件あります`,
+        href: '#sec-failures',
+      })
+    }
+    const failedReminders = detail.reminders.filter(
+      (reminder) => reminder.status === 'failed' || reminder.status === 'failed_permanent',
+    )
+    if (failedReminders.length > 0) {
+      items.push({
+        key: 'reminder',
+        text: `送信に失敗したお知らせ予定が${failedReminders.length}件あります`,
+        href: isLineLinked ? '#sec-reminders' : undefined,
+      })
+    }
+    return items
+  }, [detail, failedNotificationOps, isLineLinked])
+
+  const loadMoreAudit = async () => {
+    if (!selectedAccountId || !detail) return
+    // 対象の切替で始まる load() と同じ世代番号で、遅れて返った
+    // 別予約の履歴が今の画面へ混ざらないようにする（DEEP-18 と同じ仕組み）。
+    const generation = loadGeneration.current
+    setAuditLoading(true)
+    setAuditError('')
+    try {
+      const res = await bookingApi.getAuditLogs(selectedAccountId, detail.id, 200)
+      if (loadGeneration.current !== generation) return
+      setExtraAuditLogs(res.audit_logs)
+    } catch {
+      if (loadGeneration.current !== generation) return
+      setAuditError('記録を読み込めませんでした。もう一度お試しください。')
+    } finally {
+      if (loadGeneration.current === generation) setAuditLoading(false)
+    }
+  }
 
   const decide = async (action: BookingAction) => {
     if (!selectedAccountId) return
@@ -843,7 +949,7 @@ function BookingDetailInner() {
                 </div>
               </section>
             ) : (
-              <section className="bg-canvas rounded-card border-hairline border p-5">
+              <section id="sec-answer" className="bg-canvas rounded-card border-hairline border p-5">
                 <h2 className="text-ink mb-3 text-sm font-semibold">申込時にいただいた回答</h2>
                 {detail.customerNote ? (
                   <>
@@ -864,7 +970,7 @@ function BookingDetailInner() {
               </section>
             )}
 
-            <section className="bg-canvas rounded-card border-hairline border p-5">
+            <section id="sec-customer" className="bg-canvas rounded-card border-hairline border p-5">
               <div className="mb-3 flex items-center justify-between gap-2">
                 <h2 className="text-ink text-sm font-semibold">お客さま</h2>
                 {detail.customer.friendId ? (
@@ -892,18 +998,89 @@ function BookingDetailInner() {
               {detail.customer.petName ? (
                 <Row label="ペットの名前">{detail.customer.petName}</Row>
               ) : null}
+              {detail.customer.tags.length > 0 ? (
+                <Row label="タグ">
+                  <span className="flex flex-wrap gap-1">
+                    {detail.customer.tags.map((tag) => (
+                      <span
+                        key={tag.id}
+                        className="bg-canvas-sunken text-ink-secondary rounded-pill px-2 py-0.5 text-xs"
+                      >
+                        {tag.name}
+                      </span>
+                    ))}
+                  </span>
+                </Row>
+              ) : null}
+              {detail.customer.mileageBalance !== null
+              && detail.customer.mileageBalance !== undefined ? (
+                <Row label="マイル">
+                  <span className="tabular-nums">{detail.customer.mileageBalance.toLocaleString()}</span>
+                </Row>
+              ) : null}
+              {detail.previousHandover?.trim() ? (
+                <Row label="前回の申し送り">
+                  <span className="whitespace-pre-wrap">{detail.previousHandover}</span>
+                </Row>
+              ) : null}
               <Row label="これまでの予約">
                 {detail.history.length === 0 ? (
                   <span className="text-ink-faint">この予約がはじめてです</span>
                 ) : (
-                  <>{detail.history.length}件</>
+                  <>
+                    {detail.history.length}件
+                    <button
+                      type="button"
+                      onClick={() => setHistoryOpen((open) => !open)}
+                      className="text-accent ml-2 text-xs underline"
+                      aria-expanded={historyOpen}
+                    >
+                      {historyOpen ? '内訳を閉じる' : '内訳を見る'}
+                    </button>
+                  </>
                 )}
               </Row>
+              {historyOpen && detail.history.length > 0 ? (
+                <ol className="border-hairline mt-1 space-y-1.5 border-t pt-3">
+                  {detail.history.map((item) => (
+                    <li key={item.id} className="text-ink-secondary flex flex-wrap gap-x-3 text-xs">
+                      <span className="tabular-nums">{jpStamp(item.startsAt)}</span>
+                      <span className="min-w-0">
+                        {item.menuName}／{item.staffName}
+                      </span>
+                      <span>{STATUS_LABELS[item.status] ?? item.status}</span>
+                    </li>
+                  ))}
+                </ol>
+              ) : null}
             </section>
           </div>
 
           <div data-design="Right" className="w-full shrink-0 space-y-4 xl:w-96">
+            {/* ---- 確認が必要なことのまとめ (IDEA-27) ---- */}
+            <section className="bg-canvas rounded-card border-hairline border p-5">
+              <h2 className="text-ink mb-3 text-sm font-semibold">確認が必要なこと</h2>
+              {attentionItems.length === 0 ? (
+                <p className="text-ink-faint text-xs">確認が必要なことはありません。</p>
+              ) : (
+                <ul className="space-y-2">
+                  {attentionItems.map((item) => (
+                    <li key={item.key} className="text-ink-secondary text-xs">
+                      {item.href ? (
+                        <a href={item.href} className="hover:text-accent hover:underline">
+                          {item.text}
+                        </a>
+                      ) : (
+                        item.text
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+
             <section
+              id="sec-actions"
               data-design="sec この予約をどうするか"
               className="bg-canvas rounded-card border-hairline border p-5"
             >
@@ -990,7 +1167,7 @@ function BookingDetailInner() {
 
             {/* ---- 送信状況と再試行 (N-393) ---- */}
             {(failedNotificationOps.length > 0 || failedCalendarOps.length > 0) && (
-              <section className="bg-canvas rounded-card border-hairline border p-5">
+              <section id="sec-failures" className="bg-canvas rounded-card border-hairline border p-5">
                 <h2 className="text-ink mb-3 text-sm font-semibold">届かなかった処理</h2>
                 <ul className="space-y-3">
                   {failedNotificationOps.map((op) => (
@@ -1051,7 +1228,7 @@ function BookingDetailInner() {
             ) : null}
 
             {isLineLinked ? (
-              <section className="bg-canvas rounded-card border-hairline border p-5">
+              <section id="sec-reminders" className="bg-canvas rounded-card border-hairline border p-5">
                 <h2 className="text-ink mb-3 text-sm font-semibold">お知らせの予定</h2>
                 {detail.reminders.length === 0 ? (
                   <p className="text-ink-faint text-xs">今後のお知らせはありません。</p>
@@ -1075,10 +1252,10 @@ function BookingDetailInner() {
               </section>
             ) : null}
 
-            {/* ---- 変更履歴 (N-394) ---- */}
-            <section className="bg-canvas rounded-card border-hairline border p-5">
+            {/* ---- 変更履歴 (N-394 / IDEA-27) ---- */}
+            <section id="sec-history" className="bg-canvas rounded-card border-hairline border p-5">
               <h2 className="text-ink mb-3 text-sm font-semibold">この予約の記録</h2>
-              {detail.auditLogs.length === 0 ? (
+              {shownAuditLogs.length === 0 ? (
                 // DEEP-19: 監査行のない予約（記録開始前のデータなど）に、
                 // LINE連携の有無から「送信しました」を推測して書かない。
                 // 出せるのは申込経路と通知実行台帳の事実だけ。
@@ -1103,11 +1280,33 @@ function BookingDetailInner() {
                   )}
                 </div>
               ) : (
-                <ol className="space-y-3">
-                  {detail.auditLogs.map((log) => (
-                    <LogRow key={log.id} at={jpStamp(log.occurredAt)} text={auditLine(log)} />
-                  ))}
-                </ol>
+                <>
+                  <ol className="space-y-3">
+                    {shownAuditLogs.map((log) => (
+                      <LogRow key={log.id} at={jpStamp(log.occurredAt)} text={auditLine(log)} />
+                    ))}
+                  </ol>
+                  {/* IDEA-27: 初期表示は要点分だけ。残りは audit-logs 口から追加取得する。
+                      取り損ねても前の一覧は消さず、再試行できるようにする。 */}
+                  {auditError ? (
+                    <p className="text-danger mt-3 text-xs">{auditError}</p>
+                  ) : null}
+                  {auditTruncated ? (
+                    <p className="text-ink-faint mt-3 text-xs">
+                      これより古い記録は省略しています。
+                    </p>
+                  ) : null}
+                  {auditRemaining > 0 && !auditTruncated ? (
+                    <button
+                      type="button"
+                      onClick={() => void loadMoreAudit()}
+                      disabled={auditLoading}
+                      className="text-accent mt-3 text-xs underline disabled:opacity-40"
+                    >
+                      {auditLoading ? '読み込み中...' : `あと${auditRemaining}件の記録を読み込む`}
+                    </button>
+                  ) : null}
+                </>
               )}
             </section>
           </div>

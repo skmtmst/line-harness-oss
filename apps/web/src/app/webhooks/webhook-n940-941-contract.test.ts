@@ -57,7 +57,8 @@ describe('N-387: まとめて再試行は上限を越えた残りを黙って置
     expect(API).toContain('remaining: number')
     expect(INTERACTIONS).toContain('response.data.remaining')
     expect(INTERACTIONS).toContain('もう一度押すと続きをやり直します')
-    expect(INTERACTIONS).toContain("response.data.remaining > 0 ? 'error' : 'success'")
+    // IDEA-26: 結果不明で送らなかった分(needsReview)も残件として成功扱いにしない。
+    expect(INTERACTIONS).toContain("response.data.remaining > 0 || response.data.needsReview > 0 ? 'error' : 'success'")
   })
 })
 
