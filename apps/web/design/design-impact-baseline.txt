@@ -128,6 +128,7 @@ shared-button-importer app/rich-menus/edit/test-apply-section.tsx
 shared-button-importer app/rich-menus/new/page.tsx
 shared-button-importer app/rich-menus/page.tsx
 shared-button-importer app/scenarios/detail/scenario-detail-client.tsx
+shared-button-importer app/scenarios/first-step/page.tsx
 shared-button-importer app/scenarios/page.tsx
 shared-button-importer app/scenarios/results/page.tsx
 shared-button-importer app/staff/email-change/page.tsx
