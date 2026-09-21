@@ -2073,6 +2073,24 @@ const spec = {
         },
       },
     },
+    '/api/scenarios/{id}/friends/{friendId}/plan': {
+      get: {
+        tags: ['Scenarios'],
+        summary: '選んだ友だちへの配信予定・待機・分岐理由を副作用なしで試算（IDEA-05）',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'friendId', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'lineAccountId', in: 'query', required: true, schema: { type: 'string' } },
+          { name: 'startAt', in: 'query', schema: { type: 'string', format: 'date-time' } },
+        ],
+        responses: {
+          '200': { description: 'Per-friend delivery plan; no side effects' },
+          '400': { description: 'lineAccountId required' },
+          '403': { description: 'Scenario view permission required' },
+          '404': { description: 'Not found in account scope' },
+        },
+      },
+    },
     '/api/scenarios/{id}/draft': {
       put: {
         tags: ['Scenarios'],
