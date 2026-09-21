@@ -12,6 +12,7 @@ import type { PhotoAssetStatus, PhotoDerivatives } from '@/lib/api'
 import { formatPhotoReceivedAt } from './photo-review-time'
 import { safePhotoSrc } from './photo-src'
 import { photoPetDisplayName } from '@/components/shared/photo-display-name'
+import { petAnimalTypeLabel } from '@/lib/nen-pets-api'
 import { text } from './photo-text'
 
 const numberOrDash = (value: unknown) => Number.isFinite(Number(value)) ? Number(value).toLocaleString('ja-JP') : '—'
@@ -122,7 +123,7 @@ export function PhotoReviewDetail({
         <Card padding="default">
           <dl>
             <div><dt className="text-xs font-bold text-ink-faint">送ってくれた人</dt><dd className="mt-1 text-xs font-bold text-ink">{text(photo.owner_name) || '名前未取得'}</dd><small className="mt-1 block text-xs text-ink-faint">投稿 {numberOrDash(photo.submission_count)}回目 ／ 戻したこと {numberOrDash(photo.returned_count)}回</small></div>
-            <div className="mt-3 border-t border-hairline pt-3"><dt className="text-xs font-bold text-ink-faint">ペット</dt><dd className="mt-1 text-xs font-bold text-ink">{photoPetDisplayName(photo.pet_name, { fallback: '未取得', honorific: false })}（{text(photo.animal_type) === 'cat' ? '猫' : '犬'}・{text(photo.breed) || '品種未取得'}）</dd></div>
+            <div className="mt-3 border-t border-hairline pt-3"><dt className="text-xs font-bold text-ink-faint">ペット</dt><dd className="mt-1 text-xs font-bold text-ink">{photoPetDisplayName(photo.pet_name, { fallback: '未取得', honorific: false })}（{petAnimalTypeLabel(text(photo.animal_type))}・{text(photo.breed) || '品種未取得'}）</dd></div>
             <div className="mt-3 border-t border-hairline pt-3"><dt className="text-xs font-bold text-ink-faint">届いた日時</dt><dd className="mt-1 text-xs font-bold text-ink">{formatPhotoReceivedAt(photo.created_at)}</dd></div>
             <div className="mt-3 border-t border-hairline pt-3"><dt className="text-xs font-bold text-ink-faint">そえられた言葉</dt><dd className="mt-1 text-xs font-bold text-ink">{text(photo.caption) ? `「${text(photo.caption)}」` : 'コメントなし'}</dd></div>
           </dl>

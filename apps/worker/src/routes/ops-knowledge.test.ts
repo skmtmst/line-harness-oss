@@ -42,6 +42,16 @@ beforeEach(async () => {
 afterEach(() => store.raw.close());
 
 describe('運営専用ナレッジ（実SQLite・AIはモック）', () => {
+  it('元の問い合わせ件名を返す際も名前とメールを匿名化する', async () => {
+    await processKnowledgeJob(environment());
+    store.raw.prepare('UPDATE hq_support_requests SET subject = ? WHERE id = ?')
+      .run('架空契約先 架空担当者 demo@example.com 配信対象の設定', requestId);
+    const article = (await knowledgeForTicket(store.db, requestId)).article!;
+    const res = await request(`/api/ops/knowledge/${article.id}`);
+    expect(res.status).toBe(200);
+    expect((await res.json() as { data: { sourceSubject: string } }).data.sourceSubject)
+      .toBe('[匿名] [匿名] [メール] 配信対象の設定');
+  });
   it('同時刻の会話はUUIDの並びで解決済みと判断せず要確認にする', async () => {
     store.raw.prepare('UPDATE hq_support_messages SET created_at = ? WHERE request_id = ?').run('2026-09-19T10:00:00.000+09:00', requestId);
     await processKnowledgeJob(environment());

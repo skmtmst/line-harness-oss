@@ -13,6 +13,7 @@ import {
   type BookingMenu,
   type BookingMenuStaff,
   type BookingNotificationPolicy,
+  type BookingOperationResult,
 } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import { canOperateBookings } from '../../lib/booking-permissions'
@@ -60,6 +61,93 @@ const POLICY_FIELD_LABELS: Record<string, string> = {
   send_line_confirmation: '確定のお知らせ',
   day_before: '前日のお知らせ',
   hours_before: '当日のお知らせ',
+}
+
+/**
+ * 通知実行台帳（operations の confirmation_line 行）に残る通知の種類。
+ * renderNotificationText (worker) の NotificationKind と対応する。
+ */
+const NOTIFICATION_KIND_LABELS: Record<string, string> = {
+  requested: '受付のお知らせ',
+  approved: '確定のお知らせ',
+  rejected: 'お断りのお知らせ',
+  expired: '期限切れのお知らせ',
+  changed: '変更のお知らせ',
+  day_before: '前日のお知らせ',
+  hours_before: '当日のお知らせ',
+}
+
+/**
+ * 送信済みのときに出す言い回し（設計 27-1-A の記録欄の語と対応）。
+ * 台帳に succeeded の行があるときだけ使う。推測では書かない。
+ */
+const NOTIFICATION_OP_SUCCEEDED_LINES: Record<string, string> = {
+  requested: '受付のお知らせを自動送信しました',
+  approved: '確定のお知らせを送信しました',
+  rejected: 'お断りのお知らせを送信しました',
+  expired: '期限切れのお知らせを送信しました',
+  changed: '変更のお知らせを送信しました',
+  day_before: '前日のお知らせを送信しました',
+  hours_before: '当日のお知らせを送信しました',
+}
+
+/**
+ * DEEP-19: 「通知を送信しました」は台帳の事実だけから作る。
+ * LINE連携の有無や通知設定から推測して書かない。
+ */
+function notificationOpLine(op: BookingOperationResult): string {
+  const kind = typeof op.result?.notificationKind === 'string' ? op.result.notificationKind : ''
+  const label = NOTIFICATION_KIND_LABELS[kind] ?? 'お知らせ'
+  switch (op.status) {
+    case 'succeeded':
+      return NOTIFICATION_OP_SUCCEEDED_LINES[kind] ?? `${label}を送信しました`
+    case 'queued':
+      return `${label}の送信待ちです`
+    case 'skipped':
+      return `${label}は送信しませんでした`
+    case 'cancelled':
+      return `${label}の送信を取りやめました`
+    case 'retry_wait':
+      return `${label}の送信に失敗しました（再試行待ち）`
+    default:
+      return `${label}の送信に失敗しました`
+  }
+}
+
+/**
+ * DEEP-20: 確認窓の説明を、実際に起きる副作用に合わせる。
+ * Worker の実処理 (booking.ts の decide 分岐) と対応:
+ *   - 承認: 友だち連携済みかつ send_line_confirmation が ON のときだけ
+ *     確定のお知らせを送る。確定へは戻れるが未承認へは戻れない。
+ *   - お断り: 連携済みなら方針に関係なくお断りのお知らせを送る。終端。
+ *   - キャンセル・完了・来店なし: お客様への自動連絡はしない。終端。
+ */
+function decideDescription(
+  action: BookingAction,
+  isLineLinked: boolean,
+  policy: BookingNotificationPolicy | undefined,
+): string {
+  switch (action) {
+    case 'approve': {
+      const notify = !isLineLinked
+        ? 'LINEと結びついていないため、お客様への自動連絡はありません。'
+        : policy?.send_line_confirmation
+          ? '確定のお知らせがお客様のLINEへ届きます。'
+          : 'この予約は確定のお知らせを送らない設定です。承認してもLINEには届きません。'
+      return `${notify}承認した予約は「未承認」には戻せません。取りやめるときはキャンセルにしてください。`
+    }
+    case 'reject':
+      return `${
+        isLineLinked
+          ? 'お断りのお知らせがお客様のLINEへ届きます。'
+          : 'LINEと結びついていないため、お客様への自動連絡はありません。'
+      }お断りにした予約は元に戻せません。受け直すには新しい予約が必要です。`
+    case 'cancel':
+      return 'キャンセルしてもお客様への自動連絡はありません。必要なら個別にご連絡ください。キャンセルした予約は元に戻せず、受け直すには新しい予約が必要です。'
+    case 'complete':
+    case 'no_show':
+      return 'この操作ではお客様への自動連絡はありません。一度変更すると、この画面から元の状態には戻せません。'
+  }
 }
 
 function jpDateTime(iso: string): string {
@@ -185,12 +273,30 @@ function BookingDetailInner() {
   const { selectedAccountId } = useAccount()
   const params = useSearchParams()
   const id = params.get('id') ?? ''
-  const [detail, setDetail] = useState<BookingAdminDetail | null>(null)
+  /**
+   * DEEP-18: 詳細は「どのアカウントの・どの予約の応答か」を鍵付きで持つ。
+   * 表示・操作に使う detail は、URLの予約IDと選択中アカウントに
+   * 一致するものだけ（下の detail 定義でピン留めする）。
+   */
+  const [detailState, setDetailState] = useState<{
+    key: { accountId: string; bookingId: string }
+    booking: BookingAdminDetail
+  } | null>(null)
   const [loading, setLoading] = useState(true)
   const [acting, setActing] = useState(false)
   const [decideTarget, setDecideTarget] = useState<BookingAction | null>(null)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
+  /**
+   * 表示・操作に使うのは、URLの予約IDと選択中アカウントに一致する
+   * 詳細だけ。鍵が合わない（切替直後・古い応答）ものは null として
+   * 扱い、変更操作を出さない（DEEP-18）。
+   */
+  const detail = detailState
+    && detailState.key.accountId === selectedAccountId
+    && detailState.key.bookingId === id
+    ? detailState.booking
+    : null
   usePageTitle(detail ? `${detail.customer.displayName} ／ ${detail.menuName}` : '予約の詳細')
 
   // ---- 変更モード (N-389) ----
@@ -216,6 +322,8 @@ function BookingDetailInner() {
   const [saving, setSaving] = useState(false)
   const [retrying, setRetrying] = useState<string | null>(null)
   const slotRequest = useRef(0)
+  /** DEEP-18: 遅れて返った古い取得が、今の対象を上書きしないよう要求の世代を数える。 */
+  const loadGeneration = useRef(0)
   // N-401: 閲覧のみの人には承認・変更・再試行のボタンを見せない。
   // 読み込めるまでは隠す。最終の可否はサーバ側の403が決める。
   const [canOperate, setCanOperate] = useState(false)
@@ -231,24 +339,51 @@ function BookingDetailInner() {
   }, [])
 
   const load = useCallback(async () => {
-    if (!id || !selectedAccountId) {
+    const generation = ++loadGeneration.current
+    const accountId = selectedAccountId
+    const bookingId = id
+    // DEEP-18: 対象が変わった瞬間に前の予約を残さない。古い詳細が
+    // 表示・操作に使われ続ける事故を防ぐ。
+    setDetailState((current) =>
+      current == null
+      || (current.key.accountId === accountId && current.key.bookingId === bookingId)
+        ? current
+        : null,
+    )
+    if (!bookingId || !accountId) {
       setLoading(false)
       return
     }
     setLoading(true)
+    setError('')
     try {
-      const res = await bookingApi.getBooking(selectedAccountId, id)
-      setDetail(res.booking)
+      const res = await bookingApi.getBooking(accountId, bookingId)
+      // あとから始めた取得が先に返っている場合、この応答は古い。
+      // 遅い応答で今の対象を上書きしない（世代の確認）。
+      if (loadGeneration.current !== generation) return
+      setDetailState({ key: { accountId, bookingId }, booking: res.booking })
     } catch {
+      if (loadGeneration.current !== generation) return
+      // 失敗時は前の予約を「今の予約」として残さない。
+      setDetailState(null)
       setError('読み込みに失敗しました')
     } finally {
-      setLoading(false)
+      if (loadGeneration.current === generation) setLoading(false)
     }
   }, [id, selectedAccountId])
 
   useEffect(() => {
     void load()
   }, [load])
+
+  // DEEP-18: 対象（アカウント×予約ID）が切り替わったら、変更モードや
+  // 確認窓・メッセージも前の対象のものを残さない。
+  useEffect(() => {
+    setEditing(false)
+    setDecideTarget(null)
+    setError('')
+    setNotice('')
+  }, [id, selectedAccountId])
 
   const status = detail?.status ?? ''
   const editable = status === 'requested' || status === 'confirmed'
@@ -269,6 +404,11 @@ function BookingDetailInner() {
   )
   const queuedCalendar = useMemo(
     () => (detail?.operations ?? []).some((op) => op.kind === 'google_calendar' && op.status === 'queued'),
+    [detail],
+  )
+  // DEEP-19: 通知履歴は実行台帳（operations）だけから作る。
+  const notificationOps = useMemo(
+    () => (detail?.operations ?? []).filter((op) => op.kind === 'confirmation_line'),
     [detail],
   )
 
@@ -402,9 +542,19 @@ function BookingDetailInner() {
     setError('')
     setNotice('')
     try {
-      await bookingApi.updateBooking(selectedAccountId, id, patch)
+      const updated = await bookingApi.updateBooking(selectedAccountId, id, patch)
       setEditing(false)
-      setNotice('予約を変更しました')
+      /* IDEA-07: 変更と一緒に動いた通知も応答から言う。
+         「組み直した/送る」が見えないと、古い通知が残ったままか、
+         新しい通知が組まれたかを画面から確かめられない。 */
+      const effects: string[] = []
+      if (updated.change_notification === 'queued') {
+        effects.push('変更のお知らせをお客様へ送ります')
+      }
+      if (updated.reminders_created > 0) {
+        effects.push('今後のお知らせを新しい日時で組み直しました')
+      }
+      setNotice(`${['予約を変更しました', ...effects].join('。')}。`)
       await load()
     } catch (cause) {
       if (cause instanceof ApiError && cause.code === 'version_conflict') {
@@ -499,8 +649,19 @@ function BookingDetailInner() {
           読み込み中...
         </div>
       ) : !detail ? (
+        // DEEP-18: 取得失敗を「存在しない予約」と混ぜない。失敗時は
+        // 前の予約も出さず、読み直す導線だけを置く。
         <p className="text-ink-faint bg-canvas rounded-card border-hairline border p-8 text-center text-sm">
-          この予約は見つかりませんでした。
+          {error ? '予約を読み込めませんでした。' : 'この予約は見つかりませんでした。'}
+          {error ? (
+            <button
+              type="button"
+              onClick={() => void load()}
+              className="text-accent ml-2 underline"
+            >
+              もう一度読み込む
+            </button>
+          ) : null}
         </p>
       ) : (
         <div data-design="Body" className="flex flex-col gap-4 xl:flex-row">
@@ -748,9 +909,15 @@ function BookingDetailInner() {
             >
               <h2 className="text-ink mb-1 text-sm font-semibold">この予約をどうするか</h2>
               <p className="text-ink-faint mb-3 text-xs">
-                {isLineLinked
-                  ? '承認するとお客様のLINEに確定のお知らせが届きます。'
-                  : 'LINEと結びついていないため、お客様への自動連絡はありません。'}
+                {/* DEEP-20: 実際の副作用に合わせる。承認は方針ONの連携済み
+                    予約だけLINEを送り、完了・来店なし・キャンセルは送らない。 */}
+                {!isLineLinked
+                  ? 'LINEと結びついていないため、お客様への自動連絡はありません。'
+                  : status === 'requested'
+                    ? (detail.notificationPolicy.send_line_confirmation
+                      ? '承認するとお客様のLINEに確定のお知らせが届きます。'
+                      : 'この予約は確定のお知らせを送らない設定です。承認してもLINEには届きません。')
+                    : '完了・来店なし・キャンセルの操作では、お客様への自動連絡はありません。'}
               </p>
               <div className="flex flex-col gap-2">
                 {/* N-401: 閲覧のみの人には状態を変える操作を出さない */}
@@ -912,12 +1079,29 @@ function BookingDetailInner() {
             <section className="bg-canvas rounded-card border-hairline border p-5">
               <h2 className="text-ink mb-3 text-sm font-semibold">この予約の記録</h2>
               {detail.auditLogs.length === 0 ? (
-                <ol className="space-y-3">
-                  <LogRow at={jpStamp(detail.requestedAt)} text="お客様が予約を申し込みました" />
-                  {isLineLinked ? (
-                    <LogRow at={jpStamp(detail.requestedAt)} text="受付のお知らせを自動送信しました" />
-                  ) : null}
-                </ol>
+                // DEEP-19: 監査行のない予約（記録開始前のデータなど）に、
+                // LINE連携の有無から「送信しました」を推測して書かない。
+                // 出せるのは申込経路と通知実行台帳の事実だけ。
+                <div className="space-y-3">
+                  <ol className="space-y-3">
+                    <LogRow
+                      at={jpStamp(detail.requestedAt)}
+                      text={detail.source === 'liff'
+                        ? 'お客様が予約を申し込みました'
+                        : 'スタッフが予約を記録しました'}
+                    />
+                    {notificationOps.map((op) => (
+                      <LogRow
+                        key={op.id}
+                        at={jpStamp(op.completedAt ?? op.scheduledAt ?? detail.requestedAt)}
+                        text={notificationOpLine(op)}
+                      />
+                    ))}
+                  </ol>
+                  {notificationOps.length === 0 && (
+                    <p className="text-ink-faint text-xs">通知履歴はありません。</p>
+                  )}
+                </div>
               ) : (
                 <ol className="space-y-3">
                   {detail.auditLogs.map((log) => (
@@ -930,12 +1114,14 @@ function BookingDetailInner() {
         </div>
       )}
 
+      {/* DEEP-18: 対象の詳細が確定していない間は確認窓を開かない。
+          DEEP-20: 説明は操作と通知方針ごとの実処理に合わせる。 */}
       <ConfirmDialog
-        open={decideTarget !== null}
+        open={decideTarget !== null && detail !== null}
         title={`この予約を「${decideTarget ? ACTION_LABELS[decideTarget] : ''}」にしますか？`}
-        description={isLineLinked
-          ? '予約した人へ、この結果がLINEで届きます。取り消すには、もう一度状態を変える必要があります。'
-          : 'LINEと結びついていないため、お客様への自動連絡はありません。'}
+        description={decideTarget && detail
+          ? decideDescription(decideTarget, isLineLinked, detail.notificationPolicy)
+          : ''}
         confirmLabel={decideTarget ? ACTION_LABELS[decideTarget] : '実行する'}
         destructive={decideTarget === 'reject' || decideTarget === 'cancel' || decideTarget === 'no_show'}
         busy={acting}

@@ -10,6 +10,7 @@ usersGrouped.get('/api/users-grouped', requireRole('owner', 'admin', 'staff'), a
     const q = c.req.query('q');
     const onlyDups = c.req.query('onlyDups') === '1';
     const account = c.req.query('account') || undefined;
+    const uidRaw = c.req.query('uid');
     const pageStr = c.req.query('page');
     const pageSizeStr = c.req.query('pageSize');
     const forceRefresh = c.req.query('refresh') === '1';
@@ -18,6 +19,8 @@ usersGrouped.get('/api/users-grouped', requireRole('owner', 'admin', 'staff'), a
       q: q || undefined,
       onlyDups,
       account,
+      // FRIEND-09: 表示中ページへの後絞りをやめ、全件へかける条件として受ける。
+      uid: uidRaw === 'linked' || uidRaw === 'unlinked' ? uidRaw : undefined,
       page: pageStr ? Number.parseInt(pageStr, 10) : undefined,
       pageSize: pageSizeStr ? Number.parseInt(pageSizeStr, 10) : undefined,
       forceRefresh,

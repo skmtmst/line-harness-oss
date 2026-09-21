@@ -35,6 +35,32 @@
   cursor: pointer;
 }
 
+/*
+ * #985 LAY-18: 「押せない理由」を添える項目だけ高さを伸ばす。
+ * 設計 hGpFq の item（34px / padding 0 10px）は据え置き、
+ * 理由のある行はこのクラスで2行にする。
+ */
+.itemWithReason {
+  height: auto;
+  min-height: 34px;
+  padding-top: 6px;
+  padding-bottom: 6px;
+}
+
+/* ラベルと「押せない理由」を縦に載せる器。 */
+.itemBody {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+}
+
+.reason {
+  color: var(--color-ink-faint);
+  font-size: var(--text-nano);
+  font-weight: 400;
+  line-height: 1.4;
+}
+
 .item:hover:not(:disabled),
 .item:focus-visible {
   background: var(--color-surface-pearl);

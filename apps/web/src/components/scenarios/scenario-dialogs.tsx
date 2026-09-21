@@ -596,12 +596,18 @@ export function TestSendDialog({
   }
 
   if (confirming) {
+    /*
+     * #985 CHK-01: 左の空きはPCのメニュー（1280px以上で256px）が
+     * 実在するときだけ取る。狭い幅では全幅にしないと、確認の本文と
+     * 操作が残った細い帯に潰れて読めない。
+     */
     return (
-      <div className="fixed inset-y-0 right-0 z-50 overflow-y-auto bg-canvas" style={{ left: 255 }} data-design-node="g2UNV">
-        <div className="border-hairline flex items-center justify-between border-b px-6" style={{ height: 76, background: 'var(--color-canvas)' }}><h1 className="text-ink text-2xl font-bold">シナリオをテスト送信</h1><Button onClick={onClose}>シナリオ編集へ戻る</Button></div>
+      <div className="fixed inset-y-0 right-0 left-0 z-50 overflow-y-auto bg-canvas xl:left-64" data-design-node="g2UNV">
+        <div className="border-hairline flex flex-wrap items-center justify-between gap-2 border-b px-6" style={{ minHeight: 76, background: 'var(--color-canvas)' }}><h1 className="text-ink text-2xl font-bold">シナリオをテスト送信</h1><Button onClick={onClose}>シナリオ編集へ戻る</Button></div>
         <main className="ml-6 mr-10 p-8">
           <p className="text-accent text-sm">シナリオ編集へ戻る</p>
-          <div className="mt-5 grid gap-6" style={{ gridTemplateColumns: '1.5fr 0.8fr' }}>
+          {/* #1015 CHK-01 残存対応: 2列の固定比は狭い幅で本文が潰れるので、lg未満は1列に畳む。 */}
+          <div className="mt-5 grid gap-6 lg:grid-cols-[1.5fr_0.8fr]">
             <section><h2 className="text-ink text-xl font-bold">選択した1名へ実際に送信</h2><p className="text-ink-secondary mt-1 text-sm">選んだ友だちのLINEへ、実際のメッセージが届きます。操作者専用の宛先ではありません。</p>
               <div className="border-hairline mt-5 rounded-panel border p-5"><h3 className="font-bold">テスト対象</h3><dl className="mt-4 space-y-4 text-sm"><div className="flex justify-between"><dt className="text-ink-faint">LINEアカウント</dt><dd className="font-medium">{accountName ?? '取得できていません'}</dd></div><div className="flex justify-between"><dt className="text-ink-faint">送信先</dt><dd className="font-medium">{selectedFriend?.displayName || '（名前なし）'}</dd></div><div className="flex justify-between"><dt className="text-ink-faint">区分</dt><dd className="font-medium">{recipientLabel}</dd></div></dl></div>
               <div className="border-hairline mt-4 rounded-panel border p-5"><h3 className="font-bold">テスト内容</h3><p className="text-ink-secondary mt-2 text-sm">{confirmSteps.length > 1 ? `選択した${confirmSteps.length}通を、通と通のあいだの待機を省略して順番に送信します。` : 'この1通だけを送信します。'}</p>
@@ -627,7 +633,12 @@ export function TestSendDialog({
               </div></aside>
           </div>
         </main>
-        <div className="fixed inset-0 z-10 flex items-start justify-center px-6" style={{ paddingTop: 265, background: 'color-mix(in srgb, var(--color-ink) 35%, transparent)' }}>
+        {/*
+          #985 CHK-01: 上の空き265pxは高さのあるPCの値。低い画面では
+          残りの高さに合わせて縮め、下へはみ出した分はスクロールして
+          「戻る」「テスト送信を開始」へ必ず到達できるようにする。
+        */}
+        <div className="fixed inset-0 z-10 flex items-start justify-center overflow-y-auto px-6 pb-6" style={{ paddingTop: 'min(265px, 30vh)', background: 'color-mix(in srgb, var(--color-ink) 35%, transparent)' }}>
           <div className="w-full rounded-panel shadow-xl" style={{ maxWidth: 672, background: 'var(--color-canvas)' }}><div className="border-hairline border-b px-6 py-5"><h2 className="text-lg font-bold">選択した1名へ実際に送信しますか？</h2><p className="text-ink-secondary mt-1 text-sm">{friendName}さん（{recipientLabel}）へ{confirmSteps.length}通をテスト送信します。実際のLINEメッセージとして届きます。</p></div><div className="space-y-3 px-6 py-5 text-sm">{requiredConfirmations.map((label, index) => (<label key={label} className="flex items-center gap-2"><input type="checkbox" checked={confirmChecks[index] === true} disabled={sending || result?.ok === true} onChange={(e) => setConfirmChecks((prev) => prev.map((v, i) => (i === index ? e.target.checked : v)))} />{label}</label>))}<p className="text-ink-faint text-xs">購読の登録は増えません。配信予定も作りません。</p>
             {sending && <p className="rounded-panel bg-info-bg text-ink-secondary px-4 py-3 text-sm">送信中です。完了までこの画面のまま待ってください。</p>}
             {result && (

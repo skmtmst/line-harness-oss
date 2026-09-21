@@ -30,13 +30,13 @@ export function TicketKnowledge({ detail, onRefresh }: { detail: OpsSupportDetai
     if (res.success) onRefresh()
     else setError(res.error || '再試行できませんでした')
   }
-  return <section data-design-node="dTlfh" className="grid gap-2" aria-label="ナレッジの確認">
+  return <section className="grid gap-2" aria-label="ナレッジの確認">
     <NoteBar>{current?.sourceCurrent
       ? current.reviewState === 'approved' && current.status === 'active' ? '確認済みの記事をナレッジに保存しています。' : '自動確認した下書きです。解決の根拠と内容を確認し、承認するまで AI の返信には使われません。'
       : job?.status === 'failed' ? '下書きを作れませんでした。時間をおいて再試行できます。'
         : '解決した内容を自動で確認します。根拠が足りない場合は「要確認」になります。承認前の記事は AI の返信に使われません。'}</NoteBar>
     <div className="flex justify-end gap-2">
-      {current && <Button data-design-node="KiIsv" size="field" disabled={busy} onClick={() => void open()}>下書きを確認</Button>}
+      {current && <Button data-design-node="rY1Kc" size="field" disabled={busy} onClick={() => void open()}>下書きを確認</Button>}
       {job?.status === 'failed' && <Button size="field" disabled={busy} onClick={() => void retry()}>もう一度試す</Button>}
     </div>
     {error && <p role="alert" className="text-caption text-status-danger">{error}</p>}
@@ -44,7 +44,7 @@ export function TicketKnowledge({ detail, onRefresh }: { detail: OpsSupportDetai
   </section>
 }
 
-/** V6 37-6-A F8supc. Feedback only concerns references actually used by this draft. */
+/** V6 37-6-A l87aC. Feedback only concerns references actually used by this draft. */
 export function KnowledgeReferences({ references, requestId, busy, onExclude }: {
   references: OpsKnowledgeReference[]; requestId: string; busy: boolean; onExclude: (id: string) => void
 }) {
@@ -67,7 +67,7 @@ export function KnowledgeReferences({ references, requestId, busy, onExclude }: 
     else setError(res.error || '読み込めませんでした')
   }
   if (!references.length) return null
-  return <section data-design-node="F8supc" className="grid gap-2" aria-label="参考にした記事">
+  return <section data-design-node="l87aC" className="grid gap-2" aria-label="参考にした記事">
     <h4 className="text-caption font-bold text-ink">参考にした記事（{references.length} 件）</h4>
     {references.map(ref => <div key={`${ref.id}-${ref.version}`} className="flex flex-wrap items-center gap-2">
       <Button className="min-w-0 flex-1 truncate text-accent-deep" size="field" disabled={busy || pending} onClick={() => void open(ref.id)}>{ref.title}</Button>

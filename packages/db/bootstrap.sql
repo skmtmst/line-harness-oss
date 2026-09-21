@@ -2065,7 +2065,7 @@ CREATE TABLE event_slots (
   sort_order  INTEGER NOT NULL DEFAULT 0,
   deleted_at  TEXT,
   created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
-  updated_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')), version INTEGER NOT NULL DEFAULT 1 CHECK (version >= 1),
+  updated_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')), version INTEGER NOT NULL DEFAULT 1 CHECK (version >= 1), client_key TEXT,
   FOREIGN KEY (event_id) REFERENCES events(id)
 );
 
@@ -6906,6 +6906,10 @@ CREATE INDEX idx_event_occurrence_applicant_snapshots_expiry
 
 CREATE INDEX idx_event_occurrence_applicant_snapshots_scope_expiry
   ON event_occurrence_applicant_snapshots(line_account_id, occurrence_id, staff_id, expires_at);
+
+CREATE UNIQUE INDEX idx_event_slots_client_key
+  ON event_slots (event_id, client_key)
+  WHERE client_key IS NOT NULL AND deleted_at IS NULL;
 
 CREATE INDEX idx_event_slots_event_starts ON event_slots (event_id, starts_at);
 

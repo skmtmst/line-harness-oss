@@ -56,7 +56,7 @@ export default function KnowledgeList() {
     if (!res.success) { setActionError(res.error || '読み込めませんでした'); return }
     setEditing(res.data)
   }
-  return <div className={styles.page} data-design-node="P5egpk">
+  return <div className={styles.page} data-design-node="csVox">
     <div className={styles.heading}><h2>ナレッジ一覧</h2></div>
     <div className={styles.filters}>
       <div className={styles.search}><Search aria-hidden="true" /><TextField aria-label="タイトル・質問・キーワードで検索"
@@ -78,11 +78,11 @@ export default function KnowledgeList() {
           const label = knowledgeState(article)
           const approved = label.label === '承認済み'
           return <Tr key={article.id}>
-            <Td className={styles.titleCell}>{article.title}</Td>
+            <Td className={styles.titleCell} title={article.title}>{article.title}</Td>
             <Td>{KNOWLEDGE_KINDS.find(v => v.value === article.kind)?.label}</Td>
             <Td><Chip tone={label.tone} className={styles.chip}>{label.label}</Chip></Td>
-            <Td>{article.usedCount ? `${article.usedCount} 回` : '—'}</Td>
-            <Td>{article.helpfulCount ? `${article.helpfulCount} 件` : '—'}</Td>
+            <Td>{article.usedCount ? `${article.usedCount}回` : '—'}</Td>
+            <Td>{article.helpfulCount ? `${article.helpfulCount}件` : '—'}</Td>
             <Td>{knowledgeDate(article.updatedAt)}</Td>
             <Td><div className={styles.rowActions}>
               <button type="button" disabled={busy} onClick={() => void open(article)}>{approved ? '直す' : label.label === '承認待ち' ? '内容を確認' : '理由を確認'}</button>

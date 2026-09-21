@@ -87,6 +87,36 @@ describe('V6 ウェビナー一覧の契約', () => {
     expect(PAGE).toContain('if (visibleItems.length === 0)')
   })
 
+  it('固定の絞り込みは「よく使う絞り込み」と呼び、保存検索と混ぜない(DETAIL-20)', () => {
+    /* 公開中のみ・下書きのみはコード固定の切替で、利用者の保存検索ではない。 */
+    expect(PAGE).toContain('よく使う絞り込み')
+    expect(PAGE).not.toContain('保存した条件')
+  })
+
+  it('同じ /webinars/new への操作名は「ウェビナーを作成」で一致する(DETAIL-02)', () => {
+    expect(PAGE).toContain('href="/webinars/new">ウェビナーを作成')
+    expect(PAGE).not.toContain('ウェビナーを作る')
+  })
+
+  it('動画欄は実メディア名を出し、slug.mp4 の偽名を作らない(DETAIL-18)', () => {
+    expect(EDIT).not.toContain('webinar.slug}.mp4')
+    expect(EDIT).toContain('設定済みの動画')
+    expect(EDIT).toContain('api.media')
+    expect(EDIT).toContain('media.filename')
+  })
+
+  it('通知概要の状態は1つの定義から描き、成功色に固定しない(DETAIL-19)', () => {
+    expect(EDIT).toContain('NOTIFICATION_ROW_STATE')
+    expect(EDIT).toContain('NotificationStateBadge')
+    /* 文言だけ変えて緑固定だった欠陥形は残さない */
+    expect(EDIT).not.toContain('text-success text-xs font-semibold">{enabled(')
+    expect(EDIT).not.toContain('const enabled = ')
+  })
+
+  it('使っていない計算・状態を残さない(DETAIL-21)', () => {
+    expect(EDIT).not.toContain('completionRate')
+  })
+
   it('物理削除ではなく履歴を残すアーカイブ確認を使う', () => {
     expect(PAGE).toContain('ウェビナーをアーカイブしますか？')
     expect(PAGE).toContain('申込者・視聴履歴・CTA・分析結果は消えません')
@@ -106,6 +136,29 @@ describe('V6 ウェビナー一覧の契約', () => {
     expect(EDIT).toContain('data-design-node="yxyzQ"')
   })
 
+  it('アーカイブ確認の背景はPCメニューのある幅だけ左を空け、狭い幅は全幅で縦に読める（#985 CHK-02）', () => {
+    const backdrop = PAGE.slice(
+      PAGE.indexOf('function ArchiveReviewBackdrop'),
+      PAGE.indexOf('const WebinarsPageWithTestSupport'),
+    )
+    // 左256pxと上56pxはPCのメニュー・上部バー（1280px以上）が実在する間だけ。
+    expect(backdrop).toContain('xl:left-64 xl:top-14')
+    // 狭い幅は縦に読めるよう切り捨てない。
+    expect(backdrop).toContain('overflow-y-auto')
+    // コメント文ではなく className 属性の中に overflow-hidden が無いこと。
+    expect(backdrop.match(/className="[^"]*overflow-hidden/g) ?? []).toHaveLength(0)
+    // 全幅で左を空ける `left-64` 単独指定へは戻さない。
+    expect(backdrop).not.toContain(' left-64 ')
+  })
+
+  it('アーカイブの失敗は対象を失わず同じ窓で伝える（#985 CHK-02）', () => {
+    expect(PAGE).toContain('setArchiveError')
+    // 成功したときだけ対象を閉じる。
+    expect(PAGE).toContain('setArchiveTarget(null)')
+    // 処理中にキャンセルで閉じない。
+    expect(PAGE).toContain('if (!archiving) setArchiveTarget(null)')
+  })
+
   it('残り12画面を実ノードと直接開ける面に分ける', () => {
     for (const node of ['PV1Vh', 'd3rFGD', 'Ho8z4', 'Xjk8q', 'GB0NR', 'D6yO7e', 'Q8sHa', 'yxyzQ']) {
       expect(EDIT).toContain(`data-design-node="${node}"`)
@@ -113,7 +166,8 @@ describe('V6 ウェビナー一覧の契約', () => {
     expect(PAGE).toContain('data-design-node="ZC13r"')
     expect(PAGE).toContain('data-design-node="LKuAQ"')
     for (const pane of ['video', 'cta', 'notifications', 'actions', 'preview', 'review', 'participants', 'analytics']) {
-      expect(EDIT).toContain(`pane === '${pane}'`)
+      /* keep-alive した面は `hidden={pane !== '...'}` で畳む。直接開ける面は `pane === '...'` のまま */
+      expect(EDIT.includes(`pane === '${pane}'`) || EDIT.includes(`pane !== '${pane}'`)).toBe(true)
     }
   })
 
@@ -121,7 +175,8 @@ describe('V6 ウェビナー一覧の契約', () => {
     for (const call of [
       'webinarApi.editor(id)',
       'webinarApi.publishValidation(webinar.id)',
-      'webinarApi.participants(webinarId, undefined, 8)',
+      'webinarApi.participants(webinarId, undefined, PARTICIPANTS_PAGE_SIZE)',
+      'webinarApi.participants(webinarId, nextCursor, PARTICIPANTS_PAGE_SIZE)',
       'webinarApi.testPublicPage(webinar.id, editor.version)',
     ]) expect(EDIT).toContain(call)
     for (const call of [

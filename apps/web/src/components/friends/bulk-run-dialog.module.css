@@ -58,9 +58,25 @@
 .confirm { display: flex; align-items: flex-start; gap: 8px; border-radius: var(--radius-mini); background: var(--color-danger-bg); padding: 10px 12px; color: var(--color-danger); font-size: var(--text-micro); font-weight: 600; line-height: 1.5; }
 .actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; margin-top: 14px; }
 .executionPanel .actions > * { width: 100%; justify-content: center; }
-@media (max-width: 1100px) {
-  .backdrop { left: 0; }
-  .screenTitle { left: 0; }
+/*
+ * #985 CHK-05: 左の256pxはPCのメニュー（1280px以上）が実在する間だけ。
+ * 1100pxで畳むと、メニューが消える1101〜1279pxに空白が残っていた。
+ * 見出しバーは画面幅を超えてはみ出さない。
+ *
+ * #1015 CHK-05 残存対応: 1280px未満では画面上にモバイルの固定ヘッダー
+ * （68px）が居る。上56pxだけ空けるとヘッダーの下端12pxが帯となって
+ * 見出しの下に残るので、画面を使い切るこの窓ではヘッダーごと覆い、
+ * 本文は見出しバー（56px）より下から始める。
+ */
+@media (max-width: 1279.98px) {
+  .backdrop { top: 0; left: 0; padding-top: 72px; }
+  .screenTitle { left: 0; width: min(420px, 100vw); }
   .operationLayout { grid-template-columns: 1fr; }
   .ops { grid-template-columns: repeat(2, minmax(150px, 1fr)); }
+}
+
+/* さらに狭い幅では余白を減らし、入りきらなければ操作カードは1列へ。 */
+@media (max-width: 640px) {
+  .backdrop { padding: 72px 16px 16px; }
+  .ops { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
 }

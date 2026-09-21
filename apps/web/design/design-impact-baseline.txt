@@ -44,6 +44,7 @@ shared-button-importer app/contents/vars/export-panel.tsx
 shared-button-importer app/contents/vars/impact-review.tsx
 shared-button-importer app/contents/vars/new/page.tsx
 shared-button-importer app/contents/vars/page.tsx
+shared-button-importer app/conversions/new/page.tsx
 shared-button-importer app/conversions/page.tsx
 shared-button-importer app/duplicates/page.tsx
 shared-button-importer app/ec-commerce/connector-panel.tsx
@@ -132,6 +133,7 @@ shared-button-importer app/staff/invite/page.tsx
 shared-button-importer app/staff/page.tsx
 shared-button-importer app/settings/manual-links/page.tsx
 shared-button-importer app/settings/page.tsx
+shared-button-importer app/tags/fields/edit/page.tsx
 shared-button-importer app/tags/fields/migrate/page.tsx
 shared-button-importer app/tags/fields/new/page.tsx
 shared-button-importer app/tags/folders/new/page.tsx
@@ -166,7 +168,6 @@ shared-button-importer components/dashboard/qr-dialog.tsx
 shared-button-importer components/feature-disabled-gate.tsx
 shared-button-importer components/forms/hq-form-definition-editor.tsx
 shared-button-importer components/friend-fields/edit-tag-page-v4.tsx
-shared-button-importer components/friend-fields/field-list.tsx
 shared-button-importer components/friend-fields/mark-list.tsx
 shared-button-importer components/friend-fields/saved-search-list.tsx
 shared-button-importer components/friend-fields/support-mark-editor.tsx
@@ -218,6 +219,8 @@ shared-button-importer components/shared/dialog.tsx
 shared-button-importer components/shared/folder-panel.tsx
 shared-button-importer components/shared/list-state.tsx
 shared-button-importer components/shared/not-connected.tsx
+# #985 LAY-18: 一覧の行の操作（詳細・編集）が共通Buttonを使う。
+shared-button-importer components/shared/row-actions.tsx
 shared-button-importer components/store-selection-gate.tsx
 shared-button-importer components/templates/message-template-editor.tsx
 shared-button-importer components/ui/kpi-collapse.tsx
@@ -253,5 +256,3 @@ shared-button-importer app/nen/members/rank-settings-tab.tsx
 shared-button-importer app/nen/pets/feeding-tab.tsx
 shared-button-importer app/nen/pets/page.tsx
 shared-button-importer app/nen/pets/pet-editor.tsx
-# #984 LAY-17: スマホのペットカード操作行が共通Buttonを使う。
-shared-button-importer app/nen/pets/pets-tab.tsx

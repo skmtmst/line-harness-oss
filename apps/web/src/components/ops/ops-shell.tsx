@@ -124,10 +124,10 @@ export default function OpsShell({ children }: { children: ReactNode }) {
     )
   }
 
-  // V6 P5egpk: environment strip belongs to the content column, not above
+  // V6 csVox: environment strip belongs to the content column, not above
   // the sidebar. Existing authentication and account-menu behavior is unchanged.
   if (pathname === '/ops/knowledge') return (
-    <div className="flex min-h-svh bg-canvas-sunken" data-design-node="jIZP0">
+    <div className="flex min-h-svh bg-shell" data-design-node="jIZP0" data-knowledge-shell>
       <OpsSidebar me={me} pathname={pathname} open={navOpen} onClose={() => setNavOpen(false)} />
       <main className="min-w-0 flex-1">
         <OpsEnvBar />

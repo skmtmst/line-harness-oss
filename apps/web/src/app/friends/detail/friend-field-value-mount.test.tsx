@@ -57,6 +57,7 @@ const routing = vi.hoisted(() => ({
 
 vi.mock('next/navigation', () => ({
   useSearchParams: () => routing.params,
+  useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
 }))
 
 vi.mock('next/link', () => ({
@@ -72,6 +73,9 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
   const actual = await importOriginal()
   return {
     ...actual,
+    // 履歴タブの口（/api/friends/:id/timeline）。試験では空の成功を返す。
+    fetchApi: () =>
+      Promise.resolve({ success: true, data: { items: [], nextCursor: null } }),
     api: {
       ...actual.api,
       friends: {

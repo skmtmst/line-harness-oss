@@ -536,6 +536,36 @@ export async function updateSupportMark(
 }
 
 /**
+ * 画面から届いた「動かせる行だけの新しい順」を、届いていない行の位置を
+ * 保ったまま全体の並びへ戻して、1回のバッチで書く（#1014 ATTR-03/04）。
+ *
+ * 共有マーク（is_inherited=1）は触らない。`updateSupportMark` に流すと
+ * 複製＋付け替えが走るため、並び替えからは必ず外す。
+ */
+export async function reorderSupportMarks(
+  db: D1Database,
+  scope: SupportMarkScope,
+  ids: string[],
+): Promise<void> {
+  const current = await getSupportMarks(db, scope);
+  const movable = new Set(
+    current.filter((mark) => mark.is_inherited !== 1).map((mark) => mark.id),
+  );
+  const requested = ids.filter((id) => movable.has(id));
+  if (requested.length < 2) return;
+  const requestedSet = new Set(requested);
+  let index = 0;
+  const nextOrder = current.map((mark) =>
+    requestedSet.has(mark.id) ? requested[index++] : mark.id);
+  await db.batch(
+    nextOrder.flatMap((id, position) =>
+      movable.has(id)
+        ? [db.prepare(`UPDATE support_marks SET display_order = ? WHERE id = ?`).bind(position, id)]
+        : []),
+  );
+}
+
+/**
  * 対応マークを置換してから保管する。
  *
  * 公開済みの配信条件などは古いマークIDを参照し続けるため、物理削除しない。

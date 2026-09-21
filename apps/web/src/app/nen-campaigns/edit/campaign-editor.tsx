@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
-import { Eye, FlaskConical, Gift, Plus, X } from 'lucide-react'
+import { Eye, FlaskConical, Gift, X } from 'lucide-react'
 import { ApiError, api, type NenCampaignAfterAction, type NenCampaignSetting } from '@/lib/api'
 import { checkNenCampaignBodyLength, NEN_CAMPAIGN_BODY_MAX_LENGTH } from '@line-crm/shared'
 import { useAccount } from '@/contexts/account-context'
@@ -279,7 +279,12 @@ export default function CampaignEditor({ campaignKey }: { campaignKey: string })
           <section className="bg-canvas rounded-card border-hairline border p-4">
             <h2 className="text-ink mb-4 text-base font-bold">送るもの</h2>
             <div className="bg-canvas-sunken rounded-card border-hairline border p-3">
-              <div className="mb-3 flex items-center justify-between gap-3"><p className="text-ink-secondary text-xs font-bold">1つめ ／ リッチメッセージ</p><div className="flex gap-2"><Button>差し替える</Button><Button>消す</Button></div></div>
+              {/*
+                NEXT-16: この配信は1通だけ。保存スキーマも bodyText 1件で、
+                複数吹き出しの追加・差し替え・削除はWorker側に口がない。
+                押せる見た目のまま置くと「増やせる」と誤解するので出さない。
+              */}
+              <div className="mb-3"><p className="text-ink-secondary text-xs font-bold">リッチメッセージ</p></div>
               <div className="bg-canvas rounded-card border-hairline border p-3">
                 <InsertToolbar targetRef={bodyRef} value={merged.bodyText} onChange={(bodyText) => setDraft((previous) => ({ ...previous, bodyText }))} />
                 {bodyCheck.fits ? (
@@ -293,7 +298,7 @@ export default function CampaignEditor({ campaignKey }: { campaignKey: string })
                 <textarea ref={bodyRef} rows={5} value={merged.bodyText} onChange={(event) => setDraft((previous) => ({ ...previous, bodyText: event.target.value }))} aria-label="配信本文" className={`${inputClass} mt-2 resize-y leading-relaxed`} />
               </div>
             </div>
-            <Button className="mt-3 h-11 w-full"><Plus aria-hidden size={16} />吹き出しを追加する（あと2つまで）</Button>
+            <p className="text-ink-faint mt-3 text-xs">この配信は1通で届きます。吹き出しの追加・差し替えにはまだ対応していません。</p>
           </section>
 
           <section className="bg-canvas rounded-card border-hairline border p-4">

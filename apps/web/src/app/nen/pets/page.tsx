@@ -8,7 +8,8 @@ import PageHeader from '@/components/shared/page-header'
 import { Tabs } from '@/components/shared/tabs'
 import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
-import { nenPetsApi, type NenPetRow } from '@/lib/nen-pets-api'
+import { nenPetsApi, petAnimalTypeLabel, type NenPetRow } from '@/lib/nen-pets-api'
+import { csvCell } from '@/lib/presentation'
 import FeedingTab from './feeding-tab'
 import PetsTab, { type PetsQuery } from './pets-tab'
 
@@ -31,14 +32,17 @@ export default function NenPetsPage() {
 
 const NEUTERED_LABEL = { yes: '済み', no: 'していない', unknown: 'わからない' } as const
 
-function csvCell(value: string | number | null | undefined): string {
-  return `"${String(value ?? '').replace(/"/g, '""')}"`
-}
-
+/*
+ * #999 DEEP-25: CSVの1マス整形は共通の csvCell（@/lib/presentation）を使う。
+ * ここにあった独自実装は引用符のエスケープだけで、ペット名・飼い主名が
+ * `= + - @` で始まると表計算ソフトが式として実行し得た（CSVインジェクション）。
+ * 共通関数は先頭に ' を足して式を無効化する。
+ * #999 DEEP-24: 種類は共通の動物種別ラベル。「その他」を犬へ変換しない。
+ */
 function petsToCsv(items: NenPetRow[]): string {
   const header = ['ペット名', '呼び名', '性別', '種類', '品種', '誕生日', '年齢', '体重(kg)', '避妊去勢', '運動量', '主食', '1日の目安(g)', '1日の必要カロリー(kcal)', '然の鹿肉の目安(g)', '体重の更新日', '飼い主', 'EC会員ID']
   const lines = items.map((p) => [
-    p.name, p.callName, p.gender === 'male' ? '男の子' : p.gender === 'female' ? '女の子' : '未回答', p.animalType === 'cat' ? '猫' : p.animalType === 'other' ? 'その他' : '犬', p.breed, p.birthday ?? '', p.ageLabel, p.weightKg ?? '', NEUTERED_LABEL[p.neutered], p.activityLabel,
+    p.name, p.callName, p.gender === 'male' ? '男の子' : p.gender === 'female' ? '女の子' : '未回答', petAnimalTypeLabel(p.animalType), p.breed, p.birthday ?? '', p.ageLabel, p.weightKg ?? '', NEUTERED_LABEL[p.neutered], p.activityLabel,
     p.productName ?? '', p.feeding?.dailyGrams ?? '', p.feeding?.dailyKcal ?? '', p.feeding?.venisonGrams ?? '', p.updatedAt.slice(0, 10), p.owner.name, p.owner.customerId ?? '',
   ].map(csvCell).join(','))
   return `\uFEFF${[header.join(','), ...lines].join('\n')}`

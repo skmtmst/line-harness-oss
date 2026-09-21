@@ -2,7 +2,7 @@
 
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { useSearchParams } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import {
   Activity,
   AlertTriangle,
@@ -28,6 +28,7 @@ import type {
   AutoReplyValidationResult,
 } from '@line-crm/shared'
 import Button from '@/components/shared/button'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
 import Select from '@/components/shared/select'
 import { usePageTitle } from '@/components/shell/page-chrome'
@@ -200,6 +201,7 @@ function senderLabel(friend: FriendListItem): string {
 }
 
 function AutoReplyPublishInner() {
+  const router = useRouter()
   const params = useSearchParams()
   const autoReplyId = params.get('id') ?? ''
   const [stage, setStage] = useState<PublishStage>('conflicts')
@@ -221,6 +223,19 @@ function AutoReplyPublishInner() {
   const [testDialogOpen, setTestDialogOpen] = useState(false)
   const [busy, setBusy] = useState(false)
   const [actionError, setActionError] = useState('')
+  /*
+    NEXT-20: 有効化の直後に「一時停止」を置くなら、一覧と同じ停止確認と
+    専用の停止口へ繋ぐ。止めた記録は stopped に持ち、画面の「稼働中」を
+    「停止中」へ更新する。
+  */
+  const [stopOpen, setStopOpen] = useState(false)
+  const [stopReason, setStopReason] = useState('')
+  const [stopError, setStopError] = useState('')
+  const [stopped, setStopped] = useState<{
+    stoppedAt: string | null
+    stoppedByStaffName: string | null
+    stopReason: string | null
+  } | null>(null)
 
   // 送信者候補は先頭20件だけ。21件目以降は名前で探す。失敗時は選び直せるよう
   // 再読込ボタンを出す（無いとテスト実行ボタンまで詰む）。
@@ -356,6 +371,67 @@ function AutoReplyPublishInner() {
     if (!res.success) throw new Error('test failed')
     setDryRun(res.data)
     setTestDialogOpen(false)
+  })
+
+  const openStopDialog = () => {
+    setStopReason('')
+    setStopError('')
+    setStopOpen(true)
+  }
+
+  /*
+    停止は確認窓の決定ボタンからだけ呼ぶ。成功したら下書きと競合を
+    読み直し（load()）、画面に残る「稼働中」を停止の表示へ更新する。
+    失敗は窓の中に理由を出し、取消なら稼働は続く。
+  */
+  const handleStop = async () => {
+    if (busy) return
+    setBusy(true)
+    setStopError('')
+    try {
+      const res = await api.autoReplies.stop(
+        autoReplyId,
+        { reason: stopReason.trim() === '' ? null : stopReason.trim() },
+        crypto.randomUUID(),
+      )
+      if (!res.success) {
+        setStopError('自動応答を停止できませんでした。状態を読み直してからお試しください。')
+        return
+      }
+      setStopOpen(false)
+      setStopReason('')
+      setStopped({
+        stoppedAt: res.data.stoppedAt,
+        stoppedByStaffName: res.data.stoppedByStaffName,
+        stopReason: res.data.stopReason,
+      })
+      await load()
+    } catch (cause) {
+      // 権限で断られたときは読み直しても直らない。読み直せとは書かない。
+      setStopError(
+        cause instanceof ApiError && cause.status === 403
+          ? 'この自動応答を停止する権限がありません。統括または管理者に依頼してください。'
+          : '自動応答を停止できませんでした。状態を読み直してからお試しください。',
+      )
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  /*
+    「複製して作成」は今の下書き設定を写した新しい下書きを作り、その
+    編集画面へ進む。単なる一覧リンクだと押した人が「複製された」と
+    読むので、対象を引き継いだ本物の複製にする。
+  */
+  const duplicate = () => void run('複製を作成', async () => {
+    if (!draft) throw new Error('draft missing')
+    const baseName = draft.settings.name || draft.settings.keyword || '自動応答'
+    const res = await api.autoReplies.createDraft({
+      ...draft.settings,
+      name: `${baseName}（複製）`.slice(0, 250),
+    })
+    if (!res.success || !res.data?.autoReplyId) throw new Error('duplicate failed')
+    router.push(`/auto-replies/edit?id=${encodeURIComponent(res.data.autoReplyId)}`)
   })
 
   return (
@@ -693,21 +769,32 @@ function AutoReplyPublishInner() {
           <div className={"arp-columns"}>
             <section className={`${"arp-panel"} ${"arp-donePanel"}`}>
               <div className={"arp-doneMark"}><MessageCircle aria-hidden="true" /></div>
-              <h2>自動応答を有効化しました</h2>
-              <p>受信メッセージを判定し、一致した友だちへ自動で返信します。</p>
+              <h2>{stopped ? '自動応答を停止しました' : '自動応答を有効化しました'}</h2>
+              <p>{stopped
+                ? '受信メッセージへの自動返信は止まりました。再開は自動応答の一覧からできます。'
+                : '受信メッセージを判定し、一致した友だちへ自動で返信します。'}</p>
               <div className={"arp-doneSummary"}>
                 <SummaryRows rows={[
                   { label: 'ルール名', value: ruleName },
                   { label: 'どんなときに動くか', value: conditionLabel(draft) },
                   { label: '対象', value: targetLabel(draft) },
                   { label: '優先順位', value: `${draft.settings.priority}番目` },
-                  { label: '状態', value: '稼働中' },
+                  { label: '状態', value: stopped ? '停止中' : '稼働中' },
                 ]} />
               </div>
-              <div className={"arp-infoNotice"}>
-                <Bell aria-hidden="true" />
-                実行エラー・競合増加・担当者引継ぎはSlackへ通知します。
-              </div>
+              {stopped ? (
+                <div className={"arp-infoNotice"}>
+                  <PauseCircle aria-hidden="true" />
+                  {stopped.stoppedByStaffName ?? 'あなた'}が停止しました
+                  {stopped.stopReason ? `（${stopped.stopReason}）` : ''}。
+                  再開は自動応答の一覧からできます。
+                </div>
+              ) : (
+                <div className={"arp-infoNotice"}>
+                  <Bell aria-hidden="true" />
+                  実行エラー・競合増加・担当者引継ぎはSlackへ通知します。
+                </div>
+              )}
               <div className={"arp-doneActions"}>
                 <Button href="/auto-replies"><List aria-hidden="true" />一覧へ戻る</Button>
                 <Button href={`/auto-replies/runs?id=${encodeURIComponent(autoReplyId)}`} variant="primary">
@@ -720,10 +807,16 @@ function AutoReplyPublishInner() {
               <section className={"arp-panel"}>
                 <PanelHeading title="次にできること" description="稼働中でも安全に変更できます。" />
                 <div className={"arp-nextActions"}>
-                  <Button><PauseCircle aria-hidden="true" />自動応答を一時停止</Button>
+                  {stopped ? (
+                    <Button href="/auto-replies"><List aria-hidden="true" />一覧で再開する</Button>
+                  ) : (
+                    <Button onClick={openStopDialog} disabled={busy}>
+                      <PauseCircle aria-hidden="true" />自動応答を一時停止
+                    </Button>
+                  )}
                   <Button href={`/auto-replies/edit?id=${encodeURIComponent(autoReplyId)}`}><Pencil aria-hidden="true" />内容を編集する</Button>
                   <Button onClick={openTestStage}><FlaskConical aria-hidden="true" />テストを再実行</Button>
-                  <Button href="/auto-replies"><Copy aria-hidden="true" />自動応答を複製して作成</Button>
+                  <Button onClick={duplicate} disabled={busy}><Copy aria-hidden="true" />自動応答を複製して作成</Button>
                 </div>
               </section>
               <section className={"arp-panel"}>
@@ -761,6 +854,41 @@ function AutoReplyPublishInner() {
           </section>
         </div>
       ) : null}
+
+      {/*
+        停止の確認窓。一覧の停止と同じ組み立て：対象と影響を見せてから
+        決定ボタンで専用の停止口へ。理由（任意）は記録に残る。
+      */}
+      <ConfirmDialog
+        open={stopOpen}
+        title={`自動応答「${ruleName}」を停止しますか？`}
+        description="止めているあいだ、この自動応答は動きません。いつ・誰が・なぜ止めたかが記録に残り、あとから再開できます。"
+        confirmLabel="停止する"
+        busy={busy}
+        error={stopError}
+        onCancel={() => {
+          if (busy) return
+          setStopError('')
+          setStopReason('')
+          setStopOpen(false)
+        }}
+        onConfirm={() => void handleStop()}
+      >
+        <div>
+          <label htmlFor="auto-reply-publish-stop-reason" className="text-ink-secondary block text-xs font-medium">
+            停止の理由（任意・記録に残ります）
+          </label>
+          <textarea
+            id="auto-reply-publish-stop-reason"
+            value={stopReason}
+            onChange={(e) => setStopReason(e.target.value)}
+            maxLength={500}
+            rows={2}
+            placeholder="例: キャンペーンが終わったので"
+            className="border-hairline rounded-control mt-1 w-full border px-3 py-2 text-sm"
+          />
+        </div>
+      </ConfirmDialog>
     </div>
   )
 }

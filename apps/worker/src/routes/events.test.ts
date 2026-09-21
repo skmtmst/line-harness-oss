@@ -137,6 +137,8 @@ function makeEventDb(state: {
   tags?: Array<{ id: string; name: string }>;
   /** キャンセル待ちの行。INSERT がここへ積まれる */
   waitlist?: Array<Record<string, unknown>>;
+  /** 予約ごとの通知予定 (event_booking_reminders)。IDEA-07 の一覧添付用。 */
+  reminders?: Array<Record<string, unknown>>;
 }): D1Database {
   state.slots ??= [];
   state.bookings ??= [];
@@ -145,6 +147,7 @@ function makeEventDb(state: {
   state.friendTags ??= [];
   state.tags ??= [];
   state.waitlist ??= [];
+  state.reminders ??= [];
   const eventMatchesAccount = (event: EventRow, account: string): boolean => {
     if (event.target_type === 'multi-account-dedup') {
       try {
@@ -671,6 +674,14 @@ function makeEventDb(state: {
             const offset = typeof bound[bound.length - 1] === 'number' ? (bound[bound.length - 1] as number) : 0;
             return { results: items.slice(offset, offset + limit) as unknown as T[] };
           }
+          // IDEA-07: 一覧に添える通知予定。booking_id IN (...) の行だけ返す。
+          if (sql.includes('FROM event_booking_reminders')) {
+            const ids = new Set(bound as string[]);
+            const rows = (state.reminders ?? [])
+              .filter((r) => ids.has(String(r.booking_id)))
+              .sort((a, b) => String(a.scheduled_at).localeCompare(String(b.scheduled_at)));
+            return { results: rows as unknown as T[] };
+          }
           // admin bookings list: SELECT b.*, s.starts_at, ..., friends.display_name FROM event_bookings b JOIN event_slots s ...
           if (sql.includes('FROM event_bookings b') && sql.includes('friend_display_name')) {
             const event_id = bound[0] as string;
@@ -772,6 +783,19 @@ function makeEventDb(state: {
             const ids = new Set(bound as string[]);
             return {
               results: (state.slots ?? []).filter((slot) => ids.has(slot.id)) as unknown as T[],
+            };
+          }
+          // #1000: SELECT * FROM event_slots WHERE event_id = ? AND deleted_at IS NULL AND client_key IN (...)
+          if (sql.startsWith('SELECT * FROM event_slots') && sql.includes('client_key IN (')) {
+            const [event_id, ...keys] = bound as [string, ...string[]];
+            const keySet = new Set(keys);
+            return {
+              results: (state.slots ?? []).filter(
+                (slot) =>
+                  slot.event_id === event_id &&
+                  slot.deleted_at == null &&
+                  keySet.has((slot as Record<string, unknown>).client_key as string),
+              ) as unknown as T[],
             };
           }
           return { results: [] };
@@ -894,11 +918,12 @@ function makeEventDb(state: {
           }
           if (sql.startsWith('INSERT INTO event_slots')) {
             const [
-              id, event_id, starts_at, ends_at, capacity, is_active, sort_order,
-            ] = bound as [string, string, string, string, number | null, number, number];
+              id, event_id, starts_at, ends_at, capacity, is_active, sort_order, client_key,
+            ] = bound as [string, string, string, string, number | null, number, number, string | null];
             (state.slots ?? []).push({
               id, event_id, starts_at, ends_at, capacity,
               is_active, sort_order, deleted_at: null,
+              client_key: client_key ?? null,
             });
             return { success: true, meta: { changes: 1 } };
           }
@@ -1728,6 +1753,103 @@ describe('event_slots admin', () => {
     expect(state.slots).toHaveLength(400);
     expect(body.items).toHaveLength(400);
     expect(body.items.map((item) => item.starts_at)).toEqual(slots.map((slot) => slot.starts_at));
+  });
+
+  // #1000 DETAIL-11: client_key で再送を吸収する。400+1の分割送信が
+  // 後半だけ失敗しても、同じキーでの再送は成功済みの枠を増やさない。
+  test('POST re-sends with the same client_key do not duplicate slots', async () => {
+    const state = {
+      events: [baseEvent({ id: 'e1', line_account_id: 'la1' })],
+      slots: [] as SlotRow[],
+    };
+    const app = setupApp(state);
+    const body = {
+      slots: [
+        { starts_at: '2099-06-01T10:00:00Z', ends_at: '2099-06-01T11:00:00Z', capacity: 5, client_key: 'op-1:0' },
+        { starts_at: '2099-06-02T10:00:00Z', ends_at: '2099-06-02T11:00:00Z', capacity: 5, client_key: 'op-1:1' },
+      ],
+    };
+    const init = { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) };
+    const first = await app.request('/api/events/admin/events/e1/slots?account_id=la1', init);
+    expect(first.status).toBe(201);
+    const firstBody = (await first.json()) as { items: SlotRow[]; created_count: number; deduplicated_count: number };
+    expect(firstBody.created_count).toBe(2);
+    expect(firstBody.deduplicated_count).toBe(0);
+    const firstIds = firstBody.items.map((item) => item.id);
+
+    // 応答喪失や部分失敗を想定した、同じキーの全件再送。
+    const second = await app.request('/api/events/admin/events/e1/slots?account_id=la1', init);
+    expect(second.status).toBe(201);
+    const secondBody = (await second.json()) as { items: Array<SlotRow & { deduplicated?: boolean }>; created_count: number; deduplicated_count: number };
+    expect(state.slots).toHaveLength(2);
+    expect(secondBody.created_count).toBe(0);
+    expect(secondBody.deduplicated_count).toBe(2);
+    // 再送でも同じ枠IDが返る(画面側が成功済みを確定できる)。
+    expect(secondBody.items.map((item) => item.id)).toEqual(firstIds);
+    expect(secondBody.items.every((item) => item.deduplicated === true)).toBe(true);
+  });
+
+  test('POST client_key dedup keeps legitimate same-time slots possible', async () => {
+    const state = {
+      events: [baseEvent({ id: 'e1', line_account_id: 'la1' })],
+      slots: [] as SlotRow[],
+    };
+    const app = setupApp(state);
+    // 日時の一意制約ではないので、キーが違う同時刻の枠は両方作れる。
+    const res = await app.request('/api/events/admin/events/e1/slots?account_id=la1', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        slots: [
+          { starts_at: '2099-06-01T10:00:00Z', ends_at: '2099-06-01T11:00:00Z', client_key: 'op-2:0' },
+          { starts_at: '2099-06-01T10:00:00Z', ends_at: '2099-06-01T11:00:00Z', client_key: 'op-2:1' },
+          { starts_at: '2099-06-01T10:00:00Z', ends_at: '2099-06-01T11:00:00Z' },
+        ],
+      }),
+    });
+    expect(res.status).toBe(201);
+    expect(state.slots).toHaveLength(3);
+  });
+
+  test('POST duplicate client_key within one request resolves to the same slot', async () => {
+    const state = {
+      events: [baseEvent({ id: 'e1', line_account_id: 'la1' })],
+      slots: [] as SlotRow[],
+    };
+    const app = setupApp(state);
+    const res = await app.request('/api/events/admin/events/e1/slots?account_id=la1', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        slots: [
+          { starts_at: '2099-06-01T10:00:00Z', ends_at: '2099-06-01T11:00:00Z', client_key: 'op-3:0' },
+          { starts_at: '2099-06-02T10:00:00Z', ends_at: '2099-06-02T11:00:00Z', client_key: 'op-3:0' },
+        ],
+      }),
+    });
+    expect(res.status).toBe(201);
+    const body = (await res.json()) as { items: Array<SlotRow & { deduplicated?: boolean }>; created_count: number; deduplicated_count: number };
+    expect(state.slots).toHaveLength(1);
+    expect(body.items).toHaveLength(2);
+    expect(body.items[0].id).toBe(body.items[1].id);
+    expect(body.created_count).toBe(1);
+    expect(body.deduplicated_count).toBe(1);
+  });
+
+  test('POST 422 for invalid client_key', async () => {
+    const state = {
+      events: [baseEvent({ id: 'e1', line_account_id: 'la1' })],
+      slots: [] as SlotRow[],
+    };
+    const res = await setupApp(state).request('/api/events/admin/events/e1/slots?account_id=la1', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        slots: [{ starts_at: '2099-06-01T10:00:00Z', ends_at: '2099-06-01T11:00:00Z', client_key: 'x'.repeat(201) }],
+      }),
+    });
+    expect(res.status).toBe(422);
+    expect(state.slots).toHaveLength(0);
   });
 
   test('POST 422 when slots empty', async () => {
@@ -2595,6 +2717,46 @@ describe('admin bookings management', () => {
     const body = (await (await setupApp(state).request('/api/events/admin/events/e1/bookings?account_id=la1&page=2&limit=1')).json()) as { items: Array<{ id: string }>; total: number };
     expect(body.items).toHaveLength(1);
     expect(body.total).toBe(2);
+  });
+
+  test('GET /:id/bookings attaches each booking reminder schedule incl. stopped ones (IDEA-07)', async () => {
+    const state = {
+      events: [baseEvent({ id: 'e1', line_account_id: 'la1' })],
+      slots: [{ id: 's1', event_id: 'e1', starts_at: '2099-06-01T10:00:00Z', ends_at: '2099-06-01T12:00:00Z', capacity: null, is_active: 1, sort_order: 0, deleted_at: null }],
+      bookings: [
+        { id: 'b1', event_id: 'e1', slot_id: 's1', friend_id: 'f1', line_account_id: 'la1', status: 'confirmed' } as BookingRow & Record<string, unknown>,
+        { id: 'b2', event_id: 'e1', slot_id: 's1', friend_id: 'f2', line_account_id: 'la1', status: 'cancelled' } as BookingRow & Record<string, unknown>,
+      ],
+      friends: [
+        { id: 'f1', line_account_id: 'la1', line_user_id: 'U1' },
+        { id: 'f2', line_account_id: 'la1', line_user_id: 'U2' },
+      ],
+      reminders: [
+        { id: 'r1', booking_id: 'b1', kind: 'day_before', scheduled_at: '2099-05-31T09:00:00Z', sent_at: null, status: 'pending' },
+        { id: 'r2', booking_id: 'b1', kind: 'hours_before', scheduled_at: '2099-06-01T08:00:00Z', sent_at: null, status: 'pending' },
+        // 取消済みの予約には「止まった分」が残る。古い通知が生きたままかを
+        // 一覧から確かめられるよう、cancelled も応答に含める。
+        { id: 'r3', booking_id: 'b2', kind: 'day_before', scheduled_at: '2099-05-31T09:00:00Z', sent_at: null, status: 'cancelled' },
+        // 別予約の通知は混ざらない。
+        { id: 'r9', booking_id: 'bx', kind: 'day_before', scheduled_at: '2099-05-30T09:00:00Z', sent_at: null, status: 'pending' },
+      ],
+    };
+    const app = setupApp(state);
+    const res = await app.request('/api/events/admin/events/e1/bookings?account_id=la1');
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      items: Array<{
+        id: string;
+        reminders: Array<{ kind: string; status: string; scheduled_at: string }>;
+      }>;
+    };
+    const b1 = body.items.find((item) => item.id === 'b1');
+    const b2 = body.items.find((item) => item.id === 'b2');
+    expect(b1?.reminders.map((reminder) => reminder.kind)).toEqual(['day_before', 'hours_before']);
+    expect(b1?.reminders.every((reminder) => reminder.status === 'pending')).toBe(true);
+    expect(b2?.reminders).toEqual([
+      expect.objectContaining({ kind: 'day_before', status: 'cancelled' }),
+    ]);
   });
 
   test('GET /:id/bookings/summary returns all-status counts and capacity without list rows', async () => {

@@ -22,7 +22,7 @@ describe('inflow link tag auto-assignment UI wiring', () => {
     expect(page).toContain('const tag = tags.find((t) => t.id === r.tagId)');
     expect(page).toContain('title={tag.name}');
     expect(page).toContain('tags={tags}');
-    expect(page).toContain('colSpan={11}');
+    expect(page).toContain('colSpan={12}');
   });
 
   test('desktop referral table stays compact without breaking identifiers mid-word', () => {

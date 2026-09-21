@@ -69,6 +69,9 @@ describe('共通部品の影響範囲', () => {
       'app/contents/vars/impact-review.tsx',
       'app/contents/vars/page.tsx',
       'app/conversions/page.tsx',
+      // #1011 FRIEND-11: 重複候補が50件を超えると後ろの候補へ辿れなかった。
+      // サーバが数えた総数でページ送りを出すため共通へ寄せた。
+      'app/duplicates/page.tsx',
       // #572: EC連携の取り込み記録が先頭20件しか出ず、21件目以降の失敗に
       // 届かなかった。状態絞りをサーバへ移し、共通へ寄せた。
       'app/ec-commerce/page.tsx',

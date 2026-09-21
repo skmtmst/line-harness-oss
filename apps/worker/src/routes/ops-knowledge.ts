@@ -40,7 +40,11 @@ opsKnowledge.get('/api/ops/knowledge', async c => {
 opsKnowledge.get('/api/ops/knowledge/:id', async c => {
   const article = await getKnowledgeArticle(dbFor(c.env), c.req.param('id'));
   if (!article) return c.json({ success: false, error: '記事が見つかりません' }, 404);
-  return c.json({ success: true, data: serializeKnowledge(article) });
+  const ticket = await getSupportTicket(dbFor(c.env), article.source_request_id);
+  const sourceSubject = ticket
+    ? redactKnowledgeText(ticket.subject, knowledgeNames(ticket, await listSupportMessages(dbFor(c.env), ticket.id)))
+    : null;
+  return c.json({ success: true, data: { ...serializeKnowledge(article), sourceSubject } });
 });
 
 opsKnowledge.put('/api/ops/knowledge/:id', requirePlatformAdminWrite(), async c => {

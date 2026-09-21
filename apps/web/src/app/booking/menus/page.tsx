@@ -95,7 +95,11 @@ function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuC
   const [tags, setTags] = useState<Tag[]>([])
   /** メニューID → 担当できるスタッフの表示名。 */
   const [menuStaff, setMenuStaff] = useState<Map<string, string[]>>(new Map())
-  const [supportingLoadState, setSupportingLoadState] = useState<SupportingLoadState>('loading')
+  /**
+   * DEEP-26: 店舗設定(getSettings)の読込状態は一覧(listMenus)と分ける。
+   * 設定が遅い・失敗しても、取れている一覧を隠さない。
+   */
+  const [settingsLoadState, setSettingsLoadState] = useState<SupportingLoadState>('loading')
   const [page, setPage] = useState(1)
   const [canManageResources, setCanManageResources] = useState(false)
   // N-411: メニュー編集は '/booking/menus'、予約設定・資源は 'booking.settings' の
@@ -112,48 +116,56 @@ function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuC
       setSettings(null)
       setSettingsError(null)
       setMenuStaff(new Map())
-      setSupportingLoadState('loading')
+      setSettingsLoadState('loading')
       setLoading(false)
       setError(null)
       return
     }
+    const accountId = selectedAccountId
     setLoading(true)
     setError(null)
     setSettingsError(null)
-    setSupportingLoadState('loading')
+    setSettingsLoadState('loading')
     // アカウント切替時は前 account の menus が表示・操作可能なまま残らないよう
     // 先にクリア。fetch 失敗でも cross-account の操作事故が起きない。
     setItems([])
     setSettings(null)
     setMenuStaff(new Map())
-    try {
-      const [r, bookingSettingsResult] = await Promise.all([
-        bookingApi.listMenus(selectedAccountId),
-        bookingApi.getSettings(selectedAccountId)
-          .then((response) => ({ response, error: null }))
-          .catch((settingsLoadError: unknown) => ({
-            response: null,
-            error: bookingRulesErrorMessage(settingsLoadError, '読み込み'),
-          })),
-      ])
-      if (loadGenerationRef.current !== requestGeneration) return
-      // 状態撮影や移行途中の口が空の器を返しても、画面全体を落とさず0件として扱う。
-      const menus = Array.isArray(r.menus) ? r.menus : []
-      setItems(menus)
-      setMenuStaff(new Map(menus.map((menu) => [
-        menu.id,
-        (menu.assigned_staff ?? []).map((person) => person.display_name || person.id),
-      ])))
-      setSupportingLoadState('ready')
-      setSettings(bookingSettingsResult.response?.success ? bookingSettingsResult.response.data : null)
-      setSettingsError(bookingSettingsResult.error)
-    } catch (e) {
-      if (loadGenerationRef.current !== requestGeneration) return
-      setError(bookingErrorMessage(e, '読み込み'))
-      setSupportingLoadState('error')
-    } finally {
-      if (loadGenerationRef.current === requestGeneration) setLoading(false)
-    }
+
+    // DEEP-26: 一覧と補助設定を別々に待つ。設定の応答が遅れても、
+    // 取れている一覧はその時点で表示する。どちらの応答も世代を確認し、
+    // 切替前アカウントの遅い応答を新しい対象へ反映しない。
+    void bookingApi.listMenus(accountId)
+      .then((r) => {
+        if (loadGenerationRef.current !== requestGeneration) return
+        // 状態撮影や移行途中の口が空の器を返しても、画面全体を落とさず0件として扱う。
+        const menus = Array.isArray(r.menus) ? r.menus : []
+        setItems(menus)
+        setMenuStaff(new Map(menus.map((menu) => [
+          menu.id,
+          (menu.assigned_staff ?? []).map((person) => person.display_name || person.id),
+        ])))
+      })
+      .catch((e) => {
+        if (loadGenerationRef.current !== requestGeneration) return
+        setError(bookingErrorMessage(e, '読み込み'))
+      })
+      .finally(() => {
+        if (loadGenerationRef.current === requestGeneration) setLoading(false)
+      })
+
+    void bookingApi.getSettings(accountId)
+      .then((response) => {
+        if (loadGenerationRef.current !== requestGeneration) return
+        setSettings(response.success ? response.data : null)
+        setSettingsLoadState('ready')
+      })
+      .catch((settingsLoadError: unknown) => {
+        if (loadGenerationRef.current !== requestGeneration) return
+        setSettings(null)
+        setSettingsError(bookingRulesErrorMessage(settingsLoadError, '読み込み'))
+        setSettingsLoadState('error')
+      })
   }, [selectedAccountId])
 
   useEffect(() => {
@@ -254,11 +266,12 @@ function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuC
   }, [pageCount])
 
   const favorite = useMemo(() => {
-    if (supportingLoadState !== 'ready' || items.length === 0) return null
+    // 直近30日の件数は一覧応答に載るので、設定の到着を待たずに出せる。
+    if (items.length === 0) return null
     return items.reduce((best, menu) =>
       (bookingCounts.get(menu.id) ?? 0) > (bookingCounts.get(best.id) ?? 0) ? menu : best,
     items[0])
-  }, [bookingCounts, items, supportingLoadState])
+  }, [bookingCounts, items])
 
   const activeWindowDays = useMemo(
     () => [...new Set(items.filter((menu) => menu.is_active).map((menu) => menu.booking_window_days).filter((days): days is number => typeof days === 'number'))].sort((a, b) => a - b),
@@ -266,9 +279,12 @@ function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuC
   )
   const businessHours = businessHourSummary(settings?.businessHours)
   const configuredWindowDays = settings?.bookingWindowDays
-  const bookingWindowDays = typeof configuredWindowDays === 'number' && configuredWindowDays > 0
+  // 店舗設定がまだ確定していない間は、メニュー側の値を既定値として
+  // 見せない（DEEP-26）。設定が取れた・失敗した後だけフォールバックする。
+  const bookingWindowDays = settingsLoadState === 'ready'
+      && typeof configuredWindowDays === 'number' && configuredWindowDays > 0
     ? configuredWindowDays
-    : (activeWindowDays.length === 1 ? activeWindowDays[0] : null)
+    : (settingsLoadState !== 'loading' && activeWindowDays.length === 1 ? activeWindowDays[0] : null)
 
   return (
     <div data-design-node="QSLEH">
@@ -293,23 +309,31 @@ function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuC
           unit=""
           detail={supportingDetail(
             Boolean(selectedAccountId),
-            supportingLoadState,
+            loading ? 'loading' : error ? 'error' : 'ready',
             favorite ? `この30日で ${bookingCounts.get(favorite.id) ?? 0}件` : '予約実績はありません',
           )}
         />
         <Kpi
           title="受け付けている時間"
-          value={loading || error ? '—' : businessHours.value}
+          value={settingsLoadState === 'ready' ? businessHours.value : '—'}
           unit=""
-          detail={loading || error ? '受付枠で曜日ごとに確認' : businessHours.detail || '受付枠で曜日ごとに確認'}
+          detail={supportingDetail(
+            Boolean(selectedAccountId),
+            settingsLoadState,
+            businessHours.detail || '受付枠で曜日ごとに確認',
+          )}
         />
         <Kpi
           title="先の予約が取れる範囲"
-          value={loading || error || bookingWindowDays === null
+          value={settingsLoadState === 'loading' || bookingWindowDays === null
             ? '—'
             : `${bookingWindowDays}日先まで`}
           unit=""
-          detail={bookingWindowDays === null ? '予約のルールで確認' : `今日から ${bookingWindowEnd(bookingWindowDays)} まで`}
+          detail={settingsLoadState === 'loading'
+            ? '読み込み中'
+            : bookingWindowDays === null
+              ? '予約のルールで確認'
+              : `今日から ${bookingWindowEnd(bookingWindowDays)} まで`}
         />
       </div>
 
@@ -322,7 +346,7 @@ function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuC
           accountId={selectedAccountId}
           settings={settings}
           items={items}
-          loading={loading}
+          loading={settingsLoadState === 'loading'}
           error={error ?? settingsError}
           canManageResources={canManageResources}
           onRetry={() => void load()}
@@ -392,9 +416,7 @@ function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuC
                        * 「だれもいません」と出すと、割当済みなのに未割当に見える。
                        * 実際の割当をそのまま出し、0人のときだけ「担当なし」と書く。
                        */}
-                      {supportingLoadState !== 'ready' ? (
-                        <span className="text-ink-faint text-xs">—（未取得）</span>
-                      ) : (menuStaff.get(m.id) ?? []).length === 0 ? (
+                      {(menuStaff.get(m.id) ?? []).length === 0 ? (
                         // 担当が0人だと、公開していても予約フォームに枠が出ない。
                         // 「-」だと設定漏れなのか読み取れないので、はっきり書く。
                         <span className={`${m.is_active ? 'text-warning' : 'text-ink-faint'} text-xs`}>担当なし</span>
@@ -403,7 +425,7 @@ function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuC
                       )}
                     </td>
                     <td className="px-4 py-3 text-right text-sm tabular-nums">
-                      {supportingLoadState === 'ready' ? `${bookingCounts.get(m.id) ?? 0} 件` : '—'}
+                      {`${bookingCounts.get(m.id) ?? 0} 件`}
                     </td>
                     <td className="px-4 py-3 text-right">
                       <div className="inline-flex gap-2 text-xs">

@@ -88,6 +88,16 @@ export default function EmailThread({
 }) {
   const [detail, setDetail] = useState<EmailDetail | null>(null)
   const [reply, setReply] = useState('')
+  /*
+    F06: 下書きは会話ごとに保管する。Aへの送信応答を待つ間にBへ移って
+    入力しても、Aの成功応答がBの文面を消さない。A→B→Aの往復でも
+    それぞれの下書きが戻る。消すのは「送った会話の、送った版」だけ。
+  */
+  const draftsRef = useRef(new Map<string, string>())
+  const writeDraft = useCallback((thread: string, value: string) => {
+    if (value) draftsRef.current.set(thread, value)
+    else draftsRef.current.delete(thread)
+  }, [])
   const [sending, setSending] = useState(false)
   const [error, setError] = useState('')
   const bottomRef = useRef<HTMLDivElement>(null)
@@ -133,6 +143,19 @@ export default function EmailThread({
   const genRef = useRef(createPollGeneration())
   const latestThreadRef = useRef(threadId)
   latestThreadRef.current = threadId
+
+  /*
+    F06: 入力欄の正本は draftsRef。setReply を直接使うと、どの会話の
+    下書きか記録が残らず、会話の切替・送信完了で他の会話の文面まで
+    消えてしまう。画面表示（reply）と保管（draftsRef）を一緒に動かす。
+  */
+  const setReplyDraft = useCallback((value: string | ((prev: string) => string)) => {
+    setReply((prev) => {
+      const next = typeof value === 'function' ? value(prev) : value
+      writeDraft(latestThreadRef.current, next)
+      return next
+    })
+  }, [writeDraft])
 
   // 静かな取り直しは成否を返す。失敗の数え直し・待ちの延長は startVisiblePoll が持つ。
   // 古い取得の応答は捨て、失敗にも数えない(新しい取得が届ける)。
@@ -189,7 +212,8 @@ export default function EmailThread({
   const pollRef = useRef<VisiblePollHandle | null>(null)
   useEffect(() => {
     setDetail(null)
-    setReply('')
+    // F06: 別会話へ移るときは空にするのではなく、その会話の下書きを戻す。
+    setReply(draftsRef.current.get(threadId) ?? '')
     setThreadStalled(false)
     // 初回も同じ1本に載せる。初回だけ外に別走させると
     // 初回と5秒後の取得が重複する。初回だけ表示あり、2回目から静かに。
@@ -268,7 +292,9 @@ export default function EmailThread({
 
   const sendReply = async () => {
     if (!reply.trim() || sending) return
-    const content = reply.trim()
+    const sentThread = threadId
+    const sentBody = reply
+    const content = sentBody.trim()
     const signature = JSON.stringify({ threadId, body: content })
     const idempotencyKey = sendKeysRef.current.get(signature)
     setSending(true)
@@ -280,7 +306,15 @@ export default function EmailThread({
         body: JSON.stringify({ body: content, revision: detail?.thread.revision }),
       })
       sendKeysRef.current.clear(signature)
-      setReply('')
+      /*
+        F06: 消すのは送った会話の送った版だけ。応答待ちの間に同じ会話へ
+        追記した新しい版（draftが送った版と違う）は残し、別会話へ
+        移っていた場合は表示中の入力欄に触らない。
+      */
+      if (draftsRef.current.get(sentThread) === sentBody) {
+        draftsRef.current.delete(sentThread)
+        if (latestThreadRef.current === sentThread) setReply('')
+      }
       await load()
       onChanged?.()
     } catch (sendError) {
@@ -562,7 +596,7 @@ export default function EmailThread({
         <div className="rounded-[10px] border border-[#D0D5DD] bg-canvas p-2 focus-within:border-[#06C755] focus-within:ring-2 focus-within:ring-[#06C755]/15">
           <textarea
             value={reply}
-            onChange={(e) => setReply(e.target.value)}
+            onChange={(e) => setReplyDraft(e.target.value)}
             onKeyDown={(e) => {
               if (e.key !== 'Enter') return
               if (e.metaKey || e.ctrlKey) {
@@ -603,7 +637,7 @@ export default function EmailThread({
         open={showTemplatePicker}
         onClose={() => setShowTemplatePicker(false)}
         onPick={(content) => {
-          setReply((prev) => (prev ? `${prev}\n${content}` : content))
+          setReplyDraft((prev) => (prev ? `${prev}\n${content}` : content))
           setShowTemplatePicker(false)
         }}
       />

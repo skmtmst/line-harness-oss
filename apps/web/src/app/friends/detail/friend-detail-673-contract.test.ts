@@ -23,9 +23,9 @@ describe('#673-送り 友だち詳細の全導線は受信箱の読む形で渡�
     expect(PAGE).toContain('`/chats?friend=${encodeURIComponent(friendId)}`')
   })
 
-  it('6導線すべてがその口を使う（上ボタン・対応・名前・タグ・追加・操作節）', () => {
+  it('9導線すべてがその口を使う（上ボタン・対応・名前・タグ・追加・操作節・メニュー2件・履歴のメッセージ元情報リンク）', () => {
     const uses = PAGE.split('inboxHrefForFriend(friendId)').length - 1
-    expect(uses).toBe(6)
+    expect(uses).toBe(9)
   })
 
   it('「受信箱で開く」の表示は残っている', () => {

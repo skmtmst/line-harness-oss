@@ -1,0 +1,122 @@
+/*
+ * ラジオカード（監査 DEEP-02／共通仕様「入力欄と選択カード」§2）。
+ *
+ * ●・○ の文字を丸めるのではなく、input[type=radio] 本体を appearance で
+ * 描き直す。外円 20px・内点 8px・間は白い隙間。押せる範囲はカード全体
+ * （label が input を丸ごと囲む）。選択状態は「丸の中点＋淡い緑の面＋
+ * 強めの枠」の組み合わせで示し、色だけに頼らない。
+ */
+
+.group {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+/* 群名を見出しとして出す場合（既定は読み上げ専用の sr-only）。 */
+.legend {
+  padding: 0;
+  color: var(--color-ink);
+  font-size: var(--text-body);
+  font-weight: 700;
+}
+
+.items {
+  display: grid;
+  gap: 8px;
+}
+
+.card {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr);
+  gap: 8px;
+  align-items: start;
+  height: 100%;
+  padding: 12px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card);
+  background: var(--color-canvas);
+  cursor: pointer;
+  transition: background-color 120ms ease-out, border-color 120ms ease-out;
+}
+
+.card:hover {
+  background: var(--color-canvas-sunken);
+}
+
+/* 選択中：淡い緑の面＋強めの枠。ホバーでも面の色は変えない。 */
+.checked,
+.checked:hover {
+  border-color: var(--color-accent);
+  background: var(--color-accent-soft);
+}
+
+/* 未選択：白い円に輪郭。輪郭は白地で読める濃さ（$ink-faint）を使う。 */
+.radio {
+  appearance: none;
+  flex: none;
+  width: 20px;
+  height: 20px;
+  margin: 1px 0 0;
+  padding: 0;
+  border: 2px solid var(--color-ink-faint);
+  border-radius: var(--radius-pill);
+  background: var(--color-canvas);
+  cursor: pointer;
+}
+
+/*
+ * 選択中：外側の輪郭＋中央の小さな点。点（8px）と外円の間は
+ * inset の影で白い隙間（4px）を作る。accent-deep は白地で 5.44:1。
+ */
+.radio:checked {
+  border-color: var(--color-accent-deep);
+  background: var(--color-accent-deep);
+  box-shadow: inset 0 0 0 4px var(--color-canvas);
+}
+
+/* フォーカス枠は選択色と別にする（色だけで選択／操作位置を兼ねない）。 */
+.radio:focus-visible {
+  outline: 2px solid var(--color-status-info);
+  outline-offset: 2px;
+}
+
+.disabled {
+  cursor: not-allowed;
+  background: var(--color-canvas-sunken);
+}
+
+.disabled .radio {
+  border-color: var(--color-ink-disabled);
+  cursor: not-allowed;
+}
+
+.invalid {
+  border-color: var(--color-status-danger);
+}
+
+.invalid .radio {
+  border-color: var(--color-status-danger);
+}
+
+.body {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.title {
+  color: var(--color-ink);
+  font-size: var(--text-body);
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.note,
+.reason {
+  color: var(--color-ink-faint);
+  font-size: var(--text-caption);
+  font-weight: 400;
+  line-height: 1.5;
+}

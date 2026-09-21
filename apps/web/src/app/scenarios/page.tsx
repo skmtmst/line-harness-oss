@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import type { Scenario } from '@line-crm/shared'
 import { api, type ScenarioRuns, type ScenarioSimulation } from '@/lib/api'
@@ -198,16 +198,68 @@ export default function ScenariosPage() {
   const [toggleTarget, setToggleTarget] = useState<ScenarioWithCount | null>(null)
   const [toggleBusy, setToggleBusy] = useState(false)
   const [toggleError, setToggleError] = useState('')
+  /**
+   * 絞り込みを掛けない「すべて」の件数（NEXT-26）。
+   *
+   * 一覧APIの `total` は検索・フォルダ・停止中などの絞り込みを
+   * 通ったあとの数なので、フォルダ帯の「すべて」には使えない。
+   * 同じアカウント範囲で、絞り込み無しの件数だけ別に取る。
+   * `null` は「まだ数えられていない」。FolderPanel は `—` を出す。
+   */
+  const [overallTotal, setOverallTotal] = useState<number | null>(null)
 
+  /*
+   * 直近で選んでいるアカウント。切替後に前のアカウント宛の遅い応答が
+   * 返ってきても採用しないための印（テンプレート一覧の N-147 と同じ）。
+   */
+  const activeAccountRef = useRef<string | null>(selectedAccountId)
+
+  useEffect(() => {
+    activeAccountRef.current = selectedAccountId
+    // フォルダはアカウント単位。切り替えたら前のアカウントの帯も
+    // 選択中のフォルダも残さない。件数は次の取得が来るまで「未取得」にする。
+    setFolders([])
+    setUnfiledCount(null)
+    setFolderFilter('')
+    setOverallTotal(null)
+  }, [selectedAccountId])
+
+  /*
+   * NEXT-26: 一覧・フォルダ・KPIは同じアカウント範囲で数える。
+   * 一覧は `lineAccountId` を渡しているのに、フォルダとKPIは全権限範囲で
+   * 数えていたため「KPI12件・すべて11・未分類12」が混在していた。
+   */
   const loadFolders = useCallback(async () => {
-    const res = await api.folders.list('scenario')
+    const accountId = selectedAccountId
+    const res = await api.folders.list('scenario', accountId ?? undefined)
+    if (activeAccountRef.current !== accountId) return
     if (res.success) setFolders(res.data)
     setUnfiledCount(res.success ? res.unfiledCount ?? null : null)
-  }, [])
+  }, [selectedAccountId])
 
   useEffect(() => {
     void loadFolders()
   }, [loadFolders])
+
+  /** 「すべて」の件数。絞り込み無し・同じアカウント範囲で、一覧と同じ口から取る。 */
+  const loadOverallTotal = useCallback(async () => {
+    const accountId = selectedAccountId
+    try {
+      const res = await api.scenarios.listPage({
+        accountId: accountId || undefined,
+        page: 1,
+        limit: 1,
+      })
+      if (activeAccountRef.current !== accountId) return
+      setOverallTotal(res.success ? res.data.total : null)
+    } catch {
+      if (activeAccountRef.current === accountId) setOverallTotal(null)
+    }
+  }, [selectedAccountId])
+
+  useEffect(() => {
+    void loadOverallTotal()
+  }, [loadOverallTotal])
 
   useEffect(() => {
     const timer = setTimeout(() => setServerQuery(nameQuery.trim()), 300)
@@ -309,17 +361,44 @@ export default function ScenariosPage() {
     }
   }
 
-  /** 一覧からフォルダを付け替える。作ったフォルダへ中身を入れる操作。 */
-  const handleMoveFolder = async (id: string, folderId: string) => {
+  /**
+   * フォルダを付け替える。作ったフォルダへ中身を入れる操作。
+   *
+   * 行の「その他→フォルダを移動」と選択時の一括操作、どちらもここへ来る
+   * （NEXT-25）。移すと各フォルダの件数が変わるので、一覧と合わせて
+   * フォルダ帯の件数も読み直す（NEXT-26）。1件でも失敗があれば例外を
+   * 投げ、呼び出し元の窓に残してもらう。
+   */
+  const handleMoveFolders = async (ids: string[], folderId: string) => {
     setActionError('')
-    try {
-      const res = await api.scenarios.update(id, { folderId: folderId || null })
-      if (!res.success) throw new Error(res.error)
-      void loadScenarios()
-    } catch {
+    const results = await Promise.all(
+      ids.map((id) => api.scenarios.update(id, { folderId: folderId || null }).catch(() => null)),
+    )
+    const failed = results.filter((res) => !res || !res.success).length
+    void loadScenarios()
+    void loadFolders()
+    if (failed > 0) {
       setActionError('フォルダを変更できませんでした。状態を読み直してから、もう一度お試しください。')
+      throw new Error(`${failed}件のフォルダ移動に失敗しました`)
     }
   }
+
+  /*
+   * 「すべて」とフォルダ内訳の母集団の差（#981 A05-02）。
+   *
+   * アカウントを1つ選んでいるとき、一覧（＝「すべて」の母集団）には
+   * 全アカウントに共通で適用されるシナリオ（line_account_id IS NULL）も
+   * 出るが、フォルダAPIの件数はそのアカウントの行だけを数える（#730）。
+   * 共通ぶんがあれば、ずれではなく定義の違いとして画面に書く。
+   * 件数が1つでも取れていないときは差を推測しない（0とみなして黙る）。
+   */
+  const folderedTotal = folders.every((f) => f.itemCount !== undefined)
+    ? folders.reduce((sum, f) => sum + (f.itemCount ?? 0), 0)
+    : null
+  const sharedScenarioCount =
+    overallTotal !== null && unfiledCount !== null && folderedTotal !== null
+      ? Math.max(0, overallTotal - folderedTotal - unfiledCount)
+      : 0
 
   /** 畳んだ帯に出す、いま選んでいるフォルダ名（U027）。 */
   const activeFolderLabel =
@@ -335,12 +414,18 @@ export default function ScenariosPage() {
    */
   const folderPanel = (
     <FolderPanel
-      total={`${scenarioList.total} 件`}
+      /*
+        見出しの総数と「すべて」は、絞り込みを掛けない全体の件数。
+        一覧の `total` は検索・フォルダ選択を通ったあとの数なので、
+        ここに使うと「すべて11・未分類12」のように母集団がずれた
+        数字が並ぶ（NEXT-26）。取れていないときは「—」を出す。
+      */
+      total={overallTotal === null ? '—' : `${overallTotal} 件`}
       activeId={folderFilter}
       onSelect={setFolderFilter}
       onAddFolder={() => setFolderDialogOpen(true)}
       rows={[
-        { id: '', label: 'すべて', count: scenarioList.total },
+        { id: '', label: 'すべて', count: overallTotal },
         ...folders.map((f) => ({
           id: f.id,
           label: f.name,
@@ -359,6 +444,16 @@ export default function ScenariosPage() {
       <p className="text-ink-faint text-xs leading-relaxed">
         フォルダを消しても、入っていたシナリオは未分類として残ります。
       </p>
+      {/*
+        #981 A05-02: 「すべて」（一覧と同じ母集団）には全アカウント共通の
+        シナリオも入るが、フォルダ別の件数と「未分類」はこのアカウントの
+        ものだけを数える。差があるときだけ理由を書く。
+      */}
+      {sharedScenarioCount > 0 ? (
+        <p className="text-ink-faint text-xs leading-relaxed">
+          全アカウントに共通で適用されるシナリオが{sharedScenarioCount}件あります。「すべて」の件数には含まれますが、フォルダ別の件数と「未分類」には含まれません。
+        </p>
+      ) : null}
     </FolderPanel>
   )
 
@@ -372,6 +467,9 @@ export default function ScenariosPage() {
       const res = await api.scenarios.delete(id)
       if (!res.success) throw new Error(res.error)
       void loadScenarios()
+      // 全体・フォルダ内訳・未分類の件数が減るので、一覧と一緒に読み直す（NEXT-26）。
+      void loadFolders()
+      void loadOverallTotal()
     } catch {
       setActionError('シナリオを削除できませんでした。状態を読み直してから、もう一度お試しください。')
     }
@@ -389,9 +487,24 @@ export default function ScenariosPage() {
       <div data-design="KPIs">
       <ListKpis
         variant="broadcast"
+        // NEXT-26: 一覧・フォルダと同じアカウント範囲で数える。
+        // 未選択（全アカウント表示）のときは未指定＝一覧と同じ全範囲。
+        accountId={selectedAccountId ?? undefined}
         titles={['シナリオ', '購読中', '読了済', '今週の配信']}
         build={(s) => [
-            { title: 'シナリオ', value: s.scenarios.total, unit: '件', detail: `稼働中 ${s.scenarios.active}` },
+            {
+              title: 'シナリオ',
+              /*
+               * #981 A05-02: 「すべて」と同じ母集団で数える。
+               * `s.scenarios.total` は全アカウント共通のシナリオ
+               * （line_account_id IS NULL）を含まないため、アカウントを
+               * 選んだ表示では一覧・「すべて」とずれる。一覧と同じ口で
+               * 数えた overallTotal を使い、未取得は `—`。
+               */
+              value: overallTotal,
+              unit: '件',
+              detail: `稼働中 ${s.scenarios.active}${sharedScenarioCount > 0 ? `・共通 ${sharedScenarioCount}件を含む` : ''}`,
+            },
             { title: '購読中', value: s.scenarios.subscribers, unit: '人', detail: '現在配信中・重複を含む' },
             {
               title: '読了済',
@@ -550,6 +663,17 @@ export default function ScenariosPage() {
       </div>
 
 
+      {/*
+        フォルダ帯の「すべて」は絞り込み無しの全体件数、ここはいまの
+        検索・絞り込みに一致した件数。2つを同じ数字で出さない（NEXT-26）。
+        絞り込んでいないときは一致＝全体なので、この行は出さない。
+      */}
+      {(serverQuery || stoppedOnly || createdThisMonthOnly || folderFilter) && scenarioList.loaded && (
+        <p className="text-ink-faint mb-3 text-xs tabular-nums">
+          条件に一致したシナリオ：{scenarioList.total.toLocaleString('ja-JP')}件
+        </p>
+      )}
+
       {actionError && (
         <div className="mb-4 p-4 bg-danger-bg border border-danger-bg rounded-lg text-danger text-sm">
           {actionError}
@@ -570,7 +694,7 @@ export default function ScenariosPage() {
           scenarios={scenarios}
           onReorder={handleReorder}
           folders={folders}
-          onMoveFolder={handleMoveFolder}
+          onMoveFolders={handleMoveFolders}
           onToggleActive={(id) => requestToggleActive(id)}
           onDelete={handleDelete}
           onCreate={() => void handleCreate()}

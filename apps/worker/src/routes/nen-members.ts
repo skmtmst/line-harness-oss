@@ -39,6 +39,7 @@ import {
 import { attachTagAndFireSideEffects } from '../services/friend-tag-attach.js';
 import { APPETITE_LABELS, STOOL_LABELS, thirtyDaySummary, type HealthLogRow } from '../services/nen-health-admin.js';
 import { petCallName, petGender } from '../services/nen-pet-name.js';
+import { isFeedingSupportedAnimal, petAnimalTypeLabel, toPetAnimalType } from '../lib/nen-pet-species.js';
 import { normalizeNenPetBirthday } from '../lib/nen-pet-birthday.js';
 import {
   refreshAllNenTags,
@@ -124,6 +125,8 @@ function dateOnly(value: unknown): string | null {
 function feedingGuide(animalType: string, weightKg: number) {
   // NENの初期目安。主食商品の熱量・年齢・活動量・体調で調整する前提で、
   // LIFF画面にも必ず「医療判断ではない目安」と表示する。
+  // DEEP-24: 係数は犬・猫専用。「その他」に犬の式を当てず null を返す。
+  if (!isFeedingSupportedAnimal(toPetAnimalType(animalType))) return null;
   const minPerKg = animalType === 'cat' ? 25 : 20;
   const maxPerKg = animalType === 'cat' ? 35 : 30;
   const min = Math.max(1, Math.round(weightKg * minPerKg));
@@ -137,7 +140,17 @@ function feedingGuide(animalType: string, weightKg: number) {
 }
 
 function petCard(pet: Record<string, unknown>): Message {
+  // DEEP-24: 「その他」は犬へ倒さず「その他」と出す。フード目安の計算は
+  // 犬・猫専用なので、対象外の子には数値の代わりにその旨を添える。
+  const supported = isFeedingSupportedAnimal(toPetAnimalType(pet.animal_type));
   const guide = `${pet.recommended_daily_min_grams}〜${pet.recommended_daily_max_grams}g/日`;
+  const feedingLines = supported
+    ? [
+        { type: 'text', text: `1日のフード目安：${guide}`, size: 'sm', color: '#334155', wrap: true },
+        { type: 'text', text: `鹿肉をトッピングする場合の目安：${pet.venison_daily_grams}g/日まで`, size: 'sm', color: '#334155', wrap: true },
+        { type: 'text', text: `1kgのフード：約${pet.food_cycle_days}日分`, size: 'sm', color: '#334155', wrap: true },
+      ]
+    : [{ type: 'text', text: 'フード目安の自動計算は犬・猫が対象です。かかりつけの獣医師にご相談ください。', size: 'sm', color: '#334155', wrap: true }];
   return {
     type: 'flex', altText: `${pet.name}ちゃんのマイペット登録が完了しました`,
     contents: {
@@ -145,11 +158,9 @@ function petCard(pet: Record<string, unknown>): Message {
       body: { type: 'box', layout: 'vertical', spacing: 'md', contents: [
         { type: 'text', text: 'MY PET CARD', size: 'xs', weight: 'bold', color: '#16815B' },
         { type: 'text', text: `${pet.name}ちゃん`, size: 'xl', weight: 'bold', color: '#123F2B' },
-        { type: 'text', text: `${pet.animal_type === 'cat' ? '猫' : '犬'}・${pet.breed || '品種未登録'}・${pet.weight_kg}kg`, size: 'sm', color: '#64748B', wrap: true },
+        { type: 'text', text: `${petAnimalTypeLabel(pet.animal_type)}・${pet.breed || '品種未登録'}・${pet.weight_kg}kg`, size: 'sm', color: '#64748B', wrap: true },
         { type: 'separator' },
-        { type: 'text', text: `1日のフード目安：${guide}`, size: 'sm', color: '#334155', wrap: true },
-        { type: 'text', text: `鹿肉をトッピングする場合の目安：${pet.venison_daily_grams}g/日まで`, size: 'sm', color: '#334155', wrap: true },
-        { type: 'text', text: `1kgのフード：約${pet.food_cycle_days}日分`, size: 'sm', color: '#334155', wrap: true },
+        ...feedingLines,
         { type: 'text', text: '※年齢・活動量・体調・商品の熱量で変わる一般的な目安です。心配な症状は獣医師へご相談ください。', size: 'xs', color: '#94A3B8', wrap: true },
       ] },
     },
@@ -460,23 +471,28 @@ async function buildMembership(db: D1Database, lineAccountId: string | null, sna
  */
 function mapPet(row: Record<string, unknown>, products: FeedingProductRow[] = [], treatLimitPercent = DEFAULT_TREAT_LIMIT_PERCENT) {
   const neutered = neuteredFromRow(row.neutered);
+  // DEEP-24: 「その他」の動物を犬へ変換しない。犬・猫専用の給与計算も対象外。
+  const animalType = toPetAnimalType(row.animal_type);
+  const feedingSupported = isFeedingSupportedAnimal(animalType);
   const plan = planForPetRow({
-    id: String(row.id), animal_type: String(row.animal_type || 'dog'), weight_kg: row.weight_kg as number | null,
+    id: String(row.id), animal_type: animalType, weight_kg: row.weight_kg as number | null,
     birthday: (row.birthday as string | null) ?? null, neutered: row.neutered as number | null,
     activity_level: (row.activity_level as string | null) ?? null, feeding_product_id: (row.feeding_product_id as string | null) ?? null,
   }, products, new Date(), treatLimitPercent);
   return {
-    id: row.id, customerId: row.customer_id, name: row.name, callName: petCallName(String(row.name ?? ''), row.gender), animalType: row.animal_type,
+    id: row.id, customerId: row.customer_id, name: row.name, callName: petCallName(String(row.name ?? ''), row.gender), animalType,
     gender: petGender(row.gender), breed: row.breed, birthday: row.birthday, weightKg: row.weight_kg,
     concerns: JSON.parse(String(row.concerns || '[]')),
     neutered: neutered === true ? 'yes' : neutered === false ? 'no' : 'unknown',
     activityLevel: normalizeActivity(row.activity_level) ?? 'normal',
     feedingProductId: row.feeding_product_id || null,
     feeding: feedingView(plan),
-    recommendedDailyGrams: row.recommended_daily_grams,
-    recommendedDailyMinGrams: row.recommended_daily_min_grams,
-    recommendedDailyMaxGrams: row.recommended_daily_max_grams,
-    venisonDailyGrams: row.venison_daily_grams, foodCycleDays: row.food_cycle_days,
+    // 種別が犬・猫以外のとき、過去に犬として計算・保存された目安を出さない。
+    recommendedDailyGrams: feedingSupported ? row.recommended_daily_grams : null,
+    recommendedDailyMinGrams: feedingSupported ? row.recommended_daily_min_grams : null,
+    recommendedDailyMaxGrams: feedingSupported ? row.recommended_daily_max_grams : null,
+    venisonDailyGrams: feedingSupported ? row.venison_daily_grams : null,
+    foodCycleDays: feedingSupported ? row.food_cycle_days : null,
     imageUrl: row.image_url || null,
   };
 }
@@ -646,7 +662,9 @@ nenMembers.post('/api/liff/nen/pets', async (c) => {
   if (!friend) return c.json({ success: false, error: 'Unauthorized' }, 401);
   const body = await c.req.json<Record<string, unknown>>().catch(() => null);
   const name = typeof body?.name === 'string' ? body.name.trim() : '';
-  const animalType = body?.animalType === 'cat' ? 'cat' : body?.animalType === 'dog' ? 'dog' : '';
+  // DEEP-24: 「その他」も登録できる。犬・猫専用の目安計算は feedingGuide が
+  // 対象外として null を返し、犬の係数で作った数値を保存しない。
+  const animalType = body?.animalType === 'cat' || body?.animalType === 'dog' || body?.animalType === 'other' ? body.animalType : '';
   const breed = typeof body?.breed === 'string' ? body.breed.trim().slice(0, 80) : '';
   const weightKg = Number(body?.weightKg);
   // 誕生日は月日だけ（MM-DD）でも登録できる。生まれた年が分からない子も
@@ -680,8 +698,8 @@ nenMembers.post('/api/liff/nen/pets', async (c) => {
   ).bind(
     id, friend.id, friend.user_id, name, animalType,
     gender,
-    birthday, breed, weightKg, JSON.stringify(concerns), guide.daily, guide.min, guide.max,
-    guide.venison, guide.cycleDays, photoKey, imageUrl, now, now,
+    birthday, breed, weightKg, JSON.stringify(concerns), guide?.daily ?? null, guide?.min ?? null, guide?.max ?? null,
+    guide?.venison ?? null, guide?.cycleDays ?? null, photoKey, imageUrl, now, now,
     feeding.neutered === undefined || feeding.neutered === null ? null : feeding.neutered ? 1 : 0,
     feeding.activityLevel ?? 'normal',
     feeding.feedingProductId ?? null,
@@ -877,7 +895,7 @@ nenMembers.get('/api/liff/nen/health-logs/summary', async (c) => {
        FROM nen_health_logs WHERE pet_id = ? AND logged_on >= ? ORDER BY logged_on DESC`,
   ).bind(pet.id, since).all<HealthLogRow>();
   return c.json({ success: true, data: {
-    pet: { id: pet.id, name: pet.name, callName: petCallName(pet.name, pet.gender), animalType: pet.animal_type === 'cat' ? 'cat' : 'dog', breed: pet.breed ?? '', birthday: pet.birthday, weightKg: pet.weight_kg },
+    pet: { id: pet.id, name: pet.name, callName: petCallName(pet.name, pet.gender), animalType: toPetAnimalType(pet.animal_type), breed: pet.breed ?? '', birthday: pet.birthday, weightKg: pet.weight_kg },
     owner: { name: friend.display_name ?? '' },
     generatedAt: today.toISOString(),
     summary: thirtyDaySummary(logs.results ?? [], today),

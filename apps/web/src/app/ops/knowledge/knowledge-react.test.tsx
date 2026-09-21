@@ -39,10 +39,23 @@ async function flush() { await act(async () => { await vi.advanceTimersByTimeAsy
 const button = (label: string) => Array.from(document.querySelectorAll('button')).find(b => b.textContent?.trim() === label)!
 
 describe('V6 knowledge UI', () => {
+  it('shows the actual source subject, JST evidence time and only quoted conditions', async () => {
+    await act(async () => root.render(<KnowledgeEditor article={{ ...article, sourceSubject: '実際の問い合わせ件名', evidence: [
+      { ...article.evidence[0], createdAt: '2026-09-19T00:40:00Z' }, article.evidence[1],
+      { ...article.evidence[0], role: 'condition', quote: '対象フォームの回答後アクション' },
+    ] }} onClose={() => {}} onSaved={() => {}} />))
+    expect(document.body.textContent).toContain('#MB-0312 実際の問い合わせ件名')
+    expect(document.querySelector('time')?.textContent).toBe('09:40')
+    expect(document.body.textContent).toContain('適用条件：対象フォームの回答後アクション')
+  })
+  it('does not invent an applicability condition when the source has none', async () => {
+    await act(async () => root.render(<KnowledgeEditor article={article} onClose={() => {}} onSaved={() => {}} />))
+    expect(document.body.textContent).toContain('適用条件：原文に明示なし')
+  })
   it('displays actual draft references and sends feedback or exclusion for that article', async () => {
     const exclude = vi.fn()
     await act(async () => root.render(<KnowledgeReferences requestId="ticket" references={[{ id: article.id, title: article.title, version: 3 }]} busy={false} onExclude={exclude} />))
-    expect(host.querySelector('[data-design-node="F8supc"]')).not.toBeNull()
+    expect(host.querySelector('[data-design-node="l87aC"]')).not.toBeNull()
     await act(async () => button('役に立った').click())
     expect(mocks.feedback).toHaveBeenCalledWith('article', 'ticket', 'helpful')
     expect(button('役に立った').getAttribute('aria-pressed')).toBe('true')
@@ -61,7 +74,7 @@ describe('V6 knowledge UI', () => {
   })
   it('shows ops-only columns and review actions without FAQ publishing controls', async () => {
     await act(async () => root.render(<OpsKnowledgePage />)); await flush()
-    expect(host.querySelector('[data-design-node="P5egpk"]')).not.toBeNull()
+    expect(host.querySelector('[data-design-node="csVox"]')).not.toBeNull()
     expect(host.textContent).toContain('承認待ち')
     expect(host.textContent).toContain('内容を確認')
     expect(host.textContent).not.toContain('FAQ')
@@ -95,7 +108,7 @@ describe('V6 knowledge UI', () => {
   })
   it('warns that editing an approved article invalidates approval', async () => {
     await act(async () => root.render(<KnowledgeEditor article={{ ...article, reviewState: 'approved', status: 'active' }} onClose={() => {}} onSaved={() => {}} />))
-    expect(document.querySelector('[data-design-node="MGgKT"]')).not.toBeNull()
+    expect(document.querySelector('[data-design-node="ZAOc7"]')).not.toBeNull()
     expect(document.body.textContent).toContain('再承認するまで')
     expect(button('承認待ちで保存')).toBeDefined()
     expect(button('承認して有効にする')).toBeUndefined()

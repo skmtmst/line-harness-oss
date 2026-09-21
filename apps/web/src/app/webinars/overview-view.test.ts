@@ -47,11 +47,27 @@ describe('ウェビナー一覧の実測値', () => {
     expect(card?.detail).toBe('延べ予約 451件')
   })
 
-  it('視聴不能を0人にせずAPIの理由を表示する', () => {
+  it('視聴不能を0人にせず、理由は説明アイコンの中へまとめる', () => {
     const card = overviewCards(overview()).find(({ key }) => key === 'viewers')
     expect(card?.view.text).toBe(NOT_AVAILABLE)
     expect(card?.view.note).toContain('区間')
-    expect(card?.detail).toContain('視聴率 —')
+    /* 3段目は短い状態だけ。理由の長文は detail へ直置きしない（#1005）。 */
+    expect(card?.status).toBe('取得できていません')
+    expect(card?.detail).toBe(`視聴率 ${NOT_AVAILABLE}`)
+    expect(card?.description).toContain('実際に見た区間の記録をまだ集計できないため')
+    expect(card?.description).toContain('視聴人数を取得できないため')
+    expect(card?.description).toContain('視聴人数:')
+    expect(card?.description).toContain('視聴率:')
+  })
+
+  it('同じ理由で出せない指標は説明の中でひとつにまとめる', () => {
+    const sameReason = overview({
+      viewers: unavailable('視聴区間の記録をまだ集計できないため'),
+      viewRate: unavailable('視聴区間の記録をまだ集計できないため'),
+    })
+    const card = overviewCards(sameReason).find(({ key }) => key === 'viewers')
+    expect(card?.description).toBe('視聴区間の記録をまだ集計できないため。')
+    expect(card?.description).not.toContain('視聴人数:')
   })
 
   it('視聴率の小数を百分率で表示する', () => {

@@ -4,11 +4,11 @@ import StickyBar from '@/components/shared/sticky-bar'
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { api, ApiError, eventsApi, type EventDetail, type EventSlot } from '@/lib/api'
+import { api, ApiError, EventSlotsPartialError, eventsApi, type EventDetail, type EventSlot, type EventSlotInput } from '@/lib/api'
 import ImageUploader from '@/components/shared/image-uploader'
 import OgEditor from '@/components/shared/og-editor'
 import { useAccount } from '@/contexts/account-context'
-import { generateBulkSlots, type BulkSlotInput } from './bulk-slot-generator'
+import { BULK_SLOT_LIMIT, generateBulkSlots, type BulkSlotInput } from './bulk-slot-generator'
 import { jstHHMMToUtcIso } from './jst'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Select from '@/components/shared/select'
@@ -57,7 +57,6 @@ export default function EventForm({ accountId, eventId }: EventFormProps) {
   const [saving, setSaving] = useState(false)
   const [loading, setLoading] = useState(true)
   const [toast, setToast] = useState<string | null>(null)
-  const [copied, setCopied] = useState(false)
   const [copiedValue, setCopiedValue] = useState<string | null>(null)
   const [tags, setTags] = useState<Array<{ id: string; name: string }>>([])
 
@@ -206,18 +205,6 @@ export default function EventForm({ accountId, eventId }: EventFormProps) {
       )
     } finally {
       setSaving(false)
-    }
-  }
-
-  async function copyLiffUrl() {
-    if (!liffUrl) return
-    try {
-      await navigator.clipboard.writeText(liffUrl)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
-    } catch {
-      // 予約URL欄が隣に読取専用で置いてあるので何も出さない(点検#520の軽15)。
-      // 書けない環境では欄を押して範囲選択し、手でコピーできる。
     }
   }
 
@@ -691,10 +678,16 @@ function SlotsTab({
   const [deleteSlotTarget, setDeleteSlotTarget] = useState<EventSlot | null>(null)
   const [deletingSlot, setDeletingSlot] = useState(false)
   const [deleteSlotError, setDeleteSlotError] = useState('')
-  /** まとめて作る枠の下見。作る前に件数と最初・最後を読ませる。 */
+  /*
+    まとめて作る枠の下見。作る前に件数と最初・最後を読ませる。
+    #1000 DETAIL-11: 下見の時点で操作IDと枠ごとの再送防止キー
+    (client_key)を確定し、失敗後は残りだけを同じキーで再送する。
+    bulkDone はこの下見のうち作成が確認できた件数。
+  */
   const [bulkPreview, setBulkPreview] = useState<
-    { slots: Array<{ starts_at: string; ends_at: string; capacity: number | null }> } | null
+    { operationId: string; slots: Array<EventSlotInput & { client_key: string }> } | null
   >(null)
+  const [bulkDone, setBulkDone] = useState(0)
   const [bulkBusy, setBulkBusy] = useState(false)
   const [bulkError, setBulkError] = useState('')
 
@@ -739,14 +732,35 @@ function SlotsTab({
     setBulkBusy(true)
     setBulkError('')
     try {
-      await eventsApi.createSlots(accountId, eventId, bulkPreview.slots)
+      /*
+        確定済みの分は送り直さない(DETAIL-11)。残りは同じ client_key を
+        持つので、応答喪失で画面の件数と実際がずれていても
+        サーバー側が既存枠へ解決し、総数は増えない。
+      */
+      const remaining = bulkPreview.slots.slice(bulkDone)
+      if (remaining.length === 0) {
+        setBulkPreview(null)
+        setBulkDone(0)
+        await refresh()
+        setShowBulk(false)
+        return
+      }
+      await eventsApi.createSlots(accountId, eventId, remaining)
       setBulkPreview(null)
+      setBulkDone(0)
       await refresh()
       setShowBulk(false)
-    } catch {
+    } catch (e) {
       // 400件ずつ送るので、途中で切れると一部だけ作られたまま残る。
-      // どこまで作られたかを見せるため、失敗しても一覧を取り直す。
-      setBulkError('枠を作りきれませんでした。途中まで作られていることがあります。一覧を読み直して、足りない分だけ追加してください。')
+      // 作成が確認できた件数を数え、残りだけを次の送信対象にする。
+      const completed = e instanceof EventSlotsPartialError ? e.completed.length : 0
+      const done = bulkDone + completed
+      setBulkDone(done)
+      setBulkError(
+        done > 0
+          ? `${done}件は追加済みです。残り${bulkPreview.slots.length - done}件は、もう一度「まとめて作る」を押すと続きから再開します。`
+          : '枠を作りきれませんでした。途中まで作られていることがあります。一覧を読み直して、足りない分だけ追加してください。',
+      )
       await refresh()
     } finally {
       setBulkBusy(false)
@@ -853,9 +867,23 @@ function SlotsTab({
             /*
               作る前に**下見を出す**。件数が0でも `alert()` は使わず、
               同じ窓で理由を読ませて、作るボタンを出さない。
+              生成は501件目で打ち切られる(DETAIL-12)。上限超過は
+              例外として投げ、入力窓の中で理由を読ませる。
             */
+            const generated = generateBulkSlots(input)
+            if (generated.length > BULK_SLOT_LIMIT) {
+              throw new Error('500件を超える一括作成はできません。期間や曜日を分けて追加してください')
+            }
+            const operationId = crypto.randomUUID()
             setBulkError('')
-            setBulkPreview({ slots: generateBulkSlots(input) })
+            setBulkDone(0)
+            setBulkPreview({
+              operationId,
+              slots: generated.map((slot, index) => ({
+                ...slot,
+                client_key: `${operationId}:${index}`,
+              })),
+            })
           }}
         />
       )}
@@ -880,10 +908,12 @@ function SlotsTab({
         open={bulkPreview !== null}
         title={bulkPreview && bulkPreview.slots.length === 0
           ? '作られる枠が0件です'
-          : `${bulkPreview?.slots.length ?? 0}件の予約枠を作りますか？`}
+          : bulkDone > 0
+            ? `残り${(bulkPreview?.slots.length ?? 0) - bulkDone}件の予約枠を作りますか？`
+            : `${bulkPreview?.slots.length ?? 0}件の予約枠を作りますか？`}
         description={bulkPreview && bulkPreview.slots.length === 0
           ? '入れた条件では枠が1つも作られません。期間・曜日・時間帯を見直してから、もう一度お試しください。まだ何も作っていません。'
-          : `${bulkPreview && bulkPreview.slots.length > 0 ? formatJpDateTime(bulkPreview.slots[0].starts_at) : ''}から${bulkPreview && bulkPreview.slots.length > 0 ? formatJpDateTime(bulkPreview.slots[bulkPreview.slots.length - 1].starts_at) : ''}までの枠をまとめて作ります。いまある枠は消えません。作った枠は1件ずつ削除できます（予約が入ったあとは削除できません）。`}
+          : `${bulkPreview && bulkPreview.slots.length > 0 ? formatJpDateTime(bulkPreview.slots[0].starts_at) : ''}から${bulkPreview && bulkPreview.slots.length > 0 ? formatJpDateTime(bulkPreview.slots[bulkPreview.slots.length - 1].starts_at) : ''}までの枠をまとめて作ります。いまある枠は消えません。作った枠は1件ずつ削除できます（予約が入ったあとは削除できません）。${bulkDone > 0 ? `${bulkDone}件は追加済みで、再送しても二重にはなりません。` : ''}`}
         confirmLabel="まとめて作る"
         cancelLabel={bulkPreview && bulkPreview.slots.length === 0 ? '条件を直す' : 'キャンセル'}
         busy={bulkBusy}
@@ -892,6 +922,7 @@ function SlotsTab({
         onCancel={() => {
           if (bulkBusy) return
           setBulkError('')
+          setBulkDone(0)
           setBulkPreview(null)
         }}
       />

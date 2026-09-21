@@ -1,5 +1,5 @@
 -- Ops-only knowledge. Additive: no historical ticket backfill or data rewrite.
--- 441 allocated after checking development and open PRs on 2026-09-20.
+-- 442 allocated after checking development and open PRs on 2026-09-21.
 ALTER TABLE hq_support_requests ADD COLUMN knowledge_revision INTEGER NOT NULL DEFAULT 0;
 
 CREATE TABLE platform_knowledge_jobs (

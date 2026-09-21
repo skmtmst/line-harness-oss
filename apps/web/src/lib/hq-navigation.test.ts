@@ -7,6 +7,9 @@ import {
   decideRootLanding,
   hqOpenHref,
   resolveHqOpenTarget,
+  resolveStoreReturnPath,
+  resetAuthSelectionCleared,
+  storeSelectionHref,
 } from './hq-navigation'
 
 function storage(initial: Record<string, string> = {}) {
@@ -63,15 +66,77 @@ describe('統括から店舗画面を開く', () => {
 })
 
 describe('認証後の前回選択解除', () => {
-  it('同じ認証セッションで一度だけ保存値を消す', () => {
+  it('ログインし直しでは一度だけ保存値を消し、印は共有側へ立てる', () => {
+    // ログイン画面が印を外したあと、次の認証確認で一度だけ
+    // 前回の店舗選択を捨てる。
     const local = storage({ [ACCOUNT_SELECTION_KEY]: 'old-account' })
     const session = storage()
     expect(clearSelectionAfterAuthentication(local, session)).toBe(true)
     expect(local.getItem(ACCOUNT_SELECTION_KEY)).toBeNull()
-    expect(session.getItem(AUTH_SELECTION_CLEARED_KEY)).toBe('1')
+    expect(local.getItem(AUTH_SELECTION_CLEARED_KEY)).toBe('1')
 
     local.setItem(ACCOUNT_SELECTION_KEY, 'current-account')
     expect(clearSelectionAfterAuthentication(local, session)).toBe(false)
     expect(local.getItem(ACCOUNT_SELECTION_KEY)).toBe('current-account')
+  })
+
+  it('新規タブ・再読込では他タブの選択を消さない', () => {
+    // 印の正本は共有の localStorage。タブごとの sessionStorage が
+    // 空になる新規タブでも、印が残っている限り選択を消さない（NEXT-07）。
+    const local = storage({
+      [ACCOUNT_SELECTION_KEY]: 'account-1',
+      [AUTH_SELECTION_CLEARED_KEY]: '1',
+    })
+    const freshTabSession = storage()
+    expect(clearSelectionAfterAuthentication(local, freshTabSession)).toBe(false)
+    expect(local.getItem(ACCOUNT_SELECTION_KEY)).toBe('account-1')
+  })
+
+  it('sessionStorage にだけ残る旧印でも消さない', () => {
+    // 旧版が置いた印や確認用スクリプトの印は sessionStorage に残る。
+    // 消えた選択は戻せないので、残存印がある側は消さない方向に倒す。
+    const local = storage({ [ACCOUNT_SELECTION_KEY]: 'account-1' })
+    const session = storage({ [AUTH_SELECTION_CLEARED_KEY]: '1' })
+    expect(clearSelectionAfterAuthentication(local, session)).toBe(false)
+    expect(local.getItem(ACCOUNT_SELECTION_KEY)).toBe('account-1')
+  })
+
+  it('ログイン・ログアウトは両方の印を外して次の確認で消せるようにする', () => {
+    const local = storage({ [AUTH_SELECTION_CLEARED_KEY]: '1' })
+    const session = storage({ [AUTH_SELECTION_CLEARED_KEY]: '1' })
+    resetAuthSelectionCleared(local, session)
+    expect(local.getItem(AUTH_SELECTION_CLEARED_KEY)).toBeNull()
+    expect(session.getItem(AUTH_SELECTION_CLEARED_KEY)).toBeNull()
+    // 印が外れたあとの認証確認では前回の選択を一度だけ捨てる。
+    local.setItem(ACCOUNT_SELECTION_KEY, 'old-account')
+    expect(clearSelectionAfterAuthentication(local, session)).toBe(true)
+    expect(local.getItem(ACCOUNT_SELECTION_KEY)).toBeNull()
+  })
+})
+
+describe('店舗選択から元の画面へ戻る', () => {
+  it('アプリ内の店舗画面パスだけを戻り先にする', () => {
+    expect(resolveStoreReturnPath('/line-notifications/edit?id=1')).toBe('/line-notifications/edit?id=1')
+    expect(resolveStoreReturnPath('/friends#top')).toBe('/friends#top')
+    expect(resolveStoreReturnPath('/friends')).toBe('/friends')
+  })
+
+  it('外部URL・店舗不要の画面・空は戻り先にしない', () => {
+    expect(resolveStoreReturnPath('https://example.com/x')).toBeNull()
+    expect(resolveStoreReturnPath('//evil.example')).toBeNull()
+    expect(resolveStoreReturnPath('javascript:alert(1)')).toBeNull()
+    expect(resolveStoreReturnPath('/hq')).toBeNull()
+    expect(resolveStoreReturnPath('/hq/open?target=tags')).toBeNull()
+    expect(resolveStoreReturnPath('/login')).toBeNull()
+    expect(resolveStoreReturnPath(null)).toBeNull()
+    expect(resolveStoreReturnPath('')).toBeNull()
+  })
+
+  it('戻り先付きの店舗一覧URLを組み立てる', () => {
+    expect(storeSelectionHref('/line-notifications/edit?id=1'))
+      .toBe(`/hq?return=${encodeURIComponent('/line-notifications/edit?id=1')}`)
+    expect(storeSelectionHref(null)).toBe('/hq')
+    expect(storeSelectionHref('/hq')).toBe('/hq')
+    expect(storeSelectionHref('https://example.com')).toBe('/hq')
   })
 })

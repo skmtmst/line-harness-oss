@@ -2,7 +2,6 @@
 
 import { Fragment, useMemo, useState, type ReactNode } from 'react'
 import { Gift, MessageSquare, Newspaper, Package, RotateCw, Send } from 'lucide-react'
-import ActionMenu from '@/components/shared/action-menu'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Drawer from '@/components/shared/drawer'
@@ -11,7 +10,7 @@ import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
 import PageHeader from '@/components/shared/page-header'
 import Pagination from '@/components/shared/pagination'
-import { MoreAction } from '@/components/shared/row-actions'
+import { RowActions } from '@/components/shared/row-actions'
 import Select from '@/components/shared/select'
 import StatusBadge from '@/components/shared/status-badge'
 import StickyBar from '@/components/shared/sticky-bar'
@@ -425,7 +424,6 @@ function AutoPanel({
   const [trigger, setTrigger] = useState('')
   const [status, setStatus] = useState('')
   const [sort, setSort] = useState<AutoSort>('sent_desc')
-  const [openMenuKey, setOpenMenuKey] = useState<string | null>(null)
 
   const metricFor = (setting: NenCampaignSetting) => metrics?.flows.find((flow) => flow.campaignKey === setting.campaignKey)
   const shown = settings
@@ -529,11 +527,16 @@ function AutoPanel({
                     </Td>
                     <Td>{setting.isEnabled ? <StatusBadge tone="success" size="compact">配信中</StatusBadge> : <StatusBadge tone="warning" size="compact">停止中</StatusBadge>}</Td>
                     <Td align="right">
-                      <span className="relative inline-flex items-center justify-end gap-2">
-                        <Button href={`/nen-campaigns/edit?key=${encodeURIComponent(setting.campaignKey)}`} size="field">編集</Button>
-                        <MoreAction label={`${setting.label}のその他の操作`} onClick={() => setOpenMenuKey((current) => current === setting.campaignKey ? null : setting.campaignKey)} />
-                        <ActionMenu open={openMenuKey === setting.campaignKey} ariaLabel={`${setting.label}の操作`} onClose={() => setOpenMenuKey(null)} items={menuItems} />
-                      </span>
+                      {/*
+                        #985 LAY-18: 行の操作は共用の RowActions。
+                        「編集」＋「⋯」（中身を見る・テスト送信・止める/動かす）の
+                        並びを部品へ委ね、画面ごとの手組みへは戻さない。
+                      */}
+                      <RowActions
+                        subjectName={setting.label}
+                        edit={{ href: `/nen-campaigns/edit?key=${encodeURIComponent(setting.campaignKey)}` }}
+                        menuItems={menuItems}
+                      />
                     </Td>
                   </Tr>
                 )

@@ -2,6 +2,7 @@
 
 import SelectField from '@/components/shared/select-field'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
+import type { ReactNode } from 'react'
 import Link from 'next/link'
 import Button from '@/components/shared/button'
 import Pagination from '@/components/shared/pagination'
@@ -22,6 +23,7 @@ import {
   type WebinarOverview,
 } from '@/lib/api'
 import KpiCollapse from '@/components/ui/kpi-collapse'
+import KpiCard from '@/components/shared/kpi-card'
 import { overviewCards } from './overview-view'
 import { publicationStateLabel } from '@/components/webinars/publication-label'
 
@@ -313,6 +315,19 @@ function WebinarListErrorNotice({
   )
 }
 
+/*
+  一覧の器(白い面・最低360px)。**行があるときだけ包む。**
+  読込・空・失敗の1枚は ListState が自分で面と高さを持つので、
+  器に入れると白い余白と灰色の二重背景になる(監査 DETAIL-01)。
+*/
+function WebinarListCard({ children }: { children: ReactNode }) {
+  return (
+    <div className="border-hairline bg-canvas min-h-[360px] overflow-hidden rounded-card border">
+      {children}
+    </div>
+  )
+}
+
 function WebinarListContent({
   accountLoading,
   loading,
@@ -339,17 +354,19 @@ function WebinarListContent({
   if (accountLoading || loading) return <ListState kind="loading" />
   if (!selectedAccountId) {
     return (
-      <div className="p-12 text-center text-sm font-medium text-ink">
-        {accountsCount > 0 ? '上のバーでLINE公式アカウントを選んでください' : 'LINE公式アカウントが登録されていません'}
-      </div>
+      <WebinarListCard>
+        <div className="p-12 text-center text-sm font-medium text-ink">
+          {accountsCount > 0 ? '上のバーでLINE公式アカウントを選んでください' : 'LINE公式アカウントが登録されていません'}
+        </div>
+      </WebinarListCard>
     )
   }
   if (loadFailure) {
     return visibleItems.length > 0 ? (
-      <>
+      <WebinarListCard>
         <WebinarListErrorNotice failure={loadFailure} onRetry={onRetry} />
         <WebinarListTable items={visibleItems} onArchive={onArchive} />
-      </>
+      </WebinarListCard>
     ) : (
       <ListState
         kind={loadFailure.kind}
@@ -365,17 +382,17 @@ function WebinarListContent({
         kind="empty"
         title="まだウェビナーがありません"
         description="動画セミナーの申込と視聴を、ここで管理します。"
-        action={<Button variant="primary" href="/webinars/new">ウェビナーを作る</Button>}
+        action={<Button variant="primary" href="/webinars/new">ウェビナーを作成</Button>}
       />
     ) : (
-      <ListState kind="empty" title="条件に合うウェビナーはありません" description="検索文字か保存した条件を変えてください。" />
+      <ListState kind="empty" title="条件に合うウェビナーはありません" description="検索文字かよく使う絞り込みを変えてください。" />
     )
   }
   return (
-    <>
+    <WebinarListCard>
       {refreshing ? <p role="status" className="text-ink-faint border-hairline border-b px-4 py-2 text-xs">検索中…</p> : null}
       <WebinarListTable items={visibleItems} onArchive={onArchive} />
-    </>
+    </WebinarListCard>
   )
 }
 
@@ -696,19 +713,22 @@ function WebinarsPage() {
         </div>
       ) : (
         <KpiCollapse data-design="KPIs" className="mx-auto mb-4 max-w-[1600px] px-6 pt-4" gridClassName="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          {/*
+            #1005: カードは共通KpiCardの3段（見出し・数値・短い状態）で出す。
+            取得できない詳しい理由は description として説明アイコンの中へ渡し、
+            長文で行全体の高さを伸ばさない。状態自体は detail に残す。
+          */}
           {overviewCards(visibleOverview).map((card) => (
-            <div key={card.key} className="bg-canvas rounded-card border-hairline border p-4">
-              <p className="text-ink-faint text-xs">{card.title}</p>
-              <p
-                className={`mt-1 text-2xl font-bold tabular-nums ${
-                  card.view.available ? 'text-ink' : 'text-ink-faint'
-                }`}
-              >
-                {card.view.text}
-              </p>
-              {card.view.note ? <p className="text-ink-faint mt-0.5 text-xs">{card.view.note}</p> : null}
-              {card.detail ? <p className="text-ink-faint mt-0.5 text-xs">{card.detail}</p> : null}
-            </div>
+            <KpiCard
+              key={card.key}
+              title={card.title}
+              value={null}
+              unit=""
+              valueText={card.view.text}
+              valueTone={card.view.available ? 'default' : 'faint'}
+              detail={[card.status, card.detail].filter(Boolean).join('・')}
+              description={card.description ?? undefined}
+            />
           ))}
         </KpiCollapse>
       )}
@@ -751,26 +771,24 @@ function WebinarsPage() {
             </div>
 
             <div data-design="Saved" className="mb-3 flex flex-wrap items-center gap-2">
-              <span className="text-ink-faint text-xs whitespace-nowrap">保存した条件</span>
+              <span className="text-ink-faint text-xs whitespace-nowrap">よく使う絞り込み</span>
               {([{ key: 'active', label: '公開中のみ' }, { key: 'draft', label: '下書きのみ' }] as const).map(({ key, label }) => (
                 <button key={key} onClick={() => setSavedFilter(savedFilter === key ? '' : key)} aria-pressed={savedFilter === key} className={`rounded-pill border px-3 py-1 text-xs transition-colors ${savedFilter === key ? 'border-accent bg-accent-soft text-ink' : 'border-hairline text-ink-secondary hover:bg-canvas-sunken'}`}>{label}</button>
               ))}
             </div>
 
-            <div className="border-hairline bg-canvas min-h-[360px] overflow-hidden rounded-card border">
-              <WebinarListContent
-                accountLoading={accountLoading}
-                loading={loading}
-                selectedAccountId={selectedAccountId}
-                accountsCount={accounts.length}
-                loadFailure={loadFailure}
-                visibleItems={visibleItems}
-                panelGrand={panelGrand}
-                refreshing={refreshing}
-                onRetry={() => void refresh()}
-                onArchive={openArchive}
-              />
-            </div>
+            <WebinarListContent
+              accountLoading={accountLoading}
+              loading={loading}
+              selectedAccountId={selectedAccountId}
+              accountsCount={accounts.length}
+              loadFailure={loadFailure}
+              visibleItems={visibleItems}
+              panelGrand={panelGrand}
+              refreshing={refreshing}
+              onRetry={() => void refresh()}
+              onArchive={openArchive}
+            />
 
             {hasListData && visibleTotal > 0 && (
               <div className="mt-3 flex flex-wrap items-center justify-between gap-3"><p className="text-ink-faint text-xs tabular-nums">{(currentPage - 1) * pageSize + 1}〜{(currentPage - 1) * pageSize + visible.length}件 / 全{visibleTotal}件</p><Pagination page={currentPage} pageCount={pageCount} onPageChange={setPage} ariaLabel="ウェビナー一覧のページ送り" /></div>
@@ -822,8 +840,13 @@ function WebinarsPage() {
 }
 
 function ArchiveReviewBackdrop({ target }: { target: WebinarListItem }) {
+  /*
+   * #985 CHK-02: 左の256pxと上の56pxはPCのメニュー・ヘッダーが
+   * 実在する幅（1280px以上）だけ空ける。狭い幅では全幅を使い、
+   * overflow-hidden で説明と戻る操作を切り捨てず、縦に読めるようにする。
+   */
   return (
-    <div className="bg-canvas-sunken fixed inset-y-14 left-64 right-0 z-10 overflow-hidden px-10 py-5" data-design-node="LKuAQ">
+    <div className="bg-canvas-sunken fixed inset-x-0 bottom-0 top-[var(--mobile-header-height)] z-10 overflow-y-auto px-4 py-5 sm:px-10 xl:left-64 xl:top-14" data-design-node="LKuAQ">
       <div className="mx-auto max-w-screen-2xl">
         <p className="text-accent text-xs font-bold">← ウェビナー一覧</p>
         <div className="mt-5 grid gap-4 xl:grid-cols-4">

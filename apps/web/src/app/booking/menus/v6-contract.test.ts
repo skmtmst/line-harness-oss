@@ -57,7 +57,7 @@ describe('V6 予約設定', () => {
 
   it('表示している一覧操作は実際に使える', () => {
     expect(LIST).not.toContain('準備中')
-    expect(LIST).toContain('bookingApi.getSettings(selectedAccountId)')
+    expect(LIST).toContain('bookingApi.getSettings(accountId)')
     expect(LIST).toContain('<Pagination page={page} pageCount={pageCount}')
     expect(LIST).toContain('止める・出す')
     expect(LIST).toContain('bookingApi.patchMenu(selectedAccountId, menu.id, version')
@@ -66,10 +66,14 @@ describe('V6 予約設定', () => {
     expect(LIST).not.toContain('CSVで書き出す')
   })
 
-  it('作成後の担当保存だけが失敗した場合は、作成済みと伝えて設定導線を出す', () => {
-    expect(CREATE).toContain('setCreatedMenuNeedingStaff(res.id)')
-    expect(CREATE).toContain('メニューは作成されましたが、担当スタッフを保存できませんでした。')
-    expect(CREATE).toContain('担当スタッフを設定する')
+  it('作成後の担当保存だけが失敗した場合は、作成済みと伝えて設定導線を出す (DEEP-16)', () => {
+    // メニュー作成済みの再実行は createMenu を呼ばず、残りの担当設定だけを
+    // やり直す。同名メニューの二重作成を防ぐ。
+    expect(CREATE).toContain('createdMenuNeedingStaff?.menuId ?? null')
+    expect(CREATE).toContain('setCreatedMenuNeedingStaff({ menuId, remainingStaffIds')
+    expect(CREATE).toContain('メニューは作成済みですが、一部の担当スタッフを保存できませんでした。')
+    expect(CREATE).toContain('もう一度押しても新しいメニューは増えません')
+    expect(CREATE).toContain('担当の設定をやり直す')
     expect(CREATE).toContain('/booking/menus?tab=staff&menu=')
   })
 
@@ -83,10 +87,14 @@ describe('V6 予約設定', () => {
     expect(LIST).toContain('/booking/staff/shifts#special')
   })
 
-  it('担当の取得失敗を「未登録」と誤表示しない', () => {
-    expect(CREATE).toContain('staffLoadFailed')
+  it('担当の取得失敗・取得中を「未登録」と誤表示せず作成も止める (DEEP-17)', () => {
+    expect(CREATE).toContain('staffLoadState')
+    expect(CREATE).toContain('担当を読み込んでいます')
     expect(CREATE).toContain('担当を読み込めませんでした。開き直してください')
     expect(CREATE).toContain('まだスタッフが登録されていません')
+    // 候補が確定するまで保存しない。候補にいないIDは選択数に数えない。
+    expect(CREATE).toContain("staffLoadState === 'loading'")
+    expect(CREATE).toContain('assignedIds')
   })
 
   it('編集窓の入力欄は共通の枠線と輪郭へ寄せる', () => {

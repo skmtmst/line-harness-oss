@@ -13,6 +13,7 @@ import {
   type AnalyticsCrossResult,
   type AnalyticsFunnelRunResult,
   type AnalyticsMetric,
+  type AnalyticsMetricState,
   type AnalyticsReactionsOverview,
   type AnalyticsRoutesOverview,
   type AnalyticsUsageOverview,
@@ -2160,6 +2161,46 @@ function shownValue(metric: AnalyticsMetric<number>): number | null {
   return metric.state === 'available' || metric.state === 'partial' ? metric.value : null
 }
 
+/*
+ * #1005: KPIカードの3段目には短い状態だけを置く。APIが返す理由文は長い
+ * ことがあるので detail へ直置きせず、説明アイコンの中（description）へ
+ * 逃がして、行全体が理由の長さで伸びないようにする。未取得のラベルは
+ * #606 の決めごとに合わせて「未取得」と書く。
+ */
+const METRIC_STATE_TEXT: Record<AnalyticsMetricState, string> = {
+  available: '',
+  partial: '一部だけ集計できています',
+  pending: '集計を待っています',
+  insufficient: '数が少なく出せません',
+  unavailable: '未取得',
+  failed: '取得に失敗しました',
+}
+
+type KpiCardState = {
+  detail: string
+  description?: string
+  onRetry?: () => void
+}
+
+/**
+ * 指標ごとのカード文言を「短い状態＋説明」へ分ける。
+ * 理由があるときは detail を短い状態に差し替え、理由全文は description へ。
+ * failed のときだけ、その場で読み直せる再試行を渡せるようにする。
+ */
+function metricCardState(
+  metric: Pick<AnalyticsMetric<unknown>, 'state' | 'reason'>,
+  fallback: KpiCardState,
+  retry?: () => void,
+): KpiCardState {
+  const retryable = metric.state === 'failed' && retry ? { onRetry: retry } : {}
+  if (!metric.reason) return { ...fallback, ...retryable }
+  return {
+    detail: METRIC_STATE_TEXT[metric.state] || '未取得',
+    description: metric.reason,
+    ...retryable,
+  }
+}
+
 function MetricCell({ metric, percent, currency }: {
   metric: AnalyticsMetric<number | string>
   percent?: boolean
@@ -2228,6 +2269,11 @@ function FriendsOverviewTab({ accountId }: { accountId: string }) {
     ? Math.max(0, ((addedValue - removedValue) / addedValue) * 100)
     : null
   const pendingReason = overview.stateReason ?? '日ごとの集計がまだありません'
+  /* 全体が「実測できた」でないときのカードは、短い状態＋理由全文の説明に分ける。 */
+  const pendingCard: KpiCardState = {
+    detail: METRIC_STATE_TEXT[overview.state] || '未取得',
+    description: pendingReason,
+  }
   // 日ごとの表は行ごとの状態を持たない。全体の状態が「実測できた」でないときは、
   // 0 が並んだ30行を出さずに理由を1行で出す。
   const daysShown = overview.state === 'available' || overview.state === 'partial'
@@ -2236,11 +2282,12 @@ function FriendsOverviewTab({ accountId }: { accountId: string }) {
   return <div data-design-node="Zxezb" className="space-y-4">
     <AnalyticsPeriodControl days={days} onChange={setDays} />
     {overview.state !== 'available' && overview.stateReason && <div className="bg-warning-bg border-warning rounded-card border px-4 py-3 text-sm">{overview.stateReason}</div>}
+    {/* #1005: 理由文は description（説明アイコン）へ。detail は短い状態だけ。 */}
     <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
-      <KpiCard title="現在つながっている" value={shownValue(overview.metrics.currentFriends)} unit="人" detail={overview.metrics.currentFriends.reason ?? (netValue === null ? pendingReason : `この${days}日の差し引き ${netValue > 0 ? '+' : ''}${netValue}人`)} />
-      <KpiCard title="増えた友だち" value={addedValue} unit="人" detail={overview.metrics.added.reason ?? (addedValue === null ? pendingReason : `この${days}日。初回 ${metricText(overview.metrics.firstTime)}人`)} />
-      <KpiCard title="減った友だち" value={removedValue} unit="人" detail={overview.metrics.removed.reason ?? (removedValue === null ? pendingReason : `この${days}日。ブロック・友だち解除`)} />
-      <KpiCard title="差し引き" value={netValue} unit="人" detail={remainingRate === null ? pendingReason : `増加 − 減少。残っている割合 ${remainingRate.toFixed(1)}%`} />
+      <KpiCard title="現在つながっている" value={shownValue(overview.metrics.currentFriends)} unit="人" {...metricCardState(overview.metrics.currentFriends, netValue === null ? pendingCard : { detail: `この${days}日の差し引き ${netValue > 0 ? '+' : ''}${netValue}人` }, state.retry)} />
+      <KpiCard title="増えた友だち" value={addedValue} unit="人" {...metricCardState(overview.metrics.added, addedValue === null ? pendingCard : { detail: `この${days}日。初回 ${metricText(overview.metrics.firstTime)}人` }, state.retry)} />
+      <KpiCard title="減った友だち" value={removedValue} unit="人" {...metricCardState(overview.metrics.removed, removedValue === null ? pendingCard : { detail: `この${days}日。ブロック・友だち解除` }, state.retry)} />
+      <KpiCard title="差し引き" value={netValue} unit="人" {...metricCardState(overview.metrics.net, remainingRate === null ? pendingCard : { detail: `増加 − 減少。残っている割合 ${remainingRate.toFixed(1)}%` }, state.retry)} />
     </div>
     <AnalyticsNotice>増えた人と減った人を日ごとに並べています。減りが増えた日に何を配信したかも、同じ日付で確かめられます。</AnalyticsNotice>
     <section className="bg-canvas rounded-card border-hairline border p-4">
@@ -2317,9 +2364,9 @@ function ReactionsOverviewTab({ accountId }: { accountId: string }) {
     <AnalyticsPeriodControl days={days} onChange={setDays} />
     <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
       <KpiCard title={`この${days}日に送った`} value={overview.campaigns.length} unit="回" detail="一覧に取得できた配信" />
-      <KpiCard title="届いた人" value={delivered} unit="人" detail={overview.metrics.delivered.reason ?? '配信ごとの到達数の合計'} />
-      <KpiCard title="押された割合" value={clickRate} unit="%" detail="LINEクリック ÷ 届いた人" />
-      <KpiCard title="取得できない配信" value={shownValue(overview.metrics.unavailableCampaigns)} unit="件" detail={overview.metrics.unavailableCampaigns.reason ?? '開封などを取得できない配信'} />
+      <KpiCard title="届いた人" value={delivered} unit="人" {...metricCardState(overview.metrics.delivered, { detail: '配信ごとの到達数の合計' }, state.retry)} />
+      <KpiCard title="押された割合" value={clickRate} unit="%" detail="LINEクリック ÷ 届いた人" description={overview.metrics.lineClicked.reason ?? overview.metrics.delivered.reason ?? undefined} />
+      <KpiCard title="取得できない配信" value={shownValue(overview.metrics.unavailableCampaigns)} unit="件" {...metricCardState(overview.metrics.unavailableCampaigns, { detail: '開封などを取得できない配信' }, state.retry)} />
     </div>
     <AnalyticsNotice>配信ごとの開かれ方・押され方です。20人未満など取得できない数は、0ではなく「—」と理由で示します。</AnalyticsNotice>
     {truncationNote && <AnalyticsNotice>{truncationNote}までを表示しています。それより古い配信は一覧にもCSVの書き出しにも入りません。</AnalyticsNotice>}
@@ -2430,26 +2477,28 @@ function UsageOverviewTab({ accountId }: { accountId: string }) {
         title="作ったのに使っていない"
         value={shownValue(overview.summary.unusedItems)}
         unit="個"
-        detail={overview.summary.unusedItems.reason ?? '8分類の利用状況から集計'}
+        {...metricCardState(overview.summary.unusedItems, { detail: '8分類の利用状況から集計' }, state.retry)}
         action={(shownValue(overview.summary.unusedItems) ?? 0) > 0 ? { label: '片づける', href: '#usage-items' } : undefined}
       />
       <KpiCard
         title="確認できた参照切れ"
         value={shownValue(overview.summary.brokenReferences)}
         unit="件"
-        detail={overview.summary.brokenReferences.reason ?? '対応済みの参照をすべて確認'}
+        {...metricCardState(overview.summary.brokenReferences, { detail: '対応済みの参照をすべて確認' }, state.retry)}
       />
       <KpiCard
         title="自動で動いた回数"
         value={shownValue(overview.summary.automaticRuns)}
         unit="回"
-        detail={`この${days}日。${overview.summary.automaticRuns.reason ?? '実行記録から集計'}。手で送ったのは${overview.summary.manualSends.value?.toLocaleString('ja-JP') ?? '—'}回`}
+        {...metricCardState(overview.summary.automaticRuns, { detail: `この${days}日。実行記録から集計。手で送ったのは${overview.summary.manualSends.value?.toLocaleString('ja-JP') ?? '—'}回` }, state.retry)}
       />
       <KpiCard
         title="手作業が減った時間"
         value={estimatedHoursSavedValue}
         unit="時間"
-        detail={overview.summary.estimatedHoursSaved.reason ?? '1件30秒として試算'}
+        detail={overview.summary.estimatedHoursSaved.reason ? (METRIC_STATE_TEXT[overview.summary.estimatedHoursSaved.state] || '未取得') : '1件30秒として試算'}
+        description={overview.summary.estimatedHoursSaved.reason ?? undefined}
+        onRetry={overview.summary.estimatedHoursSaved.state === 'failed' ? state.retry : undefined}
       />
     </div>
     {overview.stateReason ? <div className="bg-warning-bg border-warning rounded-card border px-4 py-3 text-sm">{overview.stateReason}</div> : <AnalyticsNotice>項目が多いほど良い、ではありません。使っていないものは使用先を確かめてから、下の「片づける」で整理できます。</AnalyticsNotice>}

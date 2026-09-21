@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { api, webinarApi, type Webinar, type WebinarInput, type WebinarScheduleRule } from '@/lib/api'
 import type { MediaItem } from '@line-crm/shared'
@@ -38,9 +38,21 @@ function inferDailySchedule(rules: WebinarScheduleRule[]): { start: string; end:
 
 export interface WebinarFormProps {
   initial?: Webinar
+  /*
+    編集画面の段（step）の中に置くとき、下の固定バーは親の1本にまとめる。
+    `hideBar` で内側の保存バーを出さず、`registerSave` / `onDirtyChange` で
+    親の固定バーから保存・未保存表示を操作できるようにする。
+  */
+  hideBar?: boolean
+  /** 編集で保存できたとき、一覧へ戻さず新しい中身を呼び出し側へ返す。 */
+  onSaved?: (webinar: Webinar) => void
+  /** 保存していない変更があるかを親へ伝える。 */
+  onDirtyChange?: (dirty: boolean) => void
+  /** 親へ保存操作を登録する。戻り値が true のときだけ保存が完了している。 */
+  registerSave?: (save: (() => Promise<boolean>) | null) => void
 }
 
-export default function WebinarForm({ initial }: WebinarFormProps) {
+export default function WebinarForm({ initial, hideBar = false, onSaved, onDirtyChange, registerSave }: WebinarFormProps) {
   const router = useRouter()
   const { selectedAccountId } = useAccount()
   const [title, setTitle] = useState(initial?.title ?? '')
@@ -96,8 +108,40 @@ export default function WebinarForm({ initial }: WebinarFormProps) {
     ? Boolean(initial?.videoPrefix?.trim())
     : Boolean(videoChoice)
 
+  /*
+    「最後に読めた・保存できた内容」を未保存判定の正本にする。
+    保存できたらこの基準も一緒に進めるので、保存後に
+    「未保存」の印が残ったり、段を往復して入力が消えたりしない。
+  */
+  const [baseline, setBaseline] = useState(() => ({
+    title: initial?.title ?? '',
+    slug: initial?.slug ?? '',
+    status: (initial?.status ?? 'draft') as Webinar['status'],
+    durationMinutes: initial ? Math.round(initial.durationSeconds / 60) : 120,
+    videoChoice: initial?.videoMediaId ?? (initial?.videoPrefix ? EXTERNAL_VIDEO : ''),
+    rules: (initial?.schedule ?? []) as WebinarScheduleRule[],
+  }))
+
   /** 下書きから公開へ変えるときだけ、確認を挟む。 */
-  const isPublishing = status === 'active' && initial?.status !== 'active'
+  const isPublishing = status === 'active' && baseline.status !== 'active'
+
+  /*
+    未保存の変更があるか。**段を行き来しても消えない画面にするため、**
+    親の固定バーが「未保存」を出す材料にする。
+  */
+  const dirty =
+    title !== baseline.title ||
+    slug !== baseline.slug ||
+    status !== baseline.status ||
+    durationMinutes !== baseline.durationMinutes ||
+    videoChoice !== baseline.videoChoice ||
+    JSON.stringify(rules) !== JSON.stringify(baseline.rules)
+
+  useEffect(() => {
+    onDirtyChange?.(dirty)
+  }, [dirty, onDirtyChange])
+  /* 画面から外れるときは未保存の印を残さない。 */
+  useEffect(() => () => onDirtyChange?.(false), [onDirtyChange])
 
   /**
    * 公開してよいか。**足りないまま公開すると、友だちの画面で気づくことになる。**
@@ -110,20 +154,37 @@ export default function WebinarForm({ initial }: WebinarFormProps) {
     return ''
   }
 
-  /** 下書き保存はそのまま。公開は足りないものを先に言い、確認を挟む。 */
-  const requestSave = () => {
+  /**
+   * 保存してよい状態か整えてから保存する。戻り値は「保存が完了したか」。
+   * 公開の確認を開いたときは false ——保存はまだ終わっていない。
+   */
+  const requestSave = async (): Promise<boolean> => {
     if (!isPublishing) {
-      void save()
-      return
+      return save()
     }
     const problem = publicationProblem()
     if (problem) {
       setError(problem)
-      return
+      return false
     }
     setError(null)
     setPublishConfirmOpen(true)
+    return false
   }
+
+  /*
+    親の固定バーから呼べるよう、いちばん新しい保存操作を登録する。
+    確認を挟む公開の流れも含めて `requestSave` を渡す。
+  */
+  const requestSaveRef = useRef(requestSave)
+  useEffect(() => {
+    requestSaveRef.current = requestSave
+  })
+  useEffect(() => {
+    if (!registerSave) return
+    registerSave(() => requestSaveRef.current())
+    return () => registerSave(null)
+  }, [registerSave])
 
   const updateRule = (i: number, patch: Partial<WebinarScheduleRule>) =>
     setRules((prev) => prev.map((r, j) => (j === i ? { ...r, ...patch } : r)))
@@ -147,10 +208,11 @@ export default function WebinarForm({ initial }: WebinarFormProps) {
   const dailyOverview = inferDailySchedule(rules)
   const nonDailyCount = rules.length - dailyRules.length
 
-  const save = async () => {
+  /** 保存が完了したら true。失敗したら入力を残したまま false を返す。 */
+  const save = async (): Promise<boolean> => {
     if (!initial && !selectedAccountId) {
       setError('上のバーでLINE公式アカウントを選んでください')
-      return
+      return false
     }
     setSaving(true)
     setError(null)
@@ -168,15 +230,29 @@ export default function WebinarForm({ initial }: WebinarFormProps) {
     try {
       if (initial) {
         const updated = await webinarApi.update(initial.id, input)
+        /* 未保存判定の正本を送った内容へ進める。画面を畳まなくても印が消える。 */
+        setBaseline({ title, slug, status, durationMinutes, videoChoice, rules })
         /* 公開したときは完了の面へ。**何が公開されたのかを最後に読ませる。** */
-        router.push(isPublishing ? `/webinars/published?id=${updated.data.id}` : '/webinars')
-      } else {
-        const created = await webinarApi.create(input)
-        /* 作ってすぐ公開したときも、完了の面へ。 */
-        router.push(isPublishing ? `/webinars/published?id=${created.data.id}` : `/webinars/edit?id=${created.data.id}`)
+        if (isPublishing) {
+          router.push(`/webinars/published?id=${updated.data.id}`)
+          return true
+        }
+        /* 編集画面の段の中では、一覧へ戻さず新しい中身を親へ返す。 */
+        if (onSaved) {
+          onSaved(updated.data)
+          return true
+        }
+        router.push('/webinars')
+        return true
       }
+      const created = await webinarApi.create(input)
+      /* 作ってすぐ公開したときも、完了の面へ。 */
+      router.push(isPublishing ? `/webinars/published?id=${created.data.id}` : `/webinars/edit?id=${created.data.id}`)
+      return true
     } catch (err) {
       setError(webinarErrorText(err, '保存できませんでした。入力を見直してください。'))
+      return false
+    } finally {
       setSaving(false)
     }
   }
@@ -383,10 +459,13 @@ export default function WebinarForm({ initial }: WebinarFormProps) {
         </details>
       </section>
 
+      {/* 段画面の中では親の固定バーが保存を引き受ける。保存バーは1つにする。 */}
+      {hideBar ? null : (
       <StickyBar
         status="変更内容を確認して本番へ反映します"
-        actions={<button onClick={requestSave} disabled={saving} className="rounded-xl bg-action px-6 py-2.5 text-sm font-bold text-on-action shadow-sm disabled:opacity-50">{saving ? '保存中...' : isPublishing ? '公開する' : '変更を保存'}</button>}
+        actions={<button onClick={() => void requestSave()} disabled={saving} className="rounded-xl bg-action px-6 py-2.5 text-sm font-bold text-on-action shadow-sm disabled:opacity-50">{saving ? '保存中...' : isPublishing ? '公開する' : '変更を保存'}</button>}
       />
+      )}
 
       {/*
         公開の確認（設計 `D6yO7e` 10-1-G）。**押した瞬間に友だちへ出さない。**

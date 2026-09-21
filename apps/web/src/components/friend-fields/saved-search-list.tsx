@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { Trash2 } from 'lucide-react'
 import ReorderGrip from './reorder-grip'
+import { mergeVisibleOrder } from './reorder-utils'
 import type { SavedSearch, SavedSearchCondition, Tag } from '@line-crm/shared'
 import { api, ApiError, type SavedSearchSummary } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
@@ -65,20 +66,29 @@ export default function SavedSearchList({ accountId }: { accountId: string | nul
   const [summary, setSummary] = useState<SavedSearchSummary | null>(null)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
+  /*
+    並び替え・削除の失敗（#1014 ATTR-02）。読み込みの失敗は loadError。
+    読み直しで消さず、次の操作か再試行の成功まで残す。
+  */
   const [error, setError] = useState('')
+  const [retryOrder, setRetryOrder] = useState<SavedSearch[] | null>(null)
   const [tags, setTags] = useState<Tag[]>([])
   const [conditionLabels, setConditionLabels] = useState<SavedSearchConditionLabels>({})
   const [pendingDelete, setPendingDelete] = useState<SavedSearch | null>(null)
   const [query, setQuery] = useState('')
   const [usageFilter, setUsageFilter] = useState<SavedSearchUsageFilter>('all')
-  const [matchFilter, setMatchFilter] = useState<'all' | 'matched' | 'zero'>('all')
+  const [matchFilter, setMatchFilter] = useState<'all' | 'matched' | 'zero' | 'unknown'>('all')
   const loadSequence = useRef(0)
 
   const load = useCallback(async () => {
     const sequence = ++loadSequence.current
     setLoading(true)
     setLoadError('')
-    setError('')
+    /*
+      ATTR-02: ここで `error`（並び替え・削除の失敗）は消さない。
+      保存に失敗した直後の再読込でメッセージが消え、あたかも成功した
+      ように見えた。消すのは操作をやり直して成功したときだけ。
+    */
     setItems([])
     setSummary(null)
     setTags([])
@@ -122,6 +132,16 @@ export default function SavedSearchList({ accountId }: { accountId: string | nul
     void load()
   }, [load])
 
+  /*
+    アカウントが変わったら、前のアカウントの削除確認を閉じる。
+    別アカウントの検索を消す確認が残ると、表示と操作対象がずれる。
+  */
+  useEffect(() => {
+    setPendingDelete(null)
+    setError('')
+    setRetryOrder(null)
+  }, [accountId])
+
   const remove = (search: SavedSearch) => {
     setPendingDelete(search)
   }
@@ -137,41 +157,64 @@ export default function SavedSearchList({ accountId }: { accountId: string | nul
     }
   }
 
+  /*
+    並び替えは /api/saved-searches/reorder へ「動かせる行だけの新しい順」を
+    1回で渡す（#1014 ATTR-02/03）。
+
+    以前は行ごとの PATCH で順位を書いていた。他人が作った検索は404で
+    断られるので途中までしか反映されず、絞り込みで隠れた行は全て末尾へ
+    送られていた（`?? 9999` のソート）。サーバーは動かせる行だけを
+    原子的に入れ替え、隠れた行と他人が作った検索の位置を保つ。
+  */
+  const applyOrder = async (next: SavedSearch[]) => {
+    if (!accountId) return
+    const account = accountId
+    const previous = items
+    setItems(next)
+    setError('')
+    setRetryOrder(null)
+    try {
+      const res = await api.savedSearches.reorder(account, next.map((search) => search.id))
+      if (!res.success) throw new Error(res.error)
+      void load()
+    } catch (reason) {
+      // 失敗した並びは保存済みと見せず元に戻す。理由と再試行は次の操作まで残す。
+      setItems(previous)
+      setError(reason instanceof ApiError ? `並び順を保存できませんでした（${reason.message}）` : '並び順を保存できませんでした')
+      setRetryOrder(next)
+    }
+  }
+
   /**
    * つまみにフォーカスして ↑/↓ で1つ動かす（N-049）。
-   * 保存は各検索の displayOrder を並び順に合わせて PATCH する。
-   * 自分以外が作った検索はサーバーが404で断るので、
-   * 失敗したら並びを戻して理由を出す。
+   * 絞り込み中は見えている行だけを入れ替え、隠れた行の位置を保つ。
    */
   const keyboardMove = async (id: string, direction: -1 | 1) => {
-    if (!accountId) return
     const order = visible.map((search) => search.id)
     const from = order.indexOf(id)
     const to = from + direction
     if (from < 0 || to < 0 || to >= order.length) return
     order.splice(to, 0, ...order.splice(from, 1))
-    const rank = new Map(order.map((sid, index) => [sid, index]))
-    const next = [...items].sort((a, b) => (rank.get(a.id) ?? 9999) - (rank.get(b.id) ?? 9999))
-    setItems(next)
-    try {
-      await Promise.all(
-        next.map((search, index) =>
-          api.savedSearches.update(search.id, accountId, { displayOrder: index }),
-        ),
-      )
-      void load()
-    } catch {
-      setError('並び順を保存できませんでした')
-      void load()
-    }
+    const visibleNext = order.map((i) => items.find((item) => item.id === i)).filter(Boolean) as SavedSearch[]
+    await applyOrder(mergeVisibleOrder(items, visibleNext))
   }
 
   const ready = Boolean(accountId) && !loading && !loadError
   const fallbackKpis = savedSearchKpiValues(items, ready)
   const kpis = summary ?? fallbackKpis
   const visible = filterSavedSearches(items, query, usageFilter).filter((item) => {
-    if (matchFilter === 'all' || item.matchCount === null || item.matchCount === undefined) return true
-    return matchFilter === 'zero' ? item.matchCount === 0 : item.matchCount > 0
+    /*
+      ATTR-08: 人数が `null` / `undefined`（未集計・集計失敗）は
+      「0人」にも「1人以上」にも数えない。数字の絞り込みは数字が
+      入っている行だけに掛ける。以前は null が全フィルターに素通りして、
+      0人の一覧に未集計が混ざっていた。
+    */
+    const count = item.matchCount
+    const uncounted = count === null || count === undefined
+    // 「未集計」を選んだときだけ未集計の行を出す。数字の絞り込みには混ぜない。
+    if (matchFilter === 'unknown') return uncounted
+    if (uncounted) return matchFilter === 'all'
+    return matchFilter === 'zero' ? count === 0 : count > 0
   })
 
   return (
@@ -183,8 +226,12 @@ export default function SavedSearchList({ accountId }: { accountId: string | nul
         <SummaryCard title="今月の呼び出し" value={kpis.callsThisMonth} unit="回" detail={kpis.callsThisMonth === null ? '呼び出し記録は未接続' : '配信・自動処理'} loading={loading} variant="v6" />
       </div>
 
+      {/*
+        ATTR-23: 細かい仕様（AND/OR・演算子の数・軸の数）はここに並べず、
+        「どこから作るか」を先に伝える。条件の作り方は友だち一覧側に揃える。
+      */}
       <p className="border-hairline text-ink-secondary mb-4 rounded-control border bg-canvas px-3 py-2 text-sm">
-        AND群とOR群、友だち情報の10演算子を組み合わせ、保存した条件からコピーして再利用します。軸は呼び出し元で変わります（友だち一覧14軸・配信15軸）。
+        友だち一覧の絞り込みを「この条件を保存」でここに保存します。配信や自動処理からも同じ条件を呼び出せます。
       </p>
 
       {!accountId && (
@@ -196,6 +243,19 @@ export default function SavedSearchList({ accountId }: { accountId: string | nul
       {error && (
         <div className="bg-danger-bg border-danger-bg text-danger mb-4 rounded-lg border p-4 text-sm">
           {error}
+          {retryOrder ? (
+            <button
+              type="button"
+              className="ml-2 font-semibold underline underline-offset-2"
+              onClick={() => {
+                const next = retryOrder
+                setRetryOrder(null)
+                if (next) void applyOrder(next)
+              }}
+            >
+              再試行
+            </button>
+          ) : null}
         </div>
       )}
 
@@ -231,9 +291,14 @@ export default function SavedSearchList({ accountId }: { accountId: string | nul
           <option value="all">該当人数：すべて</option>
           <option value="matched">1人以上</option>
           <option value="zero">0人</option>
+          {/* ATTR-08: 未集計・集計失敗は「0人」とは別の状態として探せる。 */}
+          <option value="unknown">未集計</option>
         </select>
         <span className="flex-1" />
-        <Button href="/friends" variant="primary">保存条件からコピー</Button>
+        {/*
+          作る導線はタブの右に1個だけ（#1014 ATTR-22）。
+          「保存条件からコピー」は一覧内の第二導線だったので、ここからは外す。
+        */}
         {ready ? (
           <span className="text-caption tabular-nums text-ink-faint">
             {visible.length === items.length
@@ -254,28 +319,38 @@ export default function SavedSearchList({ accountId }: { accountId: string | nul
           action={<Button type="button" onClick={() => void load()}>保存した検索を再読み込み</Button>}
         />
       ) : items.length === 0 ? (
-        <p className="bg-canvas rounded-card border-hairline text-ink-faint border p-8 text-center text-sm">
-          保存した検索はまだありません。
-          <Link href="/friends" className="text-accent ml-1 hover:underline">
-            友だち一覧へ
-          </Link>
-        </p>
+        /*
+          ATTR-23: 0件のときは「保存条件からコピー」ではなく、
+          最初の1件を作る本筋の導線（友だち一覧の絞り込み → この条件を保存）
+          へ案内する。
+        */
+        <ListState
+          kind="empty"
+          title="まだ保存した検索がありません"
+          description="友だち一覧で条件を絞り、「この条件を保存」を押すとここに追加されます。"
+          action={<Button href="/friends" variant="primary">友だち一覧で条件を作る</Button>}
+        />
       ) : visible.length === 0 ? (
         <p className="bg-canvas rounded-card border-hairline text-ink-faint border p-8 text-center text-sm">
           条件に合う保存した検索はありません。条件名か使用先を変えてください。
         </p>
       ) : (
         <div className="overflow-hidden rounded-card border border-hairline bg-canvas [box-shadow:1px_1px_2px_rgba(15,23,42,0.10)]">
-          <table className="w-full table-fixed text-sm">
+          {/*
+            960px以上は表（#1014 ATTR-15）。該当・共有・操作は短い言葉なので
+            幅を絞り、はみ出た「条件の要約」と「更新者・日時」に回す。
+            それ未満は縦に重ねたカード（ATTR-14）。
+          */}
+          <table className="hidden w-full table-fixed text-sm md:table">
             <thead className="border-b border-hairline bg-canvas-sunken text-[11px] text-ink-faint">
               <TableHeadRow>
-                <Th className="w-1/6 px-3 py-3">条件名 ／ 所有・範囲・参照・版</Th>
+                <Th className="w-[16%] px-3 py-3">条件名 ／ 所有・範囲・参照・版</Th>
                 <Th className="w-1/4 px-3 py-3">条件の要約</Th>
-                <Th className="w-1/12 px-3 py-3">該当</Th>
-                <Th className="w-1/12 px-3 py-3">共有</Th>
+                <Th className="w-[7%] px-3 py-3">該当</Th>
+                <Th className="w-[8%] px-3 py-3">共有</Th>
                 <Th className="w-1/6 px-3 py-3">使用先</Th>
-                <Th className="w-1/6 px-3 py-3">更新者・日時</Th>
-                <Th className="w-1/12 px-3 py-3">操作</Th>
+                <Th className="w-[12%] px-3 py-3">更新者・日時</Th>
+                <Th className="w-[140px] px-3 py-3">操作</Th>
               </TableHeadRow>
             </thead>
             <tbody className="divide-y divide-hairline">
@@ -301,10 +376,16 @@ export default function SavedSearchList({ accountId }: { accountId: string | nul
                     {/* つまみは装飾ではなく ↑/↓ で並び替えられる（N-049）。 */}
                     <ReorderGrip label={search.name} onMove={(direction) => void keyboardMove(search.id, direction)} />
                   {search.lineAccountId ? (
+                    /*
+                      ATTR-24: 長い名前は省略するだけでなく、ホバー（title）と
+                      読み上げ（aria-label）で全文を伝える。
+                      「条件を確認・編集」だけだと、どの条件か分からない。
+                    */
                     <Link
                       href={`/tags/searches/edit?id=${encodeURIComponent(search.id)}`}
                       className="truncate font-bold text-action hover:underline"
-                      title="条件を確認・編集"
+                      title={search.name}
+                      aria-label={`${search.name} を編集`}
                     >
                       {search.name}
                     </Link>
@@ -361,6 +442,64 @@ export default function SavedSearchList({ accountId }: { accountId: string | nul
           })}
             </tbody>
           </table>
+          {/*
+            960px未満は縦に重ねたカード（#1014 ATTR-14/15）。
+            名前・人数・使用先・操作を同じカード内に収める。
+          */}
+          <ul className="divide-y divide-hairline md:hidden">
+            {visible.map((search) => {
+              const deleteDisabled = !search.lineAccountId || search.canDelete !== true
+              const deleteTitle = !search.lineAccountId
+                ? '管理者が対象アカウントを割り当てるまで変更できません'
+                : search.usedIn === undefined
+                  ? '使用先を確認できないため削除できません'
+                : search.usedIn.length > 0
+                  ? `使用中のため削除できません（${search.usedIn?.length ?? 0}件）`
+                : search.canDelete === true
+                  ? '保存した検索を削除'
+                  : '削除できるか確認できません'
+              const { all, any } = splitConditions(search.conditions, tags, conditionLabels)
+              return (
+                <li key={search.id} className="px-3 py-3">
+                  <div className="flex items-start gap-2">
+                    <span className="pt-1"><ReorderGrip label={search.name} onMove={(direction) => void keyboardMove(search.id, direction)} /></span>
+                    <div className="min-w-0 flex-1">
+                      {search.lineAccountId ? (
+                        <Link href={`/tags/searches/edit?id=${encodeURIComponent(search.id)}`} className="block truncate font-bold text-action hover:underline" title={search.name} aria-label={`${search.name} を編集`}>
+                          {search.name}
+                        </Link>
+                      ) : (
+                        <span className="block truncate font-bold text-ink" title={search.name}>{search.name}</span>
+                      )}
+                      <p className="mt-0.5 text-[11px] text-ink-faint">
+                        {search.isShared ? '全員' : '自分だけ'}・{selectedAccount?.name ?? search.lineAccountId ?? '対象未設定'}・v{search.revision ?? 1}
+                      </p>
+                      <p className="mt-1 text-xs leading-5 text-ink-secondary">
+                        {all.length > 0 ? all.join('・') : null}
+                        {any.length > 0 ? `${all.length > 0 ? '・' : ''}いずれか：${any.join('・')}` : null}
+                        {all.length === 0 && any.length === 0 ? '指定なし' : null}
+                      </p>
+                      <p className="mt-1 text-xs text-ink-faint">
+                        {search.matchCount === null || search.matchCount === undefined ? '該当 —' : `該当 ${search.matchCount.toLocaleString('ja-JP')}人`}・{search.usedIn === undefined ? '使用先 —' : search.usedIn.length === 0 ? '未使用' : search.usedIn.map((usage) => `${USAGE_KIND_LABELS[usage.kind]}「${usage.name}」`).join('・')}
+                      </p>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-2 pt-1">
+                      {search.lineAccountId ? <Link href={`/friends?savedSearch=${search.id}`} className="whitespace-nowrap text-xs font-semibold text-action hover:underline">一覧へ</Link> : null}
+                      <button
+                        onClick={() => remove(search)}
+                        disabled={deleteDisabled}
+                        aria-label={`${search.name}を削除`}
+                        title={deleteTitle}
+                        className="rounded-md p-1 text-danger hover:bg-danger-bg disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        <Trash2 aria-hidden="true" size={16} />
+                      </button>
+                    </div>
+                  </div>
+                </li>
+              )
+            })}
+          </ul>
         </div>
       )}
 

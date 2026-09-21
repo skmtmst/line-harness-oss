@@ -91,9 +91,11 @@ export function ReminderFooter({ status = '下書き保存', secondary, primary,
   )
 }
 
-export function Choice({ selected, title, note, onClick }: { selected: boolean; title: string; note?: string; onClick: () => void }) {
-  return <button type="button" className={selected ? styles.choiceActive : styles.choice} onClick={onClick}><span>{selected ? '●' : '○'}</span><strong>{title}</strong>{note ? <small>{note}</small> : null}</button>
-}
+/*
+ * #999 DEEP-02: 1つだけ選ぶ選択カードは共通の RadioCard / RadioCardGroup
+ * （components/shared/radio-card）を使う。ここにあった ●・○ の文字を
+ * 置いた button は、radio の役割・選択状態を支援技術へ伝えなかったため撤去。
+ */
 
 export function ReminderButton(props: ButtonProps) {
   return <Button {...props} className={[styles.smallButton, props.className].filter(Boolean).join(' ')} />
@@ -103,9 +105,21 @@ export function ReminderStepCard({ selected, number, timing, title, note, onClic
   return <button type="button" className={selected ? styles.stepCardActive : styles.stepCard} onClick={onClick}><span>{number}</span><strong>{timing}</strong><b>{title}</b><small>{note}</small></button>
 }
 
-export function Field({ label, note, required, children }: { label: string; note?: string; required?: boolean; children: ReactNode }) {
-  // #976 U086: 「必須」はラベル文に埋めず、共通の札を使う
-  return <label className={styles.field}><span>{label}{required ? <RequiredBadge /> : null}</span>{note ? <small>{note}</small> : null}{children}</label>
+export function Field({ label, note, required, labelAside, children }: { label: string; note?: string; required?: boolean; labelAside?: ReactNode; children: ReactNode }) {
+  /*
+   * #996 DEEP-01: 共通Fieldと同じ3段構造（ラベル行／入力行／補足・エラー行）。
+   * カウンター類はラベル行の右（labelAside）、補足文は入力の下に置く。
+   * 補足が増えても入力行の位置は動かないので、横並びの上端がそろう。
+   * 段の見た目は .field の子セレクタで決める（design-debtの未解決classNameを増やさない）。
+   * #976 U086: 「必須」はラベル文に埋めず、共通の札を使う。
+   */
+  return (
+    <label className={styles.field}>
+      <span><span>{label}{required ? <RequiredBadge /> : null}</span>{labelAside ? <small>{labelAside}</small> : null}</span>
+      {children}
+      {note ? <small>{note}</small> : null}
+    </label>
+  )
 }
 
 export function Pill({ tone = 'neutral', children }: { tone?: 'neutral' | 'success' | 'warning' | 'danger'; children: ReactNode }) {

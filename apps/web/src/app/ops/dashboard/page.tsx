@@ -77,7 +77,7 @@ export default function OpsDashboardPage() {
         <SummaryCard variant="v6" title="契約中" value={k ? k.active : null} unit="" detail={k ? `ライト${k.byPlan.light}・スタンダード${k.byPlan.standard}・プロ${k.byPlan.pro}` : '—'} loading={loading} />
         <SummaryCard variant="v6" title="トライアル中" value={k ? k.trialing : null} unit="" detail={k ? `${label}の新規 ${k.newInPeriod}` : '—'} loading={loading} />
         <SummaryCard variant="v6" title={`${label}の解約`} value={k ? k.churnInPeriod : null} unit="" detail={k ? `解約率 ${k.churnRate.toFixed(1)}%` : '—'} badge={k && k.churnInPeriod > 0 ? '確認' : undefined} badgeTone="danger" loading={loading} />
-        <div data-design-node="pKV5S"><SummaryCard variant="v6" title="今月の AI 利用" value={data?.ai?.callsThisMonth ?? null} unit="回" detail={data?.ai ? `下書き ${data.ai.draftsThisMonth} 回・有効な記事 ${data.ai.articlesActive} 件` : '—'} loading={loading} /></div>
+        <div data-design-node="G0vK7"><SummaryCard variant="v6" title="今月の AI 利用" value={data?.ai?.callsThisMonth ?? null} unit="回" detail={data?.ai ? `返信の下書き${data.ai.draftsThisMonth}回・記事化${data.ai.callsThisMonth - data.ai.draftsThisMonth}回` : '—'} loading={loading} /></div>
       </div>
 
       {/* グラフ帯 */}

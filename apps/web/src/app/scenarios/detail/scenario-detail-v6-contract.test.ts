@@ -57,11 +57,17 @@ describe('V6 シナリオ編集の契約', () => {
   })
 
   it('作ったフォルダへ一覧からシナリオを移せる', () => {
+    /*
+      NEXT-25: 各行の幅176pxのフォルダ select は名前列を潰していたため、
+      行の「その他→フォルダを移動」と複数選択の一括操作へ集約した。
+      移動先を選ぶ窓の select は `v6-select` のまま。
+    */
     expect(LIST).toContain("api.scenarios.update(id, { folderId: folderId || null })")
-    expect(LIST).toContain('onMoveFolder={handleMoveFolder}')
+    expect(LIST).toContain('onMoveFolders={handleMoveFolders}')
     expect(LIST_TABLE).toContain('フォルダ')
     expect(LIST_TABLE).toContain('className="v6-select')
-    expect(LIST_TABLE).toContain("onMoveFolder?.(s.id, event.target.value)")
+    expect(LIST_TABLE).toContain("label: 'フォルダを移動'")
+    expect(LIST_TABLE).toContain('onMoveFolders(moveIds, moveDraft)')
   })
 
   it('「今月作成」は日本時間の月初を共通一覧APIへ渡して絞り込む', () => {

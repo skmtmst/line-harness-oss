@@ -109,7 +109,7 @@ describe('画面に「準備中」を置かない', () => {
     // 数え漏れ（読む場所を間違えて 0 件になる）だけを見張る。
     // ちょうどの枚数は画面が増えるたびに動くので、下限をゆるく取る。
     expect(FILES.length).toBeGreaterThan(300)
-    expect(FILES.filter((f) => /^app\/.*\/page\.tsx$/.test(f.p) || f.p === 'app/page.tsx')).toHaveLength(183)  // 2026-09-20: 最新開発版と運営専用ナレッジ（37-11）を統合した後の実測値。
+    expect(FILES.filter((f) => /^app\/.*\/page\.tsx$/.test(f.p) || f.p === 'app/page.tsx')).toHaveLength(184)  // 情報欄の編集画面と運営専用ナレッジ（37-11）を含む実測値。
   })
 
   it('共通部品に「準備中」が1つも無い', () => {

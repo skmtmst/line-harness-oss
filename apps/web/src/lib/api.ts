@@ -596,6 +596,36 @@ export type FriendFieldMigrationPreview = {
   previewExpiresAt: string | null
 }
 
+/** GET /api/field-migrations/:runId の返り値。実行状況と失敗行を画面へ出す。 */
+export type FriendFieldMigrationRun = {
+  runId: string
+  sourceFieldId: string
+  targetFieldId: string
+  status: 'previewed' | 'queued' | 'running' | 'partial' | 'succeeded' | 'failed' | 'stale'
+  summary: {
+    total: number
+    convertible: number
+    review: number
+    invalid: number
+    processed: number
+    succeeded: number
+    failed: number
+  }
+  usageTargets: unknown
+  rows: Array<{
+    friendId: string
+    sourceValue: string
+    convertedValue: string | null
+    status: string
+    reason: string | null
+  }>
+  previewExpiresAt: string | null
+  rollbackDeadline: string | null
+  error: string | null
+  createdAt: string
+  updatedAt: string
+}
+
 export type SupportMarkListItem = SupportMark & {
   friendCount: number
   automationRules: SupportMarkAutomationRule[]
@@ -2920,6 +2950,8 @@ export type ListStats = {
     inUse: number
     unanswered: number
     inProgress: number
+    /** 受信箱の「保留」トーク数。未対応割合の母数に入れる（#1014 ATTR-21）。 */
+    onHold: number
     resolved: number
     changedLast7: number
   }
@@ -4325,6 +4357,11 @@ export interface UidMigrationRun {
   completedAt: string | null
   rolledBackAt: string | null
   failureReason: string | null
+  /**
+   * 完了、または一部失敗で反映済みの行がある = 切り戻せる。
+   * 口が返さない古い応答では undefined になるため `=== true` で扱う。
+   */
+  rollbackable?: boolean
   items?: UidMigrationItem[]
 }
 
@@ -4757,6 +4794,7 @@ export type OpsSupportDraft = { body: string; aiGenerated: boolean; generatedAt:
 export type OpsKnowledgeReviewState = 'pending' | 'approved' | 'needs_review' | 'dismissed'
 export type OpsKnowledgeInput = { title: string; question: string; answer: string; kind: HqSupportKind; keywords: string[] }
 export type OpsKnowledgeArticle = OpsKnowledgeInput & {
+  sourceSubject?: string | null
   id: string; version: number; sourceRequestId: string; ticketNo: number | null; sourceCurrent: boolean
   reviewState: OpsKnowledgeReviewState; status: 'active' | 'disabled'; reviewReason: string
   evidence: Array<{ messageId: string; createdAt: string; authorKind: 'tenant' | 'ops'; quote: string; role: 'action' | 'result' | 'condition' }>
@@ -5186,11 +5224,34 @@ export const api = {
       fetchApi<ApiResponse<FriendFieldListSummary>>(
         `/api/friend-fields-stats?lineAccountId=${encodeURIComponent(accountId)}`,
       ),
-    /** 値は変更せず、種類を変えた場合に確認が要る友だちだけを返す。 */
-    migrationPreview: (id: string, accountId: string, targetType: FriendFieldType) =>
+    /**
+     * 値は変更せず、種類を変えた場合に確認が要る友だちだけを返す。
+     * targetFieldId を渡すと実行へ使える previewToken・期限が返る
+     * （渡さない場合は件数だけの読み取り専用確認）。
+     */
+    migrationPreview: (id: string, accountId: string, options: { targetType?: FriendFieldType; targetFieldId?: string }) =>
       fetchApi<ApiResponse<FriendFieldMigrationPreview>>(
         `/api/friend-fields/${id}/migration-preview?lineAccountId=${encodeURIComponent(accountId)}`,
-        { method: 'POST', body: JSON.stringify({ targetType }) },
+        { method: 'POST', body: JSON.stringify(options) },
+      ),
+    /**
+     * 事前確認で発行された previewToken で本移行を実行する。
+     * Idempotency-Key は確認ごとに1つだけ発行し、再送・二重実行を
+     * サーバー側で同じ実行に束ねる。
+     */
+    migrationExecute: (id: string, accountId: string, previewToken: string, idempotencyKey: string) =>
+      fetchApi<ApiResponse<{ runId: string }>>(
+        `/api/friend-fields/${id}/migrations?lineAccountId=${encodeURIComponent(accountId)}`,
+        {
+          method: 'POST',
+          headers: { 'Idempotency-Key': idempotencyKey },
+          body: JSON.stringify({ previewToken }),
+        },
+      ),
+    /** 実行の状態と失敗した行を確認する。 */
+    migrationRun: (runId: string, accountId: string) =>
+      fetchApi<ApiResponse<FriendFieldMigrationRun>>(
+        `/api/field-migrations/${runId}?lineAccountId=${encodeURIComponent(accountId)}`,
       ),
     create: (accountId: string, data: {
       name: string
@@ -5218,7 +5279,15 @@ export const api = {
       data: Partial<
         Pick<
           FriendField,
-          'name' | 'folderId' | 'defaultValue' | 'isPersonal' | 'isStarred' | 'displayOrder'
+          | 'name'
+          | 'folderId'
+          | 'defaultValue'
+          | 'isPersonal'
+          | 'isStarred'
+          | 'displayOrder'
+          | 'ecFieldPath'
+          | 'ecIsMaster'
+          | 'version'
         >
       > & { options?: string[] | null },
     ) =>
@@ -5226,6 +5295,15 @@ export const api = {
         method: 'PATCH',
         body: JSON.stringify(data),
       }),
+    /**
+     * 動かせる行だけの新しい順を1回で保存する（#1014 ATTR-02/03/04）。
+     * 隠れた行と共通項目の位置はサーバー側で保つ。
+     */
+    reorder: (accountId: string, ids: string[]) =>
+      fetchApi<ApiResponse<{ updated: number }>>(
+        `/api/friend-fields/reorder?lineAccountId=${encodeURIComponent(accountId)}`,
+        { method: 'PATCH', body: JSON.stringify({ ids }) },
+      ),
     /** 値が入っている項目は409。物理削除せず移行する。 */
     delete: (id: string, accountId: string) =>
       fetchApi<ApiResponse<null>>(
@@ -5283,6 +5361,15 @@ export const api = {
         method: 'PATCH',
         body: JSON.stringify(data),
         },
+      ),
+    /**
+     * 動かせる行だけの新しい順を1回で保存する（#1014 ATTR-02/03/04）。
+     * 共有マークへ行ごとのPATCHを送ると複製が起きるため、必ずこちらを使う。
+     */
+    reorder: (accountId: string, ids: string[]) =>
+      fetchApi<ApiResponse<{ updated: number }>>(
+        `/api/support-marks/reorder?lineAccountId=${encodeURIComponent(accountId)}`,
+        { method: 'PATCH', body: JSON.stringify({ ids }) },
       ),
     /** 影響が確認時から変わっていない場合だけ、友だちを置換してマークを保管する。 */
     delete: (id: string, accountId: string, data: {
@@ -5412,6 +5499,15 @@ export const api = {
         method: 'PATCH',
         body: JSON.stringify(data),
       }),
+    /**
+     * 動かせる検索だけの新しい順を1回で保存する（#1014 ATTR-02/03）。
+     * 他人が作った検索や絞り込みで隠れた検索の位置はサーバー側で保つ。
+     */
+    reorder: (accountId: string, ids: string[]) =>
+      fetchApi<ApiResponse<{ updated: number }>>(
+        `/api/saved-searches/reorder?lineAccountId=${encodeURIComponent(accountId)}`,
+        { method: 'PATCH', body: JSON.stringify({ ids }) },
+      ),
     delete: (id: string, accountId: string) =>
       fetchApi<ApiResponse<null>>(`/api/saved-searches/${id}?lineAccountId=${encodeURIComponent(accountId)}`, { method: 'DELETE' }),
   },
@@ -10137,6 +10233,8 @@ export const api = {
       q?: string;
       onlyDups?: boolean;
       account?: string;
+      /** FRIEND-09: UID連携の絞り込みは全件へかけるサーバー条件。 */
+      uid?: 'linked' | 'unlinked';
       page?: number;
       pageSize?: number;
       forceRefresh?: boolean;
@@ -10145,6 +10243,7 @@ export const api = {
       if (opts?.q) p.set('q', opts.q);
       if (opts?.onlyDups) p.set('onlyDups', '1');
       if (opts?.account) p.set('account', opts.account);
+      if (opts?.uid) p.set('uid', opts.uid);
       if (opts?.page) p.set('page', String(opts.page));
       if (opts?.pageSize) p.set('pageSize', String(opts.pageSize));
       if (opts?.forceRefresh) p.set('refresh', '1');
@@ -10803,16 +10902,20 @@ export const api = {
   identityCandidates: {
     list: (params: {
       kind: IdentityCandidateKind
-      status?: IdentityCandidateStatus
+      /** 'all' は状態で絞らない（FRIEND-11。「すべて」が pending だけを見せていた）。 */
+      status?: IdentityCandidateStatus | 'all'
       lineAccountId?: string
       limit?: number
       offset?: number
+      /** FRIEND-11: 名前・根拠の検索語。サーバー側で全件へかける。 */
+      q?: string
     }) => {
       const query = new URLSearchParams({ kind: params.kind })
       if (params.status) query.set('status', params.status)
       if (params.lineAccountId) query.set('lineAccountId', params.lineAccountId)
       if (params.limit !== undefined) query.set('limit', String(params.limit))
       if (params.offset !== undefined) query.set('offset', String(params.offset))
+      if (params.q) query.set('q', params.q)
       return fetchApi<ApiResponse<IdentityCandidateList>>(`/api/identity-candidates?${query.toString()}`)
     },
     get: (id: string) =>
@@ -12019,6 +12122,35 @@ export interface EventSlot {
   is_active: number;
   sort_order: number;
   active_count?: number;
+  /** 一括追加の再送防止キー。サーバーが同じイベント内で一意に扱う(#1000)。 */
+  client_key?: string | null;
+  /** 再送で既存枠に解決された場合 true。新規作成分は false。 */
+  deduplicated?: boolean;
+}
+
+/** createSlots に渡す1枠分の入力。client_key は再送を吸収するための任意キー。 */
+export interface EventSlotInput {
+  starts_at: string;
+  ends_at: string;
+  capacity: number | null;
+  is_active?: number;
+  sort_order?: number;
+  client_key?: string;
+}
+
+/**
+ * 枠の一括作成が途中のチャンクで失敗したときのエラー。
+ * `completed` には作成が確認できた分(失敗したチャンクより前)が入るので、
+ * 画面は残りだけを再送できる(#1000 DETAIL-11)。
+ */
+export class EventSlotsPartialError extends Error {
+  readonly completed: EventSlot[];
+
+  constructor(message: string, completed: EventSlot[], cause?: unknown) {
+    super(message, { cause });
+    this.name = 'EventSlotsPartialError';
+    this.completed = completed;
+  }
 }
 
 export interface EventBookingItem {
@@ -12045,6 +12177,17 @@ export interface EventBookingItem {
   companion_count?: number | null;
   is_first_time?: number | null;
   line_account_name?: string | null;
+  /**
+   * この予約に紐づく自動お知らせの予定と状態（IDEA-07）。
+   * 開催回の移動・取消で止まった分も status で返るので、
+   * 変更前後の通知と残存をこの配列から確かめられる。
+   */
+  reminders?: Array<{
+    kind: 'day_before' | 'hours_before';
+    scheduled_at: string;
+    sent_at: string | null;
+    status: 'pending' | 'sent' | 'failed' | 'failed_permanent' | 'cancelled';
+  }>;
 }
 
 export interface EventBookingSummary {
@@ -12166,16 +12309,28 @@ export const eventsApi = {
   createSlots: (
     accountId: string,
     eventId: string,
-    slots: Array<{ starts_at: string; ends_at: string; capacity: number | null; is_active?: number; sort_order?: number }>,
+    slots: EventSlotInput[],
+    options?: { operationId?: string },
   ) => (async () => {
     // 誤指定で何千件も作らないよう、総数に上限を置く(点検#520の中9)。
     // 1口400件の分割は裏側の上限に合わせたままにする。
     if (slots.length > 500) {
       throw new Error('500件を超える一括作成はできません。期間や曜日を分けて追加してください')
     }
+    /*
+      #1000 DETAIL-11: 400+1のような分割送信が途中で失敗・応答を失っても、
+      再送で成功済み分を二重登録しないよう、各枠に操作ID由来の client_key を
+      付ける。サーバーは同じイベント内の既存キーを再利用して返す。
+      日時の一意制約は正当な同時開催を壊すので使わない。
+    */
+    const keyed = slots.map((slot, index) =>
+      slot.client_key != null || !options?.operationId
+        ? slot
+        : { ...slot, client_key: `${options.operationId}:${index}` },
+    )
     const items: EventSlot[] = []
-    for (let offset = 0; offset < slots.length; offset += 400) {
-      const chunk = slots.slice(offset, offset + 400)
+    for (let offset = 0; offset < keyed.length; offset += 400) {
+      const chunk = keyed.slice(offset, offset + 400)
       try {
         const response = await fetchApi<{ items: EventSlot[] }>(
           withAccount(`/api/events/admin/events/${eventId}/slots`, accountId),
@@ -12184,7 +12339,11 @@ export const eventsApi = {
         items.push(...response.items)
       } catch (error) {
         const detail = error instanceof Error ? `（${error.message}）` : ''
-        throw new Error(`${items.length}件まで追加されました。残りを確認してから、もう一度追加してください${detail}`, { cause: error })
+        throw new EventSlotsPartialError(
+          `${items.length}件まで追加されました。残りを確認してから、もう一度追加してください${detail}`,
+          [...items],
+          error,
+        )
       }
     }
     return { items }

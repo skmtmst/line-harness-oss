@@ -399,7 +399,8 @@
     "438_rich_menu_ops.sql",
     "439_staff_email_change.sql",
     "440_conversion_draft_and_ingest.sql",
-    "441_platform_knowledge.sql"
+    "441_event_slot_client_key.sql",
+    "442_platform_knowledge.sql"
   ],
-  "migrationCount": 400
+  "migrationCount": 401
 }
