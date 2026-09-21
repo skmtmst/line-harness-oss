@@ -1271,10 +1271,32 @@ export type ConversionIngestionEvent = {
   conversionPointId: string
   result: 'recorded' | 'duplicate' | 'rejected'
   reason: string | null
+  /** IDEA-19: 検証の受信。成果表へ書かず台帳だけに残るので実績には混入しない。 */
+  isTest: boolean
   sourceEventId: string | null
   friendId: string | null
   payloadShape: Record<string, unknown> | null
   signatureSha256: string | null
+  createdAt: string
+}
+
+/**
+ * IDEA-19: 成果1件ごとの業務状態。
+ * 口が承認状態と取消台帳から導出するので、画面は組み立て直さない。
+ */
+export type ConversionDefinitionEventStatus =
+  | 'confirmed' | 'pending' | 'rejected' | 'cancelled'
+
+export type ConversionDefinitionEvent = {
+  id: string
+  friendId: string
+  friendName: string | null
+  status: ConversionDefinitionEventStatus
+  approvalStatus: 'pending' | 'approved' | 'rejected' | null
+  cancelled: boolean
+  value: number | null
+  source: string | null
+  sourceEventId: string | null
   createdAt: string
 }
 
@@ -7817,6 +7839,11 @@ export const api = {
     ingestionEvents: (id: string, limit = 50) =>
       fetchApi<ApiResponse<{ items: ConversionIngestionEvent[] }>>(
         `/api/conversions/definitions/${encodeURIComponent(id)}/ingest-events?limit=${limit}`,
+      ),
+    /** IDEA-19: 成果1件ずつの一覧(新しい順)。状態は口が導出済み。 */
+    definitionEvents: (id: string, limit = 50) =>
+      fetchApi<ApiResponse<{ items: ConversionDefinitionEvent[] }>>(
+        `/api/conversions/definitions/${encodeURIComponent(id)}/events?limit=${limit}`,
       ),
     definitionReport: (params: { from: string; to: string; lineAccountId?: string }) => {
       const query = Object.fromEntries(

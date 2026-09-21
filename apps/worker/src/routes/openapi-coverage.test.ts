@@ -170,6 +170,7 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'GET /api/common-vars/exports',
   'GET /api/common-vars/exports/{id}',
   'GET /api/common-vars/exports/{id}/download',
+  'GET /api/conversions/definitions/{id}/events',
   'GET /api/conversions/definitions/{id}/ingest-events',
   'GET /api/conversions/events',
   'GET /api/conversions/points',
