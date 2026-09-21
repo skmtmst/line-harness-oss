@@ -578,7 +578,7 @@ function SavedSearchEditInner() {
               「変更後の条件」は未計算だと分かるようにする。取れていない
               ときは計算時点を出さない（推定で埋めない）。
             */}
-            <p className="mt-1 text-[11px] text-ink-faint">
+            <p className="mt-1 text-micro text-ink-faint">
               {previewError || preview?.error
                 ? '未計算'
                 : preview?.calculatedAt

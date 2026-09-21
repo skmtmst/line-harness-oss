@@ -77,7 +77,7 @@ export function AttributeKindGuide({ current }: { current: AttributeKind }) {
             <li key={kind} className={isCurrent ? 'rounded-control bg-accent-soft p-2' : 'p-2'}>
               <p className="font-semibold text-ink">
                 {guide.label}
-                {isCurrent ? <span className="ml-1 rounded-pill bg-accent px-2 py-0.5 text-[10px] font-bold text-on-accent">この画面</span> : null}
+                {isCurrent ? <span className="ml-1 rounded-pill bg-accent-deep px-2 py-0.5 text-nano font-bold text-on-accent">この画面</span> : null}
               </p>
               <p className="mt-0.5 leading-5">{guide.holds}。{guide.useWhen}ときに選びます。</p>
               {!isCurrent ? (
