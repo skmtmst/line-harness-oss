@@ -10,6 +10,8 @@ import {
   changePreviewNotConnected,
   characterCountText,
   isChangeItem,
+  reflectionScopeText,
+  reflectionTimingText,
   reviewWarnings,
   changeSummaryText,
   hiddenText,
@@ -58,6 +60,7 @@ function impact(over: Partial<CommonVarDeleteImpact> = {}): CommonVarDeleteImpac
     total: 0,
     blockingTotal: 0,
     historicalTotal: 0,
+    sendingFixedTotal: 0,
     unscopedFormTotal: 0,
     canDelete: true,
     byKind: {
@@ -85,8 +88,21 @@ describe('保存が落ちた理由を、運用者の言葉で出す', () => {
     expect(text).toContain('LINEアカウント')
   })
 
-  it('先に別の人が保存していたら、読み直してからと言う', () => {
-    expect(saveErrorText(new ApiError(409, 'API error: 409'))).toContain('ほかの人が先に保存しました')
+  it('先に別の人が保存していたら、入力が残ることと上書きになることを言う（IDEA-14）', () => {
+    // 「読み直してから」と言うと入力が消えると読める。画面は入力を残す。
+    const text = saveErrorText(new ApiError(409, 'API error: 409'))
+    expect(text).toContain('ほかの人が先に保存しました')
+    expect(text).toContain('入力した内容は残っています')
+  })
+
+  it('確認のあとで使用先が変わった409は、確認を読み直したと言う', () => {
+    const text = saveErrorText(new ApiError(409, 'API error: 409', 'impact_usage_changed'))
+    expect(text).toContain('使用先が変わりました')
+    expect(text).not.toContain('API error')
+  })
+
+  it('確認なしの保存を止められた428は、読み直したと言う', () => {
+    expect(saveErrorText(new ApiError(428, 'API error: 428'))).toContain('影響の確認')
   })
 
   it('サーバー側の失敗は、待って試すことと連絡先を言う', () => {
@@ -161,6 +177,66 @@ describe('影響確認は、変わる場所と変わらない場所を分ける'
   })
 })
 
+describe('反映範囲は状態ごとに分け、いつ効くかを保存前に書く（IDEA-14）', () => {
+  it('変わる場所を、編集中・公開中・予約中などの状態別に数える', () => {
+    const text = reflectionScopeText(impact({
+      blockingTotal: 3,
+      items: [
+        usage({ name: '書いている途中の配信', status: '下書き' }),
+        usage({ name: '公開中のルール', status: '公開中' }),
+        usage({ name: '来週の配信', status: '配信予約中' }),
+      ],
+    }))
+    expect(text).toBe('内訳: 下書き1件・公開中1件・配信予約中1件')
+  })
+
+  it('口が知らない呼び名も、落とさず末尾へ並べる', () => {
+    const text = reflectionScopeText(impact({
+      blockingTotal: 1,
+      items: [usage({ status: '点検中' })],
+    }))
+    expect(text).toContain('点検中1件')
+  })
+
+  it('変わるものが無ければ内訳を出さない', () => {
+    expect(reflectionScopeText(impact())).toBeNull()
+  })
+
+  it('予約中があるときは「送信を始めるときの新しい値」と言う', () => {
+    const text = reflectionTimingText(impact({
+      blockingTotal: 1,
+      items: [usage({ status: '配信予約中' })],
+    }))
+    expect(text).toContain('配信予約中')
+    expect(text).toContain('送信を始めるとき')
+  })
+
+  it('予約中が無ければ、次に送る・実行されるときからとだけ言う', () => {
+    const text = reflectionTimingText(impact({
+      blockingTotal: 1,
+      items: [usage({ status: '下書き' })],
+    }))
+    expect(text).toContain('次に送る・実行されるときから')
+    expect(text).not.toContain('配信予約中')
+  })
+
+  it('送信を始めた配信と送信済みは、変わらない側として数える', () => {
+    const text = reflectionTimingText(impact({
+      blockingTotal: 1,
+      historicalTotal: 2,
+      sendingFixedTotal: 3,
+      items: [usage()],
+    }))
+    expect(text).toContain('送信を始めた配信3か所')
+    expect(text).toContain('送信済み2か所')
+    expect(text).toContain('変わりません')
+  })
+
+  it('変わるものも変わらないものも無ければ、何も書かない', () => {
+    expect(reflectionTimingText(impact())).toBeNull()
+  })
+})
+
 describe('取れないものは、取れないと書く', () => {
   /*
     2026-09-04: 変更後の文と文字数の検査は #773 でつながった。
@@ -231,10 +307,22 @@ describe('共通情報編集（uNBlA）の画面', () => {
     expect(IMPACT_REVIEW).toContain('characterCountText(item)')
   })
 
-  it('状態の語彙は口とそろえる。「公開中」は出さない（#578 L12）', () => {
-    expect(IMPACT_REVIEW).not.toContain('公開中')
+  it('状態の語彙は口とそろえ、編集中・公開中・予約中の内訳を保存前に出す（IDEA-14）', () => {
+    // 「公開中」は口（commonVarUsageStatus）が返す状態名になった。
+    // 画面は口の呼び名をそのまま数え、自分で呼び名を作らない。
     expect(IMPACT_REVIEW).toContain('配信予約中')
-    expect(EDIT).toContain('配信予約中・配信中の設定にも反映されます')
+    expect(EDIT).toContain('reflectionScopeText(impact)')
+    expect(EDIT).toContain('reflectionTimingText(impact)')
+    expect(IMPACT_SECTION).toContain('reflectionScopeText(impact)')
+    // 「配信中にも全部反映」のような、固定済み送信を直すと読める断言をしない。
+    expect(EDIT).not.toContain('配信中の設定にも反映されます')
+  })
+
+  it('競合で入力を消さない。load()ではなく版だけ取り直す（IDEA-14）', () => {
+    // load() は名前・値・メモまで初期化する。409/428で呼ぶと入力が消える。
+    const CATCH = sliceBetween(SAVE_FN, '} catch (e) {', '} finally {')
+    expect(CATCH).toContain('void refreshBaseline(item.id, accountAtRequest, e)')
+    expect(CATCH).not.toContain('void load()')
   })
 
   it('読み込めなかったときだけ再読み込みを出す', () => {
@@ -272,6 +360,7 @@ describe('変更前確認（#773 の口）', () => {
     total: items.length,
     blockingTotal: items.filter((i) => i.changesOnSave).length,
     historicalTotal: 0,
+    sendingFixedTotal: 0,
     unscopedFormTotal: 0,
     canDelete: false,
     byKind: {} as CommonVarChangeImpact['byKind'],

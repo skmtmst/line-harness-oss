@@ -26,6 +26,8 @@ import {
   changeSummaryText,
   historicalText,
   isChangeItem,
+  reflectionScopeText,
+  reflectionTimingText,
   reviewWarnings,
   hiddenText,
   immediateItems,
@@ -215,6 +217,35 @@ function EditCommonVarInner() {
     void load()
   }, [load])
 
+  /**
+   * 保存が競合したとき、**入力を残したまま**いま保存されている版へ合わせる
+   * （IDEA-14）。
+   *
+   * `load()` は名前・値・メモまで初期化するので、競合のたびに打ち直しに
+   * なり、同時編集で入力が消える。ここでは詳細と予約だけを取り直して
+   * `item`（版・いまの値・履歴・使用先）を最新へ進め、入力欄は触らない。
+   * 409応答の `currentVersion` を先に入れておくと、取り直しに失敗しても
+   * 次の保存で新しい版を名乗れる。
+   */
+  const refreshBaseline = async (varId: string, accountId: string, err?: ApiError) => {
+    const body = err?.data as { currentVersion?: unknown } | undefined
+    if (typeof body?.currentVersion === 'number' && Number.isInteger(body.currentVersion)) {
+      const currentVersion = body.currentVersion
+      setItem((prev) => (prev ? { ...prev, version: currentVersion } : prev))
+    }
+    try {
+      const [detail, scheduleList] = await Promise.all([
+        api.commonVars.detail(varId, accountId),
+        api.commonVars.schedules(varId, accountId),
+      ])
+      if (accountId !== latestAccountRef.current) return
+      if (scheduleList.success) setSchedules(scheduleList.data)
+      if (detail.success) setItem(detail.data)
+    } catch {
+      // 読み直せなくても入力は残る。版が古いままの次の保存は同じ文で断る。
+    }
+  }
+
   const save = async () => {
     if (!item || saving || !selectedAccountId) return
     const accountAtRequest = selectedAccountId
@@ -270,11 +301,14 @@ function EditCommonVarInner() {
     } catch (e) {
       // `fetchApi` は2xx以外を投げる。ここで一言にまとめてしまうと、
       // 権限が無いのか対象が消えたのかが運用者に届かない。
-      // 428・409（確認切れ・競合）は文面のまま見せ、最新を読み直す。
+      // 428・409（確認切れ・競合）では入力を消さない。いま保存されている
+      // 版だけを取り直し、打ち込んだ内容はそのまま残す（IDEA-14）。
+      // 確認画面を開いていたまま古い写しを見続けないよう畳む。
       if (e instanceof ApiError && (e.status === 428 || e.status === 409)) {
         if (accountAtRequest !== latestAccountRef.current) return
+        setShowImpactReview(false)
         setError(saveErrorText(e))
-        void load()
+        void refreshBaseline(item.id, accountAtRequest, e)
         return
       }
       setError(saveErrorText(e))
@@ -487,14 +521,27 @@ function EditCommonVarInner() {
                   />}
                 </div>
 
+                {/*
+                  保存する**前**に、変わる範囲を状態（編集中・公開中・予約中）
+                  ごとに分け、いつから効くか・何が変わらないかを示す
+                  （IDEA-14）。「配信中にも反映」とだけ言うと、値を固定済みの
+                  送信が直ると誤読されるため、実際の版管理（送信開始時の
+                  写し）と言い方をそろえる。
+                */}
                 {impactState === 'ready' && impact ? (
                   <div className="bg-status-warning-soft text-status-warning rounded-control px-4 py-3 text-sm" role="status">
-                    <p className="font-bold">
-                      保存すると、この値を差し込んでいる{impact.total.toLocaleString('ja-JP')}か所が変わります
-                    </p>
-                    <p className="mt-1 text-xs">
-                      「{item.value || '（空）'}」→「{value || '（空）'}」。配信予約中・配信中の設定にも反映されます。
-                    </p>
+                    <p className="font-bold">{changeSummaryText(impact)}</p>
+                    {value !== item.value ? (
+                      <p className="mt-1 text-xs">
+                        「{item.value || '（空）'}」→「{value || '（空）'}」
+                      </p>
+                    ) : null}
+                    {reflectionScopeText(impact) ? (
+                      <p className="mt-1 text-xs">{reflectionScopeText(impact)}</p>
+                    ) : null}
+                    {reflectionTimingText(impact) ? (
+                      <p className="mt-1 text-xs">{reflectionTimingText(impact)}</p>
+                    ) : null}
                   </div>
                 ) : null}
 
@@ -568,6 +615,16 @@ function EditCommonVarInner() {
                     <Button type="button" onClick={() => void removeSchedule(schedule.id)}>予定を削除</Button>
                   </div>
                 ))}
+                {/*
+                  予約中の扱いを保存前に明示する（IDEA-14）。いま値を保存
+                  してもこの予定は消えず、時刻になると登録した値へ変わる
+                  （applyDueCommonVarSchedules と同じ動き）。
+                */}
+                {schedules.length > 0 ? (
+                  <p className="text-ink-faint mt-3 text-xs">
+                    いま値を保存しても、この予定は消えません。予定の時刻になると、ここに登録した値へ変わります。
+                  </p>
+                ) : null}
               </section>
 
               <section className="bg-canvas rounded-card border-hairline border p-4">
@@ -635,6 +692,12 @@ function EditCommonVarInner() {
                     <>
                       <div className="border-hairline space-y-1 border-b px-4 py-3 text-xs">
                         <p className="text-ink-secondary font-semibold">{changeSummaryText(impact)}</p>
+                        {reflectionScopeText(impact) ? (
+                          <p className="text-ink-faint">{reflectionScopeText(impact)}</p>
+                        ) : null}
+                        {reflectionTimingText(impact) ? (
+                          <p className="text-ink-faint">{reflectionTimingText(impact)}</p>
+                        ) : null}
                         {historicalText(impact) ? (
                           <p className="text-ink-faint">{historicalText(impact)}</p>
                         ) : null}

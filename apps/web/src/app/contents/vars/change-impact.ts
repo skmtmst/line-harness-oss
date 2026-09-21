@@ -125,6 +125,76 @@ export function immediateItems(impact: CommonVarDeleteImpact | CommonVarChangeIm
   return impact.items.filter((item) => item.blocksDeletion)
 }
 
+/*
+ * IDEA-14: 保存する**前**に、変わる範囲を「編集中・公開中・予約中」で分けて
+ * 見せる。種類（テンプレート・配信…）だけでは、同じ配信でも書いている
+ * 途中か・予約済みかで直し方が違うため、状態ごとに数える。
+ *
+ * 呼び名は口（commonVarUsageStatus）が返すものをそのまま使い、表の
+ * 状態欄と同じ語彙で並べる。口が知らない呼び名をこちらで作らない。
+ */
+const REFLECTION_STATUS_ORDER = [
+  '下書き', '公開中', '配信予約中', '配信中', '使われています', '停止中',
+] as const
+
+/** 「変わる場所」の状態別の内訳。変わるものが無ければ出さない。 */
+export function reflectionScopeText(
+  impact: CommonVarDeleteImpact | CommonVarChangeImpact,
+): string | null {
+  const counts = new Map<string, number>()
+  for (const item of immediateItems(impact)) {
+    counts.set(item.status, (counts.get(item.status) ?? 0) + 1)
+  }
+  if (counts.size === 0) return null
+  const known = REFLECTION_STATUS_ORDER.filter((label) => counts.has(label))
+  const unknown = [...counts.keys()].filter(
+    (label) => !(REFLECTION_STATUS_ORDER as readonly string[]).includes(label),
+  )
+  return `内訳: ${[...known, ...unknown]
+    .map((label) => `${label}${counts.get(label)!.toLocaleString('ja-JP')}件`)
+    .join('・')}`
+}
+
+/**
+ * いつから新しい値になるか、そして何が変わらないか。
+ *
+ * 処理の実態（common-var-snapshot.ts・applyDueCommonVarSchedules）と
+ * そろえる。
+ * - 下書き・公開中・配信予約中のものは、送る・実行するときに値を読む。
+ *   次に動くときから新しい値が入る。
+ * - 送信を始めた配信は、開始時点の値の写しを持つので、あとから値を
+ *   直してもその配信は変わらない。
+ * - 送信済みの文も、そのときの値のまま変わらない。
+ */
+export function reflectionTimingText(
+  impact: CommonVarDeleteImpact | CommonVarChangeImpact,
+): string | null {
+  const { immediate, historical } = changeCounts(impact)
+  const fixed = impact.sendingFixedTotal
+  if (immediate === 0 && historical === 0 && fixed === 0) return null
+  const parts: string[] = []
+  if (immediate > 0) {
+    parts.push('変わる場所は、次に送る・実行されるときから新しい値が入ります。')
+    const hasScheduled = immediateItems(impact).some(
+      (item) => item.status === '配信予約中',
+    )
+    if (hasScheduled) {
+      parts.push('配信予約中のものは、送信を始めるときの新しい値で送られます。')
+    }
+  }
+  const unchanged: string[] = []
+  if (fixed > 0) {
+    unchanged.push(`送信を始めた配信${fixed.toLocaleString('ja-JP')}か所`)
+  }
+  if (historical > 0) {
+    unchanged.push(`送信済み${historical.toLocaleString('ja-JP')}か所`)
+  }
+  if (unchanged.length > 0) {
+    parts.push(`${unchanged.join('と')}は、そのときの値のまま変わりません。`)
+  }
+  return parts.join('')
+}
+
 /**
  * 保存が落ちた理由を、運用者の言葉にする。
  *
@@ -156,9 +226,22 @@ export function saveErrorText(err: unknown): string {
       return 'この共通情報は見つかりませんでした。'
         + 'ほかの人が削除したか、選んでいるLINEアカウントが違います。一覧から開き直してください。'
     case 409:
-      return 'ほかの人が先に保存しました。最新の内容を読み込んでから、もう一度お試しください。'
+      /*
+       * 編集画面は409を受けても入力欄を消さない（IDEA-14）。いま保存
+       * されている版だけを取り直し、打ち込んだ内容はそのまま残る。
+       * 「読み込んでから」と言うと入力が消えると読めるので、残ることと
+       * 上書きになることを書く。
+       */
+      if (err.code === 'impact_usage_changed') {
+        return '影響を確認したあとに使用先が変わりました。'
+          + '確認を読み直したので、内容を確かめてからもう一度保存してください。'
+      }
+      return 'ほかの人が先に保存しました。入力した内容は残っています。'
+        + 'もう一度保存すると、その内容で上書きします。'
     case 422:
       return '差し込み名は後から変えられません。名前と値だけを直してください。'
+    case 428:
+      return '保存の前に影響の確認が必要です。確認を読み直したので、もう一度保存してください。'
     case 429:
       return '短い時間に操作が集中しました。少し待ってから、もう一度お試しください。'
     default:
