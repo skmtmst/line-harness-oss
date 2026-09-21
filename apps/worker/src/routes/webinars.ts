@@ -47,6 +47,7 @@ import {
   publishWebinarEditorVersion,
   getWebinarViewSegmentCoverage,
   getWebinarParticipantOperations,
+  classifyWebinarParticipant,
   getWebinarMonitoringSummary,
   getWebinarPublicAccount,
   getWebinarActions,
@@ -66,6 +67,7 @@ import {
   type WebinarActionType,
   type WebinarEditorSettings,
   type WebinarEditorSettingsInput,
+  type WebinarParticipantClassification,
   type WebinarParticipantStat,
   getMediaById,
   getMediaIdByR2Key,
@@ -1925,15 +1927,48 @@ webinarRoutes.get('/api/webinars/:id/analytics', async (c) => {
   }
 });
 
+// 参加者の分類フィルタ。未参加=申込のみ・入場記録なし、途中離脱=入場したが
+// 完了未満、完了=最大視聴が閾値以上、計測外=外部動画などで個人視聴を
+// 取得できない人（分類しない）。
+const WEBINAR_PARTICIPANT_FILTERS = new Set<WebinarParticipantClassification>([
+  'unviewed', 'dropped_off', 'completed', 'unmeasured',
+]);
+
+async function webinarParticipantMeasurement(
+  db: D1Database,
+  webinarId: string,
+): Promise<{ measured: boolean; reason: string | null }> {
+  const editor = await getWebinarEditorSettings(db, webinarId);
+  return editor?.delivery_kind === 'external'
+    ? { measured: false, reason: '外部動画では個人の視聴区間を取得できません' }
+    : { measured: true, reason: null };
+}
+
 webinarRoutes.get(
   '/api/webinars/:id/participants',
   requireRole('owner', 'admin'),
   async (c) => {
   try {
     const id = c.req.param('id');
+    const filterRaw = c.req.query('filter');
+    if (filterRaw !== undefined && !WEBINAR_PARTICIPANT_FILTERS.has(filterRaw as WebinarParticipantClassification)) {
+      return c.json({ success: false, error: 'invalid_filter' }, 400);
+    }
+    const classification = (filterRaw ?? null) as WebinarParticipantClassification | null;
     const limit = Math.min(200, Math.max(1, Number(c.req.query('limit') ?? 50) || 50));
     const offset = Math.max(0, Number(c.req.query('cursor') ?? 0) || 0);
-    const rows = await getWebinarParticipantOperations(c.env.DB, id, limit + 1, offset);
+    const [webinar, measurement] = await Promise.all([
+      getWebinarById(c.env.DB, id),
+      webinarParticipantMeasurement(c.env.DB, id),
+    ]);
+    if (!webinar) return c.json({ success: false, error: 'Not found' }, 404);
+    const completionThresholdSeconds = Math.max(1, Math.floor(webinar.duration_seconds * 0.9));
+    const rows = await getWebinarParticipantOperations(c.env.DB, id, limit + 1, offset, {
+      durationSeconds: webinar.duration_seconds,
+      completionThresholdSeconds,
+      measured: measurement.measured,
+      classification,
+    });
     const hasNext = rows.length > limit;
     return c.json({
       success: true,
@@ -1952,8 +1987,23 @@ webinarRoutes.get(
           actionStatus: row.action_status,
           errorDetail: row.action_error,
           staffIntegrationStatus: row.integration_status,
+          classification: classifyWebinarParticipant(row, {
+            measured: measurement.measured,
+            completionThresholdSeconds,
+          }),
+          liveSessions: Number(row.live_sessions),
+          replaySessions: Number(row.replay_sessions),
+          lastJoinKind: row.last_join_kind,
         })),
         nextCursor: hasNext ? String(offset + limit) : null,
+        // 分類の根拠を応答へ載せ、画面側が推測で別ルールを作らないようにする。
+        measurement: measurement.measured
+          ? { state: 'available' as const, reason: null }
+          : { state: 'unavailable' as const, reason: measurement.reason },
+        rule: {
+          completionThresholdSeconds,
+          durationSeconds: webinar.duration_seconds,
+        },
       },
     });
   } catch (err) {
@@ -1970,13 +2020,37 @@ function csvCell(value: unknown): string {
   return `"${text.replaceAll('"', '""')}"`;
 }
 
+const WEBINAR_CLASSIFICATION_LABELS: Record<WebinarParticipantClassification, string> = {
+  unviewed: '未参加',
+  dropped_off: '途中離脱',
+  completed: '視聴完了',
+  unmeasured: '計測外',
+};
+
 webinarRoutes.get(
   '/api/webinars/:id/participants.csv',
   requireRole('owner', 'admin'),
   async (c) => {
     try {
       const id = c.req.param('id');
-      const participants = await getWebinarParticipantStats(c.env.DB, id, 10_000);
+      const filterRaw = c.req.query('filter');
+      if (filterRaw !== undefined && !WEBINAR_PARTICIPANT_FILTERS.has(filterRaw as WebinarParticipantClassification)) {
+        return c.json({ success: false, error: 'invalid_filter' }, 400);
+      }
+      const classification = (filterRaw ?? null) as WebinarParticipantClassification | null;
+      const [webinar, measurement] = await Promise.all([
+        getWebinarById(c.env.DB, id),
+        webinarParticipantMeasurement(c.env.DB, id),
+      ]);
+      if (!webinar) return c.json({ success: false, error: 'Not found' }, 404);
+      const completionThresholdSeconds = Math.max(1, Math.floor(webinar.duration_seconds * 0.9));
+      // 申込だけで入場していない人も含めて書き出す（未参加の絞り込み先に使える）。
+      const participants = await getWebinarParticipantOperations(c.env.DB, id, 10_000, 0, {
+        durationSeconds: webinar.duration_seconds,
+        completionThresholdSeconds,
+        measured: measurement.measured,
+        classification,
+      });
       const rows = participants.map((participant) => [
         participant.friend_name ?? '',
         participant.first_joined_at,
@@ -1985,9 +2059,15 @@ webinarRoutes.get(
         participant.registered ? '申込あり' : '申込なし',
         participant.cta_clicked_at ? 'クリック済み' : '未クリック',
         participant.form_submitted_at ? '送信済み' : '未送信',
+        WEBINAR_CLASSIFICATION_LABELS[classifyWebinarParticipant(participant, {
+          measured: measurement.measured,
+          completionThresholdSeconds,
+        })],
+        participant.live_sessions,
+        participant.replay_sessions,
       ].map(csvCell).join(','));
       const csv = [
-        ['参加者', '初回視聴', '最終視聴', '最大視聴秒数', '申込', 'CTA', 'フォーム'].map(csvCell).join(','),
+        ['参加者', '初回視聴', '最終視聴', '最大視聴秒数', '申込', 'CTA', 'フォーム', '分類', 'ライブ参加回数', '録画視聴回数'].map(csvCell).join(','),
         ...rows,
       ].join('\r\n');
       auditLog(c, 'webinar.participant.export', { kind: 'webinar', id });

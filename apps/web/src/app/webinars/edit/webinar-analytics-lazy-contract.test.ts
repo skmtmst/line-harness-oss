@@ -19,8 +19,8 @@ describe('V6 ウェビナー編集の集計の遅延読み込みの契約', () =
   it('参加者一覧はカーソルで最後まで読め、コメントとは取り口を分ける', () => {
     // 参加者口は staff には 403 が返る(N-118)。403 を個別に捌く。
     // 一覧は nextCursor を辿って全員分まで読める。8件どまりに戻さない。
-    expect(PAGE).toContain('webinarApi.participants(webinarId, undefined, PARTICIPANTS_PAGE_SIZE)')
-    expect(PAGE).toContain('webinarApi.participants(webinarId, nextCursor, PARTICIPANTS_PAGE_SIZE)')
+    expect(PAGE).toContain('webinarApi.participants(webinarId, undefined, PARTICIPANTS_PAGE_SIZE, participantFilter || undefined)')
+    expect(PAGE).toContain('webinarApi.participants(webinarId, nextCursor, PARTICIPANTS_PAGE_SIZE, participantFilter || undefined)')
     expect(PAGE).toContain('loadMoreParticipants')
     /*
       コメントは参加者・集計と一緒に取らない。片方の失敗でもう片方が

@@ -2,6 +2,10 @@ import { Hono } from 'hono';
 import type { Env } from '../index.js';
 import { describe, expect, test, beforeEach, vi } from 'vitest';
 
+// 分類は純粋関数なので実物を差す。ロジックを試験側へ複写すると
+// 実装と乖離しても気づけないため。
+const realDb = await vi.importActual<typeof import('@line-crm/db')>('@line-crm/db');
+
 const dbMocks = {
   getWebinars: vi.fn(),
   getWebinarList: vi.fn(),
@@ -58,6 +62,7 @@ const dbMocks = {
   publishWebinarEditorVersion: vi.fn(),
   getWebinarViewSegmentCoverage: vi.fn(),
   getWebinarParticipantOperations: vi.fn(),
+  classifyWebinarParticipant: realDb.classifyWebinarParticipant,
   getWebinarMonitoringSummary: vi.fn(),
   getWebinarPublicAccount: vi.fn(),
   formBelongsToLineAccount: vi.fn(),
@@ -1437,7 +1442,7 @@ describe('admin CRUD', () => {
     dbMocks.getWebinarCtas.mockResolvedValue([{ id: 'cta-1' }, { id: 'cta-2' }]);
 
     const res = await adminReq('/api/webinars/w1/editor');
-    const body = (await res.json()) as { data: Record<string, any> };
+    const body = (await res.json()) as { data: Record<string, unknown> };
 
     expect(res.status).toBe(200);
     expect(body.data).toMatchObject({
@@ -1703,15 +1708,21 @@ describe('admin CRUD', () => {
 
   test('参加者CSVは個人データを式として実行させず書き出す', async () => {
     dbMocks.getWebinarById.mockResolvedValue(makeWebinar());
-    dbMocks.getWebinarParticipantStats.mockResolvedValue([{
+    dbMocks.getWebinarParticipantOperations.mockResolvedValue([{
       friend_id: 'friend-1', friend_name: '=HYPERLINK("https://bad.example")', picture_url: null,
       sessions: 1, first_joined_at: '2026-09-06T10:00:00+09:00', latest_joined_at: '2026-09-06T10:30:00+09:00',
       max_watched_seconds: 1800, cta_clicked_at: null, registered: 1, form_submitted_at: null,
+      action_status: null, action_error: null, integration_status: 'pending',
+      live_sessions: 1, replay_sessions: 0, last_join_kind: 'live',
     }]);
     const res = await adminReq('/api/webinars/w1/participants.csv');
     expect(res.status).toBe(200);
     expect(res.headers.get('content-type')).toContain('text/csv');
-    expect(await res.text()).toContain("'=HYPERLINK")
+    const text = await res.text();
+    expect(text).toContain("'=HYPERLINK")
+    // 分類・ライブ/録画の列が出る（IDEA-10: 分類の根拠と区別をCSVでも確認できる）。
+    expect(text).toContain('分類');
+    expect(text).toContain('途中離脱');
   });
 
   test('PUT /api/webinars/:id — 空 title は 400 で updateWebinar が呼ばれない', async () => {
