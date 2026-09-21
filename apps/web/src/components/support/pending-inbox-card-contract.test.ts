@@ -22,14 +22,40 @@ function code(source: string): string {
 describe('対応が必要な受信の読込失敗', () => {
   it('失敗を別の状態として持ち、「なし」と言い切らない', () => {
     const body = code(CARD)
-    expect(body).toContain('const [loadFailed, setLoadFailed]')
-    expect(body).toContain('setLoadFailed(true)')
-    expect(body).toContain('setLoadFailed(false)')
+    // DASH-24/A01-06: 失敗・権限なし・読込中・0件を別々の状態として持つ。
+    expect(body).toContain('const [loadFailure, setLoadFailure]')
+    expect(body).toContain("setLoadFailure('error')")
+    expect(body).toContain('setLoadFailure(null)')
     // 「なし」の文の前に、失敗の枝があること。
     const empty = body.indexOf('返信を待っている問い合わせはありません')
     expect(empty).toBeGreaterThan(-1)
     const before = body.slice(0, empty)
-    expect(before.lastIndexOf('loadFailed')).toBeGreaterThan(-1)
+    expect(before.lastIndexOf('loadFailure')).toBeGreaterThan(-1)
+  })
+
+  it('読込中と権限なしを 0件・失敗 と区別する（A01-06）', () => {
+    const body = code(CARD)
+    expect(body).toContain('loading && !summary')
+    expect(body).toContain("loadFailure === 'forbidden'")
+    expect(body).toContain('STATE_TEXT.forbiddenView')
+  })
+
+  it('成功後の更新失敗は古い値のまま読み直しを出す（DASH-24）', () => {
+    const body = code(CARD)
+    expect(body).toContain('loadFailure && summary')
+    expect(body).toContain('最終更新')
+  })
+
+  it('表示件数を担当者ごとに保存・復元する（DASH-25）', () => {
+    const body = code(CARD)
+    expect(body).toContain('lh_pending_inbox_page_size:')
+    expect(body).toContain('api.staff.me()')
+  })
+
+  it('遅れた古い応答が最新を上書きしない（DASH-23）', () => {
+    const body = code(CARD)
+    expect(body).toContain('loadSeq.current')
+    expect(body).toContain('seq !== loadSeq.current')
   })
 
   it('取れていないときは読み直しを出し、再試行は既存の読込を呼ぶだけ', () => {

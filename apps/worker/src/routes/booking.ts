@@ -4732,9 +4732,17 @@ booking.get('/api/booking/admin/requests-summary', async (c) => {
             SUM(CASE WHEN substr(datetime(starts_at, '+9 hours'), 1, 7) = ? AND status IN ('cancelled','rejected','no_show') THEN 1 ELSE 0 END) AS month_cancelled,
             SUM(CASE WHEN substr(datetime(starts_at, '+9 hours'), 1, 7) = ? THEN 1 ELSE 0 END) AS last_month_total,
             SUM(CASE WHEN date(datetime(starts_at, '+9 hours')) = ? THEN 1 ELSE 0 END) AS today_total,
+            /*
+             * ダッシュボードの「今日の予約」カードが使う専用集計（A01-04）。
+             * 明細取得の上限(100件)に引っ張られず、取消・完了・無断を除いた
+             * 「今日対応する予約」の総数を返す。
+             */
+            SUM(CASE WHEN date(datetime(starts_at, '+9 hours')) = ?
+                     AND status NOT IN ('rejected','cancelled','canceled','completed','no_show')
+                     THEN 1 ELSE 0 END) AS today_active_total,
             SUM(CASE WHEN date(datetime(starts_at, '+9 hours')) BETWEEN ? AND ? THEN 1 ELSE 0 END) AS week_total
        FROM bookings WHERE line_account_id = ?`,
-  ).bind(thisMonth, thisMonth, thisMonth, lastMonth, today, today, weekTo, accountId).first<Record<string, number>>();
+  ).bind(thisMonth, thisMonth, thisMonth, lastMonth, today, today, today, weekTo, accountId).first<Record<string, number>>();
   const byMenu = await c.env.DB.prepare(
     `SELECT m.name, COUNT(*) AS total FROM bookings b
        INNER JOIN menus m ON m.id = b.menu_id
@@ -4744,7 +4752,9 @@ booking.get('/api/booking/admin/requests-summary', async (c) => {
     total: Number(totals?.total ?? 0), requested: Number(totals?.requested ?? 0),
     monthTotal: Number(totals?.month_total ?? 0), monthConfirmed: Number(totals?.month_confirmed ?? 0),
     monthCancelled: Number(totals?.month_cancelled ?? 0), lastMonthTotal: Number(totals?.last_month_total ?? 0),
-    todayTotal: Number(totals?.today_total ?? 0), weekTotal: Number(totals?.week_total ?? 0),
+    todayTotal: Number(totals?.today_total ?? 0),
+    todayActiveTotal: Number(totals?.today_active_total ?? 0),
+    weekTotal: Number(totals?.week_total ?? 0),
     byMenu: byMenu.results.map((row) => ({ name: row.name, total: Number(row.total) })),
   });
 });

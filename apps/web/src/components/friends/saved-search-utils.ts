@@ -261,6 +261,7 @@ export type SavedSearchConditionLabels = {
   marks?: Readonly<Record<string, string>>
   scenarios?: Readonly<Record<string, string>>
   fields?: Readonly<Record<string, string>>
+  assignees?: Readonly<Record<string, string>>
 }
 
 const CHAT_STATUS_LABELS: Readonly<Record<string, string>> = {
@@ -286,6 +287,28 @@ function singleDateLabel(condition: SavedSearchCondition, name: string): string 
   return `${name}を指定`
 }
 
+/*
+ * 友だち情報欄の値に使う比較方法の呼び名。
+ * `SAVED_SEARCH_FIELD_OPS`（packages/shared）と1対1。編集画面が
+ * 10演算子すべてを作れるので、eq/ne 以外も誤った文言で出さない
+ * （IDEA-04：変更前後の条件をそのまま読める形で出す）。
+ */
+const FIELD_OP_LABELS: Readonly<Record<string, string>> = {
+  eq: 'が次と同じ',
+  equals: 'が次と同じ',
+  ne: 'が次と異なる',
+  not_equals: 'が次と異なる',
+  contains: 'が次を含む',
+  not_contains: 'が次を含まない',
+  gte: 'が次以上',
+  gt: 'がより大きい',
+  lte: 'が以下',
+  lt: 'がより小さい',
+}
+
+/** 「〜が無い」系の存在確認の否定形。has/eq は旧形式の互換名。 */
+const NEGATED_OPS = new Set(['not_exists', 'not_has', 'excludes', 'ne', 'not_equals'])
+
 /** 保存値のIDや演算子を画面へ露出させず、運用者が読める条件にする。 */
 export function describeSavedCondition(
   condition: SavedSearchCondition,
@@ -296,30 +319,37 @@ export function describeSavedCondition(
   const value = condition.kind === 'tag'
     ? tags.find((tag) => tag.id === raw)?.name ?? (raw ? '選択済みのタグ' : '')
     : raw
-  if (condition.kind === 'tag') return `タグ ${condition.op === 'excludes' ? 'を含まない' : 'を含む'}「${value || '未指定'}」`
-  if (condition.kind === 'name') return `名前に「${value || '未指定'}」を含む`
+  if (condition.kind === 'tag') return `タグ ${NEGATED_OPS.has(condition.op) ? 'を含まない' : 'を含む'}「${value || '未指定'}」`
+  if (condition.kind === 'name') return condition.op === 'eq' ? `名前が「${value || '未指定'}」` : `名前に「${value || '未指定'}」を含む`
   if (condition.kind === 'field') {
     const fieldName = condition.key
       ? labels.fields?.[condition.key] ?? '選択済みの友だち情報'
       : '項目未指定'
-    return `${fieldName} ${condition.op === 'ne' ? 'が次と異なる' : 'が次と同じ'}「${value || '未指定'}」`
+    if (condition.op === 'exists' || condition.op === 'has') return `${fieldName} が登録あり`
+    if (condition.op === 'not_exists' || condition.op === 'not_has') return `${fieldName} が未登録`
+    return `${fieldName} ${FIELD_OP_LABELS[condition.op] ?? 'が次と同じ'}「${value || '未指定'}」`
   }
-  if (condition.kind === 'status_message') return `ステータスメッセージに「${value || '未指定'}」を含む`
+  if (condition.kind === 'status_message') return condition.op === 'eq' ? `ステータスメッセージが「${value || '未指定'}」` : `ステータスメッセージに「${value || '未指定'}」を含む`
   if (condition.kind === 'mark') return `対応マークが「${labels.marks?.[raw] ?? (raw ? '選択済みの対応マーク' : '未指定')}」`
   if (condition.kind === 'scenario') return `シナリオが「${labels.scenarios?.[raw] ?? (raw ? '選択済みのシナリオ' : '未指定')}」`
+  if (condition.kind === 'assignee') {
+    const assigneeName = labels.assignees?.[raw] ?? (raw ? '選択済みの担当者' : '未指定')
+    return NEGATED_OPS.has(condition.op) ? `担当者が「${assigneeName}」以外` : `担当者が「${assigneeName}」`
+  }
   if (condition.kind === 'chat_status') return `対応状況が「${CHAT_STATUS_LABELS[raw] ?? (raw ? '選択済みの状態' : '未指定')}」`
   if (condition.kind === 'following') return condition.value === true ? '友だち中' : 'ブロック済み'
   if (condition.kind === 'created_at') return singleDateLabel(condition, '友だち追加日')
   if (condition.kind === 'last_activity') return singleDateLabel(condition, '最終反応日')
-  if (condition.kind === 'event_booking') return 'イベント予約がある'
-  if (condition.kind === 'calendar_booking') return 'カレンダー予約がある'
-  if (condition.kind === 'reminder') return 'リマインダがある'
+  if (condition.kind === 'event_booking') return NEGATED_OPS.has(condition.op) ? 'イベント予約がない' : 'イベント予約がある'
+  if (condition.kind === 'calendar_booking') return NEGATED_OPS.has(condition.op) ? 'カレンダー予約がない' : 'カレンダー予約がある'
+  if (condition.kind === 'reminder') return NEGATED_OPS.has(condition.op) ? 'リマインダがない' : 'リマインダがある'
   if (condition.kind === 'memo') {
-    if (condition.op === 'exists') return '個別メモがある'
-    if (condition.op === 'not_exists') return '個別メモがない'
+    if (condition.op === 'exists' || condition.op === 'has') return '個別メモがある'
+    if (condition.op === 'not_exists' || condition.op === 'not_has') return '個別メモがない'
+    if (condition.op === 'eq' || condition.op === 'equals') return `個別メモが「${value || '未指定'}」`
     return `個別メモに「${value || '未指定'}」を含む`
   }
-  if (condition.kind === 'common_event') return `その他のイベント「${value || '未指定'}」がある`
+  if (condition.kind === 'common_event') return NEGATED_OPS.has(condition.op) ? `その他のイベント「${value || '未指定'}」がない` : `その他のイベント「${value || '未指定'}」がある`
   if (condition.kind === 'form') return '回答フォーム（未接続）'
   if (condition.kind === 'purchase') return '購入履歴（未接続）'
   return '条件を確認できません'

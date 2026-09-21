@@ -1044,6 +1044,61 @@ export type RichMenuScheduleInput = {
   restoreGroupId?: string | null
 }
 
+/** 公開run1件。版の要約・状態・試行に使ったLINE ID・最終エラー。 */
+export type RichMenuPublishRun = {
+  id: string
+  status: 'running' | 'succeeded' | 'failed'
+  lastErrorCode: string | null
+  idempotencyKey: string
+  requestedByStaffId: string
+  createdAt: string
+  updatedAt: string
+  version: {
+    name: string | null
+    chatBarText: string | null
+    pageCount: number | null
+    /** その版が「誰に出る版」だったか。読めないスナップショットでは null。 */
+    isDefaultForAll: boolean | null
+    targetingEnabled: boolean | null
+  }
+  pages: Array<{
+    pageId: string
+    orderIndex: number
+    newRichMenuId: string
+    oldRichMenuId: string | null
+  }>
+}
+
+/**
+ * 公開履歴の応答。`published` はいま対象へ出ている版（最後に成功したrun）、
+ * `draftDiffersFromPublished` は編集中の下書きが公開版と違うか。
+ */
+export type RichMenuPublishRunsResponse = {
+  runs: RichMenuPublishRun[]
+  published: RichMenuPublishRun | null
+  draftDiffersFromPublished: boolean | null
+}
+
+/** 本人LINEへのテスト適用1件。 */
+export type RichMenuTestApplyItem = {
+  id: string
+  status: string
+  previousRichMenuId: string | null
+  /** 適用前の表示を記録できたか。false の失敗は本人の表示を変えていない。 */
+  previousCaptured: boolean
+  appliedRichMenuId: string | null
+  lastErrorCode: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+/** revert が本人の表示に何をしたか。 */
+export type RichMenuTestApplyUserMenuAction =
+  | 'restored'
+  | 'already_restored'
+  | 'left_as_is'
+  | 'untouched'
+
 /**
  * 対応マークの自動変更ルール（設計 `GMvBd` 4-3-A）。
  *
@@ -1216,10 +1271,32 @@ export type ConversionIngestionEvent = {
   conversionPointId: string
   result: 'recorded' | 'duplicate' | 'rejected'
   reason: string | null
+  /** IDEA-19: 検証の受信。成果表へ書かず台帳だけに残るので実績には混入しない。 */
+  isTest: boolean
   sourceEventId: string | null
   friendId: string | null
   payloadShape: Record<string, unknown> | null
   signatureSha256: string | null
+  createdAt: string
+}
+
+/**
+ * IDEA-19: 成果1件ごとの業務状態。
+ * 口が承認状態と取消台帳から導出するので、画面は組み立て直さない。
+ */
+export type ConversionDefinitionEventStatus =
+  | 'confirmed' | 'pending' | 'rejected' | 'cancelled'
+
+export type ConversionDefinitionEvent = {
+  id: string
+  friendId: string
+  friendName: string | null
+  status: ConversionDefinitionEventStatus
+  approvalStatus: 'pending' | 'approved' | 'rejected' | null
+  cancelled: boolean
+  value: number | null
+  source: string | null
+  sourceEventId: string | null
   createdAt: string
 }
 
@@ -3592,6 +3669,11 @@ export type DashboardOverview = {
       used: number | null
       limit: number | null
       remaining: number | null
+      /**
+       * LINE が「上限なし」（type=none）を返した契約。limit=null の
+       * 取得失敗・未接続と区別する（DASH-08）。段階配備中の旧Workerでは未返却。
+       */
+      unlimited?: boolean
     }>
     friendTrend: DashboardMetric<DashboardFriendTrendPoint[]>
     officialProfileUrl: DashboardMetric<string>
@@ -3923,6 +4005,11 @@ export type EcShipmentList = {
   later: EcShipment[]
   soonCount: number
   laterCount: number
+  /**
+   * 今日が出荷予定の総数。明細の limit で切る前の走査全件から数える（DASH-22）。
+   * 段階配備中の旧Workerでは未返却。その場合は画面側が返った明細から数える。
+   */
+  todayCount?: number
   scanned: number
   scanLimit: number
 }
@@ -7792,6 +7879,11 @@ export const api = {
       fetchApi<ApiResponse<{ items: ConversionIngestionEvent[] }>>(
         `/api/conversions/definitions/${encodeURIComponent(id)}/ingest-events?limit=${limit}`,
       ),
+    /** IDEA-19: 成果1件ずつの一覧(新しい順)。状態は口が導出済み。 */
+    definitionEvents: (id: string, limit = 50) =>
+      fetchApi<ApiResponse<{ items: ConversionDefinitionEvent[] }>>(
+        `/api/conversions/definitions/${encodeURIComponent(id)}/events?limit=${limit}`,
+      ),
     definitionReport: (params: { from: string; to: string; lineAccountId?: string }) => {
       const query = Object.fromEntries(
         Object.entries(params)
@@ -10525,24 +10617,11 @@ export const api = {
         warnings: string[];
       }>>(`/api/rich-menu-groups/${groupId}/unpublish`, { method: 'POST' }),
 
-    /** N-151: 公開runの履歴。版・状態・試行・最終エラー・LINE IDを返す。 */
+    /** N-151: 公開runの履歴と「いま出ている版」。下書きとの差分フラグも返す。 */
     publishRuns: (groupId: string) =>
-      fetchApi<ApiResponse<Array<{
-        id: string;
-        status: 'running' | 'succeeded' | 'failed';
-        lastErrorCode: string | null;
-        idempotencyKey: string;
-        requestedByStaffId: string;
-        createdAt: string;
-        updatedAt: string;
-        version: { name: string | null; chatBarText: string | null; pageCount: number | null };
-        pages: Array<{
-          pageId: string;
-          orderIndex: number;
-          newRichMenuId: string;
-          oldRichMenuId: string | null;
-        }>;
-      }>>>(`/api/rich-menu-groups/${groupId}/publish-runs`),
+      fetchApi<ApiResponse<RichMenuPublishRunsResponse>>(
+        `/api/rich-menu-groups/${groupId}/publish-runs`,
+      ),
 
     /** N-151: 失敗したrunだけを、保存された版のまま再試行する。 */
     retryPublishRun: (groupId: string, requestId: string) =>
@@ -10583,21 +10662,15 @@ export const api = {
         effective: { value: number | null; state: 'available' | 'unavailable'; reason: string | null };
       }>>(`/api/rich-menu-groups/${groupId}/audience-summary`),
 
-    /** N-152: 本人LINEへのテスト適用の状態。連携済みか・適用中かを返す。 */
+    /** N-152: 本人LINEへのテスト適用の状態。連携済みか・適用中か・宛先を返す。 */
     testApplyState: (groupId: string) =>
       fetchApi<ApiResponse<{
         linked: boolean;
         linkGuidance: string | null;
-        active: {
-          id: string; status: string; previousRichMenuId: string | null;
-          appliedRichMenuId: string | null; lastErrorCode: string | null;
-          createdAt: string; updatedAt: string;
-        } | null;
-        recent: Array<{
-          id: string; status: string; previousRichMenuId: string | null;
-          appliedRichMenuId: string | null; lastErrorCode: string | null;
-          createdAt: string; updatedAt: string;
-        }>;
+        /** 宛先の明示。連携済みの本人LINEだけ。未連携なら null。 */
+        destination: { staffName: string | null; lineUserIdMasked: string } | null;
+        active: RichMenuTestApplyItem | null;
+        recent: RichMenuTestApplyItem[];
       }>>(`/api/rich-menu-groups/${groupId}/test-apply`),
 
     /** N-152: 本人確認済みLINEへテスト適用する。confirm: true が必須。 */
@@ -10613,7 +10686,9 @@ export const api = {
 
     /** N-152: テスト適用を取り消して適用前のメニューへ戻す。冪等。 */
     testApplyRevert: (groupId: string, idempotencyKey: string, applyId?: string) =>
-      fetchApi<ApiResponse<{ id: string; status: string }>>(
+      fetchApi<ApiResponse<
+        RichMenuTestApplyItem & { userMenuAction?: RichMenuTestApplyUserMenuAction }
+      >>(
         `/api/rich-menu-groups/${groupId}/test-apply/revert`,
         {
           method: 'POST',
@@ -12053,6 +12128,11 @@ export const bookingApi = {
       monthCancelled: number
       lastMonthTotal: number
       todayTotal: number
+      /**
+       * 取消・完了・無断を除いた「今日対応する予約」の総数（A01-04）。
+       * 明細取得の上限100件に引っ張られない。段階配備中の旧Workerでは未返却。
+       */
+      todayActiveTotal?: number
       weekTotal: number
       byMenu: Array<{ name: string; total: number }>
     }>(withAccount(`/api/booking/admin/requests-summary?${query.toString()}`, accountId))

@@ -566,6 +566,30 @@ const spec = {
       },
     },
     // ── NEN Members (会員ランク・ライフタイム・マイル ★V6 37-1) ──────────────
+    '/api/public/nen/adopted-photos': {
+      get: {
+        tags: ['NEN Members'],
+        summary: '公開許可済みでサイト掲載中の採用写真を取得',
+        security: [],
+        parameters: [
+          {
+            name: 'lineAccountId', in: 'query', required: false,
+            description: '内部LINEアカウントID。officialAccountBasicIdと両方指定した場合は同じアカウントであることが必要',
+            schema: { type: 'string' },
+          },
+          {
+            name: 'officialAccountBasicId', in: 'query', required: false,
+            description: 'LINE公式アカウントのBasic ID。前後の空白を除いた完全一致で、有効かつ未アーカイブの一意なアカウントだけを選択',
+            schema: { type: 'string' },
+          },
+        ],
+        responses: {
+          '200': { description: 'Public photos for the selected LINE account' },
+          '400': { description: 'Selector missing or selectors do not match' },
+          '404': { description: 'No unique active LINE account matches the Basic ID' },
+        },
+      },
+    },
     '/api/nen/rank-settings': {
       get: {
         tags: ['NEN Members'], summary: '会員ランク設定（ランク・決まり方・ライフタイムの節目・数値）を取得',
@@ -3047,13 +3071,32 @@ const spec = {
         tags: ['Conversions'],
         summary: '外部受信の成否履歴',
         description: '受け取った/再送/拒否の記録。署名・本文・秘密値は含まず、'
-          + '署名のSHA-256と本文の項目名だけ残す。',
+          + '署名のSHA-256と本文の項目名だけ残す。isTest=true は検証の受信'
+          + '(成果表には書かず実績へ混入しない)。',
         parameters: [
           { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
           { name: 'limit', in: 'query', required: false, schema: { type: 'integer', minimum: 1, maximum: 200, default: 50 } },
         ],
         responses: {
           '200': { description: '受信の成否履歴(新しい順)' },
+          '404': { description: '見えない・存在しない成果地点' },
+        },
+      },
+    },
+    '/api/conversions/definitions/{id}/events': {
+      get: {
+        tags: ['Conversions'],
+        summary: '成果1件ずつの一覧',
+        description: 'IDEA-19: 成果名の下に1件ごとの状態を返す。status は'
+          + ' confirmed(確定)/pending(確認待ち)/rejected(却下)/cancelled(取消)で、'
+          + '承認状態と取消台帳から導出済み。検証の受信は成果表へ書かないため'
+          + 'この一覧には本番実績だけが並ぶ。',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'limit', in: 'query', required: false, schema: { type: 'integer', minimum: 1, maximum: 200, default: 50 } },
+        ],
+        responses: {
+          '200': { description: '成果の一覧(新しい順)' },
           '404': { description: '見えない・存在しない成果地点' },
         },
       },
@@ -3078,6 +3121,11 @@ const spec = {
                   lineUserId: { type: 'string' },
                   value: { type: ['number', 'null'] },
                   metadata: { type: 'object' },
+                  test: {
+                    type: 'boolean',
+                    description: 'true のとき検証の受信。同じ検査を通るが成果表には書かず、'
+                      + '受信履歴にだけ残る(売上・報酬・集計へ混入しない)',
+                  },
                 },
               },
             },

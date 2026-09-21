@@ -35,6 +35,9 @@ export type ShipmentSummary = {
   today: number
   soon: number
   later: number
+  /* 走査が上限に達したとき true。「今日 N件」が取りこぼしを含み得る目印。 */
+  scanLimited: boolean
+  scanLimit: number
 }
 
 export default function ShipmentPanel({
@@ -59,9 +62,16 @@ export default function ShipmentPanel({
         if (!r.success) throw new Error(r.error)
         setData(r.data)
         onSummaryChange?.({
-          today: r.data.soon.filter((row) => row.shipDate === r.data.today).length,
+          /*
+           * 「今日の出荷」は表示する10件ではなく、走査した全イベントからの
+           * 集計値を使う（DASH-22）。段階配備中の旧Workerは todayCount を
+           * 返さないため、その場合だけ表示中の行から数える。
+           */
+          today: r.data.todayCount ?? r.data.soon.filter((row) => row.shipDate === r.data.today).length,
           soon: r.data.soonCount,
           later: r.data.laterCount,
+          scanLimited: r.data.scanned >= r.data.scanLimit,
+          scanLimit: r.data.scanLimit,
         })
       })
       .catch(() => {
@@ -97,12 +107,9 @@ export default function ShipmentPanel({
             <button type="button" onClick={() => setAttempt((count) => count + 1)} className="mt-1 font-medium underline">もう一度読み込む</button>
           </div>
         ) : !data || (data.soonCount === 0 && data.laterCount === 0) ? (
-          <p className="py-6 text-center text-sm text-ink-faint">
-            出荷予定はまだありません。
-            <br />
-            <span className="text-xs text-ink-faint">
-              ECから注文や定期便の通知を受け取ると、ここに並びます。
-            </span>
+          /* 0件の詳細枠は1行へ縮める（A01-05）。大きな空きは「取得中」と紛らわしい。 */
+          <p className="py-4 text-center text-sm text-ink-faint">
+            出荷予定はまだありません。EC通知を受け取るとここに並びます。
           </p>
         ) : (
           <>
@@ -201,7 +208,7 @@ export default function ShipmentPanel({
 
             {/* 走査上限に張り付いているときだけ、取りこぼしがありうる旨を出す。 */}
             {data.scanned >= data.scanLimit && (
-              <p className="mt-3 text-[11px] text-gray-400">
+              <p className="text-ink-faint mt-3 text-[11px]">
                 直近{data.scanLimit}件のイベントから算出しています。それより前の予定は含まれません。
               </p>
             )}

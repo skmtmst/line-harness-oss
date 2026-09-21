@@ -400,7 +400,8 @@
     "439_staff_email_change.sql",
     "440_conversion_draft_and_ingest.sql",
     "441_event_slot_client_key.sql",
-    "442_platform_knowledge.sql"
+    "442_platform_knowledge.sql",
+    "443_conversion_ingest_test_flag.sql"
   ],
-  "migrationCount": 401
+  "migrationCount": 402
 }
