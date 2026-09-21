@@ -1215,77 +1215,121 @@ friends.get(
         return c.json({ success: false, error: 'ページ位置が正しくありません' }, 400);
       }
       const friendId = c.req.param('id');
-      // N-717: 8項のcompound SELECTはD1の SQLITE_MAX_COMPOUND_SELECT(既定5)を
-      // 超えて "too many terms in compound SELECT" になる（better-sqlite3の
-      // 既定上限は500なので手元試験は通ってしまい、D1でだけ落ちる）。
-      // 4項ずつのCTEへ割り、外側で2項のUNION ALLへまとめて5項以下に収める。
-      // UNION ALLのみを使い、順序・重複の扱いは変えていない。
+      /*
+        N-717: compound SELECTはD1の SQLITE_MAX_COMPOUND_SELECT(既定5)を超えて
+        "too many terms in compound SELECT" になる（better-sqlite3の既定上限は
+        500なので手元試験は通ってしまい、D1でだけ落ちる）。
+        4項ずつのCTEへ割り、外側でUNION ALLへまとめて5項以下に収める形を保つ。
+        IDEA-03 で注文・写真投稿を足したので、専用ソース10項を
+        group_a(4) + group_b(4) + group_c(2) の3CTEへ分け、外側は3項。
+
+        重複の扱い（IDEA-03「重複なし」）:
+        analytics_events は事実の分析用の写しで、同じ出来事が専用台帳にも
+        1行ある（受信メッセージ→messages_log、フォーム回答→form_submissions、
+        予約の確定/取消→各予約台帳、注文→ec_orders、postback→messages_log）。
+        そのevent_typeはanalytics側から外し、1つの出来事が2行出ないようにする。
+        タグ変更・シナリオ開始など専用台帳を持たないイベントはそのまま出す。
+
+        status: 出せるソースだけ状態を返す。状態を持たない行は NULL。
+        source: 元の台帳を指す {kind,id} に、遷移先で必要な親ID(form_id等)と
+        外部URL(注文詳細・投稿画像)だけを添える。行き先が無い種類は NULL のまま。
+      */
       const result = await c.env.DB.prepare(
         `WITH group_a AS (
              SELECT ml.id,
                     CASE WHEN ml.direction = 'incoming' THEN 'message_received' ELSE 'message_sent' END AS event_type,
                     CASE WHEN ml.direction = 'incoming' THEN 'メッセージを受信しました' ELSE 'メッセージを送信しました' END AS summary,
-                    'message' AS source_kind, ml.id AS source_id, ml.created_at AS occurred_at,
+                    NULL AS status,
+                    'message' AS source_kind, ml.id AS source_id,
+                    NULL AS source_parent_id, NULL AS source_url,
+                    ml.created_at AS occurred_at,
                     COALESCE(ml.line_account_id, f.line_account_id) AS line_account_id
                FROM messages_log ml JOIN friends f ON f.id = ml.friend_id
               WHERE ml.friend_id = ? AND (ml.delivery_type IS NULL OR ml.delivery_type != 'test')
              UNION ALL
-             SELECT fs.id, 'form_submitted', '回答フォームへ回答しました',
-                    'form_submission', fs.id, fs.created_at, f.line_account_id
+             SELECT fs.id, 'form_submitted', '回答フォームへ回答しました', NULL,
+                    'form_submission', fs.id, fs.form_id, NULL, fs.created_at, f.line_account_id
                FROM form_submissions fs JOIN friends f ON f.id = fs.friend_id
               WHERE fs.friend_id = ?
              UNION ALL
-             SELECT b.id, 'booking', 'カレンダー予約が更新されました',
-                    'booking', b.id, COALESCE(b.updated_at, b.created_at), b.line_account_id
+             SELECT b.id, 'booking', 'カレンダー予約が更新されました', b.status,
+                    'booking', b.id, NULL, NULL, COALESCE(b.updated_at, b.created_at), b.line_account_id
                FROM bookings b WHERE b.friend_id = ?
              UNION ALL
-             SELECT cb.id, 'calendar_booking', '外部カレンダー予約が更新されました',
-                    'calendar_booking', cb.id, COALESCE(cb.updated_at, cb.created_at), f.line_account_id
+             SELECT cb.id, 'calendar_booking', '外部カレンダー予約が更新されました', cb.status,
+                    'calendar_booking', cb.id, NULL, NULL, COALESCE(cb.updated_at, cb.created_at), f.line_account_id
                FROM calendar_bookings cb JOIN friends f ON f.id = cb.friend_id
               WHERE cb.friend_id = ?
            ),
            group_b AS (
-             SELECT eb.id, 'event_booking', 'イベント予約が更新されました',
-                    'event_booking', eb.id, COALESCE(eb.updated_at, eb.requested_at), eb.line_account_id
+             SELECT eb.id, 'event_booking', 'イベント予約が更新されました', eb.status,
+                    'event_booking', eb.id, eb.event_id, NULL, COALESCE(eb.updated_at, eb.requested_at), eb.line_account_id
                FROM event_bookings eb WHERE eb.friend_id = ?
              UNION ALL
-             SELECT fr.id, 'reminder', 'リマインダが更新されました',
-                    'friend_reminder', fr.id, COALESCE(fr.updated_at, fr.created_at), f.line_account_id
+             SELECT fr.id, 'reminder', 'リマインダが更新されました', fr.status,
+                    'friend_reminder', fr.id, fr.reminder_id, NULL, COALESCE(fr.updated_at, fr.created_at), f.line_account_id
                FROM friend_reminders fr JOIN friends f ON f.id = fr.friend_id
               WHERE fr.friend_id = ?
              UNION ALL
-             SELECT ie.id, ie.event_type, ie.summary,
-                    'identity_event', ie.id, ie.occurred_at, f.line_account_id
+             SELECT ie.id, ie.event_type, ie.summary, NULL,
+                    'identity_event', ie.id, NULL, NULL, ie.occurred_at, f.line_account_id
                FROM identity_events ie JOIN friends f ON f.user_id = ie.user_id
               WHERE f.id = ? AND ie.tenant_id = COALESCE(
                 (SELECT la2.tenant_id FROM line_accounts la2 WHERE la2.id = f.line_account_id),
                 '00000000-0000-4000-8000-000000000001'
               )
              UNION ALL
-             SELECT ae.id, ae.event_type, '共通イベントを記録しました',
-                    ae.source_kind, ae.source_id, ae.occurred_at, ae.line_account_id
-               FROM analytics_events ae WHERE ae.friend_id = ?
+             SELECT ae.id, ae.event_type, '共通イベントを記録しました', NULL,
+                    ae.source_kind, ae.source_id, NULL, NULL, ae.occurred_at, ae.line_account_id
+               FROM analytics_events ae
+              WHERE ae.friend_id = ?
+                AND ae.event_type NOT IN (
+                  'message_received', 'message_sent', 'postback_received',
+                  'form_submitted', 'booking_confirmed', 'booking_cancelled',
+                  'ec.order.confirmed', 'ec.order.payment_received',
+                  'ec.order.bank_transfer_reminder', 'ec.order.shipped',
+                  'ec.order.cancelled', 'ec.order.refunded'
+                )
+           ),
+           group_c AS (
+             SELECT o.id, 'ec_order', '注文 ' || o.order_number || ' を記録しました',
+                    o.normalized_status,
+                    'ec_order', o.id, NULL, o.detail_url, o.ordered_at, o.line_account_id
+               FROM ec_orders o WHERE o.friend_id = ?
+             UNION ALL
+             SELECT p.id, 'photo_submitted', '写真を投稿しました', p.status,
+                    'nen_photo_submission', p.id, NULL, p.image_url, p.created_at, f.line_account_id
+               FROM nen_photo_submissions p JOIN friends f ON f.id = p.friend_id
+              WHERE p.friend_id = ?
            )
-         SELECT timeline.id, timeline.event_type, timeline.summary,
-                timeline.source_kind, timeline.source_id, timeline.occurred_at,
+         SELECT timeline.id, timeline.event_type, timeline.summary, timeline.status,
+                timeline.source_kind, timeline.source_id,
+                timeline.source_parent_id, timeline.source_url,
+                timeline.occurred_at,
                 timeline.line_account_id, la.name AS line_account_name
            FROM (
              SELECT * FROM group_a
              UNION ALL
              SELECT * FROM group_b
+             UNION ALL
+             SELECT * FROM group_c
            ) timeline
            LEFT JOIN line_accounts la ON la.id = timeline.line_account_id
           ORDER BY timeline.occurred_at DESC, timeline.id DESC
           LIMIT ? OFFSET ?`,
       ).bind(
         friendId, friendId, friendId, friendId, friendId, friendId, friendId, friendId,
+        friendId, friendId,
         limitRaw + 1, offsetRaw,
       ).all<{
         id: string;
         event_type: string;
         summary: string;
+        status: string | null;
         source_kind: string;
         source_id: string;
+        source_parent_id: string | null;
+        source_url: string | null;
         occurred_at: string;
         line_account_id: string | null;
         line_account_name: string | null;
@@ -1295,7 +1339,13 @@ friends.get(
         id: row.id,
         type: row.event_type,
         summary: row.summary,
-        source: { kind: row.source_kind, id: row.source_id },
+        status: row.status,
+        source: {
+          kind: row.source_kind,
+          id: row.source_id,
+          parentId: row.source_parent_id,
+          url: row.source_url,
+        },
         occurredAt: row.occurred_at,
         lineAccount: row.line_account_id
           ? { id: row.line_account_id, name: row.line_account_name ?? null }
