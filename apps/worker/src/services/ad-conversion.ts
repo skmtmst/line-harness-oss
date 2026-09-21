@@ -16,6 +16,7 @@ import {
   getActiveAdPlatforms,
   getAdPlatformById,
   getPinnedAdConversionAccount,
+  isOperationCapabilityStopped,
   selectAdClickForPlatform,
   takeAdConversionOutboxRow,
   type AdConversionOutboxRow,
@@ -185,6 +186,10 @@ export async function sendAdConversions(
       eventValue, currency: opts?.currency, amountInMinorUnit: opts?.amountInMinorUnit,
       idempotencyKey, providerEventId, clickSnapshot,
     });
+    // 緊急停止 (#1050): ad_postback が止まっている統括は outbox へ積む
+    // だけにして外部への送信試行をしない。pending の行は復旧後に
+    // drainAdConversionOutbox が届ける。
+    if (await isOperationCapabilityStopped(db, lineAccountId, 'ad_postback')) continue;
     const outboxLease = await takeAdConversionOutboxRow(db, outboxId);
     if (!outboxLease) continue; // 他が送り中・送り済み
     const outboxRow = await getAdConversionOutboxById(db, outboxId);
@@ -314,6 +319,14 @@ export async function drainAdConversionOutbox(
       // 取り出し後に帰属が変わった設定へは送らない。
       if (platform.line_account_id !== row.line_account_id) {
         throw new Error(`platform account changed: ${row.ad_platform_id}`);
+      }
+      // 緊急停止 (#1050): ad_postback 停止中は claim を pending へ戻して
+      // 外部へ出さない。停止を失敗として数えない。
+      if (await isOperationCapabilityStopped(db, row.line_account_id, 'ad_postback')) {
+        await finishAdConversionOutbox(db, {
+          id: row.id, lease: row.lease_token ?? '', status: 'pending',
+        });
+        continue;
       }
       const result = await attemptPlatformSend(db, {
         platform, friendId: row.friend_id, lineAccountId: row.line_account_id,

@@ -219,6 +219,9 @@ describe('資産タブのstaffゲート (N-144)', () => {
     fireEvent.click(screen.getByText('カルーセル'))
     // owner には作成ボタンと各カードの編集・削除が出る
     expect(await screen.findByText('カルーセルを作る')).toBeTruthy()
+    // 資産カードは別フェッチで遅れて届く。作成ボタンだけ先に出るため、
+    // カード名を待ってから編集・削除を同期確認する（staff側と同じ待ち方）。
+    expect(await screen.findByText('秋キャンペーン')).toBeTruthy()
     expect(screen.getByText('編集')).toBeTruthy()
     expect(screen.getByText('削除')).toBeTruthy()
     expect(screen.queryByText(/オーナーと管理者だけができます。一覧の閲覧はこのまま使えます/)).toBeNull()

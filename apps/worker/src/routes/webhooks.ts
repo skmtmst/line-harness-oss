@@ -36,6 +36,7 @@ import {
   revokeIntegrationApiToken,
   rotateIntegrationApiToken,
   INTEGRATION_API_SCOPES,
+  isOperationCapabilityStopped,
   type IntegrationApiTokenRow,
   type WebhookInteractionRow,
   type IncomingWebhookIdentityMatch,
@@ -954,6 +955,10 @@ webhooks.post('/api/webhooks/outgoing/:id/test', requireRole('owner', 'admin'), 
     const webhook = await getOutgoingWebhookById(c.env.DB, c.req.param('id'), lineAccountId);
     if (!webhook) return c.json({ success: false, error: 'Not found' }, 404);
     if (!webhook.is_active) return c.json({ success: false, error: '止めている送り先は試せません' }, 409);
+    // 緊急停止 (#1050): webhook_outgoing 停止中は試し送信も受け付けない。
+    if (await isOperationCapabilityStopped(c.env.DB, lineAccountId, 'webhook_outgoing')) {
+      return c.json({ success: false, error: '緊急停止中のため試し送信できません' }, 409);
+    }
     // 署名は送信直前に復号した値で付ける。secretが設定済みで読めない
     // (鍵不足・復号失敗)ときだけ送らずに止める(#650)。未設定の旧行は従来どおり試す。
     let sendSecret: string | null = null;
@@ -1126,6 +1131,9 @@ webhooks.post('/api/webhooks/interactions/:id/retry', requireRole('owner', 'admi
     }
     if (code === 'webhook_secret_unavailable') {
       return c.json({ success: false, error: 'secret を確認できないため送り直しを止めました' }, 503);
+    }
+    if (code === 'emergency_stopped') {
+      return c.json({ success: false, error: '緊急停止中のため再送できません' }, 409);
     }
     if (code === 'webhook_not_found') return c.json({ success: false, error: code }, 404);
     if (code === 'webhook_inactive' || code === 'payload_unavailable') {

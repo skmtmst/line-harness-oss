@@ -11,8 +11,10 @@ import {
   updateChat,
   isOperationCapabilityStopped,
   jstNow,
+  OPERATION_CAPABILITIES,
 } from '@line-crm/db';
-import type { Friend, LineAccount } from '@line-crm/db';
+import type { Friend, LineAccount, OperationCapability } from '@line-crm/db';
+import { OPERATION_PROXY_CAPABILITY_HEADER } from '../services/operation-send-paths.js';
 import { authenticateApiToken } from '../middleware/auth.js';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
 import { messageToLogPayload } from '../services/step-delivery.js';
@@ -552,20 +554,30 @@ function proxyHandler(prefix: string, upstreamBase: string, logSends: boolean) {
     if (retryKey) headers['X-Line-Retry-Key'] = retryKey;
 
     /*
-     * 緊急停止の判定は副作用 (上流fetch) の直前に置く (#960)。
+     * 緊急停止の判定は副作用 (上流fetch) の直前に置く (#960 / #1050)。
      * broadcast/multicast/narrowcast と manual 指定なしの自動 push は、
-     * broadcast_dispatch が止まっている間は上流へ一切出さない。
+     * 該当 capability が止まっている間は上流へ一切出さない。
      * 例外は reply と X-Line-Harness-Source: manual の push —— 人間が
      * 相手を見て送る1:1返信は一斉送信の停止対象ではない。
+     *
+     * #1050: X-Line-Harness-Capability で送信経路の停止対象を名乗れる。
+     * 値が無い・知らない値の自動送信は従来どおり broadcast_dispatch
+     * (一斉送信 = 安全側) として止める。
      * アカウント単位の停止とグローバル (*) の停止の両方が効く。
      */
+    const requestedCapability = c.req.header(OPERATION_PROXY_CAPABILITY_HEADER);
+    const dispatchCapability: OperationCapability =
+      requestedCapability &&
+      (OPERATION_CAPABILITIES as readonly string[]).includes(requestedCapability)
+        ? (requestedCapability as OperationCapability)
+        : 'broadcast_dispatch';
     const isBulkDispatch =
       method === 'POST' &&
       (BULK_DISPATCH_PATHS.has(path) ||
         (path === '/v2/bot/message/push' && logSource !== 'manual'));
     if (
       isBulkDispatch &&
-      (await isOperationCapabilityStopped(c.env.DB, caller.lineAccountId, 'broadcast_dispatch'))
+      (await isOperationCapabilityStopped(c.env.DB, caller.lineAccountId, dispatchCapability))
     ) {
       return c.json(
         { message: 'Message dispatch is stopped by emergency operation control' },

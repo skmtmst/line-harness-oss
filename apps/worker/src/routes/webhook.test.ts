@@ -11,6 +11,7 @@ const lineClientMocks = vi.hoisted(() => ({
 // Stub the DB graph — these tests focus on webhook guard behavior and the
 // first-contact friend registration path without touching real D1/LINE.
 vi.mock('@line-crm/db', () => ({
+  isOperationCapabilityStopped: vi.fn(async () => false),
   upsertFriend: vi.fn(),
   updateFriendFollowStatus: vi.fn(),
   getFriendByLineUserIdForAccount: vi.fn(),

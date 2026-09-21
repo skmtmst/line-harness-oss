@@ -7,6 +7,8 @@ vi.mock('@line-crm/db', async (importOriginal) => {
   return {
   KNOWN_OUTGOING_EVENT_TYPES: actual.KNOWN_OUTGOING_EVENT_TYPES,
   isKnownOutgoingEventType: actual.isKnownOutgoingEventType,
+  // #1050: 緊急停止の判定。個別の試験で立てる場合は mockResolvedValue で差し替える。
+  isOperationCapabilityStopped: vi.fn(async () => false),
   getIncomingWebhooks: vi.fn(),
   getIncomingWebhookById: vi.fn(),
   createIncomingWebhook: vi.fn(),

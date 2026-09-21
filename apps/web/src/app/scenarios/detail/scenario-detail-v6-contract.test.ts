@@ -38,6 +38,26 @@ describe('V6 シナリオ編集の契約', () => {
     expect(DIALOGS).toContain('setSending(false)')
   })
 
+  it('フォルダ候補はシナリオ所属アカウントで取り、候補外の保存値は理由を示して保持する', () => {
+    /*
+     * SCENARIO-20: 無指定の folders.list は全権限範囲を返すため、
+     * 別アカウントの同名フォルダを選んで保存できてしまう。
+     * 所属アカウント（共通なら選択中）の候補だけを出し、
+     * アカウントが切り替わったら取り直す。
+     */
+    expect(PAGE).toContain('const folderAccountId = scenario?.lineAccountId ?? selectedAccountId')
+    expect(PAGE).toContain("api.folders.list('scenario', folderAccountId ?? undefined)")
+    expect(PAGE).not.toContain("api.folders.list('scenario')")
+    expect(PAGE).toContain('[folderAccountId]')
+    // 候補に無い保存値は消さず「名前を確認できません」として残し、理由を示す。
+    expect(PAGE).toContain('editFolderMissing')
+    expect(PAGE).toContain('名前を確認できません')
+    expect(PAGE).toContain('このアカウントの候補にありません')
+    // 候補を取り直せないあいだは変更を止める（別範囲の値を黙って保存しない）。
+    expect(PAGE).toContain("disabled={folderState !== 'ready'}")
+    expect(PAGE).toContain('フォルダを確認できないため、いまは変更できません。')
+  })
+
   it('一覧のフォルダ追加を既存の共通ダイアログへ接続する', () => {
     expect(LIST).toContain("import FolderAddDialog from '@/components/shared/folder-add-dialog'")
     expect(LIST).toContain('onAddFolder={() => setFolderDialogOpen(true)}')

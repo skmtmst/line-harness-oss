@@ -14,6 +14,7 @@ import {
   recomputeAutoReplyEvaluationFromActions,
   reserveAutoReplyActionRun,
   reserveAutoReplyEvaluation,
+  isOperationCapabilityStopped,
 } from '@line-crm/db';
 import type { AutoReply, AutoReplyEvaluationStatus, Friend } from '@line-crm/db';
 import { logOutgoingMessage } from './event-bus.js';
@@ -515,6 +516,14 @@ export async function matchAndReply(
   const permission = await getSendPermissionForAccount(db, lineAccountId ?? friend.line_account_id ?? null);
   if (!permission.allowed) {
     await markAutoReplyEvaluationSkipped(db, evaluationId, 'billing_blocked');
+    return { matched: false, replyTokenConsumed: false };
+  }
+
+  // 緊急停止 (#1050): auto_reply_dispatch が止まっている統括は返さない。
+  // replyToken は持ち越せないので追い送りはせず、台帳へ理由を残す。
+  // 受信そのものは受信箱に残る（運用者が手で返せる）。
+  if (await isOperationCapabilityStopped(db, lineAccountId ?? friend.line_account_id ?? null, 'auto_reply_dispatch')) {
+    await markAutoReplyEvaluationSkipped(db, evaluationId, 'emergency_stopped');
     return { matched: false, replyTokenConsumed: false };
   }
 

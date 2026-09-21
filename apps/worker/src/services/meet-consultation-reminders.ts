@@ -1,5 +1,6 @@
 import type { HarnessProxyDispatch } from './line-proxy-send.js';
 import { pushViaHarnessProxy } from './line-proxy-send.js';
+import { isOperationCapabilityStopped } from '@line-crm/db';
 import { resolveLineCredential } from '@line-crm/db';
 import { featureJobCanRun } from './feature-enforcement.js';
 import { cancelByTrigger, enrollByTrigger, reconcileV6ToStartsAt } from './reminder-trigger.js';
@@ -364,6 +365,11 @@ export async function processDueMeetConsultationReminders(
     if (row.line_account_id && !await featureJobCanRun(db, { accountId: row.line_account_id, featureId: 'booking', job: 'meet consultation reminders' })) {
       continue;
     }
+    // 緊急停止 (#1050): reminder_dispatch が止まっている統括は行に触れず
+    // pending のまま残す。復旧すれば次の cron が拾う。
+    if (await isOperationCapabilityStopped(db, row.line_account_id, 'reminder_dispatch')) {
+      continue;
+    }
     // 取消と配信の競合対策: 送る直前に相談の状態を確かめ、取消済みなら送らない。
     const live = await db
       .prepare(`SELECT status FROM meet_consultations WHERE id = ?`)
@@ -411,6 +417,7 @@ export async function processDueMeetConsultationReminders(
         [{ type: 'text', text }],
         row.id,
         options.proxyDispatch,
+        'reminder_dispatch',
       );
       // 同時取消で止められた行を sent で上書きしない (状態だけ守る。送信数は数える)。
       const marked = await db

@@ -183,6 +183,14 @@ export async function pushImmediateFirstStep(
     // instant-push its first step.
     if (!scenarioRow.is_active) return false;
 
+    // 緊急停止 (#1050): scenario_dispatch が止まっているアカウントの
+    // シナリオは1通目の即時送信もしない。登録行・claim には触れず、
+    // cron 側 (processStepDeliveries も同じ停止を見る) が復旧後に届ける。
+    const { isOperationCapabilityStopped } = await import('@line-crm/db');
+    if (await isOperationCapabilityStopped(db, scenarioRow.line_account_id ?? null, 'scenario_dispatch')) {
+      return false;
+    }
+
     // 送る1通目は、購読開始時に固定した公開版だけから読む（351）。live の
     // 下書き表は読まない。版が無い・欠損しているときは送らない。
     const loadPinnedFirstStep = async (
@@ -443,6 +451,12 @@ export async function pushImmediateFirstStep(
       messages = [buildMessage(decorated.messageType, decorated.content)];
     }
 
+    // メッセージ組み立ての間に停止へ切り替わった分も、外部送信の直前に拾う。
+    // claim は戻し、cron が復旧後に1通目を届ける。
+    if (await isOperationCapabilityStopped(db, scenarioRow.line_account_id ?? null, 'scenario_dispatch')) {
+      await releaseClaim();
+      return false;
+    }
     try {
       if (options?.reply) {
         await options.reply.client.replyMessage(options.reply.replyToken, messages);

@@ -51,6 +51,7 @@ const PINNED_SOURCE = {
 
 const dbMocks = vi.hoisted(() => ({
   getScenarioById: vi.fn(),
+  isOperationCapabilityStopped: vi.fn(async () => false),
   getScenarioPublishedVersion: vi.fn(),
   getStepsForDelivery: vi.fn(),
   scenarioStepExists: vi.fn(),

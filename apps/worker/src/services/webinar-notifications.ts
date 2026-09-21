@@ -505,6 +505,7 @@ export async function sendWebinarNotificationTest(
         }],
         crypto.randomUUID(),
         options.proxyDispatch,
+        'reminder_dispatch',
       );
       sent++;
     } catch {
@@ -686,6 +687,7 @@ export async function processWebinarNotificationJobs(
         }],
         row.line_retry_key,
         options.proxyDispatch,
+        'reminder_dispatch',
       );
       await db.prepare(
         `UPDATE webinar_notification_jobs

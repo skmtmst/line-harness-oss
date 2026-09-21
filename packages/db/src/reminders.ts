@@ -1605,6 +1605,32 @@ export async function claimReminderDeliveryRun(
 }
 
 /**
+ * 緊急停止のために握ったまま送らなかった claim をキューへ戻す (#1050)。
+ *
+ * claim で進めた attempt 系のカウンタを差し戻し、status を queued へ戻す。
+ * 自分が握った claimed 行だけが対象で、取消や別実行の確定は上書きしない。
+ * 停止中に送られなかった分は「失敗」ではないため、再試行回数を消費させない。
+ */
+export async function releaseClaimedReminderRun(
+  db: D1Database,
+  input: { id: string; now: string },
+): Promise<void> {
+  await db
+    .prepare(
+      `UPDATE reminder_delivery_runs
+          SET status = 'queued',
+              attempt_count = MAX(0, attempt_count - 1),
+              retry_cycle_attempt_count = MAX(0, retry_cycle_attempt_count - 1),
+              lease_expires_at = NULL,
+              next_retry_at = NULL,
+              updated_at = ?
+        WHERE id = ? AND status = 'claimed'`,
+    )
+    .bind(input.now, input.id)
+    .run();
+}
+
+/**
  * 外部送信の直前に送る権利を確かめる (原子的)。
  *
  * claim 後・push 前のわずかな間に取消が入る競合がある。送る直前に1文で

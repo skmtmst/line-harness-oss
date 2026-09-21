@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('@line-crm/db', () => ({
+  isOperationCapabilityStopped: vi.fn(async () => false),
   claimWebhookInteractionRetry: vi.fn(),
   createWebhookInteraction: vi.fn(),
   finishWebhookInteraction: vi.fn(),

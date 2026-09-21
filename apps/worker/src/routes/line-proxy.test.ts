@@ -14,6 +14,15 @@ vi.mock('@line-crm/db', () => ({
   createChat: vi.fn(),
   updateChat: vi.fn(),
   isOperationCapabilityStopped: vi.fn(async () => false),
+  OPERATION_CAPABILITIES: [
+    'broadcast_dispatch',
+    'scenario_dispatch',
+    'reminder_dispatch',
+    'automation_actions',
+    'auto_reply_dispatch',
+    'webhook_outgoing',
+    'ad_postback',
+  ],
   getStaffById: vi.fn(async () => ({ account_scope: 'all' })),
   getStaffAccountScopeIds: vi.fn(async () => []),
   jstNow: vi.fn(() => '2026-08-02T12:00:00.000'),
@@ -851,6 +860,78 @@ describe('emergency stop (broadcast_dispatch)', () => {
       'acc-1',
       'broadcast_dispatch',
     );
+  });
+
+  /*
+   * #1050 — X-Line-Harness-Capability で送信経路ごとの停止対象を名乗る。
+   * 停止中は上流へ一切出さず 409 を返す。値が無い・知らない値の自動送信は
+   * 従来どおり broadcast_dispatch (安全側) で止める。
+   */
+  test.each([
+    'reminder_dispatch',
+    'scenario_dispatch',
+    'automation_actions',
+  ])('stopped: capability header %s gates automatic push with that capability', async (capability) => {
+    vi.mocked(isOperationCapabilityStopped).mockResolvedValue(true as never);
+    const { db, executed } = fakeDb();
+    const res = await setupApp().request(
+      pushRequest('acc-token', undefined, { 'X-Line-Harness-Capability': capability }),
+      {},
+      env(db),
+    );
+
+    expect(res.status).toBe(409);
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(loggedRows(executed)).toHaveLength(0);
+    expect(isOperationCapabilityStopped).toHaveBeenCalledWith(db, 'acc-1', capability);
+  });
+
+  test('capability header only narrows the capability that is stopped', async () => {
+    // reminder_dispatch だけ止まっている想定。broadcast 既定の自動 push は
+    // reminder_dispatch を名乗らないので broadcast_dispatch で判定する。
+    vi.mocked(isOperationCapabilityStopped).mockImplementation(
+      async (_db, _account, capability) => capability === 'reminder_dispatch',
+    );
+    const { db } = fakeDb();
+    const res = await setupApp().request(pushRequest('acc-token'), {}, env(db));
+
+    expect(res.status).toBe(200);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(isOperationCapabilityStopped).toHaveBeenCalledWith(db, 'acc-1', 'broadcast_dispatch');
+  });
+
+  test('unknown capability header falls back to broadcast_dispatch (safe default)', async () => {
+    vi.mocked(isOperationCapabilityStopped).mockResolvedValue(true as never);
+    const { db } = fakeDb();
+    const res = await setupApp().request(
+      pushRequest('acc-token', undefined, { 'X-Line-Harness-Capability': 'not_a_capability' }),
+      {},
+      env(db),
+    );
+
+    expect(res.status).toBe(409);
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(isOperationCapabilityStopped).toHaveBeenCalledWith(db, 'acc-1', 'broadcast_dispatch');
+  });
+
+  test('manual push ignores the capability header entirely', async () => {
+    // manual 1:1 返信は停止対象外。ヘッダが付いていても manual が優先され、
+    // 停止判定自体を呼ばない。
+    vi.mocked(isOperationCapabilityStopped).mockResolvedValue(true as never);
+    const { db, executed } = fakeDb();
+    const res = await setupApp().request(
+      pushRequest('acc-token', undefined, {
+        'X-Line-Harness-Source': 'manual',
+        'X-Line-Harness-Capability': 'reminder_dispatch',
+      }),
+      {},
+      env(db),
+    );
+
+    expect(res.status).toBe(200);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(isOperationCapabilityStopped).not.toHaveBeenCalled();
+    expect(loggedRows(executed)[0].source).toBe('manual');
   });
 
   test('stopped: unrelated proxy calls are unaffected', async () => {
