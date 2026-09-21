@@ -22,6 +22,9 @@ import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
 import ScenarioList from '@/components/scenarios/scenario-list'
+import { ON_COMPLETE_LABEL, type OnCompleteMode } from '@/components/scenarios/scenario-dialogs'
+import { scenarioReferenceData } from '@/components/scenarios/scenario-reference-data'
+import type { ScenarioTriggerItem } from '@/lib/api'
 import { startChecklist } from './start-checklist'
 
 type ScenarioWithCount = Scenario & {
@@ -32,6 +35,17 @@ type ScenarioWithCount = Scenario & {
 
 /** 未分類を表す印。空文字は「すべて」なので別の値にする。 */
 const UNFILED = '__unfiled__'
+
+/** 開始のきっかけ1件を、確認欄で読める1行にする。 */
+function describeStartTrigger(trigger: ScenarioTriggerItem, tagName: string | null): string {
+  if (trigger.kind === 'friend_add') return '友だち追加時'
+  if (trigger.kind === 'tag_added') {
+    return tagName ? `タグ「${tagName}」が付いたとき` : 'タグが付いたとき（タグ名を確認できません）'
+  }
+  if (trigger.kind === 'form_answer') return 'フォーム回答時'
+  if (trigger.kind === 'booking_confirmed') return '予約確定時'
+  return '呼ばれたとき'
+}
 
 function StartScenarioDialog({
   scenario,
@@ -46,38 +60,113 @@ function StartScenarioDialog({
   onConfirm: () => void
   onCancel: () => void
 }) {
-  const { selectedAccountId } = useAccount()
+  const { selectedAccountId, accounts } = useAccount()
   const lineAccountId = scenario.lineAccountId ?? selectedAccountId
   const [simulation, setSimulation] = useState<ScenarioSimulation | null>(null)
   const [runs, setRuns] = useState<ScenarioRuns | null>(null)
-  const [preflightLoading, setPreflightLoading] = useState(true)
+  /*
+   * SCENARIO-06: 確認欄は実設定から組み立てる。開始のきっかけ・終了後の
+   * 処理・完了時アクションを実データで取り、取れないものは「未取得」と
+   * 書く。固定の説明文を置くと、実設定と違うことを確認したことになる。
+   */
+  const [triggers, setTriggers] = useState<ScenarioTriggerItem[] | null>(null)
+  const [completeActionCount, setCompleteActionCount] = useState<number | null>(null)
+  const [tagNameById, setTagNameById] = useState<Record<string, string>>({})
+  const [moveTargetName, setMoveTargetName] = useState<string | null>(null)
+  /*
+   * SCENARIO-07: 試算の取得待ち・取得失敗のあいだは開始できない。
+   * 「対象人数・内容・送信枠を確認しました」のチェックが入っていても、
+   * 数が読めていないなら確認したことにならない。
+   */
+  const [preflightState, setPreflightState] = useState<'loading' | 'ready' | 'error'>('loading')
+  const [preflightReason, setPreflightReason] = useState('')
   /*
    * 開始は戻せない操作なので、確認のチェックが入るまで開始ボタンを
    * 押せない。defaultChecked の非制御にすると、見ていないまま
    * 始められて確認が形だけになる（点検 #495 中4）。
    */
   const [confirmed, setConfirmed] = useState(false)
+  /*
+   * SCENARIO-07: アカウントか対象が変わると古い取得が走ったままになる。
+   * あとから返ってきた古い応答を新しい対象へ書き込まないよう、
+   * 何回目の取得かを覚えて、新しい取得が始まった時点で捨てる。
+   */
+  const preflightSeqRef = useRef(0)
 
+  /*
+   * SCENARIO-07: 共通シナリオでは選択中のアカウントで対象が変わる。
+   * アカウント・対象・設定が変わったあともチェック済みを引き継ぐと、
+   * 別の対象へ「確認しました」を使い回すことになる。変わったら外す。
+   */
   useEffect(() => {
+    setConfirmed(false)
+  }, [scenario.id, scenario.updatedAt, lineAccountId])
+
+  const loadPreflight = useCallback(async () => {
+    const seq = ++preflightSeqRef.current
     if (!lineAccountId) {
-      setPreflightLoading(false)
+      setPreflightState('error')
+      setPreflightReason('LINEアカウントが選ばれていないため、対象人数を試算できません。')
       return
     }
-    let cancelled = false
-    setPreflightLoading(true)
-    void Promise.all([
-      api.scenarios.simulate(scenario.id, lineAccountId).catch(() => null),
-      api.scenarios.runs(scenario.id, lineAccountId, { limit: 1 }).catch(() => null),
-    ]).then(([simulationResponse, runsResponse]) => {
-      if (cancelled) return
-      setSimulation(simulationResponse?.success ? simulationResponse.data : null)
-      setRuns(runsResponse?.success ? runsResponse.data : null)
-      setPreflightLoading(false)
-    })
-    return () => {
-      cancelled = true
+    setPreflightState('loading')
+    setPreflightReason('')
+    const [simulationResponse, runsResponse, triggersResponse, actionsResponse, tagsResponse, moveTargetResponse] =
+      await Promise.all([
+        api.scenarios.simulate(scenario.id, lineAccountId).catch(() => null),
+        api.scenarios.runs(scenario.id, lineAccountId, { limit: 1 }).catch(() => null),
+        api.scenarios.triggers.list(scenario.id).catch(() => null),
+        api.scenarios.actions.list(scenario.id).catch(() => null),
+        scenarioReferenceData.tags(lineAccountId).catch(() => null),
+        scenario.onCompleteMode === 'move' && scenario.onCompleteScenarioId
+          ? api.scenarios.get(scenario.onCompleteScenarioId).catch(() => null)
+          : Promise.resolve(null),
+      ])
+    // 新しい取得が始まっていたら、この古い応答は書き込まない（SCENARIO-07）。
+    if (seq !== preflightSeqRef.current) return
+    setSimulation(simulationResponse?.success ? simulationResponse.data : null)
+    setRuns(runsResponse?.success ? runsResponse.data : null)
+    setTriggers(triggersResponse?.success ? triggersResponse.data : null)
+    setCompleteActionCount(
+      actionsResponse?.success
+        ? actionsResponse.data.filter((a) => a.hook === 'scenario_completed').length
+        : null,
+    )
+    setTagNameById(
+      tagsResponse?.success
+        ? Object.fromEntries(tagsResponse.data.map((t) => [t.id, t.name]))
+        : {},
+    )
+    setMoveTargetName(
+      moveTargetResponse && moveTargetResponse.success ? moveTargetResponse.data.name : null,
+    )
+    /*
+     * 人数の試算と配信記録の両方が取れないときは「確認できた」と言えない
+     * ので開始を止める。きっかけ・タグ名・移動先名だけの失敗は、その欄を
+     * 「取得できません」と書いて警告どまりにする。
+     */
+    if (!simulationResponse?.success && !runsResponse?.success) {
+      setPreflightState('error')
+      setPreflightReason(
+        simulationResponse && !simulationResponse.success
+          ? simulationResponse.error
+          : '開始前の実データを取得できませんでした。',
+      )
+      return
     }
-  }, [lineAccountId, scenario.id])
+    setPreflightState('ready')
+  }, [
+    lineAccountId,
+    scenario.id,
+    scenario.onCompleteMode,
+    scenario.onCompleteScenarioId,
+  ])
+
+  useEffect(() => {
+    void loadPreflight()
+  }, [loadPreflight])
+
+  const preflightLoading = preflightState === 'loading'
 
   const checks = startChecklist(scenario).map((item, index) => {
     if (index === 1 && simulation) {
@@ -115,6 +204,37 @@ function StartScenarioDialog({
     }
     return item
   })
+
+  /*
+   * SCENARIO-06: 終了後の処理は編集画面と同じ onCompleteMode / 移動先 /
+   * 完了時アクションから読む。実設定と別の表示（固定文など）は置かない。
+   */
+  const completeMode = (scenario.onCompleteMode ?? 'pause') as OnCompleteMode
+  const accountLabel =
+    scenario.lineAccountId === null
+      ? '全アカウント共通'
+      : accounts.find((a) => a.id === lineAccountId)?.name ?? '—（取得できません）'
+  const triggerSummary =
+    triggers === null
+      ? preflightLoading
+        ? '—（確認中）'
+        : '—（取得できません）'
+      : triggers.length === 0
+        ? '呼ばれたときだけ（アクション・手動での開始）'
+        : triggers
+            .map((t) => describeStartTrigger(t, t.tagId ? tagNameById[t.tagId] ?? null : null))
+            .join('、')
+  const completeSummary =
+    ON_COMPLETE_LABEL[completeMode] +
+    (completeMode === 'move'
+      ? `（${moveTargetName ?? (preflightLoading ? '確認中…' : '移動先を取得できませんでした')}）`
+      : '') +
+    (completeActionCount === null
+      ? ''
+      : completeActionCount > 0
+        ? `＋完了時アクション ${completeActionCount}件`
+        : '')
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-6" style={{ background: 'color-mix(in srgb, var(--color-ink) 35%, transparent)' }} role="dialog" aria-modal="true" aria-labelledby="start-scenario-title">
       <div className="border-hairline flex w-full flex-col overflow-y-auto rounded-card border shadow-xl" style={{ height: 860, maxWidth: 1040, background: 'var(--color-canvas)' }}>
@@ -132,10 +252,12 @@ function StartScenarioDialog({
           <section className="border-hairline rounded-card border p-5" style={{ minHeight: 510 }}>
             <p className="text-ink mb-4 text-sm font-bold">開始するシナリオ</p>
             <dl className="space-y-3 text-sm">
-              <div className="flex justify-between gap-4"><dt className="text-ink-faint">開始対象</dt><dd className="text-ink text-right font-medium">{simulation ? `新規開始予定 ${simulation.audience.newStartPlanned.toLocaleString('ja-JP')}人` : preflightLoading ? '—（試算中）' : '—（取得できません）'}</dd></div>
-              <div className="border-hairline flex justify-between gap-4 border-t pt-3"><dt className="text-ink-faint">開始タイミング</dt><dd className="text-ink text-right font-medium">保存後すぐ</dd></div>
+              <div className="flex justify-between gap-4"><dt className="text-ink-faint">シナリオ</dt><dd className="text-ink text-right font-medium">{scenario.name}</dd></div>
+              <div className="border-hairline flex justify-between gap-4 border-t pt-3"><dt className="text-ink-faint">LINEアカウント</dt><dd className="text-ink text-right font-medium">{accountLabel}</dd></div>
+              <div className="border-hairline flex justify-between gap-4 border-t pt-3"><dt className="text-ink-faint">開始対象</dt><dd className="text-ink text-right font-medium">{simulation ? `新規開始予定 ${simulation.audience.newStartPlanned.toLocaleString('ja-JP')}人` : preflightLoading ? '—（試算中）' : '—（取得できません）'}</dd></div>
+              <div className="border-hairline flex justify-between gap-4 border-t pt-3"><dt className="text-ink-faint">開始のきっかけ</dt><dd className="text-ink text-right font-medium">{triggerSummary}</dd></div>
               <div className="border-hairline flex justify-between gap-4 border-t pt-3"><dt className="text-ink-faint">配信ステップ</dt><dd className="text-ink text-right font-medium">{simulation ? `${simulation.steps.length}通` : scenario.stepCount === undefined ? '—通' : `${scenario.stepCount}通`}</dd></div>
-              <div className="border-hairline flex justify-between gap-4 border-t pt-3"><dt className="text-ink-faint">終了後</dt><dd className="text-ink text-right font-medium">完了タグ＋担当者通知</dd></div>
+              <div className="border-hairline flex justify-between gap-4 border-t pt-3"><dt className="text-ink-faint">終了後</dt><dd className="text-ink text-right font-medium">{completeSummary}</dd></div>
             </dl>
           </section>
 
@@ -143,6 +265,18 @@ function StartScenarioDialog({
             <p className="text-ink mb-3 text-sm font-bold">配信前チェック</p>
             <ul className="space-y-3 text-sm">
               {preflightLoading ? <li className="text-ink-faint text-xs">開始前の実データを確認しています…</li> : null}
+              {preflightState === 'error' ? (
+                <li className="text-danger flex items-start gap-3 text-xs">
+                  <span>対象人数を試算できなかったため、開始はできません。{preflightReason}</span>
+                  <button
+                    type="button"
+                    className="text-info shrink-0 font-medium hover:underline"
+                    onClick={() => void loadPreflight()}
+                  >
+                    再試行
+                  </button>
+                </li>
+              ) : null}
               {checks.map((item) => (
                 <li key={item.label} className="flex items-start gap-3">
                   <span aria-hidden className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-xs font-bold ${item.state === 'ok' ? 'bg-success-bg text-success' : item.state === 'warn' ? 'bg-warning-bg text-warning' : 'bg-canvas-sunken text-ink-faint'}`}>
@@ -157,13 +291,13 @@ function StartScenarioDialog({
 
         <div className="bg-warning-bg mx-6 mb-5 rounded-card px-5 py-4">
           <p className="text-warning text-sm font-bold">開始後に起きること</p>
-          <ul className="text-ink-secondary mt-2 space-y-1 text-xs"><li>・条件に一致した{simulation?.audience.newStartPlanned.toLocaleString('ja-JP') ?? '—'}人が購読を開始します</li><li>・配信中の友だちは停止するまで次のステップへ進みます</li><li>・開始・停止・編集は監査履歴とSlackのPRスレッドへ記録します</li></ul>
+          <ul className="text-ink-secondary mt-2 space-y-1 text-xs"><li>・条件に一致した{simulation?.audience.newStartPlanned.toLocaleString('ja-JP') ?? '—'}人が購読を開始します</li><li>・配信中の友だちは停止するまで次のステップへ進みます</li><li>・一度届いたメッセージは取り消せません。間違いに気づいたらすぐ停止してください</li></ul>
         </div>
-        <label className="mx-6 mb-4 flex items-center gap-2 text-sm font-medium"><input type="checkbox" checked={confirmed} onChange={(event) => setConfirmed(event.target.checked)} />対象人数・内容・送信枠を確認しました</label>
+        <label className={`mx-6 mb-4 flex items-center gap-2 text-sm font-medium ${preflightLoading ? 'opacity-60' : ''}`}><input type="checkbox" checked={confirmed} disabled={preflightState !== 'ready'} onChange={(event) => setConfirmed(event.target.checked)} />対象人数・内容・送信枠を確認しました</label>
         {error ? <p className="bg-danger-bg text-danger mx-6 mb-4 rounded-card px-4 py-3 text-sm">{error}</p> : null}
         <div className="border-hairline mt-auto flex justify-end gap-3 border-t px-6 py-4">
-          <span className="text-ink-faint mr-auto self-center text-xs">開始後も緊急停止できます。停止理由は履歴に残ります。</span><Button onClick={onCancel} disabled={busy}>戻って確認</Button>
-          <Button variant="primary" onClick={onConfirm} disabled={busy || !confirmed}>{busy ? '開始中…' : '配信を開始'}</Button>
+          <span className="text-ink-faint mr-auto self-center text-xs">開始後も、一覧からいつでも停止できます。</span><Button onClick={onCancel} disabled={busy}>戻って確認</Button>
+          <Button variant="primary" onClick={onConfirm} disabled={busy || !confirmed || preflightState !== 'ready'}>{busy ? '開始中…' : '配信を開始'}</Button>
         </div>
       </div>
     </div>
@@ -472,6 +606,12 @@ export default function ScenariosPage() {
       void loadOverallTotal()
     } catch {
       setActionError('シナリオを削除できませんでした。状態を読み直してから、もう一度お試しください。')
+      /*
+       * SCENARIO-18: 失敗を呼び出し元の確認窓へ返す。ここで握りつぶすと
+       * 一覧側の確認窓が成功と同じく閉じてしまい、消えていないのに
+       * 「消した」と見えてしまう。
+       */
+      throw new Error('scenario delete failed')
     }
   }
 
