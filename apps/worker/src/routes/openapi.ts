@@ -1394,6 +1394,23 @@ const spec = {
         },
       },
     },
+    '/api/media/{id}/versions/{versionNo}/download': {
+      get: {
+        tags: ['Contents'],
+        summary: '登録メディアの指定した版を認証付きでダウンロード（元ファイルの取り戻し）',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'versionNo', in: 'path', required: true, schema: { type: 'integer', minimum: 1 } },
+          { name: 'accountId', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': { description: 'Version file bytes with Content-Disposition: attachment' },
+          '400': { description: 'Account id is required' },
+          '403': { description: 'Staff role required' },
+          '404': { description: 'Media or version not found in account scope' },
+        },
+      },
+    },
     '/api/media/{id}/content': {
       get: {
         tags: ['Contents'],

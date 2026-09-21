@@ -138,6 +138,7 @@ const CANONICAL_DENY_AUDITS: Array<{
   kind: string;
 }> = [
   { method: 'GET', pattern: /^\/api\/media\/([^/]+)\/download(?:\/|$)/, action: 'media.download', kind: 'media' },
+  { method: 'GET', pattern: /^\/api\/media\/([^/]+)\/versions\/([^/]+)\/download(?:\/|$)/, action: 'media.download', kind: 'media' },
   { method: 'GET', pattern: /^\/api\/common-vars\/exports\/([^/]+)\/download(?:\/|$)/, action: 'common_var_export.download', kind: 'common_var_export' },
 ];
 

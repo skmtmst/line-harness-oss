@@ -6526,7 +6526,14 @@ export const api = {
       `/api/media/${encodeURIComponent(id)}/versions`,
       { method: 'POST', body: JSON.stringify(data) },
     ),
-    update: (id: string, accountId: string, data: { filename?: string; folderId?: string | null }) =>
+    update: (id: string, accountId: string, data: {
+      filename?: string
+      folderId?: string | null
+      /** 既知の利用期限（YYYY-MM-DD）。null で記録を消して「不明」へ戻す。 */
+      usageExpiresAt?: string | null
+      /** 同意・権利の確認記録（500文字まで）。null/空で消す。 */
+      usageConsentNote?: string | null
+    }) =>
       fetchApi<ApiResponse<MediaItem>>(`/api/media/${id}?accountId=${encodeURIComponent(accountId)}`, {
         method: 'PATCH',
         body: JSON.stringify(data),
@@ -6576,6 +6583,12 @@ export const api = {
     /** 保存URLへ直接行かず、権限確認と監査を通る口から受け取る。 */
     download: (id: string, accountId: string) =>
       fetchApiBlob(`/api/media/${encodeURIComponent(id)}/download?accountId=${encodeURIComponent(accountId)}`),
+    /**
+     * 指定した版のダウンロード（IDEA-15）。第1版は登録時の元ファイルで、
+     * 差し替え後もここから取り戻せる。権限確認と監査は download と同じ。
+     */
+    downloadVersion: (id: string, versionNo: number, accountId: string) =>
+      fetchApiBlob(`/api/media/${encodeURIComponent(id)}/versions/${encodeURIComponent(versionNo)}/download?accountId=${encodeURIComponent(accountId)}`),
     /**
      * 縮小表示・試し見・ファイル開きの参照先。Cookieで認証されるため
      * img・video・audio の src や別タブ開きにそのまま使える。
