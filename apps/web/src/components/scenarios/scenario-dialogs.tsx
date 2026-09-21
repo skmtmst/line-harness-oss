@@ -812,15 +812,12 @@ export function TestSendDialog({
  * 確定した日時に見せない（NEXT-01〜04 の「確認が嘘をつかない」に揃える）。
  */
 
-const FRIEND_PLAN_OUTCOME: Record<
-  ScenarioFriendPlanStep['outcome'],
-  { label: string; className: string }
-> = {
-  deliver: { label: '届く見通し', className: 'border-success bg-success-bg text-success' },
-  skip: { label: '送らず次へ', className: 'border-hairline text-ink-secondary' },
-  branch: { label: '条件で分岐', className: 'border-warning bg-warning-bg text-warning' },
-  pause: { label: 'この通のあと停止', className: 'border-warning bg-warning-bg text-warning' },
-  undetermined: { label: '未確定', className: 'border-hairline text-ink-faint' },
+const FRIEND_PLAN_OUTCOME: Record<ScenarioFriendPlanStep['outcome'], string> = {
+  deliver: '届く見通し',
+  skip: '送らず次へ',
+  branch: '条件で分岐',
+  pause: 'この通のあと停止',
+  undetermined: '未確定',
 }
 
 const FRIEND_PLAN_STATUS: Record<string, string> = {
@@ -838,7 +835,6 @@ const FRIEND_PLAN_BASIS: Record<ScenarioFriendPlan['basis'], string> = {
 
 /** 予定1行。時刻が無い・動的条件で変わるものは「未確定」を添える。 */
 function FriendPlanStepRow({ step }: { step: ScenarioFriendPlanStep }) {
-  const outcome = FRIEND_PLAN_OUTCOME[step.outcome]
   return (
     <li className="border-hairline border-b px-4 py-2.5 text-sm last:border-b-0">
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
@@ -846,8 +842,18 @@ function FriendPlanStepRow({ step }: { step: ScenarioFriendPlanStep }) {
         <span className="text-ink-secondary shrink-0 tabular-nums">
           {step.scheduledAt ?? '—'}
         </span>
-        <span className={`rounded-pill shrink-0 border px-2 py-0.5 text-xs ${outcome.className}`}>
-          {outcome.label}
+        <span
+          className={`rounded-pill shrink-0 border px-2 py-0.5 text-xs ${
+            step.outcome === 'deliver'
+              ? 'border-success bg-success-bg text-success'
+              : step.outcome === 'branch' || step.outcome === 'pause'
+                ? 'border-warning bg-warning-bg text-warning'
+                : step.outcome === 'skip'
+                  ? 'border-hairline text-ink-secondary'
+                  : 'border-hairline text-ink-faint'
+          }`}
+        >
+          {FRIEND_PLAN_OUTCOME[step.outcome]}
         </span>
         {step.dynamic ? (
           <span className="text-ink-faint shrink-0 text-xs">未確定</span>
@@ -953,15 +959,7 @@ export function FriendPlanDialog({
       title="友だちへの配信予定"
       description="このシナリオが選んだ友だちへどう届くかを確認します。送信・シナリオへの登録・タグの更新は行いません。"
       onClose={onClose}
-      footer={
-        <button
-          type="button"
-          onClick={onClose}
-          className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control h-10 border px-5 text-sm"
-        >
-          閉じる
-        </button>
-      }
+      footer={<Button onClick={onClose}>閉じる</Button>}
     >
       {!resolvedAccountId ? (
         <p className="rounded-panel bg-warning-bg text-ink-secondary mb-4 px-4 py-3 text-xs">
@@ -976,13 +974,13 @@ export function FriendPlanDialog({
         className="border-hairline rounded-control text-ink h-10 w-full border px-3 text-sm"
         aria-label="確認する友だちを名前で探す"
       />
-      <div className="border-hairline rounded-panel mt-3 max-h-48 overflow-y-auto border">
+      <div className="border-hairline divide-hairline rounded-panel mt-3 max-h-48 divide-y overflow-y-auto border">
         {friendsStatus === 'ready' && friends.map((friend) => (
           <button
             key={friend.id}
             type="button"
             onClick={() => setSelected({ id: friend.id, name: friend.displayName || '（名前なし）' })}
-            className={`border-hairline flex w-full items-center gap-2 border-b px-4 py-2.5 text-left text-sm last:border-b-0 ${
+            className={`flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm ${
               selected?.id === friend.id ? 'bg-accent-soft text-accent font-medium' : 'text-ink'
             }`}
           >
