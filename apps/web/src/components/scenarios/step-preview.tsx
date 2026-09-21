@@ -25,6 +25,8 @@ export interface StepPreviewProps {
   deliveryTime: string
   /** elapsed / relative のときの「〜時間後」。 */
   offsetHours: number
+  /** elapsed / relative の「〜分後」（時間に入りきらない分）。省略は 0。 */
+  offsetMinutes?: number
   kind: StepMessageKind
   /** テンプレートを選んでいるときは、その名前。 */
   templateName?: string | null
@@ -70,6 +72,7 @@ export function computeDeliveryAt(
   offsetDays: number,
   deliveryTime: string,
   offsetHours: number,
+  offsetMinutes = 0,
 ): Date {
   const at = new Date(start.getTime())
   if (mode === 'absolute_time') {
@@ -81,6 +84,7 @@ export function computeDeliveryAt(
   }
   at.setDate(at.getDate() + offsetDays)
   at.setHours(at.getHours() + offsetHours)
+  at.setMinutes(at.getMinutes() + offsetMinutes)
   return at
 }
 
@@ -89,6 +93,7 @@ function scheduleWords(
   offsetDays: number,
   deliveryTime: string,
   offsetHours: number,
+  offsetMinutes = 0,
 ): string {
   if (mode === 'absolute_time') {
     return offsetDays === 0 ? `当日の ${deliveryTime}` : `${offsetDays}日後の ${deliveryTime}`
@@ -96,6 +101,7 @@ function scheduleWords(
   const parts: string[] = []
   if (offsetDays > 0) parts.push(`${offsetDays}日`)
   if (offsetHours > 0) parts.push(`${offsetHours}時間`)
+  if (offsetMinutes > 0) parts.push(`${offsetMinutes}分`)
   return parts.length === 0 ? 'すぐに' : `${parts.join('と')}後`
 }
 
@@ -129,6 +135,7 @@ export default function StepPreview({
   offsetDays,
   deliveryTime,
   offsetHours,
+  offsetMinutes = 0,
   kind,
   templateName,
   body,
@@ -138,8 +145,15 @@ export default function StepPreview({
   audienceLabel,
 }: StepPreviewProps) {
   const start = nowJst()
-  const at = computeDeliveryAt(start, deliveryMode, offsetDays, deliveryTime, offsetHours)
-  const words = scheduleWords(deliveryMode, offsetDays, deliveryTime, offsetHours)
+  const at = computeDeliveryAt(
+    start,
+    deliveryMode,
+    offsetDays,
+    deliveryTime,
+    offsetHours,
+    offsetMinutes,
+  )
+  const words = scheduleWords(deliveryMode, offsetDays, deliveryTime, offsetHours, offsetMinutes)
   const rolled = rolledToNextDay(start, at, deliveryMode, offsetDays)
 
   return (
