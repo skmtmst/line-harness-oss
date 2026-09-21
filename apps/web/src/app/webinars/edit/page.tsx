@@ -39,6 +39,7 @@ import {
   type WebinarNotificationSettings,
   type WebinarPublishValidation,
   type WebinarParticipantPage,
+  type WebinarParticipantClassification,
 } from '@/lib/api'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { WEBINAR_SAKURA_COMMENTS_MAX } from '@/components/webinars/webinar-limits'
@@ -422,6 +423,55 @@ function ParticipantAvatar({
 /* 参加者一覧の1頁ぶん。サーバーは最大200件まで返す。 */
 const PARTICIPANTS_PAGE_SIZE = 50
 
+/*
+ * 参加者の分類フィルタ（IDEA-10）。分類ルールはサーバーが持ち、
+ * 画面はラベルだけを決める。計測外 = 外部動画などで個人の視聴を
+ * 取得できず、視聴データが無いことを未視聴と断定しない区分。
+ */
+const PARTICIPANT_FILTER_OPTIONS: Array<{ value: '' | WebinarParticipantClassification; label: string }> = [
+  { value: '', label: 'すべての申込・参加者' },
+  { value: 'unviewed', label: '未参加（申込のみ・入場記録なし）' },
+  { value: 'dropped_off', label: '途中離脱（入場したが未完了）' },
+  { value: 'completed', label: '視聴完了' },
+  { value: 'unmeasured', label: '計測外' },
+]
+
+type ParticipantRow = WebinarParticipantPage['items'][number]
+
+/**
+ * 参加者行の分類表示。サーバーの classification を優先し、
+ * 無い古い応答だけ従来の推測へ落とす。
+ */
+function participantStateLabel(participant: ParticipantRow, durationSeconds: number): string {
+  const rate = Math.min(100, Math.round((participant.maxWatchedSeconds / Math.max(1, durationSeconds)) * 100))
+  const hasWatchError = participant.staffIntegrationStatus === 'needs_attention' || Boolean(participant.errorDetail)
+  if (participant.classification === undefined) {
+    return participant.maxWatchedSeconds === 0
+      ? hasWatchError ? '視聴エラー' : participant.latestJoinedAt ? '視聴開始直後' : '未視聴'
+      : rate >= 90 ? `視聴完了 ${rate}%` : rate > 0 ? `視聴中 ${rate}%` : '未視聴'
+  }
+  switch (participant.classification) {
+    case 'unmeasured': return '計測外'
+    case 'unviewed': return '未参加'
+    case 'completed': return `視聴完了 ${rate}%`
+    case 'dropped_off':
+      return participant.maxWatchedSeconds === 0
+        ? hasWatchError ? '視聴エラー' : '入場のみ（再生を確認できず）'
+        : `途中離脱 ${rate}%`
+  }
+}
+
+/** 入場がライブ時間内か終了後（録画）かを回数つきで短く示す。 */
+function joinKindLabel(participant: ParticipantRow): string {
+  const live = participant.liveSessions ?? 0
+  const replay = participant.replaySessions ?? 0
+  if (live === 0 && replay === 0) return ''
+  const parts: string[] = []
+  if (live > 0) parts.push(`ライブ${live}`)
+  if (replay > 0) parts.push(`録画${replay}`)
+  return `（${parts.join('・')}）`
+}
+
 function AnalyticsTab({ webinarId, durationSeconds, view = 'analytics', analytics, analyticsState, webinarStatus, onRetry, onOpenParticipants }: { webinarId: string; durationSeconds: number; view?: 'participants' | 'analytics' | 'legacy'; analytics: WebinarAnalytics | null; analyticsState: 'idle' | 'loading' | 'ready' | 'error'; webinarStatus: Webinar['status']; onRetry: () => void; onOpenParticipants?: () => void }) {
   /*
     参加者一覧は表示目的ごとに独立して読む。コメントや集計の失敗で
@@ -433,6 +483,10 @@ function AnalyticsTab({ webinarId, durationSeconds, view = 'analytics', analytic
   const [loadingMore, setLoadingMore] = useState(false)
   const [moreError, setMoreError] = useState('')
   const [attempt, setAttempt] = useState(0)
+  /* 分類フィルタと、応答が教える分類の根拠・計測可否。古い応答では欠ける。 */
+  const [participantFilter, setParticipantFilter] = useState<'' | WebinarParticipantClassification>('')
+  const [participantRule, setParticipantRule] = useState<WebinarParticipantPage['rule'] | null>(null)
+  const [participantMeasurement, setParticipantMeasurement] = useState<WebinarParticipantPage['measurement'] | null>(null)
 
   /*
     集計(`analytics`)は親が1回だけ取る。ここで取ると、分析の段を開くたびに
@@ -448,11 +502,13 @@ function AnalyticsTab({ webinarId, durationSeconds, view = 'analytics', analytic
       個人の参加履歴はオーナー・管理者だけの口。staff には 403 が返るので、
       失敗扱いにせず「見られない」とだけ覚えて集計の表示は続ける。
     */
-    webinarApi.participants(webinarId, undefined, PARTICIPANTS_PAGE_SIZE)
+    webinarApi.participants(webinarId, undefined, PARTICIPANTS_PAGE_SIZE, participantFilter || undefined)
       .then((res) => {
         if (cancelled) return
         setParticipantItems(res.data.items)
         setNextCursor(res.data.nextCursor)
+        setParticipantRule(res.data.rule ?? null)
+        setParticipantMeasurement(res.data.measurement ?? null)
         setParticipantsState('ready')
       })
       .catch((cause) => {
@@ -460,7 +516,7 @@ function AnalyticsTab({ webinarId, durationSeconds, view = 'analytics', analytic
         setParticipantsState(cause instanceof ApiError && cause.status === 403 ? 'denied' : 'error')
       })
     return () => { cancelled = true }
-  }, [webinarId, attempt])
+  }, [webinarId, attempt, participantFilter])
 
   /* サーバーが nextCursor を返す限り、次の頁を読み足せる。重複は friendId で除く。 */
   const loadMoreParticipants = async () => {
@@ -468,12 +524,14 @@ function AnalyticsTab({ webinarId, durationSeconds, view = 'analytics', analytic
     setLoadingMore(true)
     setMoreError('')
     try {
-      const res = await webinarApi.participants(webinarId, nextCursor, PARTICIPANTS_PAGE_SIZE)
+      const res = await webinarApi.participants(webinarId, nextCursor, PARTICIPANTS_PAGE_SIZE, participantFilter || undefined)
       setParticipantItems((prev) => {
         const seen = new Set(prev.map((item) => item.friendId))
         return [...prev, ...res.data.items.filter((item) => !seen.has(item.friendId))]
       })
       setNextCursor(res.data.nextCursor)
+      setParticipantRule(res.data.rule ?? null)
+      setParticipantMeasurement(res.data.measurement ?? null)
     } catch {
       setMoreError('続きを読み込めませんでした。もう一度お試しください。')
     } finally {
@@ -499,7 +557,7 @@ function AnalyticsTab({ webinarId, durationSeconds, view = 'analytics', analytic
     const watching = summary ? Math.max(0, summary.viewers - summary.completed) : 0
     return (
       <div className="space-y-4" data-design-node="Q8sHa">
-        <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-ink text-lg font-bold">参加者管理</h2><p className="text-ink-faint mt-1 text-xs">申込・視聴・CTA・フォームの結果を友だち単位で確認します。</p></div>{participantsState === 'ready' ? <Button href={webinarApi.participantsCsvUrl(webinarId)}>参加者をCSVで書き出す</Button> : null}</div>
+        <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-ink text-lg font-bold">参加者管理</h2><p className="text-ink-faint mt-1 text-xs">申込・視聴・CTA・フォームの結果を友だち単位で確認します。</p></div>{participantsState === 'ready' ? <div className="flex flex-wrap items-center gap-2"><SelectField aria-label="参加者の分類で絞り込む" size="compact" value={participantFilter} onChange={(event) => setParticipantFilter(event.target.value as '' | WebinarParticipantClassification)} options={PARTICIPANT_FILTER_OPTIONS} /><Button href={webinarApi.participantsCsvUrl(webinarId, participantFilter || undefined)}>参加者をCSVで書き出す</Button></div> : null}</div>
         {summary ? (
         <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           {[['申込', summary.reservations, 'text-success'], ['視聴開始', summary.viewers, 'text-accent'], ['視聴完了', summary.completed, 'text-warning'], ['エラー', analytics?.formFunnel.submitErrors ?? 0, 'text-danger']].map(([label, value, tone]) => <div key={String(label)} className="border-hairline bg-canvas rounded-card border p-4 shadow-card"><p className="text-ink-faint text-xs">{label}</p><p className={`${tone} mt-2 text-2xl font-bold tabular-nums`}>{Number(value).toLocaleString('ja-JP')}{label === 'エラー' ? '件' : '人'}</p></div>)}
@@ -512,7 +570,7 @@ function AnalyticsTab({ webinarId, durationSeconds, view = 'analytics', analytic
         )}
         <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_390px]">
           <section className="border-hairline bg-canvas overflow-hidden rounded-card border shadow-card">
-            <div className="border-hairline border-b px-4 py-3"><h3 className="text-ink font-bold">参加者一覧</h3><p className="text-ink-faint mt-1 text-xs">何をきっかけに、何が実行されたかを分析できます。{participantsState === 'ready' ? `${participantItems.length.toLocaleString('ja-JP')}人を表示${nextCursor ? '（まだ続きがあります）' : ''}` : ''}</p></div>
+            <div className="border-hairline border-b px-4 py-3"><h3 className="text-ink font-bold">参加者一覧</h3><p className="text-ink-faint mt-1 text-xs">何をきっかけに、何が実行されたかを分析できます。{participantsState === 'ready' ? `${participantItems.length.toLocaleString('ja-JP')}人を表示${nextCursor ? '（まだ続きがあります）' : ''}` : ''}</p>{participantRule || participantMeasurement?.state === 'unavailable' ? <p className="text-ink-faint mt-1 text-xs">{participantRule ? `分類の根拠：視聴完了＝最大視聴位置が動画の90%（${fmtSec(participantRule.completionThresholdSeconds)}）以上。未参加＝申込のみで入場記録なし。ライブ／録画は入場時刻で区別。` : ''}{participantMeasurement?.state === 'unavailable' ? `${participantRule ? ' ' : ''}${participantMeasurement.reason}。個人の分類は「計測外」になります。` : ''}</p> : null}</div>
             {participantsState === 'loading' ? (
               <p className="text-ink-faint p-8 text-center text-sm">読み込み中...</p>
             ) : participantsState === 'error' ? (
@@ -521,18 +579,16 @@ function AnalyticsTab({ webinarId, durationSeconds, view = 'analytics', analytic
                 <button type="button" onClick={() => setAttempt((count) => count + 1)} className="text-accent mt-2 font-medium underline">もう一度読み込む</button>
               </div>
             ) : null}
-            <div className="divide-hairline divide-y">{participantsState === 'ready' && participantItems.length === 0 ? <p className="text-ink-faint p-8 text-center text-sm">まだ参加者がいません。</p> : participantItems.map((participant) => {
+            <div className="divide-hairline divide-y">{participantsState === 'ready' && participantItems.length === 0 ? <p className="text-ink-faint p-8 text-center text-sm">{participantFilter ? 'この分類に該当する人はいません。' : 'まだ参加者がいません。'}</p> : participantItems.map((participant) => {
               const name = participant.friendName ?? '名前未取得'
               const rate = Math.min(100, Math.round((participant.maxWatchedSeconds / Math.max(1, durationSeconds)) * 100))
               const operational = 'staffIntegrationStatus' in participant ? participant : null
               /*
-                0秒を一律「視聴エラー」にしない。要対応・失敗文があるときだけ
-                エラー、参加記録があるときは開始直後の離脱、無ければ未視聴。
+                分類はサーバーの一つのルールで決まる（応答の rule を参照）。
+                視聴データの無い人を未視聴と断定せず、入場記録が無い人は
+                「未参加」、外部動画など計測不能な人は「計測外」と表示する。
               */
-              const hasWatchError = operational?.staffIntegrationStatus === 'needs_attention' || Boolean(operational?.errorDetail)
-              const state = participant.maxWatchedSeconds === 0
-                ? hasWatchError ? '視聴エラー' : participant.latestJoinedAt ? '視聴開始直後' : '未視聴'
-                : rate >= 90 ? `視聴完了 ${rate}%` : rate > 0 ? `視聴中 ${rate}%` : '未視聴'
+              const state = participantStateLabel(participant, durationSeconds)
               const action = operational?.errorDetail
                 ? operational.errorDetail
                 : participant.formSubmittedAt ? '動画・CTA＋フォーム送信' : participant.ctaClickedAt ? '動画・CTA' : participant.maxWatchedSeconds > 0 ? '動画視聴' : '要対応へ追加'
@@ -541,7 +597,7 @@ function AnalyticsTab({ webinarId, durationSeconds, view = 'analytics', analytic
                 : operational?.staffIntegrationStatus === 'completed' || rate >= 90
                   ? '成功'
                   : '分析待ち'
-              return <div key={participant.friendId} className="grid gap-3 px-4 py-3 text-sm md:grid-cols-5 md:items-center"><div className="flex min-w-0 items-center gap-3"><ParticipantAvatar name={name} pictureUrl={participant.pictureUrl} /><span className="truncate font-semibold">{name}</span></div><span className="text-ink-secondary">{state}</span><span className="text-ink-secondary" title={operational?.errorDetail ?? undefined}>{action}</span><span className={`rounded-pill w-fit px-2 py-1 text-[11px] font-semibold ${status === '成功' ? 'bg-success-bg text-success' : status === 'エラー' ? 'bg-danger-bg text-danger' : 'bg-warning-bg text-warning'}`}>{status}</span><time className="text-ink-faint text-xs">{participant.latestJoinedAt ? compactDateTime(participant.latestJoinedAt).split(' ').at(-1) : '未視聴'}</time></div>
+              return <div key={participant.friendId} className="grid gap-3 px-4 py-3 text-sm md:grid-cols-5 md:items-center"><div className="flex min-w-0 items-center gap-3"><ParticipantAvatar name={name} pictureUrl={participant.pictureUrl} /><span className="truncate font-semibold">{name}</span></div><span className="text-ink-secondary">{state}{joinKindLabel(participant)}</span><span className="text-ink-secondary" title={operational?.errorDetail ?? undefined}>{action}</span><span className={`rounded-pill w-fit px-2 py-1 text-[11px] font-semibold ${status === '成功' ? 'bg-success-bg text-success' : status === 'エラー' ? 'bg-danger-bg text-danger' : 'bg-warning-bg text-warning'}`}>{status}</span><time className="text-ink-faint text-xs">{participant.latestJoinedAt ? compactDateTime(participant.latestJoinedAt).split(' ').at(-1) : '—'}</time></div>
             })}</div>
             {/* まだ続きがあるときだけ「次の頁」を出す。9人目以降もここから辿れる。 */}
             {participantsState === 'ready' && (nextCursor || moreError) ? (
@@ -556,10 +612,10 @@ function AnalyticsTab({ webinarId, durationSeconds, view = 'analytics', analytic
           {/* 集計が読めていない間・読めなかったときは、内訳の段を出さない。 */}
           {summary && analytics ? (
           <aside className="space-y-3">
-            <section className="border-hairline bg-canvas rounded-card border p-4 shadow-card"><h3 className="text-ink text-sm font-bold">参加状況の内訳</h3><p className="text-ink-faint mt-1 text-xs">一覧を開かずに効果を分析できます。</p><dl className="divide-hairline mt-3 divide-y">{[['予約', summary.registeredAndJoined, percent(summary.registeredAndJoined, summary.reservations)], ['視聴中', watching, percent(watching, summary.reservations)], ['未視聴', unviewed, percent(unviewed, summary.reservations)]].map(([label, count, rate]) => <div key={String(label)} className="flex items-center justify-between py-3 text-xs"><dt className="text-ink-secondary">{label}</dt><dd className="text-ink font-bold">{Number(count).toLocaleString('ja-JP')}回 <span className="text-ink-faint ml-2 font-normal">{rate}</span></dd></div>)}</dl></section>
+            <section className="border-hairline bg-canvas rounded-card border p-4 shadow-card"><h3 className="text-ink text-sm font-bold">参加状況の内訳</h3><p className="text-ink-faint mt-1 text-xs">一覧を開かずに効果を分析できます。</p><dl className="divide-hairline mt-3 divide-y">{[['予約', summary.registeredAndJoined, percent(summary.registeredAndJoined, summary.reservations)], ['視聴中', watching, percent(watching, summary.reservations)], ['未参加', unviewed, percent(unviewed, summary.reservations)]].map(([label, count, rate]) => <div key={String(label)} className="flex items-center justify-between py-3 text-xs"><dt className="text-ink-secondary">{label}</dt><dd className="text-ink font-bold">{Number(count).toLocaleString('ja-JP')}回 <span className="text-ink-faint ml-2 font-normal">{rate}</span></dd></div>)}</dl></section>
             <section className="border-hairline bg-canvas rounded-card border p-4 shadow-card"><h3 className="text-ink text-sm font-bold">稼働状況</h3><dl className="divide-hairline mt-3 divide-y text-xs"><div className="flex justify-between py-3"><dt className="text-ink-faint">状態</dt><dd className={`${webinarStatus === 'active' ? 'text-success' : 'text-ink'} font-bold`}>{webinarStatusLabel(webinarStatus)}</dd></div><div className="flex justify-between py-3"><dt className="text-ink-faint">申込→視聴</dt><dd className="text-ink font-bold">{percent(summary.viewers, summary.reservations)}</dd></div><div className="flex justify-between py-3"><dt className="text-ink-faint">平均視聴</dt><dd className="text-ink font-bold">{fmtSec(summary.avgWatchedSeconds)}</dd></div></dl></section>
             <section className="border-danger bg-danger-bg rounded-card border p-4"><h3 className="text-danger text-sm font-bold">要分析</h3><p className="text-danger mt-2 text-xs">視聴・送信エラー {analytics.formFunnel.submitErrors}件</p></section>
-            <section className="border-hairline bg-canvas rounded-card border p-4 shadow-card"><h3 className="text-ink text-sm font-bold">担当者視聴完了</h3><p className="text-ink-faint mt-2 text-xs">未視聴・相談希望の連携状況は運用者通知で確認します。</p></section>
+            <section className="border-hairline bg-canvas rounded-card border p-4 shadow-card"><h3 className="text-ink text-sm font-bold">担当者視聴完了</h3><p className="text-ink-faint mt-2 text-xs">未参加・相談希望の連携状況は運用者通知で確認します。</p></section>
           </aside>
           ) : null}
         </div>

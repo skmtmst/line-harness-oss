@@ -231,6 +231,42 @@ export interface WebinarParticipantOperation extends WebinarParticipantStat {
   action_status: string | null;
   action_error: string | null;
   integration_status: 'completed' | 'needs_attention' | 'pending';
+  /** 開催時間内に入場した回数（ライブ視聴）。 */
+  live_sessions: number;
+  /** 開催終了後に専用リンクで入場した回数（録画視聴）。 */
+  replay_sessions: number;
+  /** 直近の入場がライブか録画か。参加記録がなければ null。 */
+  last_join_kind: 'live' | 'replay' | null;
+}
+
+/**
+ * 参加者の分類。未参加＝申込はあるが入場記録なし、途中離脱＝入場したが
+ * 完了閾値未満、完了＝閾値以上、計測外＝外部動画などで個人の視聴を
+ * 取得できないため分類しない（視聴データが無いことを未視聴と断定しない）。
+ */
+export type WebinarParticipantClassification =
+  'unviewed' | 'dropped_off' | 'completed' | 'unmeasured';
+
+export interface WebinarParticipantQueryOptions {
+  /** ライブ／録画の境界に使う動画の長さ（秒）。0 以下は区別不能として全てライブ扱い。 */
+  durationSeconds: number;
+  /** 完了とみなす最大視聴秒数（呼び出し側で duration×0.9 等を決める）。 */
+  completionThresholdSeconds: number;
+  /** false のとき全員「計測外」。未参加・離脱・完了の絞り込みは空を返す。 */
+  measured: boolean;
+  /** 指定時はその分類だけを返す。 */
+  classification?: WebinarParticipantClassification | null;
+}
+
+export function classifyWebinarParticipant(
+  row: { sessions: number; max_watched_seconds: number },
+  options: { measured: boolean; completionThresholdSeconds: number },
+): WebinarParticipantClassification {
+  if (!options.measured) return 'unmeasured';
+  if (row.sessions === 0) return 'unviewed';
+  return row.max_watched_seconds >= options.completionThresholdSeconds
+    ? 'completed'
+    : 'dropped_off';
 }
 
 export interface WebinarMonitoringSummary {
@@ -695,45 +731,103 @@ export async function recordWebinarViewSegment(
   ).run();
 }
 
+/**
+ * 申込者∪入場者を friend 単位で返す。入場時刻が開催終了を過ぎた行は
+ * 録画（replay）視聴としてライブと区別する。`options.classification` で
+ * 未参加／途中離脱／完了／計測外に絞り込める。`measured = false`
+ * （外部動画などで個人の視聴を取得できない）ときは分類不能を意味し、
+ * 全員「計測外」になる——視聴データが無い人を未視聴と断定しない。
+ */
 export async function getWebinarParticipantOperations(
   db: D1Database,
   webinarId: string,
   limit = 100,
   offset = 0,
+  options?: WebinarParticipantQueryOptions,
 ): Promise<WebinarParticipantOperation[]> {
+  const durationSeconds = Math.max(0, options?.durationSeconds ?? 0);
+  // 動画長が不明なら入場時刻だけでは録画と断定できない。境界を実質無限大にして
+  // 全てライブ扱いにし、根拠のない録画判定を出さない。
+  const replayBoundarySeconds = durationSeconds > 0 ? durationSeconds : 2_147_483_647;
+  const measured = options?.measured ?? true;
+  const classification = options?.classification ?? null;
+  const threshold = Math.max(0, options?.completionThresholdSeconds ?? 0);
+
+  const binds: unknown[] = [
+    webinarId, webinarId,
+    webinarId, webinarId, webinarId, webinarId, webinarId,
+    webinarId,
+    webinarId,
+    webinarId, replayBoundarySeconds,
+    webinarId, replayBoundarySeconds,
+    replayBoundarySeconds, webinarId,
+    webinarId, webinarId,
+  ];
+  let filterSql = '';
+  if (classification === 'unmeasured') {
+    // 計測可能なウェビナーに「計測外」の人はいない。
+    if (measured) filterSql = 'WHERE 1 = 0';
+  } else if (!measured) {
+    // 計測不能のウェビナーでは未参加・離脱・完了を断定しない。
+    if (classification) filterSql = 'WHERE 1 = 0';
+  } else if (classification === 'unviewed') {
+    filterSql = 'WHERE sessions = 0';
+  } else if (classification === 'dropped_off') {
+    filterSql = 'WHERE sessions > 0 AND max_watched_seconds < ?';
+    binds.push(threshold);
+  } else if (classification === 'completed') {
+    filterSql = 'WHERE max_watched_seconds >= ?';
+    binds.push(threshold);
+  }
+  binds.push(limit, offset);
+
   const result = await db.prepare(
     `WITH identities AS (
        SELECT friend_id FROM webinar_registrations WHERE webinar_id = ? AND status = 'active'
        UNION
        SELECT friend_id FROM webinar_viewers WHERE webinar_id = ?
      )
-     SELECT i.friend_id,
-            f.display_name AS friend_name,
-            f.picture_url,
-            (SELECT COUNT(*) FROM webinar_viewers v WHERE v.webinar_id = ? AND v.friend_id = i.friend_id) AS sessions,
-            COALESCE((SELECT MIN(v.joined_at) FROM webinar_viewers v WHERE v.webinar_id = ? AND v.friend_id = i.friend_id), '') AS first_joined_at,
-            COALESCE((SELECT MAX(v.joined_at) FROM webinar_viewers v WHERE v.webinar_id = ? AND v.friend_id = i.friend_id), '') AS latest_joined_at,
-            COALESCE((SELECT MAX(v.last_position_seconds) FROM webinar_viewers v WHERE v.webinar_id = ? AND v.friend_id = i.friend_id), 0) AS max_watched_seconds,
-            (SELECT MAX(v.cta_clicked_at) FROM webinar_viewers v WHERE v.webinar_id = ? AND v.friend_id = i.friend_id) AS cta_clicked_at,
-            1 AS registered,
-            (SELECT MAX(fs.created_at)
-               FROM form_submissions fs
-               JOIN webinar_ctas wc ON wc.form_id = fs.form_id
-              WHERE wc.webinar_id = ? AND fs.friend_id = i.friend_id) AS form_submitted_at,
-            (SELECT ae.status FROM webinar_action_executions ae
-              WHERE ae.webinar_id = ? AND ae.friend_id = i.friend_id
-              ORDER BY ae.updated_at DESC LIMIT 1) AS action_status,
-            (SELECT ae.last_error FROM webinar_action_executions ae
-              WHERE ae.webinar_id = ? AND ae.friend_id = i.friend_id
-              ORDER BY ae.updated_at DESC LIMIT 1) AS action_error
-       FROM identities i
-       LEFT JOIN friends f ON f.id = i.friend_id
-      ORDER BY latest_joined_at DESC, i.friend_id
-      LIMIT ? OFFSET ?`,
-  ).bind(
-    webinarId, webinarId, webinarId, webinarId, webinarId, webinarId,
-    webinarId, webinarId, webinarId, webinarId, limit, offset,
-  ).all<Omit<WebinarParticipantOperation, 'integration_status'>>();
+     SELECT * FROM (
+       SELECT i.friend_id,
+              f.display_name AS friend_name,
+              f.picture_url,
+              (SELECT COUNT(*) FROM webinar_viewers v WHERE v.webinar_id = ? AND v.friend_id = i.friend_id) AS sessions,
+              COALESCE((SELECT MIN(v.joined_at) FROM webinar_viewers v WHERE v.webinar_id = ? AND v.friend_id = i.friend_id), '') AS first_joined_at,
+              COALESCE((SELECT MAX(v.joined_at) FROM webinar_viewers v WHERE v.webinar_id = ? AND v.friend_id = i.friend_id), '') AS latest_joined_at,
+              COALESCE((SELECT MAX(v.last_position_seconds) FROM webinar_viewers v WHERE v.webinar_id = ? AND v.friend_id = i.friend_id), 0) AS max_watched_seconds,
+              (SELECT MAX(v.cta_clicked_at) FROM webinar_viewers v WHERE v.webinar_id = ? AND v.friend_id = i.friend_id) AS cta_clicked_at,
+              EXISTS (
+                SELECT 1 FROM webinar_registrations r
+                WHERE r.webinar_id = ? AND r.friend_id = i.friend_id AND r.status = 'active'
+              ) AS registered,
+              (SELECT MAX(fs.created_at)
+                 FROM form_submissions fs
+                 JOIN webinar_ctas wc ON wc.form_id = fs.form_id
+                WHERE wc.webinar_id = ? AND fs.friend_id = i.friend_id) AS form_submitted_at,
+              (SELECT COUNT(*) FROM webinar_viewers v
+                WHERE v.webinar_id = ? AND v.friend_id = i.friend_id
+                  AND unixepoch(v.joined_at) < v.session_start_at + ?) AS live_sessions,
+              (SELECT COUNT(*) FROM webinar_viewers v
+                WHERE v.webinar_id = ? AND v.friend_id = i.friend_id
+                  AND unixepoch(v.joined_at) >= v.session_start_at + ?) AS replay_sessions,
+              (SELECT CASE WHEN unixepoch(v.joined_at) >= v.session_start_at + ?
+                        THEN 'replay' ELSE 'live' END
+                 FROM webinar_viewers v
+                WHERE v.webinar_id = ? AND v.friend_id = i.friend_id
+                ORDER BY v.joined_at DESC LIMIT 1) AS last_join_kind,
+              (SELECT ae.status FROM webinar_action_executions ae
+                WHERE ae.webinar_id = ? AND ae.friend_id = i.friend_id
+                ORDER BY ae.updated_at DESC LIMIT 1) AS action_status,
+              (SELECT ae.last_error FROM webinar_action_executions ae
+                WHERE ae.webinar_id = ? AND ae.friend_id = i.friend_id
+                ORDER BY ae.updated_at DESC LIMIT 1) AS action_error
+         FROM identities i
+         LEFT JOIN friends f ON f.id = i.friend_id
+     )
+     ${filterSql}
+     ORDER BY latest_joined_at DESC, friend_id
+     LIMIT ? OFFSET ?`,
+  ).bind(...binds).all<Omit<WebinarParticipantOperation, 'integration_status'>>();
   return (result.results ?? []).map((row) => ({
     ...row,
     integration_status: row.action_status === 'succeeded'
