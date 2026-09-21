@@ -110,6 +110,7 @@ function durationDetail(
 function retryabilityText(item: WebhookInteraction, allowed: boolean): string {
   if (item.status === 'succeeded') return '届いた記録なので、送り直す必要はありません。'
   if (item.status === 'pending') return 'いま処理の途中です。終わってから結果を確かめてください。'
+  if (item.status === 'retried') return 'すでに送り直した記録です。あとから追加された新しい記録の結果を確かめてください。'
   if (item.direction === 'incoming') {
     return '受け取った記録なので、こちらからは送り直せません。相手側でもう一度送ってもらってください。'
   }
