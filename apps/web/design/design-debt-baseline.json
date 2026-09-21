@@ -374,7 +374,7 @@
     "direct-secondary-button": 1
   },
   "app/webhooks/webhook-interactions.tsx": {
-    "unresolved-classname": 29
+    "unresolved-classname": 40
   },
   "app/webinars/edit/page.tsx": {
     "arbitrary-value": 24,

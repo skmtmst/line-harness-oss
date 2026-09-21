@@ -1399,6 +1399,17 @@ export interface OutgoingWebhookCreated extends Omit<OutgoingWebhook, 'hasSecret
 
 export type WebhookInteractionDirection = 'outgoing' | 'incoming';
 export type WebhookInteractionStatus = 'pending' | 'succeeded' | 'failed' | 'retried';
+/**
+ * 失敗理由の内部記号。'unknown' は「相手先へ届いたか分からない」失敗で、
+ * 無条件の再送をせず、相手先で確かめてから復旧する対象(IDEA-26)。
+ */
+export type WebhookInteractionFailureReason =
+  | 'connection_failed'
+  | 'response_4xx'
+  | 'response_429'
+  | 'response_5xx'
+  | 'processing_failed'
+  | 'unknown';
 
 /**
  * 外部連携の1回分の安全な表示。URL、シークレット、送受信本文は含めない。
@@ -1414,7 +1425,10 @@ export interface WebhookInteraction {
   responseStatus: number | null;
   attemptCount: number;
   durationMs: number | null;
+  /** 画面に出す日本語の失敗理由。 */
   failureReason: string | null;
+  /** 判定に使う失敗理由の記号。'unknown' は送り直し前に相手先での確認を要する。 */
+  failureReasonCode: WebhookInteractionFailureReason | null;
   canRetry: boolean;
   startedAt: string;
   completedAt: string | null;
@@ -1427,6 +1441,8 @@ export interface WebhookInteractionSummary {
   incoming: number;
   succeeded: number;
   failed: number;
+  /** 失敗のうち「届いたか分からない」件数。まとめて再送の対象外(IDEA-26)。 */
+  resultUnknown: number;
   averageDurationMs: number | null;
 }
 

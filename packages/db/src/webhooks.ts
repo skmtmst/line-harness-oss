@@ -142,6 +142,12 @@ export interface WebhookInteractionSummary {
   incoming: number;
   succeeded: number;
   failed: number;
+  /**
+   * 失敗のうち「相手先へ届いたか分からない」件数(IDEA-26)。
+   * この件数は無条件のまとめて再送へ入れず、相手先で確かめてから
+   * 1件ずつやり直す対象として画面へ示す。
+   */
+  resultUnknown: number;
   averageDurationMs: number | null;
 }
 
@@ -303,6 +309,7 @@ export async function listWebhookInteractions(
               SUM(CASE WHEN direction='incoming' THEN 1 ELSE 0 END) AS incoming,
               SUM(CASE WHEN status='succeeded' THEN 1 ELSE 0 END) AS succeeded,
               SUM(CASE WHEN status='failed' THEN 1 ELSE 0 END) AS failed,
+              SUM(CASE WHEN status='failed' AND failure_reason='unknown' THEN 1 ELSE 0 END) AS result_unknown,
               AVG(CASE WHEN status IN ('succeeded','failed') THEN duration_ms END) AS average_duration_ms
          FROM webhook_interaction_logs
         WHERE line_account_id=? AND created_at>=? AND status!='retried'`,
@@ -319,12 +326,23 @@ export async function listWebhookInteractions(
       incoming: summaryRow?.incoming ?? 0,
       succeeded: summaryRow?.succeeded ?? 0,
       failed: summaryRow?.failed ?? 0,
+      resultUnknown: summaryRow?.result_unknown ?? 0,
       averageDurationMs: summaryRow?.average_duration_ms == null
         ? null
         : Math.round(summaryRow.average_duration_ms),
     },
   };
 }
+
+/*
+ * IDEA-26: 「結果を確認できませんでした」(failure_reason='unknown') の記録は
+ * 相手先へ届いたか分からない。無条件にまとめて再送すると、届いていた
+ * 処理を二重に送る恐れがあるため一括再送の対象から外し、相手先で
+ * 確かめてから1件ずつやり直す対象として別に数える。
+ */
+const RETRYABLE_FAILURE_FILTER =
+  `direction='outgoing' AND status='failed'
+   AND (failure_reason IS NULL OR failure_reason <> 'unknown')`;
 
 export async function listFailedWebhookInteractionsForRetry(
   db: D1Database,
@@ -333,7 +351,7 @@ export async function listFailedWebhookInteractionsForRetry(
 ): Promise<WebhookInteractionRow[]> {
   const result = await db.prepare(
     `SELECT * FROM webhook_interaction_logs
-      WHERE line_account_id=? AND direction='outgoing' AND status='failed'
+      WHERE line_account_id=? AND ${RETRYABLE_FAILURE_FILTER}
       ORDER BY created_at ASC LIMIT ?`,
   ).bind(lineAccountId, Math.min(50, Math.max(1, limit))).all<WebhookInteractionRow>();
   return result.results ?? [];
@@ -343,6 +361,7 @@ export async function listFailedWebhookInteractionsForRetry(
  * まとめて再試行の対象になる失敗記録の総数。
  * 1リクエストの外部通信上限で一部しか処理できないとき、残り件数を
  * 画面へ明示するために使う（N-387: 対象外を黙って残さない）。
+ * 結果不明の記録は対象外なので、ここでも数えない(IDEA-26)。
  */
 export async function countFailedWebhookInteractionsForRetry(
   db: D1Database,
@@ -350,7 +369,23 @@ export async function countFailedWebhookInteractionsForRetry(
 ): Promise<number> {
   const row = await db.prepare(
     `SELECT COUNT(*) AS count FROM webhook_interaction_logs
-      WHERE line_account_id=? AND direction='outgoing' AND status='failed'`,
+      WHERE line_account_id=? AND ${RETRYABLE_FAILURE_FILTER}`,
+  ).bind(lineAccountId).first<{ count: number }>();
+  return Number(row?.count ?? 0);
+}
+
+/**
+ * 「届いたか分からない」失敗記録の総数(IDEA-26)。
+ * まとめて再送には乗せず、画面へ「相手先で確かめる必要がある件数」として返す。
+ */
+export async function countUnverifiedWebhookInteractions(
+  db: D1Database,
+  lineAccountId: string,
+): Promise<number> {
+  const row = await db.prepare(
+    `SELECT COUNT(*) AS count FROM webhook_interaction_logs
+      WHERE line_account_id=? AND direction='outgoing' AND status='failed'
+        AND failure_reason='unknown'`,
   ).bind(lineAccountId).first<{ count: number }>();
   return Number(row?.count ?? 0);
 }

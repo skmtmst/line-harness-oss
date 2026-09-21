@@ -36,6 +36,7 @@ vi.mock('@/lib/api', () => ({
     updateBooking: vi.fn(async () => ({})),
     retryCalendarSync: vi.fn(async () => ({ status: 'succeeded' })),
     retryNotification: vi.fn(async () => ({ status: 'succeeded' })),
+    getAuditLogs: vi.fn(async () => ({ audit_logs: [] })),
   },
 }))
 
@@ -53,12 +54,23 @@ const booking = (name: string, overrides: Record<string, unknown> = {}) => ({
   endsAt: '2026-09-20T02:00:00Z',
   requestedAt: '2026-09-19T01:00:00Z',
   source: 'liff',
-  customer: { displayName: `${name}顧客`, isLineLinked: true, friendId: null, phone: null },
+  customer: {
+    displayName: `${name}顧客`,
+    isLineLinked: true,
+    friendId: null,
+    phone: null,
+    bookingCustomerId: null,
+    petName: null,
+    tags: [],
+    mileageBalance: null,
+  },
+  previousHandover: null,
   notificationPolicy: { send_line_confirmation: false, day_before: false, hours_before: false },
   history: [],
   operations: [],
   reminders: [],
   auditLogs: [],
+  auditLogTotal: 0,
   lockVersion: 1,
   ...overrides,
 })
@@ -208,7 +220,16 @@ describe('DEEP-20: 確認窓の説明を実処理に合わせる', () => {
   it('LINE未連携なら、どの操作でも自動連絡が無いことを伝える', async () => {
     m.get.mockResolvedValue({
       booking: booking('A', {
-        customer: { displayName: 'A顧客', isLineLinked: false, friendId: null, phone: '末尾 1234' },
+        customer: {
+          displayName: 'A顧客',
+          isLineLinked: false,
+          friendId: null,
+          phone: '末尾 1234',
+          bookingCustomerId: null,
+          petName: null,
+          tags: [],
+          mileageBalance: null,
+        },
       }),
     })
     render(<Page />)

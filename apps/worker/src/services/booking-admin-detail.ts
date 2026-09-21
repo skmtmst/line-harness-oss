@@ -1,6 +1,12 @@
 import { listBookingOperations, type BookingOperationRun } from './booking-operation-runs.js';
 import { listBookingAuditLogs } from '@line-crm/db';
 
+/**
+ * IDEA-27: 詳細の初回応答に同梱する変更履歴は要点だけ（直近10件）。
+ * 長い履歴は GET .../audit-logs で追加取得する。総数は auditLogTotal で返す。
+ */
+const AUDIT_PREVIEW_LIMIT = 10;
+
 interface BookingDetailRow {
   id: string;
   line_account_id: string;
@@ -180,7 +186,7 @@ export async function getBookingAdminDetail(
       WHERE b.id = ? AND b.line_account_id = ?`,
   ).bind(input.id, input.lineAccountId).first<BookingDetailRow>();
   if (!row) return null;
-  const [profile, history, reminders, operations, auditLogs] = await Promise.all([
+  const [profile, history, reminders, operations, auditLogs, auditTotalRow] = await Promise.all([
     friendProfile(db, row.friend_id),
     historyForCustomer(db, {
       lineAccountId: input.lineAccountId,
@@ -195,7 +201,11 @@ export async function getBookingAdminDetail(
       id: string; kind: string; scheduled_at: string; sent_at: string | null; status: string; retry_count: number;
     }>(),
     listBookingOperations(db, { bookingId: row.id, lineAccountId: input.lineAccountId }),
-    listBookingAuditLogs(db, { bookingId: row.id, lineAccountId: input.lineAccountId, limit: 100 }),
+    listBookingAuditLogs(db, { bookingId: row.id, lineAccountId: input.lineAccountId, limit: AUDIT_PREVIEW_LIMIT }),
+    db.prepare(
+      `SELECT COUNT(*) AS total FROM booking_audit_logs
+        WHERE booking_id = ? AND line_account_id = ?`,
+    ).bind(row.id, input.lineAccountId).first<{ total: number }>(),
   ]);
   const previousHandover = history.find((item) => item.internal_note?.trim())?.internal_note ?? null;
   let notificationPolicy: Record<string, boolean> = {
@@ -267,6 +277,8 @@ export async function getBookingAdminDetail(
       retryCount: Number(item.retry_count),
     })),
     operations,
+    /** 変更履歴の総数。auditLogs は直近の要点分だけなので、残りは画面側が追加取得する。 */
+    auditLogTotal: Number(auditTotalRow?.total ?? auditLogs.length),
     auditLogs: auditLogs.map((log) => ({
       id: log.id,
       action: log.action,
