@@ -3,6 +3,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { ApiError, fetchApi } from '@/lib/api'
+import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import { IdempotencyKeyStore } from '@/lib/idempotency-key-store'
 import { createPollGeneration, startVisiblePoll, type VisiblePollHandle } from '@/lib/visible-polling'
 import TemplatePicker from '@/components/chats/template-picker'
@@ -394,6 +395,13 @@ export default function EmailThread({
   }
 
   /*
+   * INBOX-19: MAILのメモ窓もLINEと同じ約束にする。開いたら窓の中へ
+   * フォーカス、Tab は窓の中で回り、Escape で閉じ、閉じたら
+   * 「内部メモ」ボタンへフォーカスを戻す。保存中は Escape で閉じない。
+   */
+  const memoDialogRef = useOverlayFocus(showMemoEditor, closeMemoEditor, memoSaving)
+
+  /*
    * INBOX-25/26: メモの保存は「保存を始めたスレッドと版」に結びつける。
    * - 応答を待つ間に閉じたり別スレッドへ切り替わっても、今の画面へ
    *   結果を書き込まない。
@@ -658,7 +666,8 @@ export default function EmailThread({
             onClick={closeMemoEditor}
           >
             <div
-              className="w-full max-w-lg rounded-[14px] border border-[#E5E7EB] bg-canvas shadow-2xl"
+              ref={memoDialogRef}
+              className="max-h-[calc(100dvh-2rem)] w-full max-w-lg overflow-y-auto rounded-[14px] border border-[#E5E7EB] bg-canvas shadow-2xl"
               onClick={(event) => event.stopPropagation()}
             >
               <div className="border-b border-[#E5E7EB] px-5 py-4">

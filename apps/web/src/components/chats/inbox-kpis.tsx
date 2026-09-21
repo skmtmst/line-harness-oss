@@ -59,7 +59,8 @@ export default function InboxKpis() {
           ['自分が担当', value(stats?.mine)],
           ['今日の受信', value(stats?.todayInbound)],
           ['メール', value(stats?.todayByChannel?.email)],
-          ['期限超過', value(stats?.waitingOverAnHour)],
+          // INBOX-10: 数えるのは対応期限ではなく、未対応のまま1時間以上。
+          ['1時間以上待ち', value(stats?.waitingOverAnHour)],
         ].map(([label, count], index) => (
           <div key={label} className="min-w-0">
             <p className={`whitespace-nowrap text-[11px] font-semibold ${index === 3 ? 'text-[#334155]' : 'text-[#667085]'}`}>{label}</p>

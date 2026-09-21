@@ -1610,6 +1610,27 @@ const spec = {
         },
       },
     },
+    '/api/chats/quick-counts': {
+      get: {
+        tags: ['Chats'],
+        summary: '受信箱クイック絞り込み（すべて／要返信／1時間以上待ち）の件数を現在の条件で集計',
+        parameters: [
+          { name: 'status', in: 'query', schema: { type: 'string' } },
+          { name: 'operatorId', in: 'query', schema: { type: 'string' } },
+          { name: 'assignee', in: 'query', schema: { type: 'string' } },
+          { name: 'unreadOnly', in: 'query', schema: { type: 'string', enum: ['1', 'true'] } },
+          { name: 'channel', in: 'query', schema: { type: 'string', enum: ['all', 'line', 'email'] } },
+          { name: 'lineAccountId', in: 'query', schema: { type: 'string' } },
+          { name: 'q', in: 'query', schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': { description: 'Counts { all, reply, overdue } scoped to the current filters and visible channel' },
+          '400': { description: 'channel が不正' },
+          '403': { description: 'Staff role required' },
+          '404': { description: 'LINE account not found in account scope' },
+        },
+      },
+    },
     '/api/chats/outbound-failures': {
       get: {
         tags: ['Chats'],

@@ -1153,13 +1153,24 @@ friends.get('/api/friends/:id', requireVisibleFriend, async (c) => {
     const id = c.req.param('id');
     const db = c.env.DB;
 
-    const [friend, tags, formSubmissions, support] = await Promise.all([
+    const [friend, tags, formSubmissions, formSubmissionTotal, support] = await Promise.all([
       // 一覧と同じ first_tracked_link_id → tracked_links.name 基準で
       // 流入元名を添える（N-036）。無い・消えた流入元は null で、
       // 画面側は従来どおり「不明」を出す。
       getFriendWithFirstTrackedLinkName(db, id),
       getFriendTags(db, id),
+      /*
+       * 回答は最新10件まで。「あと何件あるか」が分かるよう、総数を
+       * 別に数えて返す（INBOX-17）。画面側は「全N件中10件を表示」と
+       * 続きへの導線を出せる。
+       */
       getFormSubmissionsByFriend(db, id, 10),
+      db
+        .prepare('SELECT COUNT(*) AS total FROM form_submissions WHERE friend_id = ?')
+        .bind(id)
+        .first<{ total: number }>()
+        .then((row) => row?.total ?? 0)
+        .catch(() => null),
       /*
        * 対応の状況（対応マーク・担当者・個別メモ）。
        *
@@ -1201,6 +1212,7 @@ friends.get('/api/friends/:id', requireVisibleFriend, async (c) => {
               notes: support.notes,
             }
           : null,
+        formSubmissionTotal,
         formSubmissions: formSubmissions.map((submission) => ({
           id: submission.id,
           formId: submission.form_id,
