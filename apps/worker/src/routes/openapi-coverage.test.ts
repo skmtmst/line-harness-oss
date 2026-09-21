@@ -184,6 +184,7 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'GET /api/friends/{friendId}/reminders',
   'GET /api/friends/{id}',
   'GET /api/friends/{id}/fields',
+  'GET /api/friends/{id}/upcoming',
   'GET /api/friends/count',
   'GET /api/hq/banners/generations/{id}',
   'GET /api/hq/banners/images',

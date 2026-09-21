@@ -500,6 +500,12 @@ export interface CommonVarDeleteImpact {
   total: number;
   blockingTotal: number;
   historicalTotal: number;
+  /**
+   * 配信中で、送信開始時に固定した値の写し（スナップショット）を持つ
+   * 使用先の件数。共通情報を直しても、その配信は固定済みの値のまま
+   * 送られる（IDEA-14）。
+   */
+  sendingFixedTotal: number;
   unscopedFormTotal: number;
   canDelete: boolean;
   byKind: Record<CommonVarUsageKind, number>;
@@ -515,7 +521,7 @@ export interface CommonVarDeleteImpact {
  * 削除前の1件に、保存すると何がどう変わるかを足したもの。
  */
 export interface CommonVarChangeImpactItem extends CommonVarDeleteImpactItem {
-  /** 保存すると変わるか。**送信済みの記録は変わらない。** */
+  /** 保存すると変わるか。**送信済みの記録と、送信開始時の値で固定済みの配信中は変わらない。** */
   changesOnSave: boolean;
   /** 差し込みの目印を本文から読み取れたか。読めないと変更後の文を作れない。 */
   previewAvailable: boolean;
