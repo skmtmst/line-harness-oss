@@ -257,4 +257,59 @@ describe('POST /api/conversions/ingest/:id (N-270)', () => {
     const response = await signedRequest({ friendId: 'f1' }, { eventId: 'e1' });
     expect(response.status).toBe(200);
   });
+
+  describe('#1037 IDEA-19: test:true の検証受信', () => {
+    it('同じ検査を通すが成果表へ書かず、検証として台帳へ残す', async () => {
+      const response = await signedRequest(
+        { friendId: 'friend-1', sourceEventId: 'test-1', value: 500, test: true },
+      );
+      expect(response.status).toBe(200);
+      const json = (await response.json()) as {
+        success: boolean;
+        data: { received: boolean; test: boolean; duplicated: boolean };
+      };
+      expect(json.data).toMatchObject({ received: true, test: true, duplicated: false });
+      // 検証は成果表を触らない。売上・報酬・集計へ混入しないことの根拠。
+      expect(dbMocks.trackConversion).not.toHaveBeenCalled();
+      expect(lastLog()).toMatchObject({
+        result: 'recorded', isTest: true,
+        sourceEventId: 'test-1', friendId: 'friend-1',
+      });
+    });
+
+    it('検証の再送でも成果表は触らず、検証の受信としてだけ残す', async () => {
+      const first = await signedRequest({ friendId: 'f1', test: true }, { eventId: 'test-dup' });
+      const second = await signedRequest({ friendId: 'f1', test: true }, { eventId: 'test-dup' });
+      expect(first.status).toBe(200);
+      expect(second.status).toBe(200);
+      expect(dbMocks.trackConversion).not.toHaveBeenCalled();
+      expect(lastLog()).toMatchObject({ result: 'recorded', isTest: true, sourceEventId: 'test-dup' });
+    });
+
+    it('検証でも友だちを特定できなければ400で、検証扱いの friend_missing を残す', async () => {
+      const response = await signedRequest({ test: true, value: 100 }, { eventId: 'test-no-friend' });
+      expect(response.status).toBe(400);
+      expect(lastLog()).toMatchObject({
+        result: 'rejected', reason: 'friend_missing', isTest: true, sourceEventId: 'test-no-friend',
+      });
+      expect(dbMocks.trackConversion).not.toHaveBeenCalled();
+    });
+
+    it('検証でもイベントIDが無ければ400で、検証扱いの source_event_id_missing を残す', async () => {
+      const response = await signedRequest({ friendId: 'f1', test: true });
+      expect(response.status).toBe(400);
+      expect(lastLog()).toMatchObject({
+        result: 'rejected', reason: 'source_event_id_missing', isTest: true,
+      });
+    });
+
+    it('test が true でない値は本番の受信として扱う', async () => {
+      const response = await signedRequest(
+        { friendId: 'f1', sourceEventId: 'prod-1', test: 'true' },
+      );
+      expect(response.status).toBe(200);
+      expect(dbMocks.trackConversion).toHaveBeenCalled();
+      expect(lastLog()?.isTest).not.toBe(true);
+    });
+  });
 });

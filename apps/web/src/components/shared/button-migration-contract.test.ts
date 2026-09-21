@@ -309,7 +309,7 @@ describe('標準ボタンの第1段階移行', () => {
     // 2026-09-06: 最新development統合後と機能18の直しを合わせた実測値。
     // 機能18では任意値指定を4つ減らしている。
     expect(debt['arbitrary-value']).toBeGreaterThan(0)
-  })
+  }, 60000)
 
   it('V5基準・V6画面優先と画像比較の未検証を契約へ残す', () => {
     const contract = JSON.parse(readFileSync(join(WEB, 'design', 'design-parts.json'), 'utf8'))

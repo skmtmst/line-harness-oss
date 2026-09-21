@@ -9,6 +9,7 @@ import {
   type ConversionDefinitionReport,
   type ConversionDefinitionFilter,
   type ConversionDefinitionState,
+  type ConversionDefinitionEvent,
   type ConversionIngestionEvent,
 } from '@/lib/api'
 import type { ConversionPoint } from '@line-crm/shared'
@@ -116,6 +117,52 @@ const EVENT_TYPE_LABELS: Record<string, string> = {
   form_submitted: '申込・登録',
   reservation_confirmed: '来店・参加',
   webinar_completed: 'その他',
+}
+
+/**
+ * IDEA-19: 成果1件の業務状態を運用者の言葉にする。
+ * 状態の導出は口(listConversionDefinitionEvents)が済ませている。
+ * 「検知」は受信履歴の「受け取った」が担い、ここは確定後の帰結を出す。
+ */
+const EVENT_STATUS_LABELS: Record<ConversionDefinitionEvent['status'], string> = {
+  confirmed: '確定',
+  pending: '確認待ち',
+  rejected: '却下',
+  cancelled: '取消',
+}
+
+/**
+ * IDEA-19: 外部受信の失敗理由を業務の言葉にする。
+ * 口が返す理由コードをそのまま出すと運用者が読めないため、ここで訳す。
+ * 辞書に無い理由はコードを出さず、判別用に title へ残す。
+ */
+const INGEST_REASON_LABELS: Record<string, string> = {
+  point_not_found: 'この成果地点が見つかりませんでした',
+  point_draft: '下書きのため、まだ計測していません',
+  point_stopped: '計測を止めているため、受け取りませんでした',
+  ingest_disabled: '外部からの受け口を止めています',
+  secret_not_issued: '受信用の鍵がまだ発行されていません',
+  signature_missing: '署名のない送信でした',
+  signature_mismatch: '署名が一致しませんでした。連携先の鍵を確認してください',
+  invalid_json: '送信内容の形式が正しくありませんでした',
+  source_event_id_missing: '送信側のイベントIDが無いため、重複かどうかを判定できませんでした',
+  friend_missing: '友だちを特定できませんでした',
+  friend_not_found: '指定された友だちが見つかりませんでした',
+  account_mismatch: 'このアカウントの友だちではないため、数えませんでした',
+  idempotency_conflict: '同じイベントIDで違う内容が届いたため、受け取りませんでした',
+}
+
+/** 受信履歴1件を運用者の言葉にする。検証の受信は本番実績と区別して出す。 */
+function ingestionEventLabel(event: ConversionIngestionEvent): string {
+  const reason = event.reason
+    ? INGEST_REASON_LABELS[event.reason] ?? '受け取れませんでした。理由は管理側の記録を確認してください'
+    : null
+  const base = event.isTest
+    ? event.result === 'rejected' ? '検証の受信（受け取れなかった）' : '検証の受信（実績には数えません）'
+    : event.result === 'recorded' ? '検知して数えた'
+      : event.result === 'duplicate' ? '同じ受信の再送（二重には数えません）'
+      : '受け取れなかった'
+  return reason ? `${base}（${reason}）` : base
 }
 
 import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
@@ -312,6 +359,12 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
   const [issuedSecret, setIssuedSecret] = useState('')
   const [ingestError, setIngestError] = useState('')
   const [ingestEvents, setIngestEvents] = useState<ConversionIngestionEvent[]>([])
+  /**
+   * IDEA-19: 成果1件ずつの記録。状態(確定・確認待ち・却下・取消)は
+   * 口が導出済みのものをそのまま出す。数え方や計測方法を問わず読む。
+   */
+  const [definitionEvents, setDefinitionEvents] = useState<ConversionDefinitionEvent[]>([])
+  const [eventsFailed, setEventsFailed] = useState(false)
 
   /**
    * 一覧は検索・並びを口へ渡し、続く頁をすべて読む(#513 M2・M3)。
@@ -448,13 +501,25 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
   /**
    * N-270: 詳細を開いたら受信履歴も読む。失敗しても詳細自体は開く
    * （履歴だけ見えない状態にしないため、ここでは握る）。
+   *
+   * IDEA-19: 成果1件ずつの記録は計測方法を問わず読む。こちらは失敗が
+   * 分かるよう `eventsFailed` を立て、静かに空へ倒さない。
    */
   useEffect(() => {
     setIssuedSecret('')
     setIngestError('')
     setIngestEvents([])
-    if (!detailTarget || detailTarget.measureMethod !== 'webhook') return
+    setDefinitionEvents([])
+    setEventsFailed(false)
+    if (!detailTarget) return
     const id = detailTarget.id
+    void api.conversions.definitionEvents(id, 10)
+      .then((response) => {
+        if (response.success) setDefinitionEvents(response.data.items)
+        else setEventsFailed(true)
+      })
+      .catch(() => setEventsFailed(true))
+    if (detailTarget.measureMethod !== 'webhook') return
     void api.conversions.ingestionEvents(id, 5)
       .then((response) => {
         if (response.success) setIngestEvents(response.data.items)
@@ -937,6 +1002,51 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
               </p>
             ) : null}
             {ingestError ? <p className="text-danger text-sm" role="alert">{ingestError}</p> : null}
+            {/*
+             * IDEA-19: 「購入」「相談完了」など成果1件ずつの記録。
+             * 検知は受信履歴、ここは数えた成果の状態(確定・確認待ち・却下・取消)
+             * を業務の言葉で出す。重複通知・再送は冪等で1件に潰れているので、
+             * この一覧の件数と「この30日」の確定数は同じ台帳から数えて一致する。
+             * 検証の受信は成果表へ書かないため、ここには本番実績だけが並ぶ。
+             */}
+            <section className="border-hairline rounded-control border p-4">
+              <h3 className="text-ink text-sm font-bold">最近の成果</h3>
+              {eventsFailed ? (
+                <p className="text-ink-faint mt-2 text-xs leading-5" role="status">
+                  成果の記録を読み込めませんでした。一覧の件数は上の「この30日」を確認してください。
+                </p>
+              ) : definitionEvents.length === 0 ? (
+                <p className="text-ink-faint mt-2 text-xs leading-5">
+                  まだ成果がありません。検知した成果がここに新しい順で並びます。
+                </p>
+              ) : (
+                <ul className="mt-3 space-y-1 text-xs">
+                  {definitionEvents.map((event) => (
+                    <li key={event.id} className="text-ink-secondary flex items-baseline justify-between gap-2">
+                      <span className="text-ink min-w-0">
+                        <span className="font-medium">{event.friendName ?? '名前のない友だち'}</span>
+                        <span
+                          className={`ml-2 inline-block rounded px-1.5 py-0.5 font-semibold ${
+                            event.status === 'cancelled' ? 'bg-danger-bg text-danger'
+                              : event.status === 'pending' ? 'bg-info-bg text-info'
+                              : event.status === 'rejected' ? 'bg-canvas-sunken text-ink-faint'
+                              : 'bg-success-bg text-success'
+                          }`}
+                        >
+                          {EVENT_STATUS_LABELS[event.status]}
+                        </span>
+                        {event.value !== null ? (
+                          <span className="text-ink-faint ml-2 tabular-nums">¥{event.value.toLocaleString('ja-JP')}</span>
+                        ) : null}
+                      </span>
+                      <span className="text-ink-faint shrink-0 tabular-nums">
+                        {event.createdAt.slice(0, 16).replace('T', ' ')}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
             {detailTarget.measureMethod === 'webhook' ? (
               <section className="border-hairline rounded-control border p-4">
                 <h3 className="text-ink text-sm font-bold">外部からの受信</h3>
@@ -978,9 +1088,11 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
                   <ul className="mt-3 space-y-1 text-xs">
                     {ingestEvents.slice(0, 5).map((event) => (
                       <li key={event.id} className="text-ink-secondary flex justify-between gap-2">
-                        <span className={event.result === 'rejected' ? 'text-danger' : 'text-ink'}>
-                          {event.result === 'recorded' ? '受け取った' : event.result === 'duplicate' ? '同じ受信の再送' : '受け取れなかった'}
-                          {event.reason ? `（${event.reason}）` : ''}
+                        <span
+                          className={event.result === 'rejected' ? 'text-danger' : event.isTest ? 'text-info' : 'text-ink'}
+                          title={event.reason ?? undefined}
+                        >
+                          {ingestionEventLabel(event)}
                         </span>
                         <span className="text-ink-faint tabular-nums">{event.createdAt.slice(0, 16).replace('T', ' ')}</span>
                       </li>

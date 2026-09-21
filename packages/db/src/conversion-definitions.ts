@@ -1456,6 +1456,11 @@ export type ConversionIngestionEvent = {
   conversionPointId: string;
   result: 'recorded' | 'duplicate' | 'rejected';
   reason: string | null;
+  /**
+   * IDEA-19: 検証の受信か。true の受信は成果表へ書かず台帳だけに残るので、
+   * 売上・報酬・集計へ混入しない。本番の受信は false。
+   */
+  isTest: boolean;
   sourceEventId: string | null;
   friendId: string | null;
   payloadShape: Record<string, unknown> | null;
@@ -1468,6 +1473,7 @@ type IngestionEventRow = {
   conversion_point_id: string;
   result: 'recorded' | 'duplicate' | 'rejected';
   reason: string | null;
+  is_test: number | null;
   source_event_id: string | null;
   friend_id: string | null;
   payload_shape_json: string | null;
@@ -1482,6 +1488,8 @@ export async function recordConversionIngestionEvent(
     conversionPointId: string;
     result: 'recorded' | 'duplicate' | 'rejected';
     reason?: string | null;
+    /** IDEA-19: 検証の受信なら true。成果表には書かない受信の目印。 */
+    isTest?: boolean;
     sourceEventId?: string | null;
     friendId?: string | null;
     payloadShape?: Record<string, unknown> | null;
@@ -1489,14 +1497,15 @@ export async function recordConversionIngestionEvent(
   },
 ): Promise<void> {
   await db.prepare(`INSERT INTO conversion_ingestion_events
-    (id, conversion_point_id, result, reason, source_event_id, friend_id,
+    (id, conversion_point_id, result, reason, is_test, source_event_id, friend_id,
      payload_shape_json, signature_sha256, created_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
     .bind(
       crypto.randomUUID(),
       input.conversionPointId,
       input.result,
       input.reason ?? null,
+      input.isTest ? 1 : 0,
       input.sourceEventId ?? null,
       input.friendId ?? null,
       input.payloadShape ? JSON.stringify(input.payloadShape) : null,
@@ -1523,6 +1532,7 @@ export async function listConversionIngestionEvents(
     conversionPointId: row.conversion_point_id,
     result: row.result,
     reason: row.reason,
+    isTest: row.is_test === 1,
     sourceEventId: row.source_event_id,
     friendId: row.friend_id,
     payloadShape: row.payload_shape_json
@@ -1531,6 +1541,133 @@ export async function listConversionIngestionEvents(
     signatureSha256: row.signature_sha256,
     createdAt: row.created_at,
   }));
+}
+
+/**
+ * IDEA-19: 成果1件ごとの業務状態。
+ *
+ * - confirmed : 確定。承認が要らない成果は記録と同時にここへ来る。
+ * - pending   : 確認待ち。アフィリエイト経由の成果で承認がまだのもの。
+ * - rejected  : 確認の結果、却下されたもの。確定成果には数えない。
+ * - cancelled : 確定のあと取消(返品・取消調整)が入ったもの。
+ */
+export type ConversionDefinitionEventStatus =
+  | 'confirmed' | 'pending' | 'rejected' | 'cancelled';
+
+export type ConversionDefinitionEventItem = {
+  id: string;
+  friendId: string;
+  /** 友だちの表示名。退会・削除済みなら null(画面はIDに倒す)。 */
+  friendName: string | null;
+  status: ConversionDefinitionEventStatus;
+  /** 生の承認状態。却下理由の列は持たないため null / pending / approved / rejected のみ。 */
+  approvalStatus: 'pending' | 'approved' | 'rejected' | null;
+  /** 取消台帳に取消が入っているか。 */
+  cancelled: boolean;
+  /** 計測したときの1件あたりの金額(地点の後からの編集に引きずられない控え)。 */
+  value: number | null;
+  /** どこから届いた成果か。metadata の source / sourceType を写す。 */
+  source: string | null;
+  sourceEventId: string | null;
+  createdAt: string;
+};
+
+type DefinitionEventRow = {
+  id: string;
+  friend_id: string;
+  friend_name: string | null;
+  approval_status: 'pending' | 'approved' | 'rejected' | null;
+  cancelled: number;
+  value_snapshot: number | null;
+  metadata: string | null;
+  created_at: string;
+};
+
+function readEventMetadataSource(metadata: string | null): {
+  source: string | null;
+  sourceEventId: string | null;
+} {
+  if (!metadata) return { source: null, sourceEventId: null };
+  try {
+    const parsed: unknown = JSON.parse(metadata);
+    if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      return { source: null, sourceEventId: null };
+    }
+    const record = parsed as Record<string, unknown>;
+    const source = typeof record.source === 'string'
+      ? record.source
+      : typeof record.sourceType === 'string' ? record.sourceType : null;
+    const sourceEventId = typeof record.sourceEventId === 'string' ? record.sourceEventId : null;
+    return { source, sourceEventId };
+  } catch {
+    return { source: null, sourceEventId: null };
+  }
+}
+
+/**
+ * IDEA-19: 成果地点ごとの成果1件ずつの一覧(新しい順)。
+ *
+ * 「検知・確認待ち・確定・取消」を業務の言葉で画面へ渡すため、
+ * 承認状態と取消台帳(affiliate_adjustments の cancel)から状態を導出する。
+ * 重複通知・再送は冪等キーで1件に潰れているため、この一覧の確定件数と
+ * 集計(netCount)は同じ台帳から数えて一致する。
+ *
+ * 取消台帳が無い環境(移行293より前の構成)では取消判定を0に倒し、
+ * 「取消かどうか分からない」を「取消でない」と偽らないため
+ * cancelled 判定だけを無効化して返す。
+ */
+export async function listConversionDefinitionEvents(
+  db: D1Database,
+  input: { id: string; scope: ConversionDefinitionScope; limit?: number },
+): Promise<ConversionDefinitionEventItem[] | null> {
+  const current = await currentDefinitionForMutation(db, input.id, input.scope);
+  if (!current) return null;
+  const limit = Math.min(100, Math.max(1, input.limit ?? 50));
+
+  const tables = await db
+    .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name IN ('affiliate_adjustments','affiliate_reward_entries')")
+    .all<{ name: string }>();
+  const hasCancellationLedger = tables.results.length === 2;
+  const cancelledSql = hasCancellationLedger
+    ? `EXISTS(SELECT 1 FROM affiliate_reward_entries re
+              JOIN affiliate_adjustments aa ON aa.source_entry_id = re.id
+             WHERE re.conversion_event_id = ce.id AND aa.reason_type = 'cancel')`
+    : '0';
+
+  const rows = await db
+    .prepare(
+      `SELECT ce.id, ce.friend_id, f.display_name AS friend_name,
+              ce.approval_status, ce.value_snapshot, ce.metadata, ce.created_at,
+              ${cancelledSql} AS cancelled
+         FROM conversion_events ce
+         LEFT JOIN friends f ON f.id = ce.friend_id
+        WHERE ce.conversion_point_id = ?
+        ORDER BY ce.created_at DESC, ce.id DESC
+        LIMIT ?`,
+    )
+    .bind(input.id, limit)
+    .all<DefinitionEventRow>();
+
+  return rows.results.map((row) => {
+    const { source, sourceEventId } = readEventMetadataSource(row.metadata);
+    const cancelled = row.cancelled === 1;
+    return {
+      id: row.id,
+      friendId: row.friend_id,
+      friendName: row.friend_name,
+      status: cancelled
+        ? 'cancelled'
+        : row.approval_status === 'pending'
+          ? 'pending'
+          : row.approval_status === 'rejected' ? 'rejected' : 'confirmed',
+      approvalStatus: row.approval_status,
+      cancelled,
+      value: row.value_snapshot,
+      source,
+      sourceEventId,
+      createdAt: row.created_at,
+    };
+  });
 }
 
 type ReportRow = {
