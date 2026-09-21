@@ -410,6 +410,8 @@ export type CommonVarChangeImpactDetail = CommonVarChangeImpact & {
   usageByKind: CommonVarChangeImpact['byKind']
   scheduledUsageCount: number
   publishedUsageCount: number
+  /** 送信開始時の値で固定済みの配信中。保存しても変わらない側（IDEA-14）。 */
+  sendingFixedUsageCount: number
   usageRevision: string
   impactProof: string
 }

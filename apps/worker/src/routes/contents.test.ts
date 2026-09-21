@@ -306,6 +306,7 @@ const EMPTY_COMMON_VAR_IMPACT = {
   total: 0,
   blockingTotal: 0,
   historicalTotal: 0,
+  sendingFixedTotal: 0,
   unscopedFormTotal: 0,
   byKind: {
     template: 0,
@@ -1986,6 +1987,64 @@ describe('共通情報', () => {
         usageRevision: expect.any(String),
       },
     });
+  });
+
+  /*
+    IDEA-14: 送信開始時の値で固定済みの配信は、保存してもその配信の
+    文は変わらない。「変わる場所」に入れると説明と処理がずれるので、
+    状態名・changesOnSave・件数のすべてで分ける。
+  */
+  it('固定済みの配信中は変わらない側へ数え、公開中はその名で返す', async () => {
+    mocks.getCommonVarUsageImpact.mockResolvedValue({
+      ...EMPTY_COMMON_VAR_IMPACT,
+      total: 3,
+      blockingTotal: 2,
+      sendingFixedTotal: 1,
+      byKind: { ...EMPTY_COMMON_VAR_IMPACT.byKind, broadcast: 2, scenario: 1 },
+      items: [
+        { kind: 'broadcast', source_id: 'b-fix', source_parent_id: null, source_name: '送信中の配信', source_status: 'sending_fixed', source_content: '{{var.shop_hours}}です', is_historical: 0 },
+        { kind: 'broadcast', source_id: 'b-sch', source_parent_id: null, source_name: '予約配信', source_status: 'scheduled', source_content: '{{var.shop_hours}}です', is_historical: 0 },
+        { kind: 'scenario', source_id: 's-1', source_parent_id: null, source_name: '公開中シナリオ', source_status: 'published', source_content: '{{var.shop_hours}}', is_historical: 0 },
+      ],
+    });
+    const res = await req('/api/common-vars/cv-1/impact-preview', 'POST', {
+      accountId: 'account-1', nextValue: '11-20',
+    });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({
+      data: {
+        sendingFixedTotal: 1,
+        sendingFixedUsageCount: 1,
+        scheduledUsageCount: 1,
+        publishedUsageCount: 1,
+        items: [
+          {
+            name: '送信中の配信', status: '配信中（送信開始時の値で固定済み）',
+            changesOnSave: false, blocksDeletion: false,
+          },
+          { name: '予約配信', status: '配信予約中', changesOnSave: true },
+          { name: '公開中シナリオ', status: '公開中', changesOnSave: true },
+        ],
+      },
+    });
+  });
+
+  it('固定済みの配信中だけなら、履歴を残したまま削除できる', async () => {
+    // 写しを持つ配信は、消してもその配信の文は変わらない。
+    mocks.getCommonVarUsageImpact.mockResolvedValue({
+      ...EMPTY_COMMON_VAR_IMPACT,
+      total: 1,
+      sendingFixedTotal: 1,
+      byKind: { ...EMPTY_COMMON_VAR_IMPACT.byKind, broadcast: 1 },
+      items: [{
+        kind: 'broadcast', source_id: 'b-fix', source_parent_id: null,
+        source_name: '送信中の配信', source_status: 'sending_fixed',
+        source_content: '{{var.shop_hours}}です', is_historical: 0,
+      }],
+    });
+    const res = await req('/api/common-vars/cv-1?accountId=account-1', 'DELETE');
+    expect(res.status).toBe(200);
+    expect(mocks.deleteCommonVar).toHaveBeenCalled();
   });
 
   it('変更影響の古い版は409で再読込を求める', async () => {
