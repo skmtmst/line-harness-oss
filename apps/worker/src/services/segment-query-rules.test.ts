@@ -302,3 +302,62 @@ describe('分析の一時対象者(N-274)', () => {
     expect(sql).toContain('analytics_result_audience_members')
   })
 })
+
+describe('友だち一覧からの引継ぎ条件（chat_status / operator_id）', () => {
+  /*
+   * IDEA-03。一覧の「対応」「担当者」絞り込みを配信条件へ写すための
+   * ルール。一覧と同じ chats 台帳を見るので、一覧に出た人と
+   * 配信対象がずれない。行が無い人は一覧どおり resolved 扱い。
+   */
+  beforeEach(() => {
+    raw.prepare(
+      `INSERT INTO operators (id, name, email) VALUES ('op-1', '佐藤', 'sato@example.com')`,
+    ).run()
+    raw
+      .prepare(
+        `INSERT INTO chats (id, friend_id, operator_id, status, created_at, updated_at)
+         VALUES ('chat-a', 'a', 'op-1', 'unread', '2026-01-01T00:00:00.000', '2026-01-01T00:00:00.000'),
+                ('chat-b', 'b', NULL, 'resolved', '2026-01-01T00:00:00.000', '2026-01-01T00:00:00.000')`,
+      )
+      .run()
+    // c には chats 行を作らない（一覧どおり resolved 扱いになるはず）。
+  })
+
+  it('chat_status: 未対応の人だけが残る', async () => {
+    expect(
+      await idsMatching({ operator: 'AND', rules: [{ type: 'chat_status', value: 'unread' }] }),
+    ).toEqual(['a'])
+  })
+
+  it('chat_status: 対応済みは行の無い人も含む（一覧と同じ resolved 扱い）', async () => {
+    expect(
+      await idsMatching({ operator: 'AND', rules: [{ type: 'chat_status', value: 'resolved' }] }),
+    ).toEqual(['b', 'c'])
+  })
+
+  it('chat_status: 知らない状態は組み立てを断る', () => {
+    expect(() =>
+      buildSegmentQuery({ operator: 'AND', rules: [{ type: 'chat_status', value: 'closed' }] }),
+    ).toThrow()
+  })
+
+  it('operator_id: その担当者が付いている人だけが残る', async () => {
+    expect(
+      await idsMatching({ operator: 'AND', rules: [{ type: 'operator_id', value: 'op-1' }] }),
+    ).toEqual(['a'])
+  })
+
+  it('operator_id: 空欄は全員一致にせず組み立てを断る', () => {
+    expect(() =>
+      buildSegmentQuery({ operator: 'AND', rules: [{ type: 'operator_id', value: '' }] }),
+    ).toThrow()
+  })
+
+  it('一般の条件保存口（配信経路）でも組み立てられる', () => {
+    const { sql } = buildPublicSegmentQuery({
+      operator: 'AND',
+      rules: [{ type: 'chat_status', value: 'unread' }, { type: 'operator_id', value: 'op-1' }],
+    })
+    expect(sql).toContain('chats')
+  })
+})
