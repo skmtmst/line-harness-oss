@@ -28,7 +28,9 @@ import {
 import ConnectorPanel from './connector-panel'
 import EcTabs from './ec-tabs-view'
 import SubscriptionsPanel from './subscriptions-panel'
+import OrderDetailDrawer from './order-detail-drawer'
 import { EC_TABS } from './ec-tabs'
+import { FAILURE_KIND_TEXT } from './ec-failure'
 import { formatEcDateTime as dateTime } from './ec-datetime'
 import styles from './ec-commerce-v6.module.css'
 
@@ -121,7 +123,14 @@ function EventsPanel({ accountId }: { accountId: string | null }) {
   const [sort, setSort] = useState<'newest' | 'oldest'>('newest')
   const [retryingSlot, setRetryingSlot] = useState<{ accountId: string | null; id: string | null }>({ accountId, id: null })
   const [noticeSlot, setNoticeSlot] = useState<{ accountId: string | null; notice: { tone: 'success' | 'error'; text: string } | null }>({ accountId, notice: null })
+  /*
+   * 「この注文の状況」パネル。一覧の他の値と同じく、開いた対象は必ず
+   * 「どのアカウントで開いたか」と一体で持つ。アカウントを切り替えた
+   * 描画では不一致＝閉じる、に倒れるので別アカウントの注文が残らない。
+   */
+  const [detailSlot, setDetailSlot] = useState<{ accountId: string | null; orderId: string | null }>({ accountId, orderId: null })
   const retryingId = retryingSlot.accountId === accountId ? retryingSlot.id : null
+  const detailOrderId = detailSlot.accountId === accountId ? detailSlot.orderId : null
   /* 絞りとページを同時に変えたとき、古い読み込みの返事で上書きしない。 */
   const overviewLoadSeq = useRef(0)
   const listLoadSeq = useRef(0)
@@ -400,8 +409,20 @@ function EventsPanel({ accountId }: { accountId: string | null }) {
                     ? `${action.errorMessage ?? '通知は送りませんでした'}。発送後の案内は予約しました`
                     : action.errorMessage ?? '何もしていません'
                   : ACTION_LABEL[action.eventType] ?? `未対応の出来事（${action.eventType}）`}</Td>
-              <Td><span className={`${styles.status} ${statusInfo.tone}`}>{statusInfo.label}</span></Td>
+              <Td>
+                <span className={styles.cellStack}>
+                  <span className={`${styles.status} ${statusInfo.tone}`}>{statusInfo.label}</span>
+                  {/* IDEA-23: 失敗・見送りの分類（未連携／権限・認証／通信の失敗など）を状態の下へ添える。 */}
+                  {action.failureKind && action.status !== 'succeeded'
+                    ? <span className={styles.cellSub}>{FAILURE_KIND_TEXT[action.failureKind].label}</span>
+                    : null}
+                </span>
+              </Td>
               <ActionCell>
+                {/* IDEA-23: 注文がある行は「この注文の状況」から出来事→通知→成果まで辿れる。 */}
+                {order
+                  ? <button type="button" className={styles.textLink} onClick={() => setDetailSlot({ accountId, orderId: order.id })}>注文の状況</button>
+                  : null}
                 {/* 友だち詳細は静的書き出しのため /friends/detail?id= 形。/friends/<id> は存在しない（IDEA-21 で修正）。 */}
                 {(action.friendId ?? order?.friendId)
                   ? <Link className={styles.textLink} href={`/friends/detail?id=${encodeURIComponent(action.friendId ?? order?.friendId ?? '')}`}>中身を見る</Link>
@@ -419,6 +440,13 @@ function EventsPanel({ accountId }: { accountId: string | null }) {
         </div>
       ) : null}
       {listState === 'ready' && pageCount > 1 ? <Pagination page={page} pageCount={pageCount} onPageChange={setPage} /> : null}
+      <OrderDetailDrawer
+        orderId={detailOrderId}
+        accountId={accountId}
+        onClose={() => setDetailSlot({ accountId, orderId: null })}
+        onRetryAction={retry}
+        retryingId={retryingId}
+      />
     </>
   )
 }

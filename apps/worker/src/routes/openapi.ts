@@ -2442,6 +2442,22 @@ const spec = {
         },
       },
     },
+    '/api/ec-commerce/orders/{id}': {
+      get: {
+        tags: ['NEN delivery'],
+        summary: 'EC注文1件の処理状況（届いた出来事・通知・発送後の案内・成果/マイル/スコア）',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'lineAccountId', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': { description: 'Order processing detail' },
+          '400': { description: 'LINE account is required' },
+          '403': { description: 'ec.event.view permission or account scope required' },
+          '404': { description: 'Order not found in account scope' },
+        },
+      },
+    },
     '/api/nen-campaigns/pets': {
       post: {
         tags: ['NEN delivery'],
