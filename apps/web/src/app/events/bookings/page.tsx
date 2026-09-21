@@ -56,6 +56,25 @@ const STATUS_LABELS = new Map([
   ['accepted', '受諾済み'] as const,
 ])
 
+/*
+ * IDEA-07: 予約に紐づく自動お知らせの予定を、予約そのもののそばで見せる。
+ * 開催回の移動や取消で止まった分も「停止済み」として出し、
+ * 古い通知が残っていないか・二重になっていないかをこの一覧で確かめられる。
+ * 別管理の通知一覧は作らず、変更に連動するこの場所だけで見せる。
+ */
+const REMINDER_KIND_LABELS: Record<string, string> = {
+  day_before: '前日のお知らせ',
+  hours_before: '開始前のお知らせ',
+}
+
+const REMINDER_STATUS_LABELS: Record<string, string> = {
+  pending: '送信予定',
+  sent: '送信済み',
+  cancelled: '停止済み',
+  failed: '失敗',
+  failed_permanent: '失敗',
+}
+
 function formatJp(iso: string | null | undefined, fallback: string): string {
   if (!iso) return fallback
   const date = new Date(iso)
@@ -957,6 +976,22 @@ function BookingsInner() {
                       </td>
                       <td className="text-ink-secondary px-4 py-3">
                         {formatJp(b.slot_starts_at, '予約枠は未取得')}
+                        {/* IDEA-07: この予約の通知予定。承認で組まれ、
+                            開催回の移動・取消で「停止済み」へ変わる。 */}
+                        {(b.reminders ?? []).length > 0 ? (
+                          <ul className="text-ink-faint mt-1 space-y-0.5 text-xs" data-booking-reminders={b.id}>
+                            {(b.reminders ?? []).map((reminder, index) => (
+                              <li key={`${reminder.kind}:${reminder.scheduled_at}:${index}`}>
+                                {REMINDER_KIND_LABELS[reminder.kind] ?? 'お知らせ'}
+                                {' '}
+                                {formatJp(reminder.scheduled_at, '日時未取得')}
+                                <span className="ml-1">
+                                  {REMINDER_STATUS_LABELS[reminder.status] ?? reminder.status}
+                                </span>
+                              </li>
+                            ))}
+                          </ul>
+                        ) : null}
                       </td>
                       <td className="text-ink-secondary px-4 py-3">
                         {b.companion_note ?? '登録情報は未接続'}
