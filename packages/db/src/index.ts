@@ -133,4 +133,5 @@ export * from './friend-tag-side-effects';
 export * from './hq-templates';
 export * from './platform-admins';
 export * from './nen-member-ranks';
+export * from './platform-knowledge.js';
 export * from './integration-api-tokens';

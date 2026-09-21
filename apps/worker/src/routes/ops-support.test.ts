@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
-import { createHqSupportRequest, statusForStage } from '@line-crm/db';
+import { createHqSupportRequest, addSupportTenantMessage, statusForStage } from '@line-crm/db';
 import type { Env } from '../index.js';
 import type { AuthenticatedStaff } from '../middleware/auth.js';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
@@ -248,12 +248,14 @@ describe('下書きと AI', () => {
     expect(res.status).toBe(201);
     const body = await res.json() as { data: { body: string; aiGenerated: boolean; generatedAt: string | null } };
     expect(body.data.aiGenerated).toBe(true);
-    expect(body.data.body).toContain('山田さま');
+    expect(body.data.body).toContain('[匿名]さま');
     expect(body.data.generatedAt).toBeTruthy();
     expect(run).toHaveBeenCalledWith('@cf/meta/llama-3.3-70b-instruct-fp8-fast', expect.objectContaining({ messages: expect.any(Array), max_tokens: 900 }));
     const input = run.mock.calls[0][1] as { messages: Array<{ role: string; content: string }> };
     // 個人のメールアドレスは AI に渡さない
     expect(input.messages.map((m) => m.content).join('\n')).not.toContain('yamada@example.com');
+    expect(input.messages.map((m) => m.content).join('\n')).not.toContain('山田');
+    expect(input.messages.map((m) => m.content).join('\n')).not.toContain('株式会社サンプル');
   });
 
   it('AI が時間内に返らなければ 504 で、下書きは作られない', async () => {
@@ -269,6 +271,29 @@ describe('下書きと AI', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+  it('最新の追加説明から根拠を探し、個別回答を生成する。除外しても記事は他の問い合わせに残る', async () => {
+    const source = await seedTicket('過去に解決した請求書の問い合わせ');
+    testDb.raw.prepare("UPDATE hq_support_requests SET stage = 'resolved' WHERE id = ?").run(source.id);
+    testDb.raw.prepare(`INSERT INTO platform_knowledge_articles (id,source_request_id,source_revision,title,question,answer,kind,review_state,status,created_at,updated_at)
+      VALUES ('billing-evidence',?,0,'請求書の再発行','請求書','承認済みの対応根拠','billing','approved','active','2026-09-21','2026-09-21')`).run(source.id);
+    const t = await seedTicket('画面がうまく使えない');
+    await addSupportTenantMessage(testDb.db, { requestId: t.id, staffId: 'owner-1', staffName: '山田 太郎', body: '説明を訂正します。請求書の再発行です。再ログインは実施済みです。', attachmentKeys: [] });
+    const run = vi.fn(async () => ({ response: '状況を確認するため追加の情報をお願いします。' }));
+    const res = await app(master, { run }).request(`/api/ops/support/tickets/${t.id}/draft/ai`, json({}));
+    expect(res.status).toBe(201);
+    expect((await res.json() as { data: { references: { id: string }[] } }).data.references).toEqual([expect.objectContaining({ id: 'billing-evidence' })]);
+    const call = run.mock.calls[0] as unknown as [string, { messages: { role: string; content: string }[] }];
+    expect(call[1].messages[1].content).toContain('再ログインは実施済み');
+    expect(call[1].messages[1].content).toContain('承認済みの対応根拠');
+    expect(call[1].messages[0].content).toContain('記事の回答文を転用せず');
+    expect(call[1].messages[0].content).toContain('実施済みの操作を理由なく繰り返し勧めない');
+    expect(call[1].messages[0].content).toContain('使える根拠がない場合');
+    const excluded = await app(master, { run }).request(`/api/ops/support/tickets/${t.id}/draft/ai`, json({ excludeArticleIds: ['billing-evidence'] }));
+    expect((await excluded.json() as { data: { references: unknown[] } }).data.references).toEqual([]);
+    expect(JSON.stringify(run.mock.calls[1])).not.toContain('承認済みの対応根拠');
+    expect(testDb.raw.prepare('SELECT status FROM platform_knowledge_articles WHERE id = ?').get('billing-evidence')).toEqual({ status: 'active' });
+    expect(mail.sendPlainMail).not.toHaveBeenCalled();
   });
 
   it('AI が失敗したら 502 で、下書きは作られない', async () => {

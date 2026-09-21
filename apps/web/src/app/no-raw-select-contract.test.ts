@@ -52,7 +52,7 @@ const NOT_YET: Record<string, number> = {}
 
 describe('素の <select> を画面に書かない', () => {
   it('全ページを読めている', () => {
-    expect(PAGES.length).toBe(183)  // 2026-10-07: 情報欄の編集画面（tags/fields/edit、#1013 ATTR-05）を足した後の実測値。
+    expect(PAGES.length).toBe(184)  // 情報欄の編集画面と運営専用ナレッジ（37-11）を含む実測値。
   })
 
   it('表に無い画面は素の <select> を持たない', () => {
