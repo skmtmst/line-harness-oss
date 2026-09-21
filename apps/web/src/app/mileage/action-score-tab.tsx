@@ -10,6 +10,7 @@ import Select from '@/components/shared/select'
 import SummaryCard from '@/components/shared/summary-card'
 import { ActionCell, DataTable, Td, Th, TableHeadRow, Tr } from '@/components/shared/table'
 import ActionScoreAdjustmentDialog from './action-score-adjustment-dialog'
+import ActionScoreHistoryDialog from './action-score-history-dialog'
 import {
   api,
   type ActionScoreBand,
@@ -18,7 +19,7 @@ import {
   type ActionScoreSort,
 } from '@/lib/api'
 import { csvCell } from '@/lib/presentation'
-import { formatMileageDate, formatMileageNumber } from './mileage-display'
+import { actionScoreReasonLabel, formatMileageDate, formatMileageNumber } from './mileage-display'
 
 const PAGE_SIZE_OPTIONS = [20, 50, 100] as const
 
@@ -67,21 +68,7 @@ function scoreRangeQuery(filter: ActionScoreFilter, summary: ActionScoreOverview
   return query.toString()
 }
 
-function safeReason(reason: string | null) {
-  if (!reason) return '点数が変わった理由は未取得'
-  const labels: Record<string, string> = {
-    message_received: 'メッセージ返信',
-    link_clicked: '配信URLクリック',
-    form_submitted: '回答フォーム回答',
-    booking_created: '予約',
-    purchase_completed: '購入',
-    friend_blocked: 'ブロック',
-  }
-  const [source, detail] = reason.split('→').map((part) => part.trim())
-  if (labels[source]) return detail || labels[source]
-  if (/^[a-z0-9_.-]+$/i.test(reason)) return '反応の記録'
-  return reason
-}
+const safeReason = actionScoreReasonLabel
 
 function scoreValue(item: ActionScoreOverview['items'][number]) {
   return item.currentScore
@@ -115,6 +102,11 @@ export default function ActionScoreTab({ accountId }: { accountId: string }) {
    */
   const [canAdjust, setCanAdjust] = useState(false)
   const [adjustTarget, setAdjustTarget] = useState<ActionScoreOverview['items'][number] | null>(null)
+  /*
+   * IDEA-17: 点数が変わった根拠を1人分たどる明細窓。
+   * 一覧の「最後の反応」だけでは履歴全体は追えないため。
+   */
+  const [historyTarget, setHistoryTarget] = useState<ActionScoreOverview['items'][number] | null>(null)
 
   useEffect(() => {
     let current = true
@@ -315,6 +307,7 @@ export default function ActionScoreTab({ accountId }: { accountId: string }) {
                     </Td>
                     <ActionCell>
                       <div className="flex flex-wrap justify-end gap-2">
+                        <Button onClick={() => setHistoryTarget(item)}>点数の変化を見る</Button>
                         {canAdjust ? <Button onClick={() => setAdjustTarget(item)}>点数を直す</Button> : null}
                         <Button href={`/friends/detail?id=${encodeURIComponent(item.friendId)}`}>この人を見る</Button>
                       </div>
@@ -341,6 +334,15 @@ export default function ActionScoreTab({ accountId }: { accountId: string }) {
           currentScore={scoreValue(adjustTarget)}
           onCancel={() => setAdjustTarget(null)}
           onCompleted={async () => { await load() }}
+        />
+      ) : null}
+      {historyTarget ? (
+        <ActionScoreHistoryDialog
+          open={historyTarget !== null}
+          friendId={historyTarget.friendId}
+          friendName={historyTarget.displayName}
+          currentScore={scoreValue(historyTarget)}
+          onCancel={() => setHistoryTarget(null)}
         />
       ) : null}
     </section>

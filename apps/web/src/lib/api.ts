@@ -2922,6 +2922,30 @@ export type ActionScoreBandPreview = {
   totalFriends: number
   measuredAt: string
 }
+/**
+ * 1人の点数と、その点数になった記録の明細。
+ * `scoreBefore` / `scoreAfter` / `eventType` は移行前の行では欠ける。
+ */
+export type FriendScoreHistoryItem = {
+  id: string
+  scoringRuleId: string | null
+  ruleKey: string | null
+  scoreChange: number
+  scoreBefore: number | null
+  scoreAfter: number | null
+  reason: string | null
+  eventType: string | null
+  source: string | null
+  occurredAt: string
+  createdAt: string
+  mode: 'manual' | 'automatic'
+  executedByStaffName: string | null
+}
+export type FriendScoreDetail = {
+  friendId: string
+  currentScore: number
+  history: FriendScoreHistoryItem[]
+}
 /** Friend list items, optionally hydrated with chat status (when ?includeChatStatus=true) */
 export type FriendListItem = FriendWithTags & Partial<{
   latestIncomingMessage: { content: string; messageType: string; createdAt: string } | null
@@ -9622,9 +9646,7 @@ export const api = {
     deleteRule: (id: string) =>
       fetchApi<ApiResponse<null>>(`/api/scoring-rules/${id}`, { method: 'DELETE' }),
     friendScore: (friendId: string) =>
-      fetchApi<ApiResponse<{ totalScore: number; history: { id: string; scoreChange: number; reason: string | null; createdAt: string }[] }>>(
-        `/api/friends/${friendId}/score`,
-      ),
+      fetchApi<ApiResponse<FriendScoreDetail>>(`/api/friends/${friendId}/score`),
   },
   mileage: {
     /*
@@ -10717,7 +10739,15 @@ export const api = {
       }>>>('/api/message-templates'),
   },
   entryRoutes: {
-    list: () => fetchApi<ApiResponse<EntryRoute[]>>('/api/entry-routes'),
+    /*
+     * accountId を渡すと Worker がそのアカウント所属の経路だけを返す。
+     * 省略時は可視範囲の全経路（複数アカウント分を含み得る）。
+     * アカウント単位で選ぶ画面は必ず渡す（DASH-09）。
+     */
+    list: (accountId?: string) =>
+      fetchApi<ApiResponse<EntryRoute[]>>(
+        `/api/entry-routes${accountId ? `?account_id=${encodeURIComponent(accountId)}` : ''}`,
+      ),
     get: (id: string) => fetchApi<ApiResponse<EntryRoute>>(`/api/entry-routes/${id}`),
     create: (data: CreateEntryRouteInput) =>
       fetchApi<ApiResponse<EntryRoute>>('/api/entry-routes', {

@@ -13,6 +13,21 @@ import TemplateFolderSelect, {
 type TemplateLoadStatus = 'idle' | 'loading' | 'ready' | 'error'
 
 /**
+ * 一覧口が返す使用数。shared の `Template` には無いが、GET /api/templates
+ * は usageCount・月間/累計の送信数を返す。「よく使う」はこれで並べる。
+ */
+type UsageAwareTemplate = Template & {
+  usageCount?: number
+  monthlySendCount?: number | null
+  totalSendCount?: number | null
+}
+
+/** 「よく使う」の並べ方。直近の送信数→累計→使用箇所数の順で見る。 */
+function usageScore(template: UsageAwareTemplate): number {
+  return template.monthlySendCount ?? template.totalSendCount ?? template.usageCount ?? 0
+}
+
+/**
  * テンプレートを選ぶ（設計 V2 2-1-1）。
  *
  * 受信箱の入力欄から開く。選ぶと本文が入力欄に入り、送る前に直せる。
@@ -179,7 +194,16 @@ export default function TemplatePicker({
       if (!q) return true
       return t.name.toLowerCase().includes(q) || t.messageContent.toLowerCase().includes(q)
     })
-    if (category === 'frequent') return filtered.slice(0, 5)
+    /*
+     * 「よく使う」。先頭5件を切るだけだと、登録順のたまたま上にあった
+     * ものが「よく使う」に見えてしまう。一覧口が返す送信数・使用箇所数の
+     * 多い順にしてから5件に絞る。数えられるものが無いものは 0 として扱う。
+     */
+    if (category === 'frequent') {
+      return [...filtered]
+        .sort((a, b) => usageScore(b as UsageAwareTemplate) - usageScore(a as UsageAwareTemplate))
+        .slice(0, 5)
+    }
     if (category === 'reservation') return filtered.filter((template) => /予約|来店|前日|日程/.test(`${template.name} ${template.messageContent}`))
     if (category === 'ec') return filtered.filter((template) => /EC|注文|発送|配送|商品/.test(`${template.name} ${template.messageContent}`))
     return filtered
@@ -274,8 +298,13 @@ export default function TemplatePicker({
           />
         </div>
 
-        <div className="min-h-0 flex-1 grid-cols-[350px_1fr] md:grid">
-          <div className="min-h-0 overflow-y-auto border-r border-[#E5E7EB] bg-[#F7F8F6] p-3">
+        {/*
+          * 狭い画面では左の一覧と右のプレビューを縦に積み、この領域ごと
+          * スクロールする。プレビューを md 以上だけにすると、狭い画面では
+          * 挿入前に全文を確かめる場所がなくなる（IDEA-11）。
+          */}
+        <div className="min-h-0 flex-1 overflow-y-auto md:grid md:grid-cols-[350px_1fr] md:overflow-visible">
+          <div className="min-h-0 border-b border-[#E5E7EB] bg-[#F7F8F6] p-3 md:overflow-y-auto md:border-b-0 md:border-r">
             <div className="mb-2 flex flex-wrap items-center gap-1.5">
               {[
                 { key: 'all' as const, label: 'すべて' },
@@ -315,7 +344,7 @@ export default function TemplatePicker({
                       aria-pressed={selected?.id === template.id}
                       className={`w-full rounded-lg border px-3 py-3 text-left ${selected?.id === template.id ? 'border-[#A6E7BD] bg-[#EAFBF0]' : 'border-[#E5E7EB] bg-canvas hover:bg-[#F2F4F7]'}`}
                     >
-                      <p className="truncate text-sm font-semibold text-[#1F2937]">{template.name}</p>
+                      <p className="truncate text-sm font-semibold text-[#1F2937]" title={template.name}>{template.name}</p>
                       <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-[#667085]">{template.messageContent}</p>
                     </button>
                   </li>
@@ -324,7 +353,7 @@ export default function TemplatePicker({
             )}
           </div>
 
-          <section className="hidden min-h-0 overflow-y-auto bg-canvas p-6 md:block" aria-label="テンプレートのプレビュー">
+          <section className="min-h-0 bg-canvas p-6 md:overflow-y-auto" aria-label="テンプレートのプレビュー">
             {selected ? (
               <div>
                 <div className="flex items-center justify-between gap-3">

@@ -63,7 +63,8 @@ describe('受信箱の応答対象照合(#962)', () => {
     expect(PAGE).toContain('dropSentDraft(schedulingChatId, schedulingAccountId, { content })')
     // 入力欄・添付は「今もその会話を開いていて、版が変わっていない」ときだけ消す。
     expect(PAGE).toContain("setMessageContent((prev) => (prev.trim() === content ? '' : prev))")
-    expect(PAGE).toContain('setPendingImage((prev) => (prev === pendingImage ? null : prev))')
+    // 添付は送った版と同じときだけ外し、ファイル名の記録も一緒に消す(INBOX-23/32)。
+    expect(PAGE).toContain('if (pendingImageRef.current === pendingImage)')
   })
 })
 
