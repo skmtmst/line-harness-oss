@@ -87,14 +87,32 @@ describe('V6 1通目設定の契約', () => {
     expect(TABS).not.toContain('rounded-t-control')
   })
 
-  it('本文の高さと、日数・時刻の幅を設計に合わせる', () => {
-    expect(PAGE_CSS).toMatch(/\.bodyField \{[^}]*height: 118px;/)
-    expect(PAGE_CSS).toMatch(/\.smallField \{[^}]*height: 38px;[^}]*width: 110px;/)
-    expect(PAGE_CSS).toMatch(/\.timeField \{[^}]*height: 38px;[^}]*width: 130px;/)
+  it('入力欄の高さと本文の伸び方を共通基準（UX-01）に合わせる', () => {
+    /*
+     * SCENARIO-19: 入力・選択・ボタンは PC 40px・タッチ 44px。
+     * 本文の作成欄は 160px を下限に内容に応じて伸び、上限を超えた分は
+     * 欄内スクロール。幅だけが設計固有の数（日数110・時刻130）。
+     */
+    expect(PAGE_CSS).toMatch(/\.smallField \{[^}]*height: 40px;[^}]*width: 110px;/)
+    expect(PAGE_CSS).toMatch(/\.timeField \{[^}]*height: 40px;[^}]*width: 130px;/)
+    expect(PAGE_CSS).toMatch(/\.bodyField \{[^}]*min-height: 160px;/)
+    expect(PAGE_CSS).toMatch(/\.bodyField \{[^}]*field-sizing: content;/)
+    expect(PAGE_CSS).toMatch(/\.bodyField \{[^}]*max-height:/)
+    expect(PAGE_CSS).toContain('@media (pointer: coarse)')
+    expect(PAGE_CSS).toMatch(/\.smallField,\s*\n\s*\.timeField \{[^}]*height: 44px;/)
     expect(PAGE).toContain('styles.bodyField')
     expect(PAGE).toContain('styles.smallField')
     expect(PAGE).toContain('styles.timeField')
     expect(PAGE).not.toContain('w-20 border px-3 py-2 text-sm')
+  })
+
+  it('本文は手動でも広げられ、「本文」の字が入力欄と結び付く', () => {
+    // SCENARIO-19: resize を禁じると、伸長が効かない環境で長文が隠れたままになる。
+    expect(PAGE).toContain('resize-y')
+    expect(PAGE).not.toContain('resize-none')
+    // ラベルを押すと入力欄へ移る（UX-01 / U087）。
+    expect(PAGE).toContain('htmlFor="first-step-body"')
+    expect(PAGE).toContain('id="first-step-body"')
   })
 
   it('本文の文字数を出す', () => {
