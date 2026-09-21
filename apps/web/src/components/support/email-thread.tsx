@@ -65,7 +65,12 @@ export function EmailThreadBackButton({ onBack }: { onBack: () => void }) {
 
 function EmailThreadHeader({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex min-h-[66px] items-center justify-between gap-2 border-b border-[#E5E7EB] bg-canvas px-4 py-3">
+    /*
+     * U008/U010: 狭い幅では宛先を1行目いっぱいに取り、対応・担当・
+     * 顧客情報は2行目へ折り返す。1行に固定すると 320/390px で件名や
+     * 右の操作が潰れて、誰へ返すのか読めなかった。LINE のトークと同じ組み方。
+     */
+    <div className="flex min-h-[66px] flex-wrap items-center justify-between gap-x-2 gap-y-2 border-b border-[#E5E7EB] bg-canvas px-4 py-3">
       {children}
     </div>
   )
@@ -100,6 +105,10 @@ export default function EmailThread({
   }, [])
   const [sending, setSending] = useState(false)
   const [error, setError] = useState('')
+  /** 初回の読み込みが失敗した理由。再試行の口と一緒に出す(INBOX-28)。 */
+  const [loadError, setLoadError] = useState('')
+  // INBOX-24: IME変換中・変換確定のEnterは送信キーにしない。
+  const isComposingRef = useRef(false)
   const bottomRef = useRef<HTMLDivElement>(null)
   const sendKeysRef = useRef(new IdempotencyKeyStore())
 
@@ -113,6 +122,8 @@ export default function EmailThread({
   const [memoError, setMemoError] = useState('')
   /** 送信キー。LINE 側と同じ設定を読む。別々にすると片方だけ効かない。 */
   const [sendMode, setSendMode] = useState<'enter' | 'shift-enter'>('shift-enter')
+  // U008: 狭い幅で切れた件名を、その場で全文に広げるための状態。
+  const [headerSubjectExpanded, setHeaderSubjectExpanded] = useState(false)
 
   useEffect(() => {
     try {
@@ -157,6 +168,20 @@ export default function EmailThread({
     })
   }, [writeDraft])
 
+  /*
+   * INBOX-28: 読み込み失敗の理由を分けて伝える。
+   * 404は会話自体が無い、403は権限、それ以外は回線やサーバー。
+   * 空の会話と失敗を混同しない。
+   */
+  const describeLoadFailure = (cause: unknown): string => {
+    if (cause instanceof ApiError) {
+      if (cause.status === 404) return 'このメールの会話は見つかりませんでした'
+      if (cause.status === 403) return 'このメールの会話を見る権限がありません'
+      if (cause.status === 401) return 'ログインの期限が切れています。再ログインしてください'
+    }
+    return 'メールの会話を読み込めませんでした。接続を確認して再試行してください'
+  }
+
   // 静かな取り直しは成否を返す。失敗の数え直し・待ちの延長は startVisiblePoll が持つ。
   // 古い取得の応答は捨て、失敗にも数えない(新しい取得が届ける)。
   const load = useCallback(
@@ -172,15 +197,17 @@ export default function EmailThread({
         if (isStale()) return true
         if (res.success) {
           setDetail(res.data)
+          setLoadError('')
           if (!quiet) {
             window.setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 50)
           }
           return true
         }
+        if (!quiet) setLoadError('メールの会話を読み込めませんでした。接続を確認して再試行してください')
         return false
-      } catch {
+      } catch (loadErrorCause) {
         if (isStale()) return true
-        if (!quiet) setError('メールの会話を読み込めませんでした')
+        if (!quiet) setLoadError(describeLoadFailure(loadErrorCause))
         return false
       }
     },
@@ -215,6 +242,16 @@ export default function EmailThread({
     // F06: 別会話へ移るときは空にするのではなく、その会話の下書きを戻す。
     setReply(draftsRef.current.get(threadId) ?? '')
     setThreadStalled(false)
+    setLoadError('')
+    /*
+     * INBOX-25: 別スレッドへ切り替わったら、前のスレッドのメモ編集を
+     * 閉じて保存中の印も下ろす。保存の応答が遅れて届いても、
+     * 新しいスレッドの画面へ書き込ませない。
+     */
+    setShowMemoEditor(false)
+    setMemoSaving(false)
+    setMemoError('')
+    setHeaderSubjectExpanded(false)
     // 初回も同じ1本に載せる。初回だけ外に別走させると
     // 初回と5秒後の取得が重複する。初回だけ表示あり、2回目から静かに。
     let first = true
@@ -254,11 +291,15 @@ export default function EmailThread({
    * 失敗も画面に出なかった。経路を合わせ、失敗を出すようにした。
    */
   const updateStatus = async (status: ThreadStatus) => {
+    // 操作を始めたスレッドを固定する。応答を待つ間に別スレッドへ
+    // 切り替わっても、その画面へ結果・失敗を書き込まない(A02-01/04)。
+    const myThread = threadId
     try {
       const res = await fetchApi<{ success: boolean; error?: string }>(
-        `/api/support/email/threads/${encodeURIComponent(threadId)}/status`,
+        `/api/support/email/threads/${encodeURIComponent(myThread)}/status`,
         { method: 'PATCH', body: JSON.stringify({ status, revision: detail?.thread.revision }) },
       )
+      if (latestThreadRef.current !== myThread) return
       if (!res.success) {
         setError(res.error || '状態を変えられませんでした')
         return
@@ -267,17 +308,19 @@ export default function EmailThread({
       await load(true)
       onChanged?.()
     } catch {
-      setError('状態を変えられませんでした')
+      if (latestThreadRef.current === myThread) setError('状態を変えられませんでした')
     }
   }
 
   /** 担当を付け替える（LINE のトークと同じ）。 */
   const updateAssignee = async (staffId: string | null) => {
+    const myThread = threadId
     try {
       const res = await fetchApi<{ success: boolean; error?: string }>(
-        `/api/support/email/threads/${encodeURIComponent(threadId)}/assignee`,
+        `/api/support/email/threads/${encodeURIComponent(myThread)}/assignee`,
         { method: 'PATCH', body: JSON.stringify({ staffId, revision: detail?.thread.revision }) },
       )
+      if (latestThreadRef.current !== myThread) return
       if (!res.success) {
         setError(res.error || '担当を変えられませんでした')
         return
@@ -286,21 +329,26 @@ export default function EmailThread({
       await load(true)
       onChanged?.()
     } catch {
-      setError('担当を変えられませんでした')
+      if (latestThreadRef.current === myThread) setError('担当を変えられませんでした')
     }
   }
 
   const sendReply = async () => {
     if (!reply.trim() || sending) return
-    const sentThread = threadId
+    /*
+      F06+A02-01/04: 送信を始めたスレッドと送った版を固定する。
+      応答を待つ間に別の会話へ切り替わっても、その画面の入力欄を
+      消したり失敗を出したりしない。消すのは送った会話の送った版だけ。
+    */
+    const sendingThreadId = threadId
     const sentBody = reply
     const content = sentBody.trim()
-    const signature = JSON.stringify({ threadId, body: content })
+    const signature = JSON.stringify({ threadId: sendingThreadId, body: content })
     const idempotencyKey = sendKeysRef.current.get(signature)
     setSending(true)
     setError('')
     try {
-      await fetchApi(`/api/support/email/threads/${encodeURIComponent(threadId)}/reply`, {
+      await fetchApi(`/api/support/email/threads/${encodeURIComponent(sendingThreadId)}/reply`, {
         method: 'POST',
         headers: { 'Idempotency-Key': idempotencyKey },
         body: JSON.stringify({ body: content, revision: detail?.thread.revision }),
@@ -309,20 +357,23 @@ export default function EmailThread({
       /*
         F06: 消すのは送った会話の送った版だけ。応答待ちの間に同じ会話へ
         追記した新しい版（draftが送った版と違う）は残し、別会話へ
-        移っていた場合は表示中の入力欄に触らない。
+        移っていた場合は表示中の入力欄に触らない(A02-01/04)。
       */
-      if (draftsRef.current.get(sentThread) === sentBody) {
-        draftsRef.current.delete(sentThread)
-        if (latestThreadRef.current === sentThread) setReply('')
+      if (draftsRef.current.get(sendingThreadId) === sentBody) {
+        draftsRef.current.delete(sendingThreadId)
+        if (latestThreadRef.current === sendingThreadId) setReply('')
       }
-      await load()
+      // 同じスレッドを開いているときだけ会話を取り直す。
+      if (latestThreadRef.current === sendingThreadId) await load()
       onChanged?.()
     } catch (sendError) {
-      setError(
-        sendError instanceof ApiError && sendError.status === 409
-          ? '二重送信を避けるため送信を止めました。会話を読み直し、他担当者の返信と送信履歴を確認してください'
-          : '返信を送れませんでした',
-      )
+      if (latestThreadRef.current === sendingThreadId) {
+        setError(
+          sendError instanceof ApiError && sendError.status === 409
+            ? '二重送信を避けるため送信を止めました。会話を読み直し、他担当者の返信と送信履歴を確認してください'
+            : '返信を送れませんでした',
+        )
+      }
     } finally {
       setSending(false)
     }
@@ -335,33 +386,62 @@ export default function EmailThread({
   }
 
   const closeMemoEditor = () => {
+    // 閉じたあとに届く保存結果は画面へ適用しない(INBOX-25)。
+    memoSaveGenRef.current += 1
     setMemoDraft(detail?.thread.notes ?? '')
     setMemoError('')
     setShowMemoEditor(false)
   }
 
+  /*
+   * INBOX-25/26: メモの保存は「保存を始めたスレッドと版」に結びつける。
+   * - 応答を待つ間に閉じたり別スレッドへ切り替わっても、今の画面へ
+   *   結果を書き込まない。
+   * - 成功したら返ってきた notes と revision をそのまま採用する。
+   *   古い版のまま次の保存を送ると409になる(INBOX-26)。
+   * - 409(他の人が先に更新)は書いた下書きを消さず、読み直しを促す。
+   */
+  const memoSaveGenRef = useRef(0)
   const saveMemo = async () => {
     if (!detail || memoSaving) return
+    const myThread = threadId
+    const myRevision = detail.thread.revision
+    const mySeq = ++memoSaveGenRef.current
+    const isStale = () =>
+      memoSaveGenRef.current !== mySeq || latestThreadRef.current !== myThread
     setMemoSaving(true)
     setMemoError('')
     try {
-      const res = await fetchApi<{ success: boolean; error?: string }>(
+      const res = await fetchApi<{ success: boolean; error?: string; data?: { notes: string | null; revision: number } }>(
         `/api/support/email/threads/${encodeURIComponent(threadId)}/notes`,
-        { method: 'PATCH', body: JSON.stringify({ notes: memoDraft, revision: detail.thread.revision }) },
+        { method: 'PATCH', body: JSON.stringify({ notes: memoDraft, revision: myRevision }) },
       )
+      if (isStale()) return
       if (!res.success) {
         setMemoError(res.error || '内部メモを保存できませんでした')
         return
       }
-      setDetail((current) => current ? {
+      setDetail((current) => current && current.thread.id === myThread ? {
         ...current,
-        thread: { ...current.thread, notes: memoDraft || null },
+        thread: {
+          ...current.thread,
+          // 返ってきた保存結果を採用する。次の保存はこの版を送る。
+          notes: res.data?.notes ?? memoDraft ?? null,
+          revision: res.data?.revision ?? myRevision,
+        },
       } : current)
       setShowMemoEditor(false)
       onChanged?.()
-    } catch {
-      setMemoError('内部メモを保存できませんでした')
+    } catch (saveError) {
+      if (isStale()) return
+      if (saveError instanceof ApiError && saveError.status === 409) {
+        // 書いた下書きは残す。消すと入れ直しになる。
+        setMemoError('他の担当者が先に更新しています。会話を読み直してから保存し直してください。')
+      } else {
+        setMemoError('内部メモを保存できませんでした')
+      }
     } finally {
+      // 閉じた・切り替わったあとも「保存中」の印は必ず下ろす。
       setMemoSaving(false)
     }
   }
@@ -375,8 +455,21 @@ export default function EmailThread({
             <p className="text-ink truncate text-sm font-medium">お問い合わせ（メール）</p>
           </div>
         </EmailThreadHeader>
-        <div className="text-ink-faint flex flex-1 items-center justify-center text-sm">
-          {error || '会話を読み込み中...'}
+        <div className="text-ink-faint flex flex-1 flex-col items-center justify-center gap-2 px-4 text-center text-sm">
+          {/*
+            INBOX-28: 初回の読み込み失敗は空白にせず、理由と再試行を出す。
+            空の会話とは見せ分ける。再試行はキーボードでも押せる。
+          */}
+          <p>{loadError || '会話を読み込み中...'}</p>
+          {loadError ? (
+            <button
+              type="button"
+              onClick={() => setThreadRetryKey((key) => key + 1)}
+              className="text-action font-semibold underline underline-offset-2"
+            >
+              もう一度読み込む
+            </button>
+          ) : null}
         </div>
       </div>
     )
@@ -385,19 +478,38 @@ export default function EmailThread({
   return (
     <>
       <EmailThreadHeader>
-        <div className="flex min-w-0 items-center gap-2">
+        <div className="flex min-w-0 basis-full items-center gap-2 sm:basis-auto sm:flex-1">
           <EmailThreadBackButton onBack={onBack} />
           <div className="min-w-0">
-            <p className="text-ink truncate text-sm font-medium">{detail.thread.subject}</p>
-            <p className="text-ink-faint mt-0.5 truncate text-xs">
+            {/*
+              U008: 長い件名が狭い幅で切れても、押すと(キーボードでも)
+              全文に広げられる。title でも全文を確認できる。
+            */}
+            <button
+              type="button"
+              title={detail.thread.subject}
+              aria-expanded={headerSubjectExpanded}
+              onClick={() => setHeaderSubjectExpanded((v) => !v)}
+              className={`block w-full text-left text-sm font-medium text-ink ${headerSubjectExpanded ? 'whitespace-normal break-all' : 'truncate'}`}
+            >
+              {detail.thread.subject}
+            </button>
+            <p
+              className="text-ink-faint mt-0.5 truncate text-xs"
+              title={`${detail.thread.customer_name || detail.thread.customer_email} ・ メール`}
+            >
               {detail.thread.customer_name || detail.thread.customer_email} ・ メール
             </p>
           </div>
         </div>
         {/* LINE のトークと同じ並び：対応 ・ 担当 ・ 顧客情報。 */}
-        <div className="flex flex-wrap items-center justify-end gap-3">
+        <div className="ml-auto flex flex-wrap items-center justify-end gap-x-3 gap-y-2">
           <label className="flex items-center gap-1.5 text-xs">
-            <span className="text-ink-faint">対応</span>
+            {/*
+              U010: 「対応」「担当」の短い文字が縦に割れないよう、
+              ラベルは1行で保ち、収まらないときは行ごと次へ落とす。
+            */}
+            <span className="text-ink-faint whitespace-nowrap">対応</span>
             <select
               value={detail.thread.status}
               onChange={(e) => void updateStatus(e.target.value as ThreadStatus)}
@@ -410,7 +522,7 @@ export default function EmailThread({
             </select>
           </label>
           <label className="flex items-center gap-1.5 text-xs">
-            <span className="text-ink-faint">担当</span>
+            <span className="text-ink-faint whitespace-nowrap">担当</span>
             <select
               value={detail.thread.assigned_staff_id ?? ''}
               onChange={(e) => void updateAssignee(e.target.value || null)}
@@ -471,20 +583,24 @@ export default function EmailThread({
       </div>
 
       <div data-inbox-v4="composer" className="sticky bottom-0 border-t border-[#E5E7EB] bg-canvas px-4 py-3">
-        {/* 上段。LINE のトークと同じ：テンプレートを選択 ・ 送信の設定 …… 改行のしかた */}
-        <div className="mb-2 flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
+        {/*
+          上段。LINE のトークと同じ：テンプレートを選択 ・ 送信の設定 …… 改行のしかた。
+          U010: 横に収まらなければ次の行へ折り返す。1行に固定したままだと
+          390px で右の操作が画面外へ切れ、短い文言が縦に割れて読めない。
+        */}
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
+          <div className="flex min-w-0 flex-wrap items-center gap-2">
             <button
               type="button"
               onClick={() => setShowTemplatePicker(true)}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-[#E5E7EB] bg-canvas px-3 py-2 text-xs font-semibold text-[#2563EB] hover:bg-[#F7F8F6]"
+              className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-[#E5E7EB] bg-canvas px-3 py-2 text-xs font-semibold text-[#2563EB] hover:bg-[#F7F8F6]"
             >
               ▧ テンプレートを選択
             </button>
             <button
               type="button"
               onClick={() => setShowComposerOptions(v => !v)}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-[#E5E7EB] bg-canvas px-3 py-2 text-xs font-semibold text-[#2563EB] hover:bg-[#F7F8F6]"
+              className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-[#E5E7EB] bg-canvas px-3 py-2 text-xs font-semibold text-[#2563EB] hover:bg-[#F7F8F6]"
             >
               ⚙ {showComposerOptions ? '送信の設定を閉じる' : '送信の設定'}
             </button>
@@ -492,12 +608,12 @@ export default function EmailThread({
               type="button"
               onClick={openMemoEditor}
               aria-expanded={showMemoEditor}
-              className="inline-flex items-center rounded-lg border border-[#E5E7EB] bg-canvas px-3 py-2 text-xs font-semibold text-[#344054] hover:bg-[#F7F8F6]"
+              className="inline-flex shrink-0 items-center whitespace-nowrap rounded-lg border border-[#E5E7EB] bg-canvas px-3 py-2 text-xs font-semibold text-[#344054] hover:bg-[#F7F8F6]"
             >
               内部メモ
             </button>
           </div>
-          <span className="text-ink-faint text-xs">
+          <span className="text-ink-faint shrink-0 text-xs">
             {sendMode === 'enter' ? 'Shift + Enter で改行' : 'Enter で改行'}
           </span>
         </div>
@@ -597,8 +713,16 @@ export default function EmailThread({
           <textarea
             value={reply}
             onChange={(e) => setReplyDraft(e.target.value)}
+            onCompositionStart={() => { isComposingRef.current = true }}
+            onCompositionEnd={() => { isComposingRef.current = false }}
             onKeyDown={(e) => {
               if (e.key !== 'Enter') return
+              /*
+               * INBOX-24: IME変換中・変換を確定するEnterは送信しない。
+               * keyCode 229 は確定キーの押下。これを送信扱いすると
+               * 変換の途中の文がそのまま飛ぶ。LINE側と同じ判定。
+               */
+              if (e.nativeEvent.isComposing || isComposingRef.current || e.keyCode === 229) return
               if (e.metaKey || e.ctrlKey) {
                 e.preventDefault()
                 void sendReply()
@@ -617,14 +741,19 @@ export default function EmailThread({
             rows={3}
             className="w-full resize-none border-0 px-1 py-1 text-sm outline-none"
           />
-          <div className="mt-1 flex items-center justify-between gap-2">
-            <span className="text-ink-faint text-xs">
+          {/*
+            U009: 差出人・返信ボタンが同じ行に詰まると 390px でボタンの
+            文字が複数行に割れる。行を折り返せるようにし、ボタンは
+            縮まず1行で保つ。差出人は長いときだけ省略する。
+          */}
+          <div className="mt-1 flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
+            <span className="text-ink-faint min-w-0 truncate text-xs" title="差出人 contact-shed@nen-petfood.com">
               差出人 contact-shed@nen-petfood.com
             </span>
             <button
               onClick={() => void sendReply()}
               disabled={!reply.trim() || sending}
-              className="rounded-lg bg-accent-deep px-5 py-2 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-deep/90 disabled:cursor-not-allowed disabled:opacity-50"
+              className="shrink-0 whitespace-nowrap rounded-lg bg-accent-deep px-5 py-2 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-deep/90 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {sending ? '送信中...' : 'メールで返信'}
             </button>

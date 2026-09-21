@@ -83,7 +83,7 @@
     "direct-secondary-button": 1
   },
   "app/chats/page.tsx": {
-    "arbitrary-value": 100,
+    "arbitrary-value": 109,
     "direct-primary-button": 2,
     "unresolved-classname": 2,
     "direct-secondary-button": 2
@@ -446,8 +446,8 @@
     "arbitrary-value": 1
   },
   "components/chats/friend-info-sidebar.tsx": {
-    "arbitrary-value": 51,
-    "unresolved-classname": 11,
+    "arbitrary-value": 52,
+    "unresolved-classname": 12,
     "direct-secondary-button": 1
   },
   "components/chats/inbox-dropdown.tsx": {

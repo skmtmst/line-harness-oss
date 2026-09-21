@@ -72,7 +72,16 @@ export function describeSendFailure(error: unknown, now: Date = new Date()): str
   }
 
   if (error.status === 400) {
-    return 'LINEがこの送信を受け付けませんでした。内容を見直して送り直してください。'
+    /*
+     * INBOX-29: 入力の検証文(文字数・必須項目など)はLINEの拒否ではない。
+     * 口が返す検証済みの文言をそのまま伝え、文言が無いときだけ
+     * 従来の言い換えを使う。検証文は fetchApi が内部文言を除いた
+     * 安全なものだけを載せる。
+     */
+    const detail = typeof error.message === 'string' && error.message && !error.message.startsWith('API error:')
+      ? error.message
+      : ''
+    return detail || 'LINEがこの送信を受け付けませんでした。内容を見直して送り直してください。'
   }
 
   if (error.status === 502) {
