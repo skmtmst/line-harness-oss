@@ -111,7 +111,15 @@ export default function AutomationRunsPage() {
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   const [data, setData] = useState<RunsResponse | null>(null)
   const [query, setQuery] = useState(searchFromUrl)
-  const [resultFilter, setResultFilter] = useState<'all' | 'executed' | 'skipped' | 'problems'>('all')
+  /*
+   * URLの `?status=` で絞り込み済みの記録を開ける（IDEA-01）。
+   * ダッシュボードの「失敗した実行」カードは `?status=problems` でここへ来る。
+   * 知らない値は「すべて」へ落とす。
+   */
+  const [resultFilter, setResultFilter] = useState<'all' | 'executed' | 'skipped' | 'problems'>(() => {
+    const raw = searchParams.get('status')
+    return raw === 'executed' || raw === 'skipped' || raw === 'problems' ? raw : 'all'
+  })
   const [selectedRun, setSelectedRun] = useState<AutomationRun | null>(null)
   const [selectedDetail, setSelectedDetail] = useState<AutomationRunDetail | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)

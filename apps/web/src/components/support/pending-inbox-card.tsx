@@ -8,6 +8,7 @@ import Pagination from '@/components/shared/pagination'
 import Select from '@/components/shared/select'
 import StatusBadge from '@/components/shared/status-badge'
 import { STATE_TEXT } from '@/components/shared/not-connected'
+import { dashboardLocalUpdatedAt } from '@/components/dashboard/freshness'
 
 /**
  * 対応が必要な受信（設計 `V2 1-1 ダッシュボード` の `card 対応が必要な受信`）。
@@ -39,9 +40,13 @@ type InboxItem = {
 
 export function inboxItemHref(item: Pick<InboxItem, 'channel' | 'id'>): string {
   const rawId = item.id.replace(/^(line|email):/, '')
+  /*
+   * `status=unread` は受信箱側が読む絞り込み（IDEA-01）。
+   * 旧 `unanswered=1` も受信箱側で「未対応」として受け続ける。
+   */
   return item.channel === 'email'
     ? `/chats?channel=email&thread=${encodeURIComponent(rawId)}`
-    : `/chats?friend=${encodeURIComponent(rawId)}&unanswered=1`
+    : `/chats?friend=${encodeURIComponent(rawId)}&status=unread`
 }
 
 /**
@@ -86,7 +91,11 @@ function ChannelBadge({ channel }: { channel: InboxItem['channel'] }) {
 export default function PendingInboxCard({
   onSummaryChange,
 }: {
-  onSummaryChange?: (summary: PendingInboxSummary | null) => void
+  /*
+   * 取得の成否も一緒に知らせる（IDEA-01）。失敗時は summary=null・
+   * ok=false で呼び、上部の小カードが「0件」と失敗を取り違えないようにする。
+   */
+  onSummaryChange?: (summary: PendingInboxSummary | null, ok?: boolean) => void
 }) {
   const [summary, setSummary] = useState<PendingInboxSummary | null>(null)
   const [items, setItems] = useState<InboxItem[]>([])
@@ -162,13 +171,14 @@ export default function PendingInboxCard({
       if (seq !== loadSeq.current) return
       if (inboxResponse.success) {
         setSummary(inboxResponse.data.summary)
-        onSummaryChange?.(inboxResponse.data.summary)
+        onSummaryChange?.(inboxResponse.data.summary, true)
         setItems(inboxResponse.data.items)
         setLoadFailure(null)
         setLastSuccessAt(new Date())
       } else {
         // 形違いの返事も「なし」にしない。無いのは数ではなく取れた事実。
         setLoadFailure('error')
+        onSummaryChange?.(null, false)
       }
     } catch (caught) {
       if (seq !== loadSeq.current) return
@@ -177,6 +187,7 @@ export default function PendingInboxCard({
       setLoadFailure(
         caught instanceof ApiError && caught.status === 403 ? 'forbidden' : 'error',
       )
+      onSummaryChange?.(null, false)
     } finally {
       if (seq === loadSeq.current) setLoading(false)
     }
@@ -227,7 +238,13 @@ export default function PendingInboxCard({
             options={PAGE_SIZE_OPTIONS.map((n) => ({ value: String(n), label: `${n}件表示` }))}
           />
         </span>
-        <Link href="/chats" className="text-info text-xs font-semibold hover:underline">受信箱をすべて見る</Link>
+        <span className="flex items-center gap-3">
+          {/* 一覧がいつ時点のものか。30秒ごとの再取得で古い値を最新と誤認しない。 */}
+          {dashboardLocalUpdatedAt(lastSuccessAt) ? (
+            <span className="text-ink-faint text-xs">{dashboardLocalUpdatedAt(lastSuccessAt)}</span>
+          ) : null}
+          <Link href="/chats" className="text-info text-xs font-semibold hover:underline">受信箱をすべて見る</Link>
+        </span>
       </div>
 
       {/*

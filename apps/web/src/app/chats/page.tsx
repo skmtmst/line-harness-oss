@@ -614,7 +614,17 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
   const [selectedChatId, setSelectedChatId] = useState<string | null>(null)
   const [selectedFriendId, setSelectedFriendId] = useState<string | null>(null)
   const [chatDetail, setChatDetail] = useState<ChatDetail | null>(null)
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
+  /*
+   * URLの `?status=` で絞り込み済みの受信箱を開けるようにする（IDEA-01）。
+   * ダッシュボードの「対応が必要な受信」は `?status=unread` でここへ来る。
+   * 旧い深掘りリンクの `unanswered=1` も「未対応」として受ける。
+   */
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>(() => {
+    const raw = (params.get('status') ?? '').trim()
+    if (statusFilters.some((f) => f.key === raw)) return raw as StatusFilter
+    if (params.get('unanswered') === '1' || params.get('unanswered') === 'true') return 'unread'
+    return 'all'
+  })
   const [quickFilter, setQuickFilter] = useState<'all' | 'reply' | 'overdue'>('all')
   const [assigneeFilter, setAssigneeFilter] = useState('all')
   const [filterOpen, setFilterOpen] = useState(false)
