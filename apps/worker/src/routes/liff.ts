@@ -64,19 +64,29 @@ function decodeState(encoded: string): string {
 
 const liffRoutes = new Hono<Env>();
 
+/**
+ * 呼び出し側の見えるアカウントに絞る WHERE 断片を作る。
+ * IDEA-18: 友だち(f)だけでなく注文(o)や相関副問合せの友だち(f2)にも
+ * 同じ条件を使うため、別名ごとの断片を `for(alias)` で作れるようにした。
+ * 既定の where/binds は従来どおり友だち別名 `f` のものを返す。
+ */
 async function analyticsAccountScope(c: Context<Env>, lineAccountId?: string) {
   const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
-  if (lineAccountId) {
-    return scope.allowedAccountIds.includes(lineAccountId)
-      ? { where: 'AND f.line_account_id = ?', binds: [lineAccountId] }
-      : null;
+  if (lineAccountId && !scope.allowedAccountIds.includes(lineAccountId)) {
+    return null;
   }
-  const where = scope.allowedAccountIds.length
-    ? `AND (f.line_account_id IN (${scope.allowedAccountIds.map(() => '?').join(',')})${scope.canSeeUnassigned ? ' OR f.line_account_id IS NULL' : ''})`
-    : scope.canSeeUnassigned
-      ? 'AND f.line_account_id IS NULL'
-      : 'AND 1 = 0';
-  return { where, binds: scope.allowedAccountIds };
+  const forAlias = (alias: string) => {
+    if (lineAccountId) {
+      return { where: `AND ${alias}.line_account_id = ?`, binds: [lineAccountId] };
+    }
+    const where = scope.allowedAccountIds.length
+      ? `AND (${alias}.line_account_id IN (${scope.allowedAccountIds.map(() => '?').join(',')})${scope.canSeeUnassigned ? ` OR ${alias}.line_account_id IS NULL` : ''})`
+      : scope.canSeeUnassigned
+        ? `AND ${alias}.line_account_id IS NULL`
+        : 'AND 1 = 0';
+    return { where, binds: scope.allowedAccountIds };
+  };
+  return { ...forAlias('f'), for: forAlias };
 }
 
 async function saveFriendAddCandidate(
@@ -1659,6 +1669,14 @@ liffRoutes.get('/api/analytics/ref-summary', requireRole('owner', 'admin', 'staf
     // (例えば X Harness が発行する UUID ref) も summary に拾えるようにする。
     // 名前は entry_routes と LEFT JOIN して引く (未登録なら NULL → クライアン
     // ト側で「(未登録)」と表示)。
+    //
+    // IDEA-18: 購入・返金も同じ経路へ連結する。注文は「その経路で最初に来た
+    // 友だち(first-touch)」が起こした ec_orders だけを数える。友だちの絞り込み
+    // と同じ条件(相関副問合せの f2 に同じアカウント範囲)で数えるので、経路別の
+    // 購入件数と /api/analytics/ref/:refCode/orders の明細は同じ母集団になる。
+    // 同じ注文は ec_orders の (line_account_id, source_key, external_order_id)
+    // 一意制約で取り込み時に1行へ潰れているため、ここでは行数をそのまま数える。
+    const friendScope = accountScope.for('f2');
     const rows = await db
       .prepare(
         `SELECT
@@ -1666,7 +1684,18 @@ liffRoutes.get('/api/analytics/ref-summary', requireRole('owner', 'admin', 'staf
           er.name as name,
           COUNT(DISTINCT f.id) as friend_count,
           COUNT(DISTINCT rt.id) as click_count,
-          MAX(f.created_at) as latest_at
+          MAX(f.created_at) as latest_at,
+          (SELECT COUNT(*) FROM ec_orders o
+             JOIN friends f2 ON f2.id = o.friend_id
+            WHERE f2.ref_code = f.ref_code ${friendScope.where}) as order_count,
+          (SELECT COUNT(*) FROM ec_orders o
+             JOIN friends f2 ON f2.id = o.friend_id
+            WHERE f2.ref_code = f.ref_code AND o.normalized_status = 'refunded'
+              ${friendScope.where}) as refunded_order_count,
+          (SELECT COUNT(*) FROM ec_orders o
+             JOIN friends f2 ON f2.id = o.friend_id
+            WHERE f2.ref_code = f.ref_code AND o.normalized_status = 'cancelled'
+              ${friendScope.where}) as cancelled_order_count
         FROM friends f
         LEFT JOIN entry_routes er ON er.ref_code = f.ref_code
         LEFT JOIN ref_tracking rt ON rt.ref_code = f.ref_code AND rt.friend_id = f.id
@@ -1675,13 +1704,21 @@ liffRoutes.get('/api/analytics/ref-summary', requireRole('owner', 'admin', 'staf
         GROUP BY f.ref_code, er.name
         ORDER BY friend_count DESC`,
       )
-      .bind(...accountScope.binds)
+      .bind(
+        ...friendScope.binds,
+        ...friendScope.binds,
+        ...friendScope.binds,
+        ...accountScope.binds,
+      )
       .all<{
         ref_code: string;
         name: string;
         friend_count: number;
         click_count: number;
         latest_at: string | null;
+        order_count: number;
+        refunded_order_count: number;
+        cancelled_order_count: number;
       }>();
 
     const totalStmt = db
@@ -1693,6 +1730,34 @@ liffRoutes.get('/api/analytics/ref-summary', requireRole('owner', 'admin', 'staf
       .prepare(`SELECT COUNT(*) as count FROM friends f WHERE ref_code IS NOT NULL AND ref_code != '' ${accountScope.where}`)
       .bind(...accountScope.binds);
     const friendsWithRefRes = await refStmt.first<{ count: number }>();
+
+    /*
+      IDEA-18: 未計測を「0件」と混ぜないための注文の内訳。
+      - attributed: 友だちに結びつき、その友だちに流入経路(ref)がある注文
+      - noRoute:    友だちには結びついたが流入経路が分からない注文
+      - unlinked:   LINEの友だちに結びついていない注文(会員のつき合わせ対象)
+      注文の範囲は注文自身の所属アカウント(o.line_account_id)で絞る。
+    */
+    const orderScope = accountScope.for('o');
+    const ordersRes = await db
+      .prepare(
+        `SELECT COUNT(*) AS orders_total,
+           SUM(CASE WHEN o.friend_id IS NOT NULL THEN 1 ELSE 0 END) AS orders_linked,
+           SUM(CASE WHEN f3.ref_code IS NOT NULL AND f3.ref_code != '' THEN 1 ELSE 0 END) AS orders_attributed,
+           SUM(CASE WHEN o.normalized_status = 'refunded' THEN 1 ELSE 0 END) AS orders_refunded,
+           SUM(CASE WHEN o.normalized_status = 'cancelled' THEN 1 ELSE 0 END) AS orders_cancelled
+         FROM ec_orders o
+         LEFT JOIN friends f3 ON f3.id = o.friend_id
+         WHERE 1 = 1 ${orderScope.where}`,
+      )
+      .bind(...orderScope.binds)
+      .first<{
+        orders_total: number;
+        orders_linked: number | null;
+        orders_attributed: number | null;
+        orders_refunded: number | null;
+        orders_cancelled: number | null;
+      }>();
 
     const totalFriends = totalFriendsRes?.count ?? 0;
     const friendsWithRef = friendsWithRefRes?.count ?? 0;
@@ -1706,10 +1771,20 @@ liffRoutes.get('/api/analytics/ref-summary', requireRole('owner', 'admin', 'staf
           friendCount: r.friend_count,
           clickCount: r.click_count,
           latestAt: r.latest_at,
+          orderCount: r.order_count,
+          refundedOrderCount: r.refunded_order_count,
+          cancelledOrderCount: r.cancelled_order_count,
         })),
         totalFriends,
         friendsWithRef,
         friendsWithoutRef: totalFriends - friendsWithRef,
+        orders: {
+          total: ordersRes?.orders_total ?? 0,
+          linked: ordersRes?.orders_linked ?? 0,
+          attributed: ordersRes?.orders_attributed ?? 0,
+          refunded: ordersRes?.orders_refunded ?? 0,
+          cancelled: ordersRes?.orders_cancelled ?? 0,
+        },
       },
     });
   } catch (err) {
@@ -1783,6 +1858,123 @@ liffRoutes.get('/api/analytics/ref/:refCode', requireRole('owner', 'admin', 'sta
     });
   } catch (err) {
     console.error('GET /api/analytics/ref/:refCode error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+/**
+ * GET /api/analytics/ref/:refCode/orders — その経路から来た友だちの注文明細
+ *
+ * IDEA-18: 経路別集計(ref-summary の orderCount)と同じ条件の明細を返し、
+ * 画面上で集計と注文をつき合わせられるようにする。
+ *
+ * 帰属ルールは first-touch: friends.ref_code がこの経路の友だちに結びついた
+ * ec_orders だけ。同じ注文は (line_account_id, source_key, external_order_id)
+ * の一意制約で取り込み時に1行へ潰れているので、再取込で二重に出ない。
+ * 友だちに結びついていない注文(未連携)や経路が分からない注文は
+ * ここには出ず、ref-summary の orders.total/attributed で未計測として数える。
+ */
+liffRoutes.get('/api/analytics/ref/:refCode/orders', requireRole('owner', 'admin', 'staff'), async (c) => {
+  try {
+    const db = c.env.DB;
+    const refCode = c.req.param('refCode');
+    const lineAccountId = c.req.query('lineAccountId');
+    const accountScope = await analyticsAccountScope(c, lineAccountId);
+    if (!accountScope) {
+      return c.json({ success: false, error: 'このLINEアカウントを表示する権限がありません' }, 403);
+    }
+
+    const limitRaw = Number(c.req.query('limit') ?? '20');
+    const offsetRaw = Number(c.req.query('offset') ?? '0');
+    const limit = Number.isInteger(limitRaw) ? Math.min(Math.max(limitRaw, 1), 50) : 20;
+    const offset = Number.isInteger(offsetRaw) ? Math.max(offsetRaw, 0) : 0;
+
+    const where = `f.ref_code = ? ${accountScope.where}`;
+    const binds = [refCode, ...accountScope.binds];
+
+    const [items, countRes, summaryRes] = await Promise.all([
+      db
+        .prepare(
+          `SELECT o.id, o.order_number, o.normalized_status, o.provider_status,
+                  o.currency, o.total_amount_minor, o.refunded_amount_minor,
+                  o.ordered_at, o.detail_url,
+                  f.id AS friend_id, f.display_name AS friend_name
+             FROM ec_orders o
+             JOIN friends f ON f.id = o.friend_id
+            WHERE ${where}
+            ORDER BY o.ordered_at DESC, o.id DESC
+            LIMIT ? OFFSET ?`,
+        )
+        .bind(...binds, limit, offset)
+        .all<{
+          id: string;
+          order_number: string;
+          normalized_status: string;
+          provider_status: string;
+          currency: string;
+          total_amount_minor: number | null;
+          refunded_amount_minor: number | null;
+          ordered_at: string;
+          detail_url: string | null;
+          friend_id: string;
+          friend_name: string | null;
+        }>(),
+      db
+        .prepare(
+          `SELECT COUNT(*) AS count
+             FROM ec_orders o JOIN friends f ON f.id = o.friend_id
+            WHERE ${where}`,
+        )
+        .bind(...binds)
+        .first<{ count: number }>(),
+      db
+        .prepare(
+          `SELECT
+             SUM(CASE WHEN o.normalized_status = 'refunded' THEN 1 ELSE 0 END) AS refunded,
+             SUM(CASE WHEN o.normalized_status = 'cancelled' THEN 1 ELSE 0 END) AS cancelled,
+             SUM(o.total_amount_minor) AS total_amount,
+             SUM(o.refunded_amount_minor) AS refunded_amount
+           FROM ec_orders o JOIN friends f ON f.id = o.friend_id
+          WHERE ${where}`,
+        )
+        .bind(...binds)
+        .first<{
+          refunded: number | null;
+          cancelled: number | null;
+          total_amount: number | null;
+          refunded_amount: number | null;
+        }>(),
+    ]);
+
+    return c.json({
+      success: true,
+      data: {
+        refCode,
+        total: countRes?.count ?? 0,
+        // 金額は取れていない注文があると合計が欠ける。0 ではなく null で
+        // 「額は未計測」を表す（画面側は「—」を出す）。
+        summary: {
+          refunded: summaryRes?.refunded ?? 0,
+          cancelled: summaryRes?.cancelled ?? 0,
+          totalAmount: summaryRes?.total_amount ?? null,
+          refundedAmount: summaryRes?.refunded_amount ?? null,
+        },
+        items: (items.results ?? []).map((row) => ({
+          id: row.id,
+          orderNumber: row.order_number,
+          status: row.normalized_status,
+          providerStatus: row.provider_status,
+          currency: row.currency,
+          totalAmount: row.total_amount_minor,
+          refundedAmount: row.refunded_amount_minor,
+          orderedAt: row.ordered_at,
+          detailUrl: row.detail_url,
+          friend: { id: row.friend_id, displayName: row.friend_name },
+        })),
+      },
+    });
+  } catch (err) {
+    console.error('GET /api/analytics/ref/:refCode/orders error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
