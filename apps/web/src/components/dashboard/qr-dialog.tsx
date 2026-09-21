@@ -69,6 +69,7 @@ export default function QrDialog({
   onRouteIdChange,
   visualReferenceQr = false,
   routes: routesProp,
+  routesPending: routesPendingProp,
 }: {
   open: boolean
   onClose: () => void
@@ -89,9 +90,16 @@ export default function QrDialog({
     同じ口を外と中で2回叩かない。
   */
   routes?: EntryRoute[]
+  /*
+    経路一覧の取得がまだ終わっていないとき true。
+    アカウント切替直後など、一覧が来る前に「経路が見つからない」と
+    断定しないための目印（DASH-09）。
+  */
+  routesPending?: boolean
 }) {
-  const [fetchedRoutes, setFetchedRoutes] = useState<EntryRoute[]>([])
-  const routes = routesProp ?? fetchedRoutes
+  const [fetchedRoutes, setFetchedRoutes] = useState<EntryRoute[] | null>(null)
+  const routes = routesProp ?? fetchedRoutes ?? []
+  const routesPending = routesProp !== undefined ? (routesPendingProp ?? false) : fetchedRoutes === null
   const [routeId, setRouteId] = useState(initialRouteId)
   const [size, setSize] = useState(SIZES[0].value)
   const [format, setFormat] = useState(FORMATS[0].value)
@@ -110,10 +118,11 @@ export default function QrDialog({
     void api.entryRoutes.list()
       .then((res) => {
         // 停止中の経路のQRを配ると、読み取っても友だち追加できない。
-        if (!cancelled && res.success) setFetchedRoutes(res.data.filter((r) => r.isActive))
+        if (!cancelled) setFetchedRoutes(res.success ? res.data.filter((r) => r.isActive) : [])
       })
       .catch(() => {
         // 経路一覧だけが取れなくても、基本の追加URLのQRは表示できる。
+        if (!cancelled) setFetchedRoutes([])
       })
     return () => {
       cancelled = true
@@ -122,11 +131,20 @@ export default function QrDialog({
 
   const base = (process.env.NEXT_PUBLIC_API_URL ?? '').replace(/\/$/, '')
   const route = routes.find((r) => r.id === routeId)
+  /*
+   * 指定された経路が現在の一覧に無い（停止・削除・別アカウントの経路）
+   * ときは、基本URLのQRへ黙って置き換えない。経路を選び直すまで
+   * QR・コピー・ダウンロードを止める（DASH-09 / DASH-28 の方向）。
+   */
+  const routeMissing = routeId !== '' && !route && !routesPending
   const link = route ? `${base}/r/${route.refCode}` : baseLink
 
   useEffect(() => {
     let cancelled = false
     setQrDataUrl('')
+    if (routeMissing) {
+      return () => { cancelled = true }
+    }
     void QRCode.toDataURL(link, {
       width: 220,
       margin: 1,
@@ -137,7 +155,7 @@ export default function QrDialog({
     return () => {
       cancelled = true
     }
-  }, [link])
+  }, [link, routeMissing])
 
   // Escape・Tabの循環・背景スクロール停止・閉じたあとのフォーカス戻しは
   // 共通のoverlay作法に揃える。保存中の処理はないためEscapeは常に閉じる。
@@ -161,7 +179,9 @@ export default function QrDialog({
    */
   const profileUrl = route
     ? link
-    : resolveOfficialProfileUrl(officialProfileUrl, accountBasicId)
+    : routeMissing
+      ? null
+      : resolveOfficialProfileUrl(officialProfileUrl, accountBasicId)
 
   const copy = async () => {
     try {
@@ -233,7 +253,11 @@ export default function QrDialog({
           {/* 名前はQRの下。読み取る人が見るのは絵で、名前はその確認に使う。 */}
           <div className="flex flex-col items-center">
             <div className="bg-canvas-sunken rounded-panel flex h-[280px] w-[280px] items-center justify-center">
-              {visualReferenceQr ? (
+              {routeMissing ? (
+                <p className="text-ink-faint max-w-[220px] px-4 text-center text-xs leading-relaxed">
+                  選んだ経路はこのアカウントでは見つかりません。<br />経路を選び直してください。
+                </p>
+              ) : visualReferenceQr ? (
                 <QrCode aria-label="友だち追加QRコード" className="text-ink" size={150} strokeWidth={3.8} />
               ) : (
                 /* eslint-disable-next-line @next/next/no-img-element -- Worker のQRプロキシ。静的アセットではない */
@@ -277,9 +301,15 @@ export default function QrDialog({
                   ...routes.map((r) => ({ value: r.id, label: r.name })),
                 ]}
               />
-              <p className="text-ink-faint mt-1 text-xs">
-                選んだ経路のQRコードとURLが表示されます。
-              </p>
+              {routeMissing ? (
+                <p className="text-danger mt-1 text-xs" role="alert">
+                  選んだ経路はこのアカウントでは使えません。別の経路か「基本の追加URL」を選んでください。
+                </p>
+              ) : (
+                <p className="text-ink-faint mt-1 text-xs">
+                  選んだ経路のQRコードとURLが表示されます。
+                </p>
+              )}
             </div>
 
             <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
@@ -327,13 +357,14 @@ export default function QrDialog({
                   id="qr-link"
                   readOnly
                   rows={2}
-                  value={link}
+                  value={routeMissing ? '' : link}
                   onFocus={(e) => e.currentTarget.select()}
                   className="text-ink-secondary min-w-0 flex-1 resize-none bg-transparent px-3 py-2 pr-16 font-mono text-xs leading-relaxed focus:outline-none"
                 />
                 <button
                   onClick={copy}
-                  className="text-action absolute right-2 top-2 rounded px-1.5 py-1 text-xs font-medium hover:underline"
+                  disabled={routeMissing}
+                  className="text-action absolute right-2 top-2 rounded px-1.5 py-1 text-xs font-medium hover:underline disabled:cursor-not-allowed disabled:text-ink-faint disabled:no-underline"
                 >
                   {copied ? 'コピーしました ✓' : 'コピー'}
                 </button>
@@ -344,16 +375,23 @@ export default function QrDialog({
             </div>
 
             <div className="flex flex-wrap gap-2">
-              <Button
-                href={saveHref}
-                variant="primary"
-              >
-                <DownloadIcon />画像をダウンロード
-              </Button>
+              {routeMissing ? (
+                <Button variant="primary" disabled>
+                  <DownloadIcon />画像をダウンロード
+                </Button>
+              ) : (
+                <Button
+                  href={saveHref}
+                  variant="primary"
+                >
+                  <DownloadIcon />画像をダウンロード
+                </Button>
+              )}
               <button
                 type="button"
                 onClick={printQr}
-                className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-3 py-2 text-sm font-medium"
+                disabled={routeMissing}
+                className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-3 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-60"
               >
                 PDFで印刷
               </button>
