@@ -542,9 +542,19 @@ function BookingDetailInner() {
     setError('')
     setNotice('')
     try {
-      await bookingApi.updateBooking(selectedAccountId, id, patch)
+      const updated = await bookingApi.updateBooking(selectedAccountId, id, patch)
       setEditing(false)
-      setNotice('予約を変更しました')
+      /* IDEA-07: 変更と一緒に動いた通知も応答から言う。
+         「組み直した/送る」が見えないと、古い通知が残ったままか、
+         新しい通知が組まれたかを画面から確かめられない。 */
+      const effects: string[] = []
+      if (updated.change_notification === 'queued') {
+        effects.push('変更のお知らせをお客様へ送ります')
+      }
+      if (updated.reminders_created > 0) {
+        effects.push('今後のお知らせを新しい日時で組み直しました')
+      }
+      setNotice(`${['予約を変更しました', ...effects].join('。')}。`)
       await load()
     } catch (cause) {
       if (cause instanceof ApiError && cause.code === 'version_conflict') {

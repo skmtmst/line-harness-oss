@@ -12148,6 +12148,17 @@ export interface EventBookingItem {
   companion_count?: number | null;
   is_first_time?: number | null;
   line_account_name?: string | null;
+  /**
+   * この予約に紐づく自動お知らせの予定と状態（IDEA-07）。
+   * 開催回の移動・取消で止まった分も status で返るので、
+   * 変更前後の通知と残存をこの配列から確かめられる。
+   */
+  reminders?: Array<{
+    kind: 'day_before' | 'hours_before';
+    scheduled_at: string;
+    sent_at: string | null;
+    status: 'pending' | 'sent' | 'failed' | 'failed_permanent' | 'cancelled';
+  }>;
 }
 
 export interface EventBookingSummary {

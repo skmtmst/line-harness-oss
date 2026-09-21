@@ -137,6 +137,8 @@ function makeEventDb(state: {
   tags?: Array<{ id: string; name: string }>;
   /** キャンセル待ちの行。INSERT がここへ積まれる */
   waitlist?: Array<Record<string, unknown>>;
+  /** 予約ごとの通知予定 (event_booking_reminders)。IDEA-07 の一覧添付用。 */
+  reminders?: Array<Record<string, unknown>>;
 }): D1Database {
   state.slots ??= [];
   state.bookings ??= [];
@@ -145,6 +147,7 @@ function makeEventDb(state: {
   state.friendTags ??= [];
   state.tags ??= [];
   state.waitlist ??= [];
+  state.reminders ??= [];
   const eventMatchesAccount = (event: EventRow, account: string): boolean => {
     if (event.target_type === 'multi-account-dedup') {
       try {
@@ -670,6 +673,14 @@ function makeEventDb(state: {
             const limit = typeof bound[bound.length - 2] === 'number' ? (bound[bound.length - 2] as number) : items.length;
             const offset = typeof bound[bound.length - 1] === 'number' ? (bound[bound.length - 1] as number) : 0;
             return { results: items.slice(offset, offset + limit) as unknown as T[] };
+          }
+          // IDEA-07: 一覧に添える通知予定。booking_id IN (...) の行だけ返す。
+          if (sql.includes('FROM event_booking_reminders')) {
+            const ids = new Set(bound as string[]);
+            const rows = (state.reminders ?? [])
+              .filter((r) => ids.has(String(r.booking_id)))
+              .sort((a, b) => String(a.scheduled_at).localeCompare(String(b.scheduled_at)));
+            return { results: rows as unknown as T[] };
           }
           // admin bookings list: SELECT b.*, s.starts_at, ..., friends.display_name FROM event_bookings b JOIN event_slots s ...
           if (sql.includes('FROM event_bookings b') && sql.includes('friend_display_name')) {
@@ -2706,6 +2717,46 @@ describe('admin bookings management', () => {
     const body = (await (await setupApp(state).request('/api/events/admin/events/e1/bookings?account_id=la1&page=2&limit=1')).json()) as { items: Array<{ id: string }>; total: number };
     expect(body.items).toHaveLength(1);
     expect(body.total).toBe(2);
+  });
+
+  test('GET /:id/bookings attaches each booking reminder schedule incl. stopped ones (IDEA-07)', async () => {
+    const state = {
+      events: [baseEvent({ id: 'e1', line_account_id: 'la1' })],
+      slots: [{ id: 's1', event_id: 'e1', starts_at: '2099-06-01T10:00:00Z', ends_at: '2099-06-01T12:00:00Z', capacity: null, is_active: 1, sort_order: 0, deleted_at: null }],
+      bookings: [
+        { id: 'b1', event_id: 'e1', slot_id: 's1', friend_id: 'f1', line_account_id: 'la1', status: 'confirmed' } as BookingRow & Record<string, unknown>,
+        { id: 'b2', event_id: 'e1', slot_id: 's1', friend_id: 'f2', line_account_id: 'la1', status: 'cancelled' } as BookingRow & Record<string, unknown>,
+      ],
+      friends: [
+        { id: 'f1', line_account_id: 'la1', line_user_id: 'U1' },
+        { id: 'f2', line_account_id: 'la1', line_user_id: 'U2' },
+      ],
+      reminders: [
+        { id: 'r1', booking_id: 'b1', kind: 'day_before', scheduled_at: '2099-05-31T09:00:00Z', sent_at: null, status: 'pending' },
+        { id: 'r2', booking_id: 'b1', kind: 'hours_before', scheduled_at: '2099-06-01T08:00:00Z', sent_at: null, status: 'pending' },
+        // 取消済みの予約には「止まった分」が残る。古い通知が生きたままかを
+        // 一覧から確かめられるよう、cancelled も応答に含める。
+        { id: 'r3', booking_id: 'b2', kind: 'day_before', scheduled_at: '2099-05-31T09:00:00Z', sent_at: null, status: 'cancelled' },
+        // 別予約の通知は混ざらない。
+        { id: 'r9', booking_id: 'bx', kind: 'day_before', scheduled_at: '2099-05-30T09:00:00Z', sent_at: null, status: 'pending' },
+      ],
+    };
+    const app = setupApp(state);
+    const res = await app.request('/api/events/admin/events/e1/bookings?account_id=la1');
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      items: Array<{
+        id: string;
+        reminders: Array<{ kind: string; status: string; scheduled_at: string }>;
+      }>;
+    };
+    const b1 = body.items.find((item) => item.id === 'b1');
+    const b2 = body.items.find((item) => item.id === 'b2');
+    expect(b1?.reminders.map((reminder) => reminder.kind)).toEqual(['day_before', 'hours_before']);
+    expect(b1?.reminders.every((reminder) => reminder.status === 'pending')).toBe(true);
+    expect(b2?.reminders).toEqual([
+      expect.objectContaining({ kind: 'day_before', status: 'cancelled' }),
+    ]);
   });
 
   test('GET /:id/bookings/summary returns all-status counts and capacity without list rows', async () => {
