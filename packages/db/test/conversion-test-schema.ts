@@ -42,10 +42,11 @@ export function applyConversionTestSchema(db: Database.Database): void {
       ingest_secret_encrypted TEXT, ingest_disabled_at TEXT,
       created_at TEXT NOT NULL, updated_at TEXT NOT NULL
     );
-    -- N-270: 外部受信の成否台帳。
+    -- N-270: 外部受信の成否台帳。is_test は #1037(IDEA-19)の検証受信の目印。
     CREATE TABLE conversion_ingestion_events (
       id TEXT PRIMARY KEY, conversion_point_id TEXT NOT NULL,
-      result TEXT NOT NULL, reason TEXT, source_event_id TEXT,
+      result TEXT NOT NULL, reason TEXT, is_test INTEGER NOT NULL DEFAULT 0,
+      source_event_id TEXT,
       friend_id TEXT, payload_shape_json TEXT, signature_sha256 TEXT,
       created_at TEXT NOT NULL
     );

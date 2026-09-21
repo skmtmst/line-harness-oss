@@ -35,6 +35,7 @@ import {
   resolveConversionIngestSecret,
   recordConversionIngestionEvent,
   listConversionIngestionEvents,
+  listConversionDefinitionEvents,
   getConversionDefinitionReport,
   listConversionDefinitionsForExport,
   ConversionDefinitionError,
@@ -800,6 +801,28 @@ conversions.get('/api/conversions/definitions/:id/ingest-events', conversionPerm
   }
 });
 
+/**
+ * GET /api/conversions/definitions/:id/events — 成果1件ずつの一覧(IDEA-19)。
+ *
+ * 「購入」「相談完了」など成果名の下に、1件ごとの状態(確定・確認待ち・
+ * 却下・取消)を新しい順で返す。承認状態と取消台帳からの導出は
+ * listConversionDefinitionEvents が担い、画面は状態を組み立て直さない。
+ * 検証の受信は成果表へ書かないため、この一覧には本番実績だけが並ぶ。
+ */
+conversions.get('/api/conversions/definitions/:id/events', conversionPermission('view'), async (c) => {
+  try {
+    const scope = await conversionDefinitionScope(c);
+    if (!scope.ok) return scope.response;
+    const data = await listConversionDefinitionEvents(c.env.DB, {
+      id: c.req.param('id'), scope: scope.value, limit: listLimit(c.req.query('limit'), 50),
+    });
+    if (!data) return c.json({ success: false, error: '成果地点が見つかりません' }, 404);
+    return c.json({ success: true, data: { items: data } });
+  } catch (error) {
+    return conversionContractError(c, error);
+  }
+});
+
 const MAX_INGEST_BODY_BYTES = 64 * 1024;
 const INGEST_SIGNATURE_HEADER = 'X-Conversion-Signature';
 const INGEST_EVENT_ID_HEADER = 'X-Conversion-Event-Id';
@@ -895,11 +918,21 @@ conversions.post('/api/conversions/ingest/:id', async (c) => {
       return c.json({ success: false, error: 'Invalid JSON body' }, 400);
     }
     const payloadShape = maskedPayloadShape(payload);
+    /*
+     * IDEA-19: 検証の受信か。
+     *
+     * 本文に `"test": true` が付いた受信は、署名・イベントID・友だちの
+     * 解決まで本番と同じ検査を通す。違いは書き込みだけ——成果表には
+     * 書かず台帳へ「検証の受信」としてだけ残すので、試験イベントが
+     * 売上・報酬・集計へ混入しないことを書き込まない形で保証する。
+     * 失敗した検証も isTest 付きで残し、本番の失敗と見分けられるようにする。
+     */
+    const isTest = payload.test === true;
     const sourceEventId = (c.req.header(INGEST_EVENT_ID_HEADER) ?? '')
       || (typeof payload.sourceEventId === 'string' ? payload.sourceEventId : '');
     if (!sourceEventId.trim()) {
       await log({
-        result: 'rejected', reason: 'source_event_id_missing',
+        result: 'rejected', reason: 'source_event_id_missing', isTest,
         payloadShape, signatureSha256: signatureHash,
       });
       return c.json({
@@ -918,7 +951,7 @@ conversions.post('/api/conversions/ingest/:id', async (c) => {
     }
     if (!resolvedFriendId) {
       await log({
-        result: 'rejected', reason: 'friend_missing',
+        result: 'rejected', reason: 'friend_missing', isTest,
         sourceEventId: sourceEventId.trim().slice(0, 200),
         payloadShape, signatureSha256: signatureHash,
       });
@@ -926,6 +959,18 @@ conversions.post('/api/conversions/ingest/:id', async (c) => {
     }
     const value = payload.value === null || payload.value === undefined
       ? null : Number(payload.value);
+
+    if (isTest) {
+      await log({
+        result: 'recorded', isTest: true,
+        sourceEventId: sourceEventId.trim().slice(0, 200),
+        friendId: resolvedFriendId, payloadShape, signatureSha256: signatureHash,
+      });
+      return c.json({
+        success: true,
+        data: { received: true, test: true, duplicated: false },
+      });
+    }
 
     try {
       const outcome: { deduplicated?: boolean } = {};
