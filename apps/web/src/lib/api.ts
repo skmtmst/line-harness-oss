@@ -2500,6 +2500,29 @@ export type FriendDetail = FriendWithTags & {
     notes: string | null
   } | null
 }
+/**
+ * `GET /api/friends/:id/upcoming` の返事（IDEA-02）。
+ * null は「予定なし」、*Error=true は「取得失敗（未取得）」を表す。
+ * 確定した予定だけを返す。動的条件の将来配信は含まない。
+ */
+export type FriendUpcoming = {
+  nextBooking: {
+    kind: 'booking' | 'event_booking' | 'meet_consultation'
+    /** booking は予約ID、event_booking はイベントID、meet_consultation は相談ID */
+    id: string
+    title: string
+    startsAt: string
+    status: string
+  } | null
+  nextBookingError: boolean
+  nextAutoDelivery: {
+    kind: 'scenario' | 'reminder'
+    id: string
+    name: string
+    scheduledAt: string
+  } | null
+  nextAutoDeliveryError: boolean
+}
 export type MileageSummary = {
   programId: string
   programName: string
@@ -5079,6 +5102,12 @@ export const api = {
     },
     get: (id: string) =>
       fetchApi<ApiResponse<FriendDetail>>(`/api/friends/${id}`),
+    /**
+     * 受信箱の顧客情報に出す「次の予定」（IDEA-02）。
+     * 値が null = 予定なし、*_Error=true = 取得失敗（未取得）を区別する。
+     */
+    upcoming: (id: string) =>
+      fetchApi<ApiResponse<FriendUpcoming>>(`/api/friends/${id}/upcoming`),
     mileage: (id: string, params?: number | { limit?: number; accountId?: string }) => {
       const query = new URLSearchParams()
       const options = typeof params === 'number' ? { limit: params } : params
