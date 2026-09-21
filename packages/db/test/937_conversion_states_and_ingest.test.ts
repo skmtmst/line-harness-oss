@@ -6,6 +6,7 @@ import {
   getConversionDefinitionReport,
   getConversionReport,
   issueConversionIngestSecret,
+  listConversionDefinitionEvents,
   listConversionDefinitions,
   listConversionIngestionEvents,
   publishConversionDefinition,
@@ -238,5 +239,96 @@ describe('N-265/N-269: 母数・CVRと暦日の一致', () => {
       startDate: '2026-09-15', endDate: '2026-09-15',
     });
     expect(after[0]).toMatchObject({ totalValue: 3000 });
+  });
+});
+
+describe('#1037 IDEA-19: 成果1件ごとの状態と検証受信の区別', () => {
+  it('確定・確認待ち・却下・取消を業務状態として導出し、新しい順で返す', async () => {
+    const sqlite = setup();
+    sqlite.exec(`
+      INSERT INTO conversion_points
+        (id, name, event_type, value, line_account_id, status, created_at, updated_at)
+      VALUES
+        ('point-a', '購入', 'purchase', 5000, 'account-a', 'active', '2026-08-01', '2026-08-01'),
+        ('point-b', '担当外の成果地点', 'purchase', 1000, 'account-b', 'active', '2026-08-01', '2026-08-01');
+      INSERT INTO conversion_events
+        (id, conversion_point_id, friend_id, approval_status, value_snapshot, metadata, created_at)
+      VALUES
+        ('ev-confirmed', 'point-a', 'friend-1', NULL, 5000,
+         '{"source":"external_ingest","sourceEventId":"se-1"}', '2026-09-20 10:00:00'),
+        ('ev-pending', 'point-a', 'friend-2', 'pending', 3000, NULL, '2026-09-19 10:00:00'),
+        ('ev-rejected', 'point-a', 'friend-3', 'rejected', 2000, NULL, '2026-09-18 10:00:00'),
+        ('ev-cancelled', 'point-a', 'friend-1', 'approved', 4000, NULL, '2026-09-17 10:00:00'),
+        ('ev-other', 'point-b', 'friend-1', NULL, 1000, NULL, '2026-09-21 10:00:00');
+      -- 取消は報酬台帳の取消調整(reason_type='cancel')で表す。
+      INSERT INTO affiliate_reward_entries (id, conversion_event_id) VALUES ('re-1', 'ev-cancelled');
+      INSERT INTO affiliate_adjustments (id, source_entry_id, reason_type, amount_minor, created_at)
+      VALUES ('adj-1', 're-1', 'cancel', -400000, '2026-09-18 12:00:00');
+    `);
+    const db = asD1(sqlite);
+
+    const items = await listConversionDefinitionEvents(db, { id: 'point-a', scope });
+    expect(items).toHaveLength(4);
+    // 新しい順。
+    expect(items!.map((item) => item.id)).toEqual([
+      'ev-confirmed', 'ev-pending', 'ev-rejected', 'ev-cancelled',
+    ]);
+    const byId = new Map(items!.map((item) => [item.id, item]));
+    expect(byId.get('ev-confirmed')).toMatchObject({
+      status: 'confirmed', approvalStatus: null, cancelled: false,
+      friendName: 'いち', value: 5000,
+      source: 'external_ingest', sourceEventId: 'se-1',
+    });
+    expect(byId.get('ev-pending')).toMatchObject({ status: 'pending', approvalStatus: 'pending' });
+    expect(byId.get('ev-rejected')).toMatchObject({ status: 'rejected', approvalStatus: 'rejected' });
+    // 取消は承認済みより強い。返品・取消が入った成果は「確定」に見せない。
+    expect(byId.get('ev-cancelled')).toMatchObject({
+      status: 'cancelled', approvalStatus: 'approved', cancelled: true,
+    });
+
+    // 担当外の地点は一覧ごと見せない(404側へ倒すため null)。
+    expect(await listConversionDefinitionEvents(db, { id: 'point-b', scope })).toBeNull();
+    // 見えないIDも null。存在しない地点と区別しない。
+    expect(await listConversionDefinitionEvents(db, { id: 'point-x', scope })).toBeNull();
+  });
+
+  it('検証の受信は isTest で区別し、成果表にも集計にも混入しない', async () => {
+    const sqlite = setup();
+    sqlite.exec(`
+      INSERT INTO conversion_points
+        (id, name, event_type, value, line_account_id, status, created_at, updated_at)
+      VALUES ('point-a', '購入', 'purchase', 5000, 'account-a', 'active', '2026-08-01', '2026-08-01');
+    `);
+    const db = asD1(sqlite);
+
+    await recordConversionIngestionEvent(db, {
+      conversionPointId: 'point-a', result: 'recorded', isTest: true,
+      sourceEventId: 'test-1', friendId: 'friend-1',
+    });
+    await recordConversionIngestionEvent(db, {
+      conversionPointId: 'point-a', result: 'rejected', isTest: true,
+      reason: 'signature_mismatch',
+    });
+    await recordConversionIngestionEvent(db, {
+      conversionPointId: 'point-a', result: 'recorded',
+      sourceEventId: 'prod-1', friendId: 'friend-1',
+    });
+
+    const events = await listConversionIngestionEvents(db, { id: 'point-a', scope });
+    expect(events).toHaveLength(3);
+    const bySource = new Map(events!.map((event) => [event.sourceEventId, event]));
+    expect(bySource.get('test-1')).toMatchObject({ result: 'recorded', isTest: true });
+    // 検証の失敗も検証として残り、本番の失敗と見分けられる。
+    expect(events!.find((event) => event.result === 'rejected')).toMatchObject({ isTest: true });
+    // 既存の受信は本番扱い(既定 false)。
+    expect(bySource.get('prod-1')).toMatchObject({ result: 'recorded', isTest: false });
+
+    // 受信台帳だけの書き込みは成果表へ届かない。件数も金額も動かない。
+    expect(await listConversionDefinitionEvents(db, { id: 'point-a', scope })).toEqual([]);
+    const report = await getConversionReport(db, {
+      startDate: '2026-08-01', endDate: '2026-12-31', scope,
+    });
+    expect(report.find((row) => row.conversionPointId === 'point-a'))
+      .toMatchObject({ totalCount: 0, totalValue: 0 });
   });
 });

@@ -117,7 +117,7 @@ function formatKeys(keys: string[]): string {
  * 後続票で記載済みにした分はここから消す（残っているとテストが落とす）。
  */
 /** 未記載負債はこの件数より増やせない。 */
-const ALLOWLIST_MAX = 773;
+const ALLOWLIST_MAX = 772;
 
 /**
  * 記載済み operation の完全な基準一覧。
@@ -170,6 +170,7 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'GET /api/common-vars/exports',
   'GET /api/common-vars/exports/{id}',
   'GET /api/common-vars/exports/{id}/download',
+  'GET /api/conversions/definitions/{id}/events',
   'GET /api/conversions/definitions/{id}/ingest-events',
   'GET /api/conversions/events',
   'GET /api/conversions/points',
@@ -222,6 +223,7 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'GET /api/nen/members',
   'GET /api/nen/pets',
   'GET /api/nen/rank-settings',
+  'GET /api/public/nen/adopted-photos',
   'GET /api/nen-campaigns/deliveries',
   'GET /api/nen-campaigns/deliveries/{id}',
   'GET /api/nen-campaigns/metrics/columns',
@@ -1323,8 +1325,7 @@ const ALLOWLIST = new Set<string>([
   'GET /api/line-webhook-events',
   'POST /api/line-webhook-events/{id}/retry',
 
-  // public：公開表示専用経路（OpenAPI未記載・順次記載）（2件）
-  'GET /api/public/nen/adopted-photos',
+  // public：公開表示専用経路（OpenAPI未記載・順次記載）（1件）
   'GET /api/public/nen/gallery-preview',
 
   // core：機能設定（OpenAPI未記載・順次記載）（2件）

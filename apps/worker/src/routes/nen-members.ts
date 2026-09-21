@@ -606,8 +606,29 @@ nenMembers.get('/api/liff/nen/member', async (c) => {
 });
 
 nenMembers.get('/api/public/nen/adopted-photos', async (c) => {
-  const lineAccountId = c.req.query('lineAccountId')?.trim();
-  if (!lineAccountId) return c.json({ success: false, error: 'lineAccountId is required' }, 400);
+  const requestedLineAccountId = c.req.query('lineAccountId')?.trim() ?? '';
+  const officialAccountBasicId = c.req.query('officialAccountBasicId')?.trim() ?? '';
+  if (!requestedLineAccountId && !officialAccountBasicId) {
+    return c.json({ success: false, error: 'lineAccountId or officialAccountBasicId is required' }, 400);
+  }
+
+  let lineAccountId = requestedLineAccountId;
+  if (officialAccountBasicId) {
+    const accounts = await c.env.DB.prepare(
+      `SELECT id FROM line_accounts
+        WHERE line_basic_id = ? AND is_active = 1 AND archived_at IS NULL
+        ORDER BY id LIMIT 2`,
+    ).bind(officialAccountBasicId).all<{ id: string }>();
+    if (accounts.results.length !== 1) {
+      return c.json({ success: false, error: 'LINE account not found' }, 404);
+    }
+    const resolvedLineAccountId = String(accounts.results[0].id);
+    if (lineAccountId && lineAccountId !== resolvedLineAccountId) {
+      return c.json({ success: false, error: 'LINE account selectors do not match' }, 400);
+    }
+    lineAccountId = resolvedLineAccountId;
+  }
+
   const rows = await c.env.DB.prepare(`SELECT ps.id, ps.public_image_url AS image_url, ps.caption, ps.reviewed_at,
       CASE WHEN ps.public_pet_name = 1 THEN p.name ELSE NULL END pet_name
     FROM nen_photo_submissions ps
@@ -618,11 +639,26 @@ nenMembers.get('/api/public/nen/adopted-photos', async (c) => {
       AND ps.publication_consent_at IS NOT NULL
       AND ps.publication_withdrawn_at IS NULL
       AND ps.public_image_url IS NOT NULL
+      AND EXISTS (
+        SELECT 1
+          FROM nen_photo_publications pub
+          JOIN nen_photo_publication_placements placement
+            ON placement.publication_id = pub.id
+           AND placement.line_account_id = pub.line_account_id
+         WHERE pub.photo_id = ps.id
+           AND pub.line_account_id = ps.line_account_id
+           AND pub.status = 'published'
+           AND pub.withdrawn_at IS NULL
+           AND placement.placement_type = 'site'
+           AND placement.active = 1
+           AND placement.removed_at IS NULL
+      )
     ORDER BY ps.reviewed_at DESC, ps.created_at DESC LIMIT 24`)
     .bind(lineAccountId, lineAccountId).all<Record<string, unknown>>();
   const origin = c.req.header('Origin') || '';
   const allowed = new Set(['https://stg.nen-petfood.com', 'https://nen-petfood.com', 'https://www.nen-petfood.com']);
   if (allowed.has(origin)) c.header('Access-Control-Allow-Origin', origin);
+  c.header('Vary', 'Origin');
   c.header('Cache-Control', 'public, max-age=60, s-maxage=300');
   return c.json({ success: true, data: rows.results.map((row) => ({
     id: row.id, imageUrl: row.image_url, caption: row.caption, petName: row.pet_name,

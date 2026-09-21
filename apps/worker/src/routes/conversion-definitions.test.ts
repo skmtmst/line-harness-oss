@@ -26,6 +26,8 @@ const dbMocks = vi.hoisted(() => ({
   deleteUnusedConversionDefinition: vi.fn(),
   getConversionDefinitionReport: vi.fn(),
   listConversionDefinitionsForExport: vi.fn(),
+  listConversionDefinitionEvents: vi.fn(),
+  listConversionIngestionEvents: vi.fn(),
 }));
 const contractMocks = vi.hoisted(() => ({
   ConversionDefinitionError: class ConversionDefinitionError extends Error {
@@ -356,5 +358,47 @@ describe('点検・軽 第7便の口の整理(#585)', () => {
     }));
     expect(response.status).toBe(400);
     expect(dbMocks.createConversionDefinition).not.toHaveBeenCalled();
+  });
+});
+
+describe('#1037 IDEA-19: 成果1件ずつの一覧(GET /definitions/:id/events)', () => {
+  const EVENT_ITEMS = [
+    {
+      id: 'ev-1', friendId: 'friend-1', friendName: 'いち', status: 'confirmed',
+      approvalStatus: null, cancelled: false, value: 5000,
+      source: 'external_ingest', sourceEventId: 'se-1', createdAt: '2026-09-20 10:00:00',
+    },
+    {
+      id: 'ev-2', friendId: 'friend-2', friendName: null, status: 'cancelled',
+      approvalStatus: 'approved', cancelled: true, value: 3000,
+      source: 'ec_order_confirmed', sourceEventId: null, createdAt: '2026-09-19 10:00:00',
+    },
+  ];
+
+  it('口が導出した状態をそのまま返し、スコープと上限を渡す', async () => {
+    dbMocks.listConversionDefinitionEvents.mockResolvedValueOnce(EVENT_ITEMS);
+    const response = await app('staff').request('/api/conversions/definitions/point-a/events?limit=10');
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ success: true, data: { items: EVENT_ITEMS } });
+    expect(dbMocks.listConversionDefinitionEvents).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        id: 'point-a',
+        scope: { allowedAccountIds: ['account-a'], includeUnassigned: false },
+        limit: 10,
+      }),
+    );
+  });
+
+  it('見えない・存在しない地点は404で隠す', async () => {
+    dbMocks.listConversionDefinitionEvents.mockResolvedValueOnce(null);
+    const response = await app('staff').request('/api/conversions/definitions/point-hidden/events');
+    expect(response.status).toBe(404);
+  });
+
+  it('閲覧権限の無いstaffは403で拒否する', async () => {
+    const response = await app('staff', []).request('/api/conversions/definitions/point-a/events');
+    expect(response.status).toBe(403);
+    expect(dbMocks.listConversionDefinitionEvents).not.toHaveBeenCalled();
   });
 });
