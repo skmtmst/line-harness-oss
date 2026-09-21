@@ -348,6 +348,33 @@ describe('fireEvent — V6行動スコア', () => {
     expect(actionScoreMocks.applyActionScoreEvent).not.toHaveBeenCalled();
     expect(dbModule.applyScoring).toHaveBeenCalledWith(db, 'friend-1', 'message_received');
   });
+
+  /*
+   * IDEA-17: V6ルール未設定で旧ルールへ落ちるときも、発生元の不変IDを
+   * 渡して決定的な履歴IDで受け付ける。実行台帳(execution)が無い呼び出し
+   * でも payload.sourceEventId があれば、同じイベントの走り直しで
+   * スコアと履歴は二重に増えない。
+   */
+  it('V6未設定でも発生元IDが分かる旧ルール適用は冪等キー付きで呼ぶ', async () => {
+    const dbModule = await import('@line-crm/db');
+    actionScoreMocks.applyActionScoreEvent.mockResolvedValue({
+      configured: false,
+      status: 'legacy',
+      applications: [],
+    });
+    const db = fakeDb({ capturedInserts: [] });
+
+    await fireEvent(db, 'message_received', {
+      sourceEventId: 'webhook-1',
+      sourceKind: 'line_webhook',
+      occurredAt: '2026-08-28T00:00:00.000Z',
+      friendId: 'friend-1',
+      eventData: {},
+    }, undefined, 'account-1');
+
+    expect(actionScoreMocks.applyActionScoreEvent).toHaveBeenCalled();
+    expect(dbModule.applyScoring).toHaveBeenCalledWith(db, 'friend-1', 'message_received', 'webhook-1');
+  });
 });
 
 describe('fireEvent — 送信Webhookのアカウント解決', () => {

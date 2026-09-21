@@ -1506,12 +1506,25 @@ scoring.get('/api/friends/:id/score', requireVisibleFriendForScore, async (c) =>
       data: {
         friendId,
         currentScore: score,
+        /*
+         * IDEA-17: 点数が変わった根拠を明細から辿れるように、発生した出来事・
+         * 発生日時・前後の点数・動かした方法まで返す。旧行の NULL は欠損の
+         * まま返し、表示側で「未取得」と書き分ける。
+         */
         history: history.map((h) => ({
           id: h.id,
           scoringRuleId: h.scoring_rule_id,
+          ruleKey: h.rule_key,
           scoreChange: h.score_change,
+          scoreBefore: h.score_before,
+          scoreAfter: h.score_after,
           reason: h.reason,
+          eventType: h.event_type,
+          source: h.source,
+          occurredAt: h.occurred_at ?? h.created_at,
           createdAt: h.created_at,
+          mode: h.executed_by_staff_id || h.executed_by_staff_name ? 'manual' : 'automatic',
+          executedByStaffName: h.executed_by_staff_name,
         })),
       },
     });
@@ -1527,7 +1540,15 @@ scoring.post('/api/friends/:id/score', requireRole('owner', 'admin'), requireVis
     const friendId = c.req.param('id');
     const body = await c.req.json<{ scoreChange: number; reason?: string }>();
     if (body.scoreChange === undefined) return c.json({ success: false, error: 'scoreChange is required' }, 400);
-    await addScore(c.env.DB, { friendId, scoreChange: body.scoreChange, reason: body.reason });
+    const staff = c.get('staff');
+    await addScore(c.env.DB, {
+      friendId,
+      scoreChange: body.scoreChange,
+      reason: body.reason,
+      // IDEA-17: 手で動かした点数は「だれが」を明細からたどれるようにする。
+      executedByStaffId: staff?.id ?? null,
+      executedByStaffName: staff?.name ?? null,
+    });
     const newScore = await getFriendScore(c.env.DB, friendId);
     return c.json({ success: true, data: { friendId, currentScore: newScore } }, 201);
   } catch (err) {
