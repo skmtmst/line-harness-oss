@@ -10,29 +10,22 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { api, ApiError } from '@/lib/api'
+import {
+  api,
+  ApiError,
+  type RichMenuTestApplyItem,
+  type RichMenuTestApplyUserMenuAction,
+} from '@/lib/api'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 
 type TestApplyState = {
   linked: boolean
   linkGuidance: string | null
-  active: {
-    id: string
-    status: string
-    previousRichMenuId: string | null
-    appliedRichMenuId: string | null
-    lastErrorCode: string | null
-    createdAt: string
-    updatedAt: string
-  } | null
-  recent: Array<{
-    id: string
-    status: string
-    appliedRichMenuId: string | null
-    lastErrorCode: string | null
-    createdAt: string
-  }>
+  /** 宛先の明示。連携済みの本人LINEだけ。未連携なら null。 */
+  destination: { staffName: string | null; lineUserIdMasked: string } | null
+  active: RichMenuTestApplyItem | null
+  recent: RichMenuTestApplyItem[]
 }
 
 const APPLY_STATUS_LABEL: Record<string, string> = {
@@ -81,22 +74,38 @@ export function TestApplySection({ groupId }: { groupId: string }) {
     setConfirmKind(kind)
   }
 
+  /** revert が本人の表示に何をしたかを、そのまま利用者へ伝える。 */
+  function revertNotice(action: RichMenuTestApplyUserMenuAction | undefined): string {
+    switch (action) {
+      case 'restored':
+        return '適用前の表示へ戻しました。'
+      case 'already_restored':
+        return 'すでに適用前の表示に戻っていました。テスト用に作ったメニューだけ削除しました。'
+      case 'left_as_is':
+        return '適用後にあなたの表示が別のメニューへ変わっていたため、今の表示はそのままにしました。テスト用に作ったメニューだけ削除しました。'
+      case 'untouched':
+        return 'あなたの表示は一度も変わっていなかったため、そのままにしました。'
+      default:
+        return 'テスト適用を取り消しました。'
+    }
+  }
+
   async function run() {
     if (!confirmKind || busy) return
     setBusy(true)
     setActionError('')
     setNotice('')
     try {
-      const res = confirmKind === 'apply'
-        ? await api.richMenuGroups.testApply(groupId, keyRef.current)
-        : await api.richMenuGroups.testApplyRevert(groupId, keyRef.current)
-      if (!res.success) throw new Error(res.error)
+      if (confirmKind === 'apply') {
+        const res = await api.richMenuGroups.testApply(groupId, keyRef.current)
+        if (!res.success) throw new Error(res.error)
+        setNotice('あなたのLINEにこのメニューを出しました。LINEアプリで見え方を確認してください。')
+      } else {
+        const res = await api.richMenuGroups.testApplyRevert(groupId, keyRef.current)
+        if (!res.success) throw new Error(res.error)
+        setNotice(revertNotice(res.data.userMenuAction))
+      }
       setConfirmKind(null)
-      setNotice(
-        confirmKind === 'apply'
-          ? 'あなたのLINEにこのメニューを出しました。LINEアプリで見え方を確認してください。'
-          : '適用前の表示へ戻しました。',
-      )
       await load()
     } catch (e) {
       setActionError(
@@ -131,6 +140,12 @@ export function TestApplySection({ groupId }: { groupId: string }) {
 
       {state?.linked ? (
         <div className="mt-3 space-y-2">
+          {/* 宛先の明示。試験適用でも「誰のどのLINEへ出るか」を先に言う。 */}
+          {state.destination ? (
+            <p className="text-ink-secondary text-xs">
+              宛先: {state.destination.staffName ?? 'あなた'}のLINE（{state.destination.lineUserIdMasked}）
+            </p>
+          ) : null}
           {active ? (
             <p className="text-ink-secondary text-xs">
               いまの状態: <strong className="text-ink">{activeLabel}</strong>
@@ -140,7 +155,12 @@ export function TestApplySection({ groupId }: { groupId: string }) {
             </p>
           ) : null}
           <div className="flex flex-wrap gap-2">
-            {active && (active.status === 'applied' || active.status === 'failed') ? (
+            {/*
+             * 「元に戻す」は、適用前の表示を記録できていて戻せる時だけ出す。
+             * failed でも previousCaptured=false なら本人の表示は一度も
+             * 変わっていないので、復元不能な操作は見せず「適用して試す」を出す。
+             */}
+            {active && (active.status === 'applied' || (active.status === 'failed' && active.previousCaptured)) ? (
               <Button type="button" onClick={() => openConfirm('revert')} disabled={busy}>
                 元のメニューに戻す
               </Button>
@@ -166,7 +186,11 @@ export function TestApplySection({ groupId }: { groupId: string }) {
       <ConfirmDialog
         open={confirmKind === 'apply'}
         title="自分のLINEにこのメニューを出しますか？"
-        description="あなたのトーク画面のメニューだけがこの内容に変わります。ほかの友だちには出ません。「元のメニューに戻す」でいつでも戻せます。"
+        description={`${
+          state?.destination
+            ? `宛先: ${state.destination.staffName ?? 'あなた'}のLINE（${state.destination.lineUserIdMasked}）。`
+            : ''
+        }あなたのトーク画面のメニューだけがこの内容に変わります。ほかの友だちには出ません。「元のメニューに戻す」でいつでも戻せます。`}
         confirmLabel="自分のLINEに適用する"
         busy={busy}
         error={actionError || undefined}
@@ -180,7 +204,11 @@ export function TestApplySection({ groupId }: { groupId: string }) {
       <ConfirmDialog
         open={confirmKind === 'revert'}
         title="テスト適用を取り消しますか？"
-        description="あなたのトーク画面のメニューを、適用前の表示へ戻します。テスト用に作ったメニューがあればLINE上から削除します。"
+        description={`${
+          state?.destination
+            ? `宛先: ${state.destination.staffName ?? 'あなた'}のLINE（${state.destination.lineUserIdMasked}）。`
+            : ''
+        }あなたのトーク画面のメニューを、適用前の表示へ戻します。適用後に表示が変わっていた場合は上書きしません。テスト用に作ったメニューがあればLINE上から削除します。`}
         confirmLabel="元のメニューに戻す"
         busy={busy}
         error={actionError || undefined}

@@ -198,6 +198,63 @@ function manualPublishFingerprint(row: RichMenuGroupWithPages): string {
 }
 
 /**
+ * definition_snapshot（serializeGroupWithPages 形）から fingerprint と同じ
+ * 項目だけを取り出す。公開結果として変わる status・updatedAt・LINEのIDは
+ * 除くので、「いまの下書き」と「最後に公開した版」の差分判定に使える。
+ */
+function fingerprintFromSnapshot(snapshot: unknown): string | null {
+  if (snapshot === null || typeof snapshot !== 'object' || Array.isArray(snapshot)) return null;
+  const s = snapshot as Record<string, unknown>;
+  const rawPages = Array.isArray(s.pages) ? s.pages : [];
+  const pages = rawPages.map((raw) => {
+    const p = (raw ?? {}) as Record<string, unknown>;
+    const rawAreas = Array.isArray(p.areas) ? p.areas : [];
+    return {
+      id: p.id,
+      orderIndex: p.orderIndex,
+      name: p.name,
+      aliasId: p.aliasId,
+      imageR2Key: p.imageR2Key,
+      imageContentType: p.imageContentType,
+      areas: rawAreas.map((rawArea) => {
+        const a = (rawArea ?? {}) as Record<string, unknown>;
+        return {
+          id: a.id,
+          boundsX: a.boundsX,
+          boundsY: a.boundsY,
+          boundsWidth: a.boundsWidth,
+          boundsHeight: a.boundsHeight,
+          actionType: a.actionType,
+          actionData: a.actionData,
+          intent: a.intent,
+          label: a.label,
+          tagIds: a.tagIds,
+          scoreChange: a.scoreChange,
+          templateId: a.templateId,
+          formId: a.formId,
+          trackedLinkId: a.trackedLinkId,
+        };
+      }),
+    };
+  });
+  return JSON.stringify({
+    id: s.id,
+    accountId: s.accountId,
+    name: s.name,
+    chatBarText: s.chatBarText,
+    size: s.size,
+    defaultPageId: s.defaultPageId,
+    isDefaultForAll: s.isDefaultForAll === true,
+    targetingCondition: s.targetingCondition,
+    targetingPriority: s.targetingPriority,
+    targetingEnabled: s.targetingEnabled === true,
+    folderId: s.folderId,
+    displayOrder: s.displayOrder,
+    pages,
+  });
+}
+
+/**
  * LINE create の成功とD1 journalの間でWorkerが止まっても、次回のlist照合で
  * 同じshellを回収できる決定名。通常・予約公開の従来名とは接頭辞を分ける。
  * request/page は内部UUIDなので、最大でもLINEの300文字制限を十分下回る。
@@ -2191,12 +2248,15 @@ async function handleManualPublish(
 /**
  * 公開履歴の一覧。各runの版（スナップショットの要約）・状態・試行に使った
  * LINE ID・最終エラーを返す。別アカウントは404で隠す。
+ *
+ * 併せて「いま対象へ出ている版」（最後に成功したrun）と、編集中の下書きが
+ * その公開版と違うかを返す。画面はこれで公開版と編集版を混ぜずに説明できる。
  */
 richMenuGroups.get(
   '/api/rich-menu-groups/:groupId/publish-runs',
   requireRole('owner', 'admin'),
   async (c) => {
-    const group = await getRichMenuGroupById(c.env.DB, c.req.param('groupId'));
+    const group = await getRichMenuGroupWithPages(c.env.DB, c.req.param('groupId'));
     if (!group || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [group.account_id])) {
       return c.json({ success: false, error: 'not found' }, 404);
     }
@@ -2205,17 +2265,28 @@ richMenuGroups.get(
     for (const request of requests) {
       const shells = await getRichMenuManualPublishShells(c.env.DB, request.id);
       // 版の要約。スナップショットが読めなくても一覧自体は返す。
-      let version: { name: string | null; chatBarText: string | null; pageCount: number | null } = {
+      let version: {
+        name: string | null;
+        chatBarText: string | null;
+        pageCount: number | null;
+        // その版が「誰に出る版」だったか。対象者に見える版を説明するために返す。
+        isDefaultForAll: boolean | null;
+        targetingEnabled: boolean | null;
+      } = {
         name: null, chatBarText: null, pageCount: null,
+        isDefaultForAll: null, targetingEnabled: null,
       };
       try {
         const snapshot = JSON.parse(request.definition_snapshot) as {
           name?: string; chatBarText?: string; pages?: unknown[];
+          isDefaultForAll?: unknown; targetingEnabled?: unknown;
         };
         version = {
           name: typeof snapshot.name === 'string' ? snapshot.name : null,
           chatBarText: typeof snapshot.chatBarText === 'string' ? snapshot.chatBarText : null,
           pageCount: Array.isArray(snapshot.pages) ? snapshot.pages.length : null,
+          isDefaultForAll: typeof snapshot.isDefaultForAll === 'boolean' ? snapshot.isDefaultForAll : null,
+          targetingEnabled: typeof snapshot.targetingEnabled === 'boolean' ? snapshot.targetingEnabled : null,
         };
       } catch {
         // 壊れたスナップショットは要約なしで返す。
@@ -2237,7 +2308,30 @@ richMenuGroups.get(
         })),
       });
     }
-    return c.json({ success: true, data: runs });
+
+    // いま対象へ出ている版 = 直近で成功したrun（created_at 降順の先頭から拾う）。
+    const latestSucceeded = requests.find((request) => request.status === 'succeeded') ?? null;
+    const published = latestSucceeded
+      ? (runs.find((run) => run.id === latestSucceeded.id) ?? null)
+      : null;
+
+    // 編集中の下書きが公開版と違うか。スナップショットが読めないときは null
+    // （不明）として、画面は「違う」と断定しない。
+    let draftDiffersFromPublished: boolean | null = null;
+    if (latestSucceeded) {
+      try {
+        const snapshot = JSON.parse(latestSucceeded.definition_snapshot) as unknown;
+        const snapshotFingerprint = fingerprintFromSnapshot(snapshot);
+        draftDiffersFromPublished =
+          snapshotFingerprint === null
+            ? null
+            : snapshotFingerprint !== manualPublishFingerprint(group);
+      } catch {
+        draftDiffersFromPublished = null;
+      }
+    }
+
+    return c.json({ success: true, data: { runs, published, draftDiffersFromPublished } });
   },
 );
 
@@ -2876,6 +2970,7 @@ richMenuGroups.get('/api/rich-menu-groups/:groupId/audience-summary', async (c) 
 
 function serializeTestApply(row: {
   id: string; status: string; previous_richmenu_id: string | null;
+  previous_captured?: number | null;
   applied_richmenu_id: string | null; last_error_code: string | null;
   created_at: string; updated_at: string;
 }) {
@@ -2883,11 +2978,26 @@ function serializeTestApply(row: {
     id: row.id,
     status: row.status,
     previousRichMenuId: row.previous_richmenu_id,
+    /*
+     * 適用前の表示を記録できたか。0 のまま失敗した apply は本人のメニューを
+     * 一度も変えていないので、画面は「元に戻す」を出さず、revert も本人の
+     * メニューには触れない。
+     */
+    previousCaptured: row.previous_captured === 1,
     appliedRichMenuId: row.applied_richmenu_id,
     lastErrorCode: row.last_error_code,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
+}
+
+/**
+ * 宛先の明示に使う LINE ユーザーIDの表示用マスク。宛先確認だけできればよい
+ * ので、全桁は出さない。
+ */
+function maskLineUserId(lineUserId: string): string {
+  if (lineUserId.length <= 9) return lineUserId;
+  return `${lineUserId.slice(0, 5)}…${lineUserId.slice(-4)}`;
 }
 
 /** テスト適用の現在状態。本人LINEが連携済みかもここで返す。 */
@@ -2911,6 +3021,13 @@ richMenuGroups.get('/api/rich-menu-groups/:groupId/test-apply', async (c) => {
       linkGuidance: lineUserId
         ? null
         : 'テスト適用には、あなたのLINEアカウントとの連携が必要です。スタッフ設定からLINE連携を行ってください。',
+      /*
+       * 宛先の明示。試験適用でも「誰のどのLINEへ出るか」を画面が言えるよう、
+       * 担当者名とマスクしたLINEユーザーIDを返す。未連携なら null。
+       */
+      destination: lineUserId
+        ? { staffName: member?.name ?? null, lineUserIdMasked: maskLineUserId(lineUserId) }
+        : null,
       active: active ? serializeTestApply(active) : null,
       recent: recent
         .filter((row) => row.staff_id === staff.id)
@@ -3142,7 +3259,9 @@ richMenuGroups.post(
   requireRole('owner', 'admin'),
   async (c) => {
     const groupId = c.req.param('groupId');
-    const group = await getRichMenuGroupById(c.env.DB, groupId);
+    // pages まで読む。公開済みメニューの「適用に使ったID」を確定し、
+    // 本人の今の表示がテスト適用で出したものかを照合するために使う。
+    const group = await getRichMenuGroupWithPages(c.env.DB, groupId);
     if (!group || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [group.account_id])) {
       return c.json({ success: false, error: 'not found' }, 404);
     }
@@ -3188,21 +3307,62 @@ richMenuGroups.post(
       return c.json({ success: false, error: 'LINE client does not support per-user rich menu operations' }, 500);
     }
 
+    // テスト適用が本人へ出した可能性のあるメニューの集合。revert で上書き
+    // してよいのは、本人の表示が今もこの集合の中にあるときだけ。適用後に
+    // 本人や別経路で表示が変わっていたら、それを無言で戻さない。
+    let testShellIds: string[] = [];
     try {
-      // 1) 本人の表示を適用前へ戻す。
-      if (apply.previous_richmenu_id) {
-        await line.linkRichMenuToUser(apply.line_user_id, apply.previous_richmenu_id);
+      testShellIds = JSON.parse(apply.test_shell_ids ?? '[]') as string[];
+    } catch {
+      testShellIds = [];
+    }
+    const ourMenuIds = new Set<string>(testShellIds);
+    if (apply.applied_richmenu_id) ourMenuIds.add(apply.applied_richmenu_id);
+    if (group.status === 'published') {
+      const targetPage =
+        group.pages.find((p) => p.id === group.default_page_id)
+        ?? [...group.pages].sort((a, b) => a.order_index - b.order_index)[0];
+      // published の適用は LINE 側の既存メニューをリンクしただけ。適用後・
+      // markApplied 前に止まった failed 行でもこのIDで拾える。
+      if (targetPage?.line_richmenu_id) ourMenuIds.add(targetPage.line_richmenu_id);
+    }
+
+    try {
+      /*
+       * 1) 本人の表示の扱いを決める。
+       *    restored:         まだテストメニューが出ている → 適用前へ戻した
+       *    already_restored: すでに適用前の表示に戻っている → 何もしない
+       *    left_as_is:       適用後に別の表示へ変わっていた → 上書きしない
+       *    untouched:        適用前の記録が無い（一度も変えていない）→ 触らない
+       */
+      let userMenuAction: 'restored' | 'already_restored' | 'left_as_is' | 'untouched';
+      if (apply.previous_captured === 1) {
+        if (!line.getRichMenuIdOfUser) {
+          throw new Error('LINE client does not support reading per-user rich menu');
+        }
+        const current = await line.getRichMenuIdOfUser(apply.line_user_id);
+        if (current !== null && ourMenuIds.has(current)) {
+          // いまもテストで出したメニューが出ているので適用前へ戻す。
+          if (apply.previous_richmenu_id) {
+            await line.linkRichMenuToUser(apply.line_user_id, apply.previous_richmenu_id);
+          } else {
+            await line.unlinkRichMenuFromUser(apply.line_user_id);
+          }
+          userMenuAction = 'restored';
+        } else if (current === apply.previous_richmenu_id) {
+          // すでに適用前の表示（適用前が「個別メニューなし」なら null 同士）。
+          userMenuAction = 'already_restored';
+        } else {
+          // 適用後に表示が変わっていた。正当な変更を無言で上書きしない。
+          userMenuAction = 'left_as_is';
+        }
       } else {
-        await line.unlinkRichMenuFromUser(apply.line_user_id);
+        // previous_captured=0 は適用前の表示を記録する前に止まった apply。
+        // 本人のメニューは一度も変えていないので絶対に触らない。
+        userMenuAction = 'untouched';
       }
 
       // 2) 下書きテストで作ったメニューと、それを指している alias を掃除する。
-      let testShellIds: string[] = [];
-      try {
-        testShellIds = JSON.parse(apply.test_shell_ids ?? '[]') as string[];
-      } catch {
-        testShellIds = [];
-      }
       if (testShellIds.length > 0 && line.listRichMenuAliases) {
         const shellSet = new Set(testShellIds);
         try {
@@ -3234,7 +3394,11 @@ richMenuGroups.post(
           targetKind: 'rich_menu_group',
           targetId: group.id,
           result: 'success',
-          after: { applyId: apply.id, restoredRichMenuId: apply.previous_richmenu_id },
+          after: {
+            applyId: apply.id,
+            userMenuAction,
+            restoredRichMenuId: userMenuAction === 'restored' ? apply.previous_richmenu_id : null,
+          },
           requestTraceId: c.req.header('cf-ray') ?? c.req.header('x-request-id') ?? null,
           ipPrefix: maskAuditIp(c.req.header('cf-connecting-ip')),
           deviceFamily: auditDeviceFamily(c.req.header('user-agent')),
@@ -3244,7 +3408,10 @@ richMenuGroups.post(
       }
 
       const updated = await getRichMenuTestApplyById(c.env.DB, apply.id);
-      return c.json({ success: true, data: serializeTestApply(updated ?? apply) });
+      return c.json({
+        success: true,
+        data: { ...serializeTestApply(updated ?? apply), userMenuAction },
+      });
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
       await markRichMenuTestApplyRevertFailed(c.env.DB, apply.id, message);
