@@ -929,6 +929,198 @@ friends.get('/api/friends/:id/mileage', requireVisibleFriend, async (c) => {
   }
 });
 
+/*
+ * GET /api/friends/:id/upcoming — 受信箱の顧客情報に出す「次の予定」(IDEA-02)。
+ *
+ * 返すのは確定している未来の予定だけ:
+ *   - nextBooking … 予約（bookings / event_bookings / meet_consultations の
+ *     うち status が requested/confirmed で開始が未来のものの最先着）
+ *   - nextAutoDelivery … 確定した自動配信（friend_scenarios の
+ *     next_delivery_at と、queued 済みの reminder_delivery_runs の最先着）
+ *
+ * 条件付きでしか出ない将来配信（絞り込み配信の動的対象など）はここに
+ * 含めない。「未確定を確定予定と表示しない」ため。
+ *
+ * それぞれの取得は独立させ、片方の失敗でもう片方まで隠さない。
+ * 失敗は null ではなく *_Error=true で返し、画面が「未取得」と
+ * 「予定なし」を区別できるようにする。
+ */
+friends.get('/api/friends/:id/upcoming', requireVisibleFriend, async (c) => {
+  try {
+    const friendId = c.req.param('id');
+    const db = c.env.DB;
+    const friend = await getFriendById(db, friendId);
+    if (!friend) {
+      return c.json({ success: false, error: 'Friend not found' }, 404);
+    }
+    const accountId =
+      ((friend as unknown as Record<string, unknown>).line_account_id as string | null) ?? null;
+    const nowIso = new Date().toISOString();
+
+    type BookingCandidate = {
+      kind: 'booking' | 'event_booking' | 'meet_consultation';
+      id: string;
+      title: string;
+      startsAt: string;
+      status: string;
+    };
+
+    const fetchNextBooking = async (): Promise<BookingCandidate | null> => {
+      const candidates: BookingCandidate[] = [];
+      if (accountId) {
+        // 予約（店舗メニュー）。LINE未連携の予約客レコード経由も拾う。
+        const booking = await db
+          .prepare(
+            `SELECT b.id, b.starts_at, b.status, m.name AS title
+               FROM bookings b
+               JOIN menus m ON m.id = b.menu_id
+               LEFT JOIN booking_customers bc ON bc.id = b.booking_customer_id
+              WHERE b.line_account_id = ?
+                AND b.status IN ('requested', 'confirmed')
+                AND b.starts_at > ?
+                AND (b.friend_id = ? OR bc.friend_id = ?)
+              ORDER BY b.starts_at ASC
+              LIMIT 1`,
+          )
+          .bind(accountId, nowIso, friendId, friendId)
+          .first<{ id: string; starts_at: string; status: string; title: string | null }>();
+        if (booking) {
+          candidates.push({
+            kind: 'booking',
+            id: booking.id,
+            title: booking.title ?? '予約',
+            startsAt: booking.starts_at,
+            status: booking.status,
+          });
+        }
+        // イベント予約。開催時刻は予約枠（event_slots）側にある。
+        const eventBooking = await db
+          .prepare(
+            `SELECT eb.id, eb.status, es.starts_at, e.name AS title, e.id AS event_id
+               FROM event_bookings eb
+               JOIN event_slots es ON es.id = eb.slot_id
+               JOIN events e ON e.id = eb.event_id
+              WHERE eb.friend_id = ?
+                AND eb.line_account_id = ?
+                AND eb.status IN ('requested', 'confirmed')
+                AND es.starts_at > ?
+              ORDER BY es.starts_at ASC
+              LIMIT 1`,
+          )
+          .bind(friendId, accountId, nowIso)
+          .first<{ id: string; status: string; starts_at: string; title: string | null; event_id: string }>();
+        if (eventBooking) {
+          candidates.push({
+            kind: 'event_booking',
+            id: eventBooking.event_id,
+            title: eventBooking.title ?? 'イベント',
+            startsAt: eventBooking.starts_at,
+            status: eventBooking.status,
+          });
+        }
+      }
+      // Google Meet 個別相談。アカウント列を持たないため友だちIDで引く。
+      const meet = await db
+        .prepare(
+          `SELECT id, title, starts_at, status
+             FROM meet_consultations
+            WHERE friend_id = ?
+              AND status = 'confirmed'
+              AND starts_at > ?
+            ORDER BY starts_at ASC
+            LIMIT 1`,
+        )
+        .bind(friendId, nowIso)
+        .first<{ id: string; title: string | null; starts_at: string; status: string }>();
+      if (meet) {
+        candidates.push({
+          kind: 'meet_consultation',
+          id: meet.id,
+          title: meet.title ?? '個別相談',
+          startsAt: meet.starts_at,
+          status: meet.status,
+        });
+      }
+      candidates.sort((a, b) => (a.startsAt < b.startsAt ? -1 : a.startsAt > b.startsAt ? 1 : 0));
+      return candidates[0] ?? null;
+    };
+
+    type AutoDeliveryCandidate = {
+      kind: 'scenario' | 'reminder';
+      id: string;
+      name: string;
+      scheduledAt: string;
+    };
+
+    const fetchNextAutoDelivery = async (): Promise<AutoDeliveryCandidate | null> => {
+      const candidates: AutoDeliveryCandidate[] = [];
+      // シナリオの確定済み次通。paused は止まっているので「確定」に入れない。
+      const scenario = await db
+        .prepare(
+          `SELECT fs.scenario_id AS id, s.name, fs.next_delivery_at AS scheduled_at
+             FROM friend_scenarios fs
+             JOIN scenarios s ON s.id = fs.scenario_id
+            WHERE fs.friend_id = ?
+              AND fs.status IN ('active', 'delivering')
+              AND fs.next_delivery_at IS NOT NULL
+            ORDER BY fs.next_delivery_at ASC
+            LIMIT 1`,
+        )
+        .bind(friendId)
+        .first<{ id: string; name: string | null; scheduled_at: string }>();
+      if (scenario) {
+        candidates.push({
+          kind: 'scenario',
+          id: scenario.id,
+          name: scenario.name ?? 'シナリオ',
+          scheduledAt: scenario.scheduled_at,
+        });
+      }
+      // リマインダの確定済み配信（queued=予定、claimed=送信中、retry_wait=再試行待ち）。
+      const reminder = await db
+        .prepare(
+          `SELECT rr.reminder_id AS id, r.name, rr.scheduled_at
+             FROM reminder_delivery_runs rr
+             JOIN reminders r ON r.id = rr.reminder_id
+            WHERE rr.friend_id = ?
+              AND rr.status IN ('queued', 'claimed', 'retry_wait')
+            ORDER BY rr.scheduled_at ASC
+            LIMIT 1`,
+        )
+        .bind(friendId)
+        .first<{ id: string; name: string | null; scheduled_at: string }>();
+      if (reminder) {
+        candidates.push({
+          kind: 'reminder',
+          id: reminder.id,
+          name: reminder.name ?? 'リマインダ',
+          scheduledAt: reminder.scheduled_at,
+        });
+      }
+      candidates.sort((a, b) => (a.scheduledAt < b.scheduledAt ? -1 : a.scheduledAt > b.scheduledAt ? 1 : 0));
+      return candidates[0] ?? null;
+    };
+
+    const [bookingResult, autoDeliveryResult] = await Promise.allSettled([
+      fetchNextBooking(),
+      fetchNextAutoDelivery(),
+    ]);
+
+    return c.json({
+      success: true,
+      data: {
+        nextBooking: bookingResult.status === 'fulfilled' ? bookingResult.value : null,
+        nextBookingError: bookingResult.status === 'rejected',
+        nextAutoDelivery: autoDeliveryResult.status === 'fulfilled' ? autoDeliveryResult.value : null,
+        nextAutoDeliveryError: autoDeliveryResult.status === 'rejected',
+      },
+    });
+  } catch (err) {
+    console.error('GET /api/friends/:id/upcoming error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
 // GET /api/friends/:id - get single friend with tags
 /**
  * 友だち画面の上部に出す数（設計 `V2 2-2 友だち` の KPIs）。
