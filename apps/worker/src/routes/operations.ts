@@ -29,6 +29,10 @@ import { sha256Hex } from '../middleware/auth.js';
 import { requireIrreversibleConfirmation, requireRole } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 import { getOperationImpactPreview } from '../services/operation-impact-preview.js';
+import {
+  OPERATION_SEND_PATHS,
+  validateSendPathRegistry,
+} from '../services/operation-send-paths.js';
 import { runOperationHealthChecks } from '../services/operations-health.js';
 import { verifyOperationsEvent } from '../services/operations-signature.js';
 
@@ -308,6 +312,48 @@ operations.get('/api/operations/control/preview', requireRole('owner', 'admin'),
   } catch (error) {
     console.error('GET /api/operations/control/preview error:', error);
     return c.json({ success: false, error: '緊急停止の影響人数を取得できませんでした' }, 500);
+  }
+});
+
+/*
+ * 送信経路の台帳 (#1050)。
+ *
+ * 「停止ボタンが見える」だけでは各経路が止まるか分からないため、実装が
+ * 名乗った経路一覧と、いまの停止対象ごとの状態をそのまま返す。
+ * 台帳と実装の食い違い (経路が抜けた・証跡が消えた) は problems として
+ * 画面と契約テストの両方から見えるようにする。
+ */
+operations.get('/api/operations/send-paths', requireRole('owner', 'admin'), async (c) => {
+  const accountId = requestedAccountId(c.req.query('account_id'));
+  if (!await canReadScope(c, accountId)) {
+    return c.json({
+      success: false,
+      error: 'この範囲の送信経路を表示する権限がありません',
+      code: 'EMERGENCY_SCOPE_FORBIDDEN',
+    }, 403);
+  }
+  try {
+    const control = await getOperationControlSet(c.env.DB, accountId);
+    return c.json({
+      success: true,
+      data: {
+        evaluatedAt: new Date().toISOString(),
+        capabilities: OPERATION_CAPABILITIES,
+        problems: validateSendPathRegistry(),
+        paths: OPERATION_SEND_PATHS.map((path) => ({
+          id: path.id,
+          label: path.label,
+          kind: path.kind,
+          capability: path.capability,
+          state: path.capability ? control.states[path.capability] : null,
+          excludedReason: path.excludedReason ?? null,
+          note: path.note ?? null,
+        })),
+      },
+    });
+  } catch (error) {
+    console.error('GET /api/operations/send-paths error:', error);
+    return c.json({ success: false, error: '送信経路の一覧を取得できませんでした' }, 500);
   }
 });
 

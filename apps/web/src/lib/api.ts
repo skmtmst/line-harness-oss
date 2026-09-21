@@ -928,6 +928,28 @@ export type OperationAlert = {
   }>
 }
 
+/**
+ * 送信経路の台帳1行 (#1050)。GET /api/operations/send-paths の応答。
+ * capability=null は緊急停止の対象外と判断した経路（理由は excludedReason）。
+ */
+export type OperationSendPath = {
+  id: string
+  label: string
+  kind: 'manual' | 'auto' | 'scheduled' | 'proxy' | 'external'
+  capability: OperationCapability | null
+  state: 'running' | 'stopped' | null
+  excludedReason: string | null
+  note: string | null
+}
+
+export type OperationSendPathsResponse = {
+  evaluatedAt: string
+  capabilities: OperationCapability[]
+  /** 台帳と実装の食い違い。空なら全経路が停止対象か理由付きの対象外。 */
+  problems: string[]
+  paths: OperationSendPath[]
+}
+
 export type OperationHistoryEntry = OperationIncident & {
   historyKind?: 'incident' | 'deployment'
   occurredAt?: string
@@ -11340,6 +11362,10 @@ export const api = {
     },
     history: (limit = 100) =>
       fetchApi<ApiResponse<OperationHistoryEntry[]>>(`/api/operations/history?limit=${limit}`),
+    sendPaths: (accountId: string | null) => {
+      const query = accountId ? `?account_id=${encodeURIComponent(accountId)}` : ''
+      return fetchApi<ApiResponse<OperationSendPathsResponse>>(`/api/operations/send-paths${query}`)
+    },
     stop: (input: {
       lineAccountId: string | null
       capabilities: OperationCapability[]
