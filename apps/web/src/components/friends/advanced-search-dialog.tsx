@@ -760,35 +760,45 @@ export default function AdvancedSearchDialog({
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-3 border-t border-divider-soft px-6 py-4">
-          {onLoadSaved && savedSearchEnabled ? (
-            <Button type="button" onClick={onLoadSaved}>
-              保存した検索から読み込む
+        {/*
+          U013: 補助操作（読み込む・リセット・保存）は上段、確定操作
+          （キャンセル・この条件で表示）は下段の右へ固定する。
+          1行に混ぜると狭い幅で確定操作の位置が行によって変わり、
+          何を押せば確定かが読めなかった。
+        */}
+        <div className="border-t border-divider-soft px-6 py-4">
+          <div className="flex flex-wrap items-center gap-3">
+            {onLoadSaved && savedSearchEnabled ? (
+              <Button type="button" onClick={onLoadSaved}>
+                保存した検索から読み込む
+              </Button>
+            ) : null}
+            <button
+              type="button"
+              onClick={resetConditions}
+              className="text-xs font-medium text-ink-faint hover:text-ink-secondary"
+            >
+              条件をリセット
+            </button>
+            {savedNotice ? <span className="text-xs font-semibold text-accent-deep">{savedNotice}</span> : null}
+            {savedSearchEnabled ? (
+              <Button type="button" onClick={() => { setSaveOpen(true); setSaveError(''); setSavedNotice('') }}>条件を保存</Button>
+            ) : null}
+          </div>
+          <div className="mt-3 flex flex-wrap items-center justify-end gap-3">
+            <Button type="button" onClick={onClose}>
+              キャンセル
             </Button>
-          ) : null}
-          <button
-            type="button"
-            onClick={resetConditions}
-            className="text-xs font-medium text-ink-faint hover:text-ink-secondary"
-          >
-            条件をリセット
-          </button>
-          <Button type="button" className="ml-auto" onClick={onClose}>
-            キャンセル
-          </Button>
-          {savedNotice ? <span className="text-xs font-semibold text-accent-deep">{savedNotice}</span> : null}
-          {savedSearchEnabled ? (
-            <Button type="button" onClick={() => { setSaveOpen(true); setSaveError(''); setSavedNotice('') }}>条件を保存</Button>
-          ) : null}
-          {/* #976 U084: 主操作は共通Buttonの primary（`$accent-deep` + 白文字）。 */}
-          <Button
-            type="button"
-            variant="primary"
-            className="px-5"
-            onClick={() => onApply({ params, summary, editorState })}
-          >
-            {counting ? '再計算中…' : count === null ? 'この条件で表示' : `${count.toLocaleString('ja-JP')}人を表示`}
-          </Button>
+            {/* #976 U084: 主操作は共通Buttonの primary（`$accent-deep` + 白文字）。 */}
+            <Button
+              type="button"
+              variant="primary"
+              className="px-5"
+              onClick={() => onApply({ params, summary, editorState })}
+            >
+              {counting ? '再計算中…' : count === null ? 'この条件で表示' : `${count.toLocaleString('ja-JP')}人を表示`}
+            </Button>
+          </div>
         </div>
       </div>
       {saveOpen ? (
@@ -913,29 +923,34 @@ function TagPicker({
 
   return (
     <div>
-      <div className="flex flex-wrap items-center gap-2">
-        <select
-          aria-label="タグ名を選ぶ"
-          value={pick}
-          onChange={(e) => {
-            const id = e.target.value
-            if (!id) return
-            if (mode === 'include') {
-              if (!include.includes(id)) onChange([...include, id], exclude)
-            } else if (!exclude.includes(id)) {
-              onChange(include, [...exclude, id])
-            }
-            setPick('')
-          }}
-          className="border-hairline rounded-control bg-canvas text-ink min-w-0 flex-1 border px-3 py-2 text-sm"
-        >
-          <option value="">タグ名を選ぶ</option>
-          {tags.map((t) => (
-            <option key={t.id} value={t.id}>
-              {t.name}
-            </option>
-          ))}
-        </select>
+      {/*
+        U012: タグ名の選択は全幅の1行目、含む/含まないは別行へ。
+        同じ行に並べると狭いパネルでタグ名が数文字に切れて読めなかった。
+        選んだタグの札は下で複数行に広がり、全文を確認できる。
+      */}
+      <select
+        aria-label="タグ名を選ぶ"
+        value={pick}
+        onChange={(e) => {
+          const id = e.target.value
+          if (!id) return
+          if (mode === 'include') {
+            if (!include.includes(id)) onChange([...include, id], exclude)
+          } else if (!exclude.includes(id)) {
+            onChange(include, [...exclude, id])
+          }
+          setPick('')
+        }}
+        className="border-hairline rounded-control bg-canvas text-ink w-full border px-3 py-2 text-sm"
+      >
+        <option value="">タグ名を選ぶ</option>
+        {tags.map((t) => (
+          <option key={t.id} value={t.id}>
+            {t.name}
+          </option>
+        ))}
+      </select>
+      <div className="mt-2 flex flex-wrap items-center gap-2">
         <select
           value={mode}
           onChange={(e) => setMode(e.target.value as 'include' | 'exclude')}

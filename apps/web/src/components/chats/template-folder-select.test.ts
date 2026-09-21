@@ -37,7 +37,9 @@ describe('受信箱V6のテンプレートフォルダ', () => {
   it('開くたびに前のLINEアカウントの内容を消してから読み直す', () => {
     expect(PICKER).toContain('const { selectedAccountId } = useAccount()')
     expect(PICKER).toContain('loadedAccountId === selectedAccountId')
-    expect(PICKER).toContain('accountDataCurrent ? templates : []')
+    // 空側は useMemo で固定した空配列（描画のたびに別物にならないように）。
+    expect(PICKER).toContain('accountDataCurrent ? templates : emptyTemplates')
+    expect(PICKER).toContain('accountDataCurrent ? folders : emptyFolders')
     expect(PICKER).toContain('setTemplates([])')
     expect(PICKER).toContain('setFolders([])')
     expect(PICKER).toContain("setTemplatesStatus('loading')")

@@ -3,6 +3,7 @@
 import { useCallback, useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { api, type MileageHistoryItem, type MileageSummary } from '@/lib/api'
+import type { FriendField } from '@line-crm/shared'
 import Button from '@/components/shared/button'
 import { GripVertical, X } from 'lucide-react'
 
@@ -17,6 +18,10 @@ interface FriendDetail {
   /** 社内での呼び名。表示名が本名と違うときに使う。 */
   systemDisplayName: string | null
   refCode: string | null
+  /** N-036: 友だち詳細と同じ流入元名。無い・消えた経路は null。 */
+  firstTrackedLinkName: string | null
+  /** フォーム回答の総数。formSubmissions は最新10件までのため、続きの有無はこれで判別する。 */
+  formSubmissionTotal?: number | null
   createdAt: string
   tags: Array<{ id: string; name: string; color: string }>
   formSubmissions: Array<{
@@ -55,19 +60,25 @@ const DETAIL_SECTIONS = [
 ] as const
 type DetailSectionKey = (typeof DETAIL_SECTIONS)[number]['key']
 
-/** `Xi4x9` に描かれた、運用者が選ぶ7つの表示単位。 */
+/*
+ * `Xi4x9` に描かれた、運用者が選ぶ7つの表示単位。
+ *
+ * INBOX-04: スイッチの名前は、実際に消える節の見出しと同じ言葉にする。
+ * 以前は「予約・EC」でリッチメニュー、「内部メモ」で友だち情報と
+ * フォーム回答が隠れ、何が消えるか名前から読めなかった。
+ */
 const DETAIL_SETTING_GROUPS: Array<{
   key: string
   label: string
   sections: DetailSectionKey[]
 }> = [
-  { key: 'basic', label: '基本情報', sections: ['profile', 'names'] },
+  { key: 'basic', label: 'プロフィール・基本情報', sections: ['profile', 'names'] },
   { key: 'tags', label: 'タグ', sections: ['tags'] },
-  { key: 'assignment', label: '対応状況・担当者', sections: ['support'] },
-  { key: 'next', label: '次の対応', sections: ['starred'] },
-  { key: 'booking', label: '予約・EC', sections: ['richMenu'] },
+  { key: 'assignment', label: '次の対応', sections: ['support'] },
+  { key: 'next', label: '★つき友だち情報', sections: ['starred'] },
+  { key: 'booking', label: 'リッチメニュー', sections: ['richMenu'] },
   { key: 'mileage', label: 'マイル', sections: ['mileage'] },
-  { key: 'memo', label: '内部メモ', sections: ['metadata', 'forms'] },
+  { key: 'memo', label: '友だち情報・フォーム回答', sections: ['metadata', 'forms'] },
 ]
 
 const DEFAULT_SECTION_ORDER = DETAIL_SETTING_GROUPS.flatMap((group) => group.sections)
@@ -85,16 +96,29 @@ const statusLabels: Record<NonNullable<ChatStatusInfo['status']>, { label: strin
   resolved: { label: '対応済み', className: 'bg-success-bg text-success' },
 }
 
-/** Render a metadata value safely as text. Objects/arrays → JSON, primitives → as-is. */
+/*
+ * Render a metadata value safely as text.
+ * INBOX-07: 配列やオブジェクトも生のJSONではなく読める形へ畳む。
+ * 値の中身（URL・長文）はそのまま出し、枠の中で安全に折り返す。
+ */
 function renderValue(value: unknown): string {
-  if (value === null || value === undefined) return '-'
-  if (typeof value === 'string') return value || '-'
+  if (value === null || value === undefined || value === '') return '-'
+  if (typeof value === 'string') return value
   if (typeof value === 'number' || typeof value === 'boolean') return String(value)
-  try {
-    return JSON.stringify(value)
-  } catch {
-    return '[unparseable]'
+  if (Array.isArray(value)) {
+    const items = value.map((item) => renderValue(item)).filter((item) => item !== '-')
+    return items.length > 0 ? items.join('、') : '-'
   }
+  if (typeof value === 'object') {
+    try {
+      const entries = Object.entries(value as Record<string, unknown>)
+        .map(([key, item]) => `${key}: ${renderValue(item)}`)
+      return entries.length > 0 ? entries.join('、') : '-'
+    } catch {
+      return '-'
+    }
+  }
+  return String(value)
 }
 
 /**
@@ -262,6 +286,16 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
     return aIndex - bIndex
   })
 
+  /*
+   * INBOX-08: 各取得は「再試行」でこのパネル内からやり直せる。
+   * retry キーを増やすと effect が再取得する。失敗のたびに画面移動や
+   * 全体の再読込をさせない。
+   */
+  const [friendRetry, setFriendRetry] = useState(0)
+  const [mileageRetry, setMileageRetry] = useState(0)
+  const [richMenuRetry, setRichMenuRetry] = useState(0)
+  const [fieldsRetry, setFieldsRetry] = useState(0)
+
   useEffect(() => {
     if (!friendId) {
       setFriend(null)
@@ -275,16 +309,17 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
       if (res.success && res.data) {
         setFriend(res.data as unknown as FriendDetail)
       } else {
-        setError((res as { error?: string }).error ?? '友だち情報を取得できませんでした')
+        // 内部の例外文字列はそのまま出さない。利用者向けの短い理由にする。
+        setError('友だち情報を取得できませんでした')
       }
-    }).catch((err) => {
+    }).catch(() => {
       if (cancelled) return
-      setError(err instanceof Error ? err.message : String(err))
+      setError('友だち情報を取得できませんでした')
     }).finally(() => {
       if (!cancelled) setLoading(false)
     })
     return () => { cancelled = true }
-  }, [friendId])
+  }, [friendId, friendRetry])
 
   useEffect(() => {
     if (!friendId) {
@@ -304,7 +339,38 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
       if (!cancelled) setMileage({ kind: 'error' })
     })
     return () => { cancelled = true }
-  }, [friendId])
+  }, [friendId, mileageRetry])
+
+  /*
+   * INBOX-05/07: ★つき項目と、友だち情報の項目名（内部キーではなく
+   * 画面に出す名前）は friend_fields の定義から取る。
+   * 友だち詳細の「情報」欄と同じ口・同じ名前にそろえる。
+   */
+  type FriendFieldsState =
+    | { kind: 'loading' }
+    | { kind: 'error' }
+    | { kind: 'data'; items: FriendField[] }
+  const [friendFields, setFriendFields] = useState<FriendFieldsState>({ kind: 'loading' })
+
+  useEffect(() => {
+    if (!friendId) {
+      setFriendFields({ kind: 'loading' })
+      return
+    }
+    let cancelled = false
+    setFriendFields({ kind: 'loading' })
+    api.friendFields.forFriend(friendId, { suppressFeatureDisabledEvent: true }).then((res) => {
+      if (cancelled) return
+      if (res.success && res.data) {
+        setFriendFields({ kind: 'data', items: res.data.items })
+      } else {
+        setFriendFields({ kind: 'error' })
+      }
+    }).catch(() => {
+      if (!cancelled) setFriendFields({ kind: 'error' })
+    })
+    return () => { cancelled = true }
+  }, [friendId, fieldsRetry])
 
   // リッチメニュー — loading / error / data を区別して、null=未設定 を取得失敗と
   // 混同しないようにする。Codex review (P3) の指摘で導入。
@@ -333,7 +399,24 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
       setRichMenu({ kind: 'error' })
     })
     return () => { cancelled = true }
-  }, [friendId])
+  }, [friendId, richMenuRetry])
+
+  /*
+   * 友だち情報（metadata）のキーを、画面に出す項目名へ写す対応表。
+   * friend_fields.fieldKey → name と、フォームの項目 name → label の
+   * 両方を持つ。どちらにも無い内部キー（`_` 始まり）は業務表示から外す。
+   */
+  const metadataLabel = (key: string): string | null => {
+    if (key.startsWith('_')) return null
+    const fromField = friendFields.kind === 'data'
+      ? friendFields.items.find((field) => field.fieldKey === key)?.name
+      : undefined
+    if (fromField) return fromField
+    const fromForm = (friend?.formSubmissions ?? [])
+      .flatMap((submission) => submission.fields)
+      .find((field) => field.name === key)?.label
+    return fromForm ?? key
+  }
 
   if (!friendId) return null
 
@@ -478,7 +561,17 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
             </div>
           </div>
         ) : error ? (
-          <div className="p-4 text-xs text-red-600">{error}</div>
+          /* INBOX-08: 失敗は文字だけにせず、その場で再試行できるようにする。 */
+          <div className="space-y-2 p-4">
+            <p className="text-xs text-red-600">{error}</p>
+            <button
+              type="button"
+              onClick={() => setFriendRetry((key) => key + 1)}
+              className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control inline-flex items-center border px-3 py-1.5 text-xs font-semibold"
+            >
+              再試行する
+            </button>
+          </div>
         ) : friend ? (
           <div className="flex flex-col divide-y divide-[#E5E7EB]">
             {/* Profile Header — V4は相手・対応・担当をひとまとまりにする。 */}
@@ -551,7 +644,17 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
               {mileage.kind === 'loading' ? (
                 <div className="h-24 animate-pulse rounded-xl bg-gray-100" />
               ) : mileage.kind === 'error' ? (
-                <p className="text-[11px] text-red-500 italic">マイルの取得に失敗しました</p>
+                /* INBOX-08: 失敗と未登録を分け、その場で再試行できる。 */
+                <div className="space-y-1.5">
+                  <p className="text-[11px] text-danger">マイルを読み込めませんでした</p>
+                  <button
+                    type="button"
+                    onClick={() => setMileageRetry((key) => key + 1)}
+                    className="text-action text-[11px] font-semibold underline underline-offset-2"
+                  >
+                    再試行する
+                  </button>
+                </div>
               ) : (
                 <div className="border-hairline bg-canvas rounded-control border p-3">
                   <div className="flex items-start justify-between gap-2">
@@ -632,17 +735,22 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
               {friend.tags.length === 0 ? (
                 <p className="text-[11px] text-gray-400 italic">タグなし</p>
               ) : (
+                /*
+                  INBOX-35: タグ名はパネル幅以内に収める。長い名前は
+                  押して広げられる（ExpandableText）ので、
+                  切れたまま読めない状態にしない。
+                */
                 <div className="flex flex-wrap gap-1">
                   {friend.tags.map((tag) => (
                     <span
                       key={tag.id}
-                      className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium"
+                      className="inline-flex max-w-full items-center rounded px-2 py-0.5 text-[10px] font-medium"
                       style={{
                         backgroundColor: `${tag.color}20`,
                         color: tag.color,
                       }}
                     >
-                      {tag.name}
+                      <ExpandableText value={tag.name} className="max-w-full text-inherit" />
                     </span>
                   ))}
                 </div>
@@ -651,9 +759,10 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
 
             {/*
               ★つき友だち情報（設計 `友だち詳細`）。
-              friend_fields に「よく見る印」がまだ無いので、いまは
-              登録されている情報の先頭3件を出す。印が入ったら差し替える。
-              docs/v025-open-questions.md に残している。
+              INBOX-05: 「友だち一覧に表示（★）」が付いた項目だけを出す。
+              以前は登録順の先頭3件を出していたため、登録順で重要でない
+              情報が並び、4件目以降の★項目は届かなかった。
+              0件なら付け方への導線を出す。
             */}
             <div style={sectionStyle('starred')} className={`${sectionVisibility('starred')} p-4`}>
               <div className="mb-2 flex items-center justify-between">
@@ -662,18 +771,41 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
                   すべて見る
                 </a>
               </div>
-              {!friend.metadata || Object.keys(friend.metadata).length === 0 ? (
-                <p className="text-[11px] text-gray-400 italic">まだ登録がありません</p>
-              ) : (
-                <dl className="space-y-1.5 text-xs">
-                  {Object.entries(friend.metadata).slice(0, 3).map(([key, value]) => (
-                    <div key={key} className="flex justify-between gap-2">
-                      <dt className="text-[11px] text-gray-500 shrink-0">{key}</dt>
-                      <dd className="text-gray-700 truncate">{renderValue(value)}</dd>
-                    </div>
-                  ))}
-                </dl>
-              )}
+              {friendFields.kind === 'loading' ? (
+                <div className="h-10 animate-pulse rounded-lg bg-canvas-sunken" />
+              ) : friendFields.kind === 'error' ? (
+                <div className="space-y-1.5">
+                  <p className="text-[11px] text-danger">項目を読み込めませんでした</p>
+                  <button
+                    type="button"
+                    onClick={() => setFieldsRetry((key) => key + 1)}
+                    className="text-action text-[11px] font-semibold underline underline-offset-2"
+                  >
+                    再試行する
+                  </button>
+                </div>
+              ) : (() => {
+                const starred = friendFields.items.filter((field) => field.isStarred)
+                if (starred.length === 0) {
+                  return (
+                    <p className="text-[11px] text-gray-400">
+                      ★を付けた項目はまだありません。友だち詳細の「情報」で項目へ★を付けると、ここへ出ます。
+                    </p>
+                  )
+                }
+                return (
+                  <dl className="space-y-1.5 text-xs">
+                    {starred.map((field) => (
+                      <div key={field.id}>
+                        <dt className="text-[10px] text-gray-400 break-words">{field.name}</dt>
+                        <dd className="mt-0.5 text-gray-700">
+                          <ExpandableText value={field.value ?? null} empty="未登録" className="text-xs text-gray-700" />
+                        </dd>
+                      </div>
+                    ))}
+                  </dl>
+                )
+              })()}
             </div>
 
             {/* Rich Menu */}
@@ -683,7 +815,17 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
               {richMenu.kind === 'loading' ? (
                 <p className="text-[11px] text-gray-400 italic">読み込み中...</p>
               ) : richMenu.kind === 'error' ? (
-                <p className="text-[11px] text-red-500 italic">取得に失敗しました</p>
+                /* INBOX-08: 失敗と未設定を分け、その場で再試行できる。 */
+                <div className="space-y-1.5">
+                  <p className="text-[11px] text-danger">リッチメニューを読み込めませんでした</p>
+                  <button
+                    type="button"
+                    onClick={() => setRichMenuRetry((key) => key + 1)}
+                    className="text-action text-[11px] font-semibold underline underline-offset-2"
+                  >
+                    再試行する
+                  </button>
+                </div>
               ) : richMenu.id === null ? (
                 <p className="text-[11px] text-gray-400 italic">未設定</p>
               ) : (
@@ -704,41 +846,63 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
               {/* 設計は追加日と流入元を必ず出す。どちらも既に持っている値。 */}
               <dl className="mb-2 space-y-1 text-xs">
                 <div className="flex justify-between gap-2">
-                  <dt className="text-[11px] text-gray-500">追加日</dt>
+                  <dt className="text-[11px] text-gray-500 shrink-0">追加日</dt>
                   <dd className="text-gray-700">{formatDate(friend.createdAt)}</dd>
                 </div>
                 <div className="flex justify-between gap-2">
-                  <dt className="text-[11px] text-gray-500">流入元</dt>
-                  <dd className="text-gray-700">
-                    {/*
-                      流入経路の名前を友だち詳細で返す口がまだ無い。
-                      friends.first_tracked_link_id はあるが、この経路では
-                      引いていない。欄だけ出して、入ったら繋ぐ。
-                      docs/v025-open-questions.md に残す。
-                    */}
-                    <span className="text-gray-400">不明</span>
+                  <dt className="text-[11px] text-gray-500 shrink-0">流入元</dt>
+                  {/*
+                    INBOX-06: 友だち詳細と同じ firstTrackedLinkName を出す。
+                    計測できなかった人・経路が消えた人は null → 「不明」。
+                    取得自体の失敗は上のエラー節で再試行できる。
+                  */}
+                  <dd className="min-w-0 text-gray-700">
+                    {friend.firstTrackedLinkName ? (
+                      <ExpandableText value={friend.firstTrackedLinkName} className="text-xs text-gray-700" />
+                    ) : (
+                      <span className="text-gray-400">不明</span>
+                    )}
                   </dd>
                 </div>
               </dl>
-              {!friend.metadata || Object.keys(friend.metadata).length === 0 ? (
-                <p className="text-[11px] text-gray-400 italic">まだ登録がありません</p>
-              ) : (
-                <div>
-                <dl className="space-y-2 text-xs">
-                  {Object.entries(friend.metadata).map(([key, value]) => (
-                    <div key={key}>
-                      <dt className="text-[10px] text-gray-400 uppercase tracking-wide">{key}</dt>
-                      <dd className="text-gray-700 mt-0.5 whitespace-pre-wrap break-words">{renderValue(value)}</dd>
-                    </div>
-                  ))}
-                </dl>
-                </div>
-              )}
+              {(() => {
+                /*
+                  INBOX-07: `_` 始まりの制御用キーは業務表示から外し、
+                  項目名は内部キーではなく定義済みの表示名へ写す。
+                */
+                const entries = Object.entries(friend.metadata ?? {})
+                  .map(([key, value]) => ({ key, label: metadataLabel(key), value }))
+                  .filter((entry): entry is { key: string; label: string; value: unknown } => entry.label !== null)
+                if (entries.length === 0) {
+                  return <p className="text-[11px] text-gray-400 italic">まだ登録がありません</p>
+                }
+                return (
+                  <dl className="space-y-2 text-xs">
+                    {entries.map((entry) => (
+                      <div key={entry.key}>
+                        <dt className="text-[10px] text-gray-400 break-words">{entry.label}</dt>
+                        <dd className="text-gray-700 mt-0.5 whitespace-pre-wrap break-words">{renderValue(entry.value)}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                )
+              })()}
             </div>
 
             {/* Form answers — save_to_metadata の設定に関係なく回答履歴を表示 */}
             <div style={sectionStyle('forms')} className={`${sectionVisibility('forms')} p-4`}>
-              <h4 className="text-[11px] font-medium text-gray-500 mb-2">フォーム回答</h4>
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <h4 className="text-[11px] font-medium text-gray-500">フォーム回答</h4>
+                {/*
+                  INBOX-17: 取得するのは最新10件まで。続きがあるか、全部で
+                  何件あるかを黙らせない。10件を超える分は友だち詳細へ誘導する。
+                */}
+                {typeof friend.formSubmissionTotal === 'number' && friend.formSubmissionTotal > 0 && (
+                  <span className="text-[10px] text-gray-400">
+                    全{friend.formSubmissionTotal}件中 {friend.formSubmissions.length}件を表示
+                  </span>
+                )}
+              </div>
               {!friend.formSubmissions || friend.formSubmissions.length === 0 ? (
                 <p className="text-[11px] text-gray-400 italic">回答はまだありません</p>
               ) : (
@@ -769,6 +933,19 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
                     )
                   })}
                 </div>
+                {/*
+                  10件を超える回答はこのパネルでは追い読みしない。
+                  友だち詳細の回答一覧へ進む口を出す。
+                */}
+                {typeof friend.formSubmissionTotal === 'number'
+                  && friend.formSubmissions.length < friend.formSubmissionTotal && (
+                  <a
+                    href={`/friends/detail?id=${friend.id}`}
+                    className="text-action mt-3 inline-flex text-[11px] font-semibold hover:underline"
+                  >
+                    残り{friend.formSubmissionTotal - friend.formSubmissions.length}件は友だち詳細で見る
+                  </a>
+                )}
                 </div>
               )}
             </div>
