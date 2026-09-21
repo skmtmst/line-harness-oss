@@ -1055,7 +1055,9 @@ export default function EditDialog({
               <span className="text-ink-secondary text-xs">
                 担当者が対応中のトークでは返さない
                 <span className="text-ink-faint block text-[11px]">
-                  「対応中」のときだけ止まります。未対応のまま放置されているトークには返します。
+                  「対応中」のときだけ止まり、対応中が解除されるとあらためて動きます。
+                  未対応のまま放置されているトークには返します。
+                  予約・支払いなどの自動通知は別の送信経路なので止まりません。
                 </span>
               </span>
             </label>}
@@ -1378,6 +1380,24 @@ export default function EditDialog({
                   </Button>
                 </div>
               </div>
+              <div className="md:col-span-2">
+                <label className="flex cursor-pointer items-start gap-2">
+                  <input
+                    type="checkbox"
+                    checked={skipWhenOperatorActive}
+                    onChange={(event) => setSkipWhenOperatorActive(event.target.checked)}
+                    className="mt-0.5 h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
+                  />
+                  <span className="text-ink-secondary text-xs">
+                    担当者が対応中のトークでは返さない
+                    <span className="text-ink-faint block text-xs">
+                      「対応中」のときだけ止まり、対応中が解除されるとあらためて動きます。
+                      未対応のまま放置されているトークには返します。
+                      予約・支払いなどの自動通知は別の送信経路なので止まりません。
+                    </span>
+                  </span>
+                </label>
+              </div>
             </div>
           )}
 
@@ -1444,6 +1464,7 @@ export default function EditDialog({
                   <div className="flex justify-between gap-3 py-3"><dt className="text-ink-faint">実行すること</dt><dd className="text-ink font-medium">{actions.length}件</dd></div>
                   <div className="flex justify-between gap-3 py-3"><dt className="text-ink-faint">連続返信</dt><dd className="text-ink font-medium">{cooldown ? `${cooldown}分あける` : '制限なし'}</dd></div>
                   <div className="flex justify-between gap-3 py-3"><dt className="text-ink-faint">待ち時間</dt><dd className="text-ink font-medium">{replyDelaySummary}</dd></div>
+                  <div className="flex justify-between gap-3 py-3"><dt className="text-ink-faint">対応中のトーク</dt><dd className="text-ink font-medium">{skipWhenOperatorActive ? '返さない' : '返す'}</dd></div>
                   <div className="flex justify-between gap-3 py-3"><dt className="text-ink-faint">不一致時</dt><dd className="text-ink font-medium">{unmatchedSummary}</dd></div>
                 </>
               )}

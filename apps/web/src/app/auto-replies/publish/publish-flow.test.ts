@@ -9,7 +9,7 @@ const validation = (over: Partial<AutoReplyValidationResult> = {}): AutoReplyVal
   ({ valid: true, errors: [], warnings: [], conflicts: [], lastTestStatus: 'succeeded', ...over })
 const dryRun = (over: Partial<AutoReplyDryRunResult> = {}): AutoReplyDryRunResult =>
   ({
-    matched: true, draftWon: true, winner: null, candidates: [], actions: [],
+    matched: true, draftWon: true, operatorActive: false, winner: null, candidates: [], actions: [],
     stateChanged: false, ...over,
   }) as AutoReplyDryRunResult
 

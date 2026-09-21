@@ -2083,7 +2083,9 @@ export type AutoReplyTestReasonCode =
   | "operator_handling"
   | "already_replied_once"
   | "cooldown_active"
-  | "friend_conditions_not_met";
+  | "friend_conditions_not_met"
+  /** 同じ検証文に当たったが、先に動くルールがあるため実行されない。 */
+  | "higher_priority_won";
 
 export interface AutoReplyConflict {
   autoReplyId: string;
@@ -2104,6 +2106,11 @@ export interface AutoReplyValidationResult {
 export interface AutoReplyDryRunResult {
   matched: boolean;
   draftWon: boolean;
+  /**
+   * 試した友だちのトークが「対応中」か。
+   * 有人対応の抑止が効く状態かを画面で説明するために返す。
+   */
+  operatorActive: boolean;
   winner: {
     autoReplyId: string;
     name: string;
@@ -2116,6 +2123,8 @@ export interface AutoReplyDryRunResult {
     priority: number;
     result: "not_matched" | "skipped" | "won";
     reasonCodes: AutoReplyTestReasonCode[];
+    /** 「担当者が対応中のトークでは返さない」設定のルールか。抑止対象の明示に使う。 */
+    suppressWhenOperatorActive: boolean;
   }>;
   actions: Array<{ kind: string }>;
   stateChanged: false;

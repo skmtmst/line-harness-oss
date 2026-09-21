@@ -23,6 +23,7 @@ const mocks = vi.hoisted(() => ({
   canAccessAllLineAccounts: vi.fn(),
   evaluateAutoReplyCandidates: vi.fn(),
   previewAutoReplyContent: vi.fn(),
+  isOperatorHandling: vi.fn(),
 }));
 
 function settings(overrides: Partial<AutoReplyDraftSettings> = {}): AutoReplyDraftSettings {
@@ -155,6 +156,9 @@ vi.mock('../services/auto-reply.js', () => ({
   previewAutoReplyContent: mocks.previewAutoReplyContent,
   resolveKeywordRules: (item: AutoReply) => [{ keyword: item.keyword, matchType: item.match_type }],
 }));
+vi.mock('../services/auto-reply-conditions.js', () => ({
+  isOperatorHandling: mocks.isOperatorHandling,
+}));
 
 import { autoReplies } from './auto-replies.js';
 
@@ -209,6 +213,7 @@ beforeEach(() => {
     messageType: 'text',
     content: '山田さん、ご予約を承ります',
   });
+  mocks.isOperatorHandling.mockResolvedValue(false);
   mocks.publishAutoReplyDraftVersion.mockResolvedValue(version({
     id: 'version-published',
     status: 'published',
@@ -282,16 +287,74 @@ describe('自動応答の試験と公開', () => {
         occurredAt: '2026-08-30T03:00:00.000Z',
       }),
     }, bindings);
-    const json = await response.json() as { data: { draftWon: boolean; stateChanged: boolean } };
+    const json = await response.json() as {
+      data: {
+        draftWon: boolean;
+        operatorActive: boolean;
+        stateChanged: boolean;
+        candidates: Array<{ suppressWhenOperatorActive: boolean }>;
+      };
+    };
 
     expect(response.status).toBe(200);
-    expect(json.data).toMatchObject({ draftWon: true, stateChanged: false });
-    expect(mocks.evaluateAutoReplyCandidates).toHaveBeenCalledOnce();
+    expect(json.data).toMatchObject({ draftWon: true, operatorActive: false, stateChanged: false });
+    expect(json.data.candidates[0]?.suppressWhenOperatorActive).toBe(false);
+    // 試験は勝者の後ろも評価する。「当たるのに動かない」ルールを説明するため。
+    expect(mocks.evaluateAutoReplyCandidates).toHaveBeenCalledWith(
+      db,
+      expect.any(Array),
+      expect.objectContaining({ friendId: 'friend-a', incomingText: '予約したいです' }),
+      { continueAfterWinner: true },
+    );
     expect(mocks.recordAutoReplyDraftTest).toHaveBeenCalledWith(db, 'version-draft', {
       succeeded: true,
       staffId: 'staff-a',
     });
     expect(mocks.publishAutoReplyDraftVersion).not.toHaveBeenCalled();
+  });
+
+  it('試験は勝者の後ろの候補と対応中の抑止状態も返す', async () => {
+    const winner = rowFromSettings('rule-draft', settings());
+    const suppressed = rowFromSettings('rule-lower', settings({
+      name: '下の予約応答',
+      priority: 20,
+      skipWhenOperatorActive: true,
+    }));
+    mocks.isOperatorHandling.mockResolvedValue(true);
+    mocks.evaluateAutoReplyCandidates.mockResolvedValue([
+      { rule: winner, order: 1, result: 'won', reasonCodes: [] },
+      { rule: suppressed, order: 2, result: 'skipped', reasonCodes: ['higher_priority_won'] },
+    ]);
+
+    const response = await app().request('/api/auto-replies/rule-draft/test', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        friendId: 'friend-a',
+        incomingText: '予約したいです',
+      }),
+    }, bindings);
+    const json = await response.json() as {
+      data: {
+        operatorActive: boolean;
+        candidates: Array<{
+          autoReplyId: string;
+          result: string;
+          reasonCodes: string[];
+          suppressWhenOperatorActive: boolean;
+        }>;
+      };
+    };
+
+    expect(response.status).toBe(200);
+    expect(json.data.operatorActive).toBe(true);
+    expect(json.data.candidates).toHaveLength(2);
+    expect(json.data.candidates[1]).toMatchObject({
+      autoReplyId: 'rule-lower',
+      result: 'skipped',
+      reasonCodes: ['higher_priority_won'],
+      suppressWhenOperatorActive: true,
+    });
   });
 
   it('試験に成功していない下書きは公開しない', async () => {

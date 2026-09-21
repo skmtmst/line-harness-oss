@@ -107,6 +107,29 @@ describe('V6 自動応答一覧の契約', () => {
     expect(PUBLISH).toContain('LINEプレビュー')
   })
 
+  it('試験結果は候補の優先順位・動かない理由・解除条件と対応中の抑止を説明する', () => {
+    // 検証文に当たる候補を全部出し、優先順位で動かない理由も返す。
+    expect(PUBLISH).toContain('higher_priority_won')
+    expect(PUBLISH).toContain('上のルールが先に動きます')
+    expect(PUBLISH).toContain('このルールを先に動かすには、評価順を上のルールより前にします')
+    // 有人対応中の抑止対象・解除条件・二重返信の注意を明示する。
+    expect(PUBLISH).toContain('dryRun?.operatorActive')
+    expect(PUBLISH).toContain('suppressWhenOperatorActive')
+    expect(PUBLISH).toContain('対応中が解除されると')
+    expect(PUBLISH).toContain('担当者の返信と二重に届くことがあります')
+    expect(PUBLISH).toContain('予約・支払いなどの自動通知は別の送信経路なので')
+    // 試しても友だちへ届かないことを明記する。
+    expect(PUBLISH).toContain('選んだ友だちへは何も届きません')
+  })
+
+  it('編集画面の抑止設定は解除条件と対象外の通知を明記する', () => {
+    expect(EDITOR).toContain('担当者が対応中のトークでは返さない')
+    expect(EDITOR).toContain('対応中が解除されるとあらためて動きます')
+    expect(EDITOR).toContain('予約・支払いなどの自動通知は別の送信経路なので止まりません')
+    // ページ表示（5段の編集画面）でも抑止設定を変えられる。
+    expect(EDITOR).toContain('setSkipWhenOperatorActive(event.target.checked)')
+  })
+
   it('有効化完了の一時停止と複製を実口へ接続する（NEXT-20）', () => {
     // 停止は一覧と同じ共通の確認窓と専用の停止口へ繋ぐ。
     expect(PUBLISH).toContain("import ConfirmDialog from '@/components/shared/confirm-dialog'")

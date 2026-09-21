@@ -125,4 +125,57 @@ describe('自動応答の公開前試験が本番の判定順を共有する', (
     ]);
     expect(mocks.evaluateAutoReplyConditions).not.toHaveBeenCalled();
   });
+
+  it('試験では勝者の後ろも全部評価し、当たるのに動かないルールへ理由を付ける', async () => {
+    const result = await evaluateAutoReplyCandidates(db, [
+      rule({ id: 'first', priority: 10 }),
+      rule({ id: 'second', priority: 20 }),
+      rule({ id: 'third', priority: 30 }),
+    ], {
+      friendId: 'friend-a',
+      incomingText: '予約したいです',
+      messageKind: 'text',
+      now: new Date('2026-08-30T03:00:00.000Z'),
+    }, { continueAfterWinner: true });
+
+    expect(result.map((item) => ({
+      id: item.rule.id,
+      result: item.result,
+      reasons: item.reasonCodes,
+    }))).toEqual([
+      { id: 'first', result: 'won', reasons: [] },
+      { id: 'second', result: 'skipped', reasons: ['higher_priority_won'] },
+      { id: 'third', result: 'skipped', reasons: ['higher_priority_won'] },
+    ]);
+    // 勝者の後ろの候補も状態判定まで通す（条件で見送られる理由を区別するため）。
+    expect(mocks.evaluateAutoReplyConditions).toHaveBeenCalledTimes(3);
+  });
+
+  it('試験の勝者の後ろでも、条件や言葉で当たらないルールは自分の理由を返す', async () => {
+    mocks.evaluateAutoReplyConditions
+      .mockResolvedValueOnce({ matches: true, reasonCodes: [] })
+      .mockResolvedValueOnce({ matches: false, reasonCodes: ['operator_handling'] });
+
+    const result = await evaluateAutoReplyCandidates(db, [
+      rule({ id: 'first', priority: 10 }),
+      rule({ id: 'other-word', keyword: '返品', priority: 20 }),
+      rule({ id: 'during-handling', priority: 30 }),
+    ], {
+      friendId: 'friend-a',
+      incomingText: '予約したいです',
+      messageKind: 'text',
+      now: new Date('2026-08-30T03:00:00.000Z'),
+    }, { continueAfterWinner: true });
+
+    expect(result.map((item) => ({
+      id: item.rule.id,
+      result: item.result,
+      reasons: item.reasonCodes,
+    }))).toEqual([
+      { id: 'first', result: 'won', reasons: [] },
+      { id: 'other-word', result: 'not_matched', reasons: ['keyword_not_matched'] },
+      // 優先順位負けではなく、対応中の抑止が先に効く理由を残す。
+      { id: 'during-handling', result: 'skipped', reasons: ['operator_handling'] },
+    ]);
+  });
 });
