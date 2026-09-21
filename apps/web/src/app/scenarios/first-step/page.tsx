@@ -570,13 +570,13 @@ function FirstStepContent() {
           {targetMode === 'advanced' && (
             <div className="mt-4">
               <span className="text-ink-secondary mb-1 block text-xs font-medium">詳細条件で絞り込み</span>
-              <button
-                type="button"
-                onClick={() => setConditionOpen(true)}
-                className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control h-9 border px-4 text-sm"
-              >
+              {/*
+                共通ボタンは PC 40px・タッチ 44px。隣の入力欄やプルダウンと
+                同じ基準線に乗る（SCENARIO-19 / UX-01）。
+              */}
+              <Button onClick={() => setConditionOpen(true)} className="px-4">
                 {targetCondition ? describeCondition(targetCondition) : '絞り込み'}
-              </button>
+              </Button>
             </div>
           )}
         </section>
@@ -598,7 +598,7 @@ function FirstStepContent() {
                   min={0}
                   value={offsetDays}
                   onChange={e => setOffsetDays(Math.max(0, Number(e.target.value)))}
-                  className={`${styles.smallField} border-hairline rounded-control bg-canvas text-ink border px-3 text-caption font-semibold`}
+                  className={`${styles.smallField} border-hairline rounded-control bg-canvas text-ink border px-3`}
                 />
                 <span className="text-ink-secondary text-sm">日後</span>
               </div>
@@ -610,7 +610,7 @@ function FirstStepContent() {
                   type="time"
                   value={deliveryTime}
                   onChange={e => setDeliveryTime(e.target.value)}
-                  className={`${styles.timeField} border-hairline rounded-control bg-canvas text-ink border px-3 text-caption font-semibold`}
+                  className={`${styles.timeField} border-hairline rounded-control bg-canvas text-ink border px-3`}
                 />
               </label>
             ) : (
@@ -625,7 +625,7 @@ function FirstStepContent() {
                     onChange={e =>
                       setOffsetHours(Math.min(23, Math.max(0, Number(e.target.value))))
                     }
-                    className={`${styles.smallField} border-hairline rounded-control bg-canvas text-ink border px-3 text-caption font-semibold`}
+                    className={`${styles.smallField} border-hairline rounded-control bg-canvas text-ink border px-3`}
                   />
                   <span className="text-ink-secondary text-sm">時間</span>
                   <input
@@ -636,7 +636,7 @@ function FirstStepContent() {
                     onChange={e =>
                       setOffsetMinutesRemainder(Math.min(59, Math.max(0, Number(e.target.value))))
                     }
-                    className={`${styles.smallField} border-hairline rounded-control bg-canvas text-ink border px-3 text-caption font-semibold`}
+                    className={`${styles.smallField} border-hairline rounded-control bg-canvas text-ink border px-3`}
                   />
                   <span className="text-ink-secondary text-sm">分後</span>
                 </div>
@@ -679,16 +679,31 @@ function FirstStepContent() {
               <MessageTypeTabs value={kind} onChange={changeKind}>
                 {kind === 'text' && (
                   <div>
-                    <span className="text-ink-secondary mb-1 block text-xs font-medium">本文</span>
+                    {/*
+                      「本文」の字と入力欄を結び付ける。押したら欄へ移る
+                      （共通方針 UX-01 のラベル→入力の構造）。
+                    */}
+                    <label
+                      htmlFor="first-step-body"
+                      className="text-ink-secondary mb-1 block text-xs font-medium"
+                    >
+                      本文
+                    </label>
                     <div className="mb-2">
                       <InsertToolbar targetRef={bodyRef} value={body} onChange={editBody} />
                     </div>
+                    {/*
+                      SCENARIO-19: 高さと伸び方は first-step.module.css の
+                      bodyField が持つ（160px 下限・内容に応じて伸長）。
+                      手動でも広げられるよう resize は禁じない。
+                    */}
                     <textarea
+                      id="first-step-body"
                       ref={bodyRef}
                       value={body}
                       onChange={e => editBody(e.target.value)}
                       placeholder="はじめまして。友だち追加ありがとうございます。"
-                      className={`${styles.bodyField} border-hairline rounded-control bg-canvas text-ink focus:ring-accent w-full resize-none border px-3 py-2 text-sm focus:ring-2 focus:outline-none`}
+                      className={`${styles.bodyField} border-hairline rounded-control bg-canvas text-ink focus:ring-accent w-full resize-y border px-3 py-2 text-sm focus:ring-2 focus:outline-none`}
                     />
                     <CharCounter length={bodyLength} />
                   </div>

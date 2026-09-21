@@ -27,6 +27,7 @@ import { getSendPermissionForAccount, type SendPermissionCache } from './send-en
 import { matchesCondition, parseCondition } from './segment-query.js';
 import { runScenarioActions, resumePreviousScenario, runScenarioOp } from './scenario-actions.js';
 import { featureJobCanRun } from './feature-enforcement.js';
+import { isOperationCapabilityStopped } from '@line-crm/db';
 import { parseQuestion, buildQuestionMessages } from './scenario-question.js';
 import { expandDateVariables } from './interpolation-date.js';
 
@@ -216,6 +217,12 @@ export async function processStepDeliveries(
         .bind(fs.scenario_id)
         .first<{ line_account_id: string | null }>();
       if (ownerRow?.line_account_id && !await featureJobCanRun(db, { accountId: ownerRow.line_account_id, featureId: 'scenarios', job: 'scenario deliveries' })) {
+        continue;
+      }
+      // 緊急停止 (#1050): scenario_dispatch が止まっている統括は claim せず
+      // active のまま残す。復旧すれば next_delivery_at を過ぎた分から順に届く。
+      // アカウント未割当の旧行はグローバル停止 (*) だけに従う。
+      if (await isOperationCapabilityStopped(db, ownerRow?.line_account_id ?? null, 'scenario_dispatch')) {
         continue;
       }
       // Stealth: add small random delay between deliveries to avoid burst patterns

@@ -200,6 +200,7 @@ import {
   buildBroadcastSettleStatements,
   settleBroadcastRecipients,
   isBroadcastStopped,
+  isOperationCapabilityStopped,
 } from '@line-crm/db';
 import { calculateStaggerDelay, sleep } from './stealth.js';
 import { createBroadcastRetryKey } from './broadcast-retry-key.js';
@@ -378,6 +379,9 @@ export async function processMultiAccountDedupBroadcast(
   const allIdentKeys = new Set<string>(progress.sentIdentKeys);
 
   const failedAccountIds: string[] = [];
+  // 緊急停止 (#1050) で止まっているアカウント。失敗とは別に覚え、
+  // 残っている間は complete にしない（復旧後に残りを送るため）。
+  const heldAccountIds: string[] = [];
 
   // 単一 broadcast-wide unit を全アカウント multicast で共有する。各 LINE
   // チャネルは独立した unit namespace を持つので「同じ名前で別カウント」が
@@ -398,6 +402,13 @@ export async function processMultiAccountDedupBroadcast(
     const account = await getLineAccountById(db, accountResult.accountId);
     if (!account || !account.is_active) {
       console.log(`[multi-account-dedup] skipping inactive/missing account ${accountResult.accountId}`);
+      continue;
+    }
+    // 緊急停止 (#1050): broadcast_dispatch が止まっているアカウントの束は
+    // 始めない。identKey が未送信のまま残るので、復旧後の tick が続きを送る。
+    // 他のアカウントは止まっていなければ送る。
+    if (await isOperationCapabilityStopped(db, accountResult.accountId, 'broadcast_dispatch')) {
+      heldAccountIds.push(accountResult.accountId);
       continue;
     }
 
@@ -498,7 +509,10 @@ export async function processMultiAccountDedupBroadcast(
 
         // 次の束へ進む前に停止を読み直す（#662）。送り終えた束は取り消せない
         // ので、新しい束を始めないことで止める。
-        if (await isBroadcastStopped(db, broadcast.id)) {
+        // 緊急停止 (#1050) も同じ扱い: broadcast_dispatch が止まった
+        // アカウントは次の束を始めず、残りは未送信のまま残す。
+        if (await isBroadcastStopped(db, broadcast.id) ||
+            await isOperationCapabilityStopped(db, account.id, 'broadcast_dispatch')) {
           stopRequested = true;
           break;
         }
@@ -672,5 +686,11 @@ export async function processMultiAccountDedupBroadcast(
   //
   // complete=false (timeExceeded) のときは caller が status='sent' にせず batch_offset=0 に
   // 戻し、次の cron tick が getQueuedBroadcasts で拾って残りを送る (= 分割送信)。
-  return { totalCount, successCount, failedAccountIds, complete: !timeExceeded && !stopRequested, stopped: stopRequested };
+  return {
+    totalCount,
+    successCount,
+    failedAccountIds,
+    complete: !timeExceeded && !stopRequested && heldAccountIds.length === 0,
+    stopped: stopRequested,
+  };
 }

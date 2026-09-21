@@ -3,6 +3,7 @@ import type { LineClient } from '@line-crm/line-sdk';
 
 const dbMocks = vi.hoisted(() => ({
   ensureAutoReplyPublishedVersion: vi.fn(),
+  isOperationCapabilityStopped: vi.fn(async () => false),
   finishAutoReplyActionRun: vi.fn(),
   getTemplateById: vi.fn(),
   markAutoReplyEvaluationFinished: vi.fn(),

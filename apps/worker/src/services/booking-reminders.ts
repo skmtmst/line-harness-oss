@@ -6,6 +6,7 @@ import type { BookingNotificationSender, NotificationKind } from './booking-noti
 import { REMINDER_MAX_RETRY } from './booking-types.js';
 import { resolveLineCredential } from '@line-crm/db';
 import { featureJobCanRun } from './feature-enforcement.js';
+import { isOperationCapabilityStopped } from '@line-crm/db';
 
 interface DueRow {
   id: string;
@@ -76,6 +77,11 @@ export async function processDueReminders(
     if (row.line_account_id && !await featureJobCanRun(db, { accountId: row.line_account_id, featureId: 'booking', job: 'booking reminders' })) {
       continue;
     }
+    // 緊急停止 (#1050): reminder_dispatch が止まっている統括は claim せず
+    // pending のまま残す。復旧すれば次の cron が拾う。
+    if (await isOperationCapabilityStopped(db, row.line_account_id, 'reminder_dispatch')) {
+      continue;
+    }
     // 読み出し時点の試行回数。fence の CAS はこの値を epoch に使い、失敗記録も
     // これを基準にする (claim 後に row を読み直さない)。
     // catch へ来るのは自分が失敗したときだけ。握れなかった行は continue で
@@ -112,6 +118,19 @@ export async function processDueReminders(
         .bind(row.id, priorRetry)
         .run();
       if ((claim.meta?.changes ?? 0) === 0) continue;
+
+      // claim と送信の間に緊急停止へ切り替わった分は、握った retry_count を
+      // 差し戻して pending のまま残す (#1050)。停止を失敗として数えない。
+      if (await isOperationCapabilityStopped(db, row.line_account_id, 'reminder_dispatch')) {
+        await db
+          .prepare(
+            `UPDATE booking_reminders SET retry_count = retry_count - 1
+              WHERE id = ? AND retry_count = ? AND status IN ('pending','failed')`,
+          )
+          .bind(row.id, attemptedRetry)
+          .run();
+        continue;
+      }
 
       await params.sender({
         channelAccessToken: accessToken,

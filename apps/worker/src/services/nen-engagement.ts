@@ -1,4 +1,4 @@
-import { accountFeatureOffExclusionSql, getFriendById, getLineAccountById, jstNow } from '@line-crm/db';
+import { accountFeatureOffExclusionSql, getFriendById, getLineAccountById, isOperationCapabilityStopped, jstNow } from '@line-crm/db';
 import { NEN_CAMPAIGN_BODY_MAX_LENGTH, effectiveAnniversaryMonthDay, type LeapYearPolicy } from '@line-crm/shared';
 import type { Message } from '@line-crm/line-sdk';
 import type { EcEvent } from '../routes/ec-integrations.js';
@@ -957,6 +957,12 @@ export async function processNenDeliveries(
       skipped += 1;
       continue;
     }
+    // 緊急停止 (#1050): broadcast_dispatch が止まっている統括は claim せず
+    // pending のまま残す。復旧すれば次の tick が拾う。
+    if (job.line_account_id &&
+        await isOperationCapabilityStopped(db, job.line_account_id, 'broadcast_dispatch')) {
+      continue;
+    }
     const claim = await db.prepare(
       `UPDATE nen_delivery_jobs SET status = 'processing', attempts = attempts + 1, updated_at = ?
         WHERE id = ? AND status IN ('pending', 'failed')`,
@@ -1030,6 +1036,16 @@ export async function processNenDeliveries(
           `UPDATE nen_delivery_jobs SET status = 'skipped', last_error = ?, updated_at = ? WHERE id = ?`,
         ).bind('frequency_suppressed', jstNow(), job.id).run();
         skipped++;
+        continue;
+      }
+      // claim と送信の間に緊急停止へ切り替わった分は、claim を pending へ
+      // 差し戻す (#1050)。停止を失敗として数えない (attempts を戻す)。
+      if (job.line_account_id &&
+          await isOperationCapabilityStopped(db, job.line_account_id, 'broadcast_dispatch')) {
+        await db.prepare(
+          `UPDATE nen_delivery_jobs SET status = 'pending', attempts = attempts - 1, updated_at = ?
+            WHERE id = ? AND status = 'processing'`,
+        ).bind(jstNow(), job.id).run();
         continue;
       }
       const accessToken = account.channel_access_token;
