@@ -122,8 +122,20 @@ function ScenarioModeContent() {
         }
       })
     }
+    return () => { active = false }
+  }, [id])
+
+  /*
+   * SCENARIO-20: フォルダはアカウント単位。無指定で全権限範囲を取ると、
+   * 別アカウントの同名フォルダを選んで保存してしまう。
+   * シナリオの所属アカウント（共通なら選択中のアカウント）の候補だけを
+   * 出し、切り替わったら取り直す。
+   */
+  const folderAccountId = scenario?.lineAccountId ?? selectedAccountId
+  useEffect(() => {
+    let active = true
     setFolderState('loading')
-    void api.folders.list('scenario')
+    void api.folders.list('scenario', folderAccountId ?? undefined)
       .then((res) => {
         if (!active) return
         if (res.success) {
@@ -137,7 +149,7 @@ function ScenarioModeContent() {
         if (active) setFolderState('error')
       })
     return () => { active = false }
-  }, [id])
+  }, [folderAccountId])
 
   /**
    * 行をまだ作っていない（id なし）ときの作成。方式を確定したこの瞬間に
@@ -333,6 +345,16 @@ function ScenarioModeContent() {
                   : folderState === 'error'
                     ? 'フォルダを確認できないため、いまは変更できません。'
                     : 'フォルダを保存しています。'}
+              </span>
+            ) : null}
+            {/*
+              SCENARIO-20: 保存済みのフォルダがこのアカウントの候補に無い
+              場合は理由を示す。黙って「未分類」に見せると、保存時に
+              別範囲の値を上書きしてしまう。
+            */}
+            {folderState === 'ready' && selectedFolderMissing ? (
+              <span className="text-warning mt-1 block text-xs">
+                選択中のフォルダはこのアカウントの候補にありません（別アカウントまたは削除済み）。このまま保存すると外れます。
               </span>
             ) : null}
           </label>
