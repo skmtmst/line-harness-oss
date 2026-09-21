@@ -1,5 +1,9 @@
 import { Hono } from 'hono';
 import {
+  DASHBOARD_CARD_GROUPS as SHARED_DASHBOARD_CARD_GROUPS,
+  DASHBOARD_TODAY_VISIBLE_LIMIT,
+} from '@line-crm/shared';
+import {
   getDashboardOverview,
   getDashboardDefaultPreference,
   getDashboardPreference,
@@ -35,14 +39,15 @@ function readPeriod(raw: string | undefined): DashboardPeriod {
   return PERIODS.includes(raw as DashboardPeriod) ? (raw as DashboardPeriod) : 'today';
 }
 
+/*
+ * 許可するカードIDは @line-crm/shared の DASHBOARD_CARD_GROUPS が正本。
+ * 画面のカード定義とここが別々だと、画面が必ず送るIDをAPIが拒否して
+ * 保存できなくなる（DASH-01: support-mark-status の抜けで全保存が400）。
+ */
 const DASHBOARD_CARD_GROUPS = {
-  today: new Set(['today-inbox', 'today-photo-review', 'today-bookings', 'today-shipments']),
-  main: new Set(['shipment', 'pending-inbox', 'friend-trend', 'friend-add', 'scenario-status', 'uid-migration']),
-  right: new Set([
-    'send-quota', 'operational-alerts', 'connection-status', 'friend-status', 'upcoming',
-    'monthly-delivery', 'recent-results', 'booking-status', 'inflow-top', 'funnel-alert',
-    'automation-failures',
-  ]),
+  today: new Set<string>(SHARED_DASHBOARD_CARD_GROUPS.today),
+  main: new Set<string>(SHARED_DASHBOARD_CARD_GROUPS.main),
+  right: new Set<string>(SHARED_DASHBOARD_CARD_GROUPS.right),
 } as const;
 
 type DashboardCards = Record<keyof typeof DASHBOARD_CARD_GROUPS, Array<{ id: string; visible: boolean }>>;
@@ -68,7 +73,7 @@ function readDashboardCards(value: unknown): DashboardCards | null {
       seen.add(item.id);
       items.push({ id: item.id, visible: item.visible });
     }
-    if (group === 'today' && items.filter((item) => item.visible).length > 4) return null;
+    if (group === 'today' && items.filter((item) => item.visible).length > DASHBOARD_TODAY_VISIBLE_LIMIT) return null;
     out[group] = items;
   }
   return out;

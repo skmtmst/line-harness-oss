@@ -10748,7 +10748,15 @@ export const api = {
       }>>>('/api/message-templates'),
   },
   entryRoutes: {
-    list: () => fetchApi<ApiResponse<EntryRoute[]>>('/api/entry-routes'),
+    /*
+     * accountId を渡すと Worker がそのアカウント所属の経路だけを返す。
+     * 省略時は可視範囲の全経路（複数アカウント分を含み得る）。
+     * アカウント単位で選ぶ画面は必ず渡す（DASH-09）。
+     */
+    list: (accountId?: string) =>
+      fetchApi<ApiResponse<EntryRoute[]>>(
+        `/api/entry-routes${accountId ? `?account_id=${encodeURIComponent(accountId)}` : ''}`,
+      ),
     get: (id: string) => fetchApi<ApiResponse<EntryRoute>>(`/api/entry-routes/${id}`),
     create: (data: CreateEntryRouteInput) =>
       fetchApi<ApiResponse<EntryRoute>>('/api/entry-routes', {

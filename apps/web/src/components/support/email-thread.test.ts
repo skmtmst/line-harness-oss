@@ -30,8 +30,10 @@ const CALLS: Array<{ tail: string; method: string }> = [
 
 describe('メールのスレッドの経路', () => {
   it.each(CALLS)('画面は $tail を $method で叩く', ({ tail, method }) => {
+    // 呼び出しは「操作を始めたスレッド」を変数に固定して送る(INBOX-25)。
+    // 変数名は問わず、経路の末尾と動詞だけを突き合わせる。
     const call = new RegExp(
-      `threads/\\$\\{encodeURIComponent\\(threadId\\)\\}/${tail}\`[\\s\\S]{0,200}?method: '([A-Z]+)'`,
+      `threads/\\$\\{encodeURIComponent\\([a-zA-Z]+\\)\\}/${tail}\`[\\s\\S]{0,200}?method: '([A-Z]+)'`,
     );
     const found = CLIENT.match(call);
     expect(found?.[1], `${tail} の呼び出しが見つからない`).toBe(method);

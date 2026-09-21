@@ -97,6 +97,7 @@ function TodayTaskCard({
   value,
   detail,
   status,
+  statusTone = 'success',
 }: {
   title: string
   href: string
@@ -104,6 +105,12 @@ function TodayTaskCard({
   value: number | null
   detail: string
   status: string
+  /*
+   * 「ポイント付与あり」のような業務状態の緑は、件数を正常に取得できた
+   * ときだけ使う。権限不足・取得失敗・読込中に緑を出すと、できる状態と
+   * 見間違うため（A01-01）。
+   */
+  statusTone?: 'success' | 'muted'
 }) {
   return (
     <Card layout="vertical" padding="default" className="h-[116px] min-w-0">
@@ -116,7 +123,7 @@ function TodayTaskCard({
       </p>
       <div className="mt-2 flex items-end justify-between gap-3">
         <span className="text-ink-faint truncate text-xs" title={detail}>{detail}</span>
-        <span className="text-success shrink-0 text-xs font-medium">{status}</span>
+        <span className={`${statusTone === 'muted' ? 'text-ink-faint' : 'text-success'} shrink-0 text-xs font-medium`}>{status}</span>
       </div>
     </Card>
   )
@@ -130,11 +137,12 @@ function FriendAddLinkCard({
   officialProfileUrl: string | null | undefined
   visualQa?: DashboardOverview['visualQa']
 }) {
-  const { selectedAccount } = useAccount()
+  const { selectedAccount, selectedAccountId } = useAccount()
   const router = useRouter()
   const params = useSearchParams()
   const [copied, setCopied] = useState(false)
-  const [routes, setRoutes] = useState<EntryRoute[]>([])
+  /* null は取得中。アカウントを切り替えた直後は前のアカウントの経路を残さない。 */
+  const [routes, setRoutes] = useState<EntryRoute[] | null>(null)
   const [routeId, setRouteId] = useState('')
   /*
    * QRの表示状態はURLに残す（`?qr=base` または `?qr=<routeId>`）。
@@ -158,23 +166,35 @@ function FriendAddLinkCard({
     router.replace(text ? `/?${text}` : '/')
   }
 
+  /*
+   * 経路一覧は選択中のアカウントのものだけを取る（DASH-09）。
+   * アカウントを指定しない一覧は権限内の他アカウントの経路を含み得るため、
+   * 切替後に前のアカウントの /r/... を選んだままにしない。
+   */
   useEffect(() => {
     let cancelled = false
-    void api.entryRoutes.list()
+    setRoutes(null)
+    setRouteId('')
+    if (!selectedAccountId) {
+      return () => { cancelled = true }
+    }
+    void api.entryRoutes.list(selectedAccountId)
       .then((res) => {
-        if (!cancelled && res.success) setRoutes(res.data.filter((route) => route.isActive))
+        if (cancelled) return
+        setRoutes(res.success ? res.data.filter((route) => route.isActive) : [])
       })
       .catch(() => {
         // 経路一覧だけが取れなくても、基本の追加URLは利用できる。
+        if (!cancelled) setRoutes([])
       })
     return () => { cancelled = true }
-  }, [])
+  }, [selectedAccountId])
 
   const base = (process.env.NEXT_PUBLIC_API_URL ?? '').replace(/\/$/, '')
   const baseLink = visualQa?.friendAddUrl ?? (selectedAccount
     ? `${base}/auth/line?account=${encodeURIComponent(selectedAccount.channelId)}`
     : `${base}/auth/line`)
-  const route = routes.find((entry) => entry.id === routeId)
+  const route = (routes ?? []).find((entry) => entry.id === routeId)
   const link = route ? `${base}/r/${route.refCode}` : baseLink
 
   const onCopy = async () => {
@@ -204,7 +224,7 @@ function FriendAddLinkCard({
               className="text-ink min-w-0 flex-1 bg-transparent text-xs font-medium focus:outline-none"
               options={[
                 { value: '', label: '基本の追加URL' },
-                ...routes.map((entry) => ({ value: entry.id, label: entry.name })),
+                ...(routes ?? []).map((entry) => ({ value: entry.id, label: entry.name })),
               ]}
             />
           </label>
@@ -235,7 +255,8 @@ function FriendAddLinkCard({
         baseLink={baseLink}
         initialRouteId={showQr ? qrRouteId : routeId}
         onRouteIdChange={(id) => writeQr(id || 'base')}
-        routes={routes}
+        routes={routes ?? []}
+        routesPending={routes === null}
         visualReferenceQr={visualQa?.referenceQr ?? false}
       />
     </Card>
@@ -442,6 +463,7 @@ function DashboardPageInner() {
     updateQuery((query) => { if (key === 'today') query.delete('period'); else query.set('period', key) })
   }, [updateQuery])
   const openEditor = useCallback(() => {
+    setPreferenceSaveError(null)
     setEditorOpen(true)
     updateQuery((query) => query.set('edit', '1'))
   }, [updateQuery])
@@ -449,13 +471,24 @@ function DashboardPageInner() {
     setEditorOpen(false)
     updateQuery((query) => query.delete('edit'))
   }, [updateQuery])
-  const [data, setData] = useState<DashboardOverview | null>(null)
+  /*
+   * 概要の応答は「どのアカウントのどの期間か」を抱えて持つ（DASH-02）。
+   * アカウント・期間の切替直後や取得失敗時に、前の対象の数値を
+   * 表示し続けないため。読み直しが成功するまでは同じ対象の直前値だけを出す。
+   */
+  const [overview, setOverview] = useState<{ accountId: string; period: PeriodKey; value: DashboardOverview } | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [preferences, setPreferences] = useState<DashboardPreferences>(defaultDashboardPreferences)
   const [preferenceVersion, setPreferenceVersion] = useState(0)
   const [preferenceSaving, setPreferenceSaving] = useState(false)
   const preferenceSaveInFlight = useRef(false)
+  /*
+   * 配置の保存・初期化の失敗は編集パネルの中へ出す（DASH-05）。
+   * 背景の概要エラーと混ぜると、パネルを開いたまま失敗が見えず、
+   * 「もう一度読み込む」が配置ではなく概要の再取得になっていた。
+   */
+  const [preferenceSaveError, setPreferenceSaveError] = useState<{ message: string; conflict: boolean } | null>(null)
   const [inboxSummary, setInboxSummary] = useState<PendingInboxSummary | null>(null)
   const [shipmentSummary, setShipmentSummary] = useState<ShipmentSummary | null>(null)
   const [pendingPhotos, setPendingPhotos] = useState<number | null>(null)
@@ -482,14 +515,16 @@ function DashboardPageInner() {
   const notificationFilterRef = useRef(notificationFilter)
   selectedAccountIdRef.current = selectedAccountId
   notificationFilterRef.current = notificationFilter
-  const visibleMain = preferences.main.filter((item) => item.visible)
+  // 表示中のアカウント・期間と一致する応答だけを画面へ出す（DASH-02）。
+  const data = overview && overview.accountId === selectedAccountId && overview.period === period
+    ? overview.value
+    : null
   // 対応状況カードは support_marks の画面。オフのaccountではカードごと出さない。
   const supportMarksEnabled = useFeatureVisibility(selectedAccountId).enabled('support_marks')
   const visibleRight = preferences.right
     .filter((item) => item.visible)
     .filter((item) => item.id !== 'support-mark-status' || supportMarksEnabled)
   const visibleToday = preferences.today.filter((item) => item.visible)
-  const shipmentVisible = visibleMain.some((item) => item.id === 'shipment')
   const needsPhotos = visibleToday.some((item) => item.id === 'today-photo-review')
   const needsBookings = visibleToday.some((item) => item.id === 'today-bookings')
     || visibleRight.some((item) => item.id === 'upcoming')
@@ -527,50 +562,113 @@ function DashboardPageInner() {
     return () => { cancelled = true }
   }, [selectedAccountId])
 
+  /*
+   * アカウントが切り替わったら編集パネルを閉じる（DASH-04）。
+   * 開きっぱなしだと、前のアカウントの配置を下書きのまま新しい
+   * アカウントへ「ダッシュボードに反映」できてしまう。版番号・下書きは
+   * アカウントごとのものなので、持ち越さず閉じてから開き直させる。
+   */
+  const editorAccountRef = useRef(selectedAccountId)
+  useEffect(() => {
+    if (editorAccountRef.current === selectedAccountId) return
+    editorAccountRef.current = selectedAccountId
+    closeEditor()
+    setPreferenceSaveError(null)
+  }, [selectedAccountId, closeEditor])
+
   const applyPreferences = async (next: DashboardPreferences) => {
     // 同じ描画内の連打も、状態の再描画を待たずに止める。
     if (preferenceSaveInFlight.current) return
     if (!selectedAccountId) {
-      setError('LINEアカウントを選択してください')
+      setPreferenceSaveError({ message: 'LINEアカウントを選択してください', conflict: false })
       return
     }
+    /*
+     * 保存を始めた時点のアカウントと版を固定する（DASH-04）。
+     * 応答を待っている間に別アカウントへ切り替わっても、ここで掴んだ
+     * accountId のキャッシュだけを更新し、表示中の配置・版・パネルは
+     * 現在のアカウントのものとして触らない。
+     */
+    const accountId = selectedAccountId
     preferenceSaveInFlight.current = true
     setPreferenceSaving(true)
+    setPreferenceSaveError(null)
     try {
       const normalized = normalizeDashboardPreferences(next)
-      const response = await api.dashboard.preferences.save(selectedAccountId, {
+      const response = await api.dashboard.preferences.save(accountId, {
         version: preferenceVersion,
         cards: normalized,
       })
       if (!response.success) throw new Error(response.error)
+      try { window.localStorage.setItem(dashboardStorageKey(accountId), JSON.stringify({ version: response.data.version, cards: normalized })) } catch { /* cache unavailable */ }
+      if (selectedAccountIdRef.current !== accountId) return
       setPreferences(normalized)
       setPreferenceVersion(response.data.version)
-      setError('')
-      try { window.localStorage.setItem(dashboardStorageKey(selectedAccountId), JSON.stringify({ version: response.data.version, cards: normalized })) } catch { /* cache unavailable */ }
       closeEditor()
     } catch (caught) {
-      setError(caught instanceof Error && 'status' in caught && caught.status === 409
-        ? '別の画面で配置が更新されました。再読み込みしてください'
-        : 'ダッシュボードの配置を保存できませんでした')
+      if (selectedAccountIdRef.current !== accountId) return
+      const conflict = caught instanceof Error && 'status' in caught && caught.status === 409
+      setPreferenceSaveError({
+        message: conflict
+          ? '別の画面で配置が更新されました。再読み込みしてください'
+          : 'ダッシュボードの配置を保存できませんでした',
+        conflict,
+      })
     } finally {
       preferenceSaveInFlight.current = false
       setPreferenceSaving(false)
     }
   }
 
+  /*
+   * 「初期状態に戻す」は個人配置の削除なので、パネル内の確認ステップを
+   * 通してから実行する（A01-02）。完了応答も保存と同じくアカウント照合で
+   * 保護し、切替後に別アカウントの画面・版を書き換えない（DASH-04）。
+   */
   const resetPreferences = async () => {
-    if (!selectedAccountId) return
+    if (!selectedAccountId || preferenceSaveInFlight.current) return
+    const accountId = selectedAccountId
+    preferenceSaveInFlight.current = true
+    setPreferenceSaving(true)
+    setPreferenceSaveError(null)
     try {
-      await api.dashboard.preferences.reset(selectedAccountId)
-      const response = await api.dashboard.preferences.get(selectedAccountId)
+      await api.dashboard.preferences.reset(accountId)
+      const response = await api.dashboard.preferences.get(accountId)
+      if (selectedAccountIdRef.current !== accountId) return
       const next = response.success ? normalizeDashboardPreferences(response.data.cards) : defaultDashboardPreferences()
+      const nextVersion = response.success ? response.data.version : 0
       setPreferences(next)
-      setPreferenceVersion(0)
-      setError('')
-      try { window.localStorage.setItem(dashboardStorageKey(selectedAccountId), JSON.stringify({ version: 0, cards: next })) } catch { /* cache unavailable */ }
+      setPreferenceVersion(nextVersion)
+      try { window.localStorage.setItem(dashboardStorageKey(accountId), JSON.stringify({ version: nextVersion, cards: next })) } catch { /* cache unavailable */ }
       closeEditor()
     } catch {
-      setError('ダッシュボードの配置を初期状態へ戻せませんでした')
+      if (selectedAccountIdRef.current === accountId) {
+        setPreferenceSaveError({ message: 'ダッシュボードの配置を初期状態へ戻せませんでした', conflict: false })
+      }
+    } finally {
+      preferenceSaveInFlight.current = false
+      setPreferenceSaving(false)
+    }
+  }
+
+  /*
+   * 409（別画面での更新）のとき、パネル内から最新の配置を読み直す。
+   * 取得成功時は返した配置をdraftの新しい起点にする（DASH-05）。
+   */
+  const reloadPreferences = async (): Promise<DashboardPreferences | null> => {
+    const accountId = selectedAccountId
+    if (!accountId) return null
+    try {
+      const response = await api.dashboard.preferences.get(accountId)
+      if (!response.success || selectedAccountIdRef.current !== accountId) return null
+      const next = normalizeDashboardPreferences(response.data.cards)
+      setPreferences(next)
+      setPreferenceVersion(response.data.version)
+      try { window.localStorage.setItem(dashboardStorageKey(accountId), JSON.stringify({ version: response.data.version, cards: next })) } catch { /* cache unavailable */ }
+      setPreferenceSaveError(null)
+      return next
+    } catch {
+      return null
     }
   }
 
@@ -578,17 +676,19 @@ function DashboardPageInner() {
     const requestId = ++loadRequestId.current
     if (accountLoading) return
     if (!selectedAccountId) {
-      setData(null)
+      setOverview(null)
       setLoading(false)
       setError('LINEアカウントを選択してください')
       return
     }
+    const accountId = selectedAccountId
+    const periodKey = period
     setLoading(true)
     setError('')
     try {
-      const response = await api.dashboard.overview({ period, accountId: selectedAccountId })
+      const response = await api.dashboard.overview({ period: periodKey, accountId })
       if (requestId !== loadRequestId.current) return
-      if (response.success) setData(response.data)
+      if (response.success) setOverview({ accountId, period: periodKey, value: response.data })
       else setError(response.error)
     } catch {
       if (requestId === loadRequestId.current) setError(`データを${STATE_TEXT.error}`)
@@ -692,9 +792,18 @@ function DashboardPageInner() {
     }
     let cancelled = false
     setSupplementLoading(true)
-    /* 勘定を切り替えたら前の勘定の件数を消す。新しい件数が来るまで古い数を出さない。 */
+    /*
+     * 勘定を切り替えたら前の勘定の件数を消す。新しい件数が来るまで古い数を
+     * 出さない。写真だけでなく予約・健全性・二段階認証・対応マークの設定も
+     * すべて前のアカウントの値なので、同じタイミングで失効させる（DASH-03）。
+     */
     setPendingPhotos(null)
     setPendingPhotosState('loading')
+    setBookings(null)
+    setHealthRisk(null)
+    setHealthIssueCount(null)
+    setTwoFactorSummary(null)
+    setSupportMarkAutoOnInbound(null)
     /*
       予約の明細は今日以降だけ100件に区切って取る。終わった予約まで
       全部取ると、件数が増えたときに遅くなる。今日の数と直近の予定は
@@ -805,11 +914,25 @@ function DashboardPageInner() {
       const value = override ?? pendingPhotos
       /* 見た目確認用の差し替え値があるときは、読み込みの成否に関わらず出す。 */
       const state = override != null ? 'ready' : pendingPhotosState
-      const detail = state === 'forbidden' ? '写真を見る権限がありません'
+      /*
+       * 権限がないときは件数・緑の業務表示・「審査する」を出さず、
+       * 権限を確認する画面へ誘導する（A01-01）。権限なし・取得失敗・
+       * 0件・1件以上で、件数と説明と遷移先が矛盾しないようにする。
+       */
+      const forbidden = state === 'forbidden'
+      const detail = forbidden ? '写真を見る権限がありません'
         : state === 'error' ? STATE_TEXT.error
           : value === null ? STATE_TEXT.loading
             : `確認待ち ${value}件`
-      return <TodayTaskCard title="写真審査" href="/nen-members?tab=photos&status=pending_review" action="審査する" value={value} detail={detail} status="ポイント付与あり" />
+      return <TodayTaskCard
+        title="写真審査"
+        href={forbidden ? '/staff' : '/nen-members?tab=photos&status=pending_review'}
+        action={forbidden ? '権限を確認する' : '審査する'}
+        value={forbidden ? null : value}
+        detail={detail}
+        status={forbidden ? '権限なし' : state === 'ready' ? 'ポイント付与あり' : '確認待ち'}
+        statusTone={state === 'ready' ? 'success' : 'muted'}
+      />
     }
     if (id === 'today-bookings') return <TodayTaskCard title="今日の予約" href="/booking/bookings" action="予約を見る" value={displayedBookings === null ? null : todayBookings.length} detail="変更・取消を含む予約一覧" status={upcomingBookings.length > 0 ? `次回 ${new Date(upcomingBookings[0].starts_at).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Tokyo' })}` : '次回予定なし'} />
     if (id === 'today-shipments') return <TodayTaskCard title="出荷予定" href="/ec-commerce" action="ECを見る" value={shipmentSummary?.today ?? null} detail="EC通知から算出" status={reference?.shipmentStatus ?? (shipmentSummary ? `今日・明日 ${shipmentSummary.soon}件` : '確認中')} />
@@ -946,20 +1069,42 @@ function DashboardPageInner() {
         </KpiCollapse>
       </section> : null}
 
-      <div data-design="Shipment" className={shipmentVisible ? 'mb-6' : 'hidden'} aria-hidden={!shipmentVisible}>
-        <ShipmentPanel onSummaryChange={setShipmentSummary} />
-      </div>
-
       <div data-design="Middle" className="grid grid-cols-1 items-start gap-[18px] xl:grid-cols-[minmax(0,3fr)_minmax(300px,1fr)]">
         <div data-design="Body" className="min-w-0 space-y-[18px]">
-          {visibleMain.filter((item) => item.id !== 'shipment').map((item) => <div key={item.id}>{renderMainCard(item.id)}</div>)}
+          {/*
+            出荷予定を含め、メインのカードは編集パネルで決めた順番どおりに出す
+            （DASH-06）。以前は出荷だけがメインの外へ固定され、並べ替えても
+            先頭に居続けた。非表示にしても件数取得を止めないよう、OFFのときは
+            その場所へ畳んだままマウントを維持する。
+          */}
+          {preferences.main.map((item) => {
+            if (item.id === 'shipment') {
+              return (
+                <div key={item.id} data-design="Shipment" className={item.visible ? '' : 'hidden'} aria-hidden={!item.visible}>
+                  <ShipmentPanel onSummaryChange={setShipmentSummary} />
+                </div>
+              )
+            }
+            if (!item.visible) return null
+            return <div key={item.id}>{renderMainCard(item.id)}</div>
+          })}
         </div>
         <aside className="min-w-0 space-y-3.5">
           {visibleRight.map((item) => <div key={item.id}>{renderRightCard(item.id)}</div>)}
         </aside>
       </div>
 
-      <DashboardEditor open={editorOpen} preferences={preferences} saving={preferenceSaving} onCancel={closeEditor} onApply={applyPreferences} onReset={resetPreferences} />
+      <DashboardEditor
+        open={editorOpen}
+        preferences={preferences}
+        saving={preferenceSaving}
+        saveError={preferenceSaveError?.message ?? null}
+        saveConflict={preferenceSaveError?.conflict ?? false}
+        onReloadPreferences={reloadPreferences}
+        onCancel={closeEditor}
+        onApply={applyPreferences}
+        onReset={resetPreferences}
+      />
     </div>
   )
 }

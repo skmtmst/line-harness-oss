@@ -294,6 +294,36 @@ describe('dashboard organization account policy', () => {
     expect(await response.json()).toMatchObject({ data: { source: 'personal', version: 2 } });
   });
 
+  test('accepts every card the editor can send, including support-mark-status (DASH-01)', async () => {
+    /*
+     * 画面のカード定義とAPIの許可一覧が別々だと、画面が必ず送るIDを
+     * APIが拒否して全保存が400になる。共有定義の全IDをそのまま送る。
+     */
+    const { DASHBOARD_CARD_GROUPS } = await import('@line-crm/shared');
+    const cards = Object.fromEntries(
+      Object.entries(DASHBOARD_CARD_GROUPS).map(([group, ids]) => [
+        group,
+        ids.map((id) => ({ id, visible: true })),
+      ]),
+    );
+    // 上限超過で弾かれないよう、today は4件だけONにする。
+    cards.today = cards.today.map((item, index) => ({ ...item, visible: index < 4 }));
+    dbMocks.saveDashboardPreference.mockResolvedValue({
+      status: 'saved',
+      row: { version: 3, updated_at: '2026-08-26T10:00:00+09:00' },
+    });
+    const response = await app().request('/api/dashboard/preferences?account_id=account-1', {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ version: 2, cards }),
+    }, env());
+    expect(response.status).toBe(200);
+    expect(dbMocks.saveDashboardPreference).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ staffId: 'staff-1', lineAccountId: 'account-1', expectedVersion: 2 }),
+    );
+  });
+
   test('rejects unknown cards instead of persisting arbitrary JSON', async () => {
     const response = await app().request('/api/dashboard/preferences?account_id=account-1', {
       method: 'PUT',

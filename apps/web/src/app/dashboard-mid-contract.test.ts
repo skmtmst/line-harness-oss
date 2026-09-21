@@ -23,7 +23,8 @@ describe('ダッシュボード点検・中の契約(#491)', () => {
   })
 
   it('中3:追加URL一覧は外で1回取り、QRダイアログへ渡す', () => {
-    expect(PAGE).toContain('routes={routes}')
+    // DASH-09: null は取得中。アカウント切替直後に前の経路を残さない。
+    expect(PAGE).toContain('routes={routes ?? []}')
     expect(QR).toContain('const routes = routesProp ?? fetchedRoutes')
     expect(QR).toContain('if (!open || routesProp) return')
     expect(QR.match(/api\.entryRoutes\.list\(\)/g)).toHaveLength(1)
