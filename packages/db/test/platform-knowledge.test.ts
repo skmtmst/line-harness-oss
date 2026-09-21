@@ -69,6 +69,28 @@ describe('knowledge lifecycle on real SQLite', () => {
     expect(await searchKnowledge(db, 'usage', 'フォーム', [])).toEqual([]);
     expect((await getKnowledgeArticle(db, article.id))?.review_state).toBe('pending');
   });
+  it('retrieves Japanese words within a sentence but not unrelated articles of the same kind', async () => {
+    const article = await draft();
+    await reviewKnowledgeArticle(db, article.id, 1, 'approve', 'operator');
+    expect((await searchKnowledge(db, 'bug', 'フォームに回答しましたがタグが付きません。', [])).map(a => a.id)).toEqual([article.id]);
+    expect(await searchKnowledge(db, 'usage', '請求書の再発行をお願いします。', [])).toEqual([]);
+    expect(await searchKnowledge(db, 'usage', '', [])).toEqual([]);
+  });
+  it('an unfit vote for one ticket does not demote or disable knowledge for another customer', async () => {
+    const first = await draft();
+    await reviewKnowledgeArticle(db, first.id, 1, 'approve', 'operator');
+    const other = await createHqSupportRequest(db, { tenantId: 'tenant', staffId: 'operator', staffName: '利用者', staffEmail: null,
+      kind: 'usage', subject: '別の問い合わせ', body: '設定の確認', lineAccountId: null, attachmentKeys: [] });
+    raw.prepare("UPDATE hq_support_requests SET stage = 'resolved', knowledge_revision = 1 WHERE id = ?").run(other.id);
+    raw.prepare(`INSERT INTO platform_knowledge_articles (id,source_request_id,source_revision,title,question,answer,kind,review_state,status,created_at,updated_at)
+      VALUES ('zz-other',?,1,'フォームのタグ','どう設定するか','別の根拠','usage','approved','active','2026-09-21','2026-09-21')`).run(other.id);
+    const before = await searchKnowledge(db, 'usage', 'フォーム', []);
+    await recordKnowledgeUsage(db, before, requestId, 'operator');
+    await knowledgeFeedback(db, before[0].id, requestId, 'unhelpful');
+    expect((await searchKnowledge(db, 'usage', 'フォーム', [])).map(a => a.id)).toEqual(before.map(a => a.id));
+    expect((await getKnowledgeArticle(db, before[0].id))?.status).toBe('active');
+    expect((await searchKnowledge(db, 'usage', 'フォーム', [before[0].id])).map(a => a.id)).toEqual([before[1].id]);
+  });
   it('reopening blocks retrieval AND approval before any background work runs', async () => {
     const article = await draft();
     await reviewKnowledgeArticle(db, article.id, 1, 'approve', 'operator');

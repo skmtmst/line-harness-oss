@@ -1,6 +1,6 @@
 'use client'
 
-import { Paperclip, Plus, Sparkles } from 'lucide-react'
+import { CheckCircle2, Hourglass, Inbox, Paperclip, Plus, Sparkles, Timer } from 'lucide-react'
 import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import {
@@ -13,8 +13,9 @@ import {
   type OpsTenantRow,
   type OpsKnowledgeReference,
 } from '@/lib/api'
-import OpsPageHeader from '@/components/ops/ops-page-header'
 import { KnowledgeReferences, TicketKnowledge } from '@/components/ops/knowledge-ticket'
+import knowledgeStyles from '@/components/ops/knowledge.module.css'
+import { useOpsPageTitle } from '@/components/ops/ops-shell'
 import { formatDateTime, planLabel, PLAN_STATUS_LABEL, ROLE_LABEL, tenantDetailHref, opsCall } from '@/components/ops/ops-ui'
 import Button from '@/components/shared/button'
 import Chip, { type ChipTone } from '@/components/shared/chip'
@@ -276,13 +277,14 @@ export default function OpsSupportPage() {
   const kpis = summary?.kpis ?? null
   const ticket = detail?.ticket ?? null
   const closed = ticket?.stage === 'closed'
+  useOpsPageTitle(replyFromAi ? 'お問い合わせ ／ AIの下書き' : 'お問い合わせ')
 
   return (
-    <div data-design-node="IjIFa">
-      <OpsPageHeader title="お問い合わせ" />
+    <div className={knowledgeStyles.supportPage} data-design-node={replyFromAi && references.length > 0 && !aiBusy ? 'F3zoq' : 'IjIFa'}>
 
       <div className="mb-4">
         <Tabs
+          className={knowledgeStyles.supportTabs}
           items={STAGE_TABS.map((t) => ({
             label: t.label,
             count: summary ? summary.byStage[t.key] : undefined,
@@ -335,19 +337,27 @@ export default function OpsSupportPage() {
         </form>
       ) : null}
 
-      <div className="mb-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <SummaryCard variant="v6" title="未対応のチケット" value={kpis ? kpis.untouched : null} unit="件" detail={kpis ? `LINEから受付 ${kpis.untouchedFromLine}件` : '—'} badge={kpis && kpis.untouched > 0 ? '要対応' : undefined} badgeTone="danger" loading={!summary} />
+      <div className={knowledgeStyles.supportMetrics} data-design-node="beOJV">
+        <div className={knowledgeStyles.supportMetric}><Inbox aria-hidden="true" className="text-status-danger" />
+        <SummaryCard variant="v6" title="未対応のチケット" value={kpis ? kpis.untouched : null} unit="" detail={kpis ? `LINEから受付 ${kpis.untouchedFromLine}件` : '—'} loading={!summary} />
+        </div>
+        <div className={knowledgeStyles.supportMetric}><Timer aria-hidden="true" className="text-status-info" />
         <SummaryCard variant="v6" title="平均の初回返信" value={null} unit="" detail={kpis ? compareLabel(kpis.avgFirstReplyMinutes, kpis.prevAvgFirstReplyMinutes, 'time') : '—'} loading={!summary} valueText={kpis ? durationLabel(kpis.avgFirstReplyMinutes) : undefined} />
+        </div>
+        <div className={knowledgeStyles.supportMetric}><CheckCircle2 aria-hidden="true" className="text-accent-deep" />
         <SummaryCard variant="v6" title="解決率" value={null} unit="" detail={kpis ? compareLabel(kpis.resolutionRate, kpis.prevResolutionRate, 'rate') : '—'} loading={!summary} valueText={kpis ? (kpis.resolutionRate === null ? '—' : `${kpis.resolutionRate.toFixed(1)}%`) : undefined} />
+        </div>
+        <div className={knowledgeStyles.supportMetric}><Hourglass aria-hidden="true" className="text-chip-alt" />
         <SummaryCard variant="v6" title="平均の解決時間" value={null} unit="" detail={kpis ? compareLabel(kpis.avgResolutionMinutes, kpis.prevAvgResolutionMinutes, 'time') : '—'} loading={!summary} valueText={kpis ? durationLabel(kpis.avgResolutionMinutes) : undefined} />
+        </div>
       </div>
 
       {notice ? <p role="status" className="mb-3 text-caption text-accent-deep">{notice}</p> : null}
       {error ? <p role="alert" className="mb-3 text-caption text-status-danger">{error}</p> : null}
 
-      <div className="grid gap-4 xl:grid-cols-3">
+      <div className={knowledgeStyles.supportColumns} data-design-node="WmMDh">
         {/* 左：チケット一覧 */}
-        <section aria-label={listTitle} className="rounded-card border border-hairline bg-canvas xl:col-span-1">
+        <section aria-label={listTitle} className={knowledgeStyles.supportList}>
           <header className="flex items-center justify-between border-b border-hairline px-4 py-3">
             <h2 className="text-label font-bold text-ink">{listTitle}</h2>
             <span className="text-micro text-ink-faint">{total}件中 {tickets.length === 0 ? 0 : 1}〜{tickets.length}件</span>
@@ -389,13 +399,13 @@ export default function OpsSupportPage() {
         </section>
 
         {/* 右：内容と返信 */}
-        <section aria-label="内容と返信" className="rounded-card border border-hairline bg-canvas px-5 py-4 xl:col-span-2">
+        <section aria-label="内容と返信" className={knowledgeStyles.supportDetail} data-design-node="UcEaZ">
           {!ticket ? (
             detailLoading ? <ListState kind="loading" title="内容を読み込んでいます" /> : <ListState kind="empty" title="チケットを選んでください" description="左の一覧から開きます。" />
           ) : (
-            <div className="grid gap-4">
+            <div className="grid gap-3">
               {/* 見出し行 */}
-              <div className="flex flex-wrap items-center gap-2">
+              <div className={knowledgeStyles.supportSubject}>
                 <span className="text-label font-bold text-ink-secondary">{ticket.ticketLabel}</span>
                 <h2 className="text-body font-bold text-ink">{ticket.subject}</h2>
                 {ticket.subjectAuto ? <Chip tone="neutral">自動で付けた件名</Chip> : null}
@@ -413,7 +423,7 @@ export default function OpsSupportPage() {
               </div>
 
               {/* 問い合わせ元 */}
-              <div className="flex flex-wrap items-start gap-x-8 gap-y-2 rounded-control border border-hairline bg-canvas-sunken px-4 py-3">
+              <div className={knowledgeStyles.supportMeta}>
                 <Meta label="契約先"><Link href={tenantDetailHref(ticket.tenantId)} className="text-accent-deep underline-offset-2 hover:underline">{ticket.tenantName}</Link></Meta>
                 <Meta label="起票者">{ticket.staffName || '—'}{ticket.staffRole ? `（${ROLE_LABEL[ticket.staffRole] ?? ticket.staffRole}）` : ''}</Meta>
                 <Meta label="受付">{ticket.channel === 'admin' ? '管理画面のお問い合わせ' : ticket.channelLabel}</Meta>
@@ -429,7 +439,7 @@ export default function OpsSupportPage() {
 
               {/* やり取り */}
               {detail && <TicketKnowledge key={ticket.id} detail={detail} onRefresh={() => void loadDetail(ticket.id)} />}
-              <ol className="grid gap-3" aria-label="やり取り">
+              <ol className={knowledgeStyles.supportMessages} aria-label="やり取り">
                 <Message side="left" author={`${ticket.tenantName} ／ ${ticket.staffName || '—'}`} at={ticket.createdAt} body={ticket.body} attachments={ticket.attachments} />
                 {detail?.messages.map((m) => (
                   <Message
@@ -444,7 +454,7 @@ export default function OpsSupportPage() {
               </ol>
 
               {/* 返信 */}
-              <div className="grid gap-2 border-t border-hairline pt-4" data-design-node={aiBusy ? 'XlTAd' : replyFromAi ? 'b2uv3' : undefined}>
+              <div className={knowledgeStyles.supportReply} data-design-node={aiBusy ? 'XlTAd' : replyFromAi ? references.length > 0 ? 'RPjQ6' : 'b2uv3' : undefined}>
                 <div className="flex flex-wrap items-center gap-2">
                   <h3 className="text-label font-bold text-ink">返信</h3>
                   {aiBusy ? (
@@ -467,8 +477,9 @@ export default function OpsSupportPage() {
                     <Button size="field" onClick={skipAi}>待たずに手で書く</Button>
                   </div>
                 ) : replyFromAi ? (
-                  <div className="flex items-center justify-between rounded-control border border-hairline bg-accent-soft px-4 py-2">
-                    <p className="text-caption text-ink">AIが作った下書きです。内容を確かめて、必要なら直してから送ってください。</p>
+                  <div className={knowledgeStyles.draftNotice}>
+                    <Sparkles aria-hidden="true" />
+                    <p>お客様の状況・やり取りとナレッジをもとに作った下書きです。内容を確認してから送ってください。</p>
                     <span className="text-micro text-ink-faint">{formatDateTime(replyFromAi.generatedAt)} に作成</span>
                   </div>
                 ) : null}

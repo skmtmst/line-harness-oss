@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
 import {
   BookOpen,
   Building2,
@@ -43,6 +43,12 @@ const MENU: Array<{ href: string; label: string; icon: typeof LayoutDashboard }>
   { href: '/ops/audit', label: '監査ログ', icon: ScrollText },
 ]
 
+const OpsPageTitleContext = createContext<(title: string) => void>(() => {})
+export function useOpsPageTitle(title: string) {
+  const setTitle = useContext(OpsPageTitleContext)
+  useEffect(() => { setTitle(title); return () => setTitle('') }, [setTitle, title])
+}
+
 export default function OpsShell({ children }: { children: ReactNode }) {
   const router = useRouter()
   const pathname = usePathname()
@@ -50,6 +56,7 @@ export default function OpsShell({ children }: { children: ReactNode }) {
   const [checked, setChecked] = useState(false)
   const [loadError, setLoadError] = useState('')
   const [navOpen, setNavOpen] = useState(false)
+  const [pageTitle, setPageTitle] = useState('')
 
   /*
    * 狭い画面のメニューは開閉式。画面を移ったら閉じ、開いている間は
@@ -126,7 +133,8 @@ export default function OpsShell({ children }: { children: ReactNode }) {
 
   // V6 csVox: environment strip belongs to the content column, not above
   // the sidebar. Existing authentication and account-menu behavior is unchanged.
-  if (pathname === '/ops/knowledge') return (
+  if (pathname === '/ops/knowledge' || pathname === '/ops/support') return (
+    <OpsPageTitleContext.Provider value={setPageTitle}>
     <div className="flex min-h-svh bg-shell" data-design-node="jIZP0" data-knowledge-shell>
       <OpsSidebar me={me} pathname={pathname} open={navOpen} onClose={() => setNavOpen(false)} />
       <main className="min-w-0 flex-1">
@@ -138,11 +146,12 @@ export default function OpsShell({ children }: { children: ReactNode }) {
             <Menu aria-hidden="true" className="h-5 w-5" />メニュー
           </button>
         </div>
-        <TopBar title="ナレッジ" accounts={[]} selectedAccountId="" onAccountChange={() => {}} showAccountSwitcher={false}
+        <TopBar title={pathname === '/ops/knowledge' ? 'ナレッジ' : pageTitle || 'お問い合わせ'} accounts={[]} selectedAccountId="" onAccountChange={() => {}} showAccountSwitcher={false}
           roleLabel="運営" userName={me.name} onLogout={() => logoutAndGoToLogin('/ops/login')} />
         <div className="px-10 pb-8 pt-3.5">{children}</div>
       </main>
     </div>
+    </OpsPageTitleContext.Provider>
   )
 
   return (

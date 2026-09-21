@@ -26,16 +26,18 @@ const SELECT = `SELECT a.*, CASE WHEN ${CURRENT} THEN 1 ELSE 0 END AS source_cur
   FROM platform_knowledge_articles a JOIN hq_support_requests r ON r.id = a.source_request_id`;
 const USABLE = `${CURRENT} AND a.review_state = 'approved' AND a.status = 'active'`;
 
-/** Ranking happens inside D1. Only current, approved, active articles are candidates. */
+/** Retrieval is about this conversation, not a global popularity/quality vote. */
 export async function searchKnowledge(db: D1Database, kind: string, text: string, exclude: string[]): Promise<KnowledgeArticle[]> {
-  const words = [...new Set(text.toLowerCase().match(/[\p{L}\p{N}]{2,30}/gu) ?? [])].slice(0, 20);
+  const segments = new Intl.Segmenter('ja', { granularity: 'word' }).segment(text.normalize('NFKC').toLowerCase());
+  const stopWords = new Set(['です', 'ます', 'した', 'して', 'する', 'いる', 'ある', 'ない', 'こと', 'ため', 'ください', 'ました', 'ません', '匿名', 'メール', '担当者', 'ご担当']);
+  const words = [...new Set([...segments].filter(s => s.isWordLike && s.segment.length >= 2 && !stopWords.has(s.segment)).map(s => s.segment))].slice(0, 20);
+  if (!words.length) return [];
   const matches = words.length ? words.map(() => `CASE WHEN instr(lower(a.title || ' ' || a.question || ' ' || a.keywords), ?) > 0 THEN 1 ELSE 0 END`).join(' + ') : '0';
   const excluded = exclude.slice(0, 50);
   const result = await db.prepare(`${SELECT} WHERE ${USABLE}
-    AND (a.kind = ? OR (${matches}) > 0) ${excluded.length ? `AND a.id NOT IN (${excluded.map(() => '?').join(',')})` : ''}
-    ORDER BY CASE WHEN a.kind = ? THEN 0 ELSE 1 END, (${matches}) DESC,
-      (a.helpful_count - a.unhelpful_count) DESC, a.used_count DESC, a.id LIMIT 5`)
-    .bind(kind, ...words, ...excluded, kind, ...words).all<KnowledgeArticle>();
+    AND (${matches}) > 0 ${excluded.length ? `AND a.id NOT IN (${excluded.map(() => '?').join(',')})` : ''}
+    ORDER BY (${matches}) DESC, CASE WHEN a.kind = ? THEN 0 ELSE 1 END, a.id LIMIT 5`)
+    .bind(...words, ...excluded, ...words, kind).all<KnowledgeArticle>();
   return result.results;
 }
 

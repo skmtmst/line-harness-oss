@@ -365,6 +365,10 @@ export function buildDraftPrompt(input: {
       'あなたは LINE 公式アカウント運用ツール「musubo」の運営サポート担当です。',
       '契約先（統括）の権限者からのお問い合わせに、丁寧で具体的な日本語の返信を下書きします。',
       '守ること：',
+      '- 記事の回答文を転用せず、このお客様の状況と最新のやり取りに合わせて回答を組み立てる',
+      '- 確認済みの事実・実施済みの操作・未確認事項を区別する。実施済みの操作を理由なく繰り返し勧めない',
+      '- 参考記事は根拠の候補であり、このお客様の事実ではない。適用条件が一致する部分だけを使い、成功例を今回の解決保証にしない',
+      '- 根拠がない手順や原因を作らない。条件が不明・矛盾する場合や使える根拠がない場合は、必要な確認事項を尋ねる',
       '- 断定できないことは「確認します」と書き、事実を作らない',
       '- 手順は番号付きで短く',
       '- 相手に確認したいことがあれば最後にまとめて聞く',
@@ -411,7 +415,11 @@ opsSupport.post('/api/ops/support/tickets/:id/draft/ai', requirePlatformAdminWri
   }
   const names = [...knowledgeNames(ticket, messages), staff.name];
   const clean = (text: string) => redactKnowledgeText(text, names);
-  const articles = await searchKnowledge(db, ticket.kind, clean(`${ticket.subject} ${ticket.body}`), (body.excludeArticleIds ?? []) as string[]);
+  // Most recent customer details enter the bounded search vocabulary first.
+  // The generation prompt below still includes the complete conversation.
+  const searchText = [...messages].reverse().filter(m => m.author_kind === 'tenant').map(m => m.body)
+    .concat(ticket.subject, ticket.body, [...messages].reverse().filter(m => m.author_kind === 'ops').map(m => m.body)).join('\n');
+  const articles = await searchKnowledge(db, ticket.kind, clean(searchText), (body.excludeArticleIds ?? []) as string[]);
   const references = articles.map(article => ({ id: article.id, version: article.version, title: article.title }));
   const prompt = buildDraftPrompt({
     ticket: {

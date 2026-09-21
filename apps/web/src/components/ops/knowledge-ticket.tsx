@@ -6,6 +6,8 @@ import { opsCall } from './ops-ui'
 import KnowledgeEditor from './knowledge-editor'
 import Button from '@/components/shared/button'
 import NoteBar from '@/components/shared/note-bar'
+import { BookOpen, ArrowRight } from 'lucide-react'
+import styles from './knowledge.module.css'
 
 /** Approved V6 37-6-C: automatic generation is separate from explicit human approval. */
 export function TicketKnowledge({ detail, onRefresh }: { detail: OpsSupportDetail; onRefresh: () => void }) {
@@ -44,7 +46,7 @@ export function TicketKnowledge({ detail, onRefresh }: { detail: OpsSupportDetai
   </section>
 }
 
-/** V6 37-6-A l87aC. Feedback only concerns references actually used by this draft. */
+/** Approved V6 37-6-D LT8m5. Votes describe fit for this reply, not article correctness. */
 export function KnowledgeReferences({ references, requestId, busy, onExclude }: {
   references: OpsKnowledgeReference[]; requestId: string; busy: boolean; onExclude: (id: string) => void
 }) {
@@ -56,7 +58,7 @@ export function KnowledgeReferences({ references, requestId, busy, onExclude }: 
     setPending(true); setError('')
     const res = await opsCall(api.ops.knowledge.feedback(id, requestId, value))
     setPending(false)
-    if (res.success) setFeedback(state => ({ ...state, [id]: value }))
+    if (res.success) setFeedback(state => ({ ...state, [`${id}:${references.find(ref => ref.id === id)?.version}`]: value }))
     else setError(res.error || '保存できませんでした')
   }
   const open = async (id: string) => {
@@ -67,13 +69,13 @@ export function KnowledgeReferences({ references, requestId, busy, onExclude }: 
     else setError(res.error || '読み込めませんでした')
   }
   if (!references.length) return null
-  return <section data-design-node="l87aC" className="grid gap-2" aria-label="参考にした記事">
-    <h4 className="text-caption font-bold text-ink">参考にした記事（{references.length} 件）</h4>
-    {references.map(ref => <div key={`${ref.id}-${ref.version}`} className="flex flex-wrap items-center gap-2">
-      <Button className="min-w-0 flex-1 truncate text-accent-deep" size="field" disabled={busy || pending} onClick={() => void open(ref.id)}>{ref.title}</Button>
-      <Button size="field" disabled={busy || pending} aria-pressed={feedback[ref.id] === 'helpful'} onClick={() => void vote(ref.id, 'helpful')}>役に立った</Button>
-      <Button size="field" disabled={busy || pending} aria-pressed={feedback[ref.id] === 'unhelpful'} onClick={() => void vote(ref.id, 'unhelpful')}>立たなかった</Button>
-      <Button size="field" disabled={busy || pending} onClick={() => onExclude(ref.id)}>外して作り直す</Button>
+  return <section className="grid gap-2" aria-label="今回の回答の根拠">
+    {references.map(ref => <div data-design-node="LT8m5" key={`${ref.id}-${ref.version}`} className={styles.referenceRow}>
+      <BookOpen aria-hidden="true" className={styles.referenceIcon} />
+      <button data-design-node="secaz" className={styles.referenceLink} title={`回答の根拠：${ref.title}`} disabled={busy || pending} onClick={() => void open(ref.id)}><span>回答の根拠：{ref.title}</span><ArrowRight aria-hidden="true" /></button>
+      <Button data-design-node="HXQxY" className={styles.referenceFits} size="field" disabled={busy || pending} aria-pressed={feedback[`${ref.id}:${ref.version}`] === 'helpful'} onClick={() => void vote(ref.id, 'helpful')}>今回の回答に合う</Button>
+      <Button data-design-node="NeS62" className={styles.referenceUnfit} size="field" disabled={busy || pending} aria-pressed={feedback[`${ref.id}:${ref.version}`] === 'unhelpful'} onClick={() => void vote(ref.id, 'unhelpful')}>今回には合わない</Button>
+      <Button data-design-node="ACP9c" className={styles.referenceRegenerate} size="field" disabled={busy || pending} onClick={() => onExclude(ref.id)}>除外して回答を作り直す</Button>
     </div>)}
     {error && <p role="alert" className="text-caption text-status-danger">{error}</p>}
     {article && <KnowledgeEditor key={article.id} article={article} onClose={() => setArticle(null)} onSaved={() => setArticle(null)} />}
