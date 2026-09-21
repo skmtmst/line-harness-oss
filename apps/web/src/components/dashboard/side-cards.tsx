@@ -11,22 +11,33 @@ import Card from '@/components/shared/card'
  */
 function SideCard({
   title,
+  period,
   action,
+  freshness,
   children,
 }: {
   title: string
+  /*
+   * 数字の対象期間。「今月」「直近7日」など、見出しの脇に小さく添える
+   * （IDEA-01: カードの数字がいつの範囲かを読めるようにする）。
+   */
+  period?: string
   /** 設計に右上のリンクが無いカードもある（現在の対応状況）。 */
   action?: { label: string; href: string }
+  /** 更新時刻・取得失敗などの鮮度表示。カードの末尾右寄せで出す。 */
+  freshness?: ReactNode
   children: ReactNode
 }) {
   return (
     <Card padding="roomy">
       <div className="flex flex-col gap-2.5">
         <div className="flex items-start justify-between gap-3">
-          <h2 className="text-ink text-base leading-normal font-bold">{title}</h2>
+          <h2 className="text-ink min-w-0 text-base leading-normal font-bold">{title}</h2>
+          {period ? <span className="text-ink-faint flex-1 pt-0.5 text-[11px] font-normal">{period}</span> : null}
           {action ? <Link href={action.href} className="text-info shrink-0 text-xs font-semibold hover:underline">{action.label}</Link> : null}
         </div>
         <div>{children}</div>
+        {freshness ? <div className="flex justify-end">{freshness}</div> : null}
       </div>
     </Card>
   )
@@ -110,9 +121,14 @@ export function InboxStatusCard({ inbox }: { inbox: DashboardOverview['inbox'] }
  * 「今月の送信枠」と**同じ数を2回**描くことになり、片方を見て片方を
  * 見落とす。設計（`vUXKb`）でも枠は上の1枚だけ。
  */
-export function MonthlyDeliveryCard({ delivery }: { delivery: DashboardOverview['delivery'] }) {
+export function MonthlyDeliveryCard({ delivery, freshness }: { delivery: DashboardOverview['delivery']; freshness?: ReactNode }) {
   return (
-    <SideCard title="今月の配信" action={{ label: 'アクセス解析へ →', href: '/analytics' }}>
+    /*
+      「配信の反応」タブが同じ母集団（プッシュ・リプライの送信数）を見る画面。
+      既定タブの「友だちの増減」へ落とすと、カードの数字と遷移先の数字が
+      一致しない（IDEA-01）。
+    */
+    <SideCard title="今月の配信" action={{ label: 'アクセス解析へ →', href: '/analytics?tab=reactions' }} freshness={freshness}>
       <div className="grid grid-cols-2 gap-4">
         {/*
           設計の「プッシュ数 / リプライ数」。LINEは自発の送信（プッシュ）と
@@ -139,13 +155,19 @@ export function MonthlyDeliveryCard({ delivery }: { delivery: DashboardOverview[
 export function SupportMarkStatusCard({
   inbox,
   autoOnInbound,
+  freshness,
 }: {
   inbox: DashboardOverview['inbox'] | null
   /** 受信時の自動変更が入っているか。取れないときは null。 */
   autoOnInbound: boolean | null
+  freshness?: ReactNode
 }) {
   return (
-    <SideCard title="現在の対応状況">
+    /*
+      件数は選択中アカウントの受信箱のもの。行き先も同じ受信箱へ
+      絞って開く（IDEA-01）。
+    */
+    <SideCard title="現在の対応状況" period="現在" action={{ label: '受信箱を見る →', href: '/chats' }} freshness={freshness}>
       <div className="flex flex-wrap items-baseline gap-x-6 gap-y-2">
         {[
           { label: '未対応', value: inbox?.unanswered ?? null },
@@ -169,11 +191,16 @@ export function SupportMarkStatusCard({
 
 export function RecentResultsCard({
   conversions,
+  period,
+  freshness,
 }: {
   conversions: DashboardOverview['conversions']
+  /** 選択中の集計期間（今日・過去7日・過去28日）。カードの件数と同じ範囲を示す。 */
+  period: string
+  freshness?: ReactNode
 }) {
   return (
-    <SideCard title="最近の成果" action={{ label: '成果を見る →', href: '/conversions' }}>
+    <SideCard title="最近の成果" period={period} action={{ label: '成果を見る →', href: '/conversions' }} freshness={freshness}>
       {conversions.byPoint.length === 0 ? (
         <p className="text-ink-faint text-xs leading-relaxed">
           この期間の成果はまだありません。成果地点を作ると、ここに件数が出ます。
@@ -224,17 +251,27 @@ function formatUpcomingDate(iso: string): string {
 export function UpcomingCard({
   bookings,
   loading,
+  updatedAt,
 }: {
   bookings: BookingRequest[] | null
   loading: boolean
+  /* 明細を最後に取れた時刻。読込中・失敗時は出さない（IDEA-01）。 */
+  updatedAt?: Date | null
 }) {
   const upcoming = bookings ? activeUpcomingBookings(bookings) : []
   return (
     /*
       このカードが載せるのは予約だけ（DASH-10）。「今後の予定」「配信・予約は
       ありません」と書くと、配信が無いことにも読めてしまう。
+      行き先は予約一覧（リスト表示）。カードに並ぶのは未来の予約なので、
+      日カレンダーではなく一覧へ送る（IDEA-01）。
     */
-    <SideCard title="今後の予約" action={{ label: 'すべて見る →', href: '/booking/bookings' }}>
+    <SideCard
+      title="今後の予約"
+      period="今後"
+      action={{ label: 'すべて見る →', href: '/booking/bookings?view=list' }}
+      freshness={updatedAt ? <span className="text-ink-faint shrink-0 text-xs font-medium">更新 {updatedAt.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Tokyo' })}</span> : undefined}
+    >
       {loading ? (
         <div className="space-y-2">
           <div className="bg-canvas-sunken h-5 animate-pulse rounded" />
@@ -263,12 +300,12 @@ export function UpcomingCard({
   )
 }
 
-export function FriendStatusCard({ friends }: { friends: DashboardOverview['friends'] }) {
+export function FriendStatusCard({ friends, freshness }: { friends: DashboardOverview['friends']; freshness?: ReactNode }) {
   const blocked = friends.blockedByThem + friends.hiddenByUs + friends.blockedBoth
   const base = friends.active + blocked
   const rate = base > 0 ? (blocked / base) * 100 : 0
   return (
-    <SideCard title="友だちの状態" action={{ label: '友だちを見る →', href: '/friends' }}>
+    <SideCard title="友だちの状態" period="現在" action={{ label: '友だちを見る →', href: '/friends' }} freshness={freshness}>
       {/*
         設計（`vUXKb`）は「友だち総数 / 有効 / ブロック・非表示（率）」の3行と、
         その下に内訳。**総数と内訳が無いと、223人が誰から止められたのかが

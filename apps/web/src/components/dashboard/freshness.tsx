@@ -70,6 +70,33 @@ export function dashboardFreshnessText(
   return `更新 ${time}`
 }
 
+/**
+ * セクション・カードの対象期間ラベル（IDEA-01）。
+ * 数字がいつの範囲かをカード見出しの脇へ小さく出すための辞書。
+ */
+export function dashboardPeriodLabel(
+  period: 'today' | 'last7' | 'last28' | 'latest' | 'last7-fixed' | 'this-month' | string | null | undefined,
+): string | null {
+  switch (period) {
+    case 'today': return '今日'
+    case 'last7': return '過去7日'
+    case 'last28': return '過去28日'
+    case 'latest': return '現在'
+    case 'last7-fixed': return '直近7日'
+    case 'this-month': return '今月'
+    default: return null
+  }
+}
+
+/**
+ * 画面側で取得した時刻の表示（JST・時:分）。
+ * サーバーの asOf を持たない補助取得（予約・受信箱・出荷）の「更新 HH:MM」に使う。
+ */
+export function dashboardLocalUpdatedAt(at: Date | null | undefined): string | null {
+  if (!at || Number.isNaN(at.getTime())) return null
+  return `更新 ${at.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Tokyo' })}`
+}
+
 export default function DashboardFreshness({
   freshness,
   asOf,

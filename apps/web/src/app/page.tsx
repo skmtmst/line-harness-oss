@@ -12,7 +12,7 @@ import PendingInboxCard, { type PendingInboxSummary } from '@/components/support
 import ShipmentPanel, { type ShipmentSummary } from '@/components/dashboard/shipment-panel'
 import QrDialog from '@/components/dashboard/qr-dialog'
 import FriendTrendTable from '@/components/dashboard/friend-trend-table'
-import DashboardFreshness from '@/components/dashboard/freshness'
+import DashboardFreshness, { dashboardLocalUpdatedAt, dashboardPeriodLabel } from '@/components/dashboard/freshness'
 import {
   FriendStatusCard,
   SupportMarkStatusCard,
@@ -115,6 +115,7 @@ function EditIcon() {
 
 function TodayTaskCard({
   title,
+  period,
   href,
   action,
   value,
@@ -123,6 +124,11 @@ function TodayTaskCard({
   statusTone = 'success',
 }: {
   title: string
+  /*
+   * 件数の対象期間（「現在」「今日」「今日・明日」）。見出しの脇へ小さく出す。
+   * h3 の中には入れない。テスト・画面内の「見出し＝カード名」の対応を守るため。
+   */
+  period?: string
   href: string
   action: string
   value: number | null
@@ -138,7 +144,8 @@ function TodayTaskCard({
   return (
     <Card layout="vertical" padding="default" className="h-[116px] min-w-0">
       <div className="flex items-start justify-between gap-3">
-        <h3 className="text-ink text-sm font-semibold">{title}</h3>
+        <h3 className="text-ink min-w-0 text-sm font-semibold">{title}</h3>
+        {period ? <span className="text-ink-faint flex-1 pt-0.5 text-[11px] font-normal">{period}</span> : null}
         <Link href={href} className="text-action shrink-0 text-xs font-medium hover:underline">{action}</Link>
       </div>
       <p className="text-ink mt-2 text-[28px] leading-none font-bold tabular-nums">
@@ -304,7 +311,10 @@ function FriendTrendCard({ data, loading }: { data: DashboardOverview | null; lo
       <CardHeader
         size="roomy"
         title="友だち数の推移"
-        action={<Link href="/analytics" className="hover:underline">さらに詳しく →</Link>}
+        /* 集計は固定の直近7日。期間ボタンに連動しないことを見出し脇に書く（IDEA-01）。 */
+        meta="直近7日"
+        /* 「友だちの増減」タブが同じ系列を見る画面。既定タブでもあるが明示する。 */
+        action={<Link href="/analytics?tab=friends" className="hover:underline">さらに詳しく →</Link>}
         actionTone="info"
       />
       <FriendTrendTable trend={trend} loading={loading} />
@@ -360,16 +370,20 @@ function UnavailableDataCard({ title, onRetry, section }: {
 }
 
 function LiveDataCard({
-  title, href, linkLabel, value, unit = '件', detail, freshness,
+  title, period, href, linkLabel, value, unit = '件', detail, freshness,
 }: {
-  title: string; href: string; linkLabel: string; value: number | null; unit?: string; detail: string
+  title: string
+  /* 数字の対象期間（「現在」・選択中の期間など）。見出しの脇へ小さく出す（IDEA-01）。 */
+  period?: string
+  href: string; linkLabel: string; value: number | null; unit?: string; detail: string
   freshness?: NonNullable<DashboardOverview['sections']>[keyof NonNullable<DashboardOverview['sections']>]
 }) {
   return (
     <Card padding="roomy">
       <div className="flex items-start justify-between gap-3">
-        <h2 className="text-ink text-sm font-semibold">{title}</h2>
-        <Link href={href} className="text-action text-xs hover:underline">{linkLabel} →</Link>
+        <h2 className="text-ink min-w-0 text-sm font-semibold">{title}</h2>
+        {period ? <span className="text-ink-faint flex-1 pt-0.5 text-[11px] font-normal">{period}</span> : null}
+        <Link href={href} className="text-action shrink-0 text-xs hover:underline">{linkLabel} →</Link>
       </div>
       <p className="text-ink mt-4 text-2xl font-bold tabular-nums">
         {value === null ? '—' : value.toLocaleString('ja-JP')}<span className="ml-1 text-sm font-medium">{unit}</span>
@@ -385,10 +399,13 @@ function LiveDataCard({
 function SendQuotaCard({
   delivery,
   metric,
+  freshness,
   onRetry,
 }: {
   delivery: DashboardOverview['delivery'] | null
   metric: NonNullable<DashboardOverview['metrics']>['monthlyQuota'] | undefined
+  /* LINEの応答時刻・取得失敗。枠が「いつ時点」の数かを出す（IDEA-01）。 */
+  freshness?: ReactNode
   onRetry: () => void
 }) {
   const used = metric === undefined ? delivery?.quotaUsed ?? null : metric.value?.used ?? null
@@ -453,12 +470,15 @@ function SendQuotaCard({
           {remainingRate === null ? '残りを確認中' : `残り ${remainingRate.toFixed(1)}%`}
         </span>
       )}
-      <Link href="/accounts" className="text-action shrink-0 font-medium hover:underline">配信設定へ →</Link>
+      <span className="flex shrink-0 items-center gap-3">
+        {freshness}
+        <Link href="/accounts" className="text-action font-medium hover:underline">配信設定へ →</Link>
+      </span>
     </div>
   </Card>
 }
 
-function OperationalAlertsCard({ risk, healthIssues, oldestWaitMinutes, twoFactor, referenceCount }: { risk: HealthRisk; healthIssues: number | null; oldestWaitMinutes: number | null; twoFactor: { enabled: number; total: number } | null; referenceCount?: number }) {
+function OperationalAlertsCard({ risk, healthIssues, oldestWaitMinutes, twoFactor, referenceCount, failed, updatedAt }: { risk: HealthRisk; healthIssues: number | null; oldestWaitMinutes: number | null; twoFactor: { enabled: number; total: number } | null; referenceCount?: number; failed?: boolean; updatedAt?: Date | null }) {
   const currentHealthIssue = risk === 'warning' || risk === 'danger'
   // 未対応の長さは受信カードで管理する。ここへ重ねて警告扱いすると、
   // 接続も自動処理も正常なのに赤い「1件」が出てしまう。
@@ -466,13 +486,16 @@ function OperationalAlertsCard({ risk, healthIssues, oldestWaitMinutes, twoFacto
   return <Card padding="roomy" className="min-h-[128px]">
     <div className="flex items-start justify-between gap-3">
       <h2 className="text-ink text-base font-bold">運用アラート</h2>
+      {/* 現在時点の状態。数の対象期間が分かるよう見出し脇へ書く（IDEA-01）。 */}
+      <span className="text-ink-faint flex-1 pt-0.5 text-[11px] font-normal">現在</span>
       {/*
         #631: 件数の母集団は変えない（health issue だけを数える）。
         「最も古い未対応」と別のものを数えていることが、件数の脇の文言
         だけで分かるようにする。0件のときに「未対応が長引いている」の
         隣で緑の「0件」が出ても、別の指標だと読めるようにするのが狙い。
+        取れていないときは 0件 ではなく「未取得」とする（IDEA-01）。
       */}
-      <span className={count === null ? 'text-ink-faint text-sm font-bold' : count > 0 ? 'text-danger text-sm font-bold' : 'text-success text-sm font-bold'}>{count === null ? '—' : `接続・自動処理 ${count}件`}</span>
+      <span className={failed || count === null ? 'text-ink-faint text-sm font-bold' : count > 0 ? 'text-danger text-sm font-bold' : 'text-success text-sm font-bold'}>{failed ? '未取得' : count === null ? '—' : `接続・自動処理 ${count}件`}</span>
     </div>
     {/*
       設計（`vUXKb`）は「最も古い未対応」と「二段階認証」の2行。
@@ -487,18 +510,31 @@ function OperationalAlertsCard({ risk, healthIssues, oldestWaitMinutes, twoFacto
       <p>・最も古い未対応：{oldestWaitMinutes === null ? '—' : formatWaitRough(oldestWaitMinutes)}</p>
       <p>・組織全体の二段階認証：{twoFactor === null ? '—' : `${twoFactor.enabled} / ${twoFactor.total}人`}</p>
     </div>
-    <Link href="/emergency" className="text-action mt-3 inline-block text-xs font-medium hover:underline">運用状態を見る →</Link>
+    <div className="mt-3 flex items-center justify-between gap-3">
+      <Link href="/emergency" className="text-action inline-block text-xs font-medium hover:underline">運用状態を見る →</Link>
+      {dashboardLocalUpdatedAt(updatedAt) ? (
+        <span className="text-ink-faint shrink-0 text-xs font-medium">{dashboardLocalUpdatedAt(updatedAt)}</span>
+      ) : null}
+    </div>
   </Card>
 }
 
-function ConnectionStatusCard({ account, risk, activeFriends }: { account: ReturnType<typeof useAccount>['selectedAccount']; risk: HealthRisk; activeFriends: number | null }) {
+function ConnectionStatusCard({ account, risk, activeFriends, healthFailed, updatedAt }: { account: ReturnType<typeof useAccount>['selectedAccount']; risk: HealthRisk; activeFriends: number | null; healthFailed?: boolean; updatedAt?: Date | null }) {
   const webhook = account?.webhook?.status
   const webhookLabel = webhook === 'matched' ? '正常' : webhook === 'mismatched' || webhook === 'unconfigured' ? '要確認' : '確認中'
   return <Card padding="roomy" className="min-h-[128px]">
-    <h2 className="text-ink text-base font-bold">接続状態</h2>
+    <div className="flex items-baseline justify-between gap-3">
+      <h2 className="text-ink text-base font-bold">接続状態</h2>
+      {/* 現在時点の状態（IDEA-01）。 */}
+      <span className="text-ink-faint flex-1 text-[11px] font-normal">現在</span>
+      {dashboardLocalUpdatedAt(updatedAt) ? (
+        <span className="text-ink-faint shrink-0 text-xs font-medium">{dashboardLocalUpdatedAt(updatedAt)}</span>
+      ) : null}
+    </div>
     <dl className="mt-3 space-y-2 text-xs">
       <div className="flex justify-between gap-3"><dt className="text-ink-faint">LINE Webhook</dt><dd className={webhookLabel === '正常' ? 'text-success font-semibold' : webhookLabel === '要確認' ? 'text-danger font-semibold' : 'text-ink-faint'}>{webhookLabel}</dd></div>
-      <div className="flex justify-between gap-3"><dt className="text-ink-faint">自動処理</dt><dd className={risk === 'normal' ? 'text-success font-semibold' : risk ? 'text-danger font-semibold' : 'text-ink-faint'}>{risk === 'normal' ? '稼働中' : risk ? '要確認' : '確認中'}</dd></div>
+      {/* 稼働チェックの取得に失敗したときは「確認中」ではなく「未取得」にする（IDEA-01）。 */}
+      <div className="flex justify-between gap-3"><dt className="text-ink-faint">自動処理</dt><dd className={healthFailed ? 'text-ink-faint' : risk === 'normal' ? 'text-success font-semibold' : risk ? 'text-danger font-semibold' : 'text-ink-faint'}>{healthFailed ? '未取得' : risk === 'normal' ? '稼働中' : risk ? '要確認' : '確認中'}</dd></div>
       <div className="flex justify-between gap-3"><dt className="text-ink-faint">有効友だち</dt><dd className="text-success font-semibold">{activeFriends === null ? '—' : `${activeFriends.toLocaleString('ja-JP')}人`}</dd></div>
     </dl>
   </Card>
@@ -564,7 +600,10 @@ function DashboardPageInner() {
    */
   const [preferenceSaveError, setPreferenceSaveError] = useState<{ message: string; conflict: boolean } | null>(null)
   const [inboxSummary, setInboxSummary] = useState<PendingInboxSummary | null>(null)
+  /* 受信箱の取得が失敗したか（IDEA-01）。0件と失敗を分けるための旗。 */
+  const [inboxFailed, setInboxFailed] = useState(false)
   const [shipmentSummary, setShipmentSummary] = useState<ShipmentSummary | null>(null)
+  const [shipmentState, setShipmentState] = useState<'loading' | 'ready' | 'error'>('loading')
   const [pendingPhotos, setPendingPhotos] = useState<number | null>(null)
   /*
    * 写真審査の件数が取れなかった理由。null のままだと「読み込み中」を
@@ -578,6 +617,12 @@ function DashboardPageInner() {
    * 段階配備中の旧Worker（todayActiveTotal 未返却）では明細数へ戻る。
    */
   const [todayActiveBookings, setTodayActiveBookings] = useState<number | null>(null)
+  /* 明細の取得失敗。null だけだと「読込中」と「失敗」を区別できない（IDEA-01）。 */
+  const [bookingsFailed, setBookingsFailed] = useState(false)
+  /* 稼働チェックの取得失敗。同上（IDEA-01）。 */
+  const [healthFailed, setHealthFailed] = useState(false)
+  /* 補助取得（写真・予約・稼働・二段階・対応マーク）を最後に終えた時刻。 */
+  const [supplementLoadedAt, setSupplementLoadedAt] = useState<Date | null>(null)
   const [supplementLoading, setSupplementLoading] = useState(true)
   const [healthRisk, setHealthRisk] = useState<HealthRisk>(null)
   const [healthIssueCount, setHealthIssueCount] = useState<number | null>(null)
@@ -589,6 +634,36 @@ function DashboardPageInner() {
   const [notificationAccountId, setNotificationAccountId] = useState<string | null>(null)
   const [notificationLoading, setNotificationLoading] = useState(false)
   const [notificationError, setNotificationError] = useState('')
+  /*
+   * 子カードへの通知口は useCallback で固定する。毎描画で新しい関数を
+   * 渡すと子の取得 effect が回り続け、30秒更新とは別に取り直しが
+   * 止まらなくなる。
+   */
+  const handleShipmentSummary = useCallback(
+    (summary: ShipmentSummary | null, state?: 'loading' | 'ready' | 'error') => {
+      setShipmentSummary(summary)
+      setShipmentState(state ?? (summary ? 'ready' : 'loading'))
+    },
+    [],
+  )
+  const handleInboxSummary = useCallback(
+    (summary: PendingInboxSummary | null, ok?: boolean) => {
+      if (ok === false) {
+        /*
+         * 失敗したら前回の件数を小カードへ残さない。古い数を
+         * 最新の数と誤認させないため、失敗中は「未取得」に倒す。
+         */
+        setInboxSummary(null)
+        setInboxFailed(true)
+        return
+      }
+      if (summary) {
+        setInboxSummary(summary)
+        setInboxFailed(false)
+      }
+    },
+    [],
+  )
   const loadRequestId = useRef(0)
   const notificationRequestId = useRef(0)
   const selectedAccountIdRef = useRef(selectedAccountId)
@@ -868,6 +943,9 @@ function DashboardPageInner() {
       setTwoFactorSummary(null)
       setSupportMarkAutoOnInbound(null)
       setTodayActiveBookings(null)
+      setBookingsFailed(false)
+      setHealthFailed(false)
+      setSupplementLoadedAt(null)
       setSupplementLoading(false)
       return
     }
@@ -882,10 +960,13 @@ function DashboardPageInner() {
     setPendingPhotosState('loading')
     setBookings(null)
     setTodayActiveBookings(null)
+    setBookingsFailed(false)
     setHealthRisk(null)
     setHealthIssueCount(null)
+    setHealthFailed(false)
     setTwoFactorSummary(null)
     setSupportMarkAutoOnInbound(null)
+    setSupplementLoadedAt(null)
     /*
       予約の明細は今日以降だけ100件に区切って取る。終わった予約まで
       全部取ると、件数が増えたときに遅くなる。今日の数と直近の予定は
@@ -932,7 +1013,11 @@ function DashboardPageInner() {
         器が違う返事(障害時の HTML など)が来ても、`undefined.requests` で
         落ちない。読めなかったら「確認待ち」に出す。
       */
-      setBookings(bookingResult.status === 'fulfilled' && bookingResult.value && Array.isArray(bookingResult.value.requests) ? bookingResult.value.requests : null)
+      const bookingList = bookingResult.status === 'fulfilled' && bookingResult.value
+        ? (Array.isArray(bookingResult.value.requests) ? bookingResult.value.requests : null)
+        : null
+      setBookings(bookingList)
+      setBookingsFailed(needsBookings && bookingList === null)
       /*
         旧Workerは todayActiveTotal を返さない。そのときは null のままにし、
         表示側で明細からの件数へ戻す。取りこぼした数字を本物に見せない。
@@ -944,16 +1029,17 @@ function DashboardPageInner() {
           ? bookingSummaryResult.value.todayActiveTotal
           : null,
       )
-      setHealthRisk(
-        healthResult.status === 'fulfilled' && healthResult.value?.success
-          ? (healthResult.value.data.riskLevel as HealthRisk)
-          : null,
-      )
+      const healthData = healthResult.status === 'fulfilled' && healthResult.value?.success === true
+        ? healthResult.value.data
+        : null
+      setHealthRisk(healthData ? (healthData.riskLevel as HealthRisk) : null)
       setHealthIssueCount(
-        healthResult.status === 'fulfilled' && healthResult.value?.success
-          ? healthResult.value.data.logs.filter((log) => log.riskLevel === 'warning' || log.riskLevel === 'danger').length
+        healthData
+          ? healthData.logs.filter((log) => log.riskLevel === 'warning' || log.riskLevel === 'danger').length
           : null,
       )
+      const healthOk = healthData !== null
+      setHealthFailed(needsHealth && !healthOk)
       setTwoFactorSummary(
         staffResult.status === 'fulfilled' && staffResult.value?.success
           ? summarizeTwoFactor(staffResult.value.data)
@@ -964,6 +1050,7 @@ function DashboardPageInner() {
           ? hasInboundSupportMark(supportMarkResult.value.data)
           : null,
       )
+      setSupplementLoadedAt(new Date())
       setSupplementLoading(false)
     })
     return () => { cancelled = true }
@@ -987,16 +1074,29 @@ function DashboardPageInner() {
     ? sectionAvailable('friends') ? data?.friends.active ?? null : null
     : data.metrics.activeFriends.value
   /*
-   * 受信件数の母集団が画面内で2種類ある（A01-03）。
-   * 受信箱カードの集計は全アカウント、概要の集計は選択中のアカウント。
-   * どちらの数かが常に読み取れるよう、件数の脇に対象を書く。
+   * 「対応が必要な受信」小カードの件数は、遷移先 `/chats?status=unread` と
+   * 同じ口で数える（IDEA-01）:
+   *   LINE … 選択中アカウントの未対応（overview.inbox.unanswered）
+   *   MAIL … メールはアカウントを持たない。受信箱に同じ一覧で混ざる
+   *          未対応メール（support/inbox の emailUnread、権限のある範囲）
+   * 片方でも取れていない間は合計を出さず「—」にする。取れたぶんだけを
+   * 足すと実際より少ない件数を本物の数字に見せてしまう。
    */
-  const pendingTotal = inboxSummary?.total ?? (sectionAvailable('inbox') ? data?.inbox.unanswered : null) ?? null
-  const pendingDetail = inboxSummary
-    ? `全アカウント LINE ${inboxSummary.line}・メール ${inboxSummary.email}`
-    : data && sectionAvailable('inbox')
-      ? `選択中アカウント 対応中 ${data.inbox.inProgress}`
-      : data ? STATE_TEXT.error : STATE_TEXT.loading
+  const inboxSectionOk = data !== null && sectionAvailable('inbox')
+  const lineUnread = inboxSectionOk ? data.inbox.unanswered : null
+  const mailUnread = inboxSummary?.emailUnread ?? null
+  const pendingTotal = lineUnread === null || mailUnread === null ? null : lineUnread + mailUnread
+  const pendingDetail = lineUnread === null && mailUnread === null
+    ? (data !== null || inboxFailed || error ? STATE_TEXT.error : STATE_TEXT.loading)
+    : `LINE ${lineUnread === null ? '未取得' : lineUnread}・MAIL ${mailUnread === null ? '未取得' : mailUnread}`
+  /*
+   * 「最も古い未対応」は受信カードと同じ値を使う（要件 §6-1）。
+   * 概要が取れているときは選択中アカウントの最古未対応、取れないときは
+   * 受信箱カードの最古待ちへ退く。
+   */
+  const pendingOldest = inboxSectionOk
+    ? (data.inbox.oldestUnansweredMinutes ?? null)
+    : (inboxSummary?.oldestWaitMinutes ?? null)
   const renderMainCard = (id: DashboardCardId): ReactNode => {
     /* pending-inbox・shipment は非表示でも件数取得を続けるため、描画ループ側で別扱い。 */
     if (id === 'friend-trend') return data && !sectionAvailable('trend')
@@ -1008,7 +1108,7 @@ function DashboardPageInner() {
     />
     if (id === 'scenario-status') {
       const scenarios = sectionAvailable('operations') ? data?.operations?.scenarios : undefined
-      return <LiveDataCard title="シナリオ配信状況" href="/scenarios" linkLabel="シナリオを見る" value={scenarios?.active ?? null} detail={scenarios ? `一時停止 ${scenarios.paused}件` : data ? STATE_TEXT.error : STATE_TEXT.loading} freshness={data?.sections?.operations} />
+      return <LiveDataCard title="シナリオ配信状況" period="現在" href="/scenarios" linkLabel="シナリオを見る" value={scenarios?.active ?? null} detail={scenarios ? `一時停止 ${scenarios.paused}件` : data ? STATE_TEXT.error : STATE_TEXT.loading} freshness={data?.sections?.operations} />
     }
     if (id === 'uid-migration') {
       const migrations = sectionAvailable('operations') ? data?.operations?.migrations : undefined
@@ -1016,13 +1116,25 @@ function DashboardPageInner() {
        * 行き先は移行の画面そのもの（DASH-07）。/health は稼働状況の画面で、
        * 移行の進行は見られない。
        */
-      return <LiveDataCard title="UID移行状況" href="/accounts?tab=migration" linkLabel="移行状況を見る" value={migrations?.active ?? null} detail={migrations ? `完了 ${migrations.completed}件` : data ? STATE_TEXT.error : STATE_TEXT.loading} freshness={data?.sections?.operations} />
+      return <LiveDataCard title="UID移行状況" period="現在" href="/accounts?tab=migration" linkLabel="移行状況を見る" value={migrations?.active ?? null} detail={migrations ? `完了 ${migrations.completed}件` : data ? STATE_TEXT.error : STATE_TEXT.loading} freshness={data?.sections?.operations} />
     }
     return null
   }
 
   const renderTodayCard = (id: DashboardCardId): ReactNode => {
-    if (id === 'today-inbox') return <TodayTaskCard title="対応が必要な受信" href="/chats" action="受信箱を開く" value={pendingTotal} detail={pendingDetail} status={inboxSummary?.oldestWaitMinutes != null ? `最長 ${formatWaitRough(inboxSummary.oldestWaitMinutes)}` : '確認待ち'} />
+    if (id === 'today-inbox') return <TodayTaskCard
+      title="対応が必要な受信"
+      period="現在"
+      /* カードの件数（LINE未対応＋未対応メール）と同じ絞り込みで受信箱を開く。 */
+      href="/chats?status=unread"
+      action="受信箱を開く"
+      value={pendingTotal}
+      detail={pendingDetail}
+      status={pendingTotal === null
+        ? '未取得'
+        : pendingOldest !== null ? `最長 ${formatWaitRough(pendingOldest)}` : '—'}
+      statusTone={pendingTotal === null ? 'muted' : 'success'}
+    />
     if (id === 'today-photo-review') {
       const override = reference?.pendingPhotos
       const value = override ?? pendingPhotos
@@ -1040,6 +1152,7 @@ function DashboardPageInner() {
             : `確認待ち ${value}件`
       return <TodayTaskCard
         title="写真審査"
+        period="現在"
         href={forbidden ? '/staff' : '/nen-members?tab=photos&status=pending_review'}
         action={forbidden ? '権限を確認する' : '審査する'}
         value={forbidden ? null : value}
@@ -1057,20 +1170,42 @@ function DashboardPageInner() {
       const bookingsValue = todayActiveBookings ?? (displayedBookings === null ? null : todayBookings.length)
       return <TodayTaskCard
         title="今日の予約"
-        href="/booking/bookings"
+        period="今日"
+        /*
+         * カードの件数は「今日の有効予約」。遷移先は今日の日カレンダー
+         * （要件 §5-1: /booking/bookings?view=day）。
+         */
+        href="/booking/bookings?view=day"
         action="予約を見る"
         value={bookingsValue}
-        detail="取消・完了を除く今日の予約"
-        status={upcomingBookings.length > 0 ? nextBookingLabel(upcomingBookings[0].starts_at, today) : '次回予定なし'}
+        detail={bookingsFailed && todayActiveBookings === null ? STATE_TEXT.error : '取消・完了を除く今日の予約'}
+        /*
+         * 明細が取れていないのに「次回予定なし」と出すと、失敗を 0件 と
+         * 見せることになる（IDEA-01）。失敗は「未取得」、読込中は「確認中」。
+         */
+        status={bookingsFailed ? '未取得'
+          : bookings === null ? '確認中'
+            : upcomingBookings.length > 0 ? nextBookingLabel(upcomingBookings[0].starts_at, today) : '次回予定なし'}
+        statusTone={bookingsFailed ? 'muted' : 'success'}
       />
     }
     if (id === 'today-shipments') return <TodayTaskCard
       title="出荷予定"
+      period="今日・明日"
       href="/ec-commerce"
       action="ECを見る"
-      value={shipmentSummary?.today ?? null}
-      detail={shipmentSummary?.scanLimited ? `直近${shipmentSummary.scanLimit}件のEC通知から算出` : 'EC通知から算出'}
-      status={reference?.shipmentStatus ?? (shipmentSummary ? `今日・明日 ${shipmentSummary.soon}件` : '確認中')}
+      value={shipmentState === 'ready' ? (shipmentSummary?.today ?? null) : null}
+      detail={shipmentState === 'error'
+        ? STATE_TEXT.error
+        : shipmentState === 'ready'
+          ? (shipmentSummary?.scanLimited ? `直近${shipmentSummary.scanLimit}件のEC通知から算出` : 'EC通知から算出')
+          : STATE_TEXT.loading}
+      /*
+       * 失敗を「確認中」のままにしない（IDEA-01）。失敗は「未取得」、
+       * 取れて0件なら「今日・明日 0件」。
+       */
+      status={reference?.shipmentStatus ?? (shipmentState === 'error' ? '未取得' : shipmentState === 'ready' ? `今日・明日 ${shipmentSummary?.soon ?? 0}件` : '確認中')}
+      statusTone={shipmentState === 'error' ? 'muted' : 'success'}
     />
     return null
   }
@@ -1079,37 +1214,48 @@ function DashboardPageInner() {
     if (id === 'send-quota') return <SendQuotaCard
       delivery={sectionAvailable('quota') ? data?.delivery ?? null : null}
       metric={data?.metrics?.monthlyQuota}
+      freshness={<DashboardFreshness freshness={data?.sections?.quota?.freshness} asOf={data?.sections?.quota?.asOf} reason={data?.sections?.quota?.reason} />}
       onRetry={() => void load()}
     />
-    if (id === 'operational-alerts') return <OperationalAlertsCard risk={displayedHealthRisk} healthIssues={healthIssueCount} oldestWaitMinutes={inboxSummary?.oldestWaitMinutes ?? (sectionAvailable('inbox') ? data?.inbox.oldestUnansweredMinutes : null) ?? null} twoFactor={displayedTwoFactor} referenceCount={reference?.operationalAlerts} />
-    if (id === 'connection-status') return <ConnectionStatusCard account={selectedAccount} risk={displayedHealthRisk} activeFriends={activeFriends} />
-    if (id === 'upcoming') return <UpcomingCard bookings={displayedBookings} loading={supplementLoading} />
+    if (id === 'operational-alerts') return <OperationalAlertsCard risk={displayedHealthRisk} healthIssues={healthIssueCount} oldestWaitMinutes={pendingOldest} twoFactor={displayedTwoFactor} referenceCount={reference?.operationalAlerts} failed={healthFailed} updatedAt={supplementLoadedAt} />
+    if (id === 'connection-status') return <ConnectionStatusCard account={selectedAccount} risk={displayedHealthRisk} activeFriends={activeFriends} healthFailed={healthFailed} updatedAt={supplementLoadedAt} />
+    if (id === 'upcoming') return <UpcomingCard bookings={displayedBookings} loading={supplementLoading} updatedAt={bookingsFailed ? null : supplementLoadedAt} />
     if (id === 'monthly-delivery') return data && !sectionAvailable('delivery')
       ? <UnavailableDataCard title="今月の配信" section={data.sections?.delivery} onRetry={() => void load()} />
-      : data ? <MonthlyDeliveryCard delivery={data.delivery} />
-        : loading ? <LoadingDataCard title="今月の配信" href="/analytics" linkLabel="アクセス解析へ" />
+      : data ? <MonthlyDeliveryCard delivery={data.delivery} freshness={<DashboardFreshness freshness={data.sections?.delivery?.freshness} asOf={data.sections?.delivery?.asOf} reason={data.sections?.delivery?.reason} />} />
+        : loading ? <LoadingDataCard title="今月の配信" href="/analytics?tab=reactions" linkLabel="アクセス解析へ" />
           : <UnavailableDataCard title="今月の配信" onRetry={() => void load()} />
     if (id === 'recent-results') return data && !sectionAvailable('conversions')
       ? <UnavailableDataCard title="最近の成果" section={data.sections?.conversions} onRetry={() => void load()} />
-      : data ? <RecentResultsCard conversions={data.conversions} />
+      : data ? <RecentResultsCard conversions={data.conversions} period={dashboardPeriodLabel(period) ?? 'この期間'} freshness={<DashboardFreshness freshness={data.sections?.conversions?.freshness} asOf={data.sections?.conversions?.asOf} reason={data.sections?.conversions?.reason} />} />
         : loading ? <LoadingDataCard title="最近の成果" href="/conversions" linkLabel="成果を見る" />
           : <UnavailableDataCard title="最近の成果" onRetry={() => void load()} />
-    if (id === 'support-mark-status') return <SupportMarkStatusCard inbox={sectionAvailable('inbox') ? (data && reference?.supportInbox ? { ...data.inbox, ...reference.supportInbox } : data?.inbox ?? null) : null} autoOnInbound={supportMarkAutoOnInbound} />
+    if (id === 'support-mark-status') return <SupportMarkStatusCard inbox={sectionAvailable('inbox') ? (data && reference?.supportInbox ? { ...data.inbox, ...reference.supportInbox } : data?.inbox ?? null) : null} autoOnInbound={supportMarkAutoOnInbound} freshness={<DashboardFreshness freshness={data?.sections?.inbox?.freshness} asOf={data?.sections?.inbox?.asOf} reason={data?.sections?.inbox?.reason} />} />
     if (id === 'friend-status') return data && !sectionAvailable('friends')
       ? <UnavailableDataCard title="友だちの状態" section={data.sections?.friends} onRetry={() => void load()} />
-      : data ? <FriendStatusCard friends={data.friends} />
+      : data ? <FriendStatusCard friends={data.friends} freshness={<DashboardFreshness freshness={data.sections?.friends?.freshness} asOf={data.sections?.friends?.asOf} reason={data.sections?.friends?.reason} />} />
         : loading ? <LoadingDataCard title="友だちの状態" href="/friends" linkLabel="友だちを見る" />
           : <UnavailableDataCard title="友だちの状態" onRetry={() => void load()} />
     if (id === 'booking-status') {
       const bookingsStatus = sectionAvailable('operations') ? data?.operations?.bookings : undefined
-      return <LiveDataCard title="予約状況" href="/booking/bookings" linkLabel="予約を見る" value={bookingsStatus?.upcoming ?? null} detail={bookingsStatus ? `承認待ち ${bookingsStatus.pending}件` : data ? STATE_TEXT.error : STATE_TEXT.loading} freshness={data?.sections?.operations} />
+      /*
+       * カードは「今後の予約・承認待ち」の数。遷移先は一覧を「未承認」で
+       * 絞った形にし、副文の承認待ち件数と同じ行が並ぶ（IDEA-01）。
+       */
+      /*
+       * 大きい数字は「承認待ち」にする。行き先の `?status=requested` が
+       * 同じ母集団を出すので、カードと一覧の件数が一致する（IDEA-01）。
+       * 「今後の予約」は補足として併記する。
+       */
+      return <LiveDataCard title="予約状況" period="現在" href="/booking/bookings?view=list&status=requested" linkLabel="予約を見る" value={bookingsStatus?.pending ?? null} detail={bookingsStatus ? `今後の予約 ${bookingsStatus.upcoming}件` : data ? STATE_TEXT.error : STATE_TEXT.loading} freshness={data?.sections?.operations} />
     }
     if (id === 'inflow-top') {
       const inflowTop = sectionAvailable('operations') ? data?.operations?.inflowTop : undefined
-      return <LiveDataCard title="流入経路TOP3" href="/inflow-links" linkLabel="流入経路を見る" value={inflowTop?.[0]?.count ?? (inflowTop ? 0 : null)} detail={inflowTop ? inflowTop.map((item) => `${item.name ?? '—'} ${item.count}`).join('、') || '期間内の追加なし' : data ? STATE_TEXT.error : STATE_TEXT.loading} freshness={data?.sections?.operations} />
+      /* 「経路と成果」タブが期間内の経路別の登録・成果を見る画面（IDEA-01）。 */
+      return <LiveDataCard title="流入経路TOP3" period={dashboardPeriodLabel(period) ?? undefined} href="/analytics?tab=routes" linkLabel="経路別の内訳を見る" value={inflowTop?.[0]?.count ?? (inflowTop ? 0 : null)} detail={inflowTop ? inflowTop.map((item) => `${item.name ?? '—'} ${item.count}`).join('、') || '期間内の追加なし' : data ? STATE_TEXT.error : STATE_TEXT.loading} freshness={data?.sections?.operations} />
     }
-    if (id === 'funnel-alert') return <LiveDataCard title="ファネル要注意" href="/analytics" linkLabel="分析を見る" value={sectionAvailable('operations') ? data?.operations?.funnelAlerts ?? null : null} detail="3人以上追加・成果0件の経路" freshness={data?.sections?.operations} />
-    if (id === 'automation-failures') return <LiveDataCard title="オートメーション失敗" href="/automations" linkLabel="実行状況を見る" value={sectionAvailable('operations') ? data?.operations?.automationFailures ?? null : null} detail="期間内の失敗・一部失敗" freshness={data?.sections?.operations} />
+    if (id === 'funnel-alert') return <LiveDataCard title="ファネル要注意" period={dashboardPeriodLabel(period) ?? undefined} href="/analytics?tab=funnel" linkLabel="ファネルを見る" value={sectionAvailable('operations') ? data?.operations?.funnelAlerts ?? null : null} detail="3人以上追加・成果0件の経路" freshness={data?.sections?.operations} />
+    if (id === 'automation-failures') return <LiveDataCard title="オートメーション失敗" period={dashboardPeriodLabel(period) ?? undefined} href="/automations/runs?status=problems" linkLabel="実行状況を見る" value={sectionAvailable('operations') ? data?.operations?.automationFailures ?? null : null} detail="期間内の失敗・一部失敗" freshness={data?.sections?.operations} />
     return null
   }
 
@@ -1234,14 +1380,25 @@ function DashboardPageInner() {
             if (item.id === 'shipment') {
               return (
                 <div key={item.id} data-design="Shipment" className={item.visible ? '' : 'hidden'} aria-hidden={!item.visible}>
-                  <ShipmentPanel onSummaryChange={setShipmentSummary} />
+                  {/*
+                    選択中アカウントの出荷だけを数える（IDEA-01）。
+                    小カード「出荷予定」と遷移先 /ec-commerce は同じアカウント範囲。
+                  */}
+                  <ShipmentPanel
+                    accountId={selectedAccountId}
+                    onSummaryChange={handleShipmentSummary}
+                  />
                 </div>
               )
             }
             if (item.id === 'pending-inbox') {
               return (
                 <div key={item.id} className={item.visible ? '' : 'hidden'} aria-hidden={!item.visible}>
-                  <PendingInboxCard onSummaryChange={setInboxSummary} />
+                  {/*
+                    上部の小カードの MAIL 件数・最長待ちはこのカードの取得結果から
+                    取る（DASH-21）。失敗も一緒に知らせ、0件と取り違えない。
+                  */}
+                  <PendingInboxCard onSummaryChange={handleInboxSummary} />
                 </div>
               )
             }
