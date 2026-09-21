@@ -59,4 +59,34 @@ describe('V6 写真審査の一枚表示と掲載管理', () => {
     expect(publications).toContain('使う場所を保存')
     expect(publications).toContain('crypto.randomUUID()')
   })
+
+  it('keeps withdrawn placements traceable after withdrawal (Issue #1040)', () => {
+    // 掲載管理は「同意撤回で残った掲載先」と「外し済み」を分けて出す。
+    expect(publications).toContain('pendingWithdrawals')
+    expect(publications).toContain('withdrawnItems')
+    expect(publications).toContain('整理が必要なもの')
+    expect(publications).toContain('ご本人が公開の同意を撤回しました')
+    expect(publications).toContain('外したもの')
+    expect(publications).toContain('removed_at')
+    // 外す操作と「付与済みポイントは戻らない」説明を残す
+    expect(publications).toContain('掲載先から外す')
+    expect(publications).toContain('付与済みのポイントは戻りません')
+    expect(api).toContain('pendingWithdrawals')
+    expect(api).toContain('withdrawnItems')
+  })
+
+  it('shows adoption history, reward state and placements in the detail (Issue #1040)', () => {
+    // 詳細は採用履歴・同意・公開先・ポイントの実状態をカードで出す。
+    expect(detail).toContain('採用・同意・公開の記録')
+    expect(detail).toContain('審査の記録')
+    expect(detail).toContain('公開の同意')
+    expect(detail).toContain('photo.history')
+    expect(detail).toContain('photo.reward')
+    expect(detail).toContain('photo.publication')
+    expect(detail).toContain('publication_consent_version')
+    expect(detail).toContain('採用1回につき付与は1回')
+    expect(api).toContain('NenPhotoRewardState')
+    expect(api).toContain('NenPhotoPublicationPlacement')
+    expect(api).toContain('NenPhotoPublicationRecord')
+  })
 })
