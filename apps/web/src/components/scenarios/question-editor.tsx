@@ -62,6 +62,47 @@ export function emptyQuestion(): ScenarioQuestion {
 }
 
 /*
+ * SCENARIO-22: LINE のボタンは動作を1つしか持てない。URL・電話・
+ * メール・友だち追加・回答フォームは「開く」uri action になり、
+ * 押された通知（postback）はこちらへ届かない。届かないと返信・タグ・
+ * 友だち情報・選択肢アクションは動かせない。「何もしない」と
+ * 「シナリオを移動・停止」は postback で届くので対象外。
+ */
+export const isUriOnlyBehavior = (behavior: ChoiceBehavior): boolean =>
+  behavior === 'url' ||
+  behavior === 'tel' ||
+  behavior === 'mail' ||
+  behavior === 'add_friend' ||
+  behavior === 'form'
+
+/**
+ * URI だけの挙動では実行されない、いま設定済みの項目名を返す。
+ * 保存済みデータを黙って消さないよう、何が残っているかを画面で示す。
+ */
+export function deadAnswerSettings(choice: QuestionChoice): string[] {
+  const dead: string[] = []
+  if (choice.reply?.trim()) dead.push('選択時の返信')
+  if (choice.repeatReply?.trim()) dead.push('二度押し時の返信')
+  if (choice.userMessage?.trim()) dead.push('ユーザーメッセージ')
+  if ((choice.addTagIds?.length ?? 0) > 0) dead.push('追加するタグ')
+  if ((choice.removeTagIds?.length ?? 0) > 0) dead.push('はずすタグ')
+  if (choice.field?.fieldId) dead.push('友だち情報欄')
+  return dead
+}
+
+/** URI だけの挙動では届かない、回答依存の設定をまとめて外す。 */
+export function clearDeadAnswerSettings(choice: QuestionChoice): QuestionChoice {
+  const next = { ...choice }
+  delete next.reply
+  delete next.repeatReply
+  delete next.userMessage
+  delete next.addTagIds
+  delete next.removeTagIds
+  delete next.field
+  return next
+}
+
+/*
  * 入力欄の見た目は、他の画面（友だち属性・シナリオ編集）と同じにそろえる。
  * この画面だけ枠や余白が違うと、同じアプリに見えない。
  */
@@ -178,7 +219,16 @@ export default function QuestionEditor({
       </div>
 
       <div className={choiceColumns ? 'grid gap-3 xl:grid-cols-2' : 'space-y-3'}>
-        {value.choices.map((choice, index) => (
+        {value.choices.map((choice, index) => {
+          /*
+           * SCENARIO-22: URI を開くだけの挙動では押された通知が届かない。
+           * 届かないのに返信・タグ・アクションを設定できると、実行されると
+           * 思って保存する人が出る。未設定なら欄を出さず、残っている設定は
+           * 警告で名指しして、本人の操作でだけ消す。
+           */
+          const uriOnly = isUriOnlyBehavior(choice.behavior)
+          const dead = uriOnly ? deadAnswerSettings(choice) : []
+          return (
           <div key={index} className="border-hairline rounded-card border">
             <div className="border-hairline bg-canvas-sunken flex flex-wrap items-center justify-between gap-2 border-b px-4 py-2.5">
               <button
@@ -195,7 +245,12 @@ export default function QuestionEditor({
                 </span>
               </button>
               <div className="flex shrink-0 items-center gap-1.5">
-                {onOpenChoiceActions && (
+                {/*
+                  URI だけの挙動では postback が届かず、ここで設定する
+                  アクションも実行されない。出すと「動く」と誤解する
+                  （SCENARIO-22）。
+                */}
+                {onOpenChoiceActions && !uriOnly && (
                   <button
                     type="button"
                     onClick={() => onOpenChoiceActions(index)}
@@ -359,6 +414,30 @@ export default function QuestionEditor({
                   </div>
                 )}
 
+                {uriOnly ? (
+                  <div className="border-warning bg-warning-bg rounded-control space-y-2 border px-3 py-3">
+                    <p className="text-warning text-xs leading-relaxed">
+                      この挙動はLINE側でURLなどを開くだけで、押された通知は届きません。
+                      「選択時の返信」「タグ」「友だち情報」「アクション」は実行されません。
+                      押した記録や返信が要るときは「何もしない」にして、本文にURLを書いてください。
+                    </p>
+                    {dead.length > 0 ? (
+                      <>
+                        <p className="text-warning text-xs font-bold">
+                          いま設定されている {dead.join('・')} は実行されません。
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => setChoice(index, clearDeadAnswerSettings(choice))}
+                          className="text-danger text-xs font-medium hover:underline"
+                        >
+                          実行されない設定を消す
+                        </button>
+                      </>
+                    ) : null}
+                  </div>
+                ) : (
+                  <>
                 <div>
                   <div className="flex flex-wrap items-baseline justify-between gap-2">
                     <span className="text-ink-secondary text-xs font-medium">選択時の返信</span>
@@ -472,10 +551,13 @@ export default function QuestionEditor({
                     </div>
                   </div>
                 </details>
+                  </>
+                )}
               </div>
             )}
           </div>
-        ))}
+          )
+        })}
 
         <button
           type="button"

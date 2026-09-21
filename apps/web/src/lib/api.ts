@@ -6943,7 +6943,11 @@ export const api = {
     triggers: {
       list: (scenarioId: string) =>
         fetchApi<ApiResponse<ScenarioTriggerItem[]>>(`/api/scenarios/${scenarioId}/triggers`),
-      add: (scenarioId: string, kind: 'friend_add' | 'tag_added', tagId?: string | null) =>
+      add: (
+        scenarioId: string,
+        kind: 'friend_add' | 'tag_added' | 'form_answer' | 'booking_confirmed',
+        tagId?: string | null,
+      ) =>
         fetchApi<ApiResponse<ScenarioTriggerItem[]>>(`/api/scenarios/${scenarioId}/triggers`, {
           method: 'POST',
           body: JSON.stringify({ kind, tagId: tagId ?? null }),

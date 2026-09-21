@@ -28,7 +28,9 @@ function isStructuredKind(type: MessageType): boolean {
   return type === 'location' || type === 'video' || type === 'audio' || type === 'sticker'
 }
 import QuestionEditor, {
+  deadAnswerSettings,
   emptyQuestion,
+  isUriOnlyBehavior,
   type ScenarioQuestion,
 } from '@/components/scenarios/question-editor'
 import {
@@ -148,6 +150,20 @@ interface StepFormState {
  */
 function nextStepOrder(steps: ReadonlyArray<{ stepOrder: number }>): number {
   return steps.length > 0 ? Math.max(...steps.map((s) => s.stepOrder)) + 1 : 1
+}
+
+/*
+ * SCENARIO-09: 複製の途中で止まったことを、作りかけのコピーと
+ * 一緒に運ぶ印。stage は「どの段階で止まったか」を運用者の言葉で持つ。
+ */
+class DuplicateAborted extends Error {
+  constructor(
+    readonly copyId: string,
+    readonly stage: string,
+    cause?: unknown,
+  ) {
+    super(cause instanceof Error && cause.message ? cause.message : '複製できませんでした')
+  }
 }
 
 function emptyStepForm(stepOrder: number): StepFormState {
@@ -328,6 +344,21 @@ export default function ScenarioDetailClient({
 
   const router = useRouter()
   const [duplicating, setDuplicating] = useState(false)
+  /*
+   * SCENARIO-09: 複製が途中で止まったとき、作りかけのコピーが残る。
+   * 残っているコピーの所在・どこで止まったかを保持し、窓から
+   * 「続きからやり直す」「コピーを削除する」「コピーを開いて見る」を
+   * 選べるようにする。
+   */
+  const [duplicateRemainder, setDuplicateRemainder] = useState<{
+    copyId: string
+    copyName: string
+    stage: string
+    detail: string
+  } | null>(null)
+  const [discardDuplicateOpen, setDiscardDuplicateOpen] = useState(false)
+  const [discardingDuplicate, setDiscardingDuplicate] = useState(false)
+  const [discardDuplicateError, setDiscardDuplicateError] = useState('')
   /** 表の行で開いている1通ぶんのプレビュー。設計の「プレビュー」。 */
   const [previewStepId, setPreviewStepId] = useState<string | null>(null)
   const [duplicatingStepId, setDuplicatingStepId] = useState<string | null>(null)
@@ -544,23 +575,72 @@ export default function ScenarioDetailClient({
     if (!scenario || duplicating) return
     setDuplicating(true)
     setError('')
+    const copyName = `${scenario.name} のコピー`
+    /*
+     * SCENARIO-09: 途中で失敗したあと新しく作り直すと、不完全なコピーが
+     * 1つ増えるだけ。前回作りかけのコピーが残っていれば新しく作らず、
+     * その続きから写す。
+     */
+    let copyId = duplicateRemainder?.copyId ?? null
     try {
-      const created = await api.scenarios.create({
-        name: `${scenario.name} のコピー`,
-        description: scenario.description,
-        triggerType: scenario.triggerType,
-        triggerTagId: scenario.triggerTagId,
-        lineAccountId: scenario.lineAccountId,
-        isActive: false,
-        deliveryMode: scenario.deliveryMode,
-        allowConcurrent: scenario.allowConcurrent,
-      })
-      if (!created.success) throw new Error(created.error)
+      if (!copyId) {
+        const created = await api.scenarios.create({
+          name: copyName,
+          description: scenario.description,
+          triggerType: scenario.triggerType,
+          triggerTagId: scenario.triggerTagId,
+          lineAccountId: scenario.lineAccountId,
+          isActive: false,
+          deliveryMode: scenario.deliveryMode,
+          allowConcurrent: scenario.allowConcurrent,
+          folderId: scenario.folderId ?? null,
+        })
+        if (!created.success) throw new Error(created.error)
+        copyId = created.data.id
+      }
+      const copy = copyId
+
+      /*
+       * SCENARIO-08: シナリオ全体の配信対象と、最後まで届いた人の行き先
+       * （終了後の処理）も写す。通だけ写すと、同じ名前でまったく別の
+       * 動きをするコピーができてしまう。create はこれらを受けないので
+       * 直後の update で入れる。
+       */
+      try {
+        const updated = await api.scenarios.update(copy, {
+          audienceCondition: scenario.audienceCondition ?? null,
+          onCompleteMode: scenario.onCompleteMode ?? 'pause',
+          onCompleteScenarioId: scenario.onCompleteScenarioId ?? null,
+        })
+        if (!updated.success) throw new Error(updated.error)
+      } catch (cause) {
+        throw new DuplicateAborted(copy, 'シナリオ全体の設定（配信対象・終了後の処理）', cause)
+      }
+
+      /*
+       * 再開でも同じ通を二重に足さないよう、コピーに既にある通の番号を
+       * 読む。読めないと「どこまで写ったか」が分からないので止める。
+       */
+      const existing = await api.scenarios.get(copy).catch(() => null)
+      if (!existing?.success) {
+        throw new DuplicateAborted(
+          copy,
+          'コピー済みの内容の確認',
+          new Error(existing && !existing.success ? existing.error : 'コピーの内容を読めませんでした'),
+        )
+      }
+      const existingByOrder = new Map(existing.data.steps.map((s) => [s.stepOrder, s.id]))
+      const stepIdMap = new Map<string, string>()
       // 通は順に足す。まとめて入れる口が無い。
       // 時刻・絞り込み・質問・下書きの別まで写す。落とすと時刻指定の複製が
       // 400 で失敗したり、別物の流れになる。
       for (const step of sortedSteps) {
-        const copied = await api.scenarios.addStep(created.data.id, {
+        const already = existingByOrder.get(step.stepOrder)
+        if (already) {
+          stepIdMap.set(step.id, already)
+          continue
+        }
+        const copied = await api.scenarios.addStep(copy, {
           stepOrder: step.stepOrder,
           delayMinutes: step.delayMinutes,
           offsetDays: step.offsetDays ?? undefined,
@@ -575,15 +655,117 @@ export default function ScenarioDetailClient({
           targetCondition: (step.targetCondition as SegmentCondition | null) ?? null,
           question: (step.question as ScenarioQuestion | null) ?? null,
           isDraft: step.isDraft === true,
-        })
+        }).catch((cause) => ({ success: false as const, error: cause instanceof Error && cause.message ? cause.message : '通をコピーできませんでした' }))
         // 途中で止める。続けると通が欠けた別物の流れが残る。
-        if (!copied.success) throw new Error(copied.error)
+        if (!copied.success) throw new DuplicateAborted(copy, `${step.stepOrder}通目のコピー`, new Error(copied.error))
+        stepIdMap.set(step.id, copied.data.id)
       }
-      router.push(`/scenarios/detail?id=${created.data.id}`)
+
+      /*
+       * SCENARIO-08: 開始のきっかけ。写さないと「複製したのに
+       * 始まらない」コピーになる。再開時は既にあるものを足さない。
+       */
+      try {
+        const [sourceTriggers, copyTriggers] = await Promise.all([
+          api.scenarios.triggers.list(id),
+          api.scenarios.triggers.list(copy),
+        ])
+        if (!sourceTriggers.success) throw new Error(sourceTriggers.error)
+        if (!copyTriggers.success) throw new Error(copyTriggers.error)
+        const have = new Set(copyTriggers.data.map((t) => `${t.kind}:${t.tagId ?? ''}`))
+        for (const trigger of sourceTriggers.data) {
+          if (have.has(`${trigger.kind}:${trigger.tagId ?? ''}`)) continue
+          const added = await api.scenarios.triggers.add(copy, trigger.kind, trigger.tagId)
+          if (!added.success) throw new Error(added.error)
+        }
+      } catch (cause) {
+        throw new DuplicateAborted(copy, '開始のきっかけ', cause)
+      }
+
+      /*
+       * SCENARIO-08: アクション（通を送ったとき・選択肢を押したとき・
+       * 配り終えたとき）。通にぶら下がるものは写した先の通へ張り替える。
+       */
+      try {
+        const [sourceActions, copyActions] = await Promise.all([
+          api.scenarios.actions.list(id),
+          api.scenarios.actions.list(copy),
+        ])
+        if (!sourceActions.success) throw new Error(sourceActions.error)
+        if (!copyActions.success) throw new Error(copyActions.error)
+        const keyOf = (
+          hook: string,
+          stepId: string | null,
+          choiceIndex: number | null,
+          actionType: string,
+          sortOrder: number,
+        ) => `${hook}:${stepId ?? ''}:${choiceIndex ?? ''}:${actionType}:${sortOrder}`
+        const have = new Set(
+          copyActions.data.map((a) => keyOf(a.hook, a.stepId, a.choiceIndex, a.actionType, a.sortOrder)),
+        )
+        for (const action of sourceActions.data) {
+          const mappedStepId = action.stepId === null ? null : stepIdMap.get(action.stepId) ?? null
+          if (action.stepId !== null && mappedStepId === null) {
+            // 写せなかった通にぶら下がるアクションは足さない。
+            continue
+          }
+          const key = keyOf(action.hook, mappedStepId, action.choiceIndex, action.actionType, action.sortOrder)
+          if (have.has(key)) continue
+          const createdAction = await api.scenarios.actions.create(copy, {
+            hook: action.hook,
+            stepId: mappedStepId,
+            choiceIndex: action.choiceIndex,
+            actionType: action.actionType,
+            config: action.config,
+            condition: action.condition,
+            repeatOnRefire: action.repeatOnRefire,
+            sortOrder: action.sortOrder,
+          })
+          if (!createdAction.success) throw new Error(createdAction.error)
+          have.add(key)
+        }
+      } catch (cause) {
+        throw new DuplicateAborted(copy, 'アクション', cause)
+      }
+
+      setDuplicateRemainder(null)
+      router.push(`/scenarios/detail?id=${copy}`)
     } catch (e) {
-      setError(e instanceof Error && e.message ? e.message : '複製に失敗しました')
+      if (e instanceof DuplicateAborted) {
+        // SCENARIO-09: 不完全なコピーが残っていることを隠さない。
+        // 所在・止まった段階・やり直し/削除の窓を出す。
+        setDuplicateRemainder({
+          copyId: e.copyId,
+          copyName,
+          stage: e.stage,
+          detail: e.message,
+        })
+        setError(`複製が「${e.stage}」で止まりました。途中まで作成されたコピーが残っています。`)
+      } else {
+        setError(e instanceof Error && e.message ? e.message : '複製に失敗しました')
+      }
     } finally {
       setDuplicating(false)
+    }
+  }
+
+  /*
+   * SCENARIO-09: 途中まで作られたコピーを捨てる。元のシナリオは
+   * 触らない。失敗したら窓の中に理由を出して開いたままにする。
+   */
+  const handleDiscardDuplicate = async () => {
+    if (!duplicateRemainder || discardingDuplicate) return
+    setDiscardingDuplicate(true)
+    setDiscardDuplicateError('')
+    try {
+      const res = await api.scenarios.delete(duplicateRemainder.copyId)
+      if (!res.success) throw new Error(res.error)
+      setDiscardDuplicateOpen(false)
+      setDuplicateRemainder(null)
+    } catch {
+      setDiscardDuplicateError('作りかけのコピーを削除できませんでした。コピーを開いて状態を確認し、もう一度お試しください。')
+    } finally {
+      setDiscardingDuplicate(false)
     }
   }
 
@@ -724,6 +906,11 @@ export default function ScenarioDetailClient({
   }
 
   const handleSaveStep = async () => {
+    /*
+     * SCENARIO-21: 質問・直接入力・テンプレートはそれぞれ独立して検査する。
+     * 以前は質問がある通も else に流れてテンプレート必須判定にかかり、
+     * 直接作った質問が保存できなかった。
+     */
     if (stepForm.question) {
       if (!stepForm.question.text.trim()) {
         setStepError('質問文を入力してください')
@@ -733,9 +920,23 @@ export default function ScenarioDetailClient({
         setStepError('すべての選択肢に文字を入力してください')
         return
       }
-    }
-    // 直接入力モード: messageContent 必須 + Flex/画像 は JSON parse 検証
-    if (!stepForm.question && stepForm.inputMode === 'direct') {
+      /*
+       * SCENARIO-22: URLなどを開くだけの挙動に、届かない通知を待つ設定
+       * （返信・タグ・友だち情報）が残っていると保存を止める。消すか
+       * 「何もしない」に変えるかは本人に選ばせ、黙って消さない。
+       */
+      const deadIndex = stepForm.question.choices.findIndex(
+        (choice) => isUriOnlyBehavior(choice.behavior) && deadAnswerSettings(choice).length > 0,
+      )
+      if (deadIndex >= 0) {
+        const dead = deadAnswerSettings(stepForm.question.choices[deadIndex])
+        setStepError(
+          `選択肢${deadIndex + 1}はURLなどを開くだけの挙動のため、設定されている${dead.join('・')}は実行されません。設定を消すか、挙動を「何もしない」に変えてください。`,
+        )
+        return
+      }
+    } else if (stepForm.inputMode === 'direct') {
+      // 直接入力モード: messageContent 必須 + Flex/画像 は JSON parse 検証
       if (!stepForm.messageContent.trim()) {
         setStepError('メッセージ内容を入力してください')
         return
@@ -1421,9 +1622,11 @@ export default function ScenarioDetailClient({
 
       {!editingStepId ? (
         <div data-design="Head">
+          {/*
+            SCENARIO-24: 本文に画面名の題と説明は置かない。画面名は
+            上部バーが1つだけ持つ。本文は操作と案内だけ。
+          */}
           <Header
-            title="シナリオ編集"
-            description="配信のタイミングと内容を並べます。開始するには友だち追加時の配信やアクションから呼び出します。"
             action={
               /* 設計の並び：マニュアル / 一括プレビュー / 一括テスト送信 / 保存。
                  一覧へ戻る導線は設計では最下部にあり、ここには置かない
@@ -2096,20 +2299,80 @@ export default function ScenarioDetailClient({
       </div>
 
       {/*
+        SCENARIO-09: 途中まで作られたコピーが残っているとき、その所在と
+        やり直し・削除・確認の導線を出す。黙って残すと、どこまで写ったか
+        分からないシナリオが一覧に増える。
+      */}
+      {duplicateRemainder && (
+        <div className="border-warning bg-warning-bg rounded-card mt-4 border px-4 py-3" role="alert">
+          <p className="text-warning text-sm font-bold">
+            複製が「{duplicateRemainder.stage}」の途中で止まりました
+          </p>
+          <p className="text-ink-secondary mt-1 text-xs leading-relaxed">
+            途中まで作成されたコピー「{duplicateRemainder.copyName}」が残っています。
+            {duplicateRemainder.detail ? `（${duplicateRemainder.detail}）` : ''}
+            続きから複製をやり直すか、作りかけのコピーを削除してください。
+          </p>
+          <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
+            <button
+              type="button"
+              onClick={() => void handleDuplicate()}
+              disabled={duplicating}
+              className="text-info font-medium hover:underline disabled:opacity-40"
+            >
+              {duplicating ? '複製中...' : '続きから複製をやり直す'}
+            </button>
+            <Link
+              href={`/scenarios/detail?id=${encodeURIComponent(duplicateRemainder.copyId)}`}
+              className="text-ink-secondary hover:text-ink"
+            >
+              作りかけのコピーを開く
+            </Link>
+            <button
+              type="button"
+              onClick={() => {
+                setDiscardDuplicateError('')
+                setDiscardDuplicateOpen(true)
+              }}
+              className="text-danger font-medium hover:underline"
+            >
+              作りかけのコピーを削除
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/*
         画面のいちばん下。設計もこの位置。
 
         削除は右端に離して置く。編集の流れの途中にあると、保存のつもりで
         押し間違える。複製は左、戻るは中。
       */}
       <div className="border-hairline mt-4 flex flex-wrap items-center gap-3 border-t pt-4">
-        <button
-          type="button"
-          onClick={() => void handleDuplicate()}
-          disabled={duplicating}
-          className="text-ink-secondary hover:text-ink text-sm font-medium disabled:opacity-40"
-        >
-          {duplicating ? '複製中...' : 'このシナリオを複製'}
-        </button>
+        <span className="inline-flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => void handleDuplicate()}
+            disabled={duplicating}
+            className="text-ink-secondary hover:text-ink text-sm font-medium disabled:opacity-40"
+          >
+            {duplicating ? '複製中...' : duplicateRemainder ? '続きから複製をやり直す' : 'このシナリオを複製'}
+          </button>
+          {/*
+            SCENARIO-08: 何を写すか・何を写さないかを、押す前に見える
+            場所に書く。写らないもの（配信履歴・購読中の人）まで写った
+            と思って開始されると困る。
+          */}
+          <details className="text-ink-faint text-xs">
+            <summary className="cursor-pointer hover:text-ink-secondary">複製に含まれるもの</summary>
+            <p className="mt-1 max-w-prose leading-relaxed">
+              名前・説明・置き場・配信対象の条件・終了後の処理・開始のきっかけ・すべての通
+              （内容・配信タイミング・配信対象・質問・下書きの別）・アクションを写し、
+              停止した状態で作ります。配信履歴と購読中の友だちは写りません。
+              複製しただけでは配信されません。
+            </p>
+          </details>
+        </span>
         <Link href="/scenarios" className="text-ink-secondary hover:text-ink ml-auto text-sm">
           シナリオ一覧に戻る
         </Link>
@@ -2174,6 +2437,23 @@ export default function ScenarioDetailClient({
           if (deletingScenario) return
           setDeleteScenarioOpen(false)
           setDeleteScenarioError('')
+        }}
+      />
+
+      {/* SCENARIO-09: 複製が途中で止まったときの、作りかけコピーの削除確認 */}
+      <ConfirmDialog
+        open={discardDuplicateOpen && duplicateRemainder !== null}
+        title={duplicateRemainder ? `作りかけのコピー「${duplicateRemainder.copyName}」を削除しますか？` : ''}
+        description={`複製が「${duplicateRemainder?.stage ?? ''}」の途中で止まったため、内容が欠けた状態で残っています。削除しても元のシナリオは変わりません。この操作は取り消せません。`}
+        confirmLabel="作りかけのコピーを削除"
+        destructive
+        busy={discardingDuplicate}
+        error={discardDuplicateError}
+        onConfirm={() => void handleDiscardDuplicate()}
+        onCancel={() => {
+          if (discardingDuplicate) return
+          setDiscardDuplicateOpen(false)
+          setDiscardDuplicateError('')
         }}
       />
 
