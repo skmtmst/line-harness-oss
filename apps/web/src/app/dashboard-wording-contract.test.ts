@@ -58,9 +58,14 @@ describe('ダッシュボードの言葉を設計にそろえる', () => {
     expect(CODE, 'ダッシュボードの中に自前の整形を書かない').not.toContain('function humanWait')
   })
 
-  it('並び順ラベルは他画面と同じ言い方にする', () => {
+  it('並び順ラベルは実際の並べ方と合う言い方にする', () => {
+    /*
+     * 並びは編集パネルで本人が決めた順（A01-05）。「優先度が高い順」だと
+     * システムが重要度順に並べたように読めるため使わない。
+     */
     expect(CODE, '「優先度順」のまま').not.toContain('>優先度順<')
-    expect(CODE).toContain('優先度が高い順')
+    expect(CODE).not.toContain('優先度が高い順')
+    expect(CODE).toContain('自分で並べた順')
   })
 
   /*

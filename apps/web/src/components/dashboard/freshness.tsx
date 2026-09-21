@@ -12,7 +12,17 @@ function dashboardFreshnessReasonText(reason: Reason): string | null {
   return null
 }
 
-export function formatDashboardAsOf(asOf: string | null | undefined): string | null {
+/** JSTで「その日」を比べるためのキー。閲覧端末のタイムゾーンに左右されない。 */
+function jstDayKey(date: Date): string {
+  return date.toLocaleDateString('ja-JP', {
+    year: 'numeric',
+    month: 'numeric',
+    day: 'numeric',
+    timeZone: 'Asia/Tokyo',
+  })
+}
+
+export function formatDashboardAsOf(asOf: string | null | undefined, now: Date = new Date()): string | null {
   if (!asOf) return null
   // APIが返すtimezone無しD1時刻は、server側と同じ既存契約に従ってJSTとして扱う。
   // Z / offset 付きの値は絶対時刻なので、その指定をそのまま維持する。
@@ -21,19 +31,33 @@ export function formatDashboardAsOf(asOf: string | null | undefined): string | n
     : asOf
   const date = new Date(normalized)
   if (Number.isNaN(date.getTime())) return null
-  return date.toLocaleTimeString('ja-JP', {
+  const time = date.toLocaleTimeString('ja-JP', {
     hour: '2-digit',
     minute: '2-digit',
     timeZone: 'Asia/Tokyo',
   })
+  /*
+   * 日付が今日と違うときは日付を添える（DASH-16）。
+   * 時刻だけだと、前日・数日前に取れた値を「今日の更新」と読み違える。
+   */
+  if (jstDayKey(date) !== jstDayKey(now)) {
+    const day = date.toLocaleDateString('ja-JP', {
+      month: 'numeric',
+      day: 'numeric',
+      timeZone: 'Asia/Tokyo',
+    })
+    return `${day} ${time}`
+  }
+  return time
 }
 
 export function dashboardFreshnessText(
   freshness: Freshness,
   asOf: string | null | undefined,
   reason?: Reason,
+  now: Date = new Date(),
 ): string {
-  const time = formatDashboardAsOf(asOf)
+  const time = formatDashboardAsOf(asOf, now)
   const reasonText = dashboardFreshnessReasonText(reason)
   if (freshness === 'unavailable') return reasonText ? `取得失敗・${reasonText}` : '取得失敗'
   if (freshness === 'partial') {

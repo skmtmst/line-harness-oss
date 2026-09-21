@@ -1174,7 +1174,9 @@ ecCommerce.get('/api/ec-commerce/shipments', requireRole('owner', 'admin', 'staf
 
   // 出荷予定日は計算値なのでSQLでは並べ替えられない。直近のイベントを多めに
   // 取り出してから、算出した日付で並べ替えて limit で切る。
-  const scanLimit = Math.min(limit * 5, 200);
+  // 走査の下限は200件。上部カードの「今日の件数」はこの走査範囲から数えるので、
+  // 明細の表示件数（limit）に引っ張られて過少に数えない（DASH-22）。
+  const scanLimit = Math.min(Math.max(limit * 5, 200), 500);
   const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
   const accountWhere = scope.allowedAccountIds.length
     ? `AND (f.line_account_id IN (${scope.allowedAccountIds.map(() => '?').join(',')})${scope.canSeeUnassigned ? ' OR f.line_account_id IS NULL' : ''})`
@@ -1248,6 +1250,10 @@ ecCommerce.get('/api/ec-commerce/shipments', requireRole('owner', 'admin', 'staf
       tomorrow: tomorrowJst,
       soon: soon.slice(0, limit),
       later: later.slice(0, limit),
+      // 件数は明細の limit とは別に、走査した全件から数える（DASH-22）。
+      // 上部カードが soon.slice(0, limit) の先頭だけを数えると、
+      // 今日の出荷が limit 件を超えたとき過少表示になる。
+      todayCount: shipments.filter((row) => row.shipDate === todayJst).length,
       soonCount: soon.length,
       laterCount: later.length,
       // 走査した件数を返す。上限に張り付いていたら取りこぼしがありうる。
