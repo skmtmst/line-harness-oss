@@ -21,6 +21,7 @@ import type {
 } from '@line-crm/shared'
 import { newBlockId } from '@line-crm/shared'
 import ChoiceTable from './choice-table'
+import { describeInputUpdates } from './form-update-summary'
 import { cellInput, fieldInput, fieldSelect, type FormRefs } from './form-refs'
 
 export const BLOCK_MENU: { kind: string; type?: FormInputType; label: string; group: string }[] = [
@@ -613,6 +614,28 @@ export default function BlockEditor({
                   回答データの見出し：{block.name}
                 </span>
               </div>
+
+              {/*
+                送信時にこの質問が更新する情報と条件。登録先の設定は上の
+                入力欄に散らばっているので、保存して公開すると実際に何が
+                起きるかをここで読み取れるようにする（表示専用）。
+              */}
+              {(() => {
+                const updates = describeInputUpdates(block, refs)
+                if (updates.length === 0) return null
+                return (
+                  <div className="border-hairline rounded-control bg-canvas-sunken border p-3">
+                    <span className="text-ink-secondary block text-xs font-medium">
+                      送信時に更新する情報
+                    </span>
+                    <ul className="text-ink-faint mt-1 list-disc space-y-0.5 pl-4 text-xs">
+                      {updates.map((line) => (
+                        <li key={line}>{line}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )
+              })()}
             </>
           )}
         </div>

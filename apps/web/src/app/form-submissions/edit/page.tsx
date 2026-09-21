@@ -36,6 +36,7 @@ import FormPreview from '@/components/forms/form-preview'
 import FormDesignSettings from './form-design-settings'
 import { validateLayoutForSave } from './form-validate'
 import OptionsDialog from '@/components/forms/options-dialog'
+import { describeFormUpdates } from '@/components/forms/form-update-summary'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import StickyBar from '@/components/shared/sticky-bar'
 import SaveConflictBar from '@/components/shared/save-conflict-bar'
@@ -892,6 +893,44 @@ function FormEditInner() {
                   ))
                 )}
               </div>
+
+              {/*
+                送信時に更新する情報の一覧（IDEA-13）。
+                各質問が友だちのどの情報を更新するか・どんな条件で更新するかを、
+                保存・公開の前にまとめて確認できるようにする。質問が増えた
+                フォームでは、ブロックを1つずつ開かなくても全体を見通せる。
+              */}
+              {(() => {
+                const overview = describeFormUpdates(layout, refs, onSubmitTagId)
+                if (overview.questions.length === 0 && overview.formWide.length === 0) {
+                  return null
+                }
+                return (
+                  <details className="bg-canvas rounded-card border-hairline mt-4 border p-4">
+                    <summary className="text-ink cursor-pointer text-sm font-bold">
+                      送信時に更新する情報（{overview.questions.length}件の質問
+                      {overview.formWide.length > 0 ? `・フォーム全体${overview.formWide.length}件` : ''}）
+                    </summary>
+                    <ul className="mt-3 space-y-2">
+                      {overview.questions.map((question) => (
+                        <li key={question.blockId} className="text-xs">
+                          <span className="text-ink font-medium">{question.label}</span>
+                          <ul className="text-ink-faint mt-0.5 list-disc space-y-0.5 pl-5">
+                            {question.lines.map((line) => (
+                              <li key={line}>{line}</li>
+                            ))}
+                          </ul>
+                        </li>
+                      ))}
+                      {overview.formWide.map((line) => (
+                        <li key={line} className="text-ink-secondary text-xs">
+                          ・{line}
+                        </li>
+                      ))}
+                    </ul>
+                  </details>
+                )
+              })()}
 
               <div className="bg-canvas rounded-card border-hairline mt-4 space-y-4 border p-4">
                 <Field
