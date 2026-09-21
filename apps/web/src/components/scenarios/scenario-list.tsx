@@ -7,6 +7,7 @@ import { TableHeadRow, Th } from '@/components/shared/table'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
 import { MoreAction } from '@/components/shared/row-actions'
+import ReorderGrip from '@/components/friend-fields/reorder-grip'
 
 type ScenarioRow = Scenario & {
   stepCount?: number
@@ -84,6 +85,12 @@ export default function ScenarioList({
 }: ScenarioListProps) {
   /** いま掴んでいるシナリオ。落とした先と入れ替える。 */
   const [dragId, setDragId] = useState<string | null>(null)
+
+  /*
+   * SCENARIO-17: キーボードで動かした結果を読み上げるための live 領域。
+   * 「動いたか分からない」ままにしない。
+   */
+  const [moveNotice, setMoveNotice] = useState('')
 
   /** フォルダを移せるなら、選択と「その他→フォルダを移動」を出す。 */
   const canMove = Boolean(onMoveFolder || onMoveFolders)
@@ -220,6 +227,27 @@ export default function ScenarioList({
     const toIdx = order.indexOf(targetId)
     if (fromIdx < 0 || toIdx < 0) return
     order.splice(toIdx, 0, ...order.splice(fromIdx, 1))
+    onReorder(order)
+  }
+
+  /*
+   * SCENARIO-17: つまみにフォーカスして ↑/↓ で1つずつ動かす
+   * （友だち属性の N-049 と同じ形）。ドラッグと同じく、動かすたびに
+   * 見えている順で保存へ渡す。端では動かないことを読み上げるだけにし、
+   * 保存は呼ばない。
+   */
+  const keyboardMove = (id: string, direction: -1 | 1) => {
+    const order = scenarios.map((s) => s.id)
+    const fromIdx = order.indexOf(id)
+    const toIdx = fromIdx + direction
+    const name = scenarios.find((s) => s.id === id)?.name ?? 'このシナリオ'
+    if (fromIdx < 0 || !onReorder) return
+    if (toIdx < 0 || toIdx >= order.length) {
+      setMoveNotice(`「${name}」は${direction < 0 ? '先頭' : '末尾'}にあるため、これ以上動かせません`)
+      return
+    }
+    order.splice(toIdx, 0, ...order.splice(fromIdx, 1))
+    setMoveNotice(`「${name}」を${direction < 0 ? '上' : '下'}へ移動しました。${toIdx + 1}番目です`)
     onReorder(order)
   }
 
@@ -370,6 +398,10 @@ export default function ScenarioList({
 
   return (
     <div className="bg-canvas rounded-card border-hairline overflow-hidden border">
+      {/* SCENARIO-17: キーボードで動かした結果を読み上げる。画面には出さない。 */}
+      <span className="sr-only" role="status" aria-live="polite">
+        {moveNotice}
+      </span>
       {/*
         複数選択の一括操作は、選んでいる間だけ表の上に出す帯。
         フォルダ移動の受け口はここと行の「その他」だけに絞る（NEXT-25）。
@@ -469,17 +501,28 @@ export default function ScenarioList({
                     />
                   </td>
                 )}
-                {/* 掴んで上下に入れ替える。よく使うものを上に置くための操作。 */}
+                {/*
+                  掴んで上下に入れ替える。よく使うものを上に置くための操作。
+                  SCENARIO-17: ドラッグはマウス専用なので、中身を
+                  フォーカスできるつまみ（ReorderGrip）にして ↑/↓ でも
+                  動かせるようにする。セル側の draggable はそのまま残す。
+                */}
                 <td
                   className="text-ink-faint w-10 cursor-grab px-2 py-3 text-center align-top select-none active:cursor-grabbing"
                   draggable={Boolean(onReorder)}
                   onDragStart={() => setDragId(s.id)}
                   onDragOver={(e) => e.preventDefault()}
                   onDrop={() => dropOn(s.id)}
-                  aria-label={`${s.name} を並び替える`}
                   title="上下に動かして並び替え"
                 >
-                  ⠿
+                  <ReorderGrip
+                    label={s.name}
+                    disabled={!onReorder}
+                    disabledReason="この一覧では並び替えられません"
+                    onMove={(direction) => keyboardMove(s.id, direction)}
+                  >
+                    <span aria-hidden>⠿</span>
+                  </ReorderGrip>
                 </td>
                 {/*
                   説明が長いと、表そのものが横に伸びて横スクロールが出る。
