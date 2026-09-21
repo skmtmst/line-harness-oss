@@ -44,7 +44,11 @@ describe('tenant-scoped dashboard aggregations', () => {
       return a >= 0 && binds[a + 1] === 'account-b';
     })).toBe(true);
 
-    const migrations = queries.find(({ sql }) => sql.includes('FROM account_migrations'));
+    /*
+     * 「UID移行状況」カードの数は uid_migration_runs から取る（DASH-07）。
+     * 旧アカウント移行(account_migrations)の件数と混ぜない。
+     */
+    const migrations = queries.find(({ sql }) => sql.includes('FROM uid_migration_runs'));
     expect(migrations?.binds).toEqual(['account-a', 'account-b', 'account-a', 'account-b']);
     const broadcasts = queries.find(({ sql }) => sql.includes('FROM broadcasts b'));
     expect(broadcasts?.binds.slice(-4)).toEqual(['account-a', 'account-b', 'account-a', 'account-b']);

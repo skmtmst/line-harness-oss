@@ -103,7 +103,11 @@ export default function QrDialog({
   const [routeId, setRouteId] = useState(initialRouteId)
   const [size, setSize] = useState(SIZES[0].value)
   const [format, setFormat] = useState(FORMATS[0].value)
-  const [copied, setCopied] = useState(false)
+  /*
+   * コピーの結果は3状態。失敗しても押す前と同じ見た目だと、
+   * 配布に使うURLを取れていないことに気づけない（DASH-29）。
+   */
+  const [copyState, setCopyState] = useState<'idle' | 'copied' | 'failed'>('idle')
   const [qrDataUrl, setQrDataUrl] = useState('')
 
   // 開くたびに呼び出し元の選択に合わせる。閉じている間に向こうで
@@ -186,10 +190,14 @@ export default function QrDialog({
   const copy = async () => {
     try {
       await navigator.clipboard.writeText(link)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 1200)
+      setCopyState('copied')
+      setTimeout(() => setCopyState('idle'), 1200)
     } catch {
-      // 安全なコンテキストでないとコピーできない。下の欄から手で取れる。
+      /*
+       * 権限拒否・安全なコンテキストでない環境では書けない。
+       * 黙って終わらせず、手動で選択してコピーする案内を出す（DASH-29）。
+       */
+      setCopyState('failed')
     }
   }
 
@@ -251,8 +259,12 @@ export default function QrDialog({
 
         <div className="grid gap-5 sm:grid-cols-[auto_1fr]">
           {/* 名前はQRの下。読み取る人が見るのは絵で、名前はその確認に使う。 */}
-          <div className="flex flex-col items-center">
-            <div className="bg-canvas-sunken rounded-panel flex h-[280px] w-[280px] items-center justify-center">
+          <div className="flex min-w-0 flex-col items-center">
+            {/*
+              QRの枠は横幅に応じて縮める（DASH-13）。320pxでは280px固定だと
+              パネルの内側に収まらず横にはみ出していた。正方形は保つ。
+            */}
+            <div className="bg-canvas-sunken rounded-panel flex aspect-square w-full max-w-[280px] items-center justify-center">
               {routeMissing ? (
                 <p className="text-ink-faint max-w-[220px] px-4 text-center text-xs leading-relaxed">
                   選んだ経路はこのアカウントでは見つかりません。<br />経路を選び直してください。
@@ -266,7 +278,7 @@ export default function QrDialog({
                   alt="友だち追加QRコード"
                   width={220}
                   height={220}
-                  className="h-[220px] w-[220px]"
+                  className="aspect-square h-auto w-full max-w-[220px]"
                 />
               )}
             </div>
@@ -276,14 +288,14 @@ export default function QrDialog({
                 href={profileUrl}
                 target="_blank"
                 rel="noreferrer"
-                className="text-action mt-1 max-w-[280px] truncate text-xs hover:underline"
+                className="text-action mt-1 max-w-full truncate text-xs hover:underline"
               >
                 {profileUrl}
               </a>
             )}
           </div>
 
-          <div className="space-y-4">
+          <div className="min-w-0 space-y-4">
             <div>
               <label htmlFor="qr-route" className="text-ink-secondary mb-1 block text-xs font-medium">
                 発行中の追加URL
@@ -329,14 +341,18 @@ export default function QrDialog({
                 <span className="text-ink-secondary mb-1 block text-xs font-medium">
                   ダウンロード形式
                 </span>
-                <div className="border-hairline rounded-control flex overflow-hidden border" aria-label="画像形式">
+                {/*
+                  3形式は等幅のセグメントにする（DASH-19）。内容幅の flex だと
+                  SVG 側だけ余白が偏り、未選択の余白が選択肢の一部に見えた。
+                */}
+                <div className="border-hairline rounded-control grid grid-cols-3 overflow-hidden border" aria-label="画像形式">
                   {FORMATS.map((entry) => (
                     <button
                       key={entry.value}
                       type="button"
                       onClick={() => setFormat(entry.value)}
                       aria-pressed={format === entry.value}
-                      className={`border-hairline border-r px-3 py-2 text-xs font-medium last:border-r-0 ${format === entry.value ? 'bg-action text-on-action' : 'text-ink-secondary hover:bg-canvas-sunken'}`}
+                      className={`border-hairline flex h-10 items-center justify-center border-r px-2 text-xs font-medium last:border-r-0 ${format === entry.value ? 'bg-action text-on-action' : 'text-ink-secondary hover:bg-canvas-sunken'}`}
                     >
                       {entry.label}
                     </button>
@@ -352,25 +368,40 @@ export default function QrDialog({
               >
                 友だち追加リンク
               </label>
-              <div className="border-hairline bg-canvas-sunken rounded-control relative flex items-stretch border">
+              {/*
+                コピー操作は入力欄の外の独立した列へ出す（DASH-20）。
+                欄内の absolute 配置だと「コピーしました ✓」に変わったとき
+                URL と重なり、狭い幅では右側が切れていた。狭い幅では下へ。
+              */}
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-stretch">
                 <textarea
                   id="qr-link"
                   readOnly
-                  rows={2}
+                  rows={3}
                   value={routeMissing ? '' : link}
                   onFocus={(e) => e.currentTarget.select()}
-                  className="text-ink-secondary min-w-0 flex-1 resize-none bg-transparent px-3 py-2 pr-16 font-mono text-xs leading-relaxed focus:outline-none"
+                  className="border-hairline bg-canvas-sunken text-ink-secondary rounded-control min-w-0 flex-1 resize-none border px-3 py-2 font-mono text-xs leading-relaxed focus:outline-none"
                 />
-                <button
+                <Button
+                  variant="secondary"
+                  type="button"
                   onClick={copy}
                   disabled={routeMissing}
-                  className="text-action absolute right-2 top-2 rounded px-1.5 py-1 text-xs font-medium hover:underline disabled:cursor-not-allowed disabled:text-ink-faint disabled:no-underline"
+                  className="min-h-11 shrink-0"
                 >
-                  {copied ? 'コピーしました ✓' : 'コピー'}
-                </button>
+                  コピー
+                </Button>
               </div>
-              <p className="text-ink-faint mt-1 text-xs">
-                このURLから追加された友だちは、流入元を記録して計測できます。
+              {/*
+                コピーの成否は読み上げにも通知する（DASH-29）。
+                失敗時は欄から手動で選択してコピーできる案内を残す。
+              */}
+              <p aria-live="polite" className={`mt-1 text-xs ${copyState === 'failed' ? 'text-danger' : copyState === 'copied' ? 'text-success' : 'text-ink-faint'}`}>
+                {copyState === 'failed'
+                  ? 'コピーできませんでした。上のURLを選択してコピーしてください'
+                  : copyState === 'copied'
+                    ? 'コピーしました ✓'
+                    : 'このURLから追加された友だちは、流入元を記録して計測できます。'}
               </p>
             </div>
 
@@ -387,14 +418,14 @@ export default function QrDialog({
                   <DownloadIcon />画像をダウンロード
                 </Button>
               )}
-              <button
+              <Button
+                variant="secondary"
                 type="button"
                 onClick={printQr}
                 disabled={routeMissing}
-                className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-3 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-60"
               >
                 PDFで印刷
-              </button>
+              </Button>
             </div>
 
             <div className="border-hairline bg-surface-pearl rounded-control border p-4">

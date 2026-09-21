@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import type { DashboardOverview } from '@/lib/api'
 
 /**
@@ -8,6 +9,46 @@ import type { DashboardOverview } from '@/lib/api'
  *
  * 流入元は友だち追加日の経路名ごとに集計した実データを表示する。
  */
+
+const ESTIMATED_NOTE =
+  '「推定」の日は、日次の記録が始まる前のぶんです。いま残っている友だちから逆算しているので、退会した人は数に入っていません。記録は今日から溜まります。'
+
+/**
+ * 「推定」の説明。
+ *
+ * 以前はホバーでだけ開く absolute の吹き出しで、表のスクロール領域と
+ * カードの overflow-hidden に挟まれて端の行・狭い幅で切れていた
+ * （DASH-17）。押す・フォーカスしてEnterでその日の行内に本文を開く
+ * 形にし、画面外へはみ出さない。Escで閉じる。
+ */
+function EstimatedHelp({
+  open,
+  onToggle,
+  label,
+}: {
+  open: boolean
+  onToggle: () => void
+  label: string
+}) {
+  return (
+    <button
+      type="button"
+      aria-expanded={open}
+      aria-label={label}
+      onClick={onToggle}
+      onKeyDown={(event) => {
+        if (event.key === 'Escape' && open) {
+          event.stopPropagation()
+          onToggle()
+        }
+      }}
+      className="border-ink-faint text-ink-faint focus-visible:border-action focus-visible:text-action inline-flex h-3.5 w-3.5 cursor-help items-center justify-center rounded-full border text-nano leading-none font-semibold outline-none"
+    >
+      ?
+    </button>
+  )
+}
+
 export default function FriendTrendTable({
   trend,
   loading,
@@ -15,6 +56,11 @@ export default function FriendTrendTable({
   trend: DashboardOverview['trend']
   loading?: boolean
 }) {
+  /* 説明を開いている行。同時に1行だけにする。 */
+  const [noteOpenFor, setNoteOpenFor] = useState<string | null>(null)
+  /* 流入元の内訳を全文で開いている行。 */
+  const [sourcesOpenFor, setSourcesOpenFor] = useState<string | null>(null)
+
   if (loading) {
     return (
       <div className="space-y-2 p-5">
@@ -32,16 +78,21 @@ export default function FriendTrendTable({
   }
   return (
     <div>
+      {/*
+        狭い幅では列が多い表をそのまま縮めると見出しが一文字ずつ縦に割れる
+        （DASH-27）。見出しは折り返さず、横へ移動できることを案内する。
+      */}
+      <p className="text-ink-faint px-5 pt-2 text-micro sm:hidden">表は横にスクロールできます</p>
       <div className="overflow-x-auto">
         <table className="w-full text-sm font-normal">
           <thead>
             <tr className="text-ink-faint border-hairline border-b text-left text-xs">
-              <th className="px-5 py-2 font-medium">日付</th>
-              <th className="px-3 py-2 text-right font-medium">前日比</th>
-              <th className="px-3 py-2 text-right font-medium">登録</th>
-              <th className="px-3 py-2 text-right font-medium">ブロック</th>
-              <th className="px-3 py-2 text-right font-medium">有効友だち</th>
-              <th className="px-5 py-2 font-medium">流入元の内訳</th>
+              <th className="px-5 py-2 font-medium whitespace-nowrap">日付</th>
+              <th className="px-3 py-2 text-right font-medium whitespace-nowrap">前日比</th>
+              <th className="px-3 py-2 text-right font-medium whitespace-nowrap">登録</th>
+              <th className="px-3 py-2 text-right font-medium whitespace-nowrap">ブロック</th>
+              <th className="px-3 py-2 text-right font-medium whitespace-nowrap">有効友だち</th>
+              <th className="px-5 py-2 font-medium whitespace-nowrap">流入元の内訳</th>
             </tr>
           </thead>
           <tbody className="divide-hairline divide-y">
@@ -50,30 +101,28 @@ export default function FriendTrendTable({
               const previous = rows[i + 1]
               const diff = previous ? row.active - previous.active : null
               const sources = formatTrendSources(row.sources)
+              const noteOpen = noteOpenFor === row.date
+              const sourcesOpen = sourcesOpenFor === row.date
+              const canExpandSources = sources.full !== sources.compact
               return (
                 <tr key={row.date} className="text-ink-secondary">
                   <td className="px-5 py-2.5 whitespace-nowrap">
                     {formatDate(row.date)}
                     {row.estimated && (
-                      <span className="ml-1.5 inline-flex items-center gap-1 text-[10px]">
+                      <span className="ml-1.5 inline-flex items-center gap-1 text-nano">
                         <span className="text-ink-faint">推定</span>
-                        <span className="group relative inline-flex">
-                          <button
-                            type="button"
-                            aria-label={`${formatDate(row.date)}の推定値について`}
-                            className="border-ink-faint text-ink-faint focus-visible:border-action focus-visible:text-action inline-flex h-3.5 w-3.5 cursor-help items-center justify-center rounded-full border text-[9px] leading-none font-semibold outline-none"
-                          >
-                            ?
-                          </button>
-                          <span
-                            role="tooltip"
-                            className="bg-ink text-on-accent pointer-events-none absolute top-1/2 left-full z-20 ml-2 hidden w-72 -translate-y-1/2 rounded-control px-3 py-2 text-left text-xs leading-relaxed whitespace-normal shadow-lg group-hover:block group-focus-within:block"
-                          >
-                            「推定」の日は、日次の記録が始まる前のぶんです。いま残っている友だちから逆算しているので、退会した人は数に入っていません。記録は今日から溜まります。
-                          </span>
-                        </span>
+                        <EstimatedHelp
+                          open={noteOpen}
+                          onToggle={() => setNoteOpenFor(noteOpen ? null : row.date)}
+                          label={`${formatDate(row.date)}の推定値について`}
+                        />
                       </span>
                     )}
+                    {row.estimated && noteOpen ? (
+                      <span className="text-ink-faint mt-1 block max-w-64 text-micro leading-relaxed font-normal whitespace-normal">
+                        {ESTIMATED_NOTE}
+                      </span>
+                    ) : null}
                   </td>
                   <td className="px-3 py-2.5 text-right tabular-nums">
                     {diff === null ? '—' : diff === 0 ? '0' : diff > 0 ? `+${diff}` : diff}
@@ -83,8 +132,28 @@ export default function FriendTrendTable({
                   <td className="px-3 py-2.5 text-right font-medium tabular-nums">
                     {row.active.toLocaleString('ja-JP')}
                   </td>
-                  <td className="text-ink-faint max-w-[240px] truncate px-5 py-2.5" title={sources.full}>
-                    {sources.compact}
+                  <td className="text-ink-faint max-w-[240px] px-5 py-2.5">
+                    {canExpandSources ? (
+                      /*
+                        内訳が省略されているときは、指・キーボードで全文を開ける
+                        ようにする（DASH-27）。ホバーの title だけに依存しない。
+                      */
+                      <button
+                        type="button"
+                        aria-expanded={sourcesOpen}
+                        onClick={() => setSourcesOpenFor(sourcesOpen ? null : row.date)}
+                        className="text-left hover:text-ink-secondary focus-visible:text-action focus-visible:underline"
+                      >
+                        <span className={sourcesOpen ? 'whitespace-normal' : 'block truncate'}>
+                          {sourcesOpen ? sources.full : sources.compact}
+                        </span>
+                        <span className="text-action text-nano font-medium">
+                          {sourcesOpen ? '閉じる' : 'すべて表示'}
+                        </span>
+                      </button>
+                    ) : (
+                      <span className="block truncate" title={sources.full}>{sources.compact}</span>
+                    )}
                   </td>
                 </tr>
               )
