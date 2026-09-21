@@ -49,4 +49,42 @@ describe('予約の顧客カルテ・通知実績', () => {
       operations: [expect.objectContaining({ id: 'run-1', status: 'queued' })],
     });
   });
+
+  it('IDEA-27: 変更履歴は要点分だけ同梱し、総数を別途返す', async () => {
+    const testDb = createTestD1();
+    testDb.raw.exec(`
+      INSERT INTO line_accounts (id, channel_id, name, channel_access_token, channel_secret)
+      VALUES ('account-1', 'channel-1', '本店', '', '');
+      INSERT INTO staff (id, line_account_id, name, display_name)
+      VALUES ('staff-1', 'account-1', '担当', '担当');
+      INSERT INTO menus (id, line_account_id, name, duration_minutes, buffer_after_minutes, base_price)
+      VALUES ('menu-1', 'account-1', '相談', 60, 0, 5000);
+      INSERT INTO friends (id, line_user_id, display_name, line_account_id, created_at, updated_at)
+      VALUES ('friend-1', 'U1', '山田', 'account-1', '2026-01-01', '2026-01-01');
+      INSERT INTO bookings (
+        id, line_account_id, friend_id, staff_id, menu_id, starts_at, ends_at,
+        block_ends_at, status, customer_note, internal_note, price_at_booking,
+        requested_at, decided_at, source
+      ) VALUES (
+        'booking-1', 'account-1', 'friend-1', 'staff-1', 'menu-1',
+        '2026-09-08T01:00:00.000Z', '2026-09-08T02:00:00.000Z', '2026-09-08T02:00:00.000Z',
+        'confirmed', NULL, NULL, 5000, '2026-09-07T01:00:00.000Z', '2026-09-07T02:00:00.000Z', 'operator');
+    `);
+    for (let i = 1; i <= 12; i += 1) {
+      testDb.raw.exec(`
+        INSERT INTO booking_audit_logs
+          (id, booking_id, line_account_id, action, actor_type, occurred_at, created_at)
+        VALUES ('log-${i}', 'booking-1', 'account-1', 'updated', 'staff',
+          '2026-09-08T${String(i).padStart(2, '0')}:00:00.000Z',
+          '2026-09-07T03:00:00.000Z')`);
+    }
+    const detail = await getBookingAdminDetail(testDb.db, {
+      id: 'booking-1', lineAccountId: 'account-1',
+    });
+    // 初回応答は直近10件だけ。全部で12件あることは auditLogTotal が伝える。
+    expect(detail?.auditLogs).toHaveLength(10);
+    expect(detail?.auditLogTotal).toBe(12);
+    // 新しい順で先頭が最新。
+    expect(detail?.auditLogs[0]?.id).toBe('log-12');
+  });
 });

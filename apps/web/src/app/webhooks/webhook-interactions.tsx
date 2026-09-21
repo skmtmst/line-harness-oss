@@ -5,8 +5,9 @@ import { RefreshCw } from 'lucide-react'
 import type { WebhookInteraction, WebhookInteractionList } from '@line-crm/shared'
 
 import { useAccount } from '@/contexts/account-context'
-import { api } from '@/lib/api'
+import { api, ApiError } from '@/lib/api'
 import Button from '@/components/shared/button'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
 import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
@@ -29,7 +30,7 @@ const EMPTY: WebhookInteractionList = {
   total: 0,
   page: 1,
   limit: 20,
-  summary: { total: 0, outgoing: 0, incoming: 0, succeeded: 0, failed: 0, averageDurationMs: null },
+  summary: { total: 0, outgoing: 0, incoming: 0, succeeded: 0, failed: 0, resultUnknown: 0, averageDurationMs: null },
 }
 
 const EVENT_LABELS: Record<string, string> = {
@@ -63,24 +64,64 @@ function directionLabel(direction: WebhookInteraction['direction']): string {
   return direction === 'outgoing' ? 'こちらから送った' : 'こちらで受け取った'
 }
 
-function failureDetail(items: WebhookInteraction[], failed: number): string {
+/*
+ * IDEA-26: 失敗カードの補足。「届いたか分からない」ものは無条件に
+ * 再送できないので、まとめてやり直せる数とは分けて件数を示す。
+ */
+function failureDetail(
+  items: WebhookInteraction[],
+  failed: number,
+  resultUnknown: number,
+): string {
   if (failed === 0) return '失敗はありません'
+  const reviewNote = resultUnknown > 0
+    ? `うち${resultUnknown}件は届いたか分からないため、相手先で確かめてからやり直します`
+    : ''
   const visibleFailures = items.filter((item) => item.status === 'failed')
-  if (visibleFailures.length === 0) return '送り直せます'
+  if (visibleFailures.length === 0) return `送り直せます${reviewNote ? `。${reviewNote}` : ''}`
 
   const firstDestination = visibleFailures[0]?.webhookName.split('／')[0]?.trim()
   const sameDestination = firstDestination
     && visibleFailures.every((item) => item.webhookName.startsWith(firstDestination))
-  if (!sameDestination) return '送り直せます'
-
-  return `すべて${firstDestination}。送り直せます`
+  const retryNote = sameDestination ? `すべて${firstDestination}。送り直せます` : '送り直せます'
+  return reviewNote ? `${retryNote}。${reviewNote}` : retryNote
 }
 
-function durationDetail(items: WebhookInteraction[], averageDurationMs: number | null): string {
-  if (averageDurationMs == null) return '未取得'
+/**
+ * 遅れと成功率の対象期間をカードの補足へ書く(IDEA-26)。
+ * 「いつからいつまでの数字か」が分からないと、遅い・悪いの判断が付かない。
+ */
+function durationDetail(
+  items: WebhookInteraction[],
+  averageDurationMs: number | null,
+  periodDays: number,
+): string {
+  if (averageDurationMs == null) return `この${periodDays}日は未取得`
   const durations = items.flatMap((item) => item.durationMs == null ? [] : [item.durationMs])
-  if (durations.length === 0) return '送受信の処理時間'
-  return `いちばん遅くて ${Math.round(Math.max(...durations) / 100) / 10}秒`
+  if (durations.length === 0) return `この${periodDays}日の送受信の処理時間`
+  return `この${periodDays}日でいちばん遅くて ${Math.round(Math.max(...durations) / 100) / 10}秒`
+}
+
+/*
+ * IDEA-26: その記録をここからやり直せるかを業務の言葉で説明する。
+ * 「やり直す」ボタンが出ない失敗にも、出ない理由を残す
+ * （ボタンが無いだけでは、対象の消えた失敗と条件違いが区別できない）。
+ */
+function retryabilityText(item: WebhookInteraction, allowed: boolean): string {
+  if (item.status === 'succeeded') return '届いた記録なので、送り直す必要はありません。'
+  if (item.status === 'pending') return 'いま処理の途中です。終わってから結果を確かめてください。'
+  if (item.status === 'retried') return 'すでに送り直した記録です。あとから追加された新しい記録の結果を確かめてください。'
+  if (item.direction === 'incoming') {
+    return '受け取った記録なので、こちらからは送り直せません。相手側でもう一度送ってもらってください。'
+  }
+  if (!item.canRetry) {
+    return 'つなぎ先の設定が消えたか、送った内容が残っていないため、ここからは送り直せません。'
+  }
+  if (!allowed) return '送り直せるのは管理者です。'
+  if (item.failureReasonCode === 'unknown') {
+    return '相手先に届いたか分かっていません。相手先の記録で同じ処理がないか確かめてから「やり直す」を押してください。'
+  }
+  return 'この画面の「やり直す」から、同じ届け番号でもう一度送れます。届いていた場合でも相手先で二重に処理されない仕組みです。'
 }
 
 export default function WebhookInteractions() {
@@ -103,6 +144,12 @@ export default function WebhookInteractions() {
   const [bulkRetrying, setBulkRetrying] = useState(false)
   const [notice, setNotice] = useState<{ tone: 'success' | 'error'; message: string } | null>(null)
   const [canRetry, setCanRetry] = useState(false)
+  /*
+   * 「届いたか分からない」失敗の送り直し確認(IDEA-26)。
+   * 結果不明のまま無条件に再送すると、届いていた処理を二重に送る恐れが
+   * ある。先に相手先で確かめた、という確認を挟んでから送る。
+   */
+  const [confirmingRetry, setConfirmingRetry] = useState<WebhookInteraction | null>(null)
 
   /*
    * やり直し可否は手元の保存値ではなく、入り直した本人の役割で決める(#506 軽)。
@@ -133,6 +180,7 @@ export default function WebhookInteractions() {
     setNotice(null)
     setRetrying(null)
     setBulkRetrying(false)
+    setConfirmingRetry(null)
     if (!requestAccountId) {
       setData(EMPTY)
       setLoading(false)
@@ -188,13 +236,14 @@ export default function WebhookInteractions() {
     return `${first}〜${Math.min(data.total, first + data.items.length - 1)}件 / 全${data.total}件`
   }, [data])
 
-  const retry = async (item: WebhookInteraction) => {
+  const retry = async (item: WebhookInteraction, confirmed = false) => {
     const requestAccountId = selectedAccountId
     if (!requestAccountId || loadedAccountId !== requestAccountId) return
+    setConfirmingRetry(null)
     setRetrying(item.id)
     setNotice(null)
     try {
-      const response = await api.webhooks.interactions.retry(item.id, requestAccountId)
+      const response = await api.webhooks.interactions.retry(item.id, requestAccountId, { confirmed })
       if (selectedAccountIdRef.current !== requestAccountId) return
       if (!response.success) throw new Error(response.error)
       setNotice({
@@ -204,9 +253,18 @@ export default function WebhookInteractions() {
           : `「${item.webhookName}」へ送り直しましたが、まだ届きませんでした。`,
       })
       await load()
-    } catch {
+    } catch (error) {
       if (selectedAccountIdRef.current !== requestAccountId) return
-      setNotice({ tone: 'error', message: '送り直しを受け付けられませんでした。状態を読み直してからお試しください。' })
+      /*
+        口側が「結果不明なので確認なしでは送らない」と止めた場合は、
+        確認の窓へ回す（画面が古いまま操作したときでも無条件の再送に
+        ならないようにする IDEA-26）。
+      */
+      if (error instanceof ApiError && error.code === 'result_unknown_needs_check') {
+        setConfirmingRetry(item)
+      } else {
+        setNotice({ tone: 'error', message: '送り直しを受け付けられませんでした。状態を読み直してからお試しください。' })
+      }
     } finally {
       if (selectedAccountIdRef.current === requestAccountId) setRetrying(null)
     }
@@ -226,9 +284,14 @@ export default function WebhookInteractions() {
       const remainingNote = response.data.remaining > 0
         ? `まだ失敗のまま残っているものが${response.data.remaining}件あります。もう一度押すと続きをやり直します。`
         : ''
+      // IDEA-26: 届いたか分からないものはまとめて送らない。件数と、
+      // 相手先で確かめてから1件ずつやり直すことを明示する。
+      const reviewNote = response.data.needsReview > 0
+        ? `届いたか分からないものが${response.data.needsReview}件あります。相手先の記録で同じ処理がないか確かめてから、一覧で1件ずつやり直してください。`
+        : ''
       setNotice({
-        tone: response.data.failed > 0 || response.data.skipped > 0 || response.data.remaining > 0 ? 'error' : 'success',
-        message: `${response.data.requested}件を確認し、${response.data.succeeded}件が届きました。届かなかったもの ${response.data.failed}件、対象外 ${response.data.skipped}件です。${remainingNote}`,
+        tone: response.data.failed > 0 || response.data.skipped > 0 || response.data.remaining > 0 || response.data.needsReview > 0 ? 'error' : 'success',
+        message: `${response.data.requested}件を確認し、${response.data.succeeded}件が届きました。届かなかったもの ${response.data.failed}件、対象外 ${response.data.skipped}件です。${remainingNote}${reviewNote}`,
       })
       await load()
     } catch {
@@ -275,9 +338,9 @@ export default function WebhookInteractions() {
         <>
           <div className={styles.cards}>
             <SummaryCard variant="v6" title={`この${periodDays}日`} value={data.summary.total} unit="回" detail={`送った ${data.summary.outgoing.toLocaleString('ja-JP')}・受け取った ${data.summary.incoming.toLocaleString('ja-JP')}`} />
-            <SummaryCard variant="v6" title="成功" value={data.summary.succeeded} unit="回" detail={`${successRate.toLocaleString('ja-JP')}%`} />
-            <SummaryCard variant="v6" title="失敗" value={data.summary.failed} unit="回" detail={failureDetail(data.items, data.summary.failed)} badge={data.summary.failed > 0 ? 'やり直す' : undefined} badgeTone="danger" />
-            <SummaryCard variant="v6" title="返事までの時間" value={data.summary.averageDurationMs == null ? null : Math.round(data.summary.averageDurationMs / 100) / 10} unit="秒" detail={durationDetail(data.items, data.summary.averageDurationMs)} />
+            <SummaryCard variant="v6" title="成功" value={data.summary.succeeded} unit="回" detail={`この${periodDays}日で ${successRate.toLocaleString('ja-JP')}%`} />
+            <SummaryCard variant="v6" title="失敗" value={data.summary.failed} unit="回" detail={failureDetail(data.items, data.summary.failed, data.summary.resultUnknown)} badge={data.summary.failed > 0 ? 'やり直す' : undefined} badgeTone="danger" />
+            <SummaryCard variant="v6" title="返事までの時間" value={data.summary.averageDurationMs == null ? null : Math.round(data.summary.averageDurationMs / 100) / 10} unit="秒" detail={durationDetail(data.items, data.summary.averageDurationMs, periodDays)} />
           </div>
 
           <NoteBar>送った・受け取ったやり取りの記録です。失敗したものはここからやり直せます。</NoteBar>
@@ -320,11 +383,15 @@ export default function WebhookInteractions() {
                 {data.items.map((item) => (
                   <Tr key={item.id}>
                     <Td><div className={styles.primary}>{formatJst(item.startedAt)} ／ {directionLabel(item.direction)}</div><div className={styles.secondary} title={eventLabel(item)}>{eventLabel(item)}</div></Td>
-                    <Td><div className={`${styles.primary} ${item.status === 'failed' ? styles.danger : ''}`} title={item.webhookName}>{item.webhookName}</div></Td>
+                    <Td>
+                      <div className={`${styles.primary} ${item.status === 'failed' ? styles.danger : ''}`} title={item.webhookName}>{item.webhookName}</div>
+                      {/* IDEA-26: やり直しで増えた記録を元の失敗と区別し、受理からの流れを追えるようにする */}
+                      {item.retryOfId ? <div className={styles.secondary}>前の失敗をやり直した記録</div> : null}
+                    </Td>
                     <Td><div className={styles.primary} title={item.triggerSummary}>{item.triggerSummary}</div><div className={styles.secondary}>安全のため本文と接続情報は一覧に表示しません</div></Td>
                     <Td><StatusBadge tone={item.status === 'succeeded' ? 'success' : item.status === 'failed' ? 'danger' : 'info'}>{item.responseLabel}</StatusBadge></Td>
                     <Td>{item.durationMs == null ? '—' : `${Math.round(item.durationMs / 100) / 10}秒`}</Td>
-                    <ActionCell><div className={styles.rowActions}><Button onClick={() => setSelected(item)}>中身を見る</Button>{canRetry && item.canRetry ? <Button onClick={() => void retry(item)} disabled={retrying === item.id}>{retrying === item.id ? 'やり直し中' : 'やり直す'}</Button> : null}</div></ActionCell>
+                    <ActionCell><div className={styles.rowActions}><Button onClick={() => setSelected(item)}>中身を見る</Button>{canRetry && item.canRetry ? <Button onClick={() => item.failureReasonCode === 'unknown' ? setConfirmingRetry(item) : void retry(item)} disabled={retrying === item.id}>{retrying === item.id ? 'やり直し中' : 'やり直す'}</Button> : null}</div></ActionCell>
                   </Tr>
                 ))}
               </tbody>
@@ -339,8 +406,39 @@ export default function WebhookInteractions() {
       )}
 
       <Dialog open={Boolean(selected)} title="やり取りの中身" description="接続先URL、シークレット、本文は安全のため表示しません。" onCancel={() => setSelected(null)} cancelLabel="閉じる">
-        {selected ? <dl className={styles.details}><div className={styles.detailsRow}><dt>日時</dt><dd>{formatJst(selected.startedAt)}</dd></div><div className={styles.detailsRow}><dt>向き</dt><dd>{directionLabel(selected.direction)}</dd></div><div className={styles.detailsRow}><dt>つなぎ先</dt><dd>{selected.webhookName}</dd></div><div className={styles.detailsRow}><dt>きっかけ</dt><dd>{eventLabel(selected)}</dd></div><div className={styles.detailsRow}><dt>結果</dt><dd>{selected.responseLabel}</dd></div><div className={styles.detailsRow}><dt>試した回数</dt><dd>{selected.attemptCount}回</dd></div><div className={styles.detailsRow}><dt>かかった時間</dt><dd>{selected.durationMs == null ? '—' : `${Math.round(selected.durationMs / 100) / 10}秒`}</dd></div>{selected.failureReason ? <div className={styles.detailsRow}><dt>失敗した理由</dt><dd>{selected.failureReason}</dd></div> : null}</dl> : null}
+        {selected ? (
+          <>
+            <dl className={styles.details}><div className={styles.detailsRow}><dt>日時</dt><dd>{formatJst(selected.startedAt)}</dd></div><div className={styles.detailsRow}><dt>向き</dt><dd>{directionLabel(selected.direction)}</dd></div><div className={styles.detailsRow}><dt>つなぎ先</dt><dd>{selected.webhookName}</dd></div><div className={styles.detailsRow}><dt>きっかけ</dt><dd>{eventLabel(selected)}</dd></div><div className={styles.detailsRow}><dt>結果</dt><dd>{selected.responseLabel}</dd></div><div className={styles.detailsRow}><dt>試した回数</dt><dd>{selected.attemptCount}回</dd></div><div className={styles.detailsRow}><dt>かかった時間</dt><dd>{selected.durationMs == null ? '—' : `${Math.round(selected.durationMs / 100) / 10}秒`}</dd></div>{selected.failureReason ? <div className={styles.detailsRow}><dt>失敗した理由</dt><dd>{selected.failureReason}</dd></div> : null}{selected.retryOfId ? <div className={styles.detailsRow}><dt>記録のつながり</dt><dd>前の失敗をやり直した記録です。同じ届け番号で送るので、届いていた場合でも相手先で二重に処理されません。</dd></div> : null}<div className={styles.detailsRow}><dt>やり直せるか</dt><dd>{retryabilityText(selected, canRetry)}</dd></div></dl>
+            {/*
+              IDEA-26: 技術的な記録は普段は畳んでおき、必要なときだけ開く。
+              理由を隠すために消すのではなく、一覧の業務の言葉とは分けて
+              ここへ残す。本文・URL・シークレットはここにも出さない。
+            */}
+            <details className={styles.tech}>
+              <summary className={styles.techSummary}>技術的な記録を開く</summary>
+              <dl className={styles.details}>
+                <div className={styles.detailsRow}><dt>記録の番号</dt><dd>{selected.id}</dd></div>
+                <div className={styles.detailsRow}><dt>出来事の種類</dt><dd>{selected.eventType}</dd></div>
+                <div className={styles.detailsRow}><dt>状態の記号</dt><dd>{selected.status}</dd></div>
+                <div className={styles.detailsRow}><dt>相手の応答番号</dt><dd>{selected.responseStatus ?? '—'}</dd></div>
+                <div className={styles.detailsRow}><dt>やり直し元の記録</dt><dd>{selected.retryOfId ?? '—'}</dd></div>
+              </dl>
+            </details>
+          </>
+        ) : null}
       </Dialog>
+
+      {/* IDEA-26: 「届いたか分からない」失敗は、相手先で確かめた上で送り直す */}
+      <ConfirmDialog
+        open={Boolean(confirmingRetry)}
+        title="届いたか確かめてから送り直します"
+        description={confirmingRetry ? `「${confirmingRetry.webhookName}」へ届いたかどうか分かっていません。無条件に送り直すと、届いていた処理を二重に送ることがあります。相手先の記録で同じ処理がないか確かめましたか。` : ''}
+        confirmLabel="確かめたので送り直す"
+        cancelLabel="まだ確かめていない"
+        busy={retrying === confirmingRetry?.id}
+        onConfirm={() => { if (confirmingRetry) void retry(confirmingRetry, true) }}
+        onCancel={() => setConfirmingRetry(null)}
+      />
     </div>
   )
 }
