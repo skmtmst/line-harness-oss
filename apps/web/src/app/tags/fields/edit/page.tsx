@@ -14,6 +14,7 @@ import SelectField from '@/components/shared/select-field'
 import ListState from '@/components/shared/list-state'
 import { Field, TextInput, TextArea } from '@/components/shared/form-controls'
 import { FIELD_TYPE_LABELS } from '@/components/friend-fields/field-list'
+import { AttributeKindGuide, DuplicateNameNote, findDuplicateNames } from '@/components/friend-fields/attribute-kind-guide'
 
 const NEEDS_OPTIONS = new Set(['select', 'multi_select'])
 const FILE_TYPES = new Set(['image', 'pdf'])
@@ -35,6 +36,7 @@ function EditFriendFieldForm() {
   const { selectedAccountId } = useAccount()
 
   const [field, setField] = useState<FriendField | null>(null)
+  const [siblings, setSiblings] = useState<FriendField[]>([])
   const [folders, setFolders] = useState<Folder[]>([])
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
@@ -61,6 +63,8 @@ function EditFriendFieldForm() {
       if (cancelled) return
       if (folderResult?.success) setFolders(folderResult.data)
       if (!list.success) throw new Error(list.error)
+      /* IDEA-04: 同名の項目がほかにあるかは、読んだ一覧そのもので確かめる。 */
+      setSiblings(list.data)
       const found = list.data.find((item) => item.id === id) ?? null
       if (!found) { setNotFound(true); return }
       setField(found)
@@ -141,6 +145,8 @@ function EditFriendFieldForm() {
           <div className="space-y-4">
             <Field label="項目名" htmlFor="ff-name" required>
               <TextInput id="ff-name" value={name} onChange={(event) => setName(event.target.value)} disabled={locked} />
+              {/* IDEA-04: ほかの項目と同じ名前へ変えると、一覧の重複名の整理候補になることを先に伝える。 */}
+              <DuplicateNameNote duplicates={findDuplicateNames(siblings, name, field.id)} kindLabel="項目" />
             </Field>
             {/*
               種類と差し込み名は値・テンプレートを壊すため固定（ATTR-05の
@@ -162,6 +168,8 @@ function EditFriendFieldForm() {
             <Field label="フォルダ" htmlFor="ff-folder" note="フォルダは友だち詳細のタブになります。">
               <SelectField id="ff-folder" value={folderId} onChange={(event) => setFolderId(event.target.value)} disabled={locked} aria-label="友だち情報欄のフォルダ" className="v6-select w-full" options={[{ value: '', label: '未分類' }, ...folders.map((folder) => ({ value: folder.id, label: folder.name }))]} />
             </Field>
+            {/* IDEA-04: 印だけならタグ・対応状態なら対応マークという分類の違いを、編集の場所でも確認できるようにする。 */}
+            <AttributeKindGuide current="field" />
           </div>
         </section>
 

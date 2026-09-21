@@ -16,7 +16,6 @@ import {
   dashboardFreshness,
   summarizeDashboardFreshness,
   type DashboardPeriod,
-  type DashboardOverview,
 } from '@line-crm/db';
 import type { Env } from '../index.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
@@ -34,6 +33,13 @@ import { auditLog } from '../lib/audit-log.js';
 export const dashboard = new Hono<Env>();
 
 const PERIODS: DashboardPeriod[] = ['today', 'last7', 'last28'];
+
+/*
+ * 概要応答の中で送信枠の取得に使える時間（DASH-14）。
+ * LINE 側の応答が遅いときでも、DBで集計済みの友だち数・受信などを
+ * 待たせ続けないための上限。超えたら枠だけを失敗として返す。
+ */
+const QUOTA_OVERVIEW_BUDGET_MS = 3_500;
 
 function readPeriod(raw: string | undefined): DashboardPeriod {
   return PERIODS.includes(raw as DashboardPeriod) ? (raw as DashboardPeriod) : 'today';
@@ -132,31 +138,36 @@ async function mapWithConcurrency<T, R>(
   return results;
 }
 
-async function fetchQuota(
-  token: string | undefined,
-): Promise<{
+interface QuotaResult {
   limit: number | null;
   used: number | null;
+  /** LINE 側が type=none を返した「上限なし」の契約。limit=null と取得失敗を分ける（DASH-08）。 */
+  unlimited: boolean;
   failed: boolean;
   reason: 'not_connected' | 'fetch_failed' | null;
   asOf: string | null;
-}> {
+}
+
+async function fetchQuota(
+  token: string | undefined,
+  timeoutMs = 10_000,
+): Promise<QuotaResult> {
   if (!token) {
-    return { limit: null, used: null, failed: false, reason: 'not_connected', asOf: null };
+    return { limit: null, used: null, unlimited: false, failed: false, reason: 'not_connected', asOf: null };
   }
   try {
     const [quota, consumption] = await Promise.all([
       fetch('https://api.line.me/v2/bot/message/quota', {
         headers: { Authorization: `Bearer ${token}` },
-        signal: AbortSignal.timeout(10_000),
+        signal: AbortSignal.timeout(timeoutMs),
       }),
       fetch('https://api.line.me/v2/bot/message/quota/consumption', {
         headers: { Authorization: `Bearer ${token}` },
-        signal: AbortSignal.timeout(10_000),
+        signal: AbortSignal.timeout(timeoutMs),
       }),
     ]);
     if (!quota.ok || !consumption.ok) {
-      return { limit: null, used: null, failed: true, reason: 'fetch_failed', asOf: null };
+      return { limit: null, used: null, unlimited: false, failed: true, reason: 'fetch_failed', asOf: null };
     }
     // type が 'none' のときは上限なし。数字が入らないので null のままにする。
     const q = (await quota.json()) as { type?: string; value?: number };
@@ -164,11 +175,11 @@ async function fetchQuota(
     const limit = q.type === 'limited' && typeof q.value === 'number' ? q.value : null;
     const used = typeof c.totalUsage === 'number' ? c.totalUsage : null;
     if ((q.type !== 'limited' && q.type !== 'none') || used === null || (q.type === 'limited' && limit === null)) {
-      return { limit: null, used: null, failed: true, reason: 'fetch_failed', asOf: null };
+      return { limit: null, used: null, unlimited: false, failed: true, reason: 'fetch_failed', asOf: null };
     }
-    return { limit, used, failed: false, reason: null, asOf: new Date().toISOString() };
+    return { limit, used, unlimited: q.type === 'none', failed: false, reason: null, asOf: new Date().toISOString() };
   } catch {
-    return { limit: null, used: null, failed: true, reason: 'fetch_failed', asOf: null };
+    return { limit: null, used: null, unlimited: false, failed: true, reason: 'fetch_failed', asOf: null };
   }
 }
 
@@ -184,9 +195,17 @@ dashboard.get('/api/dashboard/overview', async (c) => {
     }
 
     const statsScope = { allowedAccountIds: [accountId], includeUnassigned: false };
-    const overview: DashboardOverview = await getDashboardOverview(c.env.DB, period, statsScope);
     const quotaToken = selectedAccount.channel_access_token;
-    const quota = await fetchQuota(quotaToken);
+    /*
+     * LINE の送信枠は外部APIなので、DB集計と並行して始め、待つ時間に上限を
+     * 置く（DASH-14）。枠の応答が遅い・止まっているときに概要全体が
+     * 返らなくなるのを防ぐ。上限を超えたら枠だけ失敗として返し、
+     * 友だち数などの成功分は使える状態にする。
+     */
+    const [overview, quota] = await Promise.all([
+      getDashboardOverview(c.env.DB, period, statsScope),
+      fetchQuota(quotaToken, QUOTA_OVERVIEW_BUDGET_MS),
+    ]);
     if (quota.failed) {
       overview.partialFailures.push('quota');
     }
@@ -205,6 +224,7 @@ dashboard.get('/api/dashboard/overview', async (c) => {
         remaining: quota.limit === null || quota.used === null
           ? null
           : Math.max(quota.limit - quota.used, 0),
+        unlimited: quota.unlimited,
       } : null,
       state: quotaAvailable ? 'available' : 'unavailable',
       reason: quota.reason,
@@ -282,11 +302,14 @@ dashboard.get('/api/dashboard/organization-overview', requireRole('owner'), asyn
     const quotaUsed = quotaStatus === 'ok' && everyUsageKnown
       ? quotas.reduce((sum, quota) => sum + (quota.used ?? 0), 0)
       : null;
+    // quotaStatus が ok のとき successfulQuotas は空でない。「全て上限なし」のときだけ立つ。
+    const everyQuotaUnlimited = successfulQuotas.every((quota) => quota.unlimited);
     overview.metrics.monthlyQuota = {
       value: quotaStatus === 'ok' ? {
         used: quotaUsed,
         limit: quotaLimit,
         remaining: quotaLimit === null || quotaUsed === null ? null : Math.max(quotaLimit - quotaUsed, 0),
+        unlimited: everyQuotaUnlimited,
       } : null,
       state: quotaStatus === 'ok' ? 'available' : quotaStatus,
       reason: quotaStatus !== 'ok'

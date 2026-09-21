@@ -28,6 +28,8 @@ import { TextInput } from '@/components/shared/form-controls'
 import Button from '@/components/shared/button'
 import Select from '@/components/shared/select'
 import { optionsWithCurrent } from './reference-options'
+import { savedSearchSummary, type SavedSearchConditionLabels } from '@/components/friends/saved-search-utils'
+import { AttributeKindGuide, DuplicateNameNote, findDuplicateNames } from '@/components/friend-fields/attribute-kind-guide'
 
 const EDITABLE_KINDS: Array<{ value: SavedSearchConditionKind; label: string }> = [
   { value: 'tag', label: 'タグ' },
@@ -305,6 +307,8 @@ function SavedSearchEditInner() {
   const [isShared, setIsShared] = useState(false)
   /** 保存済みの総数。上限50件までの残りを共有範囲の下に出すために持つ。 */
   const [savedCount, setSavedCount] = useState<number | null>(null)
+  /** IDEA-04: 同名の検索がすでにあるか確かめるための、ほかの検索の名前。 */
+  const [siblingSearches, setSiblingSearches] = useState<Array<{ id: string; name: string }>>([])
   const [previewCount, setPreviewCount] = useState<number | null>(null)
   const [preview, setPreview] = useState<SavedSearchMatchPreview | null>(null)
   const [previewStale, setPreviewStale] = useState(false)
@@ -341,7 +345,9 @@ function SavedSearchEditInner() {
       setPreviewCount(res.success ? res.data.match.total : null)
       setPreview(res.success ? res.data.match : null)
       setPreviewStale(false)
+      /* 応答は成功でも中身の計算が失敗していることがある（match.error）。 */
       if (!res.success) setPreviewError(res.error)
+      else setPreviewError(res.data.match.error ?? '')
     } catch {
       if (!gateRef.current.current(token) || accountRef.current !== account) return
       setPreviewCount(null)
@@ -377,6 +383,7 @@ function SavedSearchEditInner() {
         fields: fieldResult?.success !== true,
       })
       setSavedCount(searches.success ? searches.summary.total : null)
+      setSiblingSearches(searches.success ? searches.items.map((item) => ({ id: item.id, name: item.name })) : [])
       const found = detail.success ? detail.data : null
       if (!found) {
         setError('保存した検索が見つかりません')
@@ -388,6 +395,8 @@ function SavedSearchEditInner() {
       setIsShared(found.isShared)
       setPreviewCount(found.matchCount ?? null)
       setPreview(found.match)
+      /* IDEA-04: 計算に失敗している保存値を「計算済み」の時点付きで見せない。 */
+      setPreviewError(found.match.error ?? '')
     }).catch(() => {
       if (!cancelled) setError('保存した検索を読み込めませんでした')
     }).finally(() => {
@@ -401,6 +410,29 @@ function SavedSearchEditInner() {
     return name !== original.name || isShared !== original.isShared
       || JSON.stringify(conditions) !== JSON.stringify(normalizeForEdit(original))
   }, [conditions, isShared, name, original])
+
+  /*
+   * IDEA-04: 変更前後の条件を人が読める形で並べる。
+   * IDのまま出すと「何が変わったか」が読めないので、一覧と同じ
+   * `describeSavedCondition`（savedSearchSummary）で言葉にする。
+   */
+  const conditionLabels = useMemo<SavedSearchConditionLabels>(() => ({
+    marks: Object.fromEntries(marks.map((mark) => [mark.id, mark.name])),
+    scenarios: Object.fromEntries(scenarios.map((scenario) => [scenario.id, scenario.name])),
+    fields: Object.fromEntries(fields.map((field) => [field.fieldKey, field.name])),
+  }), [marks, scenarios, fields])
+  const beforeSummary = useMemo(
+    () => (original ? savedSearchSummary(original.conditions, tags, conditionLabels) : []),
+    [original, tags, conditionLabels],
+  )
+  const afterSummary = useMemo(
+    () => savedSearchSummary(conditions, tags, conditionLabels),
+    [conditions, tags, conditionLabels],
+  )
+  const nameDuplicates = useMemo(
+    () => findDuplicateNames(siblingSearches, name, id),
+    [siblingSearches, name, id],
+  )
 
   const patchConditions = (next: SavedSearchConditions) => {
     /*
@@ -501,7 +533,11 @@ function SavedSearchEditInner() {
           <section className="rounded-card border border-hairline bg-canvas p-4 shadow-card">
             <h2 className="text-base font-bold text-ink">条件名・説明</h2>
             <div className="mt-3 grid gap-3">
-              <TextInput value={name} maxLength={80} onChange={(event) => setName(event.target.value)} className="max-w-xl" aria-label="条件名" />
+              <div>
+                <TextInput value={name} maxLength={80} onChange={(event) => setName(event.target.value)} className="max-w-xl" aria-label="条件名" />
+                {/* IDEA-04: 同名の検索がすでにあるとき、保存する前に知らせる。 */}
+                <DuplicateNameNote duplicates={nameDuplicates} kindLabel="保存した検索" />
+              </div>
               <TextInput value={conditions.description ?? ''} maxLength={300} onChange={(event) => patchConditions({ ...conditions, description: event.target.value })} placeholder="この検索を使う目的" className="max-w-xl" aria-label="説明" />
             </div>
             <fieldset className="mt-4">
@@ -524,6 +560,8 @@ function SavedSearchEditInner() {
                 共有すると、一斉配信・オートメーションの対象条件からも呼び出せます。
               </p>
             </fieldset>
+            {/* IDEA-04: 条件の保存は「保存した検索」。印ならタグ・値なら情報欄という違いを、編集の場所でも確認できるようにする。 */}
+            <div className="mt-4"><AttributeKindGuide current="search" /></div>
           </section>
 
           <ConditionGroup title="すべて満たす" operator="AND" items={conditions.all ?? []} tags={tags} marks={marks} scenarios={scenarios} fields={fields} referenceErrors={referenceErrors} onChange={(all) => patchConditions({ ...conditions, all })} />
@@ -534,10 +572,29 @@ function SavedSearchEditInner() {
           <section className="rounded-card border border-hairline bg-canvas p-4 shadow-card">
             <h2 className="text-base font-bold text-ink">該当プレビュー</h2>
             <p className="mt-3 text-3xl font-bold tabular-nums text-ink">{previewCount === null ? '—' : `${previewCount.toLocaleString('ja-JP')}人`}</p>
+            {/*
+              IDEA-04: 人数をいつ・どの条件で計ったかを出す。
+              条件を変えたあとは、出ている人数が「変更前の条件」のもので
+              「変更後の条件」は未計算だと分かるようにする。取れていない
+              ときは計算時点を出さない（推定で埋めない）。
+            */}
+            <p className="mt-1 text-micro text-ink-faint">
+              {previewError || preview?.error
+                ? '未計算'
+                : preview?.calculatedAt
+                  ? `${new Date(preview.calculatedAt).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}に計算`
+                  : '未計算'}
+            </p>
             {previewError ? (
               <p role="alert" className="mt-2 text-xs text-danger">{previewError}</p>
+            ) : previewStale ? (
+              <div className="mt-2 rounded-control border border-warning/30 bg-warning-bg p-2 text-xs leading-5 text-status-warn-deep">
+                <p className="font-semibold">条件を変更しました。上の人数は変更前の条件のもので、変更後の条件は未計算です。</p>
+                <p className="mt-1"><span className="font-semibold">変更前：</span>{beforeSummary.length ? beforeSummary.join('・') : '条件なし'}</p>
+                <p className="mt-1"><span className="font-semibold">変更後：</span>{afterSummary.length ? afterSummary.join('・') : '条件なし'}</p>
+              </div>
             ) : (
-              <p className="mt-2 text-xs text-ink-faint">{previewStale ? '条件を変更しました。再計算してください' : preview ? `LINE ${preview.byChannel.line ?? '—'}人・MAIL ${preview.byChannel.mail ?? '—'}人` : '保存済み条件で集計'}</p>
+              <p className="mt-2 text-xs text-ink-faint">{preview ? `LINE ${preview.byChannel.line ?? '—'}人・MAIL ${preview.byChannel.mail ?? '—'}人` : '保存済み条件で集計'}</p>
             )}
             <div className="mt-3 flex flex-wrap gap-2"><Button type="button" onClick={() => void recount()}>人数を再計算</Button><Button href={`/friends?savedSearch=${encodeURIComponent(id)}`} variant="primary">該当者を確認</Button></div>
           </section>

@@ -13,6 +13,7 @@ import SupportMarkRulesPanel from './support-mark-rules-panel'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { useAccount } from '@/contexts/account-context'
 import { EVENT_LABELS, eventLabel } from './support-mark-rules-view'
+import { AttributeKindGuide, DuplicateNameNote, findDuplicateNames } from './attribute-kind-guide'
 
 const COLORS = [
   { value: '#EF4B55', name: '赤' },
@@ -51,6 +52,8 @@ export default function SupportMarkEditor({ markId }: { markId?: string }) {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const selected = useMemo(() => items.find((mark) => mark.id === markId), [items, markId])
+  /* IDEA-04: 同名のマークがすでにあるとき、保存する前に知らせる（自分自身は外す）。 */
+  const nameDuplicates = useMemo(() => findDuplicateNames(items, name, markId ?? null), [items, name, markId])
   const currentUsages = selected ? [
     selected.friendCount > 0 ? `友だち ${selected.friendCount}人` : null,
     selected.usedIn?.broadcasts ? `配信 ${selected.usedIn.broadcasts}件` : null,
@@ -135,6 +138,7 @@ export default function SupportMarkEditor({ markId }: { markId?: string }) {
           <label className="mb-4 block">
             <span className="mb-1.5 block text-xs font-semibold text-ink-secondary">マーク名</span>
             <input value={name} onChange={(event) => setName(event.target.value)} className="h-10 w-full rounded-control border border-hairline px-3 text-sm outline-none focus:border-accent" placeholder="例：要確認" />
+            <DuplicateNameNote duplicates={nameDuplicates} kindLabel="対応マーク" />
           </label>
           <fieldset className="mb-4">
             <legend className="mb-2 text-xs font-semibold text-ink-secondary">色</legend>
@@ -157,6 +161,8 @@ export default function SupportMarkEditor({ markId }: { markId?: string }) {
             </label>
             <p className="mt-1 text-xs font-normal leading-relaxed text-ink-faint">最初から付けるマークは1つだけ選べます</p>
           </div>
+          {/* IDEA-04: 対応の状態管理なら対応マーク・印だけならタグ・値を持たせるなら情報欄という違いを、作る場所で確認できるようにする。 */}
+          <div className="mt-4"><AttributeKindGuide current="mark" /></div>
         </Card>
 
         {/* 設計 GMvBd は基本情報と自動変更を横並びで比較できる。 */}

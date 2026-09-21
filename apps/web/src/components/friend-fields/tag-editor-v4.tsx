@@ -13,6 +13,7 @@ import IconButton from '@/components/shared/icon-button'
 import Notice from '@/components/shared/notice'
 import StickyBar from '@/components/shared/sticky-bar'
 import { RequiredBadge } from '@/components/shared/form-controls'
+import { AttributeKindGuide, DuplicateNameNote, findDuplicateNames } from './attribute-kind-guide'
 
 export type LinkedAction = {
   id: string
@@ -398,6 +399,25 @@ export default function TagEditorV4({
   const [actions, setActions] = useState<LinkedAction[]>(initialValues?.actions ?? tag?.linkedActions ?? [])
   const [drawerOpen, setDrawerOpen] = useState(initialDrawerOpen)
   const [retroactiveOpen, setRetroactiveOpen] = useState(initialRetroactiveOpen)
+  /*
+   * IDEA-04: 同名のタグがすでにあるとき、保存する前に知らせる。
+   * 比べ方はサーバーの整理候補 `duplicate_name` と同じ正規化。
+   * 取れなかったときは注意を出さないだけ（保存自体は止めない）。
+   * HQ埋め込み（embedded）ではストアのタグ一覧を読まない。
+   */
+  const [siblingNames, setSiblingNames] = useState<Array<{ id: string; name: string }>>([])
+  useEffect(() => {
+    if (embedded || !accountId) return
+    let cancelled = false
+    void api.tags.list({ accountId })
+      .then((res) => { if (!cancelled && res.success) setSiblingNames(res.data.map((item) => ({ id: item.id, name: item.name }))) })
+      .catch(() => { /* 注意が出せないだけ。読み直しはしない */ })
+    return () => { cancelled = true }
+  }, [accountId, embedded])
+  const nameDuplicates = useMemo(
+    () => findDuplicateNames(siblingNames, name, tag?.id ?? null),
+    [siblingNames, name, tag?.id],
+  )
 
   const previewColor = groups.find((group) => group.id === groupId)?.color ?? '#3b82f6'
   const groupName = groups.find((group) => group.id === groupId)?.name ?? '未分類'
@@ -463,9 +483,11 @@ export default function TagEditorV4({
             <StepTitle number={1} title="どのタグか" />
             <div className="grid gap-4 md:grid-cols-[320px_minmax(0,1fr)]">
               <label><span className="mb-1.5 block text-xs font-semibold text-ink-secondary">所属フォルダ</span><select value={groupId} onChange={(event) => setGroupId(event.target.value)} className={inputClass}><option value="">未分類</option>{groups.map((group) => <option key={group.id} value={group.id}>{group.name}</option>)}</select></label>
-              <label><span className="mb-1.5 block text-xs font-semibold text-ink-secondary">タグ名 <RequiredBadge /></span><input value={name} onChange={(event) => setName(event.target.value)} placeholder="例: 定期購入者" className={inputClass} /></label>
+              <label><span className="mb-1.5 block text-xs font-semibold text-ink-secondary">タグ名 <RequiredBadge /></span><input value={name} onChange={(event) => setName(event.target.value)} placeholder="例: 定期購入者" className={inputClass} /><DuplicateNameNote duplicates={nameDuplicates} kindLabel="タグ" /></label>
             </div>
             <p className="mt-3 text-xs leading-5 text-ink-faint">どの分類に入れるかを選びます。未選択なら「未分類」になります。フォルダの色がタグの印になります。</p>
+            {/* IDEA-04: 「タグ」を選んだ理由と、値を持たせるなら情報欄・対応状態なら対応マークという違いを、作る場所で確認できるようにする。 */}
+            <div className="mt-4"><AttributeKindGuide current="tag" /></div>
             <label className="mt-4 flex items-start gap-3"><input type="checkbox" checked={isStarred} onChange={(event) => setIsStarred(event.target.checked)} className="mt-1 accent-accent" /><span className="text-sm font-medium text-ink">友だち一覧に表示する（★）<span className="mt-0.5 block text-xs font-normal text-ink-faint">このスイッチ、またはタグ一覧の星をクリックして、友だち一覧への表示をON／OFFできます。</span></span></label>
           </section>
 
