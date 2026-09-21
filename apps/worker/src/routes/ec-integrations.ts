@@ -87,7 +87,7 @@ async function fireEcV6Event(
     eventId: input.eventId, subscriber: 'v6', status: 'sent', idempotencyKey, now: input.now,
   });
 }
-import { enqueuePostShippingFollowUps } from '../services/nen-engagement.js';
+import { cancelPendingOrderFollowUps, enqueuePostShippingFollowUps } from '../services/nen-engagement.js';
 import { recordConversionSourceEvent } from '@line-crm/db';
 import { ecFlexMessage } from '../services/ec-notification-message.js';
 import { syncNenEcTags, syncNenPetTags } from '../services/nen-tag-sync.js';
@@ -580,6 +580,33 @@ ecIntegrations.post('/api/integrations/eccube/events', async (c) => {
     }).catch(() => undefined);
     console.error(`[ec-event] read model failed event=${event.event_id}`, error);
     return c.json({ success: false, error: 'Event processing failed' }, 503);
+  }
+
+  /*
+   * IDEA-21: 注文の取り消し・返金が届いたら、その注文を起点に待っている
+   * 発送後の案内（到着確認・口コミ・次の商品）を「送らない」へ倒す。
+   * ここで倒さないと、配信履歴に「これから送ります」と出たままになる。
+   * 止め損ねても送信時の再検証（processNenDeliveries）が最後に弾くので、
+   * この処理の失敗でイベント受付そのものは止めない。
+   */
+  if (event.event_type === 'ec.order.cancelled' || event.event_type === 'ec.order.refunded') {
+    try {
+      const cancelled = await cancelPendingOrderFollowUps(c.env.DB, {
+        lineAccountId,
+        orderNumber: event.order?.number ?? '',
+        reason: event.event_type === 'ec.order.cancelled' ? 'order_cancelled' : 'order_refunded',
+      });
+      if (cancelled > 0) {
+        console.log(JSON.stringify({
+          event: 'nen_order_followups_stopped',
+          lineAccountId,
+          orderNumber: event.order?.number ?? null,
+          stopped: cancelled,
+        }));
+      }
+    } catch (followUpError) {
+      console.error(`[ec-event] follow-up stop failed event=${event.event_id}`, followUpError);
+    }
   }
   if (row.status === 'processed' || row.status === 'skipped') {
     return c.json({ success: true, duplicate: true, status: row.status });
