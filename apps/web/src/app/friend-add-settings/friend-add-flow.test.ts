@@ -1,7 +1,14 @@
 import { describe, expect, it } from 'vitest'
 
 import type { FriendAddRuleDefinition } from '@/lib/api'
-import { friendAddFlowSteps, friendAddReaddLines } from './friend-add-flow'
+import {
+  addTimeWindow,
+  friendAddFlowSteps,
+  friendAddReaddLines,
+  removeTimeWindow,
+  timeWindowsSummary,
+  updateTimeWindow,
+} from './friend-add-flow'
 
 const BASE_DEFINITION: FriendAddRuleDefinition = {
   routeIds: ['route-1'],
@@ -173,5 +180,40 @@ describe('IDEA-09 再追加時に動く／動かない処理の説明', () => {
       definition: { ...BASE_DEFINITION, resendSuppressionHours: 0 },
     })
     expect(lines.join('')).toContain('同じ人への再送は制限しません')
+  })
+})
+
+describe('FRIENDADD-05 複数時間帯の編集で2件目以降を消さない', () => {
+  const twoWindows = [
+    { start: '09:00', end: '12:00' },
+    { start: '14:00', end: '18:00' },
+  ]
+
+  it('先頭だけを変更しても2件目以降が残る', () => {
+    // 午前/午後の2件を読込→午前だけ変更→保存しても午後が残る。
+    expect(updateTimeWindow(twoWindows, 0, { start: '08:30' })).toEqual([
+      { start: '08:30', end: '12:00' },
+      { start: '14:00', end: '18:00' },
+    ])
+    expect(updateTimeWindow(twoWindows, 1, { end: '19:00' })).toEqual([
+      { start: '09:00', end: '12:00' },
+      { start: '14:00', end: '19:00' },
+    ])
+    // もとの配列を書き換えない
+    expect(twoWindows[0]).toEqual({ start: '09:00', end: '12:00' })
+  })
+
+  it('削除・追加を配列のまま行い、未設定は空配列として扱う', () => {
+    expect(removeTimeWindow(twoWindows, 0)).toEqual([{ start: '14:00', end: '18:00' }])
+    expect(addTimeWindow([])).toEqual([{ start: '08:00', end: '21:00' }])
+    expect(updateTimeWindow(undefined, 0, { start: '10:00' })).toEqual([])
+    expect(removeTimeWindow(undefined, 0)).toEqual([])
+  })
+
+  it('サマリーは複数ある時間帯を隠さず件数を示す', () => {
+    expect(timeWindowsSummary(undefined)).toBe('いつでも')
+    expect(timeWindowsSummary([])).toBe('いつでも')
+    expect(timeWindowsSummary([{ start: '08:00', end: '21:00' }])).toBe('08:00〜21:00')
+    expect(timeWindowsSummary(twoWindows)).toBe('09:00〜12:00 など2件')
   })
 })

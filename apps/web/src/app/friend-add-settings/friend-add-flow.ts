@@ -99,6 +99,39 @@ export function friendAddFlowSteps(input: {
   ]
 }
 
+export type FriendAddTimeWindow = { start: string; end: string }
+
+/**
+ * 時間帯の1件だけを更新する。先頭以外の時間帯は保持する（FRIENDADD-05）。
+ * 以前は先頭だけを表示し、配列全体を1件で置き換えて2件目以降を消していた。
+ */
+export function updateTimeWindow(
+  windows: FriendAddTimeWindow[] | undefined,
+  index: number,
+  patch: Partial<FriendAddTimeWindow>,
+): FriendAddTimeWindow[] {
+  return (windows ?? []).map((window, itemIndex) => (itemIndex === index ? { ...window, ...patch } : window))
+}
+
+export function removeTimeWindow(
+  windows: FriendAddTimeWindow[] | undefined,
+  index: number,
+): FriendAddTimeWindow[] {
+  return (windows ?? []).filter((_, itemIndex) => itemIndex !== index)
+}
+
+export function addTimeWindow(windows: FriendAddTimeWindow[] | undefined): FriendAddTimeWindow[] {
+  return [...(windows ?? []), { start: '08:00', end: '21:00' }]
+}
+
+/** サマリー向けの時間帯表示。複数あるときは全件あることが分かる形にする。 */
+export function timeWindowsSummary(windows: FriendAddTimeWindow[] | undefined): string {
+  const list = windows ?? []
+  if (list.length === 0) return 'いつでも'
+  if (list.length === 1) return `${list[0].start}〜${list[0].end}`
+  return `${list[0].start}〜${list[0].end} など${list.length}件`
+}
+
 /**
  * 再追加（ブロック解除を含む）で動く／動かない処理の説明行。
  * 実行側と同じ分岐（returningMode・再送制限・状態）だけを説明する。

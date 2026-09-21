@@ -117,7 +117,7 @@ describe('V6 友だち追加時配信の点検・中の再発防止(#501)', () =
 
   it('新規作成の優先順位は競合一覧の最大+1にする', () => {
     // 一覧は既定20件のため、件数+1では21件を超えると重複する。
-    expect(EDITOR).toContain("api.friendAddRules.conflicts(selectedAccountId, 'first_time')")
+    expect(EDITOR).toContain("api.friendAddRules.conflicts(request.accountId, 'first_time')")
     expect(EDITOR).toContain('conflictRes.data.rules.reduce')
   })
 
@@ -143,7 +143,34 @@ describe('V6 友だち追加時配信の点検・中の再発防止(#501)', () =
   })
 
   it('テストの失敗時も理由を捨てず、確認面へ渡す', () => {
-    expect(EDITOR).toContain("if ('data' in response && response.data) setTestResult(response.data)")
+    expect(EDITOR).toContain("if ('data' in response && response.data) setTestResult({ ...testedMeta, ...response.data })")
+  })
+
+  it('アカウント切替で遅れて返る応答が切替先を上書きしない(FRIENDADD-02)', () => {
+    // 読込ごとに対象アカウント・ルール・世代を持ち、一致する応答だけ採用する。
+    expect(EDITOR).toContain('loadRequestRef')
+    expect(EDITOR).toContain('isCurrentRequest()')
+    expect(EDITOR).toContain('setLoadedAccountId(request.accountId)')
+    // 表示中の設定と保存先アカウントが一致するときだけ保存・テストする。
+    expect(EDITOR).toContain('loadedAccountId !== selectedAccountId')
+    expect(EDITOR).toContain('アカウントを切り替えています。')
+  })
+
+  it('設定を変えたあとは前のテスト結果を今の設定の判定として出さない(FRIENDADD-03)', () => {
+    // 結果は実行時のアカウント・ルール・保存済みスナップショットと結び付ける。
+    expect(EDITOR).toContain('testedMeta')
+    expect(EDITOR).toContain('testResult.snapshot === currentSnapshot')
+    expect(EDITOR).toContain('testResult.accountId === selectedAccountId')
+    expect(EDITOR).toContain('設定を変更したため、前回のテスト結果は表示していません')
+  })
+
+  it('時間帯は複数件を表示・編集し、先頭以外を消さない(FRIENDADD-05)', () => {
+    // 以前は先頭だけを表示し配列全体を1件で置き換えていた。
+    expect(EDITOR).toContain('updateTimeWindow(current.timeWindows, index')
+    expect(EDITOR).toContain('removeTimeWindow(current.timeWindows, index')
+    expect(EDITOR).toContain('addTimeWindow(current.timeWindows)')
+    expect(EDITOR).toContain('時間帯を追加')
+    expect(EDITOR).not.toContain('timeWindows: [{ ...window')
   })
 
   it('設定画面は旧振り分け口を参照しない', () => {
