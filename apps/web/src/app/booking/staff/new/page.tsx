@@ -13,6 +13,7 @@ import CreatePage, {
 import ListState from '@/components/shared/list-state'
 import Select from '@/components/shared/select'
 import { canEditFeature } from '@/lib/staff-capability'
+import { usePageTitle } from '@/components/shell/page-chrome'
 
 /**
  * 予約スタッフを登録する（設計 V2 8-2-2 / node bEL9g）。
@@ -24,6 +25,8 @@ import { canEditFeature } from '@/lib/staff-capability'
  */
 export default function NewBookingStaffPage() {
   const { selectedAccountId } = useAccount()
+  // /booking/staff/new はメニューの接頭辞に当たらず上部バーが空になるため、画面名を明示する。
+  usePageTitle('予約スタッフを登録')
   const [name, setName] = useState('')
   const [displayName, setDisplayName] = useState('')
   const [role, setRole] = useState('')
@@ -108,6 +111,7 @@ export default function NewBookingStaffPage() {
     <CreatePage
       title="予約スタッフを登録する"
       description="お客様が予約するときに指名できる担当者を登録します。"
+      showHeader={false}
       parent={['予約設定', '/booking/menus?tab=staff']}
       saveLabel="スタッフを登録"
       validate={() => {
