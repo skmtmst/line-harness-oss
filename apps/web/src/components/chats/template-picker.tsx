@@ -1,10 +1,11 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { Folder, Template } from '@line-crm/shared'
 import { api } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
+import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import TemplateFolderSelect, {
   type TemplateFolderOption,
   type TemplateFolderStatus,
@@ -66,10 +67,29 @@ export default function TemplatePicker({
     unresolved: string[]
   } | null>(null)
   const accountDataCurrent = loadedAccountId === selectedAccountId
-  const scopedTemplates = accountDataCurrent ? templates : []
-  const scopedFolders = accountDataCurrent ? folders : []
+  const emptyTemplates = useMemo<Template[]>(() => [], [])
+  const emptyFolders = useMemo<Folder[]>(() => [], [])
+  const scopedTemplates = accountDataCurrent ? templates : emptyTemplates
+  const scopedFolders = accountDataCurrent ? folders : emptyFolders
   const visibleTemplatesStatus = accountDataCurrent ? templatesStatus : 'loading'
   const visibleFoldersStatus = accountDataCurrent ? foldersStatus : 'loading'
+
+  /*
+   * INBOX-14: 共通のオーバーレイ約束。開いたら窓の中へフォーカス、
+   * Tab は窓の中で回し、Escape で閉じ、閉じたら起点（テンプレートを
+   * 開いたボタン）へフォーカスを戻す。未挿入で閉じても下書きは変えない。
+   */
+  const dialogRef = useOverlayFocus(open, onClose)
+  const searchInputRef = useRef<HTMLInputElement>(null)
+  /*
+   * 初期フォーカスは検索欄へ。useOverlayFocus は先頭の閉じるボタンへ
+   * 合わせるため、同じフレームの後に続くこの予約で検索欄へ移す。
+   */
+  useEffect(() => {
+    if (!open) return
+    const frame = requestAnimationFrame(() => searchInputRef.current?.focus())
+    return () => cancelAnimationFrame(frame)
+  }, [open])
 
   useEffect(() => {
     if (!open) {
@@ -209,9 +229,21 @@ export default function TemplatePicker({
     return filtered
   }, [category, textTemplates, search, folderId, selectedFolderIds])
 
+  /*
+   * INBOX-13: 選択は「いま見えている候補」の中だけで解決する。
+   * 検索・フォルダ・分類で一覧から外れたテンプレートを選んだままに
+   * しない。選択が結果外になったら結果の先頭へ明示的に切り替え、
+   * 0件なら未選択（挿入不可）にする。
+   */
   const selectedTemplate = useMemo(
-    () => textTemplates.find((t) => t.id === selectedId) ?? shown[0] ?? null,
-    [textTemplates, selectedId, shown],
+    () => shown.find((t) => t.id === selectedId) ?? shown[0] ?? null,
+    [selectedId, shown],
+  )
+
+  /* INBOX-15: よく使うの実績が1件も無いときは、推測と実績を区別して断る。 */
+  const frequentHasUsage = useMemo(
+    () => category === 'frequent' && shown.some((t) => usageScore(t as UsageAwareTemplate) > 0),
+    [category, shown],
   )
 
   // N-026: 差し込みを含むテンプレートは、送信と同じ解決器の結果をプレビューに
@@ -259,6 +291,7 @@ export default function TemplatePicker({
       onClick={onClose}
     >
       <div
+        ref={dialogRef}
         className="flex h-[min(720px,calc(100vh-32px))] w-[min(920px,calc(100vw-32px))] flex-col overflow-hidden rounded-[14px] border border-[#E5E7EB] bg-canvas shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
@@ -282,6 +315,7 @@ export default function TemplatePicker({
           <div className="relative">
             <svg className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-[#98A2B3]" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
             <input
+              ref={searchInputRef}
               type="search"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -304,7 +338,12 @@ export default function TemplatePicker({
           * 挿入前に全文を確かめる場所がなくなる（IDEA-11）。
           */}
         <div className="min-h-0 flex-1 overflow-y-auto md:grid md:grid-cols-[350px_1fr] md:overflow-visible">
-          <div className="min-h-0 border-b border-[#E5E7EB] bg-[#F7F8F6] p-3 md:overflow-y-auto md:border-b-0 md:border-r">
+          {/*
+            INBOX-34: 狭い画面でも一覧は自分の領域で最後までスクロールする。
+            md 未満では高さを画面の45%に留め、下のプレビューと操作へ
+            続けて届くようにする。md 以上はグリッドの残り高を使う。
+          */}
+          <div className="max-h-[45dvh] min-h-0 overflow-y-auto border-b border-[#E5E7EB] bg-[#F7F8F6] p-3 md:max-h-none md:border-b-0 md:border-r">
             <div className="mb-2 flex flex-wrap items-center gap-1.5">
               {[
                 { key: 'all' as const, label: 'すべて' },
@@ -326,6 +365,15 @@ export default function TemplatePicker({
                 {visibleTemplatesStatus === 'ready' ? `${shown.length}件` : '—'}
               </span>
             </div>
+            {/*
+              INBOX-15: 「よく使う」は送信数・使用箇所の多い順。実績がまだ
+              1件も無いときは、推測ではなく実績が無いことを先に断る。
+            */}
+            {category === 'frequent' && visibleTemplatesStatus === 'ready' && shown.length > 0 && !frequentHasUsage ? (
+              <p className="mb-2 text-[11px] leading-relaxed text-[#98A2B3]">
+                まだ送信・使用の実績がないため、実績順ではなく登録順で表示しています。
+              </p>
+            ) : null}
             {visibleTemplatesStatus === 'loading' ? (
               <p className="px-4 py-10 text-center text-sm text-ink-faint">テンプレートを読み込んでいます。</p>
             ) : visibleTemplatesStatus === 'error' ? (
@@ -381,26 +429,41 @@ export default function TemplatePicker({
           </section>
         </div>
 
-        <footer className="flex items-center justify-between gap-4 border-t border-[#E5E7EB] bg-canvas px-6 py-4">
+        {/*
+          INBOX-18: 説明文は操作より上の独立した行へ。操作は専用の行にして
+          折り返さない（以前は同じ flex 行で、説明に押されてボタンの
+          文字が1文字ずつ縦に割れていた）。
+          INBOX-13: 狭い画面では一覧とプレビューが縦に積まれるため、
+          現在の選択名を操作の直上に固定して出す。押す直前に
+          何を挿入するかが画面に残る。
+        */}
+        <footer className="border-t border-[#E5E7EB] bg-canvas px-6 py-4">
+          {selected ? (
+            <p className="mb-1 truncate text-xs font-semibold text-[#344054] md:hidden" title={selected.name}>
+              選択中: {selected.name}
+            </p>
+          ) : (
+            <p className="mb-1 text-xs text-[#98A2B3] md:hidden">テンプレートが選択されていません</p>
+          )}
           <p className="text-xs text-[#667085]">入力後に文章を編集してから送信できます。</p>
-          <div className="flex gap-2">
-          <button
-            onClick={onClose}
-            className="rounded-lg border border-[#E5E7EB] bg-canvas px-4 py-2 text-sm font-semibold text-[#667085] hover:bg-[#F7F8F6]"
-          >
-            キャンセル
-          </button>
-          <button
-            disabled={!selected}
-            onClick={() => {
-              if (!selected) return
-              onPick(selected.messageContent)
-              onClose()
-            }}
-            className="rounded-lg bg-accent-deep px-5 py-2 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-deep/90 disabled:opacity-40"
-          >
-            入力欄へ挿入
-          </button>
+          <div className="mt-3 flex flex-wrap justify-end gap-2">
+            <button
+              onClick={onClose}
+              className="min-h-11 whitespace-nowrap rounded-lg border border-[#E5E7EB] bg-canvas px-4 py-2 text-sm font-semibold text-[#667085] hover:bg-[#F7F8F6]"
+            >
+              キャンセル
+            </button>
+            <button
+              disabled={!selected}
+              onClick={() => {
+                if (!selected) return
+                onPick(selected.messageContent)
+                onClose()
+              }}
+              className="min-h-11 whitespace-nowrap rounded-lg bg-accent-deep px-5 py-2 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-deep/90 disabled:opacity-40"
+            >
+              入力欄へ挿入
+            </button>
           </div>
         </footer>
       </div>
