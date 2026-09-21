@@ -50,6 +50,9 @@ function harness(options: {
   resubmitInvite?: number;
   savedRotation?: number;
   rotationKey?: string | null;
+  reviewHistory?: Array<Record<string, unknown>>;
+  reward?: Record<string, unknown> | null;
+  detailPublication?: Record<string, unknown> | null;
 } = {}) {
   const statements: Entry[] = [];
   const batches: Entry[][] = [];
@@ -79,6 +82,13 @@ function harness(options: {
               id: 'publication-1', photo_id: 'photo-1', status: 'published', version: 2,
               last_idempotency_key: null,
             };
+          }
+          // 詳細口の掲載・報酬の単発取得（Issue #1040 IDEA-22）。
+          if (query.includes('FROM nen_photo_publications pub') && query.includes('pub.photo_id = ?')) {
+            return options.detailPublication ?? null;
+          }
+          if (query.includes('FROM nen_photo_reward_outbox')) {
+            return options.reward ?? null;
           }
           if (query.includes('SELECT e.notification_status')) {
             return options.settledState ?? null;
@@ -138,6 +148,10 @@ function harness(options: {
           }
           if (query.includes('FROM nen_photo_risk_assessments')) {
             return { results: [{ flag: 'face', confidence: 0.78 }] };
+          }
+          // 詳細口の審査履歴（Issue #1040 IDEA-22）。
+          if (query.includes('FROM nen_photo_review_events')) {
+            return { results: options.reviewHistory ?? [] };
           }
           if (query.includes('ORDER BY ps.created_at')) return { results: [{ id: 'photo-1' }] };
           return { results: [] };
@@ -236,6 +250,47 @@ describe('NEN photo review', () => {
       risks: [{ flag: 'face', confidence: 0.78 }],
     });
     expect(body.data).not.toHaveProperty('r2_key');
+  });
+
+  it('returns review history, reward state and placements with the detail (Issue #1040)', async () => {
+    const { app } = harness({
+      reviewHistory: [
+        {
+          to_status: 'adopted', reason_code: null, reason_note: null,
+          awarded_points: 5, reviewed_by_name: '担当者', notification_status: 'sent',
+          created_at: '2026-08-28 03:00:00',
+        },
+      ],
+      reward: {
+        status: 'synced', points: 5, attempt_count: 1,
+        last_error: null, synced_at: '2026-08-28 04:00:00', updated_at: '2026-08-28 04:00:00',
+      },
+      detailPublication: {
+        id: 'publication-1', status: 'published', view_count: 12,
+        published_at: '2026-08-28 05:00:00', withdrawn_at: null, withdrawn_by_name: null,
+      },
+    });
+    const response = await app.request('/api/nen-members/photos/photo-1?accountId=account-a');
+    expect(response.status).toBe(200);
+    const body = await response.json() as { data: Record<string, unknown> };
+    expect(body.data).toMatchObject({
+      id: 'photo-1',
+      history: [{ to_status: 'adopted', awarded_points: 5, reviewed_by_name: '担当者' }],
+      reward: { status: 'synced', points: 5 },
+      publication: { id: 'publication-1', status: 'published' },
+    });
+    // 掲載先は外したものも含めて返す（撤回後に残る公開先を追う）。
+    const publication = body.data.publication as { placements: Array<Record<string, unknown>> };
+    expect(publication.placements).toHaveLength(1);
+    expect(publication.placements[0]).toMatchObject({ placement_type: 'column' });
+  });
+
+  it('returns empty history and null reward when the photo was never decided', async () => {
+    const { app } = harness();
+    const response = await app.request('/api/nen-members/photos/photo-1?accountId=account-a');
+    expect(response.status).toBe(200);
+    const body = await response.json() as { data: Record<string, unknown> };
+    expect(body.data).toMatchObject({ history: [], reward: null, publication: null });
   });
 
   it('lists only consented active publications and preserves unknown view counts', async () => {

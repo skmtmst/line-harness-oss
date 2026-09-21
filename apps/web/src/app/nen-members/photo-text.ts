@@ -24,3 +24,33 @@ export function reviewVersionOf(photo: Record<string, unknown> | null | undefine
   const version = typeof raw === 'number' ? raw : Number(raw ?? 1)
   return Number.isInteger(version) && version >= 0 ? version : 1
 }
+
+/*
+ * ポイント付与の実状態（アウトボックスの status）を画面の言葉へ。
+ * 手続きの行がない採用は EC 未接続（#931 N-307）。
+ * 一覧・詳細・掲載管理の3画面で同じ言い方を使う（Issue #1040 IDEA-22）。
+ */
+export function pointStatusLabel(status: unknown, points = 5) {
+  switch (text(status)) {
+    case 'synced': return `${points}ポイントを付けました`
+    case 'pending':
+    case 'processing': return `${points}ポイントを付ける手続き中`
+    case 'failed': return 'ポイントの手続きで確認が必要'
+    default: return 'EC未接続・ポイント対象外'
+  }
+}
+
+/*
+ * 戻した理由の呼び名。一覧の選択肢（page.tsx の REVIEW_REASONS）と
+ * 同じ言葉を使う（Issue #1040 IDEA-22: 採用履歴の表示）。
+ */
+const REVIEW_REASON_TEXT: Record<string, string> = {
+  privacy: 'ほかの人の顔が写っています',
+  unrelated: 'ほかのお店のロゴや商品名が写っています',
+  quality: '暗くて見えにくいです',
+  duplicate: '同じ写真をすでにもらっています',
+  other: '自分で書く',
+}
+export function photoReviewReasonLabel(code: unknown) {
+  return REVIEW_REASON_TEXT[text(code)] ?? '理由未記録'
+}

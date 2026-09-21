@@ -24,7 +24,7 @@ import { safePhotoSrc } from './photo-src'
 import { photoPetDisplayName } from '@/components/shared/photo-display-name'
 import { photoNoticeFor } from './photo-notice'
 import { photoReviewEntryFrom, photoReviewSearch } from './photo-review-query'
-import { reviewVersionOf, text } from './photo-text'
+import { pointStatusLabel, reviewVersionOf, text } from './photo-text'
 import KpiCollapse from '@/components/ui/kpi-collapse'
 import styles from './photo-review.module.css'
 
@@ -1000,20 +1000,6 @@ function formatAverageReviewTime(minutes: number | null | undefined) {
   if (minutes == null || !Number.isFinite(minutes)) return '—'
   if (minutes < 1) return `平均 ${Math.max(1, Math.round(minutes * 60))}秒`
   return `平均 ${Math.round(minutes)}分`
-}
-
-/*
- * ポイント付与の実状態（アウトボックスの status）を画面の言葉へ。
- * 手続きの行がない採用は EC 未接続（#931 N-307）。
- */
-function pointStatusLabel(status: unknown) {
-  switch (text(status)) {
-    case 'synced': return '5ポイントを付けました'
-    case 'pending':
-    case 'processing': return '5ポイントを付ける手続き中'
-    case 'failed': return 'ポイントの手続きで確認が必要'
-    default: return 'EC未接続・ポイント対象外'
-  }
 }
 
 function photoRiskLabel(flag: string) {
