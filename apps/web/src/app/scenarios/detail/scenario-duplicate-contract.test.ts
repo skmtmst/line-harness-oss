@@ -75,9 +75,34 @@ describe('シナリオの複製は通の中身を落とさない', () => {
     }
   })
 
+  it('SCENARIO-08: シナリオ全体の対象条件・終了後の処理・きっかけ・アクションも写す', () => {
+    const body = duplicateScenario()
+    for (const field of [
+      'audienceCondition:',
+      'onCompleteMode:',
+      'onCompleteScenarioId:',
+      'api.scenarios.triggers.list(id)',
+      'api.scenarios.triggers.add(copy,',
+      'api.scenarios.actions.list(id)',
+      'api.scenarios.actions.create(copy,',
+    ]) {
+      expect(body, `${field} が複製に含まれていません`).toContain(field)
+    }
+  })
+
   it('1通でも失敗したら中断し、理由を出す', () => {
     const body = duplicateScenario()
-    expect(body).toContain('if (!copied.success) throw new Error(copied.error)')
+    expect(body).toContain('if (!copied.success)')
     expect(body).toContain('e instanceof Error')
+  })
+
+  it('SCENARIO-09: 途中失敗で不完全なコピーを残したまま成功扱いにしない', () => {
+    const body = duplicateScenario()
+    // 失敗した段階と作りかけのコピーを画面へ返す
+    expect(body).toContain('DuplicateAborted')
+    expect(body).toContain('setDuplicateRemainder({')
+    // 再試行は新しいコピーを作らず続きから（既存の通は重複して足さない）
+    expect(body).toContain('duplicateRemainder?.copyId')
+    expect(body).toContain('existingByOrder')
   })
 })

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
+import { useSearchParams } from 'next/navigation'
 import { api, bookingApi, type BookingAdminDetail, type BookingMenu, type BookingRequest, type BookingStaff } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -123,10 +124,28 @@ function monthKey(offset: number): string {
 export default function BookingsPage() {
   usePageTitle('予約管理')
   const { selectedAccountId, selectedAccount } = useAccount()
+  const urlParams = useSearchParams()
   const [view, setView] = useState<'day' | 'week' | 'month' | 'list'>('day')
   const [tab, setTab] = useState<string>('requested')
   /** 「今日」「今週」の絞り込み。設計の「よく使う」にある。 */
   const [range, setRange] = useState<'all' | 'today' | 'week'>('all')
+  /*
+   * URLの `?view=` `?status=` `?range=` で絞り込み済みの一覧を開ける
+   * （IDEA-01）。ダッシュボードの「予約状況」カードは
+   * `?view=list&status=requested` でここへ来る。初回だけURLを状態へ
+   * 写し、知らない値は既定へ落とす。
+   */
+  const urlInitRef = useRef(false)
+  useEffect(() => {
+    if (urlInitRef.current) return
+    urlInitRef.current = true
+    const viewParam = urlParams.get('view')
+    if (viewParam === 'week' || viewParam === 'month' || viewParam === 'list') setView(viewParam)
+    const statusParam = urlParams.get('status')
+    if (statusParam && STATUS_TABS.some((item) => item.key === statusParam)) setTab(statusParam)
+    const rangeParam = urlParams.get('range')
+    if (rangeParam === 'today' || rangeParam === 'week') setRange(rangeParam)
+  }, [urlParams])
   const [menuFilter, setMenuFilter] = useState<string>('all')
   // N-398: 担当者・予約経路の絞り込み。一覧の取得とCSV書出しの両方に渡す。
   const [staffFilter, setStaffFilter] = useState<string>('all')

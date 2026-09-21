@@ -305,6 +305,7 @@ export default function NewConversionPointPage() {
     <CreatePage
       title="成果地点をつくる"
       description="「申込」「購入」など、成果として数えたい行動を登録します。"
+      showHeader={false}
       parent={['コンバージョン', '/conversions?tab=points']}
       successHref={(id) => `/conversions?tab=points${id ? `&highlight=${encodeURIComponent(id)}` : ''}`}
       saveLabel={saveAsDraft ? '下書きとして保存する' : 'つくって数えはじめる'}

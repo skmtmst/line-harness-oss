@@ -52,6 +52,7 @@ import {
   getScenarioRuns,
   saveScenarioDraft,
   ScenarioContractError,
+  simulateFriendPlan,
   simulateScenario,
 } from '../services/scenario-v6-contract.js';
 import { listLimit, listPage } from './list-pagination.js';
@@ -1337,6 +1338,41 @@ scenarios.get('/api/scenarios/:id/runs', scenarioPermission('view'), async (c) =
       status: c.req.query('status'),
       cursor: c.req.query('cursor'),
       limit: listLimit(c.req.query('limit'), 50, 100),
+    });
+    return c.json({ success: true, data });
+  } catch (error) {
+    return scenarioContractError(c, error);
+  }
+});
+
+/*
+ * GET /api/scenarios/:id/friends/:friendId/plan — 選んだ友だちへの配信予定を
+ * 副作用なしで試算する（IDEA-05 / B段階導入）。
+ *
+ * 「シナリオ確認」の中から検証用の友だちを選んで、配信予定・待機・分岐理由を
+ * 見る口。送信・購読登録・タグ更新は一切行わない（応答の sideEffects:false）。
+ * 友だち側のアカウント境界も見る（手動登録と同じ。担当外の友だちは404で隠す）。
+ */
+scenarios.get('/api/scenarios/:id/friends/:friendId/plan', scenarioPermission('view'), async (c) => {
+  const lineAccountId = (c.req.query('lineAccountId') ?? '').trim();
+  if (!lineAccountId) {
+    return c.json({ success: false, error: 'LINE公式アカウントを選んでください' }, 400);
+  }
+  const scopeError = await requireScenarioAccountScope(c, lineAccountId);
+  if (scopeError) return scopeError;
+  try {
+    const friend = await getFriendById(c.env.DB, c.req.param('friendId')!);
+    const friendAccountId = (friend as { line_account_id?: string | null } | null)
+      ?.line_account_id ?? null;
+    if (!friend || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [friendAccountId])) {
+      return c.json({ success: false, error: '友だちが見つかりません' }, 404);
+    }
+    const startAt = c.req.query('startAt');
+    const data = await simulateFriendPlan(c.env.DB, {
+      scenarioId: c.req.param('id')!,
+      lineAccountId,
+      friendId: c.req.param('friendId')!,
+      ...(startAt ? { startAt } : {}),
     });
     return c.json({ success: true, data });
   } catch (error) {

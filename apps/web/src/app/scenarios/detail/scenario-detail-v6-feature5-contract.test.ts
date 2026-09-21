@@ -80,9 +80,25 @@ describe('注釈を落としてから見る', () => {
 })
 
 describe('bV5Vs シナリオ編集', () => {
+  it('SCENARIO-24: 本文に画面名「シナリオ編集」と説明は出さない', () => {
+    /*
+     * 画面名は上部バーが1つだけ持つ（bV5Vs 設計）。本文に同名の題と
+     * 説明を置くと、どちらが今いる画面か分からなくなる。
+     */
+    expect(header).not.toContain('title="シナリオ編集"')
+    expect(header).not.toContain('シナリオ編集')
+    expect(header).not.toContain('配信のタイミングと内容を並べます。')
+    /*
+     * 操作は残す。配信結果・一括プレビュー・一括テスト送信・保存の
+     * 各ボタンは Header の action に渡し続ける。
+     */
+    expect(header).toContain('action=')
+    expect(detail).toContain('配信結果を見る')
+    expect(detail).toContain('一括テスト送信')
+  })
+
   it('「作成しただけでは配信されません」を見出しの説明から外し、帯へ移す', () => {
     expect(header).not.toContain('作成しただけでは配信されません')
-    expect(header).toContain('配信のタイミングと内容を並べます。')
     expect(banner).toContain(
       '作成しただけでは配信されません。開始条件を設定し、テスト送信後に配信を開始してください。',
     )
