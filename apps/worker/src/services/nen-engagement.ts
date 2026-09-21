@@ -242,6 +242,68 @@ export async function hasEarlierWindowDelivery(
   return earlier?.found === 1;
 }
 
+/**
+ * IDEA-21: job の payload から起点となった注文番号を取り出す。
+ * 発送後の案内（arrival_check / review_request / cross_sell）の payload は
+ * `{ event }` の形で `event.order.number` を持つ。コラム・誕生日の payload は
+ * 注文を持たないので null が返り、後続の注文状態チェックを素通りする。
+ */
+function orderNumberFromPayload(raw: string): string | null {
+  try {
+    const parsed = JSON.parse(raw) as Record<string, unknown> | null;
+    const event = parsed?.event as Record<string, unknown> | undefined;
+    const order = event?.order as Record<string, unknown> | undefined;
+    const number = order?.number;
+    return typeof number === 'string' && number.trim() ? number.trim() : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * IDEA-21: ECの注文台帳（ec_orders）の現在状態を返す。
+ * `external_order_id` は注文番号。行が無いときは「取り消しとは言えない」ので
+ * null を返し、呼び出し側は送信を止めない（連携の未到着で案内を欠かさない）。
+ */
+async function currentOrderState(
+  db: D1Database,
+  lineAccountId: string | null,
+  orderNumber: string,
+): Promise<string | null> {
+  if (!lineAccountId) return null;
+  const row = await db.prepare(
+    `SELECT normalized_status FROM ec_orders
+      WHERE line_account_id = ? AND external_order_id = ?
+      ORDER BY updated_at DESC LIMIT 1`,
+  ).bind(lineAccountId, orderNumber).first<{ normalized_status: string }>();
+  return row?.normalized_status ?? null;
+}
+
+/**
+ * IDEA-21: 注文の取り消し・返金が届いたとき、その注文を起点に待っている
+ * 発送後の案内を「送らない」へ倒す。送信時の再検証（processNenDeliveries）の
+ * 手前で一覧からも外し、「これから送ります」と表示したまま不適切な案内を
+ * 残さない。既に送った記録や他の注文の予約は触らない。
+ *
+ * payload が壊れた行を SQL が落とさないよう `json_valid` で守る。
+ */
+export async function cancelPendingOrderFollowUps(
+  db: D1Database,
+  input: { lineAccountId: string; orderNumber: string; reason: 'order_cancelled' | 'order_refunded' },
+): Promise<number> {
+  const orderNumber = input.orderNumber.trim();
+  if (!orderNumber) return 0;
+  const result = await db.prepare(
+    `UPDATE nen_delivery_jobs
+        SET status = 'skipped', last_error = ?, updated_at = ?
+      WHERE status = 'pending'
+        AND line_account_id = ?
+        AND json_valid(payload)
+        AND json_extract(payload, '$.event.order.number') = ?`,
+  ).bind(input.reason, jstNow(), input.lineAccountId, orderNumber).run();
+  return result.meta.changes ?? 0;
+}
+
 export function readNenCampaignSnapshot(value: string | null, campaignKey: string): CampaignRow | null {
   if (!value) return null;
   try {
@@ -928,6 +990,24 @@ export async function processNenDeliveries(
         ).bind(reason, jstNow(), job.id).run();
         skipped++;
         continue;
+      }
+      /*
+       * IDEA-21: 注文起点の案内は、送る直前に注文の現在状態を確かめる。
+       * 発送をきっかけに予約された案内（到着確認・口コミ・次の商品）は、
+       * あとから注文が取り消し・返金になっても payload の写しのまま残る。
+       * EC台帳（ec_orders）の現在状態が取り消し・返金なら送らない。
+       * 行が無い注文は「取り消しと確認できない」だけなので止めない。
+       */
+      const orderNumber = orderNumberFromPayload(job.payload);
+      if (orderNumber) {
+        const orderState = await currentOrderState(db, job.line_account_id, orderNumber);
+        if (orderState === 'cancelled' || orderState === 'refunded') {
+          await db.prepare(
+            `UPDATE nen_delivery_jobs SET status = 'skipped', last_error = ?, updated_at = ? WHERE id = ?`,
+          ).bind(orderState === 'cancelled' ? 'order_cancelled' : 'order_refunded', jstNow(), job.id).run();
+          skipped++;
+          continue;
+        }
       }
       if (await alreadyRespondedToCampaignForm(db, campaign, friend.id)) {
         await db.prepare(

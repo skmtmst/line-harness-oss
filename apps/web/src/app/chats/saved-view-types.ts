@@ -13,7 +13,7 @@ export type InboxSavedViewConditions = {
   assignees: string[]
   unread: 'all' | 'mine'
   /**
-   * 一覧上部の「すべて／要返信／期限超過」。N-020 で追加。
+   * 一覧上部の「すべて／要返信／1時間以上待ち」。N-020 で追加。
    * この値を持たない古い行は due から復元する（overdue → 'overdue'）。
    */
   quickFilter: 'all' | 'reply' | 'overdue'

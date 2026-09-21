@@ -5,6 +5,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import OpsSupportPage from './page'
 import { compareLabel, durationLabel, elapsedLabel } from './format'
+import type { OpsKnowledgeReference } from '@/lib/api'
+
+;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
 vi.mock('next/link', () => ({ default: ({ children }: { children: React.ReactNode }) => <a>{children}</a> }))
 
@@ -24,7 +27,8 @@ const ticket = {
 let host: HTMLDivElement
 let root: Root
 let calls: Array<{ url: string; method: string; body: Record<string, unknown> | null }>
-let draft: { body: string; aiGenerated: boolean; generatedAt: string | null; updatedAt: string } | null
+let draft: { body: string; aiGenerated: boolean; generatedAt: string | null; updatedAt: string; references?: OpsKnowledgeReference[] } | null
+let availableReferences: OpsKnowledgeReference[] = []
 let aiFails = false
 
 function respond(url: string, init?: RequestInit) {
@@ -38,7 +42,8 @@ function respond(url: string, init?: RequestInit) {
   if (url.includes('/api/ops/support/tickets?')) return json({ success: true, data: [ticket], total: 86 })
   if (url.endsWith('/draft/ai')) {
     if (aiFails) return json({ success: false, error: 'AI の応答が 45 秒以内に返りませんでした' }, 504)
-    draft = { body: '山田さま\nご連絡ありがとうございます。', aiGenerated: true, generatedAt: '2026-09-15T09:31:00.000+09:00', updatedAt: '2026-09-15T09:31:00.000+09:00' }
+    const excluded = (body?.excludeArticleIds ?? []) as string[]
+    draft = { body: '山田さま\nご連絡ありがとうございます。', aiGenerated: true, generatedAt: '2026-09-15T09:31:00.000+09:00', updatedAt: '2026-09-15T09:31:00.000+09:00', references: availableReferences.filter(ref => !excluded.includes(ref.id)) }
     return json({ success: true, data: draft }, 201)
   }
   if (url.endsWith('/reply')) return json({ success: true, data: { ticket: { ...ticket, stage: 'waiting', stageLabel: '待ち' }, message: {}, mailSent: true, mailSkippedReason: null } }, 201)
@@ -54,6 +59,7 @@ beforeEach(() => {
   calls = []
   draft = null
   aiFails = false
+  availableReferences = []
   process.env.NEXT_PUBLIC_API_URL = 'https://api.example.test'
   vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => respond(String(input), init)))
   host = document.createElement('div')
@@ -94,6 +100,25 @@ describe('表記の決まり', () => {
 })
 
 describe('画面', () => {
+  it('excludes evidence only for this reply, accumulates exclusions, and does not send automatically', async () => {
+    availableReferences = [{ id: 'ref-a', title: 'フォームの根拠', version: 1 }, { id: 'ref-b', title: '配信の根拠', version: 2 }]
+    await act(async () => root.render(<OpsSupportPage />)); await flush()
+    const click = async (label: string) => {
+      await act(async () => Array.from(host.querySelectorAll('button')).find(b => b.textContent === label)!.click()); await flush()
+    }
+    await click('AIで下書きを作る')
+    await click('除外して回答を作り直す')
+    expect(calls.filter(c => c.url.endsWith('/draft/ai')).at(-1)?.body).toEqual({ excludeArticleIds: ['ref-a'] })
+    expect(host.querySelector('[data-design-node="LT8m5"]')?.textContent).not.toContain('フォームの根拠')
+    await click('除外して回答を作り直す')
+    expect(calls.filter(c => c.url.endsWith('/draft/ai')).at(-1)?.body).toEqual({ excludeArticleIds: ['ref-a', 'ref-b'] })
+    expect(host.querySelector('[data-design-node="LT8m5"]')).toBeNull()
+    expect(calls.some(c => c.url.endsWith('/reply'))).toBe(false)
+    aiFails = true
+    await click('作り直す')
+    expect((host.querySelector('textarea[aria-label="返信"]') as HTMLTextAreaElement).value).toContain('山田さま')
+    expect(host.textContent).toContain('時間内に終わりませんでした')
+  })
   it('AI が失敗（5xx）しても「作成中…」のまま固まらず、エラー文を出して手書きに戻る', async () => {
     aiFails = true
     await act(async () => { root.render(<OpsSupportPage />) })
@@ -135,7 +160,7 @@ describe('画面', () => {
     expect(aiButton).toBeDefined()
     await act(async () => { aiButton!.click() })
     await flush()
-    expect(host.textContent).toContain('AIが作った下書きです')
+    expect(host.textContent).toContain('お客様の状況・やり取りとナレッジをもとに作った下書きです')
     expect(host.textContent).toContain('作り直す')
     expect(host.querySelector('[data-design-node="b2uv3"]')).not.toBeNull()
     const textarea = host.querySelector('textarea[aria-label="返信"]') as HTMLTextAreaElement

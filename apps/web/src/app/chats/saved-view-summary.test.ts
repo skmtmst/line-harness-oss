@@ -73,14 +73,14 @@ describe('保存した検索の要約', () => {
     expect(savedViewSummary(conditions({ statuses: ['on_hold'] }))).toBe('対応状況：保留')
   })
 
-  it('期限超過を保存したときは条件の要約へ出す', () => {
-    expect(savedViewSummary(conditions({ due: 'overdue' }))).toBe('期限：超過')
+  it('1時間以上待ちを保存したときは条件の要約へ出す（INBOX-10）', () => {
+    expect(savedViewSummary(conditions({ due: 'overdue' }))).toBe('1時間以上待ち')
   })
 
   it('要返信を保存したときは条件の要約へ出す（N-020）', () => {
     expect(savedViewSummary(conditions({ quickFilter: 'reply' }))).toBe('要返信')
-    // quickFilter の期限超過も、旧軸 due が無くても出す。
-    expect(savedViewSummary(conditions({ quickFilter: 'overdue' }))).toBe('期限：超過')
+    // quickFilter の「1時間以上待ち」も、旧軸 due が無くても出す。
+    expect(savedViewSummary(conditions({ quickFilter: 'overdue' }))).toBe('1時間以上待ち')
   })
 
   it('並び順は、既定でないときだけ出す', () => {

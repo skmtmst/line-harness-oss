@@ -544,6 +544,228 @@ chats.get('/api/chats/stats', requireRole('owner', 'admin', 'staff'), async (c) 
   }
 });
 
+/**
+ * 受信箱のクイック絞り込み（すべて／要返信／1時間以上待ち）の件数。
+ *
+ * INBOX-09: 「すべて」は読み込み済みの行数、「要返信」は別の集計口を
+ * 見ていたため、表示された件数と押したときの結果が一致しなかった。
+ * ここでは一覧（GET /api/chats・GET /api/support/inbox?channel=email）と
+ * 同じ条件（アカウント・検索語・担当・未読・経路）を1回の応答へまとめ、
+ * ページに載った行数ではなく条件全体をサーバーで数える。
+ *
+ * quickFilter 自体は引数に取らない。各札の件数は「その札を押したときの
+ * 条件」をこちらで足して数える。返すのは選択中の経路（channel）で
+ * 画面に見える側だけの合計。
+ *
+ * :id より先に置く。あとに置くと 'quick-counts' が id として解釈される。
+ */
+chats.get('/api/chats/quick-counts', requireRole('owner', 'admin', 'staff'), async (c) => {
+  try {
+    const staff = c.get('staff');
+    const status = c.req.query('status') ?? undefined;
+    const operatorId = c.req.query('operatorId') ?? undefined;
+    const assignee = c.req.query('assignee') ?? operatorId;
+    const unreadOnly = c.req.query('unreadOnly') === '1' || c.req.query('unreadOnly') === 'true';
+    const channel = c.req.query('channel') || 'all';
+    if (channel !== 'all' && channel !== 'line' && channel !== 'email') {
+      return c.json({ success: false as const, error: 'invalid_channel' }, 400);
+    }
+    const lineAccountId = c.req.query('lineAccountId') ?? undefined;
+    const query = (c.req.query('q') ?? '').trim().slice(0, 200);
+    const scope = await getVisibleLineAccountScope(c.env.DB, staff);
+    if (lineAccountId && !scope.allowedAccountIds.includes(lineAccountId)) {
+      return c.json({ success: false as const, error: '受信箱が見つかりません' }, 404);
+    }
+
+    // 「1時間以上待ち」の基準時刻。一覧の quickFilter=overdue と同じ定義:
+    // 対応状況が未対応で、表示される最後のメッセージ（受信・送信どちらでも）
+    // から1時間以上。対応期限の記録はまだ無い（INBOX-10）。
+    const overdueThreshold = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+
+    let line = { all: 0, reply: 0, overdue: 0 };
+    let email = { all: 0, reply: 0, overdue: 0 };
+
+    if (channel !== 'email') {
+      // ── LINE 側。一覧クエリと同じ候補集合（messages_log ∪ chats）を
+      // 同じ条件で数える。preview 用の集約は不要なので CTE 2本だけ。 ──
+      const accountFilterBindings: string[] = [];
+      let accountFilterSql: string;
+      if (lineAccountId) {
+        accountFilterSql = `friend_id IN (SELECT id FROM friends WHERE line_account_id = ?)`;
+        accountFilterBindings.push(lineAccountId);
+      } else {
+        const accountClauses: string[] = [];
+        if (scope.allowedAccountIds.length > 0) {
+          accountClauses.push(
+            `line_account_id IN (${scope.allowedAccountIds.map(() => '?').join(', ')})`,
+          );
+          accountFilterBindings.push(...scope.allowedAccountIds);
+        }
+        if (scope.canSeeUnassigned) accountClauses.push('line_account_id IS NULL');
+        accountFilterSql = accountClauses.length > 0
+          ? `friend_id IN (SELECT id FROM friends WHERE ${accountClauses.join(' OR ')})`
+          : '0=1';
+      }
+
+      const conditions: string[] = [];
+      const conditionBindings: unknown[] = [];
+      if (status && status !== 'all') {
+        conditions.push(`COALESCE(c.status, 'resolved') = ?`);
+        conditionBindings.push(status);
+      }
+      if (operatorId) {
+        if (operatorId === 'unassigned') conditions.push('c.operator_id IS NULL');
+        else {
+          conditions.push('c.operator_id = ?');
+          conditionBindings.push(operatorId);
+        }
+      }
+      if (unreadOnly) {
+        conditions.push(`EXISTS (
+          SELECT 1 FROM messages_log incoming
+          LEFT JOIN inbox_staff_reads reads
+            ON reads.channel = 'line' AND reads.conversation_id = f.id AND reads.staff_id = ?
+          WHERE incoming.friend_id = f.id AND incoming.direction = 'incoming'
+            AND (incoming.delivery_type IS NULL OR incoming.delivery_type != 'test')
+            AND (reads.last_read_at IS NULL OR incoming.created_at > reads.last_read_at)
+        )`);
+        conditionBindings.push(staff.id);
+      }
+      if (lineAccountId) {
+        conditions.push('f.line_account_id = ?');
+        conditionBindings.push(lineAccountId);
+      }
+      if (query) {
+        conditions.push(`(
+          f.display_name LIKE ? OR EXISTS (
+            SELECT 1 FROM messages_log mq
+            WHERE mq.friend_id = f.id
+              AND (mq.delivery_type IS NULL OR mq.delivery_type != 'test')
+              AND mq.content LIKE ?
+          )
+        )`);
+        const like = `%${query}%`;
+        conditionBindings.push(like, like);
+      }
+
+      const countsRow = await c.env.DB.prepare(`
+        WITH last_any AS MATERIALIZED (
+          SELECT friend_id, MAX(created_at) AS last_message_at
+          FROM messages_log
+          WHERE (delivery_type IS NULL OR delivery_type != 'test')
+            AND ${accountFilterSql}
+          GROUP BY friend_id
+        ),
+        deduped AS MATERIALIZED (
+          SELECT friend_id, MAX(last_message_at) AS last_message_at FROM (
+            SELECT friend_id, last_message_at FROM last_any
+            UNION ALL
+            SELECT friend_id, last_message_at FROM chats WHERE ${accountFilterSql}
+          ) GROUP BY friend_id
+        )
+        SELECT
+          COUNT(*) AS all_count,
+          SUM(CASE WHEN COALESCE(c.status, 'resolved') = 'unread' THEN 1 ELSE 0 END) AS reply_count,
+          SUM(CASE WHEN COALESCE(c.status, 'resolved') = 'unread'
+                AND julianday(COALESCE((
+                  SELECT MAX(latest.created_at) FROM messages_log latest
+                  WHERE latest.friend_id = f.id
+                    AND (latest.delivery_type IS NULL OR latest.delivery_type != 'test')
+                ), d.last_message_at)) <= julianday(?)
+              THEN 1 ELSE 0 END) AS overdue_count
+        FROM deduped d
+        INNER JOIN friends f ON f.id = d.friend_id
+        LEFT JOIN chats c ON c.id = (
+          SELECT id FROM chats WHERE friend_id = f.id ORDER BY created_at DESC LIMIT 1
+        )
+        WHERE 1=1
+        ${conditions.length > 0 ? 'AND ' + conditions.join(' AND ') : ''}
+      `).bind(
+        ...accountFilterBindings,
+        ...accountFilterBindings,
+        overdueThreshold,
+        ...conditionBindings,
+      ).first<{ all_count: number | null; reply_count: number | null; overdue_count: number | null }>();
+      line = {
+        all: countsRow?.all_count ?? 0,
+        reply: countsRow?.reply_count ?? 0,
+        overdue: countsRow?.overdue_count ?? 0,
+      };
+    }
+
+    /*
+     * ── メール側。一覧（/api/support/inbox?channel=email）と同じ
+     * 表示条件（デフォルトテナントのみ・同じ検索・担当・未読）で数える。 ──
+     */
+    if (channel !== 'line' && scope.canSeeUnassigned && !lineAccountId) {
+      const statusSql = !status || status === 'all'
+        ? '1=1'
+        : status === 'resolved'
+          ? `t.status = 'resolved'`
+          : status === 'unread' || status === 'in_progress' || status === 'on_hold'
+            ? 't.status = ?'
+            : `t.status != 'resolved'`;
+      // SQL 上の placeholder 順は overdue閾値（SELECT内）→ staff_id（join）→ 条件値。
+      const bindings: Array<string | number> = [];
+      if (status === 'unread' || status === 'in_progress' || status === 'on_hold') bindings.push(status);
+      let searchSql = '';
+      if (query) {
+        searchSql = `AND (
+          t.customer_email LIKE ? OR t.customer_name LIKE ? OR t.subject LIKE ? OR EXISTS (
+            SELECT 1 FROM support_email_messages searched
+            WHERE searched.thread_id = t.id AND searched.body_text LIKE ?
+          )
+        )`;
+        const like = `%${query}%`;
+        bindings.push(like, like, like, like);
+      }
+      if (assignee) {
+        if (assignee === 'unassigned') searchSql += ' AND t.assigned_staff_id IS NULL';
+        else {
+          searchSql += ' AND t.assigned_staff_id = ?';
+          bindings.push(assignee);
+        }
+      }
+      if (unreadOnly) {
+        searchSql += ' AND (sr.last_read_at IS NULL OR t.last_incoming_at > sr.last_read_at)';
+      }
+      const emailCounts = await c.env.DB.prepare(
+        `SELECT COUNT(*) AS all_count,
+                SUM(CASE WHEN t.status = 'unread' THEN 1 ELSE 0 END) AS reply_count,
+                SUM(CASE WHEN t.status = 'unread'
+                      AND julianday(t.last_incoming_at) <= julianday(?)
+                    THEN 1 ELSE 0 END) AS overdue_count
+         FROM support_email_threads t
+         LEFT JOIN inbox_staff_reads sr
+           ON sr.channel = 'email'
+          AND sr.conversation_id = t.id
+          AND sr.staff_id = ?
+         WHERE ${statusSql} ${searchSql}`,
+      ).bind(overdueThreshold, staff.id, ...bindings)
+        .first<{ all_count: number | null; reply_count: number | null; overdue_count: number | null }>();
+      email = {
+        all: emailCounts?.all_count ?? 0,
+        reply: emailCounts?.reply_count ?? 0,
+        overdue: emailCounts?.overdue_count ?? 0,
+      };
+    }
+
+    return c.json({
+      success: true as const,
+      data: {
+        all: line.all + email.all,
+        reply: line.reply + email.reply,
+        overdue: line.overdue + email.overdue,
+        line,
+        email,
+      },
+    });
+  } catch (err) {
+    console.error('GET /api/chats/quick-counts error:', err);
+    return c.json({ success: false as const, error: '件数を取得できませんでした' }, 500);
+  }
+});
+
 /** 個別送信の失敗台帳。必ずLINEアカウントを指定し、担当範囲の中だけ返す。 */
 chats.get('/api/chats/outbound-failures', requireRole('owner', 'admin', 'staff'), async (c) => {
   try {

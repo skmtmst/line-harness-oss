@@ -2,8 +2,9 @@
 
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
 import {
+  BookOpen,
   Building2,
   ChevronsUpDown,
   LayoutDashboard,
@@ -23,6 +24,7 @@ import { adminSessionHeaders, captureAdminSessionHandoff } from '@/lib/admin-ses
 import { logoutAndGoToLogin } from '@/lib/logout'
 import OpsEnvBar from './ops-env-bar'
 import ImpersonationBar from './impersonation-bar'
+import TopBar from '@/components/shared/top-bar'
 
 /**
  * 運営コンソールの外枠。★V6 37 系。
@@ -37,8 +39,15 @@ const MENU: Array<{ href: string; label: string; icon: typeof LayoutDashboard }>
   { href: '/ops/tenants', label: '契約先アカウント', icon: Building2 },
   { href: '/ops/support', label: 'お問い合わせ', icon: LifeBuoy },
   { href: '/ops/announcements', label: 'お知らせ', icon: Megaphone },
+  { href: '/ops/knowledge', label: 'ナレッジ', icon: BookOpen },
   { href: '/ops/audit', label: '監査ログ', icon: ScrollText },
 ]
+
+const OpsPageTitleContext = createContext<(title: string) => void>(() => {})
+export function useOpsPageTitle(title: string) {
+  const setTitle = useContext(OpsPageTitleContext)
+  useEffect(() => { setTitle(title); return () => setTitle('') }, [setTitle, title])
+}
 
 export default function OpsShell({ children }: { children: ReactNode }) {
   const router = useRouter()
@@ -47,6 +56,7 @@ export default function OpsShell({ children }: { children: ReactNode }) {
   const [checked, setChecked] = useState(false)
   const [loadError, setLoadError] = useState('')
   const [navOpen, setNavOpen] = useState(false)
+  const [pageTitle, setPageTitle] = useState('')
 
   /*
    * 狭い画面のメニューは開閉式。画面を移ったら閉じ、開いている間は
@@ -120,6 +130,29 @@ export default function OpsShell({ children }: { children: ReactNode }) {
       </div>
     )
   }
+
+  // V6 csVox: environment strip belongs to the content column, not above
+  // the sidebar. Existing authentication and account-menu behavior is unchanged.
+  if (pathname === '/ops/knowledge' || pathname === '/ops/support') return (
+    <OpsPageTitleContext.Provider value={setPageTitle}>
+    <div className="flex min-h-svh bg-shell" data-design-node="jIZP0" data-knowledge-shell>
+      <OpsSidebar me={me} pathname={pathname} open={navOpen} onClose={() => setNavOpen(false)} />
+      <main className="min-w-0 flex-1">
+        <OpsEnvBar />
+        {me.impersonation ? <ImpersonationBar initial={me.impersonation} onChange={() => void load()} /> : null}
+        <div className="flex h-12 items-center border-b border-hairline bg-canvas px-4 xl:hidden">
+          <button type="button" aria-expanded={navOpen} onClick={() => setNavOpen(true)}
+            className="flex min-h-11 items-center gap-2 rounded-md px-2 text-label font-bold text-ink hover:bg-canvas-sunken">
+            <Menu aria-hidden="true" className="h-5 w-5" />メニュー
+          </button>
+        </div>
+        <TopBar title={pathname === '/ops/knowledge' ? 'ナレッジ' : pageTitle || 'お問い合わせ'} accounts={[]} selectedAccountId="" onAccountChange={() => {}} showAccountSwitcher={false}
+          roleLabel="運営" userName={me.name} onLogout={() => logoutAndGoToLogin('/ops/login')} />
+        <div className="px-10 pb-8 pt-3.5">{children}</div>
+      </main>
+    </div>
+    </OpsPageTitleContext.Provider>
+  )
 
   return (
     <div className="flex min-h-svh flex-col bg-canvas-sunken" data-design-node="jIZP0">

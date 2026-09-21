@@ -101,7 +101,7 @@ async function applySingleFilter(kind: 'search' | 'status' | 'quick' | 'assignee
     return
   }
   if (kind === 'status') { await click('未対応'); return }
-  if (kind === 'quick') { await click('期限超過'); return }
+  if (kind === 'quick') { await click('1時間以上待ち'); return }
   await click('絞り込み')
   if (kind === 'assignee') {
     await act(async () => {
@@ -281,7 +281,7 @@ test('全条件の結果0件を区別し、解除後に会話を戻す', async (
     const assigneeCall = calls.filter((url) => url.pathname === '/api/chats').at(-1)!
     expect(assigneeCall.searchParams.get('operatorId')).toBe('operator-a')
   })
-  await click('期限超過')
+  await click('1時間以上待ち')
   await act(async () => { host.querySelector<HTMLInputElement>('[aria-label="未読だけ表示"]')!.click() })
 
   await eventually(() => expect(state('filtered-empty')).toBeTruthy())

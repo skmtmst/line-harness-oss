@@ -3843,6 +3843,8 @@ export type EcSubscription = {
   statusLabel: string
   riskReason: string | null
   nextShippingAt: string | null
+  /** ECが契約ごとに渡す定期便の変更ページ（httpsのみ）。無い契約は null。 */
+  manageUrl: string | null
   cycle: string | null
   items: string | null
   amount: number | null
@@ -4177,7 +4179,7 @@ export type NenDelivery = {
   version: number; updatedAt: string
 }
 
-export type NenSkippedReasonCode = 'friend_unavailable' | 'line_account_unavailable' | 'line_account_mismatch' | 'campaign_snapshot_missing' | 'campaign_disabled' | 'campaign_form_already_submitted' | 'unknown'
+export type NenSkippedReasonCode = 'friend_unavailable' | 'line_account_unavailable' | 'line_account_mismatch' | 'campaign_snapshot_missing' | 'campaign_disabled' | 'campaign_form_already_submitted' | 'frequency_suppressed' | 'order_cancelled' | 'order_refunded' | 'unknown'
 
 export type NenDeliveryList = {
   range: NenMetricsRange
@@ -4900,7 +4902,17 @@ export type OpsSupportMessage = {
   deliveredVia: string[]
   createdAt: string
 }
-export type OpsSupportDraft = { body: string; aiGenerated: boolean; generatedAt: string | null; updatedAt: string }
+export type OpsKnowledgeReference = { id: string; version: number; title: string }
+export type OpsSupportDraft = { body: string; aiGenerated: boolean; generatedAt: string | null; updatedAt: string; references?: OpsKnowledgeReference[] }
+export type OpsKnowledgeReviewState = 'pending' | 'approved' | 'needs_review' | 'dismissed'
+export type OpsKnowledgeInput = { title: string; question: string; answer: string; kind: HqSupportKind; keywords: string[] }
+export type OpsKnowledgeArticle = OpsKnowledgeInput & {
+  sourceSubject?: string | null
+  id: string; version: number; sourceRequestId: string; ticketNo: number | null; sourceCurrent: boolean
+  reviewState: OpsKnowledgeReviewState; status: 'active' | 'disabled'; reviewReason: string
+  evidence: Array<{ messageId: string; createdAt: string; authorKind: 'tenant' | 'ops'; quote: string; role: 'action' | 'result' | 'condition' }>
+  usedCount: number; helpfulCount: number; unhelpfulCount: number; updatedAt: string
+}
 export type OpsSupportSummary = {
   byStage: Record<OpsSupportStage | 'all', number>
   kpis: {
@@ -4917,6 +4929,7 @@ export type OpsSupportSummary = {
 /** 運営ダッシュボード（★V6 37-2）。形は `apps/worker/src/routes/ops-dashboard.ts`。金額は定価ベース。 */
 export type OpsDashboardPeriod = 'month' | 'prev_month' | 'year'
 export type OpsDashboard = {
+  ai?: { callsThisMonth: number; draftsThisMonth: number; articlesActive: number }
   period: OpsDashboardPeriod
   periodLabel: string
   pricing: 'list_price'
@@ -5007,6 +5020,7 @@ export type HqLineRegistration =
   | { available: false }
   | { available: true; accountName: string; basicId: string | null; addFriendUrl: string | null; linked: boolean; code: string | null; codeExpiresAt: string | null }
 export type OpsSupportDetail = {
+  knowledge?: { article: OpsKnowledgeArticle | null; job: { status: 'queued' | 'running' | 'done' | 'failed' | 'stale'; source_current: number } | null }
   ticket: OpsSupportTicket
   tenant: { accountCount: number; staffCount: number; staffWithLine: number; pastTickets: number; pastOpen: number }
   messages: OpsSupportMessage[]
@@ -7228,6 +7242,23 @@ export const api = {
     dashboard: (period?: OpsDashboardPeriod) =>
       fetchApi<ApiResponse<OpsDashboard>>(`/api/ops/dashboard${period ? `?period=${period}` : ''}`),
     lineUnregistered: () => fetchApi<ApiResponse<OpsLineUnregistered>>('/api/ops/dashboard/line-unregistered'),
+    /** 運営専用ナレッジ ★V6 37-11。 */
+    knowledge: {
+      list: (params: { q?: string; kind?: string; state?: string; offset?: number } = {}) => {
+        const query = new URLSearchParams()
+        for (const [key, value] of Object.entries(params)) if (value !== undefined && value !== '') query.set(key, String(value))
+        return fetchApi<ApiResponse<OpsKnowledgeArticle[]> & { total: number }>(`/api/ops/knowledge?${query}`)
+      },
+      article: (id: string) => fetchApi<ApiResponse<OpsKnowledgeArticle>>(`/api/ops/knowledge/${encodeURIComponent(id)}`),
+      update: (id: string, version: number, input: OpsKnowledgeInput) =>
+        fetchApi<ApiResponse<OpsKnowledgeArticle>>(`/api/ops/knowledge/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify({ version, ...input }) }),
+      review: (id: string, input: { version: number; action: 'approve' | 'dismiss' | 'disable'; confirmed?: boolean }) =>
+        fetchApi<ApiResponse<OpsKnowledgeArticle>>(`/api/ops/knowledge/${encodeURIComponent(id)}/review`, { method: 'POST', body: JSON.stringify(input) }),
+      feedback: (id: string, requestId: string, feedback: 'helpful' | 'unhelpful') =>
+        fetchApi<ApiResponse<null>>(`/api/ops/knowledge/${encodeURIComponent(id)}/feedback`, { method: 'POST', body: JSON.stringify({ requestId, feedback }) }),
+      retry: (requestId: string) =>
+        fetchApi<ApiResponse<null>>(`/api/ops/knowledge/tickets/${encodeURIComponent(requestId)}/retry`, { method: 'POST' }),
+    },
     /** お知らせ配信 ★V6 37-7。 */
     announcements: {
       list: () => fetchApi<ApiResponse<OpsAnnouncement[]> & { linked: { linked: number; total: number }; noticeLineConfigured: boolean }>('/api/ops/announcements'),
@@ -7263,8 +7294,8 @@ export const api = {
         fetchApi<ApiResponse<OpsSupportDraft | null>>(`/api/ops/support/tickets/${encodeURIComponent(id)}/draft`, { method: 'PUT', body: JSON.stringify({ body }) }),
       deleteDraft: (id: string) =>
         fetchApi<ApiResponse<null>>(`/api/ops/support/tickets/${encodeURIComponent(id)}/draft`, { method: 'DELETE' }),
-      aiDraft: (id: string) =>
-        fetchApi<ApiResponse<OpsSupportDraft>>(`/api/ops/support/tickets/${encodeURIComponent(id)}/draft/ai`, { method: 'POST', body: '{}' }),
+      aiDraft: (id: string, excludeArticleIds: string[] = []) =>
+        fetchApi<ApiResponse<OpsSupportDraft>>(`/api/ops/support/tickets/${encodeURIComponent(id)}/draft/ai`, { method: 'POST', body: JSON.stringify({ excludeArticleIds }) }),
       create: (input: { tenantId: string; subject: string; body: string; kind?: string; priority?: OpsSupportPriority; channel?: 'ops' | 'line'; staffId?: string }) =>
         fetchApi<ApiResponse<OpsSupportTicket>>('/api/ops/support/tickets', { method: 'POST', body: JSON.stringify(input) }),
     },
@@ -9405,6 +9436,34 @@ export const api = {
       if (params?.beforeId) query.beforeId = params.beforeId
       return fetchApi<ApiResponse<ChatListItem[]>>(
         '/api/chats?' + new URLSearchParams(query),
+      )
+    },
+    /*
+     * INBOX-09: 「すべて／要返信／1時間以上待ち」の件数。一覧と同じ条件を
+     * サーバーで数え、ページに載った行数や別の集計口と混ぜない。
+     */
+    quickCounts: (params?: {
+      status?: string; operatorId?: string; accountId?: string; q?: string;
+      unreadOnly?: boolean; channel?: 'all' | 'line' | 'email';
+    }) => {
+      const query: Record<string, string> = {}
+      if (params?.status) query.status = params.status
+      if (params?.operatorId) {
+        query.operatorId = params.operatorId
+        query.assignee = params.operatorId
+      }
+      if (params?.accountId) query.lineAccountId = params.accountId
+      if (params?.q) query.q = params.q
+      if (params?.unreadOnly) query.unreadOnly = '1'
+      if (params?.channel) query.channel = params.channel
+      return fetchApi<ApiResponse<{
+        all: number
+        reply: number
+        overdue: number
+        line: { all: number; reply: number; overdue: number }
+        email: { all: number; reply: number; overdue: number }
+      }>>(
+        '/api/chats/quick-counts?' + new URLSearchParams(query),
       )
     },
     get: (id: string, params?: { limit?: number; beforeAt?: string; beforeId?: string }) => {
