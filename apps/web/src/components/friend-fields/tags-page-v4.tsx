@@ -1047,6 +1047,12 @@ export default function TagsPageV4({
                             <Link href={`/tags/edit?id=${tag.id}`} className="truncate text-label font-semibold text-status-info hover:underline" title={tag.name}>{tag.name}</Link>
                             {/* 保管済みは一覧に出続けるが、開くと名前と説明しか直せない(#710)。 */}
                             {tag.status === 'archived' && <span className="shrink-0 rounded-pill bg-canvas-sunken px-2 py-0.5 text-micro font-bold text-ink-faint">保管済み</span>}
+                            {/*
+                              IDEA-04: 整理候補の「重複名」を行ごとに示す。
+                              KPIの「整理候補」だけだと、どのタグが重複候補か分からない。
+                              理由はサーバーの cleanupReasons だけを見る（画面で再判定しない）。
+                            */}
+                            {tag.cleanupReasons?.includes('duplicate_name') && <span className="shrink-0 rounded-pill bg-status-warn-soft px-2 py-0.5 text-micro font-bold text-status-warn-deep" title="正規化した名前がほかのタグと重なっています。整理候補です。">重複名</span>}
                           </div>
                           {/* ATTR-20: 登録日は名前の下へ畳む。独立した列にすると1024pxでつぶれる。 */}
                           <p className="mt-0.5 pl-4 text-[11px] text-ink-faint">{formatDate(tag.createdAt)} 登録</p>
@@ -1122,6 +1128,8 @@ export default function TagsPageV4({
                                 <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: group?.color ?? '#8b938d' }} />
                                 <Link href={`/tags/edit?id=${tag.id}`} className="truncate text-label font-semibold text-status-info hover:underline" title={tag.name}>{tag.name}</Link>
                                 {tag.status === 'archived' && <span className="shrink-0 rounded-pill bg-canvas-sunken px-2 py-0.5 text-micro font-bold text-ink-faint">保管済み</span>}
+                                {/* IDEA-04: 重複名の整理候補はカード表示でも行ごとに示す。 */}
+                                {tag.cleanupReasons?.includes('duplicate_name') && <span className="shrink-0 rounded-pill bg-status-warn-soft px-2 py-0.5 text-micro font-bold text-status-warn-deep" title="正規化した名前がほかのタグと重なっています。整理候補です。">重複名</span>}
                               </div>
                               <p className="mt-0.5 text-[11px] text-ink-faint">{formatDate(tag.createdAt)} 登録・{sourceLabel(tag)}</p>
                               {chips.length > 0 ? (

@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useMemo, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import type { FriendFieldType, Folder } from '@line-crm/shared'
+import type { FriendField, FriendFieldType, Folder } from '@line-crm/shared'
 import { api, ApiError } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import FeatureGate from '@/components/feature-gate'
@@ -13,6 +13,7 @@ import StickyBar from '@/components/shared/sticky-bar'
 import SelectField from '@/components/shared/select-field'
 import { Field, TextInput, TextArea } from '@/components/shared/form-controls'
 import { FIELD_TYPE_HINTS, FIELD_TYPE_LABELS } from '@/components/friend-fields/field-list'
+import { AttributeKindGuide, DuplicateNameNote, findDuplicateNames } from '@/components/friend-fields/attribute-kind-guide'
 
 const TYPES = Object.keys(FIELD_TYPE_LABELS) as FriendFieldType[]
 const NEEDS_OPTIONS = new Set<FriendFieldType>(['select', 'multi_select'])
@@ -52,13 +53,32 @@ function NewFriendFieldForm() {
   const [ecFieldPath, setEcFieldPath] = useState('')
   const [folderId, setFolderId] = useState('')
   const [folders, setFolders] = useState<Folder[]>([])
+  /*
+   * IDEA-04: 同名・同じ差し込み名の項目がすでにあるとき、保存する前に
+   * 知らせる。取れなかったときは注意を出さないだけ（保存は止めない）。
+   */
+  const [existing, setExisting] = useState<FriendField[]>([])
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
   useEffect(() => { void api.folders.list('friend_field').then((res) => { if (res.success) setFolders(res.data) }) }, [])
+  useEffect(() => {
+    if (!selectedAccountId) return
+    let cancelled = false
+    void api.friendFields.list(selectedAccountId)
+      .then((res) => { if (!cancelled && res.success) setExisting(res.data) })
+      .catch(() => { /* 注意が出せないだけ。読み直しはしない */ })
+    return () => { cancelled = true }
+  }, [selectedAccountId])
 
   const optionList = useMemo(() => options.split('\n').map((value) => value.trim()).filter(Boolean), [options])
   const destination = folders.find((folder) => folder.id === folderId)?.name ?? '未分類'
+  const nameDuplicates = useMemo(() => findDuplicateNames(existing, name), [existing, name])
+  const keyOwners = useMemo(() => {
+    const key = fieldKey.trim()
+    if (!key) return []
+    return existing.filter((item) => item.fieldKey === key).map((item) => item.name)
+  }, [existing, fieldKey])
 
   const save = async () => {
     if (saving) return
@@ -100,9 +120,12 @@ function NewFriendFieldForm() {
             {/* #976 U086: 必須項目は共通の「必須」札（Field required）にそろえる。 */}
             <Field label="項目名" htmlFor="ff-name" required>
               <TextInput id="ff-name" value={name} onChange={(event) => { setName(event.target.value); if (!keyTouched) setFieldKey(suggestKey(event.target.value)) }} placeholder="例：愛犬のお名前" />
+              <DuplicateNameNote duplicates={nameDuplicates} kindLabel="項目" />
             </Field>
             <Field label="差し込み名" htmlFor="ff-key" required>
               <TextInput id="ff-key" value={fieldKey} onChange={(event) => { setKeyTouched(true); setFieldKey(event.target.value) }} placeholder="pet_name" className="font-mono" />
+              {/* 差し込み名はサーバーが一意にする。先に教えておかないと保存して初めて断られる。 */}
+              {keyOwners.length > 0 ? <p className="mt-1.5 text-xs leading-5 text-status-warn-deep">この差し込み名はすでに「{keyOwners[0]}」で使われています。別の差し込み名にしてください。</p> : null}
             </Field>
             <p className="font-mono text-xs font-semibold text-accent-deep">{`{{field.${fieldKey || 'pet_name'}}}`}</p>
             <Field label="種類" htmlFor="ff-type" note={FIELD_TYPE_HINTS[type]}>
@@ -148,6 +171,8 @@ function NewFriendFieldForm() {
             <Field label="フォルダ" htmlFor="ff-folder" note="フォルダは友だち詳細のタブになります。">
               <SelectField id="ff-folder" value={folderId} onChange={(event) => setFolderId(event.target.value)} aria-label="友だち情報欄のフォルダ" className="v6-select w-full" options={[{ value: '', label: '未分類' }, ...folders.map((folder) => ({ value: folder.id, label: folder.name }))]} />
             </Field>
+            {/* IDEA-04: 「情報欄」を選んだ理由と、印だけならタグ・対応状態なら対応マークという違いを、作る場所で確認できるようにする。 */}
+            <AttributeKindGuide current="field" />
           </div>
         </section>
 
