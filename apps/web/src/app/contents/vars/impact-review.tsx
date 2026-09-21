@@ -135,7 +135,11 @@ export default function ImpactReview({
           title="送信済みの文"
           value={impact.historicalTotal}
           unit="件"
-          detail="変わりません。過去に送った文はそのときの値のままです"
+          // 送信を始めた配信は値の写しを持つので、保存しても変わらない
+          // （IDEA-14）。送信済みと同じ「変わらない」側として断りを入れる。
+          detail={impact.sendingFixedTotal > 0
+            ? `変わりません。送信を始めた配信${impact.sendingFixedTotal.toLocaleString('ja-JP')}件は、送信開始時の値で固定済みです`
+            : '変わりません。過去に送った文はそのときの値のままです'}
           variant="v6"
         />
       </div>

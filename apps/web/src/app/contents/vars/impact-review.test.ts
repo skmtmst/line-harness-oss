@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { impactBreakdown, impactCsv, overLimitCount, urgentImpactCount } from './impact-review'
 
 const impact = {
-  // 状態の語彙は口（commonVarUsageStatus）とそろえる。「公開中」を返す口は無い。
+  // 状態の語彙は口（commonVarUsageStatus）とそろえる。口が返す呼び名だけを使う。
   byKind: { template: 2, form: 1 },
   items: [
     { name: '予約配信', kindLabel: '一斉配信', status: '配信予約中 9/10 10:00', blocksDeletion: true, changesOnSave: true, currentPreview: '前', nextPreview: '後', exceedsCharacterLimit: false },
