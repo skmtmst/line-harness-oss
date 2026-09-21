@@ -543,7 +543,7 @@
     "direct-primary-button": 1
   },
   "components/dashboard/dashboard-editor.tsx": {
-    "arbitrary-value": 17,
+    "arbitrary-value": 19,
     "direct-secondary-button": 1,
     "direct-primary-button": 1
   },
@@ -552,8 +552,8 @@
     "arbitrary-value": 3
   },
   "components/dashboard/qr-dialog.tsx": {
-    "arbitrary-value": 9,
-    "direct-secondary-button": 3
+    "arbitrary-value": 10,
+    "direct-secondary-button": 2
   },
   "components/dashboard/shipment-panel.tsx": {
     "arbitrary-value": 4,
