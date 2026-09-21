@@ -10,27 +10,12 @@
  */
 
 import { useCallback, useEffect, useState } from 'react'
-import { api, ApiError } from '@/lib/api'
+import { api, ApiError, type RichMenuPublishRun } from '@/lib/api'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
 
-type PublishRun = {
-  id: string
-  status: 'running' | 'succeeded' | 'failed'
-  lastErrorCode: string | null
-  idempotencyKey: string
-  requestedByStaffId: string
-  createdAt: string
-  updatedAt: string
-  version: { name: string | null; chatBarText: string | null; pageCount: number | null }
-  pages: Array<{
-    pageId: string
-    orderIndex: number
-    newRichMenuId: string
-    oldRichMenuId: string | null
-  }>
-}
+type PublishRun = RichMenuPublishRun
 
 type ReconcileDiff = { kind: string; detail: string; pageId?: string; richMenuId?: string }
 
@@ -50,6 +35,14 @@ function formatAt(iso: string): string {
   return new Date(iso).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })
 }
 
+/** その版が誰に出る版か。スナップショットに情報が無い版は「分からない」と濁す。 */
+function audienceLabel(version: PublishRun['version']): string | null {
+  if (version.isDefaultForAll === true) return 'すべての友だち（既定メニュー）'
+  if (version.targetingEnabled === true) return '出し分け条件に合う友だち'
+  if (version.isDefaultForAll === false && version.targetingEnabled === false) return 'すべての友だち'
+  return null
+}
+
 export function PublishHistorySection({
   groupId,
   onChanged,
@@ -59,8 +52,11 @@ export function PublishHistorySection({
   onChanged?: () => void
 }) {
   const [runs, setRuns] = useState<PublishRun[] | null>(null)
+  const [published, setPublished] = useState<PublishRun | null>(null)
+  const [draftDiffers, setDraftDiffers] = useState<boolean | null>(null)
   const [loadError, setLoadError] = useState('')
   const [retryingId, setRetryingId] = useState<string | null>(null)
+  const [retryTarget, setRetryTarget] = useState<PublishRun | null>(null)
   const [notice, setNotice] = useState('')
   const [actionError, setActionError] = useState('')
 
@@ -73,7 +69,9 @@ export function PublishHistorySection({
     try {
       const res = await api.richMenuGroups.publishRuns(groupId)
       if (!res.success) throw new Error(res.error)
-      setRuns(res.data)
+      setRuns(res.data.runs)
+      setPublished(res.data.published)
+      setDraftDiffers(res.data.draftDiffersFromPublished)
       setLoadError('')
     } catch (e) {
       setLoadError(
@@ -96,6 +94,7 @@ export function PublishHistorySection({
     try {
       const res = await api.richMenuGroups.retryPublishRun(groupId, run.id)
       if (!res.success) throw new Error(res.error)
+      setRetryTarget(null)
       setNotice('失敗した公開をやり直しました。最新の状態を確認してください。')
       onChanged?.()
     } catch (e) {
@@ -108,6 +107,17 @@ export function PublishHistorySection({
       setRetryingId(null)
       void load()
     }
+  }
+
+  /** 再試行する版の説明文。対象と影響を確認してから実行する。 */
+  function retryDescription(run: PublishRun): string {
+    const audience = audienceLabel(run.version)
+    return [
+      `${formatAt(run.createdAt)} に失敗した公開を、保存された版のままやり直します。`,
+      `対象: ${audience ?? 'このメニューの出し分け設定に合う友だち'}。`,
+      '途中まで作成済みのものは続きから再開し、別の版や別の対象には適用しません。',
+      '下書きが保存時から変わっている場合は、上書きを避けるため再試行せず止めます。',
+    ].join('')
   }
 
   async function checkReconcile() {
@@ -160,6 +170,28 @@ export function PublishHistorySection({
       {actionError ? <p role="alert" className="text-danger mt-3 text-xs">{actionError}</p> : null}
       {reconcileError ? <p role="alert" className="text-danger mt-3 text-xs">{reconcileError}</p> : null}
 
+      {/* 公開版と編集中の版を混ぜないための明示。 */}
+      {!loadError && runs !== null ? (
+        <div className="border-hairline bg-canvas-sunken mt-3 rounded border px-3 py-2 text-xs leading-5">
+          {published ? (
+            <p className="text-ink">
+              いま対象に出ている版: 「{published.version.name ?? '（名前なし）'}」
+              {published.version.pageCount !== null ? ` ・ ${published.version.pageCount}ページ` : ''}
+              {audienceLabel(published.version) ? ` ・ ${audienceLabel(published.version)}に表示中` : ''}
+              {` ・ ${formatAt(published.updatedAt)} に公開`}
+            </p>
+          ) : (
+            <p className="text-ink-faint">いま対象に出ている版はありません（まだ公開に成功していません）。</p>
+          )}
+          {draftDiffers === true ? (
+            <p className="text-warning">編集中の下書きは公開中の版と違います。公開すると、この下書きで上書きされます。</p>
+          ) : null}
+          {draftDiffers === false && published ? (
+            <p className="text-ink-faint">編集中の下書きは公開中の版と同じです。</p>
+          ) : null}
+        </div>
+      ) : null}
+
       {loadError ? (
         <p role="alert" className="text-danger mt-3 text-xs">{loadError}</p>
       ) : runs === null ? (
@@ -184,7 +216,7 @@ export function PublishHistorySection({
               </span>
               {/* 失敗したものだけ再試行できる。成功済みはLINE操作をやり直さない。 */}
               {run.status === 'failed' ? (
-                <Button type="button" onClick={() => void retry(run)} disabled={retryingId !== null}>
+                <Button type="button" onClick={() => setRetryTarget(run)} disabled={retryingId !== null}>
                   {retryingId === run.id ? '再試行中…' : '失敗分を再試行'}
                 </Button>
               ) : null}
@@ -192,6 +224,31 @@ export function PublishHistorySection({
           ))}
         </ul>
       )}
+
+      {/* 再試行は対象と影響を確認してから実行する。 */}
+      <ConfirmDialog
+        open={retryTarget !== null}
+        title="失敗した公開をやり直しますか？"
+        description={retryTarget ? retryDescription(retryTarget) : ''}
+        confirmLabel="この版を再試行する"
+        busy={retryingId !== null}
+        error={actionError || undefined}
+        onCancel={() => {
+          if (retryingId) return
+          setRetryTarget(null)
+        }}
+        onConfirm={() => {
+          if (retryTarget) void retry(retryTarget)
+        }}
+      >
+        {retryTarget ? (
+          <p className="text-ink-secondary text-xs leading-5">
+            版: 「{retryTarget.version.name ?? '（名前なし）'}」
+            {retryTarget.version.pageCount !== null ? ` ・ ${retryTarget.version.pageCount}ページ` : ''}
+            {retryTarget.lastErrorCode ? ` ・ 前回の失敗: ${retryTarget.lastErrorCode.slice(0, 60)}` : ''}
+          </p>
+        ) : null}
+      </ConfirmDialog>
 
       {/* dry-run で並べたずれを読み合わせてから、明示的に修復する。 */}
       <ConfirmDialog

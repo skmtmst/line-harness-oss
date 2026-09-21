@@ -147,7 +147,7 @@ beforeEach(() => {
 // =============================================================================
 describe('GET /api/rich-menu-groups/:groupId/publish-runs', () => {
   test('版の要約・状態・最終エラー・ページごとのLINE IDを返す', async () => {
-    dbMocks.getRichMenuGroupById.mockResolvedValue(GROUP);
+    dbMocks.getRichMenuGroupWithPages.mockResolvedValue(GROUP_WITH_PAGES);
     dbMocks.listRichMenuManualPublishRequests.mockResolvedValue([
       {
         id: 'req-1', group_id: 'g1', account_id: 'a1', status: 'failed',
@@ -162,12 +162,94 @@ describe('GET /api/rich-menu-groups/:groupId/publish-runs', () => {
     ]);
     const res = await setupApp().request('/api/rich-menu-groups/g1/publish-runs');
     expect(res.status).toBe(200);
-    const body = await res.json() as { data: Array<Record<string, unknown>> };
-    expect(body.data[0]).toMatchObject({
+    const body = await res.json() as {
+      data: {
+        runs: Array<Record<string, unknown>>;
+        published: unknown;
+        draftDiffersFromPublished: boolean | null;
+      };
+    };
+    expect(body.data.runs[0]).toMatchObject({
       id: 'req-1', status: 'failed', lastErrorCode: 'LINE timeout',
       version: { name: 'メイン', chatBarText: 'menu', pageCount: 2 },
       pages: [{ pageId: 'p1', newRichMenuId: 'richmenu-new', oldRichMenuId: 'richmenu-old' }],
     });
+    // 成功したrunが無いので「いま出ている版」は無し、差分も不明（断定しない）
+    expect(body.data.published).toBeNull();
+    expect(body.data.draftDiffersFromPublished).toBeNull();
+  });
+
+  test('最後に成功したrunを「いま出ている版」として返し、下書きとの差分を判定する', async () => {
+    dbMocks.getRichMenuGroupWithPages.mockResolvedValue(GROUP_WITH_PAGES);
+    // GROUP_WITH_PAGES と同じ内容のスナップショット（serializeGroupWithPages 形）
+    const sameSnapshot = JSON.stringify({
+      id: 'g1', accountId: 'a1', name: 'メイン', chatBarText: 'menu', size: 'large',
+      defaultPageId: 'p1', isDefaultForAll: false,
+      targetingCondition: null, targetingPriority: 0, targetingEnabled: false,
+      folderId: null, displayOrder: 0,
+      pages: [{
+        id: 'p1', orderIndex: 0, name: 'トップ', aliasId: 'lhx-g1-0',
+        imageR2Key: 'img/p1.png', imageContentType: 'image/png', areas: [],
+      }],
+    });
+    const changedSnapshot = JSON.stringify({ ...JSON.parse(sameSnapshot), name: '別名' });
+    dbMocks.listRichMenuManualPublishRequests.mockResolvedValue([
+      {
+        id: 'req-new-failed', group_id: 'g1', account_id: 'a1', status: 'failed',
+        idempotency_key: 'k2', last_error_code: 'LINE timeout',
+        requested_by_staff_id: 'staff-1',
+        definition_snapshot: changedSnapshot,
+        result_json: null, created_at: 't3', updated_at: 't3',
+      },
+      {
+        id: 'req-ok', group_id: 'g1', account_id: 'a1', status: 'succeeded',
+        idempotency_key: 'k1', last_error_code: null,
+        requested_by_staff_id: 'staff-1',
+        definition_snapshot: sameSnapshot,
+        result_json: null, created_at: 't1', updated_at: 't2',
+      },
+    ]);
+    dbMocks.getRichMenuManualPublishShells.mockResolvedValue([]);
+    const res = await setupApp().request('/api/rich-menu-groups/g1/publish-runs');
+    expect(res.status).toBe(200);
+    const body = await res.json() as {
+      data: {
+        runs: Array<{ id: string }>;
+        published: { id: string } | null;
+        draftDiffersFromPublished: boolean | null;
+      };
+    };
+    // 失敗した新しいrunではなく、最後に成功したrunが「いま出ている版」
+    expect(body.data.published?.id).toBe('req-ok');
+    // 公開版と同じ内容の下書き → 差分なし
+    expect(body.data.draftDiffersFromPublished).toBe(false);
+  });
+
+  test('下書きが公開版と違うとき draftDiffersFromPublished=true', async () => {
+    dbMocks.getRichMenuGroupWithPages.mockResolvedValue(GROUP_WITH_PAGES);
+    dbMocks.listRichMenuManualPublishRequests.mockResolvedValue([
+      {
+        id: 'req-ok', group_id: 'g1', account_id: 'a1', status: 'succeeded',
+        idempotency_key: 'k1', last_error_code: null,
+        requested_by_staff_id: 'staff-1',
+        // 公開時の名前は「旧名」。今の下書き（メイン）とは違う。
+        definition_snapshot: JSON.stringify({
+          id: 'g1', accountId: 'a1', name: '旧名', chatBarText: 'menu', size: 'large',
+          defaultPageId: 'p1', isDefaultForAll: false,
+          targetingCondition: null, targetingPriority: 0, targetingEnabled: false,
+          folderId: null, displayOrder: 0,
+          pages: [{
+            id: 'p1', orderIndex: 0, name: 'トップ', aliasId: 'lhx-g1-0',
+            imageR2Key: 'img/p1.png', imageContentType: 'image/png', areas: [],
+          }],
+        }),
+        result_json: null, created_at: 't1', updated_at: 't2',
+      },
+    ]);
+    dbMocks.getRichMenuManualPublishShells.mockResolvedValue([]);
+    const res = await setupApp().request('/api/rich-menu-groups/g1/publish-runs');
+    const body = await res.json() as { data: { draftDiffersFromPublished: boolean | null } };
+    expect(body.data.draftDiffersFromPublished).toBe(true);
   });
 
   test('staffには出さない（owner/admin限定）', async () => {
@@ -177,7 +259,7 @@ describe('GET /api/rich-menu-groups/:groupId/publish-runs', () => {
   });
 
   test('見えないアカウントのgroupは404', async () => {
-    dbMocks.getRichMenuGroupById.mockResolvedValue(GROUP);
+    dbMocks.getRichMenuGroupWithPages.mockResolvedValue(GROUP_WITH_PAGES);
     accountAccessMocks.canAccessAllLineAccounts.mockResolvedValue(false);
     const res = await setupApp().request('/api/rich-menu-groups/g1/publish-runs');
     expect(res.status).toBe(404);
@@ -438,9 +520,31 @@ describe('test-apply', () => {
     dbMocks.listRichMenuTestApplies.mockResolvedValue([]);
     const res = await setupApp().request('/api/rich-menu-groups/g1/test-apply');
     expect(res.status).toBe(200);
-    const body = await res.json() as { data: { linked: boolean; linkGuidance: string | null } };
+    const body = await res.json() as {
+      data: { linked: boolean; linkGuidance: string | null; destination: unknown };
+    };
     expect(body.data.linked).toBe(false);
     expect(body.data.linkGuidance).toContain('LINE連携');
+    // 未連携では宛先を出さない
+    expect(body.data.destination).toBeNull();
+  });
+
+  test('GET: 連携済みなら宛先（担当者名とマスク済みLINE ID）を返す', async () => {
+    dbMocks.getRichMenuGroupById.mockResolvedValue(GROUP);
+    dbMocks.getStaffById.mockResolvedValue({
+      id: 'staff-1', name: '田中', line_user_id: 'U0123456789abcdef0123456789abcdef',
+    });
+    dbMocks.getActiveRichMenuTestApply.mockResolvedValue(null);
+    dbMocks.listRichMenuTestApplies.mockResolvedValue([]);
+    const res = await setupApp().request('/api/rich-menu-groups/g1/test-apply');
+    expect(res.status).toBe(200);
+    const body = await res.json() as {
+      data: { destination: { staffName: string | null; lineUserIdMasked: string } | null };
+    };
+    expect(body.data.destination?.staffName).toBe('田中');
+    // 宛先確認には十分だが全桁は出さない
+    expect(body.data.destination?.lineUserIdMasked).toBe('U0123…cdef');
+    expect(JSON.stringify(body)).not.toContain('U0123456789abcdef0123456789abcdef');
   });
 
   test('POST: 確認なし・鍵なし・未連携は400。任意の友だちIDを指定する口は無い', async () => {
@@ -506,13 +610,18 @@ describe('test-apply', () => {
   });
 
   test('revert: 適用前のメニューへ戻し、戻し済みは冪等に成功', async () => {
-    dbMocks.getRichMenuGroupById.mockResolvedValue(GROUP);
+    dbMocks.getRichMenuGroupWithPages.mockResolvedValue(GROUP_WITH_PAGES);
     dbMocks.getRichMenuTestApplyById.mockResolvedValue(APPLY);
     dbMocks.beginRichMenuTestApplyRevert.mockResolvedValue('claimed');
     dbMocks.getLineAccountById.mockResolvedValue(ACCOUNT);
     const calls: Array<{ url: string; method: string }> = [];
     const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
-      calls.push({ url: String(input), method: (init as RequestInit | undefined)?.method ?? 'GET' });
+      const method = (init as RequestInit | undefined)?.method ?? 'GET';
+      calls.push({ url: String(input), method });
+      // 本人の現在表示はテストで出したメニューのまま → 適用前へ戻す対象
+      if (method === 'GET' && String(input).endsWith('/user/U-self/richmenu')) {
+        return new Response(JSON.stringify({ richMenuId: 'richmenu-p1' }), { status: 200 });
+      }
       return new Response('{}', { status: 200 });
     });
     const res = await setupApp().request('/api/rich-menu-groups/g1/test-apply/revert', {
@@ -520,6 +629,8 @@ describe('test-apply', () => {
       body: JSON.stringify({ confirm: true, applyId: 'ta-1' }),
     });
     expect(res.status).toBe(200);
+    const body = await res.json() as { data: { userMenuAction?: string } };
+    expect(body.data.userMenuAction).toBe('restored');
     // 適用前のメニューへ張り直した
     expect(calls.some((c) => c.method === 'POST' && c.url.endsWith('/user/U-self/richmenu/richmenu-prev'))).toBe(true);
     expect(dbMocks.markRichMenuTestApplyReverted).toHaveBeenCalledWith(expect.anything(), 'ta-1');
@@ -535,8 +646,63 @@ describe('test-apply', () => {
     expect(second.headers.get('Idempotency-Replayed')).toBe('true');
   });
 
+  test('revert: 適用後に本人の表示が変わっていたら無言で上書きしない', async () => {
+    dbMocks.getRichMenuGroupWithPages.mockResolvedValue(GROUP_WITH_PAGES);
+    dbMocks.getRichMenuTestApplyById.mockResolvedValue(APPLY);
+    dbMocks.beginRichMenuTestApplyRevert.mockResolvedValue('claimed');
+    dbMocks.getLineAccountById.mockResolvedValue(ACCOUNT);
+    const calls: Array<{ url: string; method: string }> = [];
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+      const method = (init as RequestInit | undefined)?.method ?? 'GET';
+      calls.push({ url: String(input), method });
+      // 本人の表示はテスト適用後に別メニューへ変わっている
+      if (method === 'GET' && String(input).endsWith('/user/U-self/richmenu')) {
+        return new Response(JSON.stringify({ richMenuId: 'richmenu-other' }), { status: 200 });
+      }
+      return new Response('{}', { status: 200 });
+    });
+    const res = await setupApp().request('/api/rich-menu-groups/g1/test-apply/revert', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'Idempotency-Key': 'revert-1' },
+      body: JSON.stringify({ confirm: true, applyId: 'ta-1' }),
+    });
+    expect(res.status).toBe(200);
+    const body = await res.json() as { data: { userMenuAction?: string } };
+    expect(body.data.userMenuAction).toBe('left_as_is');
+    // 本人のメニューへの張り直し・解除は出していない
+    expect(calls.some((c) => c.url.includes('/user/U-self/richmenu') && c.method !== 'GET')).toBe(false);
+    expect(dbMocks.markRichMenuTestApplyReverted).toHaveBeenCalledWith(expect.anything(), 'ta-1');
+    fetchSpy.mockRestore();
+  });
+
+  test('revert: 適用前の記録が無い失敗は本人の表示に一切触らない', async () => {
+    dbMocks.getRichMenuGroupWithPages.mockResolvedValue(GROUP_WITH_PAGES);
+    // previous_captured=0: 適用前の表示を記録する前に止まった apply
+    dbMocks.getRichMenuTestApplyById.mockResolvedValue({
+      ...APPLY, status: 'failed', previous_captured: 0,
+      previous_richmenu_id: null, applied_richmenu_id: null,
+    });
+    dbMocks.beginRichMenuTestApplyRevert.mockResolvedValue('claimed');
+    dbMocks.getLineAccountById.mockResolvedValue(ACCOUNT);
+    const calls: Array<{ url: string; method: string }> = [];
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+      calls.push({ url: String(input), method: (init as RequestInit | undefined)?.method ?? 'GET' });
+      return new Response('{}', { status: 200 });
+    });
+    const res = await setupApp().request('/api/rich-menu-groups/g1/test-apply/revert', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'Idempotency-Key': 'revert-1' },
+      body: JSON.stringify({ confirm: true, applyId: 'ta-1' }),
+    });
+    expect(res.status).toBe(200);
+    const body = await res.json() as { data: { userMenuAction?: string } };
+    expect(body.data.userMenuAction).toBe('untouched');
+    // 本人のメニューは一度も変えていないので読み取りも含めて触らない
+    expect(calls.some((c) => c.url.includes('/user/U-self/richmenu'))).toBe(false);
+    expect(dbMocks.markRichMenuTestApplyReverted).toHaveBeenCalledWith(expect.anything(), 'ta-1');
+    fetchSpy.mockRestore();
+  });
+
   test('revert: 他人の適用・確認なしは拒否', async () => {
-    dbMocks.getRichMenuGroupById.mockResolvedValue(GROUP);
+    dbMocks.getRichMenuGroupWithPages.mockResolvedValue(GROUP_WITH_PAGES);
     const app = setupApp();
     // 確認なし
     expect((await app.request('/api/rich-menu-groups/g1/test-apply/revert', {
