@@ -9,6 +9,7 @@ const accountAccessMocks = vi.hoisted(() => ({
 const contractMocks = vi.hoisted(() => ({
   getScenarioRuns: vi.fn(),
   saveScenarioDraft: vi.fn(),
+  simulateFriendPlan: vi.fn(),
   simulateScenario: vi.fn(),
 }));
 const dbMocks = vi.hoisted(() => ({
@@ -83,6 +84,14 @@ beforeEach(() => {
     subscriptions: [], testSends: [], concurrentBroadcasts: [], steps: [],
   });
   contractMocks.saveScenarioDraft.mockResolvedValue({ version: 1, afterActions: [] });
+  contractMocks.simulateFriendPlan.mockResolvedValue({
+    sideEffects: false,
+    basis: 'published',
+    subscription: null,
+    start: { state: 'ok', reasons: [] },
+    steps: [],
+    warnings: [],
+  });
 });
 
 describe('scenario V6 routes', () => {
@@ -140,6 +149,55 @@ describe('scenario V6 routes', () => {
     expect(contractMocks.saveScenarioDraft).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
       scenarioId: 'scenario-1', lineAccountId: 'account-1', expectedVersion: 0,
     }));
+  });
+
+  it('友だち単位の配信予定を返す（IDEA-05）。送信・登録は起きない', async () => {
+    dbMocks.getFriendById.mockResolvedValue({ id: 'friend-1', line_account_id: 'account-1' });
+    const response = await app().request(
+      '/api/scenarios/scenario-1/friends/friend-1/plan?lineAccountId=account-1',
+    );
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      success: true,
+      data: { sideEffects: false, basis: 'published' },
+    });
+    expect(contractMocks.simulateFriendPlan).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        scenarioId: 'scenario-1',
+        lineAccountId: 'account-1',
+        friendId: 'friend-1',
+      }),
+    );
+  });
+
+  it('予定の試算も担当外アカウントの友だちは404で隠す', async () => {
+    dbMocks.getFriendById.mockResolvedValue({ id: 'friend-x', line_account_id: 'account-2' });
+    accountAccessMocks.canAccessAllLineAccounts
+      .mockResolvedValueOnce(true) // シナリオ側の範囲
+      .mockResolvedValueOnce(false); // 友だち側の範囲
+    const response = await app('staff', ['/scenarios']).request(
+      '/api/scenarios/scenario-1/friends/friend-x/plan?lineAccountId=account-1',
+    );
+    expect(response.status).toBe(404);
+    expect(contractMocks.simulateFriendPlan).not.toHaveBeenCalled();
+  });
+
+  it('予定の口も友だち不在は404、権限の無いstaffは403、account未指定は400', async () => {
+    dbMocks.getFriendById.mockResolvedValue(null);
+    const missing = await app().request(
+      '/api/scenarios/scenario-1/friends/none/plan?lineAccountId=account-1',
+    );
+    expect(missing.status).toBe(404);
+
+    const denied = await app('staff', []).request(
+      '/api/scenarios/scenario-1/friends/friend-1/plan?lineAccountId=account-1',
+    );
+    expect(denied.status).toBe(403);
+    expect(contractMocks.simulateFriendPlan).not.toHaveBeenCalled();
+
+    const noAccount = await app().request('/api/scenarios/scenario-1/friends/friend-1/plan');
+    expect(noAccount.status).toBe(400);
   });
 
   it('別アカウントは404、古い版は409を保つ', async () => {
