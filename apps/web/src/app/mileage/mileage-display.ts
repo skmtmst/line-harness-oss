@@ -101,6 +101,27 @@ export function friendHistoryItem(item: MileageAdminHistoryItem): MileageDetailH
   }
 }
 
+/**
+ * 行動スコアの履歴理由を画面向けの言葉にする。
+ * 内部のイベント名 `message_received` などをそのまま出さない。
+ * `きっかけ → ルール名` の形ならルール名だけを出す。
+ */
+export function actionScoreReasonLabel(reason: string | null) {
+  if (!reason) return '点数が変わった理由は未取得'
+  const labels: Record<string, string> = {
+    message_received: 'メッセージ返信',
+    link_clicked: '配信URLクリック',
+    form_submitted: '回答フォーム回答',
+    booking_created: '予約',
+    purchase_completed: '購入',
+    friend_blocked: 'ブロック',
+  }
+  const [source, detail] = reason.split('→').map((part) => part.trim())
+  if (labels[source]) return detail || labels[source]
+  if (/^[a-z0-9_.-]+$/i.test(reason)) return '反応の記録'
+  return reason
+}
+
 export function formatMileageChange(value: number): string {
   const number = Math.abs(value).toLocaleString('ja-JP')
   if (value > 0) return `+${number}`
