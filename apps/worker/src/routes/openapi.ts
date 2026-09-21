@@ -1058,6 +1058,17 @@ const spec = {
         responses: { '200': { description: 'Friend with tags' }, '404': { description: 'Not found' } },
       },
     },
+    '/api/friends/{id}/upcoming': {
+      get: {
+        tags: ['Friends'],
+        summary: '友だちの次回予約と次の確定した自動配信を取得（受信箱の顧客情報用・IDEA-02）',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: {
+          '200': { description: 'Earliest confirmed booking and automated delivery; per-source error flags distinguish fetch failure from none scheduled' },
+          '404': { description: 'Friend not found in account scope' },
+        },
+      },
+    },
     '/api/friends/{id}/tags': {
       post: {
         tags: ['Friends'],
