@@ -1,7 +1,24 @@
-import { computeNextDeliveryAt, DEFAULT_TENANT_ID, jstNow } from '@line-crm/db';
+import {
+  computeNextDeliveryAt,
+  DEFAULT_TENANT_ID,
+  getFriendById,
+  getScenarioPublishedVersion,
+  getStepsForDelivery,
+  jstNow,
+  parseScenarioVersionSteps,
+  type DeliveryMode,
+  type FriendScenario,
+  type PinnedScenarioStep,
+} from '@line-crm/db';
 
 import { fetchQuota } from './broadcast-quota-guard.js';
-import { buildSegmentWhere, type SegmentCondition } from './segment-query.js';
+import {
+  buildSegmentWhere,
+  matchesCondition,
+  parseCondition as parseStoredCondition,
+  type SegmentCondition,
+} from './segment-query.js';
+import { evaluateCondition, resolveScenarioDeliveryFriend } from './step-delivery.js';
 
 const ACTION_TYPES = new Set([
   'add_tag',
@@ -700,5 +717,558 @@ export async function getScenarioRuns(
       clicked: unavailable('計測URLを通へ対応付ける識別子がまだありません'),
       failed: unavailable('既存の配信履歴には通ごとの失敗台帳がありません'),
     })),
+  };
+}
+
+/* ============================================================
+ * 友だち単位の配信予定（IDEA-05 / B段階導入）
+ *
+ * 「選んだ検証顧客に対して、現在のシナリオがどう配られるか」を、
+ * 送信・登録・タグ更新のいずれも行わずに試算して返す。
+ * 判定は配信処理（step-delivery.ts）と同じ関数を使い回す：
+ *   - 条件分岐 …… evaluateCondition
+ *   - 対象の絞り込み …… parseCondition + matchesCondition
+ *   - 配信予定時刻 …… computeNextDeliveryAt（配信時と同じ JST clock-time 前提）
+ *   - 読む通 …… 購読があれば固定された公開版（getStepsForDelivery）、
+ *     なければ現在の公開版。どちらも無ければ下書きの参考予定。
+ * ========================================================== */
+
+export type ScenarioFriendPlanStep = {
+  stepId: string;
+  stepOrder: number;
+  /** 配信予定。未確定のときは null。 */
+  scheduledAt: string | null;
+  /**
+   * deliver …… この通を配信する見通し
+   * skip …… 条件を満たさずこの通は送らず次へ進む
+   * branch …… 条件不一致で指定の通へ進む
+   * pause …… この通を送ったあと一時停止する
+   * undetermined …… 動的条件（配信時の状態・回答・再開待ち）で未確定
+   */
+  outcome: 'deliver' | 'skip' | 'branch' | 'pause' | 'undetermined';
+  /** 分岐・除外の理由。読む人向けの文。 */
+  reason: string | null;
+  /** 配信時点の状態で結果が変わる条件を含むとき true。画面は「未確定」と出す。 */
+  dynamic: boolean;
+};
+
+export type ScenarioFriendPlan = {
+  scenarioId: string;
+  lineAccountId: string;
+  friendId: string;
+  friendName: string | null;
+  computedAt: string;
+  sideEffects: false;
+  /** いまの購読（待機の正体）。無ければ null（まだ開始していない）。 */
+  subscription: {
+    id: string;
+    status: string;
+    currentStepOrder: number;
+    startedAt: string;
+    nextDeliveryAt: string | null;
+    pauseReason: string | null;
+  } | null;
+  /**
+   * 予定のもとになった通の定義。
+   * pinned …… 購読に固定された公開版（実行ロジックと同じ読み方）
+   * published …… これから開始する人へ使われる現在の公開版
+   * draft …… 公開版が無いため下書きの参考予定（全て未確定）
+   */
+  basis: 'pinned' | 'published' | 'draft';
+  /** 開始・継続の見通し。blocked のとき steps は立たない。 */
+  start: { state: 'ok' | 'blocked'; reasons: string[] };
+  steps: ScenarioFriendPlanStep[];
+  warnings: string[];
+};
+
+/** JST clock-time を載せた Date を、保存形式と同じ "+09:00" 付き ISO へ。 */
+function jstClockLabel(date: Date): string {
+  return date.toISOString().slice(0, -1) + '+09:00';
+}
+
+/** "+09:00" 付き ISO（実 instant）を JST clock-time 表現の Date へ戻す。 */
+function toJstClockDate(value: string): Date {
+  return new Date(new Date(value).getTime() + 9 * 60 * 60_000);
+}
+
+/** 分岐条件を読む人向けの文にする。タグIDは名前へ解決する。 */
+async function describeStepCondition(
+  db: D1Database,
+  step: { condition_type: string | null; condition_value: string | null },
+): Promise<string> {
+  const type = step.condition_type ?? '';
+  if (type === 'tag_exists' || type === 'tag_not_exists') {
+    const tag = step.condition_value
+      ? await db
+          .prepare('SELECT name FROM tags WHERE id = ?')
+          .bind(step.condition_value)
+          .first<{ name: string }>()
+      : null;
+    const name = tag?.name ?? step.condition_value ?? '（未設定）';
+    return type === 'tag_exists' ? `タグ「${name}」を持つ` : `タグ「${name}」を持たない`;
+  }
+  if (type === 'metadata_equals' || type === 'metadata_not_equals') {
+    try {
+      const parsed = JSON.parse(step.condition_value ?? '') as { key?: unknown; value?: unknown };
+      const key = typeof parsed?.key === 'string' ? parsed.key : '（未設定）';
+      const value = parsed && 'value' in parsed ? JSON.stringify(parsed.value) : '（未設定）';
+      return type === 'metadata_equals'
+        ? `友だち情報「${key}」が ${value}`
+        : `友だち情報「${key}」が ${value} ではない`;
+    } catch {
+      return `友だち情報の条件（${type}）`;
+    }
+  }
+  return `条件（${type || '未設定'}）`;
+}
+
+export async function simulateFriendPlan(
+  db: D1Database,
+  input: { scenarioId: string; lineAccountId: string; friendId: string; startAt?: string },
+): Promise<ScenarioFriendPlan> {
+  const scenario = await db
+    .prepare(
+      `SELECT id, line_account_id, delivery_mode, audience_condition_json,
+              is_active, allow_concurrent, current_published_version_id
+         FROM scenarios WHERE id = ? AND line_account_id = ?`,
+    )
+    .bind(input.scenarioId, input.lineAccountId)
+    .first<{
+      id: string;
+      line_account_id: string;
+      delivery_mode: DeliveryMode;
+      audience_condition_json: string | null;
+      is_active: number;
+      allow_concurrent: number | null;
+      current_published_version_id: string | null;
+    }>();
+  if (!scenario) throw new ScenarioContractError('not_found', 'シナリオが見つかりません', 404);
+
+  const friend = await getFriendById(db, input.friendId);
+  if (!friend) {
+    throw new ScenarioContractError('friend_not_found', '友だちが見つかりません', 404, 'friendId');
+  }
+
+  const reasons: string[] = [];
+  const warnings: string[] = [];
+  let blocked = false;
+
+  /*
+   * 実際に配信される友だち行を、配信処理と同じ手順で解決する。
+   * 別アカウントの友だち・連携先がフォローしていない場合は届かない。
+   */
+  const deliveryFriend = await resolveScenarioDeliveryFriend(
+    db,
+    friend,
+    scenario.line_account_id ?? null,
+  );
+  if (!deliveryFriend) {
+    blocked = true;
+    reasons.push('このLINE公式アカウントではこの友だちへ配信できません');
+  } else if (!deliveryFriend.is_following) {
+    blocked = true;
+    reasons.push('友だちを解除しているため配信されません');
+  }
+
+  if (scenario.is_active === 0) {
+    blocked = true;
+    reasons.push('シナリオは停止中です');
+  }
+
+  // 最新の購読1行。待機・一時停止・完了の状態をそのまま画面へ渡す。
+  const subscription = await db
+    .prepare(
+      `SELECT * FROM friend_scenarios
+        WHERE friend_id = ? AND scenario_id = ?
+        ORDER BY started_at DESC LIMIT 1`,
+    )
+    .bind(input.friendId, input.scenarioId)
+    .first<FriendScenario>();
+
+  /*
+   * 読む通の定義。購読中なら固定された公開版（配信処理と同じ）、
+   * これから開始するなら現在の公開版、どちらも無ければ下書きを参考にする。
+   */
+  const inFlight = subscription !== null && subscription.status !== 'completed';
+  let basis: ScenarioFriendPlan['basis'];
+  let deliveryMode: DeliveryMode;
+  let audienceJson: string | null;
+  let steps: PinnedScenarioStep[];
+  if (inFlight && subscription!.published_version_id) {
+    const source = await getStepsForDelivery(
+      db,
+      input.scenarioId,
+      subscription!.published_version_id,
+    );
+    if (!source) {
+      blocked = true;
+      reasons.push('購読に固定された公開版が見つかりません（配信は止まります）');
+      basis = 'pinned';
+      deliveryMode = scenario.delivery_mode ?? 'relative';
+      audienceJson = scenario.audience_condition_json;
+      steps = [];
+    } else {
+      basis = 'pinned';
+      deliveryMode = source.deliveryMode;
+      audienceJson = source.audienceConditionJson;
+      steps = source.steps;
+    }
+  } else {
+    const version = await getScenarioPublishedVersion(db, input.scenarioId);
+    if (version) {
+      basis = 'published';
+      deliveryMode = (version.delivery_mode ?? 'relative') as DeliveryMode;
+      audienceJson = version.audience_condition_json ?? null;
+      steps = parseScenarioVersionSteps(version);
+    } else {
+      basis = 'draft';
+      deliveryMode = scenario.delivery_mode ?? 'relative';
+      audienceJson = scenario.audience_condition_json;
+      const live = await db
+        .prepare(
+          `SELECT * FROM scenario_steps WHERE scenario_id = ? ORDER BY step_order`,
+        )
+        .bind(input.scenarioId)
+        .all<PinnedScenarioStep>();
+      steps = (live.results ?? []).map((row) => ({
+        ...row,
+        live_step_id: row.id,
+        template_id_at_send: null,
+      }));
+      warnings.push('公開版がないため、下書きの内容で組み立てた参考予定です');
+    }
+  }
+
+  // 実行時と同じく、下書きの通は配信しない。
+  const deliverableSteps = steps
+    .filter((step) => (step.is_draft ?? 0) === 0)
+    .sort((a, b) => a.step_order - b.step_order);
+
+  /*
+   * 登録の可否。実行側の enrollFriendInScenario と同じ判定：
+   * すでに未完了の購読がある人・他シナリオが動いていて並行を許さない場合は
+   * 登録されない。
+   */
+  if (!inFlight) {
+    if (subscription) {
+      reasons.push('この友だちは以前このシナリオを完了しています。もう一度開始すると1通目から届きます');
+    }
+    if (scenario.allow_concurrent === 0) {
+      const other = await db
+        .prepare(
+          `SELECT 1 FROM friend_scenarios
+            WHERE friend_id = ? AND scenario_id != ? AND status = 'active'
+            LIMIT 1`,
+        )
+        .bind(input.friendId, input.scenarioId)
+        .first<{ 1: number }>();
+      if (other) {
+        blocked = true;
+        reasons.push('他のシナリオが動いているため登録されません（このシナリオは同時購読を許可していません）');
+      }
+    }
+    if (!subscription && basis === 'draft') {
+      blocked = true;
+      reasons.push('公開版がないため、いま開始しても配信されません');
+    }
+    if (!subscription && deliverableSteps.length === 0 && basis !== 'draft') {
+      reasons.push('配信する通がありません');
+    }
+  }
+
+  /*
+   * シナリオ全体の配信対象。配信処理は「満たさない人には送らず止める」ので、
+   * いま満たしていなければ予定は立たない（再開されれば動く＝未確定）。
+   * 判定対象は実行時と同じく購読行の友だちID。
+   */
+  let audienceOk = true;
+  if (deliverableSteps.length > 0) {
+    const audience = parseStoredCondition(audienceJson);
+    if (audienceJson && !audience) {
+      audienceOk = false;
+      reasons.push('配信対象の条件が読み取れません（配信時に一時停止します）');
+    } else if (audience) {
+      const evalFriendId = inFlight ? subscription!.friend_id : input.friendId;
+      audienceOk = await matchesCondition(db, evalFriendId, audience);
+      if (!audienceOk) {
+        reasons.push('配信対象の条件を現在満たしていません（配信時に再判定し、満たさないままなら一時停止します）');
+      }
+    }
+  }
+
+  const planSteps: ScenarioFriendPlanStep[] = [];
+  if (deliverableSteps.length > 0) {
+    const nowJst = new Date(Date.now() + 9 * 60 * 60_000);
+    const startAt = input.startAt ? new Date(input.startAt) : null;
+    if (input.startAt && (!startAt || !Number.isFinite(startAt.getTime()))) {
+      throw new ScenarioContractError('start_at_invalid', '開始日時が正しくありません', 400, 'startAt');
+    }
+    // 実行側と同じく、JST clock-time を UTC フィールドに載せた Date で計算する。
+    const enrolledAt = inFlight
+      ? toJstClockDate(subscription!.started_at)
+      : toJstClockDate(startAt ? startAt.toISOString() : new Date().toISOString());
+    const position = inFlight ? subscription!.current_step_order : -1;
+    const evalFriendId = inFlight ? subscription!.friend_id : input.friendId;
+    const nextFor = (step: PinnedScenarioStep, previousDeliveredAt: Date): Date =>
+      computeNextDeliveryAt(
+        { delivery_mode: deliveryMode },
+        step,
+        { enrolledAt, previousDeliveredAt, now: nowJst },
+      );
+
+    /*
+     * 一時停止・送信中の購読では以降の予定は立たない。再開すると現在位置の
+     * 続きから動くが、その日時は再開時に決まるため未確定とする。
+     */
+    let halt: string | null = null;
+    if (blocked) {
+      // 届かない・止まっていることが分かっているときは、条件評価で
+      // 余計な読みをせず、全ての通を未確定で返す（形だけは見える）。
+      halt = reasons[0] ?? 'いまは配信できないため、予定は未確定です';
+    } else if (inFlight && subscription!.status === 'paused') {
+      halt = subscription!.pause_reason === 'delivery_failed'
+        ? '配信失敗で止まっています。再開・再送されるまで以降の予定は未確定です'
+        : '一時停止中です。再開されるまで以降の予定は未確定です';
+    } else if (inFlight && subscription!.status === 'delivering') {
+      halt = 'いま配信処理中です。結果が戻るまで以降の予定は未確定です';
+    } else if (!audienceOk) {
+      halt = '配信対象の条件を現在満たしていないため、配信時に一時停止します';
+    }
+
+    // 各通の判定結果を通IDで持ち、最後に通番順で返す。
+    const outcomes = new Map<string, ScenarioFriendPlanStep>();
+    const pending = deliverableSteps.filter((step) => step.step_order > position);
+    const visited = new Set<string>();
+    let questionSeen = false;
+    // 分岐で前へ戻れる構造なので、無限ループを回数で止める。
+    const maxIterations = deliverableSteps.length * 5 + 10;
+    let iterations = 0;
+    // 相対方式の予定は「1つ前の通の予定時刻」から積む（配信時刻≒予定時刻）。
+    let previousDeliveredAt = enrolledAt;
+    let index = 0;
+    let firstPending = true;
+
+    while (index < pending.length) {
+      if (++iterations > maxIterations) {
+        warnings.push('条件分岐が循環しているため、以降の予定を確定できません');
+        for (const step of pending.slice(index)) {
+          if (!outcomes.has(step.id)) {
+            outcomes.set(step.id, {
+              stepId: step.id,
+              stepOrder: step.step_order,
+              scheduledAt: null,
+              outcome: 'undetermined',
+              reason: '条件分岐が循環しているため未確定です',
+              dynamic: true,
+            });
+          }
+        }
+        break;
+      }
+      const step = pending[index];
+      index += 1;
+
+      if (halt) {
+        outcomes.set(step.id, {
+          stepId: step.id,
+          stepOrder: step.step_order,
+          scheduledAt: null,
+          outcome: 'undetermined',
+          reason: halt,
+          dynamic: true,
+        });
+        continue;
+      }
+      if (visited.has(step.id)) {
+        warnings.push('条件分岐が循環しているため、以降の予定を確定できません');
+        outcomes.set(step.id, {
+          stepId: step.id,
+          stepOrder: step.step_order,
+          scheduledAt: null,
+          outcome: 'undetermined',
+          reason: '条件分岐が循環しているため未確定です',
+          dynamic: true,
+        });
+        halt = '条件分岐が循環しているため以降の予定は未確定です';
+        continue;
+      }
+      visited.add(step.id);
+
+      /*
+       * 予定時刻。購読中のいちばん次の通は、実行側が保存した
+       * next_delivery_at をそのまま使う（予定の正本は購読行）。
+       */
+      const storedNext =
+        firstPending && inFlight && subscription!.status === 'active'
+          ? subscription!.next_delivery_at
+          : null;
+      const scheduledDate = storedNext
+        ? toJstClockDate(storedNext)
+        : nextFor(step, previousDeliveredAt);
+      const scheduledAt = storedNext ?? jstClockLabel(scheduledDate);
+      firstPending = false;
+      // 実行側はスキップした通の判定時刻から次を積むので、通過した通の
+      // 予定時刻をそのまま次の基点にする。
+      previousDeliveredAt = scheduledDate;
+
+      // 条件分岐（実行側と同じ evaluateCondition で判定）
+      if (step.condition_type) {
+        const met = await evaluateCondition(db, evalFriendId, step);
+        if (!met) {
+          const label = await describeStepCondition(db, step);
+          const jump =
+            step.next_step_on_false !== null && step.next_step_on_false !== undefined
+              ? pending.find((s) => s.step_order === step.next_step_on_false) ??
+                deliverableSteps.find((s) => s.step_order === step.next_step_on_false)
+              : undefined;
+          if (jump) {
+            const jumpIndex = pending.indexOf(jump);
+            const forward = jump.step_order > step.step_order;
+            outcomes.set(step.id, {
+              stepId: step.id,
+              stepOrder: step.step_order,
+              scheduledAt,
+              outcome: 'branch',
+              reason: forward
+                ? `${label}を現在満たしていないため ${jump.step_order}通目へ進みます（配信時に再判定）`
+                : `${label}を現在満たしていないため ${jump.step_order}通目へ戻ります（配信時に再判定）`,
+              dynamic: true,
+            });
+            /*
+             * 実行側は current_step_order を分岐先の1つ前へ進めるので、
+             * 間の通は送られずに通り過ぎる。戻る分岐では pending の中で
+             * その通へ戻り、循環は visited で止める。
+             * 分岐先が今回の試算より前（購読開始前に配信済み）の通なら、
+             * 実行側はその通へ戻って送り直す——予定としては表せないので
+             * 以降を未確定にする。
+             */
+            if (jumpIndex >= 0) {
+              for (const skipped of pending.slice(index, jumpIndex)) {
+                if (!outcomes.has(skipped.id)) {
+                  outcomes.set(skipped.id, {
+                    stepId: skipped.id,
+                    stepOrder: skipped.step_order,
+                    scheduledAt: null,
+                    outcome: 'skip',
+                    reason: '条件分岐で通り過ぎます（配信時に再判定）',
+                    dynamic: true,
+                  });
+                }
+              }
+              index = jumpIndex;
+            } else {
+              halt = '条件分岐がすでに配信済みの通へ戻るため、以降の予定は未確定です';
+            }
+            continue;
+          }
+          outcomes.set(step.id, {
+            stepId: step.id,
+            stepOrder: step.step_order,
+            scheduledAt,
+            outcome: 'skip',
+            reason: `${label}を現在満たしていないため、この通は送らず次へ進みます（配信時に再判定）`,
+            dynamic: true,
+          });
+          continue;
+        }
+      }
+
+      // 1通ごとの配信対象（実行側と同じ parseCondition + matchesCondition）
+      const rawTarget = step.target_condition_json;
+      if (rawTarget) {
+        const target = parseStoredCondition(rawTarget);
+        const targeted = target ? await matchesCondition(db, evalFriendId, target) : false;
+        if (!targeted) {
+          outcomes.set(step.id, {
+            stepId: step.id,
+            stepOrder: step.step_order,
+            scheduledAt,
+            outcome: 'skip',
+            reason: target
+              ? 'この通の配信対象を現在満たしていません（配信時に再判定）'
+              : 'この通の配信対象の条件を読み取れないためスキップします',
+            dynamic: target !== null,
+          });
+          continue;
+        }
+      }
+
+      // ここまで来た通は配信される見通し。
+      const isQuestion = typeof step.question_json === 'string' && step.question_json.length > 0;
+      const pausesAfter = (step.after_send ?? 'continue') === 'pause';
+      outcomes.set(step.id, {
+        stepId: step.id,
+        stepOrder: step.step_order,
+        scheduledAt,
+        outcome: pausesAfter ? 'pause' : 'deliver',
+        reason: [
+          questionSeen || isQuestion
+            ? '質問への回答次第で以降の動作が変わることがあります'
+            : null,
+          pausesAfter ? 'この通を送ったあと一時停止します' : null,
+        ]
+          .filter(Boolean)
+          .join('。') || null,
+        // 質問以降・条件付きの通は配信時の状態で変わるので未確定扱いにする。
+        dynamic: questionSeen || isQuestion || pausesAfter,
+      });
+      if (isQuestion && !questionSeen) {
+        questionSeen = true;
+        warnings.push('質問への回答次第で以降の配信が変わることがあります');
+      }
+      if (pausesAfter) {
+        halt = 'この通を送ったあと一時停止します。再開されるまで以降の予定は未確定です';
+      }
+    }
+
+    for (const step of deliverableSteps) {
+      const found = outcomes.get(step.id);
+      if (found) {
+        planSteps.push(found);
+      } else if (step.step_order <= position) {
+        // すでに配信済みの通は将来の予定ではないので出さない。
+        continue;
+      } else {
+        planSteps.push({
+          stepId: step.id,
+          stepOrder: step.step_order,
+          scheduledAt: null,
+          outcome: 'undetermined',
+          reason: '判定できませんでした',
+          dynamic: true,
+        });
+      }
+    }
+  }
+
+  if (planSteps.some((step) => step.dynamic)) {
+    warnings.push('条件は配信時点の情報で再判定されます');
+  }
+  if (planSteps.some((step) => step.outcome === 'deliver' || step.outcome === 'pause')) {
+    warnings.push('実際の配信時刻は数分ずれることがあります');
+  }
+
+  return {
+    scenarioId: input.scenarioId,
+    lineAccountId: input.lineAccountId,
+    friendId: input.friendId,
+    friendName: deliveryFriend?.display_name ?? friend.display_name ?? null,
+    computedAt: new Date().toISOString(),
+    sideEffects: false,
+    subscription:
+      subscription === null
+        ? null
+        : {
+            id: subscription.id,
+            status: subscription.status,
+            currentStepOrder: subscription.current_step_order,
+            startedAt: subscription.started_at,
+            nextDeliveryAt: subscription.next_delivery_at ?? null,
+            pauseReason: subscription.pause_reason ?? null,
+          },
+    basis,
+    start: { state: blocked ? 'blocked' : 'ok', reasons },
+    steps: planSteps,
+    warnings,
   };
 }
