@@ -9397,6 +9397,34 @@ export const api = {
         '/api/chats?' + new URLSearchParams(query),
       )
     },
+    /*
+     * INBOX-09: 「すべて／要返信／1時間以上待ち」の件数。一覧と同じ条件を
+     * サーバーで数え、ページに載った行数や別の集計口と混ぜない。
+     */
+    quickCounts: (params?: {
+      status?: string; operatorId?: string; accountId?: string; q?: string;
+      unreadOnly?: boolean; channel?: 'all' | 'line' | 'email';
+    }) => {
+      const query: Record<string, string> = {}
+      if (params?.status) query.status = params.status
+      if (params?.operatorId) {
+        query.operatorId = params.operatorId
+        query.assignee = params.operatorId
+      }
+      if (params?.accountId) query.lineAccountId = params.accountId
+      if (params?.q) query.q = params.q
+      if (params?.unreadOnly) query.unreadOnly = '1'
+      if (params?.channel) query.channel = params.channel
+      return fetchApi<ApiResponse<{
+        all: number
+        reply: number
+        overdue: number
+        line: { all: number; reply: number; overdue: number }
+        email: { all: number; reply: number; overdue: number }
+      }>>(
+        '/api/chats/quick-counts?' + new URLSearchParams(query),
+      )
+    },
     get: (id: string, params?: { limit?: number; beforeAt?: string; beforeId?: string }) => {
       const query = new URLSearchParams()
       if (params?.limit !== undefined) query.set('limit', String(params.limit))
