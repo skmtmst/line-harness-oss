@@ -83,7 +83,7 @@
     "direct-secondary-button": 1
   },
   "app/chats/page.tsx": {
-    "arbitrary-value": 109,
+    "arbitrary-value": 114,
     "direct-primary-button": 2,
     "unresolved-classname": 2,
     "direct-secondary-button": 2
@@ -446,9 +446,9 @@
     "arbitrary-value": 1
   },
   "components/chats/friend-info-sidebar.tsx": {
-    "arbitrary-value": 52,
     "unresolved-classname": 12,
-    "direct-secondary-button": 1
+    "arbitrary-value": 57,
+    "direct-secondary-button": 2
   },
   "components/chats/inbox-dropdown.tsx": {
     "unresolved-classname": 11,
@@ -456,7 +456,7 @@
     "arbitrary-value": 1
   },
   "components/chats/inbox-filter-panel.tsx": {
-    "arbitrary-value": 3,
+    "arbitrary-value": 2,
     "unresolved-classname": 9,
     "direct-secondary-button": 1,
     "direct-primary-button": 1
@@ -465,12 +465,12 @@
     "arbitrary-value": 27
   },
   "components/chats/saved-view-dialog.tsx": {
-    "arbitrary-value": 4,
+    "arbitrary-value": 5,
     "direct-primary-button": 2,
     "direct-secondary-button": 1
   },
   "components/chats/template-picker.tsx": {
-    "arbitrary-value": 59,
+    "arbitrary-value": 64,
     "direct-primary-button": 1
   },
   "components/dashboard/dashboard-editor.tsx": {
@@ -735,7 +735,7 @@
     "unresolved-classname": 20
   },
   "components/support/email-thread.tsx": {
-    "arbitrary-value": 39,
+    "arbitrary-value": 40,
     "direct-primary-button": 2
   },
   "components/support/pending-inbox-card.tsx": {

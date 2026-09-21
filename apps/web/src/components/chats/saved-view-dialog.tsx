@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import Notice from '@/components/shared/notice'
+import { useOverlayFocus } from '@/components/shared/overlay-utils'
 
 /**
  * 受信箱の「この条件を保存」（設計 Pencil `Ln4zS` 保存した検索名入力モーダル）。
@@ -25,7 +26,7 @@ export type SavedViewSaveResult =
 export type SavedViewDraft = {
   name: string
   status: 'all' | 'unread' | 'in_progress' | 'on_hold' | 'resolved'
-  /** 一覧上部の「すべて／要返信／期限超過」。N-020 で期限の2値から3値へ。 */
+  /** 一覧上部の「すべて／要返信／1時間以上待ち」。N-020 で期限の2値から3値へ。 */
   quickFilter: 'all' | 'reply' | 'overdue'
   channel: 'all' | 'line' | 'email'
   assignee: string
@@ -54,6 +55,13 @@ export default function SavedViewDialog({
   onClose: () => void
 }) {
   const [name, setName] = useState('')
+  /*
+   * INBOX-22: 開いた直後の未入力はエラーではなく「まだ何もしていない
+   * 通常の状態」。入力してから消したときだけ、必須の断りを赤くする。
+   * 保存ボタンは空のあいだ押せないので、押せない理由はボタン側の
+   * title と中立の案内で伝える。
+   */
+  const [nameTouched, setNameTouched] = useState(false)
   const [error, setError] = useState('')
   const [done, setDone] = useState(false)
   const [status, setStatus] = useState(initialValue.status)
@@ -66,6 +74,7 @@ export default function SavedViewDialog({
   useEffect(() => {
     if (!open) return
     setName('')
+    setNameTouched(false)
     setError('')
     setDone(false)
     setStatus(initialValue.status)
@@ -76,14 +85,12 @@ export default function SavedViewDialog({
     setFavorite(initialValue.favorite)
   }, [open, initialValue.status, initialValue.quickFilter, initialValue.channel, initialValue.assignee, initialValue.unreadOnly, initialValue.favorite])
 
-  useEffect(() => {
-    if (!open) return
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose()
-    }
-    document.addEventListener('keydown', onKey)
-    return () => document.removeEventListener('keydown', onKey)
-  }, [open, onClose])
+  /*
+   * INBOX-02追補: 共通のオーバーレイ約束。開いたら窓の中へフォーカス、
+   * Tab は窓の中で回し、Escape で閉じ、閉じたら起点のボタンへ戻す。
+   * 保存中は Escape で閉じない（応答待ちの結果を宙に浮かせない）。
+   */
+  const dialogRef = useOverlayFocus(open, onClose, saving)
 
   if (!open || typeof document === 'undefined') return null
 
@@ -95,6 +102,9 @@ export default function SavedViewDialog({
     断るのではなく、何をすれば進めるかを先に書く。
   */
   const nameMissing = name.trim() === ''
+  /* INBOX-22: 開いた直後の未入力は中立。入力→削除したあとだけ赤い断りにする。 */
+  const showMissingError = nameMissing && nameTouched
+  const nameInvalid = Boolean(error) || showMissingError
 
   const submit = async () => {
     const trimmed = name.trim()
@@ -126,11 +136,17 @@ export default function SavedViewDialog({
       onMouseDown={(event) => { if (event.target === event.currentTarget) onClose() }}
     >
       <section
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-label="保存した検索を作成"
         data-qa-dialog="saved-view"
-        className="bg-canvas rounded-panel flex w-[560px] max-w-full flex-col overflow-hidden shadow-2xl"
+        /*
+          INBOX-11: 高さは画面の上下16pxを差し引いた範囲。見出しと
+          フッターは固定し、条件の本文だけをスクロールさせる。
+          1920×600でもタイトル・取消・保存へ届く。
+        */
+        className="bg-canvas rounded-panel flex max-h-[calc(100dvh-2rem)] w-[560px] max-w-full flex-col overflow-hidden shadow-2xl"
       >
         <header className="border-hairline flex items-start gap-4 border-b px-6 py-5">
           <div>
@@ -148,27 +164,30 @@ export default function SavedViewDialog({
             </p>
           </div>
         ) : (
-          <div className="space-y-5 px-6 py-5">
+          <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-6 py-5">
             <div>
               <div className="flex items-baseline justify-between">
-                <label htmlFor="saved-view-name" className="text-ink-secondary text-xs font-medium">検索名</label>
+                <label htmlFor="saved-view-name" className="text-ink-secondary text-xs font-medium">
+                  検索名 <span className="text-ink-faint font-normal">（必須）</span>
+                </label>
                 {/* 残りではなく「11 / 40文字」。上限が何文字かが分かる。 */}
                 <span className="text-ink-faint text-[11px] tabular-nums">{name.length} / {NAME_LIMIT}文字</span>
               </div>
               <input
                 id="saved-view-name"
                 value={name}
-                onChange={(event) => { setName(event.target.value); setError('') }}
+                onChange={(event) => { setName(event.target.value); setNameTouched(true); setError('') }}
                 maxLength={NAME_LIMIT}
                 placeholder="検索名を入力してください"
                 /*
-                  **空のあいだも枠を赤くする。** 設計 `AuSDY`（2-16）は
-                  未入力の欄を赤い枠で描く。押してから赤くするのでは、
-                  **どこを直せばよいかが押すまで分からない。**
+                  INBOX-22: 開いた直後の未入力は赤くしない。まだ何も
+                  していない状態と、入力を消した状態・失敗を分ける。
+                  赤い断りは「入力してから消した」「保存に失敗した」
+                  ときだけにする。
                 */
-                aria-invalid={Boolean(error) || nameMissing}
+                aria-invalid={nameInvalid}
                 aria-describedby={error ? 'saved-view-error' : nameMissing ? 'saved-view-name-hint' : undefined}
-                className={`rounded-control text-ink mt-1.5 h-11 w-full border px-3 text-sm outline-none ${error || nameMissing ? 'border-danger' : 'border-hairline'}`}
+                className={`rounded-control text-ink mt-1.5 h-11 w-full border px-3 text-sm outline-none ${nameInvalid ? 'border-danger' : 'border-hairline'}`}
               />
             </div>
 
@@ -193,7 +212,8 @@ export default function SavedViewDialog({
                     <select aria-label="保存する絞り込み" value={quickFilter} onChange={(event) => setQuickFilter(event.target.value as SavedViewDraft['quickFilter'])} className="border-hairline rounded-control bg-canvas text-ink h-9 w-40 border px-2 text-xs font-medium">
                       <option value="all">すべて</option>
                       <option value="reply">要返信</option>
-                      <option value="overdue">期限超過</option>
+                      {/* INBOX-10: 対応期限ではなく「未対応のまま1時間」を数える。 */}
+                      <option value="overdue">1時間以上待ち</option>
                     </select>
                   </dd>
                 </div>
@@ -242,11 +262,21 @@ export default function SavedViewDialog({
             </label>
 
             {/* 設計 `AuSDY` と同じく、直す場所を見たあとに理由を読む。 */}
-            {error || nameMissing ? (
+            {error || showMissingError ? (
               <Notice
                 id={error ? 'saved-view-error' : 'saved-view-name-hint'}
                 tone="error"
                 message={error || '検索名を入力してください。'}
+              />
+            ) : nameMissing ? (
+              /*
+                INBOX-22: まだ何も入力していない初期状態は、赤いエラーではなく
+                中立色の案内。必須であることと、押せない理由をここで伝える。
+              */
+              <Notice
+                id="saved-view-name-hint"
+                tone="validation"
+                message="検索名は必須です。入力すると保存できるようになります。"
               />
             ) : (
               <Notice
@@ -257,14 +287,18 @@ export default function SavedViewDialog({
           </div>
         )}
 
-        <footer className="border-hairline flex items-center justify-end gap-3 border-t px-6 py-4">
+        {/*
+          INBOX-11: 短い操作名は途中で改行させない。狭い幅では
+          2つの操作を縦に積み、どちらも全幅で読めるようにする。
+        */}
+        <footer className="border-hairline flex shrink-0 flex-wrap items-center justify-end gap-3 border-t px-6 py-4">
           {done ? (
-            <button type="button" onClick={onClose} className="rounded-control bg-accent-deep text-on-accent px-5 py-2 text-sm font-bold">
+            <button type="button" onClick={onClose} className="rounded-control bg-accent-deep text-on-accent whitespace-nowrap px-5 py-2 text-sm font-bold">
               閉じる
             </button>
           ) : (
             <>
-              <button type="button" onClick={onClose} className="border-hairline rounded-control text-ink-secondary border px-4 py-2 text-sm">
+              <button type="button" onClick={onClose} className="border-hairline rounded-control text-ink-secondary whitespace-nowrap border px-4 py-2 text-sm">
                 キャンセル
               </button>
               <button
@@ -273,7 +307,7 @@ export default function SavedViewDialog({
                 disabled={saving || nameMissing}
                 title={nameMissing ? '検索名を入力してください' : undefined}
                 /* 主ボタンの緑は本流が `accent-deep` へそろえた（白文字の読みやすさ）。 */
-                className="rounded-control bg-accent-deep text-on-accent px-5 py-2 text-sm font-bold disabled:opacity-40"
+                className="rounded-control bg-accent-deep text-on-accent whitespace-nowrap px-5 py-2 text-sm font-bold disabled:opacity-40"
               >
                 {saving ? '保存中' : '検索条件を保存'}
               </button>
