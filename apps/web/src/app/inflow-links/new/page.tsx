@@ -119,6 +119,7 @@ export default function NewInflowLinkPage() {
     <CreatePage
       title="流入リンクをつくる"
       description="流入経路ごとにURLを分けると、どこから友だちになったかが分かります。"
+      showHeader={false}
       parent={['流入と計測', '/inflow-links']}
       saveLabel="発行してURLを受け取る"
       successHref={(id) => `/inflow-links/detail?id=${id}`}

@@ -8,6 +8,7 @@ import { api, type CommonActionSummary } from '@/lib/api'
 import Button from '@/components/shared/button'
 import NoteBar from '@/components/shared/note-bar'
 import PageHeader from '@/components/shared/page-header'
+import { usePageTitle } from '@/components/shell/page-chrome'
 import SearchField from '@/components/shared/search-field'
 import StatusBadge from '@/components/shared/status-badge'
 import SummaryCard from '@/components/shared/summary-card'
@@ -35,6 +36,8 @@ const STATUS_LABEL: Record<CommonActionSummary['status'], string> = {
 
 export default function CommonActionsPage() {
   const canManage = useCanManageCommonActions()
+  // /common-actions はメニューの接頭辞に当たらず上部バーが空になるため、画面名を明示する。
+  usePageTitle('共通アクション')
   const { selectedAccountId, loading: accountLoading } = useAccount()
   const [items, setItems] = useState<CommonActionSummary[]>([])
   const [summary, setSummary] = useState<{
@@ -147,7 +150,7 @@ export default function CommonActionsPage() {
           { label: '共通アクション' },
         ]}
         title="共通アクション"
-        description="何度も使う処理をまとめ、利用先ごとに使う版を固定できます。"
+        description=""
         actions={(
           <>
             {canManage ? <Button href="/common-actions/new" variant="primary">共通アクションをつくる</Button> : null}
