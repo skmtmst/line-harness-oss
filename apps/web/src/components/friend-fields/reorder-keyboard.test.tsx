@@ -16,6 +16,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const calls = vi.hoisted(() => ({
   tagsReorder: vi.fn(),
+  friendFieldsReorder: vi.fn(),
+  supportMarksReorder: vi.fn(),
+  savedSearchesReorder: vi.fn(),
   friendFieldsUpdate: vi.fn(),
   supportMarksUpdate: vi.fn(),
   savedSearchesUpdate: vi.fn(),
@@ -46,11 +49,13 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
           data: { total: state.fields.length, inUse: 0, registeredFriends: 0, formLinks: null, updatedThisMonth: 0 },
         }),
         update: calls.friendFieldsUpdate,
+        reorder: calls.friendFieldsReorder,
       },
       supportMarks: {
         ...actual.api.supportMarks,
         list: async () => ({ success: true, data: state.marks }),
         update: calls.supportMarksUpdate,
+        reorder: calls.supportMarksReorder,
       },
       savedSearches: {
         ...actual.api.savedSearches,
@@ -62,6 +67,7 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
           pagination: { total: state.searches.length, limit: 50, cursor: '', nextCursor: null },
         }),
         update: calls.savedSearchesUpdate,
+        reorder: calls.savedSearchesReorder,
       },
       scenarios: {
         ...actual.api.scenarios,
@@ -74,7 +80,7 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
           success: true,
           data: {
             tags: { total: 0, unused: 0, taggedFriends: 0, assignedThisMonth: 0 },
-            marks: { total: 0, inUse: 0, unanswered: 0, inProgress: 0, resolved: 0, changedLast7: 0 },
+            marks: { total: 0, inUse: 0, unanswered: 0, inProgress: 0, onHold: 0, resolved: 0, changedLast7: 0 },
             searches: { total: 0, limit: 50 },
             templates: { total: 0, inUse: 0, sentThisMonth: 0, unused90d: 0, clickRate: null },
             scenarios: { total: 0, active: 0, subscribers: 0, completed: 0, sentThisWeek: 0 },
@@ -188,6 +194,9 @@ beforeEach(() => {
   ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
   vi.clearAllMocks()
   calls.tagsReorder.mockResolvedValue({ success: true })
+  calls.friendFieldsReorder.mockResolvedValue({ success: true, data: { updated: 3 } })
+  calls.supportMarksReorder.mockResolvedValue({ success: true, data: { updated: 3 } })
+  calls.savedSearchesReorder.mockResolvedValue({ success: true, data: { updated: 3 } })
   calls.friendFieldsUpdate.mockResolvedValue({ success: true })
   calls.supportMarksUpdate.mockResolvedValue({ success: true })
   calls.savedSearchesUpdate.mockResolvedValue({ success: true })
@@ -219,25 +228,71 @@ describe('N-049 キーボードだけで並び替えられる', () => {
     expect(calls.tagsReorder).not.toHaveBeenCalled()
   })
 
-  it('友だち情報欄: ↑で1つ上へ動き、displayOrder が並び順に変わる', async () => {
+  /*
+    #1014 ATTR-02/03/04: 並び替えは行ごとのPATCHではなく、
+    「動かせる行だけの新しい順」を1回の reorder で送る。
+    途中失敗の半端な順位と、共有マークへの複製を防ぐ。
+  */
+  it('友だち情報欄: ↑で1つ上へ動き、新しい並びを reorder API へ1回で送る', async () => {
     await render(React.createElement(FriendFieldList, { accountId: 'a1' }))
     await press(grip('項目B'), 'ArrowUp')
-    expect(calls.friendFieldsUpdate).toHaveBeenCalledWith('ff-2', 'a1', { displayOrder: 0 })
-    expect(calls.friendFieldsUpdate).toHaveBeenCalledWith('ff-1', 'a1', { displayOrder: 1 })
+    expect(calls.friendFieldsReorder).toHaveBeenCalledTimes(1)
+    expect(calls.friendFieldsReorder).toHaveBeenCalledWith('a1', ['ff-2', 'ff-1', 'ff-3'])
+    expect(calls.friendFieldsUpdate).not.toHaveBeenCalled()
   })
 
-  it('対応マーク: ↓で1つ下へ動き、displayOrder が並び順に変わる', async () => {
+  it('対応マーク: ↓で1つ下へ動き、新しい並びを reorder API へ1回で送る', async () => {
     await render(React.createElement(SupportMarkList, { accountId: 'a1' }))
     await press(grip('マークA'), 'ArrowDown')
-    expect(calls.supportMarksUpdate).toHaveBeenCalledWith('m2', 'a1', { displayOrder: 0 })
-    expect(calls.supportMarksUpdate).toHaveBeenCalledWith('m1', 'a1', { displayOrder: 1 })
+    expect(calls.supportMarksReorder).toHaveBeenCalledTimes(1)
+    expect(calls.supportMarksReorder).toHaveBeenCalledWith('a1', ['m2', 'm1', 'm3'])
+    expect(calls.supportMarksUpdate).not.toHaveBeenCalled()
   })
 
-  it('保存した検索: ↑で1つ上へ動き、displayOrder が並び順に変わる', async () => {
+  it('保存した検索: ↑で1つ上へ動き、新しい並びを reorder API へ1回で送る', async () => {
     await render(React.createElement(SavedSearchList, { accountId: 'a1' }))
     await press(grip('検索B'), 'ArrowUp')
-    expect(calls.savedSearchesUpdate).toHaveBeenCalledWith('s2', 'a1', { displayOrder: 0 })
-    expect(calls.savedSearchesUpdate).toHaveBeenCalledWith('s1', 'a1', { displayOrder: 1 })
+    expect(calls.savedSearchesReorder).toHaveBeenCalledTimes(1)
+    expect(calls.savedSearchesReorder).toHaveBeenCalledWith('a1', ['s2', 's1', 's3'])
+    expect(calls.savedSearchesUpdate).not.toHaveBeenCalled()
+  })
+
+  it('対応マーク: 共有マークは reorder の対象に入れない（#1014 ATTR-04）', async () => {
+    state.marks = [
+      mark('m1', 'マークA', 0),
+      mark('m2', 'マークB', 1),
+      { ...mark('m3', '共有マーク', 2), isInherited: true },
+    ]
+    await render(React.createElement(SupportMarkList, { accountId: 'a1' }))
+    await press(grip('マークA'), 'ArrowDown')
+    // 末尾の共有マークは位置が固定なので送らない。動かせる2件だけの新しい順。
+    expect(calls.supportMarksReorder).toHaveBeenCalledWith('a1', ['m2', 'm1'])
+    expect(calls.supportMarksUpdate).not.toHaveBeenCalled()
+  })
+
+  it('対応マーク: 共有マークの位置へは動かさず、理由を残す（#1014 ATTR-04）', async () => {
+    state.marks = [
+      mark('m1', 'マークA', 0),
+      { ...mark('m2', '共有マーク', 1), isInherited: true },
+      mark('m3', 'マークC', 2),
+    ]
+    await render(React.createElement(SupportMarkList, { accountId: 'a1' }))
+    await press(grip('マークA'), 'ArrowDown')
+    // 共有マークに向かう移動は止める。送られないので複製も起きない。
+    expect(calls.supportMarksReorder).not.toHaveBeenCalled()
+    expect(host.textContent).toContain('共有マーク')
+  })
+
+  it('保存に失敗したら元の並びへ戻し、失敗を残したまま再読込しない（#1014 ATTR-02）', async () => {
+    calls.friendFieldsReorder.mockResolvedValueOnce({ success: false, error: 'conflict' })
+    await render(React.createElement(FriendFieldList, { accountId: 'a1' }))
+    await press(grip('項目B'), 'ArrowUp')
+    // 失敗のあとも項目Bは元の位置（2番目）のまま表示されている。
+    // 狭幅カードと表で同じ項目が2度出るため、表の側だけを見る。
+    const table = host.querySelector('table')!
+    const names = Array.from(table.querySelectorAll('a[href*="/tags/fields/edit?id="]')).map((el) => el.textContent)
+    expect(names).toEqual(['項目A', '項目B', '項目C'])
+    expect(host.textContent).toContain('並び順を保存できませんでした')
   })
 
   it('つまみは説明付きのボタンとして出る（マウス専用の印ではない）', async () => {

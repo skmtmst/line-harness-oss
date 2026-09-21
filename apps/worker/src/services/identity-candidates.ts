@@ -347,42 +347,95 @@ function listItem(row: CandidateRow): IdentityCandidateListItem {
   };
 }
 
+/**
+ * FRIEND-11: 候補の名前・一致した根拠をサーバー側で絞る。
+ * 取得済みの先頭ページだけを画面内検索すると、51件目以降にしか
+ * 無い名前へ辿れない。スナップショットの label と根拠の label を対象にする。
+ * LIKE の `%` `_` `\` は検索語から退避する。
+ */
+function likePattern(q: string): string {
+  return `%${q.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
+}
+
 export async function listIdentityCandidates(
   db: D1Database,
   input: {
     tenantId: string;
     kind: IdentityCandidateKind;
-    status: IdentityCandidateStatus;
+    /** 'all' は状態で絞らない（画面の「すべて」）。 */
+    status: IdentityCandidateStatus | 'all';
     allowedAccountIds: string[];
     limit: number;
     offset: number;
+    q?: string;
   },
 ): Promise<IdentityCandidateList> {
   if (input.allowedAccountIds.length === 0) {
-    return { items: [], total: 0, limit: input.limit, offset: input.offset };
+    return {
+      items: [], total: 0, limit: input.limit, offset: input.offset,
+      statusCounts: {}, lowConfidenceCount: 0,
+    };
   }
   const placeholders = input.allowedAccountIds.map(() => '?').join(', ');
   const scopeSql = `left_line_account_id IN (${placeholders}) AND right_line_account_id IN (${placeholders})`;
-  const bindings = [
-    input.tenantId, input.kind, input.status,
+  const baseBindings = [
+    input.tenantId, input.kind,
     ...input.allowedAccountIds, ...input.allowedAccountIds,
   ];
-  const [rows, count] = await Promise.all([
+  const baseWhere = `tenant_id = ? AND kind = ? AND ${scopeSql}`;
+
+  const needle = input.q?.trim() ?? '';
+  const searchSql = needle
+    ? ` AND (
+        json_extract(left_snapshot_json, '$.label') LIKE ? ESCAPE '\\'
+        OR json_extract(right_snapshot_json, '$.label') LIKE ? ESCAPE '\\'
+        OR EXISTS (
+          SELECT 1 FROM json_each(identity_candidates.evidence_json) je
+          WHERE json_extract(je.value, '$.label') LIKE ? ESCAPE '\\'
+        )
+      )`
+    : '';
+  const searchBindings = needle ? [likePattern(needle), likePattern(needle), likePattern(needle)] : [];
+
+  const statusSql = input.status === 'all' ? '' : ' AND status = ?';
+  const statusBindings = input.status === 'all' ? [] : [input.status];
+
+  const [rows, count, countRows] = await Promise.all([
     db.prepare(
       `SELECT * FROM identity_candidates
-        WHERE tenant_id = ? AND kind = ? AND status = ? AND ${scopeSql}
+        WHERE ${baseWhere}${statusSql}${searchSql}
         ORDER BY detected_at DESC, id ASC LIMIT ? OFFSET ?`,
-    ).bind(...bindings, input.limit, input.offset).all<CandidateRow>(),
+    ).bind(...baseBindings, ...statusBindings, ...searchBindings, input.limit, input.offset).all<CandidateRow>(),
     db.prepare(
       `SELECT COUNT(*) AS count FROM identity_candidates
-        WHERE tenant_id = ? AND kind = ? AND status = ? AND ${scopeSql}`,
-    ).bind(...bindings).first<{ count: number }>(),
+        WHERE ${baseWhere}${statusSql}${searchSql}`,
+    ).bind(...baseBindings, ...statusBindings, ...searchBindings).first<{ count: number }>(),
+    /*
+      集計カードは「同じ検索条件・全状態」の母数で出す（FRIEND-11）。
+      状態の絞り込み自体は含めない。含めると「確認済み」を選んだ画面で
+      確認待ちの件数が 0 に見えてしまう。
+    */
+    db.prepare(
+      `SELECT status, COUNT(*) AS count,
+              SUM(CASE WHEN confidence_score < 50 THEN 1 ELSE 0 END) AS low_confidence
+         FROM identity_candidates
+        WHERE ${baseWhere}${searchSql}
+        GROUP BY status`,
+    ).bind(...baseBindings, ...searchBindings).all<{ status: IdentityCandidateStatus; count: number; low_confidence: number }>(),
   ]);
+  const statusCounts: Partial<Record<IdentityCandidateStatus, number>> = {};
+  let lowConfidenceCount = 0;
+  for (const row of countRows.results) {
+    statusCounts[row.status] = row.count;
+    lowConfidenceCount += row.low_confidence;
+  }
   return {
     items: rows.results.map(listItem),
     total: count?.count ?? 0,
     limit: input.limit,
     offset: input.offset,
+    statusCounts,
+    lowConfidenceCount,
   };
 }
 

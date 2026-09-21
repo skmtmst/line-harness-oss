@@ -5,6 +5,7 @@ import {
   getSupportMarkById,
   createSupportMarkWithAutomationRules,
   updateSupportMark,
+  reorderSupportMarks,
   replaceAndArchiveSupportMark,
   archiveSupportMarkWithReplacement,
   SupportMarkArchiveError,
@@ -14,6 +15,7 @@ import {
   getSavedSearches,
   getSavedSearchById,
   createSavedSearch,
+  reorderSavedSearches,
   updateSavedSearchWithRevision,
   deleteSavedSearch,
   countSavedSearches,
@@ -453,6 +455,35 @@ friendAttributes.post('/api/support-marks', requireRole('owner', 'admin'), async
     return c.json({ success: true, data: serializeMark(mark, createdRules) }, 201);
   } catch (err) {
     console.error('POST /api/support-marks error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+/**
+ * PATCH /api/support-marks/reorder — 並び順をまとめて書く（#1014 ATTR-02/03/04）。
+ *
+ * /api/support-marks/:id より前に置く。共有マークは `updateSupportMark` で
+ * 複製＋付け替えが走るため、行ごとの PATCH に混ぜると「並び替えただけで
+ * 共有マークが複製される」事故になる。ここでは動かせる行だけを入れ替える。
+ */
+friendAttributes.patch('/api/support-marks/reorder', requireRole('owner', 'admin'), async (c) => {
+  try {
+    const scope = await supportMarkAccess(c);
+    if (scope instanceof Response) return scope;
+    const body = await c.req.json<{ ids?: unknown }>();
+    if (!Array.isArray(body.ids) || body.ids.some((id) => typeof id !== 'string')) {
+      return c.json({ success: false, error: 'ids must be an array of mark ids' }, 400);
+    }
+    if (body.ids.length > 500) {
+      return c.json({ success: false, error: 'too many ids' }, 400);
+    }
+    if (new Set(body.ids).size !== body.ids.length) {
+      return c.json({ success: false, error: 'ids must not contain duplicates' }, 400);
+    }
+    await reorderSupportMarks(c.env.DB, scope, body.ids as string[]);
+    return c.json({ success: true, data: { updated: body.ids.length } });
+  } catch (err) {
+    console.error('PATCH /api/support-marks/reorder error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1146,6 +1177,39 @@ friendAttributes.post('/api/saved-searches', requireRole('owner', 'admin', 'staf
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
+
+/**
+ * PATCH /api/saved-searches/reorder — 並び順をまとめて書く（#1014 ATTR-02/03）。
+ *
+ * /api/saved-searches/:id より前に置く。他人が作った検索へ行ごとの
+ * PATCH は404で途中までしか反映されなかった。ここでは「動かせる行だけの
+ * 新しい順」を受け取り、触れない行の位置を保ったまま1回で書く。
+ */
+friendAttributes.patch(
+  '/api/saved-searches/reorder',
+  requireRole('owner', 'admin', 'staff'),
+  async (c) => {
+    try {
+      const access = await savedSearchAccess(c);
+      if (access instanceof Response) return access;
+      const body = await c.req.json<{ ids?: unknown }>();
+      if (!Array.isArray(body.ids) || body.ids.some((id) => typeof id !== 'string')) {
+        return c.json({ success: false, error: 'ids must be an array of search ids' }, 400);
+      }
+      if (body.ids.length > 500) {
+        return c.json({ success: false, error: 'too many ids' }, 400);
+      }
+      if (new Set(body.ids).size !== body.ids.length) {
+        return c.json({ success: false, error: 'ids must not contain duplicates' }, 400);
+      }
+      await reorderSavedSearches(c.env.DB, access, body.ids as string[]);
+      return c.json({ success: true, data: { updated: body.ids.length } });
+    } catch (err) {
+      console.error('PATCH /api/saved-searches/reorder error:', err);
+      return c.json({ success: false, error: 'Internal server error' }, 500);
+    }
+  },
+);
 
 friendAttributes.patch(
   '/api/saved-searches/:id',

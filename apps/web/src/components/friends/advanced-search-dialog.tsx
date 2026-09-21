@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import type { SavedSearchCondition, Scenario, Tag } from '@line-crm/shared'
 import { api, type FriendListParams } from '@/lib/api'
 import {
@@ -16,6 +16,7 @@ import {
 } from './saved-search-utils'
 import { TextInput } from '@/components/shared/form-controls'
 import Button from '@/components/shared/button'
+import { useOverlayFocus } from '@/components/shared/overlay-utils'
 
 /**
  * V4の詳細検索。既存APIが受け取れる条件だけを実行対象にする。
@@ -175,6 +176,24 @@ export default function AdvancedSearchDialog({
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState('')
   const [savedNotice, setSavedNotice] = useState('')
+  /*
+    FRIEND-13: 共通ダイアログと同じ約束（role=dialog・aria-modal・
+    開いたら窓の中へフォーカス・Tabは窓の中で回る・Escapeで閉じる・
+    閉じたら起点へフォーカスを戻す・背面はスクロールしない）を
+    useOverlayFocus でそろえる。
+    「条件を保存」の入れ子窓が開いている間は外側を閉じない。
+    Escapeは最上位（入れ子）だけに効かせるため、外側の閉じる処理は
+    saveOpen を見て何もしない。hook の依存にすると効果の掛け直しで
+    フォーカスが起点へ飛ぶので、ref 越しに見る。
+  */
+  const dialogTitleId = useId()
+  const saveTitleId = useId()
+  const saveOpenRef = useRef(saveOpen)
+  saveOpenRef.current = saveOpen
+  const panelRef = useOverlayFocus(open, () => {
+    if (!saveOpenRef.current) onClose()
+  })
+  const savePanelRef = useOverlayFocus(saveOpen, () => setSaveOpen(false), saving)
 
   /** IDや内部名を画面へ出さないための、ID→表示名の辞書。 */
   const labels = useMemo<SavedSearchConditionLabels>(() => ({
@@ -422,6 +441,11 @@ export default function AdvancedSearchDialog({
       onClick={onClose}
     >
       <div
+        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={dialogTitleId}
+        tabIndex={-1}
         /*
          * @container: パネル自身をコンテナにする。中の条件ブロックの
          * 組み換え（項目・比較方法・値の縦3段化）は、画面の幅ではなく
@@ -432,7 +456,7 @@ export default function AdvancedSearchDialog({
       >
         <div className="flex items-start justify-between gap-3 border-b border-divider-soft px-6 py-5">
           <div>
-            <h2 className="text-ink text-lg font-bold">絞り込み条件を設定</h2>
+            <h2 id={dialogTitleId} className="text-ink text-lg font-bold">絞り込み条件を設定</h2>
             <p className="text-ink-secondary mt-0.5 text-xs">
               条件を組み合わせて、対象の友だちだけを表示します。
             </p>
@@ -769,8 +793,17 @@ export default function AdvancedSearchDialog({
       </div>
       {saveOpen ? (
         <div className="fixed inset-0 z-110 flex items-center justify-center bg-scrim p-4" onClick={() => setSaveOpen(false)}>
-          <section className="w-full max-w-md rounded-panel border border-hairline bg-canvas p-5 shadow-card" onClick={(event) => event.stopPropagation()}>
-            <h3 className="text-lg font-bold text-ink">この条件を保存</h3>
+          {/* FRIEND-13: 入れ子窓にも同じ約束。Escapeでこの窓だけ閉じる。 */}
+          <section
+            ref={savePanelRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={saveTitleId}
+            tabIndex={-1}
+            className="w-full max-w-md rounded-panel border border-hairline bg-canvas p-5 shadow-card"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <h3 id={saveTitleId} className="text-lg font-bold text-ink">この条件を保存</h3>
             <p className="mt-1 text-xs leading-5 text-ink-faint">保存後は「保存した検索」から何度でも呼び出せます。</p>
             <label className="mt-4 block text-sm font-semibold text-ink-secondary">
               条件名

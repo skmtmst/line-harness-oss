@@ -5,7 +5,7 @@ import { Star } from 'lucide-react'
 import type { FriendListItem } from '@/lib/api'
 import Pagination from '@/components/shared/pagination'
 import ListState from '@/components/shared/list-state'
-import FriendListRow from './friend-list-row'
+import FriendListRow, { FriendListCard } from './friend-list-row'
 
 export type FriendListColumn = 'support' | 'scenario' | 'latest' | 'tags' | 'source' | 'last'
 
@@ -107,11 +107,15 @@ export default function FriendListTable({
 
   return (
     <section className="overflow-hidden rounded-card border border-hairline bg-canvas shadow-card" data-design="V6FriendTable" data-design-node="k4Hz0X">
-      <div className="flex h-14 shrink-0 items-center justify-between gap-3 border-b border-hairline px-4">
+      {/*
+        FRIEND-17: 狭い幅ではツールバーの右側（件数・表示項目）を折り返して
+        隠さない。h-14 の固定高は lg 以上にだけ掛ける。
+      */}
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-hairline px-4 py-3 lg:h-14 lg:flex-nowrap lg:py-0">
         <h2 className="whitespace-nowrap text-sm font-bold text-ink">
           友だち一覧 <span className="ml-1 text-xs font-bold text-accent">{total.toLocaleString('ja-JP')}件</span>
         </h2>
-        <div className="flex items-center gap-4 text-xs">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs">
           <span className="whitespace-nowrap text-ink-faint">{selectedCount}件選択中</span>
           <details className="relative">
             <summary className="flex h-9 cursor-pointer list-none items-center gap-2 whitespace-nowrap font-semibold text-action">
@@ -163,7 +167,8 @@ export default function FriendListTable({
         </div>
       </div>
 
-      <div className="grid h-11 shrink-0 items-center gap-2 border-b border-hairline bg-canvas-sunken px-3 text-micro font-semibold text-ink-secondary" style={{ gridTemplateColumns }}>
+      {/* FRIEND-17: 列見出しは表と対になるため、カード表示の幅では出さない。 */}
+      <div className="hidden h-11 shrink-0 items-center gap-2 border-b border-hairline bg-canvas-sunken px-3 text-micro font-semibold text-ink-secondary lg:grid" style={{ gridTemplateColumns }}>
         <div>
           <input
             ref={checkboxRef}
@@ -203,19 +208,35 @@ export default function FriendListTable({
             <ListState kind="empty" title={emptyTitle} description={emptyDescription} />
           </div>
         ) : friends.map((friend) => (
-          <FriendListRow
-            key={friend.id}
-            friend={friend}
-            selected={selectedIds?.has(friend.id)}
-            onToggleSelect={() => onToggleSelect?.(friend.id)}
-            onToggleAttention={() => onToggleAttention?.(friend)}
-            visibleColumns={visible}
-            gridTemplateColumns={gridTemplateColumns}
-          />
+          /*
+            FRIEND-17: lg未満はカード、lg以上はグリッド行。
+            両方描いてCSSで分ける。列の表示切替（visible）は両側で効く。
+          */
+          <div key={friend.id} className="contents">
+            <div className="lg:hidden">
+              <FriendListCard
+                friend={friend}
+                selected={selectedIds?.has(friend.id)}
+                onToggleSelect={() => onToggleSelect?.(friend.id)}
+                onToggleAttention={() => onToggleAttention?.(friend)}
+                visibleColumns={visible}
+              />
+            </div>
+            <div className="hidden lg:block">
+              <FriendListRow
+                friend={friend}
+                selected={selectedIds?.has(friend.id)}
+                onToggleSelect={() => onToggleSelect?.(friend.id)}
+                onToggleAttention={() => onToggleAttention?.(friend)}
+                visibleColumns={visible}
+                gridTemplateColumns={gridTemplateColumns}
+              />
+            </div>
+          </div>
         ))}
       </div>
 
-      <div className="flex h-12 shrink-0 items-center justify-between border-t border-hairline px-4">
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-t border-hairline px-4 py-2 lg:h-12 lg:flex-nowrap lg:py-0">
         <span className="text-xs text-ink-faint">{rangeStart}〜{rangeEnd}件 / 全{total.toLocaleString('ja-JP')}件</span>
         <Pagination page={page} pageCount={pageCount} onPageChange={onPageChange} disabled={status !== 'ready'} ariaLabel="友だち一覧のページ" />
       </div>

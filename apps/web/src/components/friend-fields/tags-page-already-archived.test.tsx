@@ -131,7 +131,8 @@ afterEach(() => {
 /** 一覧を描き、削除の確認窓を開く。 */
 async function openDeleteDialog() {
   render(<TagsPageV4 accountId="account-a" />)
-  const rowButton = await screen.findByRole('button', { name: '旧キャンペーン を削除' })
+  // 表と狭幅カードの両方に同じ操作が出るため、見えている側として先頭を取る。
+  const rowButton = (await screen.findAllByRole('button', { name: '旧キャンペーン を削除' }))[0]
   await act(async () => { fireEvent.click(rowButton) })
   await screen.findByText('「旧キャンペーン」を削除しますか？')
   const input = screen.getByPlaceholderText('旧キャンペーン')

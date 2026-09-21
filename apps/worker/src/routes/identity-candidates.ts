@@ -146,11 +146,17 @@ function errorResponse(c: Context<Env>, error: unknown): Response {
 identityCandidates.get('/api/identity-candidates', requireRole('owner', 'admin', 'staff'), async (c) => {
   try {
     const kind = c.req.query('kind') as IdentityCandidateKind | undefined;
-    const status = (c.req.query('status') ?? 'pending') as IdentityCandidateStatus;
+    /*
+      FRIEND-11: 'all' は状態で絞らない。画面の「すべて」が従来は
+      status 未指定 = pending だけを見せていたため、「すべて」と
+      表示しながら確認済み・保留・別人の候補が隠れていた。
+    */
+    const statusRaw = c.req.query('status') ?? 'pending';
+    const status = statusRaw === 'all' ? 'all' : (statusRaw as IdentityCandidateStatus);
     if (!kind || !KINDS.has(kind)) {
       return c.json({ success: false, error: '候補の種類を指定してください', code: 'KIND_REQUIRED' }, 400);
     }
-    if (!STATUSES.has(status)) {
+    if (status !== 'all' && !STATUSES.has(status)) {
       return c.json({ success: false, error: '候補の状態が正しくありません', code: 'INVALID_STATUS' }, 400);
     }
     if (!canUseKind(c, kind)) {
@@ -166,6 +172,8 @@ identityCandidates.get('/api/identity-candidates', requireRole('owner', 'admin',
       allowedAccountIds: requestedAccountId ? [requestedAccountId] : scope.allowedAccountIds,
       limit: Math.max(1, positiveInt(c.req.query('limit'), 20, 100)),
       offset: positiveInt(c.req.query('offset'), 0, 100_000),
+      // FRIEND-11: 名前・根拠の検索は全件へかける。
+      q: c.req.query('q') ?? undefined,
     });
     return c.json({ success: true, data });
   } catch (error) {
