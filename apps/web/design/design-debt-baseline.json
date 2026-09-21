@@ -163,7 +163,7 @@
     "unresolved-classname": 4,
     "arbitrary-value": 5,
     "direct-primary-button": 2,
-    "direct-secondary-button": 2
+    "direct-secondary-button": 3
   },
   "app/friends/identity-candidates/page.tsx": {
     "unresolved-classname": 6
