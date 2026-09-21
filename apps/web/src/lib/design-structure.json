@@ -2,6 +2,18 @@
   "_comment": "Pen.dev の承認済み設計から書き写した、各画面の Main 直下の並び。ダッシュボードと共通レイアウトはV4、未改修画面はV2を参照する。実装側は data-design 属性で同じ名前を付け、ずれたら design-structure.test.ts が落ちる。設計を変えたときは、ここも一緒に直す（そのとき差分に『設計を更新した』と残る）。",
   "_source": "docs/design-node-ids.md",
   "screens": {
+    "/ops/knowledge": {
+      "node": "csVox",
+      "name": "V6 37-11 運営・ナレッジ一覧",
+      "sections": [],
+      "parts": ["ナレッジ一覧", "解決の根拠", "下書き保存", "承認して有効にする"],
+      "visualVerification": {
+        "status": "unverified",
+        "referenceNodeIds": ["csVox", "UWx1S", "DHdsw", "o5u371", "ZAOc7"],
+        "requiredViewports": [1440, 1920],
+        "reason": "実ノードを2026-09-21に再取得。画面比較中。共通アクセント色とマニュアル導線の差分・全状態の確認が残る。"
+      }
+    },
     "/hq/billing": {
       "node": "OjkqO clQZw",
       "name": "V6 36-2 課金プラン・36-2-A 年払い",

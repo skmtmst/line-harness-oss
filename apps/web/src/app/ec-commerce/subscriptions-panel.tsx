@@ -99,7 +99,12 @@ export default function SubscriptionsPanel({ accountId }: { accountId: string | 
         <SummaryCard variant="v6" title="今月 止まった" value={summary?.cancelledThisMonth ?? null} unit="件" detail={summary?.cancellationTopReason ? `多い理由「${summary.cancellationTopReason}」` : '解約理由の記録なし'} badge={summary?.cancelledThisMonth === null ? '未取得' : undefined} badgeTone="neutral" />
         <SummaryCard variant="v6" title="支払いを確認" value={summary?.atRisk ?? null} unit="人" detail="ECの決済状態から確認" />
       </div>
-      <NoteBar>「支払いを確認」はECから届いた決済状態です。将来止めるかどうかを予測した数字ではありません。</NoteBar>
+      {/*
+       * IDEA-21: 「次の発送」はECの定期便に登録された確定の予定日。推定ではない。
+       * 購入後の案内（発送後の到着確認・口コミ・次の商品）はNEN配信が担う。
+       * 定期便の変更・休止そのものはEC側（管理画面・お客様のマイページ）で行う。
+       */}
+      <NoteBar>「支払いを確認」はECから届いた決済状態です。将来止めるかどうかを予測した数字ではありません。「次の発送」はECに登録された確定の予定日で、EC側で変わると次の同期で更新されます。購入後の案内は <Link href="/nen-campaigns" className="font-semibold underline">NEN配信</Link> で管理します。</NoteBar>
       {(summary?.monthlyStats ?? []).length > 0 ? <div className="my-4 rounded-card border border-hairline bg-canvas p-4"><p className="text-sm font-semibold text-ink">月別の定期便</p><div className="mt-3 grid gap-2 sm:grid-cols-3">{summary?.monthlyStats.slice(-6).map((item) => <div key={item.month} className="rounded-control bg-canvas-sunken px-3 py-2"><p className="text-xs text-ink-faint">{item.month}</p><p className="mt-1 text-sm font-semibold text-ink">{item.count.toLocaleString('ja-JP')}件</p><p className="text-xs text-ink-secondary">¥{item.amount.toLocaleString('ja-JP')}</p></div>)}</div></div> : null}
       <div className={styles.toolbar}>
         {/*
@@ -125,7 +130,16 @@ export default function SubscriptionsPanel({ accountId }: { accountId: string | 
                 <Td>{item.continuedCount === null ? '—' : `${item.continuedCount}回目`}</Td>
                 <Td align="right">{item.amount === null ? '—' : `¥${item.amount.toLocaleString('ja-JP')}`}</Td>
                 <Td><span className={styles.cellStack}><span className={`${styles.status} ${STATUS_TONE[item.status]}`}>{item.statusLabel}</span>{item.riskReason || item.cancellationReason ? <span className={styles.cellSub}>{item.riskReason ?? `理由「${item.cancellationReason}」`}</span> : null}</span></Td>
-                <ActionCell><Link className={styles.textLink} href={`/friends/${item.friendId}`}>中身を見る</Link></ActionCell>
+                <ActionCell>
+                  {/* 友だち詳細は静的書き出しのため /friends/detail?id= 形（IDEA-21 で修正）。 */}
+                  <Link className={styles.textLink} href={`/friends/detail?id=${encodeURIComponent(item.friendId)}`}>中身を見る</Link>
+                  {/* 定期便の変更先。ECが契約の変更ページを渡しているときだけ出す。 */}
+                  {item.manageUrl ? (
+                    <a className="whitespace-nowrap text-label font-bold text-accent-deep hover:underline" href={item.manageUrl} target="_blank" rel="noreferrer">ECで変更</a>
+                  ) : (
+                    <span className="text-micro text-ink-faint" title="ECがこの契約の変更ページを渡していないため、ここからは開けません。ECの管理画面で確認してください。">変更先なし</span>
+                  )}
+                </ActionCell>
               </Tr>
             ))}
           </tbody>
