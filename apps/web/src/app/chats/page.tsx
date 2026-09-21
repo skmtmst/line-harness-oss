@@ -1,6 +1,7 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { parseStickerMessageContent, stickerFallback } from '@line-crm/shared'
@@ -22,6 +23,7 @@ import { unreadLookup } from '@/components/chats/assignee-unread'
 import InboxFilterPanel from '@/components/chats/inbox-filter-panel'
 import SavedViewDialog, { type SavedViewDraft, type SavedViewSaveResult } from '@/components/chats/saved-view-dialog'
 import { IdempotencyKeyStore } from '@/lib/idempotency-key-store'
+import { startVisiblePoll } from '@/lib/visible-polling'
 import { UNANSWERED_REFRESH_EVENT } from '@/lib/events'
 import { useAccount } from '@/contexts/account-context'
 import TemplatePicker from '@/components/chats/template-picker'
@@ -114,6 +116,7 @@ const CHAT_PAGE_SIZE = 200
 
 function StickerMessageImage({ content }: { content: string }) {
   const [failed, setFailed] = useState(false)
+  const [retryKey, setRetryKey] = useState(0)
   const sticker = parseStickerMessageContent(content)
   const fallback = stickerFallback(content)
 
@@ -121,14 +124,77 @@ function StickerMessageImage({ content }: { content: string }) {
   // 空文字など)は画像にせず、文字の代替表示に倒す。共通側の許可リスト
   // 検証(#493-C1)が入るまでの間の最低限の guard。
   if (!sticker || failed || !sticker.stickerUrl.startsWith('https://')) {
-    return <span>{fallback}</span>
+    return (
+      <span className="inline-flex flex-col items-center gap-1">
+        <span>{fallback}</span>
+        {sticker && failed ? (
+          <button
+            type="button"
+            onClick={() => { setFailed(false); setRetryKey((key) => key + 1) }}
+            className="text-action text-[11px] font-semibold underline underline-offset-2"
+          >
+            画像を読み込み直す
+          </button>
+        ) : null}
+      </span>
+    )
   }
 
   return (
     <img
+      key={retryKey}
       src={sticker.stickerUrl}
       alt={fallback}
       className="max-h-[140px] max-w-[140px] object-contain"
+      loading="lazy"
+      referrerPolicy="no-referrer"
+      onError={() => setFailed(true)}
+    />
+  )
+}
+
+/**
+ * 履歴の画像メッセージ(INBOX-30)。
+ *
+ * 以前は alt 空・onError なしの `<img>` だけで、404・期限切れ・回線断で
+ * 何も出ない空白になっていた。スタンプと同じく、失敗は代替表示と
+ * 再読み込みに倒す。画像の内容は推測して書かない。
+ */
+function ChatImageMessage({ content }: { content: string }) {
+  const [failed, setFailed] = useState(false)
+  const [retryKey, setRetryKey] = useState(0)
+  let url: string | null = null
+  try {
+    const parsed = JSON.parse(content) as { originalContentUrl?: unknown; previewImageUrl?: unknown }
+    const candidate = parsed.originalContentUrl ?? parsed.previewImageUrl
+    if (typeof candidate === 'string' && candidate.startsWith('https://')) url = candidate
+  } catch {
+    url = null
+  }
+
+  if (!url || failed) {
+    return (
+      <span className="flex min-w-40 flex-col items-center justify-center gap-1.5 rounded-md bg-canvas-sunken px-4 py-6 text-center">
+        <span className="text-ink-faint text-xs">画像を読み込めませんでした</span>
+        {url ? (
+          <button
+            type="button"
+            onClick={() => { setFailed(false); setRetryKey((key) => key + 1) }}
+            className="text-action text-xs font-semibold underline underline-offset-2"
+          >
+            画像を読み込み直す
+          </button>
+        ) : null}
+      </span>
+    )
+  }
+
+  return (
+    <img
+      key={retryKey}
+      src={url}
+      alt="画像"
+      className="max-w-[200px] rounded"
       loading="lazy"
       referrerPolicy="no-referrer"
       onError={() => setFailed(true)}
@@ -145,6 +211,68 @@ function formatInboxDatetime(iso: string | null): string {
     minute: '2-digit',
   })
 }
+
+/*
+ * 予約時刻は「日本時間」が約束(INBOX-21)。入力欄も一覧も端末の
+ * 時間帯ではなく Asia/Tokyo で読み書きする。JST は夏時間がないので
+ * オフセットは常に +09:00。
+ */
+const INBOX_TIME_ZONE = 'Asia/Tokyo'
+
+function formatJstScheduledAt(iso: string): string {
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return '—'
+  return d.toLocaleString('ja-JP', {
+    timeZone: INBOX_TIME_ZONE,
+    month: 'numeric',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
+/**
+ * datetime-local の値(日本時間の約束)をオフセット付きのISOへ変える(INBOX-21)。
+ * 'YYYY-MM-DDTHH:MM' のまま送ると、サーバー側の Date.parse がその実行環境の
+ * 時間帯(UTC)で読み、選んだ時刻から9時間ずれた予約になる。JSTは夏時間が
+ * ないので +09:00 で固定する。すでにオフセット付きの値はそのまま通す。
+ */
+function jstDatetimeLocalToIso(local: string): string {
+  if (!local) return local
+  if (/[zZ]$|[+-]\d{2}:\d{2}$/.test(local)) return local
+  return `${local}+09:00`
+}
+
+/** UTCのISOを datetime-local の値へ戻す(日本時間で見せる)。 */
+function isoToJstDatetimeLocal(iso: string): string {
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return ''
+  const parts = new Intl.DateTimeFormat('ja-JP', {
+    timeZone: INBOX_TIME_ZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).formatToParts(d)
+  const pick = (type: string) => parts.find((part) => part.type === type)?.value ?? ''
+  // '24' 表記の深夜0時は datetime-local が読めないので '00' に直す。
+  const hour = pick('hour') === '24' ? '00' : pick('hour')
+  return `${pick('year')}-${pick('month')}-${pick('day')}T${hour}:${pick('minute')}`
+}
+
+function formatByteSize(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes < 0) return ''
+  if (bytes < 1024) return `${bytes}B`
+  return `${Math.round(bytes / 1024)}KB`
+}
+
+/** サーバーと同じ数え方(JSの .length)。差し込みは解決後の長さでサーバーが最終判定する。 */
+const MESSAGE_MAX_LENGTH = 5000
+
+/** 入力欄の自動拡張の上限。text-sm(行の高さ約20px)の8行＋上下余白。 */
+const TEXTAREA_MAX_HEIGHT_PX = 168
 
 /**
  * 設計 `xGLVe` の一覧は日付だけの `08/18`。年まで出すと桁が伸びて、
@@ -585,8 +713,23 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
   const [memoError, setMemoError] = useState('')
   const [showTemplatePicker, setShowTemplatePicker] = useState(false)
   const imageInputRef = useRef<HTMLInputElement>(null)
-  const [uploadingImage, setUploadingImage] = useState(false)
   const [imageError, setImageError] = useState('')
+  /*
+   * INBOX-23: 画像の準備(アップロード)結果は「選んだ会話」にだけ返す。
+   * 完了を待つ間に別の会話・アカウントへ切り替わっても、今開いている
+   * 入力欄へ書かない。進行中・失敗・添付済みも会話ごとに預かる。
+   * 同一会話での選び直し・「外す」は世代を進めて古い結果を捨てる。
+   */
+  const imageJobGenRef = useRef(new Map<string, number>())
+  const imageErrorDraftsRef = useRef(new Map<string, string>())
+  const imageMetaDraftsRef = useRef(new Map<string, { name: string; size: number }>())
+  const [imageBusyKeys, setImageBusyKeys] = useState<ReadonlySet<string>>(new Set())
+  const [pendingImageMeta, setPendingImageMeta] = useState<{ name: string; size: number } | null>(null)
+  const pendingImageMetaRef = useRef(pendingImageMeta)
+  pendingImageMetaRef.current = pendingImageMeta
+  const imageErrorRef = useRef(imageError)
+  imageErrorRef.current = imageError
+  const [imagePreviewOpen, setImagePreviewOpen] = useState(false)
 
   /**
    * 画像を1枚選ぶ。
@@ -596,32 +739,69 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
    * 実際には1MBで弾かれるので直した。
    */
   const handlePickImage = async (file: File) => {
+    // 選んだ時点のアカウント＋会話を固定する(INBOX-23)。完了時に
+    // どこへ出すかはこの鍵で決め、今開いている会話へは直接書かない。
+    const ownerKey = draftKeyOf(selectedAccountId, selectedChatId)
+    const reportError = (message: string) => {
+      imageErrorDraftsRef.current.set(ownerKey, message)
+      if (draftOwnerKeyRef.current === ownerKey) setImageError(message)
+    }
     if (!['image/jpeg', 'image/png'].includes(file.type)) {
-      setImageError('JPEG か PNG を選んでください')
+      reportError('JPEG か PNG を選んでください')
       return
     }
     if (file.size > 1024 * 1024) {
-      setImageError('1MB 以下にしてください')
+      reportError('1MB 以下にしてください')
       return
     }
-    setUploadingImage(true)
-    setImageError('')
+    const generation = (imageJobGenRef.current.get(ownerKey) ?? 0) + 1
+    imageJobGenRef.current.set(ownerKey, generation)
+    imageErrorDraftsRef.current.delete(ownerKey)
+    if (draftOwnerKeyRef.current === ownerKey) setImageError('')
+    setImageBusyKeys((prev) => new Set(prev).add(ownerKey))
     try {
       const res = await api.uploads.image(file)
+      // 取消・別の画像への選び直しが済んでいれば、この結果は捨てる。
+      if (imageJobGenRef.current.get(ownerKey) !== generation) return
       if (!res.success) {
-        setImageError(res.error ?? '画像を送れませんでした')
+        // 準備(アップロード)の失敗であり、相手への送信は始まっていない
+        // (INBOX-31)。「送れなかった」とは言わない。
+        reportError('画像を添付できませんでした。選び直してください')
         return
       }
-      setPendingImage({
+      const value: ImageUploaderValue = {
         mode: 'line-image',
         originalContentUrl: res.data.url,
         previewImageUrl: res.data.url,
-      })
+      }
+      imageDraftsRef.current.set(ownerKey, value)
+      imageMetaDraftsRef.current.set(ownerKey, { name: file.name, size: file.size })
+      if (draftOwnerKeyRef.current === ownerKey) {
+        setPendingImage(value)
+        setPendingImageMeta({ name: file.name, size: file.size })
+      }
     } catch {
-      setImageError('画像を送れませんでした')
+      if (imageJobGenRef.current.get(ownerKey) !== generation) return
+      reportError('画像を添付できませんでした。選び直してください')
     } finally {
-      setUploadingImage(false)
+      setImageBusyKeys((prev) => {
+        const next = new Set(prev)
+        next.delete(ownerKey)
+        return next
+      })
     }
+  }
+
+  /** 添付を外す。読み込み中の結果が遅れて届いても復活しないよう世代を進める。 */
+  const clearPendingImage = () => {
+    const ownerKey = draftKeyOf(selectedAccountId, selectedChatId)
+    imageJobGenRef.current.set(ownerKey, (imageJobGenRef.current.get(ownerKey) ?? 0) + 1)
+    imageDraftsRef.current.delete(ownerKey)
+    imageMetaDraftsRef.current.delete(ownerKey)
+    imageErrorDraftsRef.current.delete(ownerKey)
+    setPendingImage(null)
+    setPendingImageMeta(null)
+    setImageError('')
   }
   const statusFilterRef = useRef<StatusFilter>('all')
   // Send mode: 'enter' = Enter sends, Shift+Enter = newline; 'shift-enter' = reverse
@@ -665,6 +845,25 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
   const isComposingRef = useRef(false)
   const messagesScrollRef = useRef<HTMLDivElement | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  /*
+   * INBOX-27: スクロール位置の決め方を分けるための記録。
+   * - stickToBottomRef: いま下端にいるか。下端にいる間だけ新着へ追従する。
+   * - prevMessageWindowRef: 前回描いた会話・最後尾・件数。追加か切替かを判別する。
+   * - pendingPrependRef: 「前のメッセージ」で上へ足す直前の高さと位置。
+   * - unseenIncoming: 読んでいる途中に下へ届いた相手からの新着件数。
+   */
+  const stickToBottomRef = useRef(true)
+  const prevMessageWindowRef = useRef<{ chatId: string; lastId: string | null; count: number } | null>(null)
+  const pendingPrependRef = useRef<{ scrollHeight: number; scrollTop: number } | null>(null)
+  const [unseenIncoming, setUnseenIncoming] = useState(0)
+  // U008: 狭い幅で切れた宛先名を、その場で全文に広げるための状態。
+  const [headerNameExpanded, setHeaderNameExpanded] = useState(false)
+  // 会話を変えたら広げた表示も元へ戻す。
+  useEffect(() => {
+    setHeaderNameExpanded(false)
+    setUnseenIncoming(0)
+    stickToBottomRef.current = true
+  }, [selectedChatId])
 
   // ページング用カーソル。表示リストは楽観更新で並び替わるため、
   // 「サーバから最後に受け取った行」を ref で保持して次ページの起点にする
@@ -1128,12 +1327,22 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
   const [loadingOlderMessages, setLoadingOlderMessages] = useState(false)
 
   const loadChatDetail = useCallback(async (chatId: string) => {
+    /*
+     * 呼び出しの時点で開いている会話と違う相手への要求は丸ごと捨てる
+     * (A02-01)。更新操作の完了後に遅れて走る再読込が、切替先の会話の
+     * 応答を無効化して前の会話を表示し直すのを防ぐ。世代のカウントも
+     * 進めないので、いま走っている新しい会話の取得はそのまま生きる。
+     */
+    if (selectedChatIdRef.current !== chatId) return
+    const requestedAccountId = detailAccountRef.current
     const requestId = ++detailRequestIdRef.current
     setDetailLoading(true)
     setError('')
     try {
       const res = await api.chats.get(chatId, { limit: CHAT_MESSAGE_PAGE_SIZE })
       if (requestId !== detailRequestIdRef.current) return
+      // 取得の途中で別の会話・アカウントへ切り替わっていたら適用しない。
+      if (selectedChatIdRef.current !== chatId || detailAccountRef.current !== requestedAccountId) return
       if (res.success) {
         const detail = res.data
         setChatDetail(detail)
@@ -1185,6 +1394,13 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
       if (res.success) {
         const detail = res.data
         const rows = detail.messages ?? []
+        /*
+         * INBOX-27: 上へ足す追加なので、いま読んでいる位置を保持する。
+         * 追加前の高さを記録し、描画後の効果で「増えた分だけscrollTopを
+         * 足す」ことで同じメッセージが同じ画面位置に残る。
+         */
+        const el = messagesScrollRef.current
+        if (el) pendingPrependRef.current = { scrollHeight: el.scrollHeight, scrollTop: el.scrollTop }
         setChatDetail((prev) => {
           if (!prev || prev.id !== requestedChatId) return prev
           const seen = new Set((prev.messages ?? []).map((m) => m.id))
@@ -1199,6 +1415,101 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
       setLoadingOlderMessages(false)
     }
   }, [loadingOlderMessages, selectedChatId, selectedAccountId, chatDetail?.messages])
+
+  /*
+   * INBOX-12: 開いている会話を静かに取り直す。
+   * 会話ID・アカウント・定期取得の世代の照合を通った応答だけを適用する
+   * ので、切替前に出した遅い応答は別の会話へ混ざらない。世代は初回
+   * 読み込み(loadChatDetail)が使う detailRequestIdRef とは別にする。
+   * 共有すると定期取得が初回読み込みを「古い応答」にして読み込み中の
+   * まま止まる。
+   * 「前のメッセージ」で遡って読み込んだ古い分は消さずに残す。
+   */
+  const detailPollSeqRef = useRef(0)
+  const refreshChatDetailQuietly = useCallback(async (): Promise<boolean> => {
+    const chatId = selectedChatIdRef.current
+    if (!chatId) return true
+    const requestId = ++detailPollSeqRef.current
+    const accountId = detailAccountRef.current
+    try {
+      const res = await api.chats.get(chatId, { limit: CHAT_MESSAGE_PAGE_SIZE })
+      if (requestId !== detailPollSeqRef.current) return true
+      if (selectedChatIdRef.current !== chatId || detailAccountRef.current !== accountId) return true
+      if (!res.success) return false
+      const detail = res.data
+      let keptOlder = false
+      setChatDetail((prev) => {
+        if (!prev || prev.id !== detail.id) return detail
+        const latest = detail.messages ?? []
+        const prevMsgs = prev.messages ?? []
+        const latestIds = new Set(latest.map((m) => m.id))
+        const windowStart = latest[0]?.createdAt ?? ''
+        const older = prevMsgs.filter(
+          (m) => !latestIds.has(m.id) && (!windowStart || m.createdAt < windowStart),
+        )
+        keptOlder = older.length > 0
+        return { ...detail, messages: [...older, ...latest] }
+      })
+      if (keptOlder) {
+        // 遡った分を残している間は「さらに古い分があるか」は前の値を守る。
+      } else {
+        setMessagesHasMore(detail.hasMoreMessages === true)
+      }
+      return true
+    } catch {
+      return false
+    }
+  }, [])
+
+  // 一覧も静かに取り直す。全画面の読み込み(loadChats)は一覧を空にして
+  // 操作を止めるので、定期更新では既存の並びを崩さずに差し替える。
+  const listPollRequestRef = useRef(0)
+  const loadChatsQuietly = useCallback(async (): Promise<boolean> => {
+    const requestId = ++listPollRequestRef.current
+    try {
+      const res = await api.chats.list(buildListParams(null))
+      if (listPollRequestRef.current !== requestId) return true
+      if (listFilterKeyRef.current !== listFilterKey) return true
+      if (!res.success) return false
+      const rows = res.data
+      setChats((prev) => {
+        const freshIds = new Set(rows.map((row) => row.id))
+        const merged = rows.slice()
+        // 「さらに読み込む」で足した分は一覧の下に残す。
+        for (const chat of prev) if (!freshIds.has(chat.id)) merged.push(chat)
+        return merged
+      })
+      const last = rows[rows.length - 1]
+      nextCursorRef.current = last?.lastMessageAt ? { at: last.lastMessageAt, id: last.id } : null
+      setHasMoreChats(rows.length === CHAT_PAGE_SIZE)
+      setChatListFailed(false)
+      return true
+    } catch {
+      return false
+    }
+  }, [buildListParams, listFilterKey])
+
+  /*
+   * INBOX-12: 会話の定期更新。
+   * 画面が見えている間だけ5秒起点で取り直す(タブを隠すと止まり、
+   * 戻ると再開する)。失敗は待ちを延ばし、5回続いたら止まって理由と
+   * 再試行を出す。応答を適用するのは照合を通った時だけ。
+   */
+  const [chatPollStalled, setChatPollStalled] = useState(false)
+  const [chatPollRetryKey, setChatPollRetryKey] = useState(0)
+  useEffect(() => {
+    setChatPollStalled(false)
+    const poll = startVisiblePoll({
+      work: async () => {
+        const detailOk = await refreshChatDetailQuietly()
+        const listOk = channel === 'email' ? true : await loadChatsQuietly()
+        if (!detailOk || !listOk) throw new Error('inbox poll failed')
+      },
+      onGiveUp: () => setChatPollStalled(true),
+      onRecovered: () => setChatPollStalled(false),
+    })
+    return () => poll.stop()
+  }, [refreshChatDetailQuietly, loadChatsQuietly, channel, chatPollRetryKey])
 
   // 同じ会話IDが別アカウントにも存在していても、切替前の遅い応答を表示しない。
   // 初回表示では深いリンクを消さず、実際にアカウントが変わったときだけ外す。
@@ -1386,6 +1697,16 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
     if (stashedImage) imageDraftsRef.current.set(prevKey, stashedImage)
     else imageDraftsRef.current.delete(prevKey)
     setPendingImage(imageDraftsRef.current.get(nextKey) ?? null)
+    // 添付のファイル名・準備の失敗も会話ごとに預かる(INBOX-23/32)。
+    const stashedMeta = pendingImageMetaRef.current
+    if (stashedMeta) imageMetaDraftsRef.current.set(prevKey, stashedMeta)
+    else imageMetaDraftsRef.current.delete(prevKey)
+    setPendingImageMeta(imageMetaDraftsRef.current.get(nextKey) ?? null)
+    const stashedImageError = imageErrorRef.current
+    if (stashedImageError) imageErrorDraftsRef.current.set(prevKey, stashedImageError)
+    else imageErrorDraftsRef.current.delete(prevKey)
+    setImageError(imageErrorDraftsRef.current.get(nextKey) ?? '')
+    setImagePreviewOpen(false)
   }, [selectedAccountId, selectedChatId])
 
   // Surface deep-linked chats in the sidebar even when the current account
@@ -1424,41 +1745,84 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
     })
   }, [chatDetail, chats])
 
-  // 詳細が新しくロードされたら最下部（＝最新メッセージ）までスクロールする。
-  // そこから上にスクロールすれば過去のメッセージを辿れる（LINE受信画面と同じUX）。
-  // ユーザーが手動でスクロールしたら delayed auto-scroll は発動させない。
+  /*
+   * INBOX-27: メッセージの描画後にスクロール位置を決める。
+   *
+   * - 最初の表示・会話の切替 … 新しい方(下端)から見せる。
+   * - 「前のメッセージ」で上へ足した … 高さの増分だけ scrollTop を足して、
+   *   読んでいたメッセージが同じ画面位置に残るようにする。
+   * - 下への新着(自分の送信・相手の返信・定期更新) … 下端にいる時だけ
+   *   追従。読み返している途中なら動かさず、新着件数の目印を出す。
+   */
+  useLayoutEffect(() => {
+    const el = messagesScrollRef.current
+    const list = chatDetail?.messages
+    if (!el || !list || list.length === 0) {
+      if (!list || list.length === 0) prevMessageWindowRef.current = null
+      return
+    }
+    const lastId = list[list.length - 1]?.id ?? null
+    const prev = prevMessageWindowRef.current
+    prevMessageWindowRef.current = { chatId: chatDetail.id, lastId, count: list.length }
+
+    const prepend = pendingPrependRef.current
+    pendingPrependRef.current = null
+    if (prepend) {
+      const delta = el.scrollHeight - prepend.scrollHeight
+      if (delta > 0) el.scrollTop = prepend.scrollTop + delta
+      return
+    }
+
+    const sameChat = prev?.chatId === chatDetail.id
+    if (!sameChat) {
+      el.scrollTop = el.scrollHeight
+      return
+    }
+    const appended = prev.lastId !== lastId
+    if (appended && !stickToBottomRef.current) {
+      // 読み返し中に届いた分は動かさず、実際に増えた相手からの件数だけ出す。
+      const prevIndex = list.findIndex((m) => m.id === prev.lastId)
+      const fresh = prevIndex >= 0 ? list.slice(prevIndex + 1) : list
+      const incomingCount = fresh.filter((m) => m.direction === 'incoming').length
+      if (incomingCount > 0) setUnseenIncoming((count) => count + incomingCount)
+      return
+    }
+    el.scrollTop = el.scrollHeight
+  }, [chatDetail?.messages, chatDetail?.id])
+
+  // 画像などの遅れての読み込みで高さが伸びても、読み返し中の位置を崩さない。
+  // 下端にいる時だけ下端へ寄せ直す。失敗→代替表示で高さが縮む場合も同じ。
   useEffect(() => {
-    if (!chatDetail?.messages || chatDetail.messages.length === 0) return
+    const el = messagesScrollRef.current
+    if (!el || typeof MutationObserver === 'undefined') return
+    const observer = new MutationObserver(() => {
+      if (pendingPrependRef.current) return
+      if (stickToBottomRef.current) el.scrollTop = el.scrollHeight
+    })
+    observer.observe(el, { childList: true, subtree: true, attributes: true })
+    return () => observer.disconnect()
+  }, [selectedChatId])
+
+  // スクロール位置を追い続ける。下端にいる間だけ新着へ追従する(INBOX-27)。
+  useEffect(() => {
     const el = messagesScrollRef.current
     if (!el) return
-    el.scrollTop = el.scrollHeight
-    let userScrolled = false
     const onScroll = () => {
-      if (!messagesScrollRef.current) return
-      const current = messagesScrollRef.current
-      // 下端から一定以上離れたらユーザー操作とみなす
-      if (current.scrollHeight - current.scrollTop - current.clientHeight > 20) {
-        userScrolled = true
-      }
+      const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight <= 40
+      stickToBottomRef.current = atBottom
+      if (atBottom) setUnseenIncoming(0)
     }
     el.addEventListener('scroll', onScroll, { passive: true })
-    // 画像/Flex の表示後に高さが増える場合に追従するフォロワー（ユーザーがスクロール済みなら発動させない）
-    const id = window.setTimeout(() => {
-      if (userScrolled || !messagesScrollRef.current) return
-      messagesScrollRef.current.scrollTop = messagesScrollRef.current.scrollHeight
-    }, 150)
-    return () => {
-      window.clearTimeout(id)
-      el.removeEventListener('scroll', onScroll)
-    }
-  }, [chatDetail?.id, chatDetail?.messages?.length])
+    onScroll()
+    return () => el.removeEventListener('scroll', onScroll)
+  }, [selectedChatId])
 
-  // Auto-resize textarea as messageContent grows
+  // Auto-resize textarea as messageContent grows (INBOX-20: 3行〜8行で伸ばす)
   useEffect(() => {
     const el = textareaRef.current
     if (!el) return
     el.style.height = 'auto'
-    el.style.height = `${Math.min(el.scrollHeight, 200)}px`
+    el.style.height = `${Math.min(el.scrollHeight, TEXTAREA_MAX_HEIGHT_PX)}px`
   }, [messageContent])
 
   // 案内付きの空状態から一覧へ戻る。URLの指定も外す。
@@ -1519,12 +1883,18 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
     }
     if (sent.image && imageDraftsRef.current.get(key) === sent.image) {
       imageDraftsRef.current.delete(key)
+      imageMetaDraftsRef.current.delete(key)
     }
   }
 
   const handleSendMessage = async () => {
     if (!selectedChatId || sending || sendLockRef.current) return
     if (!messageContent.trim() && !pendingImage) return
+    // INBOX-29: 上限を超えた本文は送らない(下書きは消さない)。
+    if (messageContent.length > MESSAGE_MAX_LENGTH) {
+      setError(`メッセージは${MESSAGE_MAX_LENGTH.toLocaleString()}文字までです。`)
+      return
+    }
     const sendingChatId = selectedChatId  // capture the chat id for this send
     const sendingAccountId = selectedAccountId  // 送信開始時のアカウントを固定する
     sendLockRef.current = true
@@ -1563,7 +1933,10 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
          */
         dropSentDraft(sendingChatId, sendingAccountId, { content, image: pendingImage })
         if (selectedChatIdRef.current === sendingChatId && detailAccountRef.current === sendingAccountId) {
-          setPendingImage((prev) => (prev === pendingImage ? null : prev))
+          if (pendingImageRef.current === pendingImage) {
+            setPendingImage(null)
+            setPendingImageMeta(null)
+          }
           setMessageContent((prev) => (prev.trim() === content ? '' : prev))
         }
         const staffName = sendResult.success ? sendResult.data.sentByStaffName : '自分'
@@ -1607,7 +1980,10 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
         dropSentDraft(sendingChatId, sendingAccountId, { image: pendingImage })
         // 送信した会話が開かれたまま、かつ添付が送った版のままのときだけ外す(#962 F06)。
         if (selectedChatIdRef.current === sendingChatId && detailAccountRef.current === sendingAccountId) {
-          setPendingImage((prev) => (prev === pendingImage ? null : prev))
+          if (pendingImageRef.current === pendingImage) {
+            setPendingImage(null)
+            setPendingImageMeta(null)
+          }
         }
         // Optimistic update for image
         const imageMessage = buildOutgoingMessage({
@@ -1697,8 +2073,9 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
         setQuotedMessage((prev) => (prev === quotedMessage ? null : prev))
       }
     } catch (sendError) {
-      // アカウントを切り替えたあとの古い応答は、新しいアカウントの画面へ出さない。
-      if (detailAccountRef.current === sendingAccountId) {
+      // 別の会話・アカウントへ切り替えたあとの古い失敗は、
+      // 新しい画面へ出さない(A02-04)。
+      if (detailAccountRef.current === sendingAccountId && selectedChatIdRef.current === sendingChatId) {
         setError(describeSendFailure(sendError))
       }
     } finally {
@@ -1715,6 +2092,11 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
     if (!selectedChatId || scheduling || scheduleLockRef.current) return
     const content = messageContent.trim()
     if (!content) return
+    // INBOX-29: 上限を超えた本文は予約もさせない。
+    if (messageContent.length > MESSAGE_MAX_LENGTH) {
+      setError(`メッセージは${MESSAGE_MAX_LENGTH.toLocaleString()}文字までです。`)
+      return
+    }
     if (!scheduleInput) {
       setError('予約する日時を選んでください')
       return
@@ -1742,7 +2124,9 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
       })
       const res = await api.chats.schedule(schedulingChatId, {
         content,
-        scheduledAt: scheduleInput,
+        // 入力欄は日本時間の約束(INBOX-21)。オフセットを付けて送り、
+        // サーバー側の時間帯に左右されない同じ瞬間を保存する。
+        scheduledAt: jstDatetimeLocalToIso(scheduleInput),
         quotedMessageId: quotedMessage?.id,
       }, sendKeysRef.current.get(signature))
       if (res.success) {
@@ -1758,8 +2142,9 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
         await loadScheduledSends(schedulingChatId)
       }
     } catch (scheduleError) {
-      // アカウントを切り替えたあとの古い失敗は、新しいアカウントの画面へ出さない。
-      if (detailAccountRef.current === schedulingAccountId) {
+      // 別の会話・アカウントへ切り替えたあとの古い失敗は、
+      // 新しい画面へ出さない(A02-04)。
+      if (detailAccountRef.current === schedulingAccountId && selectedChatIdRef.current === schedulingChatId) {
         setError(describeSendFailure(scheduleError))
       }
     } finally {
@@ -1782,11 +2167,11 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
     }
   }
 
-  /** 予約時刻の変更。datetime-local の JST 値をそのまま口へ渡す。 */
+  /** 予約時刻の変更。datetime-local の JST 値はオフセットを付けて口へ渡す(INBOX-21)。 */
   const handleReschedule = async (scheduleId: string, nextAt: string) => {
     if (!selectedChatId || !nextAt) return
     try {
-      const res = await api.chats.updateScheduled(selectedChatId, scheduleId, { scheduledAt: nextAt })
+      const res = await api.chats.updateScheduled(selectedChatId, scheduleId, { scheduledAt: jstDatetimeLocalToIso(nextAt) })
       if (res.success) await loadScheduledSends(selectedChatId)
     } catch {
       setError('予約時刻の変更に失敗しました。一覧を読み込み直してください。')
@@ -1923,24 +2308,37 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
 
   const handleSaveMemo = async () => {
     if (!selectedChatId || memoSaving) return
+    /*
+     * 保存を始めた会話と版を固定する(INBOX-25)。応答を待つ間に別の
+     * 会話・アカウントへ切り替わっても、その画面へ結果を書き込まない。
+     */
+    const savingChatId = selectedChatId
+    const savingAccountId = selectedAccountId
+    const savingRevision = chatDetail?.revision
+    const notes = memoDraft.trim() || null
     setMemoSaving(true)
     setMemoError('')
     try {
-      const notes = memoDraft.trim() || null
-      const response = await api.chats.update(selectedChatId, {
+      const response = await api.chats.update(savingChatId, {
         notes,
-        revision: chatDetail?.revision,
+        revision: savingRevision,
       })
       if (!response.success) throw new Error(response.error || '内部メモを保存できませんでした')
-      setChatDetail((current) => current && current.id === selectedChatId
-        ? { ...current, notes, revision: response.data.revision }
+      // 返ってきた版を採用する。古い版のまま次の保存を送ると409になる。
+      setChatDetail((current) => current && current.id === savingChatId
+        ? { ...current, notes: response.data?.notes ?? notes, revision: response.data.revision }
         : current)
-      setChats((current) => current.map((chat) => chat.id === selectedChatId
+      setChats((current) => current.map((chat) => chat.id === savingChatId
         ? { ...chat, notes }
         : chat))
-      setShowMemoEditor(false)
+      // 開いている紙を閉じるのは、いまも同じ会話を見ているときだけ。
+      if (selectedChatIdRef.current === savingChatId && detailAccountRef.current === savingAccountId) {
+        setShowMemoEditor(false)
+      }
     } catch (memoSaveError) {
-      setMemoError(memoSaveError instanceof Error ? memoSaveError.message : '内部メモを保存できませんでした')
+      if (selectedChatIdRef.current === savingChatId && detailAccountRef.current === savingAccountId) {
+        setMemoError(memoSaveError instanceof Error ? memoSaveError.message : '内部メモを保存できませんでした')
+      }
     } finally {
       setMemoSaving(false)
     }
@@ -1961,6 +2359,11 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
 
   const visibleMailItems = channel === 'line' ? [] : emailItems
   const visibleLineItems = channel === 'email' ? [] : chats
+  // INBOX-29: 上限を超えた本文は送らせない(下書きは消さない)。
+  const messageLength = messageContent.length
+  const messageOverLimit = messageLength > MESSAGE_MAX_LENGTH
+  // この会話で画像の準備(アップロード)が進行中か(INBOX-23/31)。
+  const imageUploading = imageBusyKeys.has(draftKeyOf(selectedAccountId, selectedChatId))
   const quickCounts = {
     all: visibleMailItems.length + visibleLineItems.length,
     reply: inboxStats ? inboxStats.waiting :
@@ -2718,10 +3121,23 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                     </span>
                   )}
                   <div className="min-w-0">
-                    <p className="text-sm font-medium text-ink truncate">
+                    {/*
+                      U008: 長い表示名が狭い幅で切れても、押すと(キーボードでも)
+                      全文に広げられる。title でも全文を確認できる。
+                    */}
+                    <button
+                      type="button"
+                      title={chatDetail.friendName}
+                      aria-expanded={headerNameExpanded}
+                      onClick={() => setHeaderNameExpanded((v) => !v)}
+                      className={`block w-full text-left text-sm font-medium text-ink ${headerNameExpanded ? 'whitespace-normal break-all' : 'truncate'}`}
+                    >
                       {chatDetail.friendName}
-                    </p>
-                    <p className="mt-0.5 truncate text-xs text-ink-faint">
+                    </button>
+                    <p
+                      className="mt-0.5 truncate text-xs text-ink-faint"
+                      title={`${chatDetail.friendRealName ? `${chatDetail.friendRealName}・` : ''}LINE・最終受信 ${formatInboxDatetime(chatDetail.lastMessageAt)}`}
+                    >
                       {chatDetail.friendRealName ? `${chatDetail.friendRealName}・` : ''}LINE・最終受信 {formatInboxDatetime(chatDetail.lastMessageAt)}
                     </p>
                   </div>
@@ -2804,6 +3220,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
               </div>
 
               {/* Messages — LINE-style chat bubbles */}
+              <div className="relative flex min-h-0 flex-1 flex-col">
               <div ref={messagesScrollRef} className="flex-1 space-y-2 overflow-y-auto p-4" style={{ backgroundColor: '#7292BD' }}>
                 {/*
                   古い履歴の続き。直近100件だけ読んでいる会話で出す。
@@ -2842,14 +3259,9 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                         </div>
                       )
                     } else if (msg.messageType === 'image') {
-                      try {
-                        const parsed = JSON.parse(msg.content)
-                        bubbleContent = (
-                          <img src={parsed.originalContentUrl || parsed.previewImageUrl} alt="" className="max-w-[200px] rounded" />
-                        )
-                      } catch {
-                        bubbleContent = <span>[画像]</span>
-                      }
+                      // INBOX-30: 404・期限切れ・回線断は空白にせず、
+                      // 理由の出る代替表示と読み込み直しに倒す。
+                      bubbleContent = <ChatImageMessage content={msg.content} />
                     } else if (msg.messageType === 'sticker') {
                       bubbleContent = <StickerMessageImage content={msg.content} />
                     } else {
@@ -2989,6 +3401,24 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                   })
                 )}
               </div>
+              {/*
+                INBOX-27: 読み返している途中に下へ届いた新着は、位置を
+                動かさず件数の目印だけ出す。押すと新しい方へ移る。
+              */}
+              {unseenIncoming > 0 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const el = messagesScrollRef.current
+                    if (el) el.scrollTop = el.scrollHeight
+                    setUnseenIncoming(0)
+                  }}
+                  className="bg-canvas/95 text-action absolute bottom-3 left-1/2 -translate-x-1/2 rounded-pill px-3 py-1.5 text-xs font-semibold shadow-md"
+                >
+                  新着 {unseenIncoming} 件
+                </button>
+              )}
+              </div>
 
               {/*
                 入力欄（設計 `Reply`）。3段。
@@ -3002,6 +3432,19 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                 よく使うものだけ出し、設定は畳む。
               */}
               <div data-inbox-v4="composer" className="sticky bottom-0 z-10 border-t border-[#E5E7EB] bg-canvas px-4 py-3 relative">
+                {/* INBOX-12: 定期更新が連続失敗で止まったときの理由と再試行 */}
+                {chatPollStalled && (
+                  <p className="text-danger mb-2 text-xs">
+                    会話の更新を一時停止しています（接続できません）。
+                    <button
+                      type="button"
+                      onClick={() => setChatPollRetryKey((key) => key + 1)}
+                      className="font-bold underline"
+                    >
+                      再試行する
+                    </button>
+                  </p>
+                )}
                 {/* 上段 */}
                 {/*
                   U010: テンプレート・送信の設定・内部メモは横に収まらなければ
@@ -3175,7 +3618,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                         variant="primary"
                         type="button"
                         onClick={() => void handleScheduleSend()}
-                        disabled={scheduling || !messageContent.trim() || !scheduleInput}
+                        disabled={scheduling || messageOverLimit || !messageContent.trim() || !scheduleInput}
                       >
                         {scheduling ? '予約中...' : 'この日時で予約する'}
                       </Button>
@@ -3203,9 +3646,8 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                             className="flex items-center gap-2 rounded-control border border-hairline bg-canvas px-2.5 py-1.5 text-xs"
                           >
                             <span className="shrink-0 font-semibold text-ink">
-                              {new Date(row.scheduledAt).toLocaleString('ja-JP', {
-                                month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit',
-                              })}
+                              {/* INBOX-21: 予約時刻は日本時間で出す。端末の時間帯でずらさない。 */}
+                              {formatJstScheduledAt(row.scheduledAt)}
                               {row.status === 'sending' && '（送信中）'}
                             </span>
                             <span className="min-w-0 flex-1 truncate text-ink-secondary" title={row.content}>
@@ -3213,7 +3655,9 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                             </span>
                             <input
                               type="datetime-local"
-                              aria-label="予約時刻を変更"
+                              aria-label="予約時刻を変更(日本時間)"
+                              title="日本時間で指定します"
+                              defaultValue={isoToJstDatetimeLocal(row.scheduledAt)}
                               disabled={row.status !== 'scheduled'}
                               onChange={(e) => {
                                 if (e.target.value) void handleReschedule(row.id, e.target.value)
@@ -3235,9 +3679,65 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                   </div>
                 )}
 
+                {/*
+                  INBOX-32: 送る前に何を添付したかを見せる。
+                  小さい画像・ファイル名・大きさ・外す/変更/大きく見る。
+                  この添付は今開いている会話にだけ結びつく(INBOX-23)。
+                */}
+                {pendingImage && pendingImage.mode === 'line-image' && (
+                  <div
+                    data-inbox-v6="image-attachment-preview"
+                    className="mb-2 flex items-center gap-2 rounded-lg border border-hairline bg-canvas-sunken px-3 py-2"
+                  >
+                    <button
+                      type="button"
+                      onClick={() => setImagePreviewOpen(true)}
+                      title="画像を大きく見る"
+                      aria-label="添付した画像を大きく見る"
+                      className="shrink-0"
+                    >
+                      <img
+                        src={pendingImage.previewImageUrl}
+                        alt={pendingImageMeta?.name ?? '添付した画像'}
+                        className="h-10 w-10 rounded-md border border-hairline object-cover"
+                      />
+                    </button>
+                    <span className="min-w-0 flex-1 text-xs">
+                      <span className="text-ink block truncate font-semibold" title={pendingImageMeta?.name}>
+                        {pendingImageMeta?.name ?? '画像'}
+                      </span>
+                      <span className="text-ink-faint">
+                        {pendingImageMeta ? formatByteSize(pendingImageMeta.size) : ''}
+                        {pendingImageMeta ? ' ・ 添付済み' : '添付済み'}
+                      </span>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => imageInputRef.current?.click()}
+                      disabled={imageUploading}
+                      className="text-action shrink-0 whitespace-nowrap text-xs font-semibold"
+                    >
+                      変更
+                    </button>
+                    <button
+                      type="button"
+                      onClick={clearPendingImage}
+                      className="text-ink-faint hover:text-danger shrink-0 whitespace-nowrap text-xs"
+                    >
+                      外す
+                    </button>
+                  </div>
+                )}
+
                 <div className="rounded-[10px] border border-[#D0D5DD] bg-canvas p-2 focus-within:border-[#06C755] focus-within:ring-2 focus-within:ring-[#06C755]/15">
                   {/* 中段 */}
+                  {/*
+                    INBOX-20: この入力欄に textareaRef を付ける。
+                    外れていると自動拡張と「引用を選んだら入力へ戻る」が
+                    動かなかった。
+                  */}
                   <textarea
+                  ref={textareaRef}
                   value={messageContent}
                   onChange={(e) => setMessageContent(e.target.value)}
                   onKeyDown={handleKeyDown}
@@ -3246,11 +3746,19 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                   rows={3}
                   placeholder="メッセージを入力"
                   aria-label="メッセージを入力"
+                  aria-invalid={messageOverLimit}
                   className="w-full resize-none border-0 px-1 py-1 text-sm outline-none"
                   />
 
-                  <p className="text-ink-faint mt-1 text-right text-xs">
-                    {sendMode === 'enter' ? 'Shift + Enter で改行' : 'Enter で改行'}
+                  <p className="mt-1 flex items-center justify-between gap-2 text-xs">
+                    {/* INBOX-29: 残りを送る前に見せる。超えたら送らせない。 */}
+                    <span className={messageOverLimit ? 'text-danger font-semibold' : 'text-ink-faint'}>
+                      {messageLength.toLocaleString()} / {MESSAGE_MAX_LENGTH.toLocaleString()}
+                      {messageOverLimit ? ' ・ 文字数が上限を超えています' : ''}
+                    </span>
+                    <span className="text-ink-faint shrink-0">
+                      {sendMode === 'enter' ? 'Shift + Enter で改行' : 'Enter で改行'}
+                    </span>
                   </p>
 
                   {/* 下段 */}
@@ -3281,38 +3789,31 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                     <button
                       type="button"
                       onClick={() => imageInputRef.current?.click()}
-                      disabled={uploadingImage}
+                      disabled={imageUploading}
                       title="画像を選ぶ"
                       aria-label="画像を選ぶ"
                       className="rounded-md px-2 py-1 text-sm text-[#667085] hover:bg-[#F2F4F7] disabled:opacity-50"
                     >
-                      {uploadingImage ? (
-                        '…'
-                      ) : (
-                        <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24" aria-hidden="true">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M4 16V6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-2m0 0 4-4a2 2 0 0 1 3 0l5 5M14 10h.01" />
-                        </svg>
-                      )}
+                      <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24" aria-hidden="true">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M4 16V6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-2m0 0 4-4a2 2 0 0 1 3 0l5 5M14 10h.01" />
+                      </svg>
                     </button>
+                    {/*
+                      INBOX-31: 状態を分けて伝える。
+                      - 読み込み中 …「画像を読み込み中」(まだ何も送っていない)
+                      - 準備失敗 …「添付できませんでした。選び直してください」
+                      - 添付済み … INBOX-32 のプレビュー行で見せる
+                    */}
                     <span
-                      className="text-ink-faint min-w-0 text-xs"
-                      title={imageError || (pendingImage ? '画像を1枚 添付中' : '画像は JPEG / PNG、1枚 1MB まで')}
+                      className={`min-w-0 truncate text-xs ${imageError ? 'text-danger' : 'text-ink-faint'}`}
+                      title={imageError || '画像は JPEG / PNG、1枚 1MB まで'}
                     >
                       {imageError
                         ? imageError
-                        : pendingImage
-                          ? '画像を1枚 添付中'
+                        : imageUploading
+                          ? '画像を読み込み中…'
                           : '画像は JPEG / PNG、1枚 1MB まで'}
                     </span>
-                    {pendingImage && (
-                      <button
-                        type="button"
-                        onClick={() => setPendingImage(null)}
-                        className="text-ink-faint hover:text-danger text-xs"
-                      >
-                        外す
-                      </button>
-                    )}
                   </span>
                   <span className="ml-auto flex shrink-0 items-center gap-2">
                     <Button
@@ -3325,7 +3826,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                     </Button>
                     <button
                       onClick={handleSendMessage}
-                      disabled={sending || (!messageContent.trim() && !pendingImage)}
+                      disabled={sending || messageOverLimit || (!messageContent.trim() && !pendingImage)}
                       className="shrink-0 whitespace-nowrap rounded-lg bg-accent-deep px-5 py-2 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-deep/90 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       {sending ? '送信中...' : '送信'}
@@ -3344,6 +3845,42 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                   </div>
                 </div>
               </div>
+
+              {/* INBOX-32: 添付画像を大きく確かめる窓。背景か Esc 相当の閉じるで戻る。 */}
+              {imagePreviewOpen && pendingImage && pendingImage.mode === 'line-image' && typeof document !== 'undefined' && createPortal(
+                <div
+                  role="dialog"
+                  aria-modal="true"
+                  aria-label="添付した画像の確認"
+                  className="fixed inset-0 z-[100] flex items-center justify-center bg-[#101828]/60 p-4"
+                  onClick={() => setImagePreviewOpen(false)}
+                >
+                  <div
+                    className="w-full max-w-2xl rounded-[14px] border border-[#E5E7EB] bg-canvas p-4 shadow-2xl"
+                    onClick={(event) => event.stopPropagation()}
+                  >
+                    <img
+                      src={pendingImage.originalContentUrl}
+                      alt={pendingImageMeta?.name ?? '添付した画像'}
+                      className="mx-auto max-h-[70vh] w-auto max-w-full rounded-md object-contain"
+                    />
+                    <div className="mt-3 flex items-center justify-between gap-3">
+                      <p className="text-ink-faint min-w-0 truncate text-xs" title={pendingImageMeta?.name}>
+                        {pendingImageMeta?.name ?? '画像'}
+                        {pendingImageMeta ? ` ・ ${formatByteSize(pendingImageMeta.size)}` : ''}
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => setImagePreviewOpen(false)}
+                        className="shrink-0 rounded-lg border border-[#E5E7EB] bg-canvas px-4 py-2 text-sm font-semibold text-[#667085] hover:bg-[#F7F8F6]"
+                      >
+                        閉じる
+                      </button>
+                    </div>
+                  </div>
+                </div>,
+                document.body,
+              )}
             </>
           ) : null}
         </div>
