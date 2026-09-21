@@ -18,6 +18,7 @@ import { FeatureDisabledScreen } from '@/components/feature-disabled-gate'
 import { useFeatureVisibility } from '@/lib/use-feature-visibility'
 import type { FeatureKey } from '@/lib/feature-settings'
 import AdIntegration from './ad-integration'
+import RefOrdersPanel from './_components/ref-orders'
 import SiteScript from '@/components/inflow-links/site-script'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import Button from '@/components/shared/button'
@@ -51,6 +52,13 @@ interface RefRouteStats {
   friendCount: number
   clickCount: number
   latestAt: string | null
+  /*
+   * IDEA-18: 経路別の購入・返金・取消。first-touch でこの経路に帰属する
+   * 友だちが起こした注文だけを数える。古い Worker は返さないので任意項目。
+   */
+  orderCount?: number
+  refundedOrderCount?: number
+  cancelledOrderCount?: number
 }
 
 interface RefSummaryData {
@@ -61,6 +69,18 @@ interface RefSummaryData {
   routeTotal?: number
   totalClicks?: number
   averageAddRate?: number
+  /*
+   * IDEA-18: 注文の計測範囲。total=このアカウントのECに届いた注文、
+   * linked=LINEの友だちに結びついた注文、attributed=そのうち経路が分かる注文。
+   * 未計測（経路不明・未連携）を0件の成果と混ぜないために使う。
+   */
+  orders?: {
+    total: number
+    linked: number
+    attributed: number
+    refunded: number
+    cancelled: number
+  }
 }
 
 function isRefSummaryData(value: unknown): value is RefSummaryData {
@@ -712,6 +732,18 @@ function InflowLinksPageInner({
         LINEの「友だち追加」だけでは、その人がどこから来たのかは分かりません。
         ここで発行したURLをいったん通ってもらうことで、はじめて経路が分かります。QRコードも同じURLから作れます。
       </p>
+      {/*
+        IDEA-18: 集計の期間・帰属ルール・計測できる範囲を断り書きする。
+        未計測の注文を0件と読ませないため、経路が分からない件数も出す。
+        orders は古い Worker では返らないので、届いたときだけ表示する。
+      */}
+      <p className="bg-info-bg text-ink-secondary rounded-card mb-4 px-4 py-3 text-xs leading-relaxed">
+        集計は累計（全期間）です。購入・返金は、LINEの友だちと結びついた注文だけを、
+        その人がはじめて来た経路に数えます（同じ人・同じ注文は二重に数えません）。
+        {summary?.orders
+          ? `いまの範囲では注文${summary.orders.total.toLocaleString('ja-JP')}件のうち、経路が分かるのは${summary.orders.attributed.toLocaleString('ja-JP')}件、経路が分からないのは${(summary.orders.total - summary.orders.attributed).toLocaleString('ja-JP')}件（うち友だち未連携${(summary.orders.total - summary.orders.linked).toLocaleString('ja-JP')}件）です。`
+          : '注文の集計を取得できたら、経路が分かる件数と分からない件数をここに出します。'}
+      </p>
 
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2"><Button href="/inflow-links/new" variant="primary">＋ 流入リンクをつくる</Button><div className="flex gap-2"><Button onClick={exportCurrentRows} disabled={sortedRows.length === 0}>CSVで書き出す</Button><Button variant="secondary" onClick={() => setBulkOpen(true)}>まとめて操作{selectedRouteIds.size > 0 ? `（${selectedRouteIds.size}件選択中）` : ''}</Button></div></div>
 
@@ -938,6 +970,8 @@ function InflowLinksPageInner({
                     refDetailLoading={refDetailLoading}
                     refDetail={refDetail}
                     refCode={r.refCode}
+                    accountId={selectedAccountId}
+                    orderStats={r.stats}
                   >
                     <td className="px-2 py-3" onClick={(e) => e.stopPropagation()}>
                       {r.entryRouteId ? (
@@ -1192,6 +1226,8 @@ function FragmentRow({
   refDetailLoading,
   refDetail,
   refCode,
+  accountId,
+  orderStats,
   children,
 }: {
   isExpanded: boolean
@@ -1199,6 +1235,9 @@ function FragmentRow({
   refDetailLoading: boolean
   refDetail: RefDetail | null
   refCode: string
+  accountId: string | null
+  /** 経路別集計の購入・返金・取消（古い Worker では undefined）。 */
+  orderStats: RefRouteStats | undefined
   children: ReactNode
 }) {
   const friends = isExpanded && refDetail?.refCode === refCode ? refDetail.friends : null
@@ -1245,6 +1284,22 @@ function FragmentRow({
                 </div>
               </div>
             )}
+            {/*
+              IDEA-18: 経路別集計と同じ条件の注文明細。
+              集計の購入件数は orderStats.orderCount（一覧が持つ行の数）で、
+              明細の全件数はこのパネルの total。同じ母集団で数えるので一致する。
+              集計自体が届いていない(古いWorker)ときは件数の行を出さない。
+            */}
+            <div className="mt-4 border-t border-hairline pt-3" onClick={(e) => e.stopPropagation()}>
+              {orderStats?.orderCount !== undefined ? (
+                <p className="mb-2 text-xs text-ink-faint">
+                  集計では、この経路からの購入は {orderStats.orderCount.toLocaleString('ja-JP')}件
+                  （返金 {(orderStats.refundedOrderCount ?? 0).toLocaleString('ja-JP')}件・
+                  取消 {(orderStats.cancelledOrderCount ?? 0).toLocaleString('ja-JP')}件）です。
+                </p>
+              ) : null}
+              <RefOrdersPanel refCode={refCode} accountId={accountId} pageSize={10} />
+            </div>
           </td>
         </tr>
       )}

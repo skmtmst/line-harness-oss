@@ -1272,8 +1272,12 @@ nenMembers.get(
     const rows = await c.env.DB.prepare(
       `SELECT pub.id, pub.photo_id, pub.status, pub.show_owner_name, pub.view_count,
               pub.version, pub.published_at, ps.public_image_url AS image_url,
-              ps.publication_consent_at, p.name AS pet_name,
-              CASE WHEN pub.show_owner_name = 1 THEN f.display_name ELSE NULL END AS owner_name
+              ps.publication_consent_at, ps.publication_consent_version,
+              ps.awarded_points, ps.reviewed_at, ps.reviewed_by_name,
+              p.name AS pet_name,
+              CASE WHEN pub.show_owner_name = 1 THEN f.display_name ELSE NULL END AS owner_name,
+              (SELECT o.status FROM nen_photo_reward_outbox o
+                WHERE o.photo_id = ps.id AND o.line_account_id = pub.line_account_id) AS point_sync_status
          FROM nen_photo_publications pub
          JOIN nen_photo_submissions ps ON ps.id = pub.photo_id AND ps.line_account_id = pub.line_account_id
          JOIN nen_pet_profiles p ON p.id = ps.pet_id
@@ -1284,48 +1288,92 @@ nenMembers.get(
         ORDER BY pub.published_at DESC LIMIT 200`,
     ).bind(accountId).all<Record<string, unknown>>();
     /*
-     * 掲載先は1発で取る。写真ごとに1件ずつ取りに行くと、掲載数が増えるほど
-     * 遅くなる（N+1）。表示の形は変えない。
+     * 公開中ではない掲載も同じ画面で追う（Issue #1040 IDEA-22）。
+     * ご本人がLIFFで同意を撤回すると写真側の publication_withdrawn_at が
+     * 立つが、掲載先の登録（placements.active=1）は残る。上の一覧の条件から
+     * 外れるだけでは「撤回後に残る公開先」を追えないため、掲載管理の対象を
+     * まとめて返す。公開そのものは変えず、整理操作は既存の withdraw 口。
      */
-    const publicationIds = rows.results.map((row) => String(row.id));
+    const inactiveRows = await c.env.DB.prepare(
+      `SELECT pub.id, pub.photo_id, pub.status, pub.show_owner_name, pub.view_count,
+              pub.version, pub.published_at, pub.withdrawn_at, pub.updated_at,
+              sm.name AS withdrawn_by_name,
+              COALESCE(ps.public_image_url, ps.review_image_url) AS image_url,
+              ps.publication_consent_at, ps.publication_consent_version,
+              ps.publication_withdrawn_at, ps.status AS photo_status,
+              ps.awarded_points, ps.reviewed_at, ps.reviewed_by_name,
+              p.name AS pet_name,
+              CASE WHEN pub.show_owner_name = 1 THEN f.display_name ELSE NULL END AS owner_name,
+              (SELECT o.status FROM nen_photo_reward_outbox o
+                WHERE o.photo_id = ps.id AND o.line_account_id = pub.line_account_id) AS point_sync_status
+         FROM nen_photo_publications pub
+         JOIN nen_photo_submissions ps ON ps.id = pub.photo_id AND ps.line_account_id = pub.line_account_id
+         JOIN nen_pet_profiles p ON p.id = ps.pet_id
+         JOIN friends f ON f.id = ps.friend_id AND f.line_account_id = pub.line_account_id
+         LEFT JOIN staff_members sm ON sm.id = pub.withdrawn_by
+        WHERE pub.line_account_id = ?
+          AND NOT (pub.status = 'published' AND ps.status = 'adopted'
+                   AND ps.publication_consent_at IS NOT NULL
+                   AND ps.publication_withdrawn_at IS NULL)
+        ORDER BY pub.updated_at DESC LIMIT 200`,
+    ).bind(accountId).all<Record<string, unknown>>();
+    /*
+     * 掲載先は1発で取る。写真ごとに1件ずつ取りに行くと、掲載数が増えるほど
+     * 遅くなる（N+1）。公開先ごとの掲載状態を追えるよう、外した先
+     * （active=0）も外した日時つきで返す（Issue #1040 IDEA-22）。
+     */
+    const allPublications = [...rows.results, ...inactiveRows.results];
+    const publicationIds = allPublications.map((row) => String(row.id));
     const placementRows = publicationIds.length === 0 ? [] : (await c.env.DB.prepare(
-      `SELECT publication_id, id, placement_type, placement_label, view_count
+      `SELECT publication_id, id, placement_type, placement_label, view_count,
+              active, created_at, removed_at
          FROM nen_photo_publication_placements
         WHERE publication_id IN (${publicationIds.map(() => '?').join(',')})
-          AND line_account_id = ? AND active = 1
+          AND line_account_id = ?
         ORDER BY created_at`,
     ).bind(...publicationIds, accountId).all<Record<string, unknown>>()).results;
     const placementsByPublication = new Map<string, Array<Record<string, unknown>>>();
     for (const placement of placementRows) {
       const key = String(placement.publication_id);
       const list = placementsByPublication.get(key) ?? [];
-      // 返す列は従来どおり4つ（publication_id は振り分け用で返さない）。
+      // publication_id は振り分け用で返さない。掲載中か外したかは active で見る。
       list.push({
         id: placement.id,
         placement_type: placement.placement_type,
         placement_label: placement.placement_label,
         view_count: placement.view_count,
+        active: placement.active,
+        created_at: placement.created_at,
+        removed_at: placement.removed_at,
       });
       placementsByPublication.set(key, list);
     }
-    const items = rows.results.map((row) => (
+    const withPlacements = (row: Record<string, unknown>) => (
       { ...row, placements: placementsByPublication.get(String(row.id)) ?? [] }
-    )) as Array<Record<string, unknown> & {
-      placements: Array<Record<string, unknown>>;
-    }>;
+    ) as Record<string, unknown> & { placements: Array<Record<string, unknown>> };
+    const items = rows.results.map(withPlacements);
+    const inactive = inactiveRows.results.map(withPlacements);
+    // ご本人が同意を撤回したのに掲載先の整理が残っているものと、
+    // 掲載先から外し終えたものを分ける（Issue #1040 IDEA-22）。
+    const pendingWithdrawals = inactive.filter((row) => String(row.status) !== 'withdrawn');
+    const withdrawnItems = inactive.filter((row) => String(row.status) === 'withdrawn');
     const measured = items.filter((item) => item.view_count !== null && item.view_count !== undefined);
     return c.json({ success: true, data: {
       summary: {
         publishedCount: items.length,
         placementCount: new Set(items.flatMap((item) => (
-          item.placements
+          item.placements.filter((placement) => Number(placement.active ?? 1) === 1)
         ).map((placement) => `${placement.placement_type}:${placement.placement_label}`))).size,
         topPhoto: measured.length
           ? measured.reduce((top, item) => Number(item.view_count) > Number(top.view_count) ? item : top)
           : null,
         consentedCount: items.length,
+        attentionCount: pendingWithdrawals.length,
+        withdrawnCount: withdrawnItems.length,
       },
       items,
+      pendingWithdrawals,
+      withdrawnItems,
     } });
   },
 );
@@ -1448,7 +1496,8 @@ nenMembers.get('/api/nen-members/photos/:id', requirePhotoPermission('photo.subm
     `SELECT ps.id, ps.review_image_url AS image_url, ps.caption, ps.status,
             ps.image_width, ps.image_height, ps.image_byte_size, ps.captured_device,
             ps.review_version, ps.created_at, ps.publication_consent_at,
-            ps.publication_withdrawn_at, ps.display_rotation,
+            ps.publication_consent_version, ps.publication_withdrawn_at,
+            ps.display_rotation, ps.awarded_points, ps.reviewed_at, ps.reviewed_by_name,
             f.photo_watch_required AS submitter_watch,
             p.name AS pet_name, p.animal_type, p.breed,
             p.birthday, f.display_name AS owner_name,
@@ -1462,12 +1511,53 @@ nenMembers.get('/api/nen-members/photos/:id', requirePhotoPermission('photo.subm
       WHERE ps.id = ? AND ps.line_account_id = ? AND f.line_account_id = ?`,
   ).bind(c.req.param('id'), accountId, accountId).first<Record<string, unknown>>();
   if (!photo) return c.json({ success: false, error: 'Not found' }, 404);
-  const risks = await c.env.DB.prepare(
-    `SELECT flag, confidence, note, provider, model_version, assessed_at
-       FROM nen_photo_risk_assessments
-      WHERE photo_id = ? AND line_account_id = ? ORDER BY created_at DESC`,
-  ).bind(c.req.param('id'), accountId).all<Record<string, unknown>>();
-  return c.json({ success: true, data: { ...photo, risks: risks.results } });
+  /*
+   * 採用履歴・報酬・公開先を一緒に返す（Issue #1040 IDEA-22）。
+   * 「通した1回につきポイントの手続きが1回」か、撤回後にどの掲載先が
+   * 残っているかを、詳細を開いたときにその場で確認できるようにする。
+   */
+  const [risks, history, reward, publication] = await Promise.all([
+    c.env.DB.prepare(
+      `SELECT flag, confidence, note, provider, model_version, assessed_at
+         FROM nen_photo_risk_assessments
+        WHERE photo_id = ? AND line_account_id = ? ORDER BY created_at DESC`,
+    ).bind(c.req.param('id'), accountId).all<Record<string, unknown>>(),
+    c.env.DB.prepare(
+      `SELECT to_status, reason_code, reason_note, awarded_points,
+              reviewed_by_name, notification_status, created_at
+         FROM nen_photo_review_events
+        WHERE photo_id = ? AND line_account_id = ?
+        ORDER BY created_at DESC LIMIT 20`,
+    ).bind(c.req.param('id'), accountId).all<Record<string, unknown>>(),
+    c.env.DB.prepare(
+      `SELECT status, points, attempt_count, last_error, synced_at, updated_at
+         FROM nen_photo_reward_outbox
+        WHERE photo_id = ? AND line_account_id = ?`,
+    ).bind(c.req.param('id'), accountId).first<Record<string, unknown>>(),
+    c.env.DB.prepare(
+      `SELECT pub.id, pub.status, pub.view_count, pub.published_at, pub.withdrawn_at,
+              sm.name AS withdrawn_by_name
+         FROM nen_photo_publications pub
+         LEFT JOIN staff_members sm ON sm.id = pub.withdrawn_by
+        WHERE pub.photo_id = ? AND pub.line_account_id = ?`,
+    ).bind(c.req.param('id'), accountId).first<Record<string, unknown>>(),
+  ]);
+  const publicationPlacements = publication ? (await c.env.DB.prepare(
+    `SELECT id, placement_type, placement_label, view_count, active, created_at, removed_at
+       FROM nen_photo_publication_placements
+      WHERE publication_id = ? AND line_account_id = ?
+      ORDER BY created_at`,
+  ).bind(publication.id, accountId).all<Record<string, unknown>>()).results : [];
+  return c.json({
+    success: true,
+    data: {
+      ...photo,
+      risks: risks.results,
+      history: history.results,
+      reward: reward ?? null,
+      publication: publication ? { ...publication, placements: publicationPlacements } : null,
+    },
+  });
 });
 
 nenMembers.put('/api/nen-members/photos/:id/review', requireRole('owner', 'admin', 'staff'), requirePhotoPermission('photo.submission.review'), async (c) => {
