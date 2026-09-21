@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
-import type { Tag } from '@line-crm/shared'
+import type { Folder, Tag } from '@line-crm/shared'
 import { AlertTriangle, ArrowRight, CheckCircle2, Eye, GripVertical, Paperclip, Plus, Save, Send, Trash2, Zap } from 'lucide-react'
 import {
   ApiError,
@@ -531,6 +531,14 @@ export default function BroadcastForm({
   }] : [emptyBubble()])
   const [assets, setAssets] = useState<BroadcastMessageAsset[]>([])
   const [messageTemplates, setMessageTemplates] = useState<BroadcastTemplateOption[]>([])
+  /**
+   * テンプレート選択窓の絞り込み（IDEA-11）。
+   * 「置き場」はテンプレートのフォルダで、配信そのものの置き場
+   * (`folders` / kind='broadcast') とは別物なので別に持つ。
+   */
+  const [templateFolders, setTemplateFolders] = useState<Folder[]>([])
+  const [templatePickerQuery, setTemplatePickerQuery] = useState('')
+  const [templatePickerFolderId, setTemplatePickerFolderId] = useState('')
   const [showTemplatePicker, setShowTemplatePicker] = useState(openTemplatePickerInitially)
   const [selectedTemplate, setSelectedTemplate] = useState<BroadcastTemplateOption | null>(null)
   const [targetMode, setTargetMode] = useState<TargetMode>(initialCondition ? 'advanced' : 'scenario')
@@ -686,9 +694,12 @@ export default function BroadcastForm({
       // #645 差し戻し: 選んでいるアカウントを必ず渡す。口の主文は公開版だけが返り、
       // 未公開・他アカウントは候補にしない。初回引用の検索も同じ候補から行う。
       api.templates.list(undefined, requestAccountId),
-    ]).then(([assetResult, templateResult]) => {
+      // テンプレートの置き場（kind='template'）。配信の置き場とは別系統。
+      api.folders.list('template', requestAccountId),
+    ]).then(([assetResult, templateResult, folderResult]) => {
       if (!isCurrent()) return
       if (assetResult.success) setAssets(assetResult.data)
+      if (folderResult.success) setTemplateFolders(folderResult.data)
       const sendable = templateResult.success
         ? filterSendableTemplates(templateResult.data, requestAccountId)
         : []
@@ -701,6 +712,7 @@ export default function BroadcastForm({
             category: template.category,
             messageType: template.messageType,
             messageContent: template.messageContent,
+            folderId: template.folderId,
             usageCount: template.usageCount,
             updatedAt: template.updatedAt,
             accountId: template.accountId,
@@ -807,6 +819,24 @@ export default function BroadcastForm({
 
   const updateBubble = (index: number, bubble: BroadcastBubble) => setBubbles((items) => items.map((item, i) => i === index ? { ...bubble, id: item.id } : item))
   const moveBubble = (index: number, direction: -1 | 1) => setBubbles((items) => { const next = [...items]; const [item] = next.splice(index, 1); next.splice(index + direction, 0, item); return next })
+
+  /*
+   * テンプレート選択窓の候補（IDEA-11）。
+   * 以前は先頭3件だけを出していたので、4件目以降は検索・フォルダでも
+   * 届かなかった。読み込み済みの候補を全部対象に、名前・本文と置き場で絞る。
+   */
+  const pickerTemplates = useMemo(() => {
+    const q = templatePickerQuery.trim().toLowerCase()
+    return messageTemplates.filter((template) => {
+      if (templatePickerFolderId === '__none__') {
+        if (template.folderId) return false
+      } else if (templatePickerFolderId && template.folderId !== templatePickerFolderId) {
+        return false
+      }
+      if (!q) return true
+      return template.name.toLowerCase().includes(q) || template.messageContent.toLowerCase().includes(q)
+    })
+  }, [messageTemplates, templatePickerQuery, templatePickerFolderId])
   const applyTemplate = (template: BroadcastTemplateOption) => {
     const bubble = messageTemplateToBubble(template)
     if (!bubble) {
@@ -1522,20 +1552,41 @@ export default function BroadcastForm({
             <div className="flex items-start justify-between gap-3">
               <div>
                 <h3 className="text-lg font-bold text-ink">テンプレート選択</h3>
-                <p className="mt-1 text-xs text-ink-faint">フォルダやお気に入りからテンプレートを選びます。</p>
+                <p className="mt-1 text-xs text-ink-faint">名前・本文・置き場でテンプレートを探します。選ぶと右側に内容が出ます。</p>
               </div>
               <button type="button" onClick={() => setShowTemplatePicker(false)} className="text-sm font-semibold text-action hover:underline">メッセージ編集へ戻る</button>
             </div>
-            <label className="mt-4 block text-xs font-bold text-ink-secondary">フォルダ
-              <select aria-label="テンプレートのフォルダ" className="mt-2 w-full rounded-control border border-hairline px-3 py-2 text-sm">
-                <option>すべて</option>
-              </select>
-            </label>
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              <label className="block text-xs font-bold text-ink-secondary">名前・本文で検索
+                <input
+                  type="search"
+                  aria-label="テンプレート名・本文で検索"
+                  value={templatePickerQuery}
+                  onChange={(event) => setTemplatePickerQuery(event.target.value)}
+                  placeholder="テンプレート名・本文で検索"
+                  className="mt-2 w-full rounded-control border border-hairline px-3 py-2 text-sm font-normal"
+                />
+              </label>
+              <label className="block text-xs font-bold text-ink-secondary">フォルダ
+                <select
+                  aria-label="テンプレートのフォルダ"
+                  value={templatePickerFolderId}
+                  onChange={(event) => setTemplatePickerFolderId(event.target.value)}
+                  className="mt-2 w-full rounded-control border border-hairline px-3 py-2 text-sm font-normal"
+                >
+                  <option value="">すべて</option>
+                  {templateFolders.map((folder) => <option key={folder.id} value={folder.id}>{folder.name}</option>)}
+                  <option value="__none__">未分類</option>
+                </select>
+              </label>
+            </div>
             <div className="mt-4 space-y-3">
-              {messageTemplates.slice(0, 3).map((template, index) => (
+              {pickerTemplates.map((template) => (
                 <button key={template.id} type="button" onClick={() => setSelectedTemplate(template)} className="broadcast-template-row">
-                  <span aria-hidden>{index === 0 ? '☆' : index === 1 ? '★' : '▣'}</span>
-                  <span className="min-w-0 flex-1"><strong>{template.name}</strong><small>{template.category || typeLabel(template.messageType)}</small></span>
+                  <span className="min-w-0 flex-1">
+                    <strong className="break-words">{template.name}</strong>
+                    <small>{typeLabel(template.messageType)}</small>
+                  </span>
                   <span aria-hidden>›</span>
                 </button>
               ))}
@@ -1543,6 +1594,11 @@ export default function BroadcastForm({
                 <div className="rounded-card border border-dashed bg-canvas p-8 text-center text-sm text-ink-faint">
                   テンプレートがありません。「コンテンツ ＞ テンプレート」で作成してください。
                 </div>
+              )}
+              {messageTemplates.length > 0 && pickerTemplates.length === 0 && (
+                <p className="rounded-card border border-dashed bg-canvas p-6 text-center text-sm text-ink-faint">
+                  条件に合うテンプレートはありません。検索文字やフォルダを変えてください。
+                </p>
               )}
             </div>
           </section>
@@ -1808,8 +1864,19 @@ export default function BroadcastForm({
             </section>
             <section className="rounded-card border border-hairline bg-canvas p-5">
               <h3 className="text-lg font-bold text-ink">メッセージプレビュー</h3>
-              <p className="mt-1 text-xs text-ink-faint">実際のLINE表示に近い確認用プレビューです。</p>
-              <div className="mt-4 rounded-control bg-canvas-sunken p-4 text-sm text-ink">{selectedTemplate?.messageContent ?? 'テンプレートを選ぶと表示されます'}</div>
+              <p className="mt-1 text-xs text-ink-faint">実際のLINE表示に近い確認用プレビューです。差し込みの項目は、配信時に受け取る人ごとの値へ置き換わります。</p>
+              <div className="mt-4 rounded-control bg-canvas-sunken p-4 text-sm text-ink">
+                {selectedTemplate
+                  ? (() => {
+                      // 挿入前に全文を確かめる（IDEA-11）。吹き出しと同じ部品で
+                      // 出すので、改行・写真・カード型も実際の見え方に近い。
+                      const bubble = messageTemplateToBubble(selectedTemplate)
+                      return bubble
+                        ? <BubblePreview bubble={bubble} />
+                        : <p className="whitespace-pre-wrap break-words">{selectedTemplate.messageContent}</p>
+                    })()
+                  : 'テンプレートを選ぶと表示されます'}
+              </div>
             </section>
             <div className="grid grid-cols-2 gap-2"><Button type="button" onClick={() => void openTestDialog()}>テスト送信</Button><Button type="button" disabled>配信イメージを見る</Button></div>
           </div>

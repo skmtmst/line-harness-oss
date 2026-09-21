@@ -423,7 +423,13 @@ async function processScoring(
       // 公開後または明示停止後は旧ルールへ戻さず、二重加点を防ぐ。
       if (v6.configured) return;
     }
-    if (execution) await applyScoring(db, payload.friendId, eventType, execution.sourceEventId);
+    /*
+     * 旧ルールにも発生元の不変IDを渡す。実行台帳(execution)が無い経路でも
+     * payload.sourceEventId が分かれば決定的な履歴IDで受け付けるので、
+     * 同じイベントを走り直してもスコアと履歴は二重に増えない (IDEA-17)。
+     */
+    const scoreSourceEventId = execution?.sourceEventId ?? payload.sourceEventId;
+    if (scoreSourceEventId) await applyScoring(db, payload.friendId, eventType, scoreSourceEventId);
     else await applyScoring(db, payload.friendId, eventType);
   } catch (err) {
     console.error('processScoring error:', err);

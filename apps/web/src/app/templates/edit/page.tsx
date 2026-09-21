@@ -246,6 +246,105 @@ function TemplateAccountNotice({
   )
 }
 
+/** 詳細口（GET /api/templates/:id）が返す利用先の形。 */
+type TemplateDetailData = Extract<
+  Awaited<ReturnType<typeof api.templates.get>>,
+  { success: true }
+>['data']
+type TemplateUsedBy = TemplateDetailData['usedBy']
+
+/**
+ * 利用先の1行分（IDEA-11）。
+ *
+ * 一覧のドロワーと同じ行き先へ揃える。旧形式オートメーションは
+ * 開ける画面が無いので、リンクにせずその旨を添える。
+ */
+function templateUsageEntries(usedBy: TemplateUsedBy): Array<{
+  key: string
+  href: string | null
+  label: string
+}> {
+  return [
+    ...usedBy.scenarioSteps.map((usage) => ({
+      key: `scenario-${usage.stepId}`,
+      href: `/scenarios/detail?id=${usage.scenarioId}`,
+      label: `シナリオ「${usage.scenarioName}」${usage.stepOrder}通目`,
+    })),
+    ...usedBy.autoReplies.map((usage) => ({
+      key: `auto-reply-${usage.id}`,
+      href: `/auto-replies/edit?id=${usage.id}`,
+      label: `自動応答「${usage.keyword}」の返信`,
+    })),
+    ...usedBy.automations.map((usage) => ({
+      key: `automation-${usage.id}`,
+      href: null,
+      label: usage.eventType === 'inbox_favorite'
+        ? '受信箱の「よく使う」'
+        : `オートメーション「${usage.name}」（旧形式・画面からは開けません）`,
+    })),
+    ...usedBy.reminderSteps.map((usage) => ({
+      key: `reminder-${usage.stepId}`,
+      href: `/reminders/edit?id=${usage.reminderId}`,
+      label: `リマインダ「${usage.reminderName}」`,
+    })),
+    ...usedBy.richMenuAreas.map((usage) => ({
+      key: `rich-menu-${usage.areaId}`,
+      href: `/rich-menus/edit?id=${usage.groupId}`,
+      label: `リッチメニュー「${usage.groupName}」${usage.pageName}`,
+    })),
+    ...usedBy.trackedLinks.map((usage) => ({
+      key: `tracked-link-${usage.id}`,
+      href: `/inflow-links/detail?id=${usage.id}`,
+      label: `流入リンク「${usage.name}」`,
+    })),
+  ]
+}
+
+/**
+ * 「変更の利用先を表示する」（IDEA-11）。
+ *
+ * 使われているテンプレートを直すとき、保存した内容がどこへ届くかを
+ * 保存の手前に出す。出さないと、自動応答やシナリオで使われている
+ * 本文が予告なしに差し替わる。
+ */
+function TemplateUsageNotice({ usedBy }: { usedBy: TemplateUsedBy }) {
+  const entries = templateUsageEntries(usedBy)
+  return (
+    <section
+      aria-label="このテンプレートの利用先"
+      className="border-hairline rounded-control border bg-canvas-sunken p-4"
+    >
+      <p className="text-sm font-semibold text-ink">
+        この変更が使われる場所（{entries.length}か所）
+      </p>
+      {entries.length === 0 ? (
+        <p className="text-ink-secondary mt-1 text-xs">
+          このテンプレートはまだどこからも呼ばれていません。
+        </p>
+      ) : (
+        <>
+          <p className="text-ink-secondary mt-1 text-xs">
+            保存すると、次の利用先へ新しい内容がそのまま使われます。内容を確認してから保存してください。
+          </p>
+          <ul className="mt-2 space-y-1 text-xs">
+            {entries.map((entry) => (
+              <li key={entry.key}>
+                {entry.href ? (
+                  <Link href={entry.href} className="text-accent hover:underline">
+                    {entry.label}
+                  </Link>
+                ) : (
+                  <span className="text-ink-secondary">{entry.label}</span>
+                )}
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+    </section>
+  )
+}
+
 /** 編集中の中身。テンプレート1件分の下書き。 */
 interface TemplateDraft {
   name: string
@@ -267,6 +366,11 @@ interface TemplateEditorState {
   status: TemplateLoadStatus
   templateAccountId: string | null
   draft: TemplateDraft
+  /**
+   * 詳細口が返した利用先（IDEA-11）。未取得は null。
+   * 0件（どこからも呼ばれていない）と区別するため、配列と null を分ける。
+   */
+  usedBy: TemplateUsedBy | null
 }
 
 function newTemplateEditorState(templateId: string | null, visual: boolean): TemplateEditorState {
@@ -274,6 +378,7 @@ function newTemplateEditorState(templateId: string | null, visual: boolean): Tem
     requestedId: templateId,
     status: templateId ? 'loading' : 'idle',
     templateAccountId: null,
+    usedBy: null,
     draft: {
       name: visual ? '定期便 初回のご案内' : '',
       // category は旧一覧との互換用に保存だけ続ける。分け方は folderId に一本化する。
@@ -423,6 +528,8 @@ function TemplateEditInner() {
           requestedId: id,
           status: 'ready',
           templateAccountId: res.data.accountId ?? null,
+          // 利用先も同じ応答に入っている。保存の手前に出す分も一緒に持つ。
+          usedBy: res.data.usedBy ?? null,
           draft: {
             name: res.data.name,
             category: res.data.category ?? '',
@@ -526,6 +633,13 @@ function TemplateEditInner() {
           )}
           footer={(
             <>
+              {/*
+                IDEA-11: 変更の利用先を保存の手前に出す。
+                新規作成（id なし）や未取得では出さない。
+              */}
+              {id && editor.status === 'ready' && editor.usedBy ? (
+                <TemplateUsageNotice usedBy={editor.usedBy} />
+              ) : null}
               {(loadFailed ? TEMPLATE_LOAD_FAILED_MESSAGE : error) && <p className="text-danger text-sm">{loadFailed ? TEMPLATE_LOAD_FAILED_MESSAGE : error}</p>}
               {saveGuard && !loadFailed && !accountMismatch && <p role="status" className="text-ink-secondary text-sm">{saveGuard}</p>}
               <div className="flex flex-wrap gap-2">
@@ -562,6 +676,8 @@ const TemplateEditPageWithTestSupport = Object.assign(TemplateEditPage, {
     TemplateAccountNotice,
     TemplateEditInner,
     TemplateInsertControls,
+    TemplateUsageNotice,
+    templateUsageEntries,
     buildTemplatePreview,
     loadTemplateReferences,
     previewDateValue,

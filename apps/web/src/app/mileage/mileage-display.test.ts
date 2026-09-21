@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  actionScoreReasonLabel,
   formatMileageChange,
   formatMileageDate,
   formatMileageNumber,
@@ -45,5 +46,21 @@ describe('マイル履歴の表示', () => {
     expect(formatMileageNumber(null)).toBe('—')
     expect(formatMileageNumber(undefined)).toBe('—')
     expect(formatMileageNumber(Number.NaN)).toBe('—')
+  })
+})
+
+describe('行動スコアの理由表示（IDEA-17）', () => {
+  it('「きっかけ → ルール名」はルール名だけを出す', () => {
+    expect(actionScoreReasonLabel('message_received → 返信スコア')).toBe('返信スコア')
+    expect(actionScoreReasonLabel('link_clicked → クリック加点')).toBe('クリック加点')
+  })
+
+  it('内部のイベント名だけの値は汎用の言葉へ、理由なしは未取得と区別する', () => {
+    expect(actionScoreReasonLabel('unknown_event_key')).toBe('反応の記録')
+    expect(actionScoreReasonLabel(null)).toBe('点数が変わった理由は未取得')
+  })
+
+  it('担当者が書いた日本語の理由はそのまま出す', () => {
+    expect(actionScoreReasonLabel('問い合わせ対応のお詫び')).toBe('問い合わせ対応のお詫び')
   })
 })
