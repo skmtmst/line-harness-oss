@@ -313,6 +313,85 @@
   font-size: var(--text-label);
 }
 
+/* IDEA-23: 注文1件の処理状況パネル（order-detail-drawer）。 */
+.detailSection {
+  min-width: 0;
+}
+
+.detailSectionTitle {
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.detailDl {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.detailDlRow {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  min-width: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-label);
+}
+
+.detailDlRow dt {
+  flex: none;
+  width: 88px;
+  color: var(--color-ink-faint);
+  font-size: var(--text-caption);
+}
+
+.detailDlRow dd {
+  min-width: 0;
+  overflow-wrap: break-word;
+}
+
+.detailEvent {
+  min-width: 0;
+  border: 1px solid var(--color-divider-soft);
+  border-radius: var(--radius-control);
+  padding: 10px 12px;
+}
+
+.detailEventHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+
+.detailRow {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+  border-top: 1px solid var(--color-divider-soft);
+  margin-top: 8px;
+  padding-top: 8px;
+}
+
+.detailStage {
+  margin-top: 6px;
+  color: var(--color-status-danger);
+  font-size: var(--text-caption);
+  font-weight: 600;
+}
+
+.detailHint {
+  margin-top: 4px;
+  color: var(--color-ink-faint);
+  font-size: var(--text-caption);
+  line-height: 1.6;
+}
+
 .impactRow:last-child {
   border-bottom: 0;
 }

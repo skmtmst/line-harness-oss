@@ -9,6 +9,70 @@ export type EcActionExecutionStatus =
   | 'retryable_failed'
   | 'permanent_failed';
 
+/*
+ * IDEA-23: 失敗・見送りの理由を運用の言葉へ寄せる分類。
+ * 「未連携／権限不足／通信失敗」を別々に出す完了条件に対応する。
+ * 分類コード(error_code等の安全な値)からは classifyEcErrorCode、
+ * 生のエラーメッセージ(台帳の last_error 等)からは classifyEcRawError を使う。
+ * 生メッセージそのものは API の外へ出さない。
+ */
+export type EcFailureKind =
+  | 'unlinked'       // LINEの友だちと結びついていない
+  | 'not_following'  // 結びついた友だちが現在フォローしていない
+  | 'permission'     // LINE連携の認証・アカウント設定の不備
+  | 'communication'  // 一時的な通信・送信の失敗（自動または手動の再試行対象）
+  | 'rejected'       // 送信内容・宛先の拒否
+  | 'by_setting'     // 設定で意図的に送っていない
+  | 'internal';      // 内部処理の失敗
+
+/** 台帳へ保存済みの安全な分類コードを業務の分類へ写す。 */
+export function classifyEcErrorCode(code: string | null | undefined): EcFailureKind | null {
+  if (!code) return null;
+  switch (code) {
+    case 'line_identity_unmatched':
+      return 'unlinked';
+    case 'friend_not_following':
+      return 'not_following';
+    case 'notification_disabled':
+      return 'by_setting';
+    case 'line_authentication_failed':
+    case 'line_account_not_found':
+    case 'line_account_unavailable':
+    case 'line_account_mismatch':
+      return 'permission';
+    case 'line_rejected':
+      return 'rejected';
+    case 'line_rate_limited':
+    case 'line_temporary_failure':
+    case 'delivery_failed':
+      return 'communication';
+    default:
+      // read_model_failed / event_processing_failed / legacy_processing_failed など。
+      return 'internal';
+  }
+}
+
+/*
+ * 購読台帳(ec_v6_dispatches)やフォロー配信(nen_delivery_jobs)の last_error は
+ * 生のエラーメッセージが入ることがある。内容は出さず、HTTPステータスや
+ * 一時障害語の痕跡だけで業務の分類へ寄せる。読み取れないものは内部失敗。
+ */
+export function classifyEcRawError(raw: string | null | undefined): EcFailureKind | null {
+  if (!raw) return null;
+  if (/\b(401|403)\b/.test(raw) || /unauthorized|forbidden|authentication/i.test(raw)) {
+    return 'permission';
+  }
+  if (/\b(400|404|422)\b/.test(raw)) return 'rejected';
+  if (
+    /\b429\b/.test(raw)
+    || /\b5\d{2}\b/.test(raw)
+    || /timeout|timed out|network|socket|fetch|econn|eai_again/i.test(raw)
+  ) {
+    return 'communication';
+  }
+  return 'internal';
+}
+
 export const EC_ACTION_EXECUTION_STATUSES: ReadonlySet<EcActionExecutionStatus> = new Set([
   'pending', 'processing', 'succeeded', 'skipped', 'retryable_failed', 'permanent_failed',
 ]);
@@ -353,14 +417,18 @@ export interface EcActionExecutionReadModel {
   customerName: string | null;
   friendId: string | null;
   retryAvailable: boolean;
+  /** 失敗・見送りの業務分類。正常・処理中は null。 */
+  failureKind: EcFailureKind | null;
 }
 
 function actionReadModel(row: Record<string, unknown>): EcActionExecutionReadModel {
+  const errorCode = row.error_code == null ? null : String(row.error_code);
   return {
     id: String(row.id), eventId: String(row.event_id), eventType: String(row.event_type),
     actionType: String(row.action_type), ruleVersion: String(row.rule_version),
     status: row.status as EcActionExecutionStatus, attemptCount: Number(row.attempt_count),
-    maxAttempts: Number(row.max_attempts), errorCode: row.error_code == null ? null : String(row.error_code),
+    maxAttempts: Number(row.max_attempts), errorCode,
+    failureKind: classifyEcErrorCode(errorCode),
     errorMessage: row.error_message_safe == null ? null : String(row.error_message_safe),
     lastAttemptedAt: row.last_attempted_at == null ? null : String(row.last_attempted_at),
     nextRetryAt: row.next_retry_at == null ? null : String(row.next_retry_at),
@@ -611,6 +679,402 @@ export async function listEcIdentityCandidates(
       candidateExternalCustomers: Number(pendingSummary?.customer_count ?? 0),
       duplicateSuspicions: Number(duplicates?.count ?? 0), linked: Number(linked?.count ?? 0),
       potentialRevenue: revenueValues.length ? revenueValues.reduce((sum, value) => sum + value, 0) : null,
+    },
+  };
+}
+
+/*
+ * IDEA-23: 1注文の処理状況を説明できるように、注文1件へ紐づく受信出来事・
+ * 個別処理・通知送達・発送後の案内・成果/マイル/スコアをまとめて返す。
+ * 一覧用の一覧表ではなく「この注文はどこまで進み、どこで止まり、何を
+ * やり直せるか」を追うための読み取り専用ビュー。生のエラーメッセージや
+ * 注文本文・秘密値は返さず、分類と安全な文言だけを返す。
+ */
+
+export interface EcOrderDetailAttempt {
+  attemptNumber: number;
+  triggerKind: 'automatic' | 'manual';
+  toStatus: string;
+  errorCode: string | null;
+  errorMessage: string | null;
+  createdAt: string;
+}
+
+export interface EcOrderDetailDispatch {
+  subscriber: 'notification' | 'v6';
+  status: 'pending' | 'sent' | 'failed';
+  attemptCount: number;
+  updatedAt: string;
+  failureKind: EcFailureKind | null;
+}
+
+export interface EcOrderDetailDelivery {
+  id: string;
+  audienceType: 'customer' | 'operator';
+  channel: 'line' | 'email' | 'in_app';
+  status: 'pending' | 'provider_accepted' | 'excluded' | 'retry_wait' | 'failed';
+  retryable: boolean;
+  attempts: number;
+  errorCode: string | null;
+  errorMessage: string | null;
+  failureKind: EcFailureKind | null;
+  queuedAt: string;
+  acceptedAt: string | null;
+  nextRetryAt: string | null;
+  executionMode: string;
+}
+
+export interface EcOrderDetailEvent {
+  id: string;
+  externalEventId: string;
+  eventType: string;
+  status: string;
+  /** 出来事として止まったときの分類。進行中・正常は null。 */
+  failureKind: EcFailureKind | null;
+  receivedAt: string;
+  processedAt: string | null;
+  actions: Array<EcActionExecutionReadModel & { attempts: EcOrderDetailAttempt[] }>;
+  dispatches: EcOrderDetailDispatch[];
+  deliveries: EcOrderDetailDelivery[];
+}
+
+export interface EcOrderDetailFollowUp {
+  id: string;
+  campaignKey: string;
+  campaignLabel: string | null;
+  scheduledAt: string;
+  status: string;
+  attempts: number;
+  sentAt: string | null;
+  /** 既知の見送り理由コードのみ。生のエラーは出さない。 */
+  reason: string | null;
+  failureKind: EcFailureKind | null;
+}
+
+export interface EcOrderDetail {
+  order: EcOrderReadModel;
+  events: EcOrderDetailEvent[];
+  followUps: EcOrderDetailFollowUp[];
+  outcomes: {
+    conversions: Array<{
+      id: string;
+      pointName: string | null;
+      approvalStatus: 'pending' | 'approved' | 'rejected' | null;
+      value: number | null;
+      createdAt: string;
+    }>;
+    mileage: Array<{
+      id: string;
+      entryType: string;
+      amount: number;
+      status: string;
+      reason: string;
+      occurredAt: string;
+    }>;
+    scores: Array<{
+      id: string;
+      scoreChange: number;
+      reason: string | null;
+      occurredAt: string;
+    }>;
+  };
+}
+
+/* nen_delivery_jobs.last_error のうち画面へ出してよい既知の見送り理由。 */
+const FOLLOWUP_SAFE_REASONS = new Set([
+  'friend_unavailable',
+  'line_account_unavailable',
+  'line_account_mismatch',
+  'campaign_snapshot_missing',
+  'campaign_disabled',
+  'order_cancelled',
+  'order_refunded',
+  'campaign_form_already_submitted',
+  'frequency_suppressed',
+]);
+
+/**
+ * 注文1件の処理状況ビュー。アカウントと注文IDで固定し、別アカウントの
+ * 注文は存在しないものとして扱う（行の有無を越権確認させない）。
+ */
+export async function getEcOrderDetail(
+  db: D1Database,
+  input: { lineAccountId: string; orderId: string },
+): Promise<EcOrderDetail | null> {
+  const orderRow = await db.prepare(
+    `SELECT o.*, f.display_name AS customer_name
+       FROM ec_orders o LEFT JOIN friends f ON f.id = o.friend_id
+      WHERE o.id = ? AND o.line_account_id = ?`,
+  ).bind(input.orderId, input.lineAccountId).first<Record<string, unknown>>();
+  if (!orderRow) return null;
+
+  const lineRows = await db.prepare(
+    `SELECT * FROM ec_order_lines WHERE order_id = ? ORDER BY line_index`,
+  ).bind(input.orderId).all<Record<string, unknown>>();
+  const order: EcOrderReadModel = {
+    id: String(orderRow.id), lineAccountId: String(orderRow.line_account_id),
+    externalOrderId: String(orderRow.external_order_id), orderNumber: String(orderRow.order_number),
+    customerId: orderRow.customer_id == null ? null : String(orderRow.customer_id),
+    friendId: orderRow.friend_id == null ? null : String(orderRow.friend_id),
+    customerName: orderRow.customer_name == null ? null : String(orderRow.customer_name),
+    status: orderRow.normalized_status as EcOrderState, providerStatus: String(orderRow.provider_status),
+    currency: String(orderRow.currency),
+    totalAmount: orderRow.total_amount_minor == null ? null : Number(orderRow.total_amount_minor),
+    refundedAmount: orderRow.refunded_amount_minor == null ? null : Number(orderRow.refunded_amount_minor),
+    orderedAt: String(orderRow.ordered_at),
+    detailUrl: orderRow.detail_url == null ? null : String(orderRow.detail_url),
+    version: Number(orderRow.version),
+    orderLines: lineRows.results.map((line) => ({
+      id: String(line.id),
+      productId: line.external_product_id == null ? null : String(line.external_product_id),
+      productName: String(line.product_name), quantity: Number(line.quantity),
+      unitAmount: line.unit_amount_minor == null ? null : Number(line.unit_amount_minor),
+      lineAmount: line.line_amount_minor == null ? null : Number(line.line_amount_minor),
+      productUrl: line.product_url == null ? null : String(line.product_url),
+    })),
+  };
+
+  // 同じ注文番号の出来事を受信順に並べる。order.number は受信体では
+  // 数値のことがあるため TEXT へ寄せてから突き合わせる。
+  const eventRows = await db.prepare(
+    `SELECT id, external_event_id, event_type, status, error_message, received_at, processed_at
+       FROM ec_events
+      WHERE line_account_id = ? AND source = ? AND json_valid(payload)
+        AND CAST(json_extract(payload, '$.order.number') AS TEXT) = ?
+      ORDER BY received_at ASC, id ASC`,
+  ).bind(input.lineAccountId, String(orderRow.source_key), order.orderNumber)
+    .all<Record<string, unknown>>();
+  const eventIds = eventRows.results.map((row) => String(row.id));
+  const externalIds = eventRows.results.map((row) => String(row.external_event_id));
+
+  const placeholders = (count: number) => Array.from({ length: count }, () => '?').join(',');
+
+  const actionRows = eventIds.length
+    ? await db.prepare(
+      `SELECT a.*, e.event_type, e.received_at, e.friend_id,
+              json_extract(e.payload, '$.order.number') AS order_number,
+              f.display_name AS customer_name
+         FROM ec_action_executions a
+         JOIN ec_events e ON e.id = a.event_id
+         LEFT JOIN friends f ON f.id = e.friend_id
+        WHERE a.event_id IN (${placeholders(eventIds.length)})
+        ORDER BY a.created_at ASC`,
+    ).bind(...eventIds).all<Record<string, unknown>>()
+    : { results: [] as Record<string, unknown>[] };
+
+  const actionIds = actionRows.results.map((row) => String(row.id));
+  const attemptRows = actionIds.length
+    ? await db.prepare(
+      `SELECT * FROM ec_action_execution_attempts
+        WHERE action_execution_id IN (${placeholders(actionIds.length)})
+        ORDER BY action_execution_id, attempt_number`,
+    ).bind(...actionIds).all<Record<string, unknown>>()
+    : { results: [] as Record<string, unknown>[] };
+  const attemptsByAction = new Map<string, EcOrderDetailAttempt[]>();
+  for (const row of attemptRows.results) {
+    const actionId = String(row.action_execution_id);
+    const list = attemptsByAction.get(actionId) ?? [];
+    list.push({
+      attemptNumber: Number(row.attempt_number),
+      triggerKind: row.trigger_kind === 'manual' ? 'manual' : 'automatic',
+      toStatus: String(row.to_status),
+      errorCode: row.error_code == null ? null : String(row.error_code),
+      errorMessage: row.error_message_safe == null ? null : String(row.error_message_safe),
+      createdAt: String(row.created_at),
+    });
+    attemptsByAction.set(actionId, list);
+  }
+
+  const dispatchRows = eventIds.length
+    ? await db.prepare(
+      `SELECT * FROM ec_v6_dispatches WHERE event_id IN (${placeholders(eventIds.length)})`,
+    ).bind(...eventIds).all<Record<string, unknown>>()
+    : { results: [] as Record<string, unknown>[] };
+  const dispatchesByEvent = new Map<string, EcOrderDetailDispatch[]>();
+  for (const row of dispatchRows.results) {
+    const eventId = String(row.event_id);
+    const status = String(row.status);
+    const list = dispatchesByEvent.get(eventId) ?? [];
+    list.push({
+      subscriber: row.subscriber === 'v6' ? 'v6' : 'notification',
+      status: status === 'sent' ? 'sent' : status === 'failed' ? 'failed' : 'pending',
+      attemptCount: Number(row.attempt_count),
+      updatedAt: String(row.updated_at),
+      // last_error は生メッセージなので分類だけを返す。
+      failureKind: status === 'failed' ? classifyEcRawError(row.last_error == null ? null : String(row.last_error)) : null,
+    });
+    dispatchesByEvent.set(eventId, list);
+  }
+
+  /*
+   * 共通送信台帳の行をこの注文の出来事へ戻す。
+   * - 顧客通知: dedupe_key = 'ec:<外部出来事ID>'（recordCustomerEcDelivery の契約）
+   * - 運用者通知: source_event_id = 台帳行ID（dispatchOperatorEvent の契約）
+   */
+  const deliveriesByEvent = new Map<string, EcOrderDetailDelivery[]>();
+  const ecDedupeKeys = externalIds.map((id) => `ec:${id}`);
+  if (eventIds.length) {
+    const deliveryRows = await db.prepare(
+      `SELECT d.id, d.instance_id, d.audience_type, d.channel, d.status, d.retryable,
+              d.attempts, d.error_code, d.error_message_safe, d.queued_at, d.accepted_at,
+              d.next_retry_at, d.execution_mode,
+              i.dedupe_key AS instance_dedupe_key, i.source_event_id AS instance_source_event_id
+         FROM notification_deliveries d
+         JOIN notification_instances i ON i.id = d.instance_id
+        WHERE i.line_account_id = ?
+          AND (
+            (i.audience_type = 'customer' AND i.dedupe_key IN (${placeholders(ecDedupeKeys.length)}))
+            OR (i.audience_type = 'operator' AND i.source_event_id IN (${placeholders(eventIds.length)}))
+          )
+        ORDER BY d.queued_at ASC, d.id ASC`,
+    ).bind(input.lineAccountId, ...ecDedupeKeys, ...eventIds).all<Record<string, unknown>>();
+    const eventIdByExternal = new Map(eventRows.results.map((row) => [String(row.external_event_id), String(row.id)]));
+    for (const row of deliveryRows.results) {
+      const audience = row.audience_type === 'operator' ? 'operator' : 'customer';
+      const eventId = audience === 'operator'
+        ? String(row.instance_source_event_id ?? '')
+        : eventIdByExternal.get(String(row.instance_dedupe_key ?? '').slice(3)) ?? '';
+      if (!eventId) continue;
+      const errorCode = row.error_code == null ? null : String(row.error_code);
+      const list = deliveriesByEvent.get(eventId) ?? [];
+      list.push({
+        id: String(row.id),
+        audienceType: audience,
+        channel: row.channel === 'email' ? 'email' : row.channel === 'in_app' ? 'in_app' : 'line',
+        status: String(row.status) as EcOrderDetailDelivery['status'],
+        retryable: Number(row.retryable) === 1,
+        attempts: Number(row.attempts),
+        errorCode,
+        errorMessage: row.error_message_safe == null ? null : String(row.error_message_safe),
+        failureKind: classifyEcErrorCode(errorCode),
+        queuedAt: String(row.queued_at),
+        acceptedAt: row.accepted_at == null ? null : String(row.accepted_at),
+        nextRetryAt: row.next_retry_at == null ? null : String(row.next_retry_at),
+        executionMode: String(row.execution_mode),
+      });
+      deliveriesByEvent.set(eventId, list);
+    }
+  }
+
+  const events: EcOrderDetailEvent[] = eventRows.results.map((row) => {
+    const id = String(row.id);
+    const status = String(row.status);
+    const actions = actionRows.results
+      .filter((action) => String(action.event_id) === id)
+      .map((action) => ({
+        ...actionReadModel(action),
+        attempts: attemptsByAction.get(String(action.id)) ?? [],
+      }));
+    // 出来事単位の分類は個別処理のコードを正とし、無いときだけ
+    // 台帳の error_message をコードとして試す（生文は分類へ回す）。
+    const actionKind = actions.map((action) => action.failureKind).find((kind) => kind !== null) ?? null;
+    const rawError = row.error_message == null ? null : String(row.error_message);
+    const eventKind = actionKind
+      ?? classifyEcErrorCode(rawError)
+      ?? (status === 'failed' ? classifyEcRawError(rawError) : null);
+    return {
+      id,
+      externalEventId: String(row.external_event_id),
+      eventType: String(row.event_type),
+      status,
+      failureKind: eventKind,
+      receivedAt: String(row.received_at),
+      processedAt: row.processed_at == null ? null : String(row.processed_at),
+      actions,
+      dispatches: dispatchesByEvent.get(id) ?? [],
+      deliveries: deliveriesByEvent.get(id) ?? [],
+    };
+  });
+
+  const followUpRows = await db.prepare(
+    `SELECT j.id, j.campaign_key, j.scheduled_at, j.status, j.attempts, j.last_error,
+            j.sent_at, j.created_at, cs.label AS campaign_label
+       FROM nen_delivery_jobs j
+       LEFT JOIN nen_campaign_settings cs ON cs.campaign_key = j.campaign_key
+      WHERE j.line_account_id = ?
+        AND json_valid(j.payload)
+        AND json_extract(j.payload, '$.event.order.number') = ?
+      ORDER BY j.scheduled_at ASC, j.id ASC`,
+  ).bind(input.lineAccountId, order.orderNumber).all<Record<string, unknown>>();
+  const followUps: EcOrderDetailFollowUp[] = followUpRows.results.map((row) => {
+    const status = String(row.status);
+    const rawError = row.last_error == null ? null : String(row.last_error);
+    return {
+      id: String(row.id),
+      campaignKey: String(row.campaign_key),
+      campaignLabel: row.campaign_label == null ? null : String(row.campaign_label),
+      scheduledAt: String(row.scheduled_at),
+      status,
+      attempts: Number(row.attempts),
+      sentAt: row.sent_at == null ? null : String(row.sent_at),
+      reason: status === 'skipped' && rawError && FOLLOWUP_SAFE_REASONS.has(rawError) ? rawError : null,
+      failureKind: status === 'failed' ? classifyEcRawError(rawError) : null,
+    };
+  });
+
+  // 成果・マイル・スコアは発生元の外部出来事IDか注文番号で辿る。
+  // 友だち未連携の注文には付かない（記録口が友だちを要求する）。
+  const conversions = await db.prepare(
+    `SELECT ce.id, ce.point_name_snapshot, ce.approval_status, ce.value_snapshot, ce.created_at
+       FROM conversion_events ce
+      WHERE json_valid(ce.metadata)
+        AND json_extract(ce.metadata, '$.sourceType') = 'ec_order_confirmed'
+        AND (
+          json_extract(ce.metadata, '$.orderNumber') = ?
+          ${externalIds.length ? `OR json_extract(ce.metadata, '$.ecEventId') IN (${placeholders(externalIds.length)})` : ''}
+        )
+      ORDER BY ce.created_at ASC`,
+  ).bind(order.orderNumber, ...externalIds).all<Record<string, unknown>>();
+
+  const mileage = externalIds.length
+    ? await db.prepare(
+      `SELECT ml.id, ml.entry_type, ml.amount, ml.status, ml.reason, ml.occurred_at
+         FROM mileage_ledger ml
+        WHERE ml.source_event_id IN (${placeholders(externalIds.length)})
+           OR ml.engagement_event_id IN (
+             SELECT id FROM engagement_events
+              WHERE source = 'eccube' AND source_event_id IN (${placeholders(externalIds.length)})
+           )
+        ORDER BY ml.occurred_at ASC`,
+    ).bind(...externalIds, ...externalIds).all<Record<string, unknown>>()
+    : { results: [] as Record<string, unknown>[] };
+
+  const scores = externalIds.length
+    ? await db.prepare(
+      `SELECT id, score_change, reason, COALESCE(occurred_at, created_at) AS happened_at
+         FROM friend_scores
+        WHERE line_account_id = ? AND source = 'eccube'
+          AND source_event_id IN (${placeholders(externalIds.length)})
+        ORDER BY happened_at ASC`,
+    ).bind(input.lineAccountId, ...externalIds).all<Record<string, unknown>>()
+    : { results: [] as Record<string, unknown>[] };
+
+  return {
+    order,
+    events,
+    followUps,
+    outcomes: {
+      conversions: conversions.results.map((row) => ({
+        id: String(row.id),
+        pointName: row.point_name_snapshot == null ? null : String(row.point_name_snapshot),
+        approvalStatus: (row.approval_status ?? null) as 'pending' | 'approved' | 'rejected' | null,
+        value: row.value_snapshot == null ? null : Number(row.value_snapshot),
+        createdAt: String(row.created_at),
+      })),
+      mileage: mileage.results.map((row) => ({
+        id: String(row.id),
+        entryType: String(row.entry_type),
+        amount: Number(row.amount),
+        status: String(row.status),
+        reason: String(row.reason),
+        occurredAt: String(row.occurred_at),
+      })),
+      scores: scores.results.map((row) => ({
+        id: String(row.id),
+        scoreChange: Number(row.score_change),
+        reason: row.reason == null ? null : String(row.reason),
+        occurredAt: String(row.happened_at),
+      })),
     },
   };
 }
