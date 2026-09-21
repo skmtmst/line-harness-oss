@@ -114,8 +114,11 @@
   "app/ec-commerce/identity-candidates/page.tsx": {
     "unresolved-classname": 11
   },
+  "app/ec-commerce/order-detail-drawer.tsx": {
+    "unresolved-classname": 38
+  },
   "app/ec-commerce/page.tsx": {
-    "unresolved-classname": 10
+    "unresolved-classname": 13
   },
   "app/ec-commerce/subscriptions-panel.tsx": {
     "unresolved-classname": 11

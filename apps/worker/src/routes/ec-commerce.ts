@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { encryptCredential, getLineAccountById, jstNow } from '@line-crm/db';
+import { classifyEcErrorCode, encryptCredential, getLineAccountById, jstNow } from '@line-crm/db';
 import { EC_EVENT_TYPES, ecEventLabel, addDays, resolveShipDate, toJstMoment } from '@line-crm/shared';
 import { LineClient } from '@line-crm/line-sdk';
 import type { Env } from '../index.js';
@@ -426,6 +426,8 @@ ecCommerce.get(
             customerName: row.customer_name == null ? null : String(row.customer_name),
             friendId: row.friend_id == null ? null : String(row.friend_id),
             retryAvailable: row.status === 'retryable_failed' && Number(row.attempt_count) < Number(row.max_attempts),
+            /* IDEA-23: 「未連携／権限不足／通信失敗」を一覧でも分けるための分類。 */
+            failureKind: classifyEcErrorCode(row.error_code == null ? null : String(row.error_code)),
             order: orderId == null ? null : {
               id: orderId,
               lineAccountId: String(row.order_line_account_id),

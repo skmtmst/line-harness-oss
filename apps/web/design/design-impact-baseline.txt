@@ -49,6 +49,7 @@ shared-button-importer app/conversions/page.tsx
 shared-button-importer app/duplicates/page.tsx
 shared-button-importer app/ec-commerce/connector-panel.tsx
 shared-button-importer app/ec-commerce/identity-candidates/page.tsx
+shared-button-importer app/ec-commerce/order-detail-drawer.tsx
 shared-button-importer app/ec-commerce/page.tsx
 shared-button-importer app/emergency/page.tsx
 shared-button-importer app/events/bookings/page.tsx
@@ -66,6 +67,7 @@ shared-button-importer app/friends/detail/page.tsx
 shared-button-importer app/friends/identity-candidates/page.tsx
 shared-button-importer app/friends/migrations/page.tsx
 shared-button-importer app/friends/page.tsx
+shared-button-importer app/getting-started/feature-set-card.tsx
 shared-button-importer app/hq/banners/project/page.tsx
 shared-button-importer app/hq/billing/page.tsx
 shared-button-importer app/hq/members/page.tsx

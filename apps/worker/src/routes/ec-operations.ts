@@ -1,5 +1,6 @@
 import { Hono, type Context, type Next } from 'hono';
 import {
+  getEcOrderDetail,
   listEcActionExecutions,
   listEcIdentityCandidates,
   listEcOrders,
@@ -83,6 +84,33 @@ ecOperations.get(
     } catch (error) {
       console.error('GET /api/ec-commerce/orders error:', error);
       return c.json({ success: false, error: '注文を確認できませんでした' }, 500);
+    }
+  },
+);
+
+/*
+ * IDEA-23: 1注文の処理状況（届いた出来事・通知・発送後の案内・成果/マイル/
+ * スコア）をまとめて返す。一覧の各注文から「この注文の状況」を開くための口。
+ */
+ecOperations.get(
+  '/api/ec-commerce/orders/:id',
+  requireRole('owner', 'admin', 'staff'),
+  requireEcPermission('ec.event.view'),
+  async (c) => {
+    const accountId = lineAccountId(c);
+    if (!accountId) return c.json({ success: false, error: 'LINEアカウントを選択してください' }, 400);
+    if (!await visible(c, accountId)) {
+      return c.json({ success: false, error: 'このLINEアカウントを表示する権限がありません' }, 403);
+    }
+    try {
+      const data = await getEcOrderDetail(c.env.DB, {
+        lineAccountId: accountId, orderId: c.req.param('id'),
+      });
+      if (!data) return c.json({ success: false, error: '注文が見つかりません' }, 404);
+      return c.json({ success: true, data });
+    } catch (error) {
+      console.error('GET /api/ec-commerce/orders/:id error:', error);
+      return c.json({ success: false, error: '注文の処理状況を確認できませんでした' }, 500);
     }
   },
 );
