@@ -41,12 +41,23 @@ const ACTION_STATUS: Record<EcActionExecutionStatus, { label: string; tone: stri
   permanent_failed: { label: '失敗', tone: styles.statusDanger },
 }
 
+/*
+ * 「したこと」列。worker が実際に行う処理を運用の言葉で書く。
+ * IDEA-21: 発送完了では発送後の案内（NEN配信）も予約され、取り消し・返金では
+ * その注文の待っている案内を止める。定期便の出来事も通知を送るので、
+ * 「未対応の出来事」とは出さない。
+ */
 const ACTION_LABEL: Record<string, string> = {
   'ec.order.confirmed': '注文ありがとうございますを送信',
   'ec.order.payment_received': '定期便のご案内を送信',
-  'ec.order.shipped': 'お荷物を送りましたを送信',
-  'ec.order.cancelled': '注文の取り消しを反映',
-  'ec.order.refunded': '成果を取り消し・マイルを調整',
+  'ec.order.bank_transfer_reminder': '振込期限の案内を送信',
+  'ec.order.shipped': 'お荷物を送りましたを送信・発送後の案内を予約',
+  'ec.order.cancelled': '注文の取り消しを反映・発送後の案内を停止',
+  'ec.order.refunded': '成果を取り消し・マイルを調整・発送後の案内を停止',
+  'ec.subscription.upcoming': '次回定期便の案内を送信',
+  'ec.subscription.payment_failed': '決済失敗の案内を送信',
+  'ec.subscription.card_updated': 'カード変更の結果を送信',
+  'ec.subscription.cancelled': '定期便の解約を反映・解約の案内を送信',
   'ec.customer.profile_updated': '会員情報を更新',
 }
 
@@ -378,12 +389,22 @@ function EventsPanel({ accountId }: { accountId: string | null }) {
               <Td>{action.status === 'retryable_failed' || action.status === 'permanent_failed'
                 ? action.errorMessage ?? `${action.attemptCount}回やり直しました`
                 : action.status === 'skipped'
-                  ? '何もしていません'
+                  /*
+                   * 発送完了が通知停止（notification_disabled）で弾かれたときも、
+                   * worker は通知設定を見る前に発送後の案内を予約している。
+                   * 「何もしていません」と出すと届く案内の理由が追えないので、
+                   * その場合だけ予約したことを添える。友だち未解決など予約に
+                   * 届かない止まり方では errorMessage だけを出す。
+                   */
+                  ? action.eventType === 'ec.order.shipped' && action.errorCode === 'notification_disabled'
+                    ? `${action.errorMessage ?? '通知は送りませんでした'}。発送後の案内は予約しました`
+                    : action.errorMessage ?? '何もしていません'
                   : ACTION_LABEL[action.eventType] ?? `未対応の出来事（${action.eventType}）`}</Td>
               <Td><span className={`${styles.status} ${statusInfo.tone}`}>{statusInfo.label}</span></Td>
               <ActionCell>
+                {/* 友だち詳細は静的書き出しのため /friends/detail?id= 形。/friends/<id> は存在しない（IDEA-21 で修正）。 */}
                 {(action.friendId ?? order?.friendId)
-                  ? <Link className={styles.textLink} href={`/friends/${action.friendId ?? order?.friendId}`}>中身を見る</Link>
+                  ? <Link className={styles.textLink} href={`/friends/detail?id=${encodeURIComponent(action.friendId ?? order?.friendId ?? '')}`}>中身を見る</Link>
                   : <Link className={styles.textLink} href="/ec-commerce/identity-candidates">つき合わせる</Link>}
                 {action.retryAvailable ? <Button type="button" disabled={retryingId === action.id} onClick={() => void retry(action)}>{retryingId === action.id ? '戻しています…' : 'もう一度やる'}</Button> : null}
               </ActionCell>
