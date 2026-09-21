@@ -10,6 +10,7 @@ const mocks = {
   createFriendField: vi.fn(),
   createFriendFieldForScope: vi.fn(),
   updateFriendField: vi.fn(),
+  reorderFriendFields: vi.fn(),
   deleteFriendField: vi.fn(),
   countFriendFieldValues: vi.fn(),
   countFriendFieldValuesForScope: vi.fn(),
@@ -135,6 +136,7 @@ beforeEach(() => {
   mocks.createFriendField.mockResolvedValue(FIELD);
   mocks.createFriendFieldForScope.mockResolvedValue({ ...FIELD, line_account_id: 'account-1', tenant_id: 'tenant-1', is_inherited: 0 });
   mocks.updateFriendField.mockResolvedValue(FIELD);
+  mocks.reorderFriendFields.mockResolvedValue(undefined);
   mocks.countFriendFieldValues.mockResolvedValue(0);
   mocks.countFriendFieldValuesForScope.mockResolvedValue(0);
   mocks.countFriendFieldValuesForScopes.mockResolvedValue(new Map());
@@ -1095,5 +1097,41 @@ describe('個人情報の個別権限（N-045）', () => {
     });
     expect(res.status).toBe(403);
     expect(mocks.setFriendFieldValuesBulk).not.toHaveBeenCalled();
+  });
+});
+
+describe('項目の並び替え（#1014 ATTR-02/03/04）', () => {
+  it('並び替えは1回の呼び出しでまとめて保存される', async () => {
+    const res = await req(makeApp(), '/api/friend-fields/reorder?lineAccountId=account-1', 'PATCH', { ids: ['ff-2', 'ff-1'] });
+    expect(res.status).toBe(200);
+    expect(mocks.reorderFriendFields).toHaveBeenCalledTimes(1);
+    expect(mocks.reorderFriendFields).toHaveBeenCalledWith(env.DB,
+      expect.objectContaining({ tenantId: 'tenant-1', lineAccountId: 'account-1' }),
+      ['ff-2', 'ff-1']);
+    expect(mocks.updateFriendField).not.toHaveBeenCalled();
+  });
+
+  it('idsが配列でなければ400', async () => {
+    const res = await req(makeApp(), '/api/friend-fields/reorder?lineAccountId=account-1', 'PATCH', { ids: 'ff-1' });
+    expect(res.status).toBe(400);
+    expect(mocks.reorderFriendFields).not.toHaveBeenCalled();
+  });
+
+  it('lineAccountIdが無ければ400', async () => {
+    const res = await req(makeApp(), '/api/friend-fields/reorder', 'PATCH', { ids: ['ff-1', 'ff-2'] });
+    expect(res.status).toBe(400);
+    expect(mocks.reorderFriendFields).not.toHaveBeenCalled();
+  });
+
+  it('見えないアカウントの項目は並び替えられない', async () => {
+    const res = await req(makeApp(), '/api/friend-fields/reorder?lineAccountId=account-other', 'PATCH', { ids: ['ff-1', 'ff-2'] });
+    expect(res.status).toBe(404);
+    expect(mocks.reorderFriendFields).not.toHaveBeenCalled();
+  });
+
+  it('staffは項目を並び替えられない', async () => {
+    const res = await req(makeApp('staff'), '/api/friend-fields/reorder?lineAccountId=account-1', 'PATCH', { ids: ['ff-1', 'ff-2'] });
+    expect(res.status).toBe(403);
+    expect(mocks.reorderFriendFields).not.toHaveBeenCalled();
   });
 });

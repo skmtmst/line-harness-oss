@@ -318,4 +318,91 @@ describe('identity candidate contract', () => {
       code: 'EC_ACCOUNT_MISMATCH', status: 422,
     });
   });
+
+  /*
+   * FRIEND-11: 画面の「すべて」は本当に全状態を返す。集計は状態の絞り込みを
+   * 含まない全件で数え、弱い根拠（confidence < 50）の件数も出す。
+   */
+  it('lists every status with status=all and returns aggregate counts', async () => {
+    const { db } = seed();
+    await upsertIdentityCandidate(db, friendDraft());
+    // 候補の同一性は「左の対象 × 右の友だち」の組で決まる。別候補にするには
+    // 別の組にする（ここでは右を friend-c に変える）。
+    const second = friendDraft('candidate-friend-2');
+    second.confidenceScore = 30;
+    second.right = { ...second.right, id: 'friend-c' };
+    await upsertIdentityCandidate(db, second);
+    await decideIdentityCandidate(db, actor, 'candidate-friend', {
+      expectedVersion: 1, decision: 'different', reason: '別人でした',
+    });
+
+    const all = await listIdentityCandidates(db, {
+      tenantId: DEFAULT_TENANT_ID, kind: 'friend_duplicate', status: 'all',
+      allowedAccountIds: ['account-a', 'account-b'], limit: 20, offset: 0,
+    });
+    expect(all.total).toBe(2);
+    expect(all.items.map((item) => item.status).sort()).toEqual(['different', 'pending']);
+    expect(all.statusCounts).toMatchObject({ pending: 1, different: 1 });
+    expect(all.lowConfidenceCount).toBe(1);
+
+    // 状態を絞った画面でも、集計は同じ検索条件の全状態を数える。
+    const pending = await listIdentityCandidates(db, {
+      tenantId: DEFAULT_TENANT_ID, kind: 'friend_duplicate', status: 'pending',
+      allowedAccountIds: ['account-a', 'account-b'], limit: 20, offset: 0,
+    });
+    expect(pending.total).toBe(1);
+    expect(pending.statusCounts).toMatchObject({ pending: 1, different: 1 });
+  });
+
+  /*
+   * FRIEND-11: 検索はサーバー側で全件へかける。取得済みの1ページだけを
+   * 画面で絞ると、後ろのページにしか無い候補へ辿れない。
+   */
+  it('applies q across the whole candidate set before slicing the page', async () => {
+    const { db } = seed();
+    /*
+      候補は「左の対象 × 右の友だち」の組で一意（組は canonical に
+      並べ替えられるので (b,c) と (c,b) は同じ候補になる）。
+      friend-a / friend-c は本店(account-a)、friend-b は支店(account-b)。
+    */
+    const friendAccount: Record<string, string> = {
+      'friend-a': 'account-a', 'friend-b': 'account-b', 'friend-c': 'account-a',
+    };
+    const pairs: Array<[string, string]> = [
+      ['friend-b', 'friend-a'],
+      ['friend-c', 'friend-a'],
+    ];
+    for (let i = 0; i < pairs.length; i += 1) {
+      const draft = friendDraft(`candidate-${i}`);
+      draft.left = {
+        ...draft.left, id: pairs[i][0], label: `対象外 ${i}`,
+        lineAccountId: friendAccount[pairs[i][0]],
+      };
+      draft.right = {
+        ...draft.right, id: pairs[i][1], label: `対象外 ${i}`,
+        lineAccountId: friendAccount[pairs[i][1]],
+      };
+      await upsertIdentityCandidate(db, draft);
+    }
+    const hit = friendDraft('candidate-hit');
+    hit.left = { ...hit.left, id: 'friend-b', label: '佐藤 一郎', lineAccountId: 'account-b' };
+    hit.right = { ...hit.right, id: 'friend-c', lineAccountId: 'account-a' };
+    await upsertIdentityCandidate(db, hit);
+
+    const found = await listIdentityCandidates(db, {
+      tenantId: DEFAULT_TENANT_ID, kind: 'friend_duplicate', status: 'all',
+      allowedAccountIds: ['account-a', 'account-b'], limit: 2, offset: 0, q: '佐藤',
+    });
+    expect(found.total).toBe(1);
+    expect(found.items[0].id).toBe('candidate-hit');
+    // 集計も同じ検索条件で数える。
+    expect(found.statusCounts).toEqual({ pending: 1 });
+
+    const none = await listIdentityCandidates(db, {
+      tenantId: DEFAULT_TENANT_ID, kind: 'friend_duplicate', status: 'all',
+      allowedAccountIds: ['account-a', 'account-b'], limit: 20, offset: 0, q: '存在しない名前',
+    });
+    expect(none.total).toBe(0);
+    expect(none.items).toHaveLength(0);
+  });
 });

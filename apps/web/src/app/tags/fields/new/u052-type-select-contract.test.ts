@@ -25,6 +25,11 @@ describe('友だち情報欄の型選択（#975 U052）', () => {
 
   it('全型の名前と用途の一覧を残す', () => {
     // 選んでいない型の用途もこの一覧で確認できる。
-    expect(PAGE).toContain('FIELD_TYPE_LABELS[item]}（${FIELD_TYPE_HINTS[item]}）')
+    // #1014 ATTR-19: 13種を1段落に連ねた形は読めないため、
+    // 開閉できる「種類の選び方」一覧へ変えた。一覧自体は残す。
+    expect(PAGE).toContain('種類の選び方')
+    expect(PAGE).toContain('TYPES.map((item)')
+    expect(PAGE).toContain('FIELD_TYPE_LABELS[item]')
+    expect(PAGE).toContain('FIELD_TYPE_HINTS[item]')
   })
 })

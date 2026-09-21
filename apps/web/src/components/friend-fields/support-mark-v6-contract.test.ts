@@ -64,9 +64,17 @@ describe('V6 対応マーク', () => {
     expect(LIST).toContain('data-design-node="zGZMA"')
     expect(LIST).toContain('保管後は新しく選べません')
     expect(LIST).toContain('{impact.friendCount}人を「{selected.name}」へ置き換えます。')
-    expect(LIST).toContain("[data-design-part='archive-position']")
-    expect(LIST).toContain('margin-top: 310px')
-    expect(LIST).toContain('max-width: 680px')
+    /*
+      #1014 ATTR-17: 上から310px固定はやめる。390×480では下部の
+      「やめる」「置き換えて保管する」が画面外に出て、スクロールでも
+      届かなかった。画面の中に収め、中身が溢れたら内側だけを流す。
+      見出しと操作は常に見える。
+    */
+    expect(LIST).toContain('data-design-part="archive-position"')
+    expect(LIST).toContain('items-center')
+    expect(LIST).toContain('max-h-[calc(100dvh-2rem)]')
+    expect(LIST).toContain('overflow-y-auto')
+    expect(LIST).not.toContain('margin-top: 310px')
   })
 
   it('タブ行から追加画面へ進める', () => {

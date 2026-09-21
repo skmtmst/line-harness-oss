@@ -72,7 +72,9 @@ function NewFriendFieldForm() {
       const res = await api.friendFields.create(selectedAccountId, {
         name: name.trim(), fieldKey: fieldKey.trim(), type, folderId: folderId || null,
         options: NEEDS_OPTIONS.has(type) ? optionList : null,
-        defaultValue: defaultValue.trim() || null, isPersonal, isStarred,
+        // 画像・PDFは既定値を送らない（#1014 ATTR-07）。種類切替で値は捨てているが、念のため送り側でも止める。
+        defaultValue: FILE_TYPES.has(type) ? null : defaultValue.trim() || null,
+        isPersonal, isStarred,
         ecIsMaster, ecFieldPath: ecIsMaster ? ecFieldPath.trim() : null,
       })
       if (!res.success) throw new Error(res.error)
@@ -104,9 +106,40 @@ function NewFriendFieldForm() {
             </Field>
             <p className="font-mono text-xs font-semibold text-accent-deep">{`{{field.${fieldKey || 'pet_name'}}}`}</p>
             <Field label="種類" htmlFor="ff-type" note={FIELD_TYPE_HINTS[type]}>
-              <SelectField id="ff-type" value={type} onChange={(event) => setType(event.target.value as FriendFieldType)} aria-label="友だち情報欄の種類" className="v6-select w-full" options={TYPES.map((item) => ({ value: item, label: FIELD_TYPE_LABELS[item] }))} />
+              <SelectField
+                id="ff-type"
+                value={type}
+                onChange={(event) => {
+                  const next = event.target.value as FriendFieldType
+                  setType(next)
+                  /*
+                    ATTR-07: 種類を変えたら既定値は捨てる。
+                    入力欄は画像・PDFで無効化するだけだと、見えない古い値が
+                    そのまま送信されて422で弾かれていた。テキスト系に
+                    戻しても古い値を復活させない。
+                  */
+                  setDefaultValue('')
+                }}
+                aria-label="友だち情報欄の種類"
+                className="v6-select w-full"
+                options={TYPES.map((item) => ({ value: item, label: FIELD_TYPE_LABELS[item] }))}
+              />
             </Field>
-            <p className="text-xs text-ink-faint">{TYPES.map((item) => `${FIELD_TYPE_LABELS[item]}（${FIELD_TYPE_HINTS[item]}）`).join(' ／ ')}</p>
+            {/*
+              ATTR-19: 13種すべての説明を1段落に流すと読めない。
+              選択中の種類の説明は上の note に出し、残りは開閉できる一覧へ。
+            */}
+            <details className="rounded-control border border-hairline bg-canvas px-3 py-2 text-xs text-ink-faint">
+              <summary className="cursor-pointer font-semibold text-ink-secondary">種類の選び方（{TYPES.length}種）</summary>
+              <dl className="mt-2 space-y-1">
+                {TYPES.map((item) => (
+                  <div key={item} className="flex gap-2">
+                    <dt className="w-24 shrink-0 font-semibold text-ink">{FIELD_TYPE_LABELS[item]}</dt>
+                    <dd>{FIELD_TYPE_HINTS[item]}</dd>
+                  </div>
+                ))}
+              </dl>
+            </details>
             {NEEDS_OPTIONS.has(type) ? (
               <Field label="選択肢（1行に1つ）" htmlFor="ff-options">
                 <TextArea id="ff-options" rows={5} value={options} onChange={(event) => setOptions(event.target.value)} />

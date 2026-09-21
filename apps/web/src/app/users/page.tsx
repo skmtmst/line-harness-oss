@@ -7,6 +7,7 @@ import UsersTable from '@/components/users/users-table'
 import MergedPersonDetailView from '@/components/merged-person/merged-person-detail'
 import Button from '@/components/shared/button'
 import { api } from '@/lib/api'
+import { csvCell } from '@/lib/presentation'
 import type { UserRowData } from '@/components/users/user-row'
 import { usePageTitle } from '@/components/shell/page-chrome'
 
@@ -53,8 +54,9 @@ export default function UsersPage() {
   }, [q])
 
   useEffect(() => {
+    // FRIEND-09: UID条件も含めて条件変更時は1ページへ戻す。
     setPage(1)
-  }, [debouncedQ, onlyDups, account])
+  }, [debouncedQ, onlyDups, account, uid])
 
   // アカウント候補は LINE アカウント API から取得（ページ依存させない）。
   // /api/users-grouped は inactive を除外して集計するので、候補も active のみ。
@@ -82,6 +84,8 @@ export default function UsersPage() {
         q: debouncedQ || undefined,
         onlyDups: onlyDups || undefined,
         account: account || undefined,
+        // FRIEND-09: UID絞り込みはサーバーへ渡し、全件へ適用する。
+        uid: uid === 'linked' || uid === 'unlinked' ? uid : undefined,
         page,
         pageSize: PAGE_SIZE,
         forceRefresh: force || undefined,
@@ -110,35 +114,62 @@ export default function UsersPage() {
         }
       }
     }
-  }, [debouncedQ, onlyDups, account, page, pendingForceRefresh])
+  }, [debouncedQ, onlyDups, account, uid, page, pendingForceRefresh])
 
   useEffect(() => {
     load()
   }, [load])
 
-  const visibleRows = useMemo(() => rows.filter((row) => {
-    if (uid === 'linked') return row.identityKeyKind === 'uid'
-    if (uid === 'unlinked') return row.identityKeyKind !== 'uid'
-    return true
-  }), [rows, uid])
-
-  const exportCsv = () => {
-    const cell = (value: string) => `"${value.replaceAll('"', '""')}"`
-    const lines = [
-      ['統合ユーザー', '連絡先', '紐付くアカウント', 'UID', '最終接触'].map(cell).join(','),
-      ...visibleRows.map((row) => [
-        row.displayName ?? '', row.emails[0] ?? row.phones[0] ?? '',
-        row.accounts.map((item) => item.accountName).join('・'),
-        row.identityKeyKind === 'uid' ? '連携済み' : row.identityKeyKind === 'url_token' ? '要確認' : '未連携',
-        row.lastActivityAt,
-      ].map(cell).join(',')),
-    ]
-    const url = URL.createObjectURL(new Blob([`\uFEFF${lines.join('\n')}`], { type: 'text/csv;charset=utf-8' }))
-    const anchor = document.createElement('a')
-    anchor.href = url
-    anchor.download = 'merged-users.csv'
-    anchor.click()
-    URL.revokeObjectURL(url)
+  /*
+   * FRIEND-09/10: CSV は「表示中の条件」に合う全件を対象にする。
+   * 以前は表示中ページの50行だけを出していたため、UID条件を掛けた画面と
+   * 書き出しの対象がずれていた。1回の応答上限（200件）で順に取り、
+   * 件数と同じだけ集まるまで続ける。
+   * セル整形は共通の csvCell（先頭 = + - @ への ' 付け + 引用符の二重化）。
+   */
+  const [exporting, setExporting] = useState(false)
+  const [exportError, setExportError] = useState('')
+  const exportCsv = async () => {
+    if (exporting) return
+    setExporting(true)
+    setExportError('')
+    try {
+      const filters = {
+        q: debouncedQ || undefined,
+        onlyDups: onlyDups || undefined,
+        account: account || undefined,
+        uid: uid === 'linked' || uid === 'unlinked' ? uid : undefined,
+      } as const
+      const all: UserRowData[] = []
+      let exportTotal = total
+      // 上限は途中で件数が増えても無限に追い続けないための安全弁。
+      for (let p = 1; all.length < exportTotal && p <= 500; p += 1) {
+        const res = await api.usersGrouped.list({ ...filters, page: p, pageSize: 200 })
+        if (!res.success) throw new Error('fetch failed')
+        all.push(...res.data.rows)
+        exportTotal = res.data.total
+        if (res.data.rows.length === 0) break
+      }
+      const lines = [
+        ['統合ユーザー', '連絡先', '紐付くアカウント', 'UID', '最終接触'].map(csvCell).join(','),
+        ...all.map((row) => [
+          row.displayName ?? '', row.emails[0] ?? row.phones[0] ?? '',
+          row.accounts.map((item) => item.accountName).join('・'),
+          row.identityKeyKind === 'uid' ? '連携済み' : row.identityKeyKind === 'url_token' ? '要確認' : '未連携',
+          row.lastActivityAt,
+        ].map(csvCell).join(',')),
+      ]
+      const url = URL.createObjectURL(new Blob([`\uFEFF${lines.join('\n')}`], { type: 'text/csv;charset=utf-8' }))
+      const anchor = document.createElement('a')
+      anchor.href = url
+      anchor.download = 'merged-users.csv'
+      anchor.click()
+      URL.revokeObjectURL(url)
+    } catch {
+      setExportError('CSVを書き出せませんでした。時間をおいてやり直してください。')
+    } finally {
+      setExporting(false)
+    }
   }
 
   if (openedPersonId) {
@@ -175,7 +206,9 @@ export default function UsersPage() {
         <Button href="/friends/identity-candidates" variant="primary">
           ＋ 統合ユーザーを作成
         </Button>
-        <Button type="button" onClick={exportCsv} className="ml-auto">CSVで書き出す</Button>
+        <Button type="button" onClick={() => void exportCsv()} disabled={exporting} className="ml-auto">
+          {exporting ? '書き出し中…' : 'CSVで書き出す'}
+        </Button>
         <Button
           type="button"
           onClick={() => setPendingForceRefresh(true)}
@@ -209,11 +242,13 @@ export default function UsersPage() {
         [data-scroll-table] table { min-width: 860px; }
       `}</style>
 
+      {exportError ? <p className="text-xs text-danger" role="alert">{exportError}</p> : null}
+
       {/* U041: 見出し同士の衝突を、枠の内側の横移動で避ける。 */}
       <div data-scroll-table>
       <UsersTable
-        rows={visibleRows}
-        total={uid ? visibleRows.length : total}
+        rows={rows}
+        total={total}
         page={page}
         pageSize={PAGE_SIZE}
         loading={loading}

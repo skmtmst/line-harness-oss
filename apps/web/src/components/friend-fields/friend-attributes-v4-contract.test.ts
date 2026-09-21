@@ -134,8 +134,16 @@ describe('友だち属性 V4 contract', () => {
     const empty = source.indexOf('まだ友だち情報欄がありません')
     expect(empty).toBeGreaterThan(-1)
     expect(source.slice(0, empty).lastIndexOf("status === 'error'")).toBeGreaterThan(-1)
-    expect(source).toContain("status === 'ready' ? <Button href=\"/tags/fields/new\"")
-    expect(source).toContain('status === \'ready\' && error')
+    /*
+      #1014 ATTR-22: 「＋ 項目を追加」はタブ行の右に1個だけ。
+      一覧部品は作成ボタンを持たない。
+      #1014 ATTR-02: 操作の失敗は読み込みの失敗（error）とは別の
+      actionError に載せる。再読込で消えて「成功に見える」を防ぐ。
+    */
+    const tabsPage = read('components/friend-fields/tags-page-v4.tsx')
+    expect(tabsPage).toContain('href="/tags/fields/new"')
+    expect(source).not.toContain('href="/tags/fields/new"')
+    expect(source).toContain('status === \'ready\' && actionError')
     expect(source).toContain('onRetry={() => void load()}')
     expect(source).toContain("setError(forbidden ? '' : '再読み込みしても直らない場合はエラー報告へ。')")
     expect(source).toContain('setItems([])')
