@@ -42,20 +42,25 @@ describe('受信箱 保存した検索の完了判定', () => {
     expect(DIALOG).not.toContain('disabled={saving}')
   })
 
-  it('未入力の断りを共通の赤い帯で出し、欄の枠も赤くする', () => {
+  it('開いた直後の未入力は中立、入力→削除・失敗だけを赤くする（INBOX-22）', () => {
     /*
-      設計 `AuSDY`（2-16）は ⚠ の付いた**赤い帯**で「検索名を入力してください。」と言い、
-      入力欄の枠も赤い。**小さな灰色の字だと、赤い枠だけ見えて理由が読まれない。**
-
-      空のときと押して断られたときで**同じ見た目**にする。片方だけ帯にすると、
-      同じ「入力してください」が2通りの見え方をして、別のことを言われたように読める。
+      何も入力していない初期状態から赤枠・aria-invalid・赤い帯で
+      始めると、通常の未入力と誤入力・保存失敗が同じ見た目になる。
+      初期は必須の印と中立色の案内にし、赤い断りは
+      「入力してから消した」「保存に失敗した」ときだけにする。
     */
     expect(DIALOG).toContain("import Notice from '@/components/shared/notice'")
+    expect(DIALOG).toContain('const showMissingError = nameMissing && nameTouched')
+    expect(DIALOG).toContain('const nameInvalid = Boolean(error) || showMissingError')
+    expect(DIALOG).toContain('aria-invalid={nameInvalid}')
+    expect(DIALOG).toContain("${nameInvalid ? 'border-danger' : 'border-hairline'}")
+    expect(DIALOG).toContain('（必須）')
+    expect(DIALOG).toContain('検索名は必須です。入力すると保存できるようになります。')
+    // 失敗・削除後の断りは従来どおり共通の赤い帯で出す。
     expect(DIALOG).toContain('tone="error"')
     expect(DIALOG).toContain("message={error || '検索名を入力してください。'}")
-    // 空のあいだも枠を赤くする。押すまで直しどころが分からない形へ戻さない。
-    expect(DIALOG).toContain('aria-invalid={Boolean(error) || nameMissing}')
-    expect(DIALOG).toContain("${error || nameMissing ? 'border-danger' : 'border-hairline'}")
+    // 初期未入力を赤枠・aria-invalid にする形へ戻さない。
+    expect(DIALOG).not.toContain('aria-invalid={Boolean(error) || nameMissing}')
     // 自前の小さな赤字へ戻さない（共通部品を通す）。
     expect(DIALOG).not.toContain('className="text-danger mt-1.5 text-xs" role="alert"')
   })

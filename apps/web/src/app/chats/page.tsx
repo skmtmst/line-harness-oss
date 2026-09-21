@@ -317,12 +317,6 @@ function formatYmdSlash(iso: string): string {
   return `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}`
 }
 
-function isOlderThanOneHour(iso: string | null): boolean {
-  if (!iso) return false
-  const time = new Date(iso).getTime()
-  return Number.isFinite(time) && Date.now() - time >= 60 * 60 * 1000
-}
-
 type FriendItem = Pick<FriendListItem, 'id' | 'displayName' | 'pictureUrl' | 'isFollowing'>
 
 interface MessageLog {
@@ -661,7 +655,15 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
     `null` は「まだ読めていない」。**実値0とは別。**
   */
   const [assigneeUnread, setAssigneeUnread] = useState<InboxStats['assigneeUnread'] | null>(null)
-  const [inboxStats, setInboxStats] = useState<InboxStats | null>(null)
+  /*
+   * INBOX-09: 札の件数。「どの条件に対する応答か」を key で結び付け、
+   * 条件を変えた直後に古い条件の件数が出ないようにする。
+   */
+  const [quickCounts, setQuickCounts] = useState<{
+    key: string
+    counts: { all: number; reply: number; overdue: number }
+  } | null>(null)
+  const quickCountsRequestRef = useRef(0)
   const [assigneeUnreadStatus, setAssigneeUnreadStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   /*
    * 顧客情報の開閉(#982 LAY-01/LAY-02)。
@@ -2215,7 +2217,6 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
       読み終わるまで残すと、別のアカウントの未読数を見たまま担当者を選ぶ。
     */
     setAssigneeUnread(null)
-    setInboxStats(null)
     setAssigneeUnreadStatus('loading')
     ;(async () => {
       try {
@@ -2228,7 +2229,6 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
         if (cancelled) return
         /* 失敗の返事を成功として読まない。`—` のままにする。 */
         if (!res.success) throw new Error('failed')
-        setInboxStats(res.data)
         setAssigneeUnread(res.data.assigneeUnread)
         setAssigneeUnreadStatus('ready')
       } catch {
@@ -2246,6 +2246,36 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
       cancelled = true
     }
   }, [selectedAccountId])
+
+  /*
+   * INBOX-09: 「すべて／要返信／1時間以上待ち」の件数は、一覧と同じ条件で
+   * サーバーに数えさせる。quickFilter 自体は条件に含めない（各札は
+   * 「その札を押したときの件数」を表す）。応答が着順違れで戻っても
+   * requestId で新しい方だけを採用する。
+   */
+  const quickCountsKey = JSON.stringify([statusFilter, selectedAccountId, debouncedNameQuery, assigneeFilter, unreadOnly, channel])
+  useEffect(() => {
+    const requestId = ++quickCountsRequestRef.current
+    const key = quickCountsKey
+    void api.chats.quickCounts({
+      status: statusFilter === 'all' ? undefined : statusFilter,
+      operatorId: assigneeFilter === 'all' ? undefined : assigneeFilter,
+      accountId: selectedAccountId || undefined,
+      q: debouncedNameQuery || undefined,
+      unreadOnly,
+      channel,
+    }).then((res) => {
+      if (quickCountsRequestRef.current !== requestId) return
+      /* 失敗や変な形の応答を0件と読まない。`—` のままにする。 */
+      setQuickCounts(
+        res.success && res.data && typeof res.data.all === 'number'
+          ? { key, counts: { all: res.data.all, reply: res.data.reply, overdue: res.data.overdue } }
+          : null,
+      )
+    }).catch(() => {
+      if (quickCountsRequestRef.current === requestId) setQuickCounts(null)
+    })
+  }, [quickCountsKey, statusFilter, selectedAccountId, debouncedNameQuery, assigneeFilter, unreadOnly, channel])
 
   const handleStatusUpdate = async (newStatus: Chat['status']) => {
     if (!selectedChatId || !chatDetail) return
@@ -2357,22 +2387,21 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
     }
   }
 
-  const visibleMailItems = channel === 'line' ? [] : emailItems
-  const visibleLineItems = channel === 'email' ? [] : chats
+
   // INBOX-29: 上限を超えた本文は送らせない(下書きは消さない)。
   const messageLength = messageContent.length
   const messageOverLimit = messageLength > MESSAGE_MAX_LENGTH
   // この会話で画像の準備(アップロード)が進行中か(INBOX-23/31)。
   const imageUploading = imageBusyKeys.has(draftKeyOf(selectedAccountId, selectedChatId))
-  const quickCounts = {
-    all: visibleMailItems.length + visibleLineItems.length,
-    reply: inboxStats ? inboxStats.waiting :
-      visibleMailItems.filter((item) => item.status === 'unread').length
-      + visibleLineItems.filter((chat) => chat.status === 'unread').length,
-    overdue: inboxStats ? inboxStats.waitingOverAnHour :
-      visibleMailItems.filter((item) => item.status === 'unread' && isOlderThanOneHour(item.lastIncomingAt)).length
-      + visibleLineItems.filter((chat) => chat.status === 'unread' && isOlderThanOneHour(chat.lastMessageAt)).length,
-  }
+  /*
+   * INBOX-09: 札の件数は一覧と同じ条件（アカウント・検索・担当・経路・
+   * 未読）をサーバーで数えたものだけを出す。以前は「すべて」に画面へ
+   * 読み込んだ行数（最大200件）を出し、「要返信」にはフィルタを
+   * 通さない別集計を出していたため、押した結果と件数が一致しなかった。
+   * 条件に対応した応答が届くまでは `—` を出し、部分件数を全件数の
+   * ように見せない。
+   */
+  const quickCountsNow = quickCounts?.key === quickCountsKey ? quickCounts.counts : null
   const hasInboxFilters = Boolean(
     nameQuery.trim()
       || statusFilter !== 'all'
@@ -2407,18 +2436,22 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
   return (
     <div className="space-y-3">
       {savedViewSuccess ? (
+        /*
+          INBOX-11: 横幅は画面の左右16px以内。以前の minWidth:520 は
+          320/390px より大きく、閉じる操作まで画面外に出ていた。
+          閉じるボタンは縮めず、本文は折り返す。
+        */
         <div
           role="status"
-          style={{ minWidth: 520 }}
-          className="bg-accent-soft text-accent-deep border-accent fixed top-20 left-1/2 z-50 flex -translate-x-1/2 items-center gap-2 rounded-control border px-4 py-3 text-sm font-bold shadow-float"
+          className="bg-accent-soft text-accent-deep border-accent fixed top-20 left-1/2 z-50 flex w-[calc(100vw-2rem)] max-w-[520px] -translate-x-1/2 items-center gap-2 rounded-control border px-4 py-3 text-sm font-bold shadow-float"
         >
-          <CheckCircle2 aria-hidden="true" size={18} />
-          保存した検索を作成しました
+          <CheckCircle2 aria-hidden="true" size={18} className="shrink-0" />
+          <span className="min-w-0">保存した検索を作成しました</span>
           <button
             type="button"
             onClick={() => setSavedViewSuccess(false)}
             aria-label="保存完了のお知らせを閉じる"
-            className="hover:bg-accent/10 ml-auto rounded-control p-1"
+            className="hover:bg-accent/10 ml-auto shrink-0 rounded-control p-1"
           >
             <X aria-hidden="true" size={16} />
           </button>
@@ -2447,22 +2480,28 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
         aria-label="受信箱のクイック絞り込み"
       >
         {[
-          { key: 'all' as const, label: 'すべて' },
-          { key: 'reply' as const, label: '要返信' },
-          { key: 'overdue' as const, label: '期限超過' },
+          { key: 'all' as const, label: 'すべて', title: undefined },
+          { key: 'reply' as const, label: '要返信', title: '対応状況が「未対応」の会話' },
+          /*
+           * INBOX-10: ここで数えるのは対応期限ではなく、未対応のまま
+           * 最後のやり取りから1時間以上たった会話。「期限超過」と書くと
+           * 設定した期限の超過に読めるため、実態に合う名前にする。
+           */
+          { key: 'overdue' as const, label: '1時間以上待ち', title: '未対応のまま、最後のやり取りから1時間以上たった会話' },
         ].map((filter) => (
           <button
             key={filter.key}
             type="button"
             onClick={() => { setQuickFilter(filter.key); dropSavedViewParam() }}
             aria-pressed={quickFilter === filter.key}
-            className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
+            title={filter.title}
+            className={`whitespace-nowrap rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
               quickFilter === filter.key
                 ? 'border-[#06C755] bg-[#EAFBF0] text-[#057A37]'
                 : 'border-[#E5E7EB] bg-canvas text-[#667085] hover:bg-[#F7F8F6]'
             }`}
           >
-            {filter.label} <span className="ml-1 tabular-nums opacity-70">{quickCounts[filter.key]}</span>
+            {filter.label} <span className="ml-1 tabular-nums opacity-70">{quickCountsNow ? quickCountsNow[filter.key] : '—'}</span>
           </button>
         ))}
         <span className="ml-auto" />
@@ -2477,7 +2516,13 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
         <Button type="button" onClick={() => setFilterOpen(true)} aria-expanded={filterOpen}>
           絞り込み
         </Button>
-        <div className="relative">
+        {/*
+          INBOX-11: メニューは「保存した検索」ボタンではなく、画面幅いっぱいの
+          この行（section.relative）を基準に右端を合わせる。ボタン基準の
+          right-0 だと、狭い画面でボタンが左に折り返されたときパネルの
+          左側が画面外へ出た。幅も画面の左右16px以内に収める。
+        */}
+        <div>
           <Button
             type="button"
             onClick={() => {
@@ -2489,7 +2534,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
             保存した検索
           </Button>
           {savedViewsOpen && (
-            <div className="border-hairline absolute top-full right-0 z-40 mt-1.5 w-80 rounded-xl border bg-canvas p-4 shadow-xl">
+            <div className="border-hairline absolute top-full right-0 z-40 mt-1.5 max-h-[min(70dvh,32rem)] w-80 max-w-[calc(100vw-2rem)] overflow-y-auto rounded-xl border bg-canvas p-4 shadow-xl">
               <p className="text-ink text-sm font-bold">保存した検索</p>
               <div className="mt-3 space-y-1">
                 {savedViews.length === 0 ? (
@@ -3527,7 +3572,13 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                     aria-labelledby="chat-internal-memo-title"
                     data-inbox-v6="internal-memo-popover"
                     ref={memoPopoverRef}
-                    className="border-hairline rounded-panel shadow-float absolute bottom-full left-4 z-30 mb-2 w-[calc(100%-2rem)] max-w-[760px] border bg-canvas p-5"
+                    /*
+                      INBOX-19: 紙はボタンの上へ伸びるため、高さの上限を
+                      画面から差し引いておく。上限を超えた分は紙の中だけを
+                      スクロールさせ、見出しと操作が画面上部へ欠けない
+                      ようにする。
+                    */
+                    className="border-hairline rounded-panel shadow-float absolute bottom-full left-4 z-30 mb-2 max-h-[calc(100dvh-9rem)] w-[calc(100%-2rem)] max-w-[760px] overflow-y-auto border bg-canvas p-5"
                   >
                     <div className="flex items-start justify-between gap-3">
                       <h2 id="chat-internal-memo-title" className="text-ink flex items-center gap-2 text-sm font-bold">
@@ -3551,23 +3602,26 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                       className="border-hairline focus:border-accent focus:ring-accent/15 rounded-control mt-3 w-full resize-y border bg-canvas px-3 py-2 text-sm leading-6 outline-none focus:ring-2"
                     />
                     {memoError && <p className="text-danger mt-1 text-xs">{memoError}</p>}
-                    <div className="mt-3 flex items-center justify-between gap-3">
-                      <p className="text-ink-faint text-xs">この内容は社内メンバーだけが確認できます</p>
-                      <div className="flex shrink-0 items-center gap-2">
-                        {/* 設計 `B7CER8` の2つは h36・角丸8・13px・600。共通ボタンと同値。 */}
-                        <Button
-                          onClick={closeMemoEditor}
-                        >
-                          キャンセル
-                        </Button>
-                        <Button
-                          variant="primary"
-                          onClick={() => void handleSaveMemo()}
-                          disabled={memoSaving || memoDraft === (chatDetail?.notes ?? '')}
-                        >
-                          {memoSaving ? '保存中...' : 'メモを保存'}
-                        </Button>
-                      </div>
+                    {/*
+                      INBOX-19: 説明は独立した行へ。操作と同じ flex 行に置くと、
+                      狭い幅で説明が1文字ずつ縦に割れ、紙全体が上へ伸びて
+                      見出しが画面外へ出ていた。
+                    */}
+                    <p className="text-ink-faint mt-3 text-xs">この内容は社内メンバーだけが確認できます</p>
+                    <div className="mt-3 flex items-center justify-end gap-2">
+                      {/* 設計 `B7CER8` の2つは h36・角丸8・13px・600。共通ボタンと同値。 */}
+                      <Button
+                        onClick={closeMemoEditor}
+                      >
+                        キャンセル
+                      </Button>
+                      <Button
+                        variant="primary"
+                        onClick={() => void handleSaveMemo()}
+                        disabled={memoSaving || memoDraft === (chatDetail?.notes ?? '')}
+                      >
+                        {memoSaving ? '保存中...' : 'メモを保存'}
+                      </Button>
                     </div>
                   </div>
                 )}

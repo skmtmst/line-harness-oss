@@ -165,6 +165,7 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'GET /api/broadcasts',
   'GET /api/broadcasts/{id}',
   'GET /api/chats/outbound-failures',
+  'GET /api/chats/quick-counts',
   'GET /api/chats/{id}/scheduled',
   'GET /api/common-actions/resources',
   'GET /api/common-vars/exports',

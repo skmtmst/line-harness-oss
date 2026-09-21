@@ -312,8 +312,14 @@ describe('LAY-04 絞り込みパネル', () => {
     expect(footer).toContain('shrink-0')
     const body = region(INBOX_FILTER, '</header>', '<footer')
     expect(body).toContain('overflow-y-auto')
-    // 全項目（絞り込みの実行・リセット）がフッター側に残る。
-    expect(footer).toContain('この条件で絞り込む')
+    /*
+      INBOX-01: 条件は選んだ時点で即時反映される。フッターの主操作は
+      「閉じる」だけで、押すまで反映されないと読める
+      「この条件で絞り込む」へは戻さない。
+    */
+    expect(footer).toContain('閉じる')
     expect(footer).toContain('リセット')
+    expect(footer).not.toContain('この条件で絞り込む')
+    expect(footer).toContain('条件は選ぶとすぐ一覧に反映されます')
   })
 })

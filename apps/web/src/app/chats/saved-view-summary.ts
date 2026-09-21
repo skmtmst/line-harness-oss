@@ -64,10 +64,12 @@ export function savedViewSummary(
     parts.push(`対応状況：${conditions.statuses.map((s) => STATUS_LABELS[s] ?? s).join('・')}`)
   }
 
-  // 「要返信」は N-020 で保存対象になった軸。期限超過は due（旧軸）と
-  // quickFilter のどちらが立っていても出す。
+  // 「要返信」は N-020 で保存対象になった軸。「1時間以上待ち」は
+  // due（旧軸）と quickFilter のどちらが立っていても出す。
+  // INBOX-10: 対応期限ではなく「未対応のまま最後のやり取りから1時間」
+  // を数えるため、実態に合う名前を使う。
   if (conditions.quickFilter === 'reply') parts.push('要返信')
-  if (conditions.due === 'overdue' || conditions.quickFilter === 'overdue') parts.push('期限：超過')
+  if (conditions.due === 'overdue' || conditions.quickFilter === 'overdue') parts.push('1時間以上待ち')
 
   // 設計 `ASsb3` は「未読のみ」。「自分の」は担当者の軸が言っている。
   if (conditions.unread === 'mine') parts.push('未読のみ')
