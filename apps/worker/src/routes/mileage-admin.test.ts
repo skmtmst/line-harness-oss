@@ -887,6 +887,8 @@ describe('mileage admin API', () => {
     expect(added.status).toBe(201);
     expect(dbMocks.addScore).toHaveBeenCalledWith(env.DB, {
       friendId: 'friend-1', scoreChange: 3, reason: '対応記録',
+      // IDEA-17: 手で動かした点数は実行者を記録へ残す。
+      executedByStaffId: 'env-owner', executedByStaffName: 'Owner',
     });
 
     dbMocks.getFriendById.mockResolvedValue({ id: 'friend-2', line_account_id: 'account-2' });
