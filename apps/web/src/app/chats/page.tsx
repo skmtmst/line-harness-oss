@@ -792,7 +792,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
     }
   }
 
-  /** 添付を外す。準備中の結果が遅れて届いても復活しないよう世代を進める。 */
+  /** 添付を外す。読み込み中の結果が遅れて届いても復活しないよう世代を進める。 */
   const clearPendingImage = () => {
     const ownerKey = draftKeyOf(selectedAccountId, selectedChatId)
     imageJobGenRef.current.set(ownerKey, (imageJobGenRef.current.get(ownerKey) ?? 0) + 1)
@@ -3800,7 +3800,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                     </button>
                     {/*
                       INBOX-31: 状態を分けて伝える。
-                      - 準備中 …「画像を準備中」(まだ何も送っていない)
+                      - 読み込み中 …「画像を読み込み中」(まだ何も送っていない)
                       - 準備失敗 …「添付できませんでした。選び直してください」
                       - 添付済み … INBOX-32 のプレビュー行で見せる
                     */}
@@ -3811,7 +3811,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                       {imageError
                         ? imageError
                         : imageUploading
-                          ? '画像を準備中…'
+                          ? '画像を読み込み中…'
                           : '画像は JPEG / PNG、1枚 1MB まで'}
                     </span>
                   </span>
