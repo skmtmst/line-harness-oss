@@ -172,7 +172,7 @@ export function PublishHistorySection({
 
       {/* 公開版と編集中の版を混ぜないための明示。 */}
       {!loadError && runs !== null ? (
-        <div className="border-hairline bg-canvas-sub mt-3 rounded border px-3 py-2 text-xs leading-5">
+        <div className="border-hairline bg-canvas-sunken mt-3 rounded border px-3 py-2 text-xs leading-5">
           {published ? (
             <p className="text-ink">
               いま対象に出ている版: 「{published.version.name ?? '（名前なし）'}」
