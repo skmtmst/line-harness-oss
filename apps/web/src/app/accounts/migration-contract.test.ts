@@ -165,3 +165,31 @@ describe('UID移行のタブと段組み（#984 LAY-13/14）', () => {
     expect(PAGE).toContain('<TextField')
   })
 })
+
+/**
+ * #985 CHK-06 を #1015 で固定: 5段階表示は実データの進捗に連動させる。
+ * 先頭だけ常に✓だった固定表示へは戻さない。
+ */
+describe('UID移行の5段階表示（#1015 CHK-06）', () => {
+  it('現在位置は実データの状態から決める', () => {
+    // 完了・切り戻しは全段階済み、実行可能・実行中・失敗は本移行の段階、
+    // それ以外は要確認の判断の段階を示す。
+    expect(PAGE).toContain("active.status === 'completed' || active.status === 'rolled_back'")
+    expect(PAGE).toContain('STEPS.length')
+    expect(PAGE).toContain("active.status === 'ready' || active.status === 'executing' || active.status === 'failed' || unresolved === 0")
+  })
+
+  it('狭い幅は「現在n/5」と全手順の展開にする', () => {
+    // sm 未満は5列に押し込まず、現在位置＋展開できる手順一覧へ。
+    expect(PAGE).toContain('sm:hidden')
+    expect(PAGE).toContain('`現在 ${currentStep + 1}/${STEPS.length}`')
+    expect(PAGE).toContain('全手順を見る')
+    expect(PAGE).toContain('hidden sm:grid sm:grid-cols-5')
+  })
+
+  it('完了・現在・未着手を分け、失敗を完了にしない', () => {
+    expect(PAGE).toContain('すべて完了')
+    // 済んだ段階だけ✓、現在は▶、先の段階は番号のまま。
+    expect(PAGE).toContain("index < currentStep ? '✓' : index === currentStep ? '▶'")
+  })
+})
