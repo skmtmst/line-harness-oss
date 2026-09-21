@@ -5,6 +5,8 @@ import { beforeEach, describe, expect, it } from 'vitest';
 
 import {
   claimWebhookInteractionRetry,
+  countFailedWebhookInteractionsForRetry,
+  countUnverifiedWebhookInteractions,
   createWebhookInteraction,
   finishWebhookInteraction,
   getWebhookInteractionById,
@@ -98,6 +100,40 @@ describe('migration 263 Webhookやり取り記録', () => {
     await expect(claimWebhookInteractionRetry(db, row.id, 'account-a')).resolves.toBe(false);
     await restoreWebhookInteractionFailure(db, row.id, 'account-a');
     expect((await getWebhookInteractionById(db, row.id, 'account-a'))?.status).toBe('failed');
+  });
+
+  // IDEA-26: 「届いたか分からない」失敗は無条件のまとめて再送に乗せない。
+  // 相手先で確かめてから1件ずつやり直す対象として別に数える。
+  it('届いたか分からない失敗はまとめて再送の対象と件数から外す', async () => {
+    for (const [id, reason] of [
+      ['failed-5xx', 'response_5xx'],
+      ['failed-unknown', 'unknown'],
+    ] as const) {
+      const row = await createWebhookInteraction(db, {
+        id,
+        lineAccountId: 'account-a',
+        direction: 'outgoing',
+        webhookId: 'webhook-a',
+        webhookName: '顧客管理',
+        eventType: 'friend.added',
+        triggerSummary: '友だちが追加されたとき',
+        requestBodyJson: '{}',
+        idempotencyKey: id,
+      });
+      await finishWebhookInteraction(db, row.id, 'account-a', {
+        status: 'failed', responseStatus: reason === 'unknown' ? null : 500,
+        attemptCount: 1, durationMs: 100, failureReason: reason,
+      });
+    }
+
+    expect((await listFailedWebhookInteractionsForRetry(db, 'account-a')).map((item) => item.id))
+      .toEqual(['failed-5xx']);
+    expect(await countFailedWebhookInteractionsForRetry(db, 'account-a')).toBe(1);
+    expect(await countUnverifiedWebhookInteractions(db, 'account-a')).toBe(1);
+
+    const result = await listWebhookInteractions(db, { lineAccountId: 'account-a' });
+    expect(result.summary.failed).toBe(2);
+    expect(result.summary.resultUnknown).toBe(1);
   });
 
   it('検索と状態の条件をアカウント範囲の中だけに適用する', async () => {

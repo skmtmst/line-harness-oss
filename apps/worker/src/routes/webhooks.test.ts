@@ -22,6 +22,8 @@ vi.mock('@line-crm/db', async (importOriginal) => {
   getWebhookInteractionById: vi.fn(),
   listFailedWebhookInteractionsForRetry: vi.fn(),
   countFailedWebhookInteractionsForRetry: vi.fn().mockResolvedValue(0),
+  // IDEA-26: 結果不明の失敗件数(まとめて再送しない対象)。
+  countUnverifiedWebhookInteractions: vi.fn().mockResolvedValue(0),
   listWebhookInteractions: vi.fn(),
   getOutgoingWebhookDeliverySummaries: vi.fn(),
   updateIncomingWebhookConfig: vi.fn(),
@@ -105,6 +107,7 @@ import {
   getWebhookInteractionById,
   listFailedWebhookInteractionsForRetry,
   countFailedWebhookInteractionsForRetry,
+  countUnverifiedWebhookInteractions,
   listWebhookInteractions,
   getOutgoingWebhookDeliverySummaries,
   updateIncomingWebhookConfig,
@@ -209,7 +212,7 @@ beforeEach(() => {
   vi.mocked(finishWebhookInteraction).mockResolvedValue(undefined);
   vi.mocked(listWebhookInteractions).mockResolvedValue({
     items: [], total: 0, page: 1, limit: 20,
-    summary: { total: 0, outgoing: 0, incoming: 0, succeeded: 0, failed: 0, averageDurationMs: null },
+    summary: { total: 0, outgoing: 0, incoming: 0, succeeded: 0, failed: 0, resultUnknown: 0, averageDurationMs: null },
   });
   vi.mocked(listFailedWebhookInteractionsForRetry).mockResolvedValue([]);
   vi.mocked(getOutgoingWebhookDeliverySummaries).mockResolvedValue([]);
@@ -1198,7 +1201,7 @@ describe('Webhookやり取り記録', () => {
   test('一覧はアカウントを検査し、本文・配送ID・Webhook IDを返さない', async () => {
     vi.mocked(listWebhookInteractions).mockResolvedValue({
       items: [failedRow], total: 1, page: 1, limit: 20,
-      summary: { total: 1, outgoing: 1, incoming: 0, succeeded: 0, failed: 1, averageDurationMs: 820 },
+      summary: { total: 1, outgoing: 1, incoming: 0, succeeded: 0, failed: 1, resultUnknown: 0, averageDurationMs: 820 },
     });
     const res = await setupApp().request(
       `/api/webhooks/interactions?lineAccountId=${ACCOUNT_ID}`,
@@ -1210,6 +1213,8 @@ describe('Webhookやり取り記録', () => {
     const body = await res.json() as { data: { items: Array<Record<string, unknown>> } };
     expect(body.data.items[0]).toMatchObject({
       id: 'run-a', webhookName: '顧客管理', responseLabel: '処理できませんでした', canRetry: true,
+      // IDEA-26: 判定用の記号も返す。'unknown' は無条件に再送しない目印。
+      failureReasonCode: 'response_5xx',
     });
     expect(body.data.items[0]).not.toHaveProperty('request_body_json');
     expect(body.data.items[0]).not.toHaveProperty('idempotency_key');
@@ -1288,6 +1293,53 @@ describe('Webhookやり取り記録', () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as { data: { remaining: number } };
     expect(body.data.remaining).toBe(0);
+  });
+
+  // IDEA-26: 「届いたか分からない」失敗を無条件で再送しない。
+  // 確認なしの要求は 409 で止め、確かめた旨(confirmed)を添えた要求だけ通す。
+  test('届いたか分からない失敗は、確認なしの送り直しを409で止める', async () => {
+    vi.mocked(getWebhookInteractionById).mockResolvedValue({ ...failedRow, failure_reason: 'unknown' });
+    const res = await setupApp().request(
+      `/api/webhooks/interactions/run-a/retry?lineAccountId=${ACCOUNT_ID}`,
+      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' },
+      baseEnv,
+    );
+    expect(res.status).toBe(409);
+    const body = (await res.json()) as { error: string };
+    expect(body.error).toBe('result_unknown_needs_check');
+    expect(retryWebhookInteraction).not.toHaveBeenCalled();
+  });
+
+  test('届いたか分からない失敗は、確かめた確認つきなら送り直せる', async () => {
+    vi.mocked(getWebhookInteractionById).mockResolvedValue({ ...failedRow, failure_reason: 'unknown' });
+    vi.mocked(retryWebhookInteraction).mockResolvedValue({ ...failedRow, id: 'retry-a', status: 'succeeded' });
+    const res = await setupApp().request(
+      `/api/webhooks/interactions/run-a/retry?lineAccountId=${ACCOUNT_ID}`,
+      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{"confirmed":true}' },
+      baseEnv,
+    );
+    expect(res.status).toBe(200);
+    expect(retryWebhookInteraction).toHaveBeenCalledWith(
+      baseEnv.DB,
+      expect.objectContaining({ id: 'run-a', failure_reason: 'unknown' }),
+      { current: undefined, previous: undefined },
+    );
+  });
+
+  test('まとめてやり直しは結果不明の件数を needsReview で返し、残数へ混ぜない', async () => {
+    vi.mocked(listFailedWebhookInteractionsForRetry).mockResolvedValue([failedRow]);
+    vi.mocked(countFailedWebhookInteractionsForRetry).mockResolvedValue(1);
+    vi.mocked(countUnverifiedWebhookInteractions).mockResolvedValue(2);
+    vi.mocked(retryWebhookInteraction).mockResolvedValue({ ...failedRow, status: 'succeeded' });
+    const res = await setupApp().request(
+      `/api/webhooks/interactions/retry-failed?lineAccountId=${ACCOUNT_ID}`,
+      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' },
+      baseEnv,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { data: { remaining: number; needsReview: number } };
+    expect(body.data).toMatchObject({ remaining: 0, needsReview: 2 });
+    expect(retryWebhookInteraction).toHaveBeenCalledTimes(1);
   });
 });
 
