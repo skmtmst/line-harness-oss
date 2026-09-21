@@ -13075,6 +13075,8 @@ export type WebinarPublishValidation = {
   warnings: string[]
 }
 
+export type WebinarParticipantClassification = 'unviewed' | 'dropped_off' | 'completed' | 'unmeasured'
+
 export type WebinarParticipantPage = {
   items: Array<{
     friendId: string
@@ -13090,8 +13092,16 @@ export type WebinarParticipantPage = {
     actionStatus: string | null
     errorDetail: string | null
     staffIntegrationStatus: 'completed' | 'needs_attention' | 'pending'
+    /* 分類・ライブ/録画の区別はサーバー側の一つのルールで決める。
+       古い応答には無いので、無いときは画面側の推測へ落とす。 */
+    classification?: WebinarParticipantClassification
+    liveSessions?: number
+    replaySessions?: number
+    lastJoinKind?: 'live' | 'replay' | null
   }>
   nextCursor: string | null
+  measurement?: { state: 'available' | 'unavailable'; reason: string | null }
+  rule?: { completionThresholdSeconds: number; durationSeconds: number }
 }
 
 export type WebinarListParams = {
@@ -13180,7 +13190,8 @@ export const webinarApi = {
     `/api/webinars/${id}/actions`,
     { method: 'PUT', body: JSON.stringify({ actions }) },
   ),
-  participantsCsvUrl: (id: string) => `/api/webinars/${encodeURIComponent(id)}/participants.csv`,
+  participantsCsvUrl: (id: string, filter?: WebinarParticipantClassification) =>
+    `/api/webinars/${encodeURIComponent(id)}/participants.csv${filter ? `?filter=${encodeURIComponent(filter)}` : ''}`,
   notifications: (id: string) => fetchApi<{
     data: {
       settings: WebinarNotificationSettings | null
@@ -13218,10 +13229,11 @@ export const webinarApi = {
       }),
     }),
   analytics: (id: string) => fetchApi<{ data: WebinarAnalytics }>(`/api/webinars/${id}/analytics`),
-  participants: (id: string, cursor?: string, limit?: number) => fetchApi<{ data: WebinarParticipantPage }>(
-    `/api/webinars/${id}/participants${cursor || limit ? `?${[
+  participants: (id: string, cursor?: string, limit?: number, filter?: WebinarParticipantClassification) => fetchApi<{ data: WebinarParticipantPage }>(
+    `/api/webinars/${id}/participants${cursor || limit || filter ? `?${[
       cursor ? `cursor=${encodeURIComponent(cursor)}` : '',
       limit ? `limit=${encodeURIComponent(String(limit))}` : '',
+      filter ? `filter=${encodeURIComponent(filter)}` : '',
     ].filter(Boolean).join('&')}` : ''}`,
   ),
   userComments: (id: string) =>
