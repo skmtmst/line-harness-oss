@@ -360,7 +360,8 @@ export type AutoReplyCandidateReasonCode =
   | 'operator_handling'
   | 'already_replied_once'
   | 'cooldown_active'
-  | 'friend_conditions_not_met';
+  | 'friend_conditions_not_met'
+  | 'higher_priority_won';
 
 export interface AutoReplyCandidateEvaluation {
   rule: AutoReply;
@@ -380,6 +381,11 @@ export function compareAutoReplyCandidates(a: AutoReply, b: AutoReply): number {
 /**
  * 本番返信と試験画面が共有する評価器。送信・記録・状態更新は一切しない。
  * 先に通った1件で止める順番も本番と同じにする。
+ *
+ * `continueAfterWinner` を付けるのは試験だけ。本番は最初に通った1件で
+ * 止めるが、試験では「当たるのに動かない」ルールも理由つきで全部返す。
+ * 勝った後に当たるルールは `higher_priority_won` の理由で skipped になる
+ * ——優先順位が実行を止めていることを説明できるようにするため。
  */
 export async function evaluateAutoReplyCandidates(
   db: D1Database,
@@ -390,8 +396,10 @@ export async function evaluateAutoReplyCandidates(
     messageKind?: string;
     now: Date;
   },
+  opts?: { continueAfterWinner?: boolean },
 ): Promise<AutoReplyCandidateEvaluation[]> {
   const evaluations: AutoReplyCandidateEvaluation[] = [];
+  let winnerFound = false;
   for (const [index, candidate] of candidates.entries()) {
     if (!matchesMessageKind(candidate, input.messageKind)) {
       evaluations.push({
@@ -421,8 +429,20 @@ export async function evaluateAutoReplyCandidates(
       });
       continue;
     }
+    if (winnerFound) {
+      // 勝者が決まった後にも当たるルール。本番ではここまで見ないので、
+      // 「上のルールが先に動く」を実行されない理由として返す。
+      evaluations.push({
+        rule: candidate,
+        order: index + 1,
+        result: 'skipped',
+        reasonCodes: ['higher_priority_won'],
+      });
+      continue;
+    }
     evaluations.push({ rule: candidate, order: index + 1, result: 'won', reasonCodes: [] });
-    break;
+    winnerFound = true;
+    if (!opts?.continueAfterWinner) break;
   }
   return evaluations;
 }

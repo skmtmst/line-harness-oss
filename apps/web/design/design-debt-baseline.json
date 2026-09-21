@@ -83,7 +83,7 @@
     "direct-secondary-button": 1
   },
   "app/chats/page.tsx": {
-    "arbitrary-value": 100,
+    "arbitrary-value": 109,
     "direct-primary-button": 2,
     "unresolved-classname": 2,
     "direct-secondary-button": 2
@@ -446,8 +446,8 @@
     "arbitrary-value": 1
   },
   "components/chats/friend-info-sidebar.tsx": {
-    "arbitrary-value": 51,
-    "unresolved-classname": 11,
+    "arbitrary-value": 52,
+    "unresolved-classname": 12,
     "direct-secondary-button": 1
   },
   "components/chats/inbox-dropdown.tsx": {
@@ -474,14 +474,16 @@
     "direct-primary-button": 1
   },
   "components/dashboard/dashboard-editor.tsx": {
-    "arbitrary-value": 17
+    "arbitrary-value": 19,
+    "direct-primary-button": 1,
+    "direct-secondary-button": 1
   },
   "components/dashboard/friend-trend-table.tsx": {
     "direct-th": 6,
     "arbitrary-value": 3
   },
   "components/dashboard/qr-dialog.tsx": {
-    "arbitrary-value": 9,
+    "arbitrary-value": 10,
     "direct-secondary-button": 2
   },
   "components/dashboard/shipment-panel.tsx": {

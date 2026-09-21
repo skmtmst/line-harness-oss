@@ -41,6 +41,7 @@ import {
   resolveKeywordRules,
   type AutoReplyCandidateReasonCode,
 } from '../services/auto-reply.js';
+import { isOperatorHandling } from '../services/auto-reply-conditions.js';
 
 const autoReplies = new Hono<Env>();
 
@@ -237,6 +238,8 @@ interface AutoReplyValidationResult {
 interface AutoReplyDryRunResult {
   matched: boolean;
   draftWon: boolean;
+  /** 試した友だちのトークが「対応中」か。有人対応の抑止説明に使う。 */
+  operatorActive: boolean;
   winner: {
     autoReplyId: string;
     name: string;
@@ -249,6 +252,8 @@ interface AutoReplyDryRunResult {
     priority: number;
     result: 'not_matched' | 'skipped' | 'won';
     reasonCodes: AutoReplyCandidateReasonCode[];
+    /** 「担当者が対応中のトークでは返さない」設定のルールか。 */
+    suppressWhenOperatorActive: boolean;
   }>;
   actions: Array<{ kind: string }>;
   stateChanged: false;
@@ -1234,13 +1239,23 @@ autoReplies.post('/api/auto-replies/:id/test', requireRole('owner', 'admin', 'st
     }
 
     const candidates = await activeRulesWithDraft(c.env.DB, id, settings);
+    /*
+      試験では勝者の後ろも全部評価する。同じ検証文に当たるのに優先順位で
+      動かないルールを `higher_priority_won` の理由つきで返し、「なぜ
+      実行されないか」を画面で説明できるようにする。本番の評価順と
+      勝者は変わらない（先に通った1件だけが won）。
+    */
     const evaluations = await evaluateAutoReplyCandidates(c.env.DB, candidates, {
       friendId: friend.id,
       incomingText: body.incomingText,
       messageKind,
       now: occurredAt,
-    });
+    }, { continueAfterWinner: true });
     const winner = evaluations.find((item) => item.result === 'won')?.rule ?? null;
+    // 有人対応の抑止が効く状態か。試した友だちのトークが「対応中」なら、
+    // 「対応中は返さない」設定のルールだけが見送りになる——画面で抑止対象と
+    // 解除条件（対応中が解除されると動く）を説明するために返す。
+    const operatorActive = await isOperatorHandling(c.env.DB, friend.id);
     const draftWon = winner?.id === id;
     const preview = winner && winner.response_type !== 'silent'
       ? await previewAutoReplyContent(c.env.DB, friend, winner, c.env.WORKER_URL)
@@ -1250,6 +1265,7 @@ autoReplies.post('/api/auto-replies/:id/test', requireRole('owner', 'admin', 'st
     const result: AutoReplyDryRunResult = {
       matched: winner !== null,
       draftWon,
+      operatorActive,
       winner: winner && preview
         ? {
             autoReplyId: winner.id,
@@ -1264,6 +1280,7 @@ autoReplies.post('/api/auto-replies/:id/test', requireRole('owner', 'admin', 'st
         priority: item.rule.priority,
         result: item.result,
         reasonCodes: item.reasonCodes,
+        suppressWhenOperatorActive: item.rule.skip_when_operator_active === 1,
       })),
       actions: winner ? parseAutoReplyActions(winner.actions_json).map((action) => ({ kind: action.action_type })) : [],
       stateChanged: false,

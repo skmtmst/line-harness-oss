@@ -59,7 +59,13 @@ describe('Pen.dev V6を共通レイアウトの正本にする', () => {
       expect(dashboardEditor).toContain(label)
     }
     expect(dashboardEditor).toContain('useSortable')
-    expect(dashboardEditor).toContain("DashboardGroup = 'today' | 'main' | 'right'")
+    /*
+      カードID・区分の正本は @line-crm/shared の DASHBOARD_CARD_GROUPS（DASH-01）。
+      画面と保存APIが別々の一覧を持つと、画面が送るIDをAPIが拒否する。
+      区分は today / main / right の3つで、shared 側の契約試験が固定する。
+    */
+    expect(dashboardEditor).toContain("from '@line-crm/shared'")
+    expect(dashboardEditor).toContain('DashboardGroup = DashboardCardGroup')
     expect(dashboardEditor).not.toContain('上へ移動')
     expect(dashboardEditor).not.toContain('下へ移動')
   })

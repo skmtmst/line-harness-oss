@@ -97,6 +97,31 @@ function renderValue(value: unknown): string {
   }
 }
 
+/**
+ * 省略表示の名前や値。押すと(キーボードでも)全文へ広げられる。
+ * 狭いサイドバーでは長い名前が切れるので、切れたまま読めない
+ * 状態にしないためのもの(U008)。
+ */
+function ExpandableText({ value, className = '', empty = '未登録' }: {
+  value: string | null
+  className?: string
+  empty?: string
+}) {
+  const [expanded, setExpanded] = useState(false)
+  if (!value) return <span className="text-gray-400">{empty}</span>
+  return (
+    <button
+      type="button"
+      title={value}
+      aria-expanded={expanded}
+      onClick={() => setExpanded((v) => !v)}
+      className={`${className} min-w-0 text-left ${expanded ? 'whitespace-normal break-all' : 'truncate'}`}
+    >
+      {value}
+    </button>
+  )
+}
+
 export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }: Props) {
   const [friend, setFriend] = useState<FriendDetail | null>(null)
   const [loading, setLoading] = useState(false)
@@ -465,7 +490,11 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
                   <span className="text-lg font-bold">{(friend.displayName || '?').charAt(0)}</span>
                 </div>
               )}
-              <p className="text-ink mt-2 max-w-full truncate text-sm font-bold">{friend.displayName || '名前なし'}</p>
+              <ExpandableText
+                value={friend.displayName}
+                empty="名前なし"
+                className="text-ink mt-2 max-w-full text-sm font-bold"
+              />
               <p className="text-ink-faint mt-0.5 text-[11px]">LINE表示名</p>
               <div className="mt-3 flex max-w-full items-center justify-center gap-1.5">
                 {chatStatus?.status && statusLabels[chatStatus.status] ? (
@@ -475,7 +504,10 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
                 ) : (
                   <span className="bg-canvas-sunken text-ink-faint rounded-full px-2 py-1 text-[11px] font-semibold">未設定</span>
                 )}
-                <span className="bg-canvas-sunken text-ink-secondary max-w-[130px] truncate rounded-full px-2 py-1 text-[11px] font-semibold">
+                <span
+                  className="bg-canvas-sunken text-ink-secondary max-w-[130px] truncate rounded-full px-2 py-1 text-[11px] font-semibold"
+                  title={operatorName ?? undefined}
+                >
                   {operatorName || '未割り当て'}
                 </span>
               </div>
@@ -501,15 +533,11 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
               <h4 className="text-ink mb-2 text-xs font-bold">基本情報</h4>
               <div className="flex justify-between items-center gap-2">
                 <span className="text-[11px] text-gray-500 shrink-0">本名</span>
-                <span className="text-xs text-gray-700 truncate">
-                  {friend.realName || <span className="text-gray-400">未登録</span>}
-                </span>
+                <ExpandableText value={friend.realName} className="text-xs text-gray-700" />
               </div>
               <div className="flex justify-between items-center gap-2">
                 <span className="text-[11px] text-gray-500 shrink-0">システム表示名</span>
-                <span className="text-xs text-gray-700 truncate">
-                  {friend.systemDisplayName || <span className="text-gray-400">未登録</span>}
-                </span>
+                <ExpandableText value={friend.systemDisplayName} className="text-xs text-gray-700" />
               </div>
               <div className="flex items-center justify-between gap-2">
                 <span className="shrink-0 text-[11px] text-gray-500">登録日</span>
