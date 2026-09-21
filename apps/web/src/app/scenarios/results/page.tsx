@@ -21,6 +21,10 @@ import { scenarioReferenceData } from '@/components/scenarios/scenario-reference
 import { FriendPlanDialog } from '@/components/scenarios/scenario-dialogs'
 
 type ScenarioWithSteps = Scenario & { steps: ScenarioStep[] }
+
+/** 購読一覧の1ページぶん。サーバーの上限は100、画面の既定は50。 */
+const RUNS_PAGE_SIZE = 50
+
 /*
  * 到達率。分母が 0（まだ誰も参加していない）ときは「0.0%」にしない。
  * 測って 0 なのか、測れていないのか区別できなくなる（#495 軽19）。
@@ -74,7 +78,21 @@ function ResultsInner() {
   const { selectedAccountId, loading: accountLoading } = useAccount()
   const [scenario, setScenario] = useState<ScenarioWithSteps | null>(null)
   const [stats, setStats] = useState<ScenarioStats | null>(null)
+  /*
+   * SCENARIO-13: 配信記録（runs）はシナリオ本体・集計とは別の流れで読む。
+   * Promise.all でまとめて待つと、遅い補助データのせいで本文まで出ない。
+   * SCENARIO-10: runs の取得失敗は「0件」と分けて、読み直し口を出す。
+   */
   const [runs, setRuns] = useState<ScenarioRuns | null>(null)
+  const [runsState, setRunsState] = useState<'idle' | 'loading' | 'ready' | 'error'>('loading')
+  /** 続きのページを読んでいる間。初回の読み込みとは分ける。 */
+  const [runsLoadingMore, setRunsLoadingMore] = useState(false)
+  const [runsMoreError, setRunsMoreError] = useState('')
+  /*
+   * SCENARIO-12: 状態の絞り込みはサーバー側で全件へ掛ける。
+   * 手元の1ページだけを絞ると「全体で51人いるのに50人しか居ない」ように見える。
+   */
+  const [subscriptionStatus, setSubscriptionStatus] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   /*
@@ -88,6 +106,8 @@ function ResultsInner() {
   const [moveTarget, setMoveTarget] = useState<{ subscriptionId: string; friendName: string } | null>(null)
   const [moveScenarioId, setMoveScenarioId] = useState('')
   const [moveOptions, setMoveOptions] = useState<Scenario[] | null>(null)
+  /** 移し先候補の取得失敗。0件と取り違えないよう別に持つ（SCENARIO-10と同じ分け方）。 */
+  const [moveOptionsError, setMoveOptionsError] = useState(false)
   /*
    * IDEA-05: 選んだ検証顧客への配信予定・待機・分岐理由を、送信なしで
    * 確かめる窓。行から開くとその人を、パネル頭の入口から開くと
@@ -99,7 +119,15 @@ function ResultsInner() {
 
   usePageTitle(scenario ? `シナリオ結果：${scenario.name}` : null)
 
-  const load = useCallback(async () => {
+  /*
+   * SCENARIO-11: 画面（id）やアカウントを切り替えたあとに返ってきた
+   * 古い応答を新しい対象へ書き込まないための世代番号。
+   * 切替のたびに進め、飛んでいる古い応答は全部捨てる。
+   */
+  const loadSeqRef = useRef(0)
+
+  /** シナリオ本体と集計。ここだけ先に読めれば本文は見せられる。 */
+  const loadMain = useCallback(async (seq: number) => {
     if (!id) {
       setLoading(false)
       setError('配信結果を確認するシナリオが指定されていません。')
@@ -107,31 +135,117 @@ function ResultsInner() {
     }
     setLoading(true)
     setError('')
-    setScenario(null)
-    setStats(null)
-    setRuns(null)
     try {
-      const [scenarioResponse, statsResponse, runsResponse] = await Promise.all([
+      const [scenarioResponse, statsResponse] = await Promise.all([
         scenarioReferenceData.scenario(id),
         scenarioReferenceData.stats(id),
-        selectedAccountId
-          ? api.scenarios.runs(id, selectedAccountId, { limit: 50 }).catch(() => null)
-          : Promise.resolve(null),
       ])
+      if (seq !== loadSeqRef.current) return
       if (!scenarioResponse.success || !statsResponse.success) throw new Error('load failed')
       setScenario(scenarioResponse.data)
       setStats(statsResponse.data)
-      setRuns(runsResponse?.success ? runsResponse.data : null)
     } catch {
+      if (seq !== loadSeqRef.current) return
       setError('配信結果を読み込めませんでした。時間を置いてもう一度お試しください。')
     } finally {
-      setLoading(false)
+      if (seq === loadSeqRef.current) setLoading(false)
     }
-  }, [id, selectedAccountId])
+  }, [id])
+
+  /*
+   * SCENARIO-12: 購読一覧は50件ずつカーソルで辿る。
+   * `pagination.nextCursor` が返るかぎり続きがあり、
+   * `pagination.total` は絞り込みを通ったあとの全件数。
+   * 続きのページは購読の行だけを後ろへ足し、集計・通別結果・送信枠は
+   * 新しい応答のものへ置き換える（各ページ同じ値が返る）。
+   */
+  const loadRuns = useCallback(async (seq: number, cursor?: string) => {
+    if (!id) return
+    if (!selectedAccountId) {
+      // アカウントが選ばれていないと購読は読めない。「0件」ではなく未取得。
+      if (seq === loadSeqRef.current) {
+        setRuns(null)
+        setRunsState('idle')
+      }
+      return
+    }
+    if (cursor) {
+      setRunsLoadingMore(true)
+      setRunsMoreError('')
+    } else {
+      setRuns(null)
+      setRunsState('loading')
+      setRunsMoreError('')
+    }
+    try {
+      const res = await api.scenarios.runs(id, selectedAccountId, {
+        limit: RUNS_PAGE_SIZE,
+        status: subscriptionStatus || undefined,
+        cursor,
+      })
+      if (seq !== loadSeqRef.current) return
+      if (!res.success) throw new Error(res.error)
+      setRuns((current) => {
+        if (!cursor || !current) return res.data
+        const seen = new Set(current.subscriptions.map((s) => s.id))
+        return {
+          ...res.data,
+          subscriptions: [
+            ...current.subscriptions,
+            ...res.data.subscriptions.filter((s) => !seen.has(s.id)),
+          ],
+        }
+      })
+      setRunsState('ready')
+    } catch {
+      if (seq !== loadSeqRef.current) return
+      if (cursor) {
+        setRunsMoreError('続きを読み込めませんでした。もう一度お試しください。')
+      } else {
+        setRunsState('error')
+      }
+    } finally {
+      if (seq === loadSeqRef.current) setRunsLoadingMore(false)
+    }
+  }, [id, selectedAccountId, subscriptionStatus])
+
+  /** 操作後の再集計。失敗しても古い値を0に置き換えない。 */
+  const refreshStats = useCallback(async (seq: number) => {
+    try {
+      const res = await scenarioReferenceData.stats(id, true)
+      if (seq === loadSeqRef.current && res.success) setStats(res.data)
+    } catch {
+      /* 集計の取り直しに失敗しても、表示済みの値は残す */
+    }
+  }, [id])
 
   useEffect(() => {
-    if (!accountLoading) void load()
-  }, [accountLoading, load])
+    if (accountLoading) return
+    const seq = ++loadSeqRef.current
+    setScenario(null)
+    setStats(null)
+    setRuns(null)
+    setRunsMoreError('')
+    setOpError('')
+    setMoveTarget(null)
+    setMoveOptions(null)
+    setMoveOptionsError(false)
+    void loadMain(seq)
+    void loadRuns(seq)
+  }, [accountLoading, loadMain, loadRuns])
+
+  /** 購読一覧だけを読み直す。再試行と操作後の更新はこの領域に限定する（SCENARIO-13）。 */
+  const reloadRuns = useCallback(() => {
+    const seq = loadSeqRef.current
+    void loadRuns(seq)
+    void refreshStats(seq)
+  }, [loadRuns, refreshStats])
+
+  const loadMoreRuns = () => {
+    const cursor = runs?.pagination.nextCursor
+    if (!cursor || runsLoadingMore) return
+    void loadRuns(loadSeqRef.current, cursor)
+  }
 
   const sortedSteps = useMemo(
     () => [...(scenario?.steps ?? [])].sort((a, b) => a.stepOrder - b.stepOrder),
@@ -188,11 +302,24 @@ function ResultsInner() {
         return
       }
       opKeys.current.clear(signature)
-      await load()
+      // 操作後の更新は購読一覧と集計だけ。画面全体は読み直さない（SCENARIO-13）。
+      reloadRuns()
     } catch {
       setOpError(`${subscription.friendName} への操作を完了できませんでした。時間を置いてもう一度お試しください。`)
     } finally {
       setOpBusy(null)
+    }
+  }
+
+  /** 移し先候補を取る。失敗は0件と分けて、窓の中で読み直せるようにする。 */
+  const loadMoveOptions = async () => {
+    setMoveOptions(null)
+    setMoveOptionsError(false)
+    const res = await api.scenarios.list({ accountId: selectedAccountId || undefined }).catch(() => null)
+    if (res?.success) {
+      setMoveOptions(res.data)
+    } else {
+      setMoveOptionsError(true)
     }
   }
 
@@ -202,8 +329,7 @@ function ResultsInner() {
     setMoveScenarioId('')
     setOpError('')
     if (moveOptions === null) {
-      const res = await api.scenarios.list({ accountId: selectedAccountId || undefined }).catch(() => null)
-      setMoveOptions(res?.success ? res.data : [])
+      await loadMoveOptions()
     }
   }
 
@@ -221,7 +347,7 @@ function ResultsInner() {
       }
       opKeys.current.clear(signature)
       setMoveTarget(null)
-      await load()
+      reloadRuns()
     } catch {
       setOpError('移し替えを完了できませんでした。時間を置いてもう一度お試しください。')
     } finally {
@@ -248,7 +374,7 @@ function ResultsInner() {
       </div>
 
       {loading ? <ListState kind="loading" title="配信結果を読み込んでいます" /> : null}
-      {!loading && error ? <ListState kind="error" description={error} onRetry={() => void load()} /> : null}
+      {!loading && error ? <ListState kind="error" description={error} onRetry={() => void loadMain(loadSeqRef.current)} /> : null}
 
       {!loading && !error && scenario && stats ? (
         <div className={styles.columns}>
@@ -305,13 +431,56 @@ function ResultsInner() {
                   友だちを選んで配信予定を見る
                 </Button>
               </div>
-              {!runs || runs.subscriptions.length === 0 ? (
+              {/*
+                SCENARIO-12: 状態の絞り込みはサーバーへ渡して全件へ掛ける。
+                手元の表示中ページだけを絞ると、総件数と食い違う。
+              */}
+              <div className="mb-3 flex flex-wrap items-center gap-3">
+                <SelectField
+                  size="compact"
+                  value={subscriptionStatus}
+                  onChange={(event) => setSubscriptionStatus(event.target.value)}
+                  aria-label="購読の状態で絞り込む"
+                  options={[
+                    { value: '', label: 'すべての状態' },
+                    { value: 'active', label: '配信中' },
+                    { value: 'delivering', label: '送信中' },
+                    { value: 'paused', label: '停止中' },
+                    { value: 'completed', label: '完了' },
+                  ]}
+                />
+                {runs ? (
+                  <span className="text-ink-faint text-xs tabular-nums">
+                    {runs.subscriptions.length.toLocaleString('ja-JP')} / {runs.pagination.total.toLocaleString('ja-JP')}人
+                  </span>
+                ) : null}
+              </div>
+              {/*
+                SCENARIO-10: 取得失敗と「まだ誰もいない」を分ける。
+                失敗は再試行、未取得（アカウント未選択）は案内、
+                正常に0件のときだけ空状態を出す。
+              */}
+              {runsState === 'idle' ? (
+                <p className="text-ink-faint py-6 text-center text-sm">
+                  上部のLINEアカウントを選ぶと、購読している友だちの一覧を表示します。
+                </p>
+              ) : runsState === 'loading' ? (
+                <ListState kind="loading" title="購読一覧を読み込んでいます" />
+              ) : runsState === 'error' ? (
+                <ListState
+                  kind="error"
+                  title="購読一覧を表示できませんでした"
+                  description="登録が消えたわけではありません。もう一度読み込んでください。"
+                  onRetry={() => void loadRuns(loadSeqRef.current)}
+                />
+              ) : !runs || runs.subscriptions.length === 0 ? (
                 <ListState
                   kind="empty"
                   title="購読している友だちはまだいません"
                   description="開始条件に一致した友だちがここに並びます。"
                 />
               ) : (
+                <>
                 <DataTable>
                   <thead>
                     <TableHeadRow>
@@ -412,6 +581,31 @@ function ResultsInner() {
                     })}
                   </tbody>
                 </DataTable>
+                {/*
+                  SCENARIO-12: `nextCursor` が残っているかぎり続きを読める。
+                  読み込み中の失敗は一覧を消さず、直前の行を残したまま
+                  再試行口だけ出す。
+                */}
+                {runsMoreError ? (
+                  <p className="text-danger mt-3 flex flex-wrap items-center gap-3 text-xs" role="alert">
+                    {runsMoreError}
+                    <button
+                      type="button"
+                      className="text-info font-medium hover:underline"
+                      onClick={loadMoreRuns}
+                    >
+                      もう一度読み込む
+                    </button>
+                  </p>
+                ) : null}
+                {runs.pagination.nextCursor ? (
+                  <div className="mt-3 flex justify-center">
+                    <Button onClick={loadMoreRuns} disabled={runsLoadingMore}>
+                      {runsLoadingMore ? '読み込んでいます…' : 'さらに読み込む'}
+                    </Button>
+                  </div>
+                ) : null}
+              </>
               )}
             </Panel>
           </main>
@@ -482,29 +676,47 @@ function ResultsInner() {
           </div>
         )}
       >
-        <SelectField
-          value={moveScenarioId}
-          title={moveOptions === null
-            ? '読み込んでいます'
-            : moveChoices.length === 0
-              ? '移せるシナリオがありません'
-              : '移し先のシナリオを選んでください'}
-          disabled={moveOptions === null || moveChoices.length === 0 || opBusy !== null}
-          onChange={(event) => setMoveScenarioId(event.target.value)}
-          aria-label="移し先のシナリオ"
-          className="w-full"
-          options={[
-            {
-              value: '',
-              label: moveOptions === null
-                ? '読み込んでいます'
-                : moveChoices.length === 0
-                  ? '稼働中の他のシナリオがありません'
-                  : 'シナリオを選んでください',
-            },
-            ...moveChoices.map((item) => ({ value: item.id, label: item.name })),
-          ]}
-        />
+        {/*
+          候補の取得失敗は「移せるシナリオがありません」と分ける。
+          0件と見せると、存在する移し先まで無いと思われる（SCENARIO-10と同じ分け方）。
+        */}
+        {moveOptionsError ? (
+          <p className="text-danger flex flex-wrap items-center gap-3 text-sm" role="alert">
+            移し先の候補を読み込めませんでした。
+            <button
+              type="button"
+              className="text-info font-medium hover:underline"
+              onClick={() => void loadMoveOptions()}
+              disabled={opBusy !== null}
+            >
+              もう一度読み込む
+            </button>
+          </p>
+        ) : (
+          <SelectField
+            value={moveScenarioId}
+            title={moveOptions === null
+              ? '読み込んでいます'
+              : moveChoices.length === 0
+                ? '移せるシナリオがありません'
+                : '移し先のシナリオを選んでください'}
+            disabled={moveOptions === null || moveChoices.length === 0 || opBusy !== null}
+            onChange={(event) => setMoveScenarioId(event.target.value)}
+            aria-label="移し先のシナリオ"
+            className="w-full"
+            options={[
+              {
+                value: '',
+                label: moveOptions === null
+                  ? '読み込んでいます'
+                  : moveChoices.length === 0
+                    ? '稼働中の他のシナリオがありません'
+                    : 'シナリオを選んでください',
+              },
+              ...moveChoices.map((item) => ({ value: item.id, label: item.name })),
+            ]}
+          />
+        )}
       </Dialog>
     </div>
   )

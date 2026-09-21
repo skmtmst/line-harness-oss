@@ -147,6 +147,53 @@ describe('bV5Vs シナリオ編集', () => {
     const actions = slice(detail, 'text-right align-top', '</td>')
     expect(actions).toContain('flex-wrap')
   })
+
+  it('SCENARIO-23: 操作名は単語の途中で折らず、操作列の必要幅を確保する', () => {
+    /*
+     * PC1440/1920 でも操作列が 36px まで潰れ、「編集」「プレビュー」等が
+     * 1文字ずつ縦に折れて行の高さが 349px になっていた。短い操作名は
+     * 各ボタンの whitespace-nowrap で1行を保ち、収まらない幅では
+     * ボタン単位で折り返す（上の N-058 と同じ方針）。見出しの w-80 が
+     * 「内容」列へ余白を渡す前の操作列の取り分になる。
+     */
+    const actions = slice(detail, 'text-right align-top', '</td>')
+    const buttons = actions.match(/<button[\s\S]*?<\/button>/g) ?? []
+    expect(buttons.length).toBe(6)
+    for (const button of buttons) {
+      expect(button, '操作ボタンが単語の途中で折れる組み方です').toContain('whitespace-nowrap')
+    }
+    expect(thead).toContain('className="w-80" aria-label="操作"')
+  })
+})
+
+describe('SCENARIO-15 開始前試算の取り直し', () => {
+  it('試算の取得は保存済み設定の鍵を見て動き直す', () => {
+    /*
+     * 以前は id と lineAccountId だけを見ていたため、対象条件・通・時刻を
+     * 保存して loadScenario(true) しても試算を取り直さなかった。
+     * 鍵（scenarioSimulationKey）を依存に入れて、設定が変われば取り直す。
+     */
+    expect(detail).toContain('scenarioSimulationKey(scenario, triggerCount)')
+    const effect = slice(detail, 'const key = simulationKey', 'setRuns(runsResponse?.success ? runsResponse.data : null)')
+    expect(detail).toContain('}, [id, scenario?.lineAccountId, simulationKey])')
+    expect(effect).toContain('api.scenarios.simulate(id, lineAccountId)')
+  })
+
+  it('遅れて届いた旧世代の応答は捨て、旧鍵の値は確定値として出さない', () => {
+    const effect = slice(detail, 'const key = simulationKey', 'setRuns(runsResponse?.success ? runsResponse.data : null)')
+    // 世代の掃除: 依存が変わると cancelled が立ち、旧応答は書き込まない。
+    expect(effect).toContain('if (cancelled) return')
+    // 表示は「今の設定の鍵に合う結果」だけ。
+    expect(detail).toContain('simulationForKey(simulationResult, simulationKey)')
+    expect(detail).toContain('simulationResult?.key !== simulationKey')
+  })
+
+  it('取り直し中は古い人数ではなく計算中と出す', () => {
+    expect(detail).toContain('新規開始予定を計算しています…')
+    const banner = slice(detail, 'data-design-node="NrBkW"', '</div>')
+    expect(banner).toContain('simulationRefreshing')
+    expect(banner).toContain('開始予定の人数を計算しています…')
+  })
 })
 
 describe('配信対象の言い表し方', () => {

@@ -44,6 +44,18 @@ describe('シナリオ一覧の列幅と並び替え案内', () => {
     expect(LIST).toContain('title="上下に動かして並び替え"')
   })
 
+  it('SCENARIO-17: 並べ替えをキーボードでも操作できる', () => {
+    /*
+     * ドラッグ専用のセルだけではキーボードで動かせない。
+     * 友だち属性の N-049 と同じ ReorderGrip を置き、↑/↓ で1つずつ
+     * 動かす。動いた結果は sr-only の live 領域で読み上げる。
+     */
+    expect(LIST).toContain("import ReorderGrip from '@/components/friend-fields/reorder-grip'")
+    expect(LIST).toContain('onMove={(direction) => keyboardMove(s.id, direction)}')
+    expect(LIST).toContain('aria-live="polite"')
+    expect(LIST).toContain('setMoveNotice(')
+  })
+
   it('長い名前は1行省略で、全文は title で読める（NEXT-25）', () => {
     expect(LIST).toContain('min-w-0 truncate text-sm font-medium')
     expect(LIST).toContain('title={s.name}')
