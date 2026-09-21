@@ -2,7 +2,7 @@
 // 対象ウェビナーは webinar_followup_configs で明示的に有効化し、enabled_at
 // より前の過去リードを一斉送信しない。LINE送信は必ずHarnessプロキシ経由。
 
-import { getFriendById, getLineAccountById, jstNow } from '@line-crm/db';
+import { getFriendById, getLineAccountById, isOperationCapabilityStopped, jstNow } from '@line-crm/db';
 import { featureJobCanRun } from './feature-enforcement.js';
 import { pushViaHarnessProxy, type HarnessProxyDispatch } from './line-proxy-send.js';
 
@@ -400,6 +400,11 @@ export async function processWebinarFollowups(
     if (candidate.account_id && !await featureJobCanRun(db, { accountId: candidate.account_id, featureId: 'webinars', job: 'webinar followups' })) {
       continue;
     }
+    // 緊急停止 (#1050): reminder_dispatch 停止中も追跡行を作らず送らない。
+    if (candidate.account_id &&
+        await isOperationCapabilityStopped(db, candidate.account_id, 'reminder_dispatch')) {
+      continue;
+    }
     const followup = await getOrCreateFollowup(db, candidate, kind);
     if (followup.status === 'sent') continue;
     try {
@@ -418,6 +423,12 @@ export async function processWebinarFollowups(
       }
       const delivery = await deliveryConfig(db, candidate.account_id, options);
       if (!delivery.liffId) throw new Error('LIFF ID not configured');
+      // 送信直前にも緊急停止を確かめる (#1050)。停止中は pending のまま残し、
+      // 次の tick で再送対象になる。
+      if (candidate.account_id &&
+          await isOperationCapabilityStopped(db, candidate.account_id, 'reminder_dispatch')) {
+        continue;
+      }
       const url = formUrl(delivery.liffId, candidate.form_id);
       const text = buildCtaFollowupText(kind, url);
       await pushViaHarnessProxy(
@@ -427,6 +438,7 @@ export async function processWebinarFollowups(
         [{ type: 'text', text }],
         followup.retry_key,
         options.proxyDispatch,
+        'reminder_dispatch',
       );
       await db.prepare(
         `UPDATE webinar_followups
@@ -445,6 +457,11 @@ export async function processWebinarFollowups(
   }
 
   for (const { candidate, kind } of journeyDue) {
+    // 緊急停止 (#1050): reminder_dispatch 停止中は追跡行を作らず送らない。
+    if (candidate.account_id &&
+        await isOperationCapabilityStopped(db, candidate.account_id, 'reminder_dispatch')) {
+      continue;
+    }
     const followup = await getOrCreateJourneyFollowup(db, candidate, kind);
     if (followup.status === 'sent' || followup.status === 'skipped') continue;
     try {
@@ -458,6 +475,11 @@ export async function processWebinarFollowups(
       }
       const delivery = await deliveryConfig(db, candidate.account_id, options);
       if (!delivery.liffId) throw new Error('LIFF ID not configured');
+      // 送信直前にも緊急停止を確かめる (#1050)。停止中は pending のまま残す。
+      if (candidate.account_id &&
+          await isOperationCapabilityStopped(db, candidate.account_id, 'reminder_dispatch')) {
+        continue;
+      }
       const pickerUrl = webinarPickerUrl(delivery.liffId, candidate.slug);
       const text = buildJourneyFollowupText(
         kind, candidate.title, pickerUrl, candidate.booking_url,
@@ -469,6 +491,7 @@ export async function processWebinarFollowups(
         [{ type: 'text', text }],
         followup.retry_key,
         options.proxyDispatch,
+        'reminder_dispatch',
       );
       const sentAt = jstNow();
       await db.prepare(

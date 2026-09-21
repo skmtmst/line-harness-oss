@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import type { LineClient } from '@line-crm/line-sdk'
+import { restoreOperationIncident, stopOperationCapabilities } from '@line-crm/db'
 
 import { createTestD1, insertFriend } from '../test-utils/d1-sqlite.js'
 import { classifyReminderDeliveryError, processReminderDeliveries } from './reminder-delivery.js'
@@ -66,7 +67,7 @@ describe('リマインダ配信の実行記録', () => {
       resolveClient: async () => client,
     })
 
-    expect(result).toEqual({ succeeded: 0, skipped: 0, retrying: 0, failed: 0 })
+    expect(result).toEqual({ succeeded: 0, skipped: 0, retrying: 0, failed: 0, held: 0 })
     expect(pushCount).toBe(0)
     expect(raw.prepare(
       `SELECT status, scheduled_at, attempt_count FROM reminder_delivery_runs`,
@@ -101,8 +102,8 @@ describe('リマインダ配信の実行記録', () => {
       resolveClient: async () => client,
     })
 
-    expect(first).toEqual({ succeeded: 1, skipped: 0, retrying: 0, failed: 0 })
-    expect(second).toEqual({ succeeded: 0, skipped: 0, retrying: 0, failed: 0 })
+    expect(first).toEqual({ succeeded: 1, skipped: 0, retrying: 0, failed: 0, held: 0 })
+    expect(second).toEqual({ succeeded: 0, skipped: 0, retrying: 0, failed: 0, held: 0 })
     expect(pushes).toHaveLength(1)
     expect(pushes[0].userId).toBe('U-friend-1')
     expect(pushes[0].retryKey).toMatch(/^[0-9a-f-]{36}$/)
@@ -183,9 +184,9 @@ describe('リマインダ配信の実行記録', () => {
       resolveClient: async () => client,
     })
 
-    expect(failed).toEqual({ succeeded: 0, skipped: 0, retrying: 1, failed: 0 })
-    expect(tooEarly).toEqual({ succeeded: 0, skipped: 0, retrying: 0, failed: 0 })
-    expect(retried).toEqual({ succeeded: 1, skipped: 0, retrying: 0, failed: 0 })
+    expect(failed).toEqual({ succeeded: 0, skipped: 0, retrying: 1, failed: 0, held: 0 })
+    expect(tooEarly).toEqual({ succeeded: 0, skipped: 0, retrying: 0, failed: 0, held: 0 })
+    expect(retried).toEqual({ succeeded: 1, skipped: 0, retrying: 0, failed: 0, held: 0 })
     expect(retryKeys).toHaveLength(2)
     expect(retryKeys[1]).toBe(retryKeys[0])
     expect(raw.prepare(
@@ -214,7 +215,7 @@ describe('リマインダ配信の実行記録', () => {
       resolveClient: async () => client,
     })
 
-    expect(result).toEqual({ succeeded: 0, skipped: 1, retrying: 0, failed: 0 })
+    expect(result).toEqual({ succeeded: 0, skipped: 1, retrying: 0, failed: 0, held: 0 })
     expect(pushCount).toBe(0)
     expect(raw.prepare(
       `SELECT status, last_error_code, last_error_message FROM reminder_delivery_runs`,
@@ -244,7 +245,7 @@ describe('リマインダ配信の実行記録', () => {
       pause: noPause,
     })
 
-    expect(result).toEqual({ succeeded: 0, skipped: 0, retrying: 0, failed: 1 })
+    expect(result).toEqual({ succeeded: 0, skipped: 0, retrying: 0, failed: 1, held: 0 })
     expect(pushCount).toBe(0)
     expect(raw.prepare(
       `SELECT status, last_error_code, last_error_message FROM reminder_delivery_runs`,
@@ -367,7 +368,7 @@ describe('リマインダ配信の実行記録', () => {
 
     expect(pushes).toEqual(['U-friend-1'])
     // claim 拒否は握っていないため skipped に数えない。送らず止める約束は同じ。
-    expect(result).toEqual({ succeeded: 1, skipped: 0, retrying: 0, failed: 0 })
+    expect(result).toEqual({ succeeded: 1, skipped: 0, retrying: 0, failed: 0, held: 0 })
     expect(raw.prepare(
       `SELECT status FROM reminder_delivery_runs WHERE friend_reminder_id = 'enrollment-2'`,
     ).get()).toEqual({ status: 'cancelled' })
@@ -399,7 +400,7 @@ describe('リマインダ配信の実行記録', () => {
     })
 
     expect(pushes).toEqual([])
-    expect(result).toEqual({ succeeded: 0, skipped: 1, retrying: 0, failed: 0 })
+    expect(result).toEqual({ succeeded: 0, skipped: 1, retrying: 0, failed: 0, held: 0 })
     expect(raw.prepare(
       `SELECT status FROM reminder_delivery_runs WHERE friend_reminder_id = 'enrollment-1'`,
     ).get()).toEqual({ status: 'cancelled' })
@@ -433,12 +434,161 @@ describe('リマインダ配信の実行記録', () => {
     })
 
     expect(pushes).toEqual([])
-    expect(result).toEqual({ succeeded: 0, skipped: 1, retrying: 0, failed: 0 })
+    expect(result).toEqual({ succeeded: 0, skipped: 1, retrying: 0, failed: 0, held: 0 })
     expect(raw.prepare(
       `SELECT status FROM reminder_delivery_runs WHERE friend_reminder_id = 'enrollment-1'`,
     ).get()).toEqual({ status: 'cancelled' })
     expect(raw.prepare(
       `SELECT COUNT(*) AS c FROM friend_reminder_deliveries WHERE friend_reminder_id = 'enrollment-1'`,
     ).get()).toEqual({ c: 0 })
+  })
+})
+
+describe('緊急停止 (#1050)', () => {
+  const NOW = new Date('2026-08-28T09:00:00.000Z')
+
+  it('reminder_dispatch 停止中は claim せず外部へ1件も出さず、登録を active のまま残す', async () => {
+    const { db, raw } = createTestD1()
+    seedReminder(raw)
+    const pushes: string[] = []
+    const client = makeClient(async (userId) => {
+      pushes.push(userId)
+      return { requestId: 'line-request-1' }
+    })
+    const stopped = await stopOperationCapabilities(db, {
+      lineAccountId: 'account-1',
+      capabilities: ['reminder_dispatch'],
+      expectedVersion: 0,
+      actorId: 'owner-1',
+      reason: '障害対応',
+    })
+    if (stopped.status !== 'changed') throw new Error('stop failed')
+
+    const held = await processReminderDeliveries(db, client, {
+      now: NOW,
+      pause: noPause,
+      resolveClient: async () => client,
+    })
+
+    expect(held).toEqual({ succeeded: 0, skipped: 0, retrying: 0, failed: 0, held: 1 })
+    expect(pushes).toHaveLength(0)
+    // 実行行すら積まない (claim しない)。復旧でそのまま届く。
+    expect(raw.prepare(`SELECT COUNT(*) AS n FROM reminder_delivery_runs`).get()).toEqual({ n: 0 })
+    expect(raw.prepare(
+      `SELECT status FROM friend_reminders WHERE id = 'enrollment-1'`,
+    ).get()).toEqual({ status: 'active' })
+
+    const restored = await restoreOperationIncident(db, {
+      incidentId: stopped.incident.id,
+      expectedVersion: stopped.control.version,
+      actorId: 'owner-1',
+    })
+    expect(restored.status).toBe('restored')
+
+    const resumed = await processReminderDeliveries(db, client, {
+      now: NOW,
+      pause: noPause,
+      resolveClient: async () => client,
+    })
+    expect(resumed.succeeded).toBe(1)
+    expect(pushes).toEqual(['U-friend-1'])
+  })
+
+  it('claim 後・送信直前に停止へ切り替わった通は送らず、claim をキューへ戻す', async () => {
+    const { db, raw } = createTestD1()
+    seedReminder(raw)
+    const pushes: string[] = []
+    const client = makeClient(async (userId) => {
+      pushes.push(userId)
+      return { requestId: null }
+    })
+
+    const result = await processReminderDeliveries(db, client, {
+      now: NOW,
+      pause: noPause,
+      resolveClient: async () => client,
+      // claim 取得と外部送信のあいだで停止へ切り替わった想定。
+      beforePush: async () => {
+        const stopped = await stopOperationCapabilities(db, {
+          lineAccountId: 'account-1',
+          capabilities: ['reminder_dispatch'],
+          expectedVersion: 0,
+          actorId: 'owner-1',
+          reason: '障害対応',
+        })
+        if (stopped.status !== 'changed') throw new Error('stop failed')
+      },
+    })
+
+    expect(result).toEqual({ succeeded: 0, skipped: 0, retrying: 0, failed: 0, held: 1 })
+    expect(pushes).toHaveLength(0)
+    // 停止を理由に failed/skipped へしない。queued へ戻して復旧で届く。
+    expect(raw.prepare(
+      `SELECT status, lease_expires_at, next_retry_at FROM reminder_delivery_runs`,
+    ).get()).toEqual({ status: 'queued', lease_expires_at: null, next_retry_at: null })
+    expect(raw.prepare(
+      `SELECT status FROM friend_reminders WHERE id = 'enrollment-1'`,
+    ).get()).toEqual({ status: 'active' })
+  })
+
+  it('別の停止対象 (broadcast_dispatch) だけ止まっていてもリマインダは届く', async () => {
+    const { db, raw } = createTestD1()
+    seedReminder(raw)
+    const pushes: string[] = []
+    const client = makeClient(async (userId) => {
+      pushes.push(userId)
+      return { requestId: null }
+    })
+    const stopped = await stopOperationCapabilities(db, {
+      lineAccountId: 'account-1',
+      capabilities: ['broadcast_dispatch'],
+      expectedVersion: 0,
+      actorId: 'owner-1',
+      reason: '誤配信の防止',
+    })
+    if (stopped.status !== 'changed') throw new Error('stop failed')
+
+    const result = await processReminderDeliveries(db, client, {
+      now: NOW,
+      pause: noPause,
+      resolveClient: async () => client,
+    })
+
+    expect(result.succeeded).toBe(1)
+    expect(result.held).toBe(0)
+    expect(pushes).toEqual(['U-friend-1'])
+    expect(raw.prepare(
+      `SELECT status FROM reminder_delivery_runs`,
+    ).get()).toEqual({ status: 'succeeded' })
+  })
+
+  it('グローバル停止 (*) はアカウント未割当の登録にも効く', async () => {
+    const { db, raw } = createTestD1()
+    seedReminder(raw)
+    raw.prepare(`UPDATE reminders SET line_account_id = NULL WHERE id = 'reminder-1'`).run()
+    raw.prepare(`UPDATE friends SET line_account_id = NULL WHERE id = 'friend-1'`).run()
+    const pushes: string[] = []
+    const client = makeClient(async (userId) => {
+      pushes.push(userId)
+      return { requestId: null }
+    })
+    const stopped = await stopOperationCapabilities(db, {
+      lineAccountId: null,
+      capabilities: ['reminder_dispatch'],
+      expectedVersion: 0,
+      actorId: 'owner-1',
+      reason: '障害対応',
+    })
+    if (stopped.status !== 'changed') throw new Error('stop failed')
+
+    const result = await processReminderDeliveries(db, client, {
+      now: NOW,
+      pause: noPause,
+      resolveClient: async () => client,
+    })
+
+    expect(result.held).toBe(1)
+    expect(pushes).toHaveLength(0)
+    expect(raw.prepare(`SELECT COUNT(*) AS n FROM reminder_delivery_runs`).get()).toEqual({ n: 0 })
   })
 })

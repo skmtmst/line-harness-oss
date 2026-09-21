@@ -4,7 +4,7 @@ import type { BookingNotificationSender } from './booking-notifier.js';
 import { purgeExpiredIdempotency } from './booking-idempotency.js';
 import { REQUEST_TTL_HOURS } from './booking-types.js';
 import { cancelByTrigger } from './reminder-trigger.js';
-import { recordBookingAudit, resolveLineCredential } from '@line-crm/db';
+import { recordBookingAudit, resolveLineCredential, isOperationCapabilityStopped } from '@line-crm/db';
 import { featureJobCanRun } from './feature-enforcement.js';
 
 interface StaleRow {
@@ -60,6 +60,11 @@ export async function runExpirer(
   for (const row of stale.results) {
     // 機能オフ中は期限切れにせずrequestedのまま残す。再オンで再開する。
     if (row.line_account_id && !await featureJobCanRun(db, { accountId: row.line_account_id, featureId: 'booking', job: 'booking expirer' })) {
+      continue;
+    }
+    // 緊急停止 (#1050): reminder_dispatch 停止中は期限切れ通知を出せない
+    // ので、期限切れ化そのものを保留し requested のまま残す。
+    if (row.line_account_id && await isOperationCapabilityStopped(db, row.line_account_id, 'reminder_dispatch')) {
       continue;
     }
     // 条件付き UPDATE: cron 走行中に admin が同じ予約を承認/拒否した場合、
