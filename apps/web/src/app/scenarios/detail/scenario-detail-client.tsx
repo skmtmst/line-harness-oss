@@ -59,6 +59,7 @@ import {
 } from './scenario-reach-display'
 import { describeAfterSend, describeStepAudience } from './scenario-step-audience'
 import { usePageTitle } from '@/components/shell/page-chrome'
+import { useAccount } from '@/contexts/account-context'
 import { scenarioReferenceData } from '@/components/scenarios/scenario-reference-data'
 
 type ScenarioWithSteps = Scenario & { steps: ScenarioStep[] }
@@ -330,16 +331,53 @@ export default function ScenarioDetailClient({
   const [editing, setEditing] = useState(false)
   const [editForm, setEditForm] = useState({ name: '', description: '', triggerType: 'friend_add' as ScenarioTriggerType, isActive: true, allowConcurrent: true, folderId: '' })
   const [folders, setFolders] = useState<Folder[]>([])
+  const [folderState, setFolderState] = useState<'loading' | 'ready' | 'error'>('loading')
+  const { selectedAccountId } = useAccount()
 
+  /*
+   * SCENARIO-20: フォルダはアカウント単位。無指定で全権限範囲を取ると、
+   * 別アカウントの同名フォルダを選んで保存してしまう。シナリオの所属
+   * アカウント（共通なら選択中のアカウント）の候補だけを出し、
+   * アカウントが切り替わったら取り直す。候補を取り直せなかったときは
+   * 「未分類」と決めつけず、いまは変更できない旨を示す。
+   */
+  const folderAccountId = scenario?.lineAccountId ?? selectedAccountId
   useEffect(() => {
     let cancelled = false
-    void api.folders.list('scenario').then((res) => {
-      if (!cancelled && res.success) setFolders(res.data)
-    })
+    setFolderState('loading')
+    void api.folders.list('scenario', folderAccountId ?? undefined)
+      .then((res) => {
+        if (cancelled) return
+        if (res.success) {
+          setFolders(res.data)
+          setFolderState('ready')
+        } else {
+          setFolderState('error')
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setFolderState('error')
+      })
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [folderAccountId])
+
+  /*
+   * 保存済みのフォルダが、このアカウントの候補に無いか（SCENARIO-20）。
+   * 無いまま「未分類」と見せると、別範囲の値を黙って上書きしてしまう。
+   * 候補に無い保存値は、理由を示したうえで値そのものは保持する。
+   */
+  const editFolderMissing = Boolean(
+    editForm.folderId && !folders.some((f) => f.id === editForm.folderId),
+  )
+  const scenarioFolderName = !scenario?.folderId
+    ? '未分類'
+    : folderState === 'loading'
+      ? '読み込み中…'
+      : folderState === 'error'
+        ? '確認できません'
+        : (folders.find((f) => f.id === scenario.folderId)?.name ?? '名前を確認できません')
   const [saving, setSaving] = useState(false)
 
   const router = useRouter()
@@ -1747,17 +1785,38 @@ export default function ScenarioDetailClient({
             </div>
             <div>
               <label className="block text-xs font-medium text-ink-secondary mb-1">フォルダ</label>
+              {/*
+                SCENARIO-20: 候補はシナリオ所属アカウントのものだけ。
+                取得できないあいだは変更を止める（候補外の値を
+                黙って保存しないため）。保存済みの値が候補に無いときは
+                値を消さず、名前を確認できない旨の選択肢として残す。
+              */}
               <select
-                className="border-hairline rounded-control bg-canvas text-ink border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent w-full"
+                className="border-hairline rounded-control bg-canvas text-ink border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent w-full disabled:bg-canvas-sunken disabled:text-ink-faint"
                 value={editForm.folderId}
+                disabled={folderState !== 'ready'}
                 onChange={(e) => setEditForm({ ...editForm, folderId: e.target.value })}
               >
                 <option value="">未分類</option>
+                {editFolderMissing ? (
+                  <option value={editForm.folderId}>名前を確認できません</option>
+                ) : null}
                 {folders.map((f) => (
                   <option key={f.id} value={f.id}>{f.name}</option>
                 ))}
               </select>
               <p className="text-ink-faint mt-1 text-xs">一覧の左のパネルで、この分類ごとに絞り込めます。</p>
+              {folderState !== 'ready' ? (
+                <p className="text-ink-faint mt-1 text-xs">
+                  {folderState === 'loading'
+                    ? 'フォルダを読み込んでいます。'
+                    : 'フォルダを確認できないため、いまは変更できません。'}
+                </p>
+              ) : editFolderMissing ? (
+                <p className="text-warning mt-1 text-xs">
+                  選択中のフォルダはこのアカウントの候補にありません（別アカウントのものか、削除済みです）。保存済みの分類はそのまま残ります。
+                </p>
+              ) : null}
             </div>
             <div>
               <label className="block text-xs font-medium text-ink-secondary mb-1">トリガー</label>
@@ -1838,7 +1897,7 @@ export default function ScenarioDetailClient({
                 {/* 置き場は scenarios.folder_id（099）。一覧の左のパネルで
                     絞り込む先になる。 */}
                 <p className="text-ink-faint mt-0.5 truncate text-xs">
-                  フォルダ：{folders.find((f) => f.id === scenario.folderId)?.name ?? '未分類'}
+                  フォルダ：{scenarioFolderName}
                 </p>
               </SettingCard>
 
