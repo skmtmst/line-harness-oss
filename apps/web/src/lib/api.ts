@@ -9055,8 +9055,13 @@ export const api = {
         method: 'POST',
         body: JSON.stringify(data),
       }),
-    shipments: (params?: { limit?: number }) => {
-      const suffix = params?.limit === undefined ? '' : `?limit=${params.limit}`
+    shipments: (params?: { limit?: number; accountId?: string }) => {
+      const query = new URLSearchParams()
+      if (params?.limit !== undefined) query.set('limit', String(params.limit))
+      // ダッシュボードのカードは選択中アカウントの件数と遷移先を一致させる。
+      // 未指定は従来どおり可視範囲すべて。
+      if (params?.accountId) query.set('account_id', params.accountId)
+      const suffix = query.toString() ? `?${query.toString()}` : ''
       return fetchApi<ApiResponse<EcShipmentList>>(`/api/ec-commerce/shipments${suffix}`)
     },
   },

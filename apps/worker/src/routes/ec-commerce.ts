@@ -1178,11 +1178,26 @@ ecCommerce.get('/api/ec-commerce/shipments', requireRole('owner', 'admin', 'staf
   // 明細の表示件数（limit）に引っ張られて過少に数えない（DASH-22）。
   const scanLimit = Math.min(Math.max(limit * 5, 200), 500);
   const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
-  const accountWhere = scope.allowedAccountIds.length
-    ? `AND (f.line_account_id IN (${scope.allowedAccountIds.map(() => '?').join(',')})${scope.canSeeUnassigned ? ' OR f.line_account_id IS NULL' : ''})`
-    : scope.canSeeUnassigned
-      ? 'AND f.line_account_id IS NULL'
-      : 'AND 1 = 0';
+  /*
+   * ダッシュボードの「出荷予定」は選択中アカウントの件数と一致させるため、
+   * account_id / lineAccountId で1アカウントへ絞れる。未指定は従来どおり
+   * 可視範囲すべて（全アカウント）。権限外の指定は0件にせず403にする
+   * （数えられないものを0件として返さない）。
+   */
+  const requestedAccountId = (
+    c.req.query('account_id') ?? c.req.query('lineAccountId')
+  )?.trim();
+  if (requestedAccountId && !scope.allowedAccountIds.includes(requestedAccountId)) {
+    return c.json({ success: false, error: 'このLINEアカウントを表示する権限がありません' }, 403);
+  }
+  const accountWhere = requestedAccountId
+    ? 'AND f.line_account_id = ?'
+    : scope.allowedAccountIds.length
+      ? `AND (f.line_account_id IN (${scope.allowedAccountIds.map(() => '?').join(',')})${scope.canSeeUnassigned ? ' OR f.line_account_id IS NULL' : ''})`
+      : scope.canSeeUnassigned
+        ? 'AND f.line_account_id IS NULL'
+        : 'AND 1 = 0';
+  const accountBinds = requestedAccountId ? [requestedAccountId] : scope.allowedAccountIds;
   const placeholders = SHIPMENT_EVENT_TYPES.map(() => '?').join(', ');
   const rows = await c.env.DB.prepare(
     `SELECT e.id, e.event_type, e.friend_id, e.received_at,
@@ -1200,7 +1215,7 @@ ecCommerce.get('/api/ec-commerce/shipments', requireRole('owner', 'admin', 'staf
       ORDER BY e.received_at DESC
       LIMIT ?`,
   )
-    .bind(...SHIPMENT_EVENT_TYPES, ...scope.allowedAccountIds, scanLimit)
+    .bind(...SHIPMENT_EVENT_TYPES, ...accountBinds, scanLimit)
     .all<ShipmentRow>();
 
   const todayJst = toJstMoment(new Date().toISOString())?.date ?? '';
