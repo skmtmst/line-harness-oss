@@ -302,7 +302,7 @@
   "app/scenarios/first-step/page.tsx": {
     "direct-secondary-button": 2,
     "arbitrary-value": 1,
-    "unresolved-classname": 4,
+    "unresolved-classname": 5,
     "direct-primary-button": 1
   },
   "app/scenarios/mode/page.tsx": {

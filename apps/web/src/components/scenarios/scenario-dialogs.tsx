@@ -74,6 +74,7 @@ export function ConditionDialog({
 }) {
   const [draft, setDraft] = useState<SegmentCondition | null>(value)
   const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
 
   return (
     <Shell
@@ -95,11 +96,21 @@ export function ConditionDialog({
             disabled={saving}
             onClick={async () => {
               setSaving(true)
-              // 書きかけの行は落として保存する。残すと、誰にも一致しない
-              // 条件になって配信が黙って止まる。
-              await onSave(pruneCondition(draft))
-              setSaving(false)
-              onClose()
+              setError('')
+              try {
+                // 書きかけの行は落として保存する。残すと、誰にも一致しない
+                // 条件になって配信が黙って止まる。
+                await onSave(pruneCondition(draft))
+                onClose()
+              } catch {
+                /*
+                 * 呼び出し側の保存が例外で落ちても「保存中」のままにしない
+                 * （SCENARIO-05）。窓は開いたまま、下書きも残す。
+                 */
+                setError('条件を保存できませんでした。通信状態を確認して、もう一度お試しください。')
+              } finally {
+                setSaving(false)
+              }
             }}
             className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control h-10 px-5 text-sm font-medium disabled:opacity-50"
           >
@@ -108,6 +119,9 @@ export function ConditionDialog({
         </>
       }
     >
+      {error && (
+        <p className="rounded-panel bg-danger-bg text-danger mb-4 px-4 py-3 text-sm">{error}</p>
+      )}
       <span className="sr-only">{title}{description}</span>
       <section className="bg-canvas-sunken rounded-panel mb-4 px-4 py-5">
         <div className="flex flex-wrap items-center justify-between gap-2">
@@ -212,13 +226,22 @@ export function OnCompleteDialog({
             disabled={saving}
             onClick={async () => {
               setSaving(true)
-              const err = await onSave(draftMode, draftMode === 'move' ? draftTarget : null)
-              setSaving(false)
-              if (err) {
-                setError(err)
-                return
+              try {
+                const err = await onSave(draftMode, draftMode === 'move' ? draftTarget : null)
+                if (err) {
+                  setError(err)
+                  return
+                }
+                onClose()
+              } catch {
+                /*
+                 * onSave が業務失敗を返す形と、例外で落ちる形の両方がある。
+                 * 例外でも「保存中」のままにしない（SCENARIO-05）。
+                 */
+                setError('保存できませんでした。通信状態を確認して、もう一度お試しください。')
+              } finally {
+                setSaving(false)
               }
-              onClose()
             }}
             className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control h-10 px-5 text-sm font-medium disabled:opacity-50"
           >
