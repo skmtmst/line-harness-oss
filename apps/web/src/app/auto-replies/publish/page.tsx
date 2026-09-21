@@ -63,6 +63,31 @@ const REASON_LABELS: Record<string, string> = {
   already_replied_once: 'この友だちへは一度返しています',
   cooldown_active: '前回の返信から間を空けています',
   friend_conditions_not_met: '友だちの条件に当てはまりません',
+  higher_priority_won: '上のルールが先に動きます',
+}
+
+/*
+ * 見送った理由の解除条件。書かないと「いつ動き始めるか」が読めず、
+ * 止めたつもりの設定を直したり、動かないと勘違いして問い合わせになる。
+ * 解除されないもの（1人1回・キーワード不一致・優先順位負け）は、
+ * 条件の意味そのものを書く。
+ */
+const REASON_RELEASE: Record<string, string> = {
+  outside_active_window: '時間帯の中に入ると動きます',
+  weekday_not_allowed: '応答する曜日・祝日の条件に合う日に動きます',
+  operator_handling: '対応中が解除されると動きます',
+  already_replied_once: '「1人につき1回だけ応答する」設定のため動きません',
+  cooldown_active: '設定した間隔がたつと動きます',
+  friend_conditions_not_met: 'この友だちが条件に合わないので動きません',
+  higher_priority_won: 'このルールを先に動かすには、評価順を上のルールより前にします',
+}
+
+/** 友だちのトーク状態の呼び方。受信箱と同じ3段に寄せる。 */
+const CHAT_STATUS_WORDS: Record<string, string> = {
+  unread: '未対応',
+  in_progress: '対応中',
+  on_hold: '保留',
+  resolved: '対応済み',
 }
 
 const RESULT_LABELS: Record<string, string> = {
@@ -356,6 +381,20 @@ function AutoReplyPublishInner() {
   const ruleName = draft.settings.name || draft.settings.keyword || '名前を確認できません'
   const previewMessage = dryRun?.winner?.responseContent || draft.settings.responseContent
     || '—（未取得）返信内容を確認できません'
+  /*
+    試した友だちのトークが「対応中」なのに返すルールは、担当者の返信と
+    二重に届く。抑止設定の無いルールが勝ったときだけ警告を出す。
+    （抑止対象は「対応中は返さない」を付けたルールだけ——予約・支払いの
+      自動通知は別経路なので、この判定では止まらない。）
+  */
+  const winnerCandidate = dryRun?.candidates.find(
+    (item) => item.autoReplyId === dryRun.winner?.autoReplyId,
+  ) ?? null
+  const winnerRepliesDuringHandling = Boolean(
+    dryRun?.operatorActive && dryRun.winner && winnerCandidate
+      && !winnerCandidate.suppressWhenOperatorActive,
+  )
+  const selectedFriend = friends.find((friend) => friend.id === selectedFriendId) ?? null
 
   const openTestStage = () => {
     setStage('test')
@@ -582,6 +621,9 @@ function AutoReplyPublishInner() {
                         : friendLoadState === 'error'
                           ? '送信者を確認できませんでした'
                           : '送信者を読み込み中'}
+                      {selectedFriend?.chatStatus
+                        ? `・この友だちのトークは「${CHAT_STATUS_WORDS[selectedFriend.chatStatus] ?? '確認中'}」`
+                        : ''}
                     </span>
                     <div className="arp-senderTools">
                       <input
@@ -607,6 +649,9 @@ function AutoReplyPublishInner() {
                     </div>
                   </div>
                 </div>
+                <p className="text-caption text-ink-faint">
+                  ここで試しても、選んだ友だちへは何も届きません。動くかどうかの確認だけをします。
+                </p>
               </section>
 
               <section className={"arp-panel"}>
@@ -621,18 +666,52 @@ function AutoReplyPublishInner() {
                     <span><small>返信内容</small><strong>{responseLabel(draft)}</strong></span>
                   </div>
                 </div>
+                {dryRun?.operatorActive ? (
+                  <div className={"arp-infoNotice"} role="note">
+                    <Bell aria-hidden="true" />
+                    この送信者のトークは「対応中」です。「対応中は返さない」設定のルールだけが見送られ、
+                    対応中が解除されるとあらためて動きます。
+                  </div>
+                ) : null}
+                {winnerRepliesDuringHandling ? (
+                  <div className={"arp-warningNotice"} role="alert">
+                    <AlertTriangle aria-hidden="true" />
+                    「{dryRun?.winner?.name}」は対応中でも返す設定です。担当者の返信と二重に届くことがあります。
+                    二重を避けたいときは、編集で「担当者が対応中のトークでは返さない」をオンにしてください。
+                  </div>
+                ) : null}
                 {dryRun ? (
                   <ol className={"arp-evaluationList"}>
                     {dryRun.candidates.map((candidate) => (
                       <li key={candidate.autoReplyId}>
-                        <span>{candidate.priority}. {candidate.name}</span>
+                        <span>
+                          {candidate.priority}. {candidate.name}
+                          {candidate.suppressWhenOperatorActive ? (
+                            <small>「対応中は返さない」設定</small>
+                          ) : null}
+                        </span>
                         <strong>{RESULT_LABELS[candidate.result] ?? candidate.result}</strong>
                         {candidate.reasonCodes.length > 0 ? (
                           <small>{candidate.reasonCodes.map((code) => REASON_LABELS[code] ?? code).join('・')}</small>
                         ) : null}
+                        {candidate.reasonCodes.map((code) => REASON_RELEASE[code]).filter(Boolean).length > 0 ? (
+                          <small>
+                            {candidate.reasonCodes
+                              .map((code) => REASON_RELEASE[code])
+                              .filter(Boolean)
+                              .join('・')}
+                          </small>
+                        ) : null}
                       </li>
                     ))}
                   </ol>
+                ) : null}
+                {dryRun ? (
+                  <p className="text-caption text-ink-faint">
+                    「対応中は返さない」を付けたルールだけが、対応中の抑止対象です。
+                    予約・支払いなどの自動通知は別の送信経路なので、この判定では止まりません。
+                    ルールは上から順に見て、最初に条件まで通った1件だけが動きます。
+                  </p>
                 ) : null}
               </section>
             </div>
