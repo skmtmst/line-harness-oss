@@ -81,12 +81,23 @@ function inboxHrefForFriend(friendId: string) {
 
 /**
  * 友だちの履歴1行（GET /api/friends/:id/timeline の形）。
- * 対応・配信・予約・フォーム回答・名寄せ・計測イベントを時系列で返す。
+ * 対応・配信・予約・フォーム回答・注文・投稿・名寄せ・計測イベントを時系列で返す。
+ * source は元の台帳を指す。遷移先が作られている種類だけリンクにする。
  */
 type FriendTimelineItem = {
   id: string
   type: string
   summary: string
+  /** 状態を持つ種類だけ値が入る（予約の確定/取消、注文、投稿の審査など）。 */
+  status: string | null
+  source: {
+    kind: string
+    id: string
+    /** 遷移先が親単位の画面のときの親ID（フォーム回答→フォームID等）。 */
+    parentId: string | null
+    /** 管理画面の外にある元情報（注文詳細・投稿画像）のURL。 */
+    url: string | null
+  } | null
   occurredAt: string
   lineAccount: { id: string; name: string | null } | null
 }
@@ -103,16 +114,110 @@ const TIMELINE_TYPE_LABELS: Record<string, string> = {
   calendar_booking: 'カレンダー予約',
   event_booking: 'イベント予約',
   reminder: 'リマインダ',
+  ec_order: '注文',
+  photo_submitted: '写真投稿',
   candidate: '重複候補',
   link: '名寄せ',
   unlink: '名寄せ解除',
   profile: 'プロフィール採用',
   priority: '名寄せ',
   migration: 'データ移行',
+  // analytics_events 由来。専用台帳を持たない記録だけここへ届く。
+  friend_add: '友だち追加',
+  friend_unfollow: 'ブロック',
+  tag_change: 'タグ変更',
+  field_change: '情報欄変更',
+  scenario_started: 'シナリオ開始',
+  scenario_completed: 'シナリオ完了',
+  url_clicked: 'リンククリック',
+  site_event: 'サイトイベント',
+  conversion_created: 'CV登録',
+  conversion_approved: 'CV承認',
+  conversion_rejected: 'CV否認',
+  automation_completed: 'オートメーション完了',
 }
 
 function timelineTypeLabel(type: string) {
   return TIMELINE_TYPE_LABELS[type] ?? '記録'
+}
+
+/*
+ * 状態列。種類ごとに画面の言葉へそろえる。
+ * 知らない値は生の値を出す（隠すと「状態が取れたのに見えない」になる）。
+ */
+const TIMELINE_STATUS_LABELS: Record<string, Record<string, string>> = {
+  booking: {
+    requested: '申込中',
+    confirmed: '確定',
+    rejected: '却下',
+    expired: '期限切れ',
+    cancelled: 'キャンセル',
+    completed: '完了',
+    no_show: '未来店',
+  },
+  calendar_booking: {
+    confirmed: '確定',
+    cancelled: 'キャンセル',
+    completed: '完了',
+  },
+  event_booking: {
+    requested: '申込中',
+    confirmed: '確定',
+    rejected: '却下',
+    cancelled: 'キャンセル',
+    expired: '期限切れ',
+    no_show: '未来店',
+    attended: '出席',
+  },
+  reminder: {
+    active: '設定中',
+    completed: '完了',
+    cancelled: 'キャンセル',
+  },
+  ec_order: {
+    current: '有効',
+    refunded: '返金済み',
+    cancelled: 'キャンセル',
+  },
+  photo_submitted: {
+    pending: '確認待ち',
+    adopted: '採用',
+    rejected: '不採用',
+  },
+}
+
+function timelineStatusLabel(type: string, status: string | null) {
+  if (!status) return null
+  return TIMELINE_STATUS_LABELS[type]?.[status] ?? status
+}
+
+/*
+ * 元情報へのリンク。実在する画面・URLだけを出す。
+ * 行き先が無い種類（名寄せ・計測イベント・カレンダー予約）は黙って
+ * リンクを付けず、本文だけにする（IDEA-03「無いデータをあるように出さない」）。
+ */
+function timelineSourceHref(item: FriendTimelineItem, friendId: string): { href: string; external: boolean } | null {
+  const source = item.source
+  if (!source) return null
+  if (source.url) return { href: source.url, external: true }
+  switch (source.kind) {
+    case 'message':
+      return { href: inboxHrefForFriend(friendId), external: false }
+    case 'form_submission':
+      return source.parentId
+        ? { href: `/form-submissions/responses?id=${encodeURIComponent(source.parentId)}`, external: false }
+        : null
+    case 'booking':
+      return { href: `/booking/bookings/detail?id=${encodeURIComponent(source.id)}`, external: false }
+    case 'event_booking':
+      return source.parentId
+        ? { href: `/events/bookings?id=${encodeURIComponent(source.parentId)}`, external: false }
+        : null
+    case 'friend_reminder':
+      return { href: '/reminders', external: false }
+    default:
+      return null
+  }
 }
 
 /**
@@ -126,6 +231,49 @@ function responseIsStale(
   requestedAccountId: string | null,
 ) {
   return generation !== generationRef.current || requestedAccountId !== accountRef.current
+}
+
+/** 履歴1行の表の並び。概要タブ・履歴タブで同じ形にする。 */
+const TIMELINE_ROW_COLUMNS = '140px 140px 1fr 110px 64px'
+
+/**
+ * 履歴1行。日時・種別・内容・状態・アカウント・元情報リンクを出す。
+ * 狭い幅では grid をやめて折り返す（概要タブと同じ組み方）。
+ */
+function FriendTimelineRow({ item, friendId, last = false }: { item: FriendTimelineItem; friendId: string; last?: boolean }) {
+  const statusLabel = timelineStatusLabel(item.type, item.status)
+  const source = timelineSourceHref(item, friendId)
+  return (
+    <div
+      className={`text-ink-secondary flex flex-wrap items-baseline gap-x-3 gap-y-1 border-b border-hairline px-4 py-3 text-xs md:grid md:border-b-0 ${last ? 'last:border-b-0' : ''}`}
+      style={{ gridTemplateColumns: TIMELINE_ROW_COLUMNS }}
+    >
+      <span>{new Date(item.occurredAt).toLocaleString('ja-JP')}</span>
+      <span>{timelineTypeLabel(item.type)}</span>
+      <span className="min-w-0 flex-1 basis-full md:basis-auto">
+        {statusLabel ? (
+          <span className="border-hairline bg-canvas-sunken text-ink-faint mr-1.5 inline-block rounded-full border px-1.5 py-px font-semibold leading-4">
+            {statusLabel}
+          </span>
+        ) : null}
+        {item.summary}
+      </span>
+      <span className="truncate">{item.lineAccount?.name ?? '—'}</span>
+      <span>
+        {source ? (
+          source.external ? (
+            <a href={source.href} target="_blank" rel="noreferrer" className="text-accent hover:underline">
+              開く
+            </a>
+          ) : (
+            <Link href={source.href} className="text-accent hover:underline">
+              開く
+            </Link>
+          )
+        ) : null}
+      </span>
+    </div>
+  )
 }
 
 function FieldInput({
@@ -578,7 +726,16 @@ function FriendDetailInner() {
       })
       if (req !== historyReqRef.current || isStaleResponse(generation, requestedAccountId)) return
       if (res.success) {
-        setHistoryItems((prev) => (cursor ? [...prev, ...res.data.items] : res.data.items))
+        setHistoryItems((prev) => {
+          if (!cursor) return res.data.items
+          /*
+            IDEA-03「重複なし」: 続きを取る間に予約などが更新されて
+            occurred_at が動くと、同じ行が次のページへずれて二重に
+            届きうる。source が指す元の行が同じものは足さない。
+          */
+          const seen = new Set(prev.map((item) => `${item.source?.kind ?? item.type}:${item.id}`))
+          return [...prev, ...res.data.items.filter((item) => !seen.has(`${item.source?.kind ?? item.type}:${item.id}`))]
+        })
         setHistoryNextCursor(res.data.nextCursor)
         setHistoryStatus('ready')
       } else if (cursor) {
@@ -1470,7 +1627,7 @@ function FriendDetailInner() {
                     親の overflow-hidden に欠ける。md 未満では見出しを
                     畳み、各行は折り返すカードにする。
                   */}
-                  <div className="bg-canvas-sunken border-hairline hidden border-y px-4 py-3 text-xs font-semibold text-ink-faint md:grid" style={{ gridTemplateColumns: '140px 160px 1fr 140px' }}><span>日時</span><span>種別</span><span>内容</span><span>アカウント</span></div>
+                  <div className="bg-canvas-sunken border-hairline hidden border-y px-4 py-3 text-xs font-semibold text-ink-faint md:grid" style={{ gridTemplateColumns: TIMELINE_ROW_COLUMNS }}><span>日時</span><span>種別</span><span>内容</span><span>アカウント</span><span>元</span></div>
                   {historyStatus === 'loading' ? (
                     <p className="text-ink-faint px-4 py-5 text-xs">履歴を読み込んでいます…</p>
                   ) : historyStatus === 'error' ? (
@@ -1487,22 +1644,13 @@ function FriendDetailInner() {
                   ) : (
                     <>
                       {historyItems.slice(0, 5).map((item) => (
-                        <div
-                          key={item.id}
-                          className="text-ink-secondary flex flex-wrap items-baseline gap-x-3 gap-y-1 border-b border-hairline px-4 py-3 text-xs last:border-b-0 md:grid md:border-b-0"
-                          style={{ gridTemplateColumns: '140px 160px 1fr 140px' }}
-                        >
-                          <span>{new Date(item.occurredAt).toLocaleString('ja-JP')}</span>
-                          <span>{timelineTypeLabel(item.type)}</span>
-                          <span className="min-w-0 flex-1 basis-full md:basis-auto">{item.summary}</span>
-                          <span className="truncate">{item.lineAccount?.name ?? '—'}</span>
-                        </div>
+                        <FriendTimelineRow key={`${item.source?.kind ?? item.type}:${item.id}`} item={item} friendId={friendId} />
                       ))}
                       {/*
                         友だち追加の記録は本体の作成日時から出す実データ。
                         活動履歴が0件のときは、この記録だけが履歴になる。
                       */}
-                      <div className="text-ink-secondary border-hairline flex flex-wrap items-baseline gap-x-3 gap-y-1 border-t px-4 py-3 text-xs md:grid" style={{ gridTemplateColumns: '140px 160px 1fr 140px' }}><span>{friend.createdAt ? new Date(friend.createdAt).toLocaleDateString('ja-JP') : '—'}</span><span>友だち追加</span><span className="min-w-0 flex-1 basis-full md:basis-auto">{friend.firstTrackedLinkName ? `${friend.firstTrackedLinkName}から追加されました` : '友だちに追加されました'}</span><span>システム</span></div>
+                      <div className="text-ink-secondary border-hairline flex flex-wrap items-baseline gap-x-3 gap-y-1 border-t px-4 py-3 text-xs md:grid" style={{ gridTemplateColumns: TIMELINE_ROW_COLUMNS }}><span>{friend.createdAt ? new Date(friend.createdAt).toLocaleDateString('ja-JP') : '—'}</span><span>友だち追加</span><span className="min-w-0 flex-1 basis-full md:basis-auto">{friend.firstTrackedLinkName ? `${friend.firstTrackedLinkName}から追加されました` : '友だちに追加されました'}</span><span>システム</span><span /></div>
                       {historyStatus === 'ready' && historyItems.length === 0 ? (
                         <p className="text-ink-faint px-4 pb-4 text-xs">
                           上の「友だち追加の記録」以外の活動履歴はまだありません。
@@ -1617,8 +1765,8 @@ function FriendDetailInner() {
             {tab === 'history' && (
               <div className="bg-canvas rounded-card border-hairline overflow-hidden border">
                 {/* #985 CHK-04: 概要タブと同じく、狭い幅では見出しを畳みカードにする。 */}
-                <div className="bg-canvas-sunken border-hairline hidden border-b px-4 py-3 text-xs font-semibold text-ink-faint md:grid" style={{ gridTemplateColumns: '140px 160px 1fr 140px' }}>
-                  <span>日時</span><span>種別</span><span>内容</span><span>アカウント</span>
+                <div className="bg-canvas-sunken border-hairline hidden border-b px-4 py-3 text-xs font-semibold text-ink-faint md:grid" style={{ gridTemplateColumns: TIMELINE_ROW_COLUMNS }}>
+                  <span>日時</span><span>種別</span><span>内容</span><span>アカウント</span><span>元</span>
                 </div>
                 {historyStatus === 'loading' ? (
                   <p className="text-ink-faint px-4 py-6 text-center text-sm">履歴を読み込んでいます…</p>
@@ -1632,24 +1780,16 @@ function FriendDetailInner() {
                 ) : (
                   <>
                     {historyItems.map((item) => (
-                      <div
-                        key={item.id}
-                        className="text-ink-secondary border-hairline flex flex-wrap items-baseline gap-x-3 gap-y-1 border-b px-4 py-3 text-xs last:border-b-0 md:grid"
-                        style={{ gridTemplateColumns: '140px 160px 1fr 140px' }}
-                      >
-                        <span>{new Date(item.occurredAt).toLocaleString('ja-JP')}</span>
-                        <span>{timelineTypeLabel(item.type)}</span>
-                        <span className="min-w-0 flex-1 basis-full md:basis-auto">{item.summary}</span>
-                        <span className="truncate">{item.lineAccount?.name ?? '—'}</span>
-                      </div>
+                      <FriendTimelineRow key={`${item.source?.kind ?? item.type}:${item.id}`} item={item} friendId={friendId} />
                     ))}
                     {/* 最後まで取れたときだけ、いちばん古い記録として友だち追加を末尾に出す。 */}
                     {!historyNextCursor ? (
-                      <div className="text-ink-secondary border-hairline flex flex-wrap items-baseline gap-x-3 gap-y-1 border-t px-4 py-3 text-xs md:grid" style={{ gridTemplateColumns: '140px 160px 1fr 140px' }}>
+                      <div className="text-ink-secondary border-hairline flex flex-wrap items-baseline gap-x-3 gap-y-1 border-t px-4 py-3 text-xs md:grid" style={{ gridTemplateColumns: TIMELINE_ROW_COLUMNS }}>
                         <span>{friend.createdAt ? new Date(friend.createdAt).toLocaleDateString('ja-JP') : '—'}</span>
                         <span>友だち追加</span>
                         <span className="min-w-0 flex-1 basis-full md:basis-auto">{friend.firstTrackedLinkName ? `${friend.firstTrackedLinkName}から追加されました` : '友だちに追加されました'}</span>
                         <span>システム</span>
+                        <span />
                       </div>
                     ) : null}
                     {historyItems.length === 0 && !historyNextCursor ? (
