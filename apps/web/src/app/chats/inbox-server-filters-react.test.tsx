@@ -48,6 +48,10 @@ function base(url: URL) {
   if (url.pathname === '/api/chats/stats') return response({ success: true, data: {
     total: 0, unread: 0, assigneeUnread: [], waitingOverAnHour: 0,
   } })
+  if (url.pathname === '/api/chats/quick-counts') return response({ success: true, data: {
+    all: 0, reply: 0, overdue: 0,
+    line: { all: 0, reply: 0, overdue: 0 }, email: { all: 0, reply: 0, overdue: 0 },
+  } })
   return response({ success: true, data: [] })
 }
 function hold() {
@@ -108,7 +112,7 @@ test('実UIから担当・未割当・未読・要返信・期限を両APIへ送
   await click('絞り込みを閉じる')
   await click('要返信')
   for (const channel of ['line', 'email'] as const) expect(listCalls(channel).at(-1)?.searchParams.get('quickFilter')).toBe('reply')
-  await click('期限超過')
+  await click('1時間以上待ち')
   for (const channel of ['line', 'email'] as const) expect(listCalls(channel).at(-1)?.searchParams.get('quickFilter')).toBe('overdue')
 })
 
@@ -122,7 +126,7 @@ describe.each(['line', 'email'] as const)('%s 一覧の条件変更', channel =>
     await click(channel === 'line' ? 'さらに読み込む' : 'メールの続きを読み込む')
     expect(listCalls(channel).at(-1)?.searchParams.get(channel === 'line' ? 'beforeId' : 'offset'))
       .toBe(channel === 'line' ? ids.at(-1) : '200')
-    await click('期限超過')
+    await click('1時間以上待ち')
     expect(host.textContent).not.toContain(ids[0])
     expect(listCalls(channel).at(-1)?.searchParams.has(channel === 'line' ? 'beforeId' : 'offset')).toBe(false)
     await act(async () => { next.resolve(response(payload(channel, ids, 401))) })
@@ -143,7 +147,7 @@ describe.each(['line', 'email'] as const)('%s 一覧の条件変更', channel =>
     }
     await render()
     if (mode === 'append') await click(channel === 'line' ? 'さらに読み込む' : 'メールの続きを読み込む')
-    await click('期限超過')
+    await click('1時間以上待ち')
     await act(async () => { old.resolve(failed ? response({ success: false }, 503) : response(payload(channel, ['stale-result']))) })
     expect(host.textContent).toContain('new-current')
     expect(host.textContent).not.toContain('stale-result')
@@ -157,7 +161,7 @@ describe.each(['line', 'email'] as const)('%s 一覧の条件変更', channel =>
         : response(payload(channel, ['old-before-failure']))
     await render()
     expect(host.textContent).toContain('old-before-failure')
-    await click('期限超過')
+    await click('1時間以上待ち')
     expect(host.textContent).not.toContain('old-before-failure')
     expect(host.textContent).toContain('読み込みに失敗')
   })

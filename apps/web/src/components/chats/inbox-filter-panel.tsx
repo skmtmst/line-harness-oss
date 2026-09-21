@@ -1,7 +1,7 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
 import type { ChatStatus } from './inbox-dropdown'
+import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import { Filter, X } from 'lucide-react'
 
 /**
@@ -59,25 +59,24 @@ export default function InboxFilterPanel({
   onReset: () => void
   onClose: () => void
 }) {
-  const ref = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    if (!open) return
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose()
-    }
-    document.addEventListener('keydown', onKey)
-    return () => document.removeEventListener('keydown', onKey)
-  }, [open, onClose])
+  /*
+   * INBOX-02: 共通のオーバーレイ約束。開いたらパネル内へフォーカスを移し、
+   * Tab が背面へ抜けないように循環させ、背景スクロールを止め、
+   * 閉じたあとは「絞り込み」ボタンへフォーカスを戻す。
+   */
+  const ref = useOverlayFocus(open, onClose)
 
   if (!open) return null
   const set = (patch: Partial<InboxFilterValue>) => onChange({ ...value, ...patch })
 
   return (
-    <div className="fixed inset-0 z-50" role="presentation" onMouseDown={(event) => {
-      if (event.target === event.currentTarget) onClose()
-    }}>
-      <div className="bg-ink/20 absolute inset-0" aria-hidden="true" />
+    <div className="fixed inset-0 z-50" role="presentation">
+      {/*
+        INBOX-03: 閉じる操作は背景そのものに繋ぐ。以前は外枠の
+        `target === currentTarget` を見ていたが、背景は子要素が全面を覆う
+        ためその判定に届かず、灰色部分を押しても閉じなかった。
+      */}
+      <div className="bg-ink/20 absolute inset-0" aria-hidden="true" onMouseDown={onClose} />
       {/*
         狭い幅では画面の内側16pxいっぱいのシートにする(#982 LAY-04)。
         以前は top/right/width を固定していたため、390pxでは右120pxの
@@ -142,30 +141,38 @@ export default function InboxFilterPanel({
           </div>
 
           {/*
-            ここから下は、まだ絞り込める口がない。**押せる形にはしない。**
-            押せるのに何も起きない操作は、無いより悪い。効いたつもりで
-            読み違えるため。口ができたら `disabled` を外す。
+            INBOX-16: まだ絞り込めない条件は、使える条件の下へ畳む。
+            無効なまま並べると、使える条件と同じ重さで占有し、
+            狭い画面では閉じる操作まで画面外へ追いやられる。
+            仕組みができたら畳みを外して有効化する。
           */}
-          <div>
-            <span className={labelClass}>期限</span>
-            <select aria-label="期限で絞り込む" className={fieldClass} disabled defaultValue="all">
-              <option value="all">すべて</option>
-            </select>
-            <p className="text-ink-faint mt-1 text-micro">期限はまだ記録していないため、絞り込めません</p>
-          </div>
+          <details className="border-hairline rounded-control border px-3 py-2.5">
+            <summary className="text-ink-faint cursor-pointer text-xs font-medium">
+              まだ使えない条件（期限・メッセージ種別）
+            </summary>
+            <div className="mt-3 space-y-4">
+              <div>
+                <span className={labelClass}>期限</span>
+                <select aria-label="期限で絞り込む" className={fieldClass} disabled defaultValue="all">
+                  <option value="all">すべて</option>
+                </select>
+                <p className="text-ink-faint mt-1 text-micro">対応期限はまだ記録していないため、この条件では絞り込めません</p>
+              </div>
 
-          <div>
-            <span className={labelClass}>表示するメッセージ種別</span>
-            <div className="mt-1.5 grid grid-cols-2 gap-x-3 gap-y-2">
-              {MESSAGE_KINDS.map((kind) => (
-                <label key={kind} className="text-ink-faint flex items-center gap-2 text-xs">
-                  <input type="checkbox" checked readOnly disabled className="accent-accent" />
-                  {kind}
-                </label>
-              ))}
+              <div>
+                <span className={labelClass}>表示するメッセージ種別</span>
+                <div className="mt-1.5 grid grid-cols-2 gap-x-3 gap-y-2">
+                  {MESSAGE_KINDS.map((kind) => (
+                    <label key={kind} className="text-ink-faint flex items-center gap-2 text-xs">
+                      <input type="checkbox" checked readOnly disabled className="accent-accent" />
+                      {kind}
+                    </label>
+                  ))}
+                </div>
+                <p className="text-ink-faint mt-1 text-micro">メッセージ種別での絞り込みには対応していません</p>
+              </div>
             </div>
-            <p className="text-ink-faint mt-1 text-micro">種別で絞る読み口がまだ無いため、選んでも一覧は変わりません</p>
-          </div>
+          </details>
 
           <label className="border-hairline flex h-10 items-center justify-between border-t pt-3 text-sm">
             <span className="text-ink">未読だけ表示</span>
@@ -179,21 +186,30 @@ export default function InboxFilterPanel({
           </label>
         </div>
 
-        <footer className="border-hairline flex h-[68px] shrink-0 items-center justify-between gap-3 border-t px-5">
-          <button
-            type="button"
-            onClick={onReset}
-            className="border-hairline rounded-control text-ink-secondary hover:bg-canvas-sunken border px-4 py-2 text-sm"
-          >
-            リセット
-          </button>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-control bg-accent-deep text-on-accent hover:brightness-92 px-5 py-2 text-sm font-bold"
-          >
-            この条件で絞り込む
-          </button>
+        {/*
+          INBOX-01: 条件は選んだ時点ですぐ一覧へ反映される（即時適用）。
+          「この条件で絞り込む」と書くと、押すまで反映されない・閉じると
+          捨てられると読めるため、閉じる操作と実態を一致させる。
+          リセットも同じく即時に反映される。
+        */}
+        <footer className="border-hairline shrink-0 border-t px-5 py-3">
+          <p className="text-ink-faint mb-2 text-micro">条件は選ぶとすぐ一覧に反映されます</p>
+          <div className="flex items-center justify-between gap-3">
+            <button
+              type="button"
+              onClick={onReset}
+              className="border-hairline rounded-control text-ink-secondary hover:bg-canvas-sunken border px-4 py-2 text-sm"
+            >
+              リセット
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-control bg-accent-deep text-on-accent hover:brightness-92 px-5 py-2 text-sm font-bold"
+            >
+              閉じる
+            </button>
+          </div>
         </footer>
       </section>
     </div>
