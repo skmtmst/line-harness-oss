@@ -84,6 +84,9 @@ describe('共通部品の影響範囲', () => {
       'app/events/page.tsx',
       // #543: 一覧の到達不能な回答表（M2削除）と共に共通Paginationの利用を外した。
       'app/form-submissions/responses/page.tsx',
+      // IDEA-18 (#1036): 経路別の注文明細が増えても画面を重くしないよう
+      // サーバが数えた総数でページ送りを出すため共通へ寄せた。
+      'app/inflow-links/_components/ref-orders.tsx',
       // #565: 送信履歴が増えても描画を際限なく重くしないよう、20件ずつのページ送りに寄せた。
       'app/inflow-links/ad-integration.tsx',
       'app/inflow-links/page.tsx',

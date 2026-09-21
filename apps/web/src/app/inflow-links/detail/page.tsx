@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { ApiError, api, fetchApi } from '@/lib/api'
 import Button from '@/components/shared/button'
 import EditRouteModal from '../_components/edit-route-modal'
+import RefOrdersPanel, { type RefOrdersResult } from '../_components/ref-orders'
 import Select from '@/components/shared/select'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
@@ -51,6 +52,9 @@ function InflowLinkDetailPageContent() {
   const [funnelError, setFunnelError] = useState(false)
   const [funnelAttempt, setFunnelAttempt] = useState(0)
   const [friends, setFriends] = useState<AttributedFriend[]>([])
+  // IDEA-18: 購入・返金のカード値は注文明細パネルが取った集計と同じ値を使う
+  // （集計と明細が同じ条件であることを画面内で一致させる）。未取得は null。
+  const [ordersSummary, setOrdersSummary] = useState<RefOrdersResult | null>(null)
   const [tags, setTags] = useState<Tag[]>([])
   const [scenarios, setScenarios] = useState<Scenario[]>([])
   const [pools, setPools] = useState<TrafficPool[]>([])
@@ -114,6 +118,7 @@ function InflowLinkDetailPageContent() {
       setFunnel(null)
       setFunnelError(false)
       setFriends([])
+      setOrdersSummary(null)
       return
     }
     let cancelled = false
@@ -121,6 +126,7 @@ function InflowLinkDetailPageContent() {
     // #514-12: 段階の失敗を読込中のままにしない。再読み込みは funnelAttempt で引き直す。
     setFunnel(null)
     setFunnelError(false)
+    setOrdersSummary(null)
     void Promise.allSettled([
       api.entryRoutes.get(selectedId),
       api.entryRoutes.funnel(selectedId),
@@ -250,11 +256,32 @@ function InflowLinkDetailPageContent() {
           口から取れない数は書かない（#514 重大3）。funnel の4数は累計。
           残数・ブロック数・1人あたり金額の集計口は無いので「—」+理由表示。
         */}
-        <div className="grid grid-cols-2 gap-4 xl:grid-cols-4"><MetricCard label="クリック" value={funnel?.click_count} unit="回" detail="累計" /><MetricCard label="友だちになった" value={funnel?.friend_add_count} unit="人" detail={`追加率 ${addRate ?? '—'}%`} /><MetricCard label="いま残っている" value={null} unit="人" detail="残数とブロック数の集計は未接続です" /><MetricCard label="成果" value={funnel?.cv_count} unit="件" detail="1人あたりの金額は未接続です" /></div>
+        {/*
+          IDEA-18: 購入・返金もこの経路へ連結して出す。数は下の注文明細と同じ口
+          （/api/analytics/ref/:ref/orders）から取り、first-touch（その経路で
+          最初に来た友だち）の注文だけを数える。友だちに結びついていない注文や
+          経路の分からない注文は未計測としてここには出ない。
+        */}
+        <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-6"><MetricCard label="クリック" value={funnel?.click_count} unit="回" detail="累計" /><MetricCard label="友だちになった" value={funnel?.friend_add_count} unit="人" detail={`追加率 ${addRate ?? '—'}%`} /><MetricCard label="いま残っている" value={null} unit="人" detail="残数とブロック数の集計は未接続です" /><MetricCard label="成果" value={funnel?.cv_count} unit="件" detail="1人あたりの金額は未接続です" /><MetricCard label="購入" value={ordersSummary?.total ?? null} unit="件" detail={ordersSummary ? 'この経路から来た人の注文（累計）' : '注文の集計を取得できていません'} /><MetricCard label="返金・取消" value={ordersSummary ? ordersSummary.refunded + ordersSummary.cancelled : null} unit="件" detail={ordersSummary ? `返金 ${ordersSummary.refunded.toLocaleString('ja-JP')}・取消 ${ordersSummary.cancelled.toLocaleString('ja-JP')}` : '注文の集計を取得できていません'} /></div>
+        {/*
+          IDEA-18: 集計の期間・帰属ルール・計測できる範囲の断り書き。
+          未計測を0と読ませないため、数えられないものを明記する。
+        */}
+        <p className="mt-3 text-xs leading-relaxed text-ink-faint">
+          期間は累計（全期間）です。購入・返金は、この経路のURLをはじめて通って追加された友だちに結びついた注文だけを数えます
+          （はじめて来た経路にだけ付く帰属＝first-touch）。LINEの友だちと結びついていない注文、
+          経路の分からない友だちの注文、URLを開くだけで友だち追加に進まなかったクリックは計測できず、この数には入りません。
+          同じ注文は取り込み元ごとの注文番号で1件にまとまるため、再取込で二重に増えません。
+        </p>
         <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-4">
           <main data-design="Left" className="space-y-4 xl:col-span-3">
             <section><h2 className="text-lg font-bold text-ink">この経路から来た人の、その後</h2><p className="text-xs text-ink-faint">来ただけで終わっていないかを見ます。</p><div className="mt-3 rounded-card border border-hairline bg-canvas p-4">{funnel ? <FunnelView funnel={funnel} /> : funnelError ? <div className="flex flex-wrap items-center justify-between gap-3"><p className="text-xs text-ink-secondary">段階を取得できませんでした。集計データは消えていません。</p><Button variant="secondary" onClick={() => setFunnelAttempt((n) => n + 1)}>段階を再読み込み</Button></div> : <p className="text-xs text-ink-faint">読み込み中…</p>}</div></section>
             <section><h2 className="text-lg font-bold text-ink">この経路から来た友だち</h2><p className="text-xs text-ink-faint">新しい順</p>{friends.length === 0 ? <p className="mt-3 text-xs text-ink-faint">この経路から来た友だちは、まだ記録されていません。</p> : <div className="mt-3 overflow-hidden rounded-card border border-hairline bg-canvas"><table className="w-full table-fixed text-xs"><thead className="border-b border-hairline bg-canvas-sunken text-ink-faint"><TableHeadRow><Th>友だち</Th><Th>いつ来たか</Th><Th>いまの状態</Th><Th>この人の成果</Th><Th>マイル</Th><Th align="right">確認</Th></TableHeadRow></thead><tbody className="divide-y divide-hairline">{friends.slice(0, 5).map((friend) => <tr key={friend.id}><td className="px-3 py-3 font-semibold text-ink"><span className="block">{friend.displayName}</span><span className="block truncate font-normal text-ink-faint">はじめて見たページ {friend.firstPage ?? '—'}</span></td><td className="px-3 py-3 text-ink-secondary">{friend.trackedAt ? friend.trackedAt.slice(5, 16).replace('T', ' ').replaceAll('-', '/') : '日時不明'}</td><td className="px-3 py-3 font-semibold text-ink-secondary">{friend.currentStatus ?? '—'}</td><td className="px-3 py-3 text-ink-secondary">{friend.conversion ?? '—'}</td><td className="px-3 py-3 font-semibold text-ink">{friend.miles ?? '—'}</td><td className="px-3 py-3 text-right"><Link href={`/friends/detail?id=${encodeURIComponent(friend.id)}`} className="text-action hover:underline">友だちを見る</Link></td></tr>)}</tbody></table></div>}</section>
+            {/*
+              IDEA-18: 経路別集計（上の購入カード）と同じ条件の注文明細。
+              「購入 ○件」とこの一覧の全件数をそのままつき合わせられる。
+            */}
+            <section><h2 className="text-lg font-bold text-ink">この経路からの注文</h2><p className="text-xs text-ink-faint">上の「購入」の数と同じ条件の明細です。返金・取り消しは状態に出ます。</p><div className="mt-3 rounded-card border border-hairline bg-canvas p-4">{route ? <RefOrdersPanel refCode={route.refCode} onSummaryChange={setOrdersSummary} /> : null}</div></section>
           </main>
           <aside data-design="Right" className="space-y-4">
             {/*
