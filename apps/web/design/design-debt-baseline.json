@@ -243,7 +243,7 @@
     "arbitrary-value": 1
   },
   "app/page.tsx": {
-    "arbitrary-value": 10,
+    "arbitrary-value": 14,
     "direct-secondary-button": 3,
     "direct-primary-button": 2,
     "unresolved-classname": 1
@@ -480,19 +480,19 @@
   },
   "components/dashboard/friend-trend-table.tsx": {
     "direct-th": 6,
-    "arbitrary-value": 3
+    "arbitrary-value": 1
   },
   "components/dashboard/qr-dialog.tsx": {
-    "arbitrary-value": 10,
-    "direct-secondary-button": 2
+    "arbitrary-value": 7,
+    "direct-secondary-button": 1
   },
   "components/dashboard/shipment-panel.tsx": {
     "arbitrary-value": 4,
     "direct-th": 6
   },
   "components/dashboard/side-cards.tsx": {
-    "unresolved-classname": 1,
-    "arbitrary-value": 3
+    "arbitrary-value": 4,
+    "unresolved-classname": 1
   },
   "components/events/event-form.tsx": {
     "arbitrary-value": 2,
