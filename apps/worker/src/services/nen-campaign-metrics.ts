@@ -446,6 +446,8 @@ export const NEN_SKIPPED_REASONS = [
   'campaign_disabled',
   'campaign_form_already_submitted',
   'frequency_suppressed',
+  'order_cancelled',
+  'order_refunded',
 ] as const;
 
 export type NenSkippedReason = (typeof NEN_SKIPPED_REASONS)[number];
@@ -478,6 +480,8 @@ function safeFailureReason(status: string, error: string | null, attempts: numbe
     campaign_disabled: '配信の決めごとが停止中です',
     campaign_form_already_submitted: 'すでに回答済みのため送りません',
     frequency_suppressed: '近い時期に同じ配信があるため送りません',
+    order_cancelled: '注文が取り消されたため送りません',
+    order_refunded: '注文が返金になったため送りません',
   };
   if (error && known[error]) return known[error];
   return attempts >= MAX_DELIVERY_ATTEMPTS
@@ -552,13 +556,14 @@ export async function listNenDeliveries(
   ).bind(input.lineAccountId, input.range.fromSql, input.range.toSql)
     .all<{ reason: 'blocked' | 'unfollowed' | 'other'; total: number }>();
   // #727: skipped の内訳は理由コードそのままで数える。文字列一致は使わない。
-  // #733: 理由は6つ(campaign_form_already_submitted を含む)。last_error に
-  // 上流の生文(秘密値を含むことがある)が入るため、既知の6理由以外は
-  // unknown にまとめ、生文をキーとして出さない。
+  // #733: 理由は NEN_SKIPPED_REASONS と同じ集合。last_error に上流の生文
+  // (秘密値を含むことがある)が入るため、既知の理由以外は unknown にまとめ、
+  // 生文をキーとして出さない。
   const skippedRows = await db.prepare(
     `SELECT CASE WHEN last_error IN (
               'friend_unavailable', 'line_account_unavailable', 'line_account_mismatch',
-              'campaign_snapshot_missing', 'campaign_disabled', 'campaign_form_already_submitted'
+              'campaign_snapshot_missing', 'campaign_disabled', 'campaign_form_already_submitted',
+              'frequency_suppressed', 'order_cancelled', 'order_refunded'
             ) THEN last_error ELSE 'unknown' END AS reason, COUNT(*) AS total
        FROM nen_delivery_jobs
       WHERE line_account_id = ? AND status = 'skipped'

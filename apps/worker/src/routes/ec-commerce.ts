@@ -680,6 +680,13 @@ ecCommerce.get(
         : row.state === 'at_risk' ? '決済の確認が必要です' : '止まりました',
       riskReason: row.state === 'at_risk' ? '定期便のお支払いを確認できませんでした' : null,
       nextShippingAt: row.next_shipping_at,
+      /*
+       * IDEA-21: 定期便の変更先。ECが契約ごとに渡すマイページURLをそのまま出す。
+       * https 以外や形の違う値は出さない（クリック先を偽装しない）。
+       */
+      manageUrl: [contract.manage_url, contract.mypage_subscription_url]
+        .map((value) => (typeof value === 'string' ? value.trim() : ''))
+        .find((value) => value !== '' && isValidHttpsUrl(value)) ?? null,
       cycle: typeof contract.cycle === 'string' ? contract.cycle : null,
       items: subscriptionItems(contract.items),
       amount: finiteNumber(contract.amount),
