@@ -566,6 +566,30 @@ const spec = {
       },
     },
     // ── NEN Members (会員ランク・ライフタイム・マイル ★V6 37-1) ──────────────
+    '/api/public/nen/adopted-photos': {
+      get: {
+        tags: ['NEN Members'],
+        summary: '公開許可済みでサイト掲載中の採用写真を取得',
+        security: [],
+        parameters: [
+          {
+            name: 'lineAccountId', in: 'query', required: false,
+            description: '内部LINEアカウントID。officialAccountBasicIdと両方指定した場合は同じアカウントであることが必要',
+            schema: { type: 'string' },
+          },
+          {
+            name: 'officialAccountBasicId', in: 'query', required: false,
+            description: 'LINE公式アカウントのBasic ID。前後の空白を除いた完全一致で、有効かつ未アーカイブの一意なアカウントだけを選択',
+            schema: { type: 'string' },
+          },
+        ],
+        responses: {
+          '200': { description: 'Public photos for the selected LINE account' },
+          '400': { description: 'Selector missing or selectors do not match' },
+          '404': { description: 'No unique active LINE account matches the Basic ID' },
+        },
+      },
+    },
     '/api/nen/rank-settings': {
       get: {
         tags: ['NEN Members'], summary: '会員ランク設定（ランク・決まり方・ライフタイムの節目・数値）を取得',
