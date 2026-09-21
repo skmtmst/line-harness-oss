@@ -91,10 +91,17 @@ describe('V6 友だち追加時配信の運用者向け表示', () => {
     expect(EDITOR).toContain('matchedLast28Days')
   })
 
-  it('確認画面は案内と後続処理の2段にまとめる', () => {
-    expect(EDITOR).toContain('<strong>登録直後のご案内</strong>')
-    expect(EDITOR).toContain('<strong>タグ付与</strong>')
-    expect(EDITOR).toContain('<small>新規友だち</small>')
+  it('確認画面は経路・初回案内・付く属性・次の配信を実設定から順に説明する(IDEA-09)', () => {
+    // 固定の例示（テキスト＋画像＋ボタン／新規友だち）ではなく、
+    // 保存済み定義から組み立てる。再追加で動く／動かない処理も示す。
+    expect(EDITOR).toContain('friendAddFlowSteps({')
+    expect(EDITOR).toContain('friendAddReaddLines({')
+    expect(EDITOR).toContain('isFallback: rule.isFallback')
+    expect(EDITOR).toContain('friendKind: rule.friendKind')
+    expect(EDITOR).toContain('status: rule.status')
+    expect(EDITOR).toContain('再追加・ブロック解除のとき')
+    expect(EDITOR).not.toContain('登録直後のご案内')
+    expect(EDITOR).not.toContain('新規友だち')
   })
 })
 
@@ -118,7 +125,16 @@ describe('V6 友だち追加時配信の点検・中の再発防止(#501)', () =
     expect(EDITOR).toContain("value: 'none', label: '何も配信しない'")
     expect(EDITOR).toContain("value: 'same', label: 'はじめてと同じ内容'")
     expect(EDITOR).toContain("value: 'other', label: '別のシナリオ'")
-    expect(EDITOR).toContain("rule.friendKind === 'returning' && definition.returningMode === 'none'")
+    expect(EDITOR).toContain("friendKind === 'returning' && definition.returningMode === 'none'")
+  })
+
+  it('実際に配信するシナリオを編集画面で選べる(FRIENDADD-01)', () => {
+    // scenarioId は保存の必須項目だが、以前は変更する入力が無かった。
+    // 「次に流すシナリオ」欄で、このアカウントのシナリオだけを選ぶ。
+    expect(EDITOR).toContain('次に流すシナリオ')
+    expect(EDITOR).toContain('value={definition.scenarioId ??')
+    expect(EDITOR).toContain('scenarioId: event.target.value || null')
+    expect(EDITOR).toContain('scenarios.map((scenario) => ({ value: scenario.id, label: scenario.name }))')
   })
 
   it('フォルダは表にあるものから選び、自由入力で増やさない', () => {
