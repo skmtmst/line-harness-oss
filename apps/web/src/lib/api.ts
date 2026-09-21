@@ -11676,6 +11676,8 @@ export interface BookingAdminDetail {
     retryCount: number;
   }>;
   operations: BookingOperationResult[];
+  /** 変更履歴の総数。auditLogs は直近の要点分だけ。残りは getAuditLogs で追加取得する。 */
+  auditLogTotal: number;
   auditLogs: BookingAuditLog[];
 }
 
