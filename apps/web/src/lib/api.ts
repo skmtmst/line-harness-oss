@@ -3803,6 +3803,15 @@ export type EcActionExecutionStatus =
   | 'retryable_failed'
   | 'permanent_failed'
 
+export type EcFailureKind =
+  | 'unlinked'
+  | 'not_following'
+  | 'permission'
+  | 'communication'
+  | 'rejected'
+  | 'by_setting'
+  | 'internal'
+
 export type EcActionExecution = {
   id: string
   eventId: string
@@ -3822,12 +3831,102 @@ export type EcActionExecution = {
   customerName: string | null
   friendId: string | null
   retryAvailable: boolean
+  /** 失敗・見送りの業務分類。正常・処理中は null。 */
+  failureKind: EcFailureKind | null
 }
 
 export type EcActionExecutionList = {
   items: EcActionExecution[]
   total: number
   summary: Record<EcActionExecutionStatus, number>
+}
+
+/* IDEA-23: 注文1件の処理状況（GET /api/ec-commerce/orders/:id）の応答。 */
+export type EcOrderDetailAttempt = {
+  attemptNumber: number
+  triggerKind: 'automatic' | 'manual'
+  toStatus: string
+  errorCode: string | null
+  errorMessage: string | null
+  createdAt: string
+}
+
+export type EcOrderDetailDispatch = {
+  subscriber: 'notification' | 'v6'
+  status: 'pending' | 'sent' | 'failed'
+  attemptCount: number
+  updatedAt: string
+  failureKind: EcFailureKind | null
+}
+
+export type EcOrderDetailDelivery = {
+  id: string
+  audienceType: 'customer' | 'operator'
+  channel: 'line' | 'email' | 'in_app'
+  status: 'pending' | 'provider_accepted' | 'excluded' | 'retry_wait' | 'failed'
+  retryable: boolean
+  attempts: number
+  errorCode: string | null
+  errorMessage: string | null
+  failureKind: EcFailureKind | null
+  queuedAt: string
+  acceptedAt: string | null
+  nextRetryAt: string | null
+  executionMode: string
+}
+
+export type EcOrderDetailEvent = {
+  id: string
+  externalEventId: string
+  eventType: string
+  status: string
+  failureKind: EcFailureKind | null
+  receivedAt: string
+  processedAt: string | null
+  actions: Array<EcActionExecution & { attempts: EcOrderDetailAttempt[] }>
+  dispatches: EcOrderDetailDispatch[]
+  deliveries: EcOrderDetailDelivery[]
+}
+
+export type EcOrderDetailFollowUp = {
+  id: string
+  campaignKey: string
+  campaignLabel: string | null
+  scheduledAt: string
+  status: string
+  attempts: number
+  sentAt: string | null
+  reason: string | null
+  failureKind: EcFailureKind | null
+}
+
+export type EcOrderDetail = {
+  order: EcOrder
+  events: EcOrderDetailEvent[]
+  followUps: EcOrderDetailFollowUp[]
+  outcomes: {
+    conversions: Array<{
+      id: string
+      pointName: string | null
+      approvalStatus: 'pending' | 'approved' | 'rejected' | null
+      value: number | null
+      createdAt: string
+    }>
+    mileage: Array<{
+      id: string
+      entryType: string
+      amount: number
+      status: string
+      reason: string
+      occurredAt: string
+    }>
+    scores: Array<{
+      id: string
+      scoreChange: number
+      reason: string | null
+      occurredAt: string
+    }>
+  }
 }
 
 export type EcIdentityCandidateSummary = {
@@ -8978,6 +9077,10 @@ export const api = {
         `/api/ec-commerce/orders?${query}`,
       )
     },
+    orderDetail: (id: string, lineAccountId: string) =>
+      fetchApi<ApiResponse<EcOrderDetail>>(
+        `/api/ec-commerce/orders/${encodeURIComponent(id)}?lineAccountId=${encodeURIComponent(lineAccountId)}`,
+      ),
     actionExecutions: (params: { lineAccountId: string; eventId?: string; status?: EcActionExecutionStatus; statusGroup?: 'processing' | 'failed'; limit?: number; offset?: number }) => {
       const query = new URLSearchParams({ lineAccountId: params.lineAccountId })
       if (params.eventId) query.set('eventId', params.eventId)

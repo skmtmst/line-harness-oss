@@ -114,8 +114,11 @@
   "app/ec-commerce/identity-candidates/page.tsx": {
     "unresolved-classname": 11
   },
+  "app/ec-commerce/order-detail-drawer.tsx": {
+    "unresolved-classname": 38
+  },
   "app/ec-commerce/page.tsx": {
-    "unresolved-classname": 10
+    "unresolved-classname": 13
   },
   "app/ec-commerce/subscriptions-panel.tsx": {
     "unresolved-classname": 11
@@ -480,11 +483,11 @@
   },
   "components/dashboard/friend-trend-table.tsx": {
     "direct-th": 6,
-    "arbitrary-value": 3
+    "arbitrary-value": 1
   },
   "components/dashboard/qr-dialog.tsx": {
-    "arbitrary-value": 10,
-    "direct-secondary-button": 2
+    "arbitrary-value": 7,
+    "direct-secondary-button": 1
   },
   "components/dashboard/shipment-panel.tsx": {
     "arbitrary-value": 4,

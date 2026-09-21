@@ -176,6 +176,7 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'GET /api/conversions/events',
   'GET /api/conversions/points',
   'GET /api/conversions/report',
+  'GET /api/ec-commerce/orders/{id}',
   'GET /api/events/admin/events/{id}/occurrence-selector',
   'GET /api/events/admin/occurrences/{id}/applicants.csv',
   'GET /api/forms/unassigned',
