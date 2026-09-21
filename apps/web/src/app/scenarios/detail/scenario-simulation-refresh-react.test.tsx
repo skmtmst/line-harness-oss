@@ -83,6 +83,11 @@ vi.mock('next/link', () => ({
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn() }),
 }))
+/* SCENARIO-20 でフォルダ候補の取得にアカウントを使うようになったため、
+ * この試験では固定の選択アカウントを返す。 */
+vi.mock('@/contexts/account-context', () => ({
+  useAccount: () => ({ selectedAccountId: 'acc-1', accounts: [{ id: 'acc-1', name: '検証A' }] }),
+}))
 
 /* 本試験は試算の取り直しだけを見る。開かない窓・見せない部品は空の部品に替える。 */
 vi.mock('@/components/flex-preview', () => ({ default: () => null }))
