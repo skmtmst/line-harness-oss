@@ -12,6 +12,7 @@ import {
   createNotification,
   createWebhookInteraction,
   finishWebhookInteraction,
+  isOperationCapabilityStopped,
   resolveWebhookSecret,
   type WebhookInteractionFailureReason,
   type WebhookKeyInput,
@@ -1027,6 +1028,28 @@ export async function claimOutgoingDelivery(
   return Number(result.meta?.changes ?? 1) === 1 ? leaseToken : null;
 }
 
+/**
+ * claim 後・送信前に緊急停止 (#1050) へ切り替わった配送を、送る前の状態へ
+ * 戻す。'sending' だった行は lease が切れていた分なので pending へ戻す
+ * (sending + lease 無しのまま残すと sweep の条件から外れて滞留する)。
+ */
+export async function releaseOutgoingDelivery(
+  db: D1Database,
+  delivery: Pick<OutgoingDeliveryRow, 'id' | 'status'>,
+  leaseToken: string,
+  now: Date = new Date(),
+): Promise<void> {
+  const restoreStatus = delivery.status === 'sending' ? 'pending' : delivery.status;
+  await db
+    .prepare(
+      `UPDATE outgoing_webhook_deliveries
+          SET status = ?, lease_token = NULL, lease_until = NULL, updated_at = ?
+        WHERE id = ? AND lease_token = ? AND status = 'sending'`,
+    )
+    .bind(restoreStatus, now.toISOString(), delivery.id, leaseToken)
+    .run();
+}
+
 export type OutgoingAttemptFinish =
   | { kind: 'delivered'; responseStatus: number }
   | {
@@ -1262,8 +1285,21 @@ export async function sweepOutgoingWebhookDeliveries(
 
   const result: OutgoingSweepResult = { swept: 0, delivered: 0, failed: 0, retryWait: 0, skipped: 0 };
   for (const row of rows.results ?? []) {
+    // 緊急停止 (#1050): webhook_outgoing が止まっている統括は claim せず
+    // pending / retry_wait のまま残す。復旧後の sweep が拾う。
+    if (await isOperationCapabilityStopped(db, row.line_account_id, 'webhook_outgoing')) {
+      result.skipped += 1;
+      continue;
+    }
     const lease = await claimOutgoingDelivery(db, row, now);
     if (!lease) {
+      result.skipped += 1;
+      continue;
+    }
+    // claim と送信のあいだに停止へ切り替わった分は、lease を外して
+    // 送る前の状態へ戻す (#1050)。停止を配信失敗として数えない。
+    if (await isOperationCapabilityStopped(db, row.line_account_id, 'webhook_outgoing')) {
+      await releaseOutgoingDelivery(db, row, lease, now);
       result.skipped += 1;
       continue;
     }

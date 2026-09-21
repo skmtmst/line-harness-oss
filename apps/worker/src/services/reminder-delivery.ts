@@ -18,6 +18,8 @@ import {
   getFriendById,
   getLineAccountById,
   getTemplateById,
+  isOperationCapabilityStopped,
+  releaseClaimedReminderRun,
   skipReminderDeliveryRun,
   verifyClaimedRunBeforeSend,
 } from '@line-crm/db';
@@ -59,6 +61,8 @@ export interface ReminderDeliveryResult {
   skipped: number;
   retrying: number;
   failed: number;
+  /** 緊急停止で claim せず残した登録数（復旧後に届く）。 */
+  held: number;
 }
 
 /** 本番配信と下書き試験が同じテンプレート・変数展開を通る共通口。 */
@@ -131,7 +135,7 @@ export async function processReminderDeliveries(
   const nowIso = now.toISOString();
   const leaseExpiresAt = new Date(now.getTime() + LEASE_MINUTES * 60_000).toISOString();
   const pending = await getPendingReminderDeliveries(db);
-  const result: ReminderDeliveryResult = { succeeded: 0, skipped: 0, retrying: 0, failed: 0 };
+  const result: ReminderDeliveryResult = { succeeded: 0, skipped: 0, retrying: 0, failed: 0, held: 0 };
   const sendPermissions: SendPermissionCache = new Map();
 
   /*
@@ -162,6 +166,13 @@ export async function processReminderDeliveries(
       result.skipped += enrollment.steps.length;
       continue;
     }
+    // 緊急停止 (#1050): reminder_dispatch が止まっている統括は claim せず
+    // active のまま残す。実行行を積まないので復旧でそのまま届く。
+    // アカウント未割当の行はグローバル停止 (*) だけに従う。
+    if (await isOperationCapabilityStopped(db, accountId, 'reminder_dispatch')) {
+      result.held += 1;
+      continue;
+    }
 
     // 課金の状態（トライアル終了・解約）で配信が止まっている統括は送らない。
     // 予約は触らず、次の cron でまた確かめる。プランを選べば続きから届く。
@@ -172,6 +183,12 @@ export async function processReminderDeliveries(
     }
 
     for (const step of enrollment.steps) {
+      // claim の直前にも停止を確かめる。登録ごとの判定の後で止まった分は、
+      // 実行行を新しく積まずにこの登録の残り全部を保留へ回す。
+      if (await isOperationCapabilityStopped(db, accountId, 'reminder_dispatch')) {
+        result.held += 1;
+        continue enrollmentLoop;
+      }
       const sendAt = resolveReminderSendAt(
         new Date(enrollment.target_date),
         {
@@ -259,6 +276,14 @@ export async function processReminderDeliveries(
         })) {
           result.skipped++;
           continue;
+        }
+        // 外部送信の直前にも緊急停止を確かめる (#1050)。claim 後に停止へ
+        // 切り替わった分は claim をキューへ戻し、失敗・skipped にはしない
+        // (停止を理由に消さない。復旧後に届く)。
+        if (await isOperationCapabilityStopped(db, accountId, 'reminder_dispatch')) {
+          await releaseClaimedReminderRun(db, { id: run.id, now: nowIso });
+          result.held += 1;
+          continue enrollmentLoop;
         }
         const response = await deliveryClient.pushMessageWithRequestId(
           friend.line_user_id,

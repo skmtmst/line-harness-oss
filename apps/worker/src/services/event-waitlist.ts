@@ -1,4 +1,4 @@
-import { resolveLineCredential } from '@line-crm/db';
+import { resolveLineCredential, isOperationCapabilityStopped } from '@line-crm/db';
 import { sendEventBookingNotification } from './event-booking-notifier.js';
 import { featureJobCanRun } from './feature-enforcement.js';
 
@@ -111,7 +111,7 @@ export type EventWaitlistPromotionResult =
   | { kind: 'conflict'; currentVersion: number }
   | {
       kind: 'noop';
-      reason: 'no_waiting' | 'no_capacity' | 'offer_pending' | 'occurrence_started' | 'party_too_large' | 'applicant_ineligible';
+      reason: 'no_waiting' | 'no_capacity' | 'offer_pending' | 'occurrence_started' | 'party_too_large' | 'applicant_ineligible' | 'emergency_stopped';
       occurrenceVersion: number;
       promoted: null;
     }
@@ -644,6 +644,12 @@ export async function promoteEventWaitlist(
     return { kind: 'noop', reason: 'party_too_large', occurrenceVersion, promoted: null };
   }
 
+  // 緊急停止 (#1050): reminder_dispatch 停止中は席の確保 (offered 化) と
+  // 案内通知をしない。待機者は waiting のまま残り、復旧後に次の促進が届く。
+  if (await isOperationCapabilityStopped(db, params.lineAccountId, 'reminder_dispatch')) {
+    return { kind: 'noop', reason: 'emergency_stopped', occurrenceVersion, promoted: null };
+  }
+
   const token = `${crypto.randomUUID()}${crypto.randomUUID().replaceAll('-', '')}`;
   const tokenHash = await sha256(token);
   const expiresAt = new Date(
@@ -885,6 +891,11 @@ export async function processEventWaitlistPromotionJobs(
     if (job.line_account_id && !await featureJobCanRun(db, { accountId: job.line_account_id, featureId: 'events', job: 'event waitlist promotions' })) {
       continue;
     }
+    // 緊急停止 (#1050): reminder_dispatch 停止中は claim せず pending の
+    // まま残す。繰り上げ案内は復旧後の tick が届ける。
+    if (await isOperationCapabilityStopped(db, job.line_account_id, 'reminder_dispatch')) {
+      continue;
+    }
     const claimed = await db
       .prepare(
         `UPDATE event_waitlist_promotion_jobs
@@ -903,6 +914,19 @@ export async function processEventWaitlistPromotionJobs(
         sender: params.sender,
       });
       if (result.kind === 'promoted') promoted++;
+      if (result.kind === 'noop' && result.reason === 'emergency_stopped') {
+        // 緊急停止と競合した分は完了にせず pending へ戻す (#1050)。
+        // 復旧後の tick が席の確保と案内をやり直す。
+        await db
+          .prepare(
+            `UPDATE event_waitlist_promotion_jobs
+                SET status = 'pending', updated_at = ?
+              WHERE id = ? AND status = 'processing'`,
+          )
+          .bind(nowIso, job.id)
+          .run();
+        continue;
+      }
       await db
         .prepare(
           `UPDATE event_waitlist_promotion_jobs

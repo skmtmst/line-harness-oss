@@ -28,6 +28,7 @@ import {
   recordRichMenuAssignment,
   createWebhookInteraction,
   finishWebhookInteraction,
+  isOperationCapabilityStopped,
   type WebhookInteractionFailureReason,
 } from '@line-crm/db';
 import {
@@ -242,6 +243,9 @@ async function reevaluateRichMenuTargeting(
   if (!isTargetingTrigger(eventType)) return;
   if (!payload.friendId || !lineAccessToken || !lineAccountId) return;
   try {
+    // 緊急停止 (#1050): メッセージ送信ではないが、イベントに連動して顧客側の
+    // 表示を変える LINE 呼び出しなので automation_actions の停止に連動する。
+    if (await isOperationCapabilityStopped(db, lineAccountId, 'automation_actions')) return;
     await applyRichMenuTargeting(db, payload.friendId, lineAccountId, lineAccessToken);
   } catch (err) {
     console.error('[eventBus] rich menu targeting failed:', err);
@@ -289,6 +293,10 @@ async function fireOutgoingWebhooks(
         // 同じ出来事の再発火は (webhook_id, idempotency_key) の UNIQUE で
         // 積み増さず、Worker中断・cron再実行の送り残しは sweep が回収する。
         if (!deliveryAccountId) {
+          // 緊急停止 (#1050): アカウント不明でもグローバル (*) の
+          // webhook_outgoing 停止には従う。この経路は台帳へ積めないので、
+          // 停止中の通知は送らず手放す（送達の約束が作れないため）。
+          if (await isOperationCapabilityStopped(db, null, 'webhook_outgoing')) return;
           // 台帳は所属必須。アカウント不明の旧行（getActive… が通常返さない
           // 分）は従来どおりその場で送り、成否だけ記録する。
           const result = await deliverWebhook(wh, body, { idempotencyKey });
@@ -309,6 +317,10 @@ async function fireOutgoingWebhooks(
           maxAttempts: outgoingDeliveryMaxAttempts(wh.max_retries),
         });
         if (!queued) return; // 台帳済み。以後の回収は sweep の仕事。
+        // 緊急停止 (#1050): webhook_outgoing が止まっている統括は台帳へ
+        // 積んだまま初回配送を送らない。pending の行は復旧後に sweep の
+        // cron が届けるので、出来事自体は失われない。
+        if (await isOperationCapabilityStopped(db, deliveryAccountId, 'webhook_outgoing')) return;
         if (lineAccountId) {
           try {
             const interaction = await createWebhookInteraction(db, {
@@ -463,6 +475,12 @@ async function processAutomations(
       const results: Array<{ action: string; success: boolean; error?: string }> = [];
 
       for (const [index, action] of actions.entries()) {
+        // 緊急停止 (#1050): automation_actions が止まっている統括のアクション
+        // (LINE送信・Webhook起動・メニュー切替) は実行しない。イベント駆動の
+        // 動作はキューへ積めないので、止まった分は手放す。
+        if (await isOperationCapabilityStopped(
+          db, automation.line_account_id ?? lineAccountId ?? null, 'automation_actions',
+        )) break;
         try {
           await replayStep(execution, `event:legacy:${automation.id}:${index}`, async () => {
             const idempotencyKey = execution

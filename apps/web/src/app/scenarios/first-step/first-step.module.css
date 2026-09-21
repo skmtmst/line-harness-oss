@@ -1,20 +1,52 @@
 /*
  * 1通目設定の実寸（設計 `V6 5 kk8dz`）。
  *
- * 右の下見は幅500。入力は日数110・時刻130・高さ38、本文は高さ118。
- * どれもトークンには無い設計固有の数なので、ここへ名前を付けて置く。
+ * 右の下見は幅500。入力の幅は日数110・時刻130が設計固有の数なので、
+ * ここへ名前を付けて置く。
+ *
+ * 高さと文字の大きさは画面ごとに変えない。共通方針 UX-01 と同じく、
+ * 入力・選択・ボタンは PC 40px・タッチ端末 44px、本文の作成欄は
+ * 160px を下限に内容に応じて伸びる（SCENARIO-19）。
  */
 
 .smallField {
-  height: 38px;
+  height: 40px;
   width: 110px;
+  font-size: var(--text-body);
+  font-weight: 600;
 }
 
 .timeField {
-  height: 38px;
+  height: 40px;
   width: 130px;
+  font-size: var(--text-body);
+  font-weight: 600;
 }
 
 .bodyField {
-  height: 118px;
+  min-height: 160px;
+  /* 上限を超えた分は欄の中でスクロールする（UX-01）。 */
+  max-height: 60vh;
+  /*
+   * 書いた分だけ欄が伸びる。`field-sizing` が効かない環境でも
+   * 160px の下限と、手動で広げる取っ手（resize: vertical）が残る。
+   */
+  field-sizing: content;
+}
+
+/*
+ * タッチ端末は指の当たり判定のため44pxを確保する（#976 U083と同じ決まり）。
+ * 16px 未満の文字だと iOS がフォーカス時に画面を拡大し、入力中に
+ * レイアウトが動くので、欄の文字も16pxへそろえる（#976 U079）。
+ */
+@media (pointer: coarse) {
+  .smallField,
+  .timeField {
+    height: 44px;
+    font-size: var(--text-lead);
+  }
+
+  .bodyField {
+    font-size: var(--text-lead);
+  }
 }
