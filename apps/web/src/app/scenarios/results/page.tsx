@@ -18,6 +18,7 @@ import SummaryCard from '@/components/shared/summary-card'
 import { ActionCell, DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import styles from './scenario-results.module.css'
 import { scenarioReferenceData } from '@/components/scenarios/scenario-reference-data'
+import { FriendPlanDialog } from '@/components/scenarios/scenario-dialogs'
 
 type ScenarioWithSteps = Scenario & { steps: ScenarioStep[] }
 /*
@@ -87,6 +88,13 @@ function ResultsInner() {
   const [moveTarget, setMoveTarget] = useState<{ subscriptionId: string; friendName: string } | null>(null)
   const [moveScenarioId, setMoveScenarioId] = useState('')
   const [moveOptions, setMoveOptions] = useState<Scenario[] | null>(null)
+  /*
+   * IDEA-05: 選んだ検証顧客への配信予定・待機・分岐理由を、送信なしで
+   * 確かめる窓。行から開くとその人を、パネル頭の入口から開くと
+   * まだ開始していない検証用の友だちも選べる。
+   */
+  const [planOpen, setPlanOpen] = useState(false)
+  const [planFriend, setPlanFriend] = useState<{ id: string; name: string } | null>(null)
   const opKeys = useRef(new IdempotencyKeyStore())
 
   usePageTitle(scenario ? `シナリオ結果：${scenario.name}` : null)
@@ -286,6 +294,17 @@ function ResultsInner() {
             */}
             <Panel title="参加中の友だち" lead="届いている・止まっている購読を友だちごとに操作します。">
               {opError ? <NoteBar tone="warn">{opError}</NoteBar> : null}
+              <div className="mb-3">
+                <Button
+                  type="button"
+                  onClick={() => {
+                    setPlanFriend(null)
+                    setPlanOpen(true)
+                  }}
+                >
+                  友だちを選んで配信予定を見る
+                </Button>
+              </div>
               {!runs || runs.subscriptions.length === 0 ? (
                 <ListState
                   kind="empty"
@@ -334,6 +353,16 @@ function ResultsInner() {
                           </Td>
                           <ActionCell>
                             <div className="flex flex-wrap items-center justify-end gap-3">
+                              <button
+                                type="button"
+                                className="text-caption font-semibold text-accent-deep hover:underline disabled:cursor-not-allowed disabled:text-ink-faint"
+                                onClick={() => {
+                                  setPlanFriend({ id: sub.friendId, name: sub.friendName })
+                                  setPlanOpen(true)
+                                }}
+                              >
+                                予定を見る
+                              </button>
                               {sub.status === 'active' ? (
                                 <button
                                   type="button"
@@ -405,6 +434,16 @@ function ResultsInner() {
             </Panel>
           </aside>
         </div>
+      ) : null}
+
+      {/* IDEA-05: 検証顧客への配信予定。送信・登録は起きない。 */}
+      {planOpen ? (
+        <FriendPlanDialog
+          scenarioId={id}
+          lineAccountId={scenario?.lineAccountId ?? selectedAccountId ?? null}
+          initialFriend={planFriend}
+          onClose={() => setPlanOpen(false)}
+        />
       ) : null}
 
       {/* 「別のシナリオへ移す」の窓。移し先は稼働中の別シナリオだけ選べる。 */}

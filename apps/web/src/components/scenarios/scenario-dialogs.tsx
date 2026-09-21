@@ -8,7 +8,7 @@
  */
 
 import { useCallback, useEffect, useState } from 'react'
-import { api } from '@/lib/api'
+import { api, type ScenarioFriendPlan, type ScenarioFriendPlanStep } from '@/lib/api'
 import { scenarioReferenceData } from './scenario-reference-data'
 import { useAccount } from '@/contexts/account-context'
 import Button from '@/components/shared/button'
@@ -771,6 +771,305 @@ export function TestSendDialog({
           {result.message}
         </p>
       )}
+    </Shell>
+  )
+}
+
+/* ------------------------------------------- 友だち別の配信予定（IDEA-05） */
+
+/*
+ * シナリオ確認（配信結果）の中で、選んだ検証顧客へ現在のシナリオが
+ * どう配られるかを表示する。試算口（GET …/friends/:friendId/plan）は
+ * 送信・購読登録・タグ更新を一切行わない。応答の sideEffects:false が
+ * その証左なので、画面でも「送らない確認」だと断る。
+ *
+ * 予定の判定は配信処理と同じ関数を通る（条件分岐 evaluateCondition・
+ * 絞り込み matchesCondition・日時 computeNextDeliveryAt）。配信時点の
+ * 状態で結果が変わる条件は dynamic=true で返るので「未確定」と出し、
+ * 確定した日時に見せない（NEXT-01〜04 の「確認が嘘をつかない」に揃える）。
+ */
+
+const FRIEND_PLAN_OUTCOME: Record<
+  ScenarioFriendPlanStep['outcome'],
+  { label: string; className: string }
+> = {
+  deliver: { label: '届く見通し', className: 'border-success bg-success-bg text-success' },
+  skip: { label: '送らず次へ', className: 'border-hairline text-ink-secondary' },
+  branch: { label: '条件で分岐', className: 'border-warning bg-warning-bg text-warning' },
+  pause: { label: 'この通のあと停止', className: 'border-warning bg-warning-bg text-warning' },
+  undetermined: { label: '未確定', className: 'border-hairline text-ink-faint' },
+}
+
+const FRIEND_PLAN_STATUS: Record<string, string> = {
+  active: '配信中',
+  delivering: '送信中',
+  paused: '停止中',
+  completed: '完了',
+}
+
+const FRIEND_PLAN_BASIS: Record<ScenarioFriendPlan['basis'], string> = {
+  pinned: '購読に固定された公開版',
+  published: '現在の公開版',
+  draft: '下書き（公開版がないため参考）',
+}
+
+/** 予定1行。時刻が無い・動的条件で変わるものは「未確定」を添える。 */
+function FriendPlanStepRow({ step }: { step: ScenarioFriendPlanStep }) {
+  const outcome = FRIEND_PLAN_OUTCOME[step.outcome]
+  return (
+    <li className="border-hairline border-b px-4 py-2.5 text-sm last:border-b-0">
+      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+        <span className="text-ink shrink-0 font-medium tabular-nums">{step.stepOrder}通目</span>
+        <span className="text-ink-secondary shrink-0 tabular-nums">
+          {step.scheduledAt ?? '—'}
+        </span>
+        <span className={`rounded-pill shrink-0 border px-2 py-0.5 text-xs ${outcome.className}`}>
+          {outcome.label}
+        </span>
+        {step.dynamic ? (
+          <span className="text-ink-faint shrink-0 text-xs">未確定</span>
+        ) : null}
+      </div>
+      {step.reason ? (
+        <p className="text-ink-secondary mt-1 text-xs leading-relaxed">{step.reason}</p>
+      ) : null}
+    </li>
+  )
+}
+
+export function FriendPlanDialog({
+  scenarioId,
+  lineAccountId,
+  initialFriend = null,
+  onClose,
+}: {
+  scenarioId: string
+  /** アカウント専用シナリオは、そのアカウントの友だちだけを選ぶ。 */
+  lineAccountId: string | null
+  /** 参加中の友だちの行から開いたとき、その人を最初から選んだ状態にする。 */
+  initialFriend?: { id: string; name: string } | null
+  onClose: () => void
+}) {
+  const { selectedAccountId } = useAccount()
+  const resolvedAccountId = lineAccountId ?? selectedAccountId ?? null
+  const [search, setSearch] = useState('')
+  const [friends, setFriends] = useState<{ id: string; displayName: string | null }[]>([])
+  const [friendsStatus, setFriendsStatus] = useState<'loading' | 'ready' | 'error'>('loading')
+  const [selected, setSelected] = useState<{ id: string; name: string } | null>(initialFriend)
+  const [plan, setPlan] = useState<ScenarioFriendPlan | null>(null)
+  const [planStatus, setPlanStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
+  const [planError, setPlanError] = useState('')
+
+  /* 友だちの検索。テスト送信と同じく、300ms 待ってから一覧口を叩く。 */
+  useEffect(() => {
+    let cancelled = false
+    setFriendsStatus('loading')
+    const timer = setTimeout(() => {
+      void (async () => {
+        try {
+          const res = await api.friends.list({
+            accountId: resolvedAccountId ?? undefined,
+            limit: 20,
+            search,
+            includeTags: false,
+          })
+          if (cancelled) return
+          if (res.success) {
+            setFriends(res.data.items.map((f) => ({ id: f.id, displayName: f.displayName })))
+            setFriendsStatus('ready')
+          } else {
+            setFriendsStatus('error')
+          }
+        } catch {
+          if (!cancelled) setFriendsStatus('error')
+        }
+      })()
+    }, 300)
+    return () => {
+      cancelled = true
+      clearTimeout(timer)
+    }
+  }, [resolvedAccountId, search])
+
+  /* 選んだ友だちの予定を試算口から取る。選び直すたびに取り直す。 */
+  useEffect(() => {
+    if (!selected || !resolvedAccountId) {
+      setPlan(null)
+      setPlanStatus('idle')
+      return
+    }
+    let cancelled = false
+    setPlan(null)
+    setPlanError('')
+    setPlanStatus('loading')
+    void (async () => {
+      try {
+        const res = await api.scenarios.friendPlan(scenarioId, selected.id, resolvedAccountId)
+        if (cancelled) return
+        if (res.success) {
+          setPlan(res.data)
+          setPlanStatus('ready')
+        } else {
+          setPlanError(res.error)
+          setPlanStatus('error')
+        }
+      } catch {
+        if (!cancelled) {
+          setPlanError('配信予定を読み込めませんでした。')
+          setPlanStatus('error')
+        }
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [selected, resolvedAccountId, scenarioId])
+
+  return (
+    <Shell
+      title="友だちへの配信予定"
+      description="このシナリオが選んだ友だちへどう届くかを確認します。送信・シナリオへの登録・タグの更新は行いません。"
+      onClose={onClose}
+      footer={
+        <button
+          type="button"
+          onClick={onClose}
+          className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control h-10 border px-5 text-sm"
+        >
+          閉じる
+        </button>
+      }
+    >
+      {!resolvedAccountId ? (
+        <p className="rounded-panel bg-warning-bg text-ink-secondary mb-4 px-4 py-3 text-xs">
+          LINE公式アカウントを選ぶと、友だちごとの配信予定を確認できます。
+        </p>
+      ) : null}
+
+      <input
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        placeholder="名前で探す"
+        className="border-hairline rounded-control text-ink h-10 w-full border px-3 text-sm"
+        aria-label="確認する友だちを名前で探す"
+      />
+      <div className="border-hairline rounded-panel mt-3 max-h-48 overflow-y-auto border">
+        {friendsStatus === 'ready' && friends.map((friend) => (
+          <button
+            key={friend.id}
+            type="button"
+            onClick={() => setSelected({ id: friend.id, name: friend.displayName || '（名前なし）' })}
+            className={`border-hairline flex w-full items-center gap-2 border-b px-4 py-2.5 text-left text-sm last:border-b-0 ${
+              selected?.id === friend.id ? 'bg-accent-soft text-accent font-medium' : 'text-ink'
+            }`}
+          >
+            {friend.displayName || '（名前なし）'}
+          </button>
+        ))}
+        {friendsStatus === 'loading' && (
+          <p className="text-ink-faint px-4 py-6 text-center text-sm">友だちを読み込んでいます。</p>
+        )}
+        {friendsStatus === 'error' && (
+          <p className="text-danger px-4 py-6 text-center text-sm">友だちを読み込めませんでした。</p>
+        )}
+        {friendsStatus === 'ready' && friends.length === 0 && (
+          <p className="text-ink-faint px-4 py-6 text-center text-sm">見つかりません</p>
+        )}
+      </div>
+
+      {planStatus === 'loading' && (
+        <p className="text-ink-faint mt-4 px-1 text-sm">配信予定を試算しています。</p>
+      )}
+      {planStatus === 'error' && (
+        <p className="rounded-panel bg-danger-bg text-danger mt-4 px-4 py-3 text-sm">{planError}</p>
+      )}
+
+      {planStatus === 'ready' && plan ? (
+        <div className="mt-4 space-y-4">
+          {/* 待機の正体。購読があれば状態と次の予定をそのまま出す。 */}
+          <dl className="border-hairline rounded-panel space-y-2 border px-4 py-3 text-sm">
+            <div className="flex flex-wrap justify-between gap-2">
+              <dt className="text-ink-faint">友だち</dt>
+              <dd className="text-ink font-medium">{plan.friendName ?? selected?.name ?? '（名前なし）'}</dd>
+            </div>
+            <div className="flex flex-wrap justify-between gap-2">
+              <dt className="text-ink-faint">いまの状態</dt>
+              <dd className="text-ink">
+                {plan.subscription
+                  ? FRIEND_PLAN_STATUS[plan.subscription.status] ?? plan.subscription.status
+                  : 'まだ開始していません'}
+              </dd>
+            </div>
+            {plan.subscription?.nextDeliveryAt ? (
+              <div className="flex flex-wrap justify-between gap-2">
+                <dt className="text-ink-faint">次の配信予定</dt>
+                <dd className="text-ink tabular-nums">{plan.subscription.nextDeliveryAt}</dd>
+              </div>
+            ) : null}
+            {plan.subscription?.pauseReason ? (
+              <div className="flex flex-wrap justify-between gap-2">
+                <dt className="text-ink-faint">止まっている理由</dt>
+                <dd className="text-ink">
+                  {plan.subscription.pauseReason === 'delivery_failed'
+                    ? '配信失敗'
+                    : plan.subscription.pauseReason === 'after_send'
+                      ? 'この通を送ったあと止める設定'
+                      : '画面からの停止'}
+                </dd>
+              </div>
+            ) : null}
+            <div className="flex flex-wrap justify-between gap-2">
+              <dt className="text-ink-faint">予定のもと</dt>
+              <dd className="text-ink">{FRIEND_PLAN_BASIS[plan.basis]}</dd>
+            </div>
+            <div className="flex flex-wrap justify-between gap-2">
+              <dt className="text-ink-faint">試算した時刻</dt>
+              <dd className="text-ink tabular-nums">
+                {new Date(plan.computedAt).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })}
+              </dd>
+            </div>
+          </dl>
+
+          {plan.start.state === 'blocked' ? (
+            <div className="rounded-panel bg-warning-bg px-4 py-3 text-sm">
+              <p className="text-warning font-semibold">いまはこの友だちへ配信されません</p>
+              <ul className="text-ink-secondary mt-1 list-disc space-y-1 pl-5 text-xs">
+                {plan.start.reasons.map((reason) => (
+                  <li key={reason}>{reason}</li>
+                ))}
+              </ul>
+            </div>
+          ) : plan.start.reasons.length > 0 ? (
+            <div className="rounded-panel bg-info-bg px-4 py-3 text-xs">
+              <ul className="text-ink-secondary list-disc space-y-1 pl-5">
+                {plan.start.reasons.map((reason) => (
+                  <li key={reason}>{reason}</li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+
+          {plan.steps.length > 0 ? (
+            <ol className="border-hairline rounded-panel border">
+              {plan.steps.map((step) => (
+                <FriendPlanStepRow key={step.stepId} step={step} />
+              ))}
+            </ol>
+          ) : plan.start.state === 'ok' ? (
+            <p className="text-ink-faint px-1 text-sm">配信される通がありません。</p>
+          ) : null}
+
+          {plan.warnings.length > 0 ? (
+            <div className="rounded-panel bg-info-bg px-4 py-3 text-xs">
+              <ul className="text-ink-secondary list-disc space-y-1 pl-5">
+                {plan.warnings.map((warning) => (
+                  <li key={warning}>{warning}</li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
     </Shell>
   )
 }

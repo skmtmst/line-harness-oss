@@ -3499,6 +3499,44 @@ export type ScenarioRuns = {
   }>
 }
 
+/**
+ * 友だち単位の配信予定（IDEA-05）。選んだ検証顧客へ現在のシナリオがどう
+ * 配られるかを、送信・登録・タグ更新なしで試算した結果。
+ */
+export type ScenarioFriendPlanStep = {
+  stepId: string
+  stepOrder: number
+  /** 配信予定。未確定のときは null。 */
+  scheduledAt: string | null
+  outcome: 'deliver' | 'skip' | 'branch' | 'pause' | 'undetermined'
+  /** 分岐・除外の理由。読む人向けの文。 */
+  reason: string | null
+  /** 配信時点の状態で結果が変わるとき true。画面は「未確定」と出す。 */
+  dynamic: boolean
+}
+
+export type ScenarioFriendPlan = {
+  scenarioId: string
+  lineAccountId: string
+  friendId: string
+  friendName: string | null
+  computedAt: string
+  sideEffects: false
+  subscription: {
+    id: string
+    status: string
+    currentStepOrder: number
+    startedAt: string
+    nextDeliveryAt: string | null
+    pauseReason: string | null
+  } | null
+  /** pinned=購読に固定された公開版 / published=現在の公開版 / draft=下書きの参考予定 */
+  basis: 'pinned' | 'published' | 'draft'
+  start: { state: 'ok' | 'blocked'; reasons: string[] }
+  steps: ScenarioFriendPlanStep[]
+  warnings: string[]
+}
+
 export type ScenarioDraftActionV6 = {
   id: string
   hook: 'step_sent' | 'scenario_completed' | 'choice_selected'
@@ -3545,6 +3583,18 @@ function isScenarioRuns(value: unknown): value is ScenarioRuns {
     && isObjectRecord(value.quota)
     && Array.isArray(value.concurrentBroadcasts)
     && Array.isArray(value.steps)
+}
+
+function isScenarioFriendPlan(value: unknown): value is ScenarioFriendPlan {
+  if (!isObjectRecord(value)) return false
+  return typeof value.scenarioId === 'string'
+    && typeof value.friendId === 'string'
+    && typeof value.computedAt === 'string'
+    && value.sideEffects === false
+    && ['pinned', 'published', 'draft'].includes(String(value.basis))
+    && isObjectRecord(value.start)
+    && Array.isArray(value.steps)
+    && Array.isArray(value.warnings)
 }
 
 function isScenarioDraft(value: unknown): value is ScenarioDraftV6 {
@@ -6885,6 +6935,24 @@ export const api = {
       return isScenarioRuns(response.data)
         ? { success: true, data: response.data }
         : { success: false, error: '配信記録を確認できませんでした' }
+    },
+    /**
+     * 友だち単位の配信予定を副作用なしで試算する（IDEA-05）。
+     * 送信・購読登録・タグ更新は起きない。
+     */
+    friendPlan: async (
+      id: string,
+      friendId: string,
+      lineAccountId: string,
+    ): Promise<ApiResponse<ScenarioFriendPlan>> => {
+      const query = new URLSearchParams({ lineAccountId })
+      const response = await fetchApi<ApiResponse<unknown>>(
+        `/api/scenarios/${id}/friends/${friendId}/plan?${query}`,
+      )
+      if (!response.success) return response
+      return isScenarioFriendPlan(response.data)
+        ? { success: true, data: response.data }
+        : { success: false, error: '配信予定を確認できませんでした' }
     },
     /** V6送信後アクションを楽観ロック付き下書きへまとめて保存する。 */
     saveDraft: async (
