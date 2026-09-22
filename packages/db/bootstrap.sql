@@ -3327,7 +3327,7 @@ CREATE TABLE media (
   public_url  TEXT,
   uploaded_by TEXT,
   created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f','now','+9 hours'))
-, line_account_id TEXT REFERENCES line_accounts(id) ON DELETE CASCADE, archived_at TEXT, archived_by TEXT, archive_reason TEXT);
+, line_account_id TEXT REFERENCES line_accounts(id) ON DELETE CASCADE, archived_at TEXT, archived_by TEXT, archive_reason TEXT, usage_expires_at TEXT, usage_consent_note TEXT);
 
 CREATE TABLE media_storage_quotas (
   line_account_id TEXT PRIMARY KEY REFERENCES line_accounts(id) ON DELETE CASCADE,

@@ -97,6 +97,30 @@ function usageSelectValue(reference: MediaUsageReferenceState | null): string | 
   return null
 }
 
+/** 記録された利用期限の表示。日付は端末の時間帯に流されず、そのまま出す。 */
+function usageExpiryText(value: string | null | undefined): string {
+  if (!value) return '不明（記録なし）'
+  const [year, month, day] = value.split('-')
+  return `${Number(year)}/${Number(month)}/${Number(day)}`
+}
+
+/** 記録された利用期限が今日（JST）より前なら、期限切れとして明示する。 */
+function isUsageExpired(value: string | null | undefined): boolean {
+  if (!value) return false
+  const todayJst = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Tokyo', year: 'numeric', month: '2-digit', day: '2-digit',
+  }).format(new Date())
+  return value < todayJst
+}
+
+/** 版のダウンロード名。どの版か分かるように a.png → a-v1.png とする。 */
+function versionDownloadName(filename: string, versionNo: number): string {
+  const dot = filename.lastIndexOf('.')
+  return dot > 0
+    ? `${filename.slice(0, dot)}-v${versionNo}${filename.slice(dot)}`
+    : `${filename}-v${versionNo}`
+}
+
 export default function MediaDetailDialog({
   item,
   accountId,
@@ -105,6 +129,7 @@ export default function MediaDetailDialog({
   onClose,
   onOpenReplacement,
   onVersionCreated,
+  onItemUpdated,
 }: {
   item: MediaItem | null
   accountId: string | null
@@ -114,6 +139,8 @@ export default function MediaDetailDialog({
   onClose: () => void
   onOpenReplacement: (item: MediaItem) => void
   onVersionCreated: (message: string) => void
+  /** 利用期限・同意の記録を保存したとき、一覧側の表示を新しい行へ追従させる。 */
+  onItemUpdated?: (item: MediaItem) => void
 }) {
   const fileInputId = useId()
   const requestRef = useRef(0)
@@ -129,6 +156,18 @@ export default function MediaDetailDialog({
   const [versionError, setVersionError] = useState('')
   const [downloading, setDownloading] = useState(false)
   const [downloadError, setDownloadError] = useState('')
+  /** 版ごとの取り出し。版番号で押し中を持ち、連打と混線を防ぐ。 */
+  const [downloadingVersion, setDownloadingVersion] = useState<number | null>(null)
+  const [versionDownloadError, setVersionDownloadError] = useState('')
+  /*
+    既知の利用期限・同意情報（IDEA-15）。記録された値だけを見せ、
+    未記録は「不明」と出す。編集は記録係（owner/admin）だけ。
+  */
+  const [termsEditing, setTermsEditing] = useState(false)
+  const [termsExpiresAt, setTermsExpiresAt] = useState('')
+  const [termsConsentNote, setTermsConsentNote] = useState('')
+  const [termsBusy, setTermsBusy] = useState(false)
+  const [termsError, setTermsError] = useState('')
 
   /** 保存URLへ直接行かず、権限確認と監査を通る口から受け取って保存させる。 */
   const displaySrc = item && accountId ? api.media.contentUrl(item.id, accountId) : ''
@@ -149,6 +188,56 @@ export default function MediaDetailDialog({
       setDownloadError(caught instanceof Error ? caught.message : 'ダウンロードできませんでした')
     } finally {
       setDownloading(false)
+    }
+  }
+
+  /** 指定した版を認証・監査つきの口から取り出す。第1版＝登録時の元ファイル。 */
+  async function downloadVersion(versionNo: number) {
+    if (!item || !accountId || downloadingVersion !== null) return
+    setDownloadingVersion(versionNo)
+    setVersionDownloadError('')
+    try {
+      const blob = await api.media.downloadVersion(item.id, versionNo, accountId)
+      const href = URL.createObjectURL(blob)
+      const anchor = document.createElement('a')
+      anchor.href = href
+      anchor.download = versionDownloadName(item.filename, versionNo)
+      anchor.click()
+      URL.revokeObjectURL(href)
+    } catch (caught) {
+      setVersionDownloadError(caught instanceof Error ? caught.message : 'この版をダウンロードできませんでした')
+    } finally {
+      setDownloadingVersion(null)
+    }
+  }
+
+  function startTermsEdit() {
+    if (!item) return
+    setTermsExpiresAt(item.usageExpiresAt ?? '')
+    setTermsConsentNote(item.usageConsentNote ?? '')
+    setTermsError('')
+    setTermsEditing(true)
+  }
+
+  /** 利用期限・同意の記録。空欄は「記録なし＝不明」へ戻す。 */
+  async function saveTerms() {
+    if (!item || !accountId || termsBusy) return
+    setTermsBusy(true)
+    setTermsError('')
+    try {
+      const response = await api.media.update(item.id, accountId, {
+        usageExpiresAt: termsExpiresAt || null,
+        usageConsentNote: termsConsentNote.trim() || null,
+      })
+      if (!response.success) throw new Error(response.error)
+      setTermsEditing(false)
+      onItemUpdated?.(response.data)
+    } catch (caught) {
+      setTermsError(caught instanceof ApiError || caught instanceof Error
+        ? caught.message
+        : '利用期限・同意の記録を保存できませんでした')
+    } finally {
+      setTermsBusy(false)
     }
   }
 
@@ -218,6 +307,10 @@ export default function MediaDetailDialog({
     setVersionPreview(null)
     setChangeReason('')
     setVersionError('')
+    setDownloadingVersion(null)
+    setVersionDownloadError('')
+    setTermsEditing(false)
+    setTermsError('')
   }, [item?.id])
 
   function chooseVersionFile(file: File | null) {
@@ -441,6 +534,68 @@ export default function MediaDetailDialog({
 
           <section className="border-hairline rounded-card border bg-canvas p-4">
             <div className="flex items-center justify-between gap-3">
+              <h3 className="text-ink text-sm font-bold">利用の期限・同意</h3>
+              {canManage && !termsEditing ? (
+                <Button type="button" onClick={startTermsEdit}>記録する</Button>
+              ) : null}
+            </div>
+            <dl className="mt-4 space-y-3 text-xs">
+              <div className="flex items-start justify-between gap-3">
+                <dt className="text-ink-faint">利用期限</dt>
+                <dd className="text-ink text-right font-semibold">
+                  {usageExpiryText(item.usageExpiresAt)}
+                  {isUsageExpired(item.usageExpiresAt) ? (
+                    <span className="text-danger ml-1">（期限を過ぎています）</span>
+                  ) : null}
+                </dd>
+              </div>
+              <div className="flex items-start justify-between gap-3">
+                <dt className="text-ink-faint">同意・権利の記録</dt>
+                <dd className="text-ink whitespace-pre-wrap text-right font-semibold">
+                  {item.usageConsentNote ? item.usageConsentNote : '不明（記録なし）'}
+                </dd>
+              </div>
+            </dl>
+            <p className="text-ink-faint mt-3 text-xs leading-5">
+              確認できたことだけを記録します。記録のない項目は「不明」のままにし、権利や期限を推測しません。
+            </p>
+            {termsEditing ? (
+              <div className="border-hairline mt-3 space-y-3 border-t pt-3">
+                <div>
+                  <label htmlFor={`${fileInputId}-expires`} className="text-ink-secondary block text-xs font-semibold">利用期限（分かる場合だけ）</label>
+                  <input
+                    id={`${fileInputId}-expires`}
+                    type="date"
+                    value={termsExpiresAt}
+                    onChange={(event) => setTermsExpiresAt(event.target.value)}
+                    className="border-hairline rounded-control mt-1 w-full border px-3 py-2 text-sm"
+                  />
+                </div>
+                <div>
+                  <label htmlFor={`${fileInputId}-consent`} className="text-ink-secondary block text-xs font-semibold">同意・権利の記録（確認した内容だけ）</label>
+                  <input
+                    id={`${fileInputId}-consent`}
+                    type="text"
+                    value={termsConsentNote}
+                    onChange={(event) => setTermsConsentNote(event.target.value)}
+                    maxLength={500}
+                    className="border-hairline rounded-control mt-1 w-full border px-3 py-2 text-sm"
+                    placeholder="例：出演者の同意書を確認済み（2026-01-10）"
+                  />
+                </div>
+                {termsError ? <p className="bg-danger-bg text-danger rounded-control p-3 text-xs" role="alert">{termsError}</p> : null}
+                <div className="flex justify-end gap-2">
+                  <Button type="button" onClick={() => setTermsEditing(false)} disabled={termsBusy}>キャンセル</Button>
+                  <Button type="button" variant="primary" onClick={() => void saveTerms()} disabled={termsBusy}>
+                    {termsBusy ? '保存しています…' : '保存する'}
+                  </Button>
+                </div>
+              </div>
+            ) : null}
+          </section>
+
+          <section className="border-hairline rounded-card border bg-canvas p-4">
+            <div className="flex items-center justify-between gap-3">
               <h3 className="text-ink text-sm font-bold">使われている場所</h3>
               <span className="text-action text-xs font-bold">{impact ? `${impact.usageCount}か所` : '—'}</span>
             </div>
@@ -502,6 +657,42 @@ export default function MediaDetailDialog({
               <p className="text-ink-faint mt-3 text-xs leading-5">使われているあいだは削除できません。先にこの{impact.usageCount}か所から外してください。</p>
             ) : null}
           </section>
+
+          {impact && impact.versions.length > 0 ? (
+            <section className="border-hairline rounded-card border bg-canvas p-4">
+              <h3 className="text-ink text-sm font-bold">版と元ファイル</h3>
+              <p className="text-ink-faint mt-1 text-xs leading-5">
+                第1版は登録時の元ファイルです。差し替えても各版は残り、ここから取り戻せます。
+              </p>
+              <ul className="mt-3 space-y-2">
+                {impact.versions.map((version) => (
+                  <li key={version.versionNo} className="border-hairline rounded-control border p-3 text-xs">
+                    <p className="text-ink font-semibold">
+                      第{version.versionNo}版
+                      {version.isCurrent ? '（最新）' : ''}
+                      {version.versionNo === 1 ? '（元ファイル）' : ''}
+                    </p>
+                    <p className="text-ink-faint mt-1">
+                      {formatMediaSize(version.sizeBytes)} ・ {version.mimeType} ・ {formatDate(version.createdAt)}
+                    </p>
+                    {version.changeReason ? (
+                      <p className="text-ink-faint mt-1">変更理由：{version.changeReason}</p>
+                    ) : null}
+                    <div className="mt-2">
+                      <Button
+                        type="button"
+                        onClick={() => void downloadVersion(version.versionNo)}
+                        disabled={downloadingVersion !== null}
+                      >
+                        {downloadingVersion === version.versionNo ? '取得中…' : 'この版をダウンロード'}
+                      </Button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+              {versionDownloadError ? <p className="text-danger mt-2 text-xs" role="alert">{versionDownloadError}</p> : null}
+            </section>
+          ) : null}
         </aside>
       </div>
     </div>
