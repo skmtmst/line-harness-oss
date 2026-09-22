@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { Suspense, useCallback, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import {
   api,
@@ -99,7 +99,7 @@ function Fact({ label, value }: { label: string; value: string }) {
   return <div className={styles.fact}><dt>{label}</dt><dd>{value}</dd></div>
 }
 
-export default function ReminderRunsPage() {
+function ReminderRunsInner() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const reminderId = searchParams.get('id') ?? ''
@@ -427,5 +427,14 @@ export default function ReminderRunsPage() {
         onPrimary={() => { router.push(`/reminders/edit?id=${reminderId}`) }}
       />
     </div>
+  )
+}
+
+export default function ReminderRunsPage() {
+  // useSearchParams は Suspense の中でしか使えない（静的書き出しのため）。
+  return (
+    <Suspense fallback={<ListState kind="loading" />}>
+      <ReminderRunsInner />
+    </Suspense>
   )
 }
