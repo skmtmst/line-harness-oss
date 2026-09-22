@@ -20,6 +20,14 @@ import TemplatePicker from '@/components/chats/template-picker'
 
 type ThreadStatus = 'unread' | 'in_progress' | 'on_hold' | 'resolved'
 
+type EmailMessage = {
+  id: string
+  direction: 'incoming' | 'outgoing'
+  body_text: string
+  sent_by_staff_name: string | null
+  created_at: string
+}
+
 type EmailDetail = {
   thread: {
     id: string
@@ -31,13 +39,32 @@ type EmailDetail = {
     notes: string | null
     revision: number
   }
-  messages: Array<{
-    id: string
-    direction: 'incoming' | 'outgoing'
-    body_text: string
-    sent_by_staff_name: string | null
-    created_at: string
-  }>
+  messages: EmailMessage[]
+  /*
+    PERF-11: 初回は新しい側の100件だけ。古い方は before= で、
+    新着は after= で差分取得する。古いWorkerはこれらを返さないので
+    無ければ「全部ある」として扱う。
+  */
+  hasMoreOlder?: boolean
+  oldestCursor?: string | null
+  newestCursor?: string | null
+}
+
+/*
+ * PERF-11: 差分・過去分を既存の並びへ混ぜる。id で重複を除き、
+ * created_at 昇順（同時刻は id 順、Worker の並びと同じ）に保つ。
+ * 同じ応答が二度届いても重ねて出さず、順序が逆転しない。
+ */
+function mergeMessages(current: EmailMessage[], incoming: EmailMessage[]): EmailMessage[] {
+  if (incoming.length === 0) return current
+  const seen = new Set(current.map((m) => m.id))
+  const fresh = incoming.filter((m) => !seen.has(m.id))
+  if (fresh.length === 0) return current
+  const merged = [...current, ...fresh]
+  merged.sort((a, b) =>
+    a.created_at === b.created_at ? (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)
+      : a.created_at < b.created_at ? -1 : 1)
+  return merged
 }
 
 function dateTime(iso: string): string {
@@ -155,6 +182,12 @@ export default function EmailThread({
   const genRef = useRef(createPollGeneration())
   const latestThreadRef = useRef(threadId)
   latestThreadRef.current = threadId
+  // PERF-11: 差分取得の起点（newestCursor）と過去側カーソルを
+  // effect の外からも読めるよう、今出ている会話を ref で持つ。
+  const detailRef = useRef<EmailDetail | null>(null)
+  detailRef.current = detail
+  const listRef = useRef<HTMLDivElement>(null)
+  const [olderLoading, setOlderLoading] = useState(false)
 
   /*
     F06: 入力欄の正本は draftsRef。setReply を直接使うと、どの会話の
@@ -191,13 +224,35 @@ export default function EmailThread({
       const mySeq = genRef.current.next()
       const isStale = () =>
         genRef.current.isStale(mySeq) || myThread !== latestThreadRef.current
+      /*
+        PERF-11: すでに会話を持っているときは after= の差分だけ取る。
+        毎回全件・全履歴を取り直していたため、長い会話では5秒ごとに
+        全部の本文が流れていた。古いWorkerはカーソルを返さないので、
+        その場合は従来どおり全体を取る。
+      */
+      const current = detailRef.current
+      const after = current && current.thread.id === myThread ? (current.newestCursor ?? null) : null
+      const query = after ? `?after=${encodeURIComponent(after)}` : ''
       try {
         const res = await fetchApi<{ success: boolean; data: EmailDetail }>(
-          `/api/support/email/threads/${encodeURIComponent(threadId)}`,
+          `/api/support/email/threads/${encodeURIComponent(threadId)}${query}`,
         )
         if (isStale()) return true
         if (res.success) {
-          setDetail(res.data)
+          const data = res.data
+          setDetail((prev) => {
+            // 差分応答を別の会話へは混ぜない。初回はそのまま採用する。
+            if (!prev || prev.thread.id !== data.thread.id) return data
+            return {
+              ...data,
+              messages: mergeMessages(prev.messages, data.messages),
+              // 読み込み済みの古い履歴側の位置は after 応答では変わらない。
+              hasMoreOlder: prev.hasMoreOlder ?? data.hasMoreOlder,
+              oldestCursor: prev.oldestCursor ?? data.oldestCursor,
+              // 差分が空の応答は cursor を持たない。消すと次回が全件へ戻る。
+              newestCursor: data.newestCursor ?? prev.newestCursor,
+            }
+          })
           setLoadError('')
           if (!quiet) {
             window.setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 50)
@@ -380,6 +435,44 @@ export default function EmailThread({
     }
   }
 
+  /*
+   * PERF-11: 過去の履歴を1区画だけ上へ足す。上へ追加すると表示位置が
+   * ずれるので、足す前の高さとの差分だけ scrollTop を戻す。
+   * 失敗しても今の会話はそのまま残し、ボタンでやり直せる。
+   */
+  const loadOlder = async () => {
+    const myThread = threadId
+    const cursor = detailRef.current?.thread.id === myThread ? detailRef.current.oldestCursor : null
+    if (!cursor || olderLoading) return
+    const scroller = listRef.current
+    const heightBefore = scroller?.scrollHeight ?? 0
+    setOlderLoading(true)
+    try {
+      const res = await fetchApi<{ success: boolean; data: EmailDetail }>(
+        `/api/support/email/threads/${encodeURIComponent(myThread)}?before=${encodeURIComponent(cursor)}`,
+      )
+      if (latestThreadRef.current !== myThread || !res.success) return
+      const data = res.data
+      setDetail((prev) => {
+        if (!prev || prev.thread.id !== myThread) return prev
+        return {
+          ...prev,
+          messages: mergeMessages(prev.messages, data.messages),
+          hasMoreOlder: data.hasMoreOlder,
+          oldestCursor: data.oldestCursor,
+        }
+      })
+      requestAnimationFrame(() => {
+        const el = listRef.current
+        if (el && heightBefore > 0) el.scrollTop += el.scrollHeight - heightBefore
+      })
+    } catch {
+      /* 古い履歴が取れなくても今の会話はそのまま。ボタンは残る。 */
+    } finally {
+      setOlderLoading(false)
+    }
+  }
+
   const openMemoEditor = () => {
     setMemoDraft(detail?.thread.notes ?? '')
     setMemoError('')
@@ -556,7 +649,24 @@ export default function EmailThread({
         </div>
       </EmailThreadHeader>
 
-      <div className="flex-1 space-y-4 overflow-y-auto bg-[#F7F8F6] p-4">
+      <div ref={listRef} className="flex-1 space-y-4 overflow-y-auto bg-[#F7F8F6] p-4">
+        {/*
+          PERF-11: 初回は新しい側の100件だけ。もっと古い履歴があるときは
+          押した分だけ上へ足す。取りこぼしを見せないため hasMoreOlder が
+          立っている間はボタンを残す（古いWorkerは旗を返さず全件来る）。
+        */}
+        {detail.hasMoreOlder ? (
+          <div className="flex justify-center">
+            <button
+              type="button"
+              onClick={() => void loadOlder()}
+              disabled={olderLoading}
+              className="rounded-full border border-[#E5E7EB] bg-canvas px-3 py-1.5 text-xs font-semibold text-[#2563EB] hover:bg-[#F7F8F6] disabled:opacity-50"
+            >
+              {olderLoading ? '読み込み中...' : '過去のメッセージを読み込む'}
+            </button>
+          </div>
+        ) : null}
         {detail.messages.map((message) => (
           <div key={message.id} className={`flex items-end gap-2 ${message.direction === 'outgoing' ? 'justify-end' : 'justify-start'}`}>
             <div
