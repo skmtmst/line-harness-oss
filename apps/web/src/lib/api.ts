@@ -311,7 +311,8 @@ export type AuditEventItem = {
 }
 
 export type AuditEventSummary = {
-  periodDays: 30
+  /** 集計した期間の日数。全期間（from 未指定）で取ったときは null。 */
+  periodDays: number | null
   total: number
   deleted: number
   sent: number

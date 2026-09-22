@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
 import SearchField from '@/components/shared/search-field'
@@ -11,7 +11,7 @@ import { useAccount } from '@/contexts/account-context'
 import { api, ApiError, type AuditEventItem, type AuditEventSummary } from '@/lib/api'
 
 const EMPTY_SUMMARY: AuditEventSummary = {
-  periodDays: 30,
+  periodDays: null,
   total: 0,
   deleted: 0,
   sent: 0,
@@ -116,6 +116,14 @@ export default function LoginAudit({ userId }: { userId?: string }) {
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  /*
+   * STAFF-02: 集計カード・タブの件数は「最後に取得成功した期間」のもの。
+   * 読み込み中・失敗中に、選択中の期間の結果と見せかけて古い期間の数を
+   * 出さないため、表示中の集計がどの期間のものかを別に持つ。
+   */
+  const [loadedPeriod, setLoadedPeriod] = useState<string | null>(null)
+  /* 期間を素早く切り替えたとき、先に投げた遅い応答が新しい結果を上書きしないよう世代で捨てる。 */
+  const requestSeq = useRef(0)
   const [query, setQuery] = useState('')
   const [actionFilter, setActionFilter] = useState('all')
   const [periodFilter, setPeriodFilter] = useState('30')
@@ -125,6 +133,7 @@ export default function LoginAudit({ userId }: { userId?: string }) {
   const [detail, setDetail] = useState<AuditEventItem | null>(null)
 
   const load = useCallback(async () => {
+    const requestId = ++requestSeq.current
     setLoading(true)
     setError('')
     try {
@@ -150,25 +159,28 @@ export default function LoginAudit({ userId }: { userId?: string }) {
         limit: pageSize,
         offset: (page - 1) * pageSize,
       })
+      if (requestId !== requestSeq.current) return // 新しい条件の取得が続いている。古い応答は捨てる。
       if (auditResult.success) {
         setRows(auditResult.data.items)
         setSummary(auditResult.data.summary)
         setTotal(auditResult.data.pagination.total)
+        // 集計がどの期間のものかを、取得に成功した条件へそろえる。
+        setLoadedPeriod(periodFilter)
       } else {
+        // 集計だけ残すと「失敗した期間の件数」と読み違える。件数は前回取得成功時のままにし、行は消す。
         setRows([])
-        setSummary(EMPTY_SUMMARY)
         setTotal(0)
         setError(auditResult.error || '入った記録を読み込めませんでした。時間をおいて、もう一度お試しください。')
       }
     } catch (caught) {
+      if (requestId !== requestSeq.current) return
       setRows([])
-      setSummary(EMPTY_SUMMARY)
       setTotal(0)
       setError(caught instanceof ApiError && caught.status === 403
         ? '入った記録を見る権限がありません。管理者へ確認してください。'
         : '入った記録を読み込めませんでした。時間をおいて、もう一度お試しください。')
     } finally {
-      setLoading(false)
+      if (requestId === requestSeq.current) setLoading(false)
     }
   }, [actionFilter, page, pageSize, periodFilter, query, selectedAccountId, userId])
 
@@ -194,12 +206,29 @@ export default function LoginAudit({ userId }: { userId?: string }) {
   const first = total === 0 ? 0 : (currentPage - 1) * pageSize + 1
   const last = visible.length === 0 ? 0 : Math.min(first + visible.length - 1, total)
 
+  /*
+   * STAFF-02: 集計題は「表示中の数が属する期間」（loadedPeriod）で出す。
+   * 選択中の期間とずれている間は読み込み中であること、失敗したときは
+   * 前回の集計のままであることを、件数の横の補足で明記する。
+   */
+  const periodLabel = (period: string): string =>
+    PERIOD_OPTIONS.find((option) => option.value === period)?.label ?? period
+  const summaryTitle = loadedPeriod === null ? '記録' : `${periodLabel(loadedPeriod)}の記録`
+  const summaryNote = error
+    ? (loadedPeriod === null ? '記録を取得できませんでした' : '読み込みに失敗したため、前回の集計を表示しています')
+    : loading
+      ? (loadedPeriod === null || periodFilter === loadedPeriod
+          ? '記録を読み込み中…'
+          : `${periodLabel(periodFilter)}の記録を読み込み中…`)
+      : '認証と業務操作をまとめて集計'
+  const summaryValue = (value: number): number | null => (loadedPeriod === null ? null : value)
+
   return <div id="staff-audit">
-    <div data-design="KPIs" className="mb-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-      <AuditKpi label="この30日の記録" value={summary.total} note="認証と業務操作をまとめて集計" />
-      <AuditKpi label="消した操作" value={summary.deleted} note="削除として記録された操作" />
-      <AuditKpi label="配信した操作" value={summary.sent} note="送信・公開として記録された操作" />
-      <AuditKpi label="いつもと違う場所から" value={summary.suspiciousLogins} note="見なれない場所からのログイン" attention={summary.suspiciousLogins > 0} />
+    <div data-design="KPIs" className="mb-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4" aria-busy={loading}>
+      <AuditKpi label={summaryTitle} value={summaryValue(summary.total)} note={summaryNote} />
+      <AuditKpi label="消した操作" value={summaryValue(summary.deleted)} note="削除として記録された操作" />
+      <AuditKpi label="配信した操作" value={summaryValue(summary.sent)} note="送信・公開として記録された操作" />
+      <AuditKpi label="いつもと違う場所から" value={summaryValue(summary.suspiciousLogins)} note="見なれない場所からのログイン" attention={summary.suspiciousLogins > 0} />
     </div>
     <div className="mb-4 rounded-control bg-info-bg px-4 py-3 text-sm font-medium text-accent">だれが、いつ、何をしたかの記録です。いつもと違う場所からのログインは赤く出します。消した・配信した・設定を変えたで絞れます。</div>
     <div className="mb-3 flex flex-wrap items-center gap-3">
@@ -238,8 +267,8 @@ export default function LoginAudit({ userId }: { userId?: string }) {
   </div>
 }
 
-function AuditKpi({ label, value, note, attention = false }: { label: string; value: number; note: string; attention?: boolean }) {
-  return <div className="flex h-28 flex-col gap-1 rounded-card border border-hairline bg-canvas p-4"><p className="text-xs font-semibold leading-normal text-ink-faint">{label}</p><p className={`text-xl font-bold leading-normal tabular-nums ${attention ? 'text-danger' : 'text-ink'}`}>{value.toLocaleString()}<span className="ml-1 text-xs font-medium text-ink-faint">件</span></p><p className="text-xs leading-normal text-ink-faint">{note}</p></div>
+function AuditKpi({ label, value, note, attention = false }: { label: string; value: number | null; note: string; attention?: boolean }) {
+  return <div className="flex h-28 flex-col gap-1 rounded-card border border-hairline bg-canvas p-4"><p className="text-xs font-semibold leading-normal text-ink-faint">{label}</p><p className={`text-xl font-bold leading-normal tabular-nums ${attention ? 'text-danger' : 'text-ink'}`}>{value === null ? '—' : <>{value.toLocaleString()}<span className="ml-1 text-xs font-medium text-ink-faint">件</span></>}</p><p className="text-xs leading-normal text-ink-faint">{note}</p></div>
 }
 
 function AuditPageLink({ children, disabled, onClick }: { children: React.ReactNode; disabled: boolean; onClick: () => void }) {
