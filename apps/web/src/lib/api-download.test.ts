@@ -10,8 +10,9 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-vi.hoisted(() => {
+const API_BASE = vi.hoisted(() => {
   process.env.NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://worker.example.com'
+  return process.env.NEXT_PUBLIC_API_URL
 })
 
 let bookingApi: typeof import('./api').bookingApi
@@ -50,10 +51,12 @@ afterEach(() => {
 const csvResponse = () =>
   new Response('\uFEFF予約ID,お客さま名\r\nb1,山田\r\n', {
     status: 200,
-    headers: {
-      'content-type': 'text/csv; charset=utf-8',
-      'Content-Disposition': 'attachment; filename="booking-ledger-20260922.csv"',
-    },
+    // タプルで渡す（オブジェクトのキーとして書くと worker の
+    // CORS 許可ヘッダ契約試験がリクエストヘッダと誤認して拾う）。
+    headers: new Headers([
+      ['content-type', 'text/csv; charset=utf-8'],
+      ['Content-Disposition', 'attachment; filename="booking-ledger-20260922.csv"'],
+    ]),
   })
 
 describe('downloadApiFile（TECH-03）', () => {
@@ -66,7 +69,7 @@ describe('downloadApiFile（TECH-03）', () => {
 
     expect(fetchSpy).toHaveBeenCalledTimes(1)
     const [url, init] = fetchSpy.mock.calls[0] as unknown as [string, RequestInit]
-    expect(url).toBe('https://worker.example.com/api/booking/admin/bookings.csv?account_id=acc-1&status=confirmed&staff_id=staff-9')
+    expect(url).toBe(`${API_BASE}/api/booking/admin/bookings.csv?account_id=acc-1&status=confirmed&staff_id=staff-9`)
     expect(init.credentials).toBe('include')
     expect((init.headers as Record<string, string>).Authorization).toBe('Bearer lh_session:session-token-1')
     // Cookie に頼る画面遷移ではなく、取得した Blob を保存する。
@@ -81,7 +84,7 @@ describe('downloadApiFile（TECH-03）', () => {
     await eventsApi.downloadOccurrenceApplicantsCsv('acc-1', 'occ-1', 'snap-1')
 
     const [url, init] = fetchSpy.mock.calls[0] as unknown as [string, RequestInit]
-    expect(url).toBe('https://worker.example.com/api/events/admin/occurrences/occ-1/applicants.csv?snapshot_id=snap-1&account_id=acc-1')
+    expect(url).toBe(`${API_BASE}/api/events/admin/occurrences/occ-1/applicants.csv?snapshot_id=snap-1&account_id=acc-1`)
     expect((init.headers as Record<string, string>).Authorization).toBe('Bearer lh_session:session-token-2')
     expect(clicked).toHaveLength(1)
   })
