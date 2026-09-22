@@ -12055,6 +12055,45 @@ export interface BookingAvailabilityResponse {
   }>;
 }
 
+/** IDEA-28 予約設定の「この日時はなぜ予約できないか」の理由コード。 */
+export type BookingSlotBlockReason =
+  | 'menu_inactive'
+  | 'staff_not_offered'
+  | 'invalid_resource'
+  | 'booking_window'
+  | 'past_cutoff'
+  | 'invalid_time'
+  | 'not_on_grid'
+  | 'exception_closed'
+  | 'exception_invalid'
+  | 'outside_working'
+  | 'duration_overrun'
+  | 'other_booking'
+  | 'google_busy'
+  | 'capacity_full'
+  | 'store_full'
+  | 'resource_shortage'
+  | 'calendar_unavailable'
+  | 'unavailable';
+
+export interface BookingSlotCheckStaff {
+  staff_id: string;
+  display_name: string;
+  bookable: boolean;
+  remaining: number | null;
+  capacity: number | null;
+  reasons: BookingSlotBlockReason[];
+}
+
+export interface BookingSlotCheckResult {
+  date: string;
+  time: string;
+  timeZone: string;
+  bookable: boolean;
+  reasons: BookingSlotBlockReason[];
+  per_staff: BookingSlotCheckStaff[];
+}
+
 export interface ProxyBookingResult {
   booking_id: string;
   status: string;
@@ -12368,6 +12407,20 @@ export const bookingApi = {
     if (params.staffId) query.set('staff_id', params.staffId);
     if (params.excludeBookingId) query.set('exclude_booking_id', params.excludeBookingId);
     return fetchApi<BookingAvailabilityResponse>(`/api/booking/admin/availability?${query}`);
+  },
+  /** IDEA-28: 指定した日時がなぜ予約できないかを確認する（読み取り専用・予約は作らない）。 */
+  checkAvailability: (
+    accountId: string,
+    params: { menuId: string; staffId?: string; date: string; time: string },
+  ) => {
+    const query = new URLSearchParams({
+      account_id: accountId,
+      menu_id: params.menuId,
+      date: params.date,
+      time: params.time,
+    });
+    if (params.staffId) query.set('staff_id', params.staffId);
+    return fetchApi<BookingSlotCheckResult>(`/api/booking/admin/availability-check?${query}`);
   },
   createProxyBooking: (
     accountId: string,
