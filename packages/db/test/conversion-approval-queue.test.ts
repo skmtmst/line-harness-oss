@@ -496,3 +496,204 @@ describe('offerActionsIncomplete', () => {
     expect(await flagOf('cv-nooffer')).toBe(false);
   });
 });
+
+/*
+ * IDEA-16: 承認キューの行から注文番号・注文の最新状態・同じ注文の重複候補・
+ * 確定報酬・支払い確定の状態へ辿れることの固定。
+ *
+ *  - orderNumber は記録時に metadata へ残した根拠
+ *  - orderStatus は同じアカウントの最新注文（返金・取消を承認しない材料）
+ *  - sameOrderDuplicate は「同じ注文・同じ成果地点」の帰属成果が2件以上
+ *  - 注文番号はアカウントを越えて同じ番号が来るので、別アカウントの成果は
+ *    重複候補に挙げない
+ *  - rewardAmount は承認時に固定された版の金額。版が無い成果は null（未確定）
+ */
+describe('IDEA-16: 注文番号・注文状態・重複候補・報酬', () => {
+  function insertLineAccount(s: Database.Database, id: string, name: string): void {
+    s.prepare(
+      `INSERT INTO line_accounts (id, channel_id, name, channel_access_token, channel_secret)
+       VALUES (?, ?, ?, 'token', 'secret')`,
+    ).run(id, `channel-${id}`, name);
+  }
+
+  function insertEcConversion(
+    s: Database.Database,
+    opts: {
+      id: string;
+      pointId: string;
+      friendId: string;
+      affiliateId: string;
+      orderNumber: string | null;
+      ecEventId: string;
+      approvalStatus: string;
+      createdAt: string;
+    },
+  ): void {
+    s.prepare(
+      `INSERT INTO conversion_events
+         (id, conversion_point_id, friend_id, affiliate_id, approval_status, metadata, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    ).run(
+      opts.id, opts.pointId, opts.friendId, opts.affiliateId, opts.approvalStatus,
+      JSON.stringify({
+        sourceType: 'ec_order_confirmed',
+        ecEventId: opts.ecEventId,
+        orderNumber: opts.orderNumber,
+      }),
+      opts.createdAt,
+    );
+  }
+
+  function insertEcOrder(
+    s: Database.Database,
+    opts: { eventId: string; orderId: string; accountId: string; orderNumber: string; status: string },
+  ): void {
+    s.prepare(
+      `INSERT INTO ec_events
+         (id, source, external_event_id, event_type, line_account_id, payload, status, received_at, updated_at)
+       VALUES (?, ?, ?, 'ec.order.confirmed', ?, '{}', 'processed', '2026-02-01', '2026-02-01')`,
+    ).run(opts.eventId, `eccube:${opts.accountId}`, opts.eventId, opts.accountId);
+    s.prepare(
+      `INSERT INTO ec_orders
+         (id, line_account_id, source_key, external_order_id, order_number, normalized_status,
+          provider_status, ordered_at, last_event_id, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, '新規受付', '2026-02-01', ?, '2026-02-01', '2026-02-02')`,
+    ).run(opts.orderId, opts.accountId, `eccube:${opts.accountId}`, opts.orderId, opts.orderNumber, opts.status, opts.eventId);
+  }
+
+  test('注文番号と同じアカウントの最新注文状態を返す。注文が無ければ状態は null', async () => {
+    insertLineAccount(sqlite, 'acc-1', '本店');
+    insertLineAccount(sqlite, 'acc-2', '別店');
+    insertFriend(sqlite, 'f1', { userId: 'uid-1' });
+    insertFriend(sqlite, 'f3', { userId: 'uid-3' });
+    sqlite.prepare(`UPDATE friends SET line_account_id = 'acc-1' WHERE id = 'f1'`).run();
+    sqlite.prepare(`UPDATE friends SET line_account_id = 'acc-2' WHERE id = 'f3'`).run();
+    insertAffiliate(sqlite, 'aff1');
+    insertPoint(sqlite, 'p1', 100);
+
+    insertEcConversion(sqlite, {
+      id: 'cv1', pointId: 'p1', friendId: 'f1', affiliateId: 'aff1',
+      orderNumber: 'N-1001', ecEventId: 'ext-1', approvalStatus: 'pending',
+      createdAt: '2026-02-01T00:00:00.000+09:00',
+    });
+    insertEcConversion(sqlite, {
+      id: 'cv3', pointId: 'p1', friendId: 'f1', affiliateId: 'aff1',
+      orderNumber: 'N-2002', ecEventId: 'ext-3', approvalStatus: 'pending',
+      createdAt: '2026-02-02T00:00:00.000+09:00',
+    });
+    // 別アカウントの成果に同じ注文番号が来ても、本店の注文状態を拾わない。
+    insertEcConversion(sqlite, {
+      id: 'cv4', pointId: 'p1', friendId: 'f3', affiliateId: 'aff1',
+      orderNumber: 'N-1001', ecEventId: 'ext-4', approvalStatus: 'pending',
+      createdAt: '2026-02-03T00:00:00.000+09:00',
+    });
+    // acc-1 には N-1001 が返金済みで届いている。acc-2 には注文が無い。
+    insertEcOrder(sqlite, { eventId: 'ev-1', orderId: 'o-1', accountId: 'acc-1', orderNumber: 'N-1001', status: 'refunded' });
+
+    const rows = await getConversionApprovalQueue(db, { status: 'pending', scope: ALL_SCOPE, identityKeySql: IDENTITY_KEY_SQL });
+    const byEvent = new Map(rows.map((r) => [r.eventId, r]));
+    expect(byEvent.get('cv1')).toMatchObject({ orderNumber: 'N-1001', orderStatus: 'refunded' });
+    expect(byEvent.get('cv3')).toMatchObject({ orderNumber: 'N-2002', orderStatus: null });
+    // acc-2 にはこの番号の注文が無いので、本店の返金済み状態を借りない。
+    expect(byEvent.get('cv4')).toMatchObject({ orderNumber: 'N-1001', orderStatus: null });
+  });
+
+  test('同じ注文・同じ成果地点の成果が2件以上なら重複候補。別アカウントの同じ番号は候補にしない', async () => {
+    insertLineAccount(sqlite, 'acc-1', '本店');
+    insertLineAccount(sqlite, 'acc-2', '別店');
+    insertFriend(sqlite, 'f1', { userId: 'uid-1' });
+    insertFriend(sqlite, 'f2', { userId: 'uid-2' });
+    insertFriend(sqlite, 'f3', { userId: 'uid-3' });
+    sqlite.prepare(`UPDATE friends SET line_account_id = 'acc-1' WHERE id IN ('f1', 'f2')`).run();
+    sqlite.prepare(`UPDATE friends SET line_account_id = 'acc-2' WHERE id = 'f3'`).run();
+    insertAffiliate(sqlite, 'aff1');
+    insertPoint(sqlite, 'p1', 100);
+
+    // 同じ注文が別の出来事IDで届き直した形（冪等キーが違うので別の成果が立つ）。
+    insertEcConversion(sqlite, {
+      id: 'cv1', pointId: 'p1', friendId: 'f1', affiliateId: 'aff1',
+      orderNumber: 'N-1001', ecEventId: 'ext-1', approvalStatus: 'pending',
+      createdAt: '2026-02-01T00:00:00.000+09:00',
+    });
+    insertEcConversion(sqlite, {
+      id: 'cv2', pointId: 'p1', friendId: 'f2', affiliateId: 'aff1',
+      orderNumber: 'N-1001', ecEventId: 'ext-2', approvalStatus: 'pending',
+      createdAt: '2026-02-02T00:00:00.000+09:00',
+    });
+    insertEcConversion(sqlite, {
+      id: 'cv3', pointId: 'p1', friendId: 'f1', affiliateId: 'aff1',
+      orderNumber: 'N-2002', ecEventId: 'ext-3', approvalStatus: 'pending',
+      createdAt: '2026-02-03T00:00:00.000+09:00',
+    });
+    // 別店(acc-2)に同じ番号の注文が届いても、本店の重複とは数えない。
+    insertEcConversion(sqlite, {
+      id: 'cv4', pointId: 'p1', friendId: 'f3', affiliateId: 'aff1',
+      orderNumber: 'N-1001', ecEventId: 'ext-4', approvalStatus: 'pending',
+      createdAt: '2026-02-04T00:00:00.000+09:00',
+    });
+
+    const rows = await getConversionApprovalQueue(db, { status: 'pending', scope: ALL_SCOPE, identityKeySql: IDENTITY_KEY_SQL });
+    const flagByEvent = new Map(rows.map((r) => [r.eventId, r.sameOrderDuplicate]));
+    expect(flagByEvent.get('cv1')).toBe(true);
+    expect(flagByEvent.get('cv2')).toBe(true);
+    expect(flagByEvent.get('cv3')).toBe(false);
+    expect(flagByEvent.get('cv4')).toBe(false);
+  });
+
+  test('承認時に固定した報酬額と支払い確定の状態を返す。無い成果は null のまま', async () => {
+    insertLineAccount(sqlite, 'acc-1', '本店');
+    insertFriend(sqlite, 'f1', { userId: 'uid-1' });
+    sqlite.prepare(`UPDATE friends SET line_account_id = 'acc-1' WHERE id = 'f1'`).run();
+    insertAffiliate(sqlite, 'aff1');
+    insertPoint(sqlite, 'p1', 100);
+    insertEcConversion(sqlite, {
+      id: 'cv1', pointId: 'p1', friendId: 'f1', affiliateId: 'aff1',
+      orderNumber: 'N-1001', ecEventId: 'ext-1', approvalStatus: 'approved',
+      createdAt: '2026-02-01T00:00:00.000+09:00',
+    });
+    insertEcConversion(sqlite, {
+      id: 'cv2', pointId: 'p1', friendId: 'f1', affiliateId: 'aff1',
+      orderNumber: 'N-2002', ecEventId: 'ext-2', approvalStatus: 'approved',
+      createdAt: '2026-02-02T00:00:00.000+09:00',
+    });
+    // cv1 だけ承認時の版と支払い確定の行がある。
+    sqlite.prepare(`INSERT OR IGNORE INTO tenants (id, name) VALUES ('t1', 'テスト')`).run();
+    sqlite.prepare(
+      `INSERT INTO affiliate_reward_calculations
+         (id, organization_id, line_account_id, affiliate_id, conversion_event_id,
+          formula, amount_minor)
+       VALUES ('calc-1', 't1', 'acc-1', 'aff1', 'cv1', 'fixed', 400)`,
+    ).run();
+    sqlite.prepare(
+      `INSERT INTO affiliate_reward_entries
+         (id, organization_id, line_account_id, affiliate_id, conversion_event_id,
+          entry_type, amount_minor, status, idempotency_key)
+       VALUES ('re-1', 't1', 'acc-1', 'aff1', 'cv1', 'credit', 400, 'settled', 'ik-1')`,
+    ).run();
+
+    const rows = await getConversionApprovalQueue(db, { status: 'approved', scope: ALL_SCOPE, identityKeySql: IDENTITY_KEY_SQL });
+    const byEvent = new Map(rows.map((r) => [r.eventId, r]));
+    expect(byEvent.get('cv1')).toMatchObject({ rewardAmount: 400, rewardEntryStatus: 'settled' });
+    // 版も確定の行も無い成果は未確定(null)のまま。0円とは扱わない。
+    expect(byEvent.get('cv2')).toMatchObject({ rewardAmount: null, rewardEntryStatus: null });
+  });
+
+  test('注文由来でない成果(metadataなし)は注文番号・注文状態・重複候補すべて空', async () => {
+    insertFriend(sqlite, 'f1', { userId: 'uid-1' });
+    insertAffiliate(sqlite, 'aff1');
+    insertPoint(sqlite, 'p1', 100);
+    insertConversion(sqlite, {
+      id: 'cv1', pointId: 'p1', friendId: 'f1', affiliateId: 'aff1', refCode: null,
+      approvalStatus: 'pending', createdAt: '2026-02-01T00:00:00.000+09:00',
+    });
+
+    const rows = await getConversionApprovalQueue(db, { status: 'pending', scope: ALL_SCOPE, identityKeySql: IDENTITY_KEY_SQL });
+    expect(rows[0]).toMatchObject({
+      orderNumber: null,
+      orderStatus: null,
+      sameOrderDuplicate: false,
+      rewardAmount: null,
+      rewardEntryStatus: null,
+    });
+  });
+});

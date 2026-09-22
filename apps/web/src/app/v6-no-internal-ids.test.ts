@@ -125,7 +125,7 @@ describe('V6の画面に内部IDとDBの語を出さない', () => {
 describe('成果承認 n5VVTb の友だち列', () => {
   const CELL = between(
     read('affiliates/tabs.tsx'),
-    '{pagedItems.map((item) => (',
+    '{pagedItems.map((item) => {',
     '{item.affiliateName',
   )
 
@@ -170,9 +170,11 @@ describe('紹介者 jwrbf の内訳', () => {
   })
 
   it('重複のしるしの吹き出しに列名を出さない', () => {
-    const FLAG = between(TABS, '{item.duplicateFlag ? (', '</td>')
-    expect(FLAG).toContain('title={DUPLICATE_FLAG_TITLE}')
-    expect(FLAG).not.toMatch(/identity_key/i)
+    const FLAG = between(TABS, '{needsReview ? (', '</td>')
+    // IDEA-16: 理由は approvalReviewReasons が運用者の言葉で組み立てる。
+    // metadata のキー名（orderNumber/ecEventId）や列名は出さない。
+    expect(FLAG).toContain('title={reviewReasons.join')
+    expect(FLAG).not.toMatch(/identity_key|order_number|ec_event_id/i)
   })
 })
 
