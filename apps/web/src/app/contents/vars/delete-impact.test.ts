@@ -21,8 +21,12 @@ const impact = (over: Record<string, unknown> = {}) =>
   }) as never
 
 describe('差し込みキー', () => {
-  it('内部の互換キーではなく表示名で出す', () => {
-    expect(placeholderText('営業時間')).toBe('{営業時間}')
+  it('実際に置き換えられる {{var.<varKey>}} の形で出す', () => {
+    /*
+     * `{営業時間}` は置き換え対象にならず、そのまま相手へ届く。
+     * 案内する表記は挿入ツールが入れる形と同じにする（VAR-01）。
+     */
+    expect(placeholderText('shop_hours')).toBe('{{var.shop_hours}}')
   })
 })
 
@@ -32,7 +36,7 @@ describe('使われている数', () => {
   })
 
   it('件数と差し込みキーを一緒に出す', () => {
-    expect(usageText(impact())).toContain('{営業時間} は 3か所で差し込まれています')
+    expect(usageText(impact())).toContain('{{var.shop_hours}} は 3か所で差し込まれています')
   })
 })
 
@@ -89,18 +93,18 @@ describe('消してよいか', () => {
      */
     const ok = impact({ canDelete: true, total: 0, blockingTotal: 0 })
     expect(canDelete({ impact: ok, typedKey: '', busy: false })).toBe(false)
-    expect(canDelete({ impact: ok, typedKey: '{営業時間}', busy: false })).toBe(true)
-    expect(canDelete({ impact: ok, typedKey: ' {営業時間} ', busy: false })).toBe(true)
-    expect(canDelete({ impact: ok, typedKey: '{{var.shop_hours}}', busy: false })).toBe(false)
+    expect(canDelete({ impact: ok, typedKey: '{{var.shop_hours}}', busy: false })).toBe(true)
+    expect(canDelete({ impact: ok, typedKey: ' {{var.shop_hours}} ', busy: false })).toBe(true)
+    expect(canDelete({ impact: ok, typedKey: '{営業時間}', busy: false })).toBe(false)
   })
 
   it('使われているあいだは、キーを打っても押せない', () => {
-    expect(canDelete({ impact: impact(), typedKey: '{営業時間}', busy: false })).toBe(false)
+    expect(canDelete({ impact: impact(), typedKey: '{{var.shop_hours}}', busy: false })).toBe(false)
   })
 
   it('読み込めていないときと送信中は押せない', () => {
-    expect(canDelete({ impact: null, typedKey: '{営業時間}', busy: false })).toBe(false)
-    expect(canDelete({ impact: impact({ canDelete: true }), typedKey: '{営業時間}', busy: true })).toBe(false)
+    expect(canDelete({ impact: null, typedKey: '{{var.shop_hours}}', busy: false })).toBe(false)
+    expect(canDelete({ impact: impact({ canDelete: true }), typedKey: '{{var.shop_hours}}', busy: true })).toBe(false)
   })
 })
 
@@ -111,17 +115,20 @@ describe('押せない理由', () => {
 
   it('キーが未入力なら、そのことを言う', () => {
     expect(blockedReason({ impact: impact({ canDelete: true }), typedKey: '' }))
-      .toContain('{営業時間} を入力してください')
+      .toContain('{{var.shop_hours}} を入力してください')
   })
 
   it('押せるときは理由を出さない', () => {
-    expect(blockedReason({ impact: impact({ canDelete: true }), typedKey: '{営業時間}' })).toBeNull()
+    expect(blockedReason({ impact: impact({ canDelete: true }), typedKey: '{{var.shop_hours}}' })).toBeNull()
   })
 
-  it('内部の記号を出さない', () => {
-    for (const t of [blockedReason({ impact: null, typedKey: '' }), blockedReason({ impact: impact(), typedKey: '' })]) {
-      expect(t ?? '').not.toMatch(/[a-z_]{4,}\b(?![}])/)
-    }
+  it('打ってもらうキーは本文で効く表記と同じにする', () => {
+    /*
+     * 運用者が写すのは画面の案内。`{営業時間}` を打たせても
+     * 本文では置き換えられないので、実際の差し込み形を出す。
+     */
+    expect(blockedReason({ impact: impact({ canDelete: true }), typedKey: '' }))
+      .toContain(placeholderText('shop_hours'))
   })
 })
 
