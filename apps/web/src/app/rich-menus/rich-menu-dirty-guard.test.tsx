@@ -415,3 +415,72 @@ describe('公開のしかたの入力保持 (RICHMENU-06)', () => {
   })
 })
 
+/*
+ * DEEP-27: 未保存で足した条件が「保存済み条件」と出ると、保存したつもりで
+ * 画面を離れてしまう。保存済みの条件と同じかどうかで表示を分ける。
+ */
+describe('条件の保存状態の表示 (DEEP-27)', () => {
+  const GROUP_WITH_CONDITION = {
+    ...GROUP,
+    targetingEnabled: true,
+    targetingCondition: JSON.stringify({
+      operator: 'AND',
+      rules: [{ type: 'private_memo', value: '保存済み' }],
+    }),
+  }
+
+  test('保存済み条件は「保存済み」、直した条件は「未保存」と区別する', async () => {
+    richMenuGet.mockImplementation(() => Promise.resolve({ success: true, data: GROUP_WITH_CONDITION }))
+    searchParams.value = new URLSearchParams('id=grp-1&step=targeting')
+    render(<RichMenuEditPage />)
+    await flush()
+
+    await screen.findByText('保存済み条件 1件')
+
+    fireEvent.click(screen.getByText('条件を編集'))
+    await flush()
+    // スタブの条件組み立て: 押すと別の条件が1件入る
+    fireEvent.click(screen.getByText('条件を足す(スタブ)'))
+    await flush()
+
+    expect(screen.getByText('条件 1件（未保存）')).toBeTruthy()
+    expect(screen.queryByText('保存済み条件 1件')).toBeNull()
+  })
+})
+
+/*
+ * RICHMENU-03: 条件をONにしたのに条件が空だと保存できず誰にも出ない。
+ * STEP1 は「誰にも出しません」と案内するが、STEP2 は人数APIが空条件を
+ * 全員として数えるため「当てはまる5人/出る5人」と食い違って見えた。
+ * 対象の説明を両工程で揃える（数え方そのものは変えない）。
+ */
+describe('条件が空のときの対象説明 (RICHMENU-03)', () => {
+  const GROUP_EMPTY_CONDITION = {
+    ...GROUP,
+    targetingEnabled: true,
+    targetingCondition: null,
+  }
+  const EMPTY_WARNING = '条件が空です。このままだと誰にも出しません。条件を1つ以上足してください。'
+
+  test('条件ON・空条件ではSTEP2も「誰にも出しません」で0人と案内する', async () => {
+    richMenuGet.mockImplementation(() => Promise.resolve({ success: true, data: GROUP_EMPTY_CONDITION }))
+    searchParams.value = new URLSearchParams('id=grp-1&step=targeting')
+    render(<RichMenuEditPage />)
+    await flush()
+
+    await screen.findByText('このメニューを出す相手')
+    expect(screen.getByText(EMPTY_WARNING)).toBeTruthy()
+    // 「いま当てはまる人」「実際にこのメニューが出る人」は 0人 と出す
+    expect(screen.getAllByText('0人')).toHaveLength(2)
+  })
+
+  test('同じ状態でSTEP1も同じ案内を出す', async () => {
+    richMenuGet.mockImplementation(() => Promise.resolve({ success: true, data: GROUP_EMPTY_CONDITION }))
+    searchParams.value = new URLSearchParams('id=grp-1')
+    render(<RichMenuEditPage />)
+    await flush()
+
+    await screen.findByDisplayValue('メインメニュー')
+    expect(screen.getByText(EMPTY_WARNING)).toBeTruthy()
+  })
+})

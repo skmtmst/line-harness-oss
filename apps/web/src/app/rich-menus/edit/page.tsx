@@ -972,6 +972,7 @@ function Editor({
         targetingEnabled={targetingEnabled}
         targetingPriority={targetingPriority}
         targetingCondition={targetingCondition}
+        savedCondition={parseStoredCondition(group.targetingCondition)}
         tags={tags}
         preview={targetPreview}
         previewLoading={targetPreviewLoading}
@@ -1697,6 +1698,7 @@ function TargetingStep({
   targetingEnabled,
   targetingPriority,
   targetingCondition,
+  savedCondition,
   tags,
   preview,
   previewLoading,
@@ -1713,6 +1715,8 @@ function TargetingStep({
   targetingEnabled: boolean
   targetingPriority: number
   targetingCondition: SegmentCondition | null
+  /** 保存済みの条件。編集中の条件が保存済みかどうかの言い分けに使う。 */
+  savedCondition: SegmentCondition | null
   tags: PickerOption[]
   preview: RichMenuTargetPreview | null
   previewLoading: boolean
@@ -1733,6 +1737,26 @@ function TargetingStep({
   const selectedTagName = firstRule?.type.startsWith('tag_')
     ? tags.find((tag) => tag.id === firstRule.value)?.name
     : null
+  /*
+   * DEEP-27: 編集中の条件が未保存なのに「保存済み」と出ると、保存した
+   * つもりで画面を離れてしまう。保存済みの条件と同じかどうかで言い分ける。
+   */
+  const conditionUnsaved =
+    JSON.stringify(targetingCondition ?? null) !== JSON.stringify(savedCondition ?? null)
+  const conditionSummary = selectedTagName
+    ? `タグ「${selectedTagName}」を含む`
+    : targetingCondition
+      ? `${conditionUnsaved ? '条件' : '保存済み条件'} ${targetingCondition.rules.length}件`
+      : conditionUnsaved
+        ? '保存済みの条件を外しています'
+        : '条件がまだありません'
+  /*
+   * RICHMENU-03: 条件をONにしたのに条件が空だと、保存できず誰にも出ない
+   * （STEP1 の注意と同じ）。人数APIは空条件を全員として数えるため、
+   * 数字が「誰にも出ない」案内と食い違って見える。対象の説明だけを
+   * STEP1 と揃え、数え方そのものは変えない。
+   */
+  const conditionEmpty = targetingEnabled && !targetingCondition
   return (
     <main data-design-node="kQ1bs" className="mx-auto max-w-7xl p-6 pb-24">
       <nav className="text-ink-faint mb-2 text-xs"><Link href="/rich-menus">リッチメニュー</Link><span className="mx-1.5">/</span>{group.name}</nav>
@@ -1754,20 +1778,22 @@ function TargetingStep({
 
           {targetingEnabled ? (
             <div className="border-hairline mt-5 rounded-card border p-4">
-              <div className="flex items-center justify-between gap-3"><div><p className="text-ink text-sm font-bold">条件</p><p className="text-ink-secondary mt-1 text-xs">{selectedTagName ? `タグ「${selectedTagName}」を含む` : targetingCondition ? `保存済み条件 ${targetingCondition.rules.length}件` : '条件がまだありません'}</p></div>{readOnly ? null : <Button type="button" onClick={() => setConditionEditorOpen((open) => !open)}>{conditionEditorOpen ? '編集を閉じる' : '条件を編集'}</Button>}</div>
+              <div className="flex items-center justify-between gap-3"><div><p className="text-ink text-sm font-bold">条件</p><p className="text-ink-secondary mt-1 text-xs">{conditionSummary}{conditionUnsaved ? '（未保存）' : ''}</p></div>{readOnly ? null : <Button type="button" onClick={() => setConditionEditorOpen((open) => !open)}>{conditionEditorOpen ? '編集を閉じる' : '条件を編集'}</Button>}</div>
               {conditionEditorOpen && !readOnly ? <div className="mt-4"><ConditionBuilder value={targetingCondition} onChange={onTargetingCondition} label="条件" /></div> : null}
             </div>
           ) : null}
 
           <div className="border-hairline mt-5 grid gap-4 border-t pt-5 sm:grid-cols-3">
-            <div><p className="text-ink-faint text-xs">いま当てはまる人</p><p className="text-ink mt-1 text-2xl font-bold">{previewLoading ? '確認中…' : <MetricValue metric={preview?.matched} />}</p></div>
+            <div><p className="text-ink-faint text-xs">いま当てはまる人</p><p className="text-ink mt-1 text-2xl font-bold">{conditionEmpty ? '0人' : previewLoading ? '確認中…' : <MetricValue metric={preview?.matched} />}</p></div>
             <div>
               <label className="text-ink-faint text-xs" htmlFor="targeting-priority">出す順番</label>
               <div className="mt-1 flex items-center gap-2"><input id="targeting-priority" aria-label="出す順番" type="number" min={1} value={targetingPriority + 1} disabled={readOnly} onChange={(event) => onTargetingPriority(Math.max(0, Number(event.target.value) - 1))} className="border-hairline rounded-control w-20 border px-3 py-2 text-lg font-bold" /><span className="text-ink-secondary text-sm">番目</span></div>
             </div>
-            <div><p className="text-ink-faint text-xs">実際にこのメニューが出る人</p><p className="text-accent mt-1 text-2xl font-bold"><MetricValue metric={preview?.effective} /></p></div>
+            <div><p className="text-ink-faint text-xs">実際にこのメニューが出る人</p><p className="text-accent mt-1 text-2xl font-bold">{conditionEmpty ? '0人' : <MetricValue metric={preview?.effective} />}</p></div>
           </div>
-          {preview?.overlap.value ? <p className="bg-warning-bg text-warning mt-4 rounded-control px-3 py-2 text-xs">このうち {preview.overlap.value.toLocaleString('ja-JP')}人 は上の「{preview.higherMenus[0] ?? '優先メニュー'}」にも当てはまるため、そちらが出ます。</p> : null}
+          {conditionEmpty ? (
+            <p className="bg-warning-bg text-warning mt-4 rounded-control px-3 py-2 text-xs">条件が空です。このままだと誰にも出しません。条件を1つ以上足してください。</p>
+          ) : preview?.overlap.value ? <p className="bg-warning-bg text-warning mt-4 rounded-control px-3 py-2 text-xs">このうち {preview.overlap.value.toLocaleString('ja-JP')}人 は上の「{preview.higherMenus[0] ?? '優先メニュー'}」にも当てはまるため、そちらが出ます。</p> : null}
           {previewError ? <p className="text-danger mt-3 text-xs" role="alert">{previewError}</p> : null}
           <Button type="button" onClick={onRefresh} className="mt-3">人数をもう一度確認</Button>
         </section>
