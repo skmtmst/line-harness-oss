@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { FlaskConical, History, MoreHorizontal, Plus, Rocket, Trash2 } from 'lucide-react'
 import { useAccount } from '@/contexts/account-context'
@@ -45,6 +45,15 @@ function deliverySummary(rule: FriendAddRule) {
 }
 
 export default function FriendAddSettingsPage() {
+  // useSearchParams は Suspense の中でしか使えない（静的書き出しのため）。
+  return (
+    <Suspense fallback={<ListState kind="loading" />}>
+      <FriendAddSettingsInner />
+    </Suspense>
+  )
+}
+
+function FriendAddSettingsInner() {
   const searchParams = useSearchParams()
   const view = searchParams.get('view')
   if (view === 'new') return <FriendAddRuleEditor />

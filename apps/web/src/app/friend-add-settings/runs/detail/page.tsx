@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import Button from '@/components/shared/button'
@@ -33,7 +33,7 @@ function safeErrorMessage(code: string | null): string | null {
   return '処理を完了できませんでした。詳細は運用ログで確認してください。'
 }
 
-export default function FriendAddRunDetailPage() {
+function FriendAddRunDetailInner() {
   usePageTitle('友だち追加時配信・実行詳細')
   const searchParams = useSearchParams()
   const runId = searchParams.get('id') ?? ''
@@ -186,5 +186,14 @@ export default function FriendAddRunDetailPage() {
         </Button>
       )}
     </div>
+  )
+}
+
+export default function FriendAddRunDetailPage() {
+  // useSearchParams は Suspense の中でしか使えない（静的書き出しのため）。
+  return (
+    <Suspense fallback={<ListState kind="loading" />}>
+      <FriendAddRunDetailInner />
+    </Suspense>
   )
 }

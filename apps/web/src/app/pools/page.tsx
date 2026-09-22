@@ -2,7 +2,7 @@
 
 import SelectField from '@/components/shared/select-field'
 import { useEffect, useState } from 'react'
-import { api, ApiError } from '@/lib/api'
+import { api, ApiError, describeSaveFailure } from '@/lib/api'
 import type { TrafficPool, PoolAccount, LineAccount } from '@line-crm/shared'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -201,24 +201,44 @@ function PoolAccountList({
   const [removeTarget, setRemoveTarget] = useState<{ id: string; name: string } | null>(null)
   const [removing, setRemoving] = useState(false)
   const [removeError, setRemoveError] = useState('')
+  const [listError, setListError] = useState('')
 
+  /**
+   * 読み直しの失敗は握りつぶさない。一覧が空のままだと「所属なし」と
+   * 読み違えるので、取れなかったことを行の下へ出す。
+   */
   const reload = async () => {
-    const res = await api.pools.accounts.list(poolId)
-    if (res.success) setMembers(res.data)
+    try {
+      const res = await api.pools.accounts.list(poolId)
+      if (res.success) {
+        setMembers(res.data)
+        setListError('')
+      } else {
+        setListError('所属アカウントを読み込めませんでした。もう一度お試しください。')
+      }
+    } catch {
+      setListError('所属アカウントを読み込めませんでした。もう一度お試しください。')
+    }
   }
 
+  // useEffect の戻り値はcleanup関数だけ。async関数をそのまま返すと
+  // ReactがPromiseをcleanupとして扱い、拒否も拾えないので void で包む。
   useEffect(() => {
-    reload()
+    void reload()
   }, [poolId])
 
   const memberAccountIds = new Set(members.map((m) => m.lineAccountId))
   const candidates = accounts.filter((a) => !memberAccountIds.has(a.id))
 
   const onAdd = async (lineAccountId: string) => {
-    const res = await api.pools.accounts.add(poolId, lineAccountId)
-    if (res.success) {
+    try {
+      const res = await api.pools.accounts.add(poolId, lineAccountId)
+      if (!res.success) throw new Error(res.error)
       await reload()
       onChange()
+    } catch {
+      // 生のAPIエラーは運用者に読めないので、運用の言葉で出す。
+      setListError('このアカウントをプールに追加できませんでした。もう一度お試しください。')
     }
   }
 
@@ -268,17 +288,20 @@ function PoolAccountList({
             </li>
           )
         })}
-        {members.length === 0 && (
+        {members.length === 0 && !listError && (
           <li className="text-xs text-gray-400">所属アカウントなし</li>
         )}
       </ul>
+      {listError && (
+        <p className="mt-1 text-xs text-red-600">{listError}</p>
+      )}
       {candidates.length > 0 && (
         <div className="mt-2">
           <SelectField
             defaultValue=""
             onChange={(e) => {
               if (e.target.value) {
-                onAdd(e.target.value)
+                void onAdd(e.target.value)
                 e.target.value = ''
               }
             }}
@@ -324,10 +347,17 @@ function CreatePoolModal({
     if (!slug || !name || !activeAccountId) return
     setSubmitting(true)
     setError('')
-    const res = await api.pools.create({ slug, name, activeAccountId })
-    setSubmitting(false)
-    if (res.success) onCreated()
-    else setError(res.error ?? '作成に失敗しました')
+    try {
+      const res = await api.pools.create({ slug, name, activeAccountId })
+      if (res.success) onCreated()
+      else setError(res.error ?? '作成に失敗しました')
+    } catch (err) {
+      // 400系はAPIの理由（slug重複など）、403・5xxは運用の言葉へ写す（WRITE-01）。
+      setError(describeSaveFailure(err))
+    } finally {
+      // 失敗時に「作成中…」のまま固まらないよう、必ず戻す。
+      setSubmitting(false)
+    }
   }
 
   return (
