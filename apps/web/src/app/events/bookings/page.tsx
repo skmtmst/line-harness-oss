@@ -111,13 +111,19 @@ function OccurrenceApplicantsPanel({
   promoting,
   error,
   onPromote,
-  csvHref,
+  onExportCsv,
+  csvBusy,
 }: {
   data: EventOccurrenceApplicants
   promoting: boolean
   error: string
   onPromote: () => void
-  csvHref: string
+  /*
+   * TECH-03: CSVは直リンクではなく認証付き取得で取る。
+   * Cookie が届かない経路では href の直開きが401になるため。
+   */
+  onExportCsv: () => void
+  csvBusy: boolean
 }) {
   const waitlistRows = data.applicants.filter((applicant) => applicant.source === 'waitlist')
   const waitingRows = waitlistRows.filter((applicant) => applicant.status === 'waiting')
@@ -131,7 +137,14 @@ function OccurrenceApplicantsPanel({
           {data.occurrence.capacity == null ? '' : ` / 定員 ${data.occurrence.capacity}人`}
         </p>
         <div className="flex items-center gap-3">
-          <a href={csvHref} className="text-accent text-xs font-medium hover:underline">CSVを書き出す</a>
+          <button
+            type="button"
+            onClick={onExportCsv}
+            disabled={csvBusy}
+            className="text-accent text-xs font-medium hover:underline disabled:opacity-50"
+          >
+            {csvBusy ? '書き出しています…' : 'CSVを書き出す'}
+          </button>
           <Button
             onClick={onPromote}
             disabled={promoting || waitingCount === 0}
@@ -204,6 +217,8 @@ function BookingsInner() {
   const [occurrenceStatus, setOccurrenceStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   const [promotingWaitlist, setPromotingWaitlist] = useState(false)
   const [occurrenceActionError, setOccurrenceActionError] = useState('')
+  /* TECH-03: 申込者CSVの書出し中。失敗は occurrenceActionError へ出す。 */
+  const [csvBusy, setCsvBusy] = useState(false)
   const [broadcastMessage, setBroadcastMessage] = useState('')
   const [broadcastPreview, setBroadcastPreview] = useState<{ broadcastId: string; recipientCount: number; scope: string } | null>(null)
   const [broadcastBusy, setBroadcastBusy] = useState(false)
@@ -632,6 +647,28 @@ function BookingsInner() {
     }
   }
 
+  /*
+   * TECH-03: 申込者CSVは認証付き取得から保存する。直リンクは
+   * Cookie が届かない経路（cross-site の Bearer 補完など）で401になる。
+   */
+  async function exportApplicantsCsv() {
+    const accountId = selectedAccountId
+    const applicants = occurrenceApplicants
+    if (!accountId || !applicants || csvBusy) return
+    const startedScope = scope
+    setCsvBusy(true)
+    setOccurrenceActionError('')
+    try {
+      await eventsApi.downloadOccurrenceApplicantsCsv(accountId, applicants.occurrence.id, applicants.snapshotId)
+    } catch {
+      if (scopeRef.current === startedScope) {
+        setOccurrenceActionError('CSVを書き出せませんでした。通信を確認して、もう一度お試しください。')
+      }
+    } finally {
+      if (scopeRef.current === startedScope) setCsvBusy(false)
+    }
+  }
+
   async function promoteWaitlist() {
     const accountId = selectedAccountId
     const occurrence = occurrenceApplicants?.occurrence
@@ -843,7 +880,8 @@ function BookingsInner() {
               promoting={promotingWaitlist}
               error={occurrenceActionError}
               onPromote={() => void promoteWaitlist()}
-              csvHref={eventsApi.occurrenceApplicantsCsvUrl(selectedAccountId!, occurrenceApplicants.occurrence.id, occurrenceApplicants.snapshotId)}
+              onExportCsv={() => void exportApplicantsCsv()}
+              csvBusy={csvBusy}
             />
             {canManageApplicantBroadcast && (
               <>

@@ -574,9 +574,19 @@ export default function BroadcastForm({
    * 気づけない。取らなくてよい配信では切れるようにしておく。
    */
   const [measureOpens, setMeasureOpens] = useState(true)
-  // 送る前の確認。押すまで走らせない。入力のたびに投げると、
-  // 書いている途中の本文で「二重送信では」と言われ続ける。
-  const [preflight, setPreflight] = useState<BroadcastPreflight | null>(null)
+  /*
+   * 送る前の確認。押すまで走らせない。入力のたびに投げると、
+   * 書いている途中の本文で「二重送信では」と言われ続ける。
+   *
+   * **条件が変わった時点で古い確認は解除する（IDEA-06）。**
+   * `preflightResult` は最後に返ってきた応答、`preflightKey` はその応答を
+   * 取ったときの入力の指紋（下の `preflightRequestBody()` のJSON）。
+   * 画面に出す・確定に使うのは、今の入力の指紋と一致する応答だけ。
+   */
+  const [preflightResult, setPreflightResult] = useState<BroadcastPreflight | null>(null)
+  const [preflightKey, setPreflightKey] = useState<string | null>(null)
+  // 古い要求の応答で新しい確認を上書きしないための通し番号。
+  const preflightSeq = useRef(0)
   // 何分かけて配るか。0（既定）は一気に送る。
   const [spreadMinutes, setSpreadMinutes] = useState('30')
   // 送る時間。設計は「今すぐ / 日時を指定 / 友だちごとの最適な時間」の3つ。
@@ -808,7 +818,8 @@ export default function BroadcastForm({
       audienceError(targetMode, { scenarioId, tagId, condition })
       || bubblesError(bubbles)
     ) {
-      setPreflight(null)
+      setPreflightResult(null)
+      setPreflightKey(null)
       return
     }
     const timer = setTimeout(() => void runPreflight(true), 600)
@@ -894,6 +905,29 @@ export default function BroadcastForm({
     return ''
   }
   /**
+   * 配信前チェックへ渡す入力。
+   *
+   * 人数を数える口と同じ組み立てを1か所にする。この中身の指紋（JSON）を
+   * 応答と一緒に残すので、宛先・本文・日時が変わったあとに古い確認を
+   * そのまま使い回さない（IDEA-06「条件変更で古い確認が解除される」）。
+   */
+  const preflightRequestBody = () => {
+    const first = bubbles[0]
+    const content = first?.type === 'text' ? String(first.content.text ?? '') : ''
+    const target = targetPayload()
+    return {
+      targetType: target.targetType,
+      targetTagId: target.targetTagId,
+      // 条件を渡さないと、絞り込みを無視した人数（＝全員）が返る。
+      segmentConditions: target.segmentConditions ?? null,
+      lineAccountId: selectedAccountId || null,
+      messageContent: content,
+      scheduledAt: scheduledAtIso(),
+      messageCount: bubbles.length,
+    }
+  }
+
+  /**
    * 配信前チェック。
    *
    * 宛先と本文が決まっていれば、押されなくても勝手に確かめる。押して初めて
@@ -906,21 +940,16 @@ export default function BroadcastForm({
   const runPreflight = async (silent = false) => {
     if (!silent) setError('')
     try {
-      const first = bubbles[0]
-      const content = first?.type === 'text' ? String(first.content.text ?? '') : ''
-      const target = targetPayload()
-      const res = await api.broadcasts.preflight({
-        targetType: target.targetType,
-        targetTagId: target.targetTagId,
-        // 条件を渡さないと、絞り込みを無視した人数（＝全員）が返る。
-        segmentConditions: target.segmentConditions ?? null,
-        lineAccountId: selectedAccountId || null,
-        messageContent: content,
-        scheduledAt: scheduledAtIso(),
-        messageCount: bubbles.length,
-      })
-      if (res.success) setPreflight(res.data)
-      else if (!silent) setError(res.error)
+      const requestBody = preflightRequestBody()
+      const requestKey = JSON.stringify(requestBody)
+      const seq = ++preflightSeq.current
+      const res = await api.broadcasts.preflight(requestBody)
+      // 遅れて届いた古い要求の応答で、新しい確認を上書きしない。
+      if (seq !== preflightSeq.current) return
+      if (res.success) {
+        setPreflightResult(res.data)
+        setPreflightKey(requestKey)
+      } else if (!silent) setError(res.error)
     } catch {
       if (!silent) setError('確認できませんでした')
     }
@@ -1096,25 +1125,67 @@ export default function BroadcastForm({
     数えられていないときは `null` のままにして、下の `canConfirm` で
     送らせない。「たぶんこのくらい」を書くと、その数を根拠に押される。
   */
+  /*
+   * **いまの入力に対する確認だけを確定値として使う。**
+   * 宛先・本文・日時を変えると指紋がずれ、前の応答は古い確認として解除される。
+   * 再計算が終わるまで「—」のままにし、古い人数のまま予約させない（IDEA-06）。
+   */
+  const currentPreflightKey = JSON.stringify(preflightRequestBody())
+  const preflight = preflightResult !== null && preflightKey === currentPreflightKey ? preflightResult : null
   const audienceCount = preflight?.audienceCount ?? null
   /** 対象画面の人数も、事前確認が返した同じ確定値だけを使う。 */
   const audienceDisplayCount = audienceCount
   const targetModeLabel = TARGET_MODES.find((mode) => mode.value === targetMode)?.label ?? '未設定'
   /*
-    除外の人数。**数としての口がまだ無い。**
+    除外の人数と理由。**数としての口がまだ無い応答もある。**
     `preflight.warnings` に「ブロック中の友だち 42人を除いています」のような
     文が来ることはあるので、あればその文を出し、無ければ `—` にする。
     **0人と書かない。**「除外なし」と「数えられない」は別のこと。
+    理由はある分だけ並べる（ブロック・非表示・宛先不明・重複）。
   */
   const exclusionNote = preflight?.exclusions
-    ? `ブロック ${preflight.exclusions.blocked.toLocaleString('ja-JP')}人・非表示 ${preflight.exclusions.hidden.toLocaleString('ja-JP')}人・重複 ${preflight.exclusions.duplicate.toLocaleString('ja-JP')}人を除外`
+    ? (() => {
+        const ex = preflight.exclusions
+        const parts = [
+          ex.blocked > 0 ? `ブロック ${ex.blocked.toLocaleString('ja-JP')}人` : null,
+          ex.hidden > 0 ? `非表示 ${ex.hidden.toLocaleString('ja-JP')}人` : null,
+          ex.missingDestination > 0 ? `宛先不明 ${ex.missingDestination.toLocaleString('ja-JP')}人` : null,
+          ex.duplicate > 0 ? `重複 ${ex.duplicate.toLocaleString('ja-JP')}人` : null,
+        ].filter((part): part is string => part !== null)
+        return parts.length > 0 ? `${parts.join('・')}を除外` : '除外なし'
+      })()
     : preflight?.warnings.find((w) => w.message.includes('除いて'))?.message ?? null
   const quota = preflight?.quota ?? null
   const quotaAvailable = quota?.state === 'available'
   const quotaInsufficient = quota?.state === 'insufficient'
+  /*
+   * 送信枠の見え方。取れない・足りない・足りるを分け、**取得前は0扱いしない**。
+   * 最終確認（画面内と窓）の両方がここを見る。
+   */
+  const quotaNote = quota === null
+    ? null
+    : quota.state === 'unavailable'
+      ? '確認できませんでした'
+      : quota.state === 'insufficient'
+        ? `不足しています（残り ${quota.remaining?.toLocaleString('ja-JP') ?? '—'} / ${quota.monthlyLimit?.toLocaleString('ja-JP') ?? '—'}通）`
+        : `残り ${quota.remaining?.toLocaleString('ja-JP') ?? '—'} / ${quota.monthlyLimit?.toLocaleString('ja-JP') ?? '—'}通（この配信で ${quota.planned.toLocaleString('ja-JP')}通を使用）`
+  /** 対象の人数を数えた時刻。応答の evaluatedAt をJSTで出す。 */
+  const evaluatedAtLabel = preflight?.audience?.evaluatedAt
+    ? new Date(preflight.audience.evaluatedAt).toLocaleString('ja-JP', {
+        timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit',
+      })
+    : null
+  /** 把握できる重複配信。同じ時刻の前後1時間に入っている別の予約。 */
+  const concurrentBroadcasts = preflight?.concurrentBroadcasts ?? []
   const scheduledLabel = sendMode === 'scheduled' && scheduledDate
     ? `${scheduledDate.replace(/-/g, '/')} ${scheduledTime}${Number(spreadMinutes) > 0 ? `（${spreadMinutes}分かけて配信）` : ''}`
     : null
+  /*
+   * 「今すぐ配信」はここでは送らない。下書きとして保存し、詳細画面の
+   * 送信ボタンで実行する。**保存と送信をひとつの押下に見せない**ため、
+   * 日時の欄には「今すぐ」と次の操作場所を書く。
+   */
+  const sendWhenLabel = scheduledLabel ?? (sendMode === 'now' ? '今すぐ（保存後に詳細画面で送信）' : null)
   const unconfirmedCount = preflight
     ? preflight.warnings.filter((w) => w.level === 'warning').length
       + (testResult?.kind === 'success' ? 0 : 1)
@@ -1695,7 +1766,7 @@ export default function BroadcastForm({
             <div className="mt-3 grid gap-3 sm:grid-cols-2">
               <div>
                 <label htmlFor="bc-date" className="text-ink-secondary mb-1 block text-xs font-medium">
-                  配信日
+                  配信日（日本時間）
                 </label>
                 <input
                   id="bc-date"
@@ -1707,7 +1778,7 @@ export default function BroadcastForm({
               </div>
               <div>
                 <label htmlFor="bc-time" className="text-ink-secondary mb-1 block text-xs font-medium">
-                  時刻
+                  時刻（日本時間）
                 </label>
                 <input
                   id="bc-time"
@@ -1775,11 +1846,11 @@ export default function BroadcastForm({
                   const base = scheduledDate ? new Date(`${scheduledDate}T00:00:00+09:00`) : null
                   if (base) base.setDate(base.getDate() + offset)
                   const ymd = base ? base.toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric', weekday: 'short' }) : '日付未設定'
-                  const concurrent = offset === 0 ? preflight?.concurrentBroadcasts ?? [] : []
+                  const concurrent = offset === 0 ? concurrentBroadcasts : []
                   return <div key={offset} className={`rounded-control border p-3 text-xs ${offset === 0 ? 'border-accent bg-accent-soft' : 'border-hairline'}`}><p className="font-bold text-ink">{ymd}{offset === 0 ? ' 今回' : ''}</p>{concurrent.length ? concurrent.map((item) => <p key={item.id} className="mt-2 truncate text-ink-secondary" title={item.title}>{formatScheduleTime(item.scheduledAt)}　{item.title}</p>) : <p className="mt-2 text-ink-faint">予定なし</p>}</div>
                 })}
               </div>
-              {(preflight?.concurrentBroadcasts?.length ?? 0) > 0 && <p className="mt-3 rounded-control bg-warning-bg p-3 text-xs text-warning">同じ時刻の前後1時間に別の配信があります。対象が重なる場合は、間隔を空けてください。</p>}
+              {concurrentBroadcasts.length > 0 && <p className="mt-3 rounded-control bg-warning-bg p-3 text-xs text-warning">同じ時刻の前後1時間に別の配信があります。対象が重なる場合は、間隔を空けてください。</p>}
             </section>
           )}
         </section>
@@ -1795,7 +1866,8 @@ export default function BroadcastForm({
         </div>
         <ul className="mt-4 space-y-2 text-sm">
           <li className="flex items-center gap-2"><span className="text-success">✓</span><span>配信対象が設定されています</span></li>
-          <li className="flex items-center gap-2"><span className={scheduledLabel ? 'text-success' : 'text-warning'}>{scheduledLabel ? '✓' : '!'}</span><span>配信日時が設定されています</span></li>
+          {/* 「今すぐ」は日時を持たないので未設定扱いしない。予約と混同しないよう別の文にする。 */}
+          <li className="flex items-center gap-2"><span className={scheduledLabel || sendMode === 'now' ? 'text-success' : 'text-warning'}>{scheduledLabel || sendMode === 'now' ? '✓' : '!'}</span><span>{sendMode === 'now' ? '今すぐ配信を選んでいます' : '配信日時が設定されています'}</span></li>
           <li className="flex items-center gap-2"><span className={testResult?.kind === 'success' ? 'text-success' : testResult ? 'text-danger' : 'text-warning'}>{testResult?.kind === 'success' ? '✓' : '!'}</span><span>{testResult?.kind === 'success' ? 'テスト送信が完了しています' : testResult ? 'テスト送信で届かなかった宛先があります' : 'テスト送信がまだです'}</span></li>
           <li className="flex items-center gap-2"><span className={quotaInsufficient || lengthNotice.tone === 'error' ? 'text-danger' : quotaAvailable ? 'text-success' : 'text-warning'}>{quotaInsufficient || lengthNotice.tone === 'error' ? '!' : quotaAvailable ? '✓' : '○'}</span><span>{visualQaAugustCampaign ? '送信枠を超えていません' : quotaInsufficient ? `送信枠が${Math.max(0, quota.planned - (quota.remaining ?? 0)).toLocaleString('ja-JP')}通不足しています` : quotaAvailable ? `送信枠は残り${quota.remaining?.toLocaleString('ja-JP')}通です` : '送信枠を確認できません'}</span></li>
         </ul>
@@ -1810,14 +1882,27 @@ export default function BroadcastForm({
         </label>}
       </section>
 
+      {/*
+        最終確認（IDEA-06）。対象数・除外理由・計算時刻・送信枠・把握できる
+        重複配信をここへまとめる。値はどれも配信前チェックが返したものだけ。
+        「今すぐ配信」は予約ではなく下書き保存＋詳細画面での送信なので、
+        説明文と押すボタンの呼び方を分ける（保存・予約・今すぐ配信を混同しない）。
+      */}
       <section className="rounded-card border border-hairline bg-canvas p-5" data-design-node="FpgxH">
         <h3 className="text-lg font-bold text-ink">最終確認</h3>
-        <p className="mt-1 text-xs text-ink-faint">送信対象・日時・内容を確認して予約します。</p>
+        <p className="mt-1 text-xs text-ink-faint">
+          {sendMode === 'scheduled'
+            ? '送信対象・日時・内容を確認して予約します。'
+            : '送信対象・内容を確認して保存します。「今すぐ配信」は保存後に詳細画面から送信します。'}
+        </p>
         <dl className="mt-5 divide-y divide-hairline text-sm">
           {[
             ['管理名', title.trim() || '（未入力）'],
             ['対象', visualQaAugustCampaign ? '条件指定 1,213人' : `${targetModeLabel} ${audienceCount === null ? '—' : `${audienceCount.toLocaleString('ja-JP')}人`}`],
-            ['配信日時', visualQaAugustCampaign ? '2026/08/24 10:00' : scheduledLabel ?? '未設定'],
+            ['除外', visualQaAugustCampaign ? 'ブロック 12人を除外' : exclusionNote ?? '—'],
+            ['配信日時', visualQaAugustCampaign ? '2026/08/24 10:00' : sendWhenLabel ?? '未設定'],
+            ['送信枠', visualQaAugustCampaign ? '残り 8,700 / 10,000通' : quotaNote ?? '—'],
+            ['計算時刻', visualQaAugustCampaign ? '8/23 15:42' : evaluatedAtLabel ?? '—'],
             ['メッセージ', `${typeLabel(bubbles[0]?.type ?? 'text')} ${bubbles.length}通`],
             ['開封計測', measureOpens ? '有効' : '無効'],
             ['配信後', visualQaAugustCampaign ? 'タグ「配信済み」を追加' : publishedActions.find((action) => action.versionId === afterActionVersionId)?.name ?? '未設定'],
@@ -1828,7 +1913,19 @@ export default function BroadcastForm({
             </div>
           ))}
         </dl>
-        <p className="mt-3 rounded-control bg-warning-bg p-3 text-xs text-warning">予約後も配信開始前までは編集・取消できます。</p>
+        {concurrentBroadcasts.length > 0 && (
+          <div className="mt-3 rounded-control bg-warning-bg p-3 text-xs text-warning">
+            <p className="font-semibold">同じ時刻の前後1時間に別の予約配信があります。対象が重なる場合は間隔を空けてください。</p>
+            <ul className="mt-1 list-disc pl-4">
+              {concurrentBroadcasts.map((item) => <li key={item.id}>{formatScheduleTime(item.scheduledAt)}　{item.title}</li>)}
+            </ul>
+          </div>
+        )}
+        <p className="mt-3 rounded-control bg-warning-bg p-3 text-xs text-warning">
+          {sendMode === 'scheduled'
+            ? '予約後も配信開始前までは編集・取消できます。'
+            : '下書きとして保存します。送信は詳細画面で実行し、送信前にもう一度確認できます。'}
+        </p>
       </section>
     </div>
     {/*
@@ -2012,8 +2109,12 @@ export default function BroadcastForm({
                     : '配信前チェックへ'}
             </Button>
           ) : (
-            <Button variant="primary" disabled={saving || lengthNotice.tone === 'error' || !canConfirm} title={!canConfirm ? '対象人数を確認できるまで予約できません' : lengthNotice.tone === 'error' ? lengthNotice.description : undefined} onClick={() => void save()}>
-              {saving ? '保存中…' : 'この内容で予約'}
+            <Button variant="primary" disabled={saving || lengthNotice.tone === 'error' || !canConfirm} title={!canConfirm ? '対象人数を確認できるまで実行できません' : lengthNotice.tone === 'error' ? lengthNotice.description : undefined} onClick={() => void save()}>
+              {/*
+                予約と下書きを混同しない（IDEA-06）。「今すぐ配信」はここでは
+                送らず、下書きを保存して詳細画面の送信ボタンで実行する。
+              */}
+              {saving ? '保存中…' : sendMode === 'scheduled' ? 'この内容で予約' : '保存して送信画面へ'}
             </Button>
           )}
         </>
@@ -2141,9 +2242,20 @@ export default function BroadcastForm({
               {exclusionNote ?? <span className="text-ink-faint">—<span className="ml-2 text-xs">除外した人数はまだ取れません</span></span>}
             </dd>
           </div>
+          {/* 送信枠・計算時刻・把握できる重複配信もここへまとめる（IDEA-06）。 */}
+          <div className="flex justify-between gap-4 px-4 py-3">
+            <dt className="text-ink-faint">送信枠</dt>
+            <dd className={`text-right ${quotaInsufficient ? 'font-medium text-danger' : 'text-ink-secondary'}`}>
+              {quotaNote ?? '—'}
+            </dd>
+          </div>
+          <div className="flex justify-between gap-4 px-4 py-3">
+            <dt className="text-ink-faint">計算時刻</dt>
+            <dd className="text-ink-secondary text-right tabular-nums">{evaluatedAtLabel ?? '—'}</dd>
+          </div>
           <div className="flex justify-between gap-4 px-4 py-3">
             <dt className="text-ink-faint">配信日時</dt>
-            <dd className="text-ink text-right font-medium tabular-nums">{scheduledLabel ?? '—'}</dd>
+            <dd className="text-ink text-right font-medium tabular-nums">{sendWhenLabel ?? '—'}</dd>
           </div>
           <div className="flex justify-between gap-4 px-4 py-3">
             <dt className="text-ink-faint">送る中身</dt>
@@ -2166,6 +2278,22 @@ export default function BroadcastForm({
             <dd className="text-ink-secondary text-right">{trackLinks ? 'する（クリックを数えます）' : 'しない'}</dd>
           </div>
         </dl>
+
+        {/*
+          把握できる重複配信（IDEA-06）。同じ時刻の前後1時間に入っている
+          別の予約をここでも出す。送信設定の節でだけ出すと、確認の窓で
+          読み合わせるときに見落とす。
+        */}
+        {concurrentBroadcasts.length > 0 && (
+          <div className="bg-warning-bg text-warning rounded-control mt-3 p-3 text-xs leading-5">
+            <p className="font-semibold">同じ時刻の前後1時間に別の予約配信があります</p>
+            <ul className="mt-1 list-disc pl-4">
+              {concurrentBroadcasts.map((item) => (
+                <li key={item.id}>{formatScheduleTime(item.scheduledAt)}　{item.title}</li>
+              ))}
+            </ul>
+          </div>
+        )}
 
         {/*
           **未確認のまま送らせないのではなく、数えて見せる。**

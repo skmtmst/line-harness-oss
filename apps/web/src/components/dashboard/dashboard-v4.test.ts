@@ -56,8 +56,9 @@ describe('ダッシュボードV4の初期表示', () => {
     expect(qrDialog).toContain('ダウンロード形式')
     expect(qrDialog).toContain('画像をダウンロード')
     expect(qrDialog).not.toContain('PNGをダウンロード')
-    expect(qrDialog).toContain("import QRCode from 'qrcode'")
-    expect(qrDialog).toContain('QRCode.toDataURL(link')
+    // PERF-09: qrcode は静的に読まず、QR を出す瞬間にだけ読む口へ通す。
+    expect(qrDialog).not.toContain("from 'qrcode'")
+    expect(qrDialog).toContain('qrToDataURL(link')
     expect(qrDialog).toContain('src={qrDataUrl || qrSrc}')
     expect(qrDialog).toContain('visualReferenceQr ?')
     expect(qrDialog).toContain('<QrCode aria-label="友だち追加QRコード"')
@@ -376,6 +377,14 @@ describe('ダッシュボード通知', () => {
 
   it('通知種類ごとに安全な管理画面へ送る', () => {
     expect(dashboardNotificationDestination(data.items[0])).toBe('/emergency')
+    expect(dashboardNotificationDestination({
+      ...data.items[1],
+      eventType: 'broadcast.quota_short',
+    })).toBe('/broadcasts')
+    expect(dashboardNotificationDestination({
+      ...data.items[1],
+      eventType: 'broadcast.quota_short',
+    })).toBe('/broadcasts')
     expect(dashboardNotificationDestination({
       ...data.items[1],
       eventType: 'release',

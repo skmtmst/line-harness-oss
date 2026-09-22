@@ -331,6 +331,13 @@ export interface MediaItem {
   archivedAt?: string | null;
   archivedBy?: string | null;
   archiveReason?: string | null;
+  /**
+   * 運用者が記録した利用期限（YYYY-MM-DD）。null/省略は未記録＝不明。
+   * 推定値は入れない（根拠のない権利情報を作らない）。
+   */
+  usageExpiresAt?: string | null;
+  /** 同意・権利について確認済みの記録メモ。null/省略は未記録＝不明。 */
+  usageConsentNote?: string | null;
   /** 0は未使用。省略は旧APIなどでまだ取得できていない状態。 */
   usageCount?: number;
 }

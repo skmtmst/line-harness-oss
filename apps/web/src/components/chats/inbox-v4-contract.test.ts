@@ -249,7 +249,7 @@ describe('受信箱V4の画面契約', () => {
   })
 
   it('会話IDではなく友だちIDで顧客情報を読み込み、集計欠損でも画面を止めない', () => {
-    expect(PAGE).toContain('const activeFriendId = selectedFriendId')
+    expect(PAGE).toContain('const activeFriendId = (chatDetail?.id === selectedChatId')
     expect(PAGE).toContain('chatDetail.friendId')
     expect(PAGE).toContain('friendId={activeFriendId}')
     expect(INBOX_KPIS).toContain('stats?.todayByChannel?.email')

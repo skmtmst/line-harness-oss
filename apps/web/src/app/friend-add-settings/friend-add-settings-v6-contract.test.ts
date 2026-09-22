@@ -91,10 +91,17 @@ describe('V6 友だち追加時配信の運用者向け表示', () => {
     expect(EDITOR).toContain('matchedLast28Days')
   })
 
-  it('確認画面は案内と後続処理の2段にまとめる', () => {
-    expect(EDITOR).toContain('<strong>登録直後のご案内</strong>')
-    expect(EDITOR).toContain('<strong>タグ付与</strong>')
-    expect(EDITOR).toContain('<small>新規友だち</small>')
+  it('確認画面は経路・初回案内・付く属性・次の配信を実設定から順に説明する(IDEA-09)', () => {
+    // 固定の例示（テキスト＋画像＋ボタン／新規友だち）ではなく、
+    // 保存済み定義から組み立てる。再追加で動く／動かない処理も示す。
+    expect(EDITOR).toContain('friendAddFlowSteps({')
+    expect(EDITOR).toContain('friendAddReaddLines({')
+    expect(EDITOR).toContain('isFallback: rule.isFallback')
+    expect(EDITOR).toContain('friendKind: rule.friendKind')
+    expect(EDITOR).toContain('status: rule.status')
+    expect(EDITOR).toContain('再追加・ブロック解除のとき')
+    expect(EDITOR).not.toContain('登録直後のご案内')
+    expect(EDITOR).not.toContain('新規友だち')
   })
 })
 
@@ -110,7 +117,7 @@ describe('V6 友だち追加時配信の点検・中の再発防止(#501)', () =
 
   it('新規作成の優先順位は競合一覧の最大+1にする', () => {
     // 一覧は既定20件のため、件数+1では21件を超えると重複する。
-    expect(EDITOR).toContain("api.friendAddRules.conflicts(selectedAccountId, 'first_time')")
+    expect(EDITOR).toContain("api.friendAddRules.conflicts(request.accountId, 'first_time')")
     expect(EDITOR).toContain('conflictRes.data.rules.reduce')
   })
 
@@ -118,7 +125,16 @@ describe('V6 友だち追加時配信の点検・中の再発防止(#501)', () =
     expect(EDITOR).toContain("value: 'none', label: '何も配信しない'")
     expect(EDITOR).toContain("value: 'same', label: 'はじめてと同じ内容'")
     expect(EDITOR).toContain("value: 'other', label: '別のシナリオ'")
-    expect(EDITOR).toContain("rule.friendKind === 'returning' && definition.returningMode === 'none'")
+    expect(EDITOR).toContain("friendKind === 'returning' && definition.returningMode === 'none'")
+  })
+
+  it('実際に配信するシナリオを編集画面で選べる(FRIENDADD-01)', () => {
+    // scenarioId は保存の必須項目だが、以前は変更する入力が無かった。
+    // 「次に流すシナリオ」欄で、このアカウントのシナリオだけを選ぶ。
+    expect(EDITOR).toContain('次に流すシナリオ')
+    expect(EDITOR).toContain('value={definition.scenarioId ??')
+    expect(EDITOR).toContain('scenarioId: event.target.value || null')
+    expect(EDITOR).toContain('scenarios.map((scenario) => ({ value: scenario.id, label: scenario.name }))')
   })
 
   it('フォルダは表にあるものから選び、自由入力で増やさない', () => {
@@ -127,7 +143,34 @@ describe('V6 友だち追加時配信の点検・中の再発防止(#501)', () =
   })
 
   it('テストの失敗時も理由を捨てず、確認面へ渡す', () => {
-    expect(EDITOR).toContain("if ('data' in response && response.data) setTestResult(response.data)")
+    expect(EDITOR).toContain("if ('data' in response && response.data) setTestResult({ ...testedMeta, ...response.data })")
+  })
+
+  it('アカウント切替で遅れて返る応答が切替先を上書きしない(FRIENDADD-02)', () => {
+    // 読込ごとに対象アカウント・ルール・世代を持ち、一致する応答だけ採用する。
+    expect(EDITOR).toContain('loadRequestRef')
+    expect(EDITOR).toContain('isCurrentRequest()')
+    expect(EDITOR).toContain('setLoadedAccountId(request.accountId)')
+    // 表示中の設定と保存先アカウントが一致するときだけ保存・テストする。
+    expect(EDITOR).toContain('loadedAccountId !== selectedAccountId')
+    expect(EDITOR).toContain('アカウントを切り替えています。')
+  })
+
+  it('設定を変えたあとは前のテスト結果を今の設定の判定として出さない(FRIENDADD-03)', () => {
+    // 結果は実行時のアカウント・ルール・保存済みスナップショットと結び付ける。
+    expect(EDITOR).toContain('testedMeta')
+    expect(EDITOR).toContain('testResult.snapshot === currentSnapshot')
+    expect(EDITOR).toContain('testResult.accountId === selectedAccountId')
+    expect(EDITOR).toContain('設定を変更したため、前回のテスト結果は表示していません')
+  })
+
+  it('時間帯は複数件を表示・編集し、先頭以外を消さない(FRIENDADD-05)', () => {
+    // 以前は先頭だけを表示し配列全体を1件で置き換えていた。
+    expect(EDITOR).toContain('updateTimeWindow(current.timeWindows, index')
+    expect(EDITOR).toContain('removeTimeWindow(current.timeWindows, index')
+    expect(EDITOR).toContain('addTimeWindow(current.timeWindows)')
+    expect(EDITOR).toContain('時間帯を追加')
+    expect(EDITOR).not.toContain('timeWindows: [{ ...window')
   })
 
   it('設定画面は旧振り分け口を参照しない', () => {

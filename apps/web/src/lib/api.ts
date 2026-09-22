@@ -311,7 +311,8 @@ export type AuditEventItem = {
 }
 
 export type AuditEventSummary = {
-  periodDays: 30
+  /** 集計した期間の日数。全期間（from 未指定）で取ったときは null。 */
+  periodDays: number | null
   total: number
   deleted: number
   sent: number
@@ -2422,6 +2423,48 @@ async function fetchApiBlob(path: string): Promise<Blob> {
   return res.blob()
 }
 
+/**
+ * 認証付きでファイルを取り、ブラウザの保存へ渡す。
+ *
+ * `<a href>` で API の URL を直開きすると Cookie にしか頼れない。
+ * サイトをまたぐ Cookie が止められる構成（Bearer 補完経路）や、
+ * 管理画面と API のオリジンが違う配置では 401/404 になってしまう。
+ * fetchApi と同じ資格情報（Cookie + Bearer 補完）で取ってから Blob で
+ * 保存すれば、どの認証経路でも同じ許可だけが通る（TECH-03）。
+ * ファイル名はサーバーの Content-Disposition を優先し、無いときだけ
+ * fallbackFilename を使う。
+ */
+export async function downloadApiFile(path: string, fallbackFilename: string): Promise<void> {
+  const res = await fetch(`${API_URL}${path}`, {
+    credentials: 'include',
+    headers: adminSessionHeaders(),
+  })
+  if (res.status === 401 && typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent(SESSION_LOST_EVENT))
+  }
+  if (res.status >= 500) reportServerFailure(path, res.status)
+  if (!res.ok) {
+    const raw = await res.text()
+    throw new ApiError(
+      res.status,
+      extractApiErrorMessage(raw, res.status),
+      extractApiErrorCode(raw),
+    )
+  }
+  const disposition = res.headers.get('Content-Disposition') ?? ''
+  const named = /filename\*?=(?:UTF-8'')?"?([^";]+)"?/i.exec(disposition)?.[1]
+  const blob = await res.blob()
+  const href = URL.createObjectURL(blob)
+  try {
+    const anchor = document.createElement('a')
+    anchor.href = href
+    anchor.download = named ? decodeURIComponent(named) : fallbackFilename
+    anchor.click()
+  } finally {
+    URL.revokeObjectURL(href)
+  }
+}
+
 export type FriendListParams = {
   offset?: string
   limit?: string | number
@@ -2955,11 +2998,16 @@ export type AutomationRunDetail = {
   subject: string | null
   accountLabel: string | null
   triggerLabel: string
-  status: 'queued' | 'claimed' | 'succeeded' | 'skipped' | 'retry_wait' | 'permanent_failed' | 'cancelled'
+  status: 'queued' | 'claimed' | 'succeeded' | 'skipped' | 'waiting' | 'retry_wait' | 'partial' | 'permanent_failed' | 'cancelled'
   domainStatus: string
   detail: string | null
   durationMs: number | null
   failureReason: string | null
+  /** #1043: 運用停止・機能無効で動けない実行の理由。 */
+  holdReason: string | null
+  /** #1043: 実行した版がいまの公開版と同じか。 */
+  isCurrentVersion: boolean
+  currentVersionNumber: number | null
   successfulActions: string[]
   skippedActions: string[]
   failedAction: string | null
@@ -6634,7 +6682,14 @@ export const api = {
       `/api/media/${encodeURIComponent(id)}/versions`,
       { method: 'POST', body: JSON.stringify(data) },
     ),
-    update: (id: string, accountId: string, data: { filename?: string; folderId?: string | null }) =>
+    update: (id: string, accountId: string, data: {
+      filename?: string
+      folderId?: string | null
+      /** 既知の利用期限（YYYY-MM-DD）。null で記録を消して「不明」へ戻す。 */
+      usageExpiresAt?: string | null
+      /** 同意・権利の確認記録（500文字まで）。null/空で消す。 */
+      usageConsentNote?: string | null
+    }) =>
       fetchApi<ApiResponse<MediaItem>>(`/api/media/${id}?accountId=${encodeURIComponent(accountId)}`, {
         method: 'PATCH',
         body: JSON.stringify(data),
@@ -6684,6 +6739,12 @@ export const api = {
     /** 保存URLへ直接行かず、権限確認と監査を通る口から受け取る。 */
     download: (id: string, accountId: string) =>
       fetchApiBlob(`/api/media/${encodeURIComponent(id)}/download?accountId=${encodeURIComponent(accountId)}`),
+    /**
+     * 指定した版のダウンロード（IDEA-15）。第1版は登録時の元ファイルで、
+     * 差し替え後もここから取り戻せる。権限確認と監査は download と同じ。
+     */
+    downloadVersion: (id: string, versionNo: number, accountId: string) =>
+      fetchApiBlob(`/api/media/${encodeURIComponent(id)}/versions/${encodeURIComponent(versionNo)}/download?accountId=${encodeURIComponent(accountId)}`),
     /**
      * 縮小表示・試し見・ファイル開きの参照先。Cookieで認証されるため
      * img・video・audio の src や別タブ開きにそのまま使える。
@@ -8531,6 +8592,57 @@ export const api = {
         `/api/templates${suffix}`,
       )
     },
+    /*
+      PERF-12: 選択画面用の区切り取得。検索・フォルダ・分類をサーバーで
+      絞ってから1区画だけ返す。folderCounts を立てるとフォルダ別件数も
+      添えて返る。
+    */
+    listPage: (params: {
+      accountId?: string;
+      q?: string;
+      folderId?: string;
+      quick?: 'frequent' | 'reservation' | 'ec';
+      messageType?: string;
+      page?: number;
+      limit?: number;
+      folderCounts?: boolean;
+    }) => {
+      const query = new URLSearchParams()
+      if (params.accountId) query.set('account_id', params.accountId)
+      if (params.q) query.set('q', params.q)
+      if (params.folderId) query.set('folder_id', params.folderId)
+      if (params.quick) query.set('quick', params.quick)
+      if (params.messageType) query.set('message_type', params.messageType)
+      query.set('page', String(params.page ?? 1))
+      query.set('limit', String(params.limit ?? 100))
+      if (params.folderCounts) query.set('folder_counts', '1')
+      return fetchApi<ApiResponse<{
+        items: Array<{
+          id: string;
+          accountId: string | null;
+          name: string;
+          category: string;
+          messageType: string;
+          messageContent: string;
+          folderId: string | null;
+          question: TemplateQuestion | null;
+          questionStatus: 'draft' | 'published';
+          usageCount: number;
+          tapCount: number;
+          monthlySendCount: number | null;
+          totalSendCount: number | null;
+          hasDraft: boolean;
+          publishedVersion: number;
+          publishedAt: string | null;
+          draftRevision: number;
+          createdAt: string;
+          updatedAt: string;
+        }>;
+        total: number;
+        limit: number;
+        folderCounts?: Record<string, number>;
+      }>>(`/api/templates?${query.toString()}`)
+    },
     get: (id: string) =>
       fetchApi<ApiResponse<{
         id: string;
@@ -9008,11 +9120,12 @@ export const api = {
     getRun: (id: string) =>
       fetchApi<ApiResponse<AutomationRunDetail>>(`/api/automation-runs/${encodeURIComponent(id)}`),
     // #942 N-353: 実行記録のCSV書き出し口。画面の絞り込みと同じ条件を渡す。
-    runsCsvUrl: (params?: { accountId?: string; search?: string; status?: string }) => {
+    runsCsvUrl: (params?: { accountId?: string; search?: string; status?: string; includeTest?: boolean }) => {
       const query = new URLSearchParams({ format: 'csv' })
       if (params?.accountId) query.set('lineAccountId', params.accountId)
       if (params?.search) query.set('search', params.search)
       if (params?.status) query.set('status', params.status)
+      if (params?.includeTest) query.set('include_test', '1')
       return `${API_URL}/api/automation-runs?${query}`
     },
     // #942 N-353: まだ終わっていない実行を取りやめる。取消済みはそのまま成功。
@@ -12468,7 +12581,13 @@ export const bookingApi = {
    * 予約台帳CSVの書出しURL (#933 N-397)。一覧と同じ絞り込みをそのまま受ける。
    * サーバ側は最大5000件までで、範囲の断りはCSV先頭の注記行に入る。
    */
-  ledgerCsvUrl: (accountId: string, params?: {
+  /**
+   * 予約台帳CSV（N-397）。`<a href>` の直開きは Cookie にしか頼れず、
+   * Cookie が届かない認証経路（cross-site の Bearer 補完など）では
+   * 401 になってファイルが出ない。認証付きの取得で保存へ揃える（TECH-03）。
+   * ファイル名はサーバーの Content-Disposition が決める。
+   */
+  downloadLedgerCsv: (accountId: string, params?: {
     status?: string
     query?: string
     menuName?: string
@@ -12486,7 +12605,10 @@ export const bookingApi = {
     if (params?.from) query.set('from', params.from)
     if (params?.to) query.set('to', params.to)
     const suffix = query.toString() ? `&${query.toString()}` : ''
-    return `${API_URL}/api/booking/admin/bookings.csv?account_id=${encodeURIComponent(accountId)}${suffix}`
+    return downloadApiFile(
+      `/api/booking/admin/bookings.csv?account_id=${encodeURIComponent(accountId)}${suffix}`,
+      'booking-ledger.csv',
+    )
   },
   requestsSummary: (accountId: string, params: {
     month: string
@@ -12858,8 +12980,16 @@ export const eventsApi = {
     fetchApi<{ success: true; data: EventOccurrenceApplicants }>(
       withAccount(`/api/events/admin/occurrences/${encodeURIComponent(occurrenceId)}/applicants`, accountId),
     ).then((response) => response.data),
-  occurrenceApplicantsCsvUrl: (accountId: string, occurrenceId: string, snapshotId: string) =>
-    withAccount(`/api/events/admin/occurrences/${encodeURIComponent(occurrenceId)}/applicants.csv?snapshot_id=${encodeURIComponent(snapshotId)}`, accountId),
+  /*
+   * 申込者CSV。以前は相対パスの `<a href>` 直開きで、Cookie が届かない
+   * 認証経路や API と別オリジンの配置では取れなかった。認証付きの
+   * 取得からファイル保存へ揃える（TECH-03）。
+   */
+  downloadOccurrenceApplicantsCsv: (accountId: string, occurrenceId: string, snapshotId: string) =>
+    downloadApiFile(
+      withAccount(`/api/events/admin/occurrences/${encodeURIComponent(occurrenceId)}/applicants.csv?snapshot_id=${encodeURIComponent(snapshotId)}`, accountId),
+      'applicants.csv',
+    ),
   previewOccurrenceBroadcast: (accountId: string, occurrenceId: string, data: { title: string; messageContent: string; snapshotId: string }, idempotencyKey: string) =>
     fetchApi<{ success: true; data: { broadcastId: string; recipientCount: number } }>(
       withAccount(`/api/events/admin/occurrences/${encodeURIComponent(occurrenceId)}/applicant-broadcasts/preview`, accountId),

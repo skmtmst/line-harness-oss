@@ -129,7 +129,7 @@ describe('権限詳細の説明欄は選択中の権限から生成する (#983)
   it('項目を触ると「変更後の予定」と差分項目が出る', async () => {
     await openPermissionView()
 
-    fireEvent.click(screen.getByRole('button', { name: '設定を変更できる' }))
+    fireEvent.click(screen.getByRole('button', { name: '設定：変えられる（変更できる）' }))
 
     await waitFor(() => expect(screen.getByText('変更後の予定')).toBeTruthy())
     expect(screen.getByText(/いまの設定から変わるのは1項目/)).toBeTruthy()
