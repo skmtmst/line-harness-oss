@@ -3,6 +3,7 @@
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   api,
+  describeSaveFailure,
   type ConversionDefinitionList,
   type ConversionDefinitionListItem,
   type ConversionDefinitionDeleteImpact,
@@ -490,9 +491,11 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
       await load()
     } catch (error) {
       const message = error instanceof Error ? error.message : ''
+      // WRITE-01: 409の競合は専用の言葉、それ以外も権限不足・アカウント違い・
+      // 機能オフの理由が見えるようにする。内部文は画面へ出さない。
       setEditError(message.includes('更新されています')
         ? 'ほかの人がこの成果地点を先に直しました。上書きしていません。画面を閉じて読み直してから、もう一度お試しください。'
-        : message || '編集できませんでした。入力を確かめて、もう一度お試しください。')
+        : describeSaveFailure(error))
     } finally {
       setEditSaving(false)
     }

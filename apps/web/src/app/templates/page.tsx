@@ -5,7 +5,7 @@ import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu
 import { MoreAction } from '@/components/shared/row-actions'
 import StatusBadge from '@/components/shared/status-badge'
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
-import { api, ApiError, type BroadcastAssetKind, type TemplateQuestion } from '@/lib/api'
+import { api, ApiError, describeSaveFailure, type BroadcastAssetKind, type TemplateQuestion } from '@/lib/api'
 import FlexPreviewComponent from '@/components/flex-preview'
 import ImageUploader from '@/components/shared/image-uploader'
 import BroadcastAssetManager from '@/components/broadcasts/broadcast-asset-manager'
@@ -446,8 +446,10 @@ export default function TemplatesPage() {
       setEditContent(null)
       setEditName(null)
       load()
-    } catch {
-      setError('更新に失敗しました')
+    } catch (e) {
+      // WRITE-01: 「失敗しました」だけだと権限不足・アカウント違いと
+      // 通信断が区別できない。安全な理由だけを運用者へ出す。
+      setError(describeSaveFailure(e))
     }
     setSavingEdit(false)
   }

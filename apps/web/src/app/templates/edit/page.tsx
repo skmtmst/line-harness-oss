@@ -4,7 +4,7 @@ import SelectField from '@/components/shared/select-field'
 import React, { Suspense, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { api, ApiError } from '@/lib/api'
+import { api, ApiError, describeSaveFailure } from '@/lib/api'
 import { isOwnerOrAdmin } from '@/lib/staff-capability'
 import { type Folder } from '@line-crm/shared'
 import { Field, inputClass } from '@/components/shared/create-page'
@@ -212,7 +212,9 @@ async function saveTemplateEdit(
       : await ops.create({ accountId: input.selectedAccountId as string, ...payload })
     return res.success ? { ok: true } : { ok: false, error: res.error }
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : '保存に失敗しました' }
+    // WRITE-01: 権限不足・所属違い・機能オフの理由が見えるようにする。
+    // 内部文（API error: 5xx 等）は画面へ出さない。
+    return { ok: false, error: describeSaveFailure(e) }
   }
 }
 
