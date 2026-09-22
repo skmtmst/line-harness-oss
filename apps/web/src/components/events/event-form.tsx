@@ -40,11 +40,24 @@ function jstNow(): Date {
   return new Date(Date.now())
 }
 
-function formatJpDateTime(iso: string): string {
+export function formatJpDateTime(iso: string): string {
   const d = new Date(iso)
   return d.toLocaleString('ja-JP', {
     year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit',
   })
+}
+
+/**
+ * 枠の日時の出し方。「2026/09/20 23:30 〜 01:00」。
+ *
+ * 日をまたぐ枠は終了側の日付も出す(DETAIL-10)。時刻だけにすると
+ * 「9/20 23:30〜01:00」が当日深夜なのか翌日なのか読めない。
+ */
+export function formatJpSlotRange(startsAt: string, endsAt: string): string {
+  const start = formatJpDateTime(startsAt)
+  const end = formatJpDateTime(endsAt)
+  const sameDay = start.slice(0, 10) === end.slice(0, 10)
+  return `${start} 〜 ${sameDay ? end.slice(-5) : end}`
 }
 
 export default function EventForm({ accountId, eventId }: EventFormProps) {
@@ -818,7 +831,7 @@ function SlotsTab({
               {slots.map((s) => (
                 <tr key={s.id} className="border-t border-gray-200">
                   <td className="px-3 py-2 text-gray-800">
-                    {formatJpDateTime(s.starts_at)} 〜 {formatJpDateTime(s.ends_at).slice(-5)}
+                    {formatJpSlotRange(s.starts_at, s.ends_at)}
                   </td>
                   <td className="px-3 py-2 text-gray-700">{s.capacity ?? '無制限'}</td>
                   <td className="px-3 py-2 text-gray-700">{s.active_count ?? 0}</td>
