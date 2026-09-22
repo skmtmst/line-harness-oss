@@ -352,6 +352,13 @@ describe('共通情報編集（uNBlA）の画面', () => {
     // 使用先はあるが保存ですぐ変わるものが無い（送信済みだけ等）も分ける
     expect(PREVIEW_SECTION).toContain('すぐ変わる使用先の文はありません')
   })
+
+  it('VAR-06: 保存と更新予約は新規画面と同じ型検査を通す', () => {
+    // 型に合わない値・代替値は影響確認を呼ぶ前に止めて理由を出す。
+    expect(EDIT).toContain('commonVarValueError(item.type, value)')
+    expect(EDIT).toContain("commonVarValueError(item.type, fallbackValue, '代替値')")
+    expect(EDIT).toContain("commonVarValueError(item.type, draft.value, '更新後の値')")
+  })
 })
 
 describe('変更前確認（#773 の口）', () => {

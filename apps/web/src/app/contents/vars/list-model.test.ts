@@ -6,7 +6,7 @@ function item(over: Partial<CommonVar> = {}): CommonVar {
   return {
     id: 'v1', lineAccountId: 'a1', folderId: null, name: '会社名', varKey: 'company',
     type: 'text', value: '株式会社NEN', createdAt: '2026-08-01', updatedAt: '2026-08-02',
-    usageCount: 3, nextSchedule: null, ...over,
+    usageCount: 3, nextSchedule: null, validFrom: null, validUntil: null, ...over,
   }
 }
 
@@ -17,10 +17,14 @@ describe('共通情報一覧の絞り込みと並び順', () => {
     const values = [
       item({ id: 'empty', value: '' }),
       item({ id: 'scheduled', nextSchedule: { effectiveFrom: '2026-09-30', value: '' } }),
+      // VAR-04: 有効期間（開始だけ・終了だけ・両方）を設定したものも「期限つき」で拾う
+      item({ id: 'period-both', validFrom: '2026-09-01T00:00:00.000Z', validUntil: '2026-09-30T15:00:00.000Z' }),
+      item({ id: 'period-until', validUntil: '2026-09-30T15:00:00.000Z' }),
       item({ id: 'unused', usageCount: 0 }),
     ]
     expect(filterAndSortCommonVars(values, { ...input, filter: 'empty' }).map((value) => value.id)).toEqual(['empty'])
-    expect(filterAndSortCommonVars(values, { ...input, filter: 'scheduled' }).map((value) => value.id)).toEqual(['scheduled'])
+    expect(filterAndSortCommonVars(values, { ...input, filter: 'scheduled' }).map((value) => value.id))
+      .toEqual(['scheduled', 'period-both', 'period-until'])
     expect(filterAndSortCommonVars(values, { ...input, filter: 'unused' }).map((value) => value.id)).toEqual(['unused'])
   })
 

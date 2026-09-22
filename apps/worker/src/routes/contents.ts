@@ -1991,7 +1991,13 @@ contents.post('/api/common-vars', requireRole('owner', 'admin'), async (c) => {
       return c.json({ success: false, error: '名前は200文字までで入力してください' }, 400);
     }
     if (value === null) {
-      return c.json({ success: false, error: '種別に合う値を入力してください' }, 400);
+      // VAR-06: 何が悪いかを画面へ返す。画像はURL形だけを受ける（VAR-03）。
+      return c.json({
+        success: false,
+        error: type === 'image'
+          ? '画像には https:// からはじまるURLを入力してください'
+          : '種別に合う値を入力してください',
+      }, 400);
     }
     if (memo.length > 1000) {
       return c.json({ success: false, error: 'メモは1000文字までで入力してください' }, 400);
@@ -2074,7 +2080,12 @@ contents.patch('/api/common-vars/:id', requireRole('owner', 'admin'), async (c) 
     }
     const patchValue = body.value === undefined ? undefined : normalizeCommonVarValue(existing.type as CommonVarType, String(body.value));
     if (patchValue === null) {
-      return c.json({ success: false, error: '種別に合う値を入力してください' }, 400);
+      return c.json({
+        success: false,
+        error: existing.type === 'image'
+          ? '画像には https:// からはじまるURLを入力してください'
+          : '種別に合う値を入力してください',
+      }, 400);
     }
     const patchMemo = body.memo === undefined ? undefined : String(body.memo);
     if (patchMemo !== undefined && patchMemo.length > 1000) {
@@ -2417,10 +2428,24 @@ contents.post('/api/common-vars/:id/schedules', requireRole('owner', 'admin'), a
       return c.json({ success: false, error: '過去の日時は指定できません' }, 400);
     }
 
+    // VAR-06: 予約の値も登録・編集と同じ型検査を通す。ここを素通りさせると
+    // Cron が型に合わない値をそのまま書き込む（真偽の変数へ 'yes' 等）。
+    const scheduledValue = typeof body.value === 'string' ? body.value : '';
+    const normalizedScheduled = normalizeCommonVarValue(
+      existing.type as CommonVarType,
+      scheduledValue,
+    );
+    if (normalizedScheduled === null) {
+      return c.json(
+        { success: false, error: '更新後の値は種別に合う値を入力してください' },
+        400,
+      );
+    }
+
     const created = await createCommonVarSchedule(c.env.DB, {
       varId,
       effectiveFrom,
-      value: typeof body.value === 'string' ? body.value : '',
+      value: normalizedScheduled,
     });
     return c.json({ success: true, data: serializeSchedule(created) }, 201);
   } catch (err) {
