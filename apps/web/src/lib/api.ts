@@ -12783,6 +12783,18 @@ export interface EventBookingSummary {
   attended: number;
   noShow: number;
   waitlist: number;
+  /**
+   * IDEA-29: 状態ごとの人数(party_size 合計)。行数(件)と分けて返す。
+   * 配備途中の旧応答には無いため、画面側は行数へ戻す。
+   */
+  requestedSeats?: number;
+  confirmedSeats?: number;
+  /** 待機中(並んでいる)の人数。席は消費しない。 */
+  waitingSeats?: number;
+  /** 案内中・受諾済みの人数。期限付きで席を保留中。 */
+  offeredSeats?: number;
+  /** 席を消費中の人数 = requested+confirmed+offered。 */
+  activeSeats?: number;
   totalCapacity: number | null;
 }
 
@@ -12831,7 +12843,47 @@ export interface EventOccurrenceApplicants {
     activeSeats: number;
     version: number;
   };
-  summary: { bookingCount: number; waitingCount: number; activeSeats: number };
+  summary: {
+    bookingCount: number;
+    waitingCount: number;
+    activeSeats: number;
+    /** IDEA-29: 状態ごとの人数。旧応答には無いため optional。 */
+    confirmedSeats?: number;
+    requestedSeats?: number;
+    waitingSeats?: number;
+    offeredSeats?: number;
+    remainingSeats?: number | null;
+  };
+  /**
+   * IDEA-29: 繰上げ履歴。終了した待ち行(予約化・期限切れ・取消)を新しい順。
+   * 旧応答には無いため optional。
+   */
+  waitlistHistory?: Array<{
+    id: string;
+    friendId: string;
+    displayName: string | null;
+    status: string;
+    partySize: number;
+    createdAt: string;
+    offeredAt: string | null;
+    offerExpiresAt: string | null;
+    notifiedAt: string | null;
+    updatedAt: string;
+    convertedBookingId: string | null;
+  }>;
+  /** IDEA-29: 当日受付の記録。旧応答には無いため optional。 */
+  attendance?: {
+    attendedSeats: number;
+    noShowSeats: number;
+    entries: Array<{
+      id: string;
+      friendId: string;
+      displayName: string | null;
+      status: string;
+      partySize: number;
+      markedAt: string;
+    }>;
+  };
   applicants: EventOccurrenceApplicant[];
   /** 表示・CSV・一斉案内を同じ対象で扱う短期サーバースナップショット。 */
   snapshotId: string;
