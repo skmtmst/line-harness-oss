@@ -323,6 +323,23 @@ export async function getMediaVersionList(
   return rows.results;
 }
 
+/**
+ * 指定した版の1行。版ごとの実体（元ファイルの取り戻し）へ
+ * 到達するための口。アカウント境界は JOIN 側で確認する。
+ */
+export async function getMediaVersionByNo(
+  db: D1Database,
+  mediaId: string,
+  lineAccountId: string,
+  versionNo: number,
+): Promise<MediaVersion | null> {
+  return db.prepare(
+    `SELECT v.* FROM media_versions v
+       JOIN media m ON m.id = v.media_id
+      WHERE v.media_id = ? AND m.line_account_id = ? AND v.version_no = ?`,
+  ).bind(mediaId, lineAccountId, versionNo).first<MediaVersion>();
+}
+
 export async function getCurrentMediaVersionNo(
   db: D1Database,
   mediaId: string,

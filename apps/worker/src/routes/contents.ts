@@ -15,6 +15,7 @@ import {
   applyMediaReplacementPlan,
   getMediaStorageQuota,
   getMediaVersionList,
+  getMediaVersionByNo,
   getMediaLiveTarget,
   getMediaUsageReferenceStates,
   retargetMediaUsageReference,
@@ -260,6 +261,9 @@ function serializeMedia(row: Media, workerUrl: string) {
     archivedAt: row.archived_at ?? null,
     archivedBy: row.archived_by ?? null,
     archiveReason: row.archive_reason ?? null,
+    // 記録された値だけを返す。未記録は null（画面では「不明」と出す）。
+    usageExpiresAt: row.usage_expires_at ?? null,
+    usageConsentNote: row.usage_consent_note ?? null,
     usageCount: row.usage_count === undefined ? undefined : Number(row.usage_count),
   };
 }
@@ -275,6 +279,17 @@ function directUploadConfig(env: Env['Bindings']) {
 
 function normalizedEtag(value: string): string {
   return value.trim().replace(/^"|"$/g, '');
+}
+
+/** 実在する日付の YYYY-MM-DD だけを利用期限として受け付ける。 */
+function isValidUsageExpiryDate(value: string): boolean {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) return false;
+  const [year, month, day] = match.slice(1).map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  return date.getUTCFullYear() === year
+    && date.getUTCMonth() === month - 1
+    && date.getUTCDate() === day;
 }
 
 /**
@@ -928,6 +943,58 @@ contents.get('/api/media/:id/content', requireRole('owner', 'admin', 'staff'), a
 });
 
 /**
+ * 版ごとのダウンロード（IDEA-15）。
+ *
+ * 版を追加すると media.r2_key は新しい版へ進むが、旧版の実体は
+ * media_versions に残る。第1版＝登録時の元ファイルを含め、指定した版を
+ * 取り戻せる口。権限確認と監査は /download と同じ決まりで、
+ * 保存用の公開URL（/images/*）へは直接行かせない。
+ */
+contents.get('/api/media/:id/versions/:versionNo/download', requireRole('owner', 'admin', 'staff'), async (c) => {
+  try {
+    const id = c.req.param('id');
+    const accountId = c.req.query('accountId')?.trim();
+    const versionNo = Number(c.req.param('versionNo'));
+    if (!id || !Number.isInteger(versionNo) || versionNo < 1) {
+      return c.json({ success: false, error: 'Not found' }, 404);
+    }
+    if (!accountId) return c.json({ success: false, error: 'accountId query param required' }, 400);
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
+      auditLog(c, 'media.download', { kind: 'media', id }, { result: 'denied', lineAccountId: accountId });
+      return c.json({ success: false, error: 'Not found' }, 404);
+    }
+    const media = await getMediaById(c.env.DB, id, accountId);
+    if (!media) {
+      auditLog(c, 'media.download', { kind: 'media', id }, { result: 'denied', lineAccountId: accountId });
+      return c.json({ success: false, error: 'Not found' }, 404);
+    }
+    const version = await getMediaVersionByNo(c.env.DB, id, accountId, versionNo);
+    if (!version) {
+      auditLog(c, 'media.download', { kind: 'media', id }, { result: 'denied', lineAccountId: accountId });
+      return c.json({ success: false, error: 'Not found' }, 404);
+    }
+    const object = await c.env.IMAGES.get(version.r2_key);
+    if (!object) return c.json({ success: false, error: 'Not found' }, 404);
+    auditLog(c, 'media.download', { kind: 'media', id }, { result: 'success', lineAccountId: accountId });
+    // どの版か分かる名前で保存する（例: a.png → a-v1.png）。
+    const dot = media.filename.lastIndexOf('.');
+    const downloadName = dot > 0
+      ? `${media.filename.slice(0, dot)}-v${versionNo}${media.filename.slice(dot)}`
+      : `${media.filename}-v${versionNo}`;
+    return new Response(object.body, {
+      headers: {
+        'Content-Type': version.mime_type,
+        'Content-Disposition': `attachment; filename="download"; filename*=UTF-8''${encodeURIComponent(downloadName)}`,
+        'Cache-Control': 'private, no-store',
+      },
+    });
+  } catch (err) {
+    console.error('GET /api/media/:id/versions/:versionNo/download error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+/**
  * ライブ参照の公開配信。
  *
  * 使用先へライブ参照を選んだ場所には、このメディアIDのURLが
@@ -974,6 +1041,8 @@ contents.patch('/api/media/:id', requireRole('owner', 'admin'), async (c) => {
     const body = await c.req.json<{
       filename?: string;
       folderId?: string | null;
+      usageExpiresAt?: unknown;
+      usageConsentNote?: unknown;
       usageReference?: {
         refKind?: unknown;
         refId?: unknown;
@@ -1003,11 +1072,44 @@ contents.patch('/api/media/:id', requireRole('owner', 'admin'), async (c) => {
         }
       }
     }
+    /*
+      既知の利用期限・同意情報の記録（IDEA-15）。
+      日付は実在する YYYY-MM-DD だけを受け付け、null/空で消す。
+      推測で値を作らないので、形式が合わない入力は書き込まず拒否する。
+    */
+    let usageExpiresAt: string | null | undefined;
+    if ('usageExpiresAt' in body) {
+      const raw = body.usageExpiresAt;
+      if (raw === null || raw === undefined || raw === '') {
+        usageExpiresAt = null;
+      } else if (typeof raw === 'string' && isValidUsageExpiryDate(raw.trim())) {
+        usageExpiresAt = raw.trim();
+      } else {
+        return c.json({ success: false, error: '利用期限は日付（YYYY-MM-DD）で入力してください' }, 400);
+      }
+    }
+    let usageConsentNote: string | null | undefined;
+    if ('usageConsentNote' in body) {
+      const raw = body.usageConsentNote;
+      if (raw === null || raw === undefined) {
+        usageConsentNote = null;
+      } else if (typeof raw === 'string') {
+        const note = raw.trim();
+        if (note.length > 500) {
+          return c.json({ success: false, error: '同意・権利の記録は500文字までで入力してください' }, 400);
+        }
+        usageConsentNote = note || null;
+      } else {
+        return c.json({ success: false, error: '同意・権利の記録は文字列で入力してください' }, 400);
+      }
+    }
     const workerUrl = c.env.WORKER_URL || new URL(c.req.url).origin;
     if (body.usageReference === undefined) {
       const media = await updateMedia(c.env.DB, id, accountId, {
         ...(filename !== undefined ? { filename } : {}),
         ...(folderId !== undefined ? { folderId } : {}),
+        ...(usageExpiresAt !== undefined ? { usageExpiresAt } : {}),
+        ...(usageConsentNote !== undefined ? { usageConsentNote } : {}),
       });
       return c.json({ success: true, data: serializeMedia(media!, workerUrl) });
     }

@@ -49,6 +49,7 @@ const mocks = {
   applyMediaReplacementPlan: vi.fn(),
   getMediaStorageQuota: vi.fn(),
   getMediaVersionList: vi.fn(),
+  getMediaVersionByNo: vi.fn(),
   getMediaLiveTarget: vi.fn(),
   getMediaUsageReferenceStates: vi.fn(),
   retargetMediaUsageReference: vi.fn(),
@@ -1162,6 +1163,138 @@ describe('#637 指摘2 管理画面の表示は認証付きのcontent口だけ',
     const body = (await res.json()) as { data: { items: Array<{ url: string }> } };
     // 配信本文に埋めてLINEが取りに行く公開URL。秘密値は含めない。
     expect(body.data.items[0]?.url).toBe('https://api.example.com/images/media/xxx.png');
+  });
+});
+
+/*
+ * IDEA-15 登録メディア。
+ * 既知の利用期限・同意情報を詳細へ出す記録口と、版ごとの実体を
+ * 取り戻すダウンロード口。記録されていない値は推測で埋めない。
+ */
+describe('IDEA-15 メディアの利用期限・同意の記録', () => {
+  it('記録した期限と同意メモを保存し、serializeで返す', async () => {
+    const res = await req('/api/media/md-1?accountId=account-1', 'PATCH', {
+      usageExpiresAt: '2027-03-31',
+      usageConsentNote: '出演者の同意書を確認済み',
+    });
+    expect(res.status).toBe(200);
+    expect(mocks.updateMedia).toHaveBeenCalledWith(env.DB, 'md-1', 'account-1', {
+      usageExpiresAt: '2027-03-31',
+      usageConsentNote: '出演者の同意書を確認済み',
+    });
+    expect(await res.json()).toMatchObject({
+      data: { usageExpiresAt: null, usageConsentNote: null },
+    });
+  });
+
+  it('空の値は記録を消して「不明」へ戻す', async () => {
+    const res = await req('/api/media/md-1?accountId=account-1', 'PATCH', {
+      usageExpiresAt: null,
+      usageConsentNote: '',
+    });
+    expect(res.status).toBe(200);
+    expect(mocks.updateMedia).toHaveBeenCalledWith(env.DB, 'md-1', 'account-1', {
+      usageExpiresAt: null,
+      usageConsentNote: null,
+    });
+  });
+
+  it.each(['2027-13-01', '2027-02-30', '来月末', '2027/03/31'])(
+    '実在しない・形式の違う日付 %s は書き込まない',
+    async (value) => {
+      const res = await req('/api/media/md-1?accountId=account-1', 'PATCH', { usageExpiresAt: value });
+      expect(res.status).toBe(400);
+      expect(mocks.updateMedia).not.toHaveBeenCalled();
+    },
+  );
+
+  it('同意メモは500文字まで。超過は書き込まない', async () => {
+    const res = await req('/api/media/md-1?accountId=account-1', 'PATCH', {
+      usageConsentNote: 'あ'.repeat(501),
+    });
+    expect(res.status).toBe(400);
+    expect(mocks.updateMedia).not.toHaveBeenCalled();
+  });
+
+  it('staffは記録を書き換えられない', async () => {
+    const res = await req('/api/media/md-1?accountId=account-1', 'PATCH', {
+      usageExpiresAt: '2027-03-31',
+    }, 'staff');
+    expect(res.status).toBe(403);
+    expect(mocks.updateMedia).not.toHaveBeenCalled();
+  });
+});
+
+describe('IDEA-15 版ごとのダウンロード（元ファイルの取り戻し）', () => {
+  const VERSION_1 = {
+    id: 'version-1',
+    media_id: 'md-1',
+    version_no: 1,
+    r2_key: 'media/account-1/original.png',
+    mime_type: 'image/png',
+    size_bytes: 100,
+    width: 100,
+    height: 50,
+    duration_ms: null,
+    page_count: null,
+    codec: null,
+    content_hash: null,
+    etag: null,
+    scan_status: 'verified',
+    scan_result: null,
+    scanned_at: '2026-08-16',
+    change_reason: null,
+    uploaded_by: 'u-1',
+    created_at: '2026-08-16',
+    published_at: '2026-08-16',
+  };
+
+  beforeEach(() => {
+    mocks.getMediaVersionByNo.mockResolvedValue(VERSION_1);
+  });
+
+  it('指定した版の実体を添付として返す。第1版は登録時の元ファイル', async () => {
+    get.mockResolvedValueOnce({ body: 'ORIGINAL-PNG' });
+    const res = await req('/api/media/md-1/versions/1/download?accountId=account-1', 'GET');
+    expect(res.status).toBe(200);
+    expect(mocks.getMediaVersionByNo).toHaveBeenCalledWith(env.DB, 'md-1', 'account-1', 1);
+    expect(get).toHaveBeenCalledWith('media/account-1/original.png');
+    expect(res.headers.get('Content-Type')).toBe('image/png');
+    expect(res.headers.get('Content-Disposition')).toContain('attachment');
+    expect(res.headers.get('Content-Disposition')).toContain(encodeURIComponent('a-v1.png'));
+    expect(res.headers.get('Cache-Control')).toBe('private, no-store');
+    expect(await res.text()).toBe('ORIGINAL-PNG');
+  });
+
+  it('staffも版を取り出せる（ダウンロードと同じ権限）', async () => {
+    get.mockResolvedValueOnce({ body: 'ORIGINAL-PNG' });
+    const res = await req('/api/media/md-1/versions/1/download?accountId=account-1', 'GET', undefined, 'staff');
+    expect(res.status).toBe(200);
+  });
+
+  it.each(['0', '-1', '1.5', 'latest'])('版番号 %s は404', async (versionNo) => {
+    const res = await req(`/api/media/md-1/versions/${versionNo}/download?accountId=account-1`, 'GET');
+    expect(res.status).toBe(404);
+    expect(mocks.getMediaVersionByNo).not.toHaveBeenCalled();
+  });
+
+  it('存在しない版は404にする', async () => {
+    mocks.getMediaVersionByNo.mockResolvedValueOnce(null);
+    const res = await req('/api/media/md-1/versions/9/download?accountId=account-1', 'GET');
+    expect(res.status).toBe(404);
+  });
+
+  it('他アカウントのメディアは存在も返さず、版を探さない', async () => {
+    accessMocks.canAccessAllLineAccounts.mockResolvedValueOnce(false);
+    const res = await req('/api/media/md-1/versions/1/download?accountId=account-2', 'GET');
+    expect(res.status).toBe(404);
+    expect(mocks.getMediaVersionByNo).not.toHaveBeenCalled();
+  });
+
+  it('権限のない担当者は403で止める', async () => {
+    const res = await req('/api/media/md-1/versions/1/download?accountId=account-1', 'GET', undefined, null);
+    expect(res.status).toBe(403);
+    expect(mocks.getMediaVersionByNo).not.toHaveBeenCalled();
   });
 });
 
