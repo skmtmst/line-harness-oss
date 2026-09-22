@@ -32,6 +32,15 @@ vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: 'acc-1', loading: false }),
 }))
 
+/*
+ * #1043: 操作ボタンは権限キーで出し分ける。既定は owner 相当（全操作が
+ * 見える）。見るだけの権限の試験だけ差し替える。
+ */
+const runPermissions = vi.hoisted(() => ({
+  useAutomationRunPermissions: vi.fn(() => ({ canOperate: true, canExport: true })),
+}))
+vi.mock('@/components/automations/use-can-manage', () => runPermissions)
+
 import AutomationRunsPage from './page'
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
@@ -92,6 +101,7 @@ async function renderPage() {
 
 beforeEach(() => {
   vi.useFakeTimers()
+  runPermissions.useAutomationRunPermissions.mockReturnValue({ canOperate: true, canExport: true })
 })
 
 afterEach(() => {
@@ -154,5 +164,16 @@ describe('動いた記録の再実行受け付け(#736)', () => {
 
     expect(container.textContent).toContain('失敗した処理がある実行だけ、もう一度実行できます')
     expect(container.textContent).not.toContain('受け付けました')
+  })
+
+  it('見るだけの権限では再実行・CSVの操作を出さない (#1043)', async () => {
+    runPermissions.useAutomationRunPermissions.mockReturnValue({ canOperate: false, canExport: false })
+    fetchApi.mockImplementation(async () => listResponse())
+    await renderPage()
+
+    expect(retryButtons()).toHaveLength(0)
+    expect(container.textContent).not.toContain('CSVで書き出す')
+    // 記録自体（見る権限の範囲）は表示される。
+    expect(container.textContent).toContain('予約案内')
   })
 })

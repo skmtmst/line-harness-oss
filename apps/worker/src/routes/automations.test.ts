@@ -15,12 +15,26 @@ const dbMocks = {
   getAutomationExecutionRuns: vi.fn(),
   getAutomationExecutionRun: vi.fn(),
   getAutomationExecutionRunSteps: vi.fn(),
+  isOperationCapabilityStopped: vi.fn(),
   getLineAccounts: vi.fn(),
   getLineAccountScopeEntries: vi.fn(),
   getStaffById: vi.fn(),
   getStaffAccountScopeIds: vi.fn(),
 };
 vi.mock('@line-crm/db', () => dbMocks);
+
+// #1043: 止まっている理由を付けるために feature 状態を読む。
+// 既定は「有効」にして、止まる試験だけ個別に差し替える。
+const featureMocks = vi.hoisted(() => ({
+  accountFeatureAvailability: vi.fn(async () => ({
+    effectiveEnabled: true,
+    message: null as string | null,
+  })),
+}));
+vi.mock('../services/feature-enforcement.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../services/feature-enforcement.js')>()),
+  accountFeatureAvailability: featureMocks.accountFeatureAvailability,
+}));
 
 const { automations } = await import('./automations.js');
 
@@ -69,9 +83,20 @@ function setupApp(db: D1Database, staff?: Partial<AuthenticatedStaff>) {
 
 const STAFF_WITHOUT_KEY = { role: 'staff', permissionKeys: [] } as Partial<AuthenticatedStaff>;
 const STAFF_WITH_KEY = { role: 'staff', permissionKeys: ['/automations'] } as Partial<AuthenticatedStaff>;
+const STAFF_WITH_EXPORT_KEY = {
+  role: 'staff', permissionKeys: ['/automations', 'automation.run.export'],
+} as Partial<AuthenticatedStaff>;
+const STAFF_WITH_RETRY_KEY = {
+  role: 'staff', permissionKeys: ['/automations', 'automation.run.retry'],
+} as Partial<AuthenticatedStaff>;
 
 beforeEach(() => {
   for (const fn of Object.values(dbMocks)) fn.mockReset();
+  dbMocks.isOperationCapabilityStopped.mockResolvedValue(false);
+  featureMocks.accountFeatureAvailability.mockReset();
+  featureMocks.accountFeatureAvailability.mockResolvedValue({
+    effectiveEnabled: true, message: null,
+  });
   dbMocks.getLineAccountScopeEntries.mockImplementation(async (...args: unknown[]) =>
     dbMocks.getLineAccounts(...args));
   dbMocks.getLineAccounts.mockResolvedValue([
@@ -83,7 +108,7 @@ beforeEach(() => {
 });
 
 describe('GET /api/automation-runs', () => {
-  test('既存の機能固有状態を共通6状態へ読み替え、未取得値を作らない', async () => {
+  test('既存の機能固有状態を共通状態へ読み替え、未取得値を作らない', async () => {
     dbMocks.getAutomationExecutionRuns.mockResolvedValue({
       rows: [
         {
@@ -113,7 +138,8 @@ describe('GET /api/automation-runs', () => {
     expect(res.status).toBe(200);
     const body = await res.json() as { data: { items: Array<Record<string, unknown>> } };
     expect(body.data.items[0]).toMatchObject({
-      ownerKind: 'automation', status: 'permanent_failed', subject: '田中さん', accountLabel: '本店',
+      // #1043: 一部だけ成功は失敗とは別の状態で返す。
+      ownerKind: 'automation', status: 'partial', subject: '田中さん', accountLabel: '本店',
       triggerLabel: 'メッセージが届いたとき', detail: 'メッセージを送信。外部連携先が応答しませんでした',
       durationMs: 1200, canRetry: true,
     });
@@ -153,10 +179,112 @@ describe('GET /api/automation-runs', () => {
     const res = await setupApp(fakeD1()).request('/api/automation-runs?lineAccountId=acc-1');
     const body = await res.json() as { data: { items: Array<Record<string, unknown>> } };
     expect(body.data.items[0]).toMatchObject({
-      status: 'permanent_failed',
+      status: 'partial',
       detail: 'メッセージを送信。タグを追加は見送り',
       failureReason: null,
     });
+  });
+
+  /*
+   * #1043: 「待っています」と「止まっています」を区別する。
+   * 運用停止・機能無効で claim できない実行は queued のまま残るが、
+   * 理由を人の言葉で detail / holdReason に出す。
+   */
+  test('運用停止で動けない実行には止まっている理由を付ける', async () => {
+    dbMocks.isOperationCapabilityStopped.mockResolvedValue(true);
+    dbMocks.getAutomationExecutionRuns.mockResolvedValue({
+      rows: [runRow({ status: 'queued', completed_at: null, duration_ms: null, successful_actions: null })],
+      total: 1,
+      summary: { total: 1, executed: 0, skipped: 0, failed: 0, most_run_name: null, most_run_count: null },
+    });
+
+    const res = await setupApp(fakeD1()).request('/api/automation-runs?lineAccountId=acc-1');
+    expect(res.status).toBe(200);
+    const body = await res.json() as { data: { items: Array<Record<string, unknown>> } };
+    expect(body.data.items[0]).toMatchObject({
+      status: 'queued',
+      detail: '運用停止中のため、いまは動かせません。再開されると動きます',
+      holdReason: '運用停止中のため、いまは動かせません。再開されると動きます',
+    });
+    expect(dbMocks.isOperationCapabilityStopped)
+      .toHaveBeenCalledWith(expect.anything(), 'acc-1', 'automation_actions');
+  });
+
+  test('機能が無効なアカウントの実行には、その旨を理由として付ける', async () => {
+    featureMocks.accountFeatureAvailability.mockResolvedValue({
+      effectiveEnabled: false, message: 'この機能は設定でオフになっています',
+    });
+    dbMocks.getAutomationExecutionRuns.mockResolvedValue({
+      rows: [runRow({ status: 'queued', completed_at: null, duration_ms: null, successful_actions: null })],
+      total: 1,
+      summary: { total: 1, executed: 0, skipped: 0, failed: 0, most_run_name: null, most_run_count: null },
+    });
+
+    const res = await setupApp(fakeD1()).request('/api/automation-runs?lineAccountId=acc-1');
+    const body = await res.json() as { data: { items: Array<Record<string, unknown>> } };
+    expect(body.data.items[0]).toMatchObject({
+      status: 'queued',
+      holdReason: 'この機能は設定でオフになっています',
+      detail: 'この機能は設定でオフになっています',
+    });
+  });
+
+  test('待機(wait)と再試行待ちを区別し、終わった実行には止まる理由を付けない', async () => {
+    dbMocks.getAutomationExecutionRuns.mockResolvedValue({
+      rows: [
+        runRow({ id: 'run-wait', status: 'waiting', has_retry_wait: 0, successful_actions: 'add_tag' }),
+        runRow({ id: 'run-retry', status: 'waiting', has_retry_wait: 1, successful_actions: 'add_tag' }),
+        runRow({ id: 'run-done' }),
+      ],
+      total: 3,
+      summary: { total: 3, executed: 1, skipped: 0, failed: 0, most_run_name: '予約案内', most_run_count: 1 },
+    });
+
+    const res = await setupApp(fakeD1()).request('/api/automation-runs?lineAccountId=acc-1');
+    const body = await res.json() as { data: { items: Array<Record<string, unknown>> } };
+    expect(body.data.items[0]).toMatchObject({
+      status: 'waiting', detail: 'タグを追加。設定した時刻まで待っています', holdReason: null,
+    });
+    expect(body.data.items[1]).toMatchObject({
+      status: 'retry_wait', detail: 'タグを追加。失敗した処理の再試行を待っています',
+    });
+    expect(body.data.items[2]).toMatchObject({ status: 'succeeded', holdReason: null });
+  });
+
+  test('実行した版といまの公開版の区別が分かる値を返す', async () => {
+    dbMocks.getAutomationExecutionRuns.mockResolvedValue({
+      rows: [
+        runRow({ id: 'run-old', version_number: 2, current_published_version_id: 'ver-2', current_version_number: 4 }),
+        runRow({ id: 'run-now' }),
+      ],
+      total: 2,
+      summary: { total: 2, executed: 2, skipped: 0, failed: 0, most_run_name: '予約案内', most_run_count: 2 },
+    });
+
+    const res = await setupApp(fakeD1()).request('/api/automation-runs?lineAccountId=acc-1');
+    const body = await res.json() as { data: { items: Array<Record<string, unknown>> } };
+    // run-old は ver-1 で動いたが、いまの公開版は ver-2（=v4）。
+    expect(body.data.items[0]).toMatchObject({
+      versionNumber: 2, isCurrentVersion: false, currentVersionNumber: 4,
+    });
+    expect(body.data.items[1]).toMatchObject({
+      versionNumber: 3, isCurrentVersion: true, currentVersionNumber: 3,
+    });
+  });
+
+  test('include_test を付けたときだけテスト実行を含める口へ渡す', async () => {
+    dbMocks.getAutomationExecutionRuns.mockResolvedValue({
+      rows: [],
+      total: 0,
+      summary: { total: 0, executed: 0, skipped: 0, failed: 0, most_run_name: null, most_run_count: null },
+    });
+    const app = setupApp(fakeD1());
+    await app.request('/api/automation-runs?lineAccountId=acc-1');
+    expect(dbMocks.getAutomationExecutionRuns).toHaveBeenLastCalledWith(expect.anything(),
+      expect.objectContaining({ includeTest: false }));
+    await app.request('/api/automation-runs?lineAccountId=acc-1&include_test=1');
+    expect(dbMocks.getAutomationExecutionRuns).toHaveBeenLastCalledWith(expect.anything(),
+      expect.objectContaining({ includeTest: true }));
   });
 });
 
@@ -239,6 +367,8 @@ function runRow(overrides: Record<string, unknown> = {}) {
     id: 'run-1', line_account_id: 'acc-1', account_name: '本店',
     automation_id: 'auto-1', automation_name: '予約案内', automation_version_id: 'ver-1',
     version_number: 3, is_test: 0,
+    current_published_version_id: 'ver-1', current_version_number: 3,
+    has_retry_wait: 0,
     friend_id: 'friend-1', friend_name: '田中さん', source_event_id: 'event-1',
     trigger_type: 'friend_add', status: 'success',
     started_at: '2026-08-28T01:00:00.000Z', completed_at: '2026-08-28T01:00:01.000Z',
@@ -252,7 +382,8 @@ function runRow(overrides: Record<string, unknown> = {}) {
 describe('GET /api/automation-runs/:id（#942 N-354 実行の詳細）', () => {
   test('版番号・テスト印・取消可否と、処理ごとの結果・試行数を返す', async () => {
     dbMocks.getAutomationExecutionRun.mockResolvedValue(runRow({
-      status: 'waiting', version_number: 4, is_test: 1,
+      // 待機中stepに retry_at があるときだけ再試行待ち（#1043）。
+      status: 'waiting', has_retry_wait: 1, version_number: 4, is_test: 1,
       successful_actions: null, completed_at: null, duration_ms: null,
     }));
     dbMocks.getAutomationExecutionRunSteps.mockResolvedValue([
@@ -387,6 +518,27 @@ describe('CSV書き出し（#942 N-353）', () => {
     expect(res.status).toBe(403);
     expect(dbMocks.getAutomationExecutionRuns).not.toHaveBeenCalled();
   });
+
+  /*
+   * #1043 / V6 §9: CSV書き出しは個別権限 `automation.run.export`。
+   * 見るだけ（/automations）では出せず、export キーで出せる。
+   */
+  test('見るだけの権限ではCSVを出せず、書き出し権限のstaffは出せる', async () => {
+    const denied = await setupApp(fakeD1(), STAFF_WITH_KEY)
+      .request('/api/automation-runs?lineAccountId=acc-1&format=csv');
+    expect(denied.status).toBe(403);
+    expect(dbMocks.getAutomationExecutionRuns).not.toHaveBeenCalled();
+
+    dbMocks.getAutomationExecutionRuns.mockResolvedValue({
+      rows: [],
+      total: 0,
+      summary: { total: 0, executed: 0, skipped: 0, failed: 0, most_run_name: null, most_run_count: null },
+    });
+    const allowed = await setupApp(fakeD1(), STAFF_WITH_EXPORT_KEY)
+      .request('/api/automation-runs?lineAccountId=acc-1&format=csv');
+    expect(allowed.status).toBe(200);
+    expect(allowed.headers.get('Content-Type')).toBe('text/csv; charset=utf-8');
+  });
 });
 
 /*
@@ -465,11 +617,17 @@ describe('POST /api/automation-runs/:id/cancel（#942 N-353）', () => {
   test('権限キーのないstaffは403、持つstaffは取りやめられる', async () => {
     const testDb = realAutomationDb();
     addRun(testDb.raw, { id: 'run-1', status: 'waiting' });
+    addRun(testDb.raw, { id: 'run-2', status: 'waiting' });
     const denied = await setupApp(testDb.db, STAFF_WITHOUT_KEY)
       .request('/api/automation-runs/run-1/cancel', { method: 'POST' });
     expect(denied.status).toBe(403);
-    const allowed = await setupApp(testDb.db, STAFF_WITH_KEY)
+    // #1043 / V6 §9: 取り消しは automation.run.retry の個別権限。
+    // 見るだけの権限（/automations）では取りやめられない。
+    const viewOnly = await setupApp(testDb.db, STAFF_WITH_KEY)
       .request('/api/automation-runs/run-1/cancel', { method: 'POST' });
+    expect(viewOnly.status).toBe(403);
+    const allowed = await setupApp(testDb.db, STAFF_WITH_RETRY_KEY)
+      .request('/api/automation-runs/run-2/cancel', { method: 'POST' });
     expect(allowed.status).toBe(200);
   });
 });

@@ -2946,11 +2946,16 @@ export type AutomationRunDetail = {
   subject: string | null
   accountLabel: string | null
   triggerLabel: string
-  status: 'queued' | 'claimed' | 'succeeded' | 'skipped' | 'retry_wait' | 'permanent_failed' | 'cancelled'
+  status: 'queued' | 'claimed' | 'succeeded' | 'skipped' | 'waiting' | 'retry_wait' | 'partial' | 'permanent_failed' | 'cancelled'
   domainStatus: string
   detail: string | null
   durationMs: number | null
   failureReason: string | null
+  /** #1043: 運用停止・機能無効で動けない実行の理由。 */
+  holdReason: string | null
+  /** #1043: 実行した版がいまの公開版と同じか。 */
+  isCurrentVersion: boolean
+  currentVersionNumber: number | null
   successfulActions: string[]
   skippedActions: string[]
   failedAction: string | null
@@ -8993,11 +8998,12 @@ export const api = {
     getRun: (id: string) =>
       fetchApi<ApiResponse<AutomationRunDetail>>(`/api/automation-runs/${encodeURIComponent(id)}`),
     // #942 N-353: 実行記録のCSV書き出し口。画面の絞り込みと同じ条件を渡す。
-    runsCsvUrl: (params?: { accountId?: string; search?: string; status?: string }) => {
+    runsCsvUrl: (params?: { accountId?: string; search?: string; status?: string; includeTest?: boolean }) => {
       const query = new URLSearchParams({ format: 'csv' })
       if (params?.accountId) query.set('lineAccountId', params.accountId)
       if (params?.search) query.set('search', params.search)
       if (params?.status) query.set('status', params.status)
+      if (params?.includeTest) query.set('include_test', '1')
       return `${API_URL}/api/automation-runs?${query}`
     },
     // #942 N-353: まだ終わっていない実行を取りやめる。取消済みはそのまま成功。
