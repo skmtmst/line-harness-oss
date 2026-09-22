@@ -1195,6 +1195,16 @@ export type ConversionApprovalItem = {
   lineAccountId: string | null
   /** アカウント名。削除済み・未割当は null */
   lineAccountName: string | null
+  /** 成果の起こりになった注文番号。注文由来でない成果は null */
+  orderNumber: string | null
+  /** その注文の最新状態。注文が見つからない・注文由来でない成果は null */
+  orderStatus: 'current' | 'refunded' | 'cancelled' | null
+  /** 同じ注文・同じ成果地点の帰属成果がほかにもあるとき true（二重計上の候補） */
+  sameOrderDuplicate: boolean
+  /** 承認時に固定された報酬額。承認前・計算不可は null（未確定） */
+  rewardAmount: number | null
+  /** 支払い確定の行の状態。settled/paid/reversed 等。無ければ null */
+  rewardEntryStatus: 'pending' | 'approved' | 'held' | 'payable' | 'settled' | 'paid' | 'reversed' | null
 }
 
 export type ConversionDefinitionStatus = 'active' | 'stopped' | 'draft'
@@ -4043,6 +4053,25 @@ export type EcOrderDetail = {
       approvalStatus: 'pending' | 'approved' | 'rejected' | null
       value: number | null
       createdAt: string
+      /** 成果の起こりの根拠（注文番号・EC側の出来事ID） */
+      orderNumber: string | null
+      ecEventId: string | null
+      /** 帰属した紹介者。直接の成果は null */
+      affiliateName: string | null
+      /** 承認時に固定された報酬額。承認前・計算不可は null（未確定） */
+      rewardAmount: number | null
+      /** 支払い確定の行の状態（settled/paid/reversed 等）。無ければ null */
+      rewardEntryStatus: string | null
+      /** 確定後の取消で起きた反対仕訳の金額。無ければ null */
+      reversedAmount: number | null
+      /** 締めの状態（closed/exported/paid/…）。締め前は null */
+      settlementState: string | null
+      /** 支払いCSV束の最新の状態（created/approved/exported/imported）。無ければ null */
+      payoutBatchState: string | null
+      /** 取り込んだ支払い結果（paid/failed/returned）。無ければ null */
+      payoutResult: string | null
+      /** 同じ注文・同じ成果地点の成果がほかにもあるとき true */
+      duplicateCandidate: boolean
     }>
     mileage: Array<{
       id: string

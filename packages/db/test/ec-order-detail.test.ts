@@ -284,4 +284,124 @@ describe('getEcOrderDetail', () => {
     expect(detail!.events.map((event) => event.id)).toEqual(['ev-1']);
     expect(detail!.events[0].deliveries).toHaveLength(0);
   });
+
+  /*
+   * IDEA-16: 注文から成果・報酬・支払い状態まで同じ行で辿れることの固定。
+   * 確定後の取消（反対仕訳）と、同じ注文・同じ成果地点の重複候補も見せる。
+   */
+  it('成果から紹介者・確定報酬・締め・支払いCSV・支払い結果まで辿れる', async () => {
+    insertEvent({ id: 'ev-1', externalId: 'ext-1', status: 'processed' });
+    const { id: orderId } = await seedOrder({ eventId: 'ev-1', externalId: 'ext-1' });
+
+    sqlite.prepare(`INSERT INTO affiliates (id, name, code) VALUES ('aff-1', '紹介者A', 'code-aff-1')`).run();
+    sqlite.prepare(`INSERT OR IGNORE INTO tenants (id, name) VALUES ('${TENANT_ID}', 'テスト')`).run();
+    sqlite.prepare(
+      `INSERT INTO conversion_events
+         (id, conversion_point_id, friend_id, affiliate_id, metadata, point_name_snapshot,
+          value_snapshot, approval_status, approved_at, created_at)
+       VALUES ('cv-1', 'point-1', 'friend-1', 'aff-1',
+               '{"sourceType":"ec_order_confirmed","ecEventId":"ext-1","orderNumber":"NEN-1001"}',
+               '初回購入', 2860, 'approved', '2026-09-16T00:02:00.000Z', '2026-09-16T00:01:00.000Z')`,
+    ).run();
+    sqlite.prepare(
+      `INSERT INTO affiliate_reward_calculations
+         (id, organization_id, line_account_id, affiliate_id, conversion_event_id, formula, amount_minor)
+       VALUES ('calc-1', '${TENANT_ID}', 'account-1', 'aff-1', 'cv-1', 'fixed', 400)`,
+    ).run();
+    sqlite.prepare(
+      `INSERT INTO affiliate_reward_entries
+         (id, organization_id, line_account_id, affiliate_id, conversion_event_id,
+          entry_type, amount_minor, status, idempotency_key)
+       VALUES ('re-1', '${TENANT_ID}', 'account-1', 'aff-1', 'cv-1', 'credit', 400, 'settled', 'ik-credit-1'),
+              ('re-2', '${TENANT_ID}', 'account-1', 'aff-1', 'cv-1', 'debit', 400, 'reversed', 'ik-debit-1')`,
+    ).run();
+    sqlite.prepare(
+      `INSERT INTO affiliate_settlements
+         (id, organization_id, line_account_id, affiliate_id, period_from, period_to,
+          total_amount_minor, state, closed_by, idempotency_key)
+       VALUES ('st-1', '${TENANT_ID}', 'account-1', 'aff-1', '2026-09-01', '2026-09-30',
+               400, 'exported', 'staff-1', 'st-key-1')`,
+    ).run();
+    sqlite.prepare(
+      `INSERT INTO affiliate_settlement_lines (id, settlement_id, affiliate_id, entry_id, amount_minor)
+       VALUES ('sl-1', 'st-1', 'aff-1', 're-1', 400)`,
+    ).run();
+    sqlite.prepare(
+      `INSERT INTO affiliate_payout_batches
+         (id, organization_id, line_account_id, settlement_id, total_amount_minor,
+          line_count, state, created_by)
+       VALUES ('pb-1', '${TENANT_ID}', 'account-1', 'st-1', 400, 1, 'imported', 'staff-1')`,
+    ).run();
+    sqlite.prepare(
+      `INSERT INTO affiliate_payout_batch_lines
+         (id, batch_id, settlement_line_id, affiliate_id, amount_minor,
+          bank_code, bank_name, branch_code, branch_name, account_type,
+          account_number_encrypted, account_last4, account_holder_name)
+       VALUES ('pbl-1', 'pb-1', 'sl-1', 'aff-1', 400,
+               '0001', 'テスト銀行', '001', '本店', 'ordinary', 'enc', '1234', 'タロウ')`,
+    ).run();
+    sqlite.prepare(
+      `INSERT INTO affiliate_payout_results
+         (id, batch_id, affiliate_id, settlement_line_id, paid_amount_minor, result, imported_by)
+       VALUES ('pr-1', 'pb-1', 'aff-1', 'sl-1', 400, 'paid', 'staff-1')`,
+    ).run();
+
+    const detail = await getEcOrderDetail(db, { lineAccountId: 'account-1', orderId });
+    expect(detail!.outcomes.conversions).toHaveLength(1);
+    expect(detail!.outcomes.conversions[0]).toMatchObject({
+      id: 'cv-1',
+      pointName: '初回購入',
+      approvalStatus: 'approved',
+      orderNumber: 'NEN-1001',
+      ecEventId: 'ext-1',
+      affiliateName: '紹介者A',
+      rewardAmount: 400,
+      rewardEntryStatus: 'settled',
+      reversedAmount: 400,
+      settlementState: 'exported',
+      payoutBatchState: 'imported',
+      payoutResult: 'paid',
+      duplicateCandidate: false,
+    });
+  });
+
+  it('同じ注文・同じ成果地点の成果が2件あれば両方に重複候補を立てる', async () => {
+    insertEvent({ id: 'ev-1', externalId: 'ext-1', status: 'processed' });
+    const { id: orderId } = await seedOrder({ eventId: 'ev-1', externalId: 'ext-1' });
+
+    // 同じ注文が別の出来事IDで届き直した形（冪等キーが違うので別の成果が立つ）。
+    for (const [id, eventId] of [['cv-1', 'ext-1'], ['cv-2', 'ext-9']] as const) {
+      sqlite.prepare(
+        `INSERT INTO conversion_events
+           (id, conversion_point_id, friend_id, metadata, point_name_snapshot, value_snapshot, created_at)
+         VALUES (?, 'point-1', 'friend-1', ?, '初回購入', 2860, '2026-09-16T00:01:00.000Z')`,
+      ).run(id, `{"sourceType":"ec_order_confirmed","ecEventId":"${eventId}","orderNumber":"NEN-1001"}`);
+    }
+
+    const detail = await getEcOrderDetail(db, { lineAccountId: 'account-1', orderId });
+    expect(detail!.outcomes.conversions).toHaveLength(2);
+    expect(detail!.outcomes.conversions.every((row) => row.duplicateCandidate)).toBe(true);
+  });
+
+  it('別アカウントの友だちの成果は、同じ注文番号でもこの注文に混ざらない', async () => {
+    insertEvent({ id: 'ev-1', externalId: 'ext-1', status: 'processed' });
+    const { id: orderId } = await seedOrder({ eventId: 'ev-1', externalId: 'ext-1' });
+
+    // account-2 の友だちの成果地点と、同じ注文番号の成果。注文番号だけで
+    // 突き合わせると別店の成果がこの注文へ混ざる。
+    sqlite.prepare(
+      `INSERT INTO conversion_points (id, name, event_type, value, status, line_account_id, tenant_id)
+       VALUES ('point-2', '購入', 'ec_order_confirmed', 100, 'active', 'account-2', '${TENANT_ID}')`,
+    ).run();
+    sqlite.prepare(
+      `INSERT INTO conversion_events
+         (id, conversion_point_id, friend_id, metadata, point_name_snapshot, value_snapshot, created_at)
+       VALUES ('cv-other', 'point-2', 'friend-2',
+               '{"sourceType":"ec_order_confirmed","ecEventId":"ext-2","orderNumber":"NEN-1001"}',
+               '購入', 1000, '2026-09-16T00:01:00.000Z')`,
+    ).run();
+
+    const detail = await getEcOrderDetail(db, { lineAccountId: 'account-1', orderId });
+    expect(detail!.outcomes.conversions.map((row) => row.id)).toEqual([]);
+  });
 });

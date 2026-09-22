@@ -751,18 +751,48 @@ export interface EcOrderDetailFollowUp {
   failureKind: EcFailureKind | null;
 }
 
+/**
+ * IDEA-16: 注文に結びついた成果1件と、その報酬・支払いの記録。
+ *
+ * 報酬側の値はすべて「書かれた記録」をそのまま返す。承認前の成果には
+ * 計算の版も支払い確定の行も無いので rewardAmount / rewardEntryStatus は
+ * null のまま返し、画面側が「未確定」と出せるようにする。未確定の額を
+ * ここで推定して埋めない。
+ */
+export interface EcOrderDetailConversion {
+  id: string;
+  pointName: string | null;
+  approvalStatus: 'pending' | 'approved' | 'rejected' | null;
+  value: number | null;
+  createdAt: string;
+  /** 成果の起こりの根拠（記録時に metadata へ残した注文番号）。 */
+  orderNumber: string | null;
+  /** 成果の起こりの根拠（記録時に metadata へ残したEC側の出来事ID）。 */
+  ecEventId: string | null;
+  /** 帰属した紹介者。誰の紹介でもない成果は null。 */
+  affiliateName: string | null;
+  /** 承認時に固定された報酬の版の金額。承認前・計算不可は null（未確定）。 */
+  rewardAmount: number | null;
+  /** 支払い確定（締めで起きた credit 行）の状態。settled/paid/reversed 等。無ければ null。 */
+  rewardEntryStatus: string | null;
+  /** 確定後の取消で起きた反対仕訳（debit）の金額。無ければ null。 */
+  reversedAmount: number | null;
+  /** この報酬を含む締めの状態（closed/exported/paid/…）。締め前は null。 */
+  settlementState: string | null;
+  /** 支払いCSV束の最新の状態（created/approved/exported/imported）。無ければ null。 */
+  payoutBatchState: string | null;
+  /** 取り込んだ支払い結果（paid/failed/returned）。無ければ null。 */
+  payoutResult: string | null;
+  /** 同じ注文・同じ成果地点の成果がほかにもあるとき true（二重計上の候補）。 */
+  duplicateCandidate: boolean;
+}
+
 export interface EcOrderDetail {
   order: EcOrderReadModel;
   events: EcOrderDetailEvent[];
   followUps: EcOrderDetailFollowUp[];
   outcomes: {
-    conversions: Array<{
-      id: string;
-      pointName: string | null;
-      approvalStatus: 'pending' | 'approved' | 'rejected' | null;
-      value: number | null;
-      createdAt: string;
-    }>;
+    conversions: Array<EcOrderDetailConversion>;
     mileage: Array<{
       id: string;
       entryType: string;
@@ -1012,19 +1042,53 @@ export async function getEcOrderDetail(
     };
   });
 
-  // 成果・マイル・スコアは発生元の外部出来事IDか注文番号で辿る。
-  // 友だち未連携の注文には付かない（記録口が友だちを要求する）。
+  /*
+   * 成果・マイル・スコアは発生元の外部出来事IDか注文番号で辿る。
+   * 友だち未連携の注文には付かない（記録口が友だちを要求する）。
+   *
+   * IDEA-16: 成果の行から報酬の版・支払い確定・締め・支払いCSV束・支払い結果
+   * まで同じ行で返し、注文から報酬・支払い状態へそのまま辿れるようにする。
+   * 記録は友だちの所属アカウントで突き合わせる。注文番号はアカウントを
+   * 越えて同じ番号が来ることがあるため、番号だけで突き合わせると別店の
+   * 成果がこの注文へ混ざる。
+   */
   const conversions = await db.prepare(
-    `SELECT ce.id, ce.point_name_snapshot, ce.approval_status, ce.value_snapshot, ce.created_at
+    `SELECT ce.id, ce.conversion_point_id, ce.point_name_snapshot, ce.approval_status,
+            ce.value_snapshot, ce.created_at,
+            CAST(json_extract(ce.metadata, '$.orderNumber') AS TEXT) AS order_number,
+            json_extract(ce.metadata, '$.ecEventId') AS ec_event_id,
+            a.name AS affiliate_name,
+            calc.amount_minor AS reward_amount_minor,
+            credit.status AS credit_status,
+            debit.amount_minor AS reversed_amount_minor,
+            st.state AS settlement_state,
+            (SELECT pb.state
+               FROM affiliate_payout_batch_lines pbl
+               JOIN affiliate_payout_batches pb ON pb.id = pbl.batch_id
+              WHERE pbl.settlement_line_id = sl.id
+              ORDER BY pb.created_at DESC, pb.id DESC LIMIT 1) AS payout_batch_state,
+            (SELECT pr.result
+               FROM affiliate_payout_results pr
+              WHERE pr.settlement_line_id = sl.id
+              ORDER BY pr.imported_at DESC, pr.id DESC LIMIT 1) AS payout_result
        FROM conversion_events ce
+       JOIN friends cf ON cf.id = ce.friend_id AND cf.line_account_id = ?
+       LEFT JOIN affiliates a ON a.id = ce.affiliate_id
+       LEFT JOIN affiliate_reward_calculations calc ON calc.conversion_event_id = ce.id
+       LEFT JOIN affiliate_reward_entries credit
+         ON credit.conversion_event_id = ce.id AND credit.entry_type = 'credit'
+       LEFT JOIN affiliate_reward_entries debit
+         ON debit.conversion_event_id = ce.id AND debit.entry_type = 'debit'
+       LEFT JOIN affiliate_settlement_lines sl ON sl.entry_id = credit.id
+       LEFT JOIN affiliate_settlements st ON st.id = sl.settlement_id
       WHERE json_valid(ce.metadata)
         AND json_extract(ce.metadata, '$.sourceType') = 'ec_order_confirmed'
         AND (
-          json_extract(ce.metadata, '$.orderNumber') = ?
+          CAST(json_extract(ce.metadata, '$.orderNumber') AS TEXT) = ?
           ${externalIds.length ? `OR json_extract(ce.metadata, '$.ecEventId') IN (${placeholders(externalIds.length)})` : ''}
         )
       ORDER BY ce.created_at ASC`,
-  ).bind(order.orderNumber, ...externalIds).all<Record<string, unknown>>();
+  ).bind(input.lineAccountId, order.orderNumber, ...externalIds).all<Record<string, unknown>>();
 
   const mileage = externalIds.length
     ? await db.prepare(
@@ -1049,6 +1113,18 @@ export async function getEcOrderDetail(
     ).bind(input.lineAccountId, ...externalIds).all<Record<string, unknown>>()
     : { results: [] as Record<string, unknown>[] };
 
+  /*
+   * IDEA-16: 同じ注文・同じ成果地点へ2件以上の成果が乗っているときは
+   * 二重計上の候補として印を付ける。同じ出来事IDの再送は冪等キーで
+   * 1件に潰れるが、別の出来事IDで同じ注文が届き直すと別の成果が立つ。
+   * ここでは自動で消さず、候補として見せて人が確認する。
+   */
+  const conversionsPerPoint = new Map<string, number>();
+  for (const row of conversions.results) {
+    const pointId = String(row.conversion_point_id);
+    conversionsPerPoint.set(pointId, (conversionsPerPoint.get(pointId) ?? 0) + 1);
+  }
+
   return {
     order,
     events,
@@ -1060,6 +1136,16 @@ export async function getEcOrderDetail(
         approvalStatus: (row.approval_status ?? null) as 'pending' | 'approved' | 'rejected' | null,
         value: row.value_snapshot == null ? null : Number(row.value_snapshot),
         createdAt: String(row.created_at),
+        orderNumber: row.order_number == null ? null : String(row.order_number),
+        ecEventId: row.ec_event_id == null ? null : String(row.ec_event_id),
+        affiliateName: row.affiliate_name == null ? null : String(row.affiliate_name),
+        rewardAmount: row.reward_amount_minor == null ? null : Number(row.reward_amount_minor),
+        rewardEntryStatus: row.credit_status == null ? null : String(row.credit_status),
+        reversedAmount: row.reversed_amount_minor == null ? null : Number(row.reversed_amount_minor),
+        settlementState: row.settlement_state == null ? null : String(row.settlement_state),
+        payoutBatchState: row.payout_batch_state == null ? null : String(row.payout_batch_state),
+        payoutResult: row.payout_result == null ? null : String(row.payout_result),
+        duplicateCandidate: (conversionsPerPoint.get(String(row.conversion_point_id)) ?? 0) >= 2,
       })),
       mileage: mileage.results.map((row) => ({
         id: String(row.id),
