@@ -1,34 +1,13 @@
-import type { FormLayout } from '@line-crm/shared'
+import { validateFormDefinition, type FormLayout } from '@line-crm/shared'
 
-function isHttpUrl(raw: string): boolean {
-  try { return ['http:', 'https:'].includes(new URL(raw.trim()).protocol) }
-  catch { return false }
-}
-
+/**
+ * 保存できるフォーム定義か。返すのは画面に出す文言で、問題なければ null。
+ *
+ * 判定そのものは shared の `validateFormDefinition` に置く。ここと保存APIが
+ * 同じ関数を見るので、「画面では通ったのに保存で弾かれる」が起きない。
+ * 公開の直前にだけ止めるもの（分岐の循環・設定途中の動作）は
+ * `validateFormForPublish` が見る。
+ */
 export function validateFormLayoutForSave(layout: FormLayout): string | null {
-  const blocks = layout.header.concat(layout.sections.flatMap(section => section.blocks))
-  const seenNames = new Set<string>()
-  for (const block of blocks) {
-    if (block.kind === 'input') {
-      if (!block.label.trim()) return 'タイトルが空のブロックがあります'
-      if (seenNames.has(block.name)) return `回答データの見出し「${block.name}」が重複しています`
-      seenNames.add(block.name)
-      if (block.type === 'radio' || block.type === 'checkbox' || block.type === 'select') {
-        const title = block.label.trim() || block.name
-        const choices = block.choices ?? []
-        if (choices.length === 0) return `「${title}」に選択肢がありません`
-        if (choices.some(choice => !choice.label.trim())) return `「${title}」に空の選択肢があります`
-      }
-    }
-    if (block.kind === 'button' && block.url.trim() !== '' && !isHttpUrl(block.url)) {
-      return `ボタン「${block.label}」のリンク先がURLの形ではありません`
-    }
-  }
-  const thanksUrl = layout.options.thanksUrl?.trim() ?? ''
-  if (thanksUrl !== '' && !isHttpUrl(thanksUrl)) return '答えたあとに開くページがURLの形ではありません'
-  if (layout.options.deadline?.enabled) {
-    const endsAt = layout.options.deadline.endsAt?.trim() ?? ''
-    if (endsAt === '' || Number.isNaN(Date.parse(endsAt))) return '受付の期限が日時の形ではありません'
-  }
-  return null
+  return validateFormDefinition(layout)
 }

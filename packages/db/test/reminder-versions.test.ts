@@ -179,4 +179,31 @@ describe('V6 リマインダの公開版', () => {
     expect((await getPendingReminderDeliveries(db))[0].steps[0].message_content)
       .toBe('お誕生日のお知らせ')
   })
+
+  // FORM-15: 空欄・暦に無い日付の登録予定は入口で止める。
+  // 届くものが無い行を残さないため。
+  it.each(['', '   ', 'not-a-date', '2026-02-30'])(
+    '起点日が日付として読めない(%s)と登録を断る',
+    async (targetDate) => {
+      await expect(
+        enrollFriendInReminder(db, {
+          reminderId: 'any',
+          friendId: 'friend-1',
+          targetDate,
+        }),
+      ).rejects.toThrow('REMINDER_INVALID_TARGET_DATE')
+    },
+  )
+
+  it('日時つきの起点日は従来どおり受け付ける', async () => {
+    const created = await createReminderWithDraftVersion(db, settings('明日のご予約です'))
+    await testAndPublish(created.reminder.id)
+    await expect(
+      enrollFriendInReminder(db, {
+        reminderId: created.reminder.id,
+        friendId: 'friend-1',
+        targetDate: '2026-09-10T00:00:00+09:00',
+      }),
+    ).resolves.toBeTruthy()
+  })
 })

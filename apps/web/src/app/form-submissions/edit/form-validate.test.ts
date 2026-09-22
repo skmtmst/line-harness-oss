@@ -57,3 +57,50 @@ describe('validateLayoutForSave', () => {
     expect(validateLayoutForSave(ok)).toBeNull()
   })
 })
+
+describe('保存時に止める壊れた定義(FORM-03 / FORM-04 / FORM-12)', () => {
+  it('文字数の下限が上限を超える設定を止める', () => {
+    const layout = emptyLayout()
+    layout.sections[0].blocks = [
+      { id: 'q1', kind: 'input', type: 'text', name: 'memo', label: 'ひとこと', limit: { min: 100, max: 10 } },
+    ]
+    expect(validateLayoutForSave(layout)).toContain('最小文字数が最大文字数を超えています')
+  })
+
+  it('選択数の下限が上限を超える設定を止める', () => {
+    const layout = emptyLayout()
+    layout.sections[0].blocks = [
+      {
+        id: 'q1', kind: 'input', type: 'checkbox', name: 'fav', label: '好きなもの',
+        selectionLimit: { min: 3, max: 1 },
+        choices: [
+          { id: 'c1', label: '犬' },
+          { id: 'c2', label: '猫' },
+          { id: 'c3', label: '鳥' },
+        ],
+      },
+    ]
+    expect(validateLayoutForSave(layout)).toContain('下限が上限を超えています')
+  })
+
+  it('ラジオの初期選択が2つある設定を止める', () => {
+    const layout = emptyLayout()
+    layout.sections[0].blocks = [
+      choiceBlock('プラン', [
+        { id: 'c1', label: '松' },
+        { id: 'c2', label: '竹' },
+      ]),
+    ]
+    const block = layout.sections[0].blocks[0] as FormInputBlock
+    block.choices = block.choices!.map((c) => ({ ...c, defaultSelected: true }))
+    expect(validateLayoutForSave(layout)).toContain('はじめから選んでおく')
+  })
+
+  it('定員が整数でない選択肢を止める', () => {
+    const layout = emptyLayout()
+    const block = choiceBlock('希望の回', [{ id: 'c1', label: '午前' }])
+    block.choices = [{ ...block.choices![0], capacity: { enabled: true, limit: 2.5 } }]
+    layout.sections[0].blocks = [block]
+    expect(validateLayoutForSave(layout)).toContain('整数')
+  })
+})

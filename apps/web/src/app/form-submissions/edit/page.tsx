@@ -20,6 +20,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import {
   emptyLayout,
   newBlockId,
+  validateFormForPublish,
   type FormBlock,
   type FormInputType,
   type FormLayout,
@@ -104,6 +105,8 @@ function FormEditInner() {
   const [refs, setRefs] = useState<FormRefs>(EMPTY_REFS)
   const [showOptions, setShowOptions] = useState(editorTab === 'options')
   const [showAddMenu, setShowAddMenu] = useState(false)
+  const [addMenuUp, setAddMenuUp] = useState(false)
+  const addMenuButtonRef = useRef<HTMLButtonElement>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -479,6 +482,18 @@ function FormEditInner() {
       return false
     }
 
+    // 公開に進むときだけ、公開前の検査を通す。分岐の循環・消えた行き先・
+    // 共通ヘッダの分岐・選ぶ先が空の動作は、下書きでは許すが公開は止める。
+    // （公開APIも同じ検査をする。ここで先に止めるのは、保存だけ済んで
+    // 「公開に失敗しました」に化けるのを防ぐため）
+    if (publishAfter) {
+      const publishError = validateFormForPublish(layout)
+      if (publishError) {
+        setError(publishError)
+        return false
+      }
+    }
+
     if (contentRevision === null) {
       setError('読み込みが終わっていません。少し待ってから、もう一度お試しください')
       return false
@@ -834,7 +849,15 @@ function FormEditInner() {
 
                   <div className="relative">
                     <button
-                      onClick={() => setShowAddMenu((v) => !v)}
+                      ref={addMenuButtonRef}
+                      onClick={() => {
+                        // 下の固定バーに隠れるときは上へ開く
+                        if (!showAddMenu && addMenuButtonRef.current) {
+                          const rect = addMenuButtonRef.current.getBoundingClientRect()
+                          setAddMenuUp(window.innerHeight - rect.bottom < 380)
+                        }
+                        setShowAddMenu((v) => !v)
+                      }}
                       className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control px-3 py-1.5 text-xs font-medium"
                     >
                       ＋ ブロックを追加（12種）
@@ -847,7 +870,17 @@ function FormEditInner() {
                           onClick={() => setShowAddMenu(false)}
                           aria-label="閉じる"
                         />
-                        <div className="bg-canvas rounded-card border-hairline absolute right-0 z-20 mt-1 w-48 border py-1 shadow-lg">
+                        <div
+                          className={`bg-canvas rounded-card border-hairline absolute right-0 z-20 w-48 border py-1 shadow-lg max-h-[70vh] overflow-y-auto ${
+                            addMenuUp ? 'bottom-full mb-1' : 'mt-1'
+                          }`}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Escape') {
+                              setShowAddMenu(false)
+                              addMenuButtonRef.current?.focus()
+                            }
+                          }}
+                        >
                           {['飾り', '入力'].map((group) => (
                             <div key={group}>
                               <p className="text-ink-faint px-3 py-1 text-[11px]">{group}</p>
@@ -886,6 +919,7 @@ function FormEditInner() {
                       index={index}
                       sections={layout.sections}
                       refs={refs}
+                      inHeader={tab === HEADER_TAB}
                       selected={block.id === selectedBlockId}
                       onSelect={() => setSelectedBlockId(block.id)}
                       onChange={(patch) => patchBlock(block.id, patch)}
