@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import {
   getTemplatesWithUsageCount,
   getTemplateSendCounts,
+  getTemplateFolderCounts,
   getTemplateById,
   getTemplateUsage,
   createTemplate,
@@ -242,10 +243,40 @@ templates.get('/api/templates', async (c) => {
     const paging = wantsPaging
       ? parseOffsetPaging({ page: c.req.query('page'), limit: c.req.query('limit') })
       : undefined;
+    /*
+      PERF-12: 選択画面の絞り込みをサーバーで行う口。検索・フォルダ・
+      分類をページに切る前に適用しないと、届いた分だけを絞った
+      「見つからない」が起きる。folder_id は指定フォルダと直下の子を
+      含め、__none__ は未分類だけを返す。
+    */
+    const q = c.req.query('q') ?? undefined;
+    const messageType = c.req.query('message_type') ?? undefined;
+    const quickParam = c.req.query('quick');
+    const quick: 'frequent' | 'reservation' | 'ec' | undefined =
+      quickParam === 'frequent' || quickParam === 'reservation' || quickParam === 'ec'
+        ? quickParam
+        : undefined;
+    if (quickParam !== undefined && quick === undefined) {
+      return c.json({ success: false, error: 'quick が正しくありません' }, 400);
+    }
+    const folderParam = c.req.query('folder_id');
+    let folderIds: string[] | 'none' | undefined;
+    if (folderParam === '__none__') {
+      folderIds = 'none';
+    } else if (folderParam) {
+      const childRows = await c.env.DB.prepare(
+        `SELECT id FROM folders WHERE (id = ? OR parent_id = ?) AND kind = 'template'`,
+      ).bind(folderParam, folderParam).all<{ id: string }>();
+      folderIds = (childRows.results ?? []).map((row) => row.id);
+      if (!folderIds.includes(folderParam)) folderIds.push(folderParam);
+    }
+    const filter = (q || messageType || quick || folderIds !== undefined)
+      ? { q, messageType, quick, folderIds }
+      : undefined;
     const { items, total } = await getTemplatesWithUsageCount(c.env.DB, category, {
       accountIds: requestedAccountId ? [requestedAccountId] : scope.allowedAccountIds,
       includeUnassigned: requestedAccountId ? false : scope.canSeeUnassigned,
-    }, paging ? { limit: paging.limit, offset: paging.offset } : undefined);
+    }, paging ? { limit: paging.limit, offset: paging.offset } : undefined, filter);
     // 押された回数は1回のクエリでまとめて取る。1件ずつ引くと、
     // 20件並べば20回叩くことになる。
     let taps = new Map<string, number>();
@@ -288,17 +319,27 @@ templates.get('/api/templates', async (c) => {
       updatedAt: t.updated_at,
     }));
     if (wantsPaging && paging) {
+      // フォルダ欄の件数を、一覧を全件読まなくても出せるように添える。
+      const folderCounts = c.req.query('folder_counts') === '1'
+        ? Object.fromEntries(await getTemplateFolderCounts(c.env.DB, {
+          accountIds: requestedAccountId ? [requestedAccountId] : scope.allowedAccountIds,
+          includeUnassigned: requestedAccountId ? false : scope.canSeeUnassigned,
+        }, messageType))
+        : undefined;
       return c.json({
         success: true,
-        data: buildOffsetListResponse({
-          items: serialized,
-          total,
-          paging,
-          sort: [
-            { field: 'created_at', direction: 'desc' },
-            { field: 'id', direction: 'asc' },
-          ],
-        }),
+        data: {
+          ...buildOffsetListResponse({
+            items: serialized,
+            total,
+            paging,
+            sort: [
+              { field: 'created_at', direction: 'desc' },
+              { field: 'id', direction: 'asc' },
+            ],
+          }),
+          ...(folderCounts ? { folderCounts } : {}),
+        },
       });
     }
     return c.json({ success: true, data: serialized });

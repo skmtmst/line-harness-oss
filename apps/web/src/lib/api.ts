@@ -8521,6 +8521,57 @@ export const api = {
         `/api/templates${suffix}`,
       )
     },
+    /*
+      PERF-12: 選択画面用の区切り取得。検索・フォルダ・分類をサーバーで
+      絞ってから1区画だけ返す。folderCounts を立てるとフォルダ別件数も
+      添えて返る。
+    */
+    listPage: (params: {
+      accountId?: string;
+      q?: string;
+      folderId?: string;
+      quick?: 'frequent' | 'reservation' | 'ec';
+      messageType?: string;
+      page?: number;
+      limit?: number;
+      folderCounts?: boolean;
+    }) => {
+      const query = new URLSearchParams()
+      if (params.accountId) query.set('account_id', params.accountId)
+      if (params.q) query.set('q', params.q)
+      if (params.folderId) query.set('folder_id', params.folderId)
+      if (params.quick) query.set('quick', params.quick)
+      if (params.messageType) query.set('message_type', params.messageType)
+      query.set('page', String(params.page ?? 1))
+      query.set('limit', String(params.limit ?? 100))
+      if (params.folderCounts) query.set('folder_counts', '1')
+      return fetchApi<ApiResponse<{
+        items: Array<{
+          id: string;
+          accountId: string | null;
+          name: string;
+          category: string;
+          messageType: string;
+          messageContent: string;
+          folderId: string | null;
+          question: TemplateQuestion | null;
+          questionStatus: 'draft' | 'published';
+          usageCount: number;
+          tapCount: number;
+          monthlySendCount: number | null;
+          totalSendCount: number | null;
+          hasDraft: boolean;
+          publishedVersion: number;
+          publishedAt: string | null;
+          draftRevision: number;
+          createdAt: string;
+          updatedAt: string;
+        }>;
+        total: number;
+        limit: number;
+        folderCounts?: Record<string, number>;
+      }>>(`/api/templates?${query.toString()}`)
+    },
     get: (id: string) =>
       fetchApi<ApiResponse<{
         id: string;
