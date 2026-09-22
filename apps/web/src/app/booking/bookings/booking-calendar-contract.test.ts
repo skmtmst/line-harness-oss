@@ -20,11 +20,10 @@ describe('V6 予約管理の時間台帳', () => {
     expect(CALENDAR).toContain('LINEからの予約（緑）と電話の予約（青）')
   })
 
-  test('格子ごとに走査せず辞書へ束ね、空き枠は目安と書く(点検#516の中1)', () => {
+  test('格子ごとに走査せず辞書へ束ねる(点検#516の中1)', () => {
     expect(CALENDAR).toContain('new Map<string, BookingRequest[]>()')
     expect(CALENDAR).not.toContain('items.filter((booking) => booking.staff_name === name')
     expect(CALENDAR).not.toContain('items.filter((booking) => jstDay(booking.starts_at) === day')
-    expect(CALENDAR).toContain('目安です。同時受付数は含みません')
   })
 
   test('電話予約はLINE予約と同じ格子へ出し、未連携の理由も隠さない', () => {
@@ -68,9 +67,43 @@ describe('V6 予約管理の時間台帳', () => {
     expect(CALENDAR).toContain("params.set('staff', input.staffName)")
     expect(CALENDAR).toContain('aria-label="この空き枠に予約を入れる"')
     // 操作できない人（canCreate=false）は「あき」の文字だけ。押せる形に見せない。
-    expect(CALENDAR).toContain('if (!href) return')
-    expect(CALENDAR).toContain('canCreate ? newBookingHref({ day, hour, staffName: name }) : undefined')
-    expect(CALENDAR).toContain('canCreate ? newBookingHref({ day, hour }) : undefined')
+    expect(CALENDAR).toContain('if (!href) {')
+    expect(CALENDAR).toContain('canCreate && slot ? newBookingHref({ day, time: slot.start, staffName: name, menuId: slot.menuId }) : undefined')
+    expect(CALENDAR).toContain('canCreate && slot ? newBookingHref({ day, time: slot.start, staffName: slot.staffName, menuId: slot.menuId }) : undefined')
+  })
+
+  test('BOOKING-01: 空きはマス数ではなく空き枠APIの実績から計算する', () => {
+    // 「7日×10マス−予約件数」のような架空の枠数を出さない。
+    expect(CALENDAR).not.toContain('7 * HOURS.length')
+    expect(CALENDAR).not.toContain('staff.length * HOURS.length')
+    // 実績はサーバーの空き枠APIから取る（営業時間・シフト・例外日・
+    // 外部予定・同時受付数を考慮済みの枠）。
+    expect(PAGE).toContain('bookingApi.getAvailability')
+    expect(PAGE).toContain('menuId: menu.id')
+    // 未設定・取得不能・空き0を区別する。未設定/取得不能/受付0は「—」。
+    expect(PAGE).toContain("status: 'unconfigured'")
+    expect(PAGE).toContain("status: 'error'")
+    expect(CALENDAR).toContain("availability.status === 'unconfigured'")
+    expect(CALENDAR).toContain("availability.status === 'error'")
+    expect(CALENDAR).toContain('担当者か予約メニューが未設定です')
+    expect(CALENDAR).toContain('受付可能な時間がありません')
+  })
+
+  test('BOOKING-01: 稼働率は塞がった時間÷受付可能時間。受付0は「—」', () => {
+    // 要件: 予約で塞がった時間 ÷ 受付可能時間。取消・拒否は塞がない。
+    expect(CALENDAR).toContain("OCCUPIED_STATUSES = new Set(['requested', 'confirmed', 'completed', 'no_show'])")
+    expect(CALENDAR).toContain('capacity.bookedMs / capacity.acceptableMs')
+    expect(CALENDAR).toContain('受付')
+  })
+
+  test('BOOKING-01: 実際に取れる枠だけが代理予約の入口になる', () => {
+    // remaining>0 の枠があるマスだけ入口にし、取れないマスは「—」。
+    expect(CALENDAR).toContain('slot.remaining <= 0')
+    expect(CALENDAR).toContain('aria-label="受け付けていない時間"')
+    // 入口は枠を出したメニューと実際の開始時刻・担当を事前入力し、
+    // メニュー候補のない入口へ遷移させない。
+    expect(CALENDAR).toContain("params.set('menu', input.menuId)")
+    expect(CALENDAR).toContain('time: slot.start')
   })
 
   test('URLの日付・時刻・担当は下書きより優先して事前入力する (#933 N-399)', () => {
