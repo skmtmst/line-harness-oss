@@ -56,6 +56,8 @@ export function dashboardNotificationDestination(
   item: NotificationCenterItem,
 ): string {
   if (item.eventType.startsWith('account_health_')) return '/emergency'
+  // 一斉配信(送信枠不足を含む)の通知は配信一覧へ。
+  if (item.eventType.startsWith('broadcast')) return '/broadcasts'
   /*
     知らない種類はお知らせ一覧へ。行き先なし(null)にすると、
     押したのに何も起きない(既読だけ付く)死に tap になる。
