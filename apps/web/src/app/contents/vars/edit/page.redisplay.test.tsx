@@ -229,3 +229,43 @@ describe('共通情報: 保存した社内メモの再表示(実React)', () => {
     expect(memoInput().value).toBe(created.memo)
   })
 })
+
+describe('共通情報の編集: 型別の入力エラー(VAR-06, 実React)', () => {
+  it('年月日型の値を空にすると、理由を出して保存を送らない', async () => {
+    api.detail.mockResolvedValue({
+      success: true,
+      data: {
+        id: 'var-1', name: '開店日', varKey: 'open_date', type: 'date', value: '2028-02-29',
+        memo: '', folderId: null, version: 1, history: [],
+      },
+    })
+    await mount(React.createElement(EditCommonVarPage))
+    await settle()
+
+    await setValue(byId('cv-value'), '')
+    await click(byExactText('button', '共通情報を保存'))
+
+    expect(api.update).not.toHaveBeenCalled()
+    expect(host.textContent).toContain('値の日付を入力してください')
+  })
+
+  it('期間外の代替値が種別に合わないと止める', async () => {
+    api.detail.mockResolvedValue({
+      success: true,
+      data: {
+        id: 'var-1', name: 'ロゴ', varKey: 'logo_url', type: 'image',
+        value: 'https://cdn.example.com/logo.png', memo: '', folderId: null,
+        version: 1, history: [],
+      },
+    })
+    await mount(React.createElement(EditCommonVarPage))
+    await settle()
+
+    await setValue(byId('cv-expiry-behavior'), 'fallback')
+    await setValue(byId('cv-fallback-value'), 'not-an-image')
+    await click(byExactText('button', '共通情報を保存'))
+
+    expect(api.update).not.toHaveBeenCalled()
+    expect(host.textContent).toContain('代替値は https:// からはじまるURLで入力してください')
+  })
+})

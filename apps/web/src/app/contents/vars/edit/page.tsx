@@ -13,7 +13,7 @@ import type {
 } from '@line-crm/shared'
 import { api, ApiError, type CommonVarDetail } from '@/lib/api'
 import FeatureGate from '@/components/feature-gate'
-import { VAR_TYPE_LABELS, formatStamp } from '@/lib/common-vars'
+import { VAR_TYPE_LABELS, commonVarValueError, formatStamp } from '@/lib/common-vars'
 import { useAccount } from '@/contexts/account-context'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { NOT_AVAILABLE, STATE_TEXT } from '@/components/shared/not-connected'
@@ -253,13 +253,29 @@ function EditCommonVarInner() {
       setError('共通情報名を入力してください')
       return
     }
+    // VAR-06: 新規画面と同じ型検査を保存前に行い、理由を出して欄へ戻す。
+    const valueError = commonVarValueError(item.type, value)
+    if (valueError) {
+      setError(valueError)
+      document.getElementById('cv-value')?.focus()
+      return
+    }
     if (validFrom && validUntil && validFrom >= validUntil) {
       setError('有効終了は有効開始より後にしてください')
       return
     }
-    if (expiryBehavior === 'fallback' && !fallbackValue) {
-      setError('期限切れ時に使う代替値を入力してください')
-      return
+    if (expiryBehavior === 'fallback') {
+      if (!fallbackValue) {
+        setError('期限切れ時に使う代替値を入力してください')
+        document.getElementById('cv-fallback-value')?.focus()
+        return
+      }
+      const fallbackError = commonVarValueError(item.type, fallbackValue, '代替値')
+      if (fallbackError) {
+        setError(fallbackError)
+        document.getElementById('cv-fallback-value')?.focus()
+        return
+      }
     }
     setSaving(true)
     setError('')
@@ -400,6 +416,13 @@ function EditCommonVarInner() {
     if (!item || !draft || !selectedAccountId) return
     if (!draft.date) {
       setError('開始日を入れてください')
+      return
+    }
+    // VAR-06: 予約の値も本体と同じ型検査を通す。通さないとCronが
+    // 型に合わない値をそのまま書き込む。
+    const scheduleValueError = commonVarValueError(item.type, draft.value, '更新後の値')
+    if (scheduleValueError) {
+      setError(scheduleValueError)
       return
     }
     setError('')
@@ -577,7 +600,22 @@ function EditCommonVarInner() {
                   {expiryBehavior === 'fallback' && (
                     <div>
                       <label htmlFor="cv-fallback-value" className="text-ink-secondary mb-1 block text-xs font-medium">代替値</label>
-                      <input id="cv-fallback-value" type={item.type === 'number' ? 'number' : 'text'} value={fallbackValue} onChange={(e) => { setSaved(false); setFallbackValue(e.target.value) }} className="border-hairline rounded-control w-full border px-3 py-2 text-sm" />
+                      {item.type === 'boolean' ? (
+                        <SelectField
+                          id="cv-fallback-value"
+                          value={fallbackValue}
+                          onChange={(e) => { setSaved(false); setFallbackValue(e.target.value) }}
+                          options={[{ value: '', label: '選んでください' }, { value: 'true', label: 'true' }, { value: 'false', label: 'false' }]}
+                        />
+                      ) : (
+                        <input
+                          id="cv-fallback-value"
+                          type={item.type === 'number' ? 'number' : (item.type as string) === 'date' ? 'date' : (item.type as string) === 'datetime' ? 'datetime-local' : 'text'}
+                          value={fallbackValue}
+                          onChange={(e) => { setSaved(false); setFallbackValue(e.target.value) }}
+                          className="border-hairline rounded-control w-full border px-3 py-2 text-sm"
+                        />
+                      )}
                     </div>
                   )}
                 </fieldset>
@@ -890,13 +928,23 @@ function EditCommonVarInner() {
               <label htmlFor="sc-value" className="text-ink-secondary mb-1 block text-xs font-medium">
                 更新後の値
               </label>
-              <input
-                id="sc-value"
-                type={item?.type === 'number' ? 'number' : 'text'}
-                value={draft.value}
-                onChange={(e) => setDraft({ ...draft, value: e.target.value })}
-                className="border-hairline rounded-control w-full border px-3 py-2 text-sm"
-              />
+              {item?.type === 'boolean' ? (
+                <SelectField
+                  id="sc-value"
+                  value={draft.value}
+                  onChange={(e) => setDraft({ ...draft, value: e.target.value })}
+                  options={[{ value: '', label: '選んでください' }, { value: 'true', label: 'true' }, { value: 'false', label: 'false' }]}
+                  className="w-full"
+                />
+              ) : (
+                <input
+                  id="sc-value"
+                  type={item?.type === 'number' ? 'number' : (item?.type as string) === 'date' ? 'date' : (item?.type as string) === 'datetime' ? 'datetime-local' : 'text'}
+                  value={draft.value}
+                  onChange={(e) => setDraft({ ...draft, value: e.target.value })}
+                  className="border-hairline rounded-control w-full border px-3 py-2 text-sm"
+                />
+              )}
             </div>
             <div className="flex justify-end gap-2">
               <button
