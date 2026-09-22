@@ -877,16 +877,22 @@ export async function getConversionApprovalQueue(
         * 拾う。同じ注文が別の出来事IDで届き直すと冪等キーが違うため別の
         * 成果が立ち、二重報酬の候補になる。番号は受信体で数値のことが
         * あるため TEXT に寄せてから数える。
+        * 注文番号はアカウントを越えて同じ番号が来ることがあるため、
+        * 友だちの所属アカウントごとに数える。アカウントをまたぐ一致は
+        * 別店の注文なので、重複の候補には挙げない。
         */
        dup_orders AS (
          SELECT ce2.conversion_point_id AS point_id,
-                CAST(json_extract(ce2.metadata, '$.orderNumber') AS TEXT) AS order_number
+                CAST(json_extract(ce2.metadata, '$.orderNumber') AS TEXT) AS order_number,
+                f2.line_account_id AS line_account_id
            FROM conversion_events ce2
+           JOIN friends f2 ON f2.id = ce2.friend_id
           WHERE ce2.affiliate_id IS NOT NULL
             AND json_valid(ce2.metadata)
             AND json_extract(ce2.metadata, '$.orderNumber') IS NOT NULL
           GROUP BY ce2.conversion_point_id,
-                   CAST(json_extract(ce2.metadata, '$.orderNumber') AS TEXT)
+                   CAST(json_extract(ce2.metadata, '$.orderNumber') AS TEXT),
+                   f2.line_account_id
          HAVING COUNT(*) >= 2
        )
        SELECT
@@ -950,6 +956,7 @@ export async function getConversionApprovalQueue(
        LEFT JOIN dup_orders od
               ON od.point_id = ce.conversion_point_id
              AND od.order_number = CAST(json_extract(ce.metadata, '$.orderNumber') AS TEXT)
+             AND od.line_account_id IS friends.line_account_id
        LEFT JOIN dup_keys dk
               ON dk.affiliate_id = ce.affiliate_id
              AND dk.identity_key = (${identityKeySql})
