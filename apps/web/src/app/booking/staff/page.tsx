@@ -34,6 +34,7 @@ export default function BookingStaffPage() {
   const [loadStatus, setLoadStatus] = useState<LoadStatus>('loading')
   const [removeTarget, setRemoveTarget] = useState<BookingStaff | null>(null)
   const [deleting, setDeleting] = useState(false)
+  const [removeError, setRemoveError] = useState('')
   // N-411: 予約スタッフの登録・変更・削除は 'booking.settings' の実効permission。
   const [canManageStaff, setCanManageStaff] = useState(false)
   const loadRequestRef = useRef(0)
@@ -90,10 +91,14 @@ export default function BookingStaffPage() {
   async function remove(id: string) {
     if (!selectedAccountId) return
     setDeleting(true)
+    setRemoveError('')
     try {
       await bookingApi.deleteStaff(selectedAccountId, id)
       setRemoveTarget(null)
       await load()
+    } catch {
+      // 生のAPIエラーは運用者に読めないので、窓の中に運用の言葉で出す。
+      setRemoveError('このスタッフを削除できませんでした。状態を読み直してから、もう一度お試しください。')
     } finally {
       setDeleting(false)
     }
@@ -194,7 +199,7 @@ export default function BookingStaffPage() {
                           シフト
                         </Link>
                         {canManageStaff && (
-                          <button onClick={() => setRemoveTarget(s)} className="text-red-600 hover:underline">削除</button>
+                          <button onClick={() => { setRemoveError(''); setRemoveTarget(s) }} className="text-red-600 hover:underline">削除</button>
                         )}
                       </div>
                     </td>
@@ -215,7 +220,12 @@ export default function BookingStaffPage() {
         confirmLabel="削除する"
         destructive
         busy={deleting}
-        onCancel={() => setRemoveTarget(null)}
+        error={removeError}
+        onCancel={() => {
+          if (deleting) return
+          setRemoveTarget(null)
+          setRemoveError('')
+        }}
         onConfirm={() => { if (removeTarget) void remove(removeTarget.id) }}
       />
     </div>
