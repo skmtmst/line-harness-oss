@@ -57,7 +57,8 @@ function BookingStatus({ accountId, eventId }: { accountId: string; eventId: str
 
   const cells: Array<[string, string]> = [
     ['予約 / 定員', `${summary?.confirmed ?? '—'} / ${summary?.totalCapacity ?? '—'}`],
-    // 承認待ちは requested。confirmed になるまで枠は確保されない。
+    // 承認待ちは requested。未確定だが席は申請時点から消費している
+    // （EVENT-06。残席計算は requested+confirmed を数える）。
     ['承認待ち', `${summary?.requested ?? '—'} 件`],
     ['キャンセル待ち', `${summary?.waitlist ?? '—'} 件`],
     ['キャンセル', `${summary?.cancelled ?? '—'} 件`],
@@ -156,7 +157,9 @@ function EditEventInner() {
           <section className="bg-canvas-sunken rounded-card border-hairline mt-5 border p-4">
             <h2 className="text-ink text-sm font-bold">気をつけること</h2>
             <ul className="text-ink-faint mt-2 space-y-1 text-xs leading-relaxed">
-              <li>・承認制にすると、承認するまで枠は確保されません</li>
+              <li>
+                ・承認制の申込は、承認前（承認待ち）の時点から残席を使います。承認・拒否・期限切れで確定または解放されます
+              </li>
               <li>・定員に達するとキャンセル待ちに切り替わります</li>
               <li>
                 ・公開後に定員を減らすことはできますが、すでに確定した申込は取り消されません

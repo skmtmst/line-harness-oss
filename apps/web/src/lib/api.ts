@@ -5384,7 +5384,7 @@ export type HqLineRegistration =
   | { available: false }
   | { available: true; accountName: string; basicId: string | null; addFriendUrl: string | null; linked: boolean; code: string | null; codeExpiresAt: string | null }
 export type OpsSupportDetail = {
-  knowledge?: { article: OpsKnowledgeArticle | null; job: { status: 'queued' | 'running' | 'done' | 'failed' | 'stale'; source_current: number } | null }
+  knowledge?: { canProcess?: boolean; article: OpsKnowledgeArticle | null; job: { id?: string; status: 'queued' | 'running' | 'done' | 'failed' | 'stale'; source_current: number } | null }
   ticket: OpsSupportTicket
   tenant: { accountCount: number; staffCount: number; staffWithLine: number; pastTickets: number; pastOpen: number }
   messages: OpsSupportMessage[]
@@ -7688,6 +7688,8 @@ export const api = {
         fetchApi<ApiResponse<null>>(`/api/ops/knowledge/${encodeURIComponent(id)}/feedback`, { method: 'POST', body: JSON.stringify({ requestId, feedback }) }),
       retry: (requestId: string) =>
         fetchApi<ApiResponse<null>>(`/api/ops/knowledge/tickets/${encodeURIComponent(requestId)}/retry`, { method: 'POST' }),
+      process: (requestId: string) =>
+        fetchApi<ApiResponse<NonNullable<OpsSupportDetail['knowledge']>>>(`/api/ops/knowledge/tickets/${encodeURIComponent(requestId)}/process`, { method: 'POST' }),
     },
     /** お知らせ配信 ★V6 37-7。 */
     announcements: {
@@ -9157,13 +9159,15 @@ export const api = {
     getRun: (id: string) =>
       fetchApi<ApiResponse<AutomationRunDetail>>(`/api/automation-runs/${encodeURIComponent(id)}`),
     // #942 N-353: 実行記録のCSV書き出し口。画面の絞り込みと同じ条件を渡す。
+    // パスだけを返す。直リンクは Cookie が届かない経路で401になるため、
+    // 呼び出し側は downloadApiFile で認証付き取得してから保存する（#1053）。
     runsCsvUrl: (params?: { accountId?: string; search?: string; status?: string; includeTest?: boolean }) => {
       const query = new URLSearchParams({ format: 'csv' })
       if (params?.accountId) query.set('lineAccountId', params.accountId)
       if (params?.search) query.set('search', params.search)
       if (params?.status) query.set('status', params.status)
       if (params?.includeTest) query.set('include_test', '1')
-      return `${API_URL}/api/automation-runs?${query}`
+      return `/api/automation-runs?${query}`
     },
     // #942 N-353: まだ終わっていない実行を取りやめる。取消済みはそのまま成功。
     cancelRun: (id: string) =>

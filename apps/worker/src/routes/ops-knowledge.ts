@@ -1,13 +1,13 @@
 import { Hono } from 'hono';
 import {
   HQ_SUPPORT_KINDS, editKnowledgeArticle, getKnowledgeArticle, getSupportTicket,
-  knowledgeFeedback, listKnowledgeArticles, listSupportMessages, recordPlatformAudit,
+  knowledgeFeedback, knowledgeForTicket, listKnowledgeArticles, listSupportMessages, recordPlatformAudit,
   retryKnowledgeJob, reviewKnowledgeArticle, type KnowledgeArticle, type KnowledgeArticleInput,
 } from '@line-crm/db';
 import type { Env } from '../index.js';
 import { requirePlatformAdmin, requirePlatformAdminWrite } from '../middleware/platform-admin.js';
 import { dbFor } from '../services/db-router.js';
-import { knowledgeNames, knowledgeSources, redactKnowledgeText, validateKnowledgeEvidence } from '../services/platform-knowledge.js';
+import { knowledgeNames, knowledgeSources, processKnowledgeJob, redactKnowledgeText, validateKnowledgeEvidence } from '../services/platform-knowledge.js';
 
 export const opsKnowledge = new Hono<Env>();
 opsKnowledge.use('/api/ops/knowledge', requirePlatformAdmin());
@@ -103,6 +103,21 @@ opsKnowledge.post('/api/ops/knowledge/:id/feedback', requirePlatformAdminWrite()
   await recordPlatformAudit(db, { staffId: staff.id, staffName: staff.name, action: 'knowledge.feedback',
     detail: { articleId: c.req.param('id'), requestId: body.requestId, feedback: body.feedback }, visibleToTenant: false });
   return c.json({ success: true, data: null });
+});
+
+// Await on this dedicated request, not waitUntil (45s AI budget exceeds its 30s
+// post-response lifetime). Resolution stays fast; no scheduled notification job runs.
+opsKnowledge.post('/api/ops/knowledge/tickets/:id/process', requirePlatformAdminWrite(), async c => {
+  const db = dbFor(c.env);
+  const id = c.req.param('id');
+  if (!(await getSupportTicket(db, id))) return c.json({ success: false, error: '問い合わせが見つかりません' }, 404);
+  if (!c.env.AI) return c.json({ success: false, error: 'この環境では自動下書きを作成できません' }, 503);
+  await processKnowledgeJob(c.env, id);
+  const knowledge = await knowledgeForTicket(db, id);
+  return c.json({ success: true, data: {
+    article: knowledge.article ? serializeKnowledge(knowledge.article) : null,
+    job: knowledge.job, canProcess: true,
+  } });
 });
 
 opsKnowledge.post('/api/ops/knowledge/tickets/:id/retry', requirePlatformAdminWrite(), async c => {

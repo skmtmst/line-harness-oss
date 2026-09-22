@@ -130,7 +130,8 @@ describe('V6 ウェビナー一覧の契約', () => {
       expect(EDIT).toContain(`'${label}'`)
     }
     expect(EDIT).toContain('webinarApi.saveActions(webinarId, actions)')
-    expect(EDIT).toContain('webinarApi.participantsCsvUrl(webinarId)')
+    // #1053: 直リンクは Bearer 補完経路で401になるため、認証付き取得へ。
+    expect(EDIT).toContain('downloadApiFile(webinarApi.participantsCsvUrl(webinarId')
     expect(EDIT).toContain('data-design-node="Xjk8q"')
     expect(EDIT).toContain('data-design-node="Q8sHa"')
     expect(EDIT).toContain('data-design-node="yxyzQ"')

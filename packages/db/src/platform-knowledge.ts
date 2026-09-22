@@ -96,15 +96,16 @@ export function queueKnowledgeStatement(db: D1Database, requestId: string): D1Pr
     .bind(crypto.randomUUID(), now, now, requestId);
 }
 
-export async function claimKnowledgeJob(db: D1Database, now = jstNow()): Promise<KnowledgeJob | null> {
+export async function claimKnowledgeJob(db: D1Database, now = jstNow(), requestId?: string): Promise<KnowledgeJob | null> {
   const lease = new Date(Date.parse(now) + 5 * 60_000).toISOString();
   return db.prepare(`UPDATE platform_knowledge_jobs SET status = 'running', attempts = attempts + 1,
       lease_token = ?, lease_until = ?, updated_at = ?
     WHERE id = (SELECT j.id FROM platform_knowledge_jobs j JOIN hq_support_requests r ON r.id = j.request_id
       WHERE j.source_revision = r.knowledge_revision AND r.stage IN ('resolved','closed') AND j.attempts < 3
+        AND (? IS NULL OR j.request_id = ?)
         AND (j.status = 'queued' OR (j.status = 'running' AND julianday(j.lease_until) < julianday(?)))
       ORDER BY j.created_at, j.id LIMIT 1)
-    RETURNING *`).bind(crypto.randomUUID(), lease, now, now).first<KnowledgeJob>();
+    RETURNING *`).bind(crypto.randomUUID(), lease, now, requestId ?? null, requestId ?? null, now).first<KnowledgeJob>();
 }
 
 export async function finishKnowledgeJob(db: D1Database, job: KnowledgeJob, input: {
@@ -186,10 +187,12 @@ export async function reviewKnowledgeArticle(db: D1Database, id: string, version
 export async function knowledgeForTicket(db: D1Database, requestId: string) {
   const article = await db.prepare(`${SELECT} WHERE a.source_request_id = ? ORDER BY a.source_revision DESC LIMIT 1`)
     .bind(requestId).first<KnowledgeArticle>();
-  const job = await db.prepare(`SELECT j.id, j.status, j.attempts,
+  const job = await db.prepare(`SELECT j.id,
+    CASE WHEN j.status = 'running' AND j.attempts >= 3 AND julianday(j.lease_until) < julianday(?)
+      THEN 'failed' ELSE j.status END AS status, j.attempts,
     CASE WHEN j.source_revision = r.knowledge_revision AND r.stage IN ('resolved','closed') THEN 1 ELSE 0 END AS source_current
     FROM platform_knowledge_jobs j JOIN hq_support_requests r ON r.id = j.request_id
-    WHERE j.request_id = ? ORDER BY j.source_revision DESC LIMIT 1`).bind(requestId)
+    WHERE j.request_id = ? ORDER BY j.source_revision DESC LIMIT 1`).bind(jstNow(), requestId)
     .first<{ id: string; status: string; attempts: number; source_current: number }>();
   return { article, job };
 }
