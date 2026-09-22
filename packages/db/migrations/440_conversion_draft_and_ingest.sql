@@ -21,10 +21,22 @@ PRAGMA defer_foreign_keys = ON;
 
 -- conversion_points を参照している外部キーは次の4表だけと確認済み。
 -- ここに無い参照が増えていたら移行を止める。
-SELECT json(CASE WHEN (SELECT count(*) FROM pragma_foreign_key_list('conversion_events') WHERE "table" = 'conversion_points') = 1 THEN '{}' ELSE 'unexpected conversion_points foreign key: conversion_events' END);
-SELECT json(CASE WHEN (SELECT count(*) FROM pragma_foreign_key_list('conversion_event_dedup_claims') WHERE "table" = 'conversion_points') = 1 THEN '{}' ELSE 'unexpected conversion_points foreign key: conversion_event_dedup_claims' END);
-SELECT json(CASE WHEN (SELECT count(*) FROM pragma_foreign_key_list('conversion_definition_usages') WHERE "table" = 'conversion_points') = 1 THEN '{}' ELSE 'unexpected conversion_points foreign key: conversion_definition_usages' END);
-SELECT json(CASE WHEN (SELECT count(*) FROM pragma_foreign_key_list('conversion_definition_revisions') WHERE "table" = 'conversion_points') = 1 THEN '{}' ELSE 'unexpected conversion_points foreign key: conversion_definition_revisions' END);
+-- D1 は pragma_foreign_key_list() のようなテーブル値関数形式の PRAGMA を
+-- SQLITE_AUTH で拒否するため、sqlite_schema のテキストで参照列と削除動作を
+-- 確認する。列名を含めて LIKE することで想定外の列・動作の混入も止める。
+SELECT json(CASE WHEN EXISTS(SELECT 1 FROM sqlite_schema WHERE type = 'table' AND name = 'conversion_events' AND lower(sql) LIKE '%conversion_point_id%references conversion_points%on delete cascade%') THEN '{}' ELSE 'unexpected conversion_points foreign key: conversion_events' END);
+SELECT json(CASE WHEN EXISTS(SELECT 1 FROM sqlite_schema WHERE type = 'table' AND name = 'conversion_event_dedup_claims' AND lower(sql) LIKE '%conversion_point_id%references conversion_points%on delete cascade%') THEN '{}' ELSE 'unexpected conversion_points foreign key: conversion_event_dedup_claims' END);
+SELECT json(CASE WHEN EXISTS(SELECT 1 FROM sqlite_schema WHERE type = 'table' AND name = 'conversion_definition_usages' AND lower(sql) LIKE '%conversion_point_id%references conversion_points%' AND lower(sql) NOT LIKE '%references conversion_points%on delete%') THEN '{}' ELSE 'unexpected conversion_points foreign key: conversion_definition_usages' END);
+SELECT json(CASE WHEN EXISTS(SELECT 1 FROM sqlite_schema WHERE type = 'table' AND name = 'conversion_definition_revisions' AND lower(sql) LIKE '%conversion_point_id%references conversion_points%on delete cascade%') THEN '{}' ELSE 'unexpected conversion_points foreign key: conversion_definition_revisions' END);
+SELECT json(CASE WHEN (
+ SELECT COALESCE(SUM(
+   (length(lower(sql)) - length(replace(lower(sql), 'references conversion_points', ''))) / 28
+   + (length(lower(sql)) - length(replace(lower(sql), 'references "conversion_points"', ''))) / 30
+   + (length(lower(sql)) - length(replace(lower(sql), 'references [conversion_points]', ''))) / 30
+   + (length(lower(sql)) - length(replace(lower(sql), 'references `conversion_points`', ''))) / 30
+ ), 0)
+ FROM sqlite_schema WHERE type = 'table' AND name != '_cf_METADATA'
+) = 4 THEN '{}' ELSE 'unexpected conversion_points foreign key count: stop migration 440' END);
 SELECT json(CASE WHEN NOT EXISTS(
   SELECT 1 FROM sqlite_schema
   WHERE type = 'table' AND name != '_cf_METADATA'

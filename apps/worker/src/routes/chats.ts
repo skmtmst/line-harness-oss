@@ -2447,6 +2447,9 @@ function validateScheduledAt(raw: unknown): { ok: true; scheduledAt: string } | 
 /**
  * POST /api/chats/:id/schedule — 返信の予約作成。
  * Idempotency-Keyは必須で、同じキーの再送は新しい予約を作らず既存を返す。
+ * 別キーでも「対象・内容・送信予定時刻」が一致する処理中の予約があれば
+ * 新しい行を作らず既存行を返す(#977)。replayed=true でどちらの再利用かは
+ * 区別せず、画面は返された予約1件だけを表示すればよい。
  */
 chats.post('/api/chats/:id/schedule', requireRole('owner', 'admin', 'staff'), requireVisibleChat, async (c) => {
   try {
