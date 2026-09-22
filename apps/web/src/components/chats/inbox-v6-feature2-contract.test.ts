@@ -246,7 +246,7 @@ describe('LAY-01/LAY-02 顧客情報の列とドロワー', () => {
   it('開閉ボタンの文言・aria-expanded・実表示を一致させる', () => {
     // 同じ1つのボタンが開閉し、パネルは showFriendInfo だけに従う。
     // 「開いていないのに閉じると表示する」状態を作らない(#982 LAY-02)。
-    expect(PAGE).toContain('{showFriendInfo && (selectedChatId || selectedFriendId || selectedThreadId)')
+    expect(PAGE).toContain('{showFriendInfo && (selectedChatId || selectedThreadId)')
     expect(PAGE).toContain('aria-expanded={showFriendInfo}')
     expect(PAGE).toContain("showFriendInfo ? '顧客情報を閉じる' : '顧客情報を表示'")
   })

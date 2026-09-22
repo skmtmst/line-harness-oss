@@ -1766,7 +1766,7 @@ export default function BroadcastForm({
             <div className="mt-3 grid gap-3 sm:grid-cols-2">
               <div>
                 <label htmlFor="bc-date" className="text-ink-secondary mb-1 block text-xs font-medium">
-                  配信日
+                  配信日（日本時間）
                 </label>
                 <input
                   id="bc-date"
@@ -1778,7 +1778,7 @@ export default function BroadcastForm({
               </div>
               <div>
                 <label htmlFor="bc-time" className="text-ink-secondary mb-1 block text-xs font-medium">
-                  時刻
+                  時刻（日本時間）
                 </label>
                 <input
                   id="bc-time"

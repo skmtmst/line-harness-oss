@@ -34,7 +34,10 @@ describe('台帳CSVと絞り込み (#933 N-397/N-398)', () => {
     // 同じ条件を一覧取得とCSV URLの両方へ渡す（片方だけだと件数と書出しがずれる）
     expect(LIST).toContain('staffId: staffFilter')
     expect(LIST).toContain('source: sourceFilter')
-    expect(LIST).toContain('bookingApi.ledgerCsvUrl')
+    // TECH-03: CSVは直リンク（href）ではなく認証付き取得から保存する。
+    // Cookie が届かない経路でも同じ許可だけが通る。
+    expect(LIST).toContain('bookingApi.downloadLedgerCsv')
+    expect(LIST).not.toContain('Button href={csvUrl}')
     expect(LIST).toContain('CSVで書き出す')
   })
 })
