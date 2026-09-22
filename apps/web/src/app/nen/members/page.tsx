@@ -3,6 +3,7 @@
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import PageHeader from '@/components/shared/page-header'
+import ListState from '@/components/shared/list-state'
 import ScrollableTabs from '@/components/layout/scrollable-tabs'
 import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
@@ -106,7 +107,17 @@ function MembersInner() {
         />
       </div>
 
-      {!selectedAccountId ? null : tab === 'ranks' ? (
+      {/*
+        アカウント未選択で真っ白にしない。一覧系と同じく「選んでください」の
+        案内を出す（`/nen-members` やマイル明細と同じ形）。
+      */}
+      {!selectedAccountId ? (
+        <ListState
+          kind="empty"
+          title="LINEアカウントを選んでください"
+          description="上のバーから、会員を見るLINEアカウントを選びます。"
+        />
+      ) : tab === 'ranks' ? (
         <RankSettingsTab accountId={selectedAccountId} status={status} settings={settings} onSaved={handleSaved} onRetry={() => void load()} />
       ) : tab === 'lifetime' ? (
         <LifetimeTab accountId={selectedAccountId} status={status} settings={settings} onSaved={handleSaved} onRetry={() => void load()} />

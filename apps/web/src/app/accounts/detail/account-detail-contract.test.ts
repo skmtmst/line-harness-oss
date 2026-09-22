@@ -42,6 +42,17 @@ describe('V6 33-3 LINEアカウントの詳細・編集', () => {
     expect(PAGE).toContain('&tab=${t.value}')
   })
 
+  it('?id= なしで開いたとき、無限ローディングにせず一覧へ戻す', () => {
+    /*
+      `load()` は `!id` で何もせず帰るので、ガードがないと
+      「読み込んでいます」が消えない（監査 Issue #1058）。
+      対象未指定は失敗ではないので、再読み込みではなく一覧への口を出す。
+    */
+    expect(PAGE).toContain('if (!id)')
+    expect(PAGE).toContain('見るアカウントが指定されていません')
+    expect(PAGE).toContain('href="/accounts"')
+  })
+
   it('動的セグメントを使わない', () => {
     /*
       この管理画面は静的書き出し（`output: 'export'`）。**ビルド時に全IDが
