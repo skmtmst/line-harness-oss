@@ -547,7 +547,9 @@ export async function guardScheduledBroadcastQuota(
     eventType: 'broadcast.quota_short',
     title: `「${broadcast.title}」を送れませんでした`,
     body: shortfall,
-    channel: 'center',
+    // 通知センターが読むのは 'dashboard'。'center' はどの画面も読まず、
+    // 「止めた理由」を書いたつもりが誰にも見えない通知になっていた。
+    channel: 'dashboard',
     category: 'error',
     lineAccountId: accountId,
     metadata: JSON.stringify({
