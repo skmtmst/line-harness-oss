@@ -9157,13 +9157,15 @@ export const api = {
     getRun: (id: string) =>
       fetchApi<ApiResponse<AutomationRunDetail>>(`/api/automation-runs/${encodeURIComponent(id)}`),
     // #942 N-353: 実行記録のCSV書き出し口。画面の絞り込みと同じ条件を渡す。
+    // パスだけを返す。直リンクは Cookie が届かない経路で401になるため、
+    // 呼び出し側は downloadApiFile で認証付き取得してから保存する（#1053）。
     runsCsvUrl: (params?: { accountId?: string; search?: string; status?: string; includeTest?: boolean }) => {
       const query = new URLSearchParams({ format: 'csv' })
       if (params?.accountId) query.set('lineAccountId', params.accountId)
       if (params?.search) query.set('search', params.search)
       if (params?.status) query.set('status', params.status)
       if (params?.includeTest) query.set('include_test', '1')
-      return `${API_URL}/api/automation-runs?${query}`
+      return `/api/automation-runs?${query}`
     },
     // #942 N-353: まだ終わっていない実行を取りやめる。取消済みはそのまま成功。
     cancelRun: (id: string) =>
