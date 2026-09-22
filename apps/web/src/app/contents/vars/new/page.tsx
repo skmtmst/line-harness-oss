@@ -5,7 +5,8 @@ import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import type { Folder } from '@line-crm/shared'
-import { api, ApiError } from '@/lib/api'
+import { api, ApiError, describeSaveFailure } from '@/lib/api'
+import { commonVarValueError, COMMON_VAR_VALUE_REQUIRED } from '@/lib/common-vars'
 import FeatureGate from '@/components/feature-gate'
 import { useAccount } from '@/contexts/account-context'
 import Button from '@/components/shared/button'
@@ -113,6 +114,22 @@ function sensitiveFieldLabels(value: string, memo: string): string[] {
   ]
 }
 
+/** エラーを出した欄へカーソルを戻す（VAR-06）。 */
+function focusField(id: string) {
+  document.getElementById(id)?.focus()
+}
+
+/** 400の理由文から、直す欄を引く。 */
+function focusTargetForReason(message: string): string | null {
+  if (message.includes('代替値')) return 'cv-fallback-value'
+  if (message.includes('有効開始')) return 'cv-valid-from'
+  if (message.includes('有効終了')) return 'cv-valid-until'
+  if (message.includes('名前')) return 'cv-name'
+  if (message.includes('メモ')) return 'cv-memo'
+  if (message.includes('値')) return 'cv-value'
+  return null
+}
+
 /**
  * 名前から差し込み名の候補を作る。
  *
@@ -218,13 +235,30 @@ function NewCommonVarInner() {
       setError('差し込み名を入力してください')
       return
     }
+    // VAR-06: 空欄不可の種別（真偽・年月日・日時）や形式違いは、APIを呼ぶ
+    // 前に理由を出して値の欄へ戻す。400を一律の失敗文へ置き換えない。
+    const valueError = commonVarValueError(type, value)
+    if (valueError) {
+      setError(valueError)
+      focusField('cv-value')
+      return
+    }
     if (validFrom && validUntil && validFrom >= validUntil) {
       setError('有効終了は有効開始より後にしてください')
       return
     }
-    if (expiryBehavior === 'fallback' && !fallbackValue) {
-      setError('期限切れ時に使う代替値を入力してください')
-      return
+    if (expiryBehavior === 'fallback') {
+      if (!fallbackValue) {
+        setError('期限切れ時に使う代替値を入力してください')
+        focusField('cv-fallback-value')
+        return
+      }
+      const fallbackError = commonVarValueError(type, fallbackValue, '代替値')
+      if (fallbackError) {
+        setError(fallbackError)
+        focusField('cv-fallback-value')
+        return
+      }
     }
     const sensitiveFields = sensitiveFieldLabels(value, memo)
     if (sensitiveFields.length > 0 && !allowSensitive) {
@@ -257,12 +291,17 @@ function NewCommonVarInner() {
       }
       router.push('/contents/vars')
     } catch (e) {
+      // VAR-06: 400（型不一致など安全な入力エラー）は口の理由をそのまま出し、
+      // 直す欄へ戻す。通信障害・権限不足・競合とは文を分ける(describeSaveFailure)。
       if (e instanceof ApiError && e.status === 409) {
         setError('その差し込み名は既に使われています')
-      } else if (e instanceof ApiError && e.status === 422) {
-        setError(e.message)
+        focusField('cv-key')
       } else {
-        setError('保存に失敗しました')
+        setError(describeSaveFailure(e))
+        if (e instanceof ApiError && (e.status === 400 || e.status === 422)) {
+          const target = e.status === 422 ? 'cv-key' : focusTargetForReason(e.message)
+          if (target) focusField(target)
+        }
       }
     } finally {
       setSaving(false)
@@ -348,7 +387,23 @@ function NewCommonVarInner() {
           {expiryBehavior === 'fallback' && (
             <div>
               <label htmlFor="cv-fallback-value" className="text-ink-secondary mb-1 block text-xs font-medium">代替値</label>
-              <input id="cv-fallback-value" type={type === 'number' ? 'number' : 'text'} value={fallbackValue} onChange={(e) => setFallbackValue(e.target.value)} className="border-hairline rounded-control w-full border px-3 py-2 text-sm" />
+              {type === 'boolean' ? (
+                <SelectField
+                  id="cv-fallback-value"
+                  value={fallbackValue}
+                  onChange={(e) => setFallbackValue(e.target.value)}
+                  options={[{ value: '', label: '選んでください' }, { value: 'true', label: 'true' }, { value: 'false', label: 'false' }]}
+                  className="w-full"
+                />
+              ) : (
+                <input
+                  id="cv-fallback-value"
+                  type={type === 'number' ? 'number' : type === 'date' ? 'date' : type === 'datetime' ? 'datetime-local' : 'text'}
+                  value={fallbackValue}
+                  onChange={(e) => setFallbackValue(e.target.value)}
+                  className="border-hairline rounded-control w-full border px-3 py-2 text-sm"
+                />
+              )}
             </div>
           )}
         </fieldset>
@@ -427,7 +482,7 @@ function NewCommonVarInner() {
 
         <div>
           <label htmlFor="cv-value" className="text-ink-secondary mb-1 block text-sm font-medium">
-            値
+            値 {COMMON_VAR_VALUE_REQUIRED.has(type) && <span className="text-danger">*</span>}
           </label>
           {type === 'boolean' ? <SelectField id="cv-value" value={value} onChange={(e) => { setValue(e.target.value); setSecretWarningFields(null) }} options={[{ value: '', label: '選んでください' }, { value: 'true', label: 'true' }, { value: 'false', label: 'false' }]} className="w-full max-w-md" /> : type === 'long_text' ? <textarea
             ref={longValueRef}
@@ -518,7 +573,7 @@ function NewCommonVarInner() {
           </div>
         )}
 
-        {error && <p className="text-danger text-sm">{error}</p>}
+        {error && <p className="text-danger text-sm" role="alert">{error}</p>}
       </div>
 
       <StickyBar
