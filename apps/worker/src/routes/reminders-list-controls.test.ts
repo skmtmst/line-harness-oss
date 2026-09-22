@@ -387,3 +387,75 @@ describe('リマインダ名の上限 (N-078)', () => {
     expect(res.status).toBe(400);
   });
 });
+
+/*
+ * REMINDER-10: 下書き一覧の日時・通数は、編集画面と同じ下書き版から組み立てる。
+ * reminder_steps は公開時の複製なので、未公開の下書きでは作成時の既定値と
+ * 0通しか返らず、保存した「1日前の18:00・1通」と食い違っていた。
+ */
+describe('一覧の副題は編集中の版を見る (REMINDER-10)', () => {
+  test('下書きだけの行は下書き版の日時と通数を返す', async () => {
+    sqlite.raw.prepare(`UPDATE reminders SET delivery_mode = 'time' WHERE id = 'r-draft'`).run();
+    sqlite.raw.prepare(
+      `UPDATE reminder_version_steps SET offset_days = -1, send_at_time = '18:00'
+        WHERE reminder_version_id = 'ver-draft'`,
+    ).run();
+
+    const res = await list(`limit=20&lineAccountId=${ACC_A}&status=draft`);
+    expect(res.status).toBe(200);
+    const body = await res.json() as { data: { items: Array<{ id: string; stepCount: number; timingSummary: string | null }> } };
+    const item = body.data.items.find((i) => i.id === 'r-draft');
+    expect(item?.stepCount).toBe(1);
+    expect(item?.timingSummary).toBe('1日前の18:00 ／ テキスト 1通');
+  });
+
+  test('通知0件の下書きは「通知なし ／ テキスト 0通」と返す', async () => {
+    sqlite.raw.prepare(`DELETE FROM reminder_version_steps WHERE reminder_version_id = 'ver-draft'`).run();
+
+    const res = await list(`limit=20&lineAccountId=${ACC_A}&status=draft`);
+    const body = await res.json() as { data: { items: Array<{ id: string; stepCount: number; timingSummary: string | null }> } };
+    const item = body.data.items.find((i) => i.id === 'r-draft');
+    expect(item?.stepCount).toBe(0);
+    expect(item?.timingSummary).toBe('通知なし ／ テキスト 0通');
+  });
+
+  test('公開版と下書きが両方ある行は、下書きの値に版の印を付ける', async () => {
+    sqlite.raw.prepare(
+      `INSERT INTO reminder_versions
+         (id, reminder_id, version_number, status, settings_snapshot, created_at, updated_at)
+       VALUES ('ver-pub', 'r-1', 1, 'published', '{}', '2026-09-01T00:00:00.000Z', '2026-09-01T00:00:00.000Z')`,
+    ).run();
+    sqlite.raw.prepare(
+      `INSERT INTO reminder_versions
+         (id, reminder_id, version_number, status, settings_snapshot, created_at, updated_at)
+       VALUES ('ver-draft2', 'r-1', 2, 'draft', '{}', '2026-09-02T00:00:00.000Z', '2026-09-02T00:00:00.000Z')`,
+    ).run();
+    sqlite.raw.prepare(
+      `INSERT INTO reminder_version_steps
+         (id, reminder_version_id, stable_step_id, position, offset_minutes, message_type, message_content, created_at)
+       VALUES
+         ('vstep-2a', 'ver-draft2', 's-a', 0, -60, 'text', '直前です', '2026-09-02T00:00:00.000Z'),
+         ('vstep-2b', 'ver-draft2', 's-b', 1, -120, 'text', '前々です', '2026-09-02T00:00:00.000Z')`,
+    ).run();
+    sqlite.raw.prepare(
+      `UPDATE reminders
+          SET current_published_version_id = 'ver-pub', current_draft_version_id = 'ver-draft2'
+        WHERE id = 'r-1'`,
+    ).run();
+
+    const res = await list(`limit=20&lineAccountId=${ACC_A}`);
+    const body = await res.json() as { data: { items: Array<{ id: string; stepCount: number; timingSummary: string | null }> } };
+    const item = body.data.items.find((i) => i.id === 'r-1');
+    // r-1 の公開済み reminder_steps は1件だが、再編集中の下書き版は2通。
+    expect(item?.stepCount).toBe(2);
+    expect(item?.timingSummary).toBe('下書き: 1時間前・2時間前 ／ テキスト 2通');
+  });
+
+  test('版を持たない行は従来どおり reminder_steps の数を返す', async () => {
+    const res = await list(`limit=20&lineAccountId=${ACC_A}`);
+    const body = await res.json() as { data: { items: Array<{ id: string; stepCount: number; timingSummary: string | null }> } };
+    const item = body.data.items.find((i) => i.id === 'r-1');
+    expect(item?.stepCount).toBe(1);
+    expect(item?.timingSummary).toBeNull();
+  });
+});

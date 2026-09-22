@@ -35,7 +35,7 @@ import {
   type ReminderVersionRow,
   type ReminderDeliveryRunStatus,
 } from '@line-crm/db';
-import { LEAP_YEAR_POLICIES, REMINDER_NAME_MAX_LENGTH, REMINDER_NAME_TOO_LONG_MESSAGE } from '@line-crm/shared';
+import { describeReminderTiming, LEAP_YEAR_POLICIES, REMINDER_NAME_MAX_LENGTH, REMINDER_NAME_TOO_LONG_MESSAGE } from '@line-crm/shared';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
@@ -103,7 +103,7 @@ type ReminderListRow = Awaited<ReturnType<typeof getReminders>>[number] & {
   has_failure?: number | string | null;
 };
 
-function publicReminder(row: ReminderListRow, stepCount?: number, hasFailure?: boolean) {
+function publicReminder(row: ReminderListRow, stepCount?: number, hasFailure?: boolean, timingSummary?: string | null) {
   return {
     id: row.id,
     name: row.name,
@@ -122,11 +122,95 @@ function publicReminder(row: ReminderListRow, stepCount?: number, hasFailure?: b
     targetTagId: row.target_tag_id ?? null,
     folderId: row.folder_id ?? null,
     stepCount: stepCount ?? Number(row.step_count ?? 0),
+    /*
+     * REMINDER-10: 一覧の副題（日時・通数）。版から組み立てた値を渡す。
+     * null のとき画面側が reminders 行の値で組み立てる従来の形に戻る。
+     */
+    timingSummary: timingSummary ?? null,
     hasFailure: hasFailure ?? Number(row.has_failure ?? 0) > 0,
     displayOrder: row.display_order ?? 0,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
+}
+
+interface ReminderVersionStepSummaryRow {
+  reminder_version_id: string;
+  offset_minutes: number;
+  offset_days: number | null;
+  send_at_time: string | null;
+}
+
+/*
+ * REMINDER-10: 一覧の「送信時刻・通数」を、画面で編集している版の実値から作る。
+ *
+ * reminder_steps は公開時に版から複製されるだけなので、まだ公開していない
+ * 下書きでは常に0件・reminders行の作成時の値しか返らず、編集画面で保存した
+ * 「1日前の18:00・1通」と一覧の「当日18:00・0通」が食い違っていた。
+ *
+ * 下書き版があれば下書き版、なければ公開版の通を使う。両方ある
+ * （公開後に再編集中）ときは「下書き: 」を先頭に付けて、どの版の値かを
+ * 一覧でも分かるようにする。版を持たない旧来の行は従来の値のまま。
+ */
+async function loadReminderListSummaries(
+  db: D1Database,
+  rows: ReadonlyArray<{
+    id: string;
+    current_draft_version_id?: string | null;
+    current_published_version_id?: string | null;
+    delivery_mode?: string | null;
+  }>,
+): Promise<Map<string, { stepCount: number; timingSummary: string }>> {
+  const summaries = new Map<string, { stepCount: number; timingSummary: string }>();
+  const versionIds = [
+    ...new Set(
+      rows
+        .map((row) => row.current_draft_version_id ?? row.current_published_version_id ?? null)
+        .filter((id): id is string => Boolean(id)),
+    ),
+  ];
+  if (versionIds.length === 0) return summaries;
+  const steps = await db
+    .prepare(
+      `SELECT reminder_version_id, offset_minutes, offset_days, send_at_time
+         FROM reminder_version_steps
+        WHERE reminder_version_id IN (${versionIds.map(() => '?').join(',')})
+        ORDER BY position, stable_step_id`,
+    )
+    .bind(...versionIds)
+    .all<ReminderVersionStepSummaryRow>();
+  const stepsByVersion = new Map<string, ReminderVersionStepSummaryRow[]>();
+  for (const step of steps.results) {
+    const list = stepsByVersion.get(step.reminder_version_id) ?? [];
+    list.push(step);
+    stepsByVersion.set(step.reminder_version_id, list);
+  }
+  for (const row of rows) {
+    const draftId = row.current_draft_version_id ?? null;
+    const publishedId = row.current_published_version_id ?? null;
+    const versionId = draftId ?? publishedId;
+    if (!versionId) continue;
+    const versionSteps = stepsByVersion.get(versionId) ?? [];
+    const mode = row.delivery_mode === 'time' ? 'time' : 'countdown';
+    const timing = versionSteps.length === 0
+      ? '通知なし'
+      : versionSteps
+          .map((step) => describeReminderTiming(
+            {
+              offsetMinutes: step.offset_minutes,
+              offsetDays: step.offset_days,
+              sendAtTime: step.send_at_time,
+            },
+            mode,
+          ))
+          .join('・');
+    const versionMark = draftId && publishedId ? '下書き: ' : '';
+    summaries.set(row.id, {
+      stepCount: versionSteps.length,
+      timingSummary: `${versionMark}${timing} ／ テキスト ${versionSteps.length}通`,
+    });
+  }
+  return summaries;
 }
 
 function escapedLike(value: string): string {
@@ -714,10 +798,15 @@ reminders.get('/api/reminders', requireRole('owner', 'admin', 'staff'), async (c
           LIMIT ? OFFSET ?`)
         .bind(...bindings, paging.limit, paging.offset)
         .all<ReminderListRow>();
+      // REMINDER-10: 下書き版がある行は版の実値から日時・通数を組み立てる。
+      const summaries = await loadReminderListSummaries(c.env.DB, result.results);
       return c.json({
         success: true,
         data: buildOffsetListResponse({
-          items: result.results.map((row) => publicReminder(row)),
+          items: result.results.map((row) => {
+            const summary = summaries.get(row.id);
+            return publicReminder(row, summary?.stepCount, undefined, summary?.timingSummary ?? null);
+          }),
           total: Number(totalRow?.total ?? 0),
           paging,
           sort: sortSpec.meta,
@@ -773,11 +862,17 @@ reminders.get('/api/reminders', requireRole('owner', 'admin', 'staff'), async (c
       .all<{ reminder_id: string }>();
     const failedReminderIds = new Set(failures.results.map((row) => row.reminder_id));
 
-    const publicItems = items.map((r) => publicReminder(
-      r,
-      stepCounts.get(r.id) ?? 0,
-      failedReminderIds.has(r.id),
-    ));
+    // REMINDER-10: 旧配列応答も、版を持つ行は版の実値で要約する。
+    const summaries = await loadReminderListSummaries(c.env.DB, items);
+    const publicItems = items.map((r) => {
+      const summary = summaries.get(r.id);
+      return publicReminder(
+        r,
+        summary?.stepCount ?? stepCounts.get(r.id) ?? 0,
+        failedReminderIds.has(r.id),
+        summary?.timingSummary ?? null,
+      );
+    });
 
     /* 旧配列応答は、移行期限（2026-10-31）まで未移行の呼び出しだけに残す。 */
     return c.json({ success: true, data: publicItems });
