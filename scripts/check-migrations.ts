@@ -104,6 +104,29 @@ const RULES: Rule[] = [
     label: 'ADD CONSTRAINT ... UNIQUE is forbidden (may violate existing rows)',
     pattern: /\bADD\s+CONSTRAINT\s+\S+\s+UNIQUE\b/i,
   },
+  {
+    // pragma_table_info(...) / pragma_foreign_key_list(...) などの
+    // テーブル値関数形式は引数が固定でも、括弧無しの `FROM pragma_x` でも
+    // D1 の authorizer が SQLITE_AUTH で拒否する(#744)。
+    // 文形式の `PRAGMA name` はこの規則に掛からない。
+    label:
+      'pragma table-valued function is forbidden (D1 authorizer rejects pragma_* with SQLITE_AUTH)',
+    pattern: /\bpragma_\w+/i,
+  },
+  {
+    // `PRAGMA foreign_key_check` は D1 が拒否した実績があり、行を返すだけで
+    // 失敗にもならない。FK の最終確認はコミット時の強制と
+    // `PRAGMA defer_foreign_keys = off` に委ねる。
+    label:
+      'PRAGMA foreign_key_check is forbidden (D1 rejects it; use commit-time enforcement)',
+    pattern: /\bpragma\s+foreign_key_check\b/i,
+  },
+  {
+    // D1 は常に foreign_keys=on 相当で、ユーザー文からの切替は拒否される。
+    label:
+      'PRAGMA foreign_keys is forbidden (D1 always enforces foreign keys)',
+    pattern: /\bpragma\s+foreign_keys\b/i,
+  },
 ];
 
 /**

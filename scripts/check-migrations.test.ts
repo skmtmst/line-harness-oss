@@ -288,6 +288,27 @@ ALTER TABLE friends DROP COLUMN metadata;`);
   });
 });
 
+describe('D1 の authorizer が拒否する PRAGMA(#744)', () => {
+  it('pragma のテーブル値関数形式は固定引数でも通さない', () => {
+    for (const sql of [
+      "SELECT count(*) FROM pragma_foreign_key_list('tags')",
+      "SELECT count(*) FROM pragma_table_info('tags')",
+      'SELECT * FROM pragma_foreign_key_check',
+    ]) {
+      expect(checkMigration(sql).ok).toBe(false);
+    }
+  });
+
+  it('PRAGMA foreign_key_check / foreign_keys の文形式も通さない', () => {
+    expect(checkMigration('PRAGMA foreign_key_check;').ok).toBe(false);
+    expect(checkMigration('PRAGMA foreign_keys = OFF;').ok).toBe(false);
+  });
+
+  it('PRAGMA defer_foreign_keys は D1 が許可するので通す', () => {
+    expect(checkMigration('PRAGMA defer_foreign_keys = ON;').ok).toBe(true);
+  });
+});
+
 describe('印が付く前に当ててしまった作り直し', () => {
   it('名前で通す（適用済みは書き換えない決まりのため）', () => {
     const sql = 'DROP TABLE scenario_steps;';
