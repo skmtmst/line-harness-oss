@@ -11,7 +11,7 @@ vi.mock('next/navigation', () => ({
 }))
 vi.mock('@/lib/api', () => ({ api: { reminders: {} } }))
 
-import { ConfirmStage, DoneStage, PreviewStage, TestStage } from './reminder-publish-flow'
+import { ConfirmStage, DoneStage, PreviewStage, TargetStage, TestStage } from './reminder-publish-flow'
 
 const SETTINGS: ReminderDraftSettings = {
   name: '予約前のお知らせ',
@@ -173,6 +173,62 @@ describe('リマインダ公開フローの実データ表示', () => {
     expect(screen.getAllByText('確認中').length).toBeGreaterThanOrEqual(1)
     expect(screen.queryByText('未設定')).toBeNull()
     expect(screen.queryByText('送信先を再確認')).toBeNull()
+  })
+
+  // REMINDER-08: 取得失敗は「確認中」のままにせず、失敗表示と再試行を出す。
+  it('TargetStage は事前チェックの失敗を確認中と分け、再試行できる', () => {
+    const retry = vi.fn()
+    render(<TargetStage settings={SETTINGS} validation={null} validationFailed onRetryValidation={retry} onChange={() => {}} onNext={() => {}} busy={false} />)
+    expect(screen.getByText(/公開前チェックを実行できませんでした/)).toBeTruthy()
+    expect(screen.queryByText(/公開前チェックを実行しています/)).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: '再読み込み' }))
+    expect(retry).toHaveBeenCalledTimes(1)
+  })
+
+  it('TargetStage は取得中のままでは人数を0と見せない', () => {
+    render(<TargetStage settings={SETTINGS} validation={null} onChange={() => {}} onNext={() => {}} busy={false} />)
+    expect(screen.getByText(/公開前チェックを実行しています/)).toBeTruthy()
+    expect(screen.getAllByText('—人').length).toBeGreaterThanOrEqual(1)
+    expect(screen.queryByText('0人')).toBeNull()
+  })
+
+  it('PreviewStage は取得失敗を「予定なし」と混ぜず、再試行できる', () => {
+    const retry = vi.fn()
+    render(<PreviewStage settings={SETTINGS} preview={null} previewFailed onRetryPreview={retry} onNext={() => {}} />)
+    expect(screen.getAllByText(/配信予定を確認できませんでした/).length).toBeGreaterThanOrEqual(1)
+    expect(screen.queryByText('配信予定を確認しています')).toBeNull()
+    expect(screen.queryByText('送信予定はまだありません')).toBeNull()
+    expect(screen.getAllByText('未取得').length).toBeGreaterThanOrEqual(1)
+    fireEvent.click(screen.getAllByRole('button', { name: '再読み込み' })[0])
+    expect(retry).toHaveBeenCalledTimes(1)
+  })
+
+  // REMINDER-09: 通知0件では次へ進ませず、通知編集へ戻す導線を出す。
+  it('PreviewStage は通知0件なら予定を取らず編集へ戻す', () => {
+    render(<PreviewStage settings={{ ...SETTINGS, steps: [] }} preview={null} editHref="/reminders/edit?id=rem-1" onNext={() => {}} />)
+    expect(screen.getByText('送る通知がまだありません')).toBeTruthy()
+    const link = screen.getByText('通知ステップへ').closest('a')
+    expect(link?.getAttribute('href')).toBe('/reminders/edit?id=rem-1')
+    expect(screen.getByText('通知ステップへ戻る').closest('a')?.getAttribute('href')).toBe('/reminders/edit?id=rem-1')
+    // 通知0件のままテスト送信へは進めない。
+    const next = screen.getByRole('button', { name: 'テスト送信へ' }) as HTMLButtonElement
+    expect(next.disabled).toBe(true)
+  })
+
+  // REMINDER-09: 対象設定の次は通知ステップ。保存後は編集画面へ戻る。
+  it('TargetStage の主ボタンは通知ステップへ進む', () => {
+    const next = vi.fn()
+    render(<TargetStage settings={SETTINGS} validation={VALIDATION} onChange={() => {}} onNext={next} busy={false} />)
+    fireEvent.click(screen.getByRole('button', { name: '通知ステップへ' }))
+    expect(next).toHaveBeenCalledTimes(1)
+  })
+
+  it('ConfirmStage は事前チェックの失敗を成功扱いせず再試行できる', () => {
+    const retry = vi.fn()
+    render(<ConfirmStage draft={DRAFT} settings={SETTINGS} validation={null} validationFailed onRetryValidation={retry} onPublish={() => {}} busy={false} />)
+    expect(screen.getAllByText(/チェックを実行できませんでした/).length).toBeGreaterThanOrEqual(1)
+    fireEvent.click(screen.getAllByRole('button', { name: '再読み込み' })[0])
+    expect(retry).toHaveBeenCalledTimes(1)
   })
 
   it('DoneStage の主ボタンは詳細画面への実リンクで、Slackを約束しない', () => {
