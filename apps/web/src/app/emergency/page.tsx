@@ -33,6 +33,7 @@ import {
 import type { OperationRestoreDrift } from '@/lib/api'
 import releaseLog from '@/generated/release-log.json'
 import { useAccount } from '@/contexts/account-context'
+import { collectRecentUpdates, RECENT_UPDATES_LIMIT, type UpdateRelease } from './update-history'
 
 const TABS = [
   { key: 'health', label: '健全性チェック' },
@@ -1163,29 +1164,22 @@ function HistoryPanel() {
     if (!item.stoppedAt || !item.resolvedAt) return longest
     return Math.max(longest, Math.round((Date.parse(item.resolvedAt) - Date.parse(item.stoppedAt)) / 60_000))
   }, 0)
-  const releases = (releaseLog as { releases?: Array<{
-    version: string
-    released: string | null
-    entries: Array<{ kind: string; text: string; by: string | null; pr: number | null; at: string | null }>
-  }> }).releases ?? []
+  const releases = (releaseLog as { releases?: UpdateRelease[] }).releases ?? []
   const releaseUpdateCount = releases.filter((item) => item.released && Date.parse(item.released) >= Date.now() - 30 * 24 * 60 * 60 * 1000).reduce((sum, item) => sum + item.entries.length, 0)
   const deployedVersion = deployments.find((item) => item.deployment?.phase === 'succeeded' && item.deployment.version)?.deployment?.version
   const currentVersion = deployedVersion ?? releases.find((item) => item.released)?.version ?? '—'
   const updateCount = deployments.length > 0 ? deployments.filter((item) => Date.parse(item.occurredAt ?? item.createdAt) >= Date.now() - 30 * 24 * 60 * 60 * 1000).length : releaseUpdateCount
-  const releaseUpdates = releases
-    .flatMap((release) => release.entries.map((entry) => ({ ...entry, version: release.version, released: release.released })))
-  const deploymentUpdates = deployments.map((entry) => ({
-    kind: 'deployment',
-    text: entry.reason,
-    by: entry.deployment?.actor ?? entry.actorId,
-    pr: entry.deployment?.pullRequest ?? null,
-    at: entry.occurredAt ?? entry.createdAt,
-    version: entry.deployment?.version ?? entry.deployment?.environment ?? '—',
-    released: entry.occurredAt ?? entry.createdAt,
-  }))
-  const recentUpdates = [...deploymentUpdates, ...releaseUpdates]
-    .toSorted((left, right) => Date.parse(right.at ?? right.released ?? '') - Date.parse(left.at ?? left.released ?? ''))
-    .slice(0, 4)
+  /*
+   * 「管理画面の更新」欄(OPERATIONS-01)。
+   *
+   * 以前は案内が「新しい10件」なのに `.slice(0, 4)` で4件しか出さず、
+   * 5件目以降があることも分からなかった。件数は RECENT_UPDATES_LIMIT に
+   * まとめ、案内文・行数・「続きがあります」の表示を同じ定数で揃える。
+   * まだ画面に入っていない変更は行に混ぜず、件数だけ別に案内する。
+   */
+  const { updates: allUpdates, pendingCount: pendingUpdateCount } = collectRecentUpdates(deployments, releases)
+  const recentUpdates = allUpdates.slice(0, RECENT_UPDATES_LIMIT)
+  const hiddenUpdateCount = allUpdates.length - recentUpdates.length
 
   const downloadCsv = () => {
     /**
@@ -1235,8 +1229,12 @@ function HistoryPanel() {
             {state === 'loading' ? <p className="p-8 text-center text-xs text-ink-faint">記録を読み込んでいます…</p> : state === 'error' ? <p className="bg-warning-bg px-4 py-4 text-xs font-medium text-warning">緊急操作の履歴を取得できませんでした。履歴なしとは扱いません。</p> : entries.length === 0 ? <p className="p-8 text-center text-xs text-ink-faint">この期間の記録はありません。</p> : <><div className="hidden grid-cols-[170px_1.2fr_1fr_1fr_100px] gap-3 bg-canvas-sunken px-4 py-3 text-[11px] font-bold text-ink-faint md:grid"><span>いつ・だれが</span><span>止めたもの</span><span>対象</span><span>理由</span><span>戻した</span></div><div className="divide-y divide-hairline">{entries.map((entry) => <div key={entry.id} className="grid gap-3 px-4 py-4 md:grid-cols-[170px_1.2fr_1fr_1fr_100px] md:items-center"><div><time className="text-sm font-bold text-ink">{formatOperationDate(entry.createdAt)}</time><p className="mt-1 truncate text-xs text-ink-faint" title={entry.actorId}>{entry.actorId}</p></div><p className="text-xs font-bold text-ink-secondary">{entry.capabilities.map((capability) => CAPABILITY_LABEL[capability]).join('・')}</p><p className="text-xs text-ink-secondary">{entry.lineAccountId ?? 'すべてのアカウント'}</p><div><p className="text-xs font-bold text-ink-secondary">{entry.reason}</p>{entry.detail && <p className="mt-1 text-xs text-ink-faint">{entry.detail}</p>}</div><p className={`text-xs font-bold ${entry.resolvedAt ? 'text-success' : entry.status === 'failed' ? 'text-danger' : 'text-ink-faint'}`}>{entry.resolvedAt ? formatOperationDate(entry.resolvedAt) : entry.status === 'failed' ? '失敗' : '停止中'}</p></div>)}</div></>}
           </section>
           <section className="border-hairline rounded-card overflow-hidden border bg-canvas">
-            <div className="border-hairline border-b px-4 py-3"><h2 className="text-base font-bold text-ink">管理画面の更新</h2><p className="mt-0.5 text-xs text-ink-faint">管理画面へ入った変更のうち、新しい10件を表示します</p></div>
+            <div className="border-hairline border-b px-4 py-3"><h2 className="text-base font-bold text-ink">管理画面の更新</h2><p className="mt-0.5 text-xs text-ink-faint">管理画面へ入った変更のうち、新しい{RECENT_UPDATES_LIMIT}件を表示します</p></div>
             {recentUpdates.length === 0 ? <p className="p-8 text-center text-xs text-ink-faint">更新の記録はありません。</p> : <div className="divide-y divide-hairline">{recentUpdates.map((entry, index) => <div key={`${entry.version}-${entry.pr ?? index}-${entry.at ?? index}`} className="grid gap-2 px-4 py-3 md:grid-cols-[140px_minmax(0,1fr)_90px] md:items-center"><div><time className="text-xs font-bold text-ink-secondary">{formatOperationDate(entry.at ?? entry.released)}</time><p className="mt-1 text-[11px] text-ink-faint">{entry.version}</p></div><p className="line-clamp-2 text-xs leading-relaxed text-ink-secondary" title={entry.text}>{entry.text}</p><p className="text-xs font-bold text-ink-faint">{entry.by ?? '自動'}{entry.pr ? ` #${entry.pr}` : ''}</p></div>)}</div>}
+            {(hiddenUpdateCount > 0 || pendingUpdateCount > 0) && <div className="border-hairline space-y-1 border-t px-4 py-3 text-xs text-ink-faint">
+              {hiddenUpdateCount > 0 && <p>続きが{hiddenUpdateCount}件あります。この欄では新しい{RECENT_UPDATES_LIMIT}件までを表示します。</p>}
+              {pendingUpdateCount > 0 && <p>まだ画面に入っていない変更が{pendingUpdateCount}件あります。更新回数には含めていません。</p>}
+            </div>}
           </section>
         </div>
         <aside className="w-full space-y-4 xl:w-96 xl:shrink-0">
