@@ -236,6 +236,46 @@ describe('決めごと作成の二重作成(N-240)', () => {
     expect(ruleCount()).toBe(1);
   });
 
+  test('isActive:false の作成は最初のINSERTから is_active=0 で入る（DRAFT-01・冪等口）', async () => {
+    const res = await post({ ...ruleBody(ACC_A, '止まって作る決めごと'), isActive: false }, KEY_OWNER, UUID6);
+    expect(res.status).toBe(201);
+    const { data } = await res.json() as { data: { id: string; isActive: boolean } };
+    expect(data.isActive).toBe(false);
+    const row = sqlite.prepare(`SELECT is_active FROM mileage_rules WHERE id = ?`)
+      .get(data.id) as { is_active: number };
+    expect(row.is_active).toBe(0);
+    // 再送は同じ停止中の1件を回収する。有効化も二重作成もしない。
+    const retry = await post({ ...ruleBody(ACC_A, '止まって作る決めごと'), isActive: false }, KEY_OWNER, UUID6);
+    expect(retry.status).toBe(201);
+    expect(ruleCount()).toBe(1);
+    const after = sqlite.prepare(`SELECT is_active FROM mileage_rules WHERE id = ?`)
+      .get(data.id) as { is_active: number };
+    expect(after.is_active).toBe(0);
+  });
+
+  test('isActive:false はキーなし口でも最初から停止で作られる（DRAFT-01・従来口）', async () => {
+    const res = await post({ ...ruleBody(ACC_A, '止まって作る決めごと2'), isActive: false }, KEY_OWNER);
+    expect(res.status).toBe(201);
+    const { data } = await res.json() as { data: { id: string; isActive: boolean } };
+    expect(data.isActive).toBe(false);
+    const row = sqlite.prepare(`SELECT is_active FROM mileage_rules WHERE id = ?`)
+      .get(data.id) as { is_active: number };
+    expect(row.is_active).toBe(0);
+  });
+
+  test('同じkeyで稼働/停止だけを変えた再送は409で、作った行の状態を変えない', async () => {
+    const first = await post({ ...ruleBody(ACC_A, '状態を変えない決めごと'), isActive: false }, KEY_OWNER, UUID5);
+    expect(first.status).toBe(201);
+    const { data } = await first.json() as { data: { id: string } };
+    // 稼働/停止も保存値なので、変えた再送は「別内容」として断る。
+    const conflict = await post({ ...ruleBody(ACC_A, '状態を変えない決めごと'), isActive: true }, KEY_OWNER, UUID5);
+    expect(conflict.status).toBe(409);
+    expect(ruleCount()).toBe(1);
+    const row = sqlite.prepare(`SELECT is_active FROM mileage_rules WHERE id = ?`)
+      .get(data.id) as { is_active: number };
+    expect(row.is_active).toBe(0);
+  });
+
   test('鍵なし・鍵違いの利用者は401・403で止まる（実auth）', async () => {
     const env = { DB: db } as unknown as Env['Bindings'];
     const noAuth = await app().request('/api/mileage/rules', {

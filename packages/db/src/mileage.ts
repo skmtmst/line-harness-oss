@@ -1082,6 +1082,12 @@ export async function createMileageRule(
     validUntil?: string | null;
     /** 334(#521): 帰属アカウント。新規ルールでは必須。 */
     lineAccountId: string;
+    /**
+     * DRAFT-01: false なら最初のINSERTから停止(is_active=0)。未指定は従来どおり稼働。
+     * 「作る→別APIで止める」にすると途中失敗で稼働中のルールが残るため、
+     * 停止を指定した作成は1文で止まったまま入れる。
+     */
+    isActive?: boolean;
   },
 ): Promise<MileageRuleRow> {
   if (!Number.isInteger(input.amount) || input.amount <= 0) {
@@ -1098,7 +1104,7 @@ export async function createMileageRule(
       `INSERT INTO mileage_rules
          (id, program_id, name, event_type, source, amount, initial_status,
           conditions, line_account_id, is_active, valid_from, valid_until, created_at, updated_at)
-       VALUES (?, 'default', ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?)`,
+       VALUES (?, 'default', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       id,
@@ -1109,6 +1115,7 @@ export async function createMileageRule(
       input.initialStatus ?? 'available',
       input.conditions ? JSON.stringify(input.conditions) : null,
       input.lineAccountId,
+      input.isActive === false ? 0 : 1,
       input.validFrom ?? null,
       input.validUntil ?? null,
       now,
