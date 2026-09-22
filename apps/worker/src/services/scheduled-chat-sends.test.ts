@@ -70,11 +70,84 @@ function row(id: string) {
   return sqlite.raw.prepare(`SELECT * FROM scheduled_chat_sends WHERE id = ?`).get(id) as Record<string, unknown>;
 }
 
+function allRows() {
+  return sqlite.raw.prepare(`SELECT * FROM scheduled_chat_sends ORDER BY created_at`).all() as Array<Record<string, unknown>>;
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   pushMessage.mockResolvedValue({ sentMessages: [{}] });
   sqlite = createTestD1();
   seed();
+});
+
+// #977: サーバー側の冪等照合。同じ版(対象・内容・送信予定時刻)の
+// 処理中予約は、別の冪等キーが来ても新しい行を作らず再利用する。
+describe('送信予約の重複登録の拒否(#977)', () => {
+  test('別キーで同じ版を登録しても既存行が返り、行は1件のまま', async () => {
+    await schedule({ id: 's-1', key: '11111111-2222-4333-8444-555555555555', at: '2026-01-10T01:00:00.000Z', content: '同じ文面' });
+
+    const second = await createScheduledChatSend(sqlite.db, {
+      id: 's-2',
+      friendId: 'fr-1',
+      lineAccountId: 'acc-1',
+      staffId: 'owner-1',
+      messageType: 'text',
+      content: '同じ文面',
+      quotedMessageId: null,
+      idempotencyKey: '22222222-2222-4333-8444-555555555555',
+      scheduledAt: '2026-01-10T01:00:00.000Z',
+      now: NOW,
+    });
+    expect(second.created).toBe(false);
+    expect(second.row.id).toBe('s-1');
+    expect(allRows()).toHaveLength(1);
+  });
+
+  test('同一ペイロードを2連続で呼んでも行は1件(先着のみ挿入)', async () => {
+    const input = {
+      friendId: 'fr-1',
+      lineAccountId: 'acc-1',
+      staffId: 'owner-1',
+      messageType: 'text',
+      content: '連打',
+      quotedMessageId: null,
+      scheduledAt: '2026-01-10T01:00:00.000Z',
+      now: NOW,
+    };
+    const [a, b] = await Promise.all([
+      createScheduledChatSend(sqlite.db, { ...input, id: 's-a', idempotencyKey: '11111111-2222-4333-8444-555555555555' }),
+      createScheduledChatSend(sqlite.db, { ...input, id: 's-b', idempotencyKey: '22222222-2222-4333-8444-555555555555' }),
+    ]);
+    expect([a.created, b.created].sort()).toEqual([false, true]);
+    expect(allRows()).toHaveLength(1);
+  });
+
+  test('時刻・内容・引用が違えば別の予約になり、終了済みの行は照合しない', async () => {
+    await schedule({ id: 's-1', key: '11111111-2222-4333-8444-555555555555', at: '2026-01-10T01:00:00.000Z', content: '同じ文面' });
+    // 別時刻・別文面・別引用はすべて別の版。
+    await schedule({ id: 's-2', key: '22222222-2222-4333-8444-555555555555', at: '2026-01-10T02:00:00.000Z', content: '同じ文面' });
+    await schedule({ id: 's-3', key: '33333333-2222-4333-8444-555555555555', at: '2026-01-10T01:00:00.000Z', content: '別の文面' });
+    expect(allRows()).toHaveLength(3);
+
+    // 取消済みの行は照合対象から外れ、同じ版を立て直せる。
+    sqlite.raw.prepare(`UPDATE scheduled_chat_sends SET status = 'cancelled' WHERE id = 's-1'`).run();
+    const again = await createScheduledChatSend(sqlite.db, {
+      id: 's-4',
+      friendId: 'fr-1',
+      lineAccountId: 'acc-1',
+      staffId: 'owner-1',
+      messageType: 'text',
+      content: '同じ文面',
+      quotedMessageId: null,
+      idempotencyKey: '44444444-2222-4333-8444-555555555555',
+      scheduledAt: '2026-01-10T01:00:00.000Z',
+      now: NOW,
+    });
+    expect(again.created).toBe(true);
+    expect(again.row.id).toBe('s-4');
+    expect(allRows()).toHaveLength(4);
+  });
 });
 
 describe('送信予約のdispatcher(N-025)', () => {
