@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { api } from '@/lib/api'
+import { api, describeSaveFailure } from '@/lib/api'
 import type {
   EntryRoute,
   CreateEntryRouteInput,
@@ -114,12 +114,19 @@ export default function EditRouteModal({
   const doSave = async () => {
     setSubmitting(true)
     setError('')
-    const res = isNew
-      ? await api.entryRoutes.create(form)
-      : await api.entryRoutes.update(route!.id, form)
-    setSubmitting(false)
-    if (res.success) onSaved(res.data, isNew)
-    else setError(res.error ?? '保存に失敗しました')
+    try {
+      const res = isNew
+        ? await api.entryRoutes.create(form)
+        : await api.entryRoutes.update(route!.id, form)
+      if (res.success) onSaved(res.data, isNew)
+      else setError(res.error ?? '保存に失敗しました')
+    } catch (err) {
+      // 400系はAPIの理由、403・5xxは運用の言葉へ写す（WRITE-01）。
+      setError(describeSaveFailure(err))
+    } finally {
+      // 失敗時に「保存中…」のまま固まらないよう、必ず戻す。
+      setSubmitting(false)
+    }
   }
 
   const onSubmit = async () => {
