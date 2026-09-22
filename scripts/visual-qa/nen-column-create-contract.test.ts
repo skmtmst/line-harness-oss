@@ -20,8 +20,9 @@ const CLIENT_API = readFileSync(root('apps', 'web', 'src', 'lib', 'api.ts'), 'ut
 
 describe('NENコラム下書き作成の形', () => {
   it('本番口は id と queued を201で返す', () => {
-    expect(WORKER_ROUTE).toContain('data: { id, queued }');
-    expect(WORKER_ROUTE).toContain('{ success: true, data: { id, queued } }, 201');
+    // NEN-06: 下書き作成は配信予約を呼ばないため queued は常に 0。
+    expect(WORKER_ROUTE).toContain('data: { id, queued: 0 }');
+    expect(WORKER_ROUTE).toContain('{ success: true, data: { id, queued: 0 } }, 201');
   });
 
   it('客は id と queued の両方を受け取る形', () => {

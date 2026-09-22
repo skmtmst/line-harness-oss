@@ -15,7 +15,10 @@
 import type { Message } from '@line-crm/line-sdk';
 import {
   collectInputs,
+  formChoiceIsSelected,
   hasChoices,
+  isCalendarDateString,
+  isFormAnswerEmpty,
   validateAnswers,
   type FormAction,
   type FormChoice,
@@ -141,7 +144,7 @@ export function collectCapacitySlots(layout: FormLayout, answers: FormAnswers): 
 
     const selected = toLabels(answers[block.name]);
     for (const choice of limited) {
-      if (!selected.includes(choice.label)) continue;
+      if (!formChoiceIsSelected(block, choice, selected)) continue;
       slots.push({
         key: `choice:${block.name}:${choice.label}`,
         limit: choice.capacity!.limit!,
@@ -185,7 +188,7 @@ async function findFullChoice(
     if (limited.length === 0) continue;
 
     const selected = toLabels(answers[block.name]);
-    const target = limited.filter((c) => selected.includes(c.label));
+    const target = limited.filter((c) => formChoiceIsSelected(block, c, selected));
     if (target.length === 0) continue;
 
     const usage = await countChoiceUsage(db, formId, block.name);
@@ -302,8 +305,15 @@ export async function applyFormLayoutEffects(input: FormEffectInput): Promise<Fo
     }
 
     if (block.type === 'date' && block.reminder?.reminderId) {
-      await runEffectStep(input, failedEffects, destinationWrites, `reminder:${block.id}`, () =>
-        enrollFormReminderOnce(input, block.reminder!.reminderId, toText(value)));
+      await runEffectStep(input, failedEffects, destinationWrites, `reminder:${block.id}`, () => {
+        // 未回答・暦に無い日付では予定を作らない。失敗ではなく「何もしない」
+        // で工程を終える(空のまま登録予定を作っても、届くものが無いため)。
+        const dateText = toText(value);
+        if (!isCalendarDateString(dateText)) return Promise.resolve();
+        // 同じリマインダを別の日付欄にも割り当てた場合、欄ごとに別の予定と
+        // して扱う(記録キーにブロックIDを含める)。欄をまたいだ重複除去はしない。
+        return enrollFormReminderOnce(input, block.reminder!.reminderId, dateText, `reminder:${block.id}`);
+      });
     }
   }
 
@@ -432,6 +442,10 @@ async function writeDestinations(
 ): Promise<void> {
   const dest = block.destinations;
   if (!dest) return;
+  // 未回答（空文字・空白だけ・空の選択肢）は「更新しない」。
+  // 空欄を登録先へ流すと空文字での上書き＝既存の登録を消してしまうため、
+  // 書き込みを始める前にここで止める。明示的に消す操作は設けない。
+  if (isFormAnswerEmpty(value)) return;
   const text = toText(value);
 
   for (const fieldId of dest.friendFieldIds ?? []) {
@@ -508,7 +522,7 @@ async function runChoiceEffects(
   const selected = toLabels(value);
   if (selected.length === 0) return;
 
-  const chosen = (block.choices ?? []).filter((c) => selected.includes(c.label));
+  const chosen = (block.choices ?? []).filter((c) => formChoiceIsSelected(block, c, selected));
   for (const choice of chosen) {
     switch (block.choiceMode) {
       case 'tag':
