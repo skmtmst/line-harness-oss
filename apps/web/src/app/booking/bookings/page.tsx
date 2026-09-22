@@ -179,6 +179,8 @@ export default function BookingsPage() {
   const [decideTarget, setDecideTarget] = useState<{ id: string; action: 'approve' | 'reject' | 'cancel' | 'no_show' | 'complete' } | null>(null)
   const [deciding, setDeciding] = useState(false)
   const [decideError, setDecideError] = useState('')
+  /* 台帳CSVの書出し中。失敗は一覧の error 帯へ出す（TECH-03）。 */
+  const [csvBusy, setCsvBusy] = useState(false)
   /*
    * 一覧取得の応答が「どのアカウント・どの条件へ向けたものか」を照合する。
    * アカウントを切り替えたあとに遅れて届いた前のアカウントの応答で、
@@ -315,18 +317,26 @@ export default function BookingsPage() {
     })
   }, [selectedAccountId])
 
-  // N-397: 今見えている絞り込みのまま台帳CSVを出す。上限・範囲の断りは
-  // CSV先頭の注記行にサーバが書く。
-  const csvUrl = selectedAccountId
-    ? bookingApi.ledgerCsvUrl(selectedAccountId, {
-        status: tab,
-        query: query.trim() || undefined,
-        menuName: menuFilter === 'all' ? undefined : menuFilter,
-        staffId: staffFilter === 'all' ? undefined : staffFilter,
-        source: sourceFilter === 'all' ? undefined : sourceFilter,
-        ...rangeFilterParams(),
-      })
-    : null
+  /*
+   * N-397: 今見えている絞り込みのまま台帳CSVを出す。上限・範囲の断りは
+   * CSV先頭の注記行にサーバが書く。
+   * TECH-03: 直リンクは Cookie が届かない経路で取れないため、
+   * 認証付きの取得からファイル保存へ揃える。
+   */
+  const downloadLedgerCsv = () => {
+    if (!selectedAccountId || csvBusy) return
+    setCsvBusy(true)
+    void bookingApi.downloadLedgerCsv(selectedAccountId, {
+      status: tab,
+      query: query.trim() || undefined,
+      menuName: menuFilter === 'all' ? undefined : menuFilter,
+      staffId: staffFilter === 'all' ? undefined : staffFilter,
+      source: sourceFilter === 'all' ? undefined : sourceFilter,
+      ...rangeFilterParams(),
+    })
+      .catch(() => setError('CSVを書き出せませんでした。通信を確認して、もう一度お試しください。'))
+      .finally(() => setCsvBusy(false))
+  }
 
   // KPIとメニュー棚は集計口から読む。一覧全件をブラウザへ運ばない。
   useEffect(() => {
@@ -648,8 +658,10 @@ export default function BookingsPage() {
               options={SOURCE_FILTERS.map((item) => ({ value: item.key, label: item.label }))}
             />
             {/* N-397: 今の絞り込みのままCSVへ。範囲の断りはCSV先頭行に入る。 */}
-            {csvUrl ? (
-              <Button href={csvUrl} variant="secondary">CSVで書き出す</Button>
+            {selectedAccountId ? (
+              <Button variant="secondary" disabled={csvBusy} onClick={downloadLedgerCsv}>
+                {csvBusy ? '書き出しています…' : 'CSVで書き出す'}
+              </Button>
             ) : null}
             <button
               disabled
