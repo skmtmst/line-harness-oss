@@ -2210,6 +2210,40 @@ export class ApiError extends Error {
 }
 
 /**
+ * 保存・更新が失敗した理由を、運用者の言葉で返す（WRITE-01）。
+ *
+ * `ApiError.message` に入るのは 400/409/422/428 の安全と判定済みの本文だけ。
+ * 403・404・5xx は `API error: 500` のような内部文しか持たないので、
+ * status からこちらで言葉を決める。本文をそのまま出さないのは
+ * `extractApiErrorMessage` と同じ考え方。
+ */
+export function describeSaveFailure(err: unknown): string {
+  if (err instanceof ApiError) {
+    if (err.message && !/^API error: /.test(err.message)) return err.message
+    switch (err.status) {
+      case 401:
+        return 'ログインの状態が切れています。ログインし直してから、もう一度お試しください。'
+      case 403:
+        return 'このLINEアカウントや権限では保存できません。'
+          + '選んでいるアカウントと権限を確認してください。'
+      case 404:
+        return '対象が見つかりませんでした。ほかの人が削除したか、'
+          + '別のLINEアカウントのデータです。一覧から開き直してください。'
+      case 429:
+        return '短い時間に操作が集中しました。少し待ってから、もう一度お試しください。'
+      default:
+        return err.status >= 500
+          ? 'サーバー側で保存できませんでした。時間をおいて、もう一度お試しください。'
+            + '続く場合は管理者へ連絡してください。'
+          : '保存できませんでした。もう一度お試しください。'
+    }
+  }
+  if (err instanceof Error && /[ぁ-んァ-ヶ一-龠]/u.test(err.message)) return err.message
+  return '保存できませんでした。通信が切れている可能性があります。'
+    + '接続を確かめて、もう一度お試しください。'
+}
+
+/**
  * Statuses whose response body is safe to show the operator verbatim.
  *
  * These are application-level validation or conflict responses whose message

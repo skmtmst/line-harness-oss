@@ -5,7 +5,7 @@ import Button from '@/components/shared/button'
 import { useEffect, useState, useCallback, useRef, Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { api, ApiError } from '@/lib/api'
+import { api, ApiError, describeSaveFailure } from '@/lib/api'
 import { CanvasEditor, type Area } from '@/components/rich-menus/canvas-editor'
 import { AreaProperties, intentOf } from '@/components/rich-menus/area-properties'
 import type { RichMenuAreaTapCount, RichMenuTargetPreview, RichMenuScheduleInput } from '@/lib/api'
@@ -672,7 +672,9 @@ function Editor({
       await persistDraft()
       await reload()
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
+      // WRITE-01: 権限不足・所属違い・機能オフの理由が見えるようにする。
+      // 内部文（API error: 5xx 等）は画面へ出さない。
+      setError(describeSaveFailure(e))
     } finally {
       setSaving(false)
     }
