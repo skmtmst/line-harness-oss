@@ -113,4 +113,55 @@ describe('画面', () => {
     expect(document.body.textContent).toContain('木下 花')
     expect(urls.some((u) => u.endsWith('/api/ops/dashboard/line-unregistered'))).toBe(true)
   })
+
+  it('#1058: 読み込みに失敗したらエラーと再読み込みを1枚だけ出し、各セクションは読み込み中のままにしない', async () => {
+    let fail = true
+    vi.stubGlobal('fetch', vi.fn(async () => (
+      fail
+        ? new Response(JSON.stringify({ error: 'server' }), { status: 500 })
+        : new Response(JSON.stringify({ success: true, data: payload }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+    )))
+    await act(async () => { root.render(<OpsDashboardPage />) })
+    await flush()
+    // エラー表示は1枚だけ。読み込み中や空の案内は残らない。
+    expect(host.querySelectorAll('[data-list-state="error"]')).toHaveLength(1)
+    expect(host.querySelectorAll('[data-list-state="loading"]')).toHaveLength(0)
+    expect(host.querySelectorAll('[data-list-state="empty"]')).toHaveLength(0)
+    expect(host.textContent).toContain('ダッシュボードを表示できませんでした')
+    // 再読み込みで復帰する。
+    fail = false
+    const retry = Array.from(host.querySelectorAll('button')).find((b) => b.textContent?.includes('再読み込み'))
+    expect(retry).toBeTruthy()
+    await act(async () => { retry!.click() })
+    await flush()
+    expect(host.textContent).toContain('¥398,000')
+    expect(host.querySelector('[data-list-state="error"]')).toBeNull()
+  })
+
+  it('#1058: 未登録の人の一覧が読めないときは、ダイアログにエラーと再読み込みを出す', async () => {
+    let fail = true
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input)
+      if (url.includes('line-unregistered') && fail) {
+        return new Response(JSON.stringify({ error: 'server' }), { status: 500 })
+      }
+      const body = url.includes('line-unregistered')
+        ? { success: true, data: { registered: 21, total: 24, people: [{ staffId: 's1', name: '木下 花', tenantName: 'カフェ ムスビ', hasEmail: true }] } }
+        : { success: true, data: payload }
+      return new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json' } })
+    }))
+    await act(async () => { root.render(<OpsDashboardPage />) })
+    await flush()
+    const guide = Array.from(host.querySelectorAll('button')).find((b) => b.textContent?.includes('人へ案内'))
+    await act(async () => { guide!.click() })
+    await flush()
+    // ダイアログは「読み込んでいます」のままにせず、エラーと再読み込みを出す。
+    expect(document.body.textContent).toContain('未登録の人を表示できませんでした')
+    const retry = Array.from(document.body.querySelectorAll('button')).find((b) => b.textContent?.includes('再読み込み'))
+    expect(retry).toBeTruthy()
+    fail = false
+    await act(async () => { retry!.click() })
+    await flush()
+    expect(document.body.textContent).toContain('木下 花')
+  })
 })

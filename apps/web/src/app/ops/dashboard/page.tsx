@@ -33,9 +33,11 @@ export default function OpsDashboardPage() {
   const [data, setData] = useState<OpsDashboard | null>(null)
   const [error, setError] = useState('')
   const [unregistered, setUnregistered] = useState<OpsLineUnregistered | null>(null)
+  const [unregisteredError, setUnregisteredError] = useState('')
   const [showUnregistered, setShowUnregistered] = useState(false)
 
   const load = useCallback(async () => {
+    setError('')
     const res = await opsCall(api.ops.dashboard(period))
     if (!res.success) { setError(res.error || '読み込めませんでした'); return }
     setData(res.data)
@@ -46,8 +48,10 @@ export default function OpsDashboardPage() {
   const openUnregistered = async () => {
     setShowUnregistered(true)
     if (unregistered) return
+    setUnregisteredError('')
     const res = await opsCall(api.ops.lineUnregistered())
-    if (res.success) setUnregistered(res.data)
+    if (!res.success) { setUnregisteredError(res.error || '読み込めませんでした'); return }
+    setUnregistered(res.data)
   }
 
   const k = data?.kpis ?? null
@@ -72,6 +76,13 @@ export default function OpsDashboardPage() {
 
       {error ? <p role="alert" className="mb-3 text-caption text-status-danger">{error}</p> : null}
 
+      {/* 初回の読み込みに失敗したときは、各セクションが「読み込んでいます」のまま残らないよう1枚のエラー表示にまとめる。 */}
+      {!data && error ? (
+        <div className="mb-4 rounded-card border border-hairline bg-canvas">
+          <ListState kind="error" title="ダッシュボードを表示できませんでした" onRetry={() => void load()} />
+        </div>
+      ) : (
+      <>
       <div className="mb-4 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
         <SummaryCard variant="v6" title="今月のMRR" value={null} unit="" valueText={k ? formatYen(k.mrr) : undefined} detail={k ? deltaLabel(k.mrrDelta) : '—'} loading={loading} />
         <SummaryCard variant="v6" title="契約中" value={k ? k.active : null} unit="" detail={k ? `ライト${k.byPlan.light}・スタンダード${k.byPlan.standard}・プロ${k.byPlan.pro}` : '—'} loading={loading} />
@@ -178,6 +189,8 @@ export default function OpsDashboardPage() {
           </DataTable>
         )}
       </section>
+      </>
+      )}
 
       <Dialog
         open={showUnregistered}
@@ -200,6 +213,8 @@ export default function OpsDashboardPage() {
               ))}
             </ul>
           )
+        ) : unregisteredError ? (
+          <ListState kind="error" title="未登録の人を表示できませんでした" description={unregisteredError} onRetry={() => void openUnregistered()} />
         ) : <ListState kind="loading" title="読み込んでいます" />}
       </Dialog>
     </div>
