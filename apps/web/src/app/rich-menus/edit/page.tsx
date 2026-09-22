@@ -101,6 +101,28 @@ type Page = {
   areas: Area[]
 }
 
+/**
+ * STEP3「公開のしかた」の入力値。
+ *
+ * datetime-local の生の文字列のまま持つ（送信時に JST→UTC へ直す）。
+ * 下書き本体ではなく「予約・公開に使う入力」なので、下書き署名とは別の
+ * 基準（publishBaseline）と比べて未保存かを決める。
+ */
+type PublishPlanInput = {
+  mode: 'now' | 'scheduled' | 'period'
+  startsAt: string
+  endsAt: string
+  restoreGroupId: string
+}
+
+/** 公開入力の初期値。「いますぐ出す」・日時なし・戻し先なし。 */
+const DEFAULT_PUBLISH_PLAN: PublishPlanInput = {
+  mode: 'now',
+  startsAt: '',
+  endsAt: '',
+  restoreGroupId: '',
+}
+
 type Group = {
   id: string
   accountId: string
@@ -279,6 +301,15 @@ function Editor({
   const [folderId, setFolderId] = useState('')
   const [folders, setFolders] = useState<PickerOption[]>([])
 
+  /*
+   * 公開のしかた（STEP3）の入力。工程の行き来（STEP1/2/3）で工程の部品が
+   * 付け替わっても消えないよう、工程をまたぐここで持つ。予約の保存が
+   * 成功した時点の入力を publishBaseline に写し、そこから変えた間だけ
+   * 未保存として扱う。「保存せずに移動」を選んだときだけ初期値へ戻す。
+   */
+  const [publishPlan, setPublishPlan] = useState<PublishPlanInput>(DEFAULT_PUBLISH_PLAN)
+  const [publishBaseline, setPublishBaseline] = useState<PublishPlanInput>(DEFAULT_PUBLISH_PLAN)
+
   // ボタンの設定で選ぶもの（タグ・テンプレート・回答フォーム・計測リンク）。
   // メニュー本体とは別に、開いたとき1回だけ読む。
   const [tags, setTags] = useState<PickerOption[]>([])
@@ -332,6 +363,22 @@ function Editor({
     onSaved: (message) => {
       setError(null)
       setNotice(message)
+      /*
+       * 予約の保存は下書き保存も済ませてから行う。保存できた時点の内容を
+       * 「保存済み」の基準にし、公開入力も予約した内容を基準にする。
+       * ここで基準を動かさないと、全部保存済みなのに離脱確認が出る。
+       */
+      setBaselineSignature(draftSignatureOf({
+        name,
+        chatBarText,
+        isDefaultForAll,
+        targetingEnabled,
+        targetingPriority,
+        targetingCondition,
+        folderId,
+        pages,
+      }))
+      setPublishBaseline(publishPlan)
     },
     onFailed: (message) => {
       setNotice('')
@@ -374,7 +421,12 @@ function Editor({
    * busy 中は確認窓を足さない（保存の返事を待っている最中に重ねない）。
    * 画像はアップロード時点で保存済み・プレビュー表示は dirty に含めない。
    */
-  const dirty = baselineSignature !== null && draftSignatureOf({
+  /*
+   * 下書きの署名に加えて、STEP3 の公開入力も未保存の対象にする。
+   * 公開入力は下書きとは別の基準（予約が保存できた時点の入力）と比べる。
+   */
+  const publishDirty = JSON.stringify(publishPlan) !== JSON.stringify(publishBaseline)
+  const dirty = baselineSignature !== null && (publishDirty || draftSignatureOf({
     name,
     chatBarText,
     isDefaultForAll,
@@ -383,11 +435,21 @@ function Editor({
     targetingCondition,
     folderId,
     pages,
-  }) !== baselineSignature
+  }) !== baselineSignature)
   const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({
     dirty,
     busy: saving || publishing || unpublishing || deleting || busy,
   })
+  /*
+   * 「保存せずに移動」を選んだときだけ、公開入力を初期値へ戻す。
+   * 取消・Escape（cancelLeave）では触らず、入力はそのまま残る。
+   * 実際の遷移では画面ごと外れるが、確認の選択として明示しておく。
+   */
+  const confirmLeaveAndDiscard = () => {
+    setPublishPlan(DEFAULT_PUBLISH_PLAN)
+    setPublishBaseline(DEFAULT_PUBLISH_PLAN)
+    confirmLeave()
+  }
   /*
    * N-162: 離脱確認の窓は step 1/2/3 のどこにいても出す。
    * targeting/publish は早期 return で別ツリーになるため、ここで要素化して
@@ -401,7 +463,7 @@ function Editor({
       description="このまま移動すると、メニューへの変更は失われます。保存せずに移動しますか？"
       confirmLabel="保存せずに移動"
       cancelLabel="編集を続ける"
-      onConfirm={confirmLeave}
+      onConfirm={confirmLeaveAndDiscard}
       onCancel={cancelLeave}
     ></ConfirmDialog>
   )
@@ -936,6 +998,8 @@ function Editor({
         preview={targetPreview}
         saving={saving}
         publishing={publishing}
+        publish={publishPlan}
+        onPublishChange={(patch) => setPublishPlan((prev) => ({ ...prev, ...patch }))}
         onSave={() => void handleSave()}
         onPublishNow={() => void handlePublish()}
         onSchedule={scheduleSubmit}
@@ -1732,6 +1796,8 @@ function PublishStep({
   preview,
   saving,
   publishing,
+  publish,
+  onPublishChange,
   onSave,
   onPublishNow,
   onSchedule,
@@ -1743,6 +1809,13 @@ function PublishStep({
   preview: RichMenuTargetPreview | null
   saving: boolean
   publishing: boolean
+  /*
+   * 公開方法・日時・戻し先は親（編集画面全体の状態）で持つ。
+   * ここで useState すると、工程の行き来で部品が外れるたびに入力が
+   * 消え、「いますぐ出す」へ黙って戻る（RICHMENU-06）。
+   */
+  publish: PublishPlanInput
+  onPublishChange: (patch: Partial<PublishPlanInput>) => void
   onSave: () => void
   onPublishNow: () => void
   onSchedule: (input: RichMenuScheduleInput) => Promise<void>
@@ -1753,10 +1826,7 @@ function PublishStep({
 }) {
   // N-162: ステップ移動は画面内の段階移動なので a[href] ではなく router.push で行う。
   const router = useRouter()
-  const [mode, setMode] = useState<'now' | 'scheduled' | 'period'>('now')
-  const [startsAt, setStartsAt] = useState('')
-  const [endsAt, setEndsAt] = useState('')
-  const [restoreGroupId, setRestoreGroupId] = useState('')
+  const { mode, startsAt, endsAt, restoreGroupId } = publish
   const [restoreMenus, setRestoreMenus] = useState<Array<{ id: string; name: string }>>([])
 
   useEffect(() => {
@@ -1858,16 +1928,16 @@ function PublishStep({
               ['period', '期間を決める', '終わったら自動で元に戻します。キャンペーンはこれが安全です'],
             ].map(([value, label, note]) => (
               <label key={value} className={`rounded-card flex cursor-pointer gap-3 border p-4 ${mode === value ? 'border-accent bg-accent/5' : 'border-hairline'}`}>
-                <input type="radio" name="publish-mode" checked={mode === value} onChange={() => setMode(value as typeof mode)} />
+                <input type="radio" name="publish-mode" checked={mode === value} onChange={() => onPublishChange({ mode: value as PublishPlanInput['mode'] })} />
                 <span><strong className="text-ink block text-sm">{label}</strong><span className="text-ink-faint mt-1 block text-xs">{note}</span></span>
               </label>
             ))}
           </div>
           {mode !== 'now' ? (
             <div className="border-hairline mt-5 grid gap-4 border-t pt-5 sm:grid-cols-2">
-              <label className="text-ink-secondary text-xs font-semibold">出しはじめ<input aria-label="出しはじめ" type="datetime-local" value={startsAt} onChange={(event) => setStartsAt(event.target.value)} className="border-hairline rounded-control text-ink mt-1 block w-full border px-3 py-2 text-sm" /></label>
-              {mode === 'period' ? <label className="text-ink-secondary text-xs font-semibold">出しおわり<input aria-label="出しおわり" type="datetime-local" value={endsAt} onChange={(event) => setEndsAt(event.target.value)} className="border-hairline rounded-control text-ink mt-1 block w-full border px-3 py-2 text-sm" /></label> : null}
-              {mode === 'period' ? <label className="text-ink-secondary text-xs font-semibold sm:col-span-2">終わったらどうする<SelectField aria-label="終わったらどうする" value={restoreGroupId} onChange={(event) => setRestoreGroupId(event.target.value)} options={[{ value: '', label: '前のメニューに戻す（実行開始時に確定）' }, ...restoreMenus.map((item) => ({ value: item.id, label: item.name }))]} className="mt-1" /><span className="text-ink-faint mt-1 block text-xs">{restoreGroupId ? '終了時に選んだメニューへ戻します。' : '「前のメニューに戻す」は実行開始の直前、そのときに表示中のメニューに確定します。表示中のメニューが無い場合は終了時に表示を外します。'}</span></label> : null}
+              <label className="text-ink-secondary text-xs font-semibold">出しはじめ<input aria-label="出しはじめ" type="datetime-local" value={startsAt} onChange={(event) => onPublishChange({ startsAt: event.target.value })} className="border-hairline rounded-control text-ink mt-1 block w-full border px-3 py-2 text-sm" /></label>
+              {mode === 'period' ? <label className="text-ink-secondary text-xs font-semibold">出しおわり<input aria-label="出しおわり" type="datetime-local" value={endsAt} onChange={(event) => onPublishChange({ endsAt: event.target.value })} className="border-hairline rounded-control text-ink mt-1 block w-full border px-3 py-2 text-sm" /></label> : null}
+              {mode === 'period' ? <label className="text-ink-secondary text-xs font-semibold sm:col-span-2">終わったらどうする<SelectField aria-label="終わったらどうする" value={restoreGroupId} onChange={(event) => onPublishChange({ restoreGroupId: event.target.value })} options={[{ value: '', label: '前のメニューに戻す（実行開始時に確定）' }, ...restoreMenus.map((item) => ({ value: item.id, label: item.name }))]} className="mt-1" /><span className="text-ink-faint mt-1 block text-xs">{restoreGroupId ? '終了時に選んだメニューへ戻します。' : '「前のメニューに戻す」は実行開始の直前、そのときに表示中のメニューに確定します。表示中のメニューが無い場合は終了時に表示を外します。'}</span></label> : null}
             </div>
           ) : null}
 
