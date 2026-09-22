@@ -16,13 +16,24 @@ export function jstHHMMToUtcIso(date: string, hhmm: string): string {
 
 const WEEKDAY_JP = ['日', '月', '火', '水', '木', '金', '土']
 
-/** UTC の ISO → 「9月5日(土) 14:00〜15:30」。設計の枠表とプレビューで使う。 */
+/**
+ * UTC の ISO → 「9月5日(土) 14:00〜15:30」。設計の枠表とプレビューで使う。
+ *
+ * 日をまたぐ枠は終了側の日付も出す(DETAIL-10)。以前は「9月20日(日)
+ * 23:30〜01:00」と終了日が読めず、翌日なのか当日の深夜なのか区別が
+ * 付かなかった。同じ日なら従来どおり時刻だけにする。
+ */
 export function formatSlotJp(startsAt: string, endsAt: string): string {
   const s = new Date(new Date(startsAt).getTime() + 9 * 3600_000)
   const e = new Date(new Date(endsAt).getTime() + 9 * 3600_000)
   const hhmm = (d: Date) =>
     `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`
-  return `${s.getUTCMonth() + 1}月${s.getUTCDate()}日(${WEEKDAY_JP[s.getUTCDay()]}) ${hhmm(s)}〜${hhmm(e)}`
+  const day = (d: Date) => `${d.getUTCMonth() + 1}月${d.getUTCDate()}日(${WEEKDAY_JP[d.getUTCDay()]})`
+  const sameDay =
+    s.getUTCFullYear() === e.getUTCFullYear() &&
+    s.getUTCMonth() === e.getUTCMonth() &&
+    s.getUTCDate() === e.getUTCDate()
+  return `${day(s)} ${hhmm(s)}〜${sameDay ? '' : `${day(e)} `}${hhmm(e)}`
 }
 
 /** 今日（JST）の YYYY-MM-DD。日付入力の初期値。 */

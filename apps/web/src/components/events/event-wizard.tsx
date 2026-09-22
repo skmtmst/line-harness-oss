@@ -472,7 +472,18 @@ function OverviewStep({
     const [hour, minute] = firstSlot.startTime.split(':').map(Number)
     if (!Number.isFinite(hour) || !Number.isFinite(minute)) return '終了時刻未定'
     const total = hour * 60 + minute + firstSlot.durationMinutes
-    return `${String(Math.floor(total / 60) % 24).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`
+    const hhmm = `${String(Math.floor(total / 60) % 24).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`
+    /*
+     * 日をまたぐ枠は終了側の日付も出す(DETAIL-10)。
+     * 「23:30〜01:00」だけでは翌日と読み取れない。
+     */
+    if (total < 24 * 60 || !firstSlot.date) return hhmm
+    const endDate = new Date(new Date(`${firstSlot.date}T00:00:00+09:00`).getTime() + total * 60_000)
+    if (Number.isNaN(endDate.getTime())) return hhmm
+    const endDay = new Intl.DateTimeFormat('ja-JP', {
+      month: 'long', day: 'numeric', weekday: 'short', timeZone: 'Asia/Tokyo',
+    }).format(endDate)
+    return `${endDay} ${hhmm}`
   })()
   return (
     <div data-design="Body" className="flex flex-col items-start gap-4 xl:flex-row">
