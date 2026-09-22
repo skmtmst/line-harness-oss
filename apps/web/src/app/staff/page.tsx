@@ -240,19 +240,30 @@ function SessionsCard() {
   </section>
 }
 
+/*
+ * 「項目ごとに決める」の各行（STAFF-01）。3段階は [edit, view, none] の順で、
+ * 説明文はその段階で実際にできることだけを書く。
+ *   - 変えられる(edit): 閲覧に加えて、配信・返信・変更・操作などの実行も許す
+ *   - 見えるだけ(view): 読み取り専用。配信・返信・変更はできない
+ *   - 出さない(none):   メニューにも出さない（URL直打ちも拒否）
+ * 「個人情報」だけは機能のON/OFFではなくメール等の見せ方を選ぶ行なので、
+ * 選択肢の見出しを「そのまま見せる／伏せて見せる／見せない」に変える（例外）。
+ * 並びは SCOPE_ITEMS と同じ順で、index で対応させる（N-411）。
+ */
+const SCOPE_LEVEL_LABELS = ['変えられる', '見えるだけ', '出さない'] as const
+const SCOPE_MASK_LEVEL_LABELS = ['そのまま見せる', '伏せて見せる', '見せない'] as const
 const SCOPE_ROWS = [
-  ['友だち', '名前・タグ・対応状況', 'すべて', 'すべて', '見るだけ'],
-  ['個人情報', '電話番号・住所・メール', 'すべて', '伏せて表示', '見せない'],
-  ['配信', '一斉配信・シナリオ・リマインダ', '作成・配信', '作成・配信', '見るだけ'],
-  ['受信箱', '友だちとのやりとり', '返信できる', '返信できる', '見るだけ'],
-  ['予約', '予約・イベントの受付', '変更できる', '変更できる', '見るだけ'],
-  // N-411: 予約の細かい権限。SCOPE_ITEMS と同じ順で並べる（index で対応）。
+  ['友だち', '名前・タグ・対応状況', '追加・変更できる', '見るだけ', '見せない'],
+  ['個人情報', '電話番号・住所・メール', 'すべて表示', '一部を伏せて表示', '見せない'],
+  ['配信', '一斉配信・シナリオ・リマインダ', '作成・配信できる', '見るだけ', '見せない'],
+  ['受信箱', '友だちとのやりとり', '返信できる', '見るだけ', '見せない'],
+  ['予約', '予約・イベントの受付', '受付・変更できる', '見るだけ', '見せない'],
   ['予約メニュー', 'メニューと担当の編集', '変更できる', '見るだけ', '見せない'],
   ['予約設定', '受付枠・資源・予約スタッフ', '変更できる', '見るだけ', '見せない'],
   ['本人の勤務', '自分のシフト・休憩・連携', '変更できる', '見るだけ', '見せない'],
-  ['分析', '成果・流入・レポート', 'すべて', '見られる', '見られる'],
-  ['設定', 'LINE・外部連携・ユーザー', '変更できる', '見せない', '見せない'],
-  ['運用状態', '健全性・緊急停止・更新履歴', '操作できる', '見られる', '見られる'],
+  ['分析', '成果・流入・レポート', '承認・変更できる', '見るだけ', '見せない'],
+  ['設定', 'LINE・外部連携・ユーザー', '変更できる', '見るだけ', '見せない'],
+  ['運用状態', '健全性・緊急停止・更新履歴', '操作できる', '見るだけ', '見せない'],
 ] as const
 
 function PermissionScopeView({ user, memberId, canSave, copyCandidates, roleCounts, accountNames, onClose, onSaved }: {
@@ -391,7 +402,7 @@ function PermissionScopeView({ user, memberId, canSave, copyCandidates, roleCoun
           以前の3列140px固定の表形式は狭い幅で潰れていた。
           各選択肢は触れる高さ（min-h-11）を確保する。
         */}
-        <section className="overflow-hidden rounded-card border border-hairline bg-canvas"><div className="px-4 py-4"><h2 className="text-base font-bold text-ink">項目ごとに決める</h2><p className="mt-1 text-xs text-ink-faint">「変えられる」「見えるだけ」「出さない」の3つから選びます。「変えられる」は閲覧・編集に加えて配信や返信などの実行も許します。</p></div><div className="divide-y divide-hairline border-t border-hairline">{SCOPE_ROWS.map(([label, note, full, partial, none], index) => { const item = SCOPE_ITEMS[index]; const level = levels[item.id] ?? 'none'; return <div key={label} className="px-4 py-3"><div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1"><div className="min-w-0"><p className="text-xs font-bold text-ink">{label}</p><p className="mt-0.5 text-xs text-ink-faint">{note}</p></div>{item.hint ? <p className="text-xs font-semibold text-warning">{item.hint}</p> : null}</div><div className="mt-2 grid grid-cols-3 gap-2" role="group" aria-label={`${label}の見せ方`}>{([full, partial, none] as const).map((text, option) => { const optionLevel: FeatureAccessLevel = option === 0 ? 'edit' : option === 1 ? 'view' : 'none'; const selected = level === optionLevel; const optionLabel = option === 0 ? '変えられる' : option === 1 ? '見えるだけ' : '出さない'; return <button key={`${option}:${text}`} type="button" aria-label={`${label}を${text}`} aria-pressed={selected} disabled={!writable} onClick={() => setLevel(item.id, optionLevel)} className={`min-h-11 rounded-control border px-2 py-2 text-center text-xs leading-tight ${selected ? 'border-accent bg-accent-soft font-semibold text-accent' : 'border-divider-soft bg-canvas text-ink-secondary'} ${writable ? 'cursor-pointer' : 'cursor-not-allowed opacity-60'}`}><span className="block font-bold">{optionLabel}</span><span className="mt-0.5 block">{text}</span></button> })}</div></div> })}</div></section>
+        <section className="overflow-hidden rounded-card border border-hairline bg-canvas"><div className="px-4 py-4"><h2 className="text-base font-bold text-ink">項目ごとに決める</h2><p className="mt-1 text-xs text-ink-faint">「変えられる」「見えるだけ」「出さない」の3つから選びます。「変えられる」は閲覧・編集に加えて配信や返信などの実行も許し、「見えるだけ」は読み取り専用、「出さない」はメニューにも出しません。ただし「個人情報」は機能ではなくメールなどの見せ方を選ぶので、「そのまま見せる」「伏せて見せる」「見せない」の3つになります。</p></div><div className="divide-y divide-hairline border-t border-hairline">{SCOPE_ROWS.map(([label, note, full, partial, none], index) => { const item = SCOPE_ITEMS[index]; const level = levels[item.id] ?? 'none'; const optionLabels = item.kind === 'email_mask' ? SCOPE_MASK_LEVEL_LABELS : SCOPE_LEVEL_LABELS; return <div key={label} className="px-4 py-3"><div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1"><div className="min-w-0"><p className="text-xs font-bold text-ink">{label}</p><p className="mt-0.5 text-xs text-ink-faint">{note}</p></div>{item.hint ? <p className="text-xs font-semibold text-warning">{item.hint}</p> : null}</div><div className="mt-2 grid grid-cols-3 gap-2" role="group" aria-label={`${label}の見せ方`}>{([full, partial, none] as const).map((text, option) => { const optionLevel: FeatureAccessLevel = option === 0 ? 'edit' : option === 1 ? 'view' : 'none'; const selected = level === optionLevel; const optionLabel = optionLabels[option]; return <button key={`${option}:${text}`} type="button" aria-label={`${label}：${optionLabel}（${text}）`} aria-pressed={selected} disabled={!writable} onClick={() => setLevel(item.id, optionLevel)} className={`min-h-11 rounded-control border px-2 py-2 text-center text-xs leading-tight ${selected ? 'border-accent bg-accent-soft font-semibold text-accent' : 'border-divider-soft bg-canvas text-ink-secondary'} ${writable ? 'cursor-pointer' : 'cursor-not-allowed opacity-60'}`}><span className="block font-bold">{optionLabel}</span><span className="mt-0.5 block">{text}</span></button> })}</div></div> })}</div></section>
       </main>
       <aside className="space-y-3"><section className="rounded-card border border-hairline bg-canvas p-4"><div className="flex flex-wrap items-center justify-between gap-2"><h2 className="text-sm font-bold text-ink">この決め方で、この人にはこう見えます</h2>{dirty ? <span className="rounded-full bg-accent-soft px-2 py-0.5 text-xs font-semibold text-accent">変更後の予定</span> : null}</div><div className="mt-3 space-y-3 text-xs text-ink-secondary"><p><b className="text-ink">◉　メニューに出るのは{visibleItems.length}項目</b><br />　　{visibleItems.length > 0 ? visibleItems.map((item) => item.label).join('・') : '出る項目はありません'}</p><p><b className="text-ink">◉　出さないのは{hiddenItems.length}項目</b><br />　　{hiddenItems.length > 0 ? `${hiddenItems.map((item) => item.label).join('・')}。URLを直に打っても「見る権限がありません」と出ます` : '出さない項目はありません'}</p><p><b className="text-ink">◉　{piiNote}</b></p>{changedItems === null ? <p><b className="text-ink">◉　いまの設定は個別に決められているため、ここから変わる項目の内訳は未確認です</b></p> : changedItems.length > 0 ? <p><b className="text-ink">◉　いまの設定から変わるのは{changedItems.length}項目</b><br />　　{changedItems.map((item) => item.label).join('・')}</p> : <p><b className="text-ink">◉　いまの設定と同じ内容です</b></p>}</div></section><section className="rounded-card border border-hairline bg-canvas p-4"><h2 className="text-sm font-bold text-ink">つながる先</h2>{/* LAY-10: 見た目だけの矢印をやめ、本物のリンクにする。開くと未保存の下書きは捨ててその画面へ移る（キャンセルと同じ扱い）。 */}<div className="mt-3 space-y-3 text-xs"><Link href="/settings" onClick={onClose} className="block font-bold text-action hover:underline">→ 機能設定</Link><Link href="/staff?tab=audit" onClick={onClose} className="block font-bold text-action hover:underline">→ 入った記録</Link><Link href="/emergency" onClick={onClose} className="block font-bold text-action hover:underline">→ 運用状態</Link><Link href="/booking/menus" onClick={onClose} className="block font-bold text-action hover:underline">→ 予約設定</Link></div></section><section className="rounded-card border border-warning bg-warning-bg p-4"><h2 className="text-sm font-bold text-warning">気をつけること</h2><p className="mt-2 text-xs font-bold text-warning">配信を出さないと、受信箱からの返信もできません</p><p className="mt-2 text-xs text-warning">保存すると、対象者はもう一度ログインする必要があります。</p></section></aside>
     </div>
