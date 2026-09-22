@@ -200,7 +200,7 @@ describe('AUTOMATION-02/04: 条件は保存する形のまま要約へ出る', (
   it('正本の形で保存された下書きを再開すると、要約へ条件が戻る', async () => {
     mockGet.mockResolvedValue(ok({
       id: 'previous-draft', draftVersionId: 'v7', name: '途中のルール', description: null,
-      eventType: 'message_received', triggerConfig: {}, 
+      eventType: 'message_received', triggerConfig: {},
       conditions: {
         operator: 'AND',
         rules: [{ type: 'name', value: { text: '田中', targets: ['display'] } }],
