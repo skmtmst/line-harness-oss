@@ -42,6 +42,7 @@ import type { SegmentCondition } from '@/lib/segment-condition'
 import { newBroadcastDraftSession, persistBroadcastDraft } from '@/lib/broadcast-draft'
 import ConditionBuilder from '@/components/shared/condition-builder'
 import SegmentPresetControls from '@/components/broadcasts/segment-preset-controls'
+import { audienceSummary } from '@/lib/broadcast-summary'
 import InsertToolbar from '@/components/scenarios/insert-toolbar'
 import MessageKindFields, {
   emptyMessageKindState,
@@ -66,6 +67,12 @@ interface BroadcastFormProps {
   tags: Tag[]
   /** 作成された実物。予約だけを完了画面へ送り、下書きと取り違えない。 */
   onSuccess: (broadcast: ApiBroadcast) => void
+  /**
+   * BROADCAST-16: 「下書き保存」でフォームが閉じない保存にも呼ぶ。
+   * 呼び側は一覧・フォルダ件数を読み直す（保存した下書きが未分類へ
+   * 増えるのに、再訪しないと件数が古いままだった）。
+   */
+  onDraftSaved?: (broadcast: ApiBroadcast) => void
   onCancel: () => void
   openTemplatePickerInitially?: boolean
   initialTemplateId?: string | null
@@ -498,6 +505,7 @@ function bubblesError(bubbles: BroadcastBubble[]): string {
 export default function BroadcastForm({
   tags,
   onSuccess,
+  onDraftSaved,
   onCancel,
   openTemplatePickerInitially = false,
   initialTemplateId = null,
@@ -1112,7 +1120,13 @@ export default function BroadcastForm({
     setDraftSaved(false)
     try {
       // #772: 409時は persistDraft が案内ずみで null を返すため、保存ずみにはしない。
-      if (await persistDraft(scheduledAtIso(), true)) setDraftSaved(true)
+      const saved = await persistDraft(scheduledAtIso(), true)
+      if (saved) {
+        setDraftSaved(true)
+        // BROADCAST-16: フォームは閉じない保存なので、背後の一覧と
+        // フォルダ件数の読み直しは呼び側に任せる。失敗時は呼ばない。
+        onDraftSaved?.(saved)
+      }
     } catch {
       setError('下書きを保存できませんでした')
     } finally {
@@ -1139,6 +1153,9 @@ export default function BroadcastForm({
     try {
       const draft = await persistDraft(null, true)
       if (!draft) return
+      // BROADCAST-16: テスト送信でも下書きが増えるので、一覧と
+      // フォルダ件数を読み直してもらう。
+      onDraftSaved?.(draft)
       const res = await api.broadcasts.testSend(draft.id)
       /*
        * **HTTPの成功と配信の成功は分ける。** 全員に失敗しても
@@ -1200,6 +1217,28 @@ export default function BroadcastForm({
   /** 対象画面の人数も、事前確認が返した同じ確定値だけを使う。 */
   const audienceDisplayCount = audienceCount
   const targetModeLabel = TARGET_MODES.find((mode) => mode.value === targetMode)?.label ?? '未設定'
+  /*
+   * BROADCAST-15: 最終確認・事前確認の「対象」は一覧・詳細と同じ
+   * audienceSummary の文面にする。「全有効友だち」とだけ出すと、
+   * シナリオで絞った配信も全員向けに見える。
+   * シナリオ名は候補を読み終えたときだけ名前で出す。未読込のまま
+   * resolver を渡すと「シナリオ（削除済み）」と誤表示する。
+   */
+  const confirmAudienceLabel = (() => {
+    const getTagName = (id: string) => tags.find((tag) => tag.id === id)?.name ?? null
+    const getScenarioName = (id: string) => scenarios.find((item) => item.id === id)?.name ?? null
+    if (targetMode === 'all') return '友だち全員'
+    if (targetMode === 'tag') {
+      if (!tagId) return targetModeLabel
+      const name = getTagName(tagId)
+      return name ? `タグ：${name}` : 'タグ（削除済み）'
+    }
+    return audienceSummary(
+      { targetType: 'segment', segmentConditions: audience },
+      getTagName,
+      scenariosStatus === 'ready' ? getScenarioName : undefined,
+    )
+  })()
   /*
     除外の人数と理由。**数としての口がまだ無い応答もある。**
     `preflight.warnings` に「ブロック中の友だち 42人を除いています」のような
@@ -1338,7 +1377,7 @@ export default function BroadcastForm({
               <h3 className="text-lg font-bold text-ink">配信内容</h3>
               <p className="mt-1 text-xs text-ink-faint">対象・日時・メッセージの最終確認です。</p>
               <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
-                <div><dt className="text-xs text-ink-faint">対象</dt><dd className="mt-1 font-bold text-ink">全有効友だち {audienceCount?.toLocaleString('ja-JP') ?? '—'}人</dd></div>
+                <div><dt className="text-xs text-ink-faint">対象</dt><dd className="mt-1 font-bold text-ink">{confirmAudienceLabel} {audienceCount?.toLocaleString('ja-JP') ?? '—'}人</dd></div>
                 <div><dt className="text-xs text-ink-faint">配信日時</dt><dd className="mt-1 font-bold text-ink">8/24 10:00</dd></div>
               </dl>
             </section>
@@ -1974,7 +2013,7 @@ export default function BroadcastForm({
         <dl className="mt-5 divide-y divide-hairline text-sm">
           {[
             ['管理名', title.trim() || '（未入力）'],
-            ['対象', visualQaAugustCampaign ? '条件指定 1,213人' : `${targetModeLabel} ${audienceCount === null ? '—' : `${audienceCount.toLocaleString('ja-JP')}人`}`],
+            ['対象', visualQaAugustCampaign ? '条件指定 1,213人' : `${confirmAudienceLabel} ${audienceCount === null ? '—' : `${audienceCount.toLocaleString('ja-JP')}人`}`],
             ['除外', visualQaAugustCampaign ? 'ブロック 12人を除外' : exclusionNote ?? '—'],
             ['配信日時', visualQaAugustCampaign ? '2026/08/24 10:00' : sendWhenLabel ?? '未設定'],
             ['送信枠', visualQaAugustCampaign ? '残り 8,700 / 10,000通' : quotaNote ?? '—'],
@@ -2085,7 +2124,7 @@ export default function BroadcastForm({
             <section className="rounded-card border border-hairline bg-canvas p-5">
               <h3 className="text-sm font-bold text-ink">設定内容</h3>
               <dl className="mt-3 space-y-3 text-sm">
-                <div><dt className="text-xs text-ink-faint">配信対象</dt><dd className="font-bold text-ink">{targetModeLabel} {audienceDisplayCount === null ? '—' : `${audienceDisplayCount.toLocaleString('ja-JP')}人`}</dd></div>
+                <div><dt className="text-xs text-ink-faint">配信対象</dt><dd className="font-bold text-ink">{confirmAudienceLabel} {audienceDisplayCount === null ? '—' : `${audienceDisplayCount.toLocaleString('ja-JP')}人`}</dd></div>
                 <div><dt className="text-xs text-ink-faint">配信日時</dt><dd className="font-bold text-ink">未設定</dd></div>
                 <div><dt className="text-xs text-ink-faint">送信数</dt><dd className="font-bold text-ink">{bubbles.length}通</dd></div>
               </dl>
@@ -2104,7 +2143,7 @@ export default function BroadcastForm({
               <h3 className="text-sm font-bold text-ink">設定内容</h3>
               <dl className="mt-3 divide-y divide-hairline text-xs">
                 {[
-                  ['配信対象', `${targetModeLabel} ${audienceCount === null ? '—' : `${audienceCount.toLocaleString('ja-JP')}人`}`],
+                  ['配信対象', `${confirmAudienceLabel} ${audienceCount === null ? '—' : `${audienceCount.toLocaleString('ja-JP')}人`}`],
                   ['配信日時', scheduledLabel ?? '未設定'],
                   ['送信数', `${bubbles.length}通`],
                   ['配信後', publishedActions.find((action) => action.versionId === afterActionVersionId)?.name ?? '未設定'],
@@ -2305,7 +2344,7 @@ export default function BroadcastForm({
           <div className="flex justify-between gap-4 px-4 py-3">
             <dt className="text-ink-faint">配信対象</dt>
             <dd className="text-ink text-right font-medium">
-              {targetModeLabel}
+              {confirmAudienceLabel}
               <span className="ml-2 tabular-nums">
                 {audienceCount === null ? '—' : `${audienceCount.toLocaleString('ja-JP')}人`}
               </span>

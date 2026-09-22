@@ -9026,6 +9026,11 @@ export const api = {
       responseContent?: string;
       templateId?: string | null;
       lineAccountId?: string | null;
+      /**
+       * AUTOREPLY-08: 省略・false は止まった状態で作る。有効化は
+       * true の明示指定か、保存後の再開・公開操作だけ。
+       */
+      isActive?: boolean;
       /** JST の "HH:MM"。null で時間帯を問わない */
       activeFrom?: string | null;
       activeUntil?: string | null;

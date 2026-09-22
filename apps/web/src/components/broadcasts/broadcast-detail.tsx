@@ -2,7 +2,9 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
+import type { Tag } from '@line-crm/shared'
 import { ApiError, api, type ApiBroadcast, type BroadcastInsight, type BroadcastLedger } from '@/lib/api'
+import { audienceSummary } from '@/lib/broadcast-summary'
 import { useAccount } from '@/contexts/account-context'
 import Header from '@/components/layout/header'
 import FlexPreviewComponent from '@/components/flex-preview'
@@ -59,6 +61,13 @@ export default function BroadcastDetail({ broadcastId }: BroadcastDetailProps) {
    * 相手へもう一度送ると、相手のトークに2通残って取り消せないため。
    */
   const [ledger, setLedger] = useState<BroadcastLedger | null>(null)
+  // BROADCAST-15: 宛先の条件に出すタグ名・シナリオ名。一覧と同じ
+  // audienceSummary を使うので、シナリオ指定を「タグ: -」とは出さない。
+  const [audienceNames, setAudienceNames] = useState<{
+    tags: Tag[]
+    scenarios: Array<{ id: string; name: string }>
+  } | null>(null)
+  const [audienceNamesFailed, setAudienceNamesFailed] = useState(false)
 
   const load = useCallback(async () => {
     // 別 broadcast へ移動後の遅い応答は捨てる(順序逆転防止、#630)。
@@ -72,6 +81,8 @@ export default function BroadcastDetail({ broadcastId }: BroadcastDetailProps) {
     setInsight(null)
     setTargetCount(null)
     setLedger(null)
+    setAudienceNames(null)
+    setAudienceNamesFailed(false)
     try {
       const res = await api.broadcasts.get(id)
       if (requestId !== latestIdRef.current) return
@@ -86,6 +97,23 @@ export default function BroadcastDetail({ broadcastId }: BroadcastDetailProps) {
             ? prev
             : fresh,
         )
+        /*
+         * 宛先の条件の名前解決（BROADCAST-15）。タグ・シナリオの名前だけ
+         * 使う。絞り込みが無い配信では取らない。読めなくても詳細は出す。
+         */
+        if (fresh.targetType !== 'all' && fresh.targetType !== 'multi-account-dedup') {
+          void Promise.allSettled([api.tags.list(), api.scenarios.list()])
+            .then(([tagsRes, scenariosRes]) => {
+              if (requestId !== latestIdRef.current) return
+              const tags = tagsRes.status === 'fulfilled' && tagsRes.value.success ? tagsRes.value.data : null
+              const scenarios = scenariosRes.status === 'fulfilled' && scenariosRes.value.success ? scenariosRes.value.data : null
+              if (!tags && !scenarios) {
+                setAudienceNamesFailed(true)
+                return
+              }
+              setAudienceNames({ tags: tags ?? [], scenarios: scenarios ?? [] })
+            })
+        }
         /*
          * 送達台帳を読む（#662）。送信中でも送信完了でも要る。
          * 送信完了の画面には進捗の巡回が回らないので、ここで1回だけ引かないと
@@ -250,6 +278,23 @@ export default function BroadcastDetail({ broadcastId }: BroadcastDetailProps) {
   /* 配信元のアカウント。型が持っているので逃げ道は要らない（#490 軽3）。 */
   const accountId = broadcast.lineAccountId
 
+  /*
+   * BROADCAST-15: 宛先の条件は一覧と同じ audienceSummary を使う。
+   * シナリオ指定を「タグ: -」（タグ未指定）と出さない。名前がまだ
+   * 無いときは「確認中」、読めなかったときは失敗と分かる言い方にする。
+   */
+  const tagNameById = (tagId: string) => audienceNames?.tags.find((t) => t.id === tagId)?.name ?? null
+  const scenarioNameById = (scenarioId: string) =>
+    audienceNames?.scenarios.find((s) => s.id === scenarioId)?.name ?? null
+  const audienceLabel =
+    broadcast.targetType === 'all' || broadcast.targetType === 'multi-account-dedup'
+      ? audienceSummary(broadcast, () => null)
+      : audienceNamesFailed
+        ? '宛先の条件を確認できませんでした'
+        : audienceNames
+          ? audienceSummary(broadcast, tagNameById, scenarioNameById)
+          : '宛先を確認しています…'
+
   if (broadcast.status === 'sent') {
     const delivered = insight?.delivered ?? broadcast.successCount
     const opened = insight?.opens?.count ?? insight?.uniqueImpression ?? null
@@ -351,6 +396,8 @@ export default function BroadcastDetail({ broadcastId }: BroadcastDetailProps) {
               <h2 className="text-ink text-base font-bold">配信した設定</h2>
               <p className="text-ink-secondary mt-1 text-sm">この配信で使った対象と送信方法です。</p>
               <dl className="mt-3 grid gap-3 sm:grid-cols-3">
+                {/* BROADCAST-15: 一覧・下書き詳細と同じ audienceSummary の文面。 */}
+                <div className="sm:col-span-3"><dt className="text-ink-faint text-xs">対象</dt><dd className="text-ink mt-1 font-bold">{audienceLabel}</dd></div>
                 <div><dt className="text-ink-faint text-xs">配信済み</dt><dd className="text-ink mt-1 font-bold">{delivered?.toLocaleString('ja-JP') ?? '—'}人</dd></div>
                 <div><dt className="text-ink-faint text-xs">開封率</dt><dd className="text-ink mt-1 font-bold">{percentText(openRate)}</dd></div>
                 <div><dt className="text-ink-faint text-xs">クリック率</dt><dd className="text-ink mt-1 font-bold">{percentText(insight?.clickRate)}</dd></div>
@@ -422,7 +469,7 @@ export default function BroadcastDetail({ broadcastId }: BroadcastDetailProps) {
             <div className="flex justify-between">
               <dt className="text-ink-faint">対象</dt>
               <dd className="text-ink">
-                {broadcast.targetType === 'all' ? '全員' : `タグ: ${broadcast.targetTagId ?? '-'}`}
+                {audienceLabel}
                 {targetCount != null && <span className="ml-1 text-ink-faint">({targetCount.toLocaleString('ja-JP')}人)</span>}
               </dd>
             </div>
