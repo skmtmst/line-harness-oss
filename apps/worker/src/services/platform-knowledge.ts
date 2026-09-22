@@ -133,10 +133,10 @@ export async function runKnowledgeAi(env: Env['Bindings'], messages: { role: str
 }
 
 /** A leased, bounded job; failures never roll back ticket resolution. No live call in local tests. */
-export async function processKnowledgeJob(env: Env['Bindings']): Promise<void> {
+export async function processKnowledgeJob(env: Env['Bindings'], requestId?: string): Promise<void> {
   if (!env.AI) return;
   const db = dbFor(env);
-  const job = await claimKnowledgeJob(db);
+  const job = await claimKnowledgeJob(db, undefined, requestId);
   if (!job) return;
   const started = Date.now();
   const callId = job.lease_token!;

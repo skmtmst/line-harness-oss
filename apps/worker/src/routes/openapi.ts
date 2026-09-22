@@ -837,6 +837,10 @@ const spec = {
       parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
       post: { tags: ['Ops Console'], summary: '参照した記事の評価', parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }], responses: { '200': { description: 'Feedback recorded' }, '409': { description: 'Usage not found or changed' } } },
     },
+    '/api/ops/knowledge/tickets/{id}/process': {
+      parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+      post: { tags: ['Ops Console'], summary: '対象の解決済み問い合わせのナレッジ生成予約を実行（運営書込権限必須・二重実行防止）', parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }], responses: { '200': { description: 'Current knowledge and job state' }, '403': { description: 'Forbidden' }, '404': { description: 'Ticket not found' }, '503': { description: 'AI unavailable' } } },
+    },
     '/api/ops/knowledge/tickets/{id}/retry': {
       parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
       post: { tags: ['Ops Console'], summary: '失敗した記事生成の再試行を予約', parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }], responses: { '202': { description: 'Queued' }, '409': { description: 'Not retryable' } } },

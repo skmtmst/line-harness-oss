@@ -5384,7 +5384,7 @@ export type HqLineRegistration =
   | { available: false }
   | { available: true; accountName: string; basicId: string | null; addFriendUrl: string | null; linked: boolean; code: string | null; codeExpiresAt: string | null }
 export type OpsSupportDetail = {
-  knowledge?: { article: OpsKnowledgeArticle | null; job: { status: 'queued' | 'running' | 'done' | 'failed' | 'stale'; source_current: number } | null }
+  knowledge?: { canProcess?: boolean; article: OpsKnowledgeArticle | null; job: { id?: string; status: 'queued' | 'running' | 'done' | 'failed' | 'stale'; source_current: number } | null }
   ticket: OpsSupportTicket
   tenant: { accountCount: number; staffCount: number; staffWithLine: number; pastTickets: number; pastOpen: number }
   messages: OpsSupportMessage[]
@@ -7688,6 +7688,8 @@ export const api = {
         fetchApi<ApiResponse<null>>(`/api/ops/knowledge/${encodeURIComponent(id)}/feedback`, { method: 'POST', body: JSON.stringify({ requestId, feedback }) }),
       retry: (requestId: string) =>
         fetchApi<ApiResponse<null>>(`/api/ops/knowledge/tickets/${encodeURIComponent(requestId)}/retry`, { method: 'POST' }),
+      process: (requestId: string) =>
+        fetchApi<ApiResponse<NonNullable<OpsSupportDetail['knowledge']>>>(`/api/ops/knowledge/tickets/${encodeURIComponent(requestId)}/process`, { method: 'POST' }),
     },
     /** お知らせ配信 ★V6 37-7。 */
     announcements: {
