@@ -161,6 +161,40 @@ describe('migration 319 conversion definition read contract', () => {
     })).rejects.toMatchObject({ code: 'not_found', status: 404 });
   });
 
+  it('allowInactive の呼び出しだけが停止中の地点へ利用関係を記す（CONVERSION-05）', async () => {
+    /*
+     * 手追加の口は停止中を弾いたまま。ファネルの段に置かれた参照は
+     * 「実際に使っている」事実なので記す。中断後の再送も重複せず
+     * 同じ行を返す（孤児・重複を作らない）。
+     */
+    const created = await addConversionDefinitionUsage(db, {
+      conversionPointId: 'point-stop', lineAccountId: 'account-a', expectedVersion: 1,
+      refKind: 'analytics', refId: 'analysis-1', staffId: 'staff-1',
+      allowInactive: true,
+    });
+    expect(created.created).toBe(true);
+    expect(created.usage).toMatchObject({ refKind: 'analytics', refId: 'analysis-1' });
+
+    const repeated = await addConversionDefinitionUsage(db, {
+      conversionPointId: 'point-stop', lineAccountId: 'account-a', expectedVersion: 1,
+      refKind: 'analytics', refId: 'analysis-1', staffId: 'staff-1',
+      allowInactive: true,
+    });
+    expect(repeated.created).toBe(false);
+    expect(repeated.usage.id).toBe(created.usage.id);
+
+    const count = sqlite.prepare(
+      'SELECT COUNT(*) AS total FROM conversion_definition_usages WHERE conversion_point_id = ?',
+    ).get('point-stop') as { total: number };
+    expect(count.total).toBe(1);
+
+    // 手追加の口（allowInactive なし）は変わらず弾く
+    await expect(addConversionDefinitionUsage(db, {
+      conversionPointId: 'point-stop', lineAccountId: 'account-a', expectedVersion: 1,
+      refKind: 'scenario', refId: 'scenario-1', staffId: 'staff-1',
+    })).rejects.toMatchObject({ code: 'definition_stopped', status: 409 });
+  });
+
   it('現期間・前期間・日別・地点別・経路別を実イベントから集計する', async () => {
     const report = await getConversionDefinitionReport(db, {
       scope, lineAccountId: 'account-a', range, previousRange,

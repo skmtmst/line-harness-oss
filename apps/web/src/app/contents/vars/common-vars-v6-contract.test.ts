@@ -61,8 +61,12 @@ describe('V6共通情報一覧', () => {
     expect(PAGE).toContain("import { TableHeadRow, Th } from '@/components/shared/table'")
     expect(PAGE).toContain('item.usageCount === 0')
     expect(PAGE).toContain('formatListDate(item.updatedAt)')
-    expect(PAGE).toContain('placeholderText(item.name)')
-    expect(PAGE).not.toContain('>{`{{var.${item.varKey}}}`}</code>')
+    // VAR-01: 差し込みキー列は実行時に効く {{var.<varKey>}} を出す。
+    // {表示名} は本文で置き換えられないので案内しない。
+    expect(PAGE).toContain('placeholderText(item.varKey)')
+    expect(PAGE).not.toContain('placeholderText(item.name)')
+    expect(EDIT_PAGE).toContain('placeholderText(item.varKey)')
+    expect(EDIT_PAGE).not.toContain('placeholderText(item.name)')
   })
 
   it('一覧は空・期限つき・未使用の絞り込みとCSVを実際に操作できる', () => {
