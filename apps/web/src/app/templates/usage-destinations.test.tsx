@@ -64,7 +64,7 @@ vi.mock('@/lib/api', () => ({
       delete: vi.fn(),
       publish: vi.fn(),
     },
-    broadcastMessageAssets: { list: () => Promise.resolve({ success: true, data: [] }) },
+    broadcastMessageAssets: { list: () => Promise.resolve({ success: true, data: [] }), counts: () => Promise.resolve({ success: true, data: { card_message: 0, rich_message: 0, coupon: 0, research: 0 } }) },
     folders: {
       list: () => Promise.resolve({ success: true, data: [] }),
       update: vi.fn(),
