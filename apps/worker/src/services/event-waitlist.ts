@@ -83,6 +83,53 @@ export interface EventOccurrenceApplicants {
     bookingCount: number;
     waitingCount: number;
     activeSeats: number;
+    /*
+     * IDEA-29: 状態ごとの人数(party_size 合計)。行数だけだと複数人申込で
+     * 定員の残りと食い違うため、席を消費する単位で分けて返す。
+     * 待機中は席を消費しない。案内中・受諾済みは期限付きで席を保留する。
+     */
+    confirmedSeats: number;
+    requestedSeats: number;
+    waitingSeats: number;
+    offeredSeats: number;
+    /** 定員があれば残席。上限なし(null)や計算不能なら null。 */
+    remainingSeats: number | null;
+  };
+  /*
+   * IDEA-29: 繰上げ履歴。終了した待ち行(予約化・期限切れ・本人取消)を
+   * 新しい順に返す。申込者一覧(applicants)は稼働中の行だけなので、
+   * 結果が出た案内の追跡はこちらで見る。
+   */
+  waitlistHistory: Array<{
+    id: string;
+    friendId: string;
+    displayName: string | null;
+    status: string;
+    partySize: number;
+    createdAt: string;
+    offeredAt: string | null;
+    offerExpiresAt: string | null;
+    notifiedAt: string | null;
+    updatedAt: string;
+    /** 予約へ繰り上がった場合だけ、その予約ID。 */
+    convertedBookingId: string | null;
+  }>;
+  /*
+   * IDEA-29: 当日受付。この開催回で参加済・無断欠席に記録した人。
+   * 確定のままの人は受付前として summary.confirmedSeats で分かる。
+   */
+  attendance: {
+    attendedSeats: number;
+    noShowSeats: number;
+    entries: Array<{
+      id: string;
+      friendId: string;
+      displayName: string | null;
+      status: string;
+      partySize: number;
+      /** 状態を最後に更新した日時(内部メモの更新でも変わる)。 */
+      markedAt: string;
+    }>;
   };
   applicants: Array<{
     source: 'booking' | 'waitlist';
@@ -226,7 +273,7 @@ export async function getEventOccurrenceApplicants(
   const occurrence = await loadOccurrence(db, params.occurrenceId, params.lineAccountId);
   if (!occurrence) return null;
 
-  const [bookings, waitlist, activeSeats] = await Promise.all([
+  const [bookings, waitlist, activeSeats, attendanceRows, historyRows] = await Promise.all([
     db
       .prepare(
         `SELECT b.id, b.friend_id, b.status, b.party_size, b.answer_snapshot_json,
@@ -254,6 +301,58 @@ export async function getEventOccurrenceApplicants(
       .bind(params.lineAccountId, params.occurrenceId)
       .all<WaitlistApplicantRow>(),
     getEventOccurrenceUsedSeats(db, params.occurrenceId),
+    // IDEA-29: 当日受付。参加済・無断欠席は申込者一覧から外れるため、
+    // 受付の結果が見えなくならないよう別ブロックで返す。
+    db
+      .prepare(
+        `SELECT b.id, b.friend_id, b.status, b.party_size, b.updated_at,
+                f.display_name
+           FROM event_bookings b
+           LEFT JOIN friends f ON f.id = b.friend_id AND f.line_account_id = ?
+          WHERE b.slot_id = ? AND b.status IN ('attended', 'no_show')
+          ORDER BY b.updated_at DESC, b.id ASC`,
+      )
+      .bind(params.lineAccountId, params.occurrenceId)
+      .all<{
+        id: string;
+        friend_id: string;
+        status: string;
+        party_size: number;
+        updated_at: string;
+        display_name: string | null;
+      }>(),
+    /*
+     * IDEA-29: 繰上げ履歴。converted の予約IDは受諾時に
+     * `event-waitlist:<待ちID>` で作る決まりなので、存在確認だけして返す。
+     * 稼働中(waiting/offered/accepted)は applicants 側に出るため含めない。
+     */
+    db
+      .prepare(
+        `SELECT w.id, w.friend_id, w.status, w.party_size,
+                w.created_at, w.offered_at, w.offer_expires_at, w.notified_at,
+                w.updated_at, f.display_name,
+                CASE WHEN w.status = 'converted' THEN cb.id ELSE NULL END AS converted_booking_id
+           FROM event_waitlist w
+           LEFT JOIN friends f ON f.id = w.friend_id AND f.line_account_id = ?
+           LEFT JOIN event_bookings cb ON cb.id = 'event-waitlist:' || w.id
+          WHERE w.slot_id = ? AND w.status IN ('converted', 'expired', 'cancelled')
+          ORDER BY w.updated_at DESC, w.id ASC
+          LIMIT 50`,
+      )
+      .bind(params.lineAccountId, params.occurrenceId)
+      .all<{
+        id: string;
+        friend_id: string;
+        status: string;
+        party_size: number;
+        created_at: string;
+        offered_at: string | null;
+        offer_expires_at: string | null;
+        notified_at: string | null;
+        updated_at: string;
+        display_name: string | null;
+        converted_booking_id: string | null;
+      }>(),
   ]);
 
   const bookingApplicants = (bookings.results ?? []).map((row) => ({
@@ -295,6 +394,24 @@ export async function getEventOccurrenceApplicants(
   const applicants = [...bookingApplicants, ...waitlistApplicants]
     .sort((a, b) => a.appliedAt.localeCompare(b.appliedAt) || a.id.localeCompare(b.id));
 
+  const seatsOf = (rows: Array<{ partySize: number }>): number =>
+    rows.reduce((total, row) => total + row.partySize, 0);
+  const confirmedSeats = seatsOf(bookingApplicants.filter((row) => row.status === 'confirmed'));
+  const requestedSeats = seatsOf(bookingApplicants.filter((row) => row.status === 'requested'));
+  const waitingSeats = seatsOf(waitlistApplicants.filter((row) => row.status === 'waiting'));
+  const offeredSeats = seatsOf(
+    waitlistApplicants.filter((row) => row.status === 'offered' || row.status === 'accepted'),
+  );
+
+  const attendanceEntries = (attendanceRows.results ?? []).map((row) => ({
+    id: row.id,
+    friendId: row.friend_id,
+    displayName: row.display_name ?? null,
+    status: row.status,
+    partySize: row.party_size,
+    markedAt: row.updated_at,
+  }));
+
   return {
     occurrence: {
       id: occurrence.id,
@@ -309,6 +426,31 @@ export async function getEventOccurrenceApplicants(
       bookingCount: bookingApplicants.length,
       waitingCount: waitlistApplicants.filter((row) => row.status === 'waiting').length,
       activeSeats,
+      confirmedSeats,
+      requestedSeats,
+      waitingSeats,
+      offeredSeats,
+      remainingSeats: occurrence.capacity == null
+        ? null
+        : Math.max(0, occurrence.capacity - activeSeats),
+    },
+    waitlistHistory: (historyRows.results ?? []).map((row) => ({
+      id: row.id,
+      friendId: row.friend_id,
+      displayName: row.display_name ?? null,
+      status: row.status,
+      partySize: row.party_size,
+      createdAt: row.created_at,
+      offeredAt: row.offered_at,
+      offerExpiresAt: row.offer_expires_at,
+      notifiedAt: row.notified_at,
+      updatedAt: row.updated_at,
+      convertedBookingId: row.converted_booking_id,
+    })),
+    attendance: {
+      attendedSeats: seatsOf(attendanceEntries.filter((row) => row.status === 'attended')),
+      noShowSeats: seatsOf(attendanceEntries.filter((row) => row.status === 'no_show')),
+      entries: attendanceEntries,
     },
     applicants,
   };

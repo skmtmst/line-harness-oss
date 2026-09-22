@@ -31,7 +31,7 @@ describe('event applicant snapshot', () => {
   const now = new Date('2026-09-16T00:00:00.000Z');
   const data = {
     occurrence: { id: 'slot-a', eventId: 'event-a', startsAt: '2026-10-01T00:00:00.000Z', endsAt: '2026-10-01T01:00:00.000Z', capacity: 3, activeSeats: 1, version: 2 },
-    summary: { bookingCount: 1, waitingCount: 1, activeSeats: 1 },
+    summary: { bookingCount: 1, waitingCount: 1, activeSeats: 1, confirmedSeats: 1, requestedSeats: 0, waitingSeats: 1, offeredSeats: 0, remainingSeats: 2 },
     applicants: [{ source: 'booking' as const, id: 'booking-a', friendId: 'friend-a', displayName: '田中', pictureUrl: null, status: 'confirmed', partySize: 1, appliedAt: '2026-09-15T00:00:00.000Z', answers: null, firstParticipation: { isFirst: null, attendedCount: null, checkedAt: null }, offeredAt: null, offerExpiresAt: null }],
   };
 

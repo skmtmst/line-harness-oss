@@ -494,6 +494,9 @@ function makeEventDb(state: {
             const [event_id] = bound as [string];
             const rows = (state.bookings ?? []).filter((booking) => booking.event_id === event_id);
             const count = (status: string) => rows.filter((booking) => booking.status === status).length;
+            const seats = (status: string) => rows
+              .filter((booking) => booking.status === status)
+              .reduce((sum, booking) => sum + Number((booking as Record<string, unknown>).party_size ?? 1), 0);
             return {
               total: rows.length,
               requested_count: count('requested'),
@@ -503,13 +506,25 @@ function makeEventDb(state: {
               expired_count: count('expired'),
               attended_count: count('attended'),
               no_show_count: count('no_show'),
+              requested_seats: seats('requested'),
+              confirmed_seats: seats('confirmed'),
             } as T;
           }
-          if (sql.startsWith('SELECT COUNT(*) AS c FROM event_waitlist WHERE event_id = ?')) {
+          // bookings/summary の待ち列集計。同じテーブルへの別SELECT
+          // (SELECT id FROM event_waitlist ...) と混ざらないよう waiting_seats で絞る。
+          if (sql.includes('waiting_seats') && sql.includes('FROM event_waitlist WHERE event_id = ?')) {
             const [event_id] = bound as [string];
             const active = new Set(['waiting', 'offered', 'accepted']);
+            const rows = (state.waitlist ?? []).filter(
+              (row) => row.event_id === event_id && active.has(String(row.status)),
+            );
+            const seats = (statuses: string[]) => rows
+              .filter((row) => statuses.includes(String(row.status)))
+              .reduce((sum, row) => sum + Number((row as Record<string, unknown>).party_size ?? 1), 0);
             return {
-              c: (state.waitlist ?? []).filter((row) => row.event_id === event_id && active.has(String(row.status))).length,
+              c: rows.length,
+              waiting_seats: seats(['waiting']),
+              offered_seats: seats(['offered', 'accepted']),
             } as T;
           }
           if (sql.includes('AS slot_count') && sql.includes('FROM event_slots WHERE event_id = ?')) {
@@ -2767,13 +2782,14 @@ describe('admin bookings management', () => {
         { id: 's2', event_id: 'e1', starts_at: '2099-06-02T10:00:00Z', ends_at: '2099-06-02T12:00:00Z', capacity: 2, is_active: 1, sort_order: 1, deleted_at: null },
       ],
       bookings: [
-        { id: 'b1', event_id: 'e1', status: 'requested' },
-        { id: 'b2', event_id: 'e1', status: 'confirmed' },
-        { id: 'b3', event_id: 'e1', status: 'cancelled' },
+        { id: 'b1', event_id: 'e1', status: 'requested', party_size: 2 },
+        { id: 'b2', event_id: 'e1', status: 'confirmed', party_size: 1 },
+        { id: 'b3', event_id: 'e1', status: 'cancelled', party_size: 4 },
       ],
       waitlist: [
-        { id: 'w1', event_id: 'e1', status: 'waiting' },
-        { id: 'w2', event_id: 'e1', status: 'cancelled' },
+        { id: 'w1', event_id: 'e1', status: 'waiting', party_size: 3 },
+        { id: 'w2', event_id: 'e1', status: 'cancelled', party_size: 5 },
+        { id: 'w3', event_id: 'e1', status: 'offered', party_size: 2 },
       ],
     };
     const res = await setupApp(state).request('/api/events/admin/events/e1/bookings/summary?account_id=la1');
@@ -2783,8 +2799,15 @@ describe('admin bookings management', () => {
       requested: 1,
       confirmed: 1,
       cancelled: 1,
-      waitlist: 1,
+      waitlist: 2,
       totalCapacity: 5,
+      // IDEA-29: 席(人数)の内訳。待機中は席を消費せず、
+      // 案内中・受諾済みだけを残席の計算へ入れる。
+      requestedSeats: 2,
+      confirmedSeats: 1,
+      waitingSeats: 3,
+      offeredSeats: 2,
+      activeSeats: 5,
     });
   });
 
