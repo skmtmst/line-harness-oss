@@ -8,7 +8,7 @@ const PAGE = fs.readFileSync(path.join(__dirname, 'page.tsx'), 'utf8')
 describe('ダッシュボード集計範囲と深掘り先の一致(#666)', () => {
   it('N-002:写真審査は選択中アカウントの審査待ちAPIで数え、全社概要を使わない', () => {
     expect(PAGE).toContain('api.nenMembers.photoReviewMetrics(selectedAccountId)')
-    expect(PAGE).toContain('photoResult.value.data.pendingCount')
+    expect(PAGE).toContain('result.data.pendingCount')
     expect(PAGE).not.toContain('api.nenMembers.overview()')
   })
 

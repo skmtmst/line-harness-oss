@@ -24,16 +24,17 @@ vi.mock('@/lib/api', () => ({
   api: {
     templates: {
       // 実APIの契約どおり account_id が来たらその口座だけ返す。
-      list: (...args: unknown[]) => {
-        fixture.templatesCalls.push(args)
+      // PERF-12: 選択画面は区画取得(listPage)を使う。
+      listPage: (params: { accountId?: string }) => {
+        fixture.templatesCalls.push([params])
         const all = [
           { id: 'tp-1', accountId: 'acc-1', name: '本店の挨拶', messageType: 'text', messageContent: 'こんにちは', folderId: null },
           { id: 'tp-2', accountId: 'acc-2', name: '支店の挨拶', messageType: 'text', messageContent: 'こんにちは', folderId: null },
         ]
-        const accountId = args[1] as string | undefined
+        const items = params.accountId ? all.filter((t) => t.accountId === params.accountId) : all
         return Promise.resolve({
           success: true,
-          data: accountId ? all.filter((t) => t.accountId === accountId) : all,
+          data: { items, total: items.length, limit: 100, folderCounts: { '': items.length } },
         })
       },
     },
@@ -62,8 +63,8 @@ describe('テンプレート選択の口座絞り(N-136)', () => {
     await waitFor(() => {
       expect(fixture.templatesCalls.length).toBeGreaterThan(0)
     })
-    const last = fixture.templatesCalls[fixture.templatesCalls.length - 1] as unknown[]
-    expect(last[1]).toBe('acc-1')
+    const last = fixture.templatesCalls[fixture.templatesCalls.length - 1] as [{ accountId?: string }]
+    expect(last[0].accountId).toBe('acc-1')
   })
 
   test('置き場一覧も選択中のアカウントIDを渡す（N-147）', async () => {

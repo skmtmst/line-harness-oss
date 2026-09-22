@@ -1,10 +1,10 @@
 'use client'
 
 import React, { useEffect, useState } from 'react'
-import QRCode from 'qrcode'
 import { QrCode } from 'lucide-react'
 import type { EntryRoute } from '@line-crm/shared'
 import { api } from '@/lib/api'
+import { qrToDataURL } from '@/lib/qr-image'
 import Button from '@/components/shared/button'
 import SelectField from '@/components/shared/select-field'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
@@ -146,10 +146,11 @@ export default function QrDialog({
   useEffect(() => {
     let cancelled = false
     setQrDataUrl('')
-    if (routeMissing) {
+    // PERF-09: 閉じている間は QR を作らない。開いた時点で qrcode を読む。
+    if (!open || routeMissing) {
       return () => { cancelled = true }
     }
-    void QRCode.toDataURL(link, {
+    void qrToDataURL(link, {
       width: 220,
       margin: 1,
       color: { dark: '#171717', light: '#ffffff' },
@@ -159,7 +160,7 @@ export default function QrDialog({
     return () => {
       cancelled = true
     }
-  }, [link, routeMissing])
+  }, [link, routeMissing, open])
 
   // Escape・Tabの循環・背景スクロール停止・閉じたあとのフォーカス戻しは
   // 共通のoverlay作法に揃える。保存中の処理はないためEscapeは常に閉じる。
