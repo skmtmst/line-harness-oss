@@ -87,6 +87,12 @@ type EarningRuleSummary = {
   grantedMiles: number
   grantedCount: number
   averageBalance: number | null
+  /*
+   * 平均を割った人数。説明文はここから出す——別の口で取った人数
+   * （全員の数など）を書くと、実際に割った数と説明がずれる
+   * （MILEAGE-05）。残高0の人は分母に入れない。
+   */
+  averageDenominator: number | null
 }
 
 function rankLabel(rank: string | null) {
@@ -226,6 +232,7 @@ function MileagePageInner() {
         averageBalance: friendsRes.data.summary.withBalanceCount > 0
           ? Math.round(friendsRes.data.summary.available / friendsRes.data.summary.withBalanceCount)
           : null,
+        averageDenominator: friendsRes.data.summary.withBalanceCount,
       })
       setRuleOrder(items.map((rule) => rule.id))
       setRuleOrderDirty(false)
@@ -588,7 +595,7 @@ function MileagePageInner() {
           <SummaryCard variant="v6" title="動いている決めごと" value={activeRules.length} unit="つ" detail={`止めているもの ${rules.length - activeRules.length}つ`} />
           <SummaryCard variant="v6" title="この30日で付いたマイル" value={ruleSummary?.grantedMiles ?? null} unit="マイル" detail={`のべ ${formatMileageNumber(ruleSummary?.grantedCount ?? 0)}回`} />
           <SummaryCard variant="v6" title="いちばん付いている" value={topRule ? grantedMiles30d(topRule) : null} unit="マイル" detail={topRule ? `${topRule.draft.name}・${formatMileageNumber(topRule.metrics30d.granted)}回` : 'まだ付与記録はありません'} />
-          <SummaryCard variant="v6" title="1人あたりの平均" value={ruleSummary?.averageBalance ?? null} unit="マイル" detail={`持っている人 ${formatMileageNumber(tabCounts.balances ?? 0)}人で割った数`} />
+          <SummaryCard variant="v6" title="1人あたりの平均" value={ruleSummary?.averageBalance ?? null} unit="マイル" detail={ruleSummary?.averageDenominator ? `残高0の人は除き、持っている人 ${formatMileageNumber(ruleSummary.averageDenominator)}人で割った数` : '残高がある人がいないため計算していません'} />
         </div> : null}
         <NoteBar>
           どんなことをしたら何マイル付けるかを決めます。付与数を変えると、変更後に起きた行動から新しい値を使います。
