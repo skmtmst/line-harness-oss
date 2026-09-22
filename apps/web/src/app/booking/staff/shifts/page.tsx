@@ -10,14 +10,19 @@ import {
   bookingApi,
   type BookingAvailabilitySlot,
   type BookingException,
+  type BookingMenu,
   type BookingResource,
   type BookingSettings,
+  type BookingSlotBlockReason,
+  type BookingSlotCheckResult,
+  type BookingStaff,
 } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import { canEditFeature, canViewFeature } from '@/lib/staff-capability'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
+import SelectField from '@/components/shared/select-field'
 import { shortDate } from '../../lib/format-time'
 
 type LoadStatus = 'loading' | 'ready' | 'error'
@@ -471,10 +476,177 @@ function NewResourceEditor({ accountId, onCreated }: {
   )
 }
 
+/** IDEA-28: 予約できない理由コードを運用者向けの文へ。予定の件名や相手など詳細は API から返らない。 */
+const SLOT_REASON_LABELS: Record<BookingSlotBlockReason, string> = {
+  menu_inactive: 'このメニューは受付を止めているか、削除されています',
+  staff_not_offered: 'このメニューを担当できるスタッフがいません',
+  invalid_resource: 'このメニューが必要とする設備の設定に問題があります',
+  booking_window: '受付期間（何日先まで取れるか）の外です',
+  past_cutoff: '受付の締め切り（何時間前まで取れるか）を過ぎています',
+  invalid_time: 'その時刻は存在しません',
+  not_on_grid: '開始時刻が受付の刻み（30分）に合っていません',
+  exception_closed: '休業日・例外日で閉めています',
+  exception_invalid: '例外日の時間設定が壊れているため、安全のため閉めています',
+  outside_working: '勤務・営業時間の外です',
+  duration_overrun: '勤務・営業の終わりまでに所要時間が収まりません',
+  other_booking: 'ほかの予約と重なっています',
+  google_busy: '外部カレンダーの予定と重なっています',
+  capacity_full: '担当の同時受付数がいっぱいです',
+  store_full: '店舗全体の同時受付枠がいっぱいです',
+  resource_shortage: '必要な設備がその時間に足りません',
+  calendar_unavailable: '外部カレンダーを読めないため、安全のため閉めています',
+  unavailable: 'この日時は受け付けられません',
+}
+
+function slotReasonLabel(reason: BookingSlotBlockReason): string {
+  return SLOT_REASON_LABELS[reason] ?? 'この日時は受け付けられません'
+}
+
+// IDEA-28: 日時を指定して、予約できるか・だめならどの条件で閉まっているかを確かめる。
+// 読み取りだけで予約は作らない。判定はお客様の予約画面と同じ条件。
+function SlotCheckCard({ accountId, menus }: { accountId: string; menus: BookingMenu[] }) {
+  const activeMenus = useMemo(() => menus.filter((menu) => menu.is_active), [menus])
+  const [menuId, setMenuId] = useState('')
+  const [date, setDate] = useState('')
+  const [time, setTime] = useState('')
+  const [staffId, setStaffId] = useState('')
+  // 担当の絞り込みは予約スタッフ一覧の閲覧権限が要る。取れない場合は全担当まとめて判定する。
+  const [staffOptions, setStaffOptions] = useState<BookingStaff[]>([])
+  const [checking, setChecking] = useState(false)
+  const [checkError, setCheckError] = useState<string | null>(null)
+  const [result, setResult] = useState<BookingSlotCheckResult | null>(null)
+  const requestRef = useRef(0)
+
+  useEffect(() => {
+    let cancelled = false
+    void bookingApi.listStaff(accountId)
+      .then((res) => {
+        if (!cancelled) setStaffOptions(res.staff.filter((staff) => staff.is_active))
+      })
+      .catch(() => {
+        if (!cancelled) setStaffOptions([])
+      })
+    return () => { cancelled = true }
+  }, [accountId])
+
+  useEffect(() => {
+    if (!menuId && activeMenus.length > 0) setMenuId(activeMenus[0].id)
+  }, [activeMenus, menuId])
+
+  async function run() {
+    if (!menuId || !date || !time) return
+    const requestId = ++requestRef.current
+    setChecking(true)
+    setCheckError(null)
+    try {
+      const response = await bookingApi.checkAvailability(accountId, {
+        menuId,
+        staffId: staffId || undefined,
+        date,
+        time,
+      })
+      if (requestId !== requestRef.current) return
+      setResult(response)
+    } catch (error) {
+      if (requestId !== requestRef.current) return
+      setResult(null)
+      setCheckError(error instanceof ApiError && error.status === 403
+        ? 'このアカウントの予約を確かめる権限がありません。'
+        : '空き状況を確かめられませんでした。もう一度お試しください。')
+    } finally {
+      if (requestId === requestRef.current) setChecking(false)
+    }
+  }
+
+  const canRun = Boolean(menuId && date && time) && !checking
+
+  return (
+    <section className="bg-canvas border-hairline rounded-card border p-4">
+      <h2 className="text-ink font-semibold">日時を指定して空きを確認</h2>
+      <p className="text-ink-faint mt-1 text-xs">
+        お客様の予約画面と同じ条件で、その日時に予約を受けられるか確かめます。受けられないときは、勤務・外部の予定・所要時間・定員・休業日のどの条件で閉まっているかを表示します。確認しても予約は作られません。
+      </p>
+      <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <label className="text-ink-secondary text-xs">
+          メニュー
+          <SelectField
+            aria-label="確認するメニュー"
+            value={menuId}
+            onChange={(event) => { setMenuId(event.target.value); setResult(null) }}
+            className="mt-1 w-full"
+            options={[
+              ...(activeMenus.length === 0 ? [{ value: '', label: '受付中のメニューがありません' }] : []),
+              ...activeMenus.map((menu) => ({ value: menu.id, label: menu.name })),
+            ]}
+          />
+        </label>
+        <label className="text-ink-secondary text-xs">
+          日付
+          <input aria-label="確認する日付" type="date" value={date} onChange={(event) => { setDate(event.target.value); setResult(null) }} className="border-hairline rounded-control mt-1 block w-full border bg-canvas px-3 py-2 text-sm tabular-nums" />
+        </label>
+        <label className="text-ink-secondary text-xs">
+          開始時刻
+          <input aria-label="確認する開始時刻" type="time" value={time} onChange={(event) => { setTime(event.target.value); setResult(null) }} className="border-hairline rounded-control mt-1 block w-full border bg-canvas px-3 py-2 text-sm tabular-nums" />
+        </label>
+        {staffOptions.length > 0 ? (
+          <label className="text-ink-secondary text-xs">
+            担当
+            <SelectField
+              aria-label="確認する担当"
+              value={staffId}
+              onChange={(event) => { setStaffId(event.target.value); setResult(null) }}
+              className="mt-1 w-full"
+              options={[
+                { value: '', label: '指定しない（誰かが取れれば可）' },
+                ...staffOptions.map((staff) => ({ value: staff.id, label: staff.display_name })),
+              ]}
+            />
+          </label>
+        ) : null}
+      </div>
+      <div className="mt-3 flex justify-end">
+        <Button variant="primary" onClick={() => void run()} disabled={!canRun}>{checking ? '確認中…' : 'この日時を確かめる'}</Button>
+      </div>
+      {checkError ? <p className="text-danger mt-3 text-sm" role="alert">{checkError}</p> : null}
+      {result ? (
+        result.bookable ? (
+          <div className="bg-success-bg text-success mt-3 rounded-control p-3 text-sm" role="status">
+            <p className="font-semibold">この日時は予約を受けられます。</p>
+            <ul className="mt-1 space-y-0.5 text-xs">
+              {result.per_staff.filter((staff) => staff.bookable).map((staff) => (
+                <li key={staff.staff_id}>{staff.display_name}: 残り {staff.remaining}/{staff.capacity}</li>
+              ))}
+            </ul>
+          </div>
+        ) : (
+          <div className="bg-warning-bg text-warning mt-3 rounded-control p-3 text-sm" role="status">
+            <p className="font-semibold">この日時は予約できません。</p>
+            <ul className="mt-1 list-disc space-y-0.5 pl-5 text-xs">
+              {result.reasons.map((reason) => <li key={reason}>{slotReasonLabel(reason)}</li>)}
+            </ul>
+            {result.per_staff.length > 1 ? (
+              <ul className="mt-2 space-y-0.5 border-t border-current/20 pt-2 text-xs">
+                {result.per_staff.map((staff) => (
+                  <li key={staff.staff_id}>
+                    {staff.display_name}: {staff.bookable
+                      ? '予約できます'
+                      : staff.reasons.map(slotReasonLabel).join('、')}
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+          </div>
+        )
+      ) : null}
+    </section>
+  )
+}
+
 function StoreShiftsView() {
   usePageTitle('予約設定')
   const { selectedAccountId, selectedAccount } = useAccount()
   const [settings, setSettings] = useState<BookingSettings | null>(null)
+  const [menus, setMenus] = useState<BookingMenu[]>([])
   const [resources, setResources] = useState<BookingResource[]>([])
   const [slots, setSlots] = useState<BookingAvailabilitySlot[]>([])
   const [loadStatus, setLoadStatus] = useState<LoadStatus>('loading')
@@ -521,6 +693,7 @@ function StoreShiftsView() {
     if (!selectedAccountId) {
       loadedAccountRef.current = null
       setSettings(null)
+      setMenus([])
       setResources([])
       setSlots([])
       setLoadStatus('ready')
@@ -538,6 +711,7 @@ function StoreShiftsView() {
       if (requestId !== requestRef.current) return
       if (!settingsResult.success) throw new Error(settingsResult.error)
       setSettings(settingsResult.data)
+      setMenus(menuResult.menus)
       loadedAccountRef.current = selectedAccountId
       // 予約設定APIは {success,data:{resources}} を返す(撮影用APIも同じ器)。
       setResources(resourcesResult.data.resources)
@@ -564,6 +738,7 @@ function StoreShiftsView() {
     }).catch(() => {
       if (requestId !== requestRef.current) return
       setSettings(null)
+      setMenus([])
       setResources([])
       setSlots([])
       setLoadStatus('error')
@@ -833,6 +1008,8 @@ function StoreShiftsView() {
                 ))}
               </div>
             </section>
+
+            <SlotCheckCard key={`check:${selectedAccountId}`} accountId={selectedAccountId} menus={menus} />
           </div>
 
           <aside className="space-y-3 xl:w-96 xl:flex-none">

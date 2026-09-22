@@ -156,6 +156,7 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'GET /api/auth/password/reset/check',
   'GET /api/auth/register/check',
   'GET /api/auth/sessions',
+  'GET /api/booking/admin/availability-check',
   'GET /api/booking/admin/bookings.csv',
   'GET /api/booking/admin/bookings/{id}/audit-logs',
   'GET /api/booking/admin/staff/{id}/break-dates',
