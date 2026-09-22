@@ -1,12 +1,12 @@
 'use client'
 
-import QRCode from 'qrcode'
 import Link from 'next/link'
 import { useEffect, useState, type FormEvent } from 'react'
 import Button from '@/components/shared/button'
 import { TextField } from '@/components/shared/text-field'
 import { adminSessionHandoffPath, adminSessionHeaders, captureTwoFactorChallenge, clearTwoFactorChallenge, storeAdminSession, takeTwoFactorNextPath } from '@/lib/admin-session'
 import { useBrand } from '@/lib/use-brand'
+import { qrToDataURL } from '@/lib/qr-image'
 
 type SetupData = { provisioningUri: string; manualKey: string }
 
@@ -53,7 +53,7 @@ export default function TwoFactorSetupPage() {
 
   useEffect(() => {
     if (!setup?.provisioningUri) return
-    void QRCode.toDataURL(setup.provisioningUri, { width: 200, margin: 1 }).then(setQr)
+    void qrToDataURL(setup.provisioningUri, { width: 200, margin: 1 }).then(setQr)
   }, [setup])
 
   const submit = async (event: FormEvent) => {

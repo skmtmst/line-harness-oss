@@ -93,20 +93,25 @@ export default function SavedSearchList({ accountId }: { accountId: string | nul
     setSummary(null)
     setTags([])
     setConditionLabels({})
-    try {
-      if (!accountId) return
-      const [savedSearches, tagResult, markResult, scenarioResult, fieldResult] = await Promise.allSettled([
-        api.savedSearches.list(accountId, { limit: 50 }),
-        api.tags.list(),
-        api.supportMarks.list(accountId, { suppressFeatureDisabledEvent: true }),
-        api.scenarios.list({ accountId }),
-        api.friendFields.list(accountId, undefined, { suppressFeatureDisabledEvent: true }),
-      ])
+    if (!accountId) {
+      setLoading(false)
+      return
+    }
+    /*
+      #1017 PERF-14: 一覧は自分の応答が来た時点で出す。
+      条件の要約に使うタグ名・マーク名・シナリオ名・項目名の補助取得は
+      別に待ち、届いた時点で足す。以前は allSettled が5系統すべての
+      完了を待っていたため、遅い補助が一覧の表示まで止めていた。
+      補助が落ちても条件文だけが「未取得の名前」になるだけで、
+      一覧そのものは使える。
+    */
+    void Promise.allSettled([
+      api.tags.list(),
+      api.supportMarks.list(accountId, { suppressFeatureDisabledEvent: true }),
+      api.scenarios.list({ accountId }),
+      api.friendFields.list(accountId, undefined, { suppressFeatureDisabledEvent: true }),
+    ]).then(([tagResult, markResult, scenarioResult, fieldResult]) => {
       if (sequence !== loadSequence.current) return
-      if (savedSearches.status === 'rejected') throw savedSearches.reason
-      if (!savedSearches.value.success) throw new Error('保存した検索を読み込めませんでした')
-      setItems(savedSearches.value.items)
-      setSummary(savedSearches.value.summary)
       if (tagResult.status === 'fulfilled' && tagResult.value.success) setTags(tagResult.value.data)
       setConditionLabels({
         marks: markResult.status === 'fulfilled' && markResult.value.success
@@ -119,6 +124,13 @@ export default function SavedSearchList({ accountId }: { accountId: string | nul
           ? Object.fromEntries(fieldResult.value.data.map((field) => [field.fieldKey, field.name]))
           : {},
       })
+    })
+    try {
+      const savedSearches = await api.savedSearches.list(accountId, { limit: 50 })
+      if (sequence !== loadSequence.current) return
+      if (!savedSearches.success) throw new Error('保存した検索を読み込めませんでした')
+      setItems(savedSearches.items)
+      setSummary(savedSearches.summary)
     } catch (reason) {
       if (sequence === loadSequence.current) {
         setLoadError(reason instanceof ApiError ? reason.message : '保存した検索を読み込めませんでした')

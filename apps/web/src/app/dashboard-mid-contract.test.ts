@@ -19,7 +19,7 @@ function code(src: string): string {
 describe('ダッシュボード点検・中の契約(#491)', () => {
   it('中2:予約の明細は今日以降100件に区切り、器違いで落ちない', () => {
     expect(PAGE).toContain("bookingApi.listRequests(selectedAccountId, 'all', { from: todayStartIso, limit: 100 })")
-    expect(PAGE).toContain('Array.isArray(bookingResult.value.requests) ? bookingResult.value.requests : null')
+    expect(PAGE).toContain('Array.isArray(result.requests) ? result.requests : null')
   })
 
   it('中3:追加URL一覧は外で1回取り、QRダイアログへ渡す', () => {
