@@ -31,7 +31,7 @@ import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import { useAccount } from '@/contexts/account-context'
 import { csvCell } from '@/lib/presentation'
-import { formatAnalyticsDateTime } from './analytics-time'
+import { analyticsWeekday, formatAnalyticsDate, formatAnalyticsDateTime } from './analytics-time'
 import {
   canTidyUsage,
   referenceHealthText,
@@ -125,7 +125,6 @@ function metricSum(metrics: Array<AnalyticsMetric<number>>): number | null {
 }
 
 const RANGES = [7, 30, 90]
-const WEEKDAY_JP = ['日', '月', '火', '水', '木', '金', '土']
 
 function RangePicker({ days, onChange }: { days: number; onChange: (days: number) => void }) {
   return (
@@ -156,8 +155,21 @@ function AnalyticsPeriodControl({ days, onChange }: { days: number; onChange: (d
   )
 }
 
-function weekdayOf(date: string): string {
-  return WEEKDAY_JP[new Date(`${date}T00:00:00+09:00`).getDay()] ?? ''
+/**
+ * どの表・グラフにも同じ形で「集計期間・データ締切」を出す注記。
+ * 「この数はいつの時点の、どの範囲か」を画面ごとに書き方を変えると、
+ * 同じ条件で読めているか比べにくい。
+ */
+function AnalyticsPeriodCaption({ from, to, cutoffAt }: {
+  from: string
+  to: string
+  cutoffAt: string
+}) {
+  return (
+    <span className="text-ink-faint text-xs tabular-nums">
+      集計期間 {from}〜{to} ／ データ締切 {formatAnalyticsDateTime(cutoffAt)}
+    </span>
+  )
 }
 
 function rangeFor(days: number, now = new Date()): { from: string; to: string } {
@@ -975,6 +987,15 @@ function CrossTab({ accountId, canManage }: { accountId: string; canManage: bool
               </tbody>
             </table>
           </div>
+          {/* 表・この人数・対象者づくりがすべて同じ集計結果(runId)を見ている
+              ことを、期間と締切で確かめられるようにする。 */}
+          <div className="mt-1 flex justify-end">
+            <AnalyticsPeriodCaption
+              from={crossResult.periodFrom.slice(0, 10)}
+              to={crossResult.periodTo.slice(0, 10)}
+              cutoffAt={crossResult.dataCutoffAt}
+            />
+          </div>
 
           {canManage ? (
             <div className="bg-canvas rounded-card border-hairline mt-3 border p-4">
@@ -1017,9 +1038,6 @@ function CrossTab({ accountId, canManage }: { accountId: string; canManage: bool
             <section className="bg-canvas rounded-card border-hairline mt-3 border p-4">
               <div className="flex items-start justify-between gap-2">
                 <h3 className="text-ink text-sm font-semibold">この表から読めること</h3>
-                {crossResult && <span className="text-ink-faint shrink-0 text-xs">
-                  データ締切 {formatAnalyticsDateTime(crossResult.dataCutoffAt)}
-                </span>}
               </div>
               <ul className="text-ink-secondary mt-2 space-y-1.5 text-xs leading-relaxed">
                 {readings.map((r) => (
@@ -1542,7 +1560,7 @@ function FunnelTab({ accountId, canManage, presetConversion }: {
             {/* 条件ごとに通過率を並べる仕組みが無い。ファネルの定義が1本の
                 段の列だけで、条件で分ける口を持っていない。 */}
             {run && <p className="text-ink-faint mt-2 text-xs">
-              集計期間 {new Date(run.cohortFrom).toLocaleDateString('ja-JP')}〜{new Date(run.cohortTo).toLocaleDateString('ja-JP')}
+              集計期間 {formatAnalyticsDate(run.cohortFrom)}〜{formatAnalyticsDate(run.cohortTo)}
               ／データ締切 {formatAnalyticsDateTime(run.dataCutoffAt)}
             </p>}
             {runError && (
@@ -2293,9 +2311,18 @@ function FriendsOverviewTab({ accountId }: { accountId: string }) {
     <section className="bg-canvas rounded-card border-hairline border p-4">
       <div className="mb-4 flex flex-wrap items-start justify-between gap-2">
         <div><h2 className="font-semibold text-ink">日ごとの増減（この{days}日）</h2><p className="mt-1 text-xs text-ink-faint">上が増えた人、下が減った人です。</p></div>
-        <span className="text-xs tabular-nums text-ink-faint">{state.data.period.from}〜{state.data.period.to}</span>
+        <AnalyticsPeriodCaption from={state.data.period.from} to={state.data.period.to} cutoffAt={state.data.dataCutoffAt} />
       </div>
-      {!daysShown ? <p className="p-8 text-center text-sm text-ink-faint">{pendingReason}</p> : (
+      {!daysShown ? (
+        <div className="p-8 text-center text-sm text-ink-faint">
+          <p>{pendingReason}</p>
+          {/* 集計待ちの間は「0人」とも「次はいつ」とも言えない。更新の周期と
+              変わらない場合の戻り方だけを伝える(点検ANALYTICS-01)。 */}
+          {overview.state === 'pending' && (
+            <p className="mt-2 text-xs">日ごとの集計は数分ごとに自動で更新されます。しばらくしても変わらないときは、時間をおいて開き直してください。</p>
+          )}
+        </div>
+      ) : (
         <div
           className="grid h-44 items-center gap-1 border-y border-hairline py-3"
           style={{ gridTemplateColumns: `repeat(${Math.max(1, overview.days.length)}, minmax(0, 1fr))` }}
@@ -2314,8 +2341,14 @@ function FriendsOverviewTab({ accountId }: { accountId: string }) {
           })}
         </div>
       )}
-      <div className="mt-8 flex flex-wrap gap-4 text-xs text-ink-secondary"><span>● 増えた人</span><span className="text-danger">● 減った人</span>{overview.campaigns.map((item) => <span key={item.id}>{item.date.slice(5).replace('-', '/')} {item.name}</span>)}</div>
-      {selectedDay && <div className="mt-3 rounded-control bg-canvas-sunken px-3 py-2 text-xs text-ink-secondary"><strong className="text-ink">{selectedDay.date}（{weekdayOf(selectedDay.date)}）</strong>　増加 {selectedDay.added}人・減少 {selectedDay.removed}人・差し引き {selectedDay.net > 0 ? '+' : ''}{selectedDay.net}人　施策 {selectedCampaigns.length ? selectedCampaigns.map((item) => item.name).join('、') : 'なし'}</div>}
+      {/* グラフを出せない間は凡例も選択日の詳細も出さない。出すと
+          「増加0人・施策なし」という未取得の0が確定値に見える(点検ANALYTICS-01)。 */}
+      {daysShown && (
+        <div className="mt-8 flex flex-wrap gap-4 text-xs text-ink-secondary"><span>● 増えた人</span><span className="text-danger">● 減った人</span>{overview.campaigns.map((item) => <span key={item.id}>{item.date.slice(5).replace('-', '/')} {item.name}</span>)}</div>
+      )}
+      {daysShown && selectedDay && (
+        <div className="mt-3 rounded-control bg-canvas-sunken px-3 py-2 text-xs text-ink-secondary"><strong className="text-ink">{selectedDay.date}（{analyticsWeekday(selectedDay.date)}）</strong>　増加 {selectedDay.added}人・減少 {selectedDay.removed}人・差し引き {selectedDay.net > 0 ? '+' : ''}{selectedDay.net}人　施策 {selectedCampaigns.length ? selectedCampaigns.map((item) => item.name).join('、') : 'なし'}</div>
+      )}
     </section>
     <section className="overflow-hidden rounded-card border border-hairline bg-canvas">
       <div className="border-b border-hairline px-4 py-3"><h2 className="font-semibold text-ink">どこから増えたか</h2><p className="mt-1 text-xs text-ink-faint">「経路と成果」に接続された経路ごとの、この{days}日の実測です。</p></div>
@@ -2381,7 +2414,10 @@ function ReactionsOverviewTab({ accountId }: { accountId: string }) {
         })}
       </div>
     </section>
-    <div className="flex justify-end"><AnalyticsExportButton onClick={exportCampaigns} disabled={overview.campaigns.length === 0} /></div>
+    <div className="flex flex-wrap items-center justify-between gap-2">
+      <AnalyticsPeriodCaption from={state.data.period.from} to={state.data.period.to} cutoffAt={state.data.dataCutoffAt} />
+      <AnalyticsExportButton onClick={exportCampaigns} disabled={overview.campaigns.length === 0} />
+    </div>
     <div className="bg-canvas rounded-card border-hairline overflow-hidden border"><table className="w-full table-fixed">
       <thead><TableHeadRow><Th>配信</Th><Th>種類・日時</Th><Th align="right">対象</Th><Th align="right">到達</Th><Th align="right">開封</Th><Th align="right">LINEクリック</Th><Th align="right">成果</Th></TableHeadRow></thead>
       <tbody className="divide-hairline divide-y">{overview.campaigns.length === 0 ? <tr><td colSpan={7} className="text-ink-faint p-8 text-center text-sm">この期間の配信はありません</td></tr> : overview.campaigns.map((item) => <tr key={`${item.kind}:${item.id}`} className="text-sm"><td className="truncate px-4 py-3 font-medium" title={item.name}>{item.name}</td><td className="text-ink-secondary px-3 py-3">{item.kind === 'broadcast' ? '一斉配信' : 'シナリオ'}<br /><span className="text-xs tabular-nums">{item.sentAt.slice(0, 16).replace('T', ' ')}</span></td><td className="px-3 py-3 text-right"><MetricCell metric={item.targetPeople} /></td><td className="px-3 py-3 text-right"><MetricCell metric={item.delivered} /></td><td className="px-3 py-3 text-right"><MetricCell metric={item.opened} /></td><td className="px-3 py-3 text-right"><MetricCell metric={item.lineClicked} /></td><td className="px-3 py-3 text-right"><MetricCell metric={item.outcomes} /></td></tr>)}</tbody>
@@ -2419,7 +2455,9 @@ function RoutesOverviewTab({ accountId }: { accountId: string }) {
       <KpiCard title="差し引き" value={profit} unit="円" detail="売上から広告費を引いた残り" />
       <KpiCard title="費用を取得できない経路" value={overview.routes.filter((item) => shownValue(item.adCost) === null).length} unit="件" detail="0円として計算しません" />
     </div>
-    <AnalyticsNotice><span>経路ごとに、かかった費用と出た成果を差し引きまで出します。帰属方式は「{overview.attributionLabel}」です。</span> <Link href={overview.searchConsoleHref} className="font-medium text-accent hover:underline">Search Consoleを見る</Link></AnalyticsNotice>
+    <AnalyticsNotice><span>経路ごとに、かかった費用と出た成果を差し引きまで出します。帰属方式は「{overview.attributionLabel}」です。</span> <Link href={overview.searchConsoleHref} className="font-medium text-accent hover:underline">Search Consoleを見る</Link>
+      <p className="mt-1"><AnalyticsPeriodCaption from={state.data.period.from} to={state.data.period.to} cutoffAt={state.data.dataCutoffAt} /></p>
+    </AnalyticsNotice>
     <div className="grid grid-cols-4 overflow-hidden rounded-card border border-hairline bg-canvas">{stages.map((stage, index) => {
       const previous = index > 0 ? stages[index - 1].value : null
       const rate = previous && stage.value !== null ? stage.value / previous * 100 : null
@@ -2517,7 +2555,10 @@ function UsageOverviewTab({ accountId }: { accountId: string }) {
     </table></div>
     <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
       <p className="text-ink-faint">未使用の項目は自動で削除しません。各機能の使用先を確認してから停止・削除します。</p>
-      <p className="text-ink-faint">利用関係を最後に確認: {formatAnalyticsDateTime(overview.checkedAt)}</p>
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+        <AnalyticsPeriodCaption from={state.data.period.from} to={state.data.period.to} cutoffAt={state.data.dataCutoffAt} />
+        <span className="text-ink-faint">利用関係を最後に確認: {formatAnalyticsDateTime(overview.checkedAt)}</span>
+      </div>
     </div>
   </div>
 }
@@ -2554,7 +2595,7 @@ function UrlClicksOverviewTab({ accountId }: { accountId: string }) {
     <div className="flex flex-wrap items-center gap-2">
       <label htmlFor="url-click-search" className="sr-only">URL・配信名・リンク名で探す</label>
       <input id="url-click-search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="URL・配信名・リンク名で探す" className="h-10 min-w-64 flex-1 rounded-control border border-hairline bg-canvas px-3 text-sm" />
-      <span className="text-xs text-ink-faint">{state.data.period.from}〜{state.data.period.to}</span>
+      <AnalyticsPeriodCaption from={state.data.period.from} to={state.data.period.to} cutoffAt={state.data.dataCutoffAt} />
       <AnalyticsExportButton onClick={exportRows} disabled={visibleLinks.length === 0} />
     </div>
     <div className="bg-canvas rounded-card border-hairline overflow-hidden border"><table className="w-full table-fixed">
