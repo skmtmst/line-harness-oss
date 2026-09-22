@@ -12,6 +12,8 @@ import NoteBar from '@/components/shared/note-bar'
 import BroadcastStepRail from '@/components/broadcasts/broadcast-step-rail'
 import { useAccount } from '@/contexts/account-context'
 import { api, type ApiBroadcast } from '@/lib/api'
+import type { Tag } from '@line-crm/shared'
+import { audienceSummary } from '@/lib/broadcast-summary'
 
 type AudienceEstimate = {
   audienceCount: number
@@ -71,6 +73,12 @@ function ReservedBroadcastContent() {
   const { selectedAccountId, loading: accountLoading } = useAccount()
   const [broadcast, setBroadcast] = useState<ApiBroadcast | null>(null)
   const [estimate, setEstimate] = useState<AudienceEstimate | null>(null)
+  // BROADCAST-15: 宛先の条件に出すタグ名・シナリオ名。一覧・詳細と同じ
+  // audienceSummary を使うので、シナリオ指定を「タグ未指定」とは出さない。
+  const [audienceNames, setAudienceNames] = useState<{
+    tags: Tag[]
+    scenarios: Array<{ id: string; name: string }>
+  } | null>(null)
   const [notificationText, setNotificationText] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -115,6 +123,18 @@ function ReservedBroadcastContent() {
       }
 
       setBroadcast(result.data)
+      // 宛先が絞り込みのときだけ、条件に出すタグ名・シナリオ名を取る。
+      // 取れなくても予約の表示自体は出し続ける（型だけの表記に残る）。
+      if (result.data.targetType === 'tag' || result.data.targetType === 'segment') {
+        void Promise.allSettled([api.tags.list(), api.scenarios.list()])
+          .then(([tagsRes, scenariosRes]) => {
+            if (!isCurrent()) return
+            const tags = tagsRes.status === 'fulfilled' && tagsRes.value.success ? tagsRes.value.data : null
+            const scenarios = scenariosRes.status === 'fulfilled' && scenariosRes.value.success ? scenariosRes.value.data : null
+            if (!tags && !scenarios) return
+            setAudienceNames({ tags: tags ?? [], scenarios: scenarios ?? [] })
+          })
+      }
       /*
        * 通知設定と人数の再集計は互いに待たない。直列に待つと予約完了の
        * 表示が遅い。片方だけ取れないときも、もう片方は出す（#490 軽4）。
@@ -200,7 +220,16 @@ function ReservedBroadcastContent() {
 
   const bubbleCount = broadcast.messageBubbles?.length ?? (broadcast.messageContent ? 1 : 0)
   const audienceCount = estimate?.audienceCount ?? null
-  const audienceLabel = `${TARGET_LABELS[broadcast.targetType]}${audienceCount === null ? '' : ` ${audienceCount.toLocaleString('ja-JP')}人`}`
+  // BROADCAST-15: 名前が取れたら一覧・詳細と同じ要約（タグ名・シナリオ名入り）を出す。
+  // 取れるまでは従来の型だけの表記。逆方向へは戻らない。
+  const audienceTarget = (broadcast.targetType === 'tag' || broadcast.targetType === 'segment') && audienceNames
+    ? audienceSummary(
+        broadcast,
+        (tagId) => audienceNames.tags.find((t) => t.id === tagId)?.name ?? null,
+        (scenarioId) => audienceNames.scenarios.find((s) => s.id === scenarioId)?.name ?? null,
+      )
+    : TARGET_LABELS[broadcast.targetType]
+  const audienceLabel = `${audienceTarget}${audienceCount === null ? '' : ` ${audienceCount.toLocaleString('ja-JP')}人`}`
   const scheduledLabel = formatJst(broadcast.scheduledAt)
   const scheduledSentenceLabel = formatJstSentence(broadcast.scheduledAt)
 

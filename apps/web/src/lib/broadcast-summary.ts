@@ -121,6 +121,12 @@ export function audienceSummary(
     segmentConditions?: SegmentCondition | null
   },
   tagName: (id: string) => string | null,
+  /**
+   * シナリオ名を引く（BROADCAST-15）。
+   * 渡さない画面では「指定のシナリオを購読中」のまま。渡したのに
+   * 引けないときは、消えたことが分かる「シナリオ（削除済み）」にする。
+   */
+  scenarioName?: (id: string) => string | null,
 ): string {
   if (broadcast.targetType === 'multi-account-dedup') return '複数アカウント（重複除外）'
   if (broadcast.targetType === 'all') return '友だち全員'
@@ -144,7 +150,13 @@ export function audienceSummary(
       return name ? `タグ：${name}` : 'タグ（削除済み）'
     }
     if (rule.type === 'scenario_subscribed') {
-      return rule.value ? '指定のシナリオを購読中' : 'シナリオ購読中の全員'
+      const scenarioId = typeof rule.value === 'string' ? rule.value : ''
+      if (!scenarioId) return 'シナリオ購読中の全員'
+      // BROADCAST-15: 名前を引ける画面では「シナリオ：名前」を出す。
+      // 引けない（削除済み）ときは、あったことだけは分かる表記にする。
+      if (!scenarioName) return '指定のシナリオを購読中'
+      const name = scenarioName(scenarioId)
+      return name ? `シナリオ：${name}` : 'シナリオ（削除済み）'
     }
   }
 
