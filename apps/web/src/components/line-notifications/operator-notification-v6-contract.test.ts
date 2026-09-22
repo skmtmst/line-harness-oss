@@ -60,7 +60,8 @@ describe('V6 運用者へのお知らせ — 宛先・送信・実行記録の�
   })
 
   it('本文側に大きな画面タイトルを重ねない', () => {
-    expect(create).toContain("usePageTitle('運用者へのお知らせをつくる')")
+    // NOTIFY-04: ?id= で保存済み下書きを開き直せるため、タイトルは新規/編集で分かれる。
+    expect(create).toContain("usePageTitle(editId ? '運用者へのお知らせをなおす' : '運用者へのお知らせをつくる')")
     expect(create).not.toContain('<Header')
     expect(list).not.toContain('<Header')
   })
