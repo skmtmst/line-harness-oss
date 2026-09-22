@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { useAccount } from '@/contexts/account-context'
-import { api, fetchApi, type AutomationRunDetail } from '@/lib/api'
+import { api, downloadApiFile, fetchApi, type AutomationRunDetail } from '@/lib/api'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import MergedTabs from '@/components/layout/merged-tabs'
@@ -132,6 +132,7 @@ export default function AutomationRunsPage() {
   const [confirmCancel, setConfirmCancel] = useState(false)
   // テスト実行は既定で除き、見たいときだけ含める（V6 25-1-B）。
   const [includeTest, setIncludeTest] = useState(false)
+  const [csvBusy, setCsvBusy] = useState(false)
   /*
    * #1043 / V6 §9: 見るだけの権限では「もう一度やる」「取りやめ」
    * 「CSVで書き出す」を出さない。最終判断はサーバの個別権限キー。
@@ -260,15 +261,23 @@ export default function AutomationRunsPage() {
 
   /*
    * #942 N-353: CSV書き出し。画面の検索・絞り込みと同じ行を、
-   * `format=csv` でそのままファイルにする。セッション認証で開けるので
-   * ただのリンクでよい（先にJSONを取る必要はない）。
+   * `format=csv` でそのままファイルにする。
+   * #1053: 直リンクは Cookie が届かない経路（Bearer 補完）で401になるため、
+   * 認証付きで取得してから保存する。
    */
-  const csvUrl = api.automations.runsCsvUrl({
-    accountId: selectedAccountId || undefined,
-    search: query.trim() || undefined,
-    status: resultFilter !== 'all' ? resultFilter : undefined,
-    includeTest,
-  })
+  const downloadRunsCsv = () => {
+    if (csvBusy) return
+    setCsvBusy(true)
+    setRetryNotice('')
+    void downloadApiFile(api.automations.runsCsvUrl({
+      accountId: selectedAccountId || undefined,
+      search: query.trim() || undefined,
+      status: resultFilter !== 'all' ? resultFilter : undefined,
+      includeTest,
+    }), 'automation-runs.csv')
+      .catch(() => setRetryNotice('CSVを書き出せませんでした。通信を確認して、もう一度お試しください。'))
+      .finally(() => setCsvBusy(false))
+  }
 
   return (
     <div data-design-node="DkPY0">
@@ -276,7 +285,7 @@ export default function AutomationRunsPage() {
         <p className="text-sm text-ink-faint">自動化 ＞ オートメーション ＞ 動いた記録</p>
         {runPermissions?.canExport ? (
           <div className="text-right">
-            <Button href={csvUrl}>CSVで書き出す</Button>
+            <Button disabled={csvBusy} onClick={downloadRunsCsv}>{csvBusy ? '書き出しています…' : 'CSVで書き出す'}</Button>
             <p className="mt-1 text-xs text-ink-faint">いまの検索・絞り込みの行が出ます</p>
           </div>
         ) : null}

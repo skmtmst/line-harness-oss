@@ -170,6 +170,15 @@ function csvLinks(): string[] {
     .filter((href) => href.includes('participants.csv'))
 }
 
+/*
+ * #1053: CSVは直リンクではなく認証付き取得になった。
+ * ボタンを押すと fetch で participants.csv を取ることを確かめる。
+ */
+function csvButton(label = 'CSVで書き出す'): HTMLButtonElement | null {
+  return Array.from(host.querySelectorAll('button'))
+    .find((b) => b.textContent?.includes(label)) as HTMLButtonElement | undefined ?? null
+}
+
 describe('ウェビナー編集の参加者導線と権限 (N-118)', () => {
   it('staff が参加者の段を開くと、個人履歴もCSV導線も出さず制限の案内を出す', async () => {
     net.staffMode = true
@@ -221,7 +230,12 @@ describe('ウェビナー編集の参加者導線と権限 (N-118)', () => {
     expect(host.textContent).toContain('参加者管理')
     expect(host.textContent).toContain(FRIEND_NAME)
     expect(host.textContent).toContain('参加者をCSVで書き出す')
-    expect(csvLinks()).toEqual(['/api/webinars/webinar-1/participants.csv'])
+    // 直リンクのaタグは無く、押すと認証付きで取る（#1053）。
+    expect(csvLinks()).toEqual([])
+    const callsBefore = net.calls.length
+    await act(async () => { csvButton('参加者をCSVで書き出す')!.dispatchEvent(new MouseEvent('click', { bubbles: true })) })
+    await flush()
+    expect(net.calls.slice(callsBefore).some((call) => call.includes('/api/webinars/webinar-1/participants.csv'))).toBe(true)
   })
 
   it('owner は分析の段でもCSV導線を見られる', async () => {
@@ -230,6 +244,10 @@ describe('ウェビナー編集の参加者導線と権限 (N-118)', () => {
     await flush()
 
     expect(host.textContent).toContain('視聴結果')
-    expect(csvLinks()).toEqual(['/api/webinars/webinar-1/participants.csv'])
+    expect(csvLinks()).toEqual([])
+    const callsBefore = net.calls.length
+    await act(async () => { csvButton()!.dispatchEvent(new MouseEvent('click', { bubbles: true })) })
+    await flush()
+    expect(net.calls.slice(callsBefore).some((call) => call.includes('/api/webinars/webinar-1/participants.csv'))).toBe(true)
   })
 })

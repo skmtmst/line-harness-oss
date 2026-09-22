@@ -74,7 +74,8 @@ describe('V6 オートメーションが動いた記録（DkPY0）', () => {
   })
 
   it('CSV書き出しと実行の取りやめを実口へ接続する (#942 N-353)', () => {
-    expect(PAGE).toContain('api.automations.runsCsvUrl')
+    // #1053: 直リンクは Bearer 補完経路で401になるため、認証付き取得へ。
+    expect(PAGE).toContain('downloadApiFile(api.automations.runsCsvUrl')
     expect(PAGE).toContain('api.automations.cancelRun')
     expect(PAGE).toContain('この実行を取りやめる')
     expect(PAGE).toContain('実行を取りやめました。記録は残っています。')
