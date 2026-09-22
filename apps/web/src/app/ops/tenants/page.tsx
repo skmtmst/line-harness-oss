@@ -146,6 +146,9 @@ export default function OpsTenantsPage() {
 
       {loading ? (
         <ListState kind="loading" title="契約先を読み込んでいます" />
+      ) : error && visible.length === 0 ? (
+        // 「1件も無い」と「読み込めなかった」を言い分ける。失敗時は空の案内ではなくエラーと再読み込みを出す。
+        <ListState kind="error" title="契約先を表示できませんでした" onRetry={() => void load()} />
       ) : visible.length === 0 ? (
         <ListState kind="empty" title="該当する契約先がありません" description="検索の言葉や絞り込みを変えてください。" />
       ) : (
