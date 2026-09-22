@@ -618,6 +618,14 @@ function columnDeliveryBadge(column: NenColumn) {
   if (column.deliveryStatus === 'sent') return <StatusBadge tone="success" size="compact">配信済み {jstShortDate(column.deliveryAt)}</StatusBadge>
   if (column.deliveryStatus === 'scheduled') return <StatusBadge tone="warning" size="compact">予約 {jstShortDateTime(column.deliveryAt)}</StatusBadge>
   if (column.deliveryStatus === 'queued') return <StatusBadge tone="info" size="compact">配信待ち {jstShortDateTime(column.deliveryAt)}</StatusBadge>
+  /*
+   * NEN-06: 下書きに記録された「配信したい日時」を見せる。
+   * 予約ではない（delivery_status は draft のまま、配信待ち行列も作らない）ため、
+   * 「予約」「配信待ち」とは別の文言で出す。
+   */
+  if (column.deliveryStatus === 'draft' && column.deliveryAt) {
+    return <StatusBadge tone="neutral" size="compact">未配信・{jstShortDateTime(column.deliveryAt)} に出したい</StatusBadge>
+  }
   return <StatusBadge tone="neutral" size="compact">{columnStatusLabel[column.deliveryStatus]}</StatusBadge>
 }
 
