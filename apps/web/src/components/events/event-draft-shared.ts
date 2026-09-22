@@ -76,3 +76,85 @@ export function resolveEventMultiAccountIds(
   const ids = [...new Set(parsed)]
   return ids.includes(accountId) ? ids : [accountId, ...ids]
 }
+
+/**
+ * 締切・取消期限の選択肢（追加47件 EVENT-03 / EVENT-04）。
+ *
+ * 保存値の意味は Worker（events.ts の cancel / entry_cutoff 判定）と同じ:
+ *   null = 期限を設けない（申込締切は「開始まで受ける」、取消は「不可」）
+ *   0    = 開始直前まで
+ *   正数 = 開始 N 時間前まで
+ * 作成（ウィザード）と編集（タブ）で同じ値を同じ説明で出さないと、
+ * 作成時「いつでも取消できる」と読んだ設定が編集では「不可」に見える
+ * ような逆転が起きる。選択肢は必ずここから両画面へ配る。
+ *
+ * `value` は <select> が扱える文字列。'none' が null を表す。
+ */
+
+/** null（期限なし）を表す select の値。 */
+export const EVENT_DEADLINE_NONE = 'none'
+
+export type EventDeadlineOption = { value: string; label: string }
+
+/** 申込の締め切り（entry_cutoff_hours_before）。null = 開始まで受け付ける。 */
+export const EVENT_ENTRY_CUTOFF_OPTIONS: ReadonlyArray<EventDeadlineOption> = [
+  { value: EVENT_DEADLINE_NONE, label: '開始まで受け付ける' },
+  { value: '1', label: '開始の1時間前まで' },
+  { value: '2', label: '開始の2時間前まで' },
+  { value: '3', label: '開始の3時間前まで' },
+  { value: '24', label: '開始の24時間前まで（前日）' },
+  { value: '48', label: '開始の48時間前まで（2日前）' },
+  { value: '168', label: '開始の168時間前まで（1週間前）' },
+]
+
+/**
+ * 取消の期限（cancel_deadline_hours_before）。
+ * null = 不可（Worker は 403 cancel_not_allowed）、0 = 開始直前まで可。
+ */
+export const EVENT_CANCEL_DEADLINE_OPTIONS: ReadonlyArray<EventDeadlineOption> = [
+  { value: EVENT_DEADLINE_NONE, label: '不可（運営に LINE 連絡）' },
+  { value: '0', label: '開始直前までキャンセルできる' },
+  { value: '2', label: '開始の2時間前まで' },
+  { value: '6', label: '開始の6時間前まで' },
+  { value: '12', label: '開始の12時間前まで' },
+  { value: '24', label: '開始の24時間前まで' },
+  { value: '48', label: '開始の48時間前まで' },
+]
+
+/** 保存値（時間）→ select の value。null / 未設定は 'none'。 */
+export function deadlineSelectValue(hours: number | null | undefined): string {
+  return hours == null ? EVENT_DEADLINE_NONE : String(hours)
+}
+
+/** select の value → 保存値（時間）。'none' は null。 */
+export function parseDeadlineSelect(value: string): number | null {
+  return value === EVENT_DEADLINE_NONE ? null : Number(value)
+}
+
+/**
+ * 選択肢に無い保存値をそのまま見せるための一覧（EVENT-04）。
+ *
+ * 保存値が選択肢に無いまま select の value に渡すと、ブラウザは先頭の
+ * 項目を選んだように見せてしまい、「開始の2時間前まで」を保存した枠が
+ * 編集では「開始まで受け付ける」に見える事故になった。保存済みの値は
+ * 「保存済み：開始のN時間前まで」として数値昇順の位置へ差し込み、
+ * 別の値に読み替えない（無断で変換もしない）。
+ */
+export function deadlineOptionsWithSaved(
+  options: ReadonlyArray<EventDeadlineOption>,
+  savedHours: number | null | undefined,
+): EventDeadlineOption[] {
+  if (savedHours == null || options.some((o) => o.value === String(savedHours))) {
+    return [...options]
+  }
+  const saved: EventDeadlineOption = {
+    value: String(savedHours),
+    label: `保存済み：開始の${savedHours}時間前まで`,
+  }
+  const next = [...options]
+  const idx = next.findIndex(
+    (o) => o.value !== EVENT_DEADLINE_NONE && Number(o.value) > savedHours,
+  )
+  next.splice(idx === -1 ? next.length : idx, 0, saved)
+  return next
+}
