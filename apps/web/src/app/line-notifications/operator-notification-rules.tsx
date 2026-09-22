@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Download, Plus, Search } from 'lucide-react'
 import { usePageTitle } from '@/components/shell/page-chrome'
@@ -161,7 +162,9 @@ export default function OperatorNotificationRules({ lineAccountId }: { lineAccou
       : rules.length === 0 ? <ListState kind="empty" title="運用者へのお知らせがまだありません" action={<Button href="/line-notifications/operator/new" variant="primary">運用者へのお知らせを作る</Button>} />
       : visible.length === 0 ? <ListState kind="empty" title="条件に合うお知らせはありません" description="検索語か絞り込みを変えてください。" />
       : <DataTable><thead><tr><Th>お知らせ</Th><Th>きっかけ</Th><Th>受け取る人</Th><Th>送る時間</Th><Th>今日</Th><Th>操作</Th></tr></thead><tbody>{visible.map((rule) => <Tr key={rule.id}>
-        <NameCell name={<span title={rule.name}>{rule.name}</span>} sub={channelLabel(rule.channels)} />
+        {/* NOTIFY-04: 名前から編集画面へ戻れる。保存したお知らせを開き直して
+            直せないと、直すたびに作り直しになる。 */}
+        <NameCell name={<Link href={`/line-notifications/operator/new?id=${encodeURIComponent(rule.id)}`} className="text-accent hover:underline" title={rule.name}>{rule.name}</Link>} sub={channelLabel(rule.channels)} />
         <Td>{operatorEventLabel(rule.eventType)}</Td>
         <Td><span className={rule.recipientCount > 0 ? 'text-ink-secondary' : 'font-semibold text-warning'}>{rule.recipientCount > 0 ? `${rule.recipientCount}人` : '受け取れる人なし'}</span></Td>
         <Td>{conditionsOf(rule).scheduleLabel ?? 'いつでも'}</Td>

@@ -1,8 +1,8 @@
 'use client'
 
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
-import { useEffect, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { Suspense, useEffect, useState } from 'react'
 import { AlertTriangle, ArrowRight, Building2, Users } from 'lucide-react'
 import Button from '@/components/shared/button'
 import { Field, TextInput } from '@/components/shared/form-controls'
@@ -41,8 +41,24 @@ const DEDUPE_OPTIONS = [
   { value: '60', label: '1時間のあいだは1回だけ' },
 ]
 
-export default function NewOperatorNotificationPage() {
-  usePageTitle('運用者へのお知らせをつくる')
+/** NOTIFY-04: ?id= があれば保存ずみのお知らせを開き直して直す。 */
+function readConditions(rule: { conditions: Record<string, unknown> }) {
+  const conditions = rule.conditions
+  return {
+    threshold: typeof conditions.threshold === 'string' ? conditions.threshold : 'one',
+    importance: typeof conditions.importance === 'string' ? conditions.importance : 'normal',
+    recipientIds: Array.isArray(conditions.recipientIds)
+      ? conditions.recipientIds.filter((id): id is string => typeof id === 'string')
+      : [],
+    schedule: typeof conditions.schedule === 'string' ? conditions.schedule : 'anytime',
+    dedupeMinutes: typeof conditions.dedupeMinutes === 'number' ? String(conditions.dedupeMinutes) : '10',
+    onlyAvailable: conditions.onlyAvailable === true,
+  }
+}
+
+function NewOperatorNotificationInner() {
+  const editId = useSearchParams().get('id')
+  usePageTitle(editId ? '運用者へのお知らせをなおす' : '運用者へのお知らせをつくる')
   const router = useRouter()
   const { selectedAccountId } = useAccount()
   const [eventType, setEventType] = useState(DEFAULT_OPERATOR_EVENT_TYPE)
@@ -55,10 +71,50 @@ export default function NewOperatorNotificationPage() {
   const [dedupeMinutes, setDedupeMinutes] = useState('10')
   const [onlyAvailable, setOnlyAvailable] = useState(false)
   const [emailFallback, setEmailFallback] = useState(true)
-  const [savedRuleId, setSavedRuleId] = useState<string | null>(null)
+  // NOTIFY-04: id付きで開いたときは最初からそのIDを更新先にする。
+  // 読み込み失敗のまま新規作成へ落ちると、同じお知らせが増える。
+  const [savedRuleId, setSavedRuleId] = useState<string | null>(editId)
+  const [ruleLoading, setRuleLoading] = useState(Boolean(editId))
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
+
+  // 保存ずみのお知らせを全項目そのまま復元する。一部だけ戻すと、
+  // 開いて保存した時点で戻らなかった項目が初期値へ上書きされる。
+  useEffect(() => {
+    if (!editId || !selectedAccountId) return
+    let active = true
+    setRuleLoading(true)
+    void api.lineNotifications.operatorRules.get(editId, selectedAccountId)
+      .then((result) => {
+        if (!active) return
+        if (!result.success) throw new Error(result.error)
+        const rule = result.data
+        const saved = readConditions(rule)
+        setName(rule.name)
+        setEventType(rule.eventType)
+        setThreshold(saved.threshold)
+        setImportance(saved.importance)
+        setRecipientIds(saved.recipientIds)
+        setSchedule(saved.schedule)
+        setDedupeMinutes(saved.dedupeMinutes)
+        setOnlyAvailable(saved.onlyAvailable)
+        setEmailFallback(rule.channels.includes('email'))
+        setRuleLoading(false)
+      })
+      .catch((caught) => {
+        if (!active) return
+        setRuleLoading(false)
+        if (caught instanceof ApiError && caught.status === 403) {
+          setError('このLINEアカウントのお知らせを表示する権限がありません。')
+        } else if (caught instanceof ApiError && caught.status === 404) {
+          setError('お知らせが見つかりません。アカウントが違うか、削除された可能性があります。')
+        } else {
+          setError('お知らせを読み込めませんでした。時間をおいてもう一度お試しください。')
+        }
+      })
+    return () => { active = false }
+  }, [editId, selectedAccountId])
 
   useEffect(() => {
     let active = true
@@ -70,17 +126,20 @@ export default function NewOperatorNotificationPage() {
       if (!active) return
       if (!result.success) throw new Error(result.error)
       setRecipients(result.data)
-      setRecipientIds(result.data.items.map((item) => item.id))
+      // NOTIFY-04: 再開したお知らせの宛先は保存ずみのもの。全選択で
+      // 上書きすると、本人だけにしていた設定が全員へ広がる。
+      if (!editId) setRecipientIds(result.data.items.map((item) => item.id))
     }).catch(() => {
       if (!active) return
       setRecipients(null)
       setError('受け取る人を読み込めませんでした。')
     })
     return () => { active = false }
-  }, [selectedAccountId])
+  }, [selectedAccountId, editId])
 
   const saveDraft = async (): Promise<string | null> => {
-    if (saving) return null
+    // 読み込み中に保存すると、未復元の項目が初期値で上書きされる。
+    if (saving || ruleLoading) return null
     if (!selectedAccountId) {
       setError('LINEアカウントを選択してください。')
       return null
@@ -126,6 +185,11 @@ export default function NewOperatorNotificationPage() {
     } catch (caught) {
       if (caught instanceof ApiError && caught.status === 403) {
         setError('このLINEアカウントのお知らせを変更する権限がありません。')
+      } else if (caught instanceof ApiError && caught.status === 404) {
+        // 一覧から開いたあとに消された等。新規作成へ逃がすと別物が増える。
+        setError('お知らせが見つかりません。一覧へ戻って開き直してください。')
+      } else if (caught instanceof ApiError && caught.status === 409) {
+        setError(caught.message)
       } else if (caught instanceof ApiError && caught.status === 400) {
         setError(caught.message)
       } else {
@@ -138,7 +202,7 @@ export default function NewOperatorNotificationPage() {
   }
 
   const publish = async () => {
-    if (!selectedAccountId || saving) return
+    if (!selectedAccountId || saving || ruleLoading) return
     // 保存後に直した分も出す。古い内容のまま出さない。
     const ruleId = await saveDraft()
     if (!ruleId) return
@@ -152,7 +216,7 @@ export default function NewOperatorNotificationPage() {
   }
 
   const testSend = async () => {
-    if (!selectedAccountId || saving) return
+    if (!selectedAccountId || saving || ruleLoading) return
     const ruleId = await saveDraft()
     if (!ruleId) return
     setSaving(true); setError(''); setNotice('')
@@ -169,8 +233,8 @@ export default function NewOperatorNotificationPage() {
   return (
     <div data-design-node="N2gAza" data-selects-wide className="space-y-4 pb-24">
       <div className="flex items-center justify-between gap-3"><nav className="text-ink-faint text-xs" aria-label="パンくず">
-        <Link href="/line-notifications" className="text-accent hover:underline">LINE通知</Link><span className="mx-2">›</span><Link href="/line-notifications?tab=operator" className="text-accent hover:underline">運用者へのお知らせ</Link><span className="mx-2">›</span><span>つくる</span>
-      </nav><Button onClick={() => void testSend()} disabled={saving}>自分にテスト送信</Button></div>
+        <Link href="/line-notifications" className="text-accent hover:underline">LINE通知</Link><span className="mx-2">›</span><Link href="/line-notifications?tab=operator" className="text-accent hover:underline">運用者へのお知らせ</Link><span className="mx-2">›</span><span>{editId ? 'なおす' : 'つくる'}</span>
+      </nav><Button onClick={() => void testSend()} disabled={saving || ruleLoading}>自分にテスト送信</Button></div>
 
       <div className="border-info bg-info-bg text-info flex items-start gap-2 rounded-control border px-4 py-3 text-sm">
         <Users className="mt-0.5 shrink-0" aria-hidden="true" size={17} />
@@ -258,11 +322,11 @@ export default function NewOperatorNotificationPage() {
       </div>
 
       <StickyBar
-        status={savedRuleId ? '下書きを保存しました。テスト後に公開できます。' : '下書きです。保存しても通知は始まりません。'}
+        status={ruleLoading ? '保存ずみのお知らせを読み込んでいます…' : savedRuleId ? '下書きを保存しました。テスト後に公開できます。' : '下書きです。保存しても通知は始まりません。'}
         actions={<>
           <Button href="/line-notifications?tab=operator" variant="secondary">やめる</Button>
-          <Button onClick={() => void saveDraft()} disabled={saving}>{saving ? '保存中…' : savedRuleId ? '保存し直す' : '下書きに保存'}</Button>
-          <Button onClick={() => void publish()} disabled={saving} variant="primary">運用者へのお知らせを公開</Button>
+          <Button onClick={() => void saveDraft()} disabled={saving || ruleLoading}>{saving ? '保存中…' : savedRuleId ? '保存し直す' : '下書きに保存'}</Button>
+          <Button onClick={() => void publish()} disabled={saving || ruleLoading} variant="primary">運用者へのお知らせを公開</Button>
         </>}
       />
       {/*
@@ -274,5 +338,14 @@ export default function NewOperatorNotificationPage() {
         [data-selects-wide] select { width: 100%; }
       `}</style>
     </div>
+  )
+}
+
+// useSearchParams を使うので、静的生成の境目に Suspense が要る。
+export default function NewOperatorNotificationPage() {
+  return (
+    <Suspense>
+      <NewOperatorNotificationInner />
+    </Suspense>
   )
 }

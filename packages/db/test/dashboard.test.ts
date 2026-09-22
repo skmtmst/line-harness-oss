@@ -5,6 +5,7 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import {
+  getBroadcastStats,
   getDashboardOverview,
   dashboardFreshness,
   recordFriendSnapshot,
@@ -616,5 +617,25 @@ describe('今月の配信(#666 N-003)', () => {
       expect(overview.sections.delivery.period).toBe('this-month');
       expect(overview.period).toBe(period);
     }
+  });
+
+  test('BROADCAST-14: 一覧の「今月の配信」も送った日で数え、下書き・予約を入れない', async () => {
+    const { countedBroadcasts } = seedDelivery();
+    // 今月作っただけの予約と下書き。送っていないので件数に入らない。
+    for (const [id, status] of [['b-sched', 'scheduled'], ['b-draft2', 'draft']] as const) {
+      sqlite.prepare(
+        `INSERT INTO broadcasts
+          (id, title, message_type, message_content, target_type, status, created_at, sent_at, line_account_id, account_ids)
+         VALUES (?, ?, 'text', '本文', 'all', ?, ?, NULL, 'account-a', NULL)`,
+      ).run(id, id, status, `${jstDate(0)}T11:00:00.000+09:00`);
+    }
+
+    const scope = { allowedAccountIds: ['account-a'], canSeeUnassigned: false } as const;
+    const stats = await getBroadcastStats(db, undefined, scope);
+    // 仕込みの「数えるか」と同じ集合。作成日で数えると下書き・予約・
+    // 月跨ぎ（先月作成→今月送信）がずれる。
+    expect(stats.thisMonth).toBe(countedBroadcasts.length);
+    expect(countedBroadcasts).toEqual(['b-today', 'b-edge', 'b-made-last-month', 'b-legacy']);
+    expect(stats.scheduled).toBe(1);
   });
 });

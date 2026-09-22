@@ -83,7 +83,8 @@ function AutoReplyEditInner() {
             responseContent: '',
             templateId: null,
             lineAccountId: null,
-            isActive: true,
+            // AUTOREPLY-08: 新しい応答は止まった状態で作る。
+            isActive: false,
             priority: 0,
             messageKinds: null,
           })
