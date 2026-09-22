@@ -59,6 +59,14 @@ export interface AutomationExecutionRunRow {
   skipped_actions: string | null;
   failed_action: string | null;
   failure_code: string | null;
+  /** いま公開中の版。実行した版との違いを画面で区別する（#1043）。 */
+  current_published_version_id: string | null;
+  current_version_number: number | null;
+  /**
+   * 待機中のstepに失敗の再試行が混ざっているか（#1043）。
+   * `wait` の待機は retry_at が NULL、失敗の再試行は retry_at を持つ。
+   */
+  has_retry_wait: number | null;
 }
 
 export interface AutomationExecutionRunSummaryRow {
@@ -76,6 +84,11 @@ export interface AutomationExecutionRunsQuery {
   to: string;
   status?: AutomationRunDomainStatus[];
   search?: string;
+  /**
+   * 既定では本番実行だけを出し、テスト実行は明示したときだけ含める
+   * （V6 25-1-B「既定の一覧では本番だけを出し、切替で含める」）。
+   */
+  includeTest?: boolean;
   limit: number;
   offset: number;
 }
@@ -88,6 +101,8 @@ function automationRunWhere(input: AutomationExecutionRunsQuery, includeFilters:
     'datetime(r.created_at) < datetime(?)',
   ];
   const binds: unknown[] = [...input.allowedAccountIds, input.from, input.to];
+  // テスト実行は一覧・集計・CSVすべてで既定除外。切替時だけ含める。
+  if (!input.includeTest) clauses.push('r.is_test = 0');
   if (includeFilters && input.status?.length) {
     clauses.push(`r.status IN (${input.status.map(() => '?').join(', ')})`);
     binds.push(...input.status);
@@ -119,6 +134,7 @@ export async function getAutomationExecutionRuns(
       `SELECT r.id, r.line_account_id, la.name AS account_name,
               r.automation_id, d.name AS automation_name, r.automation_version_id,
               v.version_number, r.is_test,
+              d.current_published_version_id, cv.version_number AS current_version_number,
               r.friend_id, f.display_name AS friend_name, r.source_event_id,
               v.trigger_type, r.status, r.started_at, r.completed_at, r.created_at,
               CASE WHEN r.started_at IS NOT NULL AND r.completed_at IS NOT NULL
@@ -127,10 +143,12 @@ export async function getAutomationExecutionRuns(
               GROUP_CONCAT(CASE WHEN s.status = 'success' THEN s.action_type END, ' / ') AS successful_actions,
               GROUP_CONCAT(CASE WHEN s.status = 'skipped' THEN s.action_type END, ' / ') AS skipped_actions,
               MAX(CASE WHEN s.status = 'failed' THEN s.action_type END) AS failed_action,
-              MAX(CASE WHEN s.status = 'failed' THEN s.error_code END) AS failure_code
+              MAX(CASE WHEN s.status = 'failed' THEN s.error_code END) AS failure_code,
+              MAX(CASE WHEN s.status = 'waiting' AND s.retry_at IS NOT NULL THEN 1 ELSE 0 END) AS has_retry_wait
          FROM automation_runs r
          JOIN automation_definitions d ON d.id = r.automation_id
          JOIN automation_versions v ON v.id = r.automation_version_id
+         LEFT JOIN automation_versions cv ON cv.id = d.current_published_version_id
          LEFT JOIN friends f ON f.id = r.friend_id
          LEFT JOIN line_accounts la ON la.id = r.line_account_id
          LEFT JOIN automation_run_steps s ON s.automation_run_id = r.id
@@ -186,6 +204,7 @@ export async function getAutomationExecutionRun(
     `SELECT r.id, r.line_account_id, la.name AS account_name,
             r.automation_id, d.name AS automation_name, r.automation_version_id,
             v.version_number, r.is_test,
+            d.current_published_version_id, cv.version_number AS current_version_number,
             r.friend_id, f.display_name AS friend_name, r.source_event_id,
             v.trigger_type, r.status, r.started_at, r.completed_at, r.created_at,
             CASE WHEN r.started_at IS NOT NULL AND r.completed_at IS NOT NULL
@@ -194,10 +213,12 @@ export async function getAutomationExecutionRun(
             GROUP_CONCAT(CASE WHEN s.status = 'success' THEN s.action_type END, ' / ') AS successful_actions,
             GROUP_CONCAT(CASE WHEN s.status = 'skipped' THEN s.action_type END, ' / ') AS skipped_actions,
             MAX(CASE WHEN s.status = 'failed' THEN s.action_type END) AS failed_action,
-            MAX(CASE WHEN s.status = 'failed' THEN s.error_code END) AS failure_code
+            MAX(CASE WHEN s.status = 'failed' THEN s.error_code END) AS failure_code,
+            MAX(CASE WHEN s.status = 'waiting' AND s.retry_at IS NOT NULL THEN 1 ELSE 0 END) AS has_retry_wait
        FROM automation_runs r
        JOIN automation_definitions d ON d.id = r.automation_id
        JOIN automation_versions v ON v.id = r.automation_version_id
+       LEFT JOIN automation_versions cv ON cv.id = d.current_published_version_id
        LEFT JOIN friends f ON f.id = r.friend_id
        LEFT JOIN line_accounts la ON la.id = r.line_account_id
        LEFT JOIN automation_run_steps s ON s.automation_run_id = r.id

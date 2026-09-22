@@ -8,6 +8,7 @@ import {
   getAutomationExecutionRun,
   getAutomationExecutionRuns,
   getAutomationExecutionRunSteps,
+  isOperationCapabilityStopped,
   type AutomationRunDomainStatus,
 } from '@line-crm/db';
 import type { Env } from '../index.js';
@@ -37,6 +38,7 @@ import {
   cancelAutomationRun,
   retryAutomationRun,
 } from '../services/automation-engine.js';
+import { accountFeatureAvailability } from '../services/feature-enforcement.js';
 import { listLimit } from './list-pagination.js';
 import { automationActionLabel, automationTriggerLabel } from '@line-crm/shared';
 
@@ -63,7 +65,8 @@ async function requireAutomationRetryPermission(c: Context<Env>, next: () => Pro
   const staff = c.get('staff');
   if (!staff || (staff.role === 'staff'
     && !staff.permissionKeys?.includes('automation.run.retry'))) {
-    return c.json({ success: false, error: '失敗した処理を再実行する権限がありません' }, 403);
+    // 再実行・取りやめの両方で使うため、動詞をどちらかに絞らない。
+    return c.json({ success: false, error: 'この実行を操作する権限がありません' }, 403);
   }
   await next();
 }
@@ -139,7 +142,9 @@ type ExecutionRunStatus =
   | 'claimed'
   | 'succeeded'
   | 'skipped'
+  | 'waiting'
   | 'retry_wait'
+  | 'partial'
   | 'permanent_failed'
   | 'cancelled';
 
@@ -176,6 +181,14 @@ interface AutomationExecutionRun {
   skippedActions: string[];
   failedAction: string | null;
   failureReason: string | null;
+  /**
+   * まだ終わっていない実行が、運用停止・機能無効で動けないときの理由
+   * （#1043：停止・権限を「待っています」と区別する）。
+   */
+  holdReason: string | null;
+  /** 実行した版がいまの公開版と同じか（#1043：現在の版と実行版の区別）。 */
+  isCurrentVersion: boolean;
+  currentVersionNumber: number | null;
 }
 
 interface AutomationExecutionRunsResponse {
@@ -194,19 +207,25 @@ interface AutomationExecutionRunsResponse {
 const COMMON_STATUS_TO_DOMAIN: Record<ExecutionRunStatus, AutomationRunDomainStatus[]> = {
   queued: ['queued'],
   claimed: ['running'],
+  waiting: ['waiting'],
   succeeded: ['success'],
   skipped: ['skipped_condition'],
+  // 待機(wait)と再試行待ちはdomainでは同じ `waiting`。行の中身
+  // （待機stepの retry_at の有無）で表示側を分けるため、retry_wait の
+  // 絞り込みは待機中全体を返す意図的な近似。
   retry_wait: ['waiting'],
-  permanent_failed: ['partial', 'failed'],
+  // 一部だけ成功は失敗とは別の状態として区別する（#1043）。
+  partial: ['partial'],
+  permanent_failed: ['failed'],
   cancelled: ['cancelled'],
 };
 
 const DOMAIN_STATUS_TO_COMMON: Record<AutomationRunDomainStatus, ExecutionRunStatus> = {
   queued: 'queued',
   running: 'claimed',
-  waiting: 'retry_wait',
+  waiting: 'waiting',
   success: 'succeeded',
-  partial: 'permanent_failed',
+  partial: 'partial',
   failed: 'permanent_failed',
   cancelled: 'cancelled',
   skipped_condition: 'skipped',
@@ -230,6 +249,41 @@ function defaultWindow() {
   return { from: from.toISOString(), to: to.toISOString() };
 }
 
+/**
+ * まだ終わっていない実行が「運用停止」「機能無効」で claim できないとき、
+ * その理由をアカウントごとに人の言葉で返す（#1043）。
+ *
+ * 実行エンジンは停止中の実行を消さず queued のまま残し、再開後に動かす
+ * 設計のため、理由は書き込みではなく読み取り時に付け足す。
+ * 理由が取れなくても一覧自体は落とさない。
+ */
+async function holdReasonByAccount(
+  db: D1Database,
+  rows: readonly { line_account_id: string; status: AutomationRunDomainStatus }[],
+): Promise<ReadonlyMap<string, string>> {
+  const reasons = new Map<string, string>();
+  const accountIds = [...new Set(
+    rows
+      .filter((row) => row.status === 'queued' || row.status === 'waiting')
+      .map((row) => row.line_account_id),
+  )];
+  await Promise.all(accountIds.map(async (accountId) => {
+    try {
+      if (await isOperationCapabilityStopped(db, accountId, 'automation_actions')) {
+        reasons.set(accountId, '運用停止中のため、いまは動かせません。再開されると動きます');
+        return;
+      }
+      const availability = await accountFeatureAvailability(db, accountId, 'automations');
+      if (!availability.effectiveEnabled) {
+        reasons.set(accountId, availability.message ?? 'このアカウントではオートメーションを使えません');
+      }
+    } catch {
+      // 理由を取れなくても記録の表示自体は止めない。
+    }
+  }));
+  return reasons;
+}
+
 /** DB行 → 台帳・詳細・CSVで共通の実行記録の形。 */
 function mapExecutionRun(row: {
   id: string;
@@ -240,6 +294,9 @@ function mapExecutionRun(row: {
   automation_version_id: string;
   version_number: number;
   is_test: number;
+  current_published_version_id: string | null;
+  current_version_number: number | null;
+  has_retry_wait: number | null;
   friend_id: string | null;
   friend_name: string | null;
   source_event_id: string;
@@ -253,19 +310,30 @@ function mapExecutionRun(row: {
   skipped_actions: string | null;
   failed_action: string | null;
   failure_code: string | null;
-}): AutomationExecutionRun {
+}, holdReason: string | null = null): AutomationExecutionRun {
   const successfulActions = actionLabels(row.successful_actions);
   const skippedActions = actionLabels(row.skipped_actions);
   const failedAction = row.failed_action ? automationActionLabel(row.failed_action) : null;
   const failureReason = safeFailureReason(row.failure_code, failedAction);
-  const statusLabel = DOMAIN_STATUS_TO_COMMON[row.status];
+  // domainの `waiting` は待機(wait)と失敗の再試行待ちを兼ねる。
+  // 待機中stepに retry_at があるときだけ再試行待ちとする（#1043）。
+  const statusLabel: ExecutionRunStatus = row.status === 'waiting' && Number(row.has_retry_wait ?? 0) > 0
+    ? 'retry_wait'
+    : DOMAIN_STATUS_TO_COMMON[row.status];
+  // まだ終わっていない実行の「いま止まっている理由」。
+  const pendingReason = row.status === 'queued' || row.status === 'waiting'
+    ? holdReason
+      ?? (row.status === 'waiting'
+        ? (statusLabel === 'retry_wait' ? '失敗した処理の再試行を待っています' : '設定した時刻まで待っています')
+        : null)
+    : null;
   const detail = row.status === 'skipped_condition'
     ? '条件に合わなかったため、何もしていません'
     : row.status === 'failed'
       ? failureReason
       : row.status === 'partial'
         ? [successfulActions.join('／'), skippedActions.length ? `${skippedActions.join('／')}は見送り` : null, failedAction ? failureReason : null].filter(Boolean).join('。') || null
-        : successfulActions.join('／') || null;
+        : [successfulActions.join('／') || null, pendingReason].filter(Boolean).join('。') || null;
   return {
     id: row.id,
     ownerKind: 'automation',
@@ -301,18 +369,25 @@ function mapExecutionRun(row: {
       : row.status === 'partial' && (row.failed_action || row.failure_code)
         ? failureReason
         : null,
+    holdReason: holdReason ?? null,
+    isCurrentVersion: row.current_published_version_id != null
+      && row.automation_version_id === row.current_published_version_id,
+    currentVersionNumber: row.current_version_number == null
+      ? null
+      : Number(row.current_version_number),
   };
 }
 
-const RUN_STATUS_LABEL_CSV: Record<AutomationRunDomainStatus, string> = {
+const RUN_STATUS_LABEL_CSV: Record<ExecutionRunStatus, string> = {
   queued: '待機中',
-  running: '実行中',
-  waiting: '再試行待ち',
-  success: '成功',
+  claimed: '実行中',
+  waiting: '待機中',
+  retry_wait: '再試行待ち',
+  succeeded: '成功',
   partial: '一部失敗',
-  failed: '失敗',
+  permanent_failed: '失敗',
   cancelled: '取消',
-  skipped_condition: '条件に合わず',
+  skipped: '条件に合わず',
 };
 
 function csvCell(value: string | number | null | undefined): string {
@@ -343,7 +418,7 @@ function executionRunsCsv(items: AutomationExecutionRun[]): string {
       `v${item.versionNumber}`,
       item.friendName,
       item.triggerLabel,
-      RUN_STATUS_LABEL_CSV[item.domainStatus],
+      RUN_STATUS_LABEL_CSV[item.status],
       item.detail,
       item.isTest ? 'テスト' : '',
       item.durationMs,
@@ -597,6 +672,14 @@ automations.get(
           ? COMMON_STATUS_TO_DOMAIN[rawStatus]
           : undefined;
     const wantsCsv = c.req.query('format') === 'csv';
+    if (wantsCsv) {
+      // V6 §9: CSV書き出しは個別権限 `automation.run.export`。
+      // 見るだけの権限（/automations）では出せない。
+      const staff = c.get('staff');
+      if (staff.role === 'staff' && !staff.permissionKeys?.includes('automation.run.export')) {
+        return c.json({ success: false, error: '実行記録を書き出す権限がありません' }, 403);
+      }
+    }
     // CSVは画面の1頁ではなく絞り込み全体を出す。暴走だけ上限で留める。
     const limit = wantsCsv
       ? 5_000
@@ -605,6 +688,8 @@ automations.get(
     const defaults = defaultWindow();
     const from = c.req.query('from') || defaults.from;
     const to = c.req.query('to') || defaults.to;
+    // テスト実行は既定で除き、切替のときだけ含める（V6 25-1-B）。
+    const includeTest = c.req.query('include_test') === '1' || c.req.query('include_test') === 'true';
 
     const result = await getAutomationExecutionRuns(c.env.DB, {
       allowedAccountIds,
@@ -612,11 +697,16 @@ automations.get(
       to,
       status,
       search: c.req.query('search'),
+      includeTest,
       limit,
       offset,
     });
 
-    const items: AutomationExecutionRun[] = result.rows.map(mapExecutionRun);
+    // 運用停止・機能無効で動けない実行に、その理由を付ける（#1043）。
+    const holdReasons = await holdReasonByAccount(c.env.DB, result.rows);
+    const items: AutomationExecutionRun[] = result.rows.map(
+      (row) => mapExecutionRun(row, holdReasons.get(row.line_account_id) ?? null),
+    );
     if (wantsCsv) {
       return new Response(executionRunsCsv(items), {
         headers: {
@@ -699,11 +789,12 @@ automations.get(
         allowedAccountIds: scope.allowedAccountIds,
       });
       if (!row) return c.json({ success: false, error: '実行記録が見つかりません' }, 404);
+      const holdReasons = await holdReasonByAccount(c.env.DB, [row]);
       const steps = await getAutomationExecutionRunSteps(c.env.DB, row.id);
       return c.json({
         success: true,
         data: {
-          ...mapExecutionRun(row),
+          ...mapExecutionRun(row, holdReasons.get(row.line_account_id) ?? null),
           steps: steps.map((step) => ({
             stepKey: step.step_key,
             actionType: step.action_type,
@@ -733,10 +824,12 @@ automations.get(
  *
  * 待機中・実行中・再試行待ちの実行を cancelled で閉じる。
  * 終わった実行は 409、無い・範囲外は 404、取消済みはそのまま成功。
+ * V6 §9: 取り消しは再実行と同じ `automation.run.retry` の個別権限。
  */
 automations.post(
   '/api/automation-runs/:id/cancel',
   requireAutomationPermission,
+  requireAutomationRetryPermission,
   requireRole('owner', 'admin', 'staff'),
   async (c) => {
     try {
