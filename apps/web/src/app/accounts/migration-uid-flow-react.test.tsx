@@ -36,6 +36,12 @@ const net = vi.hoisted(() => ({
   detailResponders: new Map<string, () => Promise<Response>>(),
   /** 自分自身（実行権限の案内に使う）。 */
   me: { id: 'owner-2', role: 'owner' } as { id: string; role: string } | null,
+  /** TECH-07: 通信断・応答喪失を再現する。'network' で fetch が投げる。 */
+  failItemPatch: null as null | 'network' | { status: number; error: string },
+  failExecute: null as null | 'network' | { status: number; error: string },
+  failRollback: null as null | 'network',
+  /** 対応表GETの回数（結果不明時の読み直しを見る）。 */
+  detailGets: 0,
 }))
 
 vi.mock('next/link', () => ({
@@ -98,15 +104,27 @@ function installFetch() {
     }
     if (path === '/api/friends/migrations' && method === 'GET') return json(net.runs)
     const itemMatch = path.match(/^\/api\/friends\/migrations\/[^/]+\/items\/[^/]+$/)
-    if (itemMatch && method === 'PATCH') return json({ unresolved: 0 })
+    if (itemMatch && method === 'PATCH') {
+      if (net.failItemPatch === 'network') throw new TypeError('Failed to fetch')
+      if (net.failItemPatch) {
+        return new Response(JSON.stringify({ success: false, error: net.failItemPatch.error }), { status: net.failItemPatch.status, headers: { 'Content-Type': 'application/json' } })
+      }
+      return json({ unresolved: 0 })
+    }
     if (path.endsWith('/execute') && method === 'POST') {
+      if (net.failExecute === 'network') throw new TypeError('Failed to fetch')
+      if (net.failExecute) {
+        return new Response(JSON.stringify({ success: false, error: net.failExecute.error }), { status: net.failExecute.status, headers: { 'Content-Type': 'application/json' } })
+      }
       return json(runFixture({ status: 'completed', counts: { total: 1, auto: 0, review: 1, unmatched: 0, conflict: 0, applied: 1, failed: 0 } }))
     }
     if (path.endsWith('/rollback') && method === 'POST') {
+      if (net.failRollback === 'network') throw new TypeError('Failed to fetch')
       return json({ ...runFixture({ status: 'rolled_back' }), rolledBack: 1 })
     }
     const detailMatch = path.match(/^\/api\/friends\/migrations\/([^/]+)$/)
     if (detailMatch && method === 'GET') {
+      net.detailGets += 1
       const responder = net.detailResponders.get(detailMatch[1])
       if (responder) return responder()
       const run = net.runs.find((entry) => entry.id === detailMatch[1]) ?? runFixture({ id: detailMatch[1] })
@@ -126,6 +144,10 @@ beforeEach(() => {
   net.runs = [runFixture()]
   net.detailResponders = new Map()
   net.me = { id: 'owner-2', role: 'owner' }
+  net.failItemPatch = null
+  net.failExecute = null
+  net.failRollback = null
+  net.detailGets = 0
   installFetch()
   ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
   host = document.createElement('div')
@@ -312,5 +334,92 @@ describe('対応表の遅延応答（FRIEND-16）', () => {
     await flush()
     expect(document.body.textContent).toContain('U-C-888')
     expect(document.body.textContent).not.toContain('U-B-999')
+  })
+})
+
+describe('通信例外の結果不明（TECH-07 / FRIEND-33/34）', () => {
+  it('UID判断の通信断は「結果不明」と伝え、対応表を読み直す', async () => {
+    net.failItemPatch = 'network'
+    await render()
+    await flush()
+    fireEvent.click(buttonByText('詳細を見る'))
+    await flush()
+    const getsBefore = net.detailGets
+    fireEvent.click(buttonByText('この組合せを承認', openDialog()))
+    await flush()
+    // 「保存できませんでした」ではなく「応答を確認できなかった」と区別する。
+    expect(openDialog().textContent).toContain('応答を確認できませんでした')
+    expect(document.body.textContent).toContain('対応表を読み直して')
+    // 実際の判断を確かめるため対応表を読み直す。無条件の再送はしない。
+    expect(net.detailGets).toBeGreaterThan(getsBefore)
+    const patches = net.calls.filter((call) => call.method === 'PATCH')
+    expect(patches).toHaveLength(1)
+    // busy は必ず解除される（操作中のまま残らない）。
+    expect(buttonByText('この組合せを承認', openDialog()).disabled).toBe(false)
+  })
+
+  it('UID判断の確定失敗（サーバー応答あり）は結果不明と混ぜない', async () => {
+    net.failItemPatch = { status: 500, error: 'internal error' }
+    await render()
+    await flush()
+    fireEvent.click(buttonByText('詳細を見る'))
+    await flush()
+    const getsBefore = net.detailGets
+    fireEvent.click(buttonByText('この組合せを承認', openDialog()))
+    await flush()
+    expect(document.body.textContent).not.toContain('応答を確認できませんでした')
+    // サーバーが拒否した失敗では読み直しを増やさない。
+    expect(net.detailGets).toBe(getsBefore)
+  })
+
+  it('本移行の通信断は結果不明を示して履歴を読み直し、二重送信しない', async () => {
+    net.failExecute = 'network'
+    await render()
+    await flush()
+    fireEvent.click(buttonByText('本移行を実行'))
+    await flush()
+    const getsBefore = net.detailGets
+    fireEvent.click(buttonByText('本移行を実行', openDialog()))
+    await flush()
+    const dialog = openDialog()
+    expect(dialog.textContent).toContain('応答を確認できませんでした')
+    expect(dialog.textContent).toContain('履歴を読み直して')
+    expect(net.calls.filter((call) => call.path.endsWith('/execute') && call.method === 'POST')).toHaveLength(1)
+    expect(net.detailGets).toBeGreaterThan(getsBefore)
+    // busy 解除で閉じられる。再実行は操作者の判断に委ねる。
+    fireEvent.click(buttonByText('キャンセル', dialog))
+    await flush()
+  })
+
+  it('本移行の確定失敗（サーバー応答あり）は結果不明メッセージを出さない', async () => {
+    net.failExecute = { status: 409, error: 'already executing' }
+    await render()
+    await flush()
+    fireEvent.click(buttonByText('本移行を実行'))
+    await flush()
+    fireEvent.click(buttonByText('本移行を実行', openDialog()))
+    await flush()
+    const dialog = openDialog()
+    expect(dialog.textContent).not.toContain('応答を確認できませんでした')
+    expect(dialog.textContent).toContain('already executing')
+  })
+
+  it('切り戻しの通信断も結果不明を示して履歴を読み直す', async () => {
+    net.failRollback = 'network'
+    net.runs = [runFixture({
+      status: 'completed', rollbackable: true,
+      counts: { total: 1, auto: 0, review: 1, unmatched: 0, conflict: 0, applied: 1, failed: 0 },
+    })]
+    await render()
+    await flush()
+    fireEvent.click(buttonByText('この移行を切り戻す'))
+    await flush()
+    const getsBefore = net.detailGets
+    fireEvent.click(buttonByText('切り戻す', openDialog()))
+    await flush()
+    const dialog = openDialog()
+    expect(dialog.textContent).toContain('応答を確認できませんでした')
+    expect(net.calls.filter((call) => call.path.endsWith('/rollback') && call.method === 'POST')).toHaveLength(1)
+    expect(net.detailGets).toBeGreaterThan(getsBefore)
   })
 })

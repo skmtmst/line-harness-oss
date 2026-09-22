@@ -56,64 +56,6 @@ function Figure({ label, value, unit }: { label: string; value: number | null; u
   )
 }
 
-export function InboxStatusCard({ inbox }: { inbox: DashboardOverview['inbox'] }) {
-  /*
-    設計は「未対応 / 対応中 / 対応済み」の3本。
-    以前は対応中と対応済みを足して「対応済み」1本にしていたので、
-    **手をつけたが終わっていないもの（対応中）が画面から消えていた。**
-    未対応が減っても、それが片付いたのか手をつけただけなのかが読めない。
-  */
-  const rows = [
-    { label: '未対応', value: inbox.unanswered, bar: 'bg-warning' },
-    { label: '対応中', value: inbox.inProgress, bar: 'bg-info' },
-    { label: '対応済み', value: inbox.resolved, bar: 'bg-success' },
-  ]
-  const total = rows.reduce((sum, r) => sum + r.value, 0)
-
-  return (
-    <SideCard title="対応状況" action={{ label: '受信箱へ', href: '/chats' }}>
-      <div className="space-y-3">
-        {rows.map((r) => (
-          <div key={r.label}>
-            <div className="mb-1 flex items-baseline justify-between">
-              <span className="text-ink-secondary text-xs">{r.label}</span>
-              <span className="text-ink text-sm font-bold tabular-nums">
-                {r.value.toLocaleString('ja-JP')} 人
-              </span>
-            </div>
-            <div className="bg-canvas-sunken h-1.5 overflow-hidden rounded-full">
-              {/* 0件のときに 0/0 で NaN にしない。棒は空のまま出す。 */}
-              <div
-                className={`${r.bar} h-full rounded-full`}
-                style={{ width: total > 0 ? `${(r.value / total) * 100}%` : '0%' }}
-              />
-            </div>
-          </div>
-        ))}
-        <div className="border-hairline border-t pt-3">
-          {/*
-            設計の「平均の初回返信」。107 で受信と初回返信の時刻を残す
-            ようにしたので出せるようになった。当てた日より前の往復は
-            記録が無いため平均に入らない。
-          */}
-          <Figure
-            label="平均の初回返信"
-            value={inbox.averageFirstReplyMinutes}
-            unit="分"
-          />
-          <div className="mt-2">
-            <Figure
-              label="最も古い未対応"
-              value={inbox.oldestUnansweredMinutes}
-              unit="分前"
-            />
-          </div>
-        </div>
-      </div>
-    </SideCard>
-  )
-}
-
 /**
  * 今月の配信。**送信枠はここに出さない。**
  *

@@ -449,7 +449,11 @@ export default function BroadcastDetail({ broadcastId }: BroadcastDetailProps) {
             {broadcast.scheduledAt && (
               <div className="flex justify-between">
                 <dt className="text-ink-faint">予約日時</dt>
-                <dd className="text-ink">{new Date(broadcast.scheduledAt).toLocaleString('ja-JP')}</dd>
+                {/*
+                  予約時刻は日本時間の約束（INBOX-21）。timeZone を書かないと
+                  端末の時間帯でずれ、入力・一覧・詳細で別の時刻に見える。
+                */}
+                <dd className="text-ink">{new Date(broadcast.scheduledAt).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })}</dd>
               </div>
             )}
           </dl>
