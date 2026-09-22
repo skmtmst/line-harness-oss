@@ -49,6 +49,38 @@ beforeEach(() => {
 })
 
 describe('リマインダ下書きの入力検証', () => {
+  /*
+   * REMINDER-07: ひな形なしの新規作成は通知0件の下書きとして保存する。
+   * 空本文の通を1件こしらえて送ると422で基本設定から先へ進めなかった。
+   * 0件は未完成の下書きとして許し、公開・送信の必須検査は公開口で行う。
+   */
+  it('通知0件の下書きを作成できる', async () => {
+    mocks.createDraft.mockResolvedValue({
+      reminder: { id: 'r-new', name: '予約前のお知らせ', created_at: '2026-09-22T00:00:00.000Z' },
+      version: {
+        id: 'v-1',
+        reminder_id: 'r-new',
+        version_number: 1,
+        status: 'draft',
+        settings_snapshot: JSON.stringify(draft()),
+        last_test_status: null,
+        last_tested_at: null,
+        published_at: null,
+      },
+    })
+    const response = await createApp({}).request('/api/reminders/drafts', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(draft({ steps: [] })),
+    })
+
+    expect(response.status).toBe(201)
+    expect(mocks.createDraft).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ steps: [] }),
+    )
+  })
+
   it('基準日のずらし方が30日を超える下書きを保存しない', async () => {
     const response = await createApp({}).request('/api/reminders/drafts', {
       method: 'POST',
