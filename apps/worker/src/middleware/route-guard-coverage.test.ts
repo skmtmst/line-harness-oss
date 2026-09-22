@@ -221,6 +221,7 @@ const STAFF_FAIL_CLOSED_SNAPSHOT: string[] = [
     'GET /api/affiliates/:id/links',
     'GET /api/affiliates/:id/report',
     'GET /api/broadcast-message-assets',
+    'GET /api/broadcast-message-assets/counts',
     'GET /api/duplicates/stats',
     'GET /api/field-migrations/:runId',
     'GET /api/friend-fields-stats',

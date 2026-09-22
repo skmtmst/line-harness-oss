@@ -138,7 +138,8 @@ describe('リッチメニュー一覧のKPI', () => {
   test('アカウント切替後に遅れて届いた前アカウントのKPIを表示しない', async () => {
     let resolveAccountAList!: (value: ApiResult) => void
     let resolveAccountATaps!: (value: ApiResult) => void
-    let resolveAccountAExternal!: (value: ApiResult) => void
+    // PERF-05: 外部状態は作業画面を開くまで取らない。未発行のときは resolve が無い。
+    let resolveAccountAExternal: ((value: ApiResult) => void) | undefined
     fixture.listPage = (accountId) => accountId === 'account-a'
       ? new Promise((resolve) => { resolveAccountAList = resolve })
       : Promise.resolve(listResult(8, 6, 4))
@@ -157,7 +158,7 @@ describe('リッチメニュー一覧のKPI', () => {
     await act(async () => {
       resolveAccountAList(listResult(1, 1, 1))
       resolveAccountATaps(tapResult(10, { label: 'A社ボタン', taps: 10 }))
-      resolveAccountAExternal({ success: true, data: { currentDefault: null, lineMenus: [] } })
+      resolveAccountAExternal?.({ success: true, data: { currentDefault: null, lineMenus: [] } })
     })
 
     expect(within(kpis).queryByText('A社ボタン')).toBeNull()

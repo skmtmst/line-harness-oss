@@ -83,13 +83,6 @@ interface TemplateDetail {
 
 type TypeFilter = 'all' | 'single' | 'multiple' | 'variables' | 'question' | 'unused'
 
-const ASSET_KINDS: readonly BroadcastAssetKind[] = [
-  'card_message',
-  'rich_message',
-  'coupon',
-  'research',
-]
-
 /*
  * 種類の名前は `./template-message-type` に一本化した。
  * 一覧・詳細・引き出しで別の書き方をすると、片方だけ直って
@@ -247,21 +240,23 @@ export default function TemplatesPage() {
 
   useEffect(() => { load() }, [load])
 
+  /*
+   * PERF-04: 種類タブの件数は集計専用の口で1回だけ取る。
+   * 以前は4種類それぞれの素材一覧（各行のpayload込み）を取って
+   * 件数を数えていた。中身は種類の節を開いたとき loadAssets が取る。
+   */
   useEffect(() => {
     let cancelled = false
     if (!selectedAccountId) {
       setAssetCounts({})
       return () => { cancelled = true }
     }
-    void Promise.all(
-      ASSET_KINDS.map(async (kind) => {
-        const result = await api.broadcastMessageAssets.list({ kind, accountId: selectedAccountId })
-        return [kind, result.success ? result.data.length : undefined] as const
-      }),
-    ).then((entries) => {
-      if (cancelled) return
-      setAssetCounts(Object.fromEntries(entries.filter((entry) => entry[1] !== undefined)))
-    })
+    void api.broadcastMessageAssets.counts({ accountId: selectedAccountId })
+      .then((result) => {
+        if (cancelled || !result.success) return
+        setAssetCounts(result.data)
+      })
+      .catch(() => undefined)
     return () => { cancelled = true }
   }, [selectedAccountId])
 

@@ -908,6 +908,66 @@ export async function getFormSubmissionsByFriend(
   return result.results;
 }
 
+/**
+ * 友だちのフォーム回答の総数だけを返す（PERF-13）。
+ * 初期応答を軽くするため、本文を読まず件数だけを数える。
+ * ※同名で「フォーム×友だち」の回数を数える countFormSubmissionsByFriend が
+ * 後段にある（「1人1回」判定用）。こちらは友だちの全フォーム横断。
+ */
+export async function countFriendFormSubmissions(
+  db: D1Database,
+  friendId: string,
+): Promise<number> {
+  const row = await db
+    .prepare('SELECT COUNT(*) AS total FROM form_submissions WHERE friend_id = ?')
+    .bind(friendId)
+    .first<{ total: number }>();
+  return row?.total ?? 0;
+}
+
+/**
+ * フォーム回答履歴を古いものへ遡るカーソル式の取得（PERF-13）。
+ *
+ * 詳細画面の回答タブは「さらに読み込む」で続きを取る。
+ * cursor には前のページ末尾の `created_at|id` をそのまま渡す。
+ * 同じ created_at の行が跨がっても id で続きが切れないよう、
+ * (created_at, id) の組で見る。
+ */
+export async function getFormSubmissionsByFriendCursor(
+  db: D1Database,
+  friendId: string,
+  input: { limit?: number; cursor?: string | null } = {},
+): Promise<{ items: FriendFormSubmission[]; nextCursor: string | null }> {
+  const safeLimit = boundedListLimit(input.limit ?? 10, 10);
+  let cursorClause = '';
+  const bindings: unknown[] = [friendId];
+  if (input.cursor) {
+    const sep = input.cursor.lastIndexOf('|');
+    const cursorCreatedAt = sep > 0 ? input.cursor.slice(0, sep) : input.cursor;
+    const cursorId = sep > 0 ? input.cursor.slice(sep + 1) : '';
+    cursorClause = ' AND (fs.created_at < ? OR (fs.created_at = ? AND fs.id < ?))';
+    bindings.push(cursorCreatedAt, cursorCreatedAt, cursorId);
+  }
+  const result = await db
+    .prepare(
+      `SELECT fs.*, f.name AS form_name, f.fields AS form_fields
+       FROM form_submissions fs
+       JOIN forms f ON f.id = fs.form_id
+       WHERE fs.friend_id = ?${cursorClause}
+       ORDER BY fs.created_at DESC, fs.id DESC
+       LIMIT ?`,
+    )
+    .bind(...bindings, safeLimit + 1)
+    .all<FriendFormSubmission>();
+  const items = result.results.slice(0, safeLimit);
+  const hasMore = result.results.length > safeLimit;
+  const last = items[items.length - 1];
+  return {
+    items,
+    nextCursor: hasMore && last ? `${last.created_at}|${last.id}` : null,
+  };
+}
+
 export interface CreateFormSubmissionInput {
   formId: string;
   formVersionId?: string | null;

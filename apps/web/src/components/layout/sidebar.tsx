@@ -51,6 +51,23 @@ function isBooleanRecord(value: unknown): value is Record<string, boolean> {
     && Object.values(value).every((entry) => typeof entry === 'boolean')
 }
 
+/*
+ * PERF-08: バッジ件数をアカウント単位で共有する直近値。
+ * 切替・再マウントで 0 へちらつかせず、表示は直近値で復帰させてから
+ * 裏で取り直す。値は表示専用で、正本は常にAPIの応答。
+ */
+interface SidebarCounts {
+  unanswered: number
+  photos: number
+  operations: number
+}
+const sidebarCountCache = new Map<string, SidebarCounts>()
+
+/** テスト用: 共有している直近値を捨てる。 */
+export function clearSidebarCountCache(): void {
+  sidebarCountCache.clear()
+}
+
 export default function Sidebar({
   friendAttributesV2Mode = false,
   preview = false,
@@ -244,13 +261,32 @@ export default function Sidebar({
     .filter((section) => section.items.length > 0)
     .filter((section) => !friendAttributesV2Mode || !['自動化', '予約', '設定'].includes(section.label ?? ''))
 
+  /*
+   * PERF-08: バッジ用の件数は「出す項目があるもの」だけを購読する。
+   *
+   * 写真審査（nenMembers.overview）は、写真バッジの項目がメニューに無い
+   * 環境（機能OFF・権限なし）でも毎サイクル呼ばれて 403 を繰り返していた。
+   * メニューに写真バッジが無いなら呼ばない。未対応・運用警告は必須購読で、
+   * 写真審査は別の購読に分け、成功した分から先に反映する。
+   *
+   * アカウント切替や再マウントで 0 に戻ると数字がちらつくので、
+   * アカウントごとの直近値をモジュールに共有しておき、表示はそれで
+   * 即復帰させてから裏で取り直す。
+   */
+  const photosBadgeVisible = visibleSections.some(
+    (section) => section.items.some((item) => item.badge === 'photos'),
+  )
+
   useEffect(() => {
     if (!selectedAccountId) {
       setUnansweredCount(0)
-      setPendingPhotoCount(0)
       setOperationIssueCount(0)
       return
     }
+    const accountId = selectedAccountId
+    const cached = sidebarCountCache.get(accountId)
+    setUnansweredCount(cached?.unanswered ?? 0)
+    setOperationIssueCount(cached?.operations ?? 0)
     let cancelled = false
     // 連続操作で fetch が並走した際、遅い古いレスポンスが新しい値を上書きしない
     // ように発行順 seq でガードする。
@@ -261,22 +297,22 @@ export default function Sidebar({
         const { api } = await import('@/lib/api')
         // 運用警告は要約APIを1回だけ呼ぶ。件数分の個別取得は呼ばない(#630)。
         // ログ本文は要らない(警告数だけ)。staff に見える分だけが返る。
-        const [unanswered, nen, summary] = await Promise.allSettled([
+        const [unanswered, summary] = await Promise.allSettled([
           api.inbox.unanswered.count(),
-          api.nenMembers.overview(),
           api.health.summary(),
         ])
         if (cancelled || mySeq !== seq) return
+        const entry = sidebarCountCache.get(accountId) ?? { unanswered: 0, photos: 0, operations: 0 }
         if (unanswered.status === 'fulfilled' && unanswered.value.success) {
           setUnansweredCount(unanswered.value.data.total)
-        }
-        // 写真審査は機能を切っている環境があるので、失敗しても他を巻き込まない。
-        if (nen.status === 'fulfilled' && nen.value.success) {
-          setPendingPhotoCount(nen.value.data.pendingPhotos)
+          entry.unanswered = unanswered.value.data.total
         }
         if (summary.status === 'fulfilled' && summary.value.success) {
-          setOperationIssueCount(summary.value.data.warningCount + summary.value.data.dangerCount)
+          const total = summary.value.data.warningCount + summary.value.data.dangerCount
+          setOperationIssueCount(total)
+          entry.operations = total
         }
+        sidebarCountCache.set(accountId, entry)
       } catch {
         // サイレント失敗
       }
@@ -291,6 +327,42 @@ export default function Sidebar({
       window.removeEventListener(UNANSWERED_REFRESH_EVENT, onRefresh)
     }
   }, [selectedAccountId])
+
+  // 写真審査の件数は、写真バッジがメニューに出ているときだけ購読する。
+  // 別購読なので、権限・機能で項目が無い環境では 1回も呼ばれない。
+  useEffect(() => {
+    if (!selectedAccountId || !photosBadgeVisible) {
+      setPendingPhotoCount(0)
+      return
+    }
+    const accountId = selectedAccountId
+    const cached = sidebarCountCache.get(accountId)
+    setPendingPhotoCount(cached?.photos ?? 0)
+    let cancelled = false
+    let seq = 0
+    const fetchPhotos = async () => {
+      const mySeq = ++seq
+      try {
+        const { api } = await import('@/lib/api')
+        const nen = await api.nenMembers.overview()
+        if (cancelled || mySeq !== seq) return
+        if (nen.success) {
+          setPendingPhotoCount(nen.data.pendingPhotos)
+          const entry = sidebarCountCache.get(accountId) ?? { unanswered: 0, photos: 0, operations: 0 }
+          entry.photos = nen.data.pendingPhotos
+          sidebarCountCache.set(accountId, entry)
+        }
+      } catch {
+        // サイレント失敗
+      }
+    }
+    fetchPhotos()
+    const id = setInterval(fetchPhotos, 5 * 60_000)
+    return () => {
+      cancelled = true
+      clearInterval(id)
+    }
+  }, [selectedAccountId, photosBadgeVisible])
 
   useEffect(() => { setIsOpen(false) }, [pathname])
   useEffect(() => {

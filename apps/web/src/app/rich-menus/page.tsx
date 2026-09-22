@@ -182,6 +182,8 @@ export default function RichMenusListPage() {
   usePageTitle(showExternal ? '管理画面の外のメニューを取り込む' : 'リッチメニュー')
   const activeAccountRef = useRef<string | null>(selectedAccount?.id ?? null)
   const importRequestGenerationRef = useRef(0)
+  /** PERF-05: このアカウントで外部状態を一度でも取ったか。変更有後の取り直し判定に使う。 */
+  const externalLoadedRef = useRef(false)
   const [groups, setGroups] = useState<RichMenuGroupListItem[]>([])
   const [query, setQuery] = useState('')
   const [external, setExternal] = useState<{
@@ -209,6 +211,10 @@ export default function RichMenusListPage() {
   } | null>(null)
   const [reordering, setReordering] = useState(false)
   const [tapStats, setTapStats] = useState<RichMenuTapStats | null>(null)
+  /** PERF-05: 集計は一覧とは別に取るので、状態も別に持つ（0件・未取得・失敗を区別）。 */
+  const [tapStatsStatus, setTapStatsStatus] = useState<'loading' | 'ready' | 'error'>('loading')
+  /** PERF-05: 外部状態は作業画面を開いてから取る。idle は「まだ取っていない」。 */
+  const [externalStatus, setExternalStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null)
   /*
     消したときの影響（契約 #608）。**窓を開けてから読む。**
@@ -241,6 +247,9 @@ export default function RichMenusListPage() {
     setGroupFacets(null)
     setExternal(null)
     setTapStats(null)
+    setTapStatsStatus('loading')
+    setExternalStatus('idle')
+    externalLoadedRef.current = false
     setError(null)
     setExternalError(null)
     setApplyTo(null)
@@ -260,57 +269,35 @@ export default function RichMenusListPage() {
     if (!selectedAccount?.id) setLoading(false)
   }, [selectedAccount?.id])
 
-  const reload = useCallback(async () => {
+  /*
+   * PERF-05: 一覧の検索・ページングはD1の一覧だけを取り直す。
+   * タップ集計とLINE上の外部状態は検索のたびに変わらないので、
+   * アカウント単位で1回取って共有する。外部状態はLINE APIへの往復を
+   * 伴う重い口なので、「管理画面の外のメニュー」作業画面を開いたとき
+   * （または公開・取り込み・削除で中身が変わったあと）だけ取る。
+   */
+  const loadList = useCallback(async () => {
     if (!selectedAccount?.id) {
       setLoading(false)
       return
     }
     const accountId = selectedAccount.id
     setLoading(true)
-    setGroups([])
-    setExternal(null)
-    setTapStats(null)
     setError(null)
-    setExternalError(null)
     try {
-      // 並列に: D1 管理 group の一覧と、LINE 上の現状
-      const [groupsRes, externalRes, tapRes] = await Promise.allSettled([
-        api.richMenuGroups.listPage(accountId, {
-          page: reordering ? 1 : page,
-          limit: reordering ? 200 : pageSize,
-          query: reordering ? '' : deferredQuery,
-          folderId: reordering ? '' : folderFilter,
-          filter: reordering ? '' : savedFilter,
-          sort: reordering ? 'priority' : sortKey,
-        }),
-        api.richMenuGroups.external(accountId),
-        api.richMenuGroups.tapStats(accountId),
-      ])
+      const groupsRes = await api.richMenuGroups.listPage(accountId, {
+        page: reordering ? 1 : page,
+        limit: reordering ? 200 : pageSize,
+        query: reordering ? '' : deferredQuery,
+        folderId: reordering ? '' : folderFilter,
+        filter: reordering ? '' : savedFilter,
+        sort: reordering ? 'priority' : sortKey,
+      })
       if (activeAccountRef.current !== accountId) return
-      // 数が取れなくても一覧は出す。集計は付随情報なので、落ちても本体は止めない。
-      setTapStats(
-        tapRes.status === 'fulfilled' && tapRes.value.success ? tapRes.value.data : null,
-      )
-      if (groupsRes.status === 'fulfilled') {
-        if (!groupsRes.value.success) throw new Error('load_failed')
-        setGroups(groupsRes.value.data.items)
-        setGroupTotal(groupsRes.value.data.total)
-        setGroupFacets(groupsRes.value.data.facets ?? null)
-      } else {
-        throw groupsRes.reason
-      }
-      if (externalRes.status === 'fulfilled') {
-        const v = externalRes.value
-        if (v.success) {
-          setExternal(v.data)
-        } else {
-          setExternalError('LINE上の状態を確認できませんでした。少し待ってから、もう一度読み込んでください。')
-          setExternal(null)
-        }
-      } else {
-        setExternalError('LINE上の状態を確認できませんでした。少し待ってから、もう一度読み込んでください。')
-        setExternal(null)
-      }
+      if (!groupsRes.success) throw new Error('load_failed')
+      setGroups(groupsRes.data.items)
+      setGroupTotal(groupsRes.data.total)
+      setGroupFacets(groupsRes.data.facets ?? null)
     } catch (e) {
       if (activeAccountRef.current === accountId) {
         setError(richMenuError(e, 'load'))
@@ -320,6 +307,68 @@ export default function RichMenusListPage() {
     }
   }, [deferredQuery, folderFilter, page, pageSize, reordering, savedFilter, selectedAccount?.id, sortKey])
 
+  /** タップ集計。数が取れなくても一覧は出す（付随情報なので本体は止めない）。 */
+  const loadTapStats = useCallback(async () => {
+    const accountId = selectedAccount?.id
+    if (!accountId) {
+      setTapStatsStatus('error')
+      return
+    }
+    setTapStatsStatus('loading')
+    try {
+      const res = await api.richMenuGroups.tapStats(accountId)
+      if (activeAccountRef.current !== accountId) return
+      if (res.success) {
+        setTapStats(res.data)
+        setTapStatsStatus('ready')
+      } else {
+        setTapStatsStatus('error')
+      }
+    } catch {
+      if (activeAccountRef.current === accountId) setTapStatsStatus('error')
+    }
+  }, [selectedAccount?.id])
+
+  /*
+   * LINE上の外部状態。外部APIへ2回問い合わせる重い口なので、
+   * 作業画面を開いてから取る。一度取ったアカウントでは、公開・削除・
+   * 取り込みのあとに取り直して鮮度を保つ。
+   */
+  const loadExternal = useCallback(async () => {
+    const accountId = selectedAccount?.id
+    if (!accountId) return
+    externalLoadedRef.current = true
+    setExternalStatus('loading')
+    setExternalError(null)
+    try {
+      const res = await api.richMenuGroups.external(accountId)
+      if (activeAccountRef.current !== accountId) return
+      if (res.success) {
+        setExternal(res.data)
+        setExternalStatus('ready')
+      } else {
+        setExternalError('LINE上の状態を確認できませんでした。少し待ってから、もう一度読み込んでください。')
+        setExternal(null)
+        setExternalStatus('error')
+      }
+    } catch {
+      if (activeAccountRef.current === accountId) {
+        setExternalError('LINE上の状態を確認できませんでした。少し待ってから、もう一度読み込んでください。')
+        setExternal(null)
+        setExternalStatus('error')
+      }
+    }
+  }, [selectedAccount?.id])
+
+  /** 公開・削除・取り込みのあとの更新。読み込み済みのものだけ取り直す。 */
+  const reload = useCallback(async () => {
+    await Promise.allSettled([
+      loadList(),
+      loadTapStats(),
+      externalLoadedRef.current ? loadExternal() : Promise.resolve(),
+    ])
+  }, [loadList, loadTapStats, loadExternal])
+
   const loadFolders = useCallback(async () => {
     // #730: 選択中の1件に閉じた母集団で数える。未選択時は付けず、件数は不明（—）のまま。
     const accountId = selectedAccount?.id ?? undefined
@@ -328,8 +377,15 @@ export default function RichMenusListPage() {
   }, [selectedAccount?.id])
 
   useEffect(() => {
-    reload()
-  }, [reload])
+    void loadList()
+  }, [loadList])
+  useEffect(() => {
+    void loadTapStats()
+  }, [loadTapStats])
+  // 「管理画面の外のメニュー」作業画面を開いたときだけ LINE へ問い合わせる。
+  useEffect(() => {
+    if (showExternal && !externalLoadedRef.current) void loadExternal()
+  }, [showExternal, loadExternal])
   useEffect(() => {
     void loadFolders()
   }, [loadFolders])
@@ -353,7 +409,8 @@ export default function RichMenusListPage() {
         reordered.map((item) => item.id),
       )
       if (!res.success) throw new Error(res.error ?? '並び替え失敗')
-      await reload()
+      // 並び替えで変わるのは一覧だけ。集計・外部状態は取り直さない。
+      await loadList()
     } catch (e) {
       // **`alert()` では出さない。** 見た目がブラウザ任せで、画像比較にも
       // 写らない。画面の帯に出して、押したあとも読み返せるようにする。
@@ -549,9 +606,9 @@ export default function RichMenusListPage() {
         : '一覧を取得できませんでした'
   const tapKpiState = !selectedAccount?.id
     ? 'unselected'
-    : loading
+    : tapStatsStatus === 'loading'
       ? 'loading'
-      : tapStats
+      : tapStatsStatus === 'ready'
         ? 'ready'
         : 'error'
   const tapKpiReady = tapKpiState === 'ready'
@@ -589,7 +646,7 @@ export default function RichMenusListPage() {
         <div className="bg-canvas-sunken fixed inset-x-0 bottom-0 top-[var(--mobile-header-height)] z-40 overflow-y-auto p-4 sm:p-6 xl:left-64 xl:top-14">
           <ExternalImportWorkspace
             external={external}
-            loading={loading}
+            loading={externalStatus === 'loading'}
             error={externalError}
             onBack={() => setShowExternal(false)}
             onReload={() => void reload()}
