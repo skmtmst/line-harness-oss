@@ -27,12 +27,15 @@ export default function ChoiceTable({
   block,
   sections,
   refs,
+  inHeader = false,
   onChange,
 }: {
   block: FormInputBlock
   /** 分岐（移動先セクション）で選ぶ候補 */
   sections: FormSection[]
   refs: FormRefs
+  /** 共通ヘッダ内のブロックか。共通ヘッダは全ページに出るため分岐の起点にできない */
+  inHeader?: boolean
   onChange: (next: Partial<FormInputBlock>) => void
 }) {
   const [openChoiceId, setOpenChoiceId] = useState<string | null>(null)
@@ -225,9 +228,24 @@ export default function ChoiceTable({
                       <input
                         type="checkbox"
                         checked={choice.defaultSelected ?? false}
-                        onChange={(e) =>
+                        onChange={(e) => {
+                          // 単一選択（ラジオ・プルダウン）で初期選択は1つだけ。
+                          // 新しく付けた選択肢を残し、他の初期選択を外す。
+                          if (
+                            e.target.checked &&
+                            (block.type === 'radio' || block.type === 'select')
+                          ) {
+                            setChoices(
+                              choices.map((c) =>
+                                c.id === choice.id
+                                  ? { ...c, defaultSelected: true }
+                                  : { ...c, defaultSelected: false },
+                              ),
+                            )
+                            return
+                          }
                           patchChoice(choice.id, { defaultSelected: e.target.checked })
-                        }
+                        }}
                       />
                       はじめから選んでおく
                     </label>
@@ -253,44 +271,75 @@ export default function ChoiceTable({
                         <input
                           type="number"
                           min={1}
-                          value={choice.capacity.limit ?? 10}
+                          step={1}
+                          value={choice.capacity.limit ?? ''}
                           onChange={(e) =>
                             patchChoice(choice.id, {
                               capacity: {
                                 enabled: true,
-                                limit: Math.max(1, Number(e.target.value) || 1),
+                                // 入った値をそのまま残す。小数や空欄をここで
+                                // 丸めると、入力ミスが別の数に化けて保存される。
+                                // 整数以外は保存時の検査が止める。
+                                limit:
+                                  e.target.value === ''
+                                    ? undefined
+                                    : Number(e.target.value),
                               },
                             })
                           }
                           className={`${cellInput} w-20`}
                         />
-                        人まで
+                        人まで（1以上の整数）
                       </label>
                     )}
                   </div>
 
-                  <label className="block">
-                    <span className="text-ink-secondary mb-1 block text-xs font-medium">
-                      選んだ人を飛ばすページ
-                    </span>
-                    <select
-                      value={choice.jumpToSectionId ?? ''}
-                      onChange={(e) =>
-                        patchChoice(choice.id, { jumpToSectionId: e.target.value || null })
-                      }
-                      className={cellInput}
-                    >
-                      <option value="">— 次のページへ進む —</option>
-                      {sections.map((s, i) => (
-                        <option key={s.id} value={s.id}>
-                          {i + 1}. {s.name}
-                        </option>
-                      ))}
-                    </select>
-                    <span className="text-ink-faint mt-1 block text-xs">
-                      決めると、この選択肢を選んだ人だけ別のページへ進みます。
-                    </span>
-                  </label>
+                  {inHeader ? (
+                    <div>
+                      <span className="text-ink-secondary mb-1 block text-xs font-medium">
+                        選んだ人を飛ばすページ
+                      </span>
+                      <p className="text-ink-faint text-xs">
+                        共通ヘッダはすべてのページに出るため、ここでは分岐を使えません。
+                        分岐したい質問は各ページに置いてください。
+                      </p>
+                      {choice.jumpToSectionId && (
+                        <p className="mt-1 text-xs text-danger">
+                          この選択肢には以前の分岐設定が残っています（回答画面では動きません）。
+                          <button
+                            type="button"
+                            onClick={() => patchChoice(choice.id, { jumpToSectionId: null })}
+                            className="text-accent ml-2 underline"
+                          >
+                            分岐設定を外す
+                          </button>
+                        </p>
+                      )}
+                    </div>
+                  ) : (
+                    <label className="block">
+                      <span className="text-ink-secondary mb-1 block text-xs font-medium">
+                        選んだ人を飛ばすページ
+                      </span>
+                      <select
+                        value={choice.jumpToSectionId ?? ''}
+                        onChange={(e) =>
+                          patchChoice(choice.id, { jumpToSectionId: e.target.value || null })
+                        }
+                        className={cellInput}
+                      >
+                        <option value="">— 次のページへ進む —</option>
+                        {sections.map((s, i) => (
+                          <option key={s.id} value={s.id}>
+                            {i + 1}. {s.name}
+                          </option>
+                        ))}
+                      </select>
+                      <span className="text-ink-faint mt-1 block text-xs">
+                        決めると、この選択肢を選んだ人だけ別のページへ進みます。
+                      </span>
+                    </label>
+                  )}
                 </div>
               )}
             </li>

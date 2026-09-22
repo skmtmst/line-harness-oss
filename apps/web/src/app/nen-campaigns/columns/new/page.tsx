@@ -252,6 +252,9 @@ function NewNenColumnInner() {
             ) : null}
             <p className={styles.note}>この条件では {audienceCount == null ? '—' : audienceCount.toLocaleString('ja-JP')}人に届きます。</p>
             <Field label="配信日時（日本時間）" type="datetime-local" value={draft.scheduledAt} error={errorFor('scheduledAt')} onChange={(v) => setDraft((d) => ({ ...d, scheduledAt: v }))} />
+            {/* NEN-06: ここで入れた日時は下書きに記録されるだけで、まだ予約されない。
+                実際の配信は一覧でコラムを選んで「この内容で予約する」を押したときだけ始まる。 */}
+            <p className={styles.note}>この日時は下書きに記録されます。実際の配信は、一覧で「この内容で予約する」を押したときだけ始まります。</p>
             <h3>読んだ人にすること</h3>
             <Field label="読了イベント名" value={draft.completionEventName} placeholder="例: 秋の食事コラムを読了" onChange={(v) => setDraft((d) => ({ ...d, completionEventName: v }))} />
             <FormField label="読了後に付けるタグ">

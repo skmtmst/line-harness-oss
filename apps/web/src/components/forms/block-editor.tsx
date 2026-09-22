@@ -73,6 +73,7 @@ export default function BlockEditor({
   index,
   sections,
   refs,
+  inHeader = false,
   selected,
   onSelect,
   onChange,
@@ -81,6 +82,8 @@ export default function BlockEditor({
   index: number
   sections: FormSection[]
   refs: FormRefs
+  /** 共通ヘッダ内のブロックか。共通ヘッダは全ページに出るため分岐の起点にできない */
+  inHeader?: boolean
   selected: boolean
   onSelect: () => void
   onChange: (patch: Partial<FormBlock>) => void
@@ -418,6 +421,7 @@ export default function BlockEditor({
                   block={block}
                   sections={sections}
                   refs={refs}
+                  inHeader={inHeader}
                   onChange={patchInput}
                 />
               )}
@@ -621,7 +625,7 @@ export default function BlockEditor({
                 起きるかをここで読み取れるようにする（表示専用）。
               */}
               {(() => {
-                const updates = describeInputUpdates(block, refs)
+                const updates = describeInputUpdates(block, refs, { inHeader })
                 if (updates.length === 0) return null
                 return (
                   <div className="border-hairline rounded-control bg-canvas-sunken border p-3">

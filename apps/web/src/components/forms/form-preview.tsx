@@ -10,6 +10,7 @@
  * 「プレビューで入れた値が保存されるのか」という誤解を生む。
  */
 
+import { useEffect, useState } from 'react'
 import {
   PREFECTURES,
   formThemeButtonText,
@@ -41,6 +42,55 @@ function Box({ children }: { children?: React.ReactNode }) {
   )
 }
 
+/**
+ * 画像ブロックのプレビュー。
+ *
+ * URLが無い・読み込み中・読み込み失敗を分けて出す。失敗したときに
+ * 画像が消えるだけだと、URLの間違いに気付かないまま保存してしまう。
+ */
+function PreviewImage({ block }: { block: FormBlock & { kind: 'image' } }) {
+  const [status, setStatus] = useState<'loading' | 'ok' | 'error'>('loading')
+  useEffect(() => setStatus('loading'), [block.mediaUrl])
+
+  if (!block.mediaUrl) {
+    return (
+      <div className="border-hairline text-ink-faint rounded-control border border-dashed py-6 text-center text-xs">
+        画像のURLを入れると、ここに出ます
+      </div>
+    )
+  }
+  if (status === 'error') {
+    return (
+      <div className="border-hairline rounded-control border border-dashed py-4 text-center text-xs">
+        <p className="text-danger">画像を読み込めませんでした。URLを確認してください。</p>
+        <button
+          type="button"
+          onClick={() => setStatus('loading')}
+          className="text-accent mt-1 underline"
+        >
+          再試行
+        </button>
+      </div>
+    )
+  }
+  return (
+    <div>
+      {status === 'loading' && (
+        <p className="text-ink-faint mb-1 text-center text-[11px]">画像を読み込んでいます</p>
+      )}
+      {/* 外部URLをそのまま出すため next/image は使わない（プレビュー用途） */}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={block.mediaUrl}
+        alt=""
+        onLoad={() => setStatus('ok')}
+        onError={() => setStatus('error')}
+        className={`rounded-control ${block.size === 'full' ? 'w-full' : 'mx-auto max-w-[70%]'}`}
+      />
+    </div>
+  )
+}
+
 function PreviewBlock({ block, theme }: { block: FormBlock; theme: FormTheme }) {
   if (block.kind === 'heading') {
     const size = block.level === 1 ? 'text-lg' : block.level === 3 ? 'text-sm' : 'text-base'
@@ -61,19 +111,7 @@ function PreviewBlock({ block, theme }: { block: FormBlock; theme: FormTheme }) 
   }
 
   if (block.kind === 'image') {
-    return block.mediaUrl ? (
-      // 外部URLをそのまま出すため next/image は使わない（プレビュー用途）
-      // eslint-disable-next-line @next/next/no-img-element
-      <img
-        src={block.mediaUrl}
-        alt=""
-        className={`rounded-control ${block.size === 'full' ? 'w-full' : 'mx-auto max-w-[70%]'}`}
-      />
-    ) : (
-      <div className="border-hairline text-ink-faint rounded-control border border-dashed py-6 text-center text-xs">
-        画像のURLを入れると、ここに出ます
-      </div>
-    )
+    return <PreviewImage block={block} />
   }
 
   if (block.kind === 'button') {
@@ -105,7 +143,8 @@ function PreviewBlock({ block, theme }: { block: FormBlock; theme: FormTheme }) 
 
       {block.type === 'textarea' && <Box>{block.placeholder}</Box>}
       {block.type === 'text' && <Box>{block.placeholder}</Box>}
-      {block.type === 'date' && <Box>日付を選択</Box>}
+      {block.type === 'date' &&
+        (block.dateStyle === 'ymd' ? <Box>年＿＿＿ 月＿＿ 日＿＿</Box> : <Box>日付を選択</Box>)}
       {block.type === 'file' && <Box>ファイルを選択</Box>}
       {block.type === 'prefecture' && <Box>{PREFECTURES[12]} など</Box>}
       {block.type === 'select' && (
@@ -117,24 +156,39 @@ function PreviewBlock({ block, theme }: { block: FormBlock; theme: FormTheme }) 
           {choices.length === 0 && (
             <p className="text-ink-faint text-xs">選択肢がまだありません</p>
           )}
-          {choices.map((choice) => (
-            <span
-              key={choice.id}
-              className="flex items-center gap-1.5 text-xs"
-              style={{ color: theme.text }}
-            >
+          {choices.map((choice, choiceIndex) => {
+            // ラジオは選べるのが1つだけ。初期選択が複数残っていても
+            // プレビューでは先頭の1つだけを塗る（回答画面と同じ見え方）。
+            const firstDefaultIndex =
+              block.type === 'radio' ? choices.findIndex((c) => c.defaultSelected) : -1
+            const selected =
+              block.type === 'checkbox'
+                ? (choice.defaultSelected ?? false)
+                : choiceIndex === firstDefaultIndex
+            return (
               <span
-                className={`border-hairline inline-block h-3 w-3 border ${
-                  block.type === 'radio' ? 'rounded-pill' : 'rounded-[3px]'
-                } ${choice.defaultSelected ? '' : 'bg-canvas'}`}
-                style={choice.defaultSelected ? { backgroundColor: theme.main, borderColor: theme.main } : undefined}
-              />
-              {choice.label}
-              {choice.capacity?.enabled && (
-                <span className="text-ink-faint">（先着{choice.capacity.limit}名）</span>
-              )}
-            </span>
-          ))}
+                key={choice.id}
+                className="flex items-center gap-1.5 text-xs"
+                style={{ color: theme.text }}
+              >
+                <span
+                  className={`border-hairline inline-block h-3 w-3 border ${
+                    block.type === 'radio' ? 'rounded-pill' : 'rounded-[3px]'
+                  } ${selected ? '' : 'bg-canvas'}`}
+                  style={selected ? { backgroundColor: theme.main, borderColor: theme.main } : undefined}
+                />
+                {choice.label}
+                {choice.isOther && (
+                  <span className="border-hairline bg-canvas text-ink-faint inline-block w-16 border-b text-[10px] leading-4">
+                    自由記入
+                  </span>
+                )}
+                {choice.capacity?.enabled && (
+                  <span className="text-ink-faint">（先着{choice.capacity.limit}名）</span>
+                )}
+              </span>
+            )
+          })}
         </div>
       )}
     </div>

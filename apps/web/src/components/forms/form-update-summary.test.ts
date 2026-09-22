@@ -132,3 +132,39 @@ describe('describeFormUpdates', () => {
     expect(overview.formWide).toEqual([])
   })
 })
+
+describe('未設定の動作と共通ヘッダの分岐(FORM-07 / FORM-14)', () => {
+  it('選ぶ先が空の動作は「未選択」と添える', () => {
+    expect(describeAction({ kind: 'send_text', text: ' ' }, refs)).toContain('未設定')
+    expect(describeAction({ kind: 'send_template', templateId: '' }, refs)).toContain('未選択')
+    expect(describeAction({ kind: 'tag', op: 'add', tagIds: [] }, refs)).toContain('未選択')
+    expect(describeAction({ kind: 'friend_field', fieldId: '', value: '済' }, refs)).toContain('未選択')
+    expect(describeAction({ kind: 'scenario', op: 'start', scenarioId: '' }, refs)).toContain('未選択')
+    expect(describeAction({ kind: 'reminder', reminderId: '' }, refs)).toContain('未選択')
+  })
+
+  it('共通ヘッダの質問は、分岐があっても「動かない」と伝える', () => {
+    const block = input({
+      type: 'radio',
+      choices: [{ id: 'c1', label: '犬', jumpToSectionId: 's2' }],
+    })
+    expect(describeInputUpdates(block, refs)).toEqual(['選択肢によって進むページが変わる'])
+    expect(describeInputUpdates(block, refs, { inHeader: true })).toEqual([
+      '選択肢のページ分岐が設定されていますが、共通ヘッダでは動きません（公開時に止められます）',
+    ])
+  })
+
+  it('フォーム全体の一覧でも、共通ヘッダの分岐は「動かない」と出る', () => {
+    const layout = emptyLayout()
+    layout.header = [
+      input({
+        type: 'radio',
+        label: '種別',
+        name: 'kind',
+        choices: [{ id: 'c1', label: '犬', jumpToSectionId: 's2' }],
+      }),
+    ]
+    const overview = describeFormUpdates(layout, refs, '')
+    expect(overview.questions[0].lines[0]).toContain('共通ヘッダでは動きません')
+  })
+})

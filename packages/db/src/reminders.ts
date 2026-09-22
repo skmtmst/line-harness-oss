@@ -800,6 +800,27 @@ export async function enrollFriendInReminder(
     timezone?: string;
   },
 ): Promise<FriendReminderRow> {
+  // 起点日は日付として読める値だけ。空欄や存在しない日の登録予定は、
+  // 届くものが無いまま残るだけなので入口で止める。フォーム回答の
+  // 'YYYY-MM-DD' と、既存の友だち情報起点が渡す日時文字列の両方を
+  // 受け付ける（日付だけの形は Date が翌月へ丸めるため、分解して見る）。
+  const dateOnly = /^(\d{4})-(\d{2})-(\d{2})$/.exec(input.targetDate);
+  if (dateOnly) {
+    const parsed = new Date(`${input.targetDate}T00:00:00Z`);
+    if (
+      Number.isNaN(parsed.getTime()) ||
+      parsed.getUTCFullYear() !== Number(dateOnly[1]) ||
+      parsed.getUTCMonth() + 1 !== Number(dateOnly[2]) ||
+      parsed.getUTCDate() !== Number(dateOnly[3])
+    ) {
+      throw new Error('REMINDER_INVALID_TARGET_DATE');
+    }
+  } else if (
+    !input.targetDate ||
+    Number.isNaN(new Date(input.targetDate).getTime())
+  ) {
+    throw new Error('REMINDER_INVALID_TARGET_DATE');
+  }
   const reminder = await getReminderById(db, input.reminderId);
   if (!reminder || reminder.lifecycle_status !== 'published') {
     throw new Error('REMINDER_NOT_PUBLISHED');

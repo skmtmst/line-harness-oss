@@ -140,13 +140,19 @@ describe('コラムの新規作成（POST /columns）', () => {
     expect(mocks.prepare).not.toHaveBeenCalled();
   });
 
-  test('未来の配信日時は下書きを作り、その日時で配信待ちへ入れる', async () => {
+  /*
+   * NEN-06: 下書き保存は配信日時があっても配信待ち行列を作らない。
+   * 日時は下書きの「配信したい日時」として delivery_at に残るだけで、
+   * 予約は一覧の「この内容で予約する」（POST /columns/:id/deliver）の
+   * 明示操作だけが行う。
+   */
+  test('未来の配信日時があっても下書きを作るだけで、配信待ちへは入れない', async () => {
     const res = await post('/api/nen-campaigns/columns?lineAccountId=account-a', createBody({
       scheduledAt: '2099-05-01T10:30:00+09:00',
     }));
     expect(res.status).toBe(201);
-    expect(mocks.queueColumnDelivery).toHaveBeenCalledWith(
-      expect.anything(), expect.any(String), 'account-a', '2099-05-01 01:30:00',
-    );
+    const body = await res.json() as { success: boolean; data: { queued: number } };
+    expect(body.data.queued).toBe(0);
+    expect(mocks.queueColumnDelivery).not.toHaveBeenCalled();
   });
 });

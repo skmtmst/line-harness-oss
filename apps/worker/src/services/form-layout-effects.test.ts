@@ -192,6 +192,23 @@ describe('受け付けてよいかの判定', () => {
     expect(await checkFormGates({ ...base, db, layout, answers: { slot: '午後' } })).toBeNull();
   });
 
+  // FORM-09: YYYY-MM-DD の形だけでは足りず、暦に存在する日付だけを通す。
+  test('暦に無い日付(2月30日・平年の2月29日)は断る', async () => {
+    const layout = layoutWith([input({ name: 'day', label: '希望日', type: 'date' })]);
+    const { db } = fakeDb();
+
+    expect(
+      await checkFormGates({ ...base, db, layout, answers: { day: '2026-02-30' } }),
+    ).toBe('希望日 は存在しない日付です');
+    expect(
+      await checkFormGates({ ...base, db, layout, answers: { day: '2023-02-29' } }),
+    ).toBe('希望日 は存在しない日付です');
+    // うるう年の2月29日・通常の日付は通る
+    expect(
+      await checkFormGates({ ...base, db, layout, answers: { day: '2024-02-29' } }),
+    ).toBeNull();
+  });
+
   test('定員を決めていない選択肢は、数えに行かない', async () => {
     const layout = layoutWith([
       input({
@@ -688,6 +705,65 @@ describe('回答を配る', () => {
     expect(mocks.attachTag).not.toHaveBeenCalled();
   });
 
+  // FORM-13: 未回答の欄を登録先へ流すと、空文字での上書き＝既存の登録が
+  // 消える。空欄は「更新しない」。情報欄の呼び出しも friends 列の UPDATE
+  // も走らないことを、書き込みの形まで見て確認する。
+  test.each([
+    { name: '空文字', value: '' },
+    { name: '空白だけ', value: '   ' },
+    { name: 'null', value: null },
+    { name: '空の選択肢', value: [] },
+    { name: '空白だけの選択肢', value: ['', '  '] },
+  ])('任意欄の未回答($name)は登録先を更新しない', async ({ value }) => {
+    const layout = layoutWith([
+      input({
+        name: 'full_name',
+        label: 'お名前',
+        destinations: { friendFieldIds: ['ff-1'], realName: true, note: true },
+      }),
+    ]);
+    const { db, calls } = fakeDb();
+
+    const result = await applyFormLayoutEffects({
+      db,
+      layout,
+      friendId: 'f1',
+      answers: { full_name: value },
+    });
+
+    expect(mocks.setFriendFieldValue).not.toHaveBeenCalled();
+    expect(calls.filter((c) => c.sql.includes('UPDATE friends'))).toEqual([]);
+    expect(result.destinationWrites).toEqual({ attempted: 0, succeeded: 0, failed: 0 });
+    expect(result.failedEffects).toEqual([]);
+  });
+
+  // FORM-15: 任意の日付欄を空のまま送っても、空の日付でリマインダの
+  // 登録予定を作らない。暦に無い日付も同じく「何もしない」。
+  test.each([
+    { name: '空文字', value: '' },
+    { name: '存在しない日付', value: '2026-02-30' },
+  ])('日付欄の未回答・不正な日付($name)ではリマインダを動かさない', async ({ value }) => {
+    const layout = layoutWith([
+      input({
+        name: 'day',
+        label: '希望日',
+        type: 'date',
+        reminder: { reminderId: 'rm-1', time: '09:00' },
+      }),
+    ]);
+    const { db } = fakeDb();
+
+    const result = await applyFormLayoutEffects({
+      db,
+      layout,
+      friendId: 'f1',
+      answers: { day: value },
+    });
+
+    expect(mocks.enrollFriendInReminder).not.toHaveBeenCalled();
+    expect(result.failedEffects).toEqual([]);
+  });
+
   test('失敗した工程の名前を残し、欠落を固定しない', async () => {
     mocks.attachTag.mockRejectedValueOnce(new Error('タグの付与に失敗'));
     const pet = input({
@@ -730,7 +806,9 @@ describe('回答を配る', () => {
       friendId: 'f1',
       reminderId: 'rm-1',
       targetDate: '2026-09-01',
-      sourceEventId: 'form-submit:answer-1:reminder:rm-1',
+      // 登録元idは「どの日付欄からか」まで入る。同じリマインダを別の欄に
+      // 割り当てても、別の欄の登録と混ざらない(FORM-16)。
+      sourceEventId: `form-submit:answer-1:reminder:${day.id}`,
     });
   });
 
@@ -753,6 +831,33 @@ describe('回答を配る', () => {
     });
     expect(mocks.enrollFriendInReminder).not.toHaveBeenCalled();
     expect(result.failedEffects).toEqual([]);
+  });
+
+  // FORM-16: 同じリマインダを別の日付欄に割り当てたとき、欄ごとに別の
+  // 予定を立てる。記録キー(source_event_id)に欄のIDが入るので、2つ目の
+  // 予定が「登録済み」と誤認されて消えることはない。
+  test('同じリマインダを2つの日付欄に割り当てても、欄ごとに登録される', async () => {
+    const day1 = input({ name: 'day1', label: '初回', type: 'date', reminder: { reminderId: 'rm-1', time: '09:00' } });
+    const day2 = input({ name: 'day2', label: '再来', type: 'date', reminder: { reminderId: 'rm-1', time: '09:00' } });
+    const layout = layoutWith([day1, day2]);
+    const { db } = fakeDb();
+
+    await applyFormLayoutEffects({
+      db,
+      layout,
+      friendId: 'f1',
+      answers: { day1: '2026-09-01', day2: '2026-10-01' },
+      idempotencyPrefix: 'form-submit:answer-1',
+    });
+
+    const sourceIds = mocks.enrollFriendInReminder.mock.calls.map(
+      (call) => (call[1] as { sourceEventId: string | null }).sourceEventId,
+    );
+    expect(sourceIds).toEqual([
+      `form-submit:answer-1:reminder:${day1.id}`,
+      `form-submit:answer-1:reminder:${day2.id}`,
+    ]);
+    expect(mocks.enrollFriendInReminder).toHaveBeenCalledTimes(2);
   });
 });
 

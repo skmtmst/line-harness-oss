@@ -1161,6 +1161,8 @@ type MileageRuleCreateInput = {
   validFrom: string | null;
   validUntil: string | null;
   lineAccountId: string;
+  /** DRAFT-01: false なら最初のINSERTから停止。省略は従来どおり稼働。 */
+  isActive?: boolean;
 };
 
 async function createMileageRuleIdempotent(
@@ -1178,6 +1180,9 @@ async function createMileageRuleIdempotent(
     conditions: args.conditions ?? null,
     validFrom: args.validFrom,
     validUntil: args.validUntil,
+    // 稼働/停止も保存される値なので衝突判定に含める（止めるはずの再送が
+    // 稼働中の行を回収しないよう、同じkeyで別状態は409にする）。
+    isActive: args.isActive !== false,
   };
   const namespacedKey = `mileage-rule:${args.lineAccountId}:${args.requestKey}`;
   const now = new Date().toISOString();
@@ -1207,7 +1212,7 @@ async function createMileageRuleIdempotent(
       `INSERT OR IGNORE INTO mileage_rules
          (id, program_id, name, event_type, source, amount, initial_status,
           conditions, line_account_id, is_active, valid_from, valid_until, created_at, updated_at)
-       VALUES (?, 'default', ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?)`,
+       VALUES (?, 'default', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     ).bind(
       ruleId,
       args.name,
@@ -1217,6 +1222,7 @@ async function createMileageRuleIdempotent(
       args.initialStatus ?? 'available',
       args.conditions ? JSON.stringify(args.conditions) : null,
       args.lineAccountId,
+      args.isActive === false ? 0 : 1,
       args.validFrom,
       args.validUntil,
       nowJst,
@@ -1251,6 +1257,8 @@ scoring.post('/api/mileage/rules', requireRole('owner', 'admin'), async (c) => {
       validUntil?: string | null;
       /** 334(#521): 帰属アカウント。 */
       lineAccountId?: string;
+      /** DRAFT-01: falseなら停止中で作る。省略は従来どおり稼働。 */
+      isActive?: boolean;
     }>();
     if (!body.name?.trim() || !body.eventType?.trim() || !Number.isInteger(body.amount) || (body.amount ?? 0) <= 0) {
       return c.json({ success: false, error: 'name, eventType and a positive integer amount are required' }, 400);
@@ -1277,6 +1285,7 @@ scoring.post('/api/mileage/rules', requireRole('owner', 'admin'), async (c) => {
         validFrom: body.validFrom ?? null,
         validUntil: body.validUntil ?? null,
         lineAccountId: body.lineAccountId,
+        isActive: body.isActive,
         requestKey,
       });
       return c.json(result.body, result.status);
@@ -1291,6 +1300,7 @@ scoring.post('/api/mileage/rules', requireRole('owner', 'admin'), async (c) => {
       validFrom: body.validFrom ?? null,
       validUntil: body.validUntil ?? null,
       lineAccountId: body.lineAccountId,
+      isActive: body.isActive,
     });
     return c.json({ success: true, data: serializeMileageRule(rule) }, 201);
   } catch (err) {

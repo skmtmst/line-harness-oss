@@ -36,7 +36,11 @@ function tagName(refs: FormRefs, tagId: string): string {
  * - ECが正の情報欄には書き込まない（保存側が弾く）ので、その旨も添える
  * - 選択肢の動作は「その選択肢を選んだときだけ」という条件つき
  */
-export function describeInputUpdates(block: FormInputBlock, refs: FormRefs): string[] {
+export function describeInputUpdates(
+  block: FormInputBlock,
+  refs: FormRefs,
+  opts: { inHeader?: boolean } = {},
+): string[] {
   const lines: string[] = []
 
   const dest = block.destinations
@@ -80,7 +84,11 @@ export function describeInputUpdates(block: FormInputBlock, refs: FormRefs): str
       }
     }
     if (choiceCount > 0 && (block.choices ?? []).some((choice) => choice.jumpToSectionId)) {
-      lines.push('選択肢によって進むページが変わる')
+      lines.push(
+        opts.inHeader
+          ? '選択肢のページ分岐が設定されていますが、共通ヘッダでは動きません（公開時に止められます）'
+          : '選択肢によって進むページが変わる',
+      )
     }
   }
 
@@ -92,29 +100,44 @@ export function describeInputUpdates(block: FormInputBlock, refs: FormRefs): str
   return lines
 }
 
-/** 回答後の動作・選択肢の動作に共通する、動作1件の説明。 */
+/**
+ * 回答後の動作・選択肢の動作に共通する、動作1件の説明。
+ *
+ * 選ぶ先（テンプレート・タグ・情報欄・シナリオ・リマインダ）や本文が
+ * 空のまま残っているものは「（…未選択）」と添える。公開はその状態では
+ * 止められるので、何が欠けているかをここで読めるようにする。
+ */
 export function describeAction(action: FormAction, refs: FormRefs): string {
   switch (action.kind) {
     case 'send_text':
-      return 'テキストを送る'
+      return action.text.trim()
+        ? 'テキストを送る'
+        : 'テキストを送る（本文が未設定）'
     case 'send_template':
-      return `テンプレート「${refs.templates.find((t) => t.id === action.templateId)?.name ?? '（消えたテンプレート）'}」を送る`
+      return action.templateId
+        ? `テンプレート「${refs.templates.find((t) => t.id === action.templateId)?.name ?? '（消えたテンプレート）'}」を送る`
+        : 'テンプレートを送る（テンプレート未選択）'
     case 'tag': {
+      if (action.tagIds.length === 0) return 'タグを付ける・外す（タグ未選択）'
       const names = action.tagIds.map((id) => `「${tagName(refs, id)}」`).join('・')
       return action.op === 'remove' ? `タグ${names}を外す` : `タグ${names}を付ける`
     }
     case 'friend_field': {
+      if (!action.fieldId) return '友だち情報に書く（情報欄未選択）'
       const field = friendFieldLabel(refs, action.fieldId)
       return field.blocked
         ? `情報欄「${field.name}」に登録（ECが正のため更新しない）`
         : `情報欄「${field.name}」に「${action.value}」を登録`
     }
     case 'scenario': {
+      if (!action.scenarioId) return 'シナリオを開始・停止（シナリオ未選択）'
       const name = refs.scenarios.find((s) => s.id === action.scenarioId)?.name ?? '（消えたシナリオ）'
       return action.op === 'stop' ? `シナリオ「${name}」を止める` : `シナリオ「${name}」を始める`
     }
     case 'reminder':
-      return `リマインダ「${refs.reminders.find((r) => r.id === action.reminderId)?.name ?? '（消えたリマインダ）'}」に登録`
+      return action.reminderId
+        ? `リマインダ「${refs.reminders.find((r) => r.id === action.reminderId)?.name ?? '（消えたリマインダ）'}」に登録`
+        : 'リマインダに登録（リマインダ未選択）'
   }
 }
 
@@ -132,8 +155,9 @@ export function describeFormUpdates(
   onSubmitTagId: string,
 ): FormUpdateOverview {
   const questions: FormUpdateOverview['questions'] = []
+  const headerIds = new Set(layout.header.map((block) => block.id))
   for (const block of collectInputs(layout)) {
-    const lines = describeInputUpdates(block, refs)
+    const lines = describeInputUpdates(block, refs, { inHeader: headerIds.has(block.id) })
     if (lines.length === 0) continue
     questions.push({ blockId: block.id, label: block.label || block.name, lines })
   }
