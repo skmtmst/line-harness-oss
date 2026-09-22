@@ -4178,6 +4178,25 @@ const spec = {
         },
       },
     },
+    '/api/booking/admin/availability-check': {
+      get: {
+        tags: ['Booking'],
+        summary: '指定した日時に予約を受けられるかと、受けられない場合の理由を確認',
+        description: '予約設定画面の「この日時はなぜ取れないか」用。読み取り専用で予約は作らない。判定は実際の空き枠計算と同じ入力・同じ手順を使い、受けられない場合は理由コード（勤務外・休業日・所要時間超過・既存予約との重複・外部カレンダーの予定・定員・設備不足など）を返す。他担当の非公開予定の件名・相手など詳細は含めない。',
+        parameters: [
+          { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+          { name: 'menu_id', in: 'query', required: true, schema: { type: 'string' } },
+          { name: 'staff_id', in: 'query', required: false, schema: { type: 'string' } },
+          { name: 'date', in: 'query', required: true, schema: { type: 'string', pattern: '^\\d{4}-\\d{2}-\\d{2}$' } },
+          { name: 'time', in: 'query', required: true, schema: { type: 'string', pattern: '^\\d{2}:\\d{2}$' } },
+        ],
+        responses: {
+          '200': { description: 'bookable（受けられるか）、reasons（理由コードの一覧）、per_staff（担当ごとの可否・残数・理由）' },
+          '400': { description: 'account_id・menu_id・date・time の不足または形式不正' },
+          '403': { description: 'このLINEアカウントを表示する権限がない' },
+        },
+      },
+    },
     // ── Booking detail edit / retry / audit (N-389〜N-394 #932) ─────────────
     '/api/booking/admin/bookings.csv': {
       get: {

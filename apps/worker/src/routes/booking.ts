@@ -40,7 +40,7 @@ import type { Env } from '../index.js';
 import { requireRole, requirePermission, hasStaffPermission } from '../middleware/role-guard.js';
 import { cancelByTrigger, enrollByTrigger, rescheduleByTrigger } from '../services/reminder-trigger.js';
 import { canTransition, nextStatus, type BookingAction } from '../services/booking-state.js';
-import { getAccountTimeZone, getAvailability, getStoreCapacitySnapshot, tzDateStr, tzHHMM } from '../services/availability.js';
+import { explainBookingSlot, getAccountTimeZone, getAvailability, getStoreCapacitySnapshot, tzDateStr, tzHHMM } from '../services/availability.js';
 import { STORE_CAPACITY_GUARD_EXCLUDE_SQL, STORE_CAPACITY_GUARD_SQL, STORE_SETTINGS_VERSION_GUARD_SQL } from '../services/booking-store-capacity.js';
 import {
   BOOKING_RESOURCE_CAPACITY_GUARD_EXCLUDE_SQL,
@@ -3019,6 +3019,36 @@ booking.get('/api/booking/admin/availability', async (c) => {
     minLeadTimeMinutes: 0,
     googleCredentials: googleCredentials(c.env),
     excludeBookingId,
+  });
+  return c.json(result);
+});
+
+// IDEA-28 予約設定: 指定した日時がなぜ予約できないかを説明する確認口。
+// 読み取りだけで予約は作らない。判定はお客様の予約画面（LIFF）と同じ
+// リードタイムを使い、結果は理由コードだけを返す（他担当の非公開予定の
+// 件名・相手など詳細は含めない）。
+booking.get('/api/booking/admin/availability-check', async (c) => {
+  const accountId = await resolveAccountIdAdmin(c);
+  if (!accountId) return c.json({ error: 'missing_account_id' }, 400);
+  const menuId = c.req.query('menu_id')?.trim();
+  const staffId = c.req.query('staff_id')?.trim() || undefined;
+  const date = c.req.query('date')?.trim();
+  const time = c.req.query('time')?.trim();
+  if (!menuId || !date || !time) {
+    return c.json({ error: 'missing_params' }, 400);
+  }
+  if (!isValidShiftDate(date) || !isClockTime(time)) {
+    return c.json({ error: 'invalid_params' }, 400);
+  }
+  const result = await explainBookingSlot(c.env.DB, {
+    lineAccountId: accountId,
+    menuId,
+    staffId,
+    date,
+    time,
+    now: new Date(),
+    minLeadTimeMinutes: DEFAULT_ACCOUNT_SETTINGS.min_lead_time_minutes,
+    googleCredentials: googleCredentials(c.env),
   });
   return c.json(result);
 });
