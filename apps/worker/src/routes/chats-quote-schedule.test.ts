@@ -252,6 +252,86 @@ describe('送信予約(N-025)', () => {
     expect(scheduledRows()).toHaveLength(1);
   });
 
+  // #977: 読み込み直しでクライアントの操作キーが新規発行されても、
+  // 「対象・内容・送信予定時刻」が同じ処理中の予約はサーバー側で再利用する。
+  test('同じ版を別キーで再登録しても既存の予約を返し、行は1件のまま', async () => {
+    const at = future();
+    const first = await postSchedule({ content: 'あとで', scheduledAt: at }, KEY1);
+    expect(first.status).toBe(200);
+    const created = (await first.json()) as { data: { id: string; replayed: boolean } };
+    expect(created.data.replayed).toBe(false);
+
+    const second = await postSchedule({ content: 'あとで', scheduledAt: at }, KEY2);
+    expect(second.status).toBe(200);
+    const reused = (await second.json()) as { data: { id: string; replayed: boolean } };
+    expect(reused.data.replayed).toBe(true);
+    expect(reused.data.id).toBe(created.data.id);
+
+    const rows = scheduledRows();
+    expect(rows).toHaveLength(1);
+    expect(rows[0].status).toBe('scheduled');
+  });
+
+  // #977: 連続クリックや通信中の再試行が並行に届いても処理中は最大1件。
+  test('同じ版の予約を並行して2件投げても処理中の行は1件', async () => {
+    const at = future();
+    const [a, b] = await Promise.all([
+      postSchedule({ content: '同時の予約', scheduledAt: at }, KEY1),
+      postSchedule({ content: '同時の予約', scheduledAt: at }, KEY2),
+    ]);
+    expect(a.status).toBe(200);
+    expect(b.status).toBe(200);
+    const rows = scheduledRows();
+    expect(rows).toHaveLength(1);
+    expect(rows[0].status).toBe('scheduled');
+  });
+
+  // #977: 送信中(sending)の行も照合対象。claim済みでも同じ版を二重登録しない。
+  test('送信中に進んだ同じ版への再登録も新しい行を作らない', async () => {
+    const at = future();
+    const created = await postSchedule({ content: 'あとで', scheduledAt: at }, KEY1);
+    const { data } = (await created.json()) as { data: { id: string } };
+    sqlite.raw.prepare(
+      `UPDATE scheduled_chat_sends SET status = 'sending', lease_token = 'lease', lease_expires_at = '2099-01-01T00:00:00.000Z' WHERE id = ?`,
+    ).run(data.id);
+
+    const res = await postSchedule({ content: 'あとで', scheduledAt: at }, KEY2);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { data: { id: string; replayed: boolean } };
+    expect(body.data.replayed).toBe(true);
+    expect(body.data.id).toBe(data.id);
+    expect(scheduledRows()).toHaveLength(1);
+  });
+
+  test('内容か時刻が違えば別の予約として登録される', async () => {
+    const at = future();
+    await postSchedule({ content: 'あとで', scheduledAt: at }, KEY1);
+    await postSchedule({ content: '別の文面', scheduledAt: at }, KEY2);
+    await postSchedule(
+      { content: 'あとで', scheduledAt: new Date(Date.now() + 2 * 60 * 60_000).toISOString() },
+      KEY3,
+    );
+    // 引用の有無も版の一部。本文と時刻が同じでも別の予約になる。
+    await postSchedule({ content: 'あとで', scheduledAt: at, quotedMessageId: 'm-in' }, KEY4);
+    expect(scheduledRows()).toHaveLength(4);
+  });
+
+  test('取消済みの同じ版は照合対象にならず、新しい予約を立て直せる', async () => {
+    const at = future();
+    const created = await postSchedule({ content: 'あとで', scheduledAt: at }, KEY1);
+    const { data } = (await created.json()) as { data: { id: string } };
+    await deleteScheduled(data.id);
+
+    const res = await postSchedule({ content: 'あとで', scheduledAt: at }, KEY2);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { data: { id: string; replayed: boolean } };
+    expect(body.data.replayed).toBe(false);
+    expect(body.data.id).not.toBe(data.id);
+    const rows = scheduledRows();
+    expect(rows).toHaveLength(2);
+    expect(rows.map((r) => r.status).sort()).toEqual(['cancelled', 'scheduled']);
+  });
+
   test('無効な引用元では予約を作らない', async () => {
     const res = await postSchedule(
       { content: 'あとで', scheduledAt: future(), quotedMessageId: 'm-other-friend' },

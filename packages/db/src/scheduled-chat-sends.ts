@@ -56,6 +56,16 @@ export function normalizeScheduledAt(value: string): string {
 /**
  * 予約の新規作成。idempotency_keyの一意制約で、同じ作成要求の再送は
  * 新しい行を作らず既存の予約を返す(replay)。
+ *
+ * さらに「対象(friend×LINEアカウント)・内容(種別・本文・引用)・送信予定時刻」が
+ * 一致する処理中(scheduled/sending)の予約があれば、別キーの要求も新しい行を
+ * 作らずその既存行を返す(#977)。読み込み直しでクライアントの操作キーが
+ * 新規発行されても、同じ版の予約はサーバー側で最大1件に保つ。
+ *
+ * 挿入は単一の INSERT ... SELECT ... WHERE NOT EXISTS なので、並行する
+ * 2要求が同時に走っても後着側は重複を検出して挿入しない(TOCTOUなし)。
+ * 終了済み(sent/failed/cancelled)の行は照合対象に含めないため、
+ * 同じ内容の予約をあらためて立て直すことはできる。
  */
 export async function createScheduledChatSend(
   db: D1Database,
@@ -80,7 +90,17 @@ export async function createScheduledChatSend(
          (id, friend_id, line_account_id, staff_id, message_type, content,
           quoted_message_id, idempotency_key, scheduled_at, status,
           attempt_count, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'scheduled', 0, ?, ?)`,
+       SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, 'scheduled', 0, ?, ?
+       WHERE NOT EXISTS (
+         SELECT 1 FROM scheduled_chat_sends
+          WHERE friend_id = ?
+            AND line_account_id IS ?
+            AND message_type = ?
+            AND content = ?
+            AND quoted_message_id IS ?
+            AND scheduled_at = ?
+            AND status IN ('scheduled', 'sending')
+       )`,
     )
     .bind(
       input.id,
@@ -94,11 +114,72 @@ export async function createScheduledChatSend(
       scheduledAt,
       now,
       now,
+      input.friendId,
+      input.lineAccountId,
+      input.messageType,
+      input.content,
+      input.quotedMessageId,
+      scheduledAt,
     )
     .run();
-  const row = await getScheduledChatSendByKey(db, input.idempotencyKey);
-  if (!row) throw new Error('scheduled send record unavailable');
-  return { row, created: (result.meta?.changes ?? 0) === 1 };
+  if ((result.meta?.changes ?? 0) === 1) {
+    const row = await getScheduledChatSend(db, input.id);
+    if (!row) throw new Error('scheduled send record unavailable');
+    return { row, created: true };
+  }
+  // 同一キーの再送(replay)を先に返す。
+  const byKey = await getScheduledChatSendByKey(db, input.idempotencyKey);
+  if (byKey) return { row: byKey, created: false };
+  // 別キーだが同じ版の処理中予約がある → その行を再利用する。
+  const existing = await findInFlightScheduledChatSend(db, {
+    friendId: input.friendId,
+    lineAccountId: input.lineAccountId,
+    messageType: input.messageType,
+    content: input.content,
+    quotedMessageId: input.quotedMessageId,
+    scheduledAt,
+  });
+  if (!existing) throw new Error('scheduled send record unavailable');
+  return { row: existing, created: false };
+}
+
+/**
+ * 「対象・内容・送信予定時刻」が一致する処理中(scheduled/sending)の予約を1件引く。
+ * 並行登録の後着側が再利用する行を探す照合口。複数あれば一番古い行を返す。
+ */
+export async function findInFlightScheduledChatSend(
+  db: D1Database,
+  input: {
+    friendId: string;
+    lineAccountId: string | null;
+    messageType: string;
+    content: string;
+    quotedMessageId: string | null;
+    scheduledAt: string;
+  },
+): Promise<ScheduledChatSendRow | null> {
+  return db
+    .prepare(
+      `SELECT * FROM scheduled_chat_sends
+        WHERE friend_id = ?
+          AND line_account_id IS ?
+          AND message_type = ?
+          AND content = ?
+          AND quoted_message_id IS ?
+          AND scheduled_at = ?
+          AND status IN ('scheduled', 'sending')
+        ORDER BY created_at ASC, id ASC
+        LIMIT 1`,
+    )
+    .bind(
+      input.friendId,
+      input.lineAccountId,
+      input.messageType,
+      input.content,
+      input.quotedMessageId,
+      normalizeScheduledAt(input.scheduledAt),
+    )
+    .first<ScheduledChatSendRow>();
 }
 
 export async function getScheduledChatSendByKey(
