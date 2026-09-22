@@ -32,6 +32,13 @@ vi.mock('@/lib/api', async (importOriginal) => {
     ...actual,
     api: {
       ...actual.api,
+      // 条件部品が選択肢を読みに行く口。本物へ飛ばさない。
+      tags: { ...actual.api.tags, list: vi.fn() },
+      scenarios: { ...actual.api.scenarios, list: vi.fn() },
+      friendFields: { ...actual.api.friendFields, list: vi.fn() },
+      supportMarks: { ...actual.api.supportMarks, list: vi.fn() },
+      featureSettings: { ...actual.api.featureSettings, visibility: vi.fn() },
+      segments: { ...actual.api.segments, count: vi.fn() },
       automations: {
         ...actual.api.automations,
         list: vi.fn(),
@@ -81,6 +88,12 @@ beforeEach(() => {
     tags: [{ id: 'tag-1', name: '予約' }],
     scenarios: [{ id: 'scenario-1', name: '予約後' }],
   }))
+  ;(api.tags.list as unknown as ReturnType<typeof vi.fn>).mockResolvedValue(ok([{ id: 'tag-1', name: '予約' }]))
+  ;(api.scenarios.list as unknown as ReturnType<typeof vi.fn>).mockResolvedValue(ok([{ id: 'scenario-1', name: '予約後' }]))
+  ;(api.friendFields.list as unknown as ReturnType<typeof vi.fn>).mockResolvedValue(ok([]))
+  ;(api.supportMarks.list as unknown as ReturnType<typeof vi.fn>).mockResolvedValue(ok([]))
+  ;(api.featureSettings.visibility as unknown as ReturnType<typeof vi.fn>).mockResolvedValue(ok({ features: {} }))
+  ;(api.segments.count as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({ success: true, count: 0 })
   mockCreate.mockResolvedValue(ok({ id: 'draft-9', draftVersionId: 'v1' }))
   mockUpdate.mockResolvedValue(ok({ draftVersionId: 'v2' }))
   mockGet.mockResolvedValue(ok({
