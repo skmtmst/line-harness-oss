@@ -45,3 +45,42 @@ export function canManageAutomationRole(
   if (role === 'owner' || role === 'admin') return true
   return role === 'staff' && permissionKeys.includes('/automations')
 }
+
+/**
+ * 実行記録の操作ボタン表示の目安（#1043 / V6 §9）。
+ *
+ * `localStorage` の自己申告値なので表示の目安にしかならず、
+ * 本当の可否はサーバが個別権限キーで決める。
+ * - 再試行・取りやめ: `automation.run.retry`
+ * - CSV書き出し: `automation.run.export`
+ * owner/admin は常に `true`。見るだけの staff は `false` で、
+ * 出せない操作のボタン自体を出さない。
+ */
+export function canOperateAutomationRun(
+  role: string | null,
+  permissionKeys: readonly string[] = [],
+): boolean {
+  if (role === 'owner' || role === 'admin') return true
+  return role === 'staff' && permissionKeys.includes('automation.run.retry')
+}
+
+export function canExportAutomationRuns(
+  role: string | null,
+  permissionKeys: readonly string[] = [],
+): boolean {
+  if (role === 'owner' || role === 'admin') return true
+  return role === 'staff' && permissionKeys.includes('automation.run.export')
+}
+
+export function useAutomationRunPermissions(): { canOperate: boolean; canExport: boolean } | null {
+  const [permissions, setPermissions] = useState<{ canOperate: boolean; canExport: boolean } | null>(null)
+  useEffect(() => {
+    const role = window.localStorage.getItem('lh_staff_role')
+    const keys = readPermissionKeys()
+    setPermissions({
+      canOperate: canOperateAutomationRun(role, keys),
+      canExport: canExportAutomationRuns(role, keys),
+    })
+  }, [])
+  return permissions
+}
