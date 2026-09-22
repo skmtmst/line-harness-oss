@@ -563,6 +563,15 @@ export type AddConversionDefinitionUsageInput = {
   refId: string;
   refVersionId?: string | null;
   staffId: string;
+  /**
+   * 下書き・停止中の地点にも利用関係を記すか（CONVERSION-05）。
+   *
+   * 手で足す口（POST /api/conversions/definitions/:id/usages）は止めたまま。
+   * ファネルの段に置かれた参照は「実際に使っている」事実なので、
+   * 下書き・停止中の地点へも台帳へ書く。黙って弾くと、分析の作成は
+   * 成功したのに利用先一覧へ出ない食い違いが残る。
+   */
+  allowInactive?: boolean;
 };
 
 async function getCurrentMatchingUsage(
@@ -573,7 +582,7 @@ async function getCurrentMatchingUsage(
     JOIN conversion_points cp ON cp.id = u.conversion_point_id
     WHERE u.conversion_point_id = ? AND u.line_account_id = ? AND u.ref_kind = ? AND u.ref_id = ?
       AND COALESCE(u.ref_version_id, '') = COALESCE(?, '')
-      AND cp.version = ? AND cp.status = 'active'
+      AND cp.version = ? AND (cp.status = 'active' OR ? = 1)
       AND (cp.line_account_id IS NULL OR cp.line_account_id = ?)`)
     .bind(
       input.conversionPointId,
@@ -582,6 +591,7 @@ async function getCurrentMatchingUsage(
       input.refId,
       input.refVersionId ?? null,
       input.expectedVersion,
+      input.allowInactive ? 1 : 0,
       input.lineAccountId,
     )
     .first<UsageRow>();
@@ -597,7 +607,7 @@ async function throwLatestUsageConflict(
   if (!latest || (latest.line_account_id !== null && latest.line_account_id !== input.lineAccountId)) {
     throw new ConversionDefinitionError('not_found', '成果地点が見つかりません', 404);
   }
-  if (latest.status !== 'active') {
+  if (latest.status !== 'active' && !input.allowInactive) {
     throw new ConversionDefinitionError('definition_stopped', '停止中の成果地点には利用先を追加できません', 409);
   }
   if (Number(latest.version) !== input.expectedVersion) {
@@ -616,7 +626,7 @@ export async function addConversionDefinitionUsage(
   if (!point || (point.line_account_id !== null && point.line_account_id !== input.lineAccountId)) {
     throw new ConversionDefinitionError('not_found', '成果地点が見つかりません', 404);
   }
-  if (point.status !== 'active') {
+  if (point.status !== 'active' && !input.allowInactive) {
     throw new ConversionDefinitionError('definition_stopped', '停止中の成果地点には利用先を追加できません', 409);
   }
   if (Number(point.version) !== input.expectedVersion) {
@@ -640,7 +650,7 @@ export async function addConversionDefinitionUsage(
          ref_version_id, created_by, created_at, updated_at)
       SELECT ?, cp.id, cp.version, ?, ?, ?, ?, ?, ?, ?
         FROM conversion_points cp
-       WHERE cp.id = ? AND cp.version = ? AND cp.status = 'active'
+       WHERE cp.id = ? AND cp.version = ? AND (cp.status = 'active' OR ? = 1)
          AND (cp.line_account_id IS NULL OR cp.line_account_id = ?)`)
       .bind(
         id,
@@ -653,6 +663,7 @@ export async function addConversionDefinitionUsage(
         now,
         input.conversionPointId,
         input.expectedVersion,
+        input.allowInactive ? 1 : 0,
         input.lineAccountId,
       )
       .run();

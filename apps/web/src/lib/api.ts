@@ -1971,6 +1971,11 @@ export type SavedAnalyticsSummary = {
     periodTo: string
     dataCutoffAt: string
     createdAt: string
+    // ANALYTICS-05/06: 集計状態（未取得・失敗）とは別に、元の定義が
+    // 写しを取った版から進んでいるか。版ずれの正しい対処は再集計。
+    definitionStale: boolean
+    sourceVersionNumber: number | null
+    sourceCurrentVersionNumber: number | null
   } | null
 }
 
@@ -6323,7 +6328,13 @@ export const api = {
         name: string
         windowDays: number
         steps: Array<{ label: string; kind: string; match: Record<string, string> }>
-      }) => fetchApi<ApiResponse<{ funnelId: string; version: { id: string; versionNumber: number } }>>(
+      }) => fetchApi<ApiResponse<{
+        funnelId: string
+        version: { id: string; versionNumber: number }
+        // CONVERSION-05: 段の成果地点へ利用先を記せなかったもの。作成は
+        // 成功しているので、失敗ではなく「記せなかった」として画面へ返す。
+        usageWarnings?: string[]
+      }>>(
         `/api/analytics/funnels?account_id=${encodeURIComponent(accountId)}`,
         { method: 'POST', body: JSON.stringify(data) },
       ),
@@ -6337,7 +6348,7 @@ export const api = {
         segment?: unknown
         comparisonGroups?: unknown[]
         expectedVersionNumber: number
-      }) => fetchApi<ApiResponse<{ id: string; versionNumber: number }>>(
+      }) => fetchApi<ApiResponse<{ id: string; versionNumber: number; usageWarnings?: string[] }>>(
         `/api/analytics/funnels/${funnelId}/versions?account_id=${encodeURIComponent(accountId)}`,
         { method: 'POST', body: JSON.stringify(data) },
       ),

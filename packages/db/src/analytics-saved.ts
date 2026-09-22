@@ -19,6 +19,18 @@ export interface SavedAnalyticsSummary {
     periodTo: string;
     dataCutoffAt: string;
     createdAt: string;
+    /**
+     * 写しを取った元の定義が、その後に新版へ進んでいるか（ANALYTICS-05/06）。
+     *
+     * ファネルは「その時点の版」で集計して固定される。あとからファネルの
+     * 定義が変わると、この写しは旧版の結果になる。未取得・失敗といった
+     * 集計状態とは別の軸なので、状態のラベルには混ぜない。
+     */
+    definitionStale: boolean;
+    /** 写しが使った定義の版。分からなければ null。 */
+    sourceVersionNumber: number | null;
+    /** 元の定義のいまの版。分からなければ null。 */
+    sourceCurrentVersionNumber: number | null;
   } | null;
 }
 
@@ -196,13 +208,21 @@ export async function getSavedAnalytics(
             s.id AS snapshot_id, s.state AS snapshot_state,
             s.period_from AS snapshot_period_from, s.period_to AS snapshot_period_to,
             s.data_cutoff_at AS snapshot_data_cutoff_at,
-            s.created_at AS snapshot_created_at
+            s.created_at AS snapshot_created_at,
+            sv.version_number AS snapshot_analysis_version,
+            fv.version_number AS snapshot_source_version,
+            (SELECT MAX(v2.version_number) FROM analytics_funnel_versions v2
+              WHERE v2.funnel_id = fr.funnel_id) AS source_current_version
        FROM analytics_saved_analyses a
        LEFT JOIN analytics_saved_analysis_snapshots s ON s.id = (
          SELECT s2.id FROM analytics_saved_analysis_snapshots s2
           WHERE s2.saved_analysis_id = a.id
           ORDER BY s2.created_at DESC, s2.id DESC LIMIT 1
        )
+       LEFT JOIN analytics_saved_analysis_versions sv ON sv.id = s.analysis_version_id
+       LEFT JOIN analytics_funnel_runs fr
+         ON s.source_kind = 'funnel' AND fr.id = s.source_result_id
+       LEFT JOIN analytics_funnel_versions fv ON fv.id = fr.funnel_version_id
       WHERE a.line_account_id = ? AND a.status = 'active'
       ORDER BY a.updated_at DESC, a.id DESC`,
   ).bind(lineAccountId).all<{
@@ -212,27 +232,39 @@ export async function getSavedAnalytics(
     snapshot_id: string | null; snapshot_state: SavedAnalyticsState | null;
     snapshot_period_from: string | null; snapshot_period_to: string | null;
     snapshot_data_cutoff_at: string | null; snapshot_created_at: string | null;
+    snapshot_analysis_version: number | null;
+    snapshot_source_version: number | null; source_current_version: number | null;
   }>();
-  return rows.results.map((row) => ({
-    id: row.id,
-    name: row.name,
-    kind: row.kind,
-    status: row.status,
-    currentVersionNumber: row.current_version_number,
-    createdBy: row.created_by,
-    createdByName: row.created_by_name,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-    snapshotCount: Number(row.snapshot_count),
-    latestSnapshot: row.snapshot_id ? {
-      id: row.snapshot_id,
-      state: row.snapshot_state!,
-      periodFrom: row.snapshot_period_from!,
-      periodTo: row.snapshot_period_to!,
-      dataCutoffAt: row.snapshot_data_cutoff_at!,
-      createdAt: row.snapshot_created_at!,
-    } : null,
-  }));
+  return rows.results.map((row) => {
+    const snapshotAnalysisStale = row.snapshot_analysis_version != null
+      && row.snapshot_analysis_version < row.current_version_number;
+    const sourceDefinitionStale = row.snapshot_source_version != null
+      && row.source_current_version != null
+      && row.source_current_version > row.snapshot_source_version;
+    return {
+      id: row.id,
+      name: row.name,
+      kind: row.kind,
+      status: row.status,
+      currentVersionNumber: row.current_version_number,
+      createdBy: row.created_by,
+      createdByName: row.created_by_name,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+      snapshotCount: Number(row.snapshot_count),
+      latestSnapshot: row.snapshot_id ? {
+        id: row.snapshot_id,
+        state: row.snapshot_state!,
+        periodFrom: row.snapshot_period_from!,
+        periodTo: row.snapshot_period_to!,
+        dataCutoffAt: row.snapshot_data_cutoff_at!,
+        createdAt: row.snapshot_created_at!,
+        definitionStale: snapshotAnalysisStale || sourceDefinitionStale,
+        sourceVersionNumber: row.snapshot_source_version,
+        sourceCurrentVersionNumber: row.source_current_version,
+      } : null,
+    };
+  });
 }
 
 export async function getSavedAnalyticsSnapshots(

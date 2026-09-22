@@ -492,7 +492,7 @@ function EditCommonVarInner() {
                     <p className="text-ink-secondary mb-1 text-sm font-medium">
                       差し込みキー<RequiredBadge />
                     </p>
-                    <code className="bg-canvas-sunken text-ink block rounded-control px-3 py-2 text-sm">{placeholderText(item.name)}</code>
+                    <code className="bg-canvas-sunken text-ink block rounded-control px-3 py-2 text-sm">{placeholderText(item.varKey)}</code>
                     <p className="text-ink-faint mt-1 text-xs">本文にこの形で入ります</p>
                   </div>
                   <div>
@@ -727,9 +727,14 @@ function EditCommonVarInner() {
                       <p className="text-ink-faint border-hairline border-t px-4 py-3 text-xs">
                         {checkedAtText(impact.checkedAt)} 時点で確認
                       </p>
-                      <p className="text-ink-faint border-hairline border-t px-4 py-3 text-xs">
-                        1件ずつ確かめるときは「{impact.blockingTotal.toLocaleString('ja-JP')}か所を1件ずつ見る」へ進んでください。
-                      </p>
+                      {/* 案内は、下の操作列に同じボタンが出ているときだけ。
+                          0か所や未変更（canSave無し）のときに「見るへ進め」と
+                          言うと、存在しない操作を探させることになる。 */}
+                      {'canSave' in impact && impact.blockingTotal > 0 ? (
+                        <p className="text-ink-faint border-hairline border-t px-4 py-3 text-xs">
+                          1件ずつ確かめるときは「{impact.blockingTotal.toLocaleString('ja-JP')}か所を1件ずつ見る」へ進んでください。
+                        </p>
+                      ) : null}
                     </>
                   )}
                 </div>
@@ -769,8 +774,23 @@ function EditCommonVarInner() {
                       </>
                     ) : null}
                   </div>
+                ) : impactState !== 'ready' || !impact ? (
+                  // 読み込み中・失敗・権限不足は、その状態のまま言う。
+                  // 「確認中です」と出し続けると、0件確定や失敗と見分けが付かない。
+                  <p className="text-ink-faint mt-3 text-sm">
+                    {impactState === 'loading'
+                      ? '使用先の本文を確認しています。'
+                      : impactStateText(impactState)}
+                  </p>
+                ) : impact.total === 0 ? (
+                  // 0件は「確認済みの0」。見せる文が無いことを、そのまま言う。
+                  <p className="text-ink-faint mt-3 text-sm">
+                    使われている場所がないため、確かめる文はありません。
+                  </p>
                 ) : (
-                  <p className="text-ink-faint mt-3 text-sm">{NOT_AVAILABLE}（使用先の本文を確認中です）</p>
+                  // 使用先はあるが、保存ですぐ変わるものは無い（送信済みだけ等）。
+                  // 未取得と混ぜず、理由を書く。
+                  <p className="text-ink-faint mt-3 text-sm">{NOT_AVAILABLE}（すぐ変わる使用先の文はありません）</p>
                 )}
               </section>
             </aside>
@@ -964,7 +984,7 @@ function EditCommonVarInner() {
                 ・消えること: この共通情報に登録した更新スケジュールも一緒に消えます。
               </p>
               <p className="text-ink-secondary">
-                ・残ること: テンプレートは残ります。{placeholderText(deleteTarget?.item.name ?? '')}
+                ・残ること: テンプレートは残ります。{placeholderText(deleteTarget?.item.varKey ?? '')}
                 と書いてある場所は、これから空欄で送られます。
               </p>
               <p className="text-ink-secondary">・残ること: すでに送ったものは変わりません。</p>

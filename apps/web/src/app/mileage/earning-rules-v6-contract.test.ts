@@ -64,6 +64,18 @@ describe('V6 たまる決めごと（N46cQ）の画面', () => {
     expect(PAGE).toContain('ruleSummary?.grantedMiles')
     expect(PAGE).toContain('ruleSummary?.averageBalance')
     expect(PAGE).toContain('grantedMiles30d(rule)')
+  })
+
+  it('平均の分母と説明文の人数は同じ値を使う（MILEAGE-05）', () => {
+    // 計算は「残高のある人」で割っているのに、説明が別の口の人数
+    // （全員の数）を出すと、運用者が違う分母で読んでしまう。
+    expect(PAGE).toContain('averageDenominator: friendsRes.data.summary.withBalanceCount')
+    expect(PAGE).toContain('formatMileageNumber(ruleSummary.averageDenominator)')
+    expect(PAGE).not.toContain('formatMileageNumber(tabCounts.balances')
+    // 残高0の人を含めるか除くかを明記する
+    expect(PAGE).toContain('残高0の人は除き')
+    // 割れる人がいないときは「計算していません」と言う（0とは言わない）
+    expect(PAGE).toContain('残高がある人がいないため計算していません')
     expect(PAGE).toContain('rule.metrics30d.granted')
     expect(PAGE).toContain('rule.metrics30d.excluded')
     expect(PAGE).toContain('rule.draftVersion')
