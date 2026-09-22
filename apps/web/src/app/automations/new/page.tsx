@@ -15,6 +15,19 @@ import { RequiredBadge } from '@/components/shared/form-controls'
 import { CareCard, FeatureLinkCard } from '@/components/shared/side-cards'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { useAccount } from '@/contexts/account-context'
+/*
+ * 「だれに」の条件は、一斉配信・シナリオと同じ共通部品で作る。
+ * 以前この画面だけが「軸 + 自由入力」の独自形で、計算側（worker の
+ * SegmentCondition）と違う形で保存されていた（AUTOMATION-04）。
+ * 入力の形を正本へ揃えるため、`ConditionBuilder` をそのまま使う。
+ */
+import ConditionBuilder, {
+  isEmptyCondition,
+  isRuleComplete,
+  pruneCondition,
+  type SegmentCondition,
+  type SegmentRule,
+} from '@/components/shared/condition-builder'
 // 下書きの作成・保存は `/automations` の権限キーが門（#942 N-351）。
 // owner/admin は常に通り、権限キーを持つスタッフも通す。表示の判定は
 // 共通アクションと同じフック1本に寄せる（サーバの認可が正本）。
@@ -81,14 +94,142 @@ const REPRESENTATIVE_TRIGGER_EVENTS: readonly string[] = ['friend_add', 'message
 /** 言葉で絞れるきっかけ。ほかは本文を持たないので条件欄を出さない。 */
 const KEYWORD_EVENTS: ReadonlyArray<string> = ['message_received']
 
-const CONDITION_AXES = [
-  ['tag_exists', 'タグを持っている'], ['tag_not_exists', 'タグを持っていない'],
-  ['is_following', '友だち状態'], ['name', '名前'], ['private_memo', '個人メモ'],
-  ['status_message', 'ステータスメッセージ'], ['registered_at', '登録日'],
-  ['support_mark', '対応マーク'], ['is_hidden', '非表示状態'], ['friend_field', '友だち情報欄'],
-  ['scenario_subscribed', 'シナリオ購読'], ['scenario_state', 'シナリオ状態'],
-  ['form_answered', 'フォーム回答'], ['last_reaction_at', '最終反応日'], ['score_range', '行動スコア'],
-] as const
+/**
+ * 「だれに」の条件の1行を、状況メモへ書く（AUTOMATION-02）。
+ *
+ * **保存に送るのと同じ条件**から作るので、「条件なし」と出しながら実は
+ * 絞り込んでいた、というずれは起きない。言い方は条件部品
+ * （condition-builder.tsx）の選択肢に揃える。
+ */
+function describeConditionRule(
+  rule: SegmentRule,
+  lookups: {
+    tags: ReadonlyArray<{ id: string; name: string }>
+    scenarios: ReadonlyArray<{ id: string; name: string }>
+  },
+): string {
+  const v = rule.value as Record<string, unknown>
+  const tagName = (id: string) => lookups.tags.find((tag) => tag.id === id)?.name ?? (id || 'タグ')
+  const scenarioName = (id: string) =>
+    lookups.scenarios.find((item) => item.id === id)?.name ?? (id || 'シナリオ')
+  const dateRange = (label: string): string => {
+    const from = typeof v?.from === 'string' && v.from ? v.from : ''
+    const to = typeof v?.to === 'string' && v.to ? v.to : ''
+    if (from && to) return `${label}が${from}〜${to}の人`
+    if (from) return `${label}が${from}以降の人`
+    if (to) return `${label}が${to}までの人`
+    return `${label}で絞る人`
+  }
+  switch (rule.type) {
+    case 'tag_exists':
+      return `タグ「${tagName(String(rule.value ?? ''))}」を持っている人`
+    case 'tag_not_exists':
+      return `タグ「${tagName(String(rule.value ?? ''))}」を持っていない人`
+    case 'tag_all':
+      return '選んだタグをすべて持っている人'
+    case 'tag_not_all':
+      return '選んだタグをすべて持っている人を除く'
+    case 'is_following':
+      return rule.value === false ? 'ブロック中の人' : '友だち中の人'
+    case 'is_hidden':
+      return rule.value === true ? '非表示の人' : '表示中の人'
+    case 'name': {
+      const text = typeof v?.text === 'string' ? v.text.trim() : ''
+      return text ? `名前に「${text}」を含む人` : '名前で絞る人'
+    }
+    case 'private_memo': {
+      const text = typeof rule.value === 'string' ? rule.value.trim() : ''
+      return text ? `個別メモに「${text}」を含む人` : '個別メモで絞る人'
+    }
+    case 'status_message': {
+      const text = typeof rule.value === 'string' ? rule.value.trim() : ''
+      return text ? `ステータスメッセージに「${text}」を含む人` : 'ステータスメッセージで絞る人'
+    }
+    case 'registered_at':
+      return dateRange('友だち登録日')
+    case 'last_reaction_at':
+      return dateRange('最終反応日')
+    case 'support_mark': {
+      const count = Array.isArray(v?.markIds) ? v.markIds.length : 0
+      return v?.exclude === true
+        ? `選んだ対応マーク（${count}件）の人を除く`
+        : `対応マーク（${count}件）の人`
+    }
+    case 'friend_field':
+      return '友だち情報で絞る人'
+    case 'scenario_subscribed': {
+      const id = typeof rule.value === 'string' ? rule.value : ''
+      return id ? `シナリオ「${scenarioName(id)}」を購読中の人` : 'いずれかのシナリオを購読中の人'
+    }
+    case 'scenario_state': {
+      const id = typeof v?.scenarioId === 'string' ? v.scenarioId : ''
+      const states: Record<string, string> = {
+        subscribed: 'を購読中',
+        not_subscribed: 'を購読していない',
+        completed: 'を読み終えた',
+        ever: 'を1度でも購読した',
+      }
+      return `シナリオ「${scenarioName(id)}」${states[String(v?.state ?? 'subscribed')] ?? 'を購読中'}の人`
+    }
+    case 'form_answered':
+      return typeof rule.value === 'string' && rule.value
+        ? '選んだフォームに回答した人'
+        : 'いずれかのフォームに回答した人'
+    case 'reaction_state': {
+      const labels: Record<string, string> = {
+        reply_or_postback: '返信・応答のある人',
+        reply: '返信のある人',
+        postback: 'ボタン応答のみの人',
+        none: '返信・応答の無い人',
+      }
+      return labels[String(rule.value)] ?? '反応状態で絞る人'
+    }
+    case 'score_range': {
+      const min = typeof v?.min === 'number' ? v.min : null
+      const max = typeof v?.max === 'number' ? v.max : null
+      if (min !== null && max !== null) return `行動スコア${min}〜${max}の人`
+      if (min !== null) return `行動スコア${min}以上の人`
+      if (max !== null) return `行動スコア${max}以下の人`
+      return '行動スコアで絞る人'
+    }
+    default:
+      return '条件を付けた人'
+  }
+}
+
+/** 条件の木に入っている全ルール（要約用に平らにする）。 */
+const collectConditionRules = (condition: SegmentCondition | null): SegmentRule[] =>
+  !condition
+    ? []
+    : [...condition.rules, ...(condition.groups ?? []).flatMap(collectConditionRules)]
+
+/**
+ * 保存されていた条件を、この画面の編集の形へ戻す。
+ *
+ * 以前の保存口は「軸 + 自由入力」の独自形で、名前なら文字列のまま
+ * 保存されていた（計算側は `{ text, targets }` を期待する）。その古い形は
+ * **「読めない条件」として区別する**——黙って条件なしへ戻すと、知らない
+ * うちに全員へ届くルールに変わってしまう（AUTOMATION-04）。
+ */
+const storedConditionToForm = (
+  raw: unknown,
+): { condition: SegmentCondition | null; unreadable: boolean } => {
+  if (raw === null || raw === undefined) return { condition: null, unreadable: false }
+  if (typeof raw !== 'object' || Array.isArray(raw)) return { condition: null, unreadable: true }
+  if (Object.keys(raw as Record<string, unknown>).length === 0) {
+    return { condition: null, unreadable: false }
+  }
+  const candidate = raw as Partial<SegmentCondition>
+  if ((candidate.operator !== 'AND' && candidate.operator !== 'OR') || !Array.isArray(candidate.rules)) {
+    return { condition: null, unreadable: true }
+  }
+  const nodeUsable = (node: SegmentCondition): boolean =>
+    node.rules.every(
+      (rule) => Boolean(rule) && typeof rule === 'object' && typeof rule.type === 'string' && isRuleComplete(rule),
+    ) && (node.groups ?? []).every(nodeUsable)
+  if (!nodeUsable(candidate as SegmentCondition)) return { condition: null, unreadable: true }
+  return { condition: candidate as SegmentCondition, unreadable: false }
+}
 
 /**
  * 画面に出す「すること」(#734: 共有の正本から描画する)。
@@ -253,8 +394,13 @@ interface FormSnapshot {
   name: string
   eventType: string
   keyword: string
-  conditionType: (typeof CONDITION_AXES)[number][0] | ''
-  conditionValue: string
+  /**
+   * 「だれに」の条件。保存・人数・要約の3か所が同じこれを見る
+   * （AUTOMATION-02/04）。形は worker の SegmentCondition と同じ。
+   */
+  condition: SegmentCondition | null
+  /** 読んだ下書きの条件が古い形で読めなかったとき true。付け直すまで保存しない。 */
+  conditionUnreadable: boolean
   triggerConfig: Record<string, unknown>
   actions: ActionDraft[]
   testFriendId: string
@@ -265,14 +411,16 @@ interface FormSnapshot {
   savedFingerprint: string | null
   saveOutcome: 'idle' | 'saved' | 'failed'
   previewCount: number | null
+  /* AUTOMATION-03: 人数の確認は保存とは別の成否。失敗したことだけ控える。 */
+  previewFailed: boolean
 }
 
 const blankFormSnapshot = (): FormSnapshot => ({
   name: '',
   eventType: EVENTS[0].value,
   keyword: '',
-  conditionType: '',
-  conditionValue: '',
+  condition: null,
+  conditionUnreadable: false,
   triggerConfig: {},
   actions: [newActionDraft()],
   testFriendId: '',
@@ -281,6 +429,7 @@ const blankFormSnapshot = (): FormSnapshot => ({
   savedFingerprint: null,
   saveOutcome: 'idle',
   previewCount: null,
+  previewFailed: false,
 })
 
 /** 何か入力されているか。空のまま切り替えただけなら控えを残さない。 */
@@ -288,8 +437,8 @@ const formSnapshotHasContent = (snapshot: FormSnapshot): boolean =>
   Boolean(
     snapshot.name.trim()
       || snapshot.keyword.trim()
-      || snapshot.conditionType
-      || snapshot.conditionValue.trim()
+      || !isEmptyCondition(snapshot.condition)
+      || snapshot.conditionUnreadable
       || snapshot.testFriendId.trim()
       || snapshot.eventType !== EVENTS[0].value
       || Object.keys(snapshot.triggerConfig).length > 0
@@ -315,23 +464,15 @@ const actionDraftToPayload = (row: ActionDraft, index: number): AutomationDraftA
           }
 )
 
-/** 「だれに」の条件1件を、保存で送る形へ直す。 */
-const conditionDraft = (
-  conditionType: FormSnapshot['conditionType'],
-  conditionValue: string,
-): Record<string, unknown> => ({
-  ...(conditionType && conditionValue.trim()
-    ? {
-        operator: 'AND' as const,
-        rules: [{
-          type: conditionType,
-          value: conditionType === 'is_following' || conditionType === 'is_hidden'
-            ? conditionValue.trim() === 'true'
-            : conditionValue.trim(),
-        }],
-      }
-    : {}),
-})
+/**
+ * 「だれに」の条件を、保存で送る形へ直す（AUTOMATION-04）。
+ *
+ * 書きかけの行（タグを選ぶ前など）は落とす。一斉配信・シナリオと同じ
+ * `pruneCondition` を使うので、保存される形は計算側の正本と一致する。
+ * 条件が実質無ければ `{}`（＝絞り込みなし）を送る。
+ */
+const conditionPayload = (condition: SegmentCondition | null): Record<string, unknown> =>
+  (pruneCondition(condition) ?? {}) as Record<string, unknown>
 
 /** きっかけの詳しい設定を、保存で送る形へ直す。 */
 const normalizeTriggerConfigFor = (
@@ -381,8 +522,7 @@ const draftPayloadFingerprint = (form: {
   name: string
   eventType: string
   keyword: string
-  conditionType: FormSnapshot['conditionType']
-  conditionValue: string
+  condition: SegmentCondition | null
   triggerConfig: Record<string, unknown>
   actions: ActionDraft[]
 }): string => canonicalJson({
@@ -391,7 +531,7 @@ const draftPayloadFingerprint = (form: {
   triggerConfig: normalizeTriggerConfigFor(
     form.eventType as AutomationDraftDetail['eventType'], form.triggerConfig, form.keyword,
   ),
-  conditions: conditionDraft(form.conditionType, form.conditionValue),
+  conditions: conditionPayload(form.condition),
   actions: form.actions.map(actionDraftToPayload),
 })
 
@@ -413,24 +553,12 @@ const draftDetailToForm = (detail: AutomationDraftDetail): {
   name: string
   eventType: string
   keyword: string
-  conditionType: FormSnapshot['conditionType']
-  conditionValue: string
+  condition: SegmentCondition | null
+  conditionUnreadable: boolean
   triggerConfig: Record<string, unknown>
   actions: ActionDraft[]
 } => {
-  const rules = (detail.conditions as { rules?: unknown }).rules
-  const firstRule = Array.isArray(rules)
-    ? (rules[0] as { type?: unknown; value?: unknown } | undefined)
-    : undefined
-  const conditionType = (
-    typeof firstRule?.type === 'string'
-    && CONDITION_AXES.some(([axis]) => axis === firstRule.type)
-  )
-    ? (firstRule.type as FormSnapshot['conditionType'])
-    : ''
-  const conditionValue = firstRule && firstRule.value !== undefined && firstRule.value !== null
-    ? String(firstRule.value)
-    : ''
+  const storedCondition = storedConditionToForm(detail.conditions)
   const config = detail.triggerConfig ?? {}
   const joinIds = (value: unknown) =>
     Array.isArray(value) ? value.map((item) => String(item)).join(',') : ''
@@ -479,8 +607,8 @@ const draftDetailToForm = (detail: AutomationDraftDetail): {
     name: detail.name,
     eventType: detail.eventType,
     keyword: detail.eventType === 'message_received' ? String(config.keyword ?? '') : '',
-    conditionType,
-    conditionValue,
+    condition: storedCondition.condition,
+    conditionUnreadable: storedCondition.unreadable,
     triggerConfig,
     actions,
   }
@@ -566,11 +694,19 @@ export default function NewAutomationPage() {
   const [eventQuery, setEventQuery] = useState('')
   const [showAllEvents, setShowAllEvents] = useState(false)
   const [keyword, setKeyword] = useState('')
-  const [conditionType, setConditionType] = useState<(typeof CONDITION_AXES)[number][0] | ''>('')
-  const [conditionValue, setConditionValue] = useState('')
+  /*
+   * 「だれに」の条件。形は worker の SegmentCondition と同じ——
+   * 独自形で保存すると計算側とずれるので、共通部品の値をそのまま持つ。
+   */
+  const [condition, setCondition] = useState<SegmentCondition | null>(null)
+  /* 読んだ下書きの条件が古い形で読めなかった。付け直すまで保存しない。 */
+  const [conditionUnreadable, setConditionUnreadable] = useState(false)
   const [triggerConfig, setTriggerConfig] = useState<Record<string, unknown>>({})
   const [savedDraft, setSavedDraft] = useState<StoredDraft | null>(null)
   const [previewCount, setPreviewCount] = useState<number | null>(null)
+  /* AUTOMATION-03: 人数の確認は保存とは別の成否として持つ。 */
+  const [previewFailed, setPreviewFailed] = useState(false)
+  const [previewRefreshing, setPreviewRefreshing] = useState(false)
   const [testFriendId, setTestFriendId] = useState('')
   const [actions, setActions] = useState<ActionDraft[]>([newActionDraft()])
   const [tags, setTags] = useState<Array<{ id: string; name: string }>>([])
@@ -625,8 +761,8 @@ export default function NewAutomationPage() {
     name,
     eventType,
     keyword,
-    conditionType,
-    conditionValue,
+    condition,
+    conditionUnreadable,
     triggerConfig,
     actions,
     testFriendId,
@@ -635,6 +771,7 @@ export default function NewAutomationPage() {
     savedFingerprint,
     saveOutcome,
     previewCount,
+    previewFailed,
   })
 
   /** 控えを画面へ戻す。eventType の切替で詳細設定が消えないよう印を付ける。 */
@@ -643,8 +780,8 @@ export default function NewAutomationPage() {
     setName(snapshot.name)
     setEventType(snapshot.eventType)
     setKeyword(snapshot.keyword)
-    setConditionType(snapshot.conditionType)
-    setConditionValue(snapshot.conditionValue)
+    setCondition(snapshot.condition)
+    setConditionUnreadable(snapshot.conditionUnreadable)
     setTriggerConfig(snapshot.triggerConfig)
     setActions(snapshot.actions)
     setTestFriendId(snapshot.testFriendId)
@@ -653,6 +790,7 @@ export default function NewAutomationPage() {
     setSavedFingerprint(snapshot.savedFingerprint)
     setSaveOutcome(snapshot.saveOutcome)
     setPreviewCount(snapshot.previewCount)
+    setPreviewFailed(snapshot.previewFailed)
   }
 
   /*
@@ -856,10 +994,11 @@ export default function NewAutomationPage() {
         setName(restored.name)
         setEventType(restored.eventType)
         setKeyword(restored.keyword)
-        setConditionType(restored.conditionType)
-        setConditionValue(restored.conditionValue)
+        setCondition(restored.condition)
+        setConditionUnreadable(restored.conditionUnreadable)
         setTriggerConfig(restored.triggerConfig)
         setActions(restored.actions)
+        setPreviewFailed(false)
         const fingerprint = draftPayloadFingerprint(restored)
         setSavedFingerprint(fingerprint)
         setSaveOutcome('saved')
@@ -875,9 +1014,18 @@ export default function NewAutomationPage() {
           savedFingerprint: fingerprint,
           saveOutcome: 'saved',
           previewCount: null,
+          previewFailed: false,
         }
         setResumeStatus('ready')
         setNotice('保存した下書きを読み込みました。続きを直せます。')
+        if (restored.conditionUnreadable) {
+          /*
+           * 古い保存口が残した読めない条件。黙って「条件なし」へ戻すと
+           * 全員へ届くルールに変わるので、付け直しを頼むまで保存させない
+           * （AUTOMATION-04）。
+           */
+          setError('保存されていた「だれに」の条件は古い形のため読めませんでした。下の案内にしたがって付け直してください。')
+        }
       })
       .catch(() => {
         if (cancelled || selectedAccountRef.current !== accountId) return
@@ -908,9 +1056,24 @@ export default function NewAutomationPage() {
           .filter((event): event is (typeof EVENTS)[number] => Boolean(event)),
       }))
   const hasSameTrigger = existingAutomations.some((item) => item.eventType === selectedEvent.value)
-  const targetSummary = usesKeyword && keyword.trim()
-    ? `「${keyword.trim()}」を含む内容を送った人に`
-    : 'きっかけに当てはまった人に'
+  /*
+   * AUTOMATION-02: 要約は「保存に送る条件」と同じものから作る。
+   * 名前の条件など、言葉以外の条件が要約から落ちて「条件なし」に
+   * 見えていたので、pruneCondition（保存と同じ取捨）の結果をそのまま
+   * 文章にする。
+   */
+  const usableCondition = pruneCondition(condition)
+  const conditionSummaries = collectConditionRules(usableCondition).map(
+    (rule) => describeConditionRule(rule, { tags, scenarios }),
+  )
+  const triggerAudience = usesKeyword && keyword.trim()
+    ? `「${keyword.trim()}」を含む内容を送った人`
+    : 'きっかけに当てはまった人'
+  const targetSummary = conditionUnreadable
+    ? `${triggerAudience}に（以前保存した条件は読めませんでした）`
+    : conditionSummaries.length > 0
+      ? `${triggerAudience}のうち、${conditionSummaries.join('・')}に`
+      : `${triggerAudience}に`
   const actionSummary = actions.map((row) => {
     if (row.type === 'add_tag') {
       const tagName = tags.find((tag) => tag.id === row.tagId)?.name
@@ -993,6 +1156,14 @@ export default function NewAutomationPage() {
 
   const validate = (): string | null => {
     if (!name.trim()) return 'ルール名を入力してください'
+    /*
+     * 古い形で保存された条件を読めなかった下書きは、付け直すまで保存させない。
+     * そのまま保存すると、読めなかった条件が黙って消えて全員へ届くルールに
+     * 変わってしまう（AUTOMATION-04）。
+     */
+    if (conditionUnreadable) {
+      return '保存されていた「だれに」の条件を付け直してください（読めない古い形のままでは保存できません）'
+    }
     // 時刻・日時のきっかけは対象の友だちが必須（サーバの検証と同じ条件）。
     if (eventType === 'datetime' && !String(triggerConfig.at ?? '').trim()) return '実行日時を入力してください'
     if ((eventType === 'daily' || eventType === 'weekly') && !String(triggerConfig.time ?? '').trim()) return '実行時刻を入力してください'
@@ -1032,8 +1203,7 @@ export default function NewAutomationPage() {
     name,
     eventType: draftEventType,
     keyword,
-    conditionType,
-    conditionValue,
+    condition,
     triggerConfig,
     actions,
   })
@@ -1044,10 +1214,52 @@ export default function NewAutomationPage() {
         saveOutcome === 'failed'
           ? '保存できませんでした。入力した内容は残っています'
           : saveOutcome === 'saved'
-            ? dirtySinceSave
-              ? '保存したあとに内容を変更しています'
-              : `下書きに保存しました${savedAt === null ? '' : `（${formatClock(savedAt)}）`}`
+            ? [
+                dirtySinceSave
+                  ? '保存したあとに内容を変更しています'
+                  : `下書きに保存しました${savedAt === null ? '' : `（${formatClock(savedAt)}）`}`,
+                // AUTOMATION-03: 人数の確認の失敗は、保存の結果とは別に添える。
+                previewFailed ? '人数の確認に失敗しました' : null,
+              ].filter((part): part is string => part !== null).join('・')
             : 'まだ保存していません')
+
+  /**
+   * 保存した版の見込み人数を数え直す（AUTOMATION-03）。
+   *
+   * **保存とは別の成否を持つ。** 以前は保存と同じ try の中で待っていた
+   * ため、人数の取得が失敗すると「保存できませんでした」と出て、
+   * 保存済みの下書きが失敗扱いになっていた。ここで失敗しても下書きは
+   * 残っているので、「人数をもう一度数える」で保存した版へだけ再び
+   * 問い合わせられる（新しい下書きは作らない）。途中で店が替わっても
+   * 前の店へは書かない。
+   */
+  const refreshAudiencePreview = async (accountId: string, draft: StoredDraft) => {
+    const stashedNow = formStashRef.current[accountId]
+    if (stashedNow) stashedNow.previewFailed = false
+    if (selectedAccountRef.current === accountId) {
+      setPreviewRefreshing(true)
+      setPreviewFailed(false)
+    }
+    try {
+      const preview = await api.automations.audiencePreview(draft.id, accountId, draft.draftVersionId)
+      if (!preview.success) throw new Error(preview.error)
+      const stashed = formStashRef.current[accountId]
+      if (stashed) {
+        stashed.previewCount = preview.data.matched
+        stashed.previewFailed = false
+      }
+      if (selectedAccountRef.current === accountId) {
+        setPreviewCount(preview.data.matched)
+        setPreviewFailed(false)
+      }
+    } catch {
+      const stashed = formStashRef.current[accountId]
+      if (stashed) stashed.previewFailed = true
+      if (selectedAccountRef.current === accountId) setPreviewFailed(true)
+    } finally {
+      if (selectedAccountRef.current === accountId) setPreviewRefreshing(false)
+    }
+  }
 
   const save = async (activate: boolean) => {
     // N-357: 連打で下書きが2つできないよう、描き直しより先に鍵をかける。
@@ -1072,7 +1284,7 @@ export default function NewAutomationPage() {
       name: name.trim(),
       eventType: draftEventType,
       triggerConfig: normalizedTriggerConfig(),
-      conditions: conditionDraft(conditionType, conditionValue),
+      conditions: conditionPayload(condition),
       // すること（アクション）は { type, params } の形で持つ。
       // params の中身は type ごとに違う。
       actions: draftActions(),
@@ -1131,12 +1343,12 @@ export default function NewAutomationPage() {
         setResumeTarget(draft.id)
         syncResumeUrl(draft.id, 'push')
       }
-      const preview = await api.automations.audiencePreview(draft.id, accountId, draft.draftVersionId)
-      if (preview.success) {
-        const stashed = formStashRef.current[accountId]
-        if (stashed) stashed.previewCount = preview.data.matched
-        if (selectedAccountRef.current === accountId) setPreviewCount(preview.data.matched)
-      }
+      /*
+       * AUTOMATION-03: 人数の確認は「保存」の外で行う。ここまで来た時点で
+       * 下書きは保存済みなので、人数の失敗を保存の失敗へ混ぜない。
+       * 待たずに進める（失敗は previewFailed で別に出る）。
+       */
+      void refreshAudiencePreview(accountId, draft)
       if (!activate) {
         if (selectedAccountRef.current === accountId) {
           setNotice('下書きに保存しました。見込み人数を確認して、1人で試せます。')
@@ -1163,12 +1375,16 @@ export default function NewAutomationPage() {
             stashed.saveOutcome = 'idle'
             stashed.savedFingerprint = null
             stashed.savedAt = null
+            stashed.previewCount = null
+            stashed.previewFailed = false
           }
         }
         if (selectedAccountRef.current === accountId) {
           setSaveOutcome('idle')
           setSavedFingerprint(null)
           setSavedAt(null)
+          setPreviewCount(null)
+          setPreviewFailed(false)
           // 消えた下書きの番号をURLに残さない。残すと再読込のたびに
           // 「読み込めません」が出てしまう。
           setResumeTarget(null)
@@ -1458,14 +1674,52 @@ export default function NewAutomationPage() {
                 </div>
               </div>
             ) : null}
+            {/* AUTOMATION-02: 要約と同じ条件から作った札。条件が本当に無いときだけ「条件なし」。 */}
             <div className="mt-3 flex flex-wrap gap-2">
-              {usesKeyword && keyword.trim() ? <span className="inline-flex min-h-9 items-center rounded-full border border-hairline bg-canvas px-3 text-xs font-bold text-ink-secondary">「{keyword.trim()}」を含む</span> : <span className="inline-flex min-h-9 items-center rounded-full border border-hairline bg-canvas px-3 text-xs font-bold text-ink-secondary">条件なし</span>}
-              <div className="mt-3 grid gap-2 sm:grid-cols-3">
-                <SelectField aria-label="条件の軸" value={conditionType} onChange={(event) => setConditionType(event.target.value as typeof conditionType)} options={[{ value: '', label: '条件の軸を選ぶ' }, ...CONDITION_AXES.map(([value, label]) => ({ value, label }))]} className={styles.select} />
-                <TextField aria-label="条件の値" value={conditionValue} onChange={(event) => setConditionValue(event.target.value)} placeholder="値を入力" />
-                <span className="text-ink-faint self-center text-xs">15軸</span>
-              </div>
+              {usesKeyword && keyword.trim() ? (
+                <span className="inline-flex min-h-9 items-center rounded-full border border-hairline bg-canvas px-3 text-xs font-bold text-ink-secondary">「{keyword.trim()}」を含む</span>
+              ) : null}
+              {conditionSummaries.map((text, index) => (
+                <span
+                  key={`${index}-${text}`}
+                  className="inline-flex min-h-9 items-center rounded-full border border-hairline bg-canvas px-3 text-xs font-bold text-ink-secondary"
+                >
+                  {text}
+                </span>
+              ))}
+              {!((usesKeyword && keyword.trim()) || conditionSummaries.length > 0) ? (
+                <span className="inline-flex min-h-9 items-center rounded-full border border-hairline bg-canvas px-3 text-xs font-bold text-ink-secondary">条件なし</span>
+              ) : null}
             </div>
+            {conditionUnreadable ? (
+              /*
+               * 古い保存口が残した読めない条件（AUTOMATION-04）。
+               * 消すことも付け直すことも本人が決める。いきなり新しい条件へ
+               * 置き換える操作だけ用意し、中身を黙って書き換えない。
+               */
+              <div className="mt-3 rounded-control border border-hairline bg-canvas-sunken px-4 py-3" role="alert">
+                <p className="text-sm font-bold text-ink">保存されていた条件は読めませんでした</p>
+                <p className="mt-1 text-xs leading-5 text-ink-secondary">
+                  以前の画面が別の形で保存した条件です。このままでは人数を数えられないため、保存できません。
+                  以前の条件を外してもよければ、下のボタンから付け直せます。
+                </p>
+                <div className="mt-2">
+                  <Button variant="secondary" onClick={() => setConditionUnreadable(false)}>
+                    以前の条件を外して付け直す
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="mt-3">
+                <ConditionBuilder
+                  value={condition}
+                  onChange={setCondition}
+                  label="このルールで動かす相手"
+                  showCount={false}
+                />
+                <p className="mt-2 text-xs text-ink-faint">標準互換（15軸）。一斉配信やシナリオと同じ条件です。</p>
+              </div>
+            )}
             <p className="mt-3 text-xs font-bold text-info">いまの条件に当てはまる友だち　保存後に見込み人数を確認できます。</p>
           </Step>
 
@@ -1611,8 +1865,24 @@ export default function NewAutomationPage() {
             <h2 className={styles.sideTitle}>当てはまりそうな人数</h2>
             <p className={styles.sideMissingValue}>{previewCount === null ? '—' : `${previewCount.toLocaleString('ja-JP')}人`}</p>
             <p className={styles.sideMissingNote}>
-              {previewCount === null ? '下書きを保存すると、いまの条件で数えます。' : '保存した条件を、選択中のLINEアカウントで数えた結果です。'}
+              {/* AUTOMATION-03: 人数の失敗は保存の失敗ではない。下書きは残っている。 */}
+              {previewFailed
+                ? '人数を数えられませんでした。下書きは保存されています。'
+                : previewCount === null
+                  ? '下書きを保存すると、いまの条件で数えます。'
+                  : '保存した条件を、選択中のLINEアカウントで数えた結果です。'}
             </p>
+            {previewFailed && savedDraft && selectedAccountId ? (
+              <div className="mt-2">
+                <Button
+                  variant="secondary"
+                  disabled={previewRefreshing}
+                  onClick={() => void refreshAudiencePreview(selectedAccountId, savedDraft)}
+                >
+                  {previewRefreshing ? '数え直しています' : '人数をもう一度数える'}
+                </Button>
+              </div>
+            ) : null}
             <div className="mt-3 space-y-2">
               <TextField aria-label="1人テストの友だちID" value={testFriendId} onChange={(event) => setTestFriendId(event.target.value)} placeholder="試す友だちID" />
               <Button

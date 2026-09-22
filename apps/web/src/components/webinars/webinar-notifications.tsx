@@ -45,6 +45,28 @@ const SETTINGS_KEYS = [
   'missedEnabled', 'missedTime', 'completedEnabled',
 ] as const
 
+/**
+ * まだ保存されていないウェビナーの編集開始値（WEBINAR-09）。
+ *
+ * **全部切った状態で始める。** 未設定なのに勝手にONへしてしまうと、
+ * 気づかないうちに通知が出る。届けたいものだけを本人が選ぶ。
+ * 時刻・分はサーバーが受け付ける既定値（保存でそのまま通る値）にする。
+ */
+const emptySettings = (webinarId: string): WebinarNotificationSettings => ({
+  webinarId,
+  version: 0,
+  registrationEnabled: false,
+  dayBeforeEnabled: false,
+  dayBeforeTime: '18:00',
+  hourBeforeEnabled: false,
+  hourBeforeMinutes: 60,
+  startEnabled: false,
+  missedEnabled: false,
+  missedTime: '20:00',
+  completedEnabled: false,
+  updatedAt: '',
+})
+
 export default function WebinarNotifications({ webinarId, onLoaded, onDirtyChange, registerSave }: {
   webinarId: string
   /*
@@ -159,12 +181,31 @@ export default function WebinarNotifications({ webinarId, onLoaded, onDirtyChang
       />
     )
   }
+  /*
+   * 正常な「まだ設定が無い」と取得失敗は分けてある（上の error 分岐）。
+   * ここは取得に成功したうえで設定行が無い場合。入力欄の無い空状態だけを
+   * 返すと新規ウェビナーから通知設定を始められないので、明示的な入口を
+   * 置く。押したら全OFFの初期値で編集に入る——勝手に通知を有効化しない。
+   */
   if (!settings) {
     return (
       <ListState
         kind="empty"
         title="通知の設定がまだありません"
-        description="下の内容を決めて保存すると、申込・前日・開始前の通知が届くようになります。"
+        description="届けるものを決めて保存すると、申込・前日・開始前の通知が届くようになります。最初は全部オフの状態から始めます。"
+        action={(
+          <Button
+            onClick={() => {
+              const initial = emptySettings(webinarId)
+              setSettings(initial)
+              setBaseline(initial)
+              setNotice('')
+              setError('')
+            }}
+          >
+            通知の設定を入力する
+          </Button>
+        )}
       />
     )
   }
