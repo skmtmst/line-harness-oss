@@ -25,6 +25,9 @@ describe('分析の未取得表記', () => {
 
   it('保存結果のunavailableは「未取得」と出す', () => {
     expect(PAGE).toContain("unavailable: '未取得'")
-    expect(PAGE).toContain('未取得・失敗の最新結果')
+    // ANALYTICS-05: 「定義が古い」は版ずれだけを数える。
+    // 未取得・失敗は集計状態であり、定義の新旧とは別の軸。
+    expect(PAGE).toContain('いまの定義でまだ集計していないもの')
+    expect(PAGE).not.toContain('未取得・失敗の最新結果')
   })
 })
