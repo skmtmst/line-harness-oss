@@ -1,4 +1,4 @@
-import { parseCondition } from './segment-query.js';
+import { buildSegmentWhere, parseCondition, type SegmentCondition } from './segment-query.js';
 
 export type AutomationDraftActionType =
   | 'add_tag'
@@ -191,6 +191,46 @@ function parseActions(raw: string): AutomationDraftAction[] {
     // 下で保存データの不整合として扱う。
   }
   throw new AutomationDraftError('stored_data_invalid', '下書きの処理を読み込めませんでした');
+}
+
+/**
+ * 対象条件を「計算できる形か」まで検査する（AUTOMATION-04）。
+ *
+ * 以前は `parseCondition` が外形（operator と rules 配列）だけを見ていた
+ * ため、`{ type: 'name', value: '田中' }` のような文字列のままの値が
+ * 保存を通り、人数確認（`previewAutomationAudience` → `buildSegmentWhere`）
+ * で初めて `name rule requires an object value` と落ちていた。
+ * **保存するものは、計算側と同じ部品へその場で通す。** 組み立てられない
+ * 条件はここで断るので、版の作成という副作用の前に止まる。
+ *
+ * 空の条件（`{}`）は「絞り込みなし」の意味で許す。
+ */
+function assertDraftConditionUsable(conditions: unknown): void {
+  if (conditions === null || typeof conditions !== 'object' || Array.isArray(conditions)) {
+    throw new AutomationDraftError('condition_invalid', '対象条件を確認してください', 'conditions');
+  }
+  if (Object.keys(conditions as Record<string, unknown>).length === 0) return;
+  const parsed = parseCondition(JSON.stringify(conditions));
+  if (!parsed) {
+    throw new AutomationDraftError('condition_invalid', '対象条件を確認してください', 'conditions');
+  }
+  assertSegmentConditionComputes(parsed);
+}
+
+/**
+ * 条件を WHERE へ組み立てられるかの最終確認。組み立てられなければ
+ * 「対象条件の形が正しくありません」として拒否する。
+ */
+function assertSegmentConditionComputes(condition: SegmentCondition): void {
+  try {
+    buildSegmentWhere(condition);
+  } catch {
+    throw new AutomationDraftError(
+      'condition_invalid',
+      '対象条件の形が正しくありません。条件を選び直してください',
+      'conditions',
+    );
+  }
 }
 
 async function requireResource(
@@ -565,13 +605,7 @@ export async function updateAutomationDraft(
   const conditions = input.conditions === undefined
     ? parseObject(current.condition_config, '下書きの条件')
     : input.conditions;
-  if (conditions === null || typeof conditions !== 'object' || Array.isArray(conditions)) {
-    throw new AutomationDraftError('condition_invalid', '対象条件を確認してください', 'conditions');
-  }
-  if (Object.keys(conditions as Record<string, unknown>).length > 0
-    && !parseCondition(JSON.stringify(conditions))) {
-    throw new AutomationDraftError('condition_invalid', '対象条件を確認してください', 'conditions');
-  }
+  assertDraftConditionUsable(conditions);
 
   if (!Array.isArray(input.actions) || input.actions.length === 0 || input.actions.length > 20) {
     throw new AutomationDraftError('actions_invalid', 'することは1〜20個で選んでください', 'actions');
@@ -751,6 +785,23 @@ export async function publishAutomationDraft(
       WHERE id = ? AND automation_id = ? AND status = 'draft'`,
   ).bind(expectedVersionId, current.id).first<{ version_number: number }>();
   if (!version) throw new AutomationDraftError('not_found', '公開する下書きが見つかりません');
+  /*
+   * 古い保存口を通った壊れた条件を、そのまま公開しない（AUTOMATION-04）。
+   * 修復は `updateAutomationDraft` で条件を直して保存し直すだけでよい。
+   * 公開は状態を確定させる操作なので、計算できない条件はここでも断る。
+   */
+  const publishingConditions = parseObject(current.condition_config, '下書きの条件');
+  if (Object.keys(publishingConditions).length > 0) {
+    const parsed = parseCondition(current.condition_config);
+    if (!parsed) {
+      throw new AutomationDraftError(
+        'condition_invalid',
+        '対象条件が読めません。下書きの条件を確認して保存し直してください',
+        'conditions',
+      );
+    }
+    assertSegmentConditionComputes(parsed);
+  }
   /*
    * 新規の下書き（定義が draft）は `activate` で動かすか止めたままかを選ぶ。
    * **動いている・止めている定義の改訂下書きは、いまの稼働状態を保つ。**
