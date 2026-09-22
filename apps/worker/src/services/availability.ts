@@ -26,6 +26,8 @@ export interface Interval {
  */
 export interface BusyInterval extends Interval {
   sameMenu?: boolean;
+  /** 埋まりの由来。理由の説明用で、枠計算自体は sameMenu だけを見る。 */
+  source?: 'booking' | 'google';
 }
 
 export interface ComputeSlotsInput {
@@ -265,6 +267,138 @@ export interface CalendarSyncState {
   error?: 'unavailable';
 }
 
+/**
+ * 予約できない理由の分類（IDEA-28 予約設定の「この日時はなぜ取れないか」）。
+ * 画面はこのコードを運用者向けの文へ翻訳する。顧客名・外部予定の内容など
+ * 詳細は返さず、「どの条件で塞がっているか」だけを表す。
+ */
+export type SlotBlockReason =
+  /** メニューが無効・削除済み */
+  | 'menu_inactive'
+  /** このメニューを受け付ける担当がいない */
+  | 'staff_not_offered'
+  /** 必要な設備の設定が壊れている（fail-closed） */
+  | 'invalid_resource'
+  /** 受付期間（何日先まで取れるか）の外 */
+  | 'booking_window'
+  /** 締切（何時間前まで取れるか）を過ぎた */
+  | 'past_cutoff'
+  /** その壁時刻は存在しない（夏時間の gap 等） */
+  | 'invalid_time'
+  /** 受付の刻み（30分）の開始時刻ではない */
+  | 'not_on_grid'
+  /** 休業日・例外日で閉めている */
+  | 'exception_closed'
+  /** 例外日の時間設定が壊れていて安全側で閉めている */
+  | 'exception_invalid'
+  /** 勤務・営業時間の外 */
+  | 'outside_working'
+  /** 勤務・営業の終わりまでに所要時間が収まらない */
+  | 'duration_overrun'
+  /** 別メニューの予約と重なる */
+  | 'other_booking'
+  /** 外部カレンダーの予定と重なる */
+  | 'google_busy'
+  /** 担当の同時受付数がいっぱい */
+  | 'capacity_full'
+  /** 店舗全体の同時受付枠がいっぱい */
+  | 'store_full'
+  /** 必要な設備がその時間に足りない */
+  | 'resource_shortage'
+  /** 外部カレンダーを読めず fail-closed */
+  | 'calendar_unavailable'
+  /** 上のどれにも特定できない場合の安全側 */
+  | 'unavailable';
+
+interface ShiftRow {
+  staff_id: string;
+  work_date: string;
+  start_time: string;
+  end_time: string;
+}
+
+interface RuleRow {
+  staff_id: string;
+  weekday: number;
+  start_time: string;
+  end_time: string;
+}
+
+interface BookingRow {
+  staff_id: string;
+  menu_id: string;
+  starts_at: string;
+  block_ends_at: string;
+}
+
+interface ResourceBookingRow {
+  resource_id: string;
+  quantity: number;
+  starts_at: string;
+  block_ends_at: string;
+}
+
+interface RequiredResource {
+  id: string;
+  capacity: number | null;
+  quantity: number;
+  resource_account_id: string | null;
+  is_active: number | null;
+}
+
+/** instant 側の埋まり。fold 跨ぎを壁時刻へ潰すと消えるため、壁とは別系統で持つ。 */
+interface InstantBusy {
+  startMs: number;
+  endMs: number;
+  sameMenu: boolean;
+  source?: 'booking' | 'google';
+}
+
+/** その日が例外日で塞がる理由。working が空で block が null なら勤務時間そのものが無い。 */
+type DayBlock = 'staff_closed' | 'resource_closed' | 'store_closed' | 'invalid_exception';
+
+/**
+ * 空き計算1回分で読む全入力と派生値。
+ * getAvailability（枠の列挙）と explainBookingSlot（理由の説明）の両方が
+ * この読み込みを経由し、「画面の説明」と「実際の予約判定」が同じデータと
+ * 同じ手順から出ることを保証する。
+ */
+interface LoadedAvailability {
+  menuId: string;
+  menuForCalc: { duration_minutes: number; buffer_after_minutes: number };
+  concurrentCapacity: number;
+  staffRows: Array<{ id: string; display_name: string; is_designation_optional: number }>;
+  businessHours: BusinessHour[];
+  businessHoursConfigured: boolean;
+  requiredResources: RequiredResource[];
+  resourceCapacity: number;
+  menuResourceIds: Set<string>;
+  exceptions: AvailabilityExceptionRow[];
+  timeZone: string;
+  shiftRows: ShiftRow[];
+  ruleRows: RuleRow[];
+  bookingRows: BookingRow[];
+  resourceBookingRows: ResourceBookingRow[];
+  minLeadAt: Date;
+  windowLastDate: string | null;
+  googleBusyByStaff: Map<string, Array<{ start: string; end: string }> | null>;
+  calendarSync: CalendarSyncState[];
+  bookingMsByStaff: Map<string, InstantBusy[]>;
+  storeBookings: Array<{ startMs: number; endMs: number }>;
+  storeWindows: StoreCapacityWindow[];
+}
+
+type LoadAvailabilityResult =
+  | { kind: 'no_menu' }
+  | { kind: 'no_staff' }
+  /** 必要な設備の設定が壊れている。消費snapshot集計へ進む前に閉じる（fail-closed）。 */
+  | {
+      kind: 'invalid_resource';
+      staffRows: Array<{ id: string; display_name: string; is_designation_optional: number }>;
+      timeZone: string;
+    }
+  | { kind: 'ok'; data: LoadedAvailability };
+
 function weekdayForDate(date: string): number {
   // 暦日の曜日はタイムゾーンに依らない。00:00Z の曜日＝その日付の曜日。
   return new Date(`${date}T00:00:00Z`).getUTCDay();
@@ -385,10 +519,15 @@ function parseExceptionHours(raw: string): Interval[] | null {
   return out;
 }
 
-export async function getAvailability(
+/**
+ * 空き計算に必要な行をすべて読み、派生値（締切・受付期間・店舗定員窓・
+ * instant 側の埋まり）まで組み立てる。メニュー無し・担当無しは早期に
+ * 識別子だけ返し、枠計算へは進まない。
+ */
+async function loadAvailabilityData(
   db: D1Database,
   params: GetAvailabilityParams,
-): Promise<{ by_staff: AvailabilityByStaff[] }> {
+): Promise<LoadAvailabilityResult> {
   const menu = await db
     .prepare(
       `SELECT m.duration_minutes, m.buffer_after_minutes,
@@ -410,7 +549,7 @@ export async function getAvailability(
       override_duration: number | null;
     }>();
   if (!menu) {
-    return { by_staff: [] };
+    return { kind: 'no_menu' };
   }
 
   // SQL とパラメータ数を一致させる。staffId 未指定時の no-WHERE バリアントは
@@ -440,10 +579,9 @@ export async function getAvailability(
     display_name: string;
     is_designation_optional: number;
   }>();
-  if (!staffRows.results.length) return { by_staff: [] };
+  if (!staffRows.results.length) return { kind: 'no_staff' };
 
   const staffIds = staffRows.results.map((s) => s.id);
-  const dates = eachDate(params.from, params.to);
   const placeholders = staffIds.map(() => '?').join(',');
 
   const [businessHours, menuResources, exceptionsResult, settingsRow] = await Promise.all([
@@ -490,13 +628,8 @@ export async function getAvailability(
     || Number(row.quantity) < 1
     || Number(row.quantity) > Number(row.capacity));
   if (hasInvalidResource) {
-    return {
-      by_staff: staffRows.results.map((staff) => ({
-        staff_id: staff.id,
-        display_name: staff.display_name,
-        slots: [],
-      })),
-    };
+    // 壊れた資源設定では消費snapshot集計へ進まず閉じる。
+    return { kind: 'invalid_resource', staffRows: staffRows.results, timeZone };
   }
   const resourceCapacity = requiredResources.reduce(
     (min, row) => Math.min(min, Math.floor(Number(row.capacity) / Number(row.quantity))),
@@ -637,277 +770,630 @@ export async function getAvailability(
   }
   const storeWindows = storeCapacityWindows(businessHours.results ?? [], timeZone, rangeStart.getTime(), rangeEnd.getTime());
 
+  return {
+    kind: 'ok',
+    data: {
+      menuId: params.menuId,
+      menuForCalc,
+      concurrentCapacity: Number(menu.concurrent_capacity ?? 1),
+      staffRows: staffRows.results,
+      businessHours: businessHours.results ?? [],
+      businessHoursConfigured: settingsRow?.business_hours_configured === 1,
+      requiredResources,
+      resourceCapacity,
+      menuResourceIds,
+      exceptions,
+      timeZone,
+      shiftRows: shifts.results ?? [],
+      ruleRows: rules.results ?? [],
+      bookingRows: bookings.results ?? [],
+      resourceBookingRows: resourceBookings.results ?? [],
+      minLeadAt,
+      windowLastDate,
+      googleBusyByStaff,
+      calendarSync,
+      bookingMsByStaff,
+      storeBookings,
+      storeWindows,
+    },
+  };
+}
+
+/**
+ * その日の例外日・勤務・営業時間・資源の時間を畳み込み、予約を受けられる
+ * 壁時刻の区間を返す。塞がったときは block に理由を入れる。理由説明が
+ * 「例外日で閉まっている」と「勤務時間そのものが無い」を区別するためで、
+ * 枠計算自体は従来どおり返り値の working だけを見る。
+ */
+function computeDayWorking(
+  d: LoadedAvailability,
+  staffId: string,
+  date: string,
+): { working: Interval[]; block: DayBlock | null } {
+  // その日の例外日（JST 日付で突合。YYYY-MM-DD の辞書式比較でよい）。
+  // 毎週ルール・シフトより例外日を優先する。優先順位は下の通り。
+  //
+  // 塞ぐ（closed）: 担当・資源（このメニューが使うもの）は絶対に塞ぐ。
+  //   店舗 closed は、店舗 open（臨時営業）が同日にあれば open 区間だけ開ける。
+  // 時間: 担当 custom が稼働を置き換え、担当 open が足す。店舗 open は
+  //   平日には足し、closed 日には open 区間だけ再開する。
+  //   店舗 custom と資源の時間（custom/open）は共通部分に絞る。資源は
+  //   資源ごとに union し、資源の間で intersection する（全資源が同時
+  //   に要るため）。資源に稼働の基準が無いため、資源 open も custom と
+  //   同じ絞り込みになる（基準が常時可のため、開ける方向には働かない）。
+  // 壊れた時間・空の時間は fail-closed（枠 0）。
+  const dayExceptions = d.exceptions.filter(
+    (e) => e.date_from <= date && date <= e.date_to,
+  );
+  // 適用範囲だけを集める。適用外（別担当・使わない資源）の行は読まない。
+  const storeRows = dayExceptions.filter((e) => e.scope_kind === 'store');
+  const staffExceptionRows = dayExceptions.filter(
+    (e) => e.scope_kind === 'staff' && e.scope_id === staffId,
+  );
+  const resourceRows = dayExceptions.filter(
+    (e) => e.scope_kind === 'resource'
+      && e.scope_id != null
+      && d.menuResourceIds.has(e.scope_id),
+  );
+  // 適用される時間行を読む。壊れた行が 1 つでもあれば fail-closed。
+  let brokenTime = false;
+  const readHours = (rows: AvailabilityExceptionRow[], kind: string): Interval[] => {
+    const out: Interval[] = [];
+    for (const row of rows) {
+      if (row.kind !== kind) continue;
+      const hours = parseExceptionHours(row.hours_json);
+      if (hours === null) {
+        brokenTime = true;
+        return [];
+      }
+      out.push(...hours);
+    }
+    return mergeIntervals(out);
+  };
+  const staffCustomHours = readHours(staffExceptionRows, 'custom_hours');
+  const staffOpenHours = readHours(staffExceptionRows, 'open');
+  const storeOpenHours = readHours(storeRows, 'open');
+  const storeCustomHours = readHours(storeRows, 'custom_hours');
+  // 資源は資源ごとに union する。予約には全ての資源が同時に要るため、
+  // 資源の間は後で intersection する。空の資源が1つでもあれば枠0。
+  const resourceHoursById = new Map<string, Interval[]>();
+  for (const row of resourceRows) {
+    if (row.kind !== 'custom_hours' && row.kind !== 'open') continue;
+    const hours = parseExceptionHours(row.hours_json);
+    if (hours === null) {
+      brokenTime = true;
+      break;
+    }
+    const key = row.scope_id as string;
+    const list = resourceHoursById.get(key) ?? [];
+    list.push(...hours);
+    resourceHoursById.set(key, list);
+  }
+  const hasStaffCustom = staffExceptionRows.some((e) => e.kind === 'custom_hours');
+  const hasStaffOpen = staffExceptionRows.some((e) => e.kind === 'open');
+  const hasStoreOpen = storeRows.some((e) => e.kind === 'open');
+  const hasStoreCustom = storeRows.some((e) => e.kind === 'custom_hours');
+  if (brokenTime) return { working: [], block: 'invalid_exception' };
+  const staffClosed = staffExceptionRows.some((e) => e.kind === 'closed');
+  const resourceClosed = resourceRows.some((e) => e.kind === 'closed');
+  const storeClosed = storeRows.some((e) => e.kind === 'closed');
+  if (staffClosed) return { working: [], block: 'staff_closed' };
+  if (resourceClosed) return { working: [], block: 'resource_closed' };
+  // 店舗 open（臨時営業）は店舗 closed を切り抜く。担当・資源 closed は越えない。
+  if (storeClosed && storeOpenHours.length === 0) {
+    return { working: [], block: 'store_closed' };
+  }
+  // 空の open 行は fail-closed（足す時間が無いのに開けない）。
+  if ((hasStaffOpen && staffOpenHours.length === 0)
+    || (hasStoreOpen && storeOpenHours.length === 0)) {
+    return { working: [], block: 'invalid_exception' };
+  }
+  const shift = d.shiftRows.find((r) => r.staff_id === staffId && r.work_date === date);
+  const rule = d.ruleRows.find(
+    (r) => r.staff_id === staffId && r.weekday === weekdayForDate(date),
+  );
+  const base = shift ?? rule;
+  const coreWorking: Interval[] = hasStaffCustom
+    ? staffCustomHours
+    : base
+      ? [{ start: base.start_time, end: base.end_time }]
+      : [];
+  /*
+   * 店舗の営業時間（週次）で、通常の勤務を切り詰める（#748 / N-403）。
+   *
+   * これまで `booking_business_hours` は定員の計算にしか使われておらず、
+   * 枠の開閉には効いていなかった。営業 10:00-17:00・勤務 09:00-18:00 の
+   * 店で 09:00 の枠が出て、17:00-18:00 まではみ出していた。
+   *
+   * 明示設定前だけは、その曜日の行が1件も無ければ制限しない。
+   * 管理画面から一度でも週全体を保存した後は、0行曜日を定休日として閉じる。
+   *
+   * 同じ曜日に複数行あるときは区間として束ねる（10:00-13:00 と
+   * 14:00-18:00 なら昼休みは閉じる）。
+   *
+   * 臨時営業（例外日の `open`）はこのあと足す。**営業時間では切らない。**
+   * 日付を指定して「この日は開ける」と入れたものなので、週次の並びより
+   * そちらを採る。`closed` と `custom_hours` の扱いはこれまでどおり。
+   */
+  const dayHours = d.businessHours.filter((hour) => hour.weekday === weekdayForDate(date));
+  const businessIntervals = mergeIntervals(
+    dayHours.map((hour) => ({ start: hour.start_time, end: hour.end_time })),
+  );
+  const shouldApplyBusinessHours = businessIntervals.length > 0
+    || d.businessHoursConfigured;
+  const coreWithinBusiness = shouldApplyBusinessHours
+    ? intersectIntervals(coreWorking, businessIntervals)
+    : coreWorking;
+  let workingList = mergeIntervals([...coreWithinBusiness, ...staffOpenHours]);
+  if (!storeClosed) {
+    workingList = mergeIntervals([...workingList, ...storeOpenHours]);
+  } else {
+    // 店舗 closed を open が切り抜く日は、open 区間だけ再開する。
+    // 通常勤務は足さない（09-17 勤務＋10-12 open なら 10-12 だけ）。
+    workingList = workingList.length === 0
+      ? storeOpenHours
+      : intersectIntervals(workingList, storeOpenHours);
+  }
+  // 空の custom 行との共通部分は空になる（fail-closed）。
+  if (hasStoreCustom) workingList = intersectIntervals(workingList, storeCustomHours);
+  for (const hours of resourceHoursById.values()) {
+    workingList = intersectIntervals(workingList, mergeIntervals(hours));
+    if (workingList.length === 0) break;
+  }
+  return { working: workingList, block: null };
+}
+
+/**
+ * その日の埋まり。壁時刻側（枠刻みの判定用）と instant 側（fold 跨ぎ用）を
+ * 両方返す。理由説明が「予約」と「外部カレンダーの予定」を言い分けられる
+ * よう、source も付ける。
+ */
+function buildDayBusy(
+  d: LoadedAvailability,
+  staffId: string,
+  date: string,
+): { dayBookings: BusyInterval[]; busyMs: InstantBusy[] } {
+  const dayBookings: BusyInterval[] = d.bookingRows
+    .filter((b) => b.staff_id === staffId)
+    .filter((b) => tzDateStr(d.timeZone, new Date(b.starts_at)) === date)
+    .map((b) => ({
+      start: tzHHMM(d.timeZone, new Date(b.starts_at)),
+      end: tzHHMM(d.timeZone, new Date(b.block_ends_at)),
+      // 同じメニューの予約だけが定員まで重ねられる。
+      sameMenu: b.menu_id === d.menuId,
+      source: 'booking',
+    }));
+  const googleBusy = d.googleBusyByStaff.get(staffId);
+  // 外の予定は定員に関係なく塞ぐ（sameMenu を付けない）。
+  if (googleBusy) {
+    dayBookings.push(
+      ...googleBusyForDate(googleBusy, date, d.timeZone)
+        .map((interval) => ({ ...interval, source: 'google' as const })),
+    );
+  }
+  // instant 側の busy。当日の範囲と重なるものを instant のまま集める。
+  // fold を跨ぐ予約・予定は壁時刻へ潰すと消える（01:30→01:30）ため、
+  // 壁とは別に instant の重なりを見る。
+  const dayStartMs = zonedTimeToUtcMs(d.timeZone, date, '00:00');
+  const dayEndMs = zonedTimeToUtcMs(d.timeZone, addDays(date, 1), '00:00');
+  const busyMs: InstantBusy[] = [];
+  for (const b of d.bookingMsByStaff.get(staffId) ?? []) {
+    if (b.startMs < dayEndMs && dayStartMs < b.endMs) {
+      busyMs.push({
+        startMs: Math.max(b.startMs, dayStartMs),
+        endMs: Math.min(b.endMs, dayEndMs),
+        sameMenu: b.sameMenu,
+        source: b.source,
+      });
+    }
+  }
+  if (googleBusy) {
+    for (const interval of googleBusy) {
+      const startMs = new Date(interval.start).getTime();
+      const endMs = new Date(interval.end).getTime();
+      if (!Number.isFinite(startMs) || !Number.isFinite(endMs) || startMs >= endMs) continue;
+      if (startMs < dayEndMs && dayStartMs < endMs) {
+        busyMs.push({
+          startMs: Math.max(startMs, dayStartMs),
+          endMs: Math.min(endMs, dayEndMs),
+          sameMenu: false,
+          source: 'google',
+        });
+      }
+    }
+  }
+  return { dayBookings, busyMs };
+}
+
+/** 1つの候補枠への判定結果。emitted は getAvailability が候補として返すか。 */
+interface SlotVerdict {
+  /** 従来の列挙に残るか（満席の枠も残る）。false なら候補から外れる。 */
+  emitted: boolean;
+  /** 実際に予約を受けられるか（emitted かつ残数あり）。 */
+  bookable: boolean;
+  remaining: number;
+  capacity: number;
+  state: 'available' | 'limited' | 'full';
+  /** 受けられない理由（bookable のとき空）。 */
+  reasons: SlotBlockReason[];
+  /** 候補の開始 instant（startUtc の材料）。 */
+  startMs: number;
+}
+
+/**
+ * 候補枠1件の判定。gap・締切・instant 重なり・店舗定員・設備を従来と同じ
+ * 条件で見るが、理由説明のため「どれで落ちたか」も集める。
+ */
+function evaluateSlot(
+  d: LoadedAvailability,
+  date: string,
+  slot: Interval,
+  dayBookings: BusyInterval[],
+  busyMs: InstantBusy[],
+): SlotVerdict {
+  const occupyMs = (d.menuForCalc.duration_minutes + d.menuForCalc.buffer_after_minutes) * 60_000;
+  const slotStartMs = zonedTimeToUtcMs(d.timeZone, date, slot.start);
+  const fail = (reasons: SlotBlockReason[]): SlotVerdict => ({
+    emitted: false,
+    bookable: false,
+    remaining: 0,
+    capacity: 0,
+    state: 'full',
+    reasons,
+    startMs: slotStartMs,
+  });
+  // gap（存在しない壁時刻。DST 開始日の 02:00 台）は候補にしない。
+  // 壁→instant→壁が往復一致するものだけ出す。
+  const roundTripped = new Date(slotStartMs);
+  if (tzDateStr(d.timeZone, roundTripped) !== date
+    || tzHHMM(d.timeZone, roundTripped) !== slot.start) {
+    return fail(['invalid_time']);
+  }
+  if (new Date(slotStartMs) < d.minLeadAt) return fail(['past_cutoff']);
+  const slotEndMs = slotStartMs + occupyMs;
+  const wallSameCount = dayBookings.filter((booking) => booking.sameMenu === true
+    && overlaps(toMin(slot.start), toMin(slot.end), toMin(booking.start), toMin(booking.end))).length;
+  // instant 側の重なり。壁側が見落とす fold 跨ぎを拾う。
+  // 重なりは真の時間衝突なので、壁で空いていても塞ぐ。
+  const instantReasons = new Set<SlotBlockReason>();
+  let instantSameCount = 0;
+  for (const busy of busyMs) {
+    if (slotStartMs < busy.endMs && busy.startMs < slotEndMs) {
+      if (!busy.sameMenu) {
+        instantReasons.add(busy.source === 'google' ? 'google_busy' : 'other_booking');
+      } else {
+        instantSameCount++;
+      }
+    }
+  }
+  const sameMenuCount = Math.max(wallSameCount, instantSameCount);
+  const staffCapacity = Math.max(1, d.concurrentCapacity);
+  const storeSeats = storeSeatsForSlot(d.storeWindows, d.storeBookings, slotStartMs, slotEndMs);
+  let resourceRemaining = Number.POSITIVE_INFINITY;
+  for (const resource of d.requiredResources) {
+    const overlapping = d.resourceBookingRows.flatMap((booking) => {
+      if (booking.resource_id !== resource.id) return [];
+      const startMs = new Date(booking.starts_at).getTime();
+      const endMs = new Date(booking.block_ends_at).getTime();
+      return startMs < slotEndMs && slotStartMs < endMs
+        ? [{ startMs, endMs, quantity: Number(booking.quantity) }]
+        : [];
+    });
+    const points = [
+      slotStartMs,
+      ...overlapping.map((booking) => booking.startMs)
+        .filter((point) => slotStartMs < point && point < slotEndMs),
+    ];
+    const peakUsed = points.reduce((peak, point) => Math.max(
+      peak,
+      overlapping.reduce(
+        (used, booking) => used + (
+          booking.startMs <= point && point < booking.endMs ? booking.quantity : 0
+        ),
+        0,
+      ),
+    ), 0);
+    resourceRemaining = Math.min(
+      resourceRemaining,
+      Math.max(0, Math.floor(
+        (Number(resource.capacity) - peakUsed) / Number(resource.quantity),
+      )),
+    );
+  }
+  // 列挙から外す条件（従来の continue と同じ）。理由として全部集める。
+  const reasons: SlotBlockReason[] = [...instantReasons];
+  if (storeSeats.remaining === 0) reasons.push('store_full');
+  if (resourceRemaining === 0) reasons.push('resource_shortage');
+  if (reasons.length > 0) return fail(reasons);
+  const effectiveCapacity = Math.min(staffCapacity, storeSeats.capacity, d.resourceCapacity);
+  const remaining = Math.max(0, Math.min(
+    staffCapacity - sameMenuCount,
+    storeSeats.remaining,
+    resourceRemaining,
+  ));
+  const state = remaining === 0 ? 'full' : remaining < effectiveCapacity ? 'limited' : 'available';
+  return {
+    emitted: true,
+    bookable: remaining > 0,
+    remaining,
+    capacity: effectiveCapacity,
+    state,
+    // 満席で列挙にだけ残る枠は「担当の同時受付数いっぱい」が理由。
+    reasons: remaining === 0 ? ['capacity_full'] : [],
+    startMs: slotStartMs,
+  };
+}
+
+/**
+ * 枠刻みの候補に挙がらなかった開始時刻の理由を、computeSlots と同じ条件
+ * （勤務内に収まるか・刻みに乗るか・埋まりと重なるか）で説明する。
+ */
+function diagnoseRejectedStart(
+  working: Interval[],
+  busy: BusyInterval[],
+  startMin: number,
+  occupyMin: number,
+  granularity: number,
+  capacity: number,
+): SlotBlockReason[] {
+  // 所要時間込みで勤務区間に収まるか
+  const containing = working.filter(
+    (w) => toMin(w.start) <= startMin && startMin + occupyMin <= toMin(w.end),
+  );
+  if (containing.length === 0) {
+    const startsInside = working.some(
+      (w) => toMin(w.start) <= startMin && startMin < toMin(w.end),
+    );
+    return [startsInside ? 'duration_overrun' : 'outside_working'];
+  }
+  // computeSlots と同じ刻み: 区間の先頭を刻みへ切り上げた所から granularity ごと
+  const onGrid = containing.some((w) => {
+    const first = Math.ceil(toMin(w.start) / granularity) * granularity;
+    return startMin >= first && (startMin - first) % granularity === 0;
+  });
+  if (!onGrid) return ['not_on_grid'];
+  const reasons = new Set<SlotBlockReason>();
+  let sameMenuCount = 0;
+  for (const b of busy) {
+    if (!overlaps(startMin, startMin + occupyMin, toMin(b.start), toMin(b.end))) continue;
+    if (!b.sameMenu) {
+      reasons.add(b.source === 'google' ? 'google_busy' : 'other_booking');
+    } else {
+      sameMenuCount++;
+    }
+  }
+  if (sameMenuCount >= Math.max(1, capacity)) reasons.add('capacity_full');
+  // computeSlots は busy 以外で候補を落とさない。ここに来るなら理由の
+  // 取りこぼしなので、安全側の総称を返す。
+  if (reasons.size === 0) reasons.add('unavailable');
+  return [...reasons];
+}
+
+export async function getAvailability(
+  db: D1Database,
+  params: GetAvailabilityParams,
+): Promise<{ by_staff: AvailabilityByStaff[] }> {
+  const loaded = await loadAvailabilityData(db, params);
+  if (loaded.kind === 'no_menu' || loaded.kind === 'no_staff') {
+    return { by_staff: [] };
+  }
+  if (loaded.kind === 'invalid_resource') {
+    return {
+      by_staff: loaded.staffRows.map((staff) => ({
+        staff_id: staff.id,
+        display_name: staff.display_name,
+        slots: [],
+      })),
+    };
+  }
+  const d = loaded.data;
+  // Staff/menu concurrency is distinct from the store-wide seat budget.
+  const staffCapacity = Math.max(1, d.concurrentCapacity);
   const by_staff: AvailabilityByStaff[] = [];
-  for (const s of staffRows.results) {
+  for (const s of d.staffRows) {
     const slots: AvailabilityByStaff['slots'] = [];
-    const syncState = calendarSync.find((state) => state.staff_id === s.id);
+    const syncState = d.calendarSync.find((state) => state.staff_id === s.id);
     if (syncState?.configured && !syncState.ok) {
       by_staff.push({ staff_id: s.id, display_name: s.display_name, slots });
       continue;
     }
-    for (const date of dates) {
-      if (windowLastDate && date > windowLastDate) continue;
-      // その日の例外日（JST 日付で突合。YYYY-MM-DD の辞書式比較でよい）。
-      // 毎週ルール・シフトより例外日を優先する。優先順位は下の通り。
-      //
-      // 塞ぐ（closed）: 担当・資源（このメニューが使うもの）は絶対に塞ぐ。
-      //   店舗 closed は、店舗 open（臨時営業）が同日にあれば open 区間だけ開ける。
-      // 時間: 担当 custom が稼働を置き換え、担当 open が足す。店舗 open は
-      //   平日には足し、closed 日には open 区間だけ再開する。
-      //   店舗 custom と資源の時間（custom/open）は共通部分に絞る。資源は
-      //   資源ごとに union し、資源の間で intersection する（全資源が同時
-      //   に要るため）。資源に稼働の基準が無いため、資源 open も custom と
-      //   同じ絞り込みになる（基準が常時可のため、開ける方向には働かない）。
-      // 壊れた時間・空の時間は fail-closed（枠 0）。
-      const dayExceptions = exceptions.filter(
-        (e) => e.date_from <= date && date <= e.date_to,
-      );
-      // 適用範囲だけを集める。適用外（別担当・使わない資源）の行は読まない。
-      const storeRows = dayExceptions.filter((e) => e.scope_kind === 'store');
-      const staffRows = dayExceptions.filter(
-        (e) => e.scope_kind === 'staff' && e.scope_id === s.id,
-      );
-      const resourceRows = dayExceptions.filter(
-        (e) => e.scope_kind === 'resource'
-          && e.scope_id != null
-          && menuResourceIds.has(e.scope_id),
-      );
-      // 適用される時間行を読む。壊れた行が 1 つでもあれば fail-closed。
-      let brokenTime = false;
-      const readHours = (rows: AvailabilityExceptionRow[], kind: string): Interval[] => {
-        const out: Interval[] = [];
-        for (const row of rows) {
-          if (row.kind !== kind) continue;
-          const hours = parseExceptionHours(row.hours_json);
-          if (hours === null) {
-            brokenTime = true;
-            return [];
-          }
-          out.push(...hours);
-        }
-        return mergeIntervals(out);
-      };
-      const staffCustomHours = readHours(staffRows, 'custom_hours');
-      const staffOpenHours = readHours(staffRows, 'open');
-      const storeOpenHours = readHours(storeRows, 'open');
-      const storeCustomHours = readHours(storeRows, 'custom_hours');
-      // 資源は資源ごとに union する。予約には全ての資源が同時に要るため、
-      // 資源の間は後で intersection する。空の資源が1つでもあれば枠0。
-      const resourceHoursById = new Map<string, Interval[]>();
-      for (const row of resourceRows) {
-        if (row.kind !== 'custom_hours' && row.kind !== 'open') continue;
-        const hours = parseExceptionHours(row.hours_json);
-        if (hours === null) {
-          brokenTime = true;
-          break;
-        }
-        const key = row.scope_id as string;
-        const list = resourceHoursById.get(key) ?? [];
-        list.push(...hours);
-        resourceHoursById.set(key, list);
-      }
-      const hasStaffCustom = staffRows.some((e) => e.kind === 'custom_hours');
-      const hasStaffOpen = staffRows.some((e) => e.kind === 'open');
-      const hasStoreOpen = storeRows.some((e) => e.kind === 'open');
-      const hasStoreCustom = storeRows.some((e) => e.kind === 'custom_hours');
-      if (brokenTime) continue;
-      const staffClosed = staffRows.some((e) => e.kind === 'closed');
-      const resourceClosed = resourceRows.some((e) => e.kind === 'closed');
-      const storeClosed = storeRows.some((e) => e.kind === 'closed');
-      if (staffClosed || resourceClosed) continue;
-      // 店舗 open（臨時営業）は店舗 closed を切り抜く。担当・資源 closed は越えない。
-      if (storeClosed && storeOpenHours.length === 0) continue;
-      // 空の open 行は fail-closed（足す時間が無いのに開けない）。
-      if ((hasStaffOpen && staffOpenHours.length === 0)
-        || (hasStoreOpen && storeOpenHours.length === 0)) continue;
-      const shift = shifts.results.find((r) => r.staff_id === s.id && r.work_date === date);
-      const rule = rules.results.find(
-        (r) => r.staff_id === s.id && r.weekday === weekdayForDate(date),
-      );
-      const base = shift ?? rule;
-      const coreWorking: Interval[] = hasStaffCustom
-        ? staffCustomHours
-        : base
-          ? [{ start: base.start_time, end: base.end_time }]
-          : [];
-      /*
-       * 店舗の営業時間（週次）で、通常の勤務を切り詰める（#748 / N-403）。
-       *
-       * これまで `booking_business_hours` は定員の計算にしか使われておらず、
-       * 枠の開閉には効いていなかった。営業 10:00-17:00・勤務 09:00-18:00 の
-       * 店で 09:00 の枠が出て、17:00-18:00 まではみ出していた。
-       *
-       * 明示設定前だけは、その曜日の行が1件も無ければ制限しない。
-       * 管理画面から一度でも週全体を保存した後は、0行曜日を定休日として閉じる。
-       *
-       * 同じ曜日に複数行あるときは区間として束ねる（10:00-13:00 と
-       * 14:00-18:00 なら昼休みは閉じる）。
-       *
-       * 臨時営業（例外日の `open`）はこのあと足す。**営業時間では切らない。**
-       * 日付を指定して「この日は開ける」と入れたものなので、週次の並びより
-       * そちらを採る。`closed` と `custom_hours` の扱いはこれまでどおり。
-       */
-      const dayHours = (businessHours.results ?? [])
-        .filter((hour) => hour.weekday === weekdayForDate(date));
-      const businessIntervals = mergeIntervals(
-        dayHours.map((hour) => ({ start: hour.start_time, end: hour.end_time })),
-      );
-      const shouldApplyBusinessHours = businessIntervals.length > 0
-        || settingsRow?.business_hours_configured === 1;
-      const coreWithinBusiness = shouldApplyBusinessHours
-        ? intersectIntervals(coreWorking, businessIntervals)
-        : coreWorking;
-      let workingList = mergeIntervals([...coreWithinBusiness, ...staffOpenHours]);
-      if (!storeClosed) {
-        workingList = mergeIntervals([...workingList, ...storeOpenHours]);
-      } else {
-        // 店舗 closed を open が切り抜く日は、open 区間だけ再開する。
-        // 通常勤務は足さない（09-17 勤務＋10-12 open なら 10-12 だけ）。
-        workingList = workingList.length === 0
-          ? storeOpenHours
-          : intersectIntervals(workingList, storeOpenHours);
-      }
-      // 空の custom 行との共通部分は空になる（fail-closed）。
-      if (hasStoreCustom) workingList = intersectIntervals(workingList, storeCustomHours);
-      for (const hours of resourceHoursById.values()) {
-        workingList = intersectIntervals(workingList, mergeIntervals(hours));
-        if (workingList.length === 0) break;
-      }
-      if (workingList.length === 0) continue;
-      const dayBookings: BusyInterval[] = bookings.results
-        .filter((b) => b.staff_id === s.id)
-        .filter((b) => tzDateStr(timeZone, new Date(b.starts_at)) === date)
-        .map((b) => ({
-          start: tzHHMM(timeZone, new Date(b.starts_at)),
-          end: tzHHMM(timeZone, new Date(b.block_ends_at)),
-          // 同じメニューの予約だけが定員まで重ねられる。
-          sameMenu: b.menu_id === params.menuId,
-        }));
-      const googleBusy = googleBusyByStaff.get(s.id);
-      // 外の予定は定員に関係なく塞ぐ（sameMenu を付けない）。
-      if (googleBusy) dayBookings.push(...googleBusyForDate(googleBusy, date, timeZone));
-      // Staff/menu concurrency is distinct from the store-wide seat budget.
-      const staffCapacity = Math.max(1, Number(menu.concurrent_capacity ?? 1));
+    for (const date of eachDate(params.from, params.to)) {
+      if (d.windowLastDate && date > d.windowLastDate) continue;
+      const day = computeDayWorking(d, s.id, date);
+      if (day.block !== null || day.working.length === 0) continue;
+      const workingList = day.working;
+      const { dayBookings, busyMs } = buildDayBusy(d, s.id, date);
       const daySlots = computeSlots({
         working: workingList,
         busy: dayBookings,
-        menu: menuForCalc,
+        menu: d.menuForCalc,
         granularityMinutes: SLOT_GRANULARITY_MINUTES,
         capacity: staffCapacity,
       });
-      // instant 側の busy。当日の範囲と重なるものを instant のまま集める。
-      // fold を跨ぐ予約・予定は壁時刻へ潰すと消える（01:30→01:30）ため、
-      // 壁とは別に instant の重なりを見る。
-      const dayStartMs = zonedTimeToUtcMs(timeZone, date, '00:00');
-      const dayEndMs = zonedTimeToUtcMs(timeZone, addDays(date, 1), '00:00');
-      const busyMs: Array<{ startMs: number; endMs: number; sameMenu: boolean }> = [];
-      for (const b of bookingMsByStaff.get(s.id) ?? []) {
-        if (b.startMs < dayEndMs && dayStartMs < b.endMs) {
-          busyMs.push({
-            startMs: Math.max(b.startMs, dayStartMs),
-            endMs: Math.min(b.endMs, dayEndMs),
-            sameMenu: b.sameMenu,
-          });
-        }
-      }
-      if (googleBusy) {
-        for (const interval of googleBusy) {
-          const startMs = new Date(interval.start).getTime();
-          const endMs = new Date(interval.end).getTime();
-          if (!Number.isFinite(startMs) || !Number.isFinite(endMs) || startMs >= endMs) continue;
-          if (startMs < dayEndMs && dayStartMs < endMs) {
-            busyMs.push({
-              startMs: Math.max(startMs, dayStartMs),
-              endMs: Math.min(endMs, dayEndMs),
-              sameMenu: false,
-            });
-          }
-        }
-      }
-      const occupyMs = (menuForCalc.duration_minutes + menuForCalc.buffer_after_minutes) * 60_000;
       for (const slot of daySlots) {
-        // gap（存在しない壁時刻。DST 開始日の 02:00 台）は候補にしない。
-        // 壁→instant→壁が往復一致するものだけ出す。
-        const slotStartMs = zonedTimeToUtcMs(timeZone, date, slot.start);
-        const roundTripped = new Date(slotStartMs);
-        if (tzDateStr(timeZone, roundTripped) !== date
-          || tzHHMM(timeZone, roundTripped) !== slot.start) continue;
-        if (new Date(slotStartMs) < minLeadAt) continue;
-        const slotEndMs = slotStartMs + occupyMs;
-        const wallSameCount = dayBookings.filter((booking) => booking.sameMenu === true
-          && overlaps(toMin(slot.start), toMin(slot.end), toMin(booking.start), toMin(booking.end))).length;
-        // instant 側の重なり。壁側が見落とす fold 跨ぎを拾う。
-        // 重なりは真の時間衝突なので、壁で空いていても塞ぐ。
-        let instantBlocked = false;
-        let instantSameCount = 0;
-        for (const busy of busyMs) {
-          if (slotStartMs < busy.endMs && busy.startMs < slotEndMs) {
-            if (!busy.sameMenu) {
-              instantBlocked = true;
-              break;
-            }
-            instantSameCount++;
-          }
-        }
-        if (instantBlocked) continue;
-        const sameMenuCount = Math.max(wallSameCount, instantSameCount);
-        const storeSeats = storeSeatsForSlot(storeWindows, storeBookings, slotStartMs, slotEndMs);
-        if (storeSeats.remaining === 0) continue;
-        let resourceRemaining = Number.POSITIVE_INFINITY;
-        for (const resource of requiredResources) {
-          const overlaps = (resourceBookings.results ?? []).flatMap((booking) => {
-            if (booking.resource_id !== resource.id) return [];
-            const startMs = new Date(booking.starts_at).getTime();
-            const endMs = new Date(booking.block_ends_at).getTime();
-            return startMs < slotEndMs && slotStartMs < endMs
-              ? [{ startMs, endMs, quantity: Number(booking.quantity) }]
-              : [];
-          });
-          const points = [
-            slotStartMs,
-            ...overlaps.map((booking) => booking.startMs)
-              .filter((point) => slotStartMs < point && point < slotEndMs),
-          ];
-          const peakUsed = points.reduce((peak, point) => Math.max(
-            peak,
-            overlaps.reduce(
-              (used, booking) => used + (
-                booking.startMs <= point && point < booking.endMs ? booking.quantity : 0
-              ),
-              0,
-            ),
-          ), 0);
-          resourceRemaining = Math.min(
-            resourceRemaining,
-            Math.max(0, Math.floor(
-              (Number(resource.capacity) - peakUsed) / Number(resource.quantity),
-            )),
-          );
-        }
-        if (resourceRemaining === 0) continue;
-        const effectiveCapacity = Math.min(staffCapacity, storeSeats.capacity, resourceCapacity);
-        const remaining = Math.max(0, Math.min(
-          staffCapacity - sameMenuCount,
-          storeSeats.remaining,
-          resourceRemaining,
-        ));
+        const verdict = evaluateSlot(d, date, slot, dayBookings, busyMs);
+        if (!verdict.emitted) continue;
         slots.push({
           date,
           start: slot.start,
           end: slot.end,
-          timeZone,
-          startUtc: tzInstantIso(timeZone, slotStartMs),
-          endUtc: tzInstantIso(timeZone, slotStartMs + menuForCalc.duration_minutes * 60_000),
-          capacity: effectiveCapacity,
-          remaining,
-          state: remaining === 0 ? 'full' : remaining < effectiveCapacity ? 'limited' : 'available',
+          timeZone: d.timeZone,
+          startUtc: tzInstantIso(d.timeZone, verdict.startMs),
+          endUtc: tzInstantIso(d.timeZone, verdict.startMs + d.menuForCalc.duration_minutes * 60_000),
+          capacity: verdict.capacity,
+          remaining: verdict.remaining,
+          state: verdict.state,
         });
       }
     }
     by_staff.push({ staff_id: s.id, display_name: s.display_name, slots });
   }
-  return { by_staff, calendar_sync: calendarSync } as {
+  return { by_staff, calendar_sync: d.calendarSync } as {
     by_staff: AvailabilityByStaff[];
     calendar_sync: CalendarSyncState[];
   };
+}
+
+// ----------------------------------------------------------------
+// IDEA-28 予約設定: 「この日時はなぜ予約できないか」の説明
+// ----------------------------------------------------------------
+
+export interface ExplainSlotParams {
+  lineAccountId: string;
+  menuId: string;
+  staffId?: string;
+  /** 店舗タイムゾーンの暦日（YYYY-MM-DD）。 */
+  date: string;
+  /** 店舗タイムゾーンの壁時刻（HH:MM）。 */
+  time: string;
+  now: Date;
+  minLeadTimeMinutes: number;
+  googleCredentials?: GoogleServiceAccountCredentials;
+}
+
+export interface SlotCheckStaff {
+  staff_id: string;
+  display_name: string;
+  /** その担当でこの日時に予約できるか。 */
+  bookable: boolean;
+  /** bookable のときの残数と受付数。 */
+  remaining: number | null;
+  capacity: number | null;
+  reasons: SlotBlockReason[];
+}
+
+export interface SlotCheckResult {
+  date: string;
+  time: string;
+  timeZone: string;
+  /** 担当未指定なら誰か1人でも取れれば true。 */
+  bookable: boolean;
+  /** bookable=false のとき全担当分の理由を集約したもの。 */
+  reasons: SlotBlockReason[];
+  per_staff: SlotCheckStaff[];
+}
+
+/**
+ * 「この日時はなぜ予約できないか」を、実際の空き枠計算と同じ入力・同じ
+ * 手順で説明する。読み取りだけで予約は作らない。理由は条件の種類だけを
+ * 返し、他担当の非公開予定の内容（件名・相手など）は含めない。
+ */
+export async function explainBookingSlot(
+  db: D1Database,
+  params: ExplainSlotParams,
+): Promise<SlotCheckResult> {
+  const loaded = await loadAvailabilityData(db, {
+    lineAccountId: params.lineAccountId,
+    menuId: params.menuId,
+    staffId: params.staffId,
+    from: params.date,
+    to: params.date,
+    now: params.now,
+    minLeadTimeMinutes: params.minLeadTimeMinutes,
+    googleCredentials: params.googleCredentials,
+  });
+  const result = (partial: Partial<SlotCheckResult>): SlotCheckResult => ({
+    date: params.date,
+    time: params.time,
+    timeZone: FALLBACK_TIME_ZONE,
+    bookable: false,
+    reasons: [],
+    per_staff: [],
+    ...partial,
+  });
+  if (loaded.kind === 'no_menu') return result({ reasons: ['menu_inactive'] });
+  if (loaded.kind === 'no_staff') return result({ reasons: ['staff_not_offered'] });
+  if (loaded.kind === 'invalid_resource') {
+    return result({
+      timeZone: loaded.timeZone,
+      reasons: ['invalid_resource'],
+      per_staff: loaded.staffRows.map((staff) => ({
+        staff_id: staff.id,
+        display_name: staff.display_name,
+        bookable: false,
+        remaining: null,
+        capacity: null,
+        reasons: ['invalid_resource' as SlotBlockReason],
+      })),
+    });
+  }
+  const d = loaded.data;
+  const base = { timeZone: d.timeZone };
+  // 入力時刻そのものが不正（HH:MM の形でない、または存在しない壁時刻）
+  if (!isHhmm(params.time)) return result({ ...base, reasons: ['invalid_time'] });
+  const slotStartMs = zonedTimeToUtcMs(d.timeZone, params.date, params.time);
+  const roundTripped = new Date(slotStartMs);
+  const globalReasons: SlotBlockReason[] = [];
+  if (tzDateStr(d.timeZone, roundTripped) !== params.date
+    || tzHHMM(d.timeZone, roundTripped) !== params.time) {
+    globalReasons.push('invalid_time');
+  }
+  if (d.windowLastDate && params.date > d.windowLastDate) {
+    globalReasons.push('booking_window');
+  }
+  if (slotStartMs < d.minLeadAt.getTime()) globalReasons.push('past_cutoff');
+  const occupyMin = d.menuForCalc.duration_minutes + d.menuForCalc.buffer_after_minutes;
+  const startMin = toMin(params.time);
+  const staffCapacity = Math.max(1, d.concurrentCapacity);
+  const per_staff: SlotCheckStaff[] = [];
+  for (const s of d.staffRows) {
+    const reasons: SlotBlockReason[] = [...globalReasons];
+    let remaining: number | null = null;
+    let capacity: number | null = null;
+    let bookable = false;
+    if (reasons.length === 0) {
+      const syncState = d.calendarSync.find((state) => state.staff_id === s.id);
+      if (syncState?.configured && !syncState.ok) {
+        reasons.push('calendar_unavailable');
+      } else {
+        const day = computeDayWorking(d, s.id, params.date);
+        if (day.block !== null) {
+          reasons.push(day.block === 'invalid_exception' ? 'exception_invalid' : 'exception_closed');
+        } else if (day.working.length === 0) {
+          reasons.push('outside_working');
+        } else {
+          const { dayBookings, busyMs } = buildDayBusy(d, s.id, params.date);
+          const daySlots = computeSlots({
+            working: day.working,
+            busy: dayBookings,
+            menu: d.menuForCalc,
+            granularityMinutes: SLOT_GRANULARITY_MINUTES,
+            capacity: staffCapacity,
+          });
+          const candidate = daySlots.find((slot) => slot.start === params.time);
+          if (!candidate) {
+            reasons.push(...diagnoseRejectedStart(
+              day.working,
+              dayBookings,
+              startMin,
+              occupyMin,
+              SLOT_GRANULARITY_MINUTES,
+              staffCapacity,
+            ));
+          } else {
+            const verdict = evaluateSlot(d, params.date, candidate, dayBookings, busyMs);
+            reasons.push(...verdict.reasons);
+            bookable = verdict.bookable;
+            if (verdict.emitted) {
+              remaining = verdict.remaining;
+              capacity = verdict.capacity;
+            }
+          }
+        }
+      }
+    }
+    per_staff.push({
+      staff_id: s.id,
+      display_name: s.display_name,
+      bookable,
+      remaining,
+      capacity,
+      reasons,
+    });
+  }
+  const bookable = per_staff.some((staff) => staff.bookable);
+  const reasons = bookable
+    ? []
+    : [...new Set(per_staff.flatMap((staff) => staff.reasons))];
+  return result({ ...base, bookable, reasons, per_staff });
 }
