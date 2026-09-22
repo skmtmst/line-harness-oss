@@ -13,7 +13,7 @@ const apiMocks = vi.hoisted(() => ({
   listOccurrenceSelector: vi.fn(),
   getOccurrenceApplicants: vi.fn(),
   promoteOccurrenceWaitlist: vi.fn(),
-  occurrenceApplicantsCsvUrl: vi.fn((accountId: string, occurrenceId: string, snapshotId: string) => `/api/events/admin/occurrences/${occurrenceId}/applicants.csv?account_id=${accountId}&snapshot_id=${snapshotId}`),
+  downloadOccurrenceApplicantsCsv: vi.fn(async () => undefined),
   previewOccurrenceBroadcast: vi.fn(),
   sendOccurrenceBroadcast: vi.fn(),
 }))
