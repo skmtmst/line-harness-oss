@@ -378,6 +378,14 @@ describe('ダッシュボード通知', () => {
     expect(dashboardNotificationDestination(data.items[0])).toBe('/emergency')
     expect(dashboardNotificationDestination({
       ...data.items[1],
+      eventType: 'broadcast.quota_short',
+    })).toBe('/broadcasts')
+    expect(dashboardNotificationDestination({
+      ...data.items[1],
+      eventType: 'broadcast.quota_short',
+    })).toBe('/broadcasts')
+    expect(dashboardNotificationDestination({
+      ...data.items[1],
       eventType: 'release',
     })).toBe('/updates')
     expect(dashboardNotificationDestination({

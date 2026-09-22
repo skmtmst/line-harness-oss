@@ -141,6 +141,10 @@ describe('運用者通知の自動発火と登録簿', () => {
       .toEqual({ count: 1 });
     expect(testDb.raw.prepare(`SELECT COUNT(*) AS count FROM notification_deliveries`).get())
       .toEqual({ count: 4 });
+    // 送達は受信者2人分だが、通知センターには同じ事象につき1行だけ出る
+    // (instance id で畳む。受信者の人数分の行は画面には出さない)。
+    expect(testDb.raw.prepare(`SELECT COUNT(*) AS count FROM notifications`).get())
+      .toEqual({ count: 1 });
     const ruleInstances = testDb.raw.prepare(
       `SELECT COUNT(DISTINCT definition_id) AS count FROM notification_instances WHERE definition_id = ?`,
     ).get(live.id);
@@ -317,13 +321,14 @@ describe('運用者通知の自動発火と登録簿', () => {
               'automatic', 1, '2000-01-01T00:00:00+09:00')
     `).run(instanceId);
     // 画面通知のINSERT直後、送達行の確定前にWorkerが止まった状態。
+    // 通知センター行の主キーは送達idではなくinstance idで畳む。
     testDb.raw.prepare(`
       INSERT INTO notifications
         (id, rule_id, event_type, title, body, channel, status, metadata,
          line_account_id, category, created_at)
-      VALUES ('delivery-stuck', ?, 'booking_created', '新しい予約', 'ためし',
+      VALUES (?, ?, 'booking_created', '新しい予約', 'ためし',
               'dashboard', 'sent', '{}', 'account-1', 'info', '2000-01-01T00:00:00+09:00')
-    `).run(live.id);
+    `).run(instanceId, live.id);
     const swept = await sweepOperatorNotifications(testDb.db, env, { lineAccountId: 'account-1' });
     expect(swept).toMatchObject({ swept: 1, accepted: 1 });
     // 管理画面の通知一覧にも残る
