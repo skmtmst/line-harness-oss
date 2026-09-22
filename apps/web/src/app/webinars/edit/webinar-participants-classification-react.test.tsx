@@ -26,6 +26,7 @@ vi.mock('next/link', () => ({
 }))
 vi.mock('next/navigation', () => ({
   useSearchParams: () => fixture.params,
+  useRouter: () => ({ push: vi.fn() }),
 }))
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ accounts: [{ id: 'account-a', liffId: 'liff' }], loading: false }),

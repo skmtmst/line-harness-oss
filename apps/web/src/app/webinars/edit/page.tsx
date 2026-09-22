@@ -43,6 +43,7 @@ import {
   type WebinarParticipantClassification,
 } from '@/lib/api'
 import { usePageTitle } from '@/components/shell/page-chrome'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { WEBINAR_SAKURA_COMMENTS_MAX } from '@/components/webinars/webinar-limits'
 import { publicationStateLabel } from '@/components/webinars/publication-label'
 import { webinarErrorText } from '@/components/webinars/webinar-error-text'
@@ -2189,6 +2190,34 @@ function EditWebinarInner() {
   }
 
   /*
+    未保存の入力を持ったまま画面の外へ出る操作を止める（DETAIL-04 残存経路）。
+    一覧リンク・左メニュー・ブラウザの戻る・再読込を捕まえ、破棄か編集継続かを
+    確認する。段の行き来は画面内の移動なのでここには触れない——入力は隠すだけで
+    畳まないため失われない。契約は共通の `useUnsavedGuard` と同じ。
+  */
+  const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({
+    dirty: unsavedPanes.size > 0,
+    busy: savingForNav !== false,
+  })
+  /*
+    離脱の確認はどの段・どの画面状態にいても出す。読み込み失敗や未指定の
+    分岐は別ツリーへ早期 return するため、ここで要素化して全経路へ差し込む。
+    片方だけに置くと、dirty 中のリンクが黙って止まり「保存せずに移動」を
+    選ぶ手段がなくなる。
+  */
+  const leaveConfirmDialog = (
+    <ConfirmDialog
+      open={leaveTarget !== null}
+      title="保存していない変更があります"
+      description="このまま移動すると、ウェビナーの変更は失われます。保存せずに移動しますか？"
+      confirmLabel="保存せずに移動"
+      cancelLabel="編集を続ける"
+      onConfirm={confirmLeave}
+      onCancel={cancelLeave}
+    />
+  )
+
+  /*
     段の移動はURLにも残す。再読み込み・ブラウザの戻るで
     同じ段へ戻れるようにする（DETAIL-03/04）。
   */
@@ -2337,6 +2366,7 @@ function EditWebinarInner() {
           <p className="mt-1 text-sm text-ink-secondary">一覧から編集するウェビナーを選び直してください。</p>
           <Link href="/webinars" className="mt-3 inline-block text-sm font-semibold text-action hover:underline">ウェビナー一覧へ戻る</Link>
         </div>
+        {leaveConfirmDialog}
       </>
     )
   }
@@ -2345,6 +2375,7 @@ function EditWebinarInner() {
       <>
 
         <div className="p-6 text-gray-500">読み込み中...</div>
+        {leaveConfirmDialog}
       </>
     )
   }
@@ -2356,6 +2387,7 @@ function EditWebinarInner() {
           <p className="text-danger">{loadError ?? 'ウェビナーが見つかりませんでした'}</p>
           <Link href="/webinars" className="mt-3 inline-block text-sm font-semibold text-action hover:underline">ウェビナー一覧へ戻る</Link>
         </div>
+        {leaveConfirmDialog}
       </>
     )
   }
@@ -2497,6 +2529,7 @@ function EditWebinarInner() {
         </div>
       ) : null}
       {pane === 'participants' ? <div className="mt-4 flex justify-end gap-2"><Button href={`/webinars/edit?id=${encodeURIComponent(webinar.id)}&pane=analytics`}>分析を見る</Button><Button href={`/webinars/edit?id=${encodeURIComponent(webinar.id)}`}>ウェビナーの設定を編集</Button></div> : null}
+      {leaveConfirmDialog}
     </main>
   )
 }

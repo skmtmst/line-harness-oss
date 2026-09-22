@@ -57,6 +57,7 @@ vi.mock('next/link', () => ({
 }))
 vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(navigationMocks.query),
+  useRouter: () => ({ push: vi.fn() }),
 }))
 vi.mock('@/components/shared/button', () => ({
   default: ({ children, href, variant, ...props }: React.ComponentProps<'button'> & { href?: string; variant?: string }) =>

@@ -10,6 +10,8 @@ const searchParams = vi.hoisted(() => ({ value: new URLSearchParams() }))
 const routerPush = vi.hoisted(() => vi.fn())
 const richMenuGet = vi.hoisted(() => vi.fn())
 const richMenuUpdate = vi.hoisted(() => vi.fn())
+const richMenuSchedule = vi.hoisted(() => vi.fn())
+const richMenuPreviewTargets = vi.hoisted(() => vi.fn())
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({
@@ -39,6 +41,25 @@ vi.mock('@/components/shell/page-chrome', () => ({
   usePageTitle: () => {},
 }))
 
+/*
+ * 条件の組み立て部品は複雑なので、ここでは「押すと条件が1件入る」
+ * 最小のスタブにする。試したいのは条件の保存状態の言い分けで、
+ * 条件の組み立て自体ではない。
+ */
+vi.mock('@/components/shared/condition-builder', () => ({
+  default: ({ onChange, label }: { onChange?: (value: unknown) => void; label?: string }) =>
+    React.createElement(
+      'button',
+      {
+        type: 'button',
+        'aria-label': label ?? '条件',
+        onClick: () =>
+          onChange?.({ operator: 'AND', rules: [{ type: 'name', value: { text: '追加した条件' } }] }),
+      },
+      '条件を足す(スタブ)',
+    ),
+}))
+
 const GROUP = {
   id: 'grp-1', accountId: 'acc-1', name: 'メインメニュー', chatBarText: 'メニュー',
   size: 'large' as const, defaultPageId: 'pg-1', isDefaultForAll: false,
@@ -53,6 +74,7 @@ const GROUP = {
 
 vi.mock('@/lib/api', () => ({
   ApiError: class ApiError extends Error {},
+  describeSaveFailure: () => '保存できませんでした。もう一度お試しください。',
   api: {
     folders: { list: () => Promise.resolve({ success: true, data: [] }) },
     tags: { list: () => Promise.resolve({ success: true, data: [] }) },
@@ -65,7 +87,8 @@ vi.mock('@/lib/api', () => ({
       tapStats: () => Promise.resolve({ success: true, data: { byArea: [] } }),
       list: () => Promise.resolve({ success: true, data: [] }),
       listSchedules: () => Promise.resolve({ success: true, data: [] }),
-      previewTargets: () => Promise.resolve({ success: true, data: null }),
+      schedule: richMenuSchedule,
+      previewTargets: richMenuPreviewTargets,
       audienceSummary: () => Promise.resolve({ success: true, data: { total: { value: 0, state: 'available', reason: null }, targeted: { value: 0, state: 'available', reason: null }, excluded: { value: 0, state: 'available', reason: null }, effective: { value: 0, state: 'available', reason: null } } }),
       imageUrl: (key: string) => `/img/${key}`,
     },
@@ -101,6 +124,10 @@ beforeEach(() => {
   richMenuGet.mockImplementation(() => Promise.resolve({ success: true, data: GROUP }))
   richMenuUpdate.mockReset()
   richMenuUpdate.mockImplementation(() => Promise.resolve({ success: true, data: GROUP }))
+  richMenuSchedule.mockReset()
+  richMenuSchedule.mockImplementation(() => Promise.resolve({ success: true, data: { id: 'sch-1' } }))
+  richMenuPreviewTargets.mockReset()
+  richMenuPreviewTargets.mockImplementation(() => Promise.resolve({ success: true, data: null }))
 })
 
 afterEach(() => {
@@ -235,5 +262,225 @@ describe('リッチメニュー編集の未保存ガード (N-162)', () => {
     await flush()
     expect(screen.queryByText('保存していない変更があります')).toBeNull()
     expect(routerPush).toHaveBeenCalledWith('/rich-menus/edit?id=grp-1&step=targeting')
+  })
+})
+
+/*
+ * RICHMENU-06: STEP3「公開のしかた」の入力は工程をまたいで保持する。
+ * 以前は工程の部品の中にだけ状態があり、STEP2→STEP3 の往復で
+ * 「いますぐ出す」へ黙って戻り、日時も消えていた。
+ */
+describe('公開のしかたの入力保持 (RICHMENU-06)', () => {
+  /** searchParams を差し替えて再描画し、画面内の工程移動を再現する。 */
+  async function gotoStep(view: ReturnType<typeof render>, step: string | null) {
+    searchParams.value = new URLSearchParams(step ? `id=grp-1&step=${step}` : 'id=grp-1')
+    view.rerender(<RichMenuEditPage />)
+    await flush()
+  }
+
+  async function fillPublishSchedule() {
+    const radios = document.querySelectorAll<HTMLInputElement>('input[name="publish-mode"]')
+    // [0] いますぐ出す / [1] 日時を決めて出す / [2] 期間を決める
+    fireEvent.click(radios[1])
+    await flush()
+    await type(screen.getByLabelText('出しはじめ'), '2026-10-01T10:00')
+  }
+
+  test('日時を決めて出す＋日時入力がSTEP1→STEP3の往復で消えない', async () => {
+    searchParams.value = new URLSearchParams('id=grp-1&step=publish')
+    const view = render(<RichMenuEditPage />)
+    await flush()
+    await screen.findByText('いつ出すか')
+
+    await fillPublishSchedule()
+
+    await gotoStep(view, null)
+    await screen.findByDisplayValue('メインメニュー')
+    await gotoStep(view, 'publish')
+    await screen.findByText('いつ出すか')
+
+    const radios = document.querySelectorAll<HTMLInputElement>('input[name="publish-mode"]')
+    expect(radios[1].checked).toBe(true)
+    expect((screen.getByLabelText('出しはじめ') as HTMLInputElement).value).toBe('2026-10-01T10:00')
+  })
+
+  test('期間を決める＋出しおわり＋戻し先がSTEP往復で消えない', async () => {
+    searchParams.value = new URLSearchParams('id=grp-1&step=publish')
+    const view = render(<RichMenuEditPage />)
+    await flush()
+    await screen.findByText('いつ出すか')
+
+    const radios = document.querySelectorAll<HTMLInputElement>('input[name="publish-mode"]')
+    fireEvent.click(radios[2])
+    await flush()
+    await type(screen.getByLabelText('出しはじめ'), '2026-10-01T10:00')
+    await type(screen.getByLabelText('出しおわり'), '2026-10-07T10:00')
+
+    await gotoStep(view, 'targeting')
+    await screen.findByText('このメニューを出す相手')
+    await gotoStep(view, 'publish')
+    await screen.findByText('いつ出すか')
+
+    expect(document.querySelectorAll<HTMLInputElement>('input[name="publish-mode"]')[2].checked).toBe(true)
+    expect((screen.getByLabelText('出しはじめ') as HTMLInputElement).value).toBe('2026-10-01T10:00')
+    expect((screen.getByLabelText('出しおわり') as HTMLInputElement).value).toBe('2026-10-07T10:00')
+  })
+
+  test('公開日時を入れたまま一覧へ離れると確認が出る（dirty署名に含まれる）', async () => {
+    searchParams.value = new URLSearchParams('id=grp-1&step=publish')
+    render(<RichMenuEditPage />)
+    await flush()
+    await screen.findByText('いつ出すか')
+
+    await fillPublishSchedule()
+
+    fireEvent.click(screen.getByText('リッチメニュー'))
+    await flush()
+    expect(screen.getByText('保存していない変更があります')).toBeTruthy()
+    expect(routerPush).not.toHaveBeenCalled()
+  })
+
+  test('離脱確認を取消すと公開入力はそのまま残る', async () => {
+    searchParams.value = new URLSearchParams('id=grp-1&step=publish')
+    render(<RichMenuEditPage />)
+    await flush()
+    await screen.findByText('いつ出すか')
+
+    await fillPublishSchedule()
+
+    fireEvent.click(screen.getByText('リッチメニュー'))
+    await flush()
+    fireEvent.click(screen.getByText('編集を続ける'))
+    await flush()
+
+    expect(screen.queryByText('保存していない変更があります')).toBeNull()
+    expect(document.querySelectorAll<HTMLInputElement>('input[name="publish-mode"]')[1].checked).toBe(true)
+    expect((screen.getByLabelText('出しはじめ') as HTMLInputElement).value).toBe('2026-10-01T10:00')
+  })
+
+  test('「保存せずに移動」を選ぶと公開入力は初期値へ戻る', async () => {
+    searchParams.value = new URLSearchParams('id=grp-1&step=publish')
+    const view = render(<RichMenuEditPage />)
+    await flush()
+    await screen.findByText('いつ出すか')
+
+    await fillPublishSchedule()
+
+    fireEvent.click(screen.getByText('リッチメニュー'))
+    await flush()
+    fireEvent.click(screen.getByText('保存せずに移動'))
+    await flush()
+    expect(routerPush).toHaveBeenCalledWith('/rich-menus')
+
+    // 捨てることを選んだので、開き直すと「いますぐ出す」・日時なしに戻る
+    searchParams.value = new URLSearchParams('id=grp-1&step=publish')
+    view.rerender(<RichMenuEditPage />)
+    await flush()
+    await screen.findByText('いつ出すか')
+    expect(document.querySelectorAll<HTMLInputElement>('input[name="publish-mode"]')[0].checked).toBe(true)
+    expect(screen.queryByLabelText('出しはじめ')).toBeNull()
+  })
+
+  test('下書き保存に失敗しても公開方法と日時は残る', async () => {
+    searchParams.value = new URLSearchParams('id=grp-1&step=publish')
+    render(<RichMenuEditPage />)
+    await flush()
+    await screen.findByText('いつ出すか')
+
+    await fillPublishSchedule()
+
+    richMenuUpdate.mockImplementationOnce(() => Promise.resolve({ success: false, error: 'x' }))
+    fireEvent.click(screen.getByText('下書きに保存'))
+    await flush()
+
+    expect(document.querySelectorAll<HTMLInputElement>('input[name="publish-mode"]')[1].checked).toBe(true)
+    expect((screen.getByLabelText('出しはじめ') as HTMLInputElement).value).toBe('2026-10-01T10:00')
+  })
+
+  test('公開予約を保存できたら、その内容は未保存扱いにしない', async () => {
+    searchParams.value = new URLSearchParams('id=grp-1&step=publish')
+    render(<RichMenuEditPage />)
+    await flush()
+    await screen.findByText('いつ出すか')
+
+    await fillPublishSchedule()
+    fireEvent.click(screen.getByText('この内容で予約する'))
+    await flush()
+    expect(richMenuSchedule).toHaveBeenCalled()
+
+    // 予約できた内容は保存済みなので、一覧への離脱で確認は出ない
+    fireEvent.click(screen.getByText('リッチメニュー'))
+    await flush()
+    expect(screen.queryByText('保存していない変更があります')).toBeNull()
+  })
+})
+
+/*
+ * DEEP-27: 未保存で足した条件が「保存済み条件」と出ると、保存したつもりで
+ * 画面を離れてしまう。保存済みの条件と同じかどうかで表示を分ける。
+ */
+describe('条件の保存状態の表示 (DEEP-27)', () => {
+  const GROUP_WITH_CONDITION = {
+    ...GROUP,
+    targetingEnabled: true,
+    targetingCondition: JSON.stringify({
+      operator: 'AND',
+      rules: [{ type: 'private_memo', value: '保存済み' }],
+    }),
+  }
+
+  test('保存済み条件は「保存済み」、直した条件は「未保存」と区別する', async () => {
+    richMenuGet.mockImplementation(() => Promise.resolve({ success: true, data: GROUP_WITH_CONDITION }))
+    searchParams.value = new URLSearchParams('id=grp-1&step=targeting')
+    render(<RichMenuEditPage />)
+    await flush()
+
+    await screen.findByText('保存済み条件 1件')
+
+    fireEvent.click(screen.getByText('条件を編集'))
+    await flush()
+    // スタブの条件組み立て: 押すと別の条件が1件入る
+    fireEvent.click(screen.getByText('条件を足す(スタブ)'))
+    await flush()
+
+    expect(screen.getByText('条件 1件（未保存）')).toBeTruthy()
+    expect(screen.queryByText('保存済み条件 1件')).toBeNull()
+  })
+})
+
+/*
+ * RICHMENU-03: 条件をONにしたのに条件が空だと保存できず誰にも出ない。
+ * STEP1 は「誰にも出しません」と案内するが、STEP2 は人数APIが空条件を
+ * 全員として数えるため「当てはまる5人/出る5人」と食い違って見えた。
+ * 対象の説明を両工程で揃える（数え方そのものは変えない）。
+ */
+describe('条件が空のときの対象説明 (RICHMENU-03)', () => {
+  const GROUP_EMPTY_CONDITION = {
+    ...GROUP,
+    targetingEnabled: true,
+    targetingCondition: null,
+  }
+  const EMPTY_WARNING = '条件が空です。このままだと誰にも出しません。条件を1つ以上足してください。'
+
+  test('条件ON・空条件ではSTEP2も「誰にも出しません」で0人と案内する', async () => {
+    richMenuGet.mockImplementation(() => Promise.resolve({ success: true, data: GROUP_EMPTY_CONDITION }))
+    searchParams.value = new URLSearchParams('id=grp-1&step=targeting')
+    render(<RichMenuEditPage />)
+    await flush()
+
+    await screen.findByText('このメニューを出す相手')
+    expect(screen.getByText(EMPTY_WARNING)).toBeTruthy()
+    // 「いま当てはまる人」「実際にこのメニューが出る人」は 0人 と出す
+    expect(screen.getAllByText('0人')).toHaveLength(2)
+  })
+
+  test('同じ状態でSTEP1も同じ案内を出す', async () => {
+    richMenuGet.mockImplementation(() => Promise.resolve({ success: true, data: GROUP_EMPTY_CONDITION }))
+    searchParams.value = new URLSearchParams('id=grp-1')
+    render(<RichMenuEditPage />)
+    await flush()
+
+    await screen.findByDisplayValue('メインメニュー')
+    expect(screen.getByText(EMPTY_WARNING)).toBeTruthy()
   })
 })
