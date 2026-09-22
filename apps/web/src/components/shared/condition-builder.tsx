@@ -134,21 +134,28 @@ export default function ConditionBuilder({ value, onChange, label, showCount = t
       return () => { cancelled = true }
     }
     void (async () => {
-      const [tagRes, fieldRes, markRes, scenarioRes] = await Promise.all([
-        api.tags.list(),
-        fieldsEnabled
-          ? api.friendFields.list(selectedAccountId, undefined, { suppressFeatureDisabledEvent: true })
-          : Promise.resolve({ success: true as const, data: [] }),
-        marksEnabled
-          ? api.supportMarks.list(selectedAccountId, { suppressFeatureDisabledEvent: true })
-          : Promise.resolve({ success: true as const, data: [] }),
-        api.scenarios.list(),
-      ])
-      if (cancelled) return
-      if (tagRes.success) setTags(tagRes.data.map((t) => ({ id: t.id, name: t.name })))
-      if (fieldRes.success) setFields(fieldRes.data.map((f) => ({ id: f.id, name: f.name })))
-      if (markRes.success) setMarks(markRes.data.map((m) => ({ id: m.id, name: m.name })))
-      if (scenarioRes.success) setScenarios(scenarioRes.data.map((s) => ({ id: s.id, name: s.name })))
+      try {
+        const [tagRes, fieldRes, markRes, scenarioRes] = await Promise.all([
+          api.tags.list(),
+          fieldsEnabled
+            ? api.friendFields.list(selectedAccountId, undefined, { suppressFeatureDisabledEvent: true })
+            : Promise.resolve({ success: true as const, data: [] }),
+          marksEnabled
+            ? api.supportMarks.list(selectedAccountId, { suppressFeatureDisabledEvent: true })
+            : Promise.resolve({ success: true as const, data: [] }),
+          api.scenarios.list(),
+        ])
+        if (cancelled) return
+        if (tagRes.success && Array.isArray(tagRes.data)) setTags(tagRes.data.map((t) => ({ id: t.id, name: t.name })))
+        if (fieldRes.success && Array.isArray(fieldRes.data)) setFields(fieldRes.data.map((f) => ({ id: f.id, name: f.name })))
+        if (markRes.success && Array.isArray(markRes.data)) setMarks(markRes.data.map((m) => ({ id: m.id, name: m.name })))
+        if (scenarioRes.success && Array.isArray(scenarioRes.data)) setScenarios(scenarioRes.data.map((s) => ({ id: s.id, name: s.name })))
+      } catch {
+        /*
+         * 選択肢の読み込みが丸ごと失敗しても、条件の入力行自体は残す。
+         * 名前・日付・スコアのような選択肢を使わない条件は組めるままにする。
+         */
+      }
     })()
     return () => {
       cancelled = true
