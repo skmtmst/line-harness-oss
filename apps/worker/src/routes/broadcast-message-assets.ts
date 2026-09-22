@@ -1,5 +1,6 @@
 import { Hono, type Context, type MiddlewareHandler } from 'hono';
 import {
+  countBroadcastMessageAssetsByKind,
   createBroadcastMessageAsset,
   deleteBroadcastMessageAsset,
   getBroadcastMessageAsset,
@@ -140,6 +141,28 @@ broadcastMessageAssets.get('/api/broadcast-message-assets', async (c) => {
     ? scope.canSeeUnassigned
     : scope.allowedAccountIds.includes(row.line_account_id));
   return c.json({ success: true, data: rows.map(serialize) });
+});
+
+/*
+ * PERF-04: 種類ごとの件数だけを返す口。
+ * 一覧の初期表示は「種類の札の件数」だけで足りるのに、これまでは
+ * 各行の payload まで取って件数を数えていた。中身は種類を開いたとき
+ * 従来どおり /api/broadcast-message-assets?kind=… で取る。
+ * 数える範囲は一覧と同じ（アカウント可視範囲＋任意の lineAccountId 絞り込み）。
+ */
+broadcastMessageAssets.get('/api/broadcast-message-assets/counts', async (c) => {
+  const lineAccountId = c.req.query('lineAccountId');
+  if (lineAccountId && !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
+    return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
+  }
+  const { scope, where } = await adminAccountScope(c);
+  const counts = await countBroadcastMessageAssetsByKind(
+    c.env.DB,
+    where,
+    scope.allowedAccountIds,
+    lineAccountId || undefined,
+  );
+  return c.json({ success: true, data: counts });
 });
 
 broadcastMessageAssets.post('/api/broadcast-message-assets', requireRole('owner', 'admin'), async (c) => {
