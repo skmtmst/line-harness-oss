@@ -463,7 +463,13 @@ adminAuth.post('/api/auth/two-factor/setup/confirm', async (c) => {
 /** 高危険操作の直前だけ使える、5分・1回限りの再認証grantを発行する。 */
 adminAuth.post('/api/auth/step-up', async (c) => {
   const staffContext = c.get('staff');
-  if (!staffContext) return c.json({ success: false, error: 'Unauthorized' }, 401);
+  /*
+   * 再認証フロー専用の401。管理画面の共通401処理は code の無い
+   * 'Unauthorized'（認証middlewareの応答）をセッション喪失として扱うので、
+   * この口が画面側の再認証フローで処理される業務401だと分かるよう
+   * 機械コードを付ける（#1058）。
+   */
+  if (!staffContext) return c.json({ success: false, error: 'Unauthorized', code: 'STEP_UP_UNAUTHORIZED' }, 401);
   const body = await c.req.json<{ code?: string; purpose?: string }>()
     .catch(() => ({} as { code?: string; purpose?: string }));
   const code = body.code?.trim() ?? '';

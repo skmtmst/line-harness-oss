@@ -2,6 +2,7 @@ import { beforeAll, afterEach, describe, expect, it, vi } from 'vitest'
 import type { AutoReplyConflictPair } from './api'
 
 let fetchApi: typeof import('./api').fetchApi
+let downloadApiFile: typeof import('./api').downloadApiFile
 let ApiError: typeof import('./api').ApiError
 let extractApiErrorMessage: typeof import('./api').extractApiErrorMessage
 let extractApiErrorCode: typeof import('./api').extractApiErrorCode
@@ -18,6 +19,7 @@ beforeAll(async () => {
   process.env.NEXT_PUBLIC_API_URL = 'https://worker.example.com'
   ;({
     fetchApi,
+    downloadApiFile,
     ApiError,
     extractApiErrorMessage,
     extractApiErrorCode,
@@ -1232,6 +1234,112 @@ describe('機能オフの403契約', () => {
 
     await expect(fetchApi('/api/webinars')).rejects.toMatchObject({ status: 403, code: 'FORBIDDEN' })
     expect(listener).not.toHaveBeenCalled()
+  })
+})
+
+/*
+ * #1058: 再認証(step-up)フローの401は画面が自分で処理する通常の状態。
+ * 「Cookieが届いていません」モーダルを上に被せないよう、業務コード付きの
+ * 401では SESSION_LOST_EVENT を出さない。一方、code の無い401（認証
+ * middlewareの `Unauthorized` など）は本物のセッション喪失なので出す。
+ */
+describe('401のセッション喪失の合図 (#1058)', () => {
+  function stubBrowser(target: EventTarget) {
+    const storage = {
+      getItem: vi.fn(() => null),
+      setItem: vi.fn(),
+      removeItem: vi.fn(),
+    }
+    vi.stubGlobal('window', target)
+    vi.stubGlobal('sessionStorage', storage)
+    vi.stubGlobal('localStorage', storage)
+  }
+
+  function sessionLostSpy() {
+    const target = new EventTarget()
+    const listener = vi.fn()
+    target.addEventListener('lh-session-lost', listener)
+    stubBrowser(target)
+    return listener
+  }
+
+  function stubFetch401(body: unknown) {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(
+      typeof body === 'string' ? body : JSON.stringify(body),
+      { status: 401, headers: { 'Content-Type': 'application/json' } },
+    )))
+  }
+
+  it('STEP_UP_REQUIRED の401では合図を出さず、ApiErrorは従来どおり投げる', async () => {
+    const listener = sessionLostSpy()
+    stubFetch401({
+      success: false,
+      error: '重要操作の再認証が必要です',
+      code: 'STEP_UP_REQUIRED',
+    })
+
+    await expect(fetchApi('/api/operations/incidents', { method: 'POST' }))
+      .rejects.toMatchObject({ name: 'ApiError', status: 401, code: 'STEP_UP_REQUIRED' })
+    expect(listener).not.toHaveBeenCalled()
+  })
+
+  it('STEP_UP_UNAUTHORIZED の401でも合図を出さない', async () => {
+    const listener = sessionLostSpy()
+    stubFetch401({ success: false, error: 'Unauthorized', code: 'STEP_UP_UNAUTHORIZED' })
+
+    await expect(fetchApi('/api/auth/step-up', { method: 'POST' }))
+      .rejects.toMatchObject({ status: 401, code: 'STEP_UP_UNAUTHORIZED' })
+    expect(listener).not.toHaveBeenCalled()
+  })
+
+  it('code の無い401（認証middlewareの Unauthorized）では合図を出す', async () => {
+    const listener = sessionLostSpy()
+    // extractApiErrorCode は error フィールドからも 'Unauthorized' を拾うが、
+    // それは免除コードではないので合図を出さなければならない。
+    stubFetch401({ success: false, error: 'Unauthorized' })
+
+    await expect(fetchApi('/api/friends')).rejects.toMatchObject({ status: 401 })
+    expect(listener).toHaveBeenCalledTimes(1)
+  })
+
+  it('一覧に無いコードや非JSONの本文の401でも合図を出す', async () => {
+    // 未知コード・壊れた本文で黙らせると、本物のセッション喪失を取りこぼす。
+    const listener = sessionLostSpy()
+    stubFetch401({ success: false, code: 'VERSION_CONFLICT' })
+    await expect(fetchApi('/api/friends')).rejects.toMatchObject({ status: 401 })
+    expect(listener).toHaveBeenCalledTimes(1)
+
+    stubFetch401('<html>proxy error</html>')
+    await expect(fetchApi('/api/friends')).rejects.toMatchObject({ status: 401 })
+    expect(listener).toHaveBeenCalledTimes(2)
+  })
+
+  it('ダウンロード系の口でも再認証401では合図を出さない', async () => {
+    const listener = sessionLostSpy()
+    stubFetch401({
+      success: false,
+      error: '重要操作の再認証が必要です',
+      code: 'STEP_UP_REQUIRED',
+    })
+
+    // fetchApiBlob 経路
+    await expect(api.media.download('media-1', 'account-1'))
+      .rejects.toMatchObject({ status: 401, code: 'STEP_UP_REQUIRED' })
+    // downloadApiFile 経路
+    await expect(downloadApiFile('/api/example.csv', 'example.csv'))
+      .rejects.toMatchObject({ status: 401, code: 'STEP_UP_REQUIRED' })
+    expect(listener).not.toHaveBeenCalled()
+  })
+
+  it('ダウンロード系の口でも code の無い401では合図を出す', async () => {
+    const listener = sessionLostSpy()
+    stubFetch401({ success: false, error: 'Unauthorized' })
+
+    await expect(api.media.download('media-1', 'account-1'))
+      .rejects.toMatchObject({ status: 401 })
+    await expect(downloadApiFile('/api/example.csv', 'example.csv'))
+      .rejects.toMatchObject({ status: 401 })
+    expect(listener).toHaveBeenCalledTimes(2)
   })
 })
 
