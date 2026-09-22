@@ -101,6 +101,10 @@ const mocks = {
   normalizeCommonVarValue: (type: string, value: string) => {
     if (type === 'long_text') return value.length <= 10_000 ? value : null;
     if (type === 'boolean') return value === 'true' || value === 'false' ? value : null;
+    if (type === 'image') {
+      if (value === '') return value;
+      return value.length <= 200 && /^https:\/\/\S+$/.test(value) ? value : null;
+    }
     if (type === 'date' || type === 'datetime') {
       const match = type === 'date'
         ? /^(\d{4})-(\d{2})-(\d{2})$/.exec(value)
@@ -1792,6 +1796,21 @@ describe('共通情報', () => {
       value: 'true', expectedVersion: 3,
     }));
 
+    // VAR-03: 画像型は https URL だけを受ける。URLでない文字列は理由つきの400で止める。
+    const imageOk = await req('/api/common-vars', 'POST', {
+      accountId: 'account-1', name: 'ロゴ', varKey: 'logo_url', type: 'image',
+      value: 'https://cdn.example.com/logo.png',
+    });
+    expect(imageOk.status).toBe(201);
+    const imageBad = await req('/api/common-vars', 'POST', {
+      accountId: 'account-1', name: 'ロゴ', varKey: 'logo_bad', type: 'image',
+      value: 'not-an-image',
+    });
+    expect(imageBad.status).toBe(400);
+    expect(await imageBad.json()).toMatchObject({
+      error: '画像には https:// からはじまるURLを入力してください',
+    });
+
     // PATCH uses the persisted type, so an invalid calendar value must not get as
     // far as the impact scan or update even if the client forged a proof.
     mocks.getCommonVarById.mockResolvedValueOnce({ ...VAR, type: 'date' });
@@ -2325,6 +2344,28 @@ describe('日付での切り替え', () => {
     });
     expect(res.status).toBe(400);
     expect(mocks.createCommonVarSchedule).not.toHaveBeenCalled();
+  });
+
+  it('VAR-06: 予約の値も種別の型検査を通し、合わない値は理由つきで止める', async () => {
+    // ここを素通りさせると Cron が型に合わない値をそのまま書き込む。
+    mocks.getCommonVarById
+      .mockResolvedValueOnce({ ...VAR, type: 'boolean' })
+      .mockResolvedValueOnce({ ...VAR, type: 'boolean' });
+    const bad = await req('/api/common-vars/cv-1/schedules?accountId=account-1', 'POST', {
+      effectiveFrom: '2099-01-01T00:00',
+      value: 'yes',
+    });
+    expect(bad.status).toBe(400);
+    expect(await bad.json()).toMatchObject({
+      error: '更新後の値は種別に合う値を入力してください',
+    });
+    expect(mocks.createCommonVarSchedule).not.toHaveBeenCalled();
+
+    const ok = await req('/api/common-vars/cv-1/schedules?accountId=account-1', 'POST', {
+      effectiveFrom: '2099-01-01T00:00',
+      value: 'true',
+    });
+    expect(ok.status).toBe(201);
   });
 
   it('日時の形が違えば弾く', async () => {
