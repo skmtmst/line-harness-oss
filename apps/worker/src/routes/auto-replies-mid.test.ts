@@ -305,4 +305,76 @@ describe('点検・中: 自動応答の下書き確認・上限・ページ送�
     }, target.bindings);
     expect(response.status).toBe(200);
   });
+
+  it('AUTOREPLY-08: 新規作成はOFFをDBまで保持し、再読込・一致評価でも動かない', async () => {
+    const target = app(testDb.db);
+    const post = (body: Record<string, unknown>) => target.instance.request('/api/auto-replies', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    }, target.bindings);
+
+    // オフ指定で作る → 作った時点で止まっている。
+    const created = await post({
+      keyword: '解約',
+      matchType: 'contains',
+      responseType: 'text',
+      responseContent: '承りました',
+      lineAccountId: 'account-1',
+      isActive: false,
+    });
+    expect(created.status).toBe(201);
+    const createdBody = await created.json() as { data: { id: string; isActive: boolean; lifecycleStatus: string } };
+    expect(createdBody.data.isActive).toBe(false);
+    expect(createdBody.data.lifecycleStatus).toBe('stopped');
+
+    const createdId = createdBody.data.id;
+    expect(
+      testDb.raw.prepare('SELECT is_active, lifecycle_status FROM auto_replies WHERE id = ?').get(createdId),
+    ).toEqual({ is_active: 0, lifecycle_status: 'stopped' });
+
+    // 再読込してもオフのまま戻る。
+    const reload = await target.instance.request(`/api/auto-replies/${createdId}`, {}, target.bindings);
+    const reloadBody = await reload.json() as { data: { isActive: boolean; lifecycleStatus: string } };
+    expect(reload.status).toBe(200);
+    expect(reloadBody.data.isActive).toBe(false);
+    expect(reloadBody.data.lifecycleStatus).toBe('stopped');
+
+    // 実行系が見るのは is_active = 1 の行だけ（services/auto-reply.ts の
+    // 応答評価と同じ条件）。一致する言葉を持っていても評価対象に出ない。
+    expect(
+      testDb.raw.prepare(
+        `SELECT id FROM auto_replies
+          WHERE is_active = 1 AND deleted_at IS NULL AND id = ?`,
+      ).get(createdId),
+    ).toBeUndefined();
+
+    // isActive を書かない作成も止まる。オフを忘れて動く形には戻さない。
+    const implicit = await post({
+      keyword: '予約確認',
+      responseContent: '承りました',
+      lineAccountId: 'account-1',
+    });
+    expect(implicit.status).toBe(201);
+    const implicitBody = await implicit.json() as { data: { isActive: boolean; lifecycleStatus: string } };
+    expect(implicitBody.data.isActive).toBe(false);
+    expect(implicitBody.data.lifecycleStatus).toBe('stopped');
+
+    // 明示的な true だけが有効なルールを作る（再開・公開と同じ意味の明示操作）。
+    const explicit = await post({
+      keyword: '延長',
+      responseContent: '承りました',
+      lineAccountId: 'account-1',
+      isActive: true,
+    });
+    expect(explicit.status).toBe(201);
+    const explicitBody = await explicit.json() as { data: { isActive: boolean; lifecycleStatus: string } };
+    expect(explicitBody.data.isActive).toBe(true);
+    expect(explicitBody.data.lifecycleStatus).toBe('published');
+
+    // isActive が真偽値でない入力は作らない。
+    expect((await post({
+      keyword: '料金', responseContent: '承りました', lineAccountId: 'account-1', isActive: 'yes',
+    })).status).toBe(400);
+  });
 });

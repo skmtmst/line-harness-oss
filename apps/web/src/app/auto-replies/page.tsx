@@ -595,7 +595,9 @@ export default function AutoRepliesPage() {
             responseContent: '',
             templateId: null,
             lineAccountId: selectedAccountId,
-            isActive: true,
+            // AUTOREPLY-08: 新しい応答は止まった状態で作る。動かすのは
+            // 一覧の「再開」や公開前の確認から、保存とは別の操作で。
+            isActive: false,
           })}
         >
           ルールを作成

@@ -139,6 +139,12 @@ export interface CreateAutoReplyInput {
   keywordMatchMode?: 'any' | 'all';
   /** フォルダ。分けていなければ null。 */
   folderId?: string | null;
+  /**
+   * 新規作成時の有効/停止。**省略や false は止まったまま作る。**
+   * 「オフで作ったのに動いていた」は送り事故なので、有効化は
+   * 明示的な true（または公開・再開の操作）だけに限る。
+   */
+  isActive?: boolean;
 }
 
 export async function createAutoReply(
@@ -147,6 +153,7 @@ export async function createAutoReply(
 ): Promise<AutoReply> {
   const id = crypto.randomUUID();
   const now = jstNow();
+  const isActive = input.isActive === true;
 
   await db
     .prepare(
@@ -157,8 +164,9 @@ export async function createAutoReply(
           priority, message_kinds_json,
           actions_json, response_weekdays_json, response_holiday_rule,
           once_per_friend, keywords_json, friend_conditions_json, respond_to_all, name, keyword_match_mode, folder_id,
+          lifecycle_status,
           created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       id,
@@ -168,6 +176,7 @@ export async function createAutoReply(
       input.responseContent,
       input.templateId ?? null,
       input.lineAccountId ?? null,
+      isActive ? 1 : 0,
       input.activeFrom ?? null,
       input.activeUntil ?? null,
       input.cooldownMinutes ?? null,
@@ -186,6 +195,9 @@ export async function createAutoReply(
       input.name ?? null,
       input.keywordMatchMode ?? 'any',
       input.folderId ?? null,
+      // 止まって作った行は stopped、明示的に有効化した行は published。
+      // draft は createAutoReplyWithDraftVersion 専用。
+      isActive ? 'published' : 'stopped',
       now,
     )
     .run();
