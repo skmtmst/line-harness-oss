@@ -119,3 +119,25 @@ describe('POST /api/auth/step-up の試行回数制限', () => {
     });
   });
 });
+
+describe('POST /api/auth/step-up のstaff文脈ガード', () => {
+  /*
+   * #1058: 再認証フローの401は管理画面の共通「セッション喪失」合図と
+   * 区別できるよう、機械コードを本文へ付ける。
+   * （本番では認証middlewareが先に401を返すため、ここは保険の経路）
+   */
+  it('staff文脈が無い呼び出しは STEP_UP_UNAUTHORIZED 付きの401を返す', async () => {
+    const bare = new Hono<Env>();
+    bare.route('/', adminAuth);
+    const res = await bare.request('/api/auth/step-up', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code: '123456', purpose: 'operations.control' }),
+    }, bindings());
+    expect(res.status).toBe(401);
+    await expect(res.json()).resolves.toMatchObject({
+      success: false,
+      code: 'STEP_UP_UNAUTHORIZED',
+    });
+  });
+});

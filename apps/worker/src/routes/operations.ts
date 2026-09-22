@@ -480,7 +480,13 @@ operations.post(
       return c.json({ success: true, duplicate: true, data: { status: 'changed', control, incident, notifications } });
     }
     if (!await consumeOperationStepUp(c)) {
-      return c.json({ success: false, error: '重要操作の再認証が必要です' }, 401);
+      /*
+       * 再認証grantの未所持・期限切れは、画面が6桁コードの入力からやり直せる
+       * 通常の状態。管理画面の共通401処理（セッション喪失モーダル）に
+       * 取られないよう、機械コードを付けて区別する（#1058）。
+       * HTTPステータスは呼び出し側の既存分岐を壊さないよう401のまま。
+       */
+      return c.json({ success: false, error: '重要操作の再認証が必要です', code: 'STEP_UP_REQUIRED' }, 401);
     }
 
     try {
@@ -619,7 +625,9 @@ operations.post(
         });
       }
       if (!await consumeOperationStepUp(c)) {
-        return c.json({ success: false, error: '重要操作の再認証が必要です' }, 401);
+        // 停止側と同じく、再認証のやり直しは画面が自分で案内する通常の状態。
+        // セッション喪失モーダルと区別するため機械コードを付ける（#1058）。
+        return c.json({ success: false, error: '重要操作の再認証が必要です', code: 'STEP_UP_REQUIRED' }, 401);
       }
       const result = await restoreOperationIncident(c.env.DB, {
         incidentId: incident.id,
