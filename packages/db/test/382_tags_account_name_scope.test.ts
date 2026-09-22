@@ -91,10 +91,13 @@ function contents(db: Database.Database) {
 function migrate(db: Database.Database) { db.transaction(() => db.exec(migration))(); }
 
 describe('382: タグ名の一意性を店舗単位へ移す', () => {
-  test('D1が拒否する動的PRAGMA走査を使わず、固定テーブルごとに検査する', () => {
+  test('D1のauthorizerが拒否するpragmaテーブル値関数を一切使わない', () => {
     const executableSql = migration.replace(/--.*$/gm, '');
-    expect(executableSql).not.toMatch(/pragma_foreign_key_list\s*\(\s*[a-z]+\.name\s*\)/i);
-    expect(executableSql).not.toMatch(/pragma_foreign_key_list[\s\S]{0,300}UNION\s+ALL/i);
+    // pragma_table_info / pragma_foreign_key_list / pragma_foreign_key_check
+    // などの `pragma_*(...)` 形式は引数が固定でも SQLITE_AUTH で拒否される。
+    // 文形式の `PRAGMA defer_foreign_keys` だけが許される。
+    expect(executableSql).not.toMatch(/\bpragma_\w+\s*\(/i);
+    expect(executableSql).not.toMatch(/\bpragma\s+foreign_key_check\b/i);
   });
 
   test('実schemaの全14参照を列挙し、CASCADE対象にさらに子参照がないことを確認', () => {
