@@ -196,6 +196,33 @@ describe('V6 登録メディア一覧の契約', () => {
     expect(WORKER).toContain('failMediaUploadSession')
   })
 
+  it('既知の利用期限・同意情報を記録・表示し、未記録は「不明」と出す（IDEA-15）', () => {
+    // 詳細画面に専用の節を持ち、根拠のない権利情報を推定しない。
+    expect(DETAIL).toContain('利用期限・同意')
+    expect(DETAIL).toContain('不明（記録なし）')
+    expect(DETAIL).toContain('item.usageExpiresAt')
+    expect(DETAIL).toContain('item.usageConsentNote')
+    // 画面は PATCH で保存し、一覧を再取得して古い表示を残さない。
+    expect(DETAIL).toContain('api.media.update(item.id')
+    expect(DETAIL).toContain('usageExpiresAt')
+    expect(DETAIL).toContain('usageConsentNote')
+    expect(API).toContain('usageExpiresAt')
+    expect(API).toContain('usageConsentNote')
+    expect(WORKER).toContain('usage_expires_at')
+    expect(WORKER).toContain('usage_consent_note')
+    expect(DB).toContain('usage_expires_at')
+    expect(DB).toContain('usage_consent_note')
+  })
+
+  it('版ごとの実体を取り戻せ、第1版を元ファイルとして示す（IDEA-15）', () => {
+    expect(DETAIL).toContain('api.media.downloadVersion')
+    expect(DETAIL).toContain('元ファイル')
+    expect(API).toContain('downloadVersion')
+    expect(API).toContain('versions/${encodeURIComponent(versionNo)}/download')
+    expect(WORKER).toContain("/api/media/:id/versions/:versionNo/download")
+    expect(WORKER).toContain('getMediaVersionByNo')
+  })
+
   it('退避・復帰は管理者口だけから理由付きで呼ぶ（N-201）', () => {
     // 既定の一覧は退避済みを外し、明示の棚だけが archived=only を渡す。
     expect(PAGE).toContain("archived: showArchivedOnly ? 'only' : undefined")

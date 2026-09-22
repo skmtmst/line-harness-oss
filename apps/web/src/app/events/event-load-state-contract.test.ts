@@ -63,7 +63,8 @@ describe('V6 イベント・申込者一覧の状態', () => {
     expect(body).toContain('eventsApi.getBookingSummary(selectedAccountId, eventId)')
     expect(body).not.toContain('.listSlots(selectedAccountId, eventId)')
     expect(body).not.toContain('.listWaitlist(selectedAccountId, eventId)')
-    expect(body).toContain('describeBookingCapacity(applied, capacity)')
+    // IDEA-29: 残席は行数ではなく、席を消費中の人数(activeSeats)から引く。
+    expect(body).toContain('describeBookingCapacity(activeSeats, capacity)')
   })
 
   it('申込者一覧は切替後に前のイベント名と定員を残さない', () => {

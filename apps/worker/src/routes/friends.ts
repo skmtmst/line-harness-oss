@@ -9,6 +9,8 @@ import {
   getFriendTags,
   getFriendTagsByFriendIds,
   getFormSubmissionsByFriend,
+  getFormSubmissionsByFriendCursor,
+  countFriendFormSubmissions,
   getScenarios,
   enrollFriendInScenario,
   getMileageSummaryForFriend,
@@ -25,7 +27,7 @@ import {
   validateSearchConditions,
   SAVED_SEARCH_LIMIT,
 } from '@line-crm/db';
-import type { Friend as DbFriend, Tag as DbTag, SavedSearch, SavedSearchAccess } from '@line-crm/db';
+import type { Friend as DbFriend, Tag as DbTag, SavedSearch, SavedSearchAccess, FriendFormSubmission } from '@line-crm/db';
 import type { SavedSearchConditions } from '@line-crm/shared';
 import { fireEvent } from '../services/event-bus.js';
 import { buildMessage } from '../services/step-delivery.js';
@@ -1148,10 +1150,28 @@ friends.get('/api/friends/stats', async (c) => {
   }
 });
 
+/** 回答1件の画面向け形。詳細の同梱と履歴タブの口で同じ形にする。 */
+function serializeFriendFormSubmission(submission: FriendFormSubmission) {
+  return {
+    id: submission.id,
+    formId: submission.form_id,
+    formName: submission.form_name,
+    fields: JSON.parse(submission.form_fields || '[]') as unknown[],
+    data: JSON.parse(submission.data || '{}') as Record<string, unknown>,
+    createdAt: submission.created_at,
+  };
+}
+
 friends.get('/api/friends/:id', requireVisibleFriend, async (c) => {
   try {
     const id = c.req.param('id');
     const db = c.env.DB;
+    /*
+     * PERF-13: `?submissions=0` で回答本文の同梱を止める。
+     * 回答は forms タブを開いたとき /api/friends/:id/form-submissions で
+     * カーソル式に取る。「あと何件あるか」の総数は軽いので常に返す。
+     */
+    const includeSubmissions = c.req.query('submissions') !== '0';
 
     const [friend, tags, formSubmissions, formSubmissionTotal, support] = await Promise.all([
       // 一覧と同じ first_tracked_link_id → tracked_links.name 基準で
@@ -1164,13 +1184,8 @@ friends.get('/api/friends/:id', requireVisibleFriend, async (c) => {
        * 別に数えて返す（INBOX-17）。画面側は「全N件中10件を表示」と
        * 続きへの導線を出せる。
        */
-      getFormSubmissionsByFriend(db, id, 10),
-      db
-        .prepare('SELECT COUNT(*) AS total FROM form_submissions WHERE friend_id = ?')
-        .bind(id)
-        .first<{ total: number }>()
-        .then((row) => row?.total ?? 0)
-        .catch(() => null),
+      includeSubmissions ? getFormSubmissionsByFriend(db, id, 10) : Promise.resolve([]),
+      countFriendFormSubmissions(db, id).catch(() => null),
       /*
        * 対応の状況（対応マーク・担当者・個別メモ）。
        *
@@ -1213,18 +1228,40 @@ friends.get('/api/friends/:id', requireVisibleFriend, async (c) => {
             }
           : null,
         formSubmissionTotal,
-        formSubmissions: formSubmissions.map((submission) => ({
-          id: submission.id,
-          formId: submission.form_id,
-          formName: submission.form_name,
-          fields: JSON.parse(submission.form_fields || '[]') as unknown[],
-          data: JSON.parse(submission.data || '{}') as Record<string, unknown>,
-          createdAt: submission.created_at,
-        })),
+        formSubmissions: formSubmissions.map(serializeFriendFormSubmission),
       },
     });
   } catch (err) {
     console.error('GET /api/friends/:id error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+/*
+ * PERF-13: フォーム回答履歴をカーソル式で取る口。
+ * 友だち詳細の「回答フォーム」タブが開かれたときに呼ばれる。
+ * 10件ずつ、nextCursor で古い回答へ遡れる。認証とアカウント所属の
+ * 確認は requireVisibleFriend が担う（本体と同じ境界）。
+ */
+friends.get('/api/friends/:id/form-submissions', requireVisibleFriend, async (c) => {
+  try {
+    const id = c.req.param('id');
+    const limit = listLimit(c.req.query('limit'), 10, 50);
+    const cursor = c.req.query('cursor') || null;
+    const [page, total] = await Promise.all([
+      getFormSubmissionsByFriendCursor(c.env.DB, id, { limit, cursor }),
+      countFriendFormSubmissions(c.env.DB, id).catch(() => null),
+    ]);
+    return c.json({
+      success: true,
+      data: {
+        items: page.items.map(serializeFriendFormSubmission),
+        total,
+        nextCursor: page.nextCursor,
+      },
+    });
+  } catch (err) {
+    console.error('GET /api/friends/:id/form-submissions error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });

@@ -25,6 +25,19 @@ const summary: BillingSummary = {
 }
 beforeEach(() => {
   vi.clearAllMocks()
+  /*
+   * この環境の happy-dom は localStorage を用意しない（document と window は
+   * 入る）。ほかの画面試験と同じく、Map 仕掛けの最小の器を当てる。
+   */
+  const store = new Map<string, string>()
+  vi.stubGlobal('localStorage', {
+    getItem: (k: string) => store.get(k) ?? null,
+    setItem: (k: string, v: string) => void store.set(k, String(v)),
+    removeItem: (k: string) => void store.delete(k),
+    clear: () => store.clear(),
+    get length() { return store.size },
+    key: (i: number) => [...store.keys()][i] ?? null,
+  })
   localStorage.clear()
   localStorage.setItem('lh_staff_role', 'owner')
   calls.summary.mockResolvedValue({ success: true, data: summary })

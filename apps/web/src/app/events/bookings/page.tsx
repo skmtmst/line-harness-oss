@@ -56,6 +56,17 @@ const STATUS_LABELS = new Map([
   ['accepted', '受諾済み'] as const,
 ])
 
+/** IDEA-29: 繰上げ履歴の終了状態を運用の言葉で示す。 */
+const WAITLIST_HISTORY_LABELS: Record<string, string> = {
+  converted: '予約に繰上げ',
+  expired: '案内が期限切れ',
+  cancelled: '本人が取消',
+}
+
+function sumPartySize(rows: Array<{ partySize: number }>): number {
+  return rows.reduce((total, row) => total + row.partySize, 0)
+}
+
 /*
  * IDEA-07: 予約に紐づく自動お知らせの予定を、予約そのもののそばで見せる。
  * 開催回の移動や取消で止まった分も「停止済み」として出し、
@@ -111,27 +122,67 @@ function OccurrenceApplicantsPanel({
   promoting,
   error,
   onPromote,
-  csvHref,
+  onExportCsv,
+  csvBusy,
 }: {
   data: EventOccurrenceApplicants
   promoting: boolean
   error: string
   onPromote: () => void
-  csvHref: string
+  /*
+   * TECH-03: CSVは直リンクではなく認証付き取得で取る。
+   * Cookie が届かない経路では href の直開きが401になるため。
+   */
+  onExportCsv: () => void
+  csvBusy: boolean
 }) {
   const waitlistRows = data.applicants.filter((applicant) => applicant.source === 'waitlist')
   const waitingRows = waitlistRows.filter((applicant) => applicant.status === 'waiting')
   const waitingCount = waitingRows.length
 
+  /*
+   * IDEA-29: 申込・確定・残席・キャンセル待ち・案内済みを分けて見せる。
+   * 人数(party_size 合計)で数える。旧応答に新しい集計が無いときは、
+   * 同じ応答の申込者行から数え直す(行は全件返る)。
+   */
+  const bookingRows = data.applicants.filter((applicant) => applicant.source === 'booking')
+  const confirmedSeats = data.summary.confirmedSeats
+    ?? sumPartySize(bookingRows.filter((row) => row.status === 'confirmed'))
+  const requestedSeats = data.summary.requestedSeats
+    ?? sumPartySize(bookingRows.filter((row) => row.status === 'requested'))
+  const waitingSeats = data.summary.waitingSeats
+    ?? sumPartySize(waitingRows)
+  const offeredSeats = data.summary.offeredSeats
+    ?? sumPartySize(waitlistRows.filter((row) => row.status === 'offered' || row.status === 'accepted'))
+  const remainingSeats = data.summary.remainingSeats
+    ?? (data.occurrence.capacity == null
+      ? null
+      : Math.max(0, data.occurrence.capacity - data.occurrence.activeSeats))
+  const waitlistHistory = data.waitlistHistory ?? []
+  const attendance = data.attendance ?? null
+
   return (
     <div>
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <p className="text-ink-secondary text-sm">
-          申込 {data.summary.bookingCount}人・キャンセル待ち {data.summary.waitingCount}人
-          {data.occurrence.capacity == null ? '' : ` / 定員 ${data.occurrence.capacity}人`}
+          申込 {confirmedSeats + requestedSeats}人
+          （確定 {confirmedSeats}人・承認待ち {requestedSeats}人）
+          ・キャンセル待ち {waitingSeats}人・案内中 {offeredSeats}人
+          {data.occurrence.capacity == null
+            ? ' / 定員の上限なし'
+            : remainingSeats === 0
+              ? ` / 満席（定員 ${data.occurrence.capacity}人）`
+              : ` / 残席 ${remainingSeats}席（定員 ${data.occurrence.capacity}人）`}
         </p>
         <div className="flex items-center gap-3">
-          <a href={csvHref} className="text-accent text-xs font-medium hover:underline">CSVを書き出す</a>
+          <button
+            type="button"
+            onClick={onExportCsv}
+            disabled={csvBusy}
+            className="text-accent text-xs font-medium hover:underline disabled:opacity-50"
+          >
+            {csvBusy ? '書き出しています…' : 'CSVを書き出す'}
+          </button>
           <Button
             onClick={onPromote}
             disabled={promoting || waitingCount === 0}
@@ -186,6 +237,79 @@ function OccurrenceApplicantsPanel({
             </tbody>
         </DataTable>
       )}
+
+      {/*
+        IDEA-29: 当日受付。「確定」のままの人は受付前、参加済・無断に記録した
+        人は下の行で追う。記録の操作自体は下の予約一覧の既存ボタンで行う。
+      */}
+      <div className="border-hairline mt-4 border-t pt-3" data-idea29="attendance">
+        <h4 className="text-ink text-sm font-medium">当日の受付</h4>
+        {attendance === null ? (
+          <p className="text-ink-faint mt-1 text-xs">受付の記録はまだ取得できていません。</p>
+        ) : (
+          <>
+            <p className="text-ink-secondary mt-1 text-xs">
+              参加済 {attendance.attendedSeats}人・無断欠席 {attendance.noShowSeats}人・受付前 {confirmedSeats}人
+            </p>
+            {attendance.entries.length > 0 && (
+              <div className="mt-2 overflow-x-auto">
+                <DataTable>
+                  <thead>
+                    <TableHeadRow>
+                      <Th>友だち</Th><Th>結果</Th><Th>記録日時</Th>
+                    </TableHeadRow>
+                  </thead>
+                  <tbody>
+                    {attendance.entries.map((entry) => (
+                      <Tr key={entry.id}>
+                        <NameCell name={entry.displayName ?? '友だちは未取得'} sub={`${entry.partySize}人`} />
+                        <Td>{STATUS_LABELS.get(entry.status) ?? entry.status}</Td>
+                        <Td className="text-xs">{formatJp(entry.markedAt, '記録日時は未取得')}</Td>
+                      </Tr>
+                    ))}
+                  </tbody>
+                </DataTable>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+
+      {/*
+        IDEA-29: 繰上げ履歴。終了した待ち(予約化・期限切れ・取消)だけを出す。
+        案内中・待機中は上の一覧にいるので、ここでは結果が出た分を追う。
+      */}
+      <div className="border-hairline mt-4 border-t pt-3" data-idea29="waitlist-history">
+        <h4 className="text-ink text-sm font-medium">繰上げ・案内の履歴</h4>
+        {data.waitlistHistory === undefined ? (
+          <p className="text-ink-faint mt-1 text-xs">履歴はまだ取得できていません。</p>
+        ) : waitlistHistory.length === 0 ? (
+          <p className="text-ink-faint mt-1 text-xs">繰上げや案内の履歴はまだありません。</p>
+        ) : (
+          <div className="mt-2 overflow-x-auto">
+            <DataTable>
+              <thead>
+                <TableHeadRow>
+                  <Th>友だち</Th><Th>結果</Th><Th>並んだ日時</Th><Th>案内日時</Th><Th>終了日時</Th>
+                </TableHeadRow>
+              </thead>
+              <tbody>
+                {waitlistHistory.map((entry) => (
+                  <Tr key={entry.id}>
+                    <NameCell name={entry.displayName ?? '友だちは未取得'} sub={`${entry.partySize}人`} />
+                    <Td>{WAITLIST_HISTORY_LABELS[entry.status] ?? STATUS_LABELS.get(entry.status) ?? entry.status}</Td>
+                    <Td className="text-xs">{formatJp(entry.createdAt, '—')}</Td>
+                    <Td className="text-xs">
+                      {entry.offeredAt ? formatJp(entry.offeredAt, '案内日時は未取得') : '案内なし'}
+                    </Td>
+                    <Td className="text-xs">{formatJp(entry.updatedAt, '—')}</Td>
+                  </Tr>
+                ))}
+              </tbody>
+            </DataTable>
+          </div>
+        )}
+      </div>
     </div>
   )
 }
@@ -204,6 +328,8 @@ function BookingsInner() {
   const [occurrenceStatus, setOccurrenceStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   const [promotingWaitlist, setPromotingWaitlist] = useState(false)
   const [occurrenceActionError, setOccurrenceActionError] = useState('')
+  /* TECH-03: 申込者CSVの書出し中。失敗は occurrenceActionError へ出す。 */
+  const [csvBusy, setCsvBusy] = useState(false)
   const [broadcastMessage, setBroadcastMessage] = useState('')
   const [broadcastPreview, setBroadcastPreview] = useState<{ broadcastId: string; recipientCount: number; scope: string } | null>(null)
   const [broadcastBusy, setBroadcastBusy] = useState(false)
@@ -632,6 +758,28 @@ function BookingsInner() {
     }
   }
 
+  /*
+   * TECH-03: 申込者CSVは認証付き取得から保存する。直リンクは
+   * Cookie が届かない経路（cross-site の Bearer 補完など）で401になる。
+   */
+  async function exportApplicantsCsv() {
+    const accountId = selectedAccountId
+    const applicants = occurrenceApplicants
+    if (!accountId || !applicants || csvBusy) return
+    const startedScope = scope
+    setCsvBusy(true)
+    setOccurrenceActionError('')
+    try {
+      await eventsApi.downloadOccurrenceApplicantsCsv(accountId, applicants.occurrence.id, applicants.snapshotId)
+    } catch {
+      if (scopeRef.current === startedScope) {
+        setOccurrenceActionError('CSVを書き出せませんでした。通信を確認して、もう一度お試しください。')
+      }
+    } finally {
+      if (scopeRef.current === startedScope) setCsvBusy(false)
+    }
+  }
+
   async function promoteWaitlist() {
     const accountId = selectedAccountId
     const occurrence = occurrenceApplicants?.occurrence
@@ -704,7 +852,20 @@ function BookingsInner() {
   const confirmed = summary?.confirmed ?? 0
   const pending = summary?.requested ?? 0
   const cancelled = summary?.cancelled ?? 0
-  const applied = confirmed + pending
+  /*
+   * IDEA-29: 申込・残席・待ち列は人数(席)で数える。旧応答には席数が無い
+   * ため、その期間だけ従来の件数を人数として使う(配備の前後で
+   * 「取得できません」にせず、値の意味を保つ)。
+   */
+  const confirmedSeats = summary?.confirmedSeats ?? confirmed
+  const requestedSeats = summary?.requestedSeats ?? pending
+  const waitingSeats = summary?.waitingSeats ?? null
+  const offeredSeats = summary?.offeredSeats ?? null
+  const waitlistPeople = waitingSeats !== null && offeredSeats !== null
+    ? waitingSeats + offeredSeats
+    : (summary?.waitlist ?? 0)
+  const applied = confirmedSeats + requestedSeats
+  const activeSeats = summary?.activeSeats ?? applied
   const capacity = summary?.totalCapacity ?? 0
   const pageCount = Math.max(1, Math.ceil(bookingsTotal / PAGE_SIZE))
   const currentPage = Math.min(page, pageCount)
@@ -761,11 +922,11 @@ function BookingsInner() {
           detail={!dataReady
             ? '取得できませんでした'
             : /*
-                残りの席数を出すだけだと、**あと2席なのか20席なのかで
-                同じ言い方**になる。一覧の「あと少しで満席」と同じ
-                目安（残り1〜3席）で、声をかける回だけ言い方を変える。
+                IDEA-29: 「申込」の中身を確定と承認待ちに分ける。
+                残席は行数ではなく、席を消費中の人数(activeSeats)から
+                引く。残り1〜3席の声かけ目安は一覧と同じ基準。
               */
-              describeBookingCapacity(applied, capacity)}
+              `確定 ${confirmedSeats}人・承認待ち ${requestedSeats}人 / ${describeBookingCapacity(activeSeats, capacity)}`}
         />
         {/*
           **数の下に「次にすること」を書く。** 「対応が必要」だけだと、
@@ -784,17 +945,20 @@ function BookingsInner() {
             行が無いときは設定だけを示し、人数を推測しない。 */}
         <EventKpi
           title="キャンセル待ち"
-          value={dataReady ? String(summary?.waitlist ?? 0) : '—'}
+          value={dataReady ? String(waitlistPeople) : '—'}
           unit={dataReady ? '人' : ''}
           /*
             **読めていない設定を言い切らない。** `event` が取れていないと
             `waitlist_enabled` は undefined で、前は必ず「受け付けない設定です」
             と出ていた。**受け付ける設定なのに受け付けないと読める。**
+            IDEA-29: 並んでいる人(待機)と案内を送った人(案内中)を分ける。
           */
           detail={!dataReady
             ? '取得できませんでした'
-            : (summary?.waitlist ?? 0) > 0
-              ? '取り消しが出たら順に案内します'
+            : waitlistPeople > 0
+              ? waitingSeats !== null && offeredSeats !== null
+                ? `待機 ${waitingSeats}人・案内中 ${offeredSeats}人`
+                : '取り消しが出たら順に案内します'
               : event?.waitlist_enabled ? '空きが出たら順に案内' : '受け付けない設定です'}
         />
         <EventKpi
@@ -843,7 +1007,8 @@ function BookingsInner() {
               promoting={promotingWaitlist}
               error={occurrenceActionError}
               onPromote={() => void promoteWaitlist()}
-              csvHref={eventsApi.occurrenceApplicantsCsvUrl(selectedAccountId!, occurrenceApplicants.occurrence.id, occurrenceApplicants.snapshotId)}
+              onExportCsv={() => void exportApplicantsCsv()}
+              csvBusy={csvBusy}
             />
             {canManageApplicantBroadcast && (
               <>

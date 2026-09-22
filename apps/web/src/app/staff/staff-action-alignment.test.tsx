@@ -145,7 +145,7 @@ describe('ログインユーザー操作の表示と実処理 (#834)', () => {
     fireEvent.click(within(rowFor('対象者')).getByRole('button', { name: '中身を見る' }))
 
     // 対象者は「運用」。プリセットでは「設定」は出さない → 「変えられる」へ直すと個別設定になる。
-    fireEvent.click(screen.getByRole('button', { name: '設定を変更できる' }))
+    fireEvent.click(screen.getByRole('button', { name: '設定：変えられる（変更できる）' }))
     fireEvent.click(screen.getByRole('button', { name: /見せる範囲を保存/ }))
     fireEvent.click(screen.getByRole('button', { name: '保存する' }))
     await waitFor(() => expect(fixture.updateStaff).toHaveBeenCalledTimes(1))

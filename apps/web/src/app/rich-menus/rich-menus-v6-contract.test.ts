@@ -37,7 +37,7 @@ describe('V6リッチメニューの画面契約', () => {
     expect(PAGE).toContain("import Pagination from '@/components/shared/pagination'")
     expect(PAGE).toContain('pageCount={pageCount}')
     expect(PAGE).toContain('api.richMenuGroups.listPage(accountId')
-    expect(PAGE).toContain('setGroupTotal(groupsRes.value.data.total)')
+    expect(PAGE).toContain('setGroupTotal(groupsRes.data.total)')
     expect(PAGE).not.toContain('「表示」を増やすと出ます')
   })
 

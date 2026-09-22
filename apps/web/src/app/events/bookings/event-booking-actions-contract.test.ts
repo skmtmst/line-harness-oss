@@ -16,7 +16,8 @@ const CODE = PAGE.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
 
 describe('V6 i5SN2j イベント申込者の次行動と安全なキャンセル', () => {
   it('帯を数だけで終わらせず、次にすることへつなぐ', () => {
-    expect(CODE).toContain('describeBookingCapacity(applied, capacity)')
+    // IDEA-29: 残席は申込行数ではなく、席を消費中の人数(activeSeats)から引く。
+    expect(CODE).toContain('describeBookingCapacity(activeSeats, capacity)')
     // 0件のときと有るときで、添え字が変わること。
     expect(CODE).toContain('対応が必要：')
     expect(CODE).toContain('件を確認してください')

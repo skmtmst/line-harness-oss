@@ -13,7 +13,7 @@ const apiMocks = vi.hoisted(() => ({
   listOccurrenceSelector: vi.fn(),
   getOccurrenceApplicants: vi.fn(),
   promoteOccurrenceWaitlist: vi.fn(),
-  occurrenceApplicantsCsvUrl: vi.fn((accountId: string, occurrenceId: string, snapshotId: string) => `/api/events/admin/occurrences/${occurrenceId}/applicants.csv?account_id=${accountId}&snapshot_id=${snapshotId}`),
+  downloadOccurrenceApplicantsCsv: vi.fn(async () => undefined),
   previewOccurrenceBroadcast: vi.fn(),
   sendOccurrenceBroadcast: vi.fn(),
 }))
@@ -441,6 +441,82 @@ describe('Issue #684 イベント予約の実操作', () => {
     expect(view.container.textContent).toContain('キャンセル待ち 1番')
     expect(view.container.textContent).not.toContain('キャンセル待ち 2番')
     expect(view.container.textContent).not.toContain('キャンセル待ち 3番')
+  })
+
+  it('IDEA-29: 残席・待機/案内中の人数・繰上げ履歴・当日受付を人数で分けて出す', async () => {
+    apiMocks.getBookingSummary.mockResolvedValue({
+      requested: 1,
+      confirmed: 1,
+      rejected: 0,
+      cancelled: 0,
+      expired: 0,
+      attended: 1,
+      no_show: 0,
+      waitlist: 2,
+      requestedSeats: 2,
+      confirmedSeats: 1,
+      waitingSeats: 3,
+      offeredSeats: 2,
+      activeSeats: 5,
+      totalCapacity: 5,
+    })
+    apiMocks.getOccurrenceApplicants.mockResolvedValue({
+      occurrence: { id: 'slot-1', eventId: 'event-1', startsAt: '2099-06-01T01:00:00.000Z', endsAt: '2099-06-01T02:00:00.000Z', capacity: 5, activeSeats: 5, version: 4 },
+      summary: {
+        bookingCount: 2, waitingCount: 2, activeSeats: 5,
+        confirmedSeats: 1, requestedSeats: 2, waitingSeats: 3, offeredSeats: 2, remainingSeats: 0,
+      },
+      waitlistHistory: [
+        { id: 'wait-done', friendId: 'friend-done', displayName: '繰上 太郎', status: 'converted', partySize: 1, createdAt: '2099-05-01T01:00:00.000Z', offeredAt: '2099-05-02T01:00:00.000Z', offerExpiresAt: '2099-05-03T01:00:00.000Z', notifiedAt: '2099-05-02T01:00:00.000Z', updatedAt: '2099-05-02T02:00:00.000Z', convertedBookingId: 'event-waitlist:wait-done' },
+        { id: 'wait-lost', friendId: 'friend-lost', displayName: '期限 切子', status: 'expired', partySize: 1, createdAt: '2099-04-28T01:00:00.000Z', offeredAt: '2099-04-29T01:00:00.000Z', offerExpiresAt: '2099-04-30T01:00:00.000Z', notifiedAt: null, updatedAt: '2099-04-30T01:00:00.000Z', convertedBookingId: null },
+      ],
+      attendance: {
+        attendedSeats: 2,
+        noShowSeats: 1,
+        entries: [
+          { id: 'booking-att', friendId: 'friend-att', displayName: '参加 済子', status: 'attended', partySize: 2, markedAt: '2099-06-01T02:10:00.000Z' },
+          { id: 'booking-ns', friendId: 'friend-ns', displayName: '無断 欠子', status: 'no_show', partySize: 1, markedAt: '2099-06-01T02:20:00.000Z' },
+        ],
+      },
+      snapshotId: 'snapshot-1', snapshotExpiresAt: '2099-06-01T00:15:00.000Z',
+      applicants: [
+        { source: 'booking', id: 'booking-1', friendId: 'friend-booking', displayName: '申込 太郎', pictureUrl: null, status: 'confirmed', partySize: 1, appliedAt: '2099-05-01T01:00:00.000Z', answers: null, firstParticipation: { isFirst: null, attendedCount: null, checkedAt: null }, offeredAt: null, offerExpiresAt: null },
+        { source: 'booking', id: 'booking-2', friendId: 'friend-requested', displayName: '申込 次郎', pictureUrl: null, status: 'requested', partySize: 2, appliedAt: '2099-05-01T02:00:00.000Z', answers: null, firstParticipation: { isFirst: null, attendedCount: null, checkedAt: null }, offeredAt: null, offerExpiresAt: null },
+        { source: 'waitlist', id: 'wait-1', friendId: 'friend-waiting', displayName: '待機 花子', pictureUrl: null, status: 'waiting', partySize: 3, appliedAt: '2099-05-02T01:00:00.000Z', answers: null, firstParticipation: { isFirst: null, attendedCount: null, checkedAt: null }, offeredAt: null, offerExpiresAt: null },
+        { source: 'waitlist', id: 'wait-2', friendId: 'friend-offered', displayName: '案内 一郎', pictureUrl: null, status: 'offered', partySize: 2, appliedAt: '2099-05-02T02:00:00.000Z', answers: null, firstParticipation: { isFirst: null, attendedCount: null, checkedAt: null }, offeredAt: '2099-05-03T01:00:00.000Z', offerExpiresAt: '2099-05-04T01:00:00.000Z' },
+      ],
+    })
+    const view = await mount(<EventBookingsPage />)
+
+    // 開催回パネル: 申込を確定/承認待ちへ分け、待機と案内中を人数で分ける。
+    expect(view.container.textContent).toContain('申込 3人 （確定 1人・承認待ち 2人）')
+    expect(view.container.textContent).toContain('キャンセル待ち 3人・案内中 2人')
+    expect(view.container.textContent).toContain('満席（定員 5人）')
+    // 上部の集計カードも人数基準: 待ち列は待機+案内中=5人。
+    expect(view.container.textContent).toContain('待機 3人・案内中 2人')
+    // 当日受付: 記録済みを人数で出し、確定のままの人は受付前として残す。
+    expect(view.container.textContent).toContain('当日の受付')
+    expect(view.container.textContent).toContain('参加済 2人・無断欠席 1人・受付前 1人')
+    expect(view.container.textContent).toContain('参加 済子')
+    expect(view.container.textContent).toContain('無断 欠子')
+    // 繰上げ履歴: 予約化・期限切れを運用の言葉で出す。
+    expect(view.container.textContent).toContain('繰上げ・案内の履歴')
+    expect(view.container.textContent).toContain('予約に繰上げ')
+    expect(view.container.textContent).toContain('案内が期限切れ')
+    expect(view.container.textContent).toContain('繰上 太郎')
+  })
+
+  it('IDEA-29: 旧応答(席数・履歴なし)でも行から数え直し、未取得と0を混ぜない', async () => {
+    // beforeEach の既定応答は新しい集計フィールドを持たない旧形。
+    const view = await mount(<EventBookingsPage />)
+
+    // 行から数え直した人数で出る(確定1人・待機2人・案内中0人・残席4)。
+    expect(view.container.textContent).toContain('申込 1人 （確定 1人・承認待ち 0人）')
+    expect(view.container.textContent).toContain('キャンセル待ち 2人・案内中 0人')
+    expect(view.container.textContent).toContain('残席 4席（定員 5人）')
+    // 履歴・受付は「0件」ではなく「まだ取得できていません」と区別する。
+    expect(view.container.textContent).toContain('履歴はまだ取得できていません')
+    expect(view.container.textContent).toContain('受付の記録はまだ取得できていません')
   })
 
   it('待ち案内の失敗後は最新一覧を読み直しても理由を残す', async () => {

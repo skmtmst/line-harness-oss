@@ -42,11 +42,17 @@ function sqliteAsD1(sqlite: Database.Database): D1Database {
   } as unknown as D1Database;
 }
 
-const S1 = '2026-09-20T01:00:00.000Z';
-const S1_DAY_BEFORE = '2026-09-19T01:00:00.000Z';
-const S1_HOUR_BEFORE = '2026-09-20T00:00:00.000Z';
-const S2 = '2026-09-22T01:00:00.000Z';
-const S2_HOUR_BEFORE = '2026-09-22T00:00:00.000Z';
+// 固定日時はいつか過去になり日程変更 (startsAt は未来必須) が 400 になる。
+// 実行時点からの相対時刻で組み立てる。
+const HOUR_MS = 60 * 60 * 1000;
+const NOW = Date.now();
+const S1 = new Date(NOW + 2 * HOUR_MS).toISOString();
+const S1_DAY_BEFORE = new Date(NOW - 22 * HOUR_MS).toISOString();
+const S1_HOUR_BEFORE = new Date(NOW + 1 * HOUR_MS).toISOString();
+const S1_END = new Date(NOW + 3 * HOUR_MS).toISOString();
+const S2 = new Date(NOW + 50 * HOUR_MS).toISOString();
+const S2_HOUR_BEFORE = new Date(NOW + 49 * HOUR_MS).toISOString();
+const S2_END = new Date(NOW + 51 * HOUR_MS).toISOString();
 
 function seedBase(sqlite: Database.Database) {
   sqlite.exec(readFileSync(join(process.cwd(), '../../packages/db/bootstrap.sql'), 'utf8'));
@@ -68,7 +74,7 @@ function seedBase(sqlite: Database.Database) {
            ('rb-step-2','rb-rule-2',-60,'text','ご来店をお待ちしています');
     INSERT INTO meet_consultations
       (id, external_event_id, friend_id, title, starts_at, ends_at, meet_url, status)
-    VALUES ('MC1','EV1','f1','個別相談','${S1}','2026-09-20T02:00:00.000Z',
+    VALUES ('MC1','EV1','f1','個別相談','${S1}','${S1_END}',
       'https://meet.google.com/abc-defg-hij','confirmed');
     INSERT INTO meet_consultation_reminders
       (id, consultation_id, kind, scheduled_at, status, sent_at, retry_count, created_at, updated_at)
@@ -93,7 +99,7 @@ const postBody = {
   friendId: 'f1',
   title: '個別相談',
   startsAt: S2,
-  endsAt: '2026-09-22T02:00:00.000Z',
+  endsAt: S2_END,
   meetUrl: 'https://meet.google.com/abc-defg-hij',
 };
 

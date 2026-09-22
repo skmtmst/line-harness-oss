@@ -30,9 +30,12 @@ import {
   type ConfirmedState,
 } from './offer-kpi'
 import {
+  APPROVAL_ORDER_STATUS_TEXT,
   CLICK_SUMMARY_LABEL,
-  DUPLICATE_FLAG_TITLE,
   LINK_CODE_HEADING,
+  ORDER_DUPLICATE_TITLE,
+  REWARD_ENTRY_STATUS_TEXT,
+  approvalReviewReasons,
   duplicateFlagHeading,
   duplicateFriendNameText,
   personNameText,
@@ -1831,7 +1834,10 @@ export function ApprovalQueue() {
     rejected: accountItems.filter((item) => item.approvalStatus === 'rejected').length,
   }
   const pendingItems = accountItems.filter((item) => item.approvalStatus === 'pending')
-  const flaggedCount = pendingItems.filter((item) => item.duplicateFlag).length
+  // IDEA-16: 確認対象は「同じ友だちの重複」だけでなく、同じ注文の重複候補と
+  // 返金・取消済みの注文に由来する成果も含める。理由は approvalReviewReasons
+  // が集め、行の吹き出しと詳細で根拠ごと見せる。
+  const flaggedCount = pendingItems.filter((item) => approvalReviewReasons(item).length > 0).length
   const pendingYen = pendingItems.reduce((sum, item) => sum + (item.value ?? 0), 0)
   const averageWaitDays = pendingItems.length === 0
     ? 0
@@ -1844,10 +1850,10 @@ export function ApprovalQueue() {
     const needle = query.trim().toLocaleLowerCase('ja-JP')
     return accountItems
       .filter((item) => item.approvalStatus === status)
-      .filter((item) => !flaggedOnly || item.duplicateFlag)
+      .filter((item) => !flaggedOnly || approvalReviewReasons(item).length > 0)
       .filter((item) => {
         if (!needle) return true
-        return [item.friendName, item.affiliateName, item.offerName, item.conversionPointName]
+        return [item.friendName, item.affiliateName, item.offerName, item.conversionPointName, item.orderNumber]
           .filter(Boolean)
           .join(' ')
           .toLocaleLowerCase('ja-JP')
@@ -1868,7 +1874,7 @@ export function ApprovalQueue() {
   const showActionRetry = status === 'approved'
     && pagedItems.some((item) => item.offerActionsIncomplete)
   const safePendingIds = pagedItems
-    .filter((item) => item.approvalStatus === 'pending' && !item.duplicateFlag)
+    .filter((item) => item.approvalStatus === 'pending' && approvalReviewReasons(item).length === 0)
     .map((item) => item.eventId)
   const allSafeSelected = safePendingIds.length > 0
     && safePendingIds.every((eventId) => selected.has(eventId))
@@ -1884,7 +1890,9 @@ export function ApprovalQueue() {
   }, [actioning, accountItems, selected])
 
   const exportApprovalsCsv = () => {
-    const header = ['日時', '友だち', 'アフィリエイター', 'アカウント', '案件', '成果地点', '金額', '確認状態']
+    // IDEA-16: 注文番号を書き出す。書き出した一覧から注文・返金・支払いの
+    // 記録へ辿れるようにするための根拠列。確認状態は理由を並べて出す。
+    const header = ['日時', '友だち', 'アフィリエイター', 'アカウント', '案件', '成果地点', '注文番号', '金額', '確認状態']
     const lines = shownItems.map((item) => [
       formatDateTime(item.createdAt),
       personNameText(item.friendName),
@@ -1892,8 +1900,9 @@ export function ApprovalQueue() {
       item.lineAccountName ?? 'アカウント未設定',
       item.offerName ?? '未設定',
       item.conversionPointName ?? '未設定',
+      item.orderNumber ?? '',
       item.value ?? '',
-      item.duplicateFlag ? '確認が必要' : '問題なし',
+      approvalReviewReasons(item).join('・') || '問題なし',
     ])
     // 数式対策は共通の csvCell に寄せる（`offer-list-view.ts`）。
     const csv = [header, ...lines].map((line) => line.map(csvCell).join(',')).join('\r\n')
@@ -1909,7 +1918,7 @@ export function ApprovalQueue() {
     <div data-design-node="n5VVTb" data-approval-design="v6">
       <NoteBar tone={flaggedCount > 0 ? 'warn' : 'info'}>
         {flaggedCount > 0
-          ? `${flaggedCount}件は同じ友だちの重複が疑われます。内容を確認してから判断してください。`
+          ? `${flaggedCount}件は同じ友だちや同じ注文の重複、返金・取り消し済みの注文が疑われます。内容を確認してから判断してください。`
           : '成果を認めると報酬が確定します。確認が必要な成果は、まとめて承認の対象から外れます。'}
       </NoteBar>
 
@@ -1925,7 +1934,7 @@ export function ApprovalQueue() {
           title="確認したほうがよい"
           value={loading || error ? null : flaggedCount}
           unit={loading || error ? '' : '件'}
-          detail="同じ友だちの重複が疑われる成果"
+          detail="同じ友だち・同じ注文の重複や、返金・取り消し済みの注文の成果"
           loading={loading}
         />
         <KpiCard
@@ -1946,7 +1955,7 @@ export function ApprovalQueue() {
 
       <div className="bg-canvas rounded-card border-hairline mb-3 flex flex-wrap items-center gap-2 border p-3">
         <SearchField
-          placeholder="友だち・紹介者・案件・成果地点で検索"
+          placeholder="友だち・紹介者・案件・成果地点・注文番号で検索"
           aria-label="成果承認を検索"
           value={query}
           onChange={(value) => { setQuery(value); setPage(1); setSelected(new Set()) }}
@@ -2083,8 +2092,11 @@ export function ApprovalQueue() {
               </TableHeadRow>
             </thead>
             <tbody className="divide-hairline divide-y">
-              {pagedItems.map((item) => (
-                <tr key={item.eventId} className={item.duplicateFlag ? 'bg-warning-bg' : 'hover:bg-canvas-sunken'}>
+              {pagedItems.map((item) => {
+                const reviewReasons = approvalReviewReasons(item)
+                const needsReview = reviewReasons.length > 0
+                return (
+                <tr key={item.eventId} className={needsReview ? 'bg-warning-bg' : 'hover:bg-canvas-sunken'}>
                   <td className="text-ink px-4 py-3 text-sm">
                     <div className="flex items-start gap-2">
                     {status === 'pending' && (
@@ -2093,8 +2105,8 @@ export function ApprovalQueue() {
                         className="mt-1"
                         aria-label={`${personNameText(item.friendName)}の成果を選ぶ`}
                         checked={selected.has(item.eventId)}
-                        disabled={item.duplicateFlag}
-                        title={item.duplicateFlag ? '確認が必要な成果はまとめて承認できません' : undefined}
+                        disabled={needsReview}
+                        title={needsReview ? '確認が必要な成果はまとめて承認できません' : undefined}
                         onChange={(event) => {
                           setSelected((current) => {
                             const next = new Set(current)
@@ -2125,8 +2137,8 @@ export function ApprovalQueue() {
                     {formatYenNullable(item.value)}
                   </td>
                   <td className="px-4 py-3 text-center">
-                    {item.duplicateFlag ? (
-                      <span title={DUPLICATE_FLAG_TITLE}><Chip tone="warn">要確認</Chip></span>
+                    {needsReview ? (
+                      <span title={reviewReasons.join('・')}><Chip tone="warn">要確認</Chip></span>
                     ) : (
                       <Chip tone="ok">問題なし</Chip>
                     )}
@@ -2166,7 +2178,8 @@ export function ApprovalQueue() {
                     </td>
                   )}
                 </tr>
-              ))}
+                )
+              })}
             </tbody>
           </table>
         </div>
@@ -2181,6 +2194,44 @@ export function ApprovalQueue() {
                 {personNameText(detailItem.friendName)}／{detailItem.affiliateName ?? '紹介者名を取得できませんでした'}／{detailItem.offerName ?? '案件未設定'}
               </p>
               <p className="text-ink-faint mt-1 text-xs">{formatDateTime(detailItem.createdAt)}・{detailItem.lineAccountName ?? 'アカウント未設定'}・{detailItem.conversionPointName ?? '成果地点未設定'}・{formatYenNullable(detailItem.value)}</p>
+              {/* IDEA-16: 注文番号を根拠に、注文の最新状態・同じ注文の重複候補・
+                  確定した報酬・支払い確定の状態までここで辿る。未確定の額は
+                  「未確定」と出し、確定額と混ぜない。 */}
+              <dl className="mt-3 space-y-1 text-xs">
+                {detailItem.orderNumber ? (
+                  <div className="flex gap-2">
+                    <dt className="text-ink-faint shrink-0">起こりになった注文</dt>
+                    <dd className="text-ink-secondary">
+                      {detailItem.orderNumber}
+                      {detailItem.orderStatus
+                        ? `（${APPROVAL_ORDER_STATUS_TEXT[detailItem.orderStatus] ?? detailItem.orderStatus}）`
+                        : '（注文は見つかりません）'}
+                    </dd>
+                  </div>
+                ) : null}
+                {detailItem.sameOrderDuplicate ? (
+                  <div className="flex gap-2">
+                    <dt className="text-ink-faint shrink-0">重複の候補</dt>
+                    <dd className="text-warning">
+                      {ORDER_DUPLICATE_TITLE}：同じ注文・同じ成果地点の成果がほかにもあります。二重に認めないか注文番号で確かめてください。
+                    </dd>
+                  </div>
+                ) : null}
+                <div className="flex gap-2">
+                  <dt className="text-ink-faint shrink-0">確定した報酬</dt>
+                  <dd className="text-ink-secondary">
+                    {detailItem.rewardAmount != null ? `¥${Math.round(detailItem.rewardAmount).toLocaleString('ja-JP')}` : '未確定'}
+                  </dd>
+                </div>
+                <div className="flex gap-2">
+                  <dt className="text-ink-faint shrink-0">支払い確定の状態</dt>
+                  <dd className="text-ink-secondary">
+                    {detailItem.rewardEntryStatus
+                      ? (REWARD_ENTRY_STATUS_TEXT[detailItem.rewardEntryStatus] ?? detailItem.rewardEntryStatus)
+                      : 'まだ確定していません'}
+                  </dd>
+                </div>
+              </dl>
             </div>
             <AffiliateButton onClick={() => setDetailItem(null)}>閉じる</AffiliateButton>
           </div>
