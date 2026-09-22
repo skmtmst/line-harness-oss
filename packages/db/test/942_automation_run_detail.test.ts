@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import {
   getAutomationExecutionRun,
+  getAutomationExecutionRuns,
   getAutomationExecutionRunSteps,
 } from '../src/automations.js';
 
@@ -110,7 +111,52 @@ describe('実行記録の詳細（#942 N-354）', () => {
       failed_action: 'send_message',
       failure_code: 'line_api_error',
       duration_ms: 2000,
+      // #1043: いまの公開版と、待機中stepの再試行の有無を一緒に返す。
+      current_published_version_id: 'ver-3',
+      current_version_number: 3,
+      has_retry_wait: 0,
     });
+  });
+
+  it('待機中stepの retry_at で再試行待ちを区別する（#1043）', async () => {
+    sqlite.exec(`
+      INSERT INTO automation_runs
+        (id, line_account_id, automation_id, automation_version_id, friend_id,
+         source_event_id, idempotency_key, status, is_test, created_at)
+      VALUES ('run-wait', 'acc-1', 'auto-1', 'ver-3', 'friend-1',
+              'event-w', 'key-w', 'waiting', 0, '2026-08-28T02:00:00.000Z'),
+             ('run-retry', 'acc-1', 'auto-1', 'ver-3', 'friend-1',
+              'event-r', 'key-r', 'waiting', 0, '2026-08-28T02:00:00.000Z');
+      INSERT INTO automation_run_steps
+        (id, automation_run_id, step_key, action_type, idempotency_key, status, retry_at)
+      VALUES ('sw', 'run-wait', 'wait', 'wait', 'sw', 'waiting', NULL),
+             ('sr', 'run-retry', 'send', 'send_message', 'sr', 'waiting',
+              '2026-08-28T02:05:00.000Z');
+    `);
+    const wait = await getAutomationExecutionRun(db, {
+      runId: 'run-wait', allowedAccountIds: ['acc-1'],
+    });
+    const retry = await getAutomationExecutionRun(db, {
+      runId: 'run-retry', allowedAccountIds: ['acc-1'],
+    });
+    expect(wait?.has_retry_wait).toBe(0);
+    expect(retry?.has_retry_wait).toBe(1);
+  });
+
+  it('一覧は既定でテスト実行を除き、includeTest のときだけ含める（#1043）', async () => {
+    const base = {
+      allowedAccountIds: ['acc-1'],
+      from: '2026-08-01T00:00:00.000Z',
+      to: '2026-09-01T00:00:00.000Z',
+      limit: 20,
+      offset: 0,
+    };
+    const withoutTest = await getAutomationExecutionRuns(db, base);
+    // run-1 は is_test=1 なので既定では出ない。
+    expect(withoutTest.rows.map((row) => row.id)).toEqual([]);
+    expect(withoutTest.summary.total).toBe(0);
+    const withTest = await getAutomationExecutionRuns(db, { ...base, includeTest: true });
+    expect(withTest.rows.map((row) => row.id)).toEqual(['run-1']);
   });
 
   it('範囲外のアカウントの実行は返さない', async () => {
