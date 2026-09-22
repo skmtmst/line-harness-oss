@@ -12,6 +12,7 @@ let eventsApi: typeof import('./api').eventsApi
 let webinarApi: typeof import('./api').webinarApi
 let bookingApi: typeof import('./api').bookingApi
 let api: typeof import('./api').api
+let describeSaveFailure: typeof import('./api').describeSaveFailure
 
 beforeAll(async () => {
   process.env.NEXT_PUBLIC_API_URL = 'https://worker.example.com'
@@ -27,6 +28,7 @@ beforeAll(async () => {
     webinarApi,
     bookingApi,
     api,
+    describeSaveFailure,
   } = await import('./api'))
 })
 
@@ -1572,5 +1574,47 @@ describe('api.health.summary の軽量要約契約 (#630)', () => {
     expect(fetchSpy.mock.calls.map(([url]) => url)).toEqual([
       'https://worker.example.com/api/accounts/health-summary',
     ])
+  })
+})
+
+describe('describeSaveFailure（WRITE-01: 保存失敗の安全な理由表示）', () => {
+  it('400の本文メッセージはそのまま運用者へ出す', () => {
+    const err = new ApiError(400, 'LINEアカウントを指定してください')
+    expect(describeSaveFailure(err)).toBe('LINEアカウントを指定してください')
+  })
+
+  it('422の検証文もそのまま出す', () => {
+    const err = new ApiError(422, '本文を入力してください')
+    expect(describeSaveFailure(err)).toBe('本文を入力してください')
+  })
+
+  it('403は内部文を出さず権限の確認を促す', () => {
+    const err = new ApiError(403, 'API error: 403', 'LINE_ACCOUNT_MISMATCH')
+    const text = describeSaveFailure(err)
+    expect(text).not.toContain('API error')
+    expect(text).toContain('権限')
+  })
+
+  it('404は対象が見つからない旨を出す', () => {
+    const text = describeSaveFailure(new ApiError(404, 'API error: 404'))
+    expect(text).toContain('見つかりません')
+    expect(text).not.toContain('API error')
+  })
+
+  it('500はサーバー側の失敗として出し、内部文を見せない', () => {
+    const text = describeSaveFailure(new ApiError(500, 'API error: 500'))
+    expect(text).toContain('サーバー側')
+    expect(text).not.toContain('API error')
+  })
+
+  it('日本語を含まない内部Errorはそのまま出さない', () => {
+    const text = describeSaveFailure(new Error('Network request failed'))
+    expect(text).not.toContain('Network request failed')
+    expect(text).toContain('通信')
+  })
+
+  it('日本語のErrorメッセージはそのまま使う', () => {
+    expect(describeSaveFailure(new Error('対象が見つかりません')))
+      .toBe('対象が見つかりません')
   })
 })
