@@ -279,8 +279,10 @@ function BubblePreview({ bubble, buttons = [] }: { bubble: BroadcastBubble; butt
   return <div className="w-[82%] overflow-hidden rounded-card bg-canvas shadow-sm">{imageUrl && <img src={imageUrl} alt="素材プレビュー" className="h-32 w-full object-cover" />}<div className="p-3"><p className="text-xs font-bold">{String(bubble.content.assetName ?? TYPE_LABELS[bubble.type])}</p><p className="mt-1 text-[11px] text-ink-faint">{TYPE_LABELS[bubble.type]}のプレビュー</p></div></div>
 }
 
-function BubbleEditor({ bubble, index, total, assets, accountId, onChange, onMove, onDelete }: {
+function BubbleEditor({ bubble, index, total, assets, assetsStatus, accountId, onChange, onMove, onDelete }: {
   bubble: BroadcastBubble; index: number; total: number; assets: BroadcastMessageAsset[];
+  /** PERF-06: 候補は必要になってから取る。未取得と0件を区別するための状態。 */
+  assetsStatus?: 'idle' | 'loading' | 'ready' | 'error';
   /** 選んでいるLINEアカウント。カルーセル候補の絞り込みに使う。 */
   accountId?: string | null;
   onChange: (bubble: BroadcastBubble) => void; onMove: (direction: -1 | 1) => void; onDelete: () => void
@@ -358,7 +360,9 @@ function BubbleEditor({ bubble, index, total, assets, accountId, onChange, onMov
         <select value={String(bubble.content.assetId ?? '')} onChange={(e) => { const asset = availableAssets.find((item) => item.id === e.target.value); onChange({ ...bubble, content: asset ? { assetId: asset.id, assetName: asset.name, ...asset.payload } : { assetId: '', assetName: '' } }) }} className="w-full rounded-card border border-hairline px-3 py-2.5 text-sm">
           <option value="">テンプレートを選択してください</option>{availableAssets.map((asset) => <option key={asset.id} value={asset.id}>{asset.name}</option>)}
         </select>
-        {availableAssets.length === 0 && <p className="mt-2 text-xs text-warning">先に「コンテンツ ＞ テンプレート」で作成してください。</p>}
+        {assetsStatus === 'loading' && <p className="mt-2 text-xs text-ink-faint">テンプレートを読み込んでいます…</p>}
+        {assetsStatus === 'error' && <p className="mt-2 text-xs text-warning">テンプレートを読み込めませんでした。開き直すと再取得します。</p>}
+        {assetsStatus === 'ready' && availableAssets.length === 0 && <p className="mt-2 text-xs text-warning">先に「コンテンツ ＞ テンプレート」で作成してください。</p>}
       </div>}
     </div>
   </section>
@@ -531,6 +535,13 @@ export default function BroadcastForm({
   }] : [emptyBubble()])
   const [assets, setAssets] = useState<BroadcastMessageAsset[]>([])
   const [messageTemplates, setMessageTemplates] = useState<BroadcastTemplateOption[]>([])
+  /*
+   * PERF-06: 素材・テンプレート候補は、選択窓や素材型の吹き出しが
+   * 必要になってから取る。「未取得（＝まだ読み込み中かも）」と
+   * 「0件」を区別しないと、読み込み中に「まず作成してください」と
+   * 誤った案内が出る。
+   */
+  const [templateCandidatesStatus, setTemplateCandidatesStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
   /**
    * テンプレート選択窓の絞り込み（IDEA-11）。
    * 「置き場」はテンプレートのフォルダで、配信そのものの置き場
@@ -545,6 +556,8 @@ export default function BroadcastForm({
   /** シナリオ購読で絞るときの相手。空なら「どれか1つでも購読している人」。 */
   const [scenarioId, setScenarioId] = useState('')
   const [scenarios, setScenarios] = useState<Array<{ id: string; name: string }>>([])
+  /** PERF-06: シナリオ候補は対象者の節で「シナリオ購読中」を選んでから取る。 */
+  const [scenariosStatus, setScenariosStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
   const [tagId, setTagId] = useState('')
   /** 「詳細条件」で組み立てた絞り込み。シナリオと同じ部品で作る。 */
   const [condition, setCondition] = useState<SegmentCondition | null>(initialCondition)
@@ -677,24 +690,69 @@ export default function BroadcastForm({
   }, [])
 
   useEffect(() => {
-    api.broadcasts.list({ accountId: selectedAccountId || undefined })
+    // PERF-06: 複製候補は画面に出る3件ぶんだけAPIへ頼む。
+    // 以前は一覧を全件取って先頭3件に絞っていた。
+    api.broadcasts.list({ accountId: selectedAccountId || undefined, limit: 3 })
       .then((res) => { if (res.success) setRecentBroadcasts(res.data.slice(0, 3)) })
       .catch(() => undefined)
   }, [selectedAccountId])
 
-  // 「シナリオ購読中の全員」で選ぶ相手。名前だけ使う。
+  /*
+   * 「シナリオ購読中の全員」で選ぶ相手。名前だけ使う。
+   * PERF-06: 対象者の節が見え、かつシナリオ選択になったときだけ取る。
+   * ステップ形式では対象者ステップへ進むまで、埋め込み形式では
+   * 節が常に見えているので従来どおり取る。
+   * アカウントごとに一度取ったら、選択肢の開閉では取り直さない。
+   */
+  const audienceSectionVisible = currentStep == null || currentStep === 'audience'
+  const needsScenarioCandidates = audienceSectionVisible && targetMode === 'scenario'
+  const scenariosLoadedForRef = useRef<string | null>(null)
   useEffect(() => {
-    api.scenarios.list({ accountId: selectedAccountId || undefined, limit: 200 })
-      .then((res) => { if (res.success) setScenarios(res.data.map((item) => ({ id: item.id, name: item.name }))) })
-      .catch(() => undefined)
+    // アカウントが変わったら前のアカウントの候補を見せない。
+    setScenarios([])
+    setScenariosStatus('idle')
   }, [selectedAccountId])
+  useEffect(() => {
+    if (!selectedAccountId || !needsScenarioCandidates) return
+    if (scenariosLoadedForRef.current === selectedAccountId) return
+    const accountId = selectedAccountId
+    let cancelled = false
+    setScenariosStatus('loading')
+    api.scenarios.list({ accountId, limit: 200 })
+      .then((res) => {
+        if (cancelled) return
+        if (res.success) {
+          setScenarios(res.data.map((item) => ({ id: item.id, name: item.name })))
+          setScenariosStatus('ready')
+          scenariosLoadedForRef.current = accountId
+        } else {
+          setScenariosStatus('error')
+        }
+      })
+      .catch(() => { if (!cancelled) setScenariosStatus('error') })
+    return () => { cancelled = true }
+  }, [selectedAccountId, needsScenarioCandidates])
 
+  /*
+   * PERF-06: 素材・テンプレートの候補は、必要になってから取る。
+   * 必要になるのは、テンプレート選択窓を開いた・素材型の吹き出しが
+   * ある・初期テンプレート指定で来た、のどれか。基本設定だけを
+   * 進める利用では1回も呼ばれない。
+   */
+  const needsTemplateCandidates = showTemplatePicker
+    || Boolean(initialTemplateId || initialContentTemplateId)
+    || bubbles.some((bubble) => isContentTemplateType(bubble.type))
   useEffect(() => {
     // 独立審査(指摘4): アカウント切替で古い応答が混ざらないよう世代で照合する。
     const requestAccountId = selectedAccountId || undefined
     // 独立審査(指摘4): 新しい応答が来るまで旧アカウントの候補を見せない。
     setMessageTemplates([])
     setAssets([])
+    if (!needsTemplateCandidates) {
+      setTemplateCandidatesStatus('idle')
+      return
+    }
+    setTemplateCandidatesStatus('loading')
     const requestGeneration = templateLoadGenerationRef.current.next()
     const isCurrent = () =>
       templateLoadGenerationRef.current.isCurrent(requestGeneration)
@@ -710,6 +768,10 @@ export default function BroadcastForm({
       if (!isCurrent()) return
       if (assetResult.success) setAssets(assetResult.data)
       if (folderResult.success) setTemplateFolders(folderResult.data)
+      // 候補自体がなくても「0件」として完了扱い。失敗は別の札にする。
+      setTemplateCandidatesStatus(
+        assetResult.success && templateResult.success && folderResult.success ? 'ready' : 'error',
+      )
       const sendable = templateResult.success
         ? filterSendableTemplates(templateResult.data, requestAccountId)
         : []
@@ -747,8 +809,10 @@ export default function BroadcastForm({
         }
         appliedInitialTemplate.current = true
       }
-    }).catch(() => undefined)
-  }, [initialContentTemplateId, initialTemplateId, selectedAccountId])
+    }).catch(() => {
+      if (isCurrent()) setTemplateCandidatesStatus('error')
+    })
+  }, [initialContentTemplateId, initialTemplateId, needsTemplateCandidates, selectedAccountId])
 
   // 独立審査(指摘4): アカウント切替で旧候補・選択・吹き出しを残さない。
   // 持ち主の分かる吹き出しだけ落とし、手書き・素材は保つ。
@@ -1500,6 +1564,8 @@ export default function BroadcastForm({
               <option value="">すべてのシナリオ（どれか1つでも購読中）</option>
               {scenarios.map((scenario) => <option key={scenario.id} value={scenario.id}>{scenario.name}</option>)}
             </select>
+            {scenariosStatus === 'loading' && <p className="mt-1 text-xs text-ink-faint">シナリオを読み込んでいます…</p>}
+            {scenariosStatus === 'error' && <p className="mt-1 text-xs text-warning">シナリオを読み込めませんでした。別の絞り方を選んで戻ると再取得します。</p>}
           </div>}
           {targetMode === 'tag' && <div className="border-hairline mt-4 border-t pt-4">
             <label className="text-ink-secondary block text-xs font-semibold">どのタグ</label>
@@ -1661,7 +1727,17 @@ export default function BroadcastForm({
                   <span aria-hidden>›</span>
                 </button>
               ))}
-              {messageTemplates.length === 0 && assets.length === 0 && (
+              {templateCandidatesStatus === 'loading' && (
+                <div className="rounded-card border border-dashed bg-canvas p-8 text-center text-sm text-ink-faint">
+                  テンプレートを読み込んでいます…
+                </div>
+              )}
+              {templateCandidatesStatus === 'error' && (
+                <div className="rounded-card border border-dashed bg-canvas p-8 text-center text-sm text-warning">
+                  テンプレートを読み込めませんでした。窓を閉じて開き直すと再取得します。
+                </div>
+              )}
+              {templateCandidatesStatus === 'ready' && messageTemplates.length === 0 && assets.length === 0 && (
                 <div className="rounded-card border border-dashed bg-canvas p-8 text-center text-sm text-ink-faint">
                   テンプレートがありません。「コンテンツ ＞ テンプレート」で作成してください。
                 </div>
@@ -1688,7 +1764,7 @@ export default function BroadcastForm({
             onChange={(next) => updateBubble(index, next)}
           />
         ) : (
-          <BubbleEditor key={bubble.id} bubble={bubble} index={index} total={bubbles.length} assets={assets} accountId={selectedAccountId} onChange={(next) => updateBubble(index, next)} onMove={(direction) => moveBubble(index, direction)} onDelete={() => setBubbles((items) => items.filter((_, i) => i !== index))} />
+          <BubbleEditor key={bubble.id} bubble={bubble} index={index} total={bubbles.length} assets={assets} assetsStatus={templateCandidatesStatus} accountId={selectedAccountId} onChange={(next) => updateBubble(index, next)} onMove={(direction) => moveBubble(index, direction)} onDelete={() => setBubbles((items) => items.filter((_, i) => i !== index))} />
         ))}
         {!showTemplatePicker && <div className="mt-4 flex flex-wrap gap-2">
           <Button type="button" disabled={bubbles.length >= MAX_BUBBLES} onClick={() => setBubbles((items) => [...items, emptyBubble()])}><Plus size={15} aria-hidden /> メッセージを追加</Button>
