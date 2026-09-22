@@ -85,6 +85,8 @@ import {
   layoutToFields,
   normalizeLayout,
   parseLayout,
+  validateFormDefinition,
+  validateFormForPublish,
   type FormLayout,
   DEFAULT_TENANT_ID,
 } from '@line-crm/shared';
@@ -671,9 +673,15 @@ async function writeLegacyFriendFields(
  * も同時に作り直す。`fields` はいまも送信時の必須チェックと回答一覧の
  * 見出しが読んでいて、layout だけ更新すると両者がずれる。
  */
-function normalizeLayoutInput(raw: unknown): { layout: string; fields: string } | null {
+function normalizeLayoutInput(raw: unknown): { layout: string; fields: string } | { error: string } | null {
   const layout = normalizeLayout(raw);
   if (!layout) return null;
+  // 保存できる定義かをここで止める。画面側と同じ `validateFormDefinition`
+  // を使うので、「画面では通ったのに保存で弾かれる」にならない。
+  // 分岐の循環や設定途中の動作は下書きとして残せるため、ここでは見ず
+  // 公開の直前（publish）で止める。
+  const invalid = validateFormDefinition(layout);
+  if (invalid) return { error: invalid };
   return {
     layout: JSON.stringify(layout),
     fields: JSON.stringify(layoutToFields(layout)),
@@ -816,6 +824,17 @@ forms.post('/api/forms/:id/publish', async (c) => {
     if (!Number.isInteger(expected) || expected < 1) {
       return c.json({ success: false, error: '確認した版が必要です' }, 400);
     }
+    // 公開前の検査。下書きでは許すが公開では止めるもの——分岐の循環・
+    // 消えた行き先・共通ヘッダの分岐・選ぶ先が空の動作——をここで止める。
+    // 版がずれている場合は publish 側が 409 を返すので、確認できた版の
+    // 内容だけを検査する。
+    const draft = await getFormById(c.env.DB, id);
+    if (draft && draft.content_revision === expected) {
+      const publishError = validateFormForPublish(parseLayout(draft.layout, draft.fields));
+      if (publishError) {
+        return c.json({ success: false, error: publishError }, 400);
+      }
+    }
     const result = await publishFormVersion(c.env.DB, id, expected);
     if (result.kind === 'not_found') {
       return c.json({ success: false, error: 'Form not found' }, 404);
@@ -882,6 +901,12 @@ forms.post('/api/forms', async (c) => {
     }
 
     const normalized = body.layout !== undefined ? normalizeLayoutInput(body.layout) : null;
+    if (normalized && 'error' in normalized) {
+      return c.json({ success: false, error: normalized.error }, 400);
+    }
+    if (body.layout !== undefined && !normalized) {
+      return c.json({ success: false, error: 'layout の形が正しくありません' }, 400);
+    }
 
     const form = await createForm(c.env.DB, {
       name: body.name,
@@ -997,6 +1022,9 @@ forms.put('/api/forms/:id', async (c) => {
       const normalized = normalizeLayoutInput(body.layout);
       if (!normalized) {
         return c.json({ success: false, error: 'layout の形が正しくありません' }, 400);
+      }
+      if ('error' in normalized) {
+        return c.json({ success: false, error: normalized.error }, 400);
       }
       updates.layout = normalized.layout;
       updates.fields = normalized.fields;
