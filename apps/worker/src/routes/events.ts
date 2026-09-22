@@ -2460,14 +2460,24 @@ events.get('/api/events/admin/events/:id/bookings/summary', async (c) => {
       SUM(CASE WHEN status = 'cancelled' THEN 1 ELSE 0 END) AS cancelled_count,
       SUM(CASE WHEN status = 'expired' THEN 1 ELSE 0 END) AS expired_count,
       SUM(CASE WHEN status = 'attended' THEN 1 ELSE 0 END) AS attended_count,
-      SUM(CASE WHEN status = 'no_show' THEN 1 ELSE 0 END) AS no_show_count
+      SUM(CASE WHEN status = 'no_show' THEN 1 ELSE 0 END) AS no_show_count,
+      /*
+       * IDEA-29: 人数(party_size)の内訳。行数だと複数人申込で
+       * 定員の残りと食い違うため、席を消費する単位でも返す。
+       */
+      COALESCE(SUM(CASE WHEN status = 'requested' THEN party_size ELSE 0 END), 0) AS requested_seats,
+      COALESCE(SUM(CASE WHEN status = 'confirmed' THEN party_size ELSE 0 END), 0) AS confirmed_seats
       FROM event_bookings WHERE event_id = ?`)
     .bind(event_id)
     .first<Record<string, number | null>>();
   const waitlist = await c.env.DB
-    .prepare(`SELECT COUNT(*) AS c FROM event_waitlist WHERE event_id = ? AND status IN ('waiting','offered','accepted')`)
+    .prepare(`SELECT
+      COUNT(*) AS c,
+      COALESCE(SUM(CASE WHEN status = 'waiting' THEN party_size ELSE 0 END), 0) AS waiting_seats,
+      COALESCE(SUM(CASE WHEN status IN ('offered','accepted') THEN party_size ELSE 0 END), 0) AS offered_seats
+      FROM event_waitlist WHERE event_id = ? AND status IN ('waiting','offered','accepted')`)
     .bind(event_id)
-    .first<{ c: number }>();
+    .first<{ c: number; waiting_seats: number; offered_seats: number }>();
   const capacity = await c.env.DB
     .prepare(`SELECT
       COUNT(*) AS slot_count,
@@ -2487,6 +2497,15 @@ events.get('/api/events/admin/events/:id/bookings/summary', async (c) => {
     attended: bookingCounts?.attended_count ?? 0,
     noShow: bookingCounts?.no_show_count ?? 0,
     waitlist: waitlist?.c ?? 0,
+    requestedSeats: bookingCounts?.requested_seats ?? 0,
+    confirmedSeats: bookingCounts?.confirmed_seats ?? 0,
+    waitingSeats: waitlist?.waiting_seats ?? 0,
+    offeredSeats: waitlist?.offered_seats ?? 0,
+    // 席を消費中の人数 = 申込(requested/confirmed) + 保留中の案内(offered/accepted)。
+    // 待機中は席を消費しないので残席の計算に入れない。
+    activeSeats: (bookingCounts?.requested_seats ?? 0)
+      + (bookingCounts?.confirmed_seats ?? 0)
+      + (waitlist?.offered_seats ?? 0),
     totalCapacity: !capacity?.slot_count || capacity.uncapped_count > 0
       ? null
       : capacity.total_capacity,

@@ -22,6 +22,12 @@ import {
   FOLLOWUP_STATUS_TEXT,
   eventStoppedStage,
 } from './ec-failure'
+import {
+  PAYOUT_BATCH_STATE_TEXT,
+  PAYOUT_RESULT_TEXT,
+  REWARD_ENTRY_STATUS_TEXT,
+  SETTLEMENT_STATE_TEXT,
+} from '../affiliates/affiliate-display'
 import styles from './ec-commerce-v6.module.css'
 
 /*
@@ -288,12 +294,37 @@ export default function OrderDetailDrawer({
             ) : (
               <div className="flex flex-col gap-2">
                 {detail.outcomes.conversions.map((conversion) => (
-                  <p key={conversion.id} className={styles.cellSub}>
-                    成果：{conversion.pointName ?? '計測地点'} を記録
-                    {conversion.value !== null ? `（¥${conversion.value.toLocaleString('ja-JP')}）` : ''}
-                    {conversion.approvalStatus === 'pending' ? '・承認待ち' : conversion.approvalStatus === 'approved' ? '・承認済み' : conversion.approvalStatus === 'rejected' ? '・却下' : ''}
-                    （{dateTime(conversion.createdAt)}）
-                  </p>
+                  /*
+                   * IDEA-16: 注文から成果へ辿った行に、帰属した紹介者・確定した
+                   * 報酬・支払い確定→締め→支払いCSV→取り込んだ結果まで並べる。
+                   * 承認前の成果は報酬が「未確定」のまま。確定額と混ぜない。
+                   */
+                  <div key={conversion.id} className="min-w-0">
+                    <p className="truncate text-caption text-ink-faint">
+                      成果：{conversion.pointName ?? '計測地点'} を記録
+                      {conversion.value !== null ? `（¥${conversion.value.toLocaleString('ja-JP')}）` : ''}
+                      {conversion.approvalStatus === 'pending' ? '・承認待ち' : conversion.approvalStatus === 'approved' ? '・承認済み' : conversion.approvalStatus === 'rejected' ? '・却下' : ''}
+                      （{dateTime(conversion.createdAt)}）
+                    </p>
+                    <p className="truncate text-caption text-ink-faint">
+                      {conversion.affiliateName ? `紹介者：${conversion.affiliateName}　` : ''}
+                      報酬：{conversion.rewardAmount != null ? `¥${conversion.rewardAmount.toLocaleString('ja-JP')}` : '未確定'}
+                      {conversion.rewardEntryStatus ? `・支払い確定：${REWARD_ENTRY_STATUS_TEXT[conversion.rewardEntryStatus] ?? conversion.rewardEntryStatus}` : ''}
+                      {conversion.settlementState ? `・締め：${SETTLEMENT_STATE_TEXT[conversion.settlementState] ?? conversion.settlementState}` : ''}
+                      {conversion.payoutBatchState ? `・支払いCSV：${PAYOUT_BATCH_STATE_TEXT[conversion.payoutBatchState] ?? conversion.payoutBatchState}` : ''}
+                      {conversion.payoutResult ? `・結果：${PAYOUT_RESULT_TEXT[conversion.payoutResult] ?? conversion.payoutResult}` : ''}
+                    </p>
+                    {conversion.reversedAmount != null ? (
+                      <p className="truncate text-caption text-ink-faint">
+                        確定後の取消：−¥{conversion.reversedAmount.toLocaleString('ja-JP')}（次の支払いで差し引かれます）
+                      </p>
+                    ) : null}
+                    {conversion.duplicateCandidate ? (
+                      <p className="mt-1.5 text-caption font-semibold text-status-danger">
+                        同じ注文・同じ成果地点の成果がほかにもあります。二重に認めないか注文番号で確かめてください。
+                      </p>
+                    ) : null}
+                  </div>
                 ))}
                 {detail.outcomes.mileage.map((entry) => (
                   <p key={entry.id} className={styles.cellSub}>

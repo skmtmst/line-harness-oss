@@ -44,7 +44,9 @@ describe('機能16 V6の一覧', () => {
   it('成果承認は全状態を読み、確認不要だけをまとめて承認する', () => {
     expect(approvals).toContain('data-design-node="n5VVTb"')
     expect(approvals).toContain("(['pending', 'approved', 'rejected'] as const)")
-    expect(approvals).toContain('!item.duplicateFlag')
+    // IDEA-16: 確認対象は重複（同じ友だち・同じ注文）と返金・取消済みの注文。
+    // 理由がある行は一括承認の対象から外す。
+    expect(approvals).toContain('approvalReviewReasons(item).length === 0')
     expect(approvals).toContain('選んだ{selected.size}件をまとめて認める')
     expect(approvals).toContain('まとめて却下する')
     expect(approvals).toContain('確認が必要な成果はまとめて承認できません')
@@ -52,7 +54,7 @@ describe('機能16 V6の一覧', () => {
 
   it('成果承認は検索・並び順・CSV・状態・ページ送りを持つ', () => {
     for (const word of [
-      '友だち・紹介者・案件・成果地点で検索',
+      '友だち・紹介者・案件・成果地点・注文番号で検索',
       '金額が高い順',
       'CSVで書き出す',
       '確認したほうがよい',

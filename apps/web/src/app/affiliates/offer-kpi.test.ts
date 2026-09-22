@@ -46,6 +46,11 @@ function approval(over: Partial<ConversionApprovalItem> & { eventId: string }): 
     value: null,
     approvalStatus: 'approved',
     duplicateFlag: false,
+    orderNumber: null,
+    orderStatus: null,
+    sameOrderDuplicate: false,
+    rewardAmount: null,
+    rewardEntryStatus: null,
     ...over,
   }
 }
