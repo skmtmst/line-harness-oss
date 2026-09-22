@@ -39,6 +39,12 @@ export interface CreateAffiliateOfferInput {
   tagId?: string | null;
   scenarioId?: string | null;
   /**
+   * 下書き（非公開）で作るときは false。未指定は従来どおり公開(1)。
+   * 「作成→別APIで停止」の2段階にすると、途中失敗・通信断で有効な案件が
+   * 残るため、最初のINSERTから指定した状態で入れる（DRAFT-01）。
+   */
+  isActive?: boolean;
+  /**
    * Stable per-attempt UUID from the client (#686). When the create commits
    * but the response is lost, the client retries with the SAME operationId;
    * this lets the retry recover the original row instead of creating a
@@ -88,7 +94,7 @@ export async function createAffiliateOffer(
         `INSERT INTO affiliate_offers
            (id, name, description, reward_amount, reward_miles, mileage_program_id,
             line_account_id, tag_id, scenario_id, is_active, created_at, operation_id)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)`,
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .bind(
         id,
@@ -100,6 +106,7 @@ export async function createAffiliateOffer(
         lineAccountId,
         input.tagId ?? null,
         input.scenarioId ?? null,
+        input.isActive === false ? 0 : 1,
         now,
         input.operationId ?? null,
       )

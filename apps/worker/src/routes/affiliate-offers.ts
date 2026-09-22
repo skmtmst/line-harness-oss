@@ -138,6 +138,8 @@ affiliateOffers.post('/api/affiliate-offers', requireRole('owner', 'admin'), asy
         lineAccountId?: string | null;
         tagId?: string | null;
         scenarioId?: string | null;
+        /** DRAFT-01: falseなら最初のINSERTから非公開。省略は従来どおり公開。 */
+        isActive?: boolean;
         operationId?: string;
       }>()
       .catch(() => ({}) as Record<string, never>);
@@ -190,6 +192,7 @@ affiliateOffers.post('/api/affiliate-offers', requireRole('owner', 'admin'), asy
       lineAccountId,
       tagId: body.tagId ?? null,
       scenarioId: body.scenarioId ?? null,
+      isActive: body.isActive,
       operationId: operationId || undefined,
     });
     return c.json({ success: true, data: serializeOffer(offer) }, 201);

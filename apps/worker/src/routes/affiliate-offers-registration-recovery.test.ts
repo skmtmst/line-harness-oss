@@ -249,6 +249,60 @@ describe('POST /api/affiliate-offers — cross-account への作成を拒む (#6
   });
 });
 
+describe('POST /api/affiliate-offers — 非公開の新規保存を一旦有効にしない（DRAFT-01）', () => {
+  const activeOf = (id: string) => (
+    sqlite.prepare(`SELECT is_active FROM affiliate_offers WHERE id = ?`).get(id) as { is_active: number }
+  ).is_active;
+
+  test('isActive:false の作成は最初のINSERTから is_active=0 で入る', async () => {
+    const { app, env } = makeApp(db, OWNER);
+    const res = await app.request('/api/affiliate-offers', {
+      method: 'POST',
+      body: JSON.stringify({
+        name: '停止中で作る案件', rewardAmount: 500, lineAccountId: ACCOUNT_A, isActive: false,
+      }),
+    }, env);
+    expect(res.status).toBe(201);
+    const { data } = await res.json() as { data: { id: string; isActive: boolean } };
+    expect(data.isActive).toBe(false);
+    // 「公開で作ってから別APIで止める」ではなく、作成直後の行がすでに停止中。
+    expect(activeOf(data.id)).toBe(0);
+  });
+
+  test('isActive:false の再送は同じ停止中の1件を回収し、有効化しない', async () => {
+    const { app, env } = makeApp(db, OWNER);
+    const body = {
+      name: '停止のまま回収する案件', rewardAmount: 100, lineAccountId: ACCOUNT_A,
+      isActive: false, operationId: 'draft-offer-retry-0001',
+    };
+    const first = await app.request('/api/affiliate-offers', { method: 'POST', body: JSON.stringify(body) }, env);
+    const firstId = ((await first.json()) as { data: { id: string } }).data.id;
+
+    // 応答喪失後の再送。内容が同じなら新規作成せず同じ行を返す。
+    const retry = await app.request('/api/affiliate-offers', { method: 'POST', body: JSON.stringify(body) }, env);
+    expect(retry.status).toBe(201);
+    const retryJson = await retry.json() as { data: { id: string; isActive: boolean } };
+    expect(retryJson.data.id).toBe(firstId);
+    expect(retryJson.data.isActive).toBe(false);
+    expect(activeOf(firstId)).toBe(0);
+    const count = sqlite.prepare(`SELECT COUNT(*) AS n FROM affiliate_offers WHERE operation_id = ?`)
+      .get('draft-offer-retry-0001') as { n: number };
+    expect(count.n).toBe(1);
+  });
+
+  test('isActive を送らない作成は従来どおり公開(is_active=1)で入る', async () => {
+    const { app, env } = makeApp(db, OWNER);
+    const res = await app.request('/api/affiliate-offers', {
+      method: 'POST',
+      body: JSON.stringify({ name: 'いつもの公開案件', lineAccountId: ACCOUNT_A }),
+    }, env);
+    expect(res.status).toBe(201);
+    const { data } = await res.json() as { data: { id: string; isActive: boolean } };
+    expect(data.isActive).toBe(true);
+    expect(activeOf(data.id)).toBe(1);
+  });
+});
+
 describe('PUT /api/affiliate-offers/:id — 途中保存後の再開は全項目を保存する (#686)', () => {
   test('全項目を送るPUTは、name・rewardAmountを含めて反映する', async () => {
     const { app, env } = makeApp(db, OWNER);
