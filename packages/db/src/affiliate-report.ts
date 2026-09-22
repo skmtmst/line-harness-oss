@@ -801,6 +801,27 @@ export interface ConversionApprovalRow {
   lineAccountId: string | null;
   /** アカウント名。削除済み・未割当は null（画面側で未設定と出す）。 */
   lineAccountName: string | null;
+  /**
+   * IDEA-16: 成果の起こりになった注文番号（記録時に metadata へ残した
+   * 根拠）。注文由来でない成果は null。検索と詳細の根拠表示に使う。
+   */
+  orderNumber: string | null;
+  /**
+   * 同じ注文番号でこのアカウントに届いている最新の注文状態
+   * （current/refunded/cancelled）。注文が見つからない・注文由来でない
+   * 成果は null。返金・取消済みの注文を承認しないための確認材料。
+   */
+  orderStatus: 'current' | 'refunded' | 'cancelled' | null;
+  /**
+   * 同じ注文番号・同じ成果地点の帰属成果がほかにもあるとき true。
+   * 同じ注文が別の出来事IDで届き直したときに立つ二重計上の候補。
+   * 自動で却下せず、根拠（注文番号）と一緒に人へ見せる。
+   */
+  sameOrderDuplicate: boolean;
+  /** 承認時に固定された報酬の版の金額。承認前・計算不可は null（未確定）。 */
+  rewardAmount: number | null;
+  /** 支払い確定（締めで起きた credit 行）の状態。settled/paid/reversed 等。無ければ null。 */
+  rewardEntryStatus: string | null;
 }
 
 /**
@@ -850,6 +871,23 @@ export async function getConversionApprovalQueue(
            FROM attributed_cv
           GROUP BY affiliate_id, identity_key
          HAVING COUNT(*) >= 2
+       ),
+       /*
+        * IDEA-16: 同じ注文番号・同じ成果地点へ帰属成果が2件以上ある組を
+        * 拾う。同じ注文が別の出来事IDで届き直すと冪等キーが違うため別の
+        * 成果が立ち、二重報酬の候補になる。番号は受信体で数値のことが
+        * あるため TEXT に寄せてから数える。
+        */
+       dup_orders AS (
+         SELECT ce2.conversion_point_id AS point_id,
+                CAST(json_extract(ce2.metadata, '$.orderNumber') AS TEXT) AS order_number
+           FROM conversion_events ce2
+          WHERE ce2.affiliate_id IS NOT NULL
+            AND json_valid(ce2.metadata)
+            AND json_extract(ce2.metadata, '$.orderNumber') IS NOT NULL
+          GROUP BY ce2.conversion_point_id,
+                   CAST(json_extract(ce2.metadata, '$.orderNumber') AS TEXT)
+         HAVING COUNT(*) >= 2
        )
        SELECT
          ce.id AS event_id,
@@ -889,7 +927,16 @@ export async function getConversionApprovalQueue(
                                          AND fsd.scenario_id = off.scenario_id)))
               THEN 1 ELSE 0 END AS offer_actions_incomplete,
          cp.line_account_id AS line_account_id,
-         la.name AS line_account_name
+         la.name AS line_account_name,
+         CAST(json_extract(ce.metadata, '$.orderNumber') AS TEXT) AS order_number,
+         (SELECT eo.normalized_status
+            FROM ec_orders eo
+           WHERE eo.line_account_id = friends.line_account_id
+             AND eo.order_number = CAST(json_extract(ce.metadata, '$.orderNumber') AS TEXT)
+           ORDER BY eo.updated_at DESC, eo.id DESC LIMIT 1) AS order_status,
+         CASE WHEN od.order_number IS NOT NULL THEN 1 ELSE 0 END AS same_order_flag,
+         calc.amount_minor AS reward_amount_minor,
+         credit.status AS reward_entry_status
        FROM conversion_events ce
        JOIN friends ON friends.id = ce.friend_id
        LEFT JOIN affiliates a ON a.id = ce.affiliate_id
@@ -897,6 +944,12 @@ export async function getConversionApprovalQueue(
        LEFT JOIN line_accounts la ON la.id = cp.line_account_id
        LEFT JOIN affiliate_links al ON al.ref_code = ce.attributed_ref_code
        LEFT JOIN affiliate_offers off ON off.id = al.offer_id
+       LEFT JOIN affiliate_reward_calculations calc ON calc.conversion_event_id = ce.id
+       LEFT JOIN affiliate_reward_entries credit
+              ON credit.conversion_event_id = ce.id AND credit.entry_type = 'credit'
+       LEFT JOIN dup_orders od
+              ON od.point_id = ce.conversion_point_id
+             AND od.order_number = CAST(json_extract(ce.metadata, '$.orderNumber') AS TEXT)
        LEFT JOIN dup_keys dk
               ON dk.affiliate_id = ce.affiliate_id
              AND dk.identity_key = (${identityKeySql})
@@ -924,6 +977,11 @@ export async function getConversionApprovalQueue(
       offer_actions_incomplete: number;
       line_account_id: string | null;
       line_account_name: string | null;
+      order_number: string | null;
+      order_status: 'current' | 'refunded' | 'cancelled' | null;
+      same_order_flag: number;
+      reward_amount_minor: number | null;
+      reward_entry_status: string | null;
     }>();
 
   return result.results.map((r) => ({
@@ -943,5 +1001,10 @@ export async function getConversionApprovalQueue(
     offerActionsIncomplete: r.offer_actions_incomplete === 1,
     lineAccountId: r.line_account_id,
     lineAccountName: r.line_account_name,
+    orderNumber: r.order_number,
+    orderStatus: r.order_status,
+    sameOrderDuplicate: r.same_order_flag === 1,
+    rewardAmount: r.reward_amount_minor == null ? null : Number(r.reward_amount_minor),
+    rewardEntryStatus: r.reward_entry_status,
   }));
 }
