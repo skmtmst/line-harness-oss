@@ -97,6 +97,7 @@ describe('POST /api/nen-campaigns/columns', () => {
     expect(await response.json()).toMatchObject({ success: true, data: { id: expect.any(String) } });
     expect(mocks.canAccess).toHaveBeenCalledWith(expect.anything(), expect.anything(), ['account-a']);
     expect(state.preparedSql).toHaveLength(2);
+    expect(state.preparedSql[1]).toContain('delivery_status, delivery_at');
     expect(state.preparedSql[1]).toContain("VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, 'draft', ?, ?, ?, ?, ?, ?, ?, ?, ?)");
     expect(state.insertBinds).toEqual([
       expect.any(String),
@@ -108,6 +109,7 @@ describe('POST /api/nen-campaigns/columns', () => {
       'https://example.com/columns/NEN-Guide',
       'https://cdn.example.com/NEN-Guide.jpg',
       '2026-08-31T01:30:00.000Z',
+      null,
       'account-a',
       'all',
       null,
@@ -117,6 +119,25 @@ describe('POST /api/nen-campaigns/columns', () => {
       '2026-08-31 11:30:00',
       '2026-08-31 11:30:00',
     ]);
+  });
+
+  it('keeps a wanted delivery datetime on the draft without touching the queue (NEN-06)', async () => {
+    const state = freshState();
+    const response = await app(state).request(
+      '/api/nen-campaigns/columns?lineAccountId=account-a',
+      createRequest({ ...VALID, scheduledAt: '2099-05-01T10:30:00+09:00' }),
+    );
+
+    expect(response.status).toBe(201);
+    expect(await response.json()).toMatchObject({ success: true, data: { queued: 0 } });
+    /*
+     * 配信待ち行列や nen_columns の状態を読み書きする queueColumnDelivery が
+     * 走ると prepare が増える。SELECT slug + INSERT の2本だけが、
+     * 「下書きを作っただけで配信を予約していない」ことの印。
+     */
+    expect(state.preparedSql).toHaveLength(2);
+    // delivery_at のbind位置（published_at の次）に希望日時が入る。
+    expect(state.insertBinds?.[9]).toBe('2099-05-01T01:30:00.000Z');
   });
 
   it('stores omitted publication details as null and does not invent an external ID', async () => {

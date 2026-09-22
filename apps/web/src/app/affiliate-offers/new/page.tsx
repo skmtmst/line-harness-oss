@@ -54,7 +54,6 @@ export default function NewAffiliateOfferPage() {
   const [scenarioId, setScenarioId] = useState('')
   const [publishNow, setPublishNow] = useState(true)
   const [createdId, setCreatedId] = useState<string | null>(null)
-  const [partialSave, setPartialSave] = useState(false)
   const [tags, setTags] = useState<Tag[]>([])
   const [scenarios, setScenarios] = useState<Scenario[]>([])
   // 作成の再送で二重登録にしないための、この登録試行1回分の安定した操作
@@ -75,7 +74,6 @@ export default function NewAffiliateOfferPage() {
     if (draftAccountRef.current === selectedAccountId) return
     draftAccountRef.current = selectedAccountId
     setCreatedId(null)
-    setPartialSave(false)
     setOperationId(crypto.randomUUID())
     setTagId('')
     setScenarioId('')
@@ -109,8 +107,7 @@ export default function NewAffiliateOfferPage() {
       description="何を成果として数え、いくら払うかを決めます。"
       parent={['案件', OFFER_LIST_PATH]}
       successHref={(id) => `${OFFER_LIST_PATH}&highlight=${encodeURIComponent(String(id))}`}
-      saveLabel={partialSave ? '下書きへの変更を再開する' : publishNow ? '公開する' : '下書きに保存'}
-      statusLabel={partialSave ? '案件は公開済み・下書きへの変更は未完了' : undefined}
+      saveLabel={createdId ? '変更を保存する' : publishNow ? '公開する' : '下書きに保存'}
       variant="v6"
       designNode="GPWzq"
       validate={() => {
@@ -132,51 +129,54 @@ export default function NewAffiliateOfferPage() {
         setScenarioId('')
         setPublishNow(true)
         setCreatedId(null)
-        setPartialSave(false)
         setOperationId(crypto.randomUUID())
       }}
       onSave={async () => {
         if (!selectedAccountId) {
           throw new Error('LINEアカウントを選んでください（画面上部で選べます）')
         }
+        const fields = {
+          name: name.trim(),
+          description: description.trim() || null,
+          rewardAmount: rewardAmount ? Number(rewardAmount) : undefined,
+          rewardMiles: rewardMiles ? Number(rewardMiles) : undefined,
+          tagId: tagId || null,
+          scenarioId: scenarioId || null,
+        }
         let offerId = createdId
         if (!offerId) {
+          /*
+           * DRAFT-01: 下書きは最初の作成から isActive=false で入れる。
+           * 「公開で作ってから止める」にすると、止める呼び出しが途切れたとき
+           * 公開中の案件が残ってしまう。
+           */
           const res = await api.affiliateOffers.create({
-            name: name.trim(),
-            description: description.trim() || null,
-            rewardAmount: rewardAmount ? Number(rewardAmount) : undefined,
-            rewardMiles: rewardMiles ? Number(rewardMiles) : undefined,
+            ...fields,
             lineAccountId: selectedAccountId,
-            tagId: tagId || null,
-            scenarioId: scenarioId || null,
+            isActive: publishNow,
             operationId,
           })
           if (!res.success) throw new Error('案件を作成できませんでした。LINEアカウントを選び直してください')
           offerId = res.data.id
           setCreatedId(offerId)
-        }
-        // 作成は必ず公開中で入る（DB の INSERT が is_active=1 固定）。
-        // 下書きにしたいときだけ、続けて閉じる。名前・報酬・タグ・シナリオも
-        // 更新APIが受けるので、途中保存後にここを直して再開した分も
-        // まとめて送る（isActiveだけだと画面上の変更を失う、Issue #686）。
-        if (!publishNow) {
-          try {
-            const update = await api.affiliateOffers.update(offerId, {
-              name: name.trim(),
-              description: description.trim() || null,
-              rewardAmount: rewardAmount ? Number(rewardAmount) : undefined,
-              rewardMiles: rewardMiles ? Number(rewardMiles) : undefined,
-              tagId: tagId || null,
-              scenarioId: scenarioId || null,
-              isActive: false,
-            })
-            if (!update.success) throw new Error('update_failed')
-          } catch {
-            setPartialSave(true)
-            throw new Error('案件は作成済みですが、下書きにできませんでした。もう一度押すと下書きへの変更だけをやり直します。')
+          /*
+           * 操作UUIDの再送が先に作った行を回収しただけのとき、回収した行の
+           * 公開状態は最初の作成時のもの。画面で選んだ状態と違うなら、
+           * 明示した状態へ1回だけ直す。
+           */
+          if (res.data.isActive !== publishNow) {
+            const fix = await api.affiliateOffers.update(offerId, { isActive: publishNow })
+            if (!fix.success) {
+              throw new Error('案件の公開状態を変えられませんでした。一覧で状態を確認してください')
+            }
+          }
+        } else {
+          // 途中保存の続きは更新APIへ。公開/下書きの切り替えもこの明示操作で行う。
+          const update = await api.affiliateOffers.update(offerId, { ...fields, isActive: publishNow })
+          if (!update.success) {
+            throw new Error('案件の変更を保存できませんでした。もう一度押してください')
           }
         }
-        setPartialSave(false)
         return offerId
       }}
       aside={
@@ -229,20 +229,6 @@ export default function NewAffiliateOfferPage() {
       }
     >
       <FormSection step={1} label="どんな案件か">
-        {partialSave && createdId ? (
-          <div role="alert" className="border-warning bg-warning-bg rounded-control border px-3 py-2 text-sm">
-            <p className="text-ink font-semibold">案件は公開済みです</p>
-            <p className="text-ink-secondary mt-1">
-              下の「下書きへの変更を再開する」で続けるか、変更を破棄して公開のまま一覧へ戻れます。
-            </p>
-            <a
-              href={`${OFFER_LIST_PATH}&highlight=${encodeURIComponent(createdId)}`}
-              className="text-danger mt-2 inline-block font-semibold underline"
-            >
-              下書きへの変更を破棄し、公開のまま一覧へ戻る
-            </a>
-          </div>
-        ) : null}
         <div className="grid gap-3 lg:grid-cols-2">
         <Field label="案件名" htmlFor="of-name" required>
           <input

@@ -305,7 +305,9 @@ export default function NewMileageRulePage() {
       showHeader={false}
       designNode="BmoGY"
       variant="v6"
-      statusLabel="まだ動いていません。つくると、この瞬間から選んだ行動にマイルが付きはじめます。"
+      statusLabel={isActive
+        ? 'まだ動いていません。つくると、この瞬間から選んだ行動にマイルが付きはじめます。'
+        : '停止中で保存します。マイルはまだ付きません。動かすときは一覧から再開してください。'}
       validate={() => {
         if (!name.trim()) return 'ルール名を入力してください'
         if (!validAmount) return '付与マイルは1以上の整数で入力してください'
@@ -335,6 +337,13 @@ export default function NewMileageRulePage() {
           },
           validFrom: validFrom || null,
           validUntil: validUntil || null,
+          /*
+           * DRAFT-01: 停止中で作る指定は最初の作成APIへ渡す。
+           * 「稼働で作ってから止める」にすると、止める呼び出しが途切れたとき
+           * 動くルールが残る。fingerprint にも含め、状態を変えた再送は
+           * 別の登録として新しいキーを使う。
+           */
+          isActive,
         }
         const fingerprint = JSON.stringify(payload)
         if (createKeyRef.current?.fingerprint !== fingerprint) {
@@ -375,10 +384,6 @@ export default function NewMileageRulePage() {
             throw new Error(`${draftResponse.error}(作りかけの決めごとが残っているかもしれません。一覧で確認してください)`)
           }
           throw new Error(draftResponse.error)
-        }
-        // 作成は常に動く状態で入る。止めた状態で作りたいときだけ、続けて止める。
-        if (!isActive) {
-          await api.mileage.updateRule(res.data.id, { isActive: false })
         }
         return res.data.id
       }}

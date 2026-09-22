@@ -110,7 +110,7 @@ describe('V6 マイルの正本URLと概念分離', () => {
     // #532(#521): 旧口の作成は選択中のLINEアカウントに帰属させる。
     expect(NEW_RULE).toContain('lineAccountId: selectedAccountId!')
     expect(NEW_RULE).toContain("if (!selectedAccountId) return 'LINEアカウントを選択してください'")
-    expect(API).toContain('lineAccountId: string\n    }, options?: { idempotencyKey?: string }) =>')
+    expect(API).toContain('lineAccountId: string\n      /** DRAFT-01: falseなら最初から停止中で作る。省略は従来どおり稼働。 */\n      isActive?: boolean\n    }, options?: { idempotencyKey?: string }) =>')
     expect(NEW_RULE).toContain('expiresAfterDays: expiryDays')
     expect(NEW_RULE).toContain('cancellationEventTypes:')
     expect(NEW_RULE).toContain('notification: {')

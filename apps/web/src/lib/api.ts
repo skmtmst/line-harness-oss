@@ -10492,6 +10492,8 @@ export const api = {
       validUntil?: string | null
       /** #532(#521): 帰属するLINEアカウント。口で必須。 */
       lineAccountId: string
+      /** DRAFT-01: falseなら最初から停止中で作る。省略は従来どおり稼働。 */
+      isActive?: boolean
     }, options?: { idempotencyKey?: string }) =>
       fetchApi<ApiResponse<MileageRule>>('/api/mileage/rules', {
       method: 'POST',
@@ -11505,6 +11507,8 @@ export const api = {
       lineAccountId?: string | null
       tagId?: string | null
       scenarioId?: string | null
+      /** DRAFT-01: falseなら最初から非公開で作る。省略は従来どおり公開。 */
+      isActive?: boolean
       /** 安定した操作UUID（#686）。同じ値での再送は同じ登録を返す。 */
       operationId?: string
     }) =>
