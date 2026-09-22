@@ -162,6 +162,9 @@ function InflowLinksPageInner({
   onRouteCountChange?: (count: number | null) => void
 }) {
   const { selectedAccountId } = useAccount()
+  // PERF-03: 編集・作成窓の候補が属する機能（シナリオ/テンプレート/プール）の
+  // オン・オフ。切られている系統は候補の取得ごと呼ばない。
+  const visibility = useFeatureVisibility(selectedAccountId)
   const latestAccountRef = useRef(selectedAccountId)
   latestAccountRef.current = selectedAccountId
   const loadRequestRef = useRef(0)
@@ -234,7 +237,13 @@ function InflowLinksPageInner({
       // N-011: 経路一覧も選択accountで絞る。api.tsの共通呼び出し層は変えず、
       // この画面だけfetchApiで直接account_idを渡す。
       const routeQuery = accountAtRequest ? `?account_id=${encodeURIComponent(accountAtRequest)}` : ''
-      const [r, genreRes, p, s, t, tagRes, sum, tl] = await Promise.all([
+      /*
+        PERF-03: 行を作るのに必要な4系統だけを待つ。
+        編集・作成窓の候補（プール・シナリオ・テンプレート・タグ）は
+        一覧を使える状態にするために要らないので、下の別購読で取る。
+        補助系統の失敗が一覧を止めることも無くなる。
+      */
+      const [r, genreRes, sum, tl] = await Promise.all([
         fetchApi<{ success: boolean; data: EntryRoute[] }>(`/api/entry-routes${routeQuery}`),
         // Worker と Pages の反映順に短い時間差があっても、旧 Worker に対して
         // 画面全体をエラーにしない。ジャンル一覧だけ空として既存リンクを表示する。
@@ -242,15 +251,6 @@ function InflowLinksPageInner({
           success: false as const,
           data: [] as EntryRouteGenre[],
         })),
-        // プールは補助データ。multi_store_hierarchy がオフでも画面全体を
-        // 共通ゲートへ切り替えず、プール列だけ無しで既存リンクを表示する。
-        api.pools.list({ suppressFeatureDisabledEvent: true }).catch(() => ({
-          success: false as const,
-          data: [] as TrafficPool[],
-        })),
-        api.scenarios.list(),
-        api.messageTemplates.list(),
-        api.tags.list().catch(() => ({ success: false, data: [] as Tag[] })),
         fetchApi<{ success: boolean; data: RefSummaryData }>(
           `/api/analytics/ref-summary${summaryQuery}`,
         ).catch(() => ({ success: false, data: null })),
@@ -269,10 +269,6 @@ function InflowLinksPageInner({
         setLoadFailed(true)
       }
       if (genreRes.success) setGenres(genreRes.data)
-      if (p.success) setPools(p.data)
-      if (s.success) setScenarios(s.data)
-      if (t.success) setTemplates(t.data)
-      if (tagRes.success) setTags(tagRes.data)
       if ('success' in sum && sum.success && isRefSummaryData(sum.data)) {
         setSummary(sum.data)
         setSummaryAvailable(true)
@@ -289,29 +285,6 @@ function InflowLinksPageInner({
             isActive: row.isActive,
           })),
         )
-      }
-
-      // Load pool→accounts mapping in one request after the pool ids are known.
-      // This is a second round-trip, but it stays one request regardless of how
-      // many pools exist.
-      if (p.success) {
-        const batch = p.data.length > 0
-          ? await api.pools.listAccounts(
-              p.data.map((pool) => pool.id),
-              { suppressFeatureDisabledEvent: true },
-            )
-          : { success: true as const, data: [] }
-        if (!isCurrent()) return
-        if (batch.success) {
-          setPoolMembers(Object.fromEntries(batch.data.map(({ poolId, accounts }) => [
-            poolId,
-            new Set(accounts.filter((account) => account.isActive).map((account) => account.lineAccountId)),
-          ])))
-          setPoolMemberNames(Object.fromEntries(batch.data.map(({ poolId, accounts }) => [
-            poolId,
-            accounts.filter((account) => account.isActive).map((account) => account.accountName ?? '—'),
-          ])))
-        }
       }
     } catch {
       if (!isCurrent()) return
@@ -356,6 +329,75 @@ function InflowLinksPageInner({
       loadRequestRef.current += 1
     }
   }, [selectedAccountId])
+
+  /*
+   * PERF-03: 編集・作成窓の候補（プール・シナリオ・テンプレート・タグ）。
+   * 一覧の行を待たせない補助取得。機能を切っている系統は呼ばず、
+   * 補助の失敗は一覧を巻き込まない。
+   * 可視性の確認中は待つ。確認自体が失敗したときは従来どおり全部試す
+   * （各口は自身の失敗で落ちるだけ）。
+   */
+  useEffect(() => {
+    if (selectedAccountId && visibility.status === 'loading') return
+    const accountAtRequest = selectedAccountId
+    const generation = loadRequestRef.current
+    const featureAllowed = (key: FeatureKey) =>
+      visibility.features == null || visibility.features[key] === true
+    let cancelled = false
+    const isCurrent = () =>
+      !cancelled
+      && generation === loadRequestRef.current
+      && accountAtRequest === latestAccountRef.current
+    const loadAuxiliary = async () => {
+      const [p, s, t, tagRes] = await Promise.all([
+        // プールは補助データ。multi_store_hierarchy がオフでも画面全体を
+        // 共通ゲートへ切り替えず、プール列だけ無しで既存リンクを表示する。
+        featureAllowed('multi_store_hierarchy')
+          ? api.pools.list({ suppressFeatureDisabledEvent: true }).catch(() => ({
+              success: false as const,
+              data: [] as TrafficPool[],
+            }))
+          : Promise.resolve({ success: false as const, data: [] as TrafficPool[] }),
+        featureAllowed('scenarios')
+          ? api.scenarios.list().catch(() => ({ success: false as const, data: [] as Scenario[] }))
+          : Promise.resolve({ success: false as const, data: [] as Scenario[] }),
+        featureAllowed('templates')
+          ? api.messageTemplates.list().catch(() => ({ success: false as const, data: [] as MessageTemplate[] }))
+          : Promise.resolve({ success: false as const, data: [] as MessageTemplate[] }),
+        api.tags.list().catch(() => ({ success: false, data: [] as Tag[] })),
+      ])
+      if (!isCurrent()) return
+      if (p.success) setPools(p.data)
+      if (s.success) setScenarios(s.data)
+      if (t.success) setTemplates(t.data)
+      if (tagRes.success) setTags(tagRes.data)
+
+      // Load pool→accounts mapping in one request after the pool ids are known.
+      // This is a second round-trip, but it stays one request regardless of how
+      // many pools exist.
+      if (p.success) {
+        const batch = p.data.length > 0
+          ? await api.pools.listAccounts(
+              p.data.map((pool) => pool.id),
+              { suppressFeatureDisabledEvent: true },
+            )
+          : { success: true as const, data: [] }
+        if (!isCurrent()) return
+        if (batch.success) {
+          setPoolMembers(Object.fromEntries(batch.data.map(({ poolId, accounts }) => [
+            poolId,
+            new Set(accounts.filter((account) => account.isActive).map((account) => account.lineAccountId)),
+          ])))
+          setPoolMemberNames(Object.fromEntries(batch.data.map(({ poolId, accounts }) => [
+            poolId,
+            accounts.filter((account) => account.isActive).map((account) => account.accountName ?? '—'),
+          ])))
+        }
+      }
+    }
+    void loadAuxiliary()
+    return () => { cancelled = true }
+  }, [selectedAccountId, visibility.status, visibility.features])
 
   const onCopy = async (refCode: string, id: string) => {
     const url = referralUrl(refCode)

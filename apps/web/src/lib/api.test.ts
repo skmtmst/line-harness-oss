@@ -1481,6 +1481,54 @@ describe('fetchApi error response', () => {
     expect(init.credentials).toBe('include')
     expect((init.headers as Record<string, string>)['Content-Type']).toBe('application/json')
   })
+
+  /*
+   * PERF-10: GET/HEAD には Content-Type を付けない。
+   * `application/json` は CORS safelist 外なので、Cookie認証だけの環境で
+   * これを外すと GET が simple request になり OPTIONS preflight が消える。
+   * 呼び出し側が明示したヘッダは残る（後勝ちのスプレッド順）。
+   */
+  it('GET には Content-Type を付けない（preflight 回避）', async () => {
+    const spy = vi.fn(async () => new Response(null, { status: 204 }))
+    vi.stubGlobal('fetch', spy)
+
+    await fetchApi('/api/example')
+
+    const init = spy.mock.calls[0][1] as RequestInit
+    expect(init.credentials).toBe('include')
+    expect((init.headers as Record<string, string>)['Content-Type']).toBeUndefined()
+  })
+
+  it('HEAD にも Content-Type を付けない', async () => {
+    const spy = vi.fn(async () => new Response(null, { status: 204 }))
+    vi.stubGlobal('fetch', spy)
+
+    await fetchApi('/api/example', { method: 'HEAD' })
+
+    const init = spy.mock.calls[0][1] as RequestInit
+    expect((init.headers as Record<string, string>)['Content-Type']).toBeUndefined()
+  })
+
+  it('変更系は引き続き Content-Type: application/json を付ける', async () => {
+    const spy = vi.fn(async () => new Response(null, { status: 204 }))
+    vi.stubGlobal('fetch', spy)
+
+    for (const method of ['POST', 'PUT', 'PATCH', 'DELETE'] as const) {
+      await fetchApi('/api/example', { method })
+      const init = spy.mock.calls.at(-1)?.[1] as RequestInit
+      expect((init.headers as Record<string, string>)['Content-Type']).toBe('application/json')
+    }
+  })
+
+  it('GET で呼び出し側が Content-Type を明示した場合は尊重する', async () => {
+    const spy = vi.fn(async () => new Response(null, { status: 204 }))
+    vi.stubGlobal('fetch', spy)
+
+    await fetchApi('/api/example', { headers: { 'Content-Type': 'text/csv' } })
+
+    const init = spy.mock.calls[0][1] as RequestInit
+    expect((init.headers as Record<string, string>)['Content-Type']).toBe('text/csv')
+  })
 })
 
 describe('api.friendFields.bulk のアカウント境界契約 (#624)', () => {

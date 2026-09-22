@@ -2349,12 +2349,22 @@ export async function fetchApi<T>(path: string, options?: FetchApiOptions): Prom
     const token = getCsrfToken()
     if (token) csrfHeaders['X-CSRF-Token'] = token
   }
+  /*
+   * PERF-10: 本文を持たない GET/HEAD には Content-Type を付けない。
+   * `application/json` は CORS の safelist 外なので、付いているだけで
+   * 全 GET が preflight（OPTIONS往復）の対象になっていた。Cookie だけで
+   * 認証できる環境では、このヘッダを外すと GET が「simple request」になり
+   * preflight が消える。Bearer のフォールバック（Authorization）や
+   * CSRF ヘッダを伴う変更系は、もともと preflight が必要なので従来どおり
+   * 付ける（削っても往復は減らない）。
+   */
+  const isBodylessMethod = method === 'GET' || method === 'HEAD'
   const res = await fetch(`${API_URL}${path}`, {
     ...options,
     // Send the HttpOnly session cookie with every request.
     credentials: 'include',
     headers: {
-      'Content-Type': 'application/json',
+      ...(isBodylessMethod ? {} : { 'Content-Type': 'application/json' }),
       ...adminSessionHeaders(),
       ...csrfHeaders,
       ...options?.headers,
@@ -2558,6 +2568,8 @@ export type FriendFormSubmission = {
 }
 export type FriendDetail = FriendWithTags & {
   formSubmissions: FriendFormSubmission[]
+  /** フォーム回答の総数。submissions=0 の軽い応答でも返る（PERF-13）。 */
+  formSubmissionTotal?: number | null
   /** 対応の状況。やり取りがまだ無い友だちでは null。 */
   support: {
     status: 'unread' | 'in_progress' | 'on_hold' | 'resolved'
@@ -5398,8 +5410,26 @@ export const api = {
         '/api/friends?' + new URLSearchParams(query)
       )
     },
-    get: (id: string) =>
-      fetchApi<ApiResponse<FriendDetail>>(`/api/friends/${id}`),
+    get: (id: string, options?: { includeSubmissions?: boolean }) => {
+      const query = options?.includeSubmissions === false ? '?submissions=0' : ''
+      return fetchApi<ApiResponse<FriendDetail>>(`/api/friends/${id}${query}`)
+    },
+    /*
+     * PERF-13: フォーム回答履歴のカーソル式取得。
+     * 詳細の初期応答には本文を同梱せず、回答タブを開いたときに
+     * こちらで取る。nextCursor で10件より古い回答へ遡れる。
+     */
+    formSubmissions: (id: string, params?: { cursor?: string | null; limit?: number }) => {
+      const query = new URLSearchParams()
+      if (params?.cursor) query.set('cursor', params.cursor)
+      if (params?.limit) query.set('limit', String(params.limit))
+      const suffix = query.size ? `?${query.toString()}` : ''
+      return fetchApi<ApiResponse<{
+        items: FriendFormSubmission[]
+        total: number | null
+        nextCursor: string | null
+      }>>(`/api/friends/${encodeURIComponent(id)}/form-submissions${suffix}`)
+    },
     /**
      * 受信箱の顧客情報に出す「次の予定」（IDEA-02）。
      * 値が null = 予定なし、*_Error=true = 取得失敗（未取得）を区別する。
@@ -7466,6 +7496,13 @@ export const api = {
       if (params?.kind) query.set('kind', params.kind)
       const suffix = query.size ? `?${query.toString()}` : ''
       return fetchApi<ApiResponse<BroadcastMessageAsset[]>>(`/api/broadcast-message-assets${suffix}`)
+    },
+    /** PERF-04: 件数だけを種類ごとに返す口。初期表示の件数タブ用で、各行の payload は含まない。 */
+    counts: (params?: { accountId?: string }) => {
+      const query = new URLSearchParams()
+      if (params?.accountId) query.set('lineAccountId', params.accountId)
+      const suffix = query.size ? `?${query.toString()}` : ''
+      return fetchApi<ApiResponse<Record<BroadcastAssetKind, number>>>(`/api/broadcast-message-assets/counts${suffix}`)
     },
     create: (data: { lineAccountId?: string | null; kind: BroadcastAssetKind; name: string; payload: Record<string, unknown> }) =>
       fetchApi<ApiResponse<BroadcastMessageAsset>>('/api/broadcast-message-assets', { method: 'POST', body: JSON.stringify(data) }),

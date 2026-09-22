@@ -1070,6 +1070,21 @@ const spec = {
         responses: { '200': { description: 'Friend with tags' }, '404': { description: 'Not found' } },
       },
     },
+    '/api/friends/{id}/form-submissions': {
+      get: {
+        tags: ['Friends'],
+        summary: '友だちのフォーム回答履歴をカーソル式で取得（回答フォームタブ用・PERF-13）',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'limit', in: 'query', schema: { type: 'integer', default: 10, maximum: 50 } },
+          { name: 'cursor', in: 'query', schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': { description: 'Form submissions page with total count and nextCursor' },
+          '404': { description: 'Friend not found in account scope' },
+        },
+      },
+    },
     '/api/friends/{id}/upcoming': {
       get: {
         tags: ['Friends'],
@@ -2292,6 +2307,19 @@ const spec = {
       },
     },
     // ── Broadcasts ───────────────────────────────────────────────────────────
+    '/api/broadcast-message-assets/counts': {
+      get: {
+        tags: ['Broadcasts'],
+        summary: '配信素材の種類別件数を取得（タブ件数用・PERF-04）',
+        parameters: [
+          { name: 'lineAccountId', in: 'query', schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': { description: 'Counts keyed by asset kind' },
+          '403': { description: 'LINEアカウントの表示権限なし' },
+        },
+      },
+    },
     '/api/broadcasts': {
       get: { tags: ['Broadcasts'], summary: '配信一覧取得', responses: { '200': { description: 'All broadcasts' } } },
       post: {
