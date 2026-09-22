@@ -152,19 +152,34 @@ export default function OpsSupportPage() {
     void loadDetail(selectedId)
   }, [selectedId, loadDetail])
 
-  // Poll metadata only: never replace an operator's unsent reply while a job finishes.
+  const knowledgePending = detail?.knowledge?.job?.source_current === 1 &&
+    ['queued', 'running'].includes(detail.knowledge.job.status)
+  const knowledgeRequestId = detail?.ticket.id
+  const knowledgeJobId = detail?.knowledge?.job?.id
+  const canProcessKnowledge = detail?.knowledge?.canProcess === true
+  // Dedicated, awaited HTTP execution works with staging Cron disabled. Only
+  // metadata changes: never replace an operator's unsent reply while AI runs.
   useEffect(() => {
-    const job = detail?.knowledge?.job
-    if (!detail || !job || !['queued', 'running'].includes(job.status)) return
+    if (!knowledgeRequestId || !knowledgePending) return
     let active = true
-    const id = detail.ticket.id
-    const timer = setInterval(() => {
-      void opsCall(api.ops.support.ticket(id)).then(res => {
-        if (active && res.success) setDetail(current => current?.ticket.id === id ? { ...current, knowledge: res.data.knowledge } : current)
-      })
-    }, 15_000)
-    return () => { active = false; clearInterval(timer) }
-  }, [detail?.ticket.id, detail?.knowledge?.job?.status])
+    const id = knowledgeRequestId
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const tick = async () => {
+      const res = canProcessKnowledge
+        ? await opsCall(api.ops.knowledge.process(id))
+        : await opsCall(api.ops.support.ticket(id).then(res => res.success ? { ...res, data: res.data.knowledge } : res))
+      if (!active) return
+      if (!res.success) { setError(res.error || 'ナレッジの確認を再開できませんでした'); return }
+      const knowledge = res.data
+      setDetail(current => current?.ticket.id === id ? { ...current, knowledge } : current)
+      if (knowledge?.job?.source_current === 1 && ['queued', 'running'].includes(knowledge.job.status)) {
+        timer = setTimeout(() => { void tick() }, 15_000)
+      }
+    }
+    if (canProcessKnowledge) void tick()
+    else timer = setTimeout(() => { void tick() }, 15_000)
+    return () => { active = false; clearTimeout(timer) }
+  }, [knowledgeRequestId, knowledgeJobId, canProcessKnowledge, knowledgePending])
 
   useEffect(() => {
     if (!creating || tenants.length > 0) return

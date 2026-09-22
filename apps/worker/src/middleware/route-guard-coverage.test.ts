@@ -403,6 +403,7 @@ const STAFF_FAIL_CLOSED_SNAPSHOT: string[] = [
     'POST /api/ops/impersonation/write',
     'POST /api/ops/knowledge/:id/feedback',
     'POST /api/ops/knowledge/:id/review',
+    'POST /api/ops/knowledge/tickets/:id/process',
     'POST /api/ops/knowledge/tickets/:id/retry',
     'POST /api/ops/members',
     'POST /api/ops/members/:staffId/resend-invite',

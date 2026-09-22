@@ -15,11 +15,11 @@ let run: ReturnType<typeof vi.fn>;
 const action = '管理画面で配信対象の設定を変更しました。';
 const result = '再送したところ正常に配信できました。';
 function environment() { return { DB: store.db, AI: { run } } as unknown as Env['Bindings']; }
-function request(path: string, body?: unknown, actor = 'master', readOnly = false, method = 'POST') {
+function request(path: string, body?: unknown, actor = 'master', readOnly = false, method = 'POST', env = environment()) {
   const app = new Hono<Env>();
   app.use('*', async (c, next) => { c.set('staff', { id: actor, name: '架空担当者', role: 'owner', readOnly, tenantId: 'tenant' }); await next(); });
   app.route('/', opsKnowledge);
-  return app.request(path, body === undefined ? undefined : { method, headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }, environment());
+  return app.request(path, body === undefined ? undefined : { method, headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }, env);
 }
 beforeEach(async () => {
   store = createTestD1({ foreignKeys: true });
@@ -108,5 +108,82 @@ describe('運営専用ナレッジ（実SQLite・AIはモック）', () => {
     expect(run).toHaveBeenCalledTimes(1);
     expect(store.raw.prepare('SELECT count(*) AS n FROM platform_ai_calls').get()).toEqual({ n: 1 });
     expect(store.raw.prepare('SELECT count(*) AS n FROM platform_knowledge_articles').get()).toEqual({ n: 1 });
+  });
+
+  it('CronなしのHTTP実行でも対象だけを下書きにし、別の予約には触らない', async () => {
+    const other = await createHqSupportRequest(store.db, { tenantId: 'tenant', staffId: 'tenant-owner', staffName: '架空担当者', staffEmail: null, kind: 'usage', subject: '別件', body: '別の問い合わせです', lineAccountId: null, attachmentKeys: [] });
+    await updateSupportTicket(store.db, other.id, { stage: 'resolved' });
+    // The unrelated job is deliberately older than the requested job.
+    store.raw.prepare("UPDATE platform_knowledge_jobs SET created_at = '2020-01-01' WHERE request_id = ?").run(other.id);
+    const res = await request(`/api/ops/knowledge/tickets/${requestId}/process`, {});
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ success: true, data: { canProcess: true, job: { status: 'done' }, article: { reviewState: 'pending' } } });
+    expect((await knowledgeForTicket(store.db, other.id)).job?.status).toBe('queued');
+    expect(await searchKnowledge(store.db, 'usage', '配信', [])).toEqual([]);
+    expect(run).toHaveBeenCalledTimes(1);
+  });
+
+  it('実行口は運営書込権限必須で、存在しない問い合わせも処理しない', async () => {
+    const url = `/api/ops/knowledge/tickets/${requestId}/process`;
+    expect((await request(url, {}, 'tenant-owner')).status).toBe(403);
+    expect((await request(url, {}, 'master', true)).status).toBe(403);
+    expect((await request('/api/ops/knowledge/tickets/missing/process', {})).status).toBe(404);
+    expect(run).not.toHaveBeenCalled();
+  });
+
+  it('同時に実行要求が来てもリース中はAIを重複実行しない', async () => {
+    const response = await run(); run.mockClear();
+    let finish!: (value: unknown) => void;
+    run.mockImplementation(() => new Promise(resolve => { finish = resolve; }));
+    const url = `/api/ops/knowledge/tickets/${requestId}/process`;
+    const first = request(url, {});
+    await vi.waitFor(() => expect(run).toHaveBeenCalledTimes(1));
+    expect(await (await request(url, {})).json()).toMatchObject({ data: { job: { status: 'running' } } });
+    finish(response);
+    expect((await first).status).toBe(200);
+    await request(url, {});
+    expect(run).toHaveBeenCalledTimes(1);
+  });
+
+  it('切断後の期限切れリースを再開し、3回目の中断は再試行ボタンを出せる状態にする', async () => {
+    store.raw.prepare("UPDATE platform_knowledge_jobs SET status='running', attempts=1, lease_token='interrupted', lease_until='2020-01-01'").run();
+    const url = `/api/ops/knowledge/tickets/${requestId}/process`;
+    expect((await request(url, {})).status).toBe(200);
+    expect((await knowledgeForTicket(store.db, requestId)).job).toMatchObject({ status: 'done', attempts: 2 });
+    store.raw.prepare("UPDATE platform_knowledge_jobs SET status='running', attempts=3, lease_token='interrupted', lease_until='2020-01-01'").run();
+    expect((await knowledgeForTicket(store.db, requestId)).job?.status).toBe('failed');
+    expect((await request(`/api/ops/knowledge/tickets/${requestId}/retry`, {})).status).toBe(202);
+  });
+
+  it('AI失敗は最大3回で止まり、解決状態と人の承認条件を変えない', async () => {
+    run.mockRejectedValue(new Error('private provider detail'));
+    const url = `/api/ops/knowledge/tickets/${requestId}/process`;
+    for (let i = 0; i < 4; i++) expect((await request(url, {})).status).toBe(200);
+    expect(run).toHaveBeenCalledTimes(3);
+    expect((await knowledgeForTicket(store.db, requestId)).job?.status).toBe('failed');
+    expect((await knowledgeForTicket(store.db, requestId)).article).toBeNull();
+  });
+
+  it('AI未設定は503で返し、生成予約の試行回数を消費しない', async () => {
+    const env = environment(); delete env.AI;
+    expect((await request(`/api/ops/knowledge/tickets/${requestId}/process`, {}, 'master', false, 'POST', env)).status).toBe(503);
+    expect((await knowledgeForTicket(store.db, requestId)).job).toMatchObject({ status: 'queued', attempts: 0 });
+    expect(run).not.toHaveBeenCalled();
+  });
+
+  it('HTTP実行の時間切れも予約を残し、遅れて返るAI結果を記事にしない', async () => {
+    vi.useFakeTimers();
+    try {
+      let finish!: (value: unknown) => void;
+      run.mockImplementation(() => new Promise(resolve => { finish = resolve; }));
+      const pending = request(`/api/ops/knowledge/tickets/${requestId}/process`, {});
+      await vi.waitFor(() => expect(run).toHaveBeenCalledTimes(1));
+      await vi.advanceTimersByTimeAsync(45_000);
+      expect((await pending).status).toBe(200);
+      expect((await knowledgeForTicket(store.db, requestId)).job?.status).toBe('queued');
+      finish({ response: '{}' });
+      await Promise.resolve();
+      expect((await knowledgeForTicket(store.db, requestId)).article).toBeNull();
+    } finally { vi.useRealTimers(); }
   });
 });

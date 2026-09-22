@@ -202,7 +202,8 @@ opsSupport.get('/api/ops/support/tickets/:id', async (c) => {
       messages: messages.map((m) => serializeMessage(m, base)),
       draft: draft ? { body: draft.body, aiGenerated: draft.ai_generated === 1, generatedAt: draft.generated_at, updatedAt: draft.updated_at, references: await currentReferences(db, draft.knowledge_references) } : null,
       ai: { available: Boolean(c.env.AI) },
-      knowledge: { article: knowledge.article ? serializeKnowledge(knowledge.article) : null, job: knowledge.job },
+      knowledge: { article: knowledge.article ? serializeKnowledge(knowledge.article) : null, job: knowledge.job,
+        canProcess: Boolean(c.env.AI) && !c.get('staff').readOnly },
     },
   });
 });
