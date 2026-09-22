@@ -101,6 +101,28 @@ type Page = {
   areas: Area[]
 }
 
+/**
+ * STEP3「公開のしかた」の入力値。
+ *
+ * datetime-local の生の文字列のまま持つ（送信時に JST→UTC へ直す）。
+ * 下書き本体ではなく「予約・公開に使う入力」なので、下書き署名とは別の
+ * 基準（publishBaseline）と比べて未保存かを決める。
+ */
+type PublishPlanInput = {
+  mode: 'now' | 'scheduled' | 'period'
+  startsAt: string
+  endsAt: string
+  restoreGroupId: string
+}
+
+/** 公開入力の初期値。「いますぐ出す」・日時なし・戻し先なし。 */
+const DEFAULT_PUBLISH_PLAN: PublishPlanInput = {
+  mode: 'now',
+  startsAt: '',
+  endsAt: '',
+  restoreGroupId: '',
+}
+
 type Group = {
   id: string
   accountId: string
@@ -279,6 +301,15 @@ function Editor({
   const [folderId, setFolderId] = useState('')
   const [folders, setFolders] = useState<PickerOption[]>([])
 
+  /*
+   * 公開のしかた（STEP3）の入力。工程の行き来（STEP1/2/3）で工程の部品が
+   * 付け替わっても消えないよう、工程をまたぐここで持つ。予約の保存が
+   * 成功した時点の入力を publishBaseline に写し、そこから変えた間だけ
+   * 未保存として扱う。「保存せずに移動」を選んだときだけ初期値へ戻す。
+   */
+  const [publishPlan, setPublishPlan] = useState<PublishPlanInput>(DEFAULT_PUBLISH_PLAN)
+  const [publishBaseline, setPublishBaseline] = useState<PublishPlanInput>(DEFAULT_PUBLISH_PLAN)
+
   // ボタンの設定で選ぶもの（タグ・テンプレート・回答フォーム・計測リンク）。
   // メニュー本体とは別に、開いたとき1回だけ読む。
   const [tags, setTags] = useState<PickerOption[]>([])
@@ -332,6 +363,22 @@ function Editor({
     onSaved: (message) => {
       setError(null)
       setNotice(message)
+      /*
+       * 予約の保存は下書き保存も済ませてから行う。保存できた時点の内容を
+       * 「保存済み」の基準にし、公開入力も予約した内容を基準にする。
+       * ここで基準を動かさないと、全部保存済みなのに離脱確認が出る。
+       */
+      setBaselineSignature(draftSignatureOf({
+        name,
+        chatBarText,
+        isDefaultForAll,
+        targetingEnabled,
+        targetingPriority,
+        targetingCondition,
+        folderId,
+        pages,
+      }))
+      setPublishBaseline(publishPlan)
     },
     onFailed: (message) => {
       setNotice('')
@@ -374,7 +421,12 @@ function Editor({
    * busy 中は確認窓を足さない（保存の返事を待っている最中に重ねない）。
    * 画像はアップロード時点で保存済み・プレビュー表示は dirty に含めない。
    */
-  const dirty = baselineSignature !== null && draftSignatureOf({
+  /*
+   * 下書きの署名に加えて、STEP3 の公開入力も未保存の対象にする。
+   * 公開入力は下書きとは別の基準（予約が保存できた時点の入力）と比べる。
+   */
+  const publishDirty = JSON.stringify(publishPlan) !== JSON.stringify(publishBaseline)
+  const dirty = baselineSignature !== null && (publishDirty || draftSignatureOf({
     name,
     chatBarText,
     isDefaultForAll,
@@ -383,11 +435,21 @@ function Editor({
     targetingCondition,
     folderId,
     pages,
-  }) !== baselineSignature
+  }) !== baselineSignature)
   const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({
     dirty,
     busy: saving || publishing || unpublishing || deleting || busy,
   })
+  /*
+   * 「保存せずに移動」を選んだときだけ、公開入力を初期値へ戻す。
+   * 取消・Escape（cancelLeave）では触らず、入力はそのまま残る。
+   * 実際の遷移では画面ごと外れるが、確認の選択として明示しておく。
+   */
+  const confirmLeaveAndDiscard = () => {
+    setPublishPlan(DEFAULT_PUBLISH_PLAN)
+    setPublishBaseline(DEFAULT_PUBLISH_PLAN)
+    confirmLeave()
+  }
   /*
    * N-162: 離脱確認の窓は step 1/2/3 のどこにいても出す。
    * targeting/publish は早期 return で別ツリーになるため、ここで要素化して
@@ -401,7 +463,7 @@ function Editor({
       description="このまま移動すると、メニューへの変更は失われます。保存せずに移動しますか？"
       confirmLabel="保存せずに移動"
       cancelLabel="編集を続ける"
-      onConfirm={confirmLeave}
+      onConfirm={confirmLeaveAndDiscard}
       onCancel={cancelLeave}
     ></ConfirmDialog>
   )
@@ -910,6 +972,7 @@ function Editor({
         targetingEnabled={targetingEnabled}
         targetingPriority={targetingPriority}
         targetingCondition={targetingCondition}
+        savedCondition={parseStoredCondition(group.targetingCondition)}
         tags={tags}
         preview={targetPreview}
         previewLoading={targetPreviewLoading}
@@ -936,6 +999,8 @@ function Editor({
         preview={targetPreview}
         saving={saving}
         publishing={publishing}
+        publish={publishPlan}
+        onPublishChange={(patch) => setPublishPlan((prev) => ({ ...prev, ...patch }))}
         onSave={() => void handleSave()}
         onPublishNow={() => void handlePublish()}
         onSchedule={scheduleSubmit}
@@ -1633,6 +1698,7 @@ function TargetingStep({
   targetingEnabled,
   targetingPriority,
   targetingCondition,
+  savedCondition,
   tags,
   preview,
   previewLoading,
@@ -1649,6 +1715,8 @@ function TargetingStep({
   targetingEnabled: boolean
   targetingPriority: number
   targetingCondition: SegmentCondition | null
+  /** 保存済みの条件。編集中の条件が保存済みかどうかの言い分けに使う。 */
+  savedCondition: SegmentCondition | null
   tags: PickerOption[]
   preview: RichMenuTargetPreview | null
   previewLoading: boolean
@@ -1669,6 +1737,26 @@ function TargetingStep({
   const selectedTagName = firstRule?.type.startsWith('tag_')
     ? tags.find((tag) => tag.id === firstRule.value)?.name
     : null
+  /*
+   * DEEP-27: 編集中の条件が未保存なのに「保存済み」と出ると、保存した
+   * つもりで画面を離れてしまう。保存済みの条件と同じかどうかで言い分ける。
+   */
+  const conditionUnsaved =
+    JSON.stringify(targetingCondition ?? null) !== JSON.stringify(savedCondition ?? null)
+  const conditionSummary = selectedTagName
+    ? `タグ「${selectedTagName}」を含む`
+    : targetingCondition
+      ? `${conditionUnsaved ? '条件' : '保存済み条件'} ${targetingCondition.rules.length}件`
+      : conditionUnsaved
+        ? '保存済みの条件を外しています'
+        : '条件がまだありません'
+  /*
+   * RICHMENU-03: 条件をONにしたのに条件が空だと、保存できず誰にも出ない
+   * （STEP1 の注意と同じ）。人数APIは空条件を全員として数えるため、
+   * 数字が「誰にも出ない」案内と食い違って見える。対象の説明だけを
+   * STEP1 と揃え、数え方そのものは変えない。
+   */
+  const conditionEmpty = targetingEnabled && !targetingCondition
   return (
     <main data-design-node="kQ1bs" className="mx-auto max-w-7xl p-6 pb-24">
       <nav className="text-ink-faint mb-2 text-xs"><Link href="/rich-menus">リッチメニュー</Link><span className="mx-1.5">/</span>{group.name}</nav>
@@ -1690,20 +1778,22 @@ function TargetingStep({
 
           {targetingEnabled ? (
             <div className="border-hairline mt-5 rounded-card border p-4">
-              <div className="flex items-center justify-between gap-3"><div><p className="text-ink text-sm font-bold">条件</p><p className="text-ink-secondary mt-1 text-xs">{selectedTagName ? `タグ「${selectedTagName}」を含む` : targetingCondition ? `保存済み条件 ${targetingCondition.rules.length}件` : '条件がまだありません'}</p></div>{readOnly ? null : <Button type="button" onClick={() => setConditionEditorOpen((open) => !open)}>{conditionEditorOpen ? '編集を閉じる' : '条件を編集'}</Button>}</div>
+              <div className="flex items-center justify-between gap-3"><div><p className="text-ink text-sm font-bold">条件</p><p className="text-ink-secondary mt-1 text-xs">{conditionSummary}{conditionUnsaved ? '（未保存）' : ''}</p></div>{readOnly ? null : <Button type="button" onClick={() => setConditionEditorOpen((open) => !open)}>{conditionEditorOpen ? '編集を閉じる' : '条件を編集'}</Button>}</div>
               {conditionEditorOpen && !readOnly ? <div className="mt-4"><ConditionBuilder value={targetingCondition} onChange={onTargetingCondition} label="条件" /></div> : null}
             </div>
           ) : null}
 
           <div className="border-hairline mt-5 grid gap-4 border-t pt-5 sm:grid-cols-3">
-            <div><p className="text-ink-faint text-xs">いま当てはまる人</p><p className="text-ink mt-1 text-2xl font-bold">{previewLoading ? '確認中…' : <MetricValue metric={preview?.matched} />}</p></div>
+            <div><p className="text-ink-faint text-xs">いま当てはまる人</p><p className="text-ink mt-1 text-2xl font-bold">{conditionEmpty ? '0人' : previewLoading ? '確認中…' : <MetricValue metric={preview?.matched} />}</p></div>
             <div>
               <label className="text-ink-faint text-xs" htmlFor="targeting-priority">出す順番</label>
               <div className="mt-1 flex items-center gap-2"><input id="targeting-priority" aria-label="出す順番" type="number" min={1} value={targetingPriority + 1} disabled={readOnly} onChange={(event) => onTargetingPriority(Math.max(0, Number(event.target.value) - 1))} className="border-hairline rounded-control w-20 border px-3 py-2 text-lg font-bold" /><span className="text-ink-secondary text-sm">番目</span></div>
             </div>
-            <div><p className="text-ink-faint text-xs">実際にこのメニューが出る人</p><p className="text-accent mt-1 text-2xl font-bold"><MetricValue metric={preview?.effective} /></p></div>
+            <div><p className="text-ink-faint text-xs">実際にこのメニューが出る人</p><p className="text-accent mt-1 text-2xl font-bold">{conditionEmpty ? '0人' : <MetricValue metric={preview?.effective} />}</p></div>
           </div>
-          {preview?.overlap.value ? <p className="bg-warning-bg text-warning mt-4 rounded-control px-3 py-2 text-xs">このうち {preview.overlap.value.toLocaleString('ja-JP')}人 は上の「{preview.higherMenus[0] ?? '優先メニュー'}」にも当てはまるため、そちらが出ます。</p> : null}
+          {conditionEmpty ? (
+            <p className="bg-warning-bg text-warning mt-4 rounded-control px-3 py-2 text-xs">条件が空です。このままだと誰にも出しません。条件を1つ以上足してください。</p>
+          ) : preview?.overlap.value ? <p className="bg-warning-bg text-warning mt-4 rounded-control px-3 py-2 text-xs">このうち {preview.overlap.value.toLocaleString('ja-JP')}人 は上の「{preview.higherMenus[0] ?? '優先メニュー'}」にも当てはまるため、そちらが出ます。</p> : null}
           {previewError ? <p className="text-danger mt-3 text-xs" role="alert">{previewError}</p> : null}
           <Button type="button" onClick={onRefresh} className="mt-3">人数をもう一度確認</Button>
         </section>
@@ -1732,6 +1822,8 @@ function PublishStep({
   preview,
   saving,
   publishing,
+  publish,
+  onPublishChange,
   onSave,
   onPublishNow,
   onSchedule,
@@ -1743,6 +1835,13 @@ function PublishStep({
   preview: RichMenuTargetPreview | null
   saving: boolean
   publishing: boolean
+  /*
+   * 公開方法・日時・戻し先は親（編集画面全体の状態）で持つ。
+   * ここで useState すると、工程の行き来で部品が外れるたびに入力が
+   * 消え、「いますぐ出す」へ黙って戻る（RICHMENU-06）。
+   */
+  publish: PublishPlanInput
+  onPublishChange: (patch: Partial<PublishPlanInput>) => void
   onSave: () => void
   onPublishNow: () => void
   onSchedule: (input: RichMenuScheduleInput) => Promise<void>
@@ -1753,10 +1852,7 @@ function PublishStep({
 }) {
   // N-162: ステップ移動は画面内の段階移動なので a[href] ではなく router.push で行う。
   const router = useRouter()
-  const [mode, setMode] = useState<'now' | 'scheduled' | 'period'>('now')
-  const [startsAt, setStartsAt] = useState('')
-  const [endsAt, setEndsAt] = useState('')
-  const [restoreGroupId, setRestoreGroupId] = useState('')
+  const { mode, startsAt, endsAt, restoreGroupId } = publish
   const [restoreMenus, setRestoreMenus] = useState<Array<{ id: string; name: string }>>([])
 
   useEffect(() => {
@@ -1858,16 +1954,16 @@ function PublishStep({
               ['period', '期間を決める', '終わったら自動で元に戻します。キャンペーンはこれが安全です'],
             ].map(([value, label, note]) => (
               <label key={value} className={`rounded-card flex cursor-pointer gap-3 border p-4 ${mode === value ? 'border-accent bg-accent/5' : 'border-hairline'}`}>
-                <input type="radio" name="publish-mode" checked={mode === value} onChange={() => setMode(value as typeof mode)} />
+                <input type="radio" name="publish-mode" checked={mode === value} onChange={() => onPublishChange({ mode: value as PublishPlanInput['mode'] })} />
                 <span><strong className="text-ink block text-sm">{label}</strong><span className="text-ink-faint mt-1 block text-xs">{note}</span></span>
               </label>
             ))}
           </div>
           {mode !== 'now' ? (
             <div className="border-hairline mt-5 grid gap-4 border-t pt-5 sm:grid-cols-2">
-              <label className="text-ink-secondary text-xs font-semibold">出しはじめ<input aria-label="出しはじめ" type="datetime-local" value={startsAt} onChange={(event) => setStartsAt(event.target.value)} className="border-hairline rounded-control text-ink mt-1 block w-full border px-3 py-2 text-sm" /></label>
-              {mode === 'period' ? <label className="text-ink-secondary text-xs font-semibold">出しおわり<input aria-label="出しおわり" type="datetime-local" value={endsAt} onChange={(event) => setEndsAt(event.target.value)} className="border-hairline rounded-control text-ink mt-1 block w-full border px-3 py-2 text-sm" /></label> : null}
-              {mode === 'period' ? <label className="text-ink-secondary text-xs font-semibold sm:col-span-2">終わったらどうする<SelectField aria-label="終わったらどうする" value={restoreGroupId} onChange={(event) => setRestoreGroupId(event.target.value)} options={[{ value: '', label: '前のメニューに戻す（実行開始時に確定）' }, ...restoreMenus.map((item) => ({ value: item.id, label: item.name }))]} className="mt-1" /><span className="text-ink-faint mt-1 block text-xs">{restoreGroupId ? '終了時に選んだメニューへ戻します。' : '「前のメニューに戻す」は実行開始の直前、そのときに表示中のメニューに確定します。表示中のメニューが無い場合は終了時に表示を外します。'}</span></label> : null}
+              <label className="text-ink-secondary text-xs font-semibold">出しはじめ<input aria-label="出しはじめ" type="datetime-local" value={startsAt} onChange={(event) => onPublishChange({ startsAt: event.target.value })} className="border-hairline rounded-control text-ink mt-1 block w-full border px-3 py-2 text-sm" /></label>
+              {mode === 'period' ? <label className="text-ink-secondary text-xs font-semibold">出しおわり<input aria-label="出しおわり" type="datetime-local" value={endsAt} onChange={(event) => onPublishChange({ endsAt: event.target.value })} className="border-hairline rounded-control text-ink mt-1 block w-full border px-3 py-2 text-sm" /></label> : null}
+              {mode === 'period' ? <label className="text-ink-secondary text-xs font-semibold sm:col-span-2">終わったらどうする<SelectField aria-label="終わったらどうする" value={restoreGroupId} onChange={(event) => onPublishChange({ restoreGroupId: event.target.value })} options={[{ value: '', label: '前のメニューに戻す（実行開始時に確定）' }, ...restoreMenus.map((item) => ({ value: item.id, label: item.name }))]} className="mt-1" /><span className="text-ink-faint mt-1 block text-xs">{restoreGroupId ? '終了時に選んだメニューへ戻します。' : '「前のメニューに戻す」は実行開始の直前、そのときに表示中のメニューに確定します。表示中のメニューが無い場合は終了時に表示を外します。'}</span></label> : null}
             </div>
           ) : null}
 
