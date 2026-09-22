@@ -52,14 +52,20 @@ export default function TemplatePicker({
   chatId?: string | null
 }) {
   const { selectedAccountId } = useAccount()
-  const [templates, setTemplates] = useState<Template[]>([])
+  // PERF-12: templates は「届いた区画」だけ。全件を持たず、絞り込みは
+  // サーバーに任せる。total は絞り込み後の総数。
+  const [templates, setTemplates] = useState<UsageAwareTemplate[]>([])
+  const [total, setTotal] = useState(0)
+  const [folderCounts, setFolderCounts] = useState<Record<string, number> | null>(null)
   const [folders, setFolders] = useState<Folder[]>([])
   const [search, setSearch] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
   const [folderId, setFolderId] = useState('')
   const [selectedId, setSelectedId] = useState('')
   const [category, setCategory] = useState<'all' | 'frequent' | 'reservation' | 'ec'>('all')
   const [templatesStatus, setTemplatesStatus] = useState<TemplateLoadStatus>('idle')
   const [foldersStatus, setFoldersStatus] = useState<TemplateFolderStatus>('loading')
+  const [loadingMore, setLoadingMore] = useState(false)
   const [loadedAccountId, setLoadedAccountId] = useState<string | null>(selectedAccountId)
   const [resolvedPreview, setResolvedPreview] = useState<{
     forId: string
@@ -67,12 +73,17 @@ export default function TemplatePicker({
     unresolved: string[]
   } | null>(null)
   const accountDataCurrent = loadedAccountId === selectedAccountId
-  const emptyTemplates = useMemo<Template[]>(() => [], [])
+  const emptyTemplates = useMemo<UsageAwareTemplate[]>(() => [], [])
   const emptyFolders = useMemo<Folder[]>(() => [], [])
   const scopedTemplates = accountDataCurrent ? templates : emptyTemplates
   const scopedFolders = accountDataCurrent ? folders : emptyFolders
   const visibleTemplatesStatus = accountDataCurrent ? templatesStatus : 'loading'
   const visibleFoldersStatus = accountDataCurrent ? foldersStatus : 'loading'
+  // 連打・連続入力で遅れて届いた古い応答を混ぜない。
+  const listGenRef = useRef(0)
+  // 次に取るページ番号。重複除去で件数とページがずれても狂わないよう、
+  // 件数からは割り出さずに持つ。
+  const nextPageRef = useRef(1)
 
   /*
    * INBOX-14: 共通のオーバーレイ約束。開いたら窓の中へフォーカス、
@@ -95,10 +106,16 @@ export default function TemplatePicker({
     if (!open) {
       // 閉じている間に前回分を捨て、次に開いた最初の描画から
       // 未取得状態にする（effect後の一瞬だけ前アカウントを出さない）。
+      listGenRef.current += 1
       setTemplates([])
+      setTotal(0)
+      setFolderCounts(null)
       setFolders([])
       setSelectedId('')
       setFolderId('')
+      setSearch('')
+      setDebouncedSearch('')
+      setCategory('all')
       setTemplatesStatus('loading')
       setFoldersStatus('loading')
       setLoadedAccountId(selectedAccountId)
@@ -107,26 +124,8 @@ export default function TemplatePicker({
     let cancelled = false
     // LINEアカウントを切り替えたあとに前アカウントの内容を一瞬でも
     // 見せない。開くたびに未取得へ戻し、0件と区別する。
-    setTemplates([])
     setFolders([])
-    setSelectedId('')
-    setFolderId('')
-    setTemplatesStatus('loading')
     setFoldersStatus('loading')
-    setLoadedAccountId(selectedAccountId)
-    // N-136: 選択中のLINEアカウントで絞る。渡さないと可視範囲の
-    // 全部が見え、別アカウントの候補が出る。
-    void api.templates.list(undefined, selectedAccountId ?? undefined).then((res) => {
-      if (cancelled) return
-      if (res.success) {
-        setTemplates(res.data as unknown as Template[])
-        setTemplatesStatus('ready')
-      } else {
-        setTemplatesStatus('error')
-      }
-    }).catch(() => {
-      if (!cancelled) setTemplatesStatus('error')
-    })
     // 置き場（099 で templates.folder_id が入っている）。
     // テンプレートと同じく選択中アカウントで絞る。渡さないと
     // 可視範囲の全部が並び、別アカウントの置き場が出る（N-147）。
@@ -146,20 +145,78 @@ export default function TemplatePicker({
     }
   }, [open, selectedAccountId])
 
-  /** 文字のテンプレートだけが対象。種別タブは「メッセージ」で固定。 */
-  const textTemplates = useMemo(
-    () => scopedTemplates.filter((t) => t.messageType === 'text'),
-    [scopedTemplates],
-  )
+  // 検索欄は1打鍵ごとに取りに行かず、少し間を置いてから確定する。
+  useEffect(() => {
+    if (!open) return
+    const timer = window.setTimeout(() => setDebouncedSearch(search), 250)
+    return () => window.clearTimeout(timer)
+  }, [search, open])
 
-  /** 置き場ごとの件数。0件でも出す（空だと分かるほうがよい）。 */
-  const folderCounts = useMemo(() => {
-    const map = new Map<string, number>()
-    for (const t of textTemplates) map.set(t.folderId ?? '', (map.get(t.folderId ?? '') ?? 0) + 1)
-    return map
-  }, [textTemplates])
+  /*
+   * PERF-12: 一覧の区画取得。検索・フォルダ・分類が変わるたびに
+   * 1ページ目から取り直す。サーバー側で絞り込みを済ませてから切るので、
+   * 「届いた分だけを絞った偽の0件」にはならない。
+   */
+  useEffect(() => {
+    if (!open) return
+    const myGen = ++listGenRef.current
+    const account = selectedAccountId ?? undefined
+    setTemplatesStatus('loading')
+    void api.templates.listPage({
+      accountId: account,
+      q: debouncedSearch.trim() || undefined,
+      folderId: folderId || undefined,
+      quick: category === 'all' ? undefined : category,
+      messageType: 'text',
+      page: 1,
+      limit: 100,
+      folderCounts: true,
+    }).then((res) => {
+      if (listGenRef.current !== myGen) return
+      if (res.success) {
+        setTemplates(res.data.items as unknown as UsageAwareTemplate[])
+        setTotal(res.data.total)
+        if (res.data.folderCounts) setFolderCounts(res.data.folderCounts)
+        nextPageRef.current = 2
+        setTemplatesStatus('ready')
+      } else {
+        setTemplatesStatus('error')
+      }
+    }).catch(() => {
+      if (listGenRef.current === myGen) setTemplatesStatus('error')
+    })
+  }, [open, selectedAccountId, debouncedSearch, folderId, category])
 
-  /** 親子1段の置き場を、設計どおり同じパネルで選べる順番へ並べる。 */
+  /** 次の区画を下へ足す。区画の間で重なった分は id で除く。 */
+  const loadMore = () => {
+    if (loadingMore || templates.length >= total) return
+    const myGen = ++listGenRef.current
+    const page = nextPageRef.current
+    setLoadingMore(true)
+    void api.templates.listPage({
+      accountId: selectedAccountId ?? undefined,
+      q: debouncedSearch.trim() || undefined,
+      folderId: folderId || undefined,
+      quick: category === 'all' ? undefined : category,
+      messageType: 'text',
+      page,
+      limit: 100,
+    }).then((res) => {
+      if (listGenRef.current !== myGen) return
+      if (res.success) {
+        setTemplates((prev) => {
+          const seen = new Set(prev.map((t) => t.id))
+          return [...prev, ...(res.data.items as unknown as UsageAwareTemplate[]).filter((t) => !seen.has(t.id))]
+        })
+        setTotal(res.data.total)
+        nextPageRef.current = page + 1
+      }
+    }).catch(() => undefined).finally(() => {
+      if (listGenRef.current === myGen) setLoadingMore(false)
+    })
+  }
+
+  /** 置き場ごとの件数はサーバー集計。届くまでは数を出さない。 */
   const folderOptions = useMemo<TemplateFolderOption[]>(() => {
     const children = new Map<string | null, Folder[]>()
     for (const folder of scopedFolders) {
@@ -168,22 +225,25 @@ export default function TemplatePicker({
         : null
       children.set(parentId, [...(children.get(parentId) ?? []), folder])
     }
-    const countReady = visibleTemplatesStatus === 'ready'
+    const countOf = (id: string) => folderCounts?.[id] ?? 0
+    const countReady = folderCounts !== null
+    const allCount = countReady
+      ? Object.values(folderCounts).reduce((sum, n) => sum + n, 0)
+      : null
     const options: TemplateFolderOption[] = [
-      { value: '', label: 'すべてのフォルダ', count: countReady ? textTemplates.length : null },
+      { value: '', label: 'すべてのフォルダ', count: allCount },
     ]
     for (const parent of children.get(null) ?? []) {
       const childFolders = children.get(parent.id) ?? []
       const count = countReady
-        ? (folderCounts.get(parent.id) ?? 0)
-          + childFolders.reduce((sum, child) => sum + (folderCounts.get(child.id) ?? 0), 0)
+        ? countOf(parent.id) + childFolders.reduce((sum, child) => sum + countOf(child.id), 0)
         : null
       options.push({ value: parent.id, label: parent.name, count })
       for (const child of childFolders) {
         options.push({
           value: child.id,
           label: child.name,
-          count: countReady ? folderCounts.get(child.id) ?? 0 : null,
+          count: countReady ? countOf(child.id) : null,
           depth: 1,
         })
       }
@@ -191,43 +251,19 @@ export default function TemplatePicker({
     options.push({
       value: '__none__',
       label: '未分類',
-      count: countReady ? folderCounts.get('') ?? 0 : null,
+      count: countReady ? countOf('') : null,
     })
     return options
-  }, [folderCounts, scopedFolders, visibleTemplatesStatus, textTemplates.length])
+  }, [folderCounts, scopedFolders])
 
-  /** 親フォルダを選んだときは、その直下のフォルダも一緒に表示する。 */
-  const selectedFolderIds = useMemo(() => {
-    if (!folderId || folderId === '__none__') return null
-    return new Set([
-      folderId,
-      ...scopedFolders.filter((folder) => folder.parentId === folderId).map((folder) => folder.id),
-    ])
-  }, [folderId, scopedFolders])
-
-  const shown = useMemo(() => {
-    const q = search.trim().toLowerCase()
-    const filtered = textTemplates.filter((t) => {
-      if (folderId === '__none__' ? Boolean(t.folderId) : selectedFolderIds && !selectedFolderIds.has(t.folderId ?? '')) {
-        return false
-      }
-      if (!q) return true
-      return t.name.toLowerCase().includes(q) || t.messageContent.toLowerCase().includes(q)
-    })
-    /*
-     * 「よく使う」。先頭5件を切るだけだと、登録順のたまたま上にあった
-     * ものが「よく使う」に見えてしまう。一覧口が返す送信数・使用箇所数の
-     * 多い順にしてから5件に絞る。数えられるものが無いものは 0 として扱う。
-     */
-    if (category === 'frequent') {
-      return [...filtered]
-        .sort((a, b) => usageScore(b as UsageAwareTemplate) - usageScore(a as UsageAwareTemplate))
-        .slice(0, 5)
-    }
-    if (category === 'reservation') return filtered.filter((template) => /予約|来店|前日|日程/.test(`${template.name} ${template.messageContent}`))
-    if (category === 'ec') return filtered.filter((template) => /EC|注文|発送|配送|商品/.test(`${template.name} ${template.messageContent}`))
-    return filtered
-  }, [category, textTemplates, search, folderId, selectedFolderIds])
+  /*
+   * PERF-12: 絞り込みはサーバー済み。「よく使う」もサーバーが実績順で
+   * 返すので、ここでは先頭5件を切るだけ。
+   */
+  const shown = useMemo(
+    () => category === 'frequent' ? scopedTemplates.slice(0, 5) : scopedTemplates,
+    [category, scopedTemplates],
+  )
 
   /*
    * INBOX-13: 選択は「いま見えている候補」の中だけで解決する。
@@ -362,7 +398,7 @@ export default function TemplatePicker({
                 </button>
               ))}
               <span className="ml-auto text-[11px] text-[#98A2B3]">
-                {visibleTemplatesStatus === 'ready' ? `${shown.length}件` : '—'}
+                {visibleTemplatesStatus === 'ready' ? `${total}件` : '—'}
               </span>
             </div>
             {/*
@@ -380,7 +416,11 @@ export default function TemplatePicker({
               <p className="px-4 py-10 text-center text-sm text-danger">テンプレートを読み込めませんでした。もう一度開き直してください。</p>
             ) : shown.length === 0 ? (
               <p className="px-4 py-10 text-center text-sm text-[#98A2B3]">
-                {scopedTemplates.length === 0 ? '文字のテンプレートがまだありません。' : '見つかりませんでした。'}
+                {/*
+                  PERF-12: 絞り込み中の0件は「見つからない」、無条件の0件は
+                  「まだ無い」。届いた分だけを絞った見かけ上の0と区別する。
+                */}
+                {search.trim() || folderId || category !== 'all' ? '見つかりませんでした。' : '文字のテンプレートがまだありません。'}
               </p>
             ) : (
               <ul className="space-y-2">
@@ -399,6 +439,22 @@ export default function TemplatePicker({
                 ))}
               </ul>
             )}
+            {/*
+              PERF-12: 届いていない区画があれば下へ足す。「よく使う」は
+              上位5件だけ見せる決まりなので続きは出さない。
+            */}
+            {visibleTemplatesStatus === 'ready' && category !== 'frequent' && templates.length < total ? (
+              <div className="mt-2 flex justify-center">
+                <button
+                  type="button"
+                  onClick={loadMore}
+                  disabled={loadingMore}
+                  className="rounded-full border border-[#E5E7EB] bg-canvas px-3 py-1.5 text-xs font-semibold text-[#2563EB] hover:bg-[#F2F4F7] disabled:opacity-50"
+                >
+                  {loadingMore ? '読み込み中...' : `さらに表示（残り${total - templates.length}件）`}
+                </button>
+              </div>
+            ) : null}
           </div>
 
           <section className="min-h-0 bg-canvas p-6 md:overflow-y-auto" aria-label="テンプレートのプレビュー">

@@ -359,6 +359,20 @@ supportInbox.use('/api/support/email/*', async (c, next) => {
   return next();
 });
 
+/*
+ * PERF-11: メッセージの区切り位置。<created_at>~<id> の形で、
+ * 同じ created_at が並んでも id で順を切れる。
+ */
+function encodeMessageCursor(createdAt: string, id: string): string {
+  return `${createdAt}~${id}`;
+}
+function parseMessageCursor(raw: string | undefined): { createdAt: string; id: string } | null | undefined {
+  if (raw === undefined || raw === '') return undefined;
+  const sep = raw.indexOf('~');
+  if (sep <= 0 || sep === raw.length - 1 || raw.length > 1024) return null;
+  return { createdAt: raw.slice(0, sep), id: raw.slice(sep + 1) };
+}
+
 supportInbox.get('/api/support/email/threads/:id', async (c) => {
   const id = c.req.param('id');
   const thread = await c.env.DB.prepare(
@@ -367,14 +381,76 @@ supportInbox.get('/api/support/email/threads/:id', async (c) => {
      FROM support_email_threads WHERE id = ?`,
   ).bind(id).first();
   if (!thread) return c.json({ success: false, error: 'Thread not found' }, 404);
-  const messages = await c.env.DB.prepare(
-    `SELECT id, direction, sender_email, sender_name, recipient_email, subject,
+  /*
+    PERF-11: 毎回全件は返さない。初回は新しい側から limit 件、
+    before= で古い履歴、after= で新着の差分を取る。
+    返す messages は常に created_at 昇順。
+  */
+  const parsedLimit = Number(c.req.query('limit'));
+  const limit = Number.isSafeInteger(parsedLimit) && parsedLimit > 0
+    ? Math.min(parsedLimit, 200)
+    : 100;
+  const before = parseMessageCursor(c.req.query('before'));
+  const after = parseMessageCursor(c.req.query('after'));
+  if (before === null || after === null || (before && after)) {
+    return c.json({ success: false, error: '続きの位置が正しくありません', code: 'cursor_invalid' }, 400);
+  }
+  const messageSelect = `SELECT id, direction, sender_email, sender_name, recipient_email, subject,
             body_text, sent_by_staff_id,
             (SELECT name FROM staff_members sm WHERE sm.id = support_email_messages.sent_by_staff_id) AS sent_by_staff_name,
             created_at
-     FROM support_email_messages WHERE thread_id = ? ORDER BY created_at ASC`,
-  ).bind(id).all();
-  return c.json({ success: true, data: { thread, messages: messages.results } });
+     FROM support_email_messages`;
+  type MessageRow = {
+    id: string; direction: string; sender_email: string; sender_name: string | null;
+    recipient_email: string; subject: string; body_text: string; sent_by_staff_id: string | null;
+    sent_by_staff_name: string | null; created_at: string;
+  };
+  let messages: MessageRow[];
+  let hasMoreOlder = false;
+  if (after) {
+    // 新着差分。上側で切れたら次の取り直しが newestCursor から続く。
+    const rows = await c.env.DB.prepare(
+      `${messageSelect}
+       WHERE thread_id = ? AND (created_at > ? OR (created_at = ? AND id > ?))
+       ORDER BY created_at ASC, id ASC LIMIT ?`,
+    ).bind(id, after.createdAt, after.createdAt, after.id, limit).all<MessageRow>();
+    messages = rows.results;
+    // 前の履歴が残っているかはここでは調べない。画面は開いたときの値を持つ。
+    const older = await c.env.DB.prepare(
+      `SELECT 1 AS x FROM support_email_messages
+       WHERE thread_id = ? AND (created_at < ? OR (created_at = ? AND id < ?)) LIMIT 1`,
+    ).bind(id, after.createdAt, after.createdAt, after.id).first();
+    hasMoreOlder = older !== null;
+  } else {
+    const cursorFilter = before
+      ? 'AND (created_at < ? OR (created_at = ? AND id < ?))'
+      : '';
+    const rows = await c.env.DB.prepare(
+      `${messageSelect}
+       WHERE thread_id = ? ${cursorFilter}
+       ORDER BY created_at DESC, id DESC LIMIT ?`,
+    ).bind(
+      id,
+      ...(before ? [before.createdAt, before.createdAt, before.id] : []),
+      limit + 1,
+    ).all<MessageRow>();
+    hasMoreOlder = rows.results.length > limit;
+    messages = rows.results.slice(0, limit).reverse();
+  }
+  const total = await c.env.DB.prepare(
+    'SELECT COUNT(*) AS c FROM support_email_messages WHERE thread_id = ?',
+  ).bind(id).first<{ c: number }>();
+  return c.json({
+    success: true,
+    data: {
+      thread,
+      messages,
+      total: total?.c ?? messages.length,
+      hasMoreOlder,
+      oldestCursor: messages.length ? encodeMessageCursor(messages[0].created_at, messages[0].id) : null,
+      newestCursor: messages.length ? encodeMessageCursor(messages[messages.length - 1].created_at, messages[messages.length - 1].id) : null,
+    },
+  });
 });
 
 supportInbox.post(

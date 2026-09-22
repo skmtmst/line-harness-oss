@@ -1,8 +1,8 @@
 'use client'
 
-import QRCode from 'qrcode'
 import { useEffect, useState } from 'react'
 import { api, type HqLineRegistration } from '@/lib/api'
+import { qrToDataURL } from '@/lib/qr-image'
 import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
 
@@ -28,7 +28,7 @@ export default function NoticeLineRegisterDialog({ open, onClose, quietWhenUnava
       setInfo(res.data)
       if (res.data.available && res.data.addFriendUrl) {
         try {
-          setQr(await QRCode.toDataURL(res.data.addFriendUrl, { width: 220, margin: 1 }))
+          setQr(await qrToDataURL(res.data.addFriendUrl, { width: 220, margin: 1 }))
         } catch {
           setQr('')
         }

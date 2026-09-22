@@ -1,6 +1,5 @@
 'use client'
 
-import QRCode from 'qrcode'
 import { useEffect, useState, type FormEvent } from 'react'
 import AuthCard, { AuthField } from '@/components/auth/auth-card'
 import Button from '@/components/shared/button'
@@ -10,6 +9,7 @@ import { TextField } from '@/components/shared/text-field'
 import { adminSessionHeaders, captureAdminSessionHandoff } from '@/lib/admin-session'
 import { api } from '@/lib/api'
 import { logoutAndGoToLogin } from '@/lib/logout'
+import { qrToDataURL } from '@/lib/qr-image'
 
 /**
  * 運営コンソールの 2要素認証の設定（★V6 37-10-B `NAJKx`）。
@@ -60,7 +60,7 @@ export default function OpsTwoFactorPage() {
 
   useEffect(() => {
     if (!uri) return
-    void QRCode.toDataURL(uri, { width: 200, margin: 1 }).then(setQr)
+    void qrToDataURL(uri, { width: 200, margin: 1 }).then(setQr)
   }, [uri])
 
   const submit = async (event: FormEvent) => {

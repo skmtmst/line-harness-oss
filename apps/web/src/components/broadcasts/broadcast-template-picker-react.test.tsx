@@ -66,7 +66,11 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
       commonVars: { list: emptyList },
       friendFields: { list: emptyList },
       broadcastMessageAssets: { list: emptyList, upload: emptyList },
-      templates: { list: async () => ({ success: true, data: TEMPLATES }) },
+      templates: {
+        list: async () => ({ success: true, data: TEMPLATES }),
+        // PERF-12: 選択画面は区画取得を使う。同じ中身を区画の形で返す。
+        listPage: async () => ({ success: true, data: { items: TEMPLATES, total: TEMPLATES.length, limit: 100 } }),
+      },
       commonActions: { resources: async () => ({ success: true, data: [] }) },
       accountSettings: { getTestRecipients: async () => ({ success: true, data: [] }) },
     },

@@ -26,13 +26,17 @@ vi.mock('@/contexts/account-context', () => ({
 vi.mock('@/lib/api', () => ({
   api: {
     templates: {
-      list: async () => ({
-        success: true,
-        data: [
+      // PERF-12: 選択画面は区画取得(listPage)を使う。
+      listPage: async () => {
+        const items = [
           { id: 'tp-var', accountId: 'acc-1', name: '差し込みあり', messageType: 'text', messageContent: '{{name}}さん、{{field.pet_name}}の件です {{pet_name}}', folderId: null },
           { id: 'tp-plain', accountId: 'acc-1', name: '差し込みなし', messageType: 'text', messageContent: 'そのままの挨拶です', folderId: null },
-        ],
-      }),
+        ]
+        return {
+          success: true,
+          data: { items, total: items.length, limit: 100 },
+        }
+      },
     },
     folders: {
       list: async () => ({ success: true, data: [] }),

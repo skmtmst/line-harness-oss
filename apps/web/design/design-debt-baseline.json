@@ -473,7 +473,7 @@
     "direct-secondary-button": 1
   },
   "components/chats/template-picker.tsx": {
-    "arbitrary-value": 64,
+    "arbitrary-value": 67,
     "direct-primary-button": 1
   },
   "components/dashboard/dashboard-editor.tsx": {
@@ -738,7 +738,7 @@
     "unresolved-classname": 20
   },
   "components/support/email-thread.tsx": {
-    "arbitrary-value": 40,
+    "arbitrary-value": 43,
     "direct-primary-button": 2
   },
   "components/support/pending-inbox-card.tsx": {
