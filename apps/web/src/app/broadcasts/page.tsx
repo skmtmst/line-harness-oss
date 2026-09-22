@@ -466,8 +466,14 @@ function BroadcastList() {
 
       {/* 一覧本体（設計 `Body`）。 */}
       <div data-design="Body">
-          {/* 設計はフォルダを左の縦パネルに置く。タグ・シナリオと同じ形。 */}
-          <div style={FOLDER_RAIL_STYLE} className="grid gap-4 lg:grid-cols-[var(--folder-rail-width)_minmax(0,1fr)]">
+          {/*
+            設計はフォルダを左の縦パネルに置く。タグ・シナリオと同じ形。
+            狭い幅で1列になるときも `minmax(0,1fr)` で列を画面内に収める
+            （U014）。`grid-cols-1` を付けないと暗黙の auto 列が中身の
+            最大幅（一覧表の最小幅 640px）まで広がり、検索行ごと横に
+            はみ出して390pxで入力の右端が見えなくなる。
+          */}
+          <div style={FOLDER_RAIL_STYLE} className="grid grid-cols-1 gap-4 lg:grid-cols-[var(--folder-rail-width)_minmax(0,1fr)]">
             {/*
               件数は読み込んだ範囲での数。まだ奥があるときだけ口の total を
               総数に出す(読み込んだ分だけを総数に見せない)。全部読めていれば
