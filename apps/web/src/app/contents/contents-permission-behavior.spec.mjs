@@ -67,6 +67,7 @@ const DELETE_IMPACT = {
   ],
   checkedAt: '2026-08-31T10:00:00.000Z', lastScannedAt: '2026-08-31T10:00:00.000Z',
   canDelete: false, recommendedAction: 'review_references',
+  versions: [],
 }
 
 /**

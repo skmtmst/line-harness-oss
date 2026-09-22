@@ -64,6 +64,13 @@ export interface Media {
   archived_at?: string | null;
   archived_by?: string | null;
   archive_reason?: string | null;
+  /**
+   * 運用者が確認して記録した利用期限（YYYY-MM-DD）と同意・権利の記録。
+   * NULL は「記録なし＝不明」。根拠のない権利情報を推定で埋めないため、
+   * コード側が値を補うことはない。
+   */
+  usage_expires_at?: string | null;
+  usage_consent_note?: string | null;
   /** 一覧取得時だけ付く。使用先をカードごとに再取得しないための集計値。 */
   usage_count?: number;
 }
@@ -373,7 +380,12 @@ export async function updateMedia(
   db: D1Database,
   id: string,
   lineAccountId: string,
-  input: { filename?: string; folderId?: string | null },
+  input: {
+    filename?: string;
+    folderId?: string | null;
+    usageExpiresAt?: string | null;
+    usageConsentNote?: string | null;
+  },
 ): Promise<Media | null> {
   const sets: string[] = [];
   const values: unknown[] = [];
@@ -384,6 +396,16 @@ export async function updateMedia(
   if ('folderId' in input) {
     sets.push('folder_id = ?');
     values.push(input.folderId ?? null);
+  }
+  // 利用期限・同意の記録は明示指定されたときだけ書き換える。
+  // null は「記録を消す」で、未記録＝不明へ戻す。
+  if ('usageExpiresAt' in input) {
+    sets.push('usage_expires_at = ?');
+    values.push(input.usageExpiresAt ?? null);
+  }
+  if ('usageConsentNote' in input) {
+    sets.push('usage_consent_note = ?');
+    values.push(input.usageConsentNote ?? null);
   }
   if (sets.length > 0) {
     values.push(id, lineAccountId);
