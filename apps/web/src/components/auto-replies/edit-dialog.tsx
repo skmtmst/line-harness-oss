@@ -473,7 +473,10 @@ export default function EditDialog({
       } else if (draft.id) {
         await api.autoReplies.update(draft.id, body)
       } else {
-        await api.autoReplies.create(body)
+        // AUTOREPLY-08: 新規作成は常に止まった状態で保存する。チェックを
+        // 付けて作る形にすると「オフで保存したのに動く」の逆が起きる。
+        // 動かすのは保存後の再開・公開操作だけ。
+        await api.autoReplies.create({ ...body, isActive: false })
       }
       onSaved()
     } catch (e) {
@@ -1401,15 +1404,23 @@ export default function EditDialog({
             </div>
           )}
 
-          <label className="inline-flex items-center gap-2 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={isActive}
-              onChange={(e) => setIsActive(e.target.checked)}
-              className="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
-            />
-            <span className="text-ink-secondary text-xs">この応答をオンにする</span>
-          </label>
+          {draft.id ? (
+            <label className="inline-flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={isActive}
+                onChange={(e) => setIsActive(e.target.checked)}
+                className="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
+              />
+              <span className="text-ink-secondary text-xs">この応答をオンにする</span>
+            </label>
+          ) : (
+            // AUTOREPLY-08: 新しい応答は止まった状態で保存される。
+            // 有効化は一覧の「再開」や公開前の確認から、別の操作で行う。
+            <p className="text-ink-faint text-xs">
+              新しく作る応答は、止まった状態で保存されます。動かすには、保存したあと一覧の「再開」から有効にします。
+            </p>
+          )}
           </section>
             </>
           ) : null}

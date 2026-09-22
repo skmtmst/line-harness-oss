@@ -3,11 +3,12 @@
 import { Suspense, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
+import type { Tag } from '@line-crm/shared'
 import { ApiError, api, type ApiBroadcast, type BroadcastInsight } from '@/lib/api'
 import Button from '@/components/shared/button'
 import StickyBar from '@/components/shared/sticky-bar'
 import { useAccount } from '@/contexts/account-context'
-import { messageTypeLabel } from '@/lib/broadcast-summary'
+import { audienceSummary, messageTypeLabel } from '@/lib/broadcast-summary'
 import { broadcastBelongsToSelectedAccount } from './broadcast-detail-account'
 import { clickInsightDetail, formatBroadcastDateTime, openInsightDetail } from './broadcast-insight-display'
 import { broadcastDetailCsv } from './broadcast-detail-export'
@@ -33,6 +34,13 @@ function BroadcastDetailInner() {
   const [insightState, setInsightState] = useState<'loading' | 'ready' | 'error'>('loading')
   const [loadState, setLoadState] = useState<'loading' | 'ready' | 'not-found' | 'error'>('loading')
   const [reloadToken, setReloadToken] = useState(0)
+  // BROADCAST-15: 宛先の条件に出すタグ名・シナリオ名。配信本体とは別に取る。
+  // 読み込めないことと、宛先が消えていることは分けて出す。
+  const [audienceNameState, setAudienceNameState] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
+  const [audienceNames, setAudienceNames] = useState<{
+    tags: Tag[]
+    scenarios: Array<{ id: string; name: string }>
+  }>({ tags: [], scenarios: [] })
   const contentRef = useRef<HTMLElement>(null)
 
   const exportCsv = () => {
@@ -69,6 +77,7 @@ function BroadcastDetailInner() {
       setLoadState('not-found')
       return
     }
+    setAudienceNameState('idle')
     void (async () => {
       try {
         const detail = await api.broadcasts.get(id)
@@ -80,6 +89,26 @@ function BroadcastDetailInner() {
 
         setBroadcast(detail.data)
         setLoadState('ready')
+
+        // 宛先が絞り込みのときだけ、条件に出すタグ名・シナリオ名を取る。
+        // 取れなくても配信の詳細は出し続ける。
+        const needsAudienceNames =
+          detail.data.targetType !== 'all' && detail.data.targetType !== 'multi-account-dedup'
+        if (needsAudienceNames) {
+          setAudienceNameState('loading')
+          void Promise.allSettled([api.tags.list(), api.scenarios.list()])
+            .then(([tagsRes, scenariosRes]) => {
+              if (!active) return
+              const tags = tagsRes.status === 'fulfilled' && tagsRes.value.success ? tagsRes.value.data : null
+              const scenarios = scenariosRes.status === 'fulfilled' && scenariosRes.value.success ? scenariosRes.value.data : null
+              if (!tags && !scenarios) {
+                setAudienceNameState('error')
+                return
+              }
+              setAudienceNames({ tags: tags ?? [], scenarios: scenarios ?? [] })
+              setAudienceNameState('ready')
+            })
+        }
 
         // 詳細画面は送信日が30日より前でも開く。期間集計ではなく、
         // この配信自身の保存済みインサイトを読む。
@@ -133,6 +162,21 @@ function BroadcastDetailInner() {
   const failed = Math.max(0, total - success)
   const pct = (n: number, base: number) =>
     base > 0 ? `${Math.round((n / base) * 1000) / 10}%` : '—'
+
+  // BROADCAST-15: 宛先の条件は一覧・配信詳細パネルと同じ audienceSummary。
+  // 名前を読み込む間は「確認中」、読めないときは失敗と分かる言い方にする。
+  const tagNameById = (tagId: string) => audienceNames.tags.find((t) => t.id === tagId)?.name ?? null
+  const scenarioNameById = (scenarioId: string) =>
+    audienceNames.scenarios.find((s) => s.id === scenarioId)?.name ?? null
+  const audienceLabel = !broadcast
+    ? ''
+    : broadcast.targetType === 'all' || broadcast.targetType === 'multi-account-dedup'
+      ? audienceSummary(broadcast, tagNameById)
+      : audienceNameState === 'ready'
+        ? audienceSummary(broadcast, tagNameById, scenarioNameById)
+        : audienceNameState === 'error'
+          ? '宛先の条件を確認できませんでした'
+          : '宛先の条件を確認しています…'
 
   return (
     <div>
@@ -296,7 +340,9 @@ function BroadcastDetailInner() {
               複製して作る操作です。題名と本文を引き継いで新規作成を開きます。宛先・予約日時は引き継がないので、送る前に確かめてください。
             </p>
             <dl className="mt-3 space-y-2 text-sm">
-              <Row label="宛先の条件" value={broadcast.targetType === 'all' ? 'すべての友だち' : '絞り込みあり'} />
+              {/* BROADCAST-15: 一覧・作成確認と同じ要約（audienceSummary）を出す。
+                  シナリオ指定を「絞り込みあり」「タグ未指定」とは出さない。 */}
+              <Row label="宛先の条件" value={audienceLabel} />
               <Row
                 label="対象人数"
                 value={`${total.toLocaleString('ja-JP')}人（ブロック中を自動で除外）`}

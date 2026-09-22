@@ -125,6 +125,29 @@ describe('宛先の要約', () => {
     }, tagName)).toBe('シナリオ購読中の全員')
   })
 
+  it('BROADCAST-15: シナリオ指定は名前を出し、消えたものと区別する', () => {
+    const scenarioName = (id: string) => ({ s1: '初回フォロー' })[id] ?? null
+    const targeted = {
+      targetType: 'segment',
+      segmentConditions: {
+        operator: 'AND',
+        rules: [{ type: 'is_following', value: true }, { type: 'scenario_subscribed', value: 's1' }],
+      },
+    }
+    // 名前を引ける画面は「シナリオ：名前」。「タグ未指定」とは出さない。
+    expect(audienceSummary(targeted, tagName, scenarioName)).toBe('シナリオ：初回フォロー')
+    // 消えたシナリオは、あったことが分かる表記にする。
+    expect(audienceSummary({
+      targetType: 'segment',
+      segmentConditions: {
+        operator: 'AND',
+        rules: [{ type: 'is_following', value: true }, { type: 'scenario_subscribed', value: 'gone' }],
+      },
+    }, tagName, scenarioName)).toBe('シナリオ（削除済み）')
+    // 名前を引かない画面は従来どおり。
+    expect(audienceSummary(targeted, tagName)).toBe('指定のシナリオを購読中')
+  })
+
   it('条件が残っていなければ、その旨を出す', () => {
     expect(audienceSummary({ targetType: 'segment', segmentConditions: null }, tagName)).toBe('条件なし')
   })
