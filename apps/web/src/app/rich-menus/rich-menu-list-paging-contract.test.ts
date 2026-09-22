@@ -9,7 +9,7 @@ describe('リッチメニューの共通一覧契約', () => {
     expect(PAGE).toContain('api.richMenuGroups.listPage(accountId')
     expect(PAGE).toContain('page: reordering ? 1 : page')
     expect(PAGE).toContain('limit: reordering ? 200 : pageSize')
-    expect(PAGE).toContain('setGroupTotal(groupsRes.value.data.total)')
+    expect(PAGE).toContain('setGroupTotal(groupsRes.data.total)')
     expect(API).toContain('ApiResponse<RichMenuGroupListPage>')
   })
 })

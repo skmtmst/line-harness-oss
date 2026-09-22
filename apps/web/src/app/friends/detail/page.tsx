@@ -9,6 +9,7 @@ import {
   ApiError,
   fetchApi,
   type FriendDetail,
+  type FriendFormSubmission,
   type MileageConnectedAccount,
   type MileageSelfInsights,
   type MileageSummary,
@@ -473,6 +474,17 @@ function FriendDetailInner() {
   */
   const [historyMoreError, setHistoryMoreError] = useState(false)
   /*
+    PERF-13: フォーム回答は本体の応答に同梱せず、回答フォームタブを
+    開いたときにカーソル式で取る。履歴タブと同じく「さらに読み込む」で
+    古い回答へ遡れる。0件・未取得・失敗は別の状態で出す。
+  */
+  const [submissions, setSubmissions] = useState<FriendFormSubmission[]>([])
+  const [submissionsStatus, setSubmissionsStatus] = useState<PanelStatus>('idle')
+  const [submissionsTotal, setSubmissionsTotal] = useState<number | null>(null)
+  const [submissionsNextCursor, setSubmissionsNextCursor] = useState<string | null>(null)
+  const [submissionsLoadingMore, setSubmissionsLoadingMore] = useState(false)
+  const [submissionsMoreError, setSubmissionsMoreError] = useState(false)
+  /*
     FRIEND-31: スマートフォンでは長いプロフィールがタブを下へ追いやる。
     氏名・対応状況・主操作の下にタブが来るよう、補助プロフィールは
     lg未満では折りたたむ。lg以上では常時展開。
@@ -525,6 +537,7 @@ function FriendDetailInner() {
   const mileageReqRef = useRef(0)
   const richMenuReqRef = useRef(0)
   const historyReqRef = useRef(0)
+  const submissionsReqRef = useRef(0)
   const scenarioReqRef = useRef(0)
   const group = params.get('group') ?? BASIC_GROUP
   // 情報欄タブは friend_fields の画面。オフのaccountではタブごと出さない。
@@ -558,7 +571,9 @@ function FriendDetailInner() {
     setLoading(true)
     setError('')
     try {
-      const res = await api.friends.get(friendId)
+      // PERF-13: 回答本文は初期応答に載せない。総数だけ返るので
+      // サイドの「フォーム回答 N件」とタブの案内は変わらない。
+      const res = await api.friends.get(friendId, { includeSubmissions: false })
       if (isStaleResponse(generation, requestedAccountId)) return
       if (res.success) setFriend(res.data)
       else setError(res.error)
@@ -760,6 +775,51 @@ function FriendDetailInner() {
   }, [friendId, selectedAccountId, isStaleResponse])
 
   /*
+   * PERF-13: フォーム回答は回答フォームタブを開いたときにだけ取る。
+   * cursor を渡すと続きを足す（履歴タブの「さらに読み込む」と同じ形）。
+   * 途中の取り損ねは末尾の再試行だけに留め、取得済みの行は消さない。
+   */
+  const loadSubmissions = useCallback(async (cursor?: string) => {
+    if (!friendId) return
+    const generation = loadRequestRef.current
+    const requestedAccountId = selectedAccountId
+    const req = ++submissionsReqRef.current
+    if (cursor) {
+      setSubmissionsLoadingMore(true)
+      setSubmissionsMoreError(false)
+    } else {
+      setSubmissionsStatus('loading')
+      setSubmissionsMoreError(false)
+    }
+    try {
+      const res = await api.friends.formSubmissions(friendId, { cursor: cursor ?? null, limit: 10 })
+      if (req !== submissionsReqRef.current || isStaleResponse(generation, requestedAccountId)) return
+      if (res.success) {
+        setSubmissions((prev) => {
+          if (!cursor) return res.data.items
+          const seen = new Set(prev.map((item) => item.id))
+          return [...prev, ...res.data.items.filter((item) => !seen.has(item.id))]
+        })
+        setSubmissionsTotal(res.data.total)
+        setSubmissionsNextCursor(res.data.nextCursor)
+        setSubmissionsStatus('ready')
+      } else if (cursor) {
+        setSubmissionsMoreError(true)
+      } else {
+        setSubmissionsStatus('error')
+      }
+    } catch {
+      if (req !== submissionsReqRef.current || isStaleResponse(generation, requestedAccountId)) return
+      if (cursor) setSubmissionsMoreError(true)
+      else setSubmissionsStatus('error')
+    } finally {
+      if (req === submissionsReqRef.current && !isStaleResponse(generation, requestedAccountId)) {
+        setSubmissionsLoadingMore(false)
+      }
+    }
+  }, [friendId, selectedAccountId, isStaleResponse])
+
+  /*
    * 友だち・アカウントの切替。本体を取り直し、補助パネルは全部リセットして
    * それぞれ取り直す。履歴だけは開いているタブに合わせて別のeffectで取る。
    */
@@ -789,6 +849,12 @@ function FriendDetailInner() {
     setHistoryNextCursor(null)
     setHistoryLoadingMore(false)
     setHistoryMoreError(false)
+    setSubmissions([])
+    setSubmissionsStatus('idle')
+    setSubmissionsTotal(null)
+    setSubmissionsNextCursor(null)
+    setSubmissionsLoadingMore(false)
+    setSubmissionsMoreError(false)
     setScenarioPickerOpen(false)
     setScenarioOptions([])
     setScenarioListStatus('idle')
@@ -814,6 +880,13 @@ function FriendDetailInner() {
       void loadHistory()
     }
   }, [tab, historyStatus, loadHistory])
+
+  // PERF-13: フォーム回答も「回答フォーム」タブを開いたときにだけ取る。
+  useEffect(() => {
+    if (tab === 'forms' && submissionsStatus === 'idle') {
+      void loadSubmissions()
+    }
+  }, [tab, submissionsStatus, loadSubmissions])
 
   /*
     編集を開くたびに今の担当・対応状況を取り直す。GET /api/chats/:id は
@@ -1534,9 +1607,13 @@ function FriendDetailInner() {
                   href={`/friends/detail?id=${friendId}&tab=forms`}
                 />
                 <p className="text-ink-secondary text-xs">
-                  {friend?.formSubmissions?.length
-                    ? `${friend.formSubmissions.length}件`
-                    : '回答はまだありません'}
+                  {typeof friend?.formSubmissionTotal === 'number'
+                    ? friend.formSubmissionTotal > 0
+                      ? `${friend.formSubmissionTotal}件`
+                      : '回答はまだありません'
+                    : friend?.formSubmissions?.length
+                      ? `${friend.formSubmissions.length}件`
+                      : '回答はまだありません'}
                 </p>
               </div>
             </div>
@@ -2025,13 +2102,28 @@ function FriendDetailInner() {
 
             {tab === 'forms' && (
               <div className="bg-canvas rounded-card border-hairline border p-5">
-                {!friend?.formSubmissions || friend.formSubmissions.length === 0 ? (
+                {submissionsStatus === 'loading' || submissionsStatus === 'idle' ? (
+                  <p className="text-ink-faint py-6 text-center text-sm">回答を読み込んでいます…</p>
+                ) : submissionsStatus === 'error' ? (
+                  <div className="py-6 text-center">
+                    <p className="text-ink-faint text-sm">回答を読み込めませんでした。</p>
+                    <Button type="button" variant="secondary" className="mt-3" onClick={() => void loadSubmissions()}>
+                      もう一度読み込む
+                    </Button>
+                  </div>
+                ) : submissions.length === 0 ? (
                   <p className="text-ink-faint py-6 text-center text-sm">
                     フォームの回答はまだありません。
                   </p>
                 ) : (
+                  <>
+                  {typeof submissionsTotal === 'number' && submissionsTotal > submissions.length && (
+                    <p className="text-ink-faint mb-2 text-xs">
+                      全{submissionsTotal}件中{submissions.length}件を表示しています。
+                    </p>
+                  )}
                   <ul className="divide-hairline divide-y">
-                    {friend.formSubmissions.map((s) => {
+                    {submissions.map((s) => {
                       /*
                         FRIEND-24: data のキー（q_xxx の内部名）をそのまま
                         見出しにしない。回答時点の質問定義（fields）の label
@@ -2079,6 +2171,22 @@ function FriendDetailInner() {
                       )
                     })}
                   </ul>
+                  {submissionsNextCursor ? (
+                    <div className="mt-3 border-t border-hairline pt-3 text-center">
+                      {submissionsMoreError ? (
+                        <p className="text-warning mb-2 text-xs">続きを読み込めませんでした。</p>
+                      ) : null}
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        disabled={submissionsLoadingMore}
+                        onClick={() => void loadSubmissions(submissionsNextCursor)}
+                      >
+                        {submissionsLoadingMore ? '読み込んでいます…' : 'さらに読み込む'}
+                      </Button>
+                    </div>
+                  ) : null}
+                  </>
                 )}
               </div>
             )}
