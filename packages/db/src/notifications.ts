@@ -192,7 +192,9 @@ export async function getNotificationCenter(
     offset?: number;
   },
 ): Promise<NotificationCenterRow[]> {
-  const conditions = ['n.line_account_id = ?', "n.channel = 'dashboard'"];
+  // 'center' は旧実装が送信枠不足の通知へ付けていた値。画面は 'dashboard'
+  // しか読まなかったため書き込み済みの通知が見えなかった。両方を読む。
+  const conditions = ['n.line_account_id = ?', "n.channel IN ('dashboard', 'center')"];
   const values: unknown[] = [input.staffId, input.lineAccountId];
   if (input.category) {
     conditions.push('n.category = ?');
@@ -224,7 +226,7 @@ export async function getNotificationCenterCounts(
     FROM notifications n
     LEFT JOIN staff_notification_reads r
       ON r.notification_id = n.id AND r.staff_id = ?
-    WHERE n.line_account_id = ? AND n.channel = 'dashboard'
+    WHERE n.line_account_id = ? AND n.channel IN ('dashboard', 'center')
   `).bind(input.staffId, input.lineAccountId).first<{
     all_count: number;
     error_count: number | null;
@@ -247,7 +249,7 @@ export async function markNotificationRead(
   const result = await db.prepare(`
     INSERT OR REPLACE INTO staff_notification_reads (notification_id, staff_id, read_at)
     SELECT id, ?, ? FROM notifications
-    WHERE id = ? AND line_account_id = ? AND channel = 'dashboard'
+    WHERE id = ? AND line_account_id = ? AND channel IN ('dashboard', 'center')
   `).bind(input.staffId, now, input.notificationId, input.lineAccountId).run();
   return Number(result.meta.changes ?? 0) > 0;
 }
@@ -260,7 +262,7 @@ export async function markAllNotificationsRead(
     category?: 'error' | 'update';
   },
 ): Promise<number> {
-  const conditions = ['line_account_id = ?', "channel = 'dashboard'"];
+  const conditions = ['line_account_id = ?', "channel IN ('dashboard', 'center')"];
   const values: unknown[] = [input.staffId, jstNow(), input.lineAccountId];
   if (input.category) {
     conditions.push('category = ?');
