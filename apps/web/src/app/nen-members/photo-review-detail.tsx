@@ -13,7 +13,7 @@ import { formatPhotoReceivedAt } from './photo-review-time'
 import { safePhotoSrc } from './photo-src'
 import { photoPetDisplayName } from '@/components/shared/photo-display-name'
 import { petAnimalTypeLabel } from '@/lib/nen-pets-api'
-import { text } from './photo-text'
+import { photoReviewReasonLabel, pointStatusLabel, text } from './photo-text'
 
 const numberOrDash = (value: unknown) => Number.isFinite(Number(value)) ? Number(value).toLocaleString('ja-JP') : '—'
 
@@ -65,6 +65,20 @@ export function PhotoReviewDetail({
   if (!photo || loadKind === 'empty') return <main className="mx-auto max-w-screen-2xl p-6"><ListState kind="empty" title="確認する写真はありません" /></main>
 
   const risks = Array.isArray(photo.risks) ? photo.risks as Array<Record<string, unknown>> : []
+  /*
+   * 採用履歴・報酬・公開先（Issue #1040 IDEA-22）。口が古い場合は
+   * 項目ごとに「未取得」へ倒し、詳細自体は開いたままにする。
+   */
+  const history = Array.isArray(photo.history) ? photo.history as Array<Record<string, unknown>> : []
+  const reward = photo.reward && typeof photo.reward === 'object'
+    ? photo.reward as Record<string, unknown>
+    : null
+  const publication = photo.publication && typeof photo.publication === 'object'
+    ? photo.publication as Record<string, unknown>
+    : null
+  const publicationPlacements = publication && Array.isArray(publication.placements)
+    ? publication.placements as Array<Record<string, unknown>>
+    : []
   const hasFaceRisk = risks.some((risk) => text(risk.flag) === 'face')
   const reviewDerivative = derivatives?.items.find((item) => item.kind === 'review') ?? null
   // 派生画像・原本どちらも検査を通す。だめな値は作り直し中の表示にする。
@@ -134,6 +148,73 @@ export function PhotoReviewDetail({
             <strong>{text(risk.note) || text(risk.flag)}</strong>
             <span className="mt-1 block text-xs text-ink-faint">{risk.confidence == null ? '確からしさは未取得' : `可能性 ${Math.round(Number(risk.confidence) * 100)}%`}</span>
           </div>)}
+        </Card>
+        {/*
+         * 採用1回に付与1回・撤回後に残る公開先を、この写真の記録として
+         * その場で確認する（Issue #1040 IDEA-22）。口が古い場合は各項目が
+         * 「未取得」側へ倒れるだけで、詳細の操作は止まらない。
+         */}
+        <Card padding="default">
+          <h2 className="text-sm font-bold text-ink">採用・同意・公開の記録</h2>
+          <dl className="text-xs">
+            <div className="mt-3 border-t border-hairline pt-3">
+              <dt className="font-bold text-ink-faint">審査の記録</dt>
+              {history.length === 0
+                ? <dd className="mt-1 font-bold text-ink">まだ審査の記録はありません</dd>
+                : history.map((event, index) => <dd key={`${text(event.created_at)}-${index}`} className="mt-1 font-bold text-ink">
+                  {text(event.to_status) === 'adopted' ? '通した' : '戻した'}
+                  {text(event.reason_code) ? `（${photoReviewReasonLabel(event.reason_code)}）` : ''}
+                  ・{text(event.reviewed_by_name) || '担当未取得'}・{formatPhotoReceivedAt(event.created_at)}
+                  {Number(event.awarded_points) > 0 ? `・${Number(event.awarded_points)}ポイント` : ''}
+                  {text(event.notification_status) === 'failed' ? '・通知は失敗' : ''}
+                </dd>)}
+            </div>
+            <div className="mt-3 border-t border-hairline pt-3">
+              <dt className="font-bold text-ink-faint">公開の同意</dt>
+              <dd className="mt-1 font-bold text-ink">
+                {text(photo.publication_consent_at)
+                  ? `${formatPhotoReceivedAt(photo.publication_consent_at)}に同意${text(photo.publication_consent_version) ? `（${text(photo.publication_consent_version)}）` : ''}`
+                  : '未取得'}
+              </dd>
+              {text(photo.publication_withdrawn_at)
+                ? <dd className="mt-1 font-bold text-status-warn-deep">ご本人が撤回：{formatPhotoReceivedAt(photo.publication_withdrawn_at)}</dd>
+                : null}
+            </div>
+            <div className="mt-3 border-t border-hairline pt-3">
+              <dt className="font-bold text-ink-faint">公開先</dt>
+              {!publication
+                ? <dd className="mt-1 font-bold text-ink">まだ公開先はありません</dd>
+                : <>
+                  {text(publication.status) === 'withdrawn'
+                    ? <dd className="mt-1 font-bold text-ink">掲載先から外しました（{formatPhotoReceivedAt(publication.withdrawn_at)}{text(publication.withdrawn_by_name) ? `・${text(publication.withdrawn_by_name)}` : ''}）</dd>
+                    : null}
+                  {publicationPlacements.length === 0
+                    ? <dd className="mt-1 font-bold text-ink">掲載先の登録はありません</dd>
+                    : publicationPlacements.map((placement) => <dd key={text(placement.id)} className="mt-1 font-bold text-ink">
+                      {text(placement.placement_label)}・{Number(placement.active) === 1
+                        ? `掲載中（${formatPhotoReceivedAt(placement.created_at)}から）`
+                        : `外した（${formatPhotoReceivedAt(placement.removed_at)}）`}
+                    </dd>)}
+                  <dd className="mt-1 font-medium text-ink-faint">公開の期限は設けていません。外す操作をするまで掲載され続けます。</dd>
+                </>}
+            </div>
+            <div className="mt-3 border-t border-hairline pt-3">
+              <dt className="font-bold text-ink-faint">ポイント</dt>
+              <dd className="mt-1 font-bold text-ink">
+                {text(photo.status) === 'adopted'
+                  ? reward
+                    ? `${pointStatusLabel(reward.status, Number(reward.points) || 5)}${text(reward.synced_at) ? `（${formatPhotoReceivedAt(reward.synced_at)}）` : ''}`
+                    : 'EC未接続・ポイント対象外'
+                  : 'ポイントの対象は通した写真だけです'}
+              </dd>
+              {reward && text(reward.last_error)
+                ? <dd className="mt-1 font-medium text-status-warn-deep">確認が必要：{text(reward.last_error)}</dd>
+                : null}
+              {text(photo.status) === 'adopted'
+                ? <dd className="mt-1 font-medium text-ink-faint">採用1回につき付与は1回です。外しても付与済みのポイントは戻りません。</dd>
+                : null}
+            </div>
+          </dl>
         </Card>
         <FeatureLinkCard items={[
           { label: 'ECポイント', note: 'ECとつながっていれば、通したとき5ポイントの手続きを始める' },

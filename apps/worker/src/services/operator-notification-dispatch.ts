@@ -665,13 +665,19 @@ export async function dispatchOperatorRule(
         continue;
       }
       if (channel === 'in_app') {
+        /*
+         * 通知センターの行は「同じ事象」1件につき1行。送達は受信者ごとに
+         * 分かれるが、画面には宛先の区別が無いため、送達idを主キーにすると
+         * 受信者の人数だけ同じ通知が並んでしまう。instance id を主キーにして
+         * INSERT OR IGNORE で畳む。
+         */
         await db.prepare(`
           INSERT OR IGNORE INTO notifications
             (id, rule_id, event_type, title, body, channel, status, metadata,
              line_account_id, category, created_at)
           VALUES (?, ?, ?, ?, ?, 'dashboard', 'sent', ?, ?, ?, ?)
         `).bind(
-          claimed.id, rule.id, rule.event_type, rule.name, text,
+          instanceId, rule.id, rule.event_type, rule.name, text,
           JSON.stringify({ sourceEventId: input.sourceEventId, executionMode: input.executionMode }),
           input.lineAccountId, conditions.importance === 'urgent' ? 'error' : 'info',
           new Date().toISOString(),
@@ -845,13 +851,15 @@ export async function sweepOperatorNotifications(
       : {};
     const token = row.channel === 'line' ? await accountToken(db, row.line_account_id) : null;
     if (row.channel === 'in_app') {
+      // 発火時と同じく instance id を主キーにする。回収経路で別idを付けると
+      // 同じ事象が2行に割れる。
       await db.prepare(`
         INSERT OR IGNORE INTO notifications
           (id, rule_id, event_type, title, body, channel, status, metadata,
            line_account_id, category, created_at)
         VALUES (?, ?, ?, ?, ?, 'dashboard', 'sent', ?, ?, ?, ?)
       `).bind(
-        row.id, instance.definition_id, instance.source_event_type, ruleName, text,
+        row.instance_id, instance.definition_id, instance.source_event_type, ruleName, text,
         JSON.stringify({ sourceEventId: instance.source_event_id, executionMode: row.execution_mode, recovered: true }),
         row.line_account_id,
         ruleConditionsSnapshot.importance === 'urgent' ? 'error' : 'info',

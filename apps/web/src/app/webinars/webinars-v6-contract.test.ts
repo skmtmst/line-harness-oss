@@ -175,8 +175,8 @@ describe('V6 ウェビナー一覧の契約', () => {
     for (const call of [
       'webinarApi.editor(id)',
       'webinarApi.publishValidation(webinar.id)',
-      'webinarApi.participants(webinarId, undefined, PARTICIPANTS_PAGE_SIZE)',
-      'webinarApi.participants(webinarId, nextCursor, PARTICIPANTS_PAGE_SIZE)',
+      'webinarApi.participants(webinarId, undefined, PARTICIPANTS_PAGE_SIZE, participantFilter || undefined)',
+      'webinarApi.participants(webinarId, nextCursor, PARTICIPANTS_PAGE_SIZE, participantFilter || undefined)',
       'webinarApi.testPublicPage(webinar.id, editor.version)',
     ]) expect(EDIT).toContain(call)
     for (const call of [

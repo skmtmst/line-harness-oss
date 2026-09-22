@@ -1034,6 +1034,18 @@ const spec = {
         responses: { '200': { description: 'Audience detail' }, '404': { description: 'Not found' }, '410': { description: 'Audience expired (24h)' } },
       },
     },
+    '/api/analytics/ref/{refCode}/orders': {
+      get: {
+        tags: ['Analytics'], summary: '流入経路(REF)から来た友だちの注文明細。経路別集計(ref-summaryのorderCount)と同じfirst-touch条件で返す（IDEA-18）',
+        parameters: [
+          { name: 'refCode', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'lineAccountId', in: 'query', schema: { type: 'string' } },
+          { name: 'limit', in: 'query', schema: { type: 'integer', default: 20, maximum: 50 } },
+          { name: 'offset', in: 'query', schema: { type: 'integer', default: 0 } },
+        ],
+        responses: { '200': { description: 'Orders attributed to the ref code with status summary' }, '403': { description: 'LINEアカウントの表示権限なし' } },
+      },
+    },
     // ── Friends ─────────────────────────────────────────────────────────────
     '/api/friends': {
       get: {
@@ -1391,6 +1403,23 @@ const spec = {
           '200': { description: 'Media file bytes with Content-Disposition: attachment' },
           '403': { description: 'Staff role required' },
           '404': { description: 'Media not found in account scope' },
+        },
+      },
+    },
+    '/api/media/{id}/versions/{versionNo}/download': {
+      get: {
+        tags: ['Contents'],
+        summary: '登録メディアの指定した版を認証付きでダウンロード（元ファイルの取り戻し）',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'versionNo', in: 'path', required: true, schema: { type: 'integer', minimum: 1 } },
+          { name: 'accountId', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': { description: 'Version file bytes with Content-Disposition: attachment' },
+          '400': { description: 'Account id is required' },
+          '403': { description: 'Staff role required' },
+          '404': { description: 'Media or version not found in account scope' },
         },
       },
     },

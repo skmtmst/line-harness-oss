@@ -4416,6 +4416,85 @@ export type PhotoReviewMetrics = {
   attentionCount: number
 }
 
+/**
+ * 写真1枚の審査履歴（Issue #1040 IDEA-22）。
+ * GET /api/nen-members/photos/:id の `history` に入る。差戻し理由・
+ * 付与ポイント・担当・通知結果まで追える。
+ */
+export type NenPhotoReviewHistoryEntry = {
+  to_status: 'adopted' | 'rejected'
+  reason_code: string | null
+  reason_note: string | null
+  awarded_points: number
+  reviewed_by_name: string | null
+  notification_status: string | null
+  created_at: string
+}
+
+/**
+ * 採用に連動するポイント付与の実状態（Issue #1040 IDEA-22）。
+ * outbox の行をそのまま返す。無い写真は null（EC未連携など付与対象外）。
+ */
+export type NenPhotoRewardState = {
+  status: 'pending' | 'processing' | 'synced' | 'failed'
+  points: number
+  attempt_count: number
+  last_error: string | null
+  synced_at: string | null
+  updated_at: string
+}
+
+/** 掲載先1件。active=0 の外した先も removed_at つきで残る（Issue #1040）。 */
+export type NenPhotoPublicationPlacement = {
+  id: string
+  publication_id?: string
+  placement_type: string
+  placement_label: string
+  view_count: number | null
+  active: number | null
+  created_at?: string | null
+  removed_at?: string | null
+}
+
+/** 掲載管理・詳細で使う掲載1件分。掲載先は外したものも含む。 */
+export type NenPhotoPublicationRecord = {
+  id: string
+  photo_id?: string
+  status: 'published' | 'withdrawn'
+  view_count: number | null
+  version?: number
+  published_at: string | null
+  withdrawn_at: string | null
+  withdrawn_by_name?: string | null
+  placements?: NenPhotoPublicationPlacement[]
+}
+
+/** GET /api/nen-members/photos/:id の応答本体。 */
+export type NenPhotoDetail = Record<string, unknown> & {
+  history?: NenPhotoReviewHistoryEntry[]
+  reward?: NenPhotoRewardState | null
+  publication?: NenPhotoPublicationRecord | null
+}
+
+/**
+ * GET /api/nen-members/photos/publications の応答本体（Issue #1040）。
+ * `pendingWithdrawals` は同意撤回済みで掲載先の整理が残るもの、
+ * `withdrawnItems` は外し終えた履歴。撤回後に残る公開先を追うための口。
+ */
+export type NenPhotoPublicationList = {
+  summary: {
+    publishedCount: number
+    placementCount: number
+    topPhoto: Record<string, unknown> | null
+    consentedCount: number
+    attentionCount: number
+    withdrawnCount: number
+  }
+  items: Array<Record<string, unknown>>
+  pendingWithdrawals: Array<Record<string, unknown>>
+  withdrawnItems: Array<Record<string, unknown>>
+}
+
 /** GET /api/accounts/health-summary の応答。ログ本文は含まない。 */
 export type AccountHealthSummary = {
   items: Array<{ lineAccountId: string; riskLevel: string | null }>
@@ -6531,7 +6610,14 @@ export const api = {
       `/api/media/${encodeURIComponent(id)}/versions`,
       { method: 'POST', body: JSON.stringify(data) },
     ),
-    update: (id: string, accountId: string, data: { filename?: string; folderId?: string | null }) =>
+    update: (id: string, accountId: string, data: {
+      filename?: string
+      folderId?: string | null
+      /** 既知の利用期限（YYYY-MM-DD）。null で記録を消して「不明」へ戻す。 */
+      usageExpiresAt?: string | null
+      /** 同意・権利の確認記録（500文字まで）。null/空で消す。 */
+      usageConsentNote?: string | null
+    }) =>
       fetchApi<ApiResponse<MediaItem>>(`/api/media/${id}?accountId=${encodeURIComponent(accountId)}`, {
         method: 'PATCH',
         body: JSON.stringify(data),
@@ -6581,6 +6667,12 @@ export const api = {
     /** 保存URLへ直接行かず、権限確認と監査を通る口から受け取る。 */
     download: (id: string, accountId: string) =>
       fetchApiBlob(`/api/media/${encodeURIComponent(id)}/download?accountId=${encodeURIComponent(accountId)}`),
+    /**
+     * 指定した版のダウンロード（IDEA-15）。第1版は登録時の元ファイルで、
+     * 差し替え後もここから取り戻せる。権限確認と監査は download と同じ。
+     */
+    downloadVersion: (id: string, versionNo: number, accountId: string) =>
+      fetchApiBlob(`/api/media/${encodeURIComponent(id)}/versions/${encodeURIComponent(versionNo)}/download?accountId=${encodeURIComponent(accountId)}`),
     /**
      * 縮小表示・試し見・ファイル開きの参照先。Cookieで認証されるため
      * img・video・audio の src や別タブ開きにそのまま使える。
@@ -9552,7 +9644,7 @@ export const api = {
     photoReviewMetrics: (accountId: string) => fetchApi<ApiResponse<PhotoReviewMetrics>>(
       `/api/nen-members/photos/review-metrics?accountId=${encodeURIComponent(accountId)}`,
     ),
-    photo: (id: string, accountId: string) => fetchApi<ApiResponse<Record<string, unknown>>>(
+    photo: (id: string, accountId: string) => fetchApi<ApiResponse<NenPhotoDetail>>(
       `/api/nen-members/photos/${encodeURIComponent(id)}?accountId=${encodeURIComponent(accountId)}`,
     ),
     photoAssetStatus: (id: string, accountId: string) => fetchApi<ApiResponse<PhotoAssetStatus>>(
@@ -9597,10 +9689,9 @@ export const api = {
       },
     ),
     downloadPhotoOriginal: (downloadUrl: string) => fetchApiBlob(downloadUrl),
-    photoPublications: (accountId: string) => fetchApi<ApiResponse<{
-      summary: { publishedCount: number; placementCount: number; topPhoto: Record<string, unknown> | null; consentedCount: number }
-      items: Array<Record<string, unknown>>
-    }>>(`/api/nen-members/photos/publications?accountId=${encodeURIComponent(accountId)}`),
+    photoPublications: (accountId: string) => fetchApi<ApiResponse<NenPhotoPublicationList>>(
+      `/api/nen-members/photos/publications?accountId=${encodeURIComponent(accountId)}`,
+    ),
     withdrawPhotoPublication: (id: string, data: { accountId: string; expectedVersion: number }, idempotencyKey: string) =>
       fetchApi<ApiResponse<{ status: 'withdrawn'; version: number }>>(
         `/api/nen-members/photos/publications/${encodeURIComponent(id)}/withdraw`,
@@ -13081,6 +13172,8 @@ export type WebinarPublishValidation = {
   warnings: string[]
 }
 
+export type WebinarParticipantClassification = 'unviewed' | 'dropped_off' | 'completed' | 'unmeasured'
+
 export type WebinarParticipantPage = {
   items: Array<{
     friendId: string
@@ -13096,8 +13189,16 @@ export type WebinarParticipantPage = {
     actionStatus: string | null
     errorDetail: string | null
     staffIntegrationStatus: 'completed' | 'needs_attention' | 'pending'
+    /* 分類・ライブ/録画の区別はサーバー側の一つのルールで決める。
+       古い応答には無いので、無いときは画面側の推測へ落とす。 */
+    classification?: WebinarParticipantClassification
+    liveSessions?: number
+    replaySessions?: number
+    lastJoinKind?: 'live' | 'replay' | null
   }>
   nextCursor: string | null
+  measurement?: { state: 'available' | 'unavailable'; reason: string | null }
+  rule?: { completionThresholdSeconds: number; durationSeconds: number }
 }
 
 export type WebinarListParams = {
@@ -13186,7 +13287,8 @@ export const webinarApi = {
     `/api/webinars/${id}/actions`,
     { method: 'PUT', body: JSON.stringify({ actions }) },
   ),
-  participantsCsvUrl: (id: string) => `/api/webinars/${encodeURIComponent(id)}/participants.csv`,
+  participantsCsvUrl: (id: string, filter?: WebinarParticipantClassification) =>
+    `/api/webinars/${encodeURIComponent(id)}/participants.csv${filter ? `?filter=${encodeURIComponent(filter)}` : ''}`,
   notifications: (id: string) => fetchApi<{
     data: {
       settings: WebinarNotificationSettings | null
@@ -13224,10 +13326,11 @@ export const webinarApi = {
       }),
     }),
   analytics: (id: string) => fetchApi<{ data: WebinarAnalytics }>(`/api/webinars/${id}/analytics`),
-  participants: (id: string, cursor?: string, limit?: number) => fetchApi<{ data: WebinarParticipantPage }>(
-    `/api/webinars/${id}/participants${cursor || limit ? `?${[
+  participants: (id: string, cursor?: string, limit?: number, filter?: WebinarParticipantClassification) => fetchApi<{ data: WebinarParticipantPage }>(
+    `/api/webinars/${id}/participants${cursor || limit || filter ? `?${[
       cursor ? `cursor=${encodeURIComponent(cursor)}` : '',
       limit ? `limit=${encodeURIComponent(String(limit))}` : '',
+      filter ? `filter=${encodeURIComponent(filter)}` : '',
     ].filter(Boolean).join('&')}` : ''}`,
   ),
   userComments: (id: string) =>

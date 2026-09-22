@@ -70,3 +70,74 @@ describe('一斉配信の最終確認', () => {
     expect(FORM).toContain('busy={saving}')
   })
 })
+
+/**
+ * IDEA-06（Issue #1024）：既存の最終確認に、対象数・除外理由・計算時刻・
+ * 送信枠・把握できる重複配信をまとめる。画面内の「最終確認」節と、
+ * 予約の確認窓の両方が対象。
+ */
+describe('最終確認へのまとめ（IDEA-06）', () => {
+  // 画面内の「最終確認」節だけを切り出す。
+  const SECTION = FORM.slice(
+    FORM.indexOf('>最終確認</h3>'),
+    FORM.indexOf("shows('message') && lengthNotice.tone === 'error'"),
+  )
+  // 予約の確認窓（ConfirmDialog の中身）だけを切り出す。
+  const DIALOG = FORM.slice(
+    FORM.indexOf('open={confirmOpen}'),
+    FORM.indexOf('open={testDialogOpen}'),
+  )
+
+  it('画面内の確認に、対象数・除外理由・送信枠・計算時刻を並べる', () => {
+    for (const label of ["'対象'", "'除外'", "'配信日時'", "'送信枠'", "'計算時刻'"]) {
+      expect(SECTION, `${label} がありません`).toContain(label)
+    }
+  })
+
+  it('確認の窓にも送信枠と計算時刻を出す', () => {
+    expect(DIALOG).toContain('>送信枠</dt>')
+    expect(DIALOG).toContain('>計算時刻</dt>')
+  })
+
+  it('計算時刻は配信前チェックが数えた時刻だけを使う', () => {
+    // 表示側で今の時刻を作ると「いつ数えた数か」が誤魔化せる。
+    expect(FORM).toContain('preflight?.audience?.evaluatedAt')
+    expect(FORM).toContain('timeZone: \'Asia/Tokyo\'')
+  })
+
+  it('送信枠は取得失敗・不足・残りを分け、0や空白で誤魔化さない', () => {
+    expect(FORM).toContain("quota.state === 'unavailable'")
+    expect(FORM).toContain("quota.state === 'insufficient'")
+    expect(FORM).toContain('確認できませんでした')
+    expect(FORM).toContain('この配信で ${quota.planned.toLocaleString')
+  })
+
+  it('把握できる重複配信を、両方の確認へ出す', () => {
+    expect(SECTION).toContain('concurrentBroadcasts.map')
+    expect(SECTION).toContain('同じ時刻の前後1時間に別の予約配信があります')
+    expect(DIALOG).toContain('concurrentBroadcasts.map')
+    expect(DIALOG).toContain('同じ時刻の前後1時間に別の予約配信があります')
+  })
+
+  it('条件が変わると、古い確認を解除する', () => {
+    // 応答には取ったときの入力の指紋を付け、今の入力とずれたら使わない。
+    expect(FORM).toContain('const currentPreflightKey = JSON.stringify(preflightRequestBody())')
+    expect(FORM).toContain('preflightKey === currentPreflightKey')
+    // 宛先・本文が壊れている間は確認結果そのものを捨てる。
+    expect(FORM).toContain('setPreflightResult(null)')
+    expect(FORM).toContain('setPreflightKey(null)')
+    // 遅れて届いた古い要求の応答で、新しい確認を上書きしない。
+    expect(FORM).toContain('seq !== preflightSeq.current')
+  })
+
+  it('今すぐ配信・予約・下書きを混同しない', () => {
+    // 段つき画面の確定ボタンは、予約のときだけ「予約」と言う。
+    expect(FORM).toContain("sendMode === 'scheduled' ? 'この内容で予約' : '保存して送信画面へ'")
+    // 「今すぐ」は日時を持たない。「未設定」とは書かず、次の操作場所を書く。
+    expect(FORM).toContain("'今すぐ（保存後に詳細画面で送信）'")
+    expect(FORM).toContain('今すぐ配信を選んでいます')
+    // 保存した下書きは、送信ボタンのある詳細画面へ進める。
+    const NEW_PAGE = readFileSync(join(HERE, '..', '..', 'app', 'broadcasts', 'new', 'page.tsx'), 'utf8')
+    expect(NEW_PAGE).toContain('`/broadcasts?id=${encodeURIComponent(broadcast.id)}`')
+  })
+})
