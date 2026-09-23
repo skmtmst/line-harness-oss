@@ -65,6 +65,29 @@
   --color-action-soft: #eaf4ff;
   --color-on-action: #ffffff;
 
+  /*
+   * #669 緑の意味は2つだけ。**主操作（CTA）と成功・有効状態。**
+   *
+   * 緑が「押せるもの」と「ただの情報」の両方に使われ、主操作が埋もれて
+   * いた（全32画面で accent-deep、6画面で success が同役で共存）。
+   * 役割とトークンの対応はこれ。以後は名前で参照し、生の緑・青
+   * （Tailwind の green/blue/emerald/teal 系）は新たに書かない。
+   *
+   *   主操作の面・白文字      → accent-deep（CTA の緑。白文字 5.44:1）
+   *   成功・完了の文字と地    → success / success-bg（成功の緑）
+   *   有効・選択中の印        → accent 系（トグルON・選択タブ・現在地・
+   *                              選択チップ。選ばれている状態の表示）
+   *   テキストリンク          → action（青。緑のリンクは書かない）
+   *   補助の小字・行の補足    → ink-secondary / ink-faint（緑にしない）
+   *   数値カードの数字        → ink（緑にしない。状態を示す数だけ success 等）
+   *   情報の案内              → info 系（ティール）か status-info 系（青）。
+   *                              どちらも「情報」だが、画面内の案内は info、
+   *                              状態の札は status-info に寄せる。
+   *
+   * success-bg と accent-soft は同値（#e8f8ee）だが名前で使い分ける。
+   * 成功の地は success-bg、選択・CTA の地は accent-soft と書く。
+   */
+
   /* 文字。Pencil V5を共通基盤とし、V6でも同じ変数を使う。
    * ink が本文、ink-secondary が補足、ink-faint がラベル。 */
   --color-ink: #1d1d1f;

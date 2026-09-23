@@ -54,18 +54,26 @@
   white-space: nowrap;
 }
 
+/*
+ * #669 行の補足（件数など）は緑にしない。緑は CTA と成功・有効だけの
+ * ものにし、押せない補助文字はニュートラル（ink-secondary）にする。
+ */
 .meta {
   flex: 0 0 auto;
-  color: var(--color-accent-deep, currentColor);
+  color: var(--color-ink-secondary);
   font-size: var(--text-caption);
   font-weight: 700;
 }
 
+/*
+ * #669 カード頭の操作（「すべて見る →」など）はテキストリンクなので
+ * リンク色（action）にする。緑だと主操作ボタンと見分けがつかない。
+ */
 .action {
   display: flex;
   flex-shrink: 0;
   align-items: center;
-  color: var(--color-accent-deep);
+  color: var(--color-action);
   font-size: var(--text-label);
   font-weight: 600;
   white-space: nowrap;
