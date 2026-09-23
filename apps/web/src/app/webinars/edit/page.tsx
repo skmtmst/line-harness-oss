@@ -833,7 +833,7 @@ function AnalyticsTab({ webinarId, durationSeconds, view = 'analytics', analytic
               <span className={`h-2 w-2 rounded-full ${metric.dot}`} />
               {metric.label}
             </div>
-            <div className="mt-3 text-3xl font-bold tracking-tight text-slate-950">{metric.value}</div>
+            <div className="mt-3 text-3xl font-bold tabular-nums tracking-[-0.02em] text-slate-950">{metric.value}</div>
             <div className="mt-1 text-xs text-slate-500">{metric.detail}</div>
           </div>
         ))}

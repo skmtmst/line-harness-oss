@@ -8,6 +8,7 @@ import { ApiError, api, bookingApi, type BookingRequest, type DashboardOverview 
 import { useAccount } from '@/contexts/account-context'
 import { useFeatureVisibility } from '@/lib/use-feature-visibility'
 import { formatDurationMinutes, formatWaitRough } from '@/lib/format-duration'
+import MetricValue from '@/components/ui/metric-value'
 import PendingInboxCard, { type PendingInboxSummary } from '@/components/support/pending-inbox-card'
 import ShipmentPanel, { type ShipmentSummary } from '@/components/dashboard/shipment-panel'
 import QrDialog from '@/components/dashboard/qr-dialog'
@@ -122,6 +123,7 @@ function TodayTaskCard({
   detail,
   status,
   statusTone = 'success',
+  loading = false,
 }: {
   title: string
   /*
@@ -140,6 +142,8 @@ function TodayTaskCard({
    * 見間違うため（A01-01）。
    */
   statusTone?: 'success' | 'muted'
+  /* true の間は件数の場所に骨組みを出す。失敗・未取得は「—」のまま（#673）。 */
+  loading?: boolean
 }) {
   return (
     <Card layout="vertical" padding="default" className="h-[116px] min-w-0">
@@ -148,8 +152,19 @@ function TodayTaskCard({
         {period ? <span className="text-ink-faint flex-1 whitespace-nowrap pt-0.5 text-[11px] font-normal">{period}</span> : null}
         <Link href={href} className="text-action shrink-0 text-xs font-medium hover:underline">{action}</Link>
       </div>
-      <p className="text-ink mt-2 text-[28px] leading-none font-bold tabular-nums">
-        {value === null ? '—' : value.toLocaleString('ja-JP')}<span className="ml-0.5 text-lg">件</span>
+      <p className="text-ink mt-2 text-[28px] leading-none font-bold tabular-nums" aria-busy={loading || undefined}>
+        {loading ? (
+          <>
+            {/* #673: 「—」は「取れなかった」にも読めるので、待っている間は形だけ残す */}
+            <span className="bg-canvas-sunken inline-block h-7 w-16 animate-pulse rounded" aria-hidden="true" />
+            <span className="sr-only">{STATE_TEXT.loading}</span>
+          </>
+        ) : (
+          <>
+            {value === null ? '—' : value.toLocaleString('ja-JP')}
+            <span className="ml-0.5 text-lg">件</span>
+          </>
+        )}
       </p>
       <div className="mt-2 flex items-end justify-between gap-3">
         <span className="text-ink-faint truncate text-xs" title={detail}>{detail}</span>
@@ -370,13 +385,15 @@ function UnavailableDataCard({ title, onRetry, section }: {
 }
 
 function LiveDataCard({
-  title, period, href, linkLabel, value, unit = '件', detail, freshness,
+  title, period, href, linkLabel, value, unit = '件', detail, freshness, loading = false,
 }: {
   title: string
   /* 数字の対象期間（「現在」・選択中の期間など）。見出しの脇へ小さく出す（IDEA-01）。 */
   period?: string
   href: string; linkLabel: string; value: number | null; unit?: string; detail: string
   freshness?: NonNullable<DashboardOverview['sections']>[keyof NonNullable<DashboardOverview['sections']>]
+  /* true の間は数値の場所に骨組みを出す。失敗・未取得は「—」のまま（#673）。 */
+  loading?: boolean
 }) {
   return (
     <Card padding="roomy">
@@ -385,8 +402,18 @@ function LiveDataCard({
         {period ? <span className="text-ink-faint flex-1 whitespace-nowrap pt-0.5 text-[11px] font-normal">{period}</span> : null}
         <Link href={href} className="text-action shrink-0 text-xs hover:underline">{linkLabel} →</Link>
       </div>
-      <p className="text-ink mt-4 text-2xl font-bold tabular-nums">
-        {value === null ? '—' : value.toLocaleString('ja-JP')}<span className="ml-1 text-sm font-medium">{unit}</span>
+      <p className="text-ink mt-4 text-2xl font-bold tabular-nums" aria-busy={loading || undefined}>
+        {loading ? (
+          <>
+            {/* #673: 「—」は「取れなかった」にも読めるので、待っている間は形だけ残す */}
+            <span className="bg-canvas-sunken inline-block h-7 w-20 animate-pulse rounded" aria-hidden="true" />
+            <span className="sr-only">{STATE_TEXT.loading}</span>
+          </>
+        ) : (
+          // 監査6 #674: 数字の見せ方は MetricValue に寄せる。
+          // 値が無いときは「—」だけで単位を付けない（「—件」は数に見える）。
+          <MetricValue value={value} unit={unit} />
+        )}
       </p>
       <div className="mt-2 flex items-end justify-between gap-3">
         <p className="text-ink-faint min-w-0 truncate text-xs" title={detail}>{detail}</p>
@@ -441,7 +468,12 @@ function SendQuotaCard({
           この値は `limit - used` なので残り。言葉を付けて向きを固定する。
         */}
         <span className="text-base leading-tight">
-          {unlimited
+          {loading ? (
+            <>
+              <span className="bg-canvas-sunken inline-block h-6 w-44 animate-pulse rounded" aria-hidden="true" />
+              <span className="sr-only">{STATE_TEXT.loading}</span>
+            </>
+          ) : unlimited
             ? `使用 ${used === null ? '—' : used.toLocaleString('ja-JP')}通（上限なし）`
             : remaining === null || limit === null
               ? '—'
@@ -462,7 +494,7 @@ function SendQuotaCard({
           {`送信枠を${STATE_TEXT.error}。もう一度読み込む`}
         </button>
       ) : loading ? (
-        <span className="text-ink-faint">{STATE_TEXT.loading}…</span>
+        <span className="bg-canvas-sunken inline-block h-4 w-24 animate-pulse rounded" aria-hidden="true" />
       ) : unlimited ? (
         <span className="text-ink-faint">契約種別：無制限</span>
       ) : (
@@ -1189,7 +1221,7 @@ function DashboardPageInner() {
     />
     if (id === 'scenario-status') {
       const scenarios = sectionAvailable('operations') ? data?.operations?.scenarios : undefined
-      return <LiveDataCard title="シナリオ配信状況" period="現在" href="/scenarios" linkLabel="シナリオを見る" value={scenarios?.active ?? null} detail={scenarios ? `一時停止 ${scenarios.paused}件` : data ? STATE_TEXT.error : STATE_TEXT.loading} freshness={data?.sections?.operations} />
+      return <LiveDataCard title="シナリオ配信状況" period="現在" href="/scenarios" linkLabel="シナリオを見る" value={scenarios?.active ?? null} detail={scenarios ? `一時停止 ${scenarios.paused}件` : data ? STATE_TEXT.error : STATE_TEXT.loading} freshness={data?.sections?.operations} loading={loading} />
     }
     if (id === 'uid-migration') {
       const migrations = sectionAvailable('operations') ? data?.operations?.migrations : undefined
@@ -1197,7 +1229,7 @@ function DashboardPageInner() {
        * 行き先は移行の画面そのもの（DASH-07）。/health は稼働状況の画面で、
        * 移行の進行は見られない。
        */
-      return <LiveDataCard title="UID移行状況" period="現在" href="/accounts?tab=migration" linkLabel="移行状況を見る" value={migrations?.active ?? null} detail={migrations ? `完了 ${migrations.completed}件` : data ? STATE_TEXT.error : STATE_TEXT.loading} freshness={data?.sections?.operations} />
+      return <LiveDataCard title="UID移行状況" period="現在" href="/accounts?tab=migration" linkLabel="移行状況を見る" value={migrations?.active ?? null} detail={migrations ? `完了 ${migrations.completed}件` : data ? STATE_TEXT.error : STATE_TEXT.loading} freshness={data?.sections?.operations} loading={loading} />
     }
     return null
   }
@@ -1211,6 +1243,7 @@ function DashboardPageInner() {
       action="受信箱を開く"
       value={pendingTotal}
       detail={pendingDetail}
+      loading={pendingDetail === STATE_TEXT.loading}
       status={pendingTotal === null
         ? '未取得'
         : pendingOldest !== null ? `最長 ${formatWaitRough(pendingOldest)}` : '—'}
@@ -1238,6 +1271,7 @@ function DashboardPageInner() {
         action={forbidden ? '権限を確認する' : '審査する'}
         value={forbidden ? null : value}
         detail={detail}
+        loading={state === 'loading'}
         status={forbidden ? '権限なし' : state === 'ready' ? 'ポイント付与あり' : '確認待ち'}
         statusTone={state === 'ready' ? 'success' : 'muted'}
       />
@@ -1260,6 +1294,7 @@ function DashboardPageInner() {
         action="予約を見る"
         value={bookingsValue}
         detail={bookingsFailed && todayActiveBookings === null ? STATE_TEXT.error : '取消・完了を除く今日の予約'}
+        loading={bookingsValue === null && !bookingsFailed}
         /*
          * 明細が取れていないのに「次回予定なし」と出すと、失敗を 0件 と
          * 見せることになる（IDEA-01）。失敗は「未取得」、読込中は「確認中」。
@@ -1276,6 +1311,7 @@ function DashboardPageInner() {
       href="/ec-commerce"
       action="ECを見る"
       value={shipmentState === 'ready' ? (shipmentSummary?.today ?? null) : null}
+      loading={shipmentState === 'loading'}
       detail={shipmentState === 'error'
         ? STATE_TEXT.error
         : shipmentState === 'ready'
@@ -1328,15 +1364,15 @@ function DashboardPageInner() {
        * 同じ母集団を出すので、カードと一覧の件数が一致する（IDEA-01）。
        * 「今後の予約」は補足として併記する。
        */
-      return <LiveDataCard title="予約状況" period="現在" href="/booking/bookings?view=list&status=requested" linkLabel="予約を見る" value={bookingsStatus?.pending ?? null} detail={bookingsStatus ? `今後の予約 ${bookingsStatus.upcoming}件` : data ? STATE_TEXT.error : STATE_TEXT.loading} freshness={data?.sections?.operations} />
+      return <LiveDataCard title="予約状況" period="現在" href="/booking/bookings?view=list&status=requested" linkLabel="予約を見る" value={bookingsStatus?.pending ?? null} detail={bookingsStatus ? `今後の予約 ${bookingsStatus.upcoming}件` : data ? STATE_TEXT.error : STATE_TEXT.loading} freshness={data?.sections?.operations} loading={loading} />
     }
     if (id === 'inflow-top') {
       const inflowTop = sectionAvailable('operations') ? data?.operations?.inflowTop : undefined
       /* 「経路と成果」タブが期間内の経路別の登録・成果を見る画面（IDEA-01）。 */
-      return <LiveDataCard title="流入経路TOP3" period={dashboardPeriodLabel(period) ?? undefined} href="/analytics?tab=routes" linkLabel="経路別の内訳を見る" value={inflowTop?.[0]?.count ?? (inflowTop ? 0 : null)} detail={inflowTop ? inflowTop.map((item) => `${item.name ?? '—'} ${item.count}`).join('、') || '期間内の追加なし' : data ? STATE_TEXT.error : STATE_TEXT.loading} freshness={data?.sections?.operations} />
+      return <LiveDataCard title="流入経路TOP3" period={dashboardPeriodLabel(period) ?? undefined} href="/analytics?tab=routes" linkLabel="経路別の内訳を見る" value={inflowTop?.[0]?.count ?? (inflowTop ? 0 : null)} detail={inflowTop ? inflowTop.map((item) => `${item.name ?? '—'} ${item.count}`).join('、') || '期間内の追加なし' : data ? STATE_TEXT.error : STATE_TEXT.loading} freshness={data?.sections?.operations} loading={loading} />
     }
-    if (id === 'funnel-alert') return <LiveDataCard title="ファネル要注意" period={dashboardPeriodLabel(period) ?? undefined} href="/analytics?tab=funnel" linkLabel="ファネルを見る" value={sectionAvailable('operations') ? data?.operations?.funnelAlerts ?? null : null} detail="3人以上追加・成果0件の経路" freshness={data?.sections?.operations} />
-    if (id === 'automation-failures') return <LiveDataCard title="オートメーション失敗" period={dashboardPeriodLabel(period) ?? undefined} href="/automations/runs?status=problems" linkLabel="実行状況を見る" value={sectionAvailable('operations') ? data?.operations?.automationFailures ?? null : null} detail="期間内の失敗・一部失敗" freshness={data?.sections?.operations} />
+    if (id === 'funnel-alert') return <LiveDataCard title="ファネル要注意" period={dashboardPeriodLabel(period) ?? undefined} href="/analytics?tab=funnel" linkLabel="ファネルを見る" value={sectionAvailable('operations') ? data?.operations?.funnelAlerts ?? null : null} detail="3人以上追加・成果0件の経路" freshness={data?.sections?.operations} loading={loading} />
+    if (id === 'automation-failures') return <LiveDataCard title="オートメーション失敗" period={dashboardPeriodLabel(period) ?? undefined} href="/automations/runs?status=problems" linkLabel="実行状況を見る" value={sectionAvailable('operations') ? data?.operations?.automationFailures ?? null : null} detail="期間内の失敗・一部失敗" freshness={data?.sections?.operations} loading={loading} />
     return null
   }
 

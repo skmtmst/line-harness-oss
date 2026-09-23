@@ -168,8 +168,8 @@ export default function EventsListPage() {
       <div data-design="KPIs" className="mb-4 grid grid-cols-2 gap-3 xl:grid-cols-4">
         <EventKpi
           title="これからの回"
-          value={dataReady ? String(attention.upcoming.length) : '—'}
-          unit={dataReady ? '回' : ''}
+          value={dataReady ? attention.upcoming.length : null}
+          unit="回"
           detail={loadDetail(
             Boolean(selectedAccountId),
             loadStatus,
@@ -178,8 +178,8 @@ export default function EventsListPage() {
         />
         <EventKpi
           title="申込"
-          value={dataReady ? String(attention.applied) : '—'}
-          unit={dataReady ? '人' : ''}
+          value={dataReady ? attention.applied : null}
+          unit="人"
           detail={loadDetail(
             Boolean(selectedAccountId),
             loadStatus,
@@ -190,8 +190,8 @@ export default function EventsListPage() {
         />
         <EventKpi
           title="あと少しで満席"
-          value={dataReady ? String(attention.nearlyFull.length) : '—'}
-          unit={dataReady ? '回' : ''}
+          value={dataReady ? attention.nearlyFull.length : null}
+          unit="回"
           detail={loadDetail(
             Boolean(selectedAccountId),
             loadStatus,
@@ -200,8 +200,8 @@ export default function EventsListPage() {
         />
         <EventKpi
           title="申し込みが少ない"
-          value={dataReady ? String(attention.lowApplications.length) : '—'}
-          unit={dataReady ? '回' : ''}
+          value={dataReady ? attention.lowApplications.length : null}
+          unit="回"
           detail={loadDetail(
             Boolean(selectedAccountId),
             loadStatus,

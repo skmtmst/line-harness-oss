@@ -207,7 +207,7 @@ describe('代理予約: 下書き・空きセル・権限（実React）', () => 
     // 担当・時刻は一覧と空き枠の到着後に確かめてから選ぶ。
     expect(valueOf(byLabel('担当者'))).toBe('staff-ny')
     expect(valueOf(byLabel('空いている時間'))).toBe('10:00')
-    const dateInput = all('input').find((element) => element.getAttribute('type') === 'date')!
+    const dateInput = all('input').find((element) => element.getAttribute('name') === 'date')!
     expect(valueOf(dateInput)).toBe('2026-11-02')
     const note = all('textarea')[0]!
     expect(valueOf(note)).toBe('急ぎでお願いします')
@@ -249,7 +249,7 @@ describe('代理予約: 下書き・空きセル・権限（実React）', () => 
     await mount()
     await flush()
 
-    const dateInput = all('input').find((element) => element.getAttribute('type') === 'date')!
+    const dateInput = all('input').find((element) => element.getAttribute('name') === 'date')!
     expect(valueOf(dateInput)).toBe('2026-11-02')
     // 担当一覧はメニュー選択後に届く。届いた時点で display_name で照合して選ぶ。
     await act(async () => { setValue(byLabel('予約メニュー'), 'menu-ny') })

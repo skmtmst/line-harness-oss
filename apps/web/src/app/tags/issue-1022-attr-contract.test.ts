@@ -85,8 +85,8 @@ describe('IDEA-04（issue #1022）友だち属性の分類説明・重複候補�
     // 変更前後は一覧と同じ言葉（describeSavedCondition 経由）で出す。
     expect(source).toContain('savedSearchSummary(original.conditions')
     expect(source).toContain('savedSearchSummary(conditions')
-    // 未計算を推定で埋めない。人数は previewCount が無ければ —。
-    expect(source).toContain("previewCount === null ? '—'")
+    // 未計算を推定で埋めない。人数は previewCount が無ければ —（監査6 #674: MetricValue が出す）。
+    expect(source).toContain('<MetricValue value={previewCount}')
   })
 
   it('条件の言語化は編集画面が作れる演算子をすべて正しく説明する', () => {
