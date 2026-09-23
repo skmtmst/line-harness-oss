@@ -189,4 +189,13 @@ describe('監査 #615：一斉配信の受け入れ', () => {
     expect(text).not.toContain('8月キャンペーン配信済み')
     expect(text).toContain('実行しない')
   })
+
+  it('BC-03: メッセージ段のプレビューも、未定なのに固定の配信日時を出さない', async () => {
+    // staging で実機確認: プレビュー見出しの下に「2026/08/24 10:00 に届きます」と
+    // 常に出ていた。未設定の下書きで誤った日時を信じさせる。
+    await renderStepped('message')
+
+    expect(container.textContent ?? '').not.toContain('2026/08/24')
+    expect(container.textContent ?? '').toContain('配信日時は STEP 4 で設定します')
+  })
 })
