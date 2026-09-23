@@ -28,6 +28,7 @@ const LIST_RANGE_USERS: Array<[string, string]> = [
   ['EC連携 会員のつき合わせ', '../../app/ec-commerce/identity-candidates/page.tsx'],
   ['EC連携 定期便', '../../app/ec-commerce/subscriptions-panel.tsx'],
   ['予約メニュー', '../../app/booking/menus/page.tsx'],
+  ['ウェビナー', '../../app/webinars/page.tsx'],
   ['運営 監査ログ', '../../app/ops/audit/page.tsx'],
   ['運営 お問い合わせ', '../../app/ops/support/page.tsx'],
   ['自動化の実行記録', '../../app/automations/runs/page.tsx'],

@@ -758,7 +758,12 @@ export default function TemplatesPage() {
           onChange={(e) => setTemplateQuery(e.target.value)}
           className="border-hairline rounded-control focus:ring-accent min-w-0 flex-1 border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
         />
-        <span className="bg-canvas-sunken rounded-control px-3 py-2 text-sm font-medium">保存した検索</span>
+        {/*
+          #668: 「保存した検索」の飾りは消した。押せる形をしているのに
+          何も起きない札は、押した人に「やった」と誤解させる
+          （v6-common-rules §2-2）。保存検索の仕組みができたら、
+          一斉配信と同じ選び口（SelectField）で置き直す。
+        */}
         {/*
           ここは「20件表示」の選び口だった(#615)。**選べない選び口だった。**
           `value` だけ渡して `onChange` も読み取り専用指定も無いので、React が
