@@ -711,7 +711,7 @@ export default function NewProxyBookingPage() {
                   />
                 </Field>
                 <Field label="日付">
-                  <DateField value={date} onChange={setDate} aria-label="日付" />
+                  <DateField name="date" value={date} onChange={setDate} aria-label="日付" />
                 </Field>
                 <Field label="空いている時間">
                   <Select
