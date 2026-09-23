@@ -661,8 +661,8 @@ export default function FormSubmissionsPage() {
                       <span className="text-ink-faint">—</span>
                     ) : (
                       <>
-                        <Link href={`/form-submissions/responses?id=${encodeURIComponent(form.id)}`} aria-label={`${normalizedName}の集まった回答を見る`} className="text-accent hover:underline whitespace-nowrap">回答を見る</Link>
-                        <button type="button" onClick={() => openRename(form)} className="ml-2 text-accent hover:underline">編集</button>
+                        <Link href={`/form-submissions/responses?id=${encodeURIComponent(form.id)}`} aria-label={`${normalizedName}の集まった回答を見る`} className="text-accent-deep hover:underline whitespace-nowrap">回答を見る</Link>
+                        <button type="button" onClick={() => openRename(form)} className="ml-2 text-accent-deep hover:underline">編集</button>
                         <button type="button" onClick={() => void openDelete(form)} className="ml-2 text-danger hover:underline" aria-label={`${normalizedName}を削除`} title="回答フォームを削除">削除</button>
                       </>
                     )}

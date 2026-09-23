@@ -233,7 +233,7 @@ function MediaUpload({ bubble, onChange }: { bubble: BroadcastBubble; onChange: 
       <span className="mt-1 text-xs">上限 {isVideo ? '200MB' : '10MB'}</span>
       <input type="file" className="hidden" disabled={busy} accept={isVideo ? 'video/mp4' : 'image/jpeg,image/png'} onChange={(e) => { const f = e.target.files?.[0]; if (f) void upload(f) }} />
     </label>
-    {typeof bubble.content.originalContentUrl === 'string' && bubble.content.originalContentUrl && <p className="truncate text-xs text-accent">アップロード済み：{bubble.content.originalContentUrl}</p>}
+    {typeof bubble.content.originalContentUrl === 'string' && bubble.content.originalContentUrl && <p className="truncate text-xs text-accent-deep">アップロード済み：{bubble.content.originalContentUrl}</p>}
     {isVideo && <input value={String(bubble.content.previewImageUrl ?? '')} onChange={(e) => onChange({ ...bubble.content, previewImageUrl: e.target.value })} placeholder="プレビュー画像URL（任意）" className="w-full rounded-control border border-hairline px-3 py-2 text-sm" />}
     {bubble.type === 'rich_video' && <input value={String(bubble.content.actionUrl ?? '')} onChange={(e) => onChange({ ...bubble.content, actionUrl: e.target.value })} placeholder="再生終了後に開くURL" className="w-full rounded-control border border-hairline px-3 py-2 text-sm" />}
     {error && <p className="text-xs text-danger">{error}</p>}
@@ -1522,7 +1522,7 @@ export default function BroadcastForm({
           <div className="rounded-card border border-hairline bg-canvas p-8 text-center">
             <p className="text-ink text-sm font-semibold">{draftError}</p>
             <div className="mt-4 flex items-center justify-center gap-3">
-              <Link href="/broadcasts" className="text-accent text-sm font-medium hover:underline">
+              <Link href="/broadcasts" className="text-accent-deep text-sm font-medium hover:underline">
                 一斉配信一覧へ戻る
               </Link>
             </div>
@@ -1705,8 +1705,8 @@ export default function BroadcastForm({
               <p className="mt-1 text-sm text-ink-faint">全員または詳細条件から、実際に送れる友だちを確認します。</p>
             </div>
             <div className="rounded-card bg-accent-soft px-5 py-3 text-right">
-              <p className="text-xs font-bold text-accent">送信対象</p>
-              <p className="text-2xl font-black text-accent">
+              <p className="text-xs font-bold text-accent-deep">送信対象</p>
+              <p className="text-2xl font-black text-accent-deep">
                 {audienceDisplayCount?.toLocaleString('ja-JP') ?? '—'}
                 <span className="ml-1 text-sm">人</span>
               </p>
@@ -1851,7 +1851,7 @@ export default function BroadcastForm({
                   {preflight.audience.representatives.map((friend) => (
                     <div key={friend.friendId} className="flex items-center gap-3 py-3">
                       {friend.pictureUrl ? <img src={friend.pictureUrl} alt="" className="size-8 rounded-full object-cover" /> : (
-                        <span className="flex size-8 items-center justify-center rounded-full bg-accent-soft text-xs font-bold text-accent">{friend.displayName?.slice(0, 1) ?? '—'}</span>
+                        <span className="flex size-8 items-center justify-center rounded-full bg-accent-soft text-xs font-bold text-accent-deep">{friend.displayName?.slice(0, 1) ?? '—'}</span>
                       )}
                       <div><p className="text-sm font-bold text-ink">{friend.displayName ?? '名前未登録'}</p><p className="text-xs text-ink-faint">{friend.summary}</p></div>
                     </div>
@@ -1878,7 +1878,7 @@ export default function BroadcastForm({
             <button
               type="button"
               onClick={() => setShowTemplatePicker(true)}
-              className={`border-accent text-accent rounded-control border px-3 py-1 text-xs font-bold hover:bg-accent-soft ${currentStep === 'message' ? 'hidden' : ''}`}
+              className={`border-accent text-accent-deep rounded-control border px-3 py-1 text-xs font-bold hover:bg-accent-soft ${currentStep === 'message' ? 'hidden' : ''}`}
             >
               テンプレートから選ぶ
             </button>
@@ -2017,7 +2017,7 @@ export default function BroadcastForm({
           </div>
           {currentStep === 'message' ? (
             <p className="mt-3 flex items-center gap-2 text-sm font-semibold text-ink-secondary">
-              <Zap size={17} className="text-accent" aria-hidden />
+              <Zap size={17} className="text-accent-deep" aria-hidden />
               {publishedActions.find((action) => action.versionId === afterActionVersionId)?.name ?? '実行しない'}
             </p>
           ) : <label className="mt-3 block text-xs font-bold text-ink-secondary">実行する公開済みアクション

@@ -135,8 +135,8 @@ function FolderSelect({ tag, groups, onItemsChange, onError }: { tag: Tag; group
  */
 function linkChips(tag: Tag): Array<{ label: string; tone: string }> {
   const chips: Array<{ label: string; tone: string }> = []
-  if (tag.mileageReward) chips.push({ label: `本人+${tag.mileageReward}`, tone: 'bg-accent-soft text-accent' })
-  if (tag.referralMileageReward) chips.push({ label: `紹介+${tag.referralMileageReward}`, tone: 'bg-accent-soft text-accent' })
+  if (tag.mileageReward) chips.push({ label: `本人+${tag.mileageReward}`, tone: 'bg-accent-soft text-accent-deep' })
+  if (tag.referralMileageReward) chips.push({ label: `紹介+${tag.referralMileageReward}`, tone: 'bg-accent-soft text-accent-deep' })
   if (tag.mileageMultiplierBps) chips.push({ label: `${tag.mileageMultiplierBps / 10000}倍`, tone: 'bg-status-warn-soft text-status-warn-deep' })
   if (tag.otherActionCount) chips.push({ label: `他${tag.otherActionCount}`, tone: 'bg-canvas-sunken text-ink-faint' })
   return chips
@@ -349,7 +349,7 @@ function FolderList({ groups, items, countsKnown, active, onSelect, onChanged }:
       <nav className="p-2">{rows.map((row) => {
         const group = groups.find((item) => item.id === row.id)
         const groupIndex = group ? groups.findIndex((item) => item.id === group.id) : -1
-        return <div key={row.id} className="group relative flex items-center"><button type="button" onClick={() => onSelect(row.id)} className={`flex min-w-0 flex-1 items-center gap-2 rounded-control px-3 py-2.5 text-left text-label ${active === row.id ? 'bg-accent-soft font-bold text-accent' : 'font-semibold text-ink hover:bg-canvas-sunken'}`}><span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: row.color }} /><span className="min-w-0 flex-1 truncate">{row.name}</span><span className={`inline-flex h-[26px] shrink-0 items-center rounded-pill px-[9px] text-caption font-semibold tabular-nums ${active === row.id ? 'bg-canvas text-accent' : 'bg-canvas-sunken text-ink-faint'}`}>{countsKnown ? row.count : '—'}</span></button>{group ? <button type="button" aria-label={`${group.name}の操作`} aria-expanded={menuId === group.id} onClick={() => setMenuId((current) => current === group.id ? null : group.id)} className={`ml-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-control text-ink-faint hover:bg-canvas-sunken focus-visible:outline ${active === row.id ? '' : 'invisible group-hover:visible'}`}><MoreHorizontal aria-hidden="true" size={16} /></button> : null}{group ? <ActionMenu open={menuId === group.id} onClose={() => setMenuId(null)} ariaLabel={`${group.name}の操作`} note="削除しても、中のタグは未分類に残ります。" items={[
+        return <div key={row.id} className="group relative flex items-center"><button type="button" onClick={() => onSelect(row.id)} className={`flex min-w-0 flex-1 items-center gap-2 rounded-control px-3 py-2.5 text-left text-label ${active === row.id ? 'bg-accent-soft font-bold text-accent-deep' : 'font-semibold text-ink hover:bg-canvas-sunken'}`}><span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: row.color }} /><span className="min-w-0 flex-1 truncate">{row.name}</span><span className={`inline-flex h-[26px] shrink-0 items-center rounded-pill px-[9px] text-caption font-semibold tabular-nums ${active === row.id ? 'bg-canvas text-accent-deep' : 'bg-canvas-sunken text-ink-faint'}`}>{countsKnown ? row.count : '—'}</span></button>{group ? <button type="button" aria-label={`${group.name}の操作`} aria-expanded={menuId === group.id} onClick={() => setMenuId((current) => current === group.id ? null : group.id)} className={`ml-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-control text-ink-faint hover:bg-canvas-sunken focus-visible:outline ${active === row.id ? '' : 'invisible group-hover:visible'}`}><MoreHorizontal aria-hidden="true" size={16} /></button> : null}{group ? <ActionMenu open={menuId === group.id} onClose={() => setMenuId(null)} ariaLabel={`${group.name}の操作`} note="削除しても、中のタグは未分類に残ります。" items={[
           { id: 'rename', label: '名前を変更', icon: <Pencil size={15} />, onSelect: () => window.location.assign(`/tags/folders/new?id=${group.id}`) },
           { id: 'color', label: '色を変える', icon: <Palette size={15} />, onSelect: () => window.location.assign(`/tags/folders/new?id=${group.id}`) },
           { id: 'up', label: '並び順を上へ', icon: <ArrowUp size={15} />, disabled: busy || groupIndex === 0, onSelect: () => void move(group, -1) },
@@ -970,7 +970,7 @@ export default function TagsPageV4({
                     type="button"
                     aria-pressed={on}
                     onClick={() => setQuick((current) => on ? current.filter((k) => k !== key) : [...current, key])}
-                    className={`rounded-pill border px-3 py-1.5 ${on ? 'border-accent bg-accent-soft text-accent' : 'border-hairline bg-canvas text-ink-secondary'}`}
+                    className={`rounded-pill border px-3 py-1.5 ${on ? 'border-accent bg-accent-soft text-accent-deep' : 'border-hairline bg-canvas text-ink-secondary'}`}
                   >
                     {label}
                   </button>

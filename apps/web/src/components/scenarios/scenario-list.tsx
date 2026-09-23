@@ -414,7 +414,7 @@ export default function ScenarioList({
           <button
             type="button"
             onClick={() => openMove([...selectedIds])}
-            className="text-accent text-sm font-medium hover:underline"
+            className="text-accent-deep text-sm font-medium hover:underline"
           >
             フォルダを移動
           </button>
@@ -607,7 +607,7 @@ export default function ScenarioList({
                   <div className="relative inline-flex items-center justify-end gap-1">
                     <Link
                       href={`/scenarios/detail?id=${s.id}`}
-                      className="text-accent px-2.5 py-1 text-xs font-medium hover:underline"
+                      className="text-accent-deep px-2.5 py-1 text-xs font-medium hover:underline"
                     >
                       編集
                     </Link>

@@ -40,7 +40,7 @@ function FieldSummary({ title, field, kind }: { title: string; field: FriendFiel
           <h2 className="text-base font-bold text-ink">{field.name}</h2>
           <p className="mt-1 font-mono text-xs text-ink-faint">{`{{field.${field.fieldKey}}}`}</p>
         </div>
-        <span className={kind === 'source' ? 'rounded-full bg-surface-soft px-3 py-1 text-xs font-semibold text-ink-secondary' : 'rounded-full bg-accent-soft px-3 py-1 text-xs font-semibold text-accent'}>
+        <span className={kind === 'source' ? 'rounded-full bg-surface-soft px-3 py-1 text-xs font-semibold text-ink-secondary' : 'rounded-full bg-accent-soft px-3 py-1 text-xs font-semibold text-accent-deep'}>
           {FIELD_TYPE_LABELS[field.type]}
         </span>
       </div>
@@ -284,7 +284,7 @@ function MigrateFriendField() {
           <span className="hidden xl:block">→</span>
         </div>
         <section className="rounded-card border border-accent/30 bg-canvas p-5 shadow-sm">
-          <p className="text-xs font-semibold text-accent">移行先の項目</p>
+          <p className="text-xs font-semibold text-accent-deep">移行先の項目</p>
           {target ? (
             <div className="mt-3">
               <h2 className="text-base font-bold text-ink">{target.name}</h2>
@@ -293,7 +293,7 @@ function MigrateFriendField() {
               <button
                 type="button"
                 onClick={() => { setCreatedTarget(null); setExistingTargetId(''); resetConfirmation() }}
-                className="mt-3 text-xs font-semibold text-accent hover:underline"
+                className="mt-3 text-xs font-semibold text-accent-deep hover:underline"
               >
                 別の項目を選び直す
               </button>
@@ -363,7 +363,7 @@ function MigrateFriendField() {
           <div className="mt-5">
             <div className="grid gap-3 sm:grid-cols-4">
               <div className="rounded-control border border-hairline bg-surface-soft p-3"><p className="text-xs text-ink-faint">値がある友だち</p><p className="mt-1 text-xl font-bold text-ink">{preview.summary.total}人</p></div>
-              <div className="rounded-control border border-hairline bg-surface-soft p-3"><p className="text-xs text-ink-faint">そのまま移せる</p><p className="mt-1 text-xl font-bold text-accent">{preview.summary.convertible}人</p></div>
+              <div className="rounded-control border border-hairline bg-surface-soft p-3"><p className="text-xs text-ink-faint">そのまま移せる</p><p className="mt-1 text-xl font-bold text-accent-deep">{preview.summary.convertible}人</p></div>
               <div className="rounded-control border border-hairline bg-surface-soft p-3"><p className="text-xs text-ink-faint">人が確認する</p><p className="mt-1 text-xl font-bold text-warning">{preview.summary.review}人</p></div>
               <div className="rounded-control border border-hairline bg-surface-soft p-3"><p className="text-xs text-ink-faint">空欄</p><p className="mt-1 text-xl font-bold text-danger">{preview.summary.invalid}人</p></div>
             </div>
@@ -372,7 +372,7 @@ function MigrateFriendField() {
                 <thead><TableHeadRow><Th>友だちID</Th><Th>いまの値</Th><Th>確認する理由</Th></TableHeadRow></thead>
                 <tbody>{preview.rows.map((row) => <Tr key={row.friendId}><Td className="truncate font-mono text-xs" title={row.friendId}>{row.friendId}</Td><Td className="truncate" title={row.sourceValue}>{row.sourceValue || '（空欄）'}</Td><Td>{row.reason ?? '確認してください'}</Td></Tr>)}</tbody>
               </DataTable>
-            ) : <p className="mt-4 rounded-control bg-accent-soft p-3 text-sm text-accent">確認が必要な値はありません。</p>}
+            ) : <p className="mt-4 rounded-control bg-accent-soft p-3 text-sm text-accent-deep">確認が必要な値はありません。</p>}
           </div>
         ) : <p className="mt-4 text-sm text-ink-faint">まだ事前確認していません。未取得を0人として表示しません。</p>}
       </section>
@@ -383,7 +383,7 @@ function MigrateFriendField() {
           <div className="mt-3 grid gap-2 text-sm sm:grid-cols-3">
             {preview.usageTargets.map((usage) => <p key={`${usage.kind}:${usage.id}`} className="rounded-control bg-surface-soft p-3"><span className="block truncate font-semibold text-ink" title={usage.name}>{usage.name}</span><span className="mt-1 block text-xs text-ink-faint">{usage.kind} ／ {usage.switchable ? '移行時に切り替え' : '手動確認が必要'}</span></p>)}
           </div>
-        ) : <p className="mt-3 rounded-control bg-accent-soft p-3 text-sm text-accent">切り替えが必要な使用先はありません。</p>
+        ) : <p className="mt-3 rounded-control bg-accent-soft p-3 text-sm text-accent-deep">切り替えが必要な使用先はありません。</p>
           : <p className="mt-3 text-sm text-ink-faint">事前確認すると、回答フォームや自動処理などの使用先を表示します。</p>}
         {preview?.runId && preview.previewExpiresAt ? <p className="mt-2 text-xs text-ink-faint">確認番号：{preview.runId} ／ 有効期限：{new Date(preview.previewExpiresAt).toLocaleString('ja-JP')}</p> : null}
       </section>
@@ -393,7 +393,7 @@ function MigrateFriendField() {
           <h2 className="text-base font-bold text-ink">移行の結果</h2>
           <p className="mt-2 text-sm font-semibold text-ink">{RUN_STATUS_LABELS[run.status]}</p>
           <div className="mt-3 grid gap-3 sm:grid-cols-3">
-            <div className="rounded-control border border-hairline bg-surface-soft p-3"><p className="text-xs text-ink-faint">移行できた</p><p className="mt-1 text-xl font-bold text-accent">{run.summary.succeeded}人</p></div>
+            <div className="rounded-control border border-hairline bg-surface-soft p-3"><p className="text-xs text-ink-faint">移行できた</p><p className="mt-1 text-xl font-bold text-accent-deep">{run.summary.succeeded}人</p></div>
             <div className="rounded-control border border-hairline bg-surface-soft p-3"><p className="text-xs text-ink-faint">移行できなかった</p><p className="mt-1 text-xl font-bold text-danger">{run.summary.failed}人</p></div>
             <div className="rounded-control border border-hairline bg-surface-soft p-3"><p className="text-xs text-ink-faint">確認が必要なまま</p><p className="mt-1 text-xl font-bold text-warning">{run.summary.review + run.summary.invalid}人</p></div>
           </div>

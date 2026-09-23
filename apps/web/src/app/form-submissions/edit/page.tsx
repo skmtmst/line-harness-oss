@@ -610,7 +610,7 @@ function FormEditInner() {
 
         <p className="text-ink-faint bg-canvas rounded-card border-hairline border p-8 text-center text-sm">
           フォームが指定されていません。
-          <Link href="/form-submissions" className="text-accent ml-1 hover:underline">
+          <Link href="/form-submissions" className="text-accent-deep ml-1 hover:underline">
             一覧へ戻る
           </Link>
         </p>
@@ -780,7 +780,7 @@ function FormEditInner() {
                   onClick={() => setTab(HEADER_TAB)}
                   className={`rounded-control px-3 py-1.5 text-sm font-medium whitespace-nowrap ${
                     tab === HEADER_TAB
-                      ? 'bg-accent-soft text-accent'
+                      ? 'bg-accent-soft text-accent-deep'
                       : 'text-ink-secondary hover:bg-canvas-sunken'
                   }`}
                 >
@@ -795,7 +795,7 @@ function FormEditInner() {
                       title="ダブルクリックで名前を変えられます"
                       className={`rounded-control px-3 py-1.5 text-sm font-medium whitespace-nowrap ${
                         tab === i
-                          ? 'bg-accent-soft text-accent'
+                          ? 'bg-accent-soft text-accent-deep'
                           : 'text-ink-secondary hover:bg-canvas-sunken'
                       }`}
                     >
@@ -826,7 +826,7 @@ function FormEditInner() {
 
                 <button
                   onClick={addSection}
-                  className="text-accent hover:bg-accent-soft rounded-control px-2 py-1.5 text-sm font-bold"
+                  className="text-accent-deep hover:bg-accent-soft rounded-control px-2 py-1.5 text-sm font-bold"
                   title="ページを足す"
                 >
                   ＋

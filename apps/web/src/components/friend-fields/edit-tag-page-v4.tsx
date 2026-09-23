@@ -119,7 +119,7 @@ function ArchivedTagEditor({ tag, accountId, onCancel, onSaved }: {
         <p className="mt-1 text-xs leading-5">保管済みのタグは、あとから元に戻す機能がありません。誤字などの表示名の訂正だけできます。フォルダ・付与のしかた・マイル・連動アクションなどの設定は変更できません。</p>
       </div>
       {error && <p role="alert" className="rounded-control border border-danger/25 bg-danger-bg p-3 text-sm text-danger">{error}</p>}
-      {notice && <p className="rounded-control border border-accent/25 bg-accent-soft p-3 text-sm text-accent">{notice}</p>}
+      {notice && <p className="rounded-control border border-accent/25 bg-accent-soft p-3 text-sm text-accent-deep">{notice}</p>}
       <label className="block"><span className="mb-1.5 block text-xs font-semibold text-ink-secondary">タグ名</span><input value={name} onChange={(event) => setName(event.target.value)} maxLength={80} className="w-full rounded-control border border-hairline px-3 py-2.5 text-sm outline-none focus:border-accent" /></label>
       <label className="block"><span className="mb-1.5 block text-xs font-semibold text-ink-secondary">説明</span><textarea value={description} onChange={(event) => setDescription(event.target.value)} rows={3} className="w-full rounded-control border border-hairline px-3 py-2.5 text-sm outline-none focus:border-accent" /></label>
       <div className="flex justify-end gap-2">

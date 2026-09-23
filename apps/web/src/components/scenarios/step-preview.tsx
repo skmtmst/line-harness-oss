@@ -196,7 +196,7 @@ export default function StepPreview({
       <div className="bg-canvas-sunken rounded-card mt-3 space-y-2 p-3">
         {/* 届く日時の帯（設計 h=26 r=full 11/600 アイコン13）。 */}
         <p className="flex justify-center">
-          <span className={`${styles.band} bg-accent-soft text-accent rounded-pill flex items-center gap-1 px-2.5 text-micro font-semibold`}>
+          <span className={`${styles.band} bg-accent-soft text-accent-deep rounded-pill flex items-center gap-1 px-2.5 text-micro font-semibold`}>
             <Clock aria-hidden size={13} strokeWidth={1.75} />
             {words}・{formatJst(at)}
           </span>

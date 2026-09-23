@@ -54,11 +54,13 @@ describe('白文字を載せる緑', () => {
     expect(CSS, 'LINEの緑は残す').toContain('--color-accent: #06c755;')
   })
 
-  it('LINEの緑に白文字を載せない（選択中の札を除く）', () => {
-    const ALLOWED = ['app/chats/page.tsx']
+  /*
+    受信箱の「選択中の札」は例外にしていたが、2.25:1 で読めないので
+    2026-09-24 の点検で `bg-accent-deep` にそろえ、例外を無くした。
+  */
+  it('LINEの緑に白文字を載せない（例外なし）', () => {
     const hits: string[] = []
     for (const { p, s } of FILES) {
-      if (ALLOWED.includes(p)) continue
       for (const line of s.split('\n')) {
         if (!/bg-\[#06[cC]755\]/.test(line)) continue
         if (/text-white|text-on-accent/.test(line)) hits.push(`${p}: ${line.trim().slice(0, 70)}`)
@@ -107,11 +109,10 @@ describe('白文字を載せる緑', () => {
     expect(hits, 'var(--color-accent-deep) にしてください').toEqual([])
   })
 
-  it('受信箱の例外は、選択中の札1つだけ', () => {
+  it('受信箱の選択中の札も濃い緑', () => {
     const chats = FILES.find((f) => f.p === 'app/chats/page.tsx')
     expect(chats).toBeDefined()
-    const lines = chats!.s.split('\n').filter((l) => /bg-\[#06[cC]755\]/.test(l) && /text-white|text-on-accent/.test(l))
-    expect(lines.length, '例外が増えている').toBe(1)
-    expect(lines[0], '選択中の札であること').toContain("? 'bg-[#06C755] text-on-accent'")
+    expect(chats!.s).not.toMatch(/bg-\[#06[cC]755\]/)
+    expect(chats!.s).toContain("? 'bg-accent-deep text-on-accent'")
   })
 })

@@ -294,7 +294,7 @@ export default function ActionScoreTab({ accountId }: { accountId: string }) {
                   <Tr key={item.friendId}>
                     <Td>
                       <div className="flex min-w-0 items-center gap-2.5">
-                        {item.pictureUrl ? <img src={item.pictureUrl} alt="" className="h-8 w-8 shrink-0 rounded-full object-cover" /> : <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-accent-soft text-xs font-bold text-accent">{item.displayName.slice(0, 1)}</div>}
+                        {item.pictureUrl ? <img src={item.pictureUrl} alt="" className="h-8 w-8 shrink-0 rounded-full object-cover" /> : <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-accent-soft text-xs font-bold text-accent-deep">{item.displayName.slice(0, 1)}</div>}
                         <span className="truncate text-sm font-semibold text-ink" title={item.displayName}>{item.displayName}</span>
                       </div>
                     </Td>

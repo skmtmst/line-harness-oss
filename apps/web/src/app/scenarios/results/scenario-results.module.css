@@ -17,7 +17,7 @@
 }
 
 .crumb {
-  color: var(--color-accent);
+  color: var(--color-accent-deep);
   font-size: var(--text-label);
   font-weight: 600;
 }
@@ -103,7 +103,7 @@
 
 .reached {
   flex: 0 0 auto;
-  color: var(--color-accent);
+  color: var(--color-accent-deep);
   font-size: var(--text-caption);
 }
 

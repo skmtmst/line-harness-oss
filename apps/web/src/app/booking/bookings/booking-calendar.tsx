@@ -148,7 +148,7 @@ function EmptyCell({ href }: { href?: string }) {
       href={href}
       aria-label="この空き枠に予約を入れる"
       title="この空き枠に予約を入れる"
-      className="text-ink-faint hover:bg-accent-soft hover:text-accent inline-block rounded-control px-2 py-0.5 text-xs opacity-60 transition hover:opacity-100"
+      className="text-ink-faint hover:bg-accent-soft hover:text-accent-deep inline-block rounded-control px-2 py-0.5 text-xs opacity-60 transition hover:opacity-100"
     >
       あき ＋
     </Link>
@@ -192,7 +192,7 @@ function CalendarFrame({
           <Button variant="secondary" onClick={onPrevious} aria-label="前の期間" className="h-8 w-8">‹</Button>
           <Button variant="secondary" onClick={onNext} aria-label="次の期間" className="h-8 w-8">›</Button>
           <p className="text-ink text-sm font-semibold">{title}</p>
-          <button type="button" onClick={onToday} className="rounded-pill bg-accent-soft px-3 py-1 text-xs font-semibold text-accent">今日</button>
+          <button type="button" onClick={onToday} className="rounded-pill bg-accent-soft px-3 py-1 text-xs font-semibold text-accent-deep">今日</button>
         </div>
         <p className="text-ink-secondary text-xs tabular-nums">{meta}</p>
       </div>

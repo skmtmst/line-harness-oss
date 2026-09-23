@@ -43,7 +43,7 @@ const statusBadge: Record<string, string> = {
   rejected: 'bg-canvas-sunken text-ink-secondary',
   cancelled: 'bg-canvas-sunken text-ink-secondary',
   expired: 'bg-canvas-sunken text-ink-faint',
-  attended: 'bg-accent-soft text-accent',
+  attended: 'bg-accent-soft text-accent-deep',
   no_show: 'bg-danger-bg text-danger',
   waitlist: 'bg-warning-bg text-warning',
 }
@@ -179,7 +179,7 @@ function OccurrenceApplicantsPanel({
             type="button"
             onClick={onExportCsv}
             disabled={csvBusy}
-            className="text-accent text-xs font-medium hover:underline disabled:opacity-50"
+            className="text-accent-deep text-xs font-medium hover:underline disabled:opacity-50"
           >
             {csvBusy ? '書き出しています…' : 'CSVを書き出す'}
           </button>
@@ -226,7 +226,7 @@ function OccurrenceApplicantsPanel({
                     <ActionCell>
                       <Link
                         href={`/chats?friend=${encodeURIComponent(applicant.friendId)}`}
-                        className="text-accent text-xs font-medium hover:underline"
+                        className="text-accent-deep text-xs font-medium hover:underline"
                       >
                         個別トーク
                       </Link>
@@ -904,7 +904,7 @@ function BookingsInner() {
         <span className="text-ink text-sm font-medium">
           {event?.name ?? (loadStatus === 'error' ? 'イベント名を取得できませんでした' : '読み込み中…')}
         </span>
-        <Link href="/events" className="text-accent ml-3 text-xs hover:underline">
+        <Link href="/events" className="text-accent-deep ml-3 text-xs hover:underline">
           ほかのイベントを選ぶ
         </Link>
       </div>
@@ -1077,7 +1077,7 @@ function BookingsInner() {
                 }}
                 className={`px-4 py-3 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
                   tab === t.key
-                    ? 'border-accent text-accent bg-accent-soft'
+                    ? 'border-accent text-accent-deep bg-accent-soft'
                     : 'text-ink-secondary hover:bg-canvas-sunken border-transparent'
                 }`}
               >

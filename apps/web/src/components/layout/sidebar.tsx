@@ -482,7 +482,7 @@ export default function Sidebar({
       {isHq ? (
         <div className="px-3 pb-3 pt-4">
           <div className="rounded-card border border-hairline bg-canvas px-4 py-3">
-            <p className="text-xs font-semibold text-accent">musubo</p>
+            <p className="text-xs font-semibold text-accent-deep">musubo</p>
             <p className="mt-1 text-sm font-bold text-ink">統括コンソール</p>
           </div>
         </div>
@@ -490,7 +490,7 @@ export default function Sidebar({
         <div className="px-[13px] pb-[9px] pt-[18px]">
           <p className="mb-[11px] text-[12px] font-normal text-ink-faint">現在のLINEアカウント</p>
           <div className="flex h-[66px] items-center rounded-[12px] border border-hairline bg-canvas px-3">
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[9px] bg-accent-soft text-[14px] font-semibold text-accent">然</div>
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[9px] bg-accent-soft text-[14px] font-semibold text-accent-deep">然</div>
             <div className="ml-3 min-w-0 flex-1">
               <p className="truncate text-[14px] font-semibold text-ink">然-NEN- TEST</p>
               <p className="mt-0.5 truncate text-[10px] text-ink-faint">コミュニケーション</p>

@@ -149,7 +149,7 @@ function BroadcastDetailInner() {
       <div>
         <p className="text-ink-faint bg-canvas rounded-card border-hairline border p-8 text-center text-sm">
           配信が指定されていません。
-          <Link href="/broadcasts" className="text-accent ml-1 hover:underline">
+          <Link href="/broadcasts" className="text-accent-deep ml-1 hover:underline">
             一覧へ戻る
           </Link>
         </p>
@@ -331,7 +331,7 @@ function BroadcastDetailInner() {
               <p className="text-ink text-sm font-semibold">この配信の設定</p>
               <Link
                 href={`/broadcasts/new?duplicateFrom=${encodeURIComponent(broadcast.id)}`}
-                className="border-hairline text-accent rounded-control border px-3 py-1 text-xs hover:underline"
+                className="border-hairline text-accent-deep rounded-control border px-3 py-1 text-xs hover:underline"
               >
                 同じ設定で作り直す
               </Link>
@@ -369,7 +369,7 @@ function BroadcastDetailInner() {
           <section className="bg-canvas rounded-card border-hairline border p-5">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <p className="text-ink text-sm font-semibold">クリックされたリンク</p>
-              <Link href="/inflow-links" className="text-accent text-xs hover:underline">
+              <Link href="/inflow-links" className="text-accent-deep text-xs hover:underline">
                 流入経路で見る
               </Link>
             </div>
@@ -450,7 +450,7 @@ function SentResult({
     <div className="space-y-4">
       <nav aria-label="配信内容を見る" className="bg-canvas-sunken rounded-card grid grid-cols-5 p-1 text-center text-sm font-semibold">
         {['概要', 'クリック', '友だち', 'エラー', '配信内容'].map((label, index) => (
-          <span key={label} className={index === 0 ? 'bg-canvas text-accent rounded-control px-3 py-2' : 'text-ink-secondary px-3 py-2'}>{label}</span>
+          <span key={label} className={index === 0 ? 'bg-canvas text-accent-deep rounded-control px-3 py-2' : 'text-ink-secondary px-3 py-2'}>{label}</span>
         ))}
       </nav>
 

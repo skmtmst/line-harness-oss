@@ -828,7 +828,7 @@ export default function PhotoReviewsPage() {
         </div>
       </KpiCollapse>
 
-      <div className="rounded-control bg-info-bg px-4 py-3 text-sm font-medium text-accent">
+      <div className="rounded-control bg-info-bg px-4 py-3 text-sm font-medium text-accent-deep">
         通す・戻すを押した時点で、投稿者へお礼や直してほしい点が届きます。戻すときは理由を選び、送る文章を確認できます。
       </div>
 
@@ -866,7 +866,7 @@ export default function PhotoReviewsPage() {
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="rounded-control bg-accent-soft px-3 py-2 text-sm font-semibold text-accent">{selectedPendingPhotos.length}枚を選択中</span>
+          <span className="rounded-control bg-accent-soft px-3 py-2 text-sm font-semibold text-accent-deep">{selectedPendingPhotos.length}枚を選択中</span>
           <Button variant="primary" disabled={!selectedPhotosAreLowRisk || bulkReviewing} title={!selectedPhotosAreLowRisk && selectedPendingPhotos.length > 0 ? 'まとめて通せるのは、注意候補がない写真だけです' : undefined} onClick={() => setBulkApproveOpen(true)}>{bulkReviewing ? '処理中...' : 'まとめて通す'}</Button>
           <Button variant="secondary" disabled={selectedPendingPhotos.length === 0 || bulkReviewing} onClick={() => setBulkReturnOpen(true)}>まとめて戻す</Button>
           <span className="text-xs text-ink-faint">審査待ちの写真だけをまとめて処理します</span>

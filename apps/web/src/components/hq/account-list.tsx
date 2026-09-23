@@ -16,7 +16,7 @@ function AccountIcon({ account }: { account: AccountWithStats }) {
     return <img src={src} alt="" className="h-9 w-9 shrink-0 rounded-full object-cover" />
   }
   const label = (account.displayName || account.name).trim().slice(0, 1)
-  return <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent-soft text-sm font-bold text-accent">{label}</span>
+  return <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent-soft text-sm font-bold text-accent-deep">{label}</span>
 }
 
 function ConnectionStatus({ status }: { status: 'ok' | 'warn' | 'unknown' | undefined }) {

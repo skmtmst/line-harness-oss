@@ -231,7 +231,7 @@ function DashboardPreview({ draft }: { draft: DashboardPreferences }) {
               role="tab"
               aria-selected={device === key}
               onClick={() => setDevice(key)}
-              className={`rounded-pill border px-2.5 py-1 text-[10px] font-medium ${device === key ? 'border-accent bg-accent text-on-accent' : 'border-hairline bg-canvas text-ink-secondary'}`}
+              className={`rounded-pill border px-2.5 py-1 text-[10px] font-medium ${device === key ? 'border-accent-deep bg-accent-deep text-on-accent' : 'border-hairline bg-canvas text-ink-secondary'}`}
             >{text}</button>
           ))}
         </div>

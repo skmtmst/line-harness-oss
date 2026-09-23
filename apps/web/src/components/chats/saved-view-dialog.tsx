@@ -158,7 +158,7 @@ export default function SavedViewDialog({
 
         {done ? (
           <div className="px-6 py-8">
-            <p className="text-accent text-sm font-bold">保存しました</p>
+            <p className="text-accent-deep text-sm font-bold">保存しました</p>
             <p className="text-ink-secondary mt-1.5 text-xs">
               「保存した検索」から、いつでもこの条件を呼び出せます。
             </p>

@@ -714,7 +714,7 @@ function MileagePageInner() {
                           : `利用対象：すべての友だち・下書き v${rule.draftVersion}`}
                       </span>
                       <details className="relative shrink-0 text-ink-secondary">
-                        <summary className="cursor-pointer font-semibold text-accent">公開版の中身を見る</summary>
+                        <summary className="cursor-pointer font-semibold text-accent-deep">公開版の中身を見る</summary>
                         <p className="absolute left-0 top-full z-10 mt-1 w-72 rounded-control border border-hairline bg-canvas p-2 shadow-card" title={`${rule.published.name} / ${ruleEventLabel(rule.published.eventType, EVENT_LABELS)} / ${formatMileageNumber(rule.published.amount)}マイル`}>
                           {rule.published.name}・{ruleEventLabel(rule.published.eventType, EVENT_LABELS)}・{formatMileageNumber(rule.published.amount)}マイル
                         </p>

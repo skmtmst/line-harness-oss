@@ -266,7 +266,7 @@ function SettingCard({
             type="button"
             data-qa-open={qaOpen}
             onClick={onAction}
-            className="text-accent shrink-0 text-xs hover:underline"
+            className="text-accent-deep shrink-0 text-xs hover:underline"
           >
             {action}
           </button>
@@ -1453,7 +1453,7 @@ export default function ScenarioDetailClient({
             <button
               type="button"
               onClick={() => setStepTargetOpen(true)}
-              className="text-accent shrink-0 text-xs hover:underline"
+              className="text-accent-deep shrink-0 text-xs hover:underline"
             >
               条件を編集
             </button>
@@ -1484,7 +1484,7 @@ export default function ScenarioDetailClient({
                     title: `${stepForm.stepOrder}通目を送ったあと`,
                   })
                 }
-                className="text-accent shrink-0 text-xs hover:underline"
+                className="text-accent-deep shrink-0 text-xs hover:underline"
               >
                 ＋ アクションを追加
               </button>
@@ -1633,7 +1633,7 @@ export default function ScenarioDetailClient({
 
         <div className="bg-canvas rounded-card border border-hairline p-8 text-center">
           <p className="text-ink-faint">{error || 'シナリオが見つかりません'}</p>
-          <Link href="/scenarios" className="text-accent hover:text-accent-hover mt-4 inline-block text-sm">
+          <Link href="/scenarios" className="text-accent-deep hover:text-accent-hover mt-4 inline-block text-sm">
             ← シナリオ一覧に戻る
           </Link>
         </div>
@@ -1872,7 +1872,7 @@ export default function ScenarioDetailClient({
                 id="editIsActive"
                 checked={editForm.isActive}
                 onChange={(e) => setEditForm({ ...editForm, isActive: e.target.checked })}
-                className="h-4 w-4 rounded border-hairline text-accent focus:ring-accent"
+                className="h-4 w-4 rounded border-hairline text-accent-deep focus:ring-accent"
               />
               <label htmlFor="editIsActive" className="text-sm text-ink-secondary">有効</label>
             </div>
@@ -1882,7 +1882,7 @@ export default function ScenarioDetailClient({
                   type="checkbox"
                   checked={!editForm.allowConcurrent}
                   onChange={(e) => setEditForm({ ...editForm, allowConcurrent: !e.target.checked })}
-                  className="mt-0.5 h-4 w-4 rounded border-hairline text-accent focus:ring-accent"
+                  className="mt-0.5 h-4 w-4 rounded border-hairline text-accent-deep focus:ring-accent"
                 />
                 <span className="text-ink-secondary text-sm">
                   他のシナリオが動いている人は登録しない
@@ -2200,7 +2200,7 @@ export default function ScenarioDetailClient({
                               <button
                                 type="button"
                                 onClick={() => openInsertStep(sortedSteps[idx - 1].stepOrder)}
-                                className="text-ink-faint hover:text-accent px-3 text-xs opacity-40 transition-opacity group-hover:opacity-100"
+                                className="text-ink-faint hover:text-accent-deep px-3 text-xs opacity-40 transition-opacity group-hover:opacity-100"
                               >
                                 ＋ ここに挿入
                               </button>
@@ -2250,7 +2250,7 @@ export default function ScenarioDetailClient({
                             {title}
                           </button>
                           {step.onReachTagId && (
-                            <p className="text-accent mt-0.5 truncate text-xs">
+                            <p className="text-accent-deep mt-0.5 truncate text-xs">
                               到達タグ: {tags.find((t) => t.id === step.onReachTagId)?.name ?? step.onReachTagId}
                             </p>
                           )}

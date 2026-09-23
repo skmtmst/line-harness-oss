@@ -233,7 +233,7 @@ function NewOperatorNotificationInner() {
   return (
     <div data-design-node="N2gAza" data-selects-wide className="space-y-4 pb-24">
       <div className="flex items-center justify-between gap-3"><nav className="text-ink-faint text-xs" aria-label="パンくず">
-        <Link href="/line-notifications" className="text-accent hover:underline">LINE通知</Link><span className="mx-2">›</span><Link href="/line-notifications?tab=operator" className="text-accent hover:underline">運用者へのお知らせ</Link><span className="mx-2">›</span><span>{editId ? 'なおす' : 'つくる'}</span>
+        <Link href="/line-notifications" className="text-accent-deep hover:underline">LINE通知</Link><span className="mx-2">›</span><Link href="/line-notifications?tab=operator" className="text-accent-deep hover:underline">運用者へのお知らせ</Link><span className="mx-2">›</span><span>{editId ? 'なおす' : 'つくる'}</span>
       </nav><Button onClick={() => void testSend()} disabled={saving || ruleLoading}>自分にテスト送信</Button></div>
 
       <div className="border-info bg-info-bg text-info flex items-start gap-2 rounded-control border px-4 py-3 text-sm">
@@ -268,7 +268,7 @@ function NewOperatorNotificationInner() {
             <p className="mt-1 text-xs text-ink-faint">LINEログイン済みの人にだけ届きます。担当が決まっていないと届きません。</p>
             <div className="mt-4 grid max-w-3xl gap-3 sm:grid-cols-2"><Field label="送り先" htmlFor="operator-recipient-kind"><SelectField id="operator-recipient-kind" value="staff" onChange={() => undefined} options={[{ value: 'staff', label: 'スタッフ' }]} /></Field><Field label="チーム" htmlFor="operator-recipient-team"><SelectField id="operator-recipient-team" value="all" onChange={() => undefined} options={[{ value: 'all', label: `選択中のスタッフ（${recipientIds.length}人）` }]} /></Field></div>
             <div className="mt-3 flex flex-wrap gap-2">
-              {recipients ? recipients.items.map((recipient) => { const selected = recipientIds.includes(recipient.id); return <label key={recipient.id} className="cursor-pointer"><input type="checkbox" className="peer sr-only" checked={selected} onChange={(event) => setRecipientIds((current) => event.target.checked ? [...current, recipient.id] : current.filter((id) => id !== recipient.id))} /><span className="inline-flex rounded-pill border border-hairline bg-canvas px-3 py-1 text-xs font-semibold text-ink-secondary peer-checked:border-accent peer-checked:bg-accent-soft peer-checked:text-accent">{recipient.name}{recipient.channels.line ? '' : '（LINE未連携）'}</span></label> }) : <p className="text-sm text-ink-faint">受け取る人を読み込んでいます…</p>}
+              {recipients ? recipients.items.map((recipient) => { const selected = recipientIds.includes(recipient.id); return <label key={recipient.id} className="cursor-pointer"><input type="checkbox" className="peer sr-only" checked={selected} onChange={(event) => setRecipientIds((current) => event.target.checked ? [...current, recipient.id] : current.filter((id) => id !== recipient.id))} /><span className="inline-flex rounded-pill border border-hairline bg-canvas px-3 py-1 text-xs font-semibold text-ink-secondary peer-checked:border-accent peer-checked:bg-accent-soft peer-checked:text-accent-deep">{recipient.name}{recipient.channels.line ? '' : '（LINE未連携）'}</span></label> }) : <p className="text-sm text-ink-faint">受け取る人を読み込んでいます…</p>}
             </div>
             {recipients ? <p className="mt-3 text-xs text-ink-secondary">選択 {recipientIds.length}人 ／ LINEで受け取れる {recipients.items.filter((item) => recipientIds.includes(item.id) && item.channels.line).length}人 ／ 管理画面で受け取れる {recipientIds.length}人</p> : null}
           </section>
@@ -296,7 +296,7 @@ function NewOperatorNotificationInner() {
 
         <aside className="space-y-4">
           <section className="border-hairline bg-canvas rounded-card border p-4">
-            <div className="flex items-center gap-2"><Building2 aria-hidden="true" size={18} className="text-accent" /><h2 className="text-sm font-semibold text-ink">お店の人にはこう届きます</h2></div>
+            <div className="flex items-center gap-2"><Building2 aria-hidden="true" size={18} className="text-accent-deep" /><h2 className="text-sm font-semibold text-ink">お店の人にはこう届きます</h2></div>
             <p className="mt-2 whitespace-pre-wrap text-xs text-ink-faint">文面はここで確かめられます。<br />【運用者へのお知らせ】{name.trim() || 'お知らせ名'}</p>
           </section>
           <section className="border-warning bg-warning-bg text-warning rounded-card border p-4">
@@ -315,7 +315,7 @@ function NewOperatorNotificationInner() {
                 ['/line-notifications', '顧客へのお知らせ', 'お客様に送るもの'],
                 ['/health', '運用状態', '止まっているときの知らせ'],
                 ['/line-notifications?tab=history', '記録', '届いたかどうかの確認'],
-              ].map(([href, label, note]) => <Link key={href} href={href} className="flex items-center justify-between gap-2 text-accent hover:underline"><span className="inline-flex items-center gap-1"><ArrowRight aria-hidden="true" size={13} />{label}</span><span className="text-ink-faint">{note}</span></Link>)}
+              ].map(([href, label, note]) => <Link key={href} href={href} className="flex items-center justify-between gap-2 text-accent-deep hover:underline"><span className="inline-flex items-center gap-1"><ArrowRight aria-hidden="true" size={13} />{label}</span><span className="text-ink-faint">{note}</span></Link>)}
             </div>
           </section>
         </aside>

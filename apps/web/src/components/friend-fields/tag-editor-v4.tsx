@@ -213,7 +213,7 @@ function ActionDrawer({ accountId, suppliedResources, allowedActionTypes, onClos
                   type="button"
                   disabled={Boolean(allowedActionTypes && !allowedActionTypes.includes(action[0]))}
                   onClick={() => setSelected(action)}
-                  className={`rounded-control border px-3 py-3 text-left text-sm font-medium ${allowedActionTypes && !allowedActionTypes.includes(action[0]) ? 'cursor-not-allowed border-hairline text-ink-faint opacity-55' : selected[0] === action[0] ? 'border-accent bg-accent-soft text-accent' : 'border-hairline text-ink-secondary hover:bg-canvas-sunken'}`}
+                  className={`rounded-control border px-3 py-3 text-left text-sm font-medium ${allowedActionTypes && !allowedActionTypes.includes(action[0]) ? 'cursor-not-allowed border-hairline text-ink-faint opacity-55' : selected[0] === action[0] ? 'border-accent bg-accent-soft text-accent-deep' : 'border-hairline text-ink-secondary hover:bg-canvas-sunken'}`}
                 >
                   {action[0]}
                 </button>
@@ -503,7 +503,7 @@ export default function TagEditorV4({
           </section>
 
           <section className={cardClass}>
-            <div className="flex items-start justify-between gap-4"><StepTitle number={3} title="タグが付いたときの連動" note="このタグが付いた瞬間に動かす処理をまとめて決めます。" /><div className="flex items-center gap-2"><span className={`text-xs font-bold ${linked ? 'text-accent' : 'text-ink-faint'}`}>{linked ? 'ON' : 'OFF'}</span><Toggle checked={linked} onChange={setLinked} label="タグ連動" /></div></div>
+            <div className="flex items-start justify-between gap-4"><StepTitle number={3} title="タグが付いたときの連動" note="このタグが付いた瞬間に動かす処理をまとめて決めます。" /><div className="flex items-center gap-2"><span className={`text-xs font-bold ${linked ? 'text-accent-deep' : 'text-ink-faint'}`}>{linked ? 'ON' : 'OFF'}</span><Toggle checked={linked} onChange={setLinked} label="タグ連動" /></div></div>
             {!linked ? (
               <div className="rounded-control border border-hairline bg-canvas-sunken p-4">
                 <p className="text-sm font-semibold text-ink">ONにすると、ここで次の設定ができます</p>

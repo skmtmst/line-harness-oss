@@ -420,7 +420,7 @@ function CarouselEditorInner() {
         </nav>
         <div role="alert" className="bg-canvas rounded-card border-hairline border p-8 text-sm">
           <p className="font-bold text-ink">カルーセルの作成・変更はオーナーと管理者だけができます</p>
-          <Link href="/templates" className="text-accent hover:underline mt-3 inline-block text-sm">一覧へ戻る</Link>
+          <Link href="/templates" className="text-accent-deep hover:underline mt-3 inline-block text-sm">一覧へ戻る</Link>
         </div>
       </div>
     )
@@ -451,7 +451,7 @@ function CarouselEditorInner() {
                 <div className="p-4">
                   <p className="font-bold">{panels[1]?.title || panels[0]?.title || '（タイトル）'}</p>
                   <p className="mt-2 text-sm leading-relaxed">{panels[1]?.text || panels[0]?.text}</p>
-                  {(panels[1]?.actions || panels[0]?.actions || []).map((action, index) => <p key={index} className="border-hairline mt-2 rounded-control border p-2 text-center text-sm text-accent">{action.label}</p>)}
+                  {(panels[1]?.actions || panels[0]?.actions || []).map((action, index) => <p key={index} className="border-hairline mt-2 rounded-control border p-2 text-center text-sm text-accent-deep">{action.label}</p>)}
                 </div>
               </div>
               {/*
@@ -653,7 +653,7 @@ function CarouselEditorInner() {
                                 ),
                               })
                             }
-                            className={`rounded-control px-2.5 py-1 text-xs ${action.kind === o.value ? 'bg-accent text-on-accent' : 'bg-canvas-sunken text-ink-secondary hover:bg-hairline'}`}
+                            className={`rounded-control px-2.5 py-1 text-xs ${action.kind === o.value ? 'bg-accent-deep text-on-accent' : 'bg-canvas-sunken text-ink-secondary hover:bg-hairline'}`}
                           >
                             {o.label}
                           </button>
@@ -802,7 +802,7 @@ function CarouselEditorInner() {
                     type="button"
                     onClick={save}
                     disabled={saving}
-                    className="text-accent hover:underline ml-2 font-medium disabled:opacity-40"
+                    className="text-accent-deep hover:underline ml-2 font-medium disabled:opacity-40"
                   >
                     もう一度保存する
                   </button>
@@ -835,7 +835,7 @@ function CarouselEditorInner() {
                         {panel.actions.map((a, j) => (
                           <p
                             key={j}
-                            className="border-hairline text-accent rounded-control border px-2 py-1 text-center text-xs"
+                            className="border-hairline text-accent-deep rounded-control border px-2 py-1 text-center text-xs"
                           >
                             {a.label || '（ボタン）'}
                           </p>

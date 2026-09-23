@@ -333,7 +333,7 @@ export default function BroadcastDetail({ broadcastId }: BroadcastDetailProps) {
 
         <nav aria-label="配信結果の表示" className="border-hairline mb-5 flex gap-6 border-b text-sm font-semibold">
           {['概要', 'クリック', '友だち', 'エラー', '配信内容'].map((label, index) => (
-            <span key={label} className={index === 0 ? 'border-accent text-accent border-b-2 px-1 pb-3' : 'text-ink-secondary px-1 pb-3'}>{label}</span>
+            <span key={label} className={index === 0 ? 'border-accent text-accent-deep border-b-2 px-1 pb-3' : 'text-ink-secondary px-1 pb-3'}>{label}</span>
           ))}
         </nav>
 
@@ -451,7 +451,7 @@ export default function BroadcastDetail({ broadcastId }: BroadcastDetailProps) {
             {broadcast.status === 'draft' && (
               <Link
                 href={`/broadcasts/new?draft=${encodeURIComponent(id)}&step=message`}
-                className="text-xs font-semibold text-accent hover:underline"
+                className="text-xs font-semibold text-accent-deep hover:underline"
               >
                 本文を編集
               </Link>
@@ -528,7 +528,7 @@ export default function BroadcastDetail({ broadcastId }: BroadcastDetailProps) {
           {!showSegmentBuilder ? (
             <button
               onClick={() => setShowSegmentBuilder(true)}
-              className="text-xs text-accent hover:underline"
+              className="text-xs text-accent-deep hover:underline"
             >
               セグメント条件を編集
             </button>

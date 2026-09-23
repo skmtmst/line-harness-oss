@@ -240,7 +240,7 @@ function SaveAnalysisAction({
     return (
       <div className="bg-success-bg rounded-control flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-xs">
         <span className="text-success">定義とこの時点の結果を保存しました</span>
-        <Link href="/analytics?tab=saved" className="text-accent font-medium hover:underline">
+        <Link href="/analytics?tab=saved" className="text-accent-deep font-medium hover:underline">
           保存した分析を見る
         </Link>
       </div>
@@ -764,7 +764,7 @@ function CrossTab({ accountId, canManage }: { accountId: string; canManage: bool
     return (
       <p className="text-ink-faint bg-canvas rounded-card border-hairline border p-8 text-center text-sm">
         友だち情報欄の項目がまだありません。
-        <Link href="/tags/fields/new" className="text-accent ml-1 hover:underline">
+        <Link href="/tags/fields/new" className="text-accent-deep ml-1 hover:underline">
           項目を追加
         </Link>
       </p>
@@ -1023,8 +1023,8 @@ function CrossTab({ accountId, canManage }: { accountId: string; canManage: bool
                   <div className="bg-success-bg rounded-control flex flex-wrap items-center justify-between gap-2 p-3 text-xs">
                     <span className="text-success">{audience.memberCount}人を24時間の対象者として準備しました</span>
                     <span className="flex items-center gap-3">
-                      <Link href={`/friends?audienceId=${encodeURIComponent(audience.id)}`} className="text-accent font-medium hover:underline">対象者を開く</Link>
-                      <Link href={`/broadcasts/new?audienceId=${encodeURIComponent(audience.id)}`} className="text-accent font-medium hover:underline">この対象者へ配信を作成</Link>
+                      <Link href={`/friends?audienceId=${encodeURIComponent(audience.id)}`} className="text-accent-deep font-medium hover:underline">対象者を開く</Link>
+                      <Link href={`/broadcasts/new?audienceId=${encodeURIComponent(audience.id)}`} className="text-accent-deep font-medium hover:underline">この対象者へ配信を作成</Link>
                     </span>
                   </div>
                 )}
@@ -1438,7 +1438,7 @@ function FunnelTab({ accountId, canManage, presetConversion }: {
           {canManage ? (
             <button
               onClick={() => setCreating(true)}
-              className="text-accent ml-1 hover:underline"
+              className="text-accent-deep ml-1 hover:underline"
             >
               ＋ 段を足す
             </button>
@@ -1781,8 +1781,8 @@ function FunnelTab({ accountId, canManage, presetConversion }: {
                   <div className="bg-success-bg mt-3 flex flex-wrap items-center justify-between gap-2 rounded-control p-3 text-xs">
                     <span className="text-success">{funnelAudience.memberCount}人を24時間の対象者として準備しました</span>
                     <span className="flex items-center gap-3">
-                      <Link href={`/friends?audienceId=${encodeURIComponent(funnelAudience.id)}`} className="text-accent font-medium hover:underline">対象者を開く</Link>
-                      <Link href={`/broadcasts/new?audienceId=${encodeURIComponent(funnelAudience.id)}`} className="text-accent font-medium hover:underline">この対象者へ配信を作成</Link>
+                      <Link href={`/friends?audienceId=${encodeURIComponent(funnelAudience.id)}`} className="text-accent-deep font-medium hover:underline">対象者を開く</Link>
+                      <Link href={`/broadcasts/new?audienceId=${encodeURIComponent(funnelAudience.id)}`} className="text-accent-deep font-medium hover:underline">この対象者へ配信を作成</Link>
                     </span>
                   </div>
                 )}
@@ -1831,7 +1831,7 @@ function FunnelTab({ accountId, canManage, presetConversion }: {
                 </Chip>
                 <button
                   onClick={() => setSelected(funnel.id)}
-                  className="text-accent text-xs font-medium hover:underline"
+                  className="text-accent-deep text-xs font-medium hover:underline"
                 >
                   結果を見る
                 </button>
@@ -2514,7 +2514,7 @@ function RoutesOverviewTab({ accountId }: { accountId: string }) {
       <KpiCard title="差し引き" value={profit} unit="円" detail="売上から広告費を引いた残り" />
       <KpiCard title="費用を取得できない経路" value={overview.routes.filter((item) => shownValue(item.adCost) === null).length} unit="件" detail="0円として計算しません" />
     </div>
-    <AnalyticsNotice><span>経路ごとに、かかった費用と出た成果を差し引きまで出します。帰属方式は「{overview.attributionLabel}」です。</span> <Link href={overview.searchConsoleHref} className="font-medium text-accent hover:underline">Search Consoleを見る</Link>
+    <AnalyticsNotice><span>経路ごとに、かかった費用と出た成果を差し引きまで出します。帰属方式は「{overview.attributionLabel}」です。</span> <Link href={overview.searchConsoleHref} className="font-medium text-accent-deep hover:underline">Search Consoleを見る</Link>
       <p className="mt-1"><AnalyticsPeriodCaption from={state.data.period.from} to={state.data.period.to} cutoffAt={state.data.dataCutoffAt} /></p>
     </AnalyticsNotice>
     <div className="grid grid-cols-4 overflow-hidden rounded-card border border-hairline bg-canvas">{stages.map((stage, index) => {

@@ -794,7 +794,7 @@ export default function ScenariosPage() {
           onClick={() => setStoppedOnly((v) => !v)}
           className={`rounded-pill px-3 py-1 text-xs transition-colors ${
             stoppedOnly
-              ? 'bg-accent-soft text-accent'
+              ? 'bg-accent-soft text-accent-deep'
               : 'border-hairline text-ink-secondary hover:bg-canvas-sunken border'
           }`}
         >
@@ -826,7 +826,7 @@ export default function ScenariosPage() {
               filter.disabled
                 ? 'border-hairline text-ink-faint opacity-50'
                 : filter.active
-                  ? 'border-accent-soft bg-accent-soft text-accent'
+                  ? 'border-accent-soft bg-accent-soft text-accent-deep'
                   : 'border-hairline text-ink-secondary hover:bg-canvas-sunken'
             }`}
           >

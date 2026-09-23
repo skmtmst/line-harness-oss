@@ -836,7 +836,7 @@ function EditCommonVarInner() {
                       <p className="text-ink-secondary mt-1 break-words">{previewUsage.currentPreview}</p>
                     </div>
                     <div className="bg-accent-soft rounded-control p-3">
-                      <p className="text-accent font-semibold">保存したあとの文</p>
+                      <p className="text-accent-deep font-semibold">保存したあとの文</p>
                       <p className="text-ink mt-1 break-words">
                         {isChangeItem(previewUsage)
                           ? previewUsage.nextPreview ?? `${NOT_AVAILABLE}（使用先を開いて確認してください）`

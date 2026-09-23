@@ -49,7 +49,7 @@ export default function StepRail({
                   step.state === 'done'
                     ? 'bg-accent-deep text-on-accent'
                     : step.state === 'current'
-                      ? 'border-accent text-accent border-2'
+                      ? 'border-accent text-accent-deep border-2'
                       : 'border-hairline text-ink-faint border'
                 }`}
               >
@@ -58,7 +58,7 @@ export default function StepRail({
               <span className="min-w-0">
                 <span
                   className={`block text-xs font-bold tracking-wider ${
-                    step.state === 'todo' ? 'text-ink-faint' : 'text-accent'
+                    step.state === 'todo' ? 'text-ink-faint' : 'text-accent-deep'
                   }`}
                 >
                   STEP {step.order}
