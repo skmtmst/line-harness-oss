@@ -26,14 +26,22 @@ export function useUnsavedGuard(options: {
    * true のとき popstate を止めず・確認も出さず、そのまま通す。
    */
   samePage?: (destination: URL) => boolean
+  /**
+   * 「保存せずに移動」が確定したあと・実際に移動する直前に呼ぶ。
+   * クエリだけ変わる画面内遷移（コンポーネントがアンマウントされない）でも
+   * 「変更は消えます」と約束した通り、画面の入力を初期状態へ戻せるようにする。
+   */
+  onDiscard?: () => void
 }) {
-  const { dirty, busy = false, samePage } = options
+  const { dirty, busy = false, samePage, onDiscard } = options
   const router = useRouter()
   const [leaveTarget, setLeaveTarget] = useState<UnsavedLeaveTarget | null>(null)
   const dirtyRef = useRef(dirty)
   dirtyRef.current = dirty
   const samePageRef = useRef(samePage)
   samePageRef.current = samePage
+  const onDiscardRef = useRef(onDiscard)
+  onDiscardRef.current = onDiscard
   const allowHistoryLeaveRef = useRef(false)
   const skipRestoredPopRef = useRef(false)
   /* 公開成功など「離れてよい」と決まった遷移の直前に立てる解除印。 */
@@ -114,10 +122,17 @@ export function useUnsavedGuard(options: {
     return () => window.removeEventListener('popstate', onPopState)
   }, [dirty, busy])
 
-  /** 確認で「保存せずに移動」が選ばれたとき、予定していた移動を実行する。 */
+  /**
+   * 確認で「保存せずに移動」が選ばれたとき、予定していた移動を実行する。
+   *
+   * `onDiscard` は移動の直前に呼ぶ。「変更は消えます」と約束したあと、
+   * クエリだけ変わる画面内遷移（コンポーネントがアンマウントされない）でも
+   * 画面の入力を初期状態へ戻せるようにするため。
+   */
   const confirmLeave = useCallback(() => {
     if (!leaveTarget || busy) return
     setLeaveTarget(null)
+    onDiscardRef.current?.()
     if (leaveTarget.kind === 'history-back') {
       allowHistoryLeaveRef.current = true
       window.history.back()

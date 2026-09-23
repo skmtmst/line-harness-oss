@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { emptyLayout, type FormInputBlock } from '@line-crm/shared'
-import { validateLayoutForSave } from './form-validate'
+import { OG_IMAGE_URL_ERROR, ogImageUrlError, validateLayoutForSave } from './form-validate'
 
 function choiceBlock(label: string, choices: Array<{ id: string; label: string }>): FormInputBlock {
   return {
@@ -102,5 +102,32 @@ describe('保存時に止める壊れた定義(FORM-03 / FORM-04 / FORM-12)', ()
     block.choices = [{ ...block.choices![0], capacity: { enabled: true, limit: 2.5 } }]
     layout.sections[0].blocks = [block]
     expect(validateLayoutForSave(layout)).toContain('整数')
+  })
+})
+
+/*
+ * FORM-18 — OGP画像は https のURLだけを受け付ける。
+ *
+ * 画面には「https:// のURL」と書いてあるのに、http:// で始まるURLが
+ * そのまま保存されて残っていた。LINEのOGP取得はhttpsを前提にするので、
+ * 入力中・保存の直前の両方で同じ検査を掛ける。
+ */
+describe('ogImageUrlError（FORM-18）', () => {
+  it('空欄は「設定しない」なので通す', () => {
+    expect(ogImageUrlError('')).toBe('')
+    expect(ogImageUrlError('   ')).toBe('')
+    expect(ogImageUrlError(null)).toBe('')
+    expect(ogImageUrlError(undefined)).toBe('')
+  })
+
+  it('https:// のURLは通す', () => {
+    expect(ogImageUrlError('https://example.com/ogp.png')).toBe('')
+    expect(ogImageUrlError('  https://cdn.example.co.jp/a.jpg?x=1  ')).toBe('')
+  })
+
+  it('http:// や別の書き方は、理由つきで止める', () => {
+    expect(ogImageUrlError('http://example.com/ogp.png')).toBe(OG_IMAGE_URL_ERROR)
+    expect(ogImageUrlError('example.com/ogp.png')).toBe(OG_IMAGE_URL_ERROR)
+    expect(ogImageUrlError('ftp://example.com/x.png')).toBe(OG_IMAGE_URL_ERROR)
   })
 })

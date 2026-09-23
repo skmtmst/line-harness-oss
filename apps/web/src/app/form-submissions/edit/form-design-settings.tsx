@@ -14,6 +14,7 @@ import { Field, TextArea, TextInput } from '@/components/shared/form-controls'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import { useRouter } from 'next/navigation'
 import MediaPickerDialog from '@/app/contents/media-picker-dialog'
+import { ogImageUrlError } from './form-validate'
 
 type ColorKey = keyof Pick<FormTheme, 'main' | 'sub' | 'accent' | 'error' | 'text'>
 
@@ -57,6 +58,8 @@ export default function FormDesignSettings({
 }) {
   const router = useRouter()
   const theme = value ?? FORM_THEME_DEFAULT
+  /** FORM-18: カードの画像URLの入力時検査。空は「使わない」なので通す。 */
+  const ogImageError = ogImageUrlError(ogImageUrl)
   /** メディア選択窓を開いている対象。null なら閉じている（N-193）。 */
   const [pickerFor, setPickerFor] = useState<'background' | 'ogImage' | null>(null)
   /*
@@ -314,6 +317,11 @@ export default function FormDesignSettings({
                 onChange={(event) => onOgDescriptionChange(event.target.value)}
               />
             </Field>
+            {/*
+              FORM-18: 入力の時点で https:// 以外だと理由を出す。
+              **値は消さない。**確定時だけ弾くカラーコード欄（DEEP-12）と同じ
+              作法で、直せるように入力はそのまま残す。
+            */}
             <Field label="カードの画像URL" htmlFor="form-og-image-url" note="https で始まるURLだけ使えます。登録メディアからも選べます。">
               <TextInput
                 id="form-og-image-url"
@@ -321,8 +329,15 @@ export default function FormDesignSettings({
                 inputMode="url"
                 placeholder="https://"
                 value={ogImageUrl}
+                invalid={Boolean(ogImageError)}
+                aria-describedby={ogImageError ? 'form-og-image-url-error' : undefined}
                 onChange={(event) => onOgImageUrlChange(event.target.value)}
               />
+              {ogImageError ? (
+                <span id="form-og-image-url-error" role="alert" className="text-danger mt-1 block text-micro leading-4">
+                  {ogImageError}
+                </span>
+              ) : null}
             </Field>
             <div>
               <Button onClick={() => setPickerFor('ogImage')}>登録メディアから選ぶ</Button>
