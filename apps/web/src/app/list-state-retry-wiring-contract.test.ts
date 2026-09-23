@@ -23,7 +23,6 @@ const TARGETS = [
   '../components/friend-fields/mark-list.tsx',
   '../components/friend-fields/tags-page-v4.tsx',
   '../components/friends/bulk-run-dialog.tsx',
-  '../components/line-notifications/operator-notification-rules.tsx',
   '../components/merged-person/merged-person-detail.tsx',
   '../components/users/users-table.tsx',
 ] as const
@@ -54,7 +53,10 @@ describe('一覧の取得失敗からその場で読み直せる契約', () => {
     // #1014: 項目・対応マーク・タグの一覧に、取得失敗とは別の
     //        読み込み直し口（ListState kind="error" + onRetry）を足して3増。
     // SCENARIO-10: シナリオ結果の購読一覧に、取得失敗専用の再読み込み口を足して1増。
-    expect(errorCount).toBe(25)
+    // NOTIFY-04: どこからも使われていない古い運用者一覧（名前がリンクでない
+    //        置き忘れの写し）を消したぶん1減。生きている一覧は
+    //        app/line-notifications/operator-notification-rules.tsx。
+    expect(errorCount).toBe(24)
   })
 
   it('URLだけでは対象を特定できない状態に、直らない再読み込みを出さない', () => {
