@@ -8,6 +8,7 @@ import { api, bookingApi, type BookingAdminDetail, type BookingMenu, type Bookin
 import { useAccount } from '@/contexts/account-context'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Button from '@/components/shared/button'
+import ListState from '@/components/shared/list-state'
 import Select from '@/components/shared/select'
 import FolderPanel, { FOLDER_RAIL_WIDTH } from '@/components/shared/folder-panel'
 import { usePageTitle } from '@/components/shell/page-chrome'
@@ -568,6 +569,31 @@ export default function BookingsPage() {
   const current = Math.min(page, pageCount)
   const shown = items
 
+  /*
+   * 「まだ予約が無い」と「絞り込みで0件」は言い分ける（#635）。
+   * summary.total はアカウントの予約総数なので、0 なら条件以前に
+   * 予約そのものが無い。集計が取れていないときは安全側に「条件に合う」へ倒す。
+   * 状態タブは初期値が「未承認」なので、空の言い分けには使わず、
+   * 「絞り込みを解除」の要否だけに使う（既定タブのまま解除を出しても
+   * 全件へ戻す動線として意味を持つ）。
+   */
+  const nonTabNarrowing =
+    query.trim() !== '' ||
+    menuFilter !== 'all' ||
+    staffFilter !== 'all' ||
+    sourceFilter !== 'all' ||
+    range !== 'all'
+  const hasAnyBooking = summaryError || summary.total > 0
+  const showFilteredEmpty = hasAnyBooking || nonTabNarrowing
+  const clearListFilters = () => {
+    setQuery('')
+    setMenuFilter('all')
+    setStaffFilter('all')
+    setSourceFilter('all')
+    setRange('all')
+    setTab('all')
+  }
+
   // 絞り込みが変わったら1ページ目に戻す。3ページ目のまま条件を狭めると
   // 「該当なし」に見えてしまう。
   useEffect(() => {
@@ -845,8 +871,22 @@ export default function BookingsPage() {
               読み込み中…
             </div>
           ) : shown.length === 0 ? (
-            <div className="bg-canvas rounded-card border-hairline text-ink-faint border p-12 text-center text-sm">
-              該当する予約はありません
+            <div className="bg-canvas rounded-card border-hairline border">
+              {showFilteredEmpty ? (
+                <ListState
+                  kind="empty"
+                  title="条件に合う予約はありません"
+                  description="検索語や絞り込みを変えてください。"
+                  action={nonTabNarrowing || tab !== 'all' ? <Button variant="secondary" onClick={clearListFilters}>絞り込みを解除</Button> : undefined}
+                />
+              ) : (
+                <ListState
+                  kind="empty"
+                  title="まだ予約はありません"
+                  description="予約が入ると、ここに日時とお客さまが並びます。"
+                  action={canOperate ? <Button variant="primary" href="/booking/bookings/new">電話の予約を入れる</Button> : undefined}
+                />
+              )}
             </div>
           ) : (
             <div
