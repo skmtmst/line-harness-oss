@@ -90,6 +90,13 @@ import {
   type FormLayout,
   DEFAULT_TENANT_ID,
 } from '@line-crm/shared';
+import {
+  formMatchesListFilter,
+  formMatchesListQuery,
+  sortFormListItems,
+  type FormListFilter,
+  type FormListSort,
+} from '@line-crm/shared';
 
 const forms = new Hono<Env>();
 
@@ -143,6 +150,21 @@ const FORM_SUBMIT_DATA_MAX_FIELDS = 200;
 const FORM_SUBMIT_DATA_MAX_BYTES = 100 * 1024;
 /** 紐付けリンク id の上限。長すぎる値は受け付けない。 */
 const FORM_SUBMIT_TRACKED_LINK_MAX_LENGTH = 128;
+/**
+ * 一覧のサーバーページング（#1060）で `limit` が読めない値のときの既定。
+ * 画面の既定表示件数と揃える。
+ */
+const FORM_LIST_PAGE_FALLBACK_LIMIT = 20;
+
+/** 一覧の絞り込み。知らない値は「すべて」へ落とす（画面と同じ規則）。 */
+function validFormListFilter(value: string | undefined): FormListFilter {
+  return value === 'published' || value === 'draft' || value === 'stored' ? value : 'all';
+}
+
+/** 一覧の並び順。知らない値は「最新の回答順」へ落とす（画面と同じ規則）。 */
+function validFormListSort(value: string | undefined): FormListSort {
+  return value === 'answers' || value === 'updated' || value === 'name' ? value : 'latest-answer';
+}
 
 class FormArchiveBodyError extends Error {
   constructor(readonly status: 400 | 413, message: string) {
@@ -252,7 +274,7 @@ function serializeForm(
     id: row.id,
     name: row.name,
     description: row.description,
-    fields: JSON.parse(row.fields || '[]') as unknown[],
+    fields: JSON.parse(row.fields || '[]') as Array<Record<string, unknown>>,
     layout: parseLayout(row.layout, row.fields),
     onSubmitTagId: row.on_submit_tag_id,
     onSubmitScenarioId: row.on_submit_scenario_id,
@@ -725,9 +747,42 @@ forms.get('/api/forms', requireRole('owner', 'admin', 'staff'), async (c) => {
     // 一覧画面は `with_list_summary=1` で件数つきの形を要求する。
     // 付けない呼び出しは従来どおり配列のまま返す。
     if (c.req.query('with_list_summary') === '1') {
+      /*
+       * #1060: サーバーページング。これまで画面が全件を受け取ってから
+       * 絞り込み・並び替え・ページ切りをしていた。`limit`（+`page`）と
+       * `q` / `filter` / `sort` を新たに受け付け、Worker 側で同じ規則を
+       * 適用してから切り出す。規則の正本は @line-crm/shared に寄せてある。
+       * `limit` 未指定なら従来どおり全件を返す（既存呼び出しを壊さない）。
+       *
+       * `total` は絞り込み後の件数（ページ送りの母数）、`all_total` は
+       * フォルダ範囲だけの件数（フォルダ欄の「すべて」の件数表示用）。
+       */
+      const filter = validFormListFilter(c.req.query('filter'));
+      const sort = validFormListSort(c.req.query('sort'));
+      const search = c.req.query('q') ?? '';
+      const allTotal = data.length;
+      let list = data;
+      if (filter !== 'all') {
+        list = list.filter((row) => formMatchesListFilter(row, filter));
+      }
+      if (search.trim() !== '') {
+        list = list.filter((row) => formMatchesListQuery(row, search));
+      }
+      list = sortFormListItems(list, sort);
+      const total = list.length;
+      const limitParam = c.req.query('limit');
+      if (limitParam !== undefined && limitParam.trim() !== '') {
+        const limit = listLimit(limitParam, FORM_LIST_PAGE_FALLBACK_LIMIT);
+        const page = listPage(c.req.query('page'));
+        const items = list.slice((page - 1) * limit, (page - 1) * limit + limit);
+        return c.json({
+          success: true,
+          data: { items, total, all_total: allTotal, page, limit },
+        });
+      }
       return c.json({
         success: true,
-        data: { items: data, total: data.length, page: 1, limit: data.length },
+        data: { items: list, total, all_total: allTotal, page: 1, limit: list.length },
       });
     }
     return c.json({ success: true, data });

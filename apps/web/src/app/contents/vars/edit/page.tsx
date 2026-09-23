@@ -12,6 +12,7 @@ import type {
   Folder,
 } from '@line-crm/shared'
 import { api, ApiError, type CommonVarDetail } from '@/lib/api'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import FeatureGate from '@/components/feature-gate'
 import { VAR_TYPE_LABELS, commonVarValueError, formatStamp } from '@/lib/common-vars'
 import { useAccount } from '@/contexts/account-context'
@@ -351,6 +352,47 @@ function EditCommonVarInner() {
   const [deleteError, setDeleteError] = useState('')
   const deleteAccountSwitched = deleteTarget !== null && deleteTarget.accountId !== selectedAccountId
 
+  /*
+   * 保存していない変更を持ったまま画面の外へ出る操作を止める（VAR-01 監査）。
+   * リッチメニュー・ウェビナーと同じ `useUnsavedGuard`＋確認ダイアログの形。
+   * 読み込んだ値と同じに戻したとき・保存して再読込したあとは dirty が外れる。
+   * 更新予約の入力窓（draft）を開いている途中も、まだ登録されていない入力
+   * として数える。消す操作の確認中や削除の送信は別の窓が出ているので、
+   * busy には保存・削除の双方を入れて処理中の移動を止める。
+   */
+  const dirty = item !== null && (
+    name !== item.name ||
+    folderId !== (item.folderId ?? '') ||
+    value !== item.value ||
+    memo !== item.memo ||
+    validFrom !== utcToJstLocalInput(item.validFrom) ||
+    validUntil !== utcToJstLocalInput(item.validUntil) ||
+    expiryBehavior !== (item.expiryBehavior ?? 'stop') ||
+    fallbackValue !== (item.fallbackValue ?? '') ||
+    draft !== null
+  )
+  const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({
+    dirty,
+    busy: saving || deleting,
+  })
+  /*
+   * 離脱の確認はどの画面状態にいても出す。影響確認の一覧へ切り替えた表示
+   * （ImpactReview）は別ツリーへ早期 return するため、要素化して両方の
+   * 経路へ差し込む。片方だけに置くと dirty 中のリンクが黙って止まり、
+   * 「保存せずに移動」を選ぶ手段がなくなる。
+   */
+  const leaveConfirmDialog = (
+    <ConfirmDialog
+      open={leaveTarget !== null}
+      title="保存していない変更があります"
+      description="このまま移動すると、共通情報への変更は失われます。保存せずに移動しますか？"
+      confirmLabel="保存せずに移動"
+      cancelLabel="編集を続ける"
+      onConfirm={confirmLeave}
+      onCancel={cancelLeave}
+    />
+  )
+
   const openDelete = async () => {
     if (!item || !selectedAccountId) return
     const target = { item, accountId: selectedAccountId }
@@ -456,12 +498,15 @@ function EditCommonVarInner() {
 
   if (showImpactReview && impact && 'canSave' in impact) {
     return (
-      <ImpactReview
-        impact={impact}
-        busy={saving}
-        onBack={() => setShowImpactReview(false)}
-        onSave={() => void save()}
-      />
+      <>
+        <ImpactReview
+          impact={impact}
+          busy={saving}
+          onBack={() => setShowImpactReview(false)}
+          onSave={() => void save()}
+        />
+        {leaveConfirmDialog}
+      </>
     )
   }
 
@@ -1040,6 +1085,8 @@ function EditCommonVarInner() {
           ) : null}
         </div>
       </ConfirmDialog>
+
+      {leaveConfirmDialog}
     </div>
   )
 }

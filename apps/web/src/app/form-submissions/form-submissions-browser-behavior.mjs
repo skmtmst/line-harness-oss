@@ -16,6 +16,82 @@ import { createReadStream, existsSync, statSync } from 'node:fs'
 import { extname, join, normalize } from 'node:path'
 import { chromium } from '@playwright/test'
 
+/*
+ * #1060: 一覧の絞り込み・並び替えは Worker が済ませて1ページ分だけ返す。
+ * この検査は実ブラウザに本物と同じ応答を返す必要があるため、APIスタブにも
+ * 同じ規則が要る。規則の正本は `packages/shared/src/form-list-summary.ts`
+ * （@line-crm/shared）。素の node からは同パッケージの dist が解決できない
+ * （拡張子なしimportのため）ので、ここに同じ規則を写している。
+ * 正本を変えたらここも同じPRで直すこと。
+ */
+const displayFormName = (name) => name.replace(/\\n/g, ' ').replace(/\s+/g, ' ').trim()
+const compareDatesNewest = (a, b) => (a && b ? new Date(b) - new Date(a) : a ? -1 : b ? 1 : 0)
+const answerCount = (f) => f.submitCount ?? f.usedByAccounts.reduce((s, a) => s + a.count, 0)
+const inputBlocks = (layout) => [
+  ...(layout?.header ?? []),
+  ...(layout?.sections ?? []).flatMap((s) => s.blocks ?? []),
+].filter((b) => b.kind === 'input')
+const collectActionDestinations = (actions, fields, tags) => {
+  for (const action of actions ?? []) {
+    if (action.kind === 'friend_field' && action.fieldId) fields.add(action.fieldId)
+    if (action.kind === 'tag') for (const tagId of action.tagIds) { if (tagId) tags.add(tagId) }
+  }
+}
+const hasStoredDestination = (layout, onSubmitTagId) => {
+  const fields = new Set()
+  const tags = new Set()
+  for (const block of inputBlocks(layout)) {
+    for (const id of block.destinations?.friendFieldIds ?? []) { if (id) fields.add(id) }
+    if (block.destinations?.realName) fields.add('friends.real_name')
+    if (block.destinations?.displayName) fields.add('friends.display_name')
+    if (block.destinations?.note) fields.add('friends.note')
+    if (block.choiceMode === 'friendField' && block.choiceFriendFieldId) fields.add(block.choiceFriendFieldId)
+    for (const choice of block.choices ?? []) {
+      if (block.choiceMode === 'tag' && choice.tagId) tags.add(choice.tagId)
+      if (block.choiceMode === 'action') collectActionDestinations(choice.actions, fields, tags)
+    }
+  }
+  collectActionDestinations(layout?.options?.afterActions, fields, tags)
+  if (onSubmitTagId) tags.add(onSubmitTagId)
+  return fields.size + tags.size > 0
+}
+const formMatchesListFilter = (f, filter) => {
+  if (filter === 'published') return f.isActive
+  if (filter === 'draft') return !f.isActive
+  if (filter === 'stored') return hasStoredDestination(f.layout, f.onSubmitTagId)
+  return true
+}
+const formMatchesListQuery = (f, raw) => {
+  const q = raw.trim().toLocaleLowerCase('ja-JP')
+  if (!q) return true
+  return displayFormName(f.name).toLocaleLowerCase('ja-JP').includes(q)
+    || f.fields.some((field) => String(field.label ?? '').toLocaleLowerCase('ja-JP').includes(q))
+    || f.usedByAccounts.some((a) => a.name.toLocaleLowerCase('ja-JP').includes(q))
+}
+const sortFormListItems = (forms, sort) => {
+  if (sort === 'latest-answer') {
+    return [...forms].sort((a, b) => {
+      if (a.lastSubmittedAt && b.lastSubmittedAt) {
+        const diff = new Date(b.lastSubmittedAt) - new Date(a.lastSubmittedAt)
+        if (diff !== 0) return diff
+      } else if (a.lastSubmittedAt) return -1
+      else if (b.lastSubmittedAt) return 1
+      return new Date(b.createdAt) - new Date(a.createdAt)
+    })
+  }
+  return [...forms].sort((a, b) => {
+    if (sort === 'answers') {
+      const diff = answerCount(b) - answerCount(a)
+      if (diff !== 0) return diff
+      return compareDatesNewest(a.updatedAt, b.updatedAt) || a.id.localeCompare(b.id)
+    }
+    if (sort === 'updated') {
+      return compareDatesNewest(a.updatedAt, b.updatedAt) || a.id.localeCompare(b.id)
+    }
+    return displayFormName(a.name).localeCompare(displayFormName(b.name), 'ja-JP') || a.id.localeCompare(b.id)
+  })
+}
+
 const outDir = join(process.cwd(), 'apps/web/out')
 
 if (!existsSync(outDir)) {
@@ -193,8 +269,28 @@ async function openHarness(browser, {
       state.listCalls.push(accountId)
       const delay = listDelayMs[accountId ?? ''] ?? 0
       if (delay > 0) await new Promise((resolve) => setTimeout(resolve, delay))
-      const items = formsByAccount[accountId] ?? []
-      return json({ success: true, data: { items, total: items.length, page: 1, limit: Math.max(items.length, 1) } })
+      const all = formsByAccount[accountId] ?? []
+      /*
+       * #1060: 本物のWorkerと同じく、絞り込み・並び替え・ページ切りを
+       * ここ（API側）で済ませて返す。`limit` 未指定なら全件（互換）。
+       */
+      const rawFilter = url.searchParams.get('filter')
+      const rawSort = url.searchParams.get('sort')
+      const filter = ['published', 'draft', 'stored'].includes(rawFilter) ? rawFilter : 'all'
+      const sort = ['answers', 'updated', 'name'].includes(rawSort) ? rawSort : 'latest-answer'
+      const search = url.searchParams.get('q') ?? ''
+      let list = filter === 'all' ? all : all.filter((f) => formMatchesListFilter(f, filter))
+      if (search.trim() !== '') list = list.filter((f) => formMatchesListQuery(f, search))
+      list = sortFormListItems(list, sort)
+      const total = list.length
+      const limitParam = url.searchParams.get('limit')
+      if (limitParam !== null && limitParam !== '') {
+        const limit = Math.max(1, Math.min(200, Number.parseInt(limitParam, 10) || 20))
+        const page = Math.max(1, Number.parseInt(url.searchParams.get('page') ?? '1', 10) || 1)
+        const items = list.slice((page - 1) * limit, (page - 1) * limit + limit)
+        return json({ success: true, data: { items, total, all_total: all.length, page, limit } })
+      }
+      return json({ success: true, data: { items: list, total, all_total: all.length, page: 1, limit: Math.max(list.length, 1) } })
     }
     /*
      * 編集画面は差し込み先の一覧も読む。`/api/scenarios` は

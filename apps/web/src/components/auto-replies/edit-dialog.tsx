@@ -199,6 +199,15 @@ interface Props {
 
 type ResponseMode = 'silent' | 'template' | 'inline-text' | 'inline-flex' | 'inline-image'
 
+/**
+ * ページ表示の「優先順位」セレクトが出せる値。
+ *
+ * 保存値はこの範囲に限らない（旧画面やAPIから 30 のような値が入る）。
+ * option に無い value を持つ select はブラウザが先頭候補を表示するため、
+ * 候補外の保存値は別の option を足してそのまま見せる（AUTOREPLY-07）。
+ */
+const PRIORITY_CANDIDATES = Array.from({ length: 14 }, (_, index) => index + 1)
+
 function detectMode(d: AutoReplyDraft): ResponseMode {
   if (d.responseType === 'silent') return 'silent'
   if (d.templateId) return 'template'
@@ -670,7 +679,14 @@ export default function EditDialog({
                   onChange={(event) => setPriority(event.target.value)}
                   className="border-hairline rounded-control mt-1 w-full border bg-canvas px-3 py-2 text-sm"
                 >
-                  {Array.from({ length: 14 }, (_, index) => index + 1).map((value) => (
+                  {/*
+                    候補外の保存値は先頭の「1」へ化けさせず、そのまま出す。
+                    値は書き換えない。選び直したときだけ候補の値へ変わる。
+                  */}
+                  {priority !== '' && !PRIORITY_CANDIDATES.includes(Number(priority)) && (
+                    <option value={priority}>{priority}（現在の保存値・候補外）</option>
+                  )}
+                  {PRIORITY_CANDIDATES.map((value) => (
                     <option key={value} value={value}>{value}（高いほど先に判定）</option>
                   ))}
                 </select>

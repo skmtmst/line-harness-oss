@@ -317,10 +317,32 @@ export default function NewBookingMenuPage() {
           ? createdMenuNeedingStaff.remainingStaffIds.filter((sid) => assigned.has(sid))
           : assignedIds
         const failedStaffIds: string[] = []
+        /*
+         * #1060: 現在の割り当て表は一括口で1回だけ読む（従来は担当ごとに
+         * 1往復）。一括口の無い Worker では担当ごとの取得へ退く。
+         * 書き込みは従来どおり担当ごとのPUTで、失敗した担当だけを
+         * 再試行できる形を変えない。
+         */
+        const matrixByStaff = new Map<string, Awaited<ReturnType<typeof bookingApi.getStaffMenus>>['matrix']>()
+        try {
+          const bulk = await bookingApi.listStaffMenusBulk(selectedAccountId!)
+          for (const entry of bulk.staff) matrixByStaff.set(entry.staff_id, entry.matrix)
+        } catch {
+          await Promise.all(
+            pendingStaffIds.map(async (staffId) => {
+              try {
+                const { matrix } = await bookingApi.getStaffMenus(selectedAccountId!, staffId)
+                matrixByStaff.set(staffId, matrix)
+              } catch {
+                failedStaffIds.push(staffId)
+              }
+            }),
+          )
+        }
         await Promise.all(
-          pendingStaffIds.map(async (staffId) => {
+          pendingStaffIds.filter((staffId) => !failedStaffIds.includes(staffId)).map(async (staffId) => {
             try {
-              const { matrix } = await bookingApi.getStaffMenus(selectedAccountId!, staffId)
+              const matrix = matrixByStaff.get(staffId) ?? []
               await bookingApi.putStaffMenus(
                 selectedAccountId!,
                 staffId,

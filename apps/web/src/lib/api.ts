@@ -12140,6 +12140,11 @@ export interface BookingAvailabilityResponse {
   }>;
 }
 
+/** #1060: `menu_ids` 一括モードの応答。各要素は単独応答へ menu_id を添えた形。 */
+export interface BookingAvailabilityBatchResponse {
+  by_menu: Array<{ menu_id: string } & BookingAvailabilityResponse>;
+}
+
 /** IDEA-28 予約設定の「この日時はなぜ予約できないか」の理由コード。 */
 export type BookingSlotBlockReason =
   | 'menu_inactive'
@@ -12493,6 +12498,25 @@ export const bookingApi = {
     if (params.excludeBookingId) query.set('exclude_booking_id', params.excludeBookingId);
     return fetchApi<BookingAvailabilityResponse>(`/api/booking/admin/availability?${query}`);
   },
+  /**
+   * #1060: メニューごとの空き枠を1要求で取る一括口。
+   * カレンダーがメニュー数ぶん往復していたのを1往復へまとめる。
+   * 応答は `{ by_menu: [{ menu_id, by_staff, calendar_sync }] }`。
+   */
+  getAvailabilityBatch: (
+    accountId: string,
+    params: { menuIds: string[]; staffId?: string; from: string; to: string; excludeBookingId?: string },
+  ) => {
+    const query = new URLSearchParams({
+      account_id: accountId,
+      menu_ids: params.menuIds.join(','),
+      from: params.from,
+      to: params.to,
+    });
+    if (params.staffId) query.set('staff_id', params.staffId);
+    if (params.excludeBookingId) query.set('exclude_booking_id', params.excludeBookingId);
+    return fetchApi<BookingAvailabilityBatchResponse>(`/api/booking/admin/availability?${query}`);
+  },
   /** IDEA-28: 指定した日時がなぜ予約できないかを確認する（読み取り専用・予約は作らない）。 */
   checkAvailability: (
     accountId: string,
@@ -12608,6 +12632,15 @@ export const bookingApi = {
   getStaffMenus: (accountId: string, staffId: string) =>
     fetchApi<{ matrix: StaffMenuMatrix[] }>(
       withAccount(`/api/booking/admin/staff/${staffId}/menus`, accountId),
+    ),
+  /**
+   * #1060: 全スタッフ分の割り当て表を1要求で読む一括口。
+   * マトリクス画面がスタッフ数ぶん往復していたのを1往復へまとめる。
+   * 応答は一括PUTと同じ `{ staff: [{ staff_id, matrix }] }` の形。
+   */
+  listStaffMenusBulk: (accountId: string) =>
+    fetchApi<{ staff: Array<{ staff_id: string; matrix: StaffMenuMatrix[] }> }>(
+      withAccount('/api/booking/admin/staff-menus', accountId),
     ),
   putStaffMenus: (
     accountId: string,
