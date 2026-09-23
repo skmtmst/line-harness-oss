@@ -214,6 +214,12 @@ describe('旧ルートのリダイレクト', () => {
     ['/updates', '/emergency'],
     ['/pools', '/accounts'],
     ['/booking/staff', '/booking/menus'],
+    // Issue #638: サイトマップ/案内URLとして出回った実体の無い5本。
+    ['/booking/menus/list', '/booking/menus'],
+    ['/booking/schedule', '/booking/staff/shifts'],
+    ['/booking/rules', '/booking/menus'],
+    ['/booking', '/booking/bookings'],
+    ['/dashboard/scenarios', '/scenarios'],
   ] as const;
 
   const redirects = readFileSync(join(PUBLIC_DIR, '_redirects'), 'utf8');
