@@ -88,6 +88,47 @@ export function computeDeliveryAt(
   return at
 }
 
+/**
+ * 編集中の予定入力を、プレビューが受け取る「日・時間・分」へそろえる。
+ *
+ * 方式ごとに入力欄の持ち方が違う：
+ *   relative … delayMinutes が合計の分（日・時間・分へ分解する）
+ *   elapsed  … offsetDays ＋ offsetHours ＋ offsetMinutesRemainder
+ *   absolute_time … offsetDays ＋ deliveryTime（時間・分は使わない）
+ *
+ * 呼び出し側で欄を個別に写すと「分だけ渡し忘れ」が起き、設定内容は
+ * 「1分後」なのに配信の流れ・設定サマリーが「すぐに」のまま残る
+ * （#616 SC-02b）。ここで1か所に決める。
+ */
+export function previewOffsets(
+  mode: DeliveryMode,
+  schedule: {
+    delayMinutes: number
+    offsetDays: number
+    offsetHours: number
+    offsetMinutesRemainder: number
+  },
+): { offsetDays: number; offsetHours: number; offsetMinutes: number } {
+  if (mode === 'absolute_time') {
+    return { offsetDays: Math.max(0, schedule.offsetDays), offsetHours: 0, offsetMinutes: 0 }
+  }
+  if (mode === 'relative') {
+    const total = Number.isFinite(schedule.delayMinutes)
+      ? Math.max(0, Math.floor(schedule.delayMinutes))
+      : 0
+    return {
+      offsetDays: Math.floor(total / 1440),
+      offsetHours: Math.floor((total % 1440) / 60),
+      offsetMinutes: total % 60,
+    }
+  }
+  return {
+    offsetDays: Math.max(0, schedule.offsetDays),
+    offsetHours: Math.max(0, schedule.offsetHours),
+    offsetMinutes: Math.max(0, schedule.offsetMinutesRemainder),
+  }
+}
+
 function scheduleWords(
   mode: DeliveryMode,
   offsetDays: number,
