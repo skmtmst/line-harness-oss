@@ -1223,6 +1223,53 @@ function notificationRowState(
   return value ? 'configured' : 'unset'
 }
 
+/*
+  「当日・見逃し案内」の要約文は、時刻の有無ではなく保存された
+  各通知の有効フラグから組み立てる（監査 WEBINAR-10）。
+  全OFFで保存しても時刻の既定値は残るので、値だけ見ると
+  切った通知まで「送る」と読めてしまう。読み込み中・取得失敗・
+  まだ設定が無いのも「送る」ではないので、状態ごとに分ける。
+  説明は概要バッジと同じ NOTIFICATION_ROW_STATE の言葉を使う。
+*/
+function deliveryTimingSummary(
+  settings: WebinarNotificationSettings | null,
+  ready: boolean,
+  failed: boolean,
+): string {
+  if (!ready) return NOTIFICATION_ROW_STATE.pending.label
+  if (failed) return NOTIFICATION_ROW_STATE.failed.label
+  if (!settings) return NOTIFICATION_ROW_STATE.unset.label
+  const parts: string[] = []
+  if (settings.dayBeforeEnabled) parts.push(`前日 ${settings.dayBeforeTime || '—'}`)
+  if (settings.hourBeforeEnabled) parts.push(settings.hourBeforeMinutes ? `${settings.hourBeforeMinutes}分前` : '開始前')
+  if (settings.startEnabled) parts.push('開始時')
+  return parts.length > 0 ? parts.join('／') : '送りません'
+}
+
+function missedNoticeSummary(
+  settings: WebinarNotificationSettings | null,
+  ready: boolean,
+  failed: boolean,
+): string {
+  if (!ready) return NOTIFICATION_ROW_STATE.pending.label
+  if (failed) return NOTIFICATION_ROW_STATE.failed.label
+  if (!settings) return NOTIFICATION_ROW_STATE.unset.label
+  return settings.missedEnabled
+    ? `未視聴者へ翌日${settings.missedTime || '—'}に送信`
+    : '送りません'
+}
+
+function completedNoticeSummary(
+  settings: WebinarNotificationSettings | null,
+  ready: boolean,
+  failed: boolean,
+): string {
+  if (!ready) return NOTIFICATION_ROW_STATE.pending.label
+  if (failed) return NOTIFICATION_ROW_STATE.failed.label
+  if (!settings) return NOTIFICATION_ROW_STATE.unset.label
+  return settings.completedEnabled ? '見終わった人へお礼を送信' : '送りません'
+}
+
 function NotificationStateBadge({ state }: { state: NotificationRowState }) {
   const view = NOTIFICATION_ROW_STATE[state]
   const Icon = view.icon
@@ -1316,6 +1363,9 @@ function NotificationDesignStep({ webinarId, webinarTitle, registrations, public
     settingsReady,
     settingsFailed,
   )
+  const startState = notificationRowState(settings?.startEnabled, settingsReady, settingsFailed)
+  const missedState = notificationRowState(settings?.missedEnabled, settingsReady, settingsFailed)
+  const completedState = notificationRowState(settings?.completedEnabled, settingsReady, settingsFailed)
 
   return (
     <div className="flex flex-col gap-4 xl:flex-row" data-design-node="Ho8z4">
@@ -1330,10 +1380,11 @@ function NotificationDesignStep({ webinarId, webinarTitle, registrations, public
         </section>
         <section className="border-hairline bg-canvas rounded-card border p-4 shadow-card">
           <h2 className="text-ink text-base font-bold">当日・見逃し案内</h2>
-          <p className="text-ink-faint mt-1 text-xs">開始前・開始時・未視聴者への案内を設定します。</p>
+          <p className="text-ink-faint mt-1 text-xs">開始前・開始時・未視聴者・見終わった人への案内を設定します。</p>
           <dl className="divide-hairline mt-4 divide-y rounded-control border border-hairline">
-            <div className="px-4 py-4"><dt className="text-ink text-sm font-bold">配信タイミング</dt><dd className="text-ink-faint mt-1 text-xs">前日 {settings?.dayBeforeTime ?? '—'}／{settings?.hourBeforeMinutes ? `${settings.hourBeforeMinutes}分前` : '—'}／開始時</dd></div>
-            <div className="px-4 py-4"><dt className="text-ink text-sm font-bold">見逃し案内</dt><dd className="text-ink-faint mt-1 text-xs">未視聴者へ翌日{settings?.missedTime ?? '—'}に送信</dd></div>
+            <div className="px-4 py-4"><dt className="text-ink text-sm font-bold">配信タイミング</dt><dd className="text-ink-faint mt-1 text-xs">{deliveryTimingSummary(settings, settingsReady, settingsFailed)}</dd></div>
+            <div className="px-4 py-4"><dt className="text-ink text-sm font-bold">見逃し案内</dt><dd className="text-ink-faint mt-1 text-xs">{missedNoticeSummary(settings, settingsReady, settingsFailed)}</dd></div>
+            <div className="px-4 py-4"><dt className="text-ink text-sm font-bold">視聴完了のお礼</dt><dd className="text-ink-faint mt-1 text-xs">{completedNoticeSummary(settings, settingsReady, settingsFailed)}</dd></div>
           </dl>
         </section>
         {settingsFailed && (
@@ -1350,6 +1401,9 @@ function NotificationDesignStep({ webinarId, webinarTitle, registrations, public
       <SummaryAside rows={[
         ['申込完了', NOTIFICATION_ROW_STATE[registrationState].label],
         ['リマインド', reminderState === 'configured' ? 'リマインド中' : NOTIFICATION_ROW_STATE[reminderState].label],
+        ['開始時', NOTIFICATION_ROW_STATE[startState].label],
+        ['見逃し案内', NOTIFICATION_ROW_STATE[missedState].label],
+        ['視聴完了', NOTIFICATION_ROW_STATE[completedState].label],
         ['対象', registrations === null ? '—（未取得）' : `${registrations.toLocaleString('ja-JP')}人`],
       ]} previewBody={editor?.notificationMessages.registration || notificationPreview(null).empty}>
         <div className="flex gap-2"><Button disabled={testing || notificationTestDone || testDisabledReason !== null} title={notificationTestDone ? 'テスト済みです' : testDisabledReason ?? undefined} onClick={() => setTestConfirmOpen(true)}>{testing ? '送信中…' : notificationTestDone ? 'テスト送信済み' : 'テスト送信'}</Button>{canOpenPublicPage && publicUrl ? <Button href={publicUrl} target="_blank" rel="noreferrer">公開ページを見る</Button> : <Button disabled title={publicPageReason}>公開ページを見る</Button>}</div>
@@ -2555,6 +2609,9 @@ const EditWebinarPageWithTestSupport = Object.assign(EditWebinarPage, {
     NotificationStateBadge,
     VideoMediaLabel,
     notificationRowState,
+    deliveryTimingSummary,
+    missedNoticeSummary,
+    completedNoticeSummary,
   },
 })
 
