@@ -78,6 +78,150 @@ const EXEMPTIONS: Record<string, string> = {
     'dirty 印（*）を表示するだけの共通部品。編集画面ではない',
 }
 
+/*
+ * V6R-S0-c: 「dirty を持たない編集画面」も網に入れる。
+ *
+ * 上の DIRTY_SIGNATURE は、変更の有無を名前や文言で持つ画面しか拾えない。
+ * 変更の有無そのものを持たない編集画面（一斉配信の作成・テンプレート編集など）は、
+ * 番兵が無くてもこの試験を通っていた。そこで「保存の口」と「入力欄3つ以上」を持つ
+ * 画面を編集画面とみなし、分類を求める。
+ */
+const EDITOR_SAVE_SIGNATURE = /(?:\bapi(?:\.[A-Za-z]+)+|\b[a-z][A-Za-z]*Api)\.(?:create|update|save|patch|upsert)[A-Za-z]*\(/
+const EDITOR_INPUT_SIGNATURE = /<(input|textarea|TextField|TextArea|SelectField)\b/g
+const EDITOR_MIN_INPUTS = 3
+
+/*
+ * 編集画面の印はあるが、番兵が要るかをまだ決めていないもの（2026-09-23 時点の棚卸し）。
+ * 担当レーンが「GUARDED へ移す」か「理由を書いて EXEMPTIONS へ移す」を決め、ここから消す。
+ * **ここへの追加は禁止。** 新しい編集画面は最初から GUARDED か EXEMPTIONS に入れる。
+ */
+const UNTRIAGED: Record<string, string> = {
+  'app/affiliate-offers/new/page.tsx':
+    's3: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
+  'app/affiliates/action-dialogs.tsx':
+    's3: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
+  'app/affiliates/tabs.tsx':
+    's3: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
+  'app/analytics/page.tsx':
+    's3: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
+  'app/analytics/reports/new/page.tsx':
+    's3: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
+  'app/auto-replies/page.tsx':
+    's2: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
+  'app/auto-replies/publish/page.tsx':
+    's2: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
+  'app/booking/bookings/detail/page.tsx':
+    's3: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
+  'app/booking/menus/new/page.tsx':
+    's3: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
+  'app/booking/menus/page.tsx':
+    's3: 予約メニュー。同じ機能の staff は番兵あり。V6R-S3-b（board#1067）で付ける',
+  'app/booking/staff/new/page.tsx':
+    's3: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
+  'app/booking/staff/page.tsx':
+    's3: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
+  'app/booking/staff/shifts/page.tsx':
+    's3: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
+  'app/broadcasts/page.tsx':
+    's2: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
+  'app/chats/page.tsx':
+    's1: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
+  'app/common-actions/new/page.tsx':
+    's3: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
+  'app/contents/media-detail-dialog.tsx':
+    's3: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
+  'app/contents/page.tsx':
+    's3: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
+  'app/contents/vars/page.tsx':
+    's3: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
+  'app/conversions/new/page.tsx':
+    's3: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
+  'app/events/bookings/page.tsx':
+    's3: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
+  'app/form-submissions/page.tsx':
+    's2: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
+  'app/friends/detail/page.tsx':
+    's1: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
+  'app/friends/migrations/page.tsx':
+    's1: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
+  'app/hq/support/page.tsx':
+    'hq: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
+  'app/inflow-links/_components/edit-route-modal.tsx':
+    's3: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
+  'app/inflow-links/new/page.tsx':
+    's3: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
+  'app/inflow-links/page.tsx':
+    's3: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
+  'app/line-notifications/operator/new/page.tsx':
+    's3: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
+  'app/mileage/earning-rules/new/page.tsx':
+    's3: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
+  'app/mileage/rewards/edit/page.tsx':
+    's3: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
+  'app/nen-members/page.tsx':
+    's3: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
+  'app/nen/pets/pet-editor.tsx':
+    's3: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
+  'app/ops/announcements/page.tsx':
+    'hq: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
+  'app/ops/support/page.tsx':
+    'hq: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
+  'app/pools/new/page.tsx':
+    'hq: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
+  'app/pools/page.tsx':
+    'hq: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
+  'app/restaurant-test/restaurant-console.tsx':
+    'hq: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
+  'app/scenarios/detail/scenario-detail-client.tsx':
+    's1: シナリオ詳細。手動保存で番兵なし。V6R-S1-d（board#1065）で付ける',
+  'app/scenarios/first-step/page.tsx':
+    's1: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
+  'app/tags/fields/edit/page.tsx':
+    's1: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
+  'app/tags/fields/migrate/page.tsx':
+    's1: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
+  'app/templates/page.tsx':
+    's2: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
+  'app/templates/template-asset-editor.tsx':
+    's2: テンプレート編集の本体（app/templates/edit から載る）。V6R-S2-a（board#1066）で付ける',
+  'app/webhooks/edit/page.tsx':
+    's3: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
+  'app/webhooks/new/page.tsx':
+    's3: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
+  'app/webhooks/page.tsx':
+    's3: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
+  'app/webinars/new/page.tsx':
+    's2: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
+  'app/webinars/page.tsx':
+    's2: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
+  'components/accounts/account-edit-modal.tsx':
+    'hq: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
+  'components/auto-replies/edit-dialog.tsx':
+    's2: 自動応答の編集。共通ダイアログは背景クリックとEscで閉じる。V6R-S2-a（board#1066）で付ける',
+  'components/broadcasts/broadcast-asset-manager.tsx':
+    's2: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
+  'components/broadcasts/broadcast-form.tsx':
+    's2: 一斉配信の作成。手動保存で番兵なし。V6R-S2-a（kentavndng/line-harness-board#1066）で付ける',
+  'components/events/event-form.tsx':
+    's3: イベント作成。V6R-S3-b（board#1067）で付ける',
+  'components/events/event-wizard.tsx':
+    's3: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
+  'components/friend-fields/edit-tag-page-v4.tsx':
+    's1: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
+  'components/friend-fields/support-mark-editor.tsx':
+    's1: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
+  'components/friend-fields/support-mark-rules-panel.tsx':
+    's1: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
+  'components/friends/advanced-search-dialog.tsx':
+    's1: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
+  'components/friends/single-friend-actions.tsx':
+    's1: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
+  'components/ops/knowledge-editor.tsx':
+    'hq: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
+  'components/scenarios/action-editor.tsx':
+    's1: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
+}
+
 function* tsxFiles(dir: string): Generator<string> {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
     const path = join(dir, entry.name)
@@ -96,6 +240,20 @@ function dirtyTrackingFiles(): string[] {
       if (DIRTY_SIGNATURE.test(readFileSync(path, 'utf8'))) {
         found.push(path.slice(SRC.length + 1))
       }
+    }
+  }
+  return found.sort()
+}
+
+function editorFiles(): string[] {
+  const found: string[] = []
+  for (const root of ['app', 'components']) {
+    for (const path of tsxFiles(join(SRC, root))) {
+      const source = readFileSync(path, 'utf8')
+      if (DIRTY_SIGNATURE.test(source)) continue
+      if (!EDITOR_SAVE_SIGNATURE.test(source)) continue
+      if ((source.match(EDITOR_INPUT_SIGNATURE) ?? []).length < EDITOR_MIN_INPUTS) continue
+      found.push(path.slice(SRC.length + 1))
     }
   }
   return found.sort()
@@ -133,6 +291,27 @@ describe('未保存の編集がある画面は離脱の番兵を持つ契約（D
     }
     for (const [file, reason] of Object.entries(EXEMPTIONS)) {
       expect(reason.length, `${file} の対象外理由`).toBeGreaterThan(0)
+    }
+  })
+
+  it('dirty を持たない編集画面も、分類か未判定の一覧のどちらかに載っている（V6R-S0-c）', () => {
+    const known = new Set([
+      ...GUARDED, ...Object.keys(COVERED_BY_PARENT), ...Object.keys(EXEMPTIONS), ...Object.keys(UNTRIAGED),
+    ])
+    const unclassified = editorFiles().filter((file) => !known.has(file))
+    expect(
+      unclassified,
+      '保存の口と入力欄を持つ編集画面が未分類です。useUnsavedGuard を付けて GUARDED へ、' +
+        'または理由を書いて EXEMPTIONS へ追加してください（UNTRIAGED への追加は禁止）',
+    ).toEqual([])
+  })
+
+  it('未判定の一覧は、まだ番兵が無く・まだ編集画面の印を持つものだけ（直したら一覧から消す）', () => {
+    const editors = new Set(editorFiles())
+    for (const file of Object.keys(UNTRIAGED)) {
+      const source = readFileSync(join(SRC, file), 'utf8')
+      expect(source.includes('useUnsavedGuard('), `${file} は番兵が付いたので GUARDED へ移す`).toBe(false)
+      expect(editors.has(file), `${file} はもう編集画面の印が無いので UNTRIAGED から消す`).toBe(true)
     }
   })
 })

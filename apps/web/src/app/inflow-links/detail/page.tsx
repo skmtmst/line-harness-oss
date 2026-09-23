@@ -158,14 +158,18 @@ function InflowLinkDetailPageContent() {
   const workerBase = process.env.NEXT_PUBLIC_API_URL ?? ''
   const url = route ? `${workerBase}/r/${encodeURIComponent(route.refCode)}` : null
 
+  /** コピーできなかったとき、選んでコピーできる欄をその場に出す（ブラウザの入力窓は使わない。V6R-S3-f）。 */
+  const [copyFailed, setCopyFailed] = useState(false)
+
   async function copyUrl() {
     if (!url) return
     try {
       await navigator.clipboard.writeText(url)
       setCopied(true)
+      setCopyFailed(false)
       setTimeout(() => setCopied(false), 2000)
     } catch {
-      window.prompt('コピーしてください:', url)
+      setCopyFailed(true)
     }
   }
 
@@ -253,6 +257,19 @@ function InflowLinkDetailPageContent() {
           <div><div className="flex items-center gap-2"><span className="rounded-pill bg-canvas-sunken px-2 py-1 text-xs font-semibold"># {route.refCode}</span><span className="rounded-pill bg-canvas-sunken px-2 py-1 text-xs font-semibold">{route.genre || '未分類'}</span></div><p className="mt-2 text-sm text-ink-faint">{route.createdAt.slice(5, 10).replace('-', '/')} に発行。{url} を通った人の記録です。</p></div>
           <div className="flex gap-2"><Button onClick={copyUrl}>{copied ? 'コピーしました' : 'URLをコピー'}</Button><Button variant="secondary" onClick={() => setEditingRoute(true)}>この経路を編集</Button><Button variant="secondary" aria-label={`${route.name}の${canPermanentlyDelete ? '削除' : '受付停止'}を確認`} onClick={() => { setDeleteError(''); setDeleteChoice('stop'); setDeleteConfirmationName(''); setRedirectTargetId(''); setDeleteOpen(true) }}>{canPermanentlyDelete ? 'この経路を削除' : '受付を止める'}</Button></div>
         </div>
+        {copyFailed && url && (
+          <div role="alert" className="mb-4 space-y-2 rounded-control border border-hairline bg-canvas-sunken p-3 text-sm text-ink-secondary">
+            <p>コピーできませんでした。下の欄を選んでコピーしてください。</p>
+            <input
+              readOnly
+              autoFocus
+              value={url}
+              aria-label="流入経路のURL"
+              onFocus={(e) => e.currentTarget.select()}
+              className="w-full rounded-control border border-hairline bg-canvas px-3 py-2 font-mono text-xs"
+            />
+          </div>
+        )}
         {/*
           口から取れない数は書かない（#514 重大3）。funnel の4数は累計。
           残数・ブロック数・1人あたり金額の集計口は無いので「—」+理由表示。

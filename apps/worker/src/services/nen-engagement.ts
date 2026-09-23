@@ -39,6 +39,12 @@ export type CampaignRow = {
   /** When an open_form action is connected, skip friends who already submitted that form. */
   exclude_form_respondents?: number;
   after_actions?: NenCampaignAfterAction[];
+  /*
+   * 保存済みJSONに open_form があったが必須項目欠落で parse に落ちた=1。
+   * 「回答フォームを開く」つもりなのにフォーム未選択の旧設定を検出するための
+   * 手掛かりで、送信内容の組み立てには使わない。
+   */
+  form_action_dropped?: number;
   updated_at?: string;
 };
 
@@ -197,9 +203,10 @@ function campaignResponseFormId(campaign: CampaignRow): string | null {
  * 止めた・別アカウント専用になった既存の稼働中設定は「設定不足」として扱い、
  * 新しい送信jobを積まずに理由を配信履歴へ残す。
  */
-export type NenCampaignFormIssue = 'form_missing' | 'form_inactive' | 'form_other_account';
+export type NenCampaignFormIssue = 'form_unselected' | 'form_missing' | 'form_inactive' | 'form_other_account';
 
 export const NEN_CAMPAIGN_FORM_ISSUE_LABELS: Record<NenCampaignFormIssue, string> = {
+  form_unselected: 'つなぐ回答フォームが選ばれていません',
   form_missing: 'つなぐ回答フォームが見つかりません（削除された可能性があります）',
   form_inactive: 'つなぐ回答フォームは公開されていません',
   form_other_account: 'つなぐ回答フォームは別のLINEアカウント専用です',
@@ -229,14 +236,29 @@ export async function nenCampaignFormIssue(
   campaign: CampaignRow,
   lineAccountId: string,
 ): Promise<NenCampaignFormIssue | null> {
-  // 「開くつもり」を示す2つの手掛かり(押されたあとの設定・ボタンのURL)が
-  // 指すフォームを両方たどり、片方でも使えなければ設定不足とする。
-  const formIds = [campaignResponseFormId(campaign), campaignButtonFormId(campaign)]
-    .filter((id): id is string => id !== null);
-  for (const formId of new Set(formIds)) {
+  /*
+   * 「フォームに関わるつもり」を示す手掛かりは4つ:
+   *   押されたあとの設定(open_form)・ボタンのURL(page=form)・
+   *   parseに落ちた旧open_form・口コミ回答者の除外ON。
+   * どれかがあって指す先のフォームが使えないなら設定不足とする。
+   * 除外ONだけ残った状態も、選んだはずの除外が黙って効かない
+   * 設定不足なので同じ扱いにする。
+   */
+  const actionFormId = campaignResponseFormId(campaign);
+  const buttonFormId = campaignButtonFormId(campaign);
+  const intendsForm = actionFormId !== null
+    || buttonFormId !== null
+    || campaign.form_action_dropped === 1
+    || campaign.exclude_form_respondents === 1;
+  if (!intendsForm) return null;
+  for (const formId of new Set(
+    [actionFormId, buttonFormId].filter((id): id is string => id !== null),
+  )) {
+    if (formId === '') return 'form_unselected';
     const issue = await formIssueForId(db, formId, lineAccountId);
     if (issue) return issue;
   }
+  if (actionFormId === null) return 'form_unselected';
   return null;
 }
 
@@ -404,6 +426,7 @@ export function readNenCampaignSnapshot(value: string | null, campaignKey: strin
       || dedupWindowDays > 365
       || ![0, 1].includes(excludeFormRespondents)
     ) return null;
+    const afterActions = parseNenCampaignAfterActions(parsed.after_actions);
     return {
       campaign_key: parsed.campaign_key,
       label: parsed.label,
@@ -419,7 +442,21 @@ export function readNenCampaignSnapshot(value: string | null, campaignKey: strin
       image_url: typeof parsed.image_url === 'string' ? parsed.image_url : null,
       dedup_window_days: dedupWindowDays,
       exclude_form_respondents: excludeFormRespondents,
-      after_actions: parseNenCampaignAfterActions(parsed.after_actions),
+      after_actions: afterActions,
+      /*
+       * 「回答フォームを開く」が保存JSONにはあるのに必須項目欠落で parse に
+       * 落ちた=旧仕様の未選択設定。黙って捨てると設定不足が検出できないので
+       * 手掛かりだけ残す(NEN-07)。
+       */
+      form_action_dropped: (
+        Array.isArray(parsed.after_actions)
+        && parsed.after_actions.some(
+          (item) => item !== null
+            && typeof item === 'object'
+            && (item as Record<string, unknown>).kind === 'open_form',
+        )
+        && !afterActions.some((action) => action.kind === 'open_form')
+      ) ? 1 : 0,
       updated_at: typeof parsed.updated_at === 'string' ? parsed.updated_at : '',
     };
   } catch {

@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   createPollGeneration,
+  onlyWhenVisible,
   startVisiblePoll,
   visiblePollDelayMs,
   VISIBLE_POLL_BASE_MS,
@@ -363,5 +364,20 @@ describe('createPollGeneration', () => {
     const newSeq = gen.next()
     expect(gen.isStale(oldSeq)).toBe(true)
     expect(gen.isStale(newSeq)).toBe(false)
+  })
+})
+
+describe('onlyWhenVisible（V6R-S3-g）', () => {
+  afterEach(() => vi.unstubAllGlobals())
+
+  it('隠れている間は実行せず、表示に戻れば実行する', () => {
+    const doc = stubDocument(true)
+    const run = vi.fn()
+    const guarded = onlyWhenVisible(run)
+    guarded()
+    expect(run).not.toHaveBeenCalled()
+    doc.hidden = false
+    guarded()
+    expect(run).toHaveBeenCalledTimes(1)
   })
 })

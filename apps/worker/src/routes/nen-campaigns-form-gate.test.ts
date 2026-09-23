@@ -142,6 +142,14 @@ describe('PUT /api/nen-campaigns/settings/:key のフォーム検査', () => {
     expect(res.status).toBe(400);
     expect((await res.json() as { error: string }).error).toContain('回答フォームの選択が必要');
   });
+
+  test('口コミ除外が残った設定不足は、除外を外す保存で解除できる', async () => {
+    // 検証環境の実例: review_request の既定は「回答者を除く」ONだがフォーム無し。
+    // 編集画面はそのチェックをOFF表示・無効にするので、表示どおり除外を外す
+    // 保存が通らないと設定不足を解除する道がない。
+    const res = await putSetting(baseBody({ excludeFormRespondents: false, afterActions: [] }));
+    expect(res.status).toBe(200);
+  });
 });
 
 describe('PUT /api/nen-campaigns/settings/:key/enabled の稼働開始検査', () => {
@@ -192,5 +200,16 @@ describe('GET /api/nen-campaigns/settings の設定不足判定', () => {
     const arrival = body.data.find((row) => row.campaignKey === 'arrival_check');
     expect(review?.formIssue).toBe('form_missing');
     expect(arrival?.formIssue).toBeNull();
+  });
+
+  test('「回答者を除く」だけがONでフォームがない既定状態は form_unselected を返す', async () => {
+    // アカウント別設定が無い review_request は既定で除外ON・フォーム無し。
+    // 監査で指摘された「未選択のまま稼働できる状態」そのもの。
+    const res = await app().request('/api/nen-campaigns/settings?lineAccountId=account-1');
+    expect(res.status).toBe(200);
+    const body = await res.json() as { data: Array<{ campaignKey: string; formIssue: string | null }> };
+    expect(body.data.find((row) => row.campaignKey === 'review_request')?.formIssue)
+      .toBe('form_unselected');
+    expect(body.data.find((row) => row.campaignKey === 'arrival_check')?.formIssue).toBeNull();
   });
 });

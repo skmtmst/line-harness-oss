@@ -1343,6 +1343,35 @@ const spec = {
         },
       },
     },
+    '/api/folders/{id}/swap-order': {
+      post: {
+        tags: ['Friend Attributes'],
+        summary: '隣り合う2つのフォルダの並びを入れ替える（V6R-S2-c）',
+        description:
+          '2つの表示順を1回のバッチで書く。番号が同じ2つは、後ろへ行くほうを +1 して並びを入れ替える。同じ種類・同じアカウント・同じ親のフォルダ同士だけ受け付ける。全部の兄弟は振り直さない（同時に触った人の並びを上書きしないため）。',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: {
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['withId'],
+                properties: {
+                  withId: { type: 'string', description: '入れ替える相手のフォルダ' },
+                  accountId: { type: 'string', description: 'アカウント単位のフォルダの所有アカウント（ウェビナーは必須）' },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          '200': { description: 'Order swapped' },
+          '400': { description: 'withId missing, same folder, or folders not in the same place' },
+          '403': { description: 'Owner or admin role required' },
+          '404': { description: 'Folder not found or not in visible scope' },
+        },
+      },
+    },
     '/api/support-marks/reorder': {
       patch: {
         tags: ['Friend Attributes'],
