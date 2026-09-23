@@ -86,7 +86,7 @@ export function PhotoReviewDetail({
     ?? safePhotoSrc(photo.image_url)
   const latestAssetJob = assetStatus?.jobs[0] ?? null
   return <main className="mx-auto max-w-screen-2xl p-6" data-photo-view="detail">
-    {notice && <div className="mb-4 rounded-control border border-accent-border bg-accent-soft px-4 py-3 text-sm text-accent-hover">{notice}</div>}
+    {notice && <div role="status" aria-live="polite" className="mb-4 rounded-control border border-accent-border bg-accent-soft px-4 py-3 text-sm text-accent-hover">{notice}</div>}
     <div className="flex items-center justify-between gap-2 max-md:flex-col max-md:items-start">
       <div>
         <p className="text-xs font-bold text-ink-faint">写真審査</p>

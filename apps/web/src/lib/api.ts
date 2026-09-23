@@ -10446,9 +10446,10 @@ export const api = {
       const suffix = query.toString() ? `?${query.toString()}` : ''
       return fetchApi<ApiResponse<MileageAdminOverview>>(`/api/mileage/overview${suffix}`)
     },
-    friendsV6: (params: { accountId: string; search?: string; limit?: number; offset?: number }) => {
+    friendsV6: (params: { accountId: string; search?: string; friendId?: string; limit?: number; offset?: number }) => {
       const query = new URLSearchParams({ accountId: params.accountId })
       if (params.search) query.set('search', params.search)
+      if (params.friendId) query.set('friendId', params.friendId)
       if (params.limit !== undefined) query.set('limit', String(params.limit))
       if (params.offset !== undefined) query.set('offset', String(params.offset))
       return fetchApi<ApiResponse<MileageFriendsV6Overview>>(`/api/mileage/friends?${query.toString()}`)
@@ -10508,6 +10509,8 @@ export const api = {
     history: (params: {
       accountId: string
       search?: string
+      /** V6R-CX-e: この友だちと同じ人の履歴だけ。 */
+      friendId?: string
       entryType?: MileageHistoryItem['entryType']
       status?: MileageHistoryItem['status']
       mode?: 'automatic' | 'manual'
@@ -10518,6 +10521,7 @@ export const api = {
     }) => {
       const query = new URLSearchParams({ accountId: params.accountId })
       if (params.search) query.set('search', params.search)
+      if (params.friendId) query.set('friendId', params.friendId)
       if (params.entryType) query.set('entryType', params.entryType)
       if (params.status) query.set('status', params.status)
       if (params.mode) query.set('mode', params.mode)

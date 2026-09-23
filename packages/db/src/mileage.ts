@@ -2253,6 +2253,11 @@ export async function getMileageAdminHistory(
     accountId: string;
     visibleAccountIds?: string[];
     search?: string;
+    /**
+     * V6R-CX-e: この友だちと同じ人（名寄せした複数アカウント）の履歴だけを返す。
+     * 名前で探して100件から拾うと、同名が多いと本人がこぼれた。
+     */
+    friendId?: string;
     entryType?: MileageEntryType;
     status?: MileageEntryStatus;
     mode?: 'automatic' | 'manual';
@@ -2315,6 +2320,13 @@ export async function getMileageAdminHistory(
   const scopeBinds = [accountId, ...visibleAccountIds, ...visibleAccountIds];
   const where = ["(? = '' OR sp.display_name LIKE '%' || ? || '%')"];
   const filters: unknown[] = [search, search];
+  if (options.friendId) {
+    where.push(`sp.identity_key = (
+      SELECT CASE WHEN f.user_id IS NOT NULL THEN 'user:' || f.user_id ELSE 'friend:' || f.id END
+        FROM friends f WHERE f.id = ?
+    )`);
+    filters.push(options.friendId);
+  }
   if (options.entryType) {
     where.push('lr.entry_type = ?');
     filters.push(options.entryType);
