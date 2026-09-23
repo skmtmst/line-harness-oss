@@ -4,8 +4,9 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { api, type OpsKnowledgeArticle, type OpsKnowledgeInput } from '@/lib/api'
 import { opsCall } from './ops-ui'
-import { KNOWLEDGE_KINDS, knowledgeTime } from './knowledge-format'
+import { KNOWLEDGE_KINDS, knowledgeArticleKind, knowledgeTime } from './knowledge-format'
 import Button from '@/components/shared/button'
+import Chip from '@/components/shared/chip'
 import Dialog from '@/components/shared/dialog'
 import NoteBar from '@/components/shared/note-bar'
 import SelectField from '@/components/shared/select-field'
@@ -24,7 +25,11 @@ export default function KnowledgeEditor({ article: initial, onClose, onSaved }: 
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const editing = initial.reviewState === 'approved' && initial.sourceCurrent
-  const eligible = article.sourceCurrent && article.reviewState === 'pending' && article.evidence.length >= 2
+  const eligible = article.sourceCurrent && (article.articleKind === 'verified'
+    ? article.reviewState === 'pending' && article.evidence.length >= 2
+    : (article.reviewState === 'pending' || article.reviewState === 'needs_review'))
+  const kindLabel = knowledgeArticleKind(article.articleKind)
+  const canApprove = eligible && Boolean(form.question.trim()) && Boolean(form.answer.trim())
   const input = () => ({ ...form, keywords: keywords.split(/[、,\n]/).map(v => v.trim()).filter(Boolean) })
   const change = <K extends keyof OpsKnowledgeInput>(key: K, value: OpsKnowledgeInput[K]) => {
     setForm(f => ({ ...f, [key]: value })); setConfirmed(false)
@@ -62,30 +67,38 @@ export default function KnowledgeEditor({ article: initial, onClose, onSaved }: 
     footer={<div className={styles.footer}>
       <Button onClick={editing ? onClose : () => void dismiss()} disabled={busy}>{editing ? '保存せず閉じる' : '見送る'}</Button>
       <Button onClick={() => void save()} disabled={busy} variant={editing ? 'primary' : 'secondary'}>{editing ? '承認待ちで保存' : '下書き保存'}</Button>
-      {!editing && <Button variant="primary" disabled={busy || !eligible || !confirmed} onClick={() => void save(true)}>承認して有効にする</Button>}
+      {!editing && <Button variant="primary" disabled={busy || !canApprove || !confirmed} onClick={() => void save(true)}>承認して有効にする</Button>}
     </div>}>
     <div className={styles.editor}>
       <NoteBar className={styles.note}>{editing
         ? '変更を保存すると承認待ちに戻ります。再承認するまで、この記事は AI の返信に使われません。'
         : '自動で作成した下書きです。解決の根拠と記事案を確認してください。承認するまで AI の返信には使われません。'}</NoteBar>
-      <p className={styles.source}>元の問い合わせ：{article.ticketNo == null ? '番号未取得' : `#MB-${String(article.ticketNo).padStart(4, '0')}`}{article.sourceSubject ? ` ${article.sourceSubject}` : ''}</p>
+      <div className={styles.sourceLine}>
+        <p className={styles.source}>元の問い合わせ：{article.ticketNo == null ? '番号未取得' : `#MB-${String(article.ticketNo).padStart(4, '0')}`}{article.sourceSubject ? ` ${article.sourceSubject}` : ''}</p>
+        <Chip data-design-node="aeReviewKind" tone={kindLabel.tone} className={styles.articleKindChip}>{kindLabel.label}</Chip>
+      </div>
       {!editing && <section className={styles.evidence} data-design-node="mAjGu" aria-label="解決の根拠">
         <h3>解決の根拠</h3>
         {article.evidence.filter(e => e.role !== 'condition').map((e, i) => <p key={`${e.messageId}-${i}`}>
           <time dateTime={e.createdAt} title={e.createdAt}>{knowledgeTime(e.createdAt)}</time> {e.authorKind === 'ops' ? '担当者' : 'お客様'}：「{e.quote}」
         </p>)}
-        <p>適用条件：{article.evidence.filter(e => e.role === 'condition').map(e => e.quote).join('／') || '原文に明示なし'}。未確認の原因や途中の提案は記事に含めません。</p>
+        {article.articleKind === 'verified'
+          ? <p>適用条件：{article.evidence.filter(e => e.role === 'condition').map(e => e.quote).join('／') || '原文に明示なし'}。未確認の原因や途中の提案は記事に含めません。</p>
+          : <p>回答例はお客様の成功確認を示すものではありません。質問と運営の回答内容を元のやり取りで確認してください。</p>}
         {(!eligible || article.reviewReason) && <p>{!article.sourceCurrent ? '元のやり取りが更新されています。この記事は承認できません。' : article.reviewReason}</p>}
         <Link href={`/ops/support?id=${encodeURIComponent(article.sourceRequestId)}`}>元のやり取りを開く →</Link>
       </section>}
       <label className={styles.field}><span>題名</span><TextField value={form.title} maxLength={120} disabled={busy} onChange={e => change('title', e.target.value)} /></label>
       <label className={styles.field}><span>質問</span><TextArea className={styles.question} value={form.question} maxLength={1000} disabled={busy} onChange={e => change('question', e.target.value)} /></label>
-      <label className={styles.field}><span>答え</span><TextArea className={styles.answer} value={form.answer} maxLength={6000} disabled={busy} onChange={e => change('answer', e.target.value)} /></label>
+      <label className={styles.field}><span>答え</span><TextArea className={styles.answer} value={form.answer} maxLength={12000} disabled={busy} onChange={e => change('answer', e.target.value)} /></label>
+      {!form.answer.trim() && article.articleKind === 'answer_example' && <p data-design-node="aeEmptyAnswerNote" className={styles.emptyAnswerNote}>運営の回答がありません。答えを書いて承認できます</p>}
       <label className={styles.field}><span>キーワード</span><TextField value={keywords} maxLength={480} disabled={busy} onChange={e => { setKeywords(e.target.value); setConfirmed(false) }} /></label>
       <label className={`${styles.field} ${styles.kind}`}><span>種類</span><SelectField options={KNOWLEDGE_KINDS} value={form.kind} disabled={busy} onChange={e => change('kind', e.target.value as OpsKnowledgeInput['kind'])} /></label>
       {!editing && <label className={styles.confirm} data-design-node="xNNWI">
         <input type="checkbox" checked={confirmed} disabled={busy || !eligible} onChange={e => setConfirmed(e.target.checked)} />
-        解決策と結果を元のやり取りで確認しました
+        {article.articleKind === 'verified'
+          ? '解決策と結果を元のやり取りで確認しました'
+          : '回答内容が正しいことを元のやり取りで確認しました'}
       </label>}
     </div>
   </Dialog>

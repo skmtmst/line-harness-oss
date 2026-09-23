@@ -5,7 +5,9 @@ import { api, type OpsKnowledgeArticle, type OpsKnowledgeReference, type OpsSupp
 import { opsCall } from './ops-ui'
 import KnowledgeEditor from './knowledge-editor'
 import Button from '@/components/shared/button'
+import Chip from '@/components/shared/chip'
 import NoteBar from '@/components/shared/note-bar'
+import { knowledgeArticleKind } from './knowledge-format'
 import { BookOpen, ArrowRight } from 'lucide-react'
 import styles from './knowledge.module.css'
 
@@ -34,7 +36,9 @@ export function TicketKnowledge({ detail, onRefresh }: { detail: OpsSupportDetai
   }
   return <section className="grid gap-2" aria-label="ナレッジの確認">
     <NoteBar>{current?.sourceCurrent
-      ? current.reviewState === 'approved' && current.status === 'active' ? '確認済みの記事をナレッジに保存しています。' : '自動確認した下書きです。解決の根拠と内容を確認し、承認するまで AI の返信には使われません。'
+      ? current.reviewState === 'approved' && current.status === 'active' ? '確認済みの記事をナレッジに保存しています。' : current.articleKind === 'answer_example'
+        ? '質問と運営の回答から回答例を作りました。元のやり取りを確認して承認するまで AI の返信には使われません。'
+        : '自動確認した下書きです。解決の根拠と内容を確認し、承認するまで AI の返信には使われません。'
       : job?.status === 'failed' ? '下書きを作れませんでした。時間をおいて再試行できます。'
         : '解決した内容を自動で確認します。根拠が足りない場合は「要確認」になります。承認前の記事は AI の返信に使われません。'}</NoteBar>
     <div className="flex justify-end gap-2">
@@ -70,13 +74,16 @@ export function KnowledgeReferences({ references, requestId, busy, onExclude }: 
   }
   if (!references.length) return null
   return <section className="grid gap-2" aria-label="今回の回答の根拠">
-    {references.map(ref => <div data-design-node="LT8m5" key={`${ref.id}-${ref.version}`} className={styles.referenceRow}>
+    {references.map(ref => {
+      const kind = knowledgeArticleKind(ref.articleKind)
+      return <div data-design-node="LT8m5" key={`${ref.id}-${ref.version}`} className={styles.referenceRow}>
       <BookOpen aria-hidden="true" className={styles.referenceIcon} />
-      <button data-design-node="secaz" className={styles.referenceLink} title={`回答の根拠：${ref.title}`} disabled={busy || pending} onClick={() => void open(ref.id)}><span>回答の根拠：{ref.title}</span><ArrowRight aria-hidden="true" /></button>
+      <button data-design-node="secaz" className={styles.referenceLink} title={`回答の参考：${ref.title}`} disabled={busy || pending} onClick={() => void open(ref.id)}><span>回答の参考：{ref.title}</span><ArrowRight aria-hidden="true" /></button>
+      <Chip data-design-node={ref.articleKind === 'verified' ? 'aeSolvedRefChip' : 'aeDraftKind'} tone={kind.tone} className={styles.referenceKind}>{kind.label}</Chip>
       <Button data-design-node="HXQxY" className={styles.referenceFits} size="field" disabled={busy || pending} aria-pressed={feedback[`${ref.id}:${ref.version}`] === 'helpful'} onClick={() => void vote(ref.id, 'helpful')}>今回の回答に合う</Button>
       <Button data-design-node="NeS62" className={styles.referenceUnfit} size="field" disabled={busy || pending} aria-pressed={feedback[`${ref.id}:${ref.version}`] === 'unhelpful'} onClick={() => void vote(ref.id, 'unhelpful')}>今回には合わない</Button>
       <Button data-design-node="ACP9c" className={styles.referenceRegenerate} size="field" disabled={busy || pending} onClick={() => onExclude(ref.id)}>除外して回答を作り直す</Button>
-    </div>)}
+    </div>})}
     {error && <p role="alert" className="text-caption text-status-danger">{error}</p>}
     {article && <KnowledgeEditor key={article.id} article={article} onClose={() => setArticle(null)} onSaved={() => setArticle(null)} />}
   </section>

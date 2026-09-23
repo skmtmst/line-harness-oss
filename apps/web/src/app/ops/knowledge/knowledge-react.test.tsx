@@ -15,6 +15,7 @@ vi.mock('next/link', () => ({ default: ({ children, href }: { children: React.Re
 
 const article: OpsKnowledgeArticle = {
   id: 'article', version: 1, sourceRequestId: 'ticket', ticketNo: 312, sourceCurrent: true,
+  articleKind: 'verified',
   title: 'フォームのタグが付かないとき', question: 'タグが付かない', answer: '回答後の設定を確認した',
   kind: 'bug', keywords: ['タグ'], reviewState: 'pending', status: 'disabled', reviewReason: '',
   evidence: [
@@ -54,8 +55,10 @@ describe('V6 knowledge UI', () => {
   })
   it('displays actual draft references and sends feedback or exclusion for that article', async () => {
     const exclude = vi.fn()
-    await act(async () => root.render(<KnowledgeReferences requestId="ticket" references={[{ id: article.id, title: article.title, version: 3 }]} busy={false} onExclude={exclude} />))
+    await act(async () => root.render(<KnowledgeReferences requestId="ticket" references={[{ id: article.id, title: article.title, version: 3, articleKind: 'verified' }]} busy={false} onExclude={exclude} />))
     expect(host.querySelector('[data-design-node="LT8m5"]')).not.toBeNull()
+    expect(host.textContent).toContain('解決確認済み')
+    expect(host.textContent).toContain('回答の参考')
     await act(async () => button('今回の回答に合う').click())
     expect(mocks.feedback).toHaveBeenCalledWith('article', 'ticket', 'helpful')
     expect(button('今回の回答に合う').getAttribute('aria-pressed')).toBe('true')
@@ -68,7 +71,7 @@ describe('V6 knowledge UI', () => {
   })
   it('an unsuccessful fit vote can be retried without changing or disabling the knowledge', async () => {
     mocks.feedback.mockRejectedValueOnce(new TypeError('offline'))
-    await act(async () => root.render(<KnowledgeReferences requestId="ticket" references={[{ id: article.id, title: article.title, version: 3 }]} busy={false} onExclude={() => {}} />))
+    await act(async () => root.render(<KnowledgeReferences requestId="ticket" references={[{ id: article.id, title: article.title, version: 3, articleKind: 'verified' }]} busy={false} onExclude={() => {}} />))
     await act(async () => button('今回には合わない').click())
     expect(document.querySelector('[role="alert"]')?.textContent).toContain('通信できませんでした')
     expect(button('今回には合わない').disabled).toBe(false)
@@ -93,7 +96,9 @@ describe('V6 knowledge UI', () => {
     expect(host.textContent).toContain('内容を確認')
     expect(host.textContent).not.toContain('FAQ')
     expect(host.textContent).not.toContain('公開範囲')
-    expect(host.querySelectorAll('th')).toHaveLength(7)
+    expect(host.textContent).toContain('解決確認済み')
+    expect(host.querySelector('[data-design-node="aeKindFilter"]')).not.toBeNull()
+    expect(host.querySelectorAll('th')).toHaveLength(8)
   })
   it('requires evidence confirmation and saves the edited version before approval', async () => {
     const closed = vi.fn()
@@ -111,6 +116,25 @@ describe('V6 knowledge UI', () => {
     expect(button('承認して有効にする').disabled).toBe(true)
     expect((document.querySelector('input[type="checkbox"]') as HTMLInputElement).disabled).toBe(true)
     expect(document.body.textContent).toContain('元のやり取りが更新されています')
+  })
+  it('labels an answer example and allows approval after the operator confirms its nonempty answer', async () => {
+    const example = { ...article, articleKind: 'answer_example' as const, evidence: [
+      { ...article.evidence[0], role: 'question' as const, authorKind: 'tenant' as const, quote: '質問です' },
+      { ...article.evidence[1], role: 'answer' as const, authorKind: 'ops' as const, quote: '回答です' },
+    ], reviewReason: 'お客様の成功確認はありません。回答内容を確認して承認してください。' }
+    await act(async () => root.render(<KnowledgeEditor article={example} onClose={() => {}} onSaved={() => {}} />))
+    expect(document.body.textContent).toContain('回答例（お客様の確認なし）')
+    expect(document.body.textContent).toContain('回答内容が正しいことを元のやり取りで確認しました')
+    expect(document.body.textContent).toContain('成功確認を示すものではありません')
+    await act(async () => (document.querySelector('input[type="checkbox"]') as HTMLInputElement).click())
+    expect(button('承認して有効にする').disabled).toBe(false)
+  })
+  it('keeps a question-only example blocked until an answer is written', async () => {
+    await act(async () => root.render(<KnowledgeEditor article={{ ...article, articleKind: 'answer_example', answer: '', evidence: [], reviewState: 'needs_review' }} onClose={() => {}} onSaved={() => {}} />))
+    expect(document.body.textContent).toContain('運営の回答がありません。答えを書いて承認できます')
+    await act(async () => (document.querySelector('input[type="checkbox"]') as HTMLInputElement).click())
+    expect(button('承認して有効にする').disabled).toBe(true)
+    expect(mocks.review).not.toHaveBeenCalled()
   })
   it('recovers from a rejected save without issuing approval or trapping the dialog', async () => {
     mocks.update.mockRejectedValue(new TypeError('offline'))
