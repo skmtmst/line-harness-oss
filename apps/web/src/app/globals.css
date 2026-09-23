@@ -469,6 +469,66 @@ aside[aria-label="フォルダ"] .shadow-lg {
     tbody tr:hover {
       background-color: var(--color-canvas-sunken);
     }
+
+    /*
+     * #639 タップ高さ・ホバーの規則。ホバーできる・精密なポインタの
+     * 環境に限定する（タッチ端末ではタップ後にホバーが残るため）。
+     *
+     * ボタンは背景の無い素の文字ボタンだけがここで変わる。背景も
+     * ホバーも持つ部品（共通 Button の CSS Module、`hover:bg-*` の
+     * ユーティリティ）は層の順序でそちらが勝つ。`transition: all`
+     * は使わず、動かすプロパティを列挙する（#648の教訓）。
+     */
+    button:not(:disabled, [role="switch"]):hover,
+    [role="button"]:not([aria-disabled="true"]):hover {
+      background-color: var(--color-canvas-sunken);
+    }
+
+    /*
+     * 文字リンクは色で応答する。`text-*` のユーティリティや部品の
+     * 色指定がある箇所はそちらが勝ち、色を持たない素のリンクだけ
+     * が操作色へ変わる。下線は付けない（枠付きボタンとして描いた
+     * リンクにまで線が入るため）。
+     */
+    a:hover {
+      color: var(--color-action-hover);
+    }
+  }
+
+  /*
+   * #639 主要操作の最小高さは 32px（推奨 36px 以上は部品側で持つ）。
+   * 高さを持つ部品（共通 Button 40px・ページネーション 38px・行内
+   * アイコン 32px・タブ 44px）はそのまま。ここで持ち上がるのは
+   * 高さの指定が無い素のボタン（ダイアログの「閉じる」など約28px）
+   * だけ。`min-height` なので高い部品は変わらない。
+   *
+   * スイッチ（role="switch"）は外す。20px の軌道とつまみの比率が
+   * 決まっているため、高さだけ伸ばすと形が壊れる。
+   */
+  button:not([role="switch"]),
+  [role="button"] {
+    min-height: 32px;
+  }
+
+  /*
+   * #639 タッチ端末では指の当たりとして 44px を確保する。部品側の
+   * 規定（共通 Button・行内操作の `@media (pointer: coarse)`）と
+   * 同じ入口。PC の見た目は変わらない。
+   */
+  @media (pointer: coarse) {
+    button:not([role="switch"]),
+    [role="button"] {
+      min-height: 44px;
+    }
+  }
+
+  /*
+   * #639 文字リンクの色変化はなめらかにする。対象は色と背景だけ。
+   */
+  a {
+    transition:
+      color var(--motion-fast) ease-out,
+      background-color var(--motion-fast) ease-out;
   }
 }
 

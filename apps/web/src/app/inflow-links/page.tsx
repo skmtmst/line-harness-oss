@@ -1380,7 +1380,7 @@ function ReferralQrModal({
         </div>
         <div className="mt-5 rounded-xl bg-canvas-sunken p-3">
           <p className="break-all font-mono text-xs text-ink-secondary">{url}</p>
-          <button onClick={copy} className="mt-3 w-full rounded-lg border border-hairline bg-canvas px-3 py-2 text-sm font-medium text-action">
+          <button onClick={copy} className="mt-3 w-full rounded-lg border border-hairline bg-canvas px-3 py-2 text-sm font-medium text-action hover:bg-canvas-sunken">
             {copied ? 'コピーしました' : 'URLをコピー'}
           </button>
         </div>
