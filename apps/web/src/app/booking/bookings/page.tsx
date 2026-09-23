@@ -242,18 +242,22 @@ export default function BookingsPage() {
       ? `${workerBase}/o?liffId=${encodeURIComponent(liffId)}&page=salon-book&view=history`
       : null
   const isCopied = (url: string | null) => url !== null && copiedUrl === url
+  /** コピーできなかったURL。隣の欄を選んでもらう一言を出す（ブラウザの入力窓は使わない。V6R-S3-f）。 */
+  const [copyFailedUrl, setCopyFailedUrl] = useState<string | null>(null)
 
   async function copyUrl(url: string | null) {
     if (!url) return
     try {
       await navigator.clipboard.writeText(url)
       setCopiedUrl(url)
+      setCopyFailedUrl(null)
       if (copyTimer.current !== null) window.clearTimeout(copyTimer.current)
       copyTimer.current = window.setTimeout(() => {
         setCopiedUrl((cur) => (cur === url ? null : cur))
       }, 2000)
     } catch {
-      window.prompt('コピーしてください:', url)
+      // URL は押したボタンの隣の読取専用欄に出ている。窓は出さず、選んでコピーしてもらう。
+      setCopyFailedUrl(url)
     }
   }
 
@@ -956,6 +960,11 @@ export default function BookingsPage() {
                     </button>
                     <span className="text-ink-faint text-xs">お客さまが自分の予約履歴を見るURL</span>
                   </div>
+                ) : null}
+                {copyFailedUrl && (copyFailedUrl === shareUrl || copyFailedUrl === historyUrl) ? (
+                  <p role="alert" className="text-warning text-xs">
+                    コピーできませんでした。左の欄を選んでコピーしてください。
+                  </p>
                 ) : null}
               </div>
             ) : !workerBase ? (
