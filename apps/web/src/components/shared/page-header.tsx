@@ -32,9 +32,10 @@ import styles from './page-header.module.css'
  * （`/friends/identity-candidates` はトップバーが「友だち」）で
  * **「重複候補の確認」がどこにも出なくなる。**
  *
- * **`<h1>` そのものは消さない。** 消すと、読み上げで「この画面は何か」を
- * 辿れなくなり、見出しの階層も h2 から始まってしまう。`sr-only` で
- * 目からだけ外す。
+ * **画面の `<h1>` はトップバーが持つ。** ここは `<h2>`。以前はここも `<h1>`
+ * （同じ言葉のときは `sr-only`）で、1画面に `<h1>` が2つあった。見出しで
+ * 移動する読み上げでは同じ題が2回聞こえる（2026-09-24 の点検、★V7 修正方針）。
+ * トップバーと同じ言葉のときは出さない（トップバーの `<h1>` が同じ題を読む）。
  */
 export default function PageHeader({
   breadcrumb,
@@ -68,7 +69,7 @@ export default function PageHeader({
     <div className={[styles.header, className].filter(Boolean).join(' ')}>
       <div className={styles.heading}>
         <Breadcrumb items={breadcrumb} />
-        <h1 className={shown ? styles.title : 'sr-only'}>{title}</h1>
+        {shown ? <h2 className={styles.title}>{title}</h2> : null}
         <p className={styles.description}>{description}</p>
       </div>
       {actions ? <div className={styles.actions}>{actions}</div> : null}

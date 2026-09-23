@@ -481,7 +481,7 @@ export default function TagEditorV4({
       {notice && <Notice className="mb-4" tone="success" message={notice} />}
 
       <div className="grid min-w-0 gap-5 xl:grid-cols-[minmax(0,1fr)_470px]">
-        <main className="min-w-0 space-y-4">
+        <section className="min-w-0 space-y-4">
           <section className={cardClass}>
             <StepTitle number={1} title="どのタグか" />
             <div className="grid gap-4 md:grid-cols-[320px_minmax(0,1fr)]">
@@ -564,7 +564,7 @@ export default function TagEditorV4({
               {applyToExisting && <p className="mt-4 rounded-control border border-warning/30 bg-warning-bg p-3 text-xs leading-5 text-warning">保存すると確認画面が開きます。確認を完了するまで既存の友だちへは反映されません。</p>}
             </section>
           )}
-        </main>
+        </section>
 
         <aside className="space-y-4">
           <section className={cardClass}><h2 className="text-sm font-bold text-ink">できあがるタグ</h2><div className="mt-4 flex items-center gap-2"><span className="inline-flex items-center gap-2 rounded-pill border border-hairline px-3 py-1.5 text-sm font-medium"><span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: previewColor }} />{name || 'タグ名'}</span><span className="rounded-pill bg-canvas-sunken px-2 py-1 text-xs text-ink-faint">{groupName}</span></div><p className="mt-4 text-xs leading-5 text-ink-secondary">このタグは、配信の絞り込み・シナリオの開始条件・自動応答の付与先として使えます。</p>{linked && <div className="mt-4 border-t border-hairline pt-4"><h3 className="text-xs font-bold text-ink">連動の要約</h3><dl className="mt-2 space-y-2 text-xs text-ink-secondary"><div className="flex justify-between"><dt>本人</dt><dd className="font-semibold">+{values.rewardMiles} mile</dd></div><div className="flex justify-between"><dt>紹介者</dt><dd className="font-semibold">+{values.referralRewardMiles} mile</dd></div><div className="flex justify-between"><dt>今後の獲得マイル</dt><dd className="font-semibold">{values.multiplierBps ? `${values.multiplierBps / 10000}倍（優先度${values.multiplierPriority}）` : '変更なし'}</dd></div><div className="flex justify-between"><dt>アクション</dt><dd className="font-semibold">{actions.length}件</dd></div></dl></div>}</section>
