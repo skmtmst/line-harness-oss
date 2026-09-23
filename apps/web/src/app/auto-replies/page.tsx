@@ -635,13 +635,19 @@ export default function AutoRepliesPage() {
         data-design="Bar"
         className="bg-canvas rounded-card border-hairline mb-3 flex flex-wrap items-center gap-2 border p-3"
       >
+        {/*
+          #636: 検索欄は min-w-45（180px）を下限にする。min-w-0 だと
+          390pxで右のセレクトに押されて w=57 まで潰れ、文字が読めない。
+          下限があると flex-wrap が効いて、狭い幅では検索欄が1行を
+          占め、並び順・表示は次の行へ折り返す。
+        */}
         <input
           type="search"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="自動応答名で検索"
           aria-label="自動応答名で検索"
-          className="border-hairline rounded-control focus:ring-accent min-w-0 flex-1 border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
+          className="border-hairline rounded-control focus:ring-accent min-w-45 flex-1 border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
         />
         <span className="text-ink-faint text-xs whitespace-nowrap">並び順</span>
         <SelectField value={sortKey} onChange={(e) => setSortKey(e.target.value as SortKey)} aria-label="並び順" options={[{ value: "hits", label: "ヒット数が多い順" }, { value: "priority", label: "評価順" }, { value: "name", label: "名前順" }, { value: "created", label: "作った順" }]} className="border-hairline rounded-control focus:ring-accent border px-2 py-2 text-sm focus:ring-2 focus:outline-none" />
