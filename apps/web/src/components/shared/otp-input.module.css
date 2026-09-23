@@ -1,0 +1,68 @@
+/*
+ * 認証コード入力（6マス）。Pencil ★V7 `xHzFK`、1マスは `ENP7x`。
+ *
+ *   1マス  48×56  角丸 $radius-sm(8)  枠 1px $hairline  地 $canvas
+ *   数字   22px 太字 $ink
+ *   間隔   8
+ *   入力中 枠 2px $accent
+ *   誤り   枠 2px $status-danger  地 $status-danger-soft
+ *   無効   全体の不透明度 0.5
+ */
+
+.group {
+  display: flex;
+  gap: 8px; /* gap: 8 */
+}
+
+.slot {
+  width: 48px; /* width: 48 */
+  height: 56px; /* height: 56 */
+  flex: 0 0 auto;
+  padding: 0;
+  border: 1px solid var(--color-hairline); /* stroke: $hairline */
+  border-radius: var(--radius-control); /* cornerRadius: $radius-sm */
+  background: var(--color-canvas); /* fill: $canvas */
+  color: var(--color-ink); /* fill: $ink */
+  font-family: inherit;
+  font-size: 22px; /* fontSize: 22 */
+  font-weight: 700; /* fontWeight: 700 */
+  text-align: center;
+  caret-color: var(--color-accent);
+}
+
+/*
+ * 入力中のマス（4桁目に入力の目印 `mGMMH`）。緑の2pxの枠は、フォーカスの輪郭そのもので描く。
+ * 輪郭を消して別の線で描くと、共通の決まり（focus-visible-contract）に反し、
+ * 画面の読み上げやキーボード操作で今どこにいるかが見えなくなる。
+ */
+.slot:focus,
+.slot:focus-visible {
+  border-color: var(--color-accent); /* stroke: $accent */
+  outline: 2px solid var(--color-accent); /* strokeWidth: 2 */
+  outline-offset: -2px;
+}
+
+/* 誤り（違うコード）`Q10xgy`。読み上げと同じ aria-invalid を根拠に見た目を変える。 */
+.slot[aria-invalid='true'] {
+  border-color: var(--color-status-danger); /* stroke: $status-danger */
+  box-shadow: 0 0 0 1px var(--color-status-danger); /* strokeWidth: 2 */
+  background: var(--color-status-danger-soft); /* fill: $status-danger-soft */
+}
+
+/* 無効（確認中）`BYrQG`。 */
+.slot:disabled {
+  cursor: not-allowed;
+  opacity: 0.5; /* opacity: 0.5 */
+}
+
+@media (max-width: 380px) {
+  /* 幅の狭い電話でも6マスが1行に収まるように詰める（6×40 + 5×6 = 270px）。 */
+  .group {
+    gap: 6px;
+  }
+  .slot {
+    width: 40px;
+    height: 48px;
+    font-size: 20px;
+  }
+}
