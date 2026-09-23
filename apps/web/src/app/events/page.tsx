@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { eventsApi, type EventListItem } from '@/lib/api'
+import { clampSearchQuery, SEARCH_QUERY_MAX_LENGTH } from '@/lib/search-query'
+import { withRequestTimeout } from '@/lib/request-timeout'
 import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import Button from '@/components/shared/button'
@@ -76,13 +78,18 @@ export default function EventsListPage() {
     setItems([])
     setListTotal(0)
     try {
-      const res = await eventsApi.listEvents(selectedAccountId, {
+      /*
+       * #625: 応答なしの要求は時間切れの失敗にして、一覧を
+       * 「読み込み中」のまま残さない。検索語は入力欄で上限済みだが、
+       * ここでも切り詰めて送る語を確定させる。
+       */
+      const res = await withRequestTimeout(eventsApi.listEvents(selectedAccountId, {
         page,
         limit: PAGE_SIZE,
-        q: query.trim() || undefined,
+        q: clampSearchQuery(query.trim()) || undefined,
         filter,
         sort,
-      })
+      }))
       if (requestId !== loadRequestRef.current) return
       setItems(res.items)
       setListTotal(res.total ?? res.items.length)
@@ -216,7 +223,8 @@ export default function EventsListPage() {
         <input
           type="search"
           value={query}
-          onChange={(e) => setQuery(e.target.value)}
+          onChange={(e) => setQuery(clampSearchQuery(e.target.value))}
+          maxLength={SEARCH_QUERY_MAX_LENGTH}
           placeholder="イベント名で検索"
           aria-label="イベント名で検索"
           className="border-hairline rounded-control focus:ring-accent min-w-0 flex-1 border px-3 py-2 text-sm focus:ring-2 focus:outline-none"

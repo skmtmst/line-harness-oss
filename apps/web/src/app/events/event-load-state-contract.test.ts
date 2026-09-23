@@ -93,7 +93,8 @@ describe('V6 イベント・申込者一覧の状態', () => {
     expect(body).toContain('<Pagination')
     const list = code(EVENTS)
     expect(list).toContain('setListTotal')
-    expect(list).toContain('q: query.trim() || undefined')
+    // #625: 検索語は上限へ切り詰めてから送る
+    expect(list).toContain('q: clampSearchQuery(query.trim()) || undefined')
     expect(list).toContain('filter,')
     expect(list).toContain('sort,')
     expect(EVENTS).not.toContain('200件まで表示しています')

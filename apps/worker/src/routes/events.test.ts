@@ -160,7 +160,9 @@ function makeEventDb(state: {
   };
   const filterAdminEvents = (sql: string, bound: unknown[]): EventRow[] => {
     const account = bound[0] as string;
-    const query = sql.includes('e.name LIKE ?') ? String(bound[2] ?? '').replace(/^%|%$/g, '').replace(/\\([\\%_])/g, '$1') : '';
+    // #625: 名前検索は LIKE ではなく instr(lower(e.name), lower(?)) > 0。
+    // 束縛は `%q%` ではなく検索語そのものが来る。
+    const query = sql.includes('instr(lower(e.name)') ? String(bound[2] ?? '') : '';
     return state.events.filter((event) => {
       if (event.deleted_at != null || !eventMatchesAccount(event, account)) return false;
       if (query && !event.name.includes(query)) return false;

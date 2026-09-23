@@ -211,14 +211,17 @@ supportInbox.get('/api/support/inbox', requireRole('owner', 'admin', 'staff'), a
       if (status === 'unread' || status === 'in_progress' || status === 'on_hold') bindings.push(status);
       let searchSql = '';
       if (query) {
+        // #625: LIKE ではなく instr()。D1 の LIKE 50バイト制限で長い検索語が500になっていた。
         searchSql = `AND (
-          t.customer_email LIKE ? OR t.customer_name LIKE ? OR t.subject LIKE ? OR EXISTS (
+          instr(lower(t.customer_email), lower(?)) > 0
+          OR instr(lower(t.customer_name), lower(?)) > 0
+          OR instr(lower(t.subject), lower(?)) > 0
+          OR EXISTS (
             SELECT 1 FROM support_email_messages searched
-            WHERE searched.thread_id = t.id AND searched.body_text LIKE ?
+            WHERE searched.thread_id = t.id AND instr(lower(searched.body_text), lower(?)) > 0
           )
         )`;
-        const like = `%${query}%`;
-        bindings.push(like, like, like, like);
+        bindings.push(query, query, query, query);
       }
       if (assignee) {
         if (assignee === 'unassigned') searchSql += ' AND t.assigned_staff_id IS NULL';

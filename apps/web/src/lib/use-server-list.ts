@@ -3,6 +3,7 @@
 import { createElement, useCallback, useEffect, useRef, useState } from 'react'
 import type { ReactElement } from 'react'
 import ListState from '@/components/shared/list-state'
+import { LIST_REQUEST_TIMEOUT_MS } from '@/lib/request-timeout'
 
 export type ServerListSort = ReadonlyArray<Readonly<{
   field: string
@@ -78,11 +79,17 @@ export function useOffsetServerList<T>({
   requestKey,
   load,
   initialLimit = DEFAULT_LIMIT,
+  requestTimeoutMs = LIST_REQUEST_TIMEOUT_MS,
 }: {
   /** 絞り込み・アカウント等を直列化したキー。変わると1ページ目へ戻る。 */
   requestKey: string
   load: (request: { page: number; limit: number }, signal: AbortSignal) => Promise<ServerListResponse<T>>
   initialLimit?: number
+  /*
+   * #625: 応答しない要求をこの時間で打ち切り、失敗表示＋再試行へ落とす。
+   * 検索語の異常な長さや経路の沈黙で「読み込んでいます」が消えない事故を防ぐ。
+   */
+  requestTimeoutMs?: number
 }) {
   const [navigation, setNavigation] = useState({ requestKey, page: 1 })
   const [state, setState] = useState<LoadState<T>>(() => initialState(initialLimit))
@@ -98,6 +105,17 @@ export function useOffsetServerList<T>({
 
     const controller = new AbortController()
     setState((current) => ({ ...current, items: [], loaded: false, loading: true, error: null }))
+    /*
+     * #625: 応答なしで「読み込んでいます」が残り続けないよう、時間切れで
+     * 失敗状態へ落とす。abort で通信も止める。時間切れ後に遅れて成功しても
+     * aborted 判定で捨てるので、失敗表示のまま再試行へ進める。
+     */
+    const timeout = setTimeout(() => {
+      controller.abort()
+      setState((current) => (current.loading && current.items.length === 0
+        ? { ...current, loaded: false, loading: false, error: new Error('一覧の読み込みが時間切れになりました') }
+        : current))
+    }, requestTimeoutMs)
     void load({ page, limit: initialLimit }, controller.signal).then(
       (response) => {
         if (controller.signal.aborted) return
@@ -116,9 +134,12 @@ export function useOffsetServerList<T>({
         if (controller.signal.aborted) return
         setState((current) => ({ ...current, loaded: false, loading: false, error: asError(error) }))
       },
-    )
-    return () => controller.abort()
-  }, [initialLimit, load, navigation.requestKey, page, requestKey, retryVersion])
+    ).finally(() => clearTimeout(timeout))
+    return () => {
+      clearTimeout(timeout)
+      controller.abort()
+    }
+  }, [initialLimit, load, navigation.requestKey, page, requestKey, requestTimeoutMs, retryVersion])
 
   const setPage = useCallback((nextPage: number) => {
     const safePage = Number.isSafeInteger(nextPage) && nextPage > 0 ? nextPage : 1

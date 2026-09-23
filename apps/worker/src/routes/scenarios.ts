@@ -437,8 +437,14 @@ scenarios.get('/api/scenarios', scenarioPermission('view'), async (c) => {
     }
     const query = c.req.query('query')?.trim();
     if (query) {
-      clauses.push(`s.name LIKE ? ESCAPE '\\'`);
-      binds.push(`%${query.replaceAll('\\', '\\\\').replaceAll('%', '\\%').replaceAll('_', '\\_')}%`);
+      /*
+       * #625: LIKE ではなく instr() で部分一致する。
+       * D1 は LIKE/GLOB パターンを最大50バイトに制限するため、
+       * `%<検索語>%` を束縛すると48バイト超の検索語で500になっていた。
+       * 記号はワイルドカードとして効かず文字どおり探す点は ESCAPE 版と同じ。
+       */
+      clauses.push(`instr(lower(s.name), lower(?)) > 0`);
+      binds.push(query);
     }
     if (c.req.query('active') === '0') clauses.push('s.is_active = 0');
     const createdFrom = c.req.query('createdFrom')?.trim();
