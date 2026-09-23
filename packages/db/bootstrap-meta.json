@@ -402,7 +402,8 @@
     "441_event_slot_client_key.sql",
     "442_platform_knowledge.sql",
     "443_conversion_ingest_test_flag.sql",
-    "444_media_usage_terms.sql"
+    "444_media_usage_terms.sql",
+    "445_platform_knowledge_answer_examples.sql"
   ],
-  "migrationCount": 403
+  "migrationCount": 404
 }
