@@ -86,7 +86,7 @@ describe('ウェビナー作成からの段遷移 (#1002 DETAIL-03)', () => {
   })
 
   it('作成に失敗したら遷移せず、入力した名前を残す', async () => {
-    fixture.create.mockRejectedValue(new Error('作成に失敗しました'))
+    fixture.create.mockRejectedValue(new Error('作成に失敗しました。通信を確かめて、もう一度お試しください。'))
     await render()
     await flush()
 

@@ -84,3 +84,30 @@
     padding: 14px 40px 32px;
   }
 }
+
+/*
+ * 本文へ移動（★V7 修正方針 §2 `sM9FE`）。焦点が来るまで画面の外に置く。
+ * `display:none` にすると Tab で選べなくなるので、位置だけずらす。
+ */
+.skipLink {
+  position: fixed;
+  top: 12px;
+  left: 12px;
+  z-index: 100;
+  padding: 8px 14px;
+  border-radius: var(--radius-control);
+  background: var(--color-ink);
+  color: #ffffff;
+  font-size: var(--text-body);
+  font-weight: 700;
+  transform: translateY(-200%);
+}
+
+.skipLink:focus-visible {
+  transform: none;
+}
+
+/* 本文へ移動で焦点を受ける。枠は出さない（焦点は本文の最初の操作へ Tab で進む）。 */
+.main:focus {
+  outline: none;
+}

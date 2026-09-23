@@ -19,7 +19,6 @@ const GLOBALS = readFileSync(join(SHARED, '..', '..', 'app', 'globals.css'), 'ut
 
 /** V7 より前から ms を直書きしている部品。トークンへ移したら消す。 */
 const BASELINE = [
-  'button.module.css',
   'filter-chip.css',
   'list-state.module.css',
   'radio-card.module.css',

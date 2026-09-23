@@ -452,7 +452,7 @@ export default function AccountMigration() {
                 {currentStep >= STEPS.length ? '本移行と照合まで済んでいます' : STEPS[currentStep]}
               </p>
               <details className="mt-2">
-                <summary className="text-accent cursor-pointer text-xs font-semibold">全手順を見る</summary>
+                <summary className="text-accent-deep cursor-pointer text-xs font-semibold">全手順を見る</summary>
                 <ol className="mt-2 space-y-1">
                   {STEPS.map((step, index) => (
                     <li key={step} className={`text-xs ${index < currentStep ? 'text-success font-semibold' : index === currentStep ? 'text-action font-bold' : 'text-ink-faint'}`}>

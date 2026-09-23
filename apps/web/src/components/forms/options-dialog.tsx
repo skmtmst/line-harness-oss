@@ -67,7 +67,7 @@ export default function OptionsDialog({
               <div className="flex items-center justify-between gap-3">
                 <p className="text-ink text-xs font-bold">実行すること</p>
                 <details className="group">
-                  <summary className="border-accent text-accent rounded-control cursor-pointer list-none border px-3 py-2 text-xs font-medium">アクションを設定</summary>
+                  <summary className="border-accent text-accent-deep rounded-control cursor-pointer list-none border px-3 py-2 text-xs font-medium">アクションを設定</summary>
                   <div className="mt-3 p-3 shadow-lg" style={{ minWidth: 680, background: 'var(--color-canvas)' }}>
                     <ActionEditor value={value.afterActions ?? []} onChange={(afterActions: FormAction[]) => patch({ afterActions })} refs={refs} />
                   </div>
@@ -150,5 +150,5 @@ function OptionCard({ checked, onChange, label, note }: { checked: boolean; onCh
 }
 
 function FieldLine({ label, children }: { label: string; children: React.ReactNode }) {
-  return <label><span className="text-accent mb-1 block text-xs font-medium">{label}</span>{children}</label>
+  return <label><span className="text-accent-deep mb-1 block text-xs font-medium">{label}</span>{children}</label>
 }

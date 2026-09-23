@@ -408,7 +408,7 @@ function ScenarioModeContent() {
           type="button"
           disabled={(Boolean(id) && !scenario) || saving !== null || detailsSaving}
           onClick={() => void continueAsDraft()}
-          className="text-accent ml-auto text-sm font-medium hover:underline disabled:cursor-not-allowed disabled:opacity-50"
+          className="text-accent-deep ml-auto text-sm font-medium hover:underline disabled:cursor-not-allowed disabled:opacity-50"
         >
           あとで決める（下書きとして保存）
         </button>
@@ -475,7 +475,7 @@ function ModeCard({
       <div className="flex items-start gap-3">
         {/* 絵文字は使わない。端末やフォントで見た目が変わるうえ、
             色が乗って見出しより目立つ。線の記号にする。 */}
-        <span className="bg-accent-soft text-accent rounded-card flex h-9 w-9 shrink-0 items-center justify-center">
+        <span className="bg-accent-soft text-accent-deep rounded-card flex h-9 w-9 shrink-0 items-center justify-center">
           <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24" aria-hidden="true">
             <circle cx="12" cy="12" r="9" />
             {mode === 'absolute_time' ? (
@@ -489,7 +489,7 @@ function ModeCard({
           <h2 className="text-ink flex flex-wrap items-center gap-2 text-lg font-bold">
             {title}
             {recommended && (
-              <span className="bg-accent-soft text-accent rounded-pill px-2 py-0.5 text-xs font-bold">
+              <span className="bg-accent-soft text-accent-deep rounded-pill px-2 py-0.5 text-xs font-bold">
                 おすすめ
               </span>
             )}

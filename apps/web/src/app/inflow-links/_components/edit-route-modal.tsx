@@ -120,7 +120,7 @@ export default function EditRouteModal({
         ? await api.entryRoutes.create(form)
         : await api.entryRoutes.update(route!.id, form)
       if (res.success) onSaved(res.data, isNew)
-      else setError(res.error ?? '保存に失敗しました')
+      else setError(res.error ?? '保存に失敗しました。通信を確かめて、もう一度お試しください。')
     } catch (err) {
       // 400系はAPIの理由、403・5xxは運用の言葉へ写す（WRITE-01）。
       setError(describeSaveFailure(err))

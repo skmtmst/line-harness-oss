@@ -110,7 +110,7 @@ function TemplateDetailInner() {
       <div>
         <p className="text-ink-faint bg-canvas rounded-card border-hairline border p-8 text-center text-sm">
           テンプレートが指定されていません。
-          <Link href="/templates" className="text-accent ml-1 hover:underline">
+          <Link href="/templates" className="text-accent-deep ml-1 hover:underline">
             一覧へ戻る
           </Link>
         </p>
@@ -229,7 +229,7 @@ function TemplateDetailInner() {
                         <p className="text-ink truncate text-sm">{u.name}</p>
                       </div>
                       {u.href ? (
-                        <Link href={u.href} className="text-accent shrink-0 text-xs hover:underline">
+                        <Link href={u.href} className="text-accent-deep shrink-0 text-xs hover:underline">
                           開く
                         </Link>
                       ) : (

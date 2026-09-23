@@ -420,7 +420,7 @@ export default function TemplatesPage() {
         setFormError(res.error)
       }
     } catch {
-      setFormError('作成に失敗しました')
+      setFormError('作成に失敗しました。通信を確かめて、もう一度お試しください。')
     } finally {
       setSaving(false)
     }
@@ -1167,7 +1167,7 @@ export default function TemplatesPage() {
                         {drawerData.question.intro && <p className="text-sm whitespace-pre-wrap">{drawerData.question.intro}</p>}
                         <p className="text-sm font-semibold whitespace-pre-wrap">{drawerData.question.text}</p>
                         {drawerData.question.choices.map((choice, index) => (
-                          <div key={index} className="border-hairline rounded-control border px-3 py-2 text-center text-xs font-semibold text-accent">
+                          <div key={index} className="border-hairline rounded-control border px-3 py-2 text-center text-xs font-semibold text-accent-deep">
                             {choice.label}
                           </div>
                         ))}
@@ -1256,7 +1256,7 @@ export default function TemplatesPage() {
                       <ul className="space-y-1.5 text-xs">
                         {drawerData.usedBy.autoReplies.map((ar) => (
                           <li key={`ar-${ar.id}`}>
-                            <a href={`/auto-replies/edit?id=${ar.id}`} className="text-accent hover:underline">
+                            <a href={`/auto-replies/edit?id=${ar.id}`} className="text-accent-deep hover:underline">
                               自動返信: {ar.keyword} <span className="text-ink-faint">({ar.matchType})</span>
                             </a>
                           </li>
@@ -1272,28 +1272,28 @@ export default function TemplatesPage() {
                         ))}
                         {scenarioStepUsages.map((ss) => (
                           <li key={`ss-${ss.stepId}`}>
-                            <a href={`/scenarios/detail?id=${ss.scenarioId}`} className="text-accent hover:underline">
+                            <a href={`/scenarios/detail?id=${ss.scenarioId}`} className="text-accent-deep hover:underline">
                               シナリオ: {ss.scenarioName} <span className="text-ink-faint">#{ss.stepOrder}</span>
                             </a>
                           </li>
                         ))}
                         {reminderStepUsages.map((rs) => (
                           <li key={`rs-${rs.stepId}`}>
-                            <a href={`/reminders/edit?id=${rs.reminderId}`} className="text-accent hover:underline">
+                            <a href={`/reminders/edit?id=${rs.reminderId}`} className="text-accent-deep hover:underline">
                               リマインダ: {rs.reminderName}
                             </a>
                           </li>
                         ))}
                         {richMenuAreaUsages.map((area) => (
                           <li key={`rm-${area.areaId}`}>
-                            <a href={`/rich-menus/edit?id=${area.groupId}`} className="text-accent hover:underline">
+                            <a href={`/rich-menus/edit?id=${area.groupId}`} className="text-accent-deep hover:underline">
                               リッチメニュー: {area.groupName} / {area.pageName}{area.label ? ` / ${area.label}` : ''}
                             </a>
                           </li>
                         ))}
                         {trackedLinkUsages.map((link) => (
                           <li key={`tl-${link.id}`}>
-                            <a href={`/inflow-links/detail?id=${link.id}`} className="text-accent hover:underline">
+                            <a href={`/inflow-links/detail?id=${link.id}`} className="text-accent-deep hover:underline">
                               流入リンク: {link.name}
                             </a>
                           </li>
@@ -1346,7 +1346,7 @@ export default function TemplatesPage() {
                     {href ? (
                       <a
                         href={href}
-                        className="flex items-center gap-2 rounded-control px-1.5 py-1 text-accent hover:bg-canvas-sunken hover:underline"
+                        className="flex items-center gap-2 rounded-control px-1.5 py-1 text-accent-deep hover:bg-canvas-sunken hover:underline"
                       >
                         <Icon size={15} className="shrink-0" aria-hidden="true" />
                         <span className="min-w-0 flex-1">{label}</span>

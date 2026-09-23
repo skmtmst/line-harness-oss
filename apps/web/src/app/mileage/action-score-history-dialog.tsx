@@ -101,7 +101,7 @@ export default function ActionScoreHistoryDialog({
               <li key={item.id} className="px-4 py-3">
                 <div className="flex items-baseline justify-between gap-3">
                   <time dateTime={item.occurredAt} className="text-xs text-ink-faint">{formatMileageDate(item.occurredAt)}</time>
-                  <span className={item.scoreChange < 0 ? 'font-bold text-danger' : 'font-bold text-accent'}>
+                  <span className={item.scoreChange < 0 ? 'font-bold text-danger' : 'font-bold text-accent-deep'}>
                     {changeLabel(item)}
                   </span>
                 </div>

@@ -980,7 +980,7 @@ function TagPicker({
         {include.map((id) => (
           <span
             key={id}
-            className="bg-accent-soft text-accent rounded-pill inline-flex items-center gap-1.5 px-2.5 py-1 text-xs"
+            className="bg-accent-soft text-accent-deep rounded-pill inline-flex items-center gap-1.5 px-2.5 py-1 text-xs"
           >
             {label(id)}
             <button

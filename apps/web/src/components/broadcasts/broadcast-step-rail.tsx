@@ -37,7 +37,7 @@ export default function BroadcastStepRail({ steps }: { steps: BroadcastStep[] })
         >
           <div className="flex min-w-0 items-center justify-between gap-3">
             <p className="min-w-0">
-              <span className="text-accent block text-xs font-bold tracking-wider">
+              <span className="text-accent-deep block text-xs font-bold tracking-wider">
                 STEP {current.order} / {steps.length}
               </span>
               <span className="text-ink block truncate text-sm font-bold" title={current.label}>

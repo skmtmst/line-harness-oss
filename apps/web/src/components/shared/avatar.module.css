@@ -1,0 +1,48 @@
+/*
+ * 友だちの顔。Pencil ★V7「友だちの顔」（V7 文書 `KXDhj`）。
+ *
+ *   丸      大きさ 24・32・40・56、真円
+ *   頭文字  淡い地に同じ色の濃い字（6組、どれも 4.5:1 以上）。字は大きさの 42%・太字
+ *   画像    1px の薄い縁（better-ui：oklch(0 0 0 / 0.1)）
+ */
+
+.avatar {
+  position: relative;
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: 9999px;
+  font-weight: 700;
+  line-height: 1;
+  user-select: none;
+}
+
+.image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* 画像の縁は外側の線ではなく内側の輪郭で描く（大きさが変わらない）。 */
+.avatar:has(.image)::after {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: inset 0 0 0 1px oklch(0 0 0 / 0.1);
+  content: '';
+  pointer-events: none;
+}
+
+.s24 { width: 24px; height: 24px; font-size: 10px; }
+.s32 { width: 32px; height: 32px; font-size: 13px; }
+.s40 { width: 40px; height: 40px; font-size: 16px; }
+.s56 { width: 56px; height: 56px; font-size: 22px; }
+
+.t0 { background: var(--color-accent-soft); color: var(--color-accent-deep); }
+.t1 { background: var(--color-status-info-soft); color: var(--color-status-info); }
+.t2 { background: var(--color-status-warn-soft); color: var(--color-status-warn-deep); }
+.t3 { background: var(--color-danger-bg); color: var(--color-danger); }
+.t4 { background: var(--color-info-bg); color: var(--color-info); }
+.t5 { background: var(--color-shell); color: var(--color-ink-secondary); }

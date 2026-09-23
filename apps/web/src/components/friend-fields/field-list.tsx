@@ -319,13 +319,13 @@ export default function FriendFieldList({ accountId }: { accountId: string | nul
                     行操作は移行/削除しかなく、名前・既定値・保護設定を
                     変える入口がなかった。種類と差し込み名は編集画面でも固定。
                   */}
-                  <td className="px-3 py-3"><Link href={`/tags/fields/edit?id=${encodeURIComponent(field.id)}`} className="block truncate font-semibold text-accent hover:underline" title={`${field.name}を編集`}>{field.name}</Link><p className="truncate font-mono text-caption text-ink-faint" title={`{{field.${field.fieldKey}}}`}>{`{{field.${field.fieldKey}}}`}</p></td>
+                  <td className="px-3 py-3"><Link href={`/tags/fields/edit?id=${encodeURIComponent(field.id)}`} className="block truncate font-semibold text-accent-deep hover:underline" title={`${field.name}を編集`}>{field.name}</Link><p className="truncate font-mono text-caption text-ink-faint" title={`{{field.${field.fieldKey}}}`}>{`{{field.${field.fieldKey}}}`}</p></td>
                   <td className="px-3 py-3 text-ink">{FIELD_TYPE_LABELS[field.type] ?? field.type}</td>
                   <td className="px-3 py-3 tabular-nums text-ink">{knownUsageCount(field) ?? '—'}{knownUsageCount(field) === null ? '' : '人'}</td>
                   <td className="px-3 py-3 text-ink-faint" title={field.formUsageCount === undefined ? '回答フォームの使用数を取得できません' : undefined}>{field.formUsageCount === undefined ? '—' : `回答フォーム ${field.formUsageCount}個`}</td>
                   <td className="truncate px-3 py-3 text-ink" title={destinationLabel(field)}>{destinationLabel(field)}</td>
                   <td className="px-3 py-3 text-center"><div className="flex items-center justify-center gap-2">
-                    {(knownUsageCount(field) ?? 0) > 0 ? <Link href={`/tags/fields/migrate?id=${encodeURIComponent(field.id)}`} className="text-caption font-semibold text-accent hover:underline">移行</Link> : null}
+                    {(knownUsageCount(field) ?? 0) > 0 ? <Link href={`/tags/fields/migrate?id=${encodeURIComponent(field.id)}`} className="text-caption font-semibold text-accent-deep hover:underline">移行</Link> : null}
                     {field.isInherited ? <span title="共通項目は直接削除できません" className="text-ink-faint"><LockKeyhole size={18} aria-label="共通項目のため削除できません" /></span> : <button type="button" disabled={fieldDeletionBlockedReason(field) !== null} onClick={() => setPendingDelete(field)} aria-label={`${field.name}を削除`} title={fieldDeletionBlockedReason(field) ?? '項目を削除'} className="text-danger hover:opacity-70 disabled:cursor-not-allowed disabled:opacity-30"><Trash2 size={18} /></button>}
                   </div></td>
                 </tr>)}
@@ -354,7 +354,7 @@ export default function FriendFieldList({ accountId }: { accountId: string | nul
                     <ReorderGrip label={field.name} disabled={field.isInherited} disabledReason="共通項目は移行後に並び替えできます" onMove={(direction) => void keyboardMove(field.id, direction)} />
                   </span>
                   <div className="min-w-0 flex-1">
-                    <Link href={`/tags/fields/edit?id=${encodeURIComponent(field.id)}`} className="block truncate font-semibold text-accent hover:underline" title={`${field.name}を編集`}>{field.name}</Link>
+                    <Link href={`/tags/fields/edit?id=${encodeURIComponent(field.id)}`} className="block truncate font-semibold text-accent-deep hover:underline" title={`${field.name}を編集`}>{field.name}</Link>
                     <p className="truncate font-mono text-caption text-ink-faint">{`{{field.${field.fieldKey}}}`}</p>
                     <p className="mt-1 text-xs text-ink-secondary">
                       {FIELD_TYPE_LABELS[field.type] ?? field.type}・使用中 {knownUsageCount(field) ?? '—'}{knownUsageCount(field) === null ? '' : '人'}
@@ -364,7 +364,7 @@ export default function FriendFieldList({ accountId }: { accountId: string | nul
                     </p>
                   </div>
                   <div className="flex shrink-0 items-center gap-2 pt-1">
-                    {(knownUsageCount(field) ?? 0) > 0 ? <Link href={`/tags/fields/migrate?id=${encodeURIComponent(field.id)}`} className="text-caption font-semibold text-accent hover:underline">移行</Link> : null}
+                    {(knownUsageCount(field) ?? 0) > 0 ? <Link href={`/tags/fields/migrate?id=${encodeURIComponent(field.id)}`} className="text-caption font-semibold text-accent-deep hover:underline">移行</Link> : null}
                     {field.isInherited ? <span title="共通項目は直接削除できません" className="text-ink-faint"><LockKeyhole size={18} aria-label="共通項目のため削除できません" /></span> : <button type="button" disabled={fieldDeletionBlockedReason(field) !== null} onClick={() => setPendingDelete(field)} aria-label={`${field.name}を削除`} title={fieldDeletionBlockedReason(field) ?? '項目を削除'} className="text-danger hover:opacity-70 disabled:cursor-not-allowed disabled:opacity-30"><Trash2 size={18} /></button>}
                   </div>
                 </div>

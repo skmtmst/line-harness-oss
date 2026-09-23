@@ -433,7 +433,7 @@ export default function NewConversionPointPage() {
                   onChange={() => selectTrigger(choice)}
                   className="sr-only"
                 />
-                <Icon className={`shrink-0 ${selected ? 'text-accent' : 'text-ink-faint'}`} size={16} aria-hidden />
+                <Icon className={`shrink-0 ${selected ? 'text-accent-deep' : 'text-ink-faint'}`} size={16} aria-hidden />
                 <span className="text-ink truncate text-xs font-bold" title={choice.label}>{choice.label}</span>
               </label>
             )

@@ -392,8 +392,8 @@ export default function TemplateAssetEditor({ kind, visual = false }: { kind: As
   return (
     <div className="pb-24" data-design-node={kind === 'rich_message' ? 'j9ixI' : kind === 'coupon' ? 'hsBtl' : 'J3GxEZ'}>
       <nav className="text-caption mb-4 text-ink-faint" aria-label="現在地">
-        <Link href="/templates" className="text-accent hover:underline">テンプレート</Link>
-        <span className="mx-2">›</span><span className="text-accent">{meta.title}</span>
+        <Link href="/templates" className="text-accent-deep hover:underline">テンプレート</Link>
+        <span className="mx-2">›</span><span className="text-accent-deep">{meta.title}</span>
         <span className="mx-2">›</span><span>新しく作る</span>
       </nav>
 

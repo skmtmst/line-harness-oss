@@ -578,7 +578,7 @@ function AnalyticsTab({ webinarId, durationSeconds, view = 'analytics', analytic
         {csvError ? <p className="text-danger text-xs" role="alert">{csvError}</p> : null}
         {summary ? (
         <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          {[['申込', summary.reservations, 'text-success'], ['視聴開始', summary.viewers, 'text-accent'], ['視聴完了', summary.completed, 'text-warning'], ['エラー', analytics?.formFunnel.submitErrors ?? 0, 'text-danger']].map(([label, value, tone]) => <div key={String(label)} className="border-hairline bg-canvas rounded-card border p-4 shadow-card"><p className="text-ink-faint text-xs">{label}</p><p className={`${tone} mt-2 text-2xl font-bold tabular-nums`}>{Number(value).toLocaleString('ja-JP')}{label === 'エラー' ? '件' : '人'}</p></div>)}
+          {[['申込', summary.reservations, 'text-success'], ['視聴開始', summary.viewers, 'text-accent-deep'], ['視聴完了', summary.completed, 'text-warning'], ['エラー', analytics?.formFunnel.submitErrors ?? 0, 'text-danger']].map(([label, value, tone]) => <div key={String(label)} className="border-hairline bg-canvas rounded-card border p-4 shadow-card"><p className="text-ink-faint text-xs">{label}</p><p className={`${tone} mt-2 text-2xl font-bold tabular-nums`}>{Number(value).toLocaleString('ja-JP')}{label === 'エラー' ? '件' : '人'}</p></div>)}
         </section>
         ) : (
         <p className={`rounded-card p-4 text-sm ${analyticsState === 'error' ? 'border-danger bg-danger-bg text-danger border' : 'text-ink-faint'}`} role={analyticsState === 'error' ? 'alert' : undefined}>
@@ -594,7 +594,7 @@ function AnalyticsTab({ webinarId, durationSeconds, view = 'analytics', analytic
             ) : participantsState === 'error' ? (
               <div className="p-8 text-center text-sm" role="alert">
                 <p className="text-danger">参加者一覧を読み込めませんでした。</p>
-                <button type="button" onClick={() => setAttempt((count) => count + 1)} className="text-accent mt-2 font-medium underline">もう一度読み込む</button>
+                <button type="button" onClick={() => setAttempt((count) => count + 1)} className="text-accent-deep mt-2 font-medium underline">もう一度読み込む</button>
               </div>
             ) : null}
             <div className="divide-hairline divide-y">{participantsState === 'ready' && participantItems.length === 0 ? <p className="text-ink-faint p-8 text-center text-sm">{participantFilter ? 'この分類に該当する人はいません。' : 'まだ参加者がいません。'}</p> : participantItems.map((participant) => {
@@ -765,7 +765,7 @@ function AnalyticsTab({ webinarId, durationSeconds, view = 'analytics', analytic
           </div>
           <div className="border-hairline bg-canvas rounded-card border p-4">
             <p className="text-ink-faint text-xs">視聴開始</p>
-            <p className="text-accent mt-2 text-2xl font-bold tabular-nums">{summary.viewers.toLocaleString('ja-JP')}人</p>
+            <p className="text-accent-deep mt-2 text-2xl font-bold tabular-nums">{summary.viewers.toLocaleString('ja-JP')}人</p>
           </div>
           <div className="border-hairline bg-canvas rounded-card border p-4">
             <p className="text-ink-faint text-xs">視聴完了</p>
@@ -794,7 +794,7 @@ function AnalyticsTab({ webinarId, durationSeconds, view = 'analytics', analytic
                     <div className="flex min-w-0 items-center gap-3"><ParticipantAvatar name={name} pictureUrl={participant.pictureUrl} /><span className="truncate font-semibold">{name}</span></div>
                     <span className="text-ink-secondary">視聴完了 {watchedRate}%</span>
                     <span className="text-ink-secondary">{action}</span>
-                    <Link href={`/chats?friend=${participant.friendId}`} className="text-accent font-semibold">確認する</Link>
+                    <Link href={`/chats?friend=${participant.friendId}`} className="text-accent-deep font-semibold">確認する</Link>
                   </div>
                 )
               })}
@@ -1391,7 +1391,7 @@ function NotificationDesignStep({ webinarId, webinarTitle, registrations, public
           <button
             type="button"
             onClick={() => { setSettingsReady(false); setSettingsFailed(false); setNotifAttempt((count) => count + 1) }}
-            className="text-accent text-xs font-medium underline"
+            className="text-accent-deep text-xs font-medium underline"
           >
             通知の設定をもう一度読み込む
           </button>
@@ -1903,7 +1903,7 @@ function WebinarActionsTab({ webinarId, editor, onEditorChange }: { webinarId: s
         <section className="border-hairline bg-canvas rounded-card border p-4 shadow-card">
           <h2 className="text-ink text-base font-bold">CTA・フォーム</h2>
           <p className="text-ink-faint mt-1 text-xs">視聴完了・CTAクリック・未視聴ごとの処理を設定します。</p>
-          <div className="mt-4 flex flex-wrap gap-2">{TRIGGERS.map((item) => <span key={item.key} className={`rounded-pill border px-3 py-1 text-xs font-semibold ${item.key === 'completed' ? 'border-accent bg-accent-soft text-accent' : 'border-hairline text-ink-secondary'}`}>{item.label}</span>)}</div>
+          <div className="mt-4 flex flex-wrap gap-2">{TRIGGERS.map((item) => <span key={item.key} className={`rounded-pill border px-3 py-1 text-xs font-semibold ${item.key === 'completed' ? 'border-accent bg-accent-soft text-accent-deep' : 'border-hairline text-ink-secondary'}`}>{item.label}</span>)}</div>
         </section>
         <section className="border-hairline bg-canvas rounded-card border p-4 shadow-card">
           <div className="flex items-center justify-between gap-3"><h2 className="text-ink text-base font-bold">視聴完了メッセージ</h2><Button disabled>変数を挿入</Button></div>
@@ -2530,7 +2530,7 @@ function EditWebinarInner() {
                       state === 'done'
                         ? 'bg-accent-deep text-on-accent'
                         : state === 'current'
-                          ? 'border-accent text-accent border-2'
+                          ? 'border-accent text-accent-deep border-2'
                           : 'border-hairline text-ink-faint border'
                     }`}
                     aria-hidden="true"

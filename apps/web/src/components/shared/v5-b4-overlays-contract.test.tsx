@@ -35,7 +35,7 @@ describe('V5 B4 オーバーレイ共通部品', () => {
       <Drawer open modal={false} title="友だち詳細" details={[{ label: '担当', value: '未設定' }]} onClose={vi.fn()} />
       <Notice tone="success" message="保存しました" onClose={vi.fn()} />
       <Notice tone="validation" message="入力内容を確認してください" />
-      <Notice tone="error" message="処理に失敗しました" />
+      <Notice tone="error" message="処理に失敗しました。通信を確かめて、もう一度お試しください。" />
       <ActionMenu open inline onClose={vi.fn()} items={[{ id: 'delete', label: '削除', tone: 'danger', onSelect: vi.fn() }]} />
     </div>)
     for (const nodeId of ['VJKAT', 'ApbSZ', 'zPRvi', 'I5rKbM', 'hGpFq']) expect(html).toContain(`data-design-node="${nodeId}"`)
