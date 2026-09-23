@@ -1,8 +1,9 @@
 'use client'
 
 import InboxRow, { type InboxRowData } from './inbox-row'
+import ListRange from '@/components/ui/list-range'
 
-const fmt = new Intl.NumberFormat('ja-JP')
+
 
 interface Props {
   rows: InboxRowData[]
@@ -40,9 +41,7 @@ export default function InboxList({
       )}
       {total > 0 && (
         <div className="flex items-center justify-between border-t border-gray-100 px-4 py-3 text-sm text-gray-600">
-          <span>
-            {fmt.format(total)} 件中 {fmt.format(start)}–{fmt.format(end)} 件
-          </span>
+          <ListRange total={total} first={start} last={end} />
           <div className="flex items-center gap-2">
             <button
               type="button"

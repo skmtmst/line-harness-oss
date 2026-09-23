@@ -15,6 +15,7 @@ import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
+import ListRange from '@/components/ui/list-range'
 import { Tabs } from '@/components/shared/tabs'
 import FolderPanel, { FOLDER_RAIL_STYLE } from '@/components/shared/folder-panel'
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
@@ -769,7 +770,7 @@ export default function TemplatesPage() {
           一覧にページ送りを入れるときに一緒にやる。
         */}
         {view === 'ready' ? (
-          <span className="text-ink-secondary px-1 text-sm tabular-nums">{filteredTemplates.length}件を表示</span>
+          <ListRange className="px-1 tabular-nums" total={filteredTemplates.length} first={filteredTemplates.length === 0 ? 0 : 1} last={filteredTemplates.length} />
         ) : null}
       </div>
 

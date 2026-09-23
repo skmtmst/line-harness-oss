@@ -18,6 +18,7 @@ import type { FormLayout } from '@line-crm/shared'
 import { hasStoredDestination, summarizeFormDestinations } from './form-destination-summary'
 import FolderPanel, { FOLDER_RAIL_STYLE } from '@/components/shared/folder-panel'
 import CopyTextButton from '@/components/ui/copy-text-button'
+import ListRange from '@/components/ui/list-range'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import './form-submissions.css'
 
@@ -699,8 +700,8 @@ export default function FormSubmissionsPage() {
         )}
           {!loading && !loadError && visibleForms.length > 0 ? (
             <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-              <p className="text-xs text-ink-faint">
-                {listTotal.toLocaleString('ja-JP')}件中 {(listTotal === 0 ? 0 : pageStart + 1).toLocaleString('ja-JP')}〜{Math.min(pageStart + visibleForms.length, listTotal).toLocaleString('ja-JP')}件を表示
+              <p>
+                <ListRange total={listTotal} first={listTotal === 0 ? 0 : pageStart + 1} last={Math.min(pageStart + visibleForms.length, listTotal)} />
               </p>
               <nav aria-label="回答フォームのページ送り" className="flex items-center gap-2 text-xs">
                 <Button
