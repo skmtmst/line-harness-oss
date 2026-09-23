@@ -1906,8 +1906,20 @@ async function scheduled(
         defaultAccessToken: env.LINE_CHANNEL_ACCESS_TOKEN,
         proxyDispatch: (request) => Promise.resolve(lineProxy.fetch(request, env, ctx)),
       });
-      if (birthday.queued + birthday.failed + result.sent + result.failed + result.skipped > 0) {
-        console.log(JSON.stringify({ event: 'nen_campaign_tick', birthdayQueued: birthday.queued, birthdayIssueFailed: birthday.failed, ...result }));
+      /*
+       * PHOTO-06: 採用写真のポイント付与outboxの日次回収。
+       * 採用直後・手動の再試行で届かなかった分を、期限の来た順に届け直す。
+       * EC接続が未設定の環境では何もしない（行は「要対応」として一覧に残る）。
+       */
+      const { processDuePhotoRewards, ecPhotoPointClientFromEnv } = await import('./services/photo-reward-sync.js');
+      const photoRewards = await processDuePhotoRewards(
+        env.DB,
+        ecPhotoPointClientFromEnv(env),
+        { now: new Date() },
+      );
+      if (birthday.queued + birthday.failed + result.sent + result.failed + result.skipped
+        + photoRewards.synced + photoRewards.failed + photoRewards.skipped > 0) {
+        console.log(JSON.stringify({ event: 'nen_campaign_tick', birthdayQueued: birthday.queued, birthdayIssueFailed: birthday.failed, photoRewardSynced: photoRewards.synced, photoRewardFailed: photoRewards.failed, ...result }));
       }
     });
   } catch (e) {

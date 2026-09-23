@@ -702,6 +702,25 @@ const spec = {
         responses: { '200': { description: '30-day summary (records, weight, heart/respiratory averages, stool/appetite/skin/tear counts, notes, logs)' }, '401': { description: 'LIFF identity required' }, '404': { description: 'Pet not found' } },
       },
     },
+    // ── NEN Photo Rewards（採用写真のポイント手続き・PHOTO-06） ──────────────
+    '/api/nen-members/photos/{id}/point-retry': {
+      post: {
+        tags: ['NEN Members'],
+        summary: '止まったポイント付与手続きをもう一度ECへ送る（冪等。同じ手続きは重複付与しない）',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['accountId'], properties: { accountId: { type: 'string' } } } } } },
+        responses: { '200': { description: 'Reward state after the attempt (synced / processing / failed_retryable / failed_permanent)' }, '400': { description: 'Invalid request or photo not eligible' }, '403': { description: 'photo.reward.reconcile permission required' }, '404': { description: 'Photo not found in account scope' } },
+      },
+    },
+    '/api/nen-members/photos/{id}/point-reconcile': {
+      post: {
+        tags: ['NEN Members'],
+        summary: 'ポイント手続きの状態をECへ照合して結果を取り込む（EC側が付与済みなら二重付与せず完了扱い）',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['accountId'], properties: { accountId: { type: 'string' } } } } } },
+        responses: { '200': { description: 'Reward state after reconciliation' }, '400': { description: 'Invalid request or photo not eligible' }, '403': { description: 'photo.reward.reconcile permission required' }, '404': { description: 'Photo not found in account scope' } },
+      },
+    },
     // ── HQ Billing ─────────────────────────────────────────────────────────
     '/api/hq/billing/summary': {
       get: {

@@ -4587,13 +4587,36 @@ export type NenPhotoReviewHistoryEntry = {
  * 採用に連動するポイント付与の実状態（Issue #1040 IDEA-22）。
  * outbox の行をそのまま返す。無い写真は null（EC未連携など付与対象外）。
  */
+/**
+ * 採用写真のポイント手続きの運用向け状態（PHOTO-06）。
+ * DBのstatusとは別にサーバーが派生して返す:
+ *   stale             … pending/processing のまま24時間以上更新なし
+ *   failed_retryable  … 失敗したが再試行で進められる
+ *   failed_permanent  … 再試行しても直らない（会員連携解除など）
+ */
+export type NenPhotoRewardDisplayState =
+  'pending' | 'stale' | 'synced' | 'failed_retryable' | 'failed_permanent'
+
 export type NenPhotoRewardState = {
   status: 'pending' | 'processing' | 'synced' | 'failed'
+  state?: NenPhotoRewardDisplayState
   points: number
   attempt_count: number
   last_error: string | null
+  next_attempt_at?: string | null
   synced_at: string | null
   updated_at: string
+  reason_label?: string | null
+}
+
+/** point-retry / point-reconcile の応答（PHOTO-06）。 */
+export type NenPhotoRewardActionResult = {
+  action: 'retry' | 'reconcile'
+  state: NenPhotoRewardDisplayState
+  synced: boolean
+  duplicate: boolean
+  reason: string | null
+  reasonLabel: string | null
 }
 
 /** 掲載先1件。active=0 の外した先も removed_at つきで残る（Issue #1040）。 */
@@ -9916,6 +9939,15 @@ export const api = {
     ),
     photo: (id: string, accountId: string) => fetchApi<ApiResponse<NenPhotoDetail>>(
       `/api/nen-members/photos/${encodeURIComponent(id)}?accountId=${encodeURIComponent(accountId)}`,
+    ),
+    // PHOTO-06: 止まったポイント手続きの再試行と、EC側との照合。
+    photoPointRetry: (id: string, accountId: string) => fetchApi<ApiResponse<NenPhotoRewardActionResult>>(
+      `/api/nen-members/photos/${encodeURIComponent(id)}/point-retry`,
+      { method: 'POST', body: JSON.stringify({ accountId }) },
+    ),
+    photoPointReconcile: (id: string, accountId: string) => fetchApi<ApiResponse<NenPhotoRewardActionResult>>(
+      `/api/nen-members/photos/${encodeURIComponent(id)}/point-reconcile`,
+      { method: 'POST', body: JSON.stringify({ accountId }) },
     ),
     photoAssetStatus: (id: string, accountId: string) => fetchApi<ApiResponse<PhotoAssetStatus>>(
       `/api/nen-members/photos/${encodeURIComponent(id)}/assets/status?accountId=${encodeURIComponent(accountId)}`,

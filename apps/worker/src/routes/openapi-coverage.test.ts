@@ -400,6 +400,8 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'POST /api/mileage/rules',
   'POST /api/nen/rank-settings/resync',
   'POST /api/nen-campaigns/deliveries/{id}/retry',
+  'POST /api/nen-members/photos/{id}/point-reconcile',
+  'POST /api/nen-members/photos/{id}/point-retry',
   'POST /api/notifications/operator-outbox/sweep',
   'POST /api/operations/alerts/{id}/acknowledge',
   'POST /api/operations/alerts/{id}/notifications/retry',

@@ -19,7 +19,7 @@ const numberOrDash = (value: unknown) => Number.isFinite(Number(value)) ? Number
 
 export function PhotoReviewDetail({
   photo, position, total, loading, loadKind, reviewing, notice, assetStatus, derivatives, assetsFailed, onReloadAssets, assetProcessing, rotationSaving,
-  onBack, onMove, onApprove, onReturn, onProcessReviewAsset, onSaveRotation, onDownloadOriginal,
+  onBack, onMove, onApprove, onReturn, onProcessReviewAsset, onSaveRotation, onDownloadOriginal, onPointAction, pointActionBusy,
 }: {
   photo: Record<string, unknown> | null
   position: number
@@ -41,6 +41,9 @@ export function PhotoReviewDetail({
   onProcessReviewAsset: () => void
   onSaveRotation: (rotation: 0 | 90 | 180 | 270) => void
   onDownloadOriginal: (code: string) => Promise<void>
+  // PHOTO-06: 止まったポイント手続きの再試行・ECとの照合。
+  onPointAction: (action: 'retry' | 'reconcile') => void | Promise<void>
+  pointActionBusy: 'retry' | 'reconcile' | null
 }) {
   const [scale, setScale] = useState(1)
   const [rotation, setRotation] = useState<0 | 90 | 180 | 270>(0)
@@ -200,15 +203,29 @@ export function PhotoReviewDetail({
             </div>
             <div className="mt-3 border-t border-hairline pt-3">
               <dt className="font-bold text-ink-faint">ポイント</dt>
+              {/*
+               * 派生状態（state）はサーバーが一覧と同じ分岐で出す
+               * （PHOTO-06）。古い口から来た応答は生のstatusへ倒す。
+               */}
               <dd className="mt-1 font-bold text-ink">
                 {text(photo.status) === 'adopted'
                   ? reward
-                    ? `${pointStatusLabel(reward.status, Number(reward.points) || 5)}${text(reward.synced_at) ? `（${formatPhotoReceivedAt(reward.synced_at)}）` : ''}`
+                    ? `${pointStatusLabel(text(reward.state) || reward.status, Number(reward.points) || 5)}${text(reward.synced_at) ? `（${formatPhotoReceivedAt(reward.synced_at)}）` : ''}`
                     : 'EC未接続・ポイント対象外'
                   : 'ポイントの対象は通した写真だけです'}
               </dd>
-              {reward && text(reward.last_error)
-                ? <dd className="mt-1 font-medium text-status-warn-deep">確認が必要：{text(reward.last_error)}</dd>
+              {reward && (text(reward.reason_label) || text(reward.last_error))
+                ? <dd className="mt-1 font-medium text-status-warn-deep">確認が必要：{text(reward.reason_label) || text(reward.last_error)}</dd>
+                : null}
+              {reward && ['stale', 'failed_retryable'].includes(text(reward.state))
+                ? <dd className="mt-2 flex flex-wrap gap-2">
+                  <Button size="field" disabled={pointActionBusy !== null} onClick={() => void onPointAction('retry')}>
+                    {pointActionBusy === 'retry' ? '送り直しています…' : 'ポイント手続きをもう一度送る'}
+                  </Button>
+                  <Button size="field" disabled={pointActionBusy !== null} onClick={() => void onPointAction('reconcile')}>
+                    {pointActionBusy === 'reconcile' ? '照合しています…' : 'EC側と照合する'}
+                  </Button>
+                </dd>
                 : null}
               {text(photo.status) === 'adopted'
                 ? <dd className="mt-1 font-medium text-ink-faint">採用1回につき付与は1回です。外しても付与済みのポイントは戻りません。</dd>
