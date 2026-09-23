@@ -162,7 +162,7 @@ export default function EditRouteModal({
             value={form.genre ?? ''}
             onChange={(e) => setForm({ ...form, genre: e.target.value })}
             readOnly={genreLocked}
-            className="w-full border border-gray-200 rounded px-3 py-2 text-sm read-only:bg-emerald-50 read-only:border-emerald-200 read-only:text-emerald-800 read-only:font-medium"
+            className="w-full border border-gray-200 rounded px-3 py-2 text-sm read-only:bg-emerald-50 read-only:border-emerald-200 read-only:text-success read-only:font-medium"
             placeholder="例: A店"
             maxLength={80}
           />

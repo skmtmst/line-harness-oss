@@ -905,7 +905,7 @@ function BroadcastList() {
         .broadcast-filter-chip[data-active='true'] {
           border-color: var(--color-accent);
           background: var(--color-accent-soft);
-          color: var(--color-accent);
+          color: var(--color-accent-deep);
         }
         .broadcast-filter-chip:disabled { cursor: not-allowed; opacity: .5; }
         [data-design-node='EGMb1'][role='presentation'] {

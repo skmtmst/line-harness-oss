@@ -269,7 +269,7 @@ function FeatureRow({ item, features, ordering, usage, featureUsage, usageRetry,
           <div className="flex flex-wrap items-center gap-2">
             <p className="whitespace-nowrap text-sm font-bold text-ink">{item.label}</p>
             {sharedSwitch && (
-              <span className="rounded-pill border-hairline whitespace-nowrap border px-1.5 py-0.5 text-[9px] font-bold text-ink-faint">
+              <span className="rounded-pill border-hairline whitespace-nowrap border px-1.5 py-0.5 text-micro font-bold text-ink-faint">
                 同じスイッチ
               </span>
             )}

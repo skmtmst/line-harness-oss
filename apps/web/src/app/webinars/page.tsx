@@ -35,7 +35,7 @@ const STATUS_LABEL: Record<Webinar['status'], string> = {
 
 const STATUS_BADGE: Record<Webinar['status'], string> = {
   draft: 'bg-gray-100 text-gray-600',
-  active: 'bg-green-100 text-green-700',
+  active: 'bg-green-100 text-success',
   archived: 'bg-amber-100 text-amber-700',
 }
 

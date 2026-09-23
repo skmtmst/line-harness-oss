@@ -798,7 +798,7 @@ export default function TemplatesPage() {
             className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${
               typeFilter === key ? 'bg-accent-deep text-on-accent' : 'bg-canvas-sunken text-ink-secondary hover:bg-hairline'
             }`}
-            style={typeFilter === key ? { backgroundColor: 'var(--color-accent)' } : undefined}
+            style={typeFilter === key ? { backgroundColor: 'var(--color-accent-deep)' } : undefined}
           >
             {label}
           </button>

@@ -142,18 +142,27 @@ function TodayTaskCard({
   statusTone?: 'success' | 'muted'
 }) {
   return (
+    /*
+     * ★V7「ダッシュボードの見せ方」（V7 文書 fyR7V）。数字をいちばん大きく、状態は数字の横、
+     * 操作は右下に1つ（→付き）。以前は右上の操作・数字・補足2つの3段で、目が上下に散っていた。
+     */
     <Card layout="vertical" padding="default" className="h-[116px] min-w-0">
-      <div className="flex items-start justify-between gap-3">
-        <h3 className="text-ink min-w-0 truncate text-sm font-semibold" title={title}>{title}</h3>
-        {period ? <span className="text-ink-faint flex-1 whitespace-nowrap pt-0.5 text-[11px] font-normal">{period}</span> : null}
-        <Link href={href} className="text-action shrink-0 text-xs font-medium hover:underline">{action}</Link>
+      <div className="flex min-w-0 items-baseline gap-2">
+        <h3 className="text-ink-secondary min-w-0 truncate text-sm font-semibold" title={title}>{title}</h3>
+        {period ? <span className="text-ink-faint whitespace-nowrap text-xs font-normal">{period}</span> : null}
       </div>
-      <p className="text-ink mt-2 text-[28px] leading-none font-bold tabular-nums">
-        {value === null ? '—' : value.toLocaleString('ja-JP')}<span className="ml-0.5 text-lg">件</span>
-      </p>
-      <div className="mt-2 flex items-end justify-between gap-3">
-        <span className="text-ink-faint truncate text-xs" title={detail}>{detail}</span>
-        <span className={`${statusTone === 'muted' ? 'text-ink-faint' : 'text-success'} shrink-0 text-xs font-medium`}>{status}</span>
+      <div className="mt-2 flex min-w-0 items-baseline gap-2.5">
+        <p className="text-ink text-[28px] leading-none font-bold tabular-nums">
+          {value === null ? '—' : value.toLocaleString('ja-JP')}<span className="text-ink-secondary ml-0.5 text-sm font-semibold">件</span>
+        </p>
+        <span className={`${statusTone === 'muted' ? 'text-ink-faint' : 'text-success'} shrink-0 whitespace-nowrap text-xs font-semibold`}>{status}</span>
+      </div>
+      <div className="mt-auto flex items-center justify-between gap-3">
+        <span className="text-ink-faint min-w-0 truncate text-xs" title={detail}>{detail}</span>
+        <Link href={href} className="text-action inline-flex min-h-6 shrink-0 items-center gap-1 text-xs font-bold hover:underline">
+          {action}
+          <span aria-hidden="true">→</span>
+        </Link>
       </div>
     </Card>
   )

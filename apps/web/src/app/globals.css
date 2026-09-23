@@ -253,8 +253,13 @@
    * （`@theme` の変数は `:root` にも出るので、`var(--shadow-card)` は
    * これまでどおり読める）。
    */
-  --shadow-card: 1px 1px 2px #1920261a;
-  --shadow-float: 0 6px 18px #19202626;
+  /*
+   * 2026-09-24（★V7 修正方針・beautiful-shadows）。card は斜めの影（1px 1px 2px）だったのを、
+   * 真下にやわらかく落ちる sm に。縁は各カードの 1px の線が持つので、影の輪は入れない。
+   * float（メニュー・ポップオーバー）は md の6段。
+   */
+  --shadow-card: 0 1px 0 0 rgb(25 28 33 / 2%), 0 2px 3px -1px rgb(0 0 0 / 8%);
+  --shadow-float: 0 0 0 1px rgb(0 0 0 / 6%), 0 1px 1px -0.5px rgb(0 0 0 / 6%), 0 3px 3px -1.5px rgb(0 0 0 / 6%), 0 6px 6px -3px rgb(0 0 0 / 6%), 0 12px 12px -6px rgb(0 0 0 / 6%), 0 24px 24px -12px rgb(0 0 0 / 6%);
 
   /*
    * Tailwind の transition-colors などの既定の速さ（★V7 修正方針 §4）。

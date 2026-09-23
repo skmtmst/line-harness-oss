@@ -100,11 +100,11 @@ type InboxSavedView = {
 
 function ChannelBadge({ channel }: { channel: 'line' | 'email' }) {
   return channel === 'line' ? (
-    <span className="bg-accent-deep text-on-accent inline-flex h-5 min-w-8 items-center justify-center rounded-md px-1.5 text-[9px] font-bold">
+    <span className="bg-accent-deep text-on-accent inline-flex h-5 min-w-8 items-center justify-center rounded-md px-1.5 text-micro font-bold">
       LINE
     </span>
   ) : (
-    <span className="bg-canvas-sunken text-ink-secondary border-hairline inline-flex h-5 min-w-8 items-center justify-center rounded-md border px-1.5 text-[9px] font-bold">
+    <span className="bg-canvas-sunken text-ink-secondary border-hairline inline-flex h-5 min-w-8 items-center justify-center rounded-md border px-1.5 text-micro font-bold">
       MAIL
     </span>
   )
@@ -3154,7 +3154,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                                   ? 'rounded-tl-2xl rounded-tr-md rounded-bl-2xl rounded-br-2xl text-on-accent'
                                   : 'min-w-64 rounded-tl-md rounded-tr-2xl rounded-bl-2xl rounded-br-2xl bg-canvas text-ink'
                               }`}
-                              style={isOutgoing ? { backgroundColor: 'var(--color-accent)' } : undefined}
+                              style={isOutgoing ? { backgroundColor: 'var(--color-accent-deep)' } : undefined}
                             >
                               {/* N-025: 引用元の表示。取り消された引用元は本文を出さない。 */}
                               {msg.quoted && (
@@ -3218,7 +3218,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                                 className="border-canvas/70 bg-canvas/90 text-ink-secondary inline-flex max-w-full items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold shadow-sm"
                                 title={msg.sentByStaffName ?? '担当者情報なし'}
                               >
-                                <span className="bg-action text-on-action flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full text-[8px] font-bold">
+                                <span className="bg-action text-on-action flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full text-micro font-bold">
                                   {(msg.sentByStaffName ?? '担').charAt(0)}
                                 </span>
                                 <span className="truncate">{msg.sentByStaffName ?? '担当者'}</span>

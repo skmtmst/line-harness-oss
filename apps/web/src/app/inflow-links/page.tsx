@@ -1054,7 +1054,7 @@ function InflowLinksPageInner({
                         <span className="flex min-w-0 items-center gap-1 text-ink-secondary" title={r.name}>
                           <span className="truncate whitespace-nowrap">{r.name}</span>
                           <span
-                            className="shrink-0 rounded border border-accent-border bg-accent-soft px-1 py-0.5 text-[9px] text-accent-deep"
+                            className="shrink-0 rounded border border-accent-border bg-accent-soft px-1 py-0.5 text-micro text-accent-deep"
                             title="クリック計測とシナリオ起動が設定されています。追加先の振り分けは全体設定に従います。"
                           >
                             計測済
@@ -1064,7 +1064,7 @@ function InflowLinksPageInner({
                         <span className="flex min-w-0 items-center gap-1 text-ink-secondary" title={r.name}>
                           <span className="truncate whitespace-nowrap">{r.name}</span>
                           <span
-                            className="shrink-0 rounded border border-status-warn-soft bg-status-warn-soft px-1 py-0.5 text-[9px] text-status-warn-deep"
+                            className="shrink-0 rounded border border-status-warn-soft bg-status-warn-soft px-1 py-0.5 text-micro text-status-warn-deep"
                             title="外部で発行されたREFです。流入実績だけを集計しています。"
                           >
                             未登録

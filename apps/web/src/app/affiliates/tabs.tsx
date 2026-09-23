@@ -942,7 +942,7 @@ export function AffiliatorsTab({ accountId }: { accountId: string | null }) {
                                             <td className="py-1 pr-4 text-right font-semibold text-ink">{link.click_count.toLocaleString()}</td>
                                             <td className="py-1">
                                               {link.is_active
-                                                ? <span className="text-xs text-green-600">有効</span>
+                                                ? <span className="text-xs text-success">有効</span>
                                                 : <span className="text-xs text-ink-faint">無効</span>
                                               }
                                             </td>
@@ -2875,7 +2875,7 @@ function SettlementEditor({
         >
           {saving ? '保存中...' : '取り決めを保存'}
         </button>
-        {saved && <span className="text-xs text-emerald-600">保存しました</span>}
+        {saved && <span className="text-xs text-success">保存しました</span>}
       </div>
     </div>
   )

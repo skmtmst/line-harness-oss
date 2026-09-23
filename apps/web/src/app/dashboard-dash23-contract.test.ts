@@ -13,7 +13,7 @@ const source = readFileSync(join(HERE, 'page.tsx'), 'utf8')
  */
 describe('DASH-23 ダッシュボードの見出しは期間ラベルを折り返さない', () => {
   it('期間ラベルはすべてのカードで折り返し禁止', () => {
-    const periods = source.match(/text-ink-faint flex-1 [^"]*pt-0\.5[^"]*|text-ink-faint flex-1 [^"]*text-\[11px\][^"]*/g) ?? []
+    const periods = source.match(/text-ink-faint flex-1 [^"]*pt-0\.5[^"]*|text-ink-faint flex-1 [^"]*text-\[11px\][^"]*|text-ink-faint whitespace-nowrap text-xs font-normal/g) ?? []
     expect(periods.length).toBeGreaterThanOrEqual(4)
     for (const cls of periods) expect(cls).toContain('whitespace-nowrap')
   })

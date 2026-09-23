@@ -70,7 +70,7 @@ function MetricCard({
         <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: color }} />
       </div>
       <p className="mt-3 whitespace-nowrap text-3xl font-bold tracking-tight text-slate-950">{value}</p>
-      <p className={`mt-2 whitespace-nowrap text-xs font-semibold ${delta === null ? 'text-slate-400' : positive ? 'text-emerald-600' : 'text-rose-500'}`}>
+      <p className={`mt-2 whitespace-nowrap text-xs font-semibold ${delta === null ? 'text-slate-400' : positive ? 'text-success' : 'text-rose-500'}`}>
         {delta === null ? '前期間との比較なし' : `${positive ? '↑' : '↓'} ${oneDecimal.format(Math.abs(delta))}% 前期間比`}
       </p>
     </div>
@@ -242,7 +242,7 @@ export default function SearchConsolePage() {
           <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
             <div className="flex flex-wrap items-center gap-2">
               <span className="font-medium text-slate-700">{siteLabel(data.siteUrl)}</span>
-              <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">連携中</span>
+              <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-success">連携中</span>
               <span className="text-slate-400">Search Console のデータは反映まで2〜3日かかります</span>
             </div>
             <p className="whitespace-nowrap text-slate-400">集計期間 {data.startDate.replaceAll('-', '/')} 〜 {data.endDate.replaceAll('-', '/')}</p>

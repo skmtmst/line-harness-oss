@@ -622,7 +622,7 @@ export default function AutoRepliesPage() {
             <span
               className={
                 row.status === 'reply'
-                  ? 'inline-flex items-center px-1.5 py-0.5 rounded bg-success-bg text-green-700'
+                  ? 'inline-flex items-center px-1.5 py-0.5 rounded bg-success-bg text-success'
                   : row.status === 'silent'
                     ? 'inline-flex items-center px-1.5 py-0.5 rounded bg-amber-50 text-amber-700'
                     : 'inline-flex items-center px-1.5 py-0.5 rounded bg-canvas-sunken text-ink-faint line-through'
@@ -787,7 +787,7 @@ export default function AutoRepliesPage() {
                     <td className="px-3 py-3">
                       {/* E-01: 止めた記録があれば、いつ・誰が・なぜを title で読める */}
                       <span
-                        className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium ${r.isActive ? 'bg-success-bg text-green-700' : 'bg-canvas-sunken text-ink-faint'}`}
+                        className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium ${r.isActive ? 'bg-success-bg text-success' : 'bg-canvas-sunken text-ink-faint'}`}
                         title={stopNote(r) ?? undefined}
                       >
                         {r.isActive ? '有効' : '停止中'}
