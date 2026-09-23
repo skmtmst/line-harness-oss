@@ -241,12 +241,16 @@ function FriendAddSettingsList() {
         重なって読めなかった。共通部品の形は変えず、この画面だけ
         「収まらないときタブは折り返す・表は枠の内側で横へ動かす」にする。
         収まる幅では見た目は変わらない。
+        #636: 表の最小幅は 860→720px。1440pxではフォルダ欄を引いた
+        枠の実幅が834pxしかなく、860pxを指定すると26pxの横スクロールが
+        常時出ていた。720pxなら1440pxに収まり、狭い幅では従来どおり
+        枠の内側だけが横へ動く。
       */}
       <style>{`
         [data-tabs-row] nav:has(> span) { height: auto; flex-wrap: wrap; row-gap: 8px; }
         [data-tabs-row] nav:has(> span) > span { flex-wrap: wrap; row-gap: 0; }
         [data-scroll-table] > div { overflow-x: auto; }
-        [data-scroll-table] table { min-width: 860px; }
+        [data-scroll-table] table { min-width: 720px; }
       `}</style>
       <div data-design="FirstTime" data-tabs-row>
         <span className="sr-only">開始のタイミング。すぐに配信。あわせて実行すること。</span>
@@ -255,7 +259,12 @@ function FriendAddSettingsList() {
       </div>
       <p className="text-ink-faint my-2 text-xs">この2つを分けないと、以前からのお客さまに「はじめまして」が届きます。</p>
 
-      <div style={FOLDER_RAIL_STYLE} className="grid items-start gap-4 lg:grid-cols-[var(--folder-rail-width)_minmax(0,1fr)]">
+      {/*
+        #636: lg未満の単列も明示トラックにする。暗黙列は中身の
+        max-content（表の最小幅）へ広がり、390/768pxでページ全体が
+        約880pxにはみ出していた。minmax(0,1fr)で枠幅に留める。
+      */}
+      <div style={FOLDER_RAIL_STYLE} className="grid grid-cols-[minmax(0,1fr)] items-start gap-4 lg:grid-cols-[var(--folder-rail-width)_minmax(0,1fr)]">
         <FolderPanel
           total={`${data?.total ?? data?.items.length ?? 0}件`}
           activeId={folder ?? ''}
@@ -268,7 +277,12 @@ function FriendAddSettingsList() {
           ]}
         />
 
-        <section data-design="Rule" aria-label={`${KIND_LABELS[kind]}の設定`}>
+        {/*
+          #636: grid の子は min-w-0 が無いと中身（表の最小幅）まで縮まず、
+          lg未満の単列でページ全体が横へはみ出していた（390/768pxで
+          ページsw≈880）。縮めて、逃がす先を表の枠内スクロールに閉じる。
+        */}
+        <section data-design="Rule" aria-label={`${KIND_LABELS[kind]}の設定`} className="min-w-0">
           <span className="sr-only">判定の基準。はじめての人の判定。ブロック解除の判定。ブロック解除の回数が1回以上。</span>
           <ListToolbar searchPlaceholder="設定名で検索" searchValue={search} onSearchChange={setSearch}>
             <span className="text-ink-faint text-xs whitespace-nowrap">20件表示</span>
@@ -286,7 +300,13 @@ function FriendAddSettingsList() {
               <DataTable>
                 {/* 見出しは固定幅の表で切れることがあるため、重ねると全文が
                     読める title を付ける（第5パス D-3）。 */}
-                <thead><TableHeadRow><Th title="設定名">設定名</Th><Th title="状態">状態</Th><Th title="対象の流入リンク">対象の流入リンク</Th><Th title="最初に送るもの">最初に送るもの</Th><Th title="直近7日の友だち追加数">直近7日</Th><Th title="操作">操作</Th></TableHeadRow></thead>
+                {/*
+                  #636: 最小幅720pxでは均等6列だと各120pxしかなく、右端の
+                  操作（編集＋削除＋…）が枠から切れる。状態・直近7日・操作へ
+                  固定幅を当て、残りを文字列の3列へ回す。狭い列の文字は
+                  従来どおり1行省略＋titleで全文を確認できる。
+                */}
+                <thead><TableHeadRow><Th title="設定名">設定名</Th><Th title="状態" className="w-24">状態</Th><Th title="対象の流入リンク">対象の流入リンク</Th><Th title="最初に送るもの">最初に送るもの</Th><Th title="直近7日の友だち追加数" className="w-24">直近7日</Th><Th title="操作" className="w-40">操作</Th></TableHeadRow></thead>
                 <tbody>
                   {visibleItems.map((rule) => (
                     <Tr key={rule.id}>
