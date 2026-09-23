@@ -16,7 +16,7 @@
 import SelectField from '@/components/shared/select-field'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
 import {
   emptyLayout,
   newBlockId,
@@ -42,6 +42,7 @@ import ConfirmDialog from '@/components/shared/confirm-dialog'
 import StickyBar from '@/components/shared/sticky-bar'
 import SaveConflictBar from '@/components/shared/save-conflict-bar'
 import { conflictMessage } from './form-conflict-message'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { EMPTY_REFS, type FormRefs } from '@/components/forms/form-refs'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import Button from '@/components/shared/button'
@@ -71,7 +72,6 @@ const HEADER_TAB = -1
  */
 function FormEditInner() {
   const params = useSearchParams()
-  const router = useRouter()
   const id = params.get('id') ?? ''
   const editorTab = params.get('tab') === 'design'
     ? 'design'
@@ -128,7 +128,6 @@ function FormEditInner() {
    * 運用者に決めてもらう。`updatedAt` は相手がいつ保存したかの手がかり。
    */
   const [conflict, setConflict] = useState<{ updatedAt: string } | null>(null)
-  const [pendingNav, setPendingNav] = useState<string | null>(null)
 
   useEffect(() => {
     if (editorTab === 'options') setShowOptions(true)
@@ -425,25 +424,13 @@ function FormEditInner() {
     ogImageUrl,
     layout,
   })
-  const dirtyRef = useRef(false)
-  dirtyRef.current = savedSnapshot.current !== null && currentSnapshot !== savedSnapshot.current
+  const dirty = savedSnapshot.current !== null && currentSnapshot !== savedSnapshot.current
 
-  // タブを閉じる・戻る前の確認。保存していない変更があるときだけ出す。
-  useEffect(() => {
-    const onBeforeUnload = (event: BeforeUnloadEvent) => {
-      if (dirtyRef.current) event.preventDefault()
-    }
-    window.addEventListener('beforeunload', onBeforeUnload)
-    return () => window.removeEventListener('beforeunload', onBeforeUnload)
-  }, [])
-
-  // 編集中のタブ移動は確認してから。止めた先は共通の確認窓で聞く。
-  const confirmTabNav = (href: string) => (event: { preventDefault(): void }) => {
-    if (dirtyRef.current) {
-      event.preventDefault()
-      setPendingNav(href)
-    }
-  }
+  /*
+   * 未保存の変更がある間、画面を離れる操作を止める共通の番兵（DETAIL-04系）。
+   * タブ移動のリンク・左メニュー・戻る操作・再読込を同じ確認対話へ寄せる。
+   */
+  const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty, busy: saving })
 
   const save = async (publishAfter = false): Promise<boolean> => {
     if (!selectedAccountId) {
@@ -595,21 +582,18 @@ function FormEditInner() {
         <Button
           href={`/form-submissions/edit?id=${encodeURIComponent(id)}&tab=basic`}
           variant={editorTab === 'basic' ? 'primary' : 'secondary'}
-          onClick={confirmTabNav(`/form-submissions/edit?id=${encodeURIComponent(id)}&tab=basic`)}
         >
           フォーム編集
         </Button>
         <Button
           href={`/form-submissions/edit?id=${encodeURIComponent(id)}&tab=design`}
           variant={editorTab === 'design' ? 'primary' : 'secondary'}
-          onClick={confirmTabNav(`/form-submissions/edit?id=${encodeURIComponent(id)}&tab=design`)}
         >
           デザイン設定
         </Button>
         <Button
           href={`/form-submissions/edit?id=${encodeURIComponent(id)}&tab=options`}
           variant={editorTab === 'options' ? 'primary' : 'secondary'}
-          onClick={confirmTabNav(`/form-submissions/edit?id=${encodeURIComponent(id)}&tab=options`)}
         >
           オプション設定
         </Button>
@@ -1053,20 +1037,17 @@ function FormEditInner() {
       </ConfirmDialog>
 
       {/*
-        未保存のままタブを移動しようとしたときの確認。保存済みのフォームと
+        未保存のまま画面を離れようとしたときの確認。保存済みのフォームと
         集まった回答は変わらないが、画面上の下書きは消えるので聞く。
       */}
       <ConfirmDialog
-        open={pendingNav !== null}
+        open={leaveTarget !== null}
         title="保存していない変更があります"
         description="このまま移動すると、保存していない変更は消えます。先に保存しますか。"
         confirmLabel="保存せずに移動"
-        onConfirm={() => {
-          const href = pendingNav
-          setPendingNav(null)
-          if (href) router.push(href)
-        }}
-        onCancel={() => setPendingNav(null)}
+        cancelLabel="編集を続ける"
+        onConfirm={confirmLeave}
+        onCancel={cancelLeave}
       />
 
       {showOptions && (
