@@ -43,8 +43,8 @@ vi.mock('@/components/shared/confirm-dialog', () => ({
   ),
 }))
 vi.mock('@/components/shared/button', () => ({
-  default: ({ children, ...props }: React.ComponentProps<'button'>) => (
-    <button {...props}>{children}</button>
+  default: ({ children, href, ...props }: React.ComponentProps<'button'> & { href?: string }) => (
+    href !== undefined ? <a href={href} {...props}>{children}</a> : <button {...props}>{children}</button>
   ),
 }))
 vi.mock('@/components/shared/list-state', () => ({

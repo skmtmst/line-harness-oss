@@ -9,7 +9,7 @@ import Drawer from '@/components/shared/drawer'
 import FilterChip from '@/components/shared/filter-chip'
 import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
-import PageHeader from '@/components/shared/page-header'
+import PageHeaderH2 from '@/components/layout/page-header-h2'
 import Pagination from '@/components/shared/pagination'
 import { RowActions } from '@/components/shared/row-actions'
 import Select from '@/components/shared/select'
@@ -304,7 +304,7 @@ export function NenOverview({
   return (
     <main data-design-node={tab === 'columns' ? 'u66A0' : 'z4q1K'} className="mx-auto flex w-full flex-col gap-4 px-4 pb-8 sm:px-6" style={{ maxWidth: 1600 }}>
       <div data-design="Crumb" data-design-node="nen-header">
-        <PageHeader
+        <PageHeaderH2
           breadcrumb={[{ label: '専用機能' }, { label: 'NEN配信' }]}
           title="NEN配信"
           description=""
@@ -979,6 +979,18 @@ function HistoryPanel({ deliveryList, detail, loading, onShowDetail, onRetry, on
     ? [`ブロック ${summary.unmetReasons?.blocked ?? 0}・退会 ${summary.unmetReasons?.unfollowed ?? 0}・その他 ${summary.unmetReasons?.other ?? 0}`, skippedReasonsDetail(summary.skippedReasons as Record<string, number> | undefined)].filter(Boolean).join(' ／ ')
     : null
 
+  /*
+   * 絞り込みで0件と、まだ履歴そのものが無いのは別のこと（#635）。
+   * 「まだありません」のままだと、検索して0件でも「そもそも無い」と
+   * 読めてしまう。解除は検索語・状態チップ・ページをまとめて初期へ戻す。
+   */
+  const clearHistoryFilters = () => {
+    setDraft('')
+    setAppliedQuery('')
+    setFilter('all')
+    onChangeView(undefined, undefined, '')
+  }
+
   return (
     <>
       <div data-design="Note" data-design-node="nen-history-note">
@@ -1014,7 +1026,17 @@ function HistoryPanel({ deliveryList, detail, loading, onShowDetail, onRetry, on
         {loading && !deliveryList ? (
           <ListState kind="loading" title="送った履歴を読み込んでいます" />
         ) : shown.length === 0 ? (
-          <ListState kind="empty" emptyPreset="readonly" title="送った履歴はまだありません" description="配信が予約されると、送信前からここに記録が並びます。" />
+          filter !== 'all' || appliedQuery ? (
+            <ListState
+              kind="empty"
+              emptyPreset="readonly"
+              title="条件に合う履歴はありません"
+              description="検索語や絞り込みを変えてください。"
+              action={<Button variant="secondary" onClick={clearHistoryFilters}>検索と絞り込みを解除</Button>}
+            />
+          ) : (
+            <ListState kind="empty" emptyPreset="readonly" title="送った履歴はまだありません" description="配信が予約されると、送信前からここに記録が並びます。" />
+          )
         ) : (
           <DataTable>
             <thead>

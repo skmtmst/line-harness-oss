@@ -29,6 +29,7 @@ import {
   usageText,
 } from './delete-impact'
 import ListState from '@/components/shared/list-state'
+import CopyTextButton from '@/components/ui/copy-text-button'
 import FeatureGate from '@/components/feature-gate'
 import { useAccount } from '@/contexts/account-context'
 import SelectField from '@/components/shared/select-field'
@@ -832,7 +833,7 @@ function VarsPageInner() {
                     <Th className="px-4 py-3" style={{ width: '14%' }} title="共通情報">
                       共通情報
                     </Th>
-                    <Th className="px-4 py-3" style={{ width: '17%' }} title="差し込みキー">
+                    <Th className="px-4 py-3" style={{ width: '20%' }} title="差し込みキー">
                       差し込みキー
                     </Th>
                     <Th className="px-4 py-3" title="中身">中身</Th>
@@ -870,11 +871,19 @@ function VarsPageInner() {
                           </td>
                           <td className="px-4 py-3">
                             {/* 差し込みの書き方を独立した列に出す。名前と混ぜず、
-                                テンプレートを書くときに横へ追って確認できる。 */}
-                            <code
-                              title={placeholderText(item.varKey)}
-                              className="text-ink-faint block truncate whitespace-nowrap text-xs"
-                            >{placeholderText(item.varKey)}</code>
+                                テンプレートを書くときに横へ追って確認できる。
+                                省略表示のキーは title で読めるが取り出せないので、
+                                全文コピーの口を隣へ添える（監査6 #665）。 */}
+                            <div className="flex items-center gap-1">
+                              <code
+                                title={placeholderText(item.varKey)}
+                                className="text-ink-faint min-w-0 flex-1 truncate whitespace-nowrap text-xs"
+                              >{placeholderText(item.varKey)}</code>
+                              <CopyTextButton
+                                value={placeholderText(item.varKey)}
+                                aria-label={`${item.name}の差し込みキーをコピー`}
+                              />
+                            </div>
                           </td>
                           <td title={formatVarValue(item.type, item.value) || '（空）'} className="text-ink truncate px-4 py-3 text-sm">
                             {formatVarValue(item.type, item.value) || <span className="text-ink-faint">（空）</span>}

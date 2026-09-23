@@ -161,4 +161,41 @@ describe('NEN配信履歴の検索(#934 N-294)', () => {
     act(() => { next!.dispatchEvent(new MouseEvent('click', { bubbles: true })) })
     expect(onChangeView).toHaveBeenCalledWith(undefined, '20', '珍名')
   })
+
+  /*
+   * #635: 存在しない言葉で検索して0件になったとき、
+   * 「送った履歴はまだありません」（そもそも無い）ではなく、
+   * 「条件に合う履歴はありません」＋解除導線を出す。
+   */
+  it('存在しない言葉の検索で0件なら、条件に合う履歴はありませんと解除導線を出す', () => {
+    const onChangeView = vi.fn()
+    renderHistory(listWith([delivery()]), onChangeView)
+    typeSearch('存在しない言葉xyz')
+    submitSearch()
+    expect(onChangeView).toHaveBeenCalledWith(undefined, undefined, '存在しない言葉xyz')
+
+    // サーバが0件を返したあとの描画。
+    renderHistory(listWith([]), onChangeView)
+    expect(container.textContent).toContain('条件に合う履歴はありません')
+    expect(container.textContent).toContain('検索語や絞り込みを変えてください。')
+    expect(container.textContent).not.toContain('送った履歴はまだありません')
+  })
+
+  it('「検索と絞り込みを解除」で検索語を外して履歴を取り直す', () => {
+    const onChangeView = vi.fn()
+    renderHistory(listWith([]), onChangeView)
+    typeSearch('存在しない言葉xyz')
+    submitSearch()
+    onChangeView.mockClear()
+
+    renderHistory(listWith([]), onChangeView)
+    const clear = Array.from(container.querySelectorAll('button')).find((b) => b.textContent === '検索と絞り込みを解除')
+    expect(clear).toBeDefined()
+    act(() => { clear!.dispatchEvent(new MouseEvent('click', { bubbles: true })) })
+
+    // q='' を明示してサーバの検索語も消す。
+    expect(onChangeView).toHaveBeenCalledWith(undefined, undefined, '')
+    renderHistory(listWith([]), onChangeView)
+    expect(container.textContent).toContain('送った履歴はまだありません')
+  })
 })

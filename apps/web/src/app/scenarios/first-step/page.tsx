@@ -35,6 +35,7 @@ import type { SegmentCondition } from '@/components/shared/condition-builder'
 import { pruneCondition } from '@/lib/segment-condition'
 import SelectField from '@/components/shared/select-field'
 import Button from '@/components/shared/button'
+import StickyBar from '@/components/shared/sticky-bar'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import {
   restoreFirstStep,
@@ -815,24 +816,34 @@ function FirstStepContent() {
         </p>
       )}
 
-      <div className="mt-4 flex flex-wrap items-center gap-3">
-        <button
-          type="button"
-          onClick={() => void submit()}
-          disabled={saving || bodyOverLimit || loadState !== 'ready'}
-          className="bg-accent-deep hover:brightness-92 text-on-accent rounded-control px-5 py-3 text-sm font-bold transition-colors disabled:opacity-50"
-        >
-          {saving ? '保存中…' : '作成して編集へ →'}
-        </button>
-        <button
-          type="button"
-          onClick={() => void skip()}
-          disabled={saving}
-          className="text-ink-secondary hover:text-ink text-sm disabled:opacity-50"
-        >
-          1通目はあとで書く
-        </button>
-      </div>
+      {/*
+        保存系の操作は本文の最下部の追従バーにだけ置く
+        （`docs/v6-common-rules.md` §1-6、#642）。左は削除・状態用に
+        空け、操作群は中央へ揃える。
+      */}
+      <StickyBar
+        className="mt-4"
+        actions={(
+          <>
+            <button
+              type="button"
+              onClick={() => void skip()}
+              disabled={saving}
+              className="text-ink-secondary hover:text-ink text-sm disabled:opacity-50"
+            >
+              1通目はあとで書く
+            </button>
+            <button
+              type="button"
+              onClick={() => void submit()}
+              disabled={saving || bodyOverLimit || loadState !== 'ready'}
+              className="bg-accent-deep hover:brightness-92 text-on-accent rounded-control px-5 py-3 text-sm font-bold transition-colors disabled:opacity-50"
+            >
+              {saving ? '保存中…' : '作成して編集へ →'}
+            </button>
+          </>
+        )}
+      />
         </>
       )}
 

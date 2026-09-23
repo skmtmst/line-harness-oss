@@ -426,6 +426,12 @@ function FriendsPageInner({
             event.preventDefault()
             resetPageWith(() => setSearchSubmitted(searchInput.trim()))
           }}
+          /*
+            #636: 768/390pxでは右端（詳細条件・保存した検索・並び順・
+            検索ボタン）がviewport外へはみ出し、横スクロールしないと
+            押せなかった。flex-wrap で収まらない分を次の行へ折り返す。
+            1440pxでは1行に収まるので見た目は変わらない。
+          */
           className="flex min-w-0 flex-wrap items-center gap-2.5"
         >
           {/*

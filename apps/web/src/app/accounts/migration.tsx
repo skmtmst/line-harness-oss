@@ -755,8 +755,9 @@ function ActiveMigration({
             以前の「移行内容を確認」はクリックした時点で結び付けを保存して
             いたため、読むつもりの操作が書き込みになっていた。
           */}
-          <td className="px-4 py-3"><div className="flex flex-wrap gap-2">
-            <button type="button" disabled={busy || detailBusy} onClick={() => onShowDetail(item)} className="text-action text-xs font-semibold hover:underline">詳細を見る</button>
+          <td className="px-4 py-3"><div className="flex flex-wrap items-center gap-2">
+            {/* #641: 行操作は共通の枠つきボタン */}
+            <Button type="button" variant="secondary" disabled={busy || detailBusy} onClick={() => onShowDetail(item)}>詳細を見る</Button>
             {!item.newUid && <span className="text-ink-faint text-xs">一致先なし（新規作成は「CSVで書き出す・取り込む」で行ってください）</span>}
           </div></td>
         </tr>)}</tbody>

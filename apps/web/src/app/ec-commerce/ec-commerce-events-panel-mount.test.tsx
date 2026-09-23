@@ -226,8 +226,12 @@ function waitForCommit(el: HTMLDivElement): Promise<void> {
   })
 }
 
-function retryButton(el: HTMLDivElement): HTMLButtonElement {
-  const button = Array.from(el.querySelectorAll('button')).find((node) => node.textContent === 'もう一度やる')
+async function retryButton(el: HTMLDivElement): Promise<HTMLButtonElement> {
+  const trigger = Array.from(el.querySelectorAll('button')).find((node) => node.getAttribute('aria-label') === 'この行のその他操作')
+  if (!trigger) throw new Error('「その他」メニューが見つかりません')
+  trigger.click()
+  await drainMicrotasks()
+  const button = Array.from(el.querySelectorAll('button[role="menuitem"]')).find((node) => node.textContent === 'もう一度やる')
   if (!button) throw new Error('「もう一度やる」ボタンが見つかりません')
   return button as HTMLButtonElement
 }
@@ -282,7 +286,7 @@ describe('EC取込一覧(#685) 逆変異で赤になる実mount試験', () => {
 
     const retryDeferred = deferred<unknown>()
     mockRetry.mockReturnValueOnce(retryDeferred.promise)
-    await act(async () => { retryButton(el).click() })
+    await act(async () => { (await retryButton(el)).click() })
     expect(mockRetry).toHaveBeenCalledTimes(1)
     expect(eventsCalls).toHaveLength(1)
 
@@ -400,5 +404,52 @@ describe('EC取込一覧(#685) 逆変異で赤になる実mount試験', () => {
     expect(eventsCalls).toHaveLength(2)
     expect(el.textContent).toContain('商品2')
     expect(el.textContent).not.toContain('商品1 ×')
+  })
+})
+
+/*
+ * #635: 存在しない言葉で検索して0件になったとき、件数が減るだけでなく
+ * 「条件に合う取り込みの記録はありません」と次にやること（解除）を出す。
+ * 監査5b_23: 不存在語を入れても明示の空メッセージが特定できなかった。
+ */
+describe('EC取込一覧の絞り込み0件 (#635)', () => {
+  it('存在しない言葉で検索すると、0件の言い方と解除導線を出す', async () => {
+    const { container: el, root: r } = mount()
+    await render(el, r)
+    await act(async () => { await drainMicrotasks() })
+    await act(async () => {
+      overviewFor('account-a').resolve(ok(overview(1)))
+      eventsDeferreds[0].resolve(ok(recordsList([action('1')])))
+      await drainMicrotasks()
+    })
+    expect(el.textContent).toContain('商品1')
+
+    const input = searchInput(el)
+    await act(async () => {
+      const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')!.set!
+      nativeSetter.call(input, '存在しない言葉xyz')
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    await act(async () => { await vi.advanceTimersByTimeAsync(300) })
+    await act(async () => { await drainMicrotasks() })
+    expect(eventsCalls).toHaveLength(2)
+    expect(eventsCalls[1]).toContain('query=')
+
+    await act(async () => {
+      eventsDeferreds[1].resolve(ok(recordsList([], 0)))
+      await drainMicrotasks()
+    })
+
+    // 「0件」と分かる表示＋次の行動提案（別の言葉・絞り込み解除）。
+    expect(el.textContent).toContain('条件に合う取り込みの記録はありません')
+    expect(el.textContent).toContain('検索語や表示条件を変えてください。')
+    const clear = Array.from(el.querySelectorAll('button')).find((node) => node.textContent === '検索と絞り込みを解除')
+    expect(clear).toBeTruthy()
+
+    // 解除すると検索語を外して取り直す。
+    await act(async () => { clear!.click() })
+    await act(async () => { await drainMicrotasks() })
+    expect(eventsCalls.at(-1)).not.toContain('query=')
+    expect(searchInput(el).value).toBe('')
   })
 })

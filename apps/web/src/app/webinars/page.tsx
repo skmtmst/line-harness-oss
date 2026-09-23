@@ -1,11 +1,12 @@
 'use client'
 
-import { X } from 'lucide-react'
+import { Archive, X } from 'lucide-react'
 import SelectField from '@/components/shared/select-field'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import Link from 'next/link'
 import Button from '@/components/shared/button'
+import IconButton from '@/components/shared/icon-button'
 import Pagination from '@/components/shared/pagination'
 import ListState from '@/components/shared/list-state'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -295,7 +296,8 @@ function WebinarListTable({
             <div className="text-ink-secondary text-sm tabular-nums" title={w.registrationCount == null ? '申込人数は一覧APIに未接続です。' : undefined}><span className="text-ink-faint md:hidden">申込 </span>{measuredCount(w.registrationCount)}</div>
             <div className="text-ink-secondary text-sm tabular-nums" title={w.viewerCount == null ? '視聴人数は一覧APIに未接続です。' : undefined}><span className="text-ink-faint md:hidden">視聴 </span>{measuredCount(w.viewerCount)}</div>
             <div className="text-ink-secondary truncate text-sm md:col-span-2" title={publicationSummary(w)}>{publicationSummary(w)}</div>
-            <div className="flex items-center gap-2 md:col-span-2"><Link href={`/webinars/edit?id=${w.id}`} className="text-accent-deep text-xs font-semibold">編集</Link><button type="button" data-qa-open={w.id === 'webinar-5' ? 'LKuAQ' : undefined} onClick={() => onArchive(w)} className="text-danger text-xs font-semibold" aria-label={`${w.title}をアーカイブ`}>アーカイブ</button></div>
+            {/* #641: 「編集」は枠つきボタン、アーカイブは撮影口を維持したままアイコン化（友だち追加時配信と同じ形） */}
+            <div className="flex items-center gap-1.5 md:col-span-2"><Button href={`/webinars/edit?id=${w.id}`} variant="secondary">編集</Button><IconButton data-qa-open={w.id === 'webinar-5' ? 'LKuAQ' : undefined} onClick={() => onArchive(w)} aria-label={`${w.title}をアーカイブ`} title="アーカイブ"><Archive aria-hidden /></IconButton></div>
           </div>
         ))}
       </div>
@@ -769,7 +771,10 @@ function WebinarsPage() {
 
           <section className="min-w-0">
             <div data-design="Bar" className="bg-canvas rounded-card border-hairline mb-3 flex flex-wrap items-center gap-2 border p-3">
-              <input type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="名前・内容で検索" aria-label="ウェビナー名で検索" className="border-hairline rounded-control focus:ring-accent min-w-0 flex-1 border px-3 py-2 text-sm focus:ring-2 focus:outline-none" />
+              {/* #636: 390pxで min-w-0 の検索欄が w=41 まで潰れていた。
+                  min-w-45（180px）を下限にすると flex-wrap が効き、
+                  狭い幅では検索欄が1行・並び順と表示件数は次の行へ。 */}
+              <input type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="名前・内容で検索" aria-label="ウェビナー名で検索" className="border-hairline rounded-control focus:ring-accent min-w-45 flex-1 border px-3 py-2 text-sm focus:ring-2 focus:outline-none" />
               <span className="text-ink-faint text-xs whitespace-nowrap">並び順</span>
               <SelectField value={sortKey} onChange={(event) => setSortKey(event.target.value as SortKey)} aria-label="並び順" options={[{ value: 'updated', label: '更新が新しい順' }, { value: 'created', label: '作成が新しい順' }, { value: 'name', label: '名前順' }]} className="border-hairline rounded-control border px-2 py-2 text-sm" />
               <span className="text-ink-faint text-xs whitespace-nowrap">表示</span>

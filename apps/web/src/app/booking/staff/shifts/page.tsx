@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import StaffDetail from './staff-detail'
+import LiffDateTimePreview, { type LiffPreviewStatus } from './liff-preview'
 import {
   ApiError,
   bookingApi,
@@ -26,7 +27,6 @@ import SelectField from '@/components/shared/select-field'
 import { shortDate } from '../../lib/format-time'
 
 type LoadStatus = 'loading' | 'ready' | 'error'
-type PreviewMark = '○' | '×' | '休'
 
 const DAYS = [
   { weekday: 1, label: '月曜日' },
@@ -237,18 +237,15 @@ function BusinessHoursEditor({ accountId, settings, canEdit, onSaved, onReload }
   )
 }
 
-function isoDate(date: Date): string {
-  return date.toISOString().slice(0, 10)
-}
+const JST_OFFSET_MS = 9 * 3600_000
 
-function previewDates(): Array<{ date: string; day: number }> {
-  const now = new Date()
-  const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()))
-  return Array.from({ length: 14 }, (_, index) => {
-    const date = new Date(start)
-    date.setUTCDate(start.getUTCDate() + index)
-    return { date: isoDate(date), day: date.getUTCDate() }
-  })
+// LIFF の日時選択（apps/liff/src/components/DateTimePicker.tsx）と同じく、
+// JST の今日から14日分を空き枠の取得期間にする（liff 側の jstToday/addDays と同じ計算）。
+function previewRange(): { from: string; to: string } {
+  const from = new Date(Date.now() + JST_OFFSET_MS).toISOString().slice(0, 10)
+  const end = new Date(`${from}T00:00:00Z`)
+  end.setUTCDate(end.getUTCDate() + 13)
+  return { from, to: end.toISOString().slice(0, 10) }
 }
 
 export default function StaffShiftsPage() {
@@ -648,9 +645,14 @@ function StoreShiftsView() {
   const [settings, setSettings] = useState<BookingSettings | null>(null)
   const [menus, setMenus] = useState<BookingMenu[]>([])
   const [resources, setResources] = useState<BookingResource[]>([])
-  const [slots, setSlots] = useState<BookingAvailabilitySlot[]>([])
+  // プレビューは実LIFF（DateTimePicker）と同じ取得物を使う:
+  // 先頭の有効メニューについて、担当一覧の先頭（by_staff[0]）の空き枠。
+  const [preview, setPreview] = useState<{
+    status: LiffPreviewStatus
+    staffName: string | null
+    slots: BookingAvailabilitySlot[]
+  }>({ status: 'loading', staffName: null, slots: [] })
   const [loadStatus, setLoadStatus] = useState<LoadStatus>('loading')
-  const [previewError, setPreviewError] = useState(false)
   const [reloadKey, setReloadKey] = useState(0)
   const [addingClosed, setAddingClosed] = useState(false)
   const [closedFrom, setClosedFrom] = useState('')
@@ -680,7 +682,7 @@ function StoreShiftsView() {
   const previewUrl = selectedAccount?.liffId
     ? `${workerBase}/o?liffId=${encodeURIComponent(selectedAccount.liffId)}&page=salon-book`
     : null
-  const dates = useMemo(previewDates, [])
+  const range = useMemo(previewRange, [])
 
   useEffect(() => {
     const canEdit = canEditFeature('booking.settings')
@@ -695,12 +697,12 @@ function StoreShiftsView() {
       setSettings(null)
       setMenus([])
       setResources([])
-      setSlots([])
+      setPreview({ status: 'ready', staffName: null, slots: [] })
       setLoadStatus('ready')
       return
     }
     if (loadedAccountRef.current !== selectedAccountId) setLoadStatus('loading')
-    setPreviewError(false)
+    setPreview({ status: 'loading', staffName: null, slots: [] })
     setSaveError(null)
 
     void Promise.all([
@@ -719,54 +721,48 @@ function StoreShiftsView() {
 
       const menu = menuResult.menus.find((item) => item.is_active)
       if (!menu) {
-        setSlots([])
+        setPreview({ status: 'ready', staffName: null, slots: [] })
         return
       }
       try {
         const availability = await bookingApi.getAvailability(selectedAccountId, {
           menuId: menu.id,
-          from: dates[0].date,
-          to: dates[dates.length - 1].date,
+          from: range.from,
+          to: range.to,
         })
         if (requestId !== requestRef.current) return
-        setSlots(availability.by_staff.flatMap((item) => item.slots))
+        // LIFF は by_staff[0]（担当一覧の先頭）の枠だけを画面に出す。
+        // 全担当を合算すると実際の画面に無い時刻が混ざるので、先頭だけ使う。
+        const first = availability.by_staff[0]
+        setPreview({
+          status: 'ready',
+          staffName: first?.display_name ?? null,
+          slots: first?.slots ?? [],
+        })
       } catch {
         if (requestId !== requestRef.current) return
-        setSlots([])
-        setPreviewError(true)
+        setPreview({ status: 'error', staffName: null, slots: [] })
       }
     }).catch(() => {
       if (requestId !== requestRef.current) return
       setSettings(null)
       setMenus([])
       setResources([])
-      setSlots([])
+      setPreview({ status: 'ready', staffName: null, slots: [] })
       setLoadStatus('error')
     })
 
     return () => {
       requestRef.current += 1
     }
-  }, [dates, reloadKey, selectedAccountId])
+  }, [range, reloadKey, selectedAccountId])
 
   const storeExceptions = useMemo(
     () => (settings?.exceptions ?? []).filter((item) => !item.scopeKind || item.scopeKind === 'store'),
     [settings],
   )
-  const slotDates = useMemo(() => new Set(slots.map((slot) => slot.date)), [slots])
-  const preview = useMemo(() => dates.map((item) => {
-    const weekday = new Date(`${item.date}T00:00:00.000Z`).getUTCDay()
-    const exception = storeExceptions.find((candidate) => {
-      const from = candidate.dateFrom || candidate.date || ''
-      const to = candidate.dateTo || candidate.date || ''
-      return from <= item.date && item.date <= to
-    })
-    const hours = settings?.businessHours.find((entry) => entry.weekday === weekday)?.intervals ?? []
-    let mark: PreviewMark = slotDates.has(item.date) ? '○' : '×'
-    if (exception?.kind === 'closed'
-      || (!exception && settings?.businessHoursConfigured && hours.length === 0)) mark = '休'
-    return { ...item, mark }
-  }), [dates, settings, slotDates, storeExceptions])
+  // プレビューに出すメニューは空き枠取得と同じ「先頭の有効メニュー」。
+  const previewMenuName = menus.find((item) => item.is_active)?.name ?? null
 
   const closedWeekdays = settings?.businessHoursConfigured ? DAYS.filter((day) => (
     settings?.businessHours.find((entry) => entry.weekday === day.weekday)?.intervals.length === 0
@@ -889,7 +885,7 @@ function StoreShiftsView() {
       </div>
 
       <div data-design="Info" className="bg-info-bg text-info rounded-card px-4 py-3 text-sm">
-        何時から何時まで、どの曜日を受けるかです。右に、お客様のLINEに出るカレンダーがそのまま出ます。
+        何時から何時まで、どの曜日を受けるかです。右に、お客様のLINEに出る日時の選び方がそのまま出ます。
       </div>
 
       {!selectedAccountId ? (
@@ -1014,36 +1010,12 @@ function StoreShiftsView() {
 
           <aside className="space-y-3 xl:w-96 xl:flex-none">
             <section data-design="Preview" className="bg-canvas border-hairline rounded-card border p-4">
-              <h2 className="text-ink-secondary text-sm font-semibold">お客様のLINEではこう見えます</h2>
-              <div className="bg-info mt-3 rounded-card p-3">
-                <div className="bg-canvas rounded-control p-4">
-                  <p className="text-ink text-sm font-semibold">ご希望の日をえらんでください</p>
-                  <div className="text-ink-faint mt-3 grid grid-cols-7 gap-1 text-center text-xs">
-                    {['月', '火', '水', '木', '金', '土', '日'].map((day) => <span key={day} className="font-medium">{day}</span>)}
-                    {preview.map((item) => (
-                      <span key={item.date} className="bg-canvas-sunken rounded-control py-1" title={item.date}>
-                        <span className="block tabular-nums">{item.day}</span>
-                        <span className={item.mark === '○' ? 'text-success' : item.mark === '休' ? 'text-ink-faint' : 'text-danger'}>{item.mark}</span>
-                      </span>
-                    ))}
-                  </div>
-                  {previewError ? <p className="text-danger mt-3 text-xs">空き状況だけ読み込めませんでした。</p> : null}
-                  <dl className="text-ink-secondary mt-3 grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
-                    <div className="flex gap-2"><dt className="text-success font-semibold">○</dt><dd>あいています</dd></div>
-                    <div className="flex gap-2"><dt className="text-danger font-semibold">×</dt><dd>満席です</dd></div>
-                    <div className="flex gap-2"><dt className="font-semibold">休</dt><dd>お休み</dd></div>
-                  </dl>
-                  <p className="text-ink-faint mt-3 text-xs">○・×は受付上限に対する残数を反映しています。</p>
-                  {slots.length > 0 ? (
-                    <details className="mt-3 text-xs">
-                      <summary className="text-accent-deep cursor-pointer">空き枠の内訳を見る</summary>
-                      <div className="mt-2 space-y-1">
-                        {slots.slice(0, 6).map((slot) => <div key={`${slot.date}-${slot.start}`} className="flex justify-between"><span>{shortDate(slot.date)} {slot.start}</span><span>残り{slot.remaining}/{slot.capacity}</span></div>)}
-                      </div>
-                    </details>
-                  ) : null}
-                </div>
-              </div>
+              <LiffDateTimePreview
+                status={preview.status}
+                slots={preview.slots}
+                menuName={previewMenuName}
+                staffName={preview.staffName}
+              />
             </section>
 
             <details className="bg-canvas border-hairline rounded-card border p-3">

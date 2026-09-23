@@ -224,12 +224,13 @@ function OccurrenceApplicantsPanel({
                         : applicant.status === 'waiting' ? '案内前' : '—'}
                     </Td>
                     <ActionCell>
-                      <Link
+                      {/* #641: 行操作は枠つきボタンにそろえる */}
+                      <Button
                         href={`/chats?friend=${encodeURIComponent(applicant.friendId)}`}
-                        className="text-accent-deep text-xs font-medium hover:underline"
+                        variant="secondary"
                       >
                         個別トーク
-                      </Link>
+                      </Button>
                     </ActionCell>
                   </Tr>
                 )

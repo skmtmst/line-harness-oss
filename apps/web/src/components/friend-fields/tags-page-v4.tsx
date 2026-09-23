@@ -998,8 +998,14 @@ export default function TagsPageV4({
                 狭い画面では表だけが横に逃げる（情報を落とさないための例外）。
               */}
               <div className="overflow-x-auto">
-              {/* 960px以上は表。それ未満は縦に重ねたカードへ（#1014 ATTR-20）。 */}
-              <table className="hidden w-full min-w-[880px] table-fixed text-sm md:table">
+              {/*
+                960px以上は表。それ未満は縦に重ねたカードへ（#1014 ATTR-20）。
+                #636: 最小幅は 880→800px。1440pxではフォルダ欄を引いた表の
+                実幅が833pxしかなく、880pxを指定すると47pxの横スクロールが
+                常時出ていた。800pxなら1440pxに収まり、それより狭い幅では
+                従来どおり表の内側だけが横へ動く。
+              */}
+              <table className="hidden w-full min-w-[800px] table-fixed text-sm md:table">
                 {/* 設計 `HrwyW` の見出し。「表示」は★、「操作」はゴミ箱だけ。 */}
                 <thead className="border-b border-hairline bg-canvas-sunken text-[11px] text-ink-faint">
                   <tr>

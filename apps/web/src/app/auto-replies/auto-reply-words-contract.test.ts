@@ -281,7 +281,7 @@ describe('一覧の画面が置き換え表を通す', () => {
 
 describe('削除確認 Gy9OK の絵と、押せる形', () => {
   it('見出しの左に警告22px、削除ボタンの中にごみ箱16pxを置く', () => {
-    expect(PAGE).toContain("import { Trash2, TriangleAlert } from 'lucide-react'")
+    expect(PAGE).toContain("import { MoreHorizontal, Trash2, TriangleAlert } from 'lucide-react'")
     expect(PAGE).toContain('titleIcon={<TriangleAlert size={22} />}')
     expect(PAGE).toContain('confirmIcon={<Trash2 size={16} />}')
   })

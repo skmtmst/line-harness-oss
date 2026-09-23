@@ -49,7 +49,8 @@ describe('表見出しの第1段階移行', () => {
     }
   })
 
-  it('一覧に登録した詳細内テーブルだけ直書きthを許す', () => {
+  // 全ソース走査(countDebt)を含むため、CIの並列負荷で5秒を超えることがある。
+  it('一覧に登録した詳細内テーブルだけ直書きthを許す', { timeout: 30000 }, () => {
     for (const path of targets.filter((path) => !nativeHeaderExceptions.has(path))) {
       expect(sources[path]).not.toMatch(/<th\b/)
     }

@@ -2261,7 +2261,14 @@ export default function BroadcastForm({
     )}
     {draftSaved && <p role="status" className="mb-3 rounded-control bg-success-bg p-3 text-sm text-success">下書きを保存しました。</p>}
       </div>
-      <aside className="xl:sticky xl:top-6 xl:h-fit">
+      {/*
+        xl で右列を追従させるとき、列の中身（LINEプレビュー + 操作）が
+        表示域より高いと、下端の「テスト送信」「配信イメージを見る」が
+        72px の下部追従バーに常時被って押せなくなる（#642）。列自体を
+        バーに届かない高さへ抑えて中をスクロール可能にし、下端の操作は
+        常にバーの上まで引き出せる形にする。
+      */}
+      <aside className="xl:sticky xl:top-6 xl:h-fit xl:max-h-[calc(100dvh-7rem)] xl:overflow-y-auto">
         {showTemplatePicker ? (
           <div className="space-y-3">
             <section className="rounded-card border border-hairline bg-canvas p-5">
@@ -2422,7 +2429,7 @@ export default function BroadcastForm({
 
     {currentStep === 'message' ? <div className="h-24" aria-hidden="true" /> : null}
     {currentStep === 'confirm' ? <div className="h-4" aria-hidden="true" /> : null}
-    <StickyBar className="broadcast-form-footer" actions={(
+    <StickyBar actions={(
       <>
       {currentStep ? (
         <>
@@ -2777,7 +2784,6 @@ export default function BroadcastForm({
       .broadcast-template-row small { margin-top: 3px; color: var(--color-ink-faint); }
       .broadcast-line-preview { background: var(--color-line-preview); min-height: 428px; }
        .broadcast-url-row { display: grid; grid-template-columns: minmax(7rem, .7fr) minmax(0, 1.4fr) 7rem; }
-       .broadcast-form-footer { grid-template-columns: minmax(0, 1fr) auto 0; }
        .broadcast-preflight-page-open > :not(.broadcast-preflight-page) { display: none; }
       @media (min-width: 640px) {
         .broadcast-basic-fields { grid-template-columns: minmax(0, 1fr) 20rem; }

@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 const PAGE = readFileSync(join(__dirname, 'page.tsx'), 'utf8')
+const PREVIEW = readFileSync(join(__dirname, 'liff-preview.tsx'), 'utf8')
 const ROOT = join(__dirname, '..', '..', '..', '..', '..', '..', '..')
 const MOCK = readFileSync(join(ROOT, 'scripts/visual-qa/mock-api.mjs'), 'utf8')
 const FIXTURES = readFileSync(join(ROOT, 'scripts/visual-qa/fixtures.mjs'), 'utf8')
@@ -23,7 +24,14 @@ describe('受付枠と休業日のV6契約', () => {
     expect(PAGE).toContain('settings.maxActiveBookingsPerFriend')
     expect(PAGE).toContain('bookingApi.getAvailability(selectedAccountId')
     expect(PAGE).not.toContain('staffId: staff.id')
-    expect(PAGE).toContain('○・×は受付上限に対する残数を反映しています')
+    // Issue #643: 実LIFFは「日時を選んでください」＋空き日の縦並び＋4列時刻ボタン。
+    // 架空の月間カレンダー（○×休・凡例・内訳）は実画面に無いので残さない。
+    expect(PREVIEW).toContain('日時を選んでください')
+    expect(PREVIEW).toContain('この期間に空きはありません。')
+    expect(PREVIEW).toContain('grid-cols-4')
+    expect(PAGE).not.toContain('ご希望の日をえらんでください')
+    expect(PAGE).not.toContain('grid-cols-7')
+    expect(PREVIEW).not.toContain('ご希望の日をえらんでください')
     expect(PAGE).not.toContain('△')
     expect(PAGE).toContain('bookingApi.listResources(selectedAccountId)')
     expect(PAGE).not.toContain('準備中')
