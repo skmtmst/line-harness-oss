@@ -225,7 +225,12 @@ export async function listAccessUsers(db: D1Database, input: ListAccessUsersInpu
     if (input.status && item.status !== input.status) return false;
     if (input.roleBundle && item.roleBundle !== input.roleBundle) return false;
     if (!normalizedQuery) return true;
-    const values = [item.name, item.jobTitle, item.roleBundle];
+    /*
+     * #620: 検索欄は「人の名前・メールで検索」。照合は画面に出る項目だけに限る。
+     * roleBundle（administrator 等の内部enum ID）を対象に入れていたときは、
+     * "admin" や "view" のような見た目に無い語でも行が返っていた。
+     */
+    const values = [item.name, item.jobTitle];
     if (input.includeEmailInSearch) values.push(item.email);
     return values.some((value) => value?.toLocaleLowerCase('ja-JP').includes(normalizedQuery));
   });
@@ -474,13 +479,19 @@ export async function listAuditEvents(db: D1Database, input: ListAuditEventsInpu
     conditions.push("(ae.result <> 'success' OR ae.risk_level <> 'normal')");
   }
   if (input.actorId) { conditions.push('ae.actor_principal_id = ?'); values.push(input.actorId); }
-  if (input.action) { conditions.push('ae.action LIKE ?'); values.push(`%${input.action}%`); }
+  /*
+   * #620: ユーザー語は LIKE ではなく instr で照合する。
+   * `%…%` の LIKE だと入力中の % や _ がワイルドカードとして効いて
+   * 意図しない行を返し、さらに D1 の LIKE パターンは 50 バイト上限のため
+   * 長文の検索がサーバーエラーになっていた。
+   */
+  if (input.action) { conditions.push('instr(lower(ae.action), lower(?)) > 0'); values.push(input.action); }
   if (input.from) { conditions.push('ae.created_at >= ?'); values.push(input.from); }
   if (input.to) { conditions.push('ae.created_at <= ?'); values.push(input.to); }
   if (input.query?.trim()) {
-    const query = `%${input.query.trim()}%`;
-    conditions.push(`(ae.action LIKE ? OR COALESCE(sm.name, '') LIKE ?
-      OR COALESCE(ae.target_kind, '') LIKE ? OR COALESCE(ae.target_id, '') LIKE ?)`);
+    const query = input.query.trim();
+    conditions.push(`(instr(lower(ae.action), lower(?)) > 0 OR instr(lower(COALESCE(sm.name, '')), lower(?)) > 0
+      OR instr(lower(COALESCE(ae.target_kind, '')), lower(?)) > 0 OR instr(lower(COALESCE(ae.target_id, '')), lower(?)) > 0)`);
     values.push(query, query, query, query);
   }
   const where = `WHERE ${conditions.join(' AND ')}`;
