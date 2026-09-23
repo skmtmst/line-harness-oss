@@ -17,6 +17,7 @@ import Select from '@/components/shared/select'
 import type { FormLayout } from '@line-crm/shared'
 import { hasStoredDestination, summarizeFormDestinations } from './form-destination-summary'
 import FolderPanel, { FOLDER_RAIL_STYLE } from '@/components/shared/folder-panel'
+import CopyTextButton from '@/components/ui/copy-text-button'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import './form-submissions.css'
 
@@ -637,14 +638,28 @@ export default function FormSubmissionsPage() {
               return (
                 <tr key={form.id} className="text-ink-secondary">
                   <td className="px-3 py-2.5">
-                    {reviewMode ? (
-                      <span className="block truncate font-semibold text-ink" title={normalizedName}>
-                        {normalizedName}
-                        {form.accountScopeReviewRequired && <span className="border-accent bg-accent-soft rounded-pill ml-2 border px-2 py-0.5 text-xs text-ink">管理者確認</span>}
-                      </span>
-                    ) : (
-                      <Link href={`/form-submissions/edit?id=${encodeURIComponent(form.id)}&tab=basic`} className="block truncate font-semibold text-ink hover:underline" title={normalizedName}>{normalizedName}</Link>
-                    )}
+                    {/*
+                     * フォーム名は識別子として別の文面へ写すことがある。
+                     * 省略表示は title で読めるが取り出せないため、差し込みキー
+                     * と同じく全文コピーの口を添える（監査6 #665）。
+                     */}
+                    <div className="flex items-center gap-1">
+                      {reviewMode ? (
+                        <span className="block min-w-0 flex-1 truncate font-semibold text-ink" title={normalizedName}>
+                          {normalizedName}
+                          {form.accountScopeReviewRequired && <span className="border-accent bg-accent-soft rounded-pill ml-2 border px-2 py-0.5 text-xs text-ink">管理者確認</span>}
+                        </span>
+                      ) : (
+                        <>
+                          <Link href={`/form-submissions/edit?id=${encodeURIComponent(form.id)}&tab=basic`} className="block min-w-0 flex-1 truncate font-semibold text-ink hover:underline" title={normalizedName}>{normalizedName}</Link>
+                          {/* 管理者確認は読み取り専用なので、通常の一覧にだけコピー口を出す。 */}
+                          <CopyTextButton
+                            value={normalizedName}
+                            aria-label={`${normalizedName}のフォーム名をコピー`}
+                          />
+                        </>
+                      )}
+                    </div>
                     <span className="block truncate text-xs text-ink-faint">{form.description || `${form.fields.length}ブロック`}</span>
                   </td>
                   <td className="px-3 py-2.5 text-xs">{form.isActive ? '公開中' : '下書き'}</td>
