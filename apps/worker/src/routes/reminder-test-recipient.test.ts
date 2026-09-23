@@ -38,6 +38,14 @@ const VERSION_B = 'version-b';
 const FRIEND_A = 'friend-a';
 const FRIEND_B = 'friend-b';
 const FRIEND_UNFOLLOWED = 'friend-unfollowed';
+// REMINDER-12: 本人対応ありのadmin。友だち行はアカウントごと。
+const FRIEND_SELF = 'friend-self';
+const FRIEND_SELF_OTHER_ACCOUNT = 'friend-self-other-account';
+const FRIEND_SELF_BLOCKED = 'friend-self-blocked';
+const FRIEND_A2 = 'friend-a2';
+const KEY_ADMIN_SELF = 'key-admin-self';
+const KEY_ADMIN_SELF_OTHER = 'key-admin-self-other';
+const KEY_ADMIN_SELF_BLOCKED = 'key-admin-self-blocked';
 
 const IDEMPOTENCY_KEY = '123e4567-e89b-42d3-a456-426614174000';
 
@@ -129,6 +137,37 @@ function seed(sqlite: SqliteD1['raw']) {
     display_name: 'ブロックした人',
     is_following: 0,
   });
+  // REMINDER-12: LINE連携済みadminと、その本人の友だち行。
+  insertFriend(sqlite, FRIEND_SELF, {
+    line_account_id: ACC_A,
+    line_user_id: 'U-self-linked',
+    display_name: '連携済みの本人',
+  });
+  insertFriend(sqlite, FRIEND_SELF_OTHER_ACCOUNT, {
+    line_account_id: ACC_B,
+    line_user_id: 'U-self-other',
+    display_name: '別アカウントの本人',
+  });
+  insertFriend(sqlite, FRIEND_SELF_BLOCKED, {
+    line_account_id: ACC_A,
+    line_user_id: 'U-self-blocked',
+    display_name: 'ブロックした本人',
+    is_following: 0,
+  });
+  insertFriend(sqlite, FRIEND_A2, { line_account_id: ACC_A, display_name: '登録宛先その2' });
+  // 本人対応あり/別アカウントの本人/ブロック済みの本人の3通りを用意する。
+  sqlite.prepare(
+    `INSERT INTO staff_members (id, name, role, api_key, tenant_id, account_scope, line_user_id)
+     VALUES ('admin-self', '本人管理', 'admin', ?, 'tenant-1', 'all', 'U-self-linked')`,
+  ).run(KEY_ADMIN_SELF);
+  sqlite.prepare(
+    `INSERT INTO staff_members (id, name, role, api_key, tenant_id, account_scope, line_user_id)
+     VALUES ('admin-self-other', '別店の本人', 'admin', ?, 'tenant-1', 'all', 'U-self-other')`,
+  ).run(KEY_ADMIN_SELF_OTHER);
+  sqlite.prepare(
+    `INSERT INTO staff_members (id, name, role, api_key, tenant_id, account_scope, line_user_id)
+     VALUES ('admin-self-blocked', 'ブロック本人', 'admin', ?, 'tenant-1', 'all', 'U-self-blocked')`,
+  ).run(KEY_ADMIN_SELF_BLOCKED);
 
   for (const [id, versionId, accountId] of [
     [REMINDER_A, VERSION_A, ACC_A],
@@ -199,16 +238,23 @@ describe('テスト送信先の事前表示 (N-070)', () => {
   test('未設定なら unset を返す', async () => {
     const res = await getRecipient(REMINDER_A, KEY_OWNER);
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ success: true, data: { state: 'unset', recipient: null } });
+    expect(await res.json()).toEqual({
+      success: true,
+      data: { state: 'unset', recipient: null, recipientKind: null },
+    });
   });
 
   test('設定済みの送信先を名前つきで返す', async () => {
     setTestRecipients(sqlite.raw, ACC_A, [FRIEND_A]);
     const res = await getRecipient(REMINDER_A, KEY_OWNER);
     expect(res.status).toBe(200);
-    const body = await res.json() as { data: { state: string; recipient: { id: string; displayName: string } } };
+    const body = await res.json() as {
+      data: { state: string; recipient: { id: string; displayName: string }; recipientKind: string };
+    };
     expect(body.data.state).toBe('ready');
     expect(body.data.recipient).toMatchObject({ id: FRIEND_A, displayName: '田中 太郎' });
+    // owner は LINE未連携なので、届くのは「登録済みテスト宛先」。
+    expect(body.data.recipientKind).toBe('registered');
   });
 
   test('設定先が別アカウントの友だちなら unavailable を返す', async () => {
@@ -308,5 +354,84 @@ describe('テスト送信の失敗と回復 (N-070)', () => {
     const outOfScope = await testSend(REMINDER_B, KEY_ADMIN_A);
     expect(outOfScope.status).toBe(404);
     expect(line.pushMessageWithRequestId).not.toHaveBeenCalled();
+  });
+});
+
+/*
+ * REMINDER-12: 「自分のLINEへ」と案内しながら登録済みテスト宛先へ
+ * 送っていた取り違えの回帰。
+ * - LINE連携済みの操作者だけが本人宛て（self）になる。
+ * - 連携が無い・別アカウント・ブロック済みなら本人を名乗らず登録宛先へ倒す。
+ * - 画面に出した届け先と実際にPushした line_user_id が必ず一致する。
+ */
+describe('本人宛てと登録宛先の区別 (REMINDER-12)', () => {
+  test('LINE連携済みの操作者には登録宛先より本人を優先して返す', async () => {
+    setTestRecipients(sqlite.raw, ACC_A, [FRIEND_A]);
+    const res = await getRecipient(REMINDER_A, KEY_ADMIN_SELF);
+    expect(res.status).toBe(200);
+    const body = await res.json() as {
+      data: { state: string; recipientKind: string; recipient: { id: string; displayName: string } };
+    };
+    expect(body.data.state).toBe('ready');
+    expect(body.data.recipientKind).toBe('self');
+    expect(body.data.recipient).toMatchObject({ id: FRIEND_SELF, displayName: '連携済みの本人' });
+  });
+
+  test('本人対応が別アカウントにあるだけなら本人を名乗らず登録宛先を使う', async () => {
+    setTestRecipients(sqlite.raw, ACC_A, [FRIEND_A]);
+    const res = await getRecipient(REMINDER_A, KEY_ADMIN_SELF_OTHER);
+    const body = await res.json() as { data: { recipientKind: string; recipient: { id: string } } };
+    expect(body.data.recipientKind).toBe('registered');
+    expect(body.data.recipient.id).toBe(FRIEND_A);
+  });
+
+  test('本人がこのアカウントをブロック中なら本人宛てを無効化し登録宛先を使う', async () => {
+    setTestRecipients(sqlite.raw, ACC_A, [FRIEND_A]);
+    const res = await getRecipient(REMINDER_A, KEY_ADMIN_SELF_BLOCKED);
+    const body = await res.json() as { data: { recipientKind: string; recipient: { id: string } } };
+    expect(body.data.recipientKind).toBe('registered');
+    expect(body.data.recipient.id).toBe(FRIEND_A);
+  });
+
+  test('LINE未連携の操作者は本人を名乗れず、登録宛先が複数あっても先頭だけを使う', async () => {
+    setTestRecipients(sqlite.raw, ACC_A, [FRIEND_A, FRIEND_A2]);
+    const res = await getRecipient(REMINDER_A, KEY_OWNER);
+    const body = await res.json() as {
+      data: { recipientKind: string; recipient: { id: string; displayName: string } };
+    };
+    expect(body.data.recipientKind).toBe('registered');
+    expect(body.data.recipient).toMatchObject({ id: FRIEND_A, displayName: '田中 太郎' });
+  });
+
+  test('本人連携がある操作者のテスト送信は本人のline_user_idへ届く', async () => {
+    setTestRecipients(sqlite.raw, ACC_A, [FRIEND_A]);
+    const res = await testSend(REMINDER_A, KEY_ADMIN_SELF);
+    expect(res.status).toBe(200);
+    const body = await res.json() as {
+      data: { recipientName: string; recipientKind: string; replayed: boolean };
+    };
+    expect(body.data).toMatchObject({
+      recipientName: '連携済みの本人',
+      recipientKind: 'self',
+      replayed: false,
+    });
+    // 表示した届け先と実際のPush先が一致する。
+    expect(line.pushMessageWithRequestId.mock.calls[0][0]).toBe('U-self-linked');
+  });
+
+  test('登録宛先へのテスト送信は事前表示した宛先と同じline_user_idへ届く', async () => {
+    setTestRecipients(sqlite.raw, ACC_A, [FRIEND_A]);
+    const preview = await getRecipient(REMINDER_A, KEY_OWNER);
+    const shown = (await preview.json() as {
+      data: { recipientKind: string; recipient: { id: string } };
+    }).data;
+    const res = await testSend(REMINDER_A, KEY_OWNER);
+    expect(res.status).toBe(200);
+    const body = await res.json() as { data: { recipientName: string; recipientKind: string } };
+    expect(body.data.recipientKind).toBe('registered');
+    expect(body.data.recipientName).toBe('田中 太郎');
+    // 事前表示で返した友だちと同じ line_user_id にPushされた。
+    expect(shown.recipient.id).toBe(FRIEND_A);
+    expect(line.pushMessageWithRequestId.mock.calls[0][0]).toBe(`U${FRIEND_A}`);
   });
 });

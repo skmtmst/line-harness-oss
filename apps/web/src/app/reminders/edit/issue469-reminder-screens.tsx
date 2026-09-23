@@ -24,7 +24,7 @@ import { usePageTitle } from '@/components/shell/page-chrome'
 import { firstReminderStepMessage, reminderPlaceholders } from '@/components/reminders/reminder-labels'
 import { useReminderTestRecipient } from '@/components/reminders/use-reminder-test-recipient'
 import { useReminderTestSend } from '@/components/reminders/use-reminder-test-send'
-import { TestRecipientGuidance, testRecipientLabel } from '@/components/reminders/test-recipient-guidance'
+import { TestRecipientGuidance, testRecipientDestinationLabel, testRecipientNote, testSendConfirmDescription } from '@/components/reminders/test-recipient-guidance'
 
 function formatTestedAt(value: string | null): string {
   if (!value) return 'テスト記録なし'
@@ -299,7 +299,9 @@ export function Issue469ReminderTestStage({ reminderId }: { reminderId: string }
 
   const testedAt = formatTestedAt(subjectDraft.lastTestedAt)
   const sentTo = testSend.phase.kind === 'succeeded' ? testSend.phase.recipientName : null
-  const recipient = testRecipientLabel(testRecipient.view, sentTo)
+  const sentKind = testSend.phase.kind === 'succeeded' ? testSend.phase.recipientKind : null
+  // REMINDER-12: 届け先は「自分のLINE」と「登録済みテスト宛先」を区別して出す。
+  const recipient = testRecipientDestinationLabel(testRecipient.view, sentTo, sentKind)
   const sendIssue = testSend.phase.kind === 'failed' || testSend.phase.kind === 'unknown' ? testSend.phase.message : ''
   const sendBusy = testSend.phase.kind === 'sending'
 
@@ -316,14 +318,14 @@ export function Issue469ReminderTestStage({ reminderId }: { reminderId: string }
       <LinePreview caption="テスト送信される1通目の内容">{firstReminderStepMessage(subjectDraft.settings) || '本文がありません'}</LinePreview>
       <div className="grid grid-cols-2 gap-2"><Button onClick={openConfirm} disabled={sendBusy}>テスト送信</Button></div>
     </div>}>
-      <ReminderPanel title="テスト対象" note="自分のLINEへ確認用メッセージを送ります。"><dl className="grid min-h-24 grid-cols-2 gap-4 text-xs"><Metric label="送信先" value={recipient} /><Metric label="最終テスト日時" value={testedAt} /></dl><TestRecipientGuidance view={testRecipient.view} accountId={subjectDraft.settings.lineAccountId} onRecheck={() => void testRecipient.reload()} /></ReminderPanel>
+      <ReminderPanel title="テスト対象" note={testRecipientNote(testRecipient.view, sentKind)}><dl className="grid min-h-24 grid-cols-2 gap-4 text-xs"><Metric label="送信先" value={recipient} /><Metric label="最終テスト日時" value={testedAt} /></dl><TestRecipientGuidance view={testRecipient.view} accountId={subjectDraft.settings.lineAccountId} onRecheck={() => void testRecipient.reload()} /></ReminderPanel>
       <ReminderPanel title="差し込み値の確認" note="本文に書いた差し込みだけを並べ、どこから取るかを確認します。">{reminderPlaceholders(subjectDraft.settings, sentTo).length === 0 ? <p className="text-ink-faint px-3 py-3 text-xs">本文に差し込み値はありません。</p> : <table className="w-full border-collapse text-left text-xs"><thead><TableHeadRow><Th>変数</Th><Th>テストで使う値</Th><Th>本番での取得元</Th></TableHeadRow></thead><tbody className="border-hairline border-t">{reminderPlaceholders(subjectDraft.settings, sentTo).map((placeholder) => <tr key={placeholder.token} className="border-hairline border-t"><td className="px-3 py-3"><code>{placeholder.token}</code></td><td className="px-3 py-3">{placeholder.testValue}</td><td className="px-3 py-3">{placeholder.source}</td></tr>)}</tbody></table>}</ReminderPanel>
       <ReminderPanel title="テスト送信の履歴" note="下書きに記録された直近のテストだけを表示します。" action={subjectDraft.lastTestStatus === 'succeeded' ? <Pill tone="success">直近のテストは成功</Pill> : undefined}><table className="w-full border-collapse text-left text-xs"><thead><TableHeadRow><Th>送信日時</Th><Th>送信した通知・宛先</Th><Th>結果</Th></TableHeadRow></thead><tbody className="border-hairline border-t"><tr><td className="px-3 py-3">{testedAt}</td><td className="px-3 py-3">下書きの通知 ／ {recipient}</td><td className="px-3 py-3"><Pill tone={subjectDraft.lastTestStatus === 'succeeded' ? 'success' : 'warning'}>{subjectDraft.lastTestStatus === 'succeeded' ? '送信できました' : '成功記録なし'}</Pill></td></tr></tbody></table></ReminderPanel>
       {/* 送信の失敗・結果不明は一つの状態で持つ。窓が閉じているときだけ背面に出す。 */}
       {sendIssue && !confirmOpen ? <p className="text-danger text-xs">{sendIssue}</p> : null}
     </ReminderWorkspace>
     <div className="mt-16"><ReminderFooter status={subjectDraft.lastTestStatus === 'succeeded' ? `テスト済み ${testedAt}` : '下書き保存'} secondary={{ label: 'テスト送信', onClick: openConfirm }} primary="最終確認へ" onPrimary={() => router.push(`/reminders/edit?id=${encodeURIComponent(reminderId)}&stage=confirm`)} /></div>
-    <ConfirmDialog open={confirmOpen} title="テスト送信しますか？" description={testSend.phase.kind === 'unknown' ? '前回の送信結果を確認できていません。再試行しても二重には送られません。' : '自分のLINEへ確認用メッセージを1通送信します。'} confirmLabel={sendIssue ? 'もう一度送信' : 'テスト送信'} cancelLabel="配信予定へ戻る" busy={sendBusy} error={sendIssue} onConfirm={() => void sendTest()} onCancel={() => setConfirmOpen(false)} />
+    <ConfirmDialog open={confirmOpen} title="テスト送信しますか？" description={testSend.phase.kind === 'unknown' ? '前回の送信結果を確認できていません。再試行しても二重には送られません。' : testSendConfirmDescription(testRecipient.view, sentTo, sentKind)} confirmLabel={sendIssue ? 'もう一度送信' : 'テスト送信'} cancelLabel="配信予定へ戻る" busy={sendBusy} error={sendIssue} onConfirm={() => void sendTest()} onCancel={() => setConfirmOpen(false)} />
   </div>
 }
 
