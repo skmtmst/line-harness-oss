@@ -76,6 +76,7 @@ describe('オートメーションの見本と下書き', () => {
     const created = await createAutomationDraftFromTemplate(testDb.db, {
       templateKey: 'welcome-scenario',
       lineAccountId: 'account-1',
+      operationKey: 'op-welcome-1',
       createdBy: 'staff-1',
     });
     const draft = await getAutomationDraft(testDb.db, { id: created.id, lineAccountId: 'account-1' });
@@ -93,6 +94,7 @@ describe('オートメーションの見本と下書き', () => {
     const created = await createAutomationDraftFromTemplate(testDb.db, {
       templateKey: 'received-message-tag',
       lineAccountId: 'account-1',
+      operationKey: 'op-read-1',
     });
     await expect(getAutomationDraft(testDb.db, {
       id: created.id,
@@ -104,6 +106,7 @@ describe('オートメーションの見本と下書き', () => {
     const created = await createAutomationDraftFromTemplate(testDb.db, {
       templateKey: 'tag-followup-scenario',
       lineAccountId: 'account-1',
+      operationKey: 'op-follow-1',
     });
     await updateAutomationDraft(testDb.db, {
       id: created.id,
@@ -133,6 +136,7 @@ describe('オートメーションの見本と下書き', () => {
     const created = await createAutomationDraftFromTemplate(testDb.db, {
       templateKey: 'received-message-tag',
       lineAccountId: 'account-1',
+      operationKey: 'op-reject-1',
     });
     await expect(updateAutomationDraft(testDb.db, {
       id: created.id,
@@ -195,7 +199,8 @@ describe('保存は、読んだときの中身にだけ効く（#679）', () => 
 
   it('読んだあと・書く直前に別接続が同じ行を書き換えたら、上書きせず409で止まる', async () => {
     const created = await createAutomationDraftFromTemplate(testDb.db, {
-      templateKey: 'received-message-tag', lineAccountId: 'account-1', createdBy: 'staff-1',
+      templateKey: 'received-message-tag', lineAccountId: 'account-1',
+      operationKey: 'op-race-1', createdBy: 'staff-1',
     });
     const versionId = testDb.raw.prepare(
       'SELECT current_draft_version_id AS id FROM automation_definitions WHERE id = ?',
@@ -240,7 +245,8 @@ describe('保存は、読んだときの中身にだけ効く（#679）', () => 
 
   it('保存すると版が新しくなり、前の札ではもう保存できない', async () => {
     const created = await createAutomationDraftFromTemplate(testDb.db, {
-      templateKey: 'received-message-tag', lineAccountId: 'account-1', createdBy: 'staff-1',
+      templateKey: 'received-message-tag', lineAccountId: 'account-1',
+      operationKey: 'op-save-1', createdBy: 'staff-1',
     });
     const first = await save(testDb.db, created.id, created.draftVersionId, '1回目');
     expect(first.draftVersionId).not.toBe(created.draftVersionId);
@@ -258,7 +264,16 @@ describe('保存は、読んだときの中身にだけ効く（#679）', () => 
   });
 });
 
-describe('見本からの下書き作成は何度呼んでも1件（#679 A3）', () => {
+/*
+ * DETAIL-13: 「同じ保存操作の再試行」と「別の新規作成」を、操作ごとの鍵で分ける。
+ *
+ * 以前は店・見本・担当者・世代だけでidを決めていたため、一覧からもう一度
+ * 「新規」を押しても同じidへ戻り、新しい入力が前の下書きを上書きしていた。
+ * いまは画面が新規作成のたびに新しい鍵を振り、同じ鍵の呼び出しだけが
+ * 同じ下書きへ戻る（＝再試行だけが冪等）。既存の下書きを開くのは
+ * `?draft=<id>` でidを明示したときだけ。
+ */
+describe('見本からの下書き作成は同じ操作なら1件・別の操作なら別件（DETAIL-13 / #679 A3）', () => {
   let testDb: SqliteD1;
 
   beforeEach(() => {
@@ -267,16 +282,18 @@ describe('見本からの下書き作成は何度呼んでも1件（#679 A3）',
     addAccount(testDb.raw, 'account-2');
   });
 
-  const create = (accountId: string, createdBy: string | null = 'staff-1') =>
+  const create = (accountId: string, operationKey: string, createdBy: string | null = 'staff-1') =>
     createAutomationDraftFromTemplate(testDb.db, {
       templateKey: 'received-message-tag',
       lineAccountId: accountId,
+      operationKey,
       createdBy,
     });
 
-  it('別タブが同時に押しても下書きは1件で、同じ札を返す', async () => {
-    // 以前は毎回 crypto.randomUUID() を振っていたので2件できた。
-    const [first, second] = await Promise.all([create('account-1'), create('account-1')]);
+  it('同じ操作の再試行（ダブルクリック・通信やり直し）は1件で、同じ札を返す', async () => {
+    const [first, second] = await Promise.all([
+      create('account-1', 'op-same-save'), create('account-1', 'op-same-save'),
+    ]);
     expect(second.id).toBe(first.id);
     expect(second.draftVersionId).toBe(first.draftVersionId);
     expect(testDb.raw.prepare(
@@ -286,30 +303,76 @@ describe('見本からの下書き作成は何度呼んでも1件（#679 A3）',
       .toEqual({ count: 1 });
   });
 
+  it('別の新規作成は別の下書きになる。前の下書きへ戻って上書きしない', async () => {
+    const first = await create('account-1', 'op-first-new');
+    const second = await create('account-1', 'op-second-new');
+    expect(second.id).not.toBe(first.id);
+    expect(second.draftVersionId).not.toBe(first.draftVersionId);
+    expect(testDb.raw.prepare(
+      "SELECT COUNT(*) AS count FROM automation_definitions WHERE line_account_id = 'account-1'",
+    ).get()).toEqual({ count: 2 });
+    // 前の下書きはそのまま残っている。
+    const firstDraft = await getAutomationDraft(testDb.db, {
+      id: first.id, lineAccountId: 'account-1',
+    });
+    expect(firstDraft.id).toBe(first.id);
+  });
+
+  it('別タブが同時に押しても、別の操作なら別の下書きになる', async () => {
+    /*
+     * 別タブは別の作成操作。以前は同じidへ潰れて片方のタブがもう片方の
+     * 下書きを上書きしていた（DETAIL-13）。同時に着いても2件で終わる。
+     */
+    const [first, second] = await Promise.all([
+      create('account-1', 'op-tab-1'), create('account-1', 'op-tab-2'),
+    ]);
+    expect(second.id).not.toBe(first.id);
+    expect(testDb.raw.prepare(
+      "SELECT COUNT(*) AS count FROM automation_definitions WHERE line_account_id = 'account-1'",
+    ).get()).toEqual({ count: 2 });
+  });
+
   it('店が違えば別の下書きになる', async () => {
-    const first = await create('account-1');
-    const second = await create('account-2');
+    const first = await create('account-1', 'op-shared');
+    const second = await create('account-2', 'op-shared');
     expect(second.id).not.toBe(first.id);
     expect(testDb.raw.prepare('SELECT COUNT(*) AS count FROM automation_definitions').get())
       .toEqual({ count: 2 });
   });
 
   it('担当者が違えば別の下書きになる', async () => {
-    const first = await create('account-1', 'staff-1');
-    const second = await create('account-1', 'staff-2');
+    const first = await create('account-1', 'op-shared', 'staff-1');
+    const second = await create('account-1', 'op-shared', 'staff-2');
     expect(second.id).not.toBe(first.id);
   });
 
   it('前の下書きを公開したあとは、新しい下書きを作る', async () => {
-    const first = await create('account-1');
+    const first = await create('account-1', 'op-publish-then-new');
     testDb.raw.prepare(
       "UPDATE automation_definitions SET status = 'active' WHERE id = ?",
     ).run(first.id);
-    const second = await create('account-1');
+    const second = await create('account-1', 'op-publish-then-new');
     expect(second.id).not.toBe(first.id);
     expect(testDb.raw.prepare(
       "SELECT COUNT(*) AS count FROM automation_definitions WHERE status = 'draft'",
     ).get()).toEqual({ count: 1 });
+  });
+
+  it('操作の鍵が無い・形が違う呼び出しは断る（前の下書きへ戻る道を塞ぐ）', async () => {
+    await expect(createAutomationDraftFromTemplate(testDb.db, {
+      templateKey: 'received-message-tag', lineAccountId: 'account-1',
+      operationKey: undefined,
+    })).rejects.toMatchObject({ code: 'operation_key_invalid' });
+    await expect(createAutomationDraftFromTemplate(testDb.db, {
+      templateKey: 'received-message-tag', lineAccountId: 'account-1',
+      operationKey: 'x',
+    })).rejects.toMatchObject({ code: 'operation_key_invalid' });
+    await expect(createAutomationDraftFromTemplate(testDb.db, {
+      templateKey: 'received-message-tag', lineAccountId: 'account-1',
+      operationKey: 42,
+    })).rejects.toMatchObject({ code: 'operation_key_invalid' });
+    expect(testDb.raw.prepare('SELECT COUNT(*) AS count FROM automation_definitions').get())
+      .toEqual({ count: 0 });
   });
 });
 
@@ -325,25 +388,26 @@ describe('公開済み定義の編集・複製（#942 N-352）', () => {
   /** 公開版を持つ active の定義を1件作る。 */
   function addActiveDefinition(
     raw: Database.Database,
-    input: { id: string; name?: string; status?: string; accountId?: string } = { id: 'auto-1' },
+    input: { id?: string; name?: string; status?: string; accountId?: string } = {},
   ): string {
+    const id = input.id ?? 'auto-1';
     const accountId = input.accountId ?? 'account-1';
-    const versionId = `${input.id}-v1`;
+    const versionId = `${id}-v1`;
     raw.prepare(
       `INSERT INTO automation_definitions
          (id, line_account_id, name, status, priority, created_at, updated_at)
        VALUES (?, ?, ?, ?, 5, datetime('now'), datetime('now'))`,
-    ).run(input.id, accountId, input.name ?? '予約後フォロー', input.status ?? 'active');
+    ).run(id, accountId, input.name ?? '予約後フォロー', input.status ?? 'active');
     raw.prepare(
       `INSERT INTO automation_versions
          (id, automation_id, version_number, status, trigger_type, trigger_config,
           condition_config, action_config, published_at)
        VALUES (?, ?, 1, 'published', 'tag_change', '{"tagId":"tag-1","action":"add"}',
                '{}', '[{"id":"step-1","type":"common_action","params":{"commonActionId":"ca-1"},"onFailure":"stop"}]', datetime('now'))`,
-    ).run(versionId, input.id);
+    ).run(versionId, id);
     raw.prepare(
       `UPDATE automation_definitions SET current_published_version_id = ? WHERE id = ?`,
-    ).run(versionId, input.id);
+    ).run(versionId, id);
     return versionId;
   }
 
@@ -393,6 +457,115 @@ describe('公開済み定義の編集・複製（#942 N-352）', () => {
     expect(testDb.raw.prepare(
       `SELECT COUNT(*) AS count FROM automation_versions WHERE automation_id = 'auto-1'`,
     ).get()).toEqual({ count: 2 });
+  });
+
+  /*
+   * AUTOMATION-05: 一覧の「編集」は、止めている・下書き・動いているの
+   * どの状態でも同じidのまま編集面へ進めなければならない。稼働状態と
+   * 実行記録は一切変えない。
+   */
+  it('止めている定義も同じidの改訂用下書きで開け、状態は止めたまま（AUTOMATION-05）', async () => {
+    const versionId = addActiveDefinition(testDb.raw, { status: 'stopped' });
+    const created = await createAutomationDraftFromDefinition(testDb.db, {
+      id: 'auto-1', lineAccountId: 'account-1', createdBy: 'staff-1',
+    });
+    expect(created.id).toBe('auto-1');
+
+    const draft = await getAutomationDraft(testDb.db, {
+      id: 'auto-1', lineAccountId: 'account-1',
+    });
+    expect(draft).toMatchObject({
+      eventType: 'tag_change',
+      triggerConfig: { tagId: 'tag-1', action: 'add' },
+      actions: [{ type: 'common_action', params: { commonActionId: 'ca-1' } }],
+    });
+    const definition = testDb.raw.prepare(
+      `SELECT status, current_published_version_id FROM automation_definitions WHERE id = 'auto-1'`,
+    ).get() as { status: string; current_published_version_id: string };
+    // 公開版はそのまま、定義は止めたまま。
+    expect(definition).toEqual({ status: 'stopped', current_published_version_id: versionId });
+  });
+
+  it('下書きの定義は、ぶら下がっている下書きをそのまま返す（AUTOMATION-05）', async () => {
+    testDb.raw.prepare(
+      `INSERT INTO automation_definitions
+         (id, line_account_id, name, status, current_draft_version_id, created_at, updated_at)
+       VALUES ('draft-1', 'account-1', '作りかけ', 'draft', 'dv-1', datetime('now'), datetime('now'))`,
+    ).run();
+    testDb.raw.prepare(
+      `INSERT INTO automation_versions
+         (id, automation_id, version_number, status, trigger_type, trigger_config,
+          condition_config, action_config)
+       VALUES ('dv-1', 'draft-1', 1, 'draft', 'message_received', '{}', '{}',
+               '[{"id":"step-1","type":"send_message","params":{"content":"確認"},"onFailure":"stop"}]')`,
+    ).run();
+
+    const created = await createAutomationDraftFromDefinition(testDb.db, {
+      id: 'draft-1', lineAccountId: 'account-1',
+    });
+    expect(created.id).toBe('draft-1');
+    const draft = await getAutomationDraft(testDb.db, {
+      id: 'draft-1', lineAccountId: 'account-1',
+    });
+    expect(draft.draftVersionId).toBe(created.draftVersionId);
+    expect(draft).toMatchObject({ eventType: 'message_received' });
+    // 版を増やしていない（既存の下書きをそのまま再開した）。
+    expect(testDb.raw.prepare(
+      `SELECT COUNT(*) AS count FROM automation_versions WHERE automation_id = 'draft-1'`,
+    ).get()).toEqual({ count: 1 });
+  });
+
+  it('下書きの指し先が壊れていても、公開版から作り直して同じidで開ける（AUTOMATION-05）', async () => {
+    const versionId = addActiveDefinition(testDb.raw, { status: 'stopped' });
+    /*
+     * 「編集用の下書きを作れませんでした」の再現: 下書きの指し先が
+     * 下書きではない版（ここでは公開版）を指している壊れた状態。
+     * 以前は not_found のままで一覧の「編集」が永久に失敗した。
+     */
+    testDb.raw.prepare(
+      `UPDATE automation_definitions SET current_draft_version_id = ? WHERE id = 'auto-1'`,
+    ).run(versionId);
+
+    const created = await createAutomationDraftFromDefinition(testDb.db, {
+      id: 'auto-1', lineAccountId: 'account-1', createdBy: 'staff-1',
+    });
+    expect(created.id).toBe('auto-1');
+
+    // 公開版を写した新しい下書き版がぶら下がり、指し先はそこへ治っている。
+    const definition = testDb.raw.prepare(
+      `SELECT status, current_draft_version_id, current_published_version_id
+         FROM automation_definitions WHERE id = 'auto-1'`,
+    ).get() as {
+      status: string;
+      current_draft_version_id: string;
+      current_published_version_id: string;
+    };
+    expect(definition.status).toBe('stopped');
+    expect(definition.current_published_version_id).toBe(versionId);
+    expect(definition.current_draft_version_id).not.toBe(versionId);
+    const newVersion = testDb.raw.prepare(
+      `SELECT status, trigger_type FROM automation_versions WHERE id = ?`,
+    ).get(definition.current_draft_version_id) as { status: string; trigger_type: string };
+    expect(newVersion).toEqual({ status: 'draft', trigger_type: 'tag_change' });
+
+    // そのまま読める（編集面が開ける）状態になっている。
+    const draft = await getAutomationDraft(testDb.db, {
+      id: 'auto-1', lineAccountId: 'account-1',
+    });
+    expect(draft).toMatchObject({ eventType: 'tag_change' });
+  });
+
+  it('壊れた指し先の上書きはしない——別の下書きが先に付いたらそちらを返す（AUTOMATION-05）', async () => {
+    addActiveDefinition(testDb.raw);
+    // 先に別の下書きがぶら下がっている（同時押しで先に作られた側）。
+    const first = await createAutomationDraftFromDefinition(testDb.db, {
+      id: 'auto-1', lineAccountId: 'account-1',
+    });
+    // 公開版を写す新しい版を足さず、既存の下書きをそのまま返す。
+    const second = await createAutomationDraftFromDefinition(testDb.db, {
+      id: 'auto-1', lineAccountId: 'account-1',
+    });
+    expect(second).toEqual(first);
   });
 
   it('保管済み・下書きだけの定義と別アカウントは編集に出さない', async () => {
