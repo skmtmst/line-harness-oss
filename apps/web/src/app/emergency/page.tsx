@@ -23,6 +23,7 @@ import {
 } from '@/lib/api'
 import { formatOperationDate, type OperationSeverity } from '@/lib/operation-status'
 import { operationImpactText, type EmergencyStopTarget } from '@/lib/operation-impact'
+import { onlyWhenVisible } from '@/lib/visible-polling'
 import { operationControlSummary } from './control-summary'
 import {
   CAPABILITY_LABEL as RESTORE_DRIFT_CAPABILITY_LABEL,
@@ -33,7 +34,6 @@ import {
 import type { OperationRestoreDrift } from '@/lib/api'
 import releaseLog from '@/generated/release-log.json'
 import { useAccount } from '@/contexts/account-context'
-import { onlyWhenVisible } from '@/lib/visible-polling'
 import { collectRecentUpdates, RECENT_UPDATES_LIMIT, type UpdateRelease } from './update-history'
 
 const TABS = [
