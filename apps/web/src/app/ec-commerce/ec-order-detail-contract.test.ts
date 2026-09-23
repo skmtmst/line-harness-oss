@@ -19,7 +19,7 @@ const api = readFileSync(join(import.meta.dirname, '..', '..', 'lib', 'api.ts'),
 describe('IDEA-23 注文の状況パネルの配線', () => {
   it('新しいページやタブを増やさず、行からDrawerを開く', () => {
     expect(page).toContain("import OrderDetailDrawer from './order-detail-drawer'")
-    expect(page).toContain('注文の状況</button>')
+    expect(page).toContain("label: '注文の状況'")
     expect(page).toContain('setDetailSlot({ accountId, orderId: order.id })')
     // 詳細は既存の共有Drawerで開く（新しい画面骨組みは作らない）
     expect(drawer).toContain("import Drawer from '@/components/shared/drawer'")

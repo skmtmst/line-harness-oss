@@ -442,7 +442,8 @@ export default function ScenarioList({
             <col />
             <col className="w-28" />
             <col className="w-24" />
-            <col className="w-28" />
+            {/* 枠つき「編集」＋「…」がはみ出さない幅（#641） */}
+            <col className="w-36" />
           </colgroup>
           <thead>
             <TableHeadRow>
@@ -566,7 +567,10 @@ export default function ScenarioList({
                   購読中と読了済は1列にまとめる（NEXT-25）。
                   1行目が「いま流れている人」、2行目が「最後まで届いた人」。
                 */}
-                <td className="px-4 py-3 whitespace-nowrap">
+                <td
+                  className="px-4 py-3 whitespace-nowrap"
+                  title={`購読 ${s.subscriberCount === undefined ? '—' : s.subscriberCount.toLocaleString('ja-JP')}人 ／ 読了 ${(s.completedCount ?? 0).toLocaleString('ja-JP')}人`}
+                >
                   <div className="text-ink text-sm tabular-nums">
                     {s.subscriberCount === undefined ? '—' : s.subscriberCount.toLocaleString('ja-JP')}
                     <span className="text-ink-faint ml-0.5 text-xs">人</span>
@@ -581,7 +585,8 @@ export default function ScenarioList({
                   {s.subscriberCount === 0 && (
                     <Link
                       href={`/scenarios/detail?id=${s.id}`}
-                      className="text-info mt-0.5 block text-xs font-normal hover:underline"
+                      title="配信を始める方法"
+                      className="text-info mt-0.5 block truncate text-xs font-normal hover:underline"
                     >
                       配信を始める方法
                     </Link>
@@ -604,13 +609,11 @@ export default function ScenarioList({
                   右端の列を狭く保つ。
                 */}
                 <td className="px-4 py-3 text-right whitespace-nowrap">
-                  <div className="relative inline-flex items-center justify-end gap-1">
-                    <Link
-                      href={`/scenarios/detail?id=${s.id}`}
-                      className="text-accent px-2.5 py-1 text-xs font-medium hover:underline"
-                    >
+                  <div className="relative inline-flex items-center justify-end gap-1.5">
+                    {/* #641: 編集も「その他」と同じ枠つきボタンにそろえる（友だち追加時配信と同じ形） */}
+                    <Button href={`/scenarios/detail?id=${s.id}`} variant="secondary">
                       編集
-                    </Link>
+                    </Button>
                     {/*
                       **撮影の入口。**文言（「停止」「再開」）で探すと、言葉を
                       変えたときに撮影が黙って空振りする。Node ID を付ける。

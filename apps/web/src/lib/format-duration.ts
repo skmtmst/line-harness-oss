@@ -36,22 +36,15 @@ export function formatWaitRough(minutes: number): string {
 }
 
 /**
- * 平均・合計など「だいたいの長さ」を、人が暗算なしに読める単位で言う。
+ * 分を、人が眺めて読める一番粗い単位へ直す（Issue #666）。
  *
- * 監査6（#674）の規則。#666 が指摘した「平均 55975分」のように、
- * 分の生値を大きな指標カードへ置くと読めない。単位はここで切り替える:
- *
- * - 60分未満       → `○分`
- * - 60分以上       → `約○時間`
- * - 24時間以上     → `約○日`
- * - 30日（31日）超 → `約○ヶ月`
- *
- * `formatDurationMinutes`（「6日7時間50分」まで出す細かいほう）は
- * 残り時間を実際に数える面で使う。平均値・節約量のように
- * 大まかさが効く指標カードはこちらを使う（25オートメーションの
- * 「およそ ○時間」と同じ考え方）。
+ * 「平均 55975分」（約38.8日）のように分のまま出すと読めない。
+ * 60分以上は「約○時間」、24時間以上は「約○日」、30日以上は「約○ヶ月」。
+ * 25 オートメーションの「およそ 0時間」と同じく、単位を替えて概数で出す。
+ * 経過時間の「〜前」は `formatWaitRough`、残り時間の「6日7時間50分」は
+ * `formatDurationMinutes` と役割が違うので、ここは長さの表現だけを返す。
  */
-export function formatApproxDuration(minutes: number): string {
+export function formatMinutesRough(minutes: number): string {
   const total = Math.max(0, Math.round(minutes))
   if (total < 60) return `${total}分`
   if (total < 60 * 24) return `約${Math.round(total / 60)}時間`

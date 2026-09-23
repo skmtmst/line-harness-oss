@@ -2,7 +2,7 @@
 
 import SelectField from '@/components/shared/select-field'
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
-import { Trash2, TriangleAlert } from 'lucide-react'
+import { MoreHorizontal, Trash2, TriangleAlert } from 'lucide-react'
 import FolderPanel, { FOLDER_RAIL_STYLE } from '@/components/shared/folder-panel'
 import { toDraft } from '@/components/auto-replies/edit-dialog'
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
@@ -13,6 +13,8 @@ import EditDialog, { type AutoReplyDraft } from '@/components/auto-replies/edit-
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
 import Button from '@/components/shared/button'
+import IconButton from '@/components/shared/icon-button'
+import ActionMenu from '@/components/shared/action-menu'
 import KpiCollapse from '@/components/ui/kpi-collapse'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import {
@@ -191,6 +193,8 @@ export default function AutoRepliesPage() {
   const [toggleReason, setToggleReason] = useState('')
   const [toggling, setToggling] = useState(false)
   const [toggleError, setToggleError] = useState('')
+  // 行の「その他」メニューの開き先（#641: 停止・再開はここへ集約）
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null)
   const selectedAccountIdRef = useRef(selectedAccountId)
   selectedAccountIdRef.current = selectedAccountId
   const loadGenerationRef = useRef(0)
@@ -635,13 +639,19 @@ export default function AutoRepliesPage() {
         data-design="Bar"
         className="bg-canvas rounded-card border-hairline mb-3 flex flex-wrap items-center gap-2 border p-3"
       >
+        {/*
+          #636: 検索欄は min-w-45（180px）を下限にする。min-w-0 だと
+          390pxで右のセレクトに押されて w=57 まで潰れ、文字が読めない。
+          下限があると flex-wrap が効いて、狭い幅では検索欄が1行を
+          占め、並び順・表示は次の行へ折り返す。
+        */}
         <input
           type="search"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="自動応答名で検索"
           aria-label="自動応答名で検索"
-          className="border-hairline rounded-control focus:ring-accent min-w-0 flex-1 border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
+          className="border-hairline rounded-control focus:ring-accent min-w-45 flex-1 border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
         />
         <span className="text-ink-faint text-xs whitespace-nowrap">並び順</span>
         <SelectField value={sortKey} onChange={(e) => setSortKey(e.target.value as SortKey)} aria-label="並び順" options={[{ value: "hits", label: "ヒット数が多い順" }, { value: "priority", label: "評価順" }, { value: "name", label: "名前順" }, { value: "created", label: "作った順" }]} className="border-hairline rounded-control focus:ring-accent border px-2 py-2 text-sm focus:ring-2 focus:outline-none" />
@@ -717,15 +727,17 @@ export default function AutoRepliesPage() {
         </FolderPanel>
 
         <div data-design="Table" className="bg-canvas rounded-card border border-hairline overflow-hidden">
-          <table className="min-w-[100%] w-full table-fixed">
+          {/* #641: 枠つきボタンで広くなった操作列ぶん、表だけが横に流れるようにする */}
+          <div className="overflow-x-auto">
+          <table className="min-w-[880px] w-full table-fixed">
             <thead>
               <tr className="bg-canvas-sunken border-b border-hairline">
                 <th className="w-2/6 px-4 py-3 text-left text-xs font-semibold text-ink-faint">ルール名</th>
                 <th className="w-20 px-4 py-3 text-left text-xs font-semibold text-ink-faint">状態</th>
-                <th className="w-1/6 px-4 py-3 text-left text-xs font-semibold text-ink-faint">どんなときに動くか</th>
+                <th title="動く条件（キーワード・適用アカウント）" className="w-1/6 px-4 py-3 text-left text-xs font-semibold text-ink-faint">どんなときに動くか</th>
                 <th title="返信と実行するアクション" className="w-1/6 px-4 py-3 text-left text-xs font-semibold text-ink-faint">何を返すか</th>
-                <th className="w-24 px-4 py-3 text-left text-xs font-semibold text-ink-faint">今月の応答</th>
-                <th className="w-28 px-4 py-3 text-right text-xs font-semibold text-ink-faint">操作</th>
+                <th title="今月動いた回数" className="w-24 px-4 py-3 text-left text-xs font-semibold text-ink-faint">今月の応答</th>
+                <th title="編集・停止または再開・削除" className="w-44 px-4 py-3 text-right text-xs font-semibold text-ink-faint">操作</th>
                 <th className="hidden px-4 py-3">テンプレート</th>
                 <th className="hidden px-4 py-3">応答条件</th>
                 <th className="hidden px-4 py-3">適用アカウント</th>
@@ -815,61 +827,87 @@ export default function AutoRepliesPage() {
                         )}
                       </div>
                     </td>
-                    <td className="px-3 py-3 whitespace-nowrap">
+                    <td
+                      className="px-3 py-3 whitespace-nowrap"
+                      title={`今月 ${r.hits?.period ?? '—'}回 ／ 累計 ${r.hits?.total ?? '—'}回`}
+                    >
                       {/* **数えられていないものを 0 と書かない。** 0 は「当たらなかった」の意味。 */}
                       <span className="text-ink text-sm tabular-nums">{r.hits?.period ?? '—'}</span>
                       <span className="text-ink-faint text-xs">回</span>
                       <span className="text-ink-faint mt-0.5 block text-[10px]">累計 {r.hits?.total ?? '—'}回</span>
                     </td>
-                    <td className="px-3 py-3 text-right whitespace-nowrap">
-                      <button
-                        onClick={() => setEditing(toDraft(r))}
-                        className="px-2.5 py-1 text-xs font-medium text-blue-600 hover:bg-info-bg rounded-md"
-                      >
-                        編集
-                      </button>
-                      {/* N-086: 行から止められる。下書き（未公開）は公開の前段なので、
+                    {/* 狭い列でボタンが切れても、重ねるだけで操作の全部が
+                        読めるように title を付ける（第5パス D-3）。 */}
+                    <td
+                      className="px-3 py-3 text-right whitespace-nowrap"
+                      title={['編集', r.isActive ? '停止' : r.lifecycleStatus !== 'draft' ? '再開' : null, '削除'].filter(Boolean).join('・')}
+                    >
+                      {/* #641: 「編集」＋「削除」＋「その他（…）」の形にそろえる。
+                          N-086: 行から止められる。下書き（未公開）は公開の前段なので、
                           動かす口は出さず、公開の流れに任せる。 */}
-                      {r.isActive ? (
-                        <button
-                          aria-label={`自動応答「${r.name || (r.respondToAll ? 'すべてのメッセージ' : r.keyword)}」を停止`}
-                          onClick={() => {
-                            setToggleError('')
-                            setToggleReason('')
-                            setPendingToggle({ item: r, kind: 'stop', accountId: selectedAccountId })
-                          }}
-                          className="ml-1 px-2.5 py-1 text-xs font-medium text-ink-secondary hover:bg-canvas-sunken rounded-md"
+                      <div className="relative inline-flex items-center justify-end gap-1.5">
+                        <Button
+                          variant="secondary"
+                          onClick={() => setEditing(toDraft(r))}
                         >
-                          停止
-                        </button>
-                      ) : r.lifecycleStatus !== 'draft' ? (
-                        <button
-                          aria-label={`自動応答「${r.name || (r.respondToAll ? 'すべてのメッセージ' : r.keyword)}」を再開`}
+                          編集
+                        </Button>
+                        <IconButton
+                          aria-label={`自動応答「${r.name || (r.respondToAll ? 'すべてのメッセージ' : r.keyword)}」を削除`}
+                          title="削除"
                           onClick={() => {
-                            setToggleError('')
-                            setPendingToggle({ item: r, kind: 'resume', accountId: selectedAccountId })
+                            setDeleteError('')
+                            setPendingDelete({ item: r, accountId: selectedAccountId })
                           }}
-                          className="ml-1 px-2.5 py-1 text-xs font-medium text-ink-secondary hover:bg-canvas-sunken rounded-md"
                         >
-                          再開
-                        </button>
-                      ) : null}
-                      <button
-                        aria-label={`自動応答「${r.name || (r.respondToAll ? 'すべてのメッセージ' : r.keyword)}」を削除`}
-                        onClick={() => {
-                          setDeleteError('')
-                          setPendingDelete({ item: r, accountId: selectedAccountId })
-                        }}
-                        className="ml-1 px-2.5 py-1 text-xs font-medium text-red-500 hover:bg-danger-bg rounded-md"
-                      >
-                        削除
-                      </button>
+                          <Trash2 aria-hidden />
+                        </IconButton>
+                        {(r.isActive || r.lifecycleStatus !== 'draft') && (
+                          <>
+                            <IconButton
+                              aria-label={`自動応答「${r.name || (r.respondToAll ? 'すべてのメッセージ' : r.keyword)}」のその他操作`}
+                              aria-expanded={openMenuId === r.id}
+                              onClick={() =>
+                                setOpenMenuId((current) => (current === r.id ? null : r.id))
+                              }
+                            >
+                              <MoreHorizontal aria-hidden />
+                            </IconButton>
+                            <ActionMenu
+                              open={openMenuId === r.id}
+                              ariaLabel={`自動応答「${r.name || (r.respondToAll ? 'すべてのメッセージ' : r.keyword)}」の操作`}
+                              onClose={() => setOpenMenuId(null)}
+                              items={[
+                                r.isActive
+                                  ? {
+                                      id: 'stop',
+                                      label: '停止する',
+                                      onSelect: () => {
+                                        setToggleError('')
+                                        setToggleReason('')
+                                        setPendingToggle({ item: r, kind: 'stop', accountId: selectedAccountId })
+                                      },
+                                    }
+                                  : {
+                                      id: 'resume',
+                                      label: '再開する',
+                                      onSelect: () => {
+                                        setToggleError('')
+                                        setPendingToggle({ item: r, kind: 'resume', accountId: selectedAccountId })
+                                      },
+                                    },
+                              ]}
+                            />
+                          </>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))
               )}
             </tbody>
           </table>
+          </div>
         </div>
       </div>
 

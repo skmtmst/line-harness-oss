@@ -1,13 +1,15 @@
 'use client'
 
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
-import Link from 'next/link'
+import { MoreHorizontal } from 'lucide-react'
 import { ecEventLabel, type ApiResponse } from '@line-crm/shared'
 import { useMergedTab } from '@/components/layout/merged-tabs'
 import Button from '@/components/shared/button'
+import IconButton from '@/components/shared/icon-button'
+import ActionMenu from '@/components/shared/action-menu'
 import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
-import PageHeader from '@/components/shared/page-header'
+import PageHeaderH2 from '@/components/layout/page-header-h2'
 import Pagination from '@/components/shared/pagination'
 import Select from '@/components/shared/select'
 import SummaryCard from '@/components/shared/summary-card'
@@ -129,6 +131,8 @@ function EventsPanel({ accountId }: { accountId: string | null }) {
    * 描画では不一致＝閉じる、に倒れるので別アカウントの注文が残らない。
    */
   const [detailSlot, setDetailSlot] = useState<{ accountId: string | null; orderId: string | null }>({ accountId, orderId: null })
+  // 行の「その他」メニューの開き先（#641）
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null)
   const retryingId = retryingSlot.accountId === accountId ? retryingSlot.id : null
   const detailOrderId = detailSlot.accountId === accountId ? detailSlot.orderId : null
   /* 絞りとページを同時に変えたとき、古い読み込みの返事で上書きしない。 */
@@ -271,6 +275,18 @@ function EventsPanel({ accountId }: { accountId: string | null }) {
 
   const pageCount = Math.max(1, Math.ceil(actionTotal / ACTION_PAGE_SIZE))
 
+  /*
+   * 絞り込みで0件のときの「元に戻す」動線（#635）。検索語と状態タブを
+   * まとめて初期へ戻す。sort は「絞り込み」ではなく並びなので触らない。
+   */
+  const recordsNarrowing = searchQuery !== '' || status !== 'all'
+  const clearRecordFilters = () => {
+    setQuery('')
+    setSearchQuery('')
+    setStatus('all')
+    setPage(1)
+  }
+
   const retry = async (action: EcActionExecution) => {
     if (!accountId || !action.retryAvailable) return
     const retryAccountId = accountId
@@ -371,10 +387,17 @@ function EventsPanel({ accountId }: { accountId: string | null }) {
             ? '取り込みの記録を読み込めませんでした'
             : listState === 'empty' && !accountId
               ? 'LINEアカウントを選択してください'
-              : listState === 'empty' && searchQuery
-                ? '検索条件に合う取り込みの記録はありません'
+              : listState === 'empty' && recordsNarrowing
+                ? '条件に合う取り込みの記録はありません'
                 : undefined}
-          description={listState === 'empty' && !accountId ? '左のメニュー上部で、確認するLINEアカウントを選びます。' : undefined}
+          description={listState === 'empty' && !accountId
+            ? '左のメニュー上部で、確認するLINEアカウントを選びます。'
+            : listState === 'empty' && recordsNarrowing
+              ? '検索語や表示条件を変えてください。'
+              : undefined}
+          action={listState === 'empty' && accountId && recordsNarrowing
+            ? <Button type="button" variant="secondary" onClick={clearRecordFilters}>検索と絞り込みを解除</Button>
+            : undefined}
           onRetry={listState === 'error' ? () => void loadRecords(false) : undefined}
         />
       ) : <DataTable>
@@ -419,15 +442,41 @@ function EventsPanel({ accountId }: { accountId: string | null }) {
                 </span>
               </Td>
               <ActionCell>
-                {/* IDEA-23: 注文がある行は「この注文の状況」から出来事→通知→成果まで辿れる。 */}
-                {order
-                  ? <button type="button" className={styles.textLink} onClick={() => setDetailSlot({ accountId, orderId: order.id })}>注文の状況</button>
-                  : null}
+                {/* #641: 主操作は枠つきボタン、残りは「その他（…）」へ集約。 */}
                 {/* 友だち詳細は静的書き出しのため /friends/detail?id= 形。/friends/<id> は存在しない（IDEA-21 で修正）。 */}
                 {(action.friendId ?? order?.friendId)
-                  ? <Link className={styles.textLink} href={`/friends/detail?id=${encodeURIComponent(action.friendId ?? order?.friendId ?? '')}`}>中身を見る</Link>
-                  : <Link className={styles.textLink} href="/ec-commerce/identity-candidates">つき合わせる</Link>}
-                {action.retryAvailable ? <Button type="button" disabled={retryingId === action.id} onClick={() => void retry(action)}>{retryingId === action.id ? '戻しています…' : 'もう一度やる'}</Button> : null}
+                  ? <Button href={`/friends/detail?id=${encodeURIComponent(action.friendId ?? order?.friendId ?? '')}`} variant="secondary">中身を見る</Button>
+                  : <Button href="/ec-commerce/identity-candidates" variant="secondary">つき合わせる</Button>}
+                {order || action.retryAvailable ? (
+                  <>
+                    <IconButton
+                      aria-label="この行のその他操作"
+                      aria-expanded={openMenuId === action.id}
+                      onClick={() => setOpenMenuId((current) => (current === action.id ? null : action.id))}
+                    >
+                      <MoreHorizontal aria-hidden />
+                    </IconButton>
+                    <ActionMenu
+                      open={openMenuId === action.id}
+                      ariaLabel="この行の操作"
+                      onClose={() => setOpenMenuId(null)}
+                      items={[
+                        /* IDEA-23: 注文がある行は「この注文の状況」から出来事→通知→成果まで辿れる。 */
+                        ...(order
+                          ? [{ id: 'order', label: '注文の状況', onSelect: () => setDetailSlot({ accountId, orderId: order.id }) }]
+                          : []),
+                        ...(action.retryAvailable
+                          ? [{
+                              id: 'retry',
+                              label: retryingId === action.id ? '戻しています…' : 'もう一度やる',
+                              disabled: retryingId === action.id,
+                              onSelect: () => void retry(action),
+                            }]
+                          : []),
+                      ]}
+                    />
+                  </>
+                ) : null}
               </ActionCell>
             </Tr>
           })}
@@ -458,7 +507,7 @@ function EcCommercePageInner() {
   return (
     <div className={styles.root} data-design="Head">
       {/* マニュアルは共通トップバーに置く。本文に「ECの注文・定期便を取り込み、LINEの配信や成果へつなげます。」という重複説明は置かない。 */}
-      <PageHeader
+      <PageHeaderH2
         breadcrumb={[{ label: '専用機能' }, { label: 'EC連携' }]}
         title="EC連携"
         description=""

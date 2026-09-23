@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
-import { X } from 'lucide-react'
+import { Trash2, X } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { fetchApi } from '@/lib/api'
@@ -10,12 +10,14 @@ import { useAccount } from '@/contexts/account-context'
 import { useCanManage } from '@/components/automations/use-can-manage'
 import { displayFormName, sortFormsByLatestAnswer } from './form-list'
 import Button from '@/components/shared/button'
+import IconButton from '@/components/shared/icon-button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
 import Select from '@/components/shared/select'
 import type { FormLayout } from '@line-crm/shared'
 import { hasStoredDestination, summarizeFormDestinations } from './form-destination-summary'
 import FolderPanel, { FOLDER_RAIL_STYLE } from '@/components/shared/folder-panel'
+import CopyTextButton from '@/components/ui/copy-text-button'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import './form-submissions.css'
 
@@ -608,7 +610,9 @@ export default function FormSubmissionsPage() {
             />
           ) : (
           <div className="border-hairline rounded-card overflow-hidden border bg-white">
-            <table className="w-full table-fixed text-sm">
+            {/* #641: 操作列が広くなった分は表だけが横に流れる */}
+            <div className="overflow-x-auto">
+            <table className="w-full min-w-[880px] table-fixed text-sm">
               <thead>
                 <TableHeadRow>
                   <Th className="w-1/3">フォーム</Th>
@@ -616,7 +620,7 @@ export default function FormSubmissionsPage() {
                   <Th>回答の保存先</Th>
                   <Th className="w-24" align="right">回答数</Th>
                   <Th className="w-24">更新</Th>
-                  <Th className="w-28" align="right">操作</Th>
+                  <Th className="w-48" align="right">操作</Th>
                 </TableHeadRow>
               </thead>
               <tbody className="divide-hairline divide-y">
@@ -634,14 +638,28 @@ export default function FormSubmissionsPage() {
               return (
                 <tr key={form.id} className="text-ink-secondary">
                   <td className="px-3 py-2.5">
-                    {reviewMode ? (
-                      <span className="block truncate font-semibold text-ink" title={normalizedName}>
-                        {normalizedName}
-                        {form.accountScopeReviewRequired && <span className="border-accent bg-accent-soft rounded-pill ml-2 border px-2 py-0.5 text-xs text-ink">管理者確認</span>}
-                      </span>
-                    ) : (
-                      <Link href={`/form-submissions/edit?id=${encodeURIComponent(form.id)}&tab=basic`} className="block truncate font-semibold text-ink hover:underline" title={normalizedName}>{normalizedName}</Link>
-                    )}
+                    {/*
+                     * フォーム名は識別子として別の文面へ写すことがある。
+                     * 省略表示は title で読めるが取り出せないため、差し込みキー
+                     * と同じく全文コピーの口を添える（監査6 #665）。
+                     */}
+                    <div className="flex items-center gap-1">
+                      {reviewMode ? (
+                        <span className="block min-w-0 flex-1 truncate font-semibold text-ink" title={normalizedName}>
+                          {normalizedName}
+                          {form.accountScopeReviewRequired && <span className="border-accent bg-accent-soft rounded-pill ml-2 border px-2 py-0.5 text-xs text-ink">管理者確認</span>}
+                        </span>
+                      ) : (
+                        <>
+                          <Link href={`/form-submissions/edit?id=${encodeURIComponent(form.id)}&tab=basic`} className="block min-w-0 flex-1 truncate font-semibold text-ink hover:underline" title={normalizedName}>{normalizedName}</Link>
+                          {/* 管理者確認は読み取り専用なので、通常の一覧にだけコピー口を出す。 */}
+                          <CopyTextButton
+                            value={normalizedName}
+                            aria-label={`${normalizedName}のフォーム名をコピー`}
+                          />
+                        </>
+                      )}
+                    </div>
                     <span className="block truncate text-xs text-ink-faint">{form.description || `${form.fields.length}ブロック`}</span>
                   </td>
                   <td className="px-3 py-2.5 text-xs">{form.isActive ? '公開中' : '下書き'}</td>
@@ -660,11 +678,14 @@ export default function FormSubmissionsPage() {
                     {reviewMode ? (
                       <span className="text-ink-faint">—</span>
                     ) : (
-                      <>
-                        <Link href={`/form-submissions/responses?id=${encodeURIComponent(form.id)}`} aria-label={`${normalizedName}の集まった回答を見る`} className="text-accent hover:underline whitespace-nowrap">回答を見る</Link>
-                        <button type="button" onClick={() => openRename(form)} className="ml-2 text-accent hover:underline">編集</button>
-                        <button type="button" onClick={() => void openDelete(form)} className="ml-2 text-danger hover:underline" aria-label={`${normalizedName}を削除`} title="回答フォームを削除">削除</button>
-                      </>
+                      /* #641: 行操作は枠つきボタン＋削除アイコンにそろえる。削除は撮影口のため見せたまま */
+                      <span className="inline-flex items-center justify-end gap-1.5">
+                        <Button href={`/form-submissions/responses?id=${encodeURIComponent(form.id)}`} variant="secondary" aria-label={`${normalizedName}の集まった回答を見る`}>回答を見る</Button>
+                        <Button variant="secondary" onClick={() => openRename(form)}>編集</Button>
+                        <IconButton aria-label={`${normalizedName}を削除`} title="回答フォームを削除" onClick={() => void openDelete(form)}>
+                          <Trash2 aria-hidden />
+                        </IconButton>
+                      </span>
                     )}
                   </td>
                 </tr>
@@ -672,6 +693,7 @@ export default function FormSubmissionsPage() {
             })}
               </tbody>
             </table>
+            </div>
           </div>
           )
         )}
