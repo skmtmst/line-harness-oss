@@ -674,6 +674,9 @@
   "components/shared/breadcrumb.tsx": {
     "unresolved-classname": 4
   },
+  "components/shared/checkbox.tsx": {
+    "unresolved-classname": 9
+  },
   "components/shared/chip.tsx": {
     "unresolved-classname": 1
   },
