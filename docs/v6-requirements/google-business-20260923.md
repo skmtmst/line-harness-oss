@@ -3,6 +3,8 @@
 作成：2026-09-23 / Masato依頼 / Codex
 状態：**デザイン確認待ち。機能実装・配備は未着手。**
 
+保存先：[ドラフトPR #564](https://github.com/skmtmst/line-harness-oss/pull/564)。デザイン承認待ちのため未統合。
+
 ## 対象と正本
 
 - 対象：LINE管理システムの飲食店向け検証領域。既存URLは `/restaurant-test/google`。
