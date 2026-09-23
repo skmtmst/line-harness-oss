@@ -9,7 +9,7 @@ import Drawer from '@/components/shared/drawer'
 import FilterChip from '@/components/shared/filter-chip'
 import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
-import PageHeader from '@/components/shared/page-header'
+import PageHeaderH2 from '@/components/layout/page-header-h2'
 import Pagination from '@/components/shared/pagination'
 import { RowActions } from '@/components/shared/row-actions'
 import Select from '@/components/shared/select'
@@ -304,7 +304,7 @@ export function NenOverview({
   return (
     <main data-design-node={tab === 'columns' ? 'u66A0' : 'z4q1K'} className="mx-auto flex w-full flex-col gap-4 px-4 pb-8 sm:px-6" style={{ maxWidth: 1600 }}>
       <div data-design="Crumb" data-design-node="nen-header">
-        <PageHeader
+        <PageHeaderH2
           breadcrumb={[{ label: '専用機能' }, { label: 'NEN配信' }]}
           title="NEN配信"
           description=""

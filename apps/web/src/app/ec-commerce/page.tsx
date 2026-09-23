@@ -7,7 +7,7 @@ import { useMergedTab } from '@/components/layout/merged-tabs'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
-import PageHeader from '@/components/shared/page-header'
+import PageHeaderH2 from '@/components/layout/page-header-h2'
 import Pagination from '@/components/shared/pagination'
 import Select from '@/components/shared/select'
 import SummaryCard from '@/components/shared/summary-card'
@@ -477,7 +477,7 @@ function EcCommercePageInner() {
   return (
     <div className={styles.root} data-design="Head">
       {/* マニュアルは共通トップバーに置く。本文に「ECの注文・定期便を取り込み、LINEの配信や成果へつなげます。」という重複説明は置かない。 */}
-      <PageHeader
+      <PageHeaderH2
         breadcrumb={[{ label: '専用機能' }, { label: 'EC連携' }]}
         title="EC連携"
         description=""
