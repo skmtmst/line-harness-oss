@@ -1000,6 +1000,7 @@ function MediaLibraryInner() {
               <button
                 onClick={() => setPreview(item)}
                 title="プレビューを見る"
+                aria-label={`${item.filename}のプレビューを見る`}
                 className={`bg-canvas-sunken flex items-center justify-center overflow-hidden ${
                   view === 'grid' ? 'h-28' : 'h-14 w-20 shrink-0'
                 }`}
