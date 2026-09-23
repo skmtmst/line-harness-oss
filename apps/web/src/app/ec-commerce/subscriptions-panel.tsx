@@ -2,6 +2,10 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
+import { MoreHorizontal } from 'lucide-react'
+import Button from '@/components/shared/button'
+import IconButton from '@/components/shared/icon-button'
+import ActionMenu from '@/components/shared/action-menu'
 import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
 import SummaryCard from '@/components/shared/summary-card'
@@ -35,6 +39,8 @@ export default function SubscriptionsPanel({ accountId }: { accountId: string | 
   const [data, setData] = useState<EcSubscriptionList | null>(null)
   const [state, setState] = useState<'loading' | 'ready' | 'empty' | 'error' | 'forbidden'>('loading')
   const [filter, setFilter] = useState<Filter>('all')
+  // 行の「その他」メニューの開き先（#641）
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
   /** 絞り込みに合う総数。サーバが数える(#731)。 */
@@ -131,11 +137,30 @@ export default function SubscriptionsPanel({ accountId }: { accountId: string | 
                 <Td align="right">{item.amount === null ? '—' : `¥${item.amount.toLocaleString('ja-JP')}`}</Td>
                 <Td><span className={styles.cellStack}><span className={`${styles.status} ${STATUS_TONE[item.status]}`}>{item.statusLabel}</span>{item.riskReason || item.cancellationReason ? <span className={styles.cellSub}>{item.riskReason ?? `理由「${item.cancellationReason}」`}</span> : null}</span></Td>
                 <ActionCell>
+                  {/* #641: 主操作は枠つきボタン、残りは「その他（…）」へ集約。 */}
                   {/* 友だち詳細は静的書き出しのため /friends/detail?id= 形（IDEA-21 で修正）。 */}
-                  <Link className={styles.textLink} href={`/friends/detail?id=${encodeURIComponent(item.friendId)}`}>中身を見る</Link>
+                  <Button href={`/friends/detail?id=${encodeURIComponent(item.friendId)}`} variant="secondary">中身を見る</Button>
                   {/* 定期便の変更先。ECが契約の変更ページを渡しているときだけ出す。 */}
                   {item.manageUrl ? (
-                    <a className="whitespace-nowrap text-label font-bold text-accent-deep hover:underline" href={item.manageUrl} target="_blank" rel="noreferrer">ECで変更</a>
+                    <>
+                      <IconButton
+                        aria-label={`${item.ownerName ?? 'お客様'}のその他操作`}
+                        aria-expanded={openMenuId === item.id}
+                        onClick={() => setOpenMenuId((current) => (current === item.id ? null : item.id))}
+                      >
+                        <MoreHorizontal aria-hidden />
+                      </IconButton>
+                      <ActionMenu
+                        open={openMenuId === item.id}
+                        ariaLabel={`${item.ownerName ?? 'お客様'}の操作`}
+                        onClose={() => setOpenMenuId(null)}
+                        items={[{
+                          id: 'manage',
+                          label: 'ECで変更',
+                          onSelect: () => window.open(item.manageUrl!, '_blank', 'noopener,noreferrer'),
+                        }]}
+                      />
+                    </>
                   ) : (
                     <span className="text-micro text-ink-faint" title="ECがこの契約の変更ページを渡していないため、ここからは開けません。ECの管理画面で確認してください。">変更先なし</span>
                   )}

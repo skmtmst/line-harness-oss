@@ -239,14 +239,13 @@ function CommonActionVersionsInner() {
                     <Td className="text-ink-secondary" title={binding.waitingCount === null ? '未取得' : undefined}>{binding.waitingCount ?? '—'}</Td>
                     <ActionCell>
                       {canManage && binding.hasNewerVersion && published ? (
-                        <button
-                          type="button"
+                        <Button
+                          variant="secondary"
                           disabled={Boolean(working)}
-                          className="text-action font-semibold hover:underline disabled:opacity-40"
                           onClick={() => setPendingBindingId(binding.id)}
                         >
                           v{published.versionNumber}への変更内容を確認
-                        </button>
+                        </Button>
                       ) : <span className="text-ink-faint">{binding.hasNewerVersion ? '編集権限が必要' : '最新版を使用中'}</span>}
                     </ActionCell>
                   </Tr>
@@ -291,10 +290,9 @@ function CommonActionVersionsInner() {
                   <Td className="text-ink-secondary">{version.publishedAt ? new Date(version.publishedAt).toLocaleString('ja-JP') : '—'}</Td>
                   <ActionCell>
                     {!canManage ? <span className="text-ink-faint">閲覧のみ</span> : version.status === 'draft' ? (
-                      <button
-                        type="button"
+                      <Button
+                        variant="secondary"
                         disabled={Boolean(working)}
-                        className="text-action font-semibold hover:underline disabled:opacity-40"
                         onClick={() => void run(`publish:${version.id}`, () => api.commonActions.publish(
                           detail.id,
                           selectedAccountId!,
@@ -302,12 +300,11 @@ function CommonActionVersionsInner() {
                         ))}
                       >
                         この版を公開する
-                      </button>
+                      </Button>
                     ) : !draft ? (
-                      <button
-                        type="button"
+                      <Button
+                        variant="secondary"
                         disabled={Boolean(working)}
-                        className="text-action font-semibold hover:underline disabled:opacity-40"
                         onClick={() => void run(`copy:${version.id}`, () => api.commonActions.createDraft(
                           detail.id,
                           selectedAccountId!,
@@ -315,7 +312,7 @@ function CommonActionVersionsInner() {
                         ))}
                       >
                         この版をもとに新版を作る
-                      </button>
+                      </Button>
                     ) : <span className="text-ink-faint">下書き編集中</span>}
                   </ActionCell>
                 </Tr>
