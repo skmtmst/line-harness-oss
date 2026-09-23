@@ -59,9 +59,11 @@ describe('受信箱V4で既存機能を失わない', () => {
     expect(TEMPLATE_PICKER).toContain('z-[100]')
   })
 
-  it('カード影は右1px・下1pxに統一する', () => {
-    expect(PAGE).toContain('shadow-[1px_1px_2px_rgba(29,29,31,0.13)]')
-    expect(TEMPLATE_PICKER).toContain('shadow-[1px_1px_2px_rgba(29,29,31,0.13)]')
+  it('カード影は共通トークン shadow-card に統一する（#673）', () => {
+    expect(PAGE).toContain('shadow-card')
+    expect(TEMPLATE_PICKER).toContain('shadow-card')
+    expect(PAGE).not.toContain('shadow-[1px_1px_2px')
+    expect(TEMPLATE_PICKER).not.toContain('shadow-[1px_1px_2px')
   })
 })
 

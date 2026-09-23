@@ -465,7 +465,7 @@ export default function TemplatePicker({
                   {category === 'frequent' && <span className="rounded-lg border border-[#F6D68A] bg-[#FFF8E7] px-2.5 py-1.5 text-xs font-semibold text-[#B45309]">☆ よく使う</span>}
                 </div>
                 <p className="mt-5 text-xs font-semibold text-[#667085]">送信内容のプレビュー</p>
-                <div className="mt-3 min-h-[250px] rounded-[12px] bg-[#7292BD] p-5 shadow-[1px_1px_2px_rgba(29,29,31,0.13)]">
+                <div className="mt-3 min-h-[250px] rounded-[12px] bg-[#7292BD] p-5 shadow-card">
                   <div className="flex justify-center"><span className="rounded-full bg-canvas/85 px-3 py-1 text-[11px] text-[#667085]">今日</span></div>
                   <div className="mt-4 max-w-[78%] rounded-[12px] rounded-tl-[4px] bg-canvas px-4 py-3 text-sm leading-6 whitespace-pre-wrap text-[#344054] shadow-sm">{previewContent ?? selected.messageContent}</div>
                 </div>
