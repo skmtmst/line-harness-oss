@@ -1,22 +1,23 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { adminSessionHandoffPath, adminSessionHeaders, captureTwoFactorChallenge, clearTwoFactorChallenge, takeTwoFactorNextPath, storeAdminSession } from '@/lib/admin-session'
 import { useBrand } from '@/lib/use-brand'
+import OtpInput from '@/components/shared/otp-input'
 
 export default function TwoFactorLoginPage() {
-  const [digits, setDigits] = useState(['', '', '', '', '', ''])
+  const [code, setCode] = useState('')
+  /** 失敗のたびに入力欄を作り直し、1マス目へ戻す。 */
+  const [attempt, setAttempt] = useState(0)
   const [challenge, setChallenge] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const refs = useRef<Array<HTMLInputElement | null>>([])
   const brand = useBrand()
 
   useEffect(() => setChallenge(captureTwoFactorChallenge()), [])
 
   const submit = async () => {
-    const code = digits.join('')
     if (!challenge || code.length !== 6) return setError('6桁の認証コードを入力してください')
     setLoading(true)
     setError('')
@@ -56,15 +57,9 @@ export default function TwoFactorLoginPage() {
       window.location.assign(adminSessionHandoffPath(nextPath, body.data?.sessionToken, body.csrfToken))
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : '認証できませんでした')
-      setDigits(['', '', '', '', '', ''])
-      refs.current[0]?.focus()
+      setCode('')
+      setAttempt((current) => current + 1)
     } finally { setLoading(false) }
-  }
-
-  const changeDigit = (index: number, value: string) => {
-    const numeric = value.replace(/\D/g, '').slice(-1)
-    setDigits((current) => current.map((digit, i) => i === index ? numeric : digit))
-    if (numeric && index < 5) refs.current[index + 1]?.focus()
   }
 
   return <main className="flex min-h-[100svh] items-center justify-center bg-canvas-sunken px-4 py-8">
@@ -82,16 +77,23 @@ export default function TwoFactorLoginPage() {
         <h1 className="mt-3 text-xl font-bold text-ink">二段階認証</h1>
         <p className="mt-2 text-xs text-ink-secondary">認証アプリに表示されている6桁コードを入力してください</p>
       </div>
-      {error && <p className="mt-5 rounded-control bg-danger-bg px-3 py-2 text-sm text-danger">{error}</p>}
-      <label className="mt-6 block text-xs font-semibold text-ink">認証コード</label>
-      <div className="mt-2 grid grid-cols-6 gap-2" onPaste={(event) => {
-        const pasted = event.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6)
-        if (pasted.length === 6) { event.preventDefault(); setDigits(pasted.split('')); refs.current[5]?.focus() }
-      }}>
-        {digits.map((digit, index) => <input key={index} ref={(node) => { refs.current[index] = node }} value={digit} inputMode="numeric" autoComplete="one-time-code" aria-label={`認証コード${index + 1}桁目`} onChange={(event) => changeDigit(index, event.target.value)} onKeyDown={(event) => { if (event.key === 'Backspace' && !digit && index > 0) refs.current[index - 1]?.focus() }} className="h-12 min-w-0 rounded-control border border-hairline text-center text-xl font-bold outline-none focus:border-accent" />)}
+      {error && <p id="two-factor-error" role="alert" className="mt-5 rounded-control bg-danger-bg px-3 py-2 text-sm text-danger">{error}</p>}
+      <p id="two-factor-code-label" className="mt-6 block text-xs font-semibold text-ink">認証コード</p>
+      {/* ★V7 共通 認証コード入力（xHzFK）。貼り付け・自動入力も6マスへ振り分ける。 */}
+      <div className="mt-2 flex justify-center">
+        <OtpInput
+          key={attempt}
+          value={code}
+          onChange={(next) => { setCode(next); if (error) setError('') }}
+          labelledBy="two-factor-code-label"
+          describedBy={error ? 'two-factor-error' : undefined}
+          invalid={Boolean(error)}
+          disabled={loading}
+          autoFocus
+        />
       </div>
       <p className="mt-2 text-xs text-ink-faint">◷ コードは約30秒ごとに更新されます</p>
-      <button onClick={() => void submit()} disabled={loading || digits.some((digit) => !digit)} className="mt-6 h-12 w-full cursor-pointer rounded-control bg-accent-deep font-bold text-on-accent hover:brightness-92 disabled:cursor-not-allowed disabled:opacity-50">{loading ? '確認中…' : '確認してログイン'}</button>
+      <button onClick={() => void submit()} disabled={loading || code.length !== 6} className="mt-6 h-12 w-full cursor-pointer rounded-control bg-accent-deep font-bold text-on-accent hover:brightness-92 disabled:cursor-not-allowed disabled:opacity-50">{loading ? '確認中…' : '確認してログイン'}</button>
       <p className="mt-5 text-center text-xs text-ink-secondary">コードを入力できない場合</p>
       <Link href="/login" onClick={clearTwoFactorChallenge} className="mt-2 block text-center text-xs font-medium text-accent hover:underline">別のLINEアカウントでログイン</Link>
     </section>
