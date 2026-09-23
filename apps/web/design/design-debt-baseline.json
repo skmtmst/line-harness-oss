@@ -31,7 +31,7 @@
     "unresolved-classname": 30
   },
   "app/automations/new/page.tsx": {
-    "unresolved-classname": 56
+    "unresolved-classname": 55
   },
   "app/automations/page.tsx": {
     "arbitrary-value": 1
@@ -532,7 +532,7 @@
     "arbitrary-value": 94,
     "direct-secondary-button": 6,
     "unresolved-classname": 6,
-    "direct-primary-button": 3,
+    "direct-primary-button": 2,
     "direct-th": 10
   },
   "components/friend-attributes-v3/friend-attributes-v3-static.tsx": {
@@ -653,7 +653,7 @@
     "direct-secondary-button": 2
   },
   "components/scenarios/scenario-dialogs.tsx": {
-    "direct-secondary-button": 6,
+    "direct-secondary-button": 5,
     "direct-primary-button": 3,
     "arbitrary-value": 1
   },
@@ -673,6 +673,9 @@
   },
   "components/shared/breadcrumb.tsx": {
     "unresolved-classname": 4
+  },
+  "components/shared/checkbox.tsx": {
+    "unresolved-classname": 9
   },
   "components/shared/chip.tsx": {
     "unresolved-classname": 1
@@ -749,7 +752,7 @@
     "direct-primary-button": 2
   },
   "components/ui/kpi-collapse.tsx": {
-    "unresolved-classname": 3
+    "unresolved-classname": 2
   },
   "components/ui/notification-switch.tsx": {
     "arbitrary-value": 2,

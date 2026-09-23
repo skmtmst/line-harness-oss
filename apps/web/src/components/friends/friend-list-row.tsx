@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation'
 import { Circle, Star } from 'lucide-react'
 import type { FriendListItem } from '@/lib/api'
 import type { FriendListColumn } from './friend-list-table'
+import Checkbox from '@/components/shared/checkbox'
 
 interface Props {
   friend: FriendListItem
@@ -69,12 +70,11 @@ export default function FriendListRow({
       style={{ gridTemplateColumns }}
     >
       <div onClick={(event) => event.stopPropagation()}>
-        <input
-          type="checkbox"
+        {/* ★V7 共通 チェックボックス（gvjpx）。 */}
+        <Checkbox
           checked={selected ?? false}
-          onChange={() => onToggleSelect?.()}
+          onCheckedChange={() => onToggleSelect?.()}
           aria-label={`${friend.displayName}を選ぶ`}
-          className="h-4 w-4 cursor-pointer accent-accent"
         />
       </div>
 
@@ -252,12 +252,11 @@ export function FriendListCard({
     <div className="border-b border-divider-soft px-3 py-3">
       <div className="flex items-start gap-3">
         <div className="pt-1" onClick={(event) => event.stopPropagation()}>
-          <input
-            type="checkbox"
+          {/* ★V7 共通 チェックボックス（gvjpx）。 */}
+          <Checkbox
             checked={selected ?? false}
-            onChange={() => onToggleSelect?.()}
+            onCheckedChange={() => onToggleSelect?.()}
             aria-label={`${friend.displayName}を選ぶ`}
-            className="h-4 w-4 cursor-pointer accent-accent"
           />
         </div>
         <button
