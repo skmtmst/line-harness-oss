@@ -58,22 +58,33 @@ describe('U011-U013 詳細検索の狭幅対応', () => {
 })
 
 /*
- * U028/U033: 390pxではタブの並びが右端の「CSVで書き出す」「UID移行」に
- * 重なってラベルを隠していた（友だち一覧・重複検出・統合ユーザーの全タブ）。
- * 共通タブ（components/shared/tabs・layout/merged-tabs）は所有外なので、
- * 画面側の印＋scoped styleで「収まらない幅だけ折り返す」にする。
+ * U028/U033 後日談: かつて画面側の scoped style でタブ行を折り返していたが、
+ * 共通タブは MergedTabs → ScrollableTabs（横スクロール）＋≤767px の
+ * 共通狭幅対応（tabs.module.css）へ育った。画面側の折り返し上書きは
+ * スクロールと衝突し、タブラベルが語の途中で割れて右側操作と重なる
+ * 実害になったため撤去した。狭い幅では共通部品の横スクロールに任せる。
  */
-describe('U028/U033 タブと右側操作の重なり', () => {
-  it('タブ行に折り返しの印と上書きがある', () => {
-    expect(PAGE).toContain('data-design="V6Tabs" data-design-node="JB0Ki" data-tabs-row')
-    expect(PAGE).toContain('[data-tabs-row] nav:has(> span) { height: auto; flex-wrap: wrap;')
-    expect(PAGE).toContain('[data-tabs-row] nav:has(> span) > span + span { margin-left: auto; }')
+describe('タブと右側操作の重なり（共通の横スクロールへ寄せる）', () => {
+  it('画面側でタブ行を折り返す上書きを残さない', () => {
+    expect(PAGE).toContain('data-design="V6Tabs" data-design-node="JB0Ki"')
+    expect(PAGE).not.toContain('data-tabs-row')
+    expect(PAGE).not.toContain('nav:has(> span)')
+    expect(PAGE).toContain('<MergedTabs')
   })
 
   it('タブと右側操作そのものは残す', () => {
     expect(TABS).toContain("{ key: 'duplicates', label: '重複検出'")
     expect(TABS).toContain("{ key: 'merged', label: '統合ユーザー'")
     expect(PAGE).toContain('表示中をCSVで書き出す')
-    expect(PAGE).toContain('UID移行')
+  })
+
+  it('UID移行は主タブの1項目だけで、アクションへ重複して置かない', () => {
+    expect(TABS).toContain("{ key: 'uid-migration', label: 'UID移行', href: '/accounts?tab=migration' }")
+    // タブ化前の名残のリンクを右端へ置くと、タブと2重に見えて狭い幅で
+    // さらに重なりやすくなる。行き先はタブの1本に絞る。
+    // （ページ内のコメントには経緯の説明として文字列が残るため、
+    //  JSX要素としてのリンクだけを対象にする）
+    expect(PAGE).not.toContain('href="/accounts?tab=migration"')
+    expect(PAGE).not.toContain('>UID移行<')
   })
 })

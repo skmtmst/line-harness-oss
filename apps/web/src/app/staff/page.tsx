@@ -678,12 +678,12 @@ function StaffPageHost() {
     ))
     return <PermissionScopeView user={permissionTarget} memberId={memberById.get(permissionTarget.id)?.id ?? null} canSave={administrator} copyCandidates={copyCandidates} roleCounts={accessSummary.roleCounts} accountNames={accountNames} onClose={() => setPermissionTarget(null)} onSaved={finishPermissionSave} />
   }
-  return <div data-design-node="e3jz3"><div className="mb-4" data-tabs-row><MergedTabs basePath="/staff" tabs={staffTabs} active={tab} defaultKey="members" actions={tabAction} /></div>
+  return <div data-design-node="e3jz3"><div className="mb-4"><MergedTabs basePath="/staff" tabs={staffTabs} active={tab} defaultKey="members" actions={tabAction} /></div>
     {/*
-      #972 U031: 390pxではタブの並びが右端の「人を追加する」に重なっていた。
-      共通タブの形は変えず、この画面のタブ行だけ「収まらないとき折り返す」
-      にする。収まる幅では1行のままで見た目は変わらない。役わりの絞り込み
-      （下の Tabs）も同じ印で折り返す。
+      #972 U031: 役わりの絞り込み（下の Tabs）は横スクロールを持たないので、
+      この画面だけ「収まらないとき折り返す」にする。収まる幅では1行のまま。
+      主タブ（MergedTabs）は横スクロール＋共通の狭幅対応があるので印は付けない
+      （付けるとスクロールと折り返しが衝突して語の途中で割れる）。
     */}
     <style>{`
       [data-tabs-row] nav:has(> span) { height: auto; flex-wrap: wrap; row-gap: 8px; }

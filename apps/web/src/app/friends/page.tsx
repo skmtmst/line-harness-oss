@@ -745,7 +745,7 @@ function FriendsPageHost() {
         重複させない（Pencil `PhxG6` / トップバー `cBSCb`）。
         操作は独立した見出し行にせず、タブ `JB0Ki` の右端へ置く。
       */}
-      <div className="mb-4" data-design="V6Tabs" data-design-node="JB0Ki" data-tabs-row>
+      <div className="mb-4" data-design="V6Tabs" data-design-node="JB0Ki">
         <MergedTabs
           basePath="/friends"
           paramName="tab"
@@ -754,22 +754,10 @@ function FriendsPageHost() {
           actions={(
             <div className="flex flex-wrap items-center justify-end gap-2">
               {tab === 'list' ? <button type="button" onClick={() => exportCurrentPage?.()} disabled={!exportCurrentPage} className="h-9.5 rounded-control border border-hairline bg-canvas px-4 text-sm font-semibold text-ink-secondary hover:bg-canvas-sunken disabled:text-ink-disabled">表示中をCSVで書き出す</button> : null}
-              <Link href="/accounts?tab=migration" className="flex h-9.5 items-center rounded-control border border-hairline bg-canvas px-4 text-sm font-semibold text-action hover:bg-action-soft">UID移行</Link>
             </div>
           )}
         />
       </div>
-      {/*
-        U028/U033: 390pxではタブの並びが右端の「CSVで書き出す」「UID移行」に
-        重なってラベルを隠していた（友だち一覧・重複検出・統合ユーザーの全タブ）。
-        共通タブの形は変えず、この画面のタブ行だけ「収まらないとき折り返す」にする。
-        収まる幅では1行のままで見た目は変わらない。
-      */}
-      <style>{`
-        [data-tabs-row] nav:has(> span) { height: auto; flex-wrap: wrap; row-gap: 8px; }
-        [data-tabs-row] nav:has(> span) > span { flex-wrap: wrap; row-gap: 0; }
-        [data-tabs-row] nav:has(> span) > span + span { margin-left: auto; }
-      `}</style>
       {tab === 'list' ? <FriendsPageInner onNotice={setNotice} onExportReady={registerExporter} /> : null}
       {tab === 'duplicates' ? <EmbeddedPageProvider><DuplicatesPage /></EmbeddedPageProvider> : null}
       {tab === 'merged' ? <EmbeddedPageProvider><MergedUsersPage /></EmbeddedPageProvider> : null}
