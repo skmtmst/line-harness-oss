@@ -349,6 +349,7 @@ export default function TemplatesPage() {
    *
    * **隣と番号を交換する。** 全部に振り直すと、同時に触った人の並びを
    * 上書きしてしまう。端の行には押し口を出さないので、隣は必ずある。
+   * 2つの更新はサーバが1回で行う（V6R-S2-c）。途中で片方だけ変わらない。
    */
   const moveFolder = async (index: number, direction: -1 | 1) => {
     const target = folders[index]
@@ -357,8 +358,8 @@ export default function TemplatesPage() {
     setFolderBusy(true)
     setFolderError('')
     try {
-      await api.folders.update(target.id, { displayOrder: neighbor.displayOrder }, selectedAccountId ?? undefined)
-      await api.folders.update(neighbor.id, { displayOrder: target.displayOrder }, selectedAccountId ?? undefined)
+      const res = await api.folders.swapOrder(target.id, neighbor.id, selectedAccountId ?? undefined)
+      if (!res.success) throw new Error(res.error)
       await loadFolders()
     } catch {
       setFolderError('並び順を変えられませんでした。')
