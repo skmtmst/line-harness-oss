@@ -275,7 +275,7 @@ export default function TriggerEditor({
                   className={`rounded-control border px-3 py-2 text-center text-sm font-medium ${
                     kind.ready
                       ? configured
-                        ? 'border-accent text-accent'
+                        ? 'border-accent text-accent-deep'
                         : 'border-hairline text-ink-secondary'
                       : 'border-hairline text-ink-faint opacity-50'
                   }`}
@@ -414,7 +414,7 @@ export default function TriggerEditor({
               onClick={() => void recount()}
               disabled={!lineAccountId || match.kind === 'loading'}
               title={lineAccountId ? undefined : 'LINE公式アカウントを選んでください'}
-              className="text-accent text-xs hover:underline disabled:opacity-40 disabled:no-underline"
+              className="text-accent-deep text-xs hover:underline disabled:opacity-40 disabled:no-underline"
             >
               対象を再計算
             </button>
@@ -459,7 +459,7 @@ export default function TriggerEditor({
             <button
               type="button"
               onClick={() => void recount()}
-              className="text-accent mt-2 text-xs hover:underline"
+              className="text-accent-deep mt-2 text-xs hover:underline"
             >
               再読み込み
             </button>

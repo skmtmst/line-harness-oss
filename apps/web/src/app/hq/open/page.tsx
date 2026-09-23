@@ -62,7 +62,7 @@ export default function HqOpenPage() {
     <div>
       <header data-design="Head" className="mb-6 flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0">
-          <p className="text-sm font-semibold text-accent">統括コンソール</p>
+          <p className="text-sm font-semibold text-accent-deep">統括コンソール</p>
           <h1 className="mt-1 text-2xl font-bold tracking-tight text-ink">どのアカウントの{target.label}を開きますか</h1>
           <p className="mt-1 text-sm text-ink-secondary">アカウントを選ぶと、そのアカウントの管理画面へ移動します。</p>
         </div>

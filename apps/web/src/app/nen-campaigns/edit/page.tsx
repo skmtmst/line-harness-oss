@@ -69,7 +69,7 @@ function NenColumnEditInner() {
         setDrafts(next)
       }
     } catch {
-      setError('読み込みに失敗しました')
+      setError('読み込みに失敗しました。もう一度読み込んでください。')
     } finally {
       setLoading(false)
     }

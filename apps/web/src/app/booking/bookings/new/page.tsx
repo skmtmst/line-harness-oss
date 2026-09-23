@@ -609,9 +609,9 @@ export default function NewProxyBookingPage() {
   return (
     <div data-design-node={NODE_BY_STEP[step]} className="space-y-4 pb-24">
       <nav data-design="Crumb" aria-label="現在位置" className="text-ink-faint text-xs">
-        <Link href="/booking/bookings" className="text-accent">予約</Link>
+        <Link href="/booking/bookings" className="text-accent-deep">予約</Link>
         <span className="mx-2">›</span>
-        <Link href="/booking/bookings" className="text-accent">予約管理</Link>
+        <Link href="/booking/bookings" className="text-accent-deep">予約管理</Link>
         <span className="mx-2">›</span>
         <span>{step === 'confirm' ? '内容を確認' : step === 'done' ? '登録が終わりました' : step === 'conflict' ? '入れられません' : '電話の予約を入れる'}</span>
       </nav>
@@ -631,7 +631,7 @@ export default function NewProxyBookingPage() {
       {draftRestored && step === 'input' ? (
         <div className="border-hairline bg-canvas-sunken text-ink-secondary rounded-card flex flex-wrap items-center justify-between gap-2 border px-4 py-2 text-xs">
           <span>書きかけの入力を戻しました。</span>
-          <button type="button" onClick={discardDraft} className="text-accent font-semibold">
+          <button type="button" onClick={discardDraft} className="text-accent-deep font-semibold">
             破棄して最初から入れ直す
           </button>
         </div>
@@ -658,7 +658,7 @@ export default function NewProxyBookingPage() {
                     <p className="text-ink text-sm font-medium">{friend.displayName}</p>
                     <p className="text-ink-faint mt-1 text-xs">LINE連携済み</p>
                   </div>
-                  <button type="button" className="text-accent text-sm" onClick={() => {
+                  <button type="button" className="text-accent-deep text-sm" onClick={() => {
                     setFriend(null)
                     setFriendQuery('')
                   }}>選び直す</button>
@@ -1066,11 +1066,11 @@ function RelatedLinks({ includeConversion }: { includeConversion: boolean }) {
   return (
     <Card title="つながる先">
       <div className="text-ink-secondary space-y-2 text-xs">
-        <p><Link href="/booking/bookings" className="text-accent font-semibold">→ 予約管理</Link>　今日の台帳</p>
-        <p><Link href="/booking/menus" className="text-accent font-semibold">→ 予約設定</Link>　メニューと空き枠</p>
-        <p><Link href="/reminders" className="text-accent font-semibold">→ リマインダ</Link>　前日・開始前のお知らせ</p>
-        <p><Link href="/friends" className="text-accent font-semibold">→ 友だち</Link>　顧客カルテに残ります</p>
-        {includeConversion ? <p><Link href="/conversions" className="text-accent font-semibold">→ コンバージョン</Link>　予約の成果を確認</p> : null}
+        <p><Link href="/booking/bookings" className="text-accent-deep font-semibold">→ 予約管理</Link>　今日の台帳</p>
+        <p><Link href="/booking/menus" className="text-accent-deep font-semibold">→ 予約設定</Link>　メニューと空き枠</p>
+        <p><Link href="/reminders" className="text-accent-deep font-semibold">→ リマインダ</Link>　前日・開始前のお知らせ</p>
+        <p><Link href="/friends" className="text-accent-deep font-semibold">→ 友だち</Link>　顧客カルテに残ります</p>
+        {includeConversion ? <p><Link href="/conversions" className="text-accent-deep font-semibold">→ コンバージョン</Link>　予約の成果を確認</p> : null}
       </div>
     </Card>
   )

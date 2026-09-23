@@ -238,7 +238,7 @@ async function listAllConversionApprovals(
       limit: APPROVAL_PAGE_SIZE,
       offset: startOffset + page * APPROVAL_PAGE_SIZE,
     })
-    if (!res.success) throw new Error('承認の読み込みに失敗しました')
+    if (!res.success) throw new Error('承認の読み込みに失敗しました。もう一度読み込んでください。')
     items.push(...res.data)
     if (res.data.length < APPROVAL_PAGE_SIZE) return { items, truncated: false }
   }
@@ -1120,7 +1120,7 @@ export function CreateAffiliateModal({
       })
       if (!res.success) {
         // 409 → friend already an affiliate; surface the server message.
-        setFormError(res.error ?? '作成に失敗しました')
+        setFormError(res.error ?? '作成に失敗しました。通信を確かめて、もう一度お試しください。')
         setSubmitting(false)
         return
       }
@@ -1131,7 +1131,7 @@ export function CreateAffiliateModal({
         onClose()
       }
     } catch (e) {
-      setFormError(e instanceof Error ? e.message : '作成に失敗しました')
+      setFormError(e instanceof Error ? e.message : '作成に失敗しました。通信を確かめて、もう一度お試しください。')
     } finally {
       setSubmitting(false)
     }
@@ -1391,7 +1391,7 @@ function OfferFormModal({ initial, accounts, tags, scenarios, onClose, onSaved }
         if (!res.success) {
           // 失敗応答は非2xxで fetchApi が例外にするので、ここに来るのは
           // 2xx なのに success:false の形だけ。それでも文言があれば見せる。
-          setFormError((res as { error?: string }).error ?? '更新に失敗しました')
+          setFormError((res as { error?: string }).error ?? '更新に失敗しました。通信を確かめて、もう一度お試しください。')
           setSubmitting(false)
           return
         }
@@ -1406,7 +1406,7 @@ function OfferFormModal({ initial, accounts, tags, scenarios, onClose, onSaved }
           scenarioId: scenarioId || null,
         })
         if (!res.success) {
-          setFormError((res as { error?: string }).error ?? '作成に失敗しました')
+          setFormError((res as { error?: string }).error ?? '作成に失敗しました。通信を確かめて、もう一度お試しください。')
           setSubmitting(false)
           return
         }
@@ -1414,7 +1414,7 @@ function OfferFormModal({ initial, accounts, tags, scenarios, onClose, onSaved }
       onSaved()
       onClose()
     } catch (e) {
-      setFormError(e instanceof Error ? e.message : '保存に失敗しました')
+      setFormError(e instanceof Error ? e.message : '保存に失敗しました。通信を確かめて、もう一度お試しください。')
     } finally {
       setSubmitting(false)
     }
@@ -1700,10 +1700,10 @@ export function ApprovalQueue() {
         setError('ほかの人が先に判断しました。一覧を読み直しました。')
         await loadItems()
       } else {
-        setError(res.error ?? '承認に失敗しました')
+        setError(res.error ?? '承認に失敗しました。通信を確かめて、もう一度お試しください。')
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : '承認に失敗しました')
+      setError(e instanceof Error ? e.message : '承認に失敗しました。通信を確かめて、もう一度お試しください。')
     }
     setActioning(null)
   }, [actioning, loadItems])
@@ -1720,10 +1720,10 @@ export function ApprovalQueue() {
         setError('ほかの人が先に判断しました。一覧を読み直しました。')
         await loadItems()
       } else {
-        setError(res.error ?? '却下に失敗しました')
+        setError(res.error ?? '却下に失敗しました。通信を確かめて、もう一度お試しください。')
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : '却下に失敗しました')
+      setError(e instanceof Error ? e.message : '却下に失敗しました。通信を確かめて、もう一度お試しください。')
     }
     setActioning(null)
   }, [actioning, loadItems])
@@ -2777,7 +2777,7 @@ function SettlementEditor({
       setSaved(true)
       onSaved()
     } catch (e) {
-      setError(e instanceof Error ? e.message : '保存に失敗しました')
+      setError(e instanceof Error ? e.message : '保存に失敗しました。通信を確かめて、もう一度お試しください。')
     } finally {
       setSaving(false)
     }

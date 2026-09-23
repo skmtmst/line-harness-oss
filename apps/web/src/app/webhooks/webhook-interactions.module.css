@@ -50,7 +50,7 @@
 .filterActive {
   border-color: var(--color-accent);
   background: var(--color-accent-soft);
-  color: var(--color-accent);
+  color: var(--color-accent-deep);
 }
 
 .filterDanger {

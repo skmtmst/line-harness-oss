@@ -95,12 +95,12 @@ export default function TwoFactorSetupPage() {
   return <main className="flex min-h-[100svh] items-center justify-center bg-canvas-sunken px-4 py-8">
     <section className="w-full max-w-md rounded-card bg-canvas px-6 py-8 shadow-sm sm:px-10">
       <div className="flex items-center justify-center gap-3 text-sm font-semibold text-ink">
-        <span className="flex h-8 w-8 items-center justify-center rounded-control bg-accent-soft font-bold text-accent">然</span>
+        <span className="flex h-8 w-8 items-center justify-center rounded-control bg-accent-soft font-bold text-accent-deep">然</span>
         {brand.name ?? '然-NEN- 公式'}
       </div>
       <div className="mt-6 grid grid-cols-2 gap-2 text-xs">
         <div className="rounded-control bg-canvas-sunken px-3 py-2 text-success">✓ ログイン</div>
-        <div className="rounded-control bg-accent-soft px-3 py-2 font-medium text-accent">2　二段階認証の設定</div>
+        <div className="rounded-control bg-accent-soft px-3 py-2 font-medium text-accent-deep">2　二段階認証の設定</div>
       </div>
       <div className="mt-7 text-center">
         <h1 className="text-xl font-bold text-ink">二段階認証を設定</h1>
@@ -136,7 +136,7 @@ export default function TwoFactorSetupPage() {
         </form>
       ) : null}
       {!loading && !setup ? (
-        <Link href="/login" onClick={clearTwoFactorChallenge} className="mt-6 block text-center text-xs font-medium text-accent hover:underline">
+        <Link href="/login" onClick={clearTwoFactorChallenge} className="mt-6 block text-center text-xs font-medium text-accent-deep hover:underline">
           ログインへ戻る
         </Link>
       ) : null}

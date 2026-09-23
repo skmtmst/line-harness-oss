@@ -1115,7 +1115,7 @@ export default function RichMenusListPage() {
               {deleteTarget.group.status === 'draft' ? <li>
                  <strong className="text-danger">元に戻せません。</strong>
               </li> : <>
-                <li><strong className="text-accent">取り下げは、もう一度公開すれば戻せます。</strong></li>
+                <li><strong className="text-accent-deep">取り下げは、もう一度公開すれば戻せます。</strong></li>
                 <li>取り下げたあと、管理画面から削除できます。</li>
               </>}
             </ul>

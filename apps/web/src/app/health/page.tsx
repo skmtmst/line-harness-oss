@@ -133,7 +133,7 @@ export default function HealthPage() {
           Object.entries(snapshots).map(([accountId, snapshot]) => [accountId, snapshot.state]),
         ))
       } else {
-        setError('アカウント情報の取得に失敗しました')
+        setError('アカウント情報の取得に失敗しました。もう一度読み込んでください。')
       }
     } catch {
       setError('アカウント情報の読み込みに失敗しました。もう一度お試しください。')
@@ -192,7 +192,7 @@ export default function HealthPage() {
       setMigrateToId('')
       loadMigrations()
     } catch {
-      setError('移行リクエストに失敗しました')
+      setError('移行リクエストに失敗しました。通信を確かめて、もう一度お試しください。')
     } finally {
       setMigrating(false)
     }

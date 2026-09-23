@@ -99,6 +99,7 @@ shared-button-importer app/nen-campaigns/page.tsx
 shared-button-importer app/nen-members/page.tsx
 shared-button-importer app/nen-members/photo-publications.tsx
 shared-button-importer app/nen-members/photo-review-detail.tsx
+shared-button-importer app/not-found.tsx
 shared-button-importer app/notifications/page.tsx
 shared-button-importer app/ops/announcements/page.tsx
 shared-button-importer app/ops/audit/page.tsx

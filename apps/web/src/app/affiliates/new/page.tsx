@@ -388,7 +388,7 @@ export default function NewAffiliatePage() {
                 />
                 <button
                   type="submit"
-                  className="text-accent hover:bg-accent-soft rounded-control px-4 py-2 text-sm font-semibold"
+                  className="text-accent-deep hover:bg-accent-soft rounded-control px-4 py-2 text-sm font-semibold"
                 >
                   検索
                 </button>
@@ -414,7 +414,7 @@ export default function NewAffiliatePage() {
                   <button
                     type="button"
                     onClick={() => setFriendReload((value) => value + 1)}
-                    className="text-accent hover:bg-accent-soft rounded-control px-3 py-1 font-semibold"
+                    className="text-accent-deep hover:bg-accent-soft rounded-control px-3 py-1 font-semibold"
                   >
                     もう一度読み込む
                   </button>

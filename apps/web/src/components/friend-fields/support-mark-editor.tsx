@@ -220,7 +220,7 @@ export default function SupportMarkEditor({ markId }: { markId?: string }) {
         <Card padding="default" className="min-w-0">
           <h2 className="mb-3 text-sm font-bold text-ink">どこで使われるか</h2>
           <ul className="space-y-2 text-xs text-ink">
-            {DESTINATIONS.map((label) => <li key={label} className="flex items-start gap-2"><Circle size={6} fill="currentColor" className="mt-1 shrink-0 text-accent" aria-hidden="true" /><span>{label}</span></li>)}
+            {DESTINATIONS.map((label) => <li key={label} className="flex items-start gap-2"><Circle size={6} fill="currentColor" className="mt-1 shrink-0 text-accent-deep" aria-hidden="true" /><span>{label}</span></li>)}
           </ul>
           {!editing ? <p className="mt-4 text-xs leading-relaxed text-ink-faint">受信箱・友だち一覧・友だち詳細のすべてに同じ順番で表示します。</p> : null}
           {editing && currentUsages.length > 0 ? <p className="mt-4 text-xs font-semibold text-ink-secondary">現在の使用先：{currentUsages.join('、')}</p> : null}

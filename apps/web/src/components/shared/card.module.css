@@ -56,7 +56,7 @@
 
 .meta {
   flex: 0 0 auto;
-  color: var(--color-accent, currentColor);
+  color: var(--color-accent-deep, currentColor);
   font-size: var(--text-caption);
   font-weight: 700;
 }
@@ -65,7 +65,7 @@
   display: flex;
   flex-shrink: 0;
   align-items: center;
-  color: var(--color-accent);
+  color: var(--color-accent-deep);
   font-size: var(--text-label);
   font-weight: 600;
   white-space: nowrap;

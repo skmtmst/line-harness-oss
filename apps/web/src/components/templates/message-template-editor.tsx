@@ -298,7 +298,7 @@ export function MessageTemplateEditor({
           required
           note={<>
             差し込みは下の選択肢から入れられます。名前と友だち情報は受け取る人ごと、共通情報と配信日は送る時点の値に置き換わります。
-            {carouselHref && <><br />カルーセルを作るときは <Link href={carouselHref} className="text-accent hover:underline">カルーセルの編集</Link> を使ってください。</>}
+            {carouselHref && <><br />カルーセルを作るときは <Link href={carouselHref} className="text-accent-deep hover:underline">カルーセルの編集</Link> を使ってください。</>}
           </>}
         >
           {value.messageType === 'flex' ? (

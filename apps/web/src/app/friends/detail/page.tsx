@@ -263,11 +263,11 @@ function FriendTimelineRow({ item, friendId, last = false }: { item: FriendTimel
       <span>
         {source ? (
           source.external ? (
-            <a href={source.href} target="_blank" rel="noreferrer" className="text-accent hover:underline">
+            <a href={source.href} target="_blank" rel="noreferrer" className="text-accent-deep hover:underline">
               開く
             </a>
           ) : (
-            <Link href={source.href} className="text-accent hover:underline">
+            <Link href={source.href} className="text-accent-deep hover:underline">
               開く
             </Link>
           )
@@ -398,7 +398,7 @@ function SectionHead({
   return (
     <div className="mb-1.5 flex items-baseline justify-between gap-2">
       <p className="text-ink-faint text-xs font-semibold">{label}</p>
-      <Link href={href} className="text-accent shrink-0 text-xs hover:underline">
+      <Link href={href} className="text-accent-deep shrink-0 text-xs hover:underline">
         {actionLabel}
       </Link>
     </div>
@@ -582,7 +582,7 @@ function FriendDetailInner() {
       setFriend(null)
       setError(err instanceof ApiError && err.status === 404
         ? '友だちが見つかりませんでした'
-        : '読み込みに失敗しました')
+        : '読み込みに失敗しました。もう一度読み込んでください。')
     } finally {
       if (!isStaleResponse(generation, requestedAccountId)) setLoading(false)
     }
@@ -944,7 +944,7 @@ function FriendDetailInner() {
         setSupportEditing(false)
         void loadFriend()
       } else {
-        setSupportError(err instanceof ApiError ? err.message : '保存に失敗しました')
+        setSupportError(err instanceof ApiError ? err.message : '保存に失敗しました。通信を確かめて、もう一度お試しください。')
       }
     } finally {
       setSupportBusy(false)
@@ -987,7 +987,7 @@ function FriendDetailInner() {
       // 値の正本は情報欄の取得口。保存後はそこだけ取り直す。
       void loadFields()
     } catch {
-      setError('保存に失敗しました')
+      setError('保存に失敗しました。通信を確かめて、もう一度お試しください。')
     } finally {
       setSaving(false)
     }
@@ -1041,7 +1041,7 @@ function FriendDetailInner() {
         setScenarioError(res.error)
       }
     } catch (err) {
-      setScenarioError(err instanceof ApiError ? err.message : '登録に失敗しました')
+      setScenarioError(err instanceof ApiError ? err.message : '登録に失敗しました。通信を確かめて、もう一度お試しください。')
     } finally {
       setScenarioBusy(false)
     }
@@ -1136,7 +1136,7 @@ function FriendDetailInner() {
       <div>
         <p className="text-ink-faint bg-canvas rounded-card border-hairline border p-8 text-center text-sm">
           友だちが指定されていません。
-          <Link href="/friends" className="text-accent ml-1 hover:underline">
+          <Link href="/friends" className="text-accent-deep ml-1 hover:underline">
             友だち一覧へ戻る
           </Link>
         </p>
@@ -1316,7 +1316,7 @@ function FriendDetailInner() {
               ) : <div className="bg-action flex h-16 w-16 items-center justify-center rounded-full text-xl font-bold text-on-action">{friend?.displayName?.charAt(0) ?? '?'}</div>}
               <h2 className="text-ink mt-3 text-sm font-bold">{friend?.displayName ?? '名前未登録'}</h2>
               <p className="text-ink-faint mt-1 text-xs">LINE表示名</p>
-              <div className="mt-3 flex flex-wrap justify-center gap-1.5"><SupportMarkBadge status={friend?.support?.status} /><span className="bg-canvas-sunken text-ink-secondary rounded-pill px-2 py-0.5 text-micro">{friend?.support?.operatorName ?? '未割り当て'}</span><span className="bg-accent-soft text-accent rounded-pill px-2 py-0.5 text-micro">表示中</span></div>
+              <div className="mt-3 flex flex-wrap justify-center gap-1.5"><SupportMarkBadge status={friend?.support?.status} /><span className="bg-canvas-sunken text-ink-secondary rounded-pill px-2 py-0.5 text-micro">{friend?.support?.operatorName ?? '未割り当て'}</span><span className="bg-accent-soft text-accent-deep rounded-pill px-2 py-0.5 text-micro">表示中</span></div>
               <Button href={`/friends/detail?id=${friendId}&tab=info`} className="mt-3">♙ 友だち詳細</Button>
             </div>
 
@@ -1325,7 +1325,7 @@ function FriendDetailInner() {
               type="button"
               onClick={() => setProfileExpanded((v) => !v)}
               aria-expanded={profileExpanded}
-              className="text-accent w-full px-5 py-2.5 text-center text-xs font-semibold hover:bg-canvas-sunken lg:hidden"
+              className="text-accent-deep w-full px-5 py-2.5 text-center text-xs font-semibold hover:bg-canvas-sunken lg:hidden"
             >
               {profileExpanded ? '顧客情報を閉じる' : '顧客情報をすべて表示'}
             </button>
@@ -1360,7 +1360,7 @@ function FriendDetailInner() {
                   <button
                     type="button"
                     onClick={() => void loadMileage()}
-                    className="text-accent shrink-0 hover:underline"
+                    className="text-accent-deep shrink-0 hover:underline"
                   >
                     再試行
                   </button>
@@ -1383,12 +1383,12 @@ function FriendDetailInner() {
                       type="button"
                       onClick={() => (supportEditing ? setSupportEditing(false) : void openSupportEditor())}
                       aria-expanded={supportEditing}
-                      className="text-accent shrink-0 text-xs hover:underline"
+                      className="text-accent-deep shrink-0 text-xs hover:underline"
                     >
                       {supportEditing ? 'やめる' : '編集'}
                     </button>
                   ) : (
-                    <Link href={inboxHrefForFriend(friendId)} className="text-accent shrink-0 text-xs hover:underline">
+                    <Link href={inboxHrefForFriend(friendId)} className="text-accent-deep shrink-0 text-xs hover:underline">
                       編集
                     </Link>
                   )}
@@ -1539,7 +1539,7 @@ function FriendDetailInner() {
                     <button
                       type="button"
                       onClick={() => void loadFields()}
-                      className="text-accent ml-1 hover:underline"
+                      className="text-accent-deep ml-1 hover:underline"
                     >
                       再試行
                     </button>
@@ -1570,7 +1570,7 @@ function FriendDetailInner() {
                     <button
                       type="button"
                       onClick={() => void loadRichMenu()}
-                      className="text-accent hover:underline"
+                      className="text-accent-deep hover:underline"
                     >
                       再試行
                     </button>
@@ -1631,7 +1631,7 @@ function FriendDetailInner() {
                   }`}
                   className={`-mb-px border-b-2 px-4 py-2 text-sm font-medium transition-colors ${
                     tab === t.key
-                      ? 'border-accent text-accent'
+                      ? 'border-accent text-accent-deep'
                       : 'text-ink-secondary hover:text-ink border-transparent'
                   }`}
                 >
@@ -1663,7 +1663,7 @@ function FriendDetailInner() {
                         <button
                           type="button"
                           onClick={() => void loadMileage()}
-                          className="text-accent ml-1 hover:underline"
+                          className="text-accent-deep ml-1 hover:underline"
                         >
                           再試行
                         </button>
@@ -1698,7 +1698,7 @@ function FriendDetailInner() {
                   0件・取得失敗・読み込み中はそれぞれ区別して表示する。
                 */}
                 <section className="bg-canvas rounded-card border-hairline overflow-hidden border shadow-card">
-                  <div className="flex items-center justify-between px-4 py-3"><h2 className="text-ink text-sm font-bold">最近の履歴</h2><Link href={`/friends/detail?id=${friendId}&tab=history`} className="text-accent text-xs font-semibold">すべてを見る →</Link></div>
+                  <div className="flex items-center justify-between px-4 py-3"><h2 className="text-ink text-sm font-bold">最近の履歴</h2><Link href={`/friends/detail?id=${friendId}&tab=history`} className="text-accent-deep text-xs font-semibold">すべてを見る →</Link></div>
                   {/*
                     #985 CHK-04: 140+160+140pxの固定列は狭い幅で
                     親の overflow-hidden に欠ける。md 未満では見出しを
@@ -1713,7 +1713,7 @@ function FriendDetailInner() {
                       <button
                         type="button"
                         onClick={() => void loadHistory()}
-                        className="text-accent ml-1 hover:underline"
+                        className="text-accent-deep ml-1 hover:underline"
                       >
                         再試行
                       </button>
@@ -1776,7 +1776,7 @@ function FriendDetailInner() {
                           <button
                             type="button"
                             onClick={() => void openScenarioPicker()}
-                            className="text-accent ml-1 hover:underline"
+                            className="text-accent-deep ml-1 hover:underline"
                           >
                             再試行
                           </button>
@@ -1957,7 +1957,7 @@ function FriendDetailInner() {
                             aria-current={active ? 'true' : undefined}
                             className={`rounded-pill border px-3 py-1.5 text-xs font-medium transition-colors ${
                               active
-                                ? 'border-accent bg-accent-soft text-accent'
+                                ? 'border-accent bg-accent-soft text-accent-deep'
                                 : 'border-hairline text-ink-secondary hover:bg-canvas-sunken'
                             }`}
                           >
@@ -1976,7 +1976,7 @@ function FriendDetailInner() {
                     この分類は削除されたか、見つかりません。
                     <Link
                       href={`/friends/detail?id=${encodeURIComponent(friendId)}&tab=info`}
-                      className="text-accent ml-1 hover:underline"
+                      className="text-accent-deep ml-1 hover:underline"
                     >
                       基本の項目を見る
                     </Link>
@@ -2005,7 +2005,7 @@ function FriendDetailInner() {
                       {canManageFieldDefs && hiddenPersonalCount === 0 ? (
                         <Link
                           href={`/tags/fields/new?back=/friends/detail?id=${friendId}`}
-                          className="text-accent ml-1 hover:underline"
+                          className="text-accent-deep ml-1 hover:underline"
                         >
                           項目を追加
                         </Link>

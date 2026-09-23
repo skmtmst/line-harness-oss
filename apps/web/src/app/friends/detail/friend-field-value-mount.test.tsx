@@ -199,7 +199,7 @@ describe('友だち情報欄の単票保存を実Reactで固定する（N-042 #6
     const saveCalls = net.calls.filter((c) => c.name === 'friendFields.saveForFriend')
     expect(saveCalls).toHaveLength(1)
     // 保存に失敗した扱いになり、成功メッセージは出ない。
-    expect(host.textContent).toContain('保存に失敗しました')
+    expect(host.textContent).toContain('保存に失敗しました。通信を確かめて、もう一度お試しください。')
     expect(host.textContent).not.toContain('件を保存しました')
     // 保存が失敗した経路では再読み込みしない（forFriendは初回の1回だけ）。
     expect(net.calls.filter((c) => c.name === 'friendFields.forFriend')).toHaveLength(1)
@@ -216,6 +216,6 @@ describe('友だち情報欄の単票保存を実Reactで固定する（N-042 #6
     const saveCalls = net.calls.filter((c) => c.name === 'friendFields.saveForFriend')
     expect(saveCalls).toHaveLength(1)
     expect(host.textContent).toContain('1 件を保存しました')
-    expect(host.textContent).not.toContain('保存に失敗しました')
+    expect(host.textContent).not.toContain('保存に失敗しました。通信を確かめて、もう一度お試しください。')
   })
 })

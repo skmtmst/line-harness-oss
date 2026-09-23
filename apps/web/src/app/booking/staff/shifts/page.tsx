@@ -209,7 +209,7 @@ function BusinessHoursEditor({ accountId, settings, canEdit, onSaved, onReload }
                     </div>
                   ))}
                   {intervals.length < 8 ? (
-                    <button type="button" className="text-accent text-xs font-semibold underline" onClick={() => updateDay(day.weekday, (current) => [...current, { start: '09:00', end: '18:00', capacity: 1 }])}>時間帯を追加</button>
+                    <button type="button" className="text-accent-deep text-xs font-semibold underline" onClick={() => updateDay(day.weekday, (current) => [...current, { start: '09:00', end: '18:00', capacity: 1 }])}>時間帯を追加</button>
                   ) : null}
                 </div>
               )}
@@ -868,9 +868,9 @@ function StoreShiftsView() {
     <div data-design-node="tksPc" className="space-y-4 pb-8">
       <div data-design="Head" className="flex flex-wrap items-center gap-3">
         <nav aria-label="現在位置" className="text-ink-faint text-xs">
-          <Link href="/booking/bookings" className="text-accent hover:underline">予約</Link>
+          <Link href="/booking/bookings" className="text-accent-deep hover:underline">予約</Link>
           <span className="mx-2">›</span>
-          <Link href="/booking/menus" className="text-accent hover:underline">予約設定</Link>
+          <Link href="/booking/menus" className="text-accent-deep hover:underline">予約設定</Link>
           <span className="mx-2">›</span>
           <span>受付枠</span>
         </nav>
@@ -976,7 +976,7 @@ function StoreShiftsView() {
                           <p className="text-ink-secondary mt-1 text-sm">{item.reason || item.note || '休業日'}</p>
                           {canEditSettings ? (
                             <div className="mt-2 flex gap-3 text-xs">
-                              <button type="button" className="text-accent font-semibold underline" onClick={() => startEditException(item)}>修正する</button>
+                              <button type="button" className="text-accent-deep font-semibold underline" onClick={() => startEditException(item)}>修正する</button>
                               <button type="button" className="text-danger font-semibold underline" onClick={() => { setDeleteTarget(item); setExceptionError(null) }}>削除する</button>
                             </div>
                           ) : null}
@@ -1019,7 +1019,7 @@ function StoreShiftsView() {
             </section>
 
             <details className="bg-canvas border-hairline rounded-card border p-3">
-              <summary className="text-accent cursor-pointer text-sm font-semibold">設備ごとの受付上限を管理</summary>
+              <summary className="text-accent-deep cursor-pointer text-sm font-semibold">設備ごとの受付上限を管理</summary>
               <div className="mt-3 space-y-3 text-sm">
                 {canManageResources ? <NewResourceEditor key={`new:${selectedAccountId}`} accountId={selectedAccountId} onCreated={(created) => {
                   if (activeAccountRef.current === selectedAccountId) setResources((current) => [...current, created].sort((a, b) => a.name.localeCompare(b.name, 'ja')))
@@ -1060,10 +1060,10 @@ function StoreShiftsView() {
             <section data-design="Links" className="bg-canvas border-hairline rounded-card border p-4">
               <h2 className="text-ink font-semibold">つながる先</h2>
               <div className="mt-3 space-y-3 text-sm">
-                <Link href="/booking/bookings" className="text-accent flex justify-between gap-3"><span>→ 予約管理</span><span className="text-ink-faint text-xs">入った予約の台帳</span></Link>
-                <Link href="/rich-menus" className="text-accent flex justify-between gap-3"><span>→ リッチメニュー</span><span className="text-ink-faint text-xs">予約ボタンの飛び先</span></Link>
-                <Link href="/reminders" className="text-accent flex justify-between gap-3"><span>→ リマインダ</span><span className="text-ink-faint text-xs">前日・当日のお知らせ</span></Link>
-                <Link href="/users" className="text-accent flex justify-between gap-3"><span>→ ログインユーザー</span><span className="text-ink-faint text-xs">担当できる人</span></Link>
+                <Link href="/booking/bookings" className="text-accent-deep flex justify-between gap-3"><span>→ 予約管理</span><span className="text-ink-faint text-xs">入った予約の台帳</span></Link>
+                <Link href="/rich-menus" className="text-accent-deep flex justify-between gap-3"><span>→ リッチメニュー</span><span className="text-ink-faint text-xs">予約ボタンの飛び先</span></Link>
+                <Link href="/reminders" className="text-accent-deep flex justify-between gap-3"><span>→ リマインダ</span><span className="text-ink-faint text-xs">前日・当日のお知らせ</span></Link>
+                <Link href="/users" className="text-accent-deep flex justify-between gap-3"><span>→ ログインユーザー</span><span className="text-ink-faint text-xs">担当できる人</span></Link>
               </div>
             </section>
           </aside>

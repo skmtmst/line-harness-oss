@@ -214,7 +214,7 @@ function FriendMileageInner() {
           action={<div className="flex flex-wrap gap-2">{canAdjust ? <Button variant="primary" onClick={() => setAdjustmentOpen(true)}>マイルを手で増やす・減らす</Button> : null}<Button href={`/friends/detail?id=${encodeURIComponent(friend.id)}`}>友だちの詳細を見る</Button></div>}
         />
         <div className="flex flex-wrap items-center gap-4 p-4">
-          {friend.pictureUrl ? <img src={friend.pictureUrl} alt="" className="h-12 w-12 rounded-full object-cover" /> : <div className="flex h-12 w-12 items-center justify-center rounded-full bg-accent-soft text-lg font-bold text-accent">{displayName.slice(0, 1)}</div>}
+          {friend.pictureUrl ? <img src={friend.pictureUrl} alt="" className="h-12 w-12 rounded-full object-cover" /> : <div className="flex h-12 w-12 items-center justify-center rounded-full bg-accent-soft text-lg font-bold text-accent-deep">{displayName.slice(0, 1)}</div>}
           <div className="min-w-44">
             <p className="font-bold text-ink">{displayName}</p>
             <p className="mt-1 text-xs text-ink-faint">本人確認済みの接続先だけを表示します</p>
@@ -262,7 +262,7 @@ function FriendMileageInner() {
                 <Tr key={item.id}>
                   <Td><time dateTime={item.occurredAt}>{formatMileageDate(item.occurredAt)}</time></Td>
                   <Td><p className="font-semibold text-ink">{mileageEntryTypeLabel(item.entryType)}</p><p className="mt-1 text-xs text-ink-faint">{mileageStatusLabel(item.status)}</p></Td>
-                  <Td align="right"><span className={item.amount < 0 ? 'font-bold text-danger' : 'font-bold text-accent'}>{formatMileageChange(item.amount)} マイル</span></Td>
+                  <Td align="right"><span className={item.amount < 0 ? 'font-bold text-danger' : 'font-bold text-accent-deep'}>{formatMileageChange(item.amount)} マイル</span></Td>
                   <Td align="right" className="tabular-nums">{'balanceAfter' in item && typeof item.balanceAfter === 'number' ? `${item.balanceAfter.toLocaleString('ja-JP')} マイル` : '—'}</Td>
                   <Td><p className="max-w-56 truncate font-medium text-ink" title={item.reason}>{item.reason}</p></Td>
                   <Td>

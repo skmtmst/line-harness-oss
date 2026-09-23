@@ -408,7 +408,7 @@ function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuC
                     <td className="px-4 py-3 text-sm text-ink-secondary tabular-nums">
                       {m.duration_minutes} 分
                     </td>
-                    <td className={`px-4 py-3 text-sm text-right tabular-nums ${menuPriceLabel(m) === '無料' ? 'text-accent font-semibold' : ''}`}>
+                    <td className={`px-4 py-3 text-sm text-right tabular-nums ${menuPriceLabel(m) === '無料' ? 'text-accent-deep font-semibold' : ''}`}>
                       {menuPriceLabel(m)}
                     </td>
                     <td className="px-4 py-3 text-sm text-ink-secondary">
@@ -1082,7 +1082,7 @@ function EditMenuModal({
                 type="button"
                 onClick={() => void submitResources()}
                 disabled={resourceSaving || resourceLoadError !== null}
-                className="border-accent text-accent rounded-control border px-3 py-2 text-sm font-semibold disabled:opacity-50"
+                className="border-accent text-accent-deep rounded-control border px-3 py-2 text-sm font-semibold disabled:opacity-50"
               >
                 {resourceSaving ? '設備の割当を保存中…' : '設備の割当を保存'}
               </button>
@@ -1157,7 +1157,7 @@ function EditMenuModal({
                 <button
                   type="button"
                   onClick={() => void onReloadLatest()}
-                  className="text-accent mt-1 text-xs font-semibold underline"
+                  className="text-accent-deep mt-1 text-xs font-semibold underline"
                 >
                   最新の内容を読み直す
                 </button>
@@ -1273,7 +1273,7 @@ function MenusPageHost() {
           href="/booking/menus?tab=menus"
           className={`rounded-t-md px-4 py-2 text-sm ${
             tab === 'menus'
-              ? 'border-accent text-accent border-b-2 font-medium'
+              ? 'border-accent text-accent-deep border-b-2 font-medium'
               : 'text-ink-faint hover:text-ink-secondary'
           }`}
         >

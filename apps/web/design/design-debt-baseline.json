@@ -86,10 +86,10 @@
     "direct-secondary-button": 1
   },
   "app/chats/page.tsx": {
-    "arbitrary-value": 113,
+    "arbitrary-value": 112,
+    "direct-primary-button": 2,
     "unresolved-classname": 2,
-    "direct-secondary-button": 2,
-    "direct-primary-button": 1
+    "direct-secondary-button": 2
   },
   "app/contents/page.tsx": {
     "arbitrary-value": 8,
@@ -676,6 +676,9 @@
     "arbitrary-value": 1,
     "direct-secondary-button": 1,
     "direct-primary-button": 1
+  },
+  "components/shared/avatar.tsx": {
+    "unresolved-classname": 2
   },
   "components/shared/breadcrumb.tsx": {
     "unresolved-classname": 4

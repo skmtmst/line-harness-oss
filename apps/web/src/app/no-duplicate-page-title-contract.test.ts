@@ -100,6 +100,8 @@ describe('画面名を本文とトップバーで2回出さない', () => {
     expect(header).toMatch(/titleDisplay\s*=\s*'auto'/)
     expect(header).toContain('defaultTitleForPath')
     expect(header).toMatch(/barTitle !== title/)
-    expect(header).toMatch(/shown \? styles\.title : 'sr-only'/)
+    // 同じ言葉のときは出さない。画面の h1 はトップバーが持つので、本文の題は h2（2026-09-24）。
+    expect(header).toMatch(/shown \? <h2 className=\{styles\.title\}>\{title\}<\/h2> : null/)
+    expect(visible(header)).not.toMatch(/<h1[\s>]/)
   })
 })

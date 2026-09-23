@@ -80,7 +80,7 @@ export default function NewTagPageV4() {
         router.push(`/tags?highlight=${created.data.tag.id}`)
       }
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : '保存に失敗しました')
+      setError(reason instanceof Error ? reason.message : '保存に失敗しました。通信を確かめて、もう一度お試しください。')
     } finally {
       setSaving(false)
     }
