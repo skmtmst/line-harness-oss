@@ -15,6 +15,7 @@ import {
   createAutoReplyWithDraftVersion,
   getAutoReplyDraftVersion,
   getAutoReplyPublishedVersion,
+  getAutoReplyInternalMemos,
   parseAutoReplyVersionSettings,
   publishAutoReplyDraftVersion,
   recordAutoReplyDraftTest,
@@ -148,6 +149,8 @@ interface SerializedAutoReply {
   keywordMatchMode: string;
   /** フォルダ。分けていなければ null。 */
   folderId: string | null;
+  /** 運用者だけが読むメモ。版スナップショットに保存し、友だちへは出さない。 */
+  internalMemo: string | null;
   /** 273: 'draft'（未公開）| 'published' | 'stopped'。一覧が再開の可否を分けるのに使う。 */
   lifecycleStatus: string;
   /** 機能08 点検 E-01: 最後に停止した日時・担当者・理由。止めたことが無ければ null。 */
@@ -823,7 +826,10 @@ function validIdempotencyKey(value: string | undefined): value is string {
   return Boolean(value && value.length >= 8 && value.length <= 200 && /^[A-Za-z0-9._:-]+$/.test(value));
 }
 
-function serializeAutoReply(row: DbAutoReply): SerializedAutoReply {
+function serializeAutoReply(
+  row: DbAutoReply,
+  internalMemo: string | null = null,
+): SerializedAutoReply {
   return {
     id: row.id,
     keyword: row.keyword,
@@ -852,6 +858,7 @@ function serializeAutoReply(row: DbAutoReply): SerializedAutoReply {
     name: row.name,
     keywordMatchMode: row.keyword_match_mode ?? 'any',
     folderId: row.folder_id,
+    internalMemo,
     lifecycleStatus: row.lifecycle_status ?? 'published',
     stoppedAt: row.stopped_at ?? null,
     stoppedByStaffId: row.stopped_by_staff_id ?? null,
@@ -859,6 +866,22 @@ function serializeAutoReply(row: DbAutoReply): SerializedAutoReply {
     stopReason: row.stop_reason ?? null,
     createdAt: row.created_at,
   };
+}
+
+/**
+ * 社内メモを編集画面と同じ版（下書き優先、無ければ公開版）から引く。
+ * 読めなくても一覧・詳細そのものは落とさない——付随情報なので。
+ */
+async function internalMemosOf(
+  db: D1Database,
+  autoReplyIds: string[],
+): Promise<Map<string, string | null>> {
+  try {
+    return await getAutoReplyInternalMemos(db, autoReplyIds);
+  } catch (err) {
+    console.error('failed to load auto reply internal memos', err);
+    return new Map();
+  }
 }
 
 /** 停止した担当者の表示名を引く。止めた記録が無い一覧では1問も投げない。 */
@@ -1003,10 +1026,12 @@ autoReplies.get('/api/auto-replies', requireRole('owner', 'admin', 'staff'), asy
       console.error('GET /api/auto-replies — failed to count action executions', err);
     }
 
+    const memos = await internalMemosOf(c.env.DB, items.map((item) => item.id));
+
     const data: SerializedAutoReply[] = await Promise.all(
       items.map(async (row) => {
         const base: SerializedAutoReply = {
-          ...serializeAutoReply(row),
+          ...serializeAutoReply(row, memos.get(row.id) ?? null),
           ...(hitsById ? { hits: hitsById.get(row.id) ?? { period: 0, total: 0 } } : {}),
           actionExecutionCount: actionsById?.get(row.id) ?? (actionsById ? 0 : null),
           conflictAttentionCount: row.is_active === 1 ? conflictsById.get(row.id) ?? 0 : 0,
@@ -1105,7 +1130,8 @@ autoReplies.get('/api/auto-replies/:id', async (c) => {
     if (!item) {
       return c.json({ success: false, error: 'Auto-reply not found' }, 404);
     }
-    const data = serializeAutoReply(item);
+    const memos = await internalMemosOf(c.env.DB, [id]);
+    const data = serializeAutoReply(item, memos.get(id) ?? null);
     await resolveStoppedByNames(c.env.DB, [data]);
     return c.json({ success: true, data });
   } catch (err) {
@@ -1498,7 +1524,8 @@ autoReplies.post('/api/auto-replies', requireRole('owner', 'admin'), async (c) =
       messageKinds: messageKinds.value,
     });
 
-    return c.json({ success: true, data: serializeAutoReply(item) }, 201);
+    const memos = await internalMemosOf(c.env.DB, [item.id]);
+    return c.json({ success: true, data: serializeAutoReply(item, memos.get(item.id) ?? null) }, 201);
   } catch (err) {
     console.error('POST /api/auto-replies error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
@@ -1615,7 +1642,8 @@ autoReplies.put('/api/auto-replies/:id', requireRole('owner', 'admin'), async (c
       return c.json({ success: false, error: 'Auto-reply not found' }, 404);
     }
 
-    return c.json({ success: true, data: serializeAutoReply(updated) });
+    const memos = await internalMemosOf(c.env.DB, [updated.id]);
+    return c.json({ success: true, data: serializeAutoReply(updated, memos.get(updated.id) ?? null) });
   } catch (err) {
     console.error('PUT /api/auto-replies/:id error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
@@ -1664,7 +1692,8 @@ autoReplies.post('/api/auto-replies/:id/stop', requireRole('owner', 'admin'), as
     if (!stopped) {
       return c.json({ success: false, error: 'Auto-reply not found' }, 404);
     }
-    const data = serializeAutoReply(stopped);
+    const memos = await internalMemosOf(c.env.DB, [stopped.id]);
+    const data = serializeAutoReply(stopped, memos.get(stopped.id) ?? null);
     await resolveStoppedByNames(c.env.DB, [data]);
     return c.json({ success: true, data });
   } catch (err) {

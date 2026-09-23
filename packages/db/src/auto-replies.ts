@@ -1,4 +1,5 @@
 import { jstNow } from './utils.js';
+import { saveAutoReplyInternalMemo } from './auto-reply-runs.js';
 // =============================================================================
 // Auto-Replies — Keyword-triggered automatic responses (L社 自動応答 equivalent)
 // =============================================================================
@@ -140,6 +141,11 @@ export interface CreateAutoReplyInput {
   /** フォルダ。分けていなければ null。 */
   folderId?: string | null;
   /**
+   * 運用者だけが読むメモ。auto_replies には列が無く、版スナップショットへ
+   * 保存する。友だちへ送る本文には使わない（AUTOREPLY-09）。
+   */
+  internalMemo?: string | null;
+  /**
    * 新規作成時の有効/停止。**省略や false は止まったまま作る。**
    * 「オフで作ったのに動いていた」は送り事故なので、有効化は
    * 明示的な true（または公開・再開の操作）だけに限る。
@@ -202,7 +208,16 @@ export async function createAutoReply(
     )
     .run();
 
-  return (await getAutoReplyById(db, id))!;
+  const created = (await getAutoReplyById(db, id))!;
+  /*
+   * 社内メモと編集画面が読む版を先に確保する。停止したまま作ったルールは
+   * 実行されず ensureAutoReplyPublishedVersion が走らないので、ここで
+   * 公開版を作っておかないとメモの置き場も編集画面の読み込み先も無い。
+   * 版の状態は実行中の定義を表すので 'published'。ルール本体の
+   * lifecycle_status（stopped）は変えない。
+   */
+  await saveAutoReplyInternalMemo(db, created, input.internalMemo ?? null);
+  return created;
 }
 
 export interface UpdateAutoReplyInput {
@@ -239,6 +254,11 @@ export interface UpdateAutoReplyInput {
   keywordMatchMode?: 'any' | 'all';
   /** フォルダ。分けていなければ null。 */
   folderId?: string | null;
+  /**
+   * 運用者だけが読むメモ。送られたときだけ更新する。省略は「触らない」で、
+   * メモを持たない呼び出しが既存のメモを消すことはない（AUTOREPLY-09）。
+   */
+  internalMemo?: string | null;
 }
 
 export async function updateAutoReply(
@@ -341,7 +361,11 @@ export async function updateAutoReply(
     )
     .run();
 
-  return getAutoReplyById(db, id);
+  const updated = await getAutoReplyById(db, id);
+  if (updated && 'internalMemo' in input) {
+    await saveAutoReplyInternalMemo(db, updated, input.internalMemo ?? null);
+  }
+  return updated;
 }
 
 /**

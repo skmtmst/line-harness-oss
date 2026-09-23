@@ -404,6 +404,7 @@ export default function EditDialog({
         name: string | null;
         keywordMatchMode: 'any' | 'all';
         folderId: string | null;
+        internalMemo: string | null;
       } = {
         keyword,
         matchType,
@@ -442,6 +443,9 @@ export default function EditDialog({
         name: ruleName.trim() || null,
         keywordMatchMode,
         folderId: folderId || null,
+        // 新規作成・一覧の編集のどちらの保存口でも送る。ここに入れないと
+        // 入力したメモが保存要求に乗らず、再び開いたとき空になる（AUTOREPLY-09）。
+        internalMemo: internalMemo.trim() || null,
       }
       if (mode === 'template' && templateId) {
         const tpl = templates.find((t) => t.id === templateId)
