@@ -90,6 +90,14 @@ function shipped(eventId: string, occurredAt: string) {
 describe('N-291 NEN配信の実動する除外条件', () => {
   test('既存設定にも30日間の重複防止を適用し、別注文から二重予約しない', async () => {
     expect((await getNenCampaign(db, 'arrival_check', 'account-1'))?.dedup_window_days).toBe(30);
+    // 口コミ依頼は既定で「回答者を除く」がONだがフォーム未選択なので設定不足。
+    // 重複防止の検証対象は到着確認と次の商品に絞る。
+    for (const key of ['arrival_check', 'review_request', 'cross_sell']) {
+      const campaign = await getNenCampaign(db, key, 'account-1');
+      await saveNenCampaignAccountSetting(db, 'account-1', {
+        ...campaign!, exclude_form_respondents: 0,
+      });
+    }
 
     expect(await enqueuePostShippingFollowUps(
       db, shipped('shipment-1', '2026-09-01T09:00:00+09:00'), 'friend-1', 'account-1',
@@ -207,6 +215,46 @@ describe('NEN-07 (#1078): つなぐ回答フォームが使えない稼働中配
     expect(sqlite.prepare(
       `SELECT status FROM nen_delivery_jobs WHERE campaign_key = 'review_request'`,
     ).get()).toEqual({ status: 'pending' });
+  });
+
+  test('「回答者を除く」だけがONでフォームがない配信も止める(監査の実例)', async () => {
+    // 検証環境で見つかった形: 口コミ除外だけがONでフォームもURLも無い。
+    // 選んだはずの除外が黙って効かない設定不足なので job を積まない。
+    const review = await getNenCampaign(db, 'review_request', 'account-1');
+    await saveNenCampaignAccountSetting(db, 'account-1', {
+      ...review!, exclude_form_respondents: 1, after_actions: [],
+    });
+
+    expect(await enqueuePostShippingFollowUps(
+      db, shipped('shipment-1', '2026-09-01T09:00:00+09:00'), 'friend-1', 'account-1',
+    )).toBe(2);
+    expect(sqlite.prepare(
+      `SELECT status, last_error FROM nen_delivery_jobs
+        WHERE campaign_key = 'review_request' AND friend_id = 'friend-1'`,
+    ).get()).toEqual({ status: 'skipped', last_error: 'campaign_form_unavailable' });
+  });
+
+  test('保存JSONに壊れたopen_formが残る配信も止める', async () => {
+    // 旧仕様で保存された「open_formなのにformId空」の残骸。parseでは消えるが
+    // 「開くつもりだった」こと自体は検出できる必要がある。
+    const review = await getNenCampaign(db, 'review_request', 'account-1');
+    sqlite.prepare(
+      `INSERT INTO account_settings (id, line_account_id, key, value, created_at, updated_at)
+       VALUES ('s1', 'account-1', 'nen.campaign.review_request', ?, '2026-09-01', '2026-09-01')`,
+    ).run(JSON.stringify({
+      ...review!,
+      after_actions: [{ kind: 'open_form', formId: '', formName: '', buttonLabel: '' }],
+      updated_at: '2026-09-01',
+    }));
+    expect((await getNenCampaign(db, 'review_request', 'account-1'))?.form_action_dropped).toBe(1);
+
+    expect(await enqueuePostShippingFollowUps(
+      db, shipped('shipment-1', '2026-09-01T09:00:00+09:00'), 'friend-1', 'account-1',
+    )).toBe(2);
+    expect(sqlite.prepare(
+      `SELECT status, last_error FROM nen_delivery_jobs
+        WHERE campaign_key = 'review_request' AND friend_id = 'friend-1'`,
+    ).get()).toEqual({ status: 'skipped', last_error: 'campaign_form_unavailable' });
   });
 
   test('既存の予約済みjobは設定不足でも勝手に変えない', async () => {

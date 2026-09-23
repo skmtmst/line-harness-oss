@@ -274,9 +274,16 @@ nenCampaigns.put('/api/nen-campaigns/settings/:campaignKey', requireRole('owner'
    * 保存を止める。口コミ回答の除外も有効なフォーム選択が前提。
    */
   const formAction = afterActions.find((action) => action.kind === 'open_form');
+  /*
+   * 判定は「これから保存しようとする中身」で行う。除外フラグと旧open_formの
+   * 残骸はリクエスト側の値を反映させないと、設定不足を解除する保存まで
+   * 既存の不足判定で弾かれてしまう。
+   */
   const proposed: CampaignRow = {
     ...current,
     after_actions: afterActions,
+    form_action_dropped: 0,
+    exclude_form_respondents: excludeFormRespondents ? 1 : 0,
     button_url: buttonUrl || null,
   };
   const buttonFormId = campaignButtonFormId(proposed);
