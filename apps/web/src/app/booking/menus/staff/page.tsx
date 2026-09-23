@@ -6,6 +6,8 @@ import { useSearchParams } from 'next/navigation'
 import { bookingApi, type BookingMenu, type BookingStaff, type StaffMenuMatrix } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
 
 /**
  * メニューごとの担当スタッフ（設計 V2 8-2-4 / node B88kuI）。
@@ -151,6 +153,11 @@ function MenuStaffMatrixContent() {
     () => savedGrid !== null && JSON.stringify(grid) !== JSON.stringify(savedGrid),
     [grid, savedGrid],
   )
+  /*
+   * 未保存の割り当て変更がある間、画面を離れる操作を止める共通の番兵（DETAIL-04系）。
+   * 左メニュー・画面内リンク・戻る操作・再読込を同じ確認対話へ寄せる。
+   */
+  const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty, busy: saving })
   const saveStateLabel = loading
     ? '読み込み中…'
     : error
@@ -426,6 +433,16 @@ function MenuStaffMatrixContent() {
           </li>
         </ul>
       </div>
+
+      <ConfirmDialog
+        open={leaveTarget !== null}
+        title="保存していない変更があります"
+        description="このまま移動すると、担当割り当てへの変更は失われます。保存せずに移動しますか？"
+        confirmLabel="保存せずに移動"
+        cancelLabel="編集を続ける"
+        onConfirm={confirmLeave}
+        onCancel={cancelLeave}
+      />
     </div>
   )
 }

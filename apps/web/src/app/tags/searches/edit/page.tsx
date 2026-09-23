@@ -28,6 +28,7 @@ import { TextInput } from '@/components/shared/form-controls'
 import Button from '@/components/shared/button'
 import Select from '@/components/shared/select'
 import { optionsWithCurrent } from './reference-options'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { savedSearchSummary, type SavedSearchConditionLabels } from '@/components/friends/saved-search-utils'
 import { AttributeKindGuide, DuplicateNameNote, findDuplicateNames } from '@/components/friend-fields/attribute-kind-guide'
 
@@ -410,6 +411,11 @@ function SavedSearchEditInner() {
     return name !== original.name || isShared !== original.isShared
       || JSON.stringify(conditions) !== JSON.stringify(normalizeForEdit(original))
   }, [conditions, isShared, name, original])
+  /*
+   * 未保存の条件変更がある間、画面を離れる操作を止める共通の番兵（DETAIL-04系）。
+   * 「保存した検索へ」「キャンセル」「該当者を確認」などのリンクも同じ確認対話へ寄せる。
+   */
+  const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty, busy: saving })
 
   /*
    * IDEA-04: 変更前後の条件を人が読める形で並べる。
@@ -649,6 +655,15 @@ function SavedSearchEditInner() {
         )}
       />
       <ConfirmDialog open={deleteOpen && original.canDelete === true} title={`「${name}」を削除しますか？`} description="使用先が無いことをサーバーで確認済みです。保存した条件だけを削除し、友だちは削除しません。" confirmLabel="削除する" destructive onCancel={() => setDeleteOpen(false)} onConfirm={() => { setDeleteOpen(false); void remove() }} />
+      <ConfirmDialog
+        open={leaveTarget !== null}
+        title="保存していない変更があります"
+        description="このまま移動すると、検索条件への変更は失われます。保存せずに移動しますか？"
+        confirmLabel="保存せずに移動"
+        cancelLabel="編集を続ける"
+        onConfirm={confirmLeave}
+        onCancel={cancelLeave}
+      />
     </div>
   )
 }

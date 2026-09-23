@@ -14,6 +14,7 @@ import type { NenRankSettingsData } from '@/lib/nen-ranks-api'
 
 const m = vi.hoisted(() => ({ ranks: vi.fn(), milestones: vi.fn(), resync: vi.fn() }))
 vi.mock('@/lib/nen-ranks-api', () => ({ nenRanksApi: { saveRanks: m.ranks, saveMilestones: m.milestones, resync: m.resync } }))
+vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn(), refresh: vi.fn(), prefetch: vi.fn() }) }))
 
 import RankSettingsTab from './rank-settings-tab'
 import LifetimeTab from './lifetime-tab'
