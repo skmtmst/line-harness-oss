@@ -14,8 +14,10 @@ import { useAccount } from '@/contexts/account-context'
 import Button from '@/components/shared/button'
 import ConditionBuilder, {
   isEmptyCondition,
+  isRuleComplete,
   pruneCondition,
   type SegmentCondition,
+  type SegmentRule,
 } from '@/components/shared/condition-builder'
 
 function Shell({
@@ -58,6 +60,42 @@ function Shell({
 }
 
 /* ---------------------------------------------------------------- 配信対象 */
+
+/*
+ * 「現在の条件」の行に出す条件軸の名前。
+ *
+ * 窓の中で条件の中身を要約するときに使う。下の「詳しい条件を編集」
+ * （ConditionBuilder）が見ている draft と同じ値から組み立てる。
+ * 固定の見本を置くと、書いた条件と表示が食い違う（#616 SC-02c）。
+ */
+const RULE_TYPE_LABEL: Record<string, string> = {
+  name: '名前',
+  private_memo: '個別メモ',
+  status_message: 'ステータスメッセージ',
+  registered_at: '友だち登録日',
+  support_mark: '対応マーク',
+  tag_exists: 'タグ',
+  tag_all: 'タグ',
+  tag_not_exists: 'タグ（除外）',
+  tag_not_all: 'タグ（除外）',
+  friend_field: '友だち情報',
+  scenario_subscribed: 'シナリオ購読',
+  scenario_state: 'シナリオ',
+  form_answered: '回答フォーム',
+  last_reaction_at: '最終反応日',
+  reaction_state: '反応状態',
+  score_range: '行動スコア',
+  is_following: 'ブロック状態',
+  is_hidden: '表示状態',
+  analytics_audience: '一時対象者',
+  ref_code: '紹介コード',
+}
+
+/** 条件1行の読み取り。軸の名前だけはIDなしで確実に言える。 */
+function describeRule(rule: SegmentRule): string {
+  const label = RULE_TYPE_LABEL[rule.type] ?? rule.type
+  return isRuleComplete(rule) ? label : `${label}（書きかけ）`
+}
 
 export function ConditionDialog({
   title,
@@ -127,7 +165,11 @@ export function ConditionDialog({
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
             <p className="text-ink-faint text-xs">現在の条件</p>
-            <p className="text-ink mt-2 text-sm font-bold">タグ「初回案内」かつ 対応マーク「未対応」</p>
+            {/*
+              実際の下書き（draft）を言い表す。下の「詳しい条件を編集」が
+              見ているのと同じ値なので、ここだけ別の条件に見えることはない。
+            */}
+            <p className="text-ink mt-2 text-sm font-bold">{describeCondition(draft)}</p>
           </div>
           <Button onClick={() => setDraft(null)}>
             条件を初期化
@@ -135,16 +177,57 @@ export function ConditionDialog({
         </div>
       </section>
       <section className="border-hairline rounded-panel border px-4 py-5">
-        <div className="flex items-center justify-between gap-3">
-          <p className="text-ink text-sm font-bold">条件 1</p>
-          <button type="button" onClick={() => setDraft(null)} className="text-danger text-xs">削除</button>
-        </div>
-        <div className="mt-3 grid gap-2" style={{ gridTemplateColumns: '1fr 1.25fr 1fr 0.8fr' }}>
-          <div className="border-hairline rounded-control border px-3 py-2 text-sm">タグ</div>
-          <div className="border-hairline rounded-control border px-3 py-2 text-sm">初回案内</div>
-          <div className="border-hairline rounded-control border px-3 py-2 text-sm">含む</div>
-          <div className="border-hairline rounded-control border px-3 py-2 text-sm">選択したタグを持つ</div>
-        </div>
+        {draft && !isEmptyCondition(draft) ? (
+          <ul className="space-y-2">
+            {draft.rules.map((rule, i) => (
+              <li key={`rule-${i}`} className="flex items-center justify-between gap-3">
+                <p className="text-ink text-sm font-bold">
+                  条件 {i + 1}
+                  <span className="text-ink-secondary ml-2 text-xs font-normal">
+                    {describeRule(rule)}
+                  </span>
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const next = { ...draft, rules: draft.rules.filter((_, r) => r !== i) }
+                    setDraft(isEmptyCondition(next) ? null : next)
+                  }}
+                  className="text-danger shrink-0 text-xs"
+                >
+                  削除
+                </button>
+              </li>
+            ))}
+            {(draft.groups ?? []).map((group, gi) => (
+              <li key={`group-${gi}`} className="flex items-center justify-between gap-3">
+                <p className="text-ink text-sm font-bold">
+                  or条件のかたまり {gi + 1}
+                  <span className="text-ink-secondary ml-2 text-xs font-normal">
+                    {group.rules.length}件
+                  </span>
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const next = {
+                      ...draft,
+                      groups: (draft.groups ?? []).filter((_, g) => g !== gi),
+                    }
+                    setDraft(isEmptyCondition(next) ? null : next)
+                  }}
+                  className="text-danger shrink-0 text-xs"
+                >
+                  削除
+                </button>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-ink-secondary text-sm">
+            条件はまだありません。下の「詳しい条件を編集」から足せます。
+          </p>
+        )}
       </section>
       <section className="mt-4">
         <h3 className="text-ink text-sm font-bold">利用できる条件軸</h3>

@@ -13,7 +13,7 @@ import ActionEditor from '@/components/scenarios/action-editor'
 import TriggerEditor from '@/components/scenarios/trigger-editor'
 import CarouselPicker from '@/components/scenarios/carousel-picker'
 import InsertToolbar from '@/components/scenarios/insert-toolbar'
-import StepPreview from '@/components/scenarios/step-preview'
+import StepPreview, { previewOffsets } from '@/components/scenarios/step-preview'
 import type { StepMessageKind } from '@/components/scenarios/message-type-tabs'
 import MessageKindFields, {
   emptyMessageKindState,
@@ -1205,6 +1205,14 @@ export default function ScenarioDetailClient({
     }
   }
 
+  /*
+   * 通の編集フォームの右の柱（「配信の流れ」「設定サマリー」）へ渡す
+   * 日・時間・分。方式ごとの持ち方（relative の合計分 / elapsed の
+   * 日・時間・分）を previewOffsets 1か所でそろえる。分だけ渡し忘れると、
+   * 設定内容は「1分後」なのにプレビューが「すぐに」のまま残る（#616 SC-02b）。
+   */
+  const stepFormPreview = previewOffsets(deliveryMode, stepForm.schedule)
+
   // 新規追加（上部）とステップ編集（行直下インライン）の両方で使うフォーム。
   // 同時に開くのは常に片方だけなので、state は stepForm を共有する。
   const renderStepForm = () => (
@@ -1553,9 +1561,10 @@ export default function ScenarioDetailClient({
       <aside data-design-node="xfYLn" className="min-w-0 space-y-4">
         <StepPreview
           deliveryMode={deliveryMode}
-          offsetDays={stepForm.schedule.offsetDays}
+          offsetDays={stepFormPreview.offsetDays}
           deliveryTime={stepForm.schedule.deliveryTime}
-          offsetHours={stepForm.schedule.offsetHours}
+          offsetHours={stepFormPreview.offsetHours}
+          offsetMinutes={stepFormPreview.offsetMinutes}
           kind={(stepForm.question
             ? 'question'
             : stepForm.messageType === 'flex'
