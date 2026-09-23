@@ -86,10 +86,10 @@
     "direct-secondary-button": 1
   },
   "app/chats/page.tsx": {
-    "arbitrary-value": 112,
+    "arbitrary-value": 92,
+    "direct-secondary-button": 3,
     "direct-primary-button": 2,
-    "unresolved-classname": 2,
-    "direct-secondary-button": 2
+    "unresolved-classname": 2
   },
   "app/contents/page.tsx": {
     "arbitrary-value": 8,
@@ -212,7 +212,7 @@
     "unresolved-classname": 8
   },
   "app/inflow-links/page.tsx": {
-    "arbitrary-value": 18,
+    "arbitrary-value": 16,
     "direct-secondary-button": 2,
     "direct-primary-button": 1
   },
@@ -249,7 +249,7 @@
     "arbitrary-value": 1
   },
   "app/page.tsx": {
-    "arbitrary-value": 14,
+    "arbitrary-value": 13,
     "direct-secondary-button": 3,
     "direct-primary-button": 2,
     "unresolved-classname": 1
@@ -273,7 +273,7 @@
     "arbitrary-value": 3
   },
   "app/restaurant-test/restaurant-console.tsx": {
-    "arbitrary-value": 19,
+    "arbitrary-value": 18,
     "unresolved-classname": 7,
     "direct-th": 9,
     "direct-secondary-button": 2,
@@ -330,7 +330,7 @@
   },
   "app/settings/page.tsx": {
     "unresolved-classname": 1,
-    "arbitrary-value": 17
+    "arbitrary-value": 16
   },
   "app/staff/new/page.tsx": {
     "direct-secondary-button": 1,
@@ -414,7 +414,7 @@
     "direct-primary-button": 1
   },
   "components/accounts/test-recipients-setting.tsx": {
-    "arbitrary-value": 2
+    "arbitrary-value": 1
   },
   "components/auth-guard.tsx": {
     "arbitrary-value": 1
@@ -749,7 +749,7 @@
     "unresolved-classname": 20
   },
   "components/support/email-thread.tsx": {
-    "arbitrary-value": 43,
+    "arbitrary-value": 42,
     "direct-primary-button": 2
   },
   "components/support/pending-inbox-card.tsx": {
@@ -757,7 +757,7 @@
     "direct-th": 4
   },
   "components/support/support-inbox.tsx": {
-    "arbitrary-value": 15,
+    "arbitrary-value": 14,
     "direct-primary-button": 2
   },
   "components/ui/kpi-collapse.tsx": {

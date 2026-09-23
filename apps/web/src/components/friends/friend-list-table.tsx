@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { Star } from 'lucide-react'
+import { ChevronDown, Star } from 'lucide-react'
 import type { FriendListItem } from '@/lib/api'
 import Pagination from '@/components/shared/pagination'
 import Checkbox from '@/components/shared/checkbox'
@@ -112,12 +112,13 @@ export default function FriendListTable({
           友だち一覧 <span className="ml-1 text-xs font-bold text-accent-deep">{total.toLocaleString('ja-JP')}件</span>
         </h2>
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs">
-          <span className="whitespace-nowrap text-ink-faint">{selectedCount}件選択中</span>
+          {/* 選んでいる時だけ出す（★V7：0件の時は意味が無い）。 */}
+          {selectedCount > 0 ? <span className="whitespace-nowrap font-semibold text-accent-deep">{selectedCount}件選択中</span> : null}
           <details className="relative">
             <summary className="flex h-9 cursor-pointer list-none items-center gap-2 whitespace-nowrap font-semibold text-action">
               表示項目を編集
             </summary>
-            <div className="absolute right-0 z-20 mt-1 w-52 rounded-card border border-hairline bg-canvas p-2 shadow-lg">
+            <div className="absolute right-0 z-20 mt-1 w-52 rounded-card border border-hairline bg-canvas p-2 shadow-float">
               {COLUMN_LABELS.map((column) => (
                 <div key={column.key} className="rounded-control px-2 py-2 hover:bg-canvas-sunken">
                   {/* ★V7 共通 チェックボックス（gvjpx）。 */}
@@ -141,9 +142,9 @@ export default function FriendListTable({
               data-qa-open="LT8RS"
               className="flex h-10 min-w-34.5 cursor-pointer list-none items-center justify-between gap-4 rounded-control border border-hairline bg-canvas px-3 text-sm font-semibold text-ink"
             >
-              {pageSize}件表示 <span aria-hidden="true" className="text-ink-faint">⌄</span>
+              {pageSize}件表示 <ChevronDown aria-hidden="true" className="h-4 w-4 text-ink-faint" />
             </summary>
-            <div className="absolute right-0 z-20 mt-1 w-37.5 rounded-card border border-hairline bg-canvas p-1.5 shadow-lg">
+            <div className="absolute right-0 z-20 mt-1 w-37.5 rounded-card border border-hairline bg-canvas p-1.5 shadow-float">
               {pageSizeOptions.map((size) => (
                 <button
                   key={size}
