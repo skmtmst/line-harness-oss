@@ -89,9 +89,7 @@ function accountScopeSql(opts: Pick<UnansweredInboxOptions, 'allowedAccountIds' 
   return { sql: '0 = 1', bindings: [] };
 }
 
-function escapedLike(value: string): string {
-  return `%${value.replace(/[\\%_]/g, (character) => `\\${character}`)}%`;
-}
+
 
 function queryFilters(opts: UnansweredInboxOptions, includeSearch: boolean): {
   sql: string;
@@ -125,12 +123,18 @@ function queryFilters(opts: UnansweredInboxOptions, includeSearch: boolean): {
     bindings.push(new Date(Date.now() - opts.minWaitMinutes * 60_000).toISOString());
   }
   if (includeSearch && opts.q?.trim()) {
+    /*
+     * #625: LIKE ではなく instr() で部分一致する。
+     * D1 の LIKE/GLOB パターンは最大50バイトのため、48バイト超の検索語で
+     * SQLite エラー(500)になっていた。COLLATE NOCASE と同じく
+     * 大文字小文字は ASCII だけ畳む (SQLite の lower() と同じ範囲)。
+     */
     conditions.push(`(
-      f.display_name LIKE ? ESCAPE '\\' COLLATE NOCASE
-      OR incoming.content LIKE ? ESCAPE '\\' COLLATE NOCASE
+      instr(lower(f.display_name), lower(?)) > 0
+      OR instr(lower(incoming.content), lower(?)) > 0
     )`);
-    const like = escapedLike(opts.q.trim());
-    bindings.push(like, like);
+    const needle = opts.q.trim();
+    bindings.push(needle, needle);
   }
 
   return { sql: conditions.join('\n AND '), bindings };

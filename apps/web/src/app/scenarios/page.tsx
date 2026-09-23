@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import type { Scenario } from '@line-crm/shared'
 import { api, type ScenarioRuns, type ScenarioSimulation } from '@/lib/api'
 import { useOffsetServerList } from '@/lib/use-server-list'
+import { clampSearchQuery } from '@/lib/search-query'
 import { useAccount } from '@/contexts/account-context'
 
 function scenarioCompletionDetail(active: number, completed: number): string {
@@ -403,7 +404,9 @@ export default function ScenariosPage() {
   }, [loadOverallTotal])
 
   useEffect(() => {
-    const timer = setTimeout(() => setServerQuery(nameQuery.trim()), 300)
+    // #625: サーバーへ送る語はここでも上限へ切り詰める（入力欄でも切るが、
+    // 値が別経路で入っても同じ長さにそろえる）。
+    const timer = setTimeout(() => setServerQuery(clampSearchQuery(nameQuery.trim())), 300)
     return () => clearTimeout(timer)
   }, [nameQuery])
 
@@ -775,7 +778,9 @@ export default function ScenariosPage() {
       <ListToolbar
         searchPlaceholder="シナリオ名で検索"
         searchValue={nameQuery}
-        onSearchChange={setNameQuery}
+        // #625: 長い検索語は上限へ切り詰める。共有部品(ListToolbar)は
+        // 変えず、受け取る値をここで制限する。
+        onSearchChange={(value) => setNameQuery(clampSearchQuery(value))}
       />
 
       {/*
