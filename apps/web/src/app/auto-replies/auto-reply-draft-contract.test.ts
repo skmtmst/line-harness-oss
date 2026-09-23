@@ -33,6 +33,18 @@ describe('自動応答の編集に渡す中身', () => {
     expect(EDIT).not.toContain('keywordMatchMode: res.data.keywordMatchMode')
   })
 
+  it('社内メモを復元し、作成・更新・下書きのどの保存口でも送る（AUTOREPLY-09）', () => {
+    // 一覧・詳細の応答から編集の中身へ戻す。
+    expect(DIALOG).toContain('internalMemo: rule.internalMemo ?? null')
+    expect(DIALOG).toContain("useState(draft.internalMemo ?? '')")
+    // 保存本文に必ず載せる。新規作成・一覧の編集・URL 編集のどれでも送れる
+    // ように、共通の body へ入れる（版管理の口へだけ入れると一覧経由で消える）。
+    expect(DIALOG).toContain('internalMemo: internalMemo.trim() || null')
+    const API = read('..', '..', 'lib', 'api.ts')
+    expect(API).toContain('internalMemo: string | null')
+    expect(API).toContain('internalMemo?: string | null')
+  })
+
   it('曜日・アクション・キーワードの複数行も落とさない', () => {
     expect(DIALOG).toContain('responseWeekdays: rule.responseWeekdays ?? null')
     expect(DIALOG).toContain('actions: rule.actions ?? null')

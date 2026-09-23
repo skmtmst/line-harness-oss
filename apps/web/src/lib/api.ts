@@ -8987,6 +8987,8 @@ export const api = {
         keywordMatchMode: string;
         /** フォルダ。分けていなければ null。 */
         folderId: string | null;
+        /** 運用者だけが読むメモ。友だちへは出ない。 */
+        internalMemo: string | null;
         /** 273: 'draft'（未公開）| 'published' | 'stopped'。 */
         lifecycleStatus: string;
         /** 機能08 点検 E-01: 最後に停止した記録。止めたことが無ければ null。 */
@@ -9037,6 +9039,8 @@ export const api = {
         keywordMatchMode: string;
         /** フォルダ。分けていなければ null。 */
         folderId: string | null;
+        /** 運用者だけが読むメモ。友だちへは出ない。 */
+        internalMemo: string | null;
         /** 273: 'draft'（未公開）| 'published' | 'stopped'。 */
         lifecycleStatus: string;
         /** 機能08 点検 E-01: 最後に停止した記録。 */
@@ -9090,6 +9094,8 @@ export const api = {
       keywordMatchMode?: 'any' | 'all';
       /** フォルダ。 */
       folderId?: string | null;
+      /** 運用者だけが読むメモ。友だちへは出ない。1000字まで。 */
+      internalMemo?: string | null;
     }) =>
       fetchApi<ApiResponse<{ id: string }>>('/api/auto-replies', {
         method: 'POST',
@@ -9130,6 +9136,8 @@ export const api = {
       keywordMatchMode?: 'any' | 'all';
       /** フォルダ。 */
       folderId?: string | null;
+      /** 運用者だけが読むメモ。省略は変更なし、null/'' で消す。 */
+      internalMemo?: string | null;
     }) =>
       fetchApi<ApiResponse<{ id: string }>>(`/api/auto-replies/${id}`, {
         method: 'PUT',
