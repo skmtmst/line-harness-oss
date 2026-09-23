@@ -518,7 +518,7 @@ export default function BroadcastForm({
   onStepChange,
   visualQaAugustCampaign = false,
 }: BroadcastFormProps) {
-  const { selectedAccountId } = useAccount()
+  const { selectedAccountId, loading: accountLoading } = useAccount()
   /*
    * テスト送信と本番予約で同じ下書きを使う。
    * 押すたびにPOSTすると、テストした回数だけ一覧へ下書きが増え、最後の予約は
@@ -532,6 +532,14 @@ export default function BroadcastForm({
   selectedAccountIdRef.current = selectedAccountId
   const searchParams = useSearchParams()
   const appliedDuplicateFrom = useRef(false)
+  /*
+   * BROADCAST-17: 保存済みの下書きを `/broadcasts/new?draft=<id>` で
+   * 開き直したとき、下書きの中身をフォームへ戻す。
+   * `editingDraft` が無い間は下の描画を読み込み表示へ切り替える。
+   */
+  const appliedDraftFrom = useRef(false)
+  const [editingDraft, setEditingDraft] = useState<ApiBroadcast | null>(null)
+  const [draftError, setDraftError] = useState('')
   const [title, setTitle] = useState(visualQaAugustCampaign ? '8月キャンペーンのお知らせ' : '')
   const [internalMemo, setInternalMemo] = useState('')
   const [deliveryMethod, setDeliveryMethod] = useState<'new' | 'template' | 'duplicate'>('new')
@@ -684,6 +692,122 @@ export default function BroadcastForm({
       setError('元の配信を読み込めませんでした。作り直す配信を選び直してください。')
     })
   }, [searchParams])
+
+  /*
+   * 下書きの再開（BROADCAST-17）。
+   *
+   * V6 の作成5段は「同じ下書きIDを使う」作りなので、詳細画面の
+   * 「本文を編集」から来たときは同じ下書きをここで続けられる。
+   * 保存はいつもの persistDraft へ流し、下書きIDと版を draftSession へ
+   * 載せるので、新しい配信が増えることはない。
+   */
+  useEffect(() => {
+    // アカウントが確定する前に照合すると「別アカウントの下書き」と誤判定する。
+    if (appliedDraftFrom.current || accountLoading) return
+    const draftId = searchParams.get('draft')?.trim()
+    if (!draftId) return
+    appliedDraftFrom.current = true
+    void api.broadcasts.get(draftId).then((res) => {
+      if (!res.success || !res.data) {
+        setDraftError('下書きを読み込めませんでした。一覧から開き直してください。')
+        return
+      }
+      const draft = res.data
+      if (draft.status !== 'draft' && draft.status !== 'scheduled') {
+        setDraftError('この配信はすでに送信が始まっているため、ここでは編集できません。')
+        return
+      }
+      /*
+       * 複数アカウントの重複排除配信は、この画面では対象を組み立てられない。
+       * そのまま保存すると優先順位やアカウント指定が消えるので、ここでは開かない。
+       */
+      if (draft.targetType === 'multi-account-dedup') {
+        setDraftError('複数アカウントへ配る配信は、この画面では編集できません。')
+        return
+      }
+      /*
+       * 別アカウントの下書きを、いま選んでいるアカウントへ付け替えない。
+       * そのまま保存すると宛先の人数が別アカウント基準で数えられ、
+       * 配信元も静かに変わってしまう。
+       */
+      if (draft.lineAccountId && selectedAccountId && draft.lineAccountId !== selectedAccountId) {
+        setDraftError('この下書きは別のLINEアカウントで作られています。アカウントを切り替えて開き直してください。')
+        return
+      }
+
+      setTitle(draft.title)
+      setInternalMemo(draft.internalMemo ?? '')
+      setTrackLinks(draft.trackLinks)
+      setMessageButtons(draft.messageOptions?.buttons ?? [])
+      setAfterActionVersionId(draft.afterActionVersionId ?? '')
+      setFolderId(draft.folderId ?? '')
+      setMeasureOpens(draft.measureOpens ?? true)
+      const spread = Number(draft.draftPayload?.stealthSpreadMinutes ?? 0)
+      if (Number.isFinite(spread) && spread > 0) setSpreadMinutes(String(spread))
+
+      // 吹き出し。形が読めないときだけ、従来の平文本文から1枚作る。
+      const savedBubbles = draft.messageBubbles?.filter((bubble): bubble is BroadcastBubble => (
+        Boolean(bubble)
+        && typeof bubble === 'object'
+        && typeof bubble.id === 'string'
+        && typeof bubble.type === 'string'
+        && Boolean(bubble.content)
+      ))
+      setBubbles(savedBubbles?.length
+        ? savedBubbles
+        : [{ id: crypto.randomUUID(), type: draft.messageType, content: { text: draft.messageContent } }])
+
+      /*
+       * 宛先の条件。保存時に画面が足す is_following（ブロック中を除く基礎条件）は
+       * 外して戻す——残すと条件ビルダーに自分が書いていない行が出て、
+       * 保存のたびに重複していく。
+       */
+      const stored = draft.segmentConditions ?? null
+      const userCondition: SegmentCondition | null = stored
+        ? { ...stored, rules: (stored.rules ?? []).filter((rule) => rule.type !== 'is_following') }
+        : null
+      if (draft.targetType === 'tag' && draft.targetTagId) {
+        setTargetMode('tag')
+        setTagId(draft.targetTagId)
+      } else if (draft.targetType === 'all') {
+        setTargetMode('all')
+      } else {
+        const rules = userCondition?.rules ?? []
+        const groups = userCondition?.groups ?? []
+        // 「シナリオ購読中の全員」で保存された条件は、その選び方へ戻す。
+        if (rules.length === 1 && rules[0]?.type === 'scenario_subscribed' && groups.length === 0) {
+          setTargetMode('scenario')
+          setScenarioId(String(rules[0].value ?? ''))
+        } else {
+          setTargetMode('advanced')
+          setCondition(userCondition)
+          setConditionDraft(userCondition)
+        }
+      }
+
+      // 予約日時。保存値はUTC、入力は一覧と同じ日本時間（EVENT-05と同じ決めごと）。
+      if (draft.scheduledAt) {
+        const jst = new Date(new Date(draft.scheduledAt).getTime() + 9 * 60 * 60 * 1000)
+        setSendMode('scheduled')
+        setScheduledDate(jst.toISOString().slice(0, 10))
+        setScheduledTime(jst.toISOString().slice(11, 16))
+      }
+
+      /*
+       * このIDを更新として保存するため、下書きIDと版をセッションへ載せる。
+       * 載せないと persistDraft が新規作成へ流れ、下書きがもう1件増える。
+       */
+      draftSession.current = {
+        accountId: draft.lineAccountId ?? selectedAccountId ?? null,
+        draftId: draft.id,
+        version: draft.version ?? 1,
+        createKey: draftSession.current.createKey,
+      }
+      setEditingDraft(draft)
+    }).catch(() => {
+      setDraftError('下書きを読み込めませんでした。一覧から開き直してください。')
+    })
+  }, [searchParams, accountLoading, selectedAccountId])
 
   // 本文や届く時刻を変えたあとは、前の見た目に対する確認を引き継がない。
   useEffect(() => {
@@ -1087,6 +1211,15 @@ export default function BroadcastForm({
    */
   const persistDraft = async (scheduledAt: string | null, saveAsDraft = false): Promise<ApiBroadcast | null> => {
     const accountId = selectedAccountId || null
+    /*
+     * 編集中にアカウントが切り替わったまま保存すると、下書きが別アカウントの
+     * 新規配信として増える（セッションのアカウントと合わないため）。
+     * 開いたときの配信元と違うなら送らず、理由を出す（BROADCAST-17）。
+     */
+    if (editingDraft?.lineAccountId && editingDraft.lineAccountId !== accountId) {
+      setError('別のLINEアカウントへ切り替わっています。元のアカウントへ戻してから保存してください。')
+      return null
+    }
     const payload = draftPayload(scheduledAt, saveAsDraft)
     try {
       const result = await persistBroadcastDraft(
@@ -1350,6 +1483,36 @@ export default function BroadcastForm({
     } catch { setError('下書きを保存できませんでした') } finally { setSaving(false) }
   }
 
+  /*
+   * BROADCAST-17: `?draft=` で開いたとき、読み込み・照合が終わるまで
+   * 作成フォームを出さない。空のフォームが一瞬出てから下書きで
+   * 埋まると、新規作成と取り違える。
+   */
+  const draftParam = searchParams.get('draft')?.trim() ?? ''
+  if (draftParam) {
+    if (draftError) {
+      return (
+        <div className="broadcast-form-v6 mb-8">
+          <div className="rounded-card border border-hairline bg-canvas p-8 text-center">
+            <p className="text-ink text-sm font-semibold">{draftError}</p>
+            <div className="mt-4 flex items-center justify-center gap-3">
+              <Link href="/broadcasts" className="text-accent text-sm font-medium hover:underline">
+                一斉配信一覧へ戻る
+              </Link>
+            </div>
+          </div>
+        </div>
+      )
+    }
+    if (!editingDraft) {
+      return (
+        <div className="bg-canvas rounded-card border-hairline text-ink-faint border p-8 text-center text-sm">
+          下書きを読み込んでいます…
+        </div>
+      )
+    }
+  }
+
   return <div className="broadcast-form-v6 mb-8">
     {currentStep ? (
       <Link href="/broadcasts" className="mb-5 inline-flex text-sm font-semibold text-action hover:underline">
@@ -1369,6 +1532,11 @@ export default function BroadcastForm({
       </div>
     )}
     <BroadcastStepRail steps={steps} />
+    {editingDraft ? (
+      <p className="border-hairline bg-canvas-sunken text-ink-secondary mt-3 rounded-card border px-4 py-2 text-xs">
+        保存済みの下書き「{editingDraft.title}」を開いています。保存すると、この下書きへ上書きします。
+      </p>
+    ) : null}
     <div className="mt-2.5 grid gap-4 xl:grid-cols-[minmax(0,1fr)_390px]">
       <div className={`space-y-5 ${preflightDialogOpen ? 'broadcast-preflight-page-open' : ''}`}>
         {preflightDialogOpen ? (

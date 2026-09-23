@@ -35,7 +35,7 @@ import { Field, inputClass } from '@/components/shared/form-controls'
 import BlockEditor, { BLOCK_MENU } from '@/components/forms/block-editor'
 import FormPreview from '@/components/forms/form-preview'
 import FormDesignSettings from './form-design-settings'
-import { validateLayoutForSave } from './form-validate'
+import { ogImageUrlError, validateLayoutForSave } from './form-validate'
 import OptionsDialog from '@/components/forms/options-dialog'
 import { describeFormUpdates } from '@/components/forms/form-update-summary'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -427,10 +427,49 @@ function FormEditInner() {
   const dirty = savedSnapshot.current !== null && currentSnapshot !== savedSnapshot.current
 
   /*
+   * 「保存せずに移動」を選んだとき、保存済み・読み直し直後の姿へ戻す。
+   *
+   * `?tab=` だけ変わる移動や、移動先から同じ画面へ戻ったときに「消えます」と
+   * 言ったはずの変更が残っていると困る。画面がアンマウントされない
+   * 移動でも、実際に捨てた形にしてから離れる（FORM-19）。
+   */
+  const discardChanges = useCallback(() => {
+    const snapshot = savedSnapshot.current
+    if (!snapshot) return
+    const saved = JSON.parse(snapshot) as {
+      name: string
+      description: string
+      isActive: boolean
+      onSubmitTagId: string
+      ogTitle: string
+      ogDescription: string
+      ogImageUrl: string
+      layout: FormLayout
+    }
+    setName(saved.name)
+    setDescription(saved.description)
+    setIsActive(saved.isActive)
+    setOnSubmitTagId(saved.onSubmitTagId)
+    setOgTitle(saved.ogTitle)
+    setOgDescription(saved.ogDescription)
+    setOgImageUrl(saved.ogImageUrl)
+    setLayoutState(saved.layout)
+    // 捨てたあとの「元に戻す」で破棄した変更が蘇らないよう、履歴も切る。
+    undoStack.current = []
+    redoStack.current = []
+    setSelectedBlockId(null)
+  }, [])
+
+  /*
    * 未保存の変更がある間、画面を離れる操作を止める共通の番兵（DETAIL-04系）。
    * タブ移動のリンク・左メニュー・戻る操作・再読込を同じ確認対話へ寄せる。
+   * 一覧へのリンク（パンくずの「回答フォーム」）も同じ捕まえ方で止まる。
    */
-  const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty, busy: saving })
+  const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({
+    dirty,
+    busy: saving,
+    onDiscard: discardChanges,
+  })
 
   const save = async (publishAfter = false): Promise<boolean> => {
     if (!selectedAccountId) {
@@ -466,6 +505,17 @@ function FormEditInner() {
     const layoutError = validateLayoutForSave(layout)
     if (layoutError) {
       setError(layoutError)
+      return false
+    }
+
+    /*
+     * FORM-18: カードの画像URLは https:// だけ受け付ける。
+     * 欄の注記と同じ決めごとを保存でも守る。**入力は残す**——値を
+     * 消すと直せないので、理由だけ出して送らない。
+     */
+    const ogImageError = ogImageUrlError(ogImageUrl)
+    if (ogImageError) {
+      setError(ogImageError)
       return false
     }
 
