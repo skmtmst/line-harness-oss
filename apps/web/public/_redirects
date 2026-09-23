@@ -23,3 +23,12 @@
 /updates         /emergency?tab=history      308
 /pools           /accounts?tab=pools         308
 /booking/staff   /booking/menus?tab=staff    308
+
+# Issue #638: サイトマップ/案内URLとして出回ったが実体の無い5本。
+# いずれも正規ルートへ 308 で送る。/booking は親パスだけを対象にするので
+# /booking/bookings など下の階層は素通りする。
+/booking/menus/list  /booking/menus            308
+/booking/schedule    /booking/staff/shifts     308
+/booking/rules       /booking/menus?tab=rules  308
+/booking             /booking/bookings         308
+/dashboard/scenarios /scenarios                308

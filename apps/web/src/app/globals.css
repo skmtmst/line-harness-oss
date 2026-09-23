@@ -306,14 +306,22 @@
  * - 英数字・URL の扱いは今までの `normal` と同じ
  * - 見出しは行の長さを揃えて、最後の行に1〜2文字だけ残るのを防ぐ
  */
-:lang(ja) {
-  word-break: auto-phrase;
-}
+/*
+ * `@layer base` に入れる。層の外に書くと Tailwind の utilities 層より強くなり、
+ * `truncate`（1行で省略）の見出しが折り返し、`break-all`（URL・秘密値を
+ * 途中で折る）が効かなくなった（2026-09-23 の点検で発覚）。base 層なら、
+ * 画面側のクラスが指定したときはそちらが勝つ。
+ */
+@layer base {
+  :lang(ja) {
+    word-break: auto-phrase;
+  }
 
-h1,
-h2,
-h3 {
-  text-wrap: balance;
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
+  }
 }
 
 /*
