@@ -1,5 +1,6 @@
 'use client'
 
+import Disclosure from '@/components/shared/disclosure'
 import SelectField from '@/components/shared/select-field'
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { MoreHorizontal, Trash2, TriangleAlert } from 'lucide-react'
@@ -608,32 +609,37 @@ export default function AutoRepliesPage() {
         </Button>
       </div>
 
-      {/* 複数当てはまったときの挙動。書いていないと必ず問い合わせになる。 */}
-      <div className="bg-info-bg text-info mb-4 rounded-lg p-3 text-xs leading-relaxed">
-        上にあるルールから順に見て、<strong>最初に当てはまった1つだけ</strong>が動きます。
-        時間帯や連投の設定で見送られたときは、その次のルールを見ます。
-        並び順は「評価順」の数字で決まり、小さいほど先に見ます。
-      </div>
+      {/*
+        複数当てはまったときの挙動と、「適用アカウント」欄の札の読み方。書いていないと必ず問い合わせになるが、
+        毎回2つの帯が一覧を押し下げていたので、閉じた欄にしまう（★V7：今は出さなくてよいもの）。
+      */}
+      <Disclosure size="compact" title="ルールの動き方と札の見方" hint="上から順に1つだけ動きます" className="mb-4">
+        <div className="text-ink-secondary mb-3 text-xs leading-relaxed">
+          上にあるルールから順に見て、<strong>最初に当てはまった1つだけ</strong>が動きます。
+          時間帯や連投の設定で見送られたときは、その次のルールを見ます。
+          並び順は「評価順」の数字で決まり、小さいほど先に見ます。
+        </div>
 
-      {/* 「適用アカウント」欄の札の読み方。札の見た目と1対1で並べる。 */}
-      <div className="bg-info-bg border-hairline text-info mb-4 space-y-1 rounded-lg border p-3 text-xs">
-        {EFFECTIVE_LEGEND.map((row) => (
-          <p key={row.status}>
-            <span
-              className={
-                row.status === 'reply'
-                  ? 'inline-flex items-center px-1.5 py-0.5 rounded bg-success-bg text-success'
-                  : row.status === 'silent'
-                    ? 'inline-flex items-center px-1.5 py-0.5 rounded bg-amber-50 text-amber-700'
-                    : 'inline-flex items-center px-1.5 py-0.5 rounded bg-canvas-sunken text-ink-faint line-through'
-              }
-            >
-              {row.mark ? `${row.mark} ` : ''}アカウント名
-            </span>{' '}
-            {row.text}
-          </p>
-        ))}
-      </div>
+        {/* 「適用アカウント」欄の札の読み方。札の見た目と1対1で並べる。 */}
+        <div className="text-ink-secondary space-y-1 text-xs">
+          {EFFECTIVE_LEGEND.map((row) => (
+            <p key={row.status}>
+              <span
+                className={
+                  row.status === 'reply'
+                    ? 'inline-flex items-center px-1.5 py-0.5 rounded bg-success-bg text-success'
+                    : row.status === 'silent'
+                      ? 'inline-flex items-center px-1.5 py-0.5 rounded bg-amber-50 text-amber-700'
+                      : 'inline-flex items-center px-1.5 py-0.5 rounded bg-canvas-sunken text-ink-faint line-through'
+                }
+              >
+                {row.mark ? `${row.mark} ` : ''}アカウント名
+              </span>{' '}
+              {row.text}
+            </p>
+          ))}
+        </div>
+      </Disclosure>
 
       <div
         data-design="Bar"
@@ -734,8 +740,8 @@ export default function AutoRepliesPage() {
               <tr className="bg-canvas-sunken border-b border-hairline">
                 <th className="w-2/6 px-4 py-3 text-left text-xs font-semibold text-ink-faint">ルール名</th>
                 <th className="w-20 px-4 py-3 text-left text-xs font-semibold text-ink-faint">状態</th>
-                <th title="動く条件（キーワード・適用アカウント）" className="w-1/6 px-4 py-3 text-left text-xs font-semibold text-ink-faint">どんなときに動くか</th>
-                <th title="返信と実行するアクション" className="w-1/6 px-4 py-3 text-left text-xs font-semibold text-ink-faint">何を返すか</th>
+                <th title="動く条件（キーワード・適用アカウント）" className="w-1/6 whitespace-nowrap px-4 py-3 text-left text-xs font-semibold text-ink-faint">条件</th>
+                <th title="返信と実行するアクション" className="w-1/6 whitespace-nowrap px-4 py-3 text-left text-xs font-semibold text-ink-faint">返すもの</th>
                 <th title="今月動いた回数" className="w-24 px-4 py-3 text-left text-xs font-semibold text-ink-faint">今月の応答</th>
                 <th title="編集・停止または再開・削除" className="w-44 px-4 py-3 text-right text-xs font-semibold text-ink-faint">操作</th>
                 <th className="hidden px-4 py-3">テンプレート</th>
