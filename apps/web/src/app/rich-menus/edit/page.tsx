@@ -19,6 +19,13 @@ import MediaPickerDialog from '@/app/contents/media-picker-dialog'
 import { datetimeLocalJstToUtcIso } from '@/lib/jst-datetime'
 import { useScheduleSubmit } from './schedule-submit'
 import { ManualPublishAttempt } from './manual-publish-attempt'
+import {
+  DEFAULT_PUBLISH_PLAN,
+  clearPublishPlanDraft,
+  loadPublishPlanDraft,
+  savePublishPlanDraft,
+  type PublishPlanInput,
+} from './publish-plan-draft'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { PublishHistorySection } from './publish-history'
 import { TestApplySection } from './test-apply-section'
@@ -99,28 +106,6 @@ type Page = {
   imageR2Key: string | null
   imageContentType: string | null
   areas: Area[]
-}
-
-/**
- * STEP3「公開のしかた」の入力値。
- *
- * datetime-local の生の文字列のまま持つ（送信時に JST→UTC へ直す）。
- * 下書き本体ではなく「予約・公開に使う入力」なので、下書き署名とは別の
- * 基準（publishBaseline）と比べて未保存かを決める。
- */
-type PublishPlanInput = {
-  mode: 'now' | 'scheduled' | 'period'
-  startsAt: string
-  endsAt: string
-  restoreGroupId: string
-}
-
-/** 公開入力の初期値。「いますぐ出す」・日時なし・戻し先なし。 */
-const DEFAULT_PUBLISH_PLAN: PublishPlanInput = {
-  mode: 'now',
-  startsAt: '',
-  endsAt: '',
-  restoreGroupId: '',
 }
 
 type Group = {
@@ -306,9 +291,35 @@ function Editor({
    * 付け替わっても消えないよう、工程をまたぐここで持つ。予約の保存が
    * 成功した時点の入力を publishBaseline に写し、そこから変えた間だけ
    * 未保存として扱う。「保存せずに移動」を選んだときだけ初期値へ戻す。
+   *
+   * 入力はメニューIDごとに localStorage へ下書きとして残す
+   * （publish-plan-draft.ts）。サーバーの下書きpayloadに公開予定の欄が
+   * 無いためで、再読込・タブ終了で消えない。復元した下書きはまだ予約や
+   * 公開として保存されていないので、初期値との差分として未保存扱いにする。
    */
   const [publishPlan, setPublishPlan] = useState<PublishPlanInput>(DEFAULT_PUBLISH_PLAN)
   const [publishBaseline, setPublishBaseline] = useState<PublishPlanInput>(DEFAULT_PUBLISH_PLAN)
+  const publishPlanRestoredFor = useRef<string | null>(null)
+  useEffect(() => {
+    if (publishPlanRestoredFor.current === groupId) return
+    publishPlanRestoredFor.current = groupId
+    setPublishPlan(loadPublishPlanDraft(groupId) ?? DEFAULT_PUBLISH_PLAN)
+    setPublishBaseline(DEFAULT_PUBLISH_PLAN)
+  }, [groupId])
+  /** 公開入力の更新。下書き（localStorage）へも同じ内容を書く。 */
+  const updatePublishPlan = (patch: Partial<PublishPlanInput>) => {
+    setPublishPlan((prev) => {
+      const next = { ...prev, ...patch }
+      savePublishPlanDraft(groupId, next)
+      return next
+    })
+  }
+  /** 公開入力を初期値へ戻し、下書きも消す。明示破棄と公開・予約の成功で使う。 */
+  const resetPublishPlan = () => {
+    clearPublishPlanDraft(groupId)
+    setPublishPlan(DEFAULT_PUBLISH_PLAN)
+    setPublishBaseline(DEFAULT_PUBLISH_PLAN)
+  }
 
   // ボタンの設定で選ぶもの（タグ・テンプレート・回答フォーム・計測リンク）。
   // メニュー本体とは別に、開いたとき1回だけ読む。
@@ -379,6 +390,9 @@ function Editor({
         pages,
       }))
       setPublishBaseline(publishPlan)
+      // 予約できた入力はサーバーへ保存済み。下書きとして残すと、
+      // 開き直したとき予約済みの内容が「未保存の入力」として復活する。
+      clearPublishPlanDraft(groupId)
     },
     onFailed: (message) => {
       setNotice('')
@@ -446,8 +460,7 @@ function Editor({
    * 実際の遷移では画面ごと外れるが、確認の選択として明示しておく。
    */
   const confirmLeaveAndDiscard = () => {
-    setPublishPlan(DEFAULT_PUBLISH_PLAN)
-    setPublishBaseline(DEFAULT_PUBLISH_PLAN)
+    resetPublishPlan()
     confirmLeave()
   }
   /*
@@ -765,6 +778,8 @@ function Editor({
       publishAttempt.current.succeed()
       setConfirmKind(null)
       setNotice('LINEへの登録が終わりました。友だちのトーク画面に出すには、一覧の「友だちに表示」を実行してください。')
+      // 「いますぐ出す」で使い切った公開入力の下書きは残さない。
+      resetPublishPlan()
       await reload()
     } catch {
       // 生のAPIエラーは出さない。運用者が次にすることだけを窓に書く。
@@ -834,6 +849,8 @@ function Editor({
     try {
       const res = await api.richMenuGroups.delete(groupId)
       if (!res.success) throw new Error(res.error ?? '削除できませんでした')
+      // 消えたメニューの公開入力下書きを残さない。
+      clearPublishPlanDraft(groupId)
       router.push('/rich-menus')
     } catch (e) {
       setConfirmError(e instanceof Error ? e.message : '削除できませんでした。しばらくおいてから、もう一度お試しください。')
@@ -964,6 +981,24 @@ function Editor({
     ? `${api.richMenuGroups.imageUrl(activePage.imageR2Key)}?v=${imageVersion}`
     : null
 
+  /*
+   * 人数プレビューが「保存済みの条件」か「いま編集中の未保存条件」か。
+   * previewTargets には編集中の条件を渡しているので、保存済みと違う間は
+   * 人数が未保存の条件で計算されていると画面に書いて区別する。
+   * （staff は集計APIで常に保存済み条件を数えるが、条件の編集自体が
+   * できないため差分は起きない）
+   */
+  const savedCondition = parseStoredCondition(group.targetingCondition)
+  const previewUnsaved =
+    JSON.stringify(targetingEnabled ? targetingCondition : null)
+    !== JSON.stringify(group.targetingEnabled ? savedCondition : null)
+  /*
+   * 条件をONにしたのに条件が空なら、STEP2 と同じく「誰にも出しません」の
+   * 0人でそろえる。空条件をAPIへ渡すと全員として数えられ、画面の案内と
+   * 食い違って見える（RICHMENU-03 と同じ扱い）。
+   */
+  const conditionEmpty = targetingEnabled && !targetingCondition
+
   if (editorStep === 'targeting') {
     return (
       <>
@@ -972,7 +1007,8 @@ function Editor({
         targetingEnabled={targetingEnabled}
         targetingPriority={targetingPriority}
         targetingCondition={targetingCondition}
-        savedCondition={parseStoredCondition(group.targetingCondition)}
+        savedCondition={savedCondition}
+        previewUnsaved={previewUnsaved}
         tags={tags}
         preview={targetPreview}
         previewLoading={targetPreviewLoading}
@@ -1000,7 +1036,9 @@ function Editor({
         saving={saving}
         publishing={publishing}
         publish={publishPlan}
-        onPublishChange={(patch) => setPublishPlan((prev) => ({ ...prev, ...patch }))}
+        onPublishChange={updatePublishPlan}
+        conditionEmpty={conditionEmpty}
+        previewUnsaved={previewUnsaved}
         onSave={() => void handleSave()}
         onPublishNow={() => void handlePublish()}
         onSchedule={scheduleSubmit}
@@ -1699,6 +1737,7 @@ function TargetingStep({
   targetingPriority,
   targetingCondition,
   savedCondition,
+  previewUnsaved = false,
   tags,
   preview,
   previewLoading,
@@ -1717,6 +1756,8 @@ function TargetingStep({
   targetingCondition: SegmentCondition | null
   /** 保存済みの条件。編集中の条件が保存済みかどうかの言い分けに使う。 */
   savedCondition: SegmentCondition | null
+  /** 人数がまだ保存していない条件で数えられているとき true。 */
+  previewUnsaved?: boolean
   tags: PickerOption[]
   preview: RichMenuTargetPreview | null
   previewLoading: boolean
@@ -1791,6 +1832,9 @@ function TargetingStep({
             </div>
             <div><p className="text-ink-faint text-xs">実際にこのメニューが出る人</p><p className="text-accent mt-1 text-2xl font-bold">{conditionEmpty ? '0人' : <MetricValue metric={preview?.effective} />}</p></div>
           </div>
+          {previewUnsaved && !conditionEmpty ? (
+            <p className="text-ink-faint mt-2 text-xs">人数はまだ保存していない条件で数えています</p>
+          ) : null}
           {conditionEmpty ? (
             <p className="bg-warning-bg text-warning mt-4 rounded-control px-3 py-2 text-xs">条件が空です。このままだと誰にも出しません。条件を1つ以上足してください。</p>
           ) : preview?.overlap.value ? <p className="bg-warning-bg text-warning mt-4 rounded-control px-3 py-2 text-xs">このうち {preview.overlap.value.toLocaleString('ja-JP')}人 は上の「{preview.higherMenus[0] ?? '優先メニュー'}」にも当てはまるため、そちらが出ます。</p> : null}
@@ -1824,6 +1868,8 @@ function PublishStep({
   publishing,
   publish,
   onPublishChange,
+  conditionEmpty = false,
+  previewUnsaved = false,
   onSave,
   onPublishNow,
   onSchedule,
@@ -1842,6 +1888,10 @@ function PublishStep({
    */
   publish: PublishPlanInput
   onPublishChange: (patch: Partial<PublishPlanInput>) => void
+  /** 条件をONにしたのに条件が空。STEP2と同じく 0人＋誰にも出さない案内にする。 */
+  conditionEmpty?: boolean
+  /** 人数がまだ保存していない条件で数えられているとき true。 */
+  previewUnsaved?: boolean
   onSave: () => void
   onPublishNow: () => void
   onSchedule: (input: RichMenuScheduleInput) => Promise<void>
@@ -1970,17 +2020,21 @@ function PublishStep({
           <div className="border-hairline mt-6 border-t pt-5">
             <h2 className="text-ink text-sm font-bold">公開前チェック</h2>
             <ul className="mt-3 space-y-2 text-sm">
-              <li className="text-success">✓ 誰に出すかが決まっています（<MetricValue metric={preview?.matched} />）</li>
+              {conditionEmpty ? (
+                <li className="text-warning">⚠ 条件が空です。このままだと誰にも出しません（0人）。STEP2「誰に出すか」で条件を足してください。</li>
+              ) : (
+                <li className="text-success">✓ 誰に出すかが決まっています（<MetricValue metric={preview?.matched} />{previewUnsaved ? '・未保存の条件で計算' : ''}）</li>
+              )}
               <li className={imageReady ? 'text-success' : 'text-danger'}>{imageReady ? '✓' : '⚠'} 画像が登録されています{imageReady ? '' : '（未設定のページがあります）'}</li>
               <li className={unconfiguredAreas === 0 ? 'text-success' : 'text-danger'}>{unconfiguredAreas === 0 ? '✓ すべてのボタン名が設定されています' : `⚠ ボタン名が未設定の場所が ${unconfiguredAreas}件 あります`}</li>
-              {preview?.overlap.value ? <li className="text-warning">⚠ 上の「{preview.higherMenus[0] ?? '優先メニュー'}」と {preview.overlap.value.toLocaleString('ja-JP')}人 が重なっています</li> : null}
+              {!conditionEmpty && preview?.overlap.value ? <li className="text-warning">⚠ 上の「{preview.higherMenus[0] ?? '優先メニュー'}」と {preview.overlap.value.toLocaleString('ja-JP')}人 が重なっています</li> : null}
             </ul>
           </div>
         </section>
 
         <aside className="space-y-4">
-          <section className="border-hairline bg-canvas rounded-card border p-5"><h2 className="text-ink text-sm font-bold">このメニューの設定</h2><dl className="mt-4 space-y-3 text-xs"><div><dt className="text-ink-faint">誰に出るか</dt><dd className="text-ink mt-1 font-semibold"><MetricValue metric={preview?.effective} /></dd></div><div><dt className="text-ink-faint">形</dt><dd className="text-ink mt-1 font-semibold">{group.size === 'large' ? '大' : '小'}・切替あり {pages.length}枚</dd></div><div><dt className="text-ink-faint">終わったら</dt><dd className="text-ink mt-1 font-semibold">{mode === 'period' ? restoreMenus.find((item) => item.id === restoreGroupId)?.name ?? '前のメニューに戻す' : '指定なし'}</dd></div></dl></section>
-          <section className="bg-status-info-soft text-status-info rounded-card p-5 text-xs leading-5"><h2 className="text-sm font-bold">公開すると何が変わるか</h2><p className="mt-2"><MetricValue metric={preview?.effective} /> のトーク画面のメニューが入れ替わります。</p><p className="mt-2">LINEへの反映は数分かかることがあります。</p></section>
+          <section className="border-hairline bg-canvas rounded-card border p-5"><h2 className="text-ink text-sm font-bold">このメニューの設定</h2><dl className="mt-4 space-y-3 text-xs"><div><dt className="text-ink-faint">誰に出るか</dt><dd className="text-ink mt-1 font-semibold">{conditionEmpty ? '0人' : <MetricValue metric={preview?.effective} />}{previewUnsaved && !conditionEmpty ? <span className="text-ink-faint ml-1 font-normal">（未保存の条件）</span> : null}</dd></div><div><dt className="text-ink-faint">形</dt><dd className="text-ink mt-1 font-semibold">{group.size === 'large' ? '大' : '小'}・切替あり {pages.length}枚</dd></div><div><dt className="text-ink-faint">終わったら</dt><dd className="text-ink mt-1 font-semibold">{mode === 'period' ? restoreMenus.find((item) => item.id === restoreGroupId)?.name ?? '前のメニューに戻す' : '指定なし'}</dd></div></dl></section>
+          <section className="bg-status-info-soft text-status-info rounded-card p-5 text-xs leading-5"><h2 className="text-sm font-bold">公開すると何が変わるか</h2><p className="mt-2">{conditionEmpty ? '0人' : <MetricValue metric={preview?.effective} />} のトーク画面のメニューが入れ替わります。</p><p className="mt-2">LINEへの反映は数分かかることがあります。</p></section>
           {/* N-152: 全員へ出す前に、自分のLINEだけで見え方を確かめる。 */}
           {canOperate ? <TestApplySection groupId={group.id} /> : null}
         </aside>
