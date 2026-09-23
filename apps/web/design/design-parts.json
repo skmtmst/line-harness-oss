@@ -588,11 +588,11 @@
           "resolved": "13px"
         },
         {
-          "pencil": "mNUQ3 detail fill: $accent-deep（★V7 修正方針 u6pez）",
+          "pencil": "mNUQ3 detail fill: $ink-secondary（★V7：補足は状態でないので緑にしない）",
           "class": "detailNotice",
           "prop": "color",
-          "source": "var(--color-accent-deep)",
-          "resolved": "#087a3e"
+          "source": "var(--color-ink-secondary)",
+          "resolved": "#4a5565"
         },
         {
           "pencil": "mNUQ3 detail fontSize: $size-caption",
