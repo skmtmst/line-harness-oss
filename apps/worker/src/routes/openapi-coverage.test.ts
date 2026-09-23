@@ -281,6 +281,7 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'PATCH /api/booking/admin/resources/{id}',
   'PATCH /api/chats/{id}/scheduled/{scheduleId}',
   'PATCH /api/friend-fields/reorder',
+  'POST /api/folders/{id}/swap-order',
   'PATCH /api/saved-searches/reorder',
   'PATCH /api/support-marks/reorder',
   'PUT /api/booking/admin/menus/{id}/resources',
