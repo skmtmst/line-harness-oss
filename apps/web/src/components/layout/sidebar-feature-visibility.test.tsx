@@ -48,9 +48,12 @@ vi.mock('@/lib/api', () => ({
 }))
 
 import Sidebar from './sidebar'
+import { clearFeatureVisibilityCache } from '@/lib/feature-visibility-cache'
 
 describe('Sidebarのstaff向け機能表示read-model', () => {
   beforeEach(() => {
+    // 表示可否は画面間で共有される（V6R-S0-b）。試験ごとに応答を替えるので毎回捨てる。
+    clearFeatureVisibilityCache()
     fixture.accountId = 'account-1'
     window.localStorage.clear()
     fixture.visibility.mockReset()
