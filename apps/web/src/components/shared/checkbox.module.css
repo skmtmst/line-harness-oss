@@ -7,6 +7,11 @@
  *   誤り   枠 2px $status-danger  地 $status-danger-soft、誤りの文 12px $status-danger
  *   無効   全体の不透明度 0.5
  *   文字   14px $ink、四角との間 8、補足 12px $ink-faint（上との間 4）
+ *
+ * 動き（Pencil ★V7「チェックボックス 動き」`HO3V6`）
+ *   選ぶ   四角の色 motion-fast、印を一筆で描く motion-base（どちらも motion-ease-out）
+ *   外す   四角の色 motion-fast、印は motion-fast で薄くなって消える。描き戻さない
+ *   動きを減らす設定では globals.css の決まりで一瞬になる
  */
 
 .root {
@@ -59,13 +64,37 @@
   border-radius: var(--radius-icon); /* cornerRadius: $radius-xxs */
   background: var(--color-canvas); /* fill: $canvas */
   color: var(--color-on-accent); /* 印: $on-accent */
+  position: relative;
+  transition:
+    background-color var(--motion-fast) var(--motion-ease-out),
+    border-color var(--motion-fast) var(--motion-ease-out);
 }
 
-.check,
-.minus {
-  display: none;
+.mark {
+  position: absolute;
+  inset: 0;
   width: 14px; /* width: 14 */
   height: 14px; /* height: 14 */
+  margin: auto;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 3;
+}
+
+/*
+ * 隠れている印。線の長さは 0（dashoffset 1）、不透明度 0。
+ * 外すときは不透明度だけを motion-fast で下げ、消えきってから
+ * 長さを 0 に戻す（delay）。次に選んだとき、また一筆で描けるように。
+ */
+.mark path {
+  opacity: 0;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  transition:
+    opacity var(--motion-fast) var(--motion-ease-out),
+    stroke-dashoffset 0s linear var(--motion-fast);
 }
 
 .input:checked + .box,
@@ -74,12 +103,11 @@
   background: var(--color-accent-deep); /* fill: $accent-deep */
 }
 
-.input:checked:not(:indeterminate) + .box .check {
-  display: block;
-}
-
-.input:indeterminate + .box .minus {
-  display: block;
+.input:checked:not(:indeterminate) + .box .check path,
+.input:indeterminate + .box .minus path {
+  opacity: 1;
+  stroke-dashoffset: 0;
+  transition: stroke-dashoffset var(--motion-base) var(--motion-ease-out);
 }
 
 /* 入力中（キーボードで移った）`SN4Ch`。緑の2pxの枠をフォーカスの輪郭で描く。 */
