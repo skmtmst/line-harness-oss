@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation'
 import { Circle, Star } from 'lucide-react'
 import type { FriendListItem } from '@/lib/api'
 import type { FriendListColumn } from './friend-list-table'
+import Avatar from '@/components/shared/avatar'
 import Checkbox from '@/components/shared/checkbox'
 
 interface Props {
@@ -50,7 +51,6 @@ export default function FriendListRow({
     ? (new Date(incomingAt).getTime() >= new Date(outgoingAt).getTime() ? incomingAt : outgoingAt)
     : incomingAt ?? outgoingAt ?? friend.createdAt
   const attention = String(friend.metadata?.__attention ?? '') === '1'
-  const avatarColor = avatarTone(friend.displayName)
 
   const openChat = () => router.push(`/chats?friend=${friend.id}`)
 
@@ -93,14 +93,7 @@ export default function FriendListRow({
 
       <div className="flex min-w-0 items-center gap-3">
         {/* アバターは設計 `PhxG6` の 40x40 / r=18。真円（r=20）にしない。 */}
-        {friend.pictureUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element -- LINE CDNの利用者画像。
-          <img src={friend.pictureUrl} alt="" className="h-10 w-10 shrink-0 rounded-large bg-avatar-bg object-cover" />
-        ) : (
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-large text-sm font-bold text-on-accent" style={{ backgroundColor: avatarColor }}>
-            {friend.displayName?.charAt(0) ?? '?'}
-          </div>
-        )}
+        <Avatar name={friend.displayName} src={friend.pictureUrl} size={40} />
         <div className="min-w-0">
           <Link href={`/friends/detail?id=${friend.id}`} onClick={(event) => event.stopPropagation()} title={friend.displayName} className="block truncate text-sm font-bold text-ink hover:text-action hover:underline">
             {friend.displayName}
@@ -206,7 +199,6 @@ export function FriendListCard({
   const latest = friend.latestIncomingMessage
   const lastContact = latest?.createdAt ?? friend.latestOutgoingAt ?? friend.createdAt
   const attention = String(friend.metadata?.__attention ?? '') === '1'
-  const avatarColor = avatarTone(friend.displayName)
 
   const openChat = () => router.push(`/chats?friend=${friend.id}`)
 
@@ -271,14 +263,7 @@ export function FriendListCard({
         >
           <Star aria-hidden="true" className={`h-4 w-4 ${attention ? 'fill-current' : ''}`} />
         </button>
-        {friend.pictureUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element -- LINE CDNの利用者画像。
-          <img src={friend.pictureUrl} alt="" className="h-10 w-10 shrink-0 rounded-large bg-avatar-bg object-cover" />
-        ) : (
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-large text-sm font-bold text-on-accent" style={{ backgroundColor: avatarColor }}>
-            {friend.displayName?.charAt(0) ?? '?'}
-          </div>
-        )}
+        <Avatar name={friend.displayName} src={friend.pictureUrl} size={40} />
         <div className="min-w-0 flex-1">
           <Link href={`/friends/detail?id=${friend.id}`} title={friend.displayName} className="block truncate text-sm font-bold text-ink hover:text-action hover:underline">
             {friend.displayName}
