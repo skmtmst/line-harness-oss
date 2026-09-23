@@ -10,10 +10,13 @@ import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
 import {
   type CampaignRow,
+  NEN_CAMPAIGN_FORM_ISSUE_LABELS,
   buildDefaultColumnIntro,
   buildNenDeliveryMessages,
+  campaignButtonFormId,
   getNenBirthdayCouponSetting,
   getNenCampaign,
+  nenCampaignFormIssue,
   queueColumnDelivery,
   saveNenBirthdayCouponSetting,
   saveNenCampaignAccountSetting,
@@ -186,9 +189,17 @@ nenCampaigns.get('/api/nen-campaigns/settings', async (c) => {
   const keys = await c.env.DB.prepare(
     `SELECT campaign_key FROM nen_campaign_settings WHERE category != 'transactional' ORDER BY rowid`,
   ).all<{ campaign_key: string }>();
-  const settings = (await Promise.all(
+  const campaigns = (await Promise.all(
     keys.results.map((row) => getNenCampaign(c.env.DB, row.campaign_key, accountId)),
   )).filter((row): row is CampaignRow => Boolean(row));
+  /*
+   * NEN-07: つなぐ回答フォームが使えなくなった稼働中設定を一覧・編集画面で
+   * 「設定不足」と出せるよう、配信ごとに判定を行へ添えてから返す。
+   */
+  const settings = await Promise.all(campaigns.map(async (row) => ({
+    ...row,
+    form_issue: await nenCampaignFormIssue(c.env.DB, row, accountId),
+  })));
   return c.json({ success: true, data: settings.map((row) => ({
     campaignKey: row.campaign_key,
     label: row.label,
@@ -205,6 +216,7 @@ nenCampaigns.get('/api/nen-campaigns/settings', async (c) => {
     dedupWindowDays: row.dedup_window_days ?? 30,
     excludeFormRespondents: row.exclude_form_respondents === 1,
     afterActions: row.after_actions ?? [],
+    formIssue: row.form_issue,
     updatedAt: row.updated_at ?? '',
   })) });
 });
@@ -255,6 +267,35 @@ nenCampaigns.put('/api/nen-campaigns/settings/:campaignKey', requireRole('owner'
       || typeof excludeFormRespondents !== 'boolean') {
     return c.json({ success: false, error: 'Invalid delivery safeguards' }, 400);
   }
+  /*
+   * NEN-07 (#1078): 「回答フォームを開く」設定はつなぐフォームが今も使える
+   * ことを確かめる。ボタンのURLだけフォームを指している(押されたあとの
+   * 設定を外した残り・古い設定)は「開くつもりなのに未選択」と同じ扱いにして
+   * 保存を止める。口コミ回答の除外も有効なフォーム選択が前提。
+   */
+  const formAction = afterActions.find((action) => action.kind === 'open_form');
+  const proposed: CampaignRow = {
+    ...current,
+    after_actions: afterActions,
+    button_url: buttonUrl || null,
+  };
+  const buttonFormId = campaignButtonFormId(proposed);
+  if (buttonFormId !== null && buttonFormId !== formAction?.formId) {
+    return c.json({
+      success: false,
+      error: 'ボタンのURLは回答フォームを指していますが、「押されたあとにすること」でフォームが選ばれていません。先にフォームを選んでください',
+    }, 400);
+  }
+  if (excludeFormRespondents && !formAction) {
+    return c.json({
+      success: false,
+      error: '「すでに口コミを書いた人には送らない」には回答フォームの選択が必要です',
+    }, 400);
+  }
+  const formIssue = await nenCampaignFormIssue(c.env.DB, proposed, accountId);
+  if (formIssue) {
+    return c.json({ success: false, error: NEN_CAMPAIGN_FORM_ISSUE_LABELS[formIssue] }, 400);
+  }
   await saveNenCampaignAccountSetting(c.env.DB, accountId, {
     ...current,
     is_enabled: body.isEnabled ? 1 : 0,
@@ -289,6 +330,19 @@ nenCampaigns.put('/api/nen-campaigns/settings/:campaignKey/enabled', requireRole
   }
   const current = await getNenCampaign(c.env.DB, key, accountId);
   if (!current) return c.json({ success: false, error: 'Campaign not found' }, 404);
+  /*
+   * NEN-07 (#1078): つなぐ回答フォームが使えない設定は稼働開始を止める。
+   * 停止はどんな状態でも実行できる(止められなくなると復旧できない)。
+   */
+  if (body.isEnabled) {
+    const formIssue = await nenCampaignFormIssue(c.env.DB, current, accountId);
+    if (formIssue) {
+      return c.json({
+        success: false,
+        error: `設定不足のため動かせません。${NEN_CAMPAIGN_FORM_ISSUE_LABELS[formIssue]}。編集画面でフォームを選び直してください`,
+      }, 409);
+    }
+  }
   await saveNenCampaignAccountSetting(c.env.DB, accountId, {
     ...current,
     is_enabled: body.isEnabled ? 1 : 0,

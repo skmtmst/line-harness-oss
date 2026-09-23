@@ -936,6 +936,9 @@ export const FORMS = [
   formRow('form-4', 'イベント申込（8月）', '日時の希望と人数・7ブロック', 'form-folder-visit', true, 220, 61, '2026-08-25T03:00:00.000Z', '2026-08-22T03:00:00.000Z', { friendFieldCount: 4, tagCount: 0 }),
   formRow('form-5', '会員登録', '住所と生年月日・12ブロック', 'form-folder-request', false, 0, 0, null, '2026-08-15T03:00:00.000Z', { friendFieldCount: 7, tagCount: 0 }),
   { ...formRow('form-6', '旧アンケート（2025春）', '3ブロック', null, false, 1860, 0, '2025-05-30T03:00:00.000Z', '2025-05-30T03:00:00.000Z', { friendFieldCount: 2, tagCount: 0 }), status: 'archived', archivedAt: '2025-05-30T03:00:00.000Z' },
+  /* NEN-07: NEN配信「口コミのお願い」がつなぐフォーム。編集画面の選択肢と
+   * 「つながる先」へ出る公開中フォームとして見本へ置く。 */
+  formRow('form-review', '口コミ', '星の評価とひとこと・2ブロック', null, true, 210, 9, '2026-08-24T03:00:00.000Z', '2026-08-24T03:00:00.000Z', { friendFieldCount: 1, tagCount: 1 }),
 ]
 
 /** 機能13 `EMBIK`。一覧6行と、画面全体18件の集計を同じ応答で返す。 */
@@ -1090,6 +1093,8 @@ const nenCampaignSetting = (campaignKey, label, category, triggerEvent, delayDay
     { kind: 'open_form', formId: 'form-review', formName: '口コミ', buttonLabel: '感想を書く（30秒）' },
     { kind: 'award_mileage', amount: 200, trigger: 'form_submitted' },
   ] : [],
+  // 実口・型と揃える(NEN-07)。つなぐフォームが使えないときだけ理由コードが入る。
+  formIssue: null,
   updatedAt: '2026-08-25T10:00:00+09:00',
 })
 
