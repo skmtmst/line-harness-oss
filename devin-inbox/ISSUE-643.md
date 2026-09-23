@@ -2,6 +2,8 @@
 
 - ブランチ: `devin/643-liff-preview-truth`
 - 取り込んだ `origin/codex/development` の SHA: `0505a05ada59f622f192029eb2e4e2bcfb09b336`（ff-only 取り込み済み）
+- **PR: https://github.com/skmtmst/line-harness-oss/pull/652 （Issue題名に `(PR #652)` 追記済み・mergeは行っていない）**
+- 完了条件: ①実LIFF構造化 ②実データ反映 ③実React試験で構造一致を証明 — すべて実施済み
 
 ## 現状（虚偽プレビュー）の所在
 
@@ -70,7 +72,7 @@
   実React描画で構造一致を証明＋LIFF側ソースの文言・`grid-cols-4`・`grid-cols-7`不在を契約化（LIFF変更時のドリフト検知）。
 - `apps/web/src/lib/design-structure.json`: parts「ご希望の日をえらんでください」→「日時を選んでください」。
 - `apps/web/design/design-debt-baseline.json`: LIFF画面再現の直書き時刻ボタン（意図的・共通Button不使用）を1件だけ追記。
-- `docs/release-log/unreleased/xxx-kenta-予約プレビューを実物どおりにした.md`: PR番号採番後に改名・追記。
+- `docs/release-log/unreleased/652-kenta-予約プレビューを実物どおりにした.md`: 採番後に #652 を追記済み。
 
 ## 検証
 
