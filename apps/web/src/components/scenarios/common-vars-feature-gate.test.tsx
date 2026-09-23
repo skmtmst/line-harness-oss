@@ -46,6 +46,7 @@ vi.mock('@/contexts/account-context', () => ({
 
 import FeatureGate from '../feature-gate'
 import InsertToolbar from './insert-toolbar'
+import { clearFeatureVisibilityCache } from '@/lib/feature-visibility-cache'
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -69,6 +70,8 @@ function Toolbar() {
 
 describe('共通情報キーの画面接続(#862)', () => {
   beforeEach(() => {
+    // 表示可否は画面間で共有される（V6R-S0-b）。試験ごとに応答を替えるので毎回捨てる。
+    clearFeatureVisibilityCache()
     host = document.createElement('div')
     document.body.appendChild(host)
     root = createRoot(host)
