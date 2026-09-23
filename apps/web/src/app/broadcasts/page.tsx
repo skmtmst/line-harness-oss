@@ -1,5 +1,6 @@
 'use client'
 
+import DateField from '@/components/shared/date-field'
 import { Suspense, useState, useEffect, useCallback, useRef } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { Trash2 } from 'lucide-react'
@@ -561,26 +562,13 @@ function BroadcastList() {
           {savedViewError && <p role="alert" className="text-danger mb-3 text-xs">{savedViewError}</p>}
 
           <div className="mb-3 flex flex-wrap items-center gap-2">
-            <button type="button" className="broadcast-filter-chip" data-active={statusFilter === 'scheduled' || undefined} onClick={() => setStatusFilter(statusFilter === 'scheduled' ? 'all' : 'scheduled')}>✓ 予約中のみ</button>
-            <button type="button" className="broadcast-filter-chip" data-active={statusFilter === 'draft' || undefined} onClick={() => setStatusFilter(statusFilter === 'draft' ? 'all' : 'draft')}>○ 下書き</button>
-            <button type="button" className="broadcast-filter-chip" disabled title="非表示状態は現在の契約にありません">○ 非表示</button>
-            <button type="button" className="broadcast-filter-chip" disabled title="開封率による絞り込みは未接続です">○ 開封率が低い</button>
+            <button type="button" className="broadcast-filter-chip" data-active={statusFilter === 'scheduled' || undefined} onClick={() => setStatusFilter(statusFilter === 'scheduled' ? 'all' : 'scheduled')}>予約中のみ</button>
+            <button type="button" className="broadcast-filter-chip" data-active={statusFilter === 'draft' || undefined} onClick={() => setStatusFilter(statusFilter === 'draft' ? 'all' : 'draft')}>下書き</button>
+            {/* ★V7：押せない「非表示」「開封率が低い」の札は外した（機能が無い・未接続のまま置かれていた）。 */}
             <span className="text-ink-faint ml-1 text-xs whitespace-nowrap">配信日</span>
-            <input
-              type="date"
-              value={dateFrom}
-              onChange={(e) => setDateFrom(e.target.value)}
-              aria-label="配信日（開始）"
-              className="border-hairline rounded-control border px-2 py-2 text-sm"
-            />
+            <div className="w-52"><DateField value={dateFrom} onChange={setDateFrom} max={dateTo || undefined} aria-label="配信日（開始）" /></div>
             <span className="text-ink-faint text-xs">〜</span>
-            <input
-              type="date"
-              value={dateTo}
-              onChange={(e) => setDateTo(e.target.value)}
-              aria-label="配信日（終了）"
-              className="border-hairline rounded-control border px-2 py-2 text-sm"
-            />
+            <div className="w-52"><DateField value={dateTo} onChange={setDateTo} min={dateFrom || undefined} aria-label="配信日（終了）" /></div>
             <SelectField
               aria-label="並び順"
               value={sortKey}
@@ -816,7 +804,7 @@ function BroadcastList() {
                         {(broadcast.status === 'draft' || broadcast.status === 'scheduled') && (
                           <button
                             onClick={() => { setDeleteError(''); setDeleteTarget(broadcast) }}
-                            className="rounded-control p-2 text-danger transition-colors hover:bg-danger-bg"
+                            className="rounded-control p-2 text-ink-faint transition-colors hover:bg-danger-bg hover:text-danger focus-visible:text-danger"
                             aria-label={`${broadcast.title}を削除`}
                             title="削除"
                           >
