@@ -1,5 +1,5 @@
 import { api } from './api'
-import { FEATURE_SETTINGS_UPDATED_EVENT } from './feature-settings'
+import { FEATURE_SETTINGS_UPDATED_EVENT } from './feature-settings-event'
 
 /*
  * V6R-S0-b: 機能の表示可否（/api/settings/features/visibility）をアカウントごとに共有する。

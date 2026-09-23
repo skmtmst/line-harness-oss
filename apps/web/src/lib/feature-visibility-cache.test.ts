@@ -9,7 +9,7 @@ const visibility = vi.hoisted(() => vi.fn())
 vi.mock('./api', () => ({ api: { featureSettings: { visibility } } }))
 
 import { clearFeatureVisibilityCache, loadFeatureVisibility } from './feature-visibility-cache'
-import { FEATURE_SETTINGS_UPDATED_EVENT } from './feature-settings'
+import { FEATURE_SETTINGS_UPDATED_EVENT } from './feature-settings-event'
 
 const ok = { success: true as const, data: { features: { broadcasts: true } } }
 
@@ -67,5 +67,15 @@ describe('表示可否の共有（V6R-S0-b）', () => {
     now += 2_000
     await loadFeatureVisibility('acc-1')
     expect(visibility).toHaveBeenCalledTimes(2)
+  })
+})
+
+describe('表示可否の共有は軽いまま（V6R-S0-b）', () => {
+  it('メニュー定義（feature-settings・menu）を読み込まない。読み込むと全画面の最初の読み込みが約7kB増えた', async () => {
+    const { readFileSync } = await import('node:fs')
+    const { join } = await import('node:path')
+    const source = readFileSync(join(__dirname, 'feature-visibility-cache.ts'), 'utf8')
+    expect(source).not.toMatch(/from '\.\/feature-settings'/)
+    expect(source).not.toMatch(/from '\.\/menu'/)
   })
 })
