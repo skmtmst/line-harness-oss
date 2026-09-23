@@ -2,6 +2,7 @@
 
 import type { ChatStatus } from './inbox-dropdown'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
+import Select from '@/components/shared/select'
 import { Filter, X } from 'lucide-react'
 
 /**
@@ -130,14 +131,22 @@ export default function InboxFilterPanel({
 
           <div>
             <span className={labelClass}>受信経路</span>
-            <select
-              aria-label="受信経路で絞り込む"
-              value={value.channel}
-              onChange={(event) => set({ channel: event.target.value as InboxFilterValue['channel'] })}
-              className={fieldClass}
-            >
-              {CHANNEL_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-            </select>
+            {/*
+              INBOX-04: 素の `<select>` は開いた候補が OS 側の描画で、
+              画面（DOM）に現れない。実機監査でも1回押しただけでは
+              「候補が展開せず画面変化もない」としか見えないため、
+              候補をDOMへ描く共通の Select へ換える（`inbox-dropdown.tsx`
+              が同じ理由で素の select を使わないのと同じ扱い）。
+            */}
+            <div className="mt-1.5">
+              <Select
+                aria-label="受信経路で絞り込む"
+                size="full"
+                value={value.channel}
+                onChange={(next) => set({ channel: next as InboxFilterValue['channel'] })}
+                options={CHANNEL_OPTIONS}
+              />
+            </div>
           </div>
 
           {/*
