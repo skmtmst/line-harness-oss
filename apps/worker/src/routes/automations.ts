@@ -494,9 +494,18 @@ automations.post(
   async (c) => {
     const accountId = await requireDraftAccount(c);
     if (typeof accountId !== 'string') return accountId;
+    /*
+     * DETAIL-13: 新規作成の操作ごとの冪等鍵。画面は1回の作成操作に1つだけ
+     * 鍵を振り、同じ操作の再試行（ダブルクリック・通信やり直し）だけが
+     * 同じ鍵を使う。鍵が無い呼び出しは「別の操作」と見分けられず、
+     * 前の下書きへ戻って上書きする道が残るので、service 側で断る。
+     */
+    const body = await c.req.json<{ operationKey?: unknown }>()
+      .catch((): { operationKey?: unknown } => ({}));
     return draftEndpoint(c, () => createAutomationDraftFromTemplate(c.env.DB, {
       templateKey: c.req.param('key'),
       lineAccountId: accountId,
+      operationKey: body.operationKey,
       createdBy: c.get('staff')?.id,
     }), 201);
   },

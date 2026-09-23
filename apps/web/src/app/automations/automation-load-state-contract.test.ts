@@ -51,6 +51,24 @@ describe('V6 オートメーション一覧の状態', () => {
     expect(PAGE).toContain('href={`/automations/runs?search=')
   })
 
+  it('編集用の下書きを作れなかった理由を失敗の種類で分ける（AUTOMATION-05）', () => {
+    /*
+     * 「編集する」の失敗を1文にまとめると、権限不足・消えたルール・
+     * 他者の変更・通信切れを区別できない。403/404/409/それ以外で
+     * 運用者の案内を分け、404・409は一覧を読み直す。
+     */
+    expect(PAGE).toContain('describeAutomationEditFailure')
+    expect(PAGE).toContain('このルールを編集する権限がありません')
+    expect(PAGE).toContain('ルールが見つかりませんでした')
+    expect(PAGE).toContain('ほかの人の変更と重なりました')
+    expect(PAGE).toContain('サーバー側で編集用の下書きを作れませんでした')
+    expect(PAGE).toContain('通信状態を確かめて')
+    expect(PAGE).toContain('setError(describeAutomationEditFailure(caught))')
+    // 404・409 は一覧が古い可能性があるので読み直す。
+    expect(PAGE).toContain('caught.status === 404 || caught.status === 409')
+    expect(PAGE).toContain('void loadAutomations()')
+  })
+
   it('空の状態を共通部品とdata-list-stateで見分けられる', () => {
     expect(PAGE).toContain('<ListState')
     expect(PAGE).toContain('動いているオートメーションはありません。')

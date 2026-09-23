@@ -3,7 +3,7 @@
 import SelectField from '@/components/shared/select-field'
 import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { api } from '@/lib/api'
+import { api, ApiError } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -123,6 +123,35 @@ async function performAutomationAction({
     lock.release()
     onFinish()
   }
+}
+
+/**
+ * 「編集用の下書き」を作れなかった理由を、失敗の種類で分けて運用者の言葉に
+ * する（AUTOMATION-05）。
+ *
+ *   - 403 … 権限やアカウント範囲の不足。再押しでは直らないので、権限の確認を促す。
+ *   - 404 … ルールが消えた・別アカウント・範囲外。一覧の読み直しが先。
+ *   - 409 … ほかの変更と重なった。読み直してからの再試行が効く。
+ *   - それ以外（5xx・通信切れ）… 時間をおいて再試行。
+ */
+function describeAutomationEditFailure(caught: unknown): string {
+  if (caught instanceof ApiError) {
+    switch (caught.status) {
+      case 401:
+        return 'ログインの状態が切れています。ログインし直してから、もう一度お試しください。'
+      case 403:
+        return 'このルールを編集する権限がありません。選んでいるアカウントと権限を確認してください。'
+      case 404:
+        return 'ルールが見つかりませんでした。削除されたか、別のLINEアカウントのルールです。一覧を読み直しました。'
+      case 409:
+        return 'ほかの人の変更と重なりました。一覧を読み直してから、もう一度お試しください。'
+      default:
+        return caught.status >= 500
+          ? 'サーバー側で編集用の下書きを作れませんでした。時間をおいて、もう一度お試しください。'
+          : '編集用の下書きを作れませんでした。もう一度お試しください。'
+    }
+  }
+  return '編集用の下書きを作れませんでした。通信状態を確かめて、もう一度お試しください。'
 }
 
 function AutomationRowActions({
@@ -322,6 +351,10 @@ export default function AutomationsPage() {
   /**
    * 「編集」は確認なしで進めてよい。公開版を写した改訂用の下書きを
    * ぶら下げて（すでにあればそれを使う）、その下書きの編集面を開く。
+   *
+   * 失敗は種類で案内を分ける（AUTOMATION-05）。「作れませんでした」の1文だと
+   * 権限不足・消えたルール・通信切れを区別できず、できるはずの再試行や
+   * 一覧の読み直しへ進めない。404・409 は一覧が古い可能性があるので読み直す。
    */
   const handleEdit = async (target: Automation) => {
     if (rowBusyId) return
@@ -334,9 +367,12 @@ export default function AutomationsPage() {
       if (!res.success) throw new Error(res.error)
       if (selectedAccountIdRef.current !== accountId) return
       router.push(`/automations/drafts?id=${encodeURIComponent(res.data.id)}`)
-    } catch {
+    } catch (caught) {
       if (selectedAccountIdRef.current === accountId) {
-        setError('編集用の下書きを作れませんでした。状態を読み直してから、もう一度お試しください。')
+        setError(describeAutomationEditFailure(caught))
+        if (caught instanceof ApiError && (caught.status === 404 || caught.status === 409)) {
+          void loadAutomations()
+        }
       }
     } finally {
       setRowBusyId(null)

@@ -9189,10 +9189,18 @@ export const api = {
       fetchApi<ApiResponse<AutomationTemplateSummary[]>>(
         `/api/automation-templates?account_id=${encodeURIComponent(accountId)}`,
       ),
-    createDraftFromTemplate: (templateKey: string, accountId: string) =>
+    /**
+     * 見本から下書きを作る（DETAIL-13）。
+     *
+     * `operationKey` は「この新規作成の操作」を識別する鍵。1回の作成操作に
+     * 1つだけ振り、同じ操作の再試行（ダブルクリック・通信やり直し）だけが
+     * 同じ鍵を使う。別の新規作成は必ず別の鍵で呼ぶ——同じ鍵だとサーバーは
+     * 同じ下書きを返し、鍵が無い呼び出しは Worker が 422 で断る。
+     */
+    createDraftFromTemplate: (templateKey: string, accountId: string, operationKey: string) =>
       fetchApi<ApiResponse<{ id: string; draftVersionId: string }>>(
         `/api/automation-templates/${encodeURIComponent(templateKey)}/drafts?account_id=${encodeURIComponent(accountId)}`,
-        { method: 'POST', body: '{}' },
+        { method: 'POST', body: JSON.stringify({ operationKey }) },
       ),
     getDraft: (id: string, accountId: string) =>
       fetchApi<ApiResponse<AutomationDraftDetail>>(

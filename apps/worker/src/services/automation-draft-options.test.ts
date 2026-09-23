@@ -144,6 +144,8 @@ describe('下書きの選択可能一覧(#734)', () => {
         const created = await createAutomationDraftFromTemplate(testDb.db, {
           templateKey: 'received-message-tag',
           lineAccountId: 'account-1',
+          // 組み合わせごとに別の新規作成。同じ鍵だと同じ下書きへ戻る。
+          operationKey: `op-${trigger.value}-${action.value}`,
         });
         await updateAutomationDraft(testDb.db, {
           id: created.id,
@@ -173,6 +175,7 @@ describe('下書きの選択可能一覧(#734)', () => {
     const created = await createAutomationDraftFromTemplate(testDb.db, {
       templateKey: 'received-message-tag',
       lineAccountId: 'account-1',
+      operationKey: 'op-out-of-range',
     });
     await expect(updateAutomationDraft(testDb.db, {
       id: created.id,

@@ -747,4 +747,91 @@ describe('POST /api/automations/:id/draft・duplicate・status（#942 N-352）',
       });
     expect(deniedStatus.status).toBe(403);
   });
+
+  /*
+   * AUTOMATION-05: 一覧の「編集」は、止めている・下書き・動いているの
+   * どの状態でも同じidで編集面へ進めなければならない。以前は下書きの
+   * 指し先が壊れた定義で「編集用の下書きを作れませんでした」が出た。
+   */
+  test('止めているルールの「編集」も同じidの下書きを返し、状態は止めたまま', async () => {
+    const testDb = realAutomationDb();
+    testDb.raw.prepare(
+      `UPDATE automation_definitions SET status = 'stopped' WHERE id = 'auto-1'`,
+    ).run();
+    const app = setupApp(testDb.db);
+
+    const res = await app.request('/api/automations/auto-1/draft', { method: 'POST' });
+    expect(res.status).toBe(201);
+    const body = await res.json() as { data: { id: string; draftVersionId: string } };
+    expect(body.data.id).toBe('auto-1');
+
+    // そのまま下書きの編集面が開ける（同じidで読める）。
+    const draft = await app.request('/api/automation-drafts/auto-1?account_id=acc-1');
+    expect(draft.status).toBe(200);
+    await expect(draft.json()).resolves.toMatchObject({
+      success: true,
+      data: { id: 'auto-1', draftVersionId: body.data.draftVersionId },
+    });
+    // 稼働状態・公開版・実行記録は変わっていない。
+    expect(testDb.raw.prepare(
+      `SELECT status, current_published_version_id FROM automation_definitions WHERE id = 'auto-1'`,
+    ).get()).toEqual({ status: 'stopped', current_published_version_id: 'ver-1' });
+    expect(testDb.raw.prepare(
+      `SELECT COUNT(*) AS count FROM automation_runs`,
+    ).get()).toEqual({ count: 0 });
+  });
+
+  test('下書きの指し先が壊れたルールも、公開版から作り直して編集できる', async () => {
+    const testDb = realAutomationDb();
+    testDb.raw.prepare(
+      `UPDATE automation_definitions
+          SET status = 'stopped', current_draft_version_id = 'ver-1' WHERE id = 'auto-1'`,
+    ).run();
+    const app = setupApp(testDb.db);
+
+    const res = await app.request('/api/automations/auto-1/draft', { method: 'POST' });
+    expect(res.status).toBe(201);
+    const body = await res.json() as { data: { id: string } };
+    expect(body.data.id).toBe('auto-1');
+
+    // 指し先は公開版を写した新しい下書き版へ治っている。
+    const definition = testDb.raw.prepare(
+      `SELECT status, current_draft_version_id, current_published_version_id
+         FROM automation_definitions WHERE id = 'auto-1'`,
+    ).get() as {
+      status: string;
+      current_draft_version_id: string;
+      current_published_version_id: string;
+    };
+    expect(definition.status).toBe('stopped');
+    expect(definition.current_published_version_id).toBe('ver-1');
+    expect(definition.current_draft_version_id).not.toBe('ver-1');
+
+    const draft = await app.request('/api/automation-drafts/auto-1?account_id=acc-1');
+    expect(draft.status).toBe(200);
+  });
+
+  test('下書きのルールの「編集」は、ぶら下がっている下書きをそのまま返す', async () => {
+    const testDb = realAutomationDb();
+    testDb.raw.prepare(
+      `INSERT INTO automation_definitions
+         (id, line_account_id, name, status, current_draft_version_id)
+       VALUES ('draft-1', 'acc-1', '作りかけ', 'draft', 'dv-1')`,
+    ).run();
+    testDb.raw.prepare(
+      `INSERT INTO automation_versions
+         (id, automation_id, version_number, status, trigger_type, trigger_config,
+          condition_config, action_config)
+       VALUES ('dv-1', 'draft-1', 1, 'draft', 'friend_add', '{}', '{}', '[]')`,
+    ).run();
+    const app = setupApp(testDb.db);
+
+    const res = await app.request('/api/automations/draft-1/draft', { method: 'POST' });
+    expect(res.status).toBe(201);
+    const body = await res.json() as { data: { id: string } };
+    expect(body.data.id).toBe('draft-1');
+    expect(testDb.raw.prepare(
+      `SELECT COUNT(*) AS count FROM automation_versions WHERE automation_id = 'draft-1'`,
+    ).get()).toEqual({ count: 1 });
+  });
 });
