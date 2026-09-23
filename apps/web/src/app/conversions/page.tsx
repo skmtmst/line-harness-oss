@@ -1,6 +1,9 @@
 'use client'
 
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { MoreHorizontal } from 'lucide-react'
+import ActionMenu from '@/components/shared/action-menu'
+import IconButton from '@/components/shared/icon-button'
 import {
   api,
   describeSaveFailure,
@@ -308,6 +311,7 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
   const [sort, setSort] = useState<PointSort>('cv-desc')
   const [status, setStatus] = useState<StatusFilter>('all')
   const [page, setPage] = useState(1)
+  const [pointMenuId, setPointMenuId] = useState<string | null>(null)
   const [loadFailed, setLoadFailed] = useState(false)
   const [exporting, setExporting] = useState(false)
   const [exportError, setExportError] = useState('')
@@ -932,14 +936,33 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
                     {usageLabel(point)}
                   </td>
                   <td className="px-4 py-3 text-right">
-                    <div className="flex justify-end gap-2">
-                      <Button onClick={() => setDetailTarget(point)}>中身を見る</Button>
+                    {/*
+                      幅の決まっていない列へ2つのボタンを右詰めで入れると、
+                      狭い幅で内容が左の「使われている場所」へはみ出して
+                      文字に重なっていた。主操作だけ残し、詳細はメニューへ畳む。
+                    */}
+                    <div className="relative flex items-center justify-end gap-2">
                       <Button
                         href={`/analytics?tab=funnel&conversionPointId=${encodeURIComponent(point.id)}&conversionPointName=${encodeURIComponent(point.name)}`}
                         variant="primary"
                       >
                         使う場所を足す
                       </Button>
+                      <IconButton
+                        aria-label={`${point.name}のその他操作`}
+                        title={`${point.name}のその他操作`}
+                        onClick={() => setPointMenuId((current) => (current === point.id ? null : point.id))}
+                      >
+                        <MoreHorizontal />
+                      </IconButton>
+                      <ActionMenu
+                        open={pointMenuId === point.id}
+                        ariaLabel={`${point.name}の操作`}
+                        onClose={() => setPointMenuId(null)}
+                        items={[
+                          { id: 'detail', label: '中身を見る', onSelect: () => setDetailTarget(point) },
+                        ]}
+                      />
                     </div>
                   </td>
                 </tr>

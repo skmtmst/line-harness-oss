@@ -183,13 +183,29 @@ async function renderPage() {
   })
 }
 
-async function waitForPublishButton(): Promise<HTMLButtonElement> {
+async function waitForRowMenuButton(): Promise<HTMLButtonElement> {
   for (let i = 0; i < 40; i += 1) {
     await act(async () => { await Promise.resolve() })
-    const button = container.querySelector('button[aria-label="あいさつでたまるの下書きを公開して反映する"]')
+    const button = container.querySelector('button[aria-label="あいさつでたまるのその他操作"]')
     if (button) return button as HTMLButtonElement
   }
-  throw new Error('公開ボタンが出ませんでした')
+  throw new Error('その他操作のボタンが出ませんでした')
+}
+
+async function waitForPublishItem(): Promise<HTMLButtonElement> {
+  for (let i = 0; i < 40; i += 1) {
+    await act(async () => { await Promise.resolve() })
+    const items = [...container.querySelectorAll<HTMLButtonElement>('[role="menuitem"]')]
+    const item = items.find((node) => node.textContent?.trim() === '公開して反映')
+    if (item) return item
+  }
+  throw new Error('公開して反映の項目が出ませんでした')
+}
+
+/* 「公開して反映」は行の「その他操作」メニューの中。開いてから項目を押す。 */
+async function openPublishDialog() {
+  await act(async () => { (await waitForRowMenuButton()).click() })
+  await act(async () => { (await waitForPublishItem()).click() })
 }
 
 function dialog(): HTMLElement | null {
@@ -223,7 +239,7 @@ describe('たまる決めごとの公開確認(本物のReact)', () => {
     await renderPage()
 
     // ボタンを押しただけでは送らない。確認窓が出る。
-    await act(async () => { (await waitForPublishButton()).click() })
+    await openPublishDialog()
     await settle()
     expect(net.publishes()).toHaveLength(0)
     expect(dialog()).not.toBeNull()
@@ -246,7 +262,7 @@ describe('たまる決めごとの公開確認(本物のReact)', () => {
     })
     await renderPage()
 
-    await act(async () => { (await waitForPublishButton()).click() })
+    await openPublishDialog()
     await settle()
     expect(dialog()).not.toBeNull()
 
@@ -265,7 +281,7 @@ describe('たまる決めごとの公開確認(本物のReact)', () => {
     })
     await renderPage()
 
-    await act(async () => { (await waitForPublishButton()).click() })
+    await openPublishDialog()
     await settle()
     await act(async () => { dialogConfirm()?.click() })
     await settle(10)
