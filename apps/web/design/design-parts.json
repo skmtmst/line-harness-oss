@@ -211,20 +211,20 @@
       "lastCheckedAt": "2026-08-24"
     },
     "--shadow-card": {
-      "pencil": "XywGr effect",
-      "source": "1px 1px 2px #1920261a",
-      "resolved": "1px 1px 2px #1920261a",
+      "pencil": "XywGr effect → #673 Beautiful shadows sm",
+      "source": "0px 2px 3px -1px rgba(0,0,0,0.1), 0px 1px 0px 0px rgba(25,28,33,0.02), 0px 0px 0px 1px rgba(25,28,33,0.08)",
+      "resolved": "0px 2px 3px -1px #0000001a,0px 1px 0px 0px #191c2105,0px 0px 0px 1px #191c2114",
       "status": "active",
-      "note": "追加。@theme ではなく素の :root に置く。Tailwindは影の値をクラスへ直に埋め込むため変数が出力されない",
-      "lastCheckedAt": "2026-08-24"
+      "note": "#673 で Beautiful shadows の層状影（近距離の薄い影＋下端の光＋輪郭の1pxリング）へ差し替え。1px罫線だけの硬さを残さない。利用者承認済みの視覚改善（監査6・提案1）。",
+      "lastCheckedAt": "2026-09-24"
     },
     "--shadow-float": {
-      "pencil": "hGpFq/z6TmF effect",
-      "source": "0 6px 18px #19202626",
-      "resolved": "0 6px 18px #19202626",
+      "pencil": "hGpFq/z6TmF effect → #673 Beautiful shadows md",
+      "source": "0px 4px 8px -2px rgba(0,0,0,0.08), 0px 12px 24px -4px rgba(25,28,33,0.14), 0px 0px 0px 1px rgba(25,28,33,0.08)",
+      "resolved": "0px 4px 8px -2px #00000014,0px 12px 24px -4px #191c2124,0px 0px 0px 1px #191c2114",
       "status": "active",
-      "note": "追加。メニューと通知パネルの浮いた面で共有する。",
-      "lastCheckedAt": "2026-08-24"
+      "note": "#673 で Beautiful shadows の層状影へ差し替え。メニュー・ドロップダウン・モーダル・引き出しなど、カードより一段強く浮く面で共有する。",
+      "lastCheckedAt": "2026-09-24"
     },
     "--color-status-info": {
       "pencil": "$status-info",
@@ -424,7 +424,7 @@
           "class": "card",
           "prop": "box-shadow",
           "source": "var(--shadow-card)",
-          "resolved": "1px 1px 2px #1920261a"
+          "resolved": "0px 2px 3px -1px #0000001a,0px 1px 0px 0px #191c2105,0px 0px 0px 1px #191c2114"
         },
         {
           "pencil": "ラベル fill: $ink-secondary",
@@ -1566,7 +1566,7 @@
           "class": "card",
           "prop": "box-shadow",
           "source": "var(--shadow-card)",
-          "resolved": "1px 1px 2px #1920261a"
+          "resolved": "0px 2px 3px -1px #0000001a,0px 1px 0px 0px #191c2105,0px 0px 0px 1px #191c2114"
         },
         {
           "pencil": "dashboard card layout: vertical",
@@ -2590,7 +2590,7 @@
           "class": "panel",
           "prop": "box-shadow",
           "source": "var(--shadow-card)",
-          "resolved": "1px 1px 2px #1920261a"
+          "resolved": "0px 2px 3px -1px #0000001a,0px 1px 0px 0px #191c2105,0px 0px 0px 1px #191c2114"
         },
         {
           "pencil": "J6x4Q gap: 12",
@@ -2744,7 +2744,7 @@
           "class": "inline",
           "prop": "box-shadow",
           "source": "var(--shadow-card)",
-          "resolved": "1px 1px 2px #1920261a"
+          "resolved": "0px 2px 3px -1px #0000001a,0px 1px 0px 0px #191c2105,0px 0px 0px 1px #191c2114"
         },
         {
           "pencil": "VJKAT header padding top/right",
@@ -2976,7 +2976,7 @@
           "class": "menu",
           "prop": "box-shadow",
           "source": "var(--shadow-float)",
-          "resolved": "0 6px 18px #19202626"
+          "resolved": "0px 4px 8px -2px #00000014,0px 12px 24px -4px #191c2124,0px 0px 0px 1px #191c2114"
         },
         {
           "pencil": "hGpFq gap: 2",
@@ -3108,7 +3108,7 @@
           "class": "panel",
           "prop": "box-shadow",
           "source": "var(--shadow-float)",
-          "resolved": "0 6px 18px #19202626"
+          "resolved": "0px 4px 8px -2px #00000014,0px 12px 24px -4px #191c2124,0px 0px 0px 1px #191c2114"
         },
         {
           "pencil": "z6TmF header padding",
