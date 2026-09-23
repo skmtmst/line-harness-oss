@@ -249,6 +249,15 @@
    */
   --shadow-card: 1px 1px 2px #1920261a;
   --shadow-float: 0 6px 18px #19202626;
+
+  /*
+   * Tailwind の transition-colors などの既定の速さ（★V7 修正方針 §4）。
+   * 既定は 150ms・cubic-bezier(0.4,0,0.2,1) で、共通部品（120ms・motion-ease-out）と
+   * 速さが2通りあった（189か所）。物差しの値にそろえる。`@theme` は :root の
+   * --motion-* より先に読まれるので、値をそのまま書く。
+   */
+  --default-transition-duration: 120ms;
+  --default-transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 :root {
