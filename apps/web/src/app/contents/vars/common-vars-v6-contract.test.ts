@@ -101,6 +101,19 @@ describe('V6共通情報一覧', () => {
     expect(WORKER).toContain('getCommonVarUsageSummaries')
   })
 
+  it('新規・編集は未保存の入力を持ったまま出る操作を確認で止める（VAR-01 監査）', () => {
+    // リッチメニュー・ウェビナーと同じ useUnsavedGuard＋確認ダイアログの形。
+    // 「戻る」で確認なしに入力が捨てられないよう、両画面で同じ契約を固定する。
+    for (const [name, src] of [['新規', NEW_PAGE], ['編集', EDIT_PAGE]] as const) {
+      expect(src, name).toContain('useUnsavedGuard')
+      expect(src, name).toContain('保存していない変更があります')
+      expect(src, name).toContain('保存せずに移動')
+      expect(src, name).toContain('編集を続ける')
+    }
+    // 編集画面は影響確認（ImpactReview）へ切り替えた表示でも離脱確認が出る。
+    expect(EDIT_PAGE).toContain('{leaveConfirmDialog}')
+  })
+
   it('一覧・新規・編集は共通情報キーのゲートの内側にある(#862)', () => {
     for (const [name, src] of [['一覧', PAGE], ['新規', NEW_PAGE], ['編集', EDIT_PAGE]] as const) {
       expect(src, name).toContain('FeatureGate')
