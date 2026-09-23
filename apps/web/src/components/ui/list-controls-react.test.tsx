@@ -50,14 +50,13 @@ describe('SortSelect（監査6 #668: 並び順の統一）', () => {
 })
 
 describe('PageSizeSelect（監査6 #668: 表示件数の統一）', () => {
-  it('「表示件数」の字ラベルつきで、選択肢は「N件」の1形', () => {
+  it('「表示件数」の字ラベルつきで、選択肢は「N件表示」の1形', () => {
     render(<PageSizeSelect value={20} onChange={() => {}} />)
     expect(screen.getByText('表示件数')).toBeTruthy()
     const select = screen.getByLabelText('表示件数') as HTMLSelectElement
     expect(select.tagName).toBe('SELECT')
-    // 「20件表示」でも「20件を表示」でもなく「20件」
-    expect(select.options[0].textContent).toBe('20件')
-    expect(select.options[0].textContent).not.toContain('表示')
+    // 「20件」でも「20件を表示」でもなく設計の語「20件表示」
+    expect(select.options[0].textContent).toBe('20件表示')
   })
 
   it('件数の選択肢は画面が渡すものを使う（既定は 20・50・100）', () => {

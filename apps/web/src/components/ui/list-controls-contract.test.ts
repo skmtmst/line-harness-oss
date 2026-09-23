@@ -34,13 +34,13 @@ const PAGE_SIZE_SELECT_USERS: Array<[string, string]> = [
 
 /** 「検索 → 絞り込み → 並び順 → 表示件数」の順で並ぶ画面。 */
 const TOOLBAR_ORDER: Array<[string, string, string[]]> = [
-  ['リマインダ', '../../app/reminders/page.tsx', ['type="search"', '>絞り込み<', '<SortSelect', '<PageSizeSelect']],
-  ['自動応答', '../../app/auto-replies/page.tsx', ['type="search"', '>絞り込み<', '<SortSelect', '<PageSizeSelect']],
-  ['ウェビナー', '../../app/webinars/page.tsx', ['type="search"', '>絞り込み<', '<SortSelect', '<PageSizeSelect']],
-  ['共通情報', '../../app/contents/vars/page.tsx', ['data-search-row', '>絞り込み<', '<SortSelect', '<PageSizeSelect']],
+  ['リマインダ', '../../app/reminders/page.tsx', ['type="search"', '>よく使う絞り込み<', '<SortSelect', '<PageSizeSelect']],
+  ['自動応答', '../../app/auto-replies/page.tsx', ['type="search"', '>よく使う絞り込み<', '<SortSelect', '<PageSizeSelect']],
+  ['ウェビナー', '../../app/webinars/page.tsx', ['type="search"', '>よく使う絞り込み<', '<SortSelect', '<PageSizeSelect']],
+  ['共通情報', '../../app/contents/vars/page.tsx', ['data-search-row', '>よく使う絞り込み<', '<SortSelect', '<PageSizeSelect']],
 ]
 
-/** よく使う絞り込みチップの前置きは「絞り込み」の1形。 */
+/** 固定の絞り込みチップの前置きは「よく使う絞り込み」の1形（DETAIL-20 の語）。 */
 const FILTER_LABEL_USERS: Array<[string, string]> = [
   ['シナリオ', '../../app/scenarios/page.tsx'],
   ['自動応答', '../../app/auto-replies/page.tsx'],
@@ -89,14 +89,14 @@ describe('フィルターバー統一（監査6 #668）', () => {
   )
 
   it.each(FILTER_LABEL_USERS.map(([name, path]) => ({ name, path })))(
-    '$name の絞り込みチップの前置きは「絞り込み」',
+    '$name の絞り込みチップの前置きは「よく使う絞り込み」',
     ({ path }) => {
       const source = read(path)
-      expect(source, `${path} に「絞り込み」の前置きがない`).toContain('>絞り込み<')
-      // 旧い前置き（よく使う / 保存した条件 / 保存した検索）は残さない
+      expect(source, `${path} に「よく使う絞り込み」の前置きがない`).toContain('>よく使う絞り込み<')
+      // 旧い前置き（よく使う単体 / 保存した条件 / 保存した検索）は残さない
       expect(source).not.toContain('>よく使う<')
-      expect(source).not.toContain('>よく使う絞り込み<')
       expect(source).not.toContain('>保存した条件<')
+      expect(source).not.toMatch(/<span[^>]*>保存した検索<\/span>/)
     },
   )
 

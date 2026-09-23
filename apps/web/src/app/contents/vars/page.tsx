@@ -741,7 +741,7 @@ function VarsPageInner() {
 
           {/* #668: 並びは「絞り込み → 並び順 → 表示件数」の1形。 */}
           <div className="mb-3 flex flex-wrap items-center gap-2">
-            <span className="text-ink-faint text-xs whitespace-nowrap">絞り込み</span>
+            <span className="text-ink-faint text-xs whitespace-nowrap">よく使う絞り込み</span>
             {([
               ['all', 'すべて'],
               ['empty', '空のまま'],

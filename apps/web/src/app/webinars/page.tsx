@@ -781,7 +781,7 @@ function WebinarsPage() {
 
             {/* #668: 並びは「絞り込み → 並び順 → 表示件数」の1形。 */}
             <div data-design="Saved" className="mb-3 flex flex-wrap items-center gap-2">
-              <span className="text-ink-faint text-xs whitespace-nowrap">絞り込み</span>
+              <span className="text-ink-faint text-xs whitespace-nowrap">よく使う絞り込み</span>
               {([{ key: 'active', label: '公開中のみ' }, { key: 'draft', label: '下書きのみ' }] as const).map(({ key, label }) => (
                 <button key={key} onClick={() => setSavedFilter(savedFilter === key ? '' : key)} aria-pressed={savedFilter === key} className={`rounded-pill border px-3 py-1 text-xs transition-colors ${savedFilter === key ? 'border-accent bg-accent-soft text-ink' : 'border-hairline text-ink-secondary hover:bg-canvas-sunken'}`}>{label}</button>
               ))}

@@ -789,7 +789,7 @@ export default function ScenariosPage() {
         押した人ごとに違うものを想像する。
       */}
       <div className="mb-3 flex flex-wrap items-center gap-2">
-        <span className="text-ink-faint text-xs">絞り込み</span>
+        <span className="text-ink-faint text-xs">よく使う絞り込み</span>
         <button
           onClick={() => setStoppedOnly((v) => !v)}
           className={`rounded-pill px-3 py-1 text-xs transition-colors ${
