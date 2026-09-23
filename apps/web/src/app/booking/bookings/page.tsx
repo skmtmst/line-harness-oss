@@ -665,6 +665,8 @@ export default function BookingsPage() {
         {error && (
           <div className="bg-danger-bg border-danger-bg text-danger mb-4 rounded-lg border p-4 text-sm">
             {error}
+            {/* #634: 一覧の失敗からも、その場で読み直せるようにする。 */}
+            <button type="button" className="ml-2 font-semibold underline" onClick={() => void load()}>もう一度読み込む</button>
           </div>
         )}
         <BookingCalendar
@@ -676,6 +678,12 @@ export default function BookingsPage() {
           anchorDay={calendarAnchor}
           onAnchorChange={setCalendarAnchor}
           availability={availability}
+          /*
+           * #634: 空き枠の失敗からその場で読み直す。空き枠は集計・メニュー・
+           * 担当の候補が先に要るので、同じ取得列（summarySeq）を回し直す。
+           * 候補が揃うと空き枠の取得はuseEffectの依存で自動的に再実行される。
+           */
+          onRetryAvailability={() => setSummarySeq((n) => n + 1)}
         />
         {dialogs}
       </div>
@@ -689,6 +697,8 @@ export default function BookingsPage() {
       {error && (
         <div className="bg-danger-bg border-danger-bg text-danger mb-4 rounded-lg border p-4 text-sm">
           {error}
+          {/* #634: 一覧の失敗からも、その場で読み直せるようにする。 */}
+          <button type="button" className="ml-2 font-semibold underline" onClick={() => void load()}>もう一度読み込む</button>
         </div>
       )}
 

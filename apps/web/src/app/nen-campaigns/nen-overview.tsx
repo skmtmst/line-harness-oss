@@ -477,12 +477,18 @@ function AutoPanel({
             options={[{ value: '', label: '状態：すべて' }, { value: 'on', label: '状態：配信中' }, { value: 'off', label: '状態：停止中' }]}
           />
         )}
-        <Select
-          aria-label="並び順"
-          value={sort}
-          onChange={(value) => setSort(value === 'name' ? 'name' : 'sent_desc')}
-          options={[{ value: 'sent_desc', label: `並び：${monthLabel}の送信が多い順` }, { value: 'name', label: '並び：名前順' }]}
-        />
+        {/*
+          選択肢の文が長いとトリガー内で省略される。共通部品は触れないため、
+          外側の title で全文を読めるようにする（第5パス D-3）。
+        */}
+        <span title={sort === 'name' ? '並び：名前順' : `並び：${monthLabel}の送信が多い順`}>
+          <Select
+            aria-label="並び順"
+            value={sort}
+            onChange={(value) => setSort(value === 'name' ? 'name' : 'sent_desc')}
+            options={[{ value: 'sent_desc', label: `並び：${monthLabel}の送信が多い順` }, { value: 'name', label: '並び：名前順' }]}
+          />
+        </span>
         <span className="ml-auto text-caption font-semibold text-ink-faint">{shown.length}件</span>
       </div>
 
@@ -526,7 +532,7 @@ function AutoPanel({
                         <CampaignIcon campaignKey={setting.campaignKey} />
                         <span className="min-w-0">
                           <span className="block truncate text-label font-semibold text-ink" title={setting.label}>{setting.label}</span>
-                          <span className="block truncate text-micro text-ink-faint">{setting.title}</span>
+                          <span className="block truncate text-micro text-ink-faint" title={setting.title}>{setting.title}</span>
                         </span>
                       </span>
                     </Td>
@@ -1027,7 +1033,7 @@ function HistoryPanel({ deliveryList, detail, loading, onShowDetail, onRetry, on
                   <Tr>
                     <Td>
                       <span className="block text-label font-semibold text-ink">{formatNenJobDateTime(delivery.sentAt || delivery.scheduledAt)}</span>
-                      <span className="block truncate text-micro text-ink-faint">{delivery.friendName || '名前未取得'}・{delivery.lineAccountName}</span>
+                      <span className="block truncate text-micro text-ink-faint" title={`${delivery.friendName || '名前未取得'}・${delivery.lineAccountName}`}>{delivery.friendName || '名前未取得'}・{delivery.lineAccountName}</span>
                     </Td>
                     <Td><span className="text-label text-ink">{delivery.label}</span></Td>
                     <Td>

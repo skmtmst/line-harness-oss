@@ -167,7 +167,9 @@ function AnalyticsPeriodCaption({ from, to, cutoffAt }: {
 }) {
   return (
     <span className="text-ink-faint text-xs tabular-nums">
-      集計期間 {from}〜{to} ／ データ締切 {formatAnalyticsDateTime(cutoffAt)}
+      {/* #640 D-3: from/to は API の YYYY-MM-DD のまま出すと「-」区切りが
+          画面内の「/」表記と混ざる。日付専用の整形でそろえる。 */}
+      集計期間 {formatAnalyticsDate(from)}〜{formatAnalyticsDate(to)} ／ データ締切 {formatAnalyticsDateTime(cutoffAt)}
     </span>
   )
 }
@@ -991,8 +993,8 @@ function CrossTab({ accountId, canManage }: { accountId: string; canManage: bool
               ことを、期間と締切で確かめられるようにする。 */}
           <div className="mt-1 flex justify-end">
             <AnalyticsPeriodCaption
-              from={crossResult.periodFrom.slice(0, 10)}
-              to={crossResult.periodTo.slice(0, 10)}
+              from={crossResult.periodFrom}
+              to={crossResult.periodTo}
               cutoffAt={crossResult.dataCutoffAt}
             />
           </div>
@@ -2479,7 +2481,7 @@ function ReactionsOverviewTab({ accountId }: { accountId: string }) {
     </div>
     <div className="bg-canvas rounded-card border-hairline overflow-hidden border"><table className="w-full table-fixed">
       <thead><TableHeadRow><Th>配信</Th><Th>種類・日時</Th><Th align="right">対象</Th><Th align="right">到達</Th><Th align="right">開封</Th><Th align="right">LINEクリック</Th><Th align="right">成果</Th></TableHeadRow></thead>
-      <tbody className="divide-hairline divide-y">{overview.campaigns.length === 0 ? <tr><td colSpan={7} className="text-ink-faint p-8 text-center text-sm">この期間の配信はありません</td></tr> : overview.campaigns.map((item) => <tr key={`${item.kind}:${item.id}`} className="text-sm"><td className="truncate px-4 py-3 font-medium" title={item.name}>{item.name}</td><td className="text-ink-secondary px-3 py-3">{item.kind === 'broadcast' ? '一斉配信' : 'シナリオ'}<br /><span className="text-xs tabular-nums">{item.sentAt.slice(0, 16).replace('T', ' ')}</span></td><td className="px-3 py-3 text-right"><MetricCell metric={item.targetPeople} /></td><td className="px-3 py-3 text-right"><MetricCell metric={item.delivered} /></td><td className="px-3 py-3 text-right"><MetricCell metric={item.opened} /></td><td className="px-3 py-3 text-right"><MetricCell metric={item.lineClicked} /></td><td className="px-3 py-3 text-right"><MetricCell metric={item.outcomes} /></td></tr>)}</tbody>
+      <tbody className="divide-hairline divide-y">{overview.campaigns.length === 0 ? <tr><td colSpan={7} className="text-ink-faint p-8 text-center text-sm">この期間の配信はありません</td></tr> : overview.campaigns.map((item) => <tr key={`${item.kind}:${item.id}`} className="text-sm"><td className="truncate px-4 py-3 font-medium" title={item.name}>{item.name}</td><td className="text-ink-secondary px-3 py-3">{item.kind === 'broadcast' ? '一斉配信' : 'シナリオ'}<br /><span className="text-xs tabular-nums">{formatAnalyticsDateTime(item.sentAt)}</span></td><td className="px-3 py-3 text-right"><MetricCell metric={item.targetPeople} /></td><td className="px-3 py-3 text-right"><MetricCell metric={item.delivered} /></td><td className="px-3 py-3 text-right"><MetricCell metric={item.opened} /></td><td className="px-3 py-3 text-right"><MetricCell metric={item.lineClicked} /></td><td className="px-3 py-3 text-right"><MetricCell metric={item.outcomes} /></td></tr>)}</tbody>
     </table></div>
   </div>
 }
@@ -3039,7 +3041,7 @@ function SavedAnalyticsTab({ accountId, onCountChange, canManage }: {
                         <td className="text-ink-secondary px-3 py-3 text-sm">第{item.currentVersionNumber}版</td>
                         <td className="text-ink-secondary px-3 py-3 text-xs tabular-nums">
                           {item.latestSnapshot
-                            ? `${item.latestSnapshot.periodFrom.slice(0, 10)}〜${item.latestSnapshot.periodTo.slice(0, 10)}`
+                            ? `${formatAnalyticsDate(item.latestSnapshot.periodFrom)}〜${formatAnalyticsDate(item.latestSnapshot.periodTo)}`
                             : '—'}
                         </td>
                         <td className="px-3 py-3 text-xs">
@@ -3093,7 +3095,7 @@ function SavedAnalyticsTab({ accountId, onCountChange, canManage }: {
                       <span className="text-ink-faint text-xs">{SAVED_STATE_LABELS[snapshot.state]}</span>
                     </div>
                     <p className="text-ink-secondary mt-2 text-xs tabular-nums">
-                      {snapshot.periodFrom.slice(0, 10)}〜{snapshot.periodTo.slice(0, 10)}
+                      {formatAnalyticsDate(snapshot.periodFrom)}〜{formatAnalyticsDate(snapshot.periodTo)}
                     </p>
                     <p className="text-ink-faint mt-1 text-xs tabular-nums">
                       データ締切 {formatAnalyticsDateTime(snapshot.dataCutoffAt)}

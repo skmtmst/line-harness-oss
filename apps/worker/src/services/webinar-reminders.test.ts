@@ -8,6 +8,14 @@ const dbMocks = {
   getLineAccountById: vi.fn(),
   getVersionedAccountSetting: vi.fn(),
   getAccountSetting: vi.fn(),
+  getAccountSettings: vi.fn(async (_db: D1Database, _accountId: string, keys: readonly string[]) =>
+    Object.fromEntries(
+      (await Promise.all(
+        keys.map(async (key) => [key, await dbMocks.getAccountSetting(_db, _accountId, key)] as const),
+      )).filter(([, value]) => value != null),
+    )),
+  getTenantBilling: vi.fn(async () => null),
+  getTenantBillingByLineAccount: vi.fn(async () => null),
   recordAuditEvent: vi.fn(),
 };
 vi.mock('@line-crm/db', () => dbMocks);

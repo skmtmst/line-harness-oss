@@ -8,9 +8,12 @@ const HERE = dirname(fileURLToPath(import.meta.url))
 const TARGETS = [
   'affiliates/tabs.tsx',
   'booking/menus/page.tsx',
+  'broadcasts/page.tsx',
   'form-submissions/page.tsx',
   'friend-add-settings/publish/page.tsx',
   'friends/page.tsx',
+  'line-notifications/page.tsx',
+  'line-notifications/operator-notification-rules.tsx',
   'mileage/action-score-tab.tsx',
   'mileage/page.tsx',
   'nen-members/page.tsx',
@@ -56,7 +59,9 @@ describe('一覧の取得失敗からその場で読み直せる契約', () => {
     // NOTIFY-04: どこからも使われていない古い運用者一覧（名前がリンクでない
     //        置き忘れの写し）を消したぶん1減。生きている一覧は
     //        app/line-notifications/operator-notification-rules.tsx。
-    expect(errorCount).toBe(24)
+    // #634: 一斉配信の失敗表示へ再読み込み口を足し（1増）、既に onRetry を
+    //        持っていた LINE通知の2画面も契約の対象へ加えた（2増）。
+    expect(errorCount).toBe(27)
   })
 
   it('URLだけでは対象を特定できない状態に、直らない再読み込みを出さない', () => {
