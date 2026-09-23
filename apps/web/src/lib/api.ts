@@ -10175,6 +10175,8 @@ export const api = {
       fetchApi<ApiResponse<{
         sent: number
         recipientName: string
+        /** REMINDER-12: 本人宛て(self)か登録済みテスト宛先(registered)か。 */
+        recipientKind: 'self' | 'registered' | null
         replayed: boolean
         requestId: string | null
         testedAt: string

@@ -80,7 +80,7 @@ describe('リマインダ テスト送信段 (N-070)', () => {
     apiMocks.getTestRecipient.mockReturnValue(ok({ state: 'ready', recipient: { id: 'f1', displayName: '田中 太郎', pictureUrl: null } }))
     render(<Issue469ReminderTestStage reminderId="rem-1" />)
     await flush()
-    expect(screen.getAllByText('田中 太郎').length).toBeGreaterThanOrEqual(2)
+    expect(screen.getAllByText(/田中 太郎/).length).toBeGreaterThanOrEqual(2)
     expect(screen.queryByText('テスト送信後に表示')).toBeNull()
     expect(apiMocks.getTestRecipient).toHaveBeenCalledWith('rem-1')
   })
@@ -99,7 +99,7 @@ describe('リマインダ テスト送信段 (N-070)', () => {
     fireEvent.click(screen.getByRole('button', { name: '送信先を再確認' }))
     await flush()
     expect(apiMocks.getTestRecipient).toHaveBeenCalledTimes(2)
-    expect(screen.getAllByText('田中 太郎').length).toBeGreaterThanOrEqual(2)
+    expect(screen.getAllByText(/田中 太郎/).length).toBeGreaterThanOrEqual(2)
     expect(screen.queryByText('未設定')).toBeNull()
   })
 
@@ -114,7 +114,7 @@ describe('リマインダ テスト送信段 (N-070)', () => {
     apiMocks.getTestRecipient.mockReturnValueOnce(ok({ state: 'ready', recipient: { id: 'f1', displayName: '田中 太郎', pictureUrl: null } }))
     fireEvent.click(screen.getByRole('button', { name: '送信先を再確認' }))
     await flush()
-    expect(screen.getAllByText('田中 太郎').length).toBeGreaterThanOrEqual(1)
+    expect(screen.getAllByText(/田中 太郎/).length).toBeGreaterThanOrEqual(1)
   })
 
   it('送信が送信先未設定で失敗したら、その旨と案内を出して同じ画面で再試行できる', async () => {
@@ -144,7 +144,7 @@ describe('リマインダ テスト送信段 (N-070)', () => {
     await flush()
     fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'テスト送信' }))
     await flush()
-    expect(screen.getAllByText('田中 太郎').length).toBeGreaterThanOrEqual(1)
+    expect(screen.getAllByText(/田中 太郎/).length).toBeGreaterThanOrEqual(1)
     expect(screen.getAllByText(/テスト済み/).length).toBeGreaterThanOrEqual(1)
   })
 
@@ -169,7 +169,7 @@ describe('リマインダ テスト送信段 (N-070)', () => {
     rerender(<Issue469ReminderTestStage reminderId="rem-2" />)
     await flush()
     expect(screen.getByText('Bの実本文')).toBeTruthy()
-    expect(screen.getAllByText('Bの送信先').length).toBeGreaterThanOrEqual(1)
+    expect(screen.getAllByText(/Bの送信先/).length).toBeGreaterThanOrEqual(1)
 
     // 遅れて届いたAの応答は捨てる。本文も送信先もBのまま。
     await act(async () => {
@@ -177,7 +177,7 @@ describe('リマインダ テスト送信段 (N-070)', () => {
       await Promise.resolve()
     })
     expect(screen.queryByText('本文です')).toBeNull()
-    expect(screen.queryByText('Aの送信先')).toBeNull()
+    expect(screen.queryByText(/Aの送信先/)).toBeNull()
     expect(screen.getByText('Bの実本文')).toBeTruthy()
 
     fireEvent.click(screen.getAllByRole('button', { name: 'テスト送信' })[0])
@@ -296,14 +296,14 @@ describe('リマインダ テスト送信段 (N-070)', () => {
     // rem-1 の応答が来る前に rem-2 へ切り替える。
     rerender(<Issue469ReminderTestStage reminderId="rem-2" />)
     await flush()
-    expect(screen.getAllByText('別アカウントの人').length).toBeGreaterThanOrEqual(1)
+    expect(screen.getAllByText(/別アカウントの人/).length).toBeGreaterThanOrEqual(1)
 
     // 遅れて届いた rem-1 の応答は捨てる。
     await act(async () => {
       slowA.resolve({ success: true, data: { state: 'ready', recipient: { id: 'f1', displayName: '古い送信先', pictureUrl: null } } })
       await Promise.resolve()
     })
-    expect(screen.queryByText('古い送信先')).toBeNull()
-    expect(screen.getAllByText('別アカウントの人').length).toBeGreaterThanOrEqual(1)
+    expect(screen.queryByText(/古い送信先/)).toBeNull()
+    expect(screen.getAllByText(/別アカウントの人/).length).toBeGreaterThanOrEqual(1)
   })
 })
