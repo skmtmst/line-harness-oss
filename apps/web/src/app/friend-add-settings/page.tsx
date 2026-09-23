@@ -284,14 +284,16 @@ function FriendAddSettingsList() {
               {/* #972 U039: 狭い幅では見出し同士が重なるため、枠の内側で横へ動かせるようにする。 */}
               <div data-scroll-table>
               <DataTable>
-                <thead><TableHeadRow><Th>設定名</Th><Th>状態</Th><Th>対象の流入リンク</Th><Th>最初に送るもの</Th><Th>直近7日</Th><Th>操作</Th></TableHeadRow></thead>
+                {/* 見出しは固定幅の表で切れることがあるため、重ねると全文が
+                    読める title を付ける（第5パス D-3）。 */}
+                <thead><TableHeadRow><Th title="設定名">設定名</Th><Th title="状態">状態</Th><Th title="対象の流入リンク">対象の流入リンク</Th><Th title="最初に送るもの">最初に送るもの</Th><Th title="直近7日の友だち追加数">直近7日</Th><Th title="操作">操作</Th></TableHeadRow></thead>
                 <tbody>
                   {visibleItems.map((rule) => (
                     <Tr key={rule.id}>
-                      <NameCell name={<a href={`/friend-add-settings?view=edit&id=${encodeURIComponent(rule.id)}`} className="text-ink block truncate font-bold">{rule.name}</a>} sub={rule.isFallback ? 'いちばん最後に動く・消せない' : `優先順位 ${rule.priority}`} />
+                      <NameCell name={<a href={`/friend-add-settings?view=edit&id=${encodeURIComponent(rule.id)}`} className="text-ink block truncate font-bold" title={rule.name}>{rule.name}</a>} sub={rule.isFallback ? 'いちばん最後に動く・消せない' : `優先順位 ${rule.priority}`} />
                       <Td><StatusBadge tone={rule.status === 'published' || rule.isFallback ? 'success' : 'neutral'} size="compact">{rule.isFallback ? '常に有効' : rule.status === 'published' ? '有効' : rule.status === 'draft' ? '下書き' : rule.status === 'stopped' ? '停止中' : 'アーカイブ'}</StatusBadge></Td>
-                      <Td>{rule.isFallback ? '経路が取れなかったとき' : rule.routeNames.join('、') || 'すべての流入経路'}</Td>
-                      <Td>{deliverySummary(rule)}</Td>
+                      <Td><span className="block truncate" title={rule.isFallback ? '経路が取れなかったとき' : rule.routeNames.join('、') || 'すべての流入経路'}>{rule.isFallback ? '経路が取れなかったとき' : rule.routeNames.join('、') || 'すべての流入経路'}</span></Td>
+                      <Td><span className="block truncate" title={deliverySummary(rule)}>{deliverySummary(rule)}</span></Td>
                       <Td>{countText(rule.matchedLast7Days, '人')}</Td>
                       <ActionCell>
                         <div className="flex items-center gap-1">

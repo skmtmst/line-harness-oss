@@ -635,20 +635,13 @@ function BroadcastList() {
         />
       </div>
 
-      {/* Loading */}
+      {/*
+        Loading。**読み込み中であることを言葉で出す。** 骨だけのスケルトン
+        では「読み込んでいます」の文言が無く、ほかの一覧と同じ
+        読込表示（共通 ListState）にそろえる（#634）。
+      */}
       {loading ? (
-        <div className="bg-canvas rounded-card border border-hairline overflow-hidden">
-          {[...Array(4)].map((_, i) => (
-            <div key={i} className="px-4 py-4 border-b border-hairline flex items-center gap-4 animate-pulse">
-              <div className="flex-1 space-y-2">
-                <div className="h-3 bg-hairline rounded w-48" />
-                <div className="h-2 bg-canvas-sunken rounded w-32" />
-              </div>
-              <div className="h-5 bg-canvas-sunken rounded-full w-16" />
-              <div className="h-3 bg-canvas-sunken rounded w-24" />
-            </div>
-          ))}
-        </div>
+        <ListState kind="loading" />
       ) : forbidden ? (
         /*
           権限不足。**「ありません」とも「失敗しました」とも別の1枚**にする。
@@ -662,6 +655,7 @@ function BroadcastList() {
             kind="error"
             title="表示できませんでした"
             description="再読み込みしても直らないときは、エラー報告へお知らせください。"
+            onRetry={() => void load()}
           />
         ) : (
           /* 文言は設計 `TmHjF`（6-1-N）どおり。 */
