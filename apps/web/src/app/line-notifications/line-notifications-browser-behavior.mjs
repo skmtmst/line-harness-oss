@@ -143,8 +143,33 @@ function customerDefinition(accountId) {
   }
 }
 
+function operatorRule(id) {
+  return {
+    id,
+    lineAccountId: 'account-a',
+    name: '新しい予約が入りました',
+    eventType: 'reservation.created',
+    conditions: {
+      threshold: 'one',
+      importance: 'normal',
+      recipientIds: ['staff-1'],
+      recipientLabel: '1人',
+      schedule: 'anytime',
+      scheduleLabel: 'いつでも',
+      dedupeMinutes: 10,
+      onlyAvailable: false,
+    },
+    channels: ['dashboard', 'line'],
+    status: 'published',
+    recipientCount: 1,
+    occurredToday: 0,
+    version: 1,
+    updatedAt: '2026-09-01T00:00:00.000Z',
+  }
+}
+
 async function openHarness(browser) {
-  const state = { draftSaves: [], saveDelayMs: 0, holdSave: null, holdAccountLoad: {} }
+  const state = { draftSaves: [], saveDelayMs: 0, holdSave: null, holdAccountLoad: {}, operatorItems: [] }
   const context = await browser.newContext()
   await context.addInitScript(() => {
     localStorage.setItem('lh_selected_account', 'account-a')
@@ -188,7 +213,18 @@ async function openHarness(browser) {
       return json({ success: true, data: { features: {}, sidebarOrder: null, sidebarItemOrder: null, parentChildMode: false, specializedFeatureKeys: [], version: 1 } })
     }
     if (path === '/api/line-notifications/operator-rules') {
-      return json({ success: true, data: { items: [], summary: { total: 7, published: 7, stopped: 0, missingRecipients: 0, recipients: 3, acceptedToday: 0, excludedToday: 0 } } })
+      return json({ success: true, data: { items: state.operatorItems, summary: { total: 7, published: 7, stopped: 0, missingRecipients: 0, recipients: 3, acceptedToday: 0, excludedToday: 0 } } })
+    }
+    /*
+     * NOTIFY-04 の行き先。一覧の名前は ?id= 付きで開き直すので、
+     * idでの読み直しと宛先プレビューも実形で返す。
+     */
+    if (path === '/api/line-notifications/operator-rules/recipients-preview') {
+      return json({ success: true, data: { items: [{ id: 'staff-1', name: '店長 一郎', channels: { dashboard: true, line: true, email: false } }] } })
+    }
+    if (path.startsWith('/api/line-notifications/operator-rules/')) {
+      const rule = state.operatorItems.find((item) => path === `/api/line-notifications/operator-rules/${encodeURIComponent(item.id)}`)
+      return rule ? json({ success: true, data: rule }) : json({ success: false, error: 'not found' }, 404)
     }
     if (path === '/api/ec-commerce/settings') return json({ success: true, data: [notificationSetting(accountId)] })
     if (path === '/api/ec-commerce/overview') {
@@ -441,6 +477,39 @@ try {
     )
     await context.close()
     console.log('競合3（B選択直後・Bの一覧が読み込み中のうちに旧Aの応答が返る）: PASS')
+  }
+
+  {
+    /*
+     * 5. NOTIFY-04: 運用者一覧の名前から編集画面へ戻る。
+     *
+     * 監査で「名前を押しても動かない」が挙がった。名前は
+     * /line-notifications/operator/new?id=<id> への実リンクなので、
+     * 実ブラウザで押して URL が進むこと、戻っても一覧と他タブが
+     * そのまま使えることを確かめる。id に空白を含めるのは、
+     * encodeURIComponent が外れると別の通知を開いてしまうため。
+     */
+    const { context, page, state } = await openHarness(browser)
+    state.operatorItems = [operatorRule('rule-abc 123')]
+    await page.goto(`${baseUrl}/line-notifications?tab=operator`)
+    const nameLink = page.getByRole('link', { name: '新しい予約が入りました' })
+    await nameLink.waitFor({ timeout: 15_000 })
+    await nameLink.click()
+    await page.waitForFunction(() => location.pathname === '/line-notifications/operator/new', undefined, { timeout: 15_000 })
+    assert.equal(new URL(page.url()).searchParams.get('id'), 'rule-abc 123')
+    // 開き直した編集画面は、保存ずみのお知らせを読み直して名前まで戻す。
+    await page.waitForFunction(() => {
+      const input = document.querySelector('#operator-name')
+      return Boolean(input) && input.value === '新しい予約が入りました'
+    }, undefined, { timeout: 15_000 })
+
+    // 一覧へ戻っても名前のリンクと他タブはそのまま動く。
+    await page.goBack()
+    await nameLink.waitFor({ timeout: 15_000 })
+    await page.getByRole('button', { name: /顧客へのお知らせ/ }).first().click()
+    await page.waitForFunction(() => document.body.innerText.includes('注文受付'), undefined, { timeout: 15_000 })
+    await context.close()
+    console.log('NOTIFY-04（一覧の名前から編集画面へ戻る）: PASS')
   }
 
   console.log('line notifications browser behavior: PASS')

@@ -8987,6 +8987,8 @@ export const api = {
         keywordMatchMode: string;
         /** フォルダ。分けていなければ null。 */
         folderId: string | null;
+        /** 運用者だけが読むメモ。友だちへは出ない。 */
+        internalMemo: string | null;
         /** 273: 'draft'（未公開）| 'published' | 'stopped'。 */
         lifecycleStatus: string;
         /** 機能08 点検 E-01: 最後に停止した記録。止めたことが無ければ null。 */
@@ -9037,6 +9039,8 @@ export const api = {
         keywordMatchMode: string;
         /** フォルダ。分けていなければ null。 */
         folderId: string | null;
+        /** 運用者だけが読むメモ。友だちへは出ない。 */
+        internalMemo: string | null;
         /** 273: 'draft'（未公開）| 'published' | 'stopped'。 */
         lifecycleStatus: string;
         /** 機能08 点検 E-01: 最後に停止した記録。 */
@@ -9090,6 +9094,8 @@ export const api = {
       keywordMatchMode?: 'any' | 'all';
       /** フォルダ。 */
       folderId?: string | null;
+      /** 運用者だけが読むメモ。友だちへは出ない。1000字まで。 */
+      internalMemo?: string | null;
     }) =>
       fetchApi<ApiResponse<{ id: string }>>('/api/auto-replies', {
         method: 'POST',
@@ -9130,6 +9136,8 @@ export const api = {
       keywordMatchMode?: 'any' | 'all';
       /** フォルダ。 */
       folderId?: string | null;
+      /** 運用者だけが読むメモ。省略は変更なし、null/'' で消す。 */
+      internalMemo?: string | null;
     }) =>
       fetchApi<ApiResponse<{ id: string }>>(`/api/auto-replies/${id}`, {
         method: 'PUT',
@@ -9181,10 +9189,18 @@ export const api = {
       fetchApi<ApiResponse<AutomationTemplateSummary[]>>(
         `/api/automation-templates?account_id=${encodeURIComponent(accountId)}`,
       ),
-    createDraftFromTemplate: (templateKey: string, accountId: string) =>
+    /**
+     * 見本から下書きを作る（DETAIL-13）。
+     *
+     * `operationKey` は「この新規作成の操作」を識別する鍵。1回の作成操作に
+     * 1つだけ振り、同じ操作の再試行（ダブルクリック・通信やり直し）だけが
+     * 同じ鍵を使う。別の新規作成は必ず別の鍵で呼ぶ——同じ鍵だとサーバーは
+     * 同じ下書きを返し、鍵が無い呼び出しは Worker が 422 で断る。
+     */
+    createDraftFromTemplate: (templateKey: string, accountId: string, operationKey: string) =>
       fetchApi<ApiResponse<{ id: string; draftVersionId: string }>>(
         `/api/automation-templates/${encodeURIComponent(templateKey)}/drafts?account_id=${encodeURIComponent(accountId)}`,
-        { method: 'POST', body: '{}' },
+        { method: 'POST', body: JSON.stringify({ operationKey }) },
       ),
     getDraft: (id: string, accountId: string) =>
       fetchApi<ApiResponse<AutomationDraftDetail>>(
@@ -10175,6 +10191,8 @@ export const api = {
       fetchApi<ApiResponse<{
         sent: number
         recipientName: string
+        /** REMINDER-12: 本人宛て(self)か登録済みテスト宛先(registered)か。 */
+        recipientKind: 'self' | 'registered' | null
         replayed: boolean
         requestId: string | null
         testedAt: string

@@ -1,5 +1,6 @@
 import {
   getFriendById,
+  getFriendByLineUserIdForAccount,
   getLineAccountById,
   getReminderVersionSteps,
   jstNow,
@@ -170,37 +171,99 @@ export async function previewReminderDraft(
   };
 }
 
+/**
+ * REMINDER-12: テスト送信の届け先の種別。
+ *
+ * - self       : 操作者本人のLINE。staff_members.line_user_id とこの
+ *   アカウントの友だち行の対応をサーバーで確認できた場合だけ名乗る。
+ * - registered : アカウント設定で登録されたテスト送信先。本人では
+ *   ないので、画面・確認窓・要約は「登録済みテスト宛先」と実名を出す。
+ */
+export type ReminderTestRecipientKind = 'self' | 'registered';
+
 export interface ReminderTestRecipientStatus {
   // unset=未設定 / unavailable=設定済みだが届けられない / ready=送信できる
   state: 'unset' | 'unavailable' | 'ready';
   recipient: { id: string; displayName: string; pictureUrl: string | null } | null;
+  /** ready のときだけ埋まる届け先の種別。それ以外は null。 */
+  recipientKind: ReminderTestRecipientKind | null;
+}
+
+export type ReminderTestOperator = { staffId?: string | null };
+
+function recipientOf(friend: {
+  id: string;
+  display_name: string | null;
+  picture_url: string | null;
+}): NonNullable<ReminderTestRecipientStatus['recipient']> {
+  return {
+    id: friend.id,
+    displayName: friend.display_name ?? 'テスト送信先',
+    pictureUrl: friend.picture_url,
+  };
 }
 
 /*
  * テスト送信の届け先を解決する。送信前の画面表示（GET test-recipient）と
  * 実送信（testReminderDraft）が同じ判定を使うので、表示と送信がずれない。
+ *
+ * REMINDER-12: 「自分のLINEへ」と案内しながら登録済みテスト宛先へ
+ * 送っていた取り違えを直す。届け先は2種類に分け、どちらであるかを
+ * recipientKind で画面へ返す。
+ *
+ * 1. 本人宛て（self）: 操作者の staff_members.line_user_id がこの
+ *    アカウントの友だち行と一致し、ブロックされていなければ本人へ送る。
+ *    対応が確認できない・確認自体に失敗した場合は本人宛てを無効化し、
+ *    登録宛先へ倒す（本人を名乗らない）。
+ * 2. 登録テスト宛先（registered）: アカウント設定の test_recipients 先頭。
+ *    本人以外へ届くため、画面は必ず「登録済みテスト宛先」と実名を出す。
  */
 export async function resolveReminderTestRecipient(
   db: D1Database,
   lineAccountId: string,
+  operator?: ReminderTestOperator,
 ): Promise<ReminderTestRecipientStatus> {
+  if (operator?.staffId) {
+    const self = await resolveSelfRecipient(db, operator.staffId, lineAccountId);
+    if (self) return self;
+  }
   const setting = await db.prepare(
     `SELECT value FROM account_settings WHERE line_account_id = ? AND key = 'test_recipients'`,
   ).bind(lineAccountId).first<{ value: string }>();
   const friendId = setting ? (JSON.parse(setting.value) as string[])[0] : undefined;
-  if (!friendId) return { state: 'unset', recipient: null };
+  if (!friendId) return { state: 'unset', recipient: null, recipientKind: null };
   const friend = await getFriendById(db, friendId);
   if (!friend || friend.line_account_id !== lineAccountId || !friend.is_following) {
-    return { state: 'unavailable', recipient: null };
+    return { state: 'unavailable', recipient: null, recipientKind: null };
   }
-  return {
-    state: 'ready',
-    recipient: {
-      id: friend.id,
-      displayName: friend.display_name ?? 'テスト送信先',
-      pictureUrl: friend.picture_url,
-    },
-  };
+  return { state: 'ready', recipient: recipientOf(friend), recipientKind: 'registered' };
+}
+
+/*
+ * 操作者本人のLINE宛てを解決する。本人対応が確認できたときだけ ready+self を
+ * 返し、確認できない・確認に失敗したときは null（＝本人宛て無効）を返す。
+ * 例外を握りつぶすのは「確認できなかった」に含めるためで、本人を名乗る
+ * 判定だけが失敗を隠す。登録宛先の解決は別経路で行う。
+ */
+async function resolveSelfRecipient(
+  db: D1Database,
+  staffId: string,
+  lineAccountId: string,
+): Promise<ReminderTestRecipientStatus | null> {
+  try {
+    const staff = await db.prepare(
+      `SELECT line_user_id FROM staff_members WHERE id = ? AND is_active = 1`,
+    ).bind(staffId).first<{ line_user_id: string | null }>();
+    if (!staff?.line_user_id) return null;
+    const friend = await getFriendByLineUserIdForAccount(db, staff.line_user_id, lineAccountId);
+    if (!friend || friend.line_account_id !== lineAccountId || !friend.is_following) {
+      return null;
+    }
+    return { state: 'ready', recipient: recipientOf(friend), recipientKind: 'self' };
+  } catch {
+    // 本人対応の確認自体に失敗した場合は本人宛てを無効化する。
+    return null;
+  }
 }
 
 export async function testReminderDraft(
@@ -208,8 +271,18 @@ export async function testReminderDraft(
   version: ReminderVersionRow,
   settings: ReminderDraftSettings,
   requestKey: string,
-): Promise<{ sent: number; recipientName: string; replayed: boolean; testedAt: string; requestId: string | null }> {
-  const recipient = await resolveReminderTestRecipient(db, settings.lineAccountId);
+  operator?: ReminderTestOperator,
+): Promise<{
+  sent: number;
+  recipientName: string;
+  recipientKind: ReminderTestRecipientKind | null;
+  replayed: boolean;
+  testedAt: string;
+  requestId: string | null;
+}> {
+  // 表示（GET test-recipient）と同じ解決関数・同じ操作者を使う。
+  // 画面が出した届け先と実際に届く先がずれないことが REMINDER-12 の条件。
+  const recipient = await resolveReminderTestRecipient(db, settings.lineAccountId, operator);
   if (recipient.state === 'unset') throw new Error('REMINDER_TEST_RECIPIENT_NOT_CONFIGURED');
   if (recipient.state !== 'ready' || !recipient.recipient) {
     throw new Error('REMINDER_TEST_RECIPIENT_NOT_AVAILABLE');
@@ -240,6 +313,7 @@ export async function testReminderDraft(
     return {
       sent: 1,
       recipientName: friend.display_name ?? 'テスト送信先',
+      recipientKind: recipient.recipientKind,
       replayed: true,
       testedAt: now,
       requestId: null,
@@ -276,6 +350,7 @@ export async function testReminderDraft(
   return {
     sent: 1,
     recipientName: friend.display_name ?? 'テスト送信先',
+    recipientKind: recipient.recipientKind,
     replayed: false,
     testedAt: now,
     requestId: response.requestId ?? null,

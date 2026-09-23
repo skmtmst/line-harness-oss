@@ -257,6 +257,111 @@ export async function getAutoReplyPublishedVersion(
   ).bind(autoReplyId).first<AutoReplyVersionRow>();
 }
 
+/**
+ * 一覧・詳細の応答に載せる社内メモ。編集画面と同じ版（下書きを優先し、
+ * 無ければ公開版）のスナップショットから読む。版が無い・壊れている
+ * ルールはメモ無しとして扱う。
+ */
+export async function getAutoReplyInternalMemos(
+  db: D1Database,
+  autoReplyIds: string[],
+): Promise<Map<string, string | null>> {
+  const memos = new Map<string, string | null>();
+  if (autoReplyIds.length === 0) return memos;
+  const rows = await db.prepare(
+    `SELECT arv.auto_reply_id AS auto_reply_id, arv.definition_snapshot AS definition_snapshot
+       FROM auto_replies ar
+       JOIN auto_reply_versions arv
+         ON arv.id = COALESCE(ar.current_draft_version_id, ar.current_published_version_id)
+      WHERE ar.id IN (${autoReplyIds.map(() => '?').join(',')})`,
+  ).bind(...autoReplyIds).all<{ auto_reply_id: string; definition_snapshot: string }>();
+  for (const row of rows.results ?? []) {
+    try {
+      const parsed = JSON.parse(row.definition_snapshot) as { internalMemo?: unknown };
+      memos.set(
+        row.auto_reply_id,
+        typeof parsed.internalMemo === 'string' && parsed.internalMemo !== ''
+          ? parsed.internalMemo
+          : null,
+      );
+    } catch {
+      memos.set(row.auto_reply_id, null);
+    }
+  }
+  return memos;
+}
+
+/**
+ * 社内メモは auto_replies に列を持たず、版のスナップショット
+ * （definition_snapshot）にだけ置く。編集画面が読む版（下書きを優先し、
+ * 無ければ公開版）へ書き込み、版がまだ無いルールには公開版を1つ作る。
+ * 停止中に作られたルールは実行されず ensureAutoReplyPublishedVersion が
+ * 走らないため、ここで版を確保しないとメモの置き場が無い（AUTOREPLY-09）。
+ *
+ * 公開済みの版は実行記録から参照されるため definition_snapshot は不変
+ * （trg_auto_reply_versions_immutable_update）。公開版のメモを変えるときは
+ * 旧版を retired へ進め、実行中の定義＋新しいメモを持つ新版へ張り替える。
+ * 下書きは未公開の作業中なので、そのまま書き換えてよい。
+ */
+export async function saveAutoReplyInternalMemo(
+  db: D1Database,
+  rule: AutoReply,
+  internalMemo: string | null,
+): Promise<void> {
+  const now = jstNow();
+  const draft = await getAutoReplyDraftVersion(db, rule.id);
+  if (draft) {
+    const snapshot = JSON.parse(draft.definition_snapshot) as Record<string, unknown>;
+    snapshot.internalMemo = internalMemo;
+    await db.prepare(
+      `UPDATE auto_reply_versions
+          SET definition_snapshot = ?, updated_at = ?
+        WHERE id = ?`,
+    ).bind(JSON.stringify(snapshot), now, draft.id).run();
+    return;
+  }
+
+  const published = await getAutoReplyPublishedVersion(db, rule.id);
+  // 実行中の定義は auto_replies の現行値。版にしか無い設定
+  // （受信経路・遅延・未一致時の別動作）は、消えないよう直前の版から引き継ぐ。
+  const previous = published ? parseAutoReplyVersionSettings(published) : null;
+  const snapshot = JSON.stringify({
+    ...autoReplyDraftSettingsFromRow(rule),
+    receiveSources: previous?.receiveSources ?? ['line'],
+    internalMemo,
+    replyDelaySeconds: previous?.replyDelaySeconds ?? null,
+    unmatchedAction: previous?.unmatchedAction ?? null,
+  });
+  const next = await db.prepare(
+    `SELECT COALESCE(MAX(version_number), 0) + 1 AS version_number
+       FROM auto_reply_versions WHERE auto_reply_id = ?`,
+  ).bind(rule.id).first<{ version_number: number }>();
+  const versionId = crypto.randomUUID();
+  await db.batch([
+    db.prepare(
+      `UPDATE auto_reply_versions SET status = 'retired', updated_at = ?
+        WHERE auto_reply_id = ? AND status = 'published'`,
+    ).bind(now, rule.id),
+    db.prepare(
+      `INSERT INTO auto_reply_versions
+         (id, auto_reply_id, version_number, line_account_id, definition_snapshot,
+          status, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, 'published', ?, ?)`,
+    ).bind(
+      versionId,
+      rule.id,
+      Number(next?.version_number ?? 1),
+      rule.line_account_id,
+      snapshot,
+      now,
+      now,
+    ),
+    db.prepare(
+      `UPDATE auto_replies SET current_published_version_id = ? WHERE id = ?`,
+    ).bind(versionId, rule.id),
+  ]);
+}
+
 /** 新規定義と下書き版を1回のbatchで作る。作成時点では評価対象にしない。 */
 export async function createAutoReplyWithDraftVersion(
   db: D1Database,
@@ -500,6 +605,27 @@ export async function ensureAutoReplyPublishedVersion(
   const versionNumber = Number(latest?.version_number ?? 0) + 1;
   const now = jstNow();
   const id = crypto.randomUUID();
+  /*
+   * 実行の同一判定に混ぜない運用項目は、実行版を張り替えても引き継ぐ。
+   * 引き継がないと、従来の更新口（PUT /api/auto-replies/:id）で定義を
+   * 直したあとの初回評価で、新版に社内メモが載らず編集画面から消える
+   * （AUTOREPLY-09）。
+   */
+  const previous = current ?? (latest?.status === 'published' ? latest : null);
+  let snapshotToSave = snapshot;
+  if (previous) {
+    try {
+      const carried = JSON.parse(previous.definition_snapshot) as Partial<AutoReplyDraftSettings>;
+      snapshotToSave = JSON.stringify({
+        ...(JSON.parse(snapshot) as Record<string, unknown>),
+        internalMemo: carried.internalMemo ?? null,
+        replyDelaySeconds: carried.replyDelaySeconds ?? null,
+        unmatchedAction: carried.unmatchedAction ?? null,
+      });
+    } catch {
+      /* 読めない旧版は引き継がない */
+    }
+  }
   await db.batch([
     db.prepare(
       `UPDATE auto_reply_versions SET status = 'retired', updated_at = ?
@@ -510,7 +636,7 @@ export async function ensureAutoReplyPublishedVersion(
          (id, auto_reply_id, version_number, line_account_id, definition_snapshot,
           status, published_at, published_by_staff_id, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, 'published', ?, NULL, ?, ?)`,
-    ).bind(id, rule.id, versionNumber, rule.line_account_id, snapshot, now, now, now),
+    ).bind(id, rule.id, versionNumber, rule.line_account_id, snapshotToSave, now, now, now),
     db.prepare(
       `UPDATE auto_replies SET current_published_version_id = ?, lifecycle_status = 'published'
         WHERE id = ?`,

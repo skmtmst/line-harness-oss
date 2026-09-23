@@ -1081,7 +1081,11 @@ reminders.get('/api/reminders/:id/test-recipient', async (c) => {
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [settings.lineAccountId])) {
       return c.json({ success: false, error: 'Reminder not found' }, 404);
     }
-    const status = await resolveReminderTestRecipient(c.env.DB, settings.lineAccountId);
+    // REMINDER-12: 操作者を渡して本人宛て/登録宛先を区別する。実送信も同じ
+    // 解決を使うので、ここで返した届け先と実際に届く先がずれない。
+    const status = await resolveReminderTestRecipient(c.env.DB, settings.lineAccountId, {
+      staffId: c.get('staff')?.id,
+    });
     return c.json({ success: true, data: status });
   } catch (err) {
     console.error('GET /api/reminders/:id/test-recipient error:', err);
@@ -1103,7 +1107,9 @@ reminders.post('/api/reminders/:id/test-send', requireRole('owner', 'admin'), as
     }
     const referenceError = await validateReminderDraftReferences(c.env.DB, settings);
     if (referenceError) return c.json({ success: false, error: referenceError }, 422);
-    const result = await testReminderDraft(c.env.DB, draft, settings, requestKey);
+    const result = await testReminderDraft(c.env.DB, draft, settings, requestKey, {
+      staffId: c.get('staff')?.id,
+    });
     await recordReminderDraftTest(c.env.DB, draft.id, {
       succeeded: true,
       staffId: c.get('staff').id,

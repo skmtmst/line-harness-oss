@@ -17,7 +17,16 @@ export type ReminderTestRecipientView =
   | { kind: 'error' }
   | { kind: 'unset' }
   | { kind: 'unavailable' }
-  | { kind: 'ready'; recipient: NonNullable<ReminderTestRecipientStatus['recipient']> }
+  /*
+   * REMINDER-12: ready の送信先は「自分のLINE（self）」と「登録済み
+   * テスト宛先（registered）」を区別する。文言はこの種別に合わせ、
+   * 本人以外へ「自分のLINEへ」と名乗って送ることはない。
+   */
+  | {
+      kind: 'ready'
+      recipient: NonNullable<ReminderTestRecipientStatus['recipient']>
+      recipientKind: 'self' | 'registered'
+    }
 
 /**
  * 下書きのテスト送信先を読む。`reminderId` が null の間は読まない。
@@ -42,7 +51,12 @@ export function useReminderTestRecipient(reminderId: string | null) {
       }
       const data = response.data
       if (data.state === 'ready' && data.recipient) {
-        setView({ kind: 'ready', recipient: data.recipient })
+        setView({
+          kind: 'ready',
+          recipient: data.recipient,
+          // 種別が返らない古い応答は「自分のLINE」と名乗れないため登録宛先として扱う。
+          recipientKind: data.recipientKind === 'self' ? 'self' : 'registered',
+        })
       } else if (data.state === 'unavailable') {
         setView({ kind: 'unavailable' })
       } else {

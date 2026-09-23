@@ -2261,6 +2261,11 @@ export interface ReminderPublishResult {
  * テスト送信前に画面へ出す送信先の状態（N-070）。
  * unset=未設定 / unavailable=設定済みだがこのアカウントで届けられない /
  * ready=送信できる。送信本体と同じ判定を使うので表示と実送信がずれない。
+ *
+ * REMINDER-12: ready の送信先は「操作者本人のLINE（self）」と
+ * 「アカウント設定の登録済みテスト宛先（registered）」を区別する。
+ * 本人宛てはスタッフとの本人対応をサーバーで確認できた場合だけ名乗り、
+ * 登録宛先は画面・確認窓・要約で実名を明示する。
  */
 export interface ReminderTestRecipientStatus {
   state: "unset" | "unavailable" | "ready";
@@ -2269,6 +2274,8 @@ export interface ReminderTestRecipientStatus {
     displayName: string;
     pictureUrl: string | null;
   } | null;
+  /** ready のときだけ埋まる送信先の種別。それ以外は null。 */
+  recipientKind: "self" | "registered" | null;
 }
 
 /** 7機能の実行記録画面で共通に使う所有元。書込台帳は機能ごとに安全に保つ。 */
