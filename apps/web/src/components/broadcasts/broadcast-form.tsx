@@ -1917,6 +1917,33 @@ export default function BroadcastForm({
               )
             })}
           </div>
+        {!showTemplatePicker && bubbles.map((bubble, index) => bubble.type === 'text' ? (
+          <TextBubbleEditor
+            key={bubble.id}
+            bubble={bubble}
+            index={index}
+            trackLinks={trackLinks}
+            buttons={messageButtons}
+            embedded={currentStep === 'message'}
+            visualReference={visualQaAugustCampaign}
+            onTrackLinksChange={setTrackLinks}
+            onButtonsChange={setMessageButtons}
+            onChange={(next) => updateBubble(index, next)}
+          />
+        ) : (
+          <BubbleEditor key={bubble.id} bubble={bubble} index={index} total={bubbles.length} assets={assets} assetsStatus={templateCandidatesStatus} accountId={selectedAccountId} onChange={(next) => updateBubble(index, next)} onMove={(direction) => moveBubble(index, direction)} onDelete={() => setBubbles((items) => items.filter((_, i) => i !== index))} />
+        ))}
+        {!showTemplatePicker && <div className="mt-4 flex flex-wrap gap-2">
+          <Button type="button" disabled={bubbles.length >= MAX_BUBBLES} onClick={() => setBubbles((items) => [...items, emptyBubble()])}><Plus size={15} aria-hidden /> メッセージを追加</Button>
+          <Button type="button" onClick={() => setShowTemplatePicker(true)}>テンプレートから選ぶ</Button>
+          <Button type="button" disabled title="テンプレート保存の契約は未接続です"><Save size={15} aria-hidden /> 保存してテンプレート化</Button>
+        </div>}
+        </section>
+        {/*
+          BC-02: 選択窓はエディタの節の**外側**に置く。内側にあった頃は
+          開くと親の節ごと hidden になり、どの入口からも一度も表示されなかった
+          （DOMには居るため既存テストは通っていた）。監査 #615。
+        */}
         {showTemplatePicker && (
           <section className="mt-4 rounded-card border border-hairline bg-canvas p-5 shadow-sm">
             <div className="flex items-start justify-between gap-3">
@@ -1983,28 +2010,6 @@ export default function BroadcastForm({
             </div>
           </section>
         )}
-        {!showTemplatePicker && bubbles.map((bubble, index) => bubble.type === 'text' ? (
-          <TextBubbleEditor
-            key={bubble.id}
-            bubble={bubble}
-            index={index}
-            trackLinks={trackLinks}
-            buttons={messageButtons}
-            embedded={currentStep === 'message'}
-            visualReference={visualQaAugustCampaign}
-            onTrackLinksChange={setTrackLinks}
-            onButtonsChange={setMessageButtons}
-            onChange={(next) => updateBubble(index, next)}
-          />
-        ) : (
-          <BubbleEditor key={bubble.id} bubble={bubble} index={index} total={bubbles.length} assets={assets} assetsStatus={templateCandidatesStatus} accountId={selectedAccountId} onChange={(next) => updateBubble(index, next)} onMove={(direction) => moveBubble(index, direction)} onDelete={() => setBubbles((items) => items.filter((_, i) => i !== index))} />
-        ))}
-        {!showTemplatePicker && <div className="mt-4 flex flex-wrap gap-2">
-          <Button type="button" disabled={bubbles.length >= MAX_BUBBLES} onClick={() => setBubbles((items) => [...items, emptyBubble()])}><Plus size={15} aria-hidden /> メッセージを追加</Button>
-          <Button type="button" onClick={() => setShowTemplatePicker(true)}>テンプレートから選ぶ</Button>
-          <Button type="button" disabled title="テンプレート保存の契約は未接続です"><Save size={15} aria-hidden /> 保存してテンプレート化</Button>
-        </div>}
-        </section>
         {!showTemplatePicker && <section className="rounded-card border border-hairline bg-canvas p-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div><h4 className="text-sm font-bold text-ink">配信後のアクション</h4>{currentStep !== 'message' && <p className="mt-1 text-xs text-ink-faint">配信後にタグ追加などを実行します。</p>}</div>
