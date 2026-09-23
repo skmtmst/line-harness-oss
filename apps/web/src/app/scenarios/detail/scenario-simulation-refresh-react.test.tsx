@@ -96,7 +96,11 @@ vi.mock('@/components/scenarios/trigger-editor', () => ({ default: () => null })
 vi.mock('@/components/scenarios/action-editor', () => ({ default: () => null }))
 vi.mock('@/components/scenarios/carousel-picker', () => ({ default: () => null }))
 vi.mock('@/components/scenarios/insert-toolbar', () => ({ default: () => null }))
-vi.mock('@/components/scenarios/step-preview', () => ({ default: () => null }))
+vi.mock('@/components/scenarios/step-preview', () => ({
+  default: () => null,
+  /* 本試験はプレビューを見ない。詳細画面が使う変換だけ形を返す。 */
+  previewOffsets: () => ({ offsetDays: 0, offsetHours: 0, offsetMinutes: 0 }),
+}))
 vi.mock('@/components/scenarios/message-kind-fields', () => ({
   default: () => null,
   emptyMessageKindState: () => ({}),

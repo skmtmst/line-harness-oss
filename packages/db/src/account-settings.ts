@@ -28,6 +28,30 @@ export async function getAccountSetting(
 }
 
 /**
+ * Retrieve several raw setting values for an account in one round trip.
+ *
+ * 管理APIが機能設定の束を読むとき、キーごとに getAccountSetting を投げると
+ * 往復が本数分だけかかる(#633)。まとめて取って欠けたキーは「未設定」と
+ * 同じ扱いにする（返値へキーが出ない）。
+ */
+export async function getAccountSettings(
+  db: D1Database,
+  accountId: string,
+  keys: readonly string[],
+): Promise<Record<string, string>> {
+  const unique = [...new Set(keys)];
+  if (unique.length === 0) return {};
+  const result = await db
+    .prepare(
+      `SELECT key, value FROM account_settings
+       WHERE line_account_id = ? AND key IN (${unique.map(() => '?').join(',')})`,
+    )
+    .bind(accountId, ...unique)
+    .all<{ key: string; value: string }>();
+  return Object.fromEntries(result.results.map((row) => [row.key, row.value]));
+}
+
+/**
  * Upsert a raw setting value (JSON string) for an account.
  */
 export async function setAccountSetting(
