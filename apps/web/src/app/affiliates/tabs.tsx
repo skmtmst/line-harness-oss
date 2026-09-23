@@ -656,6 +656,7 @@ export function AffiliatorsTab({ accountId }: { accountId: string | null }) {
 
       {createOpen && (
         <CreateAffiliateModal
+          accountId={accountId}
           onClose={() => setCreateOpen(false)}
           onCreated={() => { void loadList() }}
         />
@@ -1057,10 +1058,12 @@ interface FriendOption {
   displayName: string | null
 }
 
-function CreateAffiliateModal({
+export function CreateAffiliateModal({
+  accountId,
   onClose,
   onCreated,
 }: {
+  accountId: string | null
   onClose: () => void
   onCreated: () => void
 }) {
@@ -1113,6 +1116,7 @@ function CreateAffiliateModal({
       const res = await api.affiliates.create({
         friendId: selected.id,
         commissionRate: rate,
+        lineAccountId: accountId ?? undefined,
       })
       if (!res.success) {
         // 409 → friend already an affiliate; surface the server message.
@@ -1131,7 +1135,7 @@ function CreateAffiliateModal({
     } finally {
       setSubmitting(false)
     }
-  }, [submitting, selected, commissionRate, onCreated, onClose])
+  }, [submitting, selected, commissionRate, accountId, onCreated, onClose])
 
   const handleCopy = useCallback(async () => {
     if (!issuedUrl) return
