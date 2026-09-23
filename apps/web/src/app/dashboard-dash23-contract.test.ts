@@ -20,6 +20,11 @@ describe('DASH-23 ダッシュボードの見出しは期間ラベルを折り�
 
   it('カードタイトルは1行省略＋title属性で全文を見せる', () => {
     const titles = source.match(/min-w-0 truncate [^"]*(?:font-semibold|font-bold)[^"]*" title=/g) ?? []
-    expect(titles.length).toBeGreaterThanOrEqual(4)
+    expect(titles.length).toBeGreaterThanOrEqual(3)
+  })
+
+  // ★V7：「運用アラート」は切らずに出し、右の状態の文は下の段へ折り返す。
+  it('運用アラートの見出しは省略しない', () => {
+    expect(source).toContain('<h2 className="text-ink shrink-0 text-base font-bold">運用アラート</h2>')
   })
 })

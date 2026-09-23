@@ -139,7 +139,7 @@ function TodayTaskCard({
    * ときだけ使う。権限不足・取得失敗・読込中に緑を出すと、できる状態と
    * 見間違うため（A01-01）。
    */
-  statusTone?: 'success' | 'muted'
+  statusTone?: 'success' | 'muted' | 'danger'
 }) {
   return (
     /*
@@ -155,7 +155,7 @@ function TodayTaskCard({
         <p className="text-ink text-[28px] leading-none font-bold tabular-nums">
           {value === null ? '—' : value.toLocaleString('ja-JP')}<span className="text-ink-secondary ml-0.5 text-sm font-semibold">件</span>
         </p>
-        <span className={`${statusTone === 'muted' ? 'text-ink-faint' : 'text-success'} shrink-0 whitespace-nowrap text-xs font-semibold`}>{status}</span>
+        <span className={`${statusTone === 'muted' ? 'text-ink-faint' : statusTone === 'danger' ? 'text-danger' : 'text-success'} shrink-0 whitespace-nowrap text-xs font-semibold`}>{status}</span>
       </div>
       <div className="mt-auto flex items-center justify-between gap-3">
         <span className="text-ink-faint min-w-0 truncate text-xs" title={detail}>{detail}</span>
@@ -493,8 +493,9 @@ function OperationalAlertsCard({ risk, healthIssues, oldestWaitMinutes, twoFacto
   // 接続も自動処理も正常なのに赤い「1件」が出てしまう。
   const count = referenceCount ?? (risk === null ? null : currentHealthIssue ? Math.max(1, healthIssues ?? 1) : 0)
   return <Card padding="roomy" className="min-h-[128px]">
-    <div className="flex items-start justify-between gap-3">
-      <h2 className="text-ink min-w-0 truncate text-base font-bold" title="運用アラート">運用アラート</h2>
+    {/* 見出しを切らない（★V7）。状態の文が長いので、見出しと同じ行に並べず下の段へ回す。 */}
+    <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+      <h2 className="text-ink shrink-0 text-base font-bold">運用アラート</h2>
       {/* 現在時点の状態。数の対象期間が分かるよう見出し脇へ書く（IDEA-01）。 */}
       <span className="text-ink-faint flex-1 whitespace-nowrap pt-0.5 text-[11px] font-normal">現在</span>
       {/*
@@ -544,7 +545,7 @@ function ConnectionStatusCard({ account, risk, activeFriends, healthFailed, upda
       <div className="flex justify-between gap-3"><dt className="text-ink-faint">LINE Webhook</dt><dd className={webhookLabel === '正常' ? 'text-success font-semibold' : webhookLabel === '要確認' ? 'text-danger font-semibold' : 'text-ink-faint'}>{webhookLabel}</dd></div>
       {/* 稼働チェックの取得に失敗したときは「確認中」ではなく「未取得」にする（IDEA-01）。 */}
       <div className="flex justify-between gap-3"><dt className="text-ink-faint">自動処理</dt><dd className={healthFailed ? 'text-ink-faint' : risk === 'normal' ? 'text-success font-semibold' : risk ? 'text-danger font-semibold' : 'text-ink-faint'}>{healthFailed ? '未取得' : risk === 'normal' ? '稼働中' : risk ? '要確認' : '確認中'}</dd></div>
-      <div className="flex justify-between gap-3"><dt className="text-ink-faint">有効友だち</dt><dd className="text-success font-semibold">{activeFriends === null ? '—' : `${activeFriends.toLocaleString('ja-JP')}人`}</dd></div>
+      <div className="flex justify-between gap-3"><dt className="text-ink-faint">有効友だち</dt><dd className="text-ink font-semibold tabular-nums">{activeFriends === null ? '—' : `${activeFriends.toLocaleString('ja-JP')}人`}</dd></div>
     </dl>
   </Card>
 }
@@ -613,6 +614,7 @@ function DashboardPageInner() {
   const [inboxFailed, setInboxFailed] = useState(false)
   const [shipmentSummary, setShipmentSummary] = useState<ShipmentSummary | null>(null)
   const [shipmentState, setShipmentState] = useState<'loading' | 'ready' | 'error'>('loading')
+  const shipmentEmpty = shipmentState === 'ready' && shipmentSummary !== null && shipmentSummary.today + shipmentSummary.soon + shipmentSummary.later === 0
   const [pendingPhotos, setPendingPhotos] = useState<number | null>(null)
   /*
    * 写真審査の件数が取れなかった理由。null のままだと「読み込み中」を
@@ -1223,7 +1225,8 @@ function DashboardPageInner() {
       status={pendingTotal === null
         ? '未取得'
         : pendingOldest !== null ? `最長 ${formatWaitRough(pendingOldest)}` : '—'}
-      statusTone={pendingTotal === null ? 'muted' : 'success'}
+      /* 待っている人がいる時の「最長 ○日前」は注意の色。緑は「問題なし」に読める（★V7）。 */
+      statusTone={pendingTotal === null ? 'muted' : pendingTotal > 0 ? 'danger' : 'success'}
     />
     if (id === 'today-photo-review') {
       const override = reference?.pendingPhotos
@@ -1440,11 +1443,6 @@ function DashboardPageInner() {
       {visibleToday.length > 0 ? <section data-design="TodayTasks" className="mb-6">
         <div className="mb-2.5 flex items-center justify-between gap-3">
           <h2 className="text-ink text-lg font-bold">今日やること</h2>
-          {/*
-            並びは編集パネルで本人が決めた順（A01-05）。「優先度が高い順」と
-            書くと、システムが重要度で並べ替えたように読めてしまう。
-          */}
-          <span className="text-ink-faint text-xs">自分で並べた順</span>
         </div>
         {/* #975 U060: 390pxでは先頭2件だけ出し、残りは「集計を見る」で開く。 */}
         <KpiCollapse gridClassName="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -1469,7 +1467,11 @@ function DashboardPageInner() {
              */
             if (item.id === 'shipment') {
               return (
-                <div key={item.id} data-design="Shipment" className={item.visible ? '' : 'hidden'} aria-hidden={!item.visible}>
+                /*
+                 * 出荷が0件の時は、上の小カード「出荷予定 0件」で足りるので大きな空の欄は出さない
+                 * （★V7 ダッシュボードの見せ方）。件数は取り続けるので、隠すだけでマウントは保つ。
+                 */
+                <div key={item.id} data-design="Shipment" className={item.visible && !shipmentEmpty ? '' : 'hidden'} aria-hidden={!item.visible || shipmentEmpty}>
                   {/*
                     選択中アカウントの出荷だけを数える（IDEA-01）。
                     小カード「出荷予定」と遷移先 /ec-commerce は同じアカウント範囲。
