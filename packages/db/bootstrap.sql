@@ -4734,7 +4734,8 @@ CREATE TABLE platform_knowledge_articles (
   helpful_count INTEGER NOT NULL DEFAULT 0,
   unhelpful_count INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL, article_kind TEXT NOT NULL DEFAULT 'verified'
+  CHECK (article_kind IN ('verified','answer_example')),
   UNIQUE(source_request_id, source_revision)
 );
 
@@ -7618,6 +7619,9 @@ CREATE INDEX idx_platform_audit_logs_created
 
 CREATE INDEX idx_platform_audit_logs_tenant
   ON platform_audit_logs(tenant_id, created_at DESC);
+
+CREATE INDEX idx_platform_knowledge_articles_kind_review
+  ON platform_knowledge_articles(article_kind, review_state, status, kind);
 
 CREATE INDEX idx_platform_knowledge_articles_review ON platform_knowledge_articles(review_state, status, kind);
 

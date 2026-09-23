@@ -61,6 +61,7 @@
 .referenceLink svg { width: 16px; height: 16px; flex: 0 0 auto; }
 .referenceLink:focus-visible { outline: 2px solid var(--color-accent-deep); outline-offset: 2px; }
 .referenceLink:disabled { opacity: .5; cursor: wait; }
+.referenceKind.referenceKind { flex: 0 0 auto; max-width: 188px; min-height: 22px; font-size: var(--text-nano); }
 .referenceRow > button:not(.referenceLink) { height: 32px; padding: 0 8px; flex: 0 0 auto; font-size: var(--text-micro); border-radius: var(--radius-control); }
 .referenceFits { width: 120px; }
 .referenceUnfit { width: 132px; }
@@ -78,6 +79,7 @@
 .search svg { position: absolute; left: 12px; top: 10px; width: 16px; height: 16px; color: var(--color-ink-faint); }
 .search input { height: 36px; padding-left: 36px; font-size: var(--text-caption); }
 .filters .filter { width: 116px; max-width: 100%; height: 36px; font-size: var(--text-caption); font-weight: 400; padding-left: 10px; }
+.filters .articleKindFilter { width: 212px; max-width: 100%; height: 36px; font-size: var(--text-caption); font-weight: 400; padding-left: 10px; }
 .count { margin-left: auto; color: var(--color-ink-faint); font-size: var(--text-caption); white-space: nowrap; }
 .note.note { gap: 10px; padding: 12px 16px; border-radius: var(--radius-card); background: var(--color-accent-soft); color: var(--color-ink); font-size: var(--text-caption); font-weight: 400; }
 .note svg { width: 18px; height: 18px; color: var(--color-accent-deep); }
@@ -87,11 +89,13 @@
 .table td { color: var(--color-ink-secondary); }
 .table .titleCell { font-weight: 600; color: var(--color-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .kindColumn { width: 136px; }
+.articleKindColumn { width: 208px; }
 .stateColumn, .numberColumn { width: 116px; }
 .helpfulColumn { width: 136px; }
 .dateColumn { width: 176px; }
 .actionsColumn { width: 212px; }
 .chip.chip { min-height: 18px; border: 0; font-size: var(--text-nano); }
+.articleKindChip.articleKindChip { min-height: 22px; border: 0; font-size: var(--text-nano); white-space: nowrap; }
 .rowActions { display: flex; gap: 24px; align-items: center; }
 .rowActions button + button::before { content: '／'; margin-right: 12px; }
 .rowActions button { color: var(--color-accent-deep); font-size: var(--text-caption); cursor: pointer; text-align: left; white-space: nowrap; }
@@ -100,6 +104,7 @@
 .error { color: var(--color-status-danger); font-size: var(--text-caption); }
 .editor { display: flex; flex-direction: column; gap: 12px; min-width: 0; line-height: 1.45; }
 .source { font-size: var(--text-caption); color: var(--color-ink-faint); }
+.sourceLine { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 .evidence { display: flex; flex-direction: column; gap: 6px; padding: 12px; border-radius: var(--radius-control); background: var(--color-shell); font-size: var(--text-caption); line-height: 1.4; color: var(--color-ink-secondary); overflow-wrap: anywhere; }
 .evidence h3 { color: var(--color-ink); font-size: var(--text-label); font-weight: 700; }
 .evidence a { color: var(--color-accent-deep); }
@@ -109,6 +114,7 @@
 .field textarea { padding: 10px 12px; font-size: var(--text-label); line-height: 1.6; resize: vertical; }
 .field .question { min-height: 64px; height: 64px; }
 .field .answer { min-height: 112px; height: 112px; }
+.emptyAnswerNote { margin-top: -6px; color: var(--color-status-info); font-size: var(--text-caption); }
 .kind { width: 360px; max-width: 100%; }
 .confirm { display: flex; gap: 8px; align-items: center; font-size: var(--text-caption); font-weight: 600; }
 .confirm input { width: 14px; height: 14px; accent-color: var(--color-accent-deep); }
@@ -131,6 +137,7 @@
 :global([data-design-node='ZAOc7']) > :global([role='dialog']):has(.editor) > h2 { font-size: var(--text-heading); }
 @media (max-width: 1500px) {
   .kindColumn { width: 120px; }
+  .articleKindColumn { width: 180px; }
   .stateColumn, .numberColumn { width: 100px; }
   .helpfulColumn { width: 112px; }
   .dateColumn { width: 112px; }
@@ -140,7 +147,7 @@
 @media (max-width: 1000px) {
   .filters { flex-wrap: wrap; }
   .table th, .table td { padding: 8px; }
-  .kindColumn, .stateColumn, .numberColumn, .helpfulColumn, .dateColumn, .actionsColumn { width: auto; }
+  .kindColumn, .articleKindColumn, .stateColumn, .numberColumn, .helpfulColumn, .dateColumn, .actionsColumn { width: auto; }
   .rowActions { gap: 8px; flex-wrap: wrap; }
 }
 @media (max-height: 900px) {

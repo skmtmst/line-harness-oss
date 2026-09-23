@@ -55,7 +55,10 @@ describe('運営専用ナレッジ（実SQLite・AIはモック）', () => {
   it('同時刻の会話はUUIDの並びで解決済みと判断せず要確認にする', async () => {
     store.raw.prepare('UPDATE hq_support_messages SET created_at = ? WHERE request_id = ?').run('2026-09-19T10:00:00.000+09:00', requestId);
     await processKnowledgeJob(environment());
-    expect((await knowledgeForTicket(store.db, requestId)).article).toMatchObject({ review_state: 'needs_review', answer: '' });
+    expect((await knowledgeForTicket(store.db, requestId)).article).toMatchObject({
+      article_kind: 'answer_example', review_state: 'pending', answer: action,
+      review_reason: 'お客様の成功確認はありません。回答内容を確認して承認してください。',
+    });
     expect(await searchKnowledge(store.db, 'usage', '配信', [])).toEqual([]);
   });
   it('自動下書き→確認→承認で初めて検索され、編集で承認が失効する', async () => {
@@ -83,8 +86,55 @@ describe('運営専用ナレッジ（実SQLite・AIはモック）', () => {
       { messageId: 'unknown', quote: action, role: 'action' }, { messageId: 'unknown', quote: result, role: 'result' },
     ] }) });
     await processKnowledgeJob(environment());
-    expect((await knowledgeForTicket(store.db, requestId)).article).toMatchObject({ review_state: 'needs_review', answer: '', evidence: '[]' });
+    expect((await knowledgeForTicket(store.db, requestId)).article).toMatchObject({
+      article_kind: 'answer_example', review_state: 'pending', question: '設定を確認したいです。', answer: action,
+    });
     expect(await searchKnowledge(store.db, 'usage', '配信', [])).toEqual([]);
+  });
+  it('回答例は元のやり取りを人が確認し、質問と答えがあれば承認できる', async () => {
+    run.mockResolvedValue({ response: JSON.stringify({ decision: 'needs_review', title: '配信対象の回答例', keywords: ['配信'] }) });
+    await processKnowledgeJob(environment());
+    const article = (await knowledgeForTicket(store.db, requestId)).article!;
+    expect(article).toMatchObject({ article_kind: 'answer_example', review_state: 'pending', status: 'disabled' });
+    const url = `/api/ops/knowledge/${article.id}`;
+    expect((await request(`${url}/review`, { version: 1, action: 'approve' })).status).toBe(400);
+    expect((await request(`${url}/review`, { version: 1, action: 'approve', confirmed: true })).status).toBe(200);
+    expect((await knowledgeForTicket(store.db, requestId)).article).toMatchObject({ review_state: 'approved', status: 'active' });
+    expect(await searchKnowledge(store.db, 'usage', '配信', [])).toHaveLength(1);
+    const audit = store.raw.prepare("SELECT detail FROM platform_audit_logs WHERE action = 'knowledge.status' ORDER BY created_at DESC LIMIT 1").get() as { detail: string };
+    expect(JSON.parse(audit.detail)).toMatchObject({ articleKind: 'answer_example', action: 'approve' });
+  });
+  it('質問か答えが空の回答例は承認できず、編集後は回答例として承認待ちになる', async () => {
+    await processKnowledgeJob(environment());
+    const article = (await knowledgeForTicket(store.db, requestId)).article!;
+    const url = `/api/ops/knowledge/${article.id}`;
+    const edited = await request(url, { version: 1, title: '配信対象', question: '質問', answer: '', kind: 'usage', keywords: [] }, 'master', false, 'PUT');
+    expect(edited.status).toBe(200);
+    expect(await edited.json()).toMatchObject({ data: { articleKind: 'answer_example', reviewState: 'pending' } });
+    expect((await request(`${url}/review`, { version: 2, action: 'approve', confirmed: true })).status).toBe(400);
+  });
+  it('運営返信が無い要確認の記事は、答えを手で書けば回答例として承認できる', async () => {
+    const noReply = await createHqSupportRequest(store.db, { tenantId: 'tenant', staffId: 'tenant-owner', staffName: '架空担当者', staffEmail: null,
+      kind: 'usage', subject: '管理者の追加', body: '管理者を追加したいです。', lineAccountId: null, attachmentKeys: [] });
+    await updateSupportTicket(store.db, noReply.id, { stage: 'resolved' });
+    await processKnowledgeJob(environment(), noReply.id);
+    const article = (await knowledgeForTicket(store.db, noReply.id)).article!;
+    expect(article).toMatchObject({ article_kind: 'answer_example', review_state: 'needs_review', question: '管理者を追加したいです。', answer: '' });
+    const url = `/api/ops/knowledge/${article.id}`;
+    const saved = await request(url, { version: 1, title: article.title, question: article.question,
+      answer: 'メンバー管理から招待してください。', kind: 'usage', keywords: [] }, 'master', false, 'PUT');
+    expect(saved.status).toBe(200);
+    expect(await saved.json()).toMatchObject({ data: { articleKind: 'answer_example', reviewState: 'needs_review' } });
+    expect((await request(`${url}/review`, { version: 2, action: 'approve', confirmed: true })).status).toBe(200);
+  });
+  it('記事の種類で一覧を絞り込める', async () => {
+    await processKnowledgeJob(environment());
+    const verified = await request('/api/ops/knowledge?articleKind=verified', undefined, 'master', false, 'GET');
+    expect(verified.status).toBe(200);
+    expect(await verified.json()).toMatchObject({ total: 1, data: [{ articleKind: 'verified' }] });
+    const examples = await request('/api/ops/knowledge?articleKind=answer_example', undefined, 'master', false, 'GET');
+    expect(await examples.json()).toMatchObject({ total: 0, data: [] });
+    expect((await request('/api/ops/knowledge?articleKind=unknown', undefined, 'master', false, 'GET')).status).toBe(400);
   });
   it('生成中の再オープンは古い生成結果を破棄する', async () => {
     const response = await run();
@@ -99,7 +149,8 @@ describe('運営専用ナレッジ（実SQLite・AIはモック）', () => {
     expect((await knowledgeForTicket(store.db, requestId)).job?.status).toBe('queued');
     expect(store.raw.prepare('SELECT stage FROM hq_support_requests WHERE id = ?').get(requestId)).toEqual({ stage: 'resolved' });
     expect(store.raw.prepare('SELECT error_code FROM platform_knowledge_jobs').get()).toEqual({ error_code: 'generation_failed' });
-    expect(logger).not.toHaveBeenCalled();
+    expect(logger).toHaveBeenCalledWith('[knowledge] generation failed', { name: 'Error' });
+    expect(JSON.stringify(logger.mock.calls)).not.toContain('provider echoed private conversation');
     logger.mockRestore();
   });
   it('同じ解決の再処理は重複生成せず、利用回数を一度だけ記録する', async () => {

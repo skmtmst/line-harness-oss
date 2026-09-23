@@ -2,15 +2,17 @@ import { jstNow } from './utils.js';
 import type { HqSupportKind } from './hq-support-requests.js';
 
 export type KnowledgeReviewState = 'pending' | 'approved' | 'needs_review' | 'dismissed';
+export type KnowledgeArticleKind = 'verified' | 'answer_example';
 export interface KnowledgeEvidence {
   messageId: string; createdAt: string; authorKind: 'tenant' | 'ops';
-  quote: string; role: 'action' | 'result' | 'condition';
+  quote: string; role: 'action' | 'result' | 'condition' | 'question' | 'answer';
 }
 export interface KnowledgeArticleInput {
   title: string; question: string; answer: string; kind: HqSupportKind; keywords: string[];
 }
 export interface KnowledgeArticle extends Omit<KnowledgeArticleInput, 'keywords'> {
   id: string; keywords: string; visibility: 'ops_only'; source_request_id: string; source_revision: number;
+  article_kind: KnowledgeArticleKind;
   review_state: KnowledgeReviewState; status: 'active' | 'disabled'; evidence: string; review_reason: string;
   version: number; approved_by_staff_id: string | null; approved_at: string | null;
   used_count: number; helpful_count: number; unhelpful_count: number; created_at: string; updated_at: string;
@@ -36,7 +38,9 @@ export async function searchKnowledge(db: D1Database, kind: string, text: string
   const excluded = exclude.slice(0, 50);
   const result = await db.prepare(`${SELECT} WHERE ${USABLE}
     AND (${matches}) > 0 ${excluded.length ? `AND a.id NOT IN (${excluded.map(() => '?').join(',')})` : ''}
-    ORDER BY (${matches}) DESC, CASE WHEN a.kind = ? THEN 0 ELSE 1 END, a.id LIMIT 5`)
+    ORDER BY (${matches}) DESC,
+      CASE WHEN a.article_kind = 'verified' THEN 0 ELSE 1 END,
+      CASE WHEN a.kind = ? THEN 0 ELSE 1 END, a.id LIMIT 5`)
     .bind(...words, ...excluded, ...words, kind).all<KnowledgeArticle>();
   return result.results;
 }
@@ -109,24 +113,27 @@ export async function claimKnowledgeJob(db: D1Database, now = jstNow(), requestI
 }
 
 export async function finishKnowledgeJob(db: D1Database, job: KnowledgeJob, input: {
-  article: KnowledgeArticleInput; evidence: KnowledgeEvidence[]; reason: string; reviewState: 'pending' | 'needs_review';
+  article: KnowledgeArticleInput; articleKind: KnowledgeArticleKind; evidence: KnowledgeEvidence[];
+  reason: string; reviewState: 'pending' | 'needs_review';
 }): Promise<void> {
   const now = jstNow();
   const articleId = crypto.randomUUID();
   await db.batch([
     db.prepare(`INSERT OR IGNORE INTO platform_knowledge_articles
-      (id, source_request_id, source_revision, title, question, answer, kind, keywords, review_state,
+      (id, source_request_id, source_revision, title, question, answer, kind, keywords, article_kind, review_state,
        evidence, review_reason, created_at, updated_at)
-      SELECT ?, j.request_id, j.source_revision, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+      SELECT ?, j.request_id, j.source_revision, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
         FROM platform_knowledge_jobs j JOIN hq_support_requests r ON r.id = j.request_id
        WHERE j.id = ? AND j.lease_token = ? AND j.status = 'running'
          AND j.source_revision = r.knowledge_revision AND r.stage IN ('resolved','closed')`)
       .bind(articleId, input.article.title, input.article.question, input.article.answer, input.article.kind,
-        JSON.stringify(input.article.keywords), input.reviewState, JSON.stringify(input.evidence), input.reason, now, now, job.id, job.lease_token),
+        JSON.stringify(input.article.keywords), input.articleKind, input.reviewState,
+        JSON.stringify(input.evidence), input.reason, now, now, job.id, job.lease_token),
     db.prepare(`INSERT INTO platform_audit_logs (id,staff_id,staff_name,action,detail,visible_to_tenant,created_at)
       SELECT ?, 'system:knowledge', '自動処理', 'ai.article_suggest', ?, 0, ?
       WHERE EXISTS (SELECT 1 FROM platform_knowledge_articles WHERE id = ?)`)
-      .bind(crypto.randomUUID(), JSON.stringify({ articleId, requestId: job.request_id, reviewState: input.reviewState }), now, articleId),
+      .bind(crypto.randomUUID(), JSON.stringify({ articleId, requestId: job.request_id,
+        reviewState: input.reviewState, articleKind: input.articleKind }), now, articleId),
     db.prepare(`UPDATE platform_knowledge_jobs SET status = CASE WHEN EXISTS (
       SELECT 1 FROM hq_support_requests r WHERE r.id = request_id AND r.knowledge_revision = source_revision
       AND r.stage IN ('resolved','closed')) THEN 'done' ELSE 'stale' END, lease_token = NULL, updated_at = ?
@@ -144,7 +151,9 @@ export async function getKnowledgeArticle(db: D1Database, id: string): Promise<K
   return db.prepare(`${SELECT} WHERE a.id = ?`).bind(id).first<KnowledgeArticle>();
 }
 
-export async function listKnowledgeArticles(db: D1Database, input: { q?: string; kind?: string; state?: string; offset?: number }) {
+export async function listKnowledgeArticles(db: D1Database, input: {
+  q?: string; kind?: string; articleKind?: KnowledgeArticleKind; state?: string; offset?: number;
+}) {
   const conditions: string[] = [];
   const binds: (string | number)[] = [];
   if (input.q) {
@@ -152,6 +161,7 @@ export async function listKnowledgeArticles(db: D1Database, input: { q?: string;
     binds.push(input.q.slice(0, 200));
   }
   if (input.kind) { conditions.push('a.kind = ?'); binds.push(input.kind); }
+  if (input.articleKind) { conditions.push('a.article_kind = ?'); binds.push(input.articleKind); }
   if (input.state === 'needs_review') conditions.push(`(a.review_state = 'needs_review' OR NOT (${CURRENT}))`);
   else if (input.state) { conditions.push(`a.review_state = ? AND (${CURRENT})`); binds.push(input.state); }
   const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
@@ -162,18 +172,24 @@ export async function listKnowledgeArticles(db: D1Database, input: { q?: string;
   return { articles: rows.results, total: count?.n ?? 0 };
 }
 
-export async function editKnowledgeArticle(db: D1Database, id: string, version: number, input: KnowledgeArticleInput): Promise<boolean> {
+export async function editKnowledgeArticle(db: D1Database, id: string, version: number, input: KnowledgeArticleInput,
+  articleKind: KnowledgeArticleKind, evidence: KnowledgeEvidence[]): Promise<boolean> {
   const r = await db.prepare(`UPDATE platform_knowledge_articles SET title = ?, question = ?, answer = ?, kind = ?,
       keywords = ?, review_state = CASE WHEN review_state = 'needs_review' THEN 'needs_review' ELSE 'pending' END,
-      status = 'disabled', approved_by_staff_id = NULL, approved_at = NULL, version = version + 1, updated_at = ?
-    WHERE id = ? AND version = ?`).bind(input.title, input.question, input.answer, input.kind, JSON.stringify(input.keywords), jstNow(), id, version).run();
+      article_kind = ?, evidence = ?, status = 'disabled', approved_by_staff_id = NULL, approved_at = NULL,
+      version = version + 1, updated_at = ? WHERE id = ? AND version = ?`)
+    .bind(input.title, input.question, input.answer, input.kind, JSON.stringify(input.keywords), articleKind,
+      JSON.stringify(evidence), jstNow(), id, version).run();
   return r.meta.changes === 1;
 }
 
 export async function reviewKnowledgeArticle(db: D1Database, id: string, version: number, action: 'approve' | 'dismiss' | 'disable', staffId: string): Promise<boolean> {
   const now = jstNow();
-  const condition = action === 'approve' ? `AND review_state = 'pending' AND json_array_length(evidence) >= 2
-    AND EXISTS (SELECT 1 FROM hq_support_requests r WHERE r.id = source_request_id
+  const condition = action === 'approve' ? `AND (
+      (article_kind = 'verified' AND review_state = 'pending' AND json_array_length(evidence) >= 2)
+      OR (article_kind = 'answer_example' AND review_state IN ('pending','needs_review')
+        AND length(trim(question)) > 0 AND length(trim(answer)) > 0)
+    ) AND EXISTS (SELECT 1 FROM hq_support_requests r WHERE r.id = source_request_id
       AND r.knowledge_revision = source_revision AND r.stage IN ('resolved','closed'))` : '';
   const result = await db.prepare(`UPDATE platform_knowledge_articles SET
     review_state = ?, status = ?, approved_by_staff_id = ?, approved_at = ?, version = version + 1, updated_at = ?

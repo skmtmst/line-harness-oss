@@ -162,7 +162,10 @@ describe('画面', () => {
   })
 
   it('excludes evidence only for this reply, accumulates exclusions, and does not send automatically', async () => {
-    availableReferences = [{ id: 'ref-a', title: 'フォームの根拠', version: 1 }, { id: 'ref-b', title: '配信の根拠', version: 2 }]
+    availableReferences = [
+      { id: 'ref-a', title: 'フォームの根拠', version: 1, articleKind: 'verified' },
+      { id: 'ref-b', title: '配信の根拠', version: 2, articleKind: 'answer_example' },
+    ]
     await act(async () => root.render(<OpsSupportPage />)); await flush()
     const click = async (label: string) => {
       await act(async () => Array.from(host.querySelectorAll('button')).find(b => b.textContent === label)!.click()); await flush()
