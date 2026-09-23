@@ -599,8 +599,16 @@ function StaffPageHost() {
     { key: 'roles', label: `権限のかたまり ${accessRoles.length}` },
   ]
   const tabUsers = tab === 'invited' ? invitedUsers : activeUsers
+  /*
+   * #620: 名前・メールを1本の文字列へ繋げて照合すると、「花子 x-sato」のような
+   * フィールド跨ぎの語でも行が返ってしまう。検索欄の案内どおり、表示中の
+   * 各項目（名前・メール・職位）へ個別に照合する。前後の空白は無視する。
+   */
+  const normalizedQuery = query.trim().toLocaleLowerCase('ja-JP')
   const filteredUsers = tabUsers.filter((user) => {
-    const matchesQuery = `${user.name} ${user.email ?? ''} ${user.jobTitle ?? ''}`.toLowerCase().includes(query.toLowerCase())
+    const matchesQuery = !normalizedQuery
+      || [user.name, user.email, user.jobTitle].some((value) =>
+        value?.toLocaleLowerCase('ja-JP').includes(normalizedQuery))
     const matchesRole = roleFilter === 'all' || user.roleBundle === roleFilter
     return matchesQuery && matchesRole
   }).sort((a, b) => sort === 'name'
