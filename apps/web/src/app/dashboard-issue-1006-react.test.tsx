@@ -274,7 +274,12 @@ describe('DASH-03 新アカウントの読込中に前の予約・運用状態�
     net.bookings = () => new Promise<Json>(() => {})
     await switchAccount('account-b')
     const card = todayCard('今日の予約')
-    expect(card.textContent).toContain('—')
+    /*
+     * #673 で読込中の件数は「—」ではなく骨組み（スケルトン）に替わった。
+     * 前のアカウントの件数が残らないことは、骨組みと busy 印で確かめる。
+     */
+    expect(card.querySelector('.animate-pulse')).not.toBeNull()
+    expect(card.querySelector('[aria-busy="true"]')).not.toBeNull()
     expect(card.textContent).not.toContain('1件')
   })
 })
