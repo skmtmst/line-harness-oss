@@ -365,7 +365,7 @@ function hoursText(ms: number): string {
   return `${hours}時間`
 }
 
-export default function BookingCalendar({ mode, items, onOpen, staffNames, canCreate = false, anchorDay, onAnchorChange, availability }: {
+export default function BookingCalendar({ mode, items, onOpen, staffNames, canCreate = false, anchorDay, onAnchorChange, availability, onRetryAvailability }: {
   mode: 'day' | 'week'
   items: BookingRequest[]
   onOpen: (id: string) => void
@@ -382,6 +382,11 @@ export default function BookingCalendar({ mode, items, onOpen, staffNames, canCr
    * 空きを推測しない。実績が無い・取れないなら「—」を出す。
    */
   availability: CalendarAvailability
+  /**
+   * #634: 空き枠（と、その元になる集計・メニュー・担当）の取り直し。
+   * 失敗の帯の中に置く。渡さないときは開き直しの案内だけを出す。
+   */
+  onRetryAvailability?: () => void
 }) {
   const weekStart = startOfWeek(anchorDay)
   const days = useMemo(() => Array.from({ length: 7 }, (_, index) => moveDay(weekStart, index)), [weekStart])
@@ -546,7 +551,16 @@ export default function BookingCalendar({ mode, items, onOpen, staffNames, canCr
       ) : null}
       {availability.status === 'error' ? (
         <div className="bg-warning-bg text-warning mb-4 rounded-control px-4 py-3 text-xs font-semibold">
-          空き枠を読み込めませんでした。予約の記録だけを表示しています。時間をおいて開き直してください。
+          空き枠を読み込めませんでした。予約の記録だけを表示しています。
+          {/*
+            * #634: 失敗の帯の中に読み直す口を出す。無いとページ全体を
+            * 開き直す以外に直す道がない（集計側の帯と同じ導線）。
+            */}
+          {onRetryAvailability ? (
+            <button type="button" className="ml-2 underline" onClick={onRetryAvailability}>もう一度読み込む</button>
+          ) : (
+            <span> 時間をおいて開き直してください。</span>
+          )}
         </div>
       ) : null}
 

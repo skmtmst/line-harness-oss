@@ -7,7 +7,7 @@ import { useMergedTab } from '@/components/layout/merged-tabs'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
-import PageHeader from '@/components/shared/page-header'
+import PageHeaderH2 from '@/components/layout/page-header-h2'
 import Pagination from '@/components/shared/pagination'
 import Select from '@/components/shared/select'
 import SummaryCard from '@/components/shared/summary-card'
@@ -271,6 +271,18 @@ function EventsPanel({ accountId }: { accountId: string | null }) {
 
   const pageCount = Math.max(1, Math.ceil(actionTotal / ACTION_PAGE_SIZE))
 
+  /*
+   * 絞り込みで0件のときの「元に戻す」動線（#635）。検索語と状態タブを
+   * まとめて初期へ戻す。sort は「絞り込み」ではなく並びなので触らない。
+   */
+  const recordsNarrowing = searchQuery !== '' || status !== 'all'
+  const clearRecordFilters = () => {
+    setQuery('')
+    setSearchQuery('')
+    setStatus('all')
+    setPage(1)
+  }
+
   const retry = async (action: EcActionExecution) => {
     if (!accountId || !action.retryAvailable) return
     const retryAccountId = accountId
@@ -371,10 +383,17 @@ function EventsPanel({ accountId }: { accountId: string | null }) {
             ? '取り込みの記録を読み込めませんでした'
             : listState === 'empty' && !accountId
               ? 'LINEアカウントを選択してください'
-              : listState === 'empty' && searchQuery
-                ? '検索条件に合う取り込みの記録はありません'
+              : listState === 'empty' && recordsNarrowing
+                ? '条件に合う取り込みの記録はありません'
                 : undefined}
-          description={listState === 'empty' && !accountId ? '左のメニュー上部で、確認するLINEアカウントを選びます。' : undefined}
+          description={listState === 'empty' && !accountId
+            ? '左のメニュー上部で、確認するLINEアカウントを選びます。'
+            : listState === 'empty' && recordsNarrowing
+              ? '検索語や表示条件を変えてください。'
+              : undefined}
+          action={listState === 'empty' && accountId && recordsNarrowing
+            ? <Button type="button" variant="secondary" onClick={clearRecordFilters}>検索と絞り込みを解除</Button>
+            : undefined}
           onRetry={listState === 'error' ? () => void loadRecords(false) : undefined}
         />
       ) : <DataTable>
@@ -458,7 +477,7 @@ function EcCommercePageInner() {
   return (
     <div className={styles.root} data-design="Head">
       {/* マニュアルは共通トップバーに置く。本文に「ECの注文・定期便を取り込み、LINEの配信や成果へつなげます。」という重複説明は置かない。 */}
-      <PageHeader
+      <PageHeaderH2
         breadcrumb={[{ label: '専用機能' }, { label: 'EC連携' }]}
         title="EC連携"
         description=""

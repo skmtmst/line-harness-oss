@@ -4,6 +4,7 @@ import {
   auditDeviceFamily,
   auditEventStatement,
   getAccountSetting,
+  getAccountSettings,
   getVersionedAccountSetting,
   maskAuditIp,
   setAccountSetting,
@@ -852,20 +853,21 @@ async function loadLegacyFeatureSettings(
   accountId: string,
   restaurantEnabled: boolean,
 ): Promise<FeatureSettingsData> {
-  const rawFeatures = await Promise.all(
-    TOGGLEABLE_FEATURES.map((key) => getAccountSetting(db, accountId, `${SETTING_PREFIX}${key}`)),
-  );
+  // 一括設定が無い旧保存だけの読み分け。キーごとの往復(30本超)を1往復に束ねる(#633)。
+  const stored = await getAccountSettings(db, accountId, [
+    ...TOGGLEABLE_FEATURES.map((key) => `${SETTING_PREFIX}${key}`),
+    SIDEBAR_ORDER_KEY,
+    SIDEBAR_ITEM_ORDER_KEY,
+  ]);
   const features: Record<string, boolean> = {};
-  TOGGLEABLE_FEATURES.forEach((key, index) => {
+  for (const key of TOGGLEABLE_FEATURES) {
     features[key] = key === 'restaurant_test' && !restaurantEnabled
       ? false
-      : featureIsEnabled(rawFeatures[index] ?? null, key);
-  });
+      : featureIsEnabled(stored[`${SETTING_PREFIX}${key}`] ?? null, key);
+  }
 
-  const [orderRaw, itemOrderRaw] = await Promise.all([
-    getAccountSetting(db, accountId, SIDEBAR_ORDER_KEY),
-    getAccountSetting(db, accountId, SIDEBAR_ITEM_ORDER_KEY),
-  ]);
+  const orderRaw = stored[SIDEBAR_ORDER_KEY] ?? null;
+  const itemOrderRaw = stored[SIDEBAR_ITEM_ORDER_KEY] ?? null;
   let sidebarOrder: string[] | null = null;
   let sidebarItemOrder: Record<string, string[]> | null = null;
   try {
@@ -918,11 +920,12 @@ async function loadFeatureVisibility(
   accountId: string,
   restaurantEnabled: boolean,
 ): Promise<FeatureVisibilityData> {
-  const state = await loadFeatureSettings(db, accountId, restaurantEnabled);
-  const [featureStates, specializedRaw] = await Promise.all([
-    accountFeatureAvailabilityMap(db, accountId, state.features),
+  // 専用カタログは設定束と独立して読めるため先に並列で投げる(#633)。
+  const [state, specializedRaw] = await Promise.all([
+    loadFeatureSettings(db, accountId, restaurantEnabled),
     getAccountSetting(db, accountId, SPECIALIZED_CATALOG_KEY),
   ]);
+  const featureStates = await accountFeatureAvailabilityMap(db, accountId, state.features);
   const specialized = new Set(specializedCatalog(specializedRaw));
   return {
     features: Object.fromEntries(TOGGLEABLE_FEATURES.map((featureId) => [
@@ -985,21 +988,21 @@ featureSettings.get('/api/settings/features', requireRole('owner', 'admin'), asy
         code: 'FEATURE_SETTINGS_SCOPE_FORBIDDEN',
       }, 403);
     }
-    const state = await loadFeatureSettings(
-      c.env.DB,
-      accountId,
-      restaurantTestEnabled(c.env),
-    );
+    // 親子モード・専用カタログは設定束と独立して読めるため並列で投げる(#633)。
+    const [state, parentChildRaw, specializedRaw] = await Promise.all([
+      loadFeatureSettings(
+        c.env.DB,
+        accountId,
+        restaurantTestEnabled(c.env),
+      ),
+      getAccountSetting(c.env.DB, accountId, PARENT_CHILD_MODE_KEY),
+      getAccountSetting(c.env.DB, accountId, SPECIALIZED_CATALOG_KEY),
+    ]);
     const featureStates = await accountFeatureAvailabilityMap(
       c.env.DB,
       accountId,
       state.features,
     );
-
-    const [parentChildRaw, specializedRaw] = await Promise.all([
-      getAccountSetting(c.env.DB, accountId, PARENT_CHILD_MODE_KEY),
-      getAccountSetting(c.env.DB, accountId, SPECIALIZED_CATALOG_KEY),
-    ]);
 
     return c.json({
       success: true,

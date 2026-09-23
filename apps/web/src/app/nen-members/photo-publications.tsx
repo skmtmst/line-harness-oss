@@ -163,7 +163,7 @@ export function PhotoPublications({ accountId, onBack }: { accountId: string; on
   const top = data.summary.topPhoto
   return <><main className="mx-auto max-w-screen-2xl p-6" data-photo-view="publications">
     <div className="flex items-center justify-between gap-2 max-md:flex-col max-md:items-start">
-      <div><p className="text-xs font-bold text-ink-faint">専用機能</p><h1 className="mt-1 text-2xl font-extrabold text-ink">写真審査</h1></div>
+      <div><p className="text-xs font-bold text-ink-faint">専用機能</p><h2 className="mt-1 text-2xl font-extrabold text-ink">写真審査</h2></div>
       <Button onClick={onBack}>見ていないものへ戻る</Button>
     </div>
     <Tabs items={[{ label: '出しているもの', current: true }, { label: '並び順を変える', disabled: true }]} />

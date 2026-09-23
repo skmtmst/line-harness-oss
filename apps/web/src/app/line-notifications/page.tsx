@@ -1023,6 +1023,17 @@ function LineNotificationsPage() {
 
   return <>
     {expandedSetting === null ? <MergedTabs basePath="/line-notifications" tabs={tabsWithCounts} active={tab} defaultKey="customer" /> : null}
+    {/*
+      * #634: 運用者タブの件数だけが取れなかったとき、タブの「取得失敗」の
+      * 隣に直す道を出す。出さないと、ページ全体を開き直す以外に
+      * 読み直す手段がない。押すと load() が件数の取得からやり直す。
+      */}
+    {expandedSetting === null && operatorState === 'error' ? (
+      <div role="alert" className="bg-warning-bg border-warning text-warning mb-4 rounded-lg border p-4 text-sm">
+        運用者へのお知らせの件数を読み込めませんでした。
+        <button type="button" className="ml-2 font-semibold underline" onClick={() => void load()}>もう一度読み込む</button>
+      </div>
+    ) : null}
     {tab === 'failures' ? <NotificationRunList lineAccountId={selectedAccountId} mode="failures" /> : null}
     {tab === 'history' ? <NotificationRunList lineAccountId={selectedAccountId} mode="history" /> : null}
     {tab === 'operator' ? <OperatorNotificationRules lineAccountId={selectedAccountId} /> : null}
