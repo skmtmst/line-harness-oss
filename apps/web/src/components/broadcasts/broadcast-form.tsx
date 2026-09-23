@@ -1572,7 +1572,7 @@ export default function BroadcastForm({
               <p className="mt-1 text-xs text-ink-faint">対象・日時・メッセージの最終確認です。</p>
               <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
                 <div><dt className="text-xs text-ink-faint">対象</dt><dd className="mt-1 font-bold text-ink">{confirmAudienceLabel} {audienceCount?.toLocaleString('ja-JP') ?? '—'}人</dd></div>
-                <div><dt className="text-xs text-ink-faint">配信日時</dt><dd className="mt-1 font-bold text-ink">8/24 10:00</dd></div>
+                <div><dt className="text-xs text-ink-faint">配信日時</dt><dd className="mt-1 font-bold text-ink">{sendWhenLabel ?? '未設定'}</dd></div>
               </dl>
             </section>
             <section className="rounded-card border border-hairline bg-canvas p-5">
@@ -2391,7 +2391,11 @@ export default function BroadcastForm({
           <div className="space-y-3">
             <section className="broadcast-line-preview rounded-card p-5 text-on-accent">
               <h3 className="text-center text-sm font-bold">LINEプレビュー</h3>
-              <p className="mx-auto mt-4 w-fit rounded-pill bg-ink/25 px-3 py-1 text-xs font-semibold">2026/08/24 10:00 に届きます</p>
+              <p className="mx-auto mt-4 w-fit rounded-pill bg-ink/25 px-3 py-1 text-xs font-semibold">
+                {visualQaAugustCampaign ? '2026/08/24 10:00 に届きます'
+                  : scheduledLabel ? `${scheduledLabel} に届きます`
+                  : '配信日時は STEP 4 で設定します'}
+              </p>
               <div className="mt-4 flex flex-col gap-3 text-ink">
                 {bubbles.map((bubble, index) => <BubblePreview key={bubble.id} bubble={bubble} buttons={index === 0 ? messageButtons : []} />)}
               </div>
