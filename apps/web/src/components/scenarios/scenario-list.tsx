@@ -567,7 +567,10 @@ export default function ScenarioList({
                   購読中と読了済は1列にまとめる（NEXT-25）。
                   1行目が「いま流れている人」、2行目が「最後まで届いた人」。
                 */}
-                <td className="px-4 py-3 whitespace-nowrap">
+                <td
+                  className="px-4 py-3 whitespace-nowrap"
+                  title={`購読 ${s.subscriberCount === undefined ? '—' : s.subscriberCount.toLocaleString('ja-JP')}人 ／ 読了 ${(s.completedCount ?? 0).toLocaleString('ja-JP')}人`}
+                >
                   <div className="text-ink text-sm tabular-nums">
                     {s.subscriberCount === undefined ? '—' : s.subscriberCount.toLocaleString('ja-JP')}
                     <span className="text-ink-faint ml-0.5 text-xs">人</span>
@@ -582,7 +585,8 @@ export default function ScenarioList({
                   {s.subscriberCount === 0 && (
                     <Link
                       href={`/scenarios/detail?id=${s.id}`}
-                      className="text-info mt-0.5 block text-xs font-normal hover:underline"
+                      title="配信を始める方法"
+                      className="text-info mt-0.5 block truncate text-xs font-normal hover:underline"
                     >
                       配信を始める方法
                     </Link>

@@ -118,10 +118,10 @@
     "unresolved-classname": 37
   },
   "app/ec-commerce/page.tsx": {
-    "unresolved-classname": 13
+    "unresolved-classname": 10
   },
   "app/ec-commerce/subscriptions-panel.tsx": {
-    "unresolved-classname": 11
+    "unresolved-classname": 10
   },
   "app/emergency/page.tsx": {
     "unresolved-classname": 5,
@@ -153,11 +153,11 @@
     "direct-primary-button": 2
   },
   "app/form-submissions/page.tsx": {
-    "arbitrary-value": 2,
+    "arbitrary-value": 3,
     "direct-primary-button": 1
   },
   "app/friend-add-settings/page.tsx": {
-    "arbitrary-value": 1
+    "arbitrary-value": 2
   },
   "app/friend-add-settings/publish/page.tsx": {
     "unresolved-classname": 45
@@ -174,7 +174,7 @@
   "app/friends/page.tsx": {
     "unresolved-classname": 2,
     "direct-primary-button": 1,
-    "direct-secondary-button": 2
+    "direct-secondary-button": 1
   },
   "app/getting-started/page.tsx": {
     "unresolved-classname": 20
@@ -209,8 +209,8 @@
     "unresolved-classname": 8
   },
   "app/inflow-links/page.tsx": {
-    "arbitrary-value": 19,
-    "direct-secondary-button": 3,
+    "arbitrary-value": 18,
+    "direct-secondary-button": 2,
     "direct-primary-button": 1
   },
   "app/line-notifications/page.tsx": {
@@ -267,7 +267,7 @@
     "unresolved-classname": 10
   },
   "app/reminders/page.tsx": {
-    "arbitrary-value": 2
+    "arbitrary-value": 3
   },
   "app/restaurant-test/restaurant-console.tsx": {
     "arbitrary-value": 19,
@@ -290,7 +290,7 @@
   },
   "app/rich-menus/page.tsx": {
     "unresolved-classname": 1,
-    "arbitrary-value": 9,
+    "arbitrary-value": 10,
     "direct-primary-button": 1,
     "direct-secondary-button": 5
   },
@@ -460,7 +460,7 @@
   },
   "components/chats/inbox-filter-panel.tsx": {
     "arbitrary-value": 2,
-    "unresolved-classname": 9,
+    "unresolved-classname": 8,
     "direct-secondary-button": 1,
     "direct-primary-button": 1
   },
@@ -601,6 +601,9 @@
   },
   "components/inflow-links/site-script.tsx": {
     "arbitrary-value": 1
+  },
+  "components/layout/page-header-h2.tsx": {
+    "unresolved-classname": 5
   },
   "components/layout/sidebar-identity.tsx": {
     "unresolved-classname": 5

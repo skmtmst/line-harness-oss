@@ -7,7 +7,7 @@
  * ときの繰り上がりを見る。
  */
 import { describe, it, expect } from 'vitest'
-import { computeDeliveryAt, renderPreviewBody } from './step-preview'
+import { computeDeliveryAt, previewOffsets, renderPreviewBody } from './step-preview'
 
 /** JSTの日時をローカルのDateとして組み立てる（画面側と同じ扱い）。 */
 function at(y: number, m: number, d: number, hh: number, mm = 0): Date {
@@ -61,6 +61,52 @@ describe('経過時間で指定', () => {
     const out = computeDeliveryAt(at(2026, 8, 19, 22, 0), 'elapsed', 0, '10:00', 5)
     expect(out.getDate()).toBe(20)
     expect(out.getHours()).toBe(3)
+  })
+})
+
+/*
+ * #616 SC-02b: 編集フォームの入力値をプレビューの「日・時間・分」へ
+ * 写す変換。分が抜けると、設定内容は「1分後」なのに配信の流れ・
+ * 設定サマリーが「すぐに」のまま残る。
+ */
+describe('プレビューへ渡す日・時間・分（previewOffsets）', () => {
+  it('elapsed は 日・時間・分をそのまま渡す（1分が0に化けない）', () => {
+    const out = previewOffsets('elapsed', {
+      delayMinutes: 0,
+      offsetDays: 0,
+      offsetHours: 0,
+      offsetMinutesRemainder: 1,
+    })
+    expect(out).toEqual({ offsetDays: 0, offsetHours: 0, offsetMinutes: 1 })
+  })
+
+  it('relative は delayMinutes の合計を日・時間・分へ分解する', () => {
+    expect(
+      previewOffsets('relative', {
+        delayMinutes: 1,
+        offsetDays: 0,
+        offsetHours: 0,
+        offsetMinutesRemainder: 0,
+      }),
+    ).toEqual({ offsetDays: 0, offsetHours: 0, offsetMinutes: 1 })
+    expect(
+      previewOffsets('relative', {
+        delayMinutes: 1500,
+        offsetDays: 0,
+        offsetHours: 0,
+        offsetMinutesRemainder: 0,
+      }),
+    ).toEqual({ offsetDays: 1, offsetHours: 1, offsetMinutes: 0 })
+  })
+
+  it('absolute_time は日だけ使い、時間・分は配信時刻側に任せる', () => {
+    const out = previewOffsets('absolute_time', {
+      delayMinutes: 90,
+      offsetDays: 2,
+      offsetHours: 3,
+      offsetMinutesRemainder: 30,
+    })
+    expect(out).toEqual({ offsetDays: 2, offsetHours: 0, offsetMinutes: 0 })
   })
 })
 
