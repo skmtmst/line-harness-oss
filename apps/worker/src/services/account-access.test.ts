@@ -2,6 +2,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { LineAccount } from '@line-crm/db';
 import { DEFAULT_TENANT_ID } from '@line-crm/shared';
 import {
+  _resetVisibleLineAccountScopeCacheForTest,
+  canAccessAllLineAccounts,
   canAccessLineAccount,
   filterVisibleLineAccounts,
   getVisibleLineAccountScope,
@@ -206,6 +208,79 @@ describe('filterVisibleLineAccounts', () => {
       ids: ['child'],
       canSeeUnassigned: false,
     });
+  });
+});
+
+describe('getVisibleLineAccountScope の同一要求メモ化(#633)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    _resetVisibleLineAccountScopeCacheForTest();
+    accounts = [...defaultAccounts, tenantBAccount];
+    staffRows = new Map([['s', { account_scope: 'all' }]]);
+    scopeIds = new Map();
+    dbMocks.getLineAccountScopeEntries.mockImplementation(async (_db, tenantId) =>
+      accounts.filter(
+        (item) => (item.tenant_id ?? DEFAULT_TENANT_ID) === tenantId,
+      ));
+  });
+
+  it('同じstaff・同じdbの再計算はD1へ行かない', async () => {
+    const db = {} as D1Database;
+    const member = staff();
+    const first = await getVisibleLineAccountScope(db, member);
+    const second = await getVisibleLineAccountScope(db, member);
+    const viaAccess = await canAccessAllLineAccounts(db, member, ['parent']);
+    expect(second).toEqual(first);
+    expect(viaAccess).toBe(true);
+    expect(dbMocks.getLineAccountScopeEntries).toHaveBeenCalledTimes(1);
+  });
+
+  it('同時に投げた解決は1回の読取に束ねる', async () => {
+    const db = {} as D1Database;
+    const member = staff();
+    const [a, b] = await Promise.all([
+      getVisibleLineAccountScope(db, member),
+      getVisibleLineAccountScope(db, member),
+    ]);
+    expect(a).toEqual(b);
+    expect(dbMocks.getLineAccountScopeEntries).toHaveBeenCalledTimes(1);
+  });
+
+  it('別のstaffオブジェクトは別要求として再計算する', async () => {
+    const db = {} as D1Database;
+    await getVisibleLineAccountScope(db, staff());
+    await getVisibleLineAccountScope(db, staff());
+    expect(dbMocks.getLineAccountScopeEntries).toHaveBeenCalledTimes(2);
+  });
+
+  it('同じstaffでも別のdbは別要求として再計算する', async () => {
+    const member = staff();
+    await getVisibleLineAccountScope({} as D1Database, member);
+    await getVisibleLineAccountScope({} as D1Database, member);
+    expect(dbMocks.getLineAccountScopeEntries).toHaveBeenCalledTimes(2);
+  });
+
+  it('失敗した解決は残さず、同じ要求内でやり直せる', async () => {
+    const db = {} as D1Database;
+    const member = staff();
+    dbMocks.getLineAccountScopeEntries
+      .mockRejectedValueOnce(new Error('d1 down'))
+      .mockImplementation(async (_db, tenantId) =>
+        accounts.filter((item) => (item.tenant_id ?? DEFAULT_TENANT_ID) === tenantId));
+    await expect(getVisibleLineAccountScope(db, member)).rejects.toThrow('d1 down');
+    await expect(getVisibleLineAccountScope(db, member)).resolves.toMatchObject({
+      allowedAccountIds: ['parent', 'child', 'grandchild'],
+    });
+    expect(dbMocks.getLineAccountScopeEntries).toHaveBeenCalledTimes(2);
+  });
+
+  it('テスト用resetで同じstaff・同じdbでも取り直せる', async () => {
+    const db = {} as D1Database;
+    const member = staff();
+    await getVisibleLineAccountScope(db, member);
+    _resetVisibleLineAccountScopeCacheForTest();
+    await getVisibleLineAccountScope(db, member);
+    expect(dbMocks.getLineAccountScopeEntries).toHaveBeenCalledTimes(2);
   });
 });
 
