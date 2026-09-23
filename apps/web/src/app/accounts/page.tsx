@@ -178,12 +178,14 @@ export default function AccountsPage() {
                         {` ・ ${account.timezone ?? 'Asia/Tokyo'}`}
                       </p>
                     </div>
-                    <Link
+                    {/* #641: カード表示でも行操作は同じ枠つきボタン */}
+                    <Button
                       href={`/accounts/detail?id=${account.id}`}
-                      className="text-action shrink-0 rounded-control px-2 py-1 text-sm font-semibold hover:underline"
+                      variant="secondary"
+                      className="shrink-0"
                     >
                       詳細
-                    </Link>
+                    </Button>
                   </div>
                   <div className="mt-2 flex flex-wrap items-center gap-2">
                     <StatusBadge tone={connection.tone}>{connection.label}</StatusBadge>
@@ -245,10 +247,10 @@ export default function AccountsPage() {
                       {parentName(account, accounts)}
                     </td>
                     <td className="px-4 py-3">
-                      <Link href={`/accounts/detail?id=${account.id}`} className="text-action text-sm hover:underline">
+                      {/* #641: 行操作は枠つきボタンにそろえる。押せない「•••」の飾りは出さない */}
+                      <Button href={`/accounts/detail?id=${account.id}`} variant="secondary">
                         詳細
-                      </Link>
-                      <span className="text-ink-faint ml-4" aria-hidden>•••</span>
+                      </Button>
                     </td>
                   </tr>
                 )

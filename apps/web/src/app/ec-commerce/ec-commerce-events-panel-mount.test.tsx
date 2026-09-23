@@ -226,8 +226,12 @@ function waitForCommit(el: HTMLDivElement): Promise<void> {
   })
 }
 
-function retryButton(el: HTMLDivElement): HTMLButtonElement {
-  const button = Array.from(el.querySelectorAll('button')).find((node) => node.textContent === 'もう一度やる')
+async function retryButton(el: HTMLDivElement): Promise<HTMLButtonElement> {
+  const trigger = Array.from(el.querySelectorAll('button')).find((node) => node.getAttribute('aria-label') === 'この行のその他操作')
+  if (!trigger) throw new Error('「その他」メニューが見つかりません')
+  trigger.click()
+  await drainMicrotasks()
+  const button = Array.from(el.querySelectorAll('button[role="menuitem"]')).find((node) => node.textContent === 'もう一度やる')
   if (!button) throw new Error('「もう一度やる」ボタンが見つかりません')
   return button as HTMLButtonElement
 }
@@ -282,7 +286,7 @@ describe('EC取込一覧(#685) 逆変異で赤になる実mount試験', () => {
 
     const retryDeferred = deferred<unknown>()
     mockRetry.mockReturnValueOnce(retryDeferred.promise)
-    await act(async () => { retryButton(el).click() })
+    await act(async () => { (await retryButton(el)).click() })
     expect(mockRetry).toHaveBeenCalledTimes(1)
     expect(eventsCalls).toHaveLength(1)
 

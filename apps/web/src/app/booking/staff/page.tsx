@@ -1,12 +1,15 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { X } from 'lucide-react'
+import { MoreHorizontal, Trash2, X } from 'lucide-react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { BOOKING_STAFF_LIMITS, parseBookingStaffInput, type StaffMember } from '@line-crm/shared'
 import ImageUploader from '@/components/shared/image-uploader'
 import Select from '@/components/shared/select'
 import Button from '@/components/shared/button'
+import IconButton from '@/components/shared/icon-button'
+import ActionMenu from '@/components/shared/action-menu'
 import ListState from '@/components/shared/list-state'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { api, bookingApi, type BookingStaff } from '@/lib/api'
@@ -38,6 +41,9 @@ export default function BookingStaffPage() {
   const [removeError, setRemoveError] = useState('')
   // N-411: 予約スタッフの登録・変更・削除は 'booking.settings' の実効permission。
   const [canManageStaff, setCanManageStaff] = useState(false)
+  // 行の「その他」メニューの開き先（#641）
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null)
+  const router = useRouter()
   const loadRequestRef = useRef(0)
 
   const load = useCallback(async () => {
@@ -192,15 +198,40 @@ export default function BookingStaffPage() {
                       )}
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <div className="inline-flex gap-2 text-xs">
-                        {canManageStaff && (
-                          <button onClick={() => setEditing(s)} className="text-blue-600 hover:underline">編集</button>
-                        )}
-                        <Link href={`/booking/staff/shifts?staff_id=${s.id}`} className="text-blue-600 hover:underline">
-                          シフト
-                        </Link>
-                        {canManageStaff && (
-                          <button onClick={() => { setRemoveError(''); setRemoveTarget(s) }} className="text-red-600 hover:underline">削除</button>
+                      {/* #641: 「編集」＋「削除」＋「その他（…）」の形にそろえる。シフトはメニューへ集約。 */}
+                      <div className="relative inline-flex items-center justify-end gap-1.5">
+                        {canManageStaff ? (
+                          <>
+                            <Button variant="secondary" onClick={() => setEditing(s)}>編集</Button>
+                            <IconButton
+                              aria-label={`${s.display_name}を削除`}
+                              title="削除"
+                              onClick={() => { setRemoveError(''); setRemoveTarget(s) }}
+                            >
+                              <Trash2 aria-hidden />
+                            </IconButton>
+                            <IconButton
+                              aria-label={`${s.display_name}のその他操作`}
+                              aria-expanded={openMenuId === s.id}
+                              onClick={() => setOpenMenuId((current) => (current === s.id ? null : s.id))}
+                            >
+                              <MoreHorizontal aria-hidden />
+                            </IconButton>
+                            <ActionMenu
+                              open={openMenuId === s.id}
+                              ariaLabel={`${s.display_name}の操作`}
+                              onClose={() => setOpenMenuId(null)}
+                              items={[{
+                                id: 'shift',
+                                label: 'シフト',
+                                onSelect: () => router.push(`/booking/staff/shifts?staff_id=${s.id}`),
+                              }]}
+                            />
+                          </>
+                        ) : (
+                          <Button href={`/booking/staff/shifts?staff_id=${s.id}`} variant="secondary">
+                            シフト
+                          </Button>
                         )}
                       </div>
                     </td>
