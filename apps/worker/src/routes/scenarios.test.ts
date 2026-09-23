@@ -240,11 +240,13 @@ describe('GET /api/scenarios?lineAccountId=X', () => {
     );
     expect(res.status).toBe(200);
     const listCall = calls.find((call) => /SELECT s\.\*, COUNT\(ss\.id\)/i.test(call.sql));
-    expect(listCall?.sql).toMatch(/s\.name LIKE \? ESCAPE/);
+    // #625: D1 の LIKE パターン50バイト制限を避けるため instr() で部分一致する。
+    // 束縛は `%夏%` ではなく検索語そのもの。
+    expect(listCall?.sql).toMatch(/instr\(lower\(s\.name\), lower\(\?\)\) > 0/);
     expect(listCall?.sql).toMatch(/s\.is_active = 0/);
     expect(listCall?.sql).toMatch(/s\.created_at >= \?/);
     expect(listCall?.sql).toMatch(/s\.folder_id = \?/);
-    expect(listCall?.binds).toEqual(['acc-1', '%夏%', '2026-09-01', 'folder-1', 50, 0]);
+    expect(listCall?.binds).toEqual(['acc-1', '夏', '2026-09-01', 'folder-1', 50, 0]);
   });
 
   test('購読数は選択中のLINEアカウントだけを実DBで集計する', async () => {

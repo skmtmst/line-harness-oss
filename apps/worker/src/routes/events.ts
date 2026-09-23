@@ -434,8 +434,13 @@ events.get('/api/events/admin/events', async (c) => {
        )`];
   const params: unknown[] = [account_id, account_id];
   if (q) {
-    conditions.push(`e.name LIKE ? ESCAPE '\\'`);
-    params.push(`%${q.replace(/[\\%_]/g, '\\$&')}%`);
+    /*
+     * #625: LIKE ではなく instr() で部分一致する。
+     * D1 の LIKE/GLOB パターンは最大50バイト。`%<検索語>%` を束縛すると
+     * 48バイト超の検索語で SQLite エラー(500)になっていた。
+     */
+    conditions.push(`instr(lower(e.name), lower(?)) > 0`);
+    params.push(q);
   }
   if (filter === 'open') conditions.push(`e.is_published = 1`);
   if (filter === 'pending') conditions.push(`EXISTS (

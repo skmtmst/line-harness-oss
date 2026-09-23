@@ -16,6 +16,8 @@ import {
   type ScheduledChatSend,
 } from '@/lib/api'
 import { buildSupportEmailInboxQuery } from './support-email-query'
+import { clampSearchQuery, SEARCH_QUERY_MAX_LENGTH } from '@/lib/search-query'
+import { withRequestTimeout } from '@/lib/request-timeout'
 import { INBOX_INFO_PANEL_MIN_VIEWPORT } from './inbox-layout'
 import { OperatorDropdown, StatusDropdown, type ChatStatus } from '@/components/chats/inbox-dropdown'
 import { unreadLookup } from '@/components/chats/assignee-unread'
@@ -711,7 +713,12 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
   const savedViewConsumedRef = useRef<string | null>(null)
 
   useEffect(() => {
-    const timer = window.setTimeout(() => setDebouncedNameQuery(nameQuery.trim()), 250)
+    /*
+     * #625: サーバーへ送る検索語は上限へ切り詰める。入力欄の maxLength に
+     * 頼るだけだと、保存した検索の復元など欄を通らない経路で長い語が
+     * そのまま出ていく。
+     */
+    const timer = window.setTimeout(() => setDebouncedNameQuery(clampSearchQuery(nameQuery.trim())), 250)
     return () => window.clearTimeout(timer)
   }, [nameQuery])
 
@@ -769,7 +776,8 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
       setEmailError('')
     }
     try {
-      const res = await fetchApi<{
+      // #625: 応答なしの要求は時間切れの失敗にし、読み込み中を残さない。
+      const res = await withRequestTimeout(fetchApi<{
         success: boolean
         data: { items: EmailInboxItem[]; summary?: { total: number } }
       }>(
@@ -782,7 +790,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
           unreadOnly,
           quickFilter: quickFilter === 'all' ? undefined : quickFilter,
         })}`,
-      )
+      ))
       if (listFilterKeyRef.current !== listFilterKey || emailListRequestRef.current !== requestId) return
       if (res.success) {
         setEmailError('')
@@ -834,7 +842,8 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
     setChatListFailed(false)
     setError('')
     try {
-      const chatRes = await api.chats.list(buildListParams(null))
+      // #625: 応答なしの要求は時間切れの失敗にし、読み込み中を残さない。
+      const chatRes = await withRequestTimeout(api.chats.list(buildListParams(null)))
       if (listFilterKeyRef.current !== listFilterKey || chatListRequestRef.current !== requestId) return
       if (chatRes.success) {
         setChatListFailed(false)
@@ -872,7 +881,8 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
     setLoadingMore(true)
     const requestId = chatListRequestRef.current
     try {
-      const chatRes = await api.chats.list(buildListParams(cursor))
+      // #625: 応答なしの要求は時間切れの失敗にし、読み込み中を残さない。
+      const chatRes = await withRequestTimeout(api.chats.list(buildListParams(cursor)))
       if (listFilterKeyRef.current !== listFilterKey || chatListRequestRef.current !== requestId) return
       if (chatRes.success) {
         const rows = chatRes.data
@@ -913,7 +923,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
   */
   const applySavedViewConditions = useCallback((view: InboxSavedView): 'all' | 'line' | 'email' => {
     const conditions = normalizeSavedViewConditions(view.conditions)
-    setNameQuery(conditions.query ?? '')
+    setNameQuery(clampSearchQuery(conditions.query ?? ''))
     setStatusFilter(conditions.statuses.length === 1 ? conditions.statuses[0] : 'all')
     setAssigneeFilter(conditions.assignees.length === 1 ? conditions.assignees[0] : 'all')
     /*
@@ -1029,7 +1039,8 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
     const savedQuickFilter = draft?.quickFilter ?? quickFilter
     return {
       version: 1,
-      query: nameQuery.trim(),
+      // #625: 保存する検索語も画面と同じ上限へそろえる。
+      query: clampSearchQuery(nameQuery.trim()),
       channels: (draft?.channel ?? channel) === 'all'
         ? ['line', 'email']
         : [(draft?.channel ?? channel) as 'line' | 'email'],
@@ -2039,14 +2050,15 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
   useEffect(() => {
     const requestId = ++quickCountsRequestRef.current
     const key = quickCountsKey
-    void api.chats.quickCounts({
+    // #625: 応答なしの要求は時間切れの失敗にする。件数は「—」へ戻り、0化しない。
+    void withRequestTimeout(api.chats.quickCounts({
       status: statusFilter === 'all' ? undefined : statusFilter,
       operatorId: assigneeFilter === 'all' ? undefined : assigneeFilter,
       accountId: selectedAccountId || undefined,
       q: debouncedNameQuery || undefined,
       unreadOnly,
       channel,
-    }).then((res) => {
+    })).then((res) => {
       if (quickCountsRequestRef.current !== requestId) return
       /* 失敗や変な形の応答を0件と読まない。`—` のままにする。 */
       setQuickCounts(
@@ -2481,7 +2493,8 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
               <input
               type="search"
               value={nameQuery}
-              onChange={(e) => { setNameQuery(e.target.value); dropSavedViewParam() }}
+              onChange={(e) => { setNameQuery(clampSearchQuery(e.target.value)); dropSavedViewParam() }}
+              maxLength={SEARCH_QUERY_MAX_LENGTH}
               placeholder="名前・メールアドレス・内容で検索"
               aria-label="名前・メールアドレス・内容で検索"
               className="w-full rounded-lg border border-[#E5E7EB] bg-canvas py-2 pr-3 pl-9 text-xs text-[#1F2937] outline-none focus:border-[#06C755] focus:ring-2 focus:ring-[#06C755]/15"

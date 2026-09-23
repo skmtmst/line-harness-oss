@@ -1,6 +1,5 @@
 'use client'
 
-import { Check, Minus } from 'lucide-react'
 import { useEffect, useId, useRef, type InputHTMLAttributes, type ReactNode } from 'react'
 import styles from './checkbox.module.css'
 
@@ -15,6 +14,9 @@ import styles from './checkbox.module.css'
  * - 未選択の枠は `$ink-faint`（白地と 4.8:1）。`$hairline` は 1.4:1 で、部品の見分けに要る 3:1 に届かない
  * - `indeterminate`（一部選択）は一覧の見出しの「表示中をすべて選ぶ」に使う
  * - 文字（children）を押しても切り替わる。文字が無いときは `aria-label` を必ず渡す
+ * - 動きは Pencil ★V7「チェックボックス 動き」（V7 文書 `HO3V6`）。印は一筆で描かれ、
+ *   外すときは描き戻さずに薄くなって消える。印の線は `pathLength=1` にして、
+ *   CSS が長さを知らなくても 0→1 で描けるようにしている
  */
 export default function Checkbox({
   checked,
@@ -69,8 +71,12 @@ export default function Checkbox({
             className={styles.input}
           />
           <span aria-hidden="true" className={styles.box}>
-            <Check className={styles.check} strokeWidth={3} />
-            <Minus className={styles.minus} strokeWidth={3} />
+            <svg className={`${styles.mark} ${styles.check}`} viewBox="0 0 24 24">
+              <path d="M4 12l5 5L20 6" pathLength={1} />
+            </svg>
+            <svg className={`${styles.mark} ${styles.minus}`} viewBox="0 0 24 24">
+              <path d="M5 12h14" pathLength={1} />
+            </svg>
           </span>
         </span>
         {children ? <span className={styles.label}>{children}</span> : null}

@@ -202,14 +202,17 @@ async function countInboxSavedViewMatches(
     where.push(`(${clauses.join(' OR ')})`);
   }
   if (conditions.query) {
-    where.push(`(f.display_name LIKE ? OR EXISTS (
+    /*
+     * #625: LIKE ではなく instr() で部分一致する。
+     * D1 の LIKE/GLOB パターンは最大50バイトのため、長い検索語で500になっていた。
+     */
+    where.push(`(instr(lower(f.display_name), lower(?)) > 0 OR EXISTS (
       SELECT 1 FROM messages_log searched
        WHERE searched.friend_id = f.id
          AND (searched.delivery_type IS NULL OR searched.delivery_type != 'test')
-         AND searched.content LIKE ?
+         AND instr(lower(searched.content), lower(?)) > 0
     ))`);
-    const like = `%${conditions.query}%`;
-    bindings.push(like, like);
+    bindings.push(conditions.query, conditions.query);
   }
   if (conditions.unread === 'mine') {
     where.push(`EXISTS (
@@ -287,12 +290,15 @@ async function countInboxSavedViewMatches(
     emailWhere.push(`(${clauses.join(' OR ')})`);
   }
   if (conditions.query) {
-    emailWhere.push(`(t.customer_email LIKE ? OR t.customer_name LIKE ? OR t.subject LIKE ? OR EXISTS (
+    // #625: LIKE ではなく instr()。D1 の LIKE 50バイト制限で長い検索語が500になっていた。
+    emailWhere.push(`(instr(lower(t.customer_email), lower(?)) > 0
+      OR instr(lower(t.customer_name), lower(?)) > 0
+      OR instr(lower(t.subject), lower(?)) > 0
+      OR EXISTS (
       SELECT 1 FROM support_email_messages searched
-       WHERE searched.thread_id = t.id AND searched.body_text LIKE ?
+       WHERE searched.thread_id = t.id AND instr(lower(searched.body_text), lower(?)) > 0
     ))`);
-    const like = `%${conditions.query}%`;
-    emailBindings.push(like, like, like, like);
+    emailBindings.push(conditions.query, conditions.query, conditions.query, conditions.query);
   }
   if (conditions.unread === 'mine') {
     emailWhere.push('(sr.last_read_at IS NULL OR t.last_incoming_at > sr.last_read_at)');
@@ -636,16 +642,16 @@ chats.get('/api/chats/quick-counts', requireRole('owner', 'admin', 'staff'), asy
         conditionBindings.push(lineAccountId);
       }
       if (query) {
+        // #625: LIKE ではなく instr()。D1 の LIKE 50バイト制限で長い検索語が500になっていた。
         conditions.push(`(
-          f.display_name LIKE ? OR EXISTS (
+          instr(lower(f.display_name), lower(?)) > 0 OR EXISTS (
             SELECT 1 FROM messages_log mq
             WHERE mq.friend_id = f.id
               AND (mq.delivery_type IS NULL OR mq.delivery_type != 'test')
-              AND mq.content LIKE ?
+              AND instr(lower(mq.content), lower(?)) > 0
           )
         )`);
-        const like = `%${query}%`;
-        conditionBindings.push(like, like);
+        conditionBindings.push(query, query);
       }
 
       const countsRow = await c.env.DB.prepare(`
@@ -710,14 +716,17 @@ chats.get('/api/chats/quick-counts', requireRole('owner', 'admin', 'staff'), asy
       if (status === 'unread' || status === 'in_progress' || status === 'on_hold') bindings.push(status);
       let searchSql = '';
       if (query) {
+        // #625: LIKE ではなく instr()。D1 の LIKE 50バイト制限で長い検索語が500になっていた。
         searchSql = `AND (
-          t.customer_email LIKE ? OR t.customer_name LIKE ? OR t.subject LIKE ? OR EXISTS (
+          instr(lower(t.customer_email), lower(?)) > 0
+          OR instr(lower(t.customer_name), lower(?)) > 0
+          OR instr(lower(t.subject), lower(?)) > 0
+          OR EXISTS (
             SELECT 1 FROM support_email_messages searched
-            WHERE searched.thread_id = t.id AND searched.body_text LIKE ?
+            WHERE searched.thread_id = t.id AND instr(lower(searched.body_text), lower(?)) > 0
           )
         )`;
-        const like = `%${query}%`;
-        bindings.push(like, like, like, like);
+        bindings.push(query, query, query, query);
       }
       if (assignee) {
         if (assignee === 'unassigned') searchSql += ' AND t.assigned_staff_id IS NULL';
@@ -959,16 +968,16 @@ chats.get('/api/chats', requireRole('owner', 'admin', 'staff'), async (c) => {
       conditionBindings.push(lineAccountId);
     }
     if (query) {
+      // #625: LIKE ではなく instr()。D1 の LIKE 50バイト制限で長い検索語が500になっていた。
       conditions.push(`(
-        f.display_name LIKE ? OR EXISTS (
+        instr(lower(f.display_name), lower(?)) > 0 OR EXISTS (
           SELECT 1 FROM messages_log mq
           WHERE mq.friend_id = f.id
             AND (mq.delivery_type IS NULL OR mq.delivery_type != 'test')
-            AND mq.content LIKE ?
+            AND instr(lower(mq.content), lower(?)) > 0
         )
       )`);
-      const like = `%${query}%`;
-      conditionBindings.push(like, like);
+      conditionBindings.push(query, query);
     }
     // status / operator filter は chats を参照するので、その時だけ page CTE 側でも
     // chats を lookup する (無条件時は 全friend × chats lookup を省く)。
