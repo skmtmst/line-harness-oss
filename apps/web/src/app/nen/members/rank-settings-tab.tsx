@@ -3,6 +3,7 @@
 import { RefreshCw } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import Button from '@/components/shared/button'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Chip from '@/components/shared/chip'
 import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
@@ -12,6 +13,7 @@ import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { TextField } from '@/components/shared/text-field'
 import { formatJstDateTime } from '@/lib/presentation'
 import { nenRanksApi, type NenRankSettingsData } from '@/lib/nen-ranks-api'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import type { LoadStatus } from './page'
 
 type Draft = { id: string | null; name: string; threshold: string; rate: string; tagName: string | null; memberCount: number }
@@ -53,6 +55,12 @@ export default function RankSettingsTab({
   const [draftAccountId, setDraftAccountId] = useState(accountId)
 
   /*
+   * 未保存の変更がある間、画面を離れる操作を止める共通の番兵（DETAIL-04系）。
+   * 左メニュー・画面内リンク・戻る操作・再読込を同じ確認対話へ寄せる。
+   */
+  const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty, busy })
+
+  /*
    * アカウントが切り替わった瞬間に編集状態を捨てる。
    * dirtyのまま残すと、Aの下書き（AのIDと編集内容）がBの保存へ乗る。
    * 切替前に未保存の変更があったときは、黙って消さず破棄したことを画面へ出す。
@@ -63,6 +71,7 @@ export default function RankSettingsTab({
     setDrafts([])
     setDirty(false)
     setError('')
+    cancelLeave()
     setNotice(hadUnsaved ? 'LINEアカウントを切り替えたため、保存していない変更は破棄しました。' : '')
   }
 
@@ -250,6 +259,16 @@ export default function RankSettingsTab({
             <Button variant="primary" onClick={() => void save()} disabled={busy || !dirty}>保存してECへ同期</Button>
           </>
         )}
+      />
+
+      <ConfirmDialog
+        open={leaveTarget !== null}
+        title="保存していない変更があります"
+        description="このまま移動すると、ランク設定への変更は失われます。保存せずに移動しますか？"
+        confirmLabel="保存せずに移動"
+        cancelLabel="編集を続ける"
+        onConfirm={confirmLeave}
+        onCancel={cancelLeave}
       />
     </>
   )

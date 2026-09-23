@@ -30,6 +30,7 @@ import { mileagePaginationTotal } from './mileage-response-state'
 import { ruleEventLabel } from './earning-rule-view'
 import MileageHistoryTab from './mileage-history-tab'
 import ActionScoreTab from './action-score-tab'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 
 const PAGE_SIZE = 20
 const TABS = [
@@ -177,6 +178,12 @@ function MileagePageInner() {
   const [rulePage, setRulePage] = useState(1)
   const [tabCounts, setTabCounts] = useState<{ balances: number | null; rules: number | null; rewards: number | null }>({ balances: null, rules: null, rewards: null })
   const [canAdjustMileage, setCanAdjustMileage] = useState(false)
+  /*
+   * 並び順の未保存変更がある間、画面を離れる操作を止める共通の番兵（DETAIL-04系）。
+   * 左メニュー・画面内リンク・戻る操作・再読込を同じ確認対話へ寄せる。
+   * タブ切替は同じ画面内の移動で下書きは残るので、番兵は画面外への離脱だけを見る。
+   */
+  const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty: ruleOrderDirty, busy: savingRuleOrder })
   const overviewTotal = mileagePaginationTotal(overview)
   const rules = ruleOverview?.items ?? []
 
@@ -790,6 +797,16 @@ function MileagePageInner() {
         error={publishError || undefined}
         onCancel={() => { if (savingRuleId === null) setPublishTarget(null) }}
         onConfirm={() => { if (publishTarget) void publishRule(publishTarget) }}
+      />
+
+      <ConfirmDialog
+        open={leaveTarget !== null}
+        title="保存していない変更があります"
+        description="このまま移動すると、たまる決めごとの並び順への変更は失われます。保存せずに移動しますか？"
+        confirmLabel="保存せずに移動"
+        cancelLabel="編集を続ける"
+        onConfirm={confirmLeave}
+        onCancel={cancelLeave}
       />
 
       {tab === 'history' && selectedAccountId ? <MileageHistoryTab key={selectedAccountId} accountId={selectedAccountId} /> : null}
