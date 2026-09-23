@@ -57,6 +57,7 @@ vi.mock('next/link', () => ({
 }))
 vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(navigationMocks.query),
+  usePathname: () => '/webinars/edit',
   useRouter: () => ({ push: vi.fn() }),
 }))
 vi.mock('@/components/shared/button', () => ({
