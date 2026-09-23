@@ -90,7 +90,7 @@ function AutoReplyEditInner() {
           })
         }
       } catch {
-        if (active) setError('読み込みに失敗しました')
+        if (active) setError('読み込みに失敗しました。もう一度読み込んでください。')
       } finally {
         if (active) setLoading(false)
       }

@@ -50,7 +50,7 @@ function StepGroup({ item, n, withLine }: { item: StepTrailItem; n: number; with
             item.state === 'done'
               ? 'bg-accent-deep text-on-accent'
               : item.state === 'current'
-                ? 'border-accent text-accent border-2'
+                ? 'border-accent text-accent-deep border-2'
                 : 'border-hairline text-ink-faint border'
           }`}
         >

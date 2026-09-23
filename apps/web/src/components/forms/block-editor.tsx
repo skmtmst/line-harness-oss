@@ -387,7 +387,7 @@ export default function BlockEditor({
                       return (
                         <span
                           key={id}
-                          className="bg-accent-soft text-accent rounded-pill inline-flex items-center gap-1 px-2 py-0.5 text-xs"
+                          className="bg-accent-soft text-accent-deep rounded-pill inline-flex items-center gap-1 px-2 py-0.5 text-xs"
                         >
                           {field?.name ?? '（消えた項目）'}
                           <button

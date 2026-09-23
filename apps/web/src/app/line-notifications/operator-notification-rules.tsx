@@ -151,7 +151,7 @@ export default function OperatorNotificationRules({ lineAccountId }: { lineAccou
 
     <div className="flex flex-wrap items-center gap-2">
       <label className="flex min-w-72 max-w-md flex-1 items-center gap-2 rounded-control border border-hairline bg-canvas px-3 py-2"><Search aria-hidden="true" size={17} className="text-ink-faint" /><span className="sr-only">お知らせを検索</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="お知らせ名・きっかけで探す" className="min-w-0 flex-1 bg-transparent text-sm outline-none" /></label>
-      {(['all', 'published', 'draft', 'missing'] as const).map((value) => <label key={value}><input className="peer sr-only" type="radio" name="operator-filter" checked={filter === value} onChange={() => setFilter(value)} /><span className="inline-flex min-h-9 cursor-pointer items-center rounded-pill border border-hairline bg-canvas px-3 text-xs font-semibold text-ink-secondary peer-checked:border-accent peer-checked:bg-accent-soft peer-checked:text-accent">{{ all: `すべて ${summary?.total ?? '—'}`, published: `出している ${summary?.published ?? '—'}`, draft: `止めている ${summary?.stopped ?? '—'}`, missing: `受け取る人がいない ${summary?.missingRecipients ?? '—'}` }[value]}</span></label>)}
+      {(['all', 'published', 'draft', 'missing'] as const).map((value) => <label key={value}><input className="peer sr-only" type="radio" name="operator-filter" checked={filter === value} onChange={() => setFilter(value)} /><span className="inline-flex min-h-9 cursor-pointer items-center rounded-pill border border-hairline bg-canvas px-3 text-xs font-semibold text-ink-secondary peer-checked:border-accent peer-checked:bg-accent-soft peer-checked:text-accent-deep">{{ all: `すべて ${summary?.total ?? '—'}`, published: `出している ${summary?.published ?? '—'}`, draft: `止めている ${summary?.stopped ?? '—'}`, missing: `受け取る人がいない ${summary?.missingRecipients ?? '—'}` }[value]}</span></label>)}
       <span className="rounded-control border border-hairline bg-canvas px-3 py-2 text-xs font-semibold text-ink-secondary">よく届く順</span>
     </div>
 
@@ -164,7 +164,7 @@ export default function OperatorNotificationRules({ lineAccountId }: { lineAccou
       : <DataTable><thead><tr><Th>お知らせ</Th><Th>きっかけ</Th><Th>受け取る人</Th><Th>送る時間</Th><Th>今日</Th><Th>操作</Th></tr></thead><tbody>{visible.map((rule) => <Tr key={rule.id}>
         {/* NOTIFY-04: 名前から編集画面へ戻れる。保存したお知らせを開き直して
             直せないと、直すたびに作り直しになる。 */}
-        <NameCell name={<Link href={`/line-notifications/operator/new?id=${encodeURIComponent(rule.id)}`} className="text-accent hover:underline" title={rule.name}>{rule.name}</Link>} sub={channelLabel(rule.channels)} />
+        <NameCell name={<Link href={`/line-notifications/operator/new?id=${encodeURIComponent(rule.id)}`} className="text-accent-deep hover:underline" title={rule.name}>{rule.name}</Link>} sub={channelLabel(rule.channels)} />
         <Td>{operatorEventLabel(rule.eventType)}</Td>
         <Td><span className={rule.recipientCount > 0 ? 'text-ink-secondary' : 'font-semibold text-warning'}>{rule.recipientCount > 0 ? `${rule.recipientCount}人` : '受け取れる人なし'}</span></Td>
         <Td>{conditionsOf(rule).scheduleLabel ?? 'いつでも'}</Td>

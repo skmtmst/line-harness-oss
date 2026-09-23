@@ -120,13 +120,13 @@ describe('共通SummaryCard', () => {
         title="配信実績"
         value={null}
         unit="件"
-        detail="取得に失敗しました"
+        detail="取得に失敗しました。もう一度読み込んでください。"
         onRetry={() => undefined}
         retryLabel="集計を読み直す"
       />,
     )
     expect(html).toContain('集計を読み直す')
-    expect(html).toContain('取得に失敗しました')
+    expect(html).toContain('取得に失敗しました。もう一度読み込んでください。')
   })
 })
 

@@ -65,7 +65,7 @@
 }
 
 .confirmationPanel .titleIcon {
-  color: var(--color-accent);
+  color: var(--color-accent-deep);
 }
 
 .confirmationPanel[role='alertdialog'] .titleIcon {

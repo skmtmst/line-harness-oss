@@ -43,7 +43,7 @@ describe('リファラルリンク編集窓の保存 (#1058)', () => {
     expect(body).toContain('api.entryRoutes.create(form)')
     expect(body).toContain('api.entryRoutes.update(route!.id, form)')
     expect(body).toContain('if (res.success) onSaved(res.data, isNew)')
-    expect(body).toContain("else setError(res.error ?? '保存に失敗しました')")
+    expect(body).toContain("else setError(res.error ?? '保存に失敗しました。通信を確かめて、もう一度お試しください。')")
   })
 
   it('失敗は窓の中の赤い帯に出る', () => {

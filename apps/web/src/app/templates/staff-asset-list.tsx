@@ -47,7 +47,7 @@ export default function StaffAssetList({ kind }: { kind: BroadcastAssetKind }) {
           <h3 className="text-ink mt-3 truncate font-bold">{item.name}</h3>
           <p className="text-ink-faint mt-1 text-xs">更新 {new Date(item.updatedAt).toLocaleString('ja-JP')}</p>
           <div className="mt-4">
-            <a href={`/broadcasts/new?contentTemplateId=${encodeURIComponent(item.id)}`} className="border-accent text-accent rounded-control inline-block border px-3 py-2 text-sm font-bold">一斉配信で使う</a>
+            <a href={`/broadcasts/new?contentTemplateId=${encodeURIComponent(item.id)}`} className="border-accent text-accent-deep rounded-control inline-block border px-3 py-2 text-sm font-bold">一斉配信で使う</a>
           </div>
         </article>
       ))}

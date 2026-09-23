@@ -80,7 +80,7 @@ function ChannelBadge({ channel }: { channel: InboxItem['channel'] }) {
       className={`mr-2 rounded-pill px-1.5 py-0.5 text-[10px] font-medium ${
         channel === 'email'
           ? 'bg-canvas-sunken text-ink-secondary'
-          : 'bg-accent-soft text-accent'
+          : 'bg-accent-soft text-accent-deep'
       }`}
     >
       {channel === 'email' ? 'メール' : 'LINE'}

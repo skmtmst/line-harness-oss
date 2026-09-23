@@ -84,7 +84,7 @@ export default function ChoiceTable({
               onClick={() => onChange({ choiceMode: m.value })}
               className={`px-3 py-1.5 text-xs font-medium transition-colors ${
                 mode === m.value
-                  ? 'bg-accent-soft text-accent'
+                  ? 'bg-accent-soft text-accent-deep'
                   : 'text-ink-secondary hover:bg-canvas-sunken'
               }`}
             >
@@ -309,7 +309,7 @@ export default function ChoiceTable({
                           <button
                             type="button"
                             onClick={() => patchChoice(choice.id, { jumpToSectionId: null })}
-                            className="text-accent ml-2 underline"
+                            className="text-accent-deep ml-2 underline"
                           >
                             分岐設定を外す
                           </button>

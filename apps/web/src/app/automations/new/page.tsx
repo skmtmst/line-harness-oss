@@ -1244,7 +1244,7 @@ export default function NewAutomationPage() {
                   ? '保存したあとに内容を変更しています'
                   : `下書きに保存しました${savedAt === null ? '' : `（${formatClock(savedAt)}）`}`,
                 // AUTOMATION-03: 人数の確認の失敗は、保存の結果とは別に添える。
-                previewFailed ? '人数の確認に失敗しました' : null,
+                previewFailed ? '人数の確認に失敗しました。通信を確かめて、もう一度お試しください。' : null,
               ].filter((part): part is string => part !== null).join('・')
             : 'まだ保存していません')
 

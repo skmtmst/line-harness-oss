@@ -109,7 +109,7 @@ function EventBlock({
                   ?? (action.status === 'succeeded' ? '完了しました'
                     : action.status === 'skipped' ? '見送りました'
                     : action.status === 'pending' || action.status === 'processing' ? '処理中です'
-                    : '失敗しました')}
+                    : '失敗しました。通信を確かめて、もう一度お試しください。')}
                 {kind ? `（${kind.label}）` : ''}
               </p>
               <p className={styles.cellSub}>

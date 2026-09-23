@@ -71,7 +71,7 @@ function Harness({ kind }: { kind: 'notice' | 'saved' }) {
       </button>
       {open && kind === 'notice' ? (
         <NoticeDialog
-          notice={{ title: '失敗しました', message: 'もう一度お試しください。' }}
+          notice={{ title: '失敗しました。通信を確かめて、もう一度お試しください。', message: 'もう一度お試しください。' }}
           onClose={() => setOpen(false)}
         />
       ) : null}

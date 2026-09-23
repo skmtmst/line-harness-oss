@@ -56,7 +56,7 @@ export default function BulkPreviewModal({ open, scenarioId, onClose }: Props) {
         .catch((cause: unknown) => {
           if (cause instanceof Error && cause.name === 'AbortError') return
           if (isCurrentPreviewRequest(requestGeneration, requestGenerationRef.current)) {
-            setError('プレビューの読み込みに失敗しました')
+            setError('プレビューの読み込みに失敗しました。もう一度読み込んでください。')
           }
         })
         .finally(() => {

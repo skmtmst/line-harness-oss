@@ -386,5 +386,5 @@ export default function SupportInbox({ channel = 'email' }: { channel?: Channel 
 
 function ChannelAvatar({ item }: { item: InboxItem }) {
   if (item.pictureUrl) return <img src={item.pictureUrl} alt="" className="h-11 w-11 shrink-0 rounded-full object-cover" /> // eslint-disable-line @next/next/no-img-element
-  return <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-xs font-black text-white ${item.channel === 'line' ? 'bg-accent' : 'bg-sky-500'}`}>{item.channel === 'line' ? 'L' : '✉'}</div>
+  return <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-xs font-black text-white ${item.channel === 'line' ? 'bg-accent-deep' : 'bg-sky-500'}`}>{item.channel === 'line' ? 'L' : '✉'}</div>
 }

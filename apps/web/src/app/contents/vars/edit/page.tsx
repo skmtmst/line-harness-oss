@@ -209,7 +209,7 @@ function EditCommonVarInner() {
       setExpiryBehavior(found.expiryBehavior ?? 'stop')
       setFallbackValue(found.fallbackValue ?? '')
     } catch {
-      if (accountAtRequest === latestAccountRef.current) setError('読み込みに失敗しました')
+      if (accountAtRequest === latestAccountRef.current) setError('読み込みに失敗しました。もう一度読み込んでください。')
     } finally {
       if (accountAtRequest === latestAccountRef.current) setLoading(false)
     }
@@ -493,7 +493,7 @@ function EditCommonVarInner() {
       await api.commonVars.deleteSchedule(item.id, scheduleId, selectedAccountId)
       void load()
     } catch {
-      setError('予約の削除に失敗しました')
+      setError('予約の削除に失敗しました。通信を確かめて、もう一度お試しください。')
     }
   }
 
@@ -836,7 +836,7 @@ function EditCommonVarInner() {
                       <p className="text-ink-secondary mt-1 break-words">{previewUsage.currentPreview}</p>
                     </div>
                     <div className="bg-accent-soft rounded-control p-3">
-                      <p className="text-accent font-semibold">保存したあとの文</p>
+                      <p className="text-accent-deep font-semibold">保存したあとの文</p>
                       <p className="text-ink mt-1 break-words">
                         {isChangeItem(previewUsage)
                           ? previewUsage.nextPreview ?? `${NOT_AVAILABLE}（使用先を開いて確認してください）`

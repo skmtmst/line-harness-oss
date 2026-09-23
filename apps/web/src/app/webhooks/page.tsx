@@ -488,7 +488,7 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
       await load()
     } catch {
       if (selectedAccountIdRef.current !== requestAccountId) return
-      setError('作成に失敗しました')
+      setError('作成に失敗しました。通信を確かめて、もう一度お試しください。')
     }
   }
 
@@ -529,7 +529,7 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
       load()
     } catch {
       if (selectedAccountIdRef.current !== requestAccountId) return
-      setError('シークレットの更新に失敗しました')
+      setError('シークレットの更新に失敗しました。通信を確かめて、もう一度お試しください。')
     }
   }
 

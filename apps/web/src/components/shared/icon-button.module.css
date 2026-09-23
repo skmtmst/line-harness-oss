@@ -10,6 +10,17 @@
   background: transparent;
   color: var(--color-ink-faint);
   cursor: pointer;
+  transition:
+    background-color var(--motion-fast) var(--motion-ease-out),
+    color var(--motion-fast) var(--motion-ease-out),
+    scale var(--motion-instant) var(--motion-ease-out);
+}
+
+/* 押したら少し沈む（★V7 修正方針 §4）。動きを減らす設定では変えない。 */
+@media (prefers-reduced-motion: no-preference) {
+  .button:active:not(:disabled) {
+    scale: 0.96;
+  }
 }
 
 .button:hover {

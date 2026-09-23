@@ -109,6 +109,6 @@ describe('まとめて削除の途中交代と結果', () => {
     // 件ごとに上書きすると最後の1件しか残らない。
     expect(bulkDelete).toContain('summarizeBulkDeleteResult(deleted, failedNames)')
     expect(bulkDelete).toContain('failedNames.push(name)')
-    expect(bulkDelete).not.toContain("setError('削除に失敗しました')")
+    expect(bulkDelete).not.toContain("setError('削除に失敗しました。通信を確かめて、もう一度お試しください。')")
   })
 })

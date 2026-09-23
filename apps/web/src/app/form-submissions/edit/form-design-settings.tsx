@@ -351,7 +351,7 @@ export default function FormDesignSettings({
               type="button"
               onClick={revertToInitial}
               title="この窓を開いた時点の設定へ戻します"
-              className="text-accent text-sm font-medium"
+              className="text-accent-deep text-sm font-medium"
             >
               元に戻す
             </button>

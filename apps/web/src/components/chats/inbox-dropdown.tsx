@@ -207,18 +207,18 @@ export function OperatorDropdown({
                 role="option"
                 aria-selected={selected}
                 onClick={() => { onChange(row.id); setOpen(false); setQuery('') }}
-                className={`${rowClass} ${selected ? 'bg-accent-soft text-accent font-medium' : 'text-ink hover:bg-canvas-sunken'}`}
+                className={`${rowClass} ${selected ? 'bg-accent-soft text-accent-deep font-medium' : 'text-ink hover:bg-canvas-sunken'}`}
               >
                 {row.id === 'all'
                   ? <span aria-hidden="true" className="block h-6 w-6 shrink-0" />
                   : <OperatorMark option={row} />}
                 <span className="min-w-0 flex-1 truncate text-left">{row.name}</span>
                 {unread === undefined ? null : (
-                  <span className={`shrink-0 tabular-nums ${selected ? 'text-accent' : 'text-ink-faint'}`}>
+                  <span className={`shrink-0 tabular-nums ${selected ? 'text-accent-deep' : 'text-ink-faint'}`}>
                     {unread === null ? '—' : unread}
                   </span>
                 )}
-                <span className={`text-accent shrink-0 ${selected ? '' : 'invisible'}`}><Check /></span>
+                <span className={`text-accent-deep shrink-0 ${selected ? '' : 'invisible'}`}><Check /></span>
               </button>
             )
           })}
@@ -250,7 +250,7 @@ const STATUS_STYLE: Record<ChatStatus, { label: string; dot: string; pill: strin
   unread: { label: '未対応', dot: 'bg-danger', pill: 'bg-danger-bg text-danger' },
   in_progress: { label: '対応中', dot: 'bg-warning', pill: 'bg-warning-bg text-warning' },
   on_hold: { label: '保留', dot: 'bg-info', pill: 'bg-info-bg text-info' },
-  resolved: { label: '対応済み', dot: 'bg-accent', pill: 'bg-accent-soft text-accent' },
+  resolved: { label: '対応済み', dot: 'bg-accent', pill: 'bg-accent-soft text-accent-deep' },
 }
 
 const STATUS_ORDER: ChatStatus[] = ['unread', 'in_progress', 'on_hold', 'resolved']
@@ -297,7 +297,7 @@ export function StatusDropdown({
               >
                 <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${style.dot}`} aria-hidden="true" />
                 <span className={`rounded-pill px-2 py-0.5 text-[11px] font-medium ${style.pill}`}>{style.label}</span>
-                <span className={`text-accent ml-auto ${selected ? '' : 'invisible'}`}><Check /></span>
+                <span className={`text-accent-deep ml-auto ${selected ? '' : 'invisible'}`}><Check /></span>
               </button>
             )
           })}
@@ -378,7 +378,7 @@ export function FolderDropdown({
             role="option"
             aria-selected={value === ''}
             onClick={() => { onChange(''); setOpen(false); setQuery('') }}
-            className={`${rowClass} justify-between ${value === '' ? 'bg-accent-soft text-accent font-medium' : 'text-ink hover:bg-canvas-sunken'}`}
+            className={`${rowClass} justify-between ${value === '' ? 'bg-accent-soft text-accent-deep font-medium' : 'text-ink hover:bg-canvas-sunken'}`}
           >
             <span className="truncate">すべてのフォルダ</span>
             <span className="tabular-nums">{totalCount}</span>
@@ -395,7 +395,7 @@ export function FolderDropdown({
                 aria-label={`フォルダ ${folder.name}`}
                 aria-selected={selected}
                 onClick={() => { onChange(folder.id); setOpen(false); setQuery('') }}
-                className={`${rowClass} justify-between ${selected ? 'bg-accent-soft text-accent font-medium' : 'text-ink hover:bg-canvas-sunken'}`}
+                className={`${rowClass} justify-between ${selected ? 'bg-accent-soft text-accent-deep font-medium' : 'text-ink hover:bg-canvas-sunken'}`}
               >
                 <span className="truncate">{folder.name}</span>
                 <span className="text-ink-faint tabular-nums">{folder.count}</span>
