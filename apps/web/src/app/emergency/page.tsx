@@ -23,6 +23,7 @@ import {
 } from '@/lib/api'
 import { formatOperationDate, type OperationSeverity } from '@/lib/operation-status'
 import { operationImpactText, type EmergencyStopTarget } from '@/lib/operation-impact'
+import { onlyWhenVisible } from '@/lib/visible-polling'
 import { operationControlSummary } from './control-summary'
 import {
   CAPABILITY_LABEL as RESTORE_DRIFT_CAPABILITY_LABEL,
@@ -564,7 +565,8 @@ function HealthPanel({
   }, [load, manualRunRequest])
 
   useEffect(() => {
-    const timer = window.setInterval(() => { void load(false) }, 5 * 60 * 1000)
+    // 隠れたタブでは取り直さない（V6R-S3-g）。
+    const timer = window.setInterval(onlyWhenVisible(() => { void load(false) }), 5 * 60 * 1000)
     return () => window.clearInterval(timer)
   }, [load])
 
