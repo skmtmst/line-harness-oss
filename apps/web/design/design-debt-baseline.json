@@ -697,6 +697,9 @@
     "unresolved-classname": 1,
     "arbitrary-value": 3
   },
+  "components/shared/date-field.tsx": {
+    "unresolved-classname": 17
+  },
   "components/shared/folder-add-dialog.tsx": {
     "direct-primary-button": 1
   },

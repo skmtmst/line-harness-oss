@@ -1,5 +1,6 @@
 'use client'
 
+import DateField from '@/components/shared/date-field'
 import { Download } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import { api, type OpsAuditRow } from '@/lib/api'
@@ -10,7 +11,6 @@ import FilterChip from '@/components/shared/filter-chip'
 import ListState from '@/components/shared/list-state'
 import Pagination from '@/components/shared/pagination'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
-import { TextField } from '@/components/shared/text-field'
 
 /** 監査ログ。★V6 37-8 `oEzZz`。 */
 
@@ -78,12 +78,12 @@ export default function OpsAuditPage() {
         </div>
         <div className="flex-1" />
         <div className="flex items-center gap-2 text-caption text-ink-secondary">
-          <div className="w-40">
-            <TextField type="date" value={from} onChange={(e) => { setFrom(e.target.value); setPage(1) }} aria-label="開始日" />
+          <div className="w-52">
+            <DateField value={from} onChange={(value) => { setFrom(value); setPage(1) }} max={to || undefined} aria-label="開始日" />
           </div>
           〜
-          <div className="w-40">
-            <TextField type="date" value={to} onChange={(e) => { setTo(e.target.value); setPage(1) }} aria-label="終了日" />
+          <div className="w-52">
+            <DateField value={to} onChange={(value) => { setTo(value); setPage(1) }} min={from || undefined} aria-label="終了日" />
           </div>
         </div>
         <Button onClick={exportCsv} disabled={rows.length === 0}>
