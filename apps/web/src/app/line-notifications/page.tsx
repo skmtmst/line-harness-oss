@@ -1100,27 +1100,49 @@ function LineNotificationsPage() {
       data-list-state={loadState === 'ready' && settings.length === 0 ? 'empty' : loadState}
       className={styles.root}
     >
-    {/* #975 U060: 7指標を390pxで積まない。先頭2件を出し、残りは「集計を見る」で開く。 */}
-    <KpiCollapse data-design="KPIs" gridClassName="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-      {kpis.map((kpi) => {
-        const { label, value, unit, note, href } = kpi
-        const body = <>
-          <p className="text-ink-faint text-xs">{label}</p>
-          <p className="text-ink mt-1 text-2xl font-bold tabular-nums">
-            {value === null ? '—' : value}
-            {value === null || unit === null ? null : <span className="text-ink-faint ml-1 text-xs font-normal">{unit}</span>}
-          </p>
-          <p className="text-ink-faint mt-0.5 text-xs">{note}</p>
-        </>
-        return <div key={label} className="bg-canvas rounded-card border-hairline border p-4">
-          {body}
-          {/* 0件のときは押し口を出さない。押しても何も無い。 */}
-          {canOpenCustomerNotificationKpi(kpi) && href
-            ? <Button onClick={() => router.replace(href)} className="mt-2">送れなかったものを見る</Button>
-            : null}
-        </div>
-      })}
-    </KpiCollapse>
+    {/*
+      #670 24: 7枚を4列に並べると4枚＋3枚の非対称になるため、意味で分ける。
+      「お知らせの状態」4枚と「今月の送信枠」3枚の2群にし、各群は
+      きれいに収まる列数にする。
+    */}
+    {/* #975 U060: 指標を390pxで積まない。先頭2件を出し、残りは「集計を見る」で開く。 */}
+    <section aria-label="お知らせの状態">
+      <KpiCollapse data-design="KPIs" gridClassName="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {kpis.slice(0, 4).map((kpi) => {
+          const { label, value, unit, note, href } = kpi
+          const body = <>
+            <p className="text-ink-faint text-xs">{label}</p>
+            <p className="text-ink mt-1 text-2xl font-bold tabular-nums">
+              {value === null ? '—' : value}
+              {value === null || unit === null ? null : <span className="text-ink-faint ml-1 text-xs font-normal">{unit}</span>}
+            </p>
+            <p className="text-ink-faint mt-0.5 text-xs">{note}</p>
+          </>
+          return <div key={label} className="bg-canvas rounded-card border-hairline border p-4">
+            {body}
+            {/* 0件のときは押し口を出さない。押しても何も無い。 */}
+            {canOpenCustomerNotificationKpi(kpi) && href
+              ? <Button onClick={() => router.replace(href)} className="mt-2">送れなかったものを見る</Button>
+              : null}
+          </div>
+        })}
+      </KpiCollapse>
+    </section>
+    <section aria-label="今月の送信枠" className="mt-4">
+      <KpiCollapse data-design="KPIs" gridClassName="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        {kpis.slice(4).map((kpi) => {
+          const { label, value, unit, note } = kpi
+          return <div key={label} className="bg-canvas rounded-card border-hairline border p-4">
+            <p className="text-ink-faint text-xs">{label}</p>
+            <p className="text-ink mt-1 text-2xl font-bold tabular-nums">
+              {value === null ? '—' : value}
+              {value === null || unit === null ? null : <span className="text-ink-faint ml-1 text-xs font-normal">{unit}</span>}
+            </p>
+            <p className="text-ink-faint mt-0.5 text-xs">{note}</p>
+          </div>
+        })}
+      </KpiCollapse>
+    </section>
     <div className="border-info bg-info-bg text-info rounded-control border px-4 py-3 text-sm leading-6">
       これは「お知らせ」であって「売り込みの配信」ではありません。顧客が配信を止めていても、取引に必要な連絡は届きます。
     </div>

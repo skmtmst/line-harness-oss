@@ -608,31 +608,36 @@ export default function AutoRepliesPage() {
         </Button>
       </div>
 
-      {/* 複数当てはまったときの挙動。書いていないと必ず問い合わせになる。 */}
-      <div className="bg-info-bg text-info mb-4 rounded-lg p-3 text-xs leading-relaxed">
-        上にあるルールから順に見て、<strong>最初に当てはまった1つだけ</strong>が動きます。
-        時間帯や連投の設定で見送られたときは、その次のルールを見ます。
-        並び順は「評価順」の数字で決まり、小さいほど先に見ます。
-      </div>
-
-      {/* 「適用アカウント」欄の札の読み方。札の見た目と1対1で並べる。 */}
-      <div className="bg-info-bg border-hairline text-info mb-4 space-y-1 rounded-lg border p-3 text-xs">
-        {EFFECTIVE_LEGEND.map((row) => (
-          <p key={row.status}>
-            <span
-              className={
-                row.status === 'reply'
-                  ? 'inline-flex items-center px-1.5 py-0.5 rounded bg-success-bg text-green-700'
-                  : row.status === 'silent'
-                    ? 'inline-flex items-center px-1.5 py-0.5 rounded bg-amber-50 text-amber-700'
-                    : 'inline-flex items-center px-1.5 py-0.5 rounded bg-canvas-sunken text-ink-faint line-through'
-              }
-            >
-              {row.mark ? `${row.mark} ` : ''}アカウント名
-            </span>{' '}
-            {row.text}
-          </p>
-        ))}
+      {/*
+        複数当てはまったときの挙動と、「適用アカウント」欄の札の読み方。
+        #670 08: 案内の帯2段を1本に圧縮する。2本並ぶとどちらが大事か分からない。
+        凡例の札は一覧の札と1対1の見た目にする(素の色指定を
+        共通トークンへ寄せ、AAのコントラストに余裕を持たせる)。
+      */}
+      <div className="bg-info-bg border-hairline text-info mb-4 rounded-lg border p-3 text-xs leading-relaxed">
+        <p>
+          上にあるルールから順に見て、<strong>最初に当てはまった1つだけ</strong>が動きます。
+          時間帯や連投の設定で見送られたときは、その次のルールを見ます。
+          並び順は「評価順」の数字で決まり、小さいほど先に見ます。
+        </p>
+        <div className="border-hairline mt-2 space-y-1 border-t pt-2">
+          {EFFECTIVE_LEGEND.map((row) => (
+            <p key={row.status}>
+              <span
+                className={
+                  row.status === 'reply'
+                    ? 'inline-flex items-center gap-0.5 rounded bg-success-bg px-1.5 py-0.5 text-[10px] font-medium text-success'
+                    : row.status === 'silent'
+                      ? 'inline-flex items-center gap-0.5 rounded bg-warning-bg px-1.5 py-0.5 text-[10px] text-warning'
+                      : 'inline-flex items-center gap-0.5 rounded bg-canvas-sunken px-1.5 py-0.5 text-[10px] text-ink-faint line-through'
+                }
+              >
+                {row.mark ? `${row.mark} ` : ''}アカウント名
+              </span>{' '}
+              {row.text}
+            </p>
+          ))}
+        </div>
       </div>
 
       <div
@@ -787,7 +792,7 @@ export default function AutoRepliesPage() {
                     <td className="px-3 py-3">
                       {/* E-01: 止めた記録があれば、いつ・誰が・なぜを title で読める */}
                       <span
-                        className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium ${r.isActive ? 'bg-success-bg text-green-700' : 'bg-canvas-sunken text-ink-faint'}`}
+                        className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium ${r.isActive ? 'bg-success-bg text-success' : 'bg-canvas-sunken text-ink-faint'}`}
                         title={stopNote(r) ?? undefined}
                       >
                         {r.isActive ? '有効' : '停止中'}
