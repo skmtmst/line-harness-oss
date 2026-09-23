@@ -221,23 +221,42 @@ function FriendsPageInner({
     // 応答で絞り込みの選択肢を上書きしない。
     const requestedAccountId = selectedAccountId
     try {
-      const [tagResponse, operatorResponse, scenarioResponse, markResponse] = await Promise.all([
+      const [tagResponse, operatorResponse, scenarioResponse] = await Promise.all([
         api.tags.list(),
         api.operators.list(),
         api.scenarios.list(requestedAccountId ? { accountId: requestedAccountId } : undefined),
-        requestedAccountId && marksEnabled
-          ? api.supportMarks.list(requestedAccountId, { suppressFeatureDisabledEvent: true })
-          : Promise.resolve({ success: true as const, data: [] }),
       ])
       if (loadContextRef.current.accountId !== requestedAccountId) return
       if (tagResponse.success) setAllTags(tagResponse.data)
       if (operatorResponse.success) setOperators(operatorResponse.data)
       if (scenarioResponse.success) setScenarios(scenarioResponse.data)
-      if (markResponse.success) setMarks(markResponse.data)
       setOptionsFailed(false)
     } catch {
       // 選択肢の取得に失敗しても、友だち一覧と検索は使える。
       // ただし「タグがない」と「取れなかった」の区別が付くよう一言出す(#496-19)。
+      setOptionsFailed(true)
+    }
+  }, [selectedAccountId])
+
+  /*
+   * 対応マークの候補だけは別に取る（V6R-S1-b）。
+   *
+   * 以前は上の選択肢と同じ Promise.all に入れ、依存に marksEnabled を持っていた。
+   * 対応マークの有効は表示可否が届いてから分かるので、届いた瞬間にタグ・担当者・
+   * シナリオまで取り直していた（検証環境の実測で3本が2回ずつ）。
+   */
+  const loadMarks = useCallback(async () => {
+    const requestedAccountId = selectedAccountId
+    if (!requestedAccountId || !marksEnabled) {
+      setMarks([])
+      return
+    }
+    try {
+      const markResponse = await api.supportMarks.list(requestedAccountId, { suppressFeatureDisabledEvent: true })
+      if (loadContextRef.current.accountId !== requestedAccountId) return
+      if (markResponse.success) setMarks(markResponse.data)
+    } catch {
+      // 上の選択肢と同じく、取れなかったことだけを一言出す(#496-19)。
       setOptionsFailed(true)
     }
   }, [selectedAccountId, marksEnabled])
@@ -300,6 +319,7 @@ function FriendsPageInner({
   }, [advanced, attentionOnly, audienceId, operatorId, page, pageSize, responseFilter, scenarioId, scoreMax, scoreMin, searchSubmitted, selectedAccountId, selectedTagId, sortMode])
 
   useEffect(() => void loadOptions(), [loadOptions])
+  useEffect(() => void loadMarks(), [loadMarks])
   useEffect(() => setPage(1), [selectedAccountId])
   useEffect(() => {
     // 保存した検索がオフのaccountでは ?savedSearch= 直URLも適用しない。
@@ -547,7 +567,7 @@ function FriendsPageInner({
         {optionsFailed ? (
           <p className="mt-2 text-xs text-ink-secondary">
             絞り込みの選択肢を読み込めませんでした。タグが空なのは、取れなかっただけかもしれません。
-            <button type="button" onClick={() => void loadOptions()} className="font-semibold text-action hover:underline">再読み込み</button>
+            <button type="button" onClick={() => { void loadOptions(); void loadMarks() }} className="font-semibold text-action hover:underline">再読み込み</button>
           </p>
         ) : null}
       </section>
