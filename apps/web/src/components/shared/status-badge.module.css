@@ -11,8 +11,9 @@
 }
 
 .compact {
-  padding: 5px 8px;
-  font-size: var(--text-nano);
+  padding: 4px 8px;
+  /* ★V7：10px は表の中で読みにくかった（better-typography：12px を大きく下回らない）。 */
+  font-size: var(--text-micro);
 }
 
 .neutral {

@@ -41,7 +41,7 @@ interface Reminder {
 const UNFILED = '__unfiled__'
 const PER_PAGE_OPTIONS = [20, 50, 100]
 const SORT_OPTIONS = [
-  { value: 'order', label: '並び替え順' },
+  { value: 'order', label: '自分で並べた順' },
   { value: 'next', label: '次の送信が近い順' },
   { value: 'created', label: '作成日が新しい順' },
   { value: 'updated', label: '更新が新しい順' },

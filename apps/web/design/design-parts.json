@@ -1826,18 +1826,18 @@
           "resolved": "700"
         },
         {
-          "pencil": "dashboard compact padding: [5,8]",
+          "pencil": "dashboard compact padding: [4,8]（★V7）",
           "class": "compact",
           "prop": "padding",
-          "source": "5px 8px",
-          "resolved": "5px 8px"
+          "source": "4px 8px",
+          "resolved": "4px 8px"
         },
         {
-          "pencil": "dashboard compact fontSize: $size-nano",
+          "pencil": "dashboard compact fontSize: $size-micro（★V7：10px は読みにくい）",
           "class": "compact",
           "prop": "font-size",
-          "source": "var(--text-nano)",
-          "resolved": "10px"
+          "source": "var(--text-micro)",
+          "resolved": "11px"
         },
         {
           "pencil": "neutral fill: $canvas-parchment",
