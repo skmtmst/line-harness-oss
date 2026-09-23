@@ -5334,15 +5334,17 @@ export type OpsSupportMessage = {
   deliveredVia: string[]
   createdAt: string
 }
-export type OpsKnowledgeReference = { id: string; version: number; title: string }
+export type OpsKnowledgeArticleKind = 'verified' | 'answer_example'
+export type OpsKnowledgeReference = { id: string; version: number; title: string; articleKind: OpsKnowledgeArticleKind }
 export type OpsSupportDraft = { body: string; aiGenerated: boolean; generatedAt: string | null; updatedAt: string; references?: OpsKnowledgeReference[] }
 export type OpsKnowledgeReviewState = 'pending' | 'approved' | 'needs_review' | 'dismissed'
 export type OpsKnowledgeInput = { title: string; question: string; answer: string; kind: HqSupportKind; keywords: string[] }
 export type OpsKnowledgeArticle = OpsKnowledgeInput & {
   sourceSubject?: string | null
   id: string; version: number; sourceRequestId: string; ticketNo: number | null; sourceCurrent: boolean
+  articleKind: OpsKnowledgeArticleKind
   reviewState: OpsKnowledgeReviewState; status: 'active' | 'disabled'; reviewReason: string
-  evidence: Array<{ messageId: string; createdAt: string; authorKind: 'tenant' | 'ops'; quote: string; role: 'action' | 'result' | 'condition' }>
+  evidence: Array<{ messageId: string; createdAt: string; authorKind: 'tenant' | 'ops'; quote: string; role: 'action' | 'result' | 'condition' | 'question' | 'answer' }>
   usedCount: number; helpfulCount: number; unhelpfulCount: number; updatedAt: string
 }
 export type OpsSupportSummary = {
@@ -7748,7 +7750,7 @@ export const api = {
     lineUnregistered: () => fetchApi<ApiResponse<OpsLineUnregistered>>('/api/ops/dashboard/line-unregistered'),
     /** 運営専用ナレッジ ★V6 37-11。 */
     knowledge: {
-      list: (params: { q?: string; kind?: string; state?: string; offset?: number } = {}) => {
+      list: (params: { q?: string; kind?: string; articleKind?: string; state?: string; offset?: number } = {}) => {
         const query = new URLSearchParams()
         for (const [key, value] of Object.entries(params)) if (value !== undefined && value !== '') query.set(key, String(value))
         return fetchApi<ApiResponse<OpsKnowledgeArticle[]> & { total: number }>(`/api/ops/knowledge?${query}`)
