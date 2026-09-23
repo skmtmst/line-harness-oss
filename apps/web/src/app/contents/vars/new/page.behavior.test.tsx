@@ -300,7 +300,7 @@ describe('共通情報の新規作成: 型別の入力エラー(VAR-06, 実React
     await click(byExactText('button', '登録'))
 
     expect(host.textContent).toContain('種別に合う値を入力してください')
-    expect(host.textContent).not.toContain('保存に失敗しました')
+    expect(host.textContent).not.toContain('保存に失敗しました。通信を確かめて、もう一度お試しください。')
   })
 
   it('重複(409)は従来の案内を出し、差し込み名の欄へ戻す', async () => {

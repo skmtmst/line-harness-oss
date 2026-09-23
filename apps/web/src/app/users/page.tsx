@@ -98,13 +98,13 @@ export default function UsersPage() {
         // 失敗時に古い rows を残すと、新しいフィルタ条件で古いデータが見えて誤誘導するのでクリア。
         setRows([])
         setTotal(0)
-        setError('取得に失敗しました')
+        setError('取得に失敗しました。もう一度読み込んでください。')
       }
     } catch {
       if (seq !== requestSeqRef.current) return
       setRows([])
       setTotal(0)
-      setError('取得に失敗しました')
+      setError('取得に失敗しました。もう一度読み込んでください。')
     } finally {
       if (seq === requestSeqRef.current) {
         setLoading(false)

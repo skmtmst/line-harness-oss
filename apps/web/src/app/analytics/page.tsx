@@ -2033,7 +2033,7 @@ function FunnelForm({
         onCreated(res.data.funnelId, res.data.usageWarnings)
       }
     } catch {
-      setError('保存に失敗しました')
+      setError('保存に失敗しました。通信を確かめて、もう一度お試しください。')
     } finally {
       setSaving(false)
     }

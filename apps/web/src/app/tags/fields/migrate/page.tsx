@@ -400,7 +400,7 @@ function MigrateFriendField() {
           {run.rows.filter((row) => row.status === 'failed').length ? (
             <DataTable className="mt-4">
               <thead><TableHeadRow><Th>友だちID</Th><Th>いまの値</Th><Th>失敗の理由</Th></TableHeadRow></thead>
-              <tbody>{run.rows.filter((row) => row.status === 'failed').map((row) => <Tr key={row.friendId}><Td className="truncate font-mono text-xs" title={row.friendId}>{row.friendId}</Td><Td className="truncate" title={row.sourceValue}>{row.sourceValue || '（空欄）'}</Td><Td>{row.reason ?? '失敗しました'}</Td></Tr>)}</tbody>
+              <tbody>{run.rows.filter((row) => row.status === 'failed').map((row) => <Tr key={row.friendId}><Td className="truncate font-mono text-xs" title={row.friendId}>{row.friendId}</Td><Td className="truncate" title={row.sourceValue}>{row.sourceValue || '（空欄）'}</Td><Td>{row.reason ?? '失敗しました。通信を確かめて、もう一度お試しください。'}</Td></Tr>)}</tbody>
             </DataTable>
           ) : null}
           {run.error ? <p role="alert" className="mt-3 rounded-control border border-danger/20 bg-danger-bg p-3 text-sm text-danger">{run.error}</p> : null}

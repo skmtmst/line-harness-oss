@@ -582,7 +582,7 @@ function FriendDetailInner() {
       setFriend(null)
       setError(err instanceof ApiError && err.status === 404
         ? '友だちが見つかりませんでした'
-        : '読み込みに失敗しました')
+        : '読み込みに失敗しました。もう一度読み込んでください。')
     } finally {
       if (!isStaleResponse(generation, requestedAccountId)) setLoading(false)
     }
@@ -944,7 +944,7 @@ function FriendDetailInner() {
         setSupportEditing(false)
         void loadFriend()
       } else {
-        setSupportError(err instanceof ApiError ? err.message : '保存に失敗しました')
+        setSupportError(err instanceof ApiError ? err.message : '保存に失敗しました。通信を確かめて、もう一度お試しください。')
       }
     } finally {
       setSupportBusy(false)
@@ -987,7 +987,7 @@ function FriendDetailInner() {
       // 値の正本は情報欄の取得口。保存後はそこだけ取り直す。
       void loadFields()
     } catch {
-      setError('保存に失敗しました')
+      setError('保存に失敗しました。通信を確かめて、もう一度お試しください。')
     } finally {
       setSaving(false)
     }
@@ -1041,7 +1041,7 @@ function FriendDetailInner() {
         setScenarioError(res.error)
       }
     } catch (err) {
-      setScenarioError(err instanceof ApiError ? err.message : '登録に失敗しました')
+      setScenarioError(err instanceof ApiError ? err.message : '登録に失敗しました。通信を確かめて、もう一度お試しください。')
     } finally {
       setScenarioBusy(false)
     }

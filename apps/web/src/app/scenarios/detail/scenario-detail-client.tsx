@@ -491,7 +491,7 @@ export default function ScenarioDetailClient({
         setError(res.error)
       }
     } catch {
-      setError('シナリオの読み込みに失敗しました')
+      setError('シナリオの読み込みに失敗しました。もう一度読み込んでください。')
     } finally {
       setLoading(false)
     }
@@ -814,7 +814,7 @@ export default function ScenarioDetailClient({
         })
         setError(`複製が「${e.stage}」で止まりました。途中まで作成されたコピーが残っています。`)
       } else {
-        setError(e instanceof Error && e.message ? e.message : '複製に失敗しました')
+        setError(e instanceof Error && e.message ? e.message : '複製に失敗しました。通信を確かめて、もう一度お試しください。')
       }
     } finally {
       setDuplicating(false)
@@ -876,7 +876,7 @@ export default function ScenarioDetailClient({
         setError(res.error)
       }
     } catch {
-      setError('保存に失敗しました')
+      setError('保存に失敗しました。通信を確かめて、もう一度お試しください。')
     } finally {
       setSaving(false)
     }
@@ -1086,7 +1086,7 @@ export default function ScenarioDetailClient({
             const orders = moving.map((st) => ({ stepId: st.id, stepOrder: st.stepOrder + 1 }))
             const moved = await api.scenarios.reorderSteps(id, orders)
             if (!moved.success) {
-              setStepError('あいだに入れるための並べ替えに失敗しました')
+              setStepError('あいだに入れるための並べ替えに失敗しました。通信を確かめて、もう一度お試しください。')
               return
             }
           }
@@ -1101,7 +1101,7 @@ export default function ScenarioDetailClient({
       loadScenario(true)
       reloadStats()
     } catch {
-      setStepError('ステップの保存に失敗しました')
+      setStepError('ステップの保存に失敗しました。通信を確かめて、もう一度お試しください。')
     } finally {
       setStepSaving(false)
     }
@@ -1133,7 +1133,7 @@ export default function ScenarioDetailClient({
           moving.map((st) => ({ stepId: st.id, stepOrder: st.stepOrder + 1 })),
         )
         if (!moved.success) {
-          setStepError('あいだに入れるための並べ替えに失敗しました')
+          setStepError('あいだに入れるための並べ替えに失敗しました。通信を確かめて、もう一度お試しください。')
           return
         }
       }
@@ -1201,7 +1201,7 @@ export default function ScenarioDetailClient({
       // 到達率バッジは stepOrder ベースでマッチングするので、並び替え後は stats も再取得
       reloadStats()
     } catch {
-      setError('並び替えに失敗しました')
+      setError('並び替えに失敗しました。通信を確かめて、もう一度お試しください。')
     }
   }
 

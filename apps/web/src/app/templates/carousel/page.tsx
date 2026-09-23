@@ -210,7 +210,7 @@ async function saveCarousel(
     }
     return { ok: true }
   } catch (e) {
-    return fail(e instanceof Error ? e.message : '保存に失敗しました')
+    return fail(e instanceof Error ? e.message : '保存に失敗しました。通信を確かめて、もう一度お試しください。')
   }
 }
 

@@ -30,6 +30,6 @@ describe('V6 dqFft シナリオ全体を削除する確認', () => {
     expect(PAGE).toContain('if (!res.success) throw new Error(res.error)')
     expect(PAGE).toContain("setDeleteScenarioOpen(false)")
     expect(PAGE).toContain('このシナリオを削除できませんでした。状態を読み直してから')
-    expect(PAGE).not.toContain("setError('削除に失敗しました')")
+    expect(PAGE).not.toContain("setError('削除に失敗しました。通信を確かめて、もう一度お試しください。')")
   })
 })

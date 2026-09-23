@@ -20,6 +20,6 @@ describe('タグ一覧の操作失敗と再取得の契約', () => {
 
   it('★切替の失敗は元に戻して理由を出す', () => {
     expect(source).toContain('setItems((current) => current.map((item) => item.id === tag.id ? { ...item, isStarred: tag.isStarred } : item))')
-    expect(source).toContain("'表示の切り替えに失敗しました'")
+    expect(source).toContain("'表示の切り替えに失敗しました。通信を確かめて、もう一度お試しください。'")
   })
 })

@@ -209,7 +209,7 @@ function FormEditInner() {
       await loadForm()
       setNotice('最新の内容を読み込みました')
     } catch {
-      setError('読み込みに失敗しました')
+      setError('読み込みに失敗しました。もう一度読み込んでください。')
     }
   }
 
@@ -247,7 +247,7 @@ function FormEditInner() {
 
         await loadForm()
       } catch {
-        setError('読み込みに失敗しました')
+        setError('読み込みに失敗しました。もう一度読み込んでください。')
       } finally {
         setLoading(false)
       }
@@ -597,7 +597,7 @@ function FormEditInner() {
         setError(conflictMessage(updatedAt))
         return false
       }
-      setError(e instanceof Error ? e.message : '保存に失敗しました')
+      setError(e instanceof Error ? e.message : '保存に失敗しました。通信を確かめて、もう一度お試しください。')
       return false
     } finally {
       setSaving(false)
