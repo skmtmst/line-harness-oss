@@ -264,15 +264,26 @@
  * - 対応していないブラウザは今までどおり（1文字単位）。見た目が壊れることはない
  * - 英数字・URL の扱いは今までの `normal` と同じ
  * - 見出しは行の長さを揃えて、最後の行に1〜2文字だけ残るのを防ぐ
+ *
+ * @layer base 内に置く理由（#648）:
+ * レイヤー外の CSS は詳細度に関係なく全レイヤーより優先されるため、ここを
+ * レイヤー外に書くと `truncate`（white-space: nowrap）や `break-all` などの
+ * ユーティリティが全画面で効かなくなる。base に入れると、ユーティリティを
+ * 明示した要素だけユーティリティが勝ち、それ以外はこの既定値が効く。
+ * `text-wrap` は `white-space` と text-wrap-mode を共有するショートハンドで、
+ * `text-wrap: balance` は nowrap を wrap へ戻す。見出しの truncate が折り返し、
+ * 固定高カードからはみ出す不具合が実際に出ていた。
  */
-:lang(ja) {
-  word-break: auto-phrase;
-}
+@layer base {
+  :lang(ja) {
+    word-break: auto-phrase;
+  }
 
-h1,
-h2,
-h3 {
-  text-wrap: balance;
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
+  }
 }
 
 /*
