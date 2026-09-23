@@ -26,6 +26,8 @@ import { photoNoticeFor } from './photo-notice'
 import { photoReviewEntryFrom, photoReviewSearch } from './photo-review-query'
 import { pointStatusLabel, reviewVersionOf, text } from './photo-text'
 import KpiCollapse from '@/components/ui/kpi-collapse'
+import MetricValue from '@/components/ui/metric-value'
+import { formatApproxDuration } from '@/lib/format-duration'
 import styles from './photo-review.module.css'
 
 type PhotoStatus = 'pending' | 'adopted' | 'rejected'
@@ -1031,7 +1033,12 @@ export default function PhotoReviewsPage() {
 function formatAverageReviewTime(minutes: number | null | undefined) {
   if (minutes == null || !Number.isFinite(minutes)) return '—'
   if (minutes < 1) return `平均 ${Math.max(1, Math.round(minutes * 60))}秒`
-  return `平均 ${Math.round(minutes)}分`
+  /*
+   * 監査6 #674: 分の生値（平均 55975分＝約39日）は読めない。
+   * 60分超は約○時間、24時間超は約○日、30日超は約○ヶ月へ切り替える
+   * （#666・25オートメーションの「およそ ○時間」と同じ規則）。
+   */
+  return `平均 ${formatApproxDuration(minutes)}`
 }
 
 function photoRiskLabel(flag: string) {
