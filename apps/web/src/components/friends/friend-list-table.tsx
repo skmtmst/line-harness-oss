@@ -1,9 +1,10 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Star } from 'lucide-react'
 import type { FriendListItem } from '@/lib/api'
 import Pagination from '@/components/shared/pagination'
+import Checkbox from '@/components/shared/checkbox'
 import ListState from '@/components/shared/list-state'
 import FriendListRow, { FriendListCard } from './friend-list-row'
 
@@ -57,15 +58,10 @@ export default function FriendListTable({
   onPageChange,
   onPageSizeChange,
 }: Props) {
-  const checkboxRef = useRef<HTMLInputElement>(null)
   const [visible, setVisible] = useState<Set<FriendListColumn>>(() => new Set(COLUMN_LABELS.map((column) => column.key)))
   const [preferencesReady, setPreferencesReady] = useState(false)
   const selectedCount = friends.filter((friend) => selectedIds?.has(friend.id)).length
   const allSelected = friends.length > 0 && selectedCount === friends.length
-
-  useEffect(() => {
-    if (checkboxRef.current) checkboxRef.current.indeterminate = selectedCount > 0 && !allSelected
-  }, [allSelected, selectedCount])
 
   useEffect(() => {
     try {
@@ -123,20 +119,20 @@ export default function FriendListTable({
             </summary>
             <div className="absolute right-0 z-20 mt-1 w-52 rounded-card border border-hairline bg-canvas p-2 shadow-lg">
               {COLUMN_LABELS.map((column) => (
-                <label key={column.key} className="flex cursor-pointer items-center gap-2 rounded-control px-2 py-2 text-xs text-ink-secondary hover:bg-canvas-sunken">
-                  <input
-                    type="checkbox"
+                <div key={column.key} className="rounded-control px-2 py-2 hover:bg-canvas-sunken">
+                  {/* ★V7 共通 チェックボックス（gvjpx）。 */}
+                  <Checkbox
                     checked={visible.has(column.key)}
-                    onChange={(event) => setVisible((previous) => {
+                    onCheckedChange={(checked) => setVisible((previous) => {
                       const next = new Set(previous)
-                      if (event.target.checked) next.add(column.key)
+                      if (checked) next.add(column.key)
                       else next.delete(column.key)
                       return next
                     })}
-                    className="h-4 w-4 accent-accent"
-                  />
-                  {column.label}
-                </label>
+                  >
+                    {column.label}
+                  </Checkbox>
+                </div>
               ))}
             </div>
           </details>
@@ -170,13 +166,12 @@ export default function FriendListTable({
       {/* FRIEND-17: 列見出しは表と対になるため、カード表示の幅では出さない。 */}
       <div className="hidden h-11 shrink-0 items-center gap-2 border-b border-hairline bg-canvas-sunken px-3 text-micro font-semibold text-ink-secondary lg:grid" style={{ gridTemplateColumns }}>
         <div>
-          <input
-            ref={checkboxRef}
-            type="checkbox"
+          {/* ★V7 共通 チェックボックス（gvjpx）。一部だけ選んでいるときは「―」。 */}
+          <Checkbox
             checked={allSelected}
-            onChange={(event) => onToggleAll?.(event.target.checked)}
+            indeterminate={selectedCount > 0 && !allSelected}
+            onCheckedChange={(checked) => onToggleAll?.(checked)}
             aria-label="表示中の友だちをすべて選ぶ"
-            className="h-4 w-4 cursor-pointer accent-accent"
           />
         </div>
         <Star aria-label="注目" className="h-4 w-4 text-ink-faint" />

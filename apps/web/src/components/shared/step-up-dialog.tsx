@@ -1,8 +1,9 @@
 'use client'
 
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useId, useState } from 'react'
 import { KeyRound } from 'lucide-react'
 import Dialog from './dialog'
+import OtpInput from './otp-input'
 
 interface StepUpDialogProps {
   open: boolean
@@ -23,6 +24,7 @@ interface StepUpDialogProps {
  */
 export default function StepUpDialog({ open, action, busy = false, error, onSubmit, onCancel }: StepUpDialogProps) {
   const [code, setCode] = useState('')
+  const labelId = useId()
   useEffect(() => { if (open) setCode('') }, [open])
   const ready = /^\d{6}$/.test(code)
   return (
@@ -37,18 +39,18 @@ export default function StepUpDialog({ open, action, busy = false, error, onSubm
       onConfirm={ready ? () => onSubmit(code) : undefined}
       onCancel={onCancel}
     >
-      <label className="mt-1 block text-sm font-medium text-ink">
-        認証アプリに表示された6桁コード
-        <input
+      <p id={labelId} className="mt-1 block text-sm font-medium text-ink">認証アプリに表示された6桁コード</p>
+      {/* ★V7 共通 認証コード入力（xHzFK）。実行はこれまでどおり「本人確認して実行」で行う。 */}
+      <div className="mt-2">
+        <OtpInput
           value={code}
-          onChange={(event) => setCode(event.target.value.replace(/\D/g, '').slice(0, 6))}
-          inputMode="numeric"
-          autoFocus
+          onChange={setCode}
+          labelledBy={labelId}
+          invalid={Boolean(error)}
           disabled={busy}
-          className="mt-2 h-12 w-full rounded-control border border-hairline px-4 text-center text-xl font-bold tracking-[0.5em] outline-none focus:border-accent"
-          placeholder="000000"
+          autoFocus
         />
-      </label>
+      </div>
     </Dialog>
   )
 }

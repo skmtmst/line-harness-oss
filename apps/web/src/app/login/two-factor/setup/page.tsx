@@ -3,10 +3,10 @@
 import Link from 'next/link'
 import { useEffect, useState, type FormEvent } from 'react'
 import Button from '@/components/shared/button'
-import { TextField } from '@/components/shared/text-field'
 import { adminSessionHandoffPath, adminSessionHeaders, captureTwoFactorChallenge, clearTwoFactorChallenge, storeAdminSession, takeTwoFactorNextPath } from '@/lib/admin-session'
 import { useBrand } from '@/lib/use-brand'
 import { qrToDataURL } from '@/lib/qr-image'
+import OtpInput from '@/components/shared/otp-input'
 
 type SetupData = { provisioningUri: string; manualKey: string }
 
@@ -126,7 +126,8 @@ export default function TwoFactorSetupPage() {
           <div className="w-full">
             <label htmlFor="totp-setup-code" className="block text-xs font-semibold text-ink">認証アプリの6桁の数字</label>
             <div className="mt-2">
-              <TextField id="totp-setup-code" value={code} onChange={(event) => setCode(event.target.value)} inputMode="numeric" autoComplete="one-time-code" maxLength={6} placeholder="000000" />
+              {/* ★V7 共通 認証コード入力（xHzFK）。 */}
+              <OtpInput id="totp-setup-code" value={code} onChange={setCode} label="認証アプリの6桁の数字" invalid={Boolean(error)} disabled={busy} />
             </div>
           </div>
           <Button type="submit" variant="primary" disabled={busy} className="w-full">

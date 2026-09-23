@@ -262,6 +262,9 @@ permission = domain.resource.action
 
 ## 12. Observability
 
+> **V7 の追加（2026-09-23）:** 処理の進みの行・骨組み表示（スケルトン）・保存結果の通知（トースト）の共通部品は [V7 追加要件 §4](./v7-additions-requirements.md) が正本。
+
+
 - request ID、trace ID、job ID、execution IDを連結
 - SLI: receipt遅延、Queue滞留、success/retry/permanent failure、reconcile未解決
 - account/provider/event type別。ただし少人数PIIを出さない
