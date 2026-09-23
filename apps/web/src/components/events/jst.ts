@@ -41,6 +41,16 @@ export function todayJst(): string {
   return new Date(Date.now() + 9 * 3600_000).toISOString().slice(0, 10)
 }
 
+/** UTC の ISO → JST の YYYY-MM-DD。枠の編集窓で保存値を日付入力へ戻す。 */
+export function utcIsoToJstDate(iso: string): string {
+  return new Date(new Date(iso).getTime() + 9 * 3600_000).toISOString().slice(0, 10)
+}
+
+/** UTC の ISO → JST の HH:MM。枠の編集窓で保存値を時刻入力へ戻す。 */
+export function utcIsoToJstHHMM(iso: string): string {
+  return new Date(new Date(iso).getTime() + 9 * 3600_000).toISOString().slice(11, 16)
+}
+
 /** 「14:00〜17:00 を 90 分ずつ」→ [14:00-15:30, 15:30-17:00]。端数は切り捨てる。 */
 export function splitBand(
   start: string,

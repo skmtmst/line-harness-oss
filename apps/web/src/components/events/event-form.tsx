@@ -9,10 +9,10 @@ import ImageUploader from '@/components/shared/image-uploader'
 import OgEditor from '@/components/shared/og-editor'
 import { useAccount } from '@/contexts/account-context'
 import { BULK_SLOT_LIMIT, generateBulkSlots, type BulkSlotInput } from './bulk-slot-generator'
-import { jstHHMMToUtcIso } from './jst'
+import { jstHHMMToUtcIso, utcIsoToJstDate, utcIsoToJstHHMM } from './jst'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Select from '@/components/shared/select'
-import { Field } from '@/components/shared/form-controls'
+import { Field, inputClass } from '@/components/shared/form-controls'
 // #740: 下書きの初期値と字数上限は作成画面と共有する。片方だけ変えないこと。
 import {
   EVENT_CANCEL_DEADLINE_OPTIONS,
@@ -707,6 +707,12 @@ function SlotsTab({
   const [deletingSlot, setDeletingSlot] = useState(false)
   const [deleteSlotError, setDeleteSlotError] = useState('')
   /*
+    入口29: 既存の枠の日時・定員を直す窓。口（PUT /slots/:slotId）は
+    もうあるので、画面には入口と入力窓だけを足す。予約が入っている枠は
+    定員を今の予約数より下げられない（口側の409と同じ決めごと）。
+  */
+  const [editSlotTarget, setEditSlotTarget] = useState<EventSlot | null>(null)
+  /*
     まとめて作る枠の下見。作る前に件数と最初・最後を読ませる。
     #1000 DETAIL-11: 下見の時点で操作IDと枠ごとの再送防止キー
     (client_key)を確定し、失敗後は残りだけを同じキーで再送する。
@@ -862,14 +868,23 @@ function SlotsTab({
                     </button>
                   </td>
                   <td className="px-3 py-2 text-right">
-                    <button
-                      onClick={() => { setDeleteSlotError(''); setDeleteSlotTarget(s) }}
-                      disabled={busy || (s.active_count ?? 0) > 0}
-                      title={(s.active_count ?? 0) > 0 ? '既存予約があるため削除できません' : '削除'}
-                      className="text-xs text-red-600 hover:underline disabled:opacity-30 disabled:no-underline"
-                    >
-                      削除
-                    </button>
+                    <div className="flex items-center justify-end gap-3">
+                      <button
+                        onClick={() => setEditSlotTarget(s)}
+                        disabled={busy}
+                        className="text-accent text-xs hover:underline disabled:opacity-30 disabled:no-underline"
+                      >
+                        編集
+                      </button>
+                      <button
+                        onClick={() => { setDeleteSlotError(''); setDeleteSlotTarget(s) }}
+                        disabled={busy || (s.active_count ?? 0) > 0}
+                        title={(s.active_count ?? 0) > 0 ? '既存予約があるため削除できません' : '削除'}
+                        className="text-xs text-red-600 hover:underline disabled:opacity-30 disabled:no-underline"
+                      >
+                        削除
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -885,6 +900,17 @@ function SlotsTab({
             await eventsApi.createSlots(accountId, eventId, [s])
             await refresh()
             setShowAdd(false)
+          }}
+        />
+      )}
+      {editSlotTarget && (
+        <EditSlotDialog
+          slot={editSlotTarget}
+          onClose={() => setEditSlotTarget(null)}
+          onSubmit={async (next) => {
+            await eventsApi.updateSlot(accountId, eventId, editSlotTarget.id, next)
+            await refresh()
+            setEditSlotTarget(null)
           }}
         />
       )}
@@ -1046,6 +1072,128 @@ function AddSlotDialog({
             className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
           >
             追加
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/*
+ * 入口29: 既存の予約枠の日時・定員を直す窓。
+ *
+ * 追加と同じ入力（日付・開始・終了・定員）を、保存値で埋めた状態で開く。
+ * 口側の決めごとと同じ検査をここでも先に行う:
+ * - 開始 < 終了
+ * - 定員は1以上の整数（空欄=無制限）
+ * - 予約が入っている枠は、定員をいまの予約数より下げられない
+ *
+ * 日時を動かしたとき、確定している予約のリマインド予定は口側が
+ * 新しい日時へ合わせて動かす。予約者へ「変わった」ことが伝わるよう、
+ * 予約のある枠ではそのことを窓の中へ書く。
+ */
+function EditSlotDialog({
+  slot,
+  onClose,
+  onSubmit,
+}: {
+  slot: EventSlot
+  onClose: () => void
+  onSubmit: (s: { starts_at: string; ends_at: string; capacity: number | null }) => Promise<void>
+}) {
+  const booked = slot.active_count ?? 0
+  const [date, setDate] = useState(() => utcIsoToJstDate(slot.starts_at))
+  const [startTime, setStartTime] = useState(() => utcIsoToJstHHMM(slot.starts_at))
+  const [endTime, setEndTime] = useState(() => utcIsoToJstHHMM(slot.ends_at))
+  const [capacity, setCapacity] = useState<string>(slot.capacity == null ? '' : String(slot.capacity))
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+
+  async function submit() {
+    setBusy(true)
+    setErr(null)
+    try {
+      const s = jstHHMMToUtcIso(date, startTime)
+      const e = jstHHMMToUtcIso(date, endTime)
+      if (s >= e) throw new Error('開始時刻 < 終了時刻')
+      const cap = capacity === '' ? null : Number(capacity)
+      if (cap != null && (!Number.isInteger(cap) || cap < 1)) throw new Error('定員は1以上の整数')
+      if (cap != null && cap < booked) {
+        throw new Error(`この枠には${booked}件の予約が入っています。定員は${booked}以上にしてください`)
+      }
+      await onSubmit({ starts_at: s, ends_at: e, capacity: cap })
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  // 新しい部品はデザイントークンで書く（このファイルの古い生色クラスを増やさない）。
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center"
+      style={{ background: 'color-mix(in srgb, var(--color-ink) 40%, transparent)' }}
+    >
+      <div className="bg-canvas rounded-card mx-4 w-full max-w-md p-6 shadow-xl">
+        <h3 className="text-ink mb-4 text-lg font-bold">予約枠を編集</h3>
+        {err && <div className="bg-danger-bg border-danger-bg text-danger rounded-control mb-3 border p-2 text-sm">{err}</div>}
+        {booked > 0 && (
+          <p className="bg-warning-bg border-warning-bg text-warning rounded-control mb-3 border p-2 text-xs">
+            この枠には{booked}件の予約が入っています。日時を変えると、確定している予約のリマインド予定も新しい日時へ合わせて動きます。定員は{booked}以上にしてください。
+          </p>
+        )}
+        <div className="space-y-3">
+          <label className="block">
+            <span className="text-ink-secondary text-sm font-medium">日付（JST）</span>
+            <input
+              type="date"
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+              className={`mt-1 ${inputClass}`}
+            />
+          </label>
+          <div className="grid grid-cols-2 gap-3">
+            <label>
+              <span className="text-ink-secondary text-sm font-medium">開始</span>
+              <input
+                type="time"
+                value={startTime}
+                onChange={(e) => setStartTime(e.target.value)}
+                className={`mt-1 ${inputClass}`}
+              />
+            </label>
+            <label>
+              <span className="text-ink-secondary text-sm font-medium">終了</span>
+              <input
+                type="time"
+                value={endTime}
+                onChange={(e) => setEndTime(e.target.value)}
+                className={`mt-1 ${inputClass}`}
+              />
+            </label>
+          </div>
+          <label className="block">
+            <span className="text-ink-secondary text-sm font-medium">定員（空欄=無制限）</span>
+            <input
+              type="number"
+              min={1}
+              value={capacity}
+              onChange={(e) => setCapacity(e.target.value)}
+              className={`mt-1 ${inputClass}`}
+            />
+          </label>
+        </div>
+        <div className="mt-5 flex justify-end gap-2">
+          <button onClick={onClose} className="border-hairline text-ink hover:bg-canvas-sunken rounded-control border px-4 py-2 text-sm">
+            キャンセル
+          </button>
+          <button
+            onClick={submit}
+            disabled={busy}
+            className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control px-4 py-2 text-sm disabled:opacity-40"
+          >
+            保存
           </button>
         </div>
       </div>
