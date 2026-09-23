@@ -362,6 +362,8 @@ async function bodyAccountIds(c: Context<Env>): Promise<string[]> {
 const RESOURCE_ACCOUNT_LOOKUPS: ReadonlyArray<{
   pattern: RegExp;
   sql: string;
+  /** 本体で行が見つからないときだけ試す予備の照合（新旧の表の同居用）。 */
+  fallbackSql?: string;
 }> = [
   { pattern: /^\/api\/templates\/([^/]+)/, sql: 'SELECT line_account_id AS account_id FROM templates WHERE id = ?' },
   { pattern: /^\/api\/scenarios\/([^/]+)/, sql: 'SELECT line_account_id AS account_id FROM scenarios WHERE id = ?' },
@@ -375,7 +377,9 @@ const RESOURCE_ACCOUNT_LOOKUPS: ReadonlyArray<{
   { pattern: /^\/api\/media\/([^/]+)/, sql: 'SELECT line_account_id AS account_id FROM media WHERE id = ?' },
   { pattern: /^\/api\/common-vars\/([^/]+)/, sql: 'SELECT line_account_id AS account_id FROM common_vars WHERE id = ?' },
   { pattern: /^\/api\/common-actions\/([^/]+)/, sql: 'SELECT line_account_id AS account_id FROM common_actions WHERE id = ?' },
-  { pattern: /^\/api\/automations\/([^/]+)/, sql: 'SELECT line_account_id AS account_id FROM automations WHERE id = ?' },
+  // #942: 一覧が返すidは V6 の automation_definitions。旧 automations 表だけを
+  // 見ると V6 ルールの稼働切替・改訂下書きが全部 LINE_ACCOUNT_REQUIRED で止まる。
+  { pattern: /^\/api\/automations\/([^/]+)/, sql: 'SELECT line_account_id AS account_id FROM automation_definitions WHERE id = ?', fallbackSql: 'SELECT line_account_id AS account_id FROM automations WHERE id = ?' },
   { pattern: /^\/api\/tracked-links\/([^/]+)/, sql: 'SELECT line_account_id AS account_id FROM tracked_links WHERE id = ?' },
   { pattern: /^\/api\/entry-routes\/([^/]+)/, sql: 'SELECT line_account_id AS account_id FROM entry_routes WHERE id = ?' },
   { pattern: /^\/api\/ad-platforms\/([^/]+)/, sql: 'SELECT line_account_id AS account_id FROM ad_platforms WHERE id = ?' },
@@ -391,13 +395,20 @@ const RESOURCE_ACCOUNT_LOOKUPS: ReadonlyArray<{
  * 表ごとの照合だけをここに集約する。
  */
 async function resourceOwnerAccountId(c: Context<Env>): Promise<string | null> {
-  for (const { pattern, sql } of RESOURCE_ACCOUNT_LOOKUPS) {
+  for (const { pattern, sql, fallbackSql } of RESOURCE_ACCOUNT_LOOKUPS) {
     const match = pattern.exec(c.req.path);
     if (!match) continue;
-    const row = await dbFor(c.env).prepare(sql)
-      .bind(decodeURIComponent(match[1]!))
+    const id = decodeURIComponent(match[1]!);
+    const db = dbFor(c.env);
+    const row = await db.prepare(sql)
+      .bind(id)
       .first<{ account_id: string | null }>();
-    return row?.account_id ?? null;
+    if (row) return row.account_id;
+    if (!fallbackSql) return null;
+    const fallback = await db.prepare(fallbackSql)
+      .bind(id)
+      .first<{ account_id: string | null }>();
+    return fallback?.account_id ?? null;
   }
   return null;
 }

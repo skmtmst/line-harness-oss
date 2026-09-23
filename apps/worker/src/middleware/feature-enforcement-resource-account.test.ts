@@ -40,6 +40,8 @@ function routeApp(current: AuthenticatedStaff | undefined) {
   instance.put('/api/templates/:id', (c) => c.json({ success: true }));
   instance.patch('/api/rich-menu-groups/:id', (c) => c.json({ success: true }));
   instance.post('/api/conversions/definitions/:id/revise', (c) => c.json({ success: true }));
+  instance.post('/api/automations/:id/status', (c) => c.json({ success: true }));
+  instance.post('/api/automations/:id/draft', (c) => c.json({ success: true }));
   return instance;
 }
 
@@ -89,6 +91,18 @@ function seedResources(testDb: SqliteD1): void {
       (id, name, event_type, line_account_id, created_at)
     VALUES ('cv-1', '成果地点1', 'purchase', 'account-1', ?)
   `).run(now);
+  // V6オートメーション。一覧が返すidはこちら（旧 automations 表には無い）。
+  testDb.raw.prepare(`
+    INSERT INTO automation_definitions
+      (id, line_account_id, name, status, created_at, updated_at)
+    VALUES ('auto-def-1', 'account-1', '監査用ルール', 'active', ?, ?)
+  `).run(now, now);
+  // 旧 automations 表の行（V6定義を持たないレガシー）。
+  testDb.raw.prepare(`
+    INSERT INTO automations
+      (id, name, event_type, line_account_id, created_at, updated_at)
+    VALUES ('auto-legacy-1', '旧ルール', 'message_received', 'account-1', ?, ?)
+  `).run(now, now);
 }
 
 function enableAll(testDb: SqliteD1): void {
@@ -269,6 +283,43 @@ describe('WRITE-01: 対象IDからの所属account解決', () => {
     }, env);
     expect(response.status).toBe(400);
     expect(await response.json()).toMatchObject({ code: 'LINE_ACCOUNT_REQUIRED' });
+  });
+
+  it('V6オートメーション定義の稼働切替も対象の所属accountで通る', async () => {
+    // #1063: automation_definitions の行は旧 automations 表に無い。
+    // 旧表だけを見る所有解決だと V6 ルールへの操作が全部 LINE_ACCOUNT_REQUIRED で止まる。
+    setFeature(testDb, 'account-1', 'automations', true);
+    const app = routeApp(staff('env-owner'));
+    const response = await app.request('/api/automations/auto-def-1/status', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ status: 'stopped' }),
+    }, env);
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ success: true });
+  });
+
+  it('V6オートメーション定義の改訂下書きも対象の所属accountで通る', async () => {
+    // 一覧の「編集する」が「編集用の下書きを作れませんでした」になる原因と同根。
+    setFeature(testDb, 'account-1', 'automations', true);
+    const app = routeApp(staff('env-owner'));
+    const response = await app.request('/api/automations/auto-def-1/draft', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({}),
+    }, env);
+    expect(response.status).toBe(200);
+  });
+
+  it('旧 automations 表だけにある行も従来どおり解決する', async () => {
+    setFeature(testDb, 'account-1', 'automations', true);
+    const app = routeApp(staff('env-owner'));
+    const response = await app.request('/api/automations/auto-legacy-1/status', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ status: 'stopped' }),
+    }, env);
+    expect(response.status).toBe(200);
   });
 
   it('スタッフ未設定の経路でも、対象の所属accountで機能判定だけを行う', async () => {
