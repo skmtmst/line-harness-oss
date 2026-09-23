@@ -471,7 +471,7 @@ export default function ActionScoreRulesPage() {
           </aside>
         </div>
 
-        {notice ? <p className="rounded-v6-control border border-v6-accent/25 bg-v6-accent-soft px-4 py-3 text-sm text-v6-accent-hover" role="status">{notice}</p> : null}
+        {notice ? <p className="rounded-v6-control border border-v6-accent/25 bg-v6-accent-soft px-4 py-3 text-sm text-accent-deep" role="status">{notice}</p> : null}
         {actionError ? <p className="rounded-v6-control border border-v6-danger/25 bg-v6-danger-bg px-4 py-3 text-sm text-v6-danger" role="alert">{actionError}</p> : null}
 
         {/*

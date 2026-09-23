@@ -56,10 +56,10 @@ describe('文字色は、置かれる面の上で 4.5:1 以上', () => {
 })
 
 describe('LINE の緑は文字色に使わない', () => {
-  it('画面のクラスに text-accent（-deep・-soft 以外）が無い', () => {
+  it('画面のクラスに text-accent・text-accent-hover（-deep・-soft 以外）が無い', () => {
     const hits = files(SRC, (n) => /\.tsx?$/.test(n))
       .flatMap((path) => readFileSync(path, 'utf8').split('\n').map((line, i) => ({ path, line, i })))
-      .filter(({ line }) => /(?<![\w-])(?:[\w-]+:)*text-(?:v6-)?accent(?![\w-])/.test(line))
+      .filter(({ line }) => /(?<![\w-])(?:[\w-]+:)*text-(?:v6-)?accent(?:-hover)?(?![\w-])/.test(line))
       .map(({ path, i }) => `${path.replace(SRC, '')}:${i + 1}`)
     expect(hits, 'text-accent-deep にしてください').toEqual([])
   })
