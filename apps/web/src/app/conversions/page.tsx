@@ -171,6 +171,8 @@ function ingestionEventLabel(event: ConversionIngestionEvent): string {
 }
 
 import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
+import { usePageTitle } from '@/components/shell/page-chrome'
+import { conversionsTabTitle } from './conversions-tab-title'
 import { useSearchParams } from 'next/navigation'
 import { AffiliatorsTab, OffersTab, ApprovalQueue } from '@/app/affiliates/tabs'
 import AffiliatePaymentTab from '@/app/affiliates/payment-tab'
@@ -1657,6 +1659,8 @@ function ReportTab({ accountId }: { accountId: string | null }) {
 function ConversionsPageHost() {
   const tab = useMergedTab(MERGED_TABS, 'tab', DEFAULT_TAB)
   const { selectedAccountId } = useAccount()
+  // タブごとの画面名をトップバーの h1 へ出す（Issue #637）。
+  usePageTitle(conversionsTabTitle(tab))
   /**
    * タブごとのV6実Node。5タブすべてを埋める。
    *

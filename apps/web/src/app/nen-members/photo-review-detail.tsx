@@ -93,7 +93,7 @@ export function PhotoReviewDetail({
     <div className="flex items-center justify-between gap-2 max-md:flex-col max-md:items-start">
       <div>
         <p className="text-xs font-bold text-ink-faint">写真審査</p>
-        <h1 className="mt-1 text-2xl font-extrabold text-ink">{photoPetDisplayName(photo.pet_name, { honorific: false })} の写真</h1>
+        <h2 className="mt-1 text-2xl font-extrabold text-ink">{photoPetDisplayName(photo.pet_name, { honorific: false })} の写真</h2>
       </div>
       <div className="flex flex-wrap items-center gap-2">
         <span className="mr-2 text-xs font-bold text-ink-secondary">{total > 0 ? `${total}枚のうち ${position + 1}枚目` : '—'}</span>
