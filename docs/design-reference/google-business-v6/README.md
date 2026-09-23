@@ -6,7 +6,7 @@ PNGは不要な生成物ではなく、承認対象を再現するための成�
 - `index.html`：画像上のボタンで画面を切り替える静的プレビュー
 - `<Node ID>.png`：Pencilから書き出した19フレーム
 - `verify.mjs`：標準Node.jsだけで動く資料の整合性検査
-- 要件・実Node ID対応：[設計記録](../../v6-requirements/google-business-20260923.md)
+- 要件案・実Node ID対応：[設計提案](design-proposal.md)
 
 確認：`node docs/design-reference/google-business-v6/verify.mjs`
 
