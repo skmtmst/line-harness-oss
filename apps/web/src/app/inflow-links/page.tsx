@@ -1154,13 +1154,14 @@ function InflowLinksPageInner({
                     </td>
                     <td className="px-2 py-3 text-right" onClick={(e) => e.stopPropagation()}>
                       {editTarget ? (
-                        <button
+                        /* #641: 編集は共通の枠つきボタン */
+                        <Button
+                          variant="secondary"
                           onClick={() => setEditing(editTarget)}
-                          className="whitespace-nowrap rounded-md border border-hairline bg-action-soft px-2 py-1 text-[11px] font-medium text-action hover:bg-surface-pearl"
                           aria-label={`${r.name}のリンクを編集`}
                         >
                           編集
-                        </button>
+                        </Button>
                       ) : r.source === 'tracked_link' ? (
                         // tracked_links は別管理 (Web app に編集 UI 未提供)。
                         // entry_routes への "昇格登録" は worker 優先順位的に
@@ -1169,13 +1170,14 @@ function InflowLinksPageInner({
                         // 編集導線 (MCP / API) に委ねる。
                         <span className="text-xs text-ink-faint">—</span>
                       ) : (
-                        <button
+                        /* #641: 登録も同じ枠つきボタン */
+                        <Button
+                          variant="secondary"
                           onClick={() => setEditing({ register: r.refCode })}
-                          className="text-xs text-action hover:underline"
                           title="未登録 ref を entry_routes に登録します。流入実績はそのまま引き継がれます。"
                         >
                           登録
-                        </button>
+                        </Button>
                       )}
                     </td>
                   </FragmentRow>

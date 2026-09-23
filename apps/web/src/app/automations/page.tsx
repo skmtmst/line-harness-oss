@@ -5,7 +5,10 @@ import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { api, ApiError } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
+import { MoreHorizontal } from 'lucide-react'
 import Button from '@/components/shared/button'
+import IconButton from '@/components/shared/icon-button'
+import ActionMenu from '@/components/shared/action-menu'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
 import AutomationTemplateGallery from '@/components/automations/automation-template-gallery'
@@ -171,18 +174,50 @@ function AutomationRowActions({
   onDuplicate: () => void
   onArchive: () => void
 }) {
+  // #641: 「編集」＋「その他（…）」の形にそろえ、複製・止める・保管はメニューへ集約。
+  const [menuOpen, setMenuOpen] = useState(false)
   return (
-    <div className="flex flex-wrap items-center justify-end gap-2">
-      <Button href={`/automations/runs?search=${encodeURIComponent(automation.name)}`} className="whitespace-nowrap">動いた記録を見る</Button>
+    <div className="relative flex flex-wrap items-center justify-end gap-1.5">
+      <Button href={`/automations/runs?search=${encodeURIComponent(automation.name)}`} variant="secondary" className="whitespace-nowrap">動いた記録を見る</Button>
       {canManage ? (
         <>
           {/* #942 N-352: 編集・複製・保管を行から直接開けるようにする。 */}
-          <Button onClick={onEdit} disabled={busy} className="whitespace-nowrap">編集する</Button>
-          <Button onClick={onDuplicate} disabled={busy} className="whitespace-nowrap">複製する</Button>
-          {automation.status === 'draft' ? null : (
-            <Button onClick={onToggle} disabled={busy} className="whitespace-nowrap">止める・動かす</Button>
-          )}
-          <Button onClick={onArchive} disabled={busy} className="whitespace-nowrap">保管する</Button>
+          <Button onClick={onEdit} disabled={busy} variant="secondary" className="whitespace-nowrap">編集する</Button>
+          <IconButton
+            aria-label={`${automation.name}のその他操作`}
+            aria-expanded={menuOpen}
+            disabled={busy}
+            onClick={() => setMenuOpen((open) => !open)}
+          >
+            <MoreHorizontal aria-hidden />
+          </IconButton>
+          <ActionMenu
+            open={menuOpen}
+            ariaLabel={`${automation.name}の操作`}
+            onClose={() => setMenuOpen(false)}
+            items={[
+              {
+                id: 'duplicate',
+                label: '複製する',
+                disabled: busy,
+                onSelect: onDuplicate,
+              },
+              ...(automation.status === 'draft'
+                ? []
+                : [{
+                    id: 'toggle',
+                    label: '止める・動かす',
+                    disabled: busy,
+                    onSelect: onToggle,
+                  }]),
+              {
+                id: 'archive',
+                label: '保管する',
+                disabled: busy,
+                onSelect: onArchive,
+              },
+            ]}
+          />
         </>
       ) : canManage === false ? (
         <span className="text-xs text-ink-faint">操作する権限がありません</span>

@@ -1,10 +1,12 @@
 'use client'
 
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
-import Link from 'next/link'
+import { MoreHorizontal } from 'lucide-react'
 import { ecEventLabel, type ApiResponse } from '@line-crm/shared'
 import { useMergedTab } from '@/components/layout/merged-tabs'
 import Button from '@/components/shared/button'
+import IconButton from '@/components/shared/icon-button'
+import ActionMenu from '@/components/shared/action-menu'
 import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
 import PageHeaderH2 from '@/components/layout/page-header-h2'
@@ -129,6 +131,8 @@ function EventsPanel({ accountId }: { accountId: string | null }) {
    * 描画では不一致＝閉じる、に倒れるので別アカウントの注文が残らない。
    */
   const [detailSlot, setDetailSlot] = useState<{ accountId: string | null; orderId: string | null }>({ accountId, orderId: null })
+  // 行の「その他」メニューの開き先（#641）
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null)
   const retryingId = retryingSlot.accountId === accountId ? retryingSlot.id : null
   const detailOrderId = detailSlot.accountId === accountId ? detailSlot.orderId : null
   /* 絞りとページを同時に変えたとき、古い読み込みの返事で上書きしない。 */
@@ -438,15 +442,41 @@ function EventsPanel({ accountId }: { accountId: string | null }) {
                 </span>
               </Td>
               <ActionCell>
-                {/* IDEA-23: 注文がある行は「この注文の状況」から出来事→通知→成果まで辿れる。 */}
-                {order
-                  ? <button type="button" className={styles.textLink} onClick={() => setDetailSlot({ accountId, orderId: order.id })}>注文の状況</button>
-                  : null}
+                {/* #641: 主操作は枠つきボタン、残りは「その他（…）」へ集約。 */}
                 {/* 友だち詳細は静的書き出しのため /friends/detail?id= 形。/friends/<id> は存在しない（IDEA-21 で修正）。 */}
                 {(action.friendId ?? order?.friendId)
-                  ? <Link className={styles.textLink} href={`/friends/detail?id=${encodeURIComponent(action.friendId ?? order?.friendId ?? '')}`}>中身を見る</Link>
-                  : <Link className={styles.textLink} href="/ec-commerce/identity-candidates">つき合わせる</Link>}
-                {action.retryAvailable ? <Button type="button" disabled={retryingId === action.id} onClick={() => void retry(action)}>{retryingId === action.id ? '戻しています…' : 'もう一度やる'}</Button> : null}
+                  ? <Button href={`/friends/detail?id=${encodeURIComponent(action.friendId ?? order?.friendId ?? '')}`} variant="secondary">中身を見る</Button>
+                  : <Button href="/ec-commerce/identity-candidates" variant="secondary">つき合わせる</Button>}
+                {order || action.retryAvailable ? (
+                  <>
+                    <IconButton
+                      aria-label="この行のその他操作"
+                      aria-expanded={openMenuId === action.id}
+                      onClick={() => setOpenMenuId((current) => (current === action.id ? null : action.id))}
+                    >
+                      <MoreHorizontal aria-hidden />
+                    </IconButton>
+                    <ActionMenu
+                      open={openMenuId === action.id}
+                      ariaLabel="この行の操作"
+                      onClose={() => setOpenMenuId(null)}
+                      items={[
+                        /* IDEA-23: 注文がある行は「この注文の状況」から出来事→通知→成果まで辿れる。 */
+                        ...(order
+                          ? [{ id: 'order', label: '注文の状況', onSelect: () => setDetailSlot({ accountId, orderId: order.id }) }]
+                          : []),
+                        ...(action.retryAvailable
+                          ? [{
+                              id: 'retry',
+                              label: retryingId === action.id ? '戻しています…' : 'もう一度やる',
+                              disabled: retryingId === action.id,
+                              onSelect: () => void retry(action),
+                            }]
+                          : []),
+                      ]}
+                    />
+                  </>
+                ) : null}
               </ActionCell>
             </Tr>
           })}

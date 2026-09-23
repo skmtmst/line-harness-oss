@@ -12,7 +12,10 @@ import type { RichMenuDeleteImpact, RichMenuTapStats } from '@/lib/api'
 import { RICH_MENU_DIMENSIONS, type Folder } from '@line-crm/shared'
 import FolderPanel, { FOLDER_RAIL_STYLE } from '@/components/shared/folder-panel'
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
+import { MoreHorizontal, Trash2 } from 'lucide-react'
 import Button from '@/components/shared/button'
+import IconButton from '@/components/shared/icon-button'
+import ActionMenu from '@/components/shared/action-menu'
 import ListState from '@/components/shared/list-state'
 import Pagination from '@/components/shared/pagination'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -235,6 +238,8 @@ export default function RichMenusListPage() {
   const [deleteError, setDeleteError] = useState<string | null>(null)
   /** N-154: 複製。押した行と実行中・失敗を別に持つ。 */
   const [duplicateTarget, setDuplicateTarget] = useState<RichMenuGroupListItem | null>(null)
+  // 行の「その他」メニューの開き先（#641: 表示先・複製・切替のつながりはここへ集約）
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null)
   const [duplicateBusy, setDuplicateBusy] = useState(false)
   const [duplicateError, setDuplicateError] = useState<string | null>(null)
   const deferredQuery = useDeferredValue(query.trim())
@@ -862,7 +867,9 @@ export default function RichMenusListPage() {
               />
             ) : (
               <section className="border-hairline bg-canvas rounded-card overflow-hidden border shadow-card">
-                <table className="w-full table-fixed text-left text-sm">
+                {/* #641: 操作列が広くなった分は表だけが横に流れる */}
+                <div className="overflow-x-auto">
+                <table className="w-full min-w-[960px] table-fixed text-left text-sm">
                   <colgroup>
                     <col style={{ width: '27%' }} />
                     <col style={{ width: '12%' }} />
@@ -926,18 +933,51 @@ export default function RichMenusListPage() {
                           {new Date(g.updatedAt).toLocaleDateString('ja-JP', { month: '2-digit', day: '2-digit' })}
                         </td>
                         <td className="px-4 py-3">
-                          <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs">
-                            {g.status === 'published' ? <button type="button" onClick={() => setApplyTo(g)} className="text-action font-semibold hover:underline">表示先</button> : null}
-                            <Link href={`/rich-menus/edit?id=${g.id}`} className="text-action font-semibold hover:underline">編集</Link>
-                            <button type="button" onClick={() => { setDuplicateError(null); setDuplicateTarget(g) }} className="text-action font-semibold hover:underline">複製</button>
-                            <Link href={`/rich-menus/connections?id=${encodeURIComponent(g.id)}`} className="text-ink-secondary hover:underline">切替のつながりを見る</Link>
-                            <button type="button" onClick={() => handleDelete(g)} data-qa-open={g.status === 'published' ? 'szXsT' : 'szXsT-draft'} className="text-danger hover:underline" title={g.status === 'published' ? 'LINE から取り下げてから削除' : '削除'}>削除</button>
+                          {/* #641: 「編集」＋「削除」＋「その他（…）」の形にそろえる。表示先・複製・切替はメニューへ集約。 */}
+                          <div className="relative inline-flex items-center justify-end gap-1.5">
+                            <Button href={`/rich-menus/edit?id=${g.id}`} variant="secondary">編集</Button>
+                            <IconButton
+                              aria-label={`${g.name}を削除`}
+                              title={g.status === 'published' ? 'LINE から取り下げてから削除' : '削除'}
+                              data-qa-open={g.status === 'published' ? 'szXsT' : 'szXsT-draft'}
+                              onClick={() => handleDelete(g)}
+                            >
+                              <Trash2 aria-hidden />
+                            </IconButton>
+                            <IconButton
+                              aria-label={`${g.name}のその他操作`}
+                              aria-expanded={openMenuId === g.id}
+                              onClick={() => setOpenMenuId((current) => (current === g.id ? null : g.id))}
+                            >
+                              <MoreHorizontal aria-hidden />
+                            </IconButton>
+                            <ActionMenu
+                              open={openMenuId === g.id}
+                              ariaLabel={`${g.name}の操作`}
+                              onClose={() => setOpenMenuId(null)}
+                              items={[
+                                ...(g.status === 'published'
+                                  ? [{ id: 'apply', label: '表示先', onSelect: () => setApplyTo(g) }]
+                                  : []),
+                                {
+                                  id: 'duplicate',
+                                  label: '複製',
+                                  onSelect: () => { setDuplicateError(null); setDuplicateTarget(g) },
+                                },
+                                {
+                                  id: 'connections',
+                                  label: '切替のつながりを見る',
+                                  onSelect: () => router.push(`/rich-menus/connections?id=${encodeURIComponent(g.id)}`),
+                                },
+                              ]}
+                            />
                           </div>
                         </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
+                </div>
               </section>
             )}
 

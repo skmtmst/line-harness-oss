@@ -1,8 +1,8 @@
 'use client'
 
 import { useCallback, useDeferredValue, useEffect, useMemo, useState } from 'react'
-import Link from 'next/link'
-import { ExternalLink, RefreshCw } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { ExternalLink, MoreHorizontal, RefreshCw } from 'lucide-react'
 import { useAccount } from '@/contexts/account-context'
 import { api, type CommonActionSummary } from '@/lib/api'
 import Button from '@/components/shared/button'
@@ -15,6 +15,8 @@ import SummaryCard from '@/components/shared/summary-card'
 import ListState from '@/components/shared/list-state'
 import { Tabs } from '@/components/shared/tabs'
 import { useCanManageCommonActions } from '@/components/automations/use-common-action-permission'
+import IconButton from '@/components/shared/icon-button'
+import ActionMenu from '@/components/shared/action-menu'
 import { ActionCell, DataTable, NameCell, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 
 type Filter = 'all' | 'published' | 'draft' | 'old_version' | 'unused'
@@ -55,6 +57,9 @@ export default function CommonActionsPage() {
   const [automationCounts, setAutomationCounts] = useState<{ active: number; stopped: number } | null>(null)
   const [templateCount, setTemplateCount] = useState<number | null>(null)
   const [duplicatingId, setDuplicatingId] = useState<string | null>(null)
+  // 行の「その他」メニューの開き先（#641）
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null)
+  const router = useRouter()
 
   const load = useCallback(async () => {
     if (!selectedAccountId) {
@@ -270,31 +275,51 @@ export default function CommonActionsPage() {
                     {item.publishedVersion ? `v${item.publishedVersion}` : '—'}
                   </Td>
                   <ActionCell>
-                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                    <Link
+                    {/* #641: 「中身を見る」＋「その他（…）」の形にそろえる。残りはメニューへ集約。 */}
+                    <div className="relative inline-flex items-center justify-end gap-1.5">
+                    <Button
                       href={`/common-actions/versions?id=${encodeURIComponent(item.id)}`}
-                      className="text-action inline-flex items-center gap-1 whitespace-nowrap font-medium hover:underline"
+                      variant="secondary"
                     >
                       中身を見る <ExternalLink size={14} aria-hidden />
-                    </Link>
+                    </Button>
                     {canManage ? (
                       <>
-                        <Link
-                          href={item.status === 'draft'
-                            ? `/common-actions/edit?id=${encodeURIComponent(item.id)}`
-                            : `/common-actions/versions?id=${encodeURIComponent(item.id)}`}
-                          className="text-action whitespace-nowrap text-xs font-medium hover:underline"
+                        <IconButton
+                          aria-label={`${item.name}のその他操作`}
+                          aria-expanded={openMenuId === item.id}
+                          onClick={() =>
+                            setOpenMenuId((current) => (current === item.id ? null : item.id))
+                          }
                         >
-                          {item.status === 'draft' ? '公開する' : '使われている場所'}
-                        </Link>
-                        <button
-                          type="button"
-                          className="text-action whitespace-nowrap text-xs font-medium hover:underline disabled:text-ink-faint"
-                          disabled={duplicatingId !== null}
-                          onClick={() => void duplicate(item)}
-                        >
-                          {duplicatingId === item.id ? '複製中' : '複製して下書きを作る'}
-                        </button>
+                          <MoreHorizontal aria-hidden />
+                        </IconButton>
+                        <ActionMenu
+                          open={openMenuId === item.id}
+                          ariaLabel={`${item.name}の操作`}
+                          onClose={() => setOpenMenuId(null)}
+                          items={[
+                            item.status === 'draft'
+                              ? {
+                                  id: 'publish',
+                                  label: '公開する',
+                                  onSelect: () =>
+                                    router.push(`/common-actions/edit?id=${encodeURIComponent(item.id)}`),
+                                }
+                              : {
+                                  id: 'usage',
+                                  label: '使われている場所',
+                                  onSelect: () =>
+                                    router.push(`/common-actions/versions?id=${encodeURIComponent(item.id)}`),
+                                },
+                            {
+                              id: 'duplicate',
+                              label: duplicatingId === item.id ? '複製中' : '複製して下書きを作る',
+                              disabled: duplicatingId !== null,
+                              onSelect: () => void duplicate(item),
+                            },
+                          ]}
+                        />
                       </>
                     ) : null}
                     </div>

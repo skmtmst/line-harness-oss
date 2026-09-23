@@ -8,7 +8,10 @@ import { api, type ScenarioRuns } from '@/lib/api'
 import { IdempotencyKeyStore } from '@/lib/idempotency-key-store'
 import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
+import { MoreHorizontal } from 'lucide-react'
 import Button from '@/components/shared/button'
+import IconButton from '@/components/shared/icon-button'
+import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
 import Dialog from '@/components/shared/dialog'
 import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
@@ -115,6 +118,8 @@ function ResultsInner() {
    */
   const [planOpen, setPlanOpen] = useState(false)
   const [planFriend, setPlanFriend] = useState<{ id: string; name: string } | null>(null)
+  // 行の「その他」メニューの開き先（#641）
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null)
   const opKeys = useRef(new IdempotencyKeyStore())
 
   usePageTitle(scenario ? `シナリオ結果：${scenario.name}` : null)
@@ -521,58 +526,68 @@ function ResultsInner() {
                               : sub.nextDeliveryAt ?? '—'}
                           </Td>
                           <ActionCell>
-                            <div className="flex flex-wrap items-center justify-end gap-3">
-                              <button
-                                type="button"
-                                className="text-caption font-semibold text-accent-deep hover:underline disabled:cursor-not-allowed disabled:text-ink-faint"
+                            {/* #641: 主操作は枠つき「予定を見る」、購読操作は「その他（…）」へ集約。 */}
+                            <div className="relative inline-flex items-center justify-end gap-1.5">
+                              <Button
+                                variant="secondary"
                                 onClick={() => {
                                   setPlanFriend({ id: sub.friendId, name: sub.friendName })
                                   setPlanOpen(true)
                                 }}
                               >
                                 予定を見る
-                              </button>
-                              {sub.status === 'active' ? (
-                                <button
-                                  type="button"
-                                  className="text-caption font-semibold text-accent-deep hover:underline disabled:cursor-not-allowed disabled:text-ink-faint"
-                                  disabled={opBusy !== null}
-                                  onClick={() => void runSubscriptionOp(sub, 'pause')}
-                                >
-                                  {opBusy === `${sub.id}:pause` ? '停止中…' : '止める'}
-                                </button>
-                              ) : null}
-                              {sub.status === 'paused' ? (
-                                <>
-                                  <button
-                                    type="button"
-                                    className="text-caption font-semibold text-accent-deep hover:underline disabled:cursor-not-allowed disabled:text-ink-faint"
-                                    disabled={opBusy !== null}
-                                    onClick={() => void runSubscriptionOp(sub, 'resume')}
-                                  >
-                                    {opBusy === `${sub.id}:resume` ? '再開中…' : '再開'}
-                                  </button>
-                                  {pausedByFailure ? (
-                                    <button
-                                      type="button"
-                                      className="text-caption font-semibold text-accent-deep hover:underline disabled:cursor-not-allowed disabled:text-ink-faint"
-                                      disabled={opBusy !== null}
-                                      onClick={() => void runSubscriptionOp(sub, 'retry')}
-                                    >
-                                      {opBusy === `${sub.id}:retry` ? '再送中…' : '失敗を再送'}
-                                    </button>
-                                  ) : null}
-                                </>
-                              ) : null}
+                              </Button>
                               {sub.status === 'active' || sub.status === 'paused' ? (
-                                <button
-                                  type="button"
-                                  className="text-caption font-semibold text-accent-deep hover:underline disabled:cursor-not-allowed disabled:text-ink-faint"
-                                  disabled={opBusy !== null}
-                                  onClick={() => void openMoveDialog(sub)}
-                                >
-                                  別のシナリオへ移す
-                                </button>
+                                <>
+                                  <IconButton
+                                    aria-label={`${sub.friendName}のその他操作`}
+                                    aria-expanded={openMenuId === sub.id}
+                                    onClick={() =>
+                                      setOpenMenuId((current) => (current === sub.id ? null : sub.id))
+                                    }
+                                  >
+                                    <MoreHorizontal aria-hidden />
+                                  </IconButton>
+                                  <ActionMenu
+                                    open={openMenuId === sub.id}
+                                    ariaLabel={`${sub.friendName}の操作`}
+                                    onClose={() => setOpenMenuId(null)}
+                                    items={(() => {
+                                      const items: ActionMenuItem[] = []
+                                      if (sub.status === 'active') {
+                                        items.push({
+                                          id: 'pause',
+                                          label: opBusy === `${sub.id}:pause` ? '停止中…' : '止める',
+                                          disabled: opBusy !== null,
+                                          onSelect: () => void runSubscriptionOp(sub, 'pause'),
+                                        })
+                                      }
+                                      if (sub.status === 'paused') {
+                                        items.push({
+                                          id: 'resume',
+                                          label: opBusy === `${sub.id}:resume` ? '再開中…' : '再開',
+                                          disabled: opBusy !== null,
+                                          onSelect: () => void runSubscriptionOp(sub, 'resume'),
+                                        })
+                                        if (pausedByFailure) {
+                                          items.push({
+                                            id: 'retry',
+                                            label: opBusy === `${sub.id}:retry` ? '再送中…' : '失敗を再送',
+                                            disabled: opBusy !== null,
+                                            onSelect: () => void runSubscriptionOp(sub, 'retry'),
+                                          })
+                                        }
+                                      }
+                                      items.push({
+                                        id: 'move',
+                                        label: '別のシナリオへ移す',
+                                        disabled: opBusy !== null,
+                                        onSelect: () => void openMoveDialog(sub),
+                                      })
+                                      return items
+                                    })()}
+                                  />
+                                </>
                               ) : null}
                             </div>
                           </ActionCell>
