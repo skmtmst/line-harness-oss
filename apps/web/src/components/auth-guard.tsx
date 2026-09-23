@@ -4,7 +4,8 @@ import { useRouter, usePathname } from 'next/navigation'
 import { adminSessionHeaders, captureAdminSessionHandoff } from '@/lib/admin-session'
 import { clearSelectionAfterAuthentication } from '@/lib/hq-navigation'
 import { isPublicAuthPath } from '@/lib/auth-email'
-import { SESSION_LOST_EVENT } from '@/lib/api'
+import { SESSION_LOST_EVENT, type OpsImpersonation } from '@/lib/api'
+import { forgetSessionSnapshot, rememberSessionSnapshot } from '@/lib/session-snapshot'
 
 /*
  * PERF-07: 画面遷移のたびの /api/auth/session を短いあいだ再利用する。
@@ -31,6 +32,7 @@ function sessionFingerprint(handoffToken: string): string {
 /** テストと、外から「次の遷移で必ず確認して」が必要なときの口。 */
 export function invalidateAuthSessionCheck(): void {
   lastSessionCheck = null
+  forgetSessionSnapshot()
 }
 
 export default function AuthGuard({ children }: { children: React.ReactNode }) {
@@ -47,7 +49,7 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
     }
 
     // セッション切れ・別タブでのログアウトは、次の遷移で必ず確認し直す。
-    const invalidate = () => { lastSessionCheck = null }
+    const invalidate = () => { lastSessionCheck = null; forgetSessionSnapshot() }
     const onStorage = (event: StorageEvent) => {
       if (event.key === 'lh_csrf' || event.key === 'lh_staff_role') invalidate()
     }
@@ -90,6 +92,8 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
         // N-424: 「見えるだけ」のキーは別枠で持つ。メニュー表示には両方を使う。
         localStorage.setItem('lh_staff_view_permissions', JSON.stringify(data.data.viewPermissionKeys ?? []))
         if (data.csrfToken) localStorage.setItem('lh_csrf', data.csrfToken)
+        // 代理ログイン帯はこの結果を読む。同じ応答をもう一度取りに行かせない（V6R-S0-a）。
+        rememberSessionSnapshot({ impersonation: (data.data.impersonation as OpsImpersonation | null | undefined) ?? null })
         // 「消した」印の正本は共有の localStorage。新規タブ・再読込では
         // 印が残るので他タブの店舗選択を消さず、ログインし直しのときだけ
         // 一度だけ消える（NEXT-07）。sessionStorage の残存印も残存扱いにする。
@@ -99,6 +103,7 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
         if (!cancelled) setChecked(true)
       } catch {
         lastSessionCheck = null
+        forgetSessionSnapshot()
         if (!cancelled) router.replace('/login')
       }
     }
