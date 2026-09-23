@@ -12,7 +12,8 @@ import {
 } from '@/lib/api'
 import FolderPanel, { FOLDER_RAIL_STYLE } from '@/components/shared/folder-panel'
 import { formatStamp } from '@/lib/common-vars'
-import Pagination from '@/components/shared/pagination'
+import Pagination, { formatPaginationSummary } from '@/components/shared/pagination'
+import ListFilterBar, { FilterControl } from '@/components/shared/list-filter-bar'
 import Button from '@/components/shared/button'
 import SearchField from '@/components/shared/search-field'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -721,34 +722,28 @@ function VarsPageInner() {
             検索は独立した全幅の行にする（#973 U026）。表示件数と同じ行に
             押し込むと、狭い幅で入力文が読めないほど潰れる。
           */}
-          <div data-search-row className="mb-3">
-            <SearchField
-              value={query}
-              onChange={(value) => {
-                setQuery(value)
-                setPage(1)
-              }}
-              onClear={() => {
-                setQuery('')
-                setPage(1)
-              }}
-              placeholder="名前・差し込みキー・中身で検索"
-              aria-label="共通情報を検索"
-            />
-          </div>
-
-          <div className="mb-3 flex flex-wrap items-center gap-2">
-            <SelectField
-              size="compact"
-              value={String(pageSize)}
-              onChange={(event) => {
-                setPageSize(Number(event.target.value))
-                setPage(1)
-              }}
-              aria-label="表示件数"
-              options={[20, 50, 100].map((value) => ({ value: String(value), label: `${value}件表示` }))}
-            />
-            {([
+          {/*
+            #668: 検索は独立した全幅の行、次へ 絞り込み → 並び替え →
+            表示件数の順。並び替えは見えるラベル＋幅保証で、自分の
+            選択値（`使われている数が多い順`）を省略しない。
+          */}
+          <ListFilterBar
+            search={
+              <SearchField
+                value={query}
+                onChange={(value) => {
+                  setQuery(value)
+                  setPage(1)
+                }}
+                onClear={() => {
+                  setQuery('')
+                  setPage(1)
+                }}
+                placeholder="名前・差し込みキー・中身で検索"
+                aria-label="共通情報を検索"
+              />
+            }
+            filters={([
               ['all', 'すべて'],
               ['empty', '空のまま'],
               ['scheduled', '期限つき'],
@@ -769,17 +764,36 @@ function VarsPageInner() {
                 {label}
               </button>
             ))}
-            <SelectField
-              value={order}
-              onChange={(event) => setOrder(event.target.value as CommonVarOrder)}
-              aria-label="並び順"
-              options={[
-                { value: 'usage_desc', label: '使われている数が多い順' },
-                { value: 'updated_desc', label: '更新が新しい順' },
-                { value: 'name_asc', label: '名前順' },
-              ]}
-            />
-          </div>
+            sort={
+              <FilterControl label="並び順" wide>
+                <SelectField
+                  value={order}
+                  onChange={(event) => setOrder(event.target.value as CommonVarOrder)}
+                  aria-label="並び順"
+                  className="w-full"
+                  options={[
+                    { value: 'usage_desc', label: '使われている数が多い順' },
+                    { value: 'updated_desc', label: '更新が新しい順' },
+                    { value: 'name_asc', label: '名前順' },
+                  ]}
+                />
+              </FilterControl>
+            }
+            pageSize={
+              <FilterControl label="表示件数">
+                <SelectField
+                  size="compact"
+                  value={String(pageSize)}
+                  onChange={(event) => {
+                    setPageSize(Number(event.target.value))
+                    setPage(1)
+                  }}
+                  aria-label="表示件数"
+                  options={[20, 50, 100].map((value) => ({ value: String(value), label: `${value}件表示` }))}
+                />
+              </FilterControl>
+            }
+          />
 
           <div className="bg-canvas rounded-card border-hairline overflow-hidden border">
             {/*
@@ -948,7 +962,12 @@ function VarsPageInner() {
           </div>
 
           <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-            <Pagination page={page} pageCount={pageCount} onPageChange={setPage} />
+            <div className="flex flex-wrap items-center gap-3">
+              <span className="text-ink-faint text-xs tabular-nums">
+                {formatPaginationSummary(filtered.length, page, pageSize)}
+              </span>
+              <Pagination page={page} pageCount={pageCount} onPageChange={setPage} />
+            </div>
 
             <button
               onClick={() => void prepareRemoveSelected()}

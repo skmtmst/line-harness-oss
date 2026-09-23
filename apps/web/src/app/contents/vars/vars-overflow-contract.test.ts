@@ -5,6 +5,10 @@ import { describe, expect, it } from 'vitest'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const PAGE = readFileSync(join(HERE, 'page.tsx'), 'utf8')
+const FILTER_BAR = readFileSync(
+  join(HERE, '../../../components/shared/list-filter-bar.tsx'),
+  'utf8',
+)
 
 /*
  * #973 U026: 共通情報の一覧（/contents/vars）で、フォルダ・検索・表を
@@ -25,8 +29,11 @@ describe('共通情報一覧のはみ出し（#973 U026）', () => {
   })
 
   it('検索は独立した全幅の行にし、入力に最小幅を課さない', () => {
-    expect(PAGE).toContain('data-search-row')
+    // #668: 検索行は共通 `ListFilterBar` の `search` 枠が持つ。
+    // `data-search-row` の実体は部品側にある。
+    expect(PAGE).toContain('<ListFilterBar')
     expect(PAGE).toContain("import SearchField from '@/components/shared/search-field'")
+    expect(FILTER_BAR).toContain('data-search-row')
     // かつての `min-w-64 flex-1` のインライン検索欄は狭い幅ではみ出す元。
     expect(PAGE).not.toContain('min-w-64')
   })

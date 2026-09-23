@@ -50,7 +50,7 @@ describe('共通部品の影響範囲', () => {
     expect(directImporters(files, paginationCss, importIndex)).toEqual([pagination])
   })
 
-  it('共通Paginationを直接importする35ファイルだけを利用先に数える', () => {
+  it('共通Paginationを直接importする36ファイルだけを利用先に数える', () => {
     // ダッシュボードの受信カードが自前の「前へ／次へ」をやめて共通へ寄せた。
     // 設計（`vUXKb` / `NjK9q`）は表の下にページ送りがあり、番号で飛べる。
     // 2026-09-02: 成果地点と流入経路の押せない「前へ／次へ」も共通へ寄せた。
@@ -82,6 +82,8 @@ describe('共通部品の影響範囲', () => {
       // 取れていないときに「1 / 1」と出て、1ページぶんは取れたように見えていた。
       'app/events/bookings/page.tsx',
       'app/events/page.tsx',
+      // #667: 回答フォーム一覧が自前の「前へ／次へ」をやめて共通へ寄せた。
+      'app/form-submissions/page.tsx',
       // #543: 一覧の到達不能な回答表（M2削除）と共に共通Paginationの利用を外した。
       'app/form-submissions/responses/page.tsx',
       // IDEA-18 (#1036): 経路別の注文明細が増えても画面を重くしないよう

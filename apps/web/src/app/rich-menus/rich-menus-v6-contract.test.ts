@@ -34,7 +34,7 @@ describe('V6リッチメニューの画面契約', () => {
 
   it('LINEアカウント切替前の応答を捨て、全件をページ送りでたどれる', () => {
     expect(PAGE).toContain('activeAccountRef.current !== accountId')
-    expect(PAGE).toContain("import Pagination from '@/components/shared/pagination'")
+    expect(PAGE).toContain("import { ListPagination } from '@/components/shared/pagination'")
     expect(PAGE).toContain('pageCount={pageCount}')
     expect(PAGE).toContain('api.richMenuGroups.listPage(accountId')
     expect(PAGE).toContain('setGroupTotal(groupsRes.data.total)')

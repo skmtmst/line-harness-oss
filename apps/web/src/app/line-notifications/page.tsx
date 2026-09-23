@@ -9,7 +9,7 @@ import OperatorNotificationRules from './operator-notification-rules'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
-import Pagination from '@/components/shared/pagination'
+import { ListPagination } from '@/components/shared/pagination'
 import {
   ApiError,
   api,
@@ -1163,8 +1163,7 @@ function LineNotificationsPage() {
           </div>
         </article>)}
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-hairline px-4 py-3">
-          <p className="text-xs text-ink-faint">お知らせの種類 {settings.length}つのうち {visiblePage.length}つを表示</p>
-          <Pagination page={customerPage} pageCount={customerPageCount} onPageChange={setCustomerPage} ariaLabel="お知らせのページ送り" />
+          <ListPagination total={visible.length} page={customerPage} pageSize={CUSTOMER_PAGE_SIZE} pageCount={customerPageCount} onPageChange={setCustomerPage} unit="つ" ariaLabel="お知らせのページ送り" />
         </div>
         </>}
     </section>

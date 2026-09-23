@@ -58,7 +58,7 @@ describe('V6 予約設定', () => {
   it('表示している一覧操作は実際に使える', () => {
     expect(LIST).not.toContain('準備中')
     expect(LIST).toContain('bookingApi.getSettings(accountId)')
-    expect(LIST).toContain('<Pagination page={page} pageCount={pageCount}')
+    expect(LIST).toContain('<ListPagination')
     expect(LIST).toContain('止める・出す')
     expect(LIST).toContain('bookingApi.patchMenu(selectedAccountId, menu.id, version')
     expect(LIST).toContain('error={visibilityError ?? undefined}')

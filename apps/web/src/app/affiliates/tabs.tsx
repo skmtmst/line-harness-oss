@@ -17,7 +17,7 @@ import Chip from '@/components/shared/chip'
 import FilterChip from '@/components/shared/filter-chip'
 import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
-import Pagination from '@/components/shared/pagination'
+import { ListPagination } from '@/components/shared/pagination'
 import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
 import { calculateAffiliateReward } from './affiliate-reward'
@@ -1036,14 +1036,13 @@ export function AffiliatorsTab({ accountId }: { accountId: string | null }) {
       )}
 
       {!loading && !error && rows.length > 0 && (
-        <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-          <p className="text-ink-faint text-xs font-semibold tabular-nums">
-            {shownRows.length === rows.length
-              ? `全 ${rows.length}件`
-              : `${shownRows.length}件 / 全 ${rows.length}件`}
-          </p>
-          <Pagination page={currentPage} pageCount={listPageCount} onPageChange={setPage} />
-        </div>
+        <ListPagination
+          total={shownRows.length}
+          page={currentPage}
+          pageSize={pageSize}
+          pageCount={listPageCount}
+          onPageChange={setPage}
+        />
       )}
     </div>
   )
@@ -2243,16 +2242,21 @@ export function ApprovalQueue() {
       )}
 
       {!loading && !error && items.length > 0 && (
-        <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-          <p className="text-ink-faint text-xs font-semibold tabular-nums">
-            {shownItems.length}件 / 全 {counts[status]}件
-            {truncatedStatuses.includes(status) ? '（まだ続きがあります）' : ''}
-          </p>
-          <Pagination page={currentPage} pageCount={approvalPageCount} onPageChange={(value) => {
-            setPage(value)
-            setSelected(new Set())
-          }} />
-        </div>
+        <>
+          <ListPagination
+            total={counts[status]}
+            page={currentPage}
+            pageSize={pageSize}
+            pageCount={approvalPageCount}
+            onPageChange={(value) => {
+              setPage(value)
+              setSelected(new Set())
+            }}
+          />
+          {truncatedStatuses.includes(status) ? (
+            <p className="text-ink-secondary mt-2 text-xs">まだ続きがあります</p>
+          ) : null}
+        </>
       )}
 
       {!loading && !error && truncatedStatuses.length > 0 && (
@@ -2696,16 +2700,13 @@ export function OffersTab() {
         onRefresh={loadOffers}
       />
 
-      <div data-design="tf" className="mt-3 flex flex-wrap items-center justify-between gap-2">
-        <p className="text-ink-faint text-xs font-semibold tabular-nums">
-          {shown.length === offers.length
-            ? `全 ${offers.length}件`
-            : `${shown.length}件 / 全 ${offers.length}件`}
-        </p>
-        {pageCount > 1 && (
-          <Pagination page={currentPage} pageCount={pageCount} onPageChange={setPage} />
-        )}
-      </div>
+      <ListPagination
+        total={shown.length}
+        page={currentPage}
+        pageSize={pageSize}
+        pageCount={pageCount}
+        onPageChange={setPage}
+      />
 
       <section className="bg-canvas rounded-card border-hairline mt-4 border p-4">
         <h3 className="text-ink text-sm font-semibold">アフィリエイターと案件のちがい</h3>

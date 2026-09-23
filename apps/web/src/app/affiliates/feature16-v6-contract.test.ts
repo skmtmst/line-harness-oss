@@ -30,7 +30,7 @@ describe('機能16 V6の一覧', () => {
       '名前・紹介コードで検索',
       'CSVで書き出す',
       '<FilterChip',
-      '<Pagination',
+      '<ListPagination',
     ]) {
       expect(affiliates).toContain(word)
     }
@@ -58,7 +58,7 @@ describe('機能16 V6の一覧', () => {
       '金額が高い順',
       'CSVで書き出す',
       '確認したほうがよい',
-      '<Pagination',
+      '<ListPagination',
     ]) {
       expect(approvals).toContain(word)
     }

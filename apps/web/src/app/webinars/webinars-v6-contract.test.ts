@@ -61,7 +61,7 @@ describe('V6 ウェビナー一覧の契約', () => {
   })
 
   it('一覧は頁ごとに取り、取った頁を絞り直さない', () => {
-    expect(PAGE).toContain("import Pagination from '@/components/shared/pagination'")
+    expect(PAGE).toContain("import { ListPagination } from '@/components/shared/pagination'")
     expect(PAGE).toContain('limit: pageSize')
     expect(PAGE).toContain('q: debouncedQuery.trim() || undefined')
     expect(PAGE).toContain('folder: selectedFolder || undefined')

@@ -161,7 +161,7 @@ describe('V6 案件一覧（GH8VL）の画面', () => {
   it('検索・表示件数・並び順・ページ送りを共通部品でつなぐ', () => {
     expect(TABS).toContain("import SearchField from '@/components/shared/search-field'")
     expect(TABS).toContain("import Select from '@/components/shared/select'")
-    expect(TABS).toContain("import Pagination from '@/components/shared/pagination'")
+    expect(TABS).toContain("import { ListPagination } from '@/components/shared/pagination'")
     expect(TABS).toContain("import FilterChip from '@/components/shared/filter-chip'")
   })
 

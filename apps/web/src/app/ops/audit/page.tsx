@@ -9,7 +9,7 @@ import { AUDIT_ACTION_LABEL, auditActionChip, formatDateTime, opsCall } from '@/
 import Button from '@/components/shared/button'
 import FilterChip from '@/components/shared/filter-chip'
 import ListState from '@/components/shared/list-state'
-import Pagination from '@/components/shared/pagination'
+import { ListPagination } from '@/components/shared/pagination'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 
 /** 監査ログ。★V6 37-8 `oEzZz`。 */
@@ -61,8 +61,6 @@ export default function OpsAuditPage() {
   }
 
   const pageCount = Math.max(1, Math.ceil(total / PAGE))
-  const first = total === 0 ? 0 : (page - 1) * PAGE + 1
-  const last = Math.min(page * PAGE, total)
 
   return (
     <div data-design-node="oEzZz">
@@ -128,10 +126,7 @@ export default function OpsAuditPage() {
         </DataTable>
       )}
 
-      <div className="mt-3 flex flex-wrap items-center justify-between gap-3 text-caption text-ink-faint">
-        <span>{total} 件中 {first}〜{last} 件を表示</span>
-        <Pagination page={page} pageCount={pageCount} onPageChange={setPage} ariaLabel="監査ログのページ" disabled={loading} />
-      </div>
+      <ListPagination total={total} page={page} pageSize={PAGE} pageCount={pageCount} onPageChange={setPage} ariaLabel="監査ログのページ" disabled={loading} className="text-caption" />
     </div>
   )
 }

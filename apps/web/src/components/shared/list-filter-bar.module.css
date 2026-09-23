@@ -1,0 +1,63 @@
+/*
+ * #668 フィルターバーの帯とラベル。層の無い CSS Module（部品側）。
+ * グローバル CSS へ足さない。ホバー色は付けない（操作の見分けを
+ * 形とラベルで行い、色の変化に頼らない）。
+ */
+
+.bar {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+/* 検索は独立した全幅の行。中身は呼び出し側の入力欄。 */
+.searchRow {
+  display: flex;
+}
+
+.searchRow > * {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* 絞り込み → 並び替え → 表示件数の順に並べる。狭い幅では折り返す。 */
+.controlsRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+/* 選択欄の見えるラベルの包み。短い語なので折り返さない。 */
+.control {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.label {
+  flex: none;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.6;
+  color: var(--color-ink-faint);
+  white-space: nowrap;
+}
+
+/*
+ * 並び替えなど選択肢が長い枠。`使われている数が多い順`（約200px）が
+ * 176px の既定枠で省略表示になっていた。枠の最小幅を保証し、
+ * 中の選択欄は包みの幅いっぱいに広げる。
+ */
+.wide {
+  min-width: min(100%, 14rem);
+}
+
+.wide > select,
+.wide > div {
+  flex: 1 1 auto;
+  min-width: 0;
+}

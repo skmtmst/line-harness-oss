@@ -47,6 +47,87 @@ function Ellipsis() {
   )
 }
 
+/* ------------------------------------------------- #667 一覧の件数表記統一 */
+
+ /*
+  * #667: 一覧の件数表記は「N件中 X〜Y件を表示」の1形式へ寄せる。
+  *
+  * 棚卸しでは少なくとも7種が混在していた（`前へ 1 次へ` のみ・
+  * `2件中1〜2件を表示`・`0〜0件 / 全0件`・`2個中1〜2個を表示`・
+  * `1つのうち1つを表示`・`5件中5件を表示しています…`・
+  * `X〜Y件 / 全Z件`・`X件 / 全Y件`・`全N件` のみ）。
+  * いちばん多かった「N件中 X〜Y件を表示」に合わせ、単位だけ
+  * 呼び出し側から渡す（件 / 個 / つ / 頭 …）。`全` は付けない。
+  * 絞り込み中の数は全体ではないので、「全」と言い切らない。
+  *
+  * 0件のときは `0件中 0〜0件を表示`、範囲外のページは最終頁へ
+  * 丸めて `最初 > 最後` にならないようにする。
+  */
+export function formatPaginationSummary(
+  total: number,
+  page: number,
+  pageSize: number,
+  unit = '件',
+): string {
+  const safeTotal = Number.isFinite(total) ? Math.max(0, Math.floor(total)) : 0
+  const safeSize = Number.isFinite(pageSize) && pageSize > 0 ? Math.floor(pageSize) : 20
+  const lastPage = Math.max(1, Math.ceil(safeTotal / safeSize))
+  const current = Math.min(lastPage, safePage(page, 1))
+  const first = safeTotal === 0 ? 0 : (current - 1) * safeSize + 1
+  const last = Math.min(current * safeSize, safeTotal)
+  const num = (value: number) => value.toLocaleString('ja-JP')
+  return `${num(safeTotal)}${unit}中 ${num(first)}〜${num(last)}${unit}を表示`
+}
+
+export type ListPaginationProps = {
+  /** 数える母集団（一覧が数えた総数。絞り込み中は条件に合う数）。 */
+  total: number
+  page: number
+  pageSize: number
+  pageCount: number
+  onPageChange: (page: number) => void
+  /** 単位。既定は `件`（`個`・`つ`・`頭` なども渡せる）。 */
+  unit?: string
+  ariaLabel?: string
+  disabled?: boolean
+  className?: string
+}
+
+/**
+ * #667: 件数とページ送りを組にした一覧フッター。
+ * 件数は `formatPaginationSummary` の1形式、送りは共通 `Pagination`。
+ * 1ページしか無いとき送りは出ない（`Pagination` 側で決める）が、
+ * 件数はいつも出す。押せない口を並べない。
+ */
+export function ListPagination({
+  total,
+  page,
+  pageSize,
+  pageCount,
+  onPageChange,
+  unit = '件',
+  ariaLabel,
+  disabled = false,
+  className,
+}: ListPaginationProps) {
+  const summary = formatPaginationSummary(total, page, pageSize, unit)
+  const classes = ['mt-3 flex flex-wrap items-center justify-between gap-3', className]
+    .filter(Boolean)
+    .join(' ')
+  return (
+    <div className={classes}>
+      <p className="text-ink-faint whitespace-nowrap text-xs tabular-nums">{summary}</p>
+      <Pagination
+        page={page}
+        pageCount={pageCount}
+        onPageChange={onPageChange}
+        ariaLabel={ariaLabel}
+        disabled={disabled}
+      />
+    </div>
+  )
+}
+
 /**
  * Pencil V5/V6 の `Blot6` を正本にした共通ページネーション。
  * 見た目と省略規則は部品側に置き、呼び出し側は現在ページと変更処理だけを渡す。

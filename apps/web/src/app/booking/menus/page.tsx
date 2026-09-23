@@ -7,7 +7,7 @@ import Link from 'next/link'
 import Button from '@/components/shared/button'
 import Breadcrumb from '@/components/shared/breadcrumb'
 import ListState from '@/components/shared/list-state'
-import Pagination from '@/components/shared/pagination'
+import { ListPagination } from '@/components/shared/pagination'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import {
   api,
@@ -450,10 +450,7 @@ function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuC
         </div>
       )}
 
-      <div className="mt-3 flex items-center justify-between gap-3">
-        <span className="text-ink-faint text-xs">メニュー {settings?.menuCount ?? items.length}つのうち {visible.length}つを表示</span>
-        <Pagination page={page} pageCount={pageCount} onPageChange={setPage} ariaLabel="予約メニューのページ送り" />
-      </div>
+      <ListPagination total={shown.length} page={page} pageSize={MENU_PAGE_SIZE} pageCount={pageCount} onPageChange={setPage} unit="つ" ariaLabel="予約メニューのページ送り" />
       </>}
 
       {editing && (

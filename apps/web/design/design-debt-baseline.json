@@ -706,6 +706,9 @@
   "components/shared/folder-add-dialog.tsx": {
     "direct-primary-button": 1
   },
+  "components/shared/list-filter-bar.tsx": {
+    "unresolved-classname": 5
+  },
   "components/shared/list-state.tsx": {
     "unresolved-classname": 5
   },

@@ -63,8 +63,10 @@ describe('V6 顧客へのお知らせの寸法', () => {
   it('一覧は設計どおり1ページ6件に区切り、件数とページ送りを同じ場所に出す', () => {
     expect(PAGE).toContain('const CUSTOMER_PAGE_SIZE = 6')
     expect(PAGE).toContain('const visiblePage = visible.slice(')
-    expect(PAGE).toContain('<Pagination page={customerPage}')
-    expect(PAGE).toContain('お知らせの種類 {settings.length}つのうち {visiblePage.length}つを表示')
+    expect(PAGE).toContain('<ListPagination')
+    // #667: 件数表記は「Nつ中 X〜Yつを表示」の1形式へ統一。
+    expect(PAGE).toContain('total={visible.length}')
+    expect(PAGE).toContain('unit="つ"')
   })
 
   it('タブ帯は共通部品（高さ44）を使う', () => {

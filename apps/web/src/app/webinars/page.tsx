@@ -7,7 +7,7 @@ import type { ReactNode } from 'react'
 import Link from 'next/link'
 import Button from '@/components/shared/button'
 import IconButton from '@/components/shared/icon-button'
-import Pagination from '@/components/shared/pagination'
+import { ListPagination } from '@/components/shared/pagination'
 import ListState from '@/components/shared/list-state'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import './webinars.css'
@@ -802,7 +802,7 @@ function WebinarsPage() {
             />
 
             {hasListData && visibleTotal > 0 && (
-              <div className="mt-3 flex flex-wrap items-center justify-between gap-3"><p className="text-ink-faint text-xs tabular-nums">{(currentPage - 1) * pageSize + 1}〜{(currentPage - 1) * pageSize + visible.length}件 / 全{visibleTotal}件</p><Pagination page={currentPage} pageCount={pageCount} onPageChange={setPage} ariaLabel="ウェビナー一覧のページ送り" /></div>
+              <ListPagination total={visibleTotal} page={currentPage} pageSize={pageSize} pageCount={pageCount} onPageChange={setPage} ariaLabel="ウェビナー一覧のページ送り" />
             )}
           </section>
         </div>

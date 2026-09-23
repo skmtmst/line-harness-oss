@@ -17,7 +17,7 @@ import Button from '@/components/shared/button'
 import IconButton from '@/components/shared/icon-button'
 import ActionMenu from '@/components/shared/action-menu'
 import ListState from '@/components/shared/list-state'
-import Pagination from '@/components/shared/pagination'
+import { ListPagination } from '@/components/shared/pagination'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import { usePageTitle } from '@/components/shell/page-chrome'
@@ -982,12 +982,7 @@ export default function RichMenusListPage() {
             )}
 
             {!loading && !error && groupTotal > 0 ? (
-              <div className="mt-4 flex items-center justify-between gap-4">
-                <p className="text-ink-faint text-xs">
-                  {groupTotal}件中 {(currentPage - 1) * effectivePageSize + 1}〜{Math.min(currentPage * effectivePageSize, groupTotal)}件を表示
-                </p>
-                <Pagination page={currentPage} pageCount={pageCount} onPageChange={setPage} ariaLabel="リッチメニューのページ送り" />
-              </div>
+              <ListPagination total={groupTotal} page={currentPage} pageSize={effectivePageSize} pageCount={pageCount} onPageChange={setPage} ariaLabel="リッチメニューのページ送り" className="mt-4" />
             ) : null}
           </div>
         </div>

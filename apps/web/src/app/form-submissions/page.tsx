@@ -13,6 +13,7 @@ import Button from '@/components/shared/button'
 import IconButton from '@/components/shared/icon-button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
+import { ListPagination } from '@/components/shared/pagination'
 import Select from '@/components/shared/select'
 import type { FormLayout } from '@line-crm/shared'
 import { hasStoredDestination, summarizeFormDestinations } from './form-destination-summary'
@@ -698,32 +699,14 @@ export default function FormSubmissionsPage() {
           )
         )}
           {!loading && !loadError && visibleForms.length > 0 ? (
-            <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-              <p className="text-xs text-ink-faint">
-                {listTotal.toLocaleString('ja-JP')}件中 {(listTotal === 0 ? 0 : pageStart + 1).toLocaleString('ja-JP')}〜{Math.min(pageStart + visibleForms.length, listTotal).toLocaleString('ja-JP')}件を表示
-              </p>
-              <nav aria-label="回答フォームのページ送り" className="flex items-center gap-2 text-xs">
-                <Button
-                  type="button"
-                  aria-label="前のページ"
-                  disabled={visiblePage <= 1}
-                  onClick={() => updateListState({ page: visiblePage - 1 })}
-                >
-                  前へ
-                </Button>
-                <span className="min-w-16 text-center tabular-nums text-ink-faint">
-                  {visiblePage} / {pageCount}
-                </span>
-                <Button
-                  type="button"
-                  aria-label="次のページ"
-                  disabled={visiblePage >= pageCount}
-                  onClick={() => updateListState({ page: visiblePage + 1 })}
-                >
-                  次へ
-                </Button>
-              </nav>
-            </div>
+            <ListPagination
+              total={listTotal}
+              page={visiblePage}
+              pageSize={pageSize}
+              pageCount={pageCount}
+              onPageChange={(next) => updateListState({ page: next })}
+              ariaLabel="回答フォームのページ送り"
+            />
           ) : null}
         </section>
       </div>
