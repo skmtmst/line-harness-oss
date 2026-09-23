@@ -923,6 +923,9 @@ const SHAPES = {
     // 本物は版を返す。無いと画面の expectedVersion 付き保存の欠落に気づけない。
     version: 1,
   },
+  // 左メニューの出し分け。無いと汎用の空一覧が返り「機能設定を読み込めませんでした」になり、
+  // メニューが基本の9項目だけになる（2026-09-24 の点検で発覚）。
+  '/api/settings/features/visibility': { features: FEATURES },
   '/api/inbox/unanswered/count': { total: 0, byAccount: [], oldestWaitMinutes: null },
   // 設計 `vUXKb` の「写真審査 1件 確認待ち」。0で返すとカードが空のまま撮れる。
   '/api/nen-members/overview': { pets: 6, healthLogs: 12, activeCare: 2, pendingPhotos: 3, members: 6, consultations: 1 },
