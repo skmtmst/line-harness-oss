@@ -30,6 +30,19 @@ function seed(raw: SqliteD1['raw']) {
        is_enabled, title, body_text, created_at, updated_at)
       VALUES (?, ?, 'follow_up', 'ec.order.shipped', ?, '10:00', 1, ?, '本文', '2026-09-01', '2026-09-01')`)
       .run(key, label, delay, label);
+    // NEN-07: 既定の review_request は「回答者を除く」ONだがフォーム未選択の
+    // ため設定不足=jobを積まない。注文状態の検証とは無関係なので、アカウント別
+    // 設定で除外を外した通常状態にしておく。
+    raw.prepare(`INSERT INTO account_settings
+      (id, line_account_id, key, value, created_at, updated_at)
+      VALUES (?, 'acc-1', ?, ?, '2026-09-01', '2026-09-01')`)
+      .run(`setting-${key}`, `nen.campaign.${key}`, JSON.stringify({
+        campaign_key: key, label, category: 'follow_up', trigger_event: 'ec.order.shipped',
+        delay_days: delay, delivery_time: '10:00', is_enabled: 1,
+        title: label, body_text: '本文', button_label: null, button_url: null, image_url: null,
+        dedup_window_days: 30, exclude_form_respondents: 0, after_actions: [],
+        updated_at: '2026-09-01',
+      }));
   }
 }
 
@@ -139,6 +152,19 @@ describe('IDEA-21 注文の取り消し・返金と発送後の案内', () => {
       VALUES ('acc-2', 'ch-2', '支店', 'tok2', 'sec2')`).run();
     raw.prepare(`INSERT INTO friends (id, line_user_id, line_account_id, is_following)
       VALUES ('friend-2', 'U2', 'acc-2', 1)`).run();
+    // NEN-07: acc-2 の既定 review_request も除外ON・フォーム未選択=設定不足に
+    // なるので、別アカウントを触らないことの検証対象は除外を外した通常状態にする。
+    raw.prepare(`INSERT INTO account_settings
+      (id, line_account_id, key, value, created_at, updated_at)
+      VALUES ('setting-acc2-review', 'acc-2', 'nen.campaign.review_request', ?, '2026-09-01', '2026-09-01')`)
+      .run(JSON.stringify({
+        campaign_key: 'review_request', label: '口コミ依頼', category: 'follow_up',
+        trigger_event: 'ec.order.shipped', delay_days: 10, delivery_time: '10:00',
+        is_enabled: 1, title: '口コミ依頼', body_text: '本文',
+        button_label: null, button_url: null, image_url: null,
+        dedup_window_days: 30, exclude_form_respondents: 0, after_actions: [],
+        updated_at: '2026-09-01',
+      }));
     await enqueuePostShippingFollowUps(db, shipped('evt-ship-1', 'NEN-300') as never, 'friend-1', 'acc-1');
     await enqueuePostShippingFollowUps(db, shipped('evt-ship-2', 'NEN-300') as never, 'friend-2', 'acc-2');
     // acc-1 側の1件を sent にしておく（送り済みは巻き戻さない）。
