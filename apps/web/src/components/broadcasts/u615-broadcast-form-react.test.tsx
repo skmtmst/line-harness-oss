@@ -166,6 +166,11 @@ describe('監査 #615：一斉配信の受け入れ', () => {
 
     const rows = [...container.querySelectorAll<HTMLElement>('.broadcast-template-row')]
     expect(rows.map((row) => row.querySelector('strong')?.textContent)).toContain('初回来店のお礼')
+
+    // DOMに居ても `hidden` の親の内側なら画面には出ない。監査が見たのはその状態。
+    for (const row of rows) {
+      expect(row.closest('.hidden'), '選択窓が hidden の内側にある').toBeNull()
+    }
   })
 
   it('BC-03: 確認の段は固定の日時・人数・タグ名を出さない', async () => {
