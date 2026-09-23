@@ -700,6 +700,9 @@
     "unresolved-classname": 1,
     "arbitrary-value": 3
   },
+  "components/shared/disclosure.tsx": {
+    "unresolved-classname": 6
+  },
   "components/shared/folder-add-dialog.tsx": {
     "direct-primary-button": 1
   },
