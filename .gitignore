@@ -34,6 +34,7 @@ apps/worker/dist/
 # `pretypecheck` / `pretest` / `prebuild` / `predev` で毎回作り直すので、
 # 置いておく必要が無い。
 apps/web/src/generated/release-log.json
+apps/web/src/generated/release-log-summary.json
 
 # DBの完成形。schema.sqlとmigrationsからビルド・テスト前に毎回生成する。
 # PRには正本のschema/migrationだけを載せ、巨大な生成差分を載せない。

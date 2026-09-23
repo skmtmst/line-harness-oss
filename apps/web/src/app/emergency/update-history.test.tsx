@@ -17,7 +17,7 @@ vi.hoisted(() => {
 })
 
 type ReleaseEntry = { kind: string; text: string; by: string | null; pr: number | null; at: string | null }
-type Release = { version: string; released: string | null; entries: ReleaseEntry[] }
+type Release = { version: string; released: string | null; entryCount?: number; entries: ReleaseEntry[] }
 
 const fixture = vi.hoisted(() => ({
   history: [] as OperationHistoryEntry[],
@@ -38,7 +38,7 @@ vi.mock('@/lib/api', async (importOriginal) => {
   }
 })
 
-vi.mock('@/generated/release-log.json', () => ({
+vi.mock('@/generated/release-log-summary.json', () => ({
   default: {
     // 各テストで fixture.releases を入れ替えるので、参照は毎回遅延にする。
     get releases() { return fixture.releases },
@@ -147,5 +147,21 @@ describe('管理画面の更新欄(OPERATIONS-01)', () => {
     expect(within(section).queryAllByTitle(/^配備済み-/)).toHaveLength(2)
     expect(within(section).queryByTitle(/^更新-/)).toBeNull()
     expect(within(section).getByText(/まだ画面に入っていない変更が3件あります/)).toBeTruthy()
+  })
+
+  it('要約（本文を削って行数だけ残した形）でも、続きと未反映の件数は行数から数える（V6R-S3-a）', async () => {
+    // 画面が読む release-log-summary.json の形。本文は新しい12行だけ、行数は別に持つ。
+    fixture.releases = [
+      { version: 'unreleased', released: null, entryCount: 2736, entries: [] },
+      { version: '1.0.0', released: '2026-09-25', entryCount: 36, entries: releaseEntries(12) },
+    ]
+    render(<HistoryPanel />)
+    await flush()
+
+    const section = updateSection()
+    expect(updateRows(section)).toHaveLength(10)
+    expect(within(section).getByText('更新-01')).toBeTruthy()
+    expect(within(section).getByText(/続きが26件あります/)).toBeTruthy()
+    expect(within(section).getByText(/まだ画面に入っていない変更が2736件あります/)).toBeTruthy()
   })
 })
