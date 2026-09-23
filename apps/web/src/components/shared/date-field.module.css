@@ -1,0 +1,296 @@
+/*
+ * 日付の選択。Pencil ★V7「日付の選択」（V7 文書 `Fw065`）。
+ *
+ *   欄     高さ 40・余白 [0,12]・角丸 8・枠 $hairline（開いている間は $accent-deep 1.5px）
+ *   暦     幅 296・余白 16・角丸 12・影 beautiful-shadows md・欄の 6px 下、左をそろえる
+ *   日付   36×36。選んだ日は濃い緑の丸、今日は線の丸、指を乗せた日は $canvas-sunken の角丸 8
+ *   動き   暦は motion-fast で出る（不透明度＋大きさ 0.97→1、左上が起点）
+ *          月送りは日付の段が 12px 横から薄く入る（motion-base）
+ */
+
+.root {
+  position: relative;
+  width: 100%;
+}
+
+.field {
+  display: flex;
+  width: 100%;
+  height: 40px;
+  align-items: center;
+  gap: 8px;
+  padding: 0 36px 0 12px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control);
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font: inherit;
+  font-size: var(--text-body);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color var(--motion-fast) var(--motion-ease-out);
+}
+
+.field[data-open] {
+  border-color: var(--color-accent-deep);
+  box-shadow: inset 0 0 0 0.5px var(--color-accent-deep);
+}
+
+.field[data-invalid] {
+  border-color: var(--color-status-danger);
+}
+
+.field:disabled {
+  cursor: not-allowed;
+  background: var(--color-canvas-sunken);
+  opacity: 0.6;
+}
+
+.field:focus-visible {
+  outline: revert;
+}
+
+.icon {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+  color: var(--color-ink-faint);
+}
+
+.value,
+.placeholder {
+  overflow: hidden;
+  min-width: 0;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.placeholder {
+  color: var(--color-ink-faint);
+}
+
+.clear {
+  position: absolute;
+  top: 8px;
+  right: 6px;
+  display: inline-flex;
+  width: 24px;
+  height: 24px;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: var(--radius-icon);
+  background: transparent;
+  color: var(--color-ink-faint);
+  cursor: pointer;
+}
+
+.clear:hover {
+  background: var(--color-canvas-sunken);
+  color: var(--color-ink);
+}
+
+.clear :global(svg) {
+  width: 14px;
+  height: 14px;
+}
+
+.popover {
+  position: absolute;
+  color: var(--color-ink);
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 60;
+  width: 296px;
+  padding: 16px;
+  border-radius: 12px;
+  background: var(--color-canvas);
+  /* beautiful-shadows md */
+  box-shadow:
+    0 0 0 1px rgb(0 0 0 / 6%),
+    0 1px 1px -0.5px rgb(0 0 0 / 6%),
+    0 3px 3px -1.5px rgb(0 0 0 / 6%),
+    0 6px 6px -3px rgb(0 0 0 / 6%),
+    0 12px 12px -6px rgb(0 0 0 / 6%),
+    0 24px 24px -12px rgb(0 0 0 / 6%);
+  transform-origin: top left;
+  animation: date-field-in var(--motion-fast) var(--motion-ease-out);
+}
+
+@keyframes date-field-in {
+  from {
+    opacity: 0;
+    scale: 0.97;
+  }
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.month {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.nav {
+  display: inline-flex;
+  width: 32px;
+  height: 32px;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--color-ink-secondary);
+  cursor: pointer;
+}
+
+.nav:hover {
+  background: var(--color-canvas-sunken);
+}
+
+.nav :global(svg) {
+  width: 16px;
+  height: 16px;
+}
+
+.weekdays,
+.week {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+}
+
+.weekdays span {
+  display: flex;
+  height: 24px;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-ink-faint);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* 赤・青は見出しだけ。日付の数字には色を付けない。 */
+.weekdays span[data-weekday='sun'] {
+  color: var(--color-danger);
+}
+
+.weekdays span[data-weekday='sat'] {
+  color: var(--color-status-info);
+}
+
+.grid[data-slide='next'] {
+  animation: date-field-next var(--motion-base) var(--motion-ease-out);
+}
+
+.grid[data-slide='prev'] {
+  animation: date-field-prev var(--motion-base) var(--motion-ease-out);
+}
+
+@keyframes date-field-next {
+  from {
+    opacity: 0;
+    translate: 12px 0;
+  }
+}
+
+@keyframes date-field-prev {
+  from {
+    opacity: 0;
+    translate: -12px 0;
+  }
+}
+
+.week > div {
+  display: flex;
+  height: 38px;
+  align-items: center;
+  justify-content: center;
+}
+
+.day {
+  display: inline-flex;
+  width: 36px;
+  height: 36px;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--color-ink);
+  font: inherit;
+  font-size: var(--text-body);
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  transition:
+    background-color var(--motion-fast) var(--motion-ease-out),
+    color var(--motion-fast) var(--motion-ease-out);
+}
+
+.day:hover:not([aria-disabled='true'], [data-selected]) {
+  background: var(--color-canvas-sunken);
+}
+
+.day[data-outside] {
+  color: var(--color-ink-faint);
+}
+
+.day[data-today] {
+  border-radius: 9999px;
+  box-shadow: inset 0 0 0 1.5px var(--color-accent-deep);
+  font-weight: 700;
+}
+
+.day[data-selected] {
+  border-radius: 9999px;
+  background: var(--color-accent-deep);
+  box-shadow: none;
+  color: var(--color-on-accent);
+  font-weight: 700;
+}
+
+.day[aria-disabled='true'] {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+.day:focus-visible {
+  outline: revert;
+}
+
+.footer {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 6px;
+  padding-top: 8px;
+  border-top: 1px solid var(--color-hairline);
+}
+
+.today,
+.reset {
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.today {
+  color: var(--color-action);
+}
+
+.reset {
+  color: var(--color-ink-secondary);
+}
+
+.today:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
