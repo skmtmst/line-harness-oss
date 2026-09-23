@@ -23,6 +23,7 @@ import { useAccount } from '@/contexts/account-context'
 import { Suspense } from 'react'
 import { useMergedTab } from '@/components/layout/merged-tabs'
 import BookingStaffPage from '@/app/booking/staff/page'
+import ListRange from '@/components/ui/list-range'
 import { bookingMenuError } from './menu-validation'
 import { bookingWindowEnd, businessHourSummary } from '../lib/format-time'
 
@@ -451,7 +452,7 @@ function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuC
       )}
 
       <div className="mt-3 flex items-center justify-between gap-3">
-        <span className="text-ink-faint text-xs">メニュー {settings?.menuCount ?? items.length}つのうち {visible.length}つを表示</span>
+        <ListRange label="メニュー" total={settings?.menuCount ?? items.length} first={visible.length === 0 ? 0 : 1} last={visible.length} />
         <Pagination page={page} pageCount={pageCount} onPageChange={setPage} ariaLabel="予約メニューのページ送り" />
       </div>
       </>}

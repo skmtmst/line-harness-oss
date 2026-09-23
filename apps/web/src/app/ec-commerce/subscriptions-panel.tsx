@@ -14,6 +14,7 @@ import { Tabs } from '@/components/shared/tabs'
 import { ActionCell, DataTable, Td, Th, TableHeadRow, Tr } from '@/components/shared/table'
 import { ApiError, api, type EcSubscription, type EcSubscriptionList } from '@/lib/api'
 import { formatEcShortDate as shortDate } from './ec-datetime'
+import ListRange from '@/components/ui/list-range'
 import styles from './ec-commerce-v6.module.css'
 
 const FILTERS = [
@@ -178,9 +179,12 @@ export default function SubscriptionsPanel({ accountId }: { accountId: string | 
       <p className={styles.footer}>
         {search.trim()
           ? `このページの ${shown.length.toLocaleString('ja-JP')}件を表示（検索はページの中だけに効きます）`
-          : `${filter === 'all' ? '定期便' : '表示条件に合う定期便'} ${total.toLocaleString('ja-JP')}件中 ${
-            total === 0 ? 0 : ((page - 1) * PAGE_SIZE + 1).toLocaleString('ja-JP')
-          }〜${((page - 1) * PAGE_SIZE + shown.length).toLocaleString('ja-JP')}件を表示`}
+          : <ListRange
+              label={filter === 'all' ? '定期便' : '表示条件に合う定期便'}
+              total={total}
+              first={total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1}
+              last={(page - 1) * PAGE_SIZE + shown.length}
+            />}
         {data && data.skipped.malformedSnapshots > 0
           ? `／ 形が読めなかったお客様のぶん ${data.skipped.malformedSnapshots.toLocaleString('ja-JP')}件は数えていません`
           : ''}

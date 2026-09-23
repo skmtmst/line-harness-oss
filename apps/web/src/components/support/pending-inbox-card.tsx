@@ -9,6 +9,7 @@ import Select from '@/components/shared/select'
 import StatusBadge from '@/components/shared/status-badge'
 import { STATE_TEXT } from '@/components/shared/not-connected'
 import { dashboardLocalUpdatedAt } from '@/components/dashboard/freshness'
+import ListRange from '@/components/ui/list-range'
 
 /**
  * 対応が必要な受信（設計 `V2 1-1 ダッシュボード` の `card 対応が必要な受信`）。
@@ -352,9 +353,7 @@ export default function PendingInboxCard({
               className="border-hairline flex h-[50px] shrink-0 items-center justify-between gap-3 border-t px-5"
               aria-label="受信一覧のページ送り"
             >
-              <span className="text-ink-secondary text-xs tabular-nums">
-                {firstRow}〜{lastRow} / {total}件
-              </span>
+              <ListRange className="tabular-nums" total={total} first={firstRow} last={lastRow} />
               <Pagination
                 page={page}
                 pageCount={pageCount}

@@ -23,6 +23,7 @@ import { FIELD_TYPE_LABELS } from '@/components/friend-fields/field-list'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
 import Button from '@/components/shared/button'
 import SelectField from '@/components/shared/select-field'
+import ListRange from '@/components/ui/list-range'
 import { usePageTitle } from '@/components/shell/page-chrome'
 
 /**
@@ -2118,8 +2119,8 @@ function FriendDetailInner() {
                 ) : (
                   <>
                   {typeof submissionsTotal === 'number' && submissionsTotal > submissions.length && (
-                    <p className="text-ink-faint mb-2 text-xs">
-                      全{submissionsTotal}件中{submissions.length}件を表示しています。
+                    <p className="mb-2">
+                      <ListRange total={submissionsTotal} first={1} last={submissions.length} />
                     </p>
                   )}
                   <ul className="divide-hairline divide-y">
