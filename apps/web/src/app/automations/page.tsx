@@ -43,7 +43,7 @@ interface Automation extends SharedAutomation {
 }
 
 const eventTypeBadgeColor: Record<AutomationEventType, string> = {
-  friend_add: 'bg-success-bg text-green-700',
+  friend_add: 'bg-success-bg text-success',
   tag_change: 'bg-blue-100 text-blue-700',
   score_threshold: 'bg-warning-bg text-yellow-700',
   cv_fire: 'bg-red-100 text-danger',
@@ -52,10 +52,10 @@ const eventTypeBadgeColor: Record<AutomationEventType, string> = {
   calendar_booked: 'bg-indigo-100 text-indigo-700',
   form_submitted: 'bg-violet-100 text-violet-700',
   link_clicked: 'bg-fuchsia-100 text-fuchsia-700',
-  datetime: 'bg-lime-100 text-lime-700',
+  datetime: 'bg-lime-100 text-success',
   daily: 'bg-amber-100 text-amber-700',
   weekly: 'bg-sky-100 text-sky-700',
-  'ec.order.confirmed': 'bg-emerald-100 text-emerald-700',
+  'ec.order.confirmed': 'bg-emerald-100 text-success',
   'ec.order.shipped': 'bg-cyan-100 text-cyan-700',
   'ec.subscription.upcoming': 'bg-teal-100 text-teal-700',
   'ec.subscription.payment_failed': 'bg-orange-100 text-orange-700',

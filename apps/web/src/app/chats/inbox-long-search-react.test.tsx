@@ -153,8 +153,8 @@ test('長い検索語で一覧口が落ちても、失敗行＋再読み込み�
     expect(list().textContent).toContain('チャットの読み込みに失敗しました。')
   })
   expect(list().querySelector('[data-inbox-list-state="loading"]')).toBeNull()
-  // タブ件数は失敗を0件と読まず「—」を出す。
-  expect(quickTabCounts()).toEqual(['—', '—', '—'])
+  // タブ件数は失敗を0件と読ませない。★V7（2026-09-24）では「—」も出さず、件数そのものを出さない。
+  expect(quickTabCounts()).toEqual([])
 
   // 再読み込みで同じ条件（長い検索語のまま）を取り直せる。
   fail = false

@@ -1010,7 +1010,7 @@ function AnalyticsTab({ webinarId, durationSeconds, view = 'analytics', analytic
                         <td className="px-4 py-3.5">
                           <div className="flex flex-wrap gap-1.5">
                             {p.formSubmittedAt ? (
-                              <span className="rounded-full bg-emerald-50 px-2 py-1 text-[10px] font-semibold text-emerald-700">フォーム送信</span>
+                              <span className="rounded-full bg-emerald-50 px-2 py-1 text-[10px] font-semibold text-success">フォーム送信</span>
                             ) : p.ctaClickedAt ? (
                               <span className="rounded-full bg-violet-50 px-2 py-1 text-[10px] font-semibold text-violet-700">CTAクリック</span>
                             ) : (

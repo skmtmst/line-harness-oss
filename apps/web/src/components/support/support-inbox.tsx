@@ -310,7 +310,7 @@ export default function SupportInbox({ channel = 'email' }: { channel?: Channel 
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
                       <p className="truncate text-sm font-bold text-gray-900">{item.customerName}</p>
-                      <span className={`rounded-full px-2 py-0.5 text-[9px] font-bold ${item.channel === 'line' ? 'bg-emerald-100 text-emerald-700' : 'bg-sky-100 text-sky-700'}`}>{item.channel === 'line' ? 'LINE' : 'EMAIL'}</span>
+                      <span className={`rounded-full px-2 py-0.5 text-micro font-bold ${item.channel === 'line' ? 'bg-emerald-100 text-success' : 'bg-sky-100 text-sky-700'}`}>{item.channel === 'line' ? 'LINE' : 'EMAIL'}</span>
                     </div>
                     <p className="mt-1 truncate text-xs font-medium text-gray-600">{item.subject}</p>
                     <p className="mt-1 truncate text-xs text-gray-400">{item.preview}</p>
@@ -353,7 +353,7 @@ export default function SupportInbox({ channel = 'email' }: { channel?: Channel 
                 <div className="flex gap-2">
                   <button onClick={() => void updateStatus('in_progress')} className={`rounded-lg px-3 py-2 text-xs font-bold ${detail.thread.status === 'in_progress' ? 'bg-amber-500 text-white' : 'bg-amber-50 text-amber-700'}`}>対応中</button>
                   <button onClick={() => void updateStatus('on_hold')} className={`rounded-lg px-3 py-2 text-xs font-bold ${detail.thread.status === 'on_hold' ? 'bg-action text-on-action' : 'bg-action-soft text-action'}`}>保留</button>
-                  <button onClick={() => void updateStatus('resolved')} className={`rounded-lg px-3 py-2 text-xs font-bold ${detail.thread.status === 'resolved' ? 'bg-emerald-600 text-white' : 'bg-emerald-50 text-emerald-700'}`}>✓ 対応済み</button>
+                  <button onClick={() => void updateStatus('resolved')} className={`rounded-lg px-3 py-2 text-xs font-bold ${detail.thread.status === 'resolved' ? 'bg-emerald-600 text-white' : 'bg-emerald-50 text-success'}`}>✓ 対応済み</button>
                   {detail.thread.status === 'resolved' && <button onClick={() => void updateStatus('unread')} className="rounded-lg bg-gray-100 px-3 py-2 text-xs font-bold text-gray-600">再オープン</button>}
                 </div>
               </div>

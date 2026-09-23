@@ -382,6 +382,25 @@ aside[aria-label="フォルダ"] .shadow-lg {
 }
 
 /*
+ * 押したら少し沈む（★V7・オーナー指示 2026-09-24「ボタンもチェックボックスと同じように」）。
+ * 共通 Button・IconButton は各自の CSS で持つ。ここは画面に直接書いたボタンの分。
+ * 横いっぱいの行（.w-full）・タブ・候補・メニュー項目・切替は、行ごと縮むと不自然なので外す。
+ * 動きを減らす設定では出さない。
+ */
+@layer base {
+  button,
+  [role='button'] {
+    transition: scale var(--motion-instant) var(--motion-ease-out);
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    :is(button, [role='button']):not(:disabled, [aria-disabled='true'], .w-full, [role='tab'], [role='option'], [role='menuitem'], [role='switch'], [role='gridcell'] *):active {
+      scale: 0.96;
+    }
+  }
+}
+
+/*
  * 動きを減らす設定（OS の「視差効果を減らす」など）では、すべての動きを
  * 一瞬で最後の状態にする。部品ごとに書き忘れても、ここで止まる。
  * `0.01ms` にするのは、`transitionend` を待つ処理が止まらないようにするため。

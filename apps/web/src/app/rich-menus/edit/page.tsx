@@ -1091,7 +1091,7 @@ function Editor({
                   ? 'text-white'
                   : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
               }`}
-              style={active ? { backgroundColor: 'var(--color-accent)' } : undefined}
+              style={active ? { backgroundColor: 'var(--color-accent-deep)' } : undefined}
             >
               {p.name}
               {active && <span className="ml-1 text-xs opacity-80">編集中</span>}

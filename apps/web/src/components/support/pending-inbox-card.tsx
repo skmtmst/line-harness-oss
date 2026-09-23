@@ -5,7 +5,6 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { ApiError, api, fetchApi } from '@/lib/api'
 import Card, { CardHeader } from '@/components/shared/card'
 import Pagination from '@/components/shared/pagination'
-import Select from '@/components/shared/select'
 import StatusBadge from '@/components/shared/status-badge'
 import { STATE_TEXT } from '@/components/shared/not-connected'
 import { dashboardLocalUpdatedAt } from '@/components/dashboard/freshness'
@@ -150,16 +149,6 @@ export default function PendingInboxCard({
     return () => { cancelled = true }
   }, [])
 
-  const changePageSize = (next: number) => {
-    setPageSize(next)
-    setPage(1)
-    const staffId = staffIdRef.current
-    if (!staffId) return
-    try {
-      window.localStorage.setItem(PAGE_SIZE_STORAGE_PREFIX + staffId, String(next))
-    } catch { /* storage unavailable */ }
-  }
-
   const load = useCallback(async () => {
     const seq = ++loadSeq.current
     try {
@@ -229,16 +218,12 @@ export default function PendingInboxCard({
         操作は2行目へ下げて折り返せるようにする。
       */}
       <div className="border-hairline flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 border-b px-5 pb-2">
-        <span className="text-ink-secondary flex items-center gap-1.5 text-xs font-normal">
-          表示件数
-          <Select
-            aria-label="表示件数"
-            value={String(pageSize)}
-            onChange={(next) => changePageSize(Number(next))}
-            options={PAGE_SIZE_OPTIONS.map((n) => ({ value: String(n), label: `${n}件表示` }))}
-          />
-        </span>
-        <span className="flex items-center gap-3">
+        {/*
+          ダッシュボードでは件数を変えさせない（★V7 ダッシュボードの見せ方、2026-09-24）。
+          ここは「いま対応が要る人」をひと目で見る場所で、全件は受信箱で見る。
+          以前あった「表示件数」のプルダウンは外した（保存済みの件数は読むだけ）。
+        */}
+        <span className="ml-auto flex items-center gap-3">
           {/* 一覧がいつ時点のものか。30秒ごとの再取得で古い値を最新と誤認しない。 */}
           {dashboardLocalUpdatedAt(lastSuccessAt) ? (
             <span className="text-ink-faint text-xs">{dashboardLocalUpdatedAt(lastSuccessAt)}</span>
@@ -316,7 +301,7 @@ export default function PendingInboxCard({
                       {elapsed(item.lastIncomingAt)}
                     </td>
                     <td className="px-5 py-2.5 whitespace-nowrap">
-                      <StatusBadge tone="success" size="compact">未確認</StatusBadge>
+                      <StatusBadge tone="warning" size="compact">未確認</StatusBadge>
                     </td>
                   </tr>
                 ))}
@@ -336,7 +321,7 @@ export default function PendingInboxCard({
                       {item.customerName}
                     </Link>
                   </span>
-                  <StatusBadge tone="success" size="compact">未確認</StatusBadge>
+                  <StatusBadge tone="warning" size="compact">未確認</StatusBadge>
                 </div>
                 <p className="text-ink-secondary mt-1 truncate text-xs" title={item.preview}>
                   {item.preview}
