@@ -322,7 +322,7 @@
     "unresolved-classname": 17
   },
   "app/search-console/page.tsx": {
-    "arbitrary-value": 11,
+    "arbitrary-value": 13,
     "direct-th": 5
   },
   "app/settings/manual-links/page.tsx": {
@@ -383,7 +383,7 @@
     "unresolved-classname": 40
   },
   "app/webinars/edit/page.tsx": {
-    "arbitrary-value": 24,
+    "arbitrary-value": 25,
     "direct-th": 13,
     "unresolved-classname": 9,
     "direct-secondary-button": 1
@@ -762,6 +762,9 @@
   },
   "components/ui/kpi-collapse.tsx": {
     "unresolved-classname": 2
+  },
+  "components/ui/metric-value.tsx": {
+    "unresolved-classname": 1
   },
   "components/ui/notification-switch.tsx": {
     "arbitrary-value": 2,

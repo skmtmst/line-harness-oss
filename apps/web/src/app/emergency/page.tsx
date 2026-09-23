@@ -23,6 +23,7 @@ import {
   type OperationSendPathsResponse,
 } from '@/lib/api'
 import { formatOperationDate, type OperationSeverity } from '@/lib/operation-status'
+import { formatMinutesRough } from '@/lib/format-duration'
 import { operationImpactText, type EmergencyStopTarget } from '@/lib/operation-impact'
 import { onlyWhenVisible } from '@/lib/visible-polling'
 import OtpInput from '@/components/shared/otp-input'
@@ -1240,7 +1241,7 @@ function HistoryPanel() {
       {/* #975 U060: 390pxでは先頭2件だけ出し、残りは「集計を見る」で開く。 */}
       <KpiCollapse gridClassName="grid grid-cols-1 gap-3 md:grid-cols-4">
         <SummaryCard label="止めた回数" value={state === 'ready' ? `${entries.length}回${truncated ? '以上' : ''}` : '—'} note={period === '30days' ? 'この30日' : 'この1年'} />
-        <SummaryCard label="いちばん長かった停止" value={longestMinutes > 0 ? `${longestMinutes}分` : '—'} note={truncated ? '直近の記録から' : period === '30days' ? 'この30日' : 'この1年'} />
+        <SummaryCard label="いちばん長かった停止" value={longestMinutes > 0 ? formatMinutesRough(longestMinutes) : '—'} note={truncated ? '直近の記録から' : period === '30days' ? 'この30日' : 'この1年'} />
         <SummaryCard label="管理画面の更新" value={`${updateCount}回`} note="この30日" />
         <SummaryCard label="いまの版" value={currentVersion} note="反映済み" />
       </KpiCollapse>

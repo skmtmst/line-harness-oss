@@ -91,7 +91,8 @@ describe('運用履歴の期間集計(N-454)', () => {
     // 既定「この1年」: 2件とも数える
     expect(summaryCard('止めた回数').getByText('2回')).toBeTruthy()
     expect(summaryCard('止めた回数').getByText('この1年')).toBeTruthy()
-    expect(summaryCard('いちばん長かった停止').getByText('120分')).toBeTruthy()
+    // 監査6 #674: 分の生値は眺める画面で読めないため「約2時間」へ人間化
+    expect(summaryCard('いちばん長かった停止').getByText('約2時間')).toBeTruthy()
     expect(screen.getByText('理由-recent')).toBeTruthy()
     expect(screen.getByText('理由-old')).toBeTruthy()
 

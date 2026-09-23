@@ -45,16 +45,16 @@ describe('V6 イベント・申込者一覧の状態', () => {
   it('イベント一覧は未取得の帯を0件にしない', () => {
     const body = code(EVENTS)
     // 帯は「数」ではなく「次にすること」を出す（`event-attention.ts`）。
-    expect(body).toContain("value={dataReady ? String(attention.upcoming.length) : '—'}")
-    expect(body).toContain("value={dataReady ? String(attention.applied) : '—'}")
+    expect(body).toContain("value={dataReady ? attention.upcoming.length : null}")
+    expect(body).toContain("value={dataReady ? attention.applied : null}")
     expect(body).toContain('登録したイベントは消えていません。')
   })
 
   it('申込者一覧は未取得の帯を0件にしない', () => {
     const body = code(BOOKINGS)
-    expect(body).toContain("value={dataReady ? String(applied) : '—'}")
-    expect(body).toContain("value={dataReady ? String(pending) : '—'}")
-    expect(body).toContain("value={dataReady ? String(cancelled) : '—'}")
+    expect(body).toContain("value={dataReady ? applied : null}")
+    expect(body).toContain("value={dataReady ? pending : null}")
+    expect(body).toContain("value={dataReady ? cancelled : null}")
     expect(body).toContain('受け付けた予約は消えていません。')
   })
 

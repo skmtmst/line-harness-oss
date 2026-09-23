@@ -69,7 +69,7 @@ function MetricCard({
         <p className="whitespace-nowrap text-sm font-medium text-slate-500">{label}</p>
         <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: color }} />
       </div>
-      <p className="mt-3 whitespace-nowrap text-3xl font-bold tracking-tight text-slate-950">{value}</p>
+      <p className="mt-3 whitespace-nowrap text-3xl font-bold tabular-nums tracking-[-0.02em] text-slate-950">{value}</p>
       <p className={`mt-2 whitespace-nowrap text-xs font-semibold ${delta === null ? 'text-slate-400' : positive ? 'text-emerald-600' : 'text-rose-500'}`}>
         {delta === null ? '前期間との比較なし' : `${positive ? '↑' : '↓'} ${oneDecimal.format(Math.abs(delta))}% 前期間比`}
       </p>
@@ -253,7 +253,7 @@ export default function SearchConsolePage() {
                 Search Console を突き合わせないと出ない。その突き合わせがまだ無い。 */}
             <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
               <p className="whitespace-nowrap text-sm font-medium text-slate-500">検索から友だち追加</p>
-              <p className="mt-3 text-3xl font-bold tracking-tight text-slate-300">—</p>
+              <p className="mt-3 text-3xl font-bold tracking-[-0.02em] text-slate-300">—</p>
               <p className="mt-2 text-xs text-slate-400">サイトスクリプトとの突き合わせが未対応</p>
             </div>
           </div>

@@ -27,8 +27,8 @@ describe('V6 photo review contract', () => {
     expect(page).toContain('api.nenMembers.photoReviewMetrics(selectedAccountId)');
     expect(page).toContain('reviewMetrics.pendingCount');
     expect(page).toContain('reviewMetrics.attentionCount');
-    expect(page).toContain('formatAverageReviewTime(reviewMetrics?.averageReviewMinutes)');
-    expect(page).toContain("if (minutes == null || !Number.isFinite(minutes)) return '—'");
+    expect(page).toContain('averageReviewDurationText(reviewMetrics?.averageReviewMinutes)');
+    expect(page).toContain("if (minutes == null || !Number.isFinite(minutes)) return null");
   });
 
   it('loads derivative status with the detail and can regenerate the review image', () => {
@@ -45,7 +45,7 @@ describe('V6 photo review contract', () => {
     expect(page).toContain('kind="error"');
     expect(page).toContain('kind="forbidden"');
     expect(page).toContain('onRetry={() => void load()}');
-    expect(page).toContain("countsReady ? counts.pending : '—'");
+    expect(page).toContain("countsReady ? counts.pending : null");
     expect(page).toContain("countsReady ? counts[value] : '—'");
   });
 
