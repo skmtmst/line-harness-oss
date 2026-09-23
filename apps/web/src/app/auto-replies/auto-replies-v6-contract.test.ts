@@ -25,6 +25,15 @@ describe('V6 自動応答一覧の契約', () => {
     expect(EDITOR).toContain('folderId: folderId || null')
   })
 
+  it('優先順位の候補外の保存値は「1」へ化けず、そのまま見せる（AUTOREPLY-07）', () => {
+    // option の無い value を持つ select はブラウザが先頭候補を表示する。
+    // 保存値 30 が「1（高いほど先に判定）」に見えていたので、候補外のときは
+    // 値そのものの option を足す。値は書き換えない。
+    expect(EDITOR).toContain('PRIORITY_CANDIDATES')
+    expect(EDITOR).toContain('!PRIORITY_CANDIDATES.includes(Number(priority))')
+    expect(EDITOR).toContain('（現在の保存値・候補外）')
+  })
+
   it('フォルダの未取得を0件に見せず、同じ編集画面で再取得できる', () => {
     expect(EDITOR).toContain('res.success && Array.isArray(res.data)')
     expect(EDITOR).toContain("foldersLoadState === 'error'")

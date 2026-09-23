@@ -42,6 +42,7 @@ vi.mock('next/link', () => ({
 }))
 vi.mock('next/navigation', () => ({
   useSearchParams: () => fixture.params,
+  usePathname: () => '/webinars/edit',
   useRouter: () => ({ push: fixture.push }),
 }))
 vi.mock('@/contexts/account-context', () => ({
@@ -52,6 +53,8 @@ vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => undefined
 /*
   通知の子タブは別口を持つのでここでは形だけにする。
   親の固定バーと同じ契約（onLoaded / registerSave / onDirtyChange）を守る。
+  「通知を変更する」は入力を汚す操作の身代わり——実物ではON/OFFや時刻の
+  変更が dirty を立て、保存で baseline が更新されて dirty が降りる。
 */
 vi.mock('@/components/webinars/webinar-notifications', () => ({
   default: function NotificationsPaneMock({ onLoaded, registerSave, onDirtyChange }: {
@@ -61,11 +64,17 @@ vi.mock('@/components/webinars/webinar-notifications', () => ({
   }) {
     React.useEffect(() => {
       onLoaded?.({ settings: { registrationEnabled: false, dayBeforeEnabled: false }, overview: null })
-      registerSave?.(() => Promise.resolve(true))
+      /* 保存できたら未保存の印を降ろす（実物は baseline を保存結果へ更新する）。 */
+      registerSave?.(async () => { onDirtyChange?.(false); return true })
       onDirtyChange?.(false)
       return () => registerSave?.(null)
     }, [onLoaded, registerSave, onDirtyChange])
-    return <div>通知設定</div>
+    return (
+      <div>
+        通知設定
+        <button type="button" onClick={() => onDirtyChange?.(true)}>通知を変更する</button>
+      </div>
+    )
   },
 }))
 
@@ -152,6 +161,12 @@ function installFetch() {
       return json([])
     }
     if (path.endsWith('/api/webinars/webinar-1/notifications/test')) return json({ sent: 2, failed: 0 })
+    if (path.endsWith('/api/webinars/webinar-1/publish-validation')) {
+      return json({ version: 3, checks: [], blockers: [], warnings: [] })
+    }
+    if (path.endsWith('/api/webinars/webinar-1/publish')) {
+      return json({ webinar: { ...webinar, status: 'active' }, validation: { version: 3, checks: [], blockers: [], warnings: [] } })
+    }
     if (path.endsWith('/api/webinars/webinar-1/editor')) return json(editor)
     if (path.endsWith('/api/webinars/webinar-1')) {
       if (method === 'PUT') {
@@ -230,6 +245,154 @@ function paneVisible(nodeSelector: string): boolean {
 
 const putCalls = () => net.calls.filter((call) => call.method === 'PUT' && call.path === '/api/webinars/webinar-1')
 const participantCalls = () => net.calls.filter((call) => call.path.includes('/participants'))
+
+function listLink(): HTMLAnchorElement {
+  const link = Array.from(host.querySelectorAll('a')).find((a) => a.textContent?.includes('ウェビナー一覧'))
+  if (!link) throw new Error('list link not found')
+  return link
+}
+
+describe('DETAIL-04 残存経路: 未保存の通知を持ったまま画面を離れない', () => {
+  async function openNotificationsPane() {
+    fixture.params = new URLSearchParams('id=webinar-1&pane=notifications')
+    await render()
+    await flush()
+  }
+
+  it('通知を直したまま一覧リンクを押すと確認が出て、閉じると入力を保ったまま残る', async () => {
+    await openNotificationsPane()
+
+    /* 6通知のON・時刻変更の身代わり。未保存の印が固定バーに出る。 */
+    await act(async () => { buttonByText('通知を変更する').click() })
+    await flush()
+    expect(host.textContent).toContain('保存していない変更があります')
+
+    await act(async () => { listLink().click() })
+    await flush()
+
+    /* 遷移しない。破棄か編集継続かを選ばせる確認が出る。 */
+    expect(fixture.push).not.toHaveBeenCalled()
+    expect(host.querySelector('[role="dialog"]')).not.toBeNull()
+
+    /* 閉じる（キャンセル）では画面に留まり、未保存の印も入力も残る。 */
+    await act(async () => { buttonByText('閉じる').click() })
+    await flush()
+    expect(host.querySelector('[role="dialog"]')).toBeNull()
+    expect(fixture.push).not.toHaveBeenCalled()
+    expect(host.textContent).toContain('保存していない変更があります')
+  })
+
+  it('「保存せずに移動」を選んだときだけ入力を捨てて一覧へ遷移する', async () => {
+    await openNotificationsPane()
+    await act(async () => { buttonByText('通知を変更する').click() })
+    await flush()
+
+    await act(async () => { listLink().click() })
+    await flush()
+    await act(async () => { buttonByText('保存せずに移動').click() })
+    await flush()
+
+    expect(fixture.push).toHaveBeenCalledWith('/webinars')
+  })
+
+  it('通知を保存してから一覧リンクを押すと確認は出ない', async () => {
+    await openNotificationsPane()
+    await act(async () => { buttonByText('通知を変更する').click() })
+    await flush()
+
+    /* 固定バーの「下書き保存」は通知の保存を呼ぶ。成功で未保存の印が降りる。 */
+    await act(async () => { buttonByText('下書き保存').click() })
+    await flush()
+    expect(host.textContent).not.toContain('保存していない変更があります')
+
+    await act(async () => { listLink().click() })
+    await flush()
+    expect(host.querySelector('[role="dialog"]')).toBeNull()
+  })
+})
+
+describe('Issue #1060 pane内の戻ると公開後の遷移では離脱確認を出さない', () => {
+  async function openNotificationsAndMakeDirty() {
+    fixture.params = new URLSearchParams('id=webinar-1&pane=notifications')
+    await render()
+    await flush()
+    await act(async () => { buttonByText('通知を変更する').click() })
+    await flush()
+    expect(host.textContent).toContain('保存していない変更があります')
+    expect(buttonByText('通知を変更する').closest('[hidden]')).toBeNull()
+  }
+
+  function beforeUnload() {
+    const event = new Event('beforeunload', { cancelable: true })
+    window.dispatchEvent(event)
+    return event
+  }
+
+  it('未保存でも同じ画面の段への戻るは確認を出さず、戻った先の段を開く', async () => {
+    const go = vi.spyOn(window.history, 'go')
+    await openNotificationsAndMakeDirty()
+
+    await act(async () => {
+      window.history.pushState(null, '', '/webinars/edit?id=webinar-1&pane=basic')
+      window.dispatchEvent(new PopStateEvent('popstate'))
+    })
+    await flush()
+
+    /* 画面内の移動なので履歴を戻さず、確認も出さない。通知の段は畳まれる。 */
+    expect(go).not.toHaveBeenCalled()
+    expect(host.querySelector('[role="dialog"]')).toBeNull()
+    expect(buttonByText('通知を変更する').closest('[hidden]')).not.toBeNull()
+    /* 未保存の入力と印はそのまま残る。 */
+    expect(host.textContent).toContain('保存していない変更があります')
+  })
+
+  it('未保存のまま一覧など外へ戻るときは、これまで通り確認を出す', async () => {
+    const go = vi.spyOn(window.history, 'go')
+    await openNotificationsAndMakeDirty()
+
+    await act(async () => {
+      window.history.pushState(null, '', '/webinars')
+      window.dispatchEvent(new PopStateEvent('popstate'))
+    })
+    await flush()
+
+    expect(go).toHaveBeenCalledWith(1)
+    expect(host.querySelector('[role="dialog"]')).not.toBeNull()
+  })
+
+  it('未保存のまま別のウェビナーへ戻るときも確認を出す', async () => {
+    const go = vi.spyOn(window.history, 'go')
+    await openNotificationsAndMakeDirty()
+
+    await act(async () => {
+      window.history.pushState(null, '', '/webinars/edit?id=webinar-2&pane=basic')
+      window.dispatchEvent(new PopStateEvent('popstate'))
+    })
+    await flush()
+
+    expect(go).toHaveBeenCalledWith(1)
+    expect(host.querySelector('[role="dialog"]')).not.toBeNull()
+  })
+
+  it('「この版を公開」のあとの画面遷移ではブラウザ標準の離脱確認を出さない', async () => {
+    const assign = vi.spyOn(window.location, 'assign').mockImplementation(() => undefined)
+    await openNotificationsAndMakeDirty()
+
+    /* dirtyの間は beforeunload が確認を出す（ガードは生きている）。 */
+    expect(beforeUnload().defaultPrevented).toBe(true)
+
+    /* STEP 5 確認へ進み、公開を実行する。 */
+    await act(async () => { buttonContaining('STEP 5').click() })
+    await flush()
+    await act(async () => { buttonByText('この版を公開').click() })
+    await flush()
+
+    /* 公開成功で公開済み画面へ遷移し、その遷移では標準の確認を出さない。 */
+    expect(net.calls.some((call) => call.method === 'POST' && call.path.endsWith('/api/webinars/webinar-1/publish'))).toBe(true)
+    expect(assign).toHaveBeenCalledWith('/webinars/published?id=webinar-1')
+    expect(beforeUnload().defaultPrevented).toBe(false)
+  })
+})
 
 describe('DETAIL-04 未保存の入力を段の往復で消さない', () => {
   it('タイトルを直して「保存して動画へ」→ 保存してから動画の段へ進み、戻っても新しいタイトルのまま', async () => {

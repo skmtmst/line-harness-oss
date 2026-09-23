@@ -7,9 +7,11 @@ import { useRouter } from 'next/navigation'
 import type { Folder } from '@line-crm/shared'
 import { api, ApiError, describeSaveFailure } from '@/lib/api'
 import { commonVarValueError, COMMON_VAR_VALUE_REQUIRED } from '@/lib/common-vars'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import FeatureGate from '@/components/feature-gate'
 import { useAccount } from '@/contexts/account-context'
 import Button from '@/components/shared/button'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
 import StickyBar from '@/components/shared/sticky-bar'
 
 /**
@@ -210,6 +212,22 @@ function NewCommonVarInner() {
   useEffect(() => {
     if (secretWarningFields) secretWarningRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
   }, [secretWarningFields])
+
+  /*
+   * 入力中に画面の外へ出る操作を止める（VAR-01 監査）。リッチメニュー・
+   * ウェビナーと同じ `useUnsavedGuard`＋確認ダイアログの形で、一覧リンク・
+   * 左メニュー・ブラウザの戻る・再読込を捕まえる。登録が終わると一覧へ
+   * router.push するので、成功後にこの警告は出ない。
+   * 初期値（全て空・種別は標準・期間外は配信停止）から1か所でも変わって
+   * いれば未保存とみなす。名前を入れると差し込み名は自動で付くが、どちらも
+   * 入力なので dirty として素直に数える。
+   */
+  const dirty = Boolean(
+    name || varKey || value || memo || folderId ||
+    validFrom || validUntil || fallbackValue ||
+    type !== 'text' || expiryBehavior !== 'stop'
+  )
+  const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty, busy: saving })
 
   // 種別は内部stateからのみ選ぶが、見つからないときは先頭へ倒す（非null断言を使わない）。
   const spec = TYPES.find((t) => t.key === type) ?? TYPES[0]
@@ -585,6 +603,16 @@ function NewCommonVarInner() {
             </Button>
           </>
         )}
+      />
+
+      <ConfirmDialog
+        open={leaveTarget !== null}
+        title="保存していない変更があります"
+        description="このまま移動すると、入力した共通情報は失われます。保存せずに移動しますか？"
+        confirmLabel="保存せずに移動"
+        cancelLabel="編集を続ける"
+        onConfirm={confirmLeave}
+        onCancel={cancelLeave}
       />
     </div>
   )

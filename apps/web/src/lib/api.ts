@@ -2157,7 +2157,9 @@ export const CSRF_STORAGE_KEY = 'lh_csrf'
 /**
  * セッションがサーバーに届かなかったときに投げる合図。
  *
- * 401 のたびに出る。受け手（SessionLostNotice）が、ログインの跡が
+ * 401 のたびに出る。ただし STEP_UP_REQUIRED などの業務コード付き401は
+ * 呼んだ画面が自分で処理するので出さない（isSessionLostExempt、#1058）。
+ * 受け手（SessionLostNotice）が、ログインの跡が
  * 残っているかどうかを見て、案内を出すか、ただの未ログインとして
  * 見送るかを決める。
  */
@@ -2338,6 +2340,27 @@ function announceFeatureDisabled(status: number, code: string | undefined, raw: 
   }))
 }
 
+/*
+ * 401 でも「セッションが届いていない」とは限らない業務コード（#1058）。
+ *
+ * 再認証（step-up）フローが返す401は、呼んだ画面（緊急操作など）が自分で
+ * 6桁コードの入力やり直しを案内する通常の状態。ここで合図を出すと、
+ * 画面の案内の上に閉じられないセッション喪失モーダルが被さってしまう。
+ * code の無い401（認証middlewareの `Unauthorized` など）や、ここに無い
+ * コードの401は、従来どおりセッション喪失として合図を出す。
+ */
+const SESSION_LOST_EXEMPT_CODES = new Set([
+  // 緊急停止・復旧の再認証grantが未所持/期限切れ（POST /api/operations/*）
+  'STEP_UP_REQUIRED',
+  // POST /api/auth/step-up が staff 文脈無しで弾く保険の401
+  'STEP_UP_UNAUTHORIZED',
+])
+
+/** 401 が業務コード付き＝セッション喪失ではない、なら true。 */
+function isSessionLostExempt(code: string | undefined): boolean {
+  return code !== undefined && SESSION_LOST_EXEMPT_CODES.has(code)
+}
+
 /** エラー本文の `data` だけを機械処理用に保持する。本文の文言は表示契約と分ける。 */
 export function extractApiErrorData(raw: string): unknown {
   if (!raw) return undefined
@@ -2419,21 +2442,22 @@ export async function fetchApi<T>(path: string, options?: FetchApiOptions): Prom
       ...options?.headers,
     },
   })
-  /*
-   * 401 は「セッションがサーバーに届いていない」。
-   *
-   * 管理画面とAPIは別サイトなので、ブラウザがサイトをまたぐCookieを
-   * 止めると全部のAPIがこれになる。各画面がそれぞれ「エラー」と出すだけ
-   * だと、全画面が同時に壊れているのに理由がどこにも出ない。
-   * 1か所で受けられるように知らせる（受け手は SessionLostNotice）。
-   */
-  if (res.status === 401 && typeof window !== 'undefined') {
-    window.dispatchEvent(new CustomEvent(SESSION_LOST_EVENT))
-  }
   if (res.status >= 500) reportServerFailure(path, res.status)
   if (!res.ok) {
     const raw = await res.text()
     const code = extractApiErrorCode(raw)
+    /*
+     * 401 は「セッションがサーバーに届いていない」。
+     *
+     * 管理画面とAPIは別サイトなので、ブラウザがサイトをまたぐCookieを
+     * 止めると全部のAPIがこれになる。各画面がそれぞれ「エラー」と出すだけ
+     * だと、全画面が同時に壊れているのに理由がどこにも出ない。
+     * 1か所で受けられるように知らせる（受け手は SessionLostNotice）。
+     * STEP_UP_REQUIRED などの業務401だけは画面が自分で処理するので出さない。
+     */
+    if (res.status === 401 && typeof window !== 'undefined' && !isSessionLostExempt(code)) {
+      window.dispatchEvent(new CustomEvent(SESSION_LOST_EVENT))
+    }
     if (!options?.suppressFeatureDisabledEvent) announceFeatureDisabled(res.status, code, raw)
     throw new ApiError(
       res.status,
@@ -2455,13 +2479,14 @@ async function fetchApiBlob(path: string): Promise<Blob> {
     credentials: 'include',
     headers: adminSessionHeaders(),
   })
-  if (res.status === 401 && typeof window !== 'undefined') {
-    window.dispatchEvent(new CustomEvent(SESSION_LOST_EVENT))
-  }
   if (res.status >= 500) reportServerFailure(path, res.status)
   if (!res.ok) {
     const raw = await res.text()
     const code = extractApiErrorCode(raw)
+    // fetchApi と同じく、業務コード付き401（再認証など）では合図を出さない。
+    if (res.status === 401 && typeof window !== 'undefined' && !isSessionLostExempt(code)) {
+      window.dispatchEvent(new CustomEvent(SESSION_LOST_EVENT))
+    }
     announceFeatureDisabled(res.status, code, raw)
     throw new ApiError(
       res.status,
@@ -2488,16 +2513,18 @@ export async function downloadApiFile(path: string, fallbackFilename: string): P
     credentials: 'include',
     headers: adminSessionHeaders(),
   })
-  if (res.status === 401 && typeof window !== 'undefined') {
-    window.dispatchEvent(new CustomEvent(SESSION_LOST_EVENT))
-  }
   if (res.status >= 500) reportServerFailure(path, res.status)
   if (!res.ok) {
     const raw = await res.text()
+    const code = extractApiErrorCode(raw)
+    // fetchApi と同じく、業務コード付き401（再認証など）では合図を出さない。
+    if (res.status === 401 && typeof window !== 'undefined' && !isSessionLostExempt(code)) {
+      window.dispatchEvent(new CustomEvent(SESSION_LOST_EVENT))
+    }
     throw new ApiError(
       res.status,
       extractApiErrorMessage(raw, res.status),
-      extractApiErrorCode(raw),
+      code,
     )
   }
   const disposition = res.headers.get('Content-Disposition') ?? ''
@@ -12113,6 +12140,11 @@ export interface BookingAvailabilityResponse {
   }>;
 }
 
+/** #1060: `menu_ids` 一括モードの応答。各要素は単独応答へ menu_id を添えた形。 */
+export interface BookingAvailabilityBatchResponse {
+  by_menu: Array<{ menu_id: string } & BookingAvailabilityResponse>;
+}
+
 /** IDEA-28 予約設定の「この日時はなぜ予約できないか」の理由コード。 */
 export type BookingSlotBlockReason =
   | 'menu_inactive'
@@ -12466,6 +12498,25 @@ export const bookingApi = {
     if (params.excludeBookingId) query.set('exclude_booking_id', params.excludeBookingId);
     return fetchApi<BookingAvailabilityResponse>(`/api/booking/admin/availability?${query}`);
   },
+  /**
+   * #1060: メニューごとの空き枠を1要求で取る一括口。
+   * カレンダーがメニュー数ぶん往復していたのを1往復へまとめる。
+   * 応答は `{ by_menu: [{ menu_id, by_staff, calendar_sync }] }`。
+   */
+  getAvailabilityBatch: (
+    accountId: string,
+    params: { menuIds: string[]; staffId?: string; from: string; to: string; excludeBookingId?: string },
+  ) => {
+    const query = new URLSearchParams({
+      account_id: accountId,
+      menu_ids: params.menuIds.join(','),
+      from: params.from,
+      to: params.to,
+    });
+    if (params.staffId) query.set('staff_id', params.staffId);
+    if (params.excludeBookingId) query.set('exclude_booking_id', params.excludeBookingId);
+    return fetchApi<BookingAvailabilityBatchResponse>(`/api/booking/admin/availability?${query}`);
+  },
   /** IDEA-28: 指定した日時がなぜ予約できないかを確認する（読み取り専用・予約は作らない）。 */
   checkAvailability: (
     accountId: string,
@@ -12581,6 +12632,15 @@ export const bookingApi = {
   getStaffMenus: (accountId: string, staffId: string) =>
     fetchApi<{ matrix: StaffMenuMatrix[] }>(
       withAccount(`/api/booking/admin/staff/${staffId}/menus`, accountId),
+    ),
+  /**
+   * #1060: 全スタッフ分の割り当て表を1要求で読む一括口。
+   * マトリクス画面がスタッフ数ぶん往復していたのを1往復へまとめる。
+   * 応答は一括PUTと同じ `{ staff: [{ staff_id, matrix }] }` の形。
+   */
+  listStaffMenusBulk: (accountId: string) =>
+    fetchApi<{ staff: Array<{ staff_id: string; matrix: StaffMenuMatrix[] }> }>(
+      withAccount('/api/booking/admin/staff-menus', accountId),
     ),
   putStaffMenus: (
     accountId: string,

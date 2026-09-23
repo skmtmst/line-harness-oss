@@ -55,7 +55,10 @@ interface FormFolder {
 
 type FormListResponse = Form[] | {
   items: Form[]
+  /** 絞り込み後の総件数（ページ送りの母数）。 */
   total: number
+  /** フォルダ範囲だけの総件数（フォルダ欄の「すべて」表示用。#1060で追加）。 */
+  all_total?: number
   page: number
   limit: number
 }
@@ -131,10 +134,17 @@ export default function FormSubmissionsPage() {
   const [forms, setForms] = useState<Form[]>([])
   const [folders, setFolders] = useState<FormFolder[]>([])
   const [formTotal, setFormTotal] = useState(0)
+  /** フォルダ欄の「すべて」件数。絞り込み前の件数（all_total）。 */
+  const [folderTotal, setFolderTotal] = useState(0)
   const [activeFolderId, setActiveFolderId] = useState('all')
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
   const [query, setQuery] = useState(() => searchParams.get('q') || '')
+  /**
+   * #1060: 検索は Worker 側で絞る。1打鍵ごとの往復を避けるため、
+   * 実際の取得には遅延した語を使う。
+   */
+  const [fetchQuery, setFetchQuery] = useState(() => searchParams.get('q') || '')
   /**
    * 管理者確認モード(#724)。通常一覧へ混ぜず、選んだときだけ未割当専用口を叩く。
    * URLには載せない。通常一覧の絞り込み・ページ送りの挙動を変えないため。
@@ -173,6 +183,7 @@ export default function FormSubmissionsPage() {
         setForms(res.data)
         setFolders([])
         setFormTotal(res.data.length)
+        setFolderTotal(res.data.length)
       } catch (error) {
         if (request !== formRequest.current) return
         // 権限が無い人（staff・制限付き・別テナント）は専用口が403/404を返す。
@@ -182,11 +193,13 @@ export default function FormSubmissionsPage() {
           setForms([])
           setFolders([])
           setFormTotal(0)
+          setFolderTotal(0)
         } else {
           setLoadError('回答フォームを読み込めませんでした。')
           setForms([])
           setFolders([])
           setFormTotal(0)
+          setFolderTotal(0)
         }
       } finally {
         if (request === formRequest.current) setLoading(false)
@@ -197,6 +210,7 @@ export default function FormSubmissionsPage() {
       setForms([])
       setFolders([])
       setFormTotal(0)
+      setFolderTotal(0)
       setLoading(false)
       return
     }
@@ -206,8 +220,16 @@ export default function FormSubmissionsPage() {
       const account = `account_id=${encodeURIComponent(selectedAccountId)}`
       // N-175 (#805): フォルダ絞りはサーバーが正本。選択をfolder_idで渡す。
       const folder = `&folder_id=${encodeURIComponent(activeFolderId)}`
+      /*
+       * #1060: 絞り込み・検索・並び替え・ページ切りは Worker と同じ規則で
+       * サーバー側に任せる（規則の正本は @line-crm/shared）。応答は
+       * 1ページ分だけで、全件をブラウザへ運ばない。
+       */
+      const paging = `&with_list_summary=1&page=${page}&limit=${pageSize}`
+        + `&filter=${formFilter}&sort=${formSort}`
+        + (fetchQuery.trim() ? `&q=${encodeURIComponent(fetchQuery.trim())}` : '')
       const [res, folderRes] = await Promise.all([
-        fetchApi<{ success: boolean; data: FormListResponse }>(`/api/forms?${account}${folder}&with_list_summary=1`),
+        fetchApi<{ success: boolean; data: FormListResponse }>(`/api/forms?${account}${folder}${paging}`),
         fetchApi<{ success: boolean; data: FormFolder[] }>(`/api/folders?kind=form&${account}`),
       ])
       if (!res.success || !folderRes.success) throw new Error('load_failed')
@@ -216,16 +238,18 @@ export default function FormSubmissionsPage() {
       setForms(items)
       setFolders(folderRes.data)
       setFormTotal(Array.isArray(res.data) ? items.length : res.data.total)
+      setFolderTotal(Array.isArray(res.data) ? items.length : (res.data.all_total ?? res.data.total))
     } catch {
       if (request !== formRequest.current) return
       setLoadError('回答フォームを読み込めませんでした。')
       setForms([])
       setFolders([])
       setFormTotal(0)
+      setFolderTotal(0)
     } finally {
       if (request === formRequest.current) setLoading(false)
     }
-  }, [reviewMode, selectedAccountId, activeFolderId])
+  }, [reviewMode, selectedAccountId, activeFolderId, page, pageSize, formFilter, formSort, fetchQuery])
 
   useEffect(() => {
     void loadForms()
@@ -240,6 +264,12 @@ export default function FormSubmissionsPage() {
     setPageSize(validPageSize(params.get('limit')))
     setPage(validPage(params.get('page')))
   }, [searchKey])
+
+  // #1060: 検索語のサーバー取得は少し遅らせ、1打鍵ごとの往復を避ける。
+  useEffect(() => {
+    const timer = window.setTimeout(() => setFetchQuery(query), 300)
+    return () => window.clearTimeout(timer)
+  }, [query])
 
   const updateListState = (next: Partial<{
     query: string
@@ -307,6 +337,8 @@ export default function FormSubmissionsPage() {
         form.id === editingForm.id ? { ...form, name } : form
       )))
       setEditingForm(null)
+      // 名前は検索・名前順の対象。サーバー側の絞り込み・並びとずれないよう読み直す。
+      void loadForms()
     } catch {
       setRenameError('フォーム名を変更できませんでした。もう一度お試しください。')
     } finally {
@@ -347,6 +379,8 @@ export default function FormSubmissionsPage() {
       if (!result.success) throw new Error('delete_failed')
       setForms((current) => current.filter((form) => form.id !== targetId))
       setDeleteTarget(null)
+      // ページの欠け・件数のずれを残さないよう、サーバー側の一覧を読み直す。
+      void loadForms()
     } catch {
       setDeleteError('この回答フォームをアーカイブできませんでした。状態を読み直してから、もう一度お試しください。')
     } finally {
@@ -377,6 +411,8 @@ export default function FormSubmissionsPage() {
       )))
       setDeleteTarget(null)
       setDeleteImpact(null)
+      // 公開中/下書きの絞り込み対象が変わるため読み直す。
+      void loadForms()
     } catch (error) {
       setDeleteError(error instanceof ApiError && error.status === 409
         ? 'ほかの人が先にこの回答フォームを保存しました。開き直して、もう一度お試しください。'
@@ -386,10 +422,14 @@ export default function FormSubmissionsPage() {
     }
   }
 
-  const sortedForms = useMemo(() => sortForms(forms, formSort), [formSort, forms])
-  const filteredForms = useMemo(() => {
+  /*
+   * 管理者確認モード（未割り当て一覧）は専用口が全件を返すので、従来どおり
+   * 画面側で絞り込み・並び替え・ページ切りをする。通常一覧は Worker が
+   * 同じ規則（@line-crm/shared）で済ませた1ページ分だけを返す（#1060）。
+   */
+  const clientFilteredForms = useMemo(() => {
     const normalizedQuery = query.trim().toLocaleLowerCase('ja-JP')
-    return sortedForms.filter((form) => {
+    return sortForms(forms, formSort).filter((form) => {
       // N-175 (#805): フォルダ絞りはサーバーが済ませている。画面では絞らない。
       if (formFilter === 'published' && !form.isActive) return false
       if (formFilter === 'draft' && form.isActive) return false
@@ -401,12 +441,15 @@ export default function FormSubmissionsPage() {
         || form.usedByAccounts.some((account) => account.name.toLocaleLowerCase('ja-JP').includes(normalizedQuery))
       )
     })
-  }, [formFilter, query, sortedForms])
+  }, [formFilter, query, formSort, forms])
 
-  const pageCount = Math.max(1, Math.ceil(filteredForms.length / pageSize))
+  const listTotal = reviewMode ? clientFilteredForms.length : formTotal
+  const pageCount = Math.max(1, Math.ceil(listTotal / pageSize))
   const visiblePage = Math.min(page, pageCount)
   const pageStart = (visiblePage - 1) * pageSize
-  const visibleForms = filteredForms.slice(pageStart, pageStart + pageSize)
+  const visibleForms = reviewMode
+    ? clientFilteredForms.slice(pageStart, pageStart + pageSize)
+    : forms
 
   useEffect(() => {
     if (!loading && !loadError && page > pageCount) updateListState({ page: pageCount })
@@ -427,7 +470,7 @@ export default function FormSubmissionsPage() {
 
       <div style={FOLDER_RAIL_STYLE} className="grid items-start gap-4 lg:grid-cols-[var(--folder-rail-width)_minmax(0,1fr)]">
         <FolderPanel
-          total={loading || loadError ? '— 件' : `${formTotal} 件`}
+          total={loading || loadError ? '— 件' : `${folderTotal} 件`}
           activeId={activeFolderId}
           onSelect={(folder) => {
             setActiveFolderId(folder)
@@ -439,9 +482,9 @@ export default function FormSubmissionsPage() {
           addFolderDisabled={canAddFolder === true}
           addFolderTitle="フォームのフォルダ保存先は未接続です"
           rows={[
-            { id: 'all', label: 'すべて', count: loading || loadError ? 0 : formTotal },
+            { id: 'all', label: 'すべて', count: loading || loadError ? 0 : folderTotal },
             ...folders.map((folder) => ({ id: folder.id, label: folder.name, count: folder.formCount })),
-            { id: 'unfiled', label: '未分類', count: loading || loadError ? 0 : Math.max(0, formTotal - folders.reduce((sum, folder) => sum + folder.formCount, 0)) },
+            { id: 'unfiled', label: '未分類', count: loading || loadError ? 0 : Math.max(0, folderTotal - folders.reduce((sum, folder) => sum + folder.formCount, 0)) },
           ]}
         />
 
@@ -544,7 +587,7 @@ export default function FormSubmissionsPage() {
             title="担当未割り当てのフォームはありません"
             description="担当の決まっていない旧フォームはここに出ます。"
           />
-        ) : forms.length === 0 ? (
+        ) : folderTotal === 0 ? (
           <ListState
             kind="empty"
             title="まだフォームがありません"
@@ -556,7 +599,7 @@ export default function FormSubmissionsPage() {
             )}
           />
         ) : (
-          filteredForms.length === 0 ? (
+          listTotal === 0 ? (
             <ListState
               kind="empty"
               title="条件に合うフォームはありません"
@@ -631,10 +674,10 @@ export default function FormSubmissionsPage() {
           </div>
           )
         )}
-          {!loading && !loadError && forms.length > 0 ? (
+          {!loading && !loadError && visibleForms.length > 0 ? (
             <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
               <p className="text-xs text-ink-faint">
-                {filteredForms.length.toLocaleString('ja-JP')}件中 {(filteredForms.length === 0 ? 0 : pageStart + 1).toLocaleString('ja-JP')}〜{Math.min(pageStart + pageSize, filteredForms.length).toLocaleString('ja-JP')}件を表示
+                {listTotal.toLocaleString('ja-JP')}件中 {(listTotal === 0 ? 0 : pageStart + 1).toLocaleString('ja-JP')}〜{Math.min(pageStart + visibleForms.length, listTotal).toLocaleString('ja-JP')}件を表示
               </p>
               <nav aria-label="回答フォームのページ送り" className="flex items-center gap-2 text-xs">
                 <Button

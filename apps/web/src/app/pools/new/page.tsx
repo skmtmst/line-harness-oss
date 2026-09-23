@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import type { LineAccount } from '@line-crm/shared'
 import { api } from '@/lib/api'
 import CreatePage, { Field, inputClass } from '@/components/shared/create-page'
@@ -14,16 +14,32 @@ export default function NewPoolPage() {
   const [slug, setSlug] = useState('')
   const [accountId, setAccountId] = useState('')
   const [accounts, setAccounts] = useState<LineAccount[]>([])
+  const [accountsError, setAccountsError] = useState('')
   const selectedAccount = accounts.find((account) => account.id === accountId)
 
-  useEffect(() => {
-    void api.lineAccounts.list().then((res) => {
+  /**
+   * 受け入れ先の一覧。取れなかったときに「アカウントが0件」と
+   * 見せると選びようがないので、失敗したことと読み直す口を出す。
+   */
+  const loadAccounts = useCallback(async () => {
+    setAccountsError('')
+    try {
+      const res = await api.lineAccounts.list()
       if (res.success) {
         setAccounts(res.data)
-        if (res.data.length > 0) setAccountId(res.data[0].id)
+        // 既に選んだあと（再読み込み）なら、その選択を上書きしない。
+        if (res.data.length > 0) setAccountId((current) => current || res.data[0].id)
+      } else {
+        setAccountsError('LINEアカウントを読み込めませんでした。もう一度お試しください。')
       }
-    })
+    } catch {
+      setAccountsError('LINEアカウントを読み込めませんでした。通信を確かめて、もう一度お試しください。')
+    }
   }, [])
+
+  useEffect(() => {
+    void loadAccounts()
+  }, [loadAccounts])
 
   return (
     <CreatePage
@@ -129,6 +145,18 @@ export default function NewPoolPage() {
           className={inputClass}
           options={accounts.map((account) => ({ value: account.id, label: account.name }))}
         />
+        {accountsError && (
+          <p className="text-danger mt-1 text-xs">
+            {accountsError}{' '}
+            <button
+              type="button"
+              onClick={() => void loadAccounts()}
+              className="underline"
+            >
+              再読み込み
+            </button>
+          </p>
+        )}
       </Field>
     </CreatePage>
   )

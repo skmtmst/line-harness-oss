@@ -100,6 +100,13 @@ function Harness() {
   const [notice, setNotice] = useState('')
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
+  // 公開入力は親が持つ（RICHMENU-06）。試験用の親としてここで持つ。
+  const [publish, setPublish] = useState<{
+    mode: 'now' | 'scheduled' | 'period'
+    startsAt: string
+    endsAt: string
+    restoreGroupId: string
+  }>({ mode: 'now', startsAt: '', endsAt: '', restoreGroupId: '' })
   const submit = useScheduleSubmit({
     groupId: group.id,
     persistDraft: async () => {},
@@ -123,6 +130,10 @@ function Harness() {
         preview={null}
         saving={saving}
         publishing={false}
+        publish={publish}
+        onPublishChange={(patch: Record<string, unknown>) =>
+          setPublish((prev) => ({ ...prev, ...patch }))
+        }
         onSave={() => {}}
         onPublishNow={() => {}}
         onSchedule={submit}

@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type FormEvent } from 'react'
 import AuthCard, { AuthField } from '@/components/auth/auth-card'
+import { opsCall } from '@/components/ops/ops-ui'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
@@ -70,7 +71,9 @@ export default function OpsTwoFactorPage() {
     if (digits.length !== 6) { setError('6桁の数字を入力してください'); return }
     setBusy(true)
     setError('')
-    const res = await api.staff.confirmTwoFactorSetup(session.id, digits)
+    // fetchApi は 4xx/5xx を例外にするので opsCall で { success: false } に直す。
+    // そのまま await すると setBusy(false) が走らず「確認しています…」のまま固まる。
+    const res = await opsCall(api.staff.confirmTwoFactorSetup(session.id, digits))
     setBusy(false)
     if (!res.success) { setError(res.error || '認証コードが正しくありません'); return }
     setState('done')

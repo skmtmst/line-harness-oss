@@ -329,6 +329,11 @@ const ALERT_ACTION_LABEL: Record<OperationAlert['events'][number]['action'], str
  *
  * お客さまへの影響 → 担当 → 直し方、の順で通知の技術的な詳細より先に出す。
  * 文言は画面側が持ち、口の checkKey と1対1に対応する。
+ *
+ * A32-01: 「お客さまへの影響」は実測そのものではなく起こり得る影響の案内なので、
+ * 実測で裏付けられない事態を断定しない。すべて「可能性」として書き、
+ * 確認そのものができていない(severity=unknown)異常では欄の出し分けで
+ * 「影響の有無も未確認」と伝える(下の OperationAlertsPanel)。
  */
 const ALERT_RESPONSE_FIRST: Record<OperationHealthCheckKey, { impact: string; recovery: string; href: string }> = {
   line_connection: {
@@ -347,17 +352,17 @@ const ALERT_RESPONSE_FIRST: Record<OperationHealthCheckKey, { impact: string; re
     href: '/ec-commerce',
   },
   webhook: {
-    impact: '外部システムへの通知が届いていません。',
+    impact: '外部システムへの通知が届いていない可能性があります。',
     recovery: '合言葉と送信先を確認し、失敗した通知を再送してください。',
     href: '/webhooks',
   },
   dispatch_jobs: {
-    impact: '予約した配信が時刻どおりに出ていません。',
+    impact: '予約した配信が時刻どおりに出ていない可能性があります。',
     recovery: '緊急コントロールで止めたままになっていないか確認してください。',
     href: '/emergency?tab=control',
   },
   friend_change: {
-    impact: '友だちが急に減っています。誤配信やブロックの可能性があります。',
+    impact: '友だちが急に減っている可能性があります。誤配信やブロックが原因の可能性があります。',
     recovery: '直近の配信内容を確認し、必要なら緊急停止してください。',
     href: '/emergency?tab=control',
   },
@@ -399,7 +404,7 @@ function OperationAlertsPanel({
         <div className="flex flex-wrap items-start justify-between gap-3"><div className="min-w-0"><div className="flex items-center gap-2"><StatusPill severity={alert.severity} /><p className="text-sm font-bold text-ink">{CHECK_DEFINITIONS.find((item) => HEALTH_CHECK_ID[alert.checkKey] === item.id)?.label ?? alert.checkKey}</p>{alert.status === 'acknowledged' && <span className="rounded-pill bg-info-bg px-2 py-1 text-xs font-bold text-info">受領済み</span>}{alert.status === 'resolved' && <span className="rounded-pill bg-success-bg px-2 py-1 text-xs font-bold text-success">解消済み</span>}</div><p className="mt-2 text-xs text-ink-secondary">{alert.summary}</p><p className="mt-1 text-xs text-ink-faint">{lastEvent ? `${ALERT_ACTION_LABEL[lastEvent.action]}：${formatOperationDate(lastEvent.createdAt)}` : formatOperationDate(alert.lastDetectedAt)}</p></div><p className={`text-xs font-bold ${alert.notification.failed + alert.notification.unconfigured > 0 ? 'text-danger' : 'text-ink-faint'}`}>{notification}</p></div>
         {/* #1050: お客さまへの影響→担当→直し方を、通知の内訳より先に出す。 */}
         {alert.status !== 'resolved' && response && <dl className="rounded-control grid gap-3 bg-canvas-sunken px-4 py-3 text-xs sm:grid-cols-3">
-          <div><dt className="font-bold text-ink-faint">お客さまへの影響</dt><dd className="mt-1 leading-relaxed text-ink-secondary">{response.impact}</dd></div>
+          <div><dt className="font-bold text-ink-faint">お客さまへの影響</dt><dd className="mt-1 leading-relaxed text-ink-secondary">{alert.severity === 'unknown' ? 'この項目はまだ確認できていないため、影響の有無も未確認です。' : response.impact}</dd></div>
           <div><dt className="font-bold text-ink-faint">担当</dt><dd className="mt-1 leading-relaxed text-ink-secondary">{alert.acknowledgedById ?? 'まだ受領されていません。下の「受領する」で担当が記録されます。'}</dd></div>
           <div><dt className="font-bold text-ink-faint">直し方</dt><dd className="mt-1 leading-relaxed text-ink-secondary">{response.recovery} <Link href={response.href} className="font-bold text-action">対象画面へ</Link></dd></div>
         </dl>}
@@ -448,12 +453,20 @@ function HealthPanel({
 
   const applySnapshot = useCallback((snapshot: OperationHealthSnapshot) => {
     const results = snapshot.latestRun?.results ?? []
+    /*
+     * A32-01: 前回の実行が期限切れ(stale)のとき、古い実測を現在の判定として
+     * 出さない。各項目の判定は「未確認」へ倒し、本文には古い結果であることを
+     * 明示して残す(古い「正常」が残って現在の健全と読み違えるのを防ぐ)。
+     */
+    const stale = snapshot.overallStatus === 'stale'
     setChecks(CHECK_DEFINITIONS.map((definition) => {
       const result = results.find((item) => HEALTH_CHECK_ID[item.checkKey] === definition.id)
       return {
         ...definition,
-        detail: result?.summary ?? 'サーバーに確認記録がありません',
-        severity: result?.status ?? 'unknown',
+        detail: result
+          ? stale ? `古い結果です（再確認待ち）: ${result.summary}` : result.summary
+          : 'サーバーに確認記録がありません',
+        severity: stale ? 'unknown' : (result?.status ?? 'unknown'),
         observedAt: result?.observedAt ?? snapshot.lastCheckedAt,
       }
     }))
@@ -554,6 +567,8 @@ function HealthPanel({
   }, [load])
 
   const displayedSeverity = loading || snapshotStatus === 'stale' ? 'unknown' : mostSevere(checks)
+  // A32-01: 期限切れ(stale)は「取得失敗」と「実測の異常」のどちらでもない第3の状態。
+  const isStale = !loading && snapshotStatus === 'stale'
   const isNormal = displayedSeverity === 'normal'
   const resultTitle = isNormal ? '異常なし' : displayedSeverity === 'warning' ? '注意' : displayedSeverity === 'danger' ? 'エラー' : '確認できない項目があります'
   const resultDescription = isNormal
@@ -562,7 +577,9 @@ function HealthPanel({
       ? '注意が必要な項目があります。チェック結果を確認してください。'
       : displayedSeverity === 'danger'
         ? '対応が必要な項目があります。チェック結果を確認してください。'
-        : '取得できない項目があります。時間をおいて再確認してください。'
+        : isStale
+          ? '前回の確認結果が期限切れです。自動確認が止まっている可能性があります。「いますぐ確かめる」で再確認してください。'
+          : '取得できない項目があります。時間をおいて再確認してください。'
   const statusIcon = isNormal ? '✓' : '!'
   const statusIconClass = isNormal ? 'text-success' : displayedSeverity === 'warning' ? 'text-warning' : displayedSeverity === 'danger' ? 'text-danger' : 'text-ink-faint'
 
@@ -611,7 +628,7 @@ function HealthPanel({
   return (
     <div className="space-y-4" data-design="V3 Health">
       <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-        <SummaryCard label="全体の状態" value={resultTitle} note={loading ? '確認中' : refreshing ? '更新中' : '最新結果'} />
+        <SummaryCard label="全体の状態" value={resultTitle} note={loading ? '確認中' : refreshing ? '更新中' : isStale ? '期限切れ（再確認待ち）' : '最新結果'} />
         <SummaryCard label="最後の確認" value={formatOperationDate(checkedAt)} note="5分ごとに自動確認" />
         <SummaryCard label="緊急停止状態" value={controlSummary.value} note={controlSummary.note} />
       </div>
@@ -623,7 +640,7 @@ function HealthPanel({
         <div className="min-w-0 flex-1">
           <p className="text-base font-bold text-ink">{loading ? '確認しています…' : `${resultTitle}。${isNormal ? '6項目のすべてが正常です。' : ''}`}</p>
           <p className="mt-0.5 text-xs text-ink-faint">
-            {loading ? '最新の状態を読み込んでいます。' : `${resultDescription} 次は${formatOperationDate(nextCheckedAt)}に自動で確かめます。`}
+            {loading ? '最新の状態を読み込んでいます。' : `${resultDescription}${isStale ? '' : ` 次は${formatOperationDate(nextCheckedAt)}に自動で確かめます。`}`}
           </p>
         </div>
         <Link href="/emergency?tab=control" className="rounded-control inline-flex min-h-9 items-center bg-danger px-3 text-xs font-bold text-on-accent hover:opacity-90">緊急停止を確認</Link>

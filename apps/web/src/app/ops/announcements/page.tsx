@@ -71,6 +71,7 @@ export default function OpsAnnouncementsPage() {
   const [deleting, setDeleting] = useState<OpsAnnouncement | null>(null)
 
   const load = useCallback(async () => {
+    setError('')
     const res = await opsCall(api.ops.announcements.list())
     setLoaded(true)
     if (!res.success) { setError(res.error || '読み込めませんでした'); return }
@@ -225,6 +226,9 @@ export default function OpsAnnouncementsPage() {
           </header>
           {!loaded ? (
             <ListState kind="loading" title="読み込んでいます" />
+          ) : error && rows.length === 0 ? (
+            // 「まだ無い」と「読み込めなかった」を言い分ける。失敗時は空の案内ではなくエラーと再読み込みを出す。
+            <ListState kind="error" title="お知らせを表示できませんでした" onRetry={() => void load()} />
           ) : rows.length === 0 ? (
             <ListState kind="empty" title="まだお知らせはありません" description="左で作って「今すぐ送る」か「配信を予約する」を押すと、ここに並びます。" />
           ) : (

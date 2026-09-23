@@ -14,6 +14,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 const m = vi.hoisted(() => ({ get: vi.fn(), save: vi.fn() }))
 vi.mock('@/lib/api', () => ({ ApiError: class extends Error { status?: number } }))
 vi.mock('@/lib/nen-ranks-api', () => ({ nenRanksApi: { feeding: m.get, saveFeeding: m.save } }))
+vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn(), refresh: vi.fn(), prefetch: vi.fn() }) }))
 
 import FeedingTab from './feeding-tab'
 

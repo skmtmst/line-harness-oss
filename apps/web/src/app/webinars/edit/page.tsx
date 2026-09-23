@@ -3,7 +3,7 @@
 import SelectField from '@/components/shared/select-field'
 import React, { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { usePathname, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import WebinarNotifications from '@/components/webinars/webinar-notifications'
 import { notificationPreview, videoPreview } from './preview-body'
@@ -43,6 +43,7 @@ import {
   type WebinarParticipantClassification,
 } from '@/lib/api'
 import { usePageTitle } from '@/components/shell/page-chrome'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { WEBINAR_SAKURA_COMMENTS_MAX } from '@/components/webinars/webinar-limits'
 import { publicationStateLabel } from '@/components/webinars/publication-label'
 import { webinarErrorText } from '@/components/webinars/webinar-error-text'
@@ -1982,7 +1983,7 @@ type PaneKey = StepKey | ExtraKey
  * STEP 5 確認（設計 `D6yO7e`）。**公開の前に、足りないものを1つずつ言う。**
  * ここで言えないと、公開してから友だちの画面で気づくことになる。
  */
-function ReviewStep({ webinar, editor, registrations, ctaCount, onBack }: { webinar: Webinar; editor: WebinarEditor; registrations: number | null; ctaCount: number; onBack: (key: StepKey) => void }) {
+function ReviewStep({ webinar, editor, registrations, ctaCount, onBack, onPublished }: { webinar: Webinar; editor: WebinarEditor; registrations: number | null; ctaCount: number; onBack: (key: StepKey) => void; onPublished: () => void }) {
   const [validation, setValidation] = useState<WebinarPublishValidation | null>(null)
   const [validationState, setValidationState] = useState<'loading' | 'ready' | 'error'>('loading')
   const [publishing, setPublishing] = useState(false)
@@ -2019,6 +2020,12 @@ function ReviewStep({ webinar, editor, registrations, ctaCount, onBack }: { webi
     setPublishError('')
     try {
       await webinarApi.publish(webinar.id, editor.version)
+      /*
+        公開できたあとの遷移は「入力を捨てる離脱」ではない。未保存の印が
+        残っていてもブラウザ標準の離脱確認が出ないよう、遷移の直前に
+        未保存ガードを外す。
+      */
+      onPublished()
       window.location.assign(`/webinars/published?id=${encodeURIComponent(webinar.id)}`)
     } catch (cause) {
       setPublishError(webinarErrorText(cause, '公開できませんでした'))
@@ -2092,6 +2099,7 @@ function ReviewStep({ webinar, editor, registrations, ctaCount, onBack }: { webi
 
 function EditWebinarInner() {
   const searchParams = useSearchParams()
+  const pathname = usePathname()
   const id = searchParams.get('id')
   const { accounts, loading: accountsLoading } = useAccount()
   /*
@@ -2187,6 +2195,41 @@ function EditWebinarInner() {
     }
     return registrar
   }
+
+  /*
+    未保存の入力を持ったまま画面の外へ出る操作を止める（DETAIL-04 残存経路）。
+    一覧リンク・左メニュー・ブラウザの戻る・再読込を捕まえ、破棄か編集継続かを
+    確認する。段の行き来は画面内の移動なのでここには触れない——入力は隠すだけで
+    畳まないため失われない。契約は共通の `useUnsavedGuard` と同じ。
+  */
+  const { leaveTarget, confirmLeave, cancelLeave, disarm } = useUnsavedGuard({
+    dirty: unsavedPanes.size > 0,
+    busy: savingForNav !== false,
+    /*
+      段の行き来で変わるのは pane だけ。同じウェビナーの中での戻る・進むは
+      離脱ではないので、確認も復元もしない。一覧や別のウェビナーへ出る
+      操作はこれまで通り止める（DETAIL-04 の pane 例外）。
+    */
+    samePage: (destination) =>
+      destination.pathname === pathname && destination.searchParams.get('id') === id,
+  })
+  /*
+    離脱の確認はどの段・どの画面状態にいても出す。読み込み失敗や未指定の
+    分岐は別ツリーへ早期 return するため、ここで要素化して全経路へ差し込む。
+    片方だけに置くと、dirty 中のリンクが黙って止まり「保存せずに移動」を
+    選ぶ手段がなくなる。
+  */
+  const leaveConfirmDialog = (
+    <ConfirmDialog
+      open={leaveTarget !== null}
+      title="保存していない変更があります"
+      description="このまま移動すると、ウェビナーの変更は失われます。保存せずに移動しますか？"
+      confirmLabel="保存せずに移動"
+      cancelLabel="編集を続ける"
+      onConfirm={confirmLeave}
+      onCancel={cancelLeave}
+    />
+  )
 
   /*
     段の移動はURLにも残す。再読み込み・ブラウザの戻るで
@@ -2337,6 +2380,7 @@ function EditWebinarInner() {
           <p className="mt-1 text-sm text-ink-secondary">一覧から編集するウェビナーを選び直してください。</p>
           <Link href="/webinars" className="mt-3 inline-block text-sm font-semibold text-action hover:underline">ウェビナー一覧へ戻る</Link>
         </div>
+        {leaveConfirmDialog}
       </>
     )
   }
@@ -2345,6 +2389,7 @@ function EditWebinarInner() {
       <>
 
         <div className="p-6 text-gray-500">読み込み中...</div>
+        {leaveConfirmDialog}
       </>
     )
   }
@@ -2356,6 +2401,7 @@ function EditWebinarInner() {
           <p className="text-danger">{loadError ?? 'ウェビナーが見つかりませんでした'}</p>
           <Link href="/webinars" className="mt-3 inline-block text-sm font-semibold text-action hover:underline">ウェビナー一覧へ戻る</Link>
         </div>
+        {leaveConfirmDialog}
       </>
     )
   }
@@ -2471,7 +2517,7 @@ function EditWebinarInner() {
           <NotificationDesignStep webinarId={webinar.id} webinarTitle={webinar.title} registrations={registrations} publicUrl={publicUrl} canOpenPublicPage={canOpenPublicPage} publicPageReason={publicPageReason} onDirtyChange={dirtyReporterFor('notifications')} registerSave={saveRegistrarFor('notifications')} />
         </div>
       ) : null}
-      {pane === 'review' && <ReviewStep webinar={webinar} editor={editor} registrations={registrations} ctaCount={ctaCount} onBack={goStep} />}
+      {pane === 'review' && <ReviewStep webinar={webinar} editor={editor} registrations={registrations} ctaCount={ctaCount} onBack={goStep} onPublished={disarm} />}
       {visitedPanes.has('comments') ? (
         <div hidden={pane !== 'comments'}>
           <CommentsTab webinarId={webinar.id} />
@@ -2497,6 +2543,7 @@ function EditWebinarInner() {
         </div>
       ) : null}
       {pane === 'participants' ? <div className="mt-4 flex justify-end gap-2"><Button href={`/webinars/edit?id=${encodeURIComponent(webinar.id)}&pane=analytics`}>分析を見る</Button><Button href={`/webinars/edit?id=${encodeURIComponent(webinar.id)}`}>ウェビナーの設定を編集</Button></div> : null}
+      {leaveConfirmDialog}
     </main>
   )
 }

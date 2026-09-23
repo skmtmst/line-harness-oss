@@ -75,6 +75,17 @@ describe('V6 33-4 乗り換え・引き継ぎ', () => {
     expect(DIFFERENT_PROVIDER_NOTE).toContain('対応表を取り込むか')
   })
 
+  it('?id= なしで開いたとき、無限ローディングにせず一覧へ戻す', () => {
+    /*
+      `load()` は `!id` で何もせず帰るので、ガードがないと
+      「読み込んでいます」が消えない（監査 Issue #1058）。
+      対象未指定は失敗ではないので、再読み込みではなく一覧への口を出す。
+    */
+    expect(PAGE).toContain('if (!id)')
+    expect(PAGE).toContain('乗り換えるアカウントが指定されていません')
+    expect(PAGE).toContain('href="/accounts"')
+  })
+
   it('動的セグメントを使わない', () => {
     // 静的書き出しなので `[id]` は書き出せない。
     expect(PAGE).toContain("search?.get('id')")

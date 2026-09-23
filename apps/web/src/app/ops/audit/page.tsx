@@ -96,6 +96,9 @@ export default function OpsAuditPage() {
 
       {loading ? (
         <ListState kind="loading" title="記録を読み込んでいます" />
+      ) : error && rows.length === 0 ? (
+        // 「記録が無い」と「読み込めなかった」を言い分ける。失敗時は空の案内ではなくエラーと再読み込みを出す。
+        <ListState kind="error" title="記録を表示できませんでした" onRetry={() => void load()} />
       ) : rows.length === 0 ? (
         <ListState kind="empty" title="記録がありません" description="運営が操作を行うと、ここに残ります。" />
       ) : (
