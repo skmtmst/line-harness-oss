@@ -15,7 +15,7 @@ import ScenariosPage from './page'
  *
  * D1 の LIKE パターン50バイト制限で `/api/scenarios?query=` が500になり、
  * 画面が「読み込み中」のまま戻らない事故があった。画面側は次を守る必要がある:
- *   - 長い検索語をそのままサーバーへ渡す
+ *   - 長い検索語は上限(200文字)へ切り詰めてサーバーへ渡す
  *   - 0件なら空状態、失敗なら失敗表示＋再読み込みで、無限「読み込み中」にしない
  */
 
@@ -29,6 +29,8 @@ vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({
 }) }))
 
 const LONG_QUERY = 'とても長い検索語'.repeat(200)
+// 画面は検索語を上限200文字へ切り詰めて送る（search-query.ts の契約）。
+const CLAMPED_QUERY = LONG_QUERY.slice(0, 200)
 
 let root: Root
 let host: HTMLDivElement
@@ -102,15 +104,15 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
-test('2000文字の検索語は切り捨てずサーバーへ届き、0件なら空状態が出る', async () => {
+test('2000文字の検索語は上限へ切り詰めてサーバーへ届き、0件なら空状態が出る', async () => {
   await act(async () => root.render(<ScenariosPage />))
   await settle()
   await typeQuery(LONG_QUERY)
 
-  // debounce(300ms)のあと、検索語をそのまま乗せた一覧取得が出る
+  // debounce(300ms)のあと、切り詰めた検索語を乗せた一覧取得が出る
   await eventually(() => {
     expect(calls.some((url) => url.pathname === '/api/scenarios'
-      && url.searchParams.get('query') === LONG_QUERY)).toBe(true)
+      && url.searchParams.get('query') === CLAMPED_QUERY)).toBe(true)
   })
   // 0件は障害ではなく空状態。「読み込んでいます」を残さない。
   await eventually(() => {
@@ -162,6 +164,6 @@ test('一覧口が落ちても失敗表示＋再読み込みが出て、無限�
   await eventually(() => {
     expect(host.querySelector('[data-list-state="error"]')).toBeNull()
     expect(calls.filter((url) => url.pathname === '/api/scenarios'
-      && url.searchParams.get('query') === LONG_QUERY).length).toBeGreaterThanOrEqual(2)
+      && url.searchParams.get('query') === CLAMPED_QUERY).length).toBeGreaterThanOrEqual(2)
   })
 })

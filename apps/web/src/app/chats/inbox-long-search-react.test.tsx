@@ -15,7 +15,8 @@ import ChatsPage from './page'
  *
  * D1 の LIKE パターン50バイト制限で一覧口が500になる事故があった。
  * サーバー側は instr() に直したが、画面側は次を守る必要がある:
- *   - 長い検索語を勝手に切り捨てず、そのままサーバーへ渡す
+ *   - 長い検索語は上限(200文字)へ切り詰めてサーバーへ渡す
+ *     （/api/chats 系は元々サーバー側でも200文字で切り詰める）
  *   - 0件なら「条件に一致する会話がありません」の空状態を出す
  *   - 口が落ちても無限「読み込み中」にせず、失敗行＋再読み込みを出す
  *   - タブ件数は失敗を 0 と読まず「—」のままにする
@@ -33,6 +34,8 @@ vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({
 }) }))
 
 const LONG_QUERY = 'あ'.repeat(2000)
+// 画面は検索語を上限200文字へ切り詰めて送る（search-query.ts の契約）。
+const CLAMPED_QUERY = LONG_QUERY.slice(0, 200)
 
 let root: Root
 let host: HTMLDivElement
@@ -107,15 +110,15 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
-test('2000文字の検索語は切り捨てずサーバーへ届き、0件なら空状態が出る', async () => {
+test('2000文字の検索語は上限へ切り詰めてサーバーへ届き、0件なら空状態が出る', async () => {
   await act(async () => root.render(<ChatsPage />))
   await settle()
   await typeQuery(LONG_QUERY)
 
-  // debounce(250ms)のあと、検索語をそのまま乗せた一覧取得が出る
+  // debounce(250ms)のあと、切り詰めた検索語を乗せた一覧取得が出る
   await eventually(() => {
-    expect(calls.some((url) => url.pathname === '/api/chats' && url.searchParams.get('q') === LONG_QUERY)).toBe(true)
-    expect(calls.some((url) => url.pathname === '/api/support/inbox' && url.searchParams.get('q') === LONG_QUERY)).toBe(true)
+    expect(calls.some((url) => url.pathname === '/api/chats' && url.searchParams.get('q') === CLAMPED_QUERY)).toBe(true)
+    expect(calls.some((url) => url.pathname === '/api/support/inbox' && url.searchParams.get('q') === CLAMPED_QUERY)).toBe(true)
   })
   // 0件は障害ではなく空状態。「会話を読み込んでいます...」を残さない。
   await eventually(() => {
