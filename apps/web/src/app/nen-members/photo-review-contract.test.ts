@@ -131,4 +131,32 @@ describe('V6 photo review contract', () => {
     expect(detail).toContain('assetsFailed');
     expect(detail).toContain('状態を読み直す');
   });
+
+  /*
+   * PHOTO-06 (#1079): 止まったポイント手続きの復旧口。
+   * 派生状態を同じ言葉で出し、stale / failed_retryable のときだけ
+   * 再試行とEC照合の入口を見せる。入口は冪等なPOST 2本。
+   */
+  it('shows stuck point procedures with retry and reconcile entries (PHOTO-06)', () => {
+    expect(api).toContain('/point-retry');
+    expect(api).toContain('/point-reconcile');
+    expect(api).toContain('NenPhotoRewardActionResult');
+    expect(detail).toContain("['stale', 'failed_retryable'].includes(text(reward.state))");
+    expect(detail).toContain('ポイント手続きをもう一度送る');
+    expect(detail).toContain('EC側と照合する');
+    expect(detail).toContain("onPointAction('retry')");
+    expect(detail).toContain("onPointAction('reconcile')");
+    expect(page).toContain('onPointAction={pointAction}');
+    expect(page).toContain('pointActionBusy={pointActionBusy}');
+    // 照合でEC付与済みが分かったときは、その旨を運用者へ伝える。
+    expect(page).toContain('すでに付与済みでした');
+  });
+
+  it('labels the derived reward states the same way in list and detail (PHOTO-06)', () => {
+    expect(helper).toContain("case 'stale': return 'ポイントの手続きが止まっています'");
+    expect(helper).toContain("case 'failed_retryable': return 'ポイントの手続きに失敗（再試行できます）'");
+    // 詳細はサーバーの派生状態を優先し、古い応答は生のstatusへ倒す。
+    expect(detail).toContain('text(reward.state) || reward.status');
+    expect(detail).toContain('reward.reason_label');
+  });
 });

@@ -8,6 +8,7 @@ import {
   jstNow,
   resolveLineCredential,
   findOrCreateGlobalTag,
+  toJstString,
 } from '@line-crm/db';
 import * as dbPackage from '@line-crm/db';
 import type { Env } from '../index.js';
@@ -38,6 +39,14 @@ import {
 } from '../services/nen-feeding.js';
 import { attachTagAndFireSideEffects } from '../services/friend-tag-attach.js';
 import { APPETITE_LABELS, STOOL_LABELS, thirtyDaySummary, type HealthLogRow } from '../services/nen-health-admin.js';
+import {
+  attemptPhotoRewardForPhoto,
+  ecPhotoPointClientFromEnv,
+  photoRewardDisplayState,
+  PHOTO_REWARD_REASON_LABELS,
+  PHOTO_REWARD_STALE_MS,
+  type EcPhotoPointClient,
+} from '../services/photo-reward-sync.js';
 import { petCallName, petGender } from '../services/nen-pet-name.js';
 import { isFeedingSupportedAnimal, petAnimalTypeLabel, toPetAnimalType } from '../lib/nen-pet-species.js';
 import { normalizeNenPetBirthday } from '../lib/nen-pet-birthday.js';
@@ -52,6 +61,28 @@ const nenMembers = new Hono<Env>();
 const CONCERNS = new Set(['tear_stain', 'coat', 'allergy', 'appetite', 'stool', 'weight', 'other']);
 const IMAGE_TYPES: Record<string, string> = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' };
 const PHOTO_ADOPTION_POINTS = 5;
+
+/*
+ * ECへのポイント付与の接続先。誕生日クーポン（index.ts の cron）と同じ
+ * 2変数で決める。未設定の環境では outbox は積んだままにして、
+ * 「手続き中」→24時間で「要対応」と画面へ正直に出す（PHOTO-06）。
+ */
+function ecPhotoPointClient(c: Context<Env>): EcPhotoPointClient | undefined {
+  return ecPhotoPointClientFromEnv(c.env);
+}
+
+/** 一覧の point_sync_status を生のstatusではなく運用向けの派生状態で返すSQL。 */
+const PHOTO_REWARD_STATE_CASE = `
+  CASE
+    WHEN o.status = 'synced' THEN 'synced'
+    WHEN o.status = 'failed' AND o.last_error IN
+      ('customer_unlinked', 'invalid_award', 'ec_auth_failed', 'attempts_exhausted')
+      THEN 'failed_permanent'
+    WHEN o.status = 'failed' THEN 'failed_retryable'
+    WHEN o.updated_at < ? THEN 'stale'
+    ELSE 'pending'
+  END`;
+
 const PHOTO_REVIEW_REASON_LABELS = {
   quality: '写真が暗い・ぼやけている',
   privacy: '人の顔や個人情報が写っている',
@@ -1230,6 +1261,7 @@ nenMembers.get('/api/nen-members/photos', requirePhotoPermission('photo.submissi
    */
   const q = (c.req.query('q') ?? '').trim().slice(0, 100);
   const like = `%${q.replace(/[\\%_]/g, (ch) => `\\${ch}`)}%`;
+  const staleCutoff = toJstString(new Date(Date.now() - PHOTO_REWARD_STALE_MS));
   const rows = await c.env.DB.prepare(
     `SELECT ps.id, ps.friend_id, ps.pet_id, ps.review_image_url AS image_url,
             ps.caption, ps.status, ps.awarded_points, ps.created_at, ps.reviewed_at,
@@ -1238,7 +1270,7 @@ nenMembers.get('/api/nen-members/photos', requirePhotoPermission('photo.submissi
             ps.review_reason_note, ps.review_notification_status,
             ps.display_rotation, f.photo_watch_required AS submitter_watch,
             p.name pet_name, f.display_name owner_name,
-            (SELECT o.status FROM nen_photo_reward_outbox o
+            (SELECT ${PHOTO_REWARD_STATE_CASE} FROM nen_photo_reward_outbox o
               WHERE o.photo_id = ps.id AND o.line_account_id = ps.line_account_id) AS point_sync_status,
             (SELECT r.flag FROM nen_photo_risk_assessments r
               WHERE r.photo_id = ps.id AND r.line_account_id = ps.line_account_id
@@ -1256,7 +1288,7 @@ nenMembers.get('/api/nen-members/photos', requirePhotoPermission('photo.submissi
       WHERE ps.line_account_id = ? AND f.line_account_id = ?
         ${q ? `AND (ps.caption LIKE ? ESCAPE '\\' OR p.name LIKE ? ESCAPE '\\' OR f.display_name LIKE ? ESCAPE '\\')` : ''}
       ORDER BY ps.created_at DESC, ps.id DESC LIMIT ? OFFSET ?`,
-  ).bind(...(q ? [accountId, accountId, like, like, like] : [accountId, accountId]), limit, offset).all<Record<string, unknown>>();
+  ).bind(staleCutoff, ...(q ? [accountId, accountId, like, like, like] : [accountId, accountId]), limit, offset).all<Record<string, unknown>>();
   return c.json({ success: true, data: rows.results });
 });
 
@@ -1269,6 +1301,7 @@ nenMembers.get(
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
       return c.json({ success: false, error: 'このLINEアカウントを表示する権限がありません' }, 403);
     }
+    const staleCutoff = toJstString(new Date(Date.now() - PHOTO_REWARD_STALE_MS));
     const rows = await c.env.DB.prepare(
       `SELECT pub.id, pub.photo_id, pub.status, pub.show_owner_name, pub.view_count,
               pub.version, pub.published_at, ps.public_image_url AS image_url,
@@ -1276,7 +1309,7 @@ nenMembers.get(
               ps.awarded_points, ps.reviewed_at, ps.reviewed_by_name,
               p.name AS pet_name,
               CASE WHEN pub.show_owner_name = 1 THEN f.display_name ELSE NULL END AS owner_name,
-              (SELECT o.status FROM nen_photo_reward_outbox o
+              (SELECT ${PHOTO_REWARD_STATE_CASE} FROM nen_photo_reward_outbox o
                 WHERE o.photo_id = ps.id AND o.line_account_id = pub.line_account_id) AS point_sync_status
          FROM nen_photo_publications pub
          JOIN nen_photo_submissions ps ON ps.id = pub.photo_id AND ps.line_account_id = pub.line_account_id
@@ -1286,7 +1319,7 @@ nenMembers.get(
           AND ps.status = 'adopted' AND ps.publication_consent_at IS NOT NULL
           AND ps.publication_withdrawn_at IS NULL
         ORDER BY pub.published_at DESC LIMIT 200`,
-    ).bind(accountId).all<Record<string, unknown>>();
+    ).bind(staleCutoff, accountId).all<Record<string, unknown>>();
     /*
      * 公開中ではない掲載も同じ画面で追う（Issue #1040 IDEA-22）。
      * ご本人がLIFFで同意を撤回すると写真側の publication_withdrawn_at が
@@ -1304,7 +1337,7 @@ nenMembers.get(
               ps.awarded_points, ps.reviewed_at, ps.reviewed_by_name,
               p.name AS pet_name,
               CASE WHEN pub.show_owner_name = 1 THEN f.display_name ELSE NULL END AS owner_name,
-              (SELECT o.status FROM nen_photo_reward_outbox o
+              (SELECT ${PHOTO_REWARD_STATE_CASE} FROM nen_photo_reward_outbox o
                 WHERE o.photo_id = ps.id AND o.line_account_id = pub.line_account_id) AS point_sync_status
          FROM nen_photo_publications pub
          JOIN nen_photo_submissions ps ON ps.id = pub.photo_id AND ps.line_account_id = pub.line_account_id
@@ -1316,7 +1349,7 @@ nenMembers.get(
                    AND ps.publication_consent_at IS NOT NULL
                    AND ps.publication_withdrawn_at IS NULL)
         ORDER BY pub.updated_at DESC LIMIT 200`,
-    ).bind(accountId).all<Record<string, unknown>>();
+    ).bind(staleCutoff, accountId).all<Record<string, unknown>>();
     /*
      * 掲載先は1発で取る。写真ごとに1件ずつ取りに行くと、掲載数が増えるほど
      * 遅くなる（N+1）。公開先ごとの掲載状態を追えるよう、外した先
@@ -1530,7 +1563,7 @@ nenMembers.get('/api/nen-members/photos/:id', requirePhotoPermission('photo.subm
         ORDER BY created_at DESC LIMIT 20`,
     ).bind(c.req.param('id'), accountId).all<Record<string, unknown>>(),
     c.env.DB.prepare(
-      `SELECT status, points, attempt_count, last_error, synced_at, updated_at
+      `SELECT status, points, attempt_count, last_error, next_attempt_at, synced_at, updated_at
          FROM nen_photo_reward_outbox
         WHERE photo_id = ? AND line_account_id = ?`,
     ).bind(c.req.param('id'), accountId).first<Record<string, unknown>>(),
@@ -1548,13 +1581,30 @@ nenMembers.get('/api/nen-members/photos/:id', requirePhotoPermission('photo.subm
       WHERE publication_id = ? AND line_account_id = ?
       ORDER BY created_at`,
   ).bind(publication.id, accountId).all<Record<string, unknown>>()).results : [];
+  /*
+   * 報酬は生のstatusではなく運用向けの派生状態（state）で返す
+   * （PHOTO-06）。「手続き中」のまま24時間以上止まったものは stale、
+   * 再試行しても直らない失敗は failed_permanent として、
+   * 一覧（point_sync_status の CASE）と同じ顔ぶれで出す。
+   */
+  const rewardView = reward
+    ? {
+      ...reward,
+      state: photoRewardDisplayState({
+        status: reward.status as 'pending' | 'processing' | 'synced' | 'failed',
+        last_error: reward.last_error as string | null,
+        updated_at: String(reward.updated_at),
+      }, new Date()),
+      reason_label: PHOTO_REWARD_REASON_LABELS[String(reward.last_error ?? '')] ?? null,
+    }
+    : null;
   return c.json({
     success: true,
     data: {
       ...photo,
       risks: risks.results,
       history: history.results,
-      reward: reward ?? null,
+      reward: rewardView,
       publication: publication ? { ...publication, placements: publicationPlacements } : null,
     },
   });
@@ -1691,6 +1741,30 @@ nenMembers.put('/api/nen-members/photos/:id/review', requireRole('owner', 'admin
     return c.json({ success: false, error: '同じ写真がほかの担当者により更新されました' }, 409);
   }
   await syncNenPhotoTags(c.env.DB, String(photo.friend_id));
+  /*
+   * outbox を積んだら、その場でECへの付与を一度試す（PHOTO-06）。
+   * ここで届けば「手続き中」のまま残らない。失敗しても採用そのものは
+   * 完了させ、行は pending/failed のまま残り、日次回収・手動の
+   * 再試行・照合のどれかで後から進められる。
+   */
+  let finalPointSync: 'pending' | 'needs_attention' | 'not_required' | 'synced' = pointSync;
+  const ecClient = status === 'adopted' && photo.customer_id ? ecPhotoPointClient(c) : undefined;
+  if (ecClient) {
+    try {
+      const attempt = await attemptPhotoRewardForPhoto(
+        c.env.DB,
+        { photoId: String(photo.id), lineAccountId: accountId },
+        ecClient,
+        { now: new Date() },
+      );
+      if (attempt.kind === 'already_synced'
+        || (attempt.kind === 'delivered' && attempt.outcome.kind === 'synced')) {
+        finalPointSync = 'synced';
+      }
+    } catch (error) {
+      console.error('photo reward initial delivery failed', error);
+    }
+  }
   const delivery = await deliverPhotoReviewNotification(c.env.DB, c, photo, {
     lineAccountId: accountId,
     photoId: photo.id,
@@ -1705,11 +1779,101 @@ nenMembers.put('/api/nen-members/photos/:id/review', requireRole('owner', 'admin
     data: {
       awardedPoints: awarded,
       pointBalance: null,
-      pointSync,
+      pointSync: finalPointSync,
       notificationStatus: delivery.notificationStatus,
     },
   });
 });
+
+/*
+ * 止まったポイント手続きを人が動かす口（PHOTO-06）。
+ *
+ * - point-retry …「手続き中」「確認が必要」の行を今すぐ届け直す。
+ * - point-reconcile … EC側に届いているかを awardKey で照合し、
+ *   EC成功・管理DB失敗の食い違いを synced へ収束させる。
+ *
+ * どちらも中身は同じ冪等な付与呼び出し（EC側が awardKey で二重付与を
+ * 防ぐ）で、入口を分けているのは「もう一度送る」と「届いたか確認する」
+ * という運用者の意図を監査ログへ残すため。
+ */
+async function handlePhotoRewardAction(c: Context<Env>, action: 'retry' | 'reconcile') {
+  const body = await c.req.json<{ accountId?: string }>().catch(() => null);
+  const accountId = body?.accountId?.trim();
+  if (!accountId) return c.json({ success: false, error: '対象アカウントを指定してください' }, 400);
+  if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
+    return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
+  }
+  const photo = await c.env.DB.prepare(
+    `SELECT ps.id, ps.status, s.customer_id
+       FROM nen_photo_submissions ps
+       LEFT JOIN nen_ec_member_snapshots s ON s.friend_id = ps.friend_id
+      WHERE ps.id = ? AND ps.line_account_id = ?`,
+  ).bind(c.req.param('id'), accountId).first<{ id: string; status: string; customer_id: string | null }>();
+  if (!photo) return c.json({ success: false, error: '写真が見つかりません' }, 404);
+  if (photo.status !== 'adopted') {
+    return c.json({ success: false, error: '採用した写真だけがポイント付与の対象です' }, 400);
+  }
+  if (!photo.customer_id) {
+    return c.json({ success: false, error: 'EC会員とつながっていないためポイントを付けられません' }, 400);
+  }
+  const client = ecPhotoPointClient(c);
+  if (!client) {
+    return c.json({ success: false, error: 'ECへの接続が設定されていません' }, 503);
+  }
+  try {
+    const attempt = await attemptPhotoRewardForPhoto(
+      c.env.DB,
+      { photoId: photo.id, lineAccountId: accountId },
+      client,
+      { now: new Date() },
+    );
+    if (attempt.kind === 'no_reward') {
+      /*
+       * outbox 行が無い古い採用には勝手に手続きを作らない。
+       * 旧経路で付与済みかもしれず、ここで作ると二重付与になりうる
+       * （受入条件: 既存の5ptデータを再付与しない）。
+       */
+      return c.json({ success: false, error: '対象のポイント手続きが見つかりません' }, 404);
+    }
+    if (attempt.kind === 'busy') {
+      return c.json({ success: false, error: 'いま別の手続きが進行中です。少し待ってからやり直してください' }, 409);
+    }
+    const synced = attempt.kind === 'already_synced'
+      || (attempt.kind === 'delivered' && attempt.outcome.kind === 'synced');
+    const duplicate = attempt.kind === 'delivered'
+      && attempt.outcome.kind === 'synced'
+      && attempt.outcome.duplicate;
+    const reason = attempt.kind === 'delivered' && attempt.outcome.kind !== 'synced'
+      ? attempt.outcome.reason : null;
+    return c.json({
+      success: true,
+      data: {
+        action,
+        state: attempt.kind === 'delivered' ? attempt.state : 'synced',
+        synced,
+        duplicate,
+        reason,
+        reasonLabel: reason ? (PHOTO_REWARD_REASON_LABELS[reason] ?? reason) : null,
+      },
+    });
+  } catch (error) {
+    console.error(`photo reward ${action} failed`, error);
+    return c.json({ success: false, error: 'ポイントの手続きに失敗しました' }, 500);
+  }
+}
+
+nenMembers.post(
+  '/api/nen-members/photos/:id/point-retry',
+  requireRole('owner', 'admin', 'staff'),
+  requirePhotoPermission('photo.reward.reconcile'),
+  (c) => handlePhotoRewardAction(c, 'retry'),
+);
+nenMembers.post(
+  '/api/nen-members/photos/:id/point-reconcile',
+  requireRole('owner', 'admin', 'staff'),
+  requirePhotoPermission('photo.reward.reconcile'),
+  (c) => handlePhotoRewardAction(c, 'reconcile'),
+);
 
 /*
  * 詳細画面で直した写真の向きを版つきで保存する（#931 N-309）。

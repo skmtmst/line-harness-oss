@@ -35,7 +35,11 @@ export function pointStatusLabel(status: unknown, points = 5) {
     case 'synced': return `${points}ポイントを付けました`
     case 'pending':
     case 'processing': return `${points}ポイントを付ける手続き中`
+    // PHOTO-06: 派生状態。長く止まった手続き・失敗の種類を区別して出す。
+    case 'stale': return 'ポイントの手続きが止まっています'
     case 'failed': return 'ポイントの手続きで確認が必要'
+    case 'failed_retryable': return 'ポイントの手続きに失敗（再試行できます）'
+    case 'failed_permanent': return 'ポイントの手続きで確認が必要'
     default: return 'EC未接続・ポイント対象外'
   }
 }

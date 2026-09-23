@@ -15,6 +15,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock('@line-crm/db', () => ({
   getFriendByLineUserIdForAccount: vi.fn(),
   jstNow: mocks.jstNow,
+  toJstString: (date: Date) => date.toISOString().replace('Z', '+09:00'),
   resolveLineCredential: mocks.resolveCredential,
   claimPhotoNotificationDelivery: mocks.claim,
   completePhotoNotificationDelivery: mocks.complete,
@@ -237,7 +238,8 @@ describe('NEN photo review', () => {
     const list = statements.find((entry) => entry.query.includes('ORDER BY ps.created_at'));
     expect(list?.query).toContain('ps.line_account_id = ? AND f.line_account_id = ?');
     // 絞り込みの2値のあとは、続きを取るための枚数と開始位置（#666）。
-    expect(list?.bindings).toEqual(['account-a', 'account-a', 200, 0]);
+    // 先頭の1値はポイント手続きの「要対応」判定に使う24時間前の区切り（PHOTO-06）。
+    expect(list?.bindings).toEqual([expect.any(String), 'account-a', 'account-a', 200, 0]);
   });
 
   it('returns a review derivative and risks without an original object key', async () => {
@@ -791,7 +793,7 @@ describe('NEN photo review', () => {
     expect(list?.query).toContain("p.name LIKE ? ESCAPE '\\'");
     expect(list?.query).toContain("f.display_name LIKE ? ESCAPE '\\'");
     expect(list?.bindings).toEqual([
-      'account-a', 'account-a', '%50\\%\\_\\\\%', '%50\\%\\_\\\\%', '%50\\%\\_\\\\%', 200, 0,
+      expect.any(String), 'account-a', 'account-a', '%50\\%\\_\\\\%', '%50\\%\\_\\\\%', '%50\\%\\_\\\\%', 200, 0,
     ]);
   });
 
@@ -801,6 +803,6 @@ describe('NEN photo review', () => {
     expect(response.status).toBe(200);
     const list = statements.find((entry) => entry.query.includes('ORDER BY ps.created_at'));
     expect(list?.query).not.toContain('LIKE');
-    expect(list?.bindings).toEqual(['account-a', 'account-a', 200, 0]);
+    expect(list?.bindings).toEqual([expect.any(String), 'account-a', 'account-a', 200, 0]);
   });
 });
