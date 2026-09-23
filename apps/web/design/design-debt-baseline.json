@@ -72,6 +72,9 @@
     "arbitrary-value": 2,
     "direct-th": 6
   },
+  "app/booking/staff/shifts/liff-preview.tsx": {
+    "direct-secondary-button": 1
+  },
   "app/broadcasts/detail/page.tsx": {
     "direct-secondary-button": 2
   },
