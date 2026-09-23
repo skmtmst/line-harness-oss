@@ -677,6 +677,9 @@
     "direct-secondary-button": 1,
     "direct-primary-button": 1
   },
+  "components/shared/avatar.tsx": {
+    "unresolved-classname": 2
+  },
   "components/shared/breadcrumb.tsx": {
     "unresolved-classname": 4
   },
