@@ -1025,7 +1025,6 @@ export default function RichMenusListPage() {
             : '管理画面に取り込みました'
         }
         description="LINE上の表示は変更していません。管理画面で編集できるようになりました。"
-        cancelLabel="閉じる"
         onCancel={() => setImportedMenuName(null)}
       />
 

@@ -990,7 +990,6 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
         onCancel={() => setDetailTarget(null)}
         footer={detailTarget ? (
           <div className="flex justify-end gap-2">
-            <Button onClick={() => setDetailTarget(null)}>閉じる</Button>
             {detailTarget.state === 'draft' ? (
               <Button
                 variant="primary"

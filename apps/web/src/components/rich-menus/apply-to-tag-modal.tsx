@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { X } from 'lucide-react'
 import { api } from '@/lib/api'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 
@@ -128,9 +129,14 @@ export function ApplyToTagModal({ groupId, groupName, onClose }: Props) {
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
         <div className="p-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-1">
-            友だちにこのメニューを表示
-          </h2>
+          <div className="mb-1 flex items-start justify-between gap-3">
+            <h2 className="text-lg font-semibold text-ink">
+              友だちにこのメニューを表示
+            </h2>
+            <button type="button" onClick={onClose} aria-label="閉じる" className="rounded-mini p-1 text-ink-secondary hover:bg-canvas-sunken">
+              <X aria-hidden="true" className="h-5 w-5" />
+            </button>
+          </div>
           <p className="text-sm text-gray-500 mb-5 break-all">「{groupName}」</p>
 
           {phase === 'config' && (
@@ -328,7 +334,7 @@ function RadioOption({
           className="mt-1"
         />
         <div className="flex-1">
-          <div className="text-sm font-medium text-gray-900">{label}</div>
+          <div className="text-sm font-medium text-ink">{label}</div>
           <p className="text-xs text-gray-600 mt-0.5">{description}</p>
           {children}
         </div>

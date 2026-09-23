@@ -11,6 +11,7 @@
  */
 
 import { useState } from 'react'
+import { X } from 'lucide-react'
 import { api } from '@/lib/api'
 import type { Folder } from '@line-crm/shared'
 
@@ -92,7 +93,12 @@ export default function FolderAddDialog({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
       <div className="bg-canvas rounded-panel w-full max-w-md p-5 shadow-xl">
-        <h2 className="text-ink text-base font-bold">{folder ? 'フォルダを直す' : 'フォルダを追加'}</h2>
+        <div className="flex items-start justify-between gap-3">
+          <h2 className="text-ink text-base font-bold">{folder ? 'フォルダを直す' : 'フォルダを追加'}</h2>
+          <button type="button" onClick={onClose} aria-label="閉じる" className="rounded-mini p-1 text-ink-secondary hover:bg-canvas-sunken">
+            <X aria-hidden="true" className="h-5 w-5" />
+          </button>
+        </div>
         {note && <p className="text-ink-faint mt-1 text-xs leading-relaxed">{note}</p>}
 
         <label className="mt-4 block">

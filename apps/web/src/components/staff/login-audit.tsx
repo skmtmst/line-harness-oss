@@ -260,7 +260,6 @@ export default function LoginAudit({ userId }: { userId?: string }) {
       title="操作記録の詳細"
       description={detail ? `${formatDate(detail.createdAt)} ／ ${detail.actor.name ?? '名前未取得'}` : undefined}
       onCancel={() => setDetail(null)}
-      footer={<div className="flex justify-end"><Button variant="secondary" onClick={() => setDetail(null)}>閉じる</Button></div>}
     >
       {detail ? <dl className="grid gap-3 text-sm"><div><dt className="text-xs text-ink-faint">対象</dt><dd className="mt-1 text-ink">{targetLabel(detail)}</dd></div><div><dt className="text-xs text-ink-faint">変更前 → 変更後</dt><dd className="mt-1 text-ink">{changeLabel(detail)}</dd></div><div><dt className="text-xs text-ink-faint">場所</dt><dd className="mt-1 text-ink">{locationLabel(detail)}</dd></div></dl> : null}
     </Dialog>

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
-import { LockKeyhole, Trash2 } from 'lucide-react'
+import { LockKeyhole, Trash2, X } from 'lucide-react'
 import ReorderGrip from './reorder-grip'
 import { mergeVisibleOrder, movableIds } from './reorder-utils'
 import { api, ApiError, type SupportMarkArchiveImpact, type SupportMarkListItem } from '@/lib/api'
@@ -82,9 +82,14 @@ function ArchiveMarkDialog({ mark, impact, replacementMarkId, loading, saving, e
   return (
     <div ref={dialogRef} className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-ink/45 p-4">
       <section data-design-node="zGZMA" data-design-part="archive-position" className="flex max-h-[calc(100dvh-2rem)] w-full max-w-[680px] flex-col overflow-hidden rounded-card border border-hairline bg-canvas shadow-2xl" role="alertdialog" aria-modal="true">
-        <div className="p-4 pb-0">
-          <h2 className="text-lg font-bold text-ink">対応マーク「{mark.name}」を保管しますか？</h2>
-          <p className="mt-2 text-xs leading-5 text-ink-secondary">保管後は新しく選べません。いま付いている友だちは、選んだマークへ置き換えて履歴を残します。</p>
+        <div className="flex items-start justify-between gap-3 p-4 pb-0">
+          <div>
+            <h2 className="text-lg font-bold text-ink">対応マーク「{mark.name}」を保管しますか？</h2>
+            <p className="mt-2 text-xs leading-5 text-ink-secondary">保管後は新しく選べません。いま付いている友だちは、選んだマークへ置き換えて履歴を残します。</p>
+          </div>
+          <button type="button" onClick={onCancel} disabled={saving} aria-label="閉じる" className="rounded-mini p-1 text-ink-secondary hover:bg-canvas-sunken disabled:opacity-50">
+            <X aria-hidden="true" className="h-5 w-5" />
+          </button>
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-1 pt-3">
           {loading ? <p className="rounded-control bg-surface-soft p-3 text-sm text-ink-faint">影響を確認しています…</p> : impact ? (

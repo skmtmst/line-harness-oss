@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { X } from 'lucide-react'
 import Link from 'next/link'
 import { BOOKING_STAFF_LIMITS, parseBookingStaffInput, type StaffMember } from '@line-crm/shared'
 import ImageUploader from '@/components/shared/image-uploader'
@@ -281,8 +282,11 @@ function Modal({
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-xl shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto">
-        <div className="px-6 py-4 border-b border-hairline">
+        <div className="flex items-center justify-between gap-3 border-b border-hairline px-6 py-4">
           <h2 className="text-base font-semibold">{form.id ? 'スタッフ編集' : '新規スタッフ'}</h2>
+          <button type="button" onClick={onClose} aria-label="閉じる" className="rounded-mini p-1 text-ink-secondary hover:bg-canvas-sunken">
+            <X aria-hidden="true" className="h-5 w-5" />
+          </button>
         </div>
         <div className="px-6 py-4 space-y-4">
           <Field label="内部名（管理用）" required>

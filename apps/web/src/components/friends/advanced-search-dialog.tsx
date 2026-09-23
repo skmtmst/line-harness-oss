@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
+import { X } from 'lucide-react'
 import type { SavedSearchCondition, Scenario, Tag } from '@line-crm/shared'
 import { api, type FriendListParams } from '@/lib/api'
 import {
@@ -813,7 +814,12 @@ export default function AdvancedSearchDialog({
             className="w-full max-w-md rounded-panel border border-hairline bg-canvas p-5 shadow-card"
             onClick={(event) => event.stopPropagation()}
           >
-            <h3 id={saveTitleId} className="text-lg font-bold text-ink">この条件を保存</h3>
+            <div className="flex items-start justify-between gap-3">
+              <h3 id={saveTitleId} className="text-lg font-bold text-ink">この条件を保存</h3>
+              <button type="button" onClick={() => setSaveOpen(false)} disabled={saving} aria-label="閉じる" className="rounded-mini p-1 text-ink-secondary hover:bg-canvas-sunken disabled:opacity-50">
+                <X aria-hidden="true" className="h-5 w-5" />
+              </button>
+            </div>
             <p className="mt-1 text-xs leading-5 text-ink-faint">保存後は「保存した検索」から何度でも呼び出せます。</p>
             <label className="mt-4 block text-sm font-semibold text-ink-secondary">
               条件名

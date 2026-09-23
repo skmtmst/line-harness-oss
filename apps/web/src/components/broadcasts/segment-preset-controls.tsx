@@ -271,11 +271,6 @@ export default function SegmentPresetControls({
         title="保存した対象条件から選ぶ"
         description="選ぶと、この画面の詳細条件へ読み込みます。"
         onCancel={() => setChooserOpen(false)}
-        footer={(
-          <div className="flex justify-end">
-            <Button type="button" variant="secondary" onClick={() => setChooserOpen(false)}>閉じる</Button>
-          </div>
-        )}
       >
         <div className="space-y-3" data-design-node="sqFXf">
           {/*

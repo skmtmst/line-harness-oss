@@ -144,8 +144,8 @@ function TodayTaskCard({
   return (
     <Card layout="vertical" padding="default" className="h-[116px] min-w-0">
       <div className="flex items-start justify-between gap-3">
-        <h3 className="text-ink min-w-0 text-sm font-semibold">{title}</h3>
-        {period ? <span className="text-ink-faint flex-1 pt-0.5 text-[11px] font-normal">{period}</span> : null}
+        <h3 className="text-ink min-w-0 truncate text-sm font-semibold" title={title}>{title}</h3>
+        {period ? <span className="text-ink-faint flex-1 whitespace-nowrap pt-0.5 text-[11px] font-normal">{period}</span> : null}
         <Link href={href} className="text-action shrink-0 text-xs font-medium hover:underline">{action}</Link>
       </div>
       <p className="text-ink mt-2 text-[28px] leading-none font-bold tabular-nums">
@@ -381,8 +381,8 @@ function LiveDataCard({
   return (
     <Card padding="roomy">
       <div className="flex items-start justify-between gap-3">
-        <h2 className="text-ink min-w-0 text-sm font-semibold">{title}</h2>
-        {period ? <span className="text-ink-faint flex-1 pt-0.5 text-[11px] font-normal">{period}</span> : null}
+        <h2 className="text-ink min-w-0 truncate text-sm font-semibold" title={title}>{title}</h2>
+        {period ? <span className="text-ink-faint flex-1 whitespace-nowrap pt-0.5 text-[11px] font-normal">{period}</span> : null}
         <Link href={href} className="text-action shrink-0 text-xs hover:underline">{linkLabel} →</Link>
       </div>
       <p className="text-ink mt-4 text-2xl font-bold tabular-nums">
@@ -485,9 +485,9 @@ function OperationalAlertsCard({ risk, healthIssues, oldestWaitMinutes, twoFacto
   const count = referenceCount ?? (risk === null ? null : currentHealthIssue ? Math.max(1, healthIssues ?? 1) : 0)
   return <Card padding="roomy" className="min-h-[128px]">
     <div className="flex items-start justify-between gap-3">
-      <h2 className="text-ink text-base font-bold">運用アラート</h2>
+      <h2 className="text-ink min-w-0 truncate text-base font-bold" title="運用アラート">運用アラート</h2>
       {/* 現在時点の状態。数の対象期間が分かるよう見出し脇へ書く（IDEA-01）。 */}
-      <span className="text-ink-faint flex-1 pt-0.5 text-[11px] font-normal">現在</span>
+      <span className="text-ink-faint flex-1 whitespace-nowrap pt-0.5 text-[11px] font-normal">現在</span>
       {/*
         #631: 件数の母集団は変えない（health issue だけを数える）。
         「最も古い未対応」と別のものを数えていることが、件数の脇の文言
@@ -524,9 +524,9 @@ function ConnectionStatusCard({ account, risk, activeFriends, healthFailed, upda
   const webhookLabel = webhook === 'matched' ? '正常' : webhook === 'mismatched' || webhook === 'unconfigured' ? '要確認' : '確認中'
   return <Card padding="roomy" className="min-h-[128px]">
     <div className="flex items-baseline justify-between gap-3">
-      <h2 className="text-ink text-base font-bold">接続状態</h2>
+      <h2 className="text-ink min-w-0 truncate text-base font-bold" title="接続状態">接続状態</h2>
       {/* 現在時点の状態（IDEA-01）。 */}
-      <span className="text-ink-faint flex-1 text-[11px] font-normal">現在</span>
+      <span className="text-ink-faint flex-1 whitespace-nowrap text-[11px] font-normal">現在</span>
       {dashboardLocalUpdatedAt(updatedAt) ? (
         <span className="text-ink-faint shrink-0 text-xs font-medium">{dashboardLocalUpdatedAt(updatedAt)}</span>
       ) : null}

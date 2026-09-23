@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { X } from 'lucide-react'
 import { api, describeSaveFailure } from '@/lib/api'
 import type {
   EntryRoute,
@@ -140,9 +141,14 @@ export default function EditRouteModal({
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50">
       <div className="bg-white rounded-lg w-full max-w-lg p-6 space-y-3 max-h-[90vh] overflow-y-auto">
-        <h2 className="text-lg font-medium">
-          {isNew ? '新規リファラルリンク' : 'リファラルリンク編集'}
-        </h2>
+        <div className="flex items-start justify-between gap-3">
+          <h2 className="text-lg font-medium">
+            {isNew ? '新規リファラルリンク' : 'リファラルリンク編集'}
+          </h2>
+          <button type="button" onClick={onClose} aria-label="閉じる" className="rounded-mini p-1 text-ink-secondary hover:bg-canvas-sunken">
+            <X aria-hidden="true" className="h-5 w-5" />
+          </button>
+        </div>
 
         {error && (
           <div className="p-2 rounded bg-red-50 border border-red-200 text-red-700 text-xs">

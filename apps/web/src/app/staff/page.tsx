@@ -1,6 +1,7 @@
 'use client'
 
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { X } from 'lucide-react'
 import Link from 'next/link'
 import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
 import LoginAudit from '@/components/staff/login-audit'
@@ -130,7 +131,7 @@ function accessFeatureLabel(user: AccessUserItem): string {
   return `${user.featureCount}機能`
 }
 function RowActionButton({ label, onClick, qaOpen }: { label: string; onClick: () => void; qaOpen?: string }) { const marker = qaOpen ?? (label === '中身を見る' ? 'EOTS4' : undefined); return <Button onClick={onClick} {...(marker ? { 'data-qa-open': marker } : {})}>{label}</Button> }
-function Modal({ children, onClose, wide = false }: { children: React.ReactNode; onClose: () => void; wide?: boolean }) { return <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/35 p-4" role="dialog" aria-modal="true" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose() }}><div className={`max-h-[90vh] w-full overflow-y-auto rounded-card bg-canvas p-6 shadow-xl ${wide ? 'max-w-3xl' : 'max-w-xl'}`}>{children}</div></div> }
+function Modal({ children, onClose, wide = false }: { children: React.ReactNode; onClose: () => void; wide?: boolean }) { return <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/35 p-4" role="dialog" aria-modal="true" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose() }}><div className={`max-h-[90vh] w-full overflow-y-auto rounded-card bg-canvas p-6 shadow-xl relative ${wide ? 'max-w-3xl' : 'max-w-xl'}`}><button type="button" onClick={onClose} aria-label="閉じる" className="absolute right-4 top-4 rounded-mini p-1 text-ink-secondary hover:bg-canvas-sunken"><X aria-hidden="true" className="h-5 w-5" /></button>{children}</div></div> }
 
 function LoginHistoryNote({ count, loading, failed = false }: { count: number | null; loading: boolean; failed?: boolean }) {
   if (loading) return <p className="text-xs text-ink-secondary">ログイン履歴を確認中…</p>
@@ -412,7 +413,7 @@ function PermissionScopeView({ user, memberId, canSave, copyCandidates, roleCoun
       狭い幅では説明は本文（いまの権限カード）へ移し、下部は操作だけに絞る。
       高さは固定せず、長いエラー文は折り返してボタンを隠さない。
     */}
-    <div className="fixed inset-x-0 bottom-0 z-20 flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-t border-hairline bg-canvas px-4 py-3 shadow-lg sm:px-8 xl:left-64">{saveError ? <p className="min-w-0 flex-1 text-xs font-medium text-danger">{saveError}</p> : <p className="hidden min-w-0 flex-1 text-xs text-ink-faint md:block">{targetIsAdministrator ? '管理者の権限は確認だけできます。この画面からは変更できません。' : `${user.name}さんはいま「${ACCESS_ROLE_LABEL[user.roleBundle]}」です。保存前に、対象者が再ログインすることを確認します。`}</p>}<div className="ml-auto flex shrink-0 gap-2"><Button variant="secondary" onClick={onClose}>{targetIsAdministrator ? '閉じる' : '×　キャンセル'}</Button>{!targetIsAdministrator && <Button disabled={saving} onClick={requestSave}>✓　{saving ? '保存中…' : '見せる範囲を保存'}</Button>}</div></div>
+    <div className="fixed inset-x-0 bottom-0 z-20 flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-t border-hairline bg-canvas px-4 py-3 shadow-lg sm:px-8 xl:left-64">{saveError ? <p className="min-w-0 flex-1 text-xs font-medium text-danger">{saveError}</p> : <p className="hidden min-w-0 flex-1 text-xs text-ink-faint md:block">{targetIsAdministrator ? '管理者の権限は確認だけできます。この画面からは変更できません。' : `${user.name}さんはいま「${ACCESS_ROLE_LABEL[user.roleBundle]}」です。保存前に、対象者が再ログインすることを確認します。`}</p>}<div className="ml-auto flex shrink-0 gap-2"><Button variant="secondary" onClick={onClose}>{targetIsAdministrator ? '一覧へ戻る' : '×　キャンセル'}</Button>{!targetIsAdministrator && <Button disabled={saving} onClick={requestSave}>✓　{saving ? '保存中…' : '見せる範囲を保存'}</Button>}</div></div>
     <ConfirmDialog
       open={saveConfirmOpen}
       title={`${user.name}さんの見せる範囲を保存しますか？`}

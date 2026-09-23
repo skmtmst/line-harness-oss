@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
+import { X } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { fetchApi } from '@/lib/api'
@@ -715,7 +716,18 @@ export default function FormSubmissionsPage() {
             aria-label="名前変更を閉じる"
           />
           <div className="relative w-full max-w-md rounded-xl bg-white p-5 shadow-xl">
-            <h3 className="text-base font-semibold text-gray-900">フォーム名を変更</h3>
+            <div className="flex items-start justify-between gap-3">
+              <h3 className="text-base font-semibold text-ink">フォーム名を変更</h3>
+              <button
+                type="button"
+                onClick={() => !savingName && setEditingForm(null)}
+                disabled={savingName}
+                aria-label="閉じる"
+                className="rounded-mini p-1 text-ink-secondary hover:bg-canvas-sunken disabled:opacity-50"
+              >
+                <X aria-hidden="true" className="h-5 w-5" />
+              </button>
+            </div>
             <p className="mt-1 text-xs text-gray-400">
               回答データやURLは変わりませんが、回答者に表示されるフォーム名も変わります。
             </p>
