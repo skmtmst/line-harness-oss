@@ -34,3 +34,20 @@ export function formatWaitRough(minutes: number): string {
   if (total < 60 * 24) return `${Math.floor(total / 60)}時間前`
   return `${Math.floor(total / (60 * 24))}日前`
 }
+
+/**
+ * 分を、人が眺めて読める一番粗い単位へ直す（Issue #666）。
+ *
+ * 「平均 55975分」（約38.8日）のように分のまま出すと読めない。
+ * 60分以上は「約○時間」、24時間以上は「約○日」、30日以上は「約○ヶ月」。
+ * 25 オートメーションの「およそ 0時間」と同じく、単位を替えて概数で出す。
+ * 経過時間の「〜前」は `formatWaitRough`、残り時間の「6日7時間50分」は
+ * `formatDurationMinutes` と役割が違うので、ここは長さの表現だけを返す。
+ */
+export function formatMinutesRough(minutes: number): string {
+  const total = Math.max(0, Math.round(minutes))
+  if (total < 60) return `${total}分`
+  if (total < 60 * 24) return `約${Math.round(total / 60)}時間`
+  if (total <= 60 * 24 * 30) return `約${Math.round(total / (60 * 24))}日`
+  return `約${Math.round(total / (60 * 24 * 30))}ヶ月`
+}

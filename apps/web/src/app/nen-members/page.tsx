@@ -18,6 +18,7 @@ import ListState from '@/components/shared/list-state'
 import { Tabs } from '@/components/shared/tabs'
 import { FeatureLinkCard } from '@/components/shared/side-cards'
 import { formatPhotoReceivedAt } from './photo-review-time'
+import { formatMinutesRough } from '@/lib/format-duration'
 import { PhotoReviewDetail } from './photo-review-detail'
 import { PhotoPublications } from './photo-publications'
 import { safePhotoSrc } from './photo-src'
@@ -419,6 +420,11 @@ export default function PhotoReviewsPage() {
 
   const pendingPhotos = photos.filter((photo) => text(photo.status) === 'pending')
   const selectedPendingPhotos = pendingPhotos.filter((photo) => selectedPhotoIds.includes(text(photo.id)))
+  /*
+   * 選択0件では「まとめて通す」「まとめて戻す」の両方を無効にする（Issue #666）。
+   * 0件で押せる形にしておくと、確認窓が「0枚をまとめて通す」と開いてしまう。
+   */
+  const bulkSelectionEmpty = selectedPendingPhotos.length === 0
   const selectedPhotosAreLowRisk = selectedPendingPhotos.length > 0
     && selectedPendingPhotos.every((photo) => ['safe', 'none', 'low'].includes(text(photo.latest_risk_flag)))
   // いま見ている札の一覧を基準にする。審査待ち基準だと、通した・戻した
@@ -867,9 +873,13 @@ export default function PhotoReviewsPage() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2">
           <span className="rounded-control bg-accent-soft px-3 py-2 text-sm font-semibold text-accent">{selectedPendingPhotos.length}枚を選択中</span>
-          <Button variant="primary" disabled={!selectedPhotosAreLowRisk || bulkReviewing} title={!selectedPhotosAreLowRisk && selectedPendingPhotos.length > 0 ? 'まとめて通せるのは、注意候補がない写真だけです' : undefined} onClick={() => setBulkApproveOpen(true)}>{bulkReviewing ? '処理中...' : 'まとめて通す'}</Button>
-          <Button variant="secondary" disabled={selectedPendingPhotos.length === 0 || bulkReviewing} onClick={() => setBulkReturnOpen(true)}>まとめて戻す</Button>
-          <span className="text-xs text-ink-faint">審査待ちの写真だけをまとめて処理します</span>
+          {/*
+           * 0件選択では両方とも無効＋理由を添える（Issue #666）。緑の主ボタンは
+           * 薄くなっても「押せそう」に見えるため、無効の理由を文字でも出す。
+           */}
+          <Button variant="primary" disabled={bulkSelectionEmpty || !selectedPhotosAreLowRisk || bulkReviewing} title={bulkSelectionEmpty ? 'まとめて処理する写真を選んでください' : !selectedPhotosAreLowRisk ? 'まとめて通せるのは、注意候補がない写真だけです' : undefined} onClick={() => setBulkApproveOpen(true)}>{bulkReviewing ? '処理中...' : 'まとめて通す'}</Button>
+          <Button variant="secondary" disabled={bulkSelectionEmpty || bulkReviewing} title={bulkSelectionEmpty ? 'まとめて処理する写真を選んでください' : undefined} onClick={() => setBulkReturnOpen(true)}>まとめて戻す</Button>
+          <span className="text-xs text-ink-faint">{bulkSelectionEmpty ? 'まとめて処理するには、先に写真を選んでください' : '審査待ちの写真だけをまとめて処理します'}</span>
         </div>
         <div className="flex items-center gap-2">
           <Button variant="secondary" disabled title="並べて見るは一覧の表示形式の追加口を接続後に使えます">▦ 並べて見る</Button>
@@ -1028,10 +1038,15 @@ export default function PhotoReviewsPage() {
   </>
 }
 
+/*
+ * 「1枚にかかる時間」の指標カード（Issue #666）。分の生値は
+ * 「平均 55975分」（約38.8日）と読めないため、単位を替えて概数で出す。
+ * 単位の切り替えは lib の共通関数に置き、他の画面でも同じ読み方にする。
+ */
 function formatAverageReviewTime(minutes: number | null | undefined) {
   if (minutes == null || !Number.isFinite(minutes)) return '—'
   if (minutes < 1) return `平均 ${Math.max(1, Math.round(minutes * 60))}秒`
-  return `平均 ${Math.round(minutes)}分`
+  return `平均 ${formatMinutesRough(minutes)}`
 }
 
 function photoRiskLabel(flag: string) {
