@@ -115,6 +115,34 @@ async function wait(ms: number) {
 }
 
 describe('一斉配信詳細の実React動作(#630)', () => {
+  /*
+   * #1061 / BROADCAST-17 — 保存した下書きをあとから本文ごと直せる入口。
+   *
+   * いまは下書きを開いても「見る」だけで、本文を直す道がなかった。
+   * 既存の編集画面（/broadcasts/new）を下書き指定で開くリンクを、
+   * 下書きにだけ出す。送信済み・送信中など、直せない配信には出さない。
+   */
+  it('下書きには「本文を編集」入口が出て、それ以外には出ない', async () => {
+    const rows: Record<string, ApiBroadcast> = {
+      D: broadcast({ id: 'D', status: 'draft', version: 2 }),
+      P: broadcast({ id: 'P', status: 'scheduled', version: 1 }),
+      S: broadcast({ id: 'S', status: 'sent', totalCount: 3, successCount: 3 }),
+    }
+    net.get = (id: string) => Promise.resolve({ success: true, data: rows[id] })
+    net.progress = () => new Promise(() => undefined)
+
+    await show('D')
+    const edit = [...host.querySelectorAll('a')].find((a) => a.textContent === '本文を編集')
+    expect(edit, '下書きには本文を編集する入口がある').toBeTruthy()
+    expect(edit?.getAttribute('href')).toBe('/broadcasts/new?draft=D&step=message')
+
+    await show('P')
+    expect([...host.querySelectorAll('a')].some((a) => a.textContent === '本文を編集')).toBe(false)
+
+    await show('S')
+    expect([...host.querySelectorAll('a')].some((a) => a.textContent === '本文を編集')).toBe(false)
+  })
+
   it('送信済みAから送信中Bへ移ると、Aの送信済みを理由にBの全文を捨てない', async () => {
     const rows: Record<string, ApiBroadcast> = {
       A: broadcast({ id: 'A', status: 'sent', totalCount: 10, successCount: 10, sentAt: '2026-09-09T00:00:00.000Z' }),

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import type { Tag } from '@line-crm/shared'
 import { ApiError, api, type ApiBroadcast, type BroadcastInsight, type BroadcastLedger } from '@/lib/api'
@@ -441,7 +442,21 @@ export default function BroadcastDetail({ broadcastId }: BroadcastDetailProps) {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
         {/* Left: Preview */}
         <div className="bg-canvas rounded-card border border-hairline p-4">
-          <h3 className="text-sm font-semibold text-ink-secondary mb-3">メッセージプレビュー</h3>
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-semibold text-ink-secondary">メッセージプレビュー</h3>
+            {/*
+              BROADCAST-17: 下書きの本文は、作成と同じ画面（メッセージ段）を
+              下書きIDつきで開き直して編集する。送ったあとの配信には出さない。
+            */}
+            {broadcast.status === 'draft' && (
+              <Link
+                href={`/broadcasts/new?draft=${encodeURIComponent(id)}&step=message`}
+                className="text-xs font-semibold text-accent hover:underline"
+              >
+                本文を編集
+              </Link>
+            )}
+          </div>
           {broadcast.messageType === 'flex' ? (
             <FlexPreviewComponent content={broadcast.messageContent} maxWidth={300} />
           ) : broadcast.messageType === 'image' ? (
