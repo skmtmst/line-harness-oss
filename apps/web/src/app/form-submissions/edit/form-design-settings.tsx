@@ -370,7 +370,6 @@ export default function FormDesignSettings({
             （`edit/page.tsx` の StickyBar）ひとつだけで、同じ意味のボタンを
             2つ並べると、押した人はどちらが効いたのか分からなくなる。
           */}
-          <Button onClick={close}>閉じる</Button>
         </footer>
       </section>
 

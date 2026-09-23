@@ -576,7 +576,6 @@ export default function AccountMigration() {
         onCancel={() => { if (!busy) { setDetailItem(null); setDetailError(null) } }}
         footer={detailItem ? (
           <div className="mt-4 flex flex-wrap items-center justify-end gap-3">
-            <Button type="button" disabled={busy} onClick={() => { setDetailItem(null); setDetailError(null) }}>閉じる</Button>
             {active && !['review', 'ready', 'failed'].includes(active.status) ? (
               <span className="text-ink-faint text-xs">この移行の状態では判断を変更できません。</span>
             ) : me && !['owner', 'admin'].includes(me.role) ? (

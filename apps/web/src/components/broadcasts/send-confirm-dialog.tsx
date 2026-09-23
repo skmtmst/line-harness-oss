@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { X } from 'lucide-react'
 
 interface PerAccountBreakdown {
   accountId: string
@@ -33,7 +34,18 @@ export default function SendConfirmDialog({ title, targetCount, accountName, isM
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className="bg-canvas rounded-lg shadow-xl max-w-sm w-full p-6">
-        <h3 className="text-base font-semibold text-ink mb-4">配信を送信しますか？</h3>
+        <div className="mb-4 flex items-start justify-between gap-3">
+          <h3 className="text-base font-semibold text-ink">配信を送信しますか？</h3>
+          <button
+            type="button"
+            onClick={onCancel}
+            disabled={countdown > 0}
+            aria-label="閉じる"
+            className="rounded-mini p-1 text-ink-secondary hover:bg-canvas-sunken disabled:opacity-50"
+          >
+            <X aria-hidden="true" className="h-5 w-5" />
+          </button>
+        </div>
         <dl className="space-y-2 text-sm mb-4">
           <div className="flex justify-between">
             <dt className="text-ink-faint">タイトル</dt>

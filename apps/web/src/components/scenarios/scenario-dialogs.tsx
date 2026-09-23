@@ -44,10 +44,10 @@ function Shell({
           <button
             type="button"
             onClick={onClose}
-            className={wide ? 'text-ink-secondary shrink-0 px-2 text-2xl leading-none' : 'border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control h-9 shrink-0 border px-4 text-sm'}
-            aria-label={wide ? '閉じる' : undefined}
+            className="text-ink-secondary shrink-0 px-2 text-2xl leading-none"
+            aria-label="閉じる"
           >
-            {wide ? '×' : '閉じる'}
+            ×
           </button>
         </div>
         <div className={`flex-1 px-6 ${wide ? 'pb-5 pt-0' : 'py-5'}`}>{children}</div>
@@ -788,7 +788,7 @@ export function TestSendDialog({
           onClick={onClose}
           className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control h-10 border px-5 text-sm"
         >
-          閉じる
+          キャンセル
         </button>
         <button
           type="button"
@@ -1052,7 +1052,6 @@ export function FriendPlanDialog({
       title="友だちへの配信予定"
       description="このシナリオが選んだ友だちへどう届くかを確認します。送信・シナリオへの登録・タグの更新は行いません。"
       onClose={onClose}
-      footer={<Button onClick={onClose}>閉じる</Button>}
     >
       {!resolvedAccountId ? (
         <p className="rounded-panel bg-warning-bg text-ink-secondary mb-4 px-4 py-3 text-xs">

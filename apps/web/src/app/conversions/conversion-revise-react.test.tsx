@@ -258,7 +258,8 @@ describe('成果地点の編集（N-252）', () => {
     await click(byLabel('購入のその他操作'))
     await click(byText('中身を見る'))
     // 詳細は開いている（この判定が空振りしないことを先に確かめる）。
-    expect(byText('閉じる')).toBeTruthy()
+    // UI-25: 「閉じる」は右上の×（aria-label）へ移った。
+    expect(byLabel('閉じる')).toBeTruthy()
     expect(byText('編集')).toBeUndefined()
   })
 })

@@ -3761,9 +3761,9 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
               type="button"
               onClick={() => setShowFriendInfo(false)}
               aria-label="顧客情報を閉じる"
-              className="absolute top-[17px] right-3 z-10 inline-flex h-8 items-center justify-center rounded-lg border border-[#E5E7EB] bg-canvas px-3 text-xs font-semibold text-[#667085] hover:bg-[#F7F8F6]"
+              className="absolute top-[17px] right-3 z-10 inline-flex h-8 w-8 items-center justify-center rounded-lg border border-[#E5E7EB] bg-canvas text-[#667085] hover:bg-[#F7F8F6]"
             >
-              閉じる
+              <X aria-hidden="true" className="h-4 w-4" />
             </button>
             {selectedThreadId ? (
               /*

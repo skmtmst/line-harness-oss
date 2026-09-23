@@ -121,11 +121,6 @@ export default function MediaPickerDialog({
       title={title}
       description={description ?? '登録済みのメディアから選んで、この画面の設定へ反映します。'}
       onCancel={onClose}
-      footer={
-        <div className="flex justify-end">
-          <Button type="button" onClick={onClose}>閉じる</Button>
-        </div>
-      }
     >
       <div className="space-y-3" data-qa-media-picker>
         <form

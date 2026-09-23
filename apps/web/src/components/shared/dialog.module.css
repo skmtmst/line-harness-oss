@@ -76,6 +76,29 @@
   outline: revert;
 }
 
+/* 見出しと右上の×を1行に並べる。中身は今までどおり縦に積む。 */
+.headerRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.headerContent {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.confirmationPanel .headerContent {
+  gap: 16px;
+}
+
+.close {
+  flex-shrink: 0;
+}
+
 .title {
   margin: 0;
   font-weight: 700;

@@ -1475,12 +1475,12 @@ function BulkRoutesDialog({
       description="選んだ経路に同じ操作をまとめて行います。実行前に、実際に変わる件数を確認できます。"
       busy={busy}
       onCancel={close}
-      footer={(
+      footer={result ? undefined : (
         <div className="border-hairline flex flex-wrap items-center justify-end gap-2 border-t pt-4">
           <Button type="button" onClick={close} disabled={busy}>
-            {result ? '閉じる' : 'キャンセル'}
+            キャンセル
           </Button>
-          {!result && action && affected.length > 0 ? (
+          {action && affected.length > 0 ? (
             <Button type="button" variant="primary" disabled={busy} onClick={() => { void run() }}>
               {busy ? '実行中…' : `${affected.length.toLocaleString('ja-JP')}件に実行する`}
             </Button>

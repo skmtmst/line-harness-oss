@@ -112,7 +112,8 @@ describe('デザイン設定に無反応な操作面を残さない(#725)', () =
     await render()
     expect(buttonTexts()).not.toContain('保存する')
     // 閉じる・元に戻すは残す。どちらも押すと反応がある。
-    expect(buttonTexts()).toContain('閉じる')
+    // UI-25: 「閉じる」は右上の×（aria-label）へ移った。
+    expect(host.querySelector('button[aria-label="閉じる"]')).toBeTruthy()
     expect(buttonTexts()).toContain('元に戻す')
   })
 

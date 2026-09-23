@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { ArrowDown, ArrowUp, MoreHorizontal, Palette, Pencil, Trash2 } from 'lucide-react'
+import { ArrowDown, ArrowUp, MoreHorizontal, Palette, Pencil, Trash2, X } from 'lucide-react'
 import type { Tag, TagGroup } from '@line-crm/shared'
 import { api, ApiError, type TagDependencies, type TagDeleteImpactReferences } from '@/lib/api'
 import ActionMenu from '@/components/shared/action-menu'
@@ -518,7 +518,10 @@ function DeleteTagDialog({ tag, accountId, onCancel, onArchived }: { tag: Tag; a
 
   return (
     <div ref={dialogRef} className="fixed inset-0 z-[90] flex items-center justify-center bg-ink/35 p-4" data-qa-dialog="tag-delete" data-impact={impactStatus}>
-      <section className="w-full max-w-[670px] -translate-y-5 rounded-card border border-hairline bg-canvas p-7 shadow-2xl" role="alertdialog" aria-modal="true">
+      <section className="relative w-full max-w-[670px] -translate-y-5 rounded-card border border-hairline bg-canvas p-7 shadow-2xl" role="alertdialog" aria-modal="true">
+        <button type="button" onClick={onCancel} aria-label="閉じる" className="absolute right-4 top-4 rounded-mini p-1 text-ink-secondary hover:bg-canvas-sunken">
+          <X aria-hidden="true" className="h-5 w-5" />
+        </button>
         <div>
           {/* 設計 `iTwNX`/`lUbvQ`。赤いゴミ箱を22pxで見出しの左に置く。 */}
           <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-danger-bg text-danger">
