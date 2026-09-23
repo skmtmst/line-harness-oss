@@ -9,6 +9,7 @@ import { Tabs } from '@/components/shared/tabs'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import { useAccount } from '@/contexts/account-context'
 import { api, ApiError, type AuditEventItem, type AuditEventSummary } from '@/lib/api'
+import ListRange from '@/components/ui/list-range'
 
 const EMPTY_SUMMARY: AuditEventSummary = {
   periodDays: null,
@@ -254,7 +255,7 @@ export default function LoginAudit({ userId }: { userId?: string }) {
         : visible.length === 0
           ? <tr><td colSpan={6} className="p-8 text-center text-ink-faint">条件に合う記録はありません。条件を変えてお試しください。</td></tr>
           : visible.map((row) => <tr key={row.id} className="hover:bg-canvas-sunken"><td className="px-3 py-3"><p className="truncate font-semibold text-ink" title={`${formatDate(row.createdAt)} ／ ${row.actor.name ?? '名前未取得'}`}>{formatDate(row.createdAt)} ／ {row.actor.name ?? '名前未取得'}</p><p className="mt-1 text-xs text-ink-faint">{row.actor.role ? ROLE_LABELS[row.actor.role] ?? row.actor.role : '権限を取得できませんでした'}</p></td><td className={`truncate px-3 py-3 font-medium ${isAttention(row) ? 'text-danger' : 'text-ink'}`} title={actionLabel(row)}>{actionLabel(row)}</td><td className="truncate px-3 py-3 text-ink-secondary" title={targetLabel(row)}>{targetLabel(row)}</td><td className="truncate px-3 py-3 text-ink-secondary" title={changeLabel(row)}>{changeLabel(row)}</td><td className={`truncate px-3 py-3 ${isAttention(row) ? 'text-danger' : 'text-ink-secondary'}`} title={locationLabel(row)}>{locationLabel(row)}</td><td className="px-3 py-3 text-right"><Button variant="secondary" onClick={() => setDetail(row)}>詳細を見る</Button></td></tr>)}</tbody></table></div>}
-    {!loading && !error && total > 0 && <div className="mt-3 flex flex-wrap items-center justify-between gap-3 text-xs text-ink-faint"><p>記録 {total.toLocaleString()}件中 {first}〜{last}件を表示</p>{pageCount > 1 && <nav aria-label="入った記録のページ送り" className="flex items-center gap-2"><AuditPageLink disabled={currentPage === 1} onClick={() => setPage(currentPage - 1)}>前へ</AuditPageLink><span className="font-semibold text-ink">{currentPage} / {pageCount}</span><AuditPageLink disabled={currentPage === pageCount} onClick={() => setPage(currentPage + 1)}>次へ</AuditPageLink></nav>}</div>}
+    {!loading && !error && total > 0 && <div className="mt-3 flex flex-wrap items-center justify-between gap-3 text-xs text-ink-faint"><ListRange label="記録" total={total} first={first} last={last} />{pageCount > 1 && <nav aria-label="入った記録のページ送り" className="flex items-center gap-2"><AuditPageLink disabled={currentPage === 1} onClick={() => setPage(currentPage - 1)}>前へ</AuditPageLink><span className="font-semibold text-ink">{currentPage} / {pageCount}</span><AuditPageLink disabled={currentPage === pageCount} onClick={() => setPage(currentPage + 1)}>次へ</AuditPageLink></nav>}</div>}
     <Dialog
       open={detail !== null}
       title="操作記録の詳細"

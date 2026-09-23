@@ -20,6 +20,7 @@ import Select from '@/components/shared/select'
 import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
 import SummaryCard from '@/components/shared/summary-card'
 import StickyBar from '@/components/shared/sticky-bar'
+import ListRange from '@/components/ui/list-range'
 
 type KindFilter = 'all' | FriendAddEventKind
 type AttributionFilter = 'all' | FriendAddEventAttributionStatus
@@ -476,23 +477,25 @@ function FriendAddRunsInner() {
             <p className="mt-3 text-xs text-ink-faint">通常URLや公式QRから追加された記録は0件にせず「経路は取得できません」と表示します。</p>
           </section>
 
-          {(canPrev || Boolean(data.nextCursor)) && <div className="flex items-center justify-between gap-3">
-            <p className="text-sm text-ink-faint">{cursorPage}ページ目・このページは{data.items.length}件</p>
-            <div className="flex gap-2">
-              <Button
-                onClick={() => goPrev()}
-                disabled={!canPrev || loading}
-              >
-                前へ
-              </Button>
-              <Button
-                onClick={() => goNext(data.nextCursor)}
-                disabled={!data.nextCursor || loading}
-              >
-                次へ
-              </Button>
-            </div>
-          </div>}
+          <div className="flex items-center justify-between gap-3">
+            <ListRange total={data.total} first={data.total === 0 ? 0 : (cursorPage - 1) * 20 + 1} last={(cursorPage - 1) * 20 + data.items.length} />
+            {(canPrev || Boolean(data.nextCursor)) && (
+              <div className="flex gap-2" aria-label="実行結果のページ送り">
+                <Button
+                  onClick={() => goPrev()}
+                  disabled={!canPrev || loading}
+                >
+                  前へ
+                </Button>
+                <Button
+                  onClick={() => goNext(data.nextCursor)}
+                  disabled={!data.nextCursor || loading}
+                >
+                  次へ
+                </Button>
+              </div>
+            )}
+          </div>
         </div>
       )}
         </main>

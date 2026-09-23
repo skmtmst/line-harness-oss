@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { RefreshCw } from 'lucide-react'
 import type { WebhookInteraction, WebhookInteractionList } from '@line-crm/shared'
 
@@ -13,6 +13,7 @@ import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
 import Notice from '@/components/shared/notice'
 import Pagination from '@/components/shared/pagination'
+import ListRange from '@/components/ui/list-range'
 import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
 import StatusBadge from '@/components/shared/status-badge'
@@ -230,11 +231,8 @@ export default function WebhookInteractions() {
     ? Math.round((data.summary.succeeded / data.summary.total) * 1000) / 10
     : 0
   const pageCount = Math.max(1, Math.ceil(data.total / data.limit))
-  const range = useMemo(() => {
-    if (data.total === 0) return '0件'
-    const first = (data.page - 1) * data.limit + 1
-    return `${first}〜${Math.min(data.total, first + data.items.length - 1)}件 / 全${data.total}件`
-  }, [data])
+  const rangeFirst = data.total === 0 ? 0 : (data.page - 1) * data.limit + 1
+  const rangeLast = data.total === 0 ? 0 : Math.min(data.total, rangeFirst + data.items.length - 1)
 
   const retry = async (item: WebhookInteraction, confirmed = false) => {
     const requestAccountId = selectedAccountId
@@ -399,7 +397,7 @@ export default function WebhookInteractions() {
           )}
 
           <div className={styles.pagination}>
-            <span className={styles.count}>やり取り {range}</span>
+            <ListRange label="やり取り" total={data.total} first={rangeFirst} last={rangeLast} />
             <Pagination page={data.page} pageCount={pageCount} onPageChange={setPage} disabled={loading} />
           </div>
         </>

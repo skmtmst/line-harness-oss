@@ -10,6 +10,7 @@ import Button from '@/components/shared/button'
 import FilterChip from '@/components/shared/filter-chip'
 import ListState from '@/components/shared/list-state'
 import Pagination from '@/components/shared/pagination'
+import ListRange from '@/components/ui/list-range'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 
 /** 監査ログ。★V6 37-8 `oEzZz`。 */
@@ -129,7 +130,7 @@ export default function OpsAuditPage() {
       )}
 
       <div className="mt-3 flex flex-wrap items-center justify-between gap-3 text-caption text-ink-faint">
-        <span>{total} 件中 {first}〜{last} 件を表示</span>
+        <ListRange total={total} first={first} last={last} />
         <Pagination page={page} pageCount={pageCount} onPageChange={setPage} ariaLabel="監査ログのページ" disabled={loading} />
       </div>
     </div>

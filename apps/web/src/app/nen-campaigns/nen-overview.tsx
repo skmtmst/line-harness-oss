@@ -17,6 +17,7 @@ import StatusBadge from '@/components/shared/status-badge'
 import StickyBar from '@/components/shared/sticky-bar'
 import SummaryCard from '@/components/shared/summary-card'
 import KpiCollapse from '@/components/ui/kpi-collapse'
+import ListRange from '@/components/ui/list-range'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { Tabs } from '@/components/shared/tabs'
 import { TextArea, TextField } from '@/components/shared/text-field'
@@ -1108,7 +1109,7 @@ function HistoryPanel({ deliveryList, detail, loading, onShowDetail, onRetry, on
         )}
       </section>
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-caption text-ink-faint">記録 {deliveryList?.pagination.total ?? 0}件中 {shown.length === 0 ? 0 : cursor + 1}〜{cursor + shown.length}件を表示</p>
+        <ListRange label="記録" total={deliveryList?.pagination.total ?? 0} first={shown.length === 0 ? 0 : cursor + 1} last={shown.length === 0 ? 0 : cursor + shown.length} />
         {deliveryList && (cursor > 0 || deliveryList.pagination.nextCursor) ? (
           <div className="flex gap-2" aria-label="送った履歴のページ送り">
             <Button type="button" disabled={cursor === 0} onClick={() => onChangeView(deliveryViewStatus(filter), String(Math.max(0, cursor - limit)), appliedQuery)}>前へ</Button>

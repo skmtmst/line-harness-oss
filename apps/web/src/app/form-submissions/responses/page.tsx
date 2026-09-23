@@ -13,6 +13,7 @@ import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { fetchApi } from '@/lib/api'
 import { csvCell } from '@/lib/presentation'
+import ListRange from '@/components/ui/list-range'
 import {
   completedDestinationWrites,
   destinationWriteText,
@@ -382,7 +383,7 @@ function FormResponsesInner() {
             </table>
           </div>
           <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-            <p className="text-ink-faint text-xs">{total === null ? '—' : `${total.toLocaleString('ja-JP')}件中 ${(page - 1) * pageSize + 1}〜${Math.min(page * pageSize, total)}件を表示`}</p>
+            <p>{total === null ? '—' : <ListRange total={total} first={total === 0 ? 0 : (page - 1) * pageSize + 1} last={Math.min(page * pageSize, total)} />}</p>
             <div className="flex items-center gap-2">
               <Select aria-label="回答の表示件数" size="page-size" value={String(pageSize)} options={[10, 20, 50].map((size) => ({ value: String(size), label: `${size}件表示` }))} onChange={(value) => void load(1, Number(value))} />
               <Pagination page={page} pageCount={pageCount} disabled={loading} ariaLabel="回答一覧のページ送り" onPageChange={(next) => void load(next, pageSize)} />
