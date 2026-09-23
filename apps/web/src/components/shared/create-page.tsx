@@ -17,6 +17,21 @@ export function createPageErrorMessage(error: unknown): string {
 }
 
 /**
+ * 保存後の戻り先に `highlight` を足す。
+ *
+ * 親URLは `/mileage?tab=earning-rules` のように既にクエリを持つことがある。
+ * `${url}?highlight=` と文字で連結すると `?tab=…?highlight=…` のように
+ * `?` が2つ並ぶ壊れたURLになり、タブ指定ごと読めなくなる（MILEAGE-09）。
+ * 既存のクエリとハッシュはそのまま保ち、`highlight` だけを書き換える。
+ */
+export function createPageReturnHref(parentHref: string, id: string | void): string {
+  if (!id) return parentHref
+  const url = new URL(parentHref, 'https://create-page.invalid')
+  url.searchParams.set('highlight', String(id))
+  return `${url.pathname}${url.search}${url.hash}`
+}
+
+/**
  * 作成画面の寸法の版。
  *
  * V6の設計は、作成画面のカードを r10・余白18・行間12、節の見出しを16/700 と
@@ -110,7 +125,7 @@ export default function CreatePage({
         return
       }
       // 作った行を一覧で目立たせる。どこに増えたのか探させない。
-      router.push(successHref ? successHref(id) : id ? `${parent[1]}?highlight=${id}` : parent[1])
+      router.push(successHref ? successHref(id) : createPageReturnHref(parent[1], id))
     } catch (e) {
       setError(createPageErrorMessage(e))
     } finally {

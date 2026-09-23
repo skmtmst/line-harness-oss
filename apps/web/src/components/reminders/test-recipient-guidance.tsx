@@ -30,6 +30,66 @@ export function testRecipientLabel(
   }
 }
 
+export type ReminderTestRecipientKind = 'self' | 'registered'
+
+/**
+ * REMINDER-12: 届け先の種別。「送ったあと」の応答が種別を持っていれば
+ * そちらが正本（表示の再読込より新しい実送信結果）。無ければ表示用の
+ * 解決結果を使う。どちらにも無ければ null＝種別が決まっていない。
+ */
+function recipientKindOf(
+  view: ReminderTestRecipientView,
+  sentKind: ReminderTestRecipientKind | null,
+): ReminderTestRecipientKind | null {
+  return sentKind ?? (view.kind === 'ready' ? view.recipientKind : null)
+}
+
+/**
+ * 「テスト対象」パネルの注記。届け先の種別が分かっているときだけ
+ * 「誰へ届くか」を名乗る。未確定のあいだは本人・登録のどちらも名乗らない。
+ */
+export function testRecipientNote(
+  view: ReminderTestRecipientView,
+  sentKind: ReminderTestRecipientKind | null = null,
+): string {
+  const kind = recipientKindOf(view, sentKind)
+  if (kind === 'self') return '自分のLINEへ確認用メッセージを送ります。'
+  if (kind === 'registered') return '登録済みのテスト送信先へ確認用メッセージを送ります。'
+  return 'テスト送信先へ確認用メッセージを送ります。'
+}
+
+/**
+ * 要約カード・送信先メトリクスの表示。登録宛先は「自分のLINE」と見分けが
+ * つくよう種別つきで出し、実名も必ず添える。
+ */
+export function testRecipientDestinationLabel(
+  view: ReminderTestRecipientView,
+  sentRecipientName: string | null,
+  sentKind: ReminderTestRecipientKind | null = null,
+): string {
+  const name = testRecipientLabel(view, sentRecipientName)
+  const kind = recipientKindOf(view, sentKind)
+  if (kind === 'self') return `自分のLINE（${name}）`
+  if (kind === 'registered') return `登録済みテスト宛先（${name}）`
+  return name
+}
+
+/**
+ * 確認窓の説明文。本人以外へ送る場合は必ず「登録済みテスト宛先」と
+ * 実名を明示して、本人へ届くという取り違えを防ぐ。
+ */
+export function testSendConfirmDescription(
+  view: ReminderTestRecipientView,
+  sentRecipientName: string | null,
+  sentKind: ReminderTestRecipientKind | null = null,
+): string {
+  const kind = recipientKindOf(view, sentKind)
+  const name = testRecipientLabel(view, sentRecipientName)
+  if (kind === 'self') return `自分のLINE（${name}）へ確認用メッセージを1通送信します。`
+  if (kind === 'registered') return `登録済みのテスト送信先「${name}」へ確認用メッセージを1通送信します。`
+  return 'テスト送信先へ確認用メッセージを1通送信します。'
+}
+
 /** 未設定・届かない・読み込み失敗のときだけ出る案内と再確認の操作。 */
 export function TestRecipientGuidance({
   view,

@@ -123,7 +123,7 @@ describe('リマインダ公開フローの実データ表示', () => {
   })
 
   it('TestStage は本文の実差し込みだけを並べ、実装に無い変数名を出さない', () => {
-    render(<TestStage draft={DRAFT} recipientName="山田 花子" recipientView={{ kind: 'ready', recipient: { id: 'f1', displayName: '山田 花子', pictureUrl: null } }} onRecipientRecheck={() => {}} onConfirm={() => {}} onNext={() => {}} />)
+    render(<TestStage draft={DRAFT} recipientName="山田 花子" recipientKind="registered" recipientView={{ kind: 'ready', recipient: { id: 'f1', displayName: '山田 花子', pictureUrl: null }, recipientKind: 'registered' }} onRecipientRecheck={() => {}} onConfirm={() => {}} onNext={() => {}} />)
     expect(screen.getByText('{{name}}')).toBeTruthy()
     expect(screen.getAllByText('山田 花子').length).toBeGreaterThanOrEqual(1)
     expect(screen.queryByText(/meet_datetime/)).toBeNull()
@@ -135,10 +135,27 @@ describe('リマインダ公開フローの実データ表示', () => {
   })
 
   it('TestStage は送信前に設定済みの送信先を出す', () => {
-    render(<TestStage draft={DRAFT} recipientName={null} recipientView={{ kind: 'ready', recipient: { id: 'f1', displayName: '田中 太郎', pictureUrl: null } }} onRecipientRecheck={() => {}} onConfirm={() => {}} onNext={() => {}} />)
+    render(<TestStage draft={DRAFT} recipientName={null} recipientView={{ kind: 'ready', recipient: { id: 'f1', displayName: '田中 太郎', pictureUrl: null }, recipientKind: 'registered' }} onRecipientRecheck={() => {}} onConfirm={() => {}} onNext={() => {}} />)
     // 送る前から実際の送信先が見える。「送ったあとに分かる」ではない。
-    expect(screen.getAllByText('田中 太郎').length).toBeGreaterThanOrEqual(2)
+    expect(screen.getAllByText(/田中 太郎/).length).toBeGreaterThanOrEqual(2)
     expect(screen.queryByText('テスト送信後に表示')).toBeNull()
+  })
+
+  // REMINDER-12: 登録済みテスト宛先は「自分のLINE」と名乗らない。
+  it('TestStage は登録済みテスト宛先を自分のLINEと名乗らず、種別と実名を出す', () => {
+    render(<TestStage draft={DRAFT} recipientName={null} recipientView={{ kind: 'ready', recipient: { id: 'f1', displayName: '田中 太郎', pictureUrl: null }, recipientKind: 'registered' }} onRecipientRecheck={() => {}} onConfirm={() => {}} onNext={() => {}} />)
+    // 要約カード・送信先メトリクス・履歴のどれにも実名つきの種別が出る。
+    expect(screen.getAllByText(/登録済みテスト宛先（田中 太郎）/).length).toBeGreaterThanOrEqual(2)
+    expect(screen.getAllByText(/登録済みのテスト送信先へ/).length).toBeGreaterThanOrEqual(1)
+    // 本人以外へ「自分のLINEへ」と案内しない。
+    expect(screen.queryByText(/自分のLINE/)).toBeNull()
+  })
+
+  it('TestStage は本人対応を確認できたときだけ「自分のLINE」と出す', () => {
+    render(<TestStage draft={DRAFT} recipientName={null} recipientView={{ kind: 'ready', recipient: { id: 'f2', displayName: '連携済みの本人', pictureUrl: null }, recipientKind: 'self' }} onRecipientRecheck={() => {}} onConfirm={() => {}} onNext={() => {}} />)
+    expect(screen.getAllByText(/自分のLINE（連携済みの本人）/).length).toBeGreaterThanOrEqual(1)
+    expect(screen.getAllByText(/自分のLINEへ確認用メッセージを送ります/).length).toBeGreaterThanOrEqual(1)
+    expect(screen.queryByText(/登録済みテスト宛先/)).toBeNull()
   })
 
   it('TestStage は未設定のとき設定画面への導線と再確認を出す', () => {

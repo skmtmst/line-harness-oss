@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { MessageCircle, Tags, UserPlus } from 'lucide-react'
 import { api, type AutomationTemplateSummary } from '@/lib/api'
@@ -23,6 +23,13 @@ export default function AutomationTemplateGallery({
   const [creating, setCreating] = useState<string | null>(null)
   const [actionError, setActionError] = useState('')
   const [triggerFilter, setTriggerFilter] = useState('すべて')
+  /*
+   * DETAIL-13: 「これで作る」1回の操作を識別する冪等鍵（店・見本ごと）。
+   * 失敗してもう一度押す・通信がやり直されるときは同じ鍵——サーバーは
+   * 同じ下書きを返すので1件に収まる。作れたあと（＝操作が終わったあと）の
+   * 次の押下は別の操作なので、新しい鍵を振る。
+   */
+  const operationKeysRef = useRef<Record<string, string>>({})
 
   const triggerFilters = useMemo(
     () => ['すべて', ...Array.from(new Set(items.map((item) => item.triggerLabel)))],
@@ -61,9 +68,14 @@ export default function AutomationTemplateGallery({
     if (!accountId || creating) return
     setCreating(item.key)
     setActionError('')
+    const slot = `${accountId}:${item.key}`
+    const operationKey = operationKeysRef.current[slot]
+      ?? (operationKeysRef.current[slot] = crypto.randomUUID())
     try {
-      const response = await api.automations.createDraftFromTemplate(item.key, accountId)
+      const response = await api.automations.createDraftFromTemplate(item.key, accountId, operationKey)
       if (!response.success) throw new Error(response.error)
+      // 操作はここで完了。次の「これで作る」は別の新規作成なので鍵を捨てる。
+      delete operationKeysRef.current[slot]
       router.push(`/automations/drafts?id=${encodeURIComponent(response.data.id)}`)
     } catch {
       setActionError('下書きを作れませんでした。状態を読み直してから、もう一度お試しください。')

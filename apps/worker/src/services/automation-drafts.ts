@@ -412,14 +412,22 @@ export async function listAutomationDraftResources(
 }
 
 /**
- * 同じ人・同じ店・同じ見本なら、いつも同じ下書きのidになるようにする（冪等鍵）。
+ * 同じ「新規作成の操作」なら、いつも同じ下書きのidになるようにする（冪等鍵）。
  *
- * `automation_definitions.id` は主鍵なので、**この値を鍵として使えば
- * 移行を足さずに一意にできる**。世代番号は、前の下書きを公開して
- * そのidが埋まったときに次へずらすためのもの。
+ * **操作ごとの鍵（`operationKey`）が同じものだけが同じidになる。**
+ * 以前は店・見本・担当者・世代だけから決めていたため、別の新規作成でも
+ * 同じ下書きへ戻り、一覧から来た新しい入力が前の下書きを上書きしていた
+ * （DETAIL-13）。画面は新規作成のたびに新しい鍵を振り、同じ保存操作の
+ * 再試行だけが同じ鍵を使う。世代番号は、前の下書きを公開してそのidが
+ * 埋まったときに次へずらすためのもの。
  */
 async function templateDraftId(
-  input: { templateKey: string; lineAccountId: string; createdBy?: string | null },
+  input: {
+    templateKey: string;
+    lineAccountId: string;
+    operationKey: string;
+    createdBy?: string | null;
+  },
   generation: number,
 ): Promise<string> {
   const seed = [
@@ -427,6 +435,7 @@ async function templateDraftId(
     input.lineAccountId,
     input.templateKey,
     input.createdBy ?? 'anonymous',
+    input.operationKey,
     String(generation),
   ].map((part) => `${part.length}:${part}`).join('|');
   const hex = await sha256Hex(seed);
@@ -447,14 +456,33 @@ async function templateDraftId(
  */
 export async function createAutomationDraftFromTemplate(
   db: D1Database,
-  input: { templateKey: string; lineAccountId: string; createdBy?: string | null },
+  input: {
+    templateKey: string;
+    lineAccountId: string;
+    /** 新規作成の操作を識別する鍵。同じ操作の再試行だけが同じ鍵を使う（DETAIL-13）。 */
+    operationKey: unknown;
+    createdBy?: string | null;
+  },
 ): Promise<{ id: string; draftVersionId: string }> {
   const source = template(input.templateKey);
+  /*
+   * 鍵が無い・形が違う呼び出しは「別の操作」と見分けられないので断る。
+   * ここを黙って通すと、古い画面や手作業の呼び出しが店・見本・担当者だけで
+   * 前の下書きへ戻り、その中身を上書きする道が残る。
+   */
+  const operationKey = typeof input.operationKey === 'string' ? input.operationKey.trim() : '';
+  if (!/^[A-Za-z0-9._-]{8,128}$/.test(operationKey)) {
+    throw new AutomationDraftError(
+      'operation_key_invalid',
+      '作成の鍵が正しくありません。画面を読み直してから、もう一度お試しください',
+    );
+  }
+  const operation = { ...input, operationKey };
   const now = new Date().toISOString();
 
   // 公開済みなどで鍵が埋まっていたら、次の世代へずらす。
   for (let generation = 0; generation < 32; generation += 1) {
-    const id = await templateDraftId(input, generation);
+    const id = await templateDraftId(operation, generation);
     const versionId = crypto.randomUUID();
     await db.batch([
       db.prepare(
@@ -863,12 +891,23 @@ export async function createAutomationDraftFromDefinition(
   if (!definition) throw new AutomationDraftError('not_found', '編集するオートメーションが見つかりません');
 
   if (definition.current_draft_version_id) {
-    // 既にある下書きをそのまま返す（冪等）。
-    const existing = await readAutomationDraftRow(db, input);
-    return {
-      id: existing.id,
-      draftVersionId: await automationRevisionToken(existing.current_draft_version_id, existing),
-    };
+    try {
+      // 既にある下書きをそのまま返す（冪等）。
+      const existing = await readAutomationDraftRow(db, input);
+      return {
+        id: existing.id,
+        draftVersionId: await automationRevisionToken(existing.current_draft_version_id, existing),
+      };
+    } catch (error) {
+      /*
+       * 指し先が「下書きではない版」や、もう無い版を指している（AUTOMATION-05）。
+       * 古い保存口が残した指し先や、途中で切れた指し替えの名残で、
+       * 開ける下書きは実際には無い。ここで not_found のまま返すと一覧の
+       * 「編集」が永久に失敗するので、公開版から作り直して指し直す。
+       * 生きた下書きがあるときだけは上書きしない（下の UPDATE の WHERE が守る）。
+       */
+      if (!(error instanceof AutomationDraftError && error.code === 'not_found')) throw error;
+    }
   }
   if (!definition.current_published_version_id) {
     throw new AutomationDraftError('not_found', '編集できる公開済みの版がありません');
@@ -883,6 +922,20 @@ export async function createAutomationDraftFromDefinition(
 
   const nextVersionId = crypto.randomUUID();
   const now = new Date().toISOString();
+  /*
+   * 「下書きが無い」と判定できるのは、指し先が空か、指す版がこの定義の
+   * 下書きでなくなっているときだけ。書き込み側でも同じ条件を確認するので、
+   * 読み取りから書き込みまでの間に別の下書きがぶら下がっても潰さない
+   * （その場合は読み直しでそちらの下書きを返す）。
+   */
+  const noLiveDraft = `(
+    d.current_draft_version_id IS NULL
+    OR NOT EXISTS (
+      SELECT 1 FROM automation_versions dv
+       WHERE dv.id = d.current_draft_version_id
+         AND dv.automation_id = d.id AND dv.status = 'draft'
+    )
+  )`;
   await db.batch([
     db.prepare(
       `INSERT INTO automation_versions
@@ -892,9 +945,9 @@ export async function createAutomationDraftFromDefinition(
               COALESCE((SELECT MAX(version_number) FROM automation_versions WHERE automation_id = ?), 0) + 1,
               'draft', ?, ?, ?, ?, ?, ?
         WHERE EXISTS (
-          SELECT 1 FROM automation_definitions
-           WHERE id = ? AND line_account_id = ? AND status IN ('active', 'stopped')
-             AND current_draft_version_id IS NULL
+          SELECT 1 FROM automation_definitions d
+           WHERE d.id = ? AND d.line_account_id = ? AND d.status IN ('draft', 'active', 'stopped')
+             AND ${noLiveDraft}
         )`,
     ).bind(
       nextVersionId, definition.id, definition.id,
@@ -904,9 +957,9 @@ export async function createAutomationDraftFromDefinition(
     ),
     db.prepare(
       // 先に下書きがぶら下がった側を守る。指し替えは1回だけ。
-      `UPDATE automation_definitions SET current_draft_version_id = ?, updated_at = ?
-        WHERE id = ? AND line_account_id = ? AND status IN ('active', 'stopped')
-          AND current_draft_version_id IS NULL
+      `UPDATE automation_definitions AS d SET current_draft_version_id = ?, updated_at = ?
+        WHERE d.id = ? AND d.line_account_id = ? AND d.status IN ('draft', 'active', 'stopped')
+          AND ${noLiveDraft}
           AND EXISTS (SELECT 1 FROM automation_versions WHERE id = ? AND automation_id = ?)`,
     ).bind(nextVersionId, now, definition.id, input.lineAccountId, nextVersionId, definition.id),
   ]);

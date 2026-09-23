@@ -1162,7 +1162,12 @@ export async function reviseConversionDefinition(
             count_repeat = ?, attribution_days = ?, source_config_json = ?,
             deduplication_mode = ?, deduplication_window_days = ?, value_mode = ?,
             reversal_policy = ?, updated_at = ?, version = version + 1
-      WHERE id = ? AND version = ? AND status = 'active'`)
+      /*
+       * 事前検査(requireExpectedDefinition)が下書きも編集可と判定するのに、
+       * CAS が active だけを通すと、下書きの正常編集が必ず0件更新→409に
+       * 倒れる(CONVERSION-07)。許可した状態と照合条件は常に一致させる。
+       */
+      WHERE id = ? AND version = ? AND status IN ('active', 'draft')`)
       .bind(
         after.name, after.sourceType, after.fixedValue, after.measureMethod, after.targetUrl,
         after.deduplicationMode === 'every' ? 1 : 0, after.attributionDays,

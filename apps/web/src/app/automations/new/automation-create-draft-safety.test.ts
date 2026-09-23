@@ -595,6 +595,35 @@ describe('V6 ルールを作る（Rv8Jv）の誤操作防止（#679）', () => {
     expect(api.updateCalls).toHaveLength(3)
   }, 60_000)
 
+  /*
+   * DETAIL-13: 一覧へ戻ってからもう一度「ルールを作る」に来たときは
+   * **別の新規作成操作**。前の操作の冪等鍵を引き継がないので、
+   * Worker には別の鍵が届き、別の下書きができる。
+   */
+  it('一覧からの再入場は別の操作鍵で別の下書きを作る（DETAIL-13）', async () => {
+    const { page, api } = await openPage()
+    await fillTagRule(page, '最初のルール')
+    await saveDraft(page)
+    expect(api.createCalls).toHaveLength(1)
+    const firstKey = (api.createCalls[0]?.body as { operationKey?: unknown })?.operationKey
+    expect(firstKey).toEqual(expect.stringMatching(/^[A-Za-z0-9._-]{8,128}$/))
+
+    // 一覧へ戻って、もう一度素の /automations/new へ。前の下書き番号はURLに載らない。
+    await page.getByRole('button', { name: 'キャンセル' }).click()
+    await page.waitForURL(`${webOrigin}/automations`)
+    await page.goto(`${webOrigin}/automations/new`, { waitUntil: 'domcontentloaded' })
+    await page.locator('#au-name').waitFor()
+    await fillTagRule(page, '二つ目のルール')
+    await saveDraft(page)
+
+    expect(api.createCalls).toHaveLength(2)
+    const secondKey = (api.createCalls[1]?.body as { operationKey?: unknown })?.operationKey
+    expect(secondKey).toEqual(expect.stringMatching(/^[A-Za-z0-9._-]{8,128}$/))
+    expect(secondKey).not.toBe(firstKey)
+    // 前の下書き（draft-account-a-1）ではなく新しい下書きへ保存されている。
+    expect(api.updateCalls.at(-1)?.pathname).toBe('/api/automation-drafts/draft-account-a-2')
+  }, 60_000)
+
   it('遅延保存中に店舗を往復しても、既存下書きと新規下書きを取り違えない', async () => {
     const { page, api } = await openPage({
       storedDrafts: { [ACCOUNT_A]: { id: 'existing-a', draftVersionId: 'existing-version-a' } },

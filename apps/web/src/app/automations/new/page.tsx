@@ -264,6 +264,19 @@ const newActionDraft = (): ActionDraft => ({
 })
 
 /**
+ * 「この新規作成の操作」を識別する鍵（DETAIL-13）。
+ *
+ * 1回の作成操作に1つだけ振り、同じ操作の再試行（ダブルクリック・保存の
+ * やり直し・通信の再送）だけが同じ鍵を使う。Worker はこの鍵から下書きの
+ * id を決めるので、別の新規作成は必ず別の鍵＝別の下書きになる。
+ * 前の下書きへ勝手に戻る道を、画面とサーバーの両方で塞ぐ。
+ */
+const newOperationKey = (): string =>
+  typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+    ? crypto.randomUUID()
+    : `op-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 18)}`
+
+/**
  * 作りかけの下書きの控え（N-357 → DETAIL-13）。
  *
  * 保存した下書きの番号は画面の記憶（`savedDraft`）にしか無かったので、
@@ -748,6 +761,13 @@ export default function NewAutomationPage() {
    */
   const formStashRef = useRef<Record<string, FormSnapshot>>({})
   const draftByAccountRef = useRef<Record<string, StoredDraft>>({})
+  /*
+   * DETAIL-13: まだ下書きが結び付いていない作成操作の冪等鍵（アカウントごと）。
+   * 作り直しのたびに振り直すと再試行が別の下書きを増やしてしまうので、
+   * 鍵は下書きが結び付くまで持ち回る。結び付いたら捨てる——その次に
+   * 作り直しが走るのは別の新規作成だから。
+   */
+  const createOpKeyRef = useRef<Record<string, string>>({})
   const previousAccountRef = useRef(selectedAccountId)
   /* 切り替えの直後はURLがまだ前のアカウントの下書きを指している。 */
   const accountSwitchPendingRef = useRef(false)
@@ -801,6 +821,11 @@ export default function NewAutomationPage() {
   const bindAccountDraft = (accountId: string, draft: StoredDraft | null) => {
     if (draft) draftByAccountRef.current[accountId] = draft
     else delete draftByAccountRef.current[accountId]
+    /*
+     * 下書きの結び付きが確定したら作成操作の鍵は役目を終える。
+     * 次に作り直しが走るのは別の新規作成なので、新しい鍵を振る。
+     */
+    delete createOpKeyRef.current[accountId]
     const stashed = formStashRef.current[accountId]
     if (stashed) stashed.savedDraft = draft
     if (selectedAccountRef.current === accountId) setSavedDraft(draft)
@@ -1301,7 +1326,17 @@ export default function NewAutomationPage() {
        */
       let draft = draftByAccountRef.current[accountId] ?? null
       if (!draft) {
-        const created = await api.automations.createDraftFromTemplate('received-message-tag', accountId)
+        /*
+         * DETAIL-13: 作成操作の冪等鍵。まだ下書きが無い保存のたびに振り直すと、
+         * 作成に成功したあと更新で失敗→やり直し、のとき別の下書きが増える。
+         * 同じ操作の再試行は同じ鍵で呼ぶので、サーバーは同じ下書きを返す。
+         * 別の新規作成（一覧からの再入場・公開後の再作成）は別の鍵になる。
+         */
+        const operationKey = createOpKeyRef.current[accountId]
+          ?? (createOpKeyRef.current[accountId] = newOperationKey())
+        const created = await api.automations.createDraftFromTemplate(
+          'received-message-tag', accountId, operationKey,
+        )
         if (!created.success) throw new Error(created.error)
         draft = created.data
         writeStoredDraft(accountId, draft)

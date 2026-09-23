@@ -4,7 +4,7 @@ import { createRoot, type Root } from 'react-dom/client'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { MediaItem } from '@line-crm/shared'
-import type { Webinar } from '@/lib/api'
+import type { Webinar, WebinarNotificationSettings } from '@/lib/api'
 import EditWebinarPage from './page'
 
 /**
@@ -14,10 +14,38 @@ import EditWebinarPage from './page'
  * - 通知概要の状態は1つの定義から描き、設定済み／未設定／確認中／
  *   取得失敗を色と文字と絵で区別する(全部 text-success だった欠陥)。
  * - 使っていない completionRate を残さない。
+ * - 通知の要約は時刻値ではなく有効フラグから組み立てる(WEBINAR-10)。
+ *   全OFFで保存しても時刻の既定値は残るので、値を見ると
+ *   切った通知まで「送る」と読めてしまう。
  */
 
-const { NOTIFICATION_ROW_STATE, NotificationStateBadge, VideoMediaLabel, notificationRowState } =
-  EditWebinarPage.__testing
+const {
+  NOTIFICATION_ROW_STATE,
+  NotificationStateBadge,
+  VideoMediaLabel,
+  notificationRowState,
+  deliveryTimingSummary,
+  missedNoticeSummary,
+  completedNoticeSummary,
+} = EditWebinarPage.__testing
+
+function notificationSettings(overrides: Partial<WebinarNotificationSettings> = {}): WebinarNotificationSettings {
+  return {
+    webinarId: 'webinar-1',
+    version: 1,
+    registrationEnabled: false,
+    dayBeforeEnabled: false,
+    dayBeforeTime: '18:00',
+    hourBeforeEnabled: false,
+    hourBeforeMinutes: 60,
+    startEnabled: false,
+    missedEnabled: false,
+    missedTime: '20:00',
+    completedEnabled: false,
+    updatedAt: '2026-09-01T00:00:00Z',
+    ...overrides,
+  }
+}
 
 function webinar(overrides: Partial<Webinar> = {}): Webinar {
   return {
@@ -107,6 +135,48 @@ describe('通知概要の状態表示(DETAIL-19)', () => {
     }
     /* 4状態すべてが別の言葉になる */
     expect(new Set(Object.values(NOTIFICATION_ROW_STATE).map((view) => view.label)).size).toBe(4)
+  })
+})
+
+describe('通知の要約は有効フラグから組み立てる(WEBINAR-10)', () => {
+  it('全通知OFFなら時刻が残っていても「送りません」と出す', () => {
+    const off = notificationSettings()
+    expect(deliveryTimingSummary(off, true, false)).toBe('送りません')
+    expect(missedNoticeSummary(off, true, false)).toBe('送りません')
+    expect(completedNoticeSummary(off, true, false)).toBe('送りません')
+  })
+
+  it('1件だけONなら、その通知だけが送る説明になる', () => {
+    expect(deliveryTimingSummary(notificationSettings({ dayBeforeEnabled: true }), true, false))
+      .toBe('前日 18:00')
+    expect(deliveryTimingSummary(notificationSettings({ hourBeforeEnabled: true }), true, false))
+      .toBe('60分前')
+    expect(deliveryTimingSummary(notificationSettings({ startEnabled: true }), true, false))
+      .toBe('開始時')
+    expect(missedNoticeSummary(notificationSettings({ missedEnabled: true }), true, false))
+      .toBe('未視聴者へ翌日20:00に送信')
+    expect(completedNoticeSummary(notificationSettings({ completedEnabled: true }), true, false))
+      .toBe('見終わった人へお礼を送信')
+  })
+
+  it('混在ならONの分だけを並べ、OFFの分は時刻を出さない', () => {
+    const mixed = notificationSettings({ dayBeforeEnabled: true, startEnabled: true })
+    expect(deliveryTimingSummary(mixed, true, false)).toBe('前日 18:00／開始時')
+    expect(deliveryTimingSummary(mixed, true, false)).not.toContain('60分前')
+    expect(missedNoticeSummary(mixed, true, false)).toBe('送りません')
+  })
+
+  it('まだ設定が無い・読み込み中・取得失敗を送るとは別に出す', () => {
+    const on = notificationSettings({ dayBeforeEnabled: true, missedEnabled: true })
+    // 取得は成功したが設定行が無い（新規ウェビナー）
+    expect(deliveryTimingSummary(null, true, false)).toBe('未設定')
+    expect(missedNoticeSummary(null, true, false)).toBe('未設定')
+    // まだ読めていない
+    expect(deliveryTimingSummary(on, false, false)).toContain('確認中')
+    // 取得に失敗した
+    expect(deliveryTimingSummary(on, true, true)).toBe('取得できません')
+    expect(missedNoticeSummary(on, true, true)).toBe('取得できません')
+    expect(completedNoticeSummary(on, true, true)).toBe('取得できません')
   })
 })
 
