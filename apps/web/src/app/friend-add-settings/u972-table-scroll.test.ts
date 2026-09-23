@@ -22,8 +22,9 @@ describe('U039 友だち追加時の配信の表見出し', () => {
   })
 
   it('表の見出しと編集への行き先は変えていない', () => {
-    expect(PAGE).toContain('<Th>設定名</Th>')
-    expect(PAGE).toContain('<Th>状態</Th>')
+    // #640: 見出しには省略時の全文確認用に title が付く。文言と行き先は同じ。
+    expect(PAGE).toMatch(/<Th[^>]*>設定名<\/Th>/)
+    expect(PAGE).toMatch(/<Th[^>]*>状態<\/Th>/)
     expect(PAGE).toContain('view=edit&id=')
   })
 })

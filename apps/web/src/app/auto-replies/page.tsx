@@ -722,10 +722,10 @@ export default function AutoRepliesPage() {
               <tr className="bg-canvas-sunken border-b border-hairline">
                 <th className="w-2/6 px-4 py-3 text-left text-xs font-semibold text-ink-faint">ルール名</th>
                 <th className="w-20 px-4 py-3 text-left text-xs font-semibold text-ink-faint">状態</th>
-                <th className="w-1/6 px-4 py-3 text-left text-xs font-semibold text-ink-faint">どんなときに動くか</th>
+                <th title="動く条件（キーワード・適用アカウント）" className="w-1/6 px-4 py-3 text-left text-xs font-semibold text-ink-faint">どんなときに動くか</th>
                 <th title="返信と実行するアクション" className="w-1/6 px-4 py-3 text-left text-xs font-semibold text-ink-faint">何を返すか</th>
-                <th className="w-24 px-4 py-3 text-left text-xs font-semibold text-ink-faint">今月の応答</th>
-                <th className="w-28 px-4 py-3 text-right text-xs font-semibold text-ink-faint">操作</th>
+                <th title="今月動いた回数" className="w-24 px-4 py-3 text-left text-xs font-semibold text-ink-faint">今月の応答</th>
+                <th title="編集・停止または再開・削除" className="w-28 px-4 py-3 text-right text-xs font-semibold text-ink-faint">操作</th>
                 <th className="hidden px-4 py-3">テンプレート</th>
                 <th className="hidden px-4 py-3">応答条件</th>
                 <th className="hidden px-4 py-3">適用アカウント</th>
@@ -815,13 +815,21 @@ export default function AutoRepliesPage() {
                         )}
                       </div>
                     </td>
-                    <td className="px-3 py-3 whitespace-nowrap">
+                    <td
+                      className="px-3 py-3 whitespace-nowrap"
+                      title={`今月 ${r.hits?.period ?? '—'}回 ／ 累計 ${r.hits?.total ?? '—'}回`}
+                    >
                       {/* **数えられていないものを 0 と書かない。** 0 は「当たらなかった」の意味。 */}
                       <span className="text-ink text-sm tabular-nums">{r.hits?.period ?? '—'}</span>
                       <span className="text-ink-faint text-xs">回</span>
                       <span className="text-ink-faint mt-0.5 block text-[10px]">累計 {r.hits?.total ?? '—'}回</span>
                     </td>
-                    <td className="px-3 py-3 text-right whitespace-nowrap">
+                    {/* 狭い列でボタンが切れても、重ねるだけで操作の全部が
+                        読めるように title を付ける（第5パス D-3）。 */}
+                    <td
+                      className="px-3 py-3 text-right whitespace-nowrap"
+                      title={['編集', r.isActive ? '停止' : r.lifecycleStatus !== 'draft' ? '再開' : null, '削除'].filter(Boolean).join('・')}
+                    >
                       <button
                         onClick={() => setEditing(toDraft(r))}
                         className="px-2.5 py-1 text-xs font-medium text-blue-600 hover:bg-info-bg rounded-md"
