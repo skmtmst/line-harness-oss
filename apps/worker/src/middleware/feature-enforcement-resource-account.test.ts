@@ -42,6 +42,8 @@ function routeApp(current: AuthenticatedStaff | undefined) {
   instance.post('/api/conversions/definitions/:id/revise', (c) => c.json({ success: true }));
   instance.post('/api/automations/:id/status', (c) => c.json({ success: true }));
   instance.post('/api/automations/:id/draft', (c) => c.json({ success: true }));
+  instance.put('/api/mileage/rules/:id', (c) => c.json({ success: true }));
+  instance.delete('/api/mileage/rules/:id', (c) => c.json({ success: true }));
   return instance;
 }
 
@@ -102,6 +104,16 @@ function seedResources(testDb: SqliteD1): void {
     INSERT INTO automations
       (id, name, event_type, line_account_id, created_at, updated_at)
     VALUES ('auto-legacy-1', '旧ルール', 'message_received', 'account-1', ?, ?)
+  `).run(now, now);
+  // たまる決めごと。一覧が返すidは mileage_rules の行そのもの。
+  testDb.raw.prepare(`
+    INSERT INTO mileage_programs (id, code, name, created_at, updated_at)
+    VALUES ('prog-1', 'default', '通常', ?, ?)
+  `).run(now, now);
+  testDb.raw.prepare(`
+    INSERT INTO mileage_rules
+      (id, program_id, name, event_type, amount, line_account_id, created_at, updated_at)
+    VALUES ('mileage-rule-1', 'prog-1', '監査用決めごと', 'booking_created', 300, 'account-1', ?, ?)
   `).run(now, now);
 }
 
@@ -330,6 +342,29 @@ describe('WRITE-01: 対象IDからの所属account解決', () => {
       method: 'PATCH',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ chatBarText: '更新後' }),
+    }, env);
+    expect(response.status).toBe(200);
+  });
+
+  it('たまる決めごとの停止（isActiveのみのPUT）も対象の所属accountで通る', async () => {
+    // #1075: PUT /api/mileage/rules/:id は {isActive} だけを送り、
+    // account を載せない。所有照合が無いと LINE_ACCOUNT_REQUIRED で止まる。
+    setFeature(testDb, 'account-1', 'mileage', true);
+    const app = routeApp(staff('env-owner'));
+    const response = await app.request('/api/mileage/rules/mileage-rule-1', {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ isActive: false }),
+    }, env);
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ success: true });
+  });
+
+  it('たまる決めごとの削除も対象の所属accountで通る', async () => {
+    setFeature(testDb, 'account-1', 'mileage', true);
+    const app = routeApp(staff('env-owner'));
+    const response = await app.request('/api/mileage/rules/mileage-rule-1', {
+      method: 'DELETE',
     }, env);
     expect(response.status).toBe(200);
   });
