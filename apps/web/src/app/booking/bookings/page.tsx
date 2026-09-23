@@ -460,24 +460,45 @@ export default function BookingsPage() {
     setAvailability({ status: 'loading', slots: [] })
     void (async () => {
       try {
-        const responses = await Promise.all(
-          activeMenus.map((menu) =>
-            bookingApi.getAvailability(requestedAccountId, {
-              menuId: menu.id,
-              from: calendarFrom,
-              to: calendarTo,
-            }),
-          ),
-        )
-        if (!alive || listAccountRef.current !== requestedAccountId) return
+        /*
+         * #1060: メニュー分の往復を1要求の一括口へまとめる。
+         * 一括口をまだ持たない Worker では 400/404 で落ちるので、
+         * そのときだけ従来のメニューごと取得へ退く（段階配備の互換）。
+         */
         const slots: CalendarSlot[] = []
-        responses.forEach((response, index) => {
-          for (const perStaff of response.by_staff) {
-            for (const slot of perStaff.slots) {
-              slots.push({ staffId: perStaff.staff_id, staffName: perStaff.display_name, menuId: activeMenus[index].id, ...slot })
+        try {
+          const batch = await bookingApi.getAvailabilityBatch(requestedAccountId, {
+            menuIds: activeMenus.map((menu) => menu.id),
+            from: calendarFrom,
+            to: calendarTo,
+          })
+          if (!alive || listAccountRef.current !== requestedAccountId) return
+          for (const perMenu of batch.by_menu) {
+            for (const perStaff of perMenu.by_staff) {
+              for (const slot of perStaff.slots) {
+                slots.push({ staffId: perStaff.staff_id, staffName: perStaff.display_name, menuId: perMenu.menu_id, ...slot })
+              }
             }
           }
-        })
+        } catch {
+          const responses = await Promise.all(
+            activeMenus.map((menu) =>
+              bookingApi.getAvailability(requestedAccountId, {
+                menuId: menu.id,
+                from: calendarFrom,
+                to: calendarTo,
+              }),
+            ),
+          )
+          if (!alive || listAccountRef.current !== requestedAccountId) return
+          responses.forEach((response, index) => {
+            for (const perStaff of response.by_staff) {
+              for (const slot of perStaff.slots) {
+                slots.push({ staffId: perStaff.staff_id, staffName: perStaff.display_name, menuId: activeMenus[index].id, ...slot })
+              }
+            }
+          })
+        }
         setAvailability({ status: 'ready', slots })
       } catch {
         if (alive && listAccountRef.current === requestedAccountId) {

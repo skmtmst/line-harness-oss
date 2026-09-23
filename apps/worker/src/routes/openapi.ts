@@ -4369,6 +4369,19 @@ const spec = {
     },
     // ── Booking staff×menu matrix bulk save (N-410 #819) ──────────────────
     '/api/booking/admin/staff-menus': {
+      get: {
+        tags: ['Booking'],
+        summary: '担当者×メニューの割り当て表を全員分まとめて読む（#1060: 一覧のN+1解消）',
+        description: 'アカウント内の全スタッフ×全メニューの割り当てを1応答で返す。応答は一括PUTと同じ `{ staff: [{ staff_id, matrix }] }` の形で、matrix は未割当のメニューも is_offered=0 で含む（単独GET `/api/booking/admin/staff/{id}/menus` と同じ器）。',
+        parameters: [
+          { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': { description: 'スタッフごとの割り当て表（staff_id × 全メニュー分のmatrix）' },
+          '400': { description: 'account_id 未指定' },
+          '403': { description: 'このLINEアカウントを表示する権限がない' },
+        },
+      },
       put: {
         tags: ['Booking'],
         summary: '担当者×メニューの割り当てを全員分まとめて置き換え（全件成功または全件不適用）',
