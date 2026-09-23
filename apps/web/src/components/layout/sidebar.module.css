@@ -128,7 +128,7 @@
   border-right: 1px solid var(--color-hairline);
   background: var(--color-canvas);
   box-shadow: 0 20px 25px -5px rgb(17 24 39 / 10%);
-  transition: transform 300ms ease-in-out;
+  transition: transform var(--motion-slow) var(--motion-ease-out);
 }
 
 .drawerClosed {

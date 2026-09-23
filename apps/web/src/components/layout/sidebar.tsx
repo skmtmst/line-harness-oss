@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useAccount } from '@/contexts/account-context'
@@ -371,6 +371,33 @@ export default function Sidebar({
     return () => { document.body.style.overflow = '' }
   }, [isOpen])
 
+  /*
+   * スマホのメニューの焦点（★V7 修正方針 §2）。
+   * 開いたら中の先頭へ、Esc で閉じ、閉じたら焦点をハンバーガーへ戻す。
+   * 閉じている間は aside に inert を付け、画面外の項目へ Tab が行かないようにする
+   * （以前は閉じても11項目が Tab で選べ、焦点が見えない所へ行っていた）。
+   */
+  const menuButtonRef = useRef<HTMLButtonElement>(null)
+  const drawerRef = useRef<HTMLElement>(null)
+  const wasOpen = useRef(false)
+  useEffect(() => {
+    if (isOpen) {
+      wasOpen.current = true
+      drawerRef.current?.querySelector<HTMLElement>('a[href], button')?.focus()
+      const onKeyDown = (event: KeyboardEvent) => {
+        if (event.key === 'Escape') setIsOpen(false)
+      }
+      document.addEventListener('keydown', onKeyDown)
+      return () => document.removeEventListener('keydown', onKeyDown)
+    }
+    if (wasOpen.current) {
+      wasOpen.current = false
+      if (!document.activeElement || document.activeElement === document.body || drawerRef.current?.contains(document.activeElement)) {
+        menuButtonRef.current?.focus()
+      }
+    }
+  }, [isOpen])
+
   /**
    * 項目に出す数。0 のときは出さない（仕様 §5）。
    *
@@ -595,9 +622,12 @@ export default function Sidebar({
       */}
       <div className={`${styles.mobileHeader} ${styles.mobileOnly}`}>
         <button
+          ref={menuButtonRef}
           onClick={() => setIsOpen(!isOpen)}
           className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg hover:bg-gray-100 transition-colors"
           aria-label="メニュー"
+          aria-expanded={isOpen}
+          aria-controls="mobile-menu"
         >
           <svg className="w-6 h-6 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             {isOpen
@@ -633,7 +663,10 @@ export default function Sidebar({
         レールは残したまま、その幅でもここを開けるようにした。
       */}
       <aside
+        id="mobile-menu"
+        ref={drawerRef}
         aria-label="管理メニュー"
+        inert={!isOpen}
         className={`${styles.drawer} ${styles.mobileOnly} ${isOpen ? '' : styles.drawerClosed}`}
       >
         <div className="absolute right-3 top-2.5 z-10">
