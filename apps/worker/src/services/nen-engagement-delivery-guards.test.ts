@@ -55,6 +55,15 @@ beforeEach(() => {
       id TEXT PRIMARY KEY, form_id TEXT NOT NULL, friend_id TEXT, data TEXT NOT NULL,
       created_at TEXT NOT NULL
     );
+    CREATE TABLE forms (
+      id TEXT PRIMARY KEY, name TEXT NOT NULL,
+      is_active INTEGER NOT NULL DEFAULT 1,
+      status TEXT NOT NULL DEFAULT 'active'
+    );
+    CREATE TABLE form_accounts (
+      form_id TEXT NOT NULL, line_account_id TEXT NOT NULL,
+      PRIMARY KEY (form_id, line_account_id)
+    );
     INSERT INTO nen_campaign_settings
       (campaign_key, label, category, trigger_event, delay_days, delivery_time,
        is_enabled, title, body_text, updated_at)
@@ -109,6 +118,7 @@ describe('N-291 NEN配信の実動する除外条件', () => {
 
   test('つないだ口コミフォームへ回答済みなら口コミ依頼だけ予約しない', async () => {
     const review = await getNenCampaign(db, 'review_request', 'account-1');
+    sqlite.prepare(`INSERT INTO forms (id, name) VALUES ('review-form', '口コミ')`).run();
     await saveNenCampaignAccountSetting(db, 'account-1', {
       ...review!,
       exclude_form_respondents: 1,
@@ -126,6 +136,99 @@ describe('N-291 NEN配信の実動する除外条件', () => {
     )).toBe(2);
     expect(sqlite.prepare(
       `SELECT COUNT(*) AS count FROM nen_delivery_jobs WHERE campaign_key = 'review_request'`,
+    ).get()).toEqual({ count: 0 });
+  });
+});
+
+describe('NEN-07 (#1078): つなぐ回答フォームが使えない稼働中配信', () => {
+  async function linkFormToReview(formId: string | null) {
+    const review = await getNenCampaign(db, 'review_request', 'account-1');
+    await saveNenCampaignAccountSetting(db, 'account-1', {
+      ...review!,
+      after_actions: formId
+        ? [{ kind: 'open_form', formId, formName: '口コミ', buttonLabel: '回答する' }]
+        : [],
+    });
+  }
+
+  test('フォームが消えた配信は送信jobを積まず、理由つきの対象外を履歴へ残す', async () => {
+    await linkFormToReview('deleted-form');
+
+    expect(await enqueuePostShippingFollowUps(
+      db, shipped('shipment-1', '2026-09-01T09:00:00+09:00'), 'friend-1', 'account-1',
+    )).toBe(2);
+
+    const job = sqlite.prepare(
+      `SELECT status, last_error FROM nen_delivery_jobs
+        WHERE campaign_key = 'review_request' AND friend_id = 'friend-1'`,
+    ).get() as { status: string; last_error: string } | undefined;
+    expect(job).toEqual({ status: 'skipped', last_error: 'campaign_form_unavailable' });
+  });
+
+  test('公開されていないフォームでも同じく止める', async () => {
+    sqlite.prepare(
+      `INSERT INTO forms (id, name, is_active) VALUES ('stopped-form', '口コミ', 0)`,
+    ).run();
+    await linkFormToReview('stopped-form');
+
+    expect(await enqueuePostShippingFollowUps(
+      db, shipped('shipment-1', '2026-09-01T09:00:00+09:00'), 'friend-1', 'account-1',
+    )).toBe(2);
+    expect(sqlite.prepare(
+      `SELECT status FROM nen_delivery_jobs WHERE campaign_key = 'review_request'`,
+    ).get()).toEqual({ status: 'skipped' });
+  });
+
+  test('別アカウント専用のフォームでも同じく止める', async () => {
+    sqlite.prepare(`INSERT INTO forms (id, name) VALUES ('other-form', '口コミ')`).run();
+    sqlite.prepare(
+      `INSERT INTO form_accounts (form_id, line_account_id) VALUES ('other-form', 'account-2')`,
+    ).run();
+    await linkFormToReview('other-form');
+
+    expect(await enqueuePostShippingFollowUps(
+      db, shipped('shipment-1', '2026-09-01T09:00:00+09:00'), 'friend-1', 'account-1',
+    )).toBe(2);
+    expect(sqlite.prepare(
+      `SELECT status FROM nen_delivery_jobs WHERE campaign_key = 'review_request'`,
+    ).get()).toEqual({ status: 'skipped' });
+  });
+
+  test('使えるフォームがつながっていれば従来どおり予約する', async () => {
+    sqlite.prepare(`INSERT INTO forms (id, name) VALUES ('ok-form', '口コミ')`).run();
+    sqlite.prepare(
+      `INSERT INTO form_accounts (form_id, line_account_id) VALUES ('ok-form', 'account-1')`,
+    ).run();
+    await linkFormToReview('ok-form');
+
+    expect(await enqueuePostShippingFollowUps(
+      db, shipped('shipment-1', '2026-09-01T09:00:00+09:00'), 'friend-1', 'account-1',
+    )).toBe(3);
+    expect(sqlite.prepare(
+      `SELECT status FROM nen_delivery_jobs WHERE campaign_key = 'review_request'`,
+    ).get()).toEqual({ status: 'pending' });
+  });
+
+  test('既存の予約済みjobは設定不足でも勝手に変えない', async () => {
+    sqlite.prepare(`INSERT INTO forms (id, name) VALUES ('ok-form', '口コミ')`).run();
+    await linkFormToReview('ok-form');
+    expect(await enqueuePostShippingFollowUps(
+      db, shipped('shipment-1', '2026-09-01T09:00:00+09:00'), 'friend-1', 'account-1',
+    )).toBe(3);
+
+    // 予約後にフォームが消えても、積み済みのpendingは送る側の判断に残す。
+    // 新しいイベントは重複防止の窓内なら記録自体を作らない(従来どおり)。
+    sqlite.prepare(`DELETE FROM forms WHERE id = 'ok-form'`).run();
+    expect(await enqueuePostShippingFollowUps(
+      db, shipped('shipment-2', '2026-09-02T09:00:00+09:00'), 'friend-1', 'account-1',
+    )).toBe(0);
+    expect(sqlite.prepare(
+      `SELECT status FROM nen_delivery_jobs
+        WHERE campaign_key = 'review_request' AND source_key = 'shipment-1'`,
+    ).get()).toEqual({ status: 'pending' });
+    expect(sqlite.prepare(
+      `SELECT COUNT(*) AS count FROM nen_delivery_jobs
+        WHERE campaign_key = 'review_request' AND source_key = 'shipment-2'`,
     ).get()).toEqual({ count: 0 });
   });
 });

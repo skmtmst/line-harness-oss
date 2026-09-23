@@ -18,7 +18,12 @@ vi.mock('@line-crm/db', () => ({
 vi.mock('../services/nen-engagement.js', () => ({
   buildDefaultColumnIntro: vi.fn(),
   buildNenDeliveryMessages: vi.fn(),
+  campaignButtonFormId: vi.fn(() => null),
   getNenCampaign: mocks.getNenCampaign,
+  nenCampaignFormIssue: vi.fn(async () => null),
+  NEN_CAMPAIGN_FORM_ISSUE_LABELS: {
+    form_missing: 'missing', form_inactive: 'inactive', form_other_account: 'other',
+  },
   queueColumnDelivery: vi.fn(),
   saveNenCampaignAccountSetting: mocks.saveNenCampaignAccountSetting,
   getNenBirthdayCouponSetting: vi.fn(),
