@@ -196,7 +196,7 @@ function BroadcastList() {
         setInsights(prev => ({ ...prev, [id]: res.data }))
       }
     } catch {
-      setError('インサイトの取得に失敗しました')
+      setError('インサイトの取得に失敗しました。もう一度読み込んでください。')
     } finally {
       setFetchingInsight(null)
     }

@@ -400,7 +400,7 @@ function FriendsPageInner({
         await loadFriends()
         onNotice({ title: '注目がほかの変更と重なりました', message: '最新の状態を読み直しました。確認してもう一度お試しください。' })
       } else {
-        onNotice({ title: '注目の変更に失敗しました', message: '通信状態を確認して、もう一度お試しください。' })
+        onNotice({ title: '注目の変更に失敗しました。通信を確かめて、もう一度お試しください。', message: '通信状態を確認して、もう一度お試しください。' })
       }
     }
   }, [loadFriends, onNotice])

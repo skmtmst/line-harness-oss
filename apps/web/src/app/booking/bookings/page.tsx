@@ -432,7 +432,7 @@ export default function BookingsPage() {
       if (collected === null) return
       if (alive && listAccountRef.current === requestedAccountId) setCalendarItems(collected)
     })().catch(() => {
-      if (alive && listAccountRef.current === requestedAccountId) setError('カレンダーの読み込みに失敗しました')
+      if (alive && listAccountRef.current === requestedAccountId) setError('カレンダーの読み込みに失敗しました。もう一度読み込んでください。')
     })
     return () => { alive = false }
   }, [selectedAccountId, view, calendarFrom, calendarTo])

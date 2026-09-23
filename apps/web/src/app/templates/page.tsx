@@ -420,7 +420,7 @@ export default function TemplatesPage() {
         setFormError(res.error)
       }
     } catch {
-      setFormError('作成に失敗しました')
+      setFormError('作成に失敗しました。通信を確かめて、もう一度お試しください。')
     } finally {
       setSaving(false)
     }

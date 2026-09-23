@@ -375,7 +375,7 @@ function BookingDetailInner() {
       if (loadGeneration.current !== generation) return
       // 失敗時は前の予約を「今の予約」として残さない。
       setDetailState(null)
-      setError('読み込みに失敗しました')
+      setError('読み込みに失敗しました。もう一度読み込んでください。')
     } finally {
       if (loadGeneration.current === generation) setLoading(false)
     }
@@ -526,7 +526,7 @@ function BookingDetailInner() {
       await bookingApi.decideRequest(selectedAccountId, id, action)
       void load()
     } catch (e) {
-      setError(e instanceof Error ? e.message : '変更に失敗しました')
+      setError(e instanceof Error ? e.message : '変更に失敗しました。通信を確かめて、もう一度お試しください。')
     } finally {
       setActing(false)
     }
@@ -706,7 +706,7 @@ function BookingDetailInner() {
     setNotice('')
     try {
       const result = await bookingApi.retryNotification(selectedAccountId, id, runId)
-      setNotice(result.status === 'succeeded' ? 'お知らせを送りました' : 'お知らせの送信に失敗しました')
+      setNotice(result.status === 'succeeded' ? 'お知らせを送りました' : 'お知らせの送信に失敗しました。通信を確かめて、もう一度お試しください。')
       await load()
     } catch {
       setError('お知らせを再送できませんでした')

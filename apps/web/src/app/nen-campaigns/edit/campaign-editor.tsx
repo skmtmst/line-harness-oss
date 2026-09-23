@@ -89,7 +89,7 @@ export default function CampaignEditor({ campaignKey }: { campaignKey: string })
       }
       if (formsResponse.success) setForms(formsResponse.data)
     }).catch(() => {
-      if (!cancelled) setError('読み込みに失敗しました')
+      if (!cancelled) setError('読み込みに失敗しました。もう一度読み込んでください。')
     }).finally(() => {
       if (!cancelled) setLoading(false)
     })
@@ -245,7 +245,7 @@ export default function CampaignEditor({ campaignKey }: { campaignKey: string })
         afterActions: actions,
       })
       if (!response.success) {
-        setError('保存に失敗しました')
+        setError('保存に失敗しました。通信を確かめて、もう一度お試しください。')
         return
       }
       setSetting(merged)

@@ -145,7 +145,7 @@ export default function BroadcastDetail({ broadcastId }: BroadcastDetailProps) {
       }
     } catch {
       if (requestId !== latestIdRef.current) return
-      setError('読み込みに失敗しました')
+      setError('読み込みに失敗しました。もう一度読み込んでください。')
     } finally {
       // 新しい取得が走っている間のスピナーを古い取得で消さない。
       if (requestId === latestIdRef.current) setLoading(false)
@@ -248,7 +248,7 @@ export default function BroadcastDetail({ broadcastId }: BroadcastDetailProps) {
           ? '確認の手順を経ていないため送信できませんでした。もう一度お試しください。'
           : status === 403
             ? 'この操作を行う権限がありません。'
-            : '送信に失敗しました',
+            : '送信に失敗しました。通信を確かめて、もう一度お試しください。',
       )
     } finally {
       setSending(false)

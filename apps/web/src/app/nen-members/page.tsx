@@ -591,7 +591,7 @@ export default function PhotoReviewsPage() {
         ? await api.nenMembers.photoPointRetry(id, selectedAccountId)
         : await api.nenMembers.photoPointReconcile(id, selectedAccountId)
       if (!response.success) {
-        setNotice(response.error || 'ポイントの手続きに失敗しました')
+        setNotice(response.error || 'ポイントの手続きに失敗しました。通信を確かめて、もう一度お試しください。')
         return
       }
       setNotice(response.data.synced
@@ -601,7 +601,7 @@ export default function PhotoReviewsPage() {
         : `手続きはまだ完了していません。${response.data.reasonLabel ? `（${response.data.reasonLabel}）` : ''}`)
       void openDetail(id)
     } catch {
-      setNotice('ポイントの手続きに失敗しました')
+      setNotice('ポイントの手続きに失敗しました。通信を確かめて、もう一度お試しください。')
     } finally {
       setPointActionBusy(null)
     }

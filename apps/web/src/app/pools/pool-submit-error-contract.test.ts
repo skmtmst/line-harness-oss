@@ -41,7 +41,7 @@ describe('新規プール窓の送信 (#1058)', () => {
   it('APIの返事(success:false)と画面の失敗表示を従来どおり分ける', () => {
     const body = fnBody(PAGE, 'const onSubmit = async ()')
     expect(body).toContain('if (res.success) onCreated()')
-    expect(body).toContain("else setError(res.error ?? '作成に失敗しました')")
+    expect(body).toContain("else setError(res.error ?? '作成に失敗しました。通信を確かめて、もう一度お試しください。')")
   })
 })
 

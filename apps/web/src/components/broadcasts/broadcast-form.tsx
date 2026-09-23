@@ -225,7 +225,7 @@ function MediaUpload({ bubble, onChange }: { bubble: BroadcastBubble; onChange: 
       const res = await api.broadcastMessageAssets.upload(file)
       if (!res.success) { setError(res.error); return }
       onChange({ ...bubble.content, originalContentUrl: res.data.url, previewImageUrl: isVideo ? (bubble.content.previewImageUrl ?? '') : res.data.url })
-    } catch { setError('アップロードに失敗しました') } finally { setBusy(false) }
+    } catch { setError('アップロードに失敗しました。通信を確かめて、もう一度お試しください。') } finally { setBusy(false) }
   }
   return <div className="space-y-3">
     <label className="flex min-h-28 cursor-pointer flex-col items-center justify-center rounded-card border-2 border-dashed border-hairline bg-canvas-sunken text-sm text-ink-faint hover:border-accent">

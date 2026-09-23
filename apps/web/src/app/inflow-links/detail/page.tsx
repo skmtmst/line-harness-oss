@@ -146,7 +146,7 @@ function InflowLinkDetailPageContent() {
         } catch {
           if (!cancelled) setFriends([])
         }
-      } else setError('リンクの取得に失敗しました')
+      } else setError('リンクの取得に失敗しました。もう一度読み込んでください。')
       if (f.status === 'fulfilled' && f.value.success) setFunnel(f.value.data)
       else if (!cancelled) setFunnelError(true)
     })

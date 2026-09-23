@@ -154,10 +154,10 @@ export default function AccountEditModal({
         onSaved()
         onClose()
       } else {
-        setError(res.error || '保存に失敗しました')
+        setError(res.error || '保存に失敗しました。通信を確かめて、もう一度お試しください。')
       }
     } catch {
-      setError('保存に失敗しました')
+      setError('保存に失敗しました。通信を確かめて、もう一度お試しください。')
     } finally {
       setSaving(false)
     }

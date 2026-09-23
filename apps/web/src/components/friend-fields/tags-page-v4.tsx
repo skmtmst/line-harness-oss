@@ -800,7 +800,7 @@ export default function TagsPageV4({
     } catch (reason) {
       /* 失敗は元に戻して理由を出し、取り直す。黙って上書きしない。 */
       setItems((current) => current.map((item) => item.id === tag.id ? { ...item, isStarred: tag.isStarred } : item))
-      setError(reason instanceof ApiError ? reason.message : '表示の切り替えに失敗しました')
+      setError(reason instanceof ApiError ? reason.message : '表示の切り替えに失敗しました。通信を確かめて、もう一度お試しください。')
       void load()
     }
   }

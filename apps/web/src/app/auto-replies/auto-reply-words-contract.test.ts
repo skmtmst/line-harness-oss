@@ -249,7 +249,7 @@ describe('一覧の画面が置き換え表を通す', () => {
     expect(PAGE).toContain('LOAD_STATE_WORDS[visibleLoadState]')
     expect(PAGE).toContain('再読み込み')
     expect(PAGE).toContain("reason instanceof ApiError && reason.status === 403 ? 'forbidden' : 'error'")
-    expect(PAGE).not.toContain('読み込みに失敗しました')
+    expect(PAGE).not.toContain('読み込みに失敗しました。もう一度読み込んでください。')
     expect(PAGE).not.toContain('読み込み中...')
     expect(PAGE).not.toContain('自動返信ルールがありません')
   })

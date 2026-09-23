@@ -258,7 +258,7 @@ describe('AUTOMATION-03: 人数の確認は保存とは別の成否', () => {
 
     // 保存は済んでいる。失敗しているのは人数の確認だけ。
     expect(el.textContent).toContain('下書きに保存しました')
-    expect(el.textContent).toContain('人数の確認に失敗しました')
+    expect(el.textContent).toContain('人数の確認に失敗しました。通信を確かめて、もう一度お試しください。')
     expect(el.textContent).not.toContain('保存できませんでした')
     expect(el.textContent).toContain('人数を数えられませんでした。下書きは保存されています。')
 
