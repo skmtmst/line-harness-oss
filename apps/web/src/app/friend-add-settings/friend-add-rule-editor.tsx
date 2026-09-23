@@ -6,6 +6,7 @@ import { Check, ChevronRight, Plus, X } from 'lucide-react'
 import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import Button from '@/components/shared/button'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { RequiredBadge } from '@/components/shared/form-controls'
 import ConditionBuilder from '@/components/shared/condition-builder'
 import Dialog from '@/components/shared/dialog'
@@ -35,6 +36,7 @@ import {
   updateTimeWindow,
 } from './friend-add-flow'
 import { resendSuppressionText } from './friend-add-text'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import './friend-add-rule-editor.css'
 
 type Step = 'basic' | 'routes' | 'message' | 'actions' | 'preview'
@@ -216,6 +218,13 @@ export default function FriendAddRuleEditor({ ruleId }: { ruleId?: string }) {
 
   const hasUnsavedChanges = savedSnapshot.current !== null
     && savedSnapshot.current !== editorSnapshot(rule, definition)
+
+  /*
+   * 最後に保存した版から入力が変わっている間、画面を離れる操作を止める
+   * 共通の番兵（DETAIL-04系）。段移動は「保存してから進む」既存の動きの
+   * ままにし、画面外への離脱（左メニュー・戻る・再読込）を確認対話へ寄せる。
+   */
+  const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty: hasUnsavedChanges, busy: saving })
 
   const validate = () => {
     if (!rule.name.trim()) return '設定名を入力してください。'
@@ -407,6 +416,16 @@ export default function FriendAddRuleEditor({ ruleId }: { ruleId?: string }) {
           />
         </div>
       )}
+
+      <ConfirmDialog
+        open={leaveTarget !== null}
+        title="保存していない変更があります"
+        description="このまま移動すると、保存していない変更は失われます。保存せずに移動しますか？"
+        confirmLabel="保存せずに移動"
+        cancelLabel="編集を続ける"
+        onConfirm={confirmLeave}
+        onCancel={cancelLeave}
+      />
     </div>
   )
 }

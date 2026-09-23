@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Button from '@/components/shared/button'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Chip from '@/components/shared/chip'
 import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
@@ -11,6 +12,7 @@ import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { TextField } from '@/components/shared/text-field'
 import { ApiError } from '@/lib/api'
 import { nenRanksApi, type NenFeedingData, type NenFeedingKind } from '@/lib/nen-ranks-api'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 
 type Draft = { id: string | null; name: string; kcal: string; isDefault: boolean; kind: NenFeedingKind }
 type Status = 'loading' | 'ready' | 'error' | 'forbidden'
@@ -50,6 +52,12 @@ export default function FeedingTab({ accountId }: { accountId: string }) {
   const generationRef = useRef(0)
 
   /*
+   * 未保存の変更がある間、画面を離れる操作を止める共通の番兵（DETAIL-04系）。
+   * 左メニュー・画面内リンク・戻る操作・再読込を同じ確認対話へ寄せる。
+   */
+  const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty, busy })
+
+  /*
    * アカウントが切り替わった瞬間に、表示データと編集状態をまとめて初期化する。
    * ここで残すと、Bの読み込み中にAのフォームと保存が有効のままになり、
    * Aの商品（AのID）をBへ保存できてしまう。世代も進めて飛行中の応答を失効させる。
@@ -63,6 +71,7 @@ export default function FeedingTab({ accountId }: { accountId: string }) {
     setTreatLimit('10')
     setDirty(false)
     setError('')
+    cancelLeave()
     setNotice(hadUnsaved ? 'LINEアカウントを切り替えたため、保存していない変更は破棄しました。' : '')
     setStatus('loading')
   }
@@ -248,6 +257,16 @@ export default function FeedingTab({ accountId }: { accountId: string }) {
             <Button variant="primary" onClick={() => void save()} disabled={busy || !dirty || status !== 'ready' || dataAccountId !== accountId}>保存する</Button>
           </>
         )}
+      />
+
+      <ConfirmDialog
+        open={leaveTarget !== null}
+        title="保存していない変更があります"
+        description="このまま移動すると、主食のカロリーへの変更は失われます。保存せずに移動しますか？"
+        confirmLabel="保存せずに移動"
+        cancelLabel="編集を続ける"
+        onConfirm={confirmLeave}
+        onCancel={cancelLeave}
       />
     </>
   )
