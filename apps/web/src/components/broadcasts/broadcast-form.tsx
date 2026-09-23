@@ -42,6 +42,7 @@ import type { SegmentCondition } from '@/lib/segment-condition'
 import { newBroadcastDraftSession, persistBroadcastDraft } from '@/lib/broadcast-draft'
 import ConditionBuilder from '@/components/shared/condition-builder'
 import SegmentPresetControls from '@/components/broadcasts/segment-preset-controls'
+import { audienceSummary } from '@/lib/broadcast-summary'
 import InsertToolbar from '@/components/scenarios/insert-toolbar'
 import MessageKindFields, {
   emptyMessageKindState,
@@ -66,6 +67,12 @@ interface BroadcastFormProps {
   tags: Tag[]
   /** 作成された実物。予約だけを完了画面へ送り、下書きと取り違えない。 */
   onSuccess: (broadcast: ApiBroadcast) => void
+  /**
+   * BROADCAST-16: 「下書き保存」でフォームが閉じない保存にも呼ぶ。
+   * 呼び側は一覧・フォルダ件数を読み直す（保存した下書きが未分類へ
+   * 増えるのに、再訪しないと件数が古いままだった）。
+   */
+  onDraftSaved?: (broadcast: ApiBroadcast) => void
   onCancel: () => void
   openTemplatePickerInitially?: boolean
   initialTemplateId?: string | null
@@ -279,8 +286,10 @@ function BubblePreview({ bubble, buttons = [] }: { bubble: BroadcastBubble; butt
   return <div className="w-[82%] overflow-hidden rounded-card bg-canvas shadow-sm">{imageUrl && <img src={imageUrl} alt="素材プレビュー" className="h-32 w-full object-cover" />}<div className="p-3"><p className="text-xs font-bold">{String(bubble.content.assetName ?? TYPE_LABELS[bubble.type])}</p><p className="mt-1 text-[11px] text-ink-faint">{TYPE_LABELS[bubble.type]}のプレビュー</p></div></div>
 }
 
-function BubbleEditor({ bubble, index, total, assets, accountId, onChange, onMove, onDelete }: {
+function BubbleEditor({ bubble, index, total, assets, assetsStatus, accountId, onChange, onMove, onDelete }: {
   bubble: BroadcastBubble; index: number; total: number; assets: BroadcastMessageAsset[];
+  /** PERF-06: 候補は必要になってから取る。未取得と0件を区別するための状態。 */
+  assetsStatus?: 'idle' | 'loading' | 'ready' | 'error';
   /** 選んでいるLINEアカウント。カルーセル候補の絞り込みに使う。 */
   accountId?: string | null;
   onChange: (bubble: BroadcastBubble) => void; onMove: (direction: -1 | 1) => void; onDelete: () => void
@@ -358,7 +367,9 @@ function BubbleEditor({ bubble, index, total, assets, accountId, onChange, onMov
         <select value={String(bubble.content.assetId ?? '')} onChange={(e) => { const asset = availableAssets.find((item) => item.id === e.target.value); onChange({ ...bubble, content: asset ? { assetId: asset.id, assetName: asset.name, ...asset.payload } : { assetId: '', assetName: '' } }) }} className="w-full rounded-card border border-hairline px-3 py-2.5 text-sm">
           <option value="">テンプレートを選択してください</option>{availableAssets.map((asset) => <option key={asset.id} value={asset.id}>{asset.name}</option>)}
         </select>
-        {availableAssets.length === 0 && <p className="mt-2 text-xs text-warning">先に「コンテンツ ＞ テンプレート」で作成してください。</p>}
+        {assetsStatus === 'loading' && <p className="mt-2 text-xs text-ink-faint">テンプレートを読み込んでいます…</p>}
+        {assetsStatus === 'error' && <p className="mt-2 text-xs text-warning">テンプレートを読み込めませんでした。開き直すと再取得します。</p>}
+        {assetsStatus === 'ready' && availableAssets.length === 0 && <p className="mt-2 text-xs text-warning">先に「コンテンツ ＞ テンプレート」で作成してください。</p>}
       </div>}
     </div>
   </section>
@@ -494,6 +505,7 @@ function bubblesError(bubbles: BroadcastBubble[]): string {
 export default function BroadcastForm({
   tags,
   onSuccess,
+  onDraftSaved,
   onCancel,
   openTemplatePickerInitially = false,
   initialTemplateId = null,
@@ -531,6 +543,13 @@ export default function BroadcastForm({
   }] : [emptyBubble()])
   const [assets, setAssets] = useState<BroadcastMessageAsset[]>([])
   const [messageTemplates, setMessageTemplates] = useState<BroadcastTemplateOption[]>([])
+  /*
+   * PERF-06: 素材・テンプレート候補は、選択窓や素材型の吹き出しが
+   * 必要になってから取る。「未取得（＝まだ読み込み中かも）」と
+   * 「0件」を区別しないと、読み込み中に「まず作成してください」と
+   * 誤った案内が出る。
+   */
+  const [templateCandidatesStatus, setTemplateCandidatesStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
   /**
    * テンプレート選択窓の絞り込み（IDEA-11）。
    * 「置き場」はテンプレートのフォルダで、配信そのものの置き場
@@ -545,6 +564,8 @@ export default function BroadcastForm({
   /** シナリオ購読で絞るときの相手。空なら「どれか1つでも購読している人」。 */
   const [scenarioId, setScenarioId] = useState('')
   const [scenarios, setScenarios] = useState<Array<{ id: string; name: string }>>([])
+  /** PERF-06: シナリオ候補は対象者の節で「シナリオ購読中」を選んでから取る。 */
+  const [scenariosStatus, setScenariosStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
   const [tagId, setTagId] = useState('')
   /** 「詳細条件」で組み立てた絞り込み。シナリオと同じ部品で作る。 */
   const [condition, setCondition] = useState<SegmentCondition | null>(initialCondition)
@@ -677,24 +698,69 @@ export default function BroadcastForm({
   }, [])
 
   useEffect(() => {
-    api.broadcasts.list({ accountId: selectedAccountId || undefined })
+    // PERF-06: 複製候補は画面に出る3件ぶんだけAPIへ頼む。
+    // 以前は一覧を全件取って先頭3件に絞っていた。
+    api.broadcasts.list({ accountId: selectedAccountId || undefined, limit: 3 })
       .then((res) => { if (res.success) setRecentBroadcasts(res.data.slice(0, 3)) })
       .catch(() => undefined)
   }, [selectedAccountId])
 
-  // 「シナリオ購読中の全員」で選ぶ相手。名前だけ使う。
+  /*
+   * 「シナリオ購読中の全員」で選ぶ相手。名前だけ使う。
+   * PERF-06: 対象者の節が見え、かつシナリオ選択になったときだけ取る。
+   * ステップ形式では対象者ステップへ進むまで、埋め込み形式では
+   * 節が常に見えているので従来どおり取る。
+   * アカウントごとに一度取ったら、選択肢の開閉では取り直さない。
+   */
+  const audienceSectionVisible = currentStep == null || currentStep === 'audience'
+  const needsScenarioCandidates = audienceSectionVisible && targetMode === 'scenario'
+  const scenariosLoadedForRef = useRef<string | null>(null)
   useEffect(() => {
-    api.scenarios.list({ accountId: selectedAccountId || undefined, limit: 200 })
-      .then((res) => { if (res.success) setScenarios(res.data.map((item) => ({ id: item.id, name: item.name }))) })
-      .catch(() => undefined)
+    // アカウントが変わったら前のアカウントの候補を見せない。
+    setScenarios([])
+    setScenariosStatus('idle')
   }, [selectedAccountId])
+  useEffect(() => {
+    if (!selectedAccountId || !needsScenarioCandidates) return
+    if (scenariosLoadedForRef.current === selectedAccountId) return
+    const accountId = selectedAccountId
+    let cancelled = false
+    setScenariosStatus('loading')
+    api.scenarios.list({ accountId, limit: 200 })
+      .then((res) => {
+        if (cancelled) return
+        if (res.success) {
+          setScenarios(res.data.map((item) => ({ id: item.id, name: item.name })))
+          setScenariosStatus('ready')
+          scenariosLoadedForRef.current = accountId
+        } else {
+          setScenariosStatus('error')
+        }
+      })
+      .catch(() => { if (!cancelled) setScenariosStatus('error') })
+    return () => { cancelled = true }
+  }, [selectedAccountId, needsScenarioCandidates])
 
+  /*
+   * PERF-06: 素材・テンプレートの候補は、必要になってから取る。
+   * 必要になるのは、テンプレート選択窓を開いた・素材型の吹き出しが
+   * ある・初期テンプレート指定で来た、のどれか。基本設定だけを
+   * 進める利用では1回も呼ばれない。
+   */
+  const needsTemplateCandidates = showTemplatePicker
+    || Boolean(initialTemplateId || initialContentTemplateId)
+    || bubbles.some((bubble) => isContentTemplateType(bubble.type))
   useEffect(() => {
     // 独立審査(指摘4): アカウント切替で古い応答が混ざらないよう世代で照合する。
     const requestAccountId = selectedAccountId || undefined
     // 独立審査(指摘4): 新しい応答が来るまで旧アカウントの候補を見せない。
     setMessageTemplates([])
     setAssets([])
+    if (!needsTemplateCandidates) {
+      setTemplateCandidatesStatus('idle')
+      return
+    }
+    setTemplateCandidatesStatus('loading')
     const requestGeneration = templateLoadGenerationRef.current.next()
     const isCurrent = () =>
       templateLoadGenerationRef.current.isCurrent(requestGeneration)
@@ -710,6 +776,10 @@ export default function BroadcastForm({
       if (!isCurrent()) return
       if (assetResult.success) setAssets(assetResult.data)
       if (folderResult.success) setTemplateFolders(folderResult.data)
+      // 候補自体がなくても「0件」として完了扱い。失敗は別の札にする。
+      setTemplateCandidatesStatus(
+        assetResult.success && templateResult.success && folderResult.success ? 'ready' : 'error',
+      )
       const sendable = templateResult.success
         ? filterSendableTemplates(templateResult.data, requestAccountId)
         : []
@@ -747,8 +817,10 @@ export default function BroadcastForm({
         }
         appliedInitialTemplate.current = true
       }
-    }).catch(() => undefined)
-  }, [initialContentTemplateId, initialTemplateId, selectedAccountId])
+    }).catch(() => {
+      if (isCurrent()) setTemplateCandidatesStatus('error')
+    })
+  }, [initialContentTemplateId, initialTemplateId, needsTemplateCandidates, selectedAccountId])
 
   // 独立審査(指摘4): アカウント切替で旧候補・選択・吹き出しを残さない。
   // 持ち主の分かる吹き出しだけ落とし、手書き・素材は保つ。
@@ -1048,7 +1120,13 @@ export default function BroadcastForm({
     setDraftSaved(false)
     try {
       // #772: 409時は persistDraft が案内ずみで null を返すため、保存ずみにはしない。
-      if (await persistDraft(scheduledAtIso(), true)) setDraftSaved(true)
+      const saved = await persistDraft(scheduledAtIso(), true)
+      if (saved) {
+        setDraftSaved(true)
+        // BROADCAST-16: フォームは閉じない保存なので、背後の一覧と
+        // フォルダ件数の読み直しは呼び側に任せる。失敗時は呼ばない。
+        onDraftSaved?.(saved)
+      }
     } catch {
       setError('下書きを保存できませんでした')
     } finally {
@@ -1075,6 +1153,9 @@ export default function BroadcastForm({
     try {
       const draft = await persistDraft(null, true)
       if (!draft) return
+      // BROADCAST-16: テスト送信でも下書きが増えるので、一覧と
+      // フォルダ件数を読み直してもらう。
+      onDraftSaved?.(draft)
       const res = await api.broadcasts.testSend(draft.id)
       /*
        * **HTTPの成功と配信の成功は分ける。** 全員に失敗しても
@@ -1136,6 +1217,28 @@ export default function BroadcastForm({
   /** 対象画面の人数も、事前確認が返した同じ確定値だけを使う。 */
   const audienceDisplayCount = audienceCount
   const targetModeLabel = TARGET_MODES.find((mode) => mode.value === targetMode)?.label ?? '未設定'
+  /*
+   * BROADCAST-15: 最終確認・事前確認の「対象」は一覧・詳細と同じ
+   * audienceSummary の文面にする。「全有効友だち」とだけ出すと、
+   * シナリオで絞った配信も全員向けに見える。
+   * シナリオ名は候補を読み終えたときだけ名前で出す。未読込のまま
+   * resolver を渡すと「シナリオ（削除済み）」と誤表示する。
+   */
+  const confirmAudienceLabel = (() => {
+    const getTagName = (id: string) => tags.find((tag) => tag.id === id)?.name ?? null
+    const getScenarioName = (id: string) => scenarios.find((item) => item.id === id)?.name ?? null
+    if (targetMode === 'all') return '友だち全員'
+    if (targetMode === 'tag') {
+      if (!tagId) return targetModeLabel
+      const name = getTagName(tagId)
+      return name ? `タグ：${name}` : 'タグ（削除済み）'
+    }
+    return audienceSummary(
+      { targetType: 'segment', segmentConditions: audience },
+      getTagName,
+      scenariosStatus === 'ready' ? getScenarioName : undefined,
+    )
+  })()
   /*
     除外の人数と理由。**数としての口がまだ無い応答もある。**
     `preflight.warnings` に「ブロック中の友だち 42人を除いています」のような
@@ -1274,7 +1377,7 @@ export default function BroadcastForm({
               <h3 className="text-lg font-bold text-ink">配信内容</h3>
               <p className="mt-1 text-xs text-ink-faint">対象・日時・メッセージの最終確認です。</p>
               <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
-                <div><dt className="text-xs text-ink-faint">対象</dt><dd className="mt-1 font-bold text-ink">全有効友だち {audienceCount?.toLocaleString('ja-JP') ?? '—'}人</dd></div>
+                <div><dt className="text-xs text-ink-faint">対象</dt><dd className="mt-1 font-bold text-ink">{confirmAudienceLabel} {audienceCount?.toLocaleString('ja-JP') ?? '—'}人</dd></div>
                 <div><dt className="text-xs text-ink-faint">配信日時</dt><dd className="mt-1 font-bold text-ink">8/24 10:00</dd></div>
               </dl>
             </section>
@@ -1500,6 +1603,8 @@ export default function BroadcastForm({
               <option value="">すべてのシナリオ（どれか1つでも購読中）</option>
               {scenarios.map((scenario) => <option key={scenario.id} value={scenario.id}>{scenario.name}</option>)}
             </select>
+            {scenariosStatus === 'loading' && <p className="mt-1 text-xs text-ink-faint">シナリオを読み込んでいます…</p>}
+            {scenariosStatus === 'error' && <p className="mt-1 text-xs text-warning">シナリオを読み込めませんでした。別の絞り方を選んで戻ると再取得します。</p>}
           </div>}
           {targetMode === 'tag' && <div className="border-hairline mt-4 border-t pt-4">
             <label className="text-ink-secondary block text-xs font-semibold">どのタグ</label>
@@ -1661,7 +1766,17 @@ export default function BroadcastForm({
                   <span aria-hidden>›</span>
                 </button>
               ))}
-              {messageTemplates.length === 0 && assets.length === 0 && (
+              {templateCandidatesStatus === 'loading' && (
+                <div className="rounded-card border border-dashed bg-canvas p-8 text-center text-sm text-ink-faint">
+                  テンプレートを読み込んでいます…
+                </div>
+              )}
+              {templateCandidatesStatus === 'error' && (
+                <div className="rounded-card border border-dashed bg-canvas p-8 text-center text-sm text-warning">
+                  テンプレートを読み込めませんでした。窓を閉じて開き直すと再取得します。
+                </div>
+              )}
+              {templateCandidatesStatus === 'ready' && messageTemplates.length === 0 && assets.length === 0 && (
                 <div className="rounded-card border border-dashed bg-canvas p-8 text-center text-sm text-ink-faint">
                   テンプレートがありません。「コンテンツ ＞ テンプレート」で作成してください。
                 </div>
@@ -1688,7 +1803,7 @@ export default function BroadcastForm({
             onChange={(next) => updateBubble(index, next)}
           />
         ) : (
-          <BubbleEditor key={bubble.id} bubble={bubble} index={index} total={bubbles.length} assets={assets} accountId={selectedAccountId} onChange={(next) => updateBubble(index, next)} onMove={(direction) => moveBubble(index, direction)} onDelete={() => setBubbles((items) => items.filter((_, i) => i !== index))} />
+          <BubbleEditor key={bubble.id} bubble={bubble} index={index} total={bubbles.length} assets={assets} assetsStatus={templateCandidatesStatus} accountId={selectedAccountId} onChange={(next) => updateBubble(index, next)} onMove={(direction) => moveBubble(index, direction)} onDelete={() => setBubbles((items) => items.filter((_, i) => i !== index))} />
         ))}
         {!showTemplatePicker && <div className="mt-4 flex flex-wrap gap-2">
           <Button type="button" disabled={bubbles.length >= MAX_BUBBLES} onClick={() => setBubbles((items) => [...items, emptyBubble()])}><Plus size={15} aria-hidden /> メッセージを追加</Button>
@@ -1766,7 +1881,7 @@ export default function BroadcastForm({
             <div className="mt-3 grid gap-3 sm:grid-cols-2">
               <div>
                 <label htmlFor="bc-date" className="text-ink-secondary mb-1 block text-xs font-medium">
-                  配信日
+                  配信日（日本時間）
                 </label>
                 <input
                   id="bc-date"
@@ -1778,7 +1893,7 @@ export default function BroadcastForm({
               </div>
               <div>
                 <label htmlFor="bc-time" className="text-ink-secondary mb-1 block text-xs font-medium">
-                  時刻
+                  時刻（日本時間）
                 </label>
                 <input
                   id="bc-time"
@@ -1898,7 +2013,7 @@ export default function BroadcastForm({
         <dl className="mt-5 divide-y divide-hairline text-sm">
           {[
             ['管理名', title.trim() || '（未入力）'],
-            ['対象', visualQaAugustCampaign ? '条件指定 1,213人' : `${targetModeLabel} ${audienceCount === null ? '—' : `${audienceCount.toLocaleString('ja-JP')}人`}`],
+            ['対象', visualQaAugustCampaign ? '条件指定 1,213人' : `${confirmAudienceLabel} ${audienceCount === null ? '—' : `${audienceCount.toLocaleString('ja-JP')}人`}`],
             ['除外', visualQaAugustCampaign ? 'ブロック 12人を除外' : exclusionNote ?? '—'],
             ['配信日時', visualQaAugustCampaign ? '2026/08/24 10:00' : sendWhenLabel ?? '未設定'],
             ['送信枠', visualQaAugustCampaign ? '残り 8,700 / 10,000通' : quotaNote ?? '—'],
@@ -2009,7 +2124,7 @@ export default function BroadcastForm({
             <section className="rounded-card border border-hairline bg-canvas p-5">
               <h3 className="text-sm font-bold text-ink">設定内容</h3>
               <dl className="mt-3 space-y-3 text-sm">
-                <div><dt className="text-xs text-ink-faint">配信対象</dt><dd className="font-bold text-ink">{targetModeLabel} {audienceDisplayCount === null ? '—' : `${audienceDisplayCount.toLocaleString('ja-JP')}人`}</dd></div>
+                <div><dt className="text-xs text-ink-faint">配信対象</dt><dd className="font-bold text-ink">{confirmAudienceLabel} {audienceDisplayCount === null ? '—' : `${audienceDisplayCount.toLocaleString('ja-JP')}人`}</dd></div>
                 <div><dt className="text-xs text-ink-faint">配信日時</dt><dd className="font-bold text-ink">未設定</dd></div>
                 <div><dt className="text-xs text-ink-faint">送信数</dt><dd className="font-bold text-ink">{bubbles.length}通</dd></div>
               </dl>
@@ -2028,7 +2143,7 @@ export default function BroadcastForm({
               <h3 className="text-sm font-bold text-ink">設定内容</h3>
               <dl className="mt-3 divide-y divide-hairline text-xs">
                 {[
-                  ['配信対象', `${targetModeLabel} ${audienceCount === null ? '—' : `${audienceCount.toLocaleString('ja-JP')}人`}`],
+                  ['配信対象', `${confirmAudienceLabel} ${audienceCount === null ? '—' : `${audienceCount.toLocaleString('ja-JP')}人`}`],
                   ['配信日時', scheduledLabel ?? '未設定'],
                   ['送信数', `${bubbles.length}通`],
                   ['配信後', publishedActions.find((action) => action.versionId === afterActionVersionId)?.name ?? '未設定'],
@@ -2229,7 +2344,7 @@ export default function BroadcastForm({
           <div className="flex justify-between gap-4 px-4 py-3">
             <dt className="text-ink-faint">配信対象</dt>
             <dd className="text-ink text-right font-medium">
-              {targetModeLabel}
+              {confirmAudienceLabel}
               <span className="ml-2 tabular-nums">
                 {audienceCount === null ? '—' : `${audienceCount.toLocaleString('ja-JP')}人`}
               </span>

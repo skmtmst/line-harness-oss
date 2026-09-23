@@ -31,7 +31,7 @@ import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import { useAccount } from '@/contexts/account-context'
 import { csvCell } from '@/lib/presentation'
-import { formatAnalyticsDateTime } from './analytics-time'
+import { analyticsWeekday, formatAnalyticsDate, formatAnalyticsDateTime } from './analytics-time'
 import {
   canTidyUsage,
   referenceHealthText,
@@ -125,7 +125,6 @@ function metricSum(metrics: Array<AnalyticsMetric<number>>): number | null {
 }
 
 const RANGES = [7, 30, 90]
-const WEEKDAY_JP = ['日', '月', '火', '水', '木', '金', '土']
 
 function RangePicker({ days, onChange }: { days: number; onChange: (days: number) => void }) {
   return (
@@ -156,8 +155,21 @@ function AnalyticsPeriodControl({ days, onChange }: { days: number; onChange: (d
   )
 }
 
-function weekdayOf(date: string): string {
-  return WEEKDAY_JP[new Date(`${date}T00:00:00+09:00`).getDay()] ?? ''
+/**
+ * どの表・グラフにも同じ形で「集計期間・データ締切」を出す注記。
+ * 「この数はいつの時点の、どの範囲か」を画面ごとに書き方を変えると、
+ * 同じ条件で読めているか比べにくい。
+ */
+function AnalyticsPeriodCaption({ from, to, cutoffAt }: {
+  from: string
+  to: string
+  cutoffAt: string
+}) {
+  return (
+    <span className="text-ink-faint text-xs tabular-nums">
+      集計期間 {from}〜{to} ／ データ締切 {formatAnalyticsDateTime(cutoffAt)}
+    </span>
+  )
 }
 
 function rangeFor(days: number, now = new Date()): { from: string; to: string } {
@@ -975,6 +987,15 @@ function CrossTab({ accountId, canManage }: { accountId: string; canManage: bool
               </tbody>
             </table>
           </div>
+          {/* 表・この人数・対象者づくりがすべて同じ集計結果(runId)を見ている
+              ことを、期間と締切で確かめられるようにする。 */}
+          <div className="mt-1 flex justify-end">
+            <AnalyticsPeriodCaption
+              from={crossResult.periodFrom.slice(0, 10)}
+              to={crossResult.periodTo.slice(0, 10)}
+              cutoffAt={crossResult.dataCutoffAt}
+            />
+          </div>
 
           {canManage ? (
             <div className="bg-canvas rounded-card border-hairline mt-3 border p-4">
@@ -1017,9 +1038,6 @@ function CrossTab({ accountId, canManage }: { accountId: string; canManage: bool
             <section className="bg-canvas rounded-card border-hairline mt-3 border p-4">
               <div className="flex items-start justify-between gap-2">
                 <h3 className="text-ink text-sm font-semibold">この表から読めること</h3>
-                {crossResult && <span className="text-ink-faint shrink-0 text-xs">
-                  データ締切 {formatAnalyticsDateTime(crossResult.dataCutoffAt)}
-                </span>}
               </div>
               <ul className="text-ink-secondary mt-2 space-y-1.5 text-xs leading-relaxed">
                 {readings.map((r) => (
@@ -1086,6 +1104,9 @@ function FunnelTab({ accountId, canManage, presetConversion }: {
     if (presetConversion?.id && canManage) setCreating(true)
   }, [presetConversion?.id, canManage])
   const [picked, setPicked] = useState<number | null>(null)
+  // CONVERSION-05: 作成はできたが成果地点への利用先記録だけ失敗したとき、
+  // 静かに成功に見せず、記せなかった地点名を出す。
+  const [usageNotice, setUsageNotice] = useState('')
   const [funnelDays, setFunnelDays] = useState(30)
   const [audienceSelection, setAudienceSelection] = useState<'reached' | 'stopped' | 'in_progress'>('stopped')
   const [funnelAudience, setFunnelAudience] = useState<{ id: string; memberCount: number; expiresAt: string } | null>(null)
@@ -1278,9 +1299,15 @@ function FunnelTab({ accountId, canManage, presetConversion }: {
 
   const activeGroup = run?.groups.find((group) => group.key === groupKey) ?? run?.groups[0] ?? null
   const result = activeGroup?.steps ?? null
+  /*
+   * ANALYTICS-04: 集計が「未取得・失敗」の結果では人数を出さない。
+   * 全部取れなかった数字を並べると「離脱100%」のような結論に読める。
+   * 一部だけ取れた（partial）は断りを添えて出す。
+   */
+  const measurable = !!run && (run.state === 'available' || run.state === 'partial')
 
   const comparisonGap = useMemo(() => {
-    if (!run || run.groups.length < 2) return null
+    if (!measurable || !run || run.groups.length < 2) return null
     let largest = 0
     for (let index = 0; index < run.groups[0].steps.length; index += 1) {
       const rates = run.groups
@@ -1290,7 +1317,7 @@ function FunnelTab({ accountId, canManage, presetConversion }: {
       largest = Math.max(largest, Math.max(...rates) - Math.min(...rates))
     }
     return Math.round(largest * 1000) / 10
-  }, [run])
+  }, [measurable, run])
 
   const prepareFunnelAudience = async () => {
     if (!run?.runId || picked === null || !result?.[picked] || !activeGroup) return
@@ -1317,22 +1344,22 @@ function FunnelTab({ accountId, canManage, presetConversion }: {
   }
 
   // いちばん落ちる段。人数の差ではなく、落ちた割合で選ぶ。母数の大きい段が
-  // いつも1位になってしまうため。
+  // いつも1位になってしまうため。まだ途中の人は「落ちた」に入れない。
   const worst = useMemo(() => {
-    if (!result || result.length < 2) return null
+    if (!measurable || !result || result.length < 2) return null
     let found: { index: number; lost: number; rate: number } | null = null
     for (let i = 1; i < result.length; i++) {
-      const prev = result[i - 1].reached
-      if (prev === 0) continue
-      const lost = prev - result[i].reached
-      const rate = lost / prev
+      const prev = result[i - 1]
+      if (prev.reached === 0) continue
+      const lost = prev.droppedAfter
+      const rate = lost / prev.reached
       if (!found || rate > found.rate) found = { index: i, lost, rate }
     }
     return found
-  }, [result])
+  }, [measurable, result])
 
   const overall = useMemo(() => {
-    if (!result || result.length === 0) return null
+    if (!measurable || !result || result.length === 0) return null
     const first = result[0]
     const last = result[result.length - 1]
     return {
@@ -1341,7 +1368,7 @@ function FunnelTab({ accountId, canManage, presetConversion }: {
       last: last.reached,
       rate: first.reached > 0 ? Math.round((last.reached / first.reached) * 1000) / 10 : null,
     }
-  }, [result])
+  }, [measurable, result])
 
   if (loading) {
     return (
@@ -1351,20 +1378,26 @@ function FunnelTab({ accountId, canManage, presetConversion }: {
     )
   }
 
-  const top = result?.[0]?.reached ?? 0
+  const top = measurable ? (result?.[0]?.reached ?? 0) : 0
   const selectedFunnel = funnels.find((f) => f.id === selected) ?? null
   const inactiveFunnels = funnels.filter((f) => f.status !== 'active')
   const exportFunnel = () => {
     if (!result) return
     downloadCsv('analytics-funnel.csv', [
+      // 判定不能・一部取得のCSVでも、画面と同じ「数えられる/いない」を守る。
+      // 状態と集計時の定義版を先頭行に書き、数字の列は画面と同じ値にする。
+      ...(run && run.state !== 'available'
+        ? [['集計状態', `${SAVED_STATE_LABELS[run.state]}${run.stateReason ? `（${run.stateReason}）` : ''}`]]
+        : []),
+      ...(run?.versionNumber != null ? [['集計した定義版', `${run.versionNumber}`]] : []),
       ['段', '到達した人', '前の段からの通過率', 'ここで止まった人', 'まだ途中の人'],
-      ...result.map((step) => [
+      ...result.map((step) => measurable ? [
         step.label,
         step.reached,
         step.conversionFromPrevious === null ? null : `${Math.round(step.conversionFromPrevious * 1000) / 10}%`,
         step.droppedAfter,
         step.inProgressAfter,
-      ]),
+      ] : [step.label, null, null, null, null]),
     ])
   }
 
@@ -1383,9 +1416,12 @@ function FunnelTab({ accountId, canManage, presetConversion }: {
             setCreating(false)
             setEditTarget(null)
           }}
-          onCreated={(id) => {
+          onCreated={(id, usageWarnings) => {
             setCreating(false)
             setEditTarget(null)
+            setUsageNotice(usageWarnings && usageWarnings.length > 0
+              ? `作成はできましたが、成果地点への利用先記録に失敗しました：${usageWarnings.join('、')}。成果地点側の利用先一覧には出ていません。`
+              : '')
             void reloadFunnels(id)
           }}
         />
@@ -1542,9 +1578,19 @@ function FunnelTab({ accountId, canManage, presetConversion }: {
             {/* 条件ごとに通過率を並べる仕組みが無い。ファネルの定義が1本の
                 段の列だけで、条件で分ける口を持っていない。 */}
             {run && <p className="text-ink-faint mt-2 text-xs">
-              集計期間 {new Date(run.cohortFrom).toLocaleDateString('ja-JP')}〜{new Date(run.cohortTo).toLocaleDateString('ja-JP')}
+              集計期間 {formatAnalyticsDate(run.cohortFrom)}〜{formatAnalyticsDate(run.cohortTo)}
               ／データ締切 {formatAnalyticsDateTime(run.dataCutoffAt)}
+              {run.versionNumber != null ? `／集計した定義版 ${run.versionNumber}` : ''}
             </p>}
+            {/* ANALYTICS-06: 「定義版」はいまの定義、結果は集計時の版の写し。
+                ずれているときは旧版の結果だと断り、再集計へ誘導する。 */}
+            {run && selectedFunnel?.currentVersion && run.versionNumber != null
+              && run.versionNumber !== selectedFunnel.currentVersion.versionNumber && (
+              <p className="text-warning mt-2 text-xs font-semibold" role="status">
+                この結果は定義版{run.versionNumber}で集計したものです。いまの定義は版{selectedFunnel.currentVersion.versionNumber}です。
+                「この{funnelDays}日を再集計」で、いまの定義の結果に更新できます。
+              </p>
+            )}
             {runError && (
               <div className="mt-2 flex flex-wrap items-center gap-2">
                 <p className="text-danger text-xs">{runError}</p>
@@ -1555,7 +1601,20 @@ function FunnelTab({ accountId, canManage, presetConversion }: {
               </div>
             )}
             {noRun && !run && <p className="text-ink-faint mt-2 text-xs">まだ集計がありません。「この{funnelDays}日を再集計」を押してください</p>}
-            {run?.stateReason && <p className="text-warning mt-2 text-xs">{run.stateReason}</p>}
+            {usageNotice && <p className="text-warning mt-2 text-xs" role="status">{usageNotice}</p>}
+            {/* ANALYTICS-04: 未取得・失敗は「判定不能」と言い、部分取得は
+                理由を添えて出す。どちらも人数を実測値とは言わない。 */}
+            {run && !measurable && (
+              <p className="text-warning mt-2 text-xs font-semibold" role="status">
+                {SAVED_STATE_LABELS[run.state]}のため、この結果は判定不能です。人数や割合は実測値ではありません。
+                {run.stateReason ? ` ${run.stateReason}` : ''}
+              </p>
+            )}
+            {run && run.state === 'partial' && (
+              <p className="text-warning mt-2 text-xs">
+                {run.stateReason ?? '一部の期間・種類のデータが無いため、実際より少なく数えている可能性があります。'}
+              </p>
+            )}
             {run && run.groups.length > 1 && (
               <div className="mt-3 max-w-xs">
                 <label htmlFor="funnel-group" className="text-ink-secondary mb-1 block text-xs font-medium">比較する条件</label>
@@ -1579,13 +1638,15 @@ function FunnelTab({ accountId, canManage, presetConversion }: {
               title="入口"
               value={overall?.entry ?? null}
               unit="人"
-              detail={overall?.entryLabel ?? '—'}
+              detail={measurable ? (overall?.entryLabel ?? '—') : run ? '判定不能' : '—'}
             />
             <KpiCard
               title="最後まで"
               value={overall?.last ?? null}
               unit="人"
-              detail={overall?.rate != null ? `通過率 ${overall.rate}%` : '—'}
+              detail={measurable
+                ? (overall?.rate != null ? `通過率 ${overall.rate}%` : '—')
+                : run ? '判定不能' : '—'}
             />
             <KpiCard
               title="いちばん落ちる段"
@@ -1594,7 +1655,7 @@ function FunnelTab({ accountId, canManage, presetConversion }: {
               detail={
                 worst && result
                   ? `${result[worst.index - 1].label} → ${result[worst.index].label}`
-                  : '—'
+                  : run && !measurable ? '判定不能' : '—'
               }
             />
             {/* 段ごとの到達日時を持っていない。ファネルの集計は「通ったか」
@@ -1616,8 +1677,12 @@ function FunnelTab({ accountId, canManage, presetConversion }: {
               </p>
               <div className="space-y-3">
                 {result.map((step, i) => {
-                  const prev = i > 0 ? result[i - 1].reached : null
-                  const lost = prev != null ? prev - step.reached : 0
+                  // 「まだ途中の人」を止まった人に混ぜない（ANALYTICS-04）。
+                  // 止まった人数は口が数えた droppedAfter をそのまま使う。
+                  const prev = i > 0 ? result[i - 1] : null
+                  const lost = prev?.droppedAfter ?? 0
+                  const inProgress = prev?.inProgressAfter ?? 0
+                  const prevReached = prev?.reached ?? 0
                   const isWorst = worst?.index === i
                   return (
                     <div key={step.stepOrder}>
@@ -1626,8 +1691,8 @@ function FunnelTab({ accountId, canManage, presetConversion }: {
                           {i + 1}. {step.label}
                         </p>
                         <p className="text-ink-secondary text-sm tabular-nums" id={`funnel-step-${step.stepOrder}-value`}>
-                          {step.reached.toLocaleString('ja-JP')} 人
-                          {i > 0 && (
+                          {measurable ? `${step.reached.toLocaleString('ja-JP')} 人` : '—'}
+                          {measurable && i > 0 && (
                             <span className="text-ink-faint ml-2 text-xs">
                               （{step.conversionFromPrevious == null ? '—' : `${Math.round(step.conversionFromPrevious * 1000) / 10}%`}）
                             </span>
@@ -1635,9 +1700,11 @@ function FunnelTab({ accountId, canManage, presetConversion }: {
                         </p>
                       </div>
                       {/* 棒は押すとその段を選ぶ。段名だけでは人数が読めないので、
-                          上の数値行をaria-describedbyで紐づける。 */}
+                          上の数値行をaria-describedbyで紐づける。判定不能の
+                          結果では対象者を作れないので、選べない形にする。 */}
                       <button
                         onClick={() => {
+                          if (!measurable) return
                           setFunnelAudience(null)
                           setPicked(i)
                         }}
@@ -1653,11 +1720,17 @@ function FunnelTab({ accountId, canManage, presetConversion }: {
                       {/* 落ちた人数と割合は数えられる。「案内が届いていない
                           可能性があります」のような原因は、運用を知らないと
                           書けないので出さない。 */}
-                      {prev != null && lost > 0 && (
+                      {measurable && prev != null && lost > 0 && (
                         <p className={`mt-1 text-xs ${isWorst ? 'text-warning' : 'text-ink-faint'}`}>
                           {lost.toLocaleString('ja-JP')}人（
-                          {Math.round((lost / prev) * 1000) / 10}%）がここで止まっています。
+                          {Math.round((lost / prevReached) * 1000) / 10}%）がここで止まっています。
+                          {inProgress > 0 ? ` ほかに${inProgress.toLocaleString('ja-JP')}人はまだ途中です。` : ''}
                           {isWorst && ' この分析でいちばん落ちる段です。'}
+                        </p>
+                      )}
+                      {measurable && prev != null && lost === 0 && inProgress > 0 && (
+                        <p className="text-ink-faint mt-1 text-xs">
+                          {inProgress.toLocaleString('ja-JP')}人はまだ途中です。期限までに次の段へ進むと数が変わります。
                         </p>
                       )}
                     </div>
@@ -1666,7 +1739,7 @@ function FunnelTab({ accountId, canManage, presetConversion }: {
               </div>
 
               <div className="border-hairline mt-4 border-t pt-3">
-                {picked != null && result[picked] ? (
+                {picked != null && result[picked] && measurable ? (
                   selectedFunnel?.status === 'active' ? (
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <div className="space-y-2">
@@ -1699,7 +1772,9 @@ function FunnelTab({ accountId, canManage, presetConversion }: {
                   )
                 ) : (
                   <p className="text-ink-faint text-xs">
-                    段を押すと、到達・停止・進行中の人を選べます。
+                    {run && !measurable
+                      ? 'この結果は判定不能のため、対象者は選べません。'
+                      : '段を押すと、到達・停止・進行中の人を選べます。'}
                   </p>
                 )}
                 {funnelAudience && (
@@ -1847,7 +1922,9 @@ function FunnelForm({
 }: {
   accountId: string
   onCancel: () => void
-  onCreated: (id: string) => void
+  // CONVERSION-05: 作成自体は成功でも、段の成果地点へ利用先を記せない
+  // ことがある。その名前一覧を第2引数で返し、呼び出し側が断りを出す。
+  onCreated: (id: string, usageWarnings?: string[]) => void
   // 指定すると「現在版を下書きへ読んだ状態」で開き、保存は新版の追加になる。
   // 過去の版と過去の結果は書き換えない。match・segment・comparisonGroupsは
   // フォームに出せない副条件ごと元の版から受け取り、保存時にそのまま返す。
@@ -1942,7 +2019,7 @@ function FunnelForm({
           setError(explainStartError(res.error, res.error))
           return
         }
-        onCreated(edit.funnelId)
+        onCreated(edit.funnelId, res.data.usageWarnings)
       } else {
         const res = await api.analytics.v6Funnels.create(accountId, {
           name: name.trim(),
@@ -1953,7 +2030,7 @@ function FunnelForm({
           setError(res.error)
           return
         }
-        onCreated(res.data.funnelId)
+        onCreated(res.data.funnelId, res.data.usageWarnings)
       }
     } catch {
       setError('保存に失敗しました')
@@ -2293,9 +2370,18 @@ function FriendsOverviewTab({ accountId }: { accountId: string }) {
     <section className="bg-canvas rounded-card border-hairline border p-4">
       <div className="mb-4 flex flex-wrap items-start justify-between gap-2">
         <div><h2 className="font-semibold text-ink">日ごとの増減（この{days}日）</h2><p className="mt-1 text-xs text-ink-faint">上が増えた人、下が減った人です。</p></div>
-        <span className="text-xs tabular-nums text-ink-faint">{state.data.period.from}〜{state.data.period.to}</span>
+        <AnalyticsPeriodCaption from={state.data.period.from} to={state.data.period.to} cutoffAt={state.data.dataCutoffAt} />
       </div>
-      {!daysShown ? <p className="p-8 text-center text-sm text-ink-faint">{pendingReason}</p> : (
+      {!daysShown ? (
+        <div className="p-8 text-center text-sm text-ink-faint">
+          <p>{pendingReason}</p>
+          {/* 集計待ちの間は「0人」とも「次はいつ」とも言えない。更新の周期と
+              変わらない場合の戻り方だけを伝える(点検ANALYTICS-01)。 */}
+          {overview.state === 'pending' && (
+            <p className="mt-2 text-xs">日ごとの集計は数分ごとに自動で更新されます。しばらくしても変わらないときは、時間をおいて開き直してください。</p>
+          )}
+        </div>
+      ) : (
         <div
           className="grid h-44 items-center gap-1 border-y border-hairline py-3"
           style={{ gridTemplateColumns: `repeat(${Math.max(1, overview.days.length)}, minmax(0, 1fr))` }}
@@ -2314,8 +2400,14 @@ function FriendsOverviewTab({ accountId }: { accountId: string }) {
           })}
         </div>
       )}
-      <div className="mt-8 flex flex-wrap gap-4 text-xs text-ink-secondary"><span>● 増えた人</span><span className="text-danger">● 減った人</span>{overview.campaigns.map((item) => <span key={item.id}>{item.date.slice(5).replace('-', '/')} {item.name}</span>)}</div>
-      {selectedDay && <div className="mt-3 rounded-control bg-canvas-sunken px-3 py-2 text-xs text-ink-secondary"><strong className="text-ink">{selectedDay.date}（{weekdayOf(selectedDay.date)}）</strong>　増加 {selectedDay.added}人・減少 {selectedDay.removed}人・差し引き {selectedDay.net > 0 ? '+' : ''}{selectedDay.net}人　施策 {selectedCampaigns.length ? selectedCampaigns.map((item) => item.name).join('、') : 'なし'}</div>}
+      {/* グラフを出せない間は凡例も選択日の詳細も出さない。出すと
+          「増加0人・施策なし」という未取得の0が確定値に見える(点検ANALYTICS-01)。 */}
+      {daysShown && (
+        <div className="mt-8 flex flex-wrap gap-4 text-xs text-ink-secondary"><span>● 増えた人</span><span className="text-danger">● 減った人</span>{overview.campaigns.map((item) => <span key={item.id}>{item.date.slice(5).replace('-', '/')} {item.name}</span>)}</div>
+      )}
+      {daysShown && selectedDay && (
+        <div className="mt-3 rounded-control bg-canvas-sunken px-3 py-2 text-xs text-ink-secondary"><strong className="text-ink">{selectedDay.date}（{analyticsWeekday(selectedDay.date)}）</strong>　増加 {selectedDay.added}人・減少 {selectedDay.removed}人・差し引き {selectedDay.net > 0 ? '+' : ''}{selectedDay.net}人　施策 {selectedCampaigns.length ? selectedCampaigns.map((item) => item.name).join('、') : 'なし'}</div>
+      )}
     </section>
     <section className="overflow-hidden rounded-card border border-hairline bg-canvas">
       <div className="border-b border-hairline px-4 py-3"><h2 className="font-semibold text-ink">どこから増えたか</h2><p className="mt-1 text-xs text-ink-faint">「経路と成果」に接続された経路ごとの、この{days}日の実測です。</p></div>
@@ -2381,7 +2473,10 @@ function ReactionsOverviewTab({ accountId }: { accountId: string }) {
         })}
       </div>
     </section>
-    <div className="flex justify-end"><AnalyticsExportButton onClick={exportCampaigns} disabled={overview.campaigns.length === 0} /></div>
+    <div className="flex flex-wrap items-center justify-between gap-2">
+      <AnalyticsPeriodCaption from={state.data.period.from} to={state.data.period.to} cutoffAt={state.data.dataCutoffAt} />
+      <AnalyticsExportButton onClick={exportCampaigns} disabled={overview.campaigns.length === 0} />
+    </div>
     <div className="bg-canvas rounded-card border-hairline overflow-hidden border"><table className="w-full table-fixed">
       <thead><TableHeadRow><Th>配信</Th><Th>種類・日時</Th><Th align="right">対象</Th><Th align="right">到達</Th><Th align="right">開封</Th><Th align="right">LINEクリック</Th><Th align="right">成果</Th></TableHeadRow></thead>
       <tbody className="divide-hairline divide-y">{overview.campaigns.length === 0 ? <tr><td colSpan={7} className="text-ink-faint p-8 text-center text-sm">この期間の配信はありません</td></tr> : overview.campaigns.map((item) => <tr key={`${item.kind}:${item.id}`} className="text-sm"><td className="truncate px-4 py-3 font-medium" title={item.name}>{item.name}</td><td className="text-ink-secondary px-3 py-3">{item.kind === 'broadcast' ? '一斉配信' : 'シナリオ'}<br /><span className="text-xs tabular-nums">{item.sentAt.slice(0, 16).replace('T', ' ')}</span></td><td className="px-3 py-3 text-right"><MetricCell metric={item.targetPeople} /></td><td className="px-3 py-3 text-right"><MetricCell metric={item.delivered} /></td><td className="px-3 py-3 text-right"><MetricCell metric={item.opened} /></td><td className="px-3 py-3 text-right"><MetricCell metric={item.lineClicked} /></td><td className="px-3 py-3 text-right"><MetricCell metric={item.outcomes} /></td></tr>)}</tbody>
@@ -2419,7 +2514,9 @@ function RoutesOverviewTab({ accountId }: { accountId: string }) {
       <KpiCard title="差し引き" value={profit} unit="円" detail="売上から広告費を引いた残り" />
       <KpiCard title="費用を取得できない経路" value={overview.routes.filter((item) => shownValue(item.adCost) === null).length} unit="件" detail="0円として計算しません" />
     </div>
-    <AnalyticsNotice><span>経路ごとに、かかった費用と出た成果を差し引きまで出します。帰属方式は「{overview.attributionLabel}」です。</span> <Link href={overview.searchConsoleHref} className="font-medium text-accent hover:underline">Search Consoleを見る</Link></AnalyticsNotice>
+    <AnalyticsNotice><span>経路ごとに、かかった費用と出た成果を差し引きまで出します。帰属方式は「{overview.attributionLabel}」です。</span> <Link href={overview.searchConsoleHref} className="font-medium text-accent hover:underline">Search Consoleを見る</Link>
+      <p className="mt-1"><AnalyticsPeriodCaption from={state.data.period.from} to={state.data.period.to} cutoffAt={state.data.dataCutoffAt} /></p>
+    </AnalyticsNotice>
     <div className="grid grid-cols-4 overflow-hidden rounded-card border border-hairline bg-canvas">{stages.map((stage, index) => {
       const previous = index > 0 ? stages[index - 1].value : null
       const rate = previous && stage.value !== null ? stage.value / previous * 100 : null
@@ -2517,7 +2614,10 @@ function UsageOverviewTab({ accountId }: { accountId: string }) {
     </table></div>
     <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
       <p className="text-ink-faint">未使用の項目は自動で削除しません。各機能の使用先を確認してから停止・削除します。</p>
-      <p className="text-ink-faint">利用関係を最後に確認: {formatAnalyticsDateTime(overview.checkedAt)}</p>
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+        <AnalyticsPeriodCaption from={state.data.period.from} to={state.data.period.to} cutoffAt={state.data.dataCutoffAt} />
+        <span className="text-ink-faint">利用関係を最後に確認: {formatAnalyticsDateTime(overview.checkedAt)}</span>
+      </div>
     </div>
   </div>
 }
@@ -2554,7 +2654,7 @@ function UrlClicksOverviewTab({ accountId }: { accountId: string }) {
     <div className="flex flex-wrap items-center gap-2">
       <label htmlFor="url-click-search" className="sr-only">URL・配信名・リンク名で探す</label>
       <input id="url-click-search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="URL・配信名・リンク名で探す" className="h-10 min-w-64 flex-1 rounded-control border border-hairline bg-canvas px-3 text-sm" />
-      <span className="text-xs text-ink-faint">{state.data.period.from}〜{state.data.period.to}</span>
+      <AnalyticsPeriodCaption from={state.data.period.from} to={state.data.period.to} cutoffAt={state.data.dataCutoffAt} />
       <AnalyticsExportButton onClick={exportRows} disabled={visibleLinks.length === 0} />
     </div>
     <div className="bg-canvas rounded-card border-hairline overflow-hidden border"><table className="w-full table-fixed">
@@ -2747,7 +2847,10 @@ function SavedAnalyticsTab({ accountId, onCountChange, canManage }: {
 
   const selected = items.find((item) => item.id === selectedId) ?? null
   const visibleItems = items.filter((item) => `${item.name} ${item.createdByName}`.toLowerCase().includes(query.trim().toLowerCase()))
-  const staleCount = items.filter((item) => item.latestSnapshot && ['unavailable', 'failed'].includes(item.latestSnapshot.state)).length
+  // ANALYTICS-05: 「定義が古い」のは版ずれだけを数える。未取得・失敗は
+  // 集計状態の話で、定義の新旧とは別の軸——混ぜると、新しい定義で
+  // まだ集計していないものと、単に取れなかったものが区別できない。
+  const staleCount = items.filter((item) => item.latestSnapshot?.definitionStale).length
   const exportSaved = () => downloadCsv('analytics-saved.csv', [
     ['分析名', '種類', '作った人', '定義版', '更新日時', '集計状態', '保存結果数'],
     ...visibleItems.map((item) => [
@@ -2756,7 +2859,9 @@ function SavedAnalyticsTab({ accountId, onCountChange, canManage }: {
       item.createdByName,
       item.currentVersionNumber,
       item.updatedAt,
-      item.latestSnapshot ? SAVED_STATE_LABELS[item.latestSnapshot.state] : null,
+      item.latestSnapshot
+        ? `${SAVED_STATE_LABELS[item.latestSnapshot.state]}${item.latestSnapshot.definitionStale ? '（旧版の結果・更新後未集計）' : ''}`
+        : null,
       item.snapshotCount,
     ]),
   ])
@@ -2766,7 +2871,7 @@ function SavedAnalyticsTab({ accountId, onCountChange, canManage }: {
       <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
         <KpiCard title="保存した分析" value={items.length} unit="件" detail="クロス分析とファネル" loading={loading} />
         <KpiCard title="保存した結果" value={items.reduce((sum, item) => sum + item.snapshotCount, 0)} unit="件" detail="時点ごとに固定した結果" loading={loading} />
-        <KpiCard title="定義が古いもの" value={staleCount} unit="件" detail="未取得・失敗の最新結果" loading={loading} />
+        <KpiCard title="定義が古いもの" value={staleCount} unit="件" detail="いまの定義でまだ集計していないもの" loading={loading} />
         <KpiCard title="選んだ分析の履歴" value={selected ? selected.snapshotCount : null} unit="件" detail={selected?.name ?? '分析を選んでください'} loading={loading} />
       </div>
       <div className="bg-info-bg border-info rounded-card border px-4 py-3 text-sm">
@@ -2939,9 +3044,16 @@ function SavedAnalyticsTab({ accountId, onCountChange, canManage }: {
                         </td>
                         <td className="px-3 py-3 text-xs">
                           {item.latestSnapshot ? (
-                            <Chip tone={SAVED_STATE_TONES[item.latestSnapshot.state]}>
-                              {SAVED_STATE_LABELS[item.latestSnapshot.state]}
-                            </Chip>
+                            <span className="inline-flex flex-wrap items-center gap-1">
+                              <Chip tone={SAVED_STATE_TONES[item.latestSnapshot.state]}>
+                                {SAVED_STATE_LABELS[item.latestSnapshot.state]}
+                              </Chip>
+                              {/* 集計状態とは別に、写しが旧版の定義で取られた
+                                  ことを出す（ANALYTICS-05/06）。 */}
+                              {item.latestSnapshot.definitionStale && (
+                                <Chip tone="warn">更新後未集計</Chip>
+                              )}
+                            </span>
                           ) : <span className="text-ink-faint">—</span>}
                         </td>
                         <td className="text-ink-secondary px-3 py-3 text-right text-sm">{item.snapshotCount}件</td>

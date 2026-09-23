@@ -96,7 +96,16 @@ describe('緊急停止の保存API', () => {
     const headers = { ...(request.headers as Record<string, string>) };
     delete headers['x-step-up-token'];
     request.headers = headers;
-    expect((await app().request('/api/operations/incidents', request, bindings())).status).toBe(401);
+    const noStepUp = await app().request('/api/operations/incidents', request, bindings());
+    expect(noStepUp.status).toBe(401);
+    /*
+     * #1058: 再認証のやり直しは画面が自分で案内する通常の状態。
+     * 管理画面がセッション喪失モーダルと区別できるよう機械コードを付ける。
+     */
+    await expect(noStepUp.json()).resolves.toMatchObject({
+      success: false,
+      code: 'STEP_UP_REQUIRED',
+    });
 
     const noKey = stopRequest();
     const noKeyHeaders = { ...(noKey.headers as Record<string, string>) };
@@ -431,6 +440,21 @@ describe('N-451 復旧前検査と安全な復旧', () => {
     ]));
     // 変更の無いシナリオは再開可能
     expect(body.data.drift.resumable).toEqual(['scenario_dispatch']);
+  });
+
+  it('復旧も再認証grantが無効なら401にSTEP_UP_REQUIREDを付ける(#1058)', async () => {
+    const stopped = await stopNow();
+    // 期限切れ・別人のgrantなど、consumeできないtokenはすべて同じ口で弾く。
+    const res = await app().request(
+      `/api/operations/incidents/${stopped.data.incident.id}/restore`,
+      restoreRequest(stopped.data.incident.id, stopped.data.control.version, 'restore-no-grant', 'no-such-grant'),
+      bindings(),
+    );
+    expect(res.status).toBe(401);
+    await expect(res.json()).resolves.toMatchObject({
+      success: false,
+      code: 'STEP_UP_REQUIRED',
+    });
   });
 
   it('restore-preview は権限・範囲・停止中以外を拒否する', async () => {

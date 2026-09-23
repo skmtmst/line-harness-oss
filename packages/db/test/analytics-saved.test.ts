@@ -99,6 +99,44 @@ describe('V6 保存した分析', () => {
     ).run(created.id, created.versionId)).toThrow('analytics_saved_parent_mismatch');
   });
 
+  it('ファネルの写しは「集計状態」と「定義の新旧」を分けて返す（ANALYTICS-05/06）', async () => {
+    sqlite.exec(`
+      INSERT INTO funnels (id, name, line_account_id, status)
+        VALUES ('funnel-a','導線A','account-a','active');
+      INSERT INTO analytics_funnel_versions
+        (id, funnel_id, line_account_id, version_number, window_days, steps_json, created_at)
+        VALUES ('fv-1','funnel-a','account-a',1,30,'[]','2026-08-01');
+      INSERT INTO analytics_funnel_runs (
+        id, line_account_id, funnel_id, funnel_version_id, cohort_from, cohort_to,
+        time_zone, data_cutoff_at, state, result_json, created_at
+      ) VALUES (
+        'run-1','account-a','funnel-a','fv-1','2026-08-01','2026-08-07',
+        'Asia/Tokyo','2026-08-08','unavailable','{"groups":[]}','2026-08-08'
+      );
+    `);
+    await createSavedAnalyticsFromResult(db, {
+      lineAccountId: 'account-a', name: '導線Aの写し', sourceKind: 'funnel',
+      sourceResultId: 'run-1', createdByName: '担当A', createdAt: '2026-08-08T01:00:00.000Z',
+    });
+    // 新しい定義＋未取得の写しは「未取得」であって「定義が古い」ではない。
+    let list = await getSavedAnalytics(db, 'account-a');
+    expect(list[0].latestSnapshot).toMatchObject({
+      state: 'unavailable', definitionStale: false,
+      sourceVersionNumber: 1, sourceCurrentVersionNumber: 1,
+    });
+    // 定義が新版へ進むと、同じ写しは「旧版の結果（更新後未集計）」になる。
+    sqlite.exec(`
+      INSERT INTO analytics_funnel_versions
+        (id, funnel_id, line_account_id, version_number, window_days, steps_json, created_at)
+        VALUES ('fv-2','funnel-a','account-a',2,30,'[]','2026-08-09');
+    `);
+    list = await getSavedAnalytics(db, 'account-a');
+    expect(list[0].latestSnapshot).toMatchObject({
+      state: 'unavailable', definitionStale: true,
+      sourceVersionNumber: 1, sourceCurrentVersionNumber: 2,
+    });
+  });
+
   it('別アカウントまたは未確定の結果を保存済みのように扱わない', async () => {
     await expect(createSavedAnalyticsFromResult(db, {
       lineAccountId: 'account-b', name: '見えない結果', sourceKind: 'cross',

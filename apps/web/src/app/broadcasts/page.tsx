@@ -83,6 +83,8 @@ function BroadcastList() {
   const [broadcasts, setBroadcasts] = useState<ApiBroadcast[]>([])
   const [listKpis, setListKpis] = useState<BroadcastListKpis | null | undefined>(undefined)
   const [tags, setTags] = useState<Tag[]>([])
+  // BROADCAST-15: シナリオ指定の宛先要約に名前を出すため、名前だけ持つ。
+  const [scenarios, setScenarios] = useState<Array<{ id: string; name: string }>>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   /*
@@ -264,7 +266,7 @@ function BroadcastList() {
     setError('')
     setForbidden(false)
     try {
-      const [broadcastsRes, tagsRes] = await Promise.all([
+      const [broadcastsRes, tagsRes, scenariosRes] = await Promise.all([
         api.broadcasts.list({
           accountId: selectedAccountId || undefined,
           limit: pageSize,
@@ -275,6 +277,8 @@ function BroadcastList() {
           sort: sortKey,
         }),
         append ? null : api.tags.list(),
+        // 宛先要約のシナリオ名。取れなくても一覧は出す（名前は「指定のシナリオ」のまま）。
+        append ? null : api.scenarios.list().catch(() => null),
       ])
       if (broadcastsRes.success) {
         if (append) {
@@ -292,6 +296,9 @@ function BroadcastList() {
       }
       else setError(broadcastsRes.error)
       if (tagsRes && tagsRes.success) setTags(tagsRes.data)
+      if (scenariosRes && scenariosRes.success) {
+        setScenarios(scenariosRes.data.map((item) => ({ id: item.id, name: item.name })))
+      }
     } catch (err) {
       /* 403 は読み直しても直らない。失敗と別の1枚にする。 */
       if (err instanceof ApiError && err.status === 403) setForbidden(true)
@@ -392,6 +399,9 @@ function BroadcastList() {
     return tags.find((t) => t.id === tagId)?.name ?? null
   }
 
+  const getScenarioName = (scenarioId: string) =>
+    scenarios.find((s) => s.id === scenarioId)?.name ?? null
+
   // タブで分類: 1アカウントへの配信 (multi-account-dedup 以外) と 複数アカウントの重複除外配信 を分ける。
   // 全件タブは未フィルタ。サイドバー account context のフィルタは API 側で済んでる。
   // 状態・フォルダは口側で絞り済み。タイトル・日付だけ手元で絞る。
@@ -456,8 +466,14 @@ function BroadcastList() {
 
       {/* 一覧本体（設計 `Body`）。 */}
       <div data-design="Body">
-          {/* 設計はフォルダを左の縦パネルに置く。タグ・シナリオと同じ形。 */}
-          <div style={FOLDER_RAIL_STYLE} className="grid gap-4 lg:grid-cols-[var(--folder-rail-width)_minmax(0,1fr)]">
+          {/*
+            設計はフォルダを左の縦パネルに置く。タグ・シナリオと同じ形。
+            狭い幅で1列になるときも `minmax(0,1fr)` で列を画面内に収める
+            （U014）。`grid-cols-1` を付けないと暗黙の auto 列が中身の
+            最大幅（一覧表の最小幅 640px）まで広がり、検索行ごと横に
+            はみ出して390pxで入力の右端が見えなくなる。
+          */}
+          <div style={FOLDER_RAIL_STYLE} className="grid grid-cols-1 gap-4 lg:grid-cols-[var(--folder-rail-width)_minmax(0,1fr)]">
             {/*
               件数は読み込んだ範囲での数。まだ奥があるときだけ口の total を
               総数に出す(読み込んだ分だけを総数に見せない)。全部読めていれば
@@ -589,7 +605,13 @@ function BroadcastList() {
       {showCreate && (
         <BroadcastForm
           tags={tags}
-          onSuccess={() => { setShowCreate(false); load() }}
+          onSuccess={() => { setShowCreate(false); void load(); void loadFolders() }}
+          /*
+           * BROADCAST-16: 「下書き保存」はフォームが閉じないので、保存のたびに
+           * 一覧とフォルダ件数を読み直す。読み直さないと、保存した下書きが
+           * 未分類へ増えても件数が古いままになる。
+           */
+          onDraftSaved={() => { void load(); void loadFolders() }}
           onCancel={() => setShowCreate(false)}
           openTemplatePickerInitially={openTemplatePicker}
         />
@@ -740,7 +762,7 @@ function BroadcastList() {
                       後から確かめられないので、監査にならなかった。
                     */}
                     <td className="px-4 py-3 text-sm text-ink-secondary">
-                      {audienceSummary(broadcast, getTagName)}
+                      {audienceSummary(broadcast, getTagName, getScenarioName)}
                     </td>
 
                     <td className="px-4 py-3 text-sm text-ink-faint tabular-nums">

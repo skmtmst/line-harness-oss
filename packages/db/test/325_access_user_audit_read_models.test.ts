@@ -137,4 +137,44 @@ describe('common audit read model', () => {
     expect(JSON.stringify(result.items[0])).not.toContain('secret');
     expect(result.summary).toMatchObject({ total: 1, sent: 1 });
   });
+
+  /*
+   * STAFF-02: 集計は一覧と同じ from/to の期間で数える。
+   * 以前は常に直近30日で数えていたため、画面で90日・全期間を選んでも
+   * 集計だけが30日のままだった。
+   */
+  it('aggregates the summary over the requested period, not a fixed 30 days', async () => {
+    addStaff({ id: 'owner-a', role: 'owner', accountId: 'account-a' });
+    const now = '2026-09-07T00:00:00.000Z';
+    await recordAuditEvent(db, {
+      id: 'event-recent', tenantId: TENANT, lineAccountId: 'account-a', category: 'business',
+      actorPrincipalId: 'owner-a', action: 'broadcast.send', result: 'success',
+      createdAt: '2026-09-05T00:00:00.000Z',
+    });
+    await recordAuditEvent(db, {
+      id: 'event-old', tenantId: TENANT, lineAccountId: 'account-a', category: 'business',
+      actorPrincipalId: 'owner-a', action: 'broadcast.send', result: 'success',
+      createdAt: '2026-07-01T00:00:00.000Z',
+    });
+
+    // 30日窓（from 指定）: 直近の1件だけを数え、日数を返す。
+    const thirty = await listAuditEvents(db, {
+      tenantId: TENANT, allowedLineAccountIds: ['account-a'], includeTenantWide: true,
+      from: '2026-08-08T00:00:00.000Z', now,
+    });
+    expect(thirty.summary).toMatchObject({ periodDays: 30, total: 1, sent: 1 });
+
+    // 90日窓: 古い方も数える。
+    const ninety = await listAuditEvents(db, {
+      tenantId: TENANT, allowedLineAccountIds: ['account-a'], includeTenantWide: true,
+      from: '2026-06-09T00:00:00.000Z', now,
+    });
+    expect(ninety.summary).toMatchObject({ periodDays: 90, total: 2, sent: 2 });
+
+    // from 未指定は全期間。日数は null で返す（30日と偽らない）。
+    const all = await listAuditEvents(db, {
+      tenantId: TENANT, allowedLineAccountIds: ['account-a'], includeTenantWide: true, now,
+    });
+    expect(all.summary).toMatchObject({ periodDays: null, total: 2, sent: 2 });
+  });
 });

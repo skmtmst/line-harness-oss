@@ -296,9 +296,18 @@ export default function AccountMigration() {
       // 詳細ダイアログを開いたままの判断は、中の表示も追従させる。
       setDetailItem((current) => (current && current.id === item.id ? { ...current, decision } : current))
     } catch (error) {
-      const text = apiErrorMessage(error, '判断を保存できませんでした。')
+      /*
+        TECH-07: 通信断・タイムアウト（ApiError ではない例外）は
+        「サーバーが拒否した」のか「応答だけ失われた」のか分からない。
+        確定失敗と結果不明を分け、結果不明では対応表を読み直して
+        実際の判断結果を表示する。無条件の再送はしない。
+      */
+      const text = error instanceof ApiError
+        ? apiErrorMessage(error, '判断を保存できませんでした。')
+        : '応答を確認できませんでした。判断が保存されている可能性があります。対応表を読み直してから確認してください。'
       setMessage(text)
       setDetailError(text)
+      if (!(error instanceof ApiError)) void loadDetail(active.id, page, classification, pendingOnly)
     } finally {
       setBusy(false)
     }
@@ -334,7 +343,19 @@ export default function AccountMigration() {
       if (detail) setRuns((current) => current.map((run) => (run.id === detail.id ? { ...detail, items: undefined } : run)))
       setConfirmExecute(false)
     } catch (error) {
-      setExecuteError(apiErrorMessage(error, '本移行を実行できませんでした。'))
+      /*
+        TECH-07/FRIEND-33: 通信断・タイムアウトは「応答だけ失われた」
+        可能性がある（サーバーでは実行が完了していることがある）。
+        確定失敗（サーバーの拒否応答）と分け、結果不明では履歴を
+        読み直して実際の状態を見せる。再実行はサーバー側が
+        executing/completed で止めるので二重反映にはならない。
+      */
+      if (error instanceof ApiError) {
+        setExecuteError(apiErrorMessage(error, '本移行を実行できませんでした。'))
+      } else {
+        setExecuteError('応答を確認できませんでした。サーバーでは実行が完了している可能性があります。履歴を読み直して状態を確認してから、必要な場合だけ再実行してください。')
+        void loadDetail(active.id, page, classification, pendingOnly)
+      }
     } finally {
       setBusy(false)
     }
@@ -363,12 +384,18 @@ export default function AccountMigration() {
       if (detail) setRuns((current) => current.map((run) => (run.id === detail.id ? { ...detail, items: undefined } : run)))
       setConfirmRollback(false)
     } catch (error) {
-      setRollbackError(apiErrorMessage(error, '切り戻しを実行できませんでした。'))
-      const data = error instanceof ApiError ? error.data : undefined
-      const conflicts = data && typeof data === 'object' && 'conflicts' in data
-        ? (data as { conflicts?: Array<{ itemId: string; oldUid: string; reason: string }> }).conflicts
-        : undefined
-      setRollbackConflicts(Array.isArray(conflicts) ? conflicts : [])
+      // TECH-07: 応答喪失と確定失敗を分ける（execute と同じ考え方）。
+      if (error instanceof ApiError) {
+        setRollbackError(apiErrorMessage(error, '切り戻しを実行できませんでした。'))
+        const data = error.data
+        const conflicts = data && typeof data === 'object' && 'conflicts' in data
+          ? (data as { conflicts?: Array<{ itemId: string; oldUid: string; reason: string }> }).conflicts
+          : undefined
+        setRollbackConflicts(Array.isArray(conflicts) ? conflicts : [])
+      } else {
+        setRollbackError('応答を確認できませんでした。切り戻しが完了している可能性があります。履歴を読み直して状態を確認してください。')
+        void loadDetail(active.id, 0, '', false)
+      }
     } finally {
       setBusy(false)
     }

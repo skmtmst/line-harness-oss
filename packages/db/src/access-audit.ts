@@ -497,7 +497,28 @@ export async function listAuditEvents(db: D1Database, input: ListAuditEventsInpu
   ).bind(...values, limit, offset).all<AuditEventRow>();
 
   const summaryScope = auditScopeSql(input);
-  const cutoff = new Date(Date.parse(input.now ?? new Date().toISOString()) - 30 * 24 * 60 * 60 * 1000).toISOString();
+  /*
+   * STAFF-02: 集計の期間は一覧と同じ from/to にそろえる。
+   * 以前は常に「直近30日」で集計していたため、画面で期間を90日・全期間へ
+   * 切り替えても集計だけが30日のままずれていた。
+   * from 未指定は全期間、to があれば集計の上限にも使う。
+   */
+  const summaryConditions = [...summaryScope.conditions];
+  const summaryValues = [...summaryScope.values];
+  const nowMs = Date.parse(input.now ?? new Date().toISOString());
+  let periodDays: number | null = null;
+  if (input.from) {
+    summaryConditions.push('ae.created_at >= ?');
+    summaryValues.push(input.from);
+    const fromMs = Date.parse(input.from);
+    if (Number.isFinite(fromMs) && Number.isFinite(nowMs)) {
+      periodDays = Math.max(1, Math.round((nowMs - fromMs) / (24 * 60 * 60 * 1000)));
+    }
+  }
+  if (input.to) {
+    summaryConditions.push('ae.created_at <= ?');
+    summaryValues.push(input.to);
+  }
   const summary = await db.prepare(
     `SELECT COUNT(*) AS total,
             SUM(CASE WHEN lower(action) LIKE '%delete%' OR lower(action) LIKE 'api.delete.%' THEN 1 ELSE 0 END) AS deleted,
@@ -508,8 +529,8 @@ export async function listAuditEvents(db: D1Database, input: ListAuditEventsInpu
             SUM(CASE WHEN category = 'auth' AND action = 'auth.login' AND result = 'success' THEN 1 ELSE 0 END) AS logins,
             SUM(CASE WHEN category = 'auth' AND (risk_level <> 'normal' OR result <> 'success') THEN 1 ELSE 0 END) AS suspicious_logins
        FROM audit_events ae
-      WHERE ${summaryScope.conditions.join(' AND ')} AND ae.created_at >= ?`,
-  ).bind(...summaryScope.values, cutoff).first<{
+      WHERE ${summaryConditions.join(' AND ')}`,
+  ).bind(...summaryValues).first<{
     total: number; deleted: number; sent: number; changed: number; logins: number; suspicious_logins: number;
   }>();
 
@@ -534,7 +555,7 @@ export async function listAuditEvents(db: D1Database, input: ListAuditEventsInpu
       createdAt: row.created_at,
     })),
     summary: {
-      periodDays: 30,
+      periodDays,
       total: Number(summary?.total ?? 0),
       deleted: Number(summary?.deleted ?? 0),
       sent: Number(summary?.sent ?? 0),

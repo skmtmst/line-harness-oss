@@ -11,7 +11,12 @@ import Select from '@/components/shared/select'
 import FolderPanel, { FOLDER_RAIL_WIDTH } from '@/components/shared/folder-panel'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { canOperateBookings } from '../lib/booking-permissions'
-import BookingCalendar from './booking-calendar'
+import BookingCalendar, {
+  moveDay,
+  startOfWeek,
+  type CalendarAvailability,
+  type CalendarSlot,
+} from './booking-calendar'
 
 /**
  * 予約管理（設計 V2 8-1 / node EAYvf）。
@@ -156,6 +161,22 @@ export default function BookingsPage() {
   const [items, setItems] = useState<BookingRequest[]>([])
   const [total, setTotal] = useState(0)
   const [calendarItems, setCalendarItems] = useState<BookingRequest[]>([])
+  /*
+   * BOOKING-01: カレンダーが実際に表示している日・週の基点。以前は内部で
+   * 持ち、取得範囲は常に「今日起点」だったため、翌週へ進んでも予約が
+   * 読まれず全マスが空きに見えた。表示範囲と取得範囲を一致させる。
+   */
+  const [calendarAnchor, setCalendarAnchor] = useState(() => jstDay(new Date().toISOString()))
+  const calendarFrom = view === 'week' ? startOfWeek(calendarAnchor) : calendarAnchor
+  const calendarTo = view === 'week' ? moveDay(calendarFrom, 6) : calendarAnchor
+  /*
+   * BOOKING-01: 空き枠の実績。カレンダーのマス数から空きを推測しない。
+   * - unconfigured: 担当0またはメニュー0。受付可能時間0として「—」を出す。
+   * - error: 設定・空き枠の読み込みに失敗。0枠・0%とは区別する。
+   * - loading / ready: 読み込み中 / 実績あり。
+   */
+  const [candidatesStatus, setCandidatesStatus] = useState<'loading' | 'ready' | 'error'>('loading')
+  const [availability, setAvailability] = useState<CalendarAvailability>({ status: 'loading', slots: [] })
   const [summary, setSummary] = useState({
     total: 0, requested: 0, monthTotal: 0, monthConfirmed: 0,
     monthCancelled: 0, lastMonthTotal: 0, todayTotal: 0, weekTotal: 0,
@@ -179,6 +200,8 @@ export default function BookingsPage() {
   const [decideTarget, setDecideTarget] = useState<{ id: string; action: 'approve' | 'reject' | 'cancel' | 'no_show' | 'complete' } | null>(null)
   const [deciding, setDeciding] = useState(false)
   const [decideError, setDecideError] = useState('')
+  /* 台帳CSVの書出し中。失敗は一覧の error 帯へ出す（TECH-03）。 */
+  const [csvBusy, setCsvBusy] = useState(false)
   /*
    * 一覧取得の応答が「どのアカウント・どの条件へ向けたものか」を照合する。
    * アカウントを切り替えたあとに遅れて届いた前のアカウントの応答で、
@@ -307,6 +330,8 @@ export default function BookingsPage() {
     setMenus([])
     setStaffList([])
     setCopiedUrl(null)
+    setCandidatesStatus('loading')
+    setAvailability({ status: 'loading', slots: [] })
     setSummaryError(false)
     setSummary({
       total: 0, requested: 0, monthTotal: 0, monthConfirmed: 0,
@@ -315,18 +340,26 @@ export default function BookingsPage() {
     })
   }, [selectedAccountId])
 
-  // N-397: 今見えている絞り込みのまま台帳CSVを出す。上限・範囲の断りは
-  // CSV先頭の注記行にサーバが書く。
-  const csvUrl = selectedAccountId
-    ? bookingApi.ledgerCsvUrl(selectedAccountId, {
-        status: tab,
-        query: query.trim() || undefined,
-        menuName: menuFilter === 'all' ? undefined : menuFilter,
-        staffId: staffFilter === 'all' ? undefined : staffFilter,
-        source: sourceFilter === 'all' ? undefined : sourceFilter,
-        ...rangeFilterParams(),
-      })
-    : null
+  /*
+   * N-397: 今見えている絞り込みのまま台帳CSVを出す。上限・範囲の断りは
+   * CSV先頭の注記行にサーバが書く。
+   * TECH-03: 直リンクは Cookie が届かない経路で取れないため、
+   * 認証付きの取得からファイル保存へ揃える。
+   */
+  const downloadLedgerCsv = () => {
+    if (!selectedAccountId || csvBusy) return
+    setCsvBusy(true)
+    void bookingApi.downloadLedgerCsv(selectedAccountId, {
+      status: tab,
+      query: query.trim() || undefined,
+      menuName: menuFilter === 'all' ? undefined : menuFilter,
+      staffId: staffFilter === 'all' ? undefined : staffFilter,
+      source: sourceFilter === 'all' ? undefined : sourceFilter,
+      ...rangeFilterParams(),
+    })
+      .catch(() => setError('CSVを書き出せませんでした。通信を確認して、もう一度お試しください。'))
+      .finally(() => setCsvBusy(false))
+  }
 
   // KPIとメニュー棚は集計口から読む。一覧全件をブラウザへ運ばない。
   useEffect(() => {
@@ -336,6 +369,7 @@ export default function BookingsPage() {
     const requestedAccountId = selectedAccountId
     let alive = true
     setSummaryError(false)
+    setCandidatesStatus('loading')
     void (async () => {
       try {
         const today = jstDay(new Date().toISOString())
@@ -351,10 +385,16 @@ export default function BookingsPage() {
         setSummary(counts)
         setMenus(menuList.menus)
         setStaffList(staffResult.staff.filter((item) => item.is_active === 1))
+        setCandidatesStatus('ready')
       } catch {
         // KPI が出ないだけで一覧は使える。ここで画面全体を止めない。
         // ただし0のまま黙ると気づけないので、KPI欄の上に理由と再試行を出す。
-        if (alive && listAccountRef.current === requestedAccountId) setSummaryError(true)
+        // BOOKING-01: メニュー・担当の候補も同じ失敗なので、カレンダー側へ
+        // 「未取得」と伝える（未設定と取り違えて0枠扱いにしない）。
+        if (alive && listAccountRef.current === requestedAccountId) {
+          setSummaryError(true)
+          setCandidatesStatus('error')
+        }
       }
     })()
     return () => {
@@ -362,7 +402,10 @@ export default function BookingsPage() {
     }
   }, [selectedAccountId, summarySeq])
 
-  // カレンダーは今日/今週の範囲だけをページごとに読み、200件を越えても欠落させない。
+  // カレンダーは表示中の日/週の範囲だけをページごとに読み、100件を越えても
+  // 欠落させない。BOOKING-01: 取得範囲はカレンダーの表示範囲（anchor）と
+  // 一致させる。前へ・次へで動いた週の予約も読み直し、読んでいない週を
+  // 「全部空き」のように見せない。
   useEffect(() => {
     if (!selectedAccountId || (view !== 'day' && view !== 'week')) return
     // 要求が向かったアカウントを固定する(#963)。ページをまたぐ取得の途中で
@@ -370,15 +413,13 @@ export default function BookingsPage() {
     const requestedAccountId = selectedAccountId
     let alive = true
     void (async () => {
-      const today = jstDay(new Date().toISOString())
-      const endDay = jstDay(new Date(Date.now() + (view === 'day' ? 1 : 7) * 86_400_000).toISOString())
       const collected: BookingRequest[] = []
       let offset = 0
       while (alive && listAccountRef.current === requestedAccountId) {
         const response = await bookingApi.listRequests(requestedAccountId, 'all', {
           limit: 100, offset,
-          from: new Date(`${today}T00:00:00+09:00`).toISOString(),
-          to: new Date(`${endDay}T00:00:00+09:00`).toISOString(),
+          from: new Date(`${calendarFrom}T00:00:00+09:00`).toISOString(),
+          to: new Date(`${moveDay(calendarTo, 1)}T00:00:00+09:00`).toISOString(),
         })
         collected.push(...response.requests)
         offset += response.requests.length
@@ -389,7 +430,63 @@ export default function BookingsPage() {
       if (alive && listAccountRef.current === requestedAccountId) setError('カレンダーの読み込みに失敗しました')
     })
     return () => { alive = false }
-  }, [selectedAccountId, view])
+  }, [selectedAccountId, view, calendarFrom, calendarTo])
+
+  /*
+   * BOOKING-01: 空き枠の実績を空き枠APIから取る。受付可能な時間は
+   * 営業時間・担当シフト・例外日・外部予定・既存予約・同時受付数を
+   * サーバー側で考慮した結果なので、カレンダーのマス数から推測しない。
+   * メニューごとに取って、全メニューの枠をマージする。
+   */
+  useEffect(() => {
+    if (!selectedAccountId || (view !== 'day' && view !== 'week')) return
+    if (candidatesStatus === 'loading') {
+      setAvailability({ status: 'loading', slots: [] })
+      return
+    }
+    if (candidatesStatus === 'error') {
+      setAvailability({ status: 'error', slots: [] })
+      return
+    }
+    const activeMenus = menus.filter((item) => item.is_active === 1)
+    if (activeMenus.length === 0 || staffList.length === 0) {
+      setAvailability({ status: 'unconfigured', slots: [] })
+      return
+    }
+    const requestedAccountId = selectedAccountId
+    let alive = true
+    // 読み直し中は前の範囲の枠を残さない。別の週の枠が新しい週の
+    // 空きとして一瞬でも出ると、取れない入口を踏ませる。
+    setAvailability({ status: 'loading', slots: [] })
+    void (async () => {
+      try {
+        const responses = await Promise.all(
+          activeMenus.map((menu) =>
+            bookingApi.getAvailability(requestedAccountId, {
+              menuId: menu.id,
+              from: calendarFrom,
+              to: calendarTo,
+            }),
+          ),
+        )
+        if (!alive || listAccountRef.current !== requestedAccountId) return
+        const slots: CalendarSlot[] = []
+        responses.forEach((response, index) => {
+          for (const perStaff of response.by_staff) {
+            for (const slot of perStaff.slots) {
+              slots.push({ staffId: perStaff.staff_id, staffName: perStaff.display_name, menuId: activeMenus[index].id, ...slot })
+            }
+          }
+        })
+        setAvailability({ status: 'ready', slots })
+      } catch {
+        if (alive && listAccountRef.current === requestedAccountId) {
+          setAvailability({ status: 'error', slots: [] })
+        }
+      }
+    })()
+    return () => { alive = false }
+  }, [selectedAccountId, view, calendarFrom, calendarTo, candidatesStatus, menus, staffList])
 
   type BookingAction = 'approve' | 'reject' | 'cancel' | 'no_show' | 'complete'
 
@@ -550,6 +647,9 @@ export default function BookingsPage() {
           onOpen={setDetailId}
           staffNames={staffList.map((item) => item.display_name)}
           canCreate={canOperate}
+          anchorDay={calendarAnchor}
+          onAnchorChange={setCalendarAnchor}
+          availability={availability}
         />
         {dialogs}
       </div>
@@ -648,8 +748,10 @@ export default function BookingsPage() {
               options={SOURCE_FILTERS.map((item) => ({ value: item.key, label: item.label }))}
             />
             {/* N-397: 今の絞り込みのままCSVへ。範囲の断りはCSV先頭行に入る。 */}
-            {csvUrl ? (
-              <Button href={csvUrl} variant="secondary">CSVで書き出す</Button>
+            {selectedAccountId ? (
+              <Button variant="secondary" disabled={csvBusy} onClick={downloadLedgerCsv}>
+                {csvBusy ? '書き出しています…' : 'CSVで書き出す'}
+              </Button>
             ) : null}
             <button
               disabled

@@ -523,16 +523,22 @@ nenCampaigns.post('/api/nen-campaigns/columns', requireRole('owner', 'admin'), a
   const id = crypto.randomUUID();
   const now = jstNow();
   const fields = buildNenColumnStorageFields(input);
+  /*
+   * NEN-05: 列・値・bind を一致させる（delivery_at が抜けていて INSERT が必ず失敗していた）。
+   * NEN-06: 下書き保存はこのINSERTだけ。配信日時が入っていても配信待ち行列へは入れず、
+   * 「配信したい日時」として delivery_at に残す（予約は POST /columns/:id/deliver の
+   * 明示操作だけが行う）。ISO8601(Z付き)で保存し、表示側が日本時間で読める形にする。
+   */
   try {
     await c.env.DB.prepare(
       `INSERT INTO nen_columns
         (id, external_id, slug, title, category, excerpt, intro_text, article_url, image_url,
-         published_at, delivery_status, line_account_id, target_mode, target_tag_id,
+         published_at, delivery_status, delivery_at, line_account_id, target_mode, target_tag_id,
          completion_event_name, completion_tag_id, source_column_id, created_at, updated_at)
        VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, 'draft', ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     ).bind(
       id, input.slug, fields.title, fields.category, fields.excerpt, fields.introText,
-      fields.articleUrl, fields.imageUrl, fields.publishedAt, accountId, input.targetMode,
+      fields.articleUrl, fields.imageUrl, fields.publishedAt, input.scheduledAt, accountId, input.targetMode,
       input.targetTagId, input.completionEventName, input.completionTagId, input.sourceColumnId, now, now,
     ).run();
   } catch (error) {
@@ -545,10 +551,7 @@ nenCampaigns.post('/api/nen-campaigns/columns', requireRole('owner', 'admin'), a
     }));
     return c.json({ success: false, error: 'column_create_failed' }, 500);
   }
-  const queued = input.scheduledAt ? await queueColumnDelivery(
-    c.env.DB, id, accountId, input.scheduledAt.slice(0, 19).replace('T', ' '),
-  ) : 0;
-  return c.json({ success: true, data: { id, queued } }, 201);
+  return c.json({ success: true, data: { id, queued: 0 } }, 201);
 });
 
 nenCampaigns.post('/api/nen-campaigns/columns/:id/duplicate', requireRole('owner', 'admin'), async (c) => {

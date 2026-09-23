@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import OpsSupportPage from './page'
 import { compareLabel, durationLabel, elapsedLabel } from './format'
-import type { OpsKnowledgeReference } from '@/lib/api'
+import type { OpsKnowledgeReference, OpsSupportDetail } from '@/lib/api'
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -30,6 +30,7 @@ let calls: Array<{ url: string; method: string; body: Record<string, unknown> | 
 let draft: { body: string; aiGenerated: boolean; generatedAt: string | null; updatedAt: string; references?: OpsKnowledgeReference[] } | null
 let availableReferences: OpsKnowledgeReference[] = []
 let aiFails = false
+let knowledge: OpsSupportDetail['knowledge']
 
 function respond(url: string, init?: RequestInit) {
   const method = init?.method ?? 'GET'
@@ -40,6 +41,10 @@ function respond(url: string, init?: RequestInit) {
     return json({ success: true, data: { byStage: { all: 86, new: 3, in_progress: 2, waiting: 1, resolved: 12, closed: 68 }, kpis: { untouched: 3, untouchedFromLine: 3, avgFirstReplyMinutes: 84, prevAvgFirstReplyMinutes: 117, resolutionRate: 96.7, prevResolutionRate: 90.7, avgResolutionMinutes: 312, prevAvgResolutionMinutes: 310 } } })
   }
   if (url.includes('/api/ops/support/tickets?')) return json({ success: true, data: [ticket], total: 86 })
+  if (url.endsWith('/api/ops/knowledge/tickets/t1/process')) {
+    knowledge = { ...knowledge!, job: { status: 'done', source_current: 1 } }
+    return json({ success: true, data: knowledge })
+  }
   if (url.endsWith('/draft/ai')) {
     if (aiFails) return json({ success: false, error: 'AI の応答が 45 秒以内に返りませんでした' }, 504)
     const excluded = (body?.excludeArticleIds ?? []) as string[]
@@ -50,7 +55,7 @@ function respond(url: string, init?: RequestInit) {
   if (url.endsWith('/api/ops/support/tickets/t1')) {
     return json({ success: true, data: { ticket, tenant: { accountCount: 4, staffCount: 6, staffWithLine: 5, pastTickets: 12, pastOpen: 0 }, messages: [
       { id: 'm1', authorKind: 'ops', authorName: '坂本 真人', body: '該当のフォームを確認します。', attachments: [], aiAssisted: false, deliveredVia: ['screen', 'email'], createdAt: '2026-09-15T09:05:00.000+09:00' },
-    ], draft, ai: { available: true } } })
+    ], draft, knowledge, ai: { available: true } } })
   }
   return json({ success: false, error: `unexpected ${method} ${url}` }, 404)
 }
@@ -59,6 +64,7 @@ beforeEach(() => {
   calls = []
   draft = null
   aiFails = false
+  knowledge = undefined
   availableReferences = []
   process.env.NEXT_PUBLIC_API_URL = 'https://api.example.test'
   vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => respond(String(input), init)))
@@ -71,6 +77,7 @@ afterEach(() => {
   act(() => root.unmount())
   host.remove()
   vi.unstubAllGlobals()
+  vi.useRealTimers()
 })
 
 async function flush() {
@@ -100,6 +107,60 @@ describe('表記の決まり', () => {
 })
 
 describe('画面', () => {
+  it('生成予約があると対象だけを自動実行し、完了後は再実行しない', async () => {
+    vi.useFakeTimers()
+    knowledge = { canProcess: true, article: null, job: { status: 'queued', source_current: 1 } }
+    await act(async () => root.render(<OpsSupportPage />)); await flush()
+    expect(calls.filter(c => c.url.endsWith('/process'))).toHaveLength(1)
+    expect(calls.find(c => c.url.endsWith('/process'))?.method).toBe('POST')
+    await act(async () => { await vi.advanceTimersByTimeAsync(60_000) }); await flush()
+    expect(calls.filter(c => c.url.endsWith('/process'))).toHaveLength(1)
+    expect(calls.some(c => c.url.endsWith('/reply'))).toBe(false)
+  })
+
+  it.each([false, undefined])('書込許可が %s の画面では生成せず、状態の読取だけを行う', async canProcess => {
+    vi.useFakeTimers()
+    knowledge = { canProcess, article: null, job: { status: 'queued', source_current: 1 } }
+    await act(async () => root.render(<OpsSupportPage />)); await flush()
+    await act(async () => { await vi.advanceTimersByTimeAsync(15_000) }); await flush()
+    expect(calls.some(c => c.url.endsWith('/process'))).toBe(false)
+    expect(calls.filter(c => c.url.endsWith('/api/ops/support/tickets/t1'))).toHaveLength(2)
+  })
+
+  it('長い生成中も返信を書けて、完了時に入力内容を上書きしない', async () => {
+    knowledge = { canProcess: true, article: null, job: { status: 'running', source_current: 1 } }
+    let finish!: () => void
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (String(input).endsWith('/process')) await new Promise<void>(resolve => { finish = resolve })
+      return respond(String(input), init)
+    }))
+    await act(async () => root.render(<OpsSupportPage />)); await flush()
+    const textarea = host.querySelector('textarea[aria-label="返信"]') as HTMLTextAreaElement
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!.call(textarea, '対応内容を確認しています。')
+      textarea.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    await act(async () => finish()); await flush()
+    expect((host.querySelector('textarea[aria-label="返信"]') as HTMLTextAreaElement).value).toBe('対応内容を確認しています。')
+  })
+
+  it('実行APIが拒否しても固まらず、エラーを示して自動呼出しを止める', async () => {
+    vi.useFakeTimers()
+    knowledge = { canProcess: true, article: null, job: { status: 'queued', source_current: 1 } }
+    const process = vi.fn(() => new Response(JSON.stringify({ success: false, error: '閲覧のみです' }), { status: 403 }))
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => String(input).endsWith('/process') ? process() : respond(String(input), init)))
+    await act(async () => root.render(<OpsSupportPage />)); await flush()
+    expect(host.textContent).toContain('この操作をする権限がありません')
+    await act(async () => { await vi.advanceTimersByTimeAsync(60_000) })
+    expect(process).toHaveBeenCalledTimes(1)
+  })
+
+  it('再オープン済みの古い生成予約は実行しない', async () => {
+    knowledge = { canProcess: true, article: null, job: { status: 'queued', source_current: 0 } }
+    await act(async () => root.render(<OpsSupportPage />)); await flush()
+    expect(calls.some(c => c.url.endsWith('/process'))).toBe(false)
+  })
+
   it('excludes evidence only for this reply, accumulates exclusions, and does not send automatically', async () => {
     availableReferences = [{ id: 'ref-a', title: 'フォームの根拠', version: 1 }, { id: 'ref-b', title: '配信の根拠', version: 2 }]
     await act(async () => root.render(<OpsSupportPage />)); await flush()

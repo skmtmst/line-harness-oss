@@ -726,6 +726,7 @@ function MediaLibraryInner() {
           setSuccessMessage(message)
           void load()
         }}
+        onItemUpdated={(updated) => setDetailsFor(updated)}
       />
     )
   }

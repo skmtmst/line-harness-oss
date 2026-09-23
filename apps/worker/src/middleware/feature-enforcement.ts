@@ -346,33 +346,107 @@ async function bodyAccountIds(c: Context<Env>): Promise<string[]> {
   return [];
 }
 
-async function requestAccountIds(c: Context<Env>): Promise<string[]> {
+/**
+ * WRITE-01: URL の対象IDから所属LINEアカウントを引く対応表。
+ *
+ * 更新系APIのpayloadにはaccountを載せない口が多い（PUT /api/templates/:id、
+ * PATCH /api/rich-menu-groups/:id など）。その場合でも対象の所有accountを
+ * サーバー側で確かめ、機能設定と権限の判定をその所属accountに対して行う。
+ * 行が無い・accountがNULL（全アカウント共用）なら従来の解決へ進む。
+ *
+ * 各 pattern の最初の捕捉はその表の主キー。`/api/conversions/ingest/:id`
+ * （署名で守る外部受信口）や `/api/media/upload-sessions/:id` のように
+ * 別のIDを持つ口は、表に無いIDとして行が見つからず従来どおり進むだけなので
+ * 個別に除外しない。
+ */
+const RESOURCE_ACCOUNT_LOOKUPS: ReadonlyArray<{
+  pattern: RegExp;
+  sql: string;
+}> = [
+  { pattern: /^\/api\/templates\/([^/]+)/, sql: 'SELECT line_account_id AS account_id FROM templates WHERE id = ?' },
+  { pattern: /^\/api\/scenarios\/([^/]+)/, sql: 'SELECT line_account_id AS account_id FROM scenarios WHERE id = ?' },
+  { pattern: /^\/api\/broadcasts\/([^/]+)/, sql: 'SELECT line_account_id AS account_id FROM broadcasts WHERE id = ?' },
+  { pattern: /^\/api\/broadcast-message-assets\/([^/]+)/, sql: 'SELECT line_account_id AS account_id FROM broadcast_message_assets WHERE id = ?' },
+  { pattern: /^\/api\/reminders\/([^/]+)/, sql: 'SELECT line_account_id AS account_id FROM reminders WHERE id = ?' },
+  { pattern: /^\/api\/friend-reminders\/([^/]+)/, sql: 'SELECT line_account_id AS account_id FROM friend_reminders WHERE id = ?' },
+  { pattern: /^\/api\/reminder-runs\/([^/]+)/, sql: 'SELECT line_account_id AS account_id FROM reminder_delivery_runs WHERE id = ?' },
+  { pattern: /^\/api\/auto-replies\/([^/]+)/, sql: 'SELECT line_account_id AS account_id FROM auto_replies WHERE id = ?' },
+  { pattern: /^\/api\/rich-menu-groups\/([^/]+)/, sql: 'SELECT account_id FROM rich_menu_groups WHERE id = ?' },
+  { pattern: /^\/api\/media\/([^/]+)/, sql: 'SELECT line_account_id AS account_id FROM media WHERE id = ?' },
+  { pattern: /^\/api\/common-vars\/([^/]+)/, sql: 'SELECT line_account_id AS account_id FROM common_vars WHERE id = ?' },
+  { pattern: /^\/api\/common-actions\/([^/]+)/, sql: 'SELECT line_account_id AS account_id FROM common_actions WHERE id = ?' },
+  { pattern: /^\/api\/automations\/([^/]+)/, sql: 'SELECT line_account_id AS account_id FROM automations WHERE id = ?' },
+  { pattern: /^\/api\/tracked-links\/([^/]+)/, sql: 'SELECT line_account_id AS account_id FROM tracked_links WHERE id = ?' },
+  { pattern: /^\/api\/entry-routes\/([^/]+)/, sql: 'SELECT line_account_id AS account_id FROM entry_routes WHERE id = ?' },
+  { pattern: /^\/api\/ad-platforms\/([^/]+)/, sql: 'SELECT line_account_id AS account_id FROM ad_platforms WHERE id = ?' },
+  { pattern: /^\/api\/friend-add-rules\/([^/]+)/, sql: 'SELECT line_account_id AS account_id FROM friend_add_rules WHERE id = ?' },
+  { pattern: /^\/api\/conversions\/(?:definitions|points)\/([^/]+)/, sql: 'SELECT line_account_id AS account_id FROM conversion_points WHERE id = ?' },
+  { pattern: /^\/api\/conversions\/events\/([^/]+)/, sql: 'SELECT line_account_id AS account_id FROM conversion_events WHERE id = ?' },
+  { pattern: /^\/api\/events\/admin\/events\/([^/]+)/, sql: 'SELECT line_account_id AS account_id FROM events WHERE id = ?' },
+];
+
+/**
+ * URL が指す対象の所属accountを返す。対象が無い・account未割当なら null。
+ * 一致する表が無い口（公開経路・collect 等）は呼ばれない前提で、
+ * 表ごとの照合だけをここに集約する。
+ */
+async function resourceOwnerAccountId(c: Context<Env>): Promise<string | null> {
+  for (const { pattern, sql } of RESOURCE_ACCOUNT_LOOKUPS) {
+    const match = pattern.exec(c.req.path);
+    if (!match) continue;
+    const row = await dbFor(c.env).prepare(sql)
+      .bind(decodeURIComponent(match[1]!))
+      .first<{ account_id: string | null }>();
+    return row?.account_id ?? null;
+  }
+  return null;
+}
+
+async function requestAccountIds(c: Context<Env>): Promise<{ ids: string[]; accountMismatch: boolean }> {
+  const explicit: string[] = [];
   for (const key of ACCOUNT_KEYS) {
     const value = c.req.query(key);
-    if (value?.trim()) return [value.trim()];
+    if (value?.trim()) {
+      explicit.push(value.trim());
+      break;
+    }
   }
-  const fromBody = await bodyAccountIds(c);
-  if (fromBody.length > 0) return fromBody;
+  if (explicit.length === 0) {
+    const fromBody = await bodyAccountIds(c);
+    explicit.push(...fromBody);
+  }
+  if (explicit.length > 0) {
+    /*
+     * 明示されたaccountとURLの対象の所属が食い違うときは断る。
+     * 別accountの名前を出せば所属の検査をすり抜けられる形にはしない。
+     * 所属がNULLの対象（全アカウント共用）はここでは判定しない。
+     */
+    const owned = await resourceOwnerAccountId(c);
+    if (owned && !explicit.includes(owned)) {
+      return { ids: [], accountMismatch: true };
+    }
+    return { ids: explicit, accountMismatch: false };
+  }
   const webinar = /^\/api\/liff\/webinars\/([^/]+)/.exec(c.req.path);
   if (webinar) {
     const row = await dbFor(c.env).prepare(
       'SELECT account_id FROM webinars WHERE slug = ?',
     ).bind(decodeURIComponent(webinar[1]!)).first<{ account_id: string | null }>();
-    if (row?.account_id) return [row.account_id];
+    if (row?.account_id) return { ids: [row.account_id], accountMismatch: false };
   }
   const webinarAdmin = /^\/api\/webinars\/([^/]+)/.exec(c.req.path);
   if (webinarAdmin && !['overview'].includes(webinarAdmin[1]!)) {
     const row = await dbFor(c.env).prepare(
       'SELECT account_id FROM webinars WHERE id = ?',
     ).bind(decodeURIComponent(webinarAdmin[1]!)).first<{ account_id: string | null }>();
-    if (row?.account_id) return [row.account_id];
+    if (row?.account_id) return { ids: [row.account_id], accountMismatch: false };
   }
   const friend = /^\/api\/friends\/([^/]+)/.exec(c.req.path);
   if (friend && !['support-mark'].includes(friend[1]!)) {
     const row = await dbFor(c.env).prepare(
       'SELECT line_account_id FROM friends WHERE id = ?',
     ).bind(decodeURIComponent(friend[1]!)).first<{ line_account_id: string | null }>();
-    if (row?.line_account_id) return [row.line_account_id];
+    if (row?.line_account_id) return { ids: [row.line_account_id], accountMismatch: false };
   }
   // /api/scenario-subscriptions/:id/... は本体に account を載せない。
   // 購読の友だちが属するアカウントで機能設定を見る（#949 N-054）。
@@ -384,11 +458,16 @@ async function requestAccountIds(c: Context<Env>): Promise<string[]> {
          JOIN friends f ON f.id = fs.friend_id
         WHERE fs.id = ?`,
     ).bind(decodeURIComponent(subscription[1]!)).first<{ line_account_id: string | null }>();
-    if (row?.line_account_id) return [row.line_account_id];
+    if (row?.line_account_id) return { ids: [row.line_account_id], accountMismatch: false };
   }
+  // WRITE-01: 更新系はpayloadにaccountを載せないため、URLの対象の所属で判定する。
+  const owned = await resourceOwnerAccountId(c);
+  if (owned) return { ids: [owned], accountMismatch: false };
   const staff = c.get('staff');
-  if (staff?.assignedLineAccountId) return [staff.assignedLineAccountId];
-  return [];
+  if (staff?.assignedLineAccountId) {
+    return { ids: [staff.assignedLineAccountId], accountMismatch: false };
+  }
+  return { ids: [], accountMismatch: false };
 }
 
 async function appendFeatureScopeMeta(c: Context<Env>, excluded: number): Promise<void> {
@@ -436,10 +515,17 @@ export const featureEnforcementMiddleware: MiddlewareHandler<Env> = async (c, ne
   }
   if (classification.kind !== 'feature') return next();
 
-  const accountIds = await requestAccountIds(c);
+  const { ids: accountIds, accountMismatch } = await requestAccountIds(c);
   const staff = c.get('staff');
   const db = dbFor(c.env);
   const isReadOperation = c.req.method === 'GET' || c.req.method === 'HEAD';
+  if (accountMismatch) {
+    return c.json({
+      success: false,
+      error: '指定されたLINEアカウントと対象データの所属が一致しません',
+      code: 'LINE_ACCOUNT_MISMATCH',
+    }, 403);
+  }
   if (accountIds.length === 0 && isReadOperation && staff) {
     const scope = await getVisibleLineAccountScope(db, staff);
     if (scope.ids.length === 0) {

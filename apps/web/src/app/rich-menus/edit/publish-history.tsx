@@ -69,9 +69,19 @@ export function PublishHistorySection({
     try {
       const res = await api.richMenuGroups.publishRuns(groupId)
       if (!res.success) throw new Error(res.error)
-      setRuns(res.data.runs)
-      setPublished(res.data.published)
-      setDraftDiffers(res.data.draftDiffersFromPublished)
+      /*
+       * 応答の形がずれている（旧API・途中のプロキシ応答など）と runs が
+       * 欠ける。undefined のまま state に入れると描画側の runs.length で
+       * 画面ごと落ちるので、履歴が読めたとみなせる形だけ採用し、
+       * それ以外は読み込み失敗として扱う。
+       */
+      const data = res.data
+      if (!data || !Array.isArray(data.runs)) {
+        throw new Error('publish-runs response malformed')
+      }
+      setRuns(data.runs)
+      setPublished(data.published ?? null)
+      setDraftDiffers(data.draftDiffersFromPublished ?? null)
       setLoadError('')
     } catch (e) {
       setLoadError(

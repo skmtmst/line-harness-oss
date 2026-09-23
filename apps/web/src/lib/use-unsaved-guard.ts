@@ -56,6 +56,9 @@ export function useUnsavedGuard(options: { dirty: boolean; busy?: boolean }) {
       const destination = new URL(anchor.href, window.location.href)
       const current = new URL(window.location.href)
       if (destination.origin !== current.origin || destination.href === current.href) return
+      // パスとクエリが同じで hash だけが変わる移動は画面内の見出しジャンプ。
+      // 画面を離れないので確認を出さない（離すと「#見出し」リンクが全部確認になる）。
+      if (destination.pathname === current.pathname && destination.search === current.search) return
       event.preventDefault()
       if (!busy) setLeaveTarget({ kind: 'link', href: `${destination.pathname}${destination.search}${destination.hash}` })
     }

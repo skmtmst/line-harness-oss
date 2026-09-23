@@ -210,6 +210,72 @@ describe('注文の状況パネル', () => {
     expect(mockOrderDetail).toHaveBeenCalledTimes(2)
   })
 
+  /*
+   * IDEA-16: 注文から成果・報酬・支払い状態へ辿る表示の固定。
+   * 未確定の額は「未確定」と出し、確定額と混ぜない。
+   */
+  it('成果の行から紹介者・確定報酬・締め・支払い結果・重複候補まで辿れる', async () => {
+    const detail = fixture()
+    detail.outcomes.conversions = [{
+      id: 'cv-1',
+      pointName: '初回購入',
+      approvalStatus: 'approved',
+      value: 2860,
+      createdAt: '2026-09-16T00:01:00.000Z',
+      orderNumber: 'NEN-1001',
+      ecEventId: 'ext-1',
+      affiliateName: '紹介者A',
+      rewardAmount: 400,
+      rewardEntryStatus: 'settled',
+      reversedAmount: 400,
+      settlementState: 'exported',
+      payoutBatchState: 'imported',
+      payoutResult: 'paid',
+      duplicateCandidate: true,
+    }]
+    mockOrderDetail.mockResolvedValue({ success: true, data: detail })
+    render()
+    await settle()
+    const text = document.body.textContent ?? ''
+    expect(text).toContain('成果：初回購入')
+    expect(text).toContain('紹介者：紹介者A')
+    expect(text).toContain('報酬：¥400')
+    expect(text).toContain('支払い確定：締めに入った')
+    expect(text).toContain('締め：書き出し済み')
+    expect(text).toContain('支払いCSV：支払い結果を取り込んだ')
+    expect(text).toContain('結果：支払い完了')
+    expect(text).toContain('確定後の取消：−¥400')
+    expect(text).toContain('同じ注文・同じ成果地点の成果がほかにもあります')
+  })
+
+  it('承認前の成果は報酬を「未確定」と出し、支払い確定の行が無いことを示す', async () => {
+    const detail = fixture()
+    detail.outcomes.conversions = [{
+      id: 'cv-1',
+      pointName: '初回購入',
+      approvalStatus: 'pending',
+      value: 2860,
+      createdAt: '2026-09-16T00:01:00.000Z',
+      orderNumber: 'NEN-1001',
+      ecEventId: 'ext-1',
+      affiliateName: '紹介者A',
+      rewardAmount: null,
+      rewardEntryStatus: null,
+      reversedAmount: null,
+      settlementState: null,
+      payoutBatchState: null,
+      payoutResult: null,
+      duplicateCandidate: false,
+    }]
+    mockOrderDetail.mockResolvedValue({ success: true, data: detail })
+    render()
+    await settle()
+    const text = document.body.textContent ?? ''
+    expect(text).toContain('報酬：未確定')
+    expect(text).not.toContain('支払い確定：')
+    expect(text).not.toContain('確定後の取消')
+  })
+
   it('権限が無いときは専用の断り文を出す', async () => {
     mockOrderDetail.mockRejectedValue(new ApiError(403, 'forbidden'))
     render()

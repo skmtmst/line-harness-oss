@@ -80,6 +80,20 @@ function AccountDetail() {
     }
   }
 
+  /*
+    `?id=` なしで開くと読み込みが始まらず「読み込んでいます」が消えない。
+    対象未指定は失敗ではないので、一覧へ戻して選び直させる（U097系）。
+  */
+  if (!id) {
+    return (
+      <ListState
+        kind="empty"
+        title="見るアカウントが指定されていません"
+        description="LINEアカウントの一覧から、見るアカウントを選び直してください。"
+        action={<Button href="/accounts">LINEアカウントの一覧へ戻る</Button>}
+      />
+    )
+  }
   if (status === 'loading') return <ListState kind="loading" />
   if (status === 'error' || !account) {
     return (

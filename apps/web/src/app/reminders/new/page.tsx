@@ -277,8 +277,14 @@ export default function NewReminderPage() {
       /*
        * #996 DEEP-06: 本文・タイミングはひな形を選んだときだけ用途に合う
        * 初期値を入れる。未選択なら空欄にし、STEP 3 で利用者が決める。
+       *
+       * REMINDER-07: ひな形なしでは空の1通目を作らない。本文の無い通は
+       * Worker の下書き検査（送る内容が空の通知があります）で弾かれ、
+       * 基本設定から先へ進めなかった。下書きは通知0件を許すので、
+       * 通知は STEP 3 で足す。空本文のまま公開・送信はできない
+       * （公開前チェックとテスト送信が別の口で止める）。
        */
-      const firstStep: ReminderDraftStep = appliedTemplate
+      const firstStep: ReminderDraftStep | null = appliedTemplate
         ? {
             stableStepId: crypto.randomUUID(),
             offsetMinutes: appliedTemplate.step.offsetMinutes,
@@ -287,14 +293,7 @@ export default function NewReminderPage() {
             messageType: 'text',
             messageContent: appliedTemplate.step.messageContent,
           }
-        : {
-            stableStepId: crypto.randomUUID(),
-            offsetMinutes: 0,
-            offsetDays: null,
-            sendAtTime: null,
-            messageType: 'text',
-            messageContent: '',
-          }
+        : null
       const settings: ReminderDraftSettings = {
         name: name.trim(), description: description.trim() || null, lineAccountId: selectedAccountId!,
         folderId: folderId || null, triggerType, deliveryMode: 'time',
@@ -304,7 +303,7 @@ export default function NewReminderPage() {
         leapYearPolicy,
         triggerOffsetMinutes: null, sendAtTime: appliedTemplate?.step.sendAtTime ?? null, targetTagId: null,
         stopConditions: { bookingCancelled: true, supportMarkCompleted: true, daysAfterTarget: 7, friendBlocked: true },
-        steps: [firstStep],
+        steps: firstStep ? [firstStep] : [],
       }
       const res = await api.reminders.createDraft(settings)
       if (!res.success) throw new Error(res.error)

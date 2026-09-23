@@ -165,7 +165,7 @@ describe('テンプレートのLINEアカウント境界', () => {
     expect(mocks.getTemplatesWithUsageCount).toHaveBeenCalledWith(env.DB, undefined, {
       accountIds: ['account-1'],
       includeUnassigned: false,
-    }, undefined);
+    }, undefined, undefined);
   });
 
   it('一覧は当月・累計の実送信数を返す', async () => {
@@ -215,7 +215,7 @@ describe('テンプレートのLINEアカウント境界', () => {
     expect(mocks.getTemplatesWithUsageCount).toHaveBeenCalledWith(env.DB, undefined, {
       accountIds: ['account-1'],
       includeUnassigned: false,
-    }, { limit: 1, offset: 1 });
+    }, { limit: 1, offset: 1 }, undefined);
   });
 
   it('中4: カード型・カルーセルの巨大な本文は422で断る', async () => {

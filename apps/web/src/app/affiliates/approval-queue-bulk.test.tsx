@@ -441,3 +441,74 @@ describe('アカウントでの絞り込み', () => {
     expect(screen.getByText('支店')).toBeTruthy()
   })
 })
+
+/*
+ * IDEA-16: 同じ注文の重複候補と、返金・取り消し済みの注文に由来する成果は
+ * 「要確認」にしてまとめて承認から外す。詳細では注文番号・注文の最新状態・
+ * 確定報酬・支払い確定の状態を根拠として出す。未確定の額は確定額にしない。
+ */
+describe('IDEA-16: 注文根拠の表示と要確認の拡大', () => {
+  function useOrderFlaggedList() {
+    fixture.listImpl = async (params?: unknown) => {
+      const status = (params as { status?: string } | undefined)?.status
+      if (status === 'pending') {
+        return {
+          success: true,
+          data: [
+            { ...item('ev-1', '利用者1'), orderNumber: 'NEN-1001', orderStatus: 'current', sameOrderDuplicate: true, rewardAmount: null, rewardEntryStatus: null },
+            { ...item('ev-2', '利用者2'), orderNumber: 'NEN-2002', orderStatus: 'refunded', sameOrderDuplicate: false, rewardAmount: null, rewardEntryStatus: null },
+            { ...item('ev-3', '利用者3'), orderNumber: 'NEN-3003', orderStatus: 'current', sameOrderDuplicate: false, rewardAmount: 400, rewardEntryStatus: 'settled' },
+          ],
+        }
+      }
+      return { success: true, data: [] }
+    }
+  }
+
+  test('同じ注文の重複候補と返金済み注文の成果は選べず、要確認になる', async () => {
+    useOrderFlaggedList()
+    render(<ApprovalQueue />)
+    await waitFor(() => {
+      expect(screen.getByLabelText('利用者1の成果を選ぶ')).toBeTruthy()
+    })
+    // 要確認の行はチェックを付けられない（まとめて承認から外れる）。
+    expect((screen.getByLabelText('利用者1の成果を選ぶ') as HTMLInputElement).disabled).toBe(true)
+    expect((screen.getByLabelText('利用者2の成果を選ぶ') as HTMLInputElement).disabled).toBe(true)
+    expect((screen.getByLabelText('利用者3の成果を選ぶ') as HTMLInputElement).disabled).toBe(false)
+    expect(screen.getAllByText('要確認')).toHaveLength(2)
+  })
+
+  test('注文番号で成果を探せる', async () => {
+    useOrderFlaggedList()
+    render(<ApprovalQueue />)
+    await waitFor(() => {
+      expect(screen.getByLabelText('利用者1の成果を選ぶ')).toBeTruthy()
+    })
+    await act(async () => {
+      fireEvent.change(screen.getByLabelText('成果承認を検索'), { target: { value: 'NEN-2002' } })
+    })
+    await waitFor(() => {
+      expect(screen.queryByLabelText('利用者1の成果を選ぶ')).toBeNull()
+      expect(screen.getByLabelText('利用者2の成果を選ぶ')).toBeTruthy()
+      expect(screen.queryByLabelText('利用者3の成果を選ぶ')).toBeNull()
+    })
+  })
+
+  test('詳細は注文番号・注文の状態・確定報酬・支払い確定の状態を根拠として出す', async () => {
+    useOrderFlaggedList()
+    render(<ApprovalQueue />)
+    await waitFor(() => {
+      expect(screen.getByLabelText('利用者1の成果を選ぶ')).toBeTruthy()
+    })
+    await act(async () => {
+      fireEvent.click(screen.getAllByRole('button', { name: '見る' })[0])
+    })
+    const dialog = await screen.findByRole('dialog', { name: '成果の詳細' })
+    expect(within(dialog).getByText(/NEN-1001/)).toBeTruthy()
+    expect(within(dialog).getByText(/通常の注文/)).toBeTruthy()
+    expect(within(dialog).getByText(/同じ注文の重複/)).toBeTruthy()
+    // 承認前の成果は確定した報酬が無いので「未確定」と出す。
+    expect(within(dialog).getByText('未確定')).toBeTruthy()
+    expect(within(dialog).getByText('まだ確定していません')).toBeTruthy()
+  })
+})

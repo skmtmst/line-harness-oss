@@ -12,8 +12,19 @@
 
 import type { FormAction, FormOptions } from '@line-crm/shared'
 import ActionEditor from './action-editor'
+import { describeAction } from './form-update-summary'
 import { fieldInput, type FormRefs } from './form-refs'
 import Button from '@/components/shared/button'
+
+/**
+ * 期限を初めてONにしたときの初期値。日本時間で「7日後の23:59」。
+ * 決め打ちの日付を表示だけに置くと、入れた覚えのない日が
+ * そのまま保存されてしまうため、ONにした時点で実値を入れる。
+ */
+function defaultDeadlineEndsAt(): string {
+  const jst = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000 + 9 * 60 * 60 * 1000)
+  return `${jst.toISOString().slice(0, 10)}T23:59`
+}
 
 export default function OptionsDialog({
   value,
@@ -62,7 +73,15 @@ export default function OptionsDialog({
                   </div>
                 </details>
               </div>
-              <p className="text-ink-secondary mt-2 text-sm">タグ「来店アンケート回答済み」を付ける ／ マイルを 50 付与 ／ お礼メッセージを送る</p>
+              {(value.afterActions ?? []).length === 0 ? (
+                <p className="text-ink-secondary mt-2 text-sm">実行することはまだありません</p>
+              ) : (
+                <ul className="text-ink-secondary mt-2 list-disc space-y-0.5 pl-5 text-sm">
+                  {(value.afterActions ?? []).map((action, index) => (
+                    <li key={index}>{describeAction(action, refs)}</li>
+                  ))}
+                </ul>
+              )}
               <p className="text-ink-faint mt-2 text-xs">カルーセルの選択肢・質問の答え・自動応答からも、同じ画面が開きます</p>
             </div>
           </section>
@@ -77,13 +96,13 @@ export default function OptionsDialog({
             <div className="mt-2 grid gap-2">
               <OptionCard checked={value.oncePerFriend?.enabled ?? false} onChange={(enabled) => patch({ oncePerFriend: { ...value.oncePerFriend, enabled } })} label="1人1回だけ答えられるようにする" note="2回目に開いた人には「回答済みです」と出ます" />
               <OptionCard checked={value.restorePrevious ?? false} onChange={(restorePrevious) => patch({ restorePrevious })} label="前回の答えを最初から入れておく" note="同じ人が答え直すとき、前の内容が入った状態で開きます。別の端末では戻せません" />
-              <OptionCard checked={value.deadline?.enabled ?? false} onChange={(enabled) => patch({ deadline: { ...value.deadline, enabled } })} label="受付の期限を決める" note="期限を過ぎたら、開いても「受付は終了しました」と出ます" />
+              <OptionCard checked={value.deadline?.enabled ?? false} onChange={(enabled) => patch({ deadline: { ...value.deadline, enabled, ...(enabled && !value.deadline?.endsAt ? { endsAt: defaultDeadlineEndsAt() } : {}) } })} label="受付の期限を決める" note="期限を過ぎたら、開いても「受付は終了しました」と出ます" />
               <OptionCard checked={value.confirmDialog?.enabled ?? false} onChange={(enabled) => patch({ confirmDialog: { ...value.confirmDialog, enabled } })} label="送信する前に確認画面を出す" note="入力ミスを減らせます。ブロックが多いフォームで効きます" />
             </div>
           </section>
 
           {value.deadline?.enabled && <div className="bg-accent-soft mt-2 grid grid-cols-2 gap-3 rounded-control p-3">
-            <FieldLine label="受付の期限"><input type="datetime-local" value={value.deadline.endsAt || '2026-09-30T23:59'} onChange={(e) => patch({ deadline: { ...value.deadline, enabled: true, endsAt: e.target.value } })} className={fieldInput} /></FieldLine>
+            <FieldLine label="受付の期限"><input type="datetime-local" value={value.deadline.endsAt ?? ''} onChange={(e) => patch({ deadline: { ...value.deadline, enabled: true, endsAt: e.target.value } })} className={fieldInput} /></FieldLine>
             <FieldLine label="期限を過ぎた人に出す文"><input type="text" value={value.deadline.message ?? ''} onChange={(e) => patch({ deadline: { ...value.deadline, enabled: true, message: e.target.value } })} className={fieldInput} /></FieldLine>
           </div>}
 

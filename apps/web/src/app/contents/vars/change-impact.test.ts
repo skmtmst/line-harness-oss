@@ -140,7 +140,7 @@ describe('影響確認は、変わる場所と変わらない場所を分ける'
 
   it('保存すると何か所が変わるかを、差し込み名つきで言う', () => {
     const text = changeSummaryText(impact({ total: 15, blockingTotal: 15 }))
-    expect(text).toContain('{営業時間}')
+    expect(text).toContain('{{var.shop_hours}}')
     expect(text).toContain('15か所')
     expect(text).toContain('すぐ変わります')
   })
@@ -332,6 +332,32 @@ describe('共通情報編集（uNBlA）の画面', () => {
 
   it('未取得を0か所として描かない', () => {
     expect(IMPACT_SECTION).toContain("impactState !== 'ready' || !impact")
+  })
+
+  it('0か所確定のとき「1件ずつ見る」への案内を出さない（VAR-02）', () => {
+    // ボタンは blockingTotal > 0 かつ変更確認（canSave）のときだけ出る。
+    // 案内文も同じ条件にしないと、存在しない操作を探させる。
+    expect(IMPACT_SECTION).toContain("'canSave' in impact && impact.blockingTotal > 0")
+  })
+
+  it('見え方の節は、確認中・0件確定・使用先ありを分けて言う（VAR-02）', () => {
+    const PREVIEW_SECTION = sliceBetween(EDIT, '差し込んだときの見え方', '</section>')
+    // 0件が確定したあとも「確認中です」と出し続けない
+    expect(PREVIEW_SECTION).toContain('impact.total === 0')
+    expect(PREVIEW_SECTION).toContain('使われている場所がないため')
+    expect(PREVIEW_SECTION).not.toContain('使用先の本文を確認中です')
+    // 読み込み中・失敗は状態の言葉で言う。0件と混ぜない
+    expect(PREVIEW_SECTION).toContain("impactState !== 'ready' || !impact")
+    expect(PREVIEW_SECTION).toContain('impactStateText(impactState)')
+    // 使用先はあるが保存ですぐ変わるものが無い（送信済みだけ等）も分ける
+    expect(PREVIEW_SECTION).toContain('すぐ変わる使用先の文はありません')
+  })
+
+  it('VAR-06: 保存と更新予約は新規画面と同じ型検査を通す', () => {
+    // 型に合わない値・代替値は影響確認を呼ぶ前に止めて理由を出す。
+    expect(EDIT).toContain('commonVarValueError(item.type, value)')
+    expect(EDIT).toContain("commonVarValueError(item.type, fallbackValue, '代替値')")
+    expect(EDIT).toContain("commonVarValueError(item.type, draft.value, '更新後の値')")
   })
 })
 

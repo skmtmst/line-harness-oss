@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import PageHeader from '@/components/shared/page-header'
@@ -12,6 +11,7 @@ import { RequiredBadge } from '@/components/shared/form-controls'
 import { useAccount } from '@/contexts/account-context'
 import { api, ApiError, fetchApi, type AnalyticsUsageOverview } from '@/lib/api'
 import { createAccountRequestGuard } from './account-request-guard'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import {
   FEATURE_SETTINGS_UPDATED_EVENT,
   groupEnabledCount,
@@ -113,10 +113,6 @@ type FeatureSaveResponse = {
   error: string
   data: { version: number }
 }
-
-type LeaveTarget =
-  | { kind: 'link'; href: string }
-  | { kind: 'history-back' }
 
 /*
  * オン／オフを持たない項目だけが使う、分類ごとの利用数バッジ。
@@ -439,7 +435,6 @@ function SidebarPreview({ groups, features }: {
 
 export default function SettingsPage() {
   const { selectedAccountId } = useAccount()
-  const router = useRouter()
   const [savedFeatures, setSavedFeatures] = useState<Record<string, boolean>>(CATALOG_DEFAULT_FEATURES)
   const [features, setFeatures] = useState<Record<string, boolean>>(CATALOG_DEFAULT_FEATURES)
   const [savedItemOrder, setSavedItemOrder] = useState<MenuItemOrder>({})
@@ -472,16 +467,39 @@ export default function SettingsPage() {
   const [impactError, setImpactError] = useState('')
   /** 既定値へ初期化する前の確認。保存済み設定へ戻す操作には使わない。 */
   const [resetToDefaultsOpen, setResetToDefaultsOpen] = useState(false)
-  /** dirtyなまま画面を離れようとした導線。空なら確認窓を閉じる。 */
-  const [leaveTarget, setLeaveTarget] = useState<LeaveTarget | null>(null)
-  const allowHistoryLeaveRef = useRef(false)
-  const skipRestoredPopRef = useRef(false)
   /**
    * 世代guard。アカウントが変わったら古い応答を捨てる。
    * Aの応答をBの画面へ混ぜないし、Aの版でBへ保存しない。
    */
   const accountGuard = useMemo(() => createAccountRequestGuard(), [])
   const accountRef = useRef(selectedAccountId)
+
+  /** 並び順を当てたあとの区分。画面も見え方の欄もこれを見る。 */
+  const groups = useMemo(() => {
+    return applyItemOrder(
+      visibleFeatureGroups({ specializedFeatureKeys, includeRestaurantTest: true }),
+      itemOrder,
+    )
+  }, [itemOrder, specializedFeatureKeys])
+
+  const currentOrder = useMemo(() => itemOrderFromGroups(groups), [groups])
+  const savedGroups = useMemo(() => applyItemOrder(
+    visibleFeatureGroups({ specializedFeatureKeys, includeRestaurantTest: true }),
+    savedItemOrder,
+  ), [savedItemOrder, specializedFeatureKeys])
+  const dirty = featureSettingsAreDirty({
+    savedFeatures,
+    features,
+    savedOrder: itemOrderFromGroups(savedGroups),
+    currentOrder,
+  })
+
+  /*
+   * 未保存の変更がある間、画面を離れる操作を止める共通の番兵（DETAIL-04系）。
+   * ブラウザ離脱・画面内リンク・戻る操作を同じ確認対話へ寄せる。
+   */
+  const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty, busy: saving })
+
   useEffect(() => {
     if (accountRef.current !== selectedAccountId) {
       accountRef.current = selectedAccountId
@@ -503,10 +521,10 @@ export default function SettingsPage() {
       setImpactGroups([])
       setImpactError('')
       setResetToDefaultsOpen(false)
-      setLeaveTarget(null)
+      cancelLeave()
       setReason('')
     }
-  }, [selectedAccountId, accountGuard])
+  }, [selectedAccountId, accountGuard, cancelLeave])
 
   /**
    * 利用数だけ後から読む。設定の表示を重い集計で待たせない。
@@ -544,7 +562,7 @@ export default function SettingsPage() {
       setSpecializedFeatureKeys([])
       setUsageCategories([])
       setUsageFeatures([])
-      setLeaveTarget(null)
+      cancelLeave()
       setLoading(false)
       return
     }
@@ -574,109 +592,9 @@ export default function SettingsPage() {
     } finally {
       if (accountGuard.isCurrent(ticket, selectedAccountId)) setLoading(false)
     }
-  }, [selectedAccountId, loadUsage, accountGuard])
+  }, [selectedAccountId, loadUsage, accountGuard, cancelLeave])
 
   useEffect(() => { void load() }, [load])
-
-  /** 並び順を当てたあとの区分。画面も見え方の欄もこれを見る。 */
-  const groups = useMemo(() => {
-    return applyItemOrder(
-      visibleFeatureGroups({ specializedFeatureKeys, includeRestaurantTest: true }),
-      itemOrder,
-    )
-  }, [itemOrder, specializedFeatureKeys])
-
-  const currentOrder = useMemo(() => itemOrderFromGroups(groups), [groups])
-  const savedGroups = useMemo(() => applyItemOrder(
-    visibleFeatureGroups({ specializedFeatureKeys, includeRestaurantTest: true }),
-    savedItemOrder,
-  ), [savedItemOrder, specializedFeatureKeys])
-  const dirty = featureSettingsAreDirty({
-    savedFeatures,
-    features,
-    savedOrder: itemOrderFromGroups(savedGroups),
-    currentOrder,
-  })
-  const dirtyRef = useRef(dirty)
-  dirtyRef.current = dirty
-
-  /*
-   * ブラウザ再読込・タブ終了だけは画面内のDialogを出せないので、標準の確認を
-   * dirtyな間だけ登録する。保存成功・account切替・unmountではeffect cleanupで外れる。
-   */
-  useEffect(() => {
-    if (!dirty) return
-    const onBeforeUnload = (event: BeforeUnloadEvent) => {
-      if (!dirtyRef.current) return
-      event.preventDefault()
-      event.returnValue = ''
-    }
-    window.addEventListener('beforeunload', onBeforeUnload)
-    return () => window.removeEventListener('beforeunload', onBeforeUnload)
-  }, [dirty])
-
-  /*
-   * 左メニュー等のLinkも含めて、同一タブの画面内遷移を捕まえる。
-   * browser backはブラウザ側が先に履歴を動かすため対象外にし、ここでは
-   * 「クリックして別の管理画面へ行く」導線だけを安全に止める。
-   */
-  useEffect(() => {
-    if (!dirty) return
-    const onDocumentClick = (event: MouseEvent) => {
-      if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
-      const target = event.target as { closest?: (selector: string) => Element | null } | null
-      const anchor = target?.closest?.('a[href]') as HTMLAnchorElement | null
-      if (!anchor || anchor.target || anchor.hasAttribute('download')) return
-      const destination = new URL(anchor.href, window.location.href)
-      const current = new URL(window.location.href)
-      if (destination.origin !== current.origin || destination.href === current.href) return
-      event.preventDefault()
-      if (!saving) setLeaveTarget({ kind: 'link', href: `${destination.pathname}${destination.search}${destination.hash}` })
-    }
-    document.addEventListener('click', onDocumentClick, true)
-    return () => document.removeEventListener('click', onDocumentClick, true)
-  }, [dirty, saving])
-
-  /*
-   * App Routerにはpages routerのbeforePopStateがないため、戻る操作はpopstateで
-   * ただちに元の履歴位置へ戻してから確認する。確認後だけ次のpopstateを通す。
-   */
-  useEffect(() => {
-    if (!dirty) {
-      skipRestoredPopRef.current = false
-      return
-    }
-    const onPopState = () => {
-      if (allowHistoryLeaveRef.current) {
-        allowHistoryLeaveRef.current = false
-        return
-      }
-      // history.go(1)で現在画面へ戻った直後のpopstateは、もう一度止めない。
-      if (skipRestoredPopRef.current) {
-        skipRestoredPopRef.current = false
-        return
-      }
-      skipRestoredPopRef.current = true
-      window.history.go(1)
-      if (!saving) setLeaveTarget({ kind: 'history-back' })
-    }
-    window.addEventListener('popstate', onPopState)
-    return () => window.removeEventListener('popstate', onPopState)
-  }, [dirty, saving])
-
-  const leaveWithoutSaving = useCallback(() => {
-    if (!leaveTarget || saving) return
-    // 遷移が始まる前にdirtyを外す。beforeunloadも不要な警告を出さない。
-    setSavedFeatures({ ...features })
-    setSavedItemOrder(currentOrder)
-    setLeaveTarget(null)
-    if (leaveTarget.kind === 'history-back') {
-      allowHistoryLeaveRef.current = true
-      window.history.back()
-      return
-    }
-    router.push(leaveTarget.href)
-  }, [leaveTarget, saving, features, currentOrder, router])
 
   const usageByItemId = useMemo(() => {
     const result = new Map<string, UsageCategory>()
@@ -1156,16 +1074,21 @@ export default function SettingsPage() {
 
       <ConfirmDialog
         open={leaveTarget !== null}
-        title="未保存の変更があります"
+        title="保存していない変更があります"
         description="保存せずに移動すると、この画面で変更した機能の表示・並び順は失われます。"
-        confirmLabel="保存せずに離れる"
-        cancelLabel="この画面に残る"
+        confirmLabel="保存せずに移動"
+        cancelLabel="編集を続ける"
         destructive
         busy={saving}
         onCancel={() => {
-          if (!saving) setLeaveTarget(null)
+          if (!saving) cancelLeave()
         }}
-        onConfirm={leaveWithoutSaving}
+        onConfirm={() => {
+          // 遷移が始まる前にdirtyを外す。beforeunloadも不要な警告を出さない。
+          setSavedFeatures({ ...features })
+          setSavedItemOrder(currentOrder)
+          confirmLeave()
+        }}
       />
 
       <ConfirmDialog

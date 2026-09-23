@@ -977,81 +977,138 @@ function DashboardPageInner() {
     const jstMidnightUtc = Date.UTC(jstNow.getUTCFullYear(), jstNow.getUTCMonth(), jstNow.getUTCDate()) - 9 * 60 * 60 * 1000
     const todayStartIso = new Date(jstMidnightUtc).toISOString()
     const todayJst = jstDay(now)
-    void Promise.allSettled([
-      needsPhotos ? api.nenMembers.photoReviewMetrics(selectedAccountId) : Promise.resolve(null),
-      needsBookings ? bookingApi.listRequests(selectedAccountId, 'all', { from: todayStartIso, limit: 100 }) : Promise.resolve(null),
-      needsHealth ? api.health.getHealth(selectedAccountId) : Promise.resolve(null),
-      needsTwoFactor ? api.staff.list() : Promise.resolve(null),
-      needsSupportMarks ? api.supportMarks.list(selectedAccountId, { suppressFeatureDisabledEvent: true }) : Promise.resolve(null),
-      /*
-        「今日の予約」の件数は明細とは別に集計APIから取る（A01-04）。
-        明細は100件までしか来ないため、件数だけは上限に引っ張られない
-        口を使う。
-      */
-      needsBookings ? bookingApi.requestsSummary(selectedAccountId, {
-        month: monthKey(0),
-        lastMonth: monthKey(-1),
-        today: todayJst,
-        weekTo: jstDay(Date.now() + 6 * 86_400_000),
-      }) : Promise.resolve(null),
-    ]).then(([photoResult, bookingResult, healthResult, staffResult, supportMarkResult, bookingSummaryResult]) => {
-      if (cancelled) return
-      const photoCount = photoResult.status === 'fulfilled' && photoResult.value?.success
-        ? photoResult.value.data.pendingCount
-        : null
-      setPendingPhotos(photoCount)
+    /*
+      PERF-01: 補足データはカードごとに届いた順で反映する。以前は
+      Promise.allSettled が全部そろうのを待ってからまとめて書いていたため、
+      遅い予約や健全性の応答が、先に届いた写真・二段階認証・対応マークの
+      カードまで待たせていた。各取得に届いた時点の反映を付け、
+      「最後に終えた時刻」はそれぞれの完了で刻む。
+    */
+    const markLoaded = () => {
+      if (!cancelled) setSupplementLoadedAt(new Date())
+    }
+    const photoPromise = needsPhotos ? api.nenMembers.photoReviewMetrics(selectedAccountId) : Promise.resolve(null)
+    const bookingPromise = needsBookings ? bookingApi.listRequests(selectedAccountId, 'all', { from: todayStartIso, limit: 100 }) : Promise.resolve(null)
+    const healthPromise = needsHealth ? api.health.getHealth(selectedAccountId) : Promise.resolve(null)
+    const staffPromise = needsTwoFactor ? api.staff.list() : Promise.resolve(null)
+    const supportMarkPromise = needsSupportMarks ? api.supportMarks.list(selectedAccountId, { suppressFeatureDisabledEvent: true }) : Promise.resolve(null)
+    /*
+      「今日の予約」の件数は明細とは別に集計APIから取る（A01-04）。
+      明細は100件までしか来ないため、件数だけは上限に引っ張られない
+      口を使う。
+    */
+    const bookingSummaryPromise = needsBookings ? bookingApi.requestsSummary(selectedAccountId, {
+      month: monthKey(0),
+      lastMonth: monthKey(-1),
+      today: todayJst,
+      weekTo: jstDay(Date.now() + 6 * 86_400_000),
+    }) : Promise.resolve(null)
+    void photoPromise.then(
+      (result) => {
+        if (cancelled) return
+        const photoCount = result?.success ? result.data.pendingCount : null
+        setPendingPhotos(photoCount)
+        setPendingPhotosState(!needsPhotos || photoCount !== null ? 'ready' : 'error')
+        markLoaded()
+      },
       /*
         取れなかった理由で出し分ける。403 は権限、それ以外は取得失敗。
         どちらも「読み込み中」のままにしない（#666 差し戻し）。
       */
-      setPendingPhotosState(
-        !needsPhotos || photoCount !== null ? 'ready'
-          : photoResult.status === 'rejected' && photoResult.reason instanceof ApiError && photoResult.reason.status === 403 ? 'forbidden'
-            : 'error',
-      )
-      /*
-        器が違う返事(障害時の HTML など)が来ても、`undefined.requests` で
-        落ちない。読めなかったら「確認待ち」に出す。
-      */
-      const bookingList = bookingResult.status === 'fulfilled' && bookingResult.value
-        ? (Array.isArray(bookingResult.value.requests) ? bookingResult.value.requests : null)
-        : null
-      setBookings(bookingList)
-      setBookingsFailed(needsBookings && bookingList === null)
-      /*
-        旧Workerは todayActiveTotal を返さない。そのときは null のままにし、
-        表示側で明細からの件数へ戻す。取りこぼした数字を本物に見せない。
-      */
-      setTodayActiveBookings(
-        bookingSummaryResult.status === 'fulfilled'
-          && bookingSummaryResult.value
-          && typeof bookingSummaryResult.value.todayActiveTotal === 'number'
-          ? bookingSummaryResult.value.todayActiveTotal
-          : null,
-      )
-      const healthData = healthResult.status === 'fulfilled' && healthResult.value?.success === true
-        ? healthResult.value.data
-        : null
-      setHealthRisk(healthData ? (healthData.riskLevel as HealthRisk) : null)
-      setHealthIssueCount(
-        healthData
-          ? healthData.logs.filter((log) => log.riskLevel === 'warning' || log.riskLevel === 'danger').length
-          : null,
-      )
-      const healthOk = healthData !== null
-      setHealthFailed(needsHealth && !healthOk)
-      setTwoFactorSummary(
-        staffResult.status === 'fulfilled' && staffResult.value?.success
-          ? summarizeTwoFactor(staffResult.value.data)
-          : null,
-      )
-      setSupportMarkAutoOnInbound(
-        supportMarkResult.status === 'fulfilled' && supportMarkResult.value?.success
-          ? hasInboundSupportMark(supportMarkResult.value.data)
-          : null,
-      )
-      setSupplementLoadedAt(new Date())
-      setSupplementLoading(false)
+      (reason) => {
+        if (cancelled) return
+        setPendingPhotos(null)
+        setPendingPhotosState(reason instanceof ApiError && reason.status === 403 ? 'forbidden' : 'error')
+        markLoaded()
+      },
+    )
+    void bookingPromise.then(
+      (result) => {
+        if (cancelled) return
+        /*
+          器が違う返事(障害時の HTML など)が来ても、`undefined.requests` で
+          落ちない。読めなかったら「確認待ち」に出す。
+        */
+        const bookingList = result && Array.isArray(result.requests) ? result.requests : null
+        setBookings(bookingList)
+        setBookingsFailed(needsBookings && bookingList === null)
+        markLoaded()
+      },
+      () => {
+        if (cancelled) return
+        setBookings(null)
+        setBookingsFailed(needsBookings)
+        markLoaded()
+      },
+    )
+    void bookingSummaryPromise.then(
+      (result) => {
+        if (cancelled) return
+        /*
+          旧Workerは todayActiveTotal を返さない。そのときは null のままにし、
+          表示側で明細からの件数へ戻す。取りこぼした数字を本物に見せない。
+        */
+        setTodayActiveBookings(result && typeof result.todayActiveTotal === 'number' ? result.todayActiveTotal : null)
+        markLoaded()
+      },
+      () => {
+        if (cancelled) return
+        setTodayActiveBookings(null)
+        markLoaded()
+      },
+    )
+    void healthPromise.then(
+      (result) => {
+        if (cancelled) return
+        const healthData = result?.success === true ? result.data : null
+        setHealthRisk(healthData ? (healthData.riskLevel as HealthRisk) : null)
+        setHealthIssueCount(
+          healthData
+            ? healthData.logs.filter((log) => log.riskLevel === 'warning' || log.riskLevel === 'danger').length
+            : null,
+        )
+        setHealthFailed(needsHealth && healthData === null)
+        markLoaded()
+      },
+      () => {
+        if (cancelled) return
+        setHealthRisk(null)
+        setHealthIssueCount(null)
+        setHealthFailed(needsHealth)
+        markLoaded()
+      },
+    )
+    void staffPromise.then(
+      (result) => {
+        if (cancelled) return
+        setTwoFactorSummary(result?.success ? summarizeTwoFactor(result.data) : null)
+        markLoaded()
+      },
+      () => {
+        if (cancelled) return
+        setTwoFactorSummary(null)
+        markLoaded()
+      },
+    )
+    void supportMarkPromise.then(
+      (result) => {
+        if (cancelled) return
+        setSupportMarkAutoOnInbound(result?.success ? hasInboundSupportMark(result.data) : null)
+        markLoaded()
+      },
+      () => {
+        if (cancelled) return
+        setSupportMarkAutoOnInbound(null)
+        markLoaded()
+      },
+    )
+    /*
+      一覧側の「読み込み中」は、このカードが実際に待つ予約系の2本だけで
+      下ろす。写真・健全性など無関係の取得が遅れても、届いた予約は
+      その時点で表示へ出る。
+    */
+    void Promise.allSettled([bookingPromise, bookingSummaryPromise]).then(() => {
+      if (!cancelled) setSupplementLoading(false)
     })
     return () => { cancelled = true }
   }, [needsBookings, needsHealth, needsPhotos, needsSupportMarks, needsTwoFactor, selectedAccountId])

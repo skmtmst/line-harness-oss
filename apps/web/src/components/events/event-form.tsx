@@ -14,7 +14,16 @@ import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Select from '@/components/shared/select'
 import { Field } from '@/components/shared/form-controls'
 // #740: 下書きの初期値と字数上限は作成画面と共有する。片方だけ変えないこと。
-import { EVENT_DEFAULT_DRAFT, EVENT_DESCRIPTION_MAX_LENGTH, EVENT_NAME_MAX_LENGTH } from './event-draft-shared'
+import {
+  EVENT_CANCEL_DEADLINE_OPTIONS,
+  EVENT_DEFAULT_DRAFT,
+  EVENT_DESCRIPTION_MAX_LENGTH,
+  EVENT_ENTRY_CUTOFF_OPTIONS,
+  EVENT_NAME_MAX_LENGTH,
+  deadlineOptionsWithSaved,
+  deadlineSelectValue,
+  parseDeadlineSelect,
+} from './event-draft-shared'
 
 type Tab = 'overview' | 'slots' | 'publish'
 
@@ -40,11 +49,30 @@ function jstNow(): Date {
   return new Date(Date.now())
 }
 
-function formatJpDateTime(iso: string): string {
+export function formatJpDateTime(iso: string): string {
   const d = new Date(iso)
+  /*
+    EVENT-05: 一覧(app/events/page.tsx)は Asia/Tokyo 固定で出す。
+    ここが端末の時間帯に依存すると、同じ開催回が一覧と編集で
+    時差分ずれて見える。保存値(UTC)は変えず、表示だけ日本時間に固定する。
+  */
   return d.toLocaleString('ja-JP', {
     year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit',
+    timeZone: 'Asia/Tokyo',
   })
+}
+
+/**
+ * 枠の日時の出し方。「2026/09/20 23:30 〜 01:00」。
+ *
+ * 日をまたぐ枠は終了側の日付も出す(DETAIL-10)。時刻だけにすると
+ * 「9/20 23:30〜01:00」が当日深夜なのか翌日なのか読めない。
+ */
+export function formatJpSlotRange(startsAt: string, endsAt: string): string {
+  const start = formatJpDateTime(startsAt)
+  const end = formatJpDateTime(endsAt)
+  const sameDay = start.slice(0, 10) === end.slice(0, 10)
+  return `${start} 〜 ${sameDay ? end.slice(-5) : end}`
 }
 
 export default function EventForm({ accountId, eventId }: EventFormProps) {
@@ -818,7 +846,7 @@ function SlotsTab({
               {slots.map((s) => (
                 <tr key={s.id} className="border-t border-gray-200">
                   <td className="px-3 py-2 text-gray-800">
-                    {formatJpDateTime(s.starts_at)} 〜 {formatJpDateTime(s.ends_at).slice(-5)}
+                    {formatJpSlotRange(s.starts_at, s.ends_at)}
                   </td>
                   <td className="px-3 py-2 text-gray-700">{s.capacity ?? '無制限'}</td>
                   <td className="px-3 py-2 text-gray-700">{s.active_count ?? 0}</td>
@@ -1189,7 +1217,7 @@ function PublishTab({
         <div>
           <div className="text-sm font-medium text-gray-900">承認制</div>
           <div className="text-xs text-gray-500 mt-0.5">
-            ON: 友だちが予約しても運営が「承認」するまで未確定<br />
+            ON: 友だちが予約しても運営が「承認」するまで未確定（承認待ちの分も残席を使います）<br />
             OFF: 定員空きがあれば即時確定
           </div>
         </div>
@@ -1256,23 +1284,27 @@ function PublishTab({
         <label htmlFor="ev-entry-cutoff" className="mb-1.5 block text-sm font-medium text-gray-700">
           申込の締め切り
         </label>
+        {/*
+          EVENT-04: 選択肢は作成画面と同じ一覧(event-draft-shared)を使う。
+          保存値が選択肢に無いときは「保存済み：…」として出し、
+          先頭項目を選んだように見せない・別値へ無断変換しない。
+        */}
         <select
           id="ev-entry-cutoff"
-          value={draft.entry_cutoff_hours_before ?? 'disabled'}
+          value={deadlineSelectValue(draft.entry_cutoff_hours_before)}
           onChange={(e) =>
-            update(
-              'entry_cutoff_hours_before',
-              e.target.value === 'disabled' ? null : Number(e.target.value),
-            )
+            update('entry_cutoff_hours_before', parseDeadlineSelect(e.target.value))
           }
           className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
-          <option value="disabled">開始まで受ける</option>
-          <option value="1">1時間前まで</option>
-          <option value="3">3時間前まで</option>
-          <option value="24">前日まで（24時間前）</option>
-          <option value="48">2日前まで（48時間前）</option>
-          <option value="168">1週間前まで</option>
+          {deadlineOptionsWithSaved(
+            EVENT_ENTRY_CUTOFF_OPTIONS,
+            draft.entry_cutoff_hours_before,
+          ).map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.label}
+            </option>
+          ))}
         </select>
       </div>
 
@@ -1280,22 +1312,25 @@ function PublishTab({
         <label className="block text-sm font-medium text-gray-700 mb-1.5">
           キャンセル期限（友だち側）
         </label>
+        {/*
+          EVENT-03: 保存値の意味は作成画面・Worker と同じ。
+          null=不可、0=開始直前まで、正数=開始N時間前。
+        */}
         <select
-          value={draft.cancel_deadline_hours_before ?? 'disabled'}
+          value={deadlineSelectValue(draft.cancel_deadline_hours_before)}
           onChange={(e) =>
-            update(
-              'cancel_deadline_hours_before',
-              e.target.value === 'disabled' ? null : Number(e.target.value),
-            )
+            update('cancel_deadline_hours_before', parseDeadlineSelect(e.target.value))
           }
           className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
-          <option value="disabled">不可（運営に LINE 連絡）</option>
-          <option value="0">直前まで可</option>
-          <option value="6">6 時間前まで</option>
-          <option value="12">12 時間前まで</option>
-          <option value="24">24 時間前まで</option>
-          <option value="48">48 時間前まで</option>
+          {deadlineOptionsWithSaved(
+            EVENT_CANCEL_DEADLINE_OPTIONS,
+            draft.cancel_deadline_hours_before,
+          ).map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.label}
+            </option>
+          ))}
         </select>
       </div>
 

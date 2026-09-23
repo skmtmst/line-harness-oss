@@ -37,18 +37,23 @@ describe('友だち情報欄の帯は、数が出せない理由を添える', (
   })
 
   it('読込中・取得失敗・権限不足を言い分ける', () => {
-    expect(CODE).toContain("status === 'loading' ? STATE_TEXT.loading")
-    expect(CODE).toContain("status === 'error' ? STATE_TEXT.error")
+    /*
+      #1017 PERF-14: 帯の状態は集計要求（statsStatus）で見る。
+      一覧（status）の成否と混ぜない。一覧が落ちても集計は出し、
+      集計が落ちても一覧は出す。
+    */
+    expect(CODE).toContain("statsStatus === 'loading' ? STATE_TEXT.loading")
+    expect(CODE).toContain("statsStatus === 'error' ? STATE_TEXT.error")
   })
 
   /*
-    403 は `setStatus('forbidden')` へ行く。`status === 'error'` の中で
+    403 は `setStatsStatus('forbidden')` へ行く。`statsStatus === 'error'` の中で
     `error === ''` を権限不足のしるしにしていたときは、その枝に**一度も
-    入らず**、帯は数え方の説明のままだった。`status` で直に見る。
+    入らず**、帯は数え方の説明のままだった。`statsStatus` で直に見る。
   */
-  it('権限不足は status で見る（error の空文字で当てない）', () => {
-    expect(CODE).toContain("status === 'forbidden' ? STATE_TEXT.forbiddenView")
-    expect(CODE, '403 は status が forbidden になるので、この当て方では入らない')
+  it('権限不足は statsStatus で見る（error の空文字で当てない）', () => {
+    expect(CODE).toContain("statsStatus === 'forbidden' ? STATE_TEXT.forbiddenView")
+    expect(CODE, '403 は statsStatus が forbidden になるので、この当て方では入らない')
       .not.toContain("error === '' ? STATE_TEXT.forbiddenView")
   })
 

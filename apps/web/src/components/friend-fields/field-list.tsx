@@ -55,6 +55,13 @@ export default function FriendFieldList({ accountId }: { accountId: string | nul
   const [items, setItems] = useState<FriendField[]>([])
   const [summary, setSummary] = useState<FriendFieldListSummary | null>(null)
   const [status, setStatus] = useState<LoadStatus>('loading')
+  /*
+    #1017 PERF-14: 上部の数値カード（集計）は一覧とは別の要求で、
+    別の状態を持つ。以前は Promise.all で束ねていたため、集計が
+    遅いと一覧まで待ち、集計が失敗すると一覧まで取得失敗になった。
+    集計が落ちても一覧は出し、一覧が落ちても届いた集計は出す。
+  */
+  const [statsStatus, setStatsStatus] = useState<LoadStatus>('loading')
   const [error, setError] = useState('')
   /*
     操作の失敗は読み込みの失敗とは別の状態にする（#1014 ATTR-02）。
@@ -95,23 +102,40 @@ export default function FriendFieldList({ accountId }: { accountId: string | nul
     const account = accountId
     const token = gateRef.current.begin()
     if (!account) {
-      setItems([]); setSummary(null); setStatus('error'); setError('LINE公式アカウントを選んでください')
+      setItems([]); setSummary(null); setStatus('error'); setStatsStatus('error'); setError('LINE公式アカウントを選んでください')
       return
     }
-    setStatus('loading'); setError('')
+    setStatus('loading'); setStatsStatus('loading'); setError('')
+    /*
+      応答が今の世代・今のアカウントのものかを確かめる印。
+      一覧と集計の両方で同じ印を使い、古いほうの応答が新しい画面へ
+      混ざらないようにする（ATTR-01）。
+    */
+    const stale = () => !gateRef.current.current(token) || accountRef.current !== account
+    /*
+      集計は一覧の応答を待たず、届いた時点でカードへ入れる。
+      失敗しても一覧は止めず、カード側が「出せない理由」を出す。
+      数が無いときに 0 を作って入れない（帯の契約試験が見張る）。
+    */
+    void api.friendFields.stats(account).then((stats) => {
+      if (stale()) return
+      if (stats.success) { setSummary(stats.data); setStatsStatus('ready') }
+      else { setSummary(null); setStatsStatus('error') }
+    }, (reason) => {
+      if (stale()) return
+      setSummary(null)
+      setStatsStatus(reason instanceof ApiError && reason.status === 403 ? 'forbidden' : 'error')
+    })
     try {
-      const [list, stats] = await Promise.all([
-        api.friendFields.list(account, { withUsage: true }), api.friendFields.stats(account),
-      ])
-      if (!gateRef.current.current(token) || accountRef.current !== account) return
-      if (!list.success || !stats.success) throw new Error('load failed')
-      setItems(list.data); setSummary(stats.data); setStatus('ready')
+      const list = await api.friendFields.list(account, { withUsage: true })
+      if (stale()) return
+      if (!list.success) throw new Error('load failed')
+      setItems(list.data); setStatus('ready')
     } catch (reason) {
-      if (!gateRef.current.current(token) || accountRef.current !== account) return
+      if (stale()) return
       const forbidden = reason instanceof ApiError && reason.status === 403
       setItems([])
       setStatus(forbidden ? 'forbidden' : 'error')
-      setSummary(null)
       setError(forbidden ? '' : '再読み込みしても直らない場合はエラー報告へ。')
     }
   }, [accountId])
@@ -206,9 +230,9 @@ export default function FriendFieldList({ accountId }: { accountId: string | nul
     開くと帯は「1項目以上を登録」「追加・編集」という数え方の説明のままで、
     **見る権限が無いのか、まだ数が来ていないのかが区別できなかった。**
   */
-  const kpiReason = status === 'loading' ? STATE_TEXT.loading
-    : status === 'forbidden' ? STATE_TEXT.forbiddenView
-      : status === 'error' ? STATE_TEXT.error
+  const kpiReason = statsStatus === 'loading' ? STATE_TEXT.loading
+    : statsStatus === 'forbidden' ? STATE_TEXT.forbiddenView
+      : statsStatus === 'error' ? STATE_TEXT.error
         : null
   /** 数が出せるときの補足（数え方の説明）と、出せないときの理由を切り替える。 */
   const detailOf = (whenAvailable: string): string => kpiReason ?? whenAvailable
@@ -244,7 +268,7 @@ export default function FriendFieldList({ accountId }: { accountId: string | nul
 
   return (
     <div data-design-node="HBTk0">
-      <div className="mb-4 grid grid-cols-2 gap-3 xl:grid-cols-4">{cards.map((card) => <SummaryCard key={card.title} {...card} loading={status === 'loading'} variant="v6" />)}</div>
+      <div className="mb-4 grid grid-cols-2 gap-3 xl:grid-cols-4">{cards.map((card) => <SummaryCard key={card.title} {...card} loading={statsStatus === 'loading'} variant="v6" />)}</div>
       <NoteBar className="mb-4">既定値は友だち情報が空欄のときの送信値です。種類は新規登録後に変更せず、回答フォーム・友だち詳細・変数挿入で同じ定義を使います。</NoteBar>
 
       <div className="mb-4 flex flex-wrap items-center gap-2">

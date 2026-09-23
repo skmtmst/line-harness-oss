@@ -3,6 +3,7 @@
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   api,
+  describeSaveFailure,
   type ConversionDefinitionList,
   type ConversionDefinitionListItem,
   type ConversionDefinitionDeleteImpact,
@@ -13,6 +14,7 @@ import {
   type ConversionIngestionEvent,
 } from '@/lib/api'
 import type { ConversionPoint } from '@line-crm/shared'
+import { deduplicationLabel } from './dedup'
 import KpiCard from '@/components/shared/kpi-card'
 
 /**
@@ -60,9 +62,9 @@ const VALUE_MODE_OPTIONS = [
   { value: 'none', label: '金額を数えない' },
 ]
 const DEDUP_OPTIONS = [
-  { value: 'every', label: '毎回数える' },
-  { value: 'once_per_friend', label: '1人1回だけ数える' },
-  { value: 'window', label: '決めた日数のあいだは1回だけ数える' },
+  { value: 'every', label: deduplicationLabel('every', null) },
+  { value: 'once_per_friend', label: deduplicationLabel('once_per_friend', null) },
+  { value: 'window', label: deduplicationLabel('window', null) },
 ]
 const REVERSAL_OPTIONS = [
   { value: 'manual', label: '人が取り消す' },
@@ -490,9 +492,11 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
       await load()
     } catch (error) {
       const message = error instanceof Error ? error.message : ''
+      // WRITE-01: 409の競合は専用の言葉、それ以外も権限不足・アカウント違い・
+      // 機能オフの理由が見えるようにする。内部文は画面へ出さない。
       setEditError(message.includes('更新されています')
         ? 'ほかの人がこの成果地点を先に直しました。上書きしていません。画面を閉じて読み直してから、もう一度お試しください。'
-        : message || '編集できませんでした。入力を確かめて、もう一度お試しください。')
+        : describeSaveFailure(error))
     } finally {
       setEditSaving(false)
     }
@@ -911,7 +915,7 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
                   <td className="text-ink-secondary w-1/4 px-4 py-3 text-sm">
                     {sourceTriggerLabel(point)}
                     <p className="text-ink-faint mt-0.5 text-xs">
-                      {measureLabel(point.measureMethod)}・{point.countRepeat === false ? '1人1回' : '毎回数える'}
+                      {measureLabel(point.measureMethod)}・{deduplicationLabel(point.deduplicationMode, point.deduplicationWindowDays)}
                     </p>
                   </td>
                   <td className="text-ink px-4 py-3 text-right text-sm tabular-nums">
@@ -991,7 +995,7 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
             <dl className="grid grid-cols-2 gap-3 text-sm">
               <div><dt className="text-ink-faint">状態</dt><dd className="text-ink mt-1 font-semibold">{STATE_LABELS[detailTarget.state]}</dd></div>
               <div><dt className="text-ink-faint">何が起きたら数えるか</dt><dd className="text-ink mt-1 font-semibold">{sourceTriggerLabel(detailTarget)}</dd></div>
-              <div><dt className="text-ink-faint">数え方</dt><dd className="text-ink mt-1 font-semibold">{detailTarget.countRepeat ? '毎回数える' : '1人1回'}</dd></div>
+              <div><dt className="text-ink-faint">数え方</dt><dd className="text-ink mt-1 font-semibold">{deduplicationLabel(detailTarget.deduplicationMode, detailTarget.deduplicationWindowDays)}</dd></div>
               <div><dt className="text-ink-faint">この30日</dt><dd className="text-ink mt-1 font-semibold">{detailTarget.metrics.netCount.toLocaleString('ja-JP')}件</dd></div>
               <div><dt className="text-ink-faint">利用先</dt><dd className="text-ink mt-1 font-semibold">{usageLabel(detailTarget)}</dd></div>
               <div><dt className="text-ink-faint">取消内訳</dt><dd className="text-ink mt-1 font-semibold">{detailTarget.metrics.cancellationCount == null ? '取消台帳は未接続' : `${detailTarget.metrics.cancellationCount}件・¥${(detailTarget.metrics.cancellationValue ?? 0).toLocaleString('ja-JP')}`}</dd></div>

@@ -74,10 +74,27 @@ describe('V6 オートメーションが動いた記録（DkPY0）', () => {
   })
 
   it('CSV書き出しと実行の取りやめを実口へ接続する (#942 N-353)', () => {
-    expect(PAGE).toContain('api.automations.runsCsvUrl')
+    // #1053: 直リンクは Bearer 補完経路で401になるため、認証付き取得へ。
+    expect(PAGE).toContain('downloadApiFile(api.automations.runsCsvUrl')
     expect(PAGE).toContain('api.automations.cancelRun')
     expect(PAGE).toContain('この実行を取りやめる')
     expect(PAGE).toContain('実行を取りやめました。記録は残っています。')
+  })
+
+  it('見るだけの権限では操作を出さず、テスト実行の切替と版の区別を持つ (#1043)', () => {
+    // 権限不足 view: 再試行・取り消し・CSVを出さない（V6 §9）。
+    expect(PAGE).toContain('useAutomationRunPermissions')
+    expect(PAGE).toContain('runPermissions?.canOperate')
+    expect(PAGE).toContain('runPermissions?.canExport')
+    // 既定は本番だけ、切替でテスト実行を含める。
+    expect(PAGE).toContain("params.set('include_test', '1')")
+    expect(PAGE).toContain('テスト実行も見る')
+    // 現在の版と実行版を区別する。
+    expect(PAGE).toContain('isCurrentVersion')
+    expect(PAGE).toContain('currentVersionNumber')
+    // 運用停止・機能無効で動けない実行の理由。
+    expect(PAGE).toContain('holdReason')
+    expect(PAGE).toContain('止まっている理由')
   })
 
   it('詳細に版番号・テスト印・処理ごとの結果を出す (#942 N-354)', () => {
@@ -163,7 +180,14 @@ describe('#735 実行記録の形が、画面・実口・見本で揃ってい�
      */
     const broken = Object.entries(toDomain).flatMap(([common, domains]) =>
       domains.filter((domain) => toCommon[domain] !== common).map((domain) => `${common}→${domain}→${toCommon[domain]}`))
-    expect(broken).toEqual([])
+    /*
+     * #1043: domain `waiting` は待機(wait)と失敗の再試行待ちを兼ねる1つの
+     * 状態で、表示側は行の中身（待機stepの retry_at の有無）で
+     * `waiting` / `retry_wait` に分ける。`retry_wait` で絞ると同じ domain の
+     * 待機中も返るため、この組み合わせだけ往復しない意図的な近似。
+     */
+    const knownSharedDomain = new Set(['retry_wait→waiting→waiting'])
+    expect(broken.filter((entry) => !knownSharedDomain.has(entry))).toEqual([])
   })
 
   it('見本の実行記録が、画面の型どおりの形を持つ', () => {

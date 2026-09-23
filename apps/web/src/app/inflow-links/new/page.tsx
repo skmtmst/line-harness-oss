@@ -2,10 +2,10 @@
 
 import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
-import QRCode from 'qrcode'
 import type { Scenario, Tag, TagGroup, TrafficPool, Template } from '@line-crm/shared'
 import { groupTagsByFolder } from '../tag-options'
 import { api } from '@/lib/api'
+import { qrToDataURL } from '@/lib/qr-image'
 import CreatePage, {
   AsideCard,
   Field,
@@ -105,7 +105,7 @@ export default function NewInflowLinkPage() {
     // 少し待ってから作り、古い解決は捨てる。
     let stale = false
     const timer = window.setTimeout(() => {
-      void QRCode.toDataURL(previewUrl, { width: 180, margin: 1, color: { dark: '#171717', light: '#ffffff' } }).then((url) => {
+      void qrToDataURL(previewUrl, { width: 180, margin: 1, color: { dark: '#171717', light: '#ffffff' } }).then((url) => {
         if (!stale) setQrDataUrl(url)
       })
     }, 250)

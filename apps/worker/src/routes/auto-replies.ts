@@ -1386,6 +1386,11 @@ autoReplies.post('/api/auto-replies/:id/publish', requireRole('owner', 'admin'),
 // 理由: 新規作成時は下書きが存在せず、版の取得・テスト必須の公開フローに
 // 乗せられない。公開前のテスト・競合確認は公開画面のフローで担保する。
 // いずれも owner/admin 専用で、本文の長さ上限は下書きと同じ基準を見る。
+//
+// isActive は省略・false ともに「止まった状態」で作る（AUTOREPLY-08）。
+// 前は入力を無視して常に有効で作っていたため、オフで保存したルールが
+// 届いたメッセージへ応答していた。動かすのは isActive: true の明示指定か、
+// 保存後の再開・公開操作だけにする。
 autoReplies.post('/api/auto-replies', requireRole('owner', 'admin'), async (c) => {
   try {
     const body = await c.req.json<{
@@ -1395,6 +1400,7 @@ autoReplies.post('/api/auto-replies', requireRole('owner', 'admin'), async (c) =
       responseContent?: string;
       templateId?: string | null;
       lineAccountId?: string | null;
+      isActive?: unknown;
       activeFrom?: unknown;
       activeUntil?: unknown;
       cooldownMinutes?: unknown;
@@ -1409,6 +1415,9 @@ autoReplies.post('/api/auto-replies', requireRole('owner', 'admin'), async (c) =
 
     // 一律で応答するルール（157）はキーワードを見ないので、空でも作れる。
     // ただし列は NOT NULL なので、空文字を入れておく。
+    if (body.isActive !== undefined && typeof body.isActive !== 'boolean') {
+      return c.json({ success: false, error: 'isActive must be a boolean' }, 400);
+    }
     if (!body.keyword && body.respondToAll !== true) {
       return c.json({ success: false, error: 'keyword is required' }, 400);
     }
@@ -1480,6 +1489,7 @@ autoReplies.post('/api/auto-replies', requireRole('owner', 'admin'), async (c) =
       responseContent: resolvedResponseContent,
       templateId: body.templateId ?? null,
       lineAccountId: body.lineAccountId ?? null,
+      isActive: body.isActive === true,
       activeFrom: activeFrom.value,
       activeUntil: activeUntil.value,
       cooldownMinutes: cooldown.value,

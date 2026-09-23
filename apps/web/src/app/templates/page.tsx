@@ -5,7 +5,7 @@ import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu
 import { MoreAction } from '@/components/shared/row-actions'
 import StatusBadge from '@/components/shared/status-badge'
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
-import { api, ApiError, type BroadcastAssetKind, type TemplateQuestion } from '@/lib/api'
+import { api, ApiError, describeSaveFailure, type BroadcastAssetKind, type TemplateQuestion } from '@/lib/api'
 import FlexPreviewComponent from '@/components/flex-preview'
 import ImageUploader from '@/components/shared/image-uploader'
 import BroadcastAssetManager from '@/components/broadcasts/broadcast-asset-manager'
@@ -82,13 +82,6 @@ interface TemplateDetail {
 }
 
 type TypeFilter = 'all' | 'single' | 'multiple' | 'variables' | 'question' | 'unused'
-
-const ASSET_KINDS: readonly BroadcastAssetKind[] = [
-  'card_message',
-  'rich_message',
-  'coupon',
-  'research',
-]
 
 /*
  * 種類の名前は `./template-message-type` に一本化した。
@@ -247,21 +240,23 @@ export default function TemplatesPage() {
 
   useEffect(() => { load() }, [load])
 
+  /*
+   * PERF-04: 種類タブの件数は集計専用の口で1回だけ取る。
+   * 以前は4種類それぞれの素材一覧（各行のpayload込み）を取って
+   * 件数を数えていた。中身は種類の節を開いたとき loadAssets が取る。
+   */
   useEffect(() => {
     let cancelled = false
     if (!selectedAccountId) {
       setAssetCounts({})
       return () => { cancelled = true }
     }
-    void Promise.all(
-      ASSET_KINDS.map(async (kind) => {
-        const result = await api.broadcastMessageAssets.list({ kind, accountId: selectedAccountId })
-        return [kind, result.success ? result.data.length : undefined] as const
-      }),
-    ).then((entries) => {
-      if (cancelled) return
-      setAssetCounts(Object.fromEntries(entries.filter((entry) => entry[1] !== undefined)))
-    })
+    void api.broadcastMessageAssets.counts({ accountId: selectedAccountId })
+      .then((result) => {
+        if (cancelled || !result.success) return
+        setAssetCounts(result.data)
+      })
+      .catch(() => undefined)
     return () => { cancelled = true }
   }, [selectedAccountId])
 
@@ -451,8 +446,10 @@ export default function TemplatesPage() {
       setEditContent(null)
       setEditName(null)
       load()
-    } catch {
-      setError('更新に失敗しました')
+    } catch (e) {
+      // WRITE-01: 「失敗しました」だけだと権限不足・アカウント違いと
+      // 通信断が区別できない。安全な理由だけを運用者へ出す。
+      setError(describeSaveFailure(e))
     }
     setSavingEdit(false)
   }

@@ -62,7 +62,7 @@ vi.mock('@/lib/api', () => ({
       },
       get: () => Promise.resolve({ success: false, error: '詳細は開かない' }),
     },
-    broadcastMessageAssets: { list: () => Promise.resolve({ success: true, data: [] }) },
+    broadcastMessageAssets: { list: () => Promise.resolve({ success: true, data: [] }), counts: () => Promise.resolve({ success: true, data: { card_message: 0, rich_message: 0, coupon: 0, research: 0 } }) },
     folders: { list: () => Promise.resolve({ success: true, data: mockState.folders }) },
   },
 }))

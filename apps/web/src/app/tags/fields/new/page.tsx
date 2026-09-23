@@ -9,11 +9,13 @@ import FeatureGate from '@/components/feature-gate'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import Breadcrumb from '@/components/shared/breadcrumb'
 import Button from '@/components/shared/button'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
 import StickyBar from '@/components/shared/sticky-bar'
 import SelectField from '@/components/shared/select-field'
 import { Field, TextInput, TextArea } from '@/components/shared/form-controls'
 import { FIELD_TYPE_HINTS, FIELD_TYPE_LABELS } from '@/components/friend-fields/field-list'
 import { AttributeKindGuide, DuplicateNameNote, findDuplicateNames } from '@/components/friend-fields/attribute-kind-guide'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 
 const TYPES = Object.keys(FIELD_TYPE_LABELS) as FriendFieldType[]
 const NEEDS_OPTIONS = new Set<FriendFieldType>(['select', 'multi_select'])
@@ -70,6 +72,20 @@ function NewFriendFieldForm() {
       .catch(() => { /* 注意が出せないだけ。読み直しはしない */ })
     return () => { cancelled = true }
   }, [selectedAccountId])
+
+  /*
+   * 入力がひとつでも入ったら未保存（作成系の他画面と同じ考え方）。
+   * この下書きはどこにも自動保存されないので、離脱前に必ず確認する。
+   */
+  const dirty = Boolean(
+    name || fieldKey || keyTouched || type !== 'text' || options || defaultValue
+      || isPersonal || !isStarred || ecIsMaster || ecFieldPath || folderId,
+  )
+  /*
+   * 未保存の入力がある間、画面を離れる操作を止める共通の番兵（DETAIL-04系）。
+   * 左メニュー・「友だち情報欄へ」・戻る操作・再読込を同じ確認対話へ寄せる。
+   */
+  const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty, busy: saving })
 
   const optionList = useMemo(() => options.split('\n').map((value) => value.trim()).filter(Boolean), [options])
   const destination = folders.find((folder) => folder.id === folderId)?.name ?? '未分類'
@@ -205,6 +221,15 @@ function NewFriendFieldForm() {
 
       {/* #976 U084/U085: 追従バーの操作は共通Button。左キャンセル→右確定の並びはStickyBarが持つ。 */}
       <StickyBar status={saving ? '項目を保存しています' : '未保存'} actions={<><Button href={back ?? '/tags?tab=fields'}>キャンセル</Button><Button type="button" variant="primary" disabled={saving} onClick={() => void save()}>{saving ? '作成中…' : '項目を作成'}</Button></>} />
+      <ConfirmDialog
+        open={leaveTarget !== null}
+        title="入力中の内容があります"
+        description="このまま移動すると、入力した内容は保存されません。移動しますか？"
+        confirmLabel="保存せずに移動"
+        cancelLabel="入力を続ける"
+        onConfirm={confirmLeave}
+        onCancel={cancelLeave}
+      />
     </div>
   )
 }

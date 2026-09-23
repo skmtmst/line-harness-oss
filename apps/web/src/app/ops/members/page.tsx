@@ -41,7 +41,10 @@ export default function OpsMembersPage() {
   const [resendingId, setResendingId] = useState<string | null>(null)
 
   const load = useCallback(async () => {
-    const [res, meRes] = await Promise.all([api.ops.members(), api.ops.me()])
+    setError('')
+    // fetchApi は 4xx/5xx を例外にするので、両方とも opsCall で受ける。
+    // 生の Promise.all だと片方の拒否で load ごと落ち、「読み込んでいます」のまま固まる。
+    const [res, meRes] = await Promise.all([opsCall(api.ops.members()), opsCall(api.ops.me())])
     setLoaded(true)
     if (!res.success) { setError(res.error || '読み込めませんでした'); return }
     setMembers(res.data)
@@ -143,6 +146,8 @@ export default function OpsMembersPage() {
       {tab === 'members' ? (
         !loaded ? (
           <ListState kind="loading" title="運営メンバーを読み込んでいます" />
+        ) : error && members.length === 0 ? (
+          <ListState kind="error" title="運営メンバーを表示できませんでした" onRetry={() => void load()} />
         ) : members.length === 0 ? (
           <ListState kind="empty" title="運営メンバーがいません" description="最初の 1 人は、自分のメールアドレスを「運営メンバーを招待」に入れて登録します。" />
         ) : (

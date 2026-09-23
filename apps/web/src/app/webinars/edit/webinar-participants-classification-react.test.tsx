@@ -26,6 +26,7 @@ vi.mock('next/link', () => ({
 }))
 vi.mock('next/navigation', () => ({
   useSearchParams: () => fixture.params,
+  useRouter: () => ({ push: vi.fn() }),
 }))
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ accounts: [{ id: 'account-a', liffId: 'liff' }], loading: false }),
@@ -195,9 +196,14 @@ describe('ウェビナー参加者の分類表示と絞り込み (IDEA-10)', () 
     await flush()
 
     expect(net.calls.some((call) => call.includes('participants?') && call.includes('filter=unviewed'))).toBe(true)
-    const csvHrefs = Array.from(host.querySelectorAll('a'))
-      .map((anchor) => anchor.getAttribute('href') ?? '')
-      .filter((href) => href.includes('participants.csv'))
-    expect(csvHrefs).toEqual(['/api/webinars/webinar-1/participants.csv?filter=unviewed'])
+    // #1053: CSVは直リンクではなくボタン＋認証付き取得。押すとfilter付きで取る。
+    const csvButton = Array.from(host.querySelectorAll('button'))
+      .find((b) => b.textContent?.includes('CSVで書き出す')) as HTMLButtonElement | undefined
+    expect(csvButton).not.toBeUndefined()
+    const callsBefore = net.calls.length
+    await act(async () => { csvButton!.dispatchEvent(new MouseEvent('click', { bubbles: true })) })
+    await flush()
+    expect(net.calls.slice(callsBefore).some((call) =>
+      call.includes('/api/webinars/webinar-1/participants.csv') && call.includes('filter=unviewed'))).toBe(true)
   })
 })

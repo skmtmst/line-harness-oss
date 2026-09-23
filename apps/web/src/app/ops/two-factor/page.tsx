@@ -1,8 +1,8 @@
 'use client'
 
-import QRCode from 'qrcode'
 import { useEffect, useState, type FormEvent } from 'react'
 import AuthCard, { AuthField } from '@/components/auth/auth-card'
+import { opsCall } from '@/components/ops/ops-ui'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
@@ -10,6 +10,7 @@ import { TextField } from '@/components/shared/text-field'
 import { adminSessionHeaders, captureAdminSessionHandoff } from '@/lib/admin-session'
 import { api } from '@/lib/api'
 import { logoutAndGoToLogin } from '@/lib/logout'
+import { qrToDataURL } from '@/lib/qr-image'
 
 /**
  * 運営コンソールの 2要素認証の設定（★V6 37-10-B `NAJKx`）。
@@ -60,7 +61,7 @@ export default function OpsTwoFactorPage() {
 
   useEffect(() => {
     if (!uri) return
-    void QRCode.toDataURL(uri, { width: 200, margin: 1 }).then(setQr)
+    void qrToDataURL(uri, { width: 200, margin: 1 }).then(setQr)
   }, [uri])
 
   const submit = async (event: FormEvent) => {
@@ -70,7 +71,9 @@ export default function OpsTwoFactorPage() {
     if (digits.length !== 6) { setError('6桁の数字を入力してください'); return }
     setBusy(true)
     setError('')
-    const res = await api.staff.confirmTwoFactorSetup(session.id, digits)
+    // fetchApi は 4xx/5xx を例外にするので opsCall で { success: false } に直す。
+    // そのまま await すると setBusy(false) が走らず「確認しています…」のまま固まる。
+    const res = await opsCall(api.staff.confirmTwoFactorSetup(session.id, digits))
     setBusy(false)
     if (!res.success) { setError(res.error || '認証コードが正しくありません'); return }
     setState('done')

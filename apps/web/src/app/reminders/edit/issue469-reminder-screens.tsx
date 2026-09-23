@@ -142,8 +142,14 @@ export function Issue469ReminderStepEditor({ reminderId }: { reminderId: string 
   if (!settings) return <p className={error ? 'text-danger p-6 text-sm' : 'text-ink-faint p-6 text-sm'}>{error || '読み込んでいます'}</p>
 
   const selectedIndex = settings.steps.findIndex((step) => step.stableStepId === selectedStepId)
-  const selectedStep = selectedIndex >= 0 ? settings.steps[selectedIndex] : settings.steps[0]
-  const allStepsHaveContent = settings.steps.every((step) => Boolean(step.templateId || step.messageContent.trim()))
+  /*
+   * REMINDER-07: ひな形なしの新規下書きは通知0件で作られる。
+   * 選べる通が無い状態をクラッシュさせず、「通知を追加」から始められる
+   * 空の状態として出す。公開・送信は別口の検査が止める。
+   */
+  const selectedStep = (selectedIndex >= 0 ? settings.steps[selectedIndex] : settings.steps[0]) ?? null
+  const allStepsHaveContent = settings.steps.length > 0
+    && settings.steps.every((step) => Boolean(step.templateId || step.messageContent.trim()))
 
   async function save() {
     if (!settings) return
@@ -180,18 +186,19 @@ export function Issue469ReminderStepEditor({ reminderId }: { reminderId: string 
     <ReminderWizard current={3} />
     <ReminderWorkspace aside={<div data-issue546-aside className="grid gap-3">
       <SummaryCard rows={[["対象者", validation?.audience.matched == null ? '検査後に表示' : `${validation.audience.matched.toLocaleString('ja-JP')}人`], ['基準日', '予約日時（Google Meet相談）'], ['通知ステップ', `${settings.steps.length}件`], ['状態', dirty ? '未保存の変更あり' : '下書き']]} />
-      <LinePreview caption={`表示例：${stepTimingLabel(selectedStep, settings.deliveryMode)} に届きます`}>{selectedStep.messageContent || '本文を入力すると、ここに表示例が出ます。'}</LinePreview>
+      <LinePreview caption={selectedStep ? `表示例：${stepTimingLabel(selectedStep, settings.deliveryMode)} に届きます` : '通知はまだありません'} empty={!selectedStep}>{selectedStep ? selectedStep.messageContent || '本文を入力すると、ここに表示例が出ます。' : '「通知を追加」で1通目を作成してください。'}</LinePreview>
     </div>}>
       <ReminderPanel title="通知ステップ" note="基準日を軸に、何回・いつ送るかを並べます。上から順に届きます。">
-        <div className="grid min-h-28 gap-2 md:grid-cols-3">{settings.steps.map((step, index) => <ReminderStepCard key={step.stableStepId} selected={step.stableStepId === selectedStep.stableStepId} number={index + 1} timing={stepTimingLabel(step, settings.deliveryMode)} title={`${index + 1}通目のお知らせ`} note={step.messageContent} onClick={() => setSelectedStepId(step.stableStepId)} />)}</div>
+        {settings.steps.length === 0 ? <p className="text-ink-faint rounded-lg border border-hairline p-3 text-xs">通知はまだありません。「通知を追加」で1通目を作成してください。本文が入るまで次へは進めません。</p> : null}
+        <div className="grid min-h-28 gap-2 md:grid-cols-3">{settings.steps.map((step, index) => <ReminderStepCard key={step.stableStepId} selected={step.stableStepId === selectedStep?.stableStepId} number={index + 1} timing={stepTimingLabel(step, settings.deliveryMode)} title={`${index + 1}通目のお知らせ`} note={step.messageContent} onClick={() => setSelectedStepId(step.stableStepId)} />)}</div>
         <div className="mt-2 flex flex-wrap items-center gap-2">
           <Button onClick={addStep} disabled={settings.steps.length >= 50}>通知を追加</Button>
-          <Button onClick={() => moveStep(selectedStep.stableStepId, -1)} disabled={selectedIndex <= 0}>前へ移動</Button>
-          <Button onClick={() => moveStep(selectedStep.stableStepId, 1)} disabled={selectedIndex < 0 || selectedIndex >= settings.steps.length - 1}>後ろへ移動</Button>
-          <Button onClick={() => removeStep(selectedStep.stableStepId)} disabled={settings.steps.length <= 1}>この通知を削除</Button>
+          <Button onClick={() => { if (selectedStep) moveStep(selectedStep.stableStepId, -1) }} disabled={!selectedStep || selectedIndex <= 0}>前へ移動</Button>
+          <Button onClick={() => { if (selectedStep) moveStep(selectedStep.stableStepId, 1) }} disabled={!selectedStep || selectedIndex < 0 || selectedIndex >= settings.steps.length - 1}>後ろへ移動</Button>
+          <Button onClick={() => { if (selectedStep) removeStep(selectedStep.stableStepId) }} disabled={settings.steps.length <= 1}>この通知を削除</Button>
         </div>
       </ReminderPanel>
-      <ReminderPanel title={`${selectedIndex + 1 || 1}通目のお知らせ`} note="送るタイミングと文面を決めます。">
+      {selectedStep ? <ReminderPanel title={`${selectedIndex + 1 || 1}通目のお知らせ`} note="送るタイミングと文面を決めます。">
         <div className="grid gap-3">
           <div className="grid gap-3 md:grid-cols-4">
             <Field label="起点"><TextInput className="border-hairline rounded-control focus:ring-accent border px-3 py-2 text-sm focus:ring-2 focus:outline-none" value="基準日" readOnly /></Field>
@@ -211,7 +218,7 @@ export function Issue469ReminderStepEditor({ reminderId }: { reminderId: string 
           <div className="flex flex-wrap gap-2"><Pill tone="success">名前</Pill><Pill>友だち情報</Pill><Pill>共通情報</Pill><Pill>回答フォーム</Pill><Pill>配信日</Pill><Pill>その他</Pill></div>
           <Field label="本文" required note={`${selectedStep.messageContent.length} / 5,000文字`}><TextArea rows={3} className="border-hairline rounded-control focus:ring-accent border px-3 py-2 text-sm focus:ring-2 focus:outline-none" value={selectedStep.messageContent} onChange={(event) => updateStep(selectedStep.stableStepId, { messageContent: event.target.value })} /></Field>
         </div>
-      </ReminderPanel>
+      </ReminderPanel> : null}
       <ReminderPanel title="URLの扱い" note="短縮するとクリック数を計測できます。Meetの参加URLは短縮しない設定です。"><div className="flex items-center justify-between rounded-lg border border-hairline p-3 text-xs"><span>Google Meet 参加URL　<Pill>参加URL（差し込み）</Pill></span><strong>短縮しない</strong></div></ReminderPanel>
       {error ? <p className="text-danger text-xs">{error}{conflict ? <button type="button" className="ml-2 underline" onClick={() => void loadDraft()}>最新を読み込み直す</button> : null}</p> : null}
     </ReminderWorkspace>

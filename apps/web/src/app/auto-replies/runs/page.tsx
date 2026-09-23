@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { ArrowLeft, Download, Eye, Pause, Pencil, RotateCcw, TriangleAlert } from 'lucide-react'
@@ -95,7 +95,7 @@ function csvFor(items: AutoReplyRun[]): string {
   return `\uFEFF${rows.map((row) => row.map(csvCell).join(',')).join('\n')}`
 }
 
-export default function AutoReplyRunsPage() {
+function AutoReplyRunsInner() {
   const searchParams = useSearchParams()
   const requestedRuleId = searchParams.get('id') ?? ''
   const [data, setData] = useState<AutoReplyRunsResponse | null>(null)
@@ -376,5 +376,14 @@ export default function AutoReplyRunsPage() {
         )}
       />
     </div>
+  )
+}
+
+export default function AutoReplyRunsPage() {
+  // useSearchParams は Suspense の中でしか使えない（静的書き出しのため）。
+  return (
+    <Suspense fallback={<ListState kind="loading" />}>
+      <AutoReplyRunsInner />
+    </Suspense>
   )
 }

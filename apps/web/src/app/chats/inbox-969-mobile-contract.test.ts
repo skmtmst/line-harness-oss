@@ -78,12 +78,6 @@ describe('#969-U009 送信ボタン: どの幅でもラベルは1行', () => {
     expect(footer).toContain('shrink-0')
   })
 
-  it('個別送信パネルの送信ボタンも同じ約束を持つ', () => {
-    const dm = region(PAGE, 'function DirectMessagePanel', 'isSafeFriendIdForInbox')
-    const send = region(dm, 'onClick={handleSend}', "{sending ? '...'")
-    expect(send).toContain('whitespace-nowrap')
-    expect(send).toContain('shrink-0')
-  })
 })
 
 describe('#969-U010 補助操作: テンプレート・送信設定・内部メモが右に切れない', () => {

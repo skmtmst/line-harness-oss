@@ -26,6 +26,7 @@ import type { MediaItem } from '@line-crm/shared'
 import {
   ApiError,
   api,
+  downloadApiFile,
   fetchApi,
   webinarApi,
   type WebinarCtaCard,
@@ -42,6 +43,7 @@ import {
   type WebinarParticipantClassification,
 } from '@/lib/api'
 import { usePageTitle } from '@/components/shell/page-chrome'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { WEBINAR_SAKURA_COMMENTS_MAX } from '@/components/webinars/webinar-limits'
 import { publicationStateLabel } from '@/components/webinars/publication-label'
 import { webinarErrorText } from '@/components/webinars/webinar-error-text'
@@ -487,6 +489,21 @@ function AnalyticsTab({ webinarId, durationSeconds, view = 'analytics', analytic
   const [participantFilter, setParticipantFilter] = useState<'' | WebinarParticipantClassification>('')
   const [participantRule, setParticipantRule] = useState<WebinarParticipantPage['rule'] | null>(null)
   const [participantMeasurement, setParticipantMeasurement] = useState<WebinarParticipantPage['measurement'] | null>(null)
+  const [csvBusy, setCsvBusy] = useState(false)
+  const [csvError, setCsvError] = useState('')
+
+  /*
+    #1053: 直リンクは Cookie が届かない経路（Bearer 補完）で401になるため、
+    認証付きで取得してから保存する。失敗は保存しない。
+  */
+  const downloadParticipantsCsv = (filter?: WebinarParticipantClassification) => {
+    if (csvBusy) return
+    setCsvBusy(true)
+    setCsvError('')
+    void downloadApiFile(webinarApi.participantsCsvUrl(webinarId, filter), 'webinar-participants.csv')
+      .catch(() => setCsvError('CSVを書き出せませんでした。通信を確認して、もう一度お試しください。'))
+      .finally(() => setCsvBusy(false))
+  }
 
   /*
     集計(`analytics`)は親が1回だけ取る。ここで取ると、分析の段を開くたびに
@@ -557,7 +574,8 @@ function AnalyticsTab({ webinarId, durationSeconds, view = 'analytics', analytic
     const watching = summary ? Math.max(0, summary.viewers - summary.completed) : 0
     return (
       <div className="space-y-4" data-design-node="Q8sHa">
-        <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-ink text-lg font-bold">参加者管理</h2><p className="text-ink-faint mt-1 text-xs">申込・視聴・CTA・フォームの結果を友だち単位で確認します。</p></div>{participantsState === 'ready' ? <div className="flex flex-wrap items-center gap-2"><SelectField aria-label="参加者の分類で絞り込む" size="compact" value={participantFilter} onChange={(event) => setParticipantFilter(event.target.value as '' | WebinarParticipantClassification)} options={PARTICIPANT_FILTER_OPTIONS} /><Button href={webinarApi.participantsCsvUrl(webinarId, participantFilter || undefined)}>参加者をCSVで書き出す</Button></div> : null}</div>
+        <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-ink text-lg font-bold">参加者管理</h2><p className="text-ink-faint mt-1 text-xs">申込・視聴・CTA・フォームの結果を友だち単位で確認します。</p></div>{participantsState === 'ready' ? <div className="flex flex-wrap items-center gap-2"><SelectField aria-label="参加者の分類で絞り込む" size="compact" value={participantFilter} onChange={(event) => setParticipantFilter(event.target.value as '' | WebinarParticipantClassification)} options={PARTICIPANT_FILTER_OPTIONS} /><Button disabled={csvBusy} onClick={() => downloadParticipantsCsv(participantFilter || undefined)}>{csvBusy ? '書き出しています…' : '参加者をCSVで書き出す'}</Button></div> : null}</div>
+        {csvError ? <p className="text-danger text-xs" role="alert">{csvError}</p> : null}
         {summary ? (
         <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           {[['申込', summary.reservations, 'text-success'], ['視聴開始', summary.viewers, 'text-accent'], ['視聴完了', summary.completed, 'text-warning'], ['エラー', analytics?.formFunnel.submitErrors ?? 0, 'text-danger']].map(([label, value, tone]) => <div key={String(label)} className="border-hairline bg-canvas rounded-card border p-4 shadow-card"><p className="text-ink-faint text-xs">{label}</p><p className={`${tone} mt-2 text-2xl font-bold tabular-nums`}>{Number(value).toLocaleString('ja-JP')}{label === 'エラー' ? '件' : '人'}</p></div>)}
@@ -641,7 +659,8 @@ function AnalyticsTab({ webinarId, durationSeconds, view = 'analytics', analytic
     const largestDropoff = largestDropoffAt(analytics.viewSegments ?? [])
     return (
       <div className="space-y-4" data-design-node="yxyzQ">
-        <div className="flex flex-wrap items-center justify-between gap-3"><nav aria-label="この段の見出しへ移動" className="flex flex-wrap gap-2">{[{ label: '概要', href: '#webinar-overview' }, { label: '視聴', href: '#webinar-watch-funnel' }, { label: '離脱', href: '#webinar-dropoff' }, { label: 'CTA', href: '#webinar-cta-funnel' }, { label: '申込', href: '#webinar-recent' }].map((item) => <a key={item.label} href={item.href} className="border-hairline bg-canvas text-ink-secondary rounded-control border px-3 py-2 text-sm font-semibold hover:underline">{item.label}</a>)}</nav>{participantsState === 'ready' ? <div className="flex gap-2">{onOpenParticipants ? <Button onClick={onOpenParticipants}>参加者一覧へ</Button> : null}<Button href={webinarApi.participantsCsvUrl(webinarId)}>CSVで書き出す</Button></div> : null}</div>
+        <div className="flex flex-wrap items-center justify-between gap-3"><nav aria-label="この段の見出しへ移動" className="flex flex-wrap gap-2">{[{ label: '概要', href: '#webinar-overview' }, { label: '視聴', href: '#webinar-watch-funnel' }, { label: '離脱', href: '#webinar-dropoff' }, { label: 'CTA', href: '#webinar-cta-funnel' }, { label: '申込', href: '#webinar-recent' }].map((item) => <a key={item.label} href={item.href} className="border-hairline bg-canvas text-ink-secondary rounded-control border px-3 py-2 text-sm font-semibold hover:underline">{item.label}</a>)}</nav>{participantsState === 'ready' ? <div className="flex gap-2">{onOpenParticipants ? <Button onClick={onOpenParticipants}>参加者一覧へ</Button> : null}<Button disabled={csvBusy} onClick={() => downloadParticipantsCsv()}>{csvBusy ? '書き出しています…' : 'CSVで書き出す'}</Button></div> : null}</div>
+        {csvError ? <p className="text-danger text-xs" role="alert">{csvError}</p> : null}
         <div className="flex flex-col gap-4 xl:flex-row">
           <div className="min-w-0 flex-1 space-y-3">
             <section className="border-hairline bg-canvas rounded-card border p-4 shadow-card"><h2 className="text-ink text-base font-bold">視聴結果</h2><p className="text-ink-faint mt-1 text-xs">申込・再生・完了率を確認します。</p><dl className="divide-hairline mt-4 divide-y rounded-control border border-hairline"><div className="flex justify-between gap-4 px-4 py-4"><dt className="text-ink-faint text-xs font-semibold">申込</dt><dd className="text-ink text-sm font-bold">{summary.reservations.toLocaleString('ja-JP')}人</dd></div><div className="flex justify-between gap-4 px-4 py-4"><dt className="text-ink-faint text-xs font-semibold">再生</dt><dd className="text-ink text-sm font-bold">{summary.viewers.toLocaleString('ja-JP')}人（{percent(summary.viewers, summary.reservations)}）</dd></div></dl></section>
@@ -734,8 +753,8 @@ function AnalyticsTab({ webinarId, durationSeconds, view = 'analytics', analytic
             <p className="text-ink-faint mt-1 text-xs">申込・視聴・CTA・フォームの結果を友だち単位で確認します。</p>
           </div>
           {participantsState === 'ready' ? (
-            <Button href={webinarApi.participantsCsvUrl(webinarId)}>
-              参加者をCSVで書き出す
+            <Button disabled={csvBusy} onClick={() => downloadParticipantsCsv()}>
+              {csvBusy ? '書き出しています…' : '参加者をCSVで書き出す'}
             </Button>
           ) : null}
         </div>
@@ -2171,6 +2190,34 @@ function EditWebinarInner() {
   }
 
   /*
+    未保存の入力を持ったまま画面の外へ出る操作を止める（DETAIL-04 残存経路）。
+    一覧リンク・左メニュー・ブラウザの戻る・再読込を捕まえ、破棄か編集継続かを
+    確認する。段の行き来は画面内の移動なのでここには触れない——入力は隠すだけで
+    畳まないため失われない。契約は共通の `useUnsavedGuard` と同じ。
+  */
+  const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({
+    dirty: unsavedPanes.size > 0,
+    busy: savingForNav !== false,
+  })
+  /*
+    離脱の確認はどの段・どの画面状態にいても出す。読み込み失敗や未指定の
+    分岐は別ツリーへ早期 return するため、ここで要素化して全経路へ差し込む。
+    片方だけに置くと、dirty 中のリンクが黙って止まり「保存せずに移動」を
+    選ぶ手段がなくなる。
+  */
+  const leaveConfirmDialog = (
+    <ConfirmDialog
+      open={leaveTarget !== null}
+      title="保存していない変更があります"
+      description="このまま移動すると、ウェビナーの変更は失われます。保存せずに移動しますか？"
+      confirmLabel="保存せずに移動"
+      cancelLabel="編集を続ける"
+      onConfirm={confirmLeave}
+      onCancel={cancelLeave}
+    />
+  )
+
+  /*
     段の移動はURLにも残す。再読み込み・ブラウザの戻るで
     同じ段へ戻れるようにする（DETAIL-03/04）。
   */
@@ -2319,6 +2366,7 @@ function EditWebinarInner() {
           <p className="mt-1 text-sm text-ink-secondary">一覧から編集するウェビナーを選び直してください。</p>
           <Link href="/webinars" className="mt-3 inline-block text-sm font-semibold text-action hover:underline">ウェビナー一覧へ戻る</Link>
         </div>
+        {leaveConfirmDialog}
       </>
     )
   }
@@ -2327,6 +2375,7 @@ function EditWebinarInner() {
       <>
 
         <div className="p-6 text-gray-500">読み込み中...</div>
+        {leaveConfirmDialog}
       </>
     )
   }
@@ -2338,6 +2387,7 @@ function EditWebinarInner() {
           <p className="text-danger">{loadError ?? 'ウェビナーが見つかりませんでした'}</p>
           <Link href="/webinars" className="mt-3 inline-block text-sm font-semibold text-action hover:underline">ウェビナー一覧へ戻る</Link>
         </div>
+        {leaveConfirmDialog}
       </>
     )
   }
@@ -2479,6 +2529,7 @@ function EditWebinarInner() {
         </div>
       ) : null}
       {pane === 'participants' ? <div className="mt-4 flex justify-end gap-2"><Button href={`/webinars/edit?id=${encodeURIComponent(webinar.id)}&pane=analytics`}>分析を見る</Button><Button href={`/webinars/edit?id=${encodeURIComponent(webinar.id)}`}>ウェビナーの設定を編集</Button></div> : null}
+      {leaveConfirmDialog}
     </main>
   )
 }

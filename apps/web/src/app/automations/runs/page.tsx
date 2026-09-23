@@ -3,15 +3,16 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { useAccount } from '@/contexts/account-context'
-import { api, fetchApi, type AutomationRunDetail } from '@/lib/api'
+import { api, downloadApiFile, fetchApi, type AutomationRunDetail } from '@/lib/api'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import MergedTabs from '@/components/layout/merged-tabs'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import FilterChip from '@/components/shared/filter-chip'
 import KpiCollapse from '@/components/ui/kpi-collapse'
+import { useAutomationRunPermissions } from '@/components/automations/use-can-manage'
 
-type RunStatus = 'queued' | 'claimed' | 'succeeded' | 'skipped' | 'retry_wait' | 'permanent_failed' | 'cancelled'
+type RunStatus = 'queued' | 'claimed' | 'succeeded' | 'skipped' | 'waiting' | 'retry_wait' | 'partial' | 'permanent_failed' | 'cancelled'
 
 type ApiResponse<T> = { success: true; data: T } | { success: false; error: string }
 
@@ -60,7 +61,9 @@ const STATUS_LABEL: Record<RunStatus, string> = {
   claimed: '動いています',
   succeeded: '動きました',
   skipped: '動きませんでした',
+  waiting: '待機しています',
   retry_wait: '再試行を待っています',
+  partial: '一部だけできました',
   permanent_failed: '失敗しました',
   cancelled: '取り消しました',
 }
@@ -127,6 +130,14 @@ export default function AutomationRunsPage() {
   const [retryNotice, setRetryNotice] = useState('')
   const [cancellingId, setCancellingId] = useState<string | null>(null)
   const [confirmCancel, setConfirmCancel] = useState(false)
+  // テスト実行は既定で除き、見たいときだけ含める（V6 25-1-B）。
+  const [includeTest, setIncludeTest] = useState(false)
+  const [csvBusy, setCsvBusy] = useState(false)
+  /*
+   * #1043 / V6 §9: 見るだけの権限では「もう一度やる」「取りやめ」
+   * 「CSVで書き出す」を出さない。最終判断はサーバの個別権限キー。
+   */
+  const runPermissions = useAutomationRunPermissions()
 
   // 検索の連打で古い応答が新しい表示を上書きしないよう世代で守る（#519 軽）。
   const loadGeneration = useRef(0)
@@ -154,6 +165,7 @@ export default function AutomationRunsPage() {
       if (selectedAccountId) params.set('lineAccountId', selectedAccountId)
       if (query.trim()) params.set('search', query.trim())
       if (resultFilter !== 'all') params.set('status', resultFilter)
+      if (includeTest) params.set('include_test', '1')
       const response = await fetchApi<ApiResponse<RunsResponse>>(`/api/automation-runs?${params}`)
       if (generation !== loadGeneration.current) return
       if (!response.success) throw new Error(response.error)
@@ -167,7 +179,7 @@ export default function AutomationRunsPage() {
       setData(null)
       setStatus('error')
     }
-  }, [accountLoading, query, resultFilter, selectedAccountId])
+  }, [accountLoading, query, resultFilter, selectedAccountId, includeTest])
 
   useEffect(() => {
     const timer = window.setTimeout(() => void load(), 400)
@@ -249,23 +261,34 @@ export default function AutomationRunsPage() {
 
   /*
    * #942 N-353: CSV書き出し。画面の検索・絞り込みと同じ行を、
-   * `format=csv` でそのままファイルにする。セッション認証で開けるので
-   * ただのリンクでよい（先にJSONを取る必要はない）。
+   * `format=csv` でそのままファイルにする。
+   * #1053: 直リンクは Cookie が届かない経路（Bearer 補完）で401になるため、
+   * 認証付きで取得してから保存する。
    */
-  const csvUrl = api.automations.runsCsvUrl({
-    accountId: selectedAccountId || undefined,
-    search: query.trim() || undefined,
-    status: resultFilter !== 'all' ? resultFilter : undefined,
-  })
+  const downloadRunsCsv = () => {
+    if (csvBusy) return
+    setCsvBusy(true)
+    setRetryNotice('')
+    void downloadApiFile(api.automations.runsCsvUrl({
+      accountId: selectedAccountId || undefined,
+      search: query.trim() || undefined,
+      status: resultFilter !== 'all' ? resultFilter : undefined,
+      includeTest,
+    }), 'automation-runs.csv')
+      .catch(() => setRetryNotice('CSVを書き出せませんでした。通信を確認して、もう一度お試しください。'))
+      .finally(() => setCsvBusy(false))
+  }
 
   return (
     <div data-design-node="DkPY0">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-ink-faint">自動化 ＞ オートメーション ＞ 動いた記録</p>
-        <div className="text-right">
-          <Button href={csvUrl}>CSVで書き出す</Button>
-          <p className="mt-1 text-xs text-ink-faint">いまの検索・絞り込みの行が出ます</p>
-        </div>
+        {runPermissions?.canExport ? (
+          <div className="text-right">
+            <Button disabled={csvBusy} onClick={downloadRunsCsv}>{csvBusy ? '書き出しています…' : 'CSVで書き出す'}</Button>
+            <p className="mt-1 text-xs text-ink-faint">いまの検索・絞り込みの行が出ます</p>
+          </div>
+        ) : null}
       </div>
       <div className="mb-4"><MergedTabs basePath="/automations/runs" paramName="tab" tabs={TABS} active="runs" /></div>
 
@@ -284,7 +307,15 @@ export default function AutomationRunsPage() {
 
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
         <input type="search" value={query} onChange={(event) => changeQuery(event.target.value)} placeholder="友だちの名前・オートメーションの名前で検索" className="h-10 w-full max-w-lg rounded-control border border-hairline bg-canvas px-3 text-sm outline-none focus:border-info" />
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
+          <label className="flex items-center gap-1.5 text-sm text-ink-secondary">
+            <input
+              type="checkbox"
+              checked={includeTest}
+              onChange={(event) => setIncludeTest(event.target.checked)}
+            />
+            テスト実行も見る
+          </label>
           <p className="text-sm text-ink-secondary">この30日・20件表示</p>
         </div>
       </div>
@@ -315,18 +346,20 @@ export default function AutomationRunsPage() {
             <div key={run.id} className="grid min-h-14 grid-cols-6 items-center gap-3 border-t border-hairline px-4 py-2 text-sm">
               <div className="min-w-0"><p className="truncate font-semibold text-ink">{formatOccurredAt(run.occurredAt)} ／ {run.subject ?? '友だち名なし'}</p><p className="truncate text-xs text-ink-faint">{run.accountLabel ?? 'アカウント名なし'}</p></div>
               <div className="min-w-0"><p className="truncate text-ink" title={run.automationName}>{run.automationName}<span className="ml-1 text-xs font-normal text-ink-faint">v{run.versionNumber}</span>{run.isTest ? <span className="ml-1 rounded-full border border-hairline bg-canvas-sunken px-2 py-0.5 text-xs font-semibold text-ink-secondary">テスト</span> : null}</p><p className="truncate text-xs text-ink-faint" title={run.triggerLabel}>{run.triggerLabel}</p></div>
-              <span className={run.status === 'permanent_failed' || run.status === 'retry_wait' ? 'font-semibold text-danger' : run.status === 'succeeded' ? 'font-semibold text-accent-deep' : 'font-semibold text-ink-faint'}>{STATUS_LABEL[run.status]}</span>
+              <span className={run.status === 'permanent_failed' || run.status === 'partial' || run.status === 'retry_wait' ? 'font-semibold text-danger' : run.status === 'succeeded' ? 'font-semibold text-accent-deep' : 'font-semibold text-ink-faint'}>{STATUS_LABEL[run.status]}</span>
               <p className="truncate text-ink-secondary" title={run.detail ?? '何もしていません'}>{run.detail ?? '何もしていません'}</p>
               <span className="tabular-nums text-ink-secondary">{formatDuration(run.durationMs)}</span>
               <div className="flex flex-wrap gap-2">
                 <Button onClick={() => setSelectedRun(run)}>中身を見る</Button>
-                <Button
-                  onClick={() => void retryRun(run)}
-                  disabled={!run.canRetry || retryingId !== null}
-                  title={run.canRetry ? '失敗した処理だけを再実行します' : '成功済みの処理は二重に実行しません'}
-                >
-                  {retryingId === run.id ? '実行中' : 'もう一度やる'}
-                </Button>
+                {runPermissions?.canOperate ? (
+                  <Button
+                    onClick={() => void retryRun(run)}
+                    disabled={!run.canRetry || retryingId !== null}
+                    title={run.canRetry ? '失敗した処理だけを再実行します' : '成功済みの処理は二重に実行しません'}
+                  >
+                    {retryingId === run.id ? '実行中' : 'もう一度やる'}
+                  </Button>
+                ) : null}
               </div>
             </div>
           ))}
@@ -345,6 +378,14 @@ export default function AutomationRunsPage() {
                 {(selectedDetail ?? selectedRun).isTest ? (
                   <span className="ml-2 rounded-full border border-hairline bg-canvas-sunken px-2 py-0.5 text-xs font-semibold text-ink-secondary">テスト実行</span>
                 ) : null}
+                {/* #1043: 実行した版といまの公開版を区別する。 */}
+                {selectedDetail ? (
+                  selectedDetail.isCurrentVersion ? (
+                    <span className="ml-2 text-xs font-normal text-ink-faint">いまの公開版です</span>
+                  ) : selectedDetail.currentVersionNumber !== null ? (
+                    <span className="ml-2 text-xs font-normal text-ink-faint">いまの公開版は v{selectedDetail.currentVersionNumber} です</span>
+                  ) : null
+                ) : null}
               </h2>
               <p className="mt-1 text-sm text-ink-secondary">{formatOccurredAt(selectedRun.occurredAt)} ／ {selectedRun.subject ?? '友だち名なし'}</p>
             </div>
@@ -355,6 +396,10 @@ export default function AutomationRunsPage() {
             <RunDetail label="結果" value={STATUS_LABEL[selectedRun.status]} />
             <RunDetail label="したこと・失敗理由" value={selectedRun.detail ?? '何もしていません'} />
             <RunDetail label="かかった時間" value={formatDuration(selectedRun.durationMs)} />
+            {/* #1043: 運用停止・機能無効で動けないときの理由を明示する。 */}
+            {selectedDetail?.holdReason ? (
+              <RunDetail label="止まっている理由" value={selectedDetail.holdReason} />
+            ) : null}
           </dl>
 
           {/* #942 N-354: 処理ごとの結果と試行回数。 */}
@@ -393,12 +438,12 @@ export default function AutomationRunsPage() {
                 : '安全な再実行の対象ではありません。成功済みの処理を二重に動かさないため、この記録からは再実行できません。'}
           </div>
           <div className="mt-3 flex flex-wrap items-center gap-3">
-            {selectedRun.canRetry ? (
+            {selectedRun.canRetry && runPermissions?.canOperate ? (
               <Button onClick={() => void retryRun(selectedRun)} disabled={retryingId !== null}>
                 {retryingId === selectedRun.id ? '実行中' : '失敗した処理をもう一度やる'}
               </Button>
             ) : null}
-            {selectedRun.canCancel ? (
+            {selectedRun.canCancel && runPermissions?.canOperate ? (
               confirmCancel ? (
                 <>
                   <span className="text-xs font-semibold text-danger">この実行を取りやめますか？記録は残りますが、実行は戻せません。</span>

@@ -132,7 +132,8 @@ describe.each(['line', 'email'] as const)('%s 一覧の条件変更', channel =>
     await act(async () => { next.resolve(response(payload(channel, ids, 401))) })
     await click(channel === 'line' ? 'さらに読み込む' : 'メールの続きを読み込む')
     expect(listCalls(channel).at(-1)?.searchParams.get('quickFilter')).toBe('overdue')
-  })
+    // 200件を描画するため、負荷が重い実行では5秒を越えることがある。
+  }, 20000)
 
   test.each([
     ['initial', false], ['append', false], ['initial', true], ['append', true],

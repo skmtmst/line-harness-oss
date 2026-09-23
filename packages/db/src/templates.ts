@@ -855,6 +855,33 @@ export async function getTemplateSendCounts(
   ]));
 }
 
+/** PERF-12: テンプレート選択の絞り込み。ページに切る前に適用する。 */
+export type TemplateListFilter = {
+  /** 名前・本文の部分一致（大文字小文字は LIKE の ASCII 規則に従う）。 */
+  q?: string;
+  /** 'none' は未分類。配列はフォルダ自身+直下の子を渡す。空配列は0件。 */
+  folderIds?: string[] | 'none';
+  /** 文字テンプレートだけに絞るなど。 */
+  messageType?: string;
+  /** 選択画面の分類。reservation/ec は名称・本文の文字一致、frequent は送信実績順。 */
+  quick?: 'reservation' | 'ec' | 'frequent';
+};
+
+const QUICK_KEYWORDS: Record<'reservation' | 'ec', string[]> = {
+  // 選択画面がこれまでクライアント側で使っていた正規表現と同じ語。
+  reservation: ['予約', '来店', '前日', '日程'],
+  ec: ['EC', '注文', '発送', '配送', '商品'],
+};
+
+function likeEscape(text: string): string {
+  return text.replace(/[\\%_]/g, (ch) => `\\${ch}`);
+}
+
+function quickClause(keywords: string[]): string {
+  // instr() は大文字小文字を区別するので、従来の正規表現と同じ一致方になる。
+  return `(${keywords.map(() => '(instr(name, ?) > 0 OR instr(message_content, ?) > 0)').join(' OR ')})`;
+}
+
 /**
  * 一覧画面用に template + 使用数を返す。
  * - auto_replies は indexed lookup (1 SQL)
@@ -866,6 +893,7 @@ export async function getTemplatesWithUsageCount(
   category?: string,
   scope?: TemplateListScope,
   paging?: { limit: number; offset: number },
+  filter?: TemplateListFilter,
 ): Promise<{ items: TemplateRowWithUsage[]; total: number }> {
   // 1. templates 本体
   const filters: string[] = [];
@@ -873,6 +901,30 @@ export async function getTemplatesWithUsageCount(
   if (category) {
     filters.push('category = ?');
     values.push(category);
+  }
+  if (filter?.messageType) {
+    filters.push('message_type = ?');
+    values.push(filter.messageType);
+  }
+  if (filter?.q && filter.q.trim() !== '') {
+    const like = `%${likeEscape(filter.q.trim())}%`;
+    filters.push(`(name LIKE ? ESCAPE '\\' OR message_content LIKE ? ESCAPE '\\')`);
+    values.push(like, like);
+  }
+  if (filter?.folderIds === 'none') {
+    filters.push('folder_id IS NULL');
+  } else if (filter?.folderIds) {
+    if (filter.folderIds.length === 0) {
+      filters.push('1 = 0');
+    } else {
+      filters.push(`folder_id IN (${filter.folderIds.map(() => '?').join(',')})`);
+      values.push(...filter.folderIds);
+    }
+  }
+  if (filter?.quick === 'reservation' || filter?.quick === 'ec') {
+    const keywords = QUICK_KEYWORDS[filter.quick];
+    filters.push(quickClause(keywords));
+    for (const word of keywords) values.push(word, word);
   }
   if (scope) {
     if (scope.accountIds.length > 0) {
@@ -889,11 +941,6 @@ export async function getTemplatesWithUsageCount(
     ? db.prepare(`SELECT COUNT(*) AS total FROM templates${where}`).bind(...values)
     : db.prepare(`SELECT COUNT(*) AS total FROM templates${where}`);
   const totalRow = await totalStmt.first<{ total: number }>();
-  const pageSql = `SELECT * FROM templates${where} ORDER BY created_at DESC, id ASC`
-    + (paging ? ' LIMIT ? OFFSET ?' : '');
-  const pageValues = paging ? [...values, paging.limit, paging.offset] : values;
-  const tplStmt = pageValues.length > 0 ? db.prepare(pageSql).bind(...pageValues) : db.prepare(pageSql);
-  const templates = await tplStmt.all<TemplateRow>();
 
   // 2. 列で参照している設定を1回の問い合わせでまとめて取る。
   // 使用先のアカウントも一緒に返し、テンプレートと同じアカウント
@@ -957,18 +1004,98 @@ export async function getTemplatesWithUsageCount(
   // テンプレートがアカウント所属なら、使用先は同じアカウント or
   // 未設定のものだけ。別アカウントの設定は名前も遷移先も見せられず、
   // 数だけ残ると削除が永久に止まる（#891）。
-  const countVisible = (template: TemplateRow): number => {
+  const countVisible = (template: { id: string; line_account_id: string | null }): number => {
     const refs = usageRefs.get(template.id) ?? [];
     const account = template.line_account_id;
     if (!account) return refs.length;
     return refs.filter((acct) => acct === null || acct === account).length;
   };
 
+  let templates: TemplateRow[];
+  if (filter?.quick === 'frequent') {
+    /*
+      PERF-12 「よく使う」: 送信実績順は行を切る前に決める必要がある。
+      絞り込んだ全件の id だけを取り、スコア順に切ってからその区画の
+      行だけ SELECT * で読む。画面側の従来順（月間→累計→使用箇所数の
+      多い順）と同じスコアにする。
+    */
+    const idRows = await (
+      values.length > 0
+        ? db.prepare(`SELECT id, line_account_id, created_at FROM templates${where}`).bind(...values)
+        : db.prepare(`SELECT id, line_account_id, created_at FROM templates${where}`)
+    ).all<{ id: string; line_account_id: string | null; created_at: string }>();
+    const ids = idRows.results ?? [];
+    const sends = await getTemplateSendCounts(db, ids.map((row) => row.id));
+    const scored = ids
+      .map((row) => ({
+        row,
+        score: sends.get(row.id)?.thisMonth ?? sends.get(row.id)?.total ?? countVisible(row),
+      }))
+      .sort((a, b) =>
+        b.score - a.score
+        || (a.row.created_at < b.row.created_at ? 1 : a.row.created_at > b.row.created_at ? -1 : 0)
+        || (a.row.id < b.row.id ? -1 : 1));
+    const slice = paging
+      ? scored.slice(paging.offset, paging.offset + paging.limit)
+      : scored;
+    const pageIds = slice.map((entry) => entry.row.id);
+    if (pageIds.length === 0) {
+      templates = [];
+    } else {
+      const rows = await db.prepare(
+        `SELECT * FROM templates WHERE id IN (${pageIds.map(() => '?').join(',')})`,
+      ).bind(...pageIds).all<TemplateRow>();
+      const order = new Map(pageIds.map((id, index) => [id, index]));
+      templates = (rows.results ?? [])
+        .sort((a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0));
+    }
+  } else {
+    const pageSql = `SELECT * FROM templates${where} ORDER BY created_at DESC, id ASC`
+      + (paging ? ' LIMIT ? OFFSET ?' : '');
+    const pageValues = paging ? [...values, paging.limit, paging.offset] : values;
+    const tplStmt = pageValues.length > 0 ? db.prepare(pageSql).bind(...pageValues) : db.prepare(pageSql);
+    templates = (await tplStmt.all<TemplateRow>()).results ?? [];
+  }
+
   return {
-    items: (templates.results ?? []).map((t) => ({
+    items: templates.map((t) => ({
       ...t,
       usage_count: countVisible(t),
     })),
     total: Number(totalRow?.total ?? 0),
   };
+}
+
+/**
+ * PERF-12: フォルダごとの件数。選択画面のフォルダ欄は件数を出すが、
+ * 一覧を全件読まなくても分かるように、スコープ内で GROUP BY だけする。
+ */
+export async function getTemplateFolderCounts(
+  db: D1Database,
+  scope?: TemplateListScope,
+  messageType?: string,
+): Promise<Map<string, number>> {
+  const filters: string[] = [];
+  const values: unknown[] = [];
+  if (messageType) {
+    filters.push('message_type = ?');
+    values.push(messageType);
+  }
+  if (scope) {
+    if (scope.accountIds.length > 0) {
+      filters.push(
+        `(line_account_id IN (${scope.accountIds.map(() => '?').join(',')})${scope.includeUnassigned ? ' OR line_account_id IS NULL' : ''})`,
+      );
+      values.push(...scope.accountIds);
+    } else {
+      filters.push(scope.includeUnassigned ? 'line_account_id IS NULL' : '1 = 0');
+    }
+  }
+  const where = filters.length ? ` WHERE ${filters.join(' AND ')}` : '';
+  const rows = await (
+    values.length > 0
+      ? db.prepare(`SELECT COALESCE(folder_id, '') AS folder_id, COUNT(*) AS c FROM templates${where} GROUP BY COALESCE(folder_id, '')`).bind(...values)
+      : db.prepare(`SELECT COALESCE(folder_id, '') AS folder_id, COUNT(*) AS c FROM templates${where} GROUP BY COALESCE(folder_id, '')`)
+  ).all<{ folder_id: string; c: number }>();
+  return new Map((rows.results ?? []).map((row) => [row.folder_id, Number(row.c)]));
 }

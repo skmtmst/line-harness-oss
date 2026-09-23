@@ -12,7 +12,6 @@ import {
   type ChatDetail as ApiChatDetail,
   type ChatDetailMessage,
   type ChatListItem,
-  type FriendListItem,
   type InboxStats,
   type ScheduledChatSend,
 } from '@/lib/api'
@@ -317,209 +316,6 @@ function formatYmdSlash(iso: string): string {
   return `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}`
 }
 
-type FriendItem = Pick<FriendListItem, 'id' | 'displayName' | 'pictureUrl' | 'isFollowing'>
-
-interface MessageLog {
-  id: string
-  direction: 'incoming' | 'outgoing'
-  messageType: string
-  content: string
-  createdAt: string
-}
-
-function DirectMessagePanel({ friendId, friend, onBack, onSent }: {
-  friendId: string
-  friend: FriendItem | null
-  onBack: () => void
-  onSent: () => void
-}) {
-  const [message, setMessage] = useState('')
-  const [sending, setSending] = useState(false)
-  const [sendError, setSendError] = useState('')
-  const [messages, setMessages] = useState<MessageLog[]>([])
-  const [loadingMessages, setLoadingMessages] = useState(true)
-  const isComposingRef = useRef(false)
-  const sendLockRef = useRef(false)
-  const sendKeysRef = useRef(new IdempotencyKeyStore())
-  // アカウント切替などでパネルが畳まれたあとの古い応答を書き込まない。
-  const aliveRef = useRef(true)
-  useEffect(() => () => { aliveRef.current = false }, [])
-  /*
-   * 送信が向かった相手を照合する現在値。同じパネルのまま相手(friendId)が
-   * 切り替わっても state は残るので、応答時に今開いている相手と照合しないと
-   * A宛の失敗表示・送信済みの行がBの会話へ出る(#979 A02-04)。
-   */
-  const friendIdRef = useRef(friendId)
-  friendIdRef.current = friendId
-  // 相手が変わったら前の相手の失敗表示を残さない。
-  useEffect(() => setSendError(''), [friendId])
-
-  useEffect(() => {
-    const loadMessages = async () => {
-      setLoadingMessages(true)
-      try {
-        const res = await fetchApi<{ success: boolean; data: MessageLog[] }>(
-          `/api/friends/${friendId}/messages`
-        )
-        if (res.success) setMessages(res.data)
-      } catch { /* silent */ }
-      setLoadingMessages(false)
-    }
-    loadMessages()
-  }, [friendId])
-
-  const handleSend = async () => {
-    if (!message.trim() || sending || sendLockRef.current) return
-    const content = message.trim()
-    // 送信開始時の相手を固定する。応答を待つ間に別の相手へ
-    // 切り替わっていても、結果を新しい相手の会話へ出さない(#979 A02-04)。
-    const sendFriendId = friendId
-    const signature = JSON.stringify({ friendId: sendFriendId, messageType: 'text', content })
-    const idempotencyKey = sendKeysRef.current.get(signature)
-    sendLockRef.current = true
-    setSending(true)
-    try {
-      await fetchApi(`/api/friends/${sendFriendId}/messages`, {
-        method: 'POST',
-        headers: { 'Idempotency-Key': idempotencyKey },
-        body: JSON.stringify({ content, messageType: 'text' }),
-      })
-      sendKeysRef.current.clear(signature)
-      if (aliveRef.current && friendIdRef.current === sendFriendId) {
-        setMessages((prev) => [...prev, {
-          id: crypto.randomUUID(),
-          direction: 'outgoing',
-          messageType: 'text',
-          content,
-          createdAt: new Date().toISOString(),
-        }])
-        setMessage('')
-        setSendError('')
-      }
-    } catch (sendError) {
-      // 失敗しても入力は残す。同じ文の再送は同じ冪等キーを使い、
-      // LINE・DBへの追加書込は1回だけになる（N-023契約）。
-      // 送信を待つ間に別の相手へ切り替わっていたら、その会話へは出さない。
-      if (aliveRef.current && friendIdRef.current === sendFriendId) setSendError(describeSendFailure(sendError))
-    }
-    setSending(false)
-    sendLockRef.current = false
-  }
-
-  function renderContent(msg: MessageLog) {
-    if (msg.messageType === 'text') return msg.content
-    if (msg.messageType === 'flex') {
-      try {
-        const parsed = JSON.parse(msg.content)
-        // Extract ALL text from flex (up to 200 chars)
-        const texts: string[] = []
-        const collectText = (obj: Record<string, unknown>) => {
-          if (texts.join(' ').length > 200) return
-          if (obj.type === 'text' && typeof obj.text === 'string') {
-            const t = (obj.text as string).trim()
-            if (t && !t.startsWith('{{')) texts.push(t)
-          }
-          for (const key of ['header', 'body', 'footer']) {
-            if (obj[key]) collectText(obj[key] as Record<string, unknown>)
-          }
-          if (Array.isArray(obj.contents)) {
-            for (const c of obj.contents) collectText(c as Record<string, unknown>)
-          }
-        }
-        collectText(parsed)
-        return texts.slice(0, 4).join('\n') || '[Flex Message]'
-      } catch { return '[Flex Message]' }
-    }
-    if (msg.messageType === 'sticker') {
-      return <StickerMessageImage content={msg.content} />
-    }
-    return `[${msg.messageType}]`
-  }
-
-  return (
-    <div className="flex flex-col h-full">
-      <div className="px-4 py-4 border-b border-hairline flex items-center gap-3">
-        <button
-          onClick={onBack}
-          aria-label="友だち一覧に戻る"
-          className="lg:hidden text-ink-faint hover:text-ink-secondary"
-        >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-          </svg>
-        </button>
-        {friend?.pictureUrl ? (
-          <img src={friend.pictureUrl} alt="" className="w-8 h-8 shrink-0 rounded-full" />
-        ) : (
-          <div className="w-8 h-8 shrink-0 rounded-full bg-hairline flex items-center justify-center">
-            <span className="text-ink-faint text-xs">{(friend?.displayName || '?').charAt(0)}</span>
-          </div>
-        )}
-        {/* U008: 長い名前は1行で省略し、全文は title で読めるようにする。 */}
-        <div className="min-w-0">
-          <p className="truncate text-sm font-bold text-ink" title={friend?.displayName || '不明'}>
-            {friend?.displayName || '不明'}
-          </p>
-          <p className="text-xs text-ink-faint">メッセージ履歴</p>
-        </div>
-      </div>
-      <div className="flex-1 overflow-y-auto p-4 space-y-3">
-        {loadingMessages ? (
-          <p className="text-center text-ink-faint text-sm">読み込み中...</p>
-        ) : messages.length === 0 ? (
-          <p className="text-center text-ink-faint text-sm">メッセージ履歴がありません</p>
-        ) : (
-          messages.map((msg) => (
-            <div key={msg.id} className={`flex ${msg.direction === 'outgoing' ? 'justify-end' : 'justify-start'}`}>
-              <div className={`max-w-[75%] rounded-2xl px-4 py-2 ${
-                msg.direction === 'outgoing'
-                  ? 'bg-accent-deep text-on-accent'
-                  : 'bg-canvas-sunken text-ink'
-              }`}>
-                <div className="text-sm whitespace-pre-wrap break-words">{renderContent(msg)}</div>
-                <p className={`text-xs mt-1 ${msg.direction === 'outgoing' ? 'text-success-bg' : 'text-ink-faint'}`}>
-                  {new Date(msg.createdAt).toLocaleString('ja-JP', { hour: '2-digit', minute: '2-digit' })}
-                </p>
-              </div>
-            </div>
-          ))
-        )}
-      </div>
-      <div className="px-4 py-3 border-t border-hairline">
-        {sendError && (
-          <p className="mb-2 text-xs text-danger" role="alert">{sendError}</p>
-        )}
-        <div className="flex gap-2">
-          <input
-            type="text"
-            value={message}
-            onChange={(e) => { setMessage(e.target.value); if (sendError) setSendError('') }}
-            onCompositionStart={() => { isComposingRef.current = true }}
-            onCompositionEnd={() => { isComposingRef.current = false }}
-            onKeyDown={(e) => {
-              // IME変換確定のEnterでは送信しない
-              if (e.nativeEvent.isComposing || isComposingRef.current || e.keyCode === 229) return
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault()
-                handleSend()
-              }
-            }}
-            placeholder="メッセージを入力..."
-            className="flex-1 border border-hairline rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
-          />
-          <button
-            onClick={handleSend}
-            disabled={!message.trim() || sending}
- className="bg-accent-deep text-on-accent shrink-0 whitespace-nowrap transition-colors hover:brightness-92 px-4 py-2 rounded-control text-sm font-medium disabled:opacity-50"
-          >
-            {sending ? '...' : '送信'}
-          </button>
-        </div>
-      </div>
-    </div>
-  )
-}
-
 /**
  * URL状態の友だちIDが口へ渡せる形か。
  *
@@ -610,9 +406,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
   const [emailLoading, setEmailLoading] = useState(true)
   // 中央ペインで開いているメール。LINEのトークと排他。
   const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null)
-  const [allFriends, setAllFriends] = useState<FriendItem[]>([])
   const [selectedChatId, setSelectedChatId] = useState<string | null>(null)
-  const [selectedFriendId, setSelectedFriendId] = useState<string | null>(null)
   const [chatDetail, setChatDetail] = useState<ChatDetail | null>(null)
   /*
    * URLの `?status=` で絞り込み済みの受信箱を開けるようにする（IDEA-01）。
@@ -1098,24 +892,6 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
     }
   }, [loadingMore, buildListParams, listFilterKey])
 
-  // Friends list (for the "new direct message" modal) — loaded lazily in the background
-  // Previously fetched 800 friends in parallel with chats, which blocked the initial render.
-  const loadAllFriends = useCallback(async () => {
-    try {
-      // The new-DM picker never renders tags, so avoid one tag query per friend.
-      const friendRes = await api.friends.list({ accountId: selectedAccountId || undefined, limit: '800', includeTags: false })
-      if (friendRes.success) {
-        setAllFriends(friendRes.data.items)
-      }
-    } catch { /* silent */ }
-  }, [selectedAccountId])
-
-  // 友だち800件は初回表示に要らない。DM欄(DirectMessagePanel)が開いたときだけ
-  // 取る。マウント時に6系統と並列で取ると、回線の細い店舗で一覧が遅れる。
-  useEffect(() => {
-    if (selectedFriendId) void loadAllFriends()
-  }, [selectedFriendId, loadAllFriends])
-
   // Keep refs in sync so setChats updater can read the latest filter without stale closure
   useEffect(() => { statusFilterRef.current = statusFilter }, [statusFilter])
 
@@ -1530,7 +1306,6 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
     detailAccountRef.current = selectedAccountId
     detailRequestIdRef.current += 1
     setSelectedChatId(null)
-    setSelectedFriendId(null)
     setChatDetail(null)
     setDetailLoading(false)
     setAttentionSaving(false)
@@ -1571,7 +1346,6 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
       deepLinkIdRef.current = null
       setDeepLinkNotice('')
       setSelectedChatId(null)
-      setSelectedFriendId(null)
       setSelectedThreadId(threadId)
       return
     }
@@ -1583,7 +1357,6 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
       // 不正なIDは口へ渡さず、別人も開かない。案内だけ出す。
       deepLinkIdRef.current = rawFriend
       setSelectedThreadId(null)
-      setSelectedFriendId(null)
       setSelectedChatId(null)
       setDeepLinkNotice(DEEP_LINK_NOTICE.malformed)
       return
@@ -1595,7 +1368,6 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
 
     deepLinkIdRef.current = rawFriend
     setSelectedThreadId(null)
-    setSelectedFriendId(null)
     // 照合できるまでは会話を選ばない。ここで選ぶと `api.chats.get` が
     // 走り、別アカウントの会話が表示されてしまう。
     setSelectedChatId(null)
@@ -2439,8 +2211,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
     // 手動で解除したので、URLの保存検索IDも外す(N-021)。
     dropSavedViewParam()
   }
-  const activeFriendId = selectedFriendId
-    ?? (chatDetail?.id === selectedChatId ? chatDetail.friendId : null)
+  const activeFriendId = (chatDetail?.id === selectedChatId ? chatDetail.friendId : null)
     ?? chats.find((chat) => chat.id === selectedChatId)?.friendId
     ?? null
   return (
@@ -2857,7 +2628,6 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                         deepLinkIdRef.current = null
                         setDeepLinkNotice('')
                         setSelectedChatId(null)
-                        setSelectedFriendId(null)
                         setSelectedThreadId(item.threadId)
                         router.replace(buildInboxUrl(channel, savedViewParam || null))
                         setEmailItems((prev) => prev.map((email) => (
@@ -2954,9 +2724,9 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                   const node = (
                     <button
                       key={chat.id}
-                      onClick={() => { setSelectedFriendId(null); handleSelectChat(chat.id); }}
+                      onClick={() => handleSelectChat(chat.id)}
                       className={`w-full border-b border-[#E5E7EB] px-3 py-3 text-left transition-colors ${
-                        isSelected && !selectedFriendId
+                        isSelected
                           ? 'bg-[#EAFBF0]'
                           : chat.isUnread
                             /*
@@ -3101,7 +2871,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
         */}
         <div
           data-inbox-v4="talk-pane"
-          className={`min-w-0 flex-1 bg-canvas flex-col overflow-hidden ${showFriendInfo ? 'border-r border-[#E5E7EB]' : ''} ${selectedChatId || selectedFriendId || selectedThreadId ? 'flex' : 'hidden lg:flex'}`}
+          className={`min-w-0 flex-1 bg-canvas flex-col overflow-hidden ${showFriendInfo ? 'border-r border-[#E5E7EB]' : ''} ${selectedChatId || selectedThreadId ? 'flex' : 'hidden lg:flex'}`}
         >
           {selectedThreadId ? (
             /* メールの往復。LINEのトークと同じ場所に出す。 */
@@ -3113,14 +2883,6 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
               onChanged={() => {
                 void loadEmails()
               }}
-            />
-          ) : selectedFriendId && !selectedChatId ? (
-            /* Direct message to friend without existing chat */
-            <DirectMessagePanel
-              friendId={selectedFriendId}
-              friend={allFriends.find((f) => f.id === selectedFriendId) || null}
-              onBack={() => setSelectedFriendId(null)}
-              onSent={() => { setSelectedFriendId(null); loadChats(); }}
             />
           ) : deepLinkNotice ? (
             // URL指定の会話が開けなかったときの空状態。別人は開かず、
@@ -3969,7 +3731,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
           いまはメールを開いているときは案内を出す。空の枠を出すより、
           なぜ出ないかが分かる方がよい。
         */}
-        {showFriendInfo && (selectedChatId || selectedFriendId || selectedThreadId) && (
+        {showFriendInfo && (selectedChatId || selectedThreadId) && (
           <>
             {/*
               1536px 未満ではトークの上に重ねるドロワー。背景（暗幕）を

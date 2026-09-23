@@ -15,6 +15,8 @@ const fixture = vi.hoisted(() => ({
   getAvailability: vi.fn(),
   updateException: vi.fn(),
   deleteException: vi.fn(),
+  listStaff: vi.fn(),
+  checkAvailability: vi.fn(),
 }))
 
 const accountSetters = new Set<(id: string | null) => void>()
@@ -68,6 +70,9 @@ vi.mock('@/lib/api', () => {
       deleteException: (...args: unknown[]) => fixture.deleteException(...args),
       // N-411: staff ロールの入口は本人の予約スタッフ解決。未紐づけを既定にする。
       listMyStaff: vi.fn(async () => ({ staff: [] })),
+      // IDEA-28: 確認カードの担当候補と「なぜ取れないか」のAPI。
+      listStaff: (...args: unknown[]) => fixture.listStaff(...args),
+      checkAvailability: (...args: unknown[]) => fixture.checkAvailability(...args),
     },
   }
 })
@@ -144,7 +149,7 @@ beforeEach(() => {
       businessHoursConfigured: true,
     }),
   }))
-  fixture.listMenus.mockResolvedValue({ menus: [{ id: 'menu-1', is_active: 1 }] })
+  fixture.listMenus.mockResolvedValue({ menus: [{ id: 'menu-1', name: 'カット', is_active: 1 }] })
   fixture.listResources.mockResolvedValue({ data: { resources: [] } })
   fixture.createResource.mockImplementation(async (accountId: string, body: Record<string, unknown>) => ({
     data: resource('resource-new', { lineAccountId: accountId, ...body }),
@@ -159,6 +164,19 @@ beforeEach(() => {
     data: exception({ ...body, version: (body.expectedVersion as number) + 1 }),
   }))
   fixture.deleteException.mockResolvedValue({ success: true, data: { id: 'exception-a' } })
+  fixture.listStaff.mockResolvedValue({
+    staff: [{ id: 's1', display_name: '担当A', is_active: 1 }],
+  })
+  fixture.checkAvailability.mockResolvedValue({
+    date: '2099-01-10',
+    time: '11:00',
+    timeZone: 'Asia/Tokyo',
+    bookable: true,
+    reasons: [],
+    per_staff: [
+      { staff_id: 's1', display_name: '担当A', bookable: true, remaining: 1, capacity: 1, reasons: [] },
+    ],
+  })
 })
 
 function exception(overrides: Record<string, unknown> = {}) {
@@ -444,5 +462,67 @@ describe('登録済みの休業日の修正・削除 (#953 E-09)', () => {
     await screen.findByText('年末休業')
     expect(screen.queryByRole('button', { name: '修正する' })).toBeNull()
     expect(screen.queryByRole('button', { name: '削除する' })).toBeNull()
+  })
+})
+
+describe('日時を指定して空きを確認 (IDEA-28)', () => {
+  async function fillCheckForm() {
+    fireEvent.change(await screen.findByLabelText('確認する日付'), { target: { value: '2099-01-10' } })
+    fireEvent.change(screen.getByLabelText('確認する開始時刻'), { target: { value: '11:00' } })
+  }
+
+  test('日時を入れて確かめるとAPIを呼び、取れる旨と残数を表示する', async () => {
+    await renderEditor()
+    await fillCheckForm()
+    fireEvent.change(await screen.findByLabelText('確認する担当'), { target: { value: 's1' } })
+    fireEvent.click(screen.getByRole('button', { name: 'この日時を確かめる' }))
+
+    await waitFor(() => expect(fixture.checkAvailability).toHaveBeenCalledWith('account-a', {
+      menuId: 'menu-1', staffId: 's1', date: '2099-01-10', time: '11:00',
+    }))
+    expect((await screen.findByText('この日時は予約を受けられます。')).textContent).toBeTruthy()
+    expect(screen.getByText('担当A: 残り 1/1')).toBeTruthy()
+  })
+
+  test('取れないときは理由を運用者向けの文で出し、詳細（予定の件名など）は出さない', async () => {
+    fixture.checkAvailability.mockResolvedValue({
+      date: '2099-01-10',
+      time: '11:00',
+      timeZone: 'Asia/Tokyo',
+      bookable: false,
+      reasons: ['other_booking', 'google_busy'],
+      per_staff: [
+        { staff_id: 's1', display_name: '担当A', bookable: false, remaining: null, capacity: null, reasons: ['google_busy'] },
+      ],
+    })
+    await renderEditor()
+    await fillCheckForm()
+    fireEvent.click(screen.getByRole('button', { name: 'この日時を確かめる' }))
+
+    expect((await screen.findByText('この日時は予約できません。')).textContent).toBeTruthy()
+    expect(screen.getByText('ほかの予約と重なっています')).toBeTruthy()
+    expect(screen.getByText('外部カレンダーの予定と重なっています')).toBeTruthy()
+  })
+
+  test('日付・時刻が空ならAPIを呼ばず、確認エラーはalertで出す', async () => {
+    fixture.checkAvailability.mockRejectedValue(new ApiError(500))
+    await renderEditor()
+    fireEvent.click(screen.getByRole('button', { name: 'この日時を確かめる' }))
+    expect(fixture.checkAvailability).not.toHaveBeenCalled()
+
+    await fillCheckForm()
+    fireEvent.click(screen.getByRole('button', { name: 'この日時を確かめる' }))
+    await waitFor(() => expect(fixture.checkAvailability).toHaveBeenCalledTimes(1))
+    expect((await screen.findByRole('alert')).textContent).toContain('空き状況を確かめられませんでした')
+  })
+
+  test('入力を変えたら前の結果を消して誤読を防ぐ', async () => {
+    await renderEditor()
+    await fillCheckForm()
+    fireEvent.click(screen.getByRole('button', { name: 'この日時を確かめる' }))
+    await screen.findByText('この日時は予約を受けられます。')
+
+    fireEvent.change(screen.getByLabelText('確認する日付'), { target: { value: '2099-01-11' } })
+    expect(screen.queryByText('この日時は予約を受けられます。')).toBeNull()
   })
 })

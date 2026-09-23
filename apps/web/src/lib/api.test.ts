@@ -2,6 +2,7 @@ import { beforeAll, afterEach, describe, expect, it, vi } from 'vitest'
 import type { AutoReplyConflictPair } from './api'
 
 let fetchApi: typeof import('./api').fetchApi
+let downloadApiFile: typeof import('./api').downloadApiFile
 let ApiError: typeof import('./api').ApiError
 let extractApiErrorMessage: typeof import('./api').extractApiErrorMessage
 let extractApiErrorCode: typeof import('./api').extractApiErrorCode
@@ -12,11 +13,13 @@ let eventsApi: typeof import('./api').eventsApi
 let webinarApi: typeof import('./api').webinarApi
 let bookingApi: typeof import('./api').bookingApi
 let api: typeof import('./api').api
+let describeSaveFailure: typeof import('./api').describeSaveFailure
 
 beforeAll(async () => {
   process.env.NEXT_PUBLIC_API_URL = 'https://worker.example.com'
   ;({
     fetchApi,
+    downloadApiFile,
     ApiError,
     extractApiErrorMessage,
     extractApiErrorCode,
@@ -27,6 +30,7 @@ beforeAll(async () => {
     webinarApi,
     bookingApi,
     api,
+    describeSaveFailure,
   } = await import('./api'))
 })
 
@@ -1233,6 +1237,112 @@ describe('機能オフの403契約', () => {
   })
 })
 
+/*
+ * #1058: 再認証(step-up)フローの401は画面が自分で処理する通常の状態。
+ * 「Cookieが届いていません」モーダルを上に被せないよう、業務コード付きの
+ * 401では SESSION_LOST_EVENT を出さない。一方、code の無い401（認証
+ * middlewareの `Unauthorized` など）は本物のセッション喪失なので出す。
+ */
+describe('401のセッション喪失の合図 (#1058)', () => {
+  function stubBrowser(target: EventTarget) {
+    const storage = {
+      getItem: vi.fn(() => null),
+      setItem: vi.fn(),
+      removeItem: vi.fn(),
+    }
+    vi.stubGlobal('window', target)
+    vi.stubGlobal('sessionStorage', storage)
+    vi.stubGlobal('localStorage', storage)
+  }
+
+  function sessionLostSpy() {
+    const target = new EventTarget()
+    const listener = vi.fn()
+    target.addEventListener('lh-session-lost', listener)
+    stubBrowser(target)
+    return listener
+  }
+
+  function stubFetch401(body: unknown) {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(
+      typeof body === 'string' ? body : JSON.stringify(body),
+      { status: 401, headers: { 'Content-Type': 'application/json' } },
+    )))
+  }
+
+  it('STEP_UP_REQUIRED の401では合図を出さず、ApiErrorは従来どおり投げる', async () => {
+    const listener = sessionLostSpy()
+    stubFetch401({
+      success: false,
+      error: '重要操作の再認証が必要です',
+      code: 'STEP_UP_REQUIRED',
+    })
+
+    await expect(fetchApi('/api/operations/incidents', { method: 'POST' }))
+      .rejects.toMatchObject({ name: 'ApiError', status: 401, code: 'STEP_UP_REQUIRED' })
+    expect(listener).not.toHaveBeenCalled()
+  })
+
+  it('STEP_UP_UNAUTHORIZED の401でも合図を出さない', async () => {
+    const listener = sessionLostSpy()
+    stubFetch401({ success: false, error: 'Unauthorized', code: 'STEP_UP_UNAUTHORIZED' })
+
+    await expect(fetchApi('/api/auth/step-up', { method: 'POST' }))
+      .rejects.toMatchObject({ status: 401, code: 'STEP_UP_UNAUTHORIZED' })
+    expect(listener).not.toHaveBeenCalled()
+  })
+
+  it('code の無い401（認証middlewareの Unauthorized）では合図を出す', async () => {
+    const listener = sessionLostSpy()
+    // extractApiErrorCode は error フィールドからも 'Unauthorized' を拾うが、
+    // それは免除コードではないので合図を出さなければならない。
+    stubFetch401({ success: false, error: 'Unauthorized' })
+
+    await expect(fetchApi('/api/friends')).rejects.toMatchObject({ status: 401 })
+    expect(listener).toHaveBeenCalledTimes(1)
+  })
+
+  it('一覧に無いコードや非JSONの本文の401でも合図を出す', async () => {
+    // 未知コード・壊れた本文で黙らせると、本物のセッション喪失を取りこぼす。
+    const listener = sessionLostSpy()
+    stubFetch401({ success: false, code: 'VERSION_CONFLICT' })
+    await expect(fetchApi('/api/friends')).rejects.toMatchObject({ status: 401 })
+    expect(listener).toHaveBeenCalledTimes(1)
+
+    stubFetch401('<html>proxy error</html>')
+    await expect(fetchApi('/api/friends')).rejects.toMatchObject({ status: 401 })
+    expect(listener).toHaveBeenCalledTimes(2)
+  })
+
+  it('ダウンロード系の口でも再認証401では合図を出さない', async () => {
+    const listener = sessionLostSpy()
+    stubFetch401({
+      success: false,
+      error: '重要操作の再認証が必要です',
+      code: 'STEP_UP_REQUIRED',
+    })
+
+    // fetchApiBlob 経路
+    await expect(api.media.download('media-1', 'account-1'))
+      .rejects.toMatchObject({ status: 401, code: 'STEP_UP_REQUIRED' })
+    // downloadApiFile 経路
+    await expect(downloadApiFile('/api/example.csv', 'example.csv'))
+      .rejects.toMatchObject({ status: 401, code: 'STEP_UP_REQUIRED' })
+    expect(listener).not.toHaveBeenCalled()
+  })
+
+  it('ダウンロード系の口でも code の無い401では合図を出す', async () => {
+    const listener = sessionLostSpy()
+    stubFetch401({ success: false, error: 'Unauthorized' })
+
+    await expect(api.media.download('media-1', 'account-1'))
+      .rejects.toMatchObject({ status: 401 })
+    await expect(downloadApiFile('/api/example.csv', 'example.csv'))
+      .rejects.toMatchObject({ status: 401 })
+    expect(listener).toHaveBeenCalledTimes(2)
+  })
+})
+
 describe('extractApiErrorData', () => {
   it('409の最新状態を機械処理用に保持し、JSON以外は捨てる', () => {
     const impact = { canDelete: false, blockers: ['incoming_switches'] }
@@ -1481,6 +1591,54 @@ describe('fetchApi error response', () => {
     expect(init.credentials).toBe('include')
     expect((init.headers as Record<string, string>)['Content-Type']).toBe('application/json')
   })
+
+  /*
+   * PERF-10: GET/HEAD には Content-Type を付けない。
+   * `application/json` は CORS safelist 外なので、Cookie認証だけの環境で
+   * これを外すと GET が simple request になり OPTIONS preflight が消える。
+   * 呼び出し側が明示したヘッダは残る（後勝ちのスプレッド順）。
+   */
+  it('GET には Content-Type を付けない（preflight 回避）', async () => {
+    const spy = vi.fn(async () => new Response(null, { status: 204 }))
+    vi.stubGlobal('fetch', spy)
+
+    await fetchApi('/api/example')
+
+    const init = spy.mock.calls[0][1] as RequestInit
+    expect(init.credentials).toBe('include')
+    expect((init.headers as Record<string, string>)['Content-Type']).toBeUndefined()
+  })
+
+  it('HEAD にも Content-Type を付けない', async () => {
+    const spy = vi.fn(async () => new Response(null, { status: 204 }))
+    vi.stubGlobal('fetch', spy)
+
+    await fetchApi('/api/example', { method: 'HEAD' })
+
+    const init = spy.mock.calls[0][1] as RequestInit
+    expect((init.headers as Record<string, string>)['Content-Type']).toBeUndefined()
+  })
+
+  it('変更系は引き続き Content-Type: application/json を付ける', async () => {
+    const spy = vi.fn(async () => new Response(null, { status: 204 }))
+    vi.stubGlobal('fetch', spy)
+
+    for (const method of ['POST', 'PUT', 'PATCH', 'DELETE'] as const) {
+      await fetchApi('/api/example', { method })
+      const init = spy.mock.calls.at(-1)?.[1] as RequestInit
+      expect((init.headers as Record<string, string>)['Content-Type']).toBe('application/json')
+    }
+  })
+
+  it('GET で呼び出し側が Content-Type を明示した場合は尊重する', async () => {
+    const spy = vi.fn(async () => new Response(null, { status: 204 }))
+    vi.stubGlobal('fetch', spy)
+
+    await fetchApi('/api/example', { headers: { 'Content-Type': 'text/csv' } })
+
+    const init = spy.mock.calls[0][1] as RequestInit
+    expect((init.headers as Record<string, string>)['Content-Type']).toBe('text/csv')
+  })
 })
 
 describe('api.friendFields.bulk のアカウント境界契約 (#624)', () => {
@@ -1524,5 +1682,47 @@ describe('api.health.summary の軽量要約契約 (#630)', () => {
     expect(fetchSpy.mock.calls.map(([url]) => url)).toEqual([
       'https://worker.example.com/api/accounts/health-summary',
     ])
+  })
+})
+
+describe('describeSaveFailure（WRITE-01: 保存失敗の安全な理由表示）', () => {
+  it('400の本文メッセージはそのまま運用者へ出す', () => {
+    const err = new ApiError(400, 'LINEアカウントを指定してください')
+    expect(describeSaveFailure(err)).toBe('LINEアカウントを指定してください')
+  })
+
+  it('422の検証文もそのまま出す', () => {
+    const err = new ApiError(422, '本文を入力してください')
+    expect(describeSaveFailure(err)).toBe('本文を入力してください')
+  })
+
+  it('403は内部文を出さず権限の確認を促す', () => {
+    const err = new ApiError(403, 'API error: 403', 'LINE_ACCOUNT_MISMATCH')
+    const text = describeSaveFailure(err)
+    expect(text).not.toContain('API error')
+    expect(text).toContain('権限')
+  })
+
+  it('404は対象が見つからない旨を出す', () => {
+    const text = describeSaveFailure(new ApiError(404, 'API error: 404'))
+    expect(text).toContain('見つかりません')
+    expect(text).not.toContain('API error')
+  })
+
+  it('500はサーバー側の失敗として出し、内部文を見せない', () => {
+    const text = describeSaveFailure(new ApiError(500, 'API error: 500'))
+    expect(text).toContain('サーバー側')
+    expect(text).not.toContain('API error')
+  })
+
+  it('日本語を含まない内部Errorはそのまま出さない', () => {
+    const text = describeSaveFailure(new Error('Network request failed'))
+    expect(text).not.toContain('Network request failed')
+    expect(text).toContain('通信')
+  })
+
+  it('日本語のErrorメッセージはそのまま使う', () => {
+    expect(describeSaveFailure(new Error('対象が見つかりません')))
+      .toBe('対象が見つかりません')
   })
 })

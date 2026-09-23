@@ -16,6 +16,16 @@ export type CommonVarType = (typeof COMMON_VAR_TYPES)[number];
 export function normalizeCommonVarValue(type: CommonVarType, value: string): string | null {
   if (type === 'long_text') return value.length <= 10_000 ? value : null;
   if (type === 'boolean') return value === 'true' || value === 'false' ? value : null;
+  /*
+   * 画像はLINEへ画像URLとして差し込まれる。URLでない文字列や https 以外の
+   * scheme は送信時に壊れるため、口で止める（VAR-03）。空は「空のまま」
+   * 運用があるため通す。要件のメディアID参照(v6-14 §5-2)へ移るまでは、
+   * 最小の形式検査として https URL だけを受ける。
+   */
+  if (type === 'image') {
+    if (value === '') return value;
+    return value.length <= 200 && /^https:\/\/\S+$/.test(value) ? value : null;
+  }
   if (type === 'date' || type === 'datetime') {
     const match = type === 'date'
       ? /^(\d{4})-(\d{2})-(\d{2})$/.exec(value)

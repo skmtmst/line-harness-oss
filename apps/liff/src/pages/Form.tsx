@@ -1,13 +1,15 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import {
   PREFECTURES,
   collectInputs,
   formThemeButtonText,
+  isOtherFreeText,
   nextSectionIndex,
   normalizeFormTheme,
   validateAnswer,
   type FormBlock,
+  type FormInputBlock,
   type FormLayout,
 } from '@line-crm/shared';
 import { api, type PublicForm } from '../lib/api.js';
@@ -51,6 +53,107 @@ function initialAnswers(layout: FormLayout): Answers {
 
 function Asterisk() {
   return <span className="ml-1 rounded-full bg-red-100 px-1.5 py-0.5 text-[10px] text-red-700">必須</span>;
+}
+
+/** 'YYYY-MM-DD' を [年, 月, 日] に分ける。形でない値は空3つにする。 */
+function splitYmd(value: string): [string, string, string] {
+  const m = /^(\d{1,4})-(\d{1,2})-(\d{1,2})$/.exec(value);
+  return m ? [m[1], m[2], m[3]] : ['', '', ''];
+}
+
+/**
+ * 日付を「年・月・日」の3欄で入れる。
+ *
+ * 編集画面で「年月日を3つに分ける」を選んだ日付欄に使う。カレンダー式は
+ * 選びにくい年代（生年月日など）があるための出し分け。
+ * 3欄とも入るまでは形の合わない値を回答に入れ、送信時の検証で
+ * 「日付を選んでください」へ流す（途中経過を正しい値と誤認しないため）。
+ */
+function DateYmdField({
+  value,
+  onChange,
+  inputClass,
+}: {
+  value: string;
+  onChange: (next: string) => void;
+  inputClass: string;
+}) {
+  const [parts, setParts] = useState<[string, string, string]>(() => splitYmd(value));
+  // 自分が出した値が戻ってきたときは欄を上書きしない（途中の入力が消えるため）
+  const lastEmitted = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (value === lastEmitted.current) return;
+    setParts(splitYmd(value));
+  }, [value]);
+
+  const update = (index: number, raw: string) => {
+    const digits = raw.replace(/[^\d]/g, '').slice(0, index === 0 ? 4 : 2);
+    const next = [...parts] as [string, string, string];
+    next[index] = digits;
+    setParts(next);
+    const all = next.every((p) => p !== '');
+    const emitted = all
+      ? `${next[0].padStart(4, '0')}-${next[1].padStart(2, '0')}-${next[2].padStart(2, '0')}`
+      : next.some((p) => p !== '')
+        ? `${next[0] || '0000'}-${next[1] || '00'}-${next[2] || '00'}`
+        : '';
+    lastEmitted.current = emitted;
+    onChange(emitted);
+  };
+
+  const partClass = `${inputClass} text-center`;
+  const specs: { placeholder: string; label: string; maxLength: number }[] = [
+    { placeholder: '年', label: '年', maxLength: 4 },
+    { placeholder: '月', label: '月', maxLength: 2 },
+    { placeholder: '日', label: '日', maxLength: 2 },
+  ];
+  return (
+    <div className="flex items-center gap-2">
+      {specs.map((spec, i) => (
+        <span key={spec.label} className="flex items-center gap-1">
+          <input
+            type="text"
+            inputMode="numeric"
+            value={parts[i]}
+            maxLength={spec.maxLength}
+            placeholder={spec.placeholder}
+            aria-label={spec.label}
+            onChange={(e) => update(i, e.target.value)}
+            className={partClass}
+            style={{ width: i === 0 ? '4.5rem' : '3.25rem' }}
+          />
+          <span className="text-sm text-gray-500">{spec.label}</span>
+        </span>
+      ))}
+    </div>
+  );
+}
+
+/** 「その他」の選択肢ラベル。無ければ空。 */
+function otherLabel(block: FormInputBlock): string {
+  return (block.choices ?? []).find((choice) => choice.isOther)?.label ?? '';
+}
+
+/** 「その他」を選んだときに出す自由記入欄。 */
+function OtherTextInput({
+  value,
+  onChange,
+  inputClass,
+}: {
+  value: string;
+  onChange: (next: string) => void;
+  inputClass: string;
+}) {
+  return (
+    <input
+      type="text"
+      value={value}
+      placeholder="具体的に入力してください"
+      onChange={(e) => onChange(e.target.value)}
+      className={`${inputClass} mt-1.5`}
+    />
+  );
 }
 
 export default function Form() {
@@ -531,14 +634,21 @@ function BlockView({
           />
         )}
 
-        {block.type === 'date' && (
-          <input
-            type="date"
-            value={text}
-            onChange={(e) => onChange(block.name, e.target.value)}
-            className={inputClass}
-          />
-        )}
+        {block.type === 'date' &&
+          (block.dateStyle === 'ymd' ? (
+            <DateYmdField
+              value={text}
+              onChange={(next) => onChange(block.name, next)}
+              inputClass={inputClass}
+            />
+          ) : (
+            <input
+              type="date"
+              value={text}
+              onChange={(e) => onChange(block.name, e.target.value)}
+              className={inputClass}
+            />
+          ))}
 
         {block.type === 'prefecture' && (
           <select
@@ -556,48 +666,120 @@ function BlockView({
         )}
 
         {block.type === 'select' && (
-          <select
-            value={text}
-            onChange={(e) => onChange(block.name, e.target.value)}
-            className={inputClass}
-          >
-            <option value="">選択してください</option>
-            {(block.choices ?? []).map((choice) => (
-              <option key={choice.id} value={choice.label}>
-                {choice.label}
-              </option>
-            ))}
-          </select>
+          <div>
+            <select
+              // 「その他」を自由記入したときは、プルダウンにはその選択肢を出す
+              value={isOtherFreeText(block, text) ? otherLabel(block) : text}
+              onChange={(e) => onChange(block.name, e.target.value)}
+              className={inputClass}
+            >
+              <option value="">選択してください</option>
+              {(block.choices ?? []).map((choice) => (
+                <option key={choice.id} value={choice.label}>
+                  {choice.label}
+                </option>
+              ))}
+            </select>
+            {isOtherFreeText(block, text) && (
+              <OtherTextInput
+                value={text}
+                onChange={(next) => onChange(block.name, next)}
+                inputClass={inputClass}
+              />
+            )}
+          </div>
         )}
 
         {block.type === 'radio' && (
           <div className={block.inline ? 'flex flex-wrap gap-3' : 'space-y-2'}>
-            {(block.choices ?? []).map((choice) => (
-              <label key={choice.id} className="flex items-center gap-2 text-sm text-gray-700">
-                <input
-                  type="radio"
-                  name={block.name}
-                  checked={text === choice.label}
-                  onChange={() => onChange(block.name, choice.label)}
-                />
-                {choice.label}
-              </label>
-            ))}
+            {(block.choices ?? []).map((choice) => {
+              // 「その他」は、ラベルそのものだけでなく自由記入の値でも選中扱い
+              const isFree = choice.isOther ? isOtherFreeText(block, text) : false;
+              const checkedRadio = choice.isOther
+                ? text === choice.label || isFree
+                : text === choice.label;
+              return (
+                <div key={choice.id}>
+                  <label className="flex items-center gap-2 text-sm text-gray-700">
+                    <input
+                      type="radio"
+                      name={block.name}
+                      checked={checkedRadio}
+                      onChange={() => onChange(block.name, choice.label)}
+                    />
+                    {choice.label}
+                  </label>
+                  {choice.isOther && checkedRadio && (
+                    <OtherTextInput
+                      value={isFree ? text : ''}
+                      onChange={(next) => onChange(block.name, next)}
+                      inputClass={inputClass}
+                    />
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
 
         {block.type === 'checkbox' && (
           <div className={block.inline ? 'flex flex-wrap gap-3' : 'space-y-2'}>
-            {(block.choices ?? []).map((choice) => (
-              <label key={choice.id} className="flex items-center gap-2 text-sm text-gray-700">
-                <input
-                  type="checkbox"
-                  checked={checked.includes(choice.label)}
-                  onChange={() => onToggle(block.name, choice.label)}
-                />
-                {choice.label}
-              </label>
-            ))}
+            {(block.choices ?? []).map((choice) => {
+              const freeTexts = checked.filter((v) => isOtherFreeText(block, v));
+              const isChecked = choice.isOther
+                ? checked.includes(choice.label) || freeTexts.length > 0
+                : checked.includes(choice.label);
+              return (
+                <div key={choice.id}>
+                  <label className="flex items-center gap-2 text-sm text-gray-700">
+                    <input
+                      type="checkbox"
+                      checked={isChecked}
+                      onChange={() => {
+                        if (!choice.isOther) {
+                          onToggle(block.name, choice.label);
+                          return;
+                        }
+                        // 「その他」を外すときは、自由記入の値も一緒に外す
+                        onChange(
+                          block.name,
+                          isChecked
+                            ? checked.filter(
+                                (v) => v !== choice.label && !isOtherFreeText(block, v),
+                              )
+                            : [...checked, choice.label],
+                        );
+                      }}
+                    />
+                    {choice.label}
+                  </label>
+                  {choice.isOther && isChecked && (
+                    <OtherTextInput
+                      value={freeTexts[0] ?? ''}
+                      onChange={(next) =>
+                        onChange(
+                          block.name,
+                          next === ''
+                            ? [
+                                ...checked.filter(
+                                  (v) => v !== choice.label && !isOtherFreeText(block, v),
+                                ),
+                                choice.label,
+                              ]
+                            : [
+                                ...checked.filter(
+                                  (v) => v !== choice.label && !isOtherFreeText(block, v),
+                                ),
+                                next,
+                              ],
+                        )
+                      }
+                      inputClass={inputClass}
+                    />
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
 

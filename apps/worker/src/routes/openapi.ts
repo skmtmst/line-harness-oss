@@ -837,6 +837,10 @@ const spec = {
       parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
       post: { tags: ['Ops Console'], summary: '参照した記事の評価', parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }], responses: { '200': { description: 'Feedback recorded' }, '409': { description: 'Usage not found or changed' } } },
     },
+    '/api/ops/knowledge/tickets/{id}/process': {
+      parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+      post: { tags: ['Ops Console'], summary: '対象の解決済み問い合わせのナレッジ生成予約を実行（運営書込権限必須・二重実行防止）', parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }], responses: { '200': { description: 'Current knowledge and job state' }, '403': { description: 'Forbidden' }, '404': { description: 'Ticket not found' }, '503': { description: 'AI unavailable' } } },
+    },
     '/api/ops/knowledge/tickets/{id}/retry': {
       parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
       post: { tags: ['Ops Console'], summary: '失敗した記事生成の再試行を予約', parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }], responses: { '202': { description: 'Queued' }, '409': { description: 'Not retryable' } } },
@@ -1068,6 +1072,21 @@ const spec = {
         summary: '友だち詳細取得',
         parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
         responses: { '200': { description: 'Friend with tags' }, '404': { description: 'Not found' } },
+      },
+    },
+    '/api/friends/{id}/form-submissions': {
+      get: {
+        tags: ['Friends'],
+        summary: '友だちのフォーム回答履歴をカーソル式で取得（回答フォームタブ用・PERF-13）',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'limit', in: 'query', schema: { type: 'integer', default: 10, maximum: 50 } },
+          { name: 'cursor', in: 'query', schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': { description: 'Form submissions page with total count and nextCursor' },
+          '404': { description: 'Friend not found in account scope' },
+        },
       },
     },
     '/api/friends/{id}/upcoming': {
@@ -1403,6 +1422,23 @@ const spec = {
           '200': { description: 'Media file bytes with Content-Disposition: attachment' },
           '403': { description: 'Staff role required' },
           '404': { description: 'Media not found in account scope' },
+        },
+      },
+    },
+    '/api/media/{id}/versions/{versionNo}/download': {
+      get: {
+        tags: ['Contents'],
+        summary: '登録メディアの指定した版を認証付きでダウンロード（元ファイルの取り戻し）',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'versionNo', in: 'path', required: true, schema: { type: 'integer', minimum: 1 } },
+          { name: 'accountId', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': { description: 'Version file bytes with Content-Disposition: attachment' },
+          '400': { description: 'Account id is required' },
+          '403': { description: 'Staff role required' },
+          '404': { description: 'Media or version not found in account scope' },
         },
       },
     },
@@ -2275,6 +2311,19 @@ const spec = {
       },
     },
     // ── Broadcasts ───────────────────────────────────────────────────────────
+    '/api/broadcast-message-assets/counts': {
+      get: {
+        tags: ['Broadcasts'],
+        summary: '配信素材の種類別件数を取得（タブ件数用・PERF-04）',
+        parameters: [
+          { name: 'lineAccountId', in: 'query', schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': { description: 'Counts keyed by asset kind' },
+          '403': { description: 'LINEアカウントの表示権限なし' },
+        },
+      },
+    },
     '/api/broadcasts': {
       get: { tags: ['Broadcasts'], summary: '配信一覧取得', responses: { '200': { description: 'All broadcasts' } } },
       post: {
@@ -4126,6 +4175,25 @@ const spec = {
           '404': { description: '対象アカウントにメニューが存在しない' },
           '409': { description: 'メニュー版が更新済み' },
           '503': { description: '設備割当を保存できない' },
+        },
+      },
+    },
+    '/api/booking/admin/availability-check': {
+      get: {
+        tags: ['Booking'],
+        summary: '指定した日時に予約を受けられるかと、受けられない場合の理由を確認',
+        description: '予約設定画面の「この日時はなぜ取れないか」用。読み取り専用で予約は作らない。判定は実際の空き枠計算と同じ入力・同じ手順を使い、受けられない場合は理由コード（勤務外・休業日・所要時間超過・既存予約との重複・外部カレンダーの予定・定員・設備不足など）を返す。他担当の非公開予定の件名・相手など詳細は含めない。',
+        parameters: [
+          { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+          { name: 'menu_id', in: 'query', required: true, schema: { type: 'string' } },
+          { name: 'staff_id', in: 'query', required: false, schema: { type: 'string' } },
+          { name: 'date', in: 'query', required: true, schema: { type: 'string', pattern: '^\\d{4}-\\d{2}-\\d{2}$' } },
+          { name: 'time', in: 'query', required: true, schema: { type: 'string', pattern: '^\\d{2}:\\d{2}$' } },
+        ],
+        responses: {
+          '200': { description: 'bookable（受けられるか）、reasons（理由コードの一覧）、per_staff（担当ごとの可否・残数・理由）' },
+          '400': { description: 'account_id・menu_id・date・time の不足または形式不正' },
+          '403': { description: 'このLINEアカウントを表示する権限がない' },
         },
       },
     },

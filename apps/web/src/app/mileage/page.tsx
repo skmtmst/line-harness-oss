@@ -30,6 +30,7 @@ import { mileagePaginationTotal } from './mileage-response-state'
 import { ruleEventLabel } from './earning-rule-view'
 import MileageHistoryTab from './mileage-history-tab'
 import ActionScoreTab from './action-score-tab'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 
 const PAGE_SIZE = 20
 const TABS = [
@@ -87,6 +88,12 @@ type EarningRuleSummary = {
   grantedMiles: number
   grantedCount: number
   averageBalance: number | null
+  /*
+   * 平均を割った人数。説明文はここから出す——別の口で取った人数
+   * （全員の数など）を書くと、実際に割った数と説明がずれる
+   * （MILEAGE-05）。残高0の人は分母に入れない。
+   */
+  averageDenominator: number | null
 }
 
 function rankLabel(rank: string | null) {
@@ -171,6 +178,12 @@ function MileagePageInner() {
   const [rulePage, setRulePage] = useState(1)
   const [tabCounts, setTabCounts] = useState<{ balances: number | null; rules: number | null; rewards: number | null }>({ balances: null, rules: null, rewards: null })
   const [canAdjustMileage, setCanAdjustMileage] = useState(false)
+  /*
+   * 並び順の未保存変更がある間、画面を離れる操作を止める共通の番兵（DETAIL-04系）。
+   * 左メニュー・画面内リンク・戻る操作・再読込を同じ確認対話へ寄せる。
+   * タブ切替は同じ画面内の移動で下書きは残るので、番兵は画面外への離脱だけを見る。
+   */
+  const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty: ruleOrderDirty, busy: savingRuleOrder })
   const overviewTotal = mileagePaginationTotal(overview)
   const rules = ruleOverview?.items ?? []
 
@@ -226,6 +239,7 @@ function MileagePageInner() {
         averageBalance: friendsRes.data.summary.withBalanceCount > 0
           ? Math.round(friendsRes.data.summary.available / friendsRes.data.summary.withBalanceCount)
           : null,
+        averageDenominator: friendsRes.data.summary.withBalanceCount,
       })
       setRuleOrder(items.map((rule) => rule.id))
       setRuleOrderDirty(false)
@@ -588,7 +602,7 @@ function MileagePageInner() {
           <SummaryCard variant="v6" title="動いている決めごと" value={activeRules.length} unit="つ" detail={`止めているもの ${rules.length - activeRules.length}つ`} />
           <SummaryCard variant="v6" title="この30日で付いたマイル" value={ruleSummary?.grantedMiles ?? null} unit="マイル" detail={`のべ ${formatMileageNumber(ruleSummary?.grantedCount ?? 0)}回`} />
           <SummaryCard variant="v6" title="いちばん付いている" value={topRule ? grantedMiles30d(topRule) : null} unit="マイル" detail={topRule ? `${topRule.draft.name}・${formatMileageNumber(topRule.metrics30d.granted)}回` : 'まだ付与記録はありません'} />
-          <SummaryCard variant="v6" title="1人あたりの平均" value={ruleSummary?.averageBalance ?? null} unit="マイル" detail={`持っている人 ${formatMileageNumber(tabCounts.balances ?? 0)}人で割った数`} />
+          <SummaryCard variant="v6" title="1人あたりの平均" value={ruleSummary?.averageBalance ?? null} unit="マイル" detail={ruleSummary?.averageDenominator ? `残高0の人は除き、持っている人 ${formatMileageNumber(ruleSummary.averageDenominator)}人で割った数` : '残高がある人がいないため計算していません'} />
         </div> : null}
         <NoteBar>
           どんなことをしたら何マイル付けるかを決めます。付与数を変えると、変更後に起きた行動から新しい値を使います。
@@ -783,6 +797,16 @@ function MileagePageInner() {
         error={publishError || undefined}
         onCancel={() => { if (savingRuleId === null) setPublishTarget(null) }}
         onConfirm={() => { if (publishTarget) void publishRule(publishTarget) }}
+      />
+
+      <ConfirmDialog
+        open={leaveTarget !== null}
+        title="保存していない変更があります"
+        description="このまま移動すると、たまる決めごとの並び順への変更は失われます。保存せずに移動しますか？"
+        confirmLabel="保存せずに移動"
+        cancelLabel="編集を続ける"
+        onConfirm={confirmLeave}
+        onCancel={cancelLeave}
       />
 
       {tab === 'history' && selectedAccountId ? <MileageHistoryTab key={selectedAccountId} accountId={selectedAccountId} /> : null}

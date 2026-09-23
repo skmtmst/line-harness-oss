@@ -1075,7 +1075,10 @@ export async function getFriendStats(
 
 /** 一斉配信の一覧に出す数（設計 `V2 4-2 一斉配信` の KPIs）。 */
 export interface BroadcastStats {
-  /** 今月の配信件数と、そのうち予約中。 */
+  /**
+   * 今月送り終わった配信の件数と、そのうち予約中。
+   * 数えるのは送った日（sent_at）。作った日ではない（BROADCAST-14）。
+   */
   thisMonth: number;
   scheduled: number;
   /** 過去28日の到達と失敗。 */
@@ -1136,8 +1139,12 @@ export async function getBroadcastStats(
   const [counts, reach] = await Promise.all([
     db
       .prepare(
+        // BROADCAST-14: 「今月の配信」は送り終わったものを、送った日で数える。
+        // 下書きや予約を作っただけでは配信実績にならない。ダッシュボードの
+        // delivery.broadcasts と同じく、sent_at の無い古い行だけ
+        // created_at で代用する（0件へ落とさない）。
         `SELECT
-           SUM(CASE WHEN substr(created_at, 1, 7) = ? THEN 1 ELSE 0 END) AS this_month,
+           SUM(CASE WHEN status = 'sent' AND substr(COALESCE(sent_at, created_at), 1, 7) = ? THEN 1 ELSE 0 END) AS this_month,
            SUM(CASE WHEN status = 'scheduled' THEN 1 ELSE 0 END) AS scheduled
          FROM broadcasts WHERE 1 = 1${accountFilter.sql}`,
       )
@@ -1149,7 +1156,7 @@ export async function getBroadcastStats(
            COALESCE(SUM(success_count), 0) AS delivered,
            COALESCE(SUM(total_count - success_count), 0) AS failed
          FROM broadcasts
-          WHERE status = 'sent' AND created_at >= ?${accountFilter.sql}`,
+          WHERE status = 'sent' AND COALESCE(sent_at, created_at) >= ?${accountFilter.sql}`,
       )
       .bind(since, ...accountFilter.binds)
       .first<{ delivered: number; failed: number }>(),

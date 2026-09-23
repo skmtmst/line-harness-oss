@@ -21,9 +21,14 @@ import { TextInput } from '@/components/shared/form-controls'
 import Select from '@/components/shared/select'
 // #740: 下書きの初期値と字数上限は編集画面と共有する。片方だけ変えないこと。
 import {
+  EVENT_CANCEL_DEADLINE_OPTIONS,
   EVENT_DEFAULT_DRAFT,
   EVENT_DESCRIPTION_MAX_LENGTH,
+  EVENT_ENTRY_CUTOFF_OPTIONS,
   EVENT_NAME_MAX_LENGTH,
+  deadlineOptionsWithSaved,
+  deadlineSelectValue,
+  parseDeadlineSelect,
   resolveEventMultiAccountIds,
 } from './event-draft-shared'
 
@@ -263,6 +268,14 @@ export default function EventWizard({ accountId, eventId, step }: EventWizardPro
         if (firstSlotId && slots.some((s) => s.id === firstSlotId)) {
           // 概要で確定した枠だけを更新する。ほかの枠の日時・定員は触らない。
           await eventsApi.updateSlot(accountId, id, firstSlotId, slotPayload)
+          /*
+            EVENT-01: 保存した枠を一覧へ即時反映する。PUT の戻り値は枠の
+            行だけで申込数(active_count)を持たないので、残席表示を狂わせ
+            ないよう一覧を読み直してから段階2へ進む。失敗時はここで
+            例外になり、古い一覧のまま「保存できた」とは表示しない。
+          */
+          const refreshed = await eventsApi.listSlots(accountId, id)
+          setSlots(refreshed.items)
         } else {
           /*
             まだ枠IDを持たない(新規作成直後・①で消えた)ときだけ作る。
@@ -472,7 +485,18 @@ function OverviewStep({
     const [hour, minute] = firstSlot.startTime.split(':').map(Number)
     if (!Number.isFinite(hour) || !Number.isFinite(minute)) return '終了時刻未定'
     const total = hour * 60 + minute + firstSlot.durationMinutes
-    return `${String(Math.floor(total / 60) % 24).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`
+    const hhmm = `${String(Math.floor(total / 60) % 24).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`
+    /*
+     * 日をまたぐ枠は終了側の日付も出す(DETAIL-10)。
+     * 「23:30〜01:00」だけでは翌日と読み取れない。
+     */
+    if (total < 24 * 60 || !firstSlot.date) return hhmm
+    const endDate = new Date(new Date(`${firstSlot.date}T00:00:00+09:00`).getTime() + total * 60_000)
+    if (Number.isNaN(endDate.getTime())) return hhmm
+    const endDay = new Intl.DateTimeFormat('ja-JP', {
+      month: 'long', day: 'numeric', weekday: 'short', timeZone: 'Asia/Tokyo',
+    }).format(endDate)
+    return `${endDay} ${hhmm}`
   })()
   return (
     <div data-design="Body" className="flex flex-col items-start gap-4 xl:flex-row">
@@ -683,7 +707,7 @@ function OverviewStep({
           <span>
             <span className="text-ink block font-medium">承認してから予約を確定する</span>
             <span className="text-ink-faint block text-xs">
-              申し込み後、申込者一覧で承認するまで確定しません。
+              申し込み後、申込者一覧で承認するまで確定しません。承認待ちの分も残席を使います。
             </span>
           </span>
         </label>
@@ -1188,21 +1212,27 @@ function SlotsStep({
         >
           <div className="grid gap-3 sm:grid-cols-2">
             <Field label="キャンセルできる期限" htmlFor="cancel-deadline">
+              {/*
+                EVENT-03: 保存値の意味は編集画面・Worker と同じ。
+                null=不可、0=開始直前まで、正数=開始N時間前。
+                選択肢は event-draft-shared で共有し、編集と食い違わせない。
+              */}
               <select
                 id="cancel-deadline"
-                value={draft.cancel_deadline_hours_before ?? ''}
+                value={deadlineSelectValue(draft.cancel_deadline_hours_before)}
                 onChange={(e) =>
-                  update(
-                    'cancel_deadline_hours_before',
-                    e.target.value === '' ? null : Number(e.target.value),
-                  )
+                  update('cancel_deadline_hours_before', parseDeadlineSelect(e.target.value))
                 }
                 className={inputClass}
               >
-                <option value="">いつでもキャンセルできる</option>
-                <option value="2">開始の2時間前まで</option>
-                <option value="24">開始の24時間前まで</option>
-                <option value="48">開始の48時間前まで</option>
+                {deadlineOptionsWithSaved(
+                  EVENT_CANCEL_DEADLINE_OPTIONS,
+                  draft.cancel_deadline_hours_before,
+                ).map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
               </select>
             </Field>
             <Field label="開始前のお知らせ" htmlFor="reminder-hours">
@@ -1447,21 +1477,27 @@ function PublishStep({
               </select>
             </Field>
             <Field label="申込の締め切り" htmlFor="entry-cutoff">
+              {/*
+                EVENT-04: 選択肢は編集画面と同じ一覧を使う。保存値が選択肢に
+                無いときは「保存済み：…」として出し、先頭項目を選んだように
+                見せない。
+              */}
               <select
                 id="entry-cutoff"
-                value={draft.entry_cutoff_hours_before ?? ''}
+                value={deadlineSelectValue(draft.entry_cutoff_hours_before)}
                 onChange={(e) =>
-                  update(
-                    'entry_cutoff_hours_before',
-                    e.target.value === '' ? null : Number(e.target.value),
-                  )
+                  update('entry_cutoff_hours_before', parseDeadlineSelect(e.target.value))
                 }
                 className={inputClass}
               >
-                <option value="">開始まで受け付ける</option>
-                <option value="2">開始の2時間前まで</option>
-                <option value="24">開始の24時間前まで</option>
-                <option value="48">開始の48時間前まで</option>
+                {deadlineOptionsWithSaved(
+                  EVENT_ENTRY_CUTOFF_OPTIONS,
+                  draft.entry_cutoff_hours_before,
+                ).map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
               </select>
             </Field>
           </div>
@@ -1530,7 +1566,14 @@ function PublishStep({
 
         <StepFooter
           back={{ label: '予約枠に戻る', onClick: onBack }}
-          next={{ label: '保存して公開', onClick: onPublish }}
+          next={{
+            /*
+              EVENT-02: ボタン名は実際の保存結果と合わせる。公開OFFのまま
+              「保存して公開」と出すと、下書き保存を公開と誤認する。
+            */
+            label: draft.is_published === 1 ? '保存して公開' : '下書きとして保存',
+            onClick: onPublish,
+          }}
           saving={saving}
         />
       </div>
@@ -1548,7 +1591,7 @@ function PublishStep({
         <AsideCard title="気をつけること">
           <ul className="text-ink-faint space-y-1.5 text-xs leading-relaxed">
             <li>・公開後に日時を変えると、申込済みの方へ変更のお知らせが届きます</li>
-            <li>・承認制にすると、申込直後は「受付中」の表示になります</li>
+            <li>・承認制にすると、申込直後は「受付中」の表示になります。承認待ちの分も残席を使います</li>
             <li>・タグで絞ると、対象外の方にはページが表示されません</li>
           </ul>
         </AsideCard>

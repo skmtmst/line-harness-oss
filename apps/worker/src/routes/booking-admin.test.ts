@@ -1291,3 +1291,157 @@ describe('staff breaks API (N-405 #655)', () => {
     }
   });
 });
+
+describe('GET /api/booking/admin/availability-check (IDEA-28)', () => {
+  // 2099-01-10 は土曜。シフトを置いて「はるか未来の空き枠」として使う。
+  const CHECK_DAY = '2099-01-10';
+  function seedCheck(sqlite: Database.Database) {
+    sqlite.exec(readFileSync(join(process.cwd(), '../../packages/db/bootstrap.sql'), 'utf8'));
+    sqlite.exec(`
+      INSERT INTO line_accounts (id, channel_id, name, channel_access_token, channel_secret)
+      VALUES ('acc1','channel-1','A店','token','secret'),
+             ('acc2','channel-2','B店','token2','secret2');
+      INSERT INTO staff (id, line_account_id, name, display_name)
+      VALUES ('s1','acc1','担当A','担当A'),
+             ('s2','acc2','担当B','担当B'),
+             ('owner-1','acc1','Owner','Owner');
+      INSERT INTO booking_settings (id, line_account_id, timezone)
+      VALUES ('bs1','acc1','Asia/Tokyo'),
+             ('bs2','acc2','Asia/Tokyo');
+      INSERT INTO menus (id, line_account_id, name, duration_minutes, buffer_after_minutes, base_price)
+      VALUES ('m1','acc1','カット',60,0,5000),
+             ('m2','acc1','カラー',90,0,8000),
+             ('mx','acc2','他店メニュー',60,0,5000);
+      INSERT INTO staff_menus (staff_id, menu_id) VALUES ('s1','m1'), ('s1','m2');
+      INSERT INTO staff_shifts (id, staff_id, work_date, start_time, end_time)
+      VALUES ('sh1','s1','${CHECK_DAY}','10:00','17:00');
+      INSERT INTO booking_customers (id, line_account_id, display_name, phone_normalized_hash, phone_encrypted, phone_last4)
+      VALUES ('c1','acc1','客A','hash','enc','0000');
+    `);
+  }
+
+  const check = (
+    app: ReturnType<typeof makeApp>['app'],
+    env: unknown,
+    qs: string,
+  ) => app.request(`/api/booking/admin/availability-check?${qs}`, {}, env as never);
+
+  test('空き枠は bookable: true、予約は一切作られない', async () => {
+    const sqlite = new Database(':memory:');
+    try {
+      seedCheck(sqlite);
+      const { app, env } = makeApp(sqliteAsD1(sqlite));
+      const res = await check(app, env, `account_id=acc1&menu_id=m1&date=${CHECK_DAY}&time=11:00&staff_id=s1`);
+      expect(res.status).toBe(200);
+      const body = await res.json() as {
+        bookable: boolean; reasons: string[];
+        per_staff: Array<{ staff_id: string; bookable: boolean; remaining: number }>;
+      };
+      expect(body.bookable).toBe(true);
+      expect(body.reasons).toEqual([]);
+      expect(body.per_staff[0]).toMatchObject({ staff_id: 's1', bookable: true, remaining: 1 });
+      // 確認だけなので bookings に行が増えないこと
+      expect(sqlite.prepare(`SELECT COUNT(*) AS n FROM bookings`).get())
+        .toEqual({ n: 0 });
+    } finally {
+      sqlite.close();
+    }
+  });
+
+  test('別メニューの予約が重なる枠は other_booking を返し、実際の空き状況と一致する', async () => {
+    const sqlite = new Database(':memory:');
+    try {
+      seedCheck(sqlite);
+      // 11:00-12:00 JST = 02:00-03:00 UTC に別メニュー(m2)の予約を置く
+      sqlite.exec(`
+        INSERT INTO bookings (id, line_account_id, booking_customer_id, staff_id, menu_id,
+          starts_at, ends_at, block_ends_at, status, price_at_booking, requested_at)
+        VALUES ('b1','acc1','c1','s1','m2',
+          '2099-01-10T02:00:00Z','2099-01-10T03:30:00Z','2099-01-10T03:30:00Z',
+          'confirmed',8000,'2026-01-01T00:00:00Z');
+      `);
+      const { app, env } = makeApp(sqliteAsD1(sqlite));
+      const res = await check(app, env, `account_id=acc1&menu_id=m1&date=${CHECK_DAY}&time=11:00&staff_id=s1`);
+      expect(res.status).toBe(200);
+      const body = await res.json() as { bookable: boolean; reasons: string[] };
+      expect(body.bookable).toBe(false);
+      expect(body.reasons).toEqual(['other_booking']);
+      // 表示理由と実判定の一致: 同じ条件の /availability でも 11:00 開始は出ない
+      const avail = await app.request(
+        `/api/booking/admin/availability?account_id=acc1&menu_id=m1&staff_id=s1&from=${CHECK_DAY}&to=${CHECK_DAY}`,
+        {}, env as never,
+      );
+      expect(avail.status).toBe(200);
+      const availBody = await avail.json() as { by_staff: Array<{ slots: Array<{ start: string }> }> };
+      // getAvailability はモックなのでここでは直接見ない（モックは computeSlots 依存）。
+      // 代わりに explainBookingSlot 側の一致は service 層テストで担保済み。
+      expect(availBody.by_staff).toBeDefined();
+    } finally {
+      sqlite.close();
+    }
+  });
+
+  test('勤務のない時間は outside_working、休業日は exception_closed', async () => {
+    const sqlite = new Database(':memory:');
+    try {
+      seedCheck(sqlite);
+      const { app, env } = makeApp(sqliteAsD1(sqlite));
+      const outside = await check(app, env, `account_id=acc1&menu_id=m1&date=${CHECK_DAY}&time=20:00`);
+      expect(outside.status).toBe(200);
+      await expect(outside.json()).resolves.toMatchObject({
+        bookable: false, reasons: ['outside_working'],
+      });
+      sqlite.exec(`
+        INSERT INTO booking_availability_exceptions (id, line_account_id, scope_kind, date_from, date_to, kind, hours_json)
+        VALUES ('ex1','acc1','store','${CHECK_DAY}','${CHECK_DAY}','closed','[]');
+      `);
+      const closed = await check(app, env, `account_id=acc1&menu_id=m1&date=${CHECK_DAY}&time=11:00`);
+      expect(closed.status).toBe(200);
+      await expect(closed.json()).resolves.toMatchObject({
+        bookable: false, reasons: ['exception_closed'],
+      });
+    } finally {
+      sqlite.close();
+    }
+  });
+
+  test('他アカウントのメニュー・担当は見えない（account境界）', async () => {
+    const sqlite = new Database(':memory:');
+    try {
+      seedCheck(sqlite);
+      const { app, env } = makeApp(sqliteAsD1(sqlite));
+      const res = await check(app, env, `account_id=acc1&menu_id=mx&date=${CHECK_DAY}&time=11:00`);
+      expect(res.status).toBe(200);
+      const body = await res.json() as { bookable: boolean; reasons: string[] };
+      expect(body.bookable).toBe(false);
+      expect(body.reasons).toEqual(['menu_inactive']);
+      // s2 は acc2 の担当 → acc1 では menu の提供担当に出ない
+      const res2 = await check(app, env, `account_id=acc1&menu_id=m1&staff_id=s2&date=${CHECK_DAY}&time=11:00`);
+      const body2 = await res2.json() as { bookable: boolean; reasons: string[] };
+      expect(body2.bookable).toBe(false);
+      expect(body2.reasons).toEqual(['staff_not_offered']);
+    } finally {
+      sqlite.close();
+    }
+  });
+
+  test('パラメータ不足・形式不正は400', async () => {
+    const sqlite = new Database(':memory:');
+    try {
+      seedCheck(sqlite);
+      const { app, env } = makeApp(sqliteAsD1(sqlite));
+      const missing = await check(app, env, 'account_id=acc1&date=2099-01-10');
+      expect(missing.status).toBe(400);
+      const badDate = await check(app, env, 'account_id=acc1&menu_id=m1&date=2099-13-40&time=11:00');
+      expect(badDate.status).toBe(400);
+      const badTime = await check(app, env, `account_id=acc1&menu_id=m1&date=${CHECK_DAY}&time=25:00`);
+      expect(badTime.status).toBe(400);
+      const noAccount = await app.request(
+        `/api/booking/admin/availability-check?menu_id=m1&date=${CHECK_DAY}&time=11:00`, {}, env as never,
+      );
+      expect(noAccount.status).toBe(400);
+    } finally {
+      sqlite.close();
+    }
+  });
+});

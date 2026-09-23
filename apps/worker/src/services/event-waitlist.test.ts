@@ -165,6 +165,60 @@ describe('V6 event waitlist and applicants', () => {
     expect(data?.summary).toMatchObject({ bookingCount: 0, waitingCount: 0 });
   });
 
+  test('IDEA-29: 席数別の集計・終了した待ち履歴・当日受付を人数で返す', async () => {
+    // 確定2人・承認待ち1人・待機1人・案内中2人・繰上げ済み1人・期限切れ1人・参加済1人。
+    seedBooking(); // booking-a: confirmed party_size=2
+    seedWaitlist(); // wait-a: waiting party_size=1
+    sqlite.exec(`
+      INSERT INTO event_bookings (
+        id, line_account_id, event_id, slot_id, friend_id, status, requested_at,
+        identity_key, party_size, updated_at
+      ) VALUES
+        ('booking-req', 'account-a', 'event-a', 'slot-a', 'friend-c', 'requested',
+         '2026-09-01T02:00:00.000Z', 'friend-c-req', 1, '2026-09-01T02:00:00.000Z'),
+        ('booking-att', 'account-a', 'event-a', 'slot-a', 'friend-c', 'attended',
+         '2026-09-01T03:00:00.000Z', 'friend-c-att', 1, '2099-06-01T05:00:00.000Z'),
+        ('event-waitlist:wait-done', 'account-a', 'event-a', 'slot-a', 'friend-c', 'confirmed',
+         '2026-08-31T00:00:00.000Z', 'friend-c-done', 1, '2026-08-31T00:00:00.000Z');
+      INSERT INTO event_waitlist (
+        id, line_account_id, event_id, slot_id, friend_id, identity_key, status,
+        party_size, created_at, updated_at, offered_at
+      ) VALUES
+        ('wait-offer', 'account-a', 'event-a', 'slot-a', 'friend-c', 'friend-c-w', 'offered',
+         2, '2026-09-01T04:00:00.000Z', '2026-09-01T05:00:00.000Z', '2026-09-01T05:00:00.000Z'),
+        ('wait-done', 'account-a', 'event-a', 'slot-a', 'friend-c', 'friend-c-d', 'converted',
+         1, '2026-08-30T00:00:00.000Z', '2026-08-31T00:00:00.000Z', '2026-08-30T01:00:00.000Z'),
+        ('wait-lost', 'account-a', 'event-a', 'slot-a', 'friend-c', 'friend-c-e', 'expired',
+         1, '2026-08-29T00:00:00.000Z', '2026-08-30T00:00:00.000Z', '2026-08-29T01:00:00.000Z');
+    `);
+
+    const data = await getEventOccurrenceApplicants(db, { occurrenceId: 'slot-a', lineAccountId: 'account-a' });
+
+    expect(data?.summary).toMatchObject({
+      bookingCount: 3, // confirmed×2 + requested×1(attendedは申込者一覧に出ない)
+      waitingCount: 1,
+      // 席を消費中 = requested1 + confirmed3 + offered2 = 6
+      activeSeats: 6,
+      confirmedSeats: 3,
+      requestedSeats: 1,
+      waitingSeats: 1,
+      offeredSeats: 2,
+      remainingSeats: 0, // capacity3 - 6 → 0(負にしない)
+    });
+    // 終了した待ちだけを履歴へ。converted は予約IDを追える。
+    expect(data?.waitlistHistory?.map((row) => row.id).sort()).toEqual(['wait-done', 'wait-lost']);
+    expect(data?.waitlistHistory?.find((row) => row.id === 'wait-done'))
+      .toMatchObject({ status: 'converted', convertedBookingId: 'event-waitlist:wait-done' });
+    // 稼働中の待ちは履歴に混ぜない。
+    expect(data?.waitlistHistory?.some((row) => row.id === 'wait-a' || row.id === 'wait-offer')).toBe(false);
+    // 当日受付: 参加済だけを人数と行で返す。
+    expect(data?.attendance).toMatchObject({
+      attendedSeats: 1,
+      noShowSeats: 0,
+      entries: [expect.objectContaining({ id: 'booking-att', status: 'attended', partySize: 1 })],
+    });
+  });
+
   test('繰上げURLを本人が承諾すると、回答内容を保った確定予約へ一度だけ変換する', async () => {
     const token = 'valid-offer-token-123456789012345678901234567890';
     await seedOffered(token);

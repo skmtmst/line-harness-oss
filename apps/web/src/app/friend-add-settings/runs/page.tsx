@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type {
   FriendAddEventAttributionStatus,
   FriendAddEventKind,
@@ -103,7 +103,7 @@ const RULE_STATUS_LABELS: Record<string, string> = {
 const CSV_EXPORT_MAX_PAGES = 50
 const CSV_EXPORT_PAGE_SIZE = 100
 
-export default function FriendAddRunsPage() {
+function FriendAddRunsInner() {
   usePageTitle('新規友だち初回案内・実行結果')
   const { selectedAccountId, accounts, loading: accountLoading } = useAccount()
   const searchParams = useSearchParams()
@@ -551,5 +551,14 @@ export default function FriendAddRunsPage() {
         onConfirm={() => void stopDelivery()}
       />
     </div>
+  )
+}
+
+export default function FriendAddRunsPage() {
+  // useSearchParams は Suspense の中でしか使えない（静的書き出しのため）。
+  return (
+    <Suspense fallback={<ListState kind="loading" />}>
+      <FriendAddRunsInner />
+    </Suspense>
   )
 }

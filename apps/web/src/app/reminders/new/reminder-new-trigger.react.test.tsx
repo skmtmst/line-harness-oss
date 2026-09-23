@@ -269,10 +269,13 @@ describe('ひな形から作る', () => {
     fireEvent.click(screen.getByRole('button', { name: /対象設定へ/ }))
     await waitFor(() => expect(fixture.createDraft).toHaveBeenCalled())
     const settings = fixture.createDraft.mock.calls[0][0]
-    expect(settings.steps[0].messageContent).toBe('')
-    expect(settings.steps[0].messageContent).not.toContain('Google Meet')
+    /*
+     * REMINDER-07: 空の1通目は作らない。空本文の通はWorkerの下書き検査で
+     * 弾かれ基本設定から先へ進めなかった。通知0件の未完成下書きとして
+     * 保存し、本文は STEP 3 の通知編集で作る。
+     */
+    expect(settings.steps).toEqual([])
     expect(settings.sendAtTime).toBeNull()
-    expect(settings.steps[0].sendAtTime).toBeNull()
   })
 
   it('「誕生日のお祝い」を使うと起点・繰り返し・本文・時刻がまとめて入る', async () => {

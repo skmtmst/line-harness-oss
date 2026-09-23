@@ -16,6 +16,7 @@
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { ApiError } from '@/lib/api'
 
 const api = vi.hoisted(() => ({
   create: vi.fn(),
@@ -196,6 +197,101 @@ describe('共通情報の新規作成(実React)', () => {
     expect(api.create.mock.calls[0][0]).toMatchObject({ accountId: 'account-2', name: 'account-2の値' })
     // account-1 で入力していた秘密値らしい社内メモは、どのアカウントへも送信されない。
     expect(api.create.mock.calls.some((call) => call[0].memo === 'password: hunter2')).toBe(false)
+  })
+})
+
+/*
+ * VAR-06: 型別の入力エラーを「保存に失敗しました」で隠さない。
+ * 空欄不可の種別は送信前に画面で止め、APIの400は理由をそのまま出して
+ * 直す欄へ戻す。通信障害・重複・権限不足とは文を分ける。
+ */
+describe('共通情報の新規作成: 型別の入力エラー(VAR-06, 実React)', () => {
+  it('真偽を選ばないままだと、理由を出して値の欄へ戻し送信しない', async () => {
+    await render()
+    await setValue(byId('cv-name'), '営業中フラグ')
+    await setValue(byId('cv-key'), 'is_open')
+    await click(host.querySelector('input[name="cv-type"][value="boolean"]') as HTMLInputElement)
+    // 「選んでください」のまま登録する。
+    await click(byExactText('button', '登録'))
+
+    expect(api.create).not.toHaveBeenCalled()
+    expect(host.textContent).toContain('値を選んでください')
+    expect((document.activeElement as HTMLElement | null)?.id).toBe('cv-value')
+  })
+
+  it('年月日を空のまま登録すると、理由を出して送信しない', async () => {
+    await render()
+    await setValue(byId('cv-name'), '開店日')
+    await setValue(byId('cv-key'), 'open_date')
+    await click(host.querySelector('input[name="cv-type"][value="date"]') as HTMLInputElement)
+    await click(byExactText('button', '登録'))
+
+    expect(api.create).not.toHaveBeenCalled()
+    expect(host.textContent).toContain('値の日付を入力してください')
+  })
+
+  it('画像に https URL でない文字列を入れると止める(VAR-03)', async () => {
+    await render()
+    await setValue(byId('cv-name'), 'ロゴ')
+    await setValue(byId('cv-key'), 'logo_url')
+    await click(host.querySelector('input[name="cv-type"][value="image"]') as HTMLInputElement)
+    await setValue(byId('cv-value'), 'not-an-image')
+    await click(byExactText('button', '登録'))
+
+    expect(api.create).not.toHaveBeenCalled()
+    expect(host.textContent).toContain('https://')
+  })
+
+  it('期間外の代替値が種別に合わないと止める', async () => {
+    await render()
+    await setValue(byId('cv-name'), 'ロゴ')
+    await setValue(byId('cv-key'), 'logo_url2')
+    await click(host.querySelector('input[name="cv-type"][value="image"]') as HTMLInputElement)
+    await setValue(byId('cv-value'), 'https://cdn.example.com/logo.png')
+    await setValue(byId('cv-expiry-behavior'), 'fallback')
+    await setValue(byId('cv-fallback-value'), 'not-an-image')
+    await click(byExactText('button', '登録'))
+
+    expect(api.create).not.toHaveBeenCalled()
+    expect(host.textContent).toContain('代替値は https:// からはじまるURLで入力してください')
+    expect((document.activeElement as HTMLElement | null)?.id).toBe('cv-fallback-value')
+  })
+
+  it('APIの400は理由をそのまま出し、「保存に失敗しました」で隠さない', async () => {
+    api.create.mockRejectedValue(new ApiError(400, '種別に合う値を入力してください'))
+    await render()
+    await setValue(byId('cv-name'), '営業時間')
+    await setValue(byId('cv-key'), 'shop_hours')
+    await setValue(byId('cv-value'), '10:00-18:00')
+    await click(byExactText('button', '登録'))
+
+    expect(host.textContent).toContain('種別に合う値を入力してください')
+    expect(host.textContent).not.toContain('保存に失敗しました')
+  })
+
+  it('重複(409)は従来の案内を出し、差し込み名の欄へ戻す', async () => {
+    api.create.mockRejectedValue(new ApiError(409, 'その差し込み名は既に使われています'))
+    await render()
+    await setValue(byId('cv-name'), '営業時間')
+    await setValue(byId('cv-key'), 'shop_hours')
+    await setValue(byId('cv-value'), '10:00-18:00')
+    await click(byExactText('button', '登録'))
+
+    expect(host.textContent).toContain('その差し込み名は既に使われています')
+    expect((document.activeElement as HTMLElement | null)?.id).toBe('cv-key')
+  })
+
+  it('通信障害は入力エラーと混ぜず、通信の言葉で言う', async () => {
+    api.create.mockRejectedValue(new TypeError('fetch failed'))
+    await render()
+    await setValue(byId('cv-name'), '営業時間')
+    await setValue(byId('cv-key'), 'shop_hours')
+    await setValue(byId('cv-value'), '10:00-18:00')
+    await click(byExactText('button', '登録'))
+
+    expect(host.textContent).toContain('通信が切れている可能性があります')
+    // 入力は消さない。
+    expect((byId('cv-value') as HTMLInputElement).value).toBe('10:00-18:00')
   })
 })
 

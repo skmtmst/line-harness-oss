@@ -850,9 +850,9 @@ function VarsPageInner() {
                             {/* 差し込みの書き方を独立した列に出す。名前と混ぜず、
                                 テンプレートを書くときに横へ追って確認できる。 */}
                             <code
-                              title={placeholderText(item.name)}
+                              title={placeholderText(item.varKey)}
                               className="text-ink-faint block truncate whitespace-nowrap text-xs"
-                            >{placeholderText(item.name)}</code>
+                            >{placeholderText(item.varKey)}</code>
                           </td>
                           <td title={item.value || '（空）'} className="text-ink truncate px-4 py-3 text-sm">
                             {item.value || <span className="text-ink-faint">（空）</span>}
@@ -1009,7 +1009,7 @@ function VarsPageInner() {
                         options={replacementCandidates.length > 0
                           ? replacementCandidates.map((candidate) => ({
                               value: candidate.id,
-                              label: `${placeholderText(candidate.name)} — ${candidate.value || '（空）'}`,
+                              label: `${placeholderText(candidate.varKey)} — ${candidate.value || '（空）'}`,
                             }))
                           : [{ value: '', label: replacementPhase === 'loading' ? '候補を読み込んでいます' : '差し替えられる候補がありません' }]}
                       />
@@ -1081,7 +1081,7 @@ function VarsPageInner() {
                   <input
                     value={typedKey}
                     onChange={(e) => setTypedKey(e.target.value)}
-                    placeholder={placeholderText(singleImpact.variable.name)}
+                    placeholder={placeholderText(singleImpact.variable.varKey)}
                     className="border-hairline rounded-control bg-canvas text-ink mt-1 w-full border px-3 py-2 text-sm"
                   />
                 </label>
