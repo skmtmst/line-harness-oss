@@ -26,6 +26,7 @@ import SummaryCard from '@/components/shared/summary-card'
 import { Tabs } from '@/components/shared/tabs'
 import { TextArea, TextField } from '@/components/shared/text-field'
 import { compareLabel, durationLabel, elapsedLabel } from './format'
+import ListRange from '@/components/ui/list-range'
 
 /**
  * お問い合わせ（チケット）★V6 37-6 `IjIFa`／37-6-A `b2uv3`（AIの下書き）／37-6-B `XlTAd`（作成中）。
@@ -375,7 +376,7 @@ export default function OpsSupportPage() {
         <section aria-label={listTitle} className={knowledgeStyles.supportList}>
           <header className="flex items-center justify-between border-b border-hairline px-4 py-3">
             <h2 className="text-label font-bold text-ink">{listTitle}</h2>
-            <span className="text-micro text-ink-faint">{total}件中 {tickets.length === 0 ? 0 : 1}〜{tickets.length}件</span>
+            <ListRange total={total} first={tickets.length === 0 ? 0 : 1} last={tickets.length} />
           </header>
           {loading && tickets.length === 0 ? (
             <ListState kind="loading" title="チケットを読み込んでいます" />

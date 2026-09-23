@@ -6,6 +6,7 @@ import type { FriendListItem } from '@/lib/api'
 import Pagination from '@/components/shared/pagination'
 import Checkbox from '@/components/shared/checkbox'
 import ListState from '@/components/shared/list-state'
+import ListRange from '@/components/ui/list-range'
 import FriendListRow, { FriendListCard } from './friend-list-row'
 
 export type FriendListColumn = 'support' | 'scenario' | 'latest' | 'tags' | 'source' | 'last'
@@ -232,7 +233,7 @@ export default function FriendListTable({
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-t border-hairline px-4 py-2 lg:h-12 lg:flex-nowrap lg:py-0">
-        <span className="text-xs text-ink-faint">{rangeStart}〜{rangeEnd}件 / 全{total.toLocaleString('ja-JP')}件</span>
+        <ListRange total={total} first={rangeStart} last={rangeEnd} />
         <Pagination page={page} pageCount={pageCount} onPageChange={onPageChange} disabled={status !== 'ready'} ariaLabel="友だち一覧のページ" />
       </div>
     </section>
