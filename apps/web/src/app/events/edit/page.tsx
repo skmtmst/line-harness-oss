@@ -87,7 +87,7 @@ function BookingStatus({ accountId, eventId }: { accountId: string; eventId: str
         )}
         <Link
           href={`/events/bookings?id=${eventId}`}
-          className="text-accent ml-auto text-xs hover:underline"
+          className="text-accent-deep ml-auto text-xs hover:underline"
         >
           予約者を見る
         </Link>
@@ -117,7 +117,7 @@ function EditEventInner() {
 
         <p className="text-ink-faint bg-canvas rounded-card border-hairline border p-8 text-center text-sm">
           イベントが指定されていません。
-          <Link href="/events" className="text-accent ml-1 hover:underline">
+          <Link href="/events" className="text-accent-deep ml-1 hover:underline">
             イベント予約へ戻る
           </Link>
         </p>

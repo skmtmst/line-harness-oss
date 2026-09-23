@@ -320,7 +320,7 @@ function FriendAddRunsInner() {
   return (
     <div data-design-node="P2J0Te" className="space-y-4 pb-8">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <Link className="text-sm font-bold text-accent hover:underline" href="/friend-add-settings">← 友だち追加時の配信</Link>
+        <Link className="text-sm font-bold text-accent-deep hover:underline" href="/friend-add-settings">← 友だち追加時の配信</Link>
         <div className="flex gap-2">
           <details className="relative">
             <summary className="cursor-pointer list-none rounded-control border border-hairline bg-canvas px-3 py-2 text-sm font-bold">絞り込み</summary>
@@ -371,7 +371,7 @@ function FriendAddRunsInner() {
       {ruleIdFilter ? (
         <p className="rounded-control border border-hairline bg-canvas-sunken px-3 py-2 text-xs text-ink-secondary">
           この設定の実行結果だけを表示しています。
-          <Link href="/friend-add-settings/runs" className="ml-2 font-bold text-accent hover:underline">すべての記録へ戻る</Link>
+          <Link href="/friend-add-settings/runs" className="ml-2 font-bold text-accent-deep hover:underline">すべての記録へ戻る</Link>
         </p>
       ) : null}
 
@@ -450,7 +450,7 @@ function FriendAddRunsInner() {
                     <div className="mt-1.5 flex items-center justify-between gap-3 pl-12">
                       <time className="min-w-0 text-xs text-ink-secondary" dateTime={item.receivedAt}>{formatJstDateTime(item.receivedAt)}</time>
                       <Link
-                        className="shrink-0 text-xs font-bold text-accent hover:underline"
+                        className="shrink-0 text-xs font-bold text-accent-deep hover:underline"
                         href={`/friend-add-settings/runs/detail?id=${encodeURIComponent(item.id)}`}
                       >
                         詳細

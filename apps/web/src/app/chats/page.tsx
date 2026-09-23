@@ -2467,7 +2467,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
 
       <div
         data-design="Panes"
-        className="border-[#E5E7EB] bg-canvas shadow-[1px_1px_2px_rgba(29,29,31,0.13)] relative flex h-[calc(100vh-196px)] min-h-[560px] overflow-hidden rounded-[10px] border"
+        className="border-[#E5E7EB] bg-canvas shadow-card relative flex h-[calc(100vh-196px)] min-h-[560px] overflow-hidden rounded-[10px] border"
       >
         {/* Left Panel: Chat List */}
         {/* 設計 `ListPane` 360px。 */}
@@ -2552,7 +2552,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                 onClick={() => { setStatusFilter(f.key); dropSavedViewParam() }}
                 className={`shrink-0 whitespace-nowrap rounded-full px-3 py-1 text-xs font-medium transition-colors ${
                   statusFilter === f.key
-                    ? 'bg-[#06C755] text-on-accent'
+                    ? 'bg-accent-deep text-on-accent'
                     : 'bg-[#F2F4F7] text-[#667085] hover:bg-[#EAECF0]'
                 }`}
               >
@@ -2946,7 +2946,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                   {chatDetail.friendPictureUrl ? (
                     <img src={chatDetail.friendPictureUrl} alt="" className="w-8 h-8 rounded-full flex-shrink-0" />
                   ) : (
-                    <span className="bg-accent-soft text-accent flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full text-sm font-bold">
+                    <span className="bg-accent-soft text-accent-deep flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full text-sm font-bold">
                       {(chatDetail.friendName || '?').charAt(0)}
                     </span>
                   )}

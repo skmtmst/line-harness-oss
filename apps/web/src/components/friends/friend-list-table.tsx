@@ -109,7 +109,7 @@ export default function FriendListTable({
       */}
       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-hairline px-4 py-3 lg:h-14 lg:flex-nowrap lg:py-0">
         <h2 className="whitespace-nowrap text-sm font-bold text-ink">
-          友だち一覧 <span className="ml-1 text-xs font-bold text-accent">{total.toLocaleString('ja-JP')}件</span>
+          友だち一覧 <span className="ml-1 text-xs font-bold text-accent-deep">{total.toLocaleString('ja-JP')}件</span>
         </h2>
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs">
           <span className="whitespace-nowrap text-ink-faint">{selectedCount}件選択中</span>
@@ -153,7 +153,7 @@ export default function FriendListTable({
                     onPageSizeChange(size)
                     event.currentTarget.closest('details')?.removeAttribute('open')
                   }}
-                  className={`flex w-full items-center justify-between rounded-control px-2.5 py-2 text-left text-xs font-semibold ${size === pageSize ? 'bg-accent-soft text-accent' : 'text-ink-secondary hover:bg-canvas-sunken'}`}
+                  className={`flex w-full items-center justify-between rounded-control px-2.5 py-2 text-left text-xs font-semibold ${size === pageSize ? 'bg-accent-soft text-accent-deep' : 'text-ink-secondary hover:bg-canvas-sunken'}`}
                 >
                   {size}件表示 {size === pageSize ? <span aria-hidden="true">✓</span> : null}
                 </button>

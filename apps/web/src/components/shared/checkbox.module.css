@@ -44,11 +44,15 @@
 }
 
 /* 本物の input は四角の上に重ねて透明にする。押す・Space・読み上げはこれが受ける。 */
+/*
+ * 押せる範囲は四角の外へ 3px ずつ広げて 24×24（WCAG 2.5.8、★V7 修正方針 §4）。
+ * 見た目の四角は 18px のまま。
+ */
 .input {
   position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
+  inset: -3px;
+  width: 24px;
+  height: 24px;
   margin: 0;
   opacity: 0;
   cursor: inherit;

@@ -198,7 +198,7 @@ export default function DuplicatesPage() {
       </section>
 
       {loading && !data ? (
-        <div className="rounded-[14px] border border-[#DADDE2] bg-white p-8 text-center text-[#565F59] shadow-[1px_1px_2px_rgba(29,29,31,0.13)]">
+        <div className="rounded-[14px] border border-[#DADDE2] bg-white p-8 text-center text-[#565F59] shadow-card">
           読み込んでいます
         </div>
       ) : !data ? (
@@ -374,7 +374,7 @@ export default function DuplicatesPage() {
             {data.perAccount.length === 0 ? (
               <p className="mt-3 text-sm text-[#8B938D]">アカウントが登録されていません。</p>
             ) : (
-              <div className="mt-3 overflow-hidden rounded-[14px] border border-[#DADDE2] bg-white shadow-[1px_1px_2px_rgba(29,29,31,0.13)]">
+              <div className="mt-3 overflow-hidden rounded-[14px] border border-[#DADDE2] bg-white shadow-card">
                 <table className="w-full table-fixed text-sm">
                   <thead>
                     <TableHeadRow>
@@ -411,7 +411,7 @@ export default function DuplicatesPage() {
               <p className="mt-1 text-xs text-[#8B938D]">
                 行アカウントの友だちのうち、列アカウントにも居る人数 （行のアカウントに対する割合）。
               </p>
-              <div className="mt-3 overflow-hidden rounded-[14px] border border-[#DADDE2] bg-white shadow-[1px_1px_2px_rgba(29,29,31,0.13)]">
+              <div className="mt-3 overflow-hidden rounded-[14px] border border-[#DADDE2] bg-white shadow-card">
                 <table className="w-full table-fixed text-sm">
                   <thead>
                     <TableHeadRow>

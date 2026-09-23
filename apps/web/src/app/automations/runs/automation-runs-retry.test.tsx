@@ -53,7 +53,7 @@ function runRow() {
     accountLabel: '本店',
     triggerLabel: 'メッセージが届いたとき',
     status: 'permanent_failed',
-    detail: '失敗しました',
+    detail: '失敗しました。通信を確かめて、もう一度お試しください。',
     durationMs: 1200,
     automationName: '予約案内',
     canRetry: true,

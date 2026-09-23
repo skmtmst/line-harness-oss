@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useAccount } from '@/contexts/account-context'
@@ -371,6 +371,33 @@ export default function Sidebar({
     return () => { document.body.style.overflow = '' }
   }, [isOpen])
 
+  /*
+   * スマホのメニューの焦点（★V7 修正方針 §2）。
+   * 開いたら中の先頭へ、Esc で閉じ、閉じたら焦点をハンバーガーへ戻す。
+   * 閉じている間は aside に inert を付け、画面外の項目へ Tab が行かないようにする
+   * （以前は閉じても11項目が Tab で選べ、焦点が見えない所へ行っていた）。
+   */
+  const menuButtonRef = useRef<HTMLButtonElement>(null)
+  const drawerRef = useRef<HTMLElement>(null)
+  const wasOpen = useRef(false)
+  useEffect(() => {
+    if (isOpen) {
+      wasOpen.current = true
+      drawerRef.current?.querySelector<HTMLElement>('a[href], button')?.focus()
+      const onKeyDown = (event: KeyboardEvent) => {
+        if (event.key === 'Escape') setIsOpen(false)
+      }
+      document.addEventListener('keydown', onKeyDown)
+      return () => document.removeEventListener('keydown', onKeyDown)
+    }
+    if (wasOpen.current) {
+      wasOpen.current = false
+      if (!document.activeElement || document.activeElement === document.body || drawerRef.current?.contains(document.activeElement)) {
+        menuButtonRef.current?.focus()
+      }
+    }
+  }, [isOpen])
+
   /**
    * 項目に出す数。0 のときは出さない（仕様 §5）。
    *
@@ -482,7 +509,7 @@ export default function Sidebar({
       {isHq ? (
         <div className="px-3 pb-3 pt-4">
           <div className="rounded-card border border-hairline bg-canvas px-4 py-3">
-            <p className="text-xs font-semibold text-accent">musubo</p>
+            <p className="text-xs font-semibold text-accent-deep">musubo</p>
             <p className="mt-1 text-sm font-bold text-ink">統括コンソール</p>
           </div>
         </div>
@@ -490,7 +517,7 @@ export default function Sidebar({
         <div className="px-[13px] pb-[9px] pt-[18px]">
           <p className="mb-[11px] text-[12px] font-normal text-ink-faint">現在のLINEアカウント</p>
           <div className="flex h-[66px] items-center rounded-[12px] border border-hairline bg-canvas px-3">
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[9px] bg-accent-soft text-[14px] font-semibold text-accent">然</div>
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[9px] bg-accent-soft text-[14px] font-semibold text-accent-deep">然</div>
             <div className="ml-3 min-w-0 flex-1">
               <p className="truncate text-[14px] font-semibold text-ink">然-NEN- TEST</p>
               <p className="mt-0.5 truncate text-[10px] text-ink-faint">コミュニケーション</p>
@@ -595,9 +622,12 @@ export default function Sidebar({
       */}
       <div className={`${styles.mobileHeader} ${styles.mobileOnly}`}>
         <button
+          ref={menuButtonRef}
           onClick={() => setIsOpen(!isOpen)}
           className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg hover:bg-gray-100 transition-colors"
           aria-label="メニュー"
+          aria-expanded={isOpen}
+          aria-controls="mobile-menu"
         >
           <svg className="w-6 h-6 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             {isOpen
@@ -633,7 +663,10 @@ export default function Sidebar({
         レールは残したまま、その幅でもここを開けるようにした。
       */}
       <aside
+        id="mobile-menu"
+        ref={drawerRef}
         aria-label="管理メニュー"
+        inert={!isOpen}
         className={`${styles.drawer} ${styles.mobileOnly} ${isOpen ? '' : styles.drawerClosed}`}
       >
         <div className="absolute right-3 top-2.5 z-10">

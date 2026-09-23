@@ -212,7 +212,7 @@
 
 /* 設計 `sfTEW`：通る数は緑、直す数は赤。数の意味を色でも先に伝える。 */
 .summaryReady {
-  color: var(--color-accent);
+  color: var(--color-accent-deep);
 }
 
 .summaryInvalid {
@@ -270,7 +270,7 @@
 .filterOn {
   border-color: var(--color-accent);
   background: var(--color-accent-soft);
-  color: var(--color-accent);
+  color: var(--color-accent-deep);
 }
 
 .tableFrame {
@@ -326,7 +326,7 @@
   white-space: nowrap;
 }
 
-.ready { background: var(--color-accent-soft); color: var(--color-accent); }
+.ready { background: var(--color-accent-soft); color: var(--color-accent-deep); }
 .skipped { background: var(--color-canvas-sunken); color: var(--color-ink-faint); }
 .invalid,
 .failed { background: var(--color-status-danger-soft); color: var(--color-status-danger); }
@@ -351,7 +351,7 @@
   border-radius: var(--radius-control);
   background: var(--color-accent-soft);
   padding: 14px 16px;
-  color: var(--color-accent);
+  color: var(--color-accent-deep);
 }
 
 .warningBanner {

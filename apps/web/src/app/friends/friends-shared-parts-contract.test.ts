@@ -58,10 +58,10 @@ describe('友だち一覧(PhxG6)を共通部品へ載せ替える契約', () => 
     expect(FRIENDS_BODY).not.toContain('h-10 whitespace-nowrap rounded-control')
   })
 
-  it('行のアバターは真円ではなく設計の40x40 r=18', () => {
-    expect(TOKENS).toContain('--radius-large: 18px;')
-    expect(ROW_BODY).toContain('h-10 w-10 shrink-0 rounded-large bg-avatar-bg object-cover')
-    expect(ROW_BODY, 'アバターが真円のまま').not.toContain('h-10 w-10 shrink-0 rounded-full')
+  // ★V7「友だちの顔」（KXDhj）：共通 Avatar の 40px の丸。画像が読めない時も頭文字（2026-09-24）。
+  it('行の顔は共通 Avatar（40px）', () => {
+    expect(ROW_BODY).toContain('<Avatar name={friend.displayName} src={friend.pictureUrl} size={40} />')
+    expect(ROW_BODY, '画像を直接描いている').not.toMatch(/<img src=\{friend\.pictureUrl\}/)
   })
 
   it('行の担当者に丸アイコンを出し、未割り当ては全角ハイフンで埋める', () => {

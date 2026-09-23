@@ -276,8 +276,8 @@ function FolderEditor() {
               <div className="border-hairline mt-7 border-t pt-6">
                 <p className="text-ink mb-3 text-sm font-semibold">作成する場所</p>
                 <div className="flex gap-2">
-                  <button type="button" onClick={() => setScope('tag')} className={`rounded-pill border px-4 py-2 text-sm font-medium ${scope === 'tag' ? 'border-accent bg-accent-soft text-accent' : 'border-hairline text-ink-secondary'}`}>タグ</button>
-                  <button type="button" onClick={() => setScope('friend_field')} className={`rounded-pill border px-4 py-2 text-sm font-medium ${scope === 'friend_field' ? 'border-accent bg-accent-soft text-accent' : 'border-hairline text-ink-secondary'}`}>友だち情報欄</button>
+                  <button type="button" onClick={() => setScope('tag')} className={`rounded-pill border px-4 py-2 text-sm font-medium ${scope === 'tag' ? 'border-accent bg-accent-soft text-accent-deep' : 'border-hairline text-ink-secondary'}`}>タグ</button>
+                  <button type="button" onClick={() => setScope('friend_field')} className={`rounded-pill border px-4 py-2 text-sm font-medium ${scope === 'friend_field' ? 'border-accent bg-accent-soft text-accent-deep' : 'border-hairline text-ink-secondary'}`}>友だち情報欄</button>
                 </div>
               </div>
             )}

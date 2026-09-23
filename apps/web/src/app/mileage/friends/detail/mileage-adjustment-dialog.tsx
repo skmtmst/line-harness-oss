@@ -262,7 +262,7 @@ export default function MileageAdjustmentDialog({
               <h3 className="text-sm font-bold text-ink">この変更で起きること</h3>
               <dl className="overflow-hidden rounded-panel border border-hairline text-sm">
                 <div className="flex justify-between border-b border-hairline px-4 py-3"><dt className="text-ink-faint">変更前</dt><dd className="font-semibold text-ink">{currentBalance.toLocaleString('ja-JP')} マイル</dd></div>
-                <div className="flex justify-between border-b border-hairline px-4 py-3"><dt className="text-ink-faint">変更量</dt><dd className={delta < 0 ? 'font-bold text-danger' : 'font-bold text-accent'}>{delta > 0 ? '+' : ''}{delta.toLocaleString('ja-JP')} マイル</dd></div>
+                <div className="flex justify-between border-b border-hairline px-4 py-3"><dt className="text-ink-faint">変更量</dt><dd className={delta < 0 ? 'font-bold text-danger' : 'font-bold text-accent-deep'}>{delta > 0 ? '+' : ''}{delta.toLocaleString('ja-JP')} マイル</dd></div>
                 <div className="flex justify-between px-4 py-3"><dt className="text-ink-faint">変更後</dt><dd className="font-bold text-ink">{balanceAfter.toLocaleString('ja-JP')} マイル</dd></div>
               </dl>
               <dl className="grid gap-2 rounded-control bg-canvas-sunken p-4 text-sm">

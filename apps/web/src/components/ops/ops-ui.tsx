@@ -88,7 +88,7 @@ export function opsErrorMessage(error: ApiError): string {
   if (error.status === 403) return 'この操作をする権限がありません'
   if (error.status === 404) return '対象が見つかりません。画面を読み直してください'
   if (error.status >= 500) return 'サーバーでエラーが起きました。少し待ってからもう一度お試しください'
-  return '処理に失敗しました'
+  return '処理に失敗しました。通信を確かめて、もう一度お試しください。'
 }
 
 export async function opsCall<T>(call: Promise<T>): Promise<T | { success: false; error: string }> {
@@ -97,6 +97,6 @@ export async function opsCall<T>(call: Promise<T>): Promise<T | { success: false
   } catch (error) {
     if (error instanceof ApiError) return { success: false, error: opsErrorMessage(error) }
     if (error instanceof TypeError) return { success: false, error: '通信できませんでした。ネットワークを確認してもう一度お試しください' }
-    return { success: false, error: error instanceof Error && error.message ? error.message : '処理に失敗しました' }
+    return { success: false, error: error instanceof Error && error.message ? error.message : '処理に失敗しました。通信を確かめて、もう一度お試しください。' }
   }
 }

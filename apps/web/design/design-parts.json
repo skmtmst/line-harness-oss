@@ -149,7 +149,7 @@
     "--color-ink-faint": {
       "pencil": "$ink-faint",
       "source": "#6e7781",
-      "resolved": "#6e7781",
+      "resolved": "#626a73",
       "status": "active",
       "note": "変更。旧 #8b938d。白地のコントラストが 3.16 → 4.55 でAAを満たす",
       "lastCheckedAt": "2026-08-24"
@@ -211,20 +211,20 @@
       "lastCheckedAt": "2026-08-24"
     },
     "--shadow-card": {
-      "pencil": "XywGr effect",
-      "source": "1px 1px 2px #1920261a",
-      "resolved": "1px 1px 2px #1920261a",
+      "pencil": "XywGr effect → #673 Beautiful shadows sm",
+      "source": "0px 2px 3px -1px rgba(0,0,0,0.1), 0px 1px 0px 0px rgba(25,28,33,0.02), 0px 0px 0px 1px rgba(25,28,33,0.08)",
+      "resolved": "0px 2px 3px -1px #0000001a,0px 1px 0px 0px #191c2105,0px 0px 0px 1px #191c2114",
       "status": "active",
-      "note": "追加。@theme ではなく素の :root に置く。Tailwindは影の値をクラスへ直に埋め込むため変数が出力されない",
-      "lastCheckedAt": "2026-08-24"
+      "note": "#673 で Beautiful shadows の層状影（近距離の薄い影＋下端の光＋輪郭の1pxリング）へ差し替え。1px罫線だけの硬さを残さない。利用者承認済みの視覚改善（監査6・提案1）。",
+      "lastCheckedAt": "2026-09-24"
     },
     "--shadow-float": {
-      "pencil": "hGpFq/z6TmF effect",
-      "source": "0 6px 18px #19202626",
-      "resolved": "0 6px 18px #19202626",
+      "pencil": "hGpFq/z6TmF effect → #673 Beautiful shadows md",
+      "source": "0px 4px 8px -2px rgba(0,0,0,0.08), 0px 12px 24px -4px rgba(25,28,33,0.14), 0px 0px 0px 1px rgba(25,28,33,0.08)",
+      "resolved": "0px 4px 8px -2px #00000014,0px 12px 24px -4px #191c2124,0px 0px 0px 1px #191c2114",
       "status": "active",
-      "note": "追加。メニューと通知パネルの浮いた面で共有する。",
-      "lastCheckedAt": "2026-08-24"
+      "note": "#673 で Beautiful shadows の層状影へ差し替え。メニュー・ドロップダウン・モーダル・引き出しなど、カードより一段強く浮く面で共有する。",
+      "lastCheckedAt": "2026-09-24"
     },
     "--color-status-info": {
       "pencil": "$status-info",
@@ -424,7 +424,7 @@
           "class": "card",
           "prop": "box-shadow",
           "source": "var(--shadow-card)",
-          "resolved": "1px 1px 2px #1920261a"
+          "resolved": "0px 2px 3px -1px #0000001a,0px 1px 0px 0px #191c2105,0px 0px 0px 1px #191c2114"
         },
         {
           "pencil": "ラベル fill: $ink-secondary",
@@ -473,7 +473,7 @@
           "class": "detail",
           "prop": "color",
           "source": "var(--color-ink-faint)",
-          "resolved": "#6e7781"
+          "resolved": "#626a73"
         },
         {
           "pencil": "説明 fontSize: $size-micro",
@@ -504,11 +504,11 @@
           "resolved": "#e8f8ee"
         },
         {
-          "pencil": "バッジ文字 fill: $accent",
+          "pencil": "バッジ文字 fill: $accent-deep（★V7 修正方針 u6pez）",
           "class": "badge",
           "prop": "color",
-          "source": "var(--color-accent)",
-          "resolved": "#06c755"
+          "source": "var(--color-accent-deep)",
+          "resolved": "#087a3e"
         },
         {
           "pencil": "バッジ fontSize: $size-nano",
@@ -543,7 +543,7 @@
           "class": "labelV6",
           "prop": "color",
           "source": "var(--color-ink-faint)",
-          "resolved": "#6e7781"
+          "resolved": "#626a73"
         },
         {
           "pencil": "V6 KPI label fontSize: $size-caption",
@@ -578,7 +578,7 @@
           "class": "labelBroadcast",
           "prop": "color",
           "source": "var(--color-ink-faint)",
-          "resolved": "#6e7781"
+          "resolved": "#626a73"
         },
         {
           "pencil": "mNUQ3 label fontSize: $size-label",
@@ -588,11 +588,11 @@
           "resolved": "13px"
         },
         {
-          "pencil": "mNUQ3 detail fill: $accent",
+          "pencil": "mNUQ3 detail fill: $accent-deep（★V7 修正方針 u6pez）",
           "class": "detailNotice",
           "prop": "color",
-          "source": "var(--color-accent)",
-          "resolved": "#06c755"
+          "source": "var(--color-accent-deep)",
+          "resolved": "#087a3e"
         },
         {
           "pencil": "mNUQ3 detail fontSize: $size-caption",
@@ -1017,7 +1017,7 @@
           "class": "cell",
           "prop": "color",
           "source": "var(--color-ink-faint)",
-          "resolved": "#6e7781"
+          "resolved": "#626a73"
         },
         {
           "pencil": "tPTMp fontSize: $size-caption",
@@ -1145,11 +1145,11 @@
           "resolved": "#e8f8ee"
         },
         {
-          "pencil": "J33xq selected label fill: $accent",
+          "pencil": "J33xq selected label fill: $accent-deep（★V7 修正方針 u6pez）",
           "class": "active",
           "prop": "color",
-          "source": "var(--color-accent)",
-          "resolved": "#06c755"
+          "source": "var(--color-accent-deep)",
+          "resolved": "#087a3e"
         },
         {
           "pencil": "J33xq selected label fontWeight: 700",
@@ -1177,7 +1177,7 @@
           "class": "sectionHeading",
           "prop": "color",
           "source": "var(--color-ink-faint)",
-          "resolved": "#6e7781"
+          "resolved": "#626a73"
         },
         {
           "pencil": "J33xq section fontSize: $size-caption",
@@ -1332,7 +1332,7 @@
           "class": "root",
           "prop": "color",
           "source": "var(--color-ink-faint)",
-          "resolved": "#6e7781"
+          "resolved": "#626a73"
         },
         {
           "pencil": "R098Z fontSize: $size-caption",
@@ -1367,7 +1367,7 @@
           "class": "separator",
           "prop": "color",
           "source": "var(--color-ink-faint)",
-          "resolved": "#6e7781"
+          "resolved": "#626a73"
         }
       ]
     },
@@ -1566,7 +1566,7 @@
           "class": "card",
           "prop": "box-shadow",
           "source": "var(--shadow-card)",
-          "resolved": "1px 1px 2px #1920261a"
+          "resolved": "0px 2px 3px -1px #0000001a,0px 1px 0px 0px #191c2105,0px 0px 0px 1px #191c2114"
         },
         {
           "pencil": "dashboard card layout: vertical",
@@ -1722,11 +1722,11 @@
           "resolved": "700"
         },
         {
-          "pencil": "t0jk8p action fill: $accent",
+          "pencil": "t0jk8p action fill: $accent-deep（★V7 修正方針 u6pez）",
           "class": "action",
           "prop": "color",
-          "source": "var(--color-accent)",
-          "resolved": "#06c755"
+          "source": "var(--color-accent-deep)",
+          "resolved": "#087a3e"
         },
         {
           "pencil": "t0jk8p action layout",
@@ -1889,11 +1889,11 @@
           "resolved": "#e8f8ee"
         },
         {
-          "pencil": "success label: $accent",
+          "pencil": "success label: $accent-deep（★V7 修正方針 u6pez）",
           "class": "success",
           "prop": "color",
-          "source": "var(--color-accent)",
-          "resolved": "#06c755"
+          "source": "var(--color-accent-deep)",
+          "resolved": "#087a3e"
         },
         {
           "pencil": "danger fill: $status-danger-soft",
@@ -2144,7 +2144,7 @@
           "class": "searchIcon",
           "prop": "color",
           "source": "var(--color-ink-faint)",
-          "resolved": "#6e7781"
+          "resolved": "#626a73"
         },
         {
           "pencil": "phlR1 text fill: $ink",
@@ -2297,7 +2297,7 @@
           "class": "chevron",
           "prop": "color",
           "source": "var(--color-ink-faint)",
-          "resolved": "#6e7781"
+          "resolved": "#626a73"
         },
         {
           "pencil": "Gfsb4 stroke: $accent",
@@ -2518,7 +2518,7 @@
           "class": "button",
           "prop": "color",
           "source": "var(--color-ink-faint)",
-          "resolved": "#6e7781"
+          "resolved": "#626a73"
         }
       ]
     },
@@ -2590,7 +2590,7 @@
           "class": "panel",
           "prop": "box-shadow",
           "source": "var(--shadow-card)",
-          "resolved": "1px 1px 2px #1920261a"
+          "resolved": "0px 2px 3px -1px #0000001a,0px 1px 0px 0px #191c2105,0px 0px 0px 1px #191c2114"
         },
         {
           "pencil": "J6x4Q gap: 12",
@@ -2632,7 +2632,7 @@
           "class": "description",
           "prop": "color",
           "source": "var(--color-ink-faint)",
-          "resolved": "#6e7781"
+          "resolved": "#626a73"
         },
         {
           "pencil": "J6x4Q description fontSize: $size-caption",
@@ -2744,7 +2744,7 @@
           "class": "inline",
           "prop": "box-shadow",
           "source": "var(--shadow-card)",
-          "resolved": "1px 1px 2px #1920261a"
+          "resolved": "0px 2px 3px -1px #0000001a,0px 1px 0px 0px #191c2105,0px 0px 0px 1px #191c2114"
         },
         {
           "pencil": "VJKAT header padding top/right",
@@ -2976,7 +2976,7 @@
           "class": "menu",
           "prop": "box-shadow",
           "source": "var(--shadow-float)",
-          "resolved": "0 6px 18px #19202626"
+          "resolved": "0px 4px 8px -2px #00000014,0px 12px 24px -4px #191c2124,0px 0px 0px 1px #191c2114"
         },
         {
           "pencil": "hGpFq gap: 2",
@@ -3108,7 +3108,7 @@
           "class": "panel",
           "prop": "box-shadow",
           "source": "var(--shadow-float)",
-          "resolved": "0 6px 18px #19202626"
+          "resolved": "0px 4px 8px -2px #00000014,0px 12px 24px -4px #191c2124,0px 0px 0px 1px #191c2114"
         },
         {
           "pencil": "z6TmF header padding",

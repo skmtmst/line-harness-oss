@@ -238,7 +238,7 @@ export default function QrDialog({
     >
       <div
         ref={panelRef}
-        className="bg-canvas rounded-panel border-hairline max-h-[90vh] w-full overflow-y-auto border p-8 shadow-[1px_1px_2px_rgba(29,29,31,0.13)]"
+        className="bg-canvas rounded-panel border-hairline max-h-[90vh] w-full overflow-y-auto border p-8 shadow-float"
         style={{ maxWidth: 820 }}
         onClick={(e) => e.stopPropagation()}
       >

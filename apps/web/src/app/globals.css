@@ -69,7 +69,12 @@
    * ink が本文、ink-secondary が補足、ink-faint がラベル。 */
   --color-ink: #1d1d1f;
   --color-ink-secondary: #4a5565;
-  --color-ink-faint: #6e7781;
+  /*
+   * ink-faint は 2026-09-24 に #6e7781 → #626a73。灰色の面（#ebedf1・#f5f5f7・
+   * #e8f8ee）の上で 3.9〜4.4:1 しかなく、AA の 4.5:1 に届かなかった。色あいは
+   * そのままで明るさだけ下げた（どの面でも 4.68:1 以上）。
+   */
+  --color-ink-faint: #626a73;
 
   /* 面。canvas がカードの地、canvas-sunken が一段沈んだ面。 */
   --color-canvas: #ffffff;
@@ -79,7 +84,8 @@
   --color-hairline: #dadde2;
 
   /* 状態。アクセントと混ぜない。 */
-  --color-success: #05913e;
+  /* 2026-09-24 に #05913e → #047833。白地 4.1:1・薄緑の地 3.7:1 で文字に使えなかった。 */
+  --color-success: #047833;
   --color-success-bg: #e8f8ee;
   --color-warning: #94600a;
   --color-warning-bg: #faf0dc;
@@ -246,9 +252,27 @@
    * 入口が2つあった。** 名前を1本にして、`@theme` の中へ移した
    * （`@theme` の変数は `:root` にも出るので、`var(--shadow-card)` は
    * これまでどおり読める）。
+   *
+   * #673 で「Beautiful shadows」の sm へ差し替えた。近距離の薄い影・
+   * 下端の光・輪郭の1pxリングの3層で、1px罫線だけの硬さを残さない。
+   * 指標カード・フォルダパネル・右レール・各種カードはすべてここを読む。
    */
-  --shadow-card: 1px 1px 2px #1920261a;
-  --shadow-float: 0 6px 18px #19202626;
+  --shadow-card: 0px 2px 3px -1px rgba(0, 0, 0, 0.1), 0px 1px 0px 0px rgba(25, 28, 33, 0.02), 0px 0px 0px 1px rgba(25, 28, 33, 0.08);
+  /*
+   * 浮いて見える面（メニュー・ドロップダウン・モーダル・引き出し）の影。
+   * Beautiful shadows の md。カードより一段強い層状影で、下の内容から
+   * 浮き上がる。表コンテナなど、カードより大きい面にもこちらを当てる。
+   */
+  --shadow-float: 0px 4px 8px -2px rgba(0, 0, 0, 0.08), 0px 12px 24px -4px rgba(25, 28, 33, 0.14), 0px 0px 0px 1px rgba(25, 28, 33, 0.08);
+
+  /*
+   * Tailwind の transition-colors などの既定の速さ（★V7 修正方針 §4）。
+   * 既定は 150ms・cubic-bezier(0.4,0,0.2,1) で、共通部品（120ms・motion-ease-out）と
+   * 速さが2通りあった（189か所）。物差しの値にそろえる。`@theme` は :root の
+   * --motion-* より先に読まれるので、値をそのまま書く。
+   */
+  --default-transition-duration: 120ms;
+  --default-transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 :root {
@@ -274,6 +298,87 @@
   --motion-slow: 300ms;
   --motion-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
   --motion-ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+}
+
+/* ---------------------------------------------------------------------
+ * #673 触った感触（emil/apple/interaction-design）
+ *
+ * ここに書くのは「全画面で同じ触感」の規定だけ。`transition: all` は
+ * 使わず、動かすプロパティを列挙する。部品が持っている transition
+ * （共通 Button の CSS Module、`transition-colors` などのユーティリティ）
+ * は base 層より強いので、そのまま残る。この規定が効くのは
+ * transition を何も持たない要素だけで、既存の動きを上書きしない。
+ * ------------------------------------------------------------------- */
+/*
+ * 上の規定は、ファイル末尾の既存 `@layer base`（:lang(ja) の文節改行）に
+ * まとめる。@layer base を複数に分けると、層の中身を数える契約試験
+ * （japanese-line-break-contract）が取りこぼす。
+ */
+
+/*
+ * メニュー・モーダルの出入り。150–250msの ease-out で、開いた位置から
+ * 少し沈みながら現れる。共有部品（components/shared/）は変更できない
+ * ため、`data-design-part` の属性を入口にここへ置く。
+ *
+ * **@layer に入れない。** 部品の CSS Module はレイヤーに属さず常に
+ * 勝つので、層の中に書くと上書き規定（下の dialog の影）が効かない。
+ * 属性で対象を絞った規定なので、レイヤー外でも副作用は生じない
+ * （ファイル先頭の data-design-node 規定と同じ書き方）。
+ */
+@keyframes lh-surface-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* 上に向かって開くメニューはトリガーの右上を起点にする。 */
+[data-design-part="action-menu"],
+[data-design-part="notification-panel"],
+aside[aria-label="フォルダ"] .shadow-lg {
+  animation: lh-surface-in var(--motion-base) var(--motion-ease-out);
+  transform-origin: top right;
+}
+
+/* モーダルは中央から。カードより一段強い影（Beautiful md）で浮かせる。 */
+[data-design-part="dialog"] {
+  animation: lh-surface-in var(--motion-base) var(--motion-ease-out);
+}
+
+[data-design-part="dialog"][data-design-node] {
+  box-shadow: var(--shadow-float);
+}
+
+/*
+ * フォルダパネルは枠線だけの平らな面だったので、カードの影で面から
+ * 浮かせる。パネル内の「…」メニュー（Tailwind の shadow-lg）は
+ * メニューの影（float）へ寄せ、他のドロップダウンと揃える。
+ */
+aside[aria-label="フォルダ"] {
+  box-shadow: var(--shadow-card);
+}
+
+aside[aria-label="フォルダ"] .shadow-lg {
+  box-shadow: var(--shadow-float);
+}
+
+/*
+ * タッチ端末の入力欄は 16px 以上（★V7 修正方針 §3）。
+ * 共通部品（TextField・Select ほか）は各自で 16px にしているが、画面に直接書いた
+ * 入力欄は 12〜14px のままで、iPhone で押すと画面が拡大されていた（2026-09-24 の点検で
+ * /broadcasts 3・/tags 5 など）。層の外に置くのは、Tailwind の text-sm などより強くするため。
+ * 大きい字の欄は `max()` でそのまま残す。
+ */
+@media (pointer: coarse) {
+  input:not([type='checkbox'], [type='radio'], [type='range'], [type='color'], [type='file']),
+  select,
+  textarea {
+    font-size: max(16px, 1em);
+  }
 }
 
 /*
@@ -321,6 +426,49 @@
   h2,
   h3 {
     text-wrap: balance;
+  }
+
+  /*
+   * #673 押した感触。ボタンは160msかけて少し沈み（scale 0.97）、離すと
+   * 戻る。押した瞬間の反応は `--motion-instant` 系ではなく、指に追従
+   * して見える 160ms にする（#673 の指定値）。
+   *
+   * 部品が持っている transition（共通 Button の CSS Module、
+   * `transition-colors` などのユーティリティ）は base 層より強いので
+   * そのまま残る。この規定が効くのは transition を何も持たない
+   * ボタンだけで、既存の動きを上書きしない。
+   */
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]) {
+    transition:
+      transform 160ms var(--motion-ease-out),
+      background-color var(--motion-fast) ease-out,
+      border-color var(--motion-fast) ease-out,
+      color var(--motion-fast) ease-out,
+      box-shadow var(--motion-fast) ease-out,
+      opacity var(--motion-fast) ease-out;
+  }
+
+  button:not(:disabled):active,
+  [role="button"]:not([aria-disabled="true"]):active {
+    transform: scale(0.97);
+  }
+
+  /*
+   * #673 表の行のホバー。行全体が薄く変わり、操作列を含めて「今この行に
+   * 触れている」ことが分かる。選択中の行などユーティリティで背景を
+   * 指定した行はそちらが勝つ（base 層の規定のため）。
+   *
+   * タッチ端末ではタップ後にホバーが残ったままになるので、
+   * 「ホバーできる・精密なポインタ」の環境に限定する（#673）。
+   */
+  @media (hover: hover) and (pointer: fine) {
+    tbody tr {
+      transition: background-color var(--motion-fast) ease-out;
+    }
+    tbody tr:hover {
+      background-color: var(--color-canvas-sunken);
+    }
   }
 }
 

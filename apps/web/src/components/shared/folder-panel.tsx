@@ -121,7 +121,7 @@ export default function FolderPanel({
                 }}
                 className={`rounded-control flex min-w-0 flex-1 items-center gap-2 px-3 py-2 text-left text-sm transition-colors ${
                   activeId === row.id
-                    ? 'bg-accent-soft text-accent font-medium'
+                    ? 'bg-accent-soft text-accent-deep font-medium'
                     : 'text-ink-secondary hover:bg-canvas-sunken'
                 }`}
               >
@@ -168,7 +168,7 @@ export default function FolderPanel({
                     aria-haspopup="menu"
                     aria-expanded={openMenuId === row.id}
                     title={`フォルダ「${row.label}」の操作`}
-                    className="text-ink-faint hover:bg-canvas-sunken hover:text-accent rounded-control min-h-8 min-w-8 text-lg leading-none opacity-0 transition-opacity group-hover:opacity-100 focus:opacity-100"
+                    className="text-ink-faint hover:bg-canvas-sunken hover:text-accent-deep rounded-control min-h-8 min-w-8 text-lg leading-none opacity-0 transition-opacity group-hover:opacity-100 focus:opacity-100"
                   >
                     …
                   </button>

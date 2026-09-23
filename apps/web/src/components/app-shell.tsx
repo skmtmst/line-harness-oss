@@ -62,6 +62,11 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             <AccountCreateWorkspace>{guardedContent}</AccountCreateWorkspace>
           ) : (
             <div className={styles.shell}>
+              {/*
+                本文へ移動（★V7 修正方針 §2）。ふだんは見えず、Tab で最初に焦点が来たときだけ
+                左上に出る。更新案内とメニュー11項目を飛ばして本文へ行ける（WCAG 2.4.1）。
+              */}
+              <a href="#main-content" className={styles.skipLink}>本文へ移動</a>
               {/* Cookieが届いていないときの案内。全画面で同じものを1つだけ出す。 */}
               <SessionLostNotice />
               {/* Phase 6: banner above sidebar+header so it pins to the top of the
@@ -114,7 +119,7 @@ function Workspace({ children }: { children: React.ReactNode }) {
   return (
     <div className={styles.side}>
       <AppTopBar />
-      <main className={styles.main}>
+      <main id="main-content" tabIndex={-1} className={styles.main}>
         {/* V6 共通メニュー J33xq と同じ256pxサイドバーを基準にする。 */}
         <div
           data-design-shell="v6-1920"
