@@ -33,6 +33,7 @@ import {
 import type { OperationRestoreDrift } from '@/lib/api'
 import releaseLog from '@/generated/release-log.json'
 import { useAccount } from '@/contexts/account-context'
+import { onlyWhenVisible } from '@/lib/visible-polling'
 import { collectRecentUpdates, RECENT_UPDATES_LIMIT, type UpdateRelease } from './update-history'
 
 const TABS = [
@@ -562,7 +563,8 @@ function HealthPanel({
   }, [load, manualRunRequest])
 
   useEffect(() => {
-    const timer = window.setInterval(() => { void load(false) }, 5 * 60 * 1000)
+    // 隠れたタブでは取り直さない（V6R-S3-g）。
+    const timer = window.setInterval(onlyWhenVisible(() => { void load(false) }), 5 * 60 * 1000)
     return () => window.clearInterval(timer)
   }, [load])
 
