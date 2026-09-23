@@ -75,15 +75,16 @@ function FriendMileageInner() {
       const [mileageResponse, staffResponse, v6Response, historyResponse] = await Promise.all([
         api.friends.mileage(friendId, { limit: 100, accountId: selectedAccountId }),
         api.staff.me().catch(() => null),
+        // V6R-CX-e: 名前で探して100件から拾うと、同名が多いと本人がこぼれる。友だちIDで取る。
         api.mileage.friendsV6({
           accountId: selectedAccountId,
-          search: friendResponse.data.displayName || undefined,
-          limit: 100,
+          friendId,
+          limit: 1,
           offset: 0,
         }).catch(() => null),
         api.mileage.history({
           accountId: selectedAccountId,
-          search: friendResponse.data.displayName || undefined,
+          friendId,
           limit: 100,
           offset: 0,
         }).catch(() => null),
@@ -96,9 +97,8 @@ function FriendMileageInner() {
         ? v6Response.data.items.find((item) => item.friendId === friendId) ?? null
         : null)
       setV6History(historyResponse?.success && Array.isArray(historyResponse.data?.items)
-        ? historyResponse.data.items
-          .filter((item) => item.primaryFriendId === friendId)
-          .map(friendHistoryItem)
+        // サーバがこの人（名寄せした複数アカウント）の履歴だけを返す。
+        ? historyResponse.data.items.map(friendHistoryItem)
         : null)
       setCanAdjust(Boolean(staffResponse?.success && (staffResponse.data.role === 'owner' || staffResponse.data.role === 'admin')))
       setCanConfigureAdjustmentPolicy(Boolean(staffResponse?.success && staffResponse.data.role === 'owner'))

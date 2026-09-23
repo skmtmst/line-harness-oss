@@ -111,6 +111,7 @@ import { autoReplies } from './routes/auto-replies.js';
 import { autoReplyRuns } from './routes/auto-reply-runs.js';
 import { adminAuth } from './routes/admin-auth.js';
 import { resolveCorsOrigin } from './middleware/admin-auth-config.js';
+import { timingMark, timingStart, type ServerTiming } from './lib/server-timing.js';
 import booking from './routes/booking.js';
 import events from './routes/events.js';
 import { trafficPools } from './routes/traffic-pools.js';
@@ -348,6 +349,8 @@ export type Env = {
     auditRecorded?: boolean;
     /** 代理ログイン中（★V6 37-5）。middleware/impersonation.ts が入れる。 */
     impersonation?: ImpersonationContext;
+    /** 段ごとの経過時間（V6R-CX-a）。lib/server-timing.ts が入れる。 */
+    serverTiming?: ServerTiming;
   };
 };
 
@@ -381,6 +384,8 @@ export const ADMIN_REQUEST_HEADERS = [
 // same-origin requests and origins on the ADMIN_ORIGIN allowlist; everything
 // else gets no Access-Control-Allow-Origin header (browser blocks it). Bearer
 // SDK/MCP callers send no Origin header and are unaffected.
+// 段ごとの経過時間を Server-Timing で返す（V6R-CX-a）。ログイン済みの職員への応答だけ。
+app.use('*', timingStart());
 app.use('*', cors({
   origin: (origin, c) => resolveCorsOrigin(c.env, origin, c.req.url),
   credentials: true,
@@ -389,24 +394,31 @@ app.use('*', cors({
   maxAge: 600,
 }));
 
+app.use('*', timingMark('cors'));
 // Rate limiting — runs before auth to block abuse early
 app.use('*', rateLimitMiddleware);
+app.use('*', timingMark('rate'));
 
 // Auth middleware — skips /webhook and /docs automatically
 app.use('*', authMiddleware);
+app.use('*', timingMark('auth'));
 
 // Tenant boundary — authenticated admin APIs may only select LINE accounts
 // that belong to the signed-in staff member's tenant.
 app.use('*', tenantScopeMiddleware);
+app.use('*', timingMark('tenant'));
 // 代理ログイン中の個人情報の伏せ字。認証の後ろ、各ルートの前。
 app.use('/api/*', piiMaskMiddleware);
+app.use('/api/*', timingMark('pii'));
 
 // 認証済み管理APIの変更を共通監査へ残す。route固有の監査がある場合は重複させない。
 app.use('/api/*', businessAuditMiddleware);
+app.use('/api/*', timingMark('audit'));
 
 // 機能設定は認証・tenant scope の後、各 route handler の前で強制する。
 // manifest と実 route の全件照合を必須テストにした上で、未分類も fail closed にする。
 app.use('/api/*', featureEnforcementMiddleware);
+app.use('/api/*', timingMark('feature'));
 
 // Mount route groups — MVP & Round 2
 app.route('/', webhook);

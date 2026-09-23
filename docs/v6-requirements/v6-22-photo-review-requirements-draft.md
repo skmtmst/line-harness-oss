@@ -106,6 +106,9 @@ AI補助で許可するもの:
 
 ## 6. 審査操作
 
+> **V7 の追加（2026-09-23）:** キー操作と「判定したら次の未審査へ進む」連続審査は [V7 追加要件 §3](./v7-additions-requirements.md) が正本。V6 の画面は変えず、Pencil ★V7 に新しく描く。
+
+
 - 一覧は未審査、採用、差戻し、公開中を分け、account scopeの件数を表示
 - 一枚表示はoriginal相当のreview derivative、投稿者、pet、投稿日時、過去採否、同意、risk flagを表示
 - 採用、差戻し、cropして採用、rotate、original downloadを権限分離

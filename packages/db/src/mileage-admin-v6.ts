@@ -344,7 +344,11 @@ export async function getMileageEarningRulesV6(
 
 export async function getMileageFriendsV6(
   db: D1Database,
-  input: { lineAccountId: string; visibleAccountIds: string[]; search: string; limit: number; offset: number },
+  input: {
+    lineAccountId: string; visibleAccountIds: string[]; search: string; limit: number; offset: number;
+    /** V6R-CX-e: 1人の友だちだけを返す。名前で探して100件から拾うと、同名が多いとこぼれる。 */
+    friendId?: string;
+  },
 ) {
   const rankRows = await db.prepare(
     `SELECT r.id, r.name, v.required_miles
@@ -399,8 +403,9 @@ export async function getMileageFriendsV6(
        FROM selected s LEFT JOIN ledger l ON l.beneficiary_key = s.beneficiary_key
        LEFT JOIN expiring e ON e.beneficiary_key = s.beneficiary_key
       WHERE (? = '' OR s.display_name LIKE '%' || ? || '%')
+        AND (? = '' OR s.friend_id = ?)
       ORDER BY available DESC, s.display_name, s.friend_id LIMIT ? OFFSET ?`,
-  ).bind(...binds, input.search, input.search, input.limit, input.offset).all<Record<string, unknown>>();
+  ).bind(...binds, input.search, input.search, input.friendId ?? '', input.friendId ?? '', input.limit, input.offset).all<Record<string, unknown>>();
   const summary = await db.prepare(
     `${ctes}
      SELECT COUNT(*) AS total_members,

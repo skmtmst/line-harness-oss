@@ -202,7 +202,8 @@ describe('権限変更の直前再認証 (N-427)', () => {
     expect(fixture.staffUpdate.mock.calls[0][2]).toBeUndefined()
 
     // 6桁コードを入れると grant を取り、同じ保存へ token を付けてやり直す
-    fireEvent.change(screen.getByPlaceholderText('000000'), { target: { value: '123456' } })
+    // 認証コード入力（★V7 xHzFK）の1マス目へまとめて入れると、6マスへ振り分けられる。
+    fireEvent.change(screen.getByLabelText('1桁目'), { target: { value: '123456' } })
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: '本人確認して実行' })) })
 
     expect(fixture.staffStepUp).toHaveBeenCalledWith('123456', 'staff.permissions.change')

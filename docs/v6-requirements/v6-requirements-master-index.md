@@ -163,3 +163,10 @@ AA が求めるのは、18.66px 未満の太字・24px 未満の並字で 4.5:1�
 - [実装ロードマップ](./v6-implementation-roadmap.md)
 - [データ移行・API・受け入れテスト計画](./v6-data-api-migration-acceptance-plan.md)
 - [進捗台帳](./v6-32-feature-requirements-progress.md)
+
+## 7. V7 の追加（2026-09-23）
+
+点検（kentavndng/line-harness-board#1064〜#1069）から、オーナーが採用した追加だけを1本にまとめた。**既存の V6 画面は変えず、Pencil に ★V7 として新しく描く。**
+
+- [V7 追加要件](./v7-additions-requirements.md): A 流れ図（05・25・09）、B 受信箱のキー操作（02）、D 写真の連続審査（22）、E 処理の進み・骨組み表示・保存結果の通知（共通）
+- [参考UIの採否](../v7-reference-ui-adoption.md): 外部の参考UIサイト7つの使い方と守りごと、部品の呼び名の対応表
