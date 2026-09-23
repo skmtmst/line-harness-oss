@@ -11,11 +11,15 @@
 #
 # /pools/new や /affiliates/new のような作成画面は残す。親のパスだけを
 # 対象にしているので、下の階層は素通りする。
+#
+# /affiliates はここに書かない。_redirects はクエリを条件にできず、
+# /affiliates?tab=offers へ来た人を tab=affiliates へ落としてしまうため。
+# /affiliates の画面側（page.tsx）が ?tab= を保ったまま /conversions へ
+# 送るので、ここに戻さないこと。
 
 /duplicates      /friends?tab=duplicates     308
 /users           /friends?tab=merged         308
 /support         /chats?channel=email        308
 /updates         /emergency?tab=history      308
 /pools           /accounts?tab=pools         308
-/affiliates      /conversions?tab=affiliates 308
 /booking/staff   /booking/menus?tab=staff    308

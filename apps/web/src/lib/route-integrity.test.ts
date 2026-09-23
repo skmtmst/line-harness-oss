@@ -213,7 +213,6 @@ describe('旧ルートのリダイレクト', () => {
     ['/support', '/chats'],
     ['/updates', '/emergency'],
     ['/pools', '/accounts'],
-    ['/affiliates', '/conversions'],
     ['/booking/staff', '/booking/menus'],
   ] as const;
 
@@ -228,6 +227,19 @@ describe('旧ルートのリダイレクト', () => {
     expect(line, `${from} のリダイレクトが _redirects にありません`).toBeTruthy();
     expect(line).toContain(toPrefix);
     expect(line).toContain('308');
+  });
+
+  it('/affiliates は _redirects に戻さず、画面側が ?tab= を保って /conversions へ送る', () => {
+    // Pages の _redirects はクエリを条件にできない。静的 308 で
+    // /conversions?tab=affiliates へ固定すると、/affiliates?tab=offers の
+    // tab が落ちる。受け皿は /affiliates の page.tsx（クライアント側で
+    // router.replace）なので、ここでは「行が無いこと」と「画面があること」
+    // の両方を固定する。
+    const line = redirects
+      .split('\n')
+      .find((l) => !l.trimStart().startsWith('#') && l.trim().startsWith('/affiliates '));
+    expect(line, '/affiliates を _redirects の静的 308 に戻すと ?tab= が落ちます').toBeFalsy();
+    expect(ROUTE_SET.has('/affiliates'), '/affiliates の画面がありません').toBe(true);
   });
 
   it('リダイレクト先の画面が実在する', () => {

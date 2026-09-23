@@ -77,6 +77,13 @@ function byExactText(tag: string, text: string): HTMLElement {
   return found as HTMLElement
 }
 
+/** 確認窓（Dialog）は portal で document.body 直下へ出るため、host の外を探す。 */
+function byExactTextInBody(tag: string, text: string): HTMLElement {
+  const found = Array.from(document.body.querySelectorAll(tag)).find((el) => el.textContent?.trim() === text)
+  if (!found) throw new Error(`見つかりません: <${tag}> "${text}"`)
+  return found as HTMLElement
+}
+
 async function setValue(element: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement, value: string) {
   const proto = element instanceof HTMLTextAreaElement
     ? HTMLTextAreaElement.prototype
@@ -168,6 +175,33 @@ describe('共通情報の新規作成(実React)', () => {
     expect(host.querySelector('[role="alertdialog"]')).not.toBeNull()
     expect(host.textContent).toContain('社内メモ')
     expect(api.create).not.toHaveBeenCalled()
+  })
+
+  it('入力中に一覧へのリンクを押すと確認を出し、「保存せずに移動」だけが遷移する（VAR-01 監査）', async () => {
+    await render()
+    await setValue(byId('cv-name'), '途中の下書き')
+
+    const backLink = Array.from(host.querySelectorAll('a')).find(
+      (el) => el.textContent?.trim() === '共通情報一覧へ戻る',
+    ) as HTMLAnchorElement
+    expect(backLink).not.toBeUndefined()
+
+    // 未保存の入力があるあいだは、リンクを押しても確認窓が先に出る。
+    await click(backLink)
+    expect(routerPush).not.toHaveBeenCalled()
+    const dialogText = () => document.body.textContent ?? ''
+    expect(dialogText()).toContain('保存していない変更があります')
+
+    // 「編集を続ける」で閉じても入力は残る。
+    await click(byExactTextInBody('button', '編集を続ける'))
+    expect(dialogText()).not.toContain('保存していない変更があります')
+    expect((byId('cv-name') as HTMLInputElement).value).toBe('途中の下書き')
+    expect(routerPush).not.toHaveBeenCalled()
+
+    // 「保存せずに移動」を選んだときだけ一覧へ進む。
+    await click(backLink)
+    await click(byExactTextInBody('button', '保存せずに移動'))
+    expect(routerPush).toHaveBeenCalledWith('/contents/vars')
   })
 
   it('警告表示中にアカウントを切り替えると、前アカウントの入力は別アカウントへ登録されない', async () => {
