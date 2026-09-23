@@ -27,6 +27,7 @@ import { photoNoticeFor } from './photo-notice'
 import { photoReviewEntryFrom, photoReviewSearch } from './photo-review-query'
 import { pointStatusLabel, reviewVersionOf, text } from './photo-text'
 import KpiCollapse from '@/components/ui/kpi-collapse'
+import MetricValue from '@/components/ui/metric-value'
 import styles from './photo-review.module.css'
 
 type PhotoStatus = 'pending' | 'adopted' | 'rejected'
@@ -808,28 +809,27 @@ export default function PhotoReviewsPage() {
       <KpiCollapse data-design="KPIs" className="mb-0" gridClassName="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <div className="rounded-card border border-hairline bg-canvas p-4">
           <p className="text-xs font-semibold text-ink-secondary">見ていない写真</p>
-          <p className="mt-1 text-2xl font-bold tabular-nums text-ink">
-            {reviewMetrics ? reviewMetrics.pendingCount : countsReady ? counts.pending : '—'}
-            <span className="ml-0.5 text-xs font-normal text-ink-faint">枚</span>
+          <p className="mt-1 text-2xl font-bold text-ink">
+            {/* 監査6 #674: 数字の見せ方は MetricValue に寄せる（tabular-nums・単位小・3状態）。 */}
+            <MetricValue value={reviewMetrics ? reviewMetrics.pendingCount : countsReady ? counts.pending : null} unit="枚" />
           </p>
           <p className="mt-0.5 text-xs text-ink-faint">{reviewMetrics?.oldestPendingAt ? `いちばん古いものは${formatPhotoReceivedAt(reviewMetrics.oldestPendingAt)}` : countsReady && counts.pending > 0 ? '古いものから確認してください' : '新しい写真をお待ちしています'}</p>
         </div>
         <div className="rounded-card border border-hairline bg-canvas p-4">
           <p className="text-xs font-semibold text-ink-secondary">この30日に見た</p>
-          <p className="mt-1 text-2xl font-bold tabular-nums text-ink">
-            {reviewedStatsReady ? reviewedIn30Days : '—'}
-            <span className="ml-0.5 text-xs font-normal text-ink-faint">枚</span>
+          <p className="mt-1 text-2xl font-bold text-ink">
+            <MetricValue value={reviewedStatsReady ? reviewedIn30Days : null} unit="枚" />
           </p>
           <p className="mt-0.5 text-xs text-ink-faint">読み込んだ写真の審査日時から集計</p>
         </div>
         <div className="rounded-card border border-hairline bg-canvas p-4">
           <p className="text-xs font-semibold text-ink-secondary">1枚にかかる時間</p>
-          <p className="mt-1 text-2xl font-bold tabular-nums text-ink">{formatAverageReviewTime(reviewMetrics?.averageReviewMinutes)}</p>
+          <p className="mt-1 text-2xl font-bold text-ink"><MetricValue prefix="平均" text={averageReviewDurationText(reviewMetrics?.averageReviewMinutes)} /></p>
           <p className="mt-0.5 text-xs text-ink-faint">審査を始めてから保存するまでの平均</p>
         </div>
         <div className="rounded-card border border-hairline bg-canvas p-4">
           <p className="text-xs font-semibold text-ink-secondary">気をつけたい写真</p>
-          <p className="mt-1 text-2xl font-bold tabular-nums text-ink">{reviewMetrics ? reviewMetrics.attentionCount : '—'}<span className="ml-0.5 text-xs font-normal text-ink-faint">枚</span></p>
+          <p className="mt-1 text-2xl font-bold text-ink"><MetricValue value={reviewMetrics ? reviewMetrics.attentionCount : null} unit="枚" /></p>
           <p className="mt-0.5 text-xs text-ink-faint">自動判定は確認順の補助だけに使います</p>
         </div>
       </KpiCollapse>
@@ -1042,11 +1042,14 @@ export default function PhotoReviewsPage() {
  * 「1枚にかかる時間」の指標カード（Issue #666）。分の生値は
  * 「平均 55975分」（約38.8日）と読めないため、単位を替えて概数で出す。
  * 単位の切り替えは lib の共通関数に置き、他の画面でも同じ読み方にする。
+ *
+ * 監査6 #674: 「平均」は MetricValue の prefix（小さく薄い字）で出すため、
+ * ここは時間の本文だけを返す。未取得は null で「—」に任せる。
  */
-function formatAverageReviewTime(minutes: number | null | undefined) {
-  if (minutes == null || !Number.isFinite(minutes)) return '—'
-  if (minutes < 1) return `平均 ${Math.max(1, Math.round(minutes * 60))}秒`
-  return `平均 ${formatMinutesRough(minutes)}`
+function averageReviewDurationText(minutes: number | null | undefined): string | null {
+  if (minutes == null || !Number.isFinite(minutes)) return null
+  if (minutes < 1) return `${Math.max(1, Math.round(minutes * 60))}秒`
+  return formatMinutesRough(minutes)
 }
 
 function photoRiskLabel(flag: string) {

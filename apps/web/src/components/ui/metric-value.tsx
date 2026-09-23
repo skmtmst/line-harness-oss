@@ -64,8 +64,6 @@ export default function MetricValue({
   // 失敗・未取得は値が残っていても「—」で出す（0 と区別するため）。
   const forcedMissing = state === 'missing' || state === 'error'
   const shown = forcedMissing ? null : (text ?? (typeof value === 'number' && Number.isFinite(value) ? value.toLocaleString('ja-JP') : null))
-  const smallClass = 'text-xs font-normal text-ink-faint'
-
   return (
     <span
       data-metric-state={metricState}
@@ -75,9 +73,10 @@ export default function MetricValue({
         <span className="text-ink-faint">—</span>
       ) : (
         <>
-          {prefix ? <span className={`mr-1 ${smallClass}`}>{prefix}</span> : null}
+          {/* 前置きの後ろは実スペース。コピーや読み上げでも「平均 約1ヶ月」と取れるように。 */}
+          {prefix ? <span className="text-xs font-normal text-ink-faint">{prefix} </span> : null}
           {shown}
-          {unit ? <span className={`ml-0.5 ${smallClass}`}>{unit}</span> : null}
+          {unit ? <span className="ml-0.5 text-xs font-normal text-ink-faint">{unit}</span> : null}
         </>
       )}
     </span>

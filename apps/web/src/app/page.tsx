@@ -8,6 +8,7 @@ import { ApiError, api, bookingApi, type BookingRequest, type DashboardOverview 
 import { useAccount } from '@/contexts/account-context'
 import { useFeatureVisibility } from '@/lib/use-feature-visibility'
 import { formatDurationMinutes, formatWaitRough } from '@/lib/format-duration'
+import MetricValue from '@/components/ui/metric-value'
 import PendingInboxCard, { type PendingInboxSummary } from '@/components/support/pending-inbox-card'
 import ShipmentPanel, { type ShipmentSummary } from '@/components/dashboard/shipment-panel'
 import QrDialog from '@/components/dashboard/qr-dialog'
@@ -385,8 +386,12 @@ function LiveDataCard({
         {period ? <span className="text-ink-faint flex-1 whitespace-nowrap pt-0.5 text-[11px] font-normal">{period}</span> : null}
         <Link href={href} className="text-action shrink-0 text-xs hover:underline">{linkLabel} →</Link>
       </div>
-      <p className="text-ink mt-4 text-2xl font-bold tabular-nums">
-        {value === null ? '—' : value.toLocaleString('ja-JP')}<span className="ml-1 text-sm font-medium">{unit}</span>
+      <p className="text-ink mt-4 text-2xl font-bold">
+        {/*
+          監査6 #674: 数字の見せ方は MetricValue に寄せる。
+          値が無いときは「—」だけで単位を付けない（「—件」は数に見える）。
+        */}
+        <MetricValue value={value} unit={unit} />
       </p>
       <div className="mt-2 flex items-end justify-between gap-3">
         <p className="text-ink-faint min-w-0 truncate text-xs" title={detail}>{detail}</p>

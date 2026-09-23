@@ -30,6 +30,7 @@ import Select from '@/components/shared/select'
 import { optionsWithCurrent } from './reference-options'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { savedSearchSummary, type SavedSearchConditionLabels } from '@/components/friends/saved-search-utils'
+import MetricValue from '@/components/ui/metric-value'
 import { AttributeKindGuide, DuplicateNameNote, findDuplicateNames } from '@/components/friend-fields/attribute-kind-guide'
 
 const EDITABLE_KINDS: Array<{ value: SavedSearchConditionKind; label: string }> = [
@@ -577,7 +578,8 @@ function SavedSearchEditInner() {
         <aside className="min-w-0 space-y-4">
           <section className="rounded-card border border-hairline bg-canvas p-4 shadow-card">
             <h2 className="text-base font-bold text-ink">該当プレビュー</h2>
-            <p className="mt-3 text-3xl font-bold tabular-nums text-ink">{previewCount === null ? '—' : `${previewCount.toLocaleString('ja-JP')}人`}</p>
+            {/* 監査6 #674: 24px超の数字は字詰め（large → tracking -0.02em）と単位小を MetricValue で揃える */}
+            <p className="mt-3 text-3xl font-bold text-ink"><MetricValue value={previewCount} unit="人" large /></p>
             {/*
               IDEA-04: 人数をいつ・どの条件で計ったかを出す。
               条件を変えたあとは、出ている人数が「変更前の条件」のもので
