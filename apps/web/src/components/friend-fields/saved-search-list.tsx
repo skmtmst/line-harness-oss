@@ -165,7 +165,7 @@ export default function SavedSearchList({ accountId }: { accountId: string | nul
       await api.savedSearches.delete(search.id, accountId)
       void load()
     } catch (reason) {
-      setError(reason instanceof ApiError ? reason.message : '削除に失敗しました')
+      setError(reason instanceof ApiError ? reason.message : '削除に失敗しました。通信を確かめて、もう一度お試しください。')
     }
   }
 

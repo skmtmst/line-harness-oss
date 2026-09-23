@@ -461,17 +461,17 @@ export default function ActionScoreRulesPage() {
             <section className="rounded-v6-card border border-hairline bg-canvas p-4 shadow-v6-card">
               <p className="text-sm font-semibold text-v6-ink">つながる先</p>
               <div className="mt-3 grid gap-2 text-xs">
-                <Link href="/broadcasts/new" className="text-v6-accent hover:underline">一斉配信 <span className="text-v6-ink-faint">— 帯で相手を選ぶ</span></Link>
-                <Link href="/scenarios" className="text-v6-accent hover:underline">シナリオ配信 <span className="text-v6-ink-faint">— 帯を条件にする</span></Link>
-                <Link href="/automations" className="text-v6-accent hover:underline">オートメーション <span className="text-v6-ink-faint">— 点が下がったときに動かす</span></Link>
-                <Link href="/analytics" className="text-v6-accent hover:underline">分析 <span className="text-v6-ink-faint">— 帯ごとの成果を見る</span></Link>
-                <Link href="/mileage" className="text-v6-accent hover:underline">マイル <span className="text-v6-ink-faint">— お客様の残高を見る</span></Link>
+                <Link href="/broadcasts/new" className="text-accent-deep hover:underline">一斉配信 <span className="text-v6-ink-faint">— 帯で相手を選ぶ</span></Link>
+                <Link href="/scenarios" className="text-accent-deep hover:underline">シナリオ配信 <span className="text-v6-ink-faint">— 帯を条件にする</span></Link>
+                <Link href="/automations" className="text-accent-deep hover:underline">オートメーション <span className="text-v6-ink-faint">— 点が下がったときに動かす</span></Link>
+                <Link href="/analytics" className="text-accent-deep hover:underline">分析 <span className="text-v6-ink-faint">— 帯ごとの成果を見る</span></Link>
+                <Link href="/mileage" className="text-accent-deep hover:underline">マイル <span className="text-v6-ink-faint">— お客様の残高を見る</span></Link>
               </div>
             </section>
           </aside>
         </div>
 
-        {notice ? <p className="rounded-v6-control border border-v6-accent/25 bg-v6-accent-soft px-4 py-3 text-sm text-v6-accent-hover" role="status">{notice}</p> : null}
+        {notice ? <p className="rounded-v6-control border border-v6-accent/25 bg-v6-accent-soft px-4 py-3 text-sm text-accent-deep" role="status">{notice}</p> : null}
         {actionError ? <p className="rounded-v6-control border border-v6-danger/25 bg-v6-danger-bg px-4 py-3 text-sm text-v6-danger" role="alert">{actionError}</p> : null}
 
         {/*

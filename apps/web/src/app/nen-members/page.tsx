@@ -597,7 +597,7 @@ export default function PhotoReviewsPage() {
         ? await api.nenMembers.photoPointRetry(id, selectedAccountId)
         : await api.nenMembers.photoPointReconcile(id, selectedAccountId)
       if (!response.success) {
-        setNotice(response.error || 'ポイントの手続きに失敗しました')
+        setNotice(response.error || 'ポイントの手続きに失敗しました。通信を確かめて、もう一度お試しください。')
         return
       }
       setNotice(response.data.synced
@@ -607,7 +607,7 @@ export default function PhotoReviewsPage() {
         : `手続きはまだ完了していません。${response.data.reasonLabel ? `（${response.data.reasonLabel}）` : ''}`)
       void openDetail(id)
     } catch {
-      setNotice('ポイントの手続きに失敗しました')
+      setNotice('ポイントの手続きに失敗しました。通信を確かめて、もう一度お試しください。')
     } finally {
       setPointActionBusy(null)
     }
@@ -755,7 +755,7 @@ export default function PhotoReviewsPage() {
   return <>
     <main className="mx-auto flex max-w-full flex-col gap-4 p-4 sm:p-6">
       {/* 審査の結果を読み上げにも届ける（V6R-S3-e）。 */}
-      {notice && <div role="status" aria-live="polite" className="rounded-control border border-accent-border bg-accent-soft px-4 py-3 text-sm text-accent-hover">{notice}</div>}
+      {notice && <div role="status" aria-live="polite" className="rounded-control border border-accent-border bg-accent-soft px-4 py-3 text-sm text-accent-deep">{notice}</div>}
       {bulkFailed.length > 0 && <div className="rounded-control border border-hairline bg-canvas px-4 py-3">
         <p className="text-sm font-bold text-ink">LINE通知を送れなかった写真（{bulkFailed.length}枚）</p>
         <p className="mt-1 text-xs text-ink-secondary">審査は保存済みです。通知だけ再送できます。</p>
@@ -834,7 +834,7 @@ export default function PhotoReviewsPage() {
         </div>
       </KpiCollapse>
 
-      <div className="rounded-control bg-info-bg px-4 py-3 text-sm font-medium text-accent">
+      <div className="rounded-control bg-info-bg px-4 py-3 text-sm font-medium text-accent-deep">
         通す・戻すを押した時点で、投稿者へお礼や直してほしい点が届きます。戻すときは理由を選び、送る文章を確認できます。
       </div>
 
@@ -872,7 +872,7 @@ export default function PhotoReviewsPage() {
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="rounded-control bg-accent-soft px-3 py-2 text-sm font-semibold text-accent">{selectedPendingPhotos.length}枚を選択中</span>
+          <span className="rounded-control bg-accent-soft px-3 py-2 text-sm font-semibold text-accent-deep">{selectedPendingPhotos.length}枚を選択中</span>
           {/*
            * 0件選択では両方とも無効＋理由を添える（Issue #666）。緑の主ボタンは
            * 薄くなっても「押せそう」に見えるため、無効の理由を文字でも出す。
@@ -916,7 +916,7 @@ export default function PhotoReviewsPage() {
             <label className="absolute left-2 top-2 flex cursor-pointer items-center gap-1.5 rounded-control border border-hairline bg-canvas px-2 py-1 text-xs font-semibold text-ink-secondary"><input type="checkbox" checked={selected} onChange={() => togglePhotoSelection(photoId)} aria-label={`${photoPetDisplayName(photo.pet_name)}の写真を選ぶ`} className="accent-accent" /><span>選ぶ</span></label>
           </div>
           <div className="p-4">
-            <div className="flex items-start justify-between gap-3"><div><p className="font-bold text-ink">{photoPetDisplayName(photo.pet_name)}</p><p className="mt-1 text-xs text-ink-faint">{text(photo.owner_name) || '名前未取得'}・{formatPhotoReceivedAt(photo.created_at)}</p></div><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${photo.status === 'pending' ? 'bg-status-warn-soft text-status-warn-deep' : photo.status === 'adopted' ? 'bg-accent-soft text-accent-hover' : 'bg-canvas-sunken text-ink-faint'}`}>{photo.status === 'pending' ? '審査待ち' : photo.status === 'adopted' ? '通しました' : '戻しました'}</span></div>
+            <div className="flex items-start justify-between gap-3"><div><p className="font-bold text-ink">{photoPetDisplayName(photo.pet_name)}</p><p className="mt-1 text-xs text-ink-faint">{text(photo.owner_name) || '名前未取得'}・{formatPhotoReceivedAt(photo.created_at)}</p></div><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${photo.status === 'pending' ? 'bg-status-warn-soft text-status-warn-deep' : photo.status === 'adopted' ? 'bg-accent-soft text-accent-deep' : 'bg-canvas-sunken text-ink-faint'}`}>{photo.status === 'pending' ? '審査待ち' : photo.status === 'adopted' ? '通しました' : '戻しました'}</span></div>
             <p className="mt-2 min-h-5 truncate text-sm text-ink-secondary" title={text(photo.caption) || 'コメントなし'}>{text(photo.caption) || 'コメントなし'}</p>
             {/*
              * 「この人の次の投稿は、必ず人が見る」を付けた方の写真。
@@ -929,7 +929,7 @@ export default function PhotoReviewsPage() {
              * ECとつながっていない採用に「付与済み」と出すのは、
              * できていない約束を画面へ書くことになる。
              */}
-            {photo.status === 'adopted' && <p className="mt-3 rounded-control bg-accent-soft px-3 py-2 text-xs font-semibold text-accent-hover">{pointStatusLabel(photo.point_sync_status)}・{photo.publication_consent_at && !photo.publication_withdrawn_at ? '公開中' : '公開は未同意'}</p>}
+            {photo.status === 'adopted' && <p className="mt-3 rounded-control bg-accent-soft px-3 py-2 text-xs font-semibold text-accent-deep">{pointStatusLabel(photo.point_sync_status)}・{photo.publication_consent_at && !photo.publication_withdrawn_at ? '公開中' : '公開は未同意'}</p>}
             {photo.status === 'rejected' && <div className="mt-3 rounded-control bg-surface-pearl px-3 py-2 text-xs text-ink-secondary"><span className="font-semibold">見送った理由：</span>{REVIEW_REASONS.find((reason) => reason.value === photo.review_reason_code)?.label ?? '理由未記録'}{text(photo.review_reason_note) && <p className="mt-1 text-ink-faint">{text(photo.review_reason_note)}</p>}</div>}
             {photo.review_notification_status === 'failed' && <div className="mt-2 flex items-center justify-between gap-3 rounded-control bg-status-warn-soft px-3 py-2 text-xs font-semibold text-status-warn-deep"><span>投稿者へのLINE通知を送れませんでした</span><Button variant="secondary" disabled={reviewing === photo.id} onClick={() => void retryNotification(text(photo.id))} className="shrink-0">{reviewing === photo.id ? '再送中...' : 'LINE通知を再送'}</Button></div>}
             {photo.status === 'pending' && <div className="mt-3 grid grid-cols-2 gap-2"><Button variant="primary" aria-label={`${photoPetDisplayName(photo.pet_name)}の写真を通す`} disabled={reviewing === photo.id} onClick={() => void review(text(photo.id), 'adopted')}>{reviewing === photo.id ? '処理中...' : '通す'}</Button><Button data-qa-open={photoId === text(visiblePhotos[0]?.id) && status === 'pending' ? 'N2J629' : undefined} variant="secondary" aria-label={`${photoPetDisplayName(photo.pet_name)}の写真を戻す`} disabled={reviewing === photo.id} onClick={() => void openRejectDialog(photoId)}>戻す</Button></div>}

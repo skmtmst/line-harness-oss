@@ -107,7 +107,7 @@ export default function BroadcastStopControls({
       }
       onChanged()
     } catch (err) {
-      setError(errorMessageFor(err, '操作に失敗しました'))
+      setError(errorMessageFor(err, '操作に失敗しました。通信を確かめて、もう一度お試しください。'))
       // 版が食い違ったときは、正しい版を取り直さないと次も失敗する。
       if (err instanceof ApiError && err.status === 409) onChanged()
     } finally {

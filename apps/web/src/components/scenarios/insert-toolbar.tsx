@@ -122,7 +122,7 @@ export default function InsertToolbar({ targetRef, value, onChange, includeAnswe
       onClick={() => token ? insert(token) : setOpen(open === key ? null : key)}
       aria-expanded={open === key}
       className={`border-hairline rounded-control h-8 border px-2.5 text-xs transition-colors ${
-        open === key ? 'bg-accent-soft text-accent border-accent' : 'text-ink-secondary hover:bg-canvas-sunken'
+        open === key ? 'bg-accent-soft text-accent-deep border-accent' : 'text-ink-secondary hover:bg-canvas-sunken'
       }`}
     >
       {label}

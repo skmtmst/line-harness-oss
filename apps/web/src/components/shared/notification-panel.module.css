@@ -41,7 +41,7 @@
   border: 0;
   background: transparent;
   padding: 2px;
-  color: var(--color-accent);
+  color: var(--color-accent-deep);
   font-size: var(--text-caption);
   font-weight: 600;
   cursor: pointer;

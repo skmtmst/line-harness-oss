@@ -374,7 +374,7 @@ describe('保存状態の表示', () => {
   })
 
   it('保存に失敗したら失敗と出し、次の画面へ進まない', async () => {
-    fixture.createDraft.mockResolvedValue({ success: false, error: '保存に失敗しました' })
+    fixture.createDraft.mockResolvedValue({ success: false, error: '保存に失敗しました。通信を確かめて、もう一度お試しください。' })
     render(<NewReminderPage />)
     fillName()
     fireEvent.click(screen.getByRole('button', { name: /対象設定へ/ }))

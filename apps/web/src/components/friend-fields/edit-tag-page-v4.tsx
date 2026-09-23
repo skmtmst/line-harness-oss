@@ -106,7 +106,7 @@ function ArchivedTagEditor({ tag, accountId, onCancel, onSaved }: {
       setNotice('保存しました。')
       onSaved(result.data.tag)
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : '保存に失敗しました')
+      setError(reason instanceof Error ? reason.message : '保存に失敗しました。通信を確かめて、もう一度お試しください。')
     } finally {
       setSaving(false)
     }
@@ -119,7 +119,7 @@ function ArchivedTagEditor({ tag, accountId, onCancel, onSaved }: {
         <p className="mt-1 text-xs leading-5">保管済みのタグは、あとから元に戻す機能がありません。誤字などの表示名の訂正だけできます。フォルダ・付与のしかた・マイル・連動アクションなどの設定は変更できません。</p>
       </div>
       {error && <p role="alert" className="rounded-control border border-danger/25 bg-danger-bg p-3 text-sm text-danger">{error}</p>}
-      {notice && <p className="rounded-control border border-accent/25 bg-accent-soft p-3 text-sm text-accent">{notice}</p>}
+      {notice && <p className="rounded-control border border-accent/25 bg-accent-soft p-3 text-sm text-accent-deep">{notice}</p>}
       <label className="block"><span className="mb-1.5 block text-xs font-semibold text-ink-secondary">タグ名</span><input value={name} onChange={(event) => setName(event.target.value)} maxLength={80} className="w-full rounded-control border border-hairline px-3 py-2.5 text-sm outline-none focus:border-accent" /></label>
       <label className="block"><span className="mb-1.5 block text-xs font-semibold text-ink-secondary">説明</span><textarea value={description} onChange={(event) => setDescription(event.target.value)} rows={3} className="w-full rounded-control border border-hairline px-3 py-2.5 text-sm outline-none focus:border-accent" /></label>
       <div className="flex justify-end gap-2">
@@ -174,7 +174,7 @@ export default function EditTagPageV4() {
       setDefinition(detail.data)
       setTag({ ...detail.data.tag, friendCount: dependenciesResult.success ? dependenciesResult.data.friendCount : detail.data.tag.friendCount })
     } catch {
-      setError('読み込みに失敗しました')
+      setError('読み込みに失敗しました。もう一度読み込んでください。')
       // 参照だけ取れていたのに消すと、窓が「取れていない」扱いになる。
       // 取れていた分は残し、まだ無いときだけ失敗にする。
       setDependenciesStatus((prev) => (prev === 'ready' ? prev : 'error'))
@@ -210,7 +210,7 @@ export default function EditTagPageV4() {
       setNotice(update.data.queued > 0 ? `保存しました。${update.data.queued}人へ遡及反映を開始しました。` : '保存しました。')
       await load()
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : '保存に失敗しました')
+      setError(reason instanceof Error ? reason.message : '保存に失敗しました。通信を確かめて、もう一度お試しください。')
     } finally {
       setSaving(false)
     }
@@ -224,7 +224,7 @@ export default function EditTagPageV4() {
       if (!result.success) throw new Error(result.error)
       router.push('/tags')
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : '削除に失敗しました')
+      setError(reason instanceof Error ? reason.message : '削除に失敗しました。通信を確かめて、もう一度お試しください。')
       setDeleteOpen(false)
     } finally {
       setDeleting(false)

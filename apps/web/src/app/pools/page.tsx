@@ -22,12 +22,12 @@ export default function PoolsPage() {
     try {
       const [poolsRes, accRes] = await Promise.all([api.pools.list(), api.lineAccounts.list()])
       if (poolsRes.success) setPools(poolsRes.data)
-      else setError('プール一覧の取得に失敗しました')
+      else setError('プール一覧の取得に失敗しました。もう一度読み込んでください。')
       if (accRes.success) setAccounts(accRes.data)
     } catch (err) {
       // FEATURE_DISABLED は共通ゲートが案内へ切り替える。それ以外だけここで伝える。
       if (!(err instanceof ApiError && err.code === 'FEATURE_DISABLED')) {
-        setError('プール一覧の取得に失敗しました')
+        setError('プール一覧の取得に失敗しました。もう一度読み込んでください。')
       }
     } finally {
       setLoading(false)
@@ -351,7 +351,7 @@ function CreatePoolModal({
     try {
       const res = await api.pools.create({ slug, name, activeAccountId })
       if (res.success) onCreated()
-      else setError(res.error ?? '作成に失敗しました')
+      else setError(res.error ?? '作成に失敗しました。通信を確かめて、もう一度お試しください。')
     } catch (err) {
       // 400系はAPIの理由（slug重複など）、403・5xxは運用の言葉へ写す（WRITE-01）。
       setError(describeSaveFailure(err))

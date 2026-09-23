@@ -163,7 +163,7 @@ export default function FriendTimeline({ friendId }: { friendId: string }) {
               'disabled' in f && f.disabled
                 ? 'text-ink-faint opacity-50'
                 : filter === f.key
-                  ? 'bg-accent-soft text-accent'
+                  ? 'bg-accent-soft text-accent-deep'
                   : 'text-ink-secondary hover:bg-canvas-sunken'
             }`}
           >
@@ -235,7 +235,7 @@ export default function FriendTimeline({ friendId }: { friendId: string }) {
           <button
             type="button"
             onClick={() => setShowTemplates(true)}
-            className="text-accent text-xs hover:underline"
+            className="text-accent-deep text-xs hover:underline"
           >
             テンプレートを選択
           </button>

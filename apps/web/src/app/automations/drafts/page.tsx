@@ -37,7 +37,7 @@ function AutomationDraftPageInner() {
         </p>
         <Link
           href="/automations?tab=templates"
-          className="text-accent mt-4 inline-block text-sm font-medium underline"
+          className="text-accent-deep mt-4 inline-block text-sm font-medium underline"
         >
           見本の一覧へ
         </Link>

@@ -1367,7 +1367,7 @@ function DashboardPageInner() {
                 type="button"
                 onClick={() => selectPeriod(item.key)}
                 aria-pressed={period === item.key}
-                className={`rounded-pill border px-4 py-2 text-xs font-medium transition-colors ${period === item.key ? 'border-accent bg-accent text-on-accent' : 'border-hairline bg-canvas text-ink-secondary hover:bg-canvas-sunken'}`}
+                className={`rounded-pill border px-4 py-2 text-xs font-medium transition-colors ${period === item.key ? 'border-accent-deep bg-accent-deep text-on-accent' : 'border-hairline bg-canvas text-ink-secondary hover:bg-canvas-sunken'}`}
               >{item.label}</button>
             ))}
           </div>
