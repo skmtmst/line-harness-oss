@@ -1,0 +1,96 @@
+/*
+ * 開閉する欄。Pencil ★V7「開閉する欄」（V7 文書 `v9M8P8`）。
+ *
+ *   枠     角丸 10・枠 $hairline・地 $canvas
+ *   見出し 高さ 48・余白 [0,16]・14px 太字。右に「3項目」などの要約（12px $ink-faint）と ∨
+ *   指     見出しの地が $canvas-sunken（motion-fast）
+ *   開く   ∨ が motion-base で 180° 回る。中身は motion-fast で薄く出る。高さは動かさない
+ *   閉じる 印を戻すだけ。中身は一瞬で消す
+ */
+
+.root {
+  overflow: hidden;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card);
+  background: var(--color-canvas);
+}
+
+.summary {
+  display: flex;
+  min-height: 48px;
+  align-items: center;
+  gap: 10px;
+  padding: 0 16px;
+  color: var(--color-ink);
+  font-size: var(--text-body);
+  font-weight: 700;
+  list-style: none;
+  cursor: pointer;
+  transition: background-color var(--motion-fast) var(--motion-ease-out);
+}
+
+.summary::-webkit-details-marker {
+  display: none;
+}
+
+.summary:hover {
+  background: var(--color-canvas-sunken);
+}
+
+.summary:focus-visible {
+  outline: revert;
+  outline-offset: -2px;
+}
+
+.title {
+  min-width: 0;
+  flex: 1;
+}
+
+.hint {
+  flex: 0 0 auto;
+  color: var(--color-ink-faint);
+  font-size: var(--text-caption);
+  font-weight: 400;
+}
+
+.root[open] .hint {
+  display: none;
+}
+
+.chevron {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+  color: var(--color-ink-secondary);
+  transition: rotate var(--motion-base) var(--motion-ease-out);
+}
+
+.root[open] .chevron {
+  rotate: 180deg;
+}
+
+.body {
+  padding: 4px 16px 16px;
+}
+
+.root[open] .body {
+  animation: disclosure-in var(--motion-fast) var(--motion-ease-out);
+}
+
+@keyframes disclosure-in {
+  from {
+    opacity: 0;
+  }
+}
+
+/* 小さい版：見出し 40・余白 [0,12]・13px。フォームの中の「詳細設定」など。 */
+.compact .summary {
+  min-height: 40px;
+  padding: 0 12px;
+  font-size: var(--text-label);
+}
+
+.compact .body {
+  padding: 4px 12px 12px;
+}

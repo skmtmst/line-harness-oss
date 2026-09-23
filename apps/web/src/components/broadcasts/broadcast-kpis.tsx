@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { api, type BroadcastListKpis, type BroadcastStats } from '@/lib/api'
 import { buildBroadcastKpiCards, countText } from './broadcast-kpi-values'
+import MetricValue from '@/components/ui/metric-value'
 
 /** 帯の副題に出す数。中身は `broadcast-kpi-values.ts`。 */
 export { countText }
@@ -64,17 +65,13 @@ export default function BroadcastKpis({
             {loading ? (
               <span className="bg-canvas-sunken inline-block h-7 w-14 animate-pulse rounded" />
             ) : (
-              <>
-                <span className="text-ink text-2xl font-bold tabular-nums">
-                  {typeof card.value === 'number' && Number.isFinite(card.value)
-                    ? card.value.toLocaleString('ja-JP')
-                    : '—'}
-                </span>
-                {/* **数が無いときは単位も出さない。** `—件` は数に見える。 */}
-                {typeof card.value === 'number' && Number.isFinite(card.value) && (
-                  <span className="text-ink-secondary text-xs">{card.unit}</span>
-                )}
-              </>
+              // 監査6 #674: 数が無いときは「—」だけで単位を出さない（`—件` は数に見える）
+              <span className="text-ink text-2xl font-bold">
+                <MetricValue
+                  value={typeof card.value === 'number' && Number.isFinite(card.value) ? card.value : null}
+                  unit={card.unit}
+                />
+              </span>
             )}
           </p>
           <p className="text-ink-faint mt-1 text-[11px] leading-relaxed">

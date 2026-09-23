@@ -17,6 +17,7 @@ import ListState from '@/components/shared/list-state'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import FilterChip from '@/components/shared/filter-chip'
 import KpiCollapse from '@/components/ui/kpi-collapse'
+import MetricValue from '@/components/ui/metric-value'
 import {
   automationActionLabel,
   automationTriggerLabel,
@@ -601,25 +602,25 @@ export default function AutomationsPage() {
       <KpiCollapse data-design="KPIs" className="mb-4" gridClassName="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <div className="bg-canvas rounded-card border-hairline border p-4">
           <p className="text-ink-faint text-xs">動いているもの</p>
-          <p className="text-ink mt-1 text-2xl font-bold tabular-nums">
-            {activeCount ?? '—'}
-            {activeCount !== null ? <span className="text-ink-faint ml-0.5 text-xs font-normal">本</span> : null}
+          <p className="text-ink mt-1 text-2xl font-bold">
+            {/* 監査6 #674: 数字の見せ方は MetricValue に寄せる */}
+            <MetricValue value={activeCount} unit="本" />
           </p>
           <p className="text-ink-faint mt-0.5 text-xs">稼働中 {activeCount ?? '—'}本・止めているもの {stoppedCount ?? '—'}本</p>
         </div>
         <div className="bg-canvas rounded-card border-hairline border p-4">
           <p className="text-ink-faint text-xs">今月の実行（この30日）</p>
-          <p className="text-ink mt-1 text-2xl font-bold tabular-nums">{automaticRuns?.toLocaleString('ja-JP') ?? '—'}{automaticRuns !== null ? '回' : ''}</p>
+          <p className="text-ink mt-1 text-2xl font-bold"><MetricValue value={automaticRuns ?? null} unit="回" /></p>
           <p className="text-ink-faint mt-0.5 text-xs">分析の「使われ方」と同じ集計</p>
         </div>
         <div className="bg-canvas rounded-card border-hairline border p-4">
           <p className="text-ink-faint text-xs">失敗した</p>
-          <p className="text-ink mt-1 text-2xl font-bold tabular-nums">{failedRuns?.toLocaleString('ja-JP') ?? '—'}{failedRuns !== null ? '回' : ''}</p>
+          <p className="text-ink mt-1 text-2xl font-bold"><MetricValue value={failedRuns ?? null} unit="回" /></p>
           <p className="text-ink-faint mt-0.5 text-xs">部分成功を含む・この30日</p>
         </div>
         <div className="bg-canvas rounded-card border-hairline border p-4">
           <p className="text-ink-faint text-xs">減らせた手作業</p>
-          <p className="text-ink mt-1 text-2xl font-bold tabular-nums">{estimatedHoursSaved !== null ? `およそ ${estimatedHoursSaved.toLocaleString('ja-JP')}時間` : '—'}</p>
+          <p className="text-ink mt-1 text-2xl font-bold"><MetricValue value={estimatedHoursSaved} prefix="およそ" unit="時間" /></p>
           <p className="text-ink-faint mt-0.5 text-xs">1回30秒として計算しています</p>
         </div>
       </KpiCollapse>

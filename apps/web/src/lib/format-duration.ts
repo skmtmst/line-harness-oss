@@ -1,3 +1,10 @@
+/*
+ * このファイルの3関数の使い分け（名前が似ているので先に書く）:
+ * - formatDurationMinutes …「残り時間」。受信箱など、あと何分かが効く面で精密表示。
+ * - formatWaitRough       …「経過時間」。最長◯日前・最も古い未対応◯日前の粗い表示。
+ * - formatMinutesRough    …「長さ」。平均◯時間・約◯ヶ月のように単位を替えた概数。
+ */
+
 /** 分数を、長い待ち時間でも読みやすい「日・時間・分」に直す。 */
 export function formatDurationMinutes(minutes: number): string {
   const total = Math.max(0, Math.floor(minutes))

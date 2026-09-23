@@ -1,5 +1,6 @@
 'use client'
 
+import Disclosure from '@/components/shared/disclosure'
 import SelectField from '@/components/shared/select-field'
 import React, { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
@@ -148,12 +149,7 @@ function SummaryAside({
 }
 
 function EditorDetails({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <details className="group border-hairline bg-canvas overflow-hidden rounded-card border">
-      <summary className="text-ink-secondary flex cursor-pointer list-none items-center justify-between px-4 py-3 text-sm font-semibold">{label}<span className="text-ink-faint group-open:rotate-180">▾</span></summary>
-      <div className="border-hairline border-t p-4">{children}</div>
-    </details>
-  )
+  return <Disclosure title={label}>{children}</Disclosure>
 }
 
 function CommentsTab({ webinarId }: { webinarId: string }) {
@@ -837,7 +833,7 @@ function AnalyticsTab({ webinarId, durationSeconds, view = 'analytics', analytic
               <span className={`h-2 w-2 rounded-full ${metric.dot}`} />
               {metric.label}
             </div>
-            <div className="mt-3 text-3xl font-bold tracking-tight text-slate-950">{metric.value}</div>
+            <div className="mt-3 text-3xl font-bold tabular-nums tracking-[-0.02em] text-slate-950">{metric.value}</div>
             <div className="mt-1 text-xs text-slate-500">{metric.detail}</div>
           </div>
         ))}

@@ -202,7 +202,7 @@ function SortableCardRow({ item, definition, onToggle }: {
 }
 
 function PreviewCard({ children, muted = false }: { children: ReactNode; muted?: boolean }) {
-  return <div className={`rounded-lg border px-2 py-2 text-[10px] font-medium ${muted ? 'border-dashed border-hairline text-ink-faint' : 'border-hairline bg-canvas text-ink shadow-[1px_1px_2px_rgba(29,29,31,0.10)]'}`}>{children}</div>
+  return <div className={`rounded-lg border px-2 py-2 text-[10px] font-medium ${muted ? 'border-dashed border-hairline text-ink-faint' : 'border-hairline bg-canvas text-ink shadow-card'}`}>{children}</div>
 }
 
 /*
@@ -343,7 +343,7 @@ export default function DashboardEditor({ open, preferences, saving = false, sav
 
   return (
     <div data-design="Editor" className="bg-ink/30 fixed inset-0 z-50 flex justify-end" role="presentation" onMouseDown={() => { if (!saving) onCancel() }}>
-      <aside ref={panelRef} role="dialog" aria-modal="true" aria-labelledby="dashboard-editor-title" className="bg-canvas flex h-full w-full max-w-[540px] flex-col shadow-[-8px_0_28px_rgba(26,28,26,0.14)]" onMouseDown={(event) => event.stopPropagation()}>
+      <aside ref={panelRef} role="dialog" aria-modal="true" aria-labelledby="dashboard-editor-title" className="bg-canvas flex h-full w-full max-w-[540px] flex-col shadow-float" onMouseDown={(event) => event.stopPropagation()}>
         <header className="border-hairline border-b px-[22px] pb-4 pt-5">
           <div className="flex items-start justify-between gap-4">
             <div>
