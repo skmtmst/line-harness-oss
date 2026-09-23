@@ -226,10 +226,9 @@ function BroadcastList() {
     setFolderBusy(true)
     setFolderError('')
     try {
-      const targetResult = await api.folders.update(target.id, { displayOrder: neighbor.displayOrder })
-      if (!targetResult.success) throw new Error(targetResult.error)
-      const neighborResult = await api.folders.update(neighbor.id, { displayOrder: target.displayOrder })
-      if (!neighborResult.success) throw new Error(neighborResult.error)
+      // 2つの更新はサーバが1回で行う（V6R-S2-c）。途中で片方だけ変わらない。
+      const result = await api.folders.swapOrder(target.id, neighbor.id)
+      if (!result.success) throw new Error(result.error)
       await loadFolders()
     } catch {
       setFolderError('並び順を変えられませんでした。')
