@@ -251,6 +251,47 @@
   --shadow-float: 0 6px 18px #19202626;
 }
 
+:root {
+  /* --- 動き（V7）------------------------------------------------------------
+   * Pencil ★V7「基礎 動き」（V7 文書 `bi8Au`）の物差し。部品の CSS は ms を
+   * 直接書かず、この4段と2本の曲線だけを使う。
+   *
+   *   instant  80 押した瞬間の反応
+   *   fast    120 色・枠の変化
+   *   base    200 形が描かれる・開く・閉じる
+   *   slow    300 画面の端から出る引き出しだけ
+   *
+   * 曲線に `--ease-*` を使わないのは、Tailwind の `ease-out` クラスが読む
+   * 同名の変数を上書きしてしまうため。
+   *
+   * `@theme` ではなく `:root` に置く。Tailwind は `@theme` の変数のうち
+   * クラスや画面のコードで使われたものしか出力せず、CSS Modules の
+   * `var()` だけから読む値は消えてしまう（dev で確かめた）。
+   */
+  --motion-instant: 80ms;
+  --motion-fast: 120ms;
+  --motion-base: 200ms;
+  --motion-slow: 300ms;
+  --motion-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --motion-ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+}
+
+/*
+ * 動きを減らす設定（OS の「視差効果を減らす」など）では、すべての動きを
+ * 一瞬で最後の状態にする。部品ごとに書き忘れても、ここで止まる。
+ * `0.01ms` にするのは、`transitionend` を待つ処理が止まらないようにするため。
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
 /*
  * 日本語の改行を文節で行う（V7、手本は detail.design の Smarter Word Break）。
  *
