@@ -30,7 +30,7 @@ const input = { title: 'フォームのタグ', question: 'どう設定するか
 async function draft() {
   await updateSupportTicket(db, requestId, { stage: 'resolved' });
   const job = (await claimKnowledgeJob(db))!;
-  await finishKnowledgeJob(db, job, { article: input, evidence: [
+  await finishKnowledgeJob(db, job, { article: input, articleKind: 'verified', evidence: [
     { messageId: 'message-a', createdAt: '2026-09-19', authorKind: 'ops', quote: '設定してテストした', role: 'action' },
     { messageId: 'message-b', createdAt: '2026-09-19', authorKind: 'tenant', quote: 'タグの付与を確認しました', role: 'result' },
   ], reason: '確認待ち', reviewState: 'pending' });
@@ -64,7 +64,7 @@ describe('knowledge lifecycle on real SQLite', () => {
   it('editing invalidates approval, and an old approval version is rejected', async () => {
     const article = await draft();
     await reviewKnowledgeArticle(db, article.id, 1, 'approve', 'operator');
-    expect(await editKnowledgeArticle(db, article.id, 2, { ...input, answer: '修正した回答' })).toBe(true);
+    expect(await editKnowledgeArticle(db, article.id, 2, { ...input, answer: '修正した回答' }, 'answer_example', [])).toBe(true);
     expect(await reviewKnowledgeArticle(db, article.id, 2, 'approve', 'operator')).toBe(false);
     expect(await searchKnowledge(db, 'usage', 'フォーム', [])).toEqual([]);
     expect((await getKnowledgeArticle(db, article.id))?.review_state).toBe('pending');
@@ -97,14 +97,14 @@ describe('knowledge lifecycle on real SQLite', () => {
     await addSupportTenantMessage(db, { requestId, staffId: 'operator', staffName: '利用者', body: '再発しました', attachmentKeys: [] });
     expect(await searchKnowledge(db, 'usage', 'フォーム', [])).toEqual([]);
     expect((await getKnowledgeArticle(db, article.id))?.source_current).toBe(0);
-    await editKnowledgeArticle(db, article.id, 2, input);
+    await editKnowledgeArticle(db, article.id, 2, input, 'answer_example', []);
     expect(await reviewKnowledgeArticle(db, article.id, 3, 'approve', 'operator')).toBe(false);
   });
   it('late generation cannot publish against changed conversation', async () => {
     await updateSupportTicket(db, requestId, { stage: 'resolved' });
     const job = (await claimKnowledgeJob(db))!;
     await updateSupportTicket(db, requestId, { stage: 'in_progress' });
-    await finishKnowledgeJob(db, job, { article: input, evidence: [], reason: '', reviewState: 'needs_review' });
+    await finishKnowledgeJob(db, job, { article: input, articleKind: 'answer_example', evidence: [], reason: '', reviewState: 'needs_review' });
     expect((await knowledgeForTicket(db, requestId)).article).toBeNull();
   });
   it('closing a resolved ticket preserves its approved evidence', async () => {
