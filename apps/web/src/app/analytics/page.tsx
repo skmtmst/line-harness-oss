@@ -2357,6 +2357,8 @@ function FriendsOverviewTab({ accountId }: { accountId: string }) {
   // 日ごとの表は行ごとの状態を持たない。全体の状態が「実測できた」でないときは、
   // 0 が並んだ30行を出さずに理由を1行で出す。
   const daysShown = overview.state === 'available' || overview.state === 'partial'
+  // 上の帯が理由全文を既に出しているとき、図側で繰り返さない(#670 20)。
+  const reasonShownInBanner = overview.state !== 'available' && Boolean(overview.stateReason)
   const selectedDay = overview.days.find((day) => day.date === selectedDate) ?? overview.days.at(-1) ?? null
   const selectedCampaigns = overview.campaigns.filter((item) => item.date === selectedDay?.date)
   return <div data-design-node="Zxezb" className="space-y-4">
@@ -2377,7 +2379,12 @@ function FriendsOverviewTab({ accountId }: { accountId: string }) {
       </div>
       {!daysShown ? (
         <div className="p-8 text-center text-sm text-ink-faint">
-          <p>{pendingReason}</p>
+          {/*
+            #670 20: 理由全文は上の帯が既に出しているときは繰り返さない。
+            同じ文が帯と図の両方に出ると二重に読める。図側は短い状態だけにし、
+            帯が無いとき(理由なし)だけ全文を出す。
+          */}
+          <p>{reasonShownInBanner ? (METRIC_STATE_TEXT[overview.state] || '未取得') : pendingReason}</p>
           {/* 集計待ちの間は「0人」とも「次はいつ」とも言えない。更新の周期と
               変わらない場合の戻り方だけを伝える(点検ANALYTICS-01)。 */}
           {overview.state === 'pending' && (
