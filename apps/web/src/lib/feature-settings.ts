@@ -54,7 +54,7 @@ export interface FeatureGroup {
   items: FeatureItem[]
 }
 
-export const FEATURE_SETTINGS_UPDATED_EVENT = 'line-harness:feature-settings-updated'
+export { FEATURE_SETTINGS_UPDATED_EVENT } from './feature-settings-event'
 export const SPECIALIZED_FEATURE_KEYS: FeatureKey[] = ['nen_campaigns', 'photo_review', 'ec_commerce', 'line_notifications']
 
 /**

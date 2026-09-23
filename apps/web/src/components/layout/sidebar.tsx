@@ -178,9 +178,10 @@ export default function Sidebar({
     setVisibilityAccountId(null)
     setVisibilityStatus('loading')
     const loadSettings = () => {
-      void import('@/lib/api')
-        .then(async ({ api }) => {
-          const visibility = await api.featureSettings.visibility(accountId)
+      void Promise.all([import('@/lib/api'), import('@/lib/feature-visibility-cache')])
+        .then(async ([{ api }, { loadFeatureVisibility }]) => {
+          // 画面側の useFeatureVisibility と同じ答えを共有する（V6R-S0-b）。
+          const visibility = await loadFeatureVisibility(accountId)
           const features = visibility.success ? visibility.data?.features : undefined
           if (!cancelled && isBooleanRecord(features)) {
             setSectionOrder(null)
