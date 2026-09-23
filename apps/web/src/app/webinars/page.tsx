@@ -1,5 +1,6 @@
 'use client'
 
+import { X } from 'lucide-react'
 import SelectField from '@/components/shared/select-field'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
@@ -89,9 +90,14 @@ function WebinarFolderDialog({
   return (
     <div className="bg-ink/35 fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="webinar-folder-title">
       <section className="bg-canvas rounded-card w-full max-w-md border border-hairline p-5 shadow-card">
-        <h2 id="webinar-folder-title" className="text-ink text-lg font-bold">
-          {folder ? 'フォルダ名を変更' : 'フォルダを追加'}
-        </h2>
+        <div className="flex items-start justify-between gap-3">
+          <h2 id="webinar-folder-title" className="text-ink text-lg font-bold">
+            {folder ? 'フォルダ名を変更' : 'フォルダを追加'}
+          </h2>
+          <button type="button" onClick={onCancel} disabled={busy} aria-label="閉じる" className="rounded-mini p-1 text-ink-secondary hover:bg-canvas-sunken disabled:opacity-50">
+            <X aria-hidden="true" className="h-5 w-5" />
+          </button>
+        </div>
         <p className="text-ink-secondary mt-2 text-sm">ウェビナーを整理する名前を入力してください。</p>
         <label className="text-ink mt-4 block text-sm font-semibold" htmlFor="webinar-folder-name">フォルダ名</label>
         <input

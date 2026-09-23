@@ -224,7 +224,6 @@ export default function ImageDetailModal({
               参照画像にする
             </Button>
           ) : null}
-          <Button onClick={onClose} disabled={busy}>閉じる</Button>
           <Button
             variant="primary"
             disabled={busy || selected.length === 0 || deliverable.length === 0}

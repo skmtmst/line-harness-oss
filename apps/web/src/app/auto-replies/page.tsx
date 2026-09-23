@@ -289,7 +289,7 @@ export default function AutoRepliesPage() {
             return (
               <span
                 key={ea.accountId}
-                className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] bg-canvas-sunken text-ink-faint line-through"
+                className="inline-flex max-w-full items-center truncate px-1.5 py-0.5 rounded text-[10px] bg-canvas-sunken text-ink-faint line-through"
                 title={title}
               >
                 {label}
@@ -300,7 +300,7 @@ export default function AutoRepliesPage() {
             return (
               <span
                 key={ea.accountId}
-                className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] bg-success-bg text-success font-medium"
+                className="inline-flex max-w-full items-center gap-0.5 truncate px-1.5 py-0.5 rounded text-[10px] bg-success-bg text-success font-medium"
                 title={title}
               >
                 {word.mark} {label}{ea.via === 'automation' && <span className="text-success">⚙</span>}
@@ -310,7 +310,7 @@ export default function AutoRepliesPage() {
           return (
             <span
               key={ea.accountId}
-              className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] bg-warning-bg text-warning"
+              className="inline-flex max-w-full items-center gap-0.5 truncate px-1.5 py-0.5 rounded text-[10px] bg-warning-bg text-warning"
               title={title}
             >
               {word.mark} {label}
@@ -795,7 +795,8 @@ export default function AutoRepliesPage() {
                         {conditionChips(r).map((label) => (
                           <span
                             key={label}
-                            className="bg-canvas-sunken text-ink-secondary rounded-pill px-1.5 py-0.5 text-[10px] whitespace-nowrap"
+                            className="bg-canvas-sunken text-ink-secondary rounded-pill max-w-full truncate px-1.5 py-0.5 text-[10px] whitespace-nowrap"
+                            title={label}
                           >
                             {label}
                           </span>

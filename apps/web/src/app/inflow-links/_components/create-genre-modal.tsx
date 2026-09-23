@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { X } from 'lucide-react'
 import { api, ApiError } from '@/lib/api'
 import type { EntryRouteGenre } from '@line-crm/shared'
 
@@ -43,9 +44,14 @@ export default function GenreModal({
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/45 p-4">
       <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
-        <h2 className="text-lg font-bold text-gray-900">
-          {genre ? 'ジャンル名を編集' : '新しいジャンル'}
-        </h2>
+        <div className="flex items-start justify-between gap-3">
+          <h2 className="text-lg font-bold text-ink">
+            {genre ? 'ジャンル名を編集' : '新しいジャンル'}
+          </h2>
+          <button type="button" onClick={onClose} aria-label="閉じる" className="rounded-mini p-1 text-ink-secondary hover:bg-canvas-sunken">
+            <X aria-hidden="true" className="h-5 w-5" />
+          </button>
+        </div>
         <p className="mt-1 text-sm text-gray-500">
           協力会社名や媒体グループなど、リンクをまとめる名前を入力してください。
         </p>

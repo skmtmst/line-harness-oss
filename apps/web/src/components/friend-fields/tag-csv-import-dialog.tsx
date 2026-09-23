@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { CircleCheck, Download, Info, TriangleAlert } from 'lucide-react'
+import { CircleCheck, Download, Info, TriangleAlert, X } from 'lucide-react'
 import type {
   TagCsvImportInputRow,
   TagCsvImportPreview,
@@ -166,6 +166,10 @@ export default function TagCsvImportDialog({
         data-design-node={designNode}
         tabIndex={-1}
       >
+        {/* 閉じ方は右上の×に一本化（UI-25）。 */}
+        <button type="button" className="absolute right-3 top-3 z-10 inline-flex items-center justify-center rounded-mini p-1.5 text-ink-secondary hover:bg-canvas-sunken hover:text-ink disabled:opacity-50" onClick={close} disabled={busy} aria-label="閉じる">
+          <X aria-hidden="true" size={18} />
+        </button>
         {phase === 'select' ? <>
           <header className={styles.header}>
             <h2 id="tag-csv-title" className={styles.title}>CSVでタグを一括登録</h2>

@@ -2,7 +2,9 @@
 
 import React, { useEffect, useId, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
+import { X } from 'lucide-react'
 import Button from './button'
+import IconButton from './icon-button'
 import { useOverlayFocus } from './overlay-utils'
 import styles from './dialog.module.css'
 
@@ -104,30 +106,38 @@ export default function Dialog({
       data-design-part="dialog"
       data-design-node={tone === 'destructive' ? 'H2S1T4' : 'J6x4Q'}
     >
-      {tone === 'destructive' && !confirmation ? <div className={styles.callout} data-qa-dialog-callout>{heading}</div> : heading}
+      <div className={styles.headerRow}>
+        <div className={styles.headerContent}>
+          {tone === 'destructive' && !confirmation ? <div className={styles.callout} data-qa-dialog-callout>{heading}</div> : heading}
+        </div>
+        {/* 閉じ方は必ず右上の×。フッターの「閉じる」ボタンは置かない（UI-25）。 */}
+        <IconButton aria-label="閉じる" title="閉じる" className={styles.close} onClick={onCancel} disabled={busy}>
+          <X aria-hidden="true" size={18} />
+        </IconButton>
+      </div>
       {children ? <div className={styles.content}>{children}</div> : null}
       {error ? <p className={styles.error} role="alert">{error}</p> : null}
-      {footer ?? (
+      {footer ?? (onConfirm ? (
         /*
          * 実行・取消は共通Buttonの役割（primary/danger/secondary）をそのまま
          * 使う（#976 U077/U083/U084）。ここで赤や緑を自前で持つと、コントラストが
          * 画面ごとにずれる。横幅の指定だけ `.designButton` で足す。
+         * 実行ボタンの無い参照窓では「キャンセル」を出さない。閉じ方は右上の×
+         * に一本化する（UI-25）。
          */
         <div className={styles.actions}>
           <Button className={styles.designButton} onClick={onCancel} disabled={busy}>{cancelLabel}</Button>
-          {onConfirm ? (
-            <Button
-              variant={tone === 'destructive' ? 'danger' : 'primary'}
-              className={styles.designButton}
-              onClick={onConfirm}
-              disabled={busy}
-            >
-              {!busy && confirmIcon ? <span className={styles.buttonIcon} aria-hidden="true">{confirmIcon}</span> : null}
-              {busy ? '処理中…' : confirmLabel}
-            </Button>
-          ) : null}
+          <Button
+            variant={tone === 'destructive' ? 'danger' : 'primary'}
+            className={styles.designButton}
+            onClick={onConfirm}
+            disabled={busy}
+          >
+            {!busy && confirmIcon ? <span className={styles.buttonIcon} aria-hidden="true">{confirmIcon}</span> : null}
+            {busy ? '処理中…' : confirmLabel}
+          </Button>
         </div>
-      )}
+      ) : null)}
     </div>
   )
 

@@ -223,7 +223,8 @@ describe('UID移行の詳細確認（FRIEND-14）', () => {
     await flush()
     fireEvent.click(buttonByText('詳細を見る'))
     await flush()
-    fireEvent.click(buttonByText('閉じる', openDialog()))
+    // UI-25: 「閉じる」は右上の×（aria-label）へ移った。
+    fireEvent.click(openDialog().querySelector<HTMLButtonElement>('button[aria-label="閉じる"]')!)
     await flush()
     expect(writes()).toHaveLength(0)
   })

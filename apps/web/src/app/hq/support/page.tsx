@@ -171,7 +171,6 @@ export default function HqSupportPage() {
           : '運営に届きました。控えメールは送れませんでしたが、内容は運営に届いています。返信はこの画面の「これまでの問い合わせ」に届きます。'}
         titleIcon={<CheckCircle2 aria-hidden="true" className="h-5 w-5 text-accent-deep" />}
         onCancel={() => setSent(null)}
-        footer={<div className="flex justify-end"><Button variant="primary" onClick={() => setSent(null)}>閉じる</Button></div>}
         designNode="X6LZP"
       >
         {sent?.ticketLabel ? <p className="text-label text-ink">受付番号：<span className="font-bold">{sent.ticketLabel}</span>　件名：{sent.subject}</p> : null}

@@ -141,10 +141,11 @@ describe('ログインユーザーの権限確認 (IDEA-30)', () => {
     expect(bundleButton && (bundleButton as HTMLButtonElement).disabled).toBe(true)
     // 管理者であることと、この画面では確認だけできることを示す
     expect(screen.getByText(/管理者はすべての機能を使えます。/)).toBeTruthy()
-    expect(screen.getByText('閉じる')).toBeTruthy()
+    // 管理者向けは一覧へ戻る導線だけが出る（権限編集モーダルではない画面内表示）。
+    expect(screen.getByRole('button', { name: '一覧へ戻る' })).toBeTruthy()
 
-    // 閉じると一覧へ戻る
-    fireEvent.click(screen.getByRole('button', { name: '閉じる' }))
+    // 戻ると一覧へ戻る
+    fireEvent.click(screen.getByRole('button', { name: '一覧へ戻る' }))
     await waitFor(() => expect(screen.getByText('対象者')).toBeTruthy())
     expect(fixture.updateStaff).not.toHaveBeenCalled()
   })

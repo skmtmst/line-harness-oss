@@ -1,5 +1,6 @@
 'use client'
 
+import { X } from 'lucide-react'
 import SelectField from '@/components/shared/select-field'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
@@ -910,8 +911,11 @@ function EditMenuModal({
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-xl shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto">
-        <div className="px-6 py-4 border-b border-hairline">
+        <div className="flex items-center justify-between gap-3 border-b border-hairline px-6 py-4">
           <h2 className="text-base font-semibold">メニュー編集</h2>
+          <button type="button" onClick={onClose} aria-label="閉じる" className="rounded-mini p-1 text-ink-secondary hover:bg-canvas-sunken">
+            <X aria-hidden="true" className="h-5 w-5" />
+          </button>
         </div>
         <div className="px-6 py-4 space-y-4">
           <Field label="名前" required>

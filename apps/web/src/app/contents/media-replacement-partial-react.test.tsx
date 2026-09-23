@@ -224,7 +224,8 @@ describe('使用先の部分差し替え（#918 N-200）', () => {
     await waitForDialogText('この画面からは差し替えられる使用先がありません')
 
     const labels = buttons().map((b) => b.textContent)
-    expect(labels).toContain('閉じる')
+    // UI-25: 「閉じる」はフッターの文字ボタンではなく右上の×（aria-label）へ移った。
+    expect(buttons().some((b) => b.getAttribute('aria-label') === '閉じる')).toBe(true)
     expect(labels).not.toContain('差し替え可能な0か所だけ差し替える')
     const all = buttons().find((b) => b.textContent === '使用先を差し替える')
     expect(all?.disabled).toBe(true)

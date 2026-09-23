@@ -86,7 +86,9 @@ export default function BulkPreviewModal({ open, scenarioId, onClose }: Props) {
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold text-ink">一括プレビュー</h2>
           <button
+            type="button"
             onClick={onClose}
+            aria-label="閉じる"
             className="text-sm text-ink-faint hover:bg-canvas-sunken px-2 py-1 rounded"
           >
             ✕
@@ -132,14 +134,7 @@ export default function BulkPreviewModal({ open, scenarioId, onClose }: Props) {
           <p className="text-sm text-ink-faint">ステップがありません</p>
         )}
 
-        <div className="mt-6 flex justify-end">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 text-sm text-ink-secondary hover:bg-canvas-sunken rounded-lg"
-          >
-            閉じる
-          </button>
-        </div>
+
       </div>
     </div>
   )

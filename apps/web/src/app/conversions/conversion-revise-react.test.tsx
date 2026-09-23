@@ -130,6 +130,10 @@ function byText(text: string): HTMLButtonElement | undefined {
     .find((node) => node.textContent?.trim() === text) as HTMLButtonElement | undefined
 }
 
+function byLabel(label: string): HTMLButtonElement | undefined {
+  return document.body.querySelector(`button[aria-label="${label}"]`) as HTMLButtonElement | undefined
+}
+
 function field(label: string): HTMLInputElement | HTMLSelectElement | undefined {
   return (document.body.querySelector(`[aria-label="${label}"]`) ?? undefined) as
     HTMLInputElement | HTMLSelectElement | undefined
@@ -149,8 +153,9 @@ async function type(node: HTMLInputElement, value: string) {
   })
 }
 
-/** 一覧から詳細を開き、編集の窓まで進める。 */
+/** 一覧から詳細を開き、編集の窓まで進める。詳細は行の「その他操作」メニューの中。 */
 async function openEditDialog() {
+  await click(byLabel('購入のその他操作'))
   await click(byText('中身を見る'))
   await click(byText('編集'))
 }
@@ -250,9 +255,11 @@ describe('成果地点の編集（N-252）', () => {
         { status: 200, headers: { 'Content-Type': 'application/json' } })
     })
     await mount()
+    await click(byLabel('購入のその他操作'))
     await click(byText('中身を見る'))
     // 詳細は開いている（この判定が空振りしないことを先に確かめる）。
-    expect(byText('閉じる')).toBeTruthy()
+    // UI-25: 「閉じる」は右上の×（aria-label）へ移った。
+    expect(byLabel('閉じる')).toBeTruthy()
     expect(byText('編集')).toBeUndefined()
   })
 })
