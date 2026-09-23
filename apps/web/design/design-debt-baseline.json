@@ -157,7 +157,7 @@
     "direct-primary-button": 1
   },
   "app/friend-add-settings/page.tsx": {
-    "arbitrary-value": 1
+    "arbitrary-value": 2
   },
   "app/friend-add-settings/publish/page.tsx": {
     "unresolved-classname": 45
