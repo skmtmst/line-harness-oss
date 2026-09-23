@@ -1878,9 +1878,9 @@ const spec = {
     },
     '/api/reminders/{id}/test-recipient': {
       get: {
-        tags: ['Reminders'], summary: '下書きのテスト送信で実際に届く送信先の状態を取得（N-070）',
+        tags: ['Reminders'], summary: '下書きのテスト送信で実際に届く送信先の状態を取得（N-070）。recipientKind が本人宛て(self)と登録済みテスト宛先(registered)を区別する（REMINDER-12）',
         parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
-        responses: { '200': { description: 'Test recipient state: unset / unavailable / ready' }, '403': { description: 'Staff role required' }, '404': { description: 'Draft not found' } },
+        responses: { '200': { description: 'Test recipient state: unset / unavailable / ready, with recipientKind distinguishing self vs registered test recipient' }, '403': { description: 'Staff role required' }, '404': { description: 'Draft not found' } },
       },
     },
     '/api/friends/{friendId}/reminders': {
