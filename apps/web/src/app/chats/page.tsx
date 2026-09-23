@@ -2500,8 +2500,11 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
               className="w-full rounded-lg border border-[#E5E7EB] bg-canvas py-2 pr-3 pl-9 text-xs text-[#1F2937] outline-none focus:border-[#06C755] focus:ring-2 focus:ring-[#06C755]/15"
               />
             </div>
+            {/*
+              #670 02: 外の「担当者」と中の「担当者：すべて」が二重だった。
+              プルダウンが自分で名乗るため、外の字は置かない。
+            */}
             <label className="mt-2 flex items-center gap-2 text-[11px] font-semibold text-[#667085]">
-              <span className="shrink-0">担当者</span>
               <span className="min-w-0 flex-1">
                 {/*
                   未読数は集計の口から渡す。**画面に見えている行から数えない**

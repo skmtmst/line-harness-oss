@@ -815,13 +815,11 @@ export default function BookingsPage() {
                 {csvBusy ? '書き出しています…' : 'CSVで書き出す'}
               </Button>
             ) : null}
-            <button
-              disabled
-              title="保存した条件は準備中です"
-              className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-sm opacity-50"
-            >
-              保存した条件
-            </button>
+            {/*
+              #670 17: 押せない「保存した条件」(準備中です)は置かない。
+              押せない口を並べると「まだ何かある」と読める。条件の保存が
+              要るときは、動く形で足し直す。
+            */}
           </div>
 
           <div data-design="Saved" className="mb-3 flex flex-wrap items-center gap-2">
