@@ -491,7 +491,7 @@ function MileagePageInner() {
   return (
     <div data-mileage-design="v6" data-design-node={tab === 'balances' ? 's98Vfw' : tab === 'earning-rules' ? 'N46cQ' : tab === 'rewards' ? 'qlVLJ' : tab === 'history' ? 'MvZm5' : 'z3PB2'}>
       <Breadcrumb items={[{ label: '成果と分析' }, { label: 'マイル' }, ...(tab === 'balances' ? [] : [{ label: TABS.find((item) => item.key === tab)?.label ?? 'マイル' }])]} className="mb-3" />
-      <div data-design="Tabs" data-tabs-row>
+      <div data-design="Tabs">
         <MergedTabs
           basePath="/mileage"
           tabs={displayTabs}
@@ -505,17 +505,12 @@ function MileagePageInner() {
         />
       </div>
       {/*
-        #972 U030: 390pxではタブの並びが右端の操作ボタンに重なっていた。
-        共通タブの形は変えず、この画面のタブ行だけ「収まらないとき折り返す」
-        にする。収まる幅では1行のままで見た目は変わらない。
-        U040 の表の側の印（data-mileage-table）もここでまとめて面倒を見る。
+        #972 U040: 決めごとの表は列が多い。狭い幅では見出しが潰れて列と
+        値の対応が読めなくなるので、枠の内側で横に動かせるようにする。
+        主タブは横スクロール＋共通の狭幅対応に任せる（折り返しの上書きを
+        付けるとスクロールと衝突して語の途中で割れる）。
       */}
       <style>{`
-        [data-tabs-row] nav:has(> span) { height: auto; flex-wrap: wrap; row-gap: 8px; }
-        [data-tabs-row] nav:has(> span) > span { flex-wrap: wrap; row-gap: 0; }
-        [data-tabs-row] nav:has(> span) > span + span { margin-left: auto; }
-        /* U040: 決めごとの表は列が多い。狭い幅では見出しが潰れて列と
-           値の対応が読めなくなるので、枠の内側で横に動かせるようにする。 */
         [data-mileage-table] { overflow-x: auto; }
         [data-mileage-table] > table { min-width: 920px; }
       `}</style>
