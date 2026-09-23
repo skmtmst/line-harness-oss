@@ -101,14 +101,16 @@ const skippedReasonLabel: Record<string, string> = {
   campaign_snapshot_missing: '予約時の配信内容を確認できません',
   campaign_disabled: '配信の決めごとが停止中です',
   campaign_form_already_submitted: 'すでに回答済みのため送りません',
+  campaign_form_unavailable: 'つなぐ回答フォームが使えなくなっているため送りません',
   frequency_suppressed: '近い時期に同じ配信があるため送りません',
   order_cancelled: '注文が取り消されたため送りません',
   order_refunded: '注文が返金になったため送りません',
   unknown: '理由を確認できません',
 }
 
-// #727: skipped のうち運用で直せる2理由。接続設定のやり直し・配信のオン戻しで解消する。
-const skippedFixableReasons = new Set(['line_account_unavailable', 'campaign_disabled'])
+// #727: skipped のうち運用で直せる理由。接続設定のやり直し・配信のオン戻し・
+// NEN-07: 回答フォームの選び直しで解消する。
+const skippedFixableReasons = new Set(['line_account_unavailable', 'campaign_disabled', 'campaign_form_unavailable'])
 
 // #733: 再送できるのは上限まで失敗した記録と、直せる理由で止まった記録だけ。
 // ボタンを出しても最終判断はサーバが行い、前提が直っていなければ409で止める。
@@ -537,7 +539,17 @@ function AutoPanel({
                         ? <span className="text-label font-semibold tabular-nums text-accent-deep" title={`¥${num(metric.associatedConversionAmount)}（送信後7日以内）`}>{num(metric.associatedConversions)}件</span>
                         : <span className="text-label tabular-nums text-ink-faint">—</span>}
                     </Td>
-                    <Td>{setting.isEnabled ? <StatusBadge tone="success" size="compact">配信中</StatusBadge> : <StatusBadge tone="warning" size="compact">停止中</StatusBadge>}</Td>
+                    <Td>
+                      {/*
+                        NEN-07: つなぐ回答フォームが使えない配信は「設定不足」。
+                        この間は新しい配信jobが積まれない(履歴に理由が残る)。
+                      */}
+                      {setting.formIssue
+                        ? <StatusBadge tone="danger" size="compact" title="つなぐ回答フォームが使えなくなっています。編集画面で選び直してください">設定不足</StatusBadge>
+                        : setting.isEnabled
+                          ? <StatusBadge tone="success" size="compact">配信中</StatusBadge>
+                          : <StatusBadge tone="warning" size="compact">停止中</StatusBadge>}
+                    </Td>
                     <Td align="right">
                       {/*
                         #985 LAY-18: 行の操作は共用の RowActions。
