@@ -559,6 +559,8 @@ scoring.get('/api/mileage/friends', requireRole('owner', 'admin', 'staff'), asyn
       lineAccountId: accountId,
       visibleAccountIds: accountScope.allowedAccountIds,
       search: c.req.query('search')?.trim() ?? '',
+      // V6R-CX-e: 友だち詳細は名前ではなく友だちIDで1人を取る。
+      friendId: c.req.query('friendId')?.trim() || undefined,
       limit: Number.isFinite(requestedLimit) ? Math.min(100, Math.max(1, requestedLimit)) : 20,
       offset: Number.isFinite(requestedOffset) ? Math.max(0, requestedOffset) : 0,
     });
@@ -757,6 +759,8 @@ scoring.get('/api/mileage/history', requireRole('owner', 'admin', 'staff'), asyn
       accountId,
       visibleAccountIds: accountScope.allowedAccountIds,
       search: c.req.query('search') || '',
+      // V6R-CX-e: 友だち詳細は、その人（名寄せした複数アカウント）の履歴だけを取る。
+      friendId: c.req.query('friendId')?.trim() || undefined,
       entryType: entryTypeValue as MileageEntryType | undefined,
       status: statusValue as MileageEntryStatus | undefined,
       mode: modeValue as 'automatic' | 'manual' | undefined,
