@@ -1,7 +1,6 @@
 'use client'
 
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
-import { useRouter } from 'next/navigation'
 import { MoreHorizontal } from 'lucide-react'
 import { ecEventLabel, type ApiResponse } from '@line-crm/shared'
 import { useMergedTab } from '@/components/layout/merged-tabs'
@@ -134,7 +133,6 @@ function EventsPanel({ accountId }: { accountId: string | null }) {
   const [detailSlot, setDetailSlot] = useState<{ accountId: string | null; orderId: string | null }>({ accountId, orderId: null })
   // 行の「その他」メニューの開き先（#641）
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
-  const router = useRouter()
   const retryingId = retryingSlot.accountId === accountId ? retryingSlot.id : null
   const detailOrderId = detailSlot.accountId === accountId ? detailSlot.orderId : null
   /* 絞りとページを同時に変えたとき、古い読み込みの返事で上書きしない。 */

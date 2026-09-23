@@ -263,7 +263,7 @@ describe('N-411 項目別権限と画面の一致（実React）', () => {
     await screen.findByText('佐藤')
     expect((screen.getByRole('button', { name: '+ 新規スタッフ' }) as HTMLButtonElement).disabled).toBe(false)
     expect(screen.getByText('編集')).toBeTruthy()
-    expect(screen.getByText('削除')).toBeTruthy()
+    expect(screen.getByRole('button', { name: '佐藤を削除' })).toBeTruthy()
   })
 
   test('権限の無い staff が新規登録画面を直URLで開いても保存導線を出さない', async () => {
