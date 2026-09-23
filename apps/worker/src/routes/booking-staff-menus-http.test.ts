@@ -57,6 +57,11 @@ async function putStaffMenusBulk(staff: unknown, role: 'owner' | 'admin' | 'staf
   }, env);
 }
 
+async function getStaffMenusBulk(accountId = 'account-a', role: 'owner' | 'admin' | 'staff' = 'owner') {
+  const { app, env } = appFor(role);
+  return app.request(`/api/booking/admin/staff-menus?account_id=${accountId}`, {}, env);
+}
+
 async function staffMenuRows(staffId: string) {
   const { results } = await db
     .prepare('SELECT menu_id, is_offered, override_duration_minutes, override_price FROM staff_menus WHERE staff_id = ? ORDER BY menu_id')
@@ -202,5 +207,44 @@ describe('staff×menu 割り当て保存の原子性', () => {
     await expect(staffMenuRows('staff-a1')).resolves.toEqual([
       { menu_id: 'menu-a1', is_offered: 1, override_duration_minutes: null, override_price: 1500 },
     ]);
+  });
+});
+
+describe('担当割り当ての一括読み取り（#1060: 一覧のN+1解消）', () => {
+  test('全スタッフ分のmatrixを1応答で返す（未割当はis_offered=0）', async () => {
+    const res = await getStaffMenusBulk();
+    expect(res.status).toBe(200);
+    const body = await res.json() as {
+      staff: Array<{
+        staff_id: string;
+        matrix: Array<{
+          menu_id: string; name: string; is_offered: number;
+          override_duration_minutes: number | null; override_price: number | null;
+        }>;
+      }>;
+    };
+    // 削除済みは含めず、アカウント内のスタッフ全員が出る。
+    expect(body.staff.map((entry) => entry.staff_id).sort()).toEqual(['staff-a1', 'staff-a2']);
+    const a1 = body.staff.find((entry) => entry.staff_id === 'staff-a1');
+    const a2 = body.staff.find((entry) => entry.staff_id === 'staff-a2');
+    // 全メニュー分の行を返す（単独GETと同じ器）。
+    expect(a1?.matrix.map((row) => row.menu_id).sort()).toEqual(['menu-a1', 'menu-a2']);
+    expect(a1?.matrix.find((row) => row.menu_id === 'menu-a1')).toMatchObject({
+      is_offered: 1, override_price: 1500,
+    });
+    expect(a1?.matrix.find((row) => row.menu_id === 'menu-a2')).toMatchObject({ is_offered: 0 });
+    expect(a2?.matrix.every((row) => row.is_offered === 0)).toBe(true);
+  });
+
+  test('アクセス権の無いアカウントには403（別アカウントの行は出ない）', async () => {
+    // canAccessAllLineAccounts のモックは account-a だけを許可する。
+    const res = await getStaffMenusBulk('account-b');
+    expect(res.status).toBe(403);
+  });
+
+  test('account_id が無ければ400', async () => {
+    const { app, env } = appFor();
+    const res = await app.request('/api/booking/admin/staff-menus', {}, env);
+    expect(res.status).toBe(400);
   });
 });

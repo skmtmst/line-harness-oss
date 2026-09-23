@@ -57,23 +57,38 @@ function MenuStaffMatrixContent() {
       setMenus(menusRes.menus)
       setStaff(staffRes.staff)
 
+      /*
+       * #1060: スタッフ数ぶん往復していた表の読み込みを1要求の一括口へ。
+       * 一括口をまだ持たない Worker では 404 で落ちるので、そのときだけ
+       * 従来のスタッフごと取得へ退く（段階配備の互換）。
+       */
+      const matrices = new Map<string, StaffMenuMatrix[]>()
+      try {
+        const bulk = await bookingApi.listStaffMenusBulk(selectedAccountId)
+        for (const entry of bulk.staff) matrices.set(entry.staff_id, entry.matrix)
+      } catch {
+        await Promise.all(
+          staffRes.staff.map(async (s) => {
+            const r = await bookingApi.getStaffMenus(selectedAccountId, s.id)
+            matrices.set(s.id, r.matrix)
+          }),
+        )
+      }
       const next: Record<string, Record<string, StaffMenuMatrix>> = {}
-      await Promise.all(
-        staffRes.staff.map(async (s) => {
-          const r = await bookingApi.getStaffMenus(selectedAccountId, s.id)
-          const byMenu: Record<string, StaffMenuMatrix> = {}
-          for (const m of menusRes.menus) {
-            byMenu[m.id] = r.matrix.find((x) => x.menu_id === m.id) ?? {
-              menu_id: m.id,
-              name: m.name,
-              is_offered: 0,
-              override_duration_minutes: null,
-              override_price: null,
-            }
+      for (const s of staffRes.staff) {
+        const matrix = matrices.get(s.id) ?? []
+        const byMenu: Record<string, StaffMenuMatrix> = {}
+        for (const m of menusRes.menus) {
+          byMenu[m.id] = matrix.find((x) => x.menu_id === m.id) ?? {
+            menu_id: m.id,
+            name: m.name,
+            is_offered: 0,
+            override_duration_minutes: null,
+            override_price: null,
           }
-          next[s.id] = byMenu
-        }),
-      )
+        }
+        next[s.id] = byMenu
+      }
       setGrid(next)
       setSavedGrid(next)
     } catch (e) {

@@ -2991,14 +2991,27 @@ booking.get('/api/booking/admin/alternatives', async (c) => {
   }));
 });
 
+/**
+ * 一括モードで受け付けるメニュー数の上限。カレンダーは公開中メニュー全部を
+ * まとめて聞くので、通常の店舗規模（数十件）には十分。悪意ある巨大な
+ * カンマ列で D1 を何往復もさせないための天井。
+ */
+const AVAILABILITY_BATCH_MAX_MENUS = 50;
+
 booking.get('/api/booking/admin/availability', async (c) => {
   const accountId = await resolveAccountIdAdmin(c);
   if (!accountId) return c.json({ error: 'missing_account_id' }, 400);
   const menuId = c.req.query('menu_id');
+  /*
+   * #1060: メニューごとの空き枠を1要求で返す一括モード。
+   * `menu_ids`（カンマ区切り）があると `{ by_menu: [...] }` を返す。
+   * 未指定なら従来どおり `menu_id` 1件の `{ by_staff, calendar_sync }`。
+   */
+  const menuIdsParam = c.req.query('menu_ids');
   const staffId = c.req.query('staff_id') || undefined;
   const from = c.req.query('from');
   const to = c.req.query('to');
-  if (!menuId || !from || !to) {
+  if ((!menuId && menuIdsParam === undefined) || !from || !to) {
     return c.json({ error: 'missing_params' }, 400);
   }
   const fromD = new Date(`${from}T00:00:00Z`);
@@ -3009,9 +3022,34 @@ booking.get('/api/booking/admin/availability', async (c) => {
   // 予約変更の枠選びでは変更対象を空き判定から外す。
   // 外さないと今の予約が自分と重なって「空きなし」に見える。
   const excludeBookingId = c.req.query('exclude_booking_id') || undefined;
+  if (menuIdsParam !== undefined) {
+    const menuIds = [...new Set(
+      menuIdsParam.split(',').map((id) => id.trim()).filter(Boolean),
+    )];
+    if (menuIds.length > AVAILABILITY_BATCH_MAX_MENUS) {
+      return c.json({ error: 'too_many_menus' }, 400);
+    }
+    // メニュー間に共有する中間状態は無いので並列で取る。N往復のHTTPが1往復に
+    // なる（DBの読みはメニュー分だが、認証・アカウント解決・往復は1回）。
+    const by_menu = await Promise.all(menuIds.map(async (id) => ({
+      menu_id: id,
+      ...(await getAvailability(c.env.DB, {
+        lineAccountId: accountId,
+        menuId: id,
+        staffId,
+        from,
+        to,
+        now: new Date(),
+        minLeadTimeMinutes: 0,
+        googleCredentials: googleCredentials(c.env),
+        excludeBookingId,
+      })),
+    })));
+    return c.json({ by_menu });
+  }
   const result = await getAvailability(c.env.DB, {
     lineAccountId: accountId,
-    menuId,
+    menuId: menuId!,
     staffId,
     from,
     to,
@@ -3784,6 +3822,68 @@ booking.put('/api/booking/admin/staff/:id/menus', requirePermission(BOOKING_MENU
     staffMenusReplaceStatements(c.env.DB, staffId, filtered),
   );
   return c.json({ ok: true });
+});
+
+// 担当割り当ての一括読み取り（#1060）。マトリクス画面は全スタッフ分を
+// 1行ずつ GET していた（N+1）。staff×menus の CROSS JOIN 1本で
+// 全員分を返す。応答は一括PUTと同じ `{ staff: [{ staff_id, matrix }] }` の形。
+booking.get('/api/booking/admin/staff-menus', async (c) => {
+  const accountId = await resolveAccountIdAdmin(c);
+  if (!accountId) return c.json({ error: 'missing_account_id' }, 400);
+  const rows = await c.env.DB
+    .prepare(
+      `SELECT s.id AS staff_id, m.id AS menu_id, m.name,
+              COALESCE(sm.is_offered, 0) AS is_offered,
+              sm.override_duration_minutes,
+              sm.override_price
+         FROM staff s
+         CROSS JOIN menus m
+         LEFT JOIN staff_menus sm
+           ON sm.staff_id = s.id AND sm.menu_id = m.id
+        WHERE s.line_account_id = ?1 AND s.deleted_at IS NULL
+          AND m.line_account_id = ?1 AND m.deleted_at IS NULL
+        ORDER BY s.sort_order ASC, m.sort_order ASC`,
+    )
+    .bind(accountId)
+    .all<{
+      staff_id: string;
+      menu_id: string;
+      name: string;
+      is_offered: number;
+      override_duration_minutes: number | null;
+      override_price: number | null;
+    }>();
+  // メニューが0件のアカウントでは CROSS JOIN が行を返さず、スタッフだけが
+  // 取りこぼされる。画面は matrix をメニュー一覧へ写すだけなので空でよいが、
+  // 応答にスタッフ自体は含めておく（単独GETと同じ器を期待する呼び出し向け）。
+  const staffRows = await c.env.DB
+    .prepare(
+      `SELECT id FROM staff
+        WHERE line_account_id = ? AND deleted_at IS NULL
+        ORDER BY sort_order ASC`,
+    )
+    .bind(accountId)
+    .all<{ id: string }>();
+  const byStaff = new Map<string, Array<{
+    menu_id: string;
+    name: string;
+    is_offered: number;
+    override_duration_minutes: number | null;
+    override_price: number | null;
+  }>>();
+  for (const staff of staffRows.results) byStaff.set(staff.id, []);
+  for (const row of rows.results) {
+    byStaff.get(row.staff_id)?.push({
+      menu_id: row.menu_id,
+      name: row.name,
+      is_offered: row.is_offered,
+      override_duration_minutes: row.override_duration_minutes,
+      override_price: row.override_price,
+    });
+  }
+  return c.json({
+    staff: [...byStaff.entries()].map(([staff_id, matrix]) => ({ staff_id, matrix })),
+  });
 });
 
 type StaffMenuAssignment = {
