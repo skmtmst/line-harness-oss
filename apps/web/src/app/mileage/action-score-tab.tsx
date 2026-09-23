@@ -37,9 +37,9 @@ const BAND_LABELS: Record<ActionScoreBand, string> = {
  * 取れていないものは `—` と書き、0 とも言い分ける。
  */
 function ScoreBand({ band }: { band: ActionScoreBand }) {
-  if (band === 'high') return <span className="rounded-full bg-accent-soft px-2.5 py-1 text-xs font-semibold text-accent-hover">{BAND_LABELS[band]}</span>
-  if (band === 'normal') return <span className="rounded-full bg-status-warn-soft px-2.5 py-1 text-xs font-semibold text-status-warn-deep">{BAND_LABELS[band]}</span>
-  return <span className="rounded-full bg-canvas-sunken px-2.5 py-1 text-xs font-semibold text-ink-secondary">{BAND_LABELS[band]}</span>
+  if (band === 'high') return <span className="whitespace-nowrap rounded-full bg-accent-soft px-2.5 py-1 text-xs font-semibold text-accent-hover">{BAND_LABELS[band]}</span>
+  if (band === 'normal') return <span className="whitespace-nowrap rounded-full bg-status-warn-soft px-2.5 py-1 text-xs font-semibold text-status-warn-deep">{BAND_LABELS[band]}</span>
+  return <span className="whitespace-nowrap rounded-full bg-canvas-sunken px-2.5 py-1 text-xs font-semibold text-ink-secondary">{BAND_LABELS[band]}</span>
 }
 
 function ScoreChange({ value }: { value: number | null | undefined }) {

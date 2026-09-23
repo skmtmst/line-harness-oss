@@ -1,13 +1,16 @@
 'use client'
 
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { MoreHorizontal } from 'lucide-react'
 import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
 import MileageRewardsTab from './mileage-rewards-tab'
+import ActionMenu from '@/components/shared/action-menu'
 import Breadcrumb from '@/components/shared/breadcrumb'
 import Button from '@/components/shared/button'
 import Chip from '@/components/shared/chip'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import FilterChip from '@/components/shared/filter-chip'
+import IconButton from '@/components/shared/icon-button'
 import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
 import Pagination from '@/components/shared/pagination'
@@ -167,6 +170,7 @@ function MileagePageInner() {
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
   const [savingRuleId, setSavingRuleId] = useState<string | null>(null)
+  const [ruleMenuId, setRuleMenuId] = useState<string | null>(null)
   const [ruleActionError, setRuleActionError] = useState('')
   const [publishTarget, setPublishTarget] = useState<MileageEarningRuleV6 | null>(null)
   const [publishError, setPublishError] = useState('')
@@ -689,13 +693,13 @@ function MileagePageInner() {
           <table className="w-full table-fixed">
             <thead>
               <TableHeadRow>
-                <Th className="w-[28%]">何をしてくれたら</Th>
-                <Th className="w-[15%]">対象の行動</Th>
-                <Th className="w-[12%]" align="right">たまるマイル</Th>
-                <Th className="w-[16%]">有効期間・失効</Th>
+                <Th className="w-[21%]">何をしてくれたら</Th>
+                <Th className="w-[11%]">対象の行動</Th>
+                <Th className="w-[11%]" align="right">たまるマイル</Th>
+                <Th className="w-[14%]">有効期間・失効</Th>
                 <Th className="w-[12%]" align="right">この30日</Th>
-                <Th className="w-[10%]" align="center">状態</Th>
-                <Th className="w-[12%]" align="center">操作</Th>
+                <Th className="w-[13%]" align="center">状態</Th>
+                <Th className="w-[18%]" align="center">操作</Th>
               </TableHeadRow>
             </thead>
             <tbody className="divide-hairline divide-y">
@@ -743,27 +747,44 @@ function MileagePageInner() {
                     </p>
                   </td>
                   <td className="px-4 py-3 text-center">
-                    <div className="flex items-center justify-center gap-1">
+                    {/*
+                      4つの操作を1行へ横並びにすると、12%程度の列へ収まらず
+                      状態列と「この30日」へ重なっていた（実機の2×2潰れと同根）。
+                      並び順だけを列へ残し、停止・公開は共通のその他メニューへ畳む。
+                    */}
+                    <div className="relative flex items-center justify-center gap-1">
                       <div className="flex gap-1" aria-label={`${rule.draft.name}の並び順`}>
                         <Button disabled={ruleSort !== 'order' || ruleFilters.length > 0 || (rulePage - 1) * RULE_PAGE_SIZE + index === 0} onClick={() => moveRule(rule.id, -1)}>上へ</Button>
                         <Button disabled={ruleSort !== 'order' || ruleFilters.length > 0 || (rulePage - 1) * RULE_PAGE_SIZE + index === shownRules.length - 1} onClick={() => moveRule(rule.id, 1)}>下へ</Button>
                       </div>
-                      <Button
-                        disabled={savingRuleId === rule.id}
-                        onClick={() => void toggleRule(rule)}
-                        aria-label={`${rule.draft.name}を${rule.published.status === 'published' ? '停止' : '再開'}する`}
+                      <IconButton
+                        aria-label={`${rule.draft.name}のその他操作`}
+                        title={`${rule.draft.name}のその他操作`}
+                        onClick={() => setRuleMenuId((current) => (current === rule.id ? null : rule.id))}
                       >
-                        {savingRuleId === rule.id
-                          ? '反映しています'
-                          : rule.published.status === 'published' ? '決めごとを停止' : '決めごとを再開'}
-                      </Button>
-                      <Button
-                        disabled={savingRuleId !== null}
-                        onClick={() => { setPublishError(''); setPublishTarget(rule) }}
-                        aria-label={`${rule.draft.name}の下書きを公開して反映する`}
-                      >
-                        公開して反映
-                      </Button>
+                        <MoreHorizontal />
+                      </IconButton>
+                      <ActionMenu
+                        open={ruleMenuId === rule.id}
+                        ariaLabel={`${rule.draft.name}の操作`}
+                        onClose={() => setRuleMenuId(null)}
+                        items={[
+                          {
+                            id: 'toggle',
+                            label: rule.published.status === 'published' ? '決めごとを停止' : '決めごとを再開',
+                            disabled: savingRuleId === rule.id,
+                            disabledReason: '反映しています',
+                            onSelect: () => void toggleRule(rule),
+                          },
+                          {
+                            id: 'publish',
+                            label: '公開して反映',
+                            disabled: savingRuleId !== null,
+                            disabledReason: '別の決めごとを反映しています',
+                            onSelect: () => { setPublishError(''); setPublishTarget(rule) },
+                          },
+                        ]}
+                      />
                     </div>
                   </td>
                 </tr>
@@ -879,13 +900,13 @@ function MileagePageInner() {
                         <p className="truncate text-sm font-semibold text-ink" title={member.displayName}>{member.displayName}</p>
                         <p className="mt-1 truncate text-xs text-ink-faint" title={member.lineAccount.name}>{member.lineAccount.name}</p>
                       </td>
-                      <td className="px-4 py-4 text-sm text-ink-secondary" title={member.rankReason}>{displayRank ?? <><span>—</span><span className="ml-1 text-xs text-ink-faint">未設定</span></>}</td>
+                      <td className="px-4 py-4"><p className="truncate text-sm text-ink-secondary" title={member.rankReason}>{displayRank ?? <><span>—</span><span className="ml-1 text-xs text-ink-faint">未設定</span></>}</p></td>
                       <td className="px-4 py-4 text-right">
                         <p className="font-bold text-accent-hover">{formatMileageNumber(member.available)}</p>
                         {member.pending > 0 && <p className="text-[10px] text-amber-600">保留 {formatMileageNumber(member.pending)}</p>}
                       </td>
                       <td className={`px-4 py-4 text-right text-sm font-semibold tabular-nums ${member.monthChange < 0 ? 'text-danger' : 'text-accent-hover'}`}>{member.monthChange > 0 ? '+' : ''}{formatMileageNumber(member.monthChange)}</td>
-                      <td className="px-4 py-4 text-sm text-ink-secondary">{member.expiringMiles30d == null ? 'なし' : `${formatMileageNumber(member.expiringMiles30d)} マイル`}</td>
+                      <td className="px-4 py-4"><p className="truncate text-sm text-ink-secondary" title={member.expiringMiles30d == null ? 'なし' : `${formatMileageNumber(member.expiringMiles30d)} マイル`}>{member.expiringMiles30d == null ? 'なし' : `${formatMileageNumber(member.expiringMiles30d)} マイル`}</p></td>
                       <td className="px-4 py-4 text-xs text-ink-secondary">{formatMileageDate(member.lastChangedAt)}</td>
                       <td className="px-4 py-3 text-right">
                         <div className="flex justify-end gap-2">
