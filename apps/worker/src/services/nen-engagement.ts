@@ -191,6 +191,77 @@ function campaignResponseFormId(campaign: CampaignRow): string | null {
   )?.formId ?? null;
 }
 
+/*
+ * NEN-07 (#1078): 「回答フォームを開く」配信は、つなぐフォームが使える状態に
+ * あるかを保存・稼働開始・job生成の各入口で確かめる。フォームが消えた・公開を
+ * 止めた・別アカウント専用になった既存の稼働中設定は「設定不足」として扱い、
+ * 新しい送信jobを積まずに理由を配信履歴へ残す。
+ */
+export type NenCampaignFormIssue = 'form_missing' | 'form_inactive' | 'form_other_account';
+
+export const NEN_CAMPAIGN_FORM_ISSUE_LABELS: Record<NenCampaignFormIssue, string> = {
+  form_missing: 'つなぐ回答フォームが見つかりません（削除された可能性があります）',
+  form_inactive: 'つなぐ回答フォームは公開されていません',
+  form_other_account: 'つなぐ回答フォームは別のLINEアカウント専用です',
+};
+
+/*
+ * ボタンのURLがフォームを指しているか。LIFFの公開形 `?page=form&id=` のときだけ
+ * id を取り出す。押されたあとの設定を外したあとにURLだけ残る形がありうるため、
+ * 設定不足の判定はアクションとURLの両方を見る。
+ */
+export function campaignButtonFormId(campaign: CampaignRow): string | null {
+  const url = campaign.button_url;
+  if (!url || !url.includes('page=form')) return null;
+  const match = /[?&]id=([^&#]+)/.exec(url);
+  // `page=form` で id が取れない=「開くつもりなのに未選択」と同じ扱い。
+  // 空文字を返して照合に落ちるようにし、form_missing として検出する。
+  if (!match) return '';
+  try {
+    return decodeURIComponent(match[1]);
+  } catch {
+    return match[1];
+  }
+}
+
+export async function nenCampaignFormIssue(
+  db: D1Database,
+  campaign: CampaignRow,
+  lineAccountId: string,
+): Promise<NenCampaignFormIssue | null> {
+  // 「開くつもり」を示す2つの手掛かり(押されたあとの設定・ボタンのURL)が
+  // 指すフォームを両方たどり、片方でも使えなければ設定不足とする。
+  const formIds = [campaignResponseFormId(campaign), campaignButtonFormId(campaign)]
+    .filter((id): id is string => id !== null);
+  for (const formId of new Set(formIds)) {
+    const issue = await formIssueForId(db, formId, lineAccountId);
+    if (issue) return issue;
+  }
+  return null;
+}
+
+async function formIssueForId(
+  db: D1Database,
+  formId: string,
+  lineAccountId: string,
+): Promise<NenCampaignFormIssue | null> {
+  const form = await db.prepare(
+    `SELECT is_active, status FROM forms WHERE id = ?`,
+  ).bind(formId).first<{ is_active: number; status: string | null }>();
+  if (!form || form.status === 'archived') return 'form_missing';
+  if (form.is_active !== 1) return 'form_inactive';
+  // 割当のあるフォームはそのアカウント専用。未割当(どのアカウントにも
+  // 属さない)のフォームは従来どおりどのアカウントからも使える。
+  const assigned = await db.prepare(
+    `SELECT line_account_id FROM form_accounts WHERE form_id = ?`,
+  ).bind(formId).all<{ line_account_id: string }>();
+  if (assigned.results.length > 0
+      && !assigned.results.some((row) => row.line_account_id === lineAccountId)) {
+    return 'form_other_account';
+  }
+  return null;
+}
+
 async function alreadyRespondedToCampaignForm(
   db: D1Database,
   campaign: CampaignRow,
@@ -604,6 +675,36 @@ export async function enqueuePostShippingFollowUps(
     const formId = campaignResponseFormId(campaign);
     const dedupWindowDays = campaign.dedup_window_days ?? 30;
     const excludeFormRespondents = campaign.exclude_form_respondents ?? 0;
+    /*
+     * NEN-07: 稼働中でも「つなぐ回答フォーム」が使えない配信は新しい送信jobを
+     * 積まない。本来予約されるはずだった分だけ「対象外」の記録を配信履歴へ
+     * 残し、理由コードを last_error へ入れる(重複防止で積まれない分は従来
+     * どおり記録もしない)。すでに予約済みの job はここでは触らない
+     * (復旧の選び方は運用者が履歴から決める)。
+     */
+    if (await nenCampaignFormIssue(db, campaign, lineAccountId) !== null) {
+      await db.prepare(
+        `INSERT OR IGNORE INTO nen_delivery_jobs
+          (id, campaign_key, friend_id, line_account_id, source_key, payload, campaign_snapshot,
+           scheduled_at, status, attempts, last_error, created_at, updated_at)
+         SELECT ?, ?, ?, ?, ?, ?, ?, ?, 'skipped', 0, 'campaign_form_unavailable', ?, ?
+          WHERE (? = 0 OR NOT EXISTS (
+            SELECT 1 FROM nen_delivery_jobs previous
+             WHERE previous.line_account_id = ?
+               AND previous.campaign_key = ?
+               AND previous.friend_id = ?
+               AND previous.status IN ('pending', 'processing', 'sent', 'failed')
+               AND ABS(julianday(previous.scheduled_at) - julianday(?)) < ?
+          ))`,
+      ).bind(
+        crypto.randomUUID(), campaign.campaign_key, friendId, lineAccountId,
+        event.event_id, JSON.stringify({ event }), campaignSnapshot(campaign),
+        scheduledAt, now, now,
+        dedupWindowDays, lineAccountId, campaign.campaign_key, friendId, scheduledAt, dedupWindowDays,
+      ).run();
+      // 戻り値は「新しく予約した送信job」の件数だけを数える。
+      continue;
+    }
     const result = await db.prepare(
       `INSERT OR IGNORE INTO nen_delivery_jobs
         (id, campaign_key, friend_id, line_account_id, source_key, payload, campaign_snapshot,

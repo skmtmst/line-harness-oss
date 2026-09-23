@@ -24,7 +24,7 @@ const TRIGGER_LABEL: Record<string, string> = {
   'pet.birthday': 'ペットの誕生日',
 }
 
-type FormOption = { id: string; name: string; description: string | null }
+type FormOption = { id: string; name: string; description: string | null; isActive: boolean }
 
 function triggerLabel(setting: NenCampaignSetting): string {
   if (setting.campaignKey === 'birthday_coupon') return 'ペットの誕生日'
@@ -132,6 +132,22 @@ export default function CampaignEditor({ campaignKey }: { campaignKey: string })
   const formAction = actions.find((action) => action.kind === 'open_form')
   const mileageAction = actions.find((action) => action.kind === 'award_mileage')
   const isBirthday = merged.campaignKey === 'birthday_coupon'
+  /*
+   * NEN-07: つなぐフォームが消えた・公開を止めた・別アカウント専用の設定は
+   * 「設定不足」。一覧へ返す判定もサーバが行い、ここでは選択肢と照合して
+   * 保存前に理由を出す(一覧に載らないフォーム=削除済みか他アカウント専用)。
+   */
+  const selectedForm = formAction ? forms.find((form) => form.id === formAction.formId) : undefined
+  const formIssueMessage = formAction
+    ? (!selectedForm
+        ? 'つなぐ回答フォームが見つかりません（削除されたか、別のLINEアカウント専用の可能性があります）'
+        : !selectedForm.isActive
+          ? 'つなぐ回答フォームは公開されていません'
+          : null)
+    : null
+  const formIssueBanner = setting?.formIssue
+    ? '設定不足：つなぐ回答フォームが使えなくなっています。この間、新しい配信は予約されません。フォームを選び直して保存してください。'
+    : null
 
   const setActions = (afterActions: NenCampaignAfterAction[]) => {
     setDraft((previous) => ({ ...previous, afterActions }))
@@ -201,6 +217,11 @@ export default function CampaignEditor({ campaignKey }: { campaignKey: string })
       setError(`本文が長すぎます（現在${bodyCheck.length.toLocaleString('ja-JP')}字・上限${bodyLimitLabel}字）。短くしてから保存してください。入力内容はそのまま残っています。`)
       return
     }
+    // NEN-07: 使えないフォームがつながったまま保存させない(サーバでも同じ検査)。
+    if (formIssueMessage) {
+      setError(`${formIssueMessage}。フォームを外して選び直してから保存してください`)
+      return
+    }
     setSaving(true)
     setError('')
     setNotice('')
@@ -250,6 +271,7 @@ export default function CampaignEditor({ campaignKey }: { campaignKey: string })
 
       {error && <p className="bg-danger-bg text-danger rounded-card px-4 py-3 text-sm">{error}</p>}
       {notice && <p className="bg-accent-soft text-accent rounded-card px-4 py-3 text-sm">{notice}</p>}
+      {formIssueBanner && <p role="alert" className="bg-warning-bg text-warning border-warning rounded-card border px-4 py-3 text-sm">{formIssueBanner}</p>}
 
       {testSearchOpen && (
         <section className="bg-canvas rounded-card border-hairline flex flex-wrap items-center gap-2 border p-3">
@@ -306,7 +328,8 @@ export default function CampaignEditor({ campaignKey }: { campaignKey: string })
             <div className="mt-3 space-y-2">
               {formAction?.kind === 'open_form' && <div className="border-hairline rounded-control flex items-center gap-3 border px-4 py-3"><span className="text-accent text-lg">▣</span><div className="min-w-0 flex-1"><p className="text-sm font-bold">回答フォーム「{formAction.formName}」を開く</p><p className="text-ink-faint text-xs">星の評価と、ひとことだけの短いフォームです</p></div><Button aria-label="回答フォームを外す" onClick={() => setActions(actions.filter((action) => action !== formAction))}><X aria-hidden size={16} /></Button></div>}
               {mileageAction?.kind === 'award_mileage' && <div className="border-hairline rounded-control flex items-center gap-3 border px-4 py-3"><Gift aria-hidden className="text-accent" size={18} /><div className="min-w-0 flex-1"><p className="text-sm font-bold">書いてくれたらマイルを {mileageAction.amount.toLocaleString('ja-JP')} 付ける</p><p className="text-ink-faint text-xs">回答フォームへの送信をきっかけにしています</p></div><Button aria-label="マイル付与を外す" onClick={() => setActions(actions.filter((action) => action !== mileageAction))}><X aria-hidden size={16} /></Button></div>}
-              {!formAction && <label className="block text-xs font-bold">回答フォームを開く<select defaultValue="" onChange={(event) => addFormAction(event.target.value)} className={`${inputClass} mt-1`}><option value="" disabled>回答フォームを選ぶ</option>{forms.map((form) => <option key={form.id} value={form.id}>{form.name}</option>)}</select></label>}
+              {formIssueMessage && <p role="alert" className="text-danger text-xs font-bold">{formIssueMessage}。フォームを外して選び直してください。</p>}
+              {!formAction && <label className="block text-xs font-bold">回答フォームを開く<select defaultValue="" onChange={(event) => addFormAction(event.target.value)} className={`${inputClass} mt-1`}><option value="" disabled>回答フォームを選ぶ</option>{forms.map((form) => <option key={form.id} value={form.id} disabled={!form.isActive}>{form.name}{form.isActive ? '' : '（公開されていないため選べません）'}</option>)}</select></label>}
               {!mileageAction && <Button onClick={addMileageAction} className="w-full"><Gift aria-hidden size={16} />回答後に200マイル付ける</Button>}
             </div>
           </section>
@@ -317,7 +340,7 @@ export default function CampaignEditor({ campaignKey }: { campaignKey: string })
             <p className="text-ink-secondary mb-3 flex items-center gap-2 text-xs font-bold"><Eye aria-hidden size={15} />高橋 直人さん（ももちゃん）にはこう届きます</p>
             <div className="bg-line-preview rounded-card p-4"><h2 className="text-on-accent text-center text-sm font-bold">LINEプレビュー</h2><p className="mt-3 text-center"><span className="bg-line-preview-label text-on-accent rounded-pill text-micro px-3 py-1 font-bold">◷ {timing}</span></p><div className="bg-canvas mt-4 rounded-card p-4"><p className="text-sm leading-relaxed whitespace-pre-wrap">{previewBody(merged.bodyText)}</p>{merged.buttonLabel && <p className="bg-accent-deep text-on-accent rounded-control mt-3 py-2 text-center text-xs font-bold">★ {merged.buttonLabel}</p>}</div></div>
           </section>
-          <section className="bg-canvas rounded-card border-hairline border p-4"><h2 className="text-sm font-bold">つながる先</h2><dl className="mt-3 space-y-2 text-xs"><div className="flex justify-between gap-3"><dt className="text-accent font-bold">→ EC連携</dt><dd className="text-ink-secondary">注文と到着の記録</dd></div><div className="flex justify-between gap-3"><dt className="text-accent font-bold">→ 共通情報</dt><dd className="text-ink-secondary">差し込んでいる「商品名」</dd></div><div className="flex justify-between gap-3"><dt className="text-accent font-bold">→ 友だち属性</dt><dd className="text-ink-secondary">友だち情報欄「ペットの名前」</dd></div>{mileageAction?.kind === 'award_mileage' && <div className="flex justify-between gap-3"><dt className="text-accent font-bold">→ マイル</dt><dd className="text-ink-secondary">書いてくれたら {mileageAction.amount}</dd></div>}{formAction?.kind === 'open_form' && <div className="flex justify-between gap-3"><dt className="text-accent font-bold">→ 回答フォーム</dt><dd className="text-ink-secondary">{formAction.formName}</dd></div>}</dl></section>
+          <section className="bg-canvas rounded-card border-hairline border p-4"><h2 className="text-sm font-bold">つながる先</h2><dl className="mt-3 space-y-2 text-xs"><div className="flex justify-between gap-3"><dt className="text-accent font-bold">→ EC連携</dt><dd className="text-ink-secondary">注文と到着の記録</dd></div><div className="flex justify-between gap-3"><dt className="text-accent font-bold">→ 共通情報</dt><dd className="text-ink-secondary">差し込んでいる「商品名」</dd></div><div className="flex justify-between gap-3"><dt className="text-accent font-bold">→ 友だち属性</dt><dd className="text-ink-secondary">友だち情報欄「ペットの名前」</dd></div>{mileageAction?.kind === 'award_mileage' && <div className="flex justify-between gap-3"><dt className="text-accent font-bold">→ マイル</dt><dd className="text-ink-secondary">書いてくれたら {mileageAction.amount}</dd></div>}{formAction?.kind === 'open_form' && <div className="flex justify-between gap-3"><dt className="text-accent font-bold">→ 回答フォーム</dt><dd className="text-ink-secondary">{formAction.formName}{selectedForm ? (selectedForm.isActive ? '（公開中）' : '（公開されていません）') : '（見つかりません）'}</dd></div>}</dl></section>
           <section className="border-warning bg-warning-bg text-warning rounded-card border p-4"><h2 className="text-sm font-bold">気をつけること</h2><div className="mt-3 space-y-3 text-xs"><p><strong className="block">◷ 20時台がいちばん押されます</strong>分析の「配信の反応」で確かめられます</p><p><strong className="block">▣ 3つ以上の吹き出しは嫌がられます</strong>1回に3つ送った配信は、ブロック率が3倍でした</p></div></section>
         </aside>
       </div>
