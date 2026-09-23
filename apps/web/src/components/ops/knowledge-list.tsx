@@ -4,7 +4,7 @@ import { Search } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { api, type OpsKnowledgeArticle } from '@/lib/api'
 import { opsCall } from '@/components/ops/ops-ui'
-import { KNOWLEDGE_KINDS, knowledgeDate, knowledgeState } from '@/components/ops/knowledge-format'
+import { KNOWLEDGE_ARTICLE_KINDS, KNOWLEDGE_KINDS, knowledgeArticleKind, knowledgeDate, knowledgeState } from '@/components/ops/knowledge-format'
 import KnowledgeEditor from '@/components/ops/knowledge-editor'
 import Button from '@/components/shared/button'
 import Chip from '@/components/shared/chip'
@@ -21,6 +21,7 @@ export default function KnowledgeList() {
   const [total, setTotal] = useState(0)
   const [q, setQ] = useState('')
   const [kind, setKind] = useState('')
+  const [articleKind, setArticleKind] = useState('')
   const [state, setState] = useState('')
   const [offset, setOffset] = useState(0)
   const [loaded, setLoaded] = useState(false)
@@ -32,12 +33,12 @@ export default function KnowledgeList() {
   const load = useCallback(async () => {
     const current = ++request.current
     setLoaded(false); setError('')
-    const res = await opsCall(api.ops.knowledge.list({ q, kind, state, offset }))
+    const res = await opsCall(api.ops.knowledge.list({ q, kind, articleKind, state, offset }))
     if (current !== request.current) return
     setLoaded(true)
     if (!res.success) { setError(res.error || '読み込めませんでした'); return }
     setRows(res.data); setTotal(res.total)
-  }, [q, kind, state, offset])
+  }, [q, kind, articleKind, state, offset])
   useEffect(() => {
     const timer = setTimeout(() => void load(), 150)
     return () => { clearTimeout(timer); request.current += 1 }
@@ -63,6 +64,9 @@ export default function KnowledgeList() {
         placeholder="タイトル・質問・キーワードで検索" value={q} onChange={e => { setQ(e.target.value); setOffset(0) }} maxLength={200} /></div>
       <SelectField aria-label="種類" className={styles.filter} value={kind} onChange={e => { setKind(e.target.value); setOffset(0) }}
         options={[{ value: '', label: '種類：すべて' }, ...KNOWLEDGE_KINDS]} />
+      <SelectField data-design-node="aeKindFilter" aria-label="記事の種類" className={styles.articleKindFilter} value={articleKind}
+        onChange={e => { setArticleKind(e.target.value); setOffset(0) }}
+        options={[{ value: '', label: '記事：すべて' }, ...KNOWLEDGE_ARTICLE_KINDS]} />
       <SelectField aria-label="状態" className={styles.filter} value={state} onChange={e => { setState(e.target.value); setOffset(0) }}
         options={[{ value: '', label: '状態：すべて' }, { value: 'pending', label: '承認待ち' }, { value: 'approved', label: '承認済み' }, { value: 'needs_review', label: '要確認' }, { value: 'dismissed', label: '見送り' }]} />
       <span className={styles.count}>{loaded && !error ? `${total}件` : '—'}</span>
@@ -72,14 +76,16 @@ export default function KnowledgeList() {
     {!loaded ? <ListState kind="loading" /> : error ? <ListState kind="error" description={error} onRetry={() => void load()} /> : rows.length === 0
       ? <ListState kind="empty" emptyPreset="readonly" title="記事はありません" description="解決した問い合わせの確認結果がここに並びます。" />
       : <DataTable className={styles.table}>
-        <colgroup><col /><col className={styles.kindColumn} /><col className={styles.stateColumn} /><col className={styles.numberColumn} /><col className={styles.helpfulColumn} /><col className={styles.dateColumn} /><col className={styles.actionsColumn} /></colgroup>
-        <thead><TableHeadRow><Th>タイトル</Th><Th>種類</Th><Th>状態</Th><Th>使われた回数</Th><Th>役に立った</Th><Th>更新日</Th><Th>操作</Th></TableHeadRow></thead>
+        <colgroup><col /><col className={styles.kindColumn} /><col className={styles.articleKindColumn} /><col className={styles.stateColumn} /><col className={styles.numberColumn} /><col className={styles.helpfulColumn} /><col className={styles.dateColumn} /><col className={styles.actionsColumn} /></colgroup>
+        <thead><TableHeadRow><Th>タイトル</Th><Th>種類</Th><Th data-design-node="aeKindHeader">記事の種類</Th><Th>状態</Th><Th>使われた回数</Th><Th>役に立った</Th><Th>更新日</Th><Th>操作</Th></TableHeadRow></thead>
         <tbody>{rows.map(article => {
           const label = knowledgeState(article)
+          const articleKindLabel = knowledgeArticleKind(article.articleKind)
           const approved = label.label === '承認済み'
           return <Tr key={article.id}>
             <Td className={styles.titleCell} title={article.title}>{article.title}</Td>
             <Td>{KNOWLEDGE_KINDS.find(v => v.value === article.kind)?.label}</Td>
+            <Td><Chip tone={articleKindLabel.tone} className={styles.articleKindChip}>{articleKindLabel.label}</Chip></Td>
             <Td><Chip tone={label.tone} className={styles.chip}>{label.label}</Chip></Td>
             <Td>{article.usedCount ? `${article.usedCount}回` : '—'}</Td>
             <Td>{article.helpfulCount ? `${article.helpfulCount}件` : '—'}</Td>

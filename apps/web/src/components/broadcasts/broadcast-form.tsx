@@ -664,9 +664,18 @@ export default function BroadcastForm({
         : stepTitle[currentStep ?? 'basic'],
   )
 
+  /*
+   * BC-02: `?templatePicker=1` で開いたとき、選択窓はメッセージの
+   * 段の中だけに出る。基本設定の段にいたままでは見出しだけ
+   * 「テンプレートを選ぶ」に変わって中身が出ないので、
+   * メッセージの段へも一緒に進める。
+   */
   useEffect(() => {
-    if (openTemplatePickerInitially) setShowTemplatePicker(true)
-  }, [openTemplatePickerInitially])
+    if (openTemplatePickerInitially) {
+      setShowTemplatePicker(true)
+      onStepChange?.('message')
+    }
+  }, [openTemplatePickerInitially]) // eslint-disable-line react-hooks/exhaustive-deps
 
   /*
    * 送信済み詳細の「同じ設定で作り直す」から来たとき、元配信を種にする
@@ -1024,7 +1033,24 @@ export default function BroadcastForm({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bubbles, tagId, condition, scenarioId, targetMode, selectedAccountId, scheduledDate, scheduledTime, sendMode])
 
-  const updateBubble = (index: number, bubble: BroadcastBubble) => setBubbles((items) => items.map((item, i) => i === index ? { ...bubble, id: item.id } : item))
+  /*
+   * BC-01: 型を切り替えると `emptyBubble` で中身が空になるが、
+   * 書きかけの本文を黙って捨てない。型ごとの中身を吹き出し単位で
+   * 一時保管し、切り替えて戻したときに同じ内容を復元する。
+   * 保存するのは画面を開いている間だけ（下書きへの永続化はしない）。
+   */
+  const bubbleContentStash = useRef(new Map<string, Map<string, Record<string, unknown>>>())
+  const updateBubble = (index: number, bubble: BroadcastBubble) => setBubbles((items) => items.map((item, i) => {
+    if (i !== index) return item
+    if (item.type !== bubble.type) {
+      const stash = bubbleContentStash.current.get(item.id) ?? new Map<string, Record<string, unknown>>()
+      stash.set(item.type, item.content)
+      bubbleContentStash.current.set(item.id, stash)
+      const restored = stash.get(bubble.type)
+      return { ...bubble, id: item.id, content: restored ?? bubble.content }
+    }
+    return { ...bubble, id: item.id }
+  }))
   const moveBubble = (index: number, direction: -1 | 1) => setBubbles((items) => { const next = [...items]; const [item] = next.splice(index, 1); next.splice(index + direction, 0, item); return next })
 
   /*
@@ -1987,7 +2013,7 @@ export default function BroadcastForm({
           {currentStep === 'message' ? (
             <p className="mt-3 flex items-center gap-2 text-sm font-semibold text-ink-secondary">
               <Zap size={17} className="text-accent" aria-hidden />
-              {publishedActions.find((action) => action.versionId === afterActionVersionId)?.name ?? 'タグ「8月キャンペーン配信済み」を追加'}
+              {publishedActions.find((action) => action.versionId === afterActionVersionId)?.name ?? '実行しない'}
             </p>
           ) : <label className="mt-3 block text-xs font-bold text-ink-secondary">実行する公開済みアクション
             <select aria-label="配信後のアクション" value={afterActionVersionId} onChange={(event) => setAfterActionVersionId(event.target.value)} className="mt-2 w-full rounded-control border border-hairline px-3 py-2 text-sm font-normal text-ink">
@@ -2270,7 +2296,16 @@ export default function BroadcastForm({
           <div className="space-y-3">
             <section className="broadcast-line-preview rounded-card p-5 text-on-accent">
               <h3 className="text-center text-sm font-bold">LINEプレビュー</h3>
-              <p className="mx-auto mt-4 w-fit rounded-pill bg-ink/25 px-3 py-1 text-xs font-semibold">2026/08/24 10:00 に届きます</p>
+              {/*
+                * BC-03: 実際に決めた値だけを出す。固定の日時・人数・
+                * タグ名を出すと、対象0人や未設定でも「実行される」
+                * ように見えてしまう。
+                */}
+              <p className="mx-auto mt-4 w-fit rounded-pill bg-ink/25 px-3 py-1 text-xs font-semibold">
+                {visualQaAugustCampaign ? '2026/08/24 10:00 に届きます'
+                  : scheduledLabel ? `${scheduledLabel} に届きます`
+                  : '保存後、詳細画面から送信します'}
+              </p>
               <div className="mt-4 flex flex-col gap-3 text-ink">
                 {bubbles.map((bubble, index) => <BubblePreview key={bubble.id} bubble={bubble} buttons={index === 0 ? messageButtons : []} />)}
               </div>
@@ -2279,10 +2314,10 @@ export default function BroadcastForm({
               <h3 className="font-bold text-ink">設定内容</h3>
               <dl className="mt-3 divide-y divide-hairline text-xs">
                 {[
-                  ['配信対象', '条件指定 1,213人'],
-                  ['配信日時', '2026/08/24 10:00'],
-                  ['送信数', '1,213通'],
-                  ['配信後', 'タグ「配信済み」を追加'],
+                  ['配信対象', visualQaAugustCampaign ? '条件指定 1,213人' : `${confirmAudienceLabel} ${audienceCount === null ? '—' : `${audienceCount.toLocaleString('ja-JP')}人`}`],
+                  ['配信日時', visualQaAugustCampaign ? '2026/08/24 10:00' : sendWhenLabel ?? '未設定'],
+                  ['送信数', visualQaAugustCampaign ? '1,213通' : audienceCount === null ? '—' : `${audienceCount.toLocaleString('ja-JP')}通`],
+                  ['配信後', visualQaAugustCampaign ? 'タグ「配信済み」を追加' : publishedActions.find((action) => action.versionId === afterActionVersionId)?.name ?? '実行しない'],
                 ].map(([label, value]) => <div key={label} className="flex items-center justify-between gap-3 py-4"><dt className="text-ink-faint">{label}</dt><dd className="text-right font-bold text-ink">{value}</dd></div>)}
               </dl>
             </section>

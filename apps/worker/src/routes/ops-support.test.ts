@@ -275,22 +275,33 @@ describe('下書きと AI', () => {
   it('最新の追加説明から根拠を探し、個別回答を生成する。除外しても記事は他の問い合わせに残る', async () => {
     const source = await seedTicket('過去に解決した請求書の問い合わせ');
     testDb.raw.prepare("UPDATE hq_support_requests SET stage = 'resolved' WHERE id = ?").run(source.id);
-    testDb.raw.prepare(`INSERT INTO platform_knowledge_articles (id,source_request_id,source_revision,title,question,answer,kind,review_state,status,created_at,updated_at)
-      VALUES ('billing-evidence',?,0,'請求書の再発行','請求書','承認済みの対応根拠','billing','approved','active','2026-09-21','2026-09-21')`).run(source.id);
+    const exampleSource = await seedTicket('過去の回答例');
+    testDb.raw.prepare("UPDATE hq_support_requests SET stage = 'resolved' WHERE id = ?").run(exampleSource.id);
+    testDb.raw.prepare(`INSERT INTO platform_knowledge_articles (id,source_request_id,source_revision,title,question,answer,kind,article_kind,review_state,status,created_at,updated_at)
+      VALUES ('billing-evidence',?,0,'請求書の再発行','請求書','承認済みの対応根拠','billing','verified','approved','active','2026-09-21','2026-09-21')`).run(source.id);
+    testDb.raw.prepare(`INSERT INTO platform_knowledge_articles (id,source_request_id,source_revision,title,question,answer,kind,article_kind,review_state,status,created_at,updated_at)
+      VALUES ('billing-example',?,0,'請求書の再発行','請求書','未確認の回答例','billing','answer_example','approved','active','2026-09-21','2026-09-21')`).run(exampleSource.id);
     const t = await seedTicket('画面がうまく使えない');
     await addSupportTenantMessage(testDb.db, { requestId: t.id, staffId: 'owner-1', staffName: '山田 太郎', body: '説明を訂正します。請求書の再発行です。再ログインは実施済みです。', attachmentKeys: [] });
     const run = vi.fn(async () => ({ response: '状況を確認するため追加の情報をお願いします。' }));
     const res = await app(master, { run }).request(`/api/ops/support/tickets/${t.id}/draft/ai`, json({}));
     expect(res.status).toBe(201);
-    expect((await res.json() as { data: { references: { id: string }[] } }).data.references).toEqual([expect.objectContaining({ id: 'billing-evidence' })]);
+    expect((await res.json() as { data: { references: { id: string; articleKind: string }[] } }).data.references).toEqual([
+      expect.objectContaining({ id: 'billing-evidence', articleKind: 'verified' }),
+      expect.objectContaining({ id: 'billing-example', articleKind: 'answer_example' }),
+    ]);
     const call = run.mock.calls[0] as unknown as [string, { messages: { role: string; content: string }[] }];
     expect(call[1].messages[1].content).toContain('再ログインは実施済み');
     expect(call[1].messages[1].content).toContain('承認済みの対応根拠');
     expect(call[1].messages[0].content).toContain('記事の回答文を転用せず');
     expect(call[1].messages[0].content).toContain('実施済みの操作を理由なく繰り返し勧めない');
     expect(call[1].messages[0].content).toContain('使える根拠がない場合');
+    expect(call[1].messages[0].content).toContain('回答例は運営の回答内容の参考であり、解決の実績ではない');
+    expect(call[1].messages[1].content).toContain('解決確認済み');
+    expect(call[1].messages[1].content).toContain('回答例（お客様の確認なし）');
     const excluded = await app(master, { run }).request(`/api/ops/support/tickets/${t.id}/draft/ai`, json({ excludeArticleIds: ['billing-evidence'] }));
-    expect((await excluded.json() as { data: { references: unknown[] } }).data.references).toEqual([]);
+    expect((await excluded.json() as { data: { references: { id: string }[] } }).data.references)
+      .toEqual([expect.objectContaining({ id: 'billing-example' })]);
     expect(JSON.stringify(run.mock.calls[1])).not.toContain('承認済みの対応根拠');
     expect(testDb.raw.prepare('SELECT status FROM platform_knowledge_articles WHERE id = ?').get('billing-evidence')).toEqual({ status: 'active' });
     expect(mail.sendPlainMail).not.toHaveBeenCalled();

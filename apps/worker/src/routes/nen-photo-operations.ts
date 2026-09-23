@@ -30,6 +30,10 @@ import { auditLog } from '../lib/audit-log.js';
 import { sha256Hex } from '../middleware/auth.js';
 import { hasStaffPermission, requireRole } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
+import {
+  attemptPhotoRewardForPhoto,
+  ecPhotoPointClientFromEnv,
+} from '../services/photo-reward-sync.js';
 
 export const nenPhotoOperations = new Hono<Env>();
 
@@ -38,7 +42,8 @@ type PhotoPermission =
   | 'photo.submission.review'
   | 'photo.submission.bulk_review'
   | 'photo.publication.manage'
-  | 'photo.original.download';
+  | 'photo.original.download'
+  | 'photo.reward.reconcile';
 
 export function requirePhotoPermission(permission: PhotoPermission) {
   return async (c: Context<Env>, next: Next) => {
@@ -262,6 +267,27 @@ nenPhotoOperations.post(
         const data = await notifyBulkPhotoDecisions(c, {
           receiptId, lineAccountId, idempotencyKey: key, decisions, result: result.result,
         });
+        /*
+         * 採用した分のポイント手続きをその場で一度届ける（PHOTO-06）。
+         * 単体採用と同じく、失敗しても審査結果は確定済みで、行は
+         * 日次回収・手動の再試行・照合で後から進められる。
+         */
+        const ecClient = ecPhotoPointClientFromEnv(c.env);
+        if (ecClient) {
+          for (const item of (result.result as BulkPhotoDecisionResult).items) {
+            if (item.decision !== 'approve') continue;
+            try {
+              await attemptPhotoRewardForPhoto(
+                c.env.DB,
+                { photoId: item.photoId, lineAccountId },
+                ecClient,
+                { now: new Date() },
+              );
+            } catch (error) {
+              console.error('bulk photo reward delivery failed', item.photoId, error);
+            }
+          }
+        }
         return c.json({ success: true, duplicate: false, data }, 201);
       }
       if (result.kind === 'not_found') return c.json({ success: false, error: '写真が見つかりません', photoId: result.photoId }, 404);

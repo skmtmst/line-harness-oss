@@ -577,6 +577,35 @@ export default function PhotoReviewsPage() {
    */
   const rotationKeys = useRef(new Map<string, string>())
   const [rotationSaving, setRotationSaving] = useState(false)
+  /*
+   * 止まったポイント手続きの復旧操作（PHOTO-06）。再試行・照合は同じ
+   * 冪等な届け直しで、結果をそのまま詳細へ反映する。
+   */
+  const [pointActionBusy, setPointActionBusy] = useState<'retry' | 'reconcile' | null>(null)
+  const pointAction = async (action: 'retry' | 'reconcile') => {
+    if (!selectedAccountId || !detailPhoto) return
+    const id = text(detailPhoto.id)
+    setPointActionBusy(action)
+    try {
+      const response = action === 'retry'
+        ? await api.nenMembers.photoPointRetry(id, selectedAccountId)
+        : await api.nenMembers.photoPointReconcile(id, selectedAccountId)
+      if (!response.success) {
+        setNotice(response.error || 'ポイントの手続きに失敗しました')
+        return
+      }
+      setNotice(response.data.synced
+        ? (response.data.duplicate
+          ? 'EC側ではすでに付与済みでした。状態を「付けました」に合わせました。'
+          : 'ポイントを付けました。')
+        : `手続きはまだ完了していません。${response.data.reasonLabel ? `（${response.data.reasonLabel}）` : ''}`)
+      void openDetail(id)
+    } catch {
+      setNotice('ポイントの手続きに失敗しました')
+    } finally {
+      setPointActionBusy(null)
+    }
+  }
   const saveRotation = async (rotation: 0 | 90 | 180 | 270) => {
     if (!selectedAccountId || !detailPhoto) return
     const id = text(detailPhoto.id)
@@ -681,6 +710,8 @@ export default function PhotoReviewsPage() {
       onProcessReviewAsset={() => processReviewAsset()}
       onSaveRotation={(rotation) => saveRotation(rotation)}
       onDownloadOriginal={downloadOriginal}
+      onPointAction={pointAction}
+      pointActionBusy={pointActionBusy}
     />
   }
 
