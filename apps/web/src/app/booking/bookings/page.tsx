@@ -11,6 +11,7 @@ import Select from '@/components/shared/select'
 import FolderPanel, { FOLDER_RAIL_WIDTH } from '@/components/shared/folder-panel'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { canOperateBookings } from '../lib/booking-permissions'
+import { fetchAllPages } from './fetch-all-pages'
 import BookingCalendar, {
   moveDay,
   startOfWeek,
@@ -413,18 +414,17 @@ export default function BookingsPage() {
     const requestedAccountId = selectedAccountId
     let alive = true
     void (async () => {
-      const collected: BookingRequest[] = []
-      let offset = 0
-      while (alive && listAccountRef.current === requestedAccountId) {
-        const response = await bookingApi.listRequests(requestedAccountId, 'all', {
-          limit: 100, offset,
-          from: new Date(`${calendarFrom}T00:00:00+09:00`).toISOString(),
-          to: new Date(`${moveDay(calendarTo, 1)}T00:00:00+09:00`).toISOString(),
-        })
-        collected.push(...response.requests)
-        offset += response.requests.length
-        if (offset >= response.total || response.requests.length === 0) break
+      const range = {
+        from: new Date(`${calendarFrom}T00:00:00+09:00`).toISOString(),
+        to: new Date(`${moveDay(calendarTo, 1)}T00:00:00+09:00`).toISOString(),
       }
+      // 2ページ目以降は同時に取る（V6R-S3-c）。途中でアカウントが替わったら集めない（#963）。
+      const collected = await fetchAllPages(
+        (offset) => bookingApi.listRequests(requestedAccountId, 'all', { limit: 100, offset, ...range }),
+        100,
+        () => alive && listAccountRef.current === requestedAccountId,
+      )
+      if (collected === null) return
       if (alive && listAccountRef.current === requestedAccountId) setCalendarItems(collected)
     })().catch(() => {
       if (alive && listAccountRef.current === requestedAccountId) setError('カレンダーの読み込みに失敗しました')
