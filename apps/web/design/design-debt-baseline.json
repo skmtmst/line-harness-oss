@@ -602,6 +602,9 @@
   "components/inflow-links/site-script.tsx": {
     "arbitrary-value": 1
   },
+  "components/layout/page-header-h2.tsx": {
+    "unresolved-classname": 5
+  },
   "components/layout/sidebar-identity.tsx": {
     "unresolved-classname": 5
   },
