@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
+import { X } from 'lucide-react'
 import { api } from '@/lib/api'
 import type { AutoReplyDraftInput, AutoReplyDraftVersion } from '@line-crm/shared'
 import type { SegmentCondition } from '@/lib/segment-condition'
@@ -584,25 +585,38 @@ export default function EditDialog({
         aria-labelledby={page ? undefined : 'auto-reply-edit-dialog-title'}
         tabIndex={page ? undefined : -1}
       >
-        <div className={`border-hairline border-b px-5 ${page ? 'py-3' : 'py-4'}`}>
-          <h3 id={page ? undefined : 'auto-reply-edit-dialog-title'} className="text-base font-semibold">
-            {page
-              ? step === 'basic'
-                ? '基本設定'
-                : step === 'trigger'
-                  ? 'どんなときに動くか'
-                  : '何を返すか'
-              : draft.id ? '自動応答編集' : '自動応答を作る'}
-          </h3>
-          <p className="text-ink-faint mt-1 text-xs leading-relaxed">
-            {page
-              ? step === 'basic'
-                ? '名前と管理方法を決めて、反応条件へ進みます。'
-                : step === 'trigger'
-                  ? '受信した言葉・曜日・時間帯・相手を組み合わせます。'
-                  : '返信内容と、応答した後に行う処理を設定します。'
-              : '受け取ったメッセージに自動で返します。曜日や時間帯、友だちの条件で出し分けできます。'}
-          </p>
+        <div className={`border-hairline flex items-start justify-between gap-3 border-b px-5 ${page ? 'py-3' : 'py-4'}`}>
+          <div className="min-w-0">
+            <h3 id={page ? undefined : 'auto-reply-edit-dialog-title'} className="text-base font-semibold">
+              {page
+                ? step === 'basic'
+                  ? '基本設定'
+                  : step === 'trigger'
+                    ? 'どんなときに動くか'
+                    : '何を返すか'
+                : draft.id ? '自動応答編集' : '自動応答を作る'}
+            </h3>
+            <p className="text-ink-faint mt-1 text-xs leading-relaxed">
+              {page
+                ? step === 'basic'
+                  ? '名前と管理方法を決めて、反応条件へ進みます。'
+                  : step === 'trigger'
+                    ? '受信した言葉・曜日・時間帯・相手を組み合わせます。'
+                    : '返信内容と、応答した後に行う処理を設定します。'
+                : '受け取ったメッセージに自動で返します。曜日や時間帯、友だちの条件で出し分けできます。'}
+            </p>
+          </div>
+          {!page ? (
+            <button
+              type="button"
+              onClick={closeOverlay}
+              disabled={saving}
+              aria-label="閉じる"
+              className="rounded-mini p-1 text-ink-secondary hover:bg-canvas-sunken disabled:opacity-50"
+            >
+              <X aria-hidden="true" className="h-5 w-5" />
+            </button>
+          ) : null}
         </div>
         <div className={page ? 'space-y-4 p-4' : 'space-y-4 p-5'}>
           {showBasic ? (

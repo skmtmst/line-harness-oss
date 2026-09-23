@@ -19,6 +19,7 @@ import {
   Pencil,
   Send,
   Tag,
+  X,
 } from 'lucide-react'
 import type {
   AutoReplyConflict,
@@ -919,6 +920,9 @@ function AutoReplyPublishInner() {
             <div className={"arp-dialogTitle"}>
               <CheckCircle2 aria-hidden="true" />
               <h2 id="test-dialog-title">テストを実行しますか？</h2>
+              <button type="button" onClick={() => setTestDialogOpen(false)} disabled={busy} aria-label="閉じる" className="ml-auto rounded-mini p-1 text-ink-secondary hover:bg-canvas-sunken disabled:opacity-50">
+                <X aria-hidden="true" className="h-5 w-5" />
+              </button>
             </div>
             <p>入力内容に一致するルールと実行予定のアクションを確認します。</p>
             <div className={"arp-dialogActions"}>

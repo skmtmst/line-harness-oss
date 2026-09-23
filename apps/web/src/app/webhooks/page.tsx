@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { X } from 'lucide-react'
 import { api, type OutgoingWebhookOverview } from '@/lib/api'
 import type { IncomingWebhook, WebhookInteractionSummary } from '@line-crm/shared'
 import { Suspense } from 'react'
@@ -578,9 +579,22 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
       {rotateTarget && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
           <form onSubmit={handleRotateSubmit} className="bg-canvas rounded-lg shadow-xl max-w-lg w-full p-6">
-            <h2 className="text-lg font-semibold text-ink mb-2">
-              「{rotateTarget.name}」のシークレットを{rotateTarget.activate ? '設定して有効化' : '更新'}
-            </h2>
+            <div className="mb-2 flex items-start justify-between gap-3">
+              <h2 className="text-lg font-semibold text-ink">
+                「{rotateTarget.name}」のシークレットを{rotateTarget.activate ? '設定して有効化' : '更新'}
+              </h2>
+              <button
+                type="button"
+                aria-label="閉じる"
+                className="rounded p-1 text-ink-secondary hover:bg-canvas-sunken"
+                onClick={() => {
+                  setRotateTarget(null)
+                  setRotateSecretValue('')
+                }}
+              >
+                <X aria-hidden="true" className="h-5 w-5" />
+              </button>
+            </div>
             <p className="text-sm text-ink-secondary mb-4">
               新しいシークレットを設定します。
               <strong className="text-danger">設定後は今回限り画面に表示されません。</strong>
@@ -629,9 +643,22 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
       {createdSecret && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
           <div className="bg-canvas rounded-lg shadow-xl max-w-lg w-full p-6">
-            <h2 className="text-lg font-semibold text-ink mb-2">
-              シークレットを保存してください
-            </h2>
+            <div className="mb-2 flex items-start justify-between gap-3">
+              <h2 className="text-lg font-semibold text-ink">
+                シークレットを保存してください
+              </h2>
+              <button
+                type="button"
+                aria-label="閉じる"
+                className="rounded p-1 text-ink-secondary hover:bg-canvas-sunken"
+                onClick={() => {
+                  setCreatedSecret(null)
+                  setSecretCopied(false)
+                }}
+              >
+                <X aria-hidden="true" className="h-5 w-5" />
+              </button>
+            </div>
             <p className="text-sm text-ink-secondary mb-4">
               「{createdSecret.name}」を作成しました。
               <strong className="text-danger">このシークレットは今後二度と表示されません。</strong>

@@ -151,7 +151,6 @@ export default function MediaReplacementDialog({
       onCancel={onClose}
       footer={(
         <div className="flex flex-wrap items-center justify-end gap-2">
-          <Button type="button" onClick={onClose} disabled={busy}>閉じる</Button>
           {impact?.canPartiallyReplace && !impact.canReplace ? (
             <Button type="button" variant="primary" onClick={() => void replace('partial')} disabled={busy}>
               {busy ? '差し替えています…' : `差し替え可能な${impact.replaceableCount}か所だけ差し替える`}

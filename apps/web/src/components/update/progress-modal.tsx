@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { X } from 'lucide-react'
 import { openUpdateStream, getUpdateStatus } from '@/lib/update-client'
 import type { UpdateEvent } from '@line-harness/update-engine'
 
@@ -116,12 +117,25 @@ export function ProgressModal({
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
       <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6">
-        <h2 className="text-lg font-semibold mb-3">
-          アップデート中{' '}
-          {mode === 'polling' && (
-            <span className="text-xs text-gray-500">(polling)</span>
-          )}
-        </h2>
+        <div className="mb-3 flex items-start justify-between gap-3">
+          <h2 className="text-lg font-semibold">
+            アップデート中{' '}
+            {mode === 'polling' && (
+              <span className="text-xs text-gray-500">(polling)</span>
+            )}
+          </h2>
+          {/* 実行中は閉じられない（従来どおり）。終了後だけ×を出す。 */}
+          {final ? (
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="閉じる"
+              className="rounded p-1 text-gray-500 hover:bg-gray-100"
+            >
+              <X aria-hidden="true" className="h-5 w-5" />
+            </button>
+          ) : null}
+        </div>
         <ul className="space-y-1 font-mono text-sm">
           {events.length === 0 && (
             <li className="text-gray-500">接続中...</li>
@@ -162,13 +176,6 @@ export function ProgressModal({
                 )}
               </p>
             )}
-            <button
-              type="button"
-              onClick={onClose}
-              className="mt-3 text-sm px-3 py-1 rounded bg-gray-200 hover:bg-gray-300"
-            >
-              閉じる
-            </button>
           </div>
         )}
       </div>

@@ -55,7 +55,7 @@ export default function OptionsDialog({
             <h2 className="text-ink text-base font-bold">オプション設定</h2>
             <p className="mt-0.5 text-xs text-ink-faint">答え終わったあとの動きと、受付のきまり</p>
           </div>
-          <button onClick={onClose} className="text-ink-faint hover:text-ink px-2 text-lg">
+          <button type="button" onClick={onClose} aria-label="閉じる" className="text-ink-faint hover:text-ink px-2 text-lg">
             ×
           </button>
         </div>
@@ -136,9 +136,6 @@ export default function OptionsDialog({
         </div>
 
         <div className="border-hairline flex justify-end gap-2 border-t px-5 py-3">
-          <Button onClick={onClose}>
-            閉じる
-          </Button>
           <Button variant="primary" onClick={() => void onSave()}>
             保存する
           </Button>

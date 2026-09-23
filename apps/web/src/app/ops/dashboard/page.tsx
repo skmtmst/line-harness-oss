@@ -196,7 +196,6 @@ export default function OpsDashboardPage() {
         open={showUnregistered}
         title="契約者専用LINEに未登録の権限者"
         description="契約者専用LINEの案内は、お知らせ配信（37-7）の LINE の口ができてから、ここから送れるようにします。いまは対象の人を確かめられます。"
-        cancelLabel="閉じる"
         onCancel={() => setShowUnregistered(false)}
       >
         {unregistered ? (

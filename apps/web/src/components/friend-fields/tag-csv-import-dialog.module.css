@@ -11,6 +11,7 @@
 }
 
 .panel {
+  position: relative;
   display: flex;
   max-height: calc(100vh - 32px);
   flex-direction: column;

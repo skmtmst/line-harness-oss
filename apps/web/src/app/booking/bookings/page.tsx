@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
+import { X } from 'lucide-react'
 import { api, bookingApi, type BookingAdminDetail, type BookingMenu, type BookingRequest, type BookingStaff } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -1099,7 +1100,14 @@ function BookingDetailPanel({
                 <Button onClick={() => onAction('cancel')} className="border-danger text-danger">予約を取り消す</Button>
               </>
             ) : null}
-            <Button onClick={onClose}>閉じる</Button>
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="閉じる"
+              className="rounded-mini p-1.5 text-ink-secondary hover:bg-canvas-sunken"
+            >
+              <X aria-hidden="true" className="h-5 w-5" />
+            </button>
           </div>
         </div>
 

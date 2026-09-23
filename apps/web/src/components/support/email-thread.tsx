@@ -2,6 +2,7 @@
 
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { X } from 'lucide-react'
 import { ApiError, fetchApi } from '@/lib/api'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import { IdempotencyKeyStore } from '@/lib/idempotency-key-store'
@@ -780,11 +781,20 @@ export default function EmailThread({
               className="max-h-[calc(100dvh-2rem)] w-full max-w-lg overflow-y-auto rounded-[14px] border border-[#E5E7EB] bg-canvas shadow-2xl"
               onClick={(event) => event.stopPropagation()}
             >
-              <div className="border-b border-[#E5E7EB] px-5 py-4">
+              <div className="flex items-start justify-between gap-3 border-b border-[#E5E7EB] px-5 py-4">
                 <div>
                   <h2 id="email-internal-memo-title" className="text-ink text-base font-bold">内部メモ</h2>
                   <p className="text-ink-faint mt-1 text-xs">担当者だけに表示され、相手には送信されません。</p>
                 </div>
+                <button
+                  type="button"
+                  onClick={closeMemoEditor}
+                  disabled={memoSaving}
+                  aria-label="閉じる"
+                  className="rounded-mini p-1 text-ink-secondary hover:bg-canvas-sunken disabled:opacity-50"
+                >
+                  <X aria-hidden="true" className="h-5 w-5" />
+                </button>
               </div>
               <div className="px-5 py-4">
                 <label htmlFor="email-internal-memo" className="text-xs font-semibold text-[#667085]">メモ内容</label>
