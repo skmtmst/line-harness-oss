@@ -1,5 +1,6 @@
 'use client'
 
+import DateField from '@/components/shared/date-field'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useAccount } from '@/contexts/account-context'
@@ -710,7 +711,7 @@ export default function NewProxyBookingPage() {
                   />
                 </Field>
                 <Field label="日付">
-                  <input type="date" value={date} onChange={(event) => setDate(event.target.value)} className="border-hairline rounded-control w-full border px-3 py-2 text-sm" />
+                  <DateField name="date" value={date} onChange={setDate} aria-label="日付" />
                 </Field>
                 <Field label="空いている時間">
                   <Select
