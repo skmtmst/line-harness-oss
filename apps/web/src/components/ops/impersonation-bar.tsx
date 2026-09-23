@@ -9,6 +9,7 @@ import ConfirmDialog from '@/components/shared/confirm-dialog'
 import NoteBar from '@/components/shared/note-bar'
 import { TextArea } from '@/components/shared/text-field'
 import { RequiredBadge } from '@/components/shared/form-controls'
+import { forgetSessionSnapshot } from '@/lib/session-snapshot'
 
 /**
  * 代理ログイン帯（★V6 37 共通 `WXp5T`）。代理ログイン中は全画面の上に常時出す。
@@ -33,6 +34,8 @@ export default function ImpersonationBar({
 
   const update = (next: OpsImpersonation | null) => {
     if (next) setState(next)
+    // 帯の状態が変わったら、AuthGuard の確認結果（切替前のもの）を次に使わせない（V6R-S0-a）。
+    forgetSessionSnapshot()
     onChange?.(next)
   }
 
@@ -48,6 +51,7 @@ export default function ImpersonationBar({
     const res = await opsCall(api.ops.impersonation.end())
     setBusy(false)
     if (res.success) {
+      forgetSessionSnapshot()
       onChange?.(null)
       router.push('/ops/tenants')
       router.refresh()

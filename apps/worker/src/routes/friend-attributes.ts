@@ -36,6 +36,7 @@ import {
   getFolderById,
   createFolder,
   updateFolder,
+  swapFolderOrder,
   deleteFolder,
   isFolderKind,
   getWebinarFolderCounts,
@@ -1604,6 +1605,46 @@ friendAttributes.patch('/api/folders/:id', requireRole('owner', 'admin'), async 
     return c.json({ success: true, data: serializeFolder(folder!) });
   } catch (err) {
     console.error('PATCH /api/folders/:id error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+/*
+ * V6R-S2-c: 隣り合う2つのフォルダの並びを、1回で入れ替える。
+ *
+ * 以前は画面が PATCH を2回送っていた。1回目だけ成功すると同じ番号のフォルダが
+ * 2つ残り、番号が同じ2つは入れ替えても並びが変わらなかった。
+ * 同じ種類・同じアカウント・同じ親のフォルダ同士だけを受け付ける。
+ */
+friendAttributes.post('/api/folders/:id/swap-order', requireRole('owner', 'admin'), async (c) => {
+  try {
+    const id = c.req.param('id');
+    const body = await c.req.json<Record<string, unknown>>().catch(() => ({} as Record<string, unknown>));
+    const withId = typeof body.withId === 'string' ? body.withId.trim() : '';
+    if (!withId || withId === id) {
+      return c.json({ success: false, error: '入れ替える相手のフォルダを指定してください' }, 400);
+    }
+    const [a, b] = await Promise.all([getFolderById(c.env.DB, id), getFolderById(c.env.DB, withId)]);
+    if (!a || !b) return c.json({ success: false, error: 'Not found' }, 404);
+    const requested = typeof body.accountId === 'string' ? body.accountId.trim() : c.req.query('account_id')?.trim();
+    for (const folder of [a, b]) {
+      const access = await folderBoundary(c, folder, requested);
+      if (access) return access;
+    }
+    if (a.kind === 'webinar') {
+      const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+      if (!requested) return c.json({ success: false, error: 'account_id_required' }, 400);
+      if (!scope.allowedAccountIds.includes(requested) || a.account_id !== requested) {
+        return c.json({ success: false, error: 'Not found' }, 404);
+      }
+    }
+    if (a.kind !== b.kind || (a.account_id ?? null) !== (b.account_id ?? null) || (a.parent_id ?? null) !== (b.parent_id ?? null)) {
+      return c.json({ success: false, error: '同じ場所のフォルダだけ並べ替えられます' }, 400);
+    }
+    await swapFolderOrder(c.env.DB, a, b);
+    return c.json({ success: true, data: { swapped: [id, withId] } });
+  } catch (err) {
+    console.error('POST /api/folders/:id/swap-order error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });

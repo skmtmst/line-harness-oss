@@ -100,10 +100,10 @@ describe('ブラウザの確認・知らせの窓を使わない', () => {
    */
   // 2026-09-14 点検#520の軽15(#739)で components/events/event-form.tsx の
   // window.prompt 2箇所を隣の読取専用欄へ寄せたので、一覧から外した。
+  // 2026-09-23 V6R-S3-f で予約管理・流入経路の詳細のコピー失敗を画面内の欄と一言へ寄せたので、
+  // 一覧から外した。
   const PROMPT_NOT_YET = [
-    'app/booking/bookings/page.tsx',
     'app/form-submissions/edit/page.tsx',
-    'app/inflow-links/detail/page.tsx',
   ]
 
   it('prompt を使うファイルを増やさない', () => {

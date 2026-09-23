@@ -5,6 +5,7 @@ import { api, type CommonVarExportJob } from '@/lib/api'
 import Button from '@/components/shared/button'
 import StatusBadge from '@/components/shared/status-badge'
 import { formatJstDateTime } from '@/lib/presentation'
+import { onlyWhenVisible } from '@/lib/visible-polling'
 
 /*
  * 共通情報の監査付きCSV出力（N-192）。
@@ -93,7 +94,8 @@ export default function VarsExportPanel({ accountId, folderId, ungrouped = false
   useEffect(() => {
     if (!active || (active.status !== 'queued' && active.status !== 'running')) return
     const generation = generationRef.current
-    const timer = window.setInterval(async () => {
+    // 隠れたタブでは聞き直さない（V6R-S3-g）。
+    const timer = window.setInterval(onlyWhenVisible(async () => {
       try {
         const res = await api.commonVars.exportDetail(active.id)
         if (generationRef.current !== generation) return
@@ -106,7 +108,7 @@ export default function VarsExportPanel({ accountId, folderId, ungrouped = false
       } catch {
         /* 一時的な通信障害では監視を止めない */
       }
-    }, POLL_INTERVAL_MS)
+    }), POLL_INTERVAL_MS)
     return () => window.clearInterval(timer)
   }, [active, accountId, refresh])
 

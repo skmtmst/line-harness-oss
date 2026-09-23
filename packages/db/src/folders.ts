@@ -166,6 +166,31 @@ export async function updateFolder(
 }
 
 /**
+ * 隣り合う2つのフォルダの並びを入れ替える（V6R-S2-c）。
+ *
+ * 以前は画面が2つのフォルダを別々に更新していたので、1回目だけ成功すると
+ * 同じ番号のフォルダが2つ残った。2つの更新を1回のまとめ書き（batch）にする。
+ *
+ * 一覧は display_order → name の順に並ぶ。番号が同じ2つは名前で並んでいるので、
+ * 番号を交換しても並びが変わらない。そのときは「後ろへ行くほう」を +1 する。
+ * 全部の兄弟を振り直さないのは、同時に触った人の並びを上書きしないため。
+ */
+export async function swapFolderOrder(db: D1Database, a: Folder, b: Folder): Promise<void> {
+  let aOrder = b.display_order;
+  let bOrder = a.display_order;
+  if (a.display_order === b.display_order) {
+    const aIsFirst = a.name <= b.name;
+    aOrder = aIsFirst ? a.display_order + 1 : a.display_order;
+    bOrder = aIsFirst ? b.display_order : b.display_order + 1;
+  }
+  const now = jstNow();
+  await db.batch([
+    db.prepare('UPDATE folders SET display_order = ?, updated_at = ? WHERE id = ?').bind(aOrder, now, a.id),
+    db.prepare('UPDATE folders SET display_order = ?, updated_at = ? WHERE id = ?').bind(bOrder, now, b.id),
+  ]);
+}
+
+/**
  * フォルダを消す。中身は消えず「未分類」に戻る。
  *
  * どの参照も ON DELETE SET NULL にしてある。フォルダは入れ物であって

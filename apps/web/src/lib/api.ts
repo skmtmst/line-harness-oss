@@ -4401,7 +4401,7 @@ export type NenCampaignSetting = {
   excludeFormRespondents: boolean
   afterActions: NenCampaignAfterAction[]
   /** NEN-07: つなぐ回答フォームが使えない稼働中設定の理由。使えるなら null */
-  formIssue: 'form_missing' | 'form_inactive' | 'form_other_account' | null
+  formIssue: 'form_unselected' | 'form_missing' | 'form_inactive' | 'form_other_account' | null
   updatedAt: string
 }
 
@@ -6994,6 +6994,15 @@ export const api = {
     /** 中身は消えず未分類に戻る。子フォルダは一緒に消える。 */
     delete: (id: string, accountId?: string) =>
       fetchApi<ApiResponse<null>>(`/api/folders/${id}${accountId ? `?account_id=${encodeURIComponent(accountId)}` : ''}`, { method: 'DELETE' }),
+    /**
+     * 隣り合う2つのフォルダの並びを1回で入れ替える（V6R-S2-c）。
+     * 以前の「PATCH を2回」は、1回目だけ成功すると同じ番号が2つ残った。
+     */
+    swapOrder: (id: string, withId: string, accountId?: string) =>
+      fetchApi<ApiResponse<{ swapped: [string, string] }>>(`/api/folders/${encodeURIComponent(id)}/swap-order`, {
+        method: 'POST',
+        body: JSON.stringify({ withId, ...(accountId ? { accountId } : {}) }),
+      }),
   },
   tagGroups: {
     list: (accountId?: string | null) => fetchApi<ApiResponse<TagGroup[]>>(

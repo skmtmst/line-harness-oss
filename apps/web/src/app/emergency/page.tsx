@@ -24,6 +24,7 @@ import {
 } from '@/lib/api'
 import { formatOperationDate, type OperationSeverity } from '@/lib/operation-status'
 import { operationImpactText, type EmergencyStopTarget } from '@/lib/operation-impact'
+import { onlyWhenVisible } from '@/lib/visible-polling'
 import { operationControlSummary } from './control-summary'
 import {
   CAPABILITY_LABEL as RESTORE_DRIFT_CAPABILITY_LABEL,
@@ -32,9 +33,11 @@ import {
   describeRestoreResult,
 } from './restore-drift'
 import type { OperationRestoreDrift } from '@/lib/api'
-import releaseLog from '@/generated/release-log.json'
+// 全文（release-log.json）ではなく要約を読む。全文は未反映の行が数千件あり、
+// 同梱するとこの画面だけ最初の読み込みが他の2倍になった（V6R-S3-a）。
+import releaseLog from '@/generated/release-log-summary.json'
 import { useAccount } from '@/contexts/account-context'
-import { collectRecentUpdates, RECENT_UPDATES_LIMIT, type UpdateRelease } from './update-history'
+import { collectRecentUpdates, RECENT_UPDATES_LIMIT, releaseEntryCount, type UpdateRelease } from './update-history'
 
 const TABS = [
   { key: 'health', label: '健全性チェック' },
@@ -563,7 +566,8 @@ function HealthPanel({
   }, [load, manualRunRequest])
 
   useEffect(() => {
-    const timer = window.setInterval(() => { void load(false) }, 5 * 60 * 1000)
+    // 隠れたタブでは取り直さない（V6R-S3-g）。
+    const timer = window.setInterval(onlyWhenVisible(() => { void load(false) }), 5 * 60 * 1000)
     return () => window.clearInterval(timer)
   }, [load])
 
@@ -1183,7 +1187,7 @@ function HistoryPanel() {
     return Math.max(longest, Math.round((Date.parse(item.resolvedAt) - Date.parse(item.stoppedAt)) / 60_000))
   }, 0)
   const releases = (releaseLog as { releases?: UpdateRelease[] }).releases ?? []
-  const releaseUpdateCount = releases.filter((item) => item.released && Date.parse(item.released) >= Date.now() - 30 * 24 * 60 * 60 * 1000).reduce((sum, item) => sum + item.entries.length, 0)
+  const releaseUpdateCount = releases.filter((item) => item.released && Date.parse(item.released) >= Date.now() - 30 * 24 * 60 * 60 * 1000).reduce((sum, item) => sum + releaseEntryCount(item), 0)
   const deployedVersion = deployments.find((item) => item.deployment?.phase === 'succeeded' && item.deployment.version)?.deployment?.version
   const currentVersion = deployedVersion ?? releases.find((item) => item.released)?.version ?? '—'
   const updateCount = deployments.length > 0 ? deployments.filter((item) => Date.parse(item.occurredAt ?? item.createdAt) >= Date.now() - 30 * 24 * 60 * 60 * 1000).length : releaseUpdateCount
@@ -1195,9 +1199,9 @@ function HistoryPanel() {
    * まとめ、案内文・行数・「続きがあります」の表示を同じ定数で揃える。
    * まだ画面に入っていない変更は行に混ぜず、件数だけ別に案内する。
    */
-  const { updates: allUpdates, pendingCount: pendingUpdateCount } = collectRecentUpdates(deployments, releases)
+  const { updates: allUpdates, pendingCount: pendingUpdateCount, totalCount: allUpdateCount } = collectRecentUpdates(deployments, releases)
   const recentUpdates = allUpdates.slice(0, RECENT_UPDATES_LIMIT)
-  const hiddenUpdateCount = allUpdates.length - recentUpdates.length
+  const hiddenUpdateCount = allUpdateCount - recentUpdates.length
 
   const downloadCsv = () => {
     /**

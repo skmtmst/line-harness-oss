@@ -933,40 +933,71 @@ function DashboardPageInner() {
     }
   }
 
+  /*
+    V6R-S1-a: 補足データはカードごとに別の effect で取る。
+
+    以前は5系統を1つの effect で取っていたため、どれか1つの「要る／要らない」が
+    後から変わると全部を取り直していた。検証環境の実測では、対応マーク機能の
+    有効が表示可否の到着で判明した瞬間に、写真・予約・予約集計・健全性・職員一覧まで
+    2回目を取りに行っていた（ダッシュボードで28本中7種が2回）。
+
+    - アカウントを切り替えたら、前のアカウントの値はすべて同じタイミングで消す（DASH-03）
+    - 届いた順にカードへ反映する（PERF-01）。「最後に終えた時刻」はそれぞれの完了で刻む
+  */
+  const markSupplementLoaded = useCallback((isCancelled: () => boolean) => {
+    if (!isCancelled()) setSupplementLoadedAt(new Date())
+  }, [])
+
   useEffect(() => {
-    if (!selectedAccountId) {
-      setBookings(null)
-      setPendingPhotos(null)
-      setPendingPhotosState('loading')
-      setHealthRisk(null)
-      setHealthIssueCount(null)
-      setTwoFactorSummary(null)
-      setSupportMarkAutoOnInbound(null)
-      setTodayActiveBookings(null)
-      setBookingsFailed(false)
-      setHealthFailed(false)
-      setSupplementLoadedAt(null)
+    // アカウントが替わったら、補足データの「最後に終えた時刻」を消す。各カードの値は各 effect が消す。
+    setSupplementLoadedAt(null)
+    setSupplementLoading(Boolean(selectedAccountId))
+  }, [selectedAccountId])
+
+  useEffect(() => {
+    setPendingPhotos(null)
+    setPendingPhotosState('loading')
+    if (!selectedAccountId) return
+    if (!needsPhotos) {
+      setPendingPhotosState('ready')
+      return
+    }
+    let cancelled = false
+    const isCancelled = () => cancelled
+    void api.nenMembers.photoReviewMetrics(selectedAccountId).then(
+      (result) => {
+        if (cancelled) return
+        const photoCount = result?.success ? result.data.pendingCount : null
+        setPendingPhotos(photoCount)
+        setPendingPhotosState(photoCount !== null ? 'ready' : 'error')
+        markSupplementLoaded(isCancelled)
+      },
+      /*
+        取れなかった理由で出し分ける。403 は権限、それ以外は取得失敗。
+        どちらも「読み込み中」のままにしない（#666 差し戻し）。
+      */
+      (reason) => {
+        if (cancelled) return
+        setPendingPhotos(null)
+        setPendingPhotosState(reason instanceof ApiError && reason.status === 403 ? 'forbidden' : 'error')
+        markSupplementLoaded(isCancelled)
+      },
+    )
+    return () => { cancelled = true }
+  }, [markSupplementLoaded, needsPhotos, selectedAccountId])
+
+  useEffect(() => {
+    setBookings(null)
+    setTodayActiveBookings(null)
+    setBookingsFailed(false)
+    if (!selectedAccountId) return
+    if (!needsBookings) {
       setSupplementLoading(false)
       return
     }
     let cancelled = false
+    const isCancelled = () => cancelled
     setSupplementLoading(true)
-    /*
-     * 勘定を切り替えたら前の勘定の件数を消す。新しい件数が来るまで古い数を
-     * 出さない。写真だけでなく予約・健全性・二段階認証・対応マークの設定も
-     * すべて前のアカウントの値なので、同じタイミングで失効させる（DASH-03）。
-     */
-    setPendingPhotos(null)
-    setPendingPhotosState('loading')
-    setBookings(null)
-    setTodayActiveBookings(null)
-    setBookingsFailed(false)
-    setHealthRisk(null)
-    setHealthIssueCount(null)
-    setHealthFailed(false)
-    setTwoFactorSummary(null)
-    setSupportMarkAutoOnInbound(null)
-    setSupplementLoadedAt(null)
     /*
       予約の明細は今日以降だけ100件に区切って取る。終わった予約まで
       全部取ると、件数が増えたときに遅くなる。今日の数と直近の予定は
@@ -977,51 +1008,18 @@ function DashboardPageInner() {
     const jstMidnightUtc = Date.UTC(jstNow.getUTCFullYear(), jstNow.getUTCMonth(), jstNow.getUTCDate()) - 9 * 60 * 60 * 1000
     const todayStartIso = new Date(jstMidnightUtc).toISOString()
     const todayJst = jstDay(now)
-    /*
-      PERF-01: 補足データはカードごとに届いた順で反映する。以前は
-      Promise.allSettled が全部そろうのを待ってからまとめて書いていたため、
-      遅い予約や健全性の応答が、先に届いた写真・二段階認証・対応マークの
-      カードまで待たせていた。各取得に届いた時点の反映を付け、
-      「最後に終えた時刻」はそれぞれの完了で刻む。
-    */
-    const markLoaded = () => {
-      if (!cancelled) setSupplementLoadedAt(new Date())
-    }
-    const photoPromise = needsPhotos ? api.nenMembers.photoReviewMetrics(selectedAccountId) : Promise.resolve(null)
-    const bookingPromise = needsBookings ? bookingApi.listRequests(selectedAccountId, 'all', { from: todayStartIso, limit: 100 }) : Promise.resolve(null)
-    const healthPromise = needsHealth ? api.health.getHealth(selectedAccountId) : Promise.resolve(null)
-    const staffPromise = needsTwoFactor ? api.staff.list() : Promise.resolve(null)
-    const supportMarkPromise = needsSupportMarks ? api.supportMarks.list(selectedAccountId, { suppressFeatureDisabledEvent: true }) : Promise.resolve(null)
+    const bookingPromise = bookingApi.listRequests(selectedAccountId, 'all', { from: todayStartIso, limit: 100 })
     /*
       「今日の予約」の件数は明細とは別に集計APIから取る（A01-04）。
       明細は100件までしか来ないため、件数だけは上限に引っ張られない
       口を使う。
     */
-    const bookingSummaryPromise = needsBookings ? bookingApi.requestsSummary(selectedAccountId, {
+    const bookingSummaryPromise = bookingApi.requestsSummary(selectedAccountId, {
       month: monthKey(0),
       lastMonth: monthKey(-1),
       today: todayJst,
       weekTo: jstDay(Date.now() + 6 * 86_400_000),
-    }) : Promise.resolve(null)
-    void photoPromise.then(
-      (result) => {
-        if (cancelled) return
-        const photoCount = result?.success ? result.data.pendingCount : null
-        setPendingPhotos(photoCount)
-        setPendingPhotosState(!needsPhotos || photoCount !== null ? 'ready' : 'error')
-        markLoaded()
-      },
-      /*
-        取れなかった理由で出し分ける。403 は権限、それ以外は取得失敗。
-        どちらも「読み込み中」のままにしない（#666 差し戻し）。
-      */
-      (reason) => {
-        if (cancelled) return
-        setPendingPhotos(null)
-        setPendingPhotosState(reason instanceof ApiError && reason.status === 403 ? 'forbidden' : 'error')
-        markLoaded()
-      },
-    )
+    })
     void bookingPromise.then(
       (result) => {
         if (cancelled) return
@@ -1031,14 +1029,14 @@ function DashboardPageInner() {
         */
         const bookingList = result && Array.isArray(result.requests) ? result.requests : null
         setBookings(bookingList)
-        setBookingsFailed(needsBookings && bookingList === null)
-        markLoaded()
+        setBookingsFailed(bookingList === null)
+        markSupplementLoaded(isCancelled)
       },
       () => {
         if (cancelled) return
         setBookings(null)
-        setBookingsFailed(needsBookings)
-        markLoaded()
+        setBookingsFailed(true)
+        markSupplementLoaded(isCancelled)
       },
     )
     void bookingSummaryPromise.then(
@@ -1049,57 +1047,12 @@ function DashboardPageInner() {
           表示側で明細からの件数へ戻す。取りこぼした数字を本物に見せない。
         */
         setTodayActiveBookings(result && typeof result.todayActiveTotal === 'number' ? result.todayActiveTotal : null)
-        markLoaded()
+        markSupplementLoaded(isCancelled)
       },
       () => {
         if (cancelled) return
         setTodayActiveBookings(null)
-        markLoaded()
-      },
-    )
-    void healthPromise.then(
-      (result) => {
-        if (cancelled) return
-        const healthData = result?.success === true ? result.data : null
-        setHealthRisk(healthData ? (healthData.riskLevel as HealthRisk) : null)
-        setHealthIssueCount(
-          healthData
-            ? healthData.logs.filter((log) => log.riskLevel === 'warning' || log.riskLevel === 'danger').length
-            : null,
-        )
-        setHealthFailed(needsHealth && healthData === null)
-        markLoaded()
-      },
-      () => {
-        if (cancelled) return
-        setHealthRisk(null)
-        setHealthIssueCount(null)
-        setHealthFailed(needsHealth)
-        markLoaded()
-      },
-    )
-    void staffPromise.then(
-      (result) => {
-        if (cancelled) return
-        setTwoFactorSummary(result?.success ? summarizeTwoFactor(result.data) : null)
-        markLoaded()
-      },
-      () => {
-        if (cancelled) return
-        setTwoFactorSummary(null)
-        markLoaded()
-      },
-    )
-    void supportMarkPromise.then(
-      (result) => {
-        if (cancelled) return
-        setSupportMarkAutoOnInbound(result?.success ? hasInboundSupportMark(result.data) : null)
-        markLoaded()
-      },
-      () => {
-        if (cancelled) return
-        setSupportMarkAutoOnInbound(null)
-        markLoaded()
+        markSupplementLoaded(isCancelled)
       },
     )
     /*
@@ -1111,7 +1064,78 @@ function DashboardPageInner() {
       if (!cancelled) setSupplementLoading(false)
     })
     return () => { cancelled = true }
-  }, [needsBookings, needsHealth, needsPhotos, needsSupportMarks, needsTwoFactor, selectedAccountId])
+  }, [markSupplementLoaded, needsBookings, selectedAccountId])
+
+  useEffect(() => {
+    setHealthRisk(null)
+    setHealthIssueCount(null)
+    setHealthFailed(false)
+    if (!selectedAccountId || !needsHealth) return
+    let cancelled = false
+    const isCancelled = () => cancelled
+    void api.health.getHealth(selectedAccountId).then(
+      (result) => {
+        if (cancelled) return
+        const healthData = result?.success === true ? result.data : null
+        setHealthRisk(healthData ? (healthData.riskLevel as HealthRisk) : null)
+        setHealthIssueCount(
+          healthData
+            ? healthData.logs.filter((log) => log.riskLevel === 'warning' || log.riskLevel === 'danger').length
+            : null,
+        )
+        setHealthFailed(healthData === null)
+        markSupplementLoaded(isCancelled)
+      },
+      () => {
+        if (cancelled) return
+        setHealthRisk(null)
+        setHealthIssueCount(null)
+        setHealthFailed(true)
+        markSupplementLoaded(isCancelled)
+      },
+    )
+    return () => { cancelled = true }
+  }, [markSupplementLoaded, needsHealth, selectedAccountId])
+
+  useEffect(() => {
+    setTwoFactorSummary(null)
+    if (!selectedAccountId || !needsTwoFactor) return
+    let cancelled = false
+    const isCancelled = () => cancelled
+    void api.staff.list().then(
+      (result) => {
+        if (cancelled) return
+        setTwoFactorSummary(result?.success ? summarizeTwoFactor(result.data) : null)
+        markSupplementLoaded(isCancelled)
+      },
+      () => {
+        if (cancelled) return
+        setTwoFactorSummary(null)
+        markSupplementLoaded(isCancelled)
+      },
+    )
+    return () => { cancelled = true }
+  }, [markSupplementLoaded, needsTwoFactor, selectedAccountId])
+
+  useEffect(() => {
+    setSupportMarkAutoOnInbound(null)
+    if (!selectedAccountId || !needsSupportMarks) return
+    let cancelled = false
+    const isCancelled = () => cancelled
+    void api.supportMarks.list(selectedAccountId, { suppressFeatureDisabledEvent: true }).then(
+      (result) => {
+        if (cancelled) return
+        setSupportMarkAutoOnInbound(result?.success ? hasInboundSupportMark(result.data) : null)
+        markSupplementLoaded(isCancelled)
+      },
+      () => {
+        if (cancelled) return
+        setSupportMarkAutoOnInbound(null)
+        markSupplementLoaded(isCancelled)
+      },
+    )
+    return () => { cancelled = true }
+  }, [markSupplementLoaded, needsSupportMarks, selectedAccountId])
 
   const activeBookings = useMemo(
     () => bookings?.filter((booking) => !inactiveBookingStatuses.has(booking.status)) ?? [],

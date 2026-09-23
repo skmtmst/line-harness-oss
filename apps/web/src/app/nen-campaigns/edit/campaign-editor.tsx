@@ -146,7 +146,9 @@ export default function CampaignEditor({ campaignKey }: { campaignKey: string })
           : null)
     : null
   const formIssueBanner = setting?.formIssue
-    ? '設定不足：つなぐ回答フォームが使えなくなっています。この間、新しい配信は予約されません。フォームを選び直して保存してください。'
+    ? setting.formIssue === 'form_unselected'
+      ? '設定不足：つなぐ回答フォームが選ばれていません。この間、新しい配信は予約されません。フォームを選んで保存してください。'
+      : '設定不足：つなぐ回答フォームが使えなくなっています。この間、新しい配信は予約されません。フォームを選び直して保存してください。'
     : null
 
   const setActions = (afterActions: NenCampaignAfterAction[]) => {
@@ -236,7 +238,10 @@ export default function CampaignEditor({ campaignKey }: { campaignKey: string })
         buttonUrl: formAction ? openFormUrl(selectedAccount?.liffId, formAction.formId) ?? merged.buttonUrl : merged.buttonUrl,
         imageUrl: merged.imageUrl,
         dedupWindowDays: merged.dedupWindowDays,
-        excludeFormRespondents: merged.excludeFormRespondents,
+        // チェックはフォーム未選択だとOFF表示・無効になる。見た目どおりに
+        // 送らないと、表示はOFFなのにDBのONが残り続け、設定不足の解除を
+        // 阻む保存拒否(除外にはフォーム必須)に当たってしまう。
+        excludeFormRespondents: Boolean(formAction) && merged.excludeFormRespondents,
         afterActions: actions,
       })
       if (!response.success) {
@@ -329,7 +334,7 @@ export default function CampaignEditor({ campaignKey }: { campaignKey: string })
               {formAction?.kind === 'open_form' && <div className="border-hairline rounded-control flex items-center gap-3 border px-4 py-3"><span className="text-accent text-lg">▣</span><div className="min-w-0 flex-1"><p className="text-sm font-bold">回答フォーム「{formAction.formName}」を開く</p><p className="text-ink-faint text-xs">星の評価と、ひとことだけの短いフォームです</p></div><Button aria-label="回答フォームを外す" onClick={() => setActions(actions.filter((action) => action !== formAction))}><X aria-hidden size={16} /></Button></div>}
               {mileageAction?.kind === 'award_mileage' && <div className="border-hairline rounded-control flex items-center gap-3 border px-4 py-3"><Gift aria-hidden className="text-accent" size={18} /><div className="min-w-0 flex-1"><p className="text-sm font-bold">書いてくれたらマイルを {mileageAction.amount.toLocaleString('ja-JP')} 付ける</p><p className="text-ink-faint text-xs">回答フォームへの送信をきっかけにしています</p></div><Button aria-label="マイル付与を外す" onClick={() => setActions(actions.filter((action) => action !== mileageAction))}><X aria-hidden size={16} /></Button></div>}
               {formIssueMessage && <p role="alert" className="text-danger text-xs font-bold">{formIssueMessage}。フォームを外して選び直してください。</p>}
-              {!formAction && <label className="block text-xs font-bold">回答フォームを開く<select defaultValue="" onChange={(event) => addFormAction(event.target.value)} className={`${inputClass} mt-1`}><option value="" disabled>回答フォームを選ぶ</option>{forms.map((form) => <option key={form.id} value={form.id} disabled={!form.isActive}>{form.name}{form.isActive ? '' : '（公開されていないため選べません）'}</option>)}</select></label>}
+              {!formAction && <label className="block text-xs font-bold">回答フォームを開かせる（任意）<select defaultValue="" onChange={(event) => addFormAction(event.target.value)} className={`${inputClass} mt-1`}><option value="" disabled>回答フォームを選ぶ</option>{forms.map((form) => <option key={form.id} value={form.id} disabled={!form.isActive}>{form.name}{form.isActive ? '' : '（公開されていないため選べません）'}</option>)}</select></label>}
               {!mileageAction && <Button onClick={addMileageAction} className="w-full"><Gift aria-hidden size={16} />回答後に200マイル付ける</Button>}
             </div>
           </section>

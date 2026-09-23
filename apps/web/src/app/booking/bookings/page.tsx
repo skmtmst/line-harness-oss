@@ -12,6 +12,7 @@ import Select from '@/components/shared/select'
 import FolderPanel, { FOLDER_RAIL_WIDTH } from '@/components/shared/folder-panel'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { canOperateBookings } from '../lib/booking-permissions'
+import { fetchAllPages } from './fetch-all-pages'
 import BookingCalendar, {
   moveDay,
   startOfWeek,
@@ -242,18 +243,22 @@ export default function BookingsPage() {
       ? `${workerBase}/o?liffId=${encodeURIComponent(liffId)}&page=salon-book&view=history`
       : null
   const isCopied = (url: string | null) => url !== null && copiedUrl === url
+  /** コピーできなかったURL。隣の欄を選んでもらう一言を出す（ブラウザの入力窓は使わない。V6R-S3-f）。 */
+  const [copyFailedUrl, setCopyFailedUrl] = useState<string | null>(null)
 
   async function copyUrl(url: string | null) {
     if (!url) return
     try {
       await navigator.clipboard.writeText(url)
       setCopiedUrl(url)
+      setCopyFailedUrl(null)
       if (copyTimer.current !== null) window.clearTimeout(copyTimer.current)
       copyTimer.current = window.setTimeout(() => {
         setCopiedUrl((cur) => (cur === url ? null : cur))
       }, 2000)
     } catch {
-      window.prompt('コピーしてください:', url)
+      // URL は押したボタンの隣の読取専用欄に出ている。窓は出さず、選んでコピーしてもらう。
+      setCopyFailedUrl(url)
     }
   }
 
@@ -414,18 +419,17 @@ export default function BookingsPage() {
     const requestedAccountId = selectedAccountId
     let alive = true
     void (async () => {
-      const collected: BookingRequest[] = []
-      let offset = 0
-      while (alive && listAccountRef.current === requestedAccountId) {
-        const response = await bookingApi.listRequests(requestedAccountId, 'all', {
-          limit: 100, offset,
-          from: new Date(`${calendarFrom}T00:00:00+09:00`).toISOString(),
-          to: new Date(`${moveDay(calendarTo, 1)}T00:00:00+09:00`).toISOString(),
-        })
-        collected.push(...response.requests)
-        offset += response.requests.length
-        if (offset >= response.total || response.requests.length === 0) break
+      const range = {
+        from: new Date(`${calendarFrom}T00:00:00+09:00`).toISOString(),
+        to: new Date(`${moveDay(calendarTo, 1)}T00:00:00+09:00`).toISOString(),
       }
+      // 2ページ目以降は同時に取る（V6R-S3-c）。途中でアカウントが替わったら集めない（#963）。
+      const collected = await fetchAllPages(
+        (offset) => bookingApi.listRequests(requestedAccountId, 'all', { limit: 100, offset, ...range }),
+        100,
+        () => alive && listAccountRef.current === requestedAccountId,
+      )
+      if (collected === null) return
       if (alive && listAccountRef.current === requestedAccountId) setCalendarItems(collected)
     })().catch(() => {
       if (alive && listAccountRef.current === requestedAccountId) setError('カレンダーの読み込みに失敗しました')
@@ -957,6 +961,11 @@ export default function BookingsPage() {
                     </button>
                     <span className="text-ink-faint text-xs">お客さまが自分の予約履歴を見るURL</span>
                   </div>
+                ) : null}
+                {copyFailedUrl && (copyFailedUrl === shareUrl || copyFailedUrl === historyUrl) ? (
+                  <p role="alert" className="text-warning text-xs">
+                    コピーできませんでした。左の欄を選んでコピーしてください。
+                  </p>
                 ) : null}
               </div>
             ) : !workerBase ? (
