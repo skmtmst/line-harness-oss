@@ -174,7 +174,7 @@
   "app/friends/page.tsx": {
     "unresolved-classname": 2,
     "direct-primary-button": 1,
-    "direct-secondary-button": 2
+    "direct-secondary-button": 1
   },
   "app/getting-started/page.tsx": {
     "unresolved-classname": 20
@@ -433,7 +433,7 @@
     "direct-primary-button": 1
   },
   "components/broadcasts/broadcast-form.tsx": {
-    "arbitrary-value": 25,
+    "arbitrary-value": 26,
     "direct-primary-button": 2,
     "direct-secondary-button": 7,
     "unresolved-classname": 3
@@ -460,7 +460,7 @@
   },
   "components/chats/inbox-filter-panel.tsx": {
     "arbitrary-value": 2,
-    "unresolved-classname": 9,
+    "unresolved-classname": 8,
     "direct-secondary-button": 1,
     "direct-primary-button": 1
   },
