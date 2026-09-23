@@ -42,7 +42,10 @@ describe('V6 マイルの正本URLと概念分離', () => {
     expect(FRIEND_DETAIL).toContain('api.friends.mileage')
     expect(FRIEND_DETAIL).toContain('api.mileage.friendsV6')
     expect(FRIEND_DETAIL).toContain('api.mileage.history')
-    expect(FRIEND_DETAIL).toContain('item.primaryFriendId === friendId')
+    // V6R-CX-e: 名前で探して100件から拾うと同名が多いとこぼれる。友だちIDで取り、絞り込みはサーバに任せる。
+    expect(FRIEND_DETAIL).toMatch(/api\.mileage\.friendsV6\(\{[\s\S]{0,80}friendId,/)
+    expect(FRIEND_DETAIL).toMatch(/api\.mileage\.history\(\{[\s\S]{0,80}friendId,/)
+    expect(FRIEND_DETAIL).not.toContain('search: friendResponse.data.displayName')
     expect(FRIEND_DETAIL).toContain('displayedHistory')
     expect(FRIEND_DETAIL).toContain('v6Friend?.expiringMiles30d')
     expect(FRIEND_DETAIL).toContain('usePageTitle')
