@@ -175,7 +175,10 @@ describe('AUDIT automation draft identity and data', () => {
     await chooseOption(tag, 'tag-1')
     await clickButton(el, '下書きに保存')
     // 前の下書きを上書きせず、新しい下書きを作ってそこへ保存する。
-    expect(mockCreate).toHaveBeenCalledWith('received-message-tag', 'account-1')
+    // DETAIL-13: 作成操作ごとの冪等鍵を渡す（この操作専用の鍵）。
+    expect(mockCreate).toHaveBeenCalledWith(
+      'received-message-tag', 'account-1', expect.stringMatching(/^[A-Za-z0-9._-]{8,128}$/),
+    )
     expect(mockUpdate).not.toHaveBeenCalledWith('previous-draft', expect.anything(), expect.anything())
     expect(mockUpdate).toHaveBeenCalledWith('draft-9', 'account-1', expect.objectContaining({ name: '別の新しいルール' }))
   })
@@ -210,6 +213,53 @@ describe('AUDIT automation draft identity and data', () => {
     expect(mockUpdate).not.toHaveBeenCalled()
   })
 
+  it('D13d: 作成応答が届かなかった保存のやり直しは、同じ操作鍵で呼ぶ', async () => {
+    /*
+     * 作成がサーバーへ届いたか分からない失敗（通信切れ・応答喪失）の
+     * やり直しは「同じ操作」。ここで別の鍵を振ると下書きが2件できるので、
+     * 同じ冪等鍵を使い回す（サーバーは同じ下書きを返し1件に収める）。
+     */
+    mockCreate
+      .mockRejectedValueOnce(new Error('network down'))
+      .mockResolvedValue(ok({ id: 'draft-9', draftVersionId: 'v1' }))
+    const el = await mountPage()
+    await typeText(el.querySelector('input[id="au-name"]') as HTMLInputElement, 'やり直すルール')
+    await chooseOption(el.querySelector('select[aria-label="自動化で付けるタグ"]') as HTMLSelectElement, 'tag-1')
+    await clickButton(el, '下書きに保存')
+    await act(async () => { await drainMicrotasks() })
+    expect(mockCreate).toHaveBeenCalledTimes(1)
+    await clickButton(el, '下書きに保存')
+    await act(async () => { await drainMicrotasks() })
+    expect(mockCreate).toHaveBeenCalledTimes(2)
+    const firstKey = mockCreate.mock.calls[0]?.[2]
+    expect(firstKey).toEqual(expect.stringMatching(/^[A-Za-z0-9._-]{8,128}$/))
+    expect(mockCreate.mock.calls[1]?.[2]).toBe(firstKey)
+  })
+
+  it('D13e: 作成できたあと更新で失敗したやり直しも、同じ鍵で同じ下書きへ戻る', async () => {
+    /*
+     * 作成は済んでいるので、やり直しで新しい鍵を振ると下書きが増える。
+     * 同じ鍵で呼ぶとサーバーは作ってある下書きを返し、そこへ更新できる。
+     */
+    mockUpdate
+      .mockRejectedValueOnce(new Error('update failed'))
+      .mockResolvedValue(ok({ draftVersionId: 'v2' }))
+    const el = await mountPage()
+    await typeText(el.querySelector('input[id="au-name"]') as HTMLInputElement, 'やり直すルール')
+    await chooseOption(el.querySelector('select[aria-label="自動化で付けるタグ"]') as HTMLSelectElement, 'tag-1')
+    await clickButton(el, '下書きに保存')
+    await act(async () => { await drainMicrotasks() })
+    expect(mockCreate).toHaveBeenCalledTimes(1)
+    await clickButton(el, '下書きに保存')
+    await act(async () => { await drainMicrotasks() })
+    expect(mockCreate).toHaveBeenCalledTimes(2)
+    expect(mockCreate.mock.calls[1]?.[2]).toBe(mockCreate.mock.calls[0]?.[2])
+    // 戻った同じ下書きへ更新できている。
+    expect(mockUpdate).toHaveBeenLastCalledWith(
+      'draft-9', 'account-1', expect.objectContaining({ name: 'やり直すルール' }),
+    )
+  })
+
   it('D14: 店を切り替えると入力はその店の控えへ。別店の文面は残らず、戻れば復元する', async () => {
     const el = await mountPage()
     await typeText(el.querySelector('#au-name') as HTMLInputElement, 'A店専用ルール')
@@ -230,7 +280,9 @@ describe('AUDIT automation draft identity and data', () => {
     await typeText(el.querySelector('#au-name') as HTMLInputElement, 'B店のルール')
     await chooseOption(el.querySelector('select[aria-label="自動化で付けるタグ"]') as HTMLSelectElement, 'tag-1')
     await clickButton(el, '下書きに保存')
-    expect(mockCreate).toHaveBeenCalledWith('received-message-tag', 'account-2')
+    expect(mockCreate).toHaveBeenCalledWith(
+      'received-message-tag', 'account-2', expect.stringMatching(/^[A-Za-z0-9._-]{8,128}$/),
+    )
     expect(mockUpdate).toHaveBeenCalledWith('draft-9', 'account-2', expect.objectContaining({ name: 'B店のルール' }))
     // B店 → A店。A店の入力がそのまま戻る。
     account.id = 'account-1'
