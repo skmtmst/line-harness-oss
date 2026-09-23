@@ -283,6 +283,21 @@
 }
 
 /*
+ * タッチ端末の入力欄は 16px 以上（★V7 修正方針 §3）。
+ * 共通部品（TextField・Select ほか）は各自で 16px にしているが、画面に直接書いた
+ * 入力欄は 12〜14px のままで、iPhone で押すと画面が拡大されていた（2026-09-24 の点検で
+ * /broadcasts 3・/tags 5 など）。層の外に置くのは、Tailwind の text-sm などより強くするため。
+ * 大きい字の欄は `max()` でそのまま残す。
+ */
+@media (pointer: coarse) {
+  input:not([type='checkbox'], [type='radio'], [type='range'], [type='color'], [type='file']),
+  select,
+  textarea {
+    font-size: max(16px, 1em);
+  }
+}
+
+/*
  * 動きを減らす設定（OS の「視差効果を減らす」など）では、すべての動きを
  * 一瞬で最後の状態にする。部品ごとに書き忘れても、ここで止まる。
  * `0.01ms` にするのは、`transitionend` を待つ処理が止まらないようにするため。

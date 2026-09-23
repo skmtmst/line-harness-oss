@@ -26,7 +26,7 @@ function statusView(status: FriendListItem['chatStatus']) {
   if (status === 'unread') return { label: '未対応', className: 'bg-status-danger-soft text-danger' }
   if (status === 'in_progress') return { label: '対応中', className: 'bg-status-warn-soft text-status-warn-deep' }
   if (status === 'on_hold') return { label: '保留', className: 'bg-action-soft text-action' }
-  return { label: '対応済み', className: 'bg-accent-soft text-accent-hover' }
+  return { label: '対応済み', className: 'bg-accent-soft text-accent-deep' }
 }
 
 export default function FriendListRow({
@@ -159,7 +159,7 @@ export default function FriendListRow({
       {visibleColumns.has('tags') ? (
         <div className="flex min-w-0 flex-wrap content-center gap-1">
           {friend.tags.slice(0, 2).map((tag, index) => (
-            <span key={tag.id} title={tag.name} className={`max-w-full truncate rounded-mini px-2 py-1 text-nano font-semibold ${index === 0 ? 'bg-accent-soft text-accent-hover' : 'bg-chip-alt-soft text-chip-alt'}`}>{tag.name}</span>
+            <span key={tag.id} title={tag.name} className={`max-w-full truncate rounded-mini px-2 py-1 text-nano font-semibold ${index === 0 ? 'bg-accent-soft text-accent-deep' : 'bg-chip-alt-soft text-chip-alt'}`}>{tag.name}</span>
           ))}
           {friend.tags.length > 2 ? <span className="rounded-mini bg-avatar-bg px-2 py-1 text-nano text-ink-secondary">+{friend.tags.length - 2}</span> : null}
           {!friend.tags.length ? <span className="text-nano text-ink-disabled">—</span> : null}
@@ -234,7 +234,7 @@ export function FriendListCard({
       node: friend.tags.length ? (
         <span className="flex flex-wrap gap-1">
           {friend.tags.map((tag, index) => (
-            <span key={tag.id} title={tag.name} className={`max-w-full truncate rounded-mini px-2 py-1 text-nano font-semibold ${index === 0 ? 'bg-accent-soft text-accent-hover' : 'bg-chip-alt-soft text-chip-alt'}`}>{tag.name}</span>
+            <span key={tag.id} title={tag.name} className={`max-w-full truncate rounded-mini px-2 py-1 text-nano font-semibold ${index === 0 ? 'bg-accent-soft text-accent-deep' : 'bg-chip-alt-soft text-chip-alt'}`}>{tag.name}</span>
           ))}
         </span>
       ) : <span className="text-ink-disabled">—</span>,
@@ -297,7 +297,7 @@ export function FriendListCard({
                 ? 'bg-status-danger-soft text-danger'
                 : friend.chatStatus === 'in_progress' || friend.chatStatus === 'on_hold'
                   ? 'bg-status-warn-soft text-status-warn-deep'
-                  : 'bg-accent-soft text-accent-hover'
+                  : 'bg-accent-soft text-accent-deep'
             }`}
           >
             {status.label}

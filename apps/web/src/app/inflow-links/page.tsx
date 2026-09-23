@@ -1054,7 +1054,7 @@ function InflowLinksPageInner({
                         <span className="flex min-w-0 items-center gap-1 text-ink-secondary" title={r.name}>
                           <span className="truncate whitespace-nowrap">{r.name}</span>
                           <span
-                            className="shrink-0 rounded border border-accent-border bg-accent-soft px-1 py-0.5 text-[9px] text-accent-hover"
+                            className="shrink-0 rounded border border-accent-border bg-accent-soft px-1 py-0.5 text-[9px] text-accent-deep"
                             title="クリック計測とシナリオ起動が設定されています。追加先の振り分けは全体設定に従います。"
                           >
                             計測済
@@ -1145,7 +1145,7 @@ function InflowLinksPageInner({
                         </button>
                         <button
                           onClick={() => setQrRoute({ refCode: r.refCode, name: r.name, genre: r.genre })}
-                          className="text-[11px] font-medium text-accent-hover hover:underline"
+                          className="text-[11px] font-medium text-accent-deep hover:underline"
                           aria-label={`${r.name}のQRコードを表示`}
                         >
                           QR
@@ -1370,7 +1370,7 @@ function ReferralQrModal({
       <div className="w-full max-w-md rounded-2xl bg-canvas p-6 shadow-2xl">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <p className="text-xs font-medium text-accent-hover">リファラルリンク・QRコード</p>
+            <p className="text-xs font-medium text-accent-deep">リファラルリンク・QRコード</p>
             <h2 className="mt-1 text-lg font-bold text-ink">{route.name}</h2>
             <p className="mt-1 text-sm text-ink-faint">{route.genre ?? '未分類'}</p>
           </div>

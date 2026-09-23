@@ -1642,7 +1642,7 @@ export default function ScenarioDetailClient({
 
         <div className="bg-canvas rounded-card border border-hairline p-8 text-center">
           <p className="text-ink-faint">{error || 'シナリオが見つかりません'}</p>
-          <Link href="/scenarios" className="text-accent-deep hover:text-accent-hover mt-4 inline-block text-sm">
+          <Link href="/scenarios" className="text-accent-deep mt-4 inline-block text-sm hover:underline">
             ← シナリオ一覧に戻る
           </Link>
         </div>

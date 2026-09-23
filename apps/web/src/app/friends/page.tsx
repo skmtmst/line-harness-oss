@@ -426,10 +426,14 @@ function FriendsPageInner({
             event.preventDefault()
             resetPageWith(() => setSearchSubmitted(searchInput.trim()))
           }}
-          className="flex min-w-0 items-center gap-2.5"
+          className="flex min-w-0 flex-wrap items-center gap-2.5"
         >
-          {/* 検索欄は共通 SearchField（設計 h42 / r8 / アイコン17 / 文字12）。 */}
-          <div className="min-w-60 flex-1">
+          {/*
+            検索欄は共通 SearchField（設計 h42 / r8 / アイコン17 / 文字12）。
+            幅が足りないときは折り返す（★V7 修正方針 §3）。以前は幅320で
+            「詳細条件」と並び順が右で切れ、押せなかった。
+          */}
+          <div className="min-w-60 flex-1 max-sm:basis-full">
             <SearchField
               className="w-full"
               aria-label="友だち名で検索"
@@ -449,7 +453,7 @@ function FriendsPageInner({
             type="button"
             aria-pressed={advanced !== null}
             onClick={() => setAdvancedOpen(true)}
-            className={`${SEARCH_ROW_SECONDARY} w-27.5 ${advanced ? 'border-accent text-accent-hover' : ''}`}
+            className={`${SEARCH_ROW_SECONDARY} w-27.5 ${advanced ? 'border-accent text-accent-deep' : ''}`}
           >
             <SlidersHorizontal aria-hidden="true" className="h-4 w-4" />
             詳細条件
@@ -482,7 +486,7 @@ function FriendsPageInner({
 
         {advanced?.summary.length ? (
           <div className="mt-3 flex flex-wrap items-center gap-2 rounded-control bg-accent-soft px-3 py-2">
-            <span className="text-xs font-bold text-accent-hover">絞り込み中</span>
+            <span className="text-xs font-bold text-accent-deep">絞り込み中</span>
             {/* 保存条件の札は共通 Chip（設計の印：高さ17 / 文字10・700 / 丸）。 */}
             {advanced.summary.map((summary) => <Chip key={summary} tone="neutral">{summary}</Chip>)}
             <button type="button" onClick={() => resetPageWith(() => setAdvanced(null))} className="ml-auto text-xs font-medium text-action hover:underline">条件を外す</button>
@@ -556,7 +560,7 @@ function FriendsPageInner({
             <Link
               href={broadcastHandoffHref}
               data-broadcast-handoff
-              className="ml-auto inline-flex h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-control border border-accent-border bg-accent-soft px-3 text-xs font-bold text-accent-hover hover:brightness-95"
+              className="ml-auto inline-flex h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-control border border-accent-border bg-accent-soft px-3 text-xs font-bold text-accent-deep hover:brightness-95"
               title="今の絞り込み条件を対象に一斉配信を作ります。人数は送信時に最新の友だちへ計算し直します。"
             >
               <Megaphone aria-hidden="true" className="h-3.5 w-3.5" />
