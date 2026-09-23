@@ -11,8 +11,9 @@ import { useAccount } from '@/contexts/account-context'
 import { BULK_SLOT_LIMIT, generateBulkSlots, type BulkSlotInput } from './bulk-slot-generator'
 import { jstHHMMToUtcIso, utcIsoToJstDate, utcIsoToJstHHMM } from './jst'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import Button from '@/components/shared/button'
 import Select from '@/components/shared/select'
-import { Field, inputClass } from '@/components/shared/form-controls'
+import { Field, TextInput } from '@/components/shared/form-controls'
 // #740: 下書きの初期値と字数上限は作成画面と共有する。片方だけ変えないこと。
 import {
   EVENT_CANCEL_DEADLINE_OPTIONS,
@@ -1146,55 +1147,51 @@ function EditSlotDialog({
         <div className="space-y-3">
           <label className="block">
             <span className="text-ink-secondary text-sm font-medium">日付（JST）</span>
-            <input
+            <TextInput
               type="date"
               value={date}
               onChange={(e) => setDate(e.target.value)}
-              className={`mt-1 ${inputClass}`}
+              className="mt-1"
             />
           </label>
           <div className="grid grid-cols-2 gap-3">
             <label>
               <span className="text-ink-secondary text-sm font-medium">開始</span>
-              <input
+              <TextInput
                 type="time"
                 value={startTime}
                 onChange={(e) => setStartTime(e.target.value)}
-                className={`mt-1 ${inputClass}`}
+                className="mt-1"
               />
             </label>
             <label>
               <span className="text-ink-secondary text-sm font-medium">終了</span>
-              <input
+              <TextInput
                 type="time"
                 value={endTime}
                 onChange={(e) => setEndTime(e.target.value)}
-                className={`mt-1 ${inputClass}`}
+                className="mt-1"
               />
             </label>
           </div>
           <label className="block">
             <span className="text-ink-secondary text-sm font-medium">定員（空欄=無制限）</span>
-            <input
+            <TextInput
               type="number"
               min={1}
               value={capacity}
               onChange={(e) => setCapacity(e.target.value)}
-              className={`mt-1 ${inputClass}`}
+              className="mt-1"
             />
           </label>
         </div>
         <div className="mt-5 flex justify-end gap-2">
-          <button onClick={onClose} className="border-hairline text-ink hover:bg-canvas-sunken rounded-control border px-4 py-2 text-sm">
+          <Button variant="secondary" onClick={onClose}>
             キャンセル
-          </button>
-          <button
-            onClick={submit}
-            disabled={busy}
-            className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control px-4 py-2 text-sm disabled:opacity-40"
-          >
-            保存
-          </button>
+          </Button>
+          <Button variant="primary" onClick={submit} disabled={busy}>
+            {busy ? '保存中...' : '保存'}
+          </Button>
         </div>
       </div>
     </div>

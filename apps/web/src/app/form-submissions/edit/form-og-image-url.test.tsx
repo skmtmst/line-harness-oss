@@ -88,8 +88,10 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
 })
 
 // api.ts は読み込み時に NEXT_PUBLIC_API_URL を要求する。ページの
-// import より先に立てておく（Vite はファイル順に評価する）。
-process.env.NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://worker.test'
+// import より先に立てておく（vi.hoisted は import より先に評価される）。
+vi.hoisted(() => {
+  process.env.NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://worker.test'
+})
 
 import { emptyLayout } from '@line-crm/shared'
 import EditFormPage from './page'
