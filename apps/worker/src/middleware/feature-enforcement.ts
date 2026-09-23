@@ -387,6 +387,9 @@ const RESOURCE_ACCOUNT_LOOKUPS: ReadonlyArray<{
   { pattern: /^\/api\/conversions\/(?:definitions|points)\/([^/]+)/, sql: 'SELECT line_account_id AS account_id FROM conversion_points WHERE id = ?' },
   { pattern: /^\/api\/conversions\/events\/([^/]+)/, sql: 'SELECT line_account_id AS account_id FROM conversion_events WHERE id = ?' },
   { pattern: /^\/api\/events\/admin\/events\/([^/]+)/, sql: 'SELECT line_account_id AS account_id FROM events WHERE id = ?' },
+  // #1075: たまる決めごとの停止・再開・削除は payload に account を載せない。
+  // 照合が無いと PUT/DELETE /api/mileage/rules/:id が全部 LINE_ACCOUNT_REQUIRED で止まる。
+  { pattern: /^\/api\/mileage\/rules\/([^/]+)/, sql: 'SELECT line_account_id AS account_id FROM mileage_rules WHERE id = ?' },
 ];
 
 /**
