@@ -121,7 +121,7 @@ export default function UserRow({ row, accountColorMap, onOpenMergedPerson }: Pr
               row.identityKeyKind === 'url_token'
                 ? 'bg-status-warn-soft text-status-warn-deep'
                 : row.identityKeyKind === 'uid'
-                  ? 'bg-accent-soft text-accent-hover'
+                  ? 'bg-accent-soft text-accent-deep'
                   : 'bg-canvas-sunken text-ink-secondary'
             }`}
             title={uidStatus.description}

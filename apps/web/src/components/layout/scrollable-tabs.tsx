@@ -79,7 +79,7 @@ export default function ScrollableTabs({
    * className」を増やさない）。外の余白は使う側の枠が持つ。
    */
   return (
-    <div className="flex min-w-0 items-stretch" data-scrollable-tabs>
+    <div className="flex min-w-0 flex-wrap items-stretch" data-scrollable-tabs>
       {canLeft ? (
         <span className="flex shrink-0 items-center border-b border-hairline px-1">
           <Button
@@ -111,7 +111,7 @@ export default function ScrollableTabs({
         見た目は shared/tabs の `.actions` と同じ帯に揃える。
       */}
       {actions ? (
-        <span className="flex shrink-0 items-center gap-2 border-b border-hairline pb-1 pl-3">{actions}</span>
+        <span className="flex shrink-0 items-center gap-2 border-b border-hairline pb-1 pl-3 max-sm:order-last max-sm:basis-full max-sm:justify-end max-sm:border-b-0 max-sm:pl-0 max-sm:pt-2">{actions}</span>
       ) : null}
       {canRight ? (
         <span className="flex shrink-0 items-center border-b border-hairline px-1">

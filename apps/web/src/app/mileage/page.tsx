@@ -576,7 +576,7 @@ function MileagePageInner() {
         <Button onClick={exportBalancesCsv} disabled={members.length === 0} className="ml-auto">この頁の残高をCSVで書き出す</Button>
       </div>
       <div className="mb-4 flex flex-wrap items-center gap-2" aria-label="残高の絞り込み状況">
-        <span className="rounded-full border border-accent bg-accent-soft px-3 py-2 text-xs font-semibold text-accent-hover">
+        <span className="rounded-full border border-accent bg-accent-soft px-3 py-2 text-xs font-semibold text-accent-deep">
           すべて {overviewTotal === null ? '—' : formatMileageNumber(overviewTotal)}
         </span>
         {(summary?.rankCounts ?? []).map((rank) => (
@@ -855,13 +855,13 @@ function MileagePageInner() {
                         <p className="mt-0.5 truncate text-xs text-ink-faint" title={member.lineAccount.name}>{member.lineAccount.name}</p>
                       </div>
                       <p className="shrink-0 text-right">
-                        <span className="block font-bold tabular-nums text-accent-hover">{formatMileageNumber(member.available)}<span className="text-xs font-normal text-ink-faint"> マイル</span></span>
+                        <span className="block font-bold tabular-nums text-accent-deep">{formatMileageNumber(member.available)}<span className="text-xs font-normal text-ink-faint"> マイル</span></span>
                         {member.pending > 0 && <span className="block text-[10px] text-warning">保留 {formatMileageNumber(member.pending)}</span>}
                       </p>
                     </div>
                     <dl className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-ink-secondary">
                       <div><dt className="inline text-ink-faint">ランク：</dt><dd className="inline" title={member.rankReason}>{displayRank ?? '未設定'}</dd></div>
-                      <div><dt className="inline text-ink-faint">今月の増減：</dt><dd className={`inline font-semibold tabular-nums ${member.monthChange < 0 ? 'text-danger' : 'text-accent-hover'}`}>{member.monthChange > 0 ? '+' : ''}{formatMileageNumber(member.monthChange)}</dd></div>
+                      <div><dt className="inline text-ink-faint">今月の増減：</dt><dd className={`inline font-semibold tabular-nums ${member.monthChange < 0 ? 'text-danger' : 'text-accent-deep'}`}>{member.monthChange > 0 ? '+' : ''}{formatMileageNumber(member.monthChange)}</dd></div>
                       <div><dt className="inline text-ink-faint">消える予定：</dt><dd className="inline">{member.expiringMiles30d == null ? 'なし' : `${formatMileageNumber(member.expiringMiles30d)} マイル`}</dd></div>
                       <div><dt className="inline text-ink-faint">最終変動：</dt><dd className="inline">{formatMileageDate(member.lastChangedAt)}</dd></div>
                     </dl>
@@ -897,10 +897,10 @@ function MileagePageInner() {
                       </td>
                       <td className="px-4 py-4"><p className="truncate text-sm text-ink-secondary" title={member.rankReason}>{displayRank ?? <><span>—</span><span className="ml-1 text-xs text-ink-faint">未設定</span></>}</p></td>
                       <td className="px-4 py-4 text-right">
-                        <p className="font-bold text-accent-hover">{formatMileageNumber(member.available)}</p>
+                        <p className="font-bold text-accent-deep">{formatMileageNumber(member.available)}</p>
                         {member.pending > 0 && <p className="text-[10px] text-amber-600">保留 {formatMileageNumber(member.pending)}</p>}
                       </td>
-                      <td className={`px-4 py-4 text-right text-sm font-semibold tabular-nums ${member.monthChange < 0 ? 'text-danger' : 'text-accent-hover'}`}>{member.monthChange > 0 ? '+' : ''}{formatMileageNumber(member.monthChange)}</td>
+                      <td className={`px-4 py-4 text-right text-sm font-semibold tabular-nums ${member.monthChange < 0 ? 'text-danger' : 'text-accent-deep'}`}>{member.monthChange > 0 ? '+' : ''}{formatMileageNumber(member.monthChange)}</td>
                       <td className="px-4 py-4"><p className="truncate text-sm text-ink-secondary" title={member.expiringMiles30d == null ? 'なし' : `${formatMileageNumber(member.expiringMiles30d)} マイル`}>{member.expiringMiles30d == null ? 'なし' : `${formatMileageNumber(member.expiringMiles30d)} マイル`}</p></td>
                       <td className="px-4 py-4 text-xs text-ink-secondary">{formatMileageDate(member.lastChangedAt)}</td>
                       <td className="px-4 py-3 text-right">
