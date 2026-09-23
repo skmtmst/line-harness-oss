@@ -96,7 +96,7 @@ function TrashIcon() {
 function FolderSelect({ tag, groups, onItemsChange, onError }: { tag: Tag; groups: TagGroup[]; onItemsChange: (update: (current: Tag[]) => Tag[]) => void; onError: (message: string) => void }) {
   const group = groups.find((item) => item.id === tag.groupId)
   return (
-    <span className="relative inline-flex h-7 items-center gap-1.5 rounded-mini border border-hairline bg-canvas px-2">
+    <span className="relative inline-flex h-7 items-center gap-1.5 rounded-mini border border-hairline bg-canvas px-2" title={group?.name ?? '未分類'}>
       <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: group?.color ?? '#c3c8c4' }} />
       <span className="truncate text-caption font-semibold text-ink">{group?.name ?? '未分類'}</span>
       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="shrink-0 text-ink-faint"><path d="m6 9 6 6 6-6" /></svg>
@@ -247,11 +247,20 @@ function isThisMonth(value: string): boolean {
   return month(new Date(value)) === month(new Date())
 }
 
-/** 登録日。設計は `2026/01/11`（0埋め）。 */
+/**
+ * 登録日。設計は `2026/01/11`（0埋め）。
+ * getFullYear 系は端末の地域で読むので、日本より遅い地域で開くと
+ * 登録日が前日にずれる。ほかの一覧と同じく JST 固定で出す（#640 D-3）。
+ */
 function formatDate(value: string): string {
   const d = new Date(value)
-  const p = (n: number) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}/${p(d.getMonth() + 1)}/${p(d.getDate())}`
+  if (Number.isNaN(d.getTime())) return value
+  return new Intl.DateTimeFormat('ja-JP', {
+    timeZone: 'Asia/Tokyo',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(d)
 }
 
 /**
@@ -349,7 +358,7 @@ function FolderList({ groups, items, countsKnown, active, onSelect, onChanged }:
       <nav className="p-2">{rows.map((row) => {
         const group = groups.find((item) => item.id === row.id)
         const groupIndex = group ? groups.findIndex((item) => item.id === group.id) : -1
-        return <div key={row.id} className="group relative flex items-center"><button type="button" onClick={() => onSelect(row.id)} className={`flex min-w-0 flex-1 items-center gap-2 rounded-control px-3 py-2.5 text-left text-label ${active === row.id ? 'bg-accent-soft font-bold text-accent' : 'font-semibold text-ink hover:bg-canvas-sunken'}`}><span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: row.color }} /><span className="min-w-0 flex-1 truncate">{row.name}</span><span className={`inline-flex h-[26px] shrink-0 items-center rounded-pill px-[9px] text-caption font-semibold tabular-nums ${active === row.id ? 'bg-canvas text-accent' : 'bg-canvas-sunken text-ink-faint'}`}>{countsKnown ? row.count : '—'}</span></button>{group ? <button type="button" aria-label={`${group.name}の操作`} aria-expanded={menuId === group.id} onClick={() => setMenuId((current) => current === group.id ? null : group.id)} className={`ml-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-control text-ink-faint hover:bg-canvas-sunken focus-visible:outline ${active === row.id ? '' : 'invisible group-hover:visible'}`}><MoreHorizontal aria-hidden="true" size={16} /></button> : null}{group ? <ActionMenu open={menuId === group.id} onClose={() => setMenuId(null)} ariaLabel={`${group.name}の操作`} note="削除しても、中のタグは未分類に残ります。" items={[
+        return <div key={row.id} className="group relative flex items-center"><button type="button" onClick={() => onSelect(row.id)} className={`flex min-w-0 flex-1 items-center gap-2 rounded-control px-3 py-2.5 text-left text-label ${active === row.id ? 'bg-accent-soft font-bold text-accent' : 'font-semibold text-ink hover:bg-canvas-sunken'}`}><span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: row.color }} /><span className="min-w-0 flex-1 truncate" title={row.name}>{row.name}</span><span className={`inline-flex h-[26px] shrink-0 items-center rounded-pill px-[9px] text-caption font-semibold tabular-nums ${active === row.id ? 'bg-canvas text-accent' : 'bg-canvas-sunken text-ink-faint'}`}>{countsKnown ? row.count : '—'}</span></button>{group ? <button type="button" aria-label={`${group.name}の操作`} aria-expanded={menuId === group.id} onClick={() => setMenuId((current) => current === group.id ? null : group.id)} className={`ml-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-control text-ink-faint hover:bg-canvas-sunken focus-visible:outline ${active === row.id ? '' : 'invisible group-hover:visible'}`}><MoreHorizontal aria-hidden="true" size={16} /></button> : null}{group ? <ActionMenu open={menuId === group.id} onClose={() => setMenuId(null)} ariaLabel={`${group.name}の操作`} note="削除しても、中のタグは未分類に残ります。" items={[
           { id: 'rename', label: '名前を変更', icon: <Pencil size={15} />, onSelect: () => window.location.assign(`/tags/folders/new?id=${group.id}`) },
           { id: 'color', label: '色を変える', icon: <Palette size={15} />, onSelect: () => window.location.assign(`/tags/folders/new?id=${group.id}`) },
           { id: 'up', label: '並び順を上へ', icon: <ArrowUp size={15} />, disabled: busy || groupIndex === 0, onSelect: () => void move(group, -1) },
@@ -1074,7 +1083,7 @@ export default function TagsPageV4({
                                 ))}
                           </div>
                         </td>
-                        <td className="truncate px-3 py-3 text-label text-ink">{usageLabel(tag)}</td>
+                        <td className="truncate px-3 py-3 text-label text-ink" title={usageLabel(tag)}>{usageLabel(tag)}</td>
                         <td className="px-3 py-3">
                           {/* 設計 `zMlMX`。押すと友だち一覧への表示を切り替える。 */}
                           <button

@@ -64,8 +64,28 @@ const MAX_BATCH_DELETE_COUNT = 20
  * 「いつ」を読ませる長い形。用途が違うので統一せず、名前で使い分ける。
  */
 function formatListDate(value: string): string {
-  const match = /^\d{4}-(\d{2})-(\d{2})/.exec(value)
-  return match ? `${match[1]}/${match[2]}` : value
+  /*
+   * 更新日は UTC の ISO で来る。区切り文字だけ直す素朴な整形だと
+   * JSTで日付がずれる（深夜の更新が前日扱い）ので、JST固定で出す。
+   */
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  return new Intl.DateTimeFormat('ja-JP', {
+    timeZone: 'Asia/Tokyo',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(date)
+}
+
+/*
+ * 種別が年月日・日時の値は、保存形（2027-10-01 や 2027-10-01T10:00）を
+ * そのまま出すと一覧のほかの日付（2026/09/29）と区切りが違って見える。
+ * 更新予定と同じ `formatStamp` の「/」区切り（曜日付き）にそろえる。
+ */
+function formatVarValue(type: CommonVar['type'], value: string): string {
+  if (!value) return ''
+  if (type === 'date' || type === 'datetime') return formatStamp(value)
+  return value
 }
 
 function VarsPageInner() {
@@ -807,20 +827,22 @@ function VarsPageInner() {
                         className="accent-green-500"
                       />
                     </Th>
-                    <Th className="px-4 py-3" style={{ width: '14%' }}>
+                    {/* 見出しも固定幅で切れ得るので、重ねると全文が読める
+                        title を付ける（第5パス D-3）。 */}
+                    <Th className="px-4 py-3" style={{ width: '14%' }} title="共通情報">
                       共通情報
                     </Th>
-                    <Th className="px-4 py-3" style={{ width: '17%' }}>
+                    <Th className="px-4 py-3" style={{ width: '17%' }} title="差し込みキー">
                       差し込みキー
                     </Th>
-                    <Th className="px-4 py-3">中身</Th>
-                    <Th className="px-4 py-3" style={{ width: '14%' }}>
+                    <Th className="px-4 py-3" title="中身">中身</Th>
+                    <Th className="px-4 py-3" style={{ width: '14%' }} title="使われている場所">
                       使われている場所
                     </Th>
-                    <Th className="px-4 py-3" style={{ width: '21%' }}>
+                    <Th className="px-4 py-3" style={{ width: '21%' }} title="最終更新日・次の変更予定">
                       更新・次の変更
                     </Th>
-                    <Th align="right" className="w-28 px-4 py-3">操作</Th>
+                    <Th align="right" className="w-28 px-4 py-3" title="編集・削除">操作</Th>
                   </TableHeadRow>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
@@ -854,31 +876,43 @@ function VarsPageInner() {
                               className="text-ink-faint block truncate whitespace-nowrap text-xs"
                             >{placeholderText(item.varKey)}</code>
                           </td>
-                          <td title={item.value || '（空）'} className="text-ink truncate px-4 py-3 text-sm">
-                            {item.value || <span className="text-ink-faint">（空）</span>}
+                          <td title={formatVarValue(item.type, item.value) || '（空）'} className="text-ink truncate px-4 py-3 text-sm">
+                            {formatVarValue(item.type, item.value) || <span className="text-ink-faint">（空）</span>}
                           </td>
-                          <td className="text-ink-secondary whitespace-nowrap px-4 py-3 text-xs">
+                          <td
+                            className="text-ink-secondary whitespace-nowrap px-4 py-3 text-xs"
+                            title={item.usageCount === undefined
+                              ? '使われている場所（未取得）'
+                              : item.usageCount === 0
+                                ? '使われていません'
+                                : `${item.usageCount.toLocaleString('ja-JP')}か所で使われています`}
+                          >
                             {item.usageCount === undefined
                               ? '—（未取得）'
                               : item.usageCount === 0
                                 ? '使われていません'
                                 : `${item.usageCount.toLocaleString('ja-JP')}か所`}
                           </td>
-                          <td className="text-ink-secondary px-4 py-3 text-xs">
+                          {/* 更新日と次の変更が長いと切れるため、セル全体に
+                              全文が読める title を付ける（第5パス D-3）。 */}
+                          <td
+                            className="text-ink-secondary px-4 py-3 text-xs"
+                            title={`最終更新 ${formatListDate(item.updatedAt)}${!pending ? ' ／ 予定なし' : ` ／ ${formatStamp(pending.effectiveFrom)} に ${formatVarValue(item.type, pending.value) || '（空）'}へ${(item.pendingScheduleCount ?? 0) > 1 ? ` ほか${(item.pendingScheduleCount ?? 1) - 1}件` : ''}`}`}
+                          >
                             <span className="whitespace-nowrap">{formatListDate(item.updatedAt)}</span>
                             {!pending ? (
                               <span className="text-ink-faint whitespace-nowrap"> ／ 予定なし</span>
                             ) : (
                               <>
                                 <span className="text-ink-faint whitespace-nowrap"> ／ {formatStamp(pending.effectiveFrom)} に</span>
-                                <span className="text-ink-faint"> {pending.value || '（空）'}へ</span>
+                                <span className="text-ink-faint"> {formatVarValue(item.type, pending.value) || '（空）'}へ</span>
                                 {(item.pendingScheduleCount ?? 0) > 1 && (
                                   <span className="text-ink-faint"> ほか{(item.pendingScheduleCount ?? 1) - 1}件</span>
                                 )}
                               </>
                             )}
                           </td>
-                          <td className="whitespace-nowrap px-4 py-3 text-right">
+                          <td className="whitespace-nowrap px-4 py-3 text-right" title="編集・削除">
                             <Link
                               href={`/contents/vars/edit?id=${item.id}`}
                               className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded border px-2 py-1 text-xs"
