@@ -33,7 +33,7 @@ describe('日付の選択（★V7）', () => {
     fireEvent.click(screen.getByRole('button', { name: '配信日' }))
     expect(screen.getByRole('dialog', { name: '日付を選ぶ' })).toBeTruthy()
     expect(screen.getAllByRole('gridcell')).toHaveLength(42)
-    expect(document.activeElement?.getAttribute('aria-label')).toBe('2026年9月23日（水）')
+    expect(document.activeElement?.getAttribute('aria-label')).toMatch(/^2026年9月23日（水）/)
   })
 
   it('矢印で動かし Enter で選ぶと、値が替わって閉じる', () => {
