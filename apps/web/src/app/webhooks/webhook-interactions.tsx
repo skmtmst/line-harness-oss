@@ -405,7 +405,7 @@ export default function WebhookInteractions() {
         </>
       )}
 
-      <Dialog open={Boolean(selected)} title="やり取りの中身" description="接続先URL、シークレット、本文は安全のため表示しません。" onCancel={() => setSelected(null)} cancelLabel="閉じる">
+      <Dialog open={Boolean(selected)} title="やり取りの中身" description="接続先URL、シークレット、本文は安全のため表示しません。" onCancel={() => setSelected(null)}>
         {selected ? (
           <>
             <dl className={styles.details}><div className={styles.detailsRow}><dt>日時</dt><dd>{formatJst(selected.startedAt)}</dd></div><div className={styles.detailsRow}><dt>向き</dt><dd>{directionLabel(selected.direction)}</dd></div><div className={styles.detailsRow}><dt>つなぎ先</dt><dd>{selected.webhookName}</dd></div><div className={styles.detailsRow}><dt>きっかけ</dt><dd>{eventLabel(selected)}</dd></div><div className={styles.detailsRow}><dt>結果</dt><dd>{selected.responseLabel}</dd></div><div className={styles.detailsRow}><dt>試した回数</dt><dd>{selected.attemptCount}回</dd></div><div className={styles.detailsRow}><dt>かかった時間</dt><dd>{selected.durationMs == null ? '—' : `${Math.round(selected.durationMs / 100) / 10}秒`}</dd></div>{selected.failureReason ? <div className={styles.detailsRow}><dt>失敗した理由</dt><dd>{selected.failureReason}</dd></div> : null}{selected.retryOfId ? <div className={styles.detailsRow}><dt>記録のつながり</dt><dd>前の失敗をやり直した記録です。同じ届け番号で送るので、届いていた場合でも相手先で二重に処理されません。</dd></div> : null}<div className={styles.detailsRow}><dt>やり直せるか</dt><dd>{retryabilityText(selected, canRetry)}</dd></div></dl>

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { Coins, Copy, Trash2 } from 'lucide-react'
+import { Coins, Copy, Trash2, X } from 'lucide-react'
 import type { Tag, TagGroup } from '@line-crm/shared'
 import { api, type CommonActionResources, type TagDefinitionAction, type TagRetroactivePreview } from '@/lib/api'
 import Breadcrumb from '@/components/layout/breadcrumb'
@@ -301,7 +301,10 @@ function RetroactiveDialog({ values, count, tagId, accountId, onCancel, onSave, 
   const referralTotal = preview ? preview.referralMiles : referralTargets * values.referralRewardMiles
   return (
     <div className="fixed inset-0 z-[90] flex items-center justify-center bg-ink/35 p-4">
-      <section className="w-full max-w-[670px] -translate-y-7 rounded-card border border-hairline bg-canvas p-7 shadow-2xl" role="alertdialog" aria-modal="true">
+      <section className="relative w-full max-w-[670px] -translate-y-7 rounded-card border border-hairline bg-canvas p-7 shadow-2xl" role="alertdialog" aria-modal="true">
+        <button type="button" onClick={onCancel} aria-label="閉じる" className="absolute right-4 top-4 rounded-mini p-1 text-ink-secondary hover:bg-canvas-sunken">
+          <X aria-hidden="true" className="h-5 w-5" />
+        </button>
         <span className="mb-4 flex h-10 w-10 items-center justify-center rounded-full bg-warning-bg text-warning" aria-hidden="true">
           <Coins size={21} strokeWidth={2} />
         </span>

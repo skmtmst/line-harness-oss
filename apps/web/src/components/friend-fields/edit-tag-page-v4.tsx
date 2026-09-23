@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
+import { X } from 'lucide-react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import type { Tag, TagGroup } from '@line-crm/shared'
 import { api, type TagDefinition, type TagDependencies, type TagDeleteImpactReferences } from '@/lib/api'
@@ -46,7 +47,10 @@ export function DeleteDialog({ tag, dependencies, dependenciesStatus, onCancel, 
       : ''
   return (
     <div className="fixed inset-0 z-[90] flex items-center justify-center bg-ink/45 p-4">
-      <section className="w-full max-w-[680px] rounded-card border border-hairline bg-canvas p-7 shadow-2xl" role="alertdialog" aria-modal="true">
+      <section className="relative w-full max-w-[680px] rounded-card border border-hairline bg-canvas p-7 shadow-2xl" role="alertdialog" aria-modal="true">
+        <button type="button" onClick={onCancel} aria-label="閉じる" className="absolute right-4 top-4 rounded-mini p-1 text-ink-secondary hover:bg-canvas-sunken">
+          <X aria-hidden="true" className="h-5 w-5" />
+        </button>
         <h2 className="text-xl font-bold text-ink">「{tag.name}」を削除しますか？</h2>
         <p className="mt-2 text-sm leading-6 text-ink-secondary">削除すると、このタグを使っている設定と友だちへの付与状態に影響します。</p>
         <div className="mt-5 overflow-hidden rounded-control border border-hairline">

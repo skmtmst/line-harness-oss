@@ -493,7 +493,7 @@ export default function ActionScoreRulesPage() {
         title="1人でスコアのルールを試す"
         description="友だちの点数や履歴は変えません。"
         onCancel={() => !busy && setTestOpen(false)}
-        footer={<div className="flex justify-end gap-2"><Button onClick={() => setTestOpen(false)} disabled={busy}>閉じる</Button><Button variant="primary" onClick={() => void runTest()} disabled={busy}>この条件をテスト</Button></div>}
+        footer={<div className="flex justify-end gap-2"><Button variant="primary" onClick={() => void runTest()} disabled={busy}>この条件をテスト</Button></div>}
       >
         <div className="grid gap-3">
           <Field label="テスト前の点数" htmlFor="test-score"><TextInput id="test-score" type="number" value={testScore} onChange={(event) => setTestScore(event.target.value)} /></Field>

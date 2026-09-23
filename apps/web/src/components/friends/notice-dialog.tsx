@@ -1,5 +1,6 @@
 'use client'
 
+import { X } from 'lucide-react'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import Button from '@/components/shared/button'
 
@@ -37,9 +38,14 @@ export default function NoticeDialog({
         className="w-full max-w-md rounded-panel border border-hairline bg-canvas p-5 shadow-card"
         onMouseDown={(event) => event.stopPropagation()}
       >
-        <h2 id="friends-notice-title" className="text-lg font-bold text-ink">
-          {notice.title}
-        </h2>
+        <div className="flex items-start justify-between gap-3">
+          <h2 id="friends-notice-title" className="text-lg font-bold text-ink">
+            {notice.title}
+          </h2>
+          <button type="button" onClick={onClose} aria-label="閉じる" className="rounded-mini p-1 text-ink-secondary hover:bg-canvas-sunken">
+            <X aria-hidden="true" className="h-5 w-5" />
+          </button>
+        </div>
         <p className="mt-2 text-sm leading-6 text-ink-secondary">{notice.message}</p>
         <div className="mt-5 flex justify-end">
           <Button variant="primary" onClick={onClose}>

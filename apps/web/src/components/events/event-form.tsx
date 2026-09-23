@@ -1,5 +1,6 @@
 'use client'
 
+import { X } from 'lucide-react'
 import StickyBar from '@/components/shared/sticky-bar'
 
 import { useEffect, useState } from 'react'
@@ -259,7 +260,7 @@ export default function EventForm({ accountId, eventId }: EventFormProps) {
       {/* page header */}
       <div className="mb-4 flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">
+          <h1 className="text-2xl font-bold text-ink">
             {eventId ? draft.name || 'イベント編集' : '新規イベント作成'}
           </h1>
           <p className="text-sm text-gray-500 mt-0.5">
@@ -1020,7 +1021,12 @@ function AddSlotDialog({
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
       <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md mx-4">
-        <h3 className="text-lg font-bold mb-4 text-gray-900">予約枠を追加</h3>
+        <div className="mb-4 flex items-start justify-between gap-3">
+          <h3 className="text-lg font-bold text-ink">予約枠を追加</h3>
+          <button type="button" onClick={onClose} aria-label="閉じる" className="rounded-mini p-1 text-ink-secondary hover:bg-canvas-sunken">
+            <X aria-hidden="true" className="h-5 w-5" />
+          </button>
+        </div>
         {err && <div className="bg-red-50 border border-red-200 text-red-700 p-2 rounded-lg mb-3 text-sm">{err}</div>}
         <div className="space-y-3">
           <label className="block">
@@ -1137,7 +1143,12 @@ function EditSlotDialog({
       style={{ background: 'color-mix(in srgb, var(--color-ink) 40%, transparent)' }}
     >
       <div className="bg-canvas rounded-card mx-4 w-full max-w-md p-6 shadow-xl">
-        <h3 className="text-ink mb-4 text-lg font-bold">予約枠を編集</h3>
+        <div className="mb-4 flex items-start justify-between gap-3">
+          <h3 className="text-ink text-lg font-bold">予約枠を編集</h3>
+          <button type="button" onClick={onClose} aria-label="閉じる" className="rounded-mini p-1 text-ink-secondary hover:bg-canvas-sunken">
+            <X aria-hidden="true" className="h-5 w-5" />
+          </button>
+        </div>
         {err && <div className="bg-danger-bg border-danger-bg text-danger rounded-control mb-3 border p-2 text-sm">{err}</div>}
         {booked > 0 && (
           <p className="bg-warning-bg border-warning-bg text-warning rounded-control mb-3 border p-2 text-xs">
@@ -1241,7 +1252,12 @@ function BulkSlotDialog({
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
       <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-lg mx-4">
-        <h3 className="text-lg font-bold mb-4 text-gray-900">予約枠の一括追加</h3>
+        <div className="mb-4 flex items-start justify-between gap-3">
+          <h3 className="text-lg font-bold text-ink">予約枠の一括追加</h3>
+          <button type="button" onClick={onClose} aria-label="閉じる" className="rounded-mini p-1 text-ink-secondary hover:bg-canvas-sunken">
+            <X aria-hidden="true" className="h-5 w-5" />
+          </button>
+        </div>
         {err && <div className="bg-red-50 border border-red-200 text-red-700 p-2 rounded-lg mb-3 text-sm">{err}</div>}
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
@@ -1360,7 +1376,7 @@ function PublishTab({
           className="mt-0.5 rounded border-gray-300"
         />
         <div>
-          <div className="text-sm font-medium text-gray-900">承認制</div>
+          <div className="text-sm font-medium text-ink">承認制</div>
           <div className="text-xs text-gray-500 mt-0.5">
             ON: 友だちが予約しても運営が「承認」するまで未確定（承認待ちの分も残席を使います）<br />
             OFF: 定員空きがあれば即時確定
@@ -1392,7 +1408,7 @@ function PublishTab({
           className="mt-0.5 rounded border-gray-300"
         />
         <div>
-          <div className="text-sm font-medium text-gray-900">キャンセル待ちを受ける</div>
+          <div className="text-sm font-medium text-ink">キャンセル待ちを受ける</div>
           <div className="text-xs text-gray-500 mt-0.5">
             ON: 定員に達したあとも申込を受け、待ちとして記録する<br />
             OFF: 定員に達したら締め切る<br />
@@ -1487,7 +1503,7 @@ function PublishTab({
           className="mt-0.5 rounded border-gray-300"
         />
         <div>
-          <div className="text-sm font-medium text-gray-900">前日リマインダ</div>
+          <div className="text-sm font-medium text-ink">前日リマインダ</div>
           <div className="text-xs text-gray-500 mt-0.5">前日 18:00 JST に LINE で通知</div>
         </div>
       </label>
@@ -1515,7 +1531,7 @@ function PublishTab({
       {/* 予約者向けカスタムメッセージ追記 */}
       <div className="border-t border-gray-200 pt-5 space-y-4">
         <div>
-          <div className="text-sm font-medium text-gray-900 mb-1">予約者向けカスタムメッセージ</div>
+          <div className="text-sm font-medium text-ink mb-1">予約者向けカスタムメッセージ</div>
           <p className="text-xs text-gray-500">
             予約者だけに届く LINE 通知の末尾に追加されます（Zoom URL など）。空欄ならデフォルト文言のみ。
           </p>
@@ -1572,7 +1588,7 @@ function PublishTab({
                 : 'border-gray-200 bg-white hover:border-gray-300'
             }`}
           >
-            <div className="text-sm font-bold text-gray-900">下書き</div>
+            <div className="text-sm font-bold text-ink">下書き</div>
             <div className="text-xs text-gray-600 mt-0.5">友だちには見えない</div>
           </button>
           <button
@@ -1584,7 +1600,7 @@ function PublishTab({
                 : 'border-gray-200 bg-white hover:border-green-300'
             }`}
           >
-            <div className="text-sm font-bold text-gray-900">公開する</div>
+            <div className="text-sm font-bold text-ink">公開する</div>
             <div className="text-xs text-gray-600 mt-0.5">予約 URL が有効になる</div>
           </button>
         </div>

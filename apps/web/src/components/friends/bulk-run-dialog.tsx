@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { X } from 'lucide-react'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import { ApiError, api } from '@/lib/api'
@@ -326,7 +327,12 @@ export default function BulkRunDialog({
       <div className={styles.panel} data-design-node="IAf7j">
         <header className={styles.head}>
           <h2 className={styles.screenTitle}>友だちを一括操作</h2>
-          <button type="button" className={styles.backButton} onClick={close}>← 友だち一覧へ戻る</button>
+          <div className="flex items-center justify-between gap-3">
+            <button type="button" className={styles.backButton} onClick={close}>← 友だち一覧へ戻る</button>
+            <button type="button" className="inline-flex items-center justify-center rounded-mini p-1.5 text-ink-secondary hover:bg-canvas hover:text-ink" onClick={close} aria-label="閉じる">
+              <X aria-hidden="true" size={20} />
+            </button>
+          </div>
           <div className={styles.selectionBanner}>
             <strong>✓　{friendIds.length.toLocaleString('ja-JP')}人を選択中</strong>
             <span>対象を確認してから操作を選んでください</span>
@@ -536,17 +542,18 @@ export default function BulkRunDialog({
               </>
             ) : null}
 
-            <div className={styles.actions}>
-              <Button onClick={close} disabled={busy}>閉じる</Button>
-              {resultState === 'ready' && canUndo(detail) ? (
-                <Button onClick={() => void undo()} disabled={busy}>取り消す</Button>
-              ) : null}
-              {resultState === 'ready' && canRetry(detail) ? (
-                <Button variant="primary" onClick={() => void retry()} disabled={busy}>
-                  失敗した{countText(detail?.temporaryFailureCount, '人')}だけやり直す
-                </Button>
-              ) : null}
-            </div>
+            {resultState === 'ready' && (canUndo(detail) || canRetry(detail)) ? (
+              <div className={styles.actions}>
+                {canUndo(detail) ? (
+                  <Button onClick={() => void undo()} disabled={busy}>取り消す</Button>
+                ) : null}
+                {canRetry(detail) ? (
+                  <Button variant="primary" onClick={() => void retry()} disabled={busy}>
+                    失敗した{countText(detail?.temporaryFailureCount, '人')}だけやり直す
+                  </Button>
+                ) : null}
+              </div>
+            ) : null}
           </div>
         ) : null}
       </div>

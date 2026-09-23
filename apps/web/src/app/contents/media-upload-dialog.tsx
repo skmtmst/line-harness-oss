@@ -2,6 +2,7 @@
 
 import { useEffect, useId, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { X } from 'lucide-react'
 import type { Folder } from '@line-crm/shared'
 import { ApiError, api } from '@/lib/api'
 import Button from '@/components/shared/button'
@@ -166,8 +167,17 @@ export default function MediaUploadDialog({
         tabIndex={-1}
         className="border-hairline max-h-screen w-full max-w-2xl overflow-y-auto rounded-card border bg-canvas shadow-xl"
       >
-        <div className="border-hairline border-b px-6 py-4">
+        <div className="border-hairline flex items-center justify-between gap-3 border-b px-6 py-4">
           <h2 id={`${inputId}-title`} className="text-ink text-xl font-bold">ファイルを入れる</h2>
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={busy}
+            aria-label="閉じる"
+            className="rounded-mini p-1 text-ink-secondary hover:bg-canvas-sunken disabled:opacity-50"
+          >
+            <X aria-hidden="true" className="h-5 w-5" />
+          </button>
         </div>
         <div className="space-y-4 p-6">
         <label
@@ -253,7 +263,6 @@ export default function MediaUploadDialog({
             {errorCount > 0 ? `${errorCount}件は登録できません` : `${entries.length}件を選択中`}
           </p>
           <div className="flex items-center gap-2">
-            <Button type="button" onClick={onClose} disabled={busy}>閉じる</Button>
             <Button type="button" variant="primary" onClick={() => void uploadReady()} disabled={busy || readyCount === 0 || !accountId}>
               {busy ? '登録しています…' : `${readyCount}件を登録する`}
             </Button>

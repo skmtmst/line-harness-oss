@@ -97,9 +97,8 @@ describe('流入経路の削除確認操作 (N-246/N-250 #906)', () => {
 
   it('TabとShift+Tabを確認窓の先頭・末尾で循環させる', async () => {
     const { dialog } = await mountAndOpen()
-    const first = within(dialog).getByRole('button', {
-      name: /新しい人を受けるのをやめる（おすすめ）/,
-    })
+    // UI-25: 右上の×が窓の先頭の操作要素になった。
+    const first = within(dialog).getByRole('button', { name: '閉じる' })
     const last = within(dialog).getByRole('button', { name: '受けるのをやめる' })
 
     last.focus()
