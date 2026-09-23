@@ -6,11 +6,11 @@ import { opsCall } from '@/components/ops/ops-ui'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
-import { TextField } from '@/components/shared/text-field'
 import { adminSessionHeaders, captureAdminSessionHandoff } from '@/lib/admin-session'
 import { api } from '@/lib/api'
 import { logoutAndGoToLogin } from '@/lib/logout'
 import { qrToDataURL } from '@/lib/qr-image'
+import OtpInput from '@/components/shared/otp-input'
 
 /**
  * 運営コンソールの 2要素認証の設定（★V6 37-10-B `NAJKx`）。
@@ -120,7 +120,8 @@ export default function OpsTwoFactorPage() {
           </div>
           <div className="w-full">
             <AuthField label="認証アプリの6桁の数字" htmlFor="ops-totp-code">
-              <TextField id="ops-totp-code" value={code} onChange={(event) => setCode(event.target.value)} inputMode="numeric" autoComplete="one-time-code" maxLength={6} placeholder="000000" />
+              {/* ★V7 共通 認証コード入力（xHzFK）。 */}
+              <OtpInput id="ops-totp-code" value={code} onChange={setCode} label="認証アプリの6桁の数字" invalid={Boolean(error)} disabled={busy} />
             </AuthField>
           </div>
           <Button type="submit" variant="primary" disabled={busy || !uri} className="w-full">
