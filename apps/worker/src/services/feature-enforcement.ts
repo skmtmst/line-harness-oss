@@ -1,6 +1,7 @@
 import {
-  getAccountSetting,
+  getAccountSettings,
   getTenantBilling,
+  getTenantBillingByLineAccount,
   getVersionedAccountSetting,
   recordAuditEvent,
 } from '@line-crm/db';
@@ -432,11 +433,19 @@ async function accountCompanyFeatureSettings(
     accountId,
     FEATURE_SETTINGS_BUNDLE_KEY,
   );
-  const entries = await Promise.all(featureIds.map(async (featureId) => {
+  // 一括設定に無い分だけ旧 `feature.<キー>` を読む。機能ごとの往復にせず
+  // 1往復でまとめて取る(#633)。
+  const missing = featureIds.filter(
+    (featureId) => typeof bundle?.data.features?.[featureId] !== 'boolean',
+  );
+  const legacyValues = missing.length > 0
+    ? await getAccountSettings(db, accountId, missing.map((featureId) => `feature.${featureId}`))
+    : {};
+  const entries = featureIds.map((featureId) => {
     const bundled = bundle?.data.features?.[featureId];
     if (typeof bundled === 'boolean') return [featureId, bundled] as const;
 
-    const legacy = await getAccountSetting(db, accountId, `feature.${featureId}`);
+    const legacy = legacyValues[`feature.${featureId}`];
     if (legacy) {
       try {
         const parsed = JSON.parse(legacy) as boolean | { enabled?: boolean };
@@ -447,7 +456,7 @@ async function accountCompanyFeatureSettings(
       }
     }
     return [featureId, featureCatalogEntry(featureId).defaultEnabled] as const;
-  }));
+  });
   return Object.fromEntries(entries) as Partial<Record<FeatureId, boolean>>;
 }
 
@@ -512,14 +521,20 @@ async function contractAvailability(
   }
   // 古い試験・移行行のようにアカウント所有者を解決できない場合は、従来どおり
   // 契約で止めない。実アカウントは tenant_id から必ず料金状態を読む。
-  const tenantKnown = context?.tenantIdsByAccount.has(accountId) ?? false;
-  const tenantId = tenantKnown
-    ? context!.tenantIdsByAccount.get(accountId) ?? null
-    : (await db.prepare('SELECT tenant_id FROM line_accounts WHERE id = ?')
-      .bind(accountId).first<{ tenant_id: string | null }>())?.tenant_id ?? null;
-  const entitlements = tenantId
-    ? await tenantEntitlements(db, tenantId, context)
-    : resolveEntitlements(null);
+  if (context?.tenantIdsByAccount.has(accountId)) {
+    const tenantId = context.tenantIdsByAccount.get(accountId) ?? null;
+    const entitlements = tenantId
+      ? await tenantEntitlements(db, tenantId, context)
+      : resolveEntitlements(null);
+    return Object.fromEntries(FEATURE_CATALOG.map((entry) => [
+      entry.featureId,
+      featureContractIsAvailable(entitlements, entry.entitlementKey),
+    ])) as Record<FeatureId, boolean>;
+  }
+  // tenant_id 読取 + tenants 読取の2往復を1往復の結合読取へ(#633)。
+  const entitlements = resolveEntitlements(
+    await getTenantBillingByLineAccount(db, accountId),
+  );
   return Object.fromEntries(FEATURE_CATALOG.map((entry) => [
     entry.featureId,
     featureContractIsAvailable(entitlements, entry.entitlementKey),
