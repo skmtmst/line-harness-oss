@@ -111,8 +111,10 @@ describe('一覧の帯（設計 6-1 `q76C35`）', () => {
   })
 
   it('数が無いときは単位も出さない', () => {
-    /* `—件` は数に見える。 */
-    expect(KPI_VIEW).toContain("typeof card.value === 'number' && Number.isFinite(card.value) && (")
+    /* `—件` は数に見える。監査6 #674: 見せ方は MetricValue へ寄せ、
+       数に直せない値は null として渡す（MetricValue が単位ごと「—」へする）。 */
+    expect(KPI_VIEW).toContain("typeof card.value === 'number' && Number.isFinite(card.value) ? card.value : null")
+    expect(KPI_VIEW).toContain('<MetricValue')
   })
 
   it('帯の組み立ては、画面から切り離して試せる形にする', () => {

@@ -918,8 +918,8 @@ function BookingsInner() {
       <div data-design="KPIs" className="mb-4 grid grid-cols-2 gap-3 xl:grid-cols-4">
         <EventKpi
           title="申込"
-          value={dataReady ? String(applied) : '—'}
-          unit={dataReady ? '人' : ''}
+          value={dataReady ? applied : null}
+          unit="人"
           detail={!dataReady
             ? '取得できませんでした'
             : /*
@@ -936,8 +936,8 @@ function BookingsInner() {
         */}
         <EventKpi
           title="承認待ち"
-          value={dataReady ? String(pending) : '—'}
-          unit={dataReady ? '件' : ''}
+          value={dataReady ? pending : null}
+          unit="件"
           detail={dataReady
             ? pending > 0 ? `対応が必要：${pending}件を確認してください` : '確認待ちはありません'
             : '取得できませんでした'}
@@ -946,8 +946,8 @@ function BookingsInner() {
             行が無いときは設定だけを示し、人数を推測しない。 */}
         <EventKpi
           title="キャンセル待ち"
-          value={dataReady ? String(waitlistPeople) : '—'}
-          unit={dataReady ? '人' : ''}
+          value={dataReady ? waitlistPeople : null}
+          unit="人"
           /*
             **読めていない設定を言い切らない。** `event` が取れていないと
             `waitlist_enabled` は undefined で、前は必ず「受け付けない設定です」
@@ -964,8 +964,8 @@ function BookingsInner() {
         />
         <EventKpi
           title="キャンセル"
-          value={dataReady ? String(cancelled) : '—'}
-          unit={dataReady ? '件' : ''}
+          value={dataReady ? cancelled : null}
+          unit="件"
           detail={dataReady
             ? cancelled > 0 ? '空いた枠を確認してください' : 'キャンセルはありません'
             : '取得できませんでした'}

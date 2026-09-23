@@ -30,8 +30,9 @@ describe('V6 オートメーション一覧の状態', () => {
 
   it('未取得の件数を0件として表示しない', () => {
     expect(PAGE).toContain("loadStatus === 'ready' ? automations.filter((item) => item.isActive).length : null")
-    expect(PAGE).toContain("estimatedHoursSaved !== null")
-    expect(PAGE).toContain("failedRuns?.toLocaleString('ja-JP') ?? '—'")
+    // 監査6 #674: 未取得は null のまま MetricValue へ渡し、「—」と0を区別する
+    expect(PAGE).toContain('<MetricValue value={estimatedHoursSaved}')
+    expect(PAGE).toContain('<MetricValue value={failedRuns ?? null}')
   })
 
   it('一覧契約の集計から30日の実行・失敗と削減時間を読む', () => {
