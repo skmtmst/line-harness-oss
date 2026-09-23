@@ -4400,6 +4400,8 @@ export type NenCampaignSetting = {
   dedupWindowDays: number
   excludeFormRespondents: boolean
   afterActions: NenCampaignAfterAction[]
+  /** NEN-07: つなぐ回答フォームが使えない稼働中設定の理由。使えるなら null */
+  formIssue: 'form_missing' | 'form_inactive' | 'form_other_account' | null
   updatedAt: string
 }
 
