@@ -30,10 +30,14 @@ const TARGETS = [
   '../components/users/users-table.tsx',
 ] as const
 
-function listStateErrors(source: string) {
-  return [...source.matchAll(/<ListState\b[\s\S]*?\/>/g)]
-    .map(([tag]) => tag)
-    .filter((tag) => tag.includes('kind="error"'))
+function failureDisplays(source: string) {
+  // 取得失敗の面は ListState か ★V7 TargetMissing のどちらか。どちらも
+  // 再読み込み口（onRetry）を持ち、古い個別ボタン（action）は持たない。
+  const tags = [
+    ...source.matchAll(/<ListState\b[\s\S]*?\/>/g),
+    ...source.matchAll(/<TargetMissing\b[\s\S]*?\/>/g),
+  ].map(([tag]) => tag)
+  return tags.filter((tag) => tag.includes('kind="error"'))
 }
 
 describe('一覧の取得失敗からその場で読み直せる契約', () => {
@@ -42,7 +46,7 @@ describe('一覧の取得失敗からその場で読み直せる契約', () => {
 
     for (const target of TARGETS) {
       const source = readFileSync(join(HERE, target), 'utf8')
-      const errors = listStateErrors(source)
+      const errors = failureDisplays(source)
       errorCount += errors.length
 
       for (const errorState of errors) {
@@ -64,6 +68,9 @@ describe('一覧の取得失敗からその場で読み直せる契約', () => {
     // #772: 統合ユーザー表の失敗表示を ListState から TableStateRow へ
     //        移したぶん1減。再読み込み口は TableStateRow の onRetry に
     //        そのまま残し、数だけが減る。
+    // V7 TargetMissing: 追加設定の公開・つながり・シナリオ結果の本体の
+    //        失敗表示を TargetMissing の error へ寄せた（ListState 23＋
+    //        TargetMissing 3で合計は変わらない）。
     expect(errorCount).toBe(26)
   })
 
@@ -71,8 +78,11 @@ describe('一覧の取得失敗からその場で読み直せる契約', () => {
     const markEdit = readFileSync(join(HERE, 'tags/marks/edit/page.tsx'), 'utf8')
     const connections = readFileSync(join(HERE, 'rich-menus/connections/page.tsx'), 'utf8')
 
-    expect(markEdit).toContain('対象の対応マークが指定されていません')
+    expect(markEdit).toContain('編集する対応マークが指定されていません')
     expect(markEdit).toContain('if (!id)')
-    expect(connections).toContain('<ListState kind="empty" title="メニューを特定できませんでした"')
+    // 対象未指定は ★V7 TargetMissing の unspecified（一覧へ戻るだけ）。
+    expect(connections).toContain('kind="unspecified"')
+    expect(connections).toContain('つながりを見るメニューが指定されていません')
+    expect(connections).toContain('backHref="/rich-menus"')
   })
 })

@@ -23,6 +23,7 @@ import FeatureGate from '@/components/feature-gate'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import Breadcrumb from '@/components/layout/breadcrumb'
 import StickyBar from '@/components/shared/sticky-bar'
+import TargetMissing from '@/components/shared/target-missing'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { TextInput } from '@/components/shared/form-controls'
 import Button from '@/components/shared/button'
@@ -297,7 +298,7 @@ function SavedSearchEditInner() {
   const router = useRouter()
   const params = useSearchParams()
   const id = params.get('id') ?? ''
-  const { selectedAccountId } = useAccount()
+  const { selectedAccountId, selectedAccount } = useAccount()
   const [original, setOriginal] = useState<SavedSearchDetail | null>(null)
   const [tags, setTags] = useState<Tag[]>([])
   const [marks, setMarks] = useState<SupportMark[]>([])
@@ -320,6 +321,10 @@ function SavedSearchEditInner() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [deleteOpen, setDeleteOpen] = useState(false)
+  /** 404・空で見つからないとき。取得の失敗（error）とは分ける。 */
+  const [searchMissing, setSearchMissing] = useState(false)
+  /** 失敗したあとの「もう一度読み込む」で取り直すための番号。 */
+  const [reloadKey, setReloadKey] = useState(0)
 
   usePageTitle('保存した検索を編集')
 
@@ -362,6 +367,7 @@ function SavedSearchEditInner() {
     let cancelled = false
     setLoading(true)
     setError('')
+    setSearchMissing(false)
     if (!selectedAccountId || !id) {
       setLoading(false)
       return
@@ -389,6 +395,7 @@ function SavedSearchEditInner() {
       const found = detail.success ? detail.data : null
       if (!found) {
         setError('保存した検索が見つかりません')
+        setSearchMissing(true)
         return
       }
       setOriginal(found)
@@ -399,13 +406,19 @@ function SavedSearchEditInner() {
       setPreview(found.match)
       /* IDEA-04: 計算に失敗している保存値を「計算済み」の時点付きで見せない。 */
       setPreviewError(found.match.error ?? '')
-    }).catch(() => {
-      if (!cancelled) setError('保存した検索を読み込めませんでした')
+    }).catch((caught: unknown) => {
+      if (cancelled) return
+      if (caught instanceof ApiError && caught.status === 404) {
+        setError('保存した検索が見つかりません')
+        setSearchMissing(true)
+      } else {
+        setError('保存した検索を読み込めませんでした')
+      }
     }).finally(() => {
       if (!cancelled) setLoading(false)
     })
     return () => { cancelled = true }
-  }, [id, selectedAccountId])
+  }, [id, reloadKey, selectedAccountId])
 
   const dirty = useMemo(() => {
     if (!original) return false
@@ -512,15 +525,41 @@ function SavedSearchEditInner() {
   }
 
   if (loading) return <p className="text-sm text-ink-faint">読み込んでいます</p>
+  if (!id) {
+    return (
+      <TargetMissing
+        kind="unspecified"
+        title="編集する保存した検索が指定されていません"
+        description="一覧から編集する検索を選び直してください。"
+        backHref="/tags?tab=searches"
+        backLabel="保存した検索の一覧へ戻る"
+      />
+    )
+  }
   if (!selectedAccountId) return <p className="rounded-card border border-hairline bg-canvas p-5 text-sm text-ink-secondary">上部でLINE公式アカウントを選んでください。</p>
   /* #975 U069: 見つからないときも行き止まりにしない。一覧へ戻る道を出す。 */
-  if (!original) return (
-    <div className="rounded-card border border-hairline bg-canvas p-5">
-      <p className="text-sm font-semibold text-danger">{error || '保存した検索が見つかりません'}</p>
-      <p className="mt-1 text-xs text-ink-faint">削除されたか、別のLINEアカウントの検索です。一覧から選び直せます。</p>
-      <Button href="/tags?tab=searches" className="mt-3">保存した検索の一覧へ戻る</Button>
-    </div>
-  )
+  if (!original && (searchMissing || !error)) {
+    return (
+      <TargetMissing
+        kind="not-found"
+        title="保存した検索が見つかりません"
+        description="削除されたか、別のLINEアカウントの検索です。一覧から選び直せます。"
+        accountName={selectedAccount?.name}
+        backHref="/tags?tab=searches"
+        backLabel="保存した検索の一覧へ戻る"
+      />
+    )
+  }
+  if (!original) {
+    return (
+      <TargetMissing
+        kind="error"
+        title="保存した検索を読み込めませんでした"
+        description="通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度読み込んでください。"
+        onRetry={() => setReloadKey((k) => k + 1)}
+      />
+    )
+  }
 
   return (
     <div data-design-node="XBkiQ">

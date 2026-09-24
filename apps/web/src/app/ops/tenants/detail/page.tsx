@@ -20,6 +20,7 @@ import Card, { CardHeader } from '@/components/shared/card'
 import Chip from '@/components/shared/chip'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
+import TargetMissing from '@/components/shared/target-missing'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { Tabs } from '@/components/shared/tabs'
 import { TextArea, TextField } from '@/components/shared/text-field'
@@ -74,6 +75,24 @@ function OpsTenantDetailContent() {
     setBusy(false)
     if (!res.success) { setError(res.error || '代理ログインを始められませんでした'); return }
     window.location.assign('/hq')
+  }
+
+  /*
+   * `?id=` なしで開くのは失敗ではないので、赤いエラーではなく
+   * ★V7「開き先がない」で一覧へ戻して選び直させる。
+   */
+  if (!id) {
+    return (
+      <div data-design-node="vhwld">
+        <TargetMissing
+          kind="unspecified"
+          title="見る契約先が指定されていません"
+          description="契約先アカウントの一覧から、見る契約先を選び直してください。"
+          backHref="/ops/tenants"
+          backLabel="契約先の一覧へ戻る"
+        />
+      </div>
+    )
   }
 
   if (!detail) {

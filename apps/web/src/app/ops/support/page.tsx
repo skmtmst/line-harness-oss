@@ -15,7 +15,7 @@ import {
 } from '@/lib/api'
 import { KnowledgeReferences, TicketKnowledge } from '@/components/ops/knowledge-ticket'
 import knowledgeStyles from '@/components/ops/knowledge.module.css'
-import { useOpsPageTitle } from '@/components/ops/ops-shell'
+import OpsPageHeader from '@/components/ops/ops-page-header'
 import { formatDateTime, planLabel, PLAN_STATUS_LABEL, ROLE_LABEL, tenantDetailHref, opsCall } from '@/components/ops/ops-ui'
 import Button from '@/components/shared/button'
 import Chip, { type ChipTone } from '@/components/shared/chip'
@@ -293,10 +293,10 @@ export default function OpsSupportPage() {
   const kpis = summary?.kpis ?? null
   const ticket = detail?.ticket ?? null
   const closed = ticket?.stage === 'closed'
-  useOpsPageTitle(replyFromAi ? 'お問い合わせ ／ AIの下書き' : 'お問い合わせ')
 
   return (
     <div className={knowledgeStyles.supportPage} data-design-node={replyFromAi && references.length > 0 && !aiBusy ? 'F3zoq' : 'IjIFa'}>
+      <OpsPageHeader title={replyFromAi ? 'お問い合わせ ／ AIの下書き' : 'お問い合わせ'} />
 
       <div className="mb-4">
         <Tabs
@@ -447,7 +447,7 @@ export default function OpsSupportPage() {
                 <Meta label="店舗">{detail?.tenant.accountCount ?? 0}</Meta>
                 <Meta label="LINE登録">{detail ? `${detail.tenant.staffCount}人中${detail.tenant.staffWithLine}人` : '—'}</Meta>
                 <Meta label="過去のチケット">{detail ? `${detail.tenant.pastTickets}件（未解決 ${detail.tenant.pastOpen}）` : '—'}</Meta>
-                <span className="ml-auto flex items-center gap-2 self-center">
+                <span className="col-span-full flex items-center justify-end gap-2">
                   <Button size="field" href={tenantDetailHref(ticket.tenantId)}>契約先を開く</Button>
                   <Button size="field" disabled={busy} onClick={() => void impersonate(ticket.tenantId, setBusy, setError)}>代理ログイン</Button>
                 </span>

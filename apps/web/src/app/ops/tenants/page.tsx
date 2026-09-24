@@ -134,7 +134,7 @@ export default function OpsTenantsPage() {
       <div className="mb-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <SummaryCard variant="v6" title="契約中" value={summary ? summary.active : null} unit="社" detail="トライアルを除く" loading={loading && !summary} />
         <SummaryCard variant="v6" title="トライアル中" value={summary ? summary.trialing : null} unit="社" detail="期限切れ前に案内" loading={loading && !summary} />
-        <SummaryCard variant="v6" title="停止中" value={summary ? summary.suspended : null} unit="社" detail="運営が止めた契約先" badge={summary?.suspended ? '確認' : undefined} badgeTone="danger" loading={loading && !summary} />
+        <SummaryCard variant="v6" title="停止中" value={summary ? summary.suspended : null} unit="社" detail="運営が止めた契約先" badge={summary?.suspended ? '確認' : undefined} badgeTone="warning" loading={loading && !summary} />
         <SummaryCard variant="v6" title="決済失敗" value={summary ? summary.pastDue : null} unit="社" detail="Stripe で支払いが止まっている" badge={summary?.pastDue ? '要対応' : undefined} badgeTone="danger" loading={loading && !summary} />
       </div>
 
@@ -164,7 +164,8 @@ export default function OpsTenantsPage() {
               <Th className="w-16" align="right">店舗</Th>
               <Th className="w-16" align="right">権限者</Th>
               <Th className="w-36">最終ログイン</Th>
-              <Th className="w-28" align="right">操作</Th>
+              {/* 「代理ログイン」（5文字）が w-28 では右端で切れる。操作列は入る幅で固定する。 */}
+              <Th className="w-32" align="right">操作</Th>
             </TableHeadRow>
           </thead>
           <tbody>

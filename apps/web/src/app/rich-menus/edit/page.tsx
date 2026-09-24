@@ -2,6 +2,8 @@
 
 import SelectField from '@/components/shared/select-field'
 import Button from '@/components/shared/button'
+import ListState from '@/components/shared/list-state'
+import TargetMissing from '@/components/shared/target-missing'
 import { useEffect, useState, useCallback, useRef, Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -179,27 +181,35 @@ function unpublishWarningText(warning: string): string {
  * 違うので、主文を言い分ける。生のエラー文（`API error: 404` など）は
  * 別で畳んで出す。
  */
-function describeLoadFailure(raw: string | null): { title: string; detail: string } {
+function describeLoadFailure(raw: string | null): {
+  kind: 'not-found' | 'forbidden' | 'error'
+  title: string
+  detail: string
+} {
   const message = raw ?? ''
   if (/API error: 404|not found|見つかりません/i.test(message)) {
     return {
+      kind: 'not-found',
       title: 'このリッチメニューは見つかりません',
       detail: '削除されたか、別のLINEアカウントのものか、リンクが古くなっています。一覧から選び直してください。',
     }
   }
   if (/API error: 403|権限|forbidden/i.test(message)) {
     return {
+      kind: 'forbidden',
       title: 'このリッチメニューを表示する権限がありません',
       detail: '権限のある人に確認するか、別のLINEアカウントを選んでください。',
     }
   }
   if (/API error: 5\d\d|Failed to fetch|NetworkError|fetch/i.test(message)) {
     return {
+      kind: 'error',
       title: '通信できませんでした',
       detail: '通信の状態を確認して、もう一度読み込んでください。',
     }
   }
   return {
+    kind: 'error',
     title: 'リッチメニューを表示できませんでした',
     detail: '時間をおいて読み込み直すか、一覧から選び直してください。',
   }
@@ -241,15 +251,17 @@ function RichMenuEditPageInner() {
     /*
       U096: 「id クエリパラメータが必要です」は技術の言葉で、何を
       選び直せばよいかが主文から読めなかった。やることを主文にし、
-      戻る操作をそばに置く。
+      戻る操作をそばに置く。開き先がない3種は ★V7 TargetMissing。
     */
     return (
       <div className="p-6 max-w-7xl mx-auto">
-        <p className="text-sm font-semibold text-danger">編集するリッチメニューが指定されていません</p>
-        <p className="text-sm text-ink-secondary mt-1">一覧から編集するリッチメニューを選び直してください。</p>
-        <Link href="/rich-menus" className="text-sm text-action hover:underline mt-2 inline-block">
-          ← リッチメニュー一覧に戻る
-        </Link>
+        <TargetMissing
+          kind="unspecified"
+          title="編集するリッチメニューが指定されていません"
+          description="一覧から編集するリッチメニューを選び直してください。"
+          backHref="/rich-menus"
+          backLabel="リッチメニュー一覧へ戻る"
+        />
       </div>
     )
   }
@@ -946,26 +958,48 @@ function Editor({
     /*
       U096: 生の `API error: 404` などを主文にしない。削除済み・権限なし・
       通信失敗を言い分け、技術情報は補助の詳細へ畳む。
+      開き先がない3種は ★V7 TargetMissing（設計 `x5cgUH`）へ寄せる。
     */
     const failure = describeLoadFailure(error)
+    if (failure.kind === 'forbidden') {
+      return (
+        <div className="p-6 max-w-7xl mx-auto">
+          <ListState
+            kind="forbidden"
+            title={failure.title}
+            description={failure.detail}
+            action={<Button href="/rich-menus">リッチメニュー一覧へ戻る</Button>}
+          />
+        </div>
+      )
+    }
+    if (failure.kind === 'not-found') {
+      return (
+        <div className="p-6 max-w-7xl mx-auto">
+          <TargetMissing
+            kind="not-found"
+            title={failure.title}
+            description={failure.detail}
+            backHref="/rich-menus"
+            backLabel="リッチメニュー一覧へ戻る"
+          />
+        </div>
+      )
+    }
     return (
       <div className="p-6 max-w-7xl mx-auto">
-        <p className="text-sm font-semibold text-danger">{failure.title}</p>
-        <p className="text-sm text-ink-secondary mt-1">{failure.detail}</p>
+        <TargetMissing
+          kind="error"
+          title={failure.title}
+          description={failure.detail}
+          onRetry={() => void reload()}
+        />
         {error ? (
           <details className="mt-2 text-xs text-ink-faint">
             <summary className="cursor-pointer">技術情報</summary>
             <p className="mt-1 break-all">{error}</p>
           </details>
         ) : null}
-        <div className="mt-3 flex items-center gap-4">
-          <Link href="/rich-menus" className="text-sm text-action hover:underline inline-block">
-            ← リッチメニュー一覧に戻る
-          </Link>
-          <button type="button" onClick={() => void reload()} className="text-sm text-action hover:underline">
-            もう一度読み込む
-          </button>
-        </div>
       </div>
     )
   }

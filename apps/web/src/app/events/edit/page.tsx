@@ -4,6 +4,7 @@ import { Suspense, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import EventForm from '@/components/events/event-form'
+import TargetMissing from '@/components/shared/target-missing'
 import { useAccount } from '@/contexts/account-context'
 import {
   eventsApi,
@@ -113,15 +114,13 @@ function EditEventInner() {
 
   if (!id) {
     return (
-      <div>
-
-        <p className="text-ink-faint bg-canvas rounded-card border-hairline border p-8 text-center text-sm">
-          イベントが指定されていません。
-          <Link href="/events" className="text-action ml-1 hover:underline">
-            イベント予約へ戻る
-          </Link>
-        </p>
-      </div>
+      <TargetMissing
+        kind="unspecified"
+        title="編集するイベントが指定されていません"
+        description="一覧から、編集するイベントを選び直してください。"
+        backHref="/events"
+        backLabel="イベント一覧へ戻る"
+      />
     )
   }
 

@@ -9,6 +9,7 @@ import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Button from '@/components/shared/button'
 import FilterChip from '@/components/shared/filter-chip'
 import ListState from '@/components/shared/list-state'
+import TargetMissing from '@/components/shared/target-missing'
 import Pagination from '@/components/shared/pagination'
 import SelectField from '@/components/shared/select-field'
 import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
@@ -633,11 +634,13 @@ function BookingsInner() {
   if (!eventId) {
     /* #975 U070: イベント未指定は行き止まりにしない。一覧へ戻る入口を出す。 */
     return (
-      <div className="rounded-card border border-hairline bg-canvas p-5">
-        <p className="text-sm font-semibold text-ink">どのイベントの申込かが決まっていません</p>
-        <p className="mt-1 text-xs text-ink-faint">イベントの一覧から選び直してください。</p>
-        <Button href="/events" className="mt-3">イベント一覧へ戻る</Button>
-      </div>
+      <TargetMissing
+        kind="unspecified"
+        title="どのイベントの申込かが決まっていません"
+        description="イベントの一覧から選び直してください。"
+        backHref="/events"
+        backLabel="イベント一覧へ戻る"
+      />
     )
   }
 
