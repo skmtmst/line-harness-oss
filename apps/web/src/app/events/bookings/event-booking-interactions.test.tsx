@@ -893,13 +893,13 @@ describe('Issue #684 イベント予約の実操作', () => {
   })
 
   it('一覧上部の件数は「表示のみ」で、タブやボタンとして扱わない', async () => {
+    // ★V7: 集計帯は下の集計カードとの重複なので出さない。上部の件数は集計カードで見る。
     const view = await mount(<EventsListPage />)
-    const summary = elements(view.container).find((element) => (
-      element.getAttribute('data-event-count-summary') !== null
+    const kpis = elements(view.container).find((element) => (
+      element.getAttribute('data-design') === 'KPIs'
     ))
-    expect(summary).toBeDefined()
-    expect(summary?.getAttribute('aria-label')).toBe('一覧の集計（表示のみ）')
-    expect(summary?.textContent).toContain('一覧の集計（表示のみ）')
-    expect(summary && elements(summary).some((element) => ['BUTTON', 'A'].includes(element.tagName))).toBe(false)
+    expect(kpis).toBeDefined()
+    expect(kpis?.textContent).toContain('これからの回')
+    expect(kpis && elements(kpis).some((element) => ['BUTTON', 'A'].includes(element.tagName))).toBe(false)
   })
 })
