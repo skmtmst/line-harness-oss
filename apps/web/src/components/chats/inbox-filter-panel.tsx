@@ -2,6 +2,7 @@
 
 import type { ChatStatus } from './inbox-dropdown'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
+import Combobox from '@/components/shared/combobox'
 import Select from '@/components/shared/select'
 import { Filter, X } from 'lucide-react'
 
@@ -117,16 +118,19 @@ export default function InboxFilterPanel({
 
           <div>
             <span className={labelClass}>担当者</span>
-            <select
-              aria-label="担当者で絞り込む（パネル）"
-              value={value.assignee}
-              onChange={(event) => set({ assignee: event.target.value })}
-              className={fieldClass}
-            >
-              <option value="all">すべて</option>
-              <option value="unassigned">未割り当て</option>
-              {operators.map((operator) => <option key={operator.id} value={operator.id}>{operator.name}</option>)}
-            </select>
+            <div className="mt-1.5">
+              <Combobox
+                aria-label="担当者で絞り込む（パネル）"
+                placeholder="すべて"
+                value={value.assignee === 'all' ? '' : value.assignee}
+                onChange={(next) => set({ assignee: next || 'all' })}
+                options={[
+                  { value: 'unassigned', label: '未割り当て' },
+                  ...operators.map((operator) => ({ value: operator.id, label: operator.name })),
+                ]}
+                className="w-full"
+              />
+            </div>
           </div>
 
           <div>

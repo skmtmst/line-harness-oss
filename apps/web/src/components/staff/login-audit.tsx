@@ -6,7 +6,7 @@ import Dialog from '@/components/shared/dialog'
 import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
 import { Tabs } from '@/components/shared/tabs'
-import { TableHeadRow, Th } from '@/components/shared/table'
+import { TableHeadRow, TableStateRow, Th } from '@/components/shared/table'
 import { useAccount } from '@/contexts/account-context'
 import { api, ApiError, type AuditEventItem, type AuditEventSummary } from '@/lib/api'
 import ListRange from '@/components/ui/list-range'
@@ -251,9 +251,9 @@ export default function LoginAudit({ userId }: { userId?: string }) {
     {error
       ? <div className="rounded-card border border-danger bg-danger-bg p-8 text-center"><p className="mb-4 font-semibold text-danger">{error}</p><Button onClick={() => void load()}>もう一度読み込む</Button></div>
       : <div className="overflow-hidden rounded-card border border-hairline bg-canvas"><table className="w-full table-fixed text-sm"><thead><TableHeadRow><Th className="w-1/4">いつ・だれが</Th><Th className="w-1/5">何をしたか</Th><Th className="w-1/5">対象</Th><Th className="w-1/5">元の値 → 新しい値</Th><Th>場所</Th><Th align="right">操作</Th></TableHeadRow></thead><tbody className="divide-y divide-hairline">{loading
-        ? <tr><td colSpan={6} className="p-8 text-center text-ink-faint">記録を読み込んでいます…</td></tr>
+        ? <TableStateRow colSpan={6} kind="loading" title="記録を読み込んでいます…" />
         : visible.length === 0
-          ? <tr><td colSpan={6} className="p-8 text-center text-ink-faint">条件に合う記録はありません。条件を変えてお試しください。</td></tr>
+          ? <TableStateRow colSpan={6} kind="empty" title="条件に合う記録はありません。条件を変えてお試しください。" />
           : visible.map((row) => <tr key={row.id} className="hover:bg-canvas-sunken"><td className="px-3 py-3"><p className="truncate font-semibold text-ink" title={`${formatDate(row.createdAt)} ／ ${row.actor.name ?? '名前未取得'}`}>{formatDate(row.createdAt)} ／ {row.actor.name ?? '名前未取得'}</p><p className="mt-1 text-xs text-ink-faint">{row.actor.role ? ROLE_LABELS[row.actor.role] ?? row.actor.role : '権限を取得できませんでした'}</p></td><td className={`truncate px-3 py-3 font-medium ${isAttention(row) ? 'text-danger' : 'text-ink'}`} title={actionLabel(row)}>{actionLabel(row)}</td><td className="truncate px-3 py-3 text-ink-secondary" title={targetLabel(row)}>{targetLabel(row)}</td><td className="truncate px-3 py-3 text-ink-secondary" title={changeLabel(row)}>{changeLabel(row)}</td><td className={`truncate px-3 py-3 ${isAttention(row) ? 'text-danger' : 'text-ink-secondary'}`} title={locationLabel(row)}>{locationLabel(row)}</td><td className="px-3 py-3 text-right"><Button variant="secondary" onClick={() => setDetail(row)}>詳細を見る</Button></td></tr>)}</tbody></table></div>}
     {!loading && !error && total > 0 && <div className="mt-3 flex flex-wrap items-center justify-between gap-3 text-xs text-ink-faint"><ListRange label="記録" total={total} first={first} last={last} />{pageCount > 1 && <nav aria-label="入った記録のページ送り" className="flex items-center gap-2"><AuditPageLink disabled={currentPage === 1} onClick={() => setPage(currentPage - 1)}>前へ</AuditPageLink><span className="font-semibold text-ink">{currentPage} / {pageCount}</span><AuditPageLink disabled={currentPage === pageCount} onClick={() => setPage(currentPage + 1)}>次へ</AuditPageLink></nav>}</div>}
     <Dialog

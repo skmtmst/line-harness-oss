@@ -14,6 +14,7 @@ import { useAccount } from '@/contexts/account-context'
 import EditDialog, { type AutoReplyDraft } from '@/components/auto-replies/edit-dialog'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
+import { TableStateRow } from '@/components/shared/table'
 import Button from '@/components/shared/button'
 import IconButton from '@/components/shared/icon-button'
 import ActionMenu from '@/components/shared/action-menu'
@@ -755,26 +756,31 @@ export default function AutoRepliesPage() {
                 読込中・読めなかった・権限が無い・本当に0件を言い分ける。
               */}
               {!ready ? (
-                <tr><td colSpan={6} className="px-4 py-8">
-                  <ListState
+                visibleLoadState === 'forbidden' ? (
+                  <tr><td colSpan={6} className="px-4 py-8">
+                    <ListState
+                      kind="forbidden"
+                      title={LOAD_STATE_WORDS.forbidden.label}
+                      description={LOAD_STATE_WORDS.forbidden.note}
+                    />
+                  </td></tr>
+                ) : (
+                  <TableStateRow
+                    colSpan={6}
                     kind={visibleLoadState}
                     title={LOAD_STATE_WORDS[visibleLoadState].label}
                     description={LOAD_STATE_WORDS[visibleLoadState].note}
-                    action={
-                      visibleLoadState === 'error'
-                        ? <Button onClick={() => void load()}>再読み込み</Button>
-                        : undefined
-                    }
+                    onRetry={visibleLoadState === 'error' ? () => void load() : undefined}
+                    retryLabel="再読み込み"
                   />
-                </td></tr>
+                )
               ) : shownInFolder.length === 0 ? (
-                <tr><td colSpan={6} className="px-4 py-8">
-                  <ListState
-                    kind="empty"
-                    title="自動応答は0件です"
-                    description="絞り込みを外すか、「自動応答を作成」から追加してください。"
-                  />
-                </td></tr>
+                <TableStateRow
+                  colSpan={6}
+                  kind="empty"
+                  title="自動応答は0件です"
+                  description="絞り込みを外すか、「自動応答を作成」から追加してください。"
+                />
               ) : (
                 shownInFolder.map((r) => (
                   <tr key={r.id} className="hover:bg-canvas-sunken">
