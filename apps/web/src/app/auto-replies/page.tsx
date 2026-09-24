@@ -294,10 +294,10 @@ export default function AutoRepliesPage() {
             return (
               <span
                 key={ea.accountId}
-                className="inline-flex max-w-full items-center truncate px-1.5 py-0.5 rounded text-[10px] bg-canvas-sunken text-ink-faint line-through"
+                className="inline-flex max-w-full items-center gap-0.5 truncate px-1.5 py-0.5 rounded text-[10px] bg-canvas-sunken text-ink-faint line-through"
                 title={title}
               >
-                {label}
+                {word.mark} {label}
               </span>
             )
           }
@@ -609,31 +609,36 @@ export default function AutoRepliesPage() {
         </Button>
       </div>
 
-      {/* 複数当てはまったときの挙動。書いていないと必ず問い合わせになる。 */}
-      <div className="bg-info-bg text-info mb-4 rounded-lg p-3 text-xs leading-relaxed">
-        上にあるルールから順に見て、<strong>最初に当てはまった1つだけ</strong>が動きます。
-        時間帯や連投の設定で見送られたときは、その次のルールを見ます。
-        並び順は「評価順」の数字で決まり、小さいほど先に見ます。
-      </div>
-
-      {/* 「適用アカウント」欄の札の読み方。札の見た目と1対1で並べる。 */}
-      <div className="bg-info-bg border-hairline text-info mb-4 space-y-1 rounded-lg border p-3 text-xs">
-        {EFFECTIVE_LEGEND.map((row) => (
-          <p key={row.status}>
-            <span
-              className={
-                row.status === 'reply'
-                  ? 'inline-flex items-center px-1.5 py-0.5 rounded bg-success-bg text-green-700'
-                  : row.status === 'silent'
-                    ? 'inline-flex items-center px-1.5 py-0.5 rounded bg-amber-50 text-amber-700'
-                    : 'inline-flex items-center px-1.5 py-0.5 rounded bg-canvas-sunken text-ink-faint line-through'
-              }
-            >
-              {row.mark ? `${row.mark} ` : ''}アカウント名
-            </span>{' '}
-            {row.text}
-          </p>
-        ))}
+      {/*
+        案内は1本の帯にまとめる。2段の帯が連続すると、肝心の一覧が
+        画面の下へ追いやられていた（監査 A13）。
+        上段は複数当てはまったときの挙動、下段は「適用アカウント」欄の
+        札の読み方。札の見た目と1対1で並べる。
+      */}
+      <div className="bg-info-bg border-hairline text-info mb-4 rounded-lg border p-3 text-xs">
+        <p className="leading-relaxed">
+          上にあるルールから順に見て、<strong>最初に当てはまった1つだけ</strong>が動きます。
+          時間帯や連投の設定で見送られたときは、その次のルールを見ます。
+          並び順は「評価順」の数字で決まり、小さいほど先に見ます。
+        </p>
+        <div className="mt-2 space-y-1 border-t border-info/20 pt-2">
+          {EFFECTIVE_LEGEND.map((row) => (
+            <p key={row.status}>
+              <span
+                className={
+                  row.status === 'reply'
+                    ? 'inline-flex items-center px-1.5 py-0.5 rounded bg-success-bg text-green-700'
+                    : row.status === 'silent'
+                      ? 'inline-flex items-center px-1.5 py-0.5 rounded bg-amber-50 text-amber-700'
+                      : 'inline-flex items-center px-1.5 py-0.5 rounded bg-canvas-sunken text-ink-faint line-through'
+                }
+              >
+                {row.mark ? `${row.mark} ` : ''}アカウント名
+              </span>{' '}
+              {row.text}
+            </p>
+          ))}
+        </div>
       </div>
 
       <div

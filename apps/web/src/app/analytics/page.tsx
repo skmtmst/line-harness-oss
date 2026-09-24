@@ -2377,7 +2377,12 @@ function FriendsOverviewTab({ accountId }: { accountId: string }) {
       </div>
       {!daysShown ? (
         <div className="p-8 text-center text-sm text-ink-faint">
-          <p>{pendingReason}</p>
+          {/*
+            理由の本文は上の警告帯が1回だけ言う。ここで stateReason を
+            もう一度出すと、同じ文が帯とグラフ枠で二重に読めた（監査 A9）。
+            枠内は短い状態と、次にすることだけに絞る。
+          */}
+          <p>{overview.state === 'pending' ? '日ごとの集計を待っています' : 'この期間の集計はまだ出せません'}</p>
           {/* 集計待ちの間は「0人」とも「次はいつ」とも言えない。更新の周期と
               変わらない場合の戻り方だけを伝える(点検ANALYTICS-01)。 */}
           {overview.state === 'pending' && (

@@ -331,8 +331,14 @@ function WebinarListErrorNotice({
   器に入れると白い余白と灰色の二重背景になる(監査 DETAIL-01)。
 */
 function WebinarListCard({ children }: { children: ReactNode }) {
+  /*
+    高さは中身に任せる。以前は固定の最小高さがあって、1行だけの一覧でも
+    表の下に大きな空白帯ができ、その外に件数表示が取り残されて見えた
+    （監査 A8）。読込・空・失敗は ListState が自分の面を持つので、
+    ここで高さを決める必要はない。
+  */
   return (
-    <div className="border-hairline bg-canvas min-h-[360px] overflow-hidden rounded-card border">
+    <div className="border-hairline bg-canvas overflow-hidden rounded-card border">
       {children}
     </div>
   )
