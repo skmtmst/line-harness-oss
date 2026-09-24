@@ -15,6 +15,7 @@ import AutomationTemplateGallery from '@/components/automations/automation-templ
 import { useCanManageAutomations } from '@/components/automations/use-automation-permission'
 import ListState from '@/components/shared/list-state'
 import { usePageTitle } from '@/components/shell/page-chrome'
+import Chip from '@/components/shared/chip'
 import FilterChip from '@/components/shared/filter-chip'
 import KpiCollapse from '@/components/ui/kpi-collapse'
 import MetricValue from '@/components/ui/metric-value'
@@ -715,7 +716,12 @@ export default function AutomationsPage() {
                 <span className="text-ink tabular-nums">{automation.executionCount30d.toLocaleString('ja-JP')}回</span>
                 {automation.failureCount30d > 0 ? <span className="text-danger block text-[11px]">失敗が{automation.failureCount30d}回</span> : null}
               </div>
-              <span className={automation.isActive ? 'font-semibold text-accent-deep' : 'font-semibold text-ink-faint'}>{automation.isActive ? '動いています' : '止めています'}</span>
+              {/*
+                状態は色文字ではなく札で出す。他の一覧は状態を印（チップ）で
+                示しており、素テキストだけの列は「まだ書き途中」に見える
+                （監査 A13）。止めている＝オフなので ok ではなく neutral。
+              */}
+              <Chip tone={automation.isActive ? 'ok' : 'neutral'}>{automation.isActive ? '動いています' : '止めています'}</Chip>
               {/* 見るだけの導線は閲覧のみにも出す。検索語にこの行の名前を載せて実対象を引き継ぐ（#677で承認されたN-352の導線部分）。 */}
               <AutomationRowActions
                 automation={automation}

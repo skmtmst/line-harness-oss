@@ -109,7 +109,9 @@ export function effectiveAccountWord(
 ): { mark: string; note: string } {
   if (status === 'not_applicable') {
     return {
-      mark: '',
+      // 消し線だけだと「デ」のような文字に見えて、押せる印かどうか
+      // 読み取れなかった（監査 A13）。無効の印を明示する。
+      mark: '✕',
       note: 'このアカウントでは動きません。別のアカウント専用の設定です',
     }
   }
@@ -159,7 +161,7 @@ export const EFFECTIVE_LEGEND: ReadonlyArray<{
   },
   {
     status: 'not_applicable',
-    mark: '',
+    mark: '✕',
     text: 'このアカウントでは動きません。別のアカウント専用の設定です。',
   },
 ]

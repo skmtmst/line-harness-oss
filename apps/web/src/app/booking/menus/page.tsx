@@ -398,7 +398,13 @@ function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuC
                 {visible.map((m) => (
                   <tr key={m.id} className={`hover:bg-canvas-sunken ${m.is_active ? '' : 'text-ink-faint'}`}>
                     <td className="px-4 py-3 text-sm font-medium">
-                      <span className="text-ink-faint mr-4" aria-hidden="true">⠿</span>{m.name}{m.is_active ? '' : '（休止中）'}
+                      {/*
+                        行頭の持ち手の飾りは外した。ドラッグで並び替えられる
+                        ように見えるが実際は押せず、並び順は「中身を見る」の
+                        中の数値欄で変える（監査 A12）。動かせない印を置くと
+                        壊れているように見える。
+                      */}
+                      {m.name}{m.is_active ? '' : '（休止中）'}
                       {m.description && <span className="text-ink-faint mt-1 block max-w-72 truncate text-xs" title={m.description}>{m.description}</span>}
                       {m.category_label && (
                         <span className="bg-canvas-sunken text-ink-faint ml-2 inline-block rounded px-2 py-0.5 text-xs">
