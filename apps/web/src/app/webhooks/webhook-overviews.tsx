@@ -124,7 +124,7 @@ function OutgoingKpis({
         unit="回"
         detail={failedNames ? `${failedNames}を確認` : 'いま確認が必要な送り先はありません'}
         badge={failedNames ? '確認' : undefined}
-        badgeTone={failedNames ? 'danger' : 'neutral'}
+        badgeTone="neutral"
         loading={summaryLoading}
         variant="v6"
       />
@@ -323,7 +323,7 @@ export function OutgoingOverview({
         summaryStatus={summaryStatus}
       />
 
-      <p className="bg-accent-soft text-ink-secondary rounded-card mb-3 px-4 py-3 text-sm leading-6">
+      <p className="bg-info-bg text-ink-secondary rounded-card mb-3 px-4 py-3 text-xs leading-6">
         「こちらから送る」は、うちで起きたことを相手に知らせます。「こちらで受け取る」は、相手で起きたことをうちに取り込みます。受け取る側のURLは、相手のサービスに貼ってください。
       </p>
 
@@ -385,12 +385,12 @@ export function OutgoingOverview({
         <DataTable>
           <thead>
             <TableHeadRow>
-              <Th>つなぎ先</Th>
-              <Th>いつ送るか</Th>
-              <Th>送るもの</Th>
-              <Th align="right">この30日</Th>
-              <Th>ようす</Th>
-              <Th>操作</Th>
+              <Th className="w-2/12">つなぎ先</Th>
+              <Th className="w-2/12">いつ送るか</Th>
+              <Th className="w-2/12">送るもの</Th>
+              <Th className="w-1/12" align="right">この30日</Th>
+              <Th className="w-2/12">ようす</Th>
+              <Th className="w-3/12">操作</Th>
             </TableHeadRow>
           </thead>
           <tbody>
@@ -402,9 +402,12 @@ export function OutgoingOverview({
               const canActivate = item.hasSecret && isHttpsUrl(item.url)
               return (
                 <Tr key={item.id}>
-                  <NameCell name={item.name} sub={maskedUrl(item.url)} />
-                  <Td>{firstEventLabel(item)}</Td>
-                  <Td>{payloadLabel(item)}</Td>
+                  <NameCell
+                    name={<span className="block truncate" title={item.name}>{item.name}</span>}
+                    sub={<span className="block truncate" title={maskedUrl(item.url)}>{maskedUrl(item.url)}</span>}
+                  />
+                  <Td><span className="block truncate" title={firstEventLabel(item)}>{firstEventLabel(item)}</span></Td>
+                  <Td><span className="block truncate" title={payloadLabel(item)}>{payloadLabel(item)}</span></Td>
                   <Td align="right">
                     <span className="text-ink tabular-nums">
                       {item.deliverySummary.total.toLocaleString('ja-JP')}回
@@ -427,21 +430,26 @@ export function OutgoingOverview({
                       {toggling ? '切り替え中' : failed ? '返事がありません' : pending ? '送信中' : item.isActive ? 'うまくいっています' : '止めています'}
                     </StatusBadge>
                     {failed && item.deliverySummary.lastResult?.completedAt ? (
-                      <span className="text-ink-faint mt-1 block text-xs">
+                      <span
+                        className="text-ink-faint mt-1 block truncate text-xs"
+                        title={`最終 ${new Date(item.deliverySummary.lastResult.completedAt).toLocaleString('ja-JP')}`}
+                      >
                         最終 {new Date(item.deliverySummary.lastResult.completedAt).toLocaleString('ja-JP')}
                       </span>
                     ) : null}
                   </Td>
                   <ActionCell>
+                    {/*
+                      行に直接置くのは「失敗をやり直す／中身を見る」だけ。
+                      「1回 試してみる」まで横に並べると操作列が「ようす」列へ
+                      重なり、状態の札が読めなくなる。試し送信は使用頻度が
+                      低いので「設定」メニューの末尾へ畳む（確認ダイアログを
+                      挟む仕掛けはそのまま）。
+                    */}
                     <div className="flex items-center justify-end gap-2 whitespace-nowrap">
                       <Button variant="secondary" href="/webhooks?tab=interactions">
                         {item.deliverySummary.canRetry ? '失敗をやり直す' : '中身を見る'}
                       </Button>
-                      <Button
-                        variant="secondary"
-                        disabled={!lineAccountId || testingId !== null || !item.isActive}
-                        onClick={() => setTestTarget(item)}
-                      >{testingId === item.id ? '試しています…' : '1回 試してみる'}</Button>
                       <div className="relative" ref={settingsId === item.id ? settingsRef : null}>
                         <Button
                           variant="secondary"
@@ -516,6 +524,20 @@ export function OutgoingOverview({
                           <Button variant="secondary" role="menuitem" href={`/webhooks/edit?id=${item.id}`}>直す</Button>
                           <Button variant="secondary" role="menuitem" onClick={() => onRotate(item)}>合言葉</Button>
                           <Button variant="secondary" role="menuitem" onClick={() => onDelete(item)}>削除</Button>
+                          {/*
+                            試し送信は本物のURLへ届くので、押しただけでは送らず
+                            確認ダイアログへ回す(N-388)。確認を開くと同時に
+                            メニューを閉じる。幅は固定しない(`min-w-36` は
+                            「止める」の押下座標を動かさないための固定で#707)。
+                          */}
+                          <Button
+                            variant="secondary"
+                            role="menuitem"
+                            disabled={!lineAccountId || testingId !== null || !item.isActive}
+                            onClick={() => { setSettingsId(null); setTestTarget(item) }}
+                          >
+                            {testingId === item.id ? '試しています…' : '1回 試してみる'}
+                          </Button>
                           </div>
                         ) : null}
                       </div>
