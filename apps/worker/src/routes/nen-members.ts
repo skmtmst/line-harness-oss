@@ -1269,7 +1269,7 @@ nenMembers.get('/api/nen-members/photos', requirePhotoPermission('photo.submissi
             ps.publication_withdrawn_at, ps.public_pet_name, ps.review_reason_code,
             ps.review_reason_note, ps.review_notification_status,
             ps.display_rotation, f.photo_watch_required AS submitter_watch,
-            p.name pet_name, f.display_name owner_name,
+            p.name pet_name, p.gender AS pet_gender, f.display_name owner_name,
             (SELECT ${PHOTO_REWARD_STATE_CASE} FROM nen_photo_reward_outbox o
               WHERE o.photo_id = ps.id AND o.line_account_id = ps.line_account_id) AS point_sync_status,
             (SELECT r.flag FROM nen_photo_risk_assessments r
@@ -1289,7 +1289,13 @@ nenMembers.get('/api/nen-members/photos', requirePhotoPermission('photo.submissi
         ${q ? `AND (ps.caption LIKE ? ESCAPE '\\' OR p.name LIKE ? ESCAPE '\\' OR f.display_name LIKE ? ESCAPE '\\')` : ''}
       ORDER BY ps.created_at DESC, ps.id DESC LIMIT ? OFFSET ?`,
   ).bind(staleCutoff, ...(q ? [accountId, accountId, like, like, like] : [accountId, accountId]), limit, offset).all<Record<string, unknown>>();
-  return c.json({ success: true, data: rows.results });
+  return c.json({
+    success: true,
+    data: rows.results.map((row) => ({
+      ...row,
+      pet_call_name: petCallName(String(row.pet_name ?? ''), row.pet_gender),
+    })),
+  });
 });
 
 nenMembers.get(
@@ -1532,7 +1538,7 @@ nenMembers.get('/api/nen-members/photos/:id', requirePhotoPermission('photo.subm
             ps.publication_consent_version, ps.publication_withdrawn_at,
             ps.display_rotation, ps.awarded_points, ps.reviewed_at, ps.reviewed_by_name,
             f.photo_watch_required AS submitter_watch,
-            p.name AS pet_name, p.animal_type, p.breed,
+            p.name AS pet_name, p.gender AS pet_gender, p.animal_type, p.breed,
             p.birthday, f.display_name AS owner_name,
             (SELECT COUNT(*) FROM nen_photo_submissions prior
               WHERE prior.friend_id = ps.friend_id AND prior.created_at <= ps.created_at) AS submission_count,
@@ -1602,6 +1608,7 @@ nenMembers.get('/api/nen-members/photos/:id', requirePhotoPermission('photo.subm
     success: true,
     data: {
       ...photo,
+      pet_call_name: petCallName(String(photo.pet_name ?? ''), photo.pet_gender),
       risks: risks.results,
       history: history.results,
       reward: rewardView,

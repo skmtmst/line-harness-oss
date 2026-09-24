@@ -13,7 +13,7 @@ import { formatPhotoReceivedAt } from './photo-review-time'
 import { safePhotoSrc } from './photo-src'
 import { photoPetDisplayName } from '@/components/shared/photo-display-name'
 import { petAnimalTypeLabel } from '@/lib/nen-pets-api'
-import { photoReviewReasonLabel, pointStatusLabel, text } from './photo-text'
+import { photoReviewReasonLabel, mileStatusLabel, text } from './photo-text'
 
 const numberOrDash = (value: unknown) => Number.isFinite(Number(value)) ? Number(value).toLocaleString('ja-JP') : '—'
 
@@ -41,7 +41,7 @@ export function PhotoReviewDetail({
   onProcessReviewAsset: () => void
   onSaveRotation: (rotation: 0 | 90 | 180 | 270) => void
   onDownloadOriginal: (code: string) => Promise<void>
-  // PHOTO-06: 止まったポイント手続きの再試行・ECとの照合。
+  // PHOTO-06: 止まったマイル手続きの再試行・ECとの照合。
   onPointAction: (action: 'retry' | 'reconcile') => void | Promise<void>
   pointActionBusy: 'retry' | 'reconcile' | null
 }) {
@@ -93,7 +93,7 @@ export function PhotoReviewDetail({
     <div className="flex items-center justify-between gap-2 max-md:flex-col max-md:items-start">
       <div>
         <p className="text-xs font-bold text-ink-faint">写真審査</p>
-        <h2 className="mt-1 text-2xl font-extrabold text-ink">{photoPetDisplayName(photo.pet_name, { honorific: false })} の写真</h2>
+        <h2 className="mt-1 text-2xl font-extrabold text-ink">{photoPetDisplayName(photo.pet_name, { callName: photo.pet_call_name, gender: photo.pet_gender })} の写真</h2>
       </div>
       <div className="flex flex-wrap items-center gap-2">
         <span className="mr-2 text-xs font-bold text-ink-secondary">{total > 0 ? `${total}枚のうち ${position + 1}枚目` : '—'}</span>
@@ -110,7 +110,7 @@ export function PhotoReviewDetail({
         <div className="grid h-96 place-items-center overflow-hidden bg-ink lg:h-160">
           {reviewUrl ? <img
             src={reviewUrl}
-            alt={`${photoPetDisplayName(photo.pet_name, { honorific: false })}の審査用写真`}
+            alt={`${photoPetDisplayName(photo.pet_name, { callName: photo.pet_call_name, gender: photo.pet_gender })}の審査用写真`}
             className="h-full w-full object-contain transition-transform"
             style={{ transform: `scale(${scale}) rotate(${rotation}deg)` }}
           /> : <p className="text-xs font-bold text-ink-faint">審査用の画像を作成中です</p>}
@@ -139,8 +139,8 @@ export function PhotoReviewDetail({
       <aside className="flex flex-col gap-3">
         <Card padding="default">
           <dl>
-            <div><dt className="text-xs font-bold text-ink-faint">送ってくれた人</dt><dd className="mt-1 text-xs font-bold text-ink">{text(photo.owner_name) || '名前未取得'}</dd><small className="mt-1 block text-xs text-ink-faint">投稿 {numberOrDash(photo.submission_count)}回目 ／ 戻したこと {numberOrDash(photo.returned_count)}回</small></div>
-            <div className="mt-3 border-t border-hairline pt-3"><dt className="text-xs font-bold text-ink-faint">ペット</dt><dd className="mt-1 text-xs font-bold text-ink">{photoPetDisplayName(photo.pet_name, { fallback: '未取得', honorific: false })}（{petAnimalTypeLabel(text(photo.animal_type))}・{text(photo.breed) || '品種未取得'}）</dd></div>
+            <div><dt className="text-xs font-bold text-ink-faint">送ってくれた人</dt><dd className="mt-1 text-xs font-bold text-ink">{text(photo.owner_name) || '名前未取得'}</dd><small className="mt-1 block text-xs text-ink-faint">投稿 {numberOrDash(photo.submission_count)}回目 ／ 見送ったこと {numberOrDash(photo.returned_count)}回</small></div>
+            <div className="mt-3 border-t border-hairline pt-3"><dt className="text-xs font-bold text-ink-faint">ペット</dt><dd className="mt-1 text-xs font-bold text-ink">{photoPetDisplayName(photo.pet_name, { fallback: '未取得', callName: photo.pet_call_name, gender: photo.pet_gender })}（{petAnimalTypeLabel(text(photo.animal_type))}・{text(photo.breed) || '品種未取得'}）</dd></div>
             <div className="mt-3 border-t border-hairline pt-3"><dt className="text-xs font-bold text-ink-faint">届いた日時</dt><dd className="mt-1 text-xs font-bold text-ink">{formatPhotoReceivedAt(photo.created_at)}</dd></div>
             <div className="mt-3 border-t border-hairline pt-3"><dt className="text-xs font-bold text-ink-faint">そえられた言葉</dt><dd className="mt-1 text-xs font-bold text-ink">{text(photo.caption) ? `「${text(photo.caption)}」` : 'コメントなし'}</dd></div>
           </dl>
@@ -165,10 +165,10 @@ export function PhotoReviewDetail({
               {history.length === 0
                 ? <dd className="mt-1 font-bold text-ink">まだ審査の記録はありません</dd>
                 : history.map((event, index) => <dd key={`${text(event.created_at)}-${index}`} className="mt-1 font-bold text-ink">
-                  {text(event.to_status) === 'adopted' ? '通した' : '戻した'}
+                  {text(event.to_status) === 'adopted' ? '採用' : '見送り'}
                   {text(event.reason_code) ? `（${photoReviewReasonLabel(event.reason_code)}）` : ''}
                   ・{text(event.reviewed_by_name) || '担当未取得'}・{formatPhotoReceivedAt(event.created_at)}
-                  {Number(event.awarded_points) > 0 ? `・${Number(event.awarded_points)}ポイント` : ''}
+                  {Number(event.awarded_points) > 0 ? `・${Number(event.awarded_points)}マイル` : ''}
                   {text(event.notification_status) === 'failed' ? '・通知は失敗' : ''}
                 </dd>)}
             </div>
@@ -202,7 +202,7 @@ export function PhotoReviewDetail({
                 </>}
             </div>
             <div className="mt-3 border-t border-hairline pt-3">
-              <dt className="font-bold text-ink-faint">ポイント</dt>
+              <dt className="font-bold text-ink-faint">マイル</dt>
               {/*
                * 派生状態（state）はサーバーが一覧と同じ分岐で出す
                * （PHOTO-06）。古い口から来た応答は生のstatusへ倒す。
@@ -210,9 +210,9 @@ export function PhotoReviewDetail({
               <dd className="mt-1 font-bold text-ink">
                 {text(photo.status) === 'adopted'
                   ? reward
-                    ? `${pointStatusLabel(text(reward.state) || reward.status, Number(reward.points) || 5)}${text(reward.synced_at) ? `（${formatPhotoReceivedAt(reward.synced_at)}）` : ''}`
-                    : 'EC未接続・ポイント対象外'
-                  : 'ポイントの対象は通した写真だけです'}
+                    ? `${mileStatusLabel(text(reward.state) || reward.status, Number(reward.points) || 5)}${text(reward.synced_at) ? `（${formatPhotoReceivedAt(reward.synced_at)}）` : ''}`
+                    : 'EC未接続・マイル対象外'
+                  : 'マイルの対象は採用した写真だけです'}
               </dd>
               {reward && (text(reward.reason_label) || text(reward.last_error))
                 ? <dd className="mt-1 font-medium text-status-warn-deep">確認が必要：{text(reward.reason_label) || text(reward.last_error)}</dd>
@@ -220,7 +220,7 @@ export function PhotoReviewDetail({
               {reward && ['stale', 'failed_retryable'].includes(text(reward.state))
                 ? <dd className="mt-2 flex flex-wrap gap-2">
                   <Button size="field" disabled={pointActionBusy !== null} onClick={() => void onPointAction('retry')}>
-                    {pointActionBusy === 'retry' ? '送り直しています…' : 'ポイント手続きをもう一度送る'}
+                    {pointActionBusy === 'retry' ? '送り直しています…' : 'マイル手続きをもう一度送る'}
                   </Button>
                   <Button size="field" disabled={pointActionBusy !== null} onClick={() => void onPointAction('reconcile')}>
                     {pointActionBusy === 'reconcile' ? '照合しています…' : 'EC側と照合する'}
@@ -228,13 +228,13 @@ export function PhotoReviewDetail({
                 </dd>
                 : null}
               {text(photo.status) === 'adopted'
-                ? <dd className="mt-1 font-medium text-ink-faint">採用1回につき付与は1回です。外しても付与済みのポイントは戻りません。</dd>
+                ? <dd className="mt-1 font-medium text-ink-faint">採用1回につき付与は1回です。外しても付与済みのマイルは戻りません。</dd>
                 : null}
             </div>
           </dl>
         </Card>
         <FeatureLinkCard items={[
-          { label: 'ECポイント', note: 'ECとつながっていれば、通したとき5ポイントの手続きを始める' },
+          { label: 'ECマイル', note: 'ECとつながっていれば、採用したとき5マイルの手続きを始める' },
           { label: 'LINE通知', note: '審査結果を本人へ送る' },
           { label: '登録メディア', note: '公開用画像の置き場' },
         ]} />
@@ -244,9 +244,9 @@ export function PhotoReviewDetail({
       <StickyBar
         status={`${total}枚のうち ${position + 1}枚目。あと${Math.max(0, total - position - 1)}枚あります。`}
         actions={<>
-        <Button disabled={reviewing} onClick={onReturn}>戻す（理由を選ぶ）</Button>
-        <Button disabled title="切り取り版の生成口を接続後に使えます">切り取ってから通す</Button>
-        <Button variant="primary" disabled={reviewing} onClick={onApprove}>{reviewing ? '処理中...' : 'このまま通す'}</Button>
+        <Button disabled={reviewing} onClick={onReturn}>見送る（理由を選ぶ）</Button>
+        <Button disabled title="切り取り版の生成口を接続後に使えます">切り取ってから採用</Button>
+        <Button variant="primary" disabled={reviewing} onClick={onApprove}>{reviewing ? '処理中...' : 'このまま採用'}</Button>
         </>}
       />
     </div>

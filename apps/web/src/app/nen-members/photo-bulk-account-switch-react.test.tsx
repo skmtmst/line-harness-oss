@@ -129,7 +129,7 @@ async function click(label: string, index = 0) {
  */
 function bulkButton(): HTMLButtonElement {
   const found = Array.from(host.querySelectorAll('button')).find(
-    (item) => ['まとめて通す', '処理中...'].includes(item.textContent?.trim() ?? ''),
+    (item) => ['まとめて採用', '処理中...'].includes(item.textContent?.trim() ?? ''),
   )
   if (!found) throw new Error(`一括のボタンが見つかりません: ${host.textContent}`)
   return found as HTMLButtonElement
@@ -159,8 +159,8 @@ describe('一括審査中にアカウントを切り替えたときの画面(#63
 
     await selectPhoto(0)
     await selectPhoto(1)
-    await click('まとめて通す')          // 一覧のボタン → 確認窓が開く
-    await click('まとめて通す', 1)       // 確認窓の実行ボタン
+    await click('まとめて採用')          // 一覧のボタン → 確認窓が開く
+    await click('まとめて採用', 1)       // 確認窓の実行ボタン
     expect(bulkCalls()).toBe(1)
 
     // 応答が返らないうちにBへ切り替える。
@@ -210,8 +210,8 @@ describe('一括審査中にアカウントを切り替えたときの画面(#63
     await render()
     await selectPhoto(0)
     await selectPhoto(1)
-    await click('まとめて通す')
-    await click('まとめて通す', 1)
+    await click('まとめて採用')
+    await click('まとめて採用', 1)
     expect(bulkCalls()).toBe(1)
 
     // Aの応答が返らないうちにBへ切り替え、そのあとAの応答が遅れて返る。
@@ -223,13 +223,13 @@ describe('一括審査中にアカウントを切り替えたときの画面(#63
     // Bの写真を選ぶと、一括のボタンは押せる形になっている。
     await selectPhoto(0)
     const bulk = bulkButton()
-    expect(bulk.textContent?.trim()).toBe('まとめて通す')
+    expect(bulk.textContent?.trim()).toBe('まとめて採用')
     expect(bulk.disabled).toBe(false)
 
     // 実際に押すと確認窓が開き、Bのアカウントで一括審査を送れる。
-    await click('まとめて通す')
-    expect(buttons('まとめて通す')).toHaveLength(2)
-    await click('まとめて通す', 1)
+    await click('まとめて採用')
+    expect(buttons('まとめて採用')).toHaveLength(2)
+    await click('まとめて採用', 1)
     expect(bulkCalls()).toBe(2)
     expect(bulkBodies[1]).toContain('account-b')
     expect(bulkBodies[1]).toContain('photo-b1')
@@ -244,8 +244,8 @@ describe('一括審査中にアカウントを切り替えたときの画面(#63
 
     await render()
     await selectPhoto(0)
-    await click('まとめて通す')
-    await click('まとめて通す', 1)
+    await click('まとめて採用')
+    await click('まとめて採用', 1)
 
     fixture.accountId = 'account-b'
     await render()
