@@ -3,6 +3,7 @@
 import { Archive, X } from 'lucide-react'
 import SortSelect from '@/components/ui/sort-select'
 import PageSizeSelect from '@/components/ui/page-size-select'
+import ListRange from '@/components/ui/list-range'
 
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
@@ -822,7 +823,7 @@ function WebinarsPage() {
               refreshing={refreshing}
               onRetry={() => void refresh()}
               onArchive={openArchive}
-              footer={hasListData && visibleTotal > 0 ? <p className="text-ink-faint text-xs tabular-nums">{(currentPage - 1) * pageSize + 1}〜{(currentPage - 1) * pageSize + visible.length}件 / 全{visibleTotal}件</p> : undefined}
+              footer={hasListData && visibleTotal > 0 ? <ListRange total={visibleTotal} first={(currentPage - 1) * pageSize + 1} last={(currentPage - 1) * pageSize + visible.length} /> : undefined}
             />
 
             {hasListData && visibleTotal > 0 && (
