@@ -53,7 +53,7 @@ describe('LIFF 写真掲載同意から公式サイト掲載まで', () => {
         (id, friend_id, pet_id, r2_key, image_url, review_image_url, public_image_url,
          content_type, caption, status, created_at, reviewed_at, updated_at, line_account_id)
        VALUES ('photo-a', 'friend-a', 'pet-a', 'original.jpg', 'https://review.example/photo-a.jpg',
-               'https://review.example/photo-a.jpg', 'https://public.example/photo-a.jpg',
+               'https://review.example/photo-a.jpg', NULL,
                'image/jpeg', 'caption', 'adopted', ?, ?, ?, 'account-a')`,
     ).run(NOW, NOW, NOW);
     target = app(testDb.db);
@@ -75,6 +75,9 @@ describe('LIFF 写真掲載同意から公式サイト掲載まで', () => {
       `SELECT status, withdrawn_at FROM nen_photo_publications WHERE photo_id = 'photo-a'`,
     ).get() as { status: string; withdrawn_at: string | null };
     expect(publication).toEqual({ status: 'published', withdrawn_at: null });
+    expect(testDb.raw.prepare(
+      `SELECT public_image_url FROM nen_photo_submissions WHERE id = 'photo-a'`,
+    ).get()).toEqual({ public_image_url: 'https://review.example/photo-a.jpg' });
     const placements = testDb.raw.prepare(
       `SELECT placement_type, placement_label, active, removed_at
          FROM nen_photo_publication_placements`,

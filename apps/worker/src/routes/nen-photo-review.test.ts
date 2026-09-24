@@ -498,6 +498,11 @@ describe('NEN photo review', () => {
     expect(await response.json()).toMatchObject({
       data: { awardedPoints: 5, pointBalance: null, pointSync: 'pending' },
     });
+    const submissionUpdate = batches[0].find((entry) => entry.query.includes('UPDATE nen_photo_submissions'));
+    expect(submissionUpdate?.query).toContain(
+      "public_image_url = CASE WHEN ? = 'adopted'",
+    );
+    expect(submissionUpdate?.bindings).toContain('adopted');
     const outbox = batches[0].find((entry) => entry.query.includes('INSERT INTO nen_photo_reward_outbox'));
     expect(outbox?.bindings).toEqual([
       expect.any(String), 'photo-1', 'account-a', 'friend-1', 'customer-1',
