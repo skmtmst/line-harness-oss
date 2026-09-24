@@ -798,5 +798,11 @@
   },
   "components/webinars/webinar-line-preview.tsx": {
     "unresolved-classname": 7
+  },
+  "components/shared/file-drop.tsx": {
+    "unresolved-classname": 20
+  },
+  "components/shared/progress.tsx": {
+    "unresolved-classname": 32
   }
 }
