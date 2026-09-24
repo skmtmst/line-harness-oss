@@ -1,9 +1,9 @@
 'use client'
 
 import { Suspense, useEffect, useState } from 'react'
-import Link from 'next/link'
 
 import AutomationDraftEditor from '@/components/automations/automation-draft-editor'
+import TargetMissing from '@/components/shared/target-missing'
 import { usePageTitle } from '@/components/shell/page-chrome'
 
 /*
@@ -30,18 +30,13 @@ function AutomationDraftPageInner() {
 
   if (!draftId) {
     return (
-      <div className="rounded-card border-hairline bg-canvas border p-8 text-center">
-        <p className="text-ink text-sm font-bold">どの下書きかが指定されていません</p>
-        <p className="text-ink-secondary mt-2 text-xs leading-5">
-          見本の一覧から選び直してください。下書きは消えていません。
-        </p>
-        <Link
-          href="/automations?tab=templates"
-          className="text-action mt-4 inline-block text-sm font-medium underline"
-        >
-          見本の一覧へ
-        </Link>
-      </div>
+      <TargetMissing
+        kind="unspecified"
+        title="開く下書きが指定されていません"
+        description="見本の一覧から選び直してください。下書きは消えていません。"
+        backHref="/automations?tab=templates"
+        backLabel="見本の一覧へ戻る"
+      />
     )
   }
 

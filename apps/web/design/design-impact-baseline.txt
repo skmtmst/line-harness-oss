@@ -117,7 +117,6 @@ shared-button-importer app/page.tsx
 shared-button-importer app/password/forgot/page.tsx
 shared-button-importer app/password/reset/page.tsx
 shared-button-importer app/pools/page.tsx
-shared-button-importer app/recipes/clone/page.tsx
 shared-button-importer app/recipes/page.tsx
 shared-button-importer app/register/complete/page.tsx
 shared-button-importer app/register/page.tsx
@@ -149,7 +148,6 @@ shared-button-importer app/tags/fields/edit/page.tsx
 shared-button-importer app/tags/fields/migrate/page.tsx
 shared-button-importer app/tags/fields/new/page.tsx
 shared-button-importer app/tags/folders/new/page.tsx
-shared-button-importer app/tags/marks/edit/page.tsx
 shared-button-importer app/tags/searches/edit/page.tsx
 shared-button-importer app/templates/detail/page.tsx
 shared-button-importer app/templates/page.tsx
@@ -233,6 +231,7 @@ shared-button-importer components/shared/not-connected.tsx
 shared-button-importer components/shared/progress.tsx
 # #985 LAY-18: 一覧の行の操作（詳細・編集）が共通Buttonを使う。
 shared-button-importer components/shared/row-actions.tsx
+shared-button-importer components/shared/target-missing.tsx
 shared-button-importer components/store-selection-gate.tsx
 shared-button-importer components/templates/message-template-editor.tsx
 shared-button-importer components/ui/kpi-collapse.tsx

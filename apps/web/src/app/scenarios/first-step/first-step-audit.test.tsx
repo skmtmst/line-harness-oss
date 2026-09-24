@@ -249,8 +249,9 @@ describe('SCENARIO-04：シナリオが確定するまで保存しない', () =>
     m.get.mockResolvedValueOnce(fail).mockResolvedValue(ok(scenario({ steps: [] })))
     await mount(<FirstStep />)
     expect(screen.queryByRole('button', { name: '作成して編集へ →' })).toBeNull()
-    expect(screen.getByText('検証用エラー')).toBeTruthy()
-    await click('再読み込み')
+    // 取得の失敗は ★V7 TargetMissing の error で出す（生の応答文は出さない）。
+    expect(screen.getByText('シナリオを読み込めませんでした')).toBeTruthy()
+    await click('もう一度読み込む')
     expect(m.get).toHaveBeenCalledTimes(2)
     expect(screen.getByRole('button', { name: '作成して編集へ →' })).toBeTruthy()
   })

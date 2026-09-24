@@ -6,6 +6,7 @@ import type { ReminderDraftSettings, ReminderDraftStep, ReminderDraftVersion, Re
 import { ApiError, api } from '@/lib/api'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import TargetMissing from '@/components/shared/target-missing'
 import { TextArea, TextInput } from '@/components/shared/form-controls'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import {
@@ -59,6 +60,8 @@ export function Issue469ReminderStepEditor({ reminderId }: { reminderId: string 
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [conflict, setConflict] = useState(false)
+  /** 404・空で見つからないとき。取得の失敗（error）とは分ける。 */
+  const [draftMissing, setDraftMissing] = useState(false)
   /*
    * 読み込み・保存の応答は順不同で返る。世代番号で最新の要求だけを
    * 状態へ反映し、遅れた応答が新しい編集を上書きしないようにする。
@@ -71,6 +74,7 @@ export function Issue469ReminderStepEditor({ reminderId }: { reminderId: string 
 
   const loadDraft = useCallback(async () => {
     const seq = ++requestSeq.current
+    setDraftMissing(false)
     try {
       const response = await api.reminders.getDraft(reminderId)
       if (seq !== requestSeq.current) return
@@ -83,8 +87,13 @@ export function Issue469ReminderStepEditor({ reminderId }: { reminderId: string 
         && response.data.settings.steps.some((step) => step.stableStepId === current)
         ? current
         : response.data.settings.steps[0]?.stableStepId ?? null)
-    } catch {
-      if (seq === requestSeq.current) setError('リマインダを読み込めませんでした。')
+    } catch (caught) {
+      if (seq !== requestSeq.current) return
+      if (caught instanceof ApiError && caught.status === 404) {
+        setDraftMissing(true)
+      } else {
+        setError('リマインダを読み込めませんでした。')
+      }
     }
   }, [reminderId])
 
@@ -139,7 +148,28 @@ export function Issue469ReminderStepEditor({ reminderId }: { reminderId: string 
     })
   }, [])
 
-  if (!settings) return <p className={error ? 'text-danger p-6 text-sm' : 'text-ink-faint p-6 text-sm'}>{error || '読み込んでいます'}</p>
+  if (!settings && (draftMissing || !error)) {
+    if (!error && !draftMissing) return <p className="text-ink-faint p-6 text-sm">読み込んでいます</p>
+    return (
+      <TargetMissing
+        kind="not-found"
+        title="このリマインダは見つかりません"
+        description="削除されたか、別の記録です。一覧から選び直してください。"
+        backHref="/reminders"
+        backLabel="リマインダ一覧へ戻る"
+      />
+    )
+  }
+  if (!settings) {
+    return (
+      <TargetMissing
+        kind="error"
+        title="リマインダを読み込めませんでした"
+        description="通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度読み込んでください。"
+        onRetry={() => void loadDraft()}
+      />
+    )
+  }
 
   const selectedIndex = settings.steps.findIndex((step) => step.stableStepId === selectedStepId)
   /*

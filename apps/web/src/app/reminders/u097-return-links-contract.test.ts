@@ -25,23 +25,24 @@ describe('一覧へ戻る操作を置く（#975 U097）', () => {
   })
 
   it('回答を見る画面は、対象未指定と対象なしの両方で一覧へ戻れる', () => {
-    expect(RESPONSES).toContain('href="/form-submissions"')
+    // 戻り先は ★V7 TargetMissing の backHref が持つ。
+    expect(RESPONSES).toContain('backHref="/form-submissions"')
     expect(RESPONSES).toContain('回答フォーム一覧へ戻る')
-    expect(RESPONSES).toContain('回答フォームが指定されていません')
-    expect(RESPONSES).toContain('回答フォームが見つかりません')
+    expect(RESPONSES).toContain('見る回答フォームが指定されていません')
+    expect(RESPONSES).toContain('この回答フォームは見つかりません')
   })
 
   it('リマインダー編集は、IDなしで一覧へ戻れる', () => {
-    expect(REMINDERS_EDIT).toContain('href="/reminders"')
+    expect(REMINDERS_EDIT).toContain('backHref="/reminders"')
     expect(REMINDERS_EDIT).toContain('リマインダ一覧へ戻る')
     // IDがないときは取得しない。
     expect(REMINDERS_EDIT).toContain('if (!id)')
   })
 
   it('ウェビナー編集は、IDなしと対象なしの両方で一覧へ戻れる', () => {
-    expect(WEBINARS_EDIT).toContain('href="/webinars"')
+    expect(WEBINARS_EDIT).toContain('backHref="/webinars"')
     expect(WEBINARS_EDIT).toContain('ウェビナー一覧へ戻る')
-    expect(WEBINARS_EDIT).toContain('ウェビナーが見つかりませんでした')
+    expect(WEBINARS_EDIT).toContain('このウェビナーは見つかりません')
     expect(WEBINARS_EDIT).toContain('if (!id)')
   })
 

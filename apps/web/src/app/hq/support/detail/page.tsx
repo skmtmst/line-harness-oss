@@ -8,6 +8,7 @@ import type { StaffMember } from '@line-crm/shared'
 import Button from '@/components/shared/button'
 import NoteBar from '@/components/shared/note-bar'
 import StickyBar from '@/components/shared/sticky-bar'
+import TargetMissing from '@/components/shared/target-missing'
 import { TextArea } from '@/components/shared/text-field'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { api, ApiError } from '@/lib/api'
@@ -43,6 +44,9 @@ export default function HqSupportDetailPage() {
   const [id, setId] = useState<string | null | undefined>(undefined)
   const [detail, setDetail] = useState<HqSupportDetail | null>(null)
   const [loadError, setLoadError] = useState('')
+  /** 404・空で見つからないとき。取得の失敗（loadError）とは分ける。 */
+  const [detailMissing, setDetailMissing] = useState(false)
+  const [detailLoading, setDetailLoading] = useState(true)
   const [me, setMe] = useState<StaffMember | null>(null)
   const [tenantName, setTenantName] = useState('')
   const [history, setHistory] = useState<HqSupportRequest[] | null>(null)
@@ -60,12 +64,21 @@ export default function HqSupportDetailPage() {
   const idMissing = id === null
 
   const load = useCallback(async (requestId: string) => {
+    setLoadError('')
+    setDetailMissing(false)
+    setDetailLoading(true)
     try {
       const res = await api.hqSupport.detail(requestId)
       if (!res.success) { setLoadError(res.error || '読み込めませんでした'); return }
       setDetail(res.data)
     } catch (caught) {
-      setLoadError(caught instanceof ApiError && caught.status === 404 ? 'このお問い合わせは見つかりません' : '読み込めませんでした')
+      if (caught instanceof ApiError && caught.status === 404) {
+        setDetailMissing(true)
+      } else {
+        setLoadError('読み込めませんでした')
+      }
+    } finally {
+      setDetailLoading(false)
     }
   }, [])
 
@@ -145,15 +158,30 @@ export default function HqSupportDetailPage() {
       <div className="flex flex-col gap-4 xl:flex-row xl:items-start">
         <section data-design-node="h0DgNn" className="flex min-w-0 flex-1 flex-col gap-4 rounded-card border border-hairline bg-canvas p-5">
           {idMissing ? (
-            <div role="alert">
-              <p className="text-label font-bold text-ink">開くお問い合わせが指定されていません</p>
-              <p className="text-caption text-ink-secondary mt-1">一覧から開くお問い合わせを選び直してください。</p>
-              <Link href="/hq/support" className="text-action mt-3 inline-block text-label font-semibold hover:underline">問い合わせの一覧へ戻る</Link>
-            </div>
-          ) : loadError ? (
-            <p className="text-label text-status-danger" role="alert">{loadError}</p>
-          ) : !detail ? (
+            <TargetMissing
+              kind="unspecified"
+              title="開くお問い合わせが指定されていません"
+              description="一覧から開くお問い合わせを選び直してください。"
+              backHref="/hq/support"
+              backLabel="問い合わせの一覧へ戻る"
+            />
+          ) : detailLoading || id === undefined ? (
             <p className="text-caption text-ink-faint">読み込んでいます…</p>
+          ) : detailMissing || (!loadError && !detail) ? (
+            <TargetMissing
+              kind="not-found"
+              title="このお問い合わせは見つかりません"
+              description="削除されたか、別の記録です。一覧から選び直してください。"
+              backHref="/hq/support"
+              backLabel="問い合わせの一覧へ戻る"
+            />
+          ) : loadError || !detail ? (
+            <TargetMissing
+              kind="error"
+              title="お問い合わせを読み込めませんでした"
+              description="通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度読み込んでください。"
+              onRetry={() => { if (id) void load(id) }}
+            />
           ) : (
             <>
               <div className="flex flex-wrap items-center gap-2.5">

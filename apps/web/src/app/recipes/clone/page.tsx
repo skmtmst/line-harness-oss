@@ -2,12 +2,12 @@
 
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import { Suspense, useEffect, useState } from 'react'
-import { api, type Recipe } from '@/lib/api'
+import { Suspense, useCallback, useEffect, useState } from 'react'
+import { api, ApiError, type Recipe } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
-import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
+import TargetMissing from '@/components/shared/target-missing'
 import SelectField from '@/components/shared/select-field'
 import StatusBadge from '@/components/shared/status-badge'
 import StickyBar from '@/components/shared/sticky-bar'
@@ -39,59 +39,78 @@ function RecipeClone() {
   const { selectedAccountId, selectedAccount, loading: accountLoading } = useAccount()
   const [recipe, setRecipe] = useState<Recipe | null>(null)
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
+  /** 404・空で見つからないとき。取得の失敗（error）とは分ける。 */
+  const [missing, setMissing] = useState(false)
   const [prefix, setPrefix] = useState('')
   const [cloneState, setCloneState] = useState<'idle' | 'saving' | 'success' | 'error'>('idle')
 
   usePageTitle(recipe ? `${recipe.name}を作る` : null)
 
+  const reload = useCallback(async (): Promise<'ok' | 'missing' | 'error'> => {
+    try {
+      const res = await api.recipes.get(id, selectedAccountId ?? undefined)
+      if (!res.success || !res.data) return 'error'
+      setRecipe(res.data)
+      return 'ok'
+    } catch (caught: unknown) {
+      if (caught instanceof ApiError && caught.status === 404) return 'missing'
+      return 'error'
+    }
+  }, [id, selectedAccountId])
+
+  const refresh = useCallback(() => {
+    setStatus('loading')
+    setMissing(false)
+    void reload().then((outcome) => {
+      if (outcome === 'missing') {
+        setMissing(true)
+        setStatus('ready')
+        return
+      }
+      setStatus(outcome === 'ok' ? 'ready' : 'error')
+    })
+  }, [reload])
+
   useEffect(() => {
     if (accountLoading || !id) return
-    let alive = true
-    setStatus('loading')
-    void api.recipes
-      .get(id, selectedAccountId ?? undefined)
-      .then((res) => {
-        if (!alive) return
-        if (!res.success || !res.data) {
-          setStatus('error')
-          return
-        }
-        setRecipe(res.data)
-        setStatus('ready')
-      })
-      .catch(() => {
-        if (alive) setStatus('error')
-      })
-    return () => {
-      alive = false
-    }
-  }, [accountLoading, id, selectedAccountId])
+    refresh()
+  }, [accountLoading, id, refresh])
 
   /*
-   * `?id=` なしで開くと読み込みが始まらない。対象未指定は失敗ではないので、
-   * 落とさず一覧へ戻して選び直させる（全ルート監査 A1、2026-09-25）。
-   */
+    id なしで開くと取得が始まらず、後段で空のまま数えて落ちていた。
+    対象未指定は失敗ではないので、一覧へ戻して選び直させる。
+  */
   if (!id) {
     return (
-      <ListState
-        kind="empty"
-        title="レシピが指定されていません"
-        description="レシピの一覧から、複製するレシピを選び直してください。"
-        action={<Button href="/recipes">レシピの一覧へ戻る</Button>}
+      <TargetMissing
+        kind="unspecified"
+        title="作るレシピが指定されていません"
+        description="一覧から、作りたいレシピを選び直してください。"
+        backHref="/recipes"
+        backLabel="レシピ一覧へ戻る"
       />
     )
   }
+
+  if (missing || (status === 'ready' && !recipe)) {
+    return (
+      <TargetMissing
+        kind="not-found"
+        title="このレシピは見つかりません"
+        description="削除されたか、別の記録です。一覧から選び直してください。"
+        backHref="/recipes"
+        backLabel="レシピ一覧へ戻る"
+      />
+    )
+  }
+
   if (status === 'error') {
     return (
-      <ListState
+      <TargetMissing
         kind="error"
         title="レシピを読み込めませんでした"
-        description="時間をおいてもう一度お試しください。"
-        action={
-          <Link href="/recipes" className={styles.backLink}>
-            レシピ一覧へ
-          </Link>
-        }
+        description="通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度読み込んでください。"
+        onRetry={() => refresh()}
       />
     )
   }

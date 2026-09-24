@@ -4,10 +4,11 @@ import { useCallback, useEffect, useState } from 'react'
 import { X } from 'lucide-react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import type { Tag, TagGroup } from '@line-crm/shared'
-import { api, type TagDefinition, type TagDependencies, type TagDeleteImpactReferences } from '@/lib/api'
+import { api, ApiError, type TagDefinition, type TagDependencies, type TagDeleteImpactReferences } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import Button from '@/components/shared/button'
+import TargetMissing from '@/components/shared/target-missing'
 import TagEditorV4, { definitionsForSave, linkedActionFromDefinition, type TagEditorValues } from './tag-editor-v4'
 
 /**
@@ -134,7 +135,7 @@ export default function EditTagPageV4() {
   usePageTitle('タグを編集')
   const router = useRouter()
   const params = useSearchParams()
-  const { selectedAccountId } = useAccount()
+  const { selectedAccountId, selectedAccount } = useAccount()
   const tagId = params.get('id') ?? ''
   const retroactiveReference = params.get('visualQa') === 'retroactive'
   const [tag, setTag] = useState<Tag | null>(null)
@@ -146,6 +147,8 @@ export default function EditTagPageV4() {
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
+  /** 404・空で見つからないとき。取得の失敗（error）とは分ける。 */
+  const [tagMissing, setTagMissing] = useState(false)
   /*
    * 削除確認に出す参照件数。`load()` で取った実値を `DeleteDialog` へ渡す。
    * 取れていないのに開いたら、窓の中は `—` で削除は押せない。
@@ -156,6 +159,8 @@ export default function EditTagPageV4() {
   const load = useCallback(async () => {
     if (!tagId || !selectedAccountId) { setLoading(false); return }
     setLoading(true)
+    setError('')
+    setTagMissing(false)
     try {
       const [detail, dependenciesResult, folders] = await Promise.all([
         api.tags.definition(tagId, selectedAccountId),
@@ -173,8 +178,12 @@ export default function EditTagPageV4() {
       if (!detail.success) throw new Error(detail.error)
       setDefinition(detail.data)
       setTag({ ...detail.data.tag, friendCount: dependenciesResult.success ? dependenciesResult.data.friendCount : detail.data.tag.friendCount })
-    } catch {
-      setError('読み込みに失敗しました。もう一度読み込んでください。')
+    } catch (caught) {
+      if (caught instanceof ApiError && caught.status === 404) {
+        setTagMissing(true)
+      } else {
+        setError('読み込みに失敗しました。もう一度読み込んでください。')
+      }
       // 参照だけ取れていたのに消すと、窓が「取れていない」扱いになる。
       // 取れていた分は残し、まだ無いときだけ失敗にする。
       setDependenciesStatus((prev) => (prev === 'ready' ? prev : 'error'))
@@ -232,8 +241,40 @@ export default function EditTagPageV4() {
   }
 
   if (loading) return <p className="p-6 text-sm text-ink-faint">読み込み中…</p>
+  if (!tagId) {
+    return (
+      <TargetMissing
+        kind="unspecified"
+        title="編集するタグが指定されていません"
+        description="一覧から編集するタグを選び直してください。"
+        backHref="/tags"
+        backLabel="タグ一覧へ戻る"
+      />
+    )
+  }
   if (!selectedAccountId) return <div role="alert" className="rounded-card border border-warning/30 bg-warning-bg p-6 text-sm text-warning">LINE公式アカウントを選んでください。</div>
-  if (!tag || !definition) return <div className="rounded-card border border-hairline bg-canvas p-8 text-center text-sm text-ink-faint">タグが見つかりません。<button type="button" onClick={() => router.push('/tags')} className="ml-2 text-action">一覧へ戻る</button></div>
+  if ((!tag || !definition) && (tagMissing || !error)) {
+    return (
+      <TargetMissing
+        kind="not-found"
+        title="このタグは見つかりません"
+        description="削除されたか、別の LINE アカウントのものです。一覧から選び直してください。"
+        accountName={selectedAccount?.name}
+        backHref="/tags"
+        backLabel="タグ一覧へ戻る"
+      />
+    )
+  }
+  if (!tag || !definition) {
+    return (
+      <TargetMissing
+        kind="error"
+        title="タグを読み込めませんでした"
+        description="通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度読み込んでください。"
+        onRetry={() => void load()}
+      />
+    )
+  }
 
   // 保管済み(archived)タグは、通常の編集フォームを出さない(#710)。
   if (tag.status === 'archived') {
