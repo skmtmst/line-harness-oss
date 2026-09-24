@@ -647,6 +647,7 @@ function LineNotificationsPage() {
   const [expanded, setExpanded] = useState<string | null>(null)
   const [loadState, setLoadState] = useState<CustomerLoadState>('loading')
   const [busy, setBusy] = useState<string | null>(null)
+  const [pendingToggle, setPendingToggle] = useState<EcNotificationSetting | null>(null)
   const [notice, setNotice] = useState<{ tone: 'success' | 'error'; text: string } | null>(null)
   const [closeConfirmOpen, setCloseConfirmOpen] = useState(false)
   /*
@@ -1066,6 +1067,18 @@ function LineNotificationsPage() {
         notice={notice}
         hasUnsaved={dirtyEvents.includes(expandedSetting.eventType)}
       />
+      {/*
+        * #734: 通知の出す・止めるはお客さまへのLINEに直結するので、
+        * 1クリックの即時切替ではなく確認窓を1回挟む（誤タップ防止）。
+        */}
+      <ConfirmDialog
+        open={pendingToggle !== null}
+        title={pendingToggle?.isEnabled ? `「${pendingToggle.label}」のお知らせを止めますか？` : `「${pendingToggle?.label ?? ''}」のお知らせを出しますか？`}
+        description={pendingToggle?.isEnabled ? '止めると、この出来事が起きてもお客さまへLINEが送られなくなります。あとからまた出せます。' : '出すと、この出来事が起きたお客さまへLINEが送られ始めます。'}
+        confirmLabel={pendingToggle?.isEnabled ? 'お知らせを止める' : 'お知らせを出す'}
+        onConfirm={pendingToggle ? () => { const s = pendingToggle; setPendingToggle(null); void save(s, !s.isEnabled) } : undefined}
+        onCancel={() => setPendingToggle(null)}
+      />
       <ConfirmDialog
         open={closeConfirmOpen}
         title="保存していない編集を破棄しますか？"
@@ -1170,7 +1183,7 @@ function LineNotificationsPage() {
               if (!displayed || displayed.value === null) return displayed?.state === 'pending' ? '集計待ち' : '— 未取得'
               return `${displayed.value}人`
             })()}</span>
-            <div className="flex items-center justify-end gap-2"><Toggle setting={setting} busy={busy === setting.eventType} onToggle={() => void save(setting, !setting.isEnabled)} /><span className={`whitespace-nowrap rounded-pill px-2 py-0.5 text-xs font-semibold ${setting.isEnabled ? 'bg-success-bg text-success' : 'bg-canvas-sunken text-ink-faint'}`}>{setting.isEnabled ? '出している' : '止めている'}</span><button type="button" onClick={() => setExpanded(expanded === setting.eventType ? null : setting.eventType)} className="line-notification-v6-row-action">{expanded === setting.eventType ? '編集を閉じる' : '内容を編集'}</button></div>
+            <div className="flex items-center justify-end gap-2"><Toggle setting={setting} busy={busy === setting.eventType} onToggle={() => setPendingToggle(setting)} /><span className={`whitespace-nowrap rounded-pill px-2 py-0.5 text-xs font-semibold ${setting.isEnabled ? 'bg-success-bg text-success' : 'bg-canvas-sunken text-ink-faint'}`}>{setting.isEnabled ? '出している' : '止めている'}</span><button type="button" onClick={() => setExpanded(expanded === setting.eventType ? null : setting.eventType)} className="line-notification-v6-row-action">{expanded === setting.eventType ? '編集を閉じる' : '内容を編集'}</button></div>
           </div>
         </article>)}
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-hairline px-4 py-3">
