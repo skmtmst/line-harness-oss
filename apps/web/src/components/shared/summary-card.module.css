@@ -138,6 +138,11 @@
   color: var(--color-ink-secondary);
 }
 
+.badge_warning {
+  background: var(--color-status-warn-soft);
+  color: var(--color-status-warn-deep);
+}
+
 .badge_danger {
   background: var(--color-danger-bg);
   color: var(--color-danger);
