@@ -39,7 +39,7 @@ describe('深掘りURLの読み取り(#666)', () => {
       .toEqual({ view: 'publications', status: 'adopted' })
   })
 
-  it('指定なし・壊れた指定は、今までどおり一覧の「見ていないもの」', () => {
+  it('指定なし・壊れた指定は、今までどおり一覧の「審査待ち」', () => {
     for (const search of ['', null, undefined, '?', '?tab=&status=', '?tab=unknown&status=unknown']) {
       expect(photoReviewEntryFrom(search)).toEqual({ view: 'list', status: 'pending' })
     }
