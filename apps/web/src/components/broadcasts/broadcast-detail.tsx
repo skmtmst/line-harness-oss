@@ -451,7 +451,7 @@ export default function BroadcastDetail({ broadcastId }: BroadcastDetailProps) {
             {broadcast.status === 'draft' && (
               <Link
                 href={`/broadcasts/new?draft=${encodeURIComponent(id)}&step=message`}
-                className="text-xs font-semibold text-accent-deep hover:underline"
+                className="text-xs font-semibold text-action hover:underline"
               >
                 本文を編集
               </Link>
@@ -528,7 +528,7 @@ export default function BroadcastDetail({ broadcastId }: BroadcastDetailProps) {
           {!showSegmentBuilder ? (
             <button
               onClick={() => setShowSegmentBuilder(true)}
-              className="text-xs text-accent-deep hover:underline"
+              className="text-xs text-action hover:underline"
             >
               セグメント条件を編集
             </button>

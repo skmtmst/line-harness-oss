@@ -3,7 +3,7 @@ import path from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 
-const SRC = path.join(__dirname)
+const SRC = path.join(__dirname, '..')
 
 function sources(dir: string, out: string[] = []): string[] {
   for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -55,5 +55,15 @@ describe('緑トークンの意味（#669 A7）', () => {
   it('情報帯の青背景に緑文字を重ねない（bg-info-bg には text-info）', () => {
     const hits = offenders((l) => l.includes('bg-info-bg') && l.includes('text-accent-deep'))
     expect(hits, `text-info へ直す: ${hits.join(', ')}`).toEqual([])
+  })
+
+  it('ボタン・折りたたみの緑文字を残さない（同一行に書かれたもの）', () => {
+    const hits = offenders(
+      (l) =>
+        l.includes('text-accent-deep') &&
+        /<button|<summary/.test(l) &&
+        !/bg-accent|border-accent/.test(l),
+    )
+    expect(hits, `text-action へ直す: ${hits.join(', ')}`).toEqual([])
   })
 })

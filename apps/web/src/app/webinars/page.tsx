@@ -35,10 +35,15 @@ const STATUS_LABEL: Record<Webinar['status'], string> = {
   draft: '下書き', active: '公開中', archived: 'アーカイブ',
 }
 
+/*
+ * #702: 札は「薄い同系背景＋濃い同系文字」のトークン規則へ統一。
+ * 生の Tailwind 灰・緑・黄はやめ、AA(4.5:1)を満たす組み合わせだけ使う。
+ * draft 6.94:1 / active 5.11:1 / archived 4.72:1（いずれも 11px 太字）。
+ */
 const STATUS_BADGE: Record<Webinar['status'], string> = {
-  draft: 'bg-gray-100 text-gray-600',
-  active: 'bg-green-100 text-green-700',
-  archived: 'bg-amber-100 text-amber-700',
+  draft: 'bg-shell text-ink-secondary',
+  active: 'bg-success-bg text-success',
+  archived: 'bg-warning-bg text-warning',
 }
 
 function scheduleSummary(w: Webinar): string {

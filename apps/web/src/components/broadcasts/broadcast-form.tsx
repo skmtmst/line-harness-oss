@@ -1522,7 +1522,7 @@ export default function BroadcastForm({
           <div className="rounded-card border border-hairline bg-canvas p-8 text-center">
             <p className="text-ink text-sm font-semibold">{draftError}</p>
             <div className="mt-4 flex items-center justify-center gap-3">
-              <Link href="/broadcasts" className="text-accent-deep text-sm font-medium hover:underline">
+              <Link href="/broadcasts" className="text-action text-sm font-medium hover:underline">
                 一斉配信一覧へ戻る
               </Link>
             </div>
@@ -2017,7 +2017,7 @@ export default function BroadcastForm({
           </div>
           {currentStep === 'message' ? (
             <p className="mt-3 flex items-center gap-2 text-sm font-semibold text-ink-secondary">
-              <Zap size={17} className="text-accent-deep" aria-hidden />
+              <Zap size={17} className="text-ink-secondary" aria-hidden />
               {publishedActions.find((action) => action.versionId === afterActionVersionId)?.name ?? '実行しない'}
             </p>
           ) : <label className="mt-3 block text-xs font-bold text-ink-secondary">実行する公開済みアクション

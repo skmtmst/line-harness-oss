@@ -111,7 +111,7 @@ export default function FriendListTable({
       */}
       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-hairline px-4 py-3 lg:h-14 lg:flex-nowrap lg:py-0">
         <h2 className="whitespace-nowrap text-sm font-bold text-ink">
-          友だち一覧 <span className="ml-1 text-xs font-bold text-accent-deep">{total.toLocaleString('ja-JP')}件</span>
+          友だち一覧 <span className="ml-1 text-xs font-bold text-ink-faint">{total.toLocaleString('ja-JP')}件</span>
         </h2>
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs">
           <span className="whitespace-nowrap text-ink-faint">{selectedCount}件選択中</span>
