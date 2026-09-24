@@ -56,8 +56,10 @@ type ReplyStatus = 'unreplied' | 'draft' | 'pending_confirm' | 'replied' | 'publ
 
 /**
  * Google接続は統括の設定。owner は常に許可し、admin はDB上で
- * 「全アカウント担当」と「配下アクセス可」が明示されている場合だけ許可する。
- * 店舗限定の管理者へ接続権限を広げないため、行が無い・値が曖昧なら拒否する。
+ * 「全アカウント担当」が明示されている場合だけ許可する。
+ * `can_access_descendant_accounts` は親子階層の範囲を表す別の権限であり、
+ * 統括全体の接続管理可否には使わない。店舗限定の管理者へ接続権限を
+ * 広げないため、行が無い・値が曖昧なら拒否する。
  */
 async function canManageGoogleConnection(c: Context<Env>): Promise<boolean> {
   const staff = c.get('staff');
@@ -66,14 +68,14 @@ async function canManageGoogleConnection(c: Context<Env>): Promise<boolean> {
   if (staff.role !== 'admin' || staff.id === 'env-owner') return false;
   const row = await dbFor(c.env)
     .prepare(
-      `SELECT account_scope, can_access_descendant_accounts
+      `SELECT account_scope
        FROM staff_members
        WHERE id = ? AND tenant_id = ? AND role = 'admin' AND is_active = 1
        LIMIT 1`,
     )
     .bind(staff.id, staffTenantId(c))
-    .first<{ account_scope: string | null; can_access_descendant_accounts: number | null }>();
-  return row?.account_scope === 'all' && row.can_access_descendant_accounts === 1;
+    .first<{ account_scope: string | null }>();
+  return row?.account_scope === 'all';
 }
 
 async function googlePermissions(c: Context<Env>) {

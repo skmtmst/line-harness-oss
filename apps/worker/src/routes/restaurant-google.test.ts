@@ -95,14 +95,18 @@ function call(path: string, init: { method?: string; body?: unknown; token?: str
   );
 }
 
-function useStaffRole(role: 'admin' | 'staff', accountScope: 'all' | 'accounts' = 'all'): void {
+function useStaffRole(
+  role: 'admin' | 'staff',
+  accountScope: 'all' | 'accounts' = 'all',
+  canAccessDescendantAccounts = accountScope === 'all',
+): void {
   testDb.raw
     .prepare(
       `INSERT OR REPLACE INTO staff_members
          (id, name, role, api_key, tenant_id, account_scope, can_access_descendant_accounts, is_active)
        VALUES (?, ?, ?, ?, ?, ?, ?, 1)`,
     )
-    .run(`${role}-1`, role, role, `${role}-key`, TENANT, accountScope, accountScope === 'all' ? 1 : 0);
+    .run(`${role}-1`, role, role, `${role}-key`, TENANT, accountScope, canAccessDescendantAccounts ? 1 : 0);
   authMocks.getStaffByApiKey.mockResolvedValue({
     id: `${role}-1`, name: role, role, access_level: 'full', permission_keys: '[]', assigned_line_account_id: null, can_access_descendant_accounts: 1,
   });
@@ -190,11 +194,29 @@ describe('Googleビジネス：設定（接続）', () => {
     expect(JSON.stringify(json)).not.toContain('secret');
   });
 
+  it('接続権限は全店担当の統括管理者へ返し、店舗限定管理者には返さない', async () => {
+    seedStore();
+    useStaffRole('admin', 'all', false);
+    const allowed = await call('/api/restaurant-test/google/connection?account_id=account-2', { token: 'admin-key' });
+    expect(allowed.status).toBe(200);
+    expect((await allowed.json() as { permissions: { canManageConnection: boolean } }).permissions.canManageConnection).toBe(true);
+
+    useStaffRole('admin', 'accounts', true);
+    testDb.raw
+      .prepare('INSERT INTO staff_account_scopes (staff_id, line_account_id, created_at) VALUES (?, ?, ?)')
+      .run('admin-1', 'account-2', '2026-09-25T00:00:00.000Z');
+    const denied = await call('/api/restaurant-test/google/connection?account_id=account-2', { token: 'admin-key' });
+    expect(denied.status).toBe(200);
+    expect((await denied.json() as { permissions: { canManageConnection: boolean } }).permissions.canManageConnection).toBe(false);
+  });
+
   it('接続開始は state を保存し、Cookie と認可URLを返す（owner と全店担当の統括管理者）', async () => {
     seedStore();
     const denied = await call('/api/restaurant-test/google/connect/start?account_id=account-2', { body: {}, token: 'admin-key' });
     expect(denied.status).toBe(401);
-    useStaffRole('admin');
+    // 配下アクセスは親子階層の別権限。全アカウント担当の統括管理者なら
+    // このフラグが無くてもGoogle接続を管理できる。
+    useStaffRole('admin', 'all', false);
     const adminAllowed = await call('/api/restaurant-test/google/connect/start?account_id=account-2', { body: {}, token: 'admin-key' });
     expect(adminAllowed.status).toBe(200);
     useStaffRole('admin', 'accounts');
