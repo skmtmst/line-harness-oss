@@ -21,7 +21,8 @@ import styles from './recipes.module.css'
  * レシピ・必要機能・複製回数はサーバの正本を読む。
  */
 export default function RecipesPage() {
-  usePageTitle('レシピ')
+  /* ★V7 C7: 題はトップバーに一本化し、本文の大きな見出しを出さない（PageHeader が同じ題なら隠す）。 */
+  usePageTitle('レシピから作る')
   const { selectedAccountId, loading: accountLoading } = useAccount()
   const [recipes, setRecipes] = useState<Recipe[]>([])
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
@@ -108,7 +109,7 @@ export default function RecipesPage() {
 
                   <div className={styles.actions}>
                     {recipe.missingFeatures.length === 0 ? (
-                      <Link href={`/recipes/clone?id=${encodeURIComponent(recipe.id)}`} className={styles.primary}>
+                      <Link href={`/recipes/clone?id=${encodeURIComponent(recipe.id)}`} className={styles.secondary}>
                         このレシピで作る
                       </Link>
                     ) : (

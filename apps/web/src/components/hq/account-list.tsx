@@ -59,7 +59,7 @@ export default function HqAccountList({
             </div>
             <div className="mt-3 flex gap-2">
               {onSettings ? <Button type="button" variant="secondary" onClick={() => onSettings(account)}>設定</Button> : null}
-              <Button type="button" variant="primary" onClick={() => onSelect(account.id)}>{selectLabel}</Button>
+              <Button type="button" variant="secondary" onClick={() => onSelect(account.id)}>{selectLabel}</Button>
             </div>
             <details className="mt-3">
               <summary className="cursor-pointer text-xs font-semibold text-ink-secondary">詳しい数値を見る</summary>
@@ -114,7 +114,7 @@ export default function HqAccountList({
                 <td className="px-5 py-2 text-right">
                   <div className="flex justify-end gap-2">
                     {onSettings ? <Button type="button" variant="secondary" onClick={() => onSettings(account)}>設定</Button> : null}
-                    <Button type="button" variant="primary" onClick={() => onSelect(account.id)}>{selectLabel}</Button>
+                    <Button type="button" variant="secondary" onClick={() => onSelect(account.id)}>{selectLabel}</Button>
                   </div>
                 </td>
               </tr>

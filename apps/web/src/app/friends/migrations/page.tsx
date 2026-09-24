@@ -5,6 +5,8 @@ import { useCallback, useEffect, useState } from 'react'
 import type { LineAccount } from '@line-crm/shared'
 import { api, type FriendMigrationJob } from '@/lib/api'
 import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
+import Disclosure from '@/components/shared/disclosure'
 import FileDropzone, { AttachmentRow } from '@/components/shared/file-drop'
 import ListState from '@/components/shared/list-state'
 import PageHeader from '@/components/shared/page-header'
@@ -123,15 +125,17 @@ export default function FriendMigrationsPage() {
       <Link href="/accounts?tab=migration" className="text-ink-secondary pb-3">UIDの移行</Link>
       <span className="border-action text-action border-b-2 pb-3 font-semibold">CSVで書き出す・取り込む</span>
     </nav>
-    <div className="bg-success-bg text-success mb-4 rounded-control px-4 py-3 text-sm">書き出しても友だちの情報は変わりません。取り込みは、まず確認だけを実行できます。</div>
-    <p className="text-ink-secondary mb-4 text-sm">取り込みは「追加・更新・変更なし・競合・エラー」の内訳を先に見せます。反映後も、いつ誰が操作したかを履歴に残します。</p>
+    <div className="bg-info-bg text-ink-secondary mb-4 rounded-control px-4 py-3 text-xs">書き出しても友だちの情報は変わりません。取り込みは、まず確認だけを実行できます。</div>
+    <Disclosure size="compact" title="取り込みの内訳の見方" hint="追加・更新など5区分" className="mb-4">
+      <p className="text-sm">取り込みは「追加・更新・変更なし・競合・エラー」の内訳を先に見せます。反映後も、いつ誰が操作したかを履歴に残します。</p>
+    </Disclosure>
 
     <div className="grid gap-4 xl:grid-cols-2">
       <section className="bg-canvas rounded-card border-hairline border p-4">
         <h2 className="text-ink text-base font-bold">CSVで書き出す</h2>
         <label className="text-ink-secondary mt-4 block text-xs font-semibold">対象<SelectField aria-label="書き出すLINEアカウント" value={accountId} onChange={(event) => setAccountId(event.target.value)} options={[{ value: '', label: 'アカウントを選択' }, ...accounts.map((account) => ({ value: account.id, label: account.name }))]} /></label>
         <fieldset className="mt-4 space-y-2"><legend className="text-ink-secondary mb-2 text-xs font-semibold">書き出す項目</legend>
-          {([['basic', '基本（名前・LINEアカウント・登録日）'], ['tags_fields', 'タグ・友だち情報'], ['support', '対応状況・対応マーク・担当者']] as const).map(([value, label]) => <label key={value} className="text-ink flex items-center gap-2 text-sm"><input type="checkbox" checked={columns.includes(value)} onChange={() => toggleColumn(value)} />{label}</label>)}
+          {([['basic', '基本（名前・LINEアカウント・登録日）'], ['tags_fields', 'タグ・友だち情報'], ['support', '対応状況・対応マーク・担当者']] as const).map(([value, label]) => <Checkbox key={value} checked={columns.includes(value)} onCheckedChange={() => toggleColumn(value)}>{label}</Checkbox>)}
         </fieldset>
         <p className="text-ink-faint mt-2 text-xs">電話番号やメールなどの個人情報は、見る権限がある人だけ選べます。</p>
         <p className="text-ink-secondary mt-4 text-sm">文字コード： UTF-8</p><p className="text-ink-faint mt-1 text-xs">Shift_JISの書き出しはまだ使えません。今はUTF-8を選んでください。</p>

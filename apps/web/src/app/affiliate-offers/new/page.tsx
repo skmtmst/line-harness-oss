@@ -34,16 +34,6 @@ function rewardIntegerError(value: string, kind: 'amount' | 'miles'): string | n
  * タグとシナリオは**成果が確定したときに実行するもの**で、成果の条件ではない。
  * ここを取り違えると、紹介の成果がいつまでも確定しない設定ができてしまう。
  */
-function Unavailable({ label, reason }: { label: string; reason: string }) {
-  return (
-    <div className="border-hairline rounded-control bg-canvas-sunken border px-3 py-2">
-      <p className="text-ink-secondary text-label font-semibold">{label}</p>
-      <p className="text-ink text-label">—</p>
-      <p className="text-ink-faint text-micro mt-0.5">{reason}</p>
-    </div>
-  )
-}
-
 export default function NewAffiliateOfferPage() {
   const { selectedAccountId, selectedAccount } = useAccount()
   const [name, setName] = useState('')
@@ -253,26 +243,7 @@ export default function NewAffiliateOfferPage() {
         </div>
       </FormSection>
 
-      <FormSection
-        step={2}
-        label="何をもって成果とするか"
-        note="成果地点はコンバージョンで作成・管理します。"
-      >
-        <div className="grid gap-3 lg:grid-cols-2">
-          <Unavailable
-            label="成果地点"
-            reason="まだ繋がっていません。案件と成果地点の紐づけAPIが接続されると選べます。"
-          />
-          <Unavailable
-            label="紹介とみなす期間"
-            reason="まだ繋がっていません。成果を数える期間が接続されると表示されます（例：友だち追加から30日以内）。"
-          />
-          <Unavailable label="同じ友だちを数える回数" reason="まだ繋がっていません。二重計上を防ぐ設定が接続されると表示されます。" />
-          <Unavailable label="成果の自動承認" reason="まだ繋がっていません。確認不要の条件が接続されると表示されます。" />
-        </div>
-      </FormSection>
-
-      <FormSection step={3} label="いくら払うか" note="現金とマイルは併用できます。">
+      <FormSection step={2} label="いくら払うか" note="現金とマイルは併用できます。">
         <div className="grid gap-3 sm:grid-cols-2">
           <Field label="報酬額（円）" htmlFor="of-amount">
             <input
@@ -323,7 +294,7 @@ export default function NewAffiliateOfferPage() {
       </FormSection>
 
       <FormSection
-        step={4}
+        step={3}
         label="成果を認めたときにすること"
         note="成果が確定したタイミングで実行されます。"
       >

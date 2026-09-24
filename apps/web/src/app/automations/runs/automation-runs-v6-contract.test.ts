@@ -66,7 +66,7 @@ describe('V6 オートメーションが動いた記録（DkPY0）', () => {
   it('詳細を開き、失敗した処理だけを安全な再実行口へ接続する', () => {
     expect(PAGE).toContain('もう一度やる')
     expect(PAGE).toContain('/api/automation-runs/${encodeURIComponent(run.id)}/retry')
-    expect(PAGE).toContain('成功済みの処理は二重に実行しません')
+    expect(PAGE).toContain('失敗した処理だけを再実行します')
     expect(PAGE).toContain('失敗した処理をもう一度やる')
     expect(PAGE).toContain('setSelectedRun(run)')
     expect(PAGE).toContain('実行記録の中身')

@@ -97,6 +97,8 @@ export default function NewRichMenuPage() {
     event.preventDefault()
     if (!selectedAccount) return setError('アカウントを選択してください')
     if (!value.name.trim()) return setError('名前を入力してください')
+    // ブラウザ標準の required 吹き出しは英語になるため使わない。空はここで日本語で止める。
+    if (!value.chatBarText.trim()) return setError('トーク画面下の文言を入力してください')
     const selectedTemplate = TEMPLATES.find((item) => item.key === value.templateKey)
     if (!selectedTemplate) return setError('面の分けかたを選び直してください')
     const areas = value.areaDraftsByTemplate[selectedTemplate.key] ?? createAreaDrafts(selectedTemplate)

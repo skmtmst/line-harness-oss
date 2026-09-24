@@ -94,7 +94,10 @@ describe('V6 シナリオ作成・配信方式 cCB7r', () => {
     expect(page).toContain("scenarioState === 'loading'")
     expect(page).toContain("scenarioState === 'ready' && scenario")
     expect(page).toContain('disabled={(Boolean(id) && !scenario) || detailsSaving}')
-    expect(page).toContain('disabled={disabled || saving !== null}')
+    // ★V7: 方式はカード全体を選ぶラジオ選択にし、確定は画面1つの主ボタン。
+    expect(page).toContain('type="radio"')
+    expect(page).toContain('name="delivery-mode"')
+    expect(page).toContain('disabled={!selectedMode || (Boolean(id) && !scenario) || saving !== null || detailsSaving}')
   })
 
   it('一覧の「作成」は行を作らず、この画面が確定の時点で初めて作る（#949 N-055）', () => {
