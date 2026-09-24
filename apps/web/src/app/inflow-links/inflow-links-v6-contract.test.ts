@@ -81,9 +81,10 @@ describe('V6 流入経路一覧の契約', () => {
     expect(PAGE).not.toContain('ページの切り替えは準備中です')
   })
 
-  it('保存した条件は作り物の札を作らず、繋がっていないと言う', () => {
-    expect(PAGE).toContain("import Chip from '@/components/shared/chip'")
-    expect(PAGE).toContain('まだ繋がっていません。条件の保存が接続されると表示されます。')
+  it('保存した条件は作り物の札も「未接続」の行も出さない（★V7）', () => {
+    // 押せない札も「まだ繋がっていません」の行も、運用する人には使えない表示。
+    // 条件の保存が接続されるまでは何も出さない。
+    expect(PAGE).not.toContain('data-design="Saved"')
     expect(PAGE).not.toContain('保存した条件は準備中です')
     for (const fake of ['追加率が高い', '計測停止中']) {
       expect(PAGE, `${fake} は取れない条件なので札にしない`).not.toContain(fake)
