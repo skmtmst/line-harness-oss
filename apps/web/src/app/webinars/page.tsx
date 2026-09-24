@@ -861,7 +861,7 @@ function ArchiveReviewBackdrop({ target }: { target: WebinarListItem }) {
       <div className="mx-auto max-w-screen-2xl">
         <p className="text-accent-deep text-xs font-bold">← ウェビナー一覧</p>
         <div className="mt-5 grid gap-4 xl:grid-cols-4">
-          <main className="space-y-4 xl:col-span-3">
+          <div className="space-y-4 xl:col-span-3">
             <section className="rounded-card border border-hairline bg-canvas p-5">
               <h2 className="text-base font-bold text-ink">アーカイブする対象</h2>
               <p className="mt-1 text-xs text-ink-secondary">アーカイブするウェビナーを確認します。</p>
@@ -872,7 +872,7 @@ function ArchiveReviewBackdrop({ target }: { target: WebinarListItem }) {
               <p className="mt-1 text-xs text-ink-secondary">アーカイブすると、一覧から外れて新しく使えなくなります。記録は残ります。</p>
               <div className="mt-4 space-y-3"><div className="rounded-control border border-hairline p-4"><strong className="text-sm text-ink">公開ページ</strong><p className="mt-1 text-xs text-ink-secondary">公開URLが無効になります</p></div><div className="rounded-control border border-hairline p-4"><strong className="text-sm text-ink">分析結果</strong><p className="mt-1 text-xs text-ink-secondary">視聴履歴とCTAの結果は消えません</p></div></div>
             </section>
-          </main>
+          </div>
           <aside className="space-y-4">
             <section className="rounded-card border border-hairline bg-canvas p-5"><h2 className="text-sm font-bold text-ink">設定サマリー</h2><dl className="mt-4 divide-y divide-hairline text-xs"><div className="flex justify-between py-3"><dt className="text-ink-faint">状態</dt><dd className="font-semibold text-ink">{STATUS_LABEL[target.status]}</dd></div><div className="flex justify-between py-3"><dt className="text-ink-faint">申込</dt><dd className="font-semibold text-ink">{measuredCount(target.registrationCount)}</dd></div><div className="flex justify-between py-3"><dt className="text-ink-faint">視聴</dt><dd className="font-semibold text-ink">{measuredCount(target.viewerCount)}</dd></div></dl></section>
             <section className="min-h-96 rounded-card bg-line-preview p-5"><p className="text-center text-xs font-bold text-on-accent">LINEプレビュー</p><div className="mt-12 rounded-control bg-canvas p-4 text-xs text-ink">このウェビナーは{target.status === 'active' ? '公開中' : '非公開'}です。</div></section>

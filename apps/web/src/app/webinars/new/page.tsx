@@ -76,7 +76,7 @@ export default function NewWebinarPage() {
   }
 
   return (
-    <main
+    <div
       data-design-node="lvaY5"
       // U054: 外側の左右余白は app-shell が持つ（16px/24px/40px）。
       // ここで px を重ねるとスマホで入力幅が二重に削られる。
@@ -184,6 +184,6 @@ export default function NewWebinarPage() {
           </>
         )}
       />
-    </main>
+    </div>
   )
 }

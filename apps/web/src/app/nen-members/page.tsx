@@ -754,7 +754,7 @@ export default function PhotoReviewsPage() {
   }
 
   return <>
-    <main className="mx-auto flex max-w-full flex-col gap-4 p-4 sm:p-6">
+    <div className="mx-auto flex max-w-full flex-col gap-4 p-4 sm:p-6">
       {/* 審査の結果を読み上げにも届ける（V6R-S3-e）。 */}
       {notice && <div role="status" aria-live="polite" className="rounded-control border border-accent-border bg-accent-soft px-4 py-3 text-sm text-accent-deep">{notice}</div>}
       {bulkFailed.length > 0 && <div className="rounded-control border border-hairline bg-canvas px-4 py-3">
@@ -985,7 +985,7 @@ export default function PhotoReviewsPage() {
         />
       </div>
       </div>
-    </main>
+    </div>
     <Dialog open={bulkApproveOpen} title={`${selectedPendingPhotos.length}枚をまとめて通す`} description="選択した写真の件数、ポイント、公開範囲を確認してください。" busy={bulkReviewing} confirmLabel="まとめて通す" cancelLabel="審査へ戻る" onCancel={() => setBulkApproveOpen(false)} onConfirm={() => void bulkReview('approve')}>
       <dl className="space-y-3 rounded-control bg-surface-pearl p-4 text-sm text-ink-secondary">
         <div className="flex justify-between gap-4"><dt>写真</dt><dd className="font-semibold text-ink">{selectedPendingPhotos.length}枚</dd></div>

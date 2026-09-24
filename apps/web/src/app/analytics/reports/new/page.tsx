@@ -290,7 +290,7 @@ function AnalyticsReportFormPage() {
       {notice && <div className="bg-success-bg text-success mb-4 rounded-control px-4 py-3 text-sm" role="status">{notice}</div>}
 
       <div className="grid items-start gap-6 xl:grid-cols-3">
-        <main className="grid gap-4 xl:col-span-2">
+        <div className="grid gap-4 xl:col-span-2">
           <section className="border-hairline bg-canvas rounded-card border p-4 sm:p-6">
             <h2 className="text-lg font-semibold">名前を付けます</h2>
             <p className="text-ink-secondary mb-4 mt-1 text-sm">複数作るときに区別できる名前を付けてください。</p>
@@ -464,7 +464,7 @@ function AnalyticsReportFormPage() {
             </ul>
             <p className="text-ink-faint mt-3 text-xs">集計待ちや一部だけ取れた期間は比べず、知らせません。</p>
           </section>
-        </main>
+        </div>
 
         <aside className="grid gap-4 md:grid-cols-2 xl:grid-cols-1">
           <section className="border-success bg-success-bg rounded-card border p-5 md:col-span-2 xl:col-span-1">

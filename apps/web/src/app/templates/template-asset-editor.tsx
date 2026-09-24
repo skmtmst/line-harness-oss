@@ -401,7 +401,7 @@ export default function TemplateAssetEditor({ kind, visual = false }: { kind: As
       {saved ? <p role="status" className="bg-success-bg text-success rounded-control mb-4 px-4 py-3 text-sm">保存しました。<Link href="/templates" className="font-semibold underline">一覧へ戻る</Link></p> : null}
 
       <div className="flex min-w-0 flex-col gap-4 xl:flex-row">
-        <main className="min-w-0 flex-1 space-y-4">
+        <div className="min-w-0 flex-1 space-y-4">
           <section className="bg-canvas border-hairline rounded-card shadow-card grid gap-4 border p-4 md:grid-cols-3">
             <div className="md:col-span-2"><Field label={`${meta.title}名`} required><TextField className="mt-2" value={name} onChange={(event) => setName(event.target.value)} /></Field></div>
             <Field label="フォルダ"><TextField className="mt-2" value={folder} onChange={(event) => setFolder(event.target.value)} /></Field>
@@ -658,7 +658,7 @@ export default function TemplateAssetEditor({ kind, visual = false }: { kind: As
               </section>
             </>
           )}
-        </main>
+        </div>
 
         <aside className="min-w-0 space-y-4 xl:sticky xl:top-4 xl:w-96 xl:shrink-0 xl:self-start">
           <section className="rounded-card bg-line-preview p-4 text-on-accent">

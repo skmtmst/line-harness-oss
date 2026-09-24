@@ -149,19 +149,19 @@ export function PhotoPublications({ accountId, onBack }: { accountId: string; on
     } finally { setBusyId('') }
   }
 
-  if (state === 'loading') return <main className="mx-auto max-w-screen-2xl p-6"><ListState kind="loading" title="出している写真を読み込んでいます" /></main>
-  if (state === 'forbidden') return <main className="mx-auto max-w-screen-2xl p-6"><ListState kind="forbidden" /></main>
-  if (state === 'error') return <main className="mx-auto max-w-screen-2xl p-6"><ListState kind="error" title="出している写真を読み込めませんでした" onRetry={() => void load()} /></main>
+  if (state === 'loading') return <div className="mx-auto max-w-screen-2xl p-6"><ListState kind="loading" title="出している写真を読み込んでいます" /></div>
+  if (state === 'forbidden') return <div className="mx-auto max-w-screen-2xl p-6"><ListState kind="forbidden" /></div>
+  if (state === 'error') return <div className="mx-auto max-w-screen-2xl p-6"><ListState kind="error" title="出している写真を読み込めませんでした" onRetry={() => void load()} /></div>
 
   const items = data?.items ?? []
   const pendingWithdrawals = Array.isArray(data?.pendingWithdrawals) ? data.pendingWithdrawals : []
   const withdrawnItems = Array.isArray(data?.withdrawnItems) ? data.withdrawnItems : []
   if (!data || (items.length === 0 && pendingWithdrawals.length === 0 && withdrawnItems.length === 0)) {
-    return <main className="mx-auto max-w-screen-2xl p-6"><Button onClick={onBack}>写真審査へ戻る</Button><ListState kind="empty" title="出している写真はありません" description="同意のある写真を掲載すると、使っている場所と表示回数がここに出ます。" /></main>
+    return <div className="mx-auto max-w-screen-2xl p-6"><Button onClick={onBack}>写真審査へ戻る</Button><ListState kind="empty" title="出している写真はありません" description="同意のある写真を掲載すると、使っている場所と表示回数がここに出ます。" /></div>
   }
 
   const top = data.summary.topPhoto
-  return <><main className="mx-auto max-w-screen-2xl p-6" data-photo-view="publications">
+  return <><div className="mx-auto max-w-screen-2xl p-6" data-photo-view="publications">
     <div className="flex items-center justify-between gap-2 max-md:flex-col max-md:items-start">
       <div><p className="text-xs font-bold text-ink-faint">専用機能</p><h2 className="mt-1 text-2xl font-extrabold text-ink">写真審査</h2></div>
       <Button onClick={onBack}>見ていないものへ戻る</Button>
@@ -254,7 +254,7 @@ export function PhotoPublications({ accountId, onBack }: { accountId: string; on
         })}
       </div>
     </section>}
-  </main>
+  </div>
   {editing && <Dialog
     open
     title={`${text(editing.pet_name) || 'この写真'}を使う場所`}

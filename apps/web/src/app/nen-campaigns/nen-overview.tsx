@@ -302,7 +302,7 @@ export function NenOverview({
   const columnSetting = settings.find((setting) => setting.category === 'column') ?? null
 
   return (
-    <main data-design-node={tab === 'columns' ? 'u66A0' : 'z4q1K'} className="mx-auto flex w-full flex-col gap-4 px-4 pb-8 sm:px-6" style={{ maxWidth: 1600 }}>
+    <div data-design-node={tab === 'columns' ? 'u66A0' : 'z4q1K'} className="mx-auto flex w-full flex-col gap-4 px-4 pb-8 sm:px-6" style={{ maxWidth: 1600 }}>
       <div data-design="Crumb" data-design-node="nen-header">
         <PageHeaderH2
           breadcrumb={[{ label: '専用機能' }, { label: 'NEN配信' }]}
@@ -395,7 +395,7 @@ export function NenOverview({
       </Drawer>
 
       <CouponDrawer open={couponOpen} coupon={coupon} saving={savingCoupon} onClose={() => onCouponOpenChange(false)} onChange={onCouponChange} onSave={onSaveCoupon} />
-    </main>
+    </div>
   )
 }
 

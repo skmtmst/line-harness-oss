@@ -365,7 +365,7 @@ export default function NenCampaignsPage() {
     if (!loadedTabs.current.has(next)) void loadTab(next)
   }
 
-  if (loading && loadedTabs.current.size === 0) return <main className="p-6"><ListState kind="loading" /></main>
+  if (loading && loadedTabs.current.size === 0) return <div className="p-6"><ListState kind="loading" /></div>
 
   /*
     ヘッダー操作。★V6 37-6 の「配信を追加」は、自動配信の種類が実キー固定（追加口が無い）

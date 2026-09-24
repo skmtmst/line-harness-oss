@@ -325,7 +325,7 @@ export default function SupportInbox({ channel = 'email' }: { channel?: Channel 
           </div>
         </aside>
 
-        <main className="flex min-h-[560px] flex-col bg-[#f4f6f5]">
+        <div className="flex min-h-[560px] flex-col bg-[#f4f6f5]">
           {!selected ? (
             <div className="flex flex-1 items-center justify-center p-8 text-center text-sm text-gray-400">
               <div>
@@ -377,7 +377,7 @@ export default function SupportInbox({ channel = 'email' }: { channel?: Channel 
               </div>
             </>
           ) : <div className="flex flex-1 items-center justify-center text-sm text-gray-400">会話を読み込み中...</div>}
-        </main>
+        </div>
       </div>
     </div>
   )
