@@ -71,7 +71,7 @@ const DESIGN: Array<{ section: string | null; items: string[] }> = [
     section: '飲食店向け（テスト）',
     items: [
       '店舗ダッシュボード', '組織・権限', '承認ワークフロー', '予約台帳', '座席・卓管理',
-      '予約枠・在庫', 'メニュー管理', 'Google・口コミ', 'LINE来店フォロー',
+      '予約枠・在庫', 'メニュー管理', 'Googleビジネス', 'LINE来店フォロー',
     ],
   },
 ];
@@ -148,7 +148,7 @@ const ROUTES: Record<string, string> = {
   '座席・卓管理': '/restaurant-test/tables',
   '予約枠・在庫': '/restaurant-test/inventory',
   メニュー管理: '/restaurant-test/menu',
-  'Google・口コミ': '/restaurant-test/google',
+  'Googleビジネス': '/restaurant-test/google',
   LINE来店フォロー: '/restaurant-test/line-followup',
 };
 
