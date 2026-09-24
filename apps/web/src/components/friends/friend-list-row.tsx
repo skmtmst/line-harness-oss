@@ -98,23 +98,31 @@ export default function FriendListRow({
           <Link href={`/friends/detail?id=${friend.id}`} onClick={(event) => event.stopPropagation()} title={friend.displayName} className="block truncate text-sm font-bold text-ink hover:text-action hover:underline">
             {friend.displayName}
           </Link>
-          <p className="mt-1 truncate text-nano text-ink-faint">登録 {formatDate(friend.createdAt)}</p>
+          <p className="mt-1 truncate text-micro text-ink-faint">登録 {formatDate(friend.createdAt)}</p>
         </div>
       </div>
 
       {visibleColumns.has('support') ? (
         <div className="min-w-0">
-          <span className={`inline-flex whitespace-nowrap rounded-full px-2 py-1 text-nano font-bold ${status.className}`}>{status.label}</span>
-          <p className="mt-1 flex min-w-0 items-center gap-1 truncate text-nano font-semibold text-ink-secondary">
-            <Circle aria-hidden="true" className="h-2 w-2 shrink-0 fill-current" style={{ color: friend.supportMark?.color ?? 'var(--color-ink-disabled)' }} />
-            {friend.supportMark?.name ?? 'マークなし'}
+          {/*
+            ★V7：対応状況の札と、自分で付ける対応マークを1段に並べる。以前は札・マーク・担当の3段で、
+            「対応済み」の札と「●対応中」のマークが縦に並んで食い違って見えた。マークが無い時は何も出さない。
+          */}
+          <p className="flex min-w-0 items-center gap-2">
+            <span className={`inline-flex whitespace-nowrap rounded-full px-2 py-0.5 text-micro font-bold ${status.className}`}>{status.label}</span>
+            {friend.supportMark ? (
+              <span className="flex min-w-0 items-center gap-1 truncate text-micro font-semibold text-ink-secondary" title={`対応マーク：${friend.supportMark.name}`}>
+                <Circle aria-hidden="true" className="h-2 w-2 shrink-0 fill-current" style={{ color: friend.supportMark.color ?? 'var(--color-ink-disabled)' }} />
+                {friend.supportMark.name}
+              </span>
+            ) : null}
           </p>
           {/*
             担当者は設計 `PhxG6` の丸アイコン付き（16x16 / r=8 / 頭文字 10px・800）。
             未割り当ては頭文字が無いので全角ハイフンを置く。空欄にすると
             「読み込み中で出ていない」と見分けが付かなくなる。
           */}
-          <p className="mt-0.5 flex min-w-0 items-center gap-1.5 text-nano text-ink-secondary">
+          <p className="mt-1 flex min-w-0 items-center gap-1.5 text-micro text-ink-secondary">
             <span
               aria-hidden="true"
               data-operator-avatar={friend.operator ? 'assigned' : 'unassigned'}
@@ -143,19 +151,19 @@ export default function FriendListRow({
               <p className="truncate text-xs text-ink" title={latest.content}>
                 {latest.messageType === 'text' ? latest.content : messageTypeLabel(latest.messageType)}
               </p>
-              <p className="mt-1 text-nano text-ink-faint">{formatDateTime(latest.createdAt)}</p>
+              <p className="mt-1 text-micro text-ink-faint">{formatDateTime(latest.createdAt)}</p>
             </>
-          ) : <><span className="text-xs text-ink-secondary">受信なし</span><p className="mt-1 text-nano text-ink-faint">—</p></>}
+          ) : <><span className="text-xs text-ink-secondary">受信なし</span><p className="mt-1 text-micro text-ink-faint">—</p></>}
         </div>
       ) : null}
 
       {visibleColumns.has('tags') ? (
         <div className="flex min-w-0 flex-wrap content-center gap-1">
           {friend.tags.slice(0, 2).map((tag, index) => (
-            <span key={tag.id} title={tag.name} className={`max-w-full truncate rounded-mini px-2 py-1 text-nano font-semibold ${index === 0 ? 'bg-accent-soft text-accent-deep' : 'bg-chip-alt-soft text-chip-alt'}`}>{tag.name}</span>
+            <span key={tag.id} title={tag.name} className={`max-w-full truncate rounded-mini px-2 py-1 text-micro font-semibold ${index === 0 ? 'bg-accent-soft text-accent-deep' : 'bg-chip-alt-soft text-chip-alt'}`}>{tag.name}</span>
           ))}
-          {friend.tags.length > 2 ? <span className="rounded-mini bg-avatar-bg px-2 py-1 text-nano text-ink-secondary">+{friend.tags.length - 2}</span> : null}
-          {!friend.tags.length ? <span className="text-nano text-ink-disabled">—</span> : null}
+          {friend.tags.length > 2 ? <span className="rounded-mini bg-avatar-bg px-2 py-1 text-micro text-ink-secondary">+{friend.tags.length - 2}</span> : null}
+          {!friend.tags.length ? <span className="text-micro text-ink-disabled">—</span> : null}
         </div>
       ) : null}
 
@@ -215,7 +223,7 @@ export function FriendListCard({
       key: 'latest',
       label: '最新メッセージ',
       node: latest
-        ? <span title={latest.content}>{latest.messageType === 'text' ? latest.content : messageTypeLabel(latest.messageType)}<span className="ml-2 text-nano text-ink-faint">{formatDateTime(latest.createdAt)}</span></span>
+        ? <span title={latest.content}>{latest.messageType === 'text' ? latest.content : messageTypeLabel(latest.messageType)}<span className="ml-2 text-micro text-ink-faint">{formatDateTime(latest.createdAt)}</span></span>
         : <span className="text-ink-secondary">受信なし</span>,
     })
   }
@@ -226,7 +234,7 @@ export function FriendListCard({
       node: friend.tags.length ? (
         <span className="flex flex-wrap gap-1">
           {friend.tags.map((tag, index) => (
-            <span key={tag.id} title={tag.name} className={`max-w-full truncate rounded-mini px-2 py-1 text-nano font-semibold ${index === 0 ? 'bg-accent-soft text-accent-deep' : 'bg-chip-alt-soft text-chip-alt'}`}>{tag.name}</span>
+            <span key={tag.id} title={tag.name} className={`max-w-full truncate rounded-mini px-2 py-1 text-micro font-semibold ${index === 0 ? 'bg-accent-soft text-accent-deep' : 'bg-chip-alt-soft text-chip-alt'}`}>{tag.name}</span>
           ))}
         </span>
       ) : <span className="text-ink-disabled">—</span>,
@@ -268,16 +276,18 @@ export function FriendListCard({
           <Link href={`/friends/detail?id=${friend.id}`} title={friend.displayName} className="block truncate text-sm font-bold text-ink hover:text-action hover:underline">
             {friend.displayName}
           </Link>
-          <p className="mt-1 flex min-w-0 items-center gap-1 truncate text-nano font-semibold text-ink-secondary">
-            <Circle aria-hidden="true" className="h-2 w-2 shrink-0 fill-current" style={{ color: friend.supportMark?.color ?? 'var(--color-ink-disabled)' }} />
-            {friend.supportMark?.name ?? 'マークなし'}
-          </p>
-          <p className="mt-0.5 truncate text-nano text-ink-secondary">担当：{friend.operator?.name ?? '未割り当て'}</p>
+          {friend.supportMark ? (
+            <p className="mt-1 flex min-w-0 items-center gap-1 truncate text-micro font-semibold text-ink-secondary">
+              <Circle aria-hidden="true" className="h-2 w-2 shrink-0 fill-current" style={{ color: friend.supportMark.color ?? 'var(--color-ink-disabled)' }} />
+              {friend.supportMark.name}
+            </p>
+          ) : null}
+          <p className="mt-0.5 truncate text-micro text-ink-secondary">担当：{friend.operator?.name ?? '未割り当て'}</p>
         </div>
         <div className="flex shrink-0 flex-col items-end gap-1">
           {/* statusView() の戻り値を className へ入れると静的に読めない。判定をここへ展開する。 */}
           <span
-            className={`inline-flex whitespace-nowrap rounded-full px-2 py-1 text-nano font-bold ${
+            className={`inline-flex whitespace-nowrap rounded-full px-2 py-1 text-micro font-bold ${
               friend.chatStatus === 'unread'
                 ? 'bg-status-danger-soft text-danger'
                 : friend.chatStatus === 'in_progress' || friend.chatStatus === 'on_hold'
@@ -287,7 +297,7 @@ export function FriendListCard({
           >
             {status.label}
           </span>
-          <span className="text-nano tabular-nums text-ink-faint" title={formatDateTime(lastContact)}>{formatDate(lastContact)}</span>
+          <span className="text-micro tabular-nums text-ink-faint" title={formatDateTime(lastContact)}>{formatDate(lastContact)}</span>
         </div>
       </div>
       <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 pl-7">
@@ -332,8 +342,12 @@ function messageTypeLabel(messageType: string): string {
   } as Record<string, string>)[messageType] ?? 'メッセージ'
 }
 
+/** 今年は「8月14日」、それ以外は「2025年8月14日」（★V7：数字の斜線より読みやすい）。 */
 function formatDate(iso: string): string {
-  return iso.slice(0, 10).replace(/-/g, '/')
+  const [year, month, day] = iso.slice(0, 10).split('-').map(Number)
+  if (!year || !month || !day) return iso.slice(0, 10)
+  const thisYear = Number(new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Tokyo', year: 'numeric' }).format(new Date()))
+  return year === thisYear ? `${month}月${day}日` : `${year}年${month}月${day}日`
 }
 
 function avatarTone(name: string): string {

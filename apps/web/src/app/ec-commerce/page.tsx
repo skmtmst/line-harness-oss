@@ -326,8 +326,8 @@ function EventsPanel({ accountId }: { accountId: string | null }) {
       {/* #975 U060: 390pxでは先頭2件だけ出し、残りは「集計を見る」で開く。 */}
       <KpiCollapse gridClassName={styles.kpis}>
         <SummaryCard variant="v6" title="今日 取り込んだ" value={overview?.last24h ?? null} unit="件" detail={overview?.byType.map((item) => `${item.label} ${item.count.toLocaleString('ja-JP')}`).join('・') ?? '内訳は未取得'} />
-        <SummaryCard variant="v6" title="つながっていない注文" value={overview?.identityPending ?? null} unit="件" detail="LINEの友だちが見つかりません" badge="つき合わせ" />
-        <SummaryCard variant="v6" title="取り込みに失敗" value={overview?.failed ?? null} unit="件" detail="3回やり直しても入りませんでした" badge="確認" badgeTone="danger" />
+        <SummaryCard variant="v6" title="つながっていない注文" value={overview?.identityPending ?? null} unit="件" detail="LINEの友だちが見つかりません" badge="つき合わせ" badgeTone="neutral" />
+        <SummaryCard variant="v6" title="取り込みに失敗" value={overview?.failed ?? null} unit="件" detail="3回やり直しても入りませんでした" badge="確認" badgeTone="neutral" />
         <div className="min-w-0 rounded-card border border-hairline bg-canvas p-4">
           <p className="text-xs font-semibold text-ink-faint">最後に届いた</p>
           <p className="mt-1 text-2xl font-bold text-ink tabular-nums">{dateTime(overview?.lastReceivedAt ?? null)}</p>
@@ -355,15 +355,18 @@ function EventsPanel({ accountId }: { accountId: string | null }) {
           placeholder="注文番号・お名前・出来事で検索"
           aria-label="取り込みの記録を検索"
         />
-        <Select
-          aria-label="取り込みの並び順"
-          value={sort}
-          onChange={(value) => setSort(value as typeof sort)}
-          options={[
-            { value: 'newest', label: '取り込みが新しい順' },
-            { value: 'oldest', label: '取り込みが古い順' },
-          ]}
-        />
+        <div className="w-full sm:w-64">
+          <Select
+            aria-label="取り込みの並び順"
+            size="full"
+            value={sort}
+            onChange={(value) => setSort(value as typeof sort)}
+            options={[
+              { value: 'newest', label: '取り込みが新しい順' },
+              { value: 'oldest', label: '取り込みが古い順' },
+            ]}
+          />
+        </div>
       </div>
       <Tabs items={([
           ['all', 'すべて', overview?.total],
@@ -462,9 +465,13 @@ function EventsPanel({ accountId }: { accountId: string | null }) {
                       ariaLabel="この行の操作"
                       onClose={() => setOpenMenuId(null)}
                       items={[
-                        /* IDEA-23: 注文がある行は「この注文の状況」から出来事→通知→成果まで辿れる。 */
+                        /*
+                         * IDEA-23: 注文がある行は「注文の状況を見る」から出来事→通知→成果まで辿れる。
+                         * #670 23: 隣の「中身を見る」と並んだときに「注文の状況中身を見る」と
+                         * 繋がって読めたため、動詞を付けて「〜を見る」同士の並びに直す。
+                         */
                         ...(order
-                          ? [{ id: 'order', label: '注文の状況', onSelect: () => setDetailSlot({ accountId, orderId: order.id }) }]
+                          ? [{ id: 'order', label: '注文の状況を見る', onSelect: () => setDetailSlot({ accountId, orderId: order.id }) }]
                           : []),
                         ...(action.retryAvailable
                           ? [{
@@ -509,7 +516,8 @@ function EcCommercePageInner() {
     <div className={styles.root} data-design="Head">
       {/* マニュアルは共通トップバーに置く。本文に「ECの注文・定期便を取り込み、LINEの配信や成果へつなげます。」という重複説明は置かない。 */}
       <PageHeaderH2
-        breadcrumb={[{ label: '専用機能' }, { label: 'EC連携' }]}
+        /* 1段だけのパンくずは上の帯の画面名と重複するので出さない。 */
+        breadcrumb={[]}
         title="EC連携"
         description=""
         actions={tab === 'events'

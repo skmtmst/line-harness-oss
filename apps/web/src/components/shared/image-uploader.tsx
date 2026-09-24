@@ -2,6 +2,7 @@
 
 import { useCallback, useRef, useState } from 'react'
 import { api } from '@/lib/api'
+import Button from './button'
 
 export type ImageUploaderMode = 'url' | 'line-image'
 
@@ -109,7 +110,7 @@ export default function ImageUploader({ mode, value, onChange, label }: ImageUpl
         <button
           type="button"
           onClick={() => setManualUrlMode((v) => !v)}
-          className="text-xs text-emerald-700 underline"
+          className="text-xs text-action underline"
         >
           {manualUrlMode ? '画像アップロードに戻す' : 'URL を直接入力'}
         </button>
@@ -170,14 +171,13 @@ export default function ImageUploader({ mode, value, onChange, label }: ImageUpl
             </div>
           ) : (
             <div className="flex flex-col items-center gap-2 py-4 text-sm text-gray-500">
-              <button
-                type="button"
+              <Button
+                variant="primary"
                 onClick={() => inputRef.current?.click()}
                 disabled={busy}
-                className="rounded-md bg-emerald-600 px-3 py-1.5 text-white hover:bg-emerald-700 disabled:opacity-50"
               >
                 {busy ? 'アップロード中…' : '画像を選択'}
-              </button>
+              </Button>
               <div className="text-xs text-gray-400">またはドラッグ&ドロップ / Cmd+V でペースト</div>
             </div>
           )}

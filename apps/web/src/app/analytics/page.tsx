@@ -2357,6 +2357,8 @@ function FriendsOverviewTab({ accountId }: { accountId: string }) {
   // 日ごとの表は行ごとの状態を持たない。全体の状態が「実測できた」でないときは、
   // 0 が並んだ30行を出さずに理由を1行で出す。
   const daysShown = overview.state === 'available' || overview.state === 'partial'
+  // 上の帯が理由全文を既に出しているとき、図側で繰り返さない(#670 20)。
+  const reasonShownInBanner = overview.state !== 'available' && Boolean(overview.stateReason)
   const selectedDay = overview.days.find((day) => day.date === selectedDate) ?? overview.days.at(-1) ?? null
   const selectedCampaigns = overview.campaigns.filter((item) => item.date === selectedDay?.date)
   return <div data-design-node="Zxezb" className="space-y-4">
@@ -2369,7 +2371,7 @@ function FriendsOverviewTab({ accountId }: { accountId: string }) {
       <KpiCard title="減った友だち" value={removedValue} unit="人" {...metricCardState(overview.metrics.removed, removedValue === null ? pendingCard : { detail: `この${days}日。ブロック・友だち解除` }, state.retry)} />
       <KpiCard title="差し引き" value={netValue} unit="人" {...metricCardState(overview.metrics.net, remainingRate === null ? pendingCard : { detail: `増加 − 減少。残っている割合 ${remainingRate.toFixed(1)}%` }, state.retry)} />
     </div>
-    <AnalyticsNotice>増えた人と減った人を日ごとに並べています。減りが増えた日に何を配信したかも、同じ日付で確かめられます。</AnalyticsNotice>
+    {/* ★V7：グラフの小見出しと同じことを繰り返していた説明の帯は外した。配信との照らし合わせは凡例の横に出ている。 */}
     <section className="bg-canvas rounded-card border-hairline border p-4">
       <div className="mb-4 flex flex-wrap items-start justify-between gap-2">
         <div><h2 className="font-semibold text-ink">日ごとの増減（この{days}日）</h2><p className="mt-1 text-xs text-ink-faint">上が増えた人、下が減った人です。</p></div>
@@ -2378,11 +2380,11 @@ function FriendsOverviewTab({ accountId }: { accountId: string }) {
       {!daysShown ? (
         <div className="p-8 text-center text-sm text-ink-faint">
           {/*
-            理由の本文は上の警告帯が1回だけ言う。ここで stateReason を
-            もう一度出すと、同じ文が帯とグラフ枠で二重に読めた（監査 A9）。
-            枠内は短い状態と、次にすることだけに絞る。
+            #670 20: 理由全文は上の帯が既に出しているときは繰り返さない。
+            同じ文が帯と図の両方に出ると二重に読める。図側は短い状態だけにし、
+            帯が無いとき(理由なし)だけ全文を出す。
           */}
-          <p>{overview.state === 'pending' ? '日ごとの集計を待っています' : 'この期間の集計はまだ出せません'}</p>
+          <p>{reasonShownInBanner ? (METRIC_STATE_TEXT[overview.state] || '未取得') : pendingReason}</p>
           {/* 集計待ちの間は「0人」とも「次はいつ」とも言えない。更新の周期と
               変わらない場合の戻り方だけを伝える(点検ANALYTICS-01)。 */}
           {overview.state === 'pending' && (
@@ -2400,9 +2402,9 @@ function FriendsOverviewTab({ accountId }: { accountId: string }) {
             // 棒は押すとその日の内訳を下へ出す。titleだけでは読み上げに届かないため、
             // 同じ内容をaria-labelとaria-pressedでも伝える。
             return <button type="button" key={day.date} onClick={() => setSelectedDate(day.date)} aria-pressed={selectedDate === day.date} className={`relative flex h-full flex-col justify-center ${selectedDate === day.date ? 'ring-2 ring-accent ring-offset-1' : ''}`} title={`${day.date} 増加${day.added}・減少${day.removed}${campaigns.length ? `・${campaigns.map((item) => item.name).join('、')}` : ''}`} aria-label={`${day.date} 増加${day.added}・減少${day.removed}${campaigns.length ? `・${campaigns.map((item) => item.name).join('、')}` : ''}`}>
-              <div className="flex h-1/2 items-end"><span className="block w-full rounded-t bg-accent" style={{ height: `${Math.max(3, day.added / max * 100)}%` }} /></div>
+              <div className="flex h-1/2 items-end"><span className="block w-full rounded-t bg-accent-deep" style={{ height: `${Math.max(3, day.added / max * 100)}%` }} /></div>
               <div className="border-t border-hairline" />
-              <div className="flex h-1/2 items-start"><span className="block w-full rounded-b bg-danger" style={{ height: `${Math.max(3, day.removed / max * 100)}%` }} /></div>
+              <div className="flex h-1/2 items-start"><span className="block w-full rounded-b bg-ink-faint/50" style={{ height: `${Math.max(3, day.removed / max * 100)}%` }} /></div>
               {(index === 0 || index === overview.days.length - 1 || campaigns.length > 0) && <span className="absolute -bottom-6 left-1/2 -translate-x-1/2 whitespace-nowrap text-[10px] text-ink-faint">{day.date.slice(5).replace('-', '/')}</span>}
             </button>
           })}
@@ -2411,7 +2413,7 @@ function FriendsOverviewTab({ accountId }: { accountId: string }) {
       {/* グラフを出せない間は凡例も選択日の詳細も出さない。出すと
           「増加0人・施策なし」という未取得の0が確定値に見える(点検ANALYTICS-01)。 */}
       {daysShown && (
-        <div className="mt-8 flex flex-wrap gap-4 text-xs text-ink-secondary"><span>● 増えた人</span><span className="text-danger">● 減った人</span>{overview.campaigns.map((item) => <span key={item.id}>{item.date.slice(5).replace('-', '/')} {item.name}</span>)}</div>
+        <div className="mt-8 flex flex-wrap gap-4 text-xs text-ink-secondary"><span><span aria-hidden="true" className="text-accent-deep">●</span> 増えた人</span><span><span aria-hidden="true" className="text-ink-faint/50">●</span> 減った人</span>{overview.campaigns.map((item) => <span key={item.id}>{item.date.slice(5).replace('-', '/')} {item.name}</span>)}</div>
       )}
       {daysShown && selectedDay && (
         <div className="mt-3 rounded-control bg-canvas-sunken px-3 py-2 text-xs text-ink-secondary"><strong className="text-ink">{selectedDay.date}（{analyticsWeekday(selectedDay.date)}）</strong>　増加 {selectedDay.added}人・減少 {selectedDay.removed}人・差し引き {selectedDay.net > 0 ? '+' : ''}{selectedDay.net}人　施策 {selectedCampaigns.length ? selectedCampaigns.map((item) => item.name).join('、') : 'なし'}</div>

@@ -8,7 +8,7 @@ import { TableHeadRow, Th } from '@/components/shared/table'
 const fmt = new Intl.NumberFormat('ja-JP')
 
 const ACCOUNT_BADGE_COLORS = [
-  'bg-emerald-100 text-emerald-700',
+  'bg-emerald-100 text-success',
   'bg-sky-100 text-sky-700',
   'bg-violet-100 text-violet-700',
   'bg-amber-100 text-amber-700',

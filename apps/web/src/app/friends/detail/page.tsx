@@ -1,5 +1,6 @@
 'use client'
 
+import Avatar from '@/components/shared/avatar'
 import { Suspense, useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -1311,14 +1312,13 @@ function FriendDetailInner() {
             </div>
 
             <div className="border-hairline flex flex-col items-center border-b px-5 py-5 text-center">
-              {friend?.pictureUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element -- LINE CDNの利用者画像。
-                <img src={friend.pictureUrl} alt="" className="h-16 w-16 rounded-full object-cover" />
-              ) : <div className="bg-action flex h-16 w-16 items-center justify-center rounded-full text-xl font-bold text-on-action">{friend?.displayName?.charAt(0) ?? '?'}</div>}
+              {/* ★V7 友だちの顔：名前が無い時は「?」ではなく人の印。 */}
+              <Avatar name={friend?.displayName} src={friend?.pictureUrl} size={56} />
               <h2 className="text-ink mt-3 text-sm font-bold">{friend?.displayName ?? '名前未登録'}</h2>
               <p className="text-ink-faint mt-1 text-xs">LINE表示名</p>
               <div className="mt-3 flex flex-wrap justify-center gap-1.5"><SupportMarkBadge status={friend?.support?.status} /><span className="bg-canvas-sunken text-ink-secondary rounded-pill px-2 py-0.5 text-micro">{friend?.support?.operatorName ?? '未割り当て'}</span><span className="bg-accent-soft text-accent-deep rounded-pill px-2 py-0.5 text-micro">表示中</span></div>
-              <Button href={`/friends/detail?id=${friendId}&tab=info`} className="mt-3">♙ 友だち詳細</Button>
+              {/* 同じ画面の「情報欄」タブへ移る。今いる画面と同じ名前・チェスの駒の記号は紛らわしかった（★V7）。 */}
+              <Button href={`/friends/detail?id=${friendId}&tab=info`} className="mt-3">情報欄を見る</Button>
             </div>
 
             {/* FRIEND-31: lg未満ではここから下（マイル以降の補助プロフィール）を畳む。 */}
@@ -1622,15 +1622,26 @@ function FriendDetailInner() {
           </aside>
 
           {/* 右：タブ */}
-          <div data-design="Right">
-            <div className="border-hairline mb-4 flex flex-wrap gap-1 border-b">
+          {/*
+            ★V7差し戻し: 折らないタブ帯がグリッドの右列を押し広げ、右端が
+            画面からはみ出していた。grid の子に min-w-0 を付け、幅の決定を
+            グリッドに任せてタブ帯だけ中で横に流す。
+          */}
+          <div data-design="Right" className="min-w-0">
+            {/*
+              ★V7: 10個のタブが 1440px で2段に折れていた。折らずに1段にし、
+              入り切らない分は横に送る。リンクで移動するタブなので
+              aria-current="page" で現在地を示す（role="tab" は付けない）。
+            */}
+            <div className="border-hairline mb-4 flex gap-1 overflow-x-auto border-b">
               {visibleTabs.map((t) => (
                 <Link
                   key={t.key}
                   href={`/friends/detail?id=${friendId}&tab=${t.key}${
                     group === BASIC_GROUP ? '' : `&group=${group}`
                   }`}
-                  className={`-mb-px border-b-2 px-4 py-2 text-sm font-medium transition-colors ${
+                  aria-current={tab === t.key ? 'page' : undefined}
+                  className={`-mb-px shrink-0 whitespace-nowrap border-b-2 px-3 py-2 text-sm font-medium transition-colors ${
                     tab === t.key
                       ? 'border-accent text-accent-deep'
                       : 'text-ink-secondary hover:text-ink border-transparent'
@@ -1647,7 +1658,7 @@ function FriendDetailInner() {
                   <section className="bg-canvas rounded-card border-hairline border p-4 shadow-card">
                     <h2 className="text-ink text-sm font-bold">進行中の配信・自動処理</h2>
                     <dl className="text-ink-secondary mt-3 space-y-2 text-xs"><div className="flex gap-5"><dt className="font-semibold">シナリオ</dt><dd>取得元を接続後に表示</dd></div><div className="flex gap-5"><dt className="font-semibold">リマインド</dt><dd>取得元を接続後に表示</dd></div><div className="flex gap-5"><dt className="font-semibold">対象ルール</dt><dd>—</dd></div></dl>
-                    <Button type="button" disabled className="mt-3">配信状態を確認</Button>
+                    {/* ★V7：押せないまま置かれていた「配信状態を確認」は外した。 */}
                   </section>
                   <section className="bg-canvas rounded-card border-hairline border p-4 shadow-card">
                     <h2 className="text-ink text-sm font-bold">同じ人としてつながる情報</h2>
@@ -1745,7 +1756,7 @@ function FriendDetailInner() {
                 <section className="bg-canvas rounded-card border-hairline border p-4 shadow-card">
                   <h2 className="text-ink text-sm font-bold">この友だちに行う操作</h2>
                   <div className="mt-3 flex flex-wrap gap-2">
-                    <Button href={inboxHrefForFriend(friendId)} variant="primary" aria-label="個別トークを開く">受信箱で開く</Button>
+                    {/* 「受信箱で開く」は画面右上にもあるので、ここでは重ねない（★V7）。 */}
                     {canManageFieldDefs ? (
                       <Button
                         type="button"
@@ -1757,9 +1768,7 @@ function FriendDetailInner() {
                         シナリオに登録
                       </Button>
                     ) : null}
-                    <Button href="/templates">テンプレート一覧を見る</Button>
-                    <Button href="/scenarios">シナリオ一覧を見る</Button>
-                    <Button href="/reminders">リマインダ一覧を見る</Button>
+                    {/* ★V7：この友だちに関係の無い「〜一覧を見る」は外した（左のメニューから行ける）。 */}
                   </div>
                   <p className="text-ink-faint mt-2 text-xs">
                     この友だちへテンプレートを送るときは、受信箱でテンプレートを選んで送信します。

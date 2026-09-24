@@ -13,10 +13,9 @@ import ConfirmDialog from '@/components/shared/confirm-dialog'
 import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
 import AutomationTemplateGallery from '@/components/automations/automation-template-gallery'
 import { useCanManageAutomations } from '@/components/automations/use-automation-permission'
+import Chip from '@/components/shared/chip'
 import ListState from '@/components/shared/list-state'
 import { usePageTitle } from '@/components/shell/page-chrome'
-import Chip from '@/components/shared/chip'
-import FilterChip from '@/components/shared/filter-chip'
 import KpiCollapse from '@/components/ui/kpi-collapse'
 import MetricValue from '@/components/ui/metric-value'
 import {
@@ -44,7 +43,7 @@ interface Automation extends SharedAutomation {
 }
 
 const eventTypeBadgeColor: Record<AutomationEventType, string> = {
-  friend_add: 'bg-success-bg text-green-700',
+  friend_add: 'bg-success-bg text-success',
   tag_change: 'bg-blue-100 text-blue-700',
   score_threshold: 'bg-warning-bg text-yellow-700',
   cv_fire: 'bg-red-100 text-danger',
@@ -53,10 +52,10 @@ const eventTypeBadgeColor: Record<AutomationEventType, string> = {
   calendar_booked: 'bg-indigo-100 text-indigo-700',
   form_submitted: 'bg-violet-100 text-violet-700',
   link_clicked: 'bg-fuchsia-100 text-fuchsia-700',
-  datetime: 'bg-lime-100 text-lime-700',
+  datetime: 'bg-lime-100 text-success',
   daily: 'bg-amber-100 text-amber-700',
   weekly: 'bg-sky-100 text-sky-700',
-  'ec.order.confirmed': 'bg-emerald-100 text-emerald-700',
+  'ec.order.confirmed': 'bg-emerald-100 text-success',
   'ec.order.shipped': 'bg-cyan-100 text-cyan-700',
   'ec.subscription.upcoming': 'bg-teal-100 text-teal-700',
   'ec.subscription.payment_failed': 'bg-orange-100 text-orange-700',
@@ -167,6 +166,7 @@ function AutomationRowActions({
   onEdit,
   onDuplicate,
   onArchive,
+  onViewRuns,
 }: {
   automation: Automation
   canManage: boolean | null
@@ -175,12 +175,18 @@ function AutomationRowActions({
   onEdit: () => void
   onDuplicate: () => void
   onArchive: () => void
+  onViewRuns: () => void
 }) {
   // #641: 「編集」＋「その他（…）」の形にそろえ、複製・止める・保管はメニューへ集約。
   const [menuOpen, setMenuOpen] = useState(false)
+  /*
+   * #670 25: 「編集する」「動いた記録を見る」の2ボタンが折返しで縦に積まれ、
+   * 行の高さを押し上げていた。記録はメニュー先頭へ移し、行の操作は1行に収める。
+   * 閲覧のみには記録ボタンを残す(#677 N-352の見るだけ導線)。
+   */
+  const runsHref = `/automations/runs?search=${encodeURIComponent(automation.name)}`
   return (
     <div className="relative flex flex-wrap items-center justify-end gap-1.5">
-      <Button href={`/automations/runs?search=${encodeURIComponent(automation.name)}`} variant="secondary" className="whitespace-nowrap">動いた記録を見る</Button>
       {canManage ? (
         <>
           {/* #942 N-352: 編集・複製・保管を行から直接開けるようにする。 */}
@@ -198,6 +204,12 @@ function AutomationRowActions({
             ariaLabel={`${automation.name}の操作`}
             onClose={() => setMenuOpen(false)}
             items={[
+              {
+                id: 'runs',
+                label: '動いた記録を見る',
+                disabled: busy,
+                onSelect: onViewRuns,
+              },
               {
                 id: 'duplicate',
                 label: '複製する',
@@ -222,7 +234,10 @@ function AutomationRowActions({
           />
         </>
       ) : canManage === false ? (
-        <span className="text-xs text-ink-faint">操作する権限がありません</span>
+        <>
+          <Button href={runsHref} variant="secondary" className="whitespace-nowrap">動いた記録を見る</Button>
+          <span className="text-xs text-ink-faint">操作する権限がありません</span>
+        </>
       ) : null}
     </div>
   )
@@ -286,7 +301,6 @@ export default function AutomationsPage() {
   const [templateCount, setTemplateCount] = useState<number | null>(null)
   const [commonActionCount, setCommonActionCount] = useState<number | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
-  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'stopped'>('all')
   const [sortOrder, setSortOrder] = useState<'runs' | 'priority' | 'name'>('runs')
   const [page, setPage] = useState(1)
   /** 押したあとにアカウントが変わったか。変わっていたら実行させない。 */
@@ -549,10 +563,11 @@ export default function AutomationsPage() {
             : item.label,
   }))
   const visibleAutomations = (() => {
-    const requestedStatus = tab === 'stopped' ? 'stopped' : statusFilter
+    // #734: 状態はタブが持つ。「動いているもの」タブは動いているものだけを出す。
+    const requestedStatus = tab === 'stopped' ? 'stopped' : 'active'
     const normalizedQuery = searchQuery.trim().toLocaleLowerCase('ja')
     return automations
-      .filter((item) => requestedStatus === 'all' || (requestedStatus === 'active' ? item.isActive : !item.isActive))
+      .filter((item) => (requestedStatus === 'active' ? item.isActive : !item.isActive))
       .filter((item) => {
         if (!normalizedQuery) return true
         const actions = item.actions.map((action) => automationActionLabel(action.type)).join(' ')
@@ -654,25 +669,11 @@ export default function AutomationsPage() {
         </div>
       </div>
 
-      {tab !== 'stopped' ? (
-        <div className="mb-3 flex flex-wrap gap-2" aria-label="状態で絞り込む">
-          {([
-            ['all', `すべて ${automations.length}`],
-            ['active', `動いている ${activeCount ?? '—'}`],
-            ['stopped', `止めている ${stoppedCount ?? '—'}`],
-          ] as const).map(([value, label]) => (
-            <FilterChip
-              key={value}
-              selected={statusFilter === value}
-              onChange={() => { setStatusFilter(value); setPage(1) }}
-            >
-              {label}
-            </FilterChip>
-          ))}
-          <span className="flex h-9 items-center rounded-full border border-hairline bg-canvas-sunken px-4 text-sm text-ink-faint">失敗あり {automations.filter((item) => item.failureCount30d > 0).length}</span>
-          <span className="flex h-9 items-center rounded-full border border-hairline bg-canvas-sunken px-4 text-sm text-ink-faint">30日 動いていない {automations.filter((item) => item.executionCount30d === 0).length}</span>
-        </div>
-      ) : null}
+      {/*
+        #734: 状態の切替はタブ（動いているもの／止めているもの）の1機構に揃える。
+        同じ意味の札（すべて／動いている／止めている）を下にも並べると、
+        どちらが効いているか分からなくなる。失敗・未稼働の数は上のKPI札が持つ。
+      */}
 
       {/* Error */}
       {error && (
@@ -716,12 +717,8 @@ export default function AutomationsPage() {
                 <span className="text-ink tabular-nums">{automation.executionCount30d.toLocaleString('ja-JP')}回</span>
                 {automation.failureCount30d > 0 ? <span className="text-danger block text-[11px]">失敗が{automation.failureCount30d}回</span> : null}
               </div>
-              {/*
-                状態は色文字ではなく札で出す。他の一覧は状態を印（チップ）で
-                示しており、素テキストだけの列は「まだ書き途中」に見える
-                （監査 A13）。止めている＝オフなので ok ではなく neutral。
-              */}
-              <Chip tone={automation.isActive ? 'ok' : 'neutral'}>{automation.isActive ? '動いています' : '止めています'}</Chip>
+              {/* #670 25: 状態は他画面と同じ札(Chip)で出す。素テキストだと列の中で浮く。 */}
+              <span><Chip tone={automation.isActive ? 'ok' : 'neutral'}>{automation.isActive ? '動いています' : '止めています'}</Chip></span>
               {/* 見るだけの導線は閲覧のみにも出す。検索語にこの行の名前を載せて実対象を引き継ぐ（#677で承認されたN-352の導線部分）。 */}
               <AutomationRowActions
                 automation={automation}
@@ -731,18 +728,22 @@ export default function AutomationsPage() {
                 onEdit={() => void handleEdit(automation)}
                 onDuplicate={() => void handleDuplicate(automation)}
                 onArchive={() => handleArchive(automation)}
+                onViewRuns={() => router.push(`/automations/runs?search=${encodeURIComponent(automation.name)}`)}
               />
             </div>
           ))}
           <div className="flex items-center justify-between border-t border-hairline px-4 py-3 text-xs text-ink-faint">
             <span>オートメーション {visibleAutomations.length}本中 {(currentPage - 1) * AUTOMATION_PAGE_SIZE + 1}〜{Math.min(currentPage * AUTOMATION_PAGE_SIZE, visibleAutomations.length)}本を表示</span>
-            <div className="flex items-center gap-3" aria-label="ページ送り">
-              <button type="button" disabled={currentPage === 1} onClick={() => setPage(currentPage - 1)} className="text-action disabled:text-ink-faint">前へ</button>
-              {Array.from({ length: listPageCount }, (_, index) => index + 1).map((pageNumber) => (
-                <button key={pageNumber} type="button" aria-current={pageNumber === currentPage ? 'page' : undefined} onClick={() => setPage(pageNumber)} className={pageNumber === currentPage ? 'text-action font-bold' : ''}>{pageNumber}</button>
-              ))}
-              <button type="button" disabled={currentPage >= listPageCount} onClick={() => setPage(currentPage + 1)} className="text-action disabled:text-ink-faint">次へ</button>
-            </div>
+            {/* #670 9: 送る先が1ページだけならページ送りは出さない。押せない口が並ぶと「まだ何かある」と読める。 */}
+            {listPageCount > 1 ? (
+              <div className="flex items-center gap-3" aria-label="ページ送り">
+                <button type="button" disabled={currentPage === 1} onClick={() => setPage(currentPage - 1)} className="text-action disabled:text-ink-faint">前へ</button>
+                {Array.from({ length: listPageCount }, (_, index) => index + 1).map((pageNumber) => (
+                  <button key={pageNumber} type="button" aria-current={pageNumber === currentPage ? 'page' : undefined} onClick={() => setPage(pageNumber)} className={pageNumber === currentPage ? 'text-action font-bold' : ''}>{pageNumber}</button>
+                ))}
+                <button type="button" disabled={currentPage >= listPageCount} onClick={() => setPage(currentPage + 1)} className="text-action disabled:text-ink-faint">次へ</button>
+              </div>
+            ) : null}
           </div>
         </div>
       )}

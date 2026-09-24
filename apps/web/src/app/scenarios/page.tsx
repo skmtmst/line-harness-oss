@@ -801,13 +801,7 @@ export default function ScenariosPage() {
           停止中のみ
         </button>
         {[
-          {
-            label: '離脱が大きい',
-            disabled: true,
-            active: false,
-            title: '離脱率の比較基準が決まっていないため、まだ数えられません',
-            onClick: undefined,
-          },
+          /* ★V7：押せないまま置かれていた「離脱が大きい」は外した（比較の基準が決まるまで出さない）。 */
           {
             label: '今月作成',
             disabled: false,

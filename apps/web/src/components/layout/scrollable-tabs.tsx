@@ -56,7 +56,11 @@ export default function ScrollableTabs({
    */
   useEffect(() => {
     const el = scrollerRef.current
-    const current = el?.querySelector<HTMLElement>('[aria-current="page"]')
+    /*
+     * ★V7: 開いているタブの印が2種類ある。リンク移動のタブは
+     * aria-current="page"、ボタン切り替えのタブは aria-selected="true"。
+     */
+    const current = el?.querySelector<HTMLElement>('[aria-current="page"], [aria-selected="true"]')
     if (!el || !current) return
     const target = current.offsetLeft - 16
     el.scrollTo({ left: Math.max(0, target) })
