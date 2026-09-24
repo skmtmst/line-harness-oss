@@ -888,11 +888,15 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
           <table className="w-full table-fixed">
             <thead>
               <TableHeadRow>
-                <Th>成果地点</Th>
-                <Th>何が起きたら数えるか</Th>
+                {/*
+                  列幅は見出し側で決める。table-fixed では先頭行の幅だけが効き、
+                  行側の td の幅指定は効かない。1440pxで足りるよう配り直す。
+                */}
+                <Th className="w-1/6">成果地点</Th>
+                <Th className="w-1/4">何が起きたら数えるか</Th>
                 <Th align="right">この30日</Th>
-                <Th align="right">金額</Th>
-                <Th>使われている場所</Th>
+                <Th align="right" className="w-24">金額</Th>
+                <Th className="w-1/4">使われている場所</Th>
                 <Th align="right" className="w-52">操作</Th>
               </TableHeadRow>
             </thead>
@@ -903,13 +907,14 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
                   ref={point.id === highlightId ? highlightRowRef : null}
                   className={point.id === highlightId ? 'bg-accent-soft' : 'hover:bg-canvas-sunken'}
                 >
-                  <td className="text-ink w-1/5 px-4 py-3 text-sm font-medium">
-                    <span className="block truncate" title={point.name}>{point.name}</span>
+                  <td className="text-ink w-1/6 px-4 py-3 text-sm font-medium">
+                    <span className="line-clamp-2" title={point.name}>{point.name}</span>
                     {/* 辞書に無い種別は中身のない印を出さない。具体的な種別だけ添える。 */}
                     {EVENT_TYPE_LABELS[point.sourceType] ? (
                       <p className="text-ink-faint mt-0.5 text-xs">{EVENT_TYPE_LABELS[point.sourceType]}</p>
                     ) : null}
-                    {point.state !== 'active' ? (
+                    {/* 状態名が無いときは空の札を出さない。口が state を返さない行で灰色の空札が出ていた。 */}
+                    {point.state !== 'active' && STATE_LABELS[point.state] ? (
                       <p
                         className={`mt-1 inline-block rounded px-1.5 py-0.5 text-xs font-semibold ${
                           point.state === 'draft' ? 'bg-info-bg text-info'
@@ -923,7 +928,7 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
                     ) : null}
                   </td>
                   <td className="text-ink-secondary w-1/4 px-4 py-3 text-sm">
-                    <span className="block truncate" title={sourceTriggerLabel(point)}>{sourceTriggerLabel(point)}</span>
+                    <span className="line-clamp-2" title={sourceTriggerLabel(point)}>{sourceTriggerLabel(point)}</span>
                     <p className="text-ink-faint mt-0.5 truncate text-xs" title={`${measureLabel(point.measureMethod)}・${deduplicationLabel(point.deduplicationMode, point.deduplicationWindowDays)}`}>
                       {measureLabel(point.measureMethod)}・{deduplicationLabel(point.deduplicationMode, point.deduplicationWindowDays)}
                     </p>
@@ -937,9 +942,9 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
                       : `¥${point.metrics.netValue.toLocaleString('ja-JP')}`}
                   </td>
                   <td className={point.usageCount === 0
-                    ? 'text-warning w-1/5 px-4 py-3 text-sm'
-                    : 'text-ink-secondary w-1/5 px-4 py-3 text-sm'}>
-                    <span className="block truncate" title={usageLabel(point)}>{usageLabel(point)}</span>
+                    ? 'text-warning w-1/4 px-4 py-3 text-sm'
+                    : 'text-ink-secondary w-1/4 px-4 py-3 text-sm'}>
+                    <span className="line-clamp-2" title={usageLabel(point)}>{usageLabel(point)}</span>
                   </td>
                   <td className="px-4 py-3 text-right whitespace-nowrap">
                     {/*
