@@ -23,6 +23,7 @@ import TagBadge from '@/components/friends/tag-badge'
 import { FIELD_TYPE_LABELS } from '@/components/friend-fields/field-list'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
 import Button from '@/components/shared/button'
+import TargetMissing from '@/components/shared/target-missing'
 import SelectField from '@/components/shared/select-field'
 import ListRange from '@/components/ui/list-range'
 import { usePageTitle } from '@/components/shell/page-chrome'
@@ -439,6 +440,8 @@ function FriendDetailInner() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  /** 404・空で見つからないとき。取得の失敗（error）とは分ける。 */
+  const [friendMissing, setFriendMissing] = useState(false)
   const [notice, setNotice] = useState('')
   const [warnings, setWarnings] = useState<string[]>([])
   /*
@@ -543,7 +546,7 @@ function FriendDetailInner() {
   const scenarioReqRef = useRef(0)
   const group = params.get('group') ?? BASIC_GROUP
   // 情報欄タブは friend_fields の画面。オフのaccountではタブごと出さない。
-  const { selectedAccountId } = useAccount()
+  const { selectedAccountId, selectedAccount } = useAccount()
   const fieldsEnabled = useFeatureVisibility(selectedAccountId).enabled('friend_fields')
   const visibleTabs = fieldsEnabled ? TABS : TABS.filter((t) => t.key !== 'info')
   /*
@@ -572,6 +575,7 @@ function FriendDetailInner() {
     const requestedAccountId = selectedAccountId
     setLoading(true)
     setError('')
+    setFriendMissing(false)
     try {
       // PERF-13: 回答本文は初期応答に載せない。総数だけ返るので
       // サイドの「フォーム回答 N件」とタブの案内は変わらない。
@@ -582,9 +586,12 @@ function FriendDetailInner() {
     } catch (err) {
       if (isStaleResponse(generation, requestedAccountId)) return
       setFriend(null)
-      setError(err instanceof ApiError && err.status === 404
-        ? '友だちが見つかりませんでした'
-        : '読み込みに失敗しました。もう一度読み込んでください。')
+      if (err instanceof ApiError && err.status === 404) {
+        setFriendMissing(true)
+        setError('')
+      } else {
+        setError('読み込みに失敗しました。もう一度読み込んでください。')
+      }
     } finally {
       if (!isStaleResponse(generation, requestedAccountId)) setLoading(false)
     }
@@ -1135,14 +1142,13 @@ function FriendDetailInner() {
 
   if (!friendId) {
     return (
-      <div>
-        <p className="text-ink-faint bg-canvas rounded-card border-hairline border p-8 text-center text-sm">
-          友だちが指定されていません。
-          <Link href="/friends" className="text-action ml-1 hover:underline">
-            友だち一覧へ戻る
-          </Link>
-        </p>
-      </div>
+      <TargetMissing
+        kind="unspecified"
+        title="見る友だちが指定されていません"
+        description="友だちの一覧から、見たい人を選び直してください。"
+        backHref="/friends"
+        backLabel="友だち一覧へ戻る"
+      />
     )
   }
 
@@ -1202,6 +1208,32 @@ function FriendDetailInner() {
     || fieldFoldersStatus !== 'ready'
   /** 設計の「本名」。友だち情報欄に同じ名前の項目があればそれを使う。 */
   const realName = fields.find((f) => f.name === '本名')?.value ?? ''
+
+  if (!loading && (friendMissing || (!error && !friend))) {
+    return (
+      <TargetMissing
+        kind="not-found"
+        title="この友だちは見つかりません"
+        description="削除されたか、別の LINE アカウントの人です。一覧から選び直してください。"
+        accountName={selectedAccount?.name}
+        backHref="/friends"
+        backLabel="友だち一覧へ戻る"
+      />
+    )
+  }
+
+  // 保存の失敗は error のまま帯で出す（下の `{error && friend && ...}`）。
+  // ここは本体が無いときだけ。友だちがあるのに error があるのは保存の失敗。
+  if (!loading && !friend) {
+    return (
+      <TargetMissing
+        kind="error"
+        title="友だちを読み込めませんでした"
+        description="通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度読み込んでください。"
+        onRetry={() => void loadFriend()}
+      />
+    )
+  }
 
   return (
     <div data-friends-detail-design="v4">
@@ -1277,19 +1309,9 @@ function FriendDetailInner() {
         NEXT-11: 読み込み中・取得失敗は「本体」だけを見る。マイルなどの
         補助パネルの遅延・失敗ではここに入らない。
       */}
-      {loading ? (
+      {loading || !friend ? (
         <div className="bg-canvas rounded-card border-hairline text-ink-faint border p-8 text-center text-sm">
           読み込み中...
-        </div>
-      ) : !friend ? (
-        <div className="bg-canvas rounded-card border-hairline border p-8 text-center text-sm">
-          <p className="text-ink-secondary">{error || '友だちを表示できませんでした'}</p>
-          <div className="mt-4 flex flex-wrap justify-center gap-2">
-            <Button type="button" onClick={() => void loadFriend()}>
-              もう一度読み込む
-            </Button>
-            <Button href="/friends">友だち一覧へ戻る</Button>
-          </div>
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-[23.5rem_1fr]">

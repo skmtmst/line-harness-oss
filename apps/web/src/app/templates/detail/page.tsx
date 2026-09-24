@@ -1,11 +1,12 @@
 'use client'
 
-import { Suspense, useEffect, useState } from 'react'
+import { Suspense, useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { api } from '@/lib/api'
+import { api, ApiError } from '@/lib/api'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import TargetMissing from '@/components/shared/target-missing'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { isOwnerOrAdmin } from '@/lib/staff-capability'
 import { templateDeleteDescription } from '../template-delete-message'
@@ -36,6 +37,8 @@ function TemplateDetailInner() {
   const [usage, setUsage] = useState<Usage | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  /** 404・空で見つからないとき。取得の失敗（error）とは分ける。 */
+  const [missing, setMissing] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState('')
@@ -47,27 +50,38 @@ function TemplateDetailInner() {
     typeof window === 'undefined' ? true : isOwnerOrAdmin())
   usePageTitle(template?.name ?? null)
 
+  const reload = useCallback(async () => {
+    setMissing(false)
+    setError('')
+    setTemplate(null)
+    setUsage(null)
+    setLoading(true)
+    try {
+      const detail = await api.templates.get(id)
+      if (detail.success) {
+        setTemplate(detail.data)
+        setUsage(detail.data.usedBy)
+      } else {
+        setError('テンプレートを読み込めませんでした。もう一度お試しください。')
+      }
+    } catch (caught) {
+      if (caught instanceof ApiError && caught.status === 404) {
+        setMissing(true)
+      } else {
+        setError('テンプレートを読み込めませんでした。もう一度お試しください。')
+      }
+    } finally {
+      setLoading(false)
+    }
+  }, [id])
+
   useEffect(() => {
     if (!id) {
       setLoading(false)
       return
     }
-    void (async () => {
-      try {
-        const detail = await api.templates.get(id)
-        if (detail.success) {
-          setTemplate(detail.data)
-          setUsage(detail.data.usedBy)
-        } else {
-          setError('テンプレートを読み込めませんでした。もう一度お試しください。')
-        }
-      } catch {
-        setError('テンプレートを読み込めませんでした。もう一度お試しください。')
-      } finally {
-        setLoading(false)
-      }
-    })()
-  }, [id])
+    void reload()
+  }, [id, reload])
 
   const usageCount = usage
     ? usage.autoReplies.length
@@ -107,14 +121,36 @@ function TemplateDetailInner() {
 
   if (!id) {
     return (
-      <div>
-        <p className="text-ink-faint bg-canvas rounded-card border-hairline border p-8 text-center text-sm">
-          テンプレートが指定されていません。
-          <Link href="/templates" className="text-action ml-1 hover:underline">
-            一覧へ戻る
-          </Link>
-        </p>
-      </div>
+      <TargetMissing
+        kind="unspecified"
+        title="見るテンプレートが指定されていません"
+        description="一覧から、見たいテンプレートを選び直してください。"
+        backHref="/templates"
+        backLabel="テンプレートの一覧へ戻る"
+      />
+    )
+  }
+
+  if (missing || (!error && !loading && !template)) {
+    return (
+      <TargetMissing
+        kind="not-found"
+        title="このテンプレートは見つかりません"
+        description="削除されたか、別の LINE アカウントのものです。一覧から選び直してください。"
+        backHref="/templates"
+        backLabel="テンプレートの一覧へ戻る"
+      />
+    )
+  }
+
+  if (error || (!loading && !template)) {
+    return (
+      <TargetMissing
+        kind="error"
+        title="テンプレートを読み込めませんでした"
+        description="通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度読み込んでください。"
+        onRetry={() => void reload()}
+      />
     )
   }
 
@@ -183,16 +219,10 @@ function TemplateDetailInner() {
         )}
       </div>
 
-      {error && <p className="text-danger mb-3 text-sm">{error}</p>}
-
-      {loading ? (
+      {loading || !template ? (
         <div className="bg-canvas rounded-card border-hairline text-ink-faint border p-8 text-center text-sm">
           読み込み中...
         </div>
-      ) : !template ? (
-        <p className="text-ink-faint bg-canvas rounded-card border-hairline border p-8 text-center text-sm">
-          このテンプレートは見つかりませんでした。
-        </p>
       ) : (
         <div data-design="Body" className="flex flex-col gap-4 xl:flex-row">
           <div data-design="Left" className="min-w-0 flex-1 space-y-4">

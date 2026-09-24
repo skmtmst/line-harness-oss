@@ -134,7 +134,9 @@ describe('V6 1通目設定の契約', () => {
     expect(PAGE).toContain("setLoadState('ready')")
     expect(PAGE).toContain("setLoadState('error')")
     expect(PAGE).toContain('loadState !== \'ready\'')
-    expect(PAGE).toContain('再読み込み')
+    // 再読み込みは ★V7 TargetMissing の error（onRetry が番号を進めて取り直す）。
+    expect(PAGE).toContain('kind="error"')
+    expect(PAGE).toContain('onRetry={() => setReloadKey((k) => k + 1)}')
   })
 
   it('保存の失敗・切断で「保存中」のままにしない', () => {

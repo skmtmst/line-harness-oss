@@ -4,10 +4,11 @@ import { Suspense, useCallback, useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { CheckCircle2 } from 'lucide-react'
 import type { Webinar, WebinarEditor } from '@/lib/api'
-import { webinarApi } from '@/lib/api'
+import { webinarApi, ApiError } from '@/lib/api'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
+import TargetMissing from '@/components/shared/target-missing'
 import NoteBar from '@/components/shared/note-bar'
 import { useAccount } from '@/contexts/account-context'
 import { publicationStateLabel } from '@/components/webinars/publication-label'
@@ -35,6 +36,8 @@ function PublishedWebinarContent() {
   const [editor, setEditor] = useState<WebinarEditor | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  /** 404・空で見つからないとき。取得の失敗（error）とは分ける。 */
+  const [missing, setMissing] = useState(false)
   const [notice, setNotice] = useState('')
   const [busy, setBusy] = useState(false)
 
@@ -46,13 +49,19 @@ function PublishedWebinarContent() {
     }
     setLoading(true)
     setError('')
+    setMissing(false)
     try {
       const [response, editorResponse] = await Promise.all([webinarApi.get(id), webinarApi.editor(id)])
       setWebinar(response.data)
       setEditor(editorResponse.data)
-    } catch {
+    } catch (caught) {
       setWebinar(null)
-      setError('公開結果を表示できませんでした。通信を確認して、もう一度お試しください。')
+      if (caught instanceof ApiError && caught.status === 404) {
+        setMissing(true)
+        setError('')
+      } else {
+        setError('公開結果を表示できませんでした。通信を確認して、もう一度お試しください。')
+      }
     } finally {
       setLoading(false)
     }
@@ -72,27 +81,35 @@ function PublishedWebinarContent() {
   */
   if (!id) {
     return (
-      <ListState
-        kind="empty"
+      <TargetMissing
+        kind="unspecified"
         title="確認するウェビナーが指定されていません"
         description="一覧から公開したウェビナーを選び直してください。"
-        action={<Button href="/webinars">ウェビナー一覧へ戻る</Button>}
+        backHref="/webinars"
+        backLabel="ウェビナー一覧へ戻る"
+      />
+    )
+  }
+
+  if (missing || (!error && (!webinar || !editor))) {
+    return (
+      <TargetMissing
+        kind="not-found"
+        title="このウェビナーは見つかりません"
+        description="公開したウェビナーが見つかりませんでした。削除されたか、一覧から選び直してください。"
+        backHref="/webinars"
+        backLabel="ウェビナー一覧へ戻る"
       />
     )
   }
 
   if (error || !webinar || !editor) {
     return (
-      <ListState
+      <TargetMissing
         kind="error"
         title="公開結果を表示できませんでした"
-        description={error || '公開したウェビナーが見つかりませんでした。'}
-        action={
-          <>
-            <Button onClick={() => void load()}>もう一度読み込む</Button>
-            <Button href="/webinars">ウェビナー一覧へ戻る</Button>
-          </>
-        }
+        description="通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度読み込んでください。"
+        onRetry={() => void load()}
       />
     )
   }

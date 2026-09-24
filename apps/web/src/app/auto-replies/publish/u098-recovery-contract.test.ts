@@ -21,15 +21,16 @@ describe('再読み込みだけにしない（#975 U098）', () => {
     expect(PUBLISH).toContain("loadState === 'missing'")
     expect(PUBLISH).toContain('公開する自動応答が指定されていません')
     expect(PUBLISH).toContain('この自動応答を有効化する権限がありません')
-    expect(PUBLISH).toContain('href="/auto-replies"')
+    // 戻り先は ★V7 TargetMissing の backHref、再読み込みは onRetry が持つ。
+    expect(PUBLISH).toContain('backHref="/auto-replies"')
     expect(PUBLISH).toContain('自動応答の一覧へ戻る')
-    expect(PUBLISH).toContain('再読み込み')
+    expect(PUBLISH).toContain('onRetry={() => void load()}')
   })
 
   it('追加設定の実施詳細は、対象未指定・アカウント未選択・失敗で履歴へ戻れる', () => {
     expect(RUN_DETAIL).toContain('見る実行詳細が指定されていません')
     expect(RUN_DETAIL).toContain('LINEアカウントを選んでください')
-    expect(RUN_DETAIL).toContain('href="/friend-add-settings/runs"')
+    expect(RUN_DETAIL).toContain('backHref="/friend-add-settings/runs"')
     expect(RUN_DETAIL).toContain('実行履歴の一覧へ戻る')
     expect(RUN_DETAIL).toContain('もう一度読み込む')
     expect(RUN_DETAIL).toContain('対象の記録が見つかりません')
@@ -38,7 +39,7 @@ describe('再読み込みだけにしない（#975 U098）', () => {
   it('公開ウェビナーは、対象未指定と読み込み失敗を分けて案内する', () => {
     expect(PUBLISHED).toContain('確認するウェビナーが指定されていません')
     expect(PUBLISHED).toContain('公開したウェビナーが見つかりませんでした')
-    expect(PUBLISHED).toContain('href="/webinars"')
+    expect(PUBLISHED).toContain('backHref="/webinars"')
     expect(PUBLISHED).toContain('ウェビナー一覧へ戻る')
     expect(PUBLISHED).toContain('もう一度読み込む')
   })
@@ -46,9 +47,10 @@ describe('再読み込みだけにしない（#975 U098）', () => {
   it('マイレージの友だち詳細は、対象未指定・アカウント未選択・失敗で一覧へ戻れる', () => {
     expect(FRIEND_DETAIL).toContain('マイル明細を見る友だちが指定されていません')
     expect(FRIEND_DETAIL).toContain('LINEアカウントを選択してください')
-    expect(FRIEND_DETAIL).toContain('href="/friends"')
+    expect(FRIEND_DETAIL).toContain('backHref="/friends"')
     expect(FRIEND_DETAIL).toContain('友だち一覧へ戻る')
-    expect(FRIEND_DETAIL).toContain('マイル明細を再読み込み')
+    // 再読み込みは ★V7 TargetMissing の error（文言は部品が持つ）。
+    expect(FRIEND_DETAIL).toContain('onRetry={() => void load()}')
     expect(FRIEND_DETAIL).toContain('友だちが選択中のLINEアカウントにいるか確認して')
   })
 })

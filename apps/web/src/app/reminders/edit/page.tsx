@@ -4,8 +4,8 @@ import ReminderPublishFlow, {
   type ReminderPublishStage,
 } from '@/components/reminders/reminder-publish-flow'
 import { Suspense } from 'react'
-import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
+import TargetMissing from '@/components/shared/target-missing'
 import { Issue469ReminderStepEditor, Issue469ReminderTestStage } from './issue469-reminder-screens'
 
 /**
@@ -33,13 +33,13 @@ const PUBLISH_STAGES = new Set<ReminderPublishStage>(['target', 'preview', 'test
  */
 function MissingReminder() {
   return (
-    <div className="p-6">
-      <p className="text-danger text-sm">編集するリマインダが指定されていません。</p>
-      <p className="text-ink-secondary mt-1 text-sm">一覧から編集するリマインダを選び直してください。</p>
-      <Link href="/reminders" className="text-action mt-3 inline-block text-sm font-semibold hover:underline">
-        リマインダ一覧へ戻る
-      </Link>
-    </div>
+    <TargetMissing
+      kind="unspecified"
+      title="編集するリマインダが指定されていません"
+      description="一覧から編集するリマインダを選び直してください。"
+      backHref="/reminders"
+      backLabel="リマインダ一覧へ戻る"
+    />
   )
 }
 

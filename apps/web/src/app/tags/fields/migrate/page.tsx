@@ -8,7 +8,9 @@ import FeatureGate from '@/components/feature-gate'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import Breadcrumb from '@/components/shared/breadcrumb'
 import Button from '@/components/shared/button'
+import ListState from '@/components/shared/list-state'
 import StickyBar from '@/components/shared/sticky-bar'
+import TargetMissing from '@/components/shared/target-missing'
 import SelectField from '@/components/shared/select-field'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { ApiError, api } from '@/lib/api'
@@ -75,6 +77,8 @@ function MigrateFriendField() {
     再試行できる失敗として出す。
   */
   const [loadError, setLoadError] = useState('')
+  /** 権限なしの失敗（見ること自体ができない）。通信の失敗とは分ける。 */
+  const [loadForbidden, setLoadForbidden] = useState(false)
 
   /*
     ATTR-10: 確認中に種類・名前・移行先を変えても、古い確認結果が
@@ -95,6 +99,7 @@ function MigrateFriendField() {
     let active = true
     setLoading(true)
     setLoadError('')
+    setLoadForbidden(false)
     void api.friendFields.list(selectedAccountId, { withUsage: true })
       .then((res) => {
         if (!active) return
@@ -109,7 +114,13 @@ function MigrateFriendField() {
       })
       .catch((reason) => {
         // ATTR-11: 失敗は loadError へ。項目未発見（!source）と混ぜない。
-        if (active) setLoadError(reason instanceof ApiError && reason.status === 403 ? '友だち情報欄を見る権限がありません。オーナーか管理者に確認してください。' : '項目を読み込めませんでした')
+        if (!active) return
+        if (reason instanceof ApiError && reason.status === 403) {
+          setLoadError('友だち情報欄を見る権限がありません。オーナーか管理者に確認してください。')
+          setLoadForbidden(true)
+        } else {
+          setLoadError('項目を読み込めませんでした')
+        }
       })
       .finally(() => { if (active) setLoading(false) })
     return () => { active = false }
@@ -229,7 +240,19 @@ function MigrateFriendField() {
   /*
     U097: 「一覧から選び直してください」と言うだけの画面に、実際に
     戻れる操作を置く。直リンク・履歴なしでも画面内だけで復帰できる。
+    開き先がない3種は ★V7 TargetMissing（設計 `x5cgUH`）。
   */
+  if (!sourceId) {
+    return (
+      <TargetMissing
+        kind="unspecified"
+        title="移行する項目が指定されていません"
+        description="一覧から移行する項目を選び直してください。"
+        backHref="/tags?tab=fields"
+        backLabel="友だち情報欄の一覧へ戻る"
+      />
+    )
+  }
   if (!selectedAccountId) return (
     <div data-design-node="KoT6c" role="alert" className="rounded-control border border-warning/30 bg-warning-bg p-4 text-sm text-warning">
       LINE公式アカウントを選んでください。
@@ -241,20 +264,32 @@ function MigrateFriendField() {
     通信失敗は再試行でき、項目が本当に無い（消された・URLが古い）
     ときだけ一覧へ戻す導線を出す。
   */
+  if (loadForbidden) {
+    return (
+      <ListState
+        kind="forbidden"
+        title="友だち情報欄を見る権限がありません"
+        description="オーナーか管理者に確認してください。"
+        action={<Button href="/tags?tab=fields">友だち情報欄の一覧へ戻る</Button>}
+      />
+    )
+  }
   if (loadError) return (
-    <div data-design-node="KoT6c" role="alert" className="rounded-control border border-danger/20 bg-danger-bg p-4 text-sm text-danger">
-      {loadError}
-      <div className="mt-3 flex gap-2">
-        <Button type="button" onClick={() => setReloadTick((tick) => tick + 1)}>もう一度読み込む</Button>
-        <Button href="/tags?tab=fields">友だち情報欄の一覧へ戻る</Button>
-      </div>
-    </div>
+    <TargetMissing
+      kind="error"
+      title="項目を読み込めませんでした"
+      description="通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度読み込んでください。"
+      onRetry={() => setReloadTick((tick) => tick + 1)}
+    />
   )
   if (!source) return (
-    <div data-design-node="KoT6c" role="alert" className="rounded-control border border-danger/20 bg-danger-bg p-4 text-sm text-danger">
-      移行元の項目が見つかりません。友だち情報欄の一覧から選び直してください。
-      <div className="mt-3"><Button href="/tags?tab=fields">友だち情報欄の一覧へ戻る</Button></div>
-    </div>
+    <TargetMissing
+      kind="not-found"
+      title="移行元の項目が見つかりません"
+      description="削除されたか、リンクが古くなっています。友だち情報欄の一覧から選び直してください。"
+      backHref="/tags?tab=fields"
+      backLabel="友だち情報欄の一覧へ戻る"
+    />
   )
 
   const confirmed = Boolean(preview?.previewToken)

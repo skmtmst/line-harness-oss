@@ -20,7 +20,8 @@ describe('問い合わせ詳細の id なし（#975 U099）', () => {
     expect(PAGE).toContain('idMissing = id === null')
     expect(PAGE).toContain('idMissing ? (')
     expect(PAGE).toContain('開くお問い合わせが指定されていません')
-    expect(PAGE).toContain('href="/hq/support"')
+    // 戻り先は ★V7 TargetMissing の backHref が持つ。
+    expect(PAGE).toContain('backHref="/hq/support"')
     expect(PAGE).toContain('問い合わせの一覧へ戻る')
   })
 

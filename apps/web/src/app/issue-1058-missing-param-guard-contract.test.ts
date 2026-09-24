@@ -22,14 +22,15 @@ describe('#1058 必須パラメータ欠落時のガード', () => {
     const page = read('accounts/detail/page.tsx')
     expect(page).toContain('if (!id)')
     expect(page).toContain('見るアカウントが指定されていません')
-    expect(page).toContain('href="/accounts"')
+    // 戻り先は ★V7 TargetMissing の backHref が持つ。
+    expect(page).toContain('backHref="/accounts"')
   })
 
   it('accounts/handover: `?id=` なしで無限ローディングにせず一覧へ戻す', () => {
     const page = read('accounts/handover/page.tsx')
     expect(page).toContain('if (!id)')
     expect(page).toContain('乗り換えるアカウントが指定されていません')
-    expect(page).toContain('href="/accounts"')
+    expect(page).toContain('backHref="/accounts"')
   })
 
   it('nen/members: アカウント未選択で真っ白にせず選び直しを案内する', () => {
@@ -42,8 +43,8 @@ describe('#1058 必須パラメータ欠落時のガード', () => {
   it('tags/marks/edit: `?id=` なしで新規作成の器を出さず一覧へ戻す', () => {
     const page = read('tags/marks/edit/page.tsx')
     // 編集ルートで id 無し＝作成画面を見せるのは黙った状態遷移なので止める。
-    expect(page).toContain('対象の対応マークが指定されていません')
-    expect(page).toContain('href="/tags?tab=marks"')
+    expect(page).toContain('編集する対応マークが指定されていません')
+    expect(page).toContain('backHref="/tags?tab=marks"')
     expect(page).toContain('if (!id)')
     expect(page).toContain('return <SupportMarkEditor markId={id} />')
     // 新規作成は /tags/marks/new が担う。編集側へ undefined を渡さない。

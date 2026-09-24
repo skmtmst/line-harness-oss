@@ -7,6 +7,7 @@ import Link from 'next/link'
 import { ApiError, api, fetchApi } from '@/lib/api'
 import { isPoolsFeatureAvailable } from '@/lib/pools-availability'
 import Button from '@/components/shared/button'
+import TargetMissing from '@/components/shared/target-missing'
 import EditRouteModal from '../_components/edit-route-modal'
 import RefOrdersPanel, { type RefOrdersResult } from '../_components/ref-orders'
 import Select from '@/components/shared/select'
@@ -66,6 +67,10 @@ function InflowLinkDetailPageContent() {
   const [editingRoute, setEditingRoute] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  /** 右の内訳を取りに行っている間。 */
+  const [routeLoading, setRouteLoading] = useState(false)
+  /** 404・空で見つからないとき。取得の失敗（error）とは分ける。 */
+  const [routeMissing, setRouteMissing] = useState(false)
   const [copied, setCopied] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [deleting, setDeleting] = useState(false)
@@ -129,10 +134,14 @@ function InflowLinkDetailPageContent() {
       setFunnelError(false)
       setFriends([])
       setOrdersSummary(null)
+      setRouteMissing(false)
+      setError('')
       return
     }
     let cancelled = false
     setError('')
+    setRouteMissing(false)
+    setRouteLoading(true)
     // #514-12: 段階の失敗を読込中のままにしない。再読み込みは funnelAttempt で引き直す。
     setFunnel(null)
     setFunnelError(false)
@@ -155,9 +164,12 @@ function InflowLinkDetailPageContent() {
         } catch {
           if (!cancelled) setFriends([])
         }
+      } else if (r.status === 'rejected' && r.reason instanceof ApiError && r.reason.status === 404) {
+        setRouteMissing(true)
       } else setError('リンクの取得に失敗しました。もう一度読み込んでください。')
       if (f.status === 'fulfilled' && f.value.success) setFunnel(f.value.data)
       else if (!cancelled) setFunnelError(true)
+      if (!cancelled) setRouteLoading(false)
     })
     return () => {
       cancelled = true
@@ -237,6 +249,41 @@ function InflowLinkDetailPageContent() {
     return Math.round((funnel.friend_add_count / funnel.click_count) * 1000) / 10
   }, [funnel])
 
+  if (!selectedId) {
+    return (
+      <TargetMissing
+        kind="unspecified"
+        title="見る流入経路が指定されていません"
+        description="一覧から、見たい流入経路を選び直してください。"
+        backHref="/inflow-links"
+        backLabel="流入経路の一覧へ戻る"
+      />
+    )
+  }
+
+  if (error) {
+    return (
+      <TargetMissing
+        kind="error"
+        title="流入経路を読み込めませんでした"
+        description="通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度読み込んでください。"
+        onRetry={() => setFunnelAttempt((n) => n + 1)}
+      />
+    )
+  }
+
+  if (routeMissing || (!loading && !routeLoading && !route)) {
+    return (
+      <TargetMissing
+        kind="not-found"
+        title="この流入経路は見つかりません"
+        description="削除されたか、リンクが古くなっています。一覧から選び直してください。"
+        backHref="/inflow-links"
+        backLabel="流入経路の一覧へ戻る"
+      />
+    )
+  }
+
   return (
     <div data-design-node="JupxW" data-design="Body">
       <nav data-design="Crumb" className="text-ink-faint mb-2 text-xs">
@@ -247,19 +294,9 @@ function InflowLinkDetailPageContent() {
         <span>リンクの詳細</span>
       </nav>
 
-      {error && <p className="text-danger mb-3 text-sm">{error}</p>}
-      {/*
-        U097: 「表示できませんでした」のあとに戻る操作が無かった。
-        一覧へ戻るリンクを文のそばに置く。
-      */}
       {!route ? (
         <div className="rounded-card border border-hairline bg-canvas p-12 text-center text-sm text-ink-faint">
-          {loading ? '読み込み中…' : (
-            <>
-              <p>流入元を表示できませんでした。削除されたか、リンクが古くなっています。</p>
-              <Link href="/inflow-links" className="text-action mt-3 inline-block font-semibold hover:underline">流入経路の一覧へ戻る</Link>
-            </>
-          )}
+          読み込み中…
         </div>
       ) : <>
         <div data-design="Head" className="mb-4 flex flex-wrap items-start justify-between gap-3">

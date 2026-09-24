@@ -83,7 +83,7 @@ describe('V6 33-4 乗り換え・引き継ぎ', () => {
     */
     expect(PAGE).toContain('if (!id)')
     expect(PAGE).toContain('乗り換えるアカウントが指定されていません')
-    expect(PAGE).toContain('href="/accounts"')
+    expect(PAGE).toContain('backHref="/accounts"')
   })
 
   it('動的セグメントを使わない', () => {

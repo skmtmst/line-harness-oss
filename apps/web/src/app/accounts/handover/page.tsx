@@ -5,6 +5,7 @@ import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import type { LineAccount } from '@line-crm/shared'
 import {
   api,
+  ApiError,
   type AccountHandover,
   type AccountHandoverDecision,
 } from '@/lib/api'
@@ -12,6 +13,7 @@ import Breadcrumb from '@/components/shared/breadcrumb'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
+import TargetMissing from '@/components/shared/target-missing'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import {
@@ -58,6 +60,8 @@ function Handover() {
   const [accounts, setAccounts] = useState<LineAccount[]>([])
   const [handover, setHandover] = useState<HandoverView | null>(null)
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
+  /** 404・空で見つからないとき。取得の失敗（error）とは分ける。 */
+  const [missing, setMissing] = useState(false)
   const [copyState, setCopyState] = useState<'idle' | 'copied'>('idle')
   const [refreshing, setRefreshing] = useState(false)
   const [confirmOpen, setConfirmOpen] = useState(false)
@@ -68,6 +72,7 @@ function Handover() {
   const load = useCallback(async () => {
     if (!id) return
     setStatus('loading')
+    setMissing(false)
     try {
       const [accountRes, accountsRes, handoversRes] = await Promise.all([
         api.lineAccounts.get(id),
@@ -93,7 +98,12 @@ function Handover() {
       }
       setHandover(detailRes.data as HandoverView)
       setStatus('ready')
-    } catch {
+    } catch (caught) {
+      if (caught instanceof ApiError && caught.status === 404) {
+        setMissing(true)
+        setStatus('ready')
+        return
+      }
       setStatus('error')
     }
   }, [id])
@@ -168,20 +178,34 @@ function Handover() {
   */
   if (!id) {
     return (
-      <ListState
-        kind="empty"
+      <TargetMissing
+        kind="unspecified"
         title="乗り換えるアカウントが指定されていません"
         description="LINEアカウントの一覧からアカウントを選び、詳細の「乗り換え」から進んでください。"
-        action={<Button href="/accounts">LINEアカウントの一覧へ戻る</Button>}
+        backHref="/accounts"
+        backLabel="LINEアカウントの一覧へ戻る"
       />
     )
   }
   if (status === 'loading') return <ListState kind="loading" />
+  if (missing || (status === 'ready' && !account)) {
+    return (
+      <TargetMissing
+        kind="not-found"
+        title="このアカウントは見つかりません"
+        description="削除されたか、別の記録です。一覧から選び直してください。"
+        backHref="/accounts"
+        backLabel="LINEアカウントの一覧へ戻る"
+      />
+    )
+  }
   if (status === 'error' || !account) {
     return (
-      <ListState
+      <TargetMissing
         kind="error"
-        action={<Button type="button" onClick={() => void load()}>再読み込み</Button>}
+        title="乗り換えの情報を読み込めませんでした"
+        description="通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度読み込んでください。"
+        onRetry={() => void load()}
       />
     )
   }

@@ -15,6 +15,7 @@ import ConfirmDialog from '@/components/shared/confirm-dialog'
 import FilterChip from '@/components/shared/filter-chip'
 import ListState from '@/components/shared/list-state'
 import StickyBar from '@/components/shared/sticky-bar'
+import TargetMissing from '@/components/shared/target-missing'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import type { AccountWithStats } from '@/contexts/account-context'
 import { api, ApiError } from '@/lib/api'
@@ -35,7 +36,7 @@ import {
   type BannerUsage,
 } from '@/lib/hq-banners'
 
-type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden' | 'notfound'
+type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden' | 'notfound' | 'missing'
 type Filter = 'all' | 'favorite' | 'delivered'
 
 /**
@@ -100,7 +101,7 @@ function ProjectInner() {
 
   const load = useCallback(async () => {
     if (!projectId) {
-      setStatus('notfound')
+      setStatus('missing')
       return
     }
     setStatus('loading')
@@ -379,25 +380,43 @@ function ProjectInner() {
   if (status === 'loading') {
     return <ListState kind="loading" title="プロジェクトを読み込んでいます" />
   }
+  if (status === 'missing') {
+    return (
+      <TargetMissing
+        kind="unspecified"
+        title="開くプロジェクトが指定されていません"
+        description="一覧から、開きたいプロジェクトを選び直してください。"
+        backHref="/hq/banners"
+        backLabel="プロジェクト一覧へ戻る"
+      />
+    )
+  }
   if (status === 'notfound') {
     return (
-      <ListState
-        kind="empty"
+      <TargetMissing
+        kind="not-found"
         title="プロジェクトが見つかりません"
-        description="アーカイブされたか、別の統括のものかもしれません。"
-        action={<Button href="/hq/banners">プロジェクト一覧へ</Button>}
+        description="アーカイブされたか、別の統括のものかもしれません。一覧から選び直してください。"
+        backHref="/hq/banners"
+        backLabel="プロジェクト一覧へ戻る"
       />
     )
   }
   if (status === 'forbidden') {
-    return <ListState kind="forbidden" description="バナー生成は統括の管理者・オーナーだけが使えます。" />
+    return (
+      <ListState
+        kind="forbidden"
+        description="バナー生成は統括の管理者・オーナーだけが使えます。"
+        action={<Button href="/hq/banners">プロジェクト一覧へ戻る</Button>}
+      />
+    )
   }
   if (status === 'error' || !project) {
     return (
-      <ListState
+      <TargetMissing
         kind="error"
         title="プロジェクトを読み込めませんでした"
-        description="通信の状態を確認して、もう一度お試しください。"
+        description="通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度読み込んでください。"
         onRetry={() => void load()}
       />
     )
