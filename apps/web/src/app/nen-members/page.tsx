@@ -835,7 +835,7 @@ export default function PhotoReviewsPage() {
         </div>
       </KpiCollapse>
 
-      <p className="rounded-card bg-info-bg px-4 py-3 text-xs leading-relaxed text-ink-secondary">
+      <p className="bg-info-bg text-ink-secondary rounded-control px-4 py-3 text-xs leading-relaxed">
         採用・見送りを押した時点で、投稿者へお礼や直してほしい点が届きます。見送るときは理由を選び、送る文章を確認できます。
       </p>
 
