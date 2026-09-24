@@ -478,7 +478,7 @@ export default function AccountMigration() {
         実行前後の判断を誤らせる。
       */}
       {(!active || ['dry_run', 'review', 'ready'].includes(active.status)) && (
-        <div className="bg-success-bg text-success mb-4 rounded-control px-4 py-3 text-sm font-medium">本移行まで、既存ユーザー・配信・シナリオには影響しません。</div>
+        <div className="bg-info-bg text-ink-secondary mb-4 rounded-control px-4 py-3 text-xs">本移行まで、既存ユーザー・配信・シナリオには影響しません。</div>
       )}
       {/*
         #984 LAY-13: 段組みと寸法をそろえる。
