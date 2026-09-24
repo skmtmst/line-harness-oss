@@ -16,7 +16,6 @@ import { useCanManageAutomations } from '@/components/automations/use-automation
 import Chip from '@/components/shared/chip'
 import ListState from '@/components/shared/list-state'
 import { usePageTitle } from '@/components/shell/page-chrome'
-import FilterChip from '@/components/shared/filter-chip'
 import KpiCollapse from '@/components/ui/kpi-collapse'
 import MetricValue from '@/components/ui/metric-value'
 import {
@@ -302,7 +301,6 @@ export default function AutomationsPage() {
   const [templateCount, setTemplateCount] = useState<number | null>(null)
   const [commonActionCount, setCommonActionCount] = useState<number | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
-  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'stopped'>('all')
   const [sortOrder, setSortOrder] = useState<'runs' | 'priority' | 'name'>('runs')
   const [page, setPage] = useState(1)
   /** 押したあとにアカウントが変わったか。変わっていたら実行させない。 */
@@ -565,10 +563,11 @@ export default function AutomationsPage() {
             : item.label,
   }))
   const visibleAutomations = (() => {
-    const requestedStatus = tab === 'stopped' ? 'stopped' : statusFilter
+    // #734: 状態はタブが持つ。「動いているもの」タブは動いているものだけを出す。
+    const requestedStatus = tab === 'stopped' ? 'stopped' : 'active'
     const normalizedQuery = searchQuery.trim().toLocaleLowerCase('ja')
     return automations
-      .filter((item) => requestedStatus === 'all' || (requestedStatus === 'active' ? item.isActive : !item.isActive))
+      .filter((item) => (requestedStatus === 'active' ? item.isActive : !item.isActive))
       .filter((item) => {
         if (!normalizedQuery) return true
         const actions = item.actions.map((action) => automationActionLabel(action.type)).join(' ')
@@ -670,25 +669,11 @@ export default function AutomationsPage() {
         </div>
       </div>
 
-      {tab !== 'stopped' ? (
-        <div className="mb-3 flex flex-wrap gap-2" aria-label="状態で絞り込む">
-          {([
-            ['all', `すべて ${automations.length}`],
-            ['active', `動いている ${activeCount ?? '—'}`],
-            ['stopped', `止めている ${stoppedCount ?? '—'}`],
-          ] as const).map(([value, label]) => (
-            <FilterChip
-              key={value}
-              selected={statusFilter === value}
-              onChange={() => { setStatusFilter(value); setPage(1) }}
-            >
-              {label}
-            </FilterChip>
-          ))}
-          <span className="flex h-9 items-center rounded-full border border-hairline bg-canvas-sunken px-4 text-sm text-ink-faint">失敗あり {automations.filter((item) => item.failureCount30d > 0).length}</span>
-          <span className="flex h-9 items-center rounded-full border border-hairline bg-canvas-sunken px-4 text-sm text-ink-faint">30日 動いていない {automations.filter((item) => item.executionCount30d === 0).length}</span>
-        </div>
-      ) : null}
+      {/*
+        #734: 状態の切替はタブ（動いているもの／止めているもの）の1機構に揃える。
+        同じ意味の札（すべて／動いている／止めている）を下にも並べると、
+        どちらが効いているか分からなくなる。失敗・未稼働の数は上のKPI札が持つ。
+      */}
 
       {/* Error */}
       {error && (

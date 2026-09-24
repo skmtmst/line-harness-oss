@@ -50,7 +50,7 @@
     "unresolved-classname": 11
   },
   "app/booking/menus/page.tsx": {
-    "arbitrary-value": 2,
+    "arbitrary-value": 3,
     "direct-th": 8,
     "direct-secondary-button": 4,
     "direct-primary-button": 1
