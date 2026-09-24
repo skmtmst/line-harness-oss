@@ -2,8 +2,9 @@
 
 import { Suspense, useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { api } from '@/lib/api'
+import { api, ApiError } from '@/lib/api'
 import CreatePage, { Field, inputClass } from '@/components/shared/create-page'
+import TargetMissing from '@/components/shared/target-missing'
 import { useAccount } from '@/contexts/account-context'
 
 /**
@@ -22,7 +23,9 @@ function EditWebhookPageInner() {
   const [url, setUrl] = useState('')
   const [eventTypes, setEventTypes] = useState('')
   const [maxRetries, setMaxRetries] = useState('0')
-  const [loadState, setLoadState] = useState<'loading' | 'ready' | 'error'>('loading')
+  const [loadState, setLoadState] = useState<'loading' | 'ready' | 'error' | 'not-found'>('loading')
+  /** 失敗したあとの「もう一度読み込む」で取り直すための番号。 */
+  const [reloadKey, setReloadKey] = useState(0)
 
   useEffect(() => {
     let cancelled = false
@@ -44,24 +47,44 @@ function EditWebhookPageInner() {
         setMaxRetries(String(res.data.maxRetries ?? 0))
         setLoadState('ready')
       })
-      .catch(() => {
-        if (!cancelled) setLoadState('error')
+      .catch((caught: unknown) => {
+        if (cancelled) return
+        if (caught instanceof ApiError && caught.status === 404) setLoadState('not-found')
+        else setLoadState('error')
       })
     return () => { cancelled = true }
-  }, [id, selectedAccountId])
+  }, [id, reloadKey, selectedAccountId])
 
   if (!id) {
     return (
-      <p className="text-ink-secondary p-6 text-sm">
-        直したい送り先が選ばれていません。外部連携の一覧から「設定 → 直す」で開いてください。
-      </p>
+      <TargetMissing
+        kind="unspecified"
+        title="直す送り先が指定されていません"
+        description="外部連携の一覧から「設定 → 直す」で開いてください。"
+        backHref="/webhooks"
+        backLabel="外部連携の一覧へ戻る"
+      />
+    )
+  }
+  if (loadState === 'not-found') {
+    return (
+      <TargetMissing
+        kind="not-found"
+        title="この送り先は見つかりません"
+        description="消えているか、別のLINEアカウントのものかもしれません。一覧から選び直してください。"
+        backHref="/webhooks"
+        backLabel="外部連携の一覧へ戻る"
+      />
     )
   }
   if (loadState === 'error') {
     return (
-      <p className="text-ink-secondary p-6 text-sm">
-        送り先の現在の設定を読めませんでした。消えているか、別のLINEアカウントのものかもしれません。
-      </p>
+      <TargetMissing
+        kind="error"
+        title="送り先の設定を読み込めませんでした"
+        description="通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度読み込んでください。"
+        onRetry={() => setReloadKey((key) => key + 1)}
+      />
     )
   }
 

@@ -12,6 +12,7 @@ import Button from '@/components/shared/button'
 import StickyBar from '@/components/shared/sticky-bar'
 import SelectField from '@/components/shared/select-field'
 import ListState from '@/components/shared/list-state'
+import TargetMissing from '@/components/shared/target-missing'
 import { Field, TextInput, TextArea } from '@/components/shared/form-controls'
 import { FIELD_TYPE_LABELS } from '@/components/friend-fields/field-list'
 import { AttributeKindGuide, DuplicateNameNote, findDuplicateNames } from '@/components/friend-fields/attribute-kind-guide'
@@ -33,13 +34,15 @@ function EditFriendFieldForm() {
   const router = useRouter()
   const params = useSearchParams()
   const id = params.get('id') ?? ''
-  const { selectedAccountId } = useAccount()
+  const { selectedAccountId, selectedAccount } = useAccount()
 
   const [field, setField] = useState<FriendField | null>(null)
   const [siblings, setSiblings] = useState<FriendField[]>([])
   const [folders, setFolders] = useState<Folder[]>([])
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
+  /** 失敗したあとの「もう一度読み込む」で取り直すための番号。 */
+  const [reloadKey, setReloadKey] = useState(0)
   const [name, setName] = useState('')
   const [options, setOptions] = useState('')
   const [defaultValue, setDefaultValue] = useState('')
@@ -56,6 +59,8 @@ function EditFriendFieldForm() {
     if (!selectedAccountId) { setLoading(false); return }
     setLoading(true)
     setError('')
+    setField(null)
+    setNotFound(false)
     void Promise.all([
       api.friendFields.list(selectedAccountId, { withUsage: true }),
       api.folders.list('friend_field').catch(() => null),
@@ -77,12 +82,18 @@ function EditFriendFieldForm() {
       setEcFieldPath(found.ecFieldPath ?? '')
       setFolderId(found.folderId ?? '')
     }).catch((reason) => {
-      if (!cancelled) setError(reason instanceof ApiError ? reason.message : '項目を読み込めませんでした')
+      if (cancelled) return
+      if (reason instanceof ApiError && reason.status === 404) {
+        setError('')
+        setNotFound(true)
+      } else {
+        setError(reason instanceof ApiError ? reason.message : '項目を読み込めませんでした')
+      }
     }).finally(() => {
       if (!cancelled) setLoading(false)
     })
     return () => { cancelled = true }
-  }, [id, selectedAccountId])
+  }, [id, reloadKey, selectedAccountId])
 
   const optionList = useMemo(() => options.split('\n').map((value) => value.trim()).filter(Boolean), [options])
 
@@ -113,14 +124,40 @@ function EditFriendFieldForm() {
   }
 
   if (loading) return <ListState kind="loading" />
+  if (!id) {
+    return (
+      <TargetMissing
+        kind="unspecified"
+        title="編集する友だち情報欄が指定されていません"
+        description="一覧から編集する項目を選び直してください。"
+        backHref="/tags?tab=fields"
+        backLabel="友だち情報欄の一覧へ戻る"
+      />
+    )
+  }
   if (!selectedAccountId) return <p className="rounded-card border border-hairline bg-canvas p-5 text-sm text-ink-secondary">上部でLINE公式アカウントを選んでください。</p>
-  if (notFound || !field) return (
-    <div className="rounded-card border border-hairline bg-canvas p-5">
-      <p className="text-sm font-semibold text-danger">{error || '友だち情報欄の項目が見つかりません'}</p>
-      <p className="mt-1 text-xs text-ink-faint">削除されたか、別のLINEアカウントの項目です。一覧から選び直せます。</p>
-      <Button href="/tags?tab=fields" className="mt-3">友だち情報欄の一覧へ戻る</Button>
-    </div>
-  )
+  if (notFound || (!error && !field)) {
+    return (
+      <TargetMissing
+        kind="not-found"
+        title="この項目は見つかりません"
+        description="削除されたか、別のLINEアカウントの項目です。一覧から選び直せます。"
+        accountName={selectedAccount?.name}
+        backHref="/tags?tab=fields"
+        backLabel="友だち情報欄の一覧へ戻る"
+      />
+    )
+  }
+  if (!field) {
+    return (
+      <TargetMissing
+        kind="error"
+        title="項目を読み込めませんでした"
+        description="通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度読み込んでください。"
+        onRetry={() => setReloadKey((k) => k + 1)}
+      />
+    )
+  }
 
   const locked = field.isInherited === true
 

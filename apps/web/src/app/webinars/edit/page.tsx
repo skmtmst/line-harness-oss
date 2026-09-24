@@ -22,6 +22,7 @@ import { useAccount } from '@/contexts/account-context'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import StickyBar from '@/components/shared/sticky-bar'
+import TargetMissing from '@/components/shared/target-missing'
 import { CheckCircle2, Circle, LoaderCircle, TriangleAlert } from 'lucide-react'
 import type { MediaItem } from '@line-crm/shared'
 import {
@@ -2158,6 +2159,10 @@ function EditWebinarInner() {
   */
   const [loadedWebinar, setLoadedWebinar] = useState<{ id: string; webinar: Webinar; editor: WebinarEditor } | null>(null)
   const [loadFailure, setLoadFailure] = useState<{ id: string; message: string } | null>(null)
+  /** 404・空で見つからないとき。取得の失敗（loadFailure）とは分ける。 */
+  const [loadMissing, setLoadMissing] = useState<{ id: string } | null>(null)
+  /** 失敗したあとの「もう一度読み込む」で取り直すための番号。 */
+  const [reloadKey, setReloadKey] = useState(0)
   const [analytics, setAnalytics] = useState<WebinarAnalytics | null>(null)
   const [analyticsState, setAnalyticsState] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
   const [analyticsId, setAnalyticsId] = useState<string | null>(null)
@@ -2167,8 +2172,9 @@ function EditWebinarInner() {
   const webinar = loadedWebinar && loadedWebinar.id === id ? loadedWebinar.webinar : null
   const editor = loadedWebinar && loadedWebinar.id === id ? loadedWebinar.editor : null
   const loadError = loadFailure && loadFailure.id === id ? loadFailure.message : null
+  const loadMissingNow = loadMissing !== null && loadMissing.id === id
   /* 今のウェビナーの中身も失敗も無い間が読み込み中。切替の1コマ目から前の中身を描かない。 */
-  const loading = webinar === null && loadError === null
+  const loading = webinar === null && loadError === null && !loadMissingNow
   const setEditor = useCallback((next: WebinarEditor) => {
     setLoadedWebinar((prev) => (prev && prev.id === id ? { ...prev, editor: next } : prev))
   }, [id])
@@ -2374,14 +2380,21 @@ function EditWebinarInner() {
         if (requestId !== loadRequestId.current) return
         /* 読めたら前の失敗文は消す。直ったのに赤い文が残らない。 */
         setLoadFailure(null)
+        setLoadMissing(null)
         setLoadedWebinar({ id, webinar: webinarResponse.data, editor: editorResponse.data })
       })
       .catch((err) => {
         if (requestId !== loadRequestId.current) return
-        setLoadFailure({ id, message: webinarErrorText(err, '読み込めませんでした。開き直してください。') })
+        if (err instanceof ApiError && err.status === 404) {
+          setLoadFailure(null)
+          setLoadMissing({ id })
+        } else {
+          setLoadMissing(null)
+          setLoadFailure({ id, message: webinarErrorText(err, '読み込めませんでした。開き直してください。') })
+        }
       })
     return () => { loadRequestId.current += 1 }
-  }, [id])
+  }, [id, reloadKey])
 
   /*
     集計は8並列の重い口。基本設定だけ直す人にも毎回走らせない。
@@ -2420,16 +2433,17 @@ function EditWebinarInner() {
   if (!id) {
     /*
       U097: 「一覧から選び直すと表示できます」と言うだけでは戻れない。
-      一覧へ戻る操作を文のそばに置く。
+      一覧へ戻る操作を文のそばに置く。開き先がない3種は ★V7 TargetMissing。
     */
     return (
       <>
-
-        <div className="p-6">
-          <p className="text-danger">編集するウェビナーが指定されていません。</p>
-          <p className="mt-1 text-sm text-ink-secondary">一覧から編集するウェビナーを選び直してください。</p>
-          <Link href="/webinars" className="mt-3 inline-block text-sm font-semibold text-action hover:underline">ウェビナー一覧へ戻る</Link>
-        </div>
+        <TargetMissing
+          kind="unspecified"
+          title="編集するウェビナーが指定されていません"
+          description="一覧から編集するウェビナーを選び直してください。"
+          backHref="/webinars"
+          backLabel="ウェビナー一覧へ戻る"
+        />
         {leaveConfirmDialog}
       </>
     )
@@ -2438,7 +2452,21 @@ function EditWebinarInner() {
     return (
       <>
 
-        <div className="p-6 text-gray-500">読み込み中...</div>
+        <div className="text-ink-faint p-6">読み込み中...</div>
+        {leaveConfirmDialog}
+      </>
+    )
+  }
+  if (loadMissingNow || (!loadError && (!webinar || !editor))) {
+    return (
+      <>
+        <TargetMissing
+          kind="not-found"
+          title="このウェビナーは見つかりません"
+          description="削除されたか、別の LINE アカウントのものです。一覧から選び直してください。"
+          backHref="/webinars"
+          backLabel="ウェビナー一覧へ戻る"
+        />
         {leaveConfirmDialog}
       </>
     )
@@ -2446,11 +2474,12 @@ function EditWebinarInner() {
   if (loadError || !webinar || !editor) {
     return (
       <>
-
-        <div className="p-6">
-          <p className="text-danger">{loadError ?? 'ウェビナーが見つかりませんでした'}</p>
-          <Link href="/webinars" className="mt-3 inline-block text-sm font-semibold text-action hover:underline">ウェビナー一覧へ戻る</Link>
-        </div>
+        <TargetMissing
+          kind="error"
+          title="ウェビナーを読み込めませんでした"
+          description="通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度読み込んでください。"
+          onRetry={() => setReloadKey((key) => key + 1)}
+        />
         {leaveConfirmDialog}
       </>
     )
