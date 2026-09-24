@@ -6,6 +6,7 @@ import { useSearchParams } from 'next/navigation'
 import type { Tag } from '@line-crm/shared'
 import { ApiError, api, type ApiBroadcast, type BroadcastInsight } from '@/lib/api'
 import Button from '@/components/shared/button'
+import Progress from '@/components/shared/progress'
 import StickyBar from '@/components/shared/sticky-bar'
 import { useAccount } from '@/contexts/account-context'
 import { audienceSummary, messageTypeLabel } from '@/lib/broadcast-summary'
@@ -14,13 +15,6 @@ import { clickInsightDetail, formatBroadcastDateTime, openInsightDetail } from '
 import { broadcastDetailCsv } from './broadcast-detail-export'
 import { broadcastCsvFilename } from '@/components/broadcasts/broadcast-csv-filename'
 import { usePageTitle } from '@/components/shell/page-chrome'
-
-const STATUS_LABELS: Record<string, string> = {
-  draft: '下書き',
-  scheduled: '予約済み',
-  sending: '送信中',
-  sent: '送信済み',
-}
 
 function BroadcastDetailInner() {
   const params = useSearchParams()
@@ -213,36 +207,43 @@ function BroadcastDetailInner() {
       ) : (
         <div className="max-w-3xl space-y-4">
           <section className="bg-canvas rounded-card border-hairline border p-5">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="text-ink text-sm font-semibold">送信の進み具合</p>
-              <span
-                className={`rounded-pill px-2 py-0.5 text-xs ${
-                  broadcast.status === 'sent'
-                    ? 'bg-success-bg text-success'
-                    : broadcast.status === 'sending'
-                      ? 'bg-warning-bg text-warning'
-                      : 'bg-canvas-sunken text-ink-faint'
-                }`}
-              >
-                {STATUS_LABELS[broadcast.status] ?? broadcast.status}
-              </span>
-            </div>
-            <p className="text-ink mt-2 text-sm tabular-nums">
-              {success.toLocaleString('ja-JP')} / {total.toLocaleString('ja-JP')} 件
-              {broadcast.status === 'sent' ? ' 完了' : ''}
-            </p>
-            <div className="bg-canvas-sunken mt-2 h-2 overflow-hidden rounded-full">
-              <div
-                className="bg-accent h-full"
-                style={{ width: total > 0 ? `${(success / total) * 100}%` : '0%' }}
-              />
-            </div>
-            {/* 開始・完了の時刻を別々に持っていない。sent_at は完了だけ。 */}
-            <p className="text-ink-faint mt-2 text-xs">
-              {broadcast.sentAt
-                ? `完了 ${formatBroadcastDateTime(broadcast.sentAt)}`
-                : '開始・完了の時刻は記録していません'}
-            </p>
+            <p className="text-ink text-sm font-semibold">送信の進み具合</p>
+            {/*
+              Progress（処理の進み部品）は送信中（sending）だけに出す。
+              下書き・予約で preparing の棒や回る印を出すと、まだ送って
+              いないのに送り始めているように見える。そのときは棒も印も
+              出さず、1行の文だけにする。sent は上の分かれ道で SentResult
+              へ行くので、ここに done / partial の分岐は置かない。
+            */}
+            {broadcast.status === 'sending' ? (
+              <>
+                <Progress
+                  state="active"
+                  title="送信中"
+                  percent={total > 0 ? (success / total) * 100 : 0}
+                  countText={`${success.toLocaleString('ja-JP')} / ${total.toLocaleString('ja-JP')} 件`}
+                  className="mt-3"
+                />
+                {/*
+                  失敗数は `totalCount - successCount` でしか出せない。送信中は
+                  「まだ送っていないぶん」も同じ引き算に入るため、その数を失敗として
+                  出すと、起きていない失敗を作ることになる。完了してから出す。
+                  （下の「到達」の欄と同じ理由。）
+                */}
+                {/* 開始・完了の時刻を別々に持っていない。sent_at は完了だけ。 */}
+                <p className="text-ink-faint mt-2 text-xs">
+                  {broadcast.sentAt
+                    ? `完了 ${formatBroadcastDateTime(broadcast.sentAt)}`
+                    : '開始・完了の時刻は記録していません'}
+                </p>
+              </>
+            ) : (
+              <p className="text-ink-secondary mt-2 text-sm">
+                {broadcast.scheduledAt
+                  ? `${formatBroadcastDateTime(broadcast.scheduledAt)} に送り始めます`
+                  : 'まだ送っていません'}
+              </p>
+            )}
           </section>
 
           <div data-design="KPIs" className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">

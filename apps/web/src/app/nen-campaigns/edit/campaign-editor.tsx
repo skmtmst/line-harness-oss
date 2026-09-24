@@ -8,6 +8,7 @@ import { checkNenCampaignBodyLength, NEN_CAMPAIGN_BODY_MAX_LENGTH } from '@line-
 import { useAccount } from '@/contexts/account-context'
 import { Field, inputClass } from '@/components/shared/form-controls'
 import Button from '@/components/shared/button'
+import Combobox from '@/components/shared/combobox'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import ListState from '@/components/shared/list-state'
@@ -334,7 +335,7 @@ export default function CampaignEditor({ campaignKey }: { campaignKey: string })
               {formAction?.kind === 'open_form' && <div className="border-hairline rounded-control flex items-center gap-3 border px-4 py-3"><span className="text-ink-faint text-lg">▣</span><div className="min-w-0 flex-1"><p className="text-sm font-bold">回答フォーム「{formAction.formName}」を開く</p><p className="text-ink-faint text-xs">星の評価と、ひとことだけの短いフォームです</p></div><Button aria-label="回答フォームを外す" onClick={() => setActions(actions.filter((action) => action !== formAction))}><X aria-hidden size={16} /></Button></div>}
               {mileageAction?.kind === 'award_mileage' && <div className="border-hairline rounded-control flex items-center gap-3 border px-4 py-3"><Gift aria-hidden className="text-ink-faint" size={18} /><div className="min-w-0 flex-1"><p className="text-sm font-bold">書いてくれたらマイルを {mileageAction.amount.toLocaleString('ja-JP')} 付ける</p><p className="text-ink-faint text-xs">回答フォームへの送信をきっかけにしています</p></div><Button aria-label="マイル付与を外す" onClick={() => setActions(actions.filter((action) => action !== mileageAction))}><X aria-hidden size={16} /></Button></div>}
               {formIssueMessage && <p role="alert" className="text-danger text-xs font-bold">{formIssueMessage}。フォームを外して選び直してください。</p>}
-              {!formAction && <label className="block text-xs font-bold">回答フォームを開かせる（任意）<select defaultValue="" onChange={(event) => addFormAction(event.target.value)} className={`${inputClass} mt-1`}><option value="" disabled>回答フォームを選ぶ</option>{forms.map((form) => <option key={form.id} value={form.id} disabled={!form.isActive}>{form.name}{form.isActive ? '' : '（公開されていないため選べません）'}</option>)}</select></label>}
+              {!formAction && <label className="block text-xs font-bold">回答フォームを開かせる（任意）<Combobox aria-label="回答フォームを開かせる（任意）" placeholder="回答フォームを選ぶ" value="" onChange={(formId) => addFormAction(formId)} options={forms.map((form) => ({ value: form.id, label: form.name, dot: form.isActive ? 'green' : 'gray', disabled: !form.isActive, hint: form.isActive ? undefined : '公開されていないため選べません' }))} className="mt-1 font-normal" /></label>}
               {!mileageAction && <Button onClick={addMileageAction} className="w-full"><Gift aria-hidden size={16} />回答後に200マイル付ける</Button>}
             </div>
           </section>

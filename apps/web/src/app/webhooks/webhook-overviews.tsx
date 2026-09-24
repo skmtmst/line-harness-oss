@@ -124,7 +124,7 @@ function OutgoingKpis({
         unit="回"
         detail={failedNames ? `${failedNames}を確認` : 'いま確認が必要な送り先はありません'}
         badge={failedNames ? '確認' : undefined}
-        badgeTone="neutral"
+        badgeTone="warning"
         loading={summaryLoading}
         variant="v6"
       />
