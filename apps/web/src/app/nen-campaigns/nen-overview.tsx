@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { Gift, MessageSquare, Newspaper, Package, RotateCw, Send } from 'lucide-react'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import Disclosure from '@/components/shared/disclosure'
 import Drawer from '@/components/shared/drawer'
 import FilterChip from '@/components/shared/filter-chip'
 import ListState from '@/components/shared/list-state'
@@ -303,7 +304,8 @@ export function NenOverview({
   const columnSetting = settings.find((setting) => setting.category === 'column') ?? null
 
   return (
-    <div data-design-node={tab === 'columns' ? 'u66A0' : 'z4q1K'} className="mx-auto flex w-full flex-col gap-4 px-4 pb-8 sm:px-6" style={{ maxWidth: 1600 }}>
+    /* 横の余白は外の枠（AppShell）が持つ。ここで足すと他の画面より右へずれる。 */
+    <div data-design-node={tab === 'columns' ? 'u66A0' : 'z4q1K'} className="mx-auto flex w-full flex-col gap-4 pb-8" style={{ maxWidth: 1600 }}>
       <div data-design="Crumb" data-design-node="nen-header">
         <PageHeaderH2
           breadcrumb={[{ label: '専用機能' }, { label: 'NEN配信' }]}
@@ -446,18 +448,21 @@ function AutoPanel({
 
   return (
     <>
-      <div data-design="Note" data-design-node="nen-auto-note">
+      <div data-design="Note" data-design-node="nen-auto-note" className="flex flex-col gap-3">
         <NoteBar tone="info">
           {pausedOnly
             ? '止めている配信です。「動かす」を押すと、次のきっかけから自動で送ります。止めている間のきっかけは送りません。'
-            : (
-              <>
-                然の出来事（注文・発送・ペット登録・記録・誕生日）をきっかけに、決めた日数後に自動で送ります。文面にはペット名・クーポンを差し込めます。取引の通知（注文受付・発送）は「設定 › LINE通知」で管理します。注文が取り消し・返金になったあとの案内は自動で止まります。きっかけの記録と定期便の次の発送は{' '}
-                <Link href="/ec-commerce?tab=subscriptions" className="font-semibold underline">EC連携</Link>
-                {' '}で確認できます。
-              </>
-            )}
+            : '然の出来事（注文・発送・ペット登録・記録・誕生日）をきっかけに、決めた日数後に自動で送ります。'}
         </NoteBar>
+        {pausedOnly ? null : (
+          <Disclosure size="compact" title="送られる仕組み">
+            <p className="text-caption leading-6 text-ink-secondary">
+              文面にはペット名・クーポンを差し込めます。取引の通知（注文受付・発送）は「設定 › LINE通知」で管理します。注文が取り消し・返金になったあとの案内は自動で止まります。きっかけの記録と定期便の次の発送は{' '}
+              <Link href="/ec-commerce?tab=subscriptions" className="font-semibold underline">EC連携</Link>
+              {' '}で確認できます。
+            </p>
+          </Disclosure>
+        )}
       </div>
 
       <div data-design="ListControls" data-design-node="nen-auto-controls" className="flex flex-wrap items-center gap-3">
@@ -482,16 +487,20 @@ function AutoPanel({
           選択肢の文が長いとトリガー内で省略される。共通部品は触れないため、
           外側の title で全文を読めるようにする（第5パス D-3）。
         */}
-        <span title={sort === 'name' ? '並び：名前順' : `並び：${monthLabel}の送信が多い順`}>
+        <div className="w-full sm:w-64" title={sort === 'name' ? '並び：名前順' : `並び：${monthLabel}の送信が多い順`}>
           <Select
             aria-label="並び順"
+            size="full"
             value={sort}
             onChange={(value) => setSort(value === 'name' ? 'name' : 'sent_desc')}
             options={[{ value: 'sent_desc', label: `並び：${monthLabel}の送信が多い順` }, { value: 'name', label: '並び：名前順' }]}
           />
-        </span>
+        </div>
         <span className="ml-auto text-caption font-semibold text-ink-faint">{shown.length}件</span>
       </div>
+
+      {/* 開封の列は「—」しか並ばないので置かず、理由だけここに残す。 */}
+      <p className="text-micro text-ink-faint">自動配信は開封を取得できません。</p>
 
       <section data-design="Table" data-design-node="nen-auto-table">
         {loading && settings.length === 0 ? (
@@ -510,7 +519,6 @@ function AutoPanel({
                 <Th className="w-56">きっかけ</Th>
                 <Th className="w-44">対象</Th>
                 <Th className="w-24" align="right">{monthLabel} 送信</Th>
-                <Th className="w-20" align="right">開封</Th>
                 <Th className="w-20" align="right">注文</Th>
                 <Th className="w-24">状態</Th>
                 {/*
@@ -544,10 +552,9 @@ function AutoPanel({
                     <Td><span className="text-label text-ink-secondary">{formatCampaignTiming(setting)}</span></Td>
                     <Td><span className="text-label text-ink-secondary">{formatCampaignAudience(setting)}</span></Td>
                     <Td align="right"><span className="text-label font-semibold tabular-nums text-ink">{num(metric?.sent ?? null)}</span></Td>
-                    <Td align="right"><span className="text-label tabular-nums text-ink-faint" title={metric?.openRate.reason ?? 'LINEから個人開封を取得できません'}>—</span></Td>
                     <Td align="right">
                       {metric && metric.associatedConversions > 0
-                        ? <span className="text-label font-semibold tabular-nums text-accent-deep" title={`¥${num(metric.associatedConversionAmount)}（送信後7日以内）`}>{num(metric.associatedConversions)}件</span>
+                        ? <span className="text-label font-semibold tabular-nums text-ink" title={`¥${num(metric.associatedConversionAmount)}（送信後7日以内）`}>{num(metric.associatedConversions)}件</span>
                         : <span className="text-label tabular-nums text-ink-faint">—</span>}
                     </Td>
                     <Td>
