@@ -1,3 +1,4 @@
+@layer components {
 .search {
   box-sizing: border-box;
   display: flex;
@@ -99,4 +100,5 @@
   .loadingIcon {
     animation: none;
   }
+}
 }
