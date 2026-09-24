@@ -60,7 +60,7 @@ describe('#640 省略表示の全文確認（title）', () => {
   it('/nen-campaigns: 配信名の補足・送った先・並び順に title', () => {
     expect(NEN_OVERVIEW).toMatch(/truncate text-micro text-ink-faint" title=\{setting\.title\}/)
     expect(NEN_OVERVIEW).toMatch(/title=\{`\$\{delivery\.friendName \|\| '名前未取得'\}・/)
-    expect(NEN_OVERVIEW).toMatch(/<span title=\{sort === 'name'/)
+    expect(NEN_OVERVIEW).toMatch(/title=\{sort === 'name'/)
   })
 
   it('/tags: フォルダ札・フォルダ行・使用先セルに title', () => {
