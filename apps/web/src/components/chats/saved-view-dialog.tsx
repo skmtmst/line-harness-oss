@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
+import Combobox from '@/components/shared/combobox'
 import Notice from '@/components/shared/notice'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
 
@@ -238,12 +239,18 @@ export default function SavedViewDialog({
                 </div>
                 <div className="flex items-center justify-between gap-3 px-3 py-2.5 text-sm">
                   <dt className="text-ink-secondary text-xs">担当者</dt>
-                  <dd>
-                    <select aria-label="保存する担当者" value={assignee} onChange={(event) => setAssignee(event.target.value)} className="border-hairline rounded-control bg-canvas text-ink h-9 w-40 border px-2 text-xs font-medium">
-                      <option value="all">すべて</option>
-                      <option value="unassigned">未割り当て</option>
-                      {operators.map((operator) => <option key={operator.id} value={operator.id}>{operator.name}</option>)}
-                    </select>
+                  <dd className="w-40">
+                    <Combobox
+                      aria-label="保存する担当者"
+                      placeholder="すべて"
+                      value={assignee === 'all' ? '' : assignee}
+                      onChange={(next) => setAssignee(next || 'all')}
+                      options={[
+                        { value: 'unassigned', label: '未割り当て' },
+                        ...operators.map((operator) => ({ value: operator.id, label: operator.name })),
+                      ]}
+                      className="w-full"
+                    />
                   </dd>
                 </div>
               </dl>
