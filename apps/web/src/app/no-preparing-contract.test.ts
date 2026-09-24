@@ -96,7 +96,7 @@ const REMAINING: Record<string, number> = {
   /* 2026-09-08 #605 で「同じ設定で作り直す」を実動作へ接続し 0 件になったので行を消した。 */
   'app/restaurant-test/stores/new/page.tsx': 1,
   'app/scenarios/detail/scenario-detail-client.tsx': 1,
-  'app/search-console/page.tsx': 3,
+  /* 2026-09-24 V7残り一覧の手直しで飾りボタン2件と接続見出しの言い回しを消し 0 件になったので行を消した。 */
   'app/templates/carousel/page.tsx': 2,
   'app/templates/edit/page.tsx': 4,
   'components/broadcasts/broadcast-form.tsx': 7,
