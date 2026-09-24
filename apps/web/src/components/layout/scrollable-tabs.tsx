@@ -97,19 +97,42 @@ export default function ScrollableTabs({
           </Button>
         </span>
       ) : null}
-      <div
-        ref={scrollerRef}
-        className="min-w-0 flex-1 overflow-x-auto"
-        onScroll={updateEdges}
-        onFocus={keepFocusVisible}
-      >
-        {/*
-          中のタブ行（shared Tabs の nav）を中身の幅まで広げる。
-          これが無いと nav は容器の幅のままでタブ列が見えないまま
-          はみ出し、スクロールしても右のタブへ届かない。
-          中身が収まるときは min-w-full で従来どおり全幅に敷く。
-        */}
-        <Tabs items={items} label={label} className="w-max min-w-full" />
+      {/*
+        #707: 390pxで4つ目以降のタブが隠れても手がかりが薄い。
+        隠れている側の端に薄い影を置き、続きがあることを見せる
+        （送りボタンと連動し、収まるときは何も出さない）。
+      */}
+      <div className="relative min-w-0 flex-1">
+        <div
+          ref={scrollerRef}
+          className="overflow-x-auto"
+          onScroll={updateEdges}
+          onFocus={keepFocusVisible}
+        >
+          {/*
+            中のタブ行（shared Tabs の nav）を中身の幅まで広げる。
+            これが無いと nav は容器の幅のままでタブ列が見えないまま
+            はみ出し、スクロールしても右のタブへ届かない。
+            中身が収まるときは min-w-full で従来どおり全幅に敷く。
+          */}
+          <Tabs items={items} label={label} className="w-max min-w-full" />
+        </div>
+        {canLeft ? (
+          <span
+            aria-hidden="true"
+            data-scroll-hint="left"
+            className="pointer-events-none absolute inset-y-0 left-0 w-6"
+            style={{ background: 'linear-gradient(to right, var(--color-canvas), transparent)' }}
+          />
+        ) : null}
+        {canRight ? (
+          <span
+            aria-hidden="true"
+            data-scroll-hint="right"
+            className="pointer-events-none absolute inset-y-0 right-0 w-6"
+            style={{ background: 'linear-gradient(to left, var(--color-canvas), transparent)' }}
+          />
+        ) : null}
       </div>
       {/*
         右端の操作はスクロール領域へ入れない。入れると「人を追加する」の
