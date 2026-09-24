@@ -1,0 +1,350 @@
+@layer components {
+/*
+ * 複数選択。Pencil ★V7 `WUVcz` §2。欄・候補の決まりは Combobox と同じ。
+ *
+ *   札     地 $shell・高さ 26・角丸 13・余白 [0,6,0,8]・文字 13・太字 $ink
+ *          点 8・外す印 12 $ink-faint。入り切らない分は「+N」（枠 $hairline）
+ *   一覧   頭に「N件選択中」（12・太字 $ink-secondary）と「すべて外す」
+ *          （12・太字 $action）。各行の頭は共通 Checkbox
+ *   動き   Combobox と同じ（motion-fast・motion-ease-out、一瞬で消える）
+ */
+
+.root {
+  position: relative;
+  min-width: 0;
+}
+
+.field {
+  box-sizing: border-box;
+  display: flex;
+  width: 100%;
+  min-height: 40px;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 8px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control);
+  background: var(--color-canvas);
+  cursor: text;
+  transition: border-color var(--motion-fast) var(--motion-ease-out);
+}
+
+.open {
+  border-color: var(--color-accent-deep);
+  box-shadow: inset 0 0 0 0.5px var(--color-accent-deep);
+}
+
+.invalid {
+  border-color: var(--color-status-danger);
+}
+
+.disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.chip {
+  display: inline-flex;
+  height: 26px;
+  align-items: center;
+  gap: 6px;
+  padding: 0 6px 0 8px;
+  border-radius: 13px;
+  background: var(--color-shell);
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.chipLabel {
+  overflow: hidden;
+  max-width: 160px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.chipRemove {
+  display: inline-flex;
+  width: 18px;
+  height: 18px;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 9999px;
+  background: transparent;
+  color: var(--color-ink-faint);
+  cursor: pointer;
+}
+
+.chipRemove:hover {
+  background: var(--color-canvas-sunken);
+  color: var(--color-ink);
+}
+
+.chipRemove svg {
+  width: 12px;
+  height: 12px;
+}
+
+.overflow {
+  display: inline-flex;
+  height: 26px;
+  align-items: center;
+  padding: 0 8px;
+  border: 1px solid var(--color-hairline);
+  border-radius: 13px;
+  background: transparent;
+  color: var(--color-ink-secondary);
+  font: inherit;
+  font-size: var(--text-label);
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.overflow:hover {
+  background: var(--color-canvas-sunken);
+}
+
+.input {
+  min-width: 80px;
+  flex: 1 1 auto;
+  border: 0;
+  background: transparent;
+  color: var(--color-ink);
+  font: inherit;
+  font-size: var(--text-body);
+}
+
+.input::placeholder {
+  color: var(--color-ink-faint);
+  opacity: 1;
+}
+
+.input:disabled {
+  cursor: not-allowed;
+}
+
+.input:focus-visible,
+.chipRemove:focus-visible,
+.overflow:focus-visible,
+.clearAll:focus-visible,
+.create:focus-visible {
+  outline: revert;
+}
+
+.popup {
+  position: absolute;
+  z-index: 60;
+  top: calc(100% + 6px);
+  left: 0;
+  width: 100%;
+  min-width: 240px;
+  max-height: 280px;
+  overflow-y: auto;
+  padding: 6px;
+  border-radius: 12px;
+  background: var(--color-canvas);
+  /* beautiful-shadows md（date-field と同じ影） */
+  box-shadow:
+    0 0 0 1px rgb(0 0 0 / 6%),
+    0 1px 1px -0.5px rgb(0 0 0 / 6%),
+    0 3px 3px -1.5px rgb(0 0 0 / 6%),
+    0 6px 6px -3px rgb(0 0 0 / 6%),
+    0 12px 12px -6px rgb(0 0 0 / 6%),
+    0 24px 24px -12px rgb(0 0 0 / 6%);
+  transform-origin: top center;
+  animation: multi-select-in var(--motion-fast) var(--motion-ease-out);
+}
+
+@keyframes multi-select-in {
+  from {
+    opacity: 0;
+    scale: 0.97;
+  }
+}
+
+.summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  font-weight: 600;
+}
+
+.clearAll {
+  border: 0;
+  background: transparent;
+  color: var(--color-action);
+  font: inherit;
+  font-size: var(--text-caption);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.clearAll:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.option {
+  display: flex;
+  height: 36px;
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px;
+  border-radius: var(--radius-control);
+  color: var(--color-ink);
+  font-size: var(--text-body);
+  cursor: pointer;
+}
+
+.option[data-active] {
+  background: var(--color-canvas-sunken);
+}
+
+.option[aria-disabled='true'] {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+/* 行の印は見た目だけ。押すのは行なので、印へは操作を通さない。 */
+.check {
+  display: inline-flex;
+  pointer-events: none;
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 auto;
+  border-radius: 9999px;
+}
+
+.dot[data-dot='green'] {
+  background: var(--color-accent-deep);
+}
+
+.dot[data-dot='blue'] {
+  background: var(--color-status-info);
+}
+
+.dot[data-dot='amber'] {
+  background: var(--color-status-warn-deep);
+}
+
+.dot[data-dot='gray'] {
+  background: var(--color-ink-faint);
+}
+
+.label {
+  overflow: hidden;
+  min-width: 0;
+  flex: 1 1 auto;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.hint {
+  flex: 0 0 auto;
+  color: var(--color-ink-faint);
+  font-size: var(--text-caption);
+  white-space: nowrap;
+}
+
+.empty {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.emptyText {
+  margin: 0;
+  padding: 10px;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-label);
+}
+
+.create {
+  display: flex;
+  height: 36px;
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: var(--color-canvas-sunken);
+  color: var(--color-accent-deep);
+  font: inherit;
+  font-size: var(--text-body);
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+
+.create svg {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+}
+
+.loading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 10px;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-label);
+}
+
+.spinner {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+  border: 2px solid var(--color-hairline);
+  border-radius: 9999px;
+  border-top-color: var(--color-ink-faint);
+  animation: multi-select-spin var(--motion-slow) linear infinite;
+}
+
+@keyframes multi-select-spin {
+  to {
+    rotate: 360deg;
+  }
+}
+
+.error {
+  margin: 4px 0 0;
+  color: var(--color-status-danger);
+  font-size: var(--text-caption);
+}
+
+.status {
+  position: absolute;
+  overflow: hidden;
+  width: 1px;
+  height: 1px;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+@media (pointer: coarse) {
+  .input {
+    font-size: var(--text-lead);
+  }
+}
+}
