@@ -894,7 +894,7 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
                 */}
                 <Th className="w-1/6">成果地点</Th>
                 <Th className="w-1/4">何が起きたら数えるか</Th>
-                <Th align="right">この30日</Th>
+                <Th align="right" className="w-28">この30日</Th>
                 <Th align="right" className="w-24">金額</Th>
                 <Th className="w-1/4">使われている場所</Th>
                 <Th align="right" className="w-52">操作</Th>
@@ -933,7 +933,7 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
                       {measureLabel(point.measureMethod)}・{deduplicationLabel(point.deduplicationMode, point.deduplicationWindowDays)}
                     </p>
                   </td>
-                  <td className="text-ink px-4 py-3 text-right text-sm tabular-nums">
+                  <td className="text-ink whitespace-nowrap px-4 py-3 text-right text-sm tabular-nums">
                     {point.metrics.netCount.toLocaleString('ja-JP')}件
                   </td>
                   <td className="text-ink-secondary px-4 py-3 text-right text-sm tabular-nums">
