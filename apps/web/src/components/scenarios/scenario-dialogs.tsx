@@ -9,6 +9,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { api, type ScenarioFriendPlan, type ScenarioFriendPlanStep } from '@/lib/api'
+import { shortDateTime } from '@/lib/hq-banners'
 import { scenarioReferenceData } from './scenario-reference-data'
 import { useAccount } from '@/contexts/account-context'
 import Button from '@/components/shared/button'
@@ -1199,7 +1200,7 @@ export function FriendPlanDialog({
             {plan.subscription?.nextDeliveryAt ? (
               <div className="flex flex-wrap justify-between gap-2">
                 <dt className="text-ink-faint">次の配信予定</dt>
-                <dd className="text-ink tabular-nums">{plan.subscription.nextDeliveryAt}</dd>
+                <dd className="text-ink tabular-nums">{shortDateTime(plan.subscription.nextDeliveryAt)}</dd>
               </div>
             ) : null}
             {plan.subscription?.pauseReason ? (

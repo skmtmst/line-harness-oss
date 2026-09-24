@@ -12,7 +12,7 @@ import KpiCollapse from '@/components/ui/kpi-collapse'
 import { ActionCell, DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { TextField } from '@/components/shared/text-field'
 import { ApiError, api } from '@/lib/api'
-import { nenPetsApi, petAnimalTypeLabel, type NenPetListData, type NenPetRow, type NenPetSort, type NenPetWeightFilter } from '@/lib/nen-pets-api'
+import { headCountLabel, nenPetsApi, petAnimalTypeLabel, type NenPetListData, type NenPetRow, type NenPetSort, type NenPetWeightFilter } from '@/lib/nen-pets-api'
 import PetEditor from './pet-editor'
 
 type ListStatus = 'loading' | 'ready' | 'error' | 'forbidden'
@@ -136,7 +136,7 @@ export default function PetsTab({
           ]}
         />
         <span className="ml-auto text-caption font-semibold text-ink-faint">
-          {data ? `${data.total.toLocaleString('ja-JP')}頭中 ${data.total === 0 ? 0 : (data.page - 1) * data.pageSize + 1}〜${Math.min(data.total, data.page * data.pageSize)}頭` : '—'}
+          {data ? headCountLabel(data.total, data.page, data.pageSize) : '—'}
         </span>
       </div>
 
