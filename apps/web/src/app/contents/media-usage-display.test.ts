@@ -35,9 +35,12 @@ describe('登録メディアの使用箇所の言葉づかい', () => {
 })
 
 describe('容量の短い表示（一覧と詳細で同じ）', () => {
-  it('B・KB・MBを使い分ける', () => {
+  it('B・KB・MB・GBを使い分ける', () => {
     expect(formatMediaSize(512)).toBe('512 B')
     expect(formatMediaSize(2048)).toBe('2 KB')
     expect(formatMediaSize(3 * 1024 * 1024)).toBe('3.0 MB')
+    // #710: 1GB超はGB表示。2048MBのような4桁MBで出さない。
+    expect(formatMediaSize(2 * 1024 * 1024 * 1024)).toBe('2.0 GB')
+    expect(formatMediaSize(1.5 * 1024 * 1024 * 1024)).toBe('1.5 GB')
   })
 })
