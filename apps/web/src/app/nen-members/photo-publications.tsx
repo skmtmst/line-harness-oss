@@ -183,7 +183,7 @@ export function PhotoPublications({ accountId, onBack }: { accountId: string; on
           const imageSrc = safePhotoSrc(item.image_url)
           return <Card key={text(item.id)} layout="vertical" overflow="hidden">
             {imageSrc ? <img className="h-36 w-full object-cover" src={imageSrc} alt={`${photoPetDisplayName(item.pet_name, { honorific: false })}の公開写真`} loading="lazy" /> : <div className="grid h-36 w-full place-items-center bg-canvas-sunken text-xs font-bold text-ink-faint">{text(item.image_url) ? '画像を表示できません' : '公開用画像を作成中です'}</div>}
-            <div className="p-2.5"><strong className="text-sm text-accent-deep">{views(item.view_count)}</strong><h2 className="mt-0.5 text-base font-extrabold text-ink">{photoPetDisplayName(item.pet_name, { fallback: 'ペット名未取得', honorific: false })}</h2><p className="mt-0.5 text-xs text-ink-faint">{text(item.owner_name) || '名前は伏せています'}</p>
+            <div className="p-2.5"><strong className="text-sm text-ink">{views(item.view_count)}</strong><h2 className="mt-0.5 text-base font-extrabold text-ink">{photoPetDisplayName(item.pet_name, { fallback: 'ペット名未取得', honorific: false })}</h2><p className="mt-0.5 text-xs text-ink-faint">{text(item.owner_name) || '名前は伏せています'}</p>
               <div className="mt-1 text-xs text-ink-faint">{placements.length ? placements.map((placement) => <PlacementLine key={text(placement.id)} placement={placement} />) : <span>どこにも出していません</span>}</div>
               {/*
                * 公開先ごとの同意・採用・ポイントの記録（Issue #1040 IDEA-22）。

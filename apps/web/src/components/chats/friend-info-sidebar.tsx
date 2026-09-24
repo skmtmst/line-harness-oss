@@ -829,7 +829,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
             <div style={sectionStyle('tags')} className={`${sectionVisibility('tags')} px-5 py-4`}>
               <div className="mb-1.5 flex items-center justify-between">
                 <h4 className="text-ink text-xs font-bold">タグ</h4>
-                <a href={`/friends/detail?id=${friend.id}`} className="text-accent-deep text-[11px] hover:underline">
+                <a href={`/friends/detail?id=${friend.id}`} className="text-action text-[11px] hover:underline">
                   ＋ 追加
                 </a>
               </div>
@@ -868,7 +868,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
             <div style={sectionStyle('starred')} className={`${sectionVisibility('starred')} p-4`}>
               <div className="mb-2 flex items-center justify-between">
                 <h4 className="text-[11px] font-medium text-gray-500">★つき友だち情報</h4>
-                <a href={`/friends/detail?id=${friend.id}`} className="text-accent-deep text-[11px] hover:underline">
+                <a href={`/friends/detail?id=${friend.id}`} className="text-action text-[11px] hover:underline">
                   すべて見る
                 </a>
               </div>
@@ -1000,7 +1000,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
                 */}
                 {typeof friend.formSubmissionTotal === 'number' && friend.formSubmissionTotal > 0 && (
                   <span className="text-[10px] text-gray-400">
-                    全{friend.formSubmissionTotal}件中 {friend.formSubmissions.length}件を表示
+                    {friend.formSubmissionTotal.toLocaleString('ja-JP')}件中 1〜{friend.formSubmissions.length.toLocaleString('ja-JP')}件を表示
                   </span>
                 )}
               </div>

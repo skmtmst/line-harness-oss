@@ -420,7 +420,7 @@ function CarouselEditorInner() {
         </nav>
         <div role="alert" className="bg-canvas rounded-card border-hairline border p-8 text-sm">
           <p className="font-bold text-ink">カルーセルの作成・変更はオーナーと管理者だけができます</p>
-          <Link href="/templates" className="text-accent-deep hover:underline mt-3 inline-block text-sm">一覧へ戻る</Link>
+          <Link href="/templates" className="text-action hover:underline mt-3 inline-block text-sm">一覧へ戻る</Link>
         </div>
       </div>
     )
@@ -802,7 +802,7 @@ function CarouselEditorInner() {
                     type="button"
                     onClick={save}
                     disabled={saving}
-                    className="text-accent-deep hover:underline ml-2 font-medium disabled:opacity-40"
+                    className="text-action hover:underline ml-2 font-medium disabled:opacity-40"
                   >
                     もう一度保存する
                   </button>

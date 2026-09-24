@@ -20,6 +20,7 @@ import type { FriendAddRule, FriendAddRuleKind, FriendAddRuleListData } from '@/
 import { api } from '@/lib/api'
 import FriendAddRuleEditor from './friend-add-rule-editor'
 import { useCursorStack } from './use-cursor-stack'
+import ListRange from '@/components/ui/list-range'
 
 const KIND_LABELS: Record<FriendAddRuleKind, string> = {
   first_time: 'はじめて友だち追加した人',
@@ -366,14 +367,15 @@ function FriendAddSettingsList() {
                 </tbody>
               </DataTable>
               </div>
-              {/* ★V7：前後どちらにも送れないとき（1ページだけ）は、押せないページ送りを出さない。 */}
-              {canPrev || data.nextCursor ? (
-                <nav className="mt-3 flex items-center justify-end gap-2" aria-label="ページ送り">
-                  <Button disabled={!canPrev || loading} onClick={() => goPrev()}>前へ</Button>
-                  <span className="text-ink-faint min-w-8 text-center text-xs tabular-nums" aria-current="page">{cursorPage}</span>
-                  <Button disabled={!data.nextCursor || loading} onClick={() => goNext(data.nextCursor)}>次へ</Button>
-                </nav>
-              ) : null}
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+                <ListRange total={data.total} first={data.total === 0 ? 0 : (cursorPage - 1) * 20 + 1} last={(cursorPage - 1) * 20 + data.items.length} />
+                {(canPrev || data.nextCursor) ? (
+                  <div className="flex items-center gap-2" aria-label="ページ送り">
+                    <Button disabled={!canPrev || loading} onClick={() => goPrev()}>前へ</Button>
+                    <Button disabled={!data.nextCursor || loading} onClick={() => goNext(data.nextCursor)}>次へ</Button>
+                  </div>
+                ) : null}
+              </div>
             </>
           )}
         </section>

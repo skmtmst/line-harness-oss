@@ -155,7 +155,7 @@ function TodayTaskCard({
         <h3 className="text-ink-secondary min-w-0 truncate text-sm font-semibold" title={title}>{title}</h3>
         {period ? <span className="text-ink-faint whitespace-nowrap text-xs font-normal">{period}</span> : null}
       </div>
-      <div className="mt-2 flex min-w-0 items-baseline gap-2.5">
+      <div className="mt-2 flex min-w-0 items-baseline gap-2">
         <p className="text-ink text-[28px] leading-none font-bold tabular-nums" aria-busy={loading || undefined}>
           {loading ? (
             <>

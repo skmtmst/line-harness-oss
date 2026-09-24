@@ -23,8 +23,9 @@ import { useAccount } from '@/contexts/account-context'
 import { Suspense } from 'react'
 import { useMergedTab } from '@/components/layout/merged-tabs'
 import BookingStaffPage from '@/app/booking/staff/page'
+import ListRange from '@/components/ui/list-range'
 import { bookingMenuError } from './menu-validation'
-import { bookingWindowEnd, businessHourSummary } from '../lib/format-time'
+import { bookingWindowEnd, businessHourSummary, minutesBeforeLabel } from '../lib/format-time'
 
 /**
  * 予約設定（設計 V2 8-2 / node nFCBf）。
@@ -390,14 +391,21 @@ function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuC
                   <th className="px-4 py-3 text-right text-xs font-semibold text-ink-faint">
                     この30日
                   </th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold text-ink-faint">操作</th>
+                  {/* #707: 390pxで表を横スクロールしても操作列を右端へ留める */}
+                  <th className="sticky right-0 bg-canvas-sunken px-4 py-3 text-right text-xs font-semibold text-ink-faint">操作</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {visible.map((m) => (
                   <tr key={m.id} className={`hover:bg-canvas-sunken ${m.is_active ? '' : 'text-ink-faint'}`}>
                     <td className="px-4 py-3 text-sm font-medium">
-                      <span className="text-ink-faint mr-4" aria-hidden="true">⠿</span>{m.name}{m.is_active ? '' : '（休止中）'}
+                      {/*
+                        行頭の持ち手の飾りは外した。ドラッグで並び替えられる
+                        ように見えるが実際は押せず、並び順は「中身を見る」の
+                        中の数値欄で変える（監査 A12）。動かせない印を置くと
+                        壊れているように見える。
+                      */}
+                      {m.name}{m.is_active ? '' : '（休止中）'}
                       {m.description && <span className="text-ink-faint mt-1 block max-w-72 truncate text-xs" title={m.description}>{m.description}</span>}
                       {m.category_label && (
                         <span className="bg-canvas-sunken text-ink-faint ml-2 inline-block rounded px-2 py-0.5 text-xs">
@@ -408,7 +416,7 @@ function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuC
                     <td className="px-4 py-3 text-sm text-ink-secondary tabular-nums">
                       {m.duration_minutes} 分
                     </td>
-                    <td className={`px-4 py-3 text-sm text-right tabular-nums ${menuPriceLabel(m) === '無料' ? 'text-accent-deep font-semibold' : ''}`}>
+                    <td className={`px-4 py-3 text-sm text-right tabular-nums ${menuPriceLabel(m) === '無料' ? 'text-ink font-semibold' : ''}`}>
                       {menuPriceLabel(m)}
                     </td>
                     <td className="px-4 py-3 text-sm text-ink-secondary">
@@ -428,7 +436,7 @@ function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuC
                     <td className="px-4 py-3 text-right text-sm tabular-nums">
                       {`${bookingCounts.get(m.id) ?? 0} 件`}
                     </td>
-                    <td className="px-4 py-3 text-right">
+                    <td className="sticky right-0 bg-canvas px-4 py-3 text-right">
                       <div className="inline-flex gap-2 text-xs">
                         {/* QSLEH の行操作は共通Button（高さ36px）より小さいため、
                             表の行高を設計どおり保つ専用の小ボタンにする。 */}
@@ -451,7 +459,7 @@ function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuC
       )}
 
       <div className="mt-3 flex items-center justify-between gap-3">
-        <span className="text-ink-faint text-xs">メニュー {settings?.menuCount ?? items.length}つのうち {visible.length}つを表示</span>
+        <ListRange label="メニュー" total={settings?.menuCount ?? items.length} first={visible.length === 0 ? 0 : 1} last={visible.length} />
         <Pagination page={page} pageCount={pageCount} onPageChange={setPage} ariaLabel="予約メニューのページ送り" />
       </div>
       </>}
@@ -554,6 +562,24 @@ function BookingRulesSummary({ accountId, settings, items, loading, error, canMa
   )
 }
 
+/** 予約で使いうる主要タイムゾーン。既定は Asia/Tokyo。 */
+const TIME_ZONE_CHOICES = [
+  'Asia/Tokyo',
+  'Asia/Seoul',
+  'Asia/Shanghai',
+  'Asia/Taipei',
+  'Asia/Singapore',
+  'Asia/Bangkok',
+  'Australia/Sydney',
+  'Pacific/Auckland',
+  'Pacific/Honolulu',
+  'America/Los_Angeles',
+  'America/New_York',
+  'Europe/London',
+  'Europe/Paris',
+  'UTC',
+]
+
 function BookingRulesEditor({ accountId, initial, canEdit, onRetry, onSaved }: {
   accountId: string
   initial: BookingSettings
@@ -606,18 +632,22 @@ function BookingRulesEditor({ accountId, initial, canEdit, onRetry, onSaved }: {
       <fieldset disabled={!canEdit} className="contents">
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         <Field label="タイムゾーン" required>
-          <input
-            aria-label="タイムゾーン"
-            type="text"
+          {/*
+           * IANA名の自由入力は綴り違いで予約全体がずれるため、候補から選ぶ形へ。
+           * 保存済みの値が候補に無いときは先頭に足して、黙って書き換えない。
+           */}
+          <SelectField
             value={draft.timeZone}
             onChange={(event) => set('timeZone', event.target.value)}
-            placeholder="Asia/Tokyo"
-            className="border-hairline rounded-control focus:ring-accent w-full border px-3 py-2 text-sm focus:outline-none focus:ring-2"
+            options={(TIME_ZONE_CHOICES.includes(draft.timeZone)
+              ? TIME_ZONE_CHOICES
+              : [draft.timeZone, ...TIME_ZONE_CHOICES]
+            ).map((zone) => ({ value: zone, label: zone }))}
           />
         </Field>
         <RuleNumberField label="何日先まで受け付けるか" unit="日" min={1} max={365} value={draft.bookingWindowDays} onChange={(value) => set('bookingWindowDays', value)} />
-        <RuleNumberField label="受付の締め切り" unit="分前" min={0} max={43200} value={draft.cutoffMinutesBefore} onChange={(value) => set('cutoffMinutesBefore', value)} />
-        <RuleNumberField label="キャンセルの期限" unit="分前" min={0} max={43200} value={draft.cancelDeadlineMinutesBefore} onChange={(value) => set('cancelDeadlineMinutesBefore', value)} />
+        <RuleNumberField label="受付の締め切り" unit="分前" min={0} max={43200} value={draft.cutoffMinutesBefore} onChange={(value) => set('cutoffMinutesBefore', value)} humanize={minutesBeforeLabel} />
+        <RuleNumberField label="キャンセルの期限" unit="分前" min={0} max={43200} value={draft.cancelDeadlineMinutesBefore} onChange={(value) => set('cancelDeadlineMinutesBefore', value)} humanize={minutesBeforeLabel} />
         <RuleNumberField label="1人が同時に持てる予約" unit="件" min={1} max={100} value={draft.maxActiveBookingsPerFriend} onChange={(value) => set('maxActiveBookingsPerFriend', value)} />
         <Field label="予約の承認" required>
           <SelectField
@@ -681,14 +711,17 @@ function BookingRulesEditor({ accountId, initial, canEdit, onRetry, onSaved }: {
   )
 }
 
-function RuleNumberField({ label, unit, min, max, value, onChange }: {
+function RuleNumberField({ label, unit, min, max, value, onChange, humanize }: {
   label: string
   unit: string
   min: number
   max: number
   value: number
   onChange: (value: number) => void
+  /** 入力値を時間・日の単位へ読み替える（例: 1440分 → 24時間前）。 */
+  humanize?: (value: number) => string | null
 }) {
+  const hint = humanize?.(value)
   return (
     <Field label={label} required>
       <div className="flex items-center gap-2">
@@ -703,6 +736,7 @@ function RuleNumberField({ label, unit, min, max, value, onChange }: {
         />
         <span className="text-ink-faint whitespace-nowrap text-xs">{unit}</span>
       </div>
+      {hint ? <p className="text-ink-faint mt-1 text-xs">＝{hint}</p> : null}
     </Field>
   )
 }
@@ -1157,7 +1191,7 @@ function EditMenuModal({
                 <button
                   type="button"
                   onClick={() => void onReloadLatest()}
-                  className="text-accent-deep mt-1 text-xs font-semibold underline"
+                  className="text-action mt-1 text-xs font-semibold underline"
                 >
                   最新の内容を読み直す
                 </button>

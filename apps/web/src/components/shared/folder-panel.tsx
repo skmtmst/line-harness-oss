@@ -168,7 +168,7 @@ export default function FolderPanel({
                     aria-haspopup="menu"
                     aria-expanded={openMenuId === row.id}
                     title={`フォルダ「${row.label}」の操作`}
-                    className="text-ink-faint hover:bg-canvas-sunken hover:text-accent-deep rounded-control min-h-8 min-w-8 text-lg leading-none opacity-0 transition-opacity group-hover:opacity-100 focus:opacity-100"
+                    className="text-ink-faint hover:bg-canvas-sunken hover:text-action rounded-control min-h-8 min-w-8 text-lg leading-none opacity-0 transition-opacity group-hover:opacity-100 focus:opacity-100"
                   >
                     …
                   </button>

@@ -535,7 +535,7 @@ function OverviewStep({
         </div>
 
         <details className="border-hairline rounded-control border px-3 py-2">
-          <summary className="text-accent-deep cursor-pointer text-sm font-medium">イベント画像を設定する</summary>
+          <summary className="text-action cursor-pointer text-sm font-medium">イベント画像を設定する</summary>
           <div className="mt-3">
             <ImageUploader
               mode="url"

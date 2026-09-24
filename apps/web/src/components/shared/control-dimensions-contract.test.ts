@@ -22,6 +22,13 @@ describe('Pencil V6 の入力・選択・押し口規定', () => {
     expect(select).toMatch(/\.select\s*{[^}]*height:\s*40px/s)
     expect(select).toMatch(/background-color:\s*var\(--color-canvas\)/)
     expect(select).toMatch(/background-position:\s*right 13px center/)
+    /*
+     * 呼び出し側の幅指定（`w-full` など utilities レイヤー）が既定幅
+     * 176px/128px を上書きできるよう、部品の宣言は components レイヤー
+     * に置く。未レイヤーに戻すとレイヤー外が常に勝ち、グリッド枠から
+     * プルダウンがはみ出す（予約設定の空き確認で発生）。
+     */
+    expect(select).toMatch(/@layer components/)
     expect(search).toMatch(/\.search\s*{[^}]*height:\s*40px/s)
     expect(search).toMatch(/background:\s*var\(--color-canvas\)/)
   })

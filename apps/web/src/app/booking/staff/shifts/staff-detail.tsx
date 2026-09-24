@@ -740,9 +740,9 @@ export default function StaffDetail({ staffId }: { staffId: string }) {
     return (
       <div data-design-node="tksPcStaff" className="space-y-4 pb-8">
         <nav aria-label="現在位置" className="text-ink-faint text-xs">
-          <Link href="/booking/bookings" className="text-accent-deep hover:underline">予約</Link>
+          <Link href="/booking/bookings" className="text-action hover:underline">予約</Link>
           <span className="mx-2">›</span>
-          <Link href="/booking/staff" className="text-accent-deep hover:underline">担当スタッフ</Link>
+          <Link href="/booking/staff" className="text-action hover:underline">担当スタッフ</Link>
           <span className="mx-2">›</span>
           <span>勤務とシフト</span>
         </nav>
@@ -793,9 +793,9 @@ export default function StaffDetail({ staffId }: { staffId: string }) {
     return (
       <div data-design-node="tksPcStaff" className="space-y-4 pb-8">
         <nav aria-label="現在位置" className="text-ink-faint text-xs">
-          <Link href="/booking/bookings" className="text-accent-deep hover:underline">予約</Link>
+          <Link href="/booking/bookings" className="text-action hover:underline">予約</Link>
           <span className="mx-2">›</span>
-          <Link href="/booking/staff" className="text-accent-deep hover:underline">担当スタッフ</Link>
+          <Link href="/booking/staff" className="text-action hover:underline">担当スタッフ</Link>
           <span className="mx-2">›</span>
           <span>勤務とシフト</span>
         </nav>
@@ -813,11 +813,11 @@ export default function StaffDetail({ staffId }: { staffId: string }) {
     <div data-design-node="tksPcStaff" className="space-y-4 pb-8">
       <div className="flex flex-wrap items-center gap-3">
         <nav aria-label="現在位置" className="text-ink-faint text-xs">
-          <Link href="/booking/bookings" className="text-accent-deep hover:underline">予約</Link>
+          <Link href="/booking/bookings" className="text-action hover:underline">予約</Link>
           <span className="mx-2">›</span>
           {/* N-411: staff ロールは担当スタッフ一覧(要 /booking/bookings 権限)を開けない */}
           {isStaffRole ? <span>自分の勤務</span> : (
-            <Link href="/booking/staff" className="text-accent-deep hover:underline">担当スタッフ</Link>
+            <Link href="/booking/staff" className="text-action hover:underline">担当スタッフ</Link>
           )}
           <span className="mx-2">›</span>
           <span>{staff.display_name}の勤務とシフト</span>
@@ -1100,7 +1100,7 @@ export default function StaffDetail({ staffId }: { staffId: string }) {
                       />
                     </label>
                     <span className="inline-flex gap-2 text-xs">
-                      <button onClick={() => void saveShiftRow(shift)} disabled={savingShift} className="text-accent-deep hover:underline disabled:opacity-50">更新</button>
+                      <button onClick={() => void saveShiftRow(shift)} disabled={savingShift} className="text-action hover:underline disabled:opacity-50">更新</button>
                       <button onClick={() => setRemoveTarget(shift)} className="text-danger hover:underline">削除</button>
                     </span>
                   </div>
@@ -1108,7 +1108,7 @@ export default function StaffDetail({ staffId }: { staffId: string }) {
               })}
             </div>
             <details className="mt-4 text-sm">
-              <summary className="text-accent-deep cursor-pointer text-sm font-semibold">いつもの勤務時間からまとめて作る</summary>
+              <summary className="text-action cursor-pointer text-sm font-semibold">いつもの勤務時間からまとめて作る</summary>
               <div className="border-hairline bg-canvas-sunken mt-3 grid gap-3 rounded-control border p-3 sm:grid-cols-3">
                 <label className="text-ink-secondary text-xs">
                   始める日
@@ -1187,9 +1187,9 @@ export default function StaffDetail({ staffId }: { staffId: string }) {
             <h2 className="text-ink font-semibold">つながる先</h2>
             <div className="mt-3 space-y-3 text-sm">
               {!isStaffRole ? (
-                <Link href="/booking/staff" className="text-accent-deep flex justify-between gap-3"><span>→ 担当スタッフ</span><span className="text-ink-faint text-xs">人の追加と削除</span></Link>
+                <Link href="/booking/staff" className="text-action flex justify-between gap-3"><span>→ 担当スタッフ</span><span className="text-ink-faint text-xs">人の追加と削除</span></Link>
               ) : null}
-              <Link href="/booking/staff/shifts" className="text-accent-deep flex justify-between gap-3"><span>→ 受付枠</span><span className="text-ink-faint text-xs">お店全体の時間と休業日</span></Link>
+              <Link href="/booking/staff/shifts" className="text-action flex justify-between gap-3"><span>→ 受付枠</span><span className="text-ink-faint text-xs">お店全体の時間と休業日</span></Link>
             </div>
           </section>
         </aside>

@@ -1,11 +1,13 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { ChevronDown, Star } from 'lucide-react'
+import { Star } from 'lucide-react'
 import type { FriendListItem } from '@/lib/api'
 import Pagination from '@/components/shared/pagination'
 import Checkbox from '@/components/shared/checkbox'
 import ListState from '@/components/shared/list-state'
+import ListRange from '@/components/ui/list-range'
+import PageSizeSelect from '@/components/ui/page-size-select'
 import FriendListRow, { FriendListCard } from './friend-list-row'
 
 export type FriendListColumn = 'support' | 'scenario' | 'latest' | 'tags' | 'source' | 'last'
@@ -109,7 +111,7 @@ export default function FriendListTable({
       */}
       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-hairline px-4 py-3 lg:h-14 lg:flex-nowrap lg:py-0">
         <h2 className="whitespace-nowrap text-sm font-bold text-ink">
-          友だち一覧 <span className="ml-1 text-xs font-bold text-accent-deep">{total.toLocaleString('ja-JP')}件</span>
+          友だち一覧 <span className="ml-1 text-xs font-bold text-ink-faint">{total.toLocaleString('ja-JP')}件</span>
         </h2>
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs">
           {/* 選んでいる時だけ出す（★V7：0件の時は意味が無い）。 */}
@@ -137,30 +139,13 @@ export default function FriendListTable({
               ))}
             </div>
           </details>
-          <details className="relative">
-            <summary
-              data-qa-open="LT8RS"
-              className="flex h-10 min-w-34.5 cursor-pointer list-none items-center justify-between gap-4 rounded-control border border-hairline bg-canvas px-3 text-sm font-semibold text-ink"
-            >
-              {pageSize}件表示 <ChevronDown aria-hidden="true" className="h-4 w-4 text-ink-faint" />
-            </summary>
-            <div className="absolute right-0 z-20 mt-1 w-37.5 rounded-card border border-hairline bg-canvas p-1.5 shadow-float">
-              {pageSizeOptions.map((size) => (
-                <button
-                  key={size}
-                  type="button"
-                  aria-pressed={size === pageSize}
-                  onClick={(event) => {
-                    onPageSizeChange(size)
-                    event.currentTarget.closest('details')?.removeAttribute('open')
-                  }}
-                  className={`flex w-full items-center justify-between rounded-control px-2.5 py-2 text-left text-xs font-semibold ${size === pageSize ? 'bg-accent-soft text-accent-deep' : 'text-ink-secondary hover:bg-canvas-sunken'}`}
-                >
-                  {size}件表示 {size === pageSize ? <span aria-hidden="true">✓</span> : null}
-                </button>
-              ))}
-            </div>
-          </details>
+          {/* #668: 件数の選び口は他の一覧と同じ「表示件数」セレクト。 */}
+          <PageSizeSelect
+            data-qa-open="LT8RS"
+            value={pageSize}
+            onChange={onPageSizeChange}
+            options={[...pageSizeOptions]}
+          />
         </div>
       </div>
 
@@ -233,7 +218,7 @@ export default function FriendListTable({
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-t border-hairline px-4 py-2 lg:h-12 lg:flex-nowrap lg:py-0">
-        <span className="text-xs text-ink-faint">{rangeStart}〜{rangeEnd}件 / 全{total.toLocaleString('ja-JP')}件</span>
+        <ListRange total={total} first={rangeStart} last={rangeEnd} />
         <Pagination page={page} pageCount={pageCount} onPageChange={onPageChange} disabled={status !== 'ready'} ariaLabel="友だち一覧のページ" />
       </div>
     </section>

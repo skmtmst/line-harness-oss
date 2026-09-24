@@ -54,3 +54,15 @@ export function bookingWindowEnd(days: number, now = new Date()): string {
     timeZone: 'Asia/Tokyo',
   }).format(date)
 }
+
+/**
+ * 分の期限を、時間・日の単位へ読み替える（監査6 #710）。
+ * 例: 90 → 1時間30分前、1440 → 24時間前、2880 → 2日前。
+ * 60分未満は分のままが一番読みやすいので読み替えを返さない。
+ */
+export function minutesBeforeLabel(minutes: number): string | null {
+  if (!Number.isFinite(minutes) || minutes < 60) return null
+  if (minutes % 1440 === 0 && minutes > 1440) return `${minutes / 1440}日前`
+  if (minutes % 60 === 0) return `${minutes / 60}時間前`
+  return `${Math.floor(minutes / 60)}時間${minutes % 60}分前`
+}

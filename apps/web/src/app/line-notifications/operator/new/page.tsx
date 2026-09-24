@@ -233,7 +233,7 @@ function NewOperatorNotificationInner() {
   return (
     <div data-design-node="N2gAza" data-selects-wide className="space-y-4 pb-24">
       <div className="flex items-center justify-between gap-3"><nav className="text-ink-faint text-xs" aria-label="パンくず">
-        <Link href="/line-notifications" className="text-accent-deep hover:underline">LINE通知</Link><span className="mx-2">›</span><Link href="/line-notifications?tab=operator" className="text-accent-deep hover:underline">運用者へのお知らせ</Link><span className="mx-2">›</span><span>{editId ? 'なおす' : 'つくる'}</span>
+        <Link href="/line-notifications" className="text-action hover:underline">LINE通知</Link><span className="mx-2">›</span><Link href="/line-notifications?tab=operator" className="text-action hover:underline">運用者へのお知らせ</Link><span className="mx-2">›</span><span>{editId ? 'なおす' : 'つくる'}</span>
       </nav><Button onClick={() => void testSend()} disabled={saving || ruleLoading}>自分にテスト送信</Button></div>
 
       <div className="border-info bg-info-bg text-info flex items-start gap-2 rounded-control border px-4 py-3 text-sm">
@@ -296,7 +296,7 @@ function NewOperatorNotificationInner() {
 
         <aside className="space-y-4">
           <section className="border-hairline bg-canvas rounded-card border p-4">
-            <div className="flex items-center gap-2"><Building2 aria-hidden="true" size={18} className="text-accent-deep" /><h2 className="text-sm font-semibold text-ink">お店の人にはこう届きます</h2></div>
+            <div className="flex items-center gap-2"><Building2 aria-hidden="true" size={18} className="text-ink-faint" /><h2 className="text-sm font-semibold text-ink">お店の人にはこう届きます</h2></div>
             <p className="mt-2 whitespace-pre-wrap text-xs text-ink-faint">文面はここで確かめられます。<br />【運用者へのお知らせ】{name.trim() || 'お知らせ名'}</p>
           </section>
           <section className="border-warning bg-warning-bg text-warning rounded-card border p-4">
@@ -315,7 +315,7 @@ function NewOperatorNotificationInner() {
                 ['/line-notifications', '顧客へのお知らせ', 'お客様に送るもの'],
                 ['/health', '運用状態', '止まっているときの知らせ'],
                 ['/line-notifications?tab=history', '記録', '届いたかどうかの確認'],
-              ].map(([href, label, note]) => <Link key={href} href={href} className="flex items-center justify-between gap-2 text-accent-deep hover:underline"><span className="inline-flex items-center gap-1"><ArrowRight aria-hidden="true" size={13} />{label}</span><span className="text-ink-faint">{note}</span></Link>)}
+              ].map(([href, label, note]) => <Link key={href} href={href} className="flex items-center justify-between gap-2 text-action hover:underline"><span className="inline-flex items-center gap-1"><ArrowRight aria-hidden="true" size={13} />{label}</span><span className="text-ink-faint">{note}</span></Link>)}
             </div>
           </section>
         </aside>

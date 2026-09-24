@@ -1,7 +1,9 @@
 'use client'
 
 import { Archive, X } from 'lucide-react'
-import SelectField from '@/components/shared/select-field'
+import SortSelect from '@/components/ui/sort-select'
+import PageSizeSelect from '@/components/ui/page-size-select'
+import ListRange from '@/components/ui/list-range'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import Link from 'next/link'
@@ -33,10 +35,15 @@ const STATUS_LABEL: Record<Webinar['status'], string> = {
   draft: '下書き', active: '公開中', archived: 'アーカイブ',
 }
 
+/*
+ * #702: 札は「薄い同系背景＋濃い同系文字」のトークン規則へ統一。
+ * 生の Tailwind 灰・緑・黄はやめ、AA(4.5:1)を満たす組み合わせだけ使う。
+ * draft 6.94:1 / active 5.11:1 / archived 4.72:1（いずれも 11px 太字）。
+ */
 const STATUS_BADGE: Record<Webinar['status'], string> = {
-  draft: 'bg-gray-100 text-gray-600',
-  active: 'bg-green-100 text-success',
-  archived: 'bg-amber-100 text-amber-700',
+  draft: 'bg-shell text-ink-secondary',
+  active: 'bg-success-bg text-success',
+  archived: 'bg-warning-bg text-warning',
 }
 
 function scheduleSummary(w: Webinar): string {
@@ -291,7 +298,7 @@ function WebinarListTable({
       <div className="divide-hairline divide-y">
         {items.map((w) => (
           <div key={w.id} className="grid gap-3 px-4 py-4 md:grid-cols-12 md:items-center">
-            <div className="min-w-0 md:col-span-4"><Link href={`/webinars/edit?id=${w.id}`} className="text-accent-deep block truncate text-sm font-bold hover:underline" title={w.title}>{w.title}</Link><span className="text-ink-faint mt-1 block truncate font-mono text-[11px]" title={`/${w.slug}`}>/{w.slug}</span></div>
+            <div className="min-w-0 md:col-span-4"><Link href={`/webinars/edit?id=${w.id}`} className="text-action block truncate text-sm font-bold hover:underline" title={w.title}>{w.title}</Link><span className="text-ink-faint mt-1 block truncate font-mono text-[11px]" title={`/${w.slug}`}>/{w.slug}</span></div>
             <div className="md:col-span-2"><span className={`rounded-pill inline-flex px-2.5 py-1 text-[11px] font-semibold ${STATUS_BADGE[w.status]}`}>{displayStatus(w)}</span></div>
             <div className="text-ink-secondary text-sm tabular-nums" title={w.registrationCount == null ? '申込人数は一覧APIに未接続です。' : undefined}><span className="text-ink-faint md:hidden">申込 </span>{measuredCount(w.registrationCount)}</div>
             <div className="text-ink-secondary text-sm tabular-nums" title={w.viewerCount == null ? '視聴人数は一覧APIに未接続です。' : undefined}><span className="text-ink-faint md:hidden">視聴 </span>{measuredCount(w.viewerCount)}</div>
@@ -329,8 +336,14 @@ function WebinarListErrorNotice({
   器に入れると白い余白と灰色の二重背景になる(監査 DETAIL-01)。
 */
 function WebinarListCard({ children }: { children: ReactNode }) {
+  /*
+    高さは中身に任せる。以前は固定の最小高さがあって、1行だけの一覧でも
+    表の下に大きな空白帯ができ、その外に件数表示が取り残されて見えた
+    （監査 A8）。読込・空・失敗は ListState が自分の面を持つので、
+    ここで高さを決める必要はない。
+  */
   return (
-    <div className="border-hairline bg-canvas min-h-[360px] overflow-hidden rounded-card border">
+    <div className="border-hairline bg-canvas overflow-hidden rounded-card border">
       {children}
     </div>
   )
@@ -775,17 +788,21 @@ function WebinarsPage() {
                   min-w-45（180px）を下限にすると flex-wrap が効き、
                   狭い幅では検索欄が1行・並び順と表示件数は次の行へ。 */}
               <input type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="名前・内容で検索" aria-label="ウェビナー名で検索" className="border-hairline rounded-control focus:ring-accent min-w-45 flex-1 border px-3 py-2 text-sm focus:ring-2 focus:outline-none" />
-              <span className="text-ink-faint text-xs whitespace-nowrap">並び順</span>
-              <SelectField value={sortKey} onChange={(event) => setSortKey(event.target.value as SortKey)} aria-label="並び順" options={[{ value: 'updated', label: '更新が新しい順' }, { value: 'created', label: '作成が新しい順' }, { value: 'name', label: '名前順' }]} className="border-hairline rounded-control border px-2 py-2 text-sm" />
-              <span className="text-ink-faint text-xs whitespace-nowrap">表示</span>
-              <SelectField size="compact" value={pageSize} onChange={(event) => setPageSize(Number(event.target.value))} aria-label="表示件数" options={[{ value: '20', label: '20件表示' }, { value: '50', label: '50件表示' }, { value: '100', label: '100件表示' }]} />
             </div>
 
+            {/* #668: 並びは「絞り込み → 並び順 → 表示件数」の1形。 */}
             <div data-design="Saved" className="mb-3 flex flex-wrap items-center gap-2">
               <span className="text-ink-faint text-xs whitespace-nowrap">よく使う絞り込み</span>
               {([{ key: 'active', label: '公開中のみ' }, { key: 'draft', label: '下書きのみ' }] as const).map(({ key, label }) => (
                 <button key={key} onClick={() => setSavedFilter(savedFilter === key ? '' : key)} aria-pressed={savedFilter === key} className={`rounded-pill border px-3 py-1 text-xs transition-colors ${savedFilter === key ? 'border-accent bg-accent-soft text-ink' : 'border-hairline text-ink-secondary hover:bg-canvas-sunken'}`}>{label}</button>
               ))}
+              <SortSelect
+                className="ml-auto"
+                value={sortKey}
+                onChange={(value) => setSortKey(value as SortKey)}
+                options={[{ value: 'updated', label: '更新が新しい順' }, { value: 'created', label: '作成が新しい順' }, { value: 'name', label: '名前順' }]}
+              />
+              <PageSizeSelect value={pageSize} onChange={setPageSize} />
             </div>
 
             <WebinarListContent
@@ -802,7 +819,7 @@ function WebinarsPage() {
             />
 
             {hasListData && visibleTotal > 0 && (
-              <div className="mt-3 flex flex-wrap items-center justify-between gap-3"><p className="text-ink-faint text-xs tabular-nums">{(currentPage - 1) * pageSize + 1}〜{(currentPage - 1) * pageSize + visible.length}件 / 全{visibleTotal}件</p><Pagination page={currentPage} pageCount={pageCount} onPageChange={setPage} ariaLabel="ウェビナー一覧のページ送り" /></div>
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-3"><ListRange total={visibleTotal} first={visibleTotal === 0 ? 0 : (currentPage - 1) * pageSize + 1} last={(currentPage - 1) * pageSize + visible.length} /><Pagination page={currentPage} pageCount={pageCount} onPageChange={setPage} ariaLabel="ウェビナー一覧のページ送り" /></div>
             )}
           </section>
         </div>
@@ -859,7 +876,7 @@ function ArchiveReviewBackdrop({ target }: { target: WebinarListItem }) {
   return (
     <div className="bg-canvas-sunken fixed inset-x-0 bottom-0 top-[var(--mobile-header-height)] z-10 overflow-y-auto px-4 py-5 sm:px-10 xl:left-64 xl:top-14" data-design-node="LKuAQ">
       <div className="mx-auto max-w-screen-2xl">
-        <p className="text-accent-deep text-xs font-bold">← ウェビナー一覧</p>
+        <p className="text-ink-faint text-xs font-bold">← ウェビナー一覧</p>
         <div className="mt-5 grid gap-4 xl:grid-cols-4">
           <div className="space-y-4 xl:col-span-3">
             <section className="rounded-card border border-hairline bg-canvas p-5">

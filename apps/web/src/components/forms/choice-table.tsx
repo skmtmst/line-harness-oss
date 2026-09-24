@@ -309,7 +309,7 @@ export default function ChoiceTable({
                           <button
                             type="button"
                             onClick={() => patchChoice(choice.id, { jumpToSectionId: null })}
-                            className="text-accent-deep ml-2 underline"
+                            className="text-action ml-2 underline"
                           >
                             分岐設定を外す
                           </button>

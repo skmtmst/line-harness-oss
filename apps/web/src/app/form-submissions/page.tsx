@@ -22,6 +22,7 @@ import type { FormLayout } from '@line-crm/shared'
 import { hasStoredDestination, summarizeFormDestinations } from './form-destination-summary'
 import FolderPanel, { FOLDER_RAIL_STYLE } from '@/components/shared/folder-panel'
 import CopyTextButton from '@/components/ui/copy-text-button'
+import ListRange from '@/components/ui/list-range'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import './form-submissions.css'
 
@@ -488,6 +489,13 @@ export default function FormSubmissionsPage() {
           // 消さずに止めて理由を添える。実データは #688（migration 372）。
           addFolderDisabled={canAddFolder === true}
           addFolderTitle="フォームのフォルダ保存先は未接続です"
+          addFolderNote={
+            canAddFolder === true ? (
+              <p className="text-ink-faint text-xs leading-relaxed">
+                フォームのフォルダ保存先はまだ接続されていません。接続されるまではフォルダを追加できません。
+              </p>
+            ) : undefined
+          }
           rows={[
             { id: 'all', label: 'すべて', count: loading || loadError ? 0 : folderTotal },
             ...folders.map((folder) => ({ id: folder.id, label: folder.name, count: folder.formCount })),
@@ -614,18 +622,19 @@ export default function FormSubmissionsPage() {
           ) : (
           <div className="border-hairline rounded-card overflow-hidden border bg-white">
             {/*
-              ★V7：1440px で右端の「編集」と削除が切れていた（表の最小幅880px＞実幅）。
-              最小幅をやめ、名前の列を伸び縮みさせ、操作の列は3つのボタンが収まる固定幅にする。
+              ★V7：1440px で右端の「編集」と削除が切れていた（表の最小幅＞実幅）。
+              最小幅は1440pxの実幅（約835px）より小さい800pxにし、名前の列を伸び縮みさせる。操作の列は2つのボタンが収まる固定幅。
+              狭い画面だけ表の中で横に流れる。回答数は「回答を見る」の入口を兼ねる。
             */}
-            <div>
-            <table className="w-full table-fixed text-sm">
+            <div className="overflow-x-auto">
+            <table className="w-full min-w-[800px] table-fixed text-sm">
               <thead>
                 <TableHeadRow>
                   <Th>フォーム</Th>
-                  <Th className="w-24">状態</Th>
+                  <Th className="w-20">状態</Th>
                   <Th className="w-32">回答の保存先</Th>
                   <Th className="w-24" align="right">回答数</Th>
-                  <Th className="w-24">更新</Th>
+                  <Th className="w-20">更新</Th>
                   <Th className="w-32" align="right">操作</Th>
                 </TableHeadRow>
               </thead>
@@ -718,8 +727,8 @@ export default function FormSubmissionsPage() {
         )}
           {!loading && !loadError && visibleForms.length > 0 ? (
             <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-              <p className="text-xs text-ink-faint">
-                {listTotal.toLocaleString('ja-JP')}件中 {(listTotal === 0 ? 0 : pageStart + 1).toLocaleString('ja-JP')}〜{Math.min(pageStart + visibleForms.length, listTotal).toLocaleString('ja-JP')}件を表示
+              <p>
+                <ListRange total={listTotal} first={listTotal === 0 ? 0 : pageStart + 1} last={Math.min(pageStart + visibleForms.length, listTotal)} />
               </p>
               <Pagination page={visiblePage} pageCount={pageCount} onPageChange={(next) => updateListState({ page: next })} ariaLabel="回答フォームのページ送り" />
             </div>

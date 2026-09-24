@@ -36,6 +36,6 @@ describe('アカウント一覧の検索行（U019）', () => {
 
   it('選べない「20件表示」は置かず、結果の件数は絞り込みの行にまとめる（★V7）', () => {
     expect(PAGE).not.toContain('20件表示')
-    expect(PAGE.indexOf('件を表示</span>')).toBeGreaterThan(PAGE.indexOf('ACCOUNT_FILTERS.map'))
+    expect(PAGE.indexOf('<ListRange')).toBeGreaterThan(PAGE.indexOf('ACCOUNT_FILTERS.map'))
   })
 })

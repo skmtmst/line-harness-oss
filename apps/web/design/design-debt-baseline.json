@@ -156,7 +156,7 @@
     "direct-primary-button": 2
   },
   "app/form-submissions/page.tsx": {
-    "arbitrary-value": 2,
+    "arbitrary-value": 3,
     "direct-primary-button": 1
   },
   "app/friend-add-settings/page.tsx": {
@@ -289,10 +289,10 @@
     "direct-primary-button": 1
   },
   "app/rich-menus/edit/page.tsx": {
+    "direct-primary-button": 1,
     "arbitrary-value": 10
   },
   "app/rich-menus/page.tsx": {
-    "unresolved-classname": 1,
     "arbitrary-value": 10,
     "direct-secondary-button": 3
   },
@@ -379,7 +379,7 @@
     "direct-secondary-button": 1
   },
   "app/webhooks/webhook-interactions.tsx": {
-    "unresolved-classname": 40
+    "unresolved-classname": 39
   },
   "app/webinars/edit/page.tsx": {
     "arbitrary-value": 25,
@@ -388,7 +388,7 @@
     "direct-secondary-button": 1
   },
   "app/webinars/page.tsx": {
-    "arbitrary-value": 8,
+    "arbitrary-value": 7,
     "unresolved-classname": 1,
     "direct-secondary-button": 1
   },
@@ -531,7 +531,7 @@
     "unresolved-classname": 8
   },
   "components/friend-attributes-v2/tag-list-v2.tsx": {
-    "arbitrary-value": 94,
+    "arbitrary-value": 93,
     "direct-secondary-button": 6,
     "unresolved-classname": 6,
     "direct-primary-button": 2,
@@ -768,12 +768,21 @@
   "components/ui/kpi-collapse.tsx": {
     "unresolved-classname": 2
   },
+  "components/ui/list-range.tsx": {
+    "unresolved-classname": 1
+  },
   "components/ui/metric-value.tsx": {
     "unresolved-classname": 1
   },
   "components/ui/notification-switch.tsx": {
     "arbitrary-value": 2,
     "direct-primary-button": 1
+  },
+  "components/ui/page-size-select.tsx": {
+    "unresolved-classname": 1
+  },
+  "components/ui/sort-select.tsx": {
+    "unresolved-classname": 1
   },
   "components/users/user-row.tsx": {
     "unresolved-classname": 1,

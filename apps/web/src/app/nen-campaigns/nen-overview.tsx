@@ -17,6 +17,7 @@ import StatusBadge from '@/components/shared/status-badge'
 import StickyBar from '@/components/shared/sticky-bar'
 import SummaryCard from '@/components/shared/summary-card'
 import KpiCollapse from '@/components/ui/kpi-collapse'
+import ListRange from '@/components/ui/list-range'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { Tabs } from '@/components/shared/tabs'
 import { TextArea, TextField } from '@/components/shared/text-field'
@@ -512,7 +513,11 @@ function AutoPanel({
                 <Th className="w-20" align="right">開封</Th>
                 <Th className="w-20" align="right">注文</Th>
                 <Th className="w-24">状態</Th>
-                <Th className="w-28" align="right"><span className="sr-only">操作</span></Th>
+                {/*
+                  #707: 390pxで表を横スクロールしたとき、操作列だけ右端に
+                  留める（PC幅では自然位置なので見た目は変わらない）。
+                */}
+                <Th className="w-28 sticky right-0 bg-surface-pearl" align="right"><span className="sr-only">操作</span></Th>
               </TableHeadRow>
             </thead>
             <tbody>
@@ -556,7 +561,7 @@ function AutoPanel({
                           ? <StatusBadge tone="success" size="compact">配信中</StatusBadge>
                           : <StatusBadge tone="warning" size="compact">停止中</StatusBadge>}
                     </Td>
-                    <Td align="right">
+                    <Td align="right" className="sticky right-0 bg-canvas">
                       {/*
                         #985 LAY-18: 行の操作は共用の RowActions。
                         「編集」＋「⋯」（中身を見る・テスト送信・止める/動かす）の
@@ -799,7 +804,8 @@ function ColumnsPanel({
                       <Th className="w-20">公開日</Th>
                       <Th className="w-40">LINE配信</Th>
                       <Th className="w-16" align="right">閲覧</Th>
-                      <Th className="w-28" align="right"><span className="sr-only">操作</span></Th>
+                      {/* #707: 390px横スクロール時に操作列を右端へ留める */}
+                      <Th className="w-28 sticky right-0 bg-surface-pearl" align="right"><span className="sr-only">操作</span></Th>
                     </TableHeadRow>
                   </thead>
                   <tbody>
@@ -825,11 +831,11 @@ function ColumnsPanel({
                           <Td><span className="text-label tabular-nums text-ink-secondary">{jstShortDate(column.publishedAt)}</span></Td>
                           <Td>{columnDeliveryBadge(column)}</Td>
                           <Td align="right"><span className="text-label tabular-nums text-ink" title={metric?.articleOpened.reason ?? undefined}>{num(metric?.articleOpened.value ?? null)}</span></Td>
-                          <Td align="right">
+                          <Td align="right" className="sticky right-0 bg-canvas">
                             {isSelected ? (
                               <span className="text-label font-semibold text-ink-faint">選択中</span>
                             ) : (
-                              <button type="button" onClick={() => onSelect(column.id)} className="text-label font-semibold text-accent-deep">
+                              <button type="button" onClick={() => onSelect(column.id)} className="text-label font-semibold text-action">
                                 {column.deliveryStatus === 'sent' ? 'もう一度送る' : column.deliveryStatus === 'draft' ? '選ぶ' : '予約を見る'}
                               </button>
                             )}
@@ -1046,7 +1052,8 @@ function HistoryPanel({ deliveryList, detail, loading, onShowDetail, onRetry, on
                 <Th className="w-48">状態</Th>
                 <Th className="w-36">きっかけ</Th>
                 <Th className="w-20" align="right">開封</Th>
-                <Th className="w-24" align="right"><span className="sr-only">操作</span></Th>
+                {/* #707: 390px横スクロール時に操作列を右端へ留める */}
+                <Th className="w-24 sticky right-0 bg-surface-pearl" align="right"><span className="sr-only">操作</span></Th>
               </TableHeadRow>
             </thead>
             <tbody>
@@ -1064,8 +1071,8 @@ function HistoryPanel({ deliveryList, detail, loading, onShowDetail, onRetry, on
                     </Td>
                     <Td><span className="text-label text-ink-secondary">{deliveryTriggerLabel(delivery.campaignKey)}</span></Td>
                     <Td align="right"><span className="text-label text-ink-faint" title={delivery.reaction.reason}>取得不可</span></Td>
-                    <Td align="right">
-                      <button type="button" onClick={() => onShowDetail(delivery.id)} className="text-label font-semibold text-accent-deep">{detail?.id === delivery.id ? '閉じる' : '中身を見る'}</button>
+                    <Td align="right" className="sticky right-0 bg-canvas">
+                      <button type="button" onClick={() => onShowDetail(delivery.id)} className="text-label font-semibold text-action">{detail?.id === delivery.id ? '閉じる' : '中身を見る'}</button>
                     </Td>
                   </Tr>
                   {detail?.id === delivery.id ? (
@@ -1079,7 +1086,7 @@ function HistoryPanel({ deliveryList, detail, loading, onShowDetail, onRetry, on
                             {detail.content.buttonLabel ? <p className="mt-2 text-caption font-bold text-accent-deep">{detail.content.buttonLabel}</p> : null}
                             {/* IDEA-21: 案内の送り先を友だち詳細へつなぐ。注文・定期便の状況はそこで追える。 */}
                             <p className="mt-2">
-                              <Link href={`/friends/detail?id=${encodeURIComponent(delivery.friendId)}`} className="text-micro font-semibold text-accent-deep hover:underline">
+                              <Link href={`/friends/detail?id=${encodeURIComponent(delivery.friendId)}`} className="text-micro font-semibold text-action hover:underline">
                                 {delivery.friendName || 'この友だち'}の記録を見る
                               </Link>
                             </p>
@@ -1108,7 +1115,7 @@ function HistoryPanel({ deliveryList, detail, loading, onShowDetail, onRetry, on
         )}
       </section>
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-caption text-ink-faint">記録 {deliveryList?.pagination.total ?? 0}件中 {shown.length === 0 ? 0 : cursor + 1}〜{cursor + shown.length}件を表示</p>
+        <ListRange label="記録" total={deliveryList?.pagination.total ?? 0} first={shown.length === 0 ? 0 : cursor + 1} last={shown.length === 0 ? 0 : cursor + shown.length} />
         {deliveryList && (cursor > 0 || deliveryList.pagination.nextCursor) ? (
           <div className="flex gap-2" aria-label="送った履歴のページ送り">
             <Button type="button" disabled={cursor === 0} onClick={() => onChangeView(deliveryViewStatus(filter), String(Math.max(0, cursor - limit)), appliedQuery)}>前へ</Button>

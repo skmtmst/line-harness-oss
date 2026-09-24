@@ -150,7 +150,7 @@ function EmptyCell({ href }: { href?: string }) {
       href={href}
       aria-label="この空き枠に予約を入れる"
       title="この空き枠に予約を入れる"
-      className="text-ink-faint hover:bg-accent-soft hover:text-accent-deep inline-block rounded-control px-2 py-0.5 text-xs opacity-60 transition hover:opacity-100"
+      className="text-ink-faint hover:bg-accent-soft hover:text-action inline-block rounded-control px-2 py-0.5 text-xs opacity-60 transition hover:opacity-100"
     >
       あき ＋
     </Link>

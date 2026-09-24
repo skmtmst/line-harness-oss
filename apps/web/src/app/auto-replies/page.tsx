@@ -1,7 +1,8 @@
 'use client'
 
 import Disclosure from '@/components/shared/disclosure'
-import SelectField from '@/components/shared/select-field'
+import SortSelect from '@/components/ui/sort-select'
+import PageSizeSelect from '@/components/ui/page-size-select'
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { MoreHorizontal, Trash2, TriangleAlert } from 'lucide-react'
 import FolderPanel, { FOLDER_RAIL_STYLE } from '@/components/shared/folder-panel'
@@ -294,10 +295,10 @@ export default function AutoRepliesPage() {
             return (
               <span
                 key={ea.accountId}
-                className="inline-flex max-w-full items-center truncate px-1.5 py-0.5 rounded text-[10px] bg-canvas-sunken text-ink-faint line-through"
+                className="inline-flex max-w-full items-center gap-0.5 truncate px-1.5 py-0.5 rounded text-[10px] bg-canvas-sunken text-ink-faint line-through"
                 title={title}
               >
-                {label}
+                {word.mark} {label}
               </span>
             )
           }
@@ -629,7 +630,7 @@ export default function AutoRepliesPage() {
                   row.status === 'reply'
                     ? 'inline-flex items-center px-1.5 py-0.5 rounded bg-success-bg text-success'
                     : row.status === 'silent'
-                      ? 'inline-flex items-center px-1.5 py-0.5 rounded bg-amber-50 text-amber-700'
+                      ? 'inline-flex items-center px-1.5 py-0.5 rounded bg-warning-bg text-warning'
                       : 'inline-flex items-center px-1.5 py-0.5 rounded bg-canvas-sunken text-ink-faint line-through'
                 }
               >
@@ -659,20 +660,11 @@ export default function AutoRepliesPage() {
           aria-label="自動応答名で検索"
           className="border-hairline rounded-control focus:ring-accent min-w-45 flex-1 border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
         />
-        <span className="text-ink-faint text-xs whitespace-nowrap">並び順</span>
-        <SelectField value={sortKey} onChange={(e) => setSortKey(e.target.value as SortKey)} aria-label="並び順" options={[{ value: "hits", label: "ヒット数が多い順" }, { value: "priority", label: "評価順" }, { value: "name", label: "名前順" }, { value: "created", label: "作った順" }]} className="border-hairline rounded-control focus:ring-accent border px-2 py-2 text-sm focus:ring-2 focus:outline-none" />
-        <span className="text-ink-faint text-xs whitespace-nowrap">表示</span>
-        <SelectField
-          size="compact"
-          value={pageSize}
-          onChange={(e) => setPageSize(Number(e.target.value))}
-          aria-label="表示件数"
-          options={[{ value: '20', label: '20件' }, { value: '50', label: '50件' }, { value: '100', label: '100件' }]}
-        />
       </div>
 
+      {/* #668: 並びは「絞り込み → 並び順 → 表示件数」の1形。 */}
       <div data-design="Saved" className="mb-3 flex flex-wrap items-center gap-2">
-        <span className="text-ink-faint text-xs whitespace-nowrap">保存した条件</span>
+        <span className="text-ink-faint text-xs whitespace-nowrap">よく使う絞り込み</span>
         {SAVED_FILTERS.map((f) => {
           const on = savedFilter === f.key
           return (
@@ -691,6 +683,13 @@ export default function AutoRepliesPage() {
             </button>
           )
         })}
+        <SortSelect
+          className="ml-auto"
+          value={sortKey}
+          onChange={(value) => setSortKey(value as SortKey)}
+          options={[{ value: 'hits', label: 'ヒット数が多い順' }, { value: 'priority', label: '評価順' }, { value: 'name', label: '名前順' }, { value: 'created', label: '作った順' }]}
+        />
+        <PageSizeSelect value={pageSize} onChange={setPageSize} />
       </div>
 
       {folderDialogOpen && (

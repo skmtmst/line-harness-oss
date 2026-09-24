@@ -338,7 +338,7 @@ function ProductTable({
                   {row.isDefault ? (
                     <Chip tone="ok">{defaultChip}</Chip>
                   ) : (
-                    <button type="button" className="text-label font-semibold text-accent-deep" onClick={() => onDefault(index)}>{makeDefault}</button>
+                    <button type="button" className="text-label font-semibold text-action" onClick={() => onDefault(index)}>{makeDefault}</button>
                   )}
                 </Td>
                 <Td align="right">
@@ -348,7 +348,7 @@ function ProductTable({
             ))}
             <Tr>
               <Td colSpan={4}>
-                <button type="button" className="text-label font-semibold text-accent-deep" onClick={onAdd} disabled={disabledAdd}>
+                <button type="button" className="text-label font-semibold text-action" onClick={onAdd} disabled={disabledAdd}>
                   {addLabel}
                 </button>
               </Td>

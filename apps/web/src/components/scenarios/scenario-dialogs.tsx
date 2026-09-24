@@ -242,7 +242,7 @@ export function ConditionDialog({
         <div className="mt-2 space-y-3">{[['担当者','流入経路','配信状況'],['予約状況','購入履歴','ブロック状態']].map((line) => <div key={line[0]} className="flex gap-2">{line.map((label) => <span key={label} className="border-hairline rounded-pill border px-2.5 py-1.5 text-xs text-ink-secondary">{label}</span>)}</div>)}</div>
       </section>
       <p className="bg-info-bg text-ink-secondary mt-5 rounded-control px-4 py-3 text-xs">複数条件は「すべて一致（AND）」または「いずれか一致（OR）」で結合できます。</p>
-      <details className="mt-3"><summary className="text-accent-deep cursor-pointer text-xs">詳しい条件を編集</summary><div className="mt-3"><ConditionBuilder value={draft} onChange={setDraft} /></div></details>
+      <details className="mt-3"><summary className="text-action cursor-pointer text-xs">詳しい条件を編集</summary><div className="mt-3"><ConditionBuilder value={draft} onChange={setDraft} /></div></details>
     </Shell>
   )
 }
@@ -804,7 +804,7 @@ export function TestSendDialog({
       <div className="fixed inset-y-0 right-0 left-0 z-50 overflow-y-auto bg-canvas xl:left-64" data-design-node="g2UNV">
         <div className="border-hairline flex flex-wrap items-center justify-between gap-2 border-b px-6" style={{ minHeight: 76, background: 'var(--color-canvas)' }}><h1 className="text-ink text-2xl font-bold">シナリオをテスト送信</h1><Button onClick={onClose}>シナリオ編集へ戻る</Button></div>
         <div className="ml-6 mr-10 p-8">
-          <p className="text-accent-deep text-sm">シナリオ編集へ戻る</p>
+          <p className="text-ink-secondary text-sm">シナリオ編集へ戻る</p>
           {/* #1015 CHK-01 残存対応: 2列の固定比は狭い幅で本文が潰れるので、lg未満は1列に畳む。 */}
           <div className="mt-5 grid gap-6 lg:grid-cols-[1.5fr_0.8fr]">
             <section><h2 className="text-ink text-xl font-bold">選択した1名へ実際に送信</h2><p className="text-ink-secondary mt-1 text-sm">選んだ友だちのLINEへ、実際のメッセージが届きます。操作者専用の宛先ではありません。</p>

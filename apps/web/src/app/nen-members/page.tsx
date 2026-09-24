@@ -834,7 +834,7 @@ export default function PhotoReviewsPage() {
         </div>
       </KpiCollapse>
 
-      <div className="rounded-control bg-info-bg px-4 py-3 text-sm font-medium text-accent-deep">
+      <div className="rounded-control bg-info-bg px-4 py-3 text-sm font-medium text-info">
         通す・戻すを押した時点で、投稿者へお礼や直してほしい点が届きます。戻すときは理由を選び、送る文章を確認できます。
       </div>
 

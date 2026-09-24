@@ -593,8 +593,8 @@ nenMembers.get('/api/liff/nen/member', async (c) => {
       ps.publication_consent_at, ps.publication_withdrawn_at, ps.public_pet_name,
       ps.created_at, p.name pet_name
       FROM nen_photo_submissions ps JOIN nen_pet_profiles p ON p.id = ps.pet_id
-      WHERE ps.friend_id = ? AND ps.status = 'adopted'
-      ORDER BY ps.reviewed_at DESC, ps.created_at DESC LIMIT 30`).bind(friend.id).all<Record<string, unknown>>(),
+      WHERE ps.friend_id = ?
+      ORDER BY ps.created_at DESC LIMIT 30`).bind(friend.id).all<Record<string, unknown>>(),
     c.env.DB.prepare(`SELECT COUNT(*) submitted_count,
       SUM(CASE WHEN status='pending' THEN 1 ELSE 0 END) pending_count,
       SUM(CASE WHEN status='adopted' THEN 1 ELSE 0 END) adopted_count,

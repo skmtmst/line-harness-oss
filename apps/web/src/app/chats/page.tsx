@@ -2503,9 +2503,11 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
               className="w-full rounded-lg border border-hairline bg-canvas py-2 pr-3 pl-9 text-xs text-ink outline-none focus:border-accent-deep focus:ring-2 focus:ring-accent-deep/15"
               />
             </div>
-            {/* 「担当者」は選ぶ欄の中（「担当者：すべて」）に出ているので、外のラベルは画面から外す（★V7）。 */}
+            {/*
+              #668: 「担当者」の字ラベルは1つだけ。OperatorDropdown が
+              自分の中に「担当者：名前」を出すので、外側の字は二重になる。
+            */}
             <label className="mt-2 flex items-center gap-2 text-[11px] font-semibold text-ink-secondary">
-              <span className="sr-only">担当者</span>
               <span className="min-w-0 flex-1">
                 {/*
                   未読数は集計の口から渡す。**画面に見えている行から数えない**
@@ -3414,7 +3416,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                     data-inbox-v6="quote-preview"
                     className="mb-2 flex items-center gap-2 rounded-lg border border-accent/40 bg-accent-soft px-3 py-1.5 text-xs"
                   >
-                    <span className="shrink-0 font-semibold text-accent-deep">引用:</span>
+                    <span className="shrink-0 font-semibold text-ink-faint">引用:</span>
                     <span className="min-w-0 flex-1 truncate text-ink-secondary">
                       {quotedMessage.isUnsent
                         ? '取り消されたメッセージ'

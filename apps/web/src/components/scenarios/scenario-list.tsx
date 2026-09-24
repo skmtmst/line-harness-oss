@@ -415,7 +415,7 @@ export default function ScenarioList({
           <button
             type="button"
             onClick={() => openMove([...selectedIds])}
-            className="text-accent-deep text-sm font-medium hover:underline"
+            className="text-action text-sm font-medium hover:underline"
           >
             フォルダを移動
           </button>

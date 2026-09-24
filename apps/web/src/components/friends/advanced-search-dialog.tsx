@@ -476,8 +476,8 @@ export default function AdvancedSearchDialog({
           <section className="rounded-panel border border-accent-border bg-accent-soft px-4 py-3">
             <div className="flex items-center justify-between gap-4">
               <div>
-                <p className="text-micro font-medium text-accent-deep">現在の条件に一致</p>
-                <p className="mt-0.5 text-xl font-bold tabular-nums text-accent-deep">
+                <p className="text-micro font-medium text-ink-faint">現在の条件に一致</p>
+                <p className="mt-0.5 text-xl font-bold tabular-nums text-ink">
                   {counting ? '…' : count === null ? '—' : `${count.toLocaleString('ja-JP')}人`}
                 </p>
               </div>
@@ -493,7 +493,7 @@ export default function AdvancedSearchDialog({
                   </button>
                 </span>
               ) : (
-                <span className="text-micro text-accent-deep">自動で再計算</span>
+                <span className="text-micro text-ink-faint">自動で再計算</span>
               )}
             </div>
           </section>

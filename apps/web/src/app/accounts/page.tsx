@@ -24,6 +24,7 @@ import {
   type AccountFilter,
 } from './account-list-view'
 import AccountMigration from './migration'
+import ListRange from '@/components/ui/list-range'
 
 type AccountWithStats = LineAccount & {
   stats?: { friendCount: number; activeScenarios: number; messagesThisMonth: number }
@@ -127,8 +128,8 @@ export default function AccountsPage() {
               {item.label}
             </FilterChip>
           ))}
-          {/* 件数は結果の件数だけ。選べない件数の文字は置かない。 */}
-          <span className="text-ink-faint ml-auto text-xs whitespace-nowrap">{shown.length}件を表示</span>
+          {/* 件数は結果の件数だけ。選べない件数の文字は置かない（★V7）。 */}
+          <ListRange className="ml-auto whitespace-nowrap" total={shown.length} first={shown.length === 0 ? 0 : 1} last={shown.length} />
         </div>
       </div>
 

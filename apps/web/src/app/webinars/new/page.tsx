@@ -134,7 +134,7 @@ export default function NewWebinarPage() {
             <div className="mt-4 space-y-3">
               <label className={`border-hairline flex cursor-pointer items-center gap-4 rounded-control border p-4 ${deliveryKind === 'on-demand' ? 'border-accent bg-accent-soft' : ''}`}>
                 <input type="radio" name="delivery-kind" checked={deliveryKind === 'on-demand'} onChange={() => setDeliveryKind('on-demand')} />
-                <span className="text-accent-deep text-xl">♙</span>
+                <span className="text-ink-faint text-xl">♙</span>
                 <span><strong className="text-ink block text-sm">オンデマンド配信</strong><span className="text-ink-faint mt-1 block text-xs">録画動画をいつでも視聴</span></span>
                 <span className="text-action ml-auto" aria-hidden="true">›</span>
               </label>

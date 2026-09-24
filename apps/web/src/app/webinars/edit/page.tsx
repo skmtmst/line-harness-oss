@@ -590,7 +590,7 @@ function AnalyticsTab({ webinarId, durationSeconds, view = 'analytics', analytic
             ) : participantsState === 'error' ? (
               <div className="p-8 text-center text-sm" role="alert">
                 <p className="text-danger">参加者一覧を読み込めませんでした。</p>
-                <button type="button" onClick={() => setAttempt((count) => count + 1)} className="text-accent-deep mt-2 font-medium underline">もう一度読み込む</button>
+                <button type="button" onClick={() => setAttempt((count) => count + 1)} className="text-action mt-2 font-medium underline">もう一度読み込む</button>
               </div>
             ) : null}
             <div className="divide-hairline divide-y">{participantsState === 'ready' && participantItems.length === 0 ? <p className="text-ink-faint p-8 text-center text-sm">{participantFilter ? 'この分類に該当する人はいません。' : 'まだ参加者がいません。'}</p> : participantItems.map((participant) => {
@@ -790,7 +790,7 @@ function AnalyticsTab({ webinarId, durationSeconds, view = 'analytics', analytic
                     <div className="flex min-w-0 items-center gap-3"><ParticipantAvatar name={name} pictureUrl={participant.pictureUrl} /><span className="truncate font-semibold">{name}</span></div>
                     <span className="text-ink-secondary">視聴完了 {watchedRate}%</span>
                     <span className="text-ink-secondary">{action}</span>
-                    <Link href={`/chats?friend=${participant.friendId}`} className="text-accent-deep font-semibold">確認する</Link>
+                    <Link href={`/chats?friend=${participant.friendId}`} className="text-action font-semibold">確認する</Link>
                   </div>
                 )
               })}
@@ -1387,7 +1387,7 @@ function NotificationDesignStep({ webinarId, webinarTitle, registrations, public
           <button
             type="button"
             onClick={() => { setSettingsReady(false); setSettingsFailed(false); setNotifAttempt((count) => count + 1) }}
-            className="text-accent-deep text-xs font-medium underline"
+            className="text-action text-xs font-medium underline"
           >
             通知の設定をもう一度読み込む
           </button>
