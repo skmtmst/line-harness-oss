@@ -258,7 +258,8 @@ describe('画面のつなぎ', () => {
   const page = read('app/users/page.tsx')
 
   it('撮影の押し口と対象面に印を付ける', () => {
-    expect(row).toContain('data-qa-open="w8W4Eh"')
+    // #748: 行の操作はメニュー部品経由になり、印は menuButtonProps で渡す形へ。
+    expect(row).toContain(`'data-qa-open': 'w8W4Eh'`)
     expect(detail).toContain('data-design-node="w8W4Eh"')
   })
 
