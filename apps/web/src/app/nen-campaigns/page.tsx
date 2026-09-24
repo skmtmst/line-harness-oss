@@ -385,7 +385,7 @@ export default function NenCampaignsPage() {
   return (
     <>
       {tabErrors[tab] ? (
-        <div className="mx-auto w-full px-4 pt-4 sm:px-6" style={{ maxWidth: 1600 }}>
+        <div className="mx-auto w-full pt-4" style={{ maxWidth: 1600 }}>
           <NoteBar
             tone="danger"
             action={<Button type="button" onClick={() => void loadTab(tab)}>もう一度読み込む</Button>}
