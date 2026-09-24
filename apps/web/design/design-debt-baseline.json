@@ -704,6 +704,9 @@
   "components/shared/date-field.tsx": {
     "unresolved-classname": 17
   },
+  "components/shared/disclosure.tsx": {
+    "unresolved-classname": 6
+  },
   "components/shared/folder-add-dialog.tsx": {
     "direct-primary-button": 1
   },
