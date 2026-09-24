@@ -503,7 +503,7 @@ export default function Sidebar({
           )}
           <div className="min-w-0">
             <p className="truncate text-sm font-bold text-gray-900">{brand.name ?? '然-NEN- LINE管理システム'}</p>
-            <p className="mt-0.5 text-[11px] font-medium text-gray-400">管理メニュー</p>
+            <p className="mt-0.5 text-micro font-medium text-ink-faint">管理メニュー</p>
           </div>
         </div>
       ) : (
@@ -524,7 +524,7 @@ export default function Sidebar({
             <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[9px] bg-accent-soft text-[14px] font-semibold text-accent-deep">然</div>
             <div className="ml-3 min-w-0 flex-1">
               <p className="truncate text-[14px] font-semibold text-ink">然-NEN- TEST</p>
-              <p className="mt-0.5 truncate text-[10px] text-ink-faint">コミュニケーション</p>
+              <p className="mt-0.5 truncate text-micro text-ink-faint">コミュニケーション</p>
             </div>
           </div>
         </div>
@@ -594,7 +594,8 @@ export default function Sidebar({
                       <span className={styles.badge}>
                         {badgeCount(item) > 99 ? '99+' : badgeCount(item)}
                       </span>
-                      <span className="sr-only">{badgeCount(item)} 件</span>
+                      {/* 読み上げは「33件」と続け、数字と単位の間に空白を入れない（§2-6）。 */}
+                      <span className="sr-only">{badgeCount(item)}件</span>
                     </>
                   )}
                 </Link>
