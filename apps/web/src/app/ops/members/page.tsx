@@ -154,12 +154,16 @@ export default function OpsMembersPage() {
           <DataTable>
             <thead>
               <TableHeadRow>
+                {/*
+                  ★V7: 操作列は入る幅で固定する（「再送」「停止」の2つ＋送信中の表示）。
+                  1440px で合計が枠に収まるよう、メール・最終ログインは詰める（1行省略＋全文は title）。
+                */}
                 <Th className="w-72">名前</Th>
-                <Th className="w-72">メール</Th>
+                <Th className="w-52">メール</Th>
                 <Th className="w-36">2要素認証</Th>
                 <Th className="w-28">状態</Th>
-                <Th className="w-44">最終ログイン</Th>
-                <Th align="right">操作</Th>
+                <Th className="w-36">最終ログイン</Th>
+                <Th className="w-48" align="right">操作</Th>
               </TableHeadRow>
             </thead>
             <tbody>

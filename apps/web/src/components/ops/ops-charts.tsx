@@ -4,8 +4,9 @@
  * 運営ダッシュボード（★V6 37-2）の絵。棒グラフ `月ごとの売上` とドーナツ `プラン別の契約`。
  *
  * 色は CSS の色トークンだけを使う（Pencil のトークン表に無い色は作らない）。
- * - 今月の棒とスタンダード: accent-deep ／ 過去の棒: surface-pearl
- * - ライト: status-info ／ プロ: chip-alt ／ トライアル: status-warn
+ * - 今月の棒: accent-deep ／ 過去の棒: surface-pearl
+ * - ライト: status-info ／ スタンダード: ink ／ プロ: chip-alt ／ トライアル: status-warn
+ * プランの分類色に緑は使わない（緑は「正常」の意味だけ）。
  */
 
 export function formatYen(yen: number): string {
@@ -72,7 +73,7 @@ export function RevenueBars({ rows, width = 920, height = 220 }: { rows: Array<{
 
 const SHARE_COLORS: Record<string, string> = {
   light: 'var(--color-status-info)',
-  standard: 'var(--color-accent-deep)',
+  standard: 'var(--color-ink)',
   pro: 'var(--color-chip-alt)',
   trial: 'var(--color-status-warn)',
 }
