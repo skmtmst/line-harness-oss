@@ -78,7 +78,7 @@ export default function NewStaffPage() {
     </FormSection>
 
     <FormSection step={2} label="役割" note="役割を選ぶと、できることの範囲が決まります。">
-      <div className="grid gap-3 lg:grid-cols-3">{ROLES.map((item) => <button key={item.value} type="button" onClick={() => setRole(item.value)} className={`min-h-24 cursor-pointer rounded-card border p-4 text-left transition-colors ${role === item.value ? 'border-accent bg-accent-soft' : 'border-hairline hover:bg-canvas-sunken'}`}><span className="flex items-center gap-2 text-sm font-semibold text-ink"><span className={`h-4 w-4 rounded-full border-2 ${role === item.value ? 'border-accent bg-accent shadow-[inset_0_0_0_3px_white]' : 'border-hairline'}`} />{item.label}</span><span className="mt-2 block whitespace-nowrap text-xs text-ink-secondary">{item.note}</span></button>)}</div>
+      <div className="grid gap-3 lg:grid-cols-3">{ROLES.map((item) => <button key={item.value} type="button" onClick={() => setRole(item.value)} className={`min-h-24 cursor-pointer rounded-card border p-4 text-left transition-colors ${role === item.value ? 'border-accent bg-accent-soft' : 'border-hairline hover:bg-canvas-sunken'}`}><span className="flex items-center gap-2 text-sm font-semibold text-ink"><span className={`h-4 w-4 rounded-full border-2 ${role === item.value ? 'border-accent bg-accent shadow-[inset_0_0_0_3px_white]' : 'border-hairline'}`} />{item.label}</span><span className="mt-2 block text-xs leading-relaxed text-ink-secondary">{item.note}</span></button>)}</div>
     </FormSection>
 
     <FormSection step={3} label="最初に表示するLINEアカウント" note="ログイン直後の表示だけを決めます。組織内のほかのアカウントにも切り替えて操作できます。">

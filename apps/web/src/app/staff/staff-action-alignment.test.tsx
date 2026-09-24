@@ -207,7 +207,13 @@ describe('ログインユーザー操作の表示と実処理 (#834)', () => {
     }))
     await mount()
 
-    fireEvent.click(within(rowFor('対象者')).getByRole('button', { name: 'この人を外す' }))
+    // ★V7: 外すは「…」の中。開く操作と選ぶ操作は別の act に分ける。
+    await act(async () => {
+      fireEvent.click(within(rowFor('対象者')).getByRole('button', { name: '対象者のその他操作' }))
+    })
+    await act(async () => {
+      fireEvent.click(screen.getByRole('menuitem', { name: 'この人を外す' }))
+    })
     expect(fixture.deleteStaff).not.toHaveBeenCalled()
 
     const confirm = screen.getByRole('button', { name: '外す' })
@@ -226,7 +232,13 @@ describe('ログインユーザー操作の表示と実処理 (#834)', () => {
     fixture.deleteStaff.mockRejectedValue(new Error('最後の管理者は外せません'))
     await mount()
 
-    fireEvent.click(within(rowFor('対象者')).getByRole('button', { name: 'この人を外す' }))
+    // ★V7: 外すは「…」の中。開く操作と選ぶ操作は別の act に分ける。
+    await act(async () => {
+      fireEvent.click(within(rowFor('対象者')).getByRole('button', { name: '対象者のその他操作' }))
+    })
+    await act(async () => {
+      fireEvent.click(screen.getByRole('menuitem', { name: 'この人を外す' }))
+    })
     fireEvent.click(screen.getByRole('button', { name: '外す' }))
 
     await waitFor(() => expect(screen.getByText('最後の管理者は外せません')).toBeTruthy())
