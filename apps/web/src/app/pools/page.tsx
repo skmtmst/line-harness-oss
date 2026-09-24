@@ -6,8 +6,11 @@ import { useEffect, useState } from 'react'
 import { api, ApiError, describeSaveFailure } from '@/lib/api'
 import type { TrafficPool, PoolAccount, LineAccount } from '@line-crm/shared'
 import { usePageTitle } from '@/components/shell/page-chrome'
+import Button from '@/components/shared/button'
 import { FeatureDisabledScreen } from '@/components/feature-disabled-gate'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import ListState from '@/components/shared/list-state'
+import StatusBadge from '@/components/shared/status-badge'
 import { isPoolsFeatureAvailable } from '@/lib/pools-availability'
 
 export default function PoolsPage() {
@@ -66,34 +69,55 @@ export default function PoolsPage() {
     )
   }
 
+  // 読み込み済み・失敗なし・0件のときは空状態だけ出す。件数と右上の
+  // 作成口を残すと、同じ緑ボタンが2つ・同じ0が2か所に重複する。
+  const isEmpty = !loading && !error && sortedPools.length === 0
+
   return (
     <div>
-      <div className="flex justify-between items-center mb-4">
-        <span className="text-sm text-gray-500">{pools.length} プール</span>
-        <button
-          onClick={() => setShowCreate(true)}
-          className="px-3 py-1.5 rounded bg-blue-600 text-white text-sm hover:bg-blue-700"
-        >
-          + 新規プール
-        </button>
-      </div>
-
-      {error && (
-        <div className="p-3 rounded bg-red-50 border border-red-200 text-red-700 text-sm mb-4">
-          {error}
-        </div>
-      )}
-
-      {loading ? (
-        <div className="bg-white rounded-lg border border-gray-200 p-8 text-center text-gray-400">
-          読み込み中...
-        </div>
+      {isEmpty ? (
+        <ListState
+          kind="empty"
+          title="まだプールがありません"
+          description="プールは、来たお客様を振り分けるLINEアカウントをまとめる入れ物です。"
+          action={
+            <Button variant="primary" onClick={() => setShowCreate(true)}>
+              ＋ プールをつくる
+            </Button>
+          }
+        />
       ) : (
-        <div className="space-y-3">
-          {sortedPools.map((pool) => (
-            <PoolCard key={pool.id} pool={pool} accounts={accounts} onChange={load} />
-          ))}
-        </div>
+        <>
+          <div className="flex justify-between items-center mb-4">
+            <span className="text-sm text-ink-secondary">{pools.length} プール</span>
+            <Button variant="primary" onClick={() => setShowCreate(true)}>
+              ＋ プールをつくる
+            </Button>
+          </div>
+
+          {loading && pools.length === 0 ? (
+            <ListState kind="loading" />
+          ) : error && pools.length === 0 ? (
+            <ListState
+              kind="error"
+              title="プール一覧を表示できませんでした"
+              description="プール一覧の取得に失敗しました。もう一度読み込んでください。"
+              onRetry={() => { void load() }}
+            />
+          ) : (
+            <div className="space-y-3">
+              {error ? (
+                <div className="border-danger bg-danger-bg text-danger rounded-control flex flex-wrap items-center gap-3 border p-4 text-sm" role="alert">
+                  <span className="min-w-0 flex-1">{error}</span>
+                  <button type="button" onClick={() => { void load() }} className="shrink-0 font-medium underline">もう一度読み込む</button>
+                </div>
+              ) : null}
+              {sortedPools.map((pool) => (
+                <PoolCard key={pool.id} pool={pool} accounts={accounts} onChange={load} />
+              ))}
+            </div>
+          )}
+        </>
       )}
 
       {showCreate && (
@@ -161,30 +185,28 @@ function PoolCard({
   }
 
   return (
-    <div className="bg-white border border-gray-200 rounded p-4">
-      <div className="flex items-center justify-between mb-2">
-        <div>
-          <h3 className="font-medium">
-            {pool.name}
+    <div className="bg-canvas border-hairline rounded-card border p-4">
+      <div className="flex items-center justify-between gap-3 mb-2">
+        <div className="min-w-0">
+          <h3 className="flex items-center gap-2 font-medium">
+            <span className="min-w-0 truncate" title={pool.name}>{pool.name}</span>
             {isMain && (
-              <span className="ml-2 text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded">
+              <StatusBadge tone="info" size="compact">
                 既定
-              </span>
+              </StatusBadge>
             )}
           </h3>
-          <p className="text-xs text-gray-500 font-mono">{pool.slug}</p>
+          <p className="text-xs text-ink-faint font-mono truncate" title={pool.slug}>{pool.slug}</p>
         </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={onCopy}
-            className="text-xs px-2 py-1 border border-gray-200 rounded hover:bg-gray-50"
-          >
+        <div className="flex shrink-0 items-center gap-2">
+          <Button variant="secondary" onClick={onCopy}>
             {copied ? '✓ コピー済' : '公開 URL コピー'}
-          </button>
+          </Button>
           {!isMain && (
             <button
+              type="button"
               onClick={() => { setDeleteError(''); setConfirmOpen(true) }}
-              className="text-xs px-2 py-1 text-red-600 hover:bg-red-50 rounded"
+              className="text-danger hover:bg-danger-bg rounded-mini px-2 py-1 text-xs"
             >
               削除
             </button>
@@ -297,15 +319,16 @@ function PoolAccountList({
           return (
             <li
               key={m.id}
-              className="flex items-center justify-between bg-gray-50 px-2 py-1 rounded"
+              className="bg-canvas-sunken rounded-mini flex items-center justify-between gap-2 px-2 py-1"
             >
-              <span>{acc?.name ?? m.lineAccountId}</span>
+              <span className="min-w-0 truncate" title={acc?.name ?? m.lineAccountId}>{acc?.name ?? m.lineAccountId}</span>
               <button
+                type="button"
                 onClick={() => {
                   setRemoveError('')
                   setRemoveTarget({ id: m.id, name: acc?.name ?? m.lineAccountId })
                 }}
-                className="text-xs text-red-600 hover:underline"
+                className="text-danger shrink-0 text-xs hover:underline"
               >
                 外す
               </button>
@@ -313,11 +336,11 @@ function PoolAccountList({
           )
         })}
         {members.length === 0 && !listError && (
-          <li className="text-xs text-gray-400">所属アカウントなし</li>
+          <li className="text-xs text-ink-faint">所属アカウントなし</li>
         )}
       </ul>
       {listError && (
-        <p className="mt-1 text-xs text-red-600">{listError}</p>
+        <p className="text-danger mt-1 text-xs">{listError}</p>
       )}
       {candidates.length > 0 && (
         <div className="mt-2">
@@ -385,8 +408,8 @@ function CreatePoolModal({
   }
 
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-lg w-full max-w-md p-6 space-y-3">
+    <div className="bg-scrim fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="bg-canvas rounded-card w-full max-w-md space-y-3 p-6">
         <div className="flex items-start justify-between gap-3">
           <h2 className="text-lg font-medium">新規プール</h2>
           <button type="button" onClick={onClose} aria-label="閉じる" className="rounded-mini p-1 text-ink-secondary hover:bg-canvas-sunken">
@@ -394,7 +417,7 @@ function CreatePoolModal({
           </button>
         </div>
         {error && (
-          <div className="p-2 rounded bg-red-50 border border-red-200 text-red-700 text-xs">
+          <div className="border-danger bg-danger-bg text-danger rounded-control border p-2 text-xs" role="alert">
             {error}
           </div>
         )}
@@ -402,30 +425,31 @@ function CreatePoolModal({
           value={slug}
           onChange={(e) => setSlug(e.target.value)}
           placeholder="slug (例: brand-a)"
-          className="w-full border border-gray-200 rounded px-3 py-2 text-sm font-mono"
+          className="border-hairline bg-canvas text-ink rounded-control w-full border px-3 py-2 font-mono text-sm"
         />
         <input
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder="表示名 (例: ブランドA)"
-          className="w-full border border-gray-200 rounded px-3 py-2 text-sm"
+          className="border-hairline bg-canvas text-ink rounded-control w-full border px-3 py-2 text-sm"
         />
         <SelectField
           value={activeAccountId}
           onChange={(e) => setActiveAccountId(e.target.value)}
           options={[{ value: '', label: '最初の所属アカウントを選択' }, ...accounts.map((a) => ({ value: a.id, label: a.name }))]}
         />
-        <div className="flex justify-end gap-2 pt-2 border-t border-gray-100">
-          <button onClick={onClose} className="text-sm px-3 py-1.5 text-gray-600">
+        <div className="border-hairline flex justify-end gap-2 border-t pt-2">
+          <Button variant="secondary" onClick={onClose}>
             キャンセル
-          </button>
-          <button
-            onClick={onSubmit}
+          </Button>
+          <Button
+            variant="primary"
+            onClick={() => { void onSubmit() }}
             disabled={submitting || !slug || !name || !activeAccountId}
-            className="text-sm px-3 py-1.5 rounded bg-blue-600 text-white disabled:opacity-50"
+            className="text-sm px-3 py-1.5 rounded bg-blue-600 text-white hover:brightness-90 disabled:opacity-50"
           >
             {submitting ? '作成中…' : '作成'}
-          </button>
+          </Button>
         </div>
       </div>
     </div>

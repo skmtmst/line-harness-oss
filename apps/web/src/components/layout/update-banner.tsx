@@ -6,16 +6,16 @@ export default function UpdateBanner() {
   if (!release) return null
 
   return (
-    <div className="bg-blue-50 border-b border-blue-200 px-4 py-2.5 flex items-center justify-between gap-3 text-sm">
+    <div className="bg-status-info-soft border-b border-hairline px-4 py-2.5 flex items-center justify-between gap-3 text-sm">
       <div className="flex items-center gap-2 min-w-0 flex-wrap">
-                <span className="text-blue-900">
+                <span className="text-status-info">
           新バージョン <strong>{release.tag}</strong> がリリースされました
         </span>
         <a
           href={release.url}
           target="_blank"
           rel="noopener noreferrer"
-          className="text-blue-700 underline hover:text-blue-900"
+          className="text-action underline hover:text-action-hover"
         >
           詳細を見る
         </a>
@@ -24,7 +24,7 @@ export default function UpdateBanner() {
         type="button"
         onClick={dismiss}
         aria-label="このアップデート通知を閉じる"
-        className="shrink-0 text-blue-600 hover:text-blue-800 px-2 -mr-2"
+        className="shrink-0 text-action hover:text-action-hover px-2 -mr-2"
       >
         ✕
       </button>

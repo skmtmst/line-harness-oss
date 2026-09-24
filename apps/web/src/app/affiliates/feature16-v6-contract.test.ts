@@ -49,9 +49,9 @@ describe('機能16 V6の一覧', () => {
     // 絞り込みの先頭は「すべて」。
     expect(affiliates).toContain('すべて')
     expect(affiliates.indexOf('すべて')).toBeLessThan(affiliates.indexOf('計測中'))
-    // 状態は「状態」列の StatusBadge、操作は枠つき「成果を見る」＋「…」。
-    expect(affiliates).toContain('状態</Th>')
-    expect(affiliates).toContain('<StatusBadge')
+    // 状態は名前の下の札（#670 16 と一本化。列と札の二重表示にしない）、操作は枠つき「成果を見る」＋「…」。
+    expect(affiliates).not.toContain('<Th align="center">状態</Th>')
+    expect(affiliates).toContain("<Chip tone={row.isActive ? 'ok' : 'neutral'}>")
     expect(affiliates).toContain('成果を見る')
     expect(affiliates).toContain('<MoreAction')
     expect(affiliates).toContain('<ActionMenu')

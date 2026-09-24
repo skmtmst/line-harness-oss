@@ -13,7 +13,6 @@ import type { Tag, Scenario, LineAccount } from '@line-crm/shared'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import ActionMenu from '@/components/shared/action-menu'
 import { MoreAction } from '@/components/shared/row-actions'
-import StatusBadge from '@/components/shared/status-badge'
 import Button from '@/components/shared/button'
 import type { ButtonProps } from '@/components/shared/button'
 import Chip from '@/components/shared/chip'
@@ -704,7 +703,6 @@ export function AffiliatorsTab({ accountId }: { accountId: string | null }) {
                 <Th align="right">友だち追加</Th>
                 <Th align="right">成果</Th>
                 <Th align="right">報酬</Th>
-                <Th align="center">状態</Th>
                 <Th align="center">操作</Th>
               </TableHeadRow>
             </thead>
@@ -721,6 +719,8 @@ export function AffiliatorsTab({ accountId }: { accountId: string | null }) {
                       <td className="text-ink px-4 py-3 text-sm font-medium">
                         <span className="block truncate" title={row.name}>{row.name}</span>
                         <span className="text-action mt-0.5 block font-mono text-xs">{row.code}</span>
+                        {/* #670 16: 状態は名前の下の札で出す。操作セルに置くと操作と読める。 */}
+                        <span className="mt-1 block"><Chip tone={row.isActive ? 'ok' : 'neutral'}>{row.isActive ? '計測中' : '停止中'}</Chip></span>
                       </td>
                       <td className="text-ink-secondary px-4 py-3 text-right text-sm tabular-nums">
                         {row.linkCount.toLocaleString()}本
@@ -733,11 +733,6 @@ export function AffiliatorsTab({ accountId }: { accountId: string | null }) {
                       </td>
                       <td className="text-ink px-4 py-3 text-right text-sm font-semibold tabular-nums">
                         {formatYen(row.rewardAmount)}
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        {row.isActive
-                          ? <StatusBadge tone="success" size="compact">計測中</StatusBadge>
-                          : <StatusBadge tone="neutral" size="compact">停止中</StatusBadge>}
                       </td>
                       {/* 行の操作は枠つきボタン＋「…」へ集約。紹介を止めるは確認画面つき。 */}
                       <td className="px-4 py-3 text-center" onClick={(event) => event.stopPropagation()}>
@@ -774,7 +769,7 @@ export function AffiliatorsTab({ accountId }: { accountId: string | null }) {
                     {/* Detail expansion row */}
                     {isExpanded && (
                       <tr key={`${row.id}-detail`}>
-                        <td colSpan={7} className="bg-canvas-sunken border-hairline border-t px-6 py-5">
+                        <td colSpan={6} className="bg-canvas-sunken border-hairline border-t px-6 py-5">
                           {detailLoading ? (
                             <p className="text-sm text-ink-faint">読み込み中...</p>
                           ) : (
@@ -967,7 +962,8 @@ export function AffiliatorsTab({ accountId }: { accountId: string | null }) {
                                             <td className="py-1 pr-4 text-right font-semibold text-ink">{link.click_count.toLocaleString()}</td>
                                             <td className="py-1">
                                               {link.is_active
-                                                ? <span className="text-xs text-green-600">有効</span>
+                                                /* #670 22: green-600 は白地で 3.3:1 しかなく AA 未満。共通トークンの濃い緑へ。 */
+                                                ? <span className="text-xs font-semibold text-success">有効</span>
                                                 : <span className="text-xs text-ink-faint">無効</span>
                                               }
                                             </td>
@@ -2900,7 +2896,8 @@ function SettlementEditor({
         >
           {saving ? '保存中...' : '取り決めを保存'}
         </button>
-        {saved && <span className="text-xs text-emerald-600">保存しました</span>}
+        {/* #670 22: emerald-600 は白地で 3.8:1 しかなく AA 未満。共通トークンの濃い緑へ。 */}
+        {saved && <span className="text-xs font-semibold text-success">保存しました</span>}
       </div>
     </div>
   )
