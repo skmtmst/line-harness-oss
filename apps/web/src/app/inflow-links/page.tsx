@@ -22,6 +22,7 @@ import RefOrdersPanel from './_components/ref-orders'
 import SiteScript from '@/components/inflow-links/site-script'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
 import Dialog from '@/components/shared/dialog'
 import Disclosure from '@/components/shared/disclosure'
 import FilterChip from '@/components/shared/filter-chip'
@@ -650,11 +651,10 @@ function InflowLinksPageInner({
 
   const formatDate = (iso: string | null) => {
     if (!iso) return '—'
-    return new Date(iso).toLocaleDateString('ja-JP', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-    })
+    // ★V7：他の一覧と同じ「8月25日」。今年でないときだけ年を付ける。
+    const date = new Date(iso)
+    const sameYear = date.getFullYear() === new Date().getFullYear()
+    return date.toLocaleDateString('ja-JP', sameYear ? { month: 'long', day: 'numeric' } : { year: 'numeric', month: 'long', day: 'numeric' })
   }
 
   // 設計のKPI。stats は期間を受け取らないので、出せるのは累計だけ。
@@ -784,7 +784,7 @@ function InflowLinksPageInner({
         </div>
       </Disclosure>
 
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-2"><Button href="/inflow-links/new" variant="primary">＋ 流入リンクをつくる</Button><div className="flex gap-2"><Button onClick={exportCurrentRows} disabled={sortedRows.length === 0}>CSVで書き出す</Button><Button variant="secondary" onClick={() => setBulkOpen(true)}>まとめて操作{selectedRouteIds.size > 0 ? `（${selectedRouteIds.size}件選択中）` : ''}</Button></div></div>
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-2"><Button href="/inflow-links/new" variant="primary">＋ 流入リンクをつくる</Button><div className="flex gap-2"><Button variant="secondary" onClick={() => setBulkOpen(true)}>まとめて操作{selectedRouteIds.size > 0 ? `（${selectedRouteIds.size}件選択中）` : ''}</Button></div></div>
 
       <div style={FOLDER_RAIL_STYLE} className="grid gap-5 lg:grid-cols-[var(--folder-rail-width)_minmax(0,1fr)]">
         <FolderPanel
@@ -846,14 +846,12 @@ function InflowLinksPageInner({
                 }}
                 size="page-size"
               />
-              <Button
-                onClick={() => setEditing('new')}
-                variant="primary"
-                disabled={!selectedGenre || selectedGenre === UNCATEGORIZED}
-                title={!selectedGenre || selectedGenre === UNCATEGORIZED ? '先に左側でフォルダを選んでください' : undefined}
-              >
-                ＋ このフォルダに流入リンクをつくる
-              </Button>
+              {/* ★V7：フォルダを選んでいないときは押せない緑のボタンを置かない。上の「流入リンクをつくる」で足りる。 */}
+              {selectedGenre && selectedGenre !== UNCATEGORIZED ? (
+                <Button onClick={() => setEditing('new')} variant="primary">
+                  ＋ このフォルダに流入リンクをつくる
+                </Button>
+              ) : null}
               {/*
                 **画面に出ている行をそのまま書き出す。** 絞り込みや並び替えを
                 無視して全件を出すと、画面と手元のファイルが食い違う。
@@ -922,27 +920,27 @@ function InflowLinksPageInner({
                   編集ボタンは割合でなく固定幅にして右端で切れないようにする。 */}
               <col className="w-10" />
               <col className="w-[20%]" />
-              <col className="w-[9%]" />
+              <col className="w-[8%]" />
               <col className="w-[13%]" />
-              <col className="w-[10%]" />
               <col className="w-[9%]" />
               <col className="w-[8%]" />
-              <col className="w-[7%]" />
               <col className="w-[9%]" />
+              <col className="w-[7%]" />
+              <col className="w-[8%]" />
               <col className="w-[9%]" />
               <col className="w-20" />
             </colgroup>
             <thead>
               <TableHeadRow>
                 <Th>
-                  <input
-                    type="checkbox"
+                  <Checkbox
                     aria-label="表示中の登録済み経路をすべて選ぶ"
                     checked={allShownSelected}
+                    indeterminate={!allShownSelected && selectableIds.some((id) => selectedRouteIds.has(id))}
                     disabled={selectableIds.length === 0}
                     title={selectableIds.length === 0 ? 'まとめて操作できる登録済みの経路がありません' : undefined}
-                    onChange={(event) => {
-                      setSelectedRouteIds(event.target.checked ? new Set(selectableIds) : new Set())
+                    onCheckedChange={(checked) => {
+                      setSelectedRouteIds(checked ? new Set(selectableIds) : new Set())
                     }}
                   />
                 </Th>
@@ -999,15 +997,14 @@ function InflowLinksPageInner({
                   >
                     <td className="px-2 py-3" onClick={(e) => e.stopPropagation()}>
                       {r.entryRouteId ? (
-                        <input
-                          type="checkbox"
+                        <Checkbox
                           aria-label={`${r.name}をまとめて操作の対象にする`}
                           checked={selectedRouteIds.has(r.entryRouteId)}
-                          onChange={(event) => {
+                          onCheckedChange={(checked) => {
                             const id = r.entryRouteId!
                             setSelectedRouteIds((current) => {
                               const next = new Set(current)
-                              if (event.target.checked) next.add(id)
+                              if (checked) next.add(id)
                               else next.delete(id)
                               return next
                             })

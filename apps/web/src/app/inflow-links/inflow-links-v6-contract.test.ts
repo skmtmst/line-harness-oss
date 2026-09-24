@@ -107,7 +107,8 @@ describe('V6 流入経路一覧の契約', () => {
 
   it('まとめて操作は対象選択→操作→影響件数の確認へ接続する（NEXT-21）', () => {
     expect(PAGE).toContain('setBulkOpen(true)')
-    expect(PAGE).toContain('type="checkbox"')
+    // ★V7：選択は共通のチェックボックス（本物の checkbox を包んでいる）。
+    expect(PAGE).toContain('<Checkbox')
     expect(PAGE).toContain('selectedRouteIds')
     // 実行は既存の更新口へ、1件ずつ結果を分けて出す。
     expect(PAGE).toContain('api.entryRoutes.update(route.id')
