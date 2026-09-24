@@ -123,8 +123,8 @@ function NotificationsPageInner() {
   const total = counts ? (filter === 'error' ? counts.error : filter === 'update' ? counts.update : counts.all) : 0
   const hasMore = items.length < total
 
+  /* ★V7: 画面側で狭い中央寄せをしない。中身の幅は共通の枠が持つ。 */
   return (
-    {/* ★V7: 画面側で狭い中央寄せをしない。中身の幅は共通の枠が持つ。 */}
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Tabs
