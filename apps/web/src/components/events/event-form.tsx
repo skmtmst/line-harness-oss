@@ -302,40 +302,39 @@ export default function EventForm({ accountId, eventId }: EventFormProps) {
           const templateUrl = `https://liff.line.me/{{liff_id}}/?page=event&id=${eventId}&liffId={{liff_id}}`
           const targetAccounts = accounts.filter((a) => accountIdsArr.includes(a.id))
           return (
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4 space-y-4">
+            <div className="bg-info-bg rounded-control mb-4 space-y-4 p-4">
               <div>
-                <div className="text-sm font-medium text-blue-900 mb-2">broadcast 用テンプレ URL</div>
-                <div className="flex gap-2 items-center">
+                <div className="text-ink mb-2 text-sm font-medium">broadcast 用テンプレ URL</div>
+                <div className="flex items-center gap-2">
                   <input
                     readOnly
                     value={templateUrl}
                     onFocus={(e) => e.currentTarget.select()}
-                    className="flex-1 border border-blue-200 rounded-lg px-3 py-2 text-xs bg-white font-mono"
+                    className="border-hairline bg-canvas text-ink rounded-control flex-1 border px-3 py-2 font-mono text-xs"
                   />
-                  <button
+                  <Button
                     type="button"
                     onClick={() => copyValue(templateUrl)}
-                    className="px-4 py-2 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700"
                   >
                     {copiedValue === templateUrl ? 'コピー済' : 'コピー'}
-                  </button>
+                  </Button>
                 </div>
-                <p className="text-xs text-blue-700 mt-2">
+                <p className="text-ink-secondary mt-2 text-xs">
                   broadcast 編集で「リンクするイベント」から選ぶと自動挿入。
                   {'{{liff_id}}'} は配信時に各友だちのアカウントに対応した値に置換されます。
                 </p>
               </div>
               <div>
-                <div className="text-sm font-medium text-blue-900 mb-2">アカウントごとの固定 URL (QR・LP 直貼り用)</div>
+                <div className="text-ink mb-2 text-sm font-medium">アカウントごとの固定 URL (QR・LP 直貼り用)</div>
                 <div className="space-y-1.5">
                   {targetAccounts.length === 0 && (
-                    <div className="text-xs text-amber-700">対象アカウントが選ばれていません</div>
+                    <div className="text-warning text-xs">対象アカウントが選ばれていません</div>
                   )}
                   {targetAccounts.map((a) => {
                     const acct = a as unknown as { liffId?: string | null; name: string; country: string | null }
                     if (!acct.liffId) {
                       return (
-                        <div key={a.id} className="text-xs text-amber-700">
+                        <div key={a.id} className="text-warning text-xs">
                           {acct.country ? acct.country + ' ' : ''}{acct.name}: LIFF ID 未設定
                         </div>
                       )
@@ -343,21 +342,20 @@ export default function EventForm({ accountId, eventId }: EventFormProps) {
                     const url = `https://liff.line.me/${acct.liffId}/?page=event&id=${eventId}&liffId=${acct.liffId}`
                     return (
                       <div key={a.id} className="flex items-center gap-2">
-                        <span className="text-xs text-gray-600 min-w-[80px] truncate">
+                        <span className="text-ink-secondary min-w-[80px] truncate text-xs">
                           {acct.country ? acct.country + ' ' : ''}{acct.name}
                         </span>
                         <input
                           readOnly
                           value={url}
                           onFocus={(e) => e.currentTarget.select()}
-                          className="flex-1 border border-blue-200 rounded-lg px-2 py-1 text-xs bg-white font-mono"
+                          className="border-hairline bg-canvas text-ink rounded-control flex-1 border px-2 py-1 font-mono text-xs"
                         />
-                        <button
+                        <Button
                           onClick={() => copyValue(url)}
-                          className="px-2 py-1 text-xs bg-blue-600 text-white rounded"
                         >
-                          {copiedValue === url ? '✓' : 'コピー'}
-                        </button>
+                          {copiedValue === url ? 'コピー済' : 'コピー'}
+                        </Button>
                       </div>
                     )
                   })}
@@ -370,24 +368,23 @@ export default function EventForm({ accountId, eventId }: EventFormProps) {
         // single 用 (既存と同じ表示)
         if (liffUrl) {
           return (
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
-              <div className="text-sm font-medium text-blue-900 mb-2">予約 URL（友だちに案内する）</div>
-              <div className="flex gap-2 items-center">
+            <div className="bg-info-bg rounded-control mb-4 p-4">
+              <div className="text-ink mb-2 text-sm font-medium">予約 URL（友だちに案内する）</div>
+              <div className="flex items-center gap-2">
                 <input
                   readOnly
                   value={liffUrl}
                   onFocus={(e) => e.currentTarget.select()}
-                  className="flex-1 border border-blue-200 rounded-lg px-3 py-2 text-xs bg-white font-mono"
+                  className="border-hairline bg-canvas text-ink rounded-control flex-1 border px-3 py-2 font-mono text-xs"
                 />
-                <button
+                <Button
                   type="button"
                   onClick={() => copyValue(liffUrl)}
-                  className="px-4 py-2 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700"
                 >
                   {copiedValue === liffUrl ? 'コピー済' : 'コピー'}
-                </button>
+                </Button>
               </div>
-              <p className="text-xs text-blue-700 mt-2">
+              <p className="text-ink-secondary mt-2 text-xs">
                 LINE / OpenChat / IG DM どこでも貼れます。受信者がタップすると LINE で予約画面が開きます。
               </p>
             </div>
