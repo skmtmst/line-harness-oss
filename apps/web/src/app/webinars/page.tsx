@@ -4,6 +4,7 @@ import { Archive, X } from 'lucide-react'
 import SortSelect from '@/components/ui/sort-select'
 import PageSizeSelect from '@/components/ui/page-size-select'
 import ListRange from '@/components/ui/list-range'
+
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import Link from 'next/link'
@@ -332,20 +333,24 @@ function WebinarListErrorNotice({
 }
 
 /*
-  一覧の器(白い面・最低360px)。**行があるときだけ包む。**
+  一覧の器(白い面)。**行があるときだけ包む。**
   読込・空・失敗の1枚は ListState が自分で面と高さを持つので、
   器に入れると白い余白と灰色の二重背景になる(監査 DETAIL-01)。
+  以前は最低360pxを付けていたが、1行だけのときに約350pxの
+  空領域が残るため外した(#670 10)。器は中身に吸着させる。
+  件数は器の内側の脚注へ入れ、枠外に孤立させない。
 */
-function WebinarListCard({ children }: { children: ReactNode }) {
+function WebinarListCard({ children, footer }: { children: ReactNode; footer?: ReactNode }) {
   /*
     高さは中身に任せる。以前は固定の最小高さがあって、1行だけの一覧でも
     表の下に大きな空白帯ができ、その外に件数表示が取り残されて見えた
     （監査 A8）。読込・空・失敗は ListState が自分の面を持つので、
-    ここで高さを決める必要はない。
+    ここで高さを決める必要はない。件数は footer で器の内側に出す。
   */
   return (
     <div className="border-hairline bg-canvas overflow-hidden rounded-card border">
       {children}
+      {footer ? <div className="border-t border-hairline px-4 py-3">{footer}</div> : null}
     </div>
   )
 }
@@ -361,6 +366,7 @@ function WebinarListContent({
   refreshing,
   onRetry,
   onArchive,
+  footer,
 }: {
   accountLoading: boolean
   loading: boolean
@@ -372,6 +378,7 @@ function WebinarListContent({
   refreshing: boolean
   onRetry: () => void
   onArchive: (target: WebinarListItem) => void
+  footer?: ReactNode
 }) {
   if (accountLoading || loading) return <ListState kind="loading" />
   if (!selectedAccountId) {
@@ -385,7 +392,7 @@ function WebinarListContent({
   }
   if (loadFailure) {
     return visibleItems.length > 0 ? (
-      <WebinarListCard>
+      <WebinarListCard footer={footer}>
         <WebinarListErrorNotice failure={loadFailure} onRetry={onRetry} />
         <WebinarListTable items={visibleItems} onArchive={onArchive} />
       </WebinarListCard>
@@ -411,7 +418,7 @@ function WebinarListContent({
     )
   }
   return (
-    <WebinarListCard>
+    <WebinarListCard footer={footer}>
       {refreshing ? <p role="status" className="text-ink-faint border-hairline border-b px-4 py-2 text-xs">検索中…</p> : null}
       <WebinarListTable items={visibleItems} onArchive={onArchive} />
     </WebinarListCard>
@@ -819,10 +826,11 @@ function WebinarsPage() {
               refreshing={refreshing}
               onRetry={() => void refresh()}
               onArchive={openArchive}
+              footer={hasListData && visibleTotal > 0 ? <ListRange total={visibleTotal} first={(currentPage - 1) * pageSize + 1} last={(currentPage - 1) * pageSize + visible.length} /> : undefined}
             />
 
             {hasListData && visibleTotal > 0 && (
-              <div className="mt-3 flex flex-wrap items-center justify-between gap-3"><ListRange total={visibleTotal} first={visibleTotal === 0 ? 0 : (currentPage - 1) * pageSize + 1} last={(currentPage - 1) * pageSize + visible.length} /><Pagination page={currentPage} pageCount={pageCount} onPageChange={setPage} ariaLabel="ウェビナー一覧のページ送り" /></div>
+              <div className="mt-3 flex flex-wrap items-center justify-end gap-3"><Pagination page={currentPage} pageCount={pageCount} onPageChange={setPage} ariaLabel="ウェビナー一覧のページ送り" /></div>
             )}
           </section>
         </div>

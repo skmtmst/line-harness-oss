@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { Coins, Copy, Trash2, X } from 'lucide-react'
+import { ArrowDown, ArrowUp, Coins, Copy, Trash2, X } from 'lucide-react'
 import type { Tag, TagGroup } from '@line-crm/shared'
 import { api, type CommonActionResources, type TagDefinitionAction, type TagRetroactivePreview } from '@/lib/api'
 import Breadcrumb from '@/components/layout/breadcrumb'
@@ -471,6 +471,22 @@ export default function TagEditorV4({
     ])
   }
 
+  /*
+   * #670 28: つまみ(⋮⋮)のドラッグはマウス専用のため、キーボードだけでは
+   * 順番を変えられなかった。各行に「上へ」「下へ」を付けて同じ move で動かす。
+   */
+  const moveAction = (index: number, direction: -1 | 1) => {
+    setActions((current) => {
+      const next = index + direction
+      if (next < 0 || next >= current.length) return current
+      const reordered = [...current]
+      const [moved] = reordered.splice(index, 1)
+      reordered.splice(next, 0, moved)
+      return reordered
+    })
+  }
+  const [dragActionId, setDragActionId] = useState<string | null>(null)
+
   return (
     <div>
       {!embedded && <div className="mb-5">
@@ -534,8 +550,8 @@ export default function TagEditorV4({
                   <label className="mt-1 flex items-start gap-2 text-sm text-ink"><input type="radio" name="reapplyMode" checked={reapplyMode === 'every'} onChange={() => setReapplyMode('every')} className="mt-1 accent-accent" /><span>付け直すたびに積む<span className="block text-xs font-normal leading-4 text-ink-faint">購入回数など、同じタグを繰り返し使う運用向けです。</span></span></label>
                 </fieldset>
                 <div className="border-t border-hairline pt-3">
-                  <div className="mb-2 flex items-center justify-between"><div><h3 className="text-sm font-bold text-ink">連動アクション</h3><p className="mt-0.5 text-xs text-ink-faint">上から順に実行されます。つまんで順番を変更できます。</p></div><button type="button" onClick={() => setDrawerOpen(true)} className="rounded-control border border-action/25 bg-action-soft px-3 py-2 text-sm font-medium text-action">＋ アクションを追加</button></div>
-                  {actions.length === 0 ? <p className="rounded-control border border-dashed border-hairline p-5 text-center text-sm text-ink-faint">連動アクションはまだありません</p> : <ol className="space-y-2">{actions.map((action, index) => <li key={action.id} className="grid grid-cols-[28px_32px_118px_minmax(0,1fr)_90px_32px_32px] items-center gap-2 rounded-control border border-hairline px-3 py-2 text-sm"><span className="cursor-grab text-ink-faint">⋮⋮</span><span className="flex h-6 w-6 items-center justify-center rounded-full bg-canvas-sunken text-xs font-bold">{index + 1}</span><span className={`rounded-control border px-2 py-1 text-center text-xs ${action.type === 'タグ追加' || action.type === 'タグ解除' || action.type === 'マイル付与' ? 'border-success bg-success-bg text-success' : action.type === '友だち情報更新' || action.type === '対応マーク変更' || action.type.startsWith('リマインダ') ? 'border-warning bg-warning-bg text-warning' : action.type.startsWith('シナリオ') || action.type === 'リッチメニュー切替' ? 'border-action bg-action-soft text-action' : 'border-info bg-info-bg text-action'}`}>{action.type}</span><span className="truncate font-medium text-ink" title={action.label}>{action.label}</span><span className={`rounded-pill px-2 py-1 text-center text-xs ${action.timing === 'すぐに' ? 'bg-success-bg text-success' : 'bg-warning-bg text-warning'}`}>{action.timing === 'すぐに' ? '即時' : action.timing}</span><IconButton onClick={() => duplicateAction(action, index)} aria-label={`${index + 1}番目のアクションを複製`}><Copy size={15} aria-hidden /></IconButton><IconButton onClick={() => setActions((current) => current.filter((item) => item.id !== action.id))} className="text-danger" aria-label={`${index + 1}番目のアクションを削除`}><Trash2 size={15} aria-hidden /></IconButton></li>)}</ol>}
+                  <div className="mb-2 flex items-center justify-between"><div><h3 className="text-sm font-bold text-ink">連動アクション</h3><p className="mt-0.5 text-xs text-ink-faint">上から順に実行されます。つまんで動かすか、↑↓ボタンで順番を変更できます。</p></div><button type="button" onClick={() => setDrawerOpen(true)} className="rounded-control border border-action/25 bg-action-soft px-3 py-2 text-sm font-medium text-action">＋ アクションを追加</button></div>
+                  {actions.length === 0 ? <p className="rounded-control border border-dashed border-hairline p-5 text-center text-sm text-ink-faint">連動アクションはまだありません</p> : <div className="overflow-x-auto pb-1"><ol className="space-y-2">{actions.map((action, index) => <li key={action.id} draggable onDragStart={() => setDragActionId(action.id)} onDragOver={(event) => event.preventDefault()} onDrop={() => { const fromId = dragActionId; setDragActionId(null); if (!fromId || fromId === action.id) return; setActions((current) => { const from = current.findIndex((item) => item.id === fromId); if (from < 0) return current; const reordered = current.filter((item) => item.id !== fromId); reordered.splice(Math.min(index, reordered.length), 0, current[from]); return reordered }) }} onDragEnd={() => setDragActionId(null)} className={`grid grid-cols-[28px_32px_118px_minmax(0,1fr)_90px_32px_32px_32px_32px] items-center gap-2 rounded-control border border-hairline px-3 py-2 text-sm ${dragActionId === action.id ? 'opacity-50' : ''}`}><span className="cursor-grab text-ink-faint" title="ドラッグで順番を変更">⋮⋮</span><span className="flex h-6 w-6 items-center justify-center rounded-full bg-canvas-sunken text-xs font-bold">{index + 1}</span><span className={`rounded-control border px-2 py-1 text-center text-xs ${action.type === 'タグ追加' || action.type === 'タグ解除' || action.type === 'マイル付与' ? 'border-success bg-success-bg text-success' : action.type === '友だち情報更新' || action.type === '対応マーク変更' || action.type.startsWith('リマインダ') ? 'border-warning bg-warning-bg text-warning' : action.type.startsWith('シナリオ') || action.type === 'リッチメニュー切替' ? 'border-action bg-action-soft text-action' : 'border-info bg-info-bg text-action'}`}>{action.type}</span><span className="truncate font-medium text-ink" title={action.label}>{action.label}</span><span className={`rounded-pill px-2 py-1 text-center text-xs ${action.timing === 'すぐに' ? 'bg-success-bg text-success' : 'bg-warning-bg text-warning'}`}>{action.timing === 'すぐに' ? '即時' : action.timing}</span><IconButton onClick={() => moveAction(index, -1)} disabled={index === 0} aria-label={`${index + 1}番目のアクションを上へ`} title="上へ"><ArrowUp size={15} aria-hidden /></IconButton><IconButton onClick={() => moveAction(index, 1)} disabled={index === actions.length - 1} aria-label={`${index + 1}番目のアクションを下へ`} title="下へ"><ArrowDown size={15} aria-hidden /></IconButton><IconButton onClick={() => duplicateAction(action, index)} aria-label={`${index + 1}番目のアクションを複製`}><Copy size={15} aria-hidden /></IconButton><IconButton onClick={() => setActions((current) => current.filter((item) => item.id !== action.id))} className="text-danger" aria-label={`${index + 1}番目のアクションを削除`}><Trash2 size={15} aria-hidden /></IconButton></li>)}</ol></div>}
                 </div>
               </div>
             )}

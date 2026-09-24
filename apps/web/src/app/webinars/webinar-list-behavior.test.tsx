@@ -241,8 +241,37 @@ describe('ウェビナー一覧の表示状態と操作', () => {
     const withRows = renderToStaticMarkup(
       <WebinarListContent {...common} visibleItems={[webinar()]} panelGrand={1} />,
     )
+    /*
+     * #670 10: 1行だけのときに約350pxの空領域が残るため、器に最低高さを
+     * 付けない。中身に吸着する。
+     */
     expect(withRows).not.toContain('min-h-[')
     expect(withRows).toContain('入門ウェビナー')
+  })
+
+  it('件数は器の内側の脚注に出て、枠外に孤立しない(#670 10)', () => {
+    const common = {
+      accountLoading: false,
+      loading: false,
+      selectedAccountId: 'account-1',
+      accountsCount: 1,
+      loadFailure: null,
+      visibleItems: [webinar()],
+      panelGrand: 1,
+      refreshing: false,
+      onRetry: vi.fn(),
+      onArchive: vi.fn(),
+    }
+    const withFooter = renderToStaticMarkup(
+      <WebinarListContent {...common} footer={<p>1〜1件 / 全1件</p>} />,
+    )
+    const cardAt = withFooter.indexOf('rounded-card')
+    const footerAt = withFooter.indexOf('1〜1件 / 全1件')
+    /* 脚注は器の内側(rounded-card の開始より後ろ)に描く */
+    expect(cardAt).toBeGreaterThanOrEqual(0)
+    expect(footerAt).toBeGreaterThan(cardAt)
+    const withoutFooter = renderToStaticMarkup(<WebinarListContent {...common} />)
+    expect(withoutFooter).not.toContain('border-t border-hairline px-4 py-3')
   })
 
   it('新規作成の操作名は画面内で一致する(DETAIL-02)', () => {
