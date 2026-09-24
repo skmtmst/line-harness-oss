@@ -257,11 +257,15 @@ async function authorizedJson<T>(
   init: { method?: string; body?: unknown } = {},
 ): Promise<T> {
   const sleep = options.sleep ?? ((ms: number) => new Promise((resolve) => setTimeout(resolve, ms)));
+  // Cloudflare Workers の組み込み fetch は、オブジェクトのメソッドとして
+  // `options.fetch(...)` と呼ぶと this が options になり Illegal invocation になる。
+  // 先にローカル変数へ取り出し、通常の関数として呼び出す。
+  const fetchFn = options.fetch;
   let lastError: GoogleBusinessError | null = null;
   for (let attempt = 0; attempt <= RETRY_DELAYS_MS.length; attempt += 1) {
     let response: Response;
     try {
-      response = await options.fetch(url, {
+      response = await fetchFn(url, {
         method: init.method ?? 'GET',
         headers: {
           authorization: `Bearer ${options.accessToken}`,

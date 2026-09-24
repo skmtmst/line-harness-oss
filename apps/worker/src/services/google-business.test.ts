@@ -67,6 +67,26 @@ describe('Google Business OAuth', () => {
 });
 
 describe('Google Business locations', () => {
+  it('Cloudflare Workers の this に厳格な組み込み fetch を通常の関数として呼ぶ', async () => {
+    const calls: string[] = [];
+    const strictFetch: FetchLike = async function (this: unknown, url: string) {
+      if (this !== undefined) throw new TypeError('Illegal invocation');
+      calls.push(url);
+      if (url.startsWith('https://mybusinessaccountmanagement.googleapis.com/v1/accounts')) {
+        return jsonResponse({ accounts: [{ name: 'accounts/111' }] });
+      }
+      if (url.includes('/v1/accounts/111/locations')) {
+        return jsonResponse({ locations: [{ name: 'locations/222', title: 'こもれび食堂 渋谷店' }] });
+      }
+      return jsonResponse({}, 404);
+    };
+
+    const locations = await listManageableLocations({ fetch: strictFetch, accessToken: 'at', sleep: noSleep });
+
+    expect(locations).toHaveLength(1);
+    expect(calls).toHaveLength(2);
+  });
+
   it('全アカウントの店舗を v4 のパスに直して返す', async () => {
     const { fetch, calls } = fetchFrom((url) => {
       if (url.startsWith('https://mybusinessaccountmanagement.googleapis.com/v1/accounts')) {
