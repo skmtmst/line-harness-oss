@@ -136,6 +136,7 @@ shared-button-importer app/scenarios/detail/scenario-detail-client.tsx
 shared-button-importer app/scenarios/first-step/page.tsx
 shared-button-importer app/scenarios/page.tsx
 shared-button-importer app/scenarios/results/page.tsx
+shared-button-importer app/search-console/page.tsx
 shared-button-importer app/staff/email-change/page.tsx
 shared-button-importer app/staff/invite/page.tsx
 shared-button-importer app/staff/page.tsx
@@ -225,11 +226,11 @@ shared-button-importer components/scenarios/trigger-editor.tsx
 shared-button-importer components/staff/login-audit.tsx
 shared-button-importer components/shared/create-page.tsx
 shared-button-importer components/shared/dialog.tsx
+shared-button-importer components/shared/file-drop.tsx
 shared-button-importer components/shared/folder-panel.tsx
-# #669: アップローダ内の操作が共通Buttonを使う。
-shared-button-importer components/shared/image-uploader.tsx
 shared-button-importer components/shared/list-state.tsx
 shared-button-importer components/shared/not-connected.tsx
+shared-button-importer components/shared/progress.tsx
 # #985 LAY-18: 一覧の行の操作（詳細・編集）が共通Buttonを使う。
 shared-button-importer components/shared/row-actions.tsx
 shared-button-importer components/store-selection-gate.tsx

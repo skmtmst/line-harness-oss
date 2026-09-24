@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL!
 // self-update を構成した環境 (create-line-harness セットアップ) でのみ設定される。
@@ -57,16 +58,16 @@ export default function UpdatesPage() {
   const rows = state.kind === 'ready' ? state.rows : []
 
   return (
-    <div className="max-w-3xl mx-auto p-6">
-      <h1 className="text-xl font-semibold mb-4">アップデート履歴</h1>
+    <div>
+      <h1 className="text-ink mb-4 text-xl font-semibold">アップデート履歴</h1>
       {state.kind === 'unconfigured' && (
-        <div className="text-gray-600 bg-gray-50 p-4 rounded mb-4 text-sm leading-relaxed">
+        <div className="bg-info-bg text-ink-secondary mb-4 rounded-control p-4 text-sm leading-relaxed">
           この環境では自動アップデートが構成されていないため、履歴はありません。
           <br />
           自動アップデートは <code className="text-xs">create-line-harness</code>{' '}
           でセットアップした環境で利用できます。自前でデプロイしている場合は{' '}
           <a
-            className="underline"
+            className="text-action underline"
             href={MANUAL_UPDATE_GUIDE_URL}
             target="_blank"
             rel="noreferrer"
@@ -77,28 +78,28 @@ export default function UpdatesPage() {
         </div>
       )}
       {state.kind === 'error' && (
-        <div className="text-amber-800 bg-amber-50 p-3 rounded mb-4 text-sm">
+        <div className="bg-status-warn-soft text-status-warn-deep mb-4 rounded-control p-3 text-sm">
           履歴を取得できませんでした（{state.message}）。時間をおいて再読み込みしてください。
         </div>
       )}
       {state.kind === 'ready' && rows.length === 0 && (
-        <p className="text-gray-500 text-sm">履歴はまだありません。</p>
+        <p className="text-ink-faint text-sm">履歴はまだありません。</p>
       )}
       {rows.length > 0 && (
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="text-left text-gray-600 border-b">
+            <thead className="text-ink-faint border-hairline border-b text-left">
               <tr>
-                <th className="py-2 pr-4">開始</th>
-                <th className="py-2 pr-4">From → To</th>
-                <th className="py-2 pr-4">Status</th>
-                <th className="py-2">Rollback</th>
+                <th className="py-2 pr-4 font-medium">開始</th>
+                <th className="py-2 pr-4 font-medium">From → To</th>
+                <th className="py-2 pr-4 font-medium">Status</th>
+                <th className="py-2 font-medium">Rollback</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="divide-hairline divide-y">
               {rows.map((r) => (
-                <tr key={r.id} className="border-b last:border-0">
-                  <td className="py-2 pr-4">
+                <tr key={r.id}>
+                  <td className="text-ink-secondary whitespace-nowrap px-0 py-2 pr-4 tabular-nums">
                     {new Date(r.started_at).toLocaleString('ja-JP', {
                       year: 'numeric',
                       month: '2-digit',
@@ -108,14 +109,14 @@ export default function UpdatesPage() {
                     })}
                   </td>
                   <td className="py-2 pr-4 font-mono text-xs">
-                    {r.from_version} → {r.to_version}
+                    <span className="block truncate" title={`${r.from_version} → ${r.to_version}`}>
+                      {r.from_version} → {r.to_version}
+                    </span>
                   </td>
                   <td className="py-2 pr-4">
-                    <span
-                      className={`text-xs px-2 py-0.5 rounded ${statusClass(r.status)}`}
-                    >
+                    <StatusBadge tone={statusTone(r.status)} size="compact">
                       {r.status}
-                    </span>
+                    </StatusBadge>
                   </td>
                   <td className="py-2">
                     {r.status === 'success' &&
@@ -131,7 +132,7 @@ export default function UpdatesPage() {
                         戻せる期間内ですが、この画面からは戻せません
                       </span>
                     ) : (
-                      <span className="text-gray-400 text-xs">—</span>
+                      <span className="text-ink-faint text-xs">—</span>
                     )}
                   </td>
                 </tr>
@@ -144,10 +145,10 @@ export default function UpdatesPage() {
   )
 }
 
-function statusClass(s: string): string {
-  if (s === 'success') return 'bg-green-100 text-success'
-  if (s === 'rolled_back') return 'bg-amber-100 text-amber-800'
-  if (s === 'failed') return 'bg-red-100 text-red-800'
-  if (s === 'running') return 'bg-blue-100 text-blue-800'
-  return 'bg-gray-100 text-gray-800'
+function statusTone(s: string): StatusBadgeTone {
+  if (s === 'success') return 'success'
+  if (s === 'rolled_back') return 'warning'
+  if (s === 'failed') return 'danger'
+  if (s === 'running') return 'info'
+  return 'neutral'
 }
