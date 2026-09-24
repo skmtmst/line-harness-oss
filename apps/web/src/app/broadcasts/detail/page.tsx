@@ -16,13 +16,6 @@ import { broadcastDetailCsv } from './broadcast-detail-export'
 import { broadcastCsvFilename } from '@/components/broadcasts/broadcast-csv-filename'
 import { usePageTitle } from '@/components/shell/page-chrome'
 
-const STATUS_LABELS: Record<string, string> = {
-  draft: '下書き',
-  scheduled: '予約済み',
-  sending: '送信中',
-  sent: '送信済み',
-}
-
 function BroadcastDetailInner() {
   const params = useSearchParams()
   const { selectedAccountId, loading: accountLoading } = useAccount()
@@ -216,54 +209,39 @@ function BroadcastDetailInner() {
           <section className="bg-canvas rounded-card border-hairline border p-5">
             <p className="text-ink text-sm font-semibold">送信の進み具合</p>
             {/*
-              進み具合は ★V7 の Progress（処理の進み部品）で見せる。
-              状態の対応：sending→active、sent で全件成功→done、sent で
-              失敗あり→partial、それ以外（下書き・予約）→preparing。
-              緑は done のときだけ（部品が持つ完了の印）。数字と完了日時は
-              文でも残し、色だけに頼らない。
+              Progress（処理の進み部品）は送信中（sending）だけに出す。
+              下書き・予約で preparing の棒や回る印を出すと、まだ送って
+              いないのに送り始めているように見える。そのときは棒も印も
+              出さず、1行の文だけにする。sent は上の分かれ道で SentResult
+              へ行くので、ここに done / partial の分岐は置かない。
             */}
-            <Progress
-              state={broadcast.status === 'sending' ? 'active' : broadcast.status === 'sent' ? (failed > 0 ? 'partial' : 'done') : 'preparing'}
-              title={
-                broadcast.status === 'sending'
-                  ? '送信中'
-                  : broadcast.status === 'sent'
-                    ? failed > 0
-                      ? '一部届きませんでした'
-                      : '送信が完了しました'
-                    : (STATUS_LABELS[broadcast.status] ?? broadcast.status)
-              }
-              percent={total > 0 ? (success / total) * 100 : 0}
-              countText={broadcast.status === 'sending'
-                ? `${success.toLocaleString('ja-JP')} / ${total.toLocaleString('ja-JP')} 件`
-                : undefined}
-              note={broadcast.status === 'sent' && failed === 0
-                ? `${success.toLocaleString('ja-JP')} / ${total.toLocaleString('ja-JP')} 件。${broadcast.sentAt ? `完了 ${formatBroadcastDateTime(broadcast.sentAt)}` : '開始・完了の時刻は記録していません'}`
-                : undefined}
-              className="mt-3"
-            />
-            {/*
-              失敗数は `totalCount - successCount` でしか出せない。送信中は
-              「まだ送っていないぶん」も同じ引き算に入るため、その数を失敗として
-              出すと、起きていない失敗を作ることになる。完了してから出す。
-              （下の「到達」の欄と同じ理由。）
-            */}
-            {broadcast.status === 'sending' || (broadcast.status === 'sent' && failed === 0) ? null : (
-              <p className="text-ink mt-2 text-sm tabular-nums">
-                {success.toLocaleString('ja-JP')} / {total.toLocaleString('ja-JP')} 件
-                {broadcast.status === 'sent' ? ' 完了' : ''}
-              </p>
-            )}
-            {/*
-              開始・完了の時刻を別々に持っていない。sent_at は完了だけ。
-              全件成功の完了（done）は Progress の note に日時を入れているので、
-              ここでは出さない（同じ日時の重複表示にしない）。
-            */}
-            {broadcast.status === 'sent' && failed === 0 ? null : (
-              <p className="text-ink-faint mt-2 text-xs">
-                {broadcast.sentAt
-                  ? `完了 ${formatBroadcastDateTime(broadcast.sentAt)}`
-                  : '開始・完了の時刻は記録していません'}
+            {broadcast.status === 'sending' ? (
+              <>
+                <Progress
+                  state="active"
+                  title="送信中"
+                  percent={total > 0 ? (success / total) * 100 : 0}
+                  countText={`${success.toLocaleString('ja-JP')} / ${total.toLocaleString('ja-JP')} 件`}
+                  className="mt-3"
+                />
+                {/*
+                  失敗数は `totalCount - successCount` でしか出せない。送信中は
+                  「まだ送っていないぶん」も同じ引き算に入るため、その数を失敗として
+                  出すと、起きていない失敗を作ることになる。完了してから出す。
+                  （下の「到達」の欄と同じ理由。）
+                */}
+                {/* 開始・完了の時刻を別々に持っていない。sent_at は完了だけ。 */}
+                <p className="text-ink-faint mt-2 text-xs">
+                  {broadcast.sentAt
+                    ? `完了 ${formatBroadcastDateTime(broadcast.sentAt)}`
+                    : '開始・完了の時刻は記録していません'}
+                </p>
+              </>
+            ) : (
+              <p className="text-ink-secondary mt-2 text-sm">
+                {broadcast.scheduledAt
+                  ? `${formatBroadcastDateTime(broadcast.scheduledAt)} に送り始めます`
+                  : 'まだ送っていません'}
               </p>
             )}
           </section>
