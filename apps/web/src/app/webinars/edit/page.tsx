@@ -2605,15 +2605,17 @@ function EditWebinarInner() {
       {pane === 'participants' && <AnalyticsTab webinarId={webinar.id} durationSeconds={webinar.durationSeconds} view="participants" analytics={analytics} analyticsState={analyticsState} webinarStatus={webinar.status} onRetry={() => { setAnalytics(null); setAnalyticsId(null); setAnalyticsState('idle') }} />}
       {pane === 'analytics' && <AnalyticsTab webinarId={webinar.id} durationSeconds={webinar.durationSeconds} analytics={analytics} analyticsState={analyticsState} webinarStatus={webinar.status} onRetry={() => { setAnalytics(null); setAnalyticsId(null); setAnalyticsState('idle') }} onOpenParticipants={() => goStep('participants')} />}
 
-      {/* 保存はこの一段だけ。各段の中に別の保存バーは出さない。 */}
+      {/* 保存はこの一段だけ。各段の中に別の保存バーは出さない。共通 StickyBar を使い、画面幅いっぱいの fixed 配置でサイドバーに重ねない。 */}
       {showSteps && nextPane && nextPaneLabel ? (
-        <div className="border-hairline bg-canvas fixed inset-x-0 bottom-0 z-20 flex justify-end border-t px-8 py-3 shadow-card">
-          <div className="flex items-center gap-2">
-            {unsavedPanes.size > 0 ? <span className="text-warning mr-1 text-xs">保存していない変更があります</span> : null}
-            <Button disabled={savingForNav !== false || !savablePanes.has(pane)} title={savablePanes.has(pane) ? undefined : 'この段の中の保存ボタンから保存します'} onClick={() => void handleDraftSave()}>{savingForNav === 'draft' ? '保存中…' : '下書き保存'}</Button>
-            <Button variant="primary" disabled={savingForNav !== false} onClick={() => void handlePrimaryAction()}>{savingForNav === 'next' ? '保存中…' : primaryLabel}</Button>
-          </div>
-        </div>
+        <StickyBar
+          status={unsavedPanes.size > 0 ? '保存していない変更があります' : undefined}
+          actions={(
+            <>
+              <Button disabled={savingForNav !== false || !savablePanes.has(pane)} title={savablePanes.has(pane) ? undefined : 'この段の中の保存ボタンから保存します'} onClick={() => void handleDraftSave()}>{savingForNav === 'draft' ? '保存中…' : '下書き保存'}</Button>
+              <Button variant="primary" disabled={savingForNav !== false} onClick={() => void handlePrimaryAction()}>{savingForNav === 'next' ? '保存中…' : primaryLabel}</Button>
+            </>
+          )}
+        />
       ) : null}
       {pane === 'participants' ? <div className="mt-4 flex justify-end gap-2"><Button href={`/webinars/edit?id=${encodeURIComponent(webinar.id)}&pane=analytics`}>分析を見る</Button><Button href={`/webinars/edit?id=${encodeURIComponent(webinar.id)}`}>ウェビナーの設定を編集</Button></div> : null}
       {leaveConfirmDialog}

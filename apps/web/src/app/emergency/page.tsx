@@ -639,10 +639,10 @@ function HealthPanel({
         <SummaryCard label="最後の確認" value={formatOperationDate(checkedAt)} note="5分ごとに自動確認" />
         <SummaryCard label="緊急停止状態" value={controlSummary.value} note={controlSummary.note} />
       </div>
-      <div className="rounded-control bg-info-bg text-info px-4 py-3 text-xs font-semibold">
-        LINEとのつながりや配信の詰まりを、5分ごとに自動で確かめています。赤が出たら「緊急コントロール」で止められます。
+      <div className="bg-info-bg text-ink-secondary rounded-control px-4 py-3 text-xs">
+        LINEとのつながりや配信の詰まりを、5分ごとに自動で確かめています。
       </div>
-      <div className={`rounded-card flex flex-wrap items-center gap-3 border px-4 py-3 ${severityStyle[displayedSeverity].panel}`}>
+      <div className="rounded-card border-hairline flex flex-wrap items-center gap-3 border bg-canvas px-4 py-3">
         <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-canvas text-sm font-bold ${statusIconClass}`}>{statusIcon}</span>
         <div className="min-w-0 flex-1">
           <p className="text-base font-bold text-ink">{loading ? '確認しています…' : `${resultTitle}。${isNormal ? '6項目のすべてが正常です。' : ''}`}</p>

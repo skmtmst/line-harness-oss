@@ -120,10 +120,7 @@ export default function NewCommonActionPage() {
     <div data-design-node="py5CG" className="pb-24">
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <p className="text-sm text-ink-faint">オートメーション ＞ 共通アクション ＞ つくる</p>
-        <div className="text-right">
-          <Button disabled title="保存後に公開版を選ぶと、対象の友だちを指定して試せます">1人で試す</Button>
-          <p className="mt-1 text-xs text-ink-faint">保存後の公開版から対象を選んで試します</p>
-        </div>
+        {/* ★V7 C6: 押せない「1人で試す」は飾りなので出さない。試す導線は保存後の公開版に置く。 */}
       </div>
 
       <div className="common-action-editor-grid grid items-start gap-4">

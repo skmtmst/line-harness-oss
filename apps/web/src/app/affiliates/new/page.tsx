@@ -280,7 +280,7 @@ export default function NewAffiliatePage() {
               <input type="checkbox" className="mt-0.5" checked={startTracking} onChange={(e) => setStartTracking(e.target.checked)} />
               <span><strong className="text-ink block">すぐに計測を始める</strong><span className="text-ink-faint text-xs">オフでもリンクは発行されます</span></span>
             </label>
-            <Unavailable label="成果時の動き" reason="まだ繋がっていません。紹介者ごとの成果時の動きが接続されると表示されます。" />
+            {/* ★V7: 未接続の断り書きは出さない。接続後に項目として出す。 */}
           </AsideCard>
 
           <AsideCard title="つながる先">
@@ -488,7 +488,7 @@ export default function NewAffiliatePage() {
 
         <div className="grid gap-3 sm:grid-cols-2">
           <Unavailable label="成果として数えるもの" reason="案件ごとに決めます。" />
-          <Unavailable label="1件あたりの上限" reason="まだ繋がっていません。上限回数が接続されると表示されます。" />
+          {/* ★V7: 未接続の断り書きは出さない。接続後に項目として出す。 */}
         </div>
       </FormSection>
 
@@ -524,7 +524,7 @@ export default function NewAffiliatePage() {
               className={W_EMAIL}
             />
           </Field>
-          <Unavailable label="振込先の登録" reason="まだ繋がっていません。銀行・支店・種別・末尾4桁が接続されると表示されます。" />
+          {/* ★V7: 未接続の断り書きは出さない。接続後に項目として出す。 */}
           <div className="border-hairline rounded-control border px-3 py-2">
           <p className="text-ink-secondary text-xs font-semibold">この方に渡すURL</p>
           <div className="flex items-center gap-2">

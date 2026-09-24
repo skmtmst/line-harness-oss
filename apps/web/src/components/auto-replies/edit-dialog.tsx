@@ -579,7 +579,7 @@ export default function EditDialog({
       <div className={page ? 'grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_390px]' : ''}>
       <div
         ref={dialogRef}
-        className={page ? 'bg-canvas rounded-card border-hairline w-full border' : 'max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-lg bg-white shadow-xl'}
+        className={page ? 'bg-canvas rounded-card border-hairline w-full border' : 'flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-lg bg-white shadow-xl'}
         role={page ? undefined : 'dialog'}
         aria-modal={page ? undefined : true}
         aria-labelledby={page ? undefined : 'auto-reply-edit-dialog-title'}
@@ -618,7 +618,7 @@ export default function EditDialog({
             </button>
           ) : null}
         </div>
-        <div className={page ? 'space-y-4 p-4' : 'space-y-4 p-5'}>
+        <div className={page ? 'space-y-4 p-4' : 'min-h-0 flex-1 space-y-4 overflow-y-auto p-5'}>
           {showBasic ? (
             <>
           <section className="space-y-4">
@@ -1460,7 +1460,8 @@ export default function EditDialog({
           ) : null}
           {error && <p className="text-xs text-red-600">{error}</p>}
         </div>
-        {!page && <StickyBar className="mx-5 mb-4" actions={stickyActions} />}
+        {/* ★V7: 窓の中身だけをスクロールさせ、保存の段は窓の下に固定する。 */}
+        {!page && <StickyBar className="mx-5 mb-4 shrink-0" actions={stickyActions} />}
       </div>
       {page && (
         /*

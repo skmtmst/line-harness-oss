@@ -207,7 +207,10 @@ describe('ログインユーザー操作の表示と実処理 (#834)', () => {
     }))
     await mount()
 
-    fireEvent.click(within(rowFor('対象者')).getByRole('button', { name: 'この人を外す' }))
+    // ★V7: 外すは行に直接出す印ボタン（「…」メニューはやめた）。
+    await act(async () => {
+      fireEvent.click(within(rowFor('対象者')).getByRole('button', { name: 'この人を外す' }))
+    })
     expect(fixture.deleteStaff).not.toHaveBeenCalled()
 
     const confirm = screen.getByRole('button', { name: '外す' })
@@ -226,7 +229,10 @@ describe('ログインユーザー操作の表示と実処理 (#834)', () => {
     fixture.deleteStaff.mockRejectedValue(new Error('最後の管理者は外せません'))
     await mount()
 
-    fireEvent.click(within(rowFor('対象者')).getByRole('button', { name: 'この人を外す' }))
+    // ★V7: 外すは行に直接出す印ボタン（「…」メニューはやめた）。
+    await act(async () => {
+      fireEvent.click(within(rowFor('対象者')).getByRole('button', { name: 'この人を外す' }))
+    })
     fireEvent.click(screen.getByRole('button', { name: '外す' }))
 
     await waitFor(() => expect(screen.getByText('最後の管理者は外せません')).toBeTruthy())

@@ -44,6 +44,8 @@ import {
 } from './affiliate-display'
 import { AffiliateArchiveDialog } from './action-dialogs'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import Dialog from '@/components/shared/dialog'
+import Toggle from '@/components/shared/toggle'
 import {
   OFFER_FILTERS,
   OFFER_PAGE_SIZES,
@@ -1442,176 +1444,135 @@ function OfferFormModal({ initial, accounts, tags, scenarios, onClose, onSaved }
   }, [submitting, name, description, rewardAmount, rewardMiles, lineAccountId, tagId, scenarioId, isActive, isEdit, initial, onSaved, onClose])
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg mx-4 overflow-hidden">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-          <h2 className="text-base font-semibold text-gray-900">
-            {isEdit ? '案件を編集' : '案件を新規作成'}
-          </h2>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
-            aria-label="閉じる"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
+    <Dialog
+      open
+      title={isEdit ? '案件を編集' : '案件を新規作成'}
+      busy={submitting}
+      error={formError ?? undefined}
+      confirmLabel={isEdit ? '更新' : '作成'}
+      cancelLabel="キャンセル"
+      onConfirm={() => { void handleSubmit() }}
+      onCancel={onClose}
+    >
+      <div className="space-y-4">
+        <div>
+          <label className="text-ink-secondary mb-1 block text-xs font-medium">
+            案件名 <span className="text-danger">*</span>
+          </label>
+          <input
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="例: 無料体験申込"
+            className="border-hairline rounded-control bg-canvas text-ink w-full border px-3 py-2 text-sm focus:outline-none"
+          />
         </div>
 
-        <div className="px-6 py-5 space-y-4 max-h-[70vh] overflow-y-auto">
-          {formError && (
-            <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-              {formError}
-            </div>
-          )}
-
-          <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">
-              案件名 <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="例: 無料体験申込"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">説明</label>
-            <textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              rows={2}
-              placeholder="案件の説明（任意）"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">報酬額（円）</label>
-            <input
-              type="number"
-              min="0"
-              step="1"
-              value={rewardAmount}
-              onChange={(e) => setRewardAmount(e.target.value)}
-              placeholder="例: 3000"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">成果承認時の付与マイル</label>
-            <input
-              type="number"
-              min="0"
-              step="1"
-              value={rewardMiles}
-              onChange={(e) => setRewardMiles(e.target.value)}
-              placeholder="例: 500"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-            <p className="mt-1 text-[11px] text-gray-400">承認された紹介1件ごとに紹介者へ付与します</p>
-          </div>
-
-          <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">誘導 LINE アカウント</label>
-            <select
-              value={lineAccountId}
-              onChange={(e) => setLineAccountId(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">— 選択しない —</option>
-              {accounts.map((acc) => (
-                <option key={acc.id} value={acc.id}>
-                  {acc.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">タグ</label>
-            <select
-              value={tagId}
-              onChange={(e) => setTagId(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">— 選択しない —</option>
-              {accountTags.map((tag) => (
-                <option key={tag.id} value={tag.id}>
-                  {tag.name}
-                </option>
-              ))}
-              {tagIdStale && (
-                <option value={tagId}>
-                  {staleTagName ?? tagId}（このアカウントでは使えません）
-                </option>
-              )}
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">シナリオ</label>
-            <select
-              value={scenarioId}
-              onChange={(e) => setScenarioId(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">— 選択しない —</option>
-              {accountScenarios.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name}
-                </option>
-              ))}
-              {scenarioIdStale && (
-                <option value={scenarioId}>
-                  {staleScenarioName ?? scenarioId}（このアカウントでは使えません）
-                </option>
-              )}
-            </select>
-          </div>
-
-          {isEdit && (
-            <div className="flex items-center gap-3">
-              <button
-                type="button"
-                onClick={() => setIsActive((v) => !v)}
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                  isActive ? 'bg-blue-600' : 'bg-gray-200'
-                }`}
-              >
-                <span
-                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                    isActive ? 'translate-x-6' : 'translate-x-1'
-                  }`}
-                />
-              </button>
-              <span className="text-sm text-gray-700">{isActive ? '有効' : '無効'}</span>
-            </div>
-          )}
+        <div>
+          <label className="text-ink-secondary mb-1 block text-xs font-medium">説明</label>
+          <textarea
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            rows={2}
+            placeholder="案件の説明（任意）"
+            className="border-hairline rounded-control bg-canvas text-ink w-full resize-none border px-3 py-2 text-sm focus:outline-none"
+          />
         </div>
 
-        <div className="flex justify-end gap-3 px-6 py-4 border-t border-gray-200">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
-          >
-            キャンセル
-          </button>
-          <button
-            onClick={() => { void handleSubmit() }}
-            disabled={submitting}
-            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded-lg"
-          >
-            {submitting ? '保存中...' : isEdit ? '更新' : '作成'}
-          </button>
+        <div>
+          <label className="text-ink-secondary mb-1 block text-xs font-medium">報酬額（円）</label>
+          <input
+            type="number"
+            min="0"
+            step="1"
+            value={rewardAmount}
+            onChange={(e) => setRewardAmount(e.target.value)}
+            placeholder="例: 3000"
+            className="border-hairline rounded-control bg-canvas text-ink w-full border px-3 py-2 text-sm focus:outline-none"
+          />
         </div>
+
+        <div>
+          <label className="text-ink-secondary mb-1 block text-xs font-medium">成果承認時の付与マイル</label>
+          <input
+            type="number"
+            min="0"
+            step="1"
+            value={rewardMiles}
+            onChange={(e) => setRewardMiles(e.target.value)}
+            placeholder="例: 500"
+            className="border-hairline rounded-control bg-canvas text-ink w-full border px-3 py-2 text-sm focus:outline-none"
+          />
+          <p className="text-ink-faint mt-1 text-[11px]">承認された紹介1件ごとに紹介者へ付与します</p>
+        </div>
+
+        <div>
+          <label className="text-ink-secondary mb-1 block text-xs font-medium">誘導 LINE アカウント</label>
+          <select
+            value={lineAccountId}
+            onChange={(e) => setLineAccountId(e.target.value)}
+            className="border-hairline rounded-control bg-canvas text-ink w-full border px-3 py-2 text-sm focus:outline-none"
+          >
+            <option value="">— 選択しない —</option>
+            {accounts.map((acc) => (
+              <option key={acc.id} value={acc.id}>
+                {acc.name}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div>
+          <label className="text-ink-secondary mb-1 block text-xs font-medium">タグ</label>
+          <select
+            value={tagId}
+            onChange={(e) => setTagId(e.target.value)}
+            className="border-hairline rounded-control bg-canvas text-ink w-full border px-3 py-2 text-sm focus:outline-none"
+          >
+            <option value="">— 選択しない —</option>
+            {accountTags.map((tag) => (
+              <option key={tag.id} value={tag.id}>
+                {tag.name}
+              </option>
+            ))}
+            {tagIdStale && (
+              <option value={tagId}>
+                {staleTagName ?? tagId}（このアカウントでは使えません）
+              </option>
+            )}
+          </select>
+        </div>
+
+        <div>
+          <label className="text-ink-secondary mb-1 block text-xs font-medium">シナリオ</label>
+          <select
+            value={scenarioId}
+            onChange={(e) => setScenarioId(e.target.value)}
+            className="border-hairline rounded-control bg-canvas text-ink w-full border px-3 py-2 text-sm focus:outline-none"
+          >
+            <option value="">— 選択しない —</option>
+            {accountScenarios.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name}
+              </option>
+            ))}
+            {scenarioIdStale && (
+              <option value={scenarioId}>
+                {staleScenarioName ?? scenarioId}（このアカウントでは使えません）
+              </option>
+            )}
+          </select>
+        </div>
+
+        {isEdit && (
+          <Toggle
+            checked={isActive}
+            onChange={setIsActive}
+            label={isActive ? '有効' : '無効'}
+          />
+        )}
       </div>
-    </div>
+    </Dialog>
   )
 }
 

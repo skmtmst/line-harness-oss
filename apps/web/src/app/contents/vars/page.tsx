@@ -841,10 +841,10 @@ function VarsPageInner() {
                     <Th className="px-4 py-3" style={{ width: '14%' }} title="使われている場所">
                       使われている場所
                     </Th>
-                    <Th className="px-4 py-3" style={{ width: '21%' }} title="最終更新日・次の変更予定">
+                    <Th className="px-4 py-3" style={{ width: '19%' }} title="最終更新日・次の変更予定">
                       更新・次の変更
                     </Th>
-                    <Th align="right" className="w-28 px-4 py-3" title="編集・削除">操作</Th>
+                    <Th align="right" className="w-36 px-4 py-3" title="編集・削除">操作</Th>
                   </TableHeadRow>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
@@ -923,21 +923,22 @@ function VarsPageInner() {
                             )}
                           </td>
                           <td className="whitespace-nowrap px-4 py-3 text-right" title="編集・削除">
-                            <Link
-                              href={`/contents/vars/edit?id=${item.id}`}
-                              className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded border px-2 py-1 text-xs"
-                            >
-                              編集
-                            </Link>
-                            <Button
-                              type="button"
-                              onClick={() => void openSingleDelete(item)}
-                              data-qa-open="yPkWe"
-                              aria-label={`${item.name}を削除`}
-                              className="ml-2"
-                            >
-                              削除
-                            </Button>
+                            <span className="inline-flex items-center justify-end gap-2">
+                              <Link
+                                href={`/contents/vars/edit?id=${item.id}`}
+                                className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded border px-2 py-1 text-xs"
+                              >
+                                編集
+                              </Link>
+                              <Button
+                                type="button"
+                                onClick={() => void openSingleDelete(item)}
+                                data-qa-open="yPkWe"
+                                aria-label={`${item.name}を削除`}
+                              >
+                                削除
+                              </Button>
+                            </span>
                           </td>
                         </tr>
                       )

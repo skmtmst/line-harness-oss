@@ -294,7 +294,7 @@ export default function DuplicatesPage() {
 
           <section className="overflow-hidden rounded-card border border-hairline bg-canvas shadow-card" aria-busy={candidatesLoading}>
             <table className="w-full table-fixed text-sm">
-              <colgroup><col style={{ width: '18%' }}/><col style={{ width: '10%' }}/><col style={{ width: '27%' }}/><col style={{ width: '18%' }}/><col style={{ width: '12%' }}/><col style={{ width: '8%' }}/><col style={{ width: '12%' }}/></colgroup>
+              <colgroup><col style={{ width: '17%' }}/><col style={{ width: '8%' }}/><col style={{ width: '24%' }}/><col style={{ width: '17%' }}/><col style={{ width: '11%' }}/><col style={{ width: '8%' }}/><col style={{ width: '15%' }}/></colgroup>
               {/*
                 #984 LAY-12: 見出しは共通の TableHeadRow（高さ44px・
                 背景・罫線を部品側で持つ）。セルの外付け余白で高さを
@@ -321,7 +321,7 @@ export default function DuplicatesPage() {
                     <td className="truncate px-3 py-3 text-ink-secondary">{[candidate.left.lineAccountName, candidate.right.lineAccountName].filter(Boolean).join(' / ') || '—'}</td>
                     <td className="px-3 py-3 text-ink-secondary">{new Date(candidate.reviewedAt ?? candidate.detectedAt).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</td>
                     <td className="px-3 py-3 font-semibold text-ink">{candidate.status === 'pending' ? '未確認' : candidate.status === 'linked' ? '確認済み' : candidate.status === 'deferred' ? '保留' : '別人'}</td>
-                    <td className="px-3 py-2"><Button href={`/friends/identity-candidates?id=${encodeURIComponent(candidate.id)}`} variant="primary">重複候補を確認</Button></td>
+                    <td className="whitespace-nowrap px-3 py-2"><Button href={`/friends/identity-candidates?id=${encodeURIComponent(candidate.id)}`}>重複候補を確認</Button></td>
                   </tr>
                 )) : <TableStateRow colSpan={7} kind="empty" title="条件に合う重複候補はありません" />}
               </tbody>

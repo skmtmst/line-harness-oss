@@ -2,7 +2,7 @@
 
 import DateField from '@/components/shared/date-field'
 import { Suspense, useState, useEffect, useCallback, useRef } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Trash2 } from 'lucide-react'
 import type { Folder, Tag } from '@line-crm/shared'
 import { ApiError, api, type ApiBroadcast, type BroadcastInsight, type BroadcastListKpis, type BroadcastSavedView } from '@/lib/api'
@@ -10,7 +10,6 @@ import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import BroadcastKpis from '@/components/broadcasts/broadcast-kpis'
 import BroadcastForm from '@/components/broadcasts/broadcast-form'
-import BroadcastDetail from '@/components/broadcasts/broadcast-detail'
 import FolderPanel, { FOLDER_RAIL_STYLE } from '@/components/shared/folder-panel'
 import ListState from '@/components/shared/list-state'
 import { audienceSummary, rowExcerpt } from '@/lib/broadcast-summary'
@@ -65,11 +64,19 @@ function formatYmdJst(iso: string): string {
 
 function BroadcastsPageContent() {
   const searchParams = useSearchParams()
+  const router = useRouter()
   const detailId = searchParams.get('id')
 
-  // If ?id=xxx is present, show detail view
+  /*
+   * 旧詳細（`/broadcasts?id=`）は新しい詳細へ置き換え遷移する。
+   * 旧デザインを残さない。履歴に戻るを残さないので `replace`。
+   */
+  useEffect(() => {
+    if (detailId) router.replace(`/broadcasts/detail?id=${encodeURIComponent(detailId)}`)
+  }, [detailId, router])
+
   if (detailId) {
-    return <BroadcastDetail broadcastId={detailId} />
+    return <div className="text-ink-faint p-6 text-sm">配信の詳細へ移動しています...</div>
   }
 
   return <BroadcastList />
@@ -711,7 +718,7 @@ function BroadcastList() {
                     */}
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
-                        <a href={`/broadcasts?id=${broadcast.id}`} className="text-sm font-medium text-action hover:text-action-hover hover:underline">
+                        <a href={`/broadcasts/detail?id=${encodeURIComponent(broadcast.id)}`} className="text-sm font-medium text-action hover:text-action-hover hover:underline">
                           {broadcast.title}
                         </a>
                         {isDedup && (

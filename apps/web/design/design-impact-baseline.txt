@@ -77,6 +77,7 @@ shared-button-importer app/hq/open/page.tsx
 shared-button-importer app/hq/page.tsx
 shared-button-importer app/hq/support/detail/page.tsx
 shared-button-importer app/hq/support/page.tsx
+shared-button-importer app/inflow-links/_components/edit-route-modal.tsx
 shared-button-importer app/inflow-links/ad-integration.tsx
 shared-button-importer app/inflow-links/detail/page.tsx
 shared-button-importer app/inflow-links/page.tsx
@@ -134,6 +135,7 @@ shared-button-importer app/rich-menus/new/page.tsx
 shared-button-importer app/rich-menus/page.tsx
 shared-button-importer app/scenarios/detail/scenario-detail-client.tsx
 shared-button-importer app/scenarios/first-step/page.tsx
+shared-button-importer app/scenarios/mode/page.tsx
 shared-button-importer app/scenarios/page.tsx
 shared-button-importer app/scenarios/results/page.tsx
 shared-button-importer app/search-console/page.tsx
@@ -163,12 +165,9 @@ shared-button-importer components/auto-replies/edit-dialog.tsx
 shared-button-importer components/automations/automation-template-gallery.tsx
 shared-button-importer components/automations/common-action-editor.tsx
 shared-button-importer components/broadcasts/broadcast-asset-manager.tsx
-shared-button-importer components/broadcasts/broadcast-detail.tsx
 shared-button-importer components/broadcasts/broadcast-form.tsx
 # #973: 狭い幅向けの簡略手順表示で「前へ／次へ」に共通ボタンを使う。
 shared-button-importer components/broadcasts/broadcast-step-rail.tsx
-shared-button-importer components/broadcasts/broadcast-stop-controls.tsx
-shared-button-importer components/broadcasts/segment-builder.tsx
 shared-button-importer components/broadcasts/segment-preset-controls.tsx
 shared-button-importer components/chats/friend-info-sidebar.tsx
 shared-button-importer components/chats/template-folder-select.tsx

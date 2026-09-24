@@ -137,7 +137,8 @@ describe('最終確認へのまとめ（IDEA-06）', () => {
     expect(FORM).toContain("'今すぐ（保存後に詳細画面で送信）'")
     expect(FORM).toContain('今すぐ配信を選んでいます')
     // 保存した下書きは、送信ボタンのある詳細画面へ進める。
+    // 旧詳細（`/broadcasts?id=`）ではなく新しい詳細へ連れていく。
     const NEW_PAGE = readFileSync(join(HERE, '..', '..', 'app', 'broadcasts', 'new', 'page.tsx'), 'utf8')
-    expect(NEW_PAGE).toContain('`/broadcasts?id=${encodeURIComponent(broadcast.id)}`')
+    expect(NEW_PAGE).toContain('`/broadcasts/detail?id=${encodeURIComponent(broadcast.id)}`')
   })
 })

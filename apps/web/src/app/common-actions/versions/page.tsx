@@ -314,10 +314,10 @@ function CommonActionVersionsInner() {
                 <Th style={{ width: '8%' }}>版</Th>
                 <Th style={{ width: '14%' }}>状態</Th>
                 <Th style={{ width: '15%' }}>作成者</Th>
-                <Th style={{ width: '23%' }}>変更内容</Th>
+                <Th style={{ width: '19%' }}>変更内容</Th>
                 <Th style={{ width: '12%' }}>中の処理</Th>
                 <Th style={{ width: '14%' }}>公開日時</Th>
-                <Th style={{ width: '14%' }}>操作</Th>
+                <Th style={{ width: '18%' }}>操作</Th>
               </TableHeadRow>
             </thead>
             <tbody>
@@ -337,6 +337,7 @@ function CommonActionVersionsInner() {
                     {!canManage ? <span className="text-ink-faint">閲覧のみ</span> : version.status === 'draft' ? (
                       <Button
                         variant="secondary"
+                        className="whitespace-nowrap"
                         disabled={Boolean(working)}
                         onClick={() => void run(`publish:${version.id}`, () => api.commonActions.publish(
                           detail.id,
@@ -349,6 +350,7 @@ function CommonActionVersionsInner() {
                     ) : !draft ? (
                       <Button
                         variant="secondary"
+                        className="whitespace-nowrap"
                         disabled={Boolean(working)}
                         onClick={() => void run(`copy:${version.id}`, () => api.commonActions.createDraft(
                           detail.id,

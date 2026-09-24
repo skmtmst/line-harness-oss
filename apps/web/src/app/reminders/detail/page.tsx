@@ -87,14 +87,9 @@ function csvFor(items: ReminderDeliveryRun[]): string {
   return `\uFEFF${rows.map((row) => row.map(csvCell).join(',')).join('\n')}`
 }
 
-function MetricCard({ label, value, tone }: { label: string; value: string; tone: 'success' | 'info' | 'warning' | 'danger' }) {
-  const toneClass = {
-    success: styles.metricSuccess,
-    info: styles.metricInfo,
-    warning: styles.metricWarning,
-    danger: styles.metricDanger,
-  }[tone]
-  return <Card padding="default" className={styles.metric}><p>{label}</p><strong className={toneClass}>{value}</strong></Card>
+/* ★V7: 数字は本文色（ink）。状態は見出しの言葉で言い、数字を色で塗らない。 */
+function MetricCard({ label, value }: { label: string; value: string }) {
+  return <Card padding="default" className={styles.metric}><p>{label}</p><strong className={styles.metricValue}>{value}</strong></Card>
 }
 
 function Fact({ label, value }: { label: string; value: string }) {
@@ -299,10 +294,10 @@ function ReminderRunsInner() {
       </div>
 
       <div className={styles.summary}>
-        <MetricCard label="送信済み" value={data ? `${data.summary.sent.toLocaleString('ja-JP')}通` : '—'} tone="success" />
-        <MetricCard label="送信予定" value={data ? `${data.summary.scheduled.toLocaleString('ja-JP')}通` : '—'} tone="info" />
-        <MetricCard label="停止" value={data ? `${data.summary.stopped.toLocaleString('ja-JP')}人` : '—'} tone="warning" />
-        <MetricCard label="エラー" value={data ? `${data.summary.errors.toLocaleString('ja-JP')}件` : '—'} tone="danger" />
+        <MetricCard label="送信済み" value={data ? `${data.summary.sent.toLocaleString('ja-JP')}通` : '—'} />
+        <MetricCard label="送信予定" value={data ? `${data.summary.scheduled.toLocaleString('ja-JP')}通` : '—'} />
+        <MetricCard label="停止" value={data ? `${data.summary.stopped.toLocaleString('ja-JP')}人` : '—'} />
+        <MetricCard label="エラー" value={data ? `${data.summary.errors.toLocaleString('ja-JP')}件` : '—'} />
       </div>
 
       {actionMessage ? <NoteBar tone={actionMessage.includes('ません') ? 'danger' : 'info'}>{actionMessage}</NoteBar> : null}

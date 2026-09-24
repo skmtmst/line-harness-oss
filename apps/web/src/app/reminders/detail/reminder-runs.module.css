@@ -34,10 +34,8 @@
   line-height: 1.2;
 }
 
-.metricSuccess { color: var(--color-success); }
-.metricInfo { color: var(--color-info); }
-.metricWarning { color: var(--color-warning); }
-.metricDanger { color: var(--color-danger); }
+/* ★V7: 数字は本文色。状態は見出しの言葉で言う。 */
+.metricValue { color: var(--color-ink); }
 
 .columns {
   display: grid;
