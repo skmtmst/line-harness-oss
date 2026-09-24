@@ -6,7 +6,7 @@
  * 見張る筋書き:
  *   1. フォームが消えた(一覧に無い)設定は「設定不足」の案内と欄の直下の理由が
  *      出て、保存APIを呼ばない。
- *   2. 公開されていないフォームは選択肢で理由つきで選べない。
+ *   2. 公開されていないフォームは候補つき入力で理由つきで選べない。
  *   3. 使えるフォームがつながっていれば「つながる先」に名前と状態が出て
  *      保存できる。
  */
@@ -174,7 +174,7 @@ describe('NEN-07: つなぐ回答フォームが使えない設定（実mount）
     expect(container.textContent).toContain('選び直してから保存してください')
   })
 
-  it('公開されていないフォームは選択肢で理由つきで選べない', async () => {
+  it('公開されていないフォームは候補つき入力で理由つきで選べない', async () => {
     settingsApi.mockResolvedValue({
       success: true,
       data: [baseSetting({ afterActions: [], buttonUrl: null, buttonLabel: null })],
@@ -188,12 +188,36 @@ describe('NEN-07: つなぐ回答フォームが使えない設定（実mount）
     })
     await mount()
 
-    const options = Array.from(container.querySelectorAll('option'))
-    const live = options.find((option) => option.value === 'form-live')
-    const draft = options.find((option) => option.value === 'form-draft')
-    expect(live?.disabled).toBe(false)
-    expect(draft?.disabled).toBe(true)
-    expect(draft?.textContent).toContain('選べません')
+    const input = container.querySelector('input[role="combobox"]')
+    expect(input).not.toBeNull()
+    const toggle = Array.from(container.querySelectorAll('button')).find(
+      (element) => element.getAttribute('aria-label') === '候補を開く',
+    )
+    expect(toggle).toBeDefined()
+    await click(toggle!)
+
+    const options = Array.from(container.querySelectorAll('[role="option"]'))
+    const live = options.find((option) => option.textContent?.includes('公開中のフォーム'))
+    const draft = options.find((option) => option.textContent?.includes('下書きフォーム'))
+    expect(live?.getAttribute('aria-disabled')).toBeNull()
+    expect(draft?.getAttribute('aria-disabled')).toBe('true')
+    expect(draft?.textContent).toContain('公開されていないため選べません')
+    // 緑の点は「使える」の意味だけ。下書きは灰色の点。
+    expect(live?.querySelector('[data-dot="green"]')).not.toBeNull()
+    expect(draft?.querySelector('[data-dot="gray"]')).not.toBeNull()
+
+    // 公開されていない候補を押しても動作は足されない。
+    await click(draft as HTMLElement)
+    await settle()
+    expect(container.textContent).not.toContain('回答フォーム「下書きフォーム」を開く')
+
+    // キーボードだけで公開中の候補を選ぶと動作が足される。
+    await act(async () => {
+      (input as HTMLInputElement).focus()
+      ;(input as HTMLInputElement).dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
+    })
+    await settle()
+    expect(container.textContent).toContain('回答フォーム「公開中のフォーム」を開く')
   })
 
   it('使えるフォームなら「つながる先」に名前と公開状態が出て保存できる', async () => {
