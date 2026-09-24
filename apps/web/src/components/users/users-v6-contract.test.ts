@@ -51,7 +51,8 @@ describe('統合ユーザーV6の画面契約', () => {
   })
 
   it('空・読込・失敗を同じ表示にしない', () => {
-    expect(TABLE).toContain('<ListState kind="loading" />')
+    // ★V7: 表の中の状態は TableStateRow に寄せる。3つの言い分けは変えない。
+    expect(TABLE).toContain('<TableStateRow colSpan={7} kind="loading" />')
     expect(TABLE).toContain('kind="error"')
     expect(TABLE).toContain('kind="empty"')
     expect(TABLE).toContain('統合ユーザーを表示できませんでした')
