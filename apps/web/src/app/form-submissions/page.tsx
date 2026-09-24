@@ -485,6 +485,13 @@ export default function FormSubmissionsPage() {
           // 消さずに止めて理由を添える。実データは #688（migration 372）。
           addFolderDisabled={canAddFolder === true}
           addFolderTitle="フォームのフォルダ保存先は未接続です"
+          addFolderNote={
+            canAddFolder === true ? (
+              <p className="text-ink-faint text-xs leading-relaxed">
+                フォームのフォルダ保存先はまだ接続されていません。接続されるまではフォルダを追加できません。
+              </p>
+            ) : undefined
+          }
           rows={[
             { id: 'all', label: 'すべて', count: loading || loadError ? 0 : folderTotal },
             ...folders.map((folder) => ({ id: folder.id, label: folder.name, count: folder.formCount })),
@@ -613,15 +620,15 @@ export default function FormSubmissionsPage() {
           <div className="border-hairline rounded-card overflow-hidden border bg-white">
             {/* #641: 操作列が広くなった分は表だけが横に流れる */}
             <div className="overflow-x-auto">
-            <table className="w-full min-w-[880px] table-fixed text-sm">
+            <table className="w-full min-w-[800px] table-fixed text-sm">
               <thead>
                 <TableHeadRow>
-                  <Th className="w-1/3">フォーム</Th>
-                  <Th className="w-28">状態</Th>
-                  <Th>回答の保存先</Th>
-                  <Th className="w-24" align="right">回答数</Th>
-                  <Th className="w-24">更新</Th>
-                  <Th className="w-48" align="right">操作</Th>
+                  <Th>フォーム</Th>
+                  <Th className="w-20">状態</Th>
+                  <Th className="w-32">回答の保存先</Th>
+                  <Th className="w-20" align="right">回答数</Th>
+                  <Th className="w-20">更新</Th>
+                  <Th className="w-52" align="right">操作</Th>
                 </TableHeadRow>
               </thead>
               <tbody className="divide-hairline divide-y">

@@ -703,7 +703,7 @@ export default function TemplatesPage() {
       */}
       <div className={`${styles.folderRail} shrink-0`}>
         <FolderPanel
-          total={`${folders.length} 件`}
+          total={`${templates.length} 件`}
           activeId={selectedCategory}
           onSelect={setSelectedCategory}
           onAddFolder={canMutateTemplates ? () => setFolderDialogOpen(true) : undefined}
@@ -980,13 +980,13 @@ export default function TemplatesPage() {
                     }}
                     className={`hover:bg-canvas-sunken cursor-pointer transition-colors focus:bg-canvas-sunken focus:outline-none ${drawerId === t.id ? 'bg-accent-soft' : ''}`}
                   >
-                    <td className="px-4 py-3">
+                    <td className="px-3 py-3">
                       <p className="text-sm font-medium text-ink">{t.name}</p>
                       <p className="text-[11px] text-ink-faint mt-0.5 truncate max-w-md">
                         {t.messageContent.slice(0, 60)}{t.messageContent.length > 60 ? '...' : ''}
                       </p>
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-3 py-3">
                       <span className={`inline-flex items-center rounded px-2 py-0.5 text-[10px] font-medium ${typeBadgeColor[t.question ? 'question' : t.messageType] ?? 'bg-canvas-sunken text-ink-secondary'}`}>
                         {messageTypeText(t.question ? 'question' : t.messageType)}
                       </span>
@@ -997,7 +997,7 @@ export default function TemplatesPage() {
                         ここには出さない。
                       */}
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-3 py-3">
                       <span className={`text-sm ${t.usageCount === 0 ? 'text-ink-faint' : 'text-ink font-medium'}`}>
                         {/*
                           **取れていないのを「0件」とも「undefined件」とも言わない。**
@@ -1007,7 +1007,7 @@ export default function TemplatesPage() {
                         {typeof t.usageCount !== 'number' ? '使用先を確認できません' : t.usageCount === 0 ? 'なし' : `${t.usageCount}件で使用`}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-right">
+                    <td className="px-3 py-3 text-right">
                       {typeof t.monthlySendCount === 'number' && typeof t.totalSendCount === 'number' ? (
                         <span
                           className="whitespace-nowrap text-xs font-medium text-ink"
@@ -1019,8 +1019,8 @@ export default function TemplatesPage() {
                         <span className="text-ink-faint text-xs">送信数を確認できません</span>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-xs text-ink-faint">{formatDate(t.updatedAt)}</td>
-                    <td className="px-4 py-3 text-right">
+                    <td className="px-3 py-3 text-xs text-ink-faint">{formatDate(t.updatedAt)}</td>
+                    <td className="px-3 py-3 text-right">
                       {/* 行のクリック（詳細を開く）へ伝えない。 */}
                       <div
                         className="relative flex items-center justify-end gap-1 whitespace-nowrap"
