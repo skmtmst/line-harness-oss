@@ -462,9 +462,13 @@ function EventsPanel({ accountId }: { accountId: string | null }) {
                       ariaLabel="この行の操作"
                       onClose={() => setOpenMenuId(null)}
                       items={[
-                        /* IDEA-23: 注文がある行は「この注文の状況」から出来事→通知→成果まで辿れる。 */
+                        /*
+                         * IDEA-23: 注文がある行は「注文の状況を見る」から出来事→通知→成果まで辿れる。
+                         * #670 23: 隣の「中身を見る」と並んだときに「注文の状況中身を見る」と
+                         * 繋がって読めたため、動詞を付けて「〜を見る」同士の並びに直す。
+                         */
                         ...(order
-                          ? [{ id: 'order', label: '注文の状況', onSelect: () => setDetailSlot({ accountId, orderId: order.id }) }]
+                          ? [{ id: 'order', label: '注文の状況を見る', onSelect: () => setDetailSlot({ accountId, orderId: order.id }) }]
                           : []),
                         ...(action.retryAvailable
                           ? [{
