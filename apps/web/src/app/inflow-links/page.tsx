@@ -826,16 +826,20 @@ function InflowLinksPageInner({
                 aria-label="流入元の名前・REFで検索"
                 className="w-full sm:w-64"
               />
-              <Select
-                aria-label="並び順"
-                label="並び順"
-                value={sort}
-                options={SORT_OPTIONS}
-                onChange={(value) => {
-                  setSort(value as RouteSort)
-                  setPage(1)
-                }}
-              />
+              {/* ★V7：「並び順：友だち追加が多い順」が標準幅では「友だち…」で切れるので、この欄だけ広げる。 */}
+              <div className="w-full sm:w-64">
+                <Select
+                  aria-label="並び順"
+                  label="並び順"
+                  size="full"
+                  value={sort}
+                  options={SORT_OPTIONS}
+                  onChange={(value) => {
+                    setSort(value as RouteSort)
+                    setPage(1)
+                  }}
+                />
+              </div>
               <Select
                 aria-label="表示件数"
                 value={String(pageSize)}
@@ -1100,10 +1104,10 @@ function InflowLinksPageInner({
                           : '—'}
                     </td>
                     <td className="whitespace-nowrap px-2 py-3 text-right font-semibold text-ink">
-                      {summaryAvailable ? (r.stats?.friendCount ?? 0) : '—'}
+                      {summaryAvailable ? (r.stats?.friendCount ?? 0).toLocaleString('ja-JP') : '—'}
                     </td>
                     <td className="whitespace-nowrap px-2 py-3 text-right text-ink-secondary">
-                      {summaryAvailable ? (r.stats?.clickCount ?? 0) : '—'}
+                      {summaryAvailable ? (r.stats?.clickCount ?? 0).toLocaleString('ja-JP') : '—'}
                     </td>
                     <td className="whitespace-nowrap px-2 py-3 text-ink-faint">
                       {summaryAvailable ? formatDate(r.stats?.latestAt ?? null) : '—'}

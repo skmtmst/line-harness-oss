@@ -14,6 +14,10 @@ import IconButton from '@/components/shared/icon-button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
 import Select from '@/components/shared/select'
+import SearchField from '@/components/shared/search-field'
+import FilterChip from '@/components/shared/filter-chip'
+import Pagination from '@/components/shared/pagination'
+import StatusBadge from '@/components/shared/status-badge'
 import type { FormLayout } from '@line-crm/shared'
 import { hasStoredDestination, summarizeFormDestinations } from './form-destination-summary'
 import FolderPanel, { FOLDER_RAIL_STYLE } from '@/components/shared/folder-panel'
@@ -119,7 +123,7 @@ function displayUpdatedAt(value: string | null): string {
   if (!value) return '—'
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return '—'
-  return date.toLocaleDateString('ja-JP', { month: '2-digit', day: '2-digit' })
+  return date.toLocaleDateString('ja-JP', { month: 'long', day: 'numeric' })
 }
 
 export default function FormSubmissionsPage() {
@@ -493,13 +497,13 @@ export default function FormSubmissionsPage() {
 
         <section className="min-w-0">
           <div className="border-hairline rounded-card mb-3 flex flex-wrap items-center gap-2 border bg-white p-3">
-            <input
-              type="search"
+            <SearchField
               value={query}
-              onChange={(event) => updateListState({ query: event.target.value, page: 1 })}
+              onChange={(value) => updateListState({ query: value, page: 1 })}
+              onClear={() => updateListState({ query: '', page: 1 })}
               placeholder="フォーム名・質問文で検索"
               aria-label="フォーム名・質問文で検索"
-              className="border-hairline rounded-control focus:ring-accent min-w-60 flex-1 border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
+              className="min-w-60 flex-1"
             />
             <Select
               aria-label="並び順"
@@ -521,33 +525,32 @@ export default function FormSubmissionsPage() {
             />
           </div>
 
+          {/*
+            ★V7：「保存した検索」と書いていたが、中身は状態の絞り込み（保存はできない）。
+            管理者確認は1行を占める大きなボタンだったので、絞り込みの右端へ寄せる。
+          */}
           <div data-design="Saved" className="mb-3 flex flex-wrap items-center gap-2">
-            <span className="text-xs text-ink-faint">保存した検索</span>
+            <span className="text-xs text-ink-faint">絞り込み</span>
             {([
               ['all', 'すべて'],
               ['published', '公開中'],
               ['draft', '下書き'],
               ['stored', '情報欄に保存している'],
-            ] as Array<[FormFilter, string]>).map(([value, label]) => {
-              const active = formFilter === value
-              return (
-                <label key={value} className={`rounded-pill cursor-pointer border px-3 py-1 text-xs ${active ? 'border-accent bg-accent-soft text-ink' : 'border-hairline bg-white text-ink-secondary'}`}>
-                  <input type="radio" name="form-filter" value={value} checked={active} onChange={() => updateListState({ filter: value, page: 1 })} className="sr-only" />
-                  {label}
-                </label>
-              )
-            })}
-          </div>
-
-          <div className="mb-3 flex flex-wrap items-center gap-2">
-            <Button
-              type="button"
-              variant={reviewMode ? 'primary' : 'secondary'}
-              aria-pressed={reviewMode}
-              onClick={() => { setReviewMode((mode) => !mode); setPage(1) }}
-            >
-              {reviewMode ? '通常の一覧に戻る' : '管理者確認（担当未割り当て）'}
-            </Button>
+            ] as Array<[FormFilter, string]>).map(([value, label]) => (
+              <FilterChip key={value} selected={formFilter === value} onChange={() => updateListState({ filter: value, page: 1 })}>
+                {label}
+              </FilterChip>
+            ))}
+            <span className="ml-auto">
+              <Button
+                type="button"
+                variant={reviewMode ? 'primary' : 'secondary'}
+                aria-pressed={reviewMode}
+                onClick={() => { setReviewMode((mode) => !mode); setPage(1) }}
+              >
+                {reviewMode ? '通常の一覧に戻る' : '管理者確認（担当未割り当て）'}
+              </Button>
+            </span>
           </div>
           {reviewMode && (
             <div className="border-hairline rounded-card mb-3 border bg-white p-3 text-xs text-ink-secondary">
@@ -610,17 +613,20 @@ export default function FormSubmissionsPage() {
             />
           ) : (
           <div className="border-hairline rounded-card overflow-hidden border bg-white">
-            {/* #641: 操作列が広くなった分は表だけが横に流れる */}
-            <div className="overflow-x-auto">
-            <table className="w-full min-w-[880px] table-fixed text-sm">
+            {/*
+              ★V7：1440px で右端の「編集」と削除が切れていた（表の最小幅880px＞実幅）。
+              最小幅をやめ、名前の列を伸び縮みさせ、操作の列は3つのボタンが収まる固定幅にする。
+            */}
+            <div>
+            <table className="w-full table-fixed text-sm">
               <thead>
                 <TableHeadRow>
-                  <Th className="w-1/3">フォーム</Th>
-                  <Th className="w-28">状態</Th>
-                  <Th>回答の保存先</Th>
+                  <Th>フォーム</Th>
+                  <Th className="w-24">状態</Th>
+                  <Th className="w-32">回答の保存先</Th>
                   <Th className="w-24" align="right">回答数</Th>
                   <Th className="w-24">更新</Th>
-                  <Th className="w-48" align="right">操作</Th>
+                  <Th className="w-60" align="right">操作</Th>
                 </TableHeadRow>
               </thead>
               <tbody className="divide-hairline divide-y">
@@ -651,7 +657,7 @@ export default function FormSubmissionsPage() {
                         </span>
                       ) : (
                         <>
-                          <Link href={`/form-submissions/edit?id=${encodeURIComponent(form.id)}&tab=basic`} className="block min-w-0 flex-1 truncate font-semibold text-ink hover:underline" title={normalizedName}>{normalizedName}</Link>
+                          <Link href={`/form-submissions/edit?id=${encodeURIComponent(form.id)}&tab=basic`} className="block min-w-0 truncate font-semibold text-ink hover:underline" title={normalizedName}>{normalizedName}</Link>
                           {/* 管理者確認は読み取り専用なので、通常の一覧にだけコピー口を出す。 */}
                           <CopyTextButton
                             value={normalizedName}
@@ -662,7 +668,9 @@ export default function FormSubmissionsPage() {
                     </div>
                     <span className="block truncate text-xs text-ink-faint">{form.description || `${form.fields.length}ブロック`}</span>
                   </td>
-                  <td className="px-3 py-2.5 text-xs">{form.isActive ? '公開中' : '下書き'}</td>
+                  <td className="px-3 py-2.5 text-xs">
+                    <StatusBadge size="compact" tone={form.isActive ? 'success' : 'neutral'}>{form.isActive ? '公開中' : '下書き'}</StatusBadge>
+                  </td>
                   <td className="truncate px-3 py-2.5 text-xs" title={listDestinationSummary}>{listDestinationSummary}</td>
                   <td className="px-3 py-2.5 text-right text-xs tabular-nums">
                     <span className="block">{displayCount ? `${displayCount.toLocaleString('ja-JP')}件` : '—'}</span>
@@ -676,7 +684,7 @@ export default function FormSubmissionsPage() {
                      * 押せる口を置くと失敗するだけなので、割り当て（#771）まで置かない。
                      */}
                     {reviewMode ? (
-                      <span className="text-ink-faint">—</span>
+                      <span className="sr-only">読み取り専用</span>
                     ) : (
                       /* #641: 行操作は枠つきボタン＋削除アイコンにそろえる。削除は撮影口のため見せたまま */
                       <span className="inline-flex items-center justify-end gap-1.5">
@@ -702,27 +710,7 @@ export default function FormSubmissionsPage() {
               <p className="text-xs text-ink-faint">
                 {listTotal.toLocaleString('ja-JP')}件中 {(listTotal === 0 ? 0 : pageStart + 1).toLocaleString('ja-JP')}〜{Math.min(pageStart + visibleForms.length, listTotal).toLocaleString('ja-JP')}件を表示
               </p>
-              <nav aria-label="回答フォームのページ送り" className="flex items-center gap-2 text-xs">
-                <Button
-                  type="button"
-                  aria-label="前のページ"
-                  disabled={visiblePage <= 1}
-                  onClick={() => updateListState({ page: visiblePage - 1 })}
-                >
-                  前へ
-                </Button>
-                <span className="min-w-16 text-center tabular-nums text-ink-faint">
-                  {visiblePage} / {pageCount}
-                </span>
-                <Button
-                  type="button"
-                  aria-label="次のページ"
-                  disabled={visiblePage >= pageCount}
-                  onClick={() => updateListState({ page: visiblePage + 1 })}
-                >
-                  次へ
-                </Button>
-              </nav>
+              <Pagination page={visiblePage} pageCount={pageCount} onPageChange={(next) => updateListState({ page: next })} ariaLabel="回答フォームのページ送り" />
             </div>
           ) : null}
         </section>

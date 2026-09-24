@@ -48,8 +48,8 @@ describe('V6 流入経路一覧の契約', () => {
     expect(PAGE).toContain('accountAtRequest === latestAccountRef.current')
     expect(PAGE).toContain('setRoutes([])')
     expect(PAGE).toContain('const [summaryAvailable, setSummaryAvailable] = useState(false)')
-    expect(PAGE).toContain("summaryAvailable ? (r.stats?.friendCount ?? 0) : '—'")
-    expect(PAGE).toContain("summaryAvailable ? (r.stats?.clickCount ?? 0) : '—'")
+    expect(PAGE).toContain("summaryAvailable ? (r.stats?.friendCount ?? 0).toLocaleString('ja-JP') : '—'")
+    expect(PAGE).toContain("summaryAvailable ? (r.stats?.clickCount ?? 0).toLocaleString('ja-JP') : '—'")
   })
 
   it('一覧型の既定値を集計成功として扱わず、画面を落とさない', () => {

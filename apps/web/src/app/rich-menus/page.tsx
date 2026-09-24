@@ -639,7 +639,7 @@ export default function RichMenusListPage() {
   }, [page, pageCount])
 
   return (
-    <div data-design-node="GO8RQ" className="mx-auto max-w-[1584px] p-6">
+    <div data-design-node="GO8RQ" className="mx-auto max-w-[1584px]">
       <span hidden>メニュー名・ボタン名で検索・保存した条件・公開中のみ</span>
       {showExternal && selectedAccount ? (
         /*
@@ -702,7 +702,7 @@ export default function RichMenusListPage() {
               : tapKpiReady
                 ? // ★V7：今月のタップが1回以上あるのに「まだ押されていません」と矛盾していた。
                   (tapStats?.total ?? 0) > 0
-                  ? 'ボタンごとの内訳はまだ集まっていません'
+                  ? '内訳はまだ集まっていません'
                   : 'まだ押されていません'
                 : tapKpiUnavailableText}
           </p>
