@@ -15,7 +15,7 @@ describe('U018 統合ユーザーの検索・絞り込みを縦へ逃がす', ()
     expect(PAGE).toContain('data-users-actions="true"')
     expect(PAGE).toContain('data-users-filters')
     expect(PAGE).toContain('[data-users-filters] > div { flex-wrap: wrap; }')
-    expect(PAGE).toContain('[data-users-filters] input[type="search"] { flex: 1 1 100%; }')
+    expect(PAGE).toContain('[data-users-filters] [data-design-node="phlR1"] { flex: 1 1 100%; }')
   })
 
   it('作成・CSV・再計算の操作は残す', () => {
