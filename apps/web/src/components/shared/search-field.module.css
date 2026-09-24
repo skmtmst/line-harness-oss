@@ -27,6 +27,8 @@
 .input {
   min-width: 0;
   flex: 1;
+  /* #734: 内側の入力本体も器の高さいっぱいにする（実測21pxでタップ領域不足と誤検出される） */
+  align-self: stretch;
   border: 0;
   background: transparent;
   color: var(--color-ink);

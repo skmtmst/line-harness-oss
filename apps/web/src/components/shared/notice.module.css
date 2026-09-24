@@ -16,9 +16,13 @@
   display: none;
 }
 
+/*
+ * #669 成功の通知の文字は success に1本化する（status-badge と同じ）。
+ * 地は同値（#e8f8ee）の success-bg に名前をそろえる。
+ */
 .success {
-  background: var(--color-accent-soft);
-  color: var(--color-accent-deep);
+  background: var(--color-success-bg);
+  color: var(--color-success);
 }
 
 .validation {

@@ -49,7 +49,15 @@ describe('V6 オートメーション一覧の状態', () => {
     // 導線は行の名前を検索語に載せる。
     expect(PAGE).toContain('api.automations.createDraftFromAutomation(')
     expect(PAGE).toContain('router.push(`/automations/drafts?id=')
-    expect(PAGE).toContain('href={`/automations/runs?search=')
+    /*
+     * #670 25: 行の2ボタンが折返しで縦に積まれ行高を支配していたため、
+     * 記録の導線はメニュー先頭へ移した(閲覧のみにはボタンを残す)。
+     */
+    expect(PAGE).toContain("id: 'runs'")
+    expect(PAGE).toContain("label: '動いた記録を見る'")
+    expect(PAGE).toContain('onViewRuns')
+    expect(PAGE).toContain('href={runsHref}')
+    expect(PAGE).toContain('runsHref = `/automations/runs?search=')
   })
 
   it('編集用の下書きを作れなかった理由を失敗の種類で分ける（AUTOMATION-05）', () => {

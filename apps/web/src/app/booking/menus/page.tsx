@@ -614,16 +614,21 @@ function BookingRulesSummary({ accountId, settings, items, loading, error, canMa
           <h3 className="text-ink text-sm font-semibold">メニューごとの上書き</h3>
           <p className="text-ink-faint mt-1 text-xs">個別に値を入れたメニューは、下の値が優先されます。</p>
         </div>
+        {/*
+          #734: 390pxでは列が多くて入りきらない。w-full だけだと表が容器幅に
+          潰れて右列の文字が途中で切れるため、内容が必要とする最小幅を持たせて
+          容器側の横スクロールで読めるようにする。
+        */}
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="w-full min-w-[560px] text-sm">
             <thead className="bg-canvas-sunken text-ink-secondary">
-              <tr><th className="px-4 py-3 text-left font-medium">メニュー</th>{rows.map((row) => <th key={row.key} className="px-4 py-3 text-left font-medium">{row.label}</th>)}</tr>
+              <tr><th className="px-4 py-3 text-left font-medium">メニュー</th>{rows.map((row) => <th key={row.key} className="px-4 py-3 text-left font-medium whitespace-nowrap">{row.label}</th>)}</tr>
             </thead>
             <tbody className="divide-hairline divide-y">
               {items.map((menu) => (
                 <tr key={menu.id}>
-                  <td className="px-4 py-3 font-medium">{menu.name}</td>
-                  {rows.map((row) => <td key={row.key} className="text-ink-secondary px-4 py-3 tabular-nums">{menu[row.key] == null ? row.none : `${menu[row.key]}${row.unit}`}</td>)}
+                  <td className="px-4 py-3 font-medium whitespace-nowrap">{menu.name}</td>
+                  {rows.map((row) => <td key={row.key} className="text-ink-secondary px-4 py-3 tabular-nums whitespace-nowrap">{menu[row.key] == null ? row.none : `${menu[row.key]}${row.unit}`}</td>)}
                 </tr>
               ))}
             </tbody>
@@ -767,7 +772,7 @@ function BookingRulesEditor({ accountId, initial, canEdit, onRetry, onSaved }: {
               type="time"
               value={draft.reminderDayBeforeTime ?? ''}
               onChange={(event) => set('reminderDayBeforeTime', event.target.value || null)}
-              className="border-hairline rounded-control focus:ring-accent w-full border px-3 py-2 text-sm tabular-nums focus:outline-none focus:ring-2"
+              className="border-hairline rounded-control focus:ring-accent w-full border px-3 h-10 text-sm tabular-nums focus:outline-none focus:ring-2"
             />
             <span className="text-ink-faint whitespace-nowrap text-xs">空欄は24時間前</span>
           </div>
@@ -823,7 +828,7 @@ function RuleNumberField({ label, unit, min, max, value, onChange, humanize }: {
           max={max}
           value={value}
           onChange={(event) => onChange(Number(event.target.value))}
-          className="border-hairline rounded-control focus:ring-accent w-full border px-3 py-2 text-sm tabular-nums focus:outline-none focus:ring-2"
+          className="border-hairline rounded-control focus:ring-accent w-full border px-3 h-10 text-sm tabular-nums focus:outline-none focus:ring-2"
         />
         <span className="text-ink-faint whitespace-nowrap text-xs">{unit}</span>
       </div>
@@ -1048,7 +1053,7 @@ function EditMenuModal({
               type="text"
               value={form.name ?? ''}
               onChange={(e) => set('name', e.target.value)}
-              className="border-hairline rounded-control focus:ring-accent w-full border px-3 py-2 text-sm focus:outline-none focus:ring-2"
+              className="border-hairline rounded-control focus:ring-accent w-full border px-3 h-10 text-sm focus:outline-none focus:ring-2"
               placeholder="例: カット"
             />
           </Field>
@@ -1057,7 +1062,7 @@ function EditMenuModal({
               type="text"
               value={form.category_label ?? ''}
               onChange={(e) => set('category_label', e.target.value)}
-              className="border-hairline rounded-control focus:ring-accent w-full border px-3 py-2 text-sm focus:outline-none focus:ring-2"
+              className="border-hairline rounded-control focus:ring-accent w-full border px-3 h-10 text-sm focus:outline-none focus:ring-2"
               placeholder="例: カット / カラー / パーマ"
             />
           </Field>
@@ -1258,7 +1263,7 @@ function EditMenuModal({
                 onChange={(e) => set('intake_question', e.target.value === '' ? null : e.target.value)}
                 placeholder="例: 気になっている箇所はありますか？"
                 maxLength={200}
-                className="border-hairline rounded-control focus:ring-accent w-full border px-3 py-2 text-sm focus:outline-none focus:ring-2"
+                className="border-hairline rounded-control focus:ring-accent w-full border px-3 h-10 text-sm focus:outline-none focus:ring-2"
               />
               <p className="text-ink-faint mt-1 text-xs">
                 空欄なら質問しません。回答は予約のメモとして残ります。
@@ -1349,7 +1354,7 @@ function NullableNumField({
           value={value ?? ''}
           placeholder="なし"
           onChange={(e) => onChange(e.target.value === '' ? null : Number(e.target.value))}
-          className="border-hairline rounded-control focus:ring-accent w-full border px-3 py-2 text-sm tabular-nums focus:outline-none focus:ring-2"
+          className="border-hairline rounded-control focus:ring-accent w-full border px-3 h-10 text-sm tabular-nums focus:outline-none focus:ring-2"
         />
         <span className="text-ink-faint whitespace-nowrap text-xs">{unit}</span>
       </div>
@@ -1369,7 +1374,7 @@ function NumField({
         type="number"
         value={value}
         onChange={(e) => onChange(Number(e.target.value))}
-        className="border-hairline rounded-control focus:ring-accent w-full border px-3 py-2 text-sm focus:outline-none focus:ring-2 tabular-nums"
+        className="border-hairline rounded-control focus:ring-accent w-full border px-3 h-10 text-sm focus:outline-none focus:ring-2 tabular-nums"
       />
     </Field>
   )

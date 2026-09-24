@@ -192,7 +192,7 @@ function CalendarFrame({
           <Button variant="secondary" onClick={onPrevious} aria-label="前の期間" className="h-8 w-8">‹</Button>
           <Button variant="secondary" onClick={onNext} aria-label="次の期間" className="h-8 w-8">›</Button>
           <p className="text-ink text-sm font-semibold">{title}</p>
-          <button type="button" onClick={onToday} className="rounded-pill bg-accent-soft px-3 py-1 text-xs font-semibold text-accent-deep">今日</button>
+          <button type="button" onClick={onToday} className="rounded-pill bg-accent-soft px-3 py-1 text-xs font-semibold text-accent-deep hover:brightness-95">今日</button>
         </div>
         <p className="text-ink-secondary text-xs tabular-nums">{meta}</p>
       </div>

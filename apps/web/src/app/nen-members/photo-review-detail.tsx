@@ -62,10 +62,10 @@ export function PhotoReviewDetail({
   const [downloadCode, setDownloadCode] = useState('')
   const [downloadBusy, setDownloadBusy] = useState(false)
   const [downloadError, setDownloadError] = useState('')
-  if (loading) return <main className="mx-auto max-w-screen-2xl p-6"><ListState kind="loading" title="写真を読み込んでいます" /></main>
-  if (loadKind === 'forbidden') return <main className="mx-auto max-w-screen-2xl p-6"><ListState kind="forbidden" /></main>
-  if (loadKind === 'error') return <main className="mx-auto max-w-screen-2xl p-6"><ListState kind="error" title="写真を読み込めませんでした" /></main>
-  if (!photo || loadKind === 'empty') return <main className="mx-auto max-w-screen-2xl p-6"><ListState kind="empty" title="確認する写真はありません" /></main>
+  if (loading) return <main><ListState kind="loading" title="写真を読み込んでいます" /></main>
+  if (loadKind === 'forbidden') return <main><ListState kind="forbidden" /></main>
+  if (loadKind === 'error') return <main><ListState kind="error" title="写真を読み込めませんでした" /></main>
+  if (!photo || loadKind === 'empty') return <main><ListState kind="empty" title="確認する写真はありません" /></main>
 
   const risks = Array.isArray(photo.risks) ? photo.risks as Array<Record<string, unknown>> : []
   /*
@@ -88,7 +88,7 @@ export function PhotoReviewDetail({
   const reviewUrl = safePhotoSrc(derivatives?.knownUrls.find((item) => item.kind === 'review')?.url)
     ?? safePhotoSrc(photo.image_url)
   const latestAssetJob = assetStatus?.jobs[0] ?? null
-  return <main className="mx-auto max-w-screen-2xl p-6" data-photo-view="detail">
+  return <main data-photo-view="detail">
     {notice && <div role="status" aria-live="polite" className="mb-4 rounded-control border border-accent-border bg-accent-soft px-4 py-3 text-sm text-accent-deep">{notice}</div>}
     <div className="flex items-center justify-between gap-2 max-md:flex-col max-md:items-start">
       <div>
