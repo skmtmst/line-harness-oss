@@ -77,6 +77,7 @@ shared-button-importer app/hq/open/page.tsx
 shared-button-importer app/hq/page.tsx
 shared-button-importer app/hq/support/detail/page.tsx
 shared-button-importer app/hq/support/page.tsx
+shared-button-importer app/inflow-links/_components/edit-route-modal.tsx
 shared-button-importer app/inflow-links/ad-integration.tsx
 shared-button-importer app/inflow-links/detail/page.tsx
 shared-button-importer app/inflow-links/page.tsx
@@ -134,6 +135,7 @@ shared-button-importer app/rich-menus/new/page.tsx
 shared-button-importer app/rich-menus/page.tsx
 shared-button-importer app/scenarios/detail/scenario-detail-client.tsx
 shared-button-importer app/scenarios/first-step/page.tsx
+shared-button-importer app/scenarios/mode/page.tsx
 shared-button-importer app/scenarios/page.tsx
 shared-button-importer app/scenarios/results/page.tsx
 shared-button-importer app/search-console/page.tsx

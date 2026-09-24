@@ -71,6 +71,8 @@ const EXEMPTIONS: Record<string, string> = {
     '入力を端末の下書きへ随時保存し、閉じる確認はエディタ内で済ませる設計。画面離脱への警告は要検討',
   'app/nen-campaigns/nen-overview.tsx':
     '紹介文の下書きは大きな一覧コンポーネント内のローカル状態。親の番兵へ載せるには報告口が要るため別途検討',
+  'app/scenarios/mode/page.tsx':
+    '★V7: 方式選択はラジオの即時確定で未保存を持たない。名前・フォルダ欄は新規時は確定時に同送、既存時は欄内の保存で確定する小さな操作のため番兵を付けない',
   'app/staff/page.tsx':
     '権限プレビューの「変更後の予定」。リンクは下書きを捨てて移る仕様として明示済み',
   'components/scenarios/trigger-editor.tsx':
@@ -139,8 +141,7 @@ const UNTRIAGED: Record<string, string> = {
     's3: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
   'app/friends/detail/page.tsx':
     's1: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
-  'app/friends/migrations/page.tsx':
-    's1: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
+  /* ★V7: 書き出し項目を共通 Checkbox へ寄せたら入力の印が3未満になり、編集画面の印が無くなったので行を消した。 */
   'app/hq/support/page.tsx':
     'hq: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
   'app/inflow-links/_components/edit-route-modal.tsx':
