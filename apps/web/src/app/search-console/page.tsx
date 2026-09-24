@@ -2,9 +2,11 @@
 
 import { useEffect, useState } from 'react'
 import MergedTabs from '@/components/layout/merged-tabs'
+import Button from '@/components/shared/button'
 import Disclosure from '@/components/shared/disclosure'
 import StatusBadge from '@/components/shared/status-badge'
 import { api } from '@/lib/api'
+import { csvCell } from '@/lib/presentation'
 import type {
   SearchConsoleMetric,
   SearchConsoleMetricRow,
@@ -210,11 +212,40 @@ export default function SearchConsolePage() {
     { label: '平均掲載順位', value: oneDecimal.format(data?.summary.position ?? 0), key: 'position', color: 'var(--color-status-warn-deep)', lower: true },
   ]
 
+  /*
+   * 操作は分析タブの後に残す（header-removal 契約）。どちらも実際に動く口にする
+   * （出す＝使える）。CSVは手元の表示データをそのまま書き出し、連携設定は
+   * 権限を足すSearch Consoleの管理画面を別タブで開く。受け口が無い飾りボタンは置かない。
+   */
+  const exportCsv = () => {
+    if (!data) return
+    const lines: string[][] = [
+      ['区分', '項目', '表示回数', 'クリック数', 'CTR(%)', '掲載順位'],
+      ['集計', `合計（${data.startDate}〜${data.endDate}）`, String(data.summary.impressions), String(data.summary.clicks), oneDecimal.format(data.summary.ctr * 100), oneDecimal.format(data.summary.position)],
+      ...data.daily.map((row) => ['日別', row.key, '', String(row.clicks), '', '']),
+      ...data.devices.map((device) => ['デバイス', { MOBILE: 'スマートフォン', DESKTOP: 'パソコン', TABLET: 'タブレット' }[device.key] ?? device.key, '', String(device.clicks), '', '']),
+      ...data.queries.map((row) => ['キーワード', row.key || '（検索語句なし）', String(row.impressions), String(row.clicks), oneDecimal.format(row.ctr * 100), oneDecimal.format(row.position)]),
+      ...data.pages.map((row) => ['ページ', row.key, String(row.impressions), String(row.clicks), oneDecimal.format(row.ctr * 100), oneDecimal.format(row.position)]),
+    ]
+    const csv = lines.map((row) => row.map((value) => csvCell(value)).join(',')).join('\n')
+    const url = URL.createObjectURL(new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' }))
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = `search-console-${data.startDate}_${data.endDate}.csv`
+    anchor.click()
+    URL.revokeObjectURL(url)
+  }
+  const settingsHref = setup?.siteUrl
+    ? `https://search.google.com/search-console/users?resource_id=${encodeURIComponent(setup.siteUrl)}`
+    : null
+
   return (
     <div>
       <MergedTabs basePath="/analytics" tabs={ANALYTICS_TABS} active="search" />
 
       <div data-design="Head" className="mb-4 flex flex-wrap items-center justify-end gap-2">
+        {data ? <Button onClick={exportCsv}>CSVで書き出す</Button> : null}
+        {settingsHref ? <Button href={settingsHref} target="_blank" rel="noreferrer">連携を設定</Button> : null}
         <div className="border-hairline flex rounded-xl border bg-canvas p-1">
           {ranges.map((range) => (
             <button
