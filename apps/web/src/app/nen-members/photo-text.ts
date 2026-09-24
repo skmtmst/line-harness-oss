@@ -26,26 +26,26 @@ export function reviewVersionOf(photo: Record<string, unknown> | null | undefine
 }
 
 /*
- * ポイント付与の実状態（アウトボックスの status）を画面の言葉へ。
+ * マイル付与の実状態（アウトボックスの status）を画面の言葉へ。
  * 手続きの行がない採用は EC 未接続（#931 N-307）。
  * 一覧・詳細・掲載管理の3画面で同じ言い方を使う（Issue #1040 IDEA-22）。
  */
-export function pointStatusLabel(status: unknown, points = 5) {
+export function mileStatusLabel(status: unknown, points = 5) {
   switch (text(status)) {
-    case 'synced': return `${points}ポイントを付けました`
+    case 'synced': return `${points}マイルを付けました`
     case 'pending':
-    case 'processing': return `${points}ポイントを付ける手続き中`
+    case 'processing': return `${points}マイルを付ける手続き中`
     // PHOTO-06: 派生状態。長く止まった手続き・失敗の種類を区別して出す。
-    case 'stale': return 'ポイントの手続きが止まっています'
-    case 'failed': return 'ポイントの手続きで確認が必要'
-    case 'failed_retryable': return 'ポイントの手続きに失敗（再試行できます）'
-    case 'failed_permanent': return 'ポイントの手続きで確認が必要'
-    default: return 'EC未接続・ポイント対象外'
+    case 'stale': return 'マイルの手続きが止まっています'
+    case 'failed': return 'マイルの手続きで確認が必要'
+    case 'failed_retryable': return 'マイルの手続きに失敗（再試行できます）'
+    case 'failed_permanent': return 'マイルの手続きで確認が必要'
+    default: return 'EC未接続・マイル対象外'
   }
 }
 
 /*
- * 戻した理由の呼び名。一覧の選択肢（page.tsx の REVIEW_REASONS）と
+ * 見送り理由の呼び名。一覧の選択肢（page.tsx の REVIEW_REASONS）と
  * 同じ言葉を使う（Issue #1040 IDEA-22: 採用履歴の表示）。
  */
 const REVIEW_REASON_TEXT: Record<string, string> = {

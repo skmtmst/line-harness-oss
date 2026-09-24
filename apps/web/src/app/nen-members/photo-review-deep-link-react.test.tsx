@@ -157,16 +157,16 @@ describe('ダッシュボードからの深掘り(#666 N-004)', () => {
   it('status=pending_review で来たら審査待ちの札を開き、その写真だけを出す', async () => {
     net.handler = listHandler(MIXED)
     await renderAt('/nen-members?tab=photos&status=pending_review')
-    expect(currentTab()).toContain('見ていないもの')
+    expect(currentTab()).toContain('審査待ち')
     expect(host.textContent).toContain('ハナ')
     expect(host.textContent).not.toContain('モモ')
     expect(host.textContent).not.toContain('ソラ')
   })
 
-  it('status=adopted なら通したものの札、status=rejected なら戻したものの札を開く', async () => {
+  it('status=adopted なら採用の札、status=rejected なら見送りの札を開く', async () => {
     net.handler = listHandler(MIXED)
     await renderAt('/nen-members?tab=photos&status=adopted')
-    expect(currentTab()).toContain('通したもの')
+    expect(currentTab()).toContain('採用')
     expect(host.textContent).toContain('モモ')
     expect(host.textContent).not.toContain('ハナ')
 
@@ -176,14 +176,14 @@ describe('ダッシュボードからの深掘り(#666 N-004)', () => {
     document.body.appendChild(host)
     root = createRoot(host)
     await renderAt('/nen-members?tab=photos&status=rejected')
-    expect(currentTab()).toContain('戻したもの')
+    expect(currentTab()).toContain('見送り')
     expect(host.textContent).toContain('ソラ')
   })
 
   it('指定がない・知らない指定のときは今までどおり審査待ちの札', async () => {
     net.handler = listHandler(MIXED)
     await renderAt('/nen-members?tab=photos&status=%E5%A3%8A%E3%82%8C%E3%81%9F%E5%80%A4')
-    expect(currentTab()).toContain('見ていないもの')
+    expect(currentTab()).toContain('審査待ち')
     expect(host.textContent).toContain('ハナ')
   })
 
@@ -191,10 +191,10 @@ describe('ダッシュボードからの深掘り(#666 N-004)', () => {
     net.handler = listHandler(MIXED)
     await renderAt('/nen-members?tab=photos&status=pending_review')
     const adopted = Array.from(host.querySelectorAll('button')).find(
-      (item) => item.textContent?.includes('通したもの'),
+      (item) => item.textContent?.includes('採用'),
     ) as HTMLButtonElement
     await act(async () => { adopted.click() })
-    expect(currentTab()).toContain('通したもの')
+    expect(currentTab()).toContain('採用')
     expect(host.textContent).toContain('モモ')
   })
 })
@@ -345,7 +345,7 @@ describe('戻す約束の2チェック(#931 N-312)', () => {
   it('2つのチェックは押せる状態で、選んだ内容が審査APIへそのまま届く', async () => {
     net.handler = detailCapableHandler(MIXED)
     await renderAt('/nen-members?tab=photos')
-    const openReject = buttonByText('戻す', host)
+    const openReject = buttonByText('見送る', host)
     expect(openReject).toBeTruthy()
     await act(async () => { openReject!.click() })
     await act(async () => { await Promise.resolve() })
@@ -363,7 +363,7 @@ describe('戻す約束の2チェック(#931 N-312)', () => {
     expect(invite.checked).toBe(false)
     expect(watch.checked).toBe(true)
 
-    const confirm = buttonByText('戻して、この文章を送る')
+    const confirm = buttonByText('見送って、この文章を送る')
     expect(confirm).toBeTruthy()
     await act(async () => { confirm!.click() })
     await act(async () => { await Promise.resolve() })

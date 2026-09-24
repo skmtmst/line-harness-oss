@@ -35,6 +35,7 @@ const GUARDED = [
   'app/nen/pets/feeding-tab.tsx',
   'app/reminders/edit/issue469-reminder-screens.tsx',
   'app/reminders/new/page.tsx',
+  'app/restaurant-test/google/google-business.tsx',
   'app/rich-menus/edit/page.tsx',
   'app/rich-menus/new/page.tsx',
   'app/settings/page.tsx',

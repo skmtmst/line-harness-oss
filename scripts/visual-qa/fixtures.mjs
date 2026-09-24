@@ -5664,15 +5664,18 @@ export const ACCOUNT_HANDOVER_DECISIONS = [
 ]
 
 /*
-  写真審査。設計 `Qu6Vk` の格子。
+  写真審査。設計 `cqWo8` の格子。
 
-  **状態を4つとも混ぜる。** 設計の札は 審査待ち／通したもの／戻したもの／すべて。
+  **状態を4つとも混ぜる。** 設計の札は 審査待ち／採用／見送り／公式サイト掲載。
   全部が審査待ちだと、残り3つの札が撮れない。
   戻したものには**理由**を入れる（`N2J629`「写真を戻す理由をえらぶ」の元）。
   `image_url` は作り物の SVG。外の絵を読みに行かないので、撮るたびに同じになる。
 */
 const petPhoto = (id, owner, pet, caption, status, hours, reason = null, note = null) => ({
-  id, owner_name: owner, pet_name: pet, caption,
+  id, owner_name: owner, pet_name: pet,
+  pet_gender: ['そら', 'レオ'].includes(pet) ? 'male' : 'female',
+  pet_call_name: `${pet}${['そら', 'レオ'].includes(pet) ? 'くん' : 'ちゃん'}`,
+  caption,
   image_url: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="640" height="640"><rect width="640" height="640" fill="%23eef6f0"/></svg>',
   status,
   review_version: 1,
@@ -5683,13 +5686,7 @@ const petPhoto = (id, owner, pet, caption, status, hours, reason = null, note = 
   review_notification_status: status === 'rejected' ? 'sent' : null,
 })
 
-/*
-  **名前に「ちゃん」を入れない。** 画面が `{pet_name}ちゃん` と後ろに付けるので、
-  ここにも入れると「ももちゃんちゃん」になる。
-  なお設計 `Qu6Vk` は「そらくん」「レオくん」と**子によって呼び方を変えている**が、
-  実装は全員に「ちゃん」を付ける。呼び方は画面ではなく飼い主が決めるものなので、
-  そこは別に直す（板 #739 の判定に書いた）。
-*/
+/* Worker と同じ完成済みの呼び名を返し、男の子=くん／女の子=ちゃんを撮影でも固定する。 */
 export const NEN_PHOTOS = [
   petPhoto('ph-1', '高橋 直人', 'もも', '朝のおさんぽ', 'pending', 48),
   petPhoto('ph-2', '前田 さくら', 'そら', 'はじめてのトリミング', 'pending', 44),
@@ -5712,7 +5709,7 @@ export const NEN_PHOTO_DETAIL = {
   ],
 }
 
-/** 機能22の実APIで返す一覧集計。設計 `Qu6Vk` の通常状態。 */
+/** 機能22の実APIで返す一覧集計。設計 `cqWo8` の通常状態。 */
 export const NEN_PHOTO_REVIEW_METRICS = {
   pendingCount: 18,
   reviewedCount: 142,

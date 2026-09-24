@@ -2458,9 +2458,9 @@ export const SCREENS = [
     verdictSource: "nen-v6/i9sQP.txt + i9sQP-1440.png + i9sQP-1920.png + i9sQP-loading/empty/error screenshots",
   },
 
-  // ── 機能22 写真審査 ─────────────────────────────────────
+  // ── 機能22 然・投稿 ─────────────────────────────────────
   {
-    ...PHOTO, node: 'Qu6Vk', name: '22-1 写真審査',
+    ...PHOTO, node: 'cqWo8', name: '37-5 然・投稿',
     states: { apis: ['**/api/nen-members/photos?*', '**/api/nen-members/photos/review-metrics?*'], kinds: ['normal', 'loading', 'empty', 'error', 'forbidden'] },
     variants: [{
       suffix: '-selected',
@@ -2470,10 +2470,7 @@ export const SCREENS = [
         { click: '選ぶ', role: 'checkbox', nth: 2, after: 100 },
       ],
     }],
-    verdict: "match",
-    verdictNote: "**2026-09-07 Issue #400で再撮影・再判定。** 3104/8791で確認。Issue #400 / 固定データ #410（PR #1181）を接続し、通常・読込・空・失敗・権限不足・選択状態を3104/8791で再撮影。1440/1920pxとも横はみ出し0。",
-    verdictSource: "photos-v6/Qu6Vk.txt + Issue #400 + PR #1181",
-    verdictHead: "codex/kenta-r2-s2-b400",
+    // cqWo8 の設計画像はリポジトリへ未書き出し。実装と台帳のノードは正本へ合わせ、判定は画像取得後に行う。
   },
   {
     ...PHOTO, node: 'hHrz8', name: '22-1-A 写真を1枚ずつ見る', mode: 'viewport', height: 1080,
@@ -3446,10 +3443,7 @@ export const CAPTURED_AT = {
     { pr: 0, head: '31293424', on: '2026-09-04', screens: ['VLMGH','DEX0k','q4lajm','WeXbL','ymXJK','i9sQP'],
       note: 'S3 第1段。**土台を直してから撮り直した。** 撮影ハーネスの押し口とルートが入れ替え前の固定データを指していたのと、モックに口が無くて画面が落ちていたのを直した（台帳の直しはこの枝、モックの直しは #728）。実装は `codex/development` そのもの。**絵は版に残さない**（#730 の決めごと）ので、証拠は `.txt` と判定の注記。' },
   ],
-  22: [
-    { pr: 0, head: '31293424', on: '2026-09-04', screens: ['Qu6Vk'],
-      note: 'S3 第1段。**土台を直してから撮り直した。** 撮影ハーネスの押し口とルートが入れ替え前の固定データを指していたのと、モックに口が無くて画面が落ちていたのを直した（台帳の直しはこの枝、モックの直しは #728）。実装は `codex/development` そのもの。**絵は版に残さない**（#730 の決めごと）ので、証拠は `.txt` と判定の注記。' },
-  ],
+  22: [],
   23: [
     { pr: 0, head: '31293424', on: '2026-09-04', screens: ['eI3gs','ELayY'],
       note: 'S3 第1段。**土台を直してから撮り直した。** 撮影ハーネスの押し口とルートが入れ替え前の固定データを指していたのと、モックに口が無くて画面が落ちていたのを直した（台帳の直しはこの枝、モックの直しは #728）。実装は `codex/development` そのもの。**絵は版に残さない**（#730 の決めごと）ので、証拠は `.txt` と判定の注記。' },
@@ -3940,8 +3934,7 @@ export const CAPTURED_AT = {
   22: [
     { pr: 1207, head: '46a869f74', on: '2026-09-07', screens: ['hHrz8', 'N2J629'], note: 'Issue #432。原本保存の再認証4状態と、戻す理由・補足・通知本文を3104/8791で撮影。1440・1920pxとも横はみ出し0で2画面を一致へ更新した。' },
     { pr: 447, head: '65adbc59', on: '2026-08-28' },
-    { pr: 0, head: 'c275749d', on: '2026-08-30', screens: ['Qu6Vk', 'N2J629'], note: 'development そのもので撮った。「理由を選んで見送る」→「見送る」に名前が変わっていた' },
-    { pr: 1044, head: '98588d0275', on: '2026-09-07', screens: ['Qu6Vk'], note: 'Issue #235。3105/8792で通常・読込・空・失敗・権限不足の全12枚を1440/1920px撮影。全画像で横はみ出し0。残る審査時間・注意候補・一括審査API差は判定注記へ記録した。' },
-    { pr: 1185, head: 'c992fbd82', on: '2026-09-07', screens: ['Qu6Vk', 'hHrz8', 'N2J629'], note: 'Issue #400。固定データ #410（PR #1181）反映後、3104/8791で3画面を全状態撮影。42枚すべて横はみ出し0。Qu6Vkを一致、残る2画面は再認証・設計差分を理由付き未接続とした。' },
+    { pr: 0, head: 'c275749d', on: '2026-08-30', screens: ['N2J629'], note: 'development そのもので撮った。「理由を選んで見送る」→「見送る」に名前が変わっていた' },
+    { pr: 1185, head: 'c992fbd82', on: '2026-09-07', screens: ['hHrz8', 'N2J629'], note: 'Issue #400。固定データ #410（PR #1181）反映後、3104/8791で詳細・見送り画面を全状態撮影。再認証・設計差分を理由付き未接続とした。' },
   ],
 }

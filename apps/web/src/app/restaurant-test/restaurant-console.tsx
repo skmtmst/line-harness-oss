@@ -1,6 +1,6 @@
 'use client'
 
-import { FormEvent, ReactNode, useCallback, useEffect, useMemo, useState } from 'react'
+import { FormEvent, ReactNode, useCallback, useEffect, useState } from 'react'
 import Header from '@/components/layout/header'
 import { useAccount, type AccountWithStats } from '@/contexts/account-context'
 import { ApiError } from '@/lib/api'
@@ -24,7 +24,6 @@ const viewMeta = {
   tables: ['座席・卓管理', 'フロア配置、席種、収容人数、結合ルールを管理します。'],
   inventory: ['予約枠・在庫', '時間帯ごとの総枠と、媒体・LINE・当日枠の配分を確認します。'],
   menu: ['メニュー管理', 'コースと単品、価格、アレルギー、提供時間帯を管理します。'],
-  google: ['Google・口コミ', '口コミ返信とGoogle最新情報を、承認前の下書きとして整えます。'],
   'line-followup': ['LINE来店フォロー', '予約前・来店後・口コミ依頼・会員証をカード型で設計します。'],
 } as const
 
@@ -158,7 +157,6 @@ export default function RestaurantConsole({ view }: { view: string }) {
       : activeView === 'tables' ? <Tables data={snapshot} store={store} busy={busy} create={(body) => mutate(() => restaurantTestApi.createTable(selectedAccountId!, body), '卓を追加しました。')} />
       : activeView === 'inventory' ? <Inventory data={snapshot} store={store} busy={busy} save={(row, body) => mutate(() => restaurantTestApi.updateInventory(selectedAccountId!, row.id, body), '予約枠を更新しました。外部媒体へは反映していません。')} />
       : activeView === 'menu' ? <Menu data={snapshot} store={store} busy={busy} create={(body) => mutate(() => restaurantTestApi.createMenu(selectedAccountId!, body), 'メニューを追加しました。')} />
-      : activeView === 'google' ? <GooglePanel data={snapshot} store={store} busy={busy} createPost={(body) => mutate(() => restaurantTestApi.createGbpPost(selectedAccountId!, body), 'Google投稿の下書きを承認キューへ追加しました。公開はしていません。')} saveReply={(id, draft) => mutate(() => restaurantTestApi.updateReviewDraft(selectedAccountId!, id, draft), '口コミ返信案を保存しました。送信はしていません。')} />
       : <LineFollowup data={snapshot} store={store} busy={busy} save={(flow, patch) => mutate(() => restaurantTestApi.updateLineFlow(selectedAccountId!, flow.id, patch), 'LINEカード設定を保存しました。送信はまだ行いません。')} />}
   </>
 }
@@ -508,24 +506,6 @@ function Menu({ data, store, busy, create }: { data: RestaurantSnapshot; store: 
     {showForm && <InlineForm title="新しいメニュー"><form onSubmit={submit} className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6"><label className="text-xs font-bold text-ink-secondary">種類<select name="kind" className="mt-1 w-full rounded-control border border-hairline bg-canvas px-3 py-2 text-sm"><option value="course">コース</option><option value="a_la_carte">単品</option></select></label><Field label="メニュー名" name="name" required /><Field label="価格（税込）" name="price" type="number" required /><Field label="アレルギー（カンマ区切り）" name="allergens" /><label className="text-xs font-bold text-ink-secondary">提供時間<select name="period" className="mt-1 w-full rounded-control border border-hairline bg-canvas px-3 py-2 text-sm"><option value="lunch">ランチ</option><option value="dinner">ディナー</option></select></label><div className="flex items-end"><button disabled={busy} className="w-full rounded-control bg-accent-deep px-4 py-2 text-sm font-bold text-on-accent">追加</button></div></form></InlineForm>}
     <Panel title="メニュー一覧" description="予約台帳・Google投稿・LINEカードで同じマスターを参照します。"><div className="overflow-x-auto"><table className="w-full min-w-[900px] text-sm"><thead className="bg-canvas-sunken text-left text-xs text-ink-faint"><tr>{['メニュー', '種類', '価格', '提供時間', '所要時間', 'アレルギー', '状態'].map((h) => <th key={h} className="px-5 py-3">{h}</th>)}</tr></thead><tbody className="divide-y divide-hairline">{rows.map((m) => <tr key={m.id}><td className="px-5 py-4 font-bold text-action">{m.name}</td><td className="px-5 py-4">{m.kind === 'course' ? 'コース' : '単品'}</td><td className="px-5 py-4 font-bold">{yen(m.price)}</td><td className="px-5 py-4">{safeArray(m.service_periods_json).map((p) => p === 'lunch' ? 'ランチ' : 'ディナー').join('・')}</td><td className="px-5 py-4">{m.duration_minutes ? `${m.duration_minutes}分` : '—'}</td><td className="px-5 py-4">{safeArray(m.allergens_json).join('・') || 'なし'}</td><td className="px-5 py-4"><Status value={m.status} /></td></tr>)}</tbody></table></div></Panel>
   </div>
-}
-
-function GooglePanel({ data, store, busy, createPost, saveReply }: { data: RestaurantSnapshot; store: RestaurantStore | null; busy: boolean; createPost: (body: Record<string, unknown>) => void; saveReply: (id: string, draft: string) => void }) {
-  const reviews = scoped(data.reviews, store?.id || '')
-  const connectors = scoped(data.connectors, store?.id || '').filter((c) => c.provider === 'google_business_profile')
-  const average = reviews.length ? reviews.reduce((s, r) => s + r.rating, 0) / reviews.length : 0
-  const postSubmit = (event: FormEvent<HTMLFormElement>) => { event.preventDefault(); if (!store) return; const fd = new FormData(event.currentTarget); createPost({ storeId: store.id, postType: fd.get('postType'), title: fd.get('title'), body: fd.get('body'), ctaType: 'book' }) }
-  return <div className="space-y-5"><div className="grid gap-4 sm:grid-cols-5"><Metric label="平均評価" value={average ? average.toFixed(1) : '—'} note="取得済み口コミ" /><Metric label="口コミ" value={reviews.length} note="キャッシュ24時間" /><Metric label="未返信" value={reviews.filter((r) => r.reply_status === 'unreplied').length} note="返信が必要" tone="warning" /><Metric label="投稿下書き" value={data.approvals.filter((a) => a.kind === 'gbp_post').length} note="承認キュー連携" /><Metric label="Google接続" value={<Status value={connectors[0]?.status || store?.google_status || 'unconfigured'} />} note="送信は無効" /></div>
-    <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_350px]"><Panel title="クチコミ一元管理" description="返信案は下書きまで。Googleへの送信は行いません。"><div className="divide-y divide-hairline">{reviews.map((r) => <ReviewEditor key={r.id} review={r} busy={busy} save={saveReply} />)}</div></Panel>
-      <div className="space-y-4"><Panel title="投稿マネージャー"><form onSubmit={postSubmit} className="space-y-3 p-5"><label className="block text-xs font-bold text-ink-secondary">投稿種別<select name="postType" className="mt-1 w-full rounded-control border border-hairline bg-canvas px-3 py-2 text-sm"><option value="standard">最新情報</option><option value="event">イベント</option><option value="offer">クーポン</option></select></label><Field label="タイトル" name="title" required /><label className="block text-xs font-bold text-ink-secondary">本文<textarea name="body" required rows={5} className="mt-1 w-full rounded-control border border-hairline px-3 py-2 text-sm font-normal leading-6" /></label><p className="text-xs text-ink-faint">画像は1200×900px推奨。現段階では下書きのみ保存します。</p><button disabled={busy || !store} className="w-full rounded-control bg-nen-green px-4 py-2 text-sm font-bold text-on-accent disabled:opacity-40">承認キューへ追加</button></form></Panel><Panel title="安全設定"><div className="p-5 text-sm leading-6 text-ink-secondary"><p className="font-bold text-nen-green">公開操作は無効</p><p>Places APIの読取キャッシュと、GBP投稿/返信の承認キューだけを先に検証します。</p></div></Panel></div>
-    </div>
-  </div>
-}
-
-function ReviewEditor({ review, busy, save }: { review: RestaurantSnapshot['reviews'][number]; busy: boolean; save: (id: string, draft: string) => void }) {
-  const suggestion = `${review.author_name || 'お客様'}、このたびはご来店いただき、また温かいお言葉をお寄せくださり誠にありがとうございます。季節のお料理と接客をお楽しみいただけたことを、スタッフ一同大変嬉しく拝読しました。またのお越しを心よりお待ちしております。`
-  const [draft, setDraft] = useState(review.reply_draft || suggestion)
-  return <article className="p-5"><div className="flex flex-wrap justify-between gap-3"><div><p className="font-bold">{review.author_name || 'Googleユーザー'}</p><p className="mt-1 text-sm tracking-widest text-nen-gold">{'★'.repeat(review.rating)}<span className="text-hairline">{'★'.repeat(5 - review.rating)}</span></p></div><div className="flex items-center gap-2"><Status value={review.reply_status} /><span className="text-xs text-ink-faint">{formatDate(review.reviewed_at)}</span></div></div><p className="mt-4 text-sm leading-6 text-ink-secondary">{review.comment || 'コメントなし'}</p><div className="mt-4 rounded-control border border-nen-border bg-nen-ivory p-4"><p className="text-xs font-bold text-nen-label">返信アシスタント（検証用下書き）</p><p className="mt-1 text-xs text-nen-copy">感情: {review.sentiment === 'positive' ? '好意的' : review.sentiment || '未分析'}。LLM接続前は丁寧な定型案を編集できます。</p><textarea value={draft} onChange={(e) => setDraft(e.target.value)} rows={5} className="mt-3 w-full rounded-control border border-nen-border bg-canvas px-3 py-2 text-sm leading-6" /><div className="mt-3 flex justify-end"><button disabled={busy || !draft.trim()} onClick={() => save(review.id, draft)} className="rounded-control bg-nen-green px-4 py-2 text-xs font-bold text-on-accent disabled:opacity-40">返信案を保存</button></div></div></article>
 }
 
 function LineFollowup({ data, store, busy, save }: { data: RestaurantSnapshot; store: RestaurantStore | null; busy: boolean; save: (flow: RestaurantLineFlow, patch: Record<string, unknown>) => void }) {

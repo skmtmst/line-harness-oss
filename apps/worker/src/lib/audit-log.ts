@@ -113,7 +113,12 @@ export type AuditAction =
   | 'webhook.interaction.retry_failed'
   | 'webhook.api_token.create'
   | 'webhook.api_token.revoke'
-  | 'webhook.api_token.rotate';
+  | 'webhook.api_token.rotate'
+  | 'restaurant.google.connect.start'
+  | 'restaurant.google.connect'
+  | 'restaurant.google.reconnect'
+  | 'restaurant.google.disconnect'
+  | 'restaurant.google.review.reply';
 
 function commonAuditWriter(): typeof recordAuditEvent | null {
   try {
