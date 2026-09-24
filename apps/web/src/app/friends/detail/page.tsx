@@ -1622,15 +1622,26 @@ function FriendDetailInner() {
           </aside>
 
           {/* 右：タブ */}
-          <div data-design="Right">
-            <div className="border-hairline mb-4 flex flex-wrap gap-1 border-b">
+          {/*
+            ★V7差し戻し: 折らないタブ帯がグリッドの右列を押し広げ、右端が
+            画面からはみ出していた。grid の子に min-w-0 を付け、幅の決定を
+            グリッドに任せてタブ帯だけ中で横に流す。
+          */}
+          <div data-design="Right" className="min-w-0">
+            {/*
+              ★V7: 10個のタブが 1440px で2段に折れていた。折らずに1段にし、
+              入り切らない分は横に送る。リンクで移動するタブなので
+              aria-current="page" で現在地を示す（role="tab" は付けない）。
+            */}
+            <div className="border-hairline mb-4 flex gap-1 overflow-x-auto border-b">
               {visibleTabs.map((t) => (
                 <Link
                   key={t.key}
                   href={`/friends/detail?id=${friendId}&tab=${t.key}${
                     group === BASIC_GROUP ? '' : `&group=${group}`
                   }`}
-                  className={`-mb-px border-b-2 px-4 py-2 text-sm font-medium transition-colors ${
+                  aria-current={tab === t.key ? 'page' : undefined}
+                  className={`-mb-px shrink-0 whitespace-nowrap border-b-2 px-3 py-2 text-sm font-medium transition-colors ${
                     tab === t.key
                       ? 'border-accent text-accent-deep'
                       : 'text-ink-secondary hover:text-ink border-transparent'
