@@ -391,7 +391,8 @@ function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuC
                   <th className="px-4 py-3 text-right text-xs font-semibold text-ink-faint">
                     この30日
                   </th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold text-ink-faint">操作</th>
+                  {/* #707: 390pxで表を横スクロールしても操作列を右端へ留める */}
+                  <th className="sticky right-0 bg-canvas-sunken px-4 py-3 text-right text-xs font-semibold text-ink-faint">操作</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -435,7 +436,7 @@ function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuC
                     <td className="px-4 py-3 text-right text-sm tabular-nums">
                       {`${bookingCounts.get(m.id) ?? 0} 件`}
                     </td>
-                    <td className="px-4 py-3 text-right">
+                    <td className="sticky right-0 bg-canvas px-4 py-3 text-right">
                       <div className="inline-flex gap-2 text-xs">
                         {/* QSLEH の行操作は共通Button（高さ36px）より小さいため、
                             表の行高を設計どおり保つ専用の小ボタンにする。 */}

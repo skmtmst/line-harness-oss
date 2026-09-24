@@ -513,7 +513,11 @@ function AutoPanel({
                 <Th className="w-20" align="right">開封</Th>
                 <Th className="w-20" align="right">注文</Th>
                 <Th className="w-24">状態</Th>
-                <Th className="w-28" align="right"><span className="sr-only">操作</span></Th>
+                {/*
+                  #707: 390pxで表を横スクロールしたとき、操作列だけ右端に
+                  留める（PC幅では自然位置なので見た目は変わらない）。
+                */}
+                <Th className="w-28 sticky right-0 bg-surface-pearl" align="right"><span className="sr-only">操作</span></Th>
               </TableHeadRow>
             </thead>
             <tbody>
@@ -557,7 +561,7 @@ function AutoPanel({
                           ? <StatusBadge tone="success" size="compact">配信中</StatusBadge>
                           : <StatusBadge tone="warning" size="compact">停止中</StatusBadge>}
                     </Td>
-                    <Td align="right">
+                    <Td align="right" className="sticky right-0 bg-canvas">
                       {/*
                         #985 LAY-18: 行の操作は共用の RowActions。
                         「編集」＋「⋯」（中身を見る・テスト送信・止める/動かす）の
@@ -800,7 +804,8 @@ function ColumnsPanel({
                       <Th className="w-20">公開日</Th>
                       <Th className="w-40">LINE配信</Th>
                       <Th className="w-16" align="right">閲覧</Th>
-                      <Th className="w-28" align="right"><span className="sr-only">操作</span></Th>
+                      {/* #707: 390px横スクロール時に操作列を右端へ留める */}
+                      <Th className="w-28 sticky right-0 bg-surface-pearl" align="right"><span className="sr-only">操作</span></Th>
                     </TableHeadRow>
                   </thead>
                   <tbody>
@@ -826,7 +831,7 @@ function ColumnsPanel({
                           <Td><span className="text-label tabular-nums text-ink-secondary">{jstShortDate(column.publishedAt)}</span></Td>
                           <Td>{columnDeliveryBadge(column)}</Td>
                           <Td align="right"><span className="text-label tabular-nums text-ink" title={metric?.articleOpened.reason ?? undefined}>{num(metric?.articleOpened.value ?? null)}</span></Td>
-                          <Td align="right">
+                          <Td align="right" className="sticky right-0 bg-canvas">
                             {isSelected ? (
                               <span className="text-label font-semibold text-ink-faint">選択中</span>
                             ) : (
@@ -1047,7 +1052,8 @@ function HistoryPanel({ deliveryList, detail, loading, onShowDetail, onRetry, on
                 <Th className="w-48">状態</Th>
                 <Th className="w-36">きっかけ</Th>
                 <Th className="w-20" align="right">開封</Th>
-                <Th className="w-24" align="right"><span className="sr-only">操作</span></Th>
+                {/* #707: 390px横スクロール時に操作列を右端へ留める */}
+                <Th className="w-24 sticky right-0 bg-surface-pearl" align="right"><span className="sr-only">操作</span></Th>
               </TableHeadRow>
             </thead>
             <tbody>
@@ -1065,7 +1071,7 @@ function HistoryPanel({ deliveryList, detail, loading, onShowDetail, onRetry, on
                     </Td>
                     <Td><span className="text-label text-ink-secondary">{deliveryTriggerLabel(delivery.campaignKey)}</span></Td>
                     <Td align="right"><span className="text-label text-ink-faint" title={delivery.reaction.reason}>取得不可</span></Td>
-                    <Td align="right">
+                    <Td align="right" className="sticky right-0 bg-canvas">
                       <button type="button" onClick={() => onShowDetail(delivery.id)} className="text-label font-semibold text-action">{detail?.id === delivery.id ? '閉じる' : '中身を見る'}</button>
                     </Td>
                   </Tr>

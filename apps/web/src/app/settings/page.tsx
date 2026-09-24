@@ -1015,12 +1015,18 @@ export default function SettingsPage() {
                 sidebar-design.test.ts が見ている。ここで二重に縛ると、
                 項目を1つ足すたびに2か所直すことになる。
               */}
+              {/*
+                監査707: 390pxでは3列ぶんの幅が容器を超え、右側のスイッチ・
+                「まとめて切替」が域外に出ていた。基底をgrid-cols-1
+                （minmax(0,1fr)で縮小可能）にし、列のdivにもmin-w-0を
+                付けて狭幅で1列へ落とす。xl以上は3列のまま。
+              */}
               <div
                 data-design="機能の一覧"
-                className={ordering ? 'space-y-4' : 'grid items-start gap-4 xl:grid-cols-3'}
+                className={ordering ? 'space-y-4' : 'grid min-w-0 grid-cols-1 items-start gap-4 xl:grid-cols-3'}
               >
                 {(ordering ? [groups] : groupColumns).map((column, columnIndex) => (
-                  <div key={columnIndex} className="space-y-3">
+                  <div key={columnIndex} className="min-w-0 space-y-3">
                     {column.map((group) => (
                       <FeatureSection
                         key={group.id}
