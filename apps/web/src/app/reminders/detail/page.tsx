@@ -261,7 +261,7 @@ function ReminderRunsInner() {
       {actionMessage ? <NoteBar tone={actionMessage.includes('ません') ? 'danger' : 'info'}>{actionMessage}</NoteBar> : null}
 
       <div className={styles.columns}>
-        <main className={styles.main}>
+        <div className={styles.main}>
           <ReminderRegistrantsPanel reminderId={reminderId} />
           <Card overflow="hidden">
             <CardHeader title="通知実績" />
@@ -387,7 +387,7 @@ function ReminderRunsInner() {
               </div>
             ) : null}
           </Card>
-        </main>
+        </div>
 
         <aside className={styles.side}>
           <Card overflow="hidden">

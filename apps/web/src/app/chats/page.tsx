@@ -1,5 +1,6 @@
 'use client'
 
+import Avatar from '@/components/shared/avatar'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import Link from 'next/link'
@@ -100,11 +101,11 @@ type InboxSavedView = {
 
 function ChannelBadge({ channel }: { channel: 'line' | 'email' }) {
   return channel === 'line' ? (
-    <span className="bg-accent-deep text-on-accent inline-flex h-5 min-w-8 items-center justify-center rounded-md px-1.5 text-[9px] font-bold">
+    <span className="bg-accent-deep text-on-accent inline-flex h-5 min-w-8 items-center justify-center rounded-md px-1.5 text-micro font-bold">
       LINE
     </span>
   ) : (
-    <span className="bg-canvas-sunken text-ink-secondary border-hairline inline-flex h-5 min-w-8 items-center justify-center rounded-md border px-1.5 text-[9px] font-bold">
+    <span className="bg-canvas-sunken text-ink-secondary border-hairline inline-flex h-5 min-w-8 items-center justify-center rounded-md border px-1.5 text-micro font-bold">
       MAIL
     </span>
   )
@@ -2290,11 +2291,13 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
             title={filter.title}
             className={`whitespace-nowrap rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
               quickFilter === filter.key
-                ? 'border-[#06C755] bg-[#EAFBF0] text-[#057A37]'
-                : 'border-[#E5E7EB] bg-canvas text-[#667085] hover:bg-[#F7F8F6]'
+                ? 'border-accent-deep bg-accent-soft text-accent-deep'
+                : 'border-hairline bg-canvas text-ink-secondary hover:bg-canvas-sunken'
             }`}
           >
-            {filter.label} <span className="ml-1 tabular-nums opacity-70">{quickCountsNow ? quickCountsNow[filter.key] : '—'}</span>
+            {filter.label}
+            {/* 件数がまだ無い時は「—」を出さない（★V7：意味の無い記号を置かない）。 */}
+            {quickCountsNow ? <span className="ml-1 tabular-nums">{quickCountsNow[filter.key]}</span> : null}
           </button>
         ))}
         <span className="ml-auto" />
@@ -2497,14 +2500,14 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
               maxLength={SEARCH_QUERY_MAX_LENGTH}
               placeholder="名前・メールアドレス・内容で検索"
               aria-label="名前・メールアドレス・内容で検索"
-              className="w-full rounded-lg border border-[#E5E7EB] bg-canvas py-2 pr-3 pl-9 text-xs text-[#1F2937] outline-none focus:border-[#06C755] focus:ring-2 focus:ring-[#06C755]/15"
+              className="w-full rounded-lg border border-hairline bg-canvas py-2 pr-3 pl-9 text-xs text-ink outline-none focus:border-accent-deep focus:ring-2 focus:ring-accent-deep/15"
               />
             </div>
             {/*
               #670 02: 外の「担当者」と中の「担当者：すべて」が二重だった。
               プルダウンが自分で名乗るため、外の字は置かない。
             */}
-            <label className="mt-2 flex items-center gap-2 text-[11px] font-semibold text-[#667085]">
+            <label className="mt-2 flex items-center gap-2 text-[11px] font-semibold text-ink-secondary">
               <span className="min-w-0 flex-1">
                 {/*
                   未読数は集計の口から渡す。**画面に見えている行から数えない**
@@ -2659,9 +2662,8 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                     >
                       <div className="flex items-start gap-3">
                         <div className="relative shrink-0">
-                          <div className="bg-canvas-sunken border-hairline flex h-10 w-10 items-center justify-center rounded-full border">
-                            <span className="text-ink-secondary text-sm font-bold">M</span>
-                          </div>
+                          {/* メールの行も名前の頭文字（以前は全員「M」で、誰の会話か目で追えなかった）。 */}
+                          <Avatar name={item.customerName} size={40} />
                           {item.isUnread && (
                             <span className="border-canvas bg-danger absolute -top-0.5 -right-0.5 h-3 w-3 rounded-full border-2" aria-label="未読" />
                           )}
@@ -2669,7 +2671,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center justify-between gap-2">
                             <p className="text-ink truncate text-sm font-medium">{item.customerName}</p>
-                            <span className="text-ink-faint shrink-0 text-[10px]">
+                            <span className="text-ink-faint shrink-0 text-xs tabular-nums">
                               {formatInboxListDate(item.lastIncomingAt)}
                             </span>
                           </div>
@@ -2678,14 +2680,14 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                               {item.subject || item.preview}
                             </p>
                             <span
-                              className={`rounded-pill shrink-0 px-1.5 py-0.5 text-[10px] font-medium ${statusConfig[item.status].className}`}
+                              className={`rounded-pill shrink-0 px-2 py-0.5 text-micro font-semibold ${statusConfig[item.status].className}`}
                             >
                               {statusConfig[item.status].label}
                             </span>
                           </div>
                           <div className="mt-1 flex items-center gap-2">
                             <ChannelBadge channel="email" />
-                            <span className="text-ink-faint inline-flex min-w-0 items-center gap-1 text-[10px]">
+                            <span className="text-ink-faint inline-flex min-w-0 items-center gap-1 text-xs">
                               <span className="bg-action-soft text-action flex h-4 w-4 shrink-0 items-center justify-center rounded-full font-bold">
                                 {(item.assignedStaffName ?? '未').charAt(0)}
                               </span>
@@ -2755,13 +2757,8 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                     >
                       <div className="flex items-start gap-3">
                         <div className="relative shrink-0">
-                          {chat.friendPictureUrl ? (
-                            <img src={chat.friendPictureUrl} alt="" className="h-10 w-10 rounded-full" />
-                          ) : (
-                            <div className="bg-canvas-sunken flex h-10 w-10 items-center justify-center rounded-full">
-                              <span className="text-ink-faint text-sm">{chat.friendName.charAt(0)}</span>
-                            </div>
-                          )}
+                          {/* ★V7 友だちの顔：画像が読めない時も色つきの頭文字。 */}
+                          <Avatar name={chat.friendName} src={chat.friendPictureUrl} size={40} />
                           {chat.isUnread && (
                             <span className="border-canvas bg-danger absolute -top-0.5 -right-0.5 h-3 w-3 rounded-full border-2" aria-label="未読" />
                           )}
@@ -2774,7 +2771,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                             {waitingLabel ? (
                               <span className="text-status-warn-deep shrink-0 text-nano font-semibold">{waitingLabel}</span>
                             ) : (
-                              <span className="text-ink-faint shrink-0 text-nano">{formatInboxListDate(chat.lastMessageAt)}</span>
+                              <span className="text-ink-faint shrink-0 text-xs tabular-nums">{formatInboxListDate(chat.lastMessageAt)}</span>
                             )}
                           </div>
                           {/*
@@ -2794,14 +2791,14 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                               {preview || <span className="text-ink-faint italic">(まだメッセージなし)</span>}
                             </p>
                             <span
-                              className={`rounded-pill shrink-0 px-1.5 py-0.5 text-[10px] font-medium ${statusConfig[chat.status].className}`}
+                              className={`rounded-pill shrink-0 px-2 py-0.5 text-micro font-semibold ${statusConfig[chat.status].className}`}
                             >
                               {statusConfig[chat.status].label}
                             </span>
                           </div>
                           <div className="mt-1 flex items-center gap-2">
                             <ChannelBadge channel="line" />
-                            <span className="text-ink-faint inline-flex min-w-0 items-center gap-1 text-[10px]">
+                            <span className="text-ink-faint inline-flex min-w-0 items-center gap-1 text-xs">
                               <span className="bg-action-soft text-action flex h-4 w-4 shrink-0 items-center justify-center rounded-full font-bold">
                                 {(operatorName ?? '未').charAt(0)}
                               </span>
@@ -2914,8 +2911,13 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
               </div>
             </div>
           ) : !selectedChatId ? (
-            <div className="flex-1 flex items-center justify-center">
-              <p className="text-ink-faint text-sm">チャットを選択してください</p>
+            <div className="flex flex-1 flex-col items-center justify-center gap-2 px-6 text-center">
+              {/* 空の右側に、何をすればよいかを添える（★V7・better-writing「空の状態は次の一手を」）。 */}
+              <span aria-hidden="true" className="bg-canvas-sunken text-ink-faint mb-1 flex h-12 w-12 items-center justify-center rounded-full">
+                <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12Z" /></svg>
+              </span>
+              <p className="text-ink text-sm font-bold">会話を選ぶと、ここに表示されます</p>
+              <p className="text-ink-faint max-w-xs text-xs leading-relaxed">左の一覧から選んでください。「要返信」で、まだ返していない会話だけに絞れます。</p>
             </div>
           ) : detailLoading ? (
             <div className="flex-1 flex items-center justify-center">
@@ -2946,13 +2948,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                     最終受信」の3点。**写真が無い人でも丸は出す。** 頭文字を
                     入れておかないと、灰色の空丸が並んで誰の会話か目で追えない。
                   */}
-                  {chatDetail.friendPictureUrl ? (
-                    <img src={chatDetail.friendPictureUrl} alt="" className="w-8 h-8 rounded-full flex-shrink-0" />
-                  ) : (
-                    <span className="bg-accent-soft text-accent-deep flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full text-sm font-bold">
-                      {(chatDetail.friendName || '?').charAt(0)}
-                    </span>
-                  )}
+                  <Avatar name={chatDetail.friendName} src={chatDetail.friendPictureUrl} size={32} />
                   <div className="min-w-0">
                     {/*
                       U008: 長い表示名が狭い幅で切れても、押すと(キーボードでも)
@@ -3157,7 +3153,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                                   ? 'rounded-tl-2xl rounded-tr-md rounded-bl-2xl rounded-br-2xl text-on-accent'
                                   : 'min-w-64 rounded-tl-md rounded-tr-2xl rounded-bl-2xl rounded-br-2xl bg-canvas text-ink'
                               }`}
-                              style={isOutgoing ? { backgroundColor: 'var(--color-accent)' } : undefined}
+                              style={isOutgoing ? { backgroundColor: 'var(--color-accent-deep)' } : undefined}
                             >
                               {/* N-025: 引用元の表示。取り消された引用元は本文を出さない。 */}
                               {msg.quoted && (
@@ -3221,7 +3217,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                                 className="border-canvas/70 bg-canvas/90 text-ink-secondary inline-flex max-w-full items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold shadow-sm"
                                 title={msg.sentByStaffName ?? '担当者情報なし'}
                               >
-                                <span className="bg-action text-on-action flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full text-[8px] font-bold">
+                                <span className="bg-action text-on-action flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full text-micro font-bold">
                                   {(msg.sentByStaffName ?? '担').charAt(0)}
                                 </span>
                                 <span className="truncate">{msg.sentByStaffName ?? '担当者'}</span>
@@ -3794,7 +3790,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                   <div className="flex h-full w-full flex-col overflow-hidden bg-canvas">
                     <div className="min-h-[66px] border-b border-[#E5E7EB] px-4 py-3 pr-20">
                       <p className="text-ink text-sm font-bold">顧客情報</p>
-                      <p className="text-ink-faint mt-0.5 truncate text-[10px]">メールの相手を確認できます</p>
+                      <p className="text-ink-faint mt-0.5 truncate text-micro">メールの相手を確認できます</p>
                     </div>
 
                     <div className="flex-1 overflow-y-auto divide-y divide-[#E5E7EB]">

@@ -531,7 +531,7 @@ function CustomerNotificationEditor({
   notice: { tone: 'success' | 'error'; text: string } | null
   hasUnsaved: boolean
 }) {
-  return <main data-design-node="Q55bb" className="min-w-0 space-y-4 pb-48 sm:pb-24">
+  return <div data-design-node="Q55bb" className="min-w-0 space-y-4 pb-48 sm:pb-24">
     <div className="flex flex-wrap items-start justify-between gap-3">
       <div>
         <p className="text-xs font-semibold text-ink-faint">LINE通知　›　お知らせの種類</p>
@@ -619,7 +619,7 @@ function CustomerNotificationEditor({
         <div data-design="editor-footer-actions" className="flex min-w-0 flex-wrap justify-end gap-2"><Button onClick={onClose}>キャンセル</Button><Button onClick={onTestSend} disabled={busy}>テスト受信者に送信</Button><Button onClick={onSave} disabled={busy}>{definition ? '下書きを保存' : 'お知らせを保存'}</Button>{definition ? <Button variant="primary" onClick={onPublish} disabled={busy}>顧客へのお知らせを公開</Button> : null}</div>
       </div>
     </div>
-  </main>
+  </div>
 }
 
 function LineNotificationsPage() {
@@ -1124,7 +1124,7 @@ function LineNotificationsPage() {
         </dl>
       </ConfirmDialog>
     </> : null}
-    {tab === 'customer' && !expandedSetting ? <main
+    {tab === 'customer' && !expandedSetting ? <div
       data-design-node="festr"
       data-list-state={loadState === 'ready' && settings.length === 0 ? 'empty' : loadState}
       className={styles.root}
@@ -1192,7 +1192,7 @@ function LineNotificationsPage() {
         </div>
         </>}
     </section>
-    </main> : null}
+    </div> : null}
   </>
 }
 

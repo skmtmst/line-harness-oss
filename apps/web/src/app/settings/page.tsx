@@ -36,7 +36,7 @@ import {
 
 function LockIcon() {
   return (
-    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" className="h-5 w-5 text-ink-faint">
+    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" className="h-3.5 w-3.5 text-ink-faint">
       <path d="M7 10V7a5 5 0 0 1 10 0v3M6 10h12a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1v-9a1 1 0 0 1 1-1Z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   )
@@ -269,7 +269,7 @@ function FeatureRow({ item, features, ordering, usage, featureUsage, usageRetry,
           <div className="flex flex-wrap items-center gap-2">
             <p className="whitespace-nowrap text-sm font-bold text-ink">{item.label}</p>
             {sharedSwitch && (
-              <span className="rounded-pill border-hairline whitespace-nowrap border px-1.5 py-0.5 text-[9px] font-bold text-ink-faint">
+              <span className="rounded-pill border-hairline whitespace-nowrap border px-1.5 py-0.5 text-micro font-bold text-ink-faint">
                 同じスイッチ
               </span>
             )}
@@ -307,14 +307,22 @@ function FeatureRow({ item, features, ordering, usage, featureUsage, usageRetry,
             </Button>
           </>
         )}
-        {item.required && <span className="text-xs font-bold text-ink-faint">必須</span>}
-        {item.required && <LockIcon />}
-        <Toggle
-          checked={enabled}
-          locked={item.required}
-          label={item.required ? `${item.label}は必須機能です` : `${item.label}を${enabled ? 'オフ' : 'オン'}にする`}
-          onChange={(next) => onToggle(item, next)}
-        />
+        {/*
+          ★V7：消せない項目は「必須」の札だけにする。以前は札・鍵の印・押せない切替の3つが並び、
+          押せない切替が「壊れている」ようにも見えた。
+        */}
+        {item.required ? (
+          <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-pill bg-canvas-sunken px-2.5 py-1 text-xs font-semibold text-ink-secondary" title={`${item.label}は必須機能のため、オフにできません`}>
+            <LockIcon />
+            必須
+          </span>
+        ) : (
+          <Toggle
+            checked={enabled}
+            label={`${item.label}を${enabled ? 'オフ' : 'オン'}にする`}
+            onChange={(next) => onToggle(item, next)}
+          />
+        )}
       </div>
     </li>
   )

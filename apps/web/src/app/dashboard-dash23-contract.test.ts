@@ -13,13 +13,18 @@ const source = readFileSync(join(HERE, 'page.tsx'), 'utf8')
  */
 describe('DASH-23 ダッシュボードの見出しは期間ラベルを折り返さない', () => {
   it('期間ラベルはすべてのカードで折り返し禁止', () => {
-    const periods = source.match(/text-ink-faint flex-1 [^"]*pt-0\.5[^"]*|text-ink-faint flex-1 [^"]*text-\[11px\][^"]*/g) ?? []
+    const periods = source.match(/text-ink-faint flex-1 [^"]*pt-0\.5[^"]*|text-ink-faint flex-1 [^"]*text-\[11px\][^"]*|text-ink-faint whitespace-nowrap text-xs font-normal/g) ?? []
     expect(periods.length).toBeGreaterThanOrEqual(4)
     for (const cls of periods) expect(cls).toContain('whitespace-nowrap')
   })
 
   it('カードタイトルは1行省略＋title属性で全文を見せる', () => {
     const titles = source.match(/min-w-0 truncate [^"]*(?:font-semibold|font-bold)[^"]*" title=/g) ?? []
-    expect(titles.length).toBeGreaterThanOrEqual(4)
+    expect(titles.length).toBeGreaterThanOrEqual(3)
+  })
+
+  // ★V7：「運用アラート」は切らずに出し、右の状態の文は下の段へ折り返す。
+  it('運用アラートの見出しは省略しない', () => {
+    expect(source).toContain('<h2 className="text-ink shrink-0 text-base font-bold">運用アラート</h2>')
   })
 })

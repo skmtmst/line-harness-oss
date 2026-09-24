@@ -164,23 +164,23 @@ export default function TestRecipientsSetting({ accountId }: TestRecipientsSetti
       {/* LINE連携済みのログインユーザーは、友だち検索に埋もれないよう常に候補へ出す。 */}
       {availableLoginUsers.length > 0 && (
         <div className="mb-2 rounded-lg border border-emerald-100 bg-emerald-50/60 p-2">
-          <p className="mb-1.5 text-[11px] font-medium text-emerald-800">ログインユーザーから追加</p>
+          <p className="mb-1.5 text-[11px] font-medium text-success">ログインユーザーから追加</p>
           <div className="flex flex-wrap gap-1.5">
             {availableLoginUsers.map((candidate) => (
               <button
                 key={candidate.id}
                 type="button"
                 onClick={() => addRecipient(candidate)}
-                className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-white px-2 py-1 text-xs font-medium text-emerald-800 hover:border-emerald-400 hover:bg-emerald-50"
+                className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-white px-2 py-1 text-xs font-medium text-success hover:border-emerald-400 hover:bg-emerald-50"
                 title={`${candidate.staffName}をテスト送信先に追加`}
               >
                 {candidate.pictureUrl ? (
                   <img src={candidate.pictureUrl} alt="" className="h-4 w-4 rounded-full" />
                 ) : (
-                  <span className="flex h-4 w-4 items-center justify-center rounded-full bg-emerald-100 text-[9px] font-bold">{candidate.staffName.charAt(0)}</span>
+                  <span className="flex h-4 w-4 items-center justify-center rounded-full bg-emerald-100 text-micro font-bold">{candidate.staffName.charAt(0)}</span>
                 )}
                 <span>{candidate.staffName}</span>
-                <span aria-hidden="true" className="text-emerald-500">＋</span>
+                <span aria-hidden="true" className="text-success">＋</span>
               </button>
             ))}
           </div>
@@ -197,7 +197,7 @@ export default function TestRecipientsSetting({ accountId }: TestRecipientsSetti
           className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-400"
         />
         {searching && <span className="absolute right-2 top-1.5 text-xs text-gray-400">検索中...</span>}
-        {saving && <span className="absolute right-2 top-1.5 text-xs text-green-500">保存中...</span>}
+        {saving && <span className="absolute right-2 top-1.5 text-xs text-success">保存中...</span>}
 
         {searchResults.length > 0 && (
           <ul className="absolute z-10 top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-40 overflow-y-auto">
