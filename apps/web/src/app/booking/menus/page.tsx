@@ -26,6 +26,7 @@ import BookingStaffPage from '@/app/booking/staff/page'
 import ListRange from '@/components/ui/list-range'
 import { bookingMenuError } from './menu-validation'
 import { bookingWindowEnd, businessHourSummary, minutesBeforeLabel } from '../lib/format-time'
+import { formatHoursBeforeHint, formatMinutesLengthHint } from '@/lib/format-duration'
 
 /**
  * 予約設定（設計 V2 8-2 / node nFCBf）。
@@ -580,6 +581,22 @@ const TIME_ZONE_CHOICES = [
   'UTC',
 ]
 
+/**
+ * 保存済みのタイムゾーンが候補にもIANAの一覧にも無いときだけ true（監査6 #710）。
+ * 昔の自由入力で残った綴り違いに気づけるよう、注意書きを出すための判定。
+ * IANAの一覧を取れない環境では警告しない（選択自体は動く）。
+ */
+function isUnknownTimeZone(zone: string): boolean {
+  if (TIME_ZONE_CHOICES.includes(zone)) return false
+  try {
+    const supportedValuesOf = (Intl as unknown as { supportedValuesOf?: (key: string) => string[] }).supportedValuesOf
+    if (typeof supportedValuesOf !== 'function') return false
+    return !supportedValuesOf.call(Intl, 'timeZone').includes(zone)
+  } catch {
+    return false
+  }
+}
+
 function BookingRulesEditor({ accountId, initial, canEdit, onRetry, onSaved }: {
   accountId: string
   initial: BookingSettings
@@ -644,6 +661,9 @@ function BookingRulesEditor({ accountId, initial, canEdit, onRetry, onSaved }: {
               : [draft.timeZone, ...TIME_ZONE_CHOICES]
             ).map((zone) => ({ value: zone, label: zone }))}
           />
+          {isUnknownTimeZone(draft.timeZone) ? (
+            <p className="text-danger mt-1 text-xs">一覧にないタイムゾーンです。綴りを確認してください（よく使う値: Asia/Tokyo）。</p>
+          ) : null}
         </Field>
         <RuleNumberField label="何日先まで受け付けるか" unit="日" min={1} max={365} value={draft.bookingWindowDays} onChange={(value) => set('bookingWindowDays', value)} />
         <RuleNumberField label="受付の締め切り" unit="分前" min={0} max={43200} value={draft.cutoffMinutesBefore} onChange={(value) => set('cutoffMinutesBefore', value)} humanize={minutesBeforeLabel} />
@@ -656,7 +676,7 @@ function BookingRulesEditor({ accountId, initial, canEdit, onRetry, onSaved }: {
             options={[{ value: 'automatic', label: '自動で確定' }, { value: 'manual', label: '確認してから確定' }]}
           />
         </Field>
-        <RuleNumberField label="仮押さえの保持時間" unit="分" min={1} max={1440} value={draft.holdMinutes} onChange={(value) => set('holdMinutes', value)} />
+        <RuleNumberField label="仮押さえの保持時間" unit="分" min={1} max={1440} value={draft.holdMinutes} onChange={(value) => set('holdMinutes', value)} humanize={formatMinutesLengthHint} />
         <Field label="予約枠の間隔" required>
           <SelectField
             value={String(draft.slotGranularityMinutes)}
@@ -681,7 +701,7 @@ function BookingRulesEditor({ accountId, initial, canEdit, onRetry, onSaved }: {
             <span className="text-ink-faint whitespace-nowrap text-xs">空欄は24時間前</span>
           </div>
         </Field>
-        <RuleNumberField label="当日のお知らせを送るタイミング" unit="時間前" min={1} max={72} value={draft.reminderHoursBefore} onChange={(value) => set('reminderHoursBefore', value)} />
+        <RuleNumberField label="当日のお知らせを送るタイミング" unit="時間前" min={1} max={72} value={draft.reminderHoursBefore} onChange={(value) => set('reminderHoursBefore', value)} humanize={formatHoursBeforeHint} />
       </div>
       <p className="text-ink-faint mt-4 text-xs">0分前は、開始直前まで受け付ける・キャンセルできる設定です。</p>
       {saveError && (
