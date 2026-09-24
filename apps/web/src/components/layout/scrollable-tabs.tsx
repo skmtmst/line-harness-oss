@@ -21,9 +21,12 @@ import { Tabs, type TabItem } from '../shared/tabs'
 export default function ScrollableTabs({
   items,
   actions,
+  label,
 }: {
   items: TabItem[]
   actions?: ReactNode
+  /** タブの並び全体を読み上げる名前（Issue #708）。 */
+  label?: string
 }) {
   const scrollerRef = useRef<HTMLDivElement>(null)
   const [canLeft, setCanLeft] = useState(false)
@@ -109,7 +112,7 @@ export default function ScrollableTabs({
             はみ出し、スクロールしても右のタブへ届かない。
             中身が収まるときは min-w-full で従来どおり全幅に敷く。
           */}
-          <Tabs items={items} className="w-max min-w-full" />
+          <Tabs items={items} className="w-max min-w-full" label={label} />
         </div>
         {canLeft ? (
           <span
