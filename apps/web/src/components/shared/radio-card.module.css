@@ -1,3 +1,4 @@
+@layer components {
 /*
  * ラジオカード（監査 DEEP-02／共通仕様「入力欄と選択カード」§2）。
  *
@@ -119,4 +120,5 @@
   font-size: var(--text-caption);
   font-weight: 400;
   line-height: 1.5;
+}
 }

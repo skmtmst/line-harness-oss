@@ -1,3 +1,4 @@
+@layer components {
 /*
  * 友だちの顔。Pencil ★V7「友だちの顔」（V7 文書 `KXDhj`）。
  *
@@ -46,3 +47,4 @@
 .t3 { background: var(--color-danger-bg); color: var(--color-danger); }
 .t4 { background: var(--color-info-bg); color: var(--color-info); }
 .t5 { background: var(--color-shell); color: var(--color-ink-secondary); }
+}

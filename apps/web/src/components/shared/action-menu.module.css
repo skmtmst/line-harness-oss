@@ -1,3 +1,4 @@
+@layer components {
 .menu {
   position: absolute;
   top: calc(100% + 6px);
@@ -106,4 +107,5 @@
   color: var(--color-ink-faint);
   font-size: var(--text-nano);
   line-height: 1.5;
+}
 }
