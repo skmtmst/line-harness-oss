@@ -30,6 +30,7 @@ import Breadcrumb from '@/components/shared/breadcrumb'
 import Chip, { type ChipTone } from '@/components/shared/chip'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { TableHeadRow, Th } from '@/components/shared/table'
+import { BarChart, toBarChartItems } from '@/components/shared/bar-chart'
 import { useAccount } from '@/contexts/account-context'
 import { csvCell } from '@/lib/presentation'
 import { analyticsWeekday, formatAnalyticsDate, formatAnalyticsDateTime } from './analytics-time'
@@ -2372,7 +2373,7 @@ function FriendsOverviewTab({ accountId }: { accountId: string }) {
     <AnalyticsNotice>増えた人と減った人を日ごとに並べています。減りが増えた日に何を配信したかも、同じ日付で確かめられます。</AnalyticsNotice>
     <section className="bg-canvas rounded-card border-hairline border p-4">
       <div className="mb-4 flex flex-wrap items-start justify-between gap-2">
-        <div><h2 className="font-semibold text-ink">日ごとの増減（この{days}日）</h2><p className="mt-1 text-xs text-ink-faint">上が増えた人、下が減った人です。</p></div>
+        <div><h2 className="font-semibold text-ink">日ごとの増減（この{days}日）</h2><p className="mt-1 text-xs text-ink-faint">左が増えた人、右が減った人です。</p></div>
         <AnalyticsPeriodCaption from={state.data.period.from} to={state.data.period.to} cutoffAt={state.data.dataCutoffAt} />
       </div>
       {!daysShown ? (
@@ -2390,28 +2391,20 @@ function FriendsOverviewTab({ accountId }: { accountId: string }) {
           )}
         </div>
       ) : (
-        <div
-          className="grid h-44 items-center gap-1 border-y border-hairline py-3"
-          style={{ gridTemplateColumns: `repeat(${Math.max(1, overview.days.length)}, minmax(0, 1fr))` }}
-        >
-          {overview.days.map((day, index) => {
-            const max = Math.max(1, ...overview.days.flatMap((item) => [item.added, item.removed]))
-            const campaigns = overview.campaigns.filter((item) => item.date === day.date)
-            // 棒は押すとその日の内訳を下へ出す。titleだけでは読み上げに届かないため、
-            // 同じ内容をaria-labelとaria-pressedでも伝える。
-            return <button type="button" key={day.date} onClick={() => setSelectedDate(day.date)} aria-pressed={selectedDate === day.date} className={`relative flex h-full flex-col justify-center ${selectedDate === day.date ? 'ring-2 ring-accent ring-offset-1' : ''}`} title={`${day.date} 増加${day.added}・減少${day.removed}${campaigns.length ? `・${campaigns.map((item) => item.name).join('、')}` : ''}`} aria-label={`${day.date} 増加${day.added}・減少${day.removed}${campaigns.length ? `・${campaigns.map((item) => item.name).join('、')}` : ''}`}>
-              <div className="flex h-1/2 items-end"><span className="block w-full rounded-t bg-accent" style={{ height: `${Math.max(3, day.added / max * 100)}%` }} /></div>
-              <div className="border-t border-hairline" />
-              <div className="flex h-1/2 items-start"><span className="block w-full rounded-b bg-danger" style={{ height: `${Math.max(3, day.removed / max * 100)}%` }} /></div>
-              {(index === 0 || index === overview.days.length - 1 || campaigns.length > 0) && <span className="absolute -bottom-6 left-1/2 -translate-x-1/2 whitespace-nowrap text-[10px] text-ink-faint">{day.date.slice(5).replace('-', '/')}</span>}
-            </button>
+        <BarChart
+          items={toBarChartItems(overview.days, {
+            campaigns: overview.campaigns,
+            formatTitle: (date) =>
+              `${Number(date.slice(5, 7))}月${Number(date.slice(8, 10))}日（${analyticsWeekday(date)}）`,
           })}
-        </div>
+          selectedKey={selectedDate}
+          onSelect={setSelectedDate}
+        />
       )}
-      {/* グラフを出せない間は凡例も選択日の詳細も出さない。出すと
+      {/* グラフを出せない間は施策名も選択日の詳細も出さない。出すと
           「増加0人・施策なし」という未取得の0が確定値に見える(点検ANALYTICS-01)。 */}
-      {daysShown && (
-        <div className="mt-8 flex flex-wrap gap-4 text-xs text-ink-secondary"><span>● 増えた人</span><span className="text-danger">● 減った人</span>{overview.campaigns.map((item) => <span key={item.id}>{item.date.slice(5).replace('-', '/')} {item.name}</span>)}</div>
+      {daysShown && overview.campaigns.length > 0 && (
+        <div className="mt-3 flex flex-wrap gap-4 text-xs text-ink-secondary">{overview.campaigns.map((item) => <span key={item.id}>{item.date.slice(5).replace('-', '/')} {item.name}</span>)}</div>
       )}
       {daysShown && selectedDay && (
         <div className="mt-3 rounded-control bg-canvas-sunken px-3 py-2 text-xs text-ink-secondary"><strong className="text-ink">{selectedDay.date}（{analyticsWeekday(selectedDay.date)}）</strong>　増加 {selectedDay.added}人・減少 {selectedDay.removed}人・差し引き {selectedDay.net > 0 ? '+' : ''}{selectedDay.net}人　施策 {selectedCampaigns.length ? selectedCampaigns.map((item) => item.name).join('、') : 'なし'}</div>
