@@ -1,3 +1,4 @@
+@layer components {
 /*
  * 案内帯。「この画面は何をするところか」を一行で言う帯。
  *
@@ -47,4 +48,5 @@
 .action {
   margin-left: auto;
   flex: none;
+}
 }

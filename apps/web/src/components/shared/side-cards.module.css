@@ -1,3 +1,4 @@
+@layer components {
 /*
  * 右カラム（幅390px）に置く2枚のカード。
  *
@@ -108,4 +109,5 @@
   color: var(--color-status-warn-deep);
   font-size: var(--text-micro); /* fontSize: $size-micro */
   font-weight: 500;
+}
 }

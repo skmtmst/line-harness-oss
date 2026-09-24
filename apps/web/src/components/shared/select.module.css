@@ -1,3 +1,4 @@
+@layer components {
 .root {
   position: relative;
   min-width: 0;
@@ -172,4 +173,5 @@
   margin-top: 4px;
   color: var(--color-danger);
   font-size: var(--text-caption);
+}
 }
