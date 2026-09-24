@@ -668,7 +668,7 @@ function FriendsPageInner({
             [data-friends-advanced-search] section.grid > button { justify-self: end; }
             /* U012: タグ選択を全幅にして「付いている／付いていない」は次の行へ。
                選んだタグは複数行に折り返して全文読めるようにする。 */
-            [data-friends-advanced-search] select[aria-label="タグ名を選ぶ"] { flex: 1 1 100%; }
+            [data-friends-advanced-search] input[aria-label="タグ名を選ぶ"] { flex: 1 1 100%; }
             [data-friends-advanced-search] span.rounded-pill:has(> button) {
               max-width: 100%;
               overflow-wrap: anywhere;

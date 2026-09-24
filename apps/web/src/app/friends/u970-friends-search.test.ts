@@ -42,7 +42,9 @@ describe('U011-U013 詳細検索の狭幅対応', () => {
   })
 
   it('U012: タグ選択を全幅にし、選択済みタグは折り返して全文読める', () => {
-    expect(PAGE).toContain('select[aria-label="タグ名を選ぶ"] { flex: 1 1 100%; }')
+    // タグ名の選択は候補つき入力（Combobox）へ移した。読み上げ名は同じで、欄は全幅のまま。
+    expect(DIALOG).toContain('aria-label="タグ名を選ぶ"')
+    expect(PAGE).toContain('input[aria-label="タグ名を選ぶ"] { flex: 1 1 100%; }')
     expect(PAGE).toContain('span.rounded-pill:has(> button)')
     expect(PAGE).toContain('overflow-wrap: anywhere')
   })

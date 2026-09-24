@@ -65,9 +65,13 @@ describe('一覧の取得失敗からその場で読み直せる契約', () => {
     //        app/line-notifications/operator-notification-rules.tsx。
     // #634: 一斉配信の失敗表示へ再読み込み口を足し（1増）、既に onRetry を
     //        持っていた LINE通知の2画面も契約の対象へ加えた（2増）。
+    // #772: 統合ユーザー表の失敗表示を ListState から TableStateRow へ
+    //        移したぶん1減。再読み込み口は TableStateRow の onRetry に
+    //        そのまま残し、数だけが減る。
     // V7 TargetMissing: 追加設定の公開・つながり・シナリオ結果の本体の
-    //        失敗表示を TargetMissing の error へ寄せた。面の数は変わらない。
-    expect(errorCount).toBe(27)
+    //        失敗表示を TargetMissing の error へ寄せた（ListState 23＋
+    //        TargetMissing 3で合計は変わらない）。
+    expect(errorCount).toBe(26)
   })
 
   it('URLだけでは対象を特定できない状態に、直らない再読み込みを出さない', () => {

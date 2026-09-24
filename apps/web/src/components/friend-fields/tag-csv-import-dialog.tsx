@@ -11,6 +11,7 @@ import type {
 } from '@line-crm/shared'
 import { api } from '@/lib/api'
 import Button from '@/components/shared/button'
+import FileDropzone, { AttachmentRow } from '@/components/shared/file-drop'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import {
@@ -45,6 +46,12 @@ function todayInJapan() {
   return new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Tokyo' }).format(new Date())
 }
 
+/** 選んだCSVの大きさを行に出すだけの短い表記。 */
+function formatTagCsvBytes(bytes: number): string {
+  if (bytes >= 1024 * 1024) return `${Math.round(bytes / (1024 * 1024) * 10) / 10}MB`
+  return `${Math.max(1, Math.round(bytes / 1024))}KB`
+}
+
 export default function TagCsvImportDialog({
   open,
   onClose,
@@ -58,11 +65,11 @@ export default function TagCsvImportDialog({
   const [phase, setPhase] = useState<Phase>('select')
   const [rows, setRows] = useState<TagCsvImportInputRow[]>([])
   const [fileName, setFileName] = useState('')
+  const [fileSize, setFileSize] = useState<number | null>(null)
   const [preview, setPreview] = useState<TagCsvImportPreview | null>(null)
   const [result, setResult] = useState<TagCsvImportResult | null>(null)
   const [filter, setFilter] = useState<PreviewFilter>('all')
   const [error, setError] = useState('')
-  const [fileInputKey, setFileInputKey] = useState(0)
   const busy = phase === 'saving'
   const panelRef = useOverlayFocus(open, onClose, busy)
 
@@ -80,8 +87,9 @@ export default function TagCsvImportDialog({
     setError('')
     setRows([])
     setPreview(null)
-    if (!file) return setFileName('')
+    if (!file) { setFileName(''); setFileSize(null); return }
     setFileName(file.name)
+    setFileSize(file.size)
     if (file.size > TAG_CSV_MAX_BYTES) {
       setError('CSVは1MB以下にしてください')
       return
@@ -97,11 +105,11 @@ export default function TagCsvImportDialog({
     setPhase('select')
     setRows([])
     setFileName('')
+    setFileSize(null)
     setPreview(null)
     setResult(null)
     setFilter('all')
     setError('')
-    setFileInputKey((current) => current + 1)
   }
 
   const confirmRows = async () => {
@@ -181,22 +189,39 @@ export default function TagCsvImportDialog({
               <li>先頭行は「タグ名,フォルダ」の見出しにできます。</li>
               <li>確認画面で、新規・見送り・入力確認を確かめてから登録します。</li>
             </ol>
-            <label className={styles.fileField}>
-              <input
-                key={fileInputKey}
-                className={styles.fileInput}
-                aria-label="登録するCSV"
-                type="file"
-                accept=".csv,text/csv"
-                onChange={(event) => void pickFile(event.target.files?.[0])}
-              />
-              <span className={styles.fileButton}>CSVを選ぶ</span>
-              <span className={`${styles.muted} ${styles.fileName}`} title={fileName || undefined}>{fileName || 'ファイル未選択'}</span>
-              <span className={`${styles.muted} ${styles.fileRule}`}>UTF-8・最大500件</span>
-            </label>
+            {/*
+              登録の実行は1回のAPI呼び出しで、途中の割合を測れない。
+              実測できない進みは出さない（Progress は足さない）。
+            */}
+            <FileDropzone
+              title="ここにCSVを置く"
+              hint="UTF-8・最大500件・1MB以下"
+              accept=".csv,text/csv"
+              chooseLabel="CSVを選ぶ"
+              onFiles={(files) => void pickFile(files[0])}
+            />
+            {fileName ? (
+              <div>
+                {error && rows.length === 0 ? (
+                  <AttachmentRow
+                    name={fileName}
+                    status="error"
+                    errorText={error}
+                    onRemove={resetSelection}
+                  />
+                ) : (
+                  <AttachmentRow
+                    name={fileName}
+                    meta={fileSize != null ? `${rows.length}件・${formatTagCsvBytes(fileSize)}` : `${rows.length}件`}
+                    onRemove={resetSelection}
+                  />
+                )}
+              </div>
+            ) : null}
             <div className={styles.note}><Info aria-hidden="true" size={18} /><span>フォルダが見つからない行は、確認画面で知らせたうえで未分類として登録します。</span></div>
           </div>
-          {error ? <p className={styles.error} role="alert">{error}</p> : null}
+          {/* ファイル由来の誤りは上の行に出ているので、ここでは重ねて出さない。 */}
+          {error && !(fileName && rows.length === 0) ? <p className={styles.error} role="alert">{error}</p> : null}
           <div className={styles.actions}>
             <Button type="button" onClick={close}>キャンセル</Button>
             <Button type="button" variant="primary" disabled={rows.length === 0} onClick={() => void confirmRows()}>取り込む内容を確認</Button>
