@@ -184,6 +184,7 @@ import Pagination from '@/components/shared/pagination'
 import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import FilterChip from '@/components/shared/filter-chip'
 import Dialog from '@/components/shared/dialog'
 import { TextField } from '@/components/shared/text-field'
 import KpiCollapse from '@/components/ui/kpi-collapse'
@@ -773,7 +774,7 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
         />
       </KpiCollapse>
 
-      <p className="bg-info-bg text-info mb-4 rounded-control px-4 py-3 text-sm font-semibold">
+      <p className="bg-info-bg text-ink-secondary mb-4 rounded-control px-4 py-3 text-xs">
         成果地点は「数え方の決めごと」です。ここで決めたものを、案件・自動応答・分析などから呼び出して使います。
       </p>
 
@@ -827,17 +828,16 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
             ['stopped', `止めている ${definitions?.stateCounts.stopped ?? 0}`],
             ['unused', `どこからも使われていない ${definitions?.stateCounts.unused ?? 0}`],
           ] as const).map(([value, label]) => (
-            <Button
+            <FilterChip
               key={value}
-              variant={status === value ? 'primary' : 'secondary'}
-              aria-pressed={status === value}
-              onClick={() => {
+              selected={status === value}
+              onChange={() => {
                 setStatus(value)
                 setPage(1)
               }}
             >
               {label}
-            </Button>
+            </FilterChip>
           ))}
           <Select
             aria-label="並び順"
@@ -893,7 +893,7 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
                 <Th align="right">この30日</Th>
                 <Th align="right">金額</Th>
                 <Th>使われている場所</Th>
-                <Th align="right">操作</Th>
+                <Th align="right" className="w-52">操作</Th>
               </TableHeadRow>
             </thead>
             <tbody className="divide-hairline divide-y">
@@ -904,8 +904,11 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
                   className={point.id === highlightId ? 'bg-accent-soft' : 'hover:bg-canvas-sunken'}
                 >
                   <td className="text-ink w-1/5 px-4 py-3 text-sm font-medium">
-                    {point.name}
-                    <p className="text-ink-faint mt-0.5 text-xs">{EVENT_TYPE_LABELS[point.sourceType] ?? 'その他'}</p>
+                    <span className="block truncate" title={point.name}>{point.name}</span>
+                    {/* 辞書に無い種別は中身のない印を出さない。具体的な種別だけ添える。 */}
+                    {EVENT_TYPE_LABELS[point.sourceType] ? (
+                      <p className="text-ink-faint mt-0.5 text-xs">{EVENT_TYPE_LABELS[point.sourceType]}</p>
+                    ) : null}
                     {point.state !== 'active' ? (
                       <p
                         className={`mt-1 inline-block rounded px-1.5 py-0.5 text-xs font-semibold ${
@@ -920,8 +923,8 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
                     ) : null}
                   </td>
                   <td className="text-ink-secondary w-1/4 px-4 py-3 text-sm">
-                    {sourceTriggerLabel(point)}
-                    <p className="text-ink-faint mt-0.5 text-xs">
+                    <span className="block truncate" title={sourceTriggerLabel(point)}>{sourceTriggerLabel(point)}</span>
+                    <p className="text-ink-faint mt-0.5 truncate text-xs" title={`${measureLabel(point.measureMethod)}・${deduplicationLabel(point.deduplicationMode, point.deduplicationWindowDays)}`}>
                       {measureLabel(point.measureMethod)}・{deduplicationLabel(point.deduplicationMode, point.deduplicationWindowDays)}
                     </p>
                   </td>
@@ -936,9 +939,9 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
                   <td className={point.usageCount === 0
                     ? 'text-warning w-1/5 px-4 py-3 text-sm'
                     : 'text-ink-secondary w-1/5 px-4 py-3 text-sm'}>
-                    {usageLabel(point)}
+                    <span className="block truncate" title={usageLabel(point)}>{usageLabel(point)}</span>
                   </td>
-                  <td className="px-4 py-3 text-right">
+                  <td className="px-4 py-3 text-right whitespace-nowrap">
                     {/*
                       幅の決まっていない列へ2つのボタンを右詰めで入れると、
                       狭い幅で内容が左の「使われている場所」へはみ出して
@@ -947,7 +950,7 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
                     <div className="relative flex items-center justify-end gap-2">
                       <Button
                         href={`/analytics?tab=funnel&conversionPointId=${encodeURIComponent(point.id)}&conversionPointName=${encodeURIComponent(point.name)}`}
-                        variant="primary"
+                        variant="secondary"
                       >
                         使う場所を足す
                       </Button>
@@ -1619,10 +1622,10 @@ function ReportTab({ accountId }: { accountId: string | null }) {
                 return (
                   <tr key={row.conversionPointId} className="hover:bg-canvas-sunken">
                     <td className="text-ink px-4 py-3 text-sm font-medium">
-                      {row.conversionPointName}
-                      <p className="text-ink-faint mt-0.5 text-xs">
-                        {EVENT_TYPE_LABELS[row.sourceType] ?? 'その他'}
-                      </p>
+                      <span className="block truncate" title={row.conversionPointName}>{row.conversionPointName}</span>
+                      {EVENT_TYPE_LABELS[row.sourceType] ? (
+                        <p className="text-ink-faint mt-0.5 text-xs">{EVENT_TYPE_LABELS[row.sourceType]}</p>
+                      ) : null}
                     </td>
                     <td className="text-ink px-4 py-3 text-right text-sm tabular-nums">
                       {row.netCount.toLocaleString('ja-JP')}件
