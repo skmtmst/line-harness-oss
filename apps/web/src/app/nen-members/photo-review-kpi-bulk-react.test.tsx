@@ -11,8 +11,8 @@ import PhotoReviewsPage from './page'
  *    出ていた。59分/61分/1439分/1441分/43200分超の境界で、
  *    分・約○時間・約○日・約○ヶ月へ切り替わることを見る。
  * 2. 「0枚を選択中」でも「まとめて通す」が緑のままに見えた。
- *    0件では「まとめて通す」「まとめて戻す」の両方が無効で、
- *    理由（写真を選んでください）が画面へ出ることを見る。
+ *    いまは選ぶ前はまとめ操作の帯自体を出さない（0枚での確認窓を
+ *    開きようがなくする）。1枚以上選んだら帯が出て両方が押せることを見る。
  *
  * 差し替えるのは通信とアカウントだけ。api・fetchApi は実物を通す。
  */
@@ -164,14 +164,14 @@ describe('「1枚にかかる時間」の読みやすい単位（Issue #666）',
 })
 
 describe('0件選択の一括操作（Issue #666）', () => {
-  it('0枚を選択中では「まとめて通す」「まとめて戻す」の両方が無効で理由が出る', async () => {
+  it('選ぶ前はまとめ操作の帯自体を出さない', async () => {
     net.handler = listHandler()
     await render()
 
-    expect(host.textContent).toContain('0枚を選択中')
-    expect(bulkButton('まとめて通す').disabled).toBe(true)
-    expect(bulkButton('まとめて戻す').disabled).toBe(true)
-    expect(host.textContent).toContain('写真を選んでください')
+    // 帯が無いので「0枚をまとめて通す」確認窓は開きようがない。
+    expect(host.textContent).not.toContain('枚を選択中')
+    expect(host.textContent).not.toContain('まとめて通す')
+    expect(host.textContent).not.toContain('まとめて戻す')
   })
 
   it('写真を選ぶと両方の一括ボタンが押せる形になる', async () => {
