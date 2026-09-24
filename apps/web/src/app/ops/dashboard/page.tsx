@@ -133,7 +133,7 @@ export default function OpsDashboardPage() {
         <section aria-label="お問い合わせ（チケット）" className="rounded-card border border-hairline bg-canvas px-5 py-4 xl:col-span-2">
           <div className="mb-2 flex items-center justify-between">
             <h3 className="text-label font-bold text-ink">お問い合わせ（チケット）</h3>
-            <Link href="/ops/support" className="text-caption text-accent-deep underline-offset-2 hover:underline">すべて見る</Link>
+            <Link href="/ops/support" className="text-caption text-action underline-offset-2 hover:underline">すべて見る</Link>
           </div>
           {data ? (
             <>
@@ -225,7 +225,7 @@ function AlertRow({ label, count, href }: { label: string; count: number; href: 
     <li className="flex items-center gap-3 py-2.5">
       <span className="text-caption text-ink">{label}</span>
       <span className="ml-auto">{count > 0 ? <Chip tone="danger">{count}件</Chip> : <Chip tone="neutral">0件</Chip>}</span>
-      <Link href={href} className="text-micro text-accent-deep underline-offset-2 hover:underline">開く</Link>
+      <Link href={href} className="text-micro text-action underline-offset-2 hover:underline">開く</Link>
     </li>
   )
 }

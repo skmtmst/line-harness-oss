@@ -1,6 +1,7 @@
 'use client'
 
-import SelectField from '@/components/shared/select-field'
+import SortSelect from '@/components/ui/sort-select'
+import PageSizeSelect from '@/components/ui/page-size-select'
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { MoreHorizontal, Trash2, TriangleAlert } from 'lucide-react'
 import FolderPanel, { FOLDER_RAIL_STYLE } from '@/components/shared/folder-panel'
@@ -293,10 +294,10 @@ export default function AutoRepliesPage() {
             return (
               <span
                 key={ea.accountId}
-                className="inline-flex max-w-full items-center truncate px-1.5 py-0.5 rounded text-[10px] bg-canvas-sunken text-ink-faint line-through"
+                className="inline-flex max-w-full items-center gap-0.5 truncate px-1.5 py-0.5 rounded text-[10px] bg-canvas-sunken text-ink-faint line-through"
                 title={title}
               >
-                {label}
+                {word.mark} {label}
               </span>
             )
           }
@@ -608,31 +609,37 @@ export default function AutoRepliesPage() {
         </Button>
       </div>
 
-      {/* 複数当てはまったときの挙動。書いていないと必ず問い合わせになる。 */}
-      <div className="bg-info-bg text-info mb-4 rounded-lg p-3 text-xs leading-relaxed">
-        上にあるルールから順に見て、<strong>最初に当てはまった1つだけ</strong>が動きます。
-        時間帯や連投の設定で見送られたときは、その次のルールを見ます。
-        並び順は「評価順」の数字で決まり、小さいほど先に見ます。
-      </div>
-
-      {/* 「適用アカウント」欄の札の読み方。札の見た目と1対1で並べる。 */}
-      <div className="bg-info-bg border-hairline text-info mb-4 space-y-1 rounded-lg border p-3 text-xs">
-        {EFFECTIVE_LEGEND.map((row) => (
-          <p key={row.status}>
-            <span
-              className={
-                row.status === 'reply'
-                  ? 'inline-flex items-center px-1.5 py-0.5 rounded bg-success-bg text-success'
-                  : row.status === 'silent'
-                    ? 'inline-flex items-center px-1.5 py-0.5 rounded bg-warning-bg text-warning'
-                    : 'inline-flex items-center px-1.5 py-0.5 rounded bg-canvas-sunken text-ink-faint line-through'
-              }
-            >
-              {row.mark ? `${row.mark} ` : ''}アカウント名
-            </span>{' '}
-            {row.text}
-          </p>
-        ))}
+      {/*
+        案内は1本の帯にまとめる。2段の帯が連続すると、肝心の一覧が
+        画面の下へ追いやられていた（監査 A13）。
+        上段は複数当てはまったときの挙動、下段は「適用アカウント」欄の
+        札の読み方。札の見た目と1対1で並べる。
+        #702: 凡例の札は行側と同じトークンで出す（黄は warning 系・4.5:1以上）。
+      */}
+      <div className="bg-info-bg border-hairline text-info mb-4 rounded-lg border p-3 text-xs">
+        <p className="leading-relaxed">
+          上にあるルールから順に見て、<strong>最初に当てはまった1つだけ</strong>が動きます。
+          時間帯や連投の設定で見送られたときは、その次のルールを見ます。
+          並び順は「評価順」の数字で決まり、小さいほど先に見ます。
+        </p>
+        <div className="mt-2 space-y-1 border-t border-info/20 pt-2">
+          {EFFECTIVE_LEGEND.map((row) => (
+            <p key={row.status}>
+              <span
+                className={
+                  row.status === 'reply'
+                    ? 'inline-flex items-center px-1.5 py-0.5 rounded bg-success-bg text-success'
+                    : row.status === 'silent'
+                      ? 'inline-flex items-center px-1.5 py-0.5 rounded bg-warning-bg text-warning'
+                      : 'inline-flex items-center px-1.5 py-0.5 rounded bg-canvas-sunken text-ink-faint line-through'
+                }
+              >
+                {row.mark ? `${row.mark} ` : ''}アカウント名
+              </span>{' '}
+              {row.text}
+            </p>
+          ))}
+        </div>
       </div>
 
       <div
@@ -653,20 +660,11 @@ export default function AutoRepliesPage() {
           aria-label="自動応答名で検索"
           className="border-hairline rounded-control focus:ring-accent min-w-45 flex-1 border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
         />
-        <span className="text-ink-faint text-xs whitespace-nowrap">並び順</span>
-        <SelectField value={sortKey} onChange={(e) => setSortKey(e.target.value as SortKey)} aria-label="並び順" options={[{ value: "hits", label: "ヒット数が多い順" }, { value: "priority", label: "評価順" }, { value: "name", label: "名前順" }, { value: "created", label: "作った順" }]} className="border-hairline rounded-control focus:ring-accent border px-2 py-2 text-sm focus:ring-2 focus:outline-none" />
-        <span className="text-ink-faint text-xs whitespace-nowrap">表示</span>
-        <SelectField
-          size="compact"
-          value={pageSize}
-          onChange={(e) => setPageSize(Number(e.target.value))}
-          aria-label="表示件数"
-          options={[{ value: '20', label: '20件' }, { value: '50', label: '50件' }, { value: '100', label: '100件' }]}
-        />
       </div>
 
+      {/* #668: 並びは「絞り込み → 並び順 → 表示件数」の1形。 */}
       <div data-design="Saved" className="mb-3 flex flex-wrap items-center gap-2">
-        <span className="text-ink-faint text-xs whitespace-nowrap">保存した条件</span>
+        <span className="text-ink-faint text-xs whitespace-nowrap">よく使う絞り込み</span>
         {SAVED_FILTERS.map((f) => {
           const on = savedFilter === f.key
           return (
@@ -685,6 +683,13 @@ export default function AutoRepliesPage() {
             </button>
           )
         })}
+        <SortSelect
+          className="ml-auto"
+          value={sortKey}
+          onChange={(value) => setSortKey(value as SortKey)}
+          options={[{ value: 'hits', label: 'ヒット数が多い順' }, { value: 'priority', label: '評価順' }, { value: 'name', label: '名前順' }, { value: 'created', label: '作った順' }]}
+        />
+        <PageSizeSelect value={pageSize} onChange={setPageSize} />
       </div>
 
       {folderDialogOpen && (

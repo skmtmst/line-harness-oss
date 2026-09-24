@@ -1005,7 +1005,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
                 */}
                 {typeof friend.formSubmissionTotal === 'number' && friend.formSubmissionTotal > 0 && (
                   <span className="text-[10px] text-gray-400">
-                    全{friend.formSubmissionTotal}件中 {friend.formSubmissions.length}件を表示
+                    {friend.formSubmissionTotal.toLocaleString('ja-JP')}件中 1〜{friend.formSubmissions.length.toLocaleString('ja-JP')}件を表示
                   </span>
                 )}
               </div>

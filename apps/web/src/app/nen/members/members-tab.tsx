@@ -191,7 +191,7 @@ function MemberRow({ member, rankOrder }: { member: NenMemberRow; rankOrder: str
       <Td><span className="text-label text-ink-secondary">{member.lastPurchasedAt ? member.lastPurchasedAt.slice(5, 10).replace('-', '/') : '—'}</span></Td>
       <Td align="right"><span className="text-label font-semibold tabular-nums text-ink">{member.mileRatePercent == null ? '—' : `${member.mileRatePercent}%`}</span></Td>
       <Td align="right">
-        <Link href={`/friends/detail?id=${encodeURIComponent(member.friendId)}`} className="text-label font-semibold text-accent-deep">詳細</Link>
+        <Link href={`/friends/detail?id=${encodeURIComponent(member.friendId)}`} className="text-label font-semibold text-action">詳細</Link>
       </Td>
     </Tr>
   )

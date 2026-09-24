@@ -224,7 +224,7 @@ function HealthRow({ row, onOpenSummary }: { row: NenHealthRow; onOpenSummary: (
         )}
       </Td>
       <Td align="right">
-        <button type="button" onClick={() => onOpenSummary(row.pet.id)} className="text-label font-semibold text-accent-deep">30日のまとめ</button>
+        <button type="button" onClick={() => onOpenSummary(row.pet.id)} className="text-label font-semibold text-action">30日のまとめ</button>
       </Td>
     </Tr>
   )

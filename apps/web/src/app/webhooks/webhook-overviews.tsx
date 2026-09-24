@@ -1033,5 +1033,5 @@ function GuideTerm({ name, children }: { name: string; children: React.ReactNode
 }
 
 function GuideLink({ href, children }: { href: string; children: React.ReactNode }) {
-  return <Link href={href} className="text-accent-deep block font-bold">→ {children}</Link>
+  return <Link href={href} className="text-action block font-bold">→ {children}</Link>
 }

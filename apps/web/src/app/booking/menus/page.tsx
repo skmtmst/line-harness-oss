@@ -23,6 +23,7 @@ import { useAccount } from '@/contexts/account-context'
 import { Suspense } from 'react'
 import { useMergedTab } from '@/components/layout/merged-tabs'
 import BookingStaffPage from '@/app/booking/staff/page'
+import ListRange from '@/components/ui/list-range'
 import { bookingMenuError } from './menu-validation'
 import { bookingWindowEnd, businessHourSummary } from '../lib/format-time'
 
@@ -397,7 +398,13 @@ function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuC
                 {visible.map((m) => (
                   <tr key={m.id} className={`hover:bg-canvas-sunken ${m.is_active ? '' : 'text-ink-faint'}`}>
                     <td className="px-4 py-3 text-sm font-medium">
-                      <span className="text-ink-faint mr-4" aria-hidden="true">⠿</span>{m.name}{m.is_active ? '' : '（休止中）'}
+                      {/*
+                        行頭の持ち手の飾りは外した。ドラッグで並び替えられる
+                        ように見えるが実際は押せず、並び順は「中身を見る」の
+                        中の数値欄で変える（監査 A12）。動かせない印を置くと
+                        壊れているように見える。
+                      */}
+                      {m.name}{m.is_active ? '' : '（休止中）'}
                       {m.description && <span className="text-ink-faint mt-1 block max-w-72 truncate text-xs" title={m.description}>{m.description}</span>}
                       {m.category_label && (
                         <span className="bg-canvas-sunken text-ink-faint ml-2 inline-block rounded px-2 py-0.5 text-xs">
@@ -408,7 +415,7 @@ function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuC
                     <td className="px-4 py-3 text-sm text-ink-secondary tabular-nums">
                       {m.duration_minutes} 分
                     </td>
-                    <td className={`px-4 py-3 text-sm text-right tabular-nums ${menuPriceLabel(m) === '無料' ? 'text-accent-deep font-semibold' : ''}`}>
+                    <td className={`px-4 py-3 text-sm text-right tabular-nums ${menuPriceLabel(m) === '無料' ? 'text-ink font-semibold' : ''}`}>
                       {menuPriceLabel(m)}
                     </td>
                     <td className="px-4 py-3 text-sm text-ink-secondary">
@@ -451,7 +458,7 @@ function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuC
       )}
 
       <div className="mt-3 flex items-center justify-between gap-3">
-        <span className="text-ink-faint text-xs">メニュー {settings?.menuCount ?? items.length}つのうち {visible.length}つを表示</span>
+        <ListRange label="メニュー" total={settings?.menuCount ?? items.length} first={visible.length === 0 ? 0 : 1} last={visible.length} />
         <Pagination page={page} pageCount={pageCount} onPageChange={setPage} ariaLabel="予約メニューのページ送り" />
       </div>
       </>}
@@ -1157,7 +1164,7 @@ function EditMenuModal({
                 <button
                   type="button"
                   onClick={() => void onReloadLatest()}
-                  className="text-accent-deep mt-1 text-xs font-semibold underline"
+                  className="text-action mt-1 text-xs font-semibold underline"
                 >
                   最新の内容を読み直す
                 </button>

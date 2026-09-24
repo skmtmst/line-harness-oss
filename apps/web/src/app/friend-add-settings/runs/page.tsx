@@ -20,6 +20,7 @@ import Select from '@/components/shared/select'
 import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
 import SummaryCard from '@/components/shared/summary-card'
 import StickyBar from '@/components/shared/sticky-bar'
+import ListRange from '@/components/ui/list-range'
 
 type KindFilter = 'all' | FriendAddEventKind
 type AttributionFilter = 'all' | FriendAddEventAttributionStatus
@@ -320,7 +321,7 @@ function FriendAddRunsInner() {
   return (
     <div data-design-node="P2J0Te" className="space-y-4 pb-8">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <Link className="text-sm font-bold text-accent-deep hover:underline" href="/friend-add-settings">← 友だち追加時の配信</Link>
+        <Link className="text-sm font-bold text-action hover:underline" href="/friend-add-settings">← 友だち追加時の配信</Link>
         <div className="flex gap-2">
           <details className="relative">
             <summary className="cursor-pointer list-none rounded-control border border-hairline bg-canvas px-3 py-2 text-sm font-bold">絞り込み</summary>
@@ -371,7 +372,7 @@ function FriendAddRunsInner() {
       {ruleIdFilter ? (
         <p className="rounded-control border border-hairline bg-canvas-sunken px-3 py-2 text-xs text-ink-secondary">
           この設定の実行結果だけを表示しています。
-          <Link href="/friend-add-settings/runs" className="ml-2 font-bold text-accent-deep hover:underline">すべての記録へ戻る</Link>
+          <Link href="/friend-add-settings/runs" className="ml-2 font-bold text-action hover:underline">すべての記録へ戻る</Link>
         </p>
       ) : null}
 
@@ -450,7 +451,7 @@ function FriendAddRunsInner() {
                     <div className="mt-1.5 flex items-center justify-between gap-3 pl-12">
                       <time className="min-w-0 text-xs text-ink-secondary" dateTime={item.receivedAt}>{formatJstDateTime(item.receivedAt)}</time>
                       <Link
-                        className="shrink-0 text-xs font-bold text-accent-deep hover:underline"
+                        className="shrink-0 text-xs font-bold text-action hover:underline"
                         href={`/friend-add-settings/runs/detail?id=${encodeURIComponent(item.id)}`}
                       >
                         詳細
@@ -476,23 +477,25 @@ function FriendAddRunsInner() {
             <p className="mt-3 text-xs text-ink-faint">通常URLや公式QRから追加された記録は0件にせず「経路は取得できません」と表示します。</p>
           </section>
 
-          {(canPrev || Boolean(data.nextCursor)) && <div className="flex items-center justify-between gap-3">
-            <p className="text-sm text-ink-faint">{cursorPage}ページ目・このページは{data.items.length}件</p>
-            <div className="flex gap-2">
-              <Button
-                onClick={() => goPrev()}
-                disabled={!canPrev || loading}
-              >
-                前へ
-              </Button>
-              <Button
-                onClick={() => goNext(data.nextCursor)}
-                disabled={!data.nextCursor || loading}
-              >
-                次へ
-              </Button>
-            </div>
-          </div>}
+          <div className="flex items-center justify-between gap-3">
+            <ListRange total={data.total} first={data.total === 0 ? 0 : (cursorPage - 1) * 20 + 1} last={(cursorPage - 1) * 20 + data.items.length} />
+            {(canPrev || Boolean(data.nextCursor)) && (
+              <div className="flex gap-2" aria-label="実行結果のページ送り">
+                <Button
+                  onClick={() => goPrev()}
+                  disabled={!canPrev || loading}
+                >
+                  前へ
+                </Button>
+                <Button
+                  onClick={() => goNext(data.nextCursor)}
+                  disabled={!data.nextCursor || loading}
+                >
+                  次へ
+                </Button>
+              </div>
+            )}
+          </div>
         </div>
       )}
         </main>

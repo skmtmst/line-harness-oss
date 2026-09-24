@@ -281,7 +281,7 @@ function MembersInner() {
                               type="button"
                               disabled={resendingId === member.id}
                               onClick={() => void resend(member)}
-                              className="text-label font-semibold text-accent-deep hover:underline disabled:opacity-50"
+                              className="text-label font-semibold text-action hover:underline disabled:opacity-50"
                             >
                               {resendingId === member.id ? '送信中…' : '招待メールを再送'}
                             </button>
@@ -290,7 +290,7 @@ function MembersInner() {
                             type="button"
                             onClick={() => { setDialogError(''); setDialog({ open: true, member }) }}
                             aria-label={`${member.name}さんの権限を変更`}
-                            className="text-label font-semibold text-accent-deep hover:underline"
+                            className="text-label font-semibold text-action hover:underline"
                           >
                             権限を変更
                           </button>
@@ -383,7 +383,7 @@ function MembersInner() {
                                   type="button"
                                   disabled={resendingId === member.id}
                                   onClick={() => void resend(member)}
-                                  className="text-label font-semibold text-accent-deep hover:underline disabled:opacity-50"
+                                  className="text-label font-semibold text-action hover:underline disabled:opacity-50"
                                 >
                                   {resendingId === member.id ? '送信中…' : '再送'}
                                 </button>
@@ -392,7 +392,7 @@ function MembersInner() {
                                 type="button"
                                 onClick={() => { setDialogError(''); setDialog({ open: true, member }) }}
                                 aria-label={`${member.name}さんの権限を変更`}
-                                className="text-label font-semibold text-accent-deep hover:underline"
+                                className="text-label font-semibold text-action hover:underline"
                               >
                                 変更
                               </button>

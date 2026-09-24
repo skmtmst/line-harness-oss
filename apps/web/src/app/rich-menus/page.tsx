@@ -2,6 +2,7 @@
 
 import SelectField from '@/components/shared/select-field'
 import SearchField from '@/components/shared/search-field'
+import ListRange from '@/components/ui/list-range'
 import { useDeferredValue, useEffect, useState, useCallback, useRef } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -777,7 +778,7 @@ export default function RichMenusListPage() {
       </div>
 
       <div data-design="Saved" className="mb-3 flex flex-wrap items-center gap-2">
-        <span className="text-ink-faint text-xs whitespace-nowrap">保存した検索</span>
+        <span className="text-ink-faint text-xs whitespace-nowrap">よく使う絞り込み</span>
         {SAVED_FILTERS.map((f) => {
           const on = savedFilter === f.key
           return (
@@ -983,8 +984,8 @@ export default function RichMenusListPage() {
 
             {!loading && !error && groupTotal > 0 ? (
               <div className="mt-4 flex items-center justify-between gap-4">
-                <p className="text-ink-faint text-xs">
-                  {groupTotal}件中 {(currentPage - 1) * effectivePageSize + 1}〜{Math.min(currentPage * effectivePageSize, groupTotal)}件を表示
+                <p>
+                  <ListRange total={groupTotal} first={(currentPage - 1) * effectivePageSize + 1} last={Math.min(currentPage * effectivePageSize, groupTotal)} />
                 </p>
                 <Pagination page={currentPage} pageCount={pageCount} onPageChange={setPage} ariaLabel="リッチメニューのページ送り" />
               </div>
@@ -1115,7 +1116,7 @@ export default function RichMenusListPage() {
               {deleteTarget.group.status === 'draft' ? <li>
                  <strong className="text-danger">元に戻せません。</strong>
               </li> : <>
-                <li><strong className="text-accent-deep">取り下げは、もう一度公開すれば戻せます。</strong></li>
+                <li><strong className="text-ink">取り下げは、もう一度公開すれば戻せます。</strong></li>
                 <li>取り下げたあと、管理画面から削除できます。</li>
               </>}
             </ul>
