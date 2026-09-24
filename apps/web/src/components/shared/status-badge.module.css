@@ -1,3 +1,4 @@
+@layer components {
 .badge {
   display: inline-flex;
   align-items: center;
@@ -30,9 +31,13 @@
   color: var(--color-status-warn-deep);
 }
 
+/*
+ * #669 成功の札の文字は success に1本化する。accent-deep（#087a3e）と
+ * success（#047833）が同役で共存していた。地は同値（#e8f8ee）のまま。
+ */
 .success {
-  background: var(--color-accent-soft);
-  color: var(--color-accent-deep);
+  background: var(--color-success-bg);
+  color: var(--color-success);
 }
 
 .danger {
@@ -42,4 +47,5 @@
    * だと薄い地で 3.53:1 しかなく AA(4.5:1)に届かない。#b3261e なら 5.89:1。
    */
   color: var(--color-danger);
+}
 }

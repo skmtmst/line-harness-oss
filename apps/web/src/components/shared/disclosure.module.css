@@ -1,3 +1,4 @@
+@layer components {
 /*
  * 開閉する欄。Pencil ★V7「開閉する欄」（V7 文書 `v9M8P8`）。
  *
@@ -93,4 +94,5 @@
 
 .compact .body {
   padding: 4px 12px 12px;
+}
 }

@@ -1,3 +1,4 @@
+@layer components {
 .headRow {
   height: 44px;
   border-bottom: 1px solid var(--color-hairline);
@@ -25,4 +26,5 @@
 
 .center {
   text-align: center;
+}
 }

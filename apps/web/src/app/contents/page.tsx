@@ -67,6 +67,13 @@ const PAGE_SIZE_OPTIONS = [
   { value: '50', label: '50件表示' },
 ]
 
+/*
+ * #670 15: 札の操作5個は同じ寸法で並べる。素の小ボタンと共通 Button が
+ * 混ざると高さ・枠・角丸がばらつき、折返しで積み方がずれる。札内では
+ * compact 1種(下の5個と同字)にそろえる。共通 Button の40pxは札の脚には
+ * 大きい。字面をそのまま書く(design-debt の unresolved-classname を増やさない)。
+ */
+
 /**
  * 絞り込みの種別。保存できる kind は image / video / audio / file の4つ。
  * file はいま PDF だけなので、そのまま「PDF」と呼ぶ。
@@ -1120,7 +1127,7 @@ function MediaLibraryInner() {
                     disabled={!canManageMedia}
                     title={canManageMedia ? '使用箇所を見る' : managementPermissionReason}
                     aria-label={`${item.filename}の使用箇所`}
-                    className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded border px-2 py-1 text-[11px] disabled:cursor-not-allowed disabled:opacity-50"
+                    className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded border px-2 py-1 text-[11px] font-semibold whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     使用箇所
                   </button>
@@ -1129,7 +1136,7 @@ function MediaLibraryInner() {
                     onClick={() => { setRenameError(''); setRenaming({ id: item.id, value: item.filename }) }}
                     title="名前を変える"
                     aria-label={`${item.filename}の名前を変える`}
-                    className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded border px-2 py-1 text-[11px]"
+                    className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded border px-2 py-1 text-[11px] font-semibold whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     編集
                   </button>
@@ -1139,7 +1146,7 @@ function MediaLibraryInner() {
                     disabled={downloadingIds.has(item.id)}
                     title="ダウンロード"
                     aria-label={`${item.filename}をダウンロード`}
-                    className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded border px-2 py-1 text-[11px] disabled:opacity-50"
+                    className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded border px-2 py-1 text-[11px] font-semibold whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     {downloadingIds.has(item.id) ? '取得中…' : 'ダウンロード'}
                   </button>
@@ -1148,7 +1155,7 @@ function MediaLibraryInner() {
                     退避済みは編集・削除の押し口を出さず、戻す口だけを残す。
                   */}
                   {canManageMedia ? (
-                  <Button
+                  <button
                     type="button"
                     onClick={() => {
                       setArchiveError('')
@@ -1157,19 +1164,22 @@ function MediaLibraryInner() {
                     }}
                     title={item.archivedAt ? '一覧へ戻す' : '一覧と新規選択から外す'}
                     aria-label={item.archivedAt ? `${item.filename}を一覧へ戻す` : `${item.filename}をアーカイブ`}
+                    className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded border px-2 py-1 text-[11px] font-semibold whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     {item.archivedAt ? '一覧へ戻す' : 'アーカイブ'}
-                  </Button>
+                  </button>
                   ) : null}
                   {canManageMedia && !item.archivedAt ? (
-                  <Button
+                  <button
                     type="button"
                     onClick={() => void openDelete(item)}
                     data-qa-open="YfTfJ"
                     aria-label={`${item.filename}を削除`}
+                    title="削除する"
+                    className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded border px-2 py-1 text-[11px] font-semibold whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     削除
-                  </Button>
+                  </button>
                   ) : null}
                 </div>
 

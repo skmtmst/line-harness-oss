@@ -1,3 +1,4 @@
+@layer components {
 /* ---------------------------------------------------------------------
  * 一覧表の外枠と行。Pencil V5 の `RwC76`「共通 標準一覧表」。★V5 で60回。
  *
@@ -72,4 +73,5 @@
   padding: 0 12px;
   vertical-align: middle;
   white-space: nowrap;
+}
 }

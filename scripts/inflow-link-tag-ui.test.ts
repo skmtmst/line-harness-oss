@@ -14,7 +14,7 @@ const modal = readFileSync(
 
 describe('inflow link tag auto-assignment UI wiring', () => {
   test('inflow-links page loads tags and shows the assigned auto-tag in the route list', () => {
-    expect(page).toContain("import type { EntryRoute, EntryRouteGenre, TrafficPool, Scenario, Tag }");
+    expect(page).toContain("import type { ApiResponse, EntryRoute, EntryRouteGenre, TrafficPool, Scenario, Tag }");
     expect(page).toContain('const [tags, setTags] = useState<Tag[]>([])');
     expect(page).toContain('api.tags.list()');
     expect(page).toContain('if (tagRes.success) setTags(tagRes.data)');

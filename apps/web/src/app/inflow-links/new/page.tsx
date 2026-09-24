@@ -2,9 +2,10 @@
 
 import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
-import type { Scenario, Tag, TagGroup, TrafficPool, Template } from '@line-crm/shared'
+import type { ApiResponse, Scenario, Tag, TagGroup, TrafficPool, Template } from '@line-crm/shared'
 import { groupTagsByFolder } from '../tag-options'
 import { api } from '@/lib/api'
+import { isPoolsFeatureAvailable } from '@/lib/pools-availability'
 import { qrToDataURL } from '@/lib/qr-image'
 import CreatePage, {
   AsideCard,
@@ -60,11 +61,18 @@ export default function NewInflowLinkPage() {
 
   useEffect(() => {
     let cancelled = false
+    // プールは補助データ。機能がオフでもリンク発行画面そのものは止めない。
+    // 403 の応答自体が console error になるため、有効と分からない限り
+    // 口を発行しない（#703）。
+    const poolsRequest: Promise<ApiResponse<TrafficPool[]>> = isPoolsFeatureAvailable().then((ok) =>
+      ok
+        ? api.pools.list({ suppressFeatureDisabledEvent: true })
+        : { success: false as const, error: 'feature_disabled' },
+    )
     void Promise.allSettled([
       api.tags.list(),
       api.scenarios.list(),
-      // プールは補助データ。機能がオフでもリンク発行画面そのものは止めない。
-      api.pools.list({ suppressFeatureDisabledEvent: true }),
+      poolsRequest,
       api.templates.list(),
       api.tagGroups.list(),
     ]).then(([t, s, p, tp, tg]) => {

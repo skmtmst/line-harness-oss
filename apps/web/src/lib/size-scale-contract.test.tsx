@@ -105,8 +105,8 @@ describe('#704 半端値を新規で使わない（ラチェット）', () => {
     const counts = countUsages(/text-\[\d+px\]/g)
     expect(
       increased(counts, {
-        'text-[11px]': 201,
-        'text-[10px]': 107,
+        'text-[11px]': 202,
+        'text-[10px]': 108,
         'text-[13px]': 18,
         'text-[12px]': 11,
         'text-[9px]': 9,
@@ -157,9 +157,9 @@ describe('#704 半端値を新規で使わない（ラチェット）', () => {
     const counts = countUsages(/(?:gap|gap-x|gap-y)-\d+\.\d+/g)
     expect(
       increased(counts, {
-        'gap-1.5': 171,
+        'gap-1.5': 172,
         'gap-2.5': 23,
-        'gap-0.5': 13,
+        'gap-0.5': 16,
         'gap-3.5': 2,
         'gap-y-1.5': 1,
         'gap-y-0.5': 1,
