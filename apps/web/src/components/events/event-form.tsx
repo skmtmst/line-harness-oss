@@ -240,8 +240,8 @@ export default function EventForm({ accountId, eventId }: EventFormProps) {
 
   if (loading) {
     return (
-      <div className="p-6 max-w-4xl mx-auto">
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center text-gray-500">
+      <div>
+        <div className="border-hairline rounded-card border bg-canvas p-12 text-center text-sm text-ink-faint">
           読み込み中...
         </div>
       </div>
@@ -249,28 +249,32 @@ export default function EventForm({ accountId, eventId }: EventFormProps) {
   }
 
   return (
-    <div className="p-6 max-w-4xl mx-auto">
+    <div>
       {/* breadcrumb */}
-      <div className="mb-4 flex items-center gap-2 text-sm">
-        <a href="/events" className="text-blue-600 hover:underline">イベント一覧</a>
-        <span className="text-gray-400">/</span>
-        <span className="text-gray-700">{eventId ? draft.name || 'イベント編集' : '新規イベント'}</span>
+      <div className="text-ink-faint mb-4 flex items-center gap-2 text-sm">
+        <a href="/events" className="text-action hover:underline">イベント一覧</a>
+        <span>/</span>
+        <span className="text-ink-secondary">{eventId ? draft.name || 'イベント編集' : '新規イベント'}</span>
       </div>
 
-      {/* page header */}
-      <div className="mb-4 flex justify-between items-center">
-        <div>
-          <h1 className="text-2xl font-bold text-ink">
+      {/*
+        ★V7 C7: 画面名の h1 はトップバーが持つ。本文は記録名を h2 で出す
+        （編集画面の正規の形）。幅・余白は共通の枠に任せ、画面側で
+        max-w・mx-auto・p-6 を足さない。
+      */}
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <h2 className="text-ink truncate text-xl font-bold">
             {eventId ? draft.name || 'イベント編集' : '新規イベント作成'}
-          </h1>
-          <p className="text-sm text-gray-500 mt-0.5">
+          </h2>
+          <p className="text-ink-faint mt-0.5 text-sm">
             {eventId ? 'タブで各項目を編集できます' : 'まず「概要」を保存するとイベントが作成されます'}
           </p>
         </div>
         {eventId && (
           <a
             href={`/events/bookings?id=${eventId}`}
-            className="px-4 py-2 text-sm font-medium border border-gray-300 rounded-lg hover:bg-gray-50"
+            className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control shrink-0 border px-4 py-2 text-sm font-medium"
           >
             予約を確認
           </a>
@@ -279,12 +283,12 @@ export default function EventForm({ accountId, eventId }: EventFormProps) {
 
       {/* toast */}
       {toast && (
-        <div className="mb-3 p-3 bg-green-50 border border-green-200 rounded-lg text-success text-sm">
+        <div className="bg-success-bg text-success mb-3 rounded-control p-3 text-sm">
           ✓ {toast}
         </div>
       )}
       {error && (
-        <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+        <div className="bg-danger-bg text-danger mb-3 rounded-control p-3 text-sm">
           {error}
         </div>
       )}
