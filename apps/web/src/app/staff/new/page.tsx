@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import type { LineAccount } from '@line-crm/shared'
 import { api } from '@/lib/api'
 import CreatePage, { AsideCard, FormSection, Field } from '@/components/shared/create-page'
+import Checkbox from '@/components/shared/checkbox'
 import { TextInput } from '@/components/shared/form-controls'
 import Select from '@/components/shared/select'
 import NotificationSwitch from '@/components/ui/notification-switch'
@@ -95,15 +96,14 @@ export default function NewStaffPage() {
           ]}
         />
       </Field>
-      <label className="mt-4 flex cursor-pointer items-start gap-2 text-sm text-ink">
-        <input type="checkbox" checked={inheritAccounts} onChange={(e) => setInheritAccounts(e.target.checked)} className="mt-1" />
-        <span>この店舗より下のアカウントにも権限を付ける</span>
-      </label>
+      <Checkbox checked={inheritAccounts} onCheckedChange={setInheritAccounts} className="mt-4">
+        この店舗より下のアカウントにも権限を付ける
+      </Checkbox>
       <p className="mt-2 text-xs text-ink-faint">担当範囲は{selectedAccount?.name ? `${selectedAccount.name}のみ` : 'この店舗のみ'}です。上のチェックを入れない限り、下のアカウントは付きません。</p>
     </FormSection>
 
     {role === 'staff' && <FormSection step={4} label="スタッフに表示する機能" note="選択した機能だけが左のメニューに表示され、操作できます。">
-      <div className="space-y-4">{PERMISSION_GROUPS.map((group) => <div key={group.label}><p className="mb-2 text-xs font-semibold text-ink-faint">{group.label}</p><div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">{group.items.map(([key, label]) => <label key={key} className={`flex cursor-pointer items-center gap-2 rounded-control border p-2.5 text-sm ${permissionKeys.includes(key) ? 'border-accent bg-accent-soft text-accent-deep' : 'border-hairline text-ink-secondary'}`}><input type="checkbox" checked={permissionKeys.includes(key)} onChange={() => togglePermission(key)} className="accent-green-500" />{label}</label>)}</div></div>)}</div>
+      <div className="space-y-4">{PERMISSION_GROUPS.map((group) => <div key={group.label}><p className="mb-2 text-xs font-semibold text-ink-faint">{group.label}</p><div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">{group.items.map(([key, label]) => <label key={key} className={`flex cursor-pointer items-center gap-2 rounded-control border p-2.5 text-sm ${permissionKeys.includes(key) ? 'border-accent bg-accent-soft text-accent-deep' : 'border-hairline text-ink-secondary'}`}><input type="checkbox" checked={permissionKeys.includes(key)} onChange={() => togglePermission(key)} className="accent-accent" />{label}</label>)}</div></div>)}</div>
     </FormSection>}
 
     <FormSection step={role === 'staff' ? 5 : 4} label="通知先" note="通知の種類ごとに、メールとLINEへの送信を切り替えます。">
