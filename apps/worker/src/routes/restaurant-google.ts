@@ -551,8 +551,13 @@ restaurantGoogle.post('/api/restaurant-test/google/connect/start', requireConnec
 });
 
 /**
- * Googleからの戻り。管理画面のセッションCookie（同一サイトの最上位GET）と、
- * 認可開始時に置いたstate Cookie／DBの state の両方が一致したときだけ保存する。
+ * Googleからの戻り。DBのstateを管理画面のログイン担当者へ結び付け、
+ * 1回使い切り・10分失効で検証してから保存する。
+ *
+ * 管理画面（pages.dev）からWorker（workers.dev）への認可開始はクロスサイト通信に
+ * なるため、ブラウザのCookie制限によってstate Cookieが保存されない場合がある。
+ * Cookieが届いた場合は追加検査として一致を必須にする一方、届かない場合も
+ * DB上の高エントロピーstate・担当者・期限・未使用の全条件が一致すれば続行する。
  */
 restaurantGoogle.get('/api/restaurant-test/google/oauth/callback', requireConnectionManager, async (c) => {
   c.header('Set-Cookie', stateCookie('', 0));
@@ -567,13 +572,13 @@ restaurantGoogle.get('/api/restaurant-test/google/oauth/callback', requireConnec
     : null;
   const lineAccountId = stateRow?.line_account_id ?? null;
 
-  if (!stateRow || !cookieState || cookieState !== state || stateRow.used_at || Date.parse(stateRow.expires_at) < Date.now()) {
+  if (!stateRow || (cookieState !== null && cookieState !== state) || stateRow.used_at || Date.parse(stateRow.expires_at) < Date.now()) {
     return c.redirect(adminReturnUrl(c, lineAccountId, 'error:invalid_state'));
   }
-  await dbFor(c.env, stateRow.store_id).prepare('UPDATE rt_google_oauth_states SET used_at = ? WHERE state = ?').bind(nowIso(), state).run();
   if (stateRow.staff_id !== c.get('staff')!.id) {
     return c.redirect(adminReturnUrl(c, lineAccountId, 'error:invalid_state'));
   }
+  await dbFor(c.env, stateRow.store_id).prepare('UPDATE rt_google_oauth_states SET used_at = ? WHERE state = ?').bind(nowIso(), state).run();
   if (c.req.query('error') || !code) {
     return c.redirect(adminReturnUrl(c, lineAccountId, 'error:denied'));
   }

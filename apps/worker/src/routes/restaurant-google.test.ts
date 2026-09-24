@@ -238,13 +238,14 @@ describe('Googleビジネス：設定（接続）', () => {
     expect(row.code_verifier_enc.startsWith('v1.')).toBe(true);
   });
 
-  async function startAndCallback(callbackQuery: (state: string) => string, cookie?: (state: string) => string) {
+  async function startAndCallback(callbackQuery: (state: string) => string, cookie?: ((state: string) => string) | null) {
     const start = await call('/api/restaurant-test/google/connect/start?account_id=account-2', { body: {} });
     const state = new URL(((await start.json()) as { authorizeUrl: string }).authorizeUrl).searchParams.get('state')!;
-    return call(`/api/restaurant-test/google/oauth/callback?${callbackQuery(state)}`, { cookie: cookie ? cookie(state) : `lh_gb_state=${state}` });
+    const cookieHeader = cookie === null ? undefined : cookie ? cookie(state) : `lh_gb_state=${state}`;
+    return call(`/api/restaurant-test/google/oauth/callback?${callbackQuery(state)}`, { cookie: cookieHeader });
   }
 
-  it('コールバック：state 一致・店舗1件なら接続済みにし、トークンを暗号化して保存する', async () => {
+  it('コールバック：クロスサイト制限でCookieが無くても、DBのstate・担当者が一致すれば接続できる', async () => {
     seedStore();
     googleHandler = (url, init) => {
       if (url === 'https://oauth2.googleapis.com/token') {
@@ -256,7 +257,7 @@ describe('Googleビジネス：設定（接続）', () => {
       if (url.includes('/v1/accounts/111/locations')) return jsonResponse({ locations: [{ name: 'locations/222', title: 'こもれび食堂 渋谷店', metadata: { mapsUri: 'https://maps.google.com/?cid=1' } }] });
       return jsonResponse({}, 404);
     };
-    const response = await startAndCallback((state) => `state=${state}&code=auth-code`);
+    const response = await startAndCallback((state) => `state=${state}&code=auth-code`, null);
     expect(response.status).toBe(302);
     const location = new URL(response.headers.get('location')!);
     expect(location.origin + location.pathname).toBe('https://admin.example.test/restaurant-test/google');
