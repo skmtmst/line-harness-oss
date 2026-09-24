@@ -257,12 +257,9 @@ function CommentsTab({ webinarId }: { webinarId: string }) {
           rows={4}
           className="w-full rounded-lg border border-hairline p-2 font-mono text-xs focus:outline-none focus:ring-2 focus:ring-action"
         />
-        <button
-          onClick={doImport}
-          className="mt-1 px-3 py-1.5 text-sm font-medium border border-hairline rounded-lg hover:bg-canvas-sunken"
-        >
+        <Button onClick={doImport} className="mt-1">
           読み込む
-        </button>
+        </Button>
       </div>
       <table className="w-full text-sm">
         <thead>
@@ -312,12 +309,9 @@ function CommentsTab({ webinarId }: { webinarId: string }) {
       </table>
       <StickyBar actions={(
         <>
-        <button
-          onClick={() => setComments((prev) => [...prev, { atSeconds: 0, authorName: '', body: '' }])}
-          className="px-3 py-1.5 text-sm font-medium border border-hairline rounded-lg hover:bg-canvas-sunken"
-        >
+        <Button onClick={() => setComments((prev) => [...prev, { atSeconds: 0, authorName: '', body: '' }])}>
           ＋ 追加
-        </button>
+        </Button>
         <button
           onClick={() => void save()}
           className="px-4 py-1.5 text-sm font-medium bg-action text-on-action rounded-lg hover:bg-action-hover"
@@ -704,7 +698,7 @@ function AnalyticsTab({ webinarId, durationSeconds, view = 'analytics', analytic
     meeting_time_3: '第3希望時刻',
   }
   const funnel = [
-    { label: '参加', value: summary.viewers, color: 'bg-info-bg0', note: 'ユニーク' },
+    { label: '参加', value: summary.viewers, color: 'bg-action', note: 'ユニーク' },
     { label: '5分視聴', value: summary.watched5m, color: 'bg-info', note: percent(summary.watched5m, summary.viewers) },
     { label: 'CTAクリック', value: summary.ctaClicks, color: 'bg-info', note: percent(summary.ctaClicks, summary.viewers) },
     { label: 'フォーム送信', value: summary.formSubmissions, color: 'bg-success', note: percent(summary.formSubmissions, summary.viewers) },
@@ -715,7 +709,7 @@ function AnalyticsTab({ webinarId, durationSeconds, view = 'analytics', analytic
       value: summary.viewers.toLocaleString('ja-JP'),
       detail: `予約 ${summary.reservations.toLocaleString('ja-JP')}人`,
       tone: 'bg-action-soft border-hairline',
-      dot: 'bg-info-bg0',
+      dot: 'bg-action',
     },
     {
       label: '予約者の参加率',
@@ -935,7 +929,7 @@ function AnalyticsTab({ webinarId, durationSeconds, view = 'analytics', analytic
             </div>
             <div className="flex flex-wrap gap-3 text-[11px] text-ink-secondary">
               <span className="flex items-center gap-1"><i className="h-2 w-2 rounded-full bg-hairline" />予約</span>
-              <span className="flex items-center gap-1"><i className="h-2 w-2 rounded-full bg-info-bg0" />参加</span>
+              <span className="flex items-center gap-1"><i className="h-2 w-2 rounded-full bg-action" />参加</span>
               <span className="flex items-center gap-1"><i className="h-2 w-2 rounded-full bg-info" />CTA</span>
               <span className="flex items-center gap-1"><i className="h-2 w-2 rounded-full bg-success" />フォーム</span>
             </div>
@@ -947,7 +941,7 @@ function AnalyticsTab({ webinarId, durationSeconds, view = 'analytics', analytic
               {daily.map((day) => (
                 <div key={day.date} className="relative flex h-full min-w-10 flex-1 items-end justify-center gap-0.5" title={`${day.date} 予約${day.reservations}・参加${day.viewers}・CTA${day.ctaClicks}・フォーム${day.formSubmissions}`}>
                   <div className="w-2 rounded-t bg-hairline" style={{ height: `${Math.max(day.reservations > 0 ? 3 : 0, (day.reservations / maxDaily) * 100)}%` }} />
-                  <div className="w-2 rounded-t bg-info-bg0" style={{ height: `${Math.max(day.viewers > 0 ? 3 : 0, (day.viewers / maxDaily) * 100)}%` }} />
+                  <div className="w-2 rounded-t bg-action" style={{ height: `${Math.max(day.viewers > 0 ? 3 : 0, (day.viewers / maxDaily) * 100)}%` }} />
                   <div className="w-2 rounded-t bg-info" style={{ height: `${Math.max(day.ctaClicks > 0 ? 3 : 0, (day.ctaClicks / maxDaily) * 100)}%` }} />
                   <div className="w-2 rounded-t bg-success" style={{ height: `${Math.max(day.formSubmissions > 0 ? 3 : 0, (day.formSubmissions / maxDaily) * 100)}%` }} />
                   <span className="absolute -bottom-6 whitespace-nowrap text-[10px] text-ink-faint">
@@ -1004,7 +998,7 @@ function AnalyticsTab({ webinarId, durationSeconds, view = 'analytics', analytic
                             <span>{fmtSec(p.maxWatchedSeconds)}</span><span>{watchedRate}%</span>
                           </div>
                           <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-canvas-sunken">
-                            <div className="h-full rounded-full bg-info-bg0" style={{ width: `${watchedRate}%` }} />
+                            <div className="h-full rounded-full bg-action" style={{ width: `${watchedRate}%` }} />
                           </div>
                         </td>
                         <td className="px-4 py-3.5">
@@ -1063,7 +1057,7 @@ function AnalyticsTab({ webinarId, durationSeconds, view = 'analytics', analytic
               <div key={d.bucketStart} className="mb-2 flex items-center gap-2 text-xs">
                 <span className="w-16 shrink-0 text-ink-secondary">{fmtSec(d.bucketStart)}〜</span>
                 <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-canvas-sunken">
-                  <div className="h-full rounded-full bg-info-bg0" style={{ width: `${(d.viewers / maxDropoff) * 100}%` }} />
+                  <div className="h-full rounded-full bg-action" style={{ width: `${(d.viewers / maxDropoff) * 100}%` }} />
                 </div>
                 <span className="w-7 text-right font-semibold text-ink-secondary">{d.viewers}</span>
               </div>
