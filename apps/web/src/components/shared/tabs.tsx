@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import type { ReactNode } from 'react'
+import type { KeyboardEvent, ReactNode } from 'react'
 import styles from './tabs.module.css'
 
 export interface TabItem {
@@ -26,6 +26,7 @@ export function Tabs({
   items,
   actions,
   className,
+  label,
 }: {
   items: TabItem[]
   /**
@@ -34,18 +35,51 @@ export function Tabs({
    */
   actions?: ReactNode
   className?: string
+  /**
+   * タブの並び全体を読み上げる名前（Issue #708）。例:「配信の種類」。
+   * 読み上げソフトが「○○のタブ一覧」と伝えられるようにする。
+   */
+  label?: string
 }) {
   /*
-   * ★V7: ボタンで切り替えるタブ（href が無いもの）があるときだけ、
-   * 中の並びを tablist にする。リンクで移動するタブは行き先の案内なので
-   * aria-current="page" のままで、role="tab" は付けない。
+   * Issue #708（監査6 a11y）: タブは見た目どおり tablist/tab の役割を持つ。
+   * 選択中は aria-selected で伝え、Tabキーで入れるのは選択中の1つだけに
+   * 絞る（roving tabindex）。左右の矢印キーで隣のタブへ移動できる
+   * （フォーカスだけ動かし、開くのは Enter/Space/クリック＝手動起動型）。
    */
-  const buttonMode = items.some((item) => !item.href)
+  const moveFocus = (event: KeyboardEvent<HTMLElement>) => {
+    const { key } = event
+    if (key !== 'ArrowRight' && key !== 'ArrowLeft' && key !== 'Home' && key !== 'End') return
+    const list = event.currentTarget.querySelectorAll<HTMLElement>('[role="tab"]:not(:disabled)')
+    const tabs = Array.from(list)
+    const current = tabs.indexOf(document.activeElement as HTMLElement)
+    if (current < 0) return
+    event.preventDefault()
+    const next =
+      key === 'Home' ? 0
+      : key === 'End' ? tabs.length - 1
+      : key === 'ArrowRight' ? (current + 1) % tabs.length
+      : (current - 1 + tabs.length) % tabs.length
+    tabs[next]?.focus()
+  }
+
   return (
     <nav className={[styles.list, className].filter(Boolean).join(' ')}>
-      <span className={styles.items} role={buttonMode ? 'tablist' : undefined}>
-        {items.map((item) => (
-          <Tab key={item.label} {...item} />
+      <span
+        className={styles.items}
+        role="tablist"
+        aria-label={label}
+        aria-orientation="horizontal"
+        onKeyDown={moveFocus}
+      >
+        {items.map((item, index) => (
+          // 選択中のタブに Tab キーで入れるようにする（roving tabindex）。
+          // どれも選ばれていないときは先頭が入口になる。
+          <Tab
+            key={item.label}
+            {...item}
+            tabIndex={item.current ? 0 : items.some((i) => i.current) ? -1 : index === 0 ? 0 : -1}
+          />
         ))}
       </span>
       {actions ? <span className={styles.actions}>{actions}</span> : null}
@@ -53,7 +87,7 @@ export function Tabs({
   )
 }
 
-function Tab({ label, href, count, current, disabled, onClick }: TabItem) {
+function Tab({ label, href, count, current, disabled, onClick, tabIndex }: TabItem & { tabIndex: number }) {
   const classes = [styles.tab, current && styles.current].filter(Boolean).join(' ')
   const body: ReactNode = (
     <>
@@ -61,34 +95,39 @@ function Tab({ label, href, count, current, disabled, onClick }: TabItem) {
       {count === undefined ? null : <span className={styles.count}>{count}</span>}
     </>
   )
-
   /*
-   * ★V7: 行き先があるタブは、開いているものも含めてリンクのまま出す。
-   * 現在地は aria-current="page" で示し、role="tab" は付けない。
-   * （開いているタブを押せないボタンにしていた頃は、現在地が
-   * 読み上げで伝わらず、見た目も薄くなっていた。）
+   * aria-current は見た目の選択位置を追う既存の印として残す
+   * （scrollable-tabs がこの属性で選択中のタブへスクロールする）。
+   * 選択の意味は role="tab" + aria-selected が持つ。
    */
-  if (href && !disabled) {
+  const shared = {
+    className: classes,
+    role: 'tab',
+    'aria-selected': current ?? false,
+    'aria-current': current ? ('page' as const) : undefined,
+    tabIndex,
+  }
+
+  if (href && !current && !disabled) {
     return (
-      <Link href={href} className={classes} aria-current={current ? 'page' : undefined}>
+      <Link href={href} {...shared}>
         {body}
       </Link>
     )
   }
 
-  /*
-   * ★V7: ボタン切り替えのタブは tab として、開いているかを
-   * aria-selected で出す（読みやすさ優先で aria-current と言い分ける）。
-   */
   return (
     <button
       type="button"
-      className={classes}
-      role="tab"
-      aria-selected={current ?? false}
+      {...shared}
       aria-disabled={disabled || undefined}
       onClick={onClick}
-      disabled={disabled || (current && !onClick)}
+      /*
+       * 選択中・onClick無しのタブは押せないが disabled にはしない。
+       * disabled のボタンはフォーカスを受けられず、選択中のタブへ
+       * Tab キーで入れなくなるため（Issue #708）。
+       */
+      disabled={disabled}
     >
       {body}
     </button>

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { formatDurationMinutes, formatMinutesRough } from './format-duration'
+import { formatDurationMinutes, formatHoursBeforeHint, formatMinutesLengthHint, formatMinutesRough } from './format-duration'
 
 describe('formatDurationMinutes', () => {
   it.each([
@@ -40,5 +40,42 @@ describe('formatMinutesRough', () => {
     [86_400, '約2ヶ月'],
   ])('%i分を%sで表示する', (minutes, expected) => {
     expect(formatMinutesRough(minutes)).toBe(expected)
+  })
+})
+
+/*
+ * Issue #710: 仮押さえの保持時間は「1440分」の生値で出ていた。
+ * 入力の横に置く読み替え（「〜前」を付けない長さ）。60分未満は
+ * 分のままが一番読みやすいので読み替えを返さない。
+ */
+describe('formatMinutesLengthHint', () => {
+  it.each([
+    [1_440, '1日'],
+    [90, '1時間30分'],
+    [60, '1時間'],
+  ])('%i分を%sと読み替える', (minutes, expected) => {
+    expect(formatMinutesLengthHint(minutes)).toBe(expected)
+  })
+
+  it.each([0, 30, 59])('%i分は読み替えを出さない', (minutes) => {
+    expect(formatMinutesLengthHint(minutes)).toBeNull()
+  })
+})
+
+/*
+ * Issue #710: 当日のお知らせは「72時間前」の生値で出ていた。
+ * 24時間の倍数のときだけ「N日前」に読み替える。
+ */
+describe('formatHoursBeforeHint', () => {
+  it.each([
+    [24, '1日前'],
+    [48, '2日前'],
+    [72, '3日前'],
+  ])('%i時間前を%sと読み替える', (hours, expected) => {
+    expect(formatHoursBeforeHint(hours)).toBe(expected)
+  })
+
+  it.each([1, 2, 25, 47])('%i時間前は読み替えを出さない', (hours) => {
+    expect(formatHoursBeforeHint(hours)).toBeNull()
   })
 })

@@ -457,11 +457,15 @@ export default function Sidebar({
    * UID移行 `/accounts?tab=migration` は友だちタブの1枚なので、
    * 「LINEアカウント」ではなく「友だち」が選ばれる。
    * 宣言先の項目がメニューに無いときは通常のパス一致へ戻す。
+   *
+   * Issue #708: 宣言が複数候補を持つ画面（受付枠など）では、
+   * いまの人に見えている項目のうち最初のものを選ぶ。見えている
+   * 項目だけを対象にするのは、担当者専用項目（自分の勤務）が
+   * 管理者のメニューには無いため。
    */
   const ownerItemId = menuOwnerForScreen(activePathname, currentSearch)
-  const hasOwnerItem = ownerItemId
-    ? sections.some((section) => section.items.some((item) => item.id === ownerItemId))
-    : false
+    ?.find((id) => visibleSections.some((section) => section.items.some((item) => item.id === id)))
+  const hasOwnerItem = Boolean(ownerItemId)
 
   const isActive = (item: MenuItem) => {
     const href = item.href
