@@ -37,14 +37,15 @@ const TAG_EDITOR = readFileSync(
 
 describe('#670 15 登録メディアの札の操作5個は同じ寸法', () => {
   it('compact 1種にそろえ、共通Buttonと混ぜない', () => {
+    // ★V7（#701）：同じ寸法の小ボタン4つ（12px・rounded-control）＋削除は他の一覧と同じゴミ箱の印。
+    // 「同じ寸法にそろえ、大きい共通Buttonを混ぜない」という #670 の狙いはそのまま見張る。
     const footerStart = CONTENTS.indexOf('mt-auto flex flex-wrap items-center justify-end')
     expect(footerStart).toBeGreaterThan(-1)
     const footer = CONTENTS.slice(footerStart, CONTENTS.indexOf('</div>', footerStart))
     expect(
-      footer.match(
-        /className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded border px-2 py-1 text-\[11px\] font-semibold whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-50"/g,
-      ),
-    ).toHaveLength(5)
+      footer.match(/className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-2\.5 py-1 text-xs whitespace-nowrap[^"]*"/g),
+    ).toHaveLength(4)
+    expect(footer).toContain('<IconButton')
     expect(footer).not.toContain('<Button')
   })
 })
@@ -73,9 +74,8 @@ describe('#670 08 自動応答の帯と凡例', () => {
   it('案内の帯2段を1本にまとめ、凡例を内側へ入れる', () => {
     expect(AUTO_REPLIES).toContain('最初に当てはまった1つだけ')
     expect(AUTO_REPLIES).toContain('EFFECTIVE_LEGEND.map')
-    expect(
-      AUTO_REPLIES.match(/bg-info-bg border-hairline text-info mb-4 rounded-lg border p-3/g),
-    ).toHaveLength(1)
+    // ★V7（#701）：1本にまとめた案内は、毎回読むものではないので開閉する欄にしまう。
+    expect(AUTO_REPLIES.match(/<Disclosure size="compact" title="ルールの動き方と札の見方"/g)).toHaveLength(1)
   })
 
   it('凡例の札は一覧の札と同じ共通トークンで出す', () => {
