@@ -7,7 +7,9 @@ import { useAccount } from '@/contexts/account-context'
 import { api, ApiError, type CommonActionDetail, type CommonActionSummary, type CommonActionVersion } from '@/lib/api'
 import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
+import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
+import TargetMissing from '@/components/shared/target-missing'
 import PageHeader from '@/components/shared/page-header'
 import StatusBadge from '@/components/shared/status-badge'
 import SummaryCard from '@/components/shared/summary-card'
@@ -59,6 +61,8 @@ function CommonActionVersionsInner() {
   const [loading, setLoading] = useState(true)
   const [working, setWorking] = useState('')
   const [error, setError] = useState('')
+  /** 取得の失敗の内訳（操作の失敗とは分ける）。 */
+  const [loadFailure, setLoadFailure] = useState<'missing' | 'forbidden' | 'error' | null>(null)
   const [pendingBindingId, setPendingBindingId] = useState<string | null>(null)
 
   const load = useCallback(async () => {
@@ -70,6 +74,7 @@ function CommonActionVersionsInner() {
     }
     setLoading(true)
     setError('')
+    setLoadFailure(null)
     setSummary(null)
     try {
       const [response, listResponse] = await Promise.all([
@@ -77,19 +82,25 @@ function CommonActionVersionsInner() {
         api.commonActions.list({ accountId: selectedAccountId }),
       ])
       if (response.success) setDetail(response.data)
-      else setError(response.error)
+      else {
+        setError(response.error)
+        setLoadFailure('error')
+      }
       setSummary(listResponse.success ? listResponse.data.find((item) => item.id === id) ?? null : null)
     } catch (caught) {
       setSummary(null)
       // U096: 生の `API error: 404` を主文にしない。原因別の言葉に写す。
       if (caught instanceof ApiError && caught.status === 404) {
         setError('この共通アクションは削除されたか、別のLINEアカウントのものです。')
+        setLoadFailure('missing')
       } else if (caught instanceof ApiError && caught.status === 403) {
         setError('この共通アクションを表示する権限がありません。')
+        setLoadFailure('forbidden')
       } else {
         setError(caught instanceof Error && caught.message && !caught.message.startsWith('API error:')
           ? caught.message
           : '版と利用先を読み込めませんでした。通信の状態を確認してください。')
+        setLoadFailure('error')
       }
     } finally {
       setLoading(false)
@@ -142,23 +153,57 @@ function CommonActionVersionsInner() {
   // 混ぜると、直すべきもの（選ぶ対象）が違って見える。
   if (!id) {
     return (
-      <div role="alert" className="border-danger bg-danger-bg text-danger rounded-card border p-6">
-        <p className="font-semibold">版を確認する共通アクションが指定されていません</p>
-        <p className="mt-1 text-sm">一覧から共通アクションを選び直してください。</p>
-        <Button href="/common-actions" className="mt-4">共通アクション一覧へ戻る</Button>
-      </div>
+      <TargetMissing
+        kind="unspecified"
+        title="版を確認する共通アクションが指定されていません"
+        description="一覧から共通アクションを選び直してください。"
+        backHref="/common-actions"
+        backLabel="共通アクション一覧へ戻る"
+      />
     )
   }
   if (loading) {
     return <div className="border-hairline rounded-card border bg-canvas p-10 text-center text-sm text-ink-faint" aria-busy="true">版と利用先を読み込んでいます</div>
   }
+  if (!selectedAccountId && !detail) {
+    return (
+      <ListState
+        kind="empty"
+        title="LINE公式アカウントを選んでください"
+        description="選ぶと版と利用先を確認できます。"
+        action={<Button href="/common-actions">共通アクション一覧へ戻る</Button>}
+      />
+    )
+  }
+  if (!detail && loadFailure === 'missing') {
+    return (
+      <TargetMissing
+        kind="not-found"
+        title="この共通アクションは見つかりません"
+        description="削除されたか、別のLINEアカウントのものです。一覧から選び直してください。"
+        backHref="/common-actions"
+        backLabel="共通アクション一覧へ戻る"
+      />
+    )
+  }
+  if (!detail && loadFailure === 'forbidden') {
+    return (
+      <ListState
+        kind="forbidden"
+        title="この共通アクションを表示する権限がありません"
+        description="権限のある人に確認するか、別のLINEアカウントを選んでください。"
+        action={<Button href="/common-actions">共通アクション一覧へ戻る</Button>}
+      />
+    )
+  }
   if (!detail) {
     return (
-      <div role="alert" className="border-danger bg-danger-bg text-danger rounded-card border p-6">
-        <p className="font-semibold">共通アクションを表示できません</p>
-        <p className="mt-1 text-sm">{error || 'LINE公式アカウントを選んでください'}</p>
-        <Button href="/common-actions" className="mt-4">共通アクション一覧へ戻る</Button>
-      </div>
+      <TargetMissing
+        kind="error"
+        title="版と利用先を読み込めませんでした"
+        description="通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度読み込んでください。"
+        onRetry={() => void load()}
+      />
     )
   }
 

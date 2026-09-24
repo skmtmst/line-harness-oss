@@ -143,7 +143,12 @@ export default function EventForm({ accountId, eventId }: EventFormProps) {
         setDraft(ev)
         setSlots(slotsRes.items)
       } catch (e) {
-        if (!cancelled) setError(e instanceof Error ? e.message : String(e))
+        // 生の `API error: 404` を主文にしない。消えたものと通信の失敗を言い分ける。
+        if (!cancelled) {
+          setError(e instanceof ApiError && e.status === 404
+            ? 'このイベントは見つかりません。削除されたか、リンクが古くなっています。一覧から選び直してください。'
+            : 'イベントを読み込めませんでした。通信の状態を確認して、もう一度読み込んでください。')
+        }
       } finally {
         if (!cancelled) setLoading(false)
       }

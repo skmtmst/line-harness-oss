@@ -22,7 +22,9 @@ import { NOT_AVAILABLE, STATE_TEXT } from '@/components/shared/not-connected'
 import { checkedAtText, placeholderText } from '../delete-impact'
 import Button from '@/components/shared/button'
 import { RequiredBadge } from '@/components/shared/form-controls'
+import ListState from '@/components/shared/list-state'
 import StickyBar from '@/components/shared/sticky-bar'
+import TargetMissing from '@/components/shared/target-missing'
 import {
   blockingErrors,
   changeSummaryText,
@@ -76,6 +78,8 @@ function EditCommonVarInner() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  /** 取得の失敗の内訳（保存・入力の失敗とは分ける）。 */
+  const [loadFailure, setLoadFailure] = useState<'missing' | 'error' | null>(null)
   const [saved, setSaved] = useState(false)
   const [showImpactReview, setShowImpactReview] = useState(false)
 
@@ -173,7 +177,8 @@ function EditCommonVarInner() {
   const load = useCallback(async () => {
     if (!id) {
       setLoading(false)
-      setError('共通情報が指定されていません')
+      setError('')
+      setLoadFailure(null)
       return
     }
     const accountAtRequest = selectedAccountId
@@ -181,10 +186,12 @@ function EditCommonVarInner() {
       setItem(null)
       setLoading(false)
       setError(accountLoading ? '' : 'LINEアカウントを選択してください')
+      setLoadFailure(null)
       return
     }
     setLoading(true)
     setError('')
+    setLoadFailure(null)
     try {
       const [detail, folderList, scheduleList] = await Promise.all([
         api.commonVars.detail(id, accountAtRequest),
@@ -197,6 +204,7 @@ function EditCommonVarInner() {
       const found = detail.success ? detail.data : undefined
       if (!found) {
         setError('この共通情報は見つかりませんでした')
+        setLoadFailure('missing')
         return
       }
       setItem(found)
@@ -208,8 +216,15 @@ function EditCommonVarInner() {
       setValidUntil(utcToJstLocalInput(found.validUntil))
       setExpiryBehavior(found.expiryBehavior ?? 'stop')
       setFallbackValue(found.fallbackValue ?? '')
-    } catch {
-      if (accountAtRequest === latestAccountRef.current) setError('読み込みに失敗しました。もう一度読み込んでください。')
+    } catch (caught) {
+      if (accountAtRequest !== latestAccountRef.current) return
+      if (caught instanceof ApiError && caught.status === 404) {
+        setError('この共通情報は見つかりませんでした')
+        setLoadFailure('missing')
+      } else {
+        setError('読み込みに失敗しました。もう一度読み込んでください。')
+        setLoadFailure('error')
+      }
     } finally {
       if (accountAtRequest === latestAccountRef.current) setLoading(false)
     }
@@ -511,6 +526,53 @@ function EditCommonVarInner() {
     )
   }
 
+  /*
+    対象が無いときは、パンくず・入力・右の案内・固定バーのどれも出さない。
+    代わりに ★V7 TargetMissing を出す（設計 `x5cgUH`）。
+  */
+  if (!id) {
+    return (
+      <TargetMissing
+        kind="unspecified"
+        title="編集する共通情報が指定されていません"
+        description="一覧から編集する共通情報を選び直してください。"
+        backHref="/contents/vars"
+        backLabel="共通情報一覧へ戻る"
+      />
+    )
+  }
+  if (!accountLoading && !selectedAccountId) {
+    return (
+      <ListState
+        kind="empty"
+        title="LINEアカウントを選んでください"
+        description="選ぶと共通情報を編集できます。"
+        action={<Button href="/contents/vars">共通情報一覧へ戻る</Button>}
+      />
+    )
+  }
+  if (!loading && loadFailure === 'missing') {
+    return (
+      <TargetMissing
+        kind="not-found"
+        title="この共通情報は見つかりません"
+        description="削除されたか、リンクが古くなっています。一覧から選び直してください。"
+        backHref="/contents/vars"
+        backLabel="共通情報一覧へ戻る"
+      />
+    )
+  }
+  if (!loading && loadFailure === 'error') {
+    return (
+      <TargetMissing
+        kind="error"
+        title="共通情報を読み込めませんでした"
+        description="通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度読み込んでください。"
+        onRetry={() => void load()}
+      />
+    )
+  }
+
   return (
     <div>
       <nav className="text-ink-faint mb-3 text-xs">
@@ -521,22 +583,16 @@ function EditCommonVarInner() {
         <span>共通情報編集</span>
       </nav>
 
-      {error && (
+      {error && item && (
         <div className="bg-danger-bg border-danger-bg text-danger mb-4 max-w-3xl rounded-lg border p-4 text-sm">
           {error}
         </div>
       )}
 
-      {loading ? (
+      {loading || !item ? (
         <div className="bg-canvas rounded-card border-hairline text-ink-faint max-w-3xl border p-8 text-center text-sm">
           読み込み中...
         </div>
-      ) : !item ? (
-        <p className="text-ink-secondary text-sm">
-          <Link href="/contents/vars" className="text-info hover:underline">
-            共通情報一覧へ戻る
-          </Link>
-        </p>
       ) : (
         <>
           <div className="grid gap-4 xl:grid-cols-3" data-design-node="gBtaK">

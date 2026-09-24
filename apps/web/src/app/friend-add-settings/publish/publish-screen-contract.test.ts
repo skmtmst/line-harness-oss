@@ -8,13 +8,16 @@ const PAGE = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'page.ts
 /** 友だち追加時配信の公開（設計 `ec9vg` 5-F ／ `quhg6` 5-G）。 */
 describe('友だち追加時配信の公開画面', () => {
   it('読込・空・失敗・権限不足を別の面にする', () => {
-    for (const kind of ['loading', 'empty', 'error', 'forbidden']) {
+    // 開き先がない3種は ★V7 TargetMissing、権限不足は ListState のまま。
+    for (const kind of ['unspecified', 'not-found', 'error']) {
       expect(PAGE).toContain(`kind="${kind}"`)
     }
+    expect(PAGE).toContain('kind="forbidden"')
     // 404は「下書きがない」。失敗と混ぜない。
     expect(PAGE).toContain('error.status === 404')
     expect(PAGE).toContain('error.status === 403')
     expect(PAGE).toContain('確認する下書きがありません')
+    expect(PAGE).toContain('公開する下書きが指定されていません')
   })
 
   it('設計のNodeと押し口に印を付ける', () => {

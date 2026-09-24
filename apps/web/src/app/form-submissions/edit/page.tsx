@@ -13,6 +13,7 @@
  * それまでの回答と結びつかなくなる。画面には出すだけで、編集させない。
  */
 
+import ListState from '@/components/shared/list-state'
 import SelectField from '@/components/shared/select-field'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
@@ -41,6 +42,7 @@ import { describeFormUpdates } from '@/components/forms/form-update-summary'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import StickyBar from '@/components/shared/sticky-bar'
 import SaveConflictBar from '@/components/shared/save-conflict-bar'
+import TargetMissing from '@/components/shared/target-missing'
 import { conflictMessage } from './form-conflict-message'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { EMPTY_REFS, type FormRefs } from '@/components/forms/form-refs'
@@ -111,6 +113,12 @@ function FormEditInner() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
+  /** 本体が読めたかどうか。読めていないときの保存・入力の失敗と分ける。 */
+  const [formLoaded, setFormLoaded] = useState(false)
+  /** 取得の失敗の内訳（保存・入力の失敗とは分ける）。 */
+  const [formLoadFailed, setFormLoadFailed] = useState<'missing' | 'error' | null>(null)
+  /** 失敗したあとの「もう一度読み込む」で取り直すための番号。 */
+  const [reloadKey, setReloadKey] = useState(0)
   // 保存済み・読み直し直後の姿。タブ移動やタブを閉じる前の確認に使う。
   const savedSnapshot = useRef<string | null>(null)
   /**
@@ -171,9 +179,9 @@ function FormEditInner() {
    * **押されるまで呼ばない。**自動で読み直すと入力が消える。
    */
   const loadForm = useCallback(async () => {
-    if (!id || !selectedAccountId) return
+    if (!id || !selectedAccountId) return false
     const res = await api.forms.get(id, selectedAccountId)
-    if (!res.success) return
+    if (!res.success) return false
     // layout はサーバ側が必ず作って返す（古いフォームは fields から）
     const nextLayout = res.data.layout ?? emptyLayout()
     const loaded = {
@@ -200,6 +208,8 @@ function FormEditInner() {
     setConflict(null)
     // 未保存のままタブ移動したときの確認に使う。読み直しが基準。
     savedSnapshot.current = JSON.stringify(loaded)
+    setFormLoaded(true)
+    return true
   }, [id, selectedAccountId])
 
   const reloadAfterConflict = async () => {
@@ -214,6 +224,7 @@ function FormEditInner() {
   }
 
   useEffect(() => {
+    setFormLoadFailed(null)
     void (async () => {
       try {
         // 参照一覧は選んでいる公式アカウントに絞る。絞らないと別アカウントの
@@ -245,14 +256,21 @@ function FormEditInner() {
             : [],
         })
 
-        await loadForm()
-      } catch {
-        setError('読み込みに失敗しました。もう一度読み込んでください。')
+        const ok = await loadForm()
+        // id なし・未選択は別の面で出す。ここは取得して見つからないときだけ。
+        if (!ok && id && selectedAccountId) setFormLoadFailed('missing')
+      } catch (caught) {
+        if (caught instanceof ApiError && caught.status === 404) {
+          setFormLoadFailed('missing')
+        } else {
+          setError('読み込みに失敗しました。もう一度読み込んでください。')
+          setFormLoadFailed('error')
+        }
       } finally {
         setLoading(false)
       }
     })()
-  }, [id, loadForm, selectedAccountId])
+  }, [id, loadForm, reloadKey, selectedAccountId])
 
   // いま編集している並び（共通ヘッダ か セクション）
   const blocks = useMemo(
@@ -604,17 +622,53 @@ function FormEditInner() {
     }
   }
 
+  /*
+    対象が無いときは、タブ・入力・右の案内・固定バーのどれも出さない。
+    代わりに ★V7 TargetMissing を出す（設計 `x5cgUH`）。
+  */
   if (!id) {
     return (
-      <div>
-
-        <p className="text-ink-faint bg-canvas rounded-card border-hairline border p-8 text-center text-sm">
-          フォームが指定されていません。
-          <Link href="/form-submissions" className="text-action ml-1 hover:underline">
-            一覧へ戻る
-          </Link>
-        </p>
-      </div>
+      <TargetMissing
+        kind="unspecified"
+        title="編集する回答フォームが指定されていません"
+        description="一覧から編集するフォームを選び直してください。"
+        backHref="/form-submissions"
+        backLabel="回答フォーム一覧へ戻る"
+      />
+    )
+  }
+  if (!loading && !selectedAccountId) {
+    return (
+      <ListState
+        kind="empty"
+        title="LINE公式アカウントを選んでください"
+        description="選ぶとフォームを編集できます。"
+      />
+    )
+  }
+  if (!loading && formLoadFailed === 'missing') {
+    return (
+      <TargetMissing
+        kind="not-found"
+        title="このフォームは見つかりません"
+        description="削除されたか、リンクが古くなっています。一覧から選び直してください。"
+        accountName={selectedAccount?.name}
+        backHref="/form-submissions"
+        backLabel="回答フォーム一覧へ戻る"
+      />
+    )
+  }
+  if (!loading && formLoadFailed === 'error' && !formLoaded) {
+    return (
+      <TargetMissing
+        kind="error"
+        title="フォームを読み込めませんでした"
+        description="通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度読み込んでください。"
+        onRetry={() => {
+          setLoading(true)
+          setReloadKey((k) => k + 1)
+        }}
+      />
     )
   }
 
@@ -663,7 +717,7 @@ function FormEditInner() {
         />
       )}
 
-      {loading ? (
+      {loading || !formLoaded ? (
         <div className="bg-canvas rounded-card border-hairline text-ink-faint border p-8 text-center text-sm">
           読み込み中...
         </div>

@@ -18,7 +18,8 @@ describe('対象が分からないときの言い方（#975 U096）', () => {
   it('共通アクション編集は、対象未指定を専用の案内にし一覧へ戻す', () => {
     expect(EDIT).toContain('編集する共通アクションが指定されていません')
     expect(EDIT).toContain('一覧から編集する共通アクションを選び直してください')
-    expect(EDIT).toContain('href="/common-actions"')
+    // 戻り先は ★V7 TargetMissing の backHref が持つ。
+    expect(EDIT).toContain('backHref="/common-actions"')
     // 技術的な「IDが不正」は画面の文言から外す。
     expect(EDIT).not.toContain('IDが不正')
   })
@@ -36,7 +37,7 @@ describe('対象が分からないときの言い方（#975 U096）', () => {
     expect(VERSIONS).toContain('版を確認する共通アクションが指定されていません')
     expect(VERSIONS).toContain('LINE公式アカウントを選んでください')
     expect(VERSIONS).toContain('この共通アクションは削除されたか、別のLINEアカウントのものです')
-    expect(VERSIONS).toContain('href="/common-actions"')
+    expect(VERSIONS).toContain('backHref="/common-actions"')
     expect(VERSIONS).not.toContain('IDが不正')
   })
 
@@ -44,8 +45,9 @@ describe('対象が分からないときの言い方（#975 U096）', () => {
     expect(RICH_MENUS).toContain('編集するリッチメニューが指定されていません')
     expect(RICH_MENUS).toContain('このリッチメニューは見つかりません')
     expect(RICH_MENUS).toContain('権限のある人に確認するか、別のLINEアカウントを選んでください')
-    expect(RICH_MENUS).toContain('リッチメニュー一覧に戻る')
-    expect(RICH_MENUS).toContain('もう一度読み込む')
+    expect(RICH_MENUS).toContain('backHref="/rich-menus"')
+    // 再読み込みは ★V7 TargetMissing の error（文言は部品が持つ。取り直し口があることだけ見る）。
+    expect(RICH_MENUS).toContain('onRetry={() => void reload()}')
     // 旧来の技術的な言い回しは残さない。
     expect(RICH_MENUS).not.toContain('対象が指定されていません')
   })
