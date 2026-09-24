@@ -45,7 +45,8 @@ describe('監査Aで足した口の形', () => {
     const res = get('/api/account-settings/test-recipient-login-users', 'accountId=x')
     expect(res.success).toBe(true)
     expect(Array.isArray(res.data)).toBe(true)
-    const first = (res.data as Array<Record<string, unknown>>)[0]
+    if (!Array.isArray(res.data)) throw new Error('test-recipient-login-users の応答は配列のはず')
+    const first = res.data[0] as Record<string, unknown>
     expect(typeof first.staffName).toBe('string')
     expect(typeof first.sameAccount).toBe('boolean')
   })
