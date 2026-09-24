@@ -136,7 +136,10 @@ describe('V6 登録メディア一覧の契約', () => {
     expect(UPLOAD).toContain('api.media.completeUpload')
     expect(UPLOAD).toContain('保存先へ直接送ります')
     expect(UPLOAD).toContain('aria-live="polite"')
-    expect(UPLOAD).toContain('この1件を再試行')
+    // 再試行は AttachmentRow の「選び直す」（onRetry）で行う。
+    // 失敗した1件だけを登録待ちに戻す。
+    expect(UPLOAD).toContain('onRetry')
+    expect(UPLOAD).toContain("state: 'ready'")
     expect(UPLOAD).toContain("entry.state === 'uploading'")
   })
 
