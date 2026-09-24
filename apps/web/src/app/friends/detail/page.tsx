@@ -1622,7 +1622,12 @@ function FriendDetailInner() {
           </aside>
 
           {/* 右：タブ */}
-          <div data-design="Right">
+          {/*
+            ★V7差し戻し: 折らないタブ帯がグリッドの右列を押し広げ、右端が
+            画面からはみ出していた。grid の子に min-w-0 を付け、幅の決定を
+            グリッドに任せてタブ帯だけ中で横に流す。
+          */}
+          <div data-design="Right" className="min-w-0">
             {/*
               ★V7: 10個のタブが 1440px で2段に折れていた。折らずに1段にし、
               入り切らない分は横に送る。リンクで移動するタブなので
