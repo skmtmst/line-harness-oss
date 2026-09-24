@@ -65,7 +65,8 @@ describe('ダッシュボードの言葉を設計にそろえる', () => {
      */
     expect(CODE, '「優先度順」のまま').not.toContain('>優先度順<')
     expect(CODE).not.toContain('優先度が高い順')
-    expect(CODE).toContain('自分で並べた順')
+    // ★V7（2026-09-24）：並び順のラベル自体を出さない。見出しの横の小さな説明は読まれず、場所を取るだけだった。
+    expect(CODE).not.toContain('自分で並べた順')
   })
 
   /*

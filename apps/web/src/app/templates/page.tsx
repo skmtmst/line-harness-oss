@@ -98,14 +98,14 @@ const typeBadgeColor: Record<string, string> = {
   question: 'bg-accent-soft text-accent-deep',
 }
 
+/** 今年は「1月13日」、それ以外は「2025年1月13日」。時刻は title で見せる（★V7：1行に収める）。 */
 function formatDate(iso: string): string {
-  return new Date(iso).toLocaleString('ja-JP', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
+  const date = new Date(iso)
+  if (Number.isNaN(date.getTime())) return iso
+  const parts = new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', year: 'numeric', month: 'numeric', day: 'numeric' }).formatToParts(date)
+  const get = (type: string) => parts.find((part) => part.type === type)?.value ?? ''
+  const thisYear = new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', year: 'numeric' }).formatToParts(new Date()).find((part) => part.type === 'year')?.value
+  return get('year') === thisYear ? `${get('month')}月${get('day')}日` : `${get('year')}年${get('month')}月${get('day')}日`
 }
 
 function formatCount(value: number): string {
@@ -736,17 +736,14 @@ export default function TemplatesPage() {
           {folderError ? <p role="alert" className="text-danger text-xs">{folderError}</p> : null}
           {canMutateTemplates ? (
             <p className="text-ink-faint text-xs leading-relaxed">
-              テンプレートは一覧の「置き場」から移せます。
+              テンプレートは一覧の「置き場」から移せます。フォルダは種類のタブをまたいで使えます。
             </p>
           ) : null}
         </FolderPanel>
       </div>
       <div className="min-w-0 flex-1">
 
-      {/* フォルダは種類とは別の整理軸。V6の説明を一覧上で読めるようにする。 */}
-      <div className="bg-info-bg text-info mb-3 rounded-control px-3 py-2 text-xs">
-        フォルダはアカウントで1組です。上のタブは種類の絞り込みで、フォルダは増えません。1つのフォルダにテキストもカルーセルも入れられます。
-      </div>
+      {/* ★V7：常に出ていた説明の帯は外し、フォルダ欄の下の説明へ短くまとめた。 */}
 
       {/* 検索と並び順（設計 `Body` の上）。 */}
       <div className="bg-canvas rounded-card border-hairline mb-3 flex flex-wrap items-center gap-2 border p-3">
@@ -980,9 +977,10 @@ export default function TemplatesPage() {
                     }}
                     className={`hover:bg-canvas-sunken cursor-pointer transition-colors focus:bg-canvas-sunken focus:outline-none ${drawerId === t.id ? 'bg-accent-soft' : ''}`}
                   >
-                    <td className="px-3 py-3">
-                      <p className="text-sm font-medium text-ink">{t.name}</p>
-                      <p className="text-[11px] text-ink-faint mt-0.5 truncate max-w-md">
+                    {/* 1列目は表の幅に合わせて縮む（以前は抜粋が最大 448px で、1440px でも表が右へはみ出した）。 */}
+                    <td className="w-2/5 max-w-0 px-4 py-3">
+                      <p className="truncate text-sm font-medium text-ink" title={t.name}>{t.name}</p>
+                      <p className="text-micro text-ink-faint mt-0.5 truncate">
                         {t.messageContent.slice(0, 60)}{t.messageContent.length > 60 ? '...' : ''}
                       </p>
                     </td>
@@ -1019,8 +1017,8 @@ export default function TemplatesPage() {
                         <span className="text-ink-faint text-xs">送信数を確認できません</span>
                       )}
                     </td>
-                    <td className="px-3 py-3 text-xs text-ink-faint">{formatDate(t.updatedAt)}</td>
-                    <td className="px-3 py-3 text-right">
+                    <td className="px-4 py-3 text-xs whitespace-nowrap text-ink-faint tabular-nums" title={new Date(t.updatedAt).toLocaleString('ja-JP')}>{formatDate(t.updatedAt)}</td>
+                    <td className="px-4 py-3 text-right">
                       {/* 行のクリック（詳細を開く）へ伝えない。 */}
                       <div
                         className="relative flex items-center justify-end gap-1 whitespace-nowrap"

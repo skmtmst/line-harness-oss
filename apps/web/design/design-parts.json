@@ -588,11 +588,11 @@
           "resolved": "13px"
         },
         {
-          "pencil": "mNUQ3 detail fill: $accent-deep（★V7 修正方針 u6pez）",
+          "pencil": "mNUQ3 detail fill: $ink-secondary（★V7：補足は状態でないので緑にしない）",
           "class": "detailNotice",
           "prop": "color",
-          "source": "var(--color-accent-deep)",
-          "resolved": "#087a3e"
+          "source": "var(--color-ink-secondary)",
+          "resolved": "#4a5565"
         },
         {
           "pencil": "mNUQ3 detail fontSize: $size-caption",
@@ -1722,11 +1722,11 @@
           "resolved": "700"
         },
         {
-          "pencil": "t0jk8p action fill: $accent-deep（★V7 修正方針 u6pez）",
+          "pencil": "t0jk8p action fill: $action（#669: 緑は主操作専用。見出しリンクはaction色へ）",
           "class": "action",
           "prop": "color",
-          "source": "var(--color-accent-deep)",
-          "resolved": "#087a3e"
+          "source": "var(--color-action)",
+          "resolved": "#0b63ce"
         },
         {
           "pencil": "t0jk8p action layout",
@@ -1826,18 +1826,18 @@
           "resolved": "700"
         },
         {
-          "pencil": "dashboard compact padding: [5,8]",
+          "pencil": "dashboard compact padding: [4,8]（★V7）",
           "class": "compact",
           "prop": "padding",
-          "source": "5px 8px",
-          "resolved": "5px 8px"
+          "source": "4px 8px",
+          "resolved": "4px 8px"
         },
         {
-          "pencil": "dashboard compact fontSize: $size-nano",
+          "pencil": "dashboard compact fontSize: $size-micro（★V7：10px は読みにくい）",
           "class": "compact",
           "prop": "font-size",
-          "source": "var(--text-nano)",
-          "resolved": "10px"
+          "source": "var(--text-micro)",
+          "resolved": "11px"
         },
         {
           "pencil": "neutral fill: $canvas-parchment",
@@ -1889,11 +1889,11 @@
           "resolved": "#e8f8ee"
         },
         {
-          "pencil": "success label: $accent-deep（★V7 修正方針 u6pez）",
+          "pencil": "success label: $success（#669: 成功色をsuccessへ1本化。accent-deepと同役だったため）",
           "class": "success",
           "prop": "color",
-          "source": "var(--color-accent-deep)",
-          "resolved": "#087a3e"
+          "source": "var(--color-success)",
+          "resolved": "#047833"
         },
         {
           "pencil": "danger fill: $status-danger-soft",

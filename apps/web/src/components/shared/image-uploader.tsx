@@ -110,7 +110,7 @@ export default function ImageUploader({ mode, value, onChange, label }: ImageUpl
         <button
           type="button"
           onClick={() => setManualUrlMode((v) => !v)}
-          className="text-xs text-emerald-700 underline"
+          className="text-xs text-action underline"
         >
           {manualUrlMode ? '画像アップロードに戻す' : 'URL を直接入力'}
         </button>

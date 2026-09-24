@@ -29,6 +29,15 @@
   color: var(--color-ink);
 }
 
+/* #639 タッチ端末では行内操作と同じく44pxを確保する（PCは32pxのまま）。 */
+@media (pointer: coarse) {
+  .button {
+    width: 44px;
+    height: 44px;
+    flex-basis: 44px;
+  }
+}
+
 .button:focus-visible {
   outline: revert;
 }

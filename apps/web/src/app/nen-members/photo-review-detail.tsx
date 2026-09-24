@@ -62,10 +62,10 @@ export function PhotoReviewDetail({
   const [downloadCode, setDownloadCode] = useState('')
   const [downloadBusy, setDownloadBusy] = useState(false)
   const [downloadError, setDownloadError] = useState('')
-  if (loading) return <main className="mx-auto max-w-screen-2xl p-6"><ListState kind="loading" title="写真を読み込んでいます" /></main>
-  if (loadKind === 'forbidden') return <main className="mx-auto max-w-screen-2xl p-6"><ListState kind="forbidden" /></main>
-  if (loadKind === 'error') return <main className="mx-auto max-w-screen-2xl p-6"><ListState kind="error" title="写真を読み込めませんでした" /></main>
-  if (!photo || loadKind === 'empty') return <main className="mx-auto max-w-screen-2xl p-6"><ListState kind="empty" title="確認する写真はありません" /></main>
+  if (loading) return <div><ListState kind="loading" title="写真を読み込んでいます" /></div>
+  if (loadKind === 'forbidden') return <div><ListState kind="forbidden" /></div>
+  if (loadKind === 'error') return <div><ListState kind="error" title="写真を読み込めませんでした" /></div>
+  if (!photo || loadKind === 'empty') return <div><ListState kind="empty" title="確認する写真はありません" /></div>
 
   const risks = Array.isArray(photo.risks) ? photo.risks as Array<Record<string, unknown>> : []
   /*
@@ -88,7 +88,7 @@ export function PhotoReviewDetail({
   const reviewUrl = safePhotoSrc(derivatives?.knownUrls.find((item) => item.kind === 'review')?.url)
     ?? safePhotoSrc(photo.image_url)
   const latestAssetJob = assetStatus?.jobs[0] ?? null
-  return <main className="mx-auto max-w-screen-2xl p-6" data-photo-view="detail">
+  return <div data-photo-view="detail">
     {notice && <div role="status" aria-live="polite" className="mb-4 rounded-control border border-accent-border bg-accent-soft px-4 py-3 text-sm text-accent-deep">{notice}</div>}
     <div className="flex items-center justify-between gap-2 max-md:flex-col max-md:items-start">
       <div>
@@ -263,7 +263,7 @@ export function PhotoReviewDetail({
         <input value={downloadCode} onChange={(event) => { setDownloadCode(event.target.value.replace(/\D/g, '').slice(0, 6)); setDownloadError('') }} inputMode="numeric" autoComplete="one-time-code" placeholder="6桁のコード" className="mt-2 w-full rounded-control border border-hairline bg-canvas px-3 py-2 text-sm font-normal text-ink" />
       </label>
     </Dialog>
-  </main>
+  </div>
 }
 
 function assetStatusLabel(status: string) {
