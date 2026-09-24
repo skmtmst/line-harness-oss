@@ -3043,6 +3043,44 @@
         }
       ]
     },
+    "combobox": {
+      "name": "★V7 候補つき入力",
+      "pencilNodes": [
+        "WUVcz"
+      ],
+      "role": "canonical",
+      "status": "pending",
+      "reviewStatus": "confirmed",
+      "code": "src/components/shared/combobox.tsx",
+      "cssModule": "src/components/shared/combobox.module.css",
+      "components": [
+        "Combobox"
+      ],
+      "cssPrefix": "combobox",
+      "pencilUsage": "タグ付け・宛先の条件・テンプレート選びを1つにする",
+      "lastCheckedAt": "2026-09-24",
+      "note": "閉じる・入力中（一致は太字・選ぶ行は灰色の地）・候補なし（＋任意の新しく作る）・読み込み中・誤りまで実装した。見た目の照合は司令塔が行う。",
+      "declarations": []
+    },
+    "multi-select": {
+      "name": "★V7 複数選択",
+      "pencilNodes": [
+        "WUVcz"
+      ],
+      "role": "canonical",
+      "status": "pending",
+      "reviewStatus": "confirmed",
+      "code": "src/components/shared/multi-select.tsx",
+      "cssModule": "src/components/shared/multi-select.module.css",
+      "components": [
+        "MultiSelect"
+      ],
+      "cssPrefix": "multi-select",
+      "pencilUsage": "タグ・宛先の複数選択を1つにする",
+      "lastCheckedAt": "2026-09-24",
+      "note": "札と+N・頭の件数とすべて外す・行頭の共通Checkbox・選んでも閉じない・Backspaceで最後の札を外すまで実装した。見た目の照合は司令塔が行う。",
+      "declarations": []
+    },
     "notification-panel": {
       "name": "V5 共通通知パネル",
       "pencilNodes": [
