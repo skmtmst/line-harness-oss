@@ -8,7 +8,6 @@ import { KNOWLEDGE_KINDS, knowledgeArticleKind, knowledgeTime } from './knowledg
 import Button from '@/components/shared/button'
 import Chip from '@/components/shared/chip'
 import Dialog from '@/components/shared/dialog'
-import NoteBar from '@/components/shared/note-bar'
 import SelectField from '@/components/shared/select-field'
 import { TextArea, TextField } from '@/components/shared/text-field'
 import styles from './knowledge.module.css'
@@ -70,9 +69,10 @@ export default function KnowledgeEditor({ article: initial, onClose, onSaved }: 
       {!editing && <Button variant="primary" disabled={busy || !canApprove || !confirmed} onClick={() => void save(true)}>承認して有効にする</Button>}
     </div>}>
     <div className={styles.editor}>
-      <NoteBar className={styles.note}>{editing
+      {/* ★V7: 緑は「正常」だけ。説明の帯は枠なしの info の小さい帯にする。 */}
+      <div role="note" className="rounded-control bg-info-bg px-4 py-3 text-xs text-ink-secondary">{editing
         ? '変更を保存すると承認待ちに戻ります。再承認するまで、この記事は AI の返信に使われません。'
-        : '自動で作成した下書きです。解決の根拠と記事案を確認してください。承認するまで AI の返信には使われません。'}</NoteBar>
+        : '自動で作成した下書きです。解決の根拠と記事案を確認してください。承認するまで AI の返信には使われません。'}</div>
       <div className={styles.sourceLine}>
         <p className={styles.source}>元の問い合わせ：{article.ticketNo == null ? '番号未取得' : `#MB-${String(article.ticketNo).padStart(4, '0')}`}{article.sourceSubject ? ` ${article.sourceSubject}` : ''}</p>
         <Chip data-design-node="aeReviewKind" tone={kindLabel.tone} className={styles.articleKindChip}>{kindLabel.label}</Chip>

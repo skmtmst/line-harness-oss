@@ -8,6 +8,7 @@ import React, { Suspense, useCallback, useEffect, useRef, useState, type ReactNo
 import type { LineAccount } from '@line-crm/shared'
 import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
 import PageHeader from '@/components/shared/page-header'
+import NoteBar from '@/components/shared/note-bar'
 import KpiCollapse from '@/components/ui/kpi-collapse'
 import {
   api,
@@ -390,7 +391,8 @@ function OperationAlertsPanel({
 }) {
   const [notes, setNotes] = useState<Record<string, string>>({})
   if (failed) return <section className="rounded-card border border-warning bg-warning-bg px-4 py-3 text-xs font-medium text-warning" role="alert">異常の受領・通知記録を取得できませんでした。異常なしとは扱いません。時間をおいて読み直してください。</section>
-  if (alerts.length === 0) return <section className="rounded-card border border-success bg-success-bg px-4 py-3 text-xs font-medium text-success"><strong>異常の記録はありません。</strong> 健全性チェックで新しい異常が見つかると、ここで担当者と通知結果を確認できます。</section>
+  // ★V7: 緑は「正常」の札だけに使う。異常なしの案内は枠なしの info の小さい帯にする。
+  if (alerts.length === 0) return <NoteBar tone="info">異常の記録はありません。健全性チェックで新しい異常が見つかると、ここで担当者と通知結果を確認できます。</NoteBar>
   return <section className="border-hairline rounded-card overflow-hidden border bg-canvas" aria-label="異常の受領と通知">
     <div className="border-hairline border-b px-4 py-3"><h2 className="text-base font-bold text-ink">異常の対応履歴と通知</h2><p className="mt-1 text-xs text-ink-faint">同じ異常はまとめます。悪化・解消・再発は履歴と通知に残ります。</p></div>
     <div className="divide-y divide-hairline">{alerts.map((alert) => {

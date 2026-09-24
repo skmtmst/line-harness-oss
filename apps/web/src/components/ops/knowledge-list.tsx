@@ -9,7 +9,6 @@ import KnowledgeEditor from '@/components/ops/knowledge-editor'
 import Button from '@/components/shared/button'
 import Chip from '@/components/shared/chip'
 import ListState from '@/components/shared/list-state'
-import NoteBar from '@/components/shared/note-bar'
 import SelectField from '@/components/shared/select-field'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { TextField } from '@/components/shared/text-field'
@@ -71,7 +70,8 @@ export default function KnowledgeList() {
         options={[{ value: '', label: '状態：すべて' }, { value: 'pending', label: '承認待ち' }, { value: 'approved', label: '承認済み' }, { value: 'needs_review', label: '要確認' }, { value: 'dismissed', label: '見送り' }]} />
       <span className={styles.count}>{loaded && !error ? `${total}件` : '—'}</span>
     </div>
-    <NoteBar className={styles.note}>解決した問い合わせを自動確認し、根拠が揃ったものだけ下書きにします。AI の返信に使うのは承認済みの記事だけです。</NoteBar>
+    {/* ★V7: 緑は「正常」だけ。説明の帯は枠なしの info の小さい帯にする。 */}
+    <div role="note" className="rounded-control bg-info-bg px-4 py-3 text-xs text-ink-secondary">解決した問い合わせを自動確認し、根拠が揃ったものだけ下書きにします。AI の返信に使うのは承認済みの記事だけです。</div>
     {actionError && <p role="alert" className={styles.error}>{actionError}</p>}
     {!loaded ? <ListState kind="loading" /> : error ? <ListState kind="error" description={error} onRetry={() => void load()} /> : rows.length === 0
       ? <ListState kind="empty" emptyPreset="readonly" title="記事はありません" description="解決した問い合わせの確認結果がここに並びます。" />
