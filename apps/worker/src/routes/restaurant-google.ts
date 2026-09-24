@@ -8,7 +8,7 @@
  * - トークンは暗号化して保存し、応答・ログに平文を出さない。
  */
 import { Hono } from 'hono';
-import type { Context } from 'hono';
+import type { Context, MiddlewareHandler } from 'hono';
 import { CredentialEncryptionKeyError, decryptCredential, encryptCredential } from '@line-crm/db';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
@@ -53,6 +53,43 @@ const REVIEWS_PAGE_SIZE_MAX = 100;
 
 type ConnectionStatus = 'pending_location' | 'connected' | 'expired' | 'no_permission' | 'disconnected';
 type ReplyStatus = 'unreplied' | 'draft' | 'pending_confirm' | 'replied' | 'published';
+
+/**
+ * Google接続は統括の設定。owner は常に許可し、admin はDB上で
+ * 「全アカウント担当」と「配下アクセス可」が明示されている場合だけ許可する。
+ * 店舗限定の管理者へ接続権限を広げないため、行が無い・値が曖昧なら拒否する。
+ */
+async function canManageGoogleConnection(c: Context<Env>): Promise<boolean> {
+  const staff = c.get('staff');
+  if (!staff) return false;
+  if (staff.role === 'owner') return true;
+  if (staff.role !== 'admin' || staff.id === 'env-owner') return false;
+  const row = await dbFor(c.env)
+    .prepare(
+      `SELECT account_scope, can_access_descendant_accounts
+       FROM staff_members
+       WHERE id = ? AND tenant_id = ? AND role = 'admin' AND is_active = 1
+       LIMIT 1`,
+    )
+    .bind(staff.id, staffTenantId(c))
+    .first<{ account_scope: string | null; can_access_descendant_accounts: number | null }>();
+  return row?.account_scope === 'all' && row.can_access_descendant_accounts === 1;
+}
+
+async function googlePermissions(c: Context<Env>) {
+  const staff = c.get('staff');
+  return {
+    canManageConnection: await canManageGoogleConnection(c),
+    canPublishReply: staff?.role === 'owner' || staff?.role === 'admin',
+  };
+}
+
+const requireConnectionManager: MiddlewareHandler<Env> = async (c, next) => {
+  if (!await canManageGoogleConnection(c)) {
+    return fail(c, 403, 'Googleアカウントの接続には統括の管理者権限が必要です');
+  }
+  return next();
+};
 
 interface StoreContext {
   id: string;
@@ -468,10 +505,11 @@ restaurantGoogle.get('/api/restaurant-test/google/connection', async (c) => {
     writeEnabled: writeEnabled(c.env),
     oauthConfigured: Boolean(oauthClient(c)),
     aiAvailable: Boolean(c.env.AI),
+    permissions: await googlePermissions(c),
   });
 });
 
-restaurantGoogle.post('/api/restaurant-test/google/connect/start', requireRole('owner'), async (c) => {
+restaurantGoogle.post('/api/restaurant-test/google/connect/start', requireConnectionManager, async (c) => {
   const client = oauthClient(c);
   if (!client) return fail(c, 503, 'Google接続の設定（OAuthクライアント）がこの環境にありません', { code: 'oauth_not_configured' });
   const store = await ensureStoreForGoogle(c);
@@ -514,7 +552,7 @@ restaurantGoogle.post('/api/restaurant-test/google/connect/start', requireRole('
  * Googleからの戻り。管理画面のセッションCookie（同一サイトの最上位GET）と、
  * 認可開始時に置いたstate Cookie／DBの state の両方が一致したときだけ保存する。
  */
-restaurantGoogle.get('/api/restaurant-test/google/oauth/callback', requireRole('owner'), async (c) => {
+restaurantGoogle.get('/api/restaurant-test/google/oauth/callback', requireConnectionManager, async (c) => {
   c.header('Set-Cookie', stateCookie('', 0));
   const state = c.req.query('state') ?? '';
   const code = c.req.query('code') ?? '';
@@ -645,7 +683,7 @@ restaurantGoogle.get('/api/restaurant-test/google/oauth/callback', requireRole('
   }
 });
 
-restaurantGoogle.post('/api/restaurant-test/google/connect/select-location', requireRole('owner'), async (c) => {
+restaurantGoogle.post('/api/restaurant-test/google/connect/select-location', requireConnectionManager, async (c) => {
   const store = await storeFor(c);
   if (!store) return fail(c, 404, 'このLINEアカウントに店舗が紐付いていません');
   const connection = await connectionFor(c, store.id);
@@ -671,7 +709,7 @@ restaurantGoogle.post('/api/restaurant-test/google/connect/select-location', req
   return c.json({ success: true, connection: publicConnection(await connectionFor(c, store.id)) });
 });
 
-restaurantGoogle.post('/api/restaurant-test/google/disconnect', requireRole('owner'), async (c) => {
+restaurantGoogle.post('/api/restaurant-test/google/disconnect', requireConnectionManager, async (c) => {
   const store = await storeFor(c);
   if (!store) return fail(c, 404, 'このLINEアカウントに店舗が紐付いていません');
   const body = await c.req.json<{ confirmed?: boolean }>().catch(() => ({}) as { confirmed?: boolean });

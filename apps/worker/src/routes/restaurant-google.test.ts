@@ -95,7 +95,14 @@ function call(path: string, init: { method?: string; body?: unknown; token?: str
   );
 }
 
-function useStaffRole(role: 'admin' | 'staff'): void {
+function useStaffRole(role: 'admin' | 'staff', accountScope: 'all' | 'accounts' = 'all'): void {
+  testDb.raw
+    .prepare(
+      `INSERT OR REPLACE INTO staff_members
+         (id, name, role, api_key, tenant_id, account_scope, can_access_descendant_accounts, is_active)
+       VALUES (?, ?, ?, ?, ?, ?, ?, 1)`,
+    )
+    .run(`${role}-1`, role, role, `${role}-key`, TENANT, accountScope, accountScope === 'all' ? 1 : 0);
   authMocks.getStaffByApiKey.mockResolvedValue({
     id: `${role}-1`, name: role, role, access_level: 'full', permission_keys: '[]', assigned_line_account_id: null, can_access_descendant_accounts: 1,
   });
@@ -175,20 +182,24 @@ describe('Googleビジネス：設定（接続）', () => {
     seedStore();
     const response = await call('/api/restaurant-test/google/connection?account_id=account-2');
     expect(response.status).toBe(200);
-    const json = (await response.json()) as { connection: { status: string }; writeEnabled: boolean; oauthConfigured: boolean };
+    const json = (await response.json()) as { connection: { status: string }; writeEnabled: boolean; oauthConfigured: boolean; permissions: { canManageConnection: boolean; canPublishReply: boolean } };
     expect(json.connection.status).toBe('disconnected');
     expect(json.writeEnabled).toBe(true);
     expect(json.oauthConfigured).toBe(true);
+    expect(json.permissions).toEqual({ canManageConnection: true, canPublishReply: true });
     expect(JSON.stringify(json)).not.toContain('secret');
   });
 
-  it('接続開始は state を保存し、Cookie と認可URLを返す（owner のみ）', async () => {
+  it('接続開始は state を保存し、Cookie と認可URLを返す（owner と全店担当の統括管理者）', async () => {
     seedStore();
     const denied = await call('/api/restaurant-test/google/connect/start?account_id=account-2', { body: {}, token: 'admin-key' });
     expect(denied.status).toBe(401);
     useStaffRole('admin');
-    const adminDenied = await call('/api/restaurant-test/google/connect/start?account_id=account-2', { body: {}, token: 'admin-key' });
-    expect(adminDenied.status).toBe(403);
+    const adminAllowed = await call('/api/restaurant-test/google/connect/start?account_id=account-2', { body: {}, token: 'admin-key' });
+    expect(adminAllowed.status).toBe(200);
+    useStaffRole('admin', 'accounts');
+    const scopedAdminDenied = await call('/api/restaurant-test/google/connect/start?account_id=account-2', { body: {}, token: 'admin-key' });
+    expect(scopedAdminDenied.status).toBe(403);
     authMocks.getStaffByApiKey.mockResolvedValue(null);
 
     const response = await call('/api/restaurant-test/google/connect/start?account_id=account-2', { body: {} });
@@ -472,7 +483,7 @@ describe('Googleビジネス：口コミ', () => {
     expect(testDb.raw.prepare('SELECT result FROM rt_google_write_log').get()).toEqual({ result: 'unknown' });
   }, 20_000);
 
-  it('権限：staff は公開・接続・解除ができず、admin は公開できるが接続はできない', async () => {
+  it('権限：staff は公開・接続・解除ができず、全店担当の統括管理者は接続できる', async () => {
     await seedReviews();
     const id = reviewIdOf('r2');
     useStaffRole('staff');
@@ -485,6 +496,6 @@ describe('Googleビジネス：口コミ', () => {
     env.GOOGLE_BUSINESS_WRITE_ENABLED = 'false';
     expect((await call(`/api/restaurant-test/google/reviews/${id}/reply?account_id=account-2`, { body: { confirmed: true, comment: 'x' }, token: 'admin-key' })).status).toBe(403);
     expect(await (await call(`/api/restaurant-test/google/reviews/${id}/reply?account_id=account-2`, { body: { confirmed: true, comment: 'x' }, token: 'admin-key' })).json()).toMatchObject({ code: 'write_disabled' });
-    expect((await call('/api/restaurant-test/google/connect/start?account_id=account-2', { body: {}, token: 'admin-key' })).status).toBe(403);
+    expect((await call('/api/restaurant-test/google/connect/start?account_id=account-2', { body: {}, token: 'admin-key' })).status).toBe(200);
   });
 });
