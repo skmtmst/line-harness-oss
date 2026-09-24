@@ -11,6 +11,9 @@ import {
 } from '@/lib/api'
 import type { Tag, Scenario, LineAccount } from '@line-crm/shared'
 import { TableHeadRow, Th } from '@/components/shared/table'
+import ActionMenu from '@/components/shared/action-menu'
+import { MoreAction } from '@/components/shared/row-actions'
+import StatusBadge from '@/components/shared/status-badge'
 import Button from '@/components/shared/button'
 import type { ButtonProps } from '@/components/shared/button'
 import Chip from '@/components/shared/chip'
@@ -284,6 +287,8 @@ export function AffiliatorsTab({ accountId }: { accountId: string | null }) {
   // ── create modal ────────────────────────────────────────────────────────────
   const [createOpen, setCreateOpen] = useState(false)
   const [archiveTarget, setArchiveTarget] = useState<{ id: string; name: string } | null>(null)
+  // 行の「…」メニューの開き先（EC連携の一覧と同じ形）
+  const [rowMenuId, setRowMenuId] = useState<string | null>(null)
 
   // ── journeys (cursor-paginated) ────────────────────────────────────────────
   const [journeys, setJourneys] = useState<JourneySummary[]>([])
@@ -535,11 +540,7 @@ export function AffiliatorsTab({ accountId }: { accountId: string | null }) {
 
   return (
     <div data-design-node="PouPn" data-affiliate-design="v6">
-      <NoteBar>
-        紹介リンクを渡した人ごとに、クリックから成果までの流れと確定した報酬を確認できます。
-      </NoteBar>
-
-      <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
         <KpiCard
           title="今月の成果"
           value={confirmedValue(approvalState, approvedTotals.count)}
@@ -561,14 +562,11 @@ export function AffiliatorsTab({ accountId }: { accountId: string | null }) {
           detail={confirmedDetail(paymentState, payoutCycle ? `${payoutCycle}・支払日は未接続` : '締め日・支払日は未接続')}
           loading={paymentState === 'loading'}
         />
-        <KpiCard
-          title="未払い残高"
-          value={null}
-          unit=""
-          detail="支払済み台帳が接続されると表示されます"
-          loading={paymentState === 'loading'}
-        />
       </div>
+
+      <NoteBar className="mb-4">
+        紹介リンクを渡した人ごとに、クリックから成果までの流れと確定した報酬を確認できます。
+      </NoteBar>
 
       <section className="bg-canvas rounded-card border-hairline mb-4 border p-4" aria-label="今月の成果の流れ">
         <div className="mb-3 flex items-center justify-between gap-3">
@@ -604,7 +602,7 @@ export function AffiliatorsTab({ accountId }: { accountId: string | null }) {
           value={query}
           onChange={(value) => { setQuery(value); setPage(1) }}
           onClear={() => { setQuery(''); setPage(1) }}
-          className="w-full md:max-w-md"
+          className="min-w-52 flex-1"
         />
         <span className="text-ink-faint whitespace-nowrap text-xs">並び順</span>
         <Select
@@ -634,6 +632,12 @@ export function AffiliatorsTab({ accountId }: { accountId: string | null }) {
       </div>
 
       <div className="mb-3 flex flex-wrap items-center gap-2">
+        <FilterChip
+          selected={filters.length === 0}
+          onChange={() => { setFilters([]); setPage(1) }}
+        >
+          すべて
+        </FilterChip>
         {([
           ['active', '計測中'],
           ['inactive', '停止中'],
@@ -700,6 +704,7 @@ export function AffiliatorsTab({ accountId }: { accountId: string | null }) {
                 <Th align="right">友だち追加</Th>
                 <Th align="right">成果</Th>
                 <Th align="right">報酬</Th>
+                <Th align="center">状態</Th>
                 <Th align="center">操作</Th>
               </TableHeadRow>
             </thead>
@@ -730,18 +735,38 @@ export function AffiliatorsTab({ accountId }: { accountId: string | null }) {
                         {formatYen(row.rewardAmount)}
                       </td>
                       <td className="px-4 py-3 text-center">
+                        {row.isActive
+                          ? <StatusBadge tone="success" size="compact">計測中</StatusBadge>
+                          : <StatusBadge tone="neutral" size="compact">停止中</StatusBadge>}
+                      </td>
+                      {/* 行の操作は枠つきボタン＋「…」へ集約。紹介を止めるは確認画面つき。 */}
+                      <td className="px-4 py-3 text-center" onClick={(event) => event.stopPropagation()}>
                         <div className="flex flex-wrap items-center justify-center gap-2">
-                          <span className="text-action text-xs font-medium">{isExpanded ? '閉じる' : '成果を見る'}</span>
-                          <span className="text-ink-faint text-xs">{row.isActive ? '計測中' : '停止中'}</span>
                           <AffiliateButton
-                            aria-label={`${row.name}の紹介停止を確認`}
-                            onClick={(event) => {
-                              event.stopPropagation()
-                              setArchiveTarget({ id: row.id, name: row.name })
-                            }}
+                            aria-label={isExpanded ? `${row.name}の成果を閉じる` : `${row.name}の成果を見る`}
+                            onClick={() => handleRowClick(row.id)}
                           >
-                            紹介を止める
+                            {isExpanded ? '閉じる' : '成果を見る'}
                           </AffiliateButton>
+                          <span className="relative inline-flex">
+                            <MoreAction
+                              label={`${row.name}のその他操作`}
+                              aria-expanded={rowMenuId === row.id}
+                              onClick={() => setRowMenuId((current) => (current === row.id ? null : row.id))}
+                            />
+                            <ActionMenu
+                              open={rowMenuId === row.id}
+                              ariaLabel={`${row.name}の操作`}
+                              onClose={() => setRowMenuId(null)}
+                              items={[
+                                {
+                                  id: 'archive',
+                                  label: '紹介を止める',
+                                  onSelect: () => setArchiveTarget({ id: row.id, name: row.name }),
+                                },
+                              ]}
+                            />
+                          </span>
                         </div>
                       </td>
                     </tr>
@@ -749,7 +774,7 @@ export function AffiliatorsTab({ accountId }: { accountId: string | null }) {
                     {/* Detail expansion row */}
                     {isExpanded && (
                       <tr key={`${row.id}-detail`}>
-                        <td colSpan={6} className="bg-canvas-sunken border-hairline border-t px-6 py-5">
+                        <td colSpan={7} className="bg-canvas-sunken border-hairline border-t px-6 py-5">
                           {detailLoading ? (
                             <p className="text-sm text-ink-faint">読み込み中...</p>
                           ) : (
