@@ -78,7 +78,7 @@ const ALLOWED_H1: Record<string, string> = {
 
 describe('画面名を本文とトップバーで2回出さない', () => {
   it('全ページを読めている', () => {
-    expect(PAGES.length).toBe(184)  // 情報欄の編集画面と運営専用ナレッジ（37-11）を含む実測値。
+    expect(PAGES.length).toBe(185)  // 情報欄の編集画面と運営専用ナレッジ（37-11）、見本ページ v7-combobox を含む実測値。
   })
 
   it('page.tsx が h1 を直接持たない', () => {
