@@ -5,7 +5,9 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { X } from 'lucide-react'
 import type { Tag, TagGroup } from '@line-crm/shared'
 import { api, type ListStats } from '@/lib/api'
+import FileDropzone, { AttachmentRow } from '@/components/shared/file-drop'
 import Pagination from '@/components/shared/pagination'
+import Progress from '@/components/shared/progress'
 import ListRange from '@/components/ui/list-range'
 
 const UNGROUPED = '__ungrouped__'
@@ -104,8 +106,31 @@ export default function FriendAttributesV2TagList({ fixture }: { fixture?: Frien
   const [manualOpen, setManualOpen] = useState(false)
   const [csvOpen, setCsvOpen] = useState(false)
   const [csvRows, setCsvRows] = useState<Array<{ name: string; folder: string }>>([])
+  const [csvFileName, setCsvFileName] = useState('')
   const [csvSaving, setCsvSaving] = useState(false)
+  const [csvDone, setCsvDone] = useState(0)
   const [csvError, setCsvError] = useState('')
+  /** 登録の列は先頭500件だけ見る（保存側の上限とそろえる）。 */
+  const csvTotal = Math.min(csvRows.length, 500)
+
+  /** 選ぶ・落とすのどちらもここへ来る。読み方（見出し除外・引用符）は変えない。 */
+  const onCsvFiles = async (files: File[]) => {
+    const file = files[0]
+    if (!file) return
+    setCsvFileName(file.name)
+    setCsvDone(0)
+    setCsvError('')
+    const text = (await file.text()).replace(/^\uFEFF/, '')
+    const parsed = text.split(/\r?\n/).map(parseCsvLine).filter((cells) => cells[0]?.trim()).map(([name, folder = '']) => ({ name: name.trim(), folder: folder.trim() }))
+    setCsvRows(parsed[0]?.name === 'タグ名' ? parsed.slice(1) : parsed)
+  }
+
+  const clearCsvSelection = () => {
+    setCsvRows([])
+    setCsvFileName('')
+    setCsvDone(0)
+    setCsvError('')
+  }
 
   const load = useCallback(async () => {
     if (fixture) return
@@ -169,7 +194,7 @@ export default function FriendAttributesV2TagList({ fixture }: { fixture?: Frien
   }
 
   return <div data-design-node="xn98K" className="min-w-0 text-ink [font-family:'SF_Pro_Text',-apple-system,BlinkMacSystemFont,'Helvetica_Neue',Arial,sans-serif]">
-    <header data-design="Head" className="flex min-h-[58px] items-start justify-between gap-5"><div><h1 className="text-[30px] font-bold leading-tight tracking-[-0.02em]">友だち属性</h1><p className="mt-1 text-[13px] text-ink-secondary">タグ・情報欄・対応マーク・保存条件を、用途まで見ながら管理します。</p></div><div className="mt-[11px] flex shrink-0 gap-2"><button type="button" onClick={() => setManualOpen(true)} className="h-9 w-[92px] rounded-control border border-hairline bg-canvas text-[13px]">マニュアル</button><button type="button" onClick={() => { setCsvOpen(true); setCsvRows([]); setCsvError('') }} className="h-9 w-[116px] rounded-control border border-hairline bg-canvas text-[13px]">CSVで一括登録</button></div></header>
+    <header data-design="Head" className="flex min-h-[58px] items-start justify-between gap-5"><div><h1 className="text-[30px] font-bold leading-tight tracking-[-0.02em]">友だち属性</h1><p className="mt-1 text-[13px] text-ink-secondary">タグ・情報欄・対応マーク・保存条件を、用途まで見ながら管理します。</p></div><div className="mt-[11px] flex shrink-0 gap-2"><button type="button" onClick={() => setManualOpen(true)} className="h-9 w-[92px] rounded-control border border-hairline bg-canvas text-[13px]">マニュアル</button><button type="button" onClick={() => { setCsvOpen(true); setCsvRows([]); setCsvFileName(''); setCsvDone(0); setCsvError('') }} className="h-9 w-[116px] rounded-control border border-hairline bg-canvas text-[13px]">CSVで一括登録</button></div></header>
     <nav data-design="Tabs" className="mt-4 flex h-7 items-center gap-2" aria-label="友だち属性の種類"><span className="inline-flex h-7 items-center rounded-pill bg-accent-soft px-2 text-[13px] font-semibold text-accent-deep">タグ</span>{[['fields','友だち情報欄'],['marks','対応マーク'],['searches','保存した検索']].map(([tab,label]) => <Link key={tab} href={`/tags?tab=${tab}`} className="inline-flex h-7 items-center rounded-pill bg-canvas-sunken px-2 text-[13px] text-ink-secondary">{label}</Link>)}</nav>
     <section data-design="KPIs" className="mt-4 grid grid-cols-2 gap-3 xl:grid-cols-4">{kpis.map(([title,value,unit,detail]) => <article key={title} className={`h-[108px] rounded-[12px] border border-hairline bg-canvas px-[14px] py-4 ${SHADOW}`}><p className="text-[12px] font-medium text-ink-secondary">{title}</p><p className="mt-1 flex items-baseline gap-1"><span className="text-[26px] font-bold tabular-nums">{value.toLocaleString('ja-JP')}</span><span className="text-[12px] text-ink-secondary">{unit}</span></p><p className="mt-1 text-[11px] text-ink-faint">{detail}</p></article>)}</section>
     <div data-design="Actions" className="mt-4 flex gap-2"><Link href="/tags/folders/new" className="inline-flex h-9 w-[118px] items-center justify-center rounded-control border border-hairline bg-canvas text-[13px]">フォルダを追加</Link><Link href="/tags/new" className="inline-flex h-9 w-[106px] items-center justify-center rounded-control bg-accent-deep text-[13px] font-semibold text-on-accent">＋ タグを追加</Link></div>
@@ -182,7 +207,7 @@ export default function FriendAttributesV2TagList({ fixture }: { fixture?: Frien
       </section>
     </div>
     {manualOpen&&<div className="fixed inset-0 z-[90] flex items-center justify-center bg-ink/40 p-4"><section role="dialog" aria-modal="true" className={`w-full max-w-[520px] rounded-card border border-hairline bg-canvas p-6 ${SHADOW}`}><div className="flex items-start justify-between gap-3"><h2 className="text-lg font-bold">友だち属性V2の使い方</h2><button type="button" onClick={()=>setManualOpen(false)} aria-label="閉じる" className="rounded-mini p-1 text-ink-secondary hover:bg-canvas-sunken"><X aria-hidden="true" className="h-5 w-5"/></button></div><p className="mt-3 text-sm leading-6 text-ink-secondary">検索、絞り込み、フォルダ変更、★表示、並び替えはこの一覧から行えます。作成・編集は移行中のため、現在の安全な登録画面を開きます。</p></section></div>}
-    {csvOpen&&<div className="fixed inset-0 z-[90] flex items-center justify-center bg-ink/40 p-4"><section role="dialog" aria-modal="true" aria-labelledby="csv-import-title" className={`w-full max-w-[560px] rounded-card border border-hairline bg-canvas p-6 ${SHADOW}`}><div className="flex items-start justify-between gap-3"><h2 id="csv-import-title" className="text-lg font-bold">CSVでタグを一括登録</h2><button type="button" disabled={csvSaving} onClick={()=>setCsvOpen(false)} aria-label="閉じる" className="rounded-mini p-1 text-ink-secondary hover:bg-canvas-sunken disabled:opacity-40"><X aria-hidden="true" className="h-5 w-5"/></button></div><p className="mt-2 text-sm leading-6 text-ink-secondary">1列目にタグ名、2列目にフォルダ名を入れます。先頭行が「タグ名」の場合は見出しとして除外します。</p><input aria-label="登録するCSV" type="file" accept=".csv,text/csv" onChange={async(event)=>{const file=event.target.files?.[0];if(!file)return;const text=(await file.text()).replace(/^\uFEFF/,'');const parsed=text.split(/\r?\n/).map(parseCsvLine).filter((cells)=>cells[0]?.trim()).map(([name,folder=''])=>({name:name.trim(),folder:folder.trim()}));setCsvRows(parsed[0]?.name==='タグ名'?parsed.slice(1):parsed);setCsvError('')}} className="mt-5 block w-full rounded-control border border-hairline p-3 text-sm"/><p className="mt-3 text-sm text-ink-secondary">登録対象: <strong className="text-ink">{csvRows.length}件</strong></p>{csvError&&<p className="mt-3 rounded-control bg-danger-bg p-3 text-sm text-danger">{csvError}</p>}<div className="mt-6 flex justify-end gap-2"><button type="button" disabled={csvSaving} onClick={()=>setCsvOpen(false)} className="rounded-control border border-hairline px-4 py-2 text-sm">キャンセル</button><button type="button" disabled={csvSaving||csvRows.length===0} onClick={async()=>{setCsvSaving(true);setCsvError('');try{const known=new Set(items.map((tag)=>tag.name));for(const row of csvRows.slice(0,500)){if(known.has(row.name))continue;const group=groups.find((candidate)=>candidate.name===row.folder);const result=await api.tags.create({name:row.name,groupId:group?.id??null});if(!result.success)throw new Error(result.error);known.add(row.name)}setCsvOpen(false);void load()}catch(reason){setCsvError(reason instanceof Error?reason.message:'一括登録できませんでした')}finally{setCsvSaving(false)}}} className="rounded-control bg-accent-deep px-4 py-2 text-sm font-semibold text-on-accent disabled:opacity-40">{csvSaving?'登録中…':'一括登録する'}</button></div></section></div>}
+    {csvOpen&&<div className="fixed inset-0 z-[90] flex items-center justify-center bg-ink/40 p-4"><section role="dialog" aria-modal="true" aria-labelledby="csv-import-title" className={`w-full max-w-[560px] rounded-card border border-hairline bg-canvas p-6 ${SHADOW}`}><div className="flex items-start justify-between gap-3"><h2 id="csv-import-title" className="text-lg font-bold">CSVでタグを一括登録</h2><button type="button" disabled={csvSaving} onClick={()=>setCsvOpen(false)} aria-label="閉じる" className="rounded-mini p-1 text-ink-secondary hover:bg-canvas-sunken disabled:opacity-40"><X aria-hidden="true" className="h-5 w-5"/></button></div><p className="mt-2 text-sm leading-6 text-ink-secondary">1列目にタグ名、2列目にフォルダ名を入れます。先頭行が「タグ名」の場合は見出しとして除外します。</p><div className="mt-5"><FileDropzone title="ここにCSVを置く" hint="1列目にタグ名、2列目にフォルダ名・先頭500件まで" accept=".csv,text/csv" disabled={csvSaving} onFiles={(files)=>void onCsvFiles(files)} /></div>{csvFileName&&csvRows.length>0?<div className="mt-3"><AttachmentRow name={csvFileName} meta={`${csvRows.length}件`} onRemove={csvSaving?undefined:clearCsvSelection} /></div>:null}{csvSaving?<div className="mt-3"><Progress state="active" title="タグを登録しています" percent={csvTotal>0?(csvDone/csvTotal)*100:0} countText={`${csvDone} / ${csvTotal} 件`} /></div>:null}{!csvSaving&&csvError&&csvDone>0?<div className="mt-3"><Progress state="partial" title={`${csvTotal}件中${csvDone}件まで処理しました`} percent={csvTotal>0?(csvDone/csvTotal)*100:0} /></div>:null}{csvError&&<p className="mt-3 rounded-control bg-danger-bg p-3 text-sm text-danger">{csvError}</p>}<div className="mt-6 flex justify-end gap-2"><button type="button" disabled={csvSaving} onClick={()=>setCsvOpen(false)} className="rounded-control border border-hairline px-4 py-2 text-sm">キャンセル</button><button type="button" disabled={csvSaving||csvRows.length===0} onClick={async()=>{setCsvSaving(true);setCsvError('');setCsvDone(0);try{const known=new Set(items.map((tag)=>tag.name));let processed=0;for(const row of csvRows.slice(0,500)){if(known.has(row.name)){processed+=1;setCsvDone(processed);continue}const group=groups.find((candidate)=>candidate.name===row.folder);const result=await api.tags.create({name:row.name,groupId:group?.id??null});if(!result.success)throw new Error(result.error);known.add(row.name);processed+=1;setCsvDone(processed)}setCsvOpen(false);void load()}catch(reason){setCsvError(reason instanceof Error?reason.message:'一括登録できませんでした')}finally{setCsvSaving(false)}}} className="rounded-control bg-accent-deep px-4 py-2 text-sm font-semibold text-on-accent disabled:opacity-40">{csvSaving?'登録中…':'一括登録する'}</button></div></section></div>}
     {deleteTarget&&<div className="fixed inset-0 z-[90] flex items-center justify-center bg-ink/40 p-4"><section role="alertdialog" aria-modal="true" className={`w-full max-w-[520px] rounded-card border border-hairline bg-canvas p-6 ${SHADOW}`}><h2 className="text-xl font-bold">タグを削除しますか？</h2><p className="mt-3 text-sm leading-6 text-ink-secondary">「{deleteTarget.name}」を削除します。この操作は元に戻せません。</p><div className="mt-6 flex justify-end gap-2"><button type="button" onClick={()=>setDeleteTarget(null)} className="rounded-control border border-hairline px-4 py-2 text-sm">キャンセル</button><button type="button" onClick={async()=>{const result=await api.tags.delete(deleteTarget.id);if(!result.success)setError(result.error);else{setDeleteTarget(null);void load()}}} className="rounded-control bg-danger px-4 py-2 text-sm font-bold text-on-accent">削除する</button></div></section></div>}
   </div>
 }
