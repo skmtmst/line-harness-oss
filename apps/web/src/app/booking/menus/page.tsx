@@ -340,7 +340,7 @@ function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuC
         />
       </div>
 
-      <div data-design="Bar" className="bg-info-bg text-info mb-4 rounded-control px-4 py-3 text-xs font-semibold">
+      <div data-design="Bar" className="bg-info-bg text-ink-secondary mb-4 rounded-control px-4 py-3 text-xs">
         ⓘ　上から並んだ順に、お客様の画面に出ます。かかる時間を長めにしておくと、あとの予約とぶつかりません。金額を空けておくと「お問い合わせ」と出ます。
       </div>
 
@@ -396,7 +396,7 @@ function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuC
                   <th className="sticky right-0 bg-canvas-sunken px-4 py-3 text-right text-xs font-semibold text-ink-faint">操作</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody className="divide-hairline divide-y">
                 {visible.map((m) => (
                   <tr key={m.id} className={`hover:bg-canvas-sunken ${m.is_active ? '' : 'text-ink-faint'}`}>
                     <td className="px-4 py-3 text-sm font-medium">
@@ -964,7 +964,7 @@ function EditMenuModal({
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto">
+      <div className="bg-canvas rounded-xl shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between gap-3 border-b border-hairline px-6 py-4">
           <h2 className="text-base font-semibold">メニュー編集</h2>
           <button type="button" onClick={onClose} aria-label="閉じる" className="rounded-mini p-1 text-ink-secondary hover:bg-canvas-sunken">

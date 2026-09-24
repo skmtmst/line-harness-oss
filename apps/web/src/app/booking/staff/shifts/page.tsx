@@ -602,7 +602,7 @@ function SlotCheckCard({ accountId, menus }: { accountId: string; menus: Booking
         ) : null}
       </div>
       <div className="mt-3 flex justify-end">
-        <Button variant="primary" onClick={() => void run()} disabled={!canRun}>{checking ? '確認中…' : 'この日時を確かめる'}</Button>
+        <Button onClick={() => void run()} disabled={!canRun}>{checking ? '確認中…' : 'この日時を確かめる'}</Button>
       </div>
       {checkError ? <p className="text-danger mt-3 text-sm" role="alert">{checkError}</p> : null}
       {result ? (
@@ -884,7 +884,7 @@ function StoreShiftsView() {
         <a href="#rules" className="text-ink-faint rounded-t-md px-4 py-2 text-sm hover:text-ink-secondary">予約のルール</a>
       </div>
 
-      <div data-design="Info" className="bg-info-bg text-info rounded-card px-4 py-3 text-sm">
+      <div data-design="Info" className="bg-info-bg text-ink-secondary rounded-card px-4 py-3 text-xs">
         何時から何時まで、どの曜日を受けるかです。右に、お客様のLINEに出る日時の選び方がそのまま出ます。
       </div>
 
