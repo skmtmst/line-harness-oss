@@ -22,7 +22,7 @@ vi.mock('@line-crm/db', () => ({
   advanceFriendScenario: vi.fn(),
   completeFriendScenario: vi.fn(),
   upsertChatOnMessage: vi.fn(),
-  getLineAccounts: vi.fn().mockResolvedValue([]),
+  listLineAccountsWithTenantStatus: vi.fn().mockResolvedValue([]),
   jstNow: vi.fn(),
   computeNextDeliveryAt: vi.fn(),
   resolveStepContent: vi.fn(),
@@ -106,7 +106,7 @@ import {
   enrollFriendInScenario,
   getEntryRouteByRefCode,
   getFriendByLineUserIdForAccount,
-  getLineAccounts,
+  listLineAccountsWithTenantStatus,
   getMessageTemplateById,
   getScenarioSteps,
   getScenarios,
@@ -123,6 +123,7 @@ import {
   touchFriendAddSendClaim,
   releaseFriendAddSendRight,
   recordAnalyticsEvent,
+  recordIncomingLineMessage,
 } from '@line-crm/db';
 import { fireEvent } from '../services/event-bus.js';
 import { handleCarouselTap } from '../services/carousel-tap.js';
@@ -159,13 +160,13 @@ const baseExecutionCtx = {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  vi.mocked(getLineAccounts).mockResolvedValue([]);
+  vi.mocked(listLineAccountsWithTenantStatus).mockResolvedValue([]);
 });
 
 describe('POST /webhook — V6 friend-add ledger', () => {
   test('再追加と今回リンクをWebhookイベント単位で記録する', async () => {
     vi.mocked(verifySignature).mockResolvedValue(true);
-    vi.mocked(getLineAccounts).mockResolvedValue([{
+    vi.mocked(listLineAccountsWithTenantStatus).mockResolvedValue([{
       id: 'account-main', channel_secret: 'env-default-secret',
       channel_access_token: 'account-token', is_active: 1,
     } as never]);
@@ -212,7 +213,7 @@ describe('POST /webhook — V6 friend-add ledger', () => {
 describe('POST /webhook — V6分析イベント', () => {
   test('友だち解除をWebhookの発生時刻とIDで記録する', async () => {
     vi.mocked(verifySignature).mockResolvedValue(true);
-    vi.mocked(getLineAccounts).mockResolvedValue([{
+    vi.mocked(listLineAccountsWithTenantStatus).mockResolvedValue([{
       id: 'account-main', channel_secret: 'env-default-secret',
       channel_access_token: 'account-token', is_active: 1,
     } as never]);
@@ -244,6 +245,43 @@ describe('POST /webhook — V6分析イベント', () => {
       occurredAt: new Date(1787530800000).toISOString(),
       dimensions: undefined,
     });
+  });
+});
+
+describe('POST /webhook — 停止中の契約先', () => {
+  test('受信メッセージは保存するが返信・自動化を発火しない', async () => {
+    vi.mocked(verifySignature).mockResolvedValue(true);
+    vi.mocked(listLineAccountsWithTenantStatus).mockResolvedValue([{
+      id: 'account-stopped', channel_secret: 'env-default-secret',
+      channel_access_token: 'account-token', is_active: 1, tenant_status: 'suspended',
+    } as never]);
+    vi.mocked(getFriendByLineUserIdForAccount).mockResolvedValue({
+      id: 'friend-stopped', line_user_id: 'U-stopped', line_account_id: 'account-stopped',
+      is_following: 1,
+    } as never);
+    const waitUntil = vi.fn();
+
+    const response = await setupApp().request('/webhook', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Line-Signature': 'x'.repeat(44) },
+      body: JSON.stringify({ destination: 'stopped-destination', events: [{
+        type: 'message', webhookEventId: 'stopped-message-1', timestamp: 1787530800000,
+        source: { type: 'user', userId: 'U-stopped' }, replyToken: 'reply-stopped',
+        message: { id: 'line-message-stopped', type: 'text', text: '問い合わせです' },
+      }] }),
+    }, baseEnv, { ...baseExecutionCtx, waitUntil } as ExecutionContext);
+    expect(response.status).toBe(200);
+    await (waitUntil.mock.calls[0]?.[0] as Promise<void>);
+
+    expect(recordIncomingLineMessage).toHaveBeenCalledWith(baseEnv.DB, expect.objectContaining({
+      friendId: 'friend-stopped', content: '問い合わせです', lineAccountId: 'account-stopped',
+    }));
+    expect(upsertChatOnMessage).toHaveBeenCalledWith(baseEnv.DB, 'friend-stopped');
+    expect(lineClientMocks.replyMessage).not.toHaveBeenCalled();
+    expect(lineClientMocks.pushMessage).not.toHaveBeenCalled();
+    expect(fireEvent).not.toHaveBeenCalled();
+    expect(applyFriendAddRouting).not.toHaveBeenCalled();
+    expect(handleCarouselTap).not.toHaveBeenCalled();
   });
 });
 
@@ -387,7 +425,7 @@ describe('POST /webhook — DoS defenses (#104)', () => {
 describe('POST /webhook — postback events', () => {
   test('records a carousel tap without firing catch-all automations', async () => {
     vi.mocked(verifySignature).mockResolvedValue(true);
-    vi.mocked(getLineAccounts).mockResolvedValue([{
+    vi.mocked(listLineAccountsWithTenantStatus).mockResolvedValue([{
       id: 'account-main', channel_secret: 'env-default-secret',
       channel_access_token: 'account-token', is_active: 1,
     } as never]);
@@ -612,7 +650,7 @@ describe('POST /webhook — postback events', () => {
 describe('POST /webhook — first-contact existing friends', () => {
   test('auto-registers an unknown text-message sender without firing friend_add handling', async () => {
     vi.mocked(verifySignature).mockResolvedValue(true);
-    vi.mocked(getLineAccounts).mockResolvedValue([{
+    vi.mocked(listLineAccountsWithTenantStatus).mockResolvedValue([{
       id: 'account-main',
       is_active: 1,
       channel_secret: 'env-default-secret',
@@ -739,7 +777,7 @@ describe('POST /webhook — first-contact existing friends', () => {
 describe('POST /webhook — friend-add抑止理由の台帳記録 (#622)', () => {
   async function sendFollowWithRouting(routing: unknown) {
     vi.mocked(verifySignature).mockResolvedValue(true);
-    vi.mocked(getLineAccounts).mockResolvedValue([{
+    vi.mocked(listLineAccountsWithTenantStatus).mockResolvedValue([{
       id: 'account-main', channel_secret: 'env-default-secret',
       channel_access_token: 'account-token', is_active: 1,
     } as never]);

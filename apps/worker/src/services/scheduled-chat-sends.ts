@@ -7,6 +7,7 @@ import {
   jstNow,
   SCHEDULED_CHAT_SEND_MAX_ATTEMPTS,
   type ScheduledChatSendRow,
+  activeTenantLineAccountSql,
 } from '@line-crm/db';
 import { resolveLineToken } from './line-token.js';
 import { classifyLineOutboundFailure } from './outbound-idempotency.js';
@@ -200,6 +201,18 @@ export async function processDueScheduledChatSends(
   options: { now?: string; limit?: number } = {},
 ): Promise<{ claimed: number; sent: number; failed: number }> {
   const now = options.now ?? new Date().toISOString();
+  // Due while stopped is a terminal cancellation, not a retry. This preserves
+  // the unsent row and prevents restore from creating an overdue push burst.
+  await env.DB.prepare(
+    `UPDATE scheduled_chat_sends
+        SET status = 'cancelled', cancelled_at = ?, updated_at = ?,
+            lease_token = NULL, lease_expires_at = NULL,
+            last_error_code = 'tenant_suspended',
+            last_error = '契約先の利用停止中に送信時刻を過ぎたため送信しませんでした'
+      WHERE status = 'scheduled' AND scheduled_at <= ?
+        AND line_account_id IS NOT NULL
+        AND NOT ${activeTenantLineAccountSql('scheduled_chat_sends.line_account_id')}`,
+  ).bind(now, now, now).run();
   const claimed = await claimDueScheduledChatSends(env.DB, {
     now,
     leaseToken: crypto.randomUUID(),

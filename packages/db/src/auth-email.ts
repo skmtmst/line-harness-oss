@@ -1,5 +1,6 @@
 import { jstNow, toJstString } from './utils.js';
 import type { StaffMember } from './staff.js';
+import { DEFAULT_TENANT_ID } from '@line-crm/shared';
 
 /**
  * メールで送る URL（会員登録の本登録・パスワード再設定）と、回数制限。★V6 36-4。
@@ -155,8 +156,16 @@ export async function getActiveStaffByEmail(db: D1Database, email: string): Prom
 /** メールとパスワードでログインできる権限者（パスワードを持つ人は 1 メール 1 人）。 */
 export async function getStaffWithPasswordByEmail(db: D1Database, email: string): Promise<StaffMember | null> {
   return db
-    .prepare('SELECT * FROM staff_members WHERE lower(email) = lower(?) AND password_hash IS NOT NULL')
-    .bind(email)
+    .prepare(`SELECT sm.*,
+      CASE
+        WHEN COALESCE(sm.tenant_id, ?) = ? THEN 'active'
+        WHEN t.status IN ('active', 'suspended', 'archived') THEN t.status
+        ELSE 'archived'
+      END AS tenant_status
+      FROM staff_members sm
+      LEFT JOIN tenants t ON t.id = COALESCE(sm.tenant_id, ?)
+      WHERE lower(sm.email) = lower(?) AND sm.password_hash IS NOT NULL`)
+    .bind(DEFAULT_TENANT_ID, DEFAULT_TENANT_ID, DEFAULT_TENANT_ID, email)
     .first<StaffMember>();
 }
 

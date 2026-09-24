@@ -4,9 +4,12 @@
 
 import type { BookingNotificationSender, NotificationKind } from './booking-notifier.js';
 import { REMINDER_MAX_RETRY } from './booking-types.js';
-import { resolveLineCredential } from '@line-crm/db';
+import {
+  activeTenantLineAccountSql,
+  isOperationCapabilityStopped,
+  resolveLineCredential,
+} from '@line-crm/db';
 import { featureJobCanRun } from './feature-enforcement.js';
-import { isOperationCapabilityStopped } from '@line-crm/db';
 
 interface DueRow {
   id: string;
@@ -41,6 +44,20 @@ export async function processDueReminders(
   db: D1Database,
   params: ProcessRemindersParams,
 ): Promise<{ sent: number; failed: number }> {
+  // Stop due rows before selection. `cancelled` is terminal but is neither a
+  // delivery success nor failure, so restoring a tenant never emits an
+  // overdue reminder burst.
+  await db.prepare(
+    `UPDATE booking_reminders
+        SET status = 'cancelled', last_error = 'tenant_suspended'
+      WHERE status IN ('pending','failed')
+        AND scheduled_at <= ?
+        AND EXISTS (
+          SELECT 1 FROM bookings stopped_booking
+           WHERE stopped_booking.id = booking_reminders.booking_id
+             AND NOT (${activeTenantLineAccountSql('stopped_booking.line_account_id')})
+        )`,
+  ).bind(params.now.toISOString()).run();
   // status は 'pending' に加え 'failed'（一時エラーで失敗、retry 残あり）も拾う。
   // 'failed_permanent' / 'sent' / 'cancelled' は再送対象外。
   const due = await db
@@ -64,6 +81,7 @@ export async function processDueReminders(
           AND r.scheduled_at <= ?
           AND b.status = 'confirmed'
           AND b.starts_at > ?       -- 開始時刻を過ぎた予約のリマインダは送らない
+          AND ${activeTenantLineAccountSql('b.line_account_id')}
         LIMIT 100`,
     )
     .bind(params.now.toISOString(), params.now.toISOString())
@@ -113,7 +131,8 @@ export async function processDueReminders(
             WHERE id = ? AND retry_count = ? AND status IN ('pending','failed')
               AND EXISTS (
                 SELECT 1 FROM bookings b
-                 WHERE b.id = booking_reminders.booking_id AND b.status = 'confirmed')`,
+                 WHERE b.id = booking_reminders.booking_id AND b.status = 'confirmed'
+                   AND ${activeTenantLineAccountSql('b.line_account_id')})`,
         )
         .bind(row.id, priorRetry)
         .run();

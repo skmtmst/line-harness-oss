@@ -49,6 +49,7 @@ import {
   getLineAccountById,
   jstNow,
   toJstString,
+  listLineAccountsWithTenantStatus,
 } from '@line-crm/db';
 import { enrollFriendInScenario } from '@line-crm/db';
 import { attachTagAndFireSideEffects } from '../services/friend-tag-attach.js';
@@ -99,6 +100,17 @@ import {
 } from '@line-crm/shared';
 
 const forms = new Hono<Env>();
+
+async function stoppedPublicFormResponse(c: Context<Env>, formId: string): Promise<Response | null> {
+  const accountIds = await getFormAccountIds(c.env.DB, formId);
+  if (accountIds.length === 0) return null;
+  const statuses = new Map(
+    (await listLineAccountsWithTenantStatus(c.env.DB)).map((account) => [account.id, account.tenant_status]),
+  );
+  return accountIds.some((accountId) => statuses.get(accountId) === 'active')
+    ? null
+    : c.json({ success: false, code: 'TENANT_SUSPENDED', error: '現在ご利用いただけません' }, 503);
+}
 
 /** 回答に添付できる画像。heic は iPhone の既定の形式なので入れておく。 */
 const FORM_UPLOAD_TYPES: Record<string, string> = {
@@ -839,6 +851,8 @@ forms.get('/api/forms/unassigned', requireRole('owner', 'admin'), async (c) => {
 
 // GET /api/forms/:id — get form
 forms.get('/api/forms/:id', async (c) => {
+  const stopped = await stoppedPublicFormResponse(c, c.req.param('id'));
+  if (stopped) return stopped;
   try {
     const id = c.req.param('id');
     const staff = c.get('staff');
@@ -1630,6 +1644,8 @@ forms.post('/api/forms/:id/submissions/:submissionId/retry-effects', async (c) =
 
 // POST /api/forms/:id/opened — record form open event (public, used by LIFF)
 forms.post('/api/forms/:id/opened', async (c) => {
+  const stopped = await stoppedPublicFormResponse(c, c.req.param('id'));
+  if (stopped) return stopped;
   try {
     const formId = c.req.param('id');
     /*
@@ -1692,6 +1708,8 @@ forms.post('/api/forms/:id/opened', async (c) => {
 
 // POST /api/forms/:id/partial — save survey answers without x_username (public, used by LIFF page 1)
 forms.post('/api/forms/:id/partial', async (c) => {
+  const stopped = await stoppedPublicFormResponse(c, c.req.param('id'));
+  if (stopped) return stopped;
   try {
     const body = await c.req.json<{ data?: Record<string, unknown> }>();
     const identity = await verifyCallerLineIdentity(c.req.header('Authorization'), c.env);
@@ -1778,6 +1796,8 @@ forms.post('/api/forms/:id/partial', async (c) => {
  * 3つ目が無いと、フォームIDさえ知っていれば誰でも画像置き場として使える。
  */
 forms.post('/api/forms/:id/files', async (c) => {
+  const stopped = await stoppedPublicFormResponse(c, c.req.param('id'));
+  if (stopped) return stopped;
   try {
     const formId = c.req.param('id');
     const form = await getFormById(c.env.DB, formId, { published: true });
@@ -1862,6 +1882,8 @@ forms.post('/api/forms/:id/files', async (c) => {
  * 別の端末で復活して見える。
  */
 forms.get('/api/forms/:id/my-latest', async (c) => {
+  const stopped = await stoppedPublicFormResponse(c, c.req.param('id'));
+  if (stopped) return stopped;
   try {
     const formId = c.req.param('id');
     const form = await getFormById(c.env.DB, formId, { published: true });
@@ -1915,6 +1937,8 @@ forms.get('/api/forms/:id/my-latest', async (c) => {
 // キーは回答行の id そのものになり、同じキーの再送は保存済みの行を返す。
 // 同じキーで内容が違う使い回しは 409 で断る。キーが無い送信は従来どおり。
 forms.post('/api/forms/:id/submit', async (c) => {
+  const stopped = await stoppedPublicFormResponse(c, c.req.param('id'));
+  if (stopped) return stopped;
   try {
     const formId = c.req.param('id');
     // 送信には Idempotency-Key(UUID)が必須。キーなしの連打・再送は

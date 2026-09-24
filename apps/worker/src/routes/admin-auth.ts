@@ -13,7 +13,10 @@ import {
   csrfCookie,
   csrfTokenFromCookie,
   expiredCookie,
+  isTenantUnavailable,
   sha256Hex,
+  TENANT_SUSPENDED_CODE,
+  TENANT_SUSPENDED_ERROR,
 } from '../middleware/auth.js';
 import { clientIp, issueSession, maskIpPrefix, randomToken, startTwoFactorChallenge, twoFactorLoginUrl, twoFactorRequired, twoFactorSetupUrl } from '../services/admin-session.js';
 import { resolveAdminAuthConfig } from '../middleware/admin-auth-config.js';
@@ -220,9 +223,16 @@ adminAuth.get('/api/auth/line/callback', async (c) => {
           invite_expires_at: null,
           line_linked_at: new Date().toISOString(),
         });
+        if (staff) staff = await getStaffById(c.env.DB, staff.id);
       }
     }
     if (!staff) return c.redirect(adminLoginUrl(c, 'not_authorized', next));
+
+    // 通常のLINEログインでは停止中の契約先へ新しいセッションを発行しない。
+    // 運営コンソールは platform admin 専用の判定へ委ねる。
+    if (next !== 'ops' && isTenantUnavailable(staff.tenant_status)) {
+      return c.redirect(adminLoginUrl(c, 'tenant_suspended', next));
+    }
 
     // 運営コンソールへの LINE ログイン（★V6 37-1）。platform_admins に登録された
     // LINE ユーザーだけを通す。契約先の権限者や、契約者専用 LINE の友だちでは入れない。
@@ -308,6 +318,10 @@ adminAuth.post('/api/auth/two-factor/verify', async (c) => {
   if (!staff?.is_active || !staff.totp_secret_enc || !staff.totp_enabled_at || !masterKey) {
     await deleteTwoFactorChallenge(c.env.DB, tokenHash);
     return c.json({ success: false, error: '二段階認証を確認できません' }, 401);
+  }
+  if (isTenantUnavailable(staff.tenant_status)) {
+    await deleteTwoFactorChallenge(c.env.DB, tokenHash);
+    return c.json({ success: false, code: TENANT_SUSPENDED_CODE, error: TENANT_SUSPENDED_ERROR }, 403);
   }
 
   const verified = await verifyTotp(
@@ -419,6 +433,10 @@ adminAuth.post('/api/auth/two-factor/setup/confirm', async (c) => {
   const masterKey = c.env.TOTP_ENCRYPTION_KEY;
   if (!staff?.is_active || !staff.totp_pending_secret_enc || !masterKey) {
     return c.json({ success: false, error: '二段階認証を確認できません' }, 401);
+  }
+  if (isTenantUnavailable(staff.tenant_status)) {
+    await deleteTwoFactorChallenge(c.env.DB, tokenHash);
+    return c.json({ success: false, code: TENANT_SUSPENDED_CODE, error: TENANT_SUSPENDED_ERROR }, 403);
   }
 
   const verified = await verifyTotp(
@@ -552,6 +570,10 @@ adminAuth.post('/api/auth/login', async (c) => {
     return c.json({ success: false, error: 'Unauthorized' }, 401);
   }
 
+  if (isTenantUnavailable(staff.tenantStatus)) {
+    return c.json({ success: false, code: TENANT_SUSPENDED_CODE, error: TENANT_SUSPENDED_ERROR }, 403);
+  }
+
   let csrfToken: string;
   if (staff.id === 'env-owner') {
     // Emergency recovery only. The normal UI never asks for or exposes this key.
@@ -634,7 +656,17 @@ adminAuth.get('/api/auth/session', async (c) => {
   // /api/auth/* は代理ログインの差し替え対象外なので、ここで直接引く。
   const active = platformAdmin ? await getActiveImpersonation(c.env.DB, staff.id) : null;
   const impersonation = active ? toImpersonationContext(active) : null;
-  return c.json({ success: true, data: { ...staff, platformAdmin, platformAdminState, impersonation }, csrfToken });
+  return c.json({
+    success: true,
+    data: {
+      ...staff,
+      tenantStatus: staff.tenantStatus ?? 'active',
+      platformAdmin,
+      platformAdminState,
+      impersonation,
+    },
+    csrfToken,
+  });
 });
 
 /**

@@ -265,3 +265,4 @@ shared-button-importer app/nen/members/rank-settings-tab.tsx
 shared-button-importer app/nen/pets/feeding-tab.tsx
 shared-button-importer app/nen/pets/page.tsx
 shared-button-importer app/nen/pets/pet-editor.tsx
+shared-button-importer components/tenant-suspended.tsx

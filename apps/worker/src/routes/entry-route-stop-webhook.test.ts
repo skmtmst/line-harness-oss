@@ -21,7 +21,7 @@ vi.mock('@line-crm/db', () => ({
   getScenarios: vi.fn().mockResolvedValue([]),
   enrollFriendInScenario: vi.fn().mockResolvedValue(null),
   getFriendAddScenarioIds: vi.fn().mockResolvedValue([]),
-  getLineAccounts: vi.fn().mockResolvedValue([]),
+  listLineAccountsWithTenantStatus: vi.fn().mockResolvedValue([]),
   jstNow: vi.fn().mockReturnValue('2026-09-08 00:00:00'),
   getEntryRouteByRefCode: vi.fn().mockResolvedValue(null),
   getEntryRouteByRefCodeAny: vi.fn().mockResolvedValue(null),
@@ -74,7 +74,7 @@ import {
   getEntryRouteByRefCode,
   getEntryRouteByRefCodeAny,
   captureFriendAddEventAttribution,
-  getLineAccounts,
+  listLineAccountsWithTenantStatus,
 } from '@line-crm/db';
 import { applyFriendAddRouting } from '../services/friend-add-routing.js';
 import {
@@ -158,7 +158,7 @@ beforeEach(() => {
   lineClientMocks.pushMessage.mockResolvedValue(undefined);
   lineClientMocks.getProfile.mockResolvedValue({ displayName: 'Tester' });
   vi.mocked(verifySignature).mockResolvedValue(true);
-  vi.mocked(getLineAccounts).mockResolvedValue([{
+  vi.mocked(listLineAccountsWithTenantStatus).mockResolvedValue([{
     id: 'account-main', channel_secret: 'env-default-secret',
     channel_access_token: 'account-token', is_active: 1,
   } as never]);

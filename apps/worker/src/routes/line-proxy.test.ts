@@ -7,6 +7,7 @@ const lineClientMocks = vi.hoisted(() => ({
 
 vi.mock('@line-crm/db', () => ({
   getLineAccounts: vi.fn(),
+  listLineAccountsWithTenantStatus: vi.fn(),
   getLineAccountScopeEntries: vi.fn(),
   getFriendByLineUserIdForAccount: vi.fn(),
   upsertFriend: vi.fn(),
@@ -51,6 +52,7 @@ vi.mock('../services/step-delivery.js', () => ({
 
 import {
   getLineAccounts,
+  listLineAccountsWithTenantStatus,
   getLineAccountScopeEntries,
   getFriendByLineUserIdForAccount,
   upsertFriend,
@@ -181,6 +183,12 @@ beforeEach(() => {
   fetchMock = vi.fn(async () => upstreamResponse());
   vi.stubGlobal('fetch', fetchMock);
   vi.mocked(getLineAccounts).mockResolvedValue([ACCOUNT] as never);
+  vi.mocked(listLineAccountsWithTenantStatus).mockImplementation(
+    async (db: D1Database) => (await vi.mocked(getLineAccounts)(db)).map((account) => ({
+      ...account,
+      tenant_status: 'active' as const,
+    })) as never,
+  );
   vi.mocked(getLineAccountScopeEntries).mockImplementation(
     async (db: D1Database) => vi.mocked(getLineAccounts)(db) as never,
   );
@@ -239,6 +247,20 @@ describe('auth', () => {
     const { db } = fakeDb();
     const res = await setupApp().request(pushRequest('acc-token'), {}, env(db));
     expect(res.status).toBe(401);
+  });
+
+  test('停止中アカウントのトークンがenv既定値と同じでも代理送信できない', async () => {
+    vi.mocked(getLineAccounts).mockResolvedValue([
+      { ...ACCOUNT, channel_access_token: 'env-token' },
+    ] as never);
+    vi.mocked(listLineAccountsWithTenantStatus).mockResolvedValue([
+      { ...ACCOUNT, channel_access_token: 'env-token', tenant_status: 'suspended' },
+    ] as never);
+    const { db } = fakeDb();
+    const res = await setupApp().request(pushRequest('env-token'), {}, env(db));
+    expect(res.status).toBe(403);
+    expect(await res.json()).toMatchObject({ code: 'TENANT_SUSPENDED' });
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   test("account_scope='all' staff can operate another LINE account in the same organization", async () => {

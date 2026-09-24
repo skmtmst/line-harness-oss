@@ -1,6 +1,8 @@
 import { jstNow } from './utils.js';
 import { DEFAULT_TENANT_ID } from '@line-crm/shared';
 
+export type TenantStatus = 'active' | 'suspended' | 'archived';
+
 export interface StaffMember {
   id: string;
   name: string;
@@ -38,8 +40,29 @@ export interface StaffMember {
   email_change_token_hash?: string | null;
   email_change_expires_at?: string | null;
   tenant_id: string | null;
+  /** 認証用 JOIN でだけ付く所属統括の実効状態。既定の運営会社は常に active。 */
+  tenant_status?: TenantStatus;
   created_at: string;
   updated_at: string;
+}
+
+/**
+ * 認証用 staff 取得の共通射影。
+ *
+ * 既定の運営会社は契約先の停止対象ではないため常に active とする。
+ * それ以外で統括行が失われている場合は安全側の archived に倒す。
+ */
+const STAFF_WITH_TENANT_STATUS = `SELECT sm.*,
+  CASE
+    WHEN COALESCE(sm.tenant_id, ?) = ? THEN 'active'
+    WHEN t.status IN ('active', 'suspended', 'archived') THEN t.status
+    ELSE 'archived'
+  END AS tenant_status
+  FROM staff_members sm
+  LEFT JOIN tenants t ON t.id = COALESCE(sm.tenant_id, ?)`;
+
+function tenantStatusBindings(): [string, string, string] {
+  return [DEFAULT_TENANT_ID, DEFAULT_TENANT_ID, DEFAULT_TENANT_ID];
 }
 
 export interface CreateStaffInput {
@@ -106,8 +129,8 @@ export async function getStaffByApiKey(
   apiKey: string,
 ): Promise<StaffMember | null> {
   return db
-    .prepare('SELECT * FROM staff_members WHERE api_key = ? AND is_active = 1')
-    .bind(apiKey)
+    .prepare(`${STAFF_WITH_TENANT_STATUS} WHERE sm.api_key = ? AND sm.is_active = 1`)
+    .bind(...tenantStatusBindings(), apiKey)
     .first<StaffMember>();
 }
 
@@ -116,8 +139,8 @@ export async function getStaffByLineUserId(
   lineUserId: string,
 ): Promise<StaffMember | null> {
   return db
-    .prepare('SELECT * FROM staff_members WHERE line_user_id = ? AND is_active = 1')
-    .bind(lineUserId)
+    .prepare(`${STAFF_WITH_TENANT_STATUS} WHERE sm.line_user_id = ? AND sm.is_active = 1`)
+    .bind(...tenantStatusBindings(), lineUserId)
     .first<StaffMember>();
 }
 
@@ -133,8 +156,8 @@ export async function getStaffByLineUserIdIncludingInactive(
   lineUserId: string,
 ): Promise<StaffMember | null> {
   return db
-    .prepare('SELECT * FROM staff_members WHERE line_user_id = ?')
-    .bind(lineUserId)
+    .prepare(`${STAFF_WITH_TENANT_STATUS} WHERE sm.line_user_id = ?`)
+    .bind(...tenantStatusBindings(), lineUserId)
     .first<StaffMember>();
 }
 
@@ -151,8 +174,8 @@ export async function getStaffById(
   id: string,
 ): Promise<StaffMember | null> {
   return db
-    .prepare('SELECT * FROM staff_members WHERE id = ?')
-    .bind(id)
+    .prepare(`${STAFF_WITH_TENANT_STATUS} WHERE sm.id = ?`)
+    .bind(...tenantStatusBindings(), id)
     .first<StaffMember>();
 }
 
@@ -288,7 +311,10 @@ export async function replaceStaffAccountScopes(
 }
 
 export async function getStaffByInviteTokenHash(db: D1Database, tokenHash: string): Promise<StaffMember | null> {
-  return db.prepare('SELECT * FROM staff_members WHERE invite_token_hash = ?').bind(tokenHash).first<StaffMember>();
+  return db
+    .prepare(`${STAFF_WITH_TENANT_STATUS} WHERE sm.invite_token_hash = ?`)
+    .bind(...tenantStatusBindings(), tokenHash)
+    .first<StaffMember>();
 }
 
 /** N-433: メール変更の確認リンクから本人の行を引く。トークンは指紋で照合する。 */
@@ -404,12 +430,18 @@ export async function getStaffByAdminSession(
 ): Promise<StaffMember | null> {
   return db
     .prepare(
-      `SELECT sm.*
+      `SELECT sm.*,
+              CASE
+                WHEN COALESCE(sm.tenant_id, ?) = ? THEN 'active'
+                WHEN t.status IN ('active', 'suspended', 'archived') THEN t.status
+                ELSE 'archived'
+              END AS tenant_status
        FROM admin_sessions s
        JOIN staff_members sm ON sm.id = s.staff_id
+       LEFT JOIN tenants t ON t.id = COALESCE(sm.tenant_id, ?)
        WHERE s.token_hash = ? AND s.expires_at > ? AND sm.is_active = 1`,
     )
-    .bind(tokenHash, now)
+    .bind(...tenantStatusBindings(), tokenHash, now)
     .first<StaffMember>();
 }
 

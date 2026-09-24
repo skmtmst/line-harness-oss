@@ -7,6 +7,7 @@ const db = vi.hoisted(() => ({
   getFriendByLineUserIdForAccount: vi.fn(),
   getEntryRouteByRefCode: vi.fn(),
   recordFriendAddAttributionCandidate: vi.fn(),
+  isLineAccountTenantActive: vi.fn(),
 }));
 vi.mock('@line-crm/db', () => db);
 
@@ -32,6 +33,7 @@ beforeEach(() => {
     id: 'candidate-1', status: 'pending', refCode: 'summer', entryRouteId: 'route-1',
     expiresAt: '2026-08-24T12:10:00.000+09:00',
   });
+  db.isLineAccountTenantActive.mockResolvedValue(true);
   vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ sub: 'U-1' }), { status: 200 })));
 });
 

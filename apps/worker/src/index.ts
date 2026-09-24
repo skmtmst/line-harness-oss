@@ -48,6 +48,7 @@ import { DEFAULT_ACCOUNT_SETTINGS } from './services/booking-types.js';
 import { authMiddleware } from './middleware/auth.js';
 import type { AuthenticatedStaff } from './middleware/auth.js';
 import { tenantScopeMiddleware } from './middleware/tenant-scope.js';
+import { tenantPublicBoundaryMiddleware } from './middleware/tenant-public-boundary.js';
 import { rateLimitMiddleware } from './middleware/rate-limit.js';
 import { businessAuditMiddleware } from './middleware/business-audit.js';
 import { featureEnforcementMiddleware } from './middleware/feature-enforcement.js';
@@ -398,6 +399,10 @@ app.use('*', timingMark('cors'));
 // Rate limiting — runs before auth to block abuse early
 app.use('*', rateLimitMiddleware);
 app.use('*', timingMark('rate'));
+
+// LIFF/public routes skip staff auth. Apply their tenant wall before auth and
+// before any route handler can persist a form/booking/member write.
+app.use('/api/liff/*', tenantPublicBoundaryMiddleware);
 
 // Auth middleware — skips /webhook and /docs automatically
 app.use('*', authMiddleware);

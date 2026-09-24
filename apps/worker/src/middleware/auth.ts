@@ -5,6 +5,10 @@ import { isForbiddenWhileImpersonating, resolveImpersonation } from './impersona
 
 import type { AdminSameSite } from './admin-auth-config.js';
 
+export type TenantStatus = 'active' | 'suspended' | 'archived';
+export const TENANT_SUSPENDED_CODE = 'TENANT_SUSPENDED';
+export const TENANT_SUSPENDED_ERROR = '現在ご利用いただけません。お問い合わせは「お問い合わせ」画面からお送りください';
+
 export const ADMIN_AUTH_COOKIE = 'lh_admin_session';
 export const ADMIN_SESSION_BEARER_PREFIX = 'lh_session:';
 export const CSRF_COOKIE = 'lh_csrf';
@@ -136,6 +140,8 @@ export type AuthenticatedStaff = {
   canAccessDescendantAccounts?: boolean;
   /** 所属する統括。認可への実適用は後続工程で行う。 */
   tenantId?: string | null;
+  /** 所属統括の実効状態。既定の運営会社と env-owner は active。 */
+  tenantStatus?: TenantStatus;
   /** 機能オフ middleware が一覧処理へ渡す、このリクエストだけの追加絞り込み。 */
   featureEnabledLineAccountIds?: string[];
 };
@@ -151,6 +157,7 @@ function toAuthenticatedStaff(staff: {
   assigned_line_account_id?: string | null;
   can_access_descendant_accounts?: number;
   tenant_id?: string | null;
+  tenant_status?: TenantStatus;
 }): AuthenticatedStaff {
   let permissionKeys: string[] = [];
   try { permissionKeys = staff.permission_keys ? JSON.parse(staff.permission_keys) as string[] : []; } catch { permissionKeys = []; }
@@ -170,7 +177,22 @@ function toAuthenticatedStaff(staff: {
     assignedLineAccountId: staff.assigned_line_account_id ?? null,
     canAccessDescendantAccounts: Boolean(staff.can_access_descendant_accounts),
     tenantId: staff.tenant_id ?? null,
+    tenantStatus: staff.tenant_status ?? 'active',
   };
+}
+
+export function isTenantUnavailable(status: TenantStatus | null | undefined): boolean {
+  return status === 'suspended' || status === 'archived';
+}
+
+/** 停止中でも契約先が自分で確認・問い合わせできる最小経路。 */
+export function isTenantSuspensionExemptPath(method: string, path: string): boolean {
+  const upper = method.toUpperCase();
+  return (upper === 'GET' && path === '/api/auth/session')
+    || (upper === 'POST' && path === '/api/auth/logout')
+    || path.startsWith('/api/hq/support')
+    || path.startsWith('/api/hq/notices')
+    || path.startsWith('/api/ops/');
 }
 
 const STAFF_API_PERMISSIONS: Array<[string, string]> = [
@@ -504,7 +526,7 @@ export async function authenticateApiToken(
 
   // Fallback: env API_KEY acts as owner (current rotation slot)
   if (token === c.env.API_KEY) {
-    return { id: 'env-owner', name: 'Owner', role: 'owner', readOnly: false, permissionKeys: [], assignedLineAccountId: null, canAccessDescendantAccounts: true };
+    return { id: 'env-owner', name: 'Owner', role: 'owner', readOnly: false, permissionKeys: [], assignedLineAccountId: null, canAccessDescendantAccounts: true, tenantStatus: 'active' };
   }
 
   // Legacy fallback: LEGACY_API_KEY accepted during rotation grace period.
@@ -518,7 +540,7 @@ export async function authenticateApiToken(
     token === c.env.LEGACY_API_KEY
   ) {
     console.log('[auth] accept_via=LEGACY_API_KEY');
-    return { id: 'env-owner', name: 'Owner', role: 'owner', readOnly: false, permissionKeys: [], assignedLineAccountId: null, canAccessDescendantAccounts: true };
+    return { id: 'env-owner', name: 'Owner', role: 'owner', readOnly: false, permissionKeys: [], assignedLineAccountId: null, canAccessDescendantAccounts: true, tenantStatus: 'active' };
   }
 
   return null;
@@ -589,6 +611,14 @@ export async function authMiddleware(c: Context<Env>, next: Next): Promise<Respo
     if (isForbiddenWhileImpersonating(method, path)) {
       return c.json({ success: false, error: '代理ログイン中はこの操作はできません（解約・権限者の削除・LINEアカウントの削除）' }, 403);
     }
+  }
+
+  // 契約先の停止・保管は画面非表示ではなく、すべての管理APIの共通境界で
+  // 強制する。運営マスターによる有効な代理ログインだけは閲覧を継続できる。
+  if (!impersonated
+      && isTenantUnavailable(staff.tenantStatus)
+      && !isTenantSuspensionExemptPath(method, path)) {
+    return c.json({ success: false, code: TENANT_SUSPENDED_CODE, error: TENANT_SUSPENDED_ERROR }, 403);
   }
 
   if (staff.readOnly && !SAFE_METHODS.has(method)) {
