@@ -354,7 +354,7 @@ describe('ダッシュボード通知', () => {
       id: 'danger',
       filterId: 'error',
       unread: true,
-      meta: '運用状態から確認してください。｜8/27 10:30',
+      meta: '運用状態から確認してください。｜8月27日 10:30',
     })
     items[0].onSelect?.()
     expect(selected).toEqual(['danger'])
