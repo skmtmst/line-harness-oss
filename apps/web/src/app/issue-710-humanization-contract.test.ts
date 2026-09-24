@@ -42,6 +42,29 @@ describe('Issue #710: タイムゾーンは選択式で綴り違いを防ぐ', (
     expect(src).toContain('TIME_ZONE_CHOICES.includes(draft.timeZone)')
     expect(src).toContain("'Asia/Tokyo'")
   })
+
+  it('IANAの一覧に無い値には綴り確認の注意を出す', () => {
+    const src = read('booking/menus/page.tsx')
+    expect(src).toContain('isUnknownTimeZone(draft.timeZone)')
+    expect(src).toContain('綴りを確認してください')
+    expect(src).toContain('Asia/Tokyo')
+  })
+})
+
+describe('Issue #710: 残りの分・時間の入力にも読み替えを添える', () => {
+  it('仮押さえの保持時間・当日のお知らせへ読み替え関数をつなぐ', () => {
+    const src = read('booking/menus/page.tsx')
+    expect(src).toContain('humanize={formatMinutesLengthHint}')
+    expect(src).toContain('humanize={formatHoursBeforeHint}')
+  })
+
+  it('読み替え関数が正しい単位へ変換する', async () => {
+    const { formatHoursBeforeHint, formatMinutesLengthHint } = await import('@/lib/format-duration')
+    expect(formatMinutesLengthHint(1440)).toBe('1日')
+    expect(formatMinutesLengthHint(30)).toBeNull()
+    expect(formatHoursBeforeHint(72)).toBe('3日前')
+    expect(formatHoursBeforeHint(2)).toBeNull()
+  })
 })
 
 describe('Issue #710: 容量は1024MB超でGBへ切り替える1関数に統一', () => {
