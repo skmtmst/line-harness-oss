@@ -29,6 +29,8 @@ export interface ComboboxProps {
   /** 誤りの文。枠が赤くなり、下に何をすれば通るかを出す。 */
   error?: string
   id?: string
+  /** 最初に入れておく打った途中の文字（見本・下書きの復元用）。 */
+  initialText?: string
   /** 読み込み中は候補の場所を空けたまま「探しています…」を出す。 */
   loading?: boolean
   name?: string
@@ -61,6 +63,7 @@ export default function Combobox({
   emptyText,
   error,
   id,
+  initialText,
   loading = false,
   name,
   onChange,
@@ -82,7 +85,7 @@ export default function Combobox({
   // 決めた値。親が value を替えたときだけ、欄の文字を選び直しの表示に戻す。
   // 入力中の options 差し替え（非同期の探し直し）では上書きしない。
   const [committed, setCommitted] = useState(value)
-  const [text, setText] = useState(() => options.find((option) => option.value === value)?.label ?? '')
+  const [text, setText] = useState(() => initialText ?? options.find((option) => option.value === value)?.label ?? '')
   if (committed !== value) {
     setCommitted(value)
     setText(options.find((option) => option.value === value)?.label ?? '')

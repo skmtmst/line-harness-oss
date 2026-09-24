@@ -101,6 +101,13 @@ describe('複数選択（★V7 WUVcz）', () => {
     expect(field.value).toBe('')
   })
 
+  it('最初から絞り込みの文字を入れて開いておける（見本用）', () => {
+    render(<Harness initial={['nen', 'regular']} initialQuery="定" defaultOpen />)
+    const listbox = screen.getByRole('listbox')
+    expect(within(listbox).getAllByRole('option')).toHaveLength(3)
+    expect(screen.getByText('2件選択中')).toBeTruthy()
+  })
+
   it('誤りは下に何をすれば通るかを出す', () => {
     render(<Harness initial={[]} error="配信先のタグを1つ以上選んでください" />)
     const field = screen.getByRole('combobox', { name: 'タグ' })

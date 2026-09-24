@@ -22,6 +22,8 @@ export interface MultiSelectProps {
   /** 誤りの文。枠が赤くなり、下に何をすれば通るかを出す。 */
   error?: string
   id?: string
+  /** 最初に入れておく絞り込みの文字（見本用）。 */
+  initialQuery?: string
   /** 読み込み中は候補の場所を空けたまま「探しています…」を出す。 */
   loading?: boolean
   /** 欄に並べる札の上限。入り切らない分は「+N」。既定は 2。 */
@@ -56,6 +58,7 @@ export default function MultiSelect({
   emptyText,
   error,
   id,
+  initialQuery,
   loading = false,
   maxChips = 2,
   name,
@@ -72,7 +75,7 @@ export default function MultiSelect({
   const rootRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const [open, setOpen] = useState(defaultOpen)
-  const [query, setQuery] = useState('')
+  const [query, setQuery] = useState(initialQuery ?? '')
   const [activeIndex, setActiveIndex] = useState(0)
 
   const selected = values

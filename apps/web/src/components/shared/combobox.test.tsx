@@ -101,6 +101,13 @@ describe('候補つき入力（★V7 WUVcz）', () => {
     expect(field.getAttribute('aria-describedby')).toBe(alert.getAttribute('id'))
   })
 
+  it('最初から打った途中の文字を入れておける（見本用）', () => {
+    render(<Harness initialText="予約" defaultOpen />)
+    const field = screen.getByRole('combobox', { name: 'テンプレート' }) as HTMLInputElement
+    expect(field.value).toBe('予約')
+    expect(within(screen.getByRole('listbox')).getAllByRole('option')).toHaveLength(3)
+  })
+
   it('×で消すと空になって一覧が開く', () => {
     render(<Harness />)
     const field = screen.getByRole('combobox', { name: 'テンプレート' }) as HTMLInputElement
