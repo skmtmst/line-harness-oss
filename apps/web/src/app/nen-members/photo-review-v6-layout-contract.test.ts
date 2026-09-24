@@ -3,7 +3,7 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 /**
- * 写真審査一覧（★V6 `Qu6Vk`）の骨格の見張り。
+ * 写真審査一覧（★V6 `cqWo8`）の骨格の見張り。
  *
  * `photo-review-contract.test.ts` は言葉と状態の分けかたを見ている。
  * こちらは**寸法と枠**を見る。分けているのは、直す理由が違うから。
@@ -15,7 +15,7 @@ const SHARED = join(HERE, '..', '..', 'components', 'shared')
 const PAGE = readFileSync(join(HERE, 'page.tsx'), 'utf8')
 const CSS = readFileSync(join(HERE, 'photo-review.module.css'), 'utf8')
 
-describe('V6 写真審査一覧（Qu6Vk）の骨格', () => {
+describe('V6 写真審査一覧（cqWo8）の骨格', () => {
   it('状態の切り替えはタブ帯（高さ44）で出す', () => {
     expect(PAGE).toContain("import { Tabs } from '@/components/shared/tabs'")
     expect(PAGE).toContain('<Tabs')
@@ -45,14 +45,14 @@ describe('V6 写真審査一覧（Qu6Vk）の骨格', () => {
 
   it('AIは確認順の補助に限り、人の判断を自動化しない', () => {
     expect(PAGE).toContain('確認順を決める条件')
-    expect(PAGE).toContain('自動で見つけた注意候補の総数です。通す・戻す・公開する判断は、必ず人が行います。')
+    expect(PAGE).toContain('自動で見つけた注意候補の総数です。採用・見送り・公開する判断は、必ず人が行います。')
     // 口が無いのに「自動で戻しました」と読める押し口・件数を置かない。
     expect(PAGE).not.toContain('自動で戻しました')
     expect(PAGE).not.toContain('自動審査を実行')
   })
 
-  it('戻す理由の内訳は読み込めた写真から数え、取れないうちは — を出す', () => {
-    expect(PAGE).toContain('戻す理由の内訳')
+  it('見送り理由の内訳は読み込めた写真から数え、取れないうちは — を出す', () => {
+    expect(PAGE).toContain('見送り理由の内訳')
     expect(PAGE).toContain('const reasonCounts = useMemo(')
     expect(PAGE).toContain("if (text(photo.status) !== 'rejected') continue")
     expect(PAGE).toContain('{reasonCounts[reason.value]}件')
@@ -80,8 +80,8 @@ describe('V6 写真審査一覧（Qu6Vk）の骨格', () => {
   it('選択した審査待ち写真だけを一括審査APIへ送る', () => {
     expect(PAGE).toContain('枚を選択中')
     expect(PAGE).toContain('togglePhotoSelection')
-    expect(PAGE).toContain('まとめて通す')
-    expect(PAGE).toContain('まとめて戻す')
+    expect(PAGE).toContain('まとめて採用')
+    expect(PAGE).toContain('まとめて見送り')
     expect(PAGE).toContain('api.nenMembers.bulkReviewPhotos')
     expect(PAGE).toContain('selectedPendingPhotos.map')
     expect(PAGE).toContain('selectedPhotosAreLowRisk')
@@ -89,7 +89,7 @@ describe('V6 写真審査一覧（Qu6Vk）の骨格', () => {
     expect(PAGE).toContain("onConfirm={() => void bulkReview('approve')}")
     expect(PAGE).toContain('setBulkReturnOpen(true)')
     expect(PAGE).toContain('crypto.randomUUID()')
-    expect(PAGE).toContain('合計 {selectedPendingPhotos.length * 5}ポイント')
+    expect(PAGE).toContain('合計 {selectedPendingPhotos.length * 5}マイル')
     expect(PAGE).toContain('公開しない')
   })
 })

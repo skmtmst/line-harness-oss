@@ -51,7 +51,7 @@ describe('V6 photo review contract', () => {
 
   it('requires a reason and previews the submitter message', () => {
     expect(page).toContain("'N2J629'");
-    expect(page).toContain('この写真を戻しますか？');
+    expect(page).toContain('この写真を見送りますか？');
     expect(page).toContain('お客様にはこう届きます');
     expect(page).toContain("reasonCode === 'other' && !reasonNote.trim()");
     for (const code of ['quality', 'privacy', 'unrelated', 'other']) {
@@ -62,15 +62,22 @@ describe('V6 photo review contract', () => {
     expect(page).toContain('明るいところで、もう一度お願いできますか。');
     expect(page).toContain('お客様に届く補足（直せます）');
     expect(page).toContain('お客様にはこう届きます（直せます）');
-    expect(page).toContain('戻しても、この方のマイルは減りません。');
+    expect(page).toContain('見送っても、この方のマイルは減りません。');
   });
 
   it('uses one set of operator words for reviewed states', () => {
-    expect(page).toContain("['adopted', '通したもの']");
-    expect(page).toContain("['rejected', '戻したもの']");
-    expect(page).toContain("['pending', '見ていないもの']");
-    expect(page).toContain("reviewing === photo.id ? '処理中...' : '通す'");
+    expect(page).toContain('data-design-node="cqWo8"');
+    expect(page).toContain("['adopted', '採用']");
+    expect(page).toContain("['rejected', '見送り']");
+    expect(page).toContain("['pending', '審査待ち']");
+    expect(page).toContain("{ label: '公式サイト掲載'");
+    expect(page).toContain("reviewing === photo.id ? '処理中...' : '採用する'");
     expect(page).toContain('response.data.awardedPoints');
+    expect(page).toContain('付与するマイル');
+    expect(page).toContain('合計 {selectedPendingPhotos.length * 5}マイル');
+    expect(page).not.toContain('ポイント');
+    expect(page).not.toContain('通しました');
+    expect(page).not.toContain('戻しました');
     expect(page).not.toContain('承認済');
     expect(page).not.toContain('採用済み');
   });
@@ -78,7 +85,7 @@ describe('V6 photo review contract', () => {
   it('shows whose photo and when before sending the rejection', () => {
     expect(page).toContain("text(rejectingPhoto.owner_name) || 'お名前は未取得'");
     expect(page).toContain('formatPhotoReceivedAt(rejectingPhoto.created_at)');
-    expect(page).toContain('この方を前に戻した回数は未取得です');
+    expect(page).toContain('この方を以前に見送った回数は未取得です');
   });
 
   it('does not claim a photo is public without consent', () => {
@@ -133,7 +140,7 @@ describe('V6 photo review contract', () => {
   });
 
   /*
-   * PHOTO-06 (#1079): 止まったポイント手続きの復旧口。
+   * PHOTO-06 (#1079): 止まったマイル手続きの復旧口。
    * 派生状態を同じ言葉で出し、stale / failed_retryable のときだけ
    * 再試行とEC照合の入口を見せる。入口は冪等なPOST 2本。
    */
@@ -142,7 +149,7 @@ describe('V6 photo review contract', () => {
     expect(api).toContain('/point-reconcile');
     expect(api).toContain('NenPhotoRewardActionResult');
     expect(detail).toContain("['stale', 'failed_retryable'].includes(text(reward.state))");
-    expect(detail).toContain('ポイント手続きをもう一度送る');
+    expect(detail).toContain('マイル手続きをもう一度送る');
     expect(detail).toContain('EC側と照合する');
     expect(detail).toContain("onPointAction('retry')");
     expect(detail).toContain("onPointAction('reconcile')");
@@ -153,8 +160,8 @@ describe('V6 photo review contract', () => {
   });
 
   it('labels the derived reward states the same way in list and detail (PHOTO-06)', () => {
-    expect(helper).toContain("case 'stale': return 'ポイントの手続きが止まっています'");
-    expect(helper).toContain("case 'failed_retryable': return 'ポイントの手続きに失敗（再試行できます）'");
+    expect(helper).toContain("case 'stale': return 'マイルの手続きが止まっています'");
+    expect(helper).toContain("case 'failed_retryable': return 'マイルの手続きに失敗（再試行できます）'");
     // 詳細はサーバーの派生状態を優先し、古い応答は生のstatusへ倒す。
     expect(detail).toContain('text(reward.state) || reward.status');
     expect(detail).toContain('reward.reason_label');
