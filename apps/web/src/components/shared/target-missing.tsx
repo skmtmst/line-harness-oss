@@ -52,7 +52,6 @@ export type TargetMissingProps = {
    * （別アカウントのものを開いた人が気づけるように）。
    */
   accountName?: string
-  className?: string
 }
 
 export default function TargetMissing({
@@ -64,10 +63,8 @@ export default function TargetMissing({
   onRetry,
   retrying = false,
   accountName,
-  className,
 }: TargetMissingProps) {
   const Icon = ICONS[kind]
-  const rootClass = [styles.root, className].filter(Boolean).join(' ')
   const showBack = (kind === 'unspecified' || kind === 'not-found') && backHref && backLabel
   const showRetry = kind === 'error' && onRetry
   const accountLine =
@@ -93,7 +90,7 @@ export default function TargetMissing({
 
   return (
     <div
-      className={rootClass}
+      className={styles.root}
       data-target-missing={kind}
       // 読み込めなかったことだけ、その場で読ませる。
       role={kind === 'error' ? 'alert' : undefined}
