@@ -8,8 +8,14 @@
  *
  * `<select>` を素で使う。見た目を合わせるために `appearance: none` にして、
  * 矢印は背景画像で描く（要素を重ねるとキーボード操作の邪魔になる）。
+ *
+ * 全体を `@layer components` に置くのは、呼び出し側の `w-full` など
+ * （utilities レイヤー）へ幅を譲るため。未レイヤーだとレイヤー外の
+ * 宣言が常に勝ち、`className` の幅指定が効かずグリッド枠をはみ出す
+ * （予約設定の空き確認カードで発生）。
  */
 
+@layer components {
 .select {
   display: block;
   width: 100%;
@@ -58,4 +64,5 @@
     height: 44px;
     font-size: var(--text-lead);
   }
+}
 }
