@@ -6,6 +6,8 @@ import { X } from 'lucide-react'
 import type { Folder } from '@line-crm/shared'
 import { ApiError, api } from '@/lib/api'
 import Button from '@/components/shared/button'
+import FileDropzone, { AttachmentRow } from '@/components/shared/file-drop'
+import Progress from '@/components/shared/progress'
 import Select from '@/components/shared/select'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import { MEDIA_ACCEPT, extractMediaMetadata, putMediaFile, validateMediaFile } from './media-direct-upload'
@@ -66,6 +68,18 @@ export default function MediaUploadDialog({
     [entries],
   )
   const errorCount = entries.filter((entry) => entry.state === 'error').length
+  const doneCount = entries.filter((entry) => entry.state === 'done').length
+  /*
+    全体の進みは実測だけ出す。登録を押す前（すべて登録待ち）は棒を出さない。
+    一度でも登録を実行した（完了か、登録中の失敗がある）ときだけ
+    Active（登録中）／Done／Partial を出す。
+  */
+  const attempted = entries.some((entry) => entry.state === 'done' || (entry.state === 'error' && entry.retryable))
+  const uploadErrorCount = entries.filter((entry) => entry.state === 'error' && entry.retryable).length
+
+  function removeEntry(index: number) {
+    setEntries((current) => current.filter((_, entryIndex) => entryIndex !== index))
+  }
 
   function stage(files: File[]) {
     const next = files.slice(0, 20).map((file) => {
@@ -181,25 +195,14 @@ export default function MediaUploadDialog({
           </button>
         </div>
         <div className="space-y-4 p-6">
-        <label
-          htmlFor={inputId}
-          className="border-info text-info rounded-card flex min-h-32 cursor-pointer flex-col items-center justify-center border border-dashed p-5 text-center"
-          onDragOver={(event) => event.preventDefault()}
-          onDrop={(event) => {
-            event.preventDefault()
-            stage([...event.dataTransfer.files])
-          }}
-        >
-          <span className="text-sm font-bold">ここにファイルをドラッグ、または押して選ぶ</span>
-          <span className="text-ink-faint mt-1 text-xs">いちどに20件まで</span>
-        </label>
-        <input
-          id={inputId}
-          type="file"
-          multiple
+        <FileDropzone
+          title="ここにファイルをドラッグ、または押して選ぶ"
+          hint="いちどに20件まで"
           accept={MEDIA_ACCEPT}
-          className="sr-only"
-          onChange={(event) => stage([...(event.target.files ?? [])])}
+          multiple
+          busy={busy}
+          busyTitle="登録しています…"
+          onFiles={stage}
         />
 
         <div className="bg-info-bg text-info rounded-control p-3 text-xs leading-5">
@@ -214,36 +217,88 @@ export default function MediaUploadDialog({
           <div>
             <div className="mb-2 flex items-center justify-between">
               <p className="text-ink text-sm font-bold">入れているもの</p>
-              <p className="text-ink-faint text-xs">{entries.length}件中 {entries.filter((entry) => entry.state === 'done').length}件 完了</p>
+              {busy || attempted ? null : (
+                <p className="text-ink-faint text-xs">{entries.length}件中 {doneCount}件 完了</p>
+              )}
             </div>
+            {/*
+              全体の進みは登録を実行してから出す（実測の完了数だけ）。
+              登録前は同じ数字の重複になるので、上の「X件中 Y件 完了」だけにする。
+            */}
+            {busy ? (
+              <Progress
+                state="active"
+                title="登録しています"
+                percent={entries.length > 0 ? (doneCount / entries.length) * 100 : 0}
+                countText={`${doneCount.toLocaleString()} / ${entries.length.toLocaleString()} 件`}
+                className="mb-3"
+              />
+            ) : attempted ? (
+              <Progress
+                state={uploadErrorCount > 0 ? 'partial' : 'done'}
+                title={uploadErrorCount > 0
+                  ? `${doneCount.toLocaleString()}件を登録し、${uploadErrorCount.toLocaleString()}件は入りませんでした`
+                  : `${doneCount.toLocaleString()}件を登録しました`}
+                percent={entries.length > 0 ? (doneCount / entries.length) * 100 : 0}
+                className="mb-3"
+              />
+            ) : null}
             <ul className="max-h-64 space-y-2 overflow-y-auto">
-              {entries.map((entry, index) => (
-                <li key={`${entry.file.name}-${entry.file.size}-${index}`} aria-live="polite" className={`rounded-control border p-3 ${entry.state === 'error' ? 'border-danger-bg bg-danger-bg' : 'border-hairline'}`}>
-                  <div className="flex min-w-0 items-center justify-between gap-3">
-                    <span className="text-ink min-w-0 truncate text-xs font-semibold" title={entry.file.name}>{entry.file.name}</span>
-                    <span className={`shrink-0 text-xs font-semibold ${entry.state === 'error' ? 'text-danger' : entry.state === 'done' ? 'text-success' : 'text-ink-faint'}`}>
-                      {entry.message || '登録できます'}
-                    </span>
-                  </div>
-                  <p className="text-ink-faint mt-1 text-xs">{formatMediaSize(entry.file.size)}</p>
-                  {entry.state === 'done' ? <div className="bg-success mt-2 h-1 w-full rounded-pill" aria-hidden="true" /> : null}
-                  {entry.state === 'uploading' || entry.state === 'preparing' || entry.state === 'verifying' ? (
-                    <progress className="mt-2 h-1 w-full" max={100} value={entry.progress} aria-label={`${entry.file.name}の送信進捗`} />
-                  ) : null}
-                  {entry.state === 'error' ? <div className="bg-danger mt-2 h-1 w-full rounded-pill" aria-hidden="true" /> : null}
-                  {entry.state === 'error' && entry.retryable ? (
-                    <button
-                      type="button"
-                      className="text-action mt-2 text-xs font-bold"
-                      onClick={() => setEntries((current) => current.map((item, entryIndex) => (
-                        entryIndex === index ? { ...item, state: 'ready', message: '', retryable: false, progress: 0 } : item
-                      )))}
-                    >
-                      この1件を再試行
-                    </button>
-                  ) : null}
-                </li>
-              ))}
+              {entries.map((entry, index) => {
+                const sizeText = formatMediaSize(entry.file.size)
+                const tone = entry.file.type.startsWith('image/') ? 'photo' as const : 'document' as const
+                if (entry.state === 'uploading' || entry.state === 'preparing' || entry.state === 'verifying') {
+                  return (
+                    <li key={`${entry.file.name}-${entry.file.size}-${index}`} aria-live="polite">
+                      <AttachmentRow
+                        name={entry.file.name}
+                        status="uploading"
+                        percent={entry.progress}
+                        uploadingText={entry.message || `送信中 ${entry.progress}%`}
+                        tone={tone}
+                      />
+                    </li>
+                  )
+                }
+                if (entry.state === 'error' && entry.retryable) {
+                  return (
+                    <li key={`${entry.file.name}-${entry.file.size}-${index}`} aria-live="polite">
+                      <AttachmentRow
+                        name={entry.file.name}
+                        status="error"
+                        errorText={entry.message}
+                        tone={tone}
+                        onRetry={() => setEntries((current) => current.map((item, entryIndex) => (
+                          entryIndex === index ? { ...item, state: 'ready', message: '', retryable: false, progress: 0 } : item
+                        )))}
+                      />
+                    </li>
+                  )
+                }
+                if (entry.state === 'error') {
+                  return (
+                    <li key={`${entry.file.name}-${entry.file.size}-${index}`} aria-live="polite">
+                      <AttachmentRow
+                        name={entry.file.name}
+                        status="error"
+                        errorText={entry.message}
+                        tone={tone}
+                        onRemove={() => removeEntry(index)}
+                      />
+                    </li>
+                  )
+                }
+                return (
+                  <li key={`${entry.file.name}-${entry.file.size}-${index}`} aria-live="polite">
+                    <AttachmentRow
+                      name={entry.file.name}
+                      meta={entry.state === 'done' ? `${sizeText}・入りました` : `${sizeText}・${entry.message || '登録できます'}`}
+                      tone={tone}
+                      onRemove={busy ? undefined : () => removeEntry(index)}
+                    />
+                  </li>
+                )
+              })}
             </ul>
           </div>
         ) : null}
