@@ -258,6 +258,9 @@ describe('画面のつなぎ', () => {
   const page = read('app/users/page.tsx')
 
   it('撮影の押し口と対象面に印を付ける', () => {
+    // #748: 行の操作はメニュー部品経由になり、印は menuButtonProps で渡す形へ。
+    // ★V7（#748）：統合ユーザー詳細は名前から開く。撮影の仕組みは印を1回押して詳細を開くので、
+    // 「…」（メニューを開くだけ）ではなく、詳細を直接開く名前のボタンに印を付ける。
     expect(row).toContain('data-qa-open="w8W4Eh"')
     expect(detail).toContain('data-design-node="w8W4Eh"')
   })

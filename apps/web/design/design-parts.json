@@ -940,6 +940,58 @@
         }
       ]
     },
+    "bar-chart": {
+      "name": "共通 棒グラフ（日ごとの増減）",
+      "pencilNodes": [
+        "h99Gb"
+      ],
+      "role": "canonical",
+      "status": "implemented",
+      "reviewStatus": "confirmed",
+      "code": "src/components/shared/bar-chart.tsx",
+      "cssModule": "src/components/shared/bar-chart.module.css",
+      "components": [
+        "BarChart",
+        "BarChartEmpty",
+        "toBarChartItems",
+        "barChartTicks"
+      ],
+      "cssPrefix": "bar-chart",
+      "pencilUsage": 1,
+      "lastCheckedAt": "2026-09-24",
+      "note": "★V7 h99Gb。増えた=accent-deep・減った=ink-faintの2色まで。数はボタンの読み上げ名・吹き出し・読み上げ用の表（共通Th）で文字としても読める。押せる範囲は列全体。表示時の伸びる動きは付けない。",
+      "visualVerification": {
+        "status": "unverified",
+        "requiredViewports": [
+          1440,
+          1920
+        ],
+        "reason": "ブラウザでの見た目の計測は司令塔が行う。コード・テストまでで完了扱い。"
+      },
+      "declarations": [
+        {
+          "pencil": "増えた棒 fill: $accent-deep",
+          "class": "addedBar",
+          "prop": "background",
+          "source": "var(--color-accent-deep)",
+          "resolved": "#087a3e"
+        },
+        {
+          "pencil": "減った棒 fill: $ink-faint",
+          "class": "removedBar",
+          "prop": "background",
+          "source": "var(--color-ink-faint)",
+          "resolved": "#626a73"
+        },
+        {
+          "pencil": "目盛り数字 11px・$ink-faint",
+          "class": "tick",
+          "prop": "font-size",
+          "source": "var(--text-micro)",
+          "resolved": "11px"
+        }
+      ]
+    },
     "table": {
       "name": "共通 表見出しセル・見出し行",
       "pencilNodes": [

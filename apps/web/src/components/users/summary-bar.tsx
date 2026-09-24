@@ -63,7 +63,7 @@ export default function SummaryBar({ rows = [] }: { rows?: UserRowData[] }) {
 
   return (
     <div
-      className="grid grid-cols-2 gap-4 sm:grid-cols-4"
+      className="grid grid-cols-2 gap-4 sm:grid-cols-3"
       data-design-node="r7eSi"
       data-users-summary="v6"
       data-summary-state={status}
@@ -93,13 +93,10 @@ export default function SummaryBar({ rows = [] }: { rows?: UserRowData[] }) {
         detail={detailOf('このページでUID確認済み')}
         loading={loading}
       />
-      <SummaryCard
-        title="重複配信の削減"
-        value={null}
-        unit="通/月"
-        detail={detailOf('配信前プレビューの実績を接続後に表示')}
-        loading={loading}
-      />
+      {/*
+        「重複配信の削減」は未接続の機能のため、カードごと出さない。
+        通数・接続後の断り書きは、つながってから足す。
+      */}
     </div>
   )
 }
