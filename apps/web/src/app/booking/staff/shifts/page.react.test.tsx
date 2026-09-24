@@ -526,3 +526,14 @@ describe('日時を指定して空きを確認 (IDEA-28)', () => {
     expect(screen.queryByText('この日時は予約を受けられます。')).toBeNull()
   })
 })
+
+describe('予約設備の利用数の形違い（監査A1）', () => {
+  test('usage が無くても落ちず「—件」と出す', async () => {
+    // 旧偽APIの形（usage なし）。本物は usage まで返す。
+    const bare = { ...resource() } as Record<string, unknown>
+    delete bare.usage
+    fixture.listResources.mockResolvedValue({ data: { resources: [bare] } })
+    await renderEditor()
+    expect(await screen.findByText(/メニュー —件/)).toBeTruthy()
+  })
+})
