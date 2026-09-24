@@ -1666,21 +1666,21 @@ function Editor({
           >
             {saving ? '保存中...' : '下書きに保存'}
           </button>
-          <button
+          {/* #702: 共有Buttonのprimaryはaccent-deep＋白文字(5.44:1)。生のLINE緑だと2.78:1で落ちる。 */}
+          <Button
+            variant="primary"
             onClick={() => {
               setConfirmError('')
               setConfirmKind('publish')
             }}
             disabled={saving || publishing || unpublishing || busy}
-            className="rounded-lg px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50"
-            style={{ backgroundColor: 'var(--color-accent-deep)' }}
           >
             {publishing
               ? 'LINE 登録中...'
               : group.status === 'published'
                 ? 'LINE に再登録'
                 : 'LINE に登録'}
-          </button>
+          </Button>
         </div>
       )} />
     </main>
