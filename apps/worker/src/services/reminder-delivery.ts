@@ -25,6 +25,7 @@ import {
   listLineAccountsWithTenantStatus,
 } from '@line-crm/db';
 import { LineClient } from '@line-crm/line-sdk';
+import { isStoppedTenantStatus } from './tenant-runtime-status.js';
 import { addJitter, sleep } from './stealth.js';
 import { getSendPermissionForAccount, type SendPermission, type SendPermissionCache } from './send-entitlements.js';
 import { buildMessage } from './line-message.js';
@@ -165,7 +166,7 @@ export async function processReminderDeliveries(
       ? (friend as unknown as Record<string, string | null>).line_account_id ?? null
       : null;
     const accountId = enrollment.line_account_id ?? friendAccountId;
-    if (accountId && tenantStatusByAccount.get(accountId) !== 'active') {
+    if (accountId && isStoppedTenantStatus(tenantStatusByAccount.get(accountId))) {
       // Materialize terminal skipped runs for steps that are already due. This
       // keeps them unsent and prevents restore from becoming an overdue blast.
       for (const step of enrollment.steps) {

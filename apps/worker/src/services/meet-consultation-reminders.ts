@@ -5,6 +5,7 @@ import {
   isOperationCapabilityStopped,
   resolveLineCredential,
 } from '@line-crm/db';
+import { stoppedTenantLineAccountSql } from './tenant-runtime-status.js';
 import { featureJobCanRun } from './feature-enforcement.js';
 import { cancelByTrigger, enrollByTrigger, reconcileV6ToStartsAt } from './reminder-trigger.js';
 
@@ -348,7 +349,7 @@ export async function processDueMeetConsultationReminders(
             FROM meet_consultations stopped_consultation
             JOIN friends stopped_friend ON stopped_friend.id=stopped_consultation.friend_id
            WHERE stopped_consultation.id=meet_consultation_reminders.consultation_id
-             AND NOT (${activeTenantLineAccountSql('stopped_friend.line_account_id')})
+             AND ${stoppedTenantLineAccountSql('stopped_friend.line_account_id')}
         )`,
   ).bind(nowIso, nowIso).run();
   const due = await db

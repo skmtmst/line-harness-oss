@@ -12,6 +12,7 @@ import {
   type MileageRewardFailurePolicy,
   activeTenantLineAccountSql,
 } from '@line-crm/db';
+import { stoppedTenantLineAccountSql } from './tenant-runtime-status.js';
 import { createAutomationActionExecutors } from './automation-action-executors.js';
 import { featureJobCanRun } from './feature-enforcement.js';
 import { AutomationActionError, type ActionDefinition } from './automation-engine.js';
@@ -404,7 +405,7 @@ export async function processDueMileageRewardDeliveries(
             updated_at = ?
       WHERE ${dueWhere}
         AND line_account_id IS NOT NULL
-        AND NOT ${activeTenantLineAccountSql('mileage_redemptions.line_account_id')}`,
+        AND ${stoppedTenantLineAccountSql('mileage_redemptions.line_account_id')}`,
   ).bind(options.now, options.now).run();
   const mileageOff = accountFeatureOffExclusionSql('mileage_redemptions.line_account_id', 'mileage');
   // オフ判定は LIMIT を数える前に SQL で行う。読んでから弾くと、オフの行が

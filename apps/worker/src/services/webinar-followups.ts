@@ -10,6 +10,7 @@ import {
   listLineAccountsWithTenantStatus,
 } from '@line-crm/db';
 import { featureJobCanRun } from './feature-enforcement.js';
+import { isStoppedTenantStatus } from './tenant-runtime-status.js';
 import { pushViaHarnessProxy, type HarnessProxyDispatch } from './line-proxy-send.js';
 
 export type WebinarFollowupOptions = {
@@ -409,7 +410,7 @@ export async function processWebinarFollowups(
   for (const { candidate, kind } of due) {
     const followup = await getOrCreateFollowup(db, candidate, kind);
     if (followup.last_error === 'tenant_suspended') continue;
-    if (candidate.account_id && tenantStatusByAccount.get(candidate.account_id) !== 'active') {
+    if (candidate.account_id && isStoppedTenantStatus(tenantStatusByAccount.get(candidate.account_id))) {
       await db.prepare(
         `UPDATE webinar_followups
             SET status='failed', last_error='tenant_suspended', updated_at=?
@@ -479,7 +480,7 @@ export async function processWebinarFollowups(
   for (const { candidate, kind } of journeyDue) {
     const followup = await getOrCreateJourneyFollowup(db, candidate, kind);
     if (followup.last_error === 'tenant_suspended') continue;
-    if (candidate.account_id && tenantStatusByAccount.get(candidate.account_id) !== 'active') {
+    if (candidate.account_id && isStoppedTenantStatus(tenantStatusByAccount.get(candidate.account_id))) {
       await db.prepare(
         `UPDATE webinar_journey_followups
             SET status='skipped', last_error='tenant_suspended', updated_at=?

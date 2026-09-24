@@ -4,6 +4,7 @@ import {
   resolveLineCredential,
   jstNow,
 } from '@line-crm/db';
+import { stoppedTenantLineAccountSql } from './tenant-runtime-status.js';
 import {
   featureJobCanRun,
 } from './feature-enforcement.js';
@@ -534,7 +535,7 @@ export async function processWebinarNotificationJobs(
         AND EXISTS (
           SELECT 1 FROM webinars stopped_webinar
            WHERE stopped_webinar.id=webinar_notification_jobs.webinar_id
-             AND NOT (${activeTenantLineAccountSql('stopped_webinar.account_id')})
+             AND ${stoppedTenantLineAccountSql('stopped_webinar.account_id')}
         )`,
   ).bind(now.toISOString(), nowEpoch).run();
   const due = await db.prepare(

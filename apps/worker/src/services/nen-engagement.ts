@@ -6,6 +6,7 @@ import {
   isOperationCapabilityStopped,
   jstNow,
 } from '@line-crm/db';
+import { stoppedTenantLineAccountSql } from './tenant-runtime-status.js';
 import { NEN_CAMPAIGN_BODY_MAX_LENGTH, effectiveAnniversaryMonthDay, type LeapYearPolicy } from '@line-crm/shared';
 import type { Message } from '@line-crm/line-sdk';
 import type { EcEvent } from '../routes/ec-integrations.js';
@@ -1073,7 +1074,7 @@ export async function processNenDeliveries(
         SET status='skipped', last_error='tenant_suspended', updated_at=?
       WHERE ${dueWhere}
         AND line_account_id IS NOT NULL
-        AND NOT ${activeTenantLineAccountSql('nen_delivery_jobs.line_account_id')}`,
+        AND ${stoppedTenantLineAccountSql('nen_delivery_jobs.line_account_id')}`,
   ).bind(jstNow(), MAX_DELIVERY_ATTEMPTS).run();
   const campaignsOff = accountFeatureOffExclusionSql('nen_delivery_jobs.line_account_id', 'nen_campaigns');
   // オフ判定は LIMIT を数える前に SQL で行う。読んでから弾くと、オフの行が

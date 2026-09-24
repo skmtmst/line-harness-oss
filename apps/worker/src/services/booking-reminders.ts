@@ -9,6 +9,7 @@ import {
   isOperationCapabilityStopped,
   resolveLineCredential,
 } from '@line-crm/db';
+import { stoppedTenantLineAccountSql } from './tenant-runtime-status.js';
 import { featureJobCanRun } from './feature-enforcement.js';
 
 interface DueRow {
@@ -55,7 +56,7 @@ export async function processDueReminders(
         AND EXISTS (
           SELECT 1 FROM bookings stopped_booking
            WHERE stopped_booking.id = booking_reminders.booking_id
-             AND NOT (${activeTenantLineAccountSql('stopped_booking.line_account_id')})
+             AND ${stoppedTenantLineAccountSql('stopped_booking.line_account_id')}
         )`,
   ).bind(params.now.toISOString()).run();
   // status は 'pending' に加え 'failed'（一時エラーで失敗、retry 残あり）も拾う。

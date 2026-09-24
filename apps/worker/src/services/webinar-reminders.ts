@@ -16,6 +16,7 @@ import {
   type Webinar,
 } from '@line-crm/db';
 import { addJitter, sleep } from './stealth.js';
+import { isStoppedTenantStatus } from './tenant-runtime-status.js';
 import { pushViaHarnessProxy } from './line-proxy-send.js';
 import type { HarnessProxyDispatch } from './line-proxy-send.js';
 import {
@@ -87,7 +88,7 @@ export async function processWebinarReminders(
   for (let i = 0; i < due.length; i++) {
     const reg = due[i];
     try {
-      if (reg.account_id && tenantStatusByAccount.get(reg.account_id) !== 'active') {
+      if (reg.account_id && isStoppedTenantStatus(tenantStatusByAccount.get(reg.account_id))) {
         // notified_at is the terminal ledger for this legacy reminder path.
         // Consuming it prevents an overdue send after the tenant is restored.
         await markWebinarRegistrationNotified(db, reg.id);

@@ -18,6 +18,7 @@ import {
   type WebhookInteractionFailureReason,
   type WebhookKeyInput,
 } from '@line-crm/db';
+import { stoppedTenantLineAccountSql } from './tenant-runtime-status.js';
 import { EXTERNAL_DELIVERY_RETRY_AFTER_MAX_MINUTES } from './external-delivery-retry.js';
 import { signHarnessEvent } from './operations-signature.js';
 
@@ -1283,7 +1284,7 @@ export async function sweepOutgoingWebhookDeliveries(
         OR (status='sending' AND lease_until IS NOT NULL AND lease_until <= ?)
         OR (status='retry_wait' AND next_retry_at <= ?)
       )
-        AND NOT ${activeTenantLineAccountSql('outgoing_webhook_deliveries.line_account_id')}`,
+        AND ${stoppedTenantLineAccountSql('outgoing_webhook_deliveries.line_account_id')}`,
   ).bind(nowIso, nowIso, stuckBefore, nowIso, nowIso).run();
   const rows = await db
     .prepare(

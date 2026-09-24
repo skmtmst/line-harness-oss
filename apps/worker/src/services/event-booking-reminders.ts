@@ -14,6 +14,7 @@ import {
   isOperationCapabilityStopped,
   resolveLineCredential,
 } from '@line-crm/db';
+import { stoppedTenantLineAccountSql } from './tenant-runtime-status.js';
 import { featureJobCanRun } from './feature-enforcement.js';
 
 export interface ComputedReminder {
@@ -150,7 +151,7 @@ export async function processDueEventReminders(
         AND EXISTS (
           SELECT 1 FROM event_bookings stopped_booking
            WHERE stopped_booking.id = event_booking_reminders.booking_id
-             AND NOT (${activeTenantLineAccountSql('stopped_booking.line_account_id')})
+             AND ${stoppedTenantLineAccountSql('stopped_booking.line_account_id')}
         )`,
   ).bind(params.now.toISOString()).run();
   // status: 'pending' or 'failed' (retryable). 'sent' / 'failed_permanent'

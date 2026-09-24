@@ -33,6 +33,7 @@ import { evaluateQuota, fetchQuota, shortfallMessage } from './broadcast-quota-g
 import { getSendPermissionForAccount, type SendPermissionCache } from './send-entitlements.js';
 import { recordLineTokenDefaultFallback } from './line-token.js';
 import { featureJobCanRun } from './feature-enforcement.js';
+import { isStoppedTenantStatus } from './tenant-runtime-status.js';
 import { assertAnalyticsAudiencesUsable, BroadcastAudienceError } from './segment-audience-guard.js';
 import type { SegmentCondition } from './segment-query.js';
 import {
@@ -610,7 +611,7 @@ export async function processScheduledBroadcasts(
   for (const broadcast of scheduled) {
     try {
       const ownerAccountId = (broadcast as unknown as Record<string, unknown>).line_account_id as string | null;
-      if (ownerAccountId && tenantStatusByAccount.get(ownerAccountId) !== 'active') {
+      if (ownerAccountId && isStoppedTenantStatus(tenantStatusByAccount.get(ownerAccountId))) {
         // Keep the content but remove the expired automatic schedule. Restoring
         // the tenant must never send a message whose due time passed while stopped.
         await db.prepare(
@@ -756,7 +757,7 @@ export async function processQueuedBroadcasts(
   for (const broadcast of queued) {
     // 機能オフ中は送信中の続きも止める。行は残るため再オンで再開する。
     const ownerAccountId = (broadcast as unknown as Record<string, unknown>).line_account_id as string | null;
-    if (ownerAccountId && tenantStatusByAccount.get(ownerAccountId) !== 'active') {
+    if (ownerAccountId && isStoppedTenantStatus(tenantStatusByAccount.get(ownerAccountId))) {
       await db.prepare(
         `UPDATE broadcasts SET status = 'draft', scheduled_at = NULL, batch_lock_at = NULL
           WHERE id = ? AND status IN ('sending', 'scheduled')`,

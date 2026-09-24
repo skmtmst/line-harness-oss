@@ -3,6 +3,7 @@ import {
   resolveLineCredential,
   isOperationCapabilityStopped,
 } from '@line-crm/db';
+import { stoppedTenantLineAccountSql } from './tenant-runtime-status.js';
 import { sendEventBookingNotification } from './event-booking-notifier.js';
 import { featureJobCanRun } from './feature-enforcement.js';
 
@@ -1023,7 +1024,7 @@ export async function processEventWaitlistPromotionJobs(
         SET status='completed', completed_at=?, updated_at=?, last_error='tenant_suspended'
       WHERE status IN ('pending','retryable_failed')
         AND available_at <= ?
-        AND NOT ${activeTenantLineAccountSql('event_waitlist_promotion_jobs.line_account_id')}`,
+        AND ${stoppedTenantLineAccountSql('event_waitlist_promotion_jobs.line_account_id')}`,
   ).bind(nowIso, nowIso, nowIso).run();
 
   const jobs = await db

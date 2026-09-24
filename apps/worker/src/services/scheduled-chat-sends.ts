@@ -9,6 +9,7 @@ import {
   type ScheduledChatSendRow,
   activeTenantLineAccountSql,
 } from '@line-crm/db';
+import { stoppedTenantLineAccountSql } from './tenant-runtime-status.js';
 import { resolveLineToken } from './line-token.js';
 import { classifyLineOutboundFailure } from './outbound-idempotency.js';
 import { renderChatMessageContent } from './manual-send-interpolation.js';
@@ -211,7 +212,7 @@ export async function processDueScheduledChatSends(
             last_error = '契約先の利用停止中に送信時刻を過ぎたため送信しませんでした'
       WHERE status = 'scheduled' AND scheduled_at <= ?
         AND line_account_id IS NOT NULL
-        AND NOT ${activeTenantLineAccountSql('scheduled_chat_sends.line_account_id')}`,
+        AND ${stoppedTenantLineAccountSql('scheduled_chat_sends.line_account_id')}`,
   ).bind(now, now, now).run();
   const claimed = await claimDueScheduledChatSends(env.DB, {
     now,
