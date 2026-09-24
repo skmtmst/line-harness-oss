@@ -116,6 +116,7 @@ shared-button-importer app/page.tsx
 shared-button-importer app/password/forgot/page.tsx
 shared-button-importer app/password/reset/page.tsx
 shared-button-importer app/pools/page.tsx
+shared-button-importer app/recipes/clone/page.tsx
 shared-button-importer app/recipes/page.tsx
 shared-button-importer app/register/complete/page.tsx
 shared-button-importer app/register/page.tsx

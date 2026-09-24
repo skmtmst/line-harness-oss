@@ -49,7 +49,7 @@ function RecipeClone() {
   const reload = useCallback(async (): Promise<'ok' | 'missing' | 'error'> => {
     try {
       const res = await api.recipes.get(id, selectedAccountId ?? undefined)
-      if (!res.success) return 'error'
+      if (!res.success || !res.data) return 'error'
       setRecipe(res.data)
       return 'ok'
     } catch (caught: unknown) {

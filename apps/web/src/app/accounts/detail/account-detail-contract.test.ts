@@ -126,3 +126,11 @@ describe('V6 33-3 LINEアカウントの詳細・編集', () => {
     expect(PAGE).toContain('予約している配信は止まります')
   })
 })
+
+describe('Webhookの突合カードの縦並び（監査・崩れ2）', () => {
+  it('狭い脇カードの4行は札の上・値の下に置く', () => {
+    for (const label of ['LINE側に登録したURL', 'Webhookの利用', '最後のテスト', '最後の受信']) {
+      expect(PAGE).toContain(`StackedRow label="${label}"`)
+    }
+  })
+})
