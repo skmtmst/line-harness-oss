@@ -383,7 +383,7 @@ function ResultsInner() {
 
       {!loading && !error && scenario && stats ? (
         <div className={styles.columns}>
-          <main className={styles.main}>
+          <div className={styles.main}>
             <Panel title="配信結果" lead="開始・完了・どの通まで届いたかを確認します。">
               <div className={styles.resultSummary}>
                 <SummaryCard variant="v6" title="開始" value={stats.enrolledTotal} unit="人" detail="このシナリオに参加した人数" />
@@ -623,7 +623,7 @@ function ResultsInner() {
               </>
               )}
             </Panel>
-          </main>
+          </div>
 
           <aside className={styles.side}>
             <Panel title="設定サマリー" lead="現在の参加状況です。">

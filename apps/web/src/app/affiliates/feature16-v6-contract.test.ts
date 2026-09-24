@@ -25,7 +25,6 @@ describe('機能16 V6の一覧', () => {
       '今月の成果',
       '承認待ち',
       '確定した報酬',
-      '未払い残高',
       '今月の成果の流れ',
       '名前・紹介コードで検索',
       'CSVで書き出す',
@@ -39,6 +38,25 @@ describe('機能16 V6の一覧', () => {
     expect(affiliates).toContain('accountSettlement?.affiliates.find')
     expect(affiliates).toContain('口座番号は本人だけに表示')
     expect(affiliates).toContain('金額を0とは扱いません')
+  })
+
+  it('紹介者一覧は未接続の札を出さず、状態は列・操作は枠つき＋「…」に寄せる', () => {
+    // 支払済み台帳が未接続の「未払い残高」は、つながるまで出さない（3列）。
+    expect(affiliates).not.toContain('未払い残高')
+    expect(affiliates).not.toContain('支払済み台帳が接続されると表示されます')
+    // 説明帯は集計カードの下。
+    expect(affiliates.indexOf('確定した報酬')).toBeLessThan(affiliates.indexOf('紹介リンクを渡した人ごとに'))
+    // 絞り込みの先頭は「すべて」。
+    expect(affiliates).toContain('すべて')
+    expect(affiliates.indexOf('すべて')).toBeLessThan(affiliates.indexOf('計測中'))
+    // 状態は名前の下の札（#670 16 と一本化。列と札の二重表示にしない）、操作は枠つき「成果を見る」＋「…」。
+    expect(affiliates).not.toContain('<Th align="center">状態</Th>')
+    expect(affiliates).toContain("<Chip tone={row.isActive ? 'ok' : 'neutral'}>")
+    expect(affiliates).toContain('成果を見る')
+    expect(affiliates).toContain('<MoreAction')
+    expect(affiliates).toContain('<ActionMenu')
+    expect(affiliates).toContain('紹介を止める')
+    expect(affiliates).toContain('<AffiliateArchiveDialog')
   })
 
   it('成果承認は全状態を読み、確認不要だけをまとめて承認する', () => {

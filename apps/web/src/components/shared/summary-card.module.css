@@ -139,6 +139,11 @@
   color: var(--color-ink-secondary);
 }
 
+.badge_warning {
+  background: var(--color-status-warn-soft);
+  color: var(--color-status-warn-deep);
+}
+
 .badge_danger {
   background: var(--color-danger-bg);
   color: var(--color-danger);
@@ -182,8 +187,9 @@
   font-weight: 500;
 }
 
+/* ★V7：補足は状態ではないので緑にしない（緑は「正常」の意味だけに使う）。以前は accent-deep。 */
 .detailNotice {
-  color: var(--color-accent-deep);
+  color: var(--color-ink-secondary);
   font-size: var(--text-caption);
   font-weight: 500;
 }

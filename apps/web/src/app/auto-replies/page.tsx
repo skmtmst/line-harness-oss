@@ -1,5 +1,6 @@
 'use client'
 
+import Disclosure from '@/components/shared/disclosure'
 import SortSelect from '@/components/ui/sort-select'
 import PageSizeSelect from '@/components/ui/page-size-select'
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
@@ -610,18 +611,18 @@ export default function AutoRepliesPage() {
       </div>
 
       {/*
-        複数当てはまったときの挙動と、「適用アカウント」欄の札の読み方。
-        #670 08: 案内の帯2段を1本に圧縮する。2本並ぶとどちらが大事か分からない。
-        凡例の札は一覧の札と1対1の見た目にする(素の色指定を
-        共通トークンへ寄せ、AAのコントラストに余裕を持たせる)。
+        複数当てはまったときの挙動と、「適用アカウント」欄の札の読み方。書いていないと必ず問い合わせになるが、
+        毎回2つの帯が一覧を押し下げていたので、閉じた欄にしまう（★V7：今は出さなくてよいもの）。
       */}
-      <div className="bg-info-bg border-hairline text-info mb-4 rounded-lg border p-3 text-xs leading-relaxed">
-        <p>
+      <Disclosure size="compact" title="ルールの動き方と札の見方" hint="上から順に1つだけ動きます" className="mb-4">
+        <div className="text-ink-secondary mb-3 text-xs leading-relaxed">
           上にあるルールから順に見て、<strong>最初に当てはまった1つだけ</strong>が動きます。
           時間帯や連投の設定で見送られたときは、その次のルールを見ます。
           並び順は「評価順」の数字で決まり、小さいほど先に見ます。
-        </p>
-        <div className="border-hairline mt-2 space-y-1 border-t pt-2">
+        </div>
+
+        {/* 「適用アカウント」欄の札の読み方。札の見た目と1対1で並べる。 */}
+        <div className="text-ink-secondary space-y-1 text-xs">
           {EFFECTIVE_LEGEND.map((row) => (
             <p key={row.status}>
               <span
@@ -639,7 +640,7 @@ export default function AutoRepliesPage() {
             </p>
           ))}
         </div>
-      </div>
+      </Disclosure>
 
       <div
         data-design="Bar"
@@ -738,8 +739,8 @@ export default function AutoRepliesPage() {
               <tr className="bg-canvas-sunken border-b border-hairline">
                 <th className="w-2/6 px-4 py-3 text-left text-xs font-semibold text-ink-faint">ルール名</th>
                 <th className="w-20 px-4 py-3 text-left text-xs font-semibold text-ink-faint">状態</th>
-                <th title="動く条件（キーワード・適用アカウント）" className="w-1/6 px-4 py-3 text-left text-xs font-semibold text-ink-faint">どんなときに動くか</th>
-                <th title="返信と実行するアクション" className="w-1/6 px-4 py-3 text-left text-xs font-semibold text-ink-faint">何を返すか</th>
+                <th title="動く条件（キーワード・適用アカウント）" className="w-1/6 whitespace-nowrap px-4 py-3 text-left text-xs font-semibold text-ink-faint">条件</th>
+                <th title="返信と実行するアクション" className="w-1/6 whitespace-nowrap px-4 py-3 text-left text-xs font-semibold text-ink-faint">返すもの</th>
                 <th title="今月動いた回数" className="w-24 px-4 py-3 text-left text-xs font-semibold text-ink-faint">今月の応答</th>
                 <th title="編集・停止または再開・削除" className="w-44 px-4 py-3 text-right text-xs font-semibold text-ink-faint">操作</th>
                 <th className="hidden px-4 py-3">テンプレート</th>

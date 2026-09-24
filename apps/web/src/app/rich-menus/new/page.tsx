@@ -149,7 +149,7 @@ export default function NewRichMenuPage() {
   }
 
   return (
-    <main data-design-node="XtfO3" className="mx-auto max-w-screen-2xl py-6">
+    <div data-design-node="XtfO3" className="mx-auto max-w-screen-2xl py-6">
       <nav data-design="Crumb" className="text-ink-faint mb-2 text-xs"><Link href="/rich-menus" className="hover:underline">リッチメニュー</Link><span className="mx-1.5">/</span><span>新規作成</span></nav>
       <form onSubmit={handleSubmit}>
         <RichMenuCreateForm
@@ -211,6 +211,6 @@ export default function NewRichMenuPage() {
         onConfirm={confirmLeave}
         onCancel={cancelLeave}
       />
-    </main>
+    </div>
   )
 }
