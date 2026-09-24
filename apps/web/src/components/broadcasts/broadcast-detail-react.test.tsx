@@ -31,9 +31,14 @@ vi.mock('../layout/header', () => ({
   default: ({ title }: { title: string }) => <h1>{title}</h1>,
 }))
 
-vi.mock('./progress-bar', () => ({
-  default: ({ totalCount, successCount }: { totalCount: number; successCount: number }) => (
-    <p>{`進捗 ${successCount}/${totalCount}`}</p>
+/*
+ * 送信の進みは共通部品 Progress（@/components/shared/progress）で出す。
+ * この試験が見るのは「題名と件数の組み合わせが混ざらないこと」だけなので、
+ * Progress の代わりに件数の文だけを出す（進捗 2 / 10 人 の形は本物の呼び出し通り）。
+ */
+vi.mock('../shared/progress', () => ({
+  default: ({ countText }: { countText?: string }) => (
+    <p>{`進捗 ${countText}`}</p>
   ),
 }))
 
@@ -187,7 +192,7 @@ describe('一斉配信詳細の実React動作(#630)', () => {
       })
 
     await show('A')
-    expect(host.textContent).toContain('進捗 2/10')
+    expect(host.textContent).toContain('進捗 2 / 10 人')
 
     // Bへ移る。全文はまだ返らないので、持っている全文はAのまま。
     await show('B')
@@ -195,7 +200,7 @@ describe('一斉配信詳細の実React動作(#630)', () => {
     // (いまは読み込み中の骨組みが被さっていて画面には出ないが、
     //  骨組みの出し方を変えた瞬間に「題名Aに件数B」が表に出る)。
     await wait(5000)
-    const mixed = host.textContent?.includes('配信 A') && host.textContent?.includes('進捗 700/900')
+    const mixed = host.textContent?.includes('配信 A') && host.textContent?.includes('進捗 700 / 900 人')
     expect(mixed).toBe(false)
 
     // Bの全文が返れば、題名も件数もBで揃う。
@@ -204,7 +209,7 @@ describe('一斉配信詳細の実React動作(#630)', () => {
     })
     await wait(5000)
     expect(host.textContent).toContain('配信 B')
-    expect(host.textContent).toContain('進捗 700/900')
+    expect(host.textContent).toContain('進捗 700 / 900 人')
   })
 
   /*
