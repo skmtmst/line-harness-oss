@@ -22,7 +22,9 @@ export type ProgressState = 'preparing' | 'active' | 'done' | 'partial'
  *   何人に送ったかを残す表示へ呼び出し側で切り替える（done / partial）
  * - 完了は印・文・満タンの棒の 3 つで伝える（緑だけにしない）
  * - 数字は桁がずれない等幅数字（`tabular-nums`）
- * - 動きを減らす設定では globals.css の決まりで一瞬になり、準備中の棒は止まって「準備中」の字だけ残る
+ * - 動きを減らす設定では globals.css の決まりで一瞬になり、準備中の棒は左端で止まる
+ *   （「準備中」の字は置かない。no-preparing 契約が共通部品の「準備中」を禁じているため。
+ *   題と補足・止まった棒で段階は伝わる）
  */
 export default function Progress({
   state,
@@ -77,7 +79,6 @@ export default function Progress({
         <div aria-hidden="true" className={styles.track}>
           <div className={styles.indeterminate} />
         </div>
-        <p className={styles.indeterminateLabel}>準備中</p>
       </div>
     )
   }

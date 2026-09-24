@@ -9,7 +9,8 @@
  *
  * 動き（決まりは設計の注記）
  *   伸び   幅ではなく scaleX（motion-base・motion-ease-out）。周りが揺れない
- *   準備中 短い棒が左右に動く（motion-slow）。動きを減らす設定では止めて「準備中」の字だけ
+ *   準備中 短い棒が左右に動く（motion-slow）。動きを減らす設定では左端で止まる
+ *   （「準備中」の字は置かない。no-preparing 契約が共通部品の「準備中」を禁じている）
  *   完了・失敗の印は出っぱなし（動きなし）
  *   動きを減らす設定では globals.css の決まりで一瞬になる
  */
@@ -113,22 +114,7 @@
   }
 }
 
-/* 動きを減らす設定では棒を止めて「準備中」の字だけ見せる（設計の注記）。 */
-.indeterminateLabel {
-  display: none;
-  margin: 0;
-  color: var(--color-ink-faint); /* fill: $ink-faint */
-  font-size: 12px; /* fontSize: 12 */
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .indeterminate {
-    display: none;
-  }
-  .indeterminateLabel {
-    display: block;
-  }
-}
+/* 動きを減らす設定では globals.css の決まりで動きが止まり、棒は左端に残る。 */
 
 .spin {
   flex: 0 0 auto;

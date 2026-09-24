@@ -30,12 +30,13 @@ export default function V7ProgressFiledropVisualQaPage() {
         backLabel="トップへ戻る"
       />
       <div className="bg-canvas p-12">
-        <h1 className="text-xl font-bold text-ink">★V7 処理の進み（Progress）</h1>
+        {/* 見本ページの題は h2 にする。本文の h1 はトップバーが持つ（no-duplicate-page-title 契約）。 */}
+        <h2 className="text-xl font-bold text-ink">★V7 処理の進み（Progress）</h2>
         <p className="mt-2 text-sm text-ink-secondary">
           一斉配信の送信・CSV取り込み・一括操作で「押した後いま何が起きているか」を見せる（大胆案 E #1074
           と同じ場面）。数が分かる時は数と割合、分からない時は段階の名前。棒の伸びは幅ではなく scaleX で動かす（周りが揺れない）。
         </p>
-        <h2 className="mt-6 text-base font-bold text-ink">1. 状態（一斉配信の送信を例に）</h2>
+        <h3 className="mt-6 text-base font-bold text-ink">1. 状態（一斉配信の送信を例に）</h3>
         <div className="mt-4 flex flex-row flex-wrap gap-6">
           <StateCard>
             <Progress
@@ -72,12 +73,12 @@ export default function V7ProgressFiledropVisualQaPage() {
           </StateCard>
         </div>
 
-        <h1 className="mt-12 text-xl font-bold text-ink">★V7 添付ファイルの行（Attachment）・ファイルを落とす場所（Dropzone）</h1>
+        <h2 className="mt-12 text-xl font-bold text-ink">★V7 添付ファイルの行（Attachment）・ファイルを落とす場所（Dropzone）</h2>
         <p className="mt-2 text-sm text-ink-secondary">
           受信箱の返信欄・配信の画像・登録メディアの取り込みでばらばらだった見せ方をそろえる。参考：kobra の
           Attachment・Magnetic Dropzone。引き寄せる動きは採らない（控えめに）。キーボードでも「ファイルを選ぶ」で同じことができる。
         </p>
-        <h2 className="mt-6 text-base font-bold text-ink">1. 添付ファイルの行</h2>
+        <h3 className="mt-6 text-base font-bold text-ink">1. 添付ファイルの行</h3>
         <div className="mt-4 flex flex-col gap-2" style={{ width: 520 }}>
           <AttachmentRow
             name="商品写真_秋.jpg"
@@ -109,7 +110,7 @@ export default function V7ProgressFiledropVisualQaPage() {
           />
         </div>
 
-        <h2 className="mt-6 text-base font-bold text-ink">2. ファイルを落とす場所</h2>
+        <h3 className="mt-6 text-base font-bold text-ink">2. ファイルを落とす場所</h3>
         <div className="mt-4 flex flex-row flex-wrap gap-7">
           <div style={{ width: 400 }}>
             <FileDropzone title="ここに画像を落とす" hint="JPEG・PNG、10MB まで" onFiles={noop} />
