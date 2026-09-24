@@ -6,7 +6,8 @@ import { describe, expect, it } from 'vitest'
 const here = dirname(fileURLToPath(import.meta.url))
 const component = readFileSync(join(here, 'friend-attributes-v3-static.tsx'), 'utf8')
 const css = readFileSync(join(here, 'friend-attributes-v3-static.module.css'), 'utf8')
-const page = readFileSync(join(here, '..', '..', 'app', 'tags-v3', 'page.tsx'), 'utf8')
+// 2026-09-25: 比較用の /tags-v3 を撤去。同じ静的表示を使う visual-qa の画面で見張りを続ける。
+const page = readFileSync(join(here, '..', '..', 'app', 'visual-qa', 'friend-attributes-v3', 'page.tsx'), 'utf8')
 const menu = readFileSync(join(here, '..', '..', 'lib', 'menu.ts'), 'utf8')
 
 describe('友だち属性V3の静的デザイン契約', () => {
