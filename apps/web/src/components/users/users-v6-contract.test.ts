@@ -37,14 +37,15 @@ describe('統合ユーザーV6の画面契約', () => {
     // 設計 `friends-v6/r7eSi.png` はここに状態の言葉だけを置く。
     expect(ROW).not.toContain('shortenUid')
     expect(ROW).not.toContain('title={a.lineUserId}')
-    expect(ROW).toContain("{expanded ? '閉じる' : '詳細を見る'}")
+    expect(ROW).toContain("label: expanded ? '閉じる' : '詳細を見る'")
     expect(PAGE).not.toContain('画像トークン')
     expect(PAGE).not.toContain('worker キャッシュ')
     expect(FILTERS).toContain('UIDで検索')
   })
 
   it('複数登録を配信済みと決めつけず要確認として出す', () => {
-    expect(ROW).toContain("row.isDuplicate ? '要確認' : '対象外'")
+    expect(ROW).toContain('{row.isDuplicate ? (')
+    expect(ROW).toContain('tone="warning"')
     expect(ROW).not.toContain('2通→1通')
     expect(ROW).toContain('送信前に配信先の確認が必要です')
   })
@@ -60,9 +61,14 @@ describe('統合ユーザーV6の画面契約', () => {
 
   it('KPI名を統合ユーザーの業務用語へそろえる', () => {
     /* 面は共通SummaryCardへ移したので、名前は title= で渡す。 */
-    for (const label of ['統合ユーザー', '紐付く友だち', 'UID連携済み', '重複配信の削減']) {
+    for (const label of ['統合ユーザー', '紐付く友だち', 'UID連携済み']) {
       expect(SUMMARY).toContain(`title="${label}"`)
     }
+    /*
+     * 「重複配信の削減」は未接続の機能のため、カードごと出さない。
+     * 通数・接続後の断り書きは、つながってから足す。
+     */
+    expect(SUMMARY).not.toContain('title="重複配信の削減"')
     expect(SUMMARY).not.toContain('余分な行数')
     expect(SUMMARY).not.toContain('余分率')
   })
@@ -73,6 +79,19 @@ describe('統合ユーザーV6の画面契約', () => {
     expect(SUMMARY).toContain('value={stats?.uniquePeople ?? null}')
     expect(SUMMARY).toContain('setStats(null)')
     expect(SUMMARY).toContain('requestGuard.isCurrent(requestGeneration)')
+  })
+
+  it('操作列はボタンが収まる固定幅にし、伸び縮みは連絡先とアカウントだけにする', () => {
+    /*
+     * 1440pxで「詳細を見る」が枠をはみ出していた。再発防止に幅を固定する。
+     * 操作列 176px＝詳細ボタン98px＋隙間8px＋「…」32px＋セル余白24px（162px）に余裕14px。
+     * 幅を持たない <col /> が2つ（連絡先・紐付くアカウント）だけ残る。
+     */
+    for (const width of ['w-[16%]', 'w-[108px]', 'w-[92px]', 'w-[176px]']) {
+      expect(TABLE).toContain(width)
+    }
+    expect(TABLE).toContain('<col />')
+    expect(TABLE).not.toContain('w-[9%]')
   })
 
   it('共通ページ送りを使い横スクロールへ逃がさない', () => {

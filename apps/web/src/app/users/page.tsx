@@ -185,14 +185,13 @@ export default function UsersPage() {
 
   return (
     <div className="space-y-4" data-users-design="v6" data-design-node="r7eSi">
-      <section className="rounded-card border border-hairline bg-canvas px-4 py-3 shadow-card">
-        <p className="text-sm font-bold text-ink">
-          複数の友だちを、1人の顧客として横断管理します。
-        </p>
-        <p className="mt-1 text-xs leading-5 text-ink-secondary">
-          元の友だちは残したまま、登録アカウント・最終接触・重複配信の確認ができます。同じ人か確認が必要なものは「要確認」と表示します。
-        </p>
-      </section>
+      {/*
+        使い方の説明は毎回読むものではないので、共通 Disclosure が無い
+        いまは1行の小さな説明文に留める（カードにしない）。
+      */}
+      <p className="text-xs leading-5 text-ink-secondary">
+        複数の友だちを、1人の顧客として横断管理します。同じ人か確認が必要なものは「要確認」と表示します。
+      </p>
 
       <SummaryBar rows={rows} />
 
@@ -235,7 +234,7 @@ export default function UsersPage() {
       </div>
       <style>{`
         [data-users-filters] > div { flex-wrap: wrap; }
-        [data-users-filters] input[type="search"] { flex: 1 1 100%; }
+        [data-users-filters] [data-design-node="phlR1"] { flex: 1 1 100%; }
         /* U041: 7列の表は狭い幅で見出しが衝突する。列同士の比較が要る表なので、
            収まらない幅では枠の内側だけ横へ動かして見出しの形を保つ。 */
         [data-scroll-table] > div { overflow-x: auto; }
