@@ -5,9 +5,10 @@ import { Fragment, useState, useEffect, useCallback, useRef } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import type { Scenario, ScenarioStep, ScenarioTriggerType, MessageType, DeliveryMode, Folder } from '@line-crm/shared'
-import { api, type ScenarioRuns } from '@/lib/api'
+import { api, ApiError, type ScenarioRuns } from '@/lib/api'
 import Header from '@/components/layout/header'
 import Button from '@/components/shared/button'
+import TargetMissing from '@/components/shared/target-missing'
 import FlexPreviewComponent from '@/components/flex-preview'
 import ActionEditor from '@/components/scenarios/action-editor'
 import TriggerEditor from '@/components/scenarios/trigger-editor'
@@ -332,6 +333,8 @@ export default function ScenarioDetailClient({
   const [scenario, setScenario] = useState<ScenarioWithSteps | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  /** 404・空で見つからないとき。取得の失敗（error）とは分ける。 */
+  const [scenarioMissing, setScenarioMissing] = useState(false)
 
   const [editing, setEditing] = useState(false)
   const [editForm, setEditForm] = useState({ name: '', description: '', triggerType: 'friend_add' as ScenarioTriggerType, isActive: true, allowConcurrent: true, folderId: '' })
@@ -475,6 +478,7 @@ export default function ScenarioDetailClient({
   const loadScenario = useCallback(async (fresh = false) => {
     setLoading(true)
     setError('')
+    setScenarioMissing(false)
     try {
       const res = await scenarioReferenceData.scenario(id, fresh)
       if (res.success) {
@@ -490,8 +494,12 @@ export default function ScenarioDetailClient({
       } else {
         setError(res.error)
       }
-    } catch {
-      setError('シナリオの読み込みに失敗しました。もう一度読み込んでください。')
+    } catch (caught) {
+      if (caught instanceof ApiError && caught.status === 404) {
+        setScenarioMissing(true)
+      } else {
+        setError('シナリオの読み込みに失敗しました。もう一度読み込んでください。')
+      }
     } finally {
       setLoading(false)
     }
@@ -1636,17 +1644,26 @@ export default function ScenarioDetailClient({
     )
   }
 
+  if (!scenario && (scenarioMissing || !error)) {
+    return (
+      <TargetMissing
+        kind="not-found"
+        title="このシナリオは見つかりません"
+        description="削除されたか、別の LINE アカウントのものです。一覧から選び直してください。"
+        backHref="/scenarios"
+        backLabel="シナリオ一覧へ戻る"
+      />
+    )
+  }
+
   if (!scenario) {
     return (
-      <div>
-
-        <div className="bg-canvas rounded-card border border-hairline p-8 text-center">
-          <p className="text-ink-faint">{error || 'シナリオが見つかりません'}</p>
-          <Link href="/scenarios" className="text-action mt-4 inline-block text-sm hover:underline">
-            ← シナリオ一覧に戻る
-          </Link>
-        </div>
-      </div>
+      <TargetMissing
+        kind="error"
+        title="シナリオを読み込めませんでした"
+        description="通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度読み込んでください。"
+        onRetry={() => void loadScenario(true)}
+      />
     )
   }
 

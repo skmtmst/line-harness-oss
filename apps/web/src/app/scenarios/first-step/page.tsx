@@ -35,6 +35,7 @@ import type { SegmentCondition } from '@/components/shared/condition-builder'
 import { pruneCondition } from '@/lib/segment-condition'
 import SelectField from '@/components/shared/select-field'
 import Button from '@/components/shared/button'
+import TargetMissing from '@/components/shared/target-missing'
 import StickyBar from '@/components/shared/sticky-bar'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import {
@@ -84,6 +85,8 @@ function FirstStepContent() {
   const [loadState, setLoadState] = useState<LoadState>('idle')
   /** 失敗したあとの「再読み込み」で effect を回し直すための番号。 */
   const [reloadKey, setReloadKey] = useState(0)
+  /** 404・空で見つからないとき。取得の失敗（error）とは分ける。 */
+  const [loadMissing, setLoadMissing] = useState(false)
   /**
    * 取得の世代番号。id が切り替わったあとに古い応答が解決しても、
    * 別のシナリオの本文やstepIdを新しい画面へ流し込まないための番兵
@@ -179,6 +182,7 @@ function FirstStepContent() {
     setScenario(null)
     setLoadState('loading')
     setError('')
+    setLoadMissing(false)
     resetForm()
     void (async () => {
       try {
@@ -217,10 +221,15 @@ function FirstStepContent() {
           setRestoreNotice(restored.restoreNotice)
         }
         setLoadState('ready')
-      } catch {
+      } catch (caught) {
         if (seq !== loadSeq.current) return
         scenarioReferenceData.invalidateScenario(id)
-        setError('シナリオを読み込めませんでした。通信状態を確認して、もう一度お試しください。')
+        if (caught instanceof ApiError && caught.status === 404) {
+          setError('')
+          setLoadMissing(true)
+        } else {
+          setError('シナリオを読み込めませんでした。通信状態を確認して、もう一度お試しください。')
+        }
         setLoadState('error')
       }
     })()
@@ -440,12 +449,13 @@ function FirstStepContent() {
 
   if (!id) {
     return (
-      <div className="text-ink-faint py-12 text-center text-sm">
-        シナリオが指定されていません。
-        <Link href="/scenarios" className="text-action ml-2 underline">
-          シナリオ一覧へ
-        </Link>
-      </div>
+      <TargetMissing
+        kind="unspecified"
+        title="1通目を作るシナリオが指定されていません"
+        description="一覧から、1通目を作るシナリオを選び直してください。"
+        backHref="/scenarios"
+        backLabel="シナリオ一覧へ戻る"
+      />
     )
   }
 
@@ -467,47 +477,57 @@ function FirstStepContent() {
         </Link>
       </div>
 
-      <ol
-        aria-label="シナリオ作成の進み方"
-        className="bg-canvas border-hairline mb-4 flex flex-wrap items-center gap-3 rounded-card border px-4 py-3 text-xs"
-      >
-        <StepMark n={1} label="シナリオ情報" state="done" />
-        <StepLine />
-        <StepMark n={2} label="配信方式" state="done" />
-        <StepLine />
-        <StepMark n={3} label="1通目を設定" state="current" />
-      </ol>
-
-      <div data-design="Notice" className="space-y-2">
-        <p className="bg-success-bg text-success rounded-card px-4 py-3 text-sm">
-          配信方式：{modeLabel[mode]}　・　シナリオ：{scenario?.name ?? '読み込み中'}
-        </p>
-        {error && <p className="bg-danger-bg text-danger rounded-card px-4 py-3 text-sm">{error}</p>}
-      </div>
-
-      {loadState !== 'ready' ? (
-        /*
-         * シナリオが確定するまでフォームは出さない（SCENARIO-04）。
-         * 取得前に入力を許すと、届いた既存の1通目が入力を上書きするか、
-         * まだ知らない既存通へ重ねて保存してしまう。失敗したときは
-         * 理由と「再読み込み」を同じ場所に出す。
-         */
-        <div className="bg-canvas rounded-card border-hairline mt-4 border p-8 text-center">
-          {loadState === 'error' ? (
-            <>
-              <p className="text-ink text-sm font-bold">シナリオを読み込めませんでした</p>
-              <p className="text-ink-secondary mt-1 text-xs leading-relaxed">
-                1通目の作成・保存はできません。通信状態を確認して、もう一度読み込んでください。
-              </p>
-              <Button onClick={() => setReloadKey(k => k + 1)} className="mt-4">
-                再読み込み
-              </Button>
-            </>
-          ) : (
-            <p className="text-ink-faint text-sm">シナリオを読み込んでいます…</p>
-          )}
-        </div>
+      {/*
+        対象が無い（取得失敗）ときは、進み方・案内・入力のどれも出さない。
+        代わりに ★V7 TargetMissing を出す（設計 `x5cgUH`）。
+      */}
+      {loadState === 'error' ? (
+        loadMissing || !error ? (
+          <TargetMissing
+            kind="not-found"
+            title="このシナリオは見つかりません"
+            description="削除されたか、別の LINE アカウントのものです。一覧から選び直してください。"
+            backHref="/scenarios"
+            backLabel="シナリオ一覧へ戻る"
+          />
+        ) : (
+          <TargetMissing
+            kind="error"
+            title="シナリオを読み込めませんでした"
+            description="1通目の作成・保存はできません。通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度読み込んでください。"
+            onRetry={() => setReloadKey((k) => k + 1)}
+          />
+        )
       ) : (
+        <>
+          <ol
+            aria-label="シナリオ作成の進み方"
+            className="bg-canvas border-hairline mb-4 flex flex-wrap items-center gap-3 rounded-card border px-4 py-3 text-xs"
+          >
+            <StepMark n={1} label="シナリオ情報" state="done" />
+            <StepLine />
+            <StepMark n={2} label="配信方式" state="done" />
+            <StepLine />
+            <StepMark n={3} label="1通目を設定" state="current" />
+          </ol>
+
+          <div data-design="Notice" className="space-y-2">
+            <p className="bg-success-bg text-success rounded-card px-4 py-3 text-sm">
+              配信方式：{modeLabel[mode]}　・　シナリオ：{scenario?.name ?? '読み込み中'}
+            </p>
+            {error && <p className="bg-danger-bg text-danger rounded-card px-4 py-3 text-sm">{error}</p>}
+          </div>
+
+          {loadState !== 'ready' ? (
+            /*
+             * シナリオが確定するまでフォームは出さない（SCENARIO-04）。
+             * 取得前に入力を許すと、届いた既存の1通目が入力を上書きするか、
+             * まだ知らない既存通へ重ねて保存してしまう。
+             */
+            <div className="bg-canvas rounded-card border-hairline mt-4 border p-8 text-center">
+              <p className="text-ink-faint text-sm">シナリオを読み込んでいます…</p>
+            </div>
+          ) : (
         <>
       {/*
         左に入力、右にプレビュー。プレビューは付いてくる（sticky）ので、
@@ -844,6 +864,8 @@ function FirstStepContent() {
           </>
         )}
       />
+        </>
+      )}
         </>
       )}
 

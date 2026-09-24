@@ -4,7 +4,7 @@ import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type React
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import type { Scenario, ScenarioStats, ScenarioStep } from '@line-crm/shared'
-import { api, type ScenarioRuns } from '@/lib/api'
+import { api, ApiError, type ScenarioRuns } from '@/lib/api'
 import { IdempotencyKeyStore } from '@/lib/idempotency-key-store'
 import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
@@ -14,6 +14,7 @@ import IconButton from '@/components/shared/icon-button'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
 import Dialog from '@/components/shared/dialog'
 import ListState from '@/components/shared/list-state'
+import TargetMissing from '@/components/shared/target-missing'
 import NoteBar from '@/components/shared/note-bar'
 import SelectField from '@/components/shared/select-field'
 import StatusBadge from '@/components/shared/status-badge'
@@ -98,6 +99,8 @@ function ResultsInner() {
   const [subscriptionStatus, setSubscriptionStatus] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  /** 404・空で見つからないとき。取得の失敗（error）とは分ける。 */
+  const [resultsMissing, setResultsMissing] = useState(false)
   /*
    * 友だち単位の操作（#949 N-054）。止める・再開・失敗を再送・移す。
    * busy は「購読ID:操作」で持ち、押した行だけを止める。
@@ -135,11 +138,13 @@ function ResultsInner() {
   const loadMain = useCallback(async (seq: number) => {
     if (!id) {
       setLoading(false)
-      setError('配信結果を確認するシナリオが指定されていません。')
+      setError('')
+      setResultsMissing(false)
       return
     }
     setLoading(true)
     setError('')
+    setResultsMissing(false)
     try {
       const [scenarioResponse, statsResponse] = await Promise.all([
         scenarioReferenceData.scenario(id),
@@ -149,9 +154,13 @@ function ResultsInner() {
       if (!scenarioResponse.success || !statsResponse.success) throw new Error('load failed')
       setScenario(scenarioResponse.data)
       setStats(statsResponse.data)
-    } catch {
+    } catch (caught) {
       if (seq !== loadSeqRef.current) return
-      setError('配信結果を読み込めませんでした。時間を置いてもう一度お試しください。')
+      if (caught instanceof ApiError && caught.status === 404) {
+        setResultsMissing(true)
+      } else {
+        setError('配信結果を読み込めませんでした。時間を置いてもう一度お試しください。')
+      }
     } finally {
       if (seq === loadSeqRef.current) setLoading(false)
     }
@@ -362,6 +371,45 @@ function ResultsInner() {
 
   const moveChoices = (moveOptions ?? []).filter((item) => item.id !== id && item.isActive)
 
+  /*
+    対象が無いときは、上の操作列（シナリオ編集へ戻る・CSVで書き出す）も
+    出さない。戻り先は TargetMissing のボタンが持つ（設計 `x5cgUH`）。
+  */
+  if (!id) {
+    return (
+      <TargetMissing
+        kind="unspecified"
+        title="配信結果を見るシナリオが指定されていません"
+        description="一覧から、結果を見たいシナリオを選び直してください。"
+        backHref="/scenarios"
+        backLabel="シナリオ一覧へ戻る"
+      />
+    )
+  }
+
+  if (!loading && (resultsMissing || (!error && !scenario))) {
+    return (
+      <TargetMissing
+        kind="not-found"
+        title="このシナリオは見つかりません"
+        description="削除されたか、別の LINE アカウントのものです。一覧から選び直してください。"
+        backHref="/scenarios"
+        backLabel="シナリオ一覧へ戻る"
+      />
+    )
+  }
+
+  if (!loading && error) {
+    return (
+      <TargetMissing
+        kind="error"
+        title="配信結果を読み込めませんでした"
+        description="通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度読み込んでください。"
+        onRetry={() => void loadMain(loadSeqRef.current)}
+      />
+    )
+  }
+
   return (
     <div className={styles.page} data-design-node="M2b2B">
       <div className={styles.actions}>
@@ -379,7 +427,6 @@ function ResultsInner() {
       </div>
 
       {loading ? <ListState kind="loading" title="配信結果を読み込んでいます" /> : null}
-      {!loading && error ? <ListState kind="error" description={error} onRetry={() => void loadMain(loadSeqRef.current)} /> : null}
 
       {!loading && !error && scenario && stats ? (
         <div className={styles.columns}>

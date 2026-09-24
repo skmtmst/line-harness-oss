@@ -6,8 +6,10 @@ import { useSearchParams } from 'next/navigation'
 import type { Tag } from '@line-crm/shared'
 import { ApiError, api, type ApiBroadcast, type BroadcastInsight } from '@/lib/api'
 import Button from '@/components/shared/button'
+import ListState from '@/components/shared/list-state'
 import Progress from '@/components/shared/progress'
 import StickyBar from '@/components/shared/sticky-bar'
+import TargetMissing from '@/components/shared/target-missing'
 import { useAccount } from '@/contexts/account-context'
 import { audienceSummary, messageTypeLabel } from '@/lib/broadcast-summary'
 import { broadcastBelongsToSelectedAccount } from './broadcast-detail-account'
@@ -18,7 +20,7 @@ import { usePageTitle } from '@/components/shell/page-chrome'
 
 function BroadcastDetailInner() {
   const params = useSearchParams()
-  const { selectedAccountId, loading: accountLoading } = useAccount()
+  const { selectedAccountId, selectedAccount, loading: accountLoading } = useAccount()
   const id = params.get('id') ?? ''
   const [broadcast, setBroadcast] = useState<ApiBroadcast | null>(null)
   usePageTitle(broadcast ? `配信結果：${broadcast.title}` : '配信の詳細')
@@ -140,14 +142,48 @@ function BroadcastDetailInner() {
 
   if (!id) {
     return (
-      <div>
-        <p className="text-ink-faint bg-canvas rounded-card border-hairline border p-8 text-center text-sm">
-          配信が指定されていません。
-          <Link href="/broadcasts" className="text-action ml-1 hover:underline">
-            一覧へ戻る
-          </Link>
-        </p>
-      </div>
+      <TargetMissing
+        kind="unspecified"
+        title="見る配信が指定されていません"
+        description="一覧から、見たい配信を選び直してください。"
+        backHref="/broadcasts"
+        backLabel="一斉配信の一覧へ戻る"
+      />
+    )
+  }
+
+  if (loadState === 'error') {
+    return (
+      <TargetMissing
+        kind="error"
+        title="配信を読み込めませんでした"
+        description="通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度読み込んでください。"
+        onRetry={() => setReloadToken((value) => value + 1)}
+      />
+    )
+  }
+
+  if (loadState === 'not-found' || (loadState === 'ready' && !broadcast)) {
+    if (!selectedAccountId) {
+      // アカウント未選択は対象の有無とは別の状態。他の画面と同じく ListState で出す。
+      return (
+        <ListState
+          kind="empty"
+          title="LINE公式アカウントを選んでください"
+          description="選ぶと配信を確認できます。"
+          action={<Button href="/broadcasts">一斉配信の一覧へ戻る</Button>}
+        />
+      )
+    }
+    return (
+      <TargetMissing
+        kind="not-found"
+        title="この配信は見つかりません"
+        description="このLINEアカウントで確認できる配信は見つかりませんでした。削除されたか、一覧から選び直してください。"
+        accountName={selectedAccount?.name}
+        backHref="/broadcasts"
+        backLabel="一斉配信の一覧へ戻る"
+      />
     )
   }
 
@@ -184,24 +220,10 @@ function BroadcastDetailInner() {
         <div className="bg-canvas rounded-card border-hairline text-ink-faint border p-8 text-center text-sm">
           読み込み中...
         </div>
-      ) : loadState === 'error' ? (
-        <div className="bg-canvas rounded-card border-hairline border p-8 text-center">
-          <p className="text-ink text-sm font-semibold">配信を読み込めませんでした</p>
-          <p className="text-ink-faint mt-1 text-xs">通信状態を確認して、もう一度お試しください。</p>
-          <Button className="mt-4" onClick={() => setReloadToken((value) => value + 1)}>
-            配信を再読み込み
-          </Button>
+      ) : !broadcast ? (
+        <div className="bg-canvas rounded-card border-hairline text-ink-faint border p-8 text-center text-sm">
+          読み込み中...
         </div>
-      ) : loadState === 'not-found' || !broadcast ? (
-        <p className="text-ink-faint bg-canvas rounded-card border-hairline border p-8 text-center text-sm">
-          {/*
-            未選択と対象外を書き分ける。未選択のまま「確認できる配信は
-            見つかりません」と出すと、権限の問題に読み違える（#490 軽6）。
-          */}
-          {!selectedAccountId
-            ? 'LINE公式アカウントを選んでください。選ぶと配信を確認できます。'
-            : 'このLINEアカウントで確認できる配信は見つかりませんでした。'}
-        </p>
       ) : String(broadcast.status) === 'sent' ? (
         <SentResult broadcast={broadcast} insight={insight} insightState={insightState} contentRef={contentRef} />
       ) : (
