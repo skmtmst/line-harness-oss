@@ -42,6 +42,7 @@ describe('共通部品を通らない直書き', () => {
       'components/shared/status-badge.tsx',
       'components/shared/summary-card.tsx',
       'components/shared/table.tsx',
+      'components/shared/bar-chart.tsx',
     ]) {
       expect(counts).not.toHaveProperty(file)
     }
