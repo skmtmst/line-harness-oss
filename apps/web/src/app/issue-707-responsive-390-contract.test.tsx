@@ -120,8 +120,8 @@ describe('21: 表は外枠で切り落とさず横スクロールで届く', () 
     expect(table).not.toBeNull()
     // 操作列は表の中に残り、押せる（スクロール先でもDOMから消えない）。
     expect(host.querySelector('button')?.textContent).toBe('中身を見る')
-    const actionHeader = [...host.querySelectorAll('th')].find((th) => th.textContent === '')
-    expect(actionHeader?.className).toContain('sticky')
+    const actionHeader = [...host.querySelectorAll('th')].find((th) => th.textContent === '操作')
+    expect(actionHeader?.className ?? '').toContain('sticky')
   })
 
   it('nen-overviewの3表すべてに操作列stickyがある', () => {
