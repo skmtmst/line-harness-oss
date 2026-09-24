@@ -6,6 +6,7 @@ import { Suspense, useEffect, useState } from 'react'
 import { api, type Recipe } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
+import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import SelectField from '@/components/shared/select-field'
 import StatusBadge from '@/components/shared/status-badge'
@@ -44,14 +45,14 @@ function RecipeClone() {
   usePageTitle(recipe ? `${recipe.name}を作る` : null)
 
   useEffect(() => {
-    if (accountLoading) return
+    if (accountLoading || !id) return
     let alive = true
     setStatus('loading')
     void api.recipes
       .get(id, selectedAccountId ?? undefined)
       .then((res) => {
         if (!alive) return
-        if (!res.success) {
+        if (!res.success || !res.data) {
           setStatus('error')
           return
         }
@@ -66,6 +67,20 @@ function RecipeClone() {
     }
   }, [accountLoading, id, selectedAccountId])
 
+  /*
+   * `?id=` なしで開くと読み込みが始まらない。対象未指定は失敗ではないので、
+   * 落とさず一覧へ戻して選び直させる（全ルート監査 A1、2026-09-25）。
+   */
+  if (!id) {
+    return (
+      <ListState
+        kind="empty"
+        title="レシピが指定されていません"
+        description="レシピの一覧から、複製するレシピを選び直してください。"
+        action={<Button href="/recipes">レシピの一覧へ戻る</Button>}
+      />
+    )
+  }
   if (status === 'error') {
     return (
       <ListState
