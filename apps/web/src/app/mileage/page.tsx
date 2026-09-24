@@ -892,7 +892,7 @@ function MileagePageInner() {
                   <Th className="w-1/6" align="right">操作</Th>
                 </TableHeadRow>
               </thead>
-              <tbody className="divide-y divide-hairline">
+              <tbody className="divide-hairline divide-y">
                 {members.map((member) => {
                   const displayRank = rankLabel(member.rank)
                   return (
