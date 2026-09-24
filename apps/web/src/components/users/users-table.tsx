@@ -1,9 +1,9 @@
 'use client'
 
 import UserRow, { type UserRowData } from './user-row'
-import ListState from '@/components/shared/list-state'
 import Pagination from '@/components/shared/pagination'
 import { TableHeadRow, Th } from '@/components/shared/table'
+import { TableStateRow } from '@/components/shared/table'
 
 const fmt = new Intl.NumberFormat('ja-JP')
 
@@ -66,26 +66,24 @@ export default function UsersTable({
         </thead>
         <tbody>
           {rows.length === 0 ? (
-            <tr>
-              <td colSpan={7} className="p-4">
-                {loading ? (
-                  <ListState kind="loading" />
-                ) : error ? (
-                  <ListState
-                    kind="error"
-                    title="統合ユーザーを表示できませんでした"
-                    description="再計算するか、時間をおいてもう一度お試しください。"
-                    onRetry={onRetry}
-                  />
-                ) : (
-                  <ListState
-                    kind="empty"
-                    title="条件に合う統合ユーザーがいません"
-                    description="検索条件を変えてお試しください。"
-                  />
-                )}
-              </td>
-            </tr>
+            loading ? (
+              <TableStateRow colSpan={7} kind="loading" />
+            ) : error ? (
+              <TableStateRow
+                colSpan={7}
+                kind="error"
+                title="統合ユーザーを表示できませんでした"
+                description="再計算するか、時間をおいてもう一度お試しください。"
+                onRetry={onRetry}
+              />
+            ) : (
+              <TableStateRow
+                colSpan={7}
+                kind="empty"
+                title="条件に合う統合ユーザーがいません"
+                description="検索条件を変えてお試しください。"
+              />
+            )
           ) : (
             rows.map((row) => (
               <UserRow
