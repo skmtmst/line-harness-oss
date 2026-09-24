@@ -610,28 +610,27 @@ export default function AutoRepliesPage() {
       </div>
 
       {/*
-        案内は1本の帯にまとめる。2段の帯が連続すると、肝心の一覧が
-        画面の下へ追いやられていた（監査 A13）。
-        上段は複数当てはまったときの挙動、下段は「適用アカウント」欄の
-        札の読み方。札の見た目と1対1で並べる。
-        #702: 凡例の札は行側と同じトークンで出す（黄は warning 系・4.5:1以上）。
+        複数当てはまったときの挙動と、「適用アカウント」欄の札の読み方。
+        #670 08: 案内の帯2段を1本に圧縮する。2本並ぶとどちらが大事か分からない。
+        凡例の札は一覧の札と1対1の見た目にする(素の色指定を
+        共通トークンへ寄せ、AAのコントラストに余裕を持たせる)。
       */}
-      <div className="bg-info-bg border-hairline text-info mb-4 rounded-lg border p-3 text-xs">
-        <p className="leading-relaxed">
+      <div className="bg-info-bg border-hairline text-info mb-4 rounded-lg border p-3 text-xs leading-relaxed">
+        <p>
           上にあるルールから順に見て、<strong>最初に当てはまった1つだけ</strong>が動きます。
           時間帯や連投の設定で見送られたときは、その次のルールを見ます。
           並び順は「評価順」の数字で決まり、小さいほど先に見ます。
         </p>
-        <div className="mt-2 space-y-1 border-t border-info/20 pt-2">
+        <div className="border-hairline mt-2 space-y-1 border-t pt-2">
           {EFFECTIVE_LEGEND.map((row) => (
             <p key={row.status}>
               <span
                 className={
                   row.status === 'reply'
-                    ? 'inline-flex items-center px-1.5 py-0.5 rounded bg-success-bg text-success'
+                    ? 'inline-flex items-center gap-0.5 rounded bg-success-bg px-1.5 py-0.5 text-[10px] font-medium text-success'
                     : row.status === 'silent'
-                      ? 'inline-flex items-center px-1.5 py-0.5 rounded bg-warning-bg text-warning'
-                      : 'inline-flex items-center px-1.5 py-0.5 rounded bg-canvas-sunken text-ink-faint line-through'
+                      ? 'inline-flex items-center gap-0.5 rounded bg-warning-bg px-1.5 py-0.5 text-[10px] text-warning'
+                      : 'inline-flex items-center gap-0.5 rounded bg-canvas-sunken px-1.5 py-0.5 text-[10px] text-ink-faint line-through'
                 }
               >
                 {row.mark ? `${row.mark} ` : ''}アカウント名
