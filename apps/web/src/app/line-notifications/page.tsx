@@ -1067,18 +1067,6 @@ function LineNotificationsPage() {
         notice={notice}
         hasUnsaved={dirtyEvents.includes(expandedSetting.eventType)}
       />
-      {/*
-        * #734: 通知の出す・止めるはお客さまへのLINEに直結するので、
-        * 1クリックの即時切替ではなく確認窓を1回挟む（誤タップ防止）。
-        */}
-      <ConfirmDialog
-        open={pendingToggle !== null}
-        title={pendingToggle?.isEnabled ? `「${pendingToggle.label}」のお知らせを止めますか？` : `「${pendingToggle?.label ?? ''}」のお知らせを出しますか？`}
-        description={pendingToggle?.isEnabled ? '止めると、この出来事が起きてもお客さまへLINEが送られなくなります。あとからまた出せます。' : '出すと、この出来事が起きたお客さまへLINEが送られ始めます。'}
-        confirmLabel={pendingToggle?.isEnabled ? 'お知らせを止める' : 'お知らせを出す'}
-        onConfirm={pendingToggle ? () => { const s = pendingToggle; setPendingToggle(null); void save(s, !s.isEnabled) } : undefined}
-        onCancel={() => setPendingToggle(null)}
-      />
       <ConfirmDialog
         open={closeConfirmOpen}
         title="保存していない編集を破棄しますか？"
@@ -1124,6 +1112,20 @@ function LineNotificationsPage() {
         </dl>
       </ConfirmDialog>
     </> : null}
+    {/*
+      * #734: 通知の出す・止めるはお客さまへのLINEに直結するので、
+      * 1クリックの即時切替ではなく確認窓を1回挟む（誤タップ防止）。
+      * 一覧（expandedSetting が無い状態）から開くので、編集画面の条件の
+      * 中には置かない。
+      */}
+    <ConfirmDialog
+      open={pendingToggle !== null}
+      title={pendingToggle?.isEnabled ? `「${pendingToggle.label}」のお知らせを止めますか？` : `「${pendingToggle?.label ?? ''}」のお知らせを出しますか？`}
+      description={pendingToggle?.isEnabled ? '止めると、この出来事が起きてもお客さまへLINEが送られなくなります。あとからまた出せます。' : '出すと、この出来事が起きたお客さまへLINEが送られ始めます。'}
+      confirmLabel={pendingToggle?.isEnabled ? 'お知らせを止める' : 'お知らせを出す'}
+      onConfirm={pendingToggle ? () => { const s = pendingToggle; setPendingToggle(null); void save(s, !s.isEnabled) } : undefined}
+      onCancel={() => setPendingToggle(null)}
+    />
     {tab === 'customer' && !expandedSetting ? <div
       data-design-node="festr"
       data-list-state={loadState === 'ready' && settings.length === 0 ? 'empty' : loadState}
