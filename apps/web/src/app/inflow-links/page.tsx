@@ -862,21 +862,11 @@ function InflowLinksPageInner({
                 }}
                 size="page-size"
               />
-              <Button
-                onClick={() => setEditing('new')}
-                variant="primary"
-                disabled={!selectedGenre || selectedGenre === UNCATEGORIZED}
-                title={!selectedGenre || selectedGenre === UNCATEGORIZED ? '先に左側でフォルダを選んでください' : undefined}
-              >
-                ＋ このフォルダに流入リンクをつくる
-              </Button>
               {/*
-                **画面に出ている行をそのまま書き出す。** 絞り込みや並び替えを
-                無視して全件を出すと、画面と手元のファイルが食い違う。
+                #734: 「このフォルダに流入リンクをつくる」「CSVで書き出す」の
+                2つ目は置かない。同じ意図の主操作は画面上部の1系統に揃える
+                （新規作成はフォルダ選択を持つ /inflow-links/new が正規口）。
               */}
-              <Button onClick={exportCurrentRows} disabled={sortedRows.length === 0}>
-                CSVで書き出す
-              </Button>
             </div>
           </div>
 
@@ -939,7 +929,7 @@ function InflowLinksPageInner({
           title={selectedGenre ? `「${selectedGenreLabel}」にはまだリンクがありません` : 'まだ流入経路がありません'}
           description={
             selectedGenre
-              ? '「このフォルダに流入リンクをつくる」から作ると、ここに出ます。'
+              ? '上の「流入リンクをつくる」から作ると、ここに出ます。'
               : '左側の「フォルダを追加」から最初のフォルダを作ってください。'
           }
         />
@@ -1393,7 +1383,7 @@ function ReferralQrModal({
         </div>
         <div className="mt-5 rounded-xl bg-canvas-sunken p-3">
           <p className="break-all font-mono text-xs text-ink-secondary">{url}</p>
-          <button onClick={copy} className="mt-3 w-full rounded-lg border border-hairline bg-canvas px-3 py-2 text-sm font-medium text-action">
+          <button onClick={copy} className="mt-3 w-full rounded-lg border border-hairline bg-canvas px-3 py-2 text-sm font-medium text-action hover:bg-canvas-sunken">
             {copied ? 'コピーしました' : 'URLをコピー'}
           </button>
         </div>

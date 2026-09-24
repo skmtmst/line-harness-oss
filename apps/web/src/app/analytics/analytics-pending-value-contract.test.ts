@@ -72,3 +72,23 @@ describe('分析は、集計できていない値を0と書かない', () => {
       .toContain("const shown = metric.state === 'available' || metric.state === 'partial'")
   })
 })
+
+/**
+ * #670 20: 「日別集計の初回更新を待っています」のような理由全文が、
+ * 上の帯と日ごとの図の両方に出て二重に読めていた。図側は帯が既に
+ * 出しているときは短い状態だけにし、帯が無いときだけ全文を出す。
+ */
+describe('分析は、集計待ちの理由を帯と図で二重に出さない', () => {
+  it('帯が理由を出しているときを1か所で決めている', () => {
+    expect(PAGE).toContain(
+      "const reasonShownInBanner = overview.state !== 'available' && Boolean(overview.stateReason)",
+    )
+  })
+
+  it('日ごとの図は、帯ありでは短い状態・帯なしでは理由全文を出す', () => {
+    expect(PAGE).toContain(
+      '<p>{reasonShownInBanner ? (METRIC_STATE_TEXT[overview.state] ||',
+    )
+    expect(PAGE, '帯が理由全文を出さなくなっている').toContain('{overview.stateReason}</div>')
+  })
+})

@@ -2501,8 +2501,8 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
               />
             </div>
             {/*
-              #668: 「担当者」の字ラベルは1つだけ。OperatorDropdown が
-              自分の中に「担当者：名前」を出すので、外側の字は二重になる。
+              #670 02: 外の「担当者」と中の「担当者：すべて」が二重だった。
+              プルダウンが自分で名乗るため、外の字は置かない。
             */}
             <label className="mt-2 flex items-center gap-2 text-[11px] font-semibold text-[#667085]">
               <span className="min-w-0 flex-1">

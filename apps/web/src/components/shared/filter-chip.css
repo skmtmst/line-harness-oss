@@ -42,3 +42,13 @@
   height: 14px;
   flex: 0 0 auto;
 }
+
+/*
+ * #639 タッチ端末では指の当たりとして44pxを確保する（PCは32pxのまま）。
+ * 共通 Button・行内操作と同じ `@media (pointer: coarse)` の入口。
+ */
+@media (pointer: coarse) {
+  .v6-filter-chip {
+    min-height: 44px;
+  }
+}
