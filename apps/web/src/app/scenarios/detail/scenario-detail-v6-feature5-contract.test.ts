@@ -141,28 +141,25 @@ describe('bV5Vs シナリオ編集', () => {
     expect(table).not.toMatch(/min-w-\[\d+px\]/)
     expect(table).toContain('<table className="w-full">')
     /*
-     * 操作は6つある。1行へ押さえる（whitespace-nowrap だけの列）と
-     * 表の幅がそのぶん広がるので、狭い幅では折り返す。
+     * ★V7: 操作6つを並べて折り返すのはやめ、「編集＋…」の1行に収める。
+     * 残り5つは「…」のメニュー項目として出す。
      */
     const actions = slice(detail, 'text-right align-top', '</td>')
-    expect(actions).toContain('flex-wrap')
+    expect(actions).not.toContain('flex-wrap')
+    expect(actions).toContain('<ActionMenu')
+    for (const id of ['preview', 'test', 'action', 'duplicate', 'delete']) {
+      expect(actions).toContain(`id: '${id}'`)
+    }
   })
 
   it('SCENARIO-23: 操作名は単語の途中で折らず、操作列の必要幅を確保する', () => {
     /*
-     * PC1440/1920 でも操作列が 36px まで潰れ、「編集」「プレビュー」等が
-     * 1文字ずつ縦に折れて行の高さが 349px になっていた。短い操作名は
-     * 各ボタンの whitespace-nowrap で1行を保ち、収まらない幅では
-     * ボタン単位で折り返す（上の N-058 と同じ方針）。見出しの w-80 が
-     * 「内容」列へ余白を渡す前の操作列の取り分になる。
+     * ★V7: 「編集＋…」の1行に収めるため、操作列の取り分は w-40 で足りる。
+     * 6つの操作名はメニュー項目として単語を折らずに出す（共通 ActionMenu）。
      */
     const actions = slice(detail, 'text-right align-top', '</td>')
-    const buttons = actions.match(/<button[\s\S]*?<\/button>/g) ?? []
-    expect(buttons.length).toBe(6)
-    for (const button of buttons) {
-      expect(button, '操作ボタンが単語の途中で折れる組み方です').toContain('whitespace-nowrap')
-    }
-    expect(thead).toContain('className="w-80" aria-label="操作"')
+    expect(actions).toContain('whitespace-nowrap')
+    expect(thead).toContain('className="w-40" aria-label="操作"')
   })
 })
 
