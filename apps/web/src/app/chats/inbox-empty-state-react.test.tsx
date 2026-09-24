@@ -104,10 +104,16 @@ async function applySingleFilter(kind: 'search' | 'status' | 'quick' | 'assignee
   if (kind === 'quick') { await click('1時間以上待ち'); return }
   await click('絞り込み')
   if (kind === 'assignee') {
+    // 担当者の選択は候補つき入力へ移した。表示名を打って候補を押す。
     await act(async () => {
-      const select = host.querySelector<HTMLSelectElement>('[aria-label="担当者で絞り込む（パネル）"]')!
-      select.value = 'operator-a'
-      select.dispatchEvent(new Event('change', { bubbles: true }))
+      const field = host.querySelector<HTMLInputElement>('[aria-label="担当者で絞り込む（パネル）"]')!
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(field, '担当A')
+      field.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    await act(async () => {
+      const option = [...host.querySelectorAll('li[role="option"]')].find((li) => li.textContent?.includes('担当A'))
+      expect(option, '担当A').toBeTruthy()
+      ;(option as HTMLElement).click()
     })
     return
   }
@@ -273,9 +279,14 @@ test('全条件の結果0件を区別し、解除後に会話を戻す', async (
   await click('未対応')
   await click('絞り込み')
   await act(async () => {
-    const select = host.querySelector<HTMLSelectElement>('[aria-label="担当者で絞り込む（パネル）"]')!
-    select.value = 'operator-a'
-    select.dispatchEvent(new Event('change', { bubbles: true }))
+    const field = host.querySelector<HTMLInputElement>('[aria-label="担当者で絞り込む（パネル）"]')!
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(field, '担当A')
+    field.dispatchEvent(new Event('input', { bubbles: true }))
+  })
+  await act(async () => {
+    const option = [...host.querySelectorAll('li[role="option"]')].find((li) => li.textContent?.includes('担当A'))
+    expect(option, '担当A').toBeTruthy()
+    ;(option as HTMLElement).click()
   })
   await eventually(() => {
     const assigneeCall = calls.filter((url) => url.pathname === '/api/chats').at(-1)!
