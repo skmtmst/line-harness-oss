@@ -21,6 +21,7 @@ import ListState from '@/components/shared/list-state'
 import Pagination from '@/components/shared/pagination'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { TableHeadRow, Th } from '@/components/shared/table'
+import StatusBadge from '@/components/shared/status-badge'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import {
   audienceReason,
@@ -134,15 +135,18 @@ type RichMenuGroupListItem = {
   updatedAt: string
 }
 
-function StatusBadge({ status }: { status: 'draft' | 'published' }) {
-  const cls =
-    status === 'published'
-      ? 'bg-success-bg text-success'
-      : 'bg-canvas-sunken text-ink-secondary'
+function MenuStatusBadge({ group }: { group: Pick<RichMenuGroupListItem, 'status' | 'publishingAt'> }) {
+  if (group.publishingAt) {
+    return (
+      <StatusBadge tone="warning" size="compact">
+        {new Date(group.publishingAt).toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric' })} に公開
+      </StatusBadge>
+    )
+  }
   return (
-    <span className={`text-xs px-2 py-0.5 rounded ${cls}`}>
-      {status === 'published' ? '公開中' : '下書き'}
-    </span>
+    <StatusBadge tone={group.status === 'published' ? 'success' : 'neutral'} size="compact">
+      {group.status === 'published' ? '公開中' : '下書き'}
+    </StatusBadge>
   )
 }
 
@@ -826,7 +830,7 @@ export default function RichMenusListPage() {
       {selectedAccount && (
         <div style={FOLDER_RAIL_STYLE} className="grid gap-4 lg:grid-cols-[var(--folder-rail-width)_minmax(0,1fr)]">
           <FolderPanel
-            total={`${folders.length + 1}`}
+            total={`${groupFacets?.total ?? groupTotal} 件`}
             activeId={folderFilter}
             onSelect={setFolderFilter}
             onAddFolder={() => setFolderDialogOpen(true)}
@@ -870,14 +874,14 @@ export default function RichMenusListPage() {
               <section className="border-hairline bg-canvas rounded-card overflow-hidden border shadow-card">
                 {/* #641: 操作列が広くなった分は表だけが横に流れる */}
                 <div className="overflow-x-auto">
-                <table className="w-full min-w-[960px] table-fixed text-left text-sm">
+                <table className="w-full min-w-[760px] table-fixed text-left text-sm">
                   <colgroup>
-                    <col style={{ width: '27%' }} />
+                    <col style={{ width: '24%' }} />
                     <col style={{ width: '12%' }} />
-                    <col style={{ width: '19%' }} />
-                    <col style={{ width: '15%' }} />
-                    <col style={{ width: '10%' }} />
                     <col style={{ width: '17%' }} />
+                    <col style={{ width: '12%' }} />
+                    <col style={{ width: '9%' }} />
+                    <col style={{ width: '26%' }} />
                   </colgroup>
                   <thead>
                     <TableHeadRow>
@@ -911,7 +915,7 @@ export default function RichMenusListPage() {
                           </div>
                         </td>
                         <td className="px-4 py-3">
-                          {g.publishingAt ? <span className="text-warning text-xs font-semibold">{new Date(g.publishingAt).toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric' })} に公開</span> : <StatusBadge status={g.status} />}
+                          <MenuStatusBadge group={g} />
                         </td>
                         <td className="px-4 py-3 text-xs text-ink-secondary">
                           {g.isDefaultForAll ? 'すべての友だち（既定）' : g.targetingEnabled && g.targetingCondition ? '条件で出し分け' : g.status === 'draft' ? '公開前' : 'すべての友だち'}

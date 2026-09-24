@@ -770,7 +770,7 @@ function MediaLibraryInner() {
       <div style={FOLDER_RAIL_STYLE} className="grid gap-4 lg:grid-cols-[var(--folder-rail-width)_minmax(0,1fr)]">
         <div className="min-w-0">
         <FolderPanel
-          total={`${folders.length + 1}`}
+          total={`${total} 件`}
           activeId={folderFilter}
           onSelect={(id) => {
             setFolderFilter(id)
