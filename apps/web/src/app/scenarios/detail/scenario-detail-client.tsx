@@ -1714,13 +1714,7 @@ export default function ScenarioDetailClient({
                  （下の「シナリオ一覧に戻る」がそれ）。 */
               <div className="flex flex-wrap items-center gap-2">
               <Button href={`/scenarios/results?id=${id}`}>配信結果を見る</Button>
-              <button
-                disabled
-                title="マニュアルは準備中です"
-                className="border-hairline text-ink-faint rounded-control border px-4 py-2 text-sm font-medium opacity-50"
-              >
-                マニュアル
-              </button>
+              {/* ★V7 C6: 押せない「マニュアル」は飾りなので出さない。 */}
               <button
                 onClick={() => setPreviewOpen(true)}
                 disabled={sortedSteps.length === 0}
