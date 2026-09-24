@@ -1,0 +1,150 @@
+@layer components {
+/*
+ * 処理の進み。Pencil ★V7 `xiHO8`。
+ *
+ *   見出し  14px 700 $ink（割合は $accent-deep、等幅数字）
+ *   棒      高さ 8 角丸 4、地 $shell、伸び $accent-deep
+ *   補足    13px $ink-secondary／下の注記 12px $ink-faint
+ *   失敗の欠け  $status-danger（満タンの棒を緑と赤で分ける）
+ *
+ * 動き（決まりは設計の注記）
+ *   伸び   幅ではなく scaleX（motion-base・motion-ease-out）。周りが揺れない
+ *   準備中 短い棒が左右に動く（motion-slow）。動きを減らす設定では左端で止まる
+ *   （「準備中」の字は置かない。no-preparing 契約が共通部品の「準備中」を禁じている）
+ *   完了・失敗の印は出っぱなし（動きなし）
+ *   動きを減らす設定では globals.css の決まりで一瞬になる
+ */
+
+.root {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 12px; /* gap: 12 */
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: 8px; /* gap: 8 */
+  margin: 0;
+}
+
+.title {
+  color: var(--color-ink); /* fill: $ink */
+  font-size: var(--text-body); /* fontSize: 14 */
+  font-weight: 700;
+}
+
+.percent {
+  margin-left: auto;
+  color: var(--color-accent-deep); /* fill: $accent-deep（進み具合＝うまくいっている途中） */
+  font-size: var(--text-body); /* fontSize: 14 */
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0;
+  color: var(--color-ink-secondary); /* fill: $ink-secondary */
+  font-size: 13px; /* fontSize: 13 */
+  font-variant-numeric: tabular-nums;
+}
+
+.note {
+  margin: 0;
+  color: var(--color-ink-secondary); /* fill: $ink-secondary */
+  font-size: 13px; /* fontSize: 13 */
+}
+
+.actions {
+  margin: 0;
+}
+
+.track {
+  height: 8px; /* height: 8 */
+  overflow: hidden;
+  border-radius: 4px; /* cornerRadius: 4 */
+  background: var(--color-shell); /* fill: $shell */
+  position: relative;
+}
+
+.fill {
+  position: absolute;
+  inset: 0;
+  border-radius: 4px; /* cornerRadius: 4 */
+  background: var(--color-accent-deep); /* fill: $accent-deep */
+  transform: scaleX(0);
+  transform-origin: left center;
+  transition: transform var(--motion-base) var(--motion-ease-out);
+}
+
+/* 失敗の欠け。右端から scaleX で出す（幅は動かさない）。 */
+.fail {
+  position: absolute;
+  inset: 0;
+  background: var(--color-status-danger); /* fill: $status-danger */
+  transform: scaleX(0);
+  transform-origin: right center;
+  transition: transform var(--motion-base) var(--motion-ease-out);
+}
+
+/* 準備中：短い棒（全体の 29%）が左右に動く。 */
+.indeterminate {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 29%; /* width: 110（380 の帯のとき） */
+  border-radius: 4px; /* cornerRadius: 4 */
+  background: var(--color-accent-deep); /* fill: $accent-deep */
+  opacity: 0.6; /* opacity: 0.6 */
+  animation: progress-slide var(--motion-slow) var(--motion-ease-in-out) infinite alternate;
+}
+
+@keyframes progress-slide {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(245%);
+  }
+}
+
+/* 動きを減らす設定では globals.css の決まりで動きが止まり、棒は左端に残る。 */
+
+.spin {
+  flex: 0 0 auto;
+  color: var(--color-accent-deep); /* fill: $accent-deep */
+  animation: progress-spin var(--motion-slow) linear infinite;
+}
+
+@keyframes progress-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.doneIcon {
+  flex: 0 0 auto;
+  color: var(--color-accent-deep); /* fill: $accent-deep */
+}
+
+.partialIcon {
+  flex: 0 0 auto;
+  color: var(--color-ink); /* fill: $ink */
+}
+
+/* 10% ごとの読み上げ。見た目には出さない。 */
+.announcer {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+}

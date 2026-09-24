@@ -1,0 +1,216 @@
+@layer components {
+/*
+ * ファイルを落とす場所・添付ファイルの行。Pencil ★V7 `NQMnx`。
+ *
+ * 落とす場所
+ *   ふだん  地 $canvas-sunken、縁 1.5px $hairline、角丸 12、高さ 180
+ *   上に来た  地 $accent-soft、縁 2px $accent-deep、見出し $accent-deep「離すと追加します」
+ *   断る   地 $status-danger-soft、縁 2px $status-danger、見出し $status-danger
+ *   大きさは状態が変わっても変えない（引き寄せない）
+ *
+ * 行
+ *   高さ 56、角丸 10、縁 1px $hairline、地 $canvas
+ *   縮小画像 36・角丸 6・1px の薄い縁（画像のとき）
+ *   名前 14px 600 $ink（1 行省略＋title）／補足 12px $ink-faint
+ *   誤り  縁 $status-danger・地 $status-danger-soft、文 12px $status-danger
+ *   送り途中  棒の高さ 4・角丸 2、地 $shell、伸び $accent-deep
+ *
+ * 動き
+ *   縁と地の変わり目は motion-fast。棒の伸びは幅ではなく scaleX（motion-base）。
+ *   動きを減らす設定では globals.css の決まりで一瞬になる
+ */
+
+.zone {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px; /* gap: 8 */
+  min-height: 180px; /* height: 180 */
+  padding: 16px;
+  border: 1.5px solid var(--color-hairline); /* stroke: $hairline */
+  border-radius: 12px; /* cornerRadius: 12 */
+  background: var(--color-canvas-sunken); /* fill: $canvas-sunken */
+  cursor: pointer;
+  transition:
+    background-color var(--motion-fast) var(--motion-ease-out),
+    border-color var(--motion-fast) var(--motion-ease-out);
+}
+
+/* ファイルを持って上に来た：縁と地を緑に。大きさは変えない。 */
+.zone[data-drag='active'] {
+  border: 2px solid var(--color-accent-deep); /* stroke: $accent-deep */
+  background: var(--color-accent-soft); /* fill: $accent-soft */
+}
+
+/* 形式が違う物を持って来た：先に断る。 */
+.zone[data-drag='reject'] {
+  border: 2px solid var(--color-status-danger); /* stroke: $status-danger */
+  background: var(--color-status-danger-soft); /* fill: $status-danger-soft */
+}
+
+.zone[data-disabled] {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.zoneTitle {
+  margin: 0;
+  color: var(--color-ink); /* fill: $ink */
+  font-size: var(--text-body); /* fontSize: 14 */
+  font-weight: 700;
+}
+
+.activeTitle {
+  margin: 0;
+  color: var(--color-accent-deep); /* fill: $accent-deep */
+  font-size: var(--text-body); /* fontSize: 14 */
+  font-weight: 700;
+}
+
+.rejectTitle {
+  margin: 0;
+  color: var(--color-status-danger); /* fill: $status-danger */
+  font-size: var(--text-body); /* fontSize: 14 */
+  font-weight: 700;
+}
+
+.zoneHint {
+  margin: 0;
+  color: var(--color-ink-faint); /* fill: $ink-faint */
+  font-size: 12px; /* fontSize: 12 */
+}
+
+.idleIcon {
+  color: var(--color-ink-secondary); /* fill: $ink-secondary */
+}
+
+.activeIcon {
+  color: var(--color-accent-deep); /* fill: $accent-deep */
+}
+
+.rejectIcon {
+  color: var(--color-status-danger); /* fill: $status-danger */
+}
+
+.spin {
+  color: var(--color-ink-secondary); /* fill: $ink-secondary */
+  animation: file-drop-spin var(--motion-slow) linear infinite;
+}
+
+@keyframes file-drop-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* 本物の file input は見せない。キーボードは「ファイルを選ぶ」ボタンから開く。 */
+.input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* キーボードで場所へ来たときの輪郭。ボタン自体の輪郭は共通 Button が持つ。 */
+.zone:focus-visible {
+  outline: 2px solid var(--color-accent); /* stroke: $accent 2px */
+  outline-offset: 2px;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 12px; /* gap: 12 */
+  min-height: 56px; /* height: 56 */
+  padding: 0 12px; /* padding: 0 12 */
+  border: 1px solid var(--color-hairline); /* stroke: $hairline */
+  border-radius: 10px; /* cornerRadius: 10 */
+  background: var(--color-canvas); /* fill: $canvas */
+}
+
+.row[data-status='error'] {
+  border-color: var(--color-status-danger); /* stroke: $status-danger */
+  background: var(--color-status-danger-soft); /* fill: $status-danger-soft */
+}
+
+.thumb {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 36px; /* width: 36 */
+  height: 36px; /* height: 36 */
+  overflow: hidden;
+  border: 1px solid var(--color-hairline); /* stroke: $hairline（画像の薄い縁） */
+  border-radius: 6px; /* cornerRadius: 6 */
+  background: var(--color-shell); /* fill: $shell */
+}
+
+.thumbIcon {
+  color: var(--color-ink-secondary); /* fill: $ink-secondary */
+}
+
+/* 呼び出し側が渡す縮小画像の印も同じ色にする。 */
+.thumb > svg {
+  color: var(--color-ink-secondary); /* fill: $ink-secondary */
+}
+
+/* 写真の縮小画像は薄い緑の地（設計 NQMnx）。書類は上の $shell のまま。 */
+.thumb[data-tone='photo'] {
+  background: var(--color-accent-soft); /* fill: $accent-soft */
+}
+
+.rowBody {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px; /* gap: 2 */
+  min-width: 0;
+}
+
+.rowName {
+  overflow: hidden;
+  color: var(--color-ink); /* fill: $ink */
+  font-size: var(--text-body); /* fontSize: 14 */
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rowMeta {
+  overflow: hidden;
+  color: var(--color-ink-faint); /* fill: $ink-faint */
+  font-size: 12px; /* fontSize: 12 */
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rowError {
+  color: var(--color-status-danger); /* fill: $status-danger */
+  font-size: 12px; /* fontSize: 12 */
+}
+
+.miniTrack {
+  display: block;
+  height: 4px; /* height: 4 */
+  overflow: hidden;
+  border-radius: 2px; /* cornerRadius: 2 */
+  background: var(--color-shell); /* fill: $shell */
+  position: relative;
+}
+
+.miniFill {
+  position: absolute;
+  inset: 0;
+  border-radius: 2px; /* cornerRadius: 2 */
+  background: var(--color-accent-deep); /* fill: $accent-deep */
+  transform: scaleX(0);
+  transform-origin: left center;
+  transition: transform var(--motion-base) var(--motion-ease-out);
+}
+}
