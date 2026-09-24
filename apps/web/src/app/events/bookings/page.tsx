@@ -1177,15 +1177,15 @@ function BookingsInner() {
                           {STATUS_LABELS.get(b.status) ?? '状態は未取得'}
                         </StatusBadge>
                         {b.status === 'requested' && (
-                          <div className="ml-2 inline-flex gap-1.5">
-                            <button
+                          <div className="ml-2 inline-flex items-center gap-1.5">
+                            <Button
                               onClick={() => decide(b.id, 'confirm')}
                               disabled={busy}
-                              className="bg-success text-on-accent rounded-control px-3 py-1 text-xs font-medium hover:brightness-95 disabled:opacity-50"
                             >
                               承認
-                            </button>
+                            </Button>
                             <button
+                              type="button"
                               data-qa-open="i5SN2j-reject"
                               onClick={() => {
                                 setRejectReason('')
@@ -1193,7 +1193,7 @@ function BookingsInner() {
                                 setRejectTarget(b)
                               }}
                               disabled={busy}
-                              className="bg-ink-secondary text-on-accent rounded-control px-3 py-1 text-xs font-medium hover:brightness-95 disabled:opacity-50"
+                              className="rounded-control px-2 py-1 text-xs font-semibold text-danger hover:underline disabled:opacity-50"
                             >
                               拒否
                             </button>
