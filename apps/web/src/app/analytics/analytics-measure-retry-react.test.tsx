@@ -387,7 +387,9 @@ describe('棒グラフと期間切替の読み上げ(N-288)', () => {
     fixture.tab = 'friends'
     await render()
 
-    const dayBar = host.querySelector('button[aria-label="2026-09-09 増加5・減少2"]') as HTMLButtonElement | null
+    // ★V7 h99Gb：棒は列全体のボタンになり、読み上げ名は「9月9日（水） 増えた5人・減った2人」。
+    // 意図は同じ（日付と増減が読める・選んだ日が分かる）。
+    const dayBar = host.querySelector('button[aria-label="9月9日（水） 増えた5人・減った2人"]') as HTMLButtonElement | null
     expect(dayBar).not.toBeNull()
     expect(dayBar?.getAttribute('aria-pressed')).toBe('false')
 
