@@ -64,6 +64,22 @@ describe('V6 30 ログインユーザーの画面契約', () => {
     expect(staffSource).not.toContain('min-w-[1180px]')
   })
 
+  it('「最後に入った」が切れないよう固定幅を配分し、操作列は欠けさせない', () => {
+    // 「人」と「見せる範囲」の広すぎる取り分をやめ、空きを日時列へ回す
+    expect(staffSource).not.toContain('<Th className="w-1/4">人</Th>')
+    expect(staffSource).not.toContain('見せる範囲</Th><Th>最後に入った')
+    // 日時と下の1行が読める幅・ボタンが収まる幅・見出しが触れない幅・操作列の順
+    expect(staffSource).toContain('<Th className="w-44">最後に入った</Th>')
+    expect(staffSource).toContain('<Th className="w-36">2段階の確認</Th>')
+    expect(staffSource).toContain('<Th className="w-20">役わり</Th>')
+    expect(staffSource).toContain('<Th align="right" className="w-72">操作</Th>')
+  })
+
+  it('「最後に入った」の下の1行は省略しても全文をtitleで読める', () => {
+    expect(staffSource).toContain('truncate text-xs text-ink-faint')
+    expect(staffSource).toContain('title={user.lastActionAt ? `最後の操作：${formatStaffDate(user.lastActionAt)}`')
+  })
+
   it('入った記録は異変を拾える札と設計順の5列を持つ', () => {
     for (const word of ['消した操作', '配信した操作', 'いつもと違う場所から', '気になるもの', '元の値 → 新しい値']) {
       expect(auditSource).toContain(word)
