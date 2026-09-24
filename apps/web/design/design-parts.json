@@ -1903,11 +1903,11 @@
           "resolved": "#fef0f0"
         },
         {
-          "pencil": "danger label: $status-danger",
+          "pencil": "danger label: $status-danger → $danger（#702: $status-danger は 3.53:1 で AA 未達。白背景・$status-danger-soft 上どちらでも 4.5:1 以上になる $danger へ寄せる）",
           "class": "danger",
           "prop": "color",
-          "source": "var(--color-status-danger)",
-          "resolved": "#e5484d"
+          "source": "var(--color-danger)",
+          "resolved": "#b3261e"
         }
       ]
     },

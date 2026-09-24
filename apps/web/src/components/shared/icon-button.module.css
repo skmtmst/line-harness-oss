@@ -1,3 +1,4 @@
+@layer components {
 .button {
   display: inline-flex;
   width: 32px;
@@ -49,4 +50,5 @@
 .button > :is(svg, img) {
   width: 18px;
   height: 18px;
+}
 }

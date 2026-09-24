@@ -1,3 +1,4 @@
+@layer components {
 .pagination {
   display: flex;
   flex-wrap: wrap; /* 幅320で「次へ」が右に切れていた（★V7 修正方針 §3） */
@@ -64,4 +65,5 @@ button.item:disabled {
   .item {
     min-height: 44px;
   }
+}
 }

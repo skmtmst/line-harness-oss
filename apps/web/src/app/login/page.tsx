@@ -130,7 +130,7 @@ export default function LoginPage() {
           この端末では7日間ログインを保持する
         </label>
         <div className="flex justify-end">
-          <Link href="/password/forgot" className="text-caption font-semibold text-accent-deep hover:underline">
+          <Link href="/password/forgot" className="text-caption font-semibold text-action hover:underline">
             パスワードを忘れた方はこちら
           </Link>
         </div>
@@ -152,7 +152,7 @@ export default function LoginPage() {
 
       <p className="text-caption text-ink-faint">
         はじめての方は{' '}
-        <Link href="/register" className="font-semibold text-accent-deep hover:underline">
+        <Link href="/register" className="font-semibold text-action hover:underline">
           無料で始める
         </Link>
       </p>

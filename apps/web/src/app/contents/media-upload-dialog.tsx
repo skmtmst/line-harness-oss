@@ -9,6 +9,7 @@ import Button from '@/components/shared/button'
 import Select from '@/components/shared/select'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import { MEDIA_ACCEPT, extractMediaMetadata, putMediaFile, validateMediaFile } from './media-direct-upload'
+import { formatMediaSize } from './media-usage-display'
 
 type UploadState = 'ready' | 'preparing' | 'uploading' | 'verifying' | 'done' | 'error'
 
@@ -224,7 +225,7 @@ export default function MediaUploadDialog({
                       {entry.message || '登録できます'}
                     </span>
                   </div>
-                  <p className="text-ink-faint mt-1 text-xs">{(entry.file.size / 1024 / 1024).toFixed(1)}MB</p>
+                  <p className="text-ink-faint mt-1 text-xs">{formatMediaSize(entry.file.size)}</p>
                   {entry.state === 'done' ? <div className="bg-success mt-2 h-1 w-full rounded-pill" aria-hidden="true" /> : null}
                   {entry.state === 'uploading' || entry.state === 'preparing' || entry.state === 'verifying' ? (
                     <progress className="mt-2 h-1 w-full" max={100} value={entry.progress} aria-label={`${entry.file.name}の送信進捗`} />

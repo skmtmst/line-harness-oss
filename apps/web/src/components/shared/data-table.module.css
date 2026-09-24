@@ -1,3 +1,4 @@
+@layer components {
 /* ---------------------------------------------------------------------
  * 一覧表の外枠と行。Pencil V5 の `RwC76`「共通 標準一覧表」。★V5 で60回。
  *
@@ -16,7 +17,11 @@
 }
 
 .frame {
-  overflow: hidden; /* clip: true */
+  /* #707: 390pxで列幅の合計が容器を超えるとき、外枠で切り落とさず
+   * 横スクロールで届ける（PC幅では収まるので見た目は変わらない）。
+   * 角丸の切り抜きは overflow-x:auto でも保たれる。 */
+  overflow-x: auto; /* clip: true → 390pxでは送って見せる */
+  overflow-y: hidden;
   border: 1px solid var(--color-hairline); /* stroke: $hairline */
   border-radius: var(--radius-card); /* cornerRadius: $radius-md */
 }
@@ -68,4 +73,5 @@
   padding: 0 12px;
   vertical-align: middle;
   white-space: nowrap;
+}
 }

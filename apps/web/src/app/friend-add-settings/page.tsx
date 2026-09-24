@@ -20,6 +20,7 @@ import type { FriendAddRule, FriendAddRuleKind, FriendAddRuleListData } from '@/
 import { api } from '@/lib/api'
 import FriendAddRuleEditor from './friend-add-rule-editor'
 import { useCursorStack } from './use-cursor-stack'
+import ListRange from '@/components/ui/list-range'
 
 const KIND_LABELS: Record<FriendAddRuleKind, string> = {
   first_time: 'はじめて友だち追加した人',
@@ -254,7 +255,7 @@ function FriendAddSettingsList() {
       `}</style>
       <div data-design="FirstTime" data-tabs-row>
         <span className="sr-only">開始のタイミング。すぐに配信。あわせて実行すること。</span>
-        <Tabs items={(Object.keys(KIND_LABELS) as FriendAddRuleKind[]).map((tab) => ({ label: KIND_LABELS[tab], current: kind === tab, onClick: () => { resetCursor(); router.replace(`/friend-add-settings?kind=${tab}`) } }))} />
+        <Tabs label="配信の種類" items={(Object.keys(KIND_LABELS) as FriendAddRuleKind[]).map((tab) => ({ label: KIND_LABELS[tab], current: kind === tab, onClick: () => { resetCursor(); router.replace(`/friend-add-settings?kind=${tab}`) } }))} />
         <span data-design="Returning" className="sr-only">以前からの友だち・ブロックを解除した人。配信しない。別のシナリオを配信する。はじめての人と同じものを配信する。開始位置。前回読んだところから。</span>
       </div>
       <p className="text-ink-faint my-2 text-xs">この2つを分けないと、以前からのお客さまに「はじめまして」が届きます。</p>
@@ -362,10 +363,14 @@ function FriendAddSettingsList() {
                 </tbody>
               </DataTable>
               </div>
-              <div className="mt-3 flex items-center justify-end gap-2" aria-label="ページ送り">
-                <Button disabled={!canPrev || loading} onClick={() => goPrev()}>前へ</Button>
-                <Button variant="primary" aria-current="page">{cursorPage}</Button>
-                <Button disabled={!data.nextCursor || loading} onClick={() => goNext(data.nextCursor)}>次へ</Button>
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+                <ListRange total={data.total} first={data.total === 0 ? 0 : (cursorPage - 1) * 20 + 1} last={(cursorPage - 1) * 20 + data.items.length} />
+                {(canPrev || data.nextCursor) ? (
+                  <div className="flex items-center gap-2" aria-label="ページ送り">
+                    <Button disabled={!canPrev || loading} onClick={() => goPrev()}>前へ</Button>
+                    <Button disabled={!data.nextCursor || loading} onClick={() => goNext(data.nextCursor)}>次へ</Button>
+                  </div>
+                ) : null}
               </div>
             </>
           )}

@@ -35,6 +35,7 @@ export default function MergedTabs({
   variant = 'underline',
   actions,
   disabledKeys = [],
+  label,
 }: {
   basePath: string
   /** クエリの名前。受信箱だけ channel を使う。 */
@@ -53,6 +54,8 @@ export default function MergedTabs({
   /** タブ行の右端に置くもの。underline のときだけ効く。 */
   actions?: ReactNode
   disabledKeys?: readonly string[]
+  /** タブの並び全体を読み上げる名前（Issue #708）。underline のときだけ効く。 */
+  label?: string
 }) {
   const router = useRouter()
   const home = defaultKey ?? tabs[0].key
@@ -72,6 +75,7 @@ export default function MergedTabs({
       <div className={styles.shared}>
       <ScrollableTabs
         actions={actions}
+        label={label}
         items={tabs.map((tab) => ({
           label: tab.label,
           current: active === tab.key,

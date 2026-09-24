@@ -95,7 +95,7 @@ export default function TwoFactorLoginPage() {
       <p className="mt-2 text-xs text-ink-faint">◷ コードは約30秒ごとに更新されます</p>
       <button onClick={() => void submit()} disabled={loading || code.length !== 6} className="mt-6 h-12 w-full cursor-pointer rounded-control bg-accent-deep font-bold text-on-accent hover:brightness-92 disabled:cursor-not-allowed disabled:opacity-50">{loading ? '確認中…' : '確認してログイン'}</button>
       <p className="mt-5 text-center text-xs text-ink-secondary">コードを入力できない場合</p>
-      <Link href="/login" onClick={clearTwoFactorChallenge} className="mt-2 block text-center text-xs font-medium text-accent-deep hover:underline">別のLINEアカウントでログイン</Link>
+      <Link href="/login" onClick={clearTwoFactorChallenge} className="mt-2 block text-center text-xs font-medium text-action hover:underline">別のLINEアカウントでログイン</Link>
     </section>
   </main>
 }
