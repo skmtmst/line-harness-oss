@@ -583,6 +583,67 @@ function decodeJpegData(data: unknown): Uint8Array | null {
   }
 }
 
+/**
+ * 採用済み写真への公開同意を、管理画面と公式サイトが読む掲載台帳へ反映する。
+ *
+ * LIFF は「サイトへの掲載に同意する」を有効にした時点で「公式サイトに
+ * 掲載中」と案内するため、同意日時だけを保存して掲載台帳を作らないと、
+ * 管理画面にも EC の公開ギャラリーにも現れない。写真ごとに一意な掲載と
+ * 公式サイトの掲載先を冪等に作り、同意を付け直した場合は既存行を再開する。
+ */
+async function ensureConsentedPhotoSitePublication(
+  db: D1Database,
+  input: {
+    photoId: string;
+    friendId: string;
+    lineAccountId: string;
+    consentVersion: string;
+    showPetName: boolean;
+    siteUrl: string;
+    now: string;
+  },
+): Promise<void> {
+  const existing = await db.prepare(
+    `SELECT id FROM nen_photo_publications WHERE photo_id = ? AND line_account_id = ?`,
+  ).bind(input.photoId, input.lineAccountId).first<{ id: string }>();
+  const publicationId = existing?.id ?? `photo-publication:${input.photoId}`;
+  const placementId = `photo-publication-site:${input.photoId}`;
+  const siteLabel = `${input.siteUrl.replace(/\/+$/, '')}/`;
+  await db.batch([
+    db.prepare(
+      `UPDATE nen_photo_submissions
+          SET publication_consent_version = ?, publication_consent_at = ?,
+              publication_withdrawn_at = NULL, public_pet_name = ?, updated_at = ?
+        WHERE id = ? AND friend_id = ? AND line_account_id = ?`,
+    ).bind(
+      input.consentVersion, input.now, input.showPetName ? 1 : 0, input.now,
+      input.photoId, input.friendId, input.lineAccountId,
+    ),
+    db.prepare(
+      `INSERT INTO nen_photo_publications
+        (id, photo_id, line_account_id, status, show_owner_name, version,
+         published_at, withdrawn_at, withdrawn_by, updated_at)
+       VALUES (?, ?, ?, 'published', 0, 1, ?, NULL, NULL, ?)
+       ON CONFLICT(photo_id) DO UPDATE SET
+         status = 'published',
+         withdrawn_at = NULL,
+         withdrawn_by = NULL,
+         version = CASE WHEN nen_photo_publications.status = 'withdrawn'
+           THEN nen_photo_publications.version + 1 ELSE nen_photo_publications.version END,
+         updated_at = excluded.updated_at`,
+    ).bind(publicationId, input.photoId, input.lineAccountId, input.now, input.now),
+    db.prepare(
+      `INSERT INTO nen_photo_publication_placements
+        (id, publication_id, line_account_id, placement_type, placement_label,
+         active, created_at, removed_at)
+       VALUES (?, ?, ?, 'site', ?, 1, ?, NULL)
+       ON CONFLICT(publication_id, placement_type, placement_label) DO UPDATE SET
+         active = 1,
+         removed_at = NULL`,
+    ).bind(placementId, publicationId, input.lineAccountId, siteLabel, input.now),
+  ]);
+}
+
 nenMembers.get('/api/liff/nen/member', async (c) => {
   const friend = await currentFriend(c);
   if (!friend) return c.json({ success: false, error: 'Unauthorized' }, 401);
@@ -1042,20 +1103,32 @@ nenMembers.put('/api/liff/nen/photos/:id/publication-consent', async (c) => {
     return c.json({ success: false, error: '公開同意の内容を確認してください' }, 400);
   }
   const photo = await c.env.DB.prepare(
-    `SELECT id FROM nen_photo_submissions WHERE id = ? AND friend_id = ? AND line_account_id = ?`,
-  ).bind(c.req.param('id'), friend.id, friend.line_account_id).first<{ id: string }>();
+    `SELECT id, status FROM nen_photo_submissions WHERE id = ? AND friend_id = ? AND line_account_id = ?`,
+  ).bind(c.req.param('id'), friend.id, friend.line_account_id).first<{ id: string; status: string }>();
   if (!photo) return c.json({ success: false, error: 'Not found' }, 404);
   const now = jstNow();
   if (body.consent) {
-    await c.env.DB.prepare(
-      `UPDATE nen_photo_submissions
-          SET publication_consent_version = ?, publication_consent_at = ?,
-              publication_withdrawn_at = NULL, public_pet_name = ?, updated_at = ?
-        WHERE id = ? AND friend_id = ? AND line_account_id = ?`,
-    ).bind(
-      consentVersion, now, body.showPetName === true ? 1 : 0, now,
-      photo.id, friend.id, friend.line_account_id,
-    ).run();
+    if (photo.status === 'adopted') {
+      await ensureConsentedPhotoSitePublication(c.env.DB, {
+        photoId: photo.id,
+        friendId: friend.id,
+        lineAccountId: String(friend.line_account_id),
+        consentVersion,
+        showPetName: body.showPetName === true,
+        siteUrl: c.env.NEN_EC_BASE_URL || 'https://nen-petfood.com',
+        now,
+      });
+    } else {
+      await c.env.DB.prepare(
+        `UPDATE nen_photo_submissions
+            SET publication_consent_version = ?, publication_consent_at = ?,
+                publication_withdrawn_at = NULL, public_pet_name = ?, updated_at = ?
+          WHERE id = ? AND friend_id = ? AND line_account_id = ?`,
+      ).bind(
+        consentVersion, now, body.showPetName === true ? 1 : 0, now,
+        photo.id, friend.id, friend.line_account_id,
+      ).run();
+    }
   } else {
     await c.env.DB.prepare(
       `UPDATE nen_photo_submissions
