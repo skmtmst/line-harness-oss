@@ -56,7 +56,6 @@ vi.mock('@/lib/api', () => {
 })
 
 /* 詳細・作成はこの試験の対象外。実部品を読み込む副作用を避けて置き換える。 */
-vi.mock('@/components/broadcasts/broadcast-detail', () => ({ default: () => null }))
 vi.mock('@/components/broadcasts/broadcast-form', () => ({ default: () => null }))
 
 import BroadcastsPage from './page'
