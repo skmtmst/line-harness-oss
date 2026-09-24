@@ -220,9 +220,9 @@ export default function RichMenuEditPage() {
   return (
     <Suspense
       fallback={
-        <main className="p-6 max-w-7xl mx-auto">
+        <div className="p-6 max-w-7xl mx-auto">
           <p className="text-sm text-gray-500">読み込み中...</p>
-        </main>
+        </div>
       }
     >
       <RichMenuEditPageInner />
@@ -244,13 +244,13 @@ function RichMenuEditPageInner() {
       戻る操作をそばに置く。
     */
     return (
-      <main className="p-6 max-w-7xl mx-auto">
+      <div className="p-6 max-w-7xl mx-auto">
         <p className="text-sm font-semibold text-danger">編集するリッチメニューが指定されていません</p>
         <p className="text-sm text-ink-secondary mt-1">一覧から編集するリッチメニューを選び直してください。</p>
         <Link href="/rich-menus" className="text-sm text-action hover:underline mt-2 inline-block">
           ← リッチメニュー一覧に戻る
         </Link>
-      </main>
+      </div>
     )
   }
   return <Editor groupId={groupId} editorStep={editorStep} router={router} />
@@ -937,9 +937,9 @@ function Editor({
 
   if (loading) {
     return (
-      <main className="p-6 max-w-7xl mx-auto">
+      <div className="p-6 max-w-7xl mx-auto">
         <p className="text-sm text-gray-500">読み込み中...</p>
-      </main>
+      </div>
     )
   }
   if (!group) {
@@ -949,7 +949,7 @@ function Editor({
     */
     const failure = describeLoadFailure(error)
     return (
-      <main className="p-6 max-w-7xl mx-auto">
+      <div className="p-6 max-w-7xl mx-auto">
         <p className="text-sm font-semibold text-danger">{failure.title}</p>
         <p className="text-sm text-ink-secondary mt-1">{failure.detail}</p>
         {error ? (
@@ -966,7 +966,7 @@ function Editor({
             もう一度読み込む
           </button>
         </div>
-      </main>
+      </div>
     )
   }
 
@@ -1051,7 +1051,7 @@ function Editor({
   }
 
   return (
-    <main className="p-6 max-w-7xl mx-auto">
+    <div className="p-6 max-w-7xl mx-auto">
       <nav data-design="Crumb" className="text-ink-faint mb-2 text-xs">
         <Link href="/rich-menus" className="hover:underline">
           リッチメニュー
@@ -1683,7 +1683,7 @@ function Editor({
           </Button>
         </div>
       )} />
-    </main>
+    </div>
   )
 }
 
@@ -1798,7 +1798,7 @@ function TargetingStep({
    */
   const conditionEmpty = targetingEnabled && !targetingCondition
   return (
-    <main data-design-node="kQ1bs" className="mx-auto max-w-7xl p-6 pb-24">
+    <div data-design-node="kQ1bs" className="mx-auto max-w-7xl p-6 pb-24">
       <nav className="text-ink-faint mb-2 text-xs"><Link href="/rich-menus">リッチメニュー</Link><span className="mx-1.5">/</span>{group.name}</nav>
       <StepHeader active={2} groupId={group.id} />
 
@@ -1855,7 +1855,7 @@ function TargetingStep({
       </div>
 
       <StickyBar actions={<div className="flex w-full items-center justify-between gap-3"><span className="text-ink-faint text-xs">{group.status === 'published' ? 'LINE登録済み' : '下書き（まだ誰にも出ていません）'}</span><div className="flex gap-2"><Button onClick={() => router.push(`/rich-menus/edit?id=${group.id}`)}>前へ：形とボタン</Button>{readOnly ? null : <Button onClick={onSave} disabled={saving}>{saving ? '保存中…' : '下書きに保存'}</Button>}<Button variant="primary" onClick={() => router.push(`/rich-menus/edit?id=${group.id}&step=publish`)}>次へ：公開のしかた</Button></div></div>} />
-    </main>
+    </div>
   )
 }
 
@@ -1990,7 +1990,7 @@ function PublishStep({
   }
 
   return (
-    <main data-design-node="UMiJ9" className="mx-auto max-w-7xl p-6 pb-24">
+    <div data-design-node="UMiJ9" className="mx-auto max-w-7xl p-6 pb-24">
       <nav className="text-ink-faint mb-2 text-xs"><Link href="/rich-menus">リッチメニュー</Link><span className="mx-1.5">/</span>{group.name}</nav>
       <StepHeader active={3} groupId={group.id} />
       <div className="grid gap-5 xl:grid-cols-3">
@@ -2080,7 +2080,7 @@ function PublishStep({
       {canOperate ? <PublishHistorySection groupId={group.id} onChanged={onChanged} /> : null}
       {/* N-156: staff は公開・保存を押せない（サーバ側も 403 で止める）。 */}
       <StickyBar actions={<div className="flex w-full items-center justify-between gap-3"><Button onClick={() => router.push(`/rich-menus/edit?id=${group.id}&step=targeting`)}>前へ：誰に出すか</Button><div className="flex gap-2">{canOperate ? <><Button onClick={onSave} disabled={saving || publishing}>下書きに保存</Button><Button variant="primary" onClick={submit} disabled={saving || publishing || (mode !== 'now' && !startsAt) || (mode === 'period' && !endsAt)}>{publishing ? '公開中…' : mode === 'now' ? 'この内容で公開する' : 'この内容で予約する'}</Button></> : <span className="text-ink-faint text-xs">閲覧のみ（公開・保存は管理者の操作です）</span>}</div></div>} />
-    </main>
+    </div>
   )
 }
 

@@ -23,8 +23,9 @@ import RefOrdersPanel from './_components/ref-orders'
 import SiteScript from '@/components/inflow-links/site-script'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import Button from '@/components/shared/button'
-import Chip from '@/components/shared/chip'
+import Checkbox from '@/components/shared/checkbox'
 import Dialog from '@/components/shared/dialog'
+import Disclosure from '@/components/shared/disclosure'
 import FilterChip from '@/components/shared/filter-chip'
 import ListState from '@/components/shared/list-state'
 import FolderPanel, { FOLDER_RAIL_STYLE } from '@/components/shared/folder-panel'
@@ -663,11 +664,10 @@ function InflowLinksPageInner({
 
   const formatDate = (iso: string | null) => {
     if (!iso) return '—'
-    return new Date(iso).toLocaleDateString('ja-JP', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-    })
+    // ★V7：他の一覧と同じ「8月25日」。今年でないときだけ年を付ける。
+    const date = new Date(iso)
+    const sameYear = date.getFullYear() === new Date().getFullYear()
+    return date.toLocaleDateString('ja-JP', sameYear ? { month: 'long', day: 'numeric' } : { year: 'numeric', month: 'long', day: 'numeric' })
   }
 
   // 設計のKPI。stats は期間を受け取らないので、出せるのは累計だけ。
@@ -779,28 +779,25 @@ function InflowLinksPageInner({
       </div>
 
       {/*
-        設計の帯。**なぜこの画面が要るのか**を先に書く。
-        「友だち追加」だけでは経路が分からないことを知らないと、
-        ここで発行したURLを通さずに配って、あとから数が合わないことになる。
+        ★V7：説明の帯2枚（なぜこの画面が要るか・IDEA-18 の集計の断り書き）は
+        毎回読むものではないので、開閉する欄に畳む。表と数字を先に見せる。
+        未計測の注文を0件と読ませないための件数は、開けば必ず読める。
       */}
-      <p className="bg-info-bg text-ink-secondary rounded-card mb-4 px-4 py-3 text-xs leading-relaxed">
-        LINEの「友だち追加」だけでは、その人がどこから来たのかは分かりません。
+      <Disclosure size="compact" className="mb-4" title="数え方と経路の分かり方" hint="累計・はじめて来た経路に数えます">
+        <div className="text-ink-secondary space-y-2 text-xs leading-relaxed">
+          <p>        LINEの「友だち追加」だけでは、その人がどこから来たのかは分かりません。
         ここで発行したURLをいったん通ってもらうことで、はじめて経路が分かります。QRコードも同じURLから作れます。
       </p>
-      {/*
-        IDEA-18: 集計の期間・帰属ルール・計測できる範囲を断り書きする。
-        未計測の注文を0件と読ませないため、経路が分からない件数も出す。
-        orders は古い Worker では返らないので、届いたときだけ表示する。
-      */}
-      <p className="bg-info-bg text-ink-secondary rounded-card mb-4 px-4 py-3 text-xs leading-relaxed">
-        集計は累計（全期間）です。購入・返金は、LINEの友だちと結びついた注文だけを、
+          <p>        集計は累計（全期間）です。購入・返金は、LINEの友だちと結びついた注文だけを、
         その人がはじめて来た経路に数えます（同じ人・同じ注文は二重に数えません）。
         {summary?.orders
           ? `いまの範囲では注文${summary.orders.total.toLocaleString('ja-JP')}件のうち、経路が分かるのは${summary.orders.attributed.toLocaleString('ja-JP')}件、経路が分からないのは${(summary.orders.total - summary.orders.attributed).toLocaleString('ja-JP')}件（うち友だち未連携${(summary.orders.total - summary.orders.linked).toLocaleString('ja-JP')}件）です。`
           : '注文の集計を取得できたら、経路が分かる件数と分からない件数をここに出します。'}
       </p>
+        </div>
+      </Disclosure>
 
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-2"><Button href="/inflow-links/new" variant="primary">＋ 流入リンクをつくる</Button><div className="flex gap-2"><Button onClick={exportCurrentRows} disabled={sortedRows.length === 0}>CSVで書き出す</Button><Button variant="secondary" onClick={() => setBulkOpen(true)}>まとめて操作{selectedRouteIds.size > 0 ? `（${selectedRouteIds.size}件選択中）` : ''}</Button></div></div>
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-2"><Button href="/inflow-links/new" variant="primary">＋ 流入リンクをつくる</Button><div className="flex gap-2"><Button variant="secondary" onClick={() => setBulkOpen(true)}>まとめて操作{selectedRouteIds.size > 0 ? `（${selectedRouteIds.size}件選択中）` : ''}</Button></div></div>
 
       <div style={FOLDER_RAIL_STYLE} className="grid gap-5 lg:grid-cols-[var(--folder-rail-width)_minmax(0,1fr)]">
         <FolderPanel
@@ -842,16 +839,20 @@ function InflowLinksPageInner({
                 aria-label="流入元の名前・REFで検索"
                 className="w-full sm:w-64"
               />
-              <Select
-                aria-label="並び順"
-                label="並び順"
-                value={sort}
-                options={SORT_OPTIONS}
-                onChange={(value) => {
-                  setSort(value as RouteSort)
-                  setPage(1)
-                }}
-              />
+              {/* ★V7：「並び順：友だち追加が多い順」が標準幅では「友だち…」で切れるので、この欄だけ広げる。 */}
+              <div className="w-full sm:w-64">
+                <Select
+                  aria-label="並び順"
+                  label="並び順"
+                  size="full"
+                  value={sort}
+                  options={SORT_OPTIONS}
+                  onChange={(value) => {
+                    setSort(value as RouteSort)
+                    setPage(1)
+                  }}
+                />
+              </div>
               <Select
                 aria-label="表示件数"
                 value={String(pageSize)}
@@ -890,19 +891,6 @@ function InflowLinksPageInner({
             ))}
           </div>
 
-          {/*
-            **保存した条件は札を作らない。**
-            設計には「よく使う」「今月分」など4つの札が描いてあるが、
-            条件を保存する口が無い。作り物の札を押せない形で置くと、
-            「保存したのに効かない」と読める。無いことを言葉で出す。
-          */}
-          <div data-design="Saved" className="mb-3 flex flex-wrap items-center gap-2">
-            <span className="text-ink-faint text-xs whitespace-nowrap">保存した条件</span>
-            <Chip tone="neutral">—</Chip>
-            <span className="text-ink-faint text-xs">
-              まだ繋がっていません。条件の保存が接続されると表示されます。
-            </span>
-          </div>
 
       {/*
         設計 `BMmxU`（18-1-F 空・読込・エラー）。**3つを言い分ける。**
@@ -937,38 +925,36 @@ function InflowLinksPageInner({
         <div className="overflow-hidden rounded-lg border border-hairline bg-canvas">
           <table className="w-full table-fixed text-xs">
             <colgroup>
+              {/* ★V7：REF は流入元名の下へ。名前が「Googl…」まで削られていたので列を1つ減らし、
+                  編集ボタンは割合でなく固定幅にして右端で切れないようにする。 */}
               <col className="w-10" />
+              <col className="w-[20%]" />
               <col className="w-[8%]" />
-              <col className="w-[8%]" />
-              <col className="w-[8%]" />
-              <col className="w-[12%]" />
+              <col className="w-[13%]" />
               <col className="w-[9%]" />
-              <col className="w-[11%]" />
+              <col className="w-[8%]" />
               <col className="w-[9%]" />
               <col className="w-[7%]" />
               <col className="w-[8%]" />
               <col className="w-[9%]" />
-              <col className="w-[6%]" />
+              <col className="w-20" />
             </colgroup>
             <thead>
               <TableHeadRow>
                 <Th>
-                  <input
-                    type="checkbox"
+                  <Checkbox
                     aria-label="表示中の登録済み経路をすべて選ぶ"
                     checked={allShownSelected}
+                    indeterminate={!allShownSelected && selectableIds.some((id) => selectedRouteIds.has(id))}
                     disabled={selectableIds.length === 0}
                     title={selectableIds.length === 0 ? 'まとめて操作できる登録済みの経路がありません' : undefined}
-                    onChange={(event) => {
-                      setSelectedRouteIds(event.target.checked ? new Set(selectableIds) : new Set())
+                    onCheckedChange={(checked) => {
+                      setSelectedRouteIds(checked ? new Set(selectableIds) : new Set())
                     }}
                   />
                 </Th>
                 <Th>
                   流入元名
-                </Th>
-                <Th>
-                  REF
                 </Th>
                 <Th>
                   追加先
@@ -980,7 +966,7 @@ function InflowLinksPageInner({
                   自動付与
                 </Th>
                 <Th>
-                  同時に動く配信
+                  <span title="同時に動く配信">同時配信</span>
                 </Th>
                 <Th align="right">
                   友だち追加
@@ -1020,27 +1006,21 @@ function InflowLinksPageInner({
                   >
                     <td className="px-2 py-3" onClick={(e) => e.stopPropagation()}>
                       {r.entryRouteId ? (
-                        <input
-                          type="checkbox"
+                        <Checkbox
                           aria-label={`${r.name}をまとめて操作の対象にする`}
                           checked={selectedRouteIds.has(r.entryRouteId)}
-                          onChange={(event) => {
+                          onCheckedChange={(checked) => {
                             const id = r.entryRouteId!
                             setSelectedRouteIds((current) => {
                               const next = new Set(current)
-                              if (event.target.checked) next.add(id)
+                              if (checked) next.add(id)
                               else next.delete(id)
                               return next
                             })
                           }}
                         />
                       ) : (
-                        <span
-                          className="text-ink-faint"
-                          title="まとめて操作は登録済みの流入経路だけに使えます"
-                        >
-                          —
-                        </span>
+                        <span className="sr-only">まとめて操作は登録済みの流入経路だけに使えます</span>
                       )}
                     </td>
                     <td className="px-2 py-3 font-medium text-ink">
@@ -1057,7 +1037,7 @@ function InflowLinksPageInner({
                         <span className="flex min-w-0 items-center gap-1 text-ink-secondary" title={r.name}>
                           <span className="truncate whitespace-nowrap">{r.name}</span>
                           <span
-                            className="shrink-0 rounded border border-accent-border bg-accent-soft px-1 py-0.5 text-[9px] text-accent-deep"
+                            className="shrink-0 rounded border border-accent-border bg-accent-soft px-1 py-0.5 text-micro text-accent-deep"
                             title="クリック計測とシナリオ起動が設定されています。追加先の振り分けは全体設定に従います。"
                           >
                             計測済
@@ -1067,16 +1047,16 @@ function InflowLinksPageInner({
                         <span className="flex min-w-0 items-center gap-1 text-ink-secondary" title={r.name}>
                           <span className="truncate whitespace-nowrap">{r.name}</span>
                           <span
-                            className="shrink-0 rounded border border-status-warn-soft bg-status-warn-soft px-1 py-0.5 text-[9px] text-status-warn-deep"
+                            className="shrink-0 rounded border border-status-warn-soft bg-status-warn-soft px-1 py-0.5 text-micro text-status-warn-deep"
                             title="外部で発行されたREFです。流入実績だけを集計しています。"
                           >
                             未登録
                           </span>
                         </span>
                       )}
-                    </td>
-                    <td className="px-2 py-3 font-mono text-action" title={r.refCode}>
-                      <span className="block truncate whitespace-nowrap">{r.refCode}</span>
+                      <span className="text-ink-faint mt-0.5 block truncate font-mono text-micro font-normal whitespace-nowrap" title={r.refCode}>
+                        {r.refCode}
+                      </span>
                     </td>
                     <td className="px-2 py-3 text-ink-secondary">
                       {pool ? (
@@ -1129,10 +1109,10 @@ function InflowLinksPageInner({
                           : '—'}
                     </td>
                     <td className="whitespace-nowrap px-2 py-3 text-right font-semibold text-ink">
-                      {summaryAvailable ? (r.stats?.friendCount ?? 0) : '—'}
+                      {summaryAvailable ? (r.stats?.friendCount ?? 0).toLocaleString('ja-JP') : '—'}
                     </td>
                     <td className="whitespace-nowrap px-2 py-3 text-right text-ink-secondary">
-                      {summaryAvailable ? (r.stats?.clickCount ?? 0) : '—'}
+                      {summaryAvailable ? (r.stats?.clickCount ?? 0).toLocaleString('ja-JP') : '—'}
                     </td>
                     <td className="whitespace-nowrap px-2 py-3 text-ink-faint">
                       {summaryAvailable ? formatDate(r.stats?.latestAt ?? null) : '—'}

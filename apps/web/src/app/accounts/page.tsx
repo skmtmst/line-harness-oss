@@ -10,7 +10,7 @@ import ListState from '@/components/shared/list-state'
 import SummaryCard from '@/components/shared/summary-card'
 import StatusBadge from '@/components/shared/status-badge'
 import SearchField from '@/components/shared/search-field'
-import Breadcrumb from '@/components/shared/breadcrumb'
+import FilterChip from '@/components/shared/filter-chip'
 import AccountOrdering from '@/components/accounts/account-ordering'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import {
@@ -81,9 +81,8 @@ export default function AccountsPage() {
   return (
     <div data-design-node="QT91v">
       <div data-design="Head" className="mb-4 flex min-h-10 flex-wrap items-center justify-between gap-3">
-        <div>
-          <Breadcrumb items={[{ label: 'LINEアカウント' }]} />
-        </div>
+        {/* ★V7：上の帯の画面名と同じ1段だけのパンくずは出さない。 */}
+        <div />
         <div className="flex flex-wrap gap-2">
           <Button type="button" onClick={() => setOrderingOpen((open) => !open)}>
             {orderingOpen ? '並び順と親子を閉じる' : '並び順と親子を変える'}
@@ -95,8 +94,9 @@ export default function AccountsPage() {
       {orderingOpen && <AccountOrdering />}
 
       <div data-design="KPIs" className="mb-4 grid grid-cols-2 gap-3 xl:grid-cols-4">
+        {/* ★V7：「100%」の札は何の割合でもない固定の文字だったので外す。 */}
         <SummaryCard title="稼働中" value={activeCount} unit="" variant="v6"
-          badge="100%" detail={activeFriendDetail} />
+          detail={activeFriendDetail} />
         <SummaryCard title="停止中" value={inactiveCount} unit="" variant="v6"
           detail="送受信を止めています" />
         <SummaryCard title="アーカイブ" value={archivedCount} unit="" variant="v6"
@@ -122,19 +122,14 @@ export default function AccountsPage() {
           />
         </div>
         <div className="mt-3 flex flex-wrap items-center gap-2">
+          {/* ★V7：絞り込みは緑の塗りボタンではなく、他の一覧と同じ絞り込みの札にする。 */}
           {ACCOUNT_FILTERS.map((item) => (
-            <Button
-              key={item.value}
-              type="button"
-              variant={filter === item.value ? 'primary' : 'secondary'}
-              onClick={() => setFilter(item.value)}
-            >
+            <FilterChip key={item.value} selected={filter === item.value} onChange={() => setFilter(item.value)}>
               {item.label}
-            </Button>
+            </FilterChip>
           ))}
-          {/* 件数は検索の横ではなく、結果の件数とまとめて置く。 */}
-          <span className="text-ink-faint ml-auto text-xs whitespace-nowrap">20件表示</span>
-          <ListRange className="whitespace-nowrap" total={shown.length} first={shown.length === 0 ? 0 : 1} last={shown.length} />
+          {/* 件数は結果の件数だけ。選べない件数の文字は置かない（★V7）。 */}
+          <ListRange className="ml-auto whitespace-nowrap" total={shown.length} first={shown.length === 0 ? 0 : 1} last={shown.length} />
         </div>
       </div>
 
@@ -222,7 +217,7 @@ export default function AccountsPage() {
                 const connection = connectionLabel(account)
                 const webhook = webhookLabel(account)
                 return (
-                  <tr key={account.id} className="border-hairline hover:bg-canvas-sunken border-t align-top">
+                  <tr key={account.id} className="border-hairline hover:bg-canvas-sunken border-t align-middle">
                     <td className="px-4 py-3">
                       <p className="text-ink text-sm font-medium">{account.name}</p>
                       <p className="text-ink-faint mt-0.5 text-xs">

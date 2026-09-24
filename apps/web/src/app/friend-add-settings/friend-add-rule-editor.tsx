@@ -388,13 +388,13 @@ export default function FriendAddRuleEditor({ ruleId }: { ruleId?: string }) {
       {notice && <div className={'friend-add-editor-notice'}>{notice}</div>}
 
       <div className={'friend-add-editor-layout'}>
-        <main className={step === 'preview' ? 'friend-add-editor-panel friend-add-editor-panelSplit' : 'friend-add-editor-panel'}>
+        <div className={step === 'preview' ? 'friend-add-editor-panel friend-add-editor-panelSplit' : 'friend-add-editor-panel'}>
           {step === 'basic' && <BasicStep rule={rule} setRule={setRule} definition={definition} setDefinition={setDefinition} options={options} />}
           {step === 'routes' && <RoutesStep rule={rule} definition={definition} options={options} toggleRoute={toggleRoute} setDefinition={setDefinition} />}
           {step === 'message' && <MessageStep definition={definition} setDefinition={setDefinition} friendKind={rule.friendKind} scenarios={options.scenarios} openActions={() => moveToStep('actions')} />}
           {step === 'actions' && <ActionsStep definition={definition} setDefinition={setDefinition} options={options} actionType={actionType} actionTarget={actionTarget} setActionType={setActionType} setActionTarget={setActionTarget} openDialog={() => router.replace(hrefFor('actions', '&dialog=add'))} />}
           {step === 'preview' && <PreviewStep rule={rule} definition={definition} options={options} result={visibleTestResult} resultStale={Boolean(testResult && !visibleTestResult)} />}
-        </main>
+        </div>
         <Summary step={step} rule={rule} definition={definition} options={options} matchedLast28Days={matchedLast28Days} pendingAction={actionDialogOpen && Boolean(actionTarget)} />
       </div>
 

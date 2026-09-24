@@ -923,6 +923,9 @@ const SHAPES = {
     // 本物は版を返す。無いと画面の expectedVersion 付き保存の欠落に気づけない。
     version: 1,
   },
+  // 左メニューの出し分け。無いと汎用の空一覧が返り「機能設定を読み込めませんでした」になり、
+  // メニューが基本の9項目だけになる（2026-09-24 の点検で発覚）。
+  '/api/settings/features/visibility': { features: FEATURES },
   '/api/inbox/unanswered/count': { total: 0, byAccount: [], oldestWaitMinutes: null },
   // 設計 `vUXKb` の「写真審査 1件 確認待ち」。0で返すとカードが空のまま撮れる。
   '/api/nen-members/overview': { pets: 6, healthLogs: 12, activeCare: 2, pendingPhotos: 3, members: 6, consultations: 1 },
@@ -2241,6 +2244,10 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
       },
     }
   }
+  // 実物は { sessions: [...] }。既定の空ページ（items）で返すと、担当者一覧が丸ごと落ちる。
+  if (pathname === '/api/auth/sessions') return { success: true, data: { sessions: [
+    { id: 'sess-current', current: true, createdAt: '2026-08-25T00:00:00.000Z', expiresAt: '2026-09-24T00:00:00.000Z', userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Chrome/128.0', ipPrefix: '203.0.113.*' },
+  ] } }
   if (pathname === '/api/staff') return { success: true, data: STAFF_MEMBERS }
   if (pathname === '/api/login-audit') return { success: true, data: LOGIN_AUDIT }
 

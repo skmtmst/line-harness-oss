@@ -375,7 +375,7 @@ export default function ActionScoreRulesPage() {
   }, [configuration])
 
   return (
-    <main data-design-node="s6MBc" className="flex flex-col gap-3.5" style={{ minHeight: 'calc(100vh - 98px)' }}>
+    <div data-design-node="s6MBc" className="flex flex-col gap-3.5" style={{ minHeight: 'calc(100vh - 98px)' }}>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Breadcrumb items={[{ label: 'マイル', href: '/mileage' }, { label: '行動スコア', href: '/mileage?tab=score' }, { label: 'ルール' }]} />
         <Button onClick={() => setTestOpen(true)}>1人で試す</Button>
@@ -564,6 +564,6 @@ export default function ActionScoreRulesPage() {
         onCancel={() => !busy && setConfirmAction(null)}
         onConfirm={() => void stop()}
       />
-    </main>
+    </div>
   )
 }

@@ -29,7 +29,7 @@ export interface FolderPanelRow {
    * このフォルダに属する件数。`null` は「数えていない」（#631）。
    *
    * 母集団が確立できていない口では、`0` と嘘をつくより出さない方がよい。
-   * `null` のときは `—` を出す。
+   * `null` のときは何も出さない（★V7：以前の `—` は並ぶと意味の無い記号の列に見えた）。
    */
   count: number | null
   /**
@@ -149,7 +149,7 @@ export default function FolderPanel({
                   </svg>
                 )}
                 <span className="min-w-0 flex-1 truncate">{row.label}</span>
-                <span className="text-ink-faint shrink-0 text-xs tabular-nums">{row.count === null ? '—' : row.count}</span>
+                {row.count === null ? null : <span className="text-ink-faint shrink-0 text-xs tabular-nums">{row.count}</span>}
               </button>
               {/* 操作は設計どおり1つの「…」へまとめる。行に5個の小さな口を
                   並べると、選択との押し間違いが増え、短い名前も狭くなる。 */}
