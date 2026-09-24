@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { X } from 'lucide-react'
 import Button from '@/components/shared/button'
+import Combobox from '@/components/shared/combobox'
 import ListState from '@/components/shared/list-state'
 import { ApiError, api } from '@/lib/api'
 import type { FriendListItem } from '@/lib/api'
@@ -380,13 +381,16 @@ export default function BulkRunDialog({
                 <div><dt>操作</dt><dd>{operationLabel(operationKind)}</dd></div>
                 <div><dt>タグ</dt><dd>{tags.find((tag) => tag.id === tagId)?.name ?? '選択してください'}</dd></div>
               </dl>
-            <label className={styles.field}>
+            <div className={styles.field}>
               <span className={styles.label}>どのタグ</span>
-              <select aria-label="どのタグ" className={styles.input} value={tagId} onChange={(e) => setTagId(e.target.value)}>
-                <option value="">選んでください</option>
-                {tags.map((tag) => <option key={tag.id} value={tag.id}>{tag.name}</option>)}
-              </select>
-            </label>
+              <Combobox
+                aria-label="どのタグ"
+                placeholder="選んでください"
+                value={tagId}
+                onChange={setTagId}
+                options={tags.map((tag) => ({ value: tag.id, label: tag.name }))}
+              />
+            </div>
             <p className={styles.executionHint}>ⓘ 実行前に対象と操作内容を確認できます。</p>
 
             {previewState === 'loading' ? <ListState kind="loading" title="対象を数えています" /> : null}
