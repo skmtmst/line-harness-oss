@@ -861,13 +861,13 @@ function MileagePageInner() {
                         <p className="mt-0.5 truncate text-xs text-ink-faint" title={member.lineAccount.name}>{member.lineAccount.name}</p>
                       </div>
                       <p className="shrink-0 text-right">
-                        <span className="block font-bold tabular-nums text-accent-deep">{formatMileageNumber(member.available)}<span className="text-xs font-normal text-ink-faint"> マイル</span></span>
-                        {member.pending > 0 && <span className="block text-[10px] text-warning">保留 {formatMileageNumber(member.pending)}</span>}
+                        <span className="block font-bold tabular-nums text-ink">{formatMileageNumber(member.available)}<span className="text-xs font-normal text-ink-faint"> マイル</span></span>
+                        {member.pending > 0 && <span className="block text-micro text-status-warn-deep">保留 {formatMileageNumber(member.pending)}</span>}
                       </p>
                     </div>
                     <dl className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-ink-secondary">
                       <div><dt className="inline text-ink-faint">ランク：</dt><dd className="inline" title={member.rankReason}>{displayRank ?? '未設定'}</dd></div>
-                      <div><dt className="inline text-ink-faint">今月の増減：</dt><dd className={`inline font-semibold tabular-nums ${member.monthChange < 0 ? 'text-danger' : 'text-accent-deep'}`}>{member.monthChange > 0 ? '+' : ''}{formatMileageNumber(member.monthChange)}</dd></div>
+                      <div><dt className="inline text-ink-faint">今月の増減：</dt><dd className={`inline font-semibold tabular-nums ${member.monthChange < 0 ? 'text-danger' : 'text-ink'}`}>{member.monthChange > 0 ? '+' : ''}{formatMileageNumber(member.monthChange)}</dd></div>
                       <div><dt className="inline text-ink-faint">消える予定：</dt><dd className="inline">{member.expiringMiles30d == null ? 'なし' : `${formatMileageNumber(member.expiringMiles30d)} マイル`}</dd></div>
                       <div><dt className="inline text-ink-faint">最終変動：</dt><dd className="inline">{formatMileageDate(member.lastChangedAt)}</dd></div>
                     </dl>
@@ -887,7 +887,7 @@ function MileagePageInner() {
                   <Th className="w-1/12">ランク</Th>
                   <Th className="w-1/12" align="right">いまの残高</Th>
                   <Th className="w-1/12" align="right">今月の増減</Th>
-                  <Th className="w-1/12">消える予定</Th>
+                  <Th className="w-1/6">消える予定（マイル）</Th>
                   <Th className="w-1/6">最終行動</Th>
                   <Th className="w-1/6" align="right">操作</Th>
                 </TableHeadRow>
@@ -903,11 +903,11 @@ function MileagePageInner() {
                       </td>
                       <td className="px-4 py-4"><p className="truncate text-sm text-ink-secondary" title={member.rankReason}>{displayRank ?? <><span>—</span><span className="ml-1 text-xs text-ink-faint">未設定</span></>}</p></td>
                       <td className="px-4 py-4 text-right">
-                        <p className="font-bold text-accent-deep">{formatMileageNumber(member.available)}</p>
-                        {member.pending > 0 && <p className="text-warning text-[10px]">保留 {formatMileageNumber(member.pending)}</p>}
+                        <p className="font-bold text-ink">{formatMileageNumber(member.available)}</p>
+                        {member.pending > 0 && <p className="text-micro text-status-warn-deep">保留 {formatMileageNumber(member.pending)}</p>}
                       </td>
-                      <td className={`px-4 py-4 text-right text-sm font-semibold tabular-nums ${member.monthChange < 0 ? 'text-danger' : 'text-accent-deep'}`}>{member.monthChange > 0 ? '+' : ''}{formatMileageNumber(member.monthChange)}</td>
-                      <td className="px-4 py-4"><p className="truncate text-sm text-ink-secondary" title={member.expiringMiles30d == null ? 'なし' : `${formatMileageNumber(member.expiringMiles30d)} マイル`}>{member.expiringMiles30d == null ? 'なし' : `${formatMileageNumber(member.expiringMiles30d)} マイル`}</p></td>
+                      <td className={`px-4 py-4 text-right text-sm font-semibold tabular-nums ${member.monthChange < 0 ? 'text-danger' : 'text-ink'}`}>{member.monthChange > 0 ? '+' : ''}{formatMileageNumber(member.monthChange)}</td>
+                      <td className="px-4 py-4"><p className="truncate text-sm text-ink-secondary" title={member.expiringMiles30d == null ? 'なし' : `${formatMileageNumber(member.expiringMiles30d)} マイル`}>{member.expiringMiles30d == null ? 'なし' : formatMileageNumber(member.expiringMiles30d)}</p></td>
                       <td className="px-4 py-4 text-xs text-ink-secondary">{formatMileageDate(member.lastChangedAt)}</td>
                       <td className="px-4 py-3 text-right">
                         <div className="flex justify-end gap-2">
@@ -925,8 +925,8 @@ function MileagePageInner() {
         )}
 
         {totalPages > 1 && (
-          <div className="border-hairline flex items-center justify-between border-t px-5 py-3">
-            <span className="text-ink-faint text-xs">
+          <div className="flex items-center justify-between border-t border-hairline px-5 py-3">
+            <span className="text-xs text-ink-faint">
               {overviewTotal === null
                 ? '表示件数は未取得'
                 : `${formatMileageNumber(overviewTotal)}人中 ${formatMileageNumber(offset + 1)}〜${formatMileageNumber(Math.min(offset + members.length, overviewTotal))}人を表示`}

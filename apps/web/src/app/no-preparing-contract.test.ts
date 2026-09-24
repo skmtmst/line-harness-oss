@@ -88,10 +88,8 @@ const DESIGN_WORDS: Record<string, number> = {
  *   絞り込みの「30日以上の絞り込みは準備中」と、行き先の決まっていない「マニュアル」。
  */
 const REMAINING: Record<string, number> = {
-  /* 2026-09-19 #932 で「時間や担当を変える」を実動作（詳細ページの変更フォーム）へ
-     接続し detail/page.tsx は 0 件になったので行を消した。
-     page.tsx は「日時変更は準備中です」を消して残り 2 件。 */
-  'app/booking/bookings/page.tsx': 2,
+  /* #670 17 で押せない「保存した条件」(準備中です)を撤去し、
+     page.tsx は 0 件になったので行を消した。 */
   'app/booking/staff/new/page.tsx': 2,
   /* 2026-09-08 #605 で「同じ設定で作り直す」を実動作へ接続し 0 件になったので行を消した。 */
   'app/restaurant-test/stores/new/page.tsx': 1,

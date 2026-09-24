@@ -5,6 +5,7 @@ import { X } from 'lucide-react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { ApiError, api, fetchApi } from '@/lib/api'
+import { isPoolsFeatureAvailable } from '@/lib/pools-availability'
 import Button from '@/components/shared/button'
 import EditRouteModal from '../_components/edit-route-modal'
 import RefOrdersPanel, { type RefOrdersResult } from '../_components/ref-orders'
@@ -12,6 +13,7 @@ import Select from '@/components/shared/select'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import type {
+  ApiResponse,
   EntryRoute,
   EntryRouteFunnel,
   Scenario,
@@ -84,12 +86,19 @@ function InflowLinkDetailPageContent() {
   // 左のリンク一覧。流入件数を添えるので、集計も一緒に引く。
   useEffect(() => {
     let cancelled = false
+    // プールは補助データ。機能がオフでもリンク詳細画面そのものは止めない。
+    // 403 の応答自体が console error になるため、有効と分からない限り
+    // 口を発行しない（#703）。
+    const poolsRequest: Promise<ApiResponse<TrafficPool[]>> = isPoolsFeatureAvailable().then((ok) =>
+      ok
+        ? api.pools.list({ suppressFeatureDisabledEvent: true })
+        : { success: false as const, error: 'feature_disabled' },
+    )
     void Promise.allSettled([
       api.entryRoutes.list(),
       api.tags.list(),
       api.scenarios.list(),
-      // プールは補助データ。機能がオフでもリンク詳細画面そのものは止めない。
-      api.pools.list({ suppressFeatureDisabledEvent: true }),
+      poolsRequest,
       // 編集窓の「追加直後に送るメッセージ」選択肢に使う。
       api.templates.list(),
       api.staff.me(),

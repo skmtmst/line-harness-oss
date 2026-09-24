@@ -716,6 +716,8 @@ export function AffiliatorsTab({ accountId }: { accountId: string | null }) {
                       <td className="text-ink px-4 py-3 text-sm font-medium">
                         <span className="block truncate" title={row.name}>{row.name}</span>
                         <span className="text-action mt-0.5 block font-mono text-xs">{row.code}</span>
+                        {/* #670 16: 状態は名前の下の札で出す。操作セルに置くと操作と読める。 */}
+                        <span className="mt-1 block"><Chip tone={row.isActive ? 'ok' : 'neutral'}>{row.isActive ? '計測中' : '停止中'}</Chip></span>
                       </td>
                       <td className="text-ink-secondary px-4 py-3 text-right text-sm tabular-nums">
                         {row.linkCount.toLocaleString()}本
@@ -732,7 +734,6 @@ export function AffiliatorsTab({ accountId }: { accountId: string | null }) {
                       <td className="px-4 py-3 text-center">
                         <div className="flex flex-wrap items-center justify-center gap-2">
                           <span className="text-action text-xs font-medium">{isExpanded ? '閉じる' : '成果を見る'}</span>
-                          <span className="text-ink-faint text-xs">{row.isActive ? '計測中' : '停止中'}</span>
                           <AffiliateButton
                             aria-label={`${row.name}の紹介停止を確認`}
                             onClick={(event) => {
@@ -942,7 +943,8 @@ export function AffiliatorsTab({ accountId }: { accountId: string | null }) {
                                             <td className="py-1 pr-4 text-right font-semibold text-ink">{link.click_count.toLocaleString()}</td>
                                             <td className="py-1">
                                               {link.is_active
-                                                ? <span className="text-xs text-green-600">有効</span>
+                                                /* #670 22: green-600 は白地で 3.3:1 しかなく AA 未満。共通トークンの濃い緑へ。 */
+                                                ? <span className="text-xs font-semibold text-success">有効</span>
                                                 : <span className="text-xs text-ink-faint">無効</span>
                                               }
                                             </td>
@@ -2875,7 +2877,8 @@ function SettlementEditor({
         >
           {saving ? '保存中...' : '取り決めを保存'}
         </button>
-        {saved && <span className="text-xs text-emerald-600">保存しました</span>}
+        {/* #670 22: emerald-600 は白地で 3.8:1 しかなく AA 未満。共通トークンの濃い緑へ。 */}
+        {saved && <span className="text-xs font-semibold text-success">保存しました</span>}
       </div>
     </div>
   )

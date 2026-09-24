@@ -26,8 +26,11 @@ describe('V6 ウェビナー一覧の契約', () => {
   it('公開中と下書きの条件をサーバーで絞り込む', () => {
     /* 取った1頁を画面で絞り直すと件数や頁数が変わる。絞りは口へ渡す。 */
     expect(PAGE).toContain('status: savedFilter || undefined')
-    expect(PAGE).toContain("{ key: 'active', label: '公開中のみ' }")
-    expect(PAGE).toContain("{ key: 'draft', label: '下書きのみ' }")
+    /* 札は共通 FilterChip。直書きの button には戻さない。 */
+    expect(PAGE).toContain("import FilterChip from '@/components/shared/filter-chip'")
+    expect(PAGE).toContain('<FilterChip')
+    expect(PAGE).toContain("label: '公開中のみ'")
+    expect(PAGE).toContain("label: '下書きのみ'")
     expect(PAGE).not.toContain('保存した条件は準備中です')
     expect(PAGE).not.toContain('foldered.filter')
   })
@@ -93,8 +96,9 @@ describe('V6 ウェビナー一覧の契約', () => {
     expect(PAGE).not.toContain('保存した条件')
   })
 
-  it('同じ /webinars/new への操作名は「ウェビナーを作成」で一致する(DETAIL-02)', () => {
-    expect(PAGE).toContain('href="/webinars/new">ウェビナーを作成')
+  it('同じ /webinars/new への操作名は「＋ ウェビナーをつくる」で一致する(DETAIL-02)', () => {
+    expect(PAGE).toContain('href="/webinars/new">＋ ウェビナーをつくる')
+    expect(PAGE).not.toContain('ウェビナーを作成')
     expect(PAGE).not.toContain('ウェビナーを作る')
   })
 

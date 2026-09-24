@@ -4,6 +4,7 @@ import { Archive, X } from 'lucide-react'
 import SortSelect from '@/components/ui/sort-select'
 import PageSizeSelect from '@/components/ui/page-size-select'
 import ListRange from '@/components/ui/list-range'
+
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import Link from 'next/link'
@@ -12,6 +13,7 @@ import IconButton from '@/components/shared/icon-button'
 import Pagination from '@/components/shared/pagination'
 import ListState from '@/components/shared/list-state'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import FilterChip from '@/components/shared/filter-chip'
 import './webinars.css'
 import FolderPanel, { FOLDER_RAIL_STYLE } from '@/components/shared/folder-panel'
 import { webinarLoadFailure, type WebinarLoadFailure } from './webinar-load-failure'
@@ -298,7 +300,7 @@ function WebinarListTable({
       <div className="divide-hairline divide-y">
         {items.map((w) => (
           <div key={w.id} className="grid gap-3 px-4 py-4 md:grid-cols-12 md:items-center">
-            <div className="min-w-0 md:col-span-4"><Link href={`/webinars/edit?id=${w.id}`} className="text-action block truncate text-sm font-bold hover:underline" title={w.title}>{w.title}</Link><span className="text-ink-faint mt-1 block truncate font-mono text-[11px]" title={`/${w.slug}`}>/{w.slug}</span></div>
+            <div className="min-w-0 md:col-span-4"><Link href={`/webinars/edit?id=${w.id}`} className="block truncate whitespace-nowrap text-sm font-semibold text-ink hover:underline" title={w.title}>{w.title}</Link><span className="text-ink-faint mt-1 block truncate font-mono text-[11px]" title={`/${w.slug}`}>/{w.slug}</span></div>
             <div className="md:col-span-2"><span className={`rounded-pill inline-flex px-2.5 py-1 text-[11px] font-semibold ${STATUS_BADGE[w.status]}`}>{displayStatus(w)}</span></div>
             <div className="text-ink-secondary text-sm tabular-nums" title={w.registrationCount == null ? '申込人数は一覧APIに未接続です。' : undefined}><span className="text-ink-faint md:hidden">申込 </span>{measuredCount(w.registrationCount)}</div>
             <div className="text-ink-secondary text-sm tabular-nums" title={w.viewerCount == null ? '視聴人数は一覧APIに未接続です。' : undefined}><span className="text-ink-faint md:hidden">視聴 </span>{measuredCount(w.viewerCount)}</div>
@@ -331,20 +333,24 @@ function WebinarListErrorNotice({
 }
 
 /*
-  一覧の器(白い面・最低360px)。**行があるときだけ包む。**
+  一覧の器(白い面)。**行があるときだけ包む。**
   読込・空・失敗の1枚は ListState が自分で面と高さを持つので、
   器に入れると白い余白と灰色の二重背景になる(監査 DETAIL-01)。
+  以前は最低360pxを付けていたが、1行だけのときに約350pxの
+  空領域が残るため外した(#670 10)。器は中身に吸着させる。
+  件数は器の内側の脚注へ入れ、枠外に孤立させない。
 */
-function WebinarListCard({ children }: { children: ReactNode }) {
+function WebinarListCard({ children, footer }: { children: ReactNode; footer?: ReactNode }) {
   /*
     高さは中身に任せる。以前は固定の最小高さがあって、1行だけの一覧でも
     表の下に大きな空白帯ができ、その外に件数表示が取り残されて見えた
     （監査 A8）。読込・空・失敗は ListState が自分の面を持つので、
-    ここで高さを決める必要はない。
+    ここで高さを決める必要はない。件数は footer で器の内側に出す。
   */
   return (
     <div className="border-hairline bg-canvas overflow-hidden rounded-card border">
       {children}
+      {footer ? <div className="border-t border-hairline px-4 py-3">{footer}</div> : null}
     </div>
   )
 }
@@ -360,6 +366,7 @@ function WebinarListContent({
   refreshing,
   onRetry,
   onArchive,
+  footer,
 }: {
   accountLoading: boolean
   loading: boolean
@@ -371,6 +378,7 @@ function WebinarListContent({
   refreshing: boolean
   onRetry: () => void
   onArchive: (target: WebinarListItem) => void
+  footer?: ReactNode
 }) {
   if (accountLoading || loading) return <ListState kind="loading" />
   if (!selectedAccountId) {
@@ -384,7 +392,7 @@ function WebinarListContent({
   }
   if (loadFailure) {
     return visibleItems.length > 0 ? (
-      <WebinarListCard>
+      <WebinarListCard footer={footer}>
         <WebinarListErrorNotice failure={loadFailure} onRetry={onRetry} />
         <WebinarListTable items={visibleItems} onArchive={onArchive} />
       </WebinarListCard>
@@ -403,14 +411,14 @@ function WebinarListContent({
         kind="empty"
         title="まだウェビナーがありません"
         description="動画セミナーの申込と視聴を、ここで管理します。"
-        action={<Button variant="primary" href="/webinars/new">ウェビナーを作成</Button>}
+        action={<Button variant="primary" href="/webinars/new">＋ ウェビナーをつくる</Button>}
       />
     ) : (
       <ListState kind="empty" title="条件に合うウェビナーはありません" description="検索文字かよく使う絞り込みを変えてください。" />
     )
   }
   return (
-    <WebinarListCard>
+    <WebinarListCard footer={footer}>
       {refreshing ? <p role="status" className="text-ink-faint border-hairline border-b px-4 py-2 text-xs">検索中…</p> : null}
       <WebinarListTable items={visibleItems} onArchive={onArchive} />
     </WebinarListCard>
@@ -720,7 +728,7 @@ function WebinarsPage() {
   return (
     <>
       {visibleOverviewFailure ? (
-        <div className="mx-auto mb-4 max-w-[1600px] px-6 pt-4">
+        <div className="mb-4">
           <ListState
             kind={visibleOverviewFailure.kind}
             title={visibleOverviewFailure.title}
@@ -733,7 +741,7 @@ function WebinarsPage() {
           />
         </div>
       ) : (
-        <KpiCollapse data-design="KPIs" className="mx-auto mb-4 max-w-[1600px] px-6 pt-4" gridClassName="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <KpiCollapse data-design="KPIs" className="mb-4" gridClassName="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {/*
             #1005: カードは共通KpiCardの3段（見出し・数値・短い状態）で出す。
             取得できない詳しい理由は description として説明アイコンの中へ渡し、
@@ -753,9 +761,11 @@ function WebinarsPage() {
           ))}
         </KpiCollapse>
       )}
-      <div data-design-node="ZC13r" className="mx-auto max-w-[1600px] px-6 pb-10">
-        <div data-design="Head" className="mb-4 flex flex-wrap gap-2">
-          <Button variant="primary" href="/webinars/new">ウェビナーを作成</Button>
+      {/* 外枠の余白は共通シェルが持つ。ここで px-6 を足すと左端がずれる。 */}
+      <div data-design-node="ZC13r">
+        {/* 作る操作は画面右上。表の上に単独で浮かせない。他の一覧と同じ置き場所。 */}
+        <div data-design="Head" className="mb-4 flex flex-wrap justify-end gap-2">
+          <Button variant="primary" href="/webinars/new">＋ ウェビナーをつくる</Button>
         </div>
 
         <div style={FOLDER_RAIL_STYLE} className="grid gap-4 lg:grid-cols-[var(--folder-rail-width)_minmax(0,1fr)]">
@@ -794,7 +804,7 @@ function WebinarsPage() {
             <div data-design="Saved" className="mb-3 flex flex-wrap items-center gap-2">
               <span className="text-ink-faint text-xs whitespace-nowrap">よく使う絞り込み</span>
               {([{ key: 'active', label: '公開中のみ' }, { key: 'draft', label: '下書きのみ' }] as const).map(({ key, label }) => (
-                <button key={key} onClick={() => setSavedFilter(savedFilter === key ? '' : key)} aria-pressed={savedFilter === key} className={`rounded-pill border px-3 py-1 text-xs transition-colors ${savedFilter === key ? 'border-accent bg-accent-soft text-ink' : 'border-hairline text-ink-secondary hover:bg-canvas-sunken'}`}>{label}</button>
+                <FilterChip key={key} selected={savedFilter === key} onChange={(next) => setSavedFilter(next ? key : '')}>{label}</FilterChip>
               ))}
               <SortSelect
                 className="ml-auto"
@@ -816,10 +826,11 @@ function WebinarsPage() {
               refreshing={refreshing}
               onRetry={() => void refresh()}
               onArchive={openArchive}
+              footer={hasListData && visibleTotal > 0 ? <ListRange total={visibleTotal} first={(currentPage - 1) * pageSize + 1} last={(currentPage - 1) * pageSize + visible.length} /> : undefined}
             />
 
             {hasListData && visibleTotal > 0 && (
-              <div className="mt-3 flex flex-wrap items-center justify-between gap-3"><ListRange total={visibleTotal} first={visibleTotal === 0 ? 0 : (currentPage - 1) * pageSize + 1} last={(currentPage - 1) * pageSize + visible.length} /><Pagination page={currentPage} pageCount={pageCount} onPageChange={setPage} ariaLabel="ウェビナー一覧のページ送り" /></div>
+              <div className="mt-3 flex flex-wrap items-center justify-end gap-3"><Pagination page={currentPage} pageCount={pageCount} onPageChange={setPage} ariaLabel="ウェビナー一覧のページ送り" /></div>
             )}
           </section>
         </div>

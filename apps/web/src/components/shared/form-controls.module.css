@@ -1,3 +1,4 @@
+@layer components {
 .field {
   min-width: 0;
 }
@@ -101,4 +102,5 @@
   .input {
     height: 44px;
   }
+}
 }

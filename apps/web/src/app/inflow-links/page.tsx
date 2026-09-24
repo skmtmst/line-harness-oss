@@ -7,7 +7,7 @@ import { useSearchParams } from 'next/navigation'
 import { ApiError, api, fetchApi } from '@/lib/api'
 import KpiCard from '@/components/shared/kpi-card'
 import { useAccount } from '@/contexts/account-context'
-import type { EntryRoute, EntryRouteGenre, TrafficPool, Scenario, Tag } from '@line-crm/shared'
+import type { ApiResponse, EntryRoute, EntryRouteGenre, TrafficPool, Scenario, Tag } from '@line-crm/shared'
 import EditRouteModal from './_components/edit-route-modal'
 import GenreModal from './_components/create-genre-modal'
 import { shouldShowReferralRow } from './visibility'
@@ -16,6 +16,7 @@ import { Suspense } from 'react'
 import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
 import { FeatureDisabledScreen } from '@/components/feature-disabled-gate'
 import { useFeatureVisibility } from '@/lib/use-feature-visibility'
+import { isPoolsFeatureAvailable } from '@/lib/pools-availability'
 import type { FeatureKey } from '@/lib/feature-settings'
 import AdIntegration from './ad-integration'
 import RefOrdersPanel from './_components/ref-orders'
@@ -349,15 +350,27 @@ function InflowLinksPageInner({
       && generation === loadRequestRef.current
       && accountAtRequest === latestAccountRef.current
     const loadAuxiliary = async () => {
-      const [p, s, t, tagRes] = await Promise.all([
-        // プールは補助データ。multi_store_hierarchy がオフでも画面全体を
-        // 共通ゲートへ切り替えず、プール列だけ無しで既存リンクを表示する。
-        featureAllowed('multi_store_hierarchy')
-          ? api.pools.list({ suppressFeatureDisabledEvent: true }).catch(() => ({
+      // プールは補助データ。multi_store_hierarchy がオフでも画面全体を
+      // 共通ゲートへ切り替えず、プール列だけ無しで既存リンクを表示する。
+      // 403 の応答自体が console error になるため、有効と分からない限り
+      // 口を発行しない（#703）。可視性が未確定のときだけ共有判定で確かめる。
+      const poolsPromise: Promise<ApiResponse<TrafficPool[]>> = visibility.features != null
+        ? (visibility.features['multi_store_hierarchy'] === true
+          ? api.pools.list({ suppressFeatureDisabledEvent: true }).catch((): ApiResponse<TrafficPool[]> => ({
+            success: false as const,
+            error: 'feature_disabled',
+          }))
+          : Promise.resolve({ success: false as const, error: 'feature_disabled' }))
+        : isPoolsFeatureAvailable(selectedAccountId ? [selectedAccountId] : null).then((ok) =>
+          ok
+            ? api.pools.list({ suppressFeatureDisabledEvent: true }).catch((): ApiResponse<TrafficPool[]> => ({
               success: false as const,
-              data: [] as TrafficPool[],
+              error: 'feature_disabled',
             }))
-          : Promise.resolve({ success: false as const, data: [] as TrafficPool[] }),
+            : { success: false as const, error: 'feature_disabled' },
+        )
+      const [p, s, t, tagRes] = await Promise.all([
+        poolsPromise,
         featureAllowed('scenarios')
           ? api.scenarios.list().catch(() => ({ success: false as const, data: [] as Scenario[] }))
           : Promise.resolve({ success: false as const, data: [] as Scenario[] }),
@@ -849,21 +862,11 @@ function InflowLinksPageInner({
                 }}
                 size="page-size"
               />
-              <Button
-                onClick={() => setEditing('new')}
-                variant="primary"
-                disabled={!selectedGenre || selectedGenre === UNCATEGORIZED}
-                title={!selectedGenre || selectedGenre === UNCATEGORIZED ? '先に左側でフォルダを選んでください' : undefined}
-              >
-                ＋ このフォルダに流入リンクをつくる
-              </Button>
               {/*
-                **画面に出ている行をそのまま書き出す。** 絞り込みや並び替えを
-                無視して全件を出すと、画面と手元のファイルが食い違う。
+                #734: 「このフォルダに流入リンクをつくる」「CSVで書き出す」の
+                2つ目は置かない。同じ意図の主操作は画面上部の1系統に揃える
+                （新規作成はフォルダ選択を持つ /inflow-links/new が正規口）。
               */}
-              <Button onClick={exportCurrentRows} disabled={sortedRows.length === 0}>
-                CSVで書き出す
-              </Button>
             </div>
           </div>
 
@@ -926,7 +929,7 @@ function InflowLinksPageInner({
           title={selectedGenre ? `「${selectedGenreLabel}」にはまだリンクがありません` : 'まだ流入経路がありません'}
           description={
             selectedGenre
-              ? '「このフォルダに流入リンクをつくる」から作ると、ここに出ます。'
+              ? '上の「流入リンクをつくる」から作ると、ここに出ます。'
               : '左側の「フォルダを追加」から最初のフォルダを作ってください。'
           }
         />
@@ -1380,7 +1383,7 @@ function ReferralQrModal({
         </div>
         <div className="mt-5 rounded-xl bg-canvas-sunken p-3">
           <p className="break-all font-mono text-xs text-ink-secondary">{url}</p>
-          <button onClick={copy} className="mt-3 w-full rounded-lg border border-hairline bg-canvas px-3 py-2 text-sm font-medium text-action">
+          <button onClick={copy} className="mt-3 w-full rounded-lg border border-hairline bg-canvas px-3 py-2 text-sm font-medium text-action hover:bg-canvas-sunken">
             {copied ? 'コピーしました' : 'URLをコピー'}
           </button>
         </div>

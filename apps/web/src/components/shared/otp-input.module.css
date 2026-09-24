@@ -1,3 +1,4 @@
+@layer components {
 /*
  * 認証コード入力（6マス）。Pencil ★V7 `xHzFK`、1マスは `ENP7x`。
  *
@@ -65,4 +66,5 @@
     height: 48px;
     font-size: 20px;
   }
+}
 }
