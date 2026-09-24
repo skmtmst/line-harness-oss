@@ -1691,6 +1691,7 @@ function ConversionsPageHost() {
         tabs={MERGED_TABS}
         active={tab}
         defaultKey={DEFAULT_TAB}
+        label="成果とアフィリエイト・コンバージョンの画面"
       />
       {tab === 'points' && <ConversionsPageInner accountId={selectedAccountId} />}
       {tab === 'affiliates' && <AffiliatorsTab accountId={selectedAccountId} />}
