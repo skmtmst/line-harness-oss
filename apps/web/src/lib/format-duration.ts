@@ -58,3 +58,26 @@ export function formatMinutesRough(minutes: number): string {
   if (total <= 60 * 24 * 30) return `約${Math.round(total / (60 * 24))}日`
   return `約${Math.round(total / (60 * 24 * 30))}ヶ月`
 }
+
+/**
+ * 長さ（「〜前」を付けない分）の読み替え（監査6 #710）。
+ *
+ * 仮押さえの保持時間のように「1440分」のままだと読めない入力の横に出す。
+ * 60分未満は分のままが一番読みやすいので読み替えを返さない。
+ * 言い方は `formatDurationMinutes` に寄せる（例: 1440 → 1日）。
+ */
+export function formatMinutesLengthHint(minutes: number): string | null {
+  if (!Number.isFinite(minutes) || minutes < 60) return null
+  return formatDurationMinutes(minutes)
+}
+
+/**
+ * 時間前の読み替え（監査6 #710）。
+ *
+ * 当日のお知らせのように「72時間前」のままだと日数が読めない入力の
+ * 横に出す。24時間の倍数のときだけ「N日前」に読み替える。
+ */
+export function formatHoursBeforeHint(hours: number): string | null {
+  if (!Number.isFinite(hours) || hours < 24 || hours % 24 !== 0) return null
+  return `${hours / 24}日前`
+}
