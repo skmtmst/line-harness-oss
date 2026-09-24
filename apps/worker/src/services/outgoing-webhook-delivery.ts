@@ -12,6 +12,7 @@ import {
   createNotification,
   createWebhookInteraction,
   finishWebhookInteraction,
+  activeTenantLineAccountSql,
   isOperationCapabilityStopped,
   resolveWebhookSecret,
   type WebhookInteractionFailureReason,
@@ -1271,12 +1272,26 @@ export async function sweepOutgoingWebhookDeliveries(
   const nowIso = now.toISOString();
   const stuckBefore = new Date(now.getTime() - OUTGOING_DELIVERY_LEASE_MINUTES * 60_000).toISOString();
   const limit = Math.max(1, Math.min(input.limit ?? OUTGOING_WEBHOOK_SWEEP_LIMIT, 100));
+  await db.prepare(
+    `UPDATE outgoing_webhook_deliveries
+        SET status='failed', lease_token=NULL, lease_until=NULL,
+            next_retry_at=NULL, error_code='tenant_suspended',
+            error_message_safe='契約先が停止中のため送信しませんでした。',
+            failed_at=?, updated_at=?
+      WHERE (
+        (status='pending' AND queued_at <= ?)
+        OR (status='sending' AND lease_until IS NOT NULL AND lease_until <= ?)
+        OR (status='retry_wait' AND next_retry_at <= ?)
+      )
+        AND NOT ${activeTenantLineAccountSql('outgoing_webhook_deliveries.line_account_id')}`,
+  ).bind(nowIso, nowIso, stuckBefore, nowIso, nowIso).run();
   const rows = await db
     .prepare(
       `SELECT * FROM outgoing_webhook_deliveries
-        WHERE (status = 'pending' AND queued_at <= ?)
+        WHERE ((status = 'pending' AND queued_at <= ?)
            OR (status = 'sending' AND lease_until IS NOT NULL AND lease_until <= ?)
-           OR (status = 'retry_wait' AND next_retry_at <= ?)
+           OR (status = 'retry_wait' AND next_retry_at <= ?))
+          AND ${activeTenantLineAccountSql('outgoing_webhook_deliveries.line_account_id')}
         ORDER BY queued_at, id
         LIMIT ?`,
     )

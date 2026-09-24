@@ -1,7 +1,10 @@
 import type { HarnessProxyDispatch } from './line-proxy-send.js';
 import { pushViaHarnessProxy } from './line-proxy-send.js';
-import { isOperationCapabilityStopped } from '@line-crm/db';
-import { resolveLineCredential } from '@line-crm/db';
+import {
+  activeTenantLineAccountSql,
+  isOperationCapabilityStopped,
+  resolveLineCredential,
+} from '@line-crm/db';
 import { featureJobCanRun } from './feature-enforcement.js';
 import { cancelByTrigger, enrollByTrigger, reconcileV6ToStartsAt } from './reminder-trigger.js';
 
@@ -335,6 +338,19 @@ export async function processDueMeetConsultationReminders(
   options: MeetReminderDeliveryOptions,
 ): Promise<{ sent: number; failed: number }> {
   const nowIso = options.now.toISOString();
+  await db.prepare(
+    `UPDATE meet_consultation_reminders
+        SET status='cancelled', last_error='tenant_suspended', updated_at=?
+      WHERE status IN ('pending','failed')
+        AND scheduled_at <= ?
+        AND EXISTS (
+          SELECT 1
+            FROM meet_consultations stopped_consultation
+            JOIN friends stopped_friend ON stopped_friend.id=stopped_consultation.friend_id
+           WHERE stopped_consultation.id=meet_consultation_reminders.consultation_id
+             AND NOT (${activeTenantLineAccountSql('stopped_friend.line_account_id')})
+        )`,
+  ).bind(nowIso, nowIso).run();
   const due = await db
     .prepare(
       `SELECT r.id, r.consultation_id, r.kind, r.retry_count,
@@ -352,6 +368,7 @@ export async function processDueMeetConsultationReminders(
           AND c.starts_at > ?
           AND f.is_following = 1
           AND la.is_active = 1
+          AND ${activeTenantLineAccountSql('f.line_account_id')}
         ORDER BY r.scheduled_at ASC
         LIMIT 100`,
     )

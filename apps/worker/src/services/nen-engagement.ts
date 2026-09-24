@@ -1,4 +1,11 @@
-import { accountFeatureOffExclusionSql, getFriendById, getLineAccountById, isOperationCapabilityStopped, jstNow } from '@line-crm/db';
+import {
+  accountFeatureOffExclusionSql,
+  activeTenantLineAccountSql,
+  getFriendById,
+  getLineAccountById,
+  isOperationCapabilityStopped,
+  jstNow,
+} from '@line-crm/db';
 import { NEN_CAMPAIGN_BODY_MAX_LENGTH, effectiveAnniversaryMonthDay, type LeapYearPolicy } from '@line-crm/shared';
 import type { Message } from '@line-crm/line-sdk';
 import type { EcEvent } from '../routes/ec-integrations.js';
@@ -1061,6 +1068,13 @@ export async function processNenDeliveries(
 ): Promise<{ sent: number; failed: number; skipped: number }> {
   const dueWhere = `status IN ('pending', 'failed') AND datetime(scheduled_at) <= datetime('now')
         AND attempts < ?`;
+  await db.prepare(
+    `UPDATE nen_delivery_jobs
+        SET status='skipped', last_error='tenant_suspended', updated_at=?
+      WHERE ${dueWhere}
+        AND line_account_id IS NOT NULL
+        AND NOT ${activeTenantLineAccountSql('nen_delivery_jobs.line_account_id')}`,
+  ).bind(jstNow(), MAX_DELIVERY_ATTEMPTS).run();
   const campaignsOff = accountFeatureOffExclusionSql('nen_delivery_jobs.line_account_id', 'nen_campaigns');
   // オフ判定は LIMIT を数える前に SQL で行う。読んでから弾くと、オフの行が
   // 上限ぶん先頭を占めたまま、後ろに並ぶ動作中アカウントの配信が進まない。
@@ -1070,6 +1084,7 @@ export async function processNenDeliveries(
        FROM nen_delivery_jobs
       WHERE ${dueWhere}
         AND NOT ${campaignsOff}
+        AND (line_account_id IS NULL OR ${activeTenantLineAccountSql('nen_delivery_jobs.line_account_id')})
       ORDER BY scheduled_at ASC LIMIT ?`,
   ).bind(MAX_DELIVERY_ATTEMPTS, MAX_JOBS_PER_TICK).all<DeliveryJob>();
   // 止めた行も同じ上限ぶんだけ読み、skipped に数えて監査を残す。

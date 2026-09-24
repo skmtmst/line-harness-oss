@@ -1,4 +1,8 @@
-import { resolveLineCredential, isOperationCapabilityStopped } from '@line-crm/db';
+import {
+  activeTenantLineAccountSql,
+  resolveLineCredential,
+  isOperationCapabilityStopped,
+} from '@line-crm/db';
 import { sendEventBookingNotification } from './event-booking-notifier.js';
 import { featureJobCanRun } from './feature-enforcement.js';
 
@@ -1014,11 +1018,20 @@ export async function processEventWaitlistPromotionJobs(
     });
   }
 
+  await db.prepare(
+    `UPDATE event_waitlist_promotion_jobs
+        SET status='completed', completed_at=?, updated_at=?, last_error='tenant_suspended'
+      WHERE status IN ('pending','retryable_failed')
+        AND available_at <= ?
+        AND NOT ${activeTenantLineAccountSql('event_waitlist_promotion_jobs.line_account_id')}`,
+  ).bind(nowIso, nowIso, nowIso).run();
+
   const jobs = await db
     .prepare(
       `SELECT id, line_account_id, event_id, slot_id, attempts
          FROM event_waitlist_promotion_jobs
         WHERE status IN ('pending', 'retryable_failed') AND available_at <= ?
+          AND ${activeTenantLineAccountSql('event_waitlist_promotion_jobs.line_account_id')}
         ORDER BY available_at ASC, created_at ASC
         LIMIT ?`,
     )

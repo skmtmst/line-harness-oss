@@ -10,6 +10,7 @@ import {
   getEntryRouteByRefCode,
   getEntryRouteByRefCodeAny,
   getLineAccountById,
+  isLineAccountTenantActive,
   getAffiliateLinkByRefCode,
   incrementAffiliateLinkClick,
   enqueueFollowingMileageMilestones,
@@ -2153,9 +2154,12 @@ async function scheduled(
     };
     const result = await processDueRichMenuSchedules(env.DB, {
       getGroupWithPages: (db, groupId) => getRichMenuGroupWithPages(db, groupId),
-      getLineAccount: (db, accountId) => getLineAccountById(db, accountId) as Promise<{
-        id: string; channel_access_token: string | null; is_active: number; archived_at: string | null;
-      } | null>,
+      getLineAccount: async (db, accountId) => {
+        if (!await isLineAccountTenantActive(db, accountId)) return null;
+        return getLineAccountById(db, accountId) as Promise<{
+          id: string; channel_access_token: string | null; is_active: number; archived_at: string | null;
+        } | null>;
+      },
       getRequestingStaff: async (db, staffId) => {
         const staff = await getStaffById(db, staffId);
         return staff as unknown as {

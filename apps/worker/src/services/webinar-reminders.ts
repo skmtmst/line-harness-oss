@@ -11,6 +11,8 @@ import {
   getFriendById,
   getLineAccountById,
   isOperationCapabilityStopped,
+  isLineAccountTenantActive,
+  listLineAccountsWithTenantStatus,
   type Webinar,
 } from '@line-crm/db';
 import { addJitter, sleep } from './stealth.js';
@@ -77,11 +79,20 @@ export async function processWebinarReminders(
 ): Promise<{ sent: number; failed: number }> {
   const now = Math.floor(Date.now() / 1000);
   const due = await getDueWebinarRegistrations(db, now, LEAD_SECONDS);
+  const tenantStatusByAccount = new Map(
+    (await listLineAccountsWithTenantStatus(db)).map((account) => [account.id, account.tenant_status]),
+  );
   let sent = 0;
   let failed = 0;
   for (let i = 0; i < due.length; i++) {
     const reg = due[i];
     try {
+      if (reg.account_id && tenantStatusByAccount.get(reg.account_id) !== 'active') {
+        // notified_at is the terminal ledger for this legacy reminder path.
+        // Consuming it prevents an overdue send after the tenant is restored.
+        await markWebinarRegistrationNotified(db, reg.id);
+        continue;
+      }
       if (!reg.account_id || !await featureJobCanRun(db, {
         accountId: reg.account_id,
         featureId: 'webinars',
@@ -139,6 +150,9 @@ export async function sendWebinarRegistrationConfirmation(
   followupLabel = '開始5分前',
 ): Promise<void> {
   try {
+    if (webinar.account_id && !await isLineAccountTenantActive(db, webinar.account_id)) {
+      return;
+    }
     // 緊急停止 (#1050): reminder_dispatch 停止中は受付確認も送らない。
     if (webinar.account_id &&
         await isOperationCapabilityStopped(db, webinar.account_id, 'reminder_dispatch')) {

@@ -2,7 +2,13 @@
 // 対象ウェビナーは webinar_followup_configs で明示的に有効化し、enabled_at
 // より前の過去リードを一斉送信しない。LINE送信は必ずHarnessプロキシ経由。
 
-import { getFriendById, getLineAccountById, isOperationCapabilityStopped, jstNow } from '@line-crm/db';
+import {
+  getFriendById,
+  getLineAccountById,
+  isOperationCapabilityStopped,
+  jstNow,
+  listLineAccountsWithTenantStatus,
+} from '@line-crm/db';
 import { featureJobCanRun } from './feature-enforcement.js';
 import { pushViaHarnessProxy, type HarnessProxyDispatch } from './line-proxy-send.js';
 
@@ -33,6 +39,7 @@ type FollowupRow = {
   id: string;
   retry_key: string;
   status: 'pending' | 'sent' | 'failed';
+  last_error?: string | null;
 };
 
 type JourneyCandidate = {
@@ -49,6 +56,7 @@ type JourneyFollowupRow = {
   id: string;
   retry_key: string;
   status: 'pending' | 'sent' | 'failed' | 'skipped';
+  last_error?: string | null;
 };
 
 function formUrl(liffId: string, formId: string): string {
@@ -163,7 +171,7 @@ async function getOrCreateFollowup(
   kind: FollowupKind,
 ): Promise<FollowupRow> {
   const existing = await db.prepare(
-    `SELECT id, retry_key, status FROM webinar_followups
+    `SELECT id, retry_key, status, last_error FROM webinar_followups
      WHERE webinar_id = ? AND friend_id = ? AND kind = ?`,
   ).bind(candidate.webinar_id, candidate.friend_id, kind).first<FollowupRow>();
   if (existing) return existing;
@@ -180,7 +188,7 @@ async function getOrCreateFollowup(
   ).run();
   return (
     await db.prepare(
-      `SELECT id, retry_key, status FROM webinar_followups
+      `SELECT id, retry_key, status, last_error FROM webinar_followups
        WHERE webinar_id = ? AND friend_id = ? AND kind = ?`,
     ).bind(candidate.webinar_id, candidate.friend_id, kind).first<FollowupRow>()
   )!;
@@ -328,7 +336,7 @@ async function getOrCreateJourneyFollowup(
   kind: WebinarJourneyFollowupKind,
 ): Promise<JourneyFollowupRow> {
   const existing = await db.prepare(
-    `SELECT id, retry_key, status FROM webinar_journey_followups
+    `SELECT id, retry_key, status, last_error FROM webinar_journey_followups
      WHERE webinar_id = ? AND friend_id = ? AND kind = ?`,
   ).bind(candidate.webinar_id, candidate.friend_id, kind).first<JourneyFollowupRow>();
   if (existing) return existing;
@@ -347,7 +355,7 @@ async function getOrCreateJourneyFollowup(
   ).run();
   return (
     await db.prepare(
-      `SELECT id, retry_key, status FROM webinar_journey_followups
+      `SELECT id, retry_key, status, last_error FROM webinar_journey_followups
        WHERE webinar_id = ? AND friend_id = ? AND kind = ?`,
     ).bind(candidate.webinar_id, candidate.friend_id, kind).first<JourneyFollowupRow>()
   )!;
@@ -393,9 +401,22 @@ export async function processWebinarFollowups(
       candidate, kind: 'submitted_no_booking_24h' as const,
     })),
   ];
+  const tenantStatusByAccount = new Map(
+    (await listLineAccountsWithTenantStatus(db)).map((account) => [account.id, account.tenant_status]),
+  );
   let sent = 0;
   let failed = 0;
   for (const { candidate, kind } of due) {
+    const followup = await getOrCreateFollowup(db, candidate, kind);
+    if (followup.last_error === 'tenant_suspended') continue;
+    if (candidate.account_id && tenantStatusByAccount.get(candidate.account_id) !== 'active') {
+      await db.prepare(
+        `UPDATE webinar_followups
+            SET status='failed', last_error='tenant_suspended', updated_at=?
+          WHERE id=? AND status!='sent'`,
+      ).bind(jstNow(), followup.id).run();
+      continue;
+    }
     // 機能オフ中は追跡行を作らず送らない。期限後も再オンで安全に再開する。
     if (candidate.account_id && !await featureJobCanRun(db, { accountId: candidate.account_id, featureId: 'webinars', job: 'webinar followups' })) {
       continue;
@@ -405,7 +426,6 @@ export async function processWebinarFollowups(
         await isOperationCapabilityStopped(db, candidate.account_id, 'reminder_dispatch')) {
       continue;
     }
-    const followup = await getOrCreateFollowup(db, candidate, kind);
     if (followup.status === 'sent') continue;
     try {
       const friend = await getFriendById(db, candidate.friend_id);
@@ -457,12 +477,21 @@ export async function processWebinarFollowups(
   }
 
   for (const { candidate, kind } of journeyDue) {
+    const followup = await getOrCreateJourneyFollowup(db, candidate, kind);
+    if (followup.last_error === 'tenant_suspended') continue;
+    if (candidate.account_id && tenantStatusByAccount.get(candidate.account_id) !== 'active') {
+      await db.prepare(
+        `UPDATE webinar_journey_followups
+            SET status='skipped', last_error='tenant_suspended', updated_at=?
+          WHERE id=? AND status NOT IN ('sent','skipped')`,
+      ).bind(jstNow(), followup.id).run();
+      continue;
+    }
     // 緊急停止 (#1050): reminder_dispatch 停止中は追跡行を作らず送らない。
     if (candidate.account_id &&
         await isOperationCapabilityStopped(db, candidate.account_id, 'reminder_dispatch')) {
       continue;
     }
-    const followup = await getOrCreateJourneyFollowup(db, candidate, kind);
     if (followup.status === 'sent' || followup.status === 'skipped') continue;
     try {
       const friend = await getFriendById(db, candidate.friend_id);
