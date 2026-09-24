@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
 
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
-import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
+import { DataTable, TableHeadRow, TableStateRow, Td, Th, Tr } from '@/components/shared/table'
 import { STATE_TEXT, notConnectedText } from '@/components/shared/not-connected'
 import { formatMileageDate, formatMileageNumber } from './mileage-display'
 import {
@@ -383,10 +383,10 @@ export default function MileageRewardsTab({ accountId }: { accountId: string | n
           </TableHeadRow>
         </thead>
         <tbody className="divide-hairline divide-y">
-          {status === 'loading' ? <tr><td colSpan={6} className="p-0"><ListState kind="loading" /></td></tr>
+          {status === 'loading' ? <TableStateRow colSpan={6} kind="loading" />
             : status === 'forbidden' ? <tr><td colSpan={6} className="p-0"><ListState kind="forbidden" description="マイルの使い道を見る権限がありません。オーナーか管理者に確認してください。" /></td></tr>
-              : status === 'error' ? <tr><td colSpan={6} className="p-0"><ListState kind="error" description="マイルの使い道を読み込めませんでした。" action={<Button variant="secondary" onClick={() => void load()}>使い道を再読み込み</Button>} /></td></tr>
-                : rewards.length === 0 ? <tr><td colSpan={6} className="p-0"><ListState kind="empty" title="いまのところ特典なし" description="ここに1つ足すと動きが変わります。交換するとクーポンやタグが自動で渡ります。" /></td></tr>
+              : status === 'error' ? <TableStateRow colSpan={6} kind="error" description="マイルの使い道を読み込めませんでした。" onRetry={() => void load()} retryLabel="使い道を再読み込み" />
+                : rewards.length === 0 ? <TableStateRow colSpan={6} kind="empty" title="いまのところ特典なし" description="ここに1つ足すと動きが変わります。交換するとクーポンやタグが自動で渡ります。" />
                   : rewards.map((reward) => {
                     const stock = stockText(reward)
                     const reach = reachMetrics.find((metric) => metric.rewardId === reward.id)
