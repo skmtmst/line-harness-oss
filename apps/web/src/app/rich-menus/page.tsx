@@ -15,6 +15,7 @@ import FolderPanel, { FOLDER_RAIL_STYLE } from '@/components/shared/folder-panel
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
 import { MoreHorizontal, Trash2 } from 'lucide-react'
 import Button from '@/components/shared/button'
+import FilterChip from '@/components/shared/filter-chip'
 import IconButton from '@/components/shared/icon-button'
 import ActionMenu from '@/components/shared/action-menu'
 import ListState from '@/components/shared/list-state'
@@ -643,7 +644,7 @@ export default function RichMenusListPage() {
   }, [page, pageCount])
 
   return (
-    <main data-design-node="GO8RQ" className="mx-auto max-w-[1584px] p-6">
+    <div data-design-node="GO8RQ" className="mx-auto max-w-[1584px]">
       <span hidden>メニュー名・ボタン名で検索・保存した条件・公開中のみ</span>
       {showExternal && selectedAccount ? (
         /*
@@ -685,7 +686,7 @@ export default function RichMenusListPage() {
         <div className="bg-canvas rounded-card border-hairline border p-4">
           <p className="text-ink-faint text-xs">今月のタップ</p>
           <p className={`mt-1 text-2xl font-bold tabular-nums ${tapKpiReady ? 'text-ink' : 'text-ink-faint'}`}>
-            {tapKpiReady ? (tapStats?.total ?? '—') : '—'}
+            {tapKpiReady ? (tapStats?.total != null ? tapStats.total.toLocaleString('ja-JP') : '—') : '—'}
             {tapKpiReady && <span className="text-ink-faint ml-0.5 text-xs font-normal">回</span>}
           </p>
           <p className="text-ink-faint mt-0.5 text-xs">
@@ -702,9 +703,12 @@ export default function RichMenusListPage() {
           </p>
           <p className="text-ink-faint mt-0.5 text-xs">
             {topArea
-              ? `${topArea.taps}回・タップ数の内訳は編集画面で見られます`
+              ? `${topArea.taps.toLocaleString('ja-JP')}回・タップ数の内訳は編集画面で見られます`
               : tapKpiReady
-                ? 'まだ押されていません'
+                ? // ★V7：今月のタップが1回以上あるのに「まだ押されていません」と矛盾していた。
+                  (tapStats?.total ?? 0) > 0
+                  ? '内訳はまだ集まっていません'
+                  : 'まだ押されていません'
                 : tapKpiUnavailableText}
           </p>
         </div>
@@ -729,12 +733,9 @@ export default function RichMenusListPage() {
         className="bg-canvas rounded-card border-hairline mb-3 border p-3"
       >
         <div className="flex flex-wrap items-center gap-2">
-          <Link
-            href="/rich-menus/new"
-            className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control inline-flex items-center gap-1 px-4 py-2 text-sm font-medium transition-colors"
-          >
+          <Button href="/rich-menus/new" variant="primary">
             メニューを作る
-          </Link>
+          </Button>
           <Button
             onClick={() => {
               // 並べ替え中は、実際の出し分け判定と同じ順番で全件を見せる。
@@ -764,7 +765,7 @@ export default function RichMenusListPage() {
         </div>
         <div className="mt-2 flex flex-wrap items-center gap-2">
           <span className="text-ink-faint text-xs whitespace-nowrap">並び順</span>
-          <SelectField value={sortKey} onChange={(e) => setSortKey(e.target.value as SortKey)} aria-label="並び順" options={[{ value: "priority", label: "出す順番（自分で決めた順）" }, { value: "taps", label: "タップ数が多い順" }, { value: "updated", label: "更新が新しい順" }, { value: "name", label: "名前順" }]} className="border-hairline rounded-control focus:ring-accent border px-2 py-2 text-sm focus:ring-2 focus:outline-none" />
+          <SelectField value={sortKey} onChange={(e) => setSortKey(e.target.value as SortKey)} aria-label="並び順" options={[{ value: "priority", label: "出す順番（自分で決めた順）" }, { value: "taps", label: "タップ数が多い順" }, { value: "updated", label: "更新が新しい順" }, { value: "name", label: "名前順" }]} className="border-hairline rounded-control focus:ring-accent min-w-60 border px-2 py-2 text-sm focus:ring-2 focus:outline-none" />
           <span className="text-ink-faint text-xs whitespace-nowrap">表示</span>
           <SelectField
             size="compact"
@@ -773,42 +774,31 @@ export default function RichMenusListPage() {
             aria-label="表示件数"
             options={[{ value: '20', label: '20件表示' }, { value: '50', label: '50件表示' }, { value: '100', label: '100件表示' }]}
           />
+          {/* ★V7：緑の帯は「正常」と読めるので、並び順の横の注記にする。 */}
+          <p className="text-ink-faint min-w-0 text-xs leading-relaxed">
+            上にあるものが優先されます。同じ友だちが複数のメニューに当てはまるときは、
+            いちばん上の1つだけが出ます。
+          </p>
         </div>
       </div>
 
-      <div className="bg-accent-soft text-ink-secondary mb-3 rounded-control px-3 py-2 text-xs leading-relaxed">
-        上にあるものが優先されます。同じ友だちが複数のメニューに当てはまるときは、
-        いちばん上の1つだけが出ます。
-      </div>
 
+      {/*
+        ★V7：「保存した検索」と書いていたが、中身は状態の絞り込み。保存はできないので名前を合わせる。
+        「管理画面の外」は絞り込みではなく別の画面を開く操作なので、札の列から出して枠つきボタンにする。
+      */}
       <div data-design="Saved" className="mb-3 flex flex-wrap items-center gap-2">
         <span className="text-ink-faint text-xs whitespace-nowrap">よく使う絞り込み</span>
-        {SAVED_FILTERS.map((f) => {
-          const on = savedFilter === f.key
-          return (
-            <button
-              key={f.key}
-              onClick={() => setSavedFilter(on ? '' : f.key)}
-              aria-pressed={on}
-              title={f.note}
-              className={`rounded-pill border px-3 py-1 text-xs transition-colors ${
-                on
-                  ? 'border-accent bg-accent-soft text-ink'
-                  : 'border-hairline text-ink-secondary hover:bg-canvas-sunken'
-              }`}
-            >
-              {f.label}
-            </button>
-          )
-        })}
-        <button
-          type="button"
-          data-qa-open="TL7tp"
-          onClick={() => setShowExternal(true)}
-          className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-pill border px-3 py-1 text-xs transition-colors"
-        >
-          管理画面の外
-        </button>
+        {SAVED_FILTERS.map((f) => (
+          <FilterChip key={f.key} selected={savedFilter === f.key} onChange={() => setSavedFilter(savedFilter === f.key && f.key ? '' : f.key)}>
+            {f.label}
+          </FilterChip>
+        ))}
+        <span className="ml-auto">
+          <Button data-qa-open="TL7tp" onClick={() => setShowExternal(true)} title="LINEの画面で直接作ったメニューを見て、取り込めます">
+            管理画面の外のメニュー
+          </Button>
+        </span>
       </div>
 
       {!selectedAccount && (
@@ -935,7 +925,7 @@ export default function RichMenusListPage() {
                           </p>
                         </td>
                         <td className="px-4 py-3 text-xs text-ink-secondary tabular-nums">
-                          {new Date(g.updatedAt).toLocaleDateString('ja-JP', { month: '2-digit', day: '2-digit' })}
+                          {new Date(g.updatedAt).toLocaleDateString('ja-JP', { month: 'long', day: 'numeric' })}
                         </td>
                         <td className="px-4 py-3">
                           {/* #641: 「編集」＋「削除」＋「その他（…）」の形にそろえる。表示先・複製・切替はメニューへ集約。 */}
@@ -1188,7 +1178,7 @@ export default function RichMenusListPage() {
           </ul>
         )}
       </ConfirmDialog>
-    </main>
+    </div>
   )
 }
 

@@ -185,7 +185,7 @@ export default function NewRestaurantStorePage() {
       })}</ol>
 
       <div className="grid min-w-0 grid-cols-1 items-start gap-5 lg:grid-cols-[minmax(0,1fr)_280px]">
-        <main className="min-w-0 rounded-card border border-hairline bg-canvas p-5 sm:p-7">
+        <div className="min-w-0 rounded-card border border-hairline bg-canvas p-5 sm:p-7">
           <p className="text-xs font-semibold text-ink-faint">ステップ {step} / 5</p>
           <h2 className="mt-2 text-xl font-bold text-ink">{steps[step - 1][0]}</h2>
           <p className="mt-2 text-sm leading-6 text-ink-secondary">{steps[step - 1][1]}</p>
@@ -235,7 +235,7 @@ export default function NewRestaurantStorePage() {
               <StickyBar className="mt-5" actions={<><button type="button" disabled={saving} onClick={() => setStep(STEP.CREDENTIALS)} className="rounded-control border border-hairline px-4 py-2.5 text-sm font-semibold text-ink disabled:opacity-40">戻る</button><button type="button" disabled={saving} onClick={() => void connect()} className="rounded-control bg-accent-deep px-5 py-2.5 text-sm font-semibold text-on-accent disabled:cursor-not-allowed disabled:opacity-40">{saving ? '接続を確認中…' : 'アカウントセットアップ実行'}</button></>} />
             </>}
           </div>}
-        </main>
+        </div>
 
         <aside className="min-w-0 rounded-card border border-hairline bg-canvas p-5">
           <h2 className="font-bold text-ink">わからないときは</h2>

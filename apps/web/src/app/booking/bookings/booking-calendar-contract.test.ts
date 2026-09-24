@@ -17,7 +17,9 @@ describe('V6 予約管理の時間台帳', () => {
     expect(CALENDAR).toContain('function WeekGrid')
     expect(CALENDAR).toContain('repeat(${Math.max(staff.length, 1)}, minmax(0, 1fr))')
     expect(CALENDAR).toContain("'64px repeat(7, minmax(0, 1fr))'")
-    expect(CALENDAR).toContain('LINEからの予約（緑）と電話の予約（青）')
+    // ★V7：色の見方は帯ではなく小さな凡例（● LINEからの予約 ● 電話の予約）。
+    expect(CALENDAR).toContain('●</span> LINEからの予約')
+    expect(CALENDAR).toContain('●</span> 電話の予約')
   })
 
   test('格子ごとに走査せず辞書へ束ねる(点検#516の中1)', () => {
@@ -99,7 +101,8 @@ describe('V6 予約管理の時間台帳', () => {
   test('BOOKING-01: 実際に取れる枠だけが代理予約の入口になる', () => {
     // remaining>0 の枠があるマスだけ入口にし、取れないマスは「—」。
     expect(CALENDAR).toContain('slot.remaining <= 0')
-    expect(CALENDAR).toContain('aria-label="受け付けていない時間"')
+    // ★V7：受け付けていないマスは空のまま、読み上げだけ伝える。
+    expect(CALENDAR).toContain('<span className="sr-only">受け付けていない時間</span>')
     // 入口は枠を出したメニューと実際の開始時刻・担当を事前入力し、
     // メニュー候補のない入口へ遷移させない。
     expect(CALENDAR).toContain("params.set('menu', input.menuId)")

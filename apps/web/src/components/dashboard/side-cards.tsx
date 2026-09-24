@@ -115,7 +115,7 @@ export function SupportMarkStatusCard({
           { label: '未対応', value: inbox?.unanswered ?? null },
           { label: '対応済み', value: inbox?.resolved ?? null },
         ].map((row) => (
-          <p key={row.label} className="text-success text-sm font-bold">
+          <p key={row.label} className={`${row.label === '未対応' && (row.value ?? 0) > 0 ? 'text-danger' : 'text-ink'} text-sm font-bold`}>
             {row.label}
             <span className="ml-1.5 tabular-nums">
               {row.value === null ? '—' : `${row.value.toLocaleString('ja-JP')}人`}
@@ -256,15 +256,15 @@ export function FriendStatusCard({ friends, freshness }: { friends: DashboardOve
       <dl className="space-y-2.5 text-sm">
         <div className="flex items-baseline justify-between gap-3">
           <dt className="text-ink-secondary text-xs">友だち総数</dt>
-          <dd className="text-success font-bold tabular-nums">{friends.total.toLocaleString('ja-JP')}人</dd>
+          <dd className="text-ink font-bold tabular-nums">{friends.total.toLocaleString('ja-JP')}人</dd>
         </div>
         <div className="flex items-baseline justify-between gap-3">
           <dt className="text-ink-secondary text-xs">有効</dt>
-          <dd className="text-success font-bold tabular-nums">{friends.active.toLocaleString('ja-JP')}人</dd>
+          <dd className="text-ink font-bold tabular-nums">{friends.active.toLocaleString('ja-JP')}人</dd>
         </div>
         <div className="flex items-baseline justify-between gap-3">
           <dt className="text-ink-secondary text-xs">ブロック・非表示</dt>
-          <dd className="text-success font-bold tabular-nums">
+          <dd className="text-ink font-bold tabular-nums">
             {blocked.toLocaleString('ja-JP')}人（{rate.toFixed(1)}%）
           </dd>
         </div>

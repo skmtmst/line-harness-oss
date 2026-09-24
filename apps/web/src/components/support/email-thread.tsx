@@ -691,7 +691,7 @@ export default function EmailThread({
                 >
                   {(message.sent_by_staff_name ?? '担').charAt(0)}
                 </div>
-                <span className="text-ink-faint mt-1 w-full truncate text-center text-[9px]">
+                <span className="text-ink-faint mt-1 w-full truncate text-center text-micro">
                   {message.sent_by_staff_name ?? '担当者'}
                 </span>
               </div>

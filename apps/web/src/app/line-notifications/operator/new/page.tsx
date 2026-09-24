@@ -242,7 +242,7 @@ function NewOperatorNotificationInner() {
       </div>
 
       <div className="grid gap-4 xl:grid-cols-3">
-        <main className="space-y-4 xl:col-span-2">
+        <div className="space-y-4 xl:col-span-2">
           <section className="border-hairline bg-canvas rounded-card border p-5">
             <h2 className="mb-4 text-sm font-semibold text-ink">どんなときに知らせるか</h2>
             <div className="grid gap-4 lg:grid-cols-3">
@@ -292,7 +292,7 @@ function NewOperatorNotificationInner() {
 
           {error ? <p role="alert" className="border-danger bg-danger-bg text-danger rounded-control border px-4 py-3 text-sm">{error}</p> : null}
           {notice ? <p role="status" className="border-success bg-success-bg text-success rounded-control border px-4 py-3 text-sm">{notice}</p> : null}
-        </main>
+        </div>
 
         <aside className="space-y-4">
           <section className="border-hairline bg-canvas rounded-card border p-4">

@@ -2372,7 +2372,7 @@ function FriendsOverviewTab({ accountId }: { accountId: string }) {
       <KpiCard title="減った友だち" value={removedValue} unit="人" {...metricCardState(overview.metrics.removed, removedValue === null ? pendingCard : { detail: `この${days}日。ブロック・友だち解除` }, state.retry)} />
       <KpiCard title="差し引き" value={netValue} unit="人" {...metricCardState(overview.metrics.net, remainingRate === null ? pendingCard : { detail: `増加 − 減少。残っている割合 ${remainingRate.toFixed(1)}%` }, state.retry)} />
     </div>
-    <AnalyticsNotice>増えた人と減った人を日ごとに並べています。減りが増えた日に何を配信したかも、同じ日付で確かめられます。</AnalyticsNotice>
+    {/* ★V7：グラフの小見出しと同じことを繰り返していた説明の帯は外した。配信との照らし合わせは凡例の横に出ている。 */}
     <section className="bg-canvas rounded-card border-hairline border p-4">
       <div className="mb-4 flex flex-wrap items-start justify-between gap-2">
         <div><h2 className="font-semibold text-ink">日ごとの増減（この{days}日）</h2><p className="mt-1 text-xs text-ink-faint">左が増えた人、右が減った人です。</p></div>
