@@ -46,25 +46,13 @@ export default function PoolsPage() {
     a.slug === 'main' ? -1 : b.slug === 'main' ? 1 : a.name.localeCompare(b.name),
   )
 
+  // 読み込み済み・失敗なし・0件のときは空状態だけ出す。件数と右上の
+  // 作成口を残すと、同じ緑ボタンが2つ・同じ0が2か所に重複する。
+  const isEmpty = !loading && !error && sortedPools.length === 0
+
   return (
     <div>
-      <div className="flex justify-between items-center mb-4">
-        <span className="text-sm text-ink-secondary">{pools.length} プール</span>
-        <Button variant="primary" onClick={() => setShowCreate(true)}>
-          ＋ プールをつくる
-        </Button>
-      </div>
-
-      {loading && pools.length === 0 ? (
-        <ListState kind="loading" />
-      ) : error && pools.length === 0 ? (
-        <ListState
-          kind="error"
-          title="プール一覧を表示できませんでした"
-          description="プール一覧の取得に失敗しました。もう一度読み込んでください。"
-          onRetry={() => { void load() }}
-        />
-      ) : sortedPools.length === 0 ? (
+      {isEmpty ? (
         <ListState
           kind="empty"
           title="まだプールがありません"
@@ -76,17 +64,37 @@ export default function PoolsPage() {
           }
         />
       ) : (
-        <div className="space-y-3">
-          {error ? (
-            <div className="border-danger bg-danger-bg text-danger rounded-control flex flex-wrap items-center gap-3 border p-4 text-sm" role="alert">
-              <span className="min-w-0 flex-1">{error}</span>
-              <button type="button" onClick={() => { void load() }} className="shrink-0 font-medium underline">もう一度読み込む</button>
+        <>
+          <div className="flex justify-between items-center mb-4">
+            <span className="text-sm text-ink-secondary">{pools.length} プール</span>
+            <Button variant="primary" onClick={() => setShowCreate(true)}>
+              ＋ プールをつくる
+            </Button>
+          </div>
+
+          {loading && pools.length === 0 ? (
+            <ListState kind="loading" />
+          ) : error && pools.length === 0 ? (
+            <ListState
+              kind="error"
+              title="プール一覧を表示できませんでした"
+              description="プール一覧の取得に失敗しました。もう一度読み込んでください。"
+              onRetry={() => { void load() }}
+            />
+          ) : (
+            <div className="space-y-3">
+              {error ? (
+                <div className="border-danger bg-danger-bg text-danger rounded-control flex flex-wrap items-center gap-3 border p-4 text-sm" role="alert">
+                  <span className="min-w-0 flex-1">{error}</span>
+                  <button type="button" onClick={() => { void load() }} className="shrink-0 font-medium underline">もう一度読み込む</button>
+                </div>
+              ) : null}
+              {sortedPools.map((pool) => (
+                <PoolCard key={pool.id} pool={pool} accounts={accounts} onChange={load} />
+              ))}
             </div>
-          ) : null}
-          {sortedPools.map((pool) => (
-            <PoolCard key={pool.id} pool={pool} accounts={accounts} onChange={load} />
-          ))}
-        </div>
+          )}
+        </>
       )}
 
       {showCreate && (
