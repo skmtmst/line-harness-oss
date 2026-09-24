@@ -560,7 +560,7 @@ export default function NotificationRunList({
                     ) : null}
                     {(item.attemptHistory?.length ?? 0) > 0 ? (
                       <details className="mt-2 text-xs text-ink-secondary">
-                        <summary className="cursor-pointer font-semibold text-accent-deep">試行履歴を確認</summary>
+                        <summary className="cursor-pointer font-semibold text-action">試行履歴を確認</summary>
                         <ul className="mt-1 space-y-1">
                           {item.attemptHistory!.map((attempt) => (
                             <li key={`${item.id}-${attempt.number}`}>
@@ -572,7 +572,7 @@ export default function NotificationRunList({
                       </details>
                     ) : null}
                     {mode === 'failures' && item.friendId ? (
-                      <Link href={`/chats?friend=${encodeURIComponent(item.friendId)}`} className="mt-1 inline-block whitespace-nowrap text-xs font-semibold text-accent-deep hover:underline">
+                      <Link href={`/chats?friend=${encodeURIComponent(item.friendId)}`} className="mt-1 inline-block whitespace-nowrap text-xs font-semibold text-action hover:underline">
                         受信箱で連絡
                       </Link>
                     ) : null}
