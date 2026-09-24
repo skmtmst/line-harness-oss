@@ -97,7 +97,8 @@ vi.mock('@/components/shared/select-field', () => ({
   ),
 }))
 vi.mock('@/components/shared/sticky-bar', () => ({
-  default: ({ actions }: { actions: React.ReactNode }) => <div>{actions}</div>,
+  // 共通部品の契約どおり status も描く（status を落とすと未保存の印が見えなくなる）。
+  default: ({ actions, status }: { actions: React.ReactNode; status?: React.ReactNode }) => <div>{status}{actions}</div>,
 }))
 
 const webinar = {
