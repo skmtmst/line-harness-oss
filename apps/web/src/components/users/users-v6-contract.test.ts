@@ -81,6 +81,19 @@ describe('統合ユーザーV6の画面契約', () => {
     expect(SUMMARY).toContain('requestGuard.isCurrent(requestGeneration)')
   })
 
+  it('操作列はボタンが収まる固定幅にし、伸び縮みは連絡先とアカウントだけにする', () => {
+    /*
+     * 1440pxで「詳細を見る」が枠をはみ出していた。再発防止に幅を固定する。
+     * 操作列 176px＝詳細ボタン98px＋隙間8px＋「…」32px＋セル余白24px（162px）に余裕14px。
+     * 幅を持たない <col /> が2つ（連絡先・紐付くアカウント）だけ残る。
+     */
+    for (const width of ['w-[16%]', 'w-[108px]', 'w-[92px]', 'w-[176px]']) {
+      expect(TABLE).toContain(width)
+    }
+    expect(TABLE).toContain('<col />')
+    expect(TABLE).not.toContain('w-[9%]')
+  })
+
   it('共通ページ送りを使い横スクロールへ逃がさない', () => {
     expect(TABLE).toContain("import Pagination from '@/components/shared/pagination'")
     expect(TABLE).toContain("import { TableHeadRow, Th } from '@/components/shared/table'")

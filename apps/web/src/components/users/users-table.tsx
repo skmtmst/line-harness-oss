@@ -38,14 +38,20 @@ export default function UsersTable({
   return (
     <div className="overflow-hidden rounded-card border border-hairline bg-canvas shadow-card">
       <table className="w-full table-fixed">
+        {/*
+          列幅の決め方（1440pxで操作ボタンが枠をはみ出していたため固定化）。
+          連絡先・紐付くアカウントだけが伸び縮みし、他は固定。
+          操作列 176px の根拠：詳細ボタン 98px（「詳細を見る」5字×14px＋左右13px＋枠2px）
+          ＋隙間 8px＋「…」32px＋セル余白 24px＝162px。閉じたメニューは描かれない。
+        */}
         <colgroup>
-          <col className="w-[18%]" />
-          <col className="w-[18%]" />
-          <col className="w-[20%]" />
-          <col className="w-[14%]" />
-          <col className="w-[11%]" />
-          <col className="w-[10%]" />
-          <col className="w-[9%]" />
+          <col className="w-[16%]" />
+          <col />
+          <col />
+          <col className="w-[108px]" />
+          <col className="w-[108px]" />
+          <col className="w-[92px]" />
+          <col className="w-[176px]" />
         </colgroup>
         <thead className="border-b border-hairline bg-canvas-sunken text-left text-micro font-semibold text-ink-secondary">
           <TableHeadRow>
