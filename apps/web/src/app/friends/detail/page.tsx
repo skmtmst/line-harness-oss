@@ -264,11 +264,11 @@ function FriendTimelineRow({ item, friendId, last = false }: { item: FriendTimel
       <span>
         {source ? (
           source.external ? (
-            <a href={source.href} target="_blank" rel="noreferrer" className="text-accent-deep hover:underline">
+            <a href={source.href} target="_blank" rel="noreferrer" className="text-action hover:underline">
               開く
             </a>
           ) : (
-            <Link href={source.href} className="text-accent-deep hover:underline">
+            <Link href={source.href} className="text-action hover:underline">
               開く
             </Link>
           )
@@ -399,7 +399,7 @@ function SectionHead({
   return (
     <div className="mb-1.5 flex items-baseline justify-between gap-2">
       <p className="text-ink-faint text-xs font-semibold">{label}</p>
-      <Link href={href} className="text-accent-deep shrink-0 text-xs hover:underline">
+      <Link href={href} className="text-action shrink-0 text-xs hover:underline">
         {actionLabel}
       </Link>
     </div>
@@ -1137,7 +1137,7 @@ function FriendDetailInner() {
       <div>
         <p className="text-ink-faint bg-canvas rounded-card border-hairline border p-8 text-center text-sm">
           友だちが指定されていません。
-          <Link href="/friends" className="text-accent-deep ml-1 hover:underline">
+          <Link href="/friends" className="text-action ml-1 hover:underline">
             友だち一覧へ戻る
           </Link>
         </p>
@@ -1326,7 +1326,7 @@ function FriendDetailInner() {
               type="button"
               onClick={() => setProfileExpanded((v) => !v)}
               aria-expanded={profileExpanded}
-              className="text-accent-deep w-full px-5 py-2.5 text-center text-xs font-semibold hover:bg-canvas-sunken lg:hidden"
+              className="text-action w-full px-5 py-2.5 text-center text-xs font-semibold hover:bg-canvas-sunken lg:hidden"
             >
               {profileExpanded ? '顧客情報を閉じる' : '顧客情報をすべて表示'}
             </button>
@@ -1361,7 +1361,7 @@ function FriendDetailInner() {
                   <button
                     type="button"
                     onClick={() => void loadMileage()}
-                    className="text-accent-deep shrink-0 hover:underline"
+                    className="text-action shrink-0 hover:underline"
                   >
                     再試行
                   </button>
@@ -1384,12 +1384,12 @@ function FriendDetailInner() {
                       type="button"
                       onClick={() => (supportEditing ? setSupportEditing(false) : void openSupportEditor())}
                       aria-expanded={supportEditing}
-                      className="text-accent-deep shrink-0 text-xs hover:underline"
+                      className="text-action shrink-0 text-xs hover:underline"
                     >
                       {supportEditing ? 'やめる' : '編集'}
                     </button>
                   ) : (
-                    <Link href={inboxHrefForFriend(friendId)} className="text-accent-deep shrink-0 text-xs hover:underline">
+                    <Link href={inboxHrefForFriend(friendId)} className="text-action shrink-0 text-xs hover:underline">
                       編集
                     </Link>
                   )}
@@ -1540,7 +1540,7 @@ function FriendDetailInner() {
                     <button
                       type="button"
                       onClick={() => void loadFields()}
-                      className="text-accent-deep ml-1 hover:underline"
+                      className="text-action ml-1 hover:underline"
                     >
                       再試行
                     </button>
@@ -1571,7 +1571,7 @@ function FriendDetailInner() {
                     <button
                       type="button"
                       onClick={() => void loadRichMenu()}
-                      className="text-accent-deep hover:underline"
+                      className="text-action hover:underline"
                     >
                       再試行
                     </button>
@@ -1664,7 +1664,7 @@ function FriendDetailInner() {
                         <button
                           type="button"
                           onClick={() => void loadMileage()}
-                          className="text-accent-deep ml-1 hover:underline"
+                          className="text-action ml-1 hover:underline"
                         >
                           再試行
                         </button>
@@ -1699,7 +1699,7 @@ function FriendDetailInner() {
                   0件・取得失敗・読み込み中はそれぞれ区別して表示する。
                 */}
                 <section className="bg-canvas rounded-card border-hairline overflow-hidden border shadow-card">
-                  <div className="flex items-center justify-between px-4 py-3"><h2 className="text-ink text-sm font-bold">最近の履歴</h2><Link href={`/friends/detail?id=${friendId}&tab=history`} className="text-accent-deep text-xs font-semibold">すべてを見る →</Link></div>
+                  <div className="flex items-center justify-between px-4 py-3"><h2 className="text-ink text-sm font-bold">最近の履歴</h2><Link href={`/friends/detail?id=${friendId}&tab=history`} className="text-action text-xs font-semibold">すべてを見る →</Link></div>
                   {/*
                     #985 CHK-04: 140+160+140pxの固定列は狭い幅で
                     親の overflow-hidden に欠ける。md 未満では見出しを
@@ -1714,7 +1714,7 @@ function FriendDetailInner() {
                       <button
                         type="button"
                         onClick={() => void loadHistory()}
-                        className="text-accent-deep ml-1 hover:underline"
+                        className="text-action ml-1 hover:underline"
                       >
                         再試行
                       </button>
@@ -1777,7 +1777,7 @@ function FriendDetailInner() {
                           <button
                             type="button"
                             onClick={() => void openScenarioPicker()}
-                            className="text-accent-deep ml-1 hover:underline"
+                            className="text-action ml-1 hover:underline"
                           >
                             再試行
                           </button>
@@ -1977,7 +1977,7 @@ function FriendDetailInner() {
                     この分類は削除されたか、見つかりません。
                     <Link
                       href={`/friends/detail?id=${encodeURIComponent(friendId)}&tab=info`}
-                      className="text-accent-deep ml-1 hover:underline"
+                      className="text-action ml-1 hover:underline"
                     >
                       基本の項目を見る
                     </Link>
@@ -2006,7 +2006,7 @@ function FriendDetailInner() {
                       {canManageFieldDefs && hiddenPersonalCount === 0 ? (
                         <Link
                           href={`/tags/fields/new?back=/friends/detail?id=${friendId}`}
-                          className="text-accent-deep ml-1 hover:underline"
+                          className="text-action ml-1 hover:underline"
                         >
                           項目を追加
                         </Link>

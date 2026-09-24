@@ -137,7 +137,7 @@ export default function EventsListPage() {
       <div data-design="Head">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <nav className="text-ink-faint text-xs">
-            <span className="text-accent-deep font-medium">予約</span>
+            <span className="text-ink font-medium">予約</span>
             <span className="mx-1.5">/</span>
             <span>イベント予約</span>
           </nav>

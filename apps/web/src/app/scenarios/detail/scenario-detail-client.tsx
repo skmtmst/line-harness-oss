@@ -266,7 +266,7 @@ function SettingCard({
             type="button"
             data-qa-open={qaOpen}
             onClick={onAction}
-            className="text-accent-deep shrink-0 text-xs hover:underline"
+            className="text-action shrink-0 text-xs hover:underline"
           >
             {action}
           </button>
@@ -1461,7 +1461,7 @@ export default function ScenarioDetailClient({
             <button
               type="button"
               onClick={() => setStepTargetOpen(true)}
-              className="text-accent-deep shrink-0 text-xs hover:underline"
+              className="text-action shrink-0 text-xs hover:underline"
             >
               条件を編集
             </button>
@@ -1492,7 +1492,7 @@ export default function ScenarioDetailClient({
                     title: `${stepForm.stepOrder}通目を送ったあと`,
                   })
                 }
-                className="text-accent-deep shrink-0 text-xs hover:underline"
+                className="text-action shrink-0 text-xs hover:underline"
               >
                 ＋ アクションを追加
               </button>
@@ -1642,7 +1642,7 @@ export default function ScenarioDetailClient({
 
         <div className="bg-canvas rounded-card border border-hairline p-8 text-center">
           <p className="text-ink-faint">{error || 'シナリオが見つかりません'}</p>
-          <Link href="/scenarios" className="text-accent-deep mt-4 inline-block text-sm hover:underline">
+          <Link href="/scenarios" className="text-action mt-4 inline-block text-sm hover:underline">
             ← シナリオ一覧に戻る
           </Link>
         </div>
@@ -2209,7 +2209,7 @@ export default function ScenarioDetailClient({
                               <button
                                 type="button"
                                 onClick={() => openInsertStep(sortedSteps[idx - 1].stepOrder)}
-                                className="text-ink-faint hover:text-accent-deep px-3 text-xs opacity-40 transition-opacity group-hover:opacity-100"
+                                className="text-ink-faint hover:text-action px-3 text-xs opacity-40 transition-opacity group-hover:opacity-100"
                               >
                                 ＋ ここに挿入
                               </button>
@@ -2259,7 +2259,7 @@ export default function ScenarioDetailClient({
                             {title}
                           </button>
                           {step.onReachTagId && (
-                            <p className="text-accent-deep mt-0.5 truncate text-xs">
+                            <p className="text-ink-faint mt-0.5 truncate text-xs">
                               到達タグ: {tags.find((t) => t.id === step.onReachTagId)?.name ?? step.onReachTagId}
                             </p>
                           )}

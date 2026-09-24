@@ -332,7 +332,7 @@ function TemplateUsageNotice({ usedBy }: { usedBy: TemplateUsedBy }) {
             {entries.map((entry) => (
               <li key={entry.key}>
                 {entry.href ? (
-                  <Link href={entry.href} className="text-accent-deep hover:underline">
+                  <Link href={entry.href} className="text-action hover:underline">
                     {entry.label}
                   </Link>
                 ) : (
@@ -584,7 +584,7 @@ function TemplateEditInner() {
         <div role="alert" className="bg-canvas rounded-card border-hairline border p-8 text-sm">
           <p className="font-bold text-ink">テンプレートの作成・変更はオーナーと管理者だけができます</p>
           <p className="text-ink-secondary mt-1">中身の確認は一覧の行を開くと読めます。</p>
-          <Link href="/templates" className="text-accent-deep hover:underline mt-3 inline-block text-sm">一覧へ戻る</Link>
+          <Link href="/templates" className="text-action hover:underline mt-3 inline-block text-sm">一覧へ戻る</Link>
         </div>
       </div>
     )

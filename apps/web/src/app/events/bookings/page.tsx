@@ -179,7 +179,7 @@ function OccurrenceApplicantsPanel({
             type="button"
             onClick={onExportCsv}
             disabled={csvBusy}
-            className="text-accent-deep text-xs font-medium hover:underline disabled:opacity-50"
+            className="text-action text-xs font-medium hover:underline disabled:opacity-50"
           >
             {csvBusy ? '書き出しています…' : 'CSVを書き出す'}
           </button>
@@ -905,7 +905,7 @@ function BookingsInner() {
         <span className="text-ink text-sm font-medium">
           {event?.name ?? (loadStatus === 'error' ? 'イベント名を取得できませんでした' : '読み込み中…')}
         </span>
-        <Link href="/events" className="text-accent-deep ml-3 text-xs hover:underline">
+        <Link href="/events" className="text-action ml-3 text-xs hover:underline">
           ほかのイベントを選ぶ
         </Link>
       </div>

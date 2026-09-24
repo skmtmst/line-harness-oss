@@ -408,7 +408,7 @@ function ScenarioModeContent() {
           type="button"
           disabled={(Boolean(id) && !scenario) || saving !== null || detailsSaving}
           onClick={() => void continueAsDraft()}
-          className="text-accent-deep ml-auto text-sm font-medium hover:underline disabled:cursor-not-allowed disabled:opacity-50"
+          className="text-action ml-auto text-sm font-medium hover:underline disabled:cursor-not-allowed disabled:opacity-50"
         >
           あとで決める（下書きとして保存）
         </button>

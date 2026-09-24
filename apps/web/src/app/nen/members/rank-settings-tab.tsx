@@ -213,7 +213,7 @@ export default function RankSettingsTab({
               })}
               <Tr>
                 <Td colSpan={6}>
-                  <button type="button" className="text-label font-semibold text-accent-deep" onClick={add} disabled={drafts.length >= 8}>
+                  <button type="button" className="text-label font-semibold text-action" onClick={add} disabled={drafts.length >= 8}>
                     ＋ ランクを追加
                   </button>
                 </Td>

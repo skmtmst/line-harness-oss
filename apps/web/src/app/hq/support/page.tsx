@@ -153,7 +153,7 @@ export default function HqSupportPage() {
       <div data-design-node="kcTeV">
         <NoteBar tone="info">
           使い方の質問、不具合、料金の相談はここから送れます。返信は登録メールアドレスに届きます（平日 2営業日以内）。
-          <button type="button" onClick={() => setLineGuide(true)} className="ml-2 text-accent-deep underline-offset-2 hover:underline">
+          <button type="button" onClick={() => setLineGuide(true)} className="ml-2 text-action underline-offset-2 hover:underline">
             運営からの大事なお知らせを LINE で受け取る（契約者専用LINEの登録案内）
           </button>
         </NoteBar>
@@ -322,7 +322,7 @@ export default function HqSupportPage() {
                         </span>
                       </span>
                       {item.replies && item.replies.length > 0 ? (
-                        <span className="text-micro text-accent-deep">運営からの返信 {item.replies.length}件・開いて続きを送れます</span>
+                        <span className="text-micro text-ink-secondary">運営からの返信 {item.replies.length}件・開いて続きを送れます</span>
                       ) : null}
                     </Link>
                   </li>

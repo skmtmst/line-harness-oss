@@ -153,7 +153,7 @@ export function FeatureSetCard({ accountId }: { accountId: string | null }) {
           <button
             type="button"
             onClick={() => void load()}
-            className="text-accent-deep ml-2 cursor-pointer font-bold underline hover:no-underline"
+            className="text-action ml-2 cursor-pointer font-bold underline hover:no-underline"
           >
             {FEATURE_SET_LABELS.retry}
           </button>
@@ -167,7 +167,7 @@ export function FeatureSetCard({ accountId }: { accountId: string | null }) {
       {state.kind === 'configured' && (
         <p className="text-sm leading-relaxed text-ink-secondary">
           {FEATURE_SET_LABELS.configured}{' '}
-          <Link href="/settings" className="text-accent-deep font-bold underline">
+          <Link href="/settings" className="text-action font-bold underline">
             {FEATURE_SET_LABELS.openSettings}
           </Link>
         </p>
@@ -176,7 +176,7 @@ export function FeatureSetCard({ accountId }: { accountId: string | null }) {
       {state.kind === 'applied' && (
         <p role="status" className="text-sm leading-relaxed text-ink-secondary">
           {FEATURE_SET_LABELS.applied(state.label)}{' '}
-          <Link href="/settings" className="text-accent-deep font-bold underline">
+          <Link href="/settings" className="text-action font-bold underline">
             {FEATURE_SET_LABELS.openSettings}
           </Link>
         </p>

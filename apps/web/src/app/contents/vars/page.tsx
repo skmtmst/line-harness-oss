@@ -1037,7 +1037,7 @@ function VarsPageInner() {
                 <h3 className="text-ink text-sm font-bold">どうしますか</h3>
                 <div className="mt-2 space-y-2">
                   <div className="border-accent bg-accent-soft rounded-control border p-3">
-                    <p className="text-accent-deep text-sm font-bold">別の共通情報に差し替えてから削除する（おすすめ）</p>
+                    <p className="text-ink text-sm font-bold">別の共通情報に差し替えてから削除する（おすすめ）</p>
                     <p className="text-ink-secondary mt-1 text-xs leading-5">
                       {singleImpact.blockingTotal.toLocaleString('ja-JP')}か所の差し込みを、選んだ別のキーへ置き換えます。置き換え後は元の共通情報を履歴が残る形で保管します。
                     </p>
