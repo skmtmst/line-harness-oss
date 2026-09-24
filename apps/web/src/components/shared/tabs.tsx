@@ -35,9 +35,15 @@ export function Tabs({
   actions?: ReactNode
   className?: string
 }) {
+  /*
+   * ★V7: ボタンで切り替えるタブ（href が無いもの）があるときだけ、
+   * 中の並びを tablist にする。リンクで移動するタブは行き先の案内なので
+   * aria-current="page" のままで、role="tab" は付けない。
+   */
+  const buttonMode = items.some((item) => !item.href)
   return (
     <nav className={[styles.list, className].filter(Boolean).join(' ')}>
-      <span className={styles.items}>
+      <span className={styles.items} role={buttonMode ? 'tablist' : undefined}>
         {items.map((item) => (
           <Tab key={item.label} {...item} />
         ))}
@@ -56,7 +62,13 @@ function Tab({ label, href, count, current, disabled, onClick }: TabItem) {
     </>
   )
 
-  if (href && !current && !disabled) {
+  /*
+   * ★V7: 行き先があるタブは、開いているものも含めてリンクのまま出す。
+   * 現在地は aria-current="page" で示し、role="tab" は付けない。
+   * （開いているタブを押せないボタンにしていた頃は、現在地が
+   * 読み上げで伝わらず、見た目も薄くなっていた。）
+   */
+  if (href && !disabled) {
     return (
       <Link href={href} className={classes} aria-current={current ? 'page' : undefined}>
         {body}
@@ -64,11 +76,16 @@ function Tab({ label, href, count, current, disabled, onClick }: TabItem) {
     )
   }
 
+  /*
+   * ★V7: ボタン切り替えのタブは tab として、開いているかを
+   * aria-selected で出す（読みやすさ優先で aria-current と言い分ける）。
+   */
   return (
     <button
       type="button"
       className={classes}
-      aria-current={current ? 'page' : undefined}
+      role="tab"
+      aria-selected={current ?? false}
       aria-disabled={disabled || undefined}
       onClick={onClick}
       disabled={disabled || (current && !onClick)}
