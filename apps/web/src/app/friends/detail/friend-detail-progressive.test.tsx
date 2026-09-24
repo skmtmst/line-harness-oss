@@ -355,15 +355,16 @@ describe('NEXT-09 対象の友だちを引き継ぐ操作', () => {
     await eventually(() => expect(host.textContent).toContain('に登録しました'))
   })
 
-  it('汎用一覧へ行くだけの入口は「一覧を見る」という正直な名前になっている', async () => {
+  // ★V7（2026-09-24）：この友だちに関係の無い「〜一覧を見る」は操作節に置かない（左のメニューから行ける）。
+  it('操作節に汎用一覧へ行くだけの入口を置かず、対象を引き継がない「送信」「設定」も名乗らない', async () => {
     await render()
     const hrefs = Array.from(host.querySelectorAll('a')).map((a) => ({
       text: a.textContent,
       href: a.getAttribute('href'),
     }))
-    expect(hrefs.some((h) => h.text === 'テンプレート一覧を見る' && h.href === '/templates')).toBe(true)
-    expect(hrefs.some((h) => h.text === 'シナリオ一覧を見る' && h.href === '/scenarios')).toBe(true)
-    expect(hrefs.some((h) => h.text === 'リマインダ一覧を見る' && h.href === '/reminders')).toBe(true)
+    expect(hrefs.some((h) => h.text === 'テンプレート一覧を見る')).toBe(false)
+    expect(hrefs.some((h) => h.text === 'シナリオ一覧を見る')).toBe(false)
+    expect(hrefs.some((h) => h.text === 'リマインダ一覧を見る')).toBe(false)
     // 対象を引き継がないのに「送信」「設定」を名乗る入口は無い
     expect(hrefs.some((h) => h.text === 'テンプレートを送信')).toBe(false)
     expect(hrefs.some((h) => h.text === 'リマインダを設定')).toBe(false)

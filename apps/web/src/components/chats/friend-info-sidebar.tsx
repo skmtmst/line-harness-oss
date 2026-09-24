@@ -1,5 +1,6 @@
 'use client'
 
+import Avatar from '@/components/shared/avatar'
 import { useCallback, useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { api, type FriendUpcoming, type MileageHistoryItem, type MileageSummary } from '@/lib/api'
@@ -626,13 +627,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
           <div className="flex flex-col divide-y divide-[#E5E7EB]">
             {/* Profile Header — V4は相手・対応・担当をひとまとまりにする。 */}
             <div style={sectionStyle('profile')} className={`${sectionVisibility('profile')} flex flex-col items-center px-5 py-5 text-center`}>
-              {friend.pictureUrl ? (
-                <img src={friend.pictureUrl} alt="" className="h-14 w-14 flex-shrink-0 rounded-full object-cover" />
-              ) : (
-                <div className="bg-action text-on-action flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-full">
-                  <span className="text-lg font-bold">{(friend.displayName || '?').charAt(0)}</span>
-                </div>
-              )}
+              <Avatar name={friend.displayName} src={friend.pictureUrl} size={56} />
               <ExpandableText
                 value={friend.displayName}
                 empty="名前なし"
