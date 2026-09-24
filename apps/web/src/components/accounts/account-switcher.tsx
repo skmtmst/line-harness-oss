@@ -46,7 +46,7 @@ export function AccountSwitchDialog({
   return <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/45 p-4" role="dialog" aria-modal="true" aria-labelledby="account-switch-title" onClick={onClose}>
     <div className="w-full max-w-md rounded-card bg-canvas p-5 shadow-2xl" onClick={(event) => event.stopPropagation()}>
       <div className="flex items-start justify-between gap-4">
-        <div><p className="text-xs font-semibold text-accent-deep">LINEアカウントを切り替え</p><h2 id="account-switch-title" className="mt-1 text-lg font-bold text-ink">このアカウントへ移動しますか？</h2></div>
+        <div><p className="text-xs font-semibold text-ink-faint">LINEアカウントを切り替え</p><h2 id="account-switch-title" className="mt-1 text-lg font-bold text-ink">このアカウントへ移動しますか？</h2></div>
         <button type="button" onClick={onClose} aria-label="閉じる" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xl text-ink-faint hover:bg-canvas-sunken">×</button>
       </div>
       {current && <div className="mt-5 flex items-center gap-3 rounded-control bg-canvas-sunken px-4 py-3">
@@ -115,7 +115,7 @@ export default function AccountSwitcher() {
           return <button key={account.id} type="button" disabled={current} onClick={() => { setTarget(account); setOpen(false) }} className={`flex w-full items-center gap-2 rounded-control px-2 py-2 text-left ${current ? 'bg-accent-soft' : 'hover:bg-canvas-sunken'}`}>
             <AccountMark account={account} />
             <span className="min-w-0 flex-1"><span className="block truncate text-xs font-semibold text-ink">{accountLabel(account)}</span><span className="block truncate text-[10px] text-ink-faint">{account.plan?.label || account.basicId || 'プラン取得中'}</span></span>
-            <span className={`text-[10px] font-semibold ${current ? 'text-success' : 'text-accent-deep'}`}>{current ? '表示中' : '選択'}</span>
+            <span className={`text-[10px] font-semibold ${current ? 'text-success' : 'text-action'}`}>{current ? '表示中' : '選択'}</span>
           </button>
         })}
       </div>}

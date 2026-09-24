@@ -183,7 +183,9 @@ export default function ProjectsSection({
           {status === 'ready' ? (
             <span className="text-micro text-ink-faint">
               {archivedMode ? 'アーカイブ ' : ''}
-              {visible.length === projects.length ? `${projects.length}件` : `${projects.length}件中 ${visible.length}件`}
+              {visible.length === projects.length
+                ? `${projects.length}件`
+                : `${projects.length}件中 1〜${visible.length}件を表示`}
             </span>
           ) : null}
         </div>

@@ -12,8 +12,17 @@ type Activity = 'low' | 'normal' | 'high';
 type Pet = { id: string; name: string; callName?: string; animalType: string; gender?: Gender | string; breed: string; birthday: string; weightKg: number; concerns: string[]; neutered?: Neutered; activityLevel?: Activity; feedingProductId?: string | null; feeding?: Feeding | null; recommendedDailyMinGrams: number; recommendedDailyMaxGrams: number; venisonDailyGrams: number; foodCycleDays: number; imageUrl?: string | null };
 type OrderItem = { name?: string; quantity?: number; product_id?: string | number | null; product_url?: string | null; productUrl?: string | null };
 type CommerceOrder = { id?: string; number?: string; date?: string; orderDate?: string; total?: number; detailUrl?: string | null; items?: OrderItem[] };
-type MemberPhoto = { id: string; imageUrl: string; caption: string; status: string; awardedPoints: number; petName?: string };
-type SiteGalleryPhoto = { imageUrl: string; alt: string };
+type MemberPhoto = {
+  id: string;
+  imageUrl: string;
+  caption: string;
+  status: string;
+  awardedPoints: number;
+  petName?: string;
+  publicationConsent?: boolean;
+  publicPetName?: boolean;
+  createdAt?: string;
+};
 type Membership = {
   rankKey: string | null; rankName: string; mileRatePercent: number | null;
   annualMilesYen: number; lifetimeMilesYen: number; mileBalance: number; validUntil: string | null;
@@ -524,19 +533,78 @@ function PhotoForm({ ctx, pets, onDone }: { ctx: Ctx; pets: Pet[]; onDone: () =>
   const choose = async (file?: File) => { if (!file) return; setBusy(true); setError(''); try { setPhoto(await optimizePhoto(file)); } catch (e) { setPhoto(null); setError(e instanceof Error ? e.message : '写真を読み込めませんでした'); } finally { setBusy(false); } };
   const submit = async () => { if (!photo || !petId) return; setBusy(true); setError(''); try { await call(ctx, '/api/liff/nen/photos', { method: 'POST', body: JSON.stringify({ petId, caption, mimeType: photo.mimeType, data: photo.data }) }); setPhoto(null); setCaption(''); onDone(); } catch (e) { setError(e instanceof Error ? e.message : '投稿できませんでした'); } finally { setBusy(false); } };
   if (!pets.length) return <Notice>先にマイペットを登録してください。</Notice>;
-  return <section className="nm-card nm-photo-card"><div className="nm-section-heading"><span>SHARE YOUR NEN MOMENT</span><h2>うちの子の“おいしい顔”を投稿</h2></div><p className="nm-sub">然を楽しむ表情や、ご家族らしい一枚をお送りください。採用された写真は公式サイトに掲載し、お買い物に使える5マイルをプレゼントします。</p><Field label="ペット"><select value={petId} onChange={e => setPetId(e.target.value)}>{pets.map(p => <option key={p.id} value={p.id}>{petLabel(p)}</option>)}</select></Field><label className="nm-photo-picker"><input type="file" accept="image/*" onChange={e => void choose(e.target.files?.[0])} />{photo ? <><img src={photo.data} alt="投稿前の確認" /><span><b>{photo.name}</b><small>{Math.ceil(photo.size / 1024).toLocaleString()}KBに最適化済み</small></span></> : <><strong>＋</strong><span><b>{busy ? '写真を最適化しています…' : '写真を選ぶ'}</b><small>iPhoneの大きな写真も自動で軽量化</small></span></>}</label><Field label="写真に添えるひとこと"><textarea value={caption} maxLength={300} placeholder="例：鹿肉ミンチの日は、待ちきれないこの笑顔です。" onChange={e => setCaption(e.target.value)} /></Field>{error && <p className="nm-error">{error}</p>}<button className="nm-primary" disabled={!photo || busy} onClick={() => void submit()}>{busy ? '処理中…' : 'この写真を投稿する'}</button><p className="nm-photo-note">投稿写真は管理者が内容を確認します。採用された写真だけが公開されます。</p></section>;
+  return <section className="nm-photo-form-card">
+    <div className="nm-photo-section-title"><h2>写真を投稿する</h2><span>すべて必須</span></div>
+    <label className="nm-photo-field"><span>ペットを選ぶ</span><select value={petId} onChange={e => setPetId(e.target.value)}>{pets.map(p => <option key={p.id} value={p.id}>{petLabel(p)}</option>)}</select></label>
+    <div className="nm-photo-upload">
+      <div className="nm-photo-label-row"><b>写真を選ぶ</b><small>選択後にプレビューします</small></div>
+      {photo ? <div className="nm-photo-selected"><div className="nm-photo-preview-frame"><img src={photo.data} alt="投稿前の写真プレビュー" /></div><div className="nm-photo-selected-actions"><strong>✓ 写真を選択しました</strong><label><input type="file" accept="image/*" onChange={e => void choose(e.target.files?.[0])} />↻ 選び直す</label></div></div> : <label className="nm-photo-picker-v6"><input type="file" accept="image/*" onChange={e => void choose(e.target.files?.[0])} /><strong aria-hidden="true">＋</strong><span>{busy ? '写真を読み込んでいます…' : '写真を選ぶ'}</span><small>縦長の写真も全体を確認できます</small></label>}
+    </div>
+    <label className="nm-photo-field"><span>ひとこと <small>300字まで</small></span><textarea value={caption} maxLength={300} placeholder="鹿肉ミンチの日は、待ちきれないこの笑顔です。" onChange={e => setCaption(e.target.value)} /><em>{caption.length} / 300</em></label>
+    {error && <p className="nm-error" role="alert">{error}</p>}
+    <button type="button" className="nm-photo-submit" disabled={!photo || busy} onClick={() => void submit()}><span aria-hidden="true">➤</span>{busy ? '処理中…' : 'この写真を投稿する'}</button>
+    <p className="nm-photo-note">投稿写真は運営が内容を確認します。採用された写真だけが公開されます</p>
+  </section>;
 }
 
-function PhotoCampaign({ photos, sitePhotos, stats }: { photos: MemberPhoto[]; sitePhotos: SiteGalleryPhoto[]; stats: MemberData['photoStats'] }) {
-  const reel = [
-    ...photos.map(photo => ({ key: `adopted-${photo.id}`, imageUrl: photo.imageUrl, alt: `${photo.petName || 'ペット'}ちゃんの採用写真`, name: `${photo.petName || 'NEN FAMILY'}ちゃん`, caption: photo.caption || 'しあわせなひととき' })),
-    ...sitePhotos.filter(site => !photos.some(photo => photo.imageUrl === site.imageUrl)).map((site, index) => ({ key: `site-${index}`, imageUrl: site.imageUrl, alt: site.alt || '公式サイト掲載中のご家族', name: 'NEN FAMILY', caption: '公式サイト掲載中' })),
-  ];
-  return <>
-    <section className="nm-photo-hero"><span>NEN PHOTO PROJECT</span><h2>夢中でぱくぱく、<br/>しあわせ顔をみんなへ。</h2><p>あなたの一枚が、次に然を知るご家族のきっかけになります。</p><div><b>採用1枚につき 5マイル</b><small>ショッピングですぐ使えます</small></div></section>
-    <section className="nm-photo-preview" aria-label="公式サイトへの掲載イメージ"><div className="nm-photo-preview-heading"><span>CUSTOMERS &amp; NEN</span><h2>夢中でぱくぱく、しあわせ顔。</h2><p>公式サイトで実際に掲載されている写真です。横へスワイプしてご覧いただけます。</p></div><div className="nm-photo-reel">{reel.length ? reel.map(photo => <figure key={photo.key}><img src={photo.imageUrl} alt={photo.alt} /><figcaption><b>{photo.name}</b><span>{photo.caption}</span></figcaption></figure>) : [1,2,3].map(index => <div className="nm-photo-placeholder" key={index}><i>＋</i><b>次に掲載されるのは<br/>あなたの家族かも</b></div>)}</div><a href="https://stg.nen-petfood.com/#nen-voices-title" target="_blank" rel="noreferrer">実際の掲載場所を見る <span>↗</span></a></section>
-    <section className="nm-photo-stats"><div><span>この企画で獲得</span><b>{stats.earnedPoints.toLocaleString()}<small>マイル</small></b></div><div><span>採用された写真</span><b>{stats.adoptedCount}<small>枚</small></b></div><p>{stats.pendingCount > 0 ? `${stats.pendingCount}枚を審査しています。結果が決まり次第、掲載とマイルへ反映します。` : '心が動いた瞬間を、いつでもお待ちしています。'}</p></section>
-  </>;
+type PhotoViewStatus = 'pending' | 'adopted' | 'rejected';
+function photoViewStatus(status: string): PhotoViewStatus {
+  if (status === 'adopted') return 'adopted';
+  if (status === 'rejected') return 'rejected';
+  return 'pending';
+}
+const photoStatusLabel: Record<PhotoViewStatus, string> = { pending: '審査中', adopted: '採用', rejected: '見送り' };
+function photoPetLabel(photo: MemberPhoto): string {
+  const name = photo.petName || 'ペット';
+  return /(くん|ちゃん|さん)$/.test(name) ? name : `${name}ちゃん`;
+}
+
+function PhotoConsent({ ctx, photo, onDone }: { ctx: Ctx; photo: MemberPhoto; onDone: () => void }) {
+  const [showPetName, setShowPetName] = useState(photo.publicPetName === true);
+  const [confirmWithdrawal, setConfirmWithdrawal] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  useEffect(() => { setShowPetName(photo.publicPetName === true); }, [photo.publicPetName]);
+  const update = async (consent: boolean, nextShowPetName = showPetName) => {
+    setBusy(true); setError('');
+    try {
+      await call(ctx, `/api/liff/nen/photos/${encodeURIComponent(photo.id)}/publication-consent`, {
+        method: 'PUT',
+        body: JSON.stringify(consent ? { consent: true, consentVersion: 'photo-public-v1', showPetName: nextShowPetName } : { consent: false }),
+      });
+      setConfirmWithdrawal(false); onDone();
+    } catch (e) { setError(e instanceof Error ? e.message : '掲載設定を変更できませんでした'); }
+    finally { setBusy(false); }
+  };
+  const changePetName = (next: boolean) => { setShowPetName(next); if (photo.publicationConsent) void update(true, next); };
+  return <div className="nm-photo-consent">
+    <label className="nm-photo-consent-check"><input type="checkbox" checked={photo.publicationConsent === true} disabled={busy} onChange={e => e.target.checked ? void update(true) : setConfirmWithdrawal(true)} /><span aria-hidden="true">✓</span><b>サイトへの掲載に同意する</b></label>
+    <fieldset disabled={busy}><legend>ペット名の表示</legend><label><input type="radio" name={`pet-name-${photo.id}`} checked={showPetName} onChange={() => changePetName(true)} />ペット名を出す</label><label><input type="radio" name={`pet-name-${photo.id}`} checked={!showPetName} onChange={() => changePetName(false)} />出さない</label></fieldset>
+    {!photo.publicationConsent && <p>同意していない写真は公式サイトに掲載されません</p>}
+    {error && <p className="nm-error" role="alert">{error}</p>}
+    {confirmWithdrawal && <div className="nm-photo-dialog-backdrop" role="presentation"><div className="nm-photo-dialog" role="dialog" aria-modal="true" aria-labelledby={`withdraw-${photo.id}`}><h3 id={`withdraw-${photo.id}`}>掲載を取り下げますか？</h3><p>公式サイトからこの写真を取り下げます。もう一度同意すれば、掲載候補に戻せます。</p><div><button type="button" disabled={busy} onClick={() => setConfirmWithdrawal(false)}>キャンセル</button><button type="button" disabled={busy} onClick={() => void update(false)}>{busy ? '処理中…' : '取り下げる'}</button></div></div></div>}
+  </div>;
+}
+
+function PhotoList({ ctx, photos, onDone }: { ctx: Ctx; photos: MemberPhoto[]; onDone: () => void }) {
+  return <section className="nm-photo-own-list">
+    <div className="nm-photo-list-heading"><h2>自分の投稿</h2><span>{photos.length}件</span></div>
+    {photos.length === 0 ? <div className="nm-photo-empty"><span aria-hidden="true">▧</span><b>まだ投稿がありません</b><p>お気に入りの一枚を投稿すると、ここに審査状況が表示されます。</p></div> : photos.map(photo => {
+      const status = photoViewStatus(photo.status);
+      return <article className="nm-photo-entry" key={photo.id}>
+        <div className="nm-photo-entry-main"><div className="nm-photo-entry-image"><img src={photo.imageUrl} alt={`${photoPetLabel(photo)}の投稿写真`} /></div><div className="nm-photo-entry-copy"><div><span className={`nm-photo-status nm-photo-status-${status}`}>{photoStatusLabel[status]}</span><time>{displayDate(photo.createdAt).replace(/^\d{4}\//, '')}</time></div><b>{photoPetLabel(photo)}</b>{status === 'pending' && <p>運営が内容を確認しています。</p>}{status === 'adopted' && <div className="nm-photo-adopted-copy">{photo.publicationConsent && <strong>公式サイトに掲載中</strong>}<em>5マイル付与</em></div>}{status === 'rejected' && <p>この投稿は公開されません。</p>}</div></div>
+        {status === 'adopted' && <PhotoConsent ctx={ctx} photo={photo} onDone={onDone} />}
+      </article>;
+    })}
+  </section>;
+}
+
+function PhotosView({ ctx, data, onDone }: { ctx: Ctx; data: MemberData; onDone: () => void }) {
+  return <section className="nm-stack nm-home-stack nm-photo-page-v6" data-design-node="pNuzE">
+    <div className="nm-photo-intro"><span aria-hidden="true">▣</span><div><h2>うちの子の一枚を投稿</h2><p>採用された写真には 5マイルをプレゼント</p></div><p>投稿後は運営が内容を確認します。状態はこの画面でいつでも確認できます。</p></div>
+    <PhotoForm ctx={ctx} pets={data.pets} onDone={onDone} />
+    <PhotoList ctx={ctx} photos={data.photos} onDone={onDone} />
+  </section>;
 }
 
 
@@ -594,17 +662,9 @@ function petAge(birthday: string): string {
 
 function App({ ctx }: { ctx: Ctx }) {
   const initialTab = new URLSearchParams(window.location.search).get('tab') as Tab | null;
-  const [tab, setTab] = useState<Tab>(['home','pets','health','orders','photos'].includes(initialTab || '') ? initialTab! : 'home'); const [data, setData] = useState<MemberData | null>(null); const [sitePhotos, setSitePhotos] = useState<SiteGalleryPhoto[]>([]); const [error, setError] = useState('');
+  const [tab, setTab] = useState<Tab>(['home','pets','health','orders','photos'].includes(initialTab || '') ? initialTab! : 'home'); const [data, setData] = useState<MemberData | null>(null); const [error, setError] = useState('');
   const load = useCallback(async () => { try { const r = await call<{ data: MemberData }>(ctx, '/api/liff/nen/member'); setData(r.data); } catch (e) { setError(e instanceof Error ? e.message : '読み込めませんでした'); } }, [ctx]);
   useEffect(() => { void load(); }, [load]);
-  useEffect(() => {
-    let active = true;
-    fetch('/api/public/nen/gallery-preview')
-      .then(response => response.ok ? response.json() : Promise.reject(new Error('gallery unavailable')))
-      .then((payload: { data?: SiteGalleryPhoto[] }) => { if (active && Array.isArray(payload.data)) setSitePhotos(payload.data); })
-      .catch(() => undefined);
-    return () => { active = false; };
-  }, []);
   if (!data) return <main className="nm-app"><p>{error || '読み込み中…'}</p></main>;
   const membership: Membership = data.membership ?? { rankKey: null, rankName: data.commerce.rank || 'レギュラー', mileRatePercent: null, annualMilesYen: data.commerce.purchaseAmount, lifetimeMilesYen: data.commerce.purchaseAmount, mileBalance: data.commerce.points, validUntil: null, next: null, ranks: [], milestones: [], nextMilestone: null };
   const tabLabel = tabItems.find(item => item.value === tab)?.label || '';
@@ -613,7 +673,7 @@ function App({ ctx }: { ctx: Ctx }) {
     : data.commerce.subscription ? [data.commerce.subscription] : [];
   const recentOrders = data.commerce.orders.slice(0, 3);
   return <main className="nm-app">
-    {tab === 'home' ? <header className="nm-home-header"><div><h1>マイページ</h1><span>然 -NEN-</span></div><p>{data.owner.displayName || 'お客様'}さん</p></header> : tab === 'pets' ? <header className="nm-home-header"><div><h1>マイペット</h1><span>然 -NEN-</span></div><p>{data.owner.displayName || 'お客様'}さん</p></header> : tab === 'health' ? <header className="nm-home-header"><div><h1>健康日記</h1><span>然 -NEN-</span></div><p>{data.owner.displayName || 'お客様'}さん</p></header> : <header className="nm-page-header"><span>NEN MEMBERS</span><h1>{tabLabel}</h1></header>}
+    {tab === 'home' ? <header className="nm-home-header"><div><h1>マイページ</h1><span>然 -NEN-</span></div><p>{data.owner.displayName || 'お客様'}さん</p></header> : tab === 'pets' ? <header className="nm-home-header"><div><h1>マイペット</h1><span>然 -NEN-</span></div><p>{data.owner.displayName || 'お客様'}さん</p></header> : tab === 'health' ? <header className="nm-home-header"><div><h1>健康日記</h1><span>然 -NEN-</span></div><p>{data.owner.displayName || 'お客様'}さん</p></header> : tab === 'photos' ? <header className="nm-home-header"><div><h1>投稿</h1><span>然 -NEN-</span></div><p>{data.owner.displayName || 'お客様'}さん</p></header> : <header className="nm-page-header"><span>NEN MEMBERS</span><h1>{tabLabel}</h1></header>}
     {tab === 'home' && <section className="nm-stack nm-home-stack">
       <MembershipSheet membership={membership} ownerName={data.owner.displayName || 'お客様'} />
       <div className="nm-card nm-lifetime"><div className="nm-lifetime-row"><span>ライフタイム</span><b>{yen(membership.lifetimeMilesYen)}</b></div><p className="nm-sub">{membership.nextMilestone ? `これまでの累計。あと ${yen(membership.nextMilestone.remainingYen)} で「${membership.nextMilestone.title}」。節目で限定グッズをご用意します` : 'これまでの累計。節目で限定グッズをご用意します'}</p></div>
@@ -623,7 +683,7 @@ function App({ ctx }: { ctx: Ctx }) {
     {tab === 'pets' && <PetsView ctx={ctx} pets={data.pets} products={data.feedingProducts || []} nenProducts={data.nenProducts || []} treatLimitPercent={data.treatLimitPercent ?? 10} onChanged={() => void load()} onHealth={() => { setTab('health'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} />}
     {tab === 'health' && <HealthDiary ctx={ctx} pets={data.pets} />}
     {tab === 'orders' && <div className="nm-stack nm-orders-page"><section className="nm-card"><div className="nm-section-heading"><span>SUBSCRIPTION</span><h2>定期便の契約状況</h2></div>{subscriptions.length ? subscriptions.map((subscription: any, contractIndex: number) => <article className="nm-subscription-view" key={subscription.id || subscription.contract_number || contractIndex}><div><span>現在の状況</span><b>{subscription.status || '契約中'}</b></div><div><span>次回お届け</span><b>{displayDate(subscription.nextShippingDate || subscription.next_shipping_date) || '確認中'}</b></div><div><span>お届け周期</span><b>{subscription.cycle || '—'}</b></div>{Array.isArray(subscription.items) && subscription.items.length > 0 && <ul>{subscription.items.map((item: OrderItem, index: number) => <li key={`${item.name}-${index}`}><span>{item.name || '商品'}</span><b>× {item.quantity || 1}</b></li>)}</ul>}<p>変更・スキップ・解約のお手続きはこの画面では行いません。</p></article>) : <p className="nm-empty-text">契約中の定期便はありません。</p>}</section><section className="nm-card"><div className="nm-section-heading"><span>ORDER HISTORY</span><h2>通常購入の履歴</h2></div>{data.commerce.orders.length ? data.commerce.orders.map((order, index) => <article className="nm-order" key={order.id || index}><div className="nm-order-head"><div><b>注文番号 {order.number || index + 1}</b><time>{displayDate(order.date || order.orderDate)}</time></div><strong>¥{Number(order.total || 0).toLocaleString()}</strong></div>{Array.isArray(order.items) && order.items.length > 0 ? <div className="nm-order-items">{order.items.map((item, itemIndex) => { const productUrl = item.product_url || item.productUrl; return <div key={`${item.name}-${itemIndex}`}><span>{item.name || '商品'} <small>× {item.quantity || 1}</small></span>{productUrl && <a href={productUrl} target="_blank" rel="noreferrer">もう一度購入</a>}</div>; })}</div> : <p className="nm-order-no-item">商品情報を確認中です。</p>}{order.detailUrl && <a className="nm-order-detail" href={order.detailUrl} target="_blank" rel="noreferrer">注文内容を見る</a>}</article>) : <p className="nm-empty-text">通常購入の履歴はまだありません。</p>}</section></div>}
-    {tab === 'photos' && <div className="nm-stack nm-photo-page"><PhotoCampaign photos={data.photos} sitePhotos={sitePhotos} stats={data.photoStats} /><PhotoForm ctx={ctx} pets={data.pets} onDone={() => void load()} />{data.photos.length > 0 && <section className="nm-adopted-gallery"><div className="nm-list-heading"><span>NEN FAMILY GALLERY</span><h2>みんなの採用写真</h2></div><div className="nm-gallery">{data.photos.map(p => <figure key={p.id}><img src={p.imageUrl} alt={`${p.petName || 'ペット'}ちゃん`} /><figcaption><b>{p.petName || 'ペット'}ちゃん</b>{p.caption && <small>{p.caption}</small>}<span>公式サイト掲載中</span></figcaption></figure>)}</div></section>}</div>}
+    {tab === 'photos' && <PhotosView ctx={ctx} data={data} onDone={() => void load()} />}
     <nav className="nm-bottom-nav" aria-label="会員メニュー">{tabItems.map(item => <button className={tab === item.value ? 'active' : ''} onClick={() => { setTab(item.value); window.scrollTo({ top: 0, behavior: 'smooth' }); }} key={item.value}><i><TabIcon tab={item.value} /></i><span>{item.label}</span></button>)}</nav>
   </main>;
 }

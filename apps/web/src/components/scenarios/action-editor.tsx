@@ -410,7 +410,7 @@ export default function ActionEditor({
             ) : (
               <div className="space-y-4">
                 <section className="bg-canvas-sunken rounded-control px-4 py-5">
-                  <div className="flex items-center justify-between"><p className="text-ink text-sm font-bold">現在の送信後アクション</p><button type="button" className="text-accent-deep text-xs font-medium">保存済みセットを呼び出す</button></div>
+                  <div className="flex items-center justify-between"><p className="text-ink text-sm font-bold">現在の送信後アクション</p><button type="button" className="text-action text-xs font-medium">保存済みセットを呼び出す</button></div>
                   <p className="text-ink-secondary mt-2 text-sm">① タグ追加 → ② 対応マーク変更 → ③ 担当者へ通知</p>
                 </section>
                 <section className="grid gap-3" style={{ gridTemplateColumns: '1fr 300px' }}>
@@ -488,7 +488,7 @@ export default function ActionEditor({
                             >
                               {action.condition ? '条件ON' : '条件OFF'}
                             </button>
-                            <details><summary className="text-accent-deep cursor-pointer list-none text-xs">内容を編集</summary><div className="absolute right-20 z-10 mt-2 rounded-card p-4 shadow-lg" style={{ width: 640, background: 'var(--color-canvas)' }}><ActionConfigEditor action={action} tags={tags} fields={fields} marks={marks} scenarios={scenarioOpts} vars={vars} onChange={(config) => void save(action, { config })} /><label className="mt-3 flex items-center gap-2 text-xs"><input type="checkbox" checked={action.repeatOnRefire} onChange={(e) => void save(action, { repeatOnRefire: e.target.checked })} />発動2回目以降も実行する</label><div className="mt-3 flex gap-2"><button type="button" onClick={() => void move(index, -1)} disabled={index === 0}>上へ</button><button type="button" onClick={() => void move(index, 1)} disabled={index === actions.length - 1}>下へ</button><button type="button" onClick={() => void remove(action)} className="text-danger">削除</button></div></div></details>
+                            <details><summary className="text-action cursor-pointer list-none text-xs">内容を編集</summary><div className="absolute right-20 z-10 mt-2 rounded-card p-4 shadow-lg" style={{ width: 640, background: 'var(--color-canvas)' }}><ActionConfigEditor action={action} tags={tags} fields={fields} marks={marks} scenarios={scenarioOpts} vars={vars} onChange={(config) => void save(action, { config })} /><label className="mt-3 flex items-center gap-2 text-xs"><input type="checkbox" checked={action.repeatOnRefire} onChange={(e) => void save(action, { repeatOnRefire: e.target.checked })} />発動2回目以降も実行する</label><div className="mt-3 flex gap-2"><button type="button" onClick={() => void move(index, -1)} disabled={index === 0}>上へ</button><button type="button" onClick={() => void move(index, 1)} disabled={index === actions.length - 1}>下へ</button><button type="button" onClick={() => void remove(action)} className="text-danger">削除</button></div></div></details>
                           </div>
                         </div>
                       </div>
@@ -500,7 +500,7 @@ export default function ActionEditor({
                     )}
                   </div>
                 </section>
-                <p className="text-accent-deep text-xs">各動作の「条件ON」から15軸の条件ビルダーを開き、分岐できます。</p>
+                <p className="text-ink-faint text-xs">各動作の「条件ON」から15軸の条件ビルダーを開き、分岐できます。</p>
               </div>
             )}
           </div>

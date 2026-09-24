@@ -86,7 +86,7 @@
     "direct-secondary-button": 1
   },
   "app/chats/page.tsx": {
-    "arbitrary-value": 112,
+    "arbitrary-value": 111,
     "direct-primary-button": 2,
     "unresolved-classname": 2,
     "direct-secondary-button": 2
@@ -109,7 +109,7 @@
     "unresolved-classname": 5
   },
   "app/duplicates/page.tsx": {
-    "arbitrary-value": 28
+    "arbitrary-value": 25
   },
   "app/ec-commerce/connector-panel.tsx": {
     "unresolved-classname": 34
@@ -289,6 +289,7 @@
     "direct-primary-button": 1
   },
   "app/rich-menus/edit/page.tsx": {
+    "direct-primary-button": 1,
     "arbitrary-value": 10
   },
   "app/rich-menus/page.tsx": {
@@ -380,7 +381,7 @@
     "direct-secondary-button": 1
   },
   "app/webhooks/webhook-interactions.tsx": {
-    "unresolved-classname": 40
+    "unresolved-classname": 39
   },
   "app/webinars/edit/page.tsx": {
     "arbitrary-value": 25,
@@ -389,7 +390,7 @@
     "direct-secondary-button": 1
   },
   "app/webinars/page.tsx": {
-    "arbitrary-value": 8,
+    "arbitrary-value": 7,
     "unresolved-classname": 1,
     "direct-secondary-button": 1
   },
@@ -468,7 +469,7 @@
     "direct-primary-button": 1
   },
   "components/chats/inbox-kpis.tsx": {
-    "arbitrary-value": 27
+    "arbitrary-value": 26
   },
   "components/chats/saved-view-dialog.tsx": {
     "arbitrary-value": 5,
@@ -476,11 +477,11 @@
     "direct-secondary-button": 1
   },
   "components/chats/template-picker.tsx": {
-    "arbitrary-value": 67,
+    "arbitrary-value": 66,
     "direct-primary-button": 1
   },
   "components/dashboard/dashboard-editor.tsx": {
-    "arbitrary-value": 19,
+    "arbitrary-value": 17,
     "direct-primary-button": 1,
     "direct-secondary-button": 1
   },
@@ -489,7 +490,7 @@
     "arbitrary-value": 1
   },
   "components/dashboard/qr-dialog.tsx": {
-    "arbitrary-value": 7,
+    "arbitrary-value": 6,
     "direct-secondary-button": 1
   },
   "components/dashboard/shipment-panel.tsx": {
@@ -532,7 +533,7 @@
     "unresolved-classname": 8
   },
   "components/friend-attributes-v2/tag-list-v2.tsx": {
-    "arbitrary-value": 94,
+    "arbitrary-value": 93,
     "direct-secondary-button": 6,
     "unresolved-classname": 6,
     "direct-primary-button": 2,
@@ -703,6 +704,9 @@
   "components/shared/date-field.tsx": {
     "unresolved-classname": 17
   },
+  "components/shared/disclosure.tsx": {
+    "unresolved-classname": 6
+  },
   "components/shared/folder-add-dialog.tsx": {
     "direct-primary-button": 1
   },
@@ -766,12 +770,21 @@
   "components/ui/kpi-collapse.tsx": {
     "unresolved-classname": 2
   },
+  "components/ui/list-range.tsx": {
+    "unresolved-classname": 1
+  },
   "components/ui/metric-value.tsx": {
     "unresolved-classname": 1
   },
   "components/ui/notification-switch.tsx": {
     "arbitrary-value": 2,
     "direct-primary-button": 1
+  },
+  "components/ui/page-size-select.tsx": {
+    "unresolved-classname": 1
+  },
+  "components/ui/sort-select.tsx": {
+    "unresolved-classname": 1
   },
   "components/users/user-row.tsx": {
     "unresolved-classname": 1,

@@ -173,7 +173,7 @@ export default function LifetimeTab({
               <Td colSpan={6}>
                 <button
                   type="button"
-                  className="text-label font-semibold text-accent-deep"
+                  className="text-label font-semibold text-action"
                   disabled={drafts.length >= 12}
                   onClick={() => { setDrafts((current) => [...current, { id: null, threshold: '', title: '', notify: true, reachedCount: 0 }]); setDirty(true) }}
                 >

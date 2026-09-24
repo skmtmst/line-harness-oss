@@ -16,7 +16,8 @@ import FolderPanel, { FOLDER_RAIL_STYLE } from '@/components/shared/folder-panel
 import Button from '@/components/shared/button'
 import Pagination from '@/components/shared/pagination'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
-import SelectField from '@/components/shared/select-field'
+import SortSelect from '@/components/ui/sort-select'
+import PageSizeSelect from '@/components/ui/page-size-select'
 import { TextInput } from '@/components/shared/form-controls'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import FilterChip from '@/components/shared/filter-chip'
@@ -187,8 +188,9 @@ export default function RemindersPage() {
       />
       <div className="min-w-0">
         <div className="bg-canvas rounded-card border-hairline mb-3 border p-3">
-          <div className="flex items-center gap-2"><TextInput type="search" placeholder="名前・内容で検索" aria-label="名前・内容で検索" value={nameQuery} onChange={(event) => setNameQuery(event.target.value)} className="min-w-0 flex-1 text-xs" /><SelectField aria-label="表示件数" className="text-xs" value={String(perPage)} onChange={(event) => setPerPage(Number(event.target.value))} options={PER_PAGE_OPTIONS.map((n) => ({ value: String(n), label: `${n}件表示` }))} /></div>
-          <div className="mt-2 flex flex-wrap items-center gap-2">{['有効','下書き','停止中'].map((status) => <FilterChip key={status} selected={statusFilter === status} onChange={() => setStatusFilter(statusFilter === status ? '' : status)}>{status}</FilterChip>)}<FilterChip selected={statusFilter === '失敗あり'} onChange={() => setStatusFilter(statusFilter === '失敗あり' ? '' : '失敗あり')}>失敗あり</FilterChip><span className="ml-auto w-44"><SelectField aria-label="並び順" className="text-micro" value={sort} onChange={(event) => setSort(event.target.value)} options={SORT_OPTIONS} /></span></div>
+          <div className="flex items-center gap-2"><TextInput type="search" placeholder="名前・内容で検索" aria-label="名前・内容で検索" value={nameQuery} onChange={(event) => setNameQuery(event.target.value)} className="min-w-0 flex-1 text-xs" /></div>
+          {/* #668: 並びは「絞り込み → 並び順 → 表示件数」の1形。 */}
+          <div className="mt-2 flex flex-wrap items-center gap-2"><span className="text-ink-faint text-xs whitespace-nowrap">よく使う絞り込み</span>{['有効','下書き','停止中'].map((status) => <FilterChip key={status} selected={statusFilter === status} onChange={() => setStatusFilter(statusFilter === status ? '' : status)}>{status}</FilterChip>)}<FilterChip selected={statusFilter === '失敗あり'} onChange={() => setStatusFilter(statusFilter === '失敗あり' ? '' : '失敗あり')}>失敗あり</FilterChip><SortSelect className="ml-auto" value={sort} onChange={setSort} options={SORT_OPTIONS} /><PageSizeSelect value={perPage} onChange={setPerPage} options={PER_PAGE_OPTIONS} /></div>
         </div>
         <div className="bg-canvas rounded-card border-hairline overflow-hidden border">
           {/* #641: 操作列が広くなった分は表だけが横に流れる */}

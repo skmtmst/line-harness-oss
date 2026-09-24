@@ -150,5 +150,5 @@ function OptionCard({ checked, onChange, label, note }: { checked: boolean; onCh
 }
 
 function FieldLine({ label, children }: { label: string; children: React.ReactNode }) {
-  return <label><span className="text-accent-deep mb-1 block text-xs font-medium">{label}</span>{children}</label>
+  return <label><span className="text-ink-secondary mb-1 block text-xs font-medium">{label}</span>{children}</label>
 }

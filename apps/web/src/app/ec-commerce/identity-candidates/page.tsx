@@ -24,6 +24,7 @@ import { useAccount } from '@/contexts/account-context'
 import { ApiError, api, type EcIdentityCandidateOperationsList } from '@/lib/api'
 import { ORDER_IMPACT_KEYS, REVENUE_IMPACT_KEYS, type IdentityCandidateImpactMetric } from '@line-crm/shared'
 import EcTabs from '../ec-tabs-view'
+import ListRange from '@/components/ui/list-range'
 import ecStyles from '../ec-commerce-v6.module.css'
 
 // #517 軽4: 計量キーは共有の正本を使う。手書きの重複を持たない。
@@ -239,8 +240,8 @@ export default function EcIdentityCandidatesPage() {
           ) : null}
 
           <p className={styles.footerNote}>
-            結びついていない {(operations?.summary.unmatched ?? 0).toLocaleString('ja-JP')} 件中 {shown.length.toLocaleString('ja-JP')} 件を表示しています。
-            結び付けても元の注文とLINEの友だちは残り、過去のLINE送信は再送しません。
+            <ListRange label="結びついていない" total={operations?.summary.unmatched ?? 0} first={shown.length === 0 ? 0 : 1} last={shown.length} />
+            <span className="block">結び付けても元の注文とLINEの友だちは残り、過去のLINE送信は再送しません。</span>
           </p>
 
           {detail ? (

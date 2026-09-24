@@ -370,8 +370,15 @@ export default function NenCampaignsPage() {
   /*
     ヘッダー操作。★V6 37-6 の「配信を追加」は、自動配信の種類が実キー固定（追加口が無い）
     ため置かない。コラムは ★V6 37-6-A どおり「ECのコラムを取り込む」（未割り当て分の割り当て）。
+    #618: 一覧に件数があっても未選択でも届くよう、新規作成入口「コラムを書く」
+    （/nen-campaigns/columns/new・日時あり下書き保存）をヘッダーに置く。
   */
-  const headerAction = tab === 'columns' ? <Button type="button" variant="primary" disabled={importing || !selectedAccountId} onClick={() => void importColumns()}>{importing ? '取り込んでいます…' : 'ECのコラムを取り込む'}</Button>
+  const headerAction = tab === 'columns' ? (
+    <span className="flex flex-wrap items-center justify-end gap-2">
+      <Button href="/nen-campaigns/columns/new" variant="primary">コラムを書く</Button>
+      <Button type="button" disabled={importing || !selectedAccountId} onClick={() => void importColumns()}>{importing ? '取り込んでいます…' : 'ECのコラムを取り込む'}</Button>
+    </span>
+  )
     : tab === 'history' ? <Button type="button" disabled={!deliveryList?.summary.pending} onClick={() => void sendPendingNow()}>待っているものを今すぐ送る</Button>
       : null
 

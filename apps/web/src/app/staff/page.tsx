@@ -211,7 +211,7 @@ function SessionsCard() {
     <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-sm font-bold text-ink">ログイン中の端末</h2><p className="mt-1 text-xs text-ink-secondary">あなたのアカウントでいまログインしている端末です。見覚えのない端末があれば「ログインを終了」で切り離せます。</p></div>
       {sessions && sessions.length > 1 && <Button variant="secondary" onClick={() => setConfirmOthers(true)}>この端末以外をすべて終了</Button>}</div>
     {error && <p className="mt-3 rounded-control bg-danger-bg p-3 text-sm text-danger" role="alert">{error}</p>}
-    {notice && <p className="mt-3 rounded-control bg-info-bg p-3 text-sm font-medium text-accent-deep" role="status">{notice}</p>}
+    {notice && <p className="mt-3 rounded-control bg-info-bg p-3 text-sm font-medium text-info" role="status">{notice}</p>}
     {sessions === null ? <p className="mt-3 text-xs text-ink-faint">読み込んでいます…</p> : sessions.length === 0 ? <p className="mt-3 text-xs text-ink-faint">ログイン中の端末はありません。</p> : (
       <ul className="mt-3 divide-y divide-hairline">
         {sessions.map((session) => <li key={session.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
@@ -701,11 +701,11 @@ function StaffPageHost() {
     {tab === 'audit' ? <div data-design-node="jwVlo"><LoginAudit /></div> : <>
     {missing > 0 && <div className="mb-4 flex items-center rounded-control bg-warning-bg px-4 py-3 text-sm"><p>🔑　二段階認証が未設定のユーザーが <b>{missing}人</b> います。高い権限の人から設定してください。</p></div>}
     <div data-design="KPIs" className="mb-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4"><Kpi label="いまいる人" value={`${accessSummary.active}`} unit="人" note={`管理者 ${accessSummary.roleCounts.administrator}・運用 ${accessSummary.roleCounts.operations}・見るだけ ${accessSummary.roleCounts.view_only}`} /><Kpi label="招待して返事がない" value={`${accessSummary.invited}`} unit="人" note={`期限切れ ${accessSummary.expiredInvitations}人`} /><Kpi label="90日 入っていない" value={`${accessSummary.unused90Days}`} unit="人" note="最終ログインから90日以上" /><Kpi label="2段階の確認" value={`${accessSummary.mfaEnabled} / ${accessSummary.active}`} unit="人" note={`管理者は必ず入れてください${accessSummary.mfaRate === null ? '' : `（${accessSummary.mfaRate}%）`}`} /></div>
-    <div className="mb-4 flex items-center justify-between gap-3 rounded-control bg-info-bg px-4 py-3 text-sm font-medium text-accent-deep"><span>「見せる範囲」は、画面ごとに決められます。電話番号や住所など、必要な情報だけを見せると事故が減ります。</span></div>
+    <div className="mb-4 flex items-center justify-between gap-3 rounded-control bg-info-bg px-4 py-3 text-sm font-medium text-info"><span>「見せる範囲」は、画面ごとに決められます。電話番号や住所など、必要な情報だけを見せると事故が減ります。</span></div>
     {error && <div className="mb-4 flex items-center justify-between gap-4 rounded-control bg-danger-bg p-3 text-sm text-danger"><p>{error}</p><Button variant="secondary" onClick={() => void load()}>もう一度読み込む</Button></div>}
-    {resendNotice && <div className="mb-4 rounded-control bg-info-bg px-4 py-3 text-sm font-medium text-accent-deep" role="status"><p>{resendNotice}</p></div>}
+    {resendNotice && <div className="mb-4 rounded-control bg-info-bg px-4 py-3 text-sm font-medium text-info" role="status"><p>{resendNotice}</p></div>}
     {resendError && <div className="mb-4 rounded-control bg-danger-bg p-3 text-sm text-danger" role="alert"><p>{resendError}</p></div>}
-    {permissionSaveNotice && <div className="mb-4 rounded-control bg-info-bg px-4 py-3 text-sm font-medium text-accent-deep" role="status"><p>{permissionSaveNotice}</p></div>}
+    {permissionSaveNotice && <div className="mb-4 rounded-control bg-info-bg px-4 py-3 text-sm font-medium text-info" role="status"><p>{permissionSaveNotice}</p></div>}
     {tab === 'members' && <SessionsCard />}
     {tab === 'roles' && <div className="mb-4 grid gap-3 md:grid-cols-2 xl:grid-cols-5">{accessRoles.map((role) => <div key={role.id} className="rounded-card border border-hairline bg-canvas p-4"><div className="flex items-start justify-between gap-2"><p className="font-semibold text-ink">{role.name}</p><span className="rounded-full bg-accent-soft px-2 py-1 text-[11px] font-semibold text-accent-deep">{role.assignedUserCount}人</span></div><p className="mt-2 text-xs leading-5 text-ink-secondary">{role.description}</p><p className="mt-3 text-xs text-ink-faint">{role.requiresMfa ? '2段階の確認が必要' : role.featureAccess === 'view' ? '閲覧のみ' : role.featureAccess === 'custom' ? '機能ごとに設定' : '編集できる'}</p></div>)}</div>}
     <div className="mb-3 flex flex-wrap items-center gap-3"><SearchField aria-label="人の名前・メールで検索" value={query} onChange={setQuery} onClear={() => setQuery('')} placeholder="人の名前・メールで検索" className="min-w-64 flex-1" /><Select aria-label="並び順" value={sort} onChange={setSort} options={LIST_SORT_OPTIONS} /></div>
