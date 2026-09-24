@@ -1,3 +1,4 @@
+@layer components {
 /*
  * 保存が弾かれたことを知らせる帯の置き場所。
  *
@@ -59,4 +60,5 @@
 
 .action:focus-visible {
   outline: revert;
+}
 }

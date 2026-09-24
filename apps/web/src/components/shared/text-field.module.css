@@ -1,3 +1,4 @@
+@layer components {
 /*
  * 入力欄。Pencil V5 の `ytG7l`「共通 入力欄」（102回）と
  * `keKe3`「共通 入力欄（複数行）」（22回）。
@@ -69,4 +70,5 @@
   .single {
     height: 44px;
   }
+}
 }

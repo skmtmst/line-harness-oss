@@ -1,3 +1,4 @@
+@layer components {
 /*
  * 印（チップ）。Pencil V5 の一覧・カードの中で、状態や区分を1語で示す小さな札。
  *
@@ -52,4 +53,5 @@
   border-color: var(--color-status-danger);
   background: var(--color-status-danger-soft);
   color: var(--color-status-danger);
+}
 }

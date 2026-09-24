@@ -6,7 +6,9 @@ import { useEffect, useState } from 'react'
 import { api, ApiError, describeSaveFailure } from '@/lib/api'
 import type { TrafficPool, PoolAccount, LineAccount } from '@line-crm/shared'
 import { usePageTitle } from '@/components/shell/page-chrome'
+import { FeatureDisabledScreen } from '@/components/feature-disabled-gate'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { isPoolsFeatureAvailable } from '@/lib/pools-availability'
 
 export default function PoolsPage() {
   usePageTitle('プール管理')
@@ -15,10 +17,22 @@ export default function PoolsPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [showCreate, setShowCreate] = useState(false)
+  // どこも無効と確定したときは口を発行せず、この案内を直接出す。
+  // 403 の応答自体が console error になるため、取ってから切り替えるのでは遅い。
+  const [featureOff, setFeatureOff] = useState(false)
 
   const load = async () => {
     setLoading(true)
     setError('')
+    setFeatureOff(false)
+    // 有効な場所が1つも無ければ GET /api/traffic-pools を発行しない（#703）。
+    // 判定と取得の隙間で切られたときは従来どおり共通ゲートが案内へ切り替える。
+    if (!(await isPoolsFeatureAvailable())) {
+      setPools([])
+      setFeatureOff(true)
+      setLoading(false)
+      return
+    }
     try {
       const [poolsRes, accRes] = await Promise.all([api.pools.list(), api.lineAccounts.list()])
       if (poolsRes.success) setPools(poolsRes.data)
@@ -42,6 +56,15 @@ export default function PoolsPage() {
   const sortedPools = [...pools].sort((a, b) =>
     a.slug === 'main' ? -1 : b.slug === 'main' ? 1 : a.name.localeCompare(b.name),
   )
+
+  // 無効と確定したときは管理UIを出さず、共通ゲートと同じ案内だけ出す。
+  if (featureOff) {
+    return (
+      <div>
+        <FeatureDisabledScreen featureId="multi_store_hierarchy" />
+      </div>
+    )
+  }
 
   return (
     <div>
