@@ -48,9 +48,9 @@ describe('友だち画面のオーナー指摘契約', () => {
     expect(USERS).toContain('items-center gap-2')
     expect(USERS).toContain('<Button\n          type="button"\n          onClick={() => setPendingForceRefresh(true)}')
     expect(USER_FILTERS).toContain('flex min-w-0 flex-1 flex-nowrap items-center gap-2')
-    // ★V7（#748）：検索欄は共通 SearchField（高さ40px＝h-10 と同じ）。選ぶ欄2つは h-10 のまま。
+    // #748: 検索欄は共有SearchField（内側が40px）へ移行。素のinputに直書きしない。
     expect(USER_FILTERS).toContain('<SearchField')
-    expect(USER_FILTERS).toContain('className="min-w-0 flex-1"')
+    expect(USER_FILTERS).toContain('min-w-0 flex-1')
     expect(USER_FILTERS).not.toContain('rounded-[14px] border')
     expect(USER_FILTERS.match(/h-10/g)?.length).toBeGreaterThanOrEqual(2)
   })
