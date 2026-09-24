@@ -124,7 +124,8 @@ function NotificationsPageInner() {
   const hasMore = items.length < total
 
   return (
-    <div className="mx-auto max-w-3xl space-y-4">
+    {/* ★V7: 画面側で狭い中央寄せをしない。中身の幅は共通の枠が持つ。 */}
+    <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Tabs
           items={filters.map((entry) => ({
