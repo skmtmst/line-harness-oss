@@ -141,7 +141,9 @@ function EmptyCell({ href }: { href?: string }) {
   // 受け付けられる枠だけが入口になり、取れないマス（営業時間外・休み・
   // 満席・まだ読み込み中）は「—」で示す。
   if (!href) {
-    return <span className="text-ink-faint text-xs opacity-50" aria-label="受け付けていない時間">—</span>
+    // ★V7：受け付けていないマスは空のまま（読み上げだけ伝える）。全マスに「—」が並ぶと、表が記号で埋まって
+    // 「あき ＋」の入口が目立たなかった。
+    return <span className="sr-only">受け付けていない時間</span>
   }
   return (
     <Link
@@ -536,11 +538,12 @@ export default function BookingCalendar({ mode, items, onOpen, staffNames, canCr
         <Kpi title="キャンセル" value={`${cancelled}件`} detail={mode === 'day' ? '選んだ日' : 'この1週間'} />
       </div>
 
-      <div className="bg-action-soft text-action mb-4 rounded-control px-4 py-3 text-xs font-semibold">
-        {mode === 'day'
-          ? '今日の予約を、時間と担当で並べた台帳です。LINEからの予約（緑）と電話の予約（青）を同じところに並べます。'
-          : '今週の予約を曜日ごとに並べています。空いているところと詰まっているところが1目で分かります。'}
-      </div>
+      {/* ★V7：常に出ていた説明の帯は、色の見方だけを小さな凡例にした。 */}
+      <p className="text-ink-secondary mb-3 flex flex-wrap items-center justify-end gap-x-4 gap-y-1 text-xs">
+        <span><span aria-hidden="true" className="text-accent-deep">●</span> LINEからの予約</span>
+        <span><span aria-hidden="true" className="text-action">●</span> 電話の予約</span>
+        <span className="text-ink-faint">「あき ＋」から予約を入れられます</span>
+      </p>
 
       {/* BOOKING-01: 未設定・取得不能・空き0を区別して知らせる。
           未設定・取得不能のときの「—」は空き0とは別の意味なので理由を出す。 */}
