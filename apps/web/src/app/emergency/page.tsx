@@ -718,8 +718,20 @@ function SendPathCoveragePanel({ accountId, revision }: { accountId: string | nu
     api.operations.sendPaths(accountId)
       .then((response) => {
         if (cancelled) return
-        if (response.success) setData(response.data)
-        else setFailed(true)
+        if (!response.success) {
+          setFailed(true)
+          return
+        }
+        /*
+         * 形の違う応答は置かない。そのまま回すと `capabilities` で
+         * 画面ごと落ちる（全ルート監査 A1、2026-09-25）。
+         */
+        const data = response.data as unknown as { capabilities?: unknown; paths?: unknown } | null
+        if (data && Array.isArray(data.capabilities) && Array.isArray(data.paths)) {
+          setData(response.data)
+        } else {
+          setFailed(true)
+        }
       })
       .catch(() => { if (!cancelled) setFailed(true) })
     return () => { cancelled = true }
@@ -752,7 +764,7 @@ function SendPathCoveragePanel({ accountId, revision }: { accountId: string | nu
     <div className="border-hairline border-b px-4 py-3">
       <h2 className="text-base font-bold text-ink">停止が届く送信経路</h2>
       <p className="mt-0.5 text-xs text-ink-faint">緊急停止が実際に届く経路と、対象外の経路の一覧です。{formatOperationDate(data.evaluatedAt)}時点</p>
-      {data.problems.length > 0 && <p className="mt-2 rounded-control bg-warning-bg px-3 py-2 text-xs font-bold text-warning" role="alert">台帳と実装がずれています: {data.problems.join(' / ')}</p>}
+      {(data.problems ?? []).length > 0 && <p className="mt-2 rounded-control bg-warning-bg px-3 py-2 text-xs font-bold text-warning" role="alert">台帳と実装がずれています: {(data.problems ?? []).join(' / ')}</p>}
     </div>
     <div className="divide-y divide-hairline">
       {groups.map((group) => <div key={group.title} className="px-4 py-3">
