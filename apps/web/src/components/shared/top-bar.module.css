@@ -1,3 +1,4 @@
+@layer components {
 /*
  * Pencil `cBSCb`（V6s 共通トップバー）の実測値。
  * 数字を変えるときは Pencil を先に直す。ここだけ変えると絵と割れる。
@@ -258,4 +259,5 @@
   .accountName {
     max-width: 120px;
   }
+}
 }

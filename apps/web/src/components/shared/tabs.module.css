@@ -1,3 +1,4 @@
+@layer components {
 /*
  * ページ内タブ。Pencil V5 の `VPn1F`（選択中）と `ISA1Q`（通常）。
  *
@@ -105,4 +106,5 @@
   .actions {
     padding-bottom: 0;
   }
+}
 }

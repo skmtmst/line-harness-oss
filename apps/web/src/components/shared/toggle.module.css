@@ -1,3 +1,4 @@
+@layer components {
 /*
  * スイッチ。Pencil V5 の機能設定（31-1）で43個並ぶ。
  *
@@ -56,4 +57,5 @@
 .toggle:focus-visible {
   outline: 2px solid var(--color-status-info);
   outline-offset: 2px;
+}
 }

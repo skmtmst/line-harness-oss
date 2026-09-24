@@ -1,3 +1,4 @@
+@layer components {
 .badge {
   display: inline-flex;
   align-items: center;
@@ -43,4 +44,5 @@
    * だと薄い地で 3.53:1 しかなく AA(4.5:1)に届かない。#b3261e なら 5.89:1。
    */
   color: var(--color-danger);
+}
 }
