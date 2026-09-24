@@ -47,8 +47,9 @@ describe('プール管理の直URL(#860)', () => {
       expect(view.getByText('機能設定を開く')).toBeTruthy()
     })
     // プールの管理UIは出ない（読み込み中にも留まらない）。
-    expect(view.queryByText('新規プール')).toBeNull()
-    expect(view.queryByText('読み込み中...')).toBeNull()
+    expect(view.queryByText('＋ プールをつくる')).toBeNull()
+    expect(view.queryByText('まだプールがありません')).toBeNull()
+    expect(view.queryByText('読み込んでいます')).toBeNull()
     expect(view.container.querySelector('[data-feature-disabled="multi_store_hierarchy"]')).toBeTruthy()
   })
 
@@ -78,7 +79,7 @@ describe('プール管理の直URL(#860)', () => {
     )
 
     await waitFor(() => expect(view.getByText('メインプール')).toBeTruthy())
-    expect(view.getByText('+ 新規プール')).toBeTruthy()
+    expect(view.getByText('＋ プールをつくる')).toBeTruthy()
     expect(view.queryByText('この機能は設定でオフになっています')).toBeNull()
   })
 })
