@@ -42,7 +42,7 @@ export default function StaffInvitationPage() {
   return (
     <main className="mx-auto flex min-h-screen max-w-xl items-center px-6 py-16">
       <section className="w-full rounded-card border border-hairline bg-canvas p-8 shadow-sm">
-        <p className="text-sm font-semibold text-accent-deep">然-NEN- LINE管理システム</p>
+        <p className="text-sm font-semibold text-ink-secondary">然-NEN- LINE管理システム</p>
         <div role="heading" aria-level={1} className="mt-3 text-2xl font-bold text-ink">管理画面への招待</div>
 
         {view === 'reading' && <p className="mt-5 text-sm text-ink-secondary">招待内容を確認しています…</p>}

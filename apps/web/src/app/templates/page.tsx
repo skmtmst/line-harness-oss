@@ -15,6 +15,7 @@ import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
+import ListRange from '@/components/ui/list-range'
 import { Tabs } from '@/components/shared/tabs'
 import FolderPanel, { FOLDER_RAIL_STYLE } from '@/components/shared/folder-panel'
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
@@ -702,7 +703,7 @@ export default function TemplatesPage() {
       */}
       <div className={`${styles.folderRail} shrink-0`}>
         <FolderPanel
-          total={`${folders.length} 件`}
+          total={`${templates.length} 件`}
           activeId={selectedCategory}
           onSelect={setSelectedCategory}
           onAddFolder={canMutateTemplates ? () => setFolderDialogOpen(true) : undefined}
@@ -757,7 +758,12 @@ export default function TemplatesPage() {
           onChange={(e) => setTemplateQuery(e.target.value)}
           className="border-hairline rounded-control focus:ring-accent min-w-0 flex-1 border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
         />
-        <span className="bg-canvas-sunken rounded-control px-3 py-2 text-sm font-medium">保存した検索</span>
+        {/*
+          #668: 「保存した検索」の飾りは消した。押せる形をしているのに
+          何も起きない札は、押した人に「やった」と誤解させる
+          （v6-common-rules §2-2）。保存検索の仕組みができたら、
+          一斉配信と同じ選び口（SelectField）で置き直す。
+        */}
         {/*
           ここは「20件表示」の選び口だった(#615)。**選べない選び口だった。**
           `value` だけ渡して `onChange` も読み取り専用指定も無いので、React が
@@ -769,7 +775,7 @@ export default function TemplatesPage() {
           一覧にページ送りを入れるときに一緒にやる。
         */}
         {view === 'ready' ? (
-          <span className="text-ink-secondary px-1 text-sm tabular-nums">{filteredTemplates.length}件を表示</span>
+          <ListRange className="px-1 tabular-nums" total={filteredTemplates.length} first={filteredTemplates.length === 0 ? 0 : 1} last={filteredTemplates.length} />
         ) : null}
       </div>
 
@@ -795,10 +801,10 @@ export default function TemplatesPage() {
           <button
             key={key}
             onClick={() => setTypeFilter(key)}
+            /* #702: 選んだ札は濃い緑＋白文字(5.44:1)。明るいLINE緑だと白文字で2.26:1しかない。 */
             className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${
               typeFilter === key ? 'bg-accent-deep text-on-accent' : 'bg-canvas-sunken text-ink-secondary hover:bg-hairline'
             }`}
-            style={typeFilter === key ? { backgroundColor: 'var(--color-accent)' } : undefined}
           >
             {label}
           </button>
@@ -974,13 +980,13 @@ export default function TemplatesPage() {
                     }}
                     className={`hover:bg-canvas-sunken cursor-pointer transition-colors focus:bg-canvas-sunken focus:outline-none ${drawerId === t.id ? 'bg-accent-soft' : ''}`}
                   >
-                    <td className="px-4 py-3">
+                    <td className="px-3 py-3">
                       <p className="text-sm font-medium text-ink">{t.name}</p>
                       <p className="text-[11px] text-ink-faint mt-0.5 truncate max-w-md">
                         {t.messageContent.slice(0, 60)}{t.messageContent.length > 60 ? '...' : ''}
                       </p>
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-3 py-3">
                       <span className={`inline-flex items-center rounded px-2 py-0.5 text-[10px] font-medium ${typeBadgeColor[t.question ? 'question' : t.messageType] ?? 'bg-canvas-sunken text-ink-secondary'}`}>
                         {messageTypeText(t.question ? 'question' : t.messageType)}
                       </span>
@@ -991,7 +997,7 @@ export default function TemplatesPage() {
                         ここには出さない。
                       */}
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-3 py-3">
                       <span className={`text-sm ${t.usageCount === 0 ? 'text-ink-faint' : 'text-ink font-medium'}`}>
                         {/*
                           **取れていないのを「0件」とも「undefined件」とも言わない。**
@@ -1001,7 +1007,7 @@ export default function TemplatesPage() {
                         {typeof t.usageCount !== 'number' ? '使用先を確認できません' : t.usageCount === 0 ? 'なし' : `${t.usageCount}件で使用`}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-right">
+                    <td className="px-3 py-3 text-right">
                       {typeof t.monthlySendCount === 'number' && typeof t.totalSendCount === 'number' ? (
                         <span
                           className="whitespace-nowrap text-xs font-medium text-ink"
@@ -1013,8 +1019,8 @@ export default function TemplatesPage() {
                         <span className="text-ink-faint text-xs">送信数を確認できません</span>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-xs text-ink-faint">{formatDate(t.updatedAt)}</td>
-                    <td className="px-4 py-3 text-right">
+                    <td className="px-3 py-3 text-xs text-ink-faint">{formatDate(t.updatedAt)}</td>
+                    <td className="px-3 py-3 text-right">
                       {/* 行のクリック（詳細を開く）へ伝えない。 */}
                       <div
                         className="relative flex items-center justify-end gap-1 whitespace-nowrap"
@@ -1256,7 +1262,7 @@ export default function TemplatesPage() {
                       <ul className="space-y-1.5 text-xs">
                         {drawerData.usedBy.autoReplies.map((ar) => (
                           <li key={`ar-${ar.id}`}>
-                            <a href={`/auto-replies/edit?id=${ar.id}`} className="text-accent-deep hover:underline">
+                            <a href={`/auto-replies/edit?id=${ar.id}`} className="text-action hover:underline">
                               自動返信: {ar.keyword} <span className="text-ink-faint">({ar.matchType})</span>
                             </a>
                           </li>
@@ -1272,28 +1278,28 @@ export default function TemplatesPage() {
                         ))}
                         {scenarioStepUsages.map((ss) => (
                           <li key={`ss-${ss.stepId}`}>
-                            <a href={`/scenarios/detail?id=${ss.scenarioId}`} className="text-accent-deep hover:underline">
+                            <a href={`/scenarios/detail?id=${ss.scenarioId}`} className="text-action hover:underline">
                               シナリオ: {ss.scenarioName} <span className="text-ink-faint">#{ss.stepOrder}</span>
                             </a>
                           </li>
                         ))}
                         {reminderStepUsages.map((rs) => (
                           <li key={`rs-${rs.stepId}`}>
-                            <a href={`/reminders/edit?id=${rs.reminderId}`} className="text-accent-deep hover:underline">
+                            <a href={`/reminders/edit?id=${rs.reminderId}`} className="text-action hover:underline">
                               リマインダ: {rs.reminderName}
                             </a>
                           </li>
                         ))}
                         {richMenuAreaUsages.map((area) => (
                           <li key={`rm-${area.areaId}`}>
-                            <a href={`/rich-menus/edit?id=${area.groupId}`} className="text-accent-deep hover:underline">
+                            <a href={`/rich-menus/edit?id=${area.groupId}`} className="text-action hover:underline">
                               リッチメニュー: {area.groupName} / {area.pageName}{area.label ? ` / ${area.label}` : ''}
                             </a>
                           </li>
                         ))}
                         {trackedLinkUsages.map((link) => (
                           <li key={`tl-${link.id}`}>
-                            <a href={`/inflow-links/detail?id=${link.id}`} className="text-accent-deep hover:underline">
+                            <a href={`/inflow-links/detail?id=${link.id}`} className="text-action hover:underline">
                               流入リンク: {link.name}
                             </a>
                           </li>
@@ -1346,7 +1352,7 @@ export default function TemplatesPage() {
                     {href ? (
                       <a
                         href={href}
-                        className="flex items-center gap-2 rounded-control px-1.5 py-1 text-accent-deep hover:bg-canvas-sunken hover:underline"
+                        className="flex items-center gap-2 rounded-control px-1.5 py-1 text-action hover:bg-canvas-sunken hover:underline"
                       >
                         <Icon size={15} className="shrink-0" aria-hidden="true" />
                         <span className="min-w-0 flex-1">{label}</span>
@@ -1368,7 +1374,7 @@ export default function TemplatesPage() {
                 <p className="mb-2 text-sm font-bold text-ink">どうしますか</p>
                 <div className="rounded-lg border border-accent-soft bg-accent-soft px-4 py-3 text-accent-deep">
                   <p className="text-sm font-bold">上の使用先を1か所ずつ開いて、別のテンプレートへ差し替えてください</p>
-                  <p className="mt-1 text-xs text-accent-deep">差し替えが終わるまで、このテンプレートは一覧に残ります。</p>
+                  <p className="mt-1 text-xs text-ink-faint">差し替えが終わるまで、このテンプレートは一覧に残ります。</p>
                 </div>
               </div>
             </div>

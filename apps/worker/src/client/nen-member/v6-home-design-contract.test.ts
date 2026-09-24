@@ -25,3 +25,26 @@ describe('V6正本 37-2 然・マイページ', () => {
     expect(styles).not.toContain('.nm-member-header {');
   });
 });
+
+describe('V6正本 37-2-C 然・投稿', () => {
+  it('uses the adopted design node and the three review labels', () => {
+    expect(main).toContain('data-design-node="pNuzE"');
+    expect(main).toContain("pending: '審査中'");
+    expect(main).toContain("adopted: '採用'");
+    expect(main).toContain("rejected: '見送り'");
+  });
+
+  it('keeps consent, reward, and empty-state wording in the LIFF view', () => {
+    expect(main).toContain('サイトへの掲載に同意する');
+    expect(main).toContain('同意していない写真は公式サイトに掲載されません');
+    expect(main).toContain('5マイル付与');
+    expect(main).toContain('まだ投稿がありません');
+    expect(main).not.toContain('5ポイント');
+  });
+
+  it('keeps tall previews fully visible and uses variables for the new palette', () => {
+    expect(styles).toContain('.nm-photo-preview-frame img');
+    expect(styles).toContain('object-fit: contain;');
+    expect(styles).toContain('--photo-');
+  });
+});

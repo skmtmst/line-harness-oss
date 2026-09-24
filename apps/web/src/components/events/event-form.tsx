@@ -874,7 +874,7 @@ function SlotsTab({
                       <button
                         onClick={() => setEditSlotTarget(s)}
                         disabled={busy}
-                        className="text-accent-deep text-xs hover:underline disabled:opacity-30 disabled:no-underline"
+                        className="text-action text-xs hover:underline disabled:opacity-30 disabled:no-underline"
                       >
                         編集
                       </button>

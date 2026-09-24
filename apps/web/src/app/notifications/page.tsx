@@ -9,7 +9,7 @@
  */
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import Link from 'next/link'
+import { AlertTriangle, Download } from 'lucide-react'
 import type { NotificationCenterData, NotificationCenterItem } from '@line-crm/shared'
 import { api } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
@@ -138,9 +138,9 @@ function NotificationsPageInner() {
           <Button variant="secondary" onClick={() => { void markAllRead() }} disabled={!counts || counts.unread === 0}>
             すべて既読にする
           </Button>
-          <Link href="/line-notifications?tab=operator" className="text-action text-xs font-medium hover:underline">
+          <Button variant="secondary" href="/line-notifications?tab=operator">
             通知設定
-          </Link>
+          </Button>
         </div>
       </div>
 
@@ -163,12 +163,18 @@ function NotificationsPageInner() {
                   onClick={() => openNotification(item)}
                   className="hover:bg-canvas-sunken flex w-full items-start gap-3 px-5 py-4 text-left"
                 >
-                  <span
-                    aria-hidden="true"
-                    className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${item.isRead ? 'bg-hairline' : 'bg-accent'}`}
-                  />
+                  {item.category === 'error' ? (
+                    <AlertTriangle aria-hidden="true" className="text-danger mt-0.5 h-4 w-4 shrink-0" />
+                  ) : item.category === 'update' ? (
+                    <Download aria-hidden="true" className="text-ink-faint mt-0.5 h-4 w-4 shrink-0" />
+                  ) : null}
+                  {item.isRead ? (
+                    <span aria-hidden="true" className="mt-1.5 h-2 w-2 shrink-0" />
+                  ) : (
+                    <span aria-hidden="true" className="bg-action mt-1.5 h-2 w-2 shrink-0 rounded-full" />
+                  )}
                   <span className="min-w-0 flex-1">
-                    <span className={`text-ink block truncate text-sm ${item.isRead ? '' : 'font-semibold'}`}>
+                    <span className={item.isRead ? 'text-ink block truncate text-sm' : 'text-ink block truncate text-sm font-semibold'}>
                       {item.title}
                       {!item.isRead ? <span className="sr-only">（未読）</span> : null}
                     </span>

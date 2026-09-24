@@ -1,3 +1,4 @@
+@layer components {
 .notice {
   position: relative;
   display: flex;
@@ -66,4 +67,5 @@
 
 .close:focus-visible {
   outline: revert;
+}
 }

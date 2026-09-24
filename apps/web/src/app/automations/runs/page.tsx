@@ -10,6 +10,7 @@ import MergedTabs from '@/components/layout/merged-tabs'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import FilterChip from '@/components/shared/filter-chip'
 import KpiCollapse from '@/components/ui/kpi-collapse'
+import ListRange from '@/components/ui/list-range'
 import { useAutomationRunPermissions } from '@/components/automations/use-can-manage'
 
 type RunStatus = 'queued' | 'claimed' | 'succeeded' | 'skipped' | 'waiting' | 'retry_wait' | 'partial' | 'permanent_failed' | 'cancelled'
@@ -363,7 +364,7 @@ export default function AutomationRunsPage() {
               </div>
             </div>
           ))}
-          <div className="border-t border-hairline px-4 py-3 text-xs text-ink-faint">記録 {data.pagination.total.toLocaleString('ja-JP')}件中 1〜{data.items.length}件を表示</div>
+          <div className="border-t border-hairline px-4 py-3"><ListRange label="記録" total={data.pagination.total} first={data.items.length === 0 ? 0 : 1} last={data.items.length} /></div>
         </div>
       )}
 

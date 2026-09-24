@@ -431,6 +431,31 @@ describe('店舗共通の予約ルール', () => {
     expect((await screen.findByRole('status')).textContent).toContain('予約の基本ルールを保存しました。')
   })
 
+  test('分・時間の入力の横に読み替えが出る（Issue #710）', async () => {
+    fixture.activeTab = 'rules'
+    fixture.getSettings = vi.fn(async () => ({ success: true, data: {
+      ...SETTINGS, holdMinutes: 1440, reminderHoursBefore: 72,
+    } }))
+    render(<MenusPage />)
+
+    await screen.findByRole('spinbutton', { name: '受付の締め切り' })
+    // 受付の締め切り・キャンセルの期限（どちらも1440分）
+    expect(screen.getAllByText('＝24時間前').length).toBe(2)
+    // 仮押さえの保持時間（1440分は長さなので「前」を付けない）
+    expect(screen.getByText('＝1日')).toBeTruthy()
+    // 当日のお知らせ（72時間前は3日前）
+    expect(screen.getByText('＝3日前')).toBeTruthy()
+  })
+
+  test('IANAに無いタイムゾーンには綴り確認の注意が出る（Issue #710）', async () => {
+    fixture.activeTab = 'rules'
+    fixture.getSettings = vi.fn(async () => ({ success: true, data: { ...SETTINGS, timeZone: 'Asia/Tokoyo' } }))
+    render(<MenusPage />)
+
+    await screen.findByRole('spinbutton', { name: '受付の締め切り' })
+    expect(screen.getByText(/綴りを確認してください/)).toBeTruthy()
+  })
+
   test('保存待ち中に店舗を切り替えても、旧店舗の応答を新店舗へ反映しない', async () => {
     fixture.activeTab = 'rules'
     fixture.getSettings = vi.fn(async (accountId: string) => ({

@@ -1,3 +1,4 @@
+@layer components {
 /*
  * パンくず。Pencil V6 の `R098Z`「共通 パンくず」。
  *
@@ -37,4 +38,5 @@
   height: 13px; /* height: 13 */
   color: var(--color-ink-faint); /* fill: $ink-faint */
   flex: none;
+}
 }

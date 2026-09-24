@@ -113,7 +113,7 @@ export default function RegisterPage() {
 
       <p className="text-caption text-ink-faint">
         すでにアカウントをお持ちの方は{' '}
-        <Link href="/login" className="font-semibold text-accent-deep hover:underline">
+        <Link href="/login" className="font-semibold text-action hover:underline">
           ログイン
         </Link>
       </p>
@@ -124,7 +124,7 @@ export default function RegisterPage() {
 function LegalWord({ href, children }: { href: string | null; children: string }) {
   if (!href) return <span className="font-semibold">{children}</span>
   return (
-    <a href={href} target="_blank" rel="noreferrer" className="font-semibold text-accent-deep hover:underline">
+    <a href={href} target="_blank" rel="noreferrer" className="font-semibold text-action hover:underline">
       {children}
     </a>
   )

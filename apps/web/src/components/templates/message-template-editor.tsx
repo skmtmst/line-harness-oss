@@ -298,7 +298,7 @@ export function MessageTemplateEditor({
           required
           note={<>
             差し込みは下の選択肢から入れられます。名前と友だち情報は受け取る人ごと、共通情報と配信日は送る時点の値に置き換わります。
-            {carouselHref && <><br />カルーセルを作るときは <Link href={carouselHref} className="text-accent-deep hover:underline">カルーセルの編集</Link> を使ってください。</>}
+            {carouselHref && <><br />カルーセルを作るときは <Link href={carouselHref} className="text-action hover:underline">カルーセルの編集</Link> を使ってください。</>}
           </>}
         >
           {value.messageType === 'flex' ? (
@@ -313,7 +313,7 @@ export function MessageTemplateEditor({
           <TemplateInsertControls accountId={referenceAccountId} state={referenceState} accountLabel={referenceAccountLabel} targetDate={targetDate} disabled={disabled} unavailableHint={referenceUnavailableHint} onTargetDateChange={onTargetDateChange} friendFields={references.friendFields} commonVars={references.commonVars} onInsert={insert} />
         </div>
         <section aria-label="本文内のURL" className="border-hairline rounded-card border p-4">
-          <div className="flex items-center justify-between gap-3"><p className="text-ink text-sm font-semibold">本文に入れたURLの扱い</p><span className="text-accent-deep text-xs font-semibold">短縮して、クリックを数える</span></div>
+          <div className="flex items-center justify-between gap-3"><p className="text-ink text-sm font-semibold">本文に入れたURLの扱い</p><span className="text-ink-faint text-xs font-semibold">短縮して、クリックを数える</span></div>
           <div className="border-hairline mt-3 overflow-hidden rounded-control border text-xs">
             <div className="bg-canvas-sunken grid grid-cols-3 gap-3 px-3 py-2 font-semibold text-ink-secondary"><span>本文の中のURL</span><span>リンク名（計測に出る名前）</span><span>流入リンクにする</span></div>
             {messageUrls.length === 0 ? <p className="text-ink-faint px-3 py-3">本文にURLはありません。</p> : messageUrls.map((url) => <div key={url} className="grid grid-cols-3 gap-3 px-3 py-3 text-ink"><span className="truncate" title={url}>{url}</span><span className="text-ink-faint">配信時に自動作成</span><span className="text-ink-faint">配信時に自動発行</span></div>)}

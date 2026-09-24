@@ -142,7 +142,7 @@ function FriendAddRunDetailInner() {
 
   return (
     <div className="space-y-4 pb-8">
-      <Link className="text-sm font-bold text-accent-deep hover:underline" href="/friend-add-settings/runs">← 実行結果へ戻る</Link>
+      <Link className="text-sm font-bold text-action hover:underline" href="/friend-add-settings/runs">← 実行結果へ戻る</Link>
       <section className="rounded-card border border-hairline bg-canvas p-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>

@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { readdirSync, readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
 const read = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8')
@@ -22,6 +22,13 @@ describe('Pencil V6 の入力・選択・押し口規定', () => {
     expect(select).toMatch(/\.select\s*{[^}]*height:\s*40px/s)
     expect(select).toMatch(/background-color:\s*var\(--color-canvas\)/)
     expect(select).toMatch(/background-position:\s*right 13px center/)
+    /*
+     * 呼び出し側の幅指定（`w-full` など utilities レイヤー）が既定幅
+     * 176px/128px を上書きできるよう、部品の宣言は components レイヤー
+     * に置く。未レイヤーに戻すとレイヤー外が常に勝ち、グリッド枠から
+     * プルダウンがはみ出す（予約設定の空き確認で発生）。
+     */
+    expect(select).toMatch(/@layer components/)
     expect(search).toMatch(/\.search\s*{[^}]*height:\s*40px/s)
     expect(search).toMatch(/background:\s*var\(--color-canvas\)/)
   })
@@ -35,6 +42,20 @@ describe('Pencil V6 の入力・選択・押し口規定', () => {
     expect(rule).toMatch(/padding-right:\s*36px/)
     expect(rule).toMatch(/background-color:\s*var\(--color-canvas\)/)
     expect(rule).toMatch(/background-position:\s*right 12px center/)
+  })
+
+  it('共有部品の CSS Module はすべて components レイヤーに置く', () => {
+    /*
+     * #718: レイヤーに属さない部品 CSS は utilities レイヤーより常に強く、
+     * 呼び出し側の `w-full` や `h-8` がエラーも出さずに無視される
+     * （予約設定のプルダウンはみ出し・カレンダー前後ボタンの高さ不整合で発生）。
+     * components レイヤーに入れると既定値は部品が持ち、
+     * 画面側のクラスは指定したときだけ勝つ。
+     */
+    const dir = new URL('.', import.meta.url)
+    const modules = readdirSync(dir).filter((name) => name.endsWith('.module.css'))
+    const offenders = modules.filter((name) => !read(`./${name}`).includes('@layer components'))
+    expect(offenders).toEqual([])
   })
 
   it('代表的な画面側上書きも規定値に戻す', () => {

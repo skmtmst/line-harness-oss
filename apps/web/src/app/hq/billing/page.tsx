@@ -255,7 +255,7 @@ function BillingInner() {
                   <Td><span className="text-label text-ink-secondary">{INVOICE_STATUS_LABELS[inv.status ?? ''] ?? inv.status ?? '—'}</span></Td>
                   <Td align="right">
                     {inv.hostedUrl ? (
-                      <a href={inv.hostedUrl} target="_blank" rel="noreferrer" className="text-label font-semibold text-accent-deep hover:underline">
+                      <a href={inv.hostedUrl} target="_blank" rel="noreferrer" className="text-label font-semibold text-action hover:underline">
                         開く
                       </a>
                     ) : (

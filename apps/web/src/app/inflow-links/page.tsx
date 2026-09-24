@@ -7,7 +7,7 @@ import { useSearchParams } from 'next/navigation'
 import { ApiError, api, fetchApi } from '@/lib/api'
 import KpiCard from '@/components/shared/kpi-card'
 import { useAccount } from '@/contexts/account-context'
-import type { EntryRoute, EntryRouteGenre, TrafficPool, Scenario, Tag } from '@line-crm/shared'
+import type { ApiResponse, EntryRoute, EntryRouteGenre, TrafficPool, Scenario, Tag } from '@line-crm/shared'
 import EditRouteModal from './_components/edit-route-modal'
 import GenreModal from './_components/create-genre-modal'
 import { shouldShowReferralRow } from './visibility'
@@ -16,6 +16,7 @@ import { Suspense } from 'react'
 import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
 import { FeatureDisabledScreen } from '@/components/feature-disabled-gate'
 import { useFeatureVisibility } from '@/lib/use-feature-visibility'
+import { isPoolsFeatureAvailable } from '@/lib/pools-availability'
 import type { FeatureKey } from '@/lib/feature-settings'
 import AdIntegration from './ad-integration'
 import RefOrdersPanel from './_components/ref-orders'
@@ -349,15 +350,27 @@ function InflowLinksPageInner({
       && generation === loadRequestRef.current
       && accountAtRequest === latestAccountRef.current
     const loadAuxiliary = async () => {
-      const [p, s, t, tagRes] = await Promise.all([
-        // プールは補助データ。multi_store_hierarchy がオフでも画面全体を
-        // 共通ゲートへ切り替えず、プール列だけ無しで既存リンクを表示する。
-        featureAllowed('multi_store_hierarchy')
-          ? api.pools.list({ suppressFeatureDisabledEvent: true }).catch(() => ({
+      // プールは補助データ。multi_store_hierarchy がオフでも画面全体を
+      // 共通ゲートへ切り替えず、プール列だけ無しで既存リンクを表示する。
+      // 403 の応答自体が console error になるため、有効と分からない限り
+      // 口を発行しない（#703）。可視性が未確定のときだけ共有判定で確かめる。
+      const poolsPromise: Promise<ApiResponse<TrafficPool[]>> = visibility.features != null
+        ? (visibility.features['multi_store_hierarchy'] === true
+          ? api.pools.list({ suppressFeatureDisabledEvent: true }).catch((): ApiResponse<TrafficPool[]> => ({
+            success: false as const,
+            error: 'feature_disabled',
+          }))
+          : Promise.resolve({ success: false as const, error: 'feature_disabled' }))
+        : isPoolsFeatureAvailable(selectedAccountId ? [selectedAccountId] : null).then((ok) =>
+          ok
+            ? api.pools.list({ suppressFeatureDisabledEvent: true }).catch((): ApiResponse<TrafficPool[]> => ({
               success: false as const,
-              data: [] as TrafficPool[],
+              error: 'feature_disabled',
             }))
-          : Promise.resolve({ success: false as const, data: [] as TrafficPool[] }),
+            : { success: false as const, error: 'feature_disabled' },
+        )
+      const [p, s, t, tagRes] = await Promise.all([
+        poolsPromise,
         featureAllowed('scenarios')
           ? api.scenarios.list().catch(() => ({ success: false as const, data: [] as Scenario[] }))
           : Promise.resolve({ success: false as const, data: [] as Scenario[] }),
@@ -1145,7 +1158,7 @@ function InflowLinksPageInner({
                         </button>
                         <button
                           onClick={() => setQrRoute({ refCode: r.refCode, name: r.name, genre: r.genre })}
-                          className="text-[11px] font-medium text-accent-deep hover:underline"
+                          className="text-[11px] font-medium text-action hover:underline"
                           aria-label={`${r.name}のQRコードを表示`}
                         >
                           QR
@@ -1372,7 +1385,7 @@ function ReferralQrModal({
       <div className="w-full max-w-md rounded-2xl bg-canvas p-6 shadow-2xl">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <p className="text-xs font-medium text-accent-deep">リファラルリンク・QRコード</p>
+            <p className="text-xs font-medium text-ink-faint">リファラルリンク・QRコード</p>
             <h2 className="mt-1 text-lg font-bold text-ink">{route.name}</h2>
             <p className="mt-1 text-sm text-ink-faint">{route.genre ?? '未分類'}</p>
           </div>

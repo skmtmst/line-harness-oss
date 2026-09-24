@@ -214,7 +214,7 @@ export default function HqFormDefinitionEditor({
         <div className="flex flex-wrap items-center gap-1 border-b border-hairline pb-2">
           <button type="button" aria-pressed={tab === HEADER_TAB} onClick={() => setTab(HEADER_TAB)} className="rounded-control px-3 py-1.5 text-sm aria-pressed:bg-accent-soft aria-pressed:text-accent-deep">共通ヘッダ</button>
           {layout.sections.map((section, index) => <span key={section.id} className="flex items-center"><button type="button" aria-pressed={tab === index} onClick={() => setTab(index)} onDoubleClick={() => renameSection(index)} className="rounded-control px-3 py-1.5 text-sm aria-pressed:bg-accent-soft aria-pressed:text-accent-deep">{section.name}</button>{tab === index && <><button type="button" onClick={() => duplicateSection(index)} className="px-1 text-xs text-ink-faint">複製</button>{layout.sections.length > 1 && <button type="button" onClick={() => requestRemoveSection(index)} className="px-1 text-xs text-danger">削除</button>}</>}</span>)}
-          <button type="button" onClick={addSection} className="rounded-control px-2 py-1.5 text-sm font-bold text-accent-deep">＋</button>
+          <button type="button" onClick={addSection} className="rounded-control px-2 py-1.5 text-sm font-bold text-action">＋</button>
         </div>
         <div className="flex flex-wrap items-center justify-between gap-2 py-2"><span className="text-sm font-bold">ブロック設定</span><div className="flex flex-wrap items-center gap-1">
           <button type="button" onClick={undo} className="rounded-control px-2 py-1 text-xs">元に戻す</button><button type="button" onClick={redo} className="rounded-control px-2 py-1 text-xs">やり直す</button>

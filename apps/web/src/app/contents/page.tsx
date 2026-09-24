@@ -24,6 +24,7 @@ import {
   usageText,
 } from './media-delete-impact'
 import Pagination from '@/components/shared/pagination'
+import ListRange from '@/components/ui/list-range'
 import FilterChip from '@/components/shared/filter-chip'
 import FolderPanel, { FOLDER_RAIL_STYLE } from '@/components/shared/folder-panel'
 import ListState from '@/components/shared/list-state'
@@ -76,11 +77,6 @@ const KINDS: Array<{ key: MediaItem['kind']; label: string }> = [
   { key: 'video', label: '動画' },
   { key: 'file', label: 'PDF' },
 ]
-
-function formatStorage(bytes: number): string {
-  if (bytes < 1024 * 1024 * 1024) return `${Math.round(bytes / 1024 / 1024)}MB`
-  return `${(bytes / 1024 / 1024 / 1024).toFixed(1)}GB`
-}
 
 function formatMediaDetails(item: MediaItem): string {
   const format = item.mimeType.split('/').at(-1)?.replace('jpeg', 'jpg').toUpperCase() ?? ''
@@ -751,7 +747,7 @@ function MediaLibraryInner() {
         </div>
         <div className="w-full max-w-xs text-right">
           <p className="text-ink-secondary text-nano font-semibold">
-            使っている容量 <span className="text-ink ml-1">{quota ? `${formatStorage(quota.usageBytes)} / ${formatStorage(quota.limitBytes)}` : '—（未取得）'}</span>
+            使っている容量 <span className="text-ink ml-1">{quota ? `${formatMediaSize(quota.usageBytes)} / ${formatMediaSize(quota.limitBytes)}` : '—（未取得）'}</span>
           </p>
           <MediaQuotaGuidance
             quota={quota}
@@ -769,7 +765,7 @@ function MediaLibraryInner() {
       <div style={FOLDER_RAIL_STYLE} className="grid gap-4 lg:grid-cols-[var(--folder-rail-width)_minmax(0,1fr)]">
         <div className="min-w-0">
         <FolderPanel
-          total={`${folders.length + 1}`}
+          total={`${total} 件`}
           activeId={folderFilter}
           onSelect={(id) => {
             setFolderFilter(id)
@@ -1370,9 +1366,7 @@ function MediaLibraryInner() {
 
       <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-3">
-          <span className="text-ink-faint text-xs">
-            全{total}件中 {total === 0 ? 0 : (page - 1) * pageSize + 1}〜{Math.min(page * pageSize, total)}件
-          </span>
+          <ListRange total={total} first={total === 0 ? 0 : (page - 1) * pageSize + 1} last={Math.min(page * pageSize, total)} />
           <Pagination page={page} pageCount={pageCount} onPageChange={setPage} />
         </div>
 

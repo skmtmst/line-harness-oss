@@ -1,3 +1,4 @@
+@layer components {
 .button {
   display: inline-flex;
   align-items: center;
@@ -119,4 +120,5 @@
 
 .danger:hover:not(:disabled) {
   filter: brightness(0.92);
+}
 }
