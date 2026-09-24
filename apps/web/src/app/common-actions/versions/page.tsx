@@ -13,6 +13,7 @@ import StatusBadge from '@/components/shared/status-badge'
 import SummaryCard from '@/components/shared/summary-card'
 import { ActionCell, DataTable, NameCell, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { useCanManageCommonActions } from '@/components/automations/use-common-action-permission'
+import { usePageTitle } from '@/components/shell/page-chrome'
 
 const ACTION_LABELS: Record<string, string> = {
   add_tag: 'タグを付ける', remove_tag: 'タグを外す', set_metadata: '友だち情報を設定する',
@@ -50,6 +51,8 @@ function versionChangeSummary(version: CommonActionVersion, versions: CommonActi
 }
 
 function CommonActionVersionsInner() {
+  // ★V7: 画面の題は上の帯だけ。本文の PageHeader は説明だけ残し、見出しは帯と同じ言葉にして隠す。
+  usePageTitle('版と使われている場所')
   const canManage = useCanManageCommonActions()
   const searchParams = useSearchParams()
   const id = searchParams.get('id') ?? ''

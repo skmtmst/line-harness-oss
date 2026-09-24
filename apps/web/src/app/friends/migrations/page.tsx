@@ -8,6 +8,7 @@ import Button from '@/components/shared/button'
 import FileDropzone, { AttachmentRow } from '@/components/shared/file-drop'
 import ListState from '@/components/shared/list-state'
 import PageHeader from '@/components/shared/page-header'
+import { usePageTitle } from '@/components/shell/page-chrome'
 import SelectField from '@/components/shared/select-field'
 import StatusBadge from '@/components/shared/status-badge'
 import SummaryCard from '@/components/shared/summary-card'
@@ -31,6 +32,8 @@ function formatImportBytes(bytes: number): string {
 }
 
 export default function FriendMigrationsPage() {
+  // ★V7: 画面の題は上の帯だけ。本文の PageHeader は説明だけ残し、見出しは帯と同じ言葉にして隠す。
+  usePageTitle('UID・顧客データ移行')
   const [accounts, setAccounts] = useState<LineAccount[]>([])
   const [accountId, setAccountId] = useState('')
   const [jobs, setJobs] = useState<FriendMigrationJob[]>([])

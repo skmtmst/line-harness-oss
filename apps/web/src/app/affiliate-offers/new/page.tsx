@@ -105,6 +105,7 @@ export default function NewAffiliateOfferPage() {
     <CreatePage
       title="案件を作る"
       description="何を成果として数え、いくら払うかを決めます。"
+      showHeader={false}
       parent={['案件', OFFER_LIST_PATH]}
       successHref={(id) => `${OFFER_LIST_PATH}&highlight=${encodeURIComponent(String(id))}`}
       saveLabel={createdId ? '変更を保存する' : publishNow ? '公開する' : '下書きに保存'}

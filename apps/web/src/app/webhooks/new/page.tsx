@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { EC_EVENT_TYPES, ecEventLabel } from '@line-crm/shared'
 import { api } from '@/lib/api'
-import CreatePage, { Field, inputClass } from '@/components/shared/create-page'
+import CreatePage, { AsideCard, Field, inputClass } from '@/components/shared/create-page'
 import { RequiredBadge } from '@/components/shared/form-controls'
 import { useAccount } from '@/contexts/account-context'
 import { MIN_SECRET_LENGTH, generateSecret } from '../secret'
@@ -68,7 +68,15 @@ export default function NewWebhookPage() {
     <CreatePage
       title="Webhookを追加する"
       description="このツールのできごとを外部へ知らせます（送り出す向きのみ）。"
+      showHeader={false}
       parent={['外部連携', '/webhooks']}
+      aside={
+        <AsideCard title="どちら向きの連携か">
+          <ul className="text-ink-faint space-y-1.5 text-xs leading-relaxed">
+            <li>・この画面で作れるのは「送り出す（Outgoing）」だけです。「受け取る（Incoming）」は外部連携の一覧から追加してください</li>
+          </ul>
+        </AsideCard>
+      }
       validate={() => {
         if (!selectedAccountId) return 'LINEアカウントを選択してください'
         if (!name.trim()) return '名前を入力してください'
@@ -104,12 +112,7 @@ export default function NewWebhookPage() {
         return res.data.id
       }}
     >
-      <p className="text-ink text-sm font-semibold">1. どちら向きの連携か</p>
-      <p className="text-ink-faint text-xs">
-        この画面で作れるのは「送り出す（Outgoing）」だけです。「受け取る（Incoming）」は外部連携の一覧から追加してください。
-      </p>
-
-      <p className="text-ink mt-2 text-sm font-semibold">2. 基本の設定</p>
+      <p className="text-ink text-sm font-semibold">基本の設定</p>
 
       <Field label="名前" htmlFor="wh-name" required>
         <input
