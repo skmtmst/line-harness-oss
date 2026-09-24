@@ -801,10 +801,10 @@ export default function TemplatesPage() {
           <button
             key={key}
             onClick={() => setTypeFilter(key)}
+            /* #702: 選んだ札は濃い緑＋白文字(5.44:1)。明るいLINE緑だと白文字で2.26:1しかない。 */
             className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${
               typeFilter === key ? 'bg-accent-deep text-on-accent' : 'bg-canvas-sunken text-ink-secondary hover:bg-hairline'
             }`}
-            style={typeFilter === key ? { backgroundColor: 'var(--color-accent)' } : undefined}
           >
             {label}
           </button>

@@ -614,6 +614,7 @@ export default function AutoRepliesPage() {
         画面の下へ追いやられていた（監査 A13）。
         上段は複数当てはまったときの挙動、下段は「適用アカウント」欄の
         札の読み方。札の見た目と1対1で並べる。
+        #702: 凡例の札は行側と同じトークンで出す（黄は warning 系・4.5:1以上）。
       */}
       <div className="bg-info-bg border-hairline text-info mb-4 rounded-lg border p-3 text-xs">
         <p className="leading-relaxed">
@@ -627,9 +628,9 @@ export default function AutoRepliesPage() {
               <span
                 className={
                   row.status === 'reply'
-                    ? 'inline-flex items-center px-1.5 py-0.5 rounded bg-success-bg text-green-700'
+                    ? 'inline-flex items-center px-1.5 py-0.5 rounded bg-success-bg text-success'
                     : row.status === 'silent'
-                      ? 'inline-flex items-center px-1.5 py-0.5 rounded bg-amber-50 text-amber-700'
+                      ? 'inline-flex items-center px-1.5 py-0.5 rounded bg-warning-bg text-warning'
                       : 'inline-flex items-center px-1.5 py-0.5 rounded bg-canvas-sunken text-ink-faint line-through'
                 }
               >
@@ -791,7 +792,7 @@ export default function AutoRepliesPage() {
                     <td className="px-3 py-3">
                       {/* E-01: 止めた記録があれば、いつ・誰が・なぜを title で読める */}
                       <span
-                        className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium ${r.isActive ? 'bg-success-bg text-green-700' : 'bg-canvas-sunken text-ink-faint'}`}
+                        className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium ${r.isActive ? 'bg-success-bg text-success' : 'bg-canvas-sunken text-ink-faint'}`}
                         title={stopNote(r) ?? undefined}
                       >
                         {r.isActive ? '有効' : '停止中'}

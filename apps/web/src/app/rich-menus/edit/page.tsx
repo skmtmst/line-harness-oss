@@ -1088,10 +1088,9 @@ function Editor({
               }}
               className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
                 active
-                  ? 'text-white'
+                  ? 'bg-accent-deep text-white'
                   : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
               }`}
-              style={active ? { backgroundColor: 'var(--color-accent)' } : undefined}
             >
               {p.name}
               {active && <span className="ml-1 text-xs opacity-80">編集中</span>}
@@ -1341,7 +1340,7 @@ function Editor({
             {targetingEnabled && (
               <>
                 {group.status !== 'published' && (
-                  <p className="rounded-control bg-amber-50 p-2 text-[11px] text-amber-700">
+                  <p className="rounded-control bg-warning-bg p-2 text-[11px] text-warning">
                     このメニューはまだ LINE に登録されていません。登録するまで、条件に
                     当てはまっても出せません。
                   </p>
@@ -1667,21 +1666,21 @@ function Editor({
           >
             {saving ? '保存中...' : '下書きに保存'}
           </button>
-          <button
+          {/* #702: 共有Buttonのprimaryはaccent-deep＋白文字(5.44:1)。生のLINE緑だと2.78:1で落ちる。 */}
+          <Button
+            variant="primary"
             onClick={() => {
               setConfirmError('')
               setConfirmKind('publish')
             }}
             disabled={saving || publishing || unpublishing || busy}
-            className="rounded-lg px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50"
-            style={{ backgroundColor: 'var(--color-accent)' }}
           >
             {publishing
               ? 'LINE 登録中...'
               : group.status === 'published'
                 ? 'LINE に再登録'
                 : 'LINE に登録'}
-          </button>
+          </Button>
         </div>
       )} />
     </main>

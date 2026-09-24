@@ -71,7 +71,7 @@ export default function GenerationPanel({
       aria-label="画像を生成"
     >
       <div className="flex h-14 items-center gap-2 px-4">
-        <Sparkles aria-hidden="true" className="h-4.5 w-4.5 text-accent-deep" />
+        <Sparkles aria-hidden="true" className="h-4.5 w-4.5 text-ink-faint" />
         <h2 className="text-body font-bold text-ink">画像を生成</h2>
         <span className="flex-1" />
         <fieldset className="flex rounded-control bg-shell p-0.5" disabled={disabled}>
@@ -199,7 +199,7 @@ export default function GenerationPanel({
                     type="button"
                     disabled={disabled}
                     onClick={() => set('textLines', [...value.textLines, ''])}
-                    className="inline-flex items-center gap-1 self-start text-caption font-semibold text-accent-deep hover:underline disabled:opacity-50"
+                    className="inline-flex items-center gap-1 self-start text-caption font-semibold text-action hover:underline disabled:opacity-50"
                   >
                     <Plus aria-hidden="true" className="h-3.5 w-3.5" />
                     行を足す

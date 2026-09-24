@@ -235,7 +235,7 @@ export default function FriendTimeline({ friendId }: { friendId: string }) {
           <button
             type="button"
             onClick={() => setShowTemplates(true)}
-            className="text-accent-deep text-xs hover:underline"
+            className="text-action text-xs hover:underline"
           >
             テンプレートを選択
           </button>

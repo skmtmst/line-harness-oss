@@ -289,6 +289,7 @@
     "direct-primary-button": 1
   },
   "app/rich-menus/edit/page.tsx": {
+    "direct-primary-button": 1,
     "arbitrary-value": 10
   },
   "app/rich-menus/page.tsx": {
@@ -389,7 +390,7 @@
     "direct-secondary-button": 1
   },
   "app/webinars/page.tsx": {
-    "arbitrary-value": 8,
+    "arbitrary-value": 7,
     "unresolved-classname": 1,
     "direct-secondary-button": 1
   },

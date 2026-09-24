@@ -74,7 +74,7 @@ export default function NoticeLineRegisterDialog({ open, onClose, quietWhenUnava
               <p className="text-body font-bold tracking-widest text-ink" aria-label="確認コード">{info.code}</p>
             ) : null}
             {info.addFriendUrl ? (
-              <a href={info.addFriendUrl} target="_blank" rel="noreferrer" className="text-accent-deep underline-offset-2 hover:underline">スマートフォンで開く（友だち追加）</a>
+              <a href={info.addFriendUrl} target="_blank" rel="noreferrer" className="text-action underline-offset-2 hover:underline">スマートフォンで開く（友だち追加）</a>
             ) : null}
             <p className="text-micro text-ink-faint">確認コードは 24 時間有効です。管理画面の「お問い合わせ」からも、いつでもこの案内を開けます。</p>
           </div>
