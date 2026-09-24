@@ -139,18 +139,19 @@
   font-weight: 700; /* fontWeight: 700 */
 }
 
+/* 止まっているだけ（進んでいない）は警告色。赤は「壊れている」に見えるため使わない。 */
 .step[data-step-state='stalled'] {
-  border-color: var(--color-danger);
+  border-color: var(--color-status-warn);
 }
 
 .step[data-step-state='stalled'] .mark {
-  border-color: var(--color-danger-bg);
-  background: var(--color-danger-bg);
-  color: var(--color-danger);
+  border-color: var(--color-warning-bg);
+  background: var(--color-warning-bg);
+  color: var(--color-warning);
 }
 
 .step[data-step-state='stalled'] .stepLine:last-of-type {
-  color: var(--color-danger);
+  color: var(--color-warning);
   font-weight: 700;
 }
 
