@@ -8,8 +8,15 @@ type TableHeadRowProps = Omit<HTMLAttributes<HTMLTableRowElement>, 'children' | 
   className?: string
 }
 
-export function TableHeadRow({ children, className, ...rowProps }: TableHeadRowProps) {
-  const classes = [styles.headRow, className].filter(Boolean).join(' ')
+export function TableHeadRow({
+  children,
+  className,
+  density,
+  ...rowProps
+}: TableHeadRowProps & { density?: 'standard' | 'comfortable' }) {
+  const classes = [styles.headRow, density === 'comfortable' && styles.headComfortable, className]
+    .filter(Boolean)
+    .join(' ')
   return (
     <tr className={classes} {...rowProps}>
       {children}
@@ -62,14 +69,37 @@ export function DataTable({ children, className }: { children: ReactNode; classN
   )
 }
 
-type TrProps = Omit<HTMLAttributes<HTMLTableRowElement>, 'children' | 'className'> & {
+export type TrProps = Omit<HTMLAttributes<HTMLTableRowElement>, 'children' | 'className'> & {
   children: ReactNode
   className?: string
+  /** ★V7：選んでいる行を薄い緑の地で示す。渡さなければ何も付けない。 */
+  selected?: boolean
+  /** ★V7：指を乗せた行に薄い地を敷く。押せる行・選べる行だけに付ける。 */
+  interactive?: boolean
+  /** ★V7：行の高さ。`comfortable` は64px。未指定は58pxのまま。 */
+  density?: 'standard' | 'comfortable'
 }
 
 /** 標準一覧の高さ58pxの行。 */
-export function Tr({ children, className, ...rowProps }: TrProps) {
-  return <tr className={[shell.row, className].filter(Boolean).join(' ')} {...rowProps}>{children}</tr>
+export function Tr({ children, className, selected, interactive, density, ...rowProps }: TrProps) {
+  const classes = [
+    shell.row,
+    density === 'comfortable' && shell.rowComfortable,
+    interactive && shell.rowInteractive,
+    selected && shell.rowSelected,
+    className,
+  ]
+    .filter(Boolean)
+    .join(' ')
+  return (
+    <tr
+      className={classes}
+      aria-selected={selected === undefined ? undefined : selected}
+      {...rowProps}
+    >
+      {children}
+    </tr>
+  )
 }
 
 export type TdProps = Omit<TdHTMLAttributes<HTMLTableCellElement>, 'align' | 'children' | 'className'> & {
@@ -118,4 +148,89 @@ export function HandleCell({ children }: { children?: ReactNode }) {
 /** 行の右端に置く操作列。 */
 export function ActionCell({ children, className }: { children?: ReactNode; className?: string }) {
   return <td className={[shell.bodyCell, shell.actionCell, className].filter(Boolean).join(' ')}>{children}</td>
+}
+
+export type SortDirection = 'asc' | 'desc' | 'none'
+
+export type SortThProps = ThProps & {
+  /** 並び順。`none` は印を出さず、押すと並べ替えを始める。 */
+  sort: SortDirection
+  onSort?: () => void
+  /** 押したときの読み上げ名。未指定は見出し文字に「で並べ替える」を足す。 */
+  sortLabel?: string
+}
+
+/**
+ * ★V7：押して並べ替える見出しセル。
+ *
+ * 並び順は `aria-sort` と ▲▼ の印の両方で伝える（印だけ・読み上げだけにしない）。
+ * 押せない見出しは今までどおり `Th` を使う。
+ */
+export function SortTh({ children, sort, onSort, sortLabel, ...cellProps }: SortThProps) {
+  const mark = sort === 'asc' ? '▲' : sort === 'desc' ? '▼' : null
+  const name = typeof children === 'string' ? children : undefined
+  return (
+    <Th aria-sort={sort === 'none' ? 'none' : sort === 'asc' ? 'ascending' : 'descending'} {...cellProps}>
+      <button
+        type="button"
+        onClick={onSort}
+        aria-label={sortLabel ?? (name ? `${name}で並べ替える` : '並べ替える')}
+        className={styles.sortButton}
+      >
+        <span>{children}</span>
+        {mark ? (
+          <span aria-hidden="true" className={styles.sortMark}>
+            {mark}
+          </span>
+        ) : null}
+      </button>
+    </Th>
+  )
+}
+
+export type TableStateKind = 'empty' | 'loading' | 'error'
+
+const TABLE_STATE_TEXT: Record<TableStateKind, { title: string; description: string }> = {
+  empty: { title: '記録はありません', description: '記録が増えると、ここに表示されます。' },
+  loading: { title: '読み込んでいます', description: 'このまま少しお待ちください。' },
+  error: { title: '表示できませんでした', description: '時間をおいて開き直してください。' },
+}
+
+/**
+ * ★V7：表の中に1行で出す状態（空・読み込み中・失敗）。
+ *
+ * 「0件」と「読めなかった」を同じ顔にしない。失敗のときだけ、やり直す
+ * ボタンを出す（`onRetry` が無いときは飾りボタンを置かない）。
+ */
+export function TableStateRow({
+  colSpan,
+  kind,
+  title,
+  description,
+  onRetry,
+  retryLabel = 'もう一度読み込む',
+}: {
+  colSpan: number
+  kind: TableStateKind
+  title?: string
+  description?: string
+  onRetry?: () => void
+  retryLabel?: string
+}) {
+  const text = TABLE_STATE_TEXT[kind]
+  return (
+    <tr className={shell.row}>
+      <td colSpan={colSpan} className={shell.bodyCell}>
+        <div className={styles.stateCell} role={kind === 'error' ? 'alert' : 'status'}>
+          <p className={styles.stateTitle}>{title ?? text.title}</p>
+          <p className={styles.stateDescription}>{description ?? text.description}</p>
+          {kind === 'error' && onRetry ? (
+            <button type="button" onClick={onRetry} className={styles.stateRetry}>
+              {retryLabel}
+            </button>
+          ) : null}
+        </div>
+      </td>
+    </tr>
+  )
 }

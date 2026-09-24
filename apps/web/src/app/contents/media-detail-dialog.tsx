@@ -435,7 +435,7 @@ export default function MediaDetailDialog({
       </div>
 
       <div className="grid gap-4 xl:grid-cols-3">
-        <main className="space-y-4 xl:col-span-2">
+        <div className="space-y-4 xl:col-span-2">
           <div className="bg-canvas-sunken rounded-card flex min-h-96 items-center justify-center overflow-hidden border border-hairline">
             {item.kind === 'image' ? (
               // eslint-disable-next-line @next/next/no-img-element
@@ -510,7 +510,7 @@ export default function MediaDetailDialog({
               )}
             </div>
           </section>
-        </main>
+        </div>
 
         <aside className="space-y-4">
           <section className="border-hairline rounded-card border bg-canvas p-4">

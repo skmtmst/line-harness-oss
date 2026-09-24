@@ -384,7 +384,7 @@ function FriendAddRunsInner() {
       </div>
 
       <div className="flex flex-col items-start gap-4 xl:flex-row">
-        <main className="min-w-0 flex-1">
+        <div className="min-w-0 flex-1">
       {accountLoading || loading ? (
         <ListState kind="loading" title="実行結果を読み込んでいます" />
       ) : !selectedAccountExists ? (
@@ -498,7 +498,7 @@ function FriendAddRunsInner() {
           </div>
         </div>
       )}
-        </main>
+        </div>
 
         <aside className="grid w-full shrink-0 gap-4 xl:w-96">
           <section className="rounded-card border border-hairline bg-canvas p-4">

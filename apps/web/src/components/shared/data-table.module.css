@@ -30,6 +30,25 @@
   height: 58px; /* 行 height: 58 */
 }
 
+/* ★V7のゆったりした行（高さ64px）。付けないときは58pxのまま。 */
+.rowComfortable {
+  height: 64px;
+}
+
+/* ★V7：選んでいる行は薄い緑の地。色だけでなく aria-selected でも伝える。 */
+.rowSelected {
+  background: var(--color-accent-soft);
+}
+
+/* ★V7：押せる行・選べる行だけ、指を乗せたときに一段沈んだ地を敷く。 */
+.rowInteractive:hover {
+  background: var(--color-canvas-sunken);
+}
+
+.rowInteractive.rowSelected:hover {
+  background: var(--color-accent-soft);
+}
+
 .row + .row .bodyCell {
   border-top: 1px solid var(--color-hairline); /* strokeWidth: {top: 1} */
 }

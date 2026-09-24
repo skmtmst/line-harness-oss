@@ -65,7 +65,8 @@ describe('V6 自動応答一覧の契約', () => {
   })
 
   it('一覧を設計の6列に収め、ルール名の下に一致方法と返信の要約を出す', () => {
-    for (const heading of ['ルール名', '状態', 'どんなときに動くか', '何を返すか', '今月の応答', '操作']) {
+    // ★V7（2026-09-24）：「どんなときに動くか」「何を返すか」は2行に折れていたので短い見出しへ。
+    for (const heading of ['ルール名', '状態', '条件', '返すもの', '今月の応答', '操作']) {
       expect(LIST).toContain(`>${heading}</th>`)
     }
     expect(LIST).toContain('ruleSubtitle(r,')

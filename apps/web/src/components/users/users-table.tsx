@@ -7,15 +7,6 @@ import { TableHeadRow, Th } from '@/components/shared/table'
 
 const fmt = new Intl.NumberFormat('ja-JP')
 
-const ACCOUNT_BADGE_COLORS = [
-  'bg-emerald-100 text-emerald-700',
-  'bg-sky-100 text-sky-700',
-  'bg-violet-100 text-violet-700',
-  'bg-amber-100 text-amber-700',
-  'bg-rose-100 text-rose-700',
-  'bg-slate-100 text-slate-700',
-]
-
 interface Props {
   rows: UserRowData[]
   total: number
@@ -39,18 +30,6 @@ export default function UsersTable({
   onPageChange,
   onOpenMergedPerson,
 }: Props) {
-  const accountColorMap = new Map<string, string>()
-  for (const row of rows) {
-    for (const a of row.accounts) {
-      if (!accountColorMap.has(a.accountId)) {
-        accountColorMap.set(
-          a.accountId,
-          ACCOUNT_BADGE_COLORS[accountColorMap.size % ACCOUNT_BADGE_COLORS.length],
-        )
-      }
-    }
-  }
-
   const totalPages = Math.max(1, Math.ceil(total / pageSize))
   const start = total === 0 ? 0 : (page - 1) * pageSize + 1
   const end = Math.min(total, page * pageSize)
@@ -59,14 +38,20 @@ export default function UsersTable({
   return (
     <div className="overflow-hidden rounded-card border border-hairline bg-canvas shadow-card">
       <table className="w-full table-fixed">
+        {/*
+          列幅の決め方（1440pxで操作ボタンが枠をはみ出していたため固定化）。
+          連絡先・紐付くアカウントだけが伸び縮みし、他は固定。
+          操作列 176px の根拠：詳細ボタン 98px（「詳細を見る」5字×14px＋左右13px＋枠2px）
+          ＋隙間 8px＋「…」32px＋セル余白 24px＝162px。閉じたメニューは描かれない。
+        */}
         <colgroup>
-          <col className="w-[18%]" />
-          <col className="w-[18%]" />
-          <col className="w-[20%]" />
-          <col className="w-[14%]" />
-          <col className="w-[11%]" />
-          <col className="w-[10%]" />
-          <col className="w-[9%]" />
+          <col className="w-[16%]" />
+          <col />
+          <col />
+          <col className="w-[108px]" />
+          <col className="w-[108px]" />
+          <col className="w-[92px]" />
+          <col className="w-[176px]" />
         </colgroup>
         <thead className="border-b border-hairline bg-canvas-sunken text-left text-micro font-semibold text-ink-secondary">
           <TableHeadRow>
@@ -106,7 +91,6 @@ export default function UsersTable({
               <UserRow
                 key={row.identityKey}
                 row={row}
-                accountColorMap={accountColorMap}
                 onOpenMergedPerson={onOpenMergedPerson}
               />
             ))

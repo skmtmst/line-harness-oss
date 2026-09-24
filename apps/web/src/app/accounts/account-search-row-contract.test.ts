@@ -34,13 +34,8 @@ describe('アカウント一覧の検索行（U019）', () => {
     expect(row).not.toContain('Button')
   })
 
-  it('「20件表示」は検索の横ではなく、結果の件数とまとめて置く', () => {
-    const rowEnd = PAGE.indexOf('</div>', PAGE.indexOf('data-search-row'))
-    const pageSizeAt = PAGE.indexOf('20件表示')
-    const shownAt = PAGE.indexOf('<ListRange')
-    expect(pageSizeAt).toBeGreaterThan(rowEnd)
-    // 結果の件数のすぐ隣（状態の絞り込みと同じ行の中）にある。
-    expect(pageSizeAt).toBeGreaterThan(PAGE.indexOf('ACCOUNT_FILTERS.map'))
-    expect(shownAt).toBeGreaterThan(pageSizeAt)
+  it('選べない「20件表示」は置かず、結果の件数は絞り込みの行にまとめる（★V7）', () => {
+    expect(PAGE).not.toContain('20件表示')
+    expect(PAGE.indexOf('<ListRange')).toBeGreaterThan(PAGE.indexOf('ACCOUNT_FILTERS.map'))
   })
 })

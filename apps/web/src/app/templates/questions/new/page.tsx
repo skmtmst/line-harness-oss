@@ -204,7 +204,7 @@ function QuestionTemplatePageInner() {
       )}
 
       <div className="grid min-w-0 gap-4 2xl:grid-cols-4">
-        <main className="min-w-0 space-y-4 2xl:col-span-3">
+        <div className="min-w-0 space-y-4 2xl:col-span-3">
           <section className="bg-canvas border-hairline rounded-card shadow-card grid gap-4 border p-4 lg:grid-cols-3">
             {/* 入力欄は共通部品。#976 U086: 必須の印は Field の required（
                 「必須」札）にそろえ、独自の赤字テキストは置かない。 */}
@@ -243,7 +243,7 @@ function QuestionTemplatePageInner() {
           <section className="bg-canvas border-hairline rounded-card shadow-card border p-4">
             <QuestionEditor value={question} onChange={setQuestion} choiceColumns />
           </section>
-        </main>
+        </div>
 
         <aside className="min-w-0 space-y-3 2xl:sticky 2xl:top-4 2xl:self-start">
           <section className="rounded-card overflow-hidden bg-line-preview p-4 text-label text-on-accent">

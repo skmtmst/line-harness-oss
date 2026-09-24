@@ -8,6 +8,7 @@ import { withRequestTimeout } from '@/lib/request-timeout'
 import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import Button from '@/components/shared/button'
+import FilterChip from '@/components/shared/filter-chip'
 import ListState from '@/components/shared/list-state'
 import Pagination from '@/components/shared/pagination'
 import SelectField from '@/components/shared/select-field'
@@ -30,13 +31,16 @@ const PAGE_SIZE = 20
 
 function formatJpDate(iso: string | null): string {
   if (!iso) return '日時未設定'
-  return new Date(iso).toLocaleString('ja-JP', {
-    month: '2-digit',
-    day: '2-digit',
+  const parts = new Intl.DateTimeFormat('ja-JP', {
+    timeZone: 'Asia/Tokyo',
+    month: 'numeric',
+    day: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
-    timeZone: 'Asia/Tokyo',
-  })
+    hourCycle: 'h23',
+  }).formatToParts(new Date(iso))
+  const get = (type: string) => parts.find((part) => part.type === type)?.value ?? ''
+  return `${get('month')}月${get('day')}日 ${get('hour')}:${get('minute')}`
 }
 
 function loadDetail(hasAccount: boolean, status: LoadStatus, readyDetail: string): string {
@@ -120,9 +124,6 @@ export default function EventsListPage() {
   const attention = useMemo(() => summarizeEventAttention(items), [items])
   const nearest = attention.upcoming[0]
   const nearestLow = attention.lowApplications[0]
-  const unpublishedCount = items.filter((event) => event.is_published !== 1).length
-  // 「終わった回」は端末時計で数えると、時計のずれで件数が合わない(点検#520軽16)。
-  // サーバー時刻の口が無いので、件数は出さず「—」にする。
 
   const pageCount = Math.max(1, Math.ceil(listTotal / PAGE_SIZE))
   const current = Math.min(page, pageCount)
@@ -150,20 +151,8 @@ export default function EventsListPage() {
         </div>
         <p className="text-ink-faint mb-4 text-sm">
           開催するイベントの申込を管理します。定員と承認制の設定ができます。
-          マニュアル・フォルダを追加・保存した条件は、接続後にここから使えます。
         </p>
       </div>
-
-      <section
-        data-event-count-summary
-        aria-label="一覧の集計（表示のみ）"
-        className="bg-canvas-sunken text-ink-secondary mb-4 flex flex-wrap items-center gap-x-6 gap-y-2 rounded-control px-4 py-3 text-sm"
-      >
-        <span className="text-ink-faint text-xs font-medium">一覧の集計（表示のみ）</span>
-        <span>これからの回 <strong className="text-ink">{dataReady ? attention.upcoming.length : '—'}</strong></span>
-        <span>受付前 <strong className="text-ink">{dataReady ? unpublishedCount : '—'}</strong></span>
-        <span>終わった回 <strong className="text-ink">—</strong></span>
-      </section>
 
       <div data-design="KPIs" className="mb-4 grid grid-cols-2 gap-3 xl:grid-cols-4">
         <EventKpi
@@ -212,7 +201,7 @@ export default function EventsListPage() {
         />
       </div>
 
-      <div className="border-info bg-info-bg text-info mb-4 rounded-control border px-4 py-3 text-sm">
+      <div className="bg-info-bg text-ink-secondary mb-4 rounded-control px-4 py-3 text-xs">
         定員に達すると、お客様の画面では自動で「満席」になります。キャンセルが出たら、キャンセル待ちの人に自動で順番が回ります。
       </div>
 
@@ -262,17 +251,13 @@ export default function EventsListPage() {
             ['full', '満席'],
           ] as const
         ).map(([key, label]) => (
-          <button
+          <FilterChip
             key={key}
-            onClick={() => setFilter(filter === key ? 'all' : key)}
-            className={`rounded-pill px-3 py-1 text-xs font-medium ${
-              filter === key
-                ? 'bg-accent-deep text-on-accent'
-                : 'bg-canvas-sunken text-ink-secondary hover:bg-hairline'
-            }`}
+            selected={filter === key}
+            onChange={(selected) => setFilter(selected ? key : 'all')}
           >
             {label}
-          </button>
+          </FilterChip>
         ))}
       </div>
 
@@ -383,18 +368,14 @@ export default function EventsListPage() {
                       )}
                     </td>
                     <td className="px-4 py-3 text-right text-sm whitespace-nowrap">
-                      <Link
-                        href={'/events/edit?id=' + e.id}
-                        className="border-hairline text-ink-secondary rounded-control mr-2 border px-3 py-1.5 text-xs font-medium"
-                      >
-                        中身を見る
-                      </Link>
-                      <Link
-                        href={'/events/bookings?id=' + e.id}
-                        className="border-accent text-accent-deep rounded-control border px-3 py-1.5 text-xs font-medium"
-                      >
-                        申込者を見る
-                      </Link>
+                      <span className="inline-flex items-center justify-end gap-2">
+                        <Button href={'/events/edit?id=' + e.id} variant="secondary">
+                          中身を見る
+                        </Button>
+                        <Button href={'/events/bookings?id=' + e.id} variant="secondary">
+                          申込者を見る
+                        </Button>
+                      </span>
                     </td>
                   </tr>
                 ))}

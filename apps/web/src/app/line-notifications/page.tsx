@@ -531,7 +531,7 @@ function CustomerNotificationEditor({
   notice: { tone: 'success' | 'error'; text: string } | null
   hasUnsaved: boolean
 }) {
-  return <main data-design-node="Q55bb" className="min-w-0 space-y-4 pb-48 sm:pb-24">
+  return <div data-design-node="Q55bb" className="min-w-0 space-y-4 pb-48 sm:pb-24">
     <div className="flex flex-wrap items-start justify-between gap-3">
       <div>
         <p className="text-xs font-semibold text-ink-faint">LINE通知　›　お知らせの種類</p>
@@ -619,7 +619,7 @@ function CustomerNotificationEditor({
         <div data-design="editor-footer-actions" className="flex min-w-0 flex-wrap justify-end gap-2"><Button onClick={onClose}>キャンセル</Button><Button onClick={onTestSend} disabled={busy}>テスト受信者に送信</Button><Button onClick={onSave} disabled={busy}>{definition ? '下書きを保存' : 'お知らせを保存'}</Button>{definition ? <Button variant="primary" onClick={onPublish} disabled={busy}>顧客へのお知らせを公開</Button> : null}</div>
       </div>
     </div>
-  </main>
+  </div>
 }
 
 function LineNotificationsPage() {
@@ -1067,18 +1067,6 @@ function LineNotificationsPage() {
         notice={notice}
         hasUnsaved={dirtyEvents.includes(expandedSetting.eventType)}
       />
-      {/*
-        * #734: 通知の出す・止めるはお客さまへのLINEに直結するので、
-        * 1クリックの即時切替ではなく確認窓を1回挟む（誤タップ防止）。
-        */}
-      <ConfirmDialog
-        open={pendingToggle !== null}
-        title={pendingToggle?.isEnabled ? `「${pendingToggle.label}」のお知らせを止めますか？` : `「${pendingToggle?.label ?? ''}」のお知らせを出しますか？`}
-        description={pendingToggle?.isEnabled ? '止めると、この出来事が起きてもお客さまへLINEが送られなくなります。あとからまた出せます。' : '出すと、この出来事が起きたお客さまへLINEが送られ始めます。'}
-        confirmLabel={pendingToggle?.isEnabled ? 'お知らせを止める' : 'お知らせを出す'}
-        onConfirm={pendingToggle ? () => { const s = pendingToggle; setPendingToggle(null); void save(s, !s.isEnabled) } : undefined}
-        onCancel={() => setPendingToggle(null)}
-      />
       <ConfirmDialog
         open={closeConfirmOpen}
         title="保存していない編集を破棄しますか？"
@@ -1124,7 +1112,21 @@ function LineNotificationsPage() {
         </dl>
       </ConfirmDialog>
     </> : null}
-    {tab === 'customer' && !expandedSetting ? <main
+    {/*
+      * #734: 通知の出す・止めるはお客さまへのLINEに直結するので、
+      * 1クリックの即時切替ではなく確認窓を1回挟む（誤タップ防止）。
+      * 一覧（expandedSetting が無い状態）から開くので、編集画面の条件の
+      * 中には置かない。
+      */}
+    <ConfirmDialog
+      open={pendingToggle !== null}
+      title={pendingToggle?.isEnabled ? `「${pendingToggle.label}」のお知らせを止めますか？` : `「${pendingToggle?.label ?? ''}」のお知らせを出しますか？`}
+      description={pendingToggle?.isEnabled ? '止めると、この出来事が起きてもお客さまへLINEが送られなくなります。あとからまた出せます。' : '出すと、この出来事が起きたお客さまへLINEが送られ始めます。'}
+      confirmLabel={pendingToggle?.isEnabled ? 'お知らせを止める' : 'お知らせを出す'}
+      onConfirm={pendingToggle ? () => { const s = pendingToggle; setPendingToggle(null); void save(s, !s.isEnabled) } : undefined}
+      onCancel={() => setPendingToggle(null)}
+    />
+    {tab === 'customer' && !expandedSetting ? <div
       data-design-node="festr"
       data-list-state={loadState === 'ready' && settings.length === 0 ? 'empty' : loadState}
       className={styles.root}
@@ -1192,7 +1194,7 @@ function LineNotificationsPage() {
         </div>
         </>}
     </section>
-    </main> : null}
+    </div> : null}
   </>
 }
 

@@ -588,11 +588,11 @@
           "resolved": "13px"
         },
         {
-          "pencil": "mNUQ3 detail fill: $accent-deep（★V7 修正方針 u6pez）",
+          "pencil": "mNUQ3 detail fill: $ink-secondary（★V7：補足は状態でないので緑にしない）",
           "class": "detailNotice",
           "prop": "color",
-          "source": "var(--color-accent-deep)",
-          "resolved": "#087a3e"
+          "source": "var(--color-ink-secondary)",
+          "resolved": "#4a5565"
         },
         {
           "pencil": "mNUQ3 detail fontSize: $size-caption",
@@ -937,6 +937,58 @@
           "prop": "font-weight",
           "source": "700",
           "resolved": "700"
+        }
+      ]
+    },
+    "bar-chart": {
+      "name": "共通 棒グラフ（日ごとの増減）",
+      "pencilNodes": [
+        "h99Gb"
+      ],
+      "role": "canonical",
+      "status": "implemented",
+      "reviewStatus": "confirmed",
+      "code": "src/components/shared/bar-chart.tsx",
+      "cssModule": "src/components/shared/bar-chart.module.css",
+      "components": [
+        "BarChart",
+        "BarChartEmpty",
+        "toBarChartItems",
+        "barChartTicks"
+      ],
+      "cssPrefix": "bar-chart",
+      "pencilUsage": 1,
+      "lastCheckedAt": "2026-09-24",
+      "note": "★V7 h99Gb。増えた=accent-deep・減った=ink-faintの2色まで。数はボタンの読み上げ名・吹き出し・読み上げ用の表（共通Th）で文字としても読める。押せる範囲は列全体。表示時の伸びる動きは付けない。",
+      "visualVerification": {
+        "status": "unverified",
+        "requiredViewports": [
+          1440,
+          1920
+        ],
+        "reason": "ブラウザでの見た目の計測は司令塔が行う。コード・テストまでで完了扱い。"
+      },
+      "declarations": [
+        {
+          "pencil": "増えた棒 fill: $accent-deep",
+          "class": "addedBar",
+          "prop": "background",
+          "source": "var(--color-accent-deep)",
+          "resolved": "#087a3e"
+        },
+        {
+          "pencil": "減った棒 fill: $ink-faint",
+          "class": "removedBar",
+          "prop": "background",
+          "source": "var(--color-ink-faint)",
+          "resolved": "#626a73"
+        },
+        {
+          "pencil": "目盛り数字 11px・$ink-faint",
+          "class": "tick",
+          "prop": "font-size",
+          "source": "var(--text-micro)",
+          "resolved": "11px"
         }
       ]
     },
@@ -1826,18 +1878,18 @@
           "resolved": "700"
         },
         {
-          "pencil": "dashboard compact padding: [5,8]",
+          "pencil": "dashboard compact padding: [4,8]（★V7）",
           "class": "compact",
           "prop": "padding",
-          "source": "5px 8px",
-          "resolved": "5px 8px"
+          "source": "4px 8px",
+          "resolved": "4px 8px"
         },
         {
-          "pencil": "dashboard compact fontSize: $size-nano",
+          "pencil": "dashboard compact fontSize: $size-micro（★V7：10px は読みにくい）",
           "class": "compact",
           "prop": "font-size",
-          "source": "var(--text-nano)",
-          "resolved": "10px"
+          "source": "var(--text-micro)",
+          "resolved": "11px"
         },
         {
           "pencil": "neutral fill: $canvas-parchment",

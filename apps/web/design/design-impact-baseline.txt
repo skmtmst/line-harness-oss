@@ -69,6 +69,7 @@ shared-button-importer app/friends/identity-candidates/page.tsx
 shared-button-importer app/friends/migrations/page.tsx
 shared-button-importer app/friends/page.tsx
 shared-button-importer app/getting-started/feature-set-card.tsx
+shared-button-importer app/health/page.tsx
 shared-button-importer app/hq/banners/project/page.tsx
 shared-button-importer app/hq/billing/page.tsx
 shared-button-importer app/hq/members/page.tsx
@@ -234,7 +235,6 @@ shared-button-importer components/shared/row-actions.tsx
 shared-button-importer components/store-selection-gate.tsx
 shared-button-importer components/templates/message-template-editor.tsx
 shared-button-importer components/ui/kpi-collapse.tsx
-shared-button-importer components/users/user-row.tsx
 shared-button-importer components/webinars/webinar-notifications.tsx
 # 標準Buttonへ移行済みとして、見た目と主要導線を監視する画面本体。
 button-migration-target app/affiliates/tabs.tsx

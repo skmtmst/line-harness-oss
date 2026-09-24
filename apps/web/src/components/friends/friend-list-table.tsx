@@ -114,12 +114,13 @@ export default function FriendListTable({
           友だち一覧 <span className="ml-1 text-xs font-bold text-ink-faint">{total.toLocaleString('ja-JP')}件</span>
         </h2>
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs">
-          <span className="whitespace-nowrap text-ink-faint">{selectedCount}件選択中</span>
+          {/* 選んでいる時だけ出す（★V7：0件の時は意味が無い）。 */}
+          {selectedCount > 0 ? <span className="whitespace-nowrap font-semibold text-accent-deep">{selectedCount}件選択中</span> : null}
           <details className="relative">
             <summary className="flex h-9 cursor-pointer list-none items-center gap-2 whitespace-nowrap font-semibold text-action">
               表示項目を編集
             </summary>
-            <div className="absolute right-0 z-20 mt-1 w-52 rounded-card border border-hairline bg-canvas p-2 shadow-lg">
+            <div className="absolute right-0 z-20 mt-1 w-52 rounded-card border border-hairline bg-canvas p-2 shadow-float">
               {COLUMN_LABELS.map((column) => (
                 <div key={column.key} className="rounded-control px-2 py-2 hover:bg-canvas-sunken">
                   {/* ★V7 共通 チェックボックス（gvjpx）。 */}

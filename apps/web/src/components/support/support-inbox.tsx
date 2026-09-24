@@ -2,6 +2,8 @@
 
 import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import Avatar from '@/components/shared/avatar'
+import StatusBadge from '@/components/shared/status-badge'
 import { ApiError, fetchApi } from '@/lib/api'
 import { IdempotencyKeyStore } from '@/lib/idempotency-key-store'
 import { createPollGeneration, startVisiblePoll } from '@/lib/visible-polling'
@@ -77,6 +79,19 @@ function elapsed(iso: string): string {
   if (minutes < 60) return `${minutes}分前`
   const hours = Math.floor(minutes / 60)
   return hours < 24 ? `${hours}時間前` : `${Math.floor(hours / 24)}日前`
+}
+
+/**
+ * 最後の受信から30分以上たち、まだ対応が終わっていないものだけを
+ * 注意として出す。対応済みの経過日数は赤くしない。
+ */
+const STALE_INCOMING_MS = 30 * 60_000
+
+function isStaleUnresolved(item: Pick<InboxItem, 'status' | 'lastIncomingAt'>): boolean {
+  return (
+    item.status !== 'resolved' &&
+    Date.now() - new Date(item.lastIncomingAt).getTime() >= STALE_INCOMING_MS
+  )
 }
 
 function dateTime(iso: string): string {
@@ -306,18 +321,24 @@ export default function SupportInbox({ channel = 'email' }: { channel?: Channel 
             {loading ? <div className="p-10 text-center text-sm text-gray-400">読み込み中...</div> : items.length === 0 ? <div className="p-10 text-center text-sm text-gray-400">対応待ちはありません</div> : items.map((item) => (
               <button key={item.id} onClick={() => choose(item)} className={`w-full p-4 text-left transition-colors hover:bg-gray-50 ${selected?.id === item.id ? 'bg-emerald-50 ring-1 ring-inset ring-emerald-200' : ''}`}>
                 <div className="flex items-start gap-3">
-                  <ChannelAvatar item={item} />
+                  <Avatar name={item.customerName} src={item.pictureUrl ?? null} size={40} />
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
                       <p className="truncate text-sm font-bold text-gray-900">{item.customerName}</p>
-                      <span className={`rounded-full px-2 py-0.5 text-[9px] font-bold ${item.channel === 'line' ? 'bg-emerald-100 text-emerald-700' : 'bg-sky-100 text-sky-700'}`}>{item.channel === 'line' ? 'LINE' : 'EMAIL'}</span>
+                      <span className={`rounded-full px-2 py-0.5 text-micro font-bold ${item.channel === 'line' ? 'bg-accent-soft text-accent-deep' : 'bg-canvas-sunken text-ink-secondary'}`}>{item.channel === 'line' ? 'LINE' : 'メール'}</span>
                     </div>
                     <p className="mt-1 truncate text-xs font-medium text-gray-600">{item.subject}</p>
                     <p className="mt-1 truncate text-xs text-gray-400">{item.preview}</p>
                   </div>
                   <div className="shrink-0 text-right">
-                    <p className={`text-[11px] font-semibold ${Date.now() - new Date(item.lastIncomingAt).getTime() >= 30 * 60_000 ? 'text-rose-600' : 'text-gray-400'}`}>{elapsed(item.lastIncomingAt)}</p>
-                    <p className="mt-1 text-[10px] text-gray-400">{statusLabel[item.status]}</p>
+                    <p className={`text-[11px] font-semibold ${isStaleUnresolved(item) ? 'text-status-warn-deep' : 'text-ink-faint'}`}>{elapsed(item.lastIncomingAt)}</p>
+                    <StatusBadge
+                      tone={item.status === 'resolved' ? 'success' : 'neutral'}
+                      size="compact"
+                      className="mt-1"
+                    >
+                      {statusLabel[item.status]}
+                    </StatusBadge>
                   </div>
                 </div>
               </button>
@@ -325,7 +346,7 @@ export default function SupportInbox({ channel = 'email' }: { channel?: Channel 
           </div>
         </aside>
 
-        <main className="flex min-h-[560px] flex-col bg-[#f4f6f5]">
+        <div className="flex min-h-[560px] flex-col bg-[#f4f6f5]">
           {!selected ? (
             <div className="flex flex-1 items-center justify-center p-8 text-center text-sm text-gray-400">
               <div>
@@ -353,7 +374,7 @@ export default function SupportInbox({ channel = 'email' }: { channel?: Channel 
                 <div className="flex gap-2">
                   <button onClick={() => void updateStatus('in_progress')} className={`rounded-lg px-3 py-2 text-xs font-bold ${detail.thread.status === 'in_progress' ? 'bg-amber-500 text-white' : 'bg-amber-50 text-amber-700'}`}>対応中</button>
                   <button onClick={() => void updateStatus('on_hold')} className={`rounded-lg px-3 py-2 text-xs font-bold ${detail.thread.status === 'on_hold' ? 'bg-action text-on-action' : 'bg-action-soft text-action'}`}>保留</button>
-                  <button onClick={() => void updateStatus('resolved')} className={`rounded-lg px-3 py-2 text-xs font-bold ${detail.thread.status === 'resolved' ? 'bg-emerald-600 text-white' : 'bg-emerald-50 text-emerald-700'}`}>✓ 対応済み</button>
+                  <button onClick={() => void updateStatus('resolved')} className={`rounded-lg px-3 py-2 text-xs font-bold ${detail.thread.status === 'resolved' ? 'bg-emerald-600 text-white' : 'bg-emerald-50 text-success'}`}>✓ 対応済み</button>
                   {detail.thread.status === 'resolved' && <button onClick={() => void updateStatus('unread')} className="rounded-lg bg-gray-100 px-3 py-2 text-xs font-bold text-gray-600">再オープン</button>}
                 </div>
               </div>
@@ -377,14 +398,11 @@ export default function SupportInbox({ channel = 'email' }: { channel?: Channel 
               </div>
             </>
           ) : <div className="flex flex-1 items-center justify-center text-sm text-gray-400">会話を読み込み中...</div>}
-        </main>
+        </div>
       </div>
     </div>
   )
 }
 
 
-function ChannelAvatar({ item }: { item: InboxItem }) {
-  if (item.pictureUrl) return <img src={item.pictureUrl} alt="" className="h-11 w-11 shrink-0 rounded-full object-cover" /> // eslint-disable-line @next/next/no-img-element
-  return <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-xs font-black text-white ${item.channel === 'line' ? 'bg-accent-deep' : 'bg-sky-500'}`}>{item.channel === 'line' ? 'L' : '✉'}</div>
-}
+/* 一覧の顔は共通 Avatar（名前から頭文字）。青丸＋✉の自前描画は使わない。 */

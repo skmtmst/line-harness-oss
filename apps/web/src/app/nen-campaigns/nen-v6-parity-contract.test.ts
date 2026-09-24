@@ -45,14 +45,21 @@ describe('V6 37-6 NEN配信の画面契約', () => {
     expect(PAGE).toContain('jstMonthRange(now, -1)')
     expect(PAGE).toContain('from: thisMonth.from, to: thisMonth.to')
     // 自動配信の開封は LINE から取れない。取れない理由を隠さない。
+    // （自動配信の表の開封列を外したため、理由は数値カードの説明と表の注記に残す）
     expect(OVERVIEW).toContain('LINEから個人開封を取得できません')
-    expect(OVERVIEW).toContain('openRate.reason')
+    expect(OVERVIEW).toContain('自動配信は開封を取得できません')
   })
 
-  it('自動配信の表は 配信／きっかけ／対象／送信／開封／注文／状態／操作', () => {
-    for (const label of ['<Th>配信</Th>', 'きっかけ</Th>', '対象</Th>', '送信</Th>', '開封</Th>', '注文</Th>', '状態</Th>']) {
+  it('自動配信の表は 配信／きっかけ／対象／送信／注文／状態／操作（開封の列は置かない）', () => {
+    for (const label of ['<Th>配信</Th>', 'きっかけ</Th>', '対象</Th>', '送信</Th>', '注文</Th>', '状態</Th>']) {
       expect(OVERVIEW).toContain(label)
     }
+    // 開封の列は「—」しか並ばないので自動配信の表には置かない。
+    // （送った履歴の表には「取得不可」の列が残るので、自動配信のパネル内だけ見る）
+    const autoPanel = OVERVIEW.slice(OVERVIEW.indexOf('function AutoPanel('), OVERVIEW.indexOf('function CouponDrawer('))
+    expect(autoPanel).toContain('注文</Th>')
+    expect(autoPanel).not.toContain('開封</Th>')
+    expect(OVERVIEW).toContain('自動配信は開封を取得できません')
     expect(OVERVIEW).toContain('formatCampaignTiming(setting)')
     expect(OVERVIEW).toContain('formatCampaignAudience(setting)')
     expect(OVERVIEW).toContain('配信中</StatusBadge>')
@@ -63,6 +70,12 @@ describe('V6 37-6 NEN配信の画面契約', () => {
     expect(OVERVIEW).toContain("setting.isEnabled ? '止める' : '動かす'")
     // 停止・再開は専用の口（#659）。
     expect(PAGE).toContain('api.nenCampaigns.setEnabled(')
+  })
+
+  it('自動配信の案内帯は1文だけにし、残りは開閉する欄へ入れる', () => {
+    expect(OVERVIEW).toContain('をきっかけに、決めた日数後に自動で送ります。')
+    expect(OVERVIEW).toContain('<Disclosure size="compact" title="送られる仕組み">')
+    expect(OVERVIEW).toContain('で確認できます。')
   })
 
   it('コラムは一覧と右パネル（LINEに届くカード／誰に・いつ送るか）と下部追従バー', () => {

@@ -234,7 +234,7 @@ export function ApplyToTagModal({ groupId, groupName, onClose }: Props) {
 
           {phase === 'done' && result && (
             <>
-              <div className="bg-green-50 border border-green-200 text-green-800 text-sm p-4 rounded-lg mb-4">
+              <div className="bg-green-50 border border-green-200 text-success text-sm p-4 rounded-lg mb-4">
                 <div className="font-medium mb-1">✓ 完了しました</div>
                 <div className="text-xs">
                   {result.message ??
