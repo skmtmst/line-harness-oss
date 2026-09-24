@@ -23,6 +23,17 @@
   --photo-danger-soft: #fff1f0;
   --photo-overlay: rgba(0, 0, 0, .38);
   --photo-shadow: rgba(0, 0, 0, .14);
+  --order-canvas: var(--photo-canvas);
+  --order-surface: var(--photo-surface);
+  --order-ink: var(--photo-ink);
+  --order-muted: var(--photo-muted);
+  --order-subtle: var(--photo-subtle);
+  --order-line: var(--photo-line);
+  --order-accent: var(--photo-accent);
+  --order-accent-ink: var(--photo-accent-ink);
+  --order-accent-soft: var(--photo-accent-soft);
+  --order-neutral-soft: var(--photo-neutral-soft);
+  --order-shadow: var(--photo-shadow);
 }
 * { box-sizing: border-box; }
 body { margin: 0; background: #f5f5f7; }
@@ -269,29 +280,52 @@ button, input, select, textarea { font: inherit; }
 @keyframes nm-ai-caret { 50% { opacity: 0; } }
 .nm-ai-disclaimer { margin: 0 16px 14px; padding: 11px 12px; border-radius: 11px; background: #f6f8f7; color: #788980; font-size: 8px; line-height: 1.7; }
 .nm-ai-saved { margin: -5px 3px 2px; color: #84948c; font-size: 8px; text-align: center; }
-.nm-orders-page { padding-top: 18px; }
 .nm-empty-text { margin: 17px 0 3px; color: #718178; font-size: 12px; }
-.nm-subscription-view { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 16px; }
-.nm-subscription-view > div { padding: 12px 8px; border-radius: 13px; background: #f1f7f3; }
-.nm-subscription-view > div span, .nm-subscription-view > div b { display: block; }
-.nm-subscription-view > div span { color: #7e9087; font-size: 8px; }
-.nm-subscription-view > div b { overflow: hidden; margin-top: 4px; color: #214b37; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
-.nm-subscription-view ul { grid-column: 1 / -1; margin: 2px 0 0; padding: 0; list-style: none; }
-.nm-subscription-view li { display: flex; justify-content: space-between; gap: 8px; padding: 8px 3px; border-bottom: 1px solid #edf2ef; color: #3f5e4f; font-size: 11px; }
-.nm-subscription-view > p { grid-column: 1 / -1; margin: 4px 0 0; color: #829289; font-size: 9px; line-height: 1.6; }
-.nm-order { margin-top: 14px; padding: 14px; border: 1px solid #e0e9e4; border-radius: 16px; background: #fff; box-shadow: 0 5px 14px rgba(24,67,47,.04); }
-.nm-order-head { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; }
-.nm-order-head b, .nm-order-head time { display: block; }
-.nm-order-head b { color: #264c3a; font-size: 12px; }
-.nm-order-head time { margin-top: 3px; color: #84938b; font-size: 9px; }
-.nm-order-head strong { color: #0f6f49; font-size: 15px; }
-.nm-order-items { margin-top: 11px; padding-top: 7px; border-top: 1px solid #eef2f0; }
-.nm-order-items > div { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 6px 0; }
-.nm-order-items span { min-width: 0; color: #536b5f; font-size: 10px; line-height: 1.5; }
-.nm-order-items small { color: #829188; white-space: nowrap; }
-.nm-order-items a { flex: none; padding: 7px 10px; border: 1px solid #16815b; border-radius: 99px; color: #0f714c; font-size: 9px; font-weight: 800; text-decoration: none; }
-.nm-order-detail { display: inline-block; margin-top: 8px; color: #6a8175; font-size: 9px; text-decoration: underline; }
-.nm-order-no-item { margin: 10px 0 0; color: #829188; font-size: 9px; }
+
+/* ★V6正本 sBTL8: V6 37-2-D 然・注文・定期（LIFF・390）。色指定はこの画面の変数だけを使う。 */
+.nm-orders-page-v6 { color: var(--order-ink); }
+.nm-order-intro, .nm-order-section, .nm-subscription-card, .nm-order-card, .nm-order-empty { border: 1px solid var(--order-line); border-radius: 10px; background: var(--order-surface); }
+.nm-order-intro { display: grid; grid-template-columns: 38px 1fr; gap: 4px 12px; padding: 16px; }
+.nm-order-intro > span { display: grid; width: 38px; height: 38px; grid-row: 1 / 3; place-items: center; border-radius: 50%; background: var(--order-accent-soft); color: var(--order-accent-ink); font-size: 19px; }
+.nm-order-intro h2 { margin: 1px 0 2px; color: var(--order-ink); font-size: 14px; line-height: 1.4; }
+.nm-order-intro div p { margin: 0; color: var(--order-muted); font-size: 10px; }
+.nm-order-intro > p { grid-column: 1 / -1; margin: 8px 0 0; color: var(--order-subtle); font-size: 11px; line-height: 1.65; }
+.nm-order-section { display: grid; gap: 10px; padding: 16px; }
+.nm-order-section-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; }
+.nm-order-section-heading > div { display: grid; gap: 2px; }
+.nm-order-section-heading span { color: var(--order-accent-ink); font-size: 9px; font-weight: 800; letter-spacing: .18em; }
+.nm-order-section-heading h2 { margin: 0; color: var(--order-ink); font-size: 16px; }
+.nm-order-section-heading small { color: var(--order-muted); font-size: 10px; }
+.nm-subscription-card, .nm-order-card { padding: 14px; box-shadow: 0 5px 14px var(--order-shadow); }
+.nm-subscription-status { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.nm-subscription-status span { color: var(--order-muted); font-size: 10px; }
+.nm-subscription-status b { display: inline-grid; min-height: 24px; padding: 0 10px; place-items: center; border-radius: 9999px; background: var(--order-accent-soft); color: var(--order-accent-ink); font-size: 10px; }
+.nm-subscription-facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 12px 0 0; }
+.nm-subscription-facts > div { min-width: 0; padding: 10px; border-radius: 8px; background: var(--order-canvas); }
+.nm-subscription-facts dt { color: var(--order-muted); font-size: 9px; }
+.nm-subscription-facts dd { overflow: hidden; margin: 4px 0 0; color: var(--order-ink); font-size: 11px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+.nm-subscription-items { display: grid; gap: 0; margin: 10px 0 0; padding: 0; list-style: none; }
+.nm-subscription-items li { display: flex; justify-content: space-between; gap: 8px; padding: 9px 2px; border-bottom: 1px solid var(--order-line); color: var(--order-subtle); font-size: 11px; }
+.nm-subscription-items b { color: var(--order-ink); white-space: nowrap; }
+.nm-order-guidance { margin: 12px 0 0; padding: 10px; border-radius: 8px; background: var(--order-accent-soft); color: var(--order-subtle); font-size: 10px; line-height: 1.65; }
+.nm-order-primary-link { display: flex; height: 40px; align-items: center; justify-content: center; gap: 8px; margin-top: 10px; border-radius: 9999px; background: var(--order-accent); color: var(--order-surface); font-size: 11px; font-weight: 700; text-decoration: none; }
+.nm-order-primary-link span, .nm-order-detail-link span { font-size: 18px; line-height: 1; }
+.nm-order-card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.nm-order-card-head b, .nm-order-card-head time { display: block; }
+.nm-order-card-head b { color: var(--order-ink); font-size: 12px; }
+.nm-order-card-head time { margin-top: 3px; color: var(--order-muted); font-size: 9px; }
+.nm-order-card-head strong { color: var(--order-accent-ink); font-size: 15px; }
+.nm-order-card-items { margin-top: 11px; padding-top: 7px; border-top: 1px solid var(--order-line); }
+.nm-order-card-items > div { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 7px 0; }
+.nm-order-card-items span { min-width: 0; color: var(--order-subtle); font-size: 10px; line-height: 1.5; }
+.nm-order-card-items small { color: var(--order-muted); white-space: nowrap; }
+.nm-order-card-items a { flex: none; padding: 7px 10px; border: 1px solid var(--order-accent); border-radius: 9999px; color: var(--order-accent-ink); font-size: 9px; font-weight: 700; text-decoration: none; }
+.nm-order-detail-link { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 9px; padding-top: 10px; border-top: 1px solid var(--order-line); color: var(--order-accent-ink); font-size: 10px; font-weight: 700; text-decoration: none; }
+.nm-order-item-pending { margin: 10px 0 0; color: var(--order-muted); font-size: 9px; }
+.nm-order-empty { display: grid; min-height: 134px; place-items: center; align-content: center; gap: 7px; padding: 18px; text-align: center; box-shadow: none; }
+.nm-order-empty > span { display: grid; width: 36px; height: 36px; place-items: center; border-radius: 50%; background: var(--order-neutral-soft); color: var(--order-muted); }
+.nm-order-empty b { color: var(--order-ink); font-size: 12px; }
+.nm-order-empty p { margin: 0; color: var(--order-muted); font-size: 10px; line-height: 1.6; }
 
 /* ★V6正本 pNuzE: V6 37-2-C 然・投稿（LIFF・390）。色指定はこの画面の変数だけを使う。 */
 .nm-photo-page-v6 { color: var(--photo-ink); }
