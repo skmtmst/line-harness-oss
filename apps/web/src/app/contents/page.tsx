@@ -147,7 +147,7 @@ function MediaLibraryInner() {
   const [folderName, setFolderName] = useState('')
   const [savingFolder, setSavingFolder] = useState(false)
   const [uploadOpen, setUploadOpen] = useState(false)
-  /* ★V7: 札の操作5つを並べない。「使用箇所＋…」の1行に収め、削除の印は残す。 */
+  /* ★V7: 札の操作を並べない。「使用箇所＋ダウンロード＋…」の1行に収め、削除の印は残す。取得は読取権限でも使うので「…」に隠さない。 */
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
 
   const [kinds, setKinds] = useState<Set<MediaItem['kind']>>(
@@ -1133,6 +1133,20 @@ function MediaLibraryInner() {
                   >
                     使用箇所
                   </button>
+                  {/*
+                    取得は読取権限でも使う操作なので「…」に隠さず、見えるボタンで出す。
+                    読み上げ名は「＜ファイル名＞をダウンロード」のまま保つ。
+                  */}
+                  <button
+                    onClick={() => void downloadItem(item)}
+                    disabled={downloadingIds.has(item.id)}
+                    title={downloadingIds.has(item.id) ? 'ファイルを取り出しています' : 'ダウンロード'}
+                    aria-label={`${item.filename}をダウンロード`}
+                    className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-2.5 py-1 text-xs whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {downloadingIds.has(item.id) ? '取得中…' : 'ダウンロード'}
+                  </button>
+                  {canManageMedia ? (
                   <span className="relative inline-flex items-center">
                     <MoreAction
                       label={`${item.filename}のその他操作`}
@@ -1144,17 +1158,18 @@ function MediaLibraryInner() {
                       ariaLabel={`${item.filename}の操作`}
                       onClose={() => setOpenMenuId(null)}
                       items={[
-                        ...(canManageMedia && !item.archivedAt ? [{ id: 'rename', label: '編集', onSelect: () => { setRenameError(''); setRenaming({ id: item.id, value: item.filename }) } }] : []),
-                        { id: 'download', label: downloadingIds.has(item.id) ? '取得中…' : 'ダウンロード', disabled: downloadingIds.has(item.id), disabledReason: 'ファイルを取り出しています', onSelect: () => { void downloadItem(item) } },
-                        ...(canManageMedia ? [{ id: 'archive', label: item.archivedAt ? '一覧へ戻す' : 'アーカイブ', onSelect: () => { setArchiveError(''); setArchiveReason(''); setArchiveTarget({ item, mode: item.archivedAt ? 'restore' : 'archive' }) } }] : []),
+                        ...(!item.archivedAt ? [{ id: 'rename', label: '編集', onSelect: () => { setRenameError(''); setRenaming({ id: item.id, value: item.filename }) } }] : []),
+                        { id: 'archive', label: item.archivedAt ? '一覧へ戻す' : 'アーカイブ', onSelect: () => { setArchiveError(''); setArchiveReason(''); setArchiveTarget({ item, mode: item.archivedAt ? 'restore' : 'archive' }) } },
                       ]}
                     />
                   </span>
+                  ) : null}
                   {/*
                     退避は消去ではない。使用中でも止めないが、理由を必ず聞く。
                     退避済みは編集・削除の押し口を出さず、戻す口だけを残す。
-                    ★V7：札の操作は「使用箇所＋…」の1行。編集・取得・アーカイブは
-                    「…」の中、削除はゴミ箱の印のまま残す。
+                    ★V7：札の操作は「使用箇所＋ダウンロード＋…」の1行。編集・
+                    アーカイブは「…」の中、削除はゴミ箱の印のまま残す。
+                    権限のない人には「…」自体を出さない（空の飾りにしない）。
                   */}
                   {canManageMedia && !item.archivedAt ? (
                   <IconButton
