@@ -429,6 +429,21 @@ aside[aria-label="フォルダ"] .shadow-lg {
   }
 
   /*
+   * Issue #708（10 ウェビナー）: キーボード操作の焦点を必ず見せる。
+   *
+   * 共通の焦点規定は「2px の実線・色は状態色の青（`status-info`）・
+   * 2px 離す」。部品ごとの `:focus-visible`（タブ・サイドバーなど）と
+   * 同じ色・太さに揃えてある。`base` 層なので、部品や画面が持つ
+   * 焦点指定（CSS Module・ユーティリティ）はそのまま勝つ。
+   * `outline: none` の上書きはここでは消さず、各画面の側で取る
+   * （`focus:outline-none` は utilities 層で base より強いため）。
+   */
+  :focus-visible {
+    outline: 2px solid var(--color-status-info);
+    outline-offset: 2px;
+  }
+
+  /*
    * #673 押した感触。ボタンは160msかけて少し沈み（scale 0.97）、離すと
    * 戻る。押した瞬間の反応は `--motion-instant` 系ではなく、指に追従
    * して見える 160ms にする（#673 の指定値）。

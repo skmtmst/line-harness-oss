@@ -75,7 +75,7 @@ function fmtSession(epoch: number): string {
 }
 
 const inputClass =
-  'w-full border border-gray-300 rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500'
+  'w-full border border-gray-300 rounded-lg px-2 py-1 text-sm focus:ring-2 focus:ring-blue-500'
 
 function webinarStatusLabel(status: Webinar['status']): string {
   if (status === 'active') return '公開中'
@@ -259,7 +259,7 @@ function CommentsTab({ webinarId }: { webinarId: string }) {
           value={importJson}
           onChange={(e) => setImportJson(e.target.value)}
           rows={4}
-          className="w-full rounded-lg border border-gray-300 p-2 font-mono text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full rounded-lg border border-gray-300 p-2 font-mono text-xs focus:ring-2 focus:ring-blue-500"
         />
         <button
           onClick={doImport}

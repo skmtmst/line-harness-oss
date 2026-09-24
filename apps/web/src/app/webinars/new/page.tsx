@@ -110,7 +110,7 @@ export default function NewWebinarPage() {
                   value={title}
                   onChange={(event) => setTitle(event.target.value)}
                   placeholder="NEN活用スタートセミナー"
-                  className="border-hairline rounded-control focus:ring-accent w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
+                  className="border-hairline rounded-control focus:ring-accent w-full border px-3 py-2 text-sm focus:ring-2"
                 />
               </div>
               <div>

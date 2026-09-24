@@ -117,7 +117,7 @@ function WebinarFolderDialog({
             if (event.key === 'Enter' && name.trim() && !busy) onSave(name.trim())
             if (event.key === 'Escape' && !busy) onCancel()
           }}
-          className="border-hairline rounded-control focus:ring-accent mt-2 w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
+          className="border-hairline rounded-control focus:ring-accent mt-2 w-full border px-3 py-2 text-sm focus:ring-2"
           placeholder="例: 商品説明"
         />
         {error ? <p className="text-danger mt-2 text-sm">{error}</p> : null}
@@ -787,7 +787,7 @@ function WebinarsPage() {
               {/* #636: 390pxで min-w-0 の検索欄が w=41 まで潰れていた。
                   min-w-45（180px）を下限にすると flex-wrap が効き、
                   狭い幅では検索欄が1行・並び順と表示件数は次の行へ。 */}
-              <input type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="名前・内容で検索" aria-label="ウェビナー名で検索" className="border-hairline rounded-control focus:ring-accent min-w-45 flex-1 border px-3 py-2 text-sm focus:ring-2 focus:outline-none" />
+              <input type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="名前・内容で検索" aria-label="ウェビナー名で検索" className="border-hairline rounded-control focus:ring-accent min-w-45 flex-1 border px-3 py-2 text-sm focus:ring-2" />
             </div>
 
             {/* #668: 並びは「絞り込み → 並び順 → 表示件数」の1形。 */}
