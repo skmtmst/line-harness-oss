@@ -1,5 +1,6 @@
 'use client'
 
+import Disclosure from '@/components/shared/disclosure'
 import SelectField from '@/components/shared/select-field'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
@@ -628,9 +629,8 @@ export default function NewConversionPointPage() {
             </span>
           </span>
         </label>
-        <details className="border-hairline rounded-control border px-3 py-2">
-          <summary className="text-ink-secondary cursor-pointer text-xs font-semibold">詳細設定（帰属期間・集計対象）</summary>
-          <div className="mt-3 grid gap-3 md:grid-cols-2">
+        <Disclosure size="compact" title="詳細設定" hint="帰属期間・集計対象">
+          <div className="grid gap-3 md:grid-cols-2">
             <Field label="友だち追加からの計測期間" htmlFor="cv-days" note="空欄なら既定の90日です。">
               <div className="flex items-center gap-1.5">
                 <input id="cv-days" type="number" min={1} max={365} value={attributionDays} onChange={(e) => setAttributionDays(e.target.value)} placeholder="90" className={`${inputClass} w-24 tabular-nums`} />
@@ -647,7 +647,7 @@ export default function NewConversionPointPage() {
               </p>
             </Field>
           </div>
-        </details>
+        </Disclosure>
       </FormSection>
     </CreatePage>
   )
