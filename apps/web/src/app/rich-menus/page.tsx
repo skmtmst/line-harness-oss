@@ -778,7 +778,7 @@ export default function RichMenusListPage() {
       </div>
 
       <div data-design="Saved" className="mb-3 flex flex-wrap items-center gap-2">
-        <span className="text-ink-faint text-xs whitespace-nowrap">保存した検索</span>
+        <span className="text-ink-faint text-xs whitespace-nowrap">よく使う絞り込み</span>
         {SAVED_FILTERS.map((f) => {
           const on = savedFilter === f.key
           return (

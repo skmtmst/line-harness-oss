@@ -776,6 +776,12 @@
     "arbitrary-value": 2,
     "direct-primary-button": 1
   },
+  "components/ui/page-size-select.tsx": {
+    "unresolved-classname": 1
+  },
+  "components/ui/sort-select.tsx": {
+    "unresolved-classname": 1
+  },
   "components/users/user-row.tsx": {
     "unresolved-classname": 1,
     "arbitrary-value": 1

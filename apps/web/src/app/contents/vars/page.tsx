@@ -30,6 +30,8 @@ import {
 } from './delete-impact'
 import ListState from '@/components/shared/list-state'
 import CopyTextButton from '@/components/ui/copy-text-button'
+import SortSelect from '@/components/ui/sort-select'
+import PageSizeSelect from '@/components/ui/page-size-select'
 import FeatureGate from '@/components/feature-gate'
 import { useAccount } from '@/contexts/account-context'
 import SelectField from '@/components/shared/select-field'
@@ -737,17 +739,9 @@ function VarsPageInner() {
             />
           </div>
 
+          {/* #668: 並びは「絞り込み → 並び順 → 表示件数」の1形。 */}
           <div className="mb-3 flex flex-wrap items-center gap-2">
-            <SelectField
-              size="compact"
-              value={String(pageSize)}
-              onChange={(event) => {
-                setPageSize(Number(event.target.value))
-                setPage(1)
-              }}
-              aria-label="表示件数"
-              options={[20, 50, 100].map((value) => ({ value: String(value), label: `${value}件表示` }))}
-            />
+            <span className="text-ink-faint text-xs whitespace-nowrap">よく使う絞り込み</span>
             {([
               ['all', 'すべて'],
               ['empty', '空のまま'],
@@ -769,15 +763,22 @@ function VarsPageInner() {
                 {label}
               </button>
             ))}
-            <SelectField
+            <SortSelect
+              className="ml-auto"
               value={order}
-              onChange={(event) => setOrder(event.target.value as CommonVarOrder)}
-              aria-label="並び順"
+              onChange={(value) => setOrder(value as CommonVarOrder)}
               options={[
                 { value: 'usage_desc', label: '使われている数が多い順' },
                 { value: 'updated_desc', label: '更新が新しい順' },
                 { value: 'name_asc', label: '名前順' },
               ]}
+            />
+            <PageSizeSelect
+              value={pageSize}
+              onChange={(value) => {
+                setPageSize(value)
+                setPage(1)
+              }}
             />
           </div>
 
