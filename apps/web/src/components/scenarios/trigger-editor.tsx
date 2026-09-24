@@ -414,7 +414,7 @@ export default function TriggerEditor({
               onClick={() => void recount()}
               disabled={!lineAccountId || match.kind === 'loading'}
               title={lineAccountId ? undefined : 'LINE公式アカウントを選んでください'}
-              className="text-accent-deep text-xs hover:underline disabled:opacity-40 disabled:no-underline"
+              className="text-action text-xs hover:underline disabled:opacity-40 disabled:no-underline"
             >
               対象を再計算
             </button>
@@ -459,7 +459,7 @@ export default function TriggerEditor({
             <button
               type="button"
               onClick={() => void recount()}
-              className="text-accent-deep mt-2 text-xs hover:underline"
+              className="text-action mt-2 text-xs hover:underline"
             >
               再読み込み
             </button>
