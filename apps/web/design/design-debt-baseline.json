@@ -92,8 +92,8 @@
     "unresolved-classname": 2
   },
   "app/contents/page.tsx": {
-    "arbitrary-value": 8,
-    "direct-secondary-button": 4,
+    "arbitrary-value": 5,
+    "direct-secondary-button": 5,
     "direct-primary-button": 1
   },
   "app/contents/vars/edit/page.tsx": {
@@ -156,7 +156,7 @@
     "direct-primary-button": 2
   },
   "app/form-submissions/page.tsx": {
-    "arbitrary-value": 3,
+    "arbitrary-value": 2,
     "direct-primary-button": 1
   },
   "app/friend-add-settings/page.tsx": {
@@ -212,7 +212,7 @@
     "unresolved-classname": 8
   },
   "app/inflow-links/page.tsx": {
-    "arbitrary-value": 16,
+    "arbitrary-value": 14,
     "direct-secondary-button": 2,
     "direct-primary-button": 1
   },
@@ -294,8 +294,7 @@
   "app/rich-menus/page.tsx": {
     "unresolved-classname": 1,
     "arbitrary-value": 10,
-    "direct-primary-button": 1,
-    "direct-secondary-button": 5
+    "direct-secondary-button": 3
   },
   "app/scenarios/detail/scenario-detail-client.tsx": {
     "arbitrary-value": 5,
@@ -366,7 +365,7 @@
   "app/templates/page.tsx": {
     "unresolved-classname": 6,
     "direct-primary-button": 2,
-    "arbitrary-value": 13
+    "arbitrary-value": 12
   },
   "app/updates/page.tsx": {
     "direct-th": 4,
