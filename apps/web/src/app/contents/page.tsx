@@ -78,11 +78,6 @@ const KINDS: Array<{ key: MediaItem['kind']; label: string }> = [
   { key: 'file', label: 'PDF' },
 ]
 
-function formatStorage(bytes: number): string {
-  if (bytes < 1024 * 1024 * 1024) return `${Math.round(bytes / 1024 / 1024)}MB`
-  return `${(bytes / 1024 / 1024 / 1024).toFixed(1)}GB`
-}
-
 function formatMediaDetails(item: MediaItem): string {
   const format = item.mimeType.split('/').at(-1)?.replace('jpeg', 'jpg').toUpperCase() ?? ''
   const details = [format]
@@ -752,7 +747,7 @@ function MediaLibraryInner() {
         </div>
         <div className="w-full max-w-xs text-right">
           <p className="text-ink-secondary text-nano font-semibold">
-            使っている容量 <span className="text-ink ml-1">{quota ? `${formatStorage(quota.usageBytes)} / ${formatStorage(quota.limitBytes)}` : '—（未取得）'}</span>
+            使っている容量 <span className="text-ink ml-1">{quota ? `${formatMediaSize(quota.usageBytes)} / ${formatMediaSize(quota.limitBytes)}` : '—（未取得）'}</span>
           </p>
           <MediaQuotaGuidance
             quota={quota}
