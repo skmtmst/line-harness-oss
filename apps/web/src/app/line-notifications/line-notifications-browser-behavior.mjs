@@ -506,7 +506,8 @@ try {
     // 一覧へ戻っても名前のリンクと他タブはそのまま動く。
     await page.goBack()
     await nameLink.waitFor({ timeout: 15_000 })
-    await page.getByRole('button', { name: /顧客へのお知らせ/ }).first().click()
+    // タブは #708 で role="tab" へ変わった（nav>button ではなく tablist/tab）。
+    await page.getByRole('tab', { name: /顧客へのお知らせ/ }).first().click()
     await page.waitForFunction(() => document.body.innerText.includes('注文受付'), undefined, { timeout: 15_000 })
     await context.close()
     console.log('NOTIFY-04（一覧の名前から編集画面へ戻る）: PASS')
