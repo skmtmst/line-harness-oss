@@ -1,7 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import Button from '@/components/shared/button'
+import { RowActions } from '@/components/shared/row-actions'
+import StatusBadge from '@/components/shared/status-badge'
 import { mergedPersonIdOf } from '@/components/merged-person/merged-person-view'
 
 const fmt = new Intl.DateTimeFormat('ja-JP', {
@@ -17,15 +18,6 @@ const dateTimeFmt = new Intl.DateTimeFormat('ja-JP', {
   minute: '2-digit',
   hour12: false,
 })
-
-const ACCOUNT_BADGE_COLORS = [
-  'bg-emerald-100 text-emerald-700',
-  'bg-sky-100 text-sky-700',
-  'bg-violet-100 text-violet-700',
-  'bg-amber-100 text-amber-700',
-  'bg-rose-100 text-rose-700',
-  'bg-slate-100 text-slate-700',
-]
 
 export interface UserRowData {
   identityKey: string
@@ -49,7 +41,6 @@ export interface UserRowData {
 
 interface Props {
   row: UserRowData
-  accountColorMap: Map<string, string>
   /** 統合ユーザー詳細（設計 `w8W4Eh`）を開く。開ける行だけに渡る。 */
   onOpenMergedPerson?: (personId: string) => void
 }
@@ -74,7 +65,7 @@ const UID_STATUS = {
   },
 } as const
 
-export default function UserRow({ row, accountColorMap, onOpenMergedPerson }: Props) {
+export default function UserRow({ row, onOpenMergedPerson }: Props) {
   const [expanded, setExpanded] = useState(false)
   /*
    * 統合ユーザー詳細を開けるのは、UIDを根拠にまとめた行だけ。
@@ -101,33 +92,31 @@ export default function UserRow({ row, accountColorMap, onOpenMergedPerson }: Pr
         </td>
         <td className="px-3 py-3">
           <div className="flex flex-wrap gap-1">
-            {row.accounts.map((a) => {
-              const color = accountColorMap.get(a.accountId) ?? ACCOUNT_BADGE_COLORS[0]
-              return (
-                <span
-                  key={a.accountId}
-                  title={a.accountName}
-                  className={`max-w-full truncate rounded-full px-2 py-0.5 text-xs font-medium ${color}`}
-                >
-                  {a.accountName}
-                </span>
-              )
-            })}
+            {row.accounts.map((a) => (
+              <span
+                key={a.accountId}
+                title={a.accountName}
+                className="max-w-full truncate rounded-full bg-canvas-sunken px-2 py-0.5 text-xs font-medium text-ink-secondary"
+              >
+                {a.accountName}
+              </span>
+            ))}
           </div>
         </td>
         <td className="min-w-0 px-3 py-3">
-          <span
-            className={`inline-flex max-w-full truncate rounded-full px-2 py-0.5 text-xs font-semibold ${
+          <StatusBadge
+            tone={
               row.identityKeyKind === 'url_token'
-                ? 'bg-status-warn-soft text-status-warn-deep'
+                ? 'warning'
                 : row.identityKeyKind === 'uid'
-                  ? 'bg-accent-soft text-accent-deep'
-                  : 'bg-canvas-sunken text-ink-secondary'
-            }`}
+                  ? 'success'
+                  : 'neutral'
+            }
+            size="compact"
             title={uidStatus.description}
           >
             {uidStatus.label}
-          </span>
+          </StatusBadge>
           {/*
             **LINEユーザーIDを画面に出さない。**
 
@@ -143,37 +132,51 @@ export default function UserRow({ row, accountColorMap, onOpenMergedPerson }: Pr
           </span>
         </td>
         <td className="px-3 py-3 text-xs font-semibold">
-          <span
-            className={row.isDuplicate ? 'text-status-warn-deep' : 'text-ink-faint'}
-            title={
-              row.isDuplicate
-                ? `${duplicateCount}つのアカウントに登録されています。送信前に配信先の確認が必要です。`
-                : '複数アカウントへの登録はありません。'
-            }
-          >
-            {row.isDuplicate ? '要確認' : '対象外'}
-          </span>
+          {row.isDuplicate ? (
+            <StatusBadge
+              tone="warning"
+              size="compact"
+              title={`${duplicateCount}つのアカウントに登録されています。送信前に配信先の確認が必要です。`}
+            >
+              要確認
+            </StatusBadge>
+          ) : (
+            <span
+              className="text-ink-faint"
+              title="複数アカウントへの登録はありません。"
+            >
+              対象外
+            </span>
+          )}
         </td>
         <td className="px-3 py-3 text-right">
-          <div className="flex flex-wrap items-center justify-end gap-2">
-            {mergedPersonId && onOpenMergedPerson ? (
-              <Button
-                type="button"
-                data-qa-open="w8W4Eh"
-                onClick={() => onOpenMergedPerson(mergedPersonId)}
-              >
-                統合ユーザーを開く
-              </Button>
-            ) : null}
-            <Button
-              type="button"
-              variant="primary"
-              aria-expanded={expanded}
-              onClick={() => setExpanded((value) => !value)}
-            >
-              {expanded ? '閉じる' : '詳細を見る'}
-            </Button>
-          </div>
+          {/*
+            行の操作は枠つきボタン1つ（詳細の開閉）＋「…」にまとめた
+            「統合ユーザーを開く」。緑の塗りは行ごとに置かない。
+          */}
+          <RowActions
+            detail={{
+              label: expanded ? '閉じる' : '詳細を見る',
+              onClick: () => setExpanded((value) => !value),
+            }}
+            menuItems={
+              mergedPersonId && onOpenMergedPerson
+                ? [
+                    {
+                      id: 'open-merged-person',
+                      label: '統合ユーザーを開く',
+                      onSelect: () => onOpenMergedPerson(mergedPersonId),
+                    },
+                  ]
+                : []
+            }
+            menuButtonProps={
+              mergedPersonId && onOpenMergedPerson
+                ? { 'data-qa-open': 'w8W4Eh' }
+                : undefined
+            }
+            subjectName={row.displayName ?? undefined}
+          />
         </td>
       </tr>
       {expanded && (
@@ -181,7 +184,7 @@ export default function UserRow({ row, accountColorMap, onOpenMergedPerson }: Pr
           <td colSpan={7} className="px-6 py-4">
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <div>
-                <p className="mb-2 text-xs font-semibold text-[#565F59]">登録アカウント詳細</p>
+                <p className="mb-2 text-xs font-semibold text-ink-secondary">登録アカウント詳細</p>
                 <ul className="space-y-1 text-sm">
                   {row.accounts.map((a) => (
                     <li key={a.friendId} className="flex flex-wrap items-center gap-2 text-ink-secondary">

@@ -7,15 +7,6 @@ import { TableHeadRow, Th } from '@/components/shared/table'
 
 const fmt = new Intl.NumberFormat('ja-JP')
 
-const ACCOUNT_BADGE_COLORS = [
-  'bg-emerald-100 text-emerald-700',
-  'bg-sky-100 text-sky-700',
-  'bg-violet-100 text-violet-700',
-  'bg-amber-100 text-amber-700',
-  'bg-rose-100 text-rose-700',
-  'bg-slate-100 text-slate-700',
-]
-
 interface Props {
   rows: UserRowData[]
   total: number
@@ -39,18 +30,6 @@ export default function UsersTable({
   onPageChange,
   onOpenMergedPerson,
 }: Props) {
-  const accountColorMap = new Map<string, string>()
-  for (const row of rows) {
-    for (const a of row.accounts) {
-      if (!accountColorMap.has(a.accountId)) {
-        accountColorMap.set(
-          a.accountId,
-          ACCOUNT_BADGE_COLORS[accountColorMap.size % ACCOUNT_BADGE_COLORS.length],
-        )
-      }
-    }
-  }
-
   const totalPages = Math.max(1, Math.ceil(total / pageSize))
   const start = total === 0 ? 0 : (page - 1) * pageSize + 1
   const end = Math.min(total, page * pageSize)
@@ -106,7 +85,6 @@ export default function UsersTable({
               <UserRow
                 key={row.identityKey}
                 row={row}
-                accountColorMap={accountColorMap}
                 onOpenMergedPerson={onOpenMergedPerson}
               />
             ))

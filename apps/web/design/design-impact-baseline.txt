@@ -230,7 +230,6 @@ shared-button-importer components/shared/row-actions.tsx
 shared-button-importer components/store-selection-gate.tsx
 shared-button-importer components/templates/message-template-editor.tsx
 shared-button-importer components/ui/kpi-collapse.tsx
-shared-button-importer components/users/user-row.tsx
 shared-button-importer components/webinars/webinar-notifications.tsx
 # 標準Buttonへ移行済みとして、見た目と主要導線を監視する画面本体。
 button-migration-target app/affiliates/tabs.tsx

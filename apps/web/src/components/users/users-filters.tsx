@@ -1,5 +1,8 @@
 'use client'
 
+import Checkbox from '@/components/shared/checkbox'
+import SearchField from '@/components/shared/search-field'
+
 interface AccountOption {
   id: string
   name: string
@@ -24,21 +27,21 @@ export default function UsersFilters({
 }: Props) {
   return (
     <div className="flex min-w-0 flex-1 flex-nowrap items-center gap-2">
-      <input
-        type="search"
+      <SearchField
         value={q}
-        onChange={(e) => onChange({ q: e.target.value })}
+        onChange={(value) => onChange({ q: value })}
+        onClear={() => onChange({ q: '' })}
         placeholder="名前・X・メール・電話・UIDで検索"
-        className="h-10 min-w-0 flex-1 rounded-control border border-hairline bg-canvas px-3 text-sm text-ink outline-none focus:border-accent"
+        aria-label="統合ユーザーをUIDで検索"
+        className="min-w-0 flex-1"
       />
-      <label className="flex h-10 items-center gap-2 whitespace-nowrap rounded-control border border-hairline bg-canvas px-3 text-sm text-ink-secondary">
-        <input
-          type="checkbox"
-          checked={onlyDups}
-          onChange={(e) => onChange({ onlyDups: e.target.checked })}
-        />
+      <Checkbox
+        checked={onlyDups}
+        onCheckedChange={(checked) => onChange({ onlyDups: checked })}
+        className="whitespace-nowrap"
+      >
         複数アカウントのみ
-      </label>
+      </Checkbox>
       <select
         value={uid}
         onChange={(e) => onChange({ uid: e.target.value })}
