@@ -215,7 +215,7 @@ export default function MileageHistoryTab({ accountId }: { accountId: string }) 
                 const item = historyView(rawItem)
                 return <Tr key={item.id}>
                   <NameCell
-                    name={<><time dateTime={item.occurredAt}>{formatMileageDate(item.occurredAt)}</time><span className="mx-1">／</span><Link href={`/mileage/friends/detail?id=${encodeURIComponent(item.primaryFriendId)}`} className="font-semibold text-accent-deep hover:underline">{item.displayName}</Link></>}
+                    name={<><time dateTime={item.occurredAt}>{formatMileageDate(item.occurredAt)}</time><span className="mx-1">／</span><Link href={`/mileage/friends/detail?id=${encodeURIComponent(item.primaryFriendId)}`} className="font-semibold text-action hover:underline">{item.displayName}</Link></>}
                     sub={item.lineAccountName || 'LINEアカウント名を確認できません'}
                   />
                   <Td align="right"><span className={item.amount < 0 ? 'font-bold text-danger' : 'font-bold text-accent-deep'}>{formatMileageChange(item.amount)}</span></Td>

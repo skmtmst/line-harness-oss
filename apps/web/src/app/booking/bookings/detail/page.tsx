@@ -721,7 +721,7 @@ function BookingDetailInner() {
       <div>
         <p className="text-ink-faint bg-canvas rounded-card border-hairline border p-8 text-center text-sm">
           予約が指定されていません。
-          <Link href="/booking/bookings" className="text-accent-deep ml-1 hover:underline">
+          <Link href="/booking/bookings" className="text-action ml-1 hover:underline">
             一覧へ戻る
           </Link>
         </p>
@@ -763,7 +763,7 @@ function BookingDetailInner() {
             <button
               type="button"
               onClick={() => void load()}
-              className="text-accent-deep ml-2 underline"
+              className="text-action ml-2 underline"
             >
               もう一度読み込む
             </button>
@@ -804,7 +804,7 @@ function BookingDetailInner() {
                           type="button"
                           onClick={() => void retryCalendar()}
                           disabled={retrying !== null || queuedCalendar}
-                          className="text-accent-deep ml-2 underline disabled:opacity-40"
+                          className="text-action ml-2 underline disabled:opacity-40"
                         >
                           {retrying === 'calendar' ? '再試行中...' : 'もう一度反映する'}
                         </button>
@@ -976,7 +976,7 @@ function BookingDetailInner() {
                 {detail.customer.friendId ? (
                   <Link
                     href={`/friends/detail?id=${encodeURIComponent(detail.customer.friendId)}`}
-                    className="text-accent-deep text-xs hover:underline"
+                    className="text-action text-xs hover:underline"
                   >
                     友だち詳細を見る
                   </Link>
@@ -1032,7 +1032,7 @@ function BookingDetailInner() {
                     <button
                       type="button"
                       onClick={() => setHistoryOpen((open) => !open)}
-                      className="text-accent-deep ml-2 text-xs underline"
+                      className="text-action ml-2 text-xs underline"
                       aria-expanded={historyOpen}
                     >
                       {historyOpen ? '内訳を閉じる' : '内訳を見る'}
@@ -1067,7 +1067,7 @@ function BookingDetailInner() {
                   {attentionItems.map((item) => (
                     <li key={item.key} className="text-ink-secondary text-xs">
                       {item.href ? (
-                        <a href={item.href} className="hover:text-accent-deep hover:underline">
+                        <a href={item.href} className="hover:text-action hover:underline">
                           {item.text}
                         </a>
                       ) : (
@@ -1183,7 +1183,7 @@ function BookingDetailInner() {
                           type="button"
                           onClick={() => void retryNotification(op.id)}
                           disabled={retrying !== null}
-                          className="text-accent-deep mt-1 text-xs underline disabled:opacity-40"
+                          className="text-action mt-1 text-xs underline disabled:opacity-40"
                         >
                           {retrying === op.id ? '再送中...' : 'もう一度送る'}
                         </button>
@@ -1203,7 +1203,7 @@ function BookingDetailInner() {
                           type="button"
                           onClick={() => void retryCalendar()}
                           disabled={retrying !== null || queuedCalendar}
-                          className="text-accent-deep mt-1 text-xs underline disabled:opacity-40"
+                          className="text-action mt-1 text-xs underline disabled:opacity-40"
                         >
                           {retrying === 'calendar' ? '再試行中...' : 'もう一度反映する'}
                         </button>
@@ -1301,7 +1301,7 @@ function BookingDetailInner() {
                       type="button"
                       onClick={() => void loadMoreAudit()}
                       disabled={auditLoading}
-                      className="text-accent-deep mt-3 text-xs underline disabled:opacity-40"
+                      className="text-action mt-3 text-xs underline disabled:opacity-40"
                     >
                       {auditLoading ? '読み込み中...' : `あと${auditRemaining}件の記録を読み込む`}
                     </button>

@@ -143,7 +143,7 @@ function NewFriendFieldForm() {
               {/* 差し込み名はサーバーが一意にする。先に教えておかないと保存して初めて断られる。 */}
               {keyOwners.length > 0 ? <p className="mt-1.5 text-xs leading-5 text-status-warn-deep">この差し込み名はすでに「{keyOwners[0]}」で使われています。別の差し込み名にしてください。</p> : null}
             </Field>
-            <p className="font-mono text-xs font-semibold text-accent-deep">{`{{field.${fieldKey || 'pet_name'}}}`}</p>
+            <p className="font-mono text-xs font-semibold text-ink-secondary">{`{{field.${fieldKey || 'pet_name'}}}`}</p>
             <Field label="種類" htmlFor="ff-type" note={FIELD_TYPE_HINTS[type]}>
               <SelectField
                 id="ff-type"

@@ -442,7 +442,7 @@ function FirstStepContent() {
     return (
       <div className="text-ink-faint py-12 text-center text-sm">
         シナリオが指定されていません。
-        <Link href="/scenarios" className="text-accent-deep ml-2 underline">
+        <Link href="/scenarios" className="text-action ml-2 underline">
           シナリオ一覧へ
         </Link>
       </div>

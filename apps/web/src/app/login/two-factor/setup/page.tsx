@@ -136,7 +136,7 @@ export default function TwoFactorSetupPage() {
         </form>
       ) : null}
       {!loading && !setup ? (
-        <Link href="/login" onClick={clearTwoFactorChallenge} className="mt-6 block text-center text-xs font-medium text-accent-deep hover:underline">
+        <Link href="/login" onClick={clearTwoFactorChallenge} className="mt-6 block text-center text-xs font-medium text-action hover:underline">
           ログインへ戻る
         </Link>
       ) : null}

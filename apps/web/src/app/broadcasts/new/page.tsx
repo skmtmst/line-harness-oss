@@ -193,7 +193,7 @@ function NewBroadcastPageContent() {
             対象者を確認するには、先にLINE公式アカウントを選んでください。
           </p>
           <div className="mt-4 flex items-center justify-center gap-3">
-            <Link href="/analytics" className="text-accent-deep text-sm font-medium hover:underline">
+            <Link href="/analytics" className="text-action text-sm font-medium hover:underline">
               分析画面へ戻る
             </Link>
           </div>
@@ -208,7 +208,7 @@ function NewBroadcastPageContent() {
                 : '対象者が見つかりません。別のアカウントで作られたか、取り消されています。'}
           </p>
           <div className="mt-4 flex items-center justify-center gap-3">
-            <Link href="/analytics" className="text-accent-deep text-sm font-medium hover:underline">
+            <Link href="/analytics" className="text-action text-sm font-medium hover:underline">
               分析画面へ戻る
             </Link>
             <Button

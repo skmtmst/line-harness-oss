@@ -440,7 +440,7 @@ export default function OpsSupportPage() {
 
               {/* 問い合わせ元 */}
               <div className={knowledgeStyles.supportMeta}>
-                <Meta label="契約先"><Link href={tenantDetailHref(ticket.tenantId)} className="text-accent-deep underline-offset-2 hover:underline">{ticket.tenantName}</Link></Meta>
+                <Meta label="契約先"><Link href={tenantDetailHref(ticket.tenantId)} className="text-action underline-offset-2 hover:underline">{ticket.tenantName}</Link></Meta>
                 <Meta label="起票者">{ticket.staffName || '—'}{ticket.staffRole ? `（${ROLE_LABEL[ticket.staffRole] ?? ticket.staffRole}）` : ''}</Meta>
                 <Meta label="受付">{ticket.channel === 'admin' ? '管理画面のお問い合わせ' : ticket.channelLabel}</Meta>
                 <Meta label="プラン">{planLabel(ticket.tenantPlanKey)}・{PLAN_STATUS_LABEL[ticket.tenantPlanStatus] ?? ticket.tenantPlanStatus}</Meta>
@@ -562,7 +562,7 @@ function Message({ side, author, at, body, attachments }: { side: 'left' | 'righ
       {attachments.length > 0 ? (
         <span className="flex flex-wrap gap-2">
           {attachments.map((a) => (
-            <a key={a.key} href={a.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-micro text-accent-deep underline-offset-2 hover:underline">
+            <a key={a.key} href={a.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-micro text-action underline-offset-2 hover:underline">
               <Paperclip aria-hidden="true" className="h-3.5 w-3.5" />
               {a.name}（{side === 'right' ? '運営から' : '契約先から'}）
             </a>

@@ -534,7 +534,7 @@ function CustomerNotificationEditor({
   return <main data-design-node="Q55bb" className="min-w-0 space-y-4 pb-48 sm:pb-24">
     <div className="flex flex-wrap items-start justify-between gap-3">
       <div>
-        <p className="text-xs font-semibold text-accent-deep">LINE通知　›　お知らせの種類</p>
+        <p className="text-xs font-semibold text-ink-faint">LINE通知　›　お知らせの種類</p>
         <p className="mt-2 text-xl font-bold text-ink">「{setting.title?.trim() || setting.label}」を編集する</p>
         <p className="mt-1 text-xs text-ink-faint">{definition ? `公開版 ${definition.currentVersionNumber ? `v${definition.currentVersionNumber}` : 'なし'} ／ 編集中の下書き` : '公開中の内容を編集します。保存した内容は次の通知から使われます。'}</p>
         {hasUnsaved ? <p className="mt-1 text-xs font-semibold text-warning">未保存の変更があります</p> : null}

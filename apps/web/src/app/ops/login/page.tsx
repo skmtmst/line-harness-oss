@@ -145,7 +145,7 @@ export default function OpsLoginPage() {
           <PasswordField id="ops-login-password" value={password} onChange={setPassword} autoComplete="current-password" />
         </AuthField>
         <div className="flex justify-end">
-          <Link href="/password/forgot" className="text-caption font-semibold text-accent-deep hover:underline">
+          <Link href="/password/forgot" className="text-caption font-semibold text-action hover:underline">
             パスワードを忘れた方はこちら
           </Link>
         </div>

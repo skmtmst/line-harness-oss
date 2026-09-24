@@ -1830,7 +1830,7 @@ function TargetingStep({
               <label className="text-ink-faint text-xs" htmlFor="targeting-priority">出す順番</label>
               <div className="mt-1 flex items-center gap-2"><input id="targeting-priority" aria-label="出す順番" type="number" min={1} value={targetingPriority + 1} disabled={readOnly} onChange={(event) => onTargetingPriority(Math.max(0, Number(event.target.value) - 1))} className="border-hairline rounded-control w-20 border px-3 py-2 text-lg font-bold" /><span className="text-ink-secondary text-sm">番目</span></div>
             </div>
-            <div><p className="text-ink-faint text-xs">実際にこのメニューが出る人</p><p className="text-accent-deep mt-1 text-2xl font-bold">{conditionEmpty ? '0人' : <MetricValue metric={preview?.effective} />}</p></div>
+            <div><p className="text-ink-faint text-xs">実際にこのメニューが出る人</p><p className="text-ink mt-1 text-2xl font-bold">{conditionEmpty ? '0人' : <MetricValue metric={preview?.effective} />}</p></div>
           </div>
           {previewUnsaved && !conditionEmpty ? (
             <p className="text-ink-faint mt-2 text-xs">人数はまだ保存していない条件で数えています</p>
