@@ -27,4 +27,66 @@
 .center {
   text-align: center;
 }
+
+/* ★V7の見出し行（高さ40px・一段沈んだ地）。付けないときは44pxのまま。 */
+.headComfortable {
+  height: 40px;
+  background: var(--color-canvas-sunken);
+}
+
+/* 押して並べ替える見出しのボタン。見出し文字の並びは変えない。 */
+.sortButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+  border-radius: var(--radius-control);
+  color: inherit;
+  font: inherit;
+}
+
+.sortButton:focus-visible {
+  outline: 2px solid var(--color-accent-deep);
+  outline-offset: 1px;
+}
+
+.sortMark {
+  font-size: var(--text-micro);
+}
+
+/* 表の中の状態行。短い状態と次にすることだけ。飾りボタンは置かない。 */
+.stateCell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 16px 12px;
+  text-align: center;
+}
+
+.stateTitle {
+  color: var(--color-ink);
+  font-size: var(--text-body);
+  font-weight: 700;
+}
+
+.stateDescription {
+  color: var(--color-ink-faint);
+  font-size: var(--text-label);
+}
+
+.stateRetry {
+  margin-top: 4px;
+  padding: 8px 16px;
+  border-radius: var(--radius-control);
+  color: var(--color-accent-deep);
+  font-size: var(--text-label);
+  font-weight: 700;
+  text-decoration: underline;
+}
+
+.stateRetry:focus-visible {
+  outline: 2px solid var(--color-accent-deep);
+  outline-offset: 1px;
+}
 }
