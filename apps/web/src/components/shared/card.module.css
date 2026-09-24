@@ -1,3 +1,4 @@
+@layer components {
 .card {
   border: 1px solid var(--color-hairline);
   border-radius: var(--radius-card);
@@ -77,4 +78,5 @@
 
 .action :is(a, button):focus-visible {
   outline: revert;
+}
 }

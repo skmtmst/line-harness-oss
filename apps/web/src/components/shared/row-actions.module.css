@@ -1,3 +1,4 @@
+@layer components {
 /*
  * 一覧の行に置くアイコン操作。Pencil V5 の
  *   `K65Uhe` 一覧 並び替えハンドル（75回）
@@ -93,4 +94,5 @@
     width: 44px;
     height: 44px;
   }
+}
 }
