@@ -144,3 +144,24 @@ describe('リマインダ詳細の登録者管理 (#868)', () => {
     expect(apiMock.updateTargetDate).toHaveBeenCalledWith('reminder-1', 'registration-1', '2026-09-16T01:00:00.000Z', 4)
   })
 })
+
+describe('登録者一覧の器（監査A2）', () => {
+  it('配列で名前が出る', async () => {
+    apiMock.list.mockResolvedValue({
+      success: true,
+      data: [
+        { ...registrant, id: 'reminder-enrollment-1', friendName: '高橋 直人' },
+        { ...registrant, id: 'reminder-enrollment-2', friendName: '前田 さくら' },
+      ],
+    })
+    await render()
+    expect(host.textContent).toContain('高橋 直人')
+    expect(host.textContent).toContain('前田 さくら')
+  })
+
+  it('旧偽APIの器（配列でない）では読み込み失敗になる', async () => {
+    apiMock.list.mockResolvedValue({ success: true, data: { items: [], total: 0, page: 1, limit: 20 } })
+    await render()
+    expect(host.textContent).toContain('登録者を読み込めませんでした')
+  })
+})

@@ -130,7 +130,12 @@ function FriendAddRunDetailInner() {
     )
   }
 
-  const failed = detail.actionRuns.filter((action) => action.status === 'failed')
+  /*
+   * 形の違う応答は空として扱う。そのまま回すと `actionRuns.filter` で
+   * 画面ごと落ちる（全ルート監査 A1、2026-09-25）。
+   */
+  const actionRuns = detail.actionRuns ?? []
+  const failed = actionRuns.filter((action) => action.status === 'failed')
   const displayName = detail.friend.displayName || '名前は未取得'
   const runStatus = detail.status === 'completed'
     ? { label: '完了', tone: 'success' as const }
@@ -156,11 +161,11 @@ function FriendAddRunDetailInner() {
       <section className="rounded-card border border-hairline bg-canvas p-4">
         <h2 className="font-bold">あわせて実行した処理</h2>
         <p className="mt-1 text-xs text-ink-faint">設定された処理を省略せず、実行順に表示します。</p>
-        {detail.actionRuns.length === 0 ? (
+        {actionRuns.length === 0 ? (
           <p className="mt-4 text-sm text-ink-secondary">実行した処理はありません。</p>
         ) : (
           <div className="mt-3 divide-y divide-hairline">
-            {detail.actionRuns.map((action, index) => {
+            {actionRuns.map((action, index) => {
               const message = safeErrorMessage(action.errorCode)
               return (
                 <div key={action.id} className="flex items-start justify-between gap-4 py-3">

@@ -103,7 +103,8 @@
 
 .reached {
   flex: 0 0 auto;
-  color: var(--color-accent-deep);
+  /* 数字は ink。緑は「正常」の意味だけに使う（全ルート監査、2026-09-25）。 */
+  color: var(--color-ink);
   font-size: var(--text-caption);
 }
 

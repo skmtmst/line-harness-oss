@@ -4957,11 +4957,15 @@ export const BOOKING_SETTINGS = {
 export const BOOKING_RESOURCES = [
   {
     id: 'resource-room-a', name: 'トリミングルームA', type: 'room', capacity: 1, isActive: true,
+    version: 1,
     businessHours: BOOKING_SETTINGS.businessHours, exceptions: BOOKING_SETTINGS.exceptions,
+    usage: { menuCount: 2, bookingCount: 5, exceptionCount: 1, referenced: true },
   },
   {
     id: 'resource-room-b', name: 'トリミングルームB', type: 'room', capacity: 1, isActive: true,
+    version: 1,
     businessHours: BOOKING_SETTINGS.businessHours, exceptions: [],
+    usage: { menuCount: 0, bookingCount: 0, exceptionCount: 0, referenced: false },
   },
 ]
 
@@ -6599,3 +6603,254 @@ export function commonVarChangeImpact(nextValue) {
     recommendedAction: 'fix_errors',
   }
 }
+
+/*
+ * 全ルート監査（2026-09-25）担当Aの欠け埋め。
+ * いずれも本物の Worker（`apps/worker/src/routes/`）が返す形。
+ * 画面側は変えず、偽APIの返しだけを実APIの形に直す。
+ */
+
+/** テスト送信先の候補（LINE連携済みのログインユーザー）。本物は配列。 */
+export const TEST_RECIPIENT_LOGIN_USERS = [
+  { id: 'friend-test-kenta', displayName: 'Kenta Kawano', pictureUrl: null, staffName: 'Kenta Kawano', sameAccount: true },
+  { id: 'friend-test-masato', displayName: 'Masato S.', pictureUrl: null, staffName: 'Masato S.', sameAccount: true },
+]
+
+/** 統括バナー生成のプリセット。本物は `BANNER_PRESETS` から `medium` を除いた形。 */
+export const HQ_BANNER_PRESETS = [
+  { key: 'line_rich_message', group: 'line', label: 'リッチメッセージ', note: '1040×1040。トークに大きく出る正方形の画像', apiSize: '1024x1024', targetWidth: 1040, targetHeight: 1040, aspectRatio: '1:1' },
+  { key: 'line_image_message', group: 'line', label: '画像メッセージ・クーポン', note: '1040×1040。画像だけを送るメッセージやクーポンの絵', apiSize: '1024x1024', targetWidth: 1040, targetHeight: 1040, aspectRatio: '1:1' },
+  { key: 'line_card', group: 'line', label: 'カードタイプ・カルーセル', note: '1200×795（1.51:1）。横にめくれるカードの画像', apiSize: '1536x1024', targetWidth: 1200, targetHeight: 795, aspectRatio: '1.51:1' },
+  { key: 'line_rich_menu_large', group: 'line', label: 'リッチメニュー（大）', note: '2500×1686。トーク画面の下に常時表示されるメニュー', apiSize: '1536x1024', targetWidth: 2500, targetHeight: 1686, aspectRatio: '3:2' },
+  { key: 'line_rich_menu_small', group: 'line', label: 'リッチメニュー（小）', note: '2500×843。高さが半分のメニュー', apiSize: '1536x1024', targetWidth: 2500, targetHeight: 843, aspectRatio: '3:1' },
+  { key: 'line_voom_square', group: 'line', label: 'LINE VOOM（正方形）', note: '1080×1080。VOOM の投稿画像', apiSize: '1024x1024', targetWidth: 1080, targetHeight: 1080, aspectRatio: '1:1' },
+  { key: 'line_voom_vertical', group: 'line', label: 'LINE VOOM（縦長）', note: '1080×1920。縦いっぱいの投稿', apiSize: '1024x1536', targetWidth: 1080, targetHeight: 1920, aspectRatio: '9:16' },
+  { key: 'sns_instagram_feed', group: 'sns', label: 'Instagram フィード（正方形）', note: '1080×1080', apiSize: '1024x1024', targetWidth: 1080, targetHeight: 1080, aspectRatio: '1:1' },
+  { key: 'sns_instagram_portrait', group: 'sns', label: 'Instagram フィード（縦長）', note: '1080×1350（4:5）', apiSize: '1024x1536', targetWidth: 1080, targetHeight: 1350, aspectRatio: '4:5' },
+  { key: 'sns_story', group: 'sns', label: 'ストーリー・リール・TikTok', note: '1080×1920（9:16）', apiSize: '1024x1536', targetWidth: 1080, targetHeight: 1920, aspectRatio: '9:16' },
+  { key: 'sns_x_post', group: 'sns', label: 'X（旧Twitter）投稿', note: '1200×675（16:9）', apiSize: '1536x1024', targetWidth: 1200, targetHeight: 675, aspectRatio: '16:9' },
+  { key: 'sns_ogp', group: 'sns', label: 'OGP・Facebook リンク画像', note: '1200×630（1.91:1）。リンクを共有したときに出る画像', apiSize: '1536x1024', targetWidth: 1200, targetHeight: 630, aspectRatio: '1.91:1' },
+  { key: 'sns_youtube_thumbnail', group: 'sns', label: 'YouTube サムネイル', note: '1280×720（16:9）', apiSize: '1536x1024', targetWidth: 1280, targetHeight: 720, aspectRatio: '16:9' },
+]
+
+/** 統括バナー生成の利用状況。本物は `usageSnapshot` の形。 */
+export const HQ_BANNER_USAGE = {
+  month: { used: 7, limit: 100, remaining: 93 },
+  today: { used: 1, limit: 4, remaining: 3 },
+  paused: false,
+  blocked: false,
+  blockedReason: null,
+  planState: 'active',
+  pausedReason: null,
+}
+
+/** 統括バナー生成の集計。本物は `getBannerStats` の形。 */
+export const HQ_BANNER_STATS = {
+  projects: { active: 2, archived: 1 },
+  deliveredImages: 18,
+  deliveredAccounts: 3,
+}
+
+/** 統括バナーのプロジェクト。本物は `serializeProject` の形。 */
+export const HQ_BANNER_PROJECTS = [
+  {
+    id: 'banner-project-qa-1', name: '秋のキャンペーン', description: '10月の友だち追加特典の案内',
+    isFavorite: true, archivedAt: null, imageCount: 2, runningCount: 0,
+    createdBy: '高橋 直人', createdAt: '2026-09-01T09:00:00+09:00', updatedAt: '2026-09-07T10:00:00+09:00',
+  },
+  {
+    id: 'banner-project-qa-2', name: 'リッチメニューの秋', description: null,
+    isFavorite: false, archivedAt: null, imageCount: 1, runningCount: 0,
+    createdBy: '佐々木 花', createdAt: '2026-09-03T09:00:00+09:00', updatedAt: '2026-09-06T10:00:00+09:00',
+  },
+]
+
+/** 統括バナーの画像。本物は `serializeImage` の形。 */
+export const HQ_BANNER_IMAGES = [
+  {
+    id: 'banner-image-qa-1', projectId: 'banner-project-qa-1', generationId: 'banner-generation-qa-1',
+    sequence: 1, source: 'generated', parentImageId: null, isFavorite: true,
+    createdBy: '高橋 直人', createdAt: '2026-09-07T10:00:00+09:00',
+    media: { id: 'banner-media-qa-1', filename: 'aki-campaign-1.png', mimeType: 'image/png', sizeBytes: 184320, width: 1040, height: 1040, url: 'https://example.invalid/banners/aki-campaign-1.png' },
+    generation: null,
+    deliveredAccountIds: ['visual-qa-account'],
+  },
+  {
+    id: 'banner-image-qa-2', projectId: 'banner-project-qa-1', generationId: 'banner-generation-qa-1',
+    sequence: 2, source: 'generated', parentImageId: null, isFavorite: false,
+    createdBy: '高橋 直人', createdAt: '2026-09-07T10:01:00+09:00',
+    media: { id: 'banner-media-qa-2', filename: 'aki-campaign-2.png', mimeType: 'image/png', sizeBytes: 172480, width: 1040, height: 1040, url: 'https://example.invalid/banners/aki-campaign-2.png' },
+    generation: null,
+    deliveredAccountIds: [],
+  },
+  {
+    id: 'banner-image-qa-3', projectId: 'banner-project-qa-2', generationId: null,
+    sequence: 1, source: 'uploaded', parentImageId: null, isFavorite: false,
+    createdBy: '佐々木 花', createdAt: '2026-09-06T10:00:00+09:00',
+    media: { id: 'banner-media-qa-3', filename: 'richmenu-aki.png', mimeType: 'image/png', sizeBytes: 512000, width: 2500, height: 1686, url: 'https://example.invalid/banners/richmenu-aki.png' },
+    generation: null,
+    deliveredAccountIds: [],
+  },
+]
+
+/** 然-NEN- 会員のランク設定。本物は `settingsResponse` の形。 */
+export const NEN_RANK_SETTINGS = {
+  ranks: [
+    { id: 'nen-rank-gold', key: 'gold', name: 'ゴールド', annualThresholdYen: 100000, mileRatePercent: 5, tagId: 'tag-nen-gold', tagName: 'NENゴールド', memberCount: 4 },
+    { id: 'nen-rank-silver', key: 'silver', name: 'シルバー', annualThresholdYen: 30000, mileRatePercent: 3, tagId: 'tag-nen-silver', tagName: 'NENシルバー', memberCount: 6 },
+    { id: 'nen-rank-bronze', key: 'bronze', name: 'ブロンズ', annualThresholdYen: 0, mileRatePercent: 1, tagId: 'tag-nen-bronze', tagName: 'NENブロンズ', memberCount: 2 },
+  ],
+  rules: {
+    yearStartMonth: 1, applyOnReach: 'immediate', keepUntil: 'next_year_end', countOrders: 'paid',
+    version: 3, syncStatus: 'synced', syncError: null, syncedAt: '2026-09-07T09:00:00+09:00', updatedAt: '2026-09-07T09:00:00+09:00',
+  },
+  milestones: [
+    { id: 'nen-milestone-1', thresholdYen: 100000, title: '10万円到達', benefitKind: null, benefitNote: null, notifyOnReach: true, reachedCount: 4 },
+  ],
+  kpis: { members: 12, annualTotalYen: 1840000, lifetimeTotalYen: 5620000, balanceTotal: 48200, usedThisMonth: 3200, byRank: { gold: 4, silver: 6, bronze: 2 } },
+}
+
+/** 然-NEN- 会員の一覧。本物は `GET /api/nen/members` の形。 */
+export const NEN_MEMBER_LIST = {
+  items: [
+    {
+      friendId: 'friend-1', name: '高橋 直人', pictureUrl: null, customerId: 'customer-1',
+      rankKey: 'gold', rankName: 'ゴールド', mileRatePercent: 5,
+      annualMilesYen: 128000, lifetimeMilesYen: 486000, mileBalance: 8200,
+      rankValidUntil: '2026-12-31', lastPurchasedAt: '2026-09-05T10:00:00+09:00', purchaseCount: 14,
+      petCount: 1, petNames: 'ももちゃん', syncedAt: '2026-09-07T09:00:00+09:00',
+    },
+    {
+      friendId: 'friend-2', name: '前田 さくら', pictureUrl: null, customerId: 'customer-2',
+      rankKey: 'silver', rankName: 'シルバー', mileRatePercent: 3,
+      annualMilesYen: 42000, lifetimeMilesYen: 96000, mileBalance: 3100,
+      rankValidUntil: '2026-12-31', lastPurchasedAt: '2026-09-02T10:00:00+09:00', purchaseCount: 6,
+      petCount: 1, petNames: 'そらくん', syncedAt: '2026-09-07T09:00:00+09:00',
+    },
+  ],
+  total: 2,
+  page: 1,
+  pageSize: 20,
+  kpis: { members: 12, annualTotalYen: 1840000, lifetimeTotalYen: 5620000, balanceTotal: 48200, usedThisMonth: 3200, byRank: { gold: 4, silver: 6, bronze: 2 } },
+  ranks: [
+    { key: 'gold', name: 'ゴールド', annualThresholdYen: 100000, mileRatePercent: 5 },
+    { key: 'silver', name: 'シルバー', annualThresholdYen: 30000, mileRatePercent: 3 },
+    { key: 'bronze', name: 'ブロンズ', annualThresholdYen: 0, mileRatePercent: 1 },
+  ],
+}
+
+/** 然-NEN- マイペットの一覧。本物は `GET /api/nen/pets` の形。 */
+export const NEN_PET_LIST = {
+  items: [
+    {
+      id: 'nen-pet-momo', name: 'もも', callName: 'ももちゃん', gender: 'female', animalType: 'dog',
+      breed: 'トイ・プードル', birthday: '2022-09-02', ageLabel: '4歳', weightKg: 3.2,
+      neutered: 'yes', activityLevel: 'normal', activityLabel: 'ふつう', productName: '鹿肉ミンチ',
+      feeding: { dailyKcal: 320, dailyGrams: 280, factorLabel: '避妊・去勢済み', stageLabel: '成犬', venisonGrams: 60, venisonKcal: 72, treatName: '鹿ジャーキー' },
+      imageUrl: null, updatedAt: '2026-09-06T10:00:00+09:00', weightStale: false,
+      owner: { friendId: 'friend-1', name: '高橋 直人', pictureUrl: null, customerId: 'customer-1' },
+    },
+    {
+      id: 'nen-pet-sora', name: 'そら', callName: 'そらくん', gender: 'male', animalType: 'cat',
+      breed: 'スコティッシュフォールド', birthday: '2024-08-28', ageLabel: '2歳', weightKg: 4.1,
+      neutered: 'unknown', activityLevel: 'low', activityLabel: 'おだやか', productName: null,
+      feeding: null,
+      imageUrl: null, updatedAt: '2026-08-20T10:00:00+09:00', weightStale: true,
+      owner: { friendId: 'friend-2', name: '前田 さくら', pictureUrl: null, customerId: 'customer-2' },
+    },
+  ],
+  total: 2,
+  page: 1,
+  pageSize: 20,
+  kpis: { total: 2, dogs: 1, cats: 1, newThisMonth: 0, computable: 1, staleWeight: 1 },
+  products: [{ id: 'feeding-product-1', name: '鹿肉ミンチ' }],
+  treatLimitPercent: 10,
+}
+
+/** 然-NEN- 健康日記の一覧。本物は `GET /api/nen/health` の形。 */
+export const NEN_HEALTH_LIST = {
+  items: [
+    {
+      pet: { id: 'nen-pet-momo', name: 'もも', callName: 'ももちゃん', animalType: 'dog', breed: 'トイ・プードル', ageLabel: '4歳', imageUrl: null },
+      owner: { friendId: 'friend-1', name: '高橋 直人', customerId: 'customer-1' },
+      lastLoggedOn: '2026-09-06', lastLoggedLabel: '昨日', daysSinceLast: 1,
+      count30d: 12, totalRecords: 48,
+      weightSeries: [3.1, 3.2, 3.2, 3.1, 3.2, 3.2, 3.3, 3.2],
+      latestWeightKg: 3.2, weightChangePercent: 3.2, latestStool: 'normal', latestAppetite: 'good',
+      changes: [], concerning: false,
+    },
+    {
+      pet: { id: 'nen-pet-sora', name: 'そら', callName: 'そらくん', animalType: 'cat', breed: 'スコティッシュフォールド', ageLabel: '2歳', imageUrl: null },
+      owner: { friendId: 'friend-2', name: '前田 さくら', customerId: 'customer-2' },
+      lastLoggedOn: null, lastLoggedLabel: '記録なし', daysSinceLast: null,
+      count30d: 0, totalRecords: 0,
+      weightSeries: [null, null, null, null, null, null, null, null],
+      latestWeightKg: null, weightChangePercent: null, latestStool: null, latestAppetite: null,
+      changes: [{ key: 'silent', label: '30日記録なし', tone: 'faint' }],
+      concerning: false,
+    },
+  ],
+  total: 2,
+  page: 1,
+  pageSize: 20,
+  kpis: { recordsThisWeek: 5, petsWithRecords: 1, petsTotal: 2, concerning: 0, silent30: 1 },
+}
+
+/** 友だち追加時配信の実行詳細。本物は `GET /api/friend-add-runs/:id` の形。 */
+export const FRIEND_ADD_RUN_DETAIL = {
+  id: 'friend-add-run-1', receivedAt: '2026-09-07T01:32:00.000Z', processedAt: '2026-09-07T01:32:00.800Z',
+  friend: { id: 'visual-friend-add-1', displayName: 'Kenta Kawano' }, friendKind: 'first_time',
+  attribution: { status: 'captured', routeId: 'route-shop', routeName: '店頭QR', reason: 'store-qr' },
+  rule: { id: 'rule-shop', name: '店頭QRの初回案内', versionId: 'rule-shop-v1', versionNumber: 1 },
+  configuredActions: [],
+  actionRuns: [
+    {
+      id: 'friend-add-action-run-1', stableId: 'action-welcome', type: 'send_message', status: 'completed',
+      attemptCount: 1, nextRetryAt: null, errorCode: null,
+      startedAt: '2026-09-07T01:32:00.100Z', completedAt: '2026-09-07T01:32:00.500Z', updatedAt: '2026-09-07T01:32:00.500Z',
+    },
+    {
+      id: 'friend-add-action-run-2', stableId: 'action-tag', type: 'add_tag', status: 'completed',
+      attemptCount: 1, nextRetryAt: null, errorCode: null,
+      startedAt: '2026-09-07T01:32:00.500Z', completedAt: '2026-09-07T01:32:00.800Z', updatedAt: '2026-09-07T01:32:00.800Z',
+    },
+  ],
+  status: 'completed',
+  errorCode: null,
+}
+
+/** 緊急停止の送信経路の台帳。本物は `GET /api/operations/send-paths` の形。 */
+export const OPERATION_SEND_PATHS = {
+  evaluatedAt: '2026-09-07T10:00:00+09:00',
+  capabilities: [
+    'broadcast_dispatch', 'scenario_dispatch', 'reminder_dispatch', 'automation_actions',
+    'auto_reply_dispatch', 'webhook_outgoing', 'ad_postback',
+  ],
+  problems: [],
+  paths: [
+    { id: 'broadcast-send', label: '一斉配信（予約・今すぐ送信・分割送信）', kind: 'scheduled', capability: 'broadcast_dispatch', state: 'running', excludedReason: null, note: '束と束のあいだで止まる。' },
+    { id: 'scenario-send', label: 'シナリオ配信', kind: 'scheduled', capability: 'scenario_dispatch', state: 'running', excludedReason: null, note: null },
+    { id: 'reminder-send', label: 'リマインダ配信', kind: 'scheduled', capability: 'reminder_dispatch', state: 'running', excludedReason: null, note: null },
+    { id: 'automation-actions', label: '自動化の処理', kind: 'auto', capability: 'automation_actions', state: 'running', excludedReason: null, note: null },
+    { id: 'auto-reply-send', label: '自動応答の送信', kind: 'auto', capability: 'auto_reply_dispatch', state: 'running', excludedReason: null, note: null },
+    { id: 'webhook-outgoing', label: 'Webhookの送信', kind: 'external', capability: 'webhook_outgoing', state: 'running', excludedReason: null, note: null },
+    { id: 'ad-postback', label: '広告の成果通知', kind: 'external', capability: 'ad_postback', state: 'running', excludedReason: null, note: null },
+    { id: 'manual-reply', label: '1対1の手動返信', kind: 'manual', capability: null, state: null, excludedReason: '担当者が手で送る1対1の返信は止めない', note: null },
+  ],
+}
+
+/** リマインダの登録者。本物は `GET /api/reminders/:id/registrants` の配列。 */
+export const REMINDER_REGISTRANTS = [
+  {
+    id: 'reminder-enrollment-1', friendId: 'friend-1', friendName: '高橋 直人', targetDate: '2026-09-10',
+    status: 'active', reminderVersionId: 'reminder-version-1', sourceKind: 'manual',
+    createdAt: '2026-09-01T09:00:00+09:00', updatedAt: '2026-09-01T09:00:00+09:00',
+    cancelledAt: null, lockVersion: 1,
+  },
+  {
+    id: 'reminder-enrollment-2', friendId: 'friend-2', friendName: '前田 さくら', targetDate: '2026-09-12',
+    status: 'active', reminderVersionId: 'reminder-version-1', sourceKind: 'form',
+    createdAt: '2026-09-02T09:00:00+09:00', updatedAt: '2026-09-02T09:00:00+09:00',
+    cancelledAt: null, lockVersion: 1,
+  },
+]

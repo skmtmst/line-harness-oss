@@ -105,7 +105,6 @@ function ReservedBroadcastContent() {
     if (!id) {
       if (!isCurrent()) return
       setBroadcast(null)
-      setError('予約した配信を特定できませんでした。')
       setLoading(false)
       return
     }
@@ -181,6 +180,20 @@ function ReservedBroadcastContent() {
     }
   }, [load])
 
+  /*
+   * `?id=` なしで開くと読み込みが始まらない。対象未指定は失敗ではないので、
+   * 落とさず予定へ戻して選び直させる（全ルート監査 A2、2026-09-25）。
+   */
+  if (!id) {
+    return (
+      <ListState
+        kind="empty"
+        title="予約した配信が指定されていません"
+        description="配信予定から、確認する予約を選び直してください。"
+        action={<Button href="/broadcasts">配信予定へ戻る</Button>}
+      />
+    )
+  }
   if (accountLoading || loading) {
     return <ListState kind="loading" title="予約結果を確認しています" />
   }

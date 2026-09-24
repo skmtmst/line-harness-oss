@@ -130,6 +130,18 @@ export interface NenHealthSummaryData {
   labels: { stool: Record<string, string>; appetite: Record<string, string> }
 }
 
+/**
+ * 一覧の頭数表示。0頭のときは範囲を付けず「0頭」だけにする。
+ * 範囲の計算に `pageSize` が要るが、取れていないときに `NaN` を
+ * 出さない（全ルート監査 A3、2026-09-25）。
+ */
+export function headCountLabel(total: number, page: number, pageSize: number): string {
+  if (total === 0) return '0頭'
+  const from = (page - 1) * pageSize + 1
+  const to = Math.min(total, page * pageSize)
+  return `${total.toLocaleString('ja-JP')}頭中 ${from}〜${to}頭`
+}
+
 function qs(params: Record<string, string | number | undefined>): string {
   const out = new URLSearchParams()
   for (const [key, value] of Object.entries(params)) {
