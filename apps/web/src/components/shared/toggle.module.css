@@ -11,10 +11,14 @@
   width: 36px; /* width: 36 */
   height: 20px; /* height: 20 */
   border-radius: var(--radius-pill); /* cornerRadius: $radius-full */
-  background: var(--color-step-idle);
+  /*
+   * ★V7（2026-09-24、better-accessibility：部品の見分けは 3:1）。オフの地は $step-idle（#eef0f3）で
+   * 白い地と 1.1:1 しかなく、切替があること自体が見えなかった。ink-faint を 72% にして約 3.2:1。
+   */
+  background: color-mix(in srgb, var(--color-ink-faint) 72%, var(--color-canvas));
   border: none;
   cursor: pointer;
-  transition: background-color 120ms ease-out;
+  transition: background-color var(--motion-fast) var(--motion-ease-out);
   flex: none;
 }
 
@@ -27,11 +31,12 @@
   height: 16px;
   border-radius: var(--radius-pill);
   background: var(--color-canvas); /* fill: $canvas */
-  transition: transform 120ms ease-out;
+  transition: transform var(--motion-fast) var(--motion-ease-out);
 }
 
 .on {
-  background: var(--color-accent); /* fill: $accent */
+  /* ★V7：明るい緑は白い地と 2.26:1。濃い緑で 5.44:1。 */
+  background: var(--color-accent-deep); /* fill: $accent-deep */
 }
 
 .on::after {

@@ -15,9 +15,10 @@ describe('機能設定の添付デザイン', () => {
     expect(source).toContain('上へ移動')
     expect(source).toContain('下へ移動')
     expect(source).toContain('function LockIcon()')
-    expect(source).toContain('item.required && <span')
+    // ★V7（2026-09-24）：消せない項目は「必須」の札（鍵の印つき）だけ。押せない切替は出さない。
+    expect(source).toContain('{item.required ? (')
     expect(source).toContain("import Toggle from '@/components/shared/toggle'")
-    expect(source).toContain('locked={item.required}')
+    expect(source).not.toContain('locked={item.required}')
     expect(source).not.toContain('function Switch(')
     expect(source).not.toMatch(/#[0-9a-fA-F]{3,8}/)
   })
