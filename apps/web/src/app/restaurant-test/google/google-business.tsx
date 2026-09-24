@@ -18,6 +18,7 @@ import { Tabs } from '@/components/shared/tabs'
 import { TextArea } from '@/components/shared/text-field'
 import { ActionCell, DataTable, NameCell, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { ApiError, api } from '@/lib/api'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import {
   restaurantGoogleApi,
   type GoogleConnectionData,
@@ -69,7 +70,7 @@ function formatDate(value: string | null | undefined): string {
 
 function Stars({ rating }: { rating: number }) {
   return (
-    <span className="text-warning inline-flex items-center gap-0.5" aria-label={`評価 ${rating}／5`}>
+    <span className="text-warning inline-flex items-center gap-1" aria-label={`評価 ${rating}／5`}>
       {[1, 2, 3, 4, 5].map((n) => (
         <Star key={n} size={14} fill={n <= rating ? 'currentColor' : 'none'} strokeWidth={1.5} className={n <= rating ? '' : 'text-ink-faint'} />
       ))}
@@ -186,7 +187,7 @@ function GoogleBusinessInner() {
 
   // 口コミの深い画面（下書き・公開確認）はタブ行を出さず、戻るボタンで一覧へ戻る。
   if (tab === 'reviews' && connected && view === 'draft' && reviewId) {
-    return <ReviewDraftScreen accountId={selectedAccountId} reviewId={reviewId} data={data} canPublish={canPublish} onBack={() => go({ tab: 'reviews' })} onPublished={() => { void load() }} />
+    return <ReviewDraftScreen accountId={selectedAccountId} reviewId={reviewId} data={data} canPublish={canPublish} backHref="/restaurant-test/google?tab=reviews" onPublished={() => { void load() }} />
   }
 
   return (
@@ -417,7 +418,7 @@ function ReviewsTab({ accountId, data, canPublish, onOpen, onSynced }: { account
         <h2 className="text-lg font-bold">口コミ</h2>
         {data.summary.newCount > 0 ? <StatusBadge tone="success">新着 {data.summary.newCount}件</StatusBadge> : null}
         {connection.averageRating !== null && connection.averageRating !== undefined ? (
-          <span className="inline-flex items-center gap-1.5 text-sm">
+          <span className="inline-flex items-center gap-2 text-sm">
             <Star size={16} className="text-warning" fill="currentColor" />
             <span className="font-bold">総合評価 {connection.averageRating.toFixed(1)}</span>
             <span className="text-ink-faint text-xs">（Google集計・{connection.totalReviewCount ?? '—'}件）</span>
@@ -489,7 +490,7 @@ function ReviewsTab({ accountId, data, canPublish, onOpen, onSynced }: { account
 
 // ---------- AI返信下書き（GB-3）＋公開確認（GB-16） ----------
 
-function ReviewDraftScreen({ accountId, reviewId, data, canPublish, onBack, onPublished }: { accountId: string; reviewId: string; data: GoogleConnectionData; canPublish: boolean; onBack: () => void; onPublished: () => void }) {
+function ReviewDraftScreen({ accountId, reviewId, data, canPublish, backHref, onPublished }: { accountId: string; reviewId: string; data: GoogleConnectionData; canPublish: boolean; backHref: string; onPublished: () => void }) {
   const [review, setReview] = useState<GoogleReview | null>(null)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
@@ -502,6 +503,9 @@ function ReviewDraftScreen({ accountId, reviewId, data, canPublish, onBack, onPu
   const [checked, setChecked] = useState(false)
   const [conflict, setConflict] = useState<string | null>(null)
   const [done, setDone] = useState<{ comment: string } | null>(null)
+  // 未保存の下書きがあるまま一覧や他画面へ移ろうとしたら止める（DETAIL-04系）。
+  const dirty = review !== null && done === null && review.replyStatus !== 'published' && review.replyStatus !== 'replied' && text !== (review.replyDraft ?? '')
+  const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty, busy: busy !== null })
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -576,7 +580,7 @@ function ReviewDraftScreen({ accountId, reviewId, data, canPublish, onBack, onPu
   }
 
   if (loading) return <ListState kind="loading" title="口コミを読み込んでいます" />
-  if (loadError || !review) return <ListState kind="error" title="口コミを表示できませんでした" description={loadError} onRetry={() => void load()} action={<Button onClick={onBack}>口コミ一覧へ戻る</Button>} />
+  if (loadError || !review) return <ListState kind="error" title="口コミを表示できませんでした" description={loadError} onRetry={() => void load()} action={<Button href={backHref}>口コミ一覧へ戻る</Button>} />
 
   const alreadyReplied = review.replyStatus === 'published' || review.replyStatus === 'replied' || Boolean(done)
   const pendingConfirm = review.replyStatus === 'pending_confirm'
@@ -621,7 +625,7 @@ function ReviewDraftScreen({ accountId, reviewId, data, canPublish, onBack, onPu
 
   return (
     <div data-design-node="TJPK5" className="text-ink min-w-0">
-      <div className="mb-4"><Button onClick={onBack}>口コミ一覧へ戻る</Button></div>
+      <div className="mb-4"><Button href={backHref}>口コミ一覧へ戻る</Button></div>
       {done ? <NoteBar className="mb-4">Googleに返信を送信しました。反映を確認できるまで「反映確認中」と表示します。</NoteBar> : null}
       {conflict !== null ? <NoteBar tone="danger" className="mb-4">別の担当者がすでに返信しています。表示されている返信：「{conflict}」</NoteBar> : null}
       {pendingConfirm && !done ? <NoteBar tone="warn" className="mb-4">前回の送信結果を確認できていません。「この内容で返信する」を押すと、先にGoogle側の状態を照合してから送信します。</NoteBar> : null}
@@ -668,7 +672,7 @@ function ReviewDraftScreen({ accountId, reviewId, data, canPublish, onBack, onPu
         <div className="flex flex-col gap-4">
           <Card>
             <CardHeader title="公開前の確認" />
-            <ul className="text-ink-secondary flex flex-col gap-1.5 text-xs leading-relaxed">
+            <ul className="text-ink-secondary flex flex-col gap-2 text-xs leading-relaxed">
               <li>☑ 事実と異なる説明や、約束できない対応がない</li>
               <li>☑ 個人情報・予約内容・問い合わせ履歴を含まない</li>
               <li>☑ 返信先：{data.connection.locationTitle ?? data.store.name} ／ {review.reviewerDisplayName ?? '匿名'}さんの口コミ</li>
@@ -683,6 +687,15 @@ function ReviewDraftScreen({ accountId, reviewId, data, canPublish, onBack, onPu
           ) : null}
         </div>
       </div>
+      <ConfirmDialog
+        open={leaveTarget !== null}
+        title="保存していない下書きがあります"
+        description="このまま移動すると、返信文の変更は失われます。下書き保存をしてから移動するか、保存せずに移動してください。"
+        confirmLabel="保存せずに移動"
+        cancelLabel="編集を続ける"
+        onConfirm={confirmLeave}
+        onCancel={cancelLeave}
+      />
     </div>
   )
 }
