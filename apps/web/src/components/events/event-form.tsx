@@ -272,12 +272,12 @@ export default function EventForm({ accountId, eventId }: EventFormProps) {
           </p>
         </div>
         {eventId && (
-          <a
+          <Button
             href={`/events/bookings?id=${eventId}`}
-            className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control shrink-0 border px-4 py-2 text-sm font-medium"
+            className="shrink-0"
           >
             予約を確認
-          </a>
+          </Button>
         )}
       </div>
 
