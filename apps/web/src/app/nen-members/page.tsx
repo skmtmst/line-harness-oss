@@ -13,6 +13,7 @@ import {
 } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import Dialog from '@/components/shared/dialog'
+import Checkbox from '@/components/shared/checkbox'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import { Tabs } from '@/components/shared/tabs'
@@ -422,10 +423,9 @@ export default function PhotoReviewsPage() {
   const pendingPhotos = photos.filter((photo) => text(photo.status) === 'pending')
   const selectedPendingPhotos = pendingPhotos.filter((photo) => selectedPhotoIds.includes(text(photo.id)))
   /*
-   * 選択0件では「まとめて通す」「まとめて戻す」の両方を無効にする（Issue #666）。
-   * 0件で押せる形にしておくと、確認窓が「0枚をまとめて通す」と開いてしまう。
+   * まとめ操作の帯自体を0件では出さないため、0件で押せる事故（Issue #666）は
+   * 起きない。残る無効条件は「注意候補あり」「処理中」だけ。
    */
-  const bulkSelectionEmpty = selectedPendingPhotos.length === 0
   const selectedPhotosAreLowRisk = selectedPendingPhotos.length > 0
     && selectedPendingPhotos.every((photo) => ['safe', 'none', 'low'].includes(text(photo.latest_risk_flag)))
   // いま見ている札の一覧を基準にする。審査待ち基準だと、通した・戻した
@@ -754,7 +754,8 @@ export default function PhotoReviewsPage() {
   }
 
   return <>
-    <div className="mx-auto flex max-w-full flex-col gap-4 p-4 sm:p-6">
+    {/* 外枠の余白は共通シェルが持つ（上14・左右40・下32）。ここで p-6 を足すと左端がずれる。 */}
+    <div className="flex min-w-0 flex-col gap-4">
       {/* 審査の結果を読み上げにも届ける（V6R-S3-e）。 */}
       {notice && <div role="status" aria-live="polite" className="rounded-control border border-accent-border bg-accent-soft px-4 py-3 text-sm text-accent-deep">{notice}</div>}
       {bulkFailed.length > 0 && <div className="rounded-control border border-hairline bg-canvas px-4 py-3">
@@ -820,23 +821,23 @@ export default function PhotoReviewsPage() {
           <p className="mt-1 text-2xl font-bold text-ink">
             <MetricValue value={reviewedStatsReady ? reviewedIn30Days : null} unit="枚" />
           </p>
-          <p className="mt-0.5 text-xs text-ink-faint">読み込んだ写真の審査日時から集計</p>
+          <p className="mt-0.5 text-xs text-ink-faint">{reviewedStatsReady ? (reviewedIn30Days > 0 ? '通した・戻した合計' : 'この30日に見た写真はまだありません') : 'まだ記録がありません'}</p>
         </div>
         <div className="rounded-card border border-hairline bg-canvas p-4">
           <p className="text-xs font-semibold text-ink-secondary">1枚にかかる時間</p>
           <p className="mt-1 text-2xl font-bold text-ink"><MetricValue prefix="平均" text={averageReviewDurationText(reviewMetrics?.averageReviewMinutes)} /></p>
-          <p className="mt-0.5 text-xs text-ink-faint">審査を始めてから保存するまでの平均</p>
+          <p className="mt-0.5 text-xs text-ink-faint">{reviewMetrics?.averageReviewMinutes != null ? '審査を始めてから保存するまでの平均' : 'まだ記録がありません'}</p>
         </div>
         <div className="rounded-card border border-hairline bg-canvas p-4">
           <p className="text-xs font-semibold text-ink-secondary">気をつけたい写真</p>
           <p className="mt-1 text-2xl font-bold text-ink"><MetricValue value={reviewMetrics ? reviewMetrics.attentionCount : null} unit="枚" /></p>
-          <p className="mt-0.5 text-xs text-ink-faint">自動判定は確認順の補助だけに使います</p>
+          <p className="mt-0.5 text-xs text-ink-faint">{reviewMetrics ? '自動判定は確認順の補助だけに使います' : 'まだ記録がありません'}</p>
         </div>
       </KpiCollapse>
 
-      <div className="rounded-control bg-info-bg px-4 py-3 text-sm font-medium text-info">
+      <p className="rounded-card bg-info-bg px-4 py-3 text-xs leading-relaxed text-ink-secondary">
         通す・戻すを押した時点で、投稿者へお礼や直してほしい点が届きます。戻すときは理由を選び、送る文章を確認できます。
-      </div>
+      </p>
 
       {/*
         * 名前・ペット名・コメントの絞り込み（#931 N-308）。
@@ -871,16 +872,17 @@ export default function PhotoReviewsPage() {
       </form>
 
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-2">
+        {/*
+         * まとめ操作の帯は1枚以上選んだときだけ出す。0件で「0枚を選択中」と
+         * 押せないボタンを並べると、確認窓が「0枚をまとめて通す」と開く
+         * 事故（Issue #666）の温床になる。選ぶ前は何も出さない。
+         */}
+        {selectedPendingPhotos.length > 0 && <div className="flex flex-wrap items-center gap-2">
           <span className="rounded-control bg-accent-soft px-3 py-2 text-sm font-semibold text-accent-deep">{selectedPendingPhotos.length}枚を選択中</span>
-          {/*
-           * 0件選択では両方とも無効＋理由を添える（Issue #666）。緑の主ボタンは
-           * 薄くなっても「押せそう」に見えるため、無効の理由を文字でも出す。
-           */}
-          <Button variant="primary" disabled={bulkSelectionEmpty || !selectedPhotosAreLowRisk || bulkReviewing} title={bulkSelectionEmpty ? 'まとめて処理する写真を選んでください' : !selectedPhotosAreLowRisk ? 'まとめて通せるのは、注意候補がない写真だけです' : undefined} onClick={() => setBulkApproveOpen(true)}>{bulkReviewing ? '処理中...' : 'まとめて通す'}</Button>
-          <Button variant="secondary" disabled={bulkSelectionEmpty || bulkReviewing} title={bulkSelectionEmpty ? 'まとめて処理する写真を選んでください' : undefined} onClick={() => setBulkReturnOpen(true)}>まとめて戻す</Button>
-          <span className="text-xs text-ink-faint">{bulkSelectionEmpty ? 'まとめて処理するには、先に写真を選んでください' : '審査待ちの写真だけをまとめて処理します'}</span>
-        </div>
+          <Button variant="primary" disabled={!selectedPhotosAreLowRisk || bulkReviewing} title={!selectedPhotosAreLowRisk ? 'まとめて通せるのは、注意候補がない写真だけです' : undefined} onClick={() => setBulkApproveOpen(true)}>{bulkReviewing ? '処理中...' : 'まとめて通す'}</Button>
+          <Button variant="secondary" disabled={bulkReviewing} onClick={() => setBulkReturnOpen(true)}>まとめて戻す</Button>
+          <span className="text-xs text-ink-faint">審査待ちの写真だけをまとめて処理します</span>
+        </div>}
         <div className="flex items-center gap-2">
           <Button variant="secondary" disabled title="並べて見るは一覧の表示形式の追加口を接続後に使えます">▦ 並べて見る</Button>
           <Button
@@ -913,7 +915,7 @@ export default function PhotoReviewsPage() {
                 style={Number(photo.display_rotation) ? { transform: `rotate(${Number(photo.display_rotation)}deg)` } : undefined}
               />
               : <div className="grid h-full w-full place-items-center text-xs font-bold text-ink-faint">画像を表示できません</div>}
-            <label className="absolute left-2 top-2 flex cursor-pointer items-center gap-1.5 rounded-control border border-hairline bg-canvas px-2 py-1 text-xs font-semibold text-ink-secondary"><input type="checkbox" checked={selected} onChange={() => togglePhotoSelection(photoId)} aria-label={`${photoPetDisplayName(photo.pet_name)}の写真を選ぶ`} className="accent-accent" /><span>選ぶ</span></label>
+            <span className="absolute left-2 top-2 rounded-control border border-hairline bg-canvas px-2 py-1 text-xs font-semibold text-ink-secondary"><Checkbox checked={selected} onCheckedChange={() => togglePhotoSelection(photoId)} aria-label={`${photoPetDisplayName(photo.pet_name)}の写真を選ぶ`}>選ぶ</Checkbox></span>
           </div>
           <div className="p-4">
             <div className="flex items-start justify-between gap-3"><div><p className="font-bold text-ink">{photoPetDisplayName(photo.pet_name)}</p><p className="mt-1 text-xs text-ink-faint">{text(photo.owner_name) || '名前未取得'}・{formatPhotoReceivedAt(photo.created_at)}</p></div><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${photo.status === 'pending' ? 'bg-status-warn-soft text-status-warn-deep' : photo.status === 'adopted' ? 'bg-accent-soft text-accent-deep' : 'bg-canvas-sunken text-ink-faint'}`}>{photo.status === 'pending' ? '審査待ち' : photo.status === 'adopted' ? '通しました' : '戻しました'}</span></div>
