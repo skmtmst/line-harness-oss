@@ -30,6 +30,7 @@ export type GoogleConnectionData = {
   writeEnabled: boolean
   oauthConfigured: boolean
   aiAvailable: boolean
+  permissions: { canManageConnection: boolean; canPublishReply: boolean }
 }
 
 export type GoogleReview = {

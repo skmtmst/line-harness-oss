@@ -1,8 +1,9 @@
 'use client'
 
 import { Suspense, useCallback, useEffect, useState } from 'react'
+import type { KeyboardEvent } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { ExternalLink, RefreshCw, Sparkles, Star } from 'lucide-react'
+import { ExternalLink, Link2, RefreshCw, Sparkles, Star } from 'lucide-react'
 import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import Button from '@/components/shared/button'
@@ -17,7 +18,7 @@ import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-ba
 import { Tabs } from '@/components/shared/tabs'
 import { TextArea } from '@/components/shared/text-field'
 import { ActionCell, DataTable, NameCell, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
-import { ApiError, api } from '@/lib/api'
+import { ApiError } from '@/lib/api'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import {
   restaurantGoogleApi,
@@ -108,17 +109,7 @@ function GoogleBusinessInner() {
   const [data, setData] = useState<GoogleConnectionData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [role, setRole] = useState<'owner' | 'admin' | 'staff' | 'viewer' | null>(null)
   const [banner, setBanner] = useState<{ tone: 'info' | 'warn' | 'danger'; text: string } | null>(null)
-
-  useEffect(() => {
-    let active = true
-    void api.staff.me().then((response) => {
-      if (!active) return
-      setRole(response.success ? (response.data.role as 'owner' | 'admin' | 'staff' | 'viewer') : null)
-    }).catch(() => undefined)
-    return () => { active = false }
-  }, [])
 
   const load = useCallback(async () => {
     if (!selectedAccountId) { setData(null); setLoading(false); return }
@@ -174,8 +165,8 @@ function GoogleBusinessInner() {
   }
   if (error || !data) return <ListState kind="error" title="Googleビジネスを表示できませんでした" description={error} onRetry={() => void load()} />
 
-  const canPublish = role === 'owner' || role === 'admin'
-  const canManageConnection = role === 'owner'
+  const canPublish = data.permissions.canPublishReply
+  const canManageConnection = data.permissions.canManageConnection
 
   const tabItems = (Object.keys(TAB_LABELS) as TabKey[]).map((key) => ({
     label: TAB_LABELS[key],
@@ -191,24 +182,63 @@ function GoogleBusinessInner() {
   }
 
   return (
-    <div className="text-ink min-w-0">
-      <div className="mb-4">
-        <Tabs
-          items={tabItems}
-          actions={connected && data.connection.locationMapsUrl ? (
-            <a href={data.connection.locationMapsUrl} target="_blank" rel="noreferrer" className="text-action inline-flex items-center gap-1 text-sm font-semibold">
-              Google マップで見る <ExternalLink size={14} />
-            </a>
-          ) : null}
-        />
+    <section className="border-hairline bg-canvas text-ink min-w-0 overflow-hidden rounded-card border" data-design-node={tab === 'settings' ? 'p9ALPi' : 'lM0zP'}>
+      <GoogleBusinessTabs items={tabItems} mapsUrl={connected ? data.connection.locationMapsUrl : null} />
+      <div className="border-hairline border-t p-5 sm:p-6 lg:p-8">
+        {banner ? <NoteBar tone={banner.tone} className="mb-4" action={<button type="button" className="text-sm font-semibold" onClick={() => setBanner(null)}>閉じる</button>}>{banner.text}</NoteBar> : null}
+        {tab === 'settings' ? (
+          <SettingsTab accountId={selectedAccountId} data={data} canManage={canManageConnection} onChanged={() => { void load() }} />
+        ) : (
+          <ReviewsTab accountId={selectedAccountId} data={data} canPublish={canPublish} onOpen={(id) => go({ tab: 'reviews', view: 'draft', id })} onSynced={() => { void load() }} />
+        )}
       </div>
-      {banner ? <NoteBar tone={banner.tone} className="mb-4" action={<button type="button" className="text-sm font-semibold" onClick={() => setBanner(null)}>閉じる</button>}>{banner.text}</NoteBar> : null}
-      {tab === 'settings' ? (
-        <SettingsTab accountId={selectedAccountId} data={data} canManage={canManageConnection} onChanged={() => { void load() }} />
-      ) : (
-        <ReviewsTab accountId={selectedAccountId} data={data} canPublish={canPublish} onOpen={(id) => go({ tab: 'reviews', view: 'draft', id })} onSynced={() => { void load() }} />
-      )}
-    </div>
+    </section>
+  )
+}
+
+function GoogleBusinessTabs({ items, mapsUrl }: { items: Array<{ label: string; current?: boolean; count?: number; disabled?: boolean; onClick: () => void }>; mapsUrl?: string | null }) {
+  const moveFocus = (event: KeyboardEvent<HTMLElement>) => {
+    const { key } = event
+    if (key !== 'ArrowRight' && key !== 'ArrowLeft' && key !== 'Home' && key !== 'End') return
+    const tabs = Array.from(event.currentTarget.querySelectorAll<HTMLElement>('[role="tab"]:not(:disabled)'))
+    const current = tabs.indexOf(document.activeElement as HTMLElement)
+    if (current < 0) return
+    event.preventDefault()
+    const next = key === 'Home'
+      ? 0
+      : key === 'End'
+        ? tabs.length - 1
+        : key === 'ArrowRight'
+          ? (current + 1) % tabs.length
+          : (current - 1 + tabs.length) % tabs.length
+    tabs[next]?.focus()
+  }
+
+  return (
+    <nav aria-label="Googleビジネスの機能" aria-orientation="horizontal" className="flex items-center gap-2 overflow-x-auto px-5 py-2.5" role="tablist" onKeyDown={moveFocus} style={{ minHeight: 58 }}>
+      {items.map((item) => (
+        <button
+          key={item.label}
+          type="button"
+          role="tab"
+          aria-selected={item.current ?? false}
+          aria-disabled={item.disabled || undefined}
+          disabled={item.disabled}
+          tabIndex={item.current ? 0 : -1}
+          onClick={item.onClick}
+          className={`h-9 shrink-0 rounded-control border px-3.5 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-status-info disabled:cursor-not-allowed disabled:opacity-40 ${
+            item.current
+              ? 'bg-accent-soft text-accent-deep'
+              : 'bg-canvas text-ink hover:bg-canvas-sunken'
+          }`}
+          style={{ borderColor: item.current ? 'transparent' : 'var(--color-hairline)' }}
+        >
+          {item.label}{item.count === undefined ? null : ` ${item.count}`}
+        </button>
+      ))}
+      <span className="grow" />
+      {mapsUrl ? <a href={mapsUrl} target="_blank" rel="noreferrer" className="text-status-info text-label inline-flex shrink-0 items-center gap-1 font-semibold">Google マップで見る <ExternalLink size={13} /></a> : null}
+    </nav>
   )
 }
 
@@ -263,19 +293,32 @@ function SettingsTab({ accountId, data, canManage, onChanged }: { accountId: str
 
   if (connection.status === 'disconnected') {
     return (
-      <div data-design-node="p9ALPi">
-        <NoteBar className="mb-4">このLINEアカウントとGoogleビジネスプロフィールを接続します。接続する店舗は、1つのLINEアカウントにつき1店舗です。</NoteBar>
-        <Card>
-          <CardHeader title="Googleアカウントを接続" meta={<StatusBadge tone="neutral">未接続</StatusBadge>} />
-          <p className="text-ink-secondary mb-3 text-sm leading-relaxed">店舗を管理しているGoogleアカウントでログインしてください。初回接続時に、Googleで管理できる店舗から接続先を1店舗確認します。接続後は、このLINEアカウントの店舗だけを表示します。</p>
-          <p className="text-ink-faint mb-4 text-xs leading-relaxed">口コミへの返信下書きを作るとき、口コミの本文と評価だけをAI（Workers AI）に送ります。投稿者の名前や個人情報は送りません。</p>
-          {!data.oauthConfigured ? <NoteBar tone="warn" className="mb-3">この環境にはGoogle接続の設定がありません。運営に連絡してください。</NoteBar> : null}
-          {actionError ? <NoteBar tone="danger" className="mb-3">{actionError}</NoteBar> : null}
-          <div className="flex gap-2">
-            <Button variant="primary" onClick={() => void startConnect()} disabled={busy || !canManage || !data.oauthConfigured}>Googleアカウントを接続</Button>
-          </div>
-          {!canManage ? <p className="text-ink-faint mt-2 text-xs">接続の管理は統括だけができます。</p> : null}
-        </Card>
+      <div data-design-node="p9ALPi" className="flex flex-col gap-6">
+        <header className="space-y-1.5">
+          <h2 className="text-metric leading-relaxed font-bold">設定</h2>
+          <p className="text-ink-secondary text-sm leading-relaxed">このLINEアカウントとGoogleビジネスプロフィールを接続します。</p>
+        </header>
+        <div className="flex justify-center pt-4 sm:pt-8">
+          <section className="border-hairline bg-canvas flex w-full flex-col gap-5 rounded-card border p-5 sm:p-8" style={{ maxWidth: 680 }} aria-labelledby="google-connect-title">
+            <div className="flex items-center gap-4">
+              <span className="bg-accent-soft flex h-12 w-12 shrink-0 items-center justify-center rounded-card text-accent-deep" aria-hidden="true"><Link2 size={24} /></span>
+              <div className="min-w-0">
+                <h3 id="google-connect-title" className="text-xl leading-relaxed font-bold">Googleアカウントを接続</h3>
+                <p className="text-ink-faint text-label leading-relaxed">未接続</p>
+              </div>
+            </div>
+            <p className="text-ink-secondary whitespace-pre-line text-sm leading-relaxed">{'店舗を管理しているGoogleアカウントでログインしてください。\n接続する店舗は、1つのLINEアカウントにつき1店舗です。'}</p>
+            {!data.oauthConfigured ? <NoteBar tone="warn">この環境にはGoogle接続の設定がありません。運営に連絡してください。</NoteBar> : null}
+            {actionError ? <NoteBar tone="danger">{actionError}</NoteBar> : null}
+            <div>
+              <Button className="min-h-11 px-5" variant="primary" onClick={() => void startConnect()} disabled={busy || !canManage || !data.oauthConfigured}><Link2 size={17} />Googleアカウントを接続</Button>
+            </div>
+            <div className="border-hairline border-t pt-5">
+              <p className="text-ink-secondary text-label whitespace-pre-line leading-relaxed">{'初回接続時に、Googleで管理できる店舗から接続先を1店舗確認します。\n接続後は、このLINEアカウントの店舗だけを表示します。'}</p>
+              {!canManage ? <p className="text-ink-faint mt-3 text-xs">Googleアカウントの接続は、統括の管理者へ依頼してください。</p> : null}
+            </div>
+          </section>
+        </div>
       </div>
     )
   }
@@ -315,27 +358,40 @@ function SettingsTab({ accountId, data, canManage, onChanged }: { accountId: str
       : <StatusBadge tone="danger">権限なし</StatusBadge>
 
   return (
-    <div data-design-node="O4GMOL">
-      <NoteBar className="mb-4">このLINEアカウントに接続しているGoogleアカウントを確認できます。</NoteBar>
+    <div data-design-node="O4GMOL" className="flex flex-col gap-6">
+      <header className="space-y-1.5">
+        <h2 className="text-metric leading-relaxed font-bold">設定</h2>
+        <p className="text-ink-secondary text-sm leading-relaxed">このLINEアカウントに接続しているGoogleアカウントを確認できます。</p>
+      </header>
       {connection.status === 'expired' ? <NoteBar tone="danger" className="mb-4">Googleとの接続を確認してください。認可が切れています。店舗を管理するGoogleアカウントで再接続してください。保存中の下書きは残っています。</NoteBar> : null}
       {connection.status === 'no_permission' ? <NoteBar tone="danger" className="mb-4">この店舗を操作する権限がありません。接続済み店舗の管理権限をGoogle側で確認してください。</NoteBar> : null}
-      <Card>
-        <CardHeader title="Googleアカウント接続済み" meta={statusBadge} />
-        <dl className="grid grid-cols-1 gap-x-8 gap-y-2 text-sm sm:grid-cols-4">
-          <dt className="text-ink-secondary sm:col-span-1">LINEアカウント</dt><dd className="font-semibold sm:col-span-3">{data.store.name}</dd>
-          <dt className="text-ink-secondary sm:col-span-1">接続店舗</dt><dd className="font-semibold sm:col-span-3">{connection.locationTitle ?? '—'}</dd>
-          <dt className="text-ink-secondary sm:col-span-1">Googleアカウント</dt><dd className="font-semibold sm:col-span-3">{connection.googleAccountEmail ?? '—'}</dd>
-          <dt className="text-ink-secondary sm:col-span-1">接続日時</dt><dd className="sm:col-span-3">{formatDateTime(connection.connectedAt)}</dd>
-          <dt className="text-ink-secondary sm:col-span-1">最終同期</dt><dd className="sm:col-span-3">{formatDateTime(connection.lastSyncedAt)}</dd>
-        </dl>
-        {actionError ? <NoteBar tone="danger" className="mt-3">{actionError}</NoteBar> : null}
-        <div className="mt-4 flex flex-wrap gap-2">
-          <Button variant="primary" onClick={() => void startConnect()} disabled={busy || !canManage}>Googleアカウントを再接続</Button>
-          <Button variant="danger" onClick={() => setConfirmDisconnect(true)} disabled={busy || !canManage}>接続を解除</Button>
-        </div>
-        <p className="text-ink-faint mt-3 text-xs leading-relaxed">認可が切れた場合は、店舗を管理するGoogleアカウントで再接続してください。再接続では同じ店舗だけを受け付けます。接続解除後は口コミの同期とGoogleへの返信を止めますが、取得済みの口コミと下書きは残ります。</p>
-        {!canManage ? <p className="text-ink-faint mt-2 text-xs">接続の管理は統括だけができます。</p> : null}
-      </Card>
+      <div className="flex justify-center pt-4 sm:pt-8">
+        <section className="border-hairline bg-canvas flex w-full flex-col gap-5 rounded-card border p-5 sm:p-8" style={{ maxWidth: 680 }} aria-labelledby="google-connected-title">
+          <div className="flex items-center gap-4">
+            <span className="bg-accent-soft flex h-12 w-12 shrink-0 items-center justify-center rounded-card text-accent-deep" aria-hidden="true"><Link2 size={24} /></span>
+            <div className="min-w-0">
+              <h3 id="google-connected-title" className="text-xl leading-relaxed font-bold">Googleアカウント接続済み</h3>
+              <div className="mt-0.5">{statusBadge}</div>
+            </div>
+          </div>
+          <dl className="text-ink-secondary grid grid-cols-1 gap-x-5 gap-y-2 text-sm sm:grid-cols-2">
+            <dt>LINEアカウント</dt><dd className="text-ink font-semibold">{data.store.name}</dd>
+            <dt>接続店舗</dt><dd className="text-ink font-semibold">{connection.locationTitle ?? '—'}</dd>
+            <dt>Googleアカウント</dt><dd className="text-ink font-semibold">{connection.googleAccountEmail ?? '—'}</dd>
+            <dt>接続日時</dt><dd className="text-ink">{formatDateTime(connection.connectedAt)}</dd>
+            <dt>最終同期</dt><dd className="text-ink">{formatDateTime(connection.lastSyncedAt)}</dd>
+          </dl>
+          {actionError ? <NoteBar tone="danger">{actionError}</NoteBar> : null}
+          <div className="flex flex-wrap gap-3">
+            <Button className="min-h-11 px-5" variant="primary" onClick={() => void startConnect()} disabled={busy || !canManage}><Link2 size={17} />Googleアカウントを再接続</Button>
+            <Button className="min-h-11" variant="danger" onClick={() => setConfirmDisconnect(true)} disabled={busy || !canManage}>接続を解除</Button>
+          </div>
+          <div className="border-hairline border-t pt-5">
+            <p className="text-ink-secondary text-label leading-relaxed">認可が切れた場合は、店舗を管理するGoogleアカウントで再接続してください。接続解除後は口コミの同期とGoogleへの返信を止めますが、取得済みの口コミと下書きは残ります。</p>
+            {!canManage ? <p className="text-ink-faint mt-3 text-xs">Googleアカウントの接続は、統括の管理者へ依頼してください。</p> : null}
+          </div>
+        </section>
+      </div>
       <ConfirmDialog
         open={confirmDisconnect}
         title="Googleアカウントの接続を解除しますか？"
