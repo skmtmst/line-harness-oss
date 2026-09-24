@@ -18,12 +18,12 @@ const SIDEBAR = readFileSync(
 describe('画面→メニュー所属の正本（#984 LAY-15）', () => {
   it('UID移行は「友だち」の画面として選ばれる', () => {
     expect(SCREEN_MENU_OWNER['/accounts?tab=migration']).toBe('friends')
-    expect(menuOwnerForScreen('/accounts', '?tab=migration')).toBe('friends')
+    expect(menuOwnerForScreen('/accounts', '?tab=migration')).toEqual(['friends'])
   })
 
   it('クエリの並びや追加パラメータに左右されない', () => {
     // 共有URLや遷移元の情報がクエリへ乗っても同じ画面として扱う。
-    expect(menuOwnerForScreen('/accounts', '?from=sidebar&tab=migration')).toBe('friends')
+    expect(menuOwnerForScreen('/accounts', '?from=sidebar&tab=migration')).toEqual(['friends'])
     // 通常の /accounts は宣言の対象外（LINEアカウントが選ばれる）。
     expect(menuOwnerForScreen('/accounts', '')).toBeUndefined()
     expect(menuOwnerForScreen('/accounts', '?tab=general')).toBeUndefined()
@@ -32,8 +32,11 @@ describe('画面→メニュー所属の正本（#984 LAY-15）', () => {
 
   it('所属先の項目がメニューに実在する', () => {
     const ids = new Set(MENU_SECTIONS.flatMap((section) => section.items.map((item) => item.id)))
-    for (const [screen, id] of Object.entries(SCREEN_MENU_OWNER)) {
-      expect(ids.has(id), `${screen} の所属先 ${id} がメニューに無い`).toBe(true)
+    for (const [screen, owner] of Object.entries(SCREEN_MENU_OWNER)) {
+      const candidates = typeof owner === 'string' ? [owner] : owner
+      for (const id of candidates) {
+        expect(ids.has(id), `${screen} の所属先 ${id} がメニューに無い`).toBe(true)
+      }
     }
   })
 
