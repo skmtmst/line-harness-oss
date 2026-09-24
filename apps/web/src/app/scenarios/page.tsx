@@ -21,6 +21,7 @@ import FolderPanel, { FOLDER_RAIL_STYLE } from '@/components/shared/folder-panel
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import Disclosure from '@/components/shared/disclosure'
 import ListState from '@/components/shared/list-state'
 import ScenarioList from '@/components/scenarios/scenario-list'
 import { ON_COMPLETE_LABEL, type OnCompleteMode } from '@/components/scenarios/scenario-dialogs'
@@ -332,11 +333,10 @@ export default function ScenariosPage() {
   const [folderDialogOpen, setFolderDialogOpen] = useState(false)
   /*
    * SCENARIO-16: 案内帯の「配信を始める方法」。リンク風の見た目だけの
-   * span だったので、押すとその場で手順が開くボタンにする。
+   * span だったので、共通の開閉欄（Disclosure）でその場に手順を出す。
    * 開始条件の設定は各シナリオの詳細画面にあるため、ここでは
    * 「どこへ行って何を設定するか」を案内する。
    */
-  const [startGuideOpen, setStartGuideOpen] = useState(false)
   const [toggleTarget, setToggleTarget] = useState<ScenarioWithCount | null>(null)
   const [toggleBusy, setToggleBusy] = useState(false)
   const [toggleError, setToggleError] = useState('')
@@ -627,32 +627,20 @@ export default function ScenariosPage() {
 
   return (
     <div>
-      <section data-design="Head" className="bg-success-bg text-success mb-4 rounded-card px-4 py-3 text-sm">
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-          <span aria-hidden>ⓘ</span>
-          <strong>作成しただけでは配信されません。開始条件を設定すると配信が始まります。</strong>
-          {/*
-            SCENARIO-16: 下線だけの span は押せない。ボタンにして、
-            その場で始め方の手順を開閉できるようにする。
-          */}
-          <button
-            type="button"
-            className="font-semibold underline underline-offset-2"
-            aria-expanded={startGuideOpen}
-            aria-controls="scenario-start-guide"
-            onClick={() => setStartGuideOpen((current) => !current)}
-          >
-            配信を始める方法
-          </button>
-        </div>
-        {startGuideOpen ? (
-          <ol id="scenario-start-guide" className="mt-2 list-decimal space-y-1 pl-8 text-sm">
-            <li>一覧からシナリオを開き、「開始のきっかけ」（友だち追加時・タグが付いたときなど）を設定します。</li>
-            <li>詳細画面の「テスト送信」で、実際の届き方を確認します。</li>
-            <li>この一覧に戻り、行の「その他 → 再開する」から配信を開始します。</li>
-          </ol>
-        ) : null}
-      </section>
+      <p data-design="Head" className="bg-info-bg text-ink-secondary mb-4 rounded-control px-4 py-3 text-xs">
+        作成しただけでは配信されません。開始条件を設定すると配信が始まります。
+      </p>
+      {/*
+        SCENARIO-16: 下線だけの span は押せない。3手順の説明は
+        開閉欄へ移し、帯は1〜2文だけにする。
+      */}
+      <Disclosure size="compact" title="配信を始める方法" hint="3手順" className="mb-4">
+        <ol className="list-decimal space-y-1 pl-5 text-sm">
+          <li>一覧からシナリオを開き、「開始のきっかけ」（友だち追加時・タグが付いたときなど）を設定します。</li>
+          <li>詳細画面の「テスト送信」で、実際の届き方を確認します。</li>
+          <li>この一覧に戻り、行の「その他 → 再開する」から配信を開始します。</li>
+        </ol>
+      </Disclosure>
 
       {/* 設計の KPI 4枚。数は /api/list-stats から4画面ぶんまとめて来る。 */}
       <div data-design="KPIs">

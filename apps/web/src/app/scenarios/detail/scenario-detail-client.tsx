@@ -49,6 +49,8 @@ import ScheduleInput, {
   type ScheduleValue,
 } from '@/components/scenarios/schedule-input'
 import BulkPreviewModal from '@/components/scenarios/bulk-preview-modal'
+import ActionMenu from '@/components/shared/action-menu'
+import { MoreAction } from '@/components/shared/row-actions'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { Th } from '@/components/shared/table'
 import {
@@ -330,6 +332,8 @@ export default function ScenarioDetailClient({
   const id = scenarioId
 
   const [scenario, setScenario] = useState<ScenarioWithSteps | null>(null)
+  /* ★V7: コンテンツ表の操作は「編集＋…」の1行に収める。…の中身は行ごとに開く。 */
+  const [stepMenuId, setStepMenuId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
@@ -1714,13 +1718,7 @@ export default function ScenarioDetailClient({
                  （下の「シナリオ一覧に戻る」がそれ）。 */
               <div className="flex flex-wrap items-center gap-2">
               <Button href={`/scenarios/results?id=${id}`}>配信結果を見る</Button>
-              <button
-                disabled
-                title="マニュアルは準備中です"
-                className="border-hairline text-ink-faint rounded-control border px-4 py-2 text-sm font-medium opacity-50"
-              >
-                マニュアル
-              </button>
+              {/* ★V7 C6: 押せない「マニュアル」は飾りなので出さない。 */}
               <button
                 onClick={() => setPreviewOpen(true)}
                 disabled={sortedSteps.length === 0}
@@ -2172,7 +2170,7 @@ export default function ScenarioDetailClient({
                     幅が足りない画面ではセルは希望幅より縮み、中のボタンが
                     flex-wrap でボタン単位に折り返す。
                   */}
-                  <Th className="w-80" aria-label="操作" />
+                  <Th className="w-40" aria-label="操作" />
                 </tr>
               </thead>
               <tbody>
@@ -2320,7 +2318,7 @@ export default function ScenarioDetailClient({
                             まで。日本語は文字のどこでも折れるため、印が
                             無いと「プレビュー」が1文字ずつ縦に並んだ。
                           */}
-                          <div className="flex flex-wrap items-center justify-end gap-x-2 gap-y-1 text-xs">
+                          <span className="relative inline-flex items-center gap-2 text-xs">
                             <button
                               type="button"
                               onClick={() =>
@@ -2330,62 +2328,25 @@ export default function ScenarioDetailClient({
                             >
                               {editingStepId === step.id ? '閉じる' : '編集'}
                             </button>
-                            <button
-                              type="button"
-                              onClick={() => setPreviewStepId(previewStepId === step.id ? null : step.id)}
-                              className="text-info whitespace-nowrap hover:underline"
-                            >
-                              プレビュー
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setTestSend({ stepId: step.id, label: `${step.stepOrder}通目` })
-                              }
-                              className="text-info whitespace-nowrap hover:underline"
-                            >
-                              テスト
-                            </button>
-                            {/* この通を送ったあとに動かすアクション。件数を出すのは、
-                                設定済みを忘れて二重に足すのを防ぐため。 */}
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setActionTarget({
-                                  hook: 'step_sent',
-                                  stepId: step.id,
-                                  choiceIndex: null,
-                                  title: `${step.stepOrder}通目を送ったあと`,
-                                })
-                              }
-                              className="text-info whitespace-nowrap hover:underline"
-                            >
-                              アクション
-                              {actionCounts[step.id] ? ` ${actionCounts[step.id]}` : ''}
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => void handleDuplicateStep(step)}
-                              disabled={duplicatingStepId === step.id}
-                              title="この通を複製する"
-                              aria-label="この通を複製する"
-                              className="text-ink-faint whitespace-nowrap hover:text-ink-secondary disabled:opacity-40"
-                            >
-                              複製
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setDeleteStepError('')
-                                setDeleteStepTarget(step)
-                              }}
-                              title="この通を削除する"
-                              aria-label="この通を削除する"
-                              className="text-ink-faint whitespace-nowrap hover:text-danger"
-                            >
-                              削除
-                            </button>
-                          </div>
+                            <MoreAction
+                              label={`${step.stepOrder}通目のその他操作`}
+                              aria-expanded={stepMenuId === step.id}
+                              onClick={() => setStepMenuId((current) => (current === step.id ? null : step.id))}
+                            />
+                            <ActionMenu
+                              open={stepMenuId === step.id}
+                              ariaLabel={`${step.stepOrder}通目の操作`}
+                              onClose={() => setStepMenuId(null)}
+                              items={[
+                                { id: 'preview', label: 'プレビュー', onSelect: () => setPreviewStepId(previewStepId === step.id ? null : step.id) },
+                                { id: 'test', label: 'テスト', onSelect: () => setTestSend({ stepId: step.id, label: `${step.stepOrder}通目` }) },
+                                /* この通を送ったあとに動かすアクション。件数を出すのは、設定済みを忘れて二重に足すのを防ぐため。 */
+                                { id: 'action', label: `アクション${actionCounts[step.id] ? ` ${actionCounts[step.id]}` : ''}`, onSelect: () => setActionTarget({ hook: 'step_sent', stepId: step.id, choiceIndex: null, title: `${step.stepOrder}通目を送ったあと` }) },
+                                { id: 'duplicate', label: duplicatingStepId === step.id ? '複製中…' : '複製', disabled: duplicatingStepId === step.id, disabledReason: 'この通を複製しています', onSelect: () => { void handleDuplicateStep(step) } },
+                                { id: 'delete', label: '削除', tone: 'danger' as const, dividerBefore: true, onSelect: () => { setDeleteStepError(''); setDeleteStepTarget(step) } },
+                              ]}
+                            />
+                          </span>
                         </td>
                       </tr>
                       {previewStepId === step.id && (

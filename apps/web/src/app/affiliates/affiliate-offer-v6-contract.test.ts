@@ -217,8 +217,12 @@ describe('V6 アフィリエイターを追加する（xqT1Z）', () => {
 
   it('口の無い項目は押せない入力欄ではなく、—と理由で出す', () => {
     expect(NEW_PAGE).toContain('function Unavailable(')
-    for (const label of ['1件あたりの上限', '振込先の登録', '成果時の動き']) {
+    // ★V7 C6: 未接続の断り書き（上限・振込先・成果時の動き）は出さない。残るのは接続と無関係の理由だけ。
+    for (const label of ['1件あたりの報酬', '成果として数えるもの']) {
       expect(NEW_PAGE).toContain(`label="${label}"`)
+    }
+    for (const label of ['1件あたりの上限', '振込先の登録', '成果時の動き']) {
+      expect(NEW_PAGE).not.toContain(`label="${label}"`)
     }
     expect(NEW_PAGE).toContain('api.friends.list(friendSearchParams(friendSearch, friendPage, selectedAccountId))')
     expect(NEW_PAGE).toContain('aria-label="友だち候補のページ"')
@@ -228,9 +232,8 @@ describe('V6 アフィリエイターを追加する（xqT1Z）', () => {
     expect(NEW_PAGE).not.toContain('<select id="af-account" disabled')
   })
 
-  it('未接続の言い方をそろえる', () => {
-    const notWired = NEW_PAGE.match(/まだ繋がっていません。[^"]*が接続されると表示されます。/g) ?? []
-    expect(notWired).toHaveLength(3)
+  it('未接続の断り書きは出さない（★V7 C6）', () => {
+    expect(NEW_PAGE).not.toContain('まだ繋がっていません')
   })
 
   it('URLのコピーは、コードが決まっているときだけ押せる', () => {

@@ -228,7 +228,7 @@ export default function RichMenuCreateForm({
           <div className="grid gap-3 lg:grid-cols-6">
             <div className="lg:col-span-3">
               <label className="text-ink-secondary mb-1 block text-sm font-medium">メニュー名<RequiredBadge /></label>
-              <input value={value.name} aria-label="メニュー名" onChange={(event) => patch({ name: event.target.value })} required disabled={locked} className="border-hairline rounded-control focus:ring-accent block w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none" placeholder="例：メインメニュー" />
+              <input value={value.name} aria-label="メニュー名" onChange={(event) => patch({ name: event.target.value })} aria-required="true" disabled={locked} className="border-hairline rounded-control focus:ring-accent block w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none" placeholder="例：メインメニュー" />
               <p className="text-ink-faint mt-1 text-xs">管理画面での識別用です。友だちには表示されません。</p>
             </div>
             <div className="lg:col-span-1">
@@ -237,7 +237,7 @@ export default function RichMenuCreateForm({
             </div>
             <div className="lg:col-span-2">
               <label className="text-ink-secondary mb-1 block text-sm font-medium">トーク画面下の文言</label>
-              <input value={value.chatBarText} aria-label="メニューを開くボタンの文字" onChange={(event) => patch({ chatBarText: event.target.value })} maxLength={14} required disabled={locked} className="border-hairline rounded-control focus:ring-accent block w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none" />
+              <input value={value.chatBarText} aria-label="メニューを開くボタンの文字" onChange={(event) => patch({ chatBarText: event.target.value })} maxLength={14} aria-required="true" disabled={locked} className="border-hairline rounded-control focus:ring-accent block w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none" />
               <p className="text-ink-faint mt-1 text-xs">14文字以内。メニューを開く前にトーク画面下に表示されます。</p>
             </div>
           </div>

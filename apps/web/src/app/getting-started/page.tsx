@@ -66,16 +66,13 @@ export default function GettingStartedPage() {
         <ListState kind={status === 'error' ? 'error' : 'loading'} />
       ) : (
         <>
+          {/*
+            帯は進み具合の1行だけ。順番の飛ばし方・終わりの判断基準・
+            ダッシュボードの帯の扱いは右の「気をつけること」が持つため、
+            ここでは繰り返さない（★V7 帯は1本）。
+          */}
           <div className={styles.progress} role="note">
-            <div>
-              <strong>{progressHeadline(steps)}</strong>
-              <span>
-                順番はおすすめです。飛ばして進んでもかまいません。終わったかどうかは、画面を開いたかではなく、実際に作られたもので判断します。
-              </span>
-            </div>
-            <span className={styles.headlineNote}>
-              全部終わると、ダッシュボードの帯は出なくなります
-            </span>
+            <strong>{progressHeadline(steps)}</strong>
           </div>
 
           {/*

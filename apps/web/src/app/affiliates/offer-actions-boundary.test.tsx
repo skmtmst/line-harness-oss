@@ -131,7 +131,8 @@ async function openOfferEdit() {
     fireEvent.click(screen.getByRole('button', { name: '編集' }))
   })
   const title = await screen.findByText('案件を編集')
-  const modal = title.closest('div.fixed')
+  // ★V7: 旧来の div.fixed 直書き窓から共通 Dialog（role=dialog）へ移した。
+  const modal = title.closest('[role="dialog"]')
   expect(modal).toBeTruthy()
   return within(modal as HTMLElement)
 }

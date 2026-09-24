@@ -301,8 +301,8 @@ export default function AutomationRunsPage() {
         <Metric label="条件に外れて動かなかった" value={data ? `${data.summary.skipped.toLocaleString('ja-JP')}回` : '—'} note="条件が厳しすぎないか見てください" />
       </KpiCollapse>
 
-      <div className="mb-4 rounded-control border border-info bg-info-bg px-4 py-3 text-sm font-medium text-info">
-        オートメーションが動いた記録です。条件に外れて動かなかったものも並ぶため、「動いていないはず」の切り分けができます。
+      <div className="bg-info-bg text-ink-secondary mb-4 rounded-control px-4 py-3 text-xs">
+        オートメーションが動いた記録です。条件に外れて動かなかったものも並びます。
       </div>
       {retryNotice ? <p className="mb-4 rounded-control border border-hairline bg-canvas-sunken px-4 py-3 text-sm text-ink-secondary" role="status">{retryNotice}</p> : null}
 
@@ -352,11 +352,11 @@ export default function AutomationRunsPage() {
               <span className="tabular-nums text-ink-secondary">{formatDuration(run.durationMs)}</span>
               <div className="flex flex-wrap gap-2">
                 <Button onClick={() => setSelectedRun(run)}>中身を見る</Button>
-                {runPermissions?.canOperate ? (
+                {runPermissions?.canOperate && run.canRetry ? (
                   <Button
                     onClick={() => void retryRun(run)}
-                    disabled={!run.canRetry || retryingId !== null}
-                    title={run.canRetry ? '失敗した処理だけを再実行します' : '成功済みの処理は二重に実行しません'}
+                    disabled={retryingId !== null}
+                    title="失敗した処理だけを再実行します"
                   >
                     {retryingId === run.id ? '実行中' : 'もう一度やる'}
                   </Button>

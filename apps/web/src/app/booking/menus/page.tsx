@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import Button from '@/components/shared/button'
 import Breadcrumb from '@/components/shared/breadcrumb'
+import Disclosure from '@/components/shared/disclosure'
 import ListState from '@/components/shared/list-state'
 import Pagination from '@/components/shared/pagination'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -381,8 +382,14 @@ function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuC
       </div>
 
       <div data-design="Bar" className="bg-info-bg text-ink-secondary mb-4 rounded-control px-4 py-3 text-xs">
-        ⓘ　上から並んだ順に、お客様の画面に出ます。順番は操作列の↑↓で変えられます。かかる時間を長めにしておくと、あとの予約とぶつかりません。金額を空けておくと「お問い合わせ」と出ます。
+        上から並んだ順に、お客様の画面に出ます。順番は操作列の↑↓で変えられます。
       </div>
+      <Disclosure size="compact" title="時間と金額の決め方" hint="2項目" className="mb-4">
+        <ul className="list-disc space-y-1 pl-5 text-sm">
+          <li>かかる時間を長めにしておくと、あとの予約とぶつかりません。</li>
+          <li>金額を空けておくと「お問い合わせ」と出ます。</li>
+        </ul>
+      </Disclosure>
 
       {activeTab === 'rules' ? (
         <BookingRulesSummary

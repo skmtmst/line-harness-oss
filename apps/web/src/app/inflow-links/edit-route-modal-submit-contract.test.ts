@@ -46,8 +46,8 @@ describe('リファラルリンク編集窓の保存 (#1058)', () => {
     expect(body).toContain("else setError(res.error ?? '保存に失敗しました。通信を確かめて、もう一度お試しください。')")
   })
 
-  it('失敗は窓の中の赤い帯に出る', () => {
-    expect(MODAL).toContain('{error && (')
-    expect(MODAL).toContain('bg-red-50')
+  it('失敗は窓の中に出る（★V7: 共通 Dialog のエラー表示へ）', () => {
+    expect(MODAL).toContain("import Dialog from '@/components/shared/dialog'")
+    expect(MODAL).toContain('error={error || undefined}')
   })
 })
