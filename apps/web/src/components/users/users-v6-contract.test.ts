@@ -54,6 +54,8 @@ describe('統合ユーザーV6の画面契約', () => {
     // ★V7: 表の中の状態は TableStateRow に寄せる。3つの言い分けは変えない。
     expect(TABLE).toContain('<TableStateRow colSpan={7} kind="loading" />')
     expect(TABLE).toContain('kind="error"')
+    // #772: 表へ移した後も、失敗からその場で読み直せる口を残す。
+    expect(TABLE).toContain('onRetry={onRetry}')
     expect(TABLE).toContain('kind="empty"')
     expect(TABLE).toContain('統合ユーザーを表示できませんでした')
     expect(TABLE).toContain('const countAvailable = !loading && !error')
