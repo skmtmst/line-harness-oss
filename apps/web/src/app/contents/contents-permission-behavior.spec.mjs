@@ -245,7 +245,10 @@ test.describe('Issue #667 メディア管理権限の実挙動', () => {
     await expect(page.getByRole('button', { name: /選択したメディアを削除/ })).toHaveCount(0)
     await expect(page.getByText('すべてのメディアを選択', { exact: true })).toHaveCount(0)
     /* 読める・持ち出せる操作は取り上げない。読取権限と編集権限を混同しないこと。 */
-    await expect(page.getByRole('button', { name: `${MEDIA_NAME}をダウンロード` }).first()).toBeVisible()
+    const moreActions = page.getByRole('button', { name: `${MEDIA_NAME}のその他操作` }).first()
+    await expect(moreActions).toBeVisible()
+    await moreActions.click()
+    await expect(page.getByRole('menuitem', { name: 'ダウンロード' })).toBeVisible()
     await expect(page.getByRole('button', { name: 'ファイルを入れる' })).toBeVisible()
 
     /* 無効なボタンは通常clickが届かない。DOM側から直接叩いても呼ばないことまで見る。 */
