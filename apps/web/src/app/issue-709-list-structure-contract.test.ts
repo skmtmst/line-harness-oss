@@ -10,6 +10,8 @@
  * 4. フォームの「フォルダを追加」は押せない理由を hover 限定の title
  *    ではなく常時表示の注記で伝える。
  * 5. 予約メニューにドラッグできない「⠿」の飾りを戻さない。
+ * 6. 残件: 28の並び替えは操作列の↑↓で行い、注意書きに導線を書く。
+ *    専用APIが無いため既存updateMenu（版つきPUT）でsort_orderを交換する。
  */
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
@@ -82,5 +84,26 @@ describe('Issue #709: 予約メニューに押せないドラッグ飾りを戻�
   it('⠿ハンドルがない', () => {
     const src = read('booking/menus/page.tsx')
     expect(src).not.toContain('⠿')
+  })
+})
+
+describe('Issue #709残件: 28予約メニューは操作列の↑↓で並び替えできる', () => {
+  it('行操作に上へ/下へボタンがある（掴めない飾りの代わり）', () => {
+    const src = read('booking/menus/page.tsx')
+    expect(src).toContain('を上へ')
+    expect(src).toContain('を下へ')
+    expect(src).toContain('moveMenu')
+  })
+
+  it('注意書きに↑↓の導線を書く', () => {
+    const src = read('booking/menus/page.tsx')
+    expect(src).toContain('操作列の↑↓で変えられます')
+  })
+
+  it('並び替えは既存updateMenu（版つきPUT）でsort_orderを交換し、新規APIを作らない', () => {
+    const src = read('booking/menus/page.tsx')
+    expect(src).toContain('bookingApi.updateMenu')
+    expect(src).toContain('sort_order: other.sort_order')
+    expect(src).not.toContain('menus/order')
   })
 })

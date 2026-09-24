@@ -94,6 +94,8 @@ function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuC
   const [visibilityTarget, setVisibilityTarget] = useState<BookingMenu | null>(null)
   const [updatingVisibility, setUpdatingVisibility] = useState(false)
   const [visibilityError, setVisibilityError] = useState<string | null>(null)
+  const [reorderBusy, setReorderBusy] = useState(false)
+  const [reorderError, setReorderError] = useState<string | null>(null)
   const [tags, setTags] = useState<Tag[]>([])
   /** メニューID → 担当できるスタッフの表示名。 */
   const [menuStaff, setMenuStaff] = useState<Map<string, string[]>>(new Map())
@@ -220,6 +222,44 @@ function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuC
   }
 
   /**
+   * #709残件: 28の行頭の持ち手飾りは掴めないため置かず、
+   * 代わりに操作列の↑↓で隣と並び順を入れ替える。専用の並び替えAPIや
+   * dnd実装は無いので、既存の updateMenu（PUT・版つき）で2件の
+   * sort_order を交換する。仕様書の一括更新口は未実装のため作らない。
+   */
+  async function moveMenu(menu: BookingMenu, delta: -1 | 1) {
+    if (!selectedAccountId || reorderBusy) return
+    const ordered = [...items].sort((a, b) => a.sort_order - b.sort_order || a.id.localeCompare(b.id))
+    const index = ordered.findIndex((m) => m.id === menu.id)
+    const nextIndex = index + delta
+    if (index < 0 || nextIndex < 0 || nextIndex >= ordered.length) return
+    const other = ordered[nextIndex]
+    const version = menu.version
+    const otherVersion = other.version
+    if (typeof version !== 'number' || !Number.isInteger(version) || version < 1
+      || typeof otherVersion !== 'number' || !Number.isInteger(otherVersion) || otherVersion < 1) {
+      await load()
+      setReorderError('最新の状態を読み直しました。もう一度お試しください。')
+      return
+    }
+    setReorderBusy(true)
+    setReorderError(null)
+    try {
+      // PUT は送らなかった項目まで既定値で上書きしてしまうため、
+      // 版つきの全項目を送る（編集窓の保存と同じ形）。
+      await bookingApi.updateMenu(selectedAccountId, menu.id, version, { ...menu, sort_order: other.sort_order })
+      await bookingApi.updateMenu(selectedAccountId, other.id, otherVersion, { ...other, sort_order: menu.sort_order })
+      await load()
+    } catch (error) {
+      // 1件目だけ通った場合もあり得るので、実際の並びを取り直して見せる。
+      setReorderError(bookingErrorMessage(error, '保存'))
+      await load()
+    } finally {
+      setReorderBusy(false)
+    }
+  }
+
+  /**
    * 公開状態を変える前に、**何が止まり何が残るかを本文で読ませる。**
    * 既存予約を残したまま新規受付だけを止めるため、確認窓を挟む。
    */
@@ -340,7 +380,7 @@ function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuC
       </div>
 
       <div data-design="Bar" className="bg-info-bg text-info mb-4 rounded-control px-4 py-3 text-xs font-semibold">
-        ⓘ　上から並んだ順に、お客様の画面に出ます。かかる時間を長めにしておくと、あとの予約とぶつかりません。金額を空けておくと「お問い合わせ」と出ます。
+        ⓘ　上から並んだ順に、お客様の画面に出ます。順番は操作列の↑↓で変えられます。かかる時間を長めにしておくと、あとの予約とぶつかりません。金額を空けておくと「お問い合わせ」と出ます。
       </div>
 
       {activeTab === 'rules' ? (
@@ -375,7 +415,12 @@ function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuC
             action={canEditMenus ? <Button variant="primary" href="/booking/menus/new">＋ 予約メニューを作る</Button> : undefined}
           />
         </div>
-      ) : (
+      ) : (<>
+        {reorderError && (
+          <p role="alert" className="border-warning-bg bg-warning-bg text-ink mb-3 rounded-control border px-4 py-2 text-xs font-semibold">
+            {reorderError}
+          </p>
+        )}
         <div
           data-design="Table"
           className="bg-canvas rounded-card border border-hairline overflow-hidden"
@@ -396,14 +441,17 @@ function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuC
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {visible.map((m) => (
+                {visible.map((m) => {
+                  const orderIndex = shown.findIndex((item) => item.id === m.id)
+                  const canMoveUp = orderIndex > 0
+                  const canMoveDown = orderIndex >= 0 && orderIndex < shown.length - 1
+                  return (
                   <tr key={m.id} className={`hover:bg-canvas-sunken ${m.is_active ? '' : 'text-ink-faint'}`}>
                     <td className="px-4 py-3 text-sm font-medium">
                       {/*
-                        行頭の持ち手の飾りは外した。ドラッグで並び替えられる
-                        ように見えるが実際は押せず、並び順は「中身を見る」の
-                        中の数値欄で変える（監査 A12）。動かせない印を置くと
-                        壊れているように見える。
+                        行頭の持ち手の飾りは置かない。ドラッグで並び替えられる
+                        ように見えるが実際は押せない印になる（監査 A12・#709）。
+                        並び順は操作列の↑↓で変える。
                       */}
                       {m.name}{m.is_active ? '' : '（休止中）'}
                       {m.description && <span className="text-ink-faint mt-1 block max-w-72 truncate text-xs" title={m.description}>{m.description}</span>}
@@ -444,19 +492,42 @@ function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuC
                           中身を見る
                         </button>
                         {canEditMenus && (
-                          <button onClick={() => setVisibilityTarget(m)} className="border-hairline rounded-control border px-2 py-1 font-semibold">
-                            止める・出す
-                          </button>
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => void moveMenu(m, -1)}
+                              disabled={reorderBusy || !canMoveUp}
+                              aria-label={`${m.name}を上へ`}
+                              title="上へ移動"
+                              className="border-hairline rounded-control border px-2 py-1 font-semibold disabled:opacity-40"
+                            >
+                              ↑
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => void moveMenu(m, 1)}
+                              disabled={reorderBusy || !canMoveDown}
+                              aria-label={`${m.name}を下へ`}
+                              title="下へ移動"
+                              className="border-hairline rounded-control border px-2 py-1 font-semibold disabled:opacity-40"
+                            >
+                              ↓
+                            </button>
+                            <button onClick={() => setVisibilityTarget(m)} className="border-hairline rounded-control border px-2 py-1 font-semibold">
+                              止める・出す
+                            </button>
+                          </>
                         )}
                       </div>
                     </td>
                   </tr>
-                ))}
+                  )
+                })}
               </tbody>
             </table>
           </div>
         </div>
-      )}
+      </>)}
 
       <div className="mt-3 flex items-center justify-between gap-3">
         <ListRange label="メニュー" total={settings?.menuCount ?? items.length} first={visible.length === 0 ? 0 : 1} last={visible.length} />
