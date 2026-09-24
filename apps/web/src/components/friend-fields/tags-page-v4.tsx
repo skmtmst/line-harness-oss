@@ -1012,9 +1012,9 @@ export default function TagsPageV4({
                     <th className="w-9 px-2 py-3" />
                     <th className="w-[22%] px-3 py-3 text-left">タグ</th>
                     <th className="w-[11%] px-3 py-3 text-left">フォルダ</th>
-                    <th className="w-[7%] px-3 py-3 text-left">付与人数</th>
-                    <th className="w-[11%] px-3 py-3 text-left">自動付与のもと</th>
-                    <th className="w-[19%] px-3 py-3 text-left">連動（マイル・アクション）</th>
+                    <th className="w-[7%] whitespace-nowrap px-3 py-3 text-left">人数</th>
+                    <th className="w-[11%] whitespace-nowrap px-3 py-3 text-left">付け方</th>
+                    <th className="w-[17%] whitespace-nowrap px-3 py-3 text-left" title="マイル・アクションとの連動">連動</th>
                     <th className="px-3 py-3 text-left">使用先</th>
                     <th className="w-[6%] px-3 py-3 text-left">表示</th>
                     <th className="w-[6%] px-3 py-3 text-left">操作</th>

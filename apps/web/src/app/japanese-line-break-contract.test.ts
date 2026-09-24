@@ -35,7 +35,7 @@ function baseLayers(css: string): string {
 
 describe('日本語の改行は画面側のクラスに負ける強さで置く', () => {
   const base = baseLayers(withoutComments)
-  const outside = withoutComments.replace(base, '')
+  const outside = base.split('\n@layer base').reduce((rest, block, index) => rest.replace(index === 0 ? block : `@layer base${block}`, ''), withoutComments)
 
   it('auto-phrase と見出しの balance は @layer base の中にある', () => {
     expect(base).toMatch(/:lang\(ja\)\s*\{\s*word-break:\s*auto-phrase;/)

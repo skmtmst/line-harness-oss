@@ -1087,7 +1087,7 @@ export default function EditDialog({
                 type="checkbox"
                 checked={skipWhenOperatorActive}
                 onChange={(e) => setSkipWhenOperatorActive(e.target.checked)}
-                className="mt-0.5 h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
+                className="mt-0.5 h-4 w-4 rounded border-gray-300 text-success focus:ring-green-500"
               />
               <span className="text-ink-secondary text-xs">
                 担当者が対応中のトークでは返さない
@@ -1423,7 +1423,7 @@ export default function EditDialog({
                     type="checkbox"
                     checked={skipWhenOperatorActive}
                     onChange={(event) => setSkipWhenOperatorActive(event.target.checked)}
-                    className="mt-0.5 h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
+                    className="mt-0.5 h-4 w-4 rounded border-gray-300 text-success focus:ring-green-500"
                   />
                   <span className="text-ink-secondary text-xs">
                     担当者が対応中のトークでは返さない
@@ -1444,7 +1444,7 @@ export default function EditDialog({
                 type="checkbox"
                 checked={isActive}
                 onChange={(e) => setIsActive(e.target.checked)}
-                className="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
+                className="h-4 w-4 rounded border-gray-300 text-success focus:ring-green-500"
               />
               <span className="text-ink-secondary text-xs">この応答をオンにする</span>
             </label>

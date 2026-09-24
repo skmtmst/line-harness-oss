@@ -48,8 +48,8 @@ describe('V6 流入経路一覧の契約', () => {
     expect(PAGE).toContain('accountAtRequest === latestAccountRef.current')
     expect(PAGE).toContain('setRoutes([])')
     expect(PAGE).toContain('const [summaryAvailable, setSummaryAvailable] = useState(false)')
-    expect(PAGE).toContain("summaryAvailable ? (r.stats?.friendCount ?? 0) : '—'")
-    expect(PAGE).toContain("summaryAvailable ? (r.stats?.clickCount ?? 0) : '—'")
+    expect(PAGE).toContain("summaryAvailable ? (r.stats?.friendCount ?? 0).toLocaleString('ja-JP') : '—'")
+    expect(PAGE).toContain("summaryAvailable ? (r.stats?.clickCount ?? 0).toLocaleString('ja-JP') : '—'")
   })
 
   it('一覧型の既定値を集計成功として扱わず、画面を落とさない', () => {
@@ -81,9 +81,10 @@ describe('V6 流入経路一覧の契約', () => {
     expect(PAGE).not.toContain('ページの切り替えは準備中です')
   })
 
-  it('保存した条件は作り物の札を作らず、繋がっていないと言う', () => {
-    expect(PAGE).toContain("import Chip from '@/components/shared/chip'")
-    expect(PAGE).toContain('まだ繋がっていません。条件の保存が接続されると表示されます。')
+  it('保存した条件は作り物の札も「未接続」の行も出さない（★V7）', () => {
+    // 押せない札も「まだ繋がっていません」の行も、運用する人には使えない表示。
+    // 条件の保存が接続されるまでは何も出さない。
+    expect(PAGE).not.toContain('data-design="Saved"')
     expect(PAGE).not.toContain('保存した条件は準備中です')
     for (const fake of ['追加率が高い', '計測停止中']) {
       expect(PAGE, `${fake} は取れない条件なので札にしない`).not.toContain(fake)
@@ -106,7 +107,8 @@ describe('V6 流入経路一覧の契約', () => {
 
   it('まとめて操作は対象選択→操作→影響件数の確認へ接続する（NEXT-21）', () => {
     expect(PAGE).toContain('setBulkOpen(true)')
-    expect(PAGE).toContain('type="checkbox"')
+    // ★V7：選択は共通のチェックボックス（本物の checkbox を包んでいる）。
+    expect(PAGE).toContain('<Checkbox')
     expect(PAGE).toContain('selectedRouteIds')
     // 実行は既存の更新口へ、1件ずつ結果を分けて出す。
     expect(PAGE).toContain('api.entryRoutes.update(route.id')

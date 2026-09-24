@@ -37,6 +37,19 @@ describe('V6 EC integration screens', () => {
     expect(tabsView).not.toContain('api.ecCommerce.subscriptions')
   })
 
+  it('keeps badges off green/red and the sort select wide (V7 touch-up)', () => {
+    // 1段だけのパンくずは画面名と重複するので出さない。
+    expect(page).not.toContain("label: '専用機能'")
+    // 「確認」「つき合わせ」の札は注意・中立にし、緑（正常の意味だけ）は使わない。
+    expect(page).toContain('badge="つき合わせ" badgeTone="neutral"')
+    expect(page).toContain('badge="確認" badgeTone="neutral"')
+    expect(page).not.toContain('badgeTone="danger"')
+    // 並び順の欄は共通 Select の full 幅で、外側で sm:w-64 を持つ。
+    expect(page).toContain('aria-label="取り込みの並び順"')
+    expect(page).toContain('size="full"')
+    expect(page).toContain('w-full sm:w-64')
+  })
+
   it('shows the V6 decision information without inventing unavailable values', () => {
     for (const wording of ['今日 取り込んだ', 'つながっていない注文', '取り込みに失敗', '最後に届いた']) {
       expect(page).toContain(wording)

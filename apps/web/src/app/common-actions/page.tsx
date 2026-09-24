@@ -188,7 +188,7 @@ export default function CommonActionsPage() {
         <SummaryCard variant="v6" title="共通アクション" value={loading ? null : (summary?.total ?? 0)} unit="" detail={loading ? '' : `うち公開中 ${totals.published}`} loading={loading} />
         <SummaryCard variant="v6" title="呼び出し元" value={loading ? null : totals.bindings} unit="" detail="5機能から" loading={loading} />
         <SummaryCard variant="v6" title="今月 動いた回数" value={loading ? null : totals.executions} unit="" detail={loading ? '' : `失敗 ${totals.failures}`} loading={loading} />
-        <SummaryCard variant="v6" title="古い版のまま" value={loading ? null : totals.outdatedItems} unit="" detail={loading ? '' : `呼び出し元 ${totals.outdated}か所`} loading={loading} badge={totals.outdatedItems > 0 ? '要確認' : undefined} />
+        <SummaryCard variant="v6" title="古い版のまま" value={loading ? null : totals.outdatedItems} unit="" detail={loading ? '' : `呼び出し元 ${totals.outdated}か所`} loading={loading} badge={totals.outdatedItems > 0 ? '要確認' : undefined} badgeTone="warning" />
       </div>
 
       <NoteBar>
@@ -196,7 +196,7 @@ export default function CommonActionsPage() {
       </NoteBar>
 
       <div className="my-3 flex flex-wrap items-center gap-2">
-        {canManage ? <Button href="/common-actions/new" variant="primary">共通アクションをつくる</Button> : null}
+        {/* ★V7：「共通アクションをつくる」は見出しの右にある。同じボタンを2つ並べない。 */}
         {selectedAccountId ? <Button href={api.commonActions.csvUrl(selectedAccountId)}>CSVで書き出す</Button> : null}
         <SearchField
           value={query}

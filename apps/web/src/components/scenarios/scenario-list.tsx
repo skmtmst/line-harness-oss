@@ -1,3 +1,4 @@
+import Checkbox from '@/components/shared/checkbox'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { ListPlus } from 'lucide-react'
@@ -449,15 +450,12 @@ export default function ScenarioList({
             <TableHeadRow>
               {canMove && (
                 <Th className="w-10 px-2" aria-label="選択">
-                  <input
-                    type="checkbox"
+                  {/* ★V7 共通 チェックボックス（押せる範囲 24px・一部選択は「―」）。 */}
+                  <Checkbox
                     checked={allOnPageSelected}
-                    ref={(el) => {
-                      if (el) el.indeterminate = !allOnPageSelected && selectedCount > 0
-                    }}
-                    onChange={toggleAllOnPage}
+                    indeterminate={!allOnPageSelected && selectedCount > 0}
+                    onCheckedChange={() => toggleAllOnPage()}
                     aria-label="このページのシナリオをすべて選択"
-                    className="h-4 w-4 align-middle"
                   />
                 </Th>
               )}
@@ -493,12 +491,10 @@ export default function ScenarioList({
               <tr key={s.id} className="hover:bg-canvas-sunken">
                 {canMove && (
                   <td className="w-10 px-2 py-3 text-center align-top">
-                    <input
-                      type="checkbox"
+                    <Checkbox
                       checked={selectedIds.has(s.id)}
-                      onChange={() => toggleOne(s.id)}
+                      onCheckedChange={() => toggleOne(s.id)}
                       aria-label={`${s.name}を選択`}
-                      className="mt-0.5 h-4 w-4"
                     />
                   </td>
                 )}
