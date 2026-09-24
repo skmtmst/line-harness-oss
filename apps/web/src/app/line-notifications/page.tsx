@@ -23,6 +23,7 @@ import { useAccount } from '@/contexts/account-context'
 import {
   canOpenCustomerNotificationKpi,
   customerNotificationKpis,
+  type CustomerNotificationKpi,
   type LineNotificationQuota,
 } from './customer-kpis'
 import KpiCollapse from '@/components/ui/kpi-collapse'
@@ -533,7 +534,7 @@ function CustomerNotificationEditor({
   return <main data-design-node="Q55bb" className="min-w-0 space-y-4 pb-48 sm:pb-24">
     <div className="flex flex-wrap items-start justify-between gap-3">
       <div>
-        <p className="text-xs font-semibold text-accent-deep">LINE通知　›　お知らせの種類</p>
+        <p className="text-xs font-semibold text-ink-faint">LINE通知　›　お知らせの種類</p>
         <p className="mt-2 text-xl font-bold text-ink">「{setting.title?.trim() || setting.label}」を編集する</p>
         <p className="mt-1 text-xs text-ink-faint">{definition ? `公開版 ${definition.currentVersionNumber ? `v${definition.currentVersionNumber}` : 'なし'} ／ 編集中の下書き` : '公開中の内容を編集します。保存した内容は次の通知から使われます。'}</p>
         {hasUnsaved ? <p className="mt-1 text-xs font-semibold text-warning">未保存の変更があります</p> : null}
@@ -859,6 +860,21 @@ function LineNotificationsPage() {
     return item
   })
   const update = (eventType: string, patch: Partial<EcNotificationSetting>) => setSettings((current) => current.map((setting) => setting.eventType === eventType ? { ...setting, ...patch } : setting))
+  const renderKpiCard = (kpi: CustomerNotificationKpi) => {
+    const { label, value, unit, note, href } = kpi
+    return <div key={label} className="bg-canvas rounded-card border-hairline border p-4">
+      <p className="text-ink-faint text-xs">{label}</p>
+      <p className="text-ink mt-1 text-2xl font-bold tabular-nums">
+        {value === null ? '—' : value}
+        {value === null || unit === null ? null : <span className="text-ink-faint ml-1 text-xs font-normal">{unit}</span>}
+      </p>
+      <p className="text-ink-faint mt-0.5 text-xs">{note}</p>
+      {/* 0件のときは押し口を出さない。押しても何も無い。 */}
+      {canOpenCustomerNotificationKpi(kpi) && href
+        ? <Button onClick={() => router.replace(href)} className="mt-2">送れなかったものを見る</Button>
+        : null}
+    </div>
+  }
   // N-340: 入力のたびに端末へ下書きを置き、未保存の印を付ける。
   const edit = (eventType: string, patch: Partial<EcNotificationSetting>) => {
     const current = settings.find((setting) => setting.eventType === eventType)
@@ -1100,49 +1116,22 @@ function LineNotificationsPage() {
       data-list-state={loadState === 'ready' && settings.length === 0 ? 'empty' : loadState}
       className={styles.root}
     >
+    {/* #975 U060: 7指標を390pxで積まない。先頭2件を出し、残りは「集計を見る」で開く。 */}
     {/*
-      #670 24: 7枚を4列に並べると4枚＋3枚の非対称になるため、意味で分ける。
-      「お知らせの状態」4枚と「今月の送信枠」3枚の2群にし、各群は
-      きれいに収まる列数にする。
+      帯は「お知らせの数」と「月の送信枠」の2まとまり。7枚を4列に流すと
+      2段目が3枚だけ伸びる非対称グリッドになっていた（監査 A13）。
+      送信枠の3枚は全幅のまとまりとして2段目へ置き、中で3列に並べる。
+      KpiCollapseの中に入れるのは、狭い幅で畳む対象から外さないため。
     */}
-    {/* #975 U060: 指標を390pxで積まない。先頭2件を出し、残りは「集計を見る」で開く。 */}
-    <section aria-label="お知らせの状態">
-      <KpiCollapse data-design="KPIs" gridClassName="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {kpis.slice(0, 4).map((kpi) => {
-          const { label, value, unit, note, href } = kpi
-          const body = <>
-            <p className="text-ink-faint text-xs">{label}</p>
-            <p className="text-ink mt-1 text-2xl font-bold tabular-nums">
-              {value === null ? '—' : value}
-              {value === null || unit === null ? null : <span className="text-ink-faint ml-1 text-xs font-normal">{unit}</span>}
-            </p>
-            <p className="text-ink-faint mt-0.5 text-xs">{note}</p>
-          </>
-          return <div key={label} className="bg-canvas rounded-card border-hairline border p-4">
-            {body}
-            {/* 0件のときは押し口を出さない。押しても何も無い。 */}
-            {canOpenCustomerNotificationKpi(kpi) && href
-              ? <Button onClick={() => router.replace(href)} className="mt-2">送れなかったものを見る</Button>
-              : null}
-          </div>
-        })}
-      </KpiCollapse>
-    </section>
-    <section aria-label="今月の送信枠" className="mt-4">
-      <KpiCollapse data-design="KPIs" gridClassName="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-        {kpis.slice(4).map((kpi) => {
-          const { label, value, unit, note } = kpi
-          return <div key={label} className="bg-canvas rounded-card border-hairline border p-4">
-            <p className="text-ink-faint text-xs">{label}</p>
-            <p className="text-ink mt-1 text-2xl font-bold tabular-nums">
-              {value === null ? '—' : value}
-              {value === null || unit === null ? null : <span className="text-ink-faint ml-1 text-xs font-normal">{unit}</span>}
-            </p>
-            <p className="text-ink-faint mt-0.5 text-xs">{note}</p>
-          </div>
-        })}
-      </KpiCollapse>
-    </section>
+    <KpiCollapse data-design="KPIs" gridClassName="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      {kpis.filter((kpi) => kpi.group === 'notice').map(renderKpiCard)}
+      <section className="sm:col-span-2 xl:col-span-4" aria-label="今月の送信枠">
+        <p className="text-ink-faint mb-2 text-xs font-semibold">今月の送信枠（LINE公式アカウントの月間上限）</p>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          {kpis.filter((kpi) => kpi.group === 'quota').map(renderKpiCard)}
+        </div>
+      </section>
+    </KpiCollapse>
     <div className="border-info bg-info-bg text-info rounded-control border px-4 py-3 text-sm leading-6">
       これは「お知らせ」であって「売り込みの配信」ではありません。顧客が配信を止めていても、取引に必要な連絡は届きます。
     </div>

@@ -26,6 +26,10 @@ const BOOKING = read('booking', 'bookings', 'page.tsx')
 const CHATS = read('chats', 'page.tsx')
 const FRIENDS = read('friends', 'page.tsx')
 const NOTIFY = read('line-notifications', 'page.tsx')
+const NOTIFY_KPIS = read('line-notifications', 'customer-kpis.ts')
+const WEBINARS = read('webinars', 'page.tsx')
+const ANALYTICS = read('analytics', 'page.tsx')
+const BOOKING_MENUS = read('booking', 'menus', 'page.tsx')
 const TAG_EDITOR = readFileSync(
   join(HERE, '..', 'components', 'friend-fields', 'tag-editor-v4.tsx'),
   'utf8',
@@ -120,12 +124,15 @@ describe('#670 02 担当者の二重ラベルと並び順の見出し', () => {
 })
 
 describe('#670 24 お知らせの集計カードは意味で分ける', () => {
-  it('状態4枚と送信枠3枚の2群にし、各群を対称の列数で出す', () => {
-    expect(NOTIFY).toContain('kpis.slice(0, 4)')
-    expect(NOTIFY).toContain('kpis.slice(4)')
-    expect(NOTIFY).toContain('aria-label="お知らせの状態"')
-    expect(NOTIFY).toContain('aria-label="今月の送信枠"')
-    expect(NOTIFY).toContain('xl:grid-cols-3')
+  it('お知らせの数と月の送信枠を別の段に分ける', () => {
+    expect(NOTIFY).toContain("kpi.group === 'notice'")
+    expect(NOTIFY).toContain("kpi.group === 'quota'")
+    expect(NOTIFY_KPIS).toContain("group: 'notice'")
+    expect(NOTIFY_KPIS).toContain("group: 'quota'")
+  })
+
+  it('送信枠の3枚は3列で並ぶ', () => {
+    expect(NOTIFY).toContain('sm:grid-cols-3')
   })
 })
 
@@ -147,5 +154,27 @@ describe('#670 22 残りのAA未満の緑を共通トークンへ', () => {
   it('success-bg の相手に green-700 を置かない', () => {
     expect(AUTOMATIONS).not.toContain('text-green-700')
     expect(AUTOMATIONS).toContain("'bg-success-bg text-success'")
+  })
+})
+
+describe('#670 10 ウェビナー一覧の器は中身の高さに合わせる（A8）', () => {
+  it('一覧の器に固定の最小高さを持たせない', () => {
+    expect(WEBINARS).not.toContain('min-h-[360px]')
+  })
+})
+
+describe('#670 20 分析の集計待ちは帯1本だけが理由を言う（A9）', () => {
+  it('グラフ枠は理由文（stateReason）を繰り返さない', () => {
+    expect(ANALYTICS).toContain('reasonShownInBanner')
+  })
+})
+
+describe('#670 28 予約メニューに押せないドラッグ持ち手を置かない（A12）', () => {
+  it('⠿ の飾りを行頭に出さない', () => {
+    expect(BOOKING_MENUS).not.toContain('⠿')
+  })
+
+  it('並び順を変える実際の経路（編集内の数値欄）は残す', () => {
+    expect(BOOKING_MENUS).toContain('label="並び順"')
   })
 })

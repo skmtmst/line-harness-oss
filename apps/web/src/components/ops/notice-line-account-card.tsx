@@ -54,7 +54,7 @@ export default function NoticeLineAccountCard() {
       {data?.current ? (
         <p className="text-caption text-ink">
           いまの指定：<span className="font-bold">{data.current.name}</span>
-          {data.current.addFriendUrl ? <>　友だち追加：<a href={data.current.addFriendUrl} target="_blank" rel="noreferrer" className="text-accent-deep underline-offset-2 hover:underline">{data.current.addFriendUrl}</a></> : '　（LINE の基本ID が未取得のため、友だち追加の URL はまだ出せません）'}
+          {data.current.addFriendUrl ? <>　友だち追加：<a href={data.current.addFriendUrl} target="_blank" rel="noreferrer" className="text-action underline-offset-2 hover:underline">{data.current.addFriendUrl}</a></> : '　（LINE の基本ID が未取得のため、友だち追加の URL はまだ出せません）'}
           　登録済み {data.linked.linked}人 / {data.linked.total}人
         </p>
       ) : (

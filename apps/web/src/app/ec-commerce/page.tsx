@@ -14,6 +14,7 @@ import Pagination from '@/components/shared/pagination'
 import Select from '@/components/shared/select'
 import SummaryCard from '@/components/shared/summary-card'
 import KpiCollapse from '@/components/ui/kpi-collapse'
+import ListRange from '@/components/ui/list-range'
 import { ActionCell, DataTable, Td, Th, TableHeadRow, Tr } from '@/components/shared/table'
 import { Tabs } from '@/components/shared/tabs'
 import { useAccount } from '@/contexts/account-context'
@@ -488,7 +489,7 @@ function EventsPanel({ accountId }: { accountId: string | null }) {
       </DataTable>}
       {listState === 'ready' ? (
         <div className={styles.footer}>
-          <p>取り込みの記録 {actionTotal.toLocaleString('ja-JP')}件中 {actions.length.toLocaleString('ja-JP')}件を表示しています。古い記録はページを進んで確認できます。</p>
+          <p><ListRange label="取り込みの記録" total={actionTotal} first={actions.length === 0 ? 0 : 1} last={actions.length} /> 古い記録はページを進んで確認できます。</p>
           <p>注文の本文や接続用の秘密値は表示しません。もう一度行うときも、成功済みの処理は重ねません。</p>
         </div>
       ) : null}

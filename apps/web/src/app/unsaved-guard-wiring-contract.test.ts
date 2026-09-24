@@ -106,8 +106,6 @@ const UNTRIAGED: Record<string, string> = {
     's3: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
   'app/analytics/reports/new/page.tsx':
     's3: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
-  'app/auto-replies/page.tsx':
-    's2: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
   'app/auto-replies/publish/page.tsx':
     's2: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
   'app/booking/bookings/detail/page.tsx':
@@ -191,8 +189,6 @@ const UNTRIAGED: Record<string, string> = {
   'app/webhooks/page.tsx':
     's3: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
   'app/webinars/new/page.tsx':
-    's2: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
-  'app/webinars/page.tsx':
     's2: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
   'components/accounts/account-edit-modal.tsx':
     'hq: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',

@@ -26,6 +26,7 @@ import SummaryCard from '@/components/shared/summary-card'
 import { Tabs } from '@/components/shared/tabs'
 import { TextArea, TextField } from '@/components/shared/text-field'
 import { compareLabel, durationLabel, elapsedLabel } from './format'
+import ListRange from '@/components/ui/list-range'
 
 /**
  * お問い合わせ（チケット）★V6 37-6 `IjIFa`／37-6-A `b2uv3`（AIの下書き）／37-6-B `XlTAd`（作成中）。
@@ -375,7 +376,7 @@ export default function OpsSupportPage() {
         <section aria-label={listTitle} className={knowledgeStyles.supportList}>
           <header className="flex items-center justify-between border-b border-hairline px-4 py-3">
             <h2 className="text-label font-bold text-ink">{listTitle}</h2>
-            <span className="text-micro text-ink-faint">{total}件中 {tickets.length === 0 ? 0 : 1}〜{tickets.length}件</span>
+            <ListRange total={total} first={tickets.length === 0 ? 0 : 1} last={tickets.length} />
           </header>
           {loading && tickets.length === 0 ? (
             <ListState kind="loading" title="チケットを読み込んでいます" />
@@ -439,7 +440,7 @@ export default function OpsSupportPage() {
 
               {/* 問い合わせ元 */}
               <div className={knowledgeStyles.supportMeta}>
-                <Meta label="契約先"><Link href={tenantDetailHref(ticket.tenantId)} className="text-accent-deep underline-offset-2 hover:underline">{ticket.tenantName}</Link></Meta>
+                <Meta label="契約先"><Link href={tenantDetailHref(ticket.tenantId)} className="text-action underline-offset-2 hover:underline">{ticket.tenantName}</Link></Meta>
                 <Meta label="起票者">{ticket.staffName || '—'}{ticket.staffRole ? `（${ROLE_LABEL[ticket.staffRole] ?? ticket.staffRole}）` : ''}</Meta>
                 <Meta label="受付">{ticket.channel === 'admin' ? '管理画面のお問い合わせ' : ticket.channelLabel}</Meta>
                 <Meta label="プラン">{planLabel(ticket.tenantPlanKey)}・{PLAN_STATUS_LABEL[ticket.tenantPlanStatus] ?? ticket.tenantPlanStatus}</Meta>
@@ -561,7 +562,7 @@ function Message({ side, author, at, body, attachments }: { side: 'left' | 'righ
       {attachments.length > 0 ? (
         <span className="flex flex-wrap gap-2">
           {attachments.map((a) => (
-            <a key={a.key} href={a.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-micro text-accent-deep underline-offset-2 hover:underline">
+            <a key={a.key} href={a.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-micro text-action underline-offset-2 hover:underline">
               <Paperclip aria-hidden="true" className="h-3.5 w-3.5" />
               {a.name}（{side === 'right' ? '運営から' : '契約先から'}）
             </a>

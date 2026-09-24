@@ -187,6 +187,7 @@ import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
 import { TextField } from '@/components/shared/text-field'
 import KpiCollapse from '@/components/ui/kpi-collapse'
+import ListRange from '@/components/ui/list-range'
 
 const DAY_MS = 24 * 60 * 60 * 1000
 
@@ -977,10 +978,13 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
       <div data-design="tf" className="mt-3 flex flex-wrap items-center justify-between gap-2">
         <p className="text-ink-faint text-xs">利用先の名前は詳細で確認できます。追加するときは分析画面でこの成果地点を選びます。</p>
         <div className="flex items-center gap-2 text-xs">
-          <span className="text-ink-faint tabular-nums">
-            成果地点 {definitions?.pagination.total ?? shown.length}個中 {shown.length === 0 ? 0 : (page - 1) * PAGE_SIZE + 1}〜
-            {Math.min(page * PAGE_SIZE, shown.length)}個を表示
-          </span>
+          <ListRange
+            className="tabular-nums"
+            label="成果地点"
+            total={definitions?.pagination.total ?? shown.length}
+            first={shown.length === 0 ? 0 : (page - 1) * PAGE_SIZE + 1}
+            last={Math.min(page * PAGE_SIZE, shown.length)}
+          />
           <Pagination page={page} pageCount={pageCount} onPageChange={setPage} />
         </div>
       </div>
@@ -1687,6 +1691,7 @@ function ConversionsPageHost() {
         tabs={MERGED_TABS}
         active={tab}
         defaultKey={DEFAULT_TAB}
+        label="成果とアフィリエイト・コンバージョンの画面"
       />
       {tab === 'points' && <ConversionsPageInner accountId={selectedAccountId} />}
       {tab === 'affiliates' && <AffiliatorsTab accountId={selectedAccountId} />}

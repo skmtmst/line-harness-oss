@@ -284,7 +284,7 @@ function MigrateFriendField() {
           <span className="hidden xl:block">→</span>
         </div>
         <section className="rounded-card border border-accent/30 bg-canvas p-5 shadow-sm">
-          <p className="text-xs font-semibold text-accent-deep">移行先の項目</p>
+          <p className="text-xs font-semibold text-ink-secondary">移行先の項目</p>
           {target ? (
             <div className="mt-3">
               <h2 className="text-base font-bold text-ink">{target.name}</h2>
@@ -293,7 +293,7 @@ function MigrateFriendField() {
               <button
                 type="button"
                 onClick={() => { setCreatedTarget(null); setExistingTargetId(''); resetConfirmation() }}
-                className="mt-3 text-xs font-semibold text-accent-deep hover:underline"
+                className="mt-3 text-xs font-semibold text-action hover:underline"
               >
                 別の項目を選び直す
               </button>
@@ -363,7 +363,7 @@ function MigrateFriendField() {
           <div className="mt-5">
             <div className="grid gap-3 sm:grid-cols-4">
               <div className="rounded-control border border-hairline bg-surface-soft p-3"><p className="text-xs text-ink-faint">値がある友だち</p><p className="mt-1 text-xl font-bold text-ink">{preview.summary.total}人</p></div>
-              <div className="rounded-control border border-hairline bg-surface-soft p-3"><p className="text-xs text-ink-faint">そのまま移せる</p><p className="mt-1 text-xl font-bold text-accent-deep">{preview.summary.convertible}人</p></div>
+              <div className="rounded-control border border-hairline bg-surface-soft p-3"><p className="text-xs text-ink-faint">そのまま移せる</p><p className="mt-1 text-xl font-bold text-ink">{preview.summary.convertible}人</p></div>
               <div className="rounded-control border border-hairline bg-surface-soft p-3"><p className="text-xs text-ink-faint">人が確認する</p><p className="mt-1 text-xl font-bold text-warning">{preview.summary.review}人</p></div>
               <div className="rounded-control border border-hairline bg-surface-soft p-3"><p className="text-xs text-ink-faint">空欄</p><p className="mt-1 text-xl font-bold text-danger">{preview.summary.invalid}人</p></div>
             </div>

@@ -233,7 +233,11 @@ describe('ウェビナー一覧の表示状態と操作', () => {
       expect(html).not.toContain('min-h-[360px]')
       expect(html).not.toContain('bg-canvas')
     }
-    /* 行があるときは一覧の器で包む */
+    /*
+     * 行があるときは一覧の器で包む。器の高さは中身に任せる——
+     * 固定の最小高さがあると1行の一覧でも表の下に大きな空白ができ、
+     * 件数表示だけが枠の外に取り残されて見えた（監査 A8）。
+     */
     const withRows = renderToStaticMarkup(
       <WebinarListContent {...common} visibleItems={[webinar()]} panelGrand={1} />,
     )
@@ -241,7 +245,7 @@ describe('ウェビナー一覧の表示状態と操作', () => {
      * #670 10: 1行だけのときに約350pxの空領域が残るため、器に最低高さを
      * 付けない。中身に吸着する。
      */
-    expect(withRows).not.toContain('min-h-[360px]')
+    expect(withRows).not.toContain('min-h-[')
     expect(withRows).toContain('入門ウェビナー')
   })
 

@@ -66,7 +66,7 @@ function PreviewImage({ block }: { block: FormBlock & { kind: 'image' } }) {
         <button
           type="button"
           onClick={() => setStatus('loading')}
-          className="text-accent-deep mt-1 underline"
+          className="text-action mt-1 underline"
         >
           再試行
         </button>

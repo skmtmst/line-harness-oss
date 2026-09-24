@@ -309,7 +309,7 @@ function Message({ side, author, at, body, attachments }: { side: 'left' | 'righ
       {attachments.length > 0 ? (
         <span className="flex flex-wrap gap-2">
           {attachments.map((a) => (
-            <a key={a.key} href={a.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-micro text-accent-deep underline-offset-2 hover:underline">
+            <a key={a.key} href={a.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-micro text-action underline-offset-2 hover:underline">
               <Paperclip aria-hidden="true" className="h-3.5 w-3.5" />
               {a.key.split('/').pop()}
             </a>
