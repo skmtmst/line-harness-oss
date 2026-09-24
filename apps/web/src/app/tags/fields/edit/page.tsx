@@ -154,7 +154,7 @@ function EditFriendFieldForm() {
             */}
             <div>
               <p className="text-xs font-semibold text-ink-faint">差し込み名（変更できません）</p>
-              <p className="mt-1 font-mono text-xs font-semibold text-accent-deep">{`{{field.${field.fieldKey}}}`}</p>
+              <p className="mt-1 font-mono text-xs font-semibold text-ink-secondary">{`{{field.${field.fieldKey}}}`}</p>
             </div>
             <div>
               <p className="text-xs font-semibold text-ink-faint">種類（変更できません）</p>

@@ -105,7 +105,7 @@ export default function PasswordForgotPage() {
       </form>
       <p className="text-caption text-ink-faint">
         思い出した方は{' '}
-        <Link href="/login" className="font-semibold text-accent-deep hover:underline">
+        <Link href="/login" className="font-semibold text-action hover:underline">
           ログイン
         </Link>
       </p>

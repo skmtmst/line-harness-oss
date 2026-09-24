@@ -830,7 +830,7 @@ function ColumnsPanel({
                             {isSelected ? (
                               <span className="text-label font-semibold text-ink-faint">選択中</span>
                             ) : (
-                              <button type="button" onClick={() => onSelect(column.id)} className="text-label font-semibold text-accent-deep">
+                              <button type="button" onClick={() => onSelect(column.id)} className="text-label font-semibold text-action">
                                 {column.deliveryStatus === 'sent' ? 'もう一度送る' : column.deliveryStatus === 'draft' ? '選ぶ' : '予約を見る'}
                               </button>
                             )}
@@ -1066,7 +1066,7 @@ function HistoryPanel({ deliveryList, detail, loading, onShowDetail, onRetry, on
                     <Td><span className="text-label text-ink-secondary">{deliveryTriggerLabel(delivery.campaignKey)}</span></Td>
                     <Td align="right"><span className="text-label text-ink-faint" title={delivery.reaction.reason}>取得不可</span></Td>
                     <Td align="right">
-                      <button type="button" onClick={() => onShowDetail(delivery.id)} className="text-label font-semibold text-accent-deep">{detail?.id === delivery.id ? '閉じる' : '中身を見る'}</button>
+                      <button type="button" onClick={() => onShowDetail(delivery.id)} className="text-label font-semibold text-action">{detail?.id === delivery.id ? '閉じる' : '中身を見る'}</button>
                     </Td>
                   </Tr>
                   {detail?.id === delivery.id ? (
@@ -1080,7 +1080,7 @@ function HistoryPanel({ deliveryList, detail, loading, onShowDetail, onRetry, on
                             {detail.content.buttonLabel ? <p className="mt-2 text-caption font-bold text-accent-deep">{detail.content.buttonLabel}</p> : null}
                             {/* IDEA-21: 案内の送り先を友だち詳細へつなぐ。注文・定期便の状況はそこで追える。 */}
                             <p className="mt-2">
-                              <Link href={`/friends/detail?id=${encodeURIComponent(delivery.friendId)}`} className="text-micro font-semibold text-accent-deep hover:underline">
+                              <Link href={`/friends/detail?id=${encodeURIComponent(delivery.friendId)}`} className="text-micro font-semibold text-action hover:underline">
                                 {delivery.friendName || 'この友だち'}の記録を見る
                               </Link>
                             </p>

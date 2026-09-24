@@ -409,7 +409,7 @@ function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuC
                     <td className="px-4 py-3 text-sm text-ink-secondary tabular-nums">
                       {m.duration_minutes} 分
                     </td>
-                    <td className={`px-4 py-3 text-sm text-right tabular-nums ${menuPriceLabel(m) === '無料' ? 'text-accent-deep font-semibold' : ''}`}>
+                    <td className={`px-4 py-3 text-sm text-right tabular-nums ${menuPriceLabel(m) === '無料' ? 'text-ink font-semibold' : ''}`}>
                       {menuPriceLabel(m)}
                     </td>
                     <td className="px-4 py-3 text-sm text-ink-secondary">
@@ -1158,7 +1158,7 @@ function EditMenuModal({
                 <button
                   type="button"
                   onClick={() => void onReloadLatest()}
-                  className="text-accent-deep mt-1 text-xs font-semibold underline"
+                  className="text-action mt-1 text-xs font-semibold underline"
                 >
                   最新の内容を読み直す
                 </button>

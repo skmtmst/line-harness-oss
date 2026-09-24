@@ -165,7 +165,7 @@ export default function OperatorNotificationRules({ lineAccountId }: { lineAccou
       : <DataTable><thead><tr><Th>お知らせ</Th><Th>きっかけ</Th><Th>受け取る人</Th><Th>送る時間</Th><Th>今日</Th><Th>操作</Th></tr></thead><tbody>{visible.map((rule) => <Tr key={rule.id}>
         {/* NOTIFY-04: 名前から編集画面へ戻れる。保存したお知らせを開き直して
             直せないと、直すたびに作り直しになる。 */}
-        <NameCell name={<Link href={`/line-notifications/operator/new?id=${encodeURIComponent(rule.id)}`} className="text-accent-deep hover:underline" title={rule.name}>{rule.name}</Link>} sub={channelLabel(rule.channels)} />
+        <NameCell name={<Link href={`/line-notifications/operator/new?id=${encodeURIComponent(rule.id)}`} className="text-action hover:underline" title={rule.name}>{rule.name}</Link>} sub={channelLabel(rule.channels)} />
         <Td>{operatorEventLabel(rule.eventType)}</Td>
         <Td><span className={rule.recipientCount > 0 ? 'text-ink-secondary' : 'font-semibold text-warning'}>{rule.recipientCount > 0 ? `${rule.recipientCount}人` : '受け取れる人なし'}</span></Td>
         <Td>{conditionsOf(rule).scheduleLabel ?? 'いつでも'}</Td>

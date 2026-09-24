@@ -610,7 +610,7 @@ function FormEditInner() {
 
         <p className="text-ink-faint bg-canvas rounded-card border-hairline border p-8 text-center text-sm">
           フォームが指定されていません。
-          <Link href="/form-submissions" className="text-accent-deep ml-1 hover:underline">
+          <Link href="/form-submissions" className="text-action ml-1 hover:underline">
             一覧へ戻る
           </Link>
         </p>

@@ -1262,7 +1262,7 @@ export default function TemplatesPage() {
                       <ul className="space-y-1.5 text-xs">
                         {drawerData.usedBy.autoReplies.map((ar) => (
                           <li key={`ar-${ar.id}`}>
-                            <a href={`/auto-replies/edit?id=${ar.id}`} className="text-accent-deep hover:underline">
+                            <a href={`/auto-replies/edit?id=${ar.id}`} className="text-action hover:underline">
                               自動返信: {ar.keyword} <span className="text-ink-faint">({ar.matchType})</span>
                             </a>
                           </li>
@@ -1278,28 +1278,28 @@ export default function TemplatesPage() {
                         ))}
                         {scenarioStepUsages.map((ss) => (
                           <li key={`ss-${ss.stepId}`}>
-                            <a href={`/scenarios/detail?id=${ss.scenarioId}`} className="text-accent-deep hover:underline">
+                            <a href={`/scenarios/detail?id=${ss.scenarioId}`} className="text-action hover:underline">
                               シナリオ: {ss.scenarioName} <span className="text-ink-faint">#{ss.stepOrder}</span>
                             </a>
                           </li>
                         ))}
                         {reminderStepUsages.map((rs) => (
                           <li key={`rs-${rs.stepId}`}>
-                            <a href={`/reminders/edit?id=${rs.reminderId}`} className="text-accent-deep hover:underline">
+                            <a href={`/reminders/edit?id=${rs.reminderId}`} className="text-action hover:underline">
                               リマインダ: {rs.reminderName}
                             </a>
                           </li>
                         ))}
                         {richMenuAreaUsages.map((area) => (
                           <li key={`rm-${area.areaId}`}>
-                            <a href={`/rich-menus/edit?id=${area.groupId}`} className="text-accent-deep hover:underline">
+                            <a href={`/rich-menus/edit?id=${area.groupId}`} className="text-action hover:underline">
                               リッチメニュー: {area.groupName} / {area.pageName}{area.label ? ` / ${area.label}` : ''}
                             </a>
                           </li>
                         ))}
                         {trackedLinkUsages.map((link) => (
                           <li key={`tl-${link.id}`}>
-                            <a href={`/inflow-links/detail?id=${link.id}`} className="text-accent-deep hover:underline">
+                            <a href={`/inflow-links/detail?id=${link.id}`} className="text-action hover:underline">
                               流入リンク: {link.name}
                             </a>
                           </li>
@@ -1352,7 +1352,7 @@ export default function TemplatesPage() {
                     {href ? (
                       <a
                         href={href}
-                        className="flex items-center gap-2 rounded-control px-1.5 py-1 text-accent-deep hover:bg-canvas-sunken hover:underline"
+                        className="flex items-center gap-2 rounded-control px-1.5 py-1 text-action hover:bg-canvas-sunken hover:underline"
                       >
                         <Icon size={15} className="shrink-0" aria-hidden="true" />
                         <span className="min-w-0 flex-1">{label}</span>
@@ -1374,7 +1374,7 @@ export default function TemplatesPage() {
                 <p className="mb-2 text-sm font-bold text-ink">どうしますか</p>
                 <div className="rounded-lg border border-accent-soft bg-accent-soft px-4 py-3 text-accent-deep">
                   <p className="text-sm font-bold">上の使用先を1か所ずつ開いて、別のテンプレートへ差し替えてください</p>
-                  <p className="mt-1 text-xs text-accent-deep">差し替えが終わるまで、このテンプレートは一覧に残ります。</p>
+                  <p className="mt-1 text-xs text-ink-faint">差し替えが終わるまで、このテンプレートは一覧に残ります。</p>
                 </div>
               </div>
             </div>

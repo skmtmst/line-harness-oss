@@ -3420,7 +3420,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                     data-inbox-v6="quote-preview"
                     className="mb-2 flex items-center gap-2 rounded-lg border border-accent/40 bg-accent-soft px-3 py-1.5 text-xs"
                   >
-                    <span className="shrink-0 font-semibold text-accent-deep">引用:</span>
+                    <span className="shrink-0 font-semibold text-ink-faint">引用:</span>
                     <span className="min-w-0 flex-1 truncate text-ink-secondary">
                       {quotedMessage.isUnsent
                         ? '取り消されたメッセージ'

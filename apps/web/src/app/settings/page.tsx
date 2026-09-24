@@ -1047,7 +1047,7 @@ export default function SettingsPage() {
               {ordering && <div data-design="運営" className="rounded-card border-hairline bg-canvas mt-5 border p-4">
                 <p className="text-ink text-sm font-bold">運営</p>
                 <p className="text-ink-secondary mt-1 text-xs leading-5">お客さまの組織からは見えません。</p>
-                <Link href="/settings/manual-links" className="text-accent-deep mt-3 inline-block text-sm font-bold">
+                <Link href="/settings/manual-links" className="text-action mt-3 inline-block text-sm font-bold">
                   マニュアルの正本表
                 </Link>
               </div>}
