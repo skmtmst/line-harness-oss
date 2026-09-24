@@ -1,8 +1,9 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { X } from 'lucide-react'
 import { api, describeSaveFailure } from '@/lib/api'
+import Button from '@/components/shared/button'
+import Dialog from '@/components/shared/dialog'
 import type {
   EntryRoute,
   CreateEntryRouteInput,
@@ -138,38 +139,44 @@ export default function EditRouteModal({
     await doSave()
   }
 
+  const saveDisabled = submitting || !form.genre?.trim() || !form.name.trim() || !form.refCode.trim()
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-lg w-full max-w-lg p-6 space-y-3 max-h-[90vh] overflow-y-auto">
-        <div className="flex items-start justify-between gap-3">
-          <h2 className="text-lg font-medium">
-            {isNew ? '新規リファラルリンク' : 'リファラルリンク編集'}
-          </h2>
-          <button type="button" onClick={onClose} aria-label="閉じる" className="rounded-mini p-1 text-ink-secondary hover:bg-canvas-sunken">
-            <X aria-hidden="true" className="h-5 w-5" />
-          </button>
+    <Dialog
+      open
+      title={isNew ? '新規リファラルリンク' : 'リファラルリンク編集'}
+      busy={submitting}
+      error={error || undefined}
+      onCancel={onClose}
+      footer={
+        <div className="flex justify-end gap-2">
+          <Button onClick={onClose} disabled={submitting}>
+            キャンセル
+          </Button>
+          <Button
+            variant="primary"
+            onClick={onSubmit}
+            disabled={saveDisabled}
+          >
+            {submitting ? '保存中…' : isNew ? '作成' : '保存'}
+          </Button>
         </div>
-
-        {error && (
-          <div className="p-2 rounded bg-red-50 border border-red-200 text-red-700 text-xs">
-            {error}
-          </div>
-        )}
-
+      }
+    >
+      <div className="space-y-3">
         <Field label="ジャンル（協力会社・グループ）">
           <input
             list={genreLocked ? undefined : 'referral-genre-options'}
             value={form.genre ?? ''}
             onChange={(e) => setForm({ ...form, genre: e.target.value })}
             readOnly={genreLocked}
-            className="w-full border border-gray-200 rounded px-3 py-2 text-sm read-only:bg-emerald-50 read-only:border-emerald-200 read-only:text-success read-only:font-medium"
+            className="border-hairline rounded-control bg-canvas text-ink w-full border px-3 py-2 text-sm"
             placeholder="例: A店"
             maxLength={80}
           />
           <datalist id="referral-genre-options">
             {existingGenres.map((genre) => <option key={genre} value={genre} />)}
           </datalist>
-          <p className="text-xs text-gray-500 mt-1">
+          <p className="text-ink-faint mt-1 text-xs">
             {genreLocked
               ? '左側で選択したジャンルへ登録されます。'
               : '同じ協力会社や媒体を同じジャンル名にすると、一覧でまとめて管理できます。'}
@@ -180,23 +187,23 @@ export default function EditRouteModal({
           <input
             value={form.name}
             onChange={(e) => setForm({ ...form, name: e.target.value })}
-            className="w-full border border-gray-200 rounded px-3 py-2 text-sm"
+            className="border-hairline rounded-control bg-canvas text-ink w-full border px-3 py-2 text-sm"
             placeholder="例: Instagram プロフィール"
             maxLength={120}
           />
         </Field>
 
-        <Field label="ref_code（URL に出る識別子）">
+        <Field label="URLに出る識別子">
           <input
             value={form.refCode}
             onChange={(e) => setForm({ ...form, refCode: e.target.value })}
             disabled={refCodeLocked}
-            className="w-full border border-gray-200 rounded px-3 py-2 text-sm font-mono disabled:bg-gray-50 disabled:text-gray-500"
+            className="border-hairline rounded-control bg-canvas text-ink disabled:bg-canvas-sunken disabled:text-ink-faint w-full border px-3 py-2 font-mono text-sm"
             placeholder="例: youtube"
           />
           {refCodeLocked && (
-            <p className="text-xs text-gray-500 mt-1">
-              既に流入があった ref を登録中のため、ref_code は変更できません。
+            <p className="text-ink-faint mt-1 text-xs">
+              既に流入があった識別子を登録中のため、URLに出る識別子は変更できません。
             </p>
           )}
         </Field>
@@ -205,7 +212,7 @@ export default function EditRouteModal({
           <select
             value={form.tagId ?? ''}
             onChange={(e) => setForm({ ...form, tagId: e.target.value || null })}
-            className="w-full border border-gray-200 rounded px-3 py-2 text-sm"
+            className="border-hairline rounded-control bg-canvas text-ink w-full border px-3 py-2 text-sm"
           >
             <option value="">— 設定なし —</option>
             {tags.map((tag) => (
@@ -214,7 +221,7 @@ export default function EditRouteModal({
               </option>
             ))}
           </select>
-          <p className="text-xs text-gray-500 mt-1">
+          <p className="text-ink-faint mt-1 text-xs">
             友だち追加時にこのタグを自動付与します。タグ未作成の場合は先にタグを作成してください。
           </p>
         </Field>
@@ -223,7 +230,7 @@ export default function EditRouteModal({
           <select
             value={form.poolId ?? ''}
             onChange={(e) => setForm({ ...form, poolId: e.target.value || null })}
-            className="w-full border border-gray-200 rounded px-3 py-2 text-sm"
+            className="border-hairline rounded-control bg-canvas text-ink w-full border px-3 py-2 text-sm"
           >
             {pools.map((p) => {
               const members = poolMembers[p.id] ?? []
@@ -245,7 +252,7 @@ export default function EditRouteModal({
           <select
             value={form.scenarioId ?? ''}
             onChange={(e) => setForm({ ...form, scenarioId: e.target.value || null })}
-            className="w-full border border-gray-200 rounded px-3 py-2 text-sm"
+            className="border-hairline rounded-control bg-canvas text-ink w-full border px-3 py-2 text-sm"
           >
             <option value="">— 設定なし —</option>
             {scenarios.map((s) => (
@@ -260,7 +267,7 @@ export default function EditRouteModal({
           <select
             value={form.introTemplateId ?? ''}
             onChange={(e) => setForm({ ...form, introTemplateId: e.target.value || null })}
-            className="w-full border border-gray-200 rounded px-3 py-2 text-sm"
+            className="border-hairline rounded-control bg-canvas text-ink w-full border px-3 py-2 text-sm"
           >
             <option value="">— 設定なし —</option>
             {templates.map((t) => (
@@ -286,48 +293,34 @@ export default function EditRouteModal({
           />
           <span>
             アカウント標準の友だち追加時設定も実行する（並走モード）
-            <span className="block text-xs text-gray-500 mt-0.5">
+            <span className="text-ink-faint mt-0.5 block text-xs">
               OFF にするとアカウント標準シナリオは抑止され、このリンクの設定だけが流れます。
             </span>
           </span>
         </label>
 
         {warning && (
-          <div className="p-3 rounded bg-yellow-50 border border-yellow-200 text-yellow-800 text-sm">
+          <div className="bg-status-warn-soft text-status-warn-deep rounded-control p-3 text-sm">
             {warning}
             <div className="mt-2">
-              <button
+              <Button
                 onClick={doSave}
                 disabled={submitting}
-                className="text-xs px-2 py-1 rounded bg-yellow-600 text-white hover:brightness-90 disabled:opacity-50"
               >
                 それでも保存
-              </button>
+              </Button>
             </div>
           </div>
         )}
-
-        <div className="flex justify-end gap-2 pt-3 border-t border-gray-100">
-          <button onClick={onClose} className="text-sm px-3 py-1.5 text-gray-600">
-            キャンセル
-          </button>
-          <button
-            onClick={onSubmit}
-            disabled={submitting || !form.genre?.trim() || !form.name.trim() || !form.refCode.trim()}
-            className="text-sm px-3 py-1.5 rounded bg-blue-600 text-white hover:brightness-90 disabled:opacity-50"
-          >
-            {submitting ? '保存中…' : isNew ? '作成' : '保存'}
-          </button>
-        </div>
       </div>
-    </div>
+    </Dialog>
   )
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <label className="block text-xs font-medium text-gray-600 mb-1">{label}</label>
+      <label className="text-ink-secondary mb-1 block text-xs font-medium">{label}</label>
       {children}
     </div>
   )
