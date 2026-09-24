@@ -146,6 +146,7 @@ import { analytics } from './routes/analytics.js';
 import { dashboard } from './routes/dashboard.js';
 import { siteTracking } from './routes/site-tracking.js';
 import { restaurantTest } from './routes/restaurant-test.js';
+import { restaurantGoogle } from './routes/restaurant-google.js';
 import { tenants } from './routes/tenants.js';
 import { ops } from './routes/ops.js';
 import { piiMaskMiddleware, type ImpersonationContext } from './middleware/impersonation.js';
@@ -267,6 +268,13 @@ export type Env = {
     // AES-GCM key for credentials stored in line_accounts. Optional so a
     // missing secret does not stop unrelated Worker routes from starting.
     LINE_CREDENTIAL_ENCRYPTION_KEY?: string;
+    /** 飲食店向けGoogleビジネス：利用者のGoogleアカウントで認可するOAuthクライアント。環境ごとに分ける。 */
+    GOOGLE_BUSINESS_OAUTH_CLIENT_ID?: string;
+    GOOGLE_BUSINESS_OAUTH_CLIENT_SECRET?: string;
+    /** 'true' のときだけGoogleへ書き込む（口コミ返信の公開）。既定は読み取りのみ。 */
+    GOOGLE_BUSINESS_WRITE_ENABLED?: string;
+    /** 口コミ返信の下書きに使う Workers AI のモデル。未設定なら OPS_SUPPORT_AI_MODEL → 既定値。 */
+    GOOGLE_BUSINESS_AI_MODEL?: string;
     ECCUBE_WEBHOOK_SECRET?: string;
     NEN_EC_BASE_URL?: string;
     NEN_RICH_MENU_STORE_URL?: string;
@@ -525,6 +533,7 @@ app.route('/', dashboard);
 app.route('/', siteTracking);
 // 飲食店向けの検証専用領域。既存NEN機能とはAPI/DB名前空間を分離する。
 app.route('/', restaurantTest);
+app.route('/', restaurantGoogle);
 app.route('/', tenants);
 app.route('/', hqBanners);
 app.route('/', hqSupport);

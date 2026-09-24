@@ -384,6 +384,10 @@ const STAFF_EXPLICIT_ALLOW: Array<[method: string, path: string]> = [
   ['POST', '/api/restaurant-test/stores/selection/clear'],
   ['GET', '/api/restaurant-test/snapshot'],
   ['POST', '/api/restaurant-test/reservations/manual'],
+  // Googleビジネス（★V6 GB-2/GB-3）：担当者も口コミを読み、同期し、下書きを作れる。公開・接続は店舗管理者以上。
+  ['GET', '/api/restaurant-test/google/connection'],
+  ['GET', '/api/restaurant-test/google/reviews'],
+  ['POST', '/api/restaurant-test/google/reviews/sync'],
   // 運営からのお知らせ（★V6 37-7）は本人宛て。担当者でも読んで既読にできる。
   ['GET', '/api/hq/notices'],
   ['GET', '/api/hq/notices/line-registration'],
@@ -391,6 +395,9 @@ const STAFF_EXPLICIT_ALLOW: Array<[method: string, path: string]> = [
 
 const STAFF_EXPLICIT_ALLOW_PATTERNS: Array<[method: string, pattern: RegExp]> = [
   ['POST', /^\/api\/restaurant-test\/stores\/[^/]+\/select$/],
+  ['GET', /^\/api\/restaurant-test\/google\/reviews\/[^/]+$/],
+  ['POST', /^\/api\/restaurant-test\/google\/reviews\/[^/]+\/draft\/generate$/],
+  ['PUT', /^\/api\/restaurant-test\/google\/reviews\/[^/]+\/draft$/],
   ['POST', /^\/api\/hq\/notices\/[^/]+\/read$/],
 ];
 
