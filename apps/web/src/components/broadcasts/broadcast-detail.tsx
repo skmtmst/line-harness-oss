@@ -10,7 +10,7 @@ import { useAccount } from '@/contexts/account-context'
 import Header from '@/components/layout/header'
 import FlexPreviewComponent from '@/components/flex-preview'
 import TestSendSection from '@/components/broadcasts/test-send-section'
-import ProgressBar from '@/components/broadcasts/progress-bar'
+import Progress from '@/components/shared/progress'
 import SendConfirmDialog from '@/components/broadcasts/send-confirm-dialog'
 import SegmentBuilder from '@/components/broadcasts/segment-builder'
 import BroadcastStopControls from '@/components/broadcasts/broadcast-stop-controls'
@@ -612,7 +612,16 @@ export default function BroadcastDetail({ broadcastId }: BroadcastDetailProps) {
 
       {broadcast.status === 'sending' && (
         <div className="mb-4">
-          <ProgressBar totalCount={broadcast.totalCount} successCount={broadcast.successCount} />
+          {/*
+            送信の進みは共通部品 Progress（★V7 xiHO8）で出す。止めた後は
+            上の札が「停止中」になるので、題もそれに合わせる（#662）。
+          */}
+          <Progress
+            state="active"
+            title={broadcast.stopped ? '停止中' : '送信中'}
+            percent={broadcast.totalCount > 0 ? (broadcast.successCount / broadcast.totalCount) * 100 : 0}
+            countText={`${broadcast.successCount.toLocaleString('ja-JP')} / ${broadcast.totalCount.toLocaleString('ja-JP')} 人`}
+          />
           {progressStalled && (
             <div className="mt-2 rounded-card border border-warning bg-warning-bg px-4 py-3 text-sm text-warning">
               進捗の更新を一時停止しています（接続できません）。

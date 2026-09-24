@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { api } from '@/lib/api'
 import { usePageTitle } from '@/components/shell/page-chrome'
+import Progress from '@/components/shared/progress'
 import SelectField from '@/components/shared/select-field'
 import Avatar from '@/components/shared/avatar'
 import Button from '@/components/shared/button'
@@ -427,8 +428,9 @@ export default function HealthPage() {
                     <tbody>
                       {migrations.map((migration) => {
                         const status = statusConfig[migration.status]
-                        const progress = migration.totalCount > 0
-                          ? Math.round((migration.migratedCount / migration.totalCount) * 100)
+                        const countText = `${migration.migratedCount.toLocaleString('ja-JP')} / ${migration.totalCount.toLocaleString('ja-JP')} 人`
+                        const percent = migration.totalCount > 0
+                          ? (migration.migratedCount / migration.totalCount) * 100
                           : 0
                         return (
                           <tr key={migration.id} className="border-b border-hairline hover:bg-canvas-sunken">
@@ -444,17 +446,25 @@ export default function HealthPage() {
                               </span>
                             </td>
                             <td className="px-4 py-3">
-                              <div className="flex items-center gap-2">
-                                <div className="w-24 h-2 bg-canvas-sunken rounded-full overflow-hidden">
-                                  <div
-                                    className="h-full rounded-full transition-all"
-                                    style={{ width: `${progress}%`, backgroundColor: 'var(--color-accent)' }}
-                                  />
-                                </div>
-                                <span className="text-xs text-ink-secondary">
-                                  {migration.migratedCount}/{migration.totalCount}
-                                </span>
-                              </div>
+                              {/*
+                                移行の進みは共通部品 Progress（★V7 xiHO8）で出す。
+                                実行中→active、完了→done、失敗→partial（残りは赤の欠け）、
+                                待ち→preparing。数は文字でも残す（n / m 人）。
+                              */}
+                              {migration.status === 'in_progress' ? (
+                                <Progress state="active" title="移行中" percent={percent} countText={countText} className="min-w-48" />
+                              ) : migration.status === 'completed' ? (
+                                <Progress state="done" title="移行が完了しました" note={countText} className="min-w-48" />
+                              ) : migration.status === 'failed' ? (
+                                <Progress
+                                  state="partial"
+                                  title={migration.migratedCount > 0 ? `${countText}まで移行し、途中で止まりました` : `移行できませんでした（${countText}）`}
+                                  percent={percent}
+                                  className="min-w-48"
+                                />
+                              ) : (
+                                <Progress state="preparing" title="移行待ち" note={countText} className="min-w-48" />
+                              )}
                             </td>
                             <td className="px-4 py-3 text-ink-faint text-xs">
                               {new Date(migration.createdAt).toLocaleString('ja-JP')}

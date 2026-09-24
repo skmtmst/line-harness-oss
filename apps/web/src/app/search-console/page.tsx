@@ -109,7 +109,7 @@ function TrendChart({ rows }: { rows: SearchConsoleMetricRow[] }) {
         <polygon points={fillPoints} fill="url(#searchClickArea)" />
         <polyline points={points} fill="none" stroke="var(--color-action)" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
-      <div className="text-ink-faint flex justify-between text-[11px]">
+      <div className="text-ink-faint text-micro flex justify-between">
         <span>{rows[0]?.key.replaceAll('-', '/')}</span>
         <span>{rows.at(-1)?.key.replaceAll('-', '/')}</span>
       </div>
@@ -283,7 +283,13 @@ export default function SearchConsolePage() {
             </section>
             <section className="rounded-card border-hairline border bg-canvas p-5">
               <h2 className="text-ink whitespace-nowrap text-base font-bold">デバイス別</h2>
-              <div className="mt-5 space-y-5">{data.devices.map((device) => { const ratio = data.summary.clicks ? (device.clicks / data.summary.clicks) * 100 : 0; const label = { MOBILE: 'スマートフォン', DESKTOP: 'パソコン', TABLET: 'タブレット' }[device.key] ?? device.key; return <div key={device.key}><div className="flex items-center justify-between gap-3 text-sm"><span className="text-ink-secondary whitespace-nowrap font-medium">{label}</span><span className="text-ink-secondary whitespace-nowrap">{number.format(device.clicks)}クリック</span></div><div className="bg-canvas-sunken mt-2 h-2 overflow-hidden rounded-full"><div className="bg-action h-full rounded-full" style={{ width: `${Math.min(ratio, 100)}%` }} /></div><p className="text-ink-faint mt-1 text-right text-[11px]">{oneDecimal.format(ratio)}%</p></div> })}</div>
+              {/*
+                端末別の割合（★V7 h99Gb の棒に寄せる）。共通部品 BarChart は
+                「日ごとの増減」専用（増えた・減ったの2系列）で3項目には使えないため、
+                今の横棒の並びのまま、目盛りの字（text-micro）・等幅数字・1色の棒にそろえる。
+                3項目に3色は付けない（h99Gb の決まり「色は2つまで」）。
+              */}
+              <div className="mt-5 space-y-5">{data.devices.map((device) => { const ratio = data.summary.clicks ? (device.clicks / data.summary.clicks) * 100 : 0; const label = { MOBILE: 'スマートフォン', DESKTOP: 'パソコン', TABLET: 'タブレット' }[device.key] ?? device.key; return <div key={device.key}><div className="flex items-center justify-between gap-3 text-sm"><span className="text-ink-secondary whitespace-nowrap font-medium">{label}</span><span className="text-ink-secondary whitespace-nowrap tabular-nums">{number.format(device.clicks)}クリック</span></div><div className="bg-canvas-sunken mt-2 h-2 overflow-hidden rounded-full"><div className="bg-action h-full rounded-full" style={{ width: `${Math.min(ratio, 100)}%` }} /></div><p className="text-ink-faint text-micro mt-1 text-right tabular-nums">{oneDecimal.format(ratio)}%</p></div> })}</div>
             </section>
           </div>
           <div className="grid gap-5 xl:grid-cols-2">
@@ -297,7 +303,7 @@ export default function SearchConsolePage() {
               <li>・「検索から友だち追加」は、サイトスクリプトで結びついた分だけを数えるものですが、その突き合わせはまだありません</li>
             </ul>
           </Disclosure>
-          <p className="text-ink-faint text-right text-[11px]">Search Console APIから読み取り専用で取得・最終更新 {new Date(data.fetchedAt).toLocaleString('ja-JP')}</p>
+          <p className="text-ink-faint text-micro text-right">Search Console APIから読み取り専用で取得・最終更新 {new Date(data.fetchedAt).toLocaleString('ja-JP')}</p>
         </div>
       )}
     </div>
