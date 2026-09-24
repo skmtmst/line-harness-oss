@@ -378,12 +378,12 @@ try {
     // 編集画面は開いたまま、見ているアカウントだけが替わる。
     const accountSelect = page.getByLabel('LINEアカウント')
     const introValue = () => page.evaluate(() => {
-      const box = document.querySelector('main[data-design-node="Q55bb"] textarea')
+      const box = document.querySelector('[data-design-node="Q55bb"] textarea')
       return box ? box.value : null
     })
     const waitForIntro = async (expected) => {
       await page.waitForFunction((want) => {
-        const box = document.querySelector('main[data-design-node="Q55bb"] textarea')
+        const box = document.querySelector('[data-design-node="Q55bb"] textarea')
         return Boolean(box) && box.value === want
       }, expected, { timeout: 15_000 })
     }
@@ -456,7 +456,7 @@ try {
     // Bの読み込みを再開させ、普通に終わらせる（隙間を通したことの裏取り）。
     releaseB()
     await page.waitForFunction(() => {
-      const box = document.querySelector('main[data-design-node="Q55bb"] textarea')
+      const box = document.querySelector('[data-design-node="Q55bb"] textarea')
       return Boolean(box) && box.value === 'B店の本文'
     }, undefined, { timeout: 15_000 })
 
@@ -467,7 +467,7 @@ try {
     // Aへ戻ると、消されていない控えが復元され、未保存の印も戻る。
     await page.getByLabel('LINEアカウント').selectOption('account-a')
     await page.waitForFunction(() => {
-      const box = document.querySelector('main[data-design-node="Q55bb"] textarea')
+      const box = document.querySelector('[data-design-node="Q55bb"] textarea')
       return Boolean(box) && box.value === 'Aで保存を押した時点の本文'
     }, undefined, { timeout: 15_000 })
     assert.ok(
