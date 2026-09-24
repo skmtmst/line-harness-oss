@@ -162,15 +162,20 @@ export default function PetsTab({
             <DataTable>
               <thead>
                 <TableHeadRow>
-                  <Th className="w-64">ペット</Th>
-                  <Th className="w-48">飼い主</Th>
-                  <Th className="w-24">年齢</Th>
+                  {/*
+                    1440pxで表がはみ出さないよう、固定幅の合計を容器（1103px）
+                    に収める。操作列 w-40 は LAY-17 の契約で保つ。
+                    伸ばすのは文字の主食の列だけ（全ルート監査、2026-09-25）。
+                  */}
+                  <Th className="w-48">ペット</Th>
+                  <Th className="w-36">飼い主</Th>
+                  <Th className="w-20">年齢</Th>
                   <Th className="w-20" align="right">体重</Th>
-                  <Th className="w-36">今日の目安</Th>
+                  <Th className="w-28">今日の目安</Th>
                   <Th className="w-24">避妊去勢</Th>
                   <Th className="w-20">運動量</Th>
                   <Th>主食</Th>
-                  <Th className="w-24">体重の更新</Th>
+                  <Th className="w-20">体重の更新</Th>
                   {/*
                     「飼い主」「編集」の枠付きボタンが横に並べて入る幅を
                     先に確保する（LAY-17/18）。
@@ -236,9 +241,9 @@ function PetRow({ pet, canEdit, onEdit }: { pet: NenPetRow; canEdit: boolean; on
           </>
         )}
       </Td>
-      <Td><span className="text-label text-ink-secondary">{NEUTERED_LABEL[pet.neutered]}</span></Td>
-      <Td><span className="text-label text-ink-secondary">{pet.activityLabel}</span></Td>
-      <Td><span className="block truncate text-label text-ink-secondary">{pet.productName ?? '（未設定）'}</span></Td>
+      <Td><span className="block truncate text-label text-ink-secondary" title={NEUTERED_LABEL[pet.neutered]}>{NEUTERED_LABEL[pet.neutered]}</span></Td>
+      <Td><span className="block truncate text-label text-ink-secondary" title={pet.activityLabel}>{pet.activityLabel}</span></Td>
+      <Td><span className="block truncate text-label text-ink-secondary" title={pet.productName ?? '（未設定）'}>{pet.productName ?? '（未設定）'}</span></Td>
       <Td>
         {pet.weightStale ? (
           <Chip tone="warn">{pet.updatedAt.slice(5, 10).replace('-', '/')}</Chip>
