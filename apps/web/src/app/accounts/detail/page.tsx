@@ -4,9 +4,10 @@ import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { Suspense, useCallback, useEffect, useState } from 'react'
 import type { LineAccount } from '@line-crm/shared'
-import { api } from '@/lib/api'
+import { api, ApiError } from '@/lib/api'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
+import TargetMissing from '@/components/shared/target-missing'
 import Breadcrumb from '@/components/shared/breadcrumb'
 import StatusBadge from '@/components/shared/status-badge'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -42,6 +43,8 @@ function AccountDetail() {
   const [account, setAccount] = useState<AccountDetailView | null>(null)
   const [all, setAll] = useState<LineAccount[]>([])
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
+  /** 404・空で見つからないとき。取得の失敗（error）とは分ける。 */
+  const [missing, setMissing] = useState(false)
   const [stopTarget, setStopTarget] = useState<LineAccount | null>(null)
   const [busy, setBusy] = useState(false)
   const [actionError, setActionError] = useState('')
@@ -49,13 +52,19 @@ function AccountDetail() {
   const load = useCallback(async () => {
     if (!id) return
     setStatus('loading')
+    setMissing(false)
     try {
       const [one, list] = await Promise.all([api.lineAccounts.get(id), api.lineAccounts.list()])
       if (!one.success) { setStatus('error'); return }
       setAccount(one.data)
       if (list.success) setAll(list.data)
       setStatus('ready')
-    } catch {
+    } catch (caught) {
+      if (caught instanceof ApiError && caught.status === 404) {
+        setMissing(true)
+        setStatus('ready')
+        return
+      }
       setStatus('error')
     }
   }, [id])
@@ -86,20 +95,34 @@ function AccountDetail() {
   */
   if (!id) {
     return (
-      <ListState
-        kind="empty"
+      <TargetMissing
+        kind="unspecified"
         title="見るアカウントが指定されていません"
         description="LINEアカウントの一覧から、見るアカウントを選び直してください。"
-        action={<Button href="/accounts">LINEアカウントの一覧へ戻る</Button>}
+        backHref="/accounts"
+        backLabel="LINEアカウントの一覧へ戻る"
       />
     )
   }
   if (status === 'loading') return <ListState kind="loading" />
+  if (missing || (status === 'ready' && !account)) {
+    return (
+      <TargetMissing
+        kind="not-found"
+        title="このアカウントは見つかりません"
+        description="削除されたか、別の記録です。一覧から選び直してください。"
+        backHref="/accounts"
+        backLabel="LINEアカウントの一覧へ戻る"
+      />
+    )
+  }
   if (status === 'error' || !account) {
     return (
-      <ListState
+      <TargetMissing
         kind="error"
-        action={<Button type="button" onClick={() => void load()}>再読み込み</Button>}
+        title="アカウントを読み込めませんでした"
+        description="通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度読み込んでください。"
+        onRetry={() => void load()}
       />
     )
   }

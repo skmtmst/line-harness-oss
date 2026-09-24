@@ -8,7 +8,8 @@ import { usePageTitle } from '@/components/shell/page-chrome'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import StatusBadge from '@/components/shared/status-badge'
-import { api, type FriendAddRunDetail } from '@/lib/api'
+import TargetMissing from '@/components/shared/target-missing'
+import { api, ApiError, type FriendAddRunDetail } from '@/lib/api'
 
 const ACTION_LABELS: Record<string, string> = {
   tag: 'タグ操作',
@@ -41,6 +42,8 @@ function FriendAddRunDetailInner() {
   const [detail, setDetail] = useState<FriendAddRunDetail | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  /** 404・空で見つからないとき。取得の失敗（error）とは分ける。 */
+  const [missing, setMissing] = useState(false)
   const [retrying, setRetrying] = useState(false)
   const [notice, setNotice] = useState('')
   const requestSequence = useRef(0)
@@ -57,6 +60,7 @@ function FriendAddRunDetailInner() {
     }
     setLoading(true)
     setError('')
+    setMissing(false)
     try {
       const response = await api.friendAddRules.runDetail(selectedAccountId, runId)
       if (requestId !== requestSequence.current) return
@@ -65,8 +69,13 @@ function FriendAddRunDetailInner() {
         return
       }
       setDetail(response.data)
-    } catch {
-      if (requestId === requestSequence.current) setError('実行詳細を表示できませんでした。')
+    } catch (caught) {
+      if (requestId !== requestSequence.current) return
+      if (caught instanceof ApiError && caught.status === 404) {
+        setMissing(true)
+        return
+      }
+      setError('実行詳細を表示できませんでした。')
     } finally {
       if (requestId === requestSequence.current) setLoading(false)
     }
@@ -103,29 +112,36 @@ function FriendAddRunDetailInner() {
   */
   if (!runId) {
     return (
-      <ListState
-        kind="empty"
+      <TargetMissing
+        kind="unspecified"
         title="見る実行詳細が指定されていません"
         description="実行履歴の一覧から、見る記録を選び直してください。"
-        action={<Button href="/friend-add-settings/runs">実行履歴の一覧へ戻る</Button>}
+        backHref="/friend-add-settings/runs"
+        backLabel="実行履歴の一覧へ戻る"
       />
     )
   }
   if (!selectedAccountId) {
     return <ListState kind="empty" title="LINEアカウントを選んでください" description="上部でLINEアカウントを選ぶと、その実行詳細を表示できます。" />
   }
+  if (missing || (!error && !detail)) {
+    return (
+      <TargetMissing
+        kind="not-found"
+        title="この実行詳細は見つかりません"
+        description="対象の記録が見つかりません。削除されたか、一覧から選び直してください。"
+        backHref="/friend-add-settings/runs"
+        backLabel="実行履歴の一覧へ戻る"
+      />
+    )
+  }
   if (error || !detail) {
     return (
-      <ListState
+      <TargetMissing
         kind="error"
         title="実行詳細を表示できませんでした"
-        description={error || '対象の記録が見つかりません。削除されたか、一覧から選び直してください。'}
-        action={
-          <>
-            <Button onClick={() => void load()}>もう一度読み込む</Button>
-            <Button href="/friend-add-settings/runs">実行履歴の一覧へ戻る</Button>
-          </>
-        }
+        description="通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度読み込んでください。"
+        onRetry={() => void load()}
       />
     )
   }

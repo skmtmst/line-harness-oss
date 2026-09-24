@@ -6,12 +6,13 @@ import { useSearchParams } from 'next/navigation'
 import type { FormLayout } from '@line-crm/shared'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
+import TargetMissing from '@/components/shared/target-missing'
 import Pagination from '@/components/shared/pagination'
 import Select from '@/components/shared/select'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
-import { fetchApi } from '@/lib/api'
+import { fetchApi, ApiError } from '@/lib/api'
 import { csvCell } from '@/lib/presentation'
 import ListRange from '@/components/ui/list-range'
 import {
@@ -101,6 +102,8 @@ function FormResponsesInner() {
   const [pageSize, setPageSize] = useState(20)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  /** 404・空で見つからないとき。取得の失敗（error）とは分ける。 */
+  const [formMissing, setFormMissing] = useState(false)
   const [query, setQuery] = useState('')
   const [view, setView] = useState<'rows' | 'summary'>('rows')
   const [selected, setSelected] = useState<Submission | null>(null)
@@ -125,6 +128,7 @@ function FormResponsesInner() {
     const request = ++loadRequest.current
     setLoading(true)
     setError('')
+    setFormMissing(false)
     try {
       const account = `account_id=${encodeURIComponent(selectedAccountId)}`
       const needle = (searchText ?? queryRef.current).trim()
@@ -144,9 +148,13 @@ function FormResponsesInner() {
       setPage(responseResult.data.page)
       setPageSize(responseResult.data.limit)
       setSelected(null)
-    } catch {
+    } catch (caught) {
       if (request !== loadRequest.current) return
-      setError('集まった回答を読み込めませんでした。')
+      if (caught instanceof ApiError && caught.status === 404) {
+        setFormMissing(true)
+      } else {
+        setError('集まった回答を読み込めませんでした。')
+      }
       setItems([])
       setSummary(null)
       setTotal(null)
@@ -286,10 +294,39 @@ function FormResponsesInner() {
     U097: 対象未指定・見つからない画面には、文で案内するだけでなく
     一覧へ戻る操作を置く。
   */
-  if (!formId) return <ListState kind="empty" title="回答フォームが指定されていません" description="一覧から回答を見るフォームを選び直してください。" action={<Button href="/form-submissions">回答フォーム一覧へ戻る</Button>} />
+  if (!formId) {
+    return (
+      <TargetMissing
+        kind="unspecified"
+        title="見る回答フォームが指定されていません"
+        description="一覧から回答を見るフォームを選び直してください。"
+        backHref="/form-submissions"
+        backLabel="回答フォーム一覧へ戻る"
+      />
+    )
+  }
   if (!selectedAccountId) return <ListState kind="empty" title="LINE公式アカウントを選んでください" />
-  if (error) return <ListState kind="error" title={error} description="通信状態を確認して、もう一度読み込んでください。" onRetry={() => void load(page, pageSize)} />
-  if (!form) return <ListState kind="empty" title="回答フォームが見つかりません" description="削除されたか、リンクが古くなっています。一覧から選び直してください。" action={<Button href="/form-submissions">回答フォーム一覧へ戻る</Button>} />
+  if (formMissing || (!error && !form)) {
+    return (
+      <TargetMissing
+        kind="not-found"
+        title="この回答フォームは見つかりません"
+        description="削除されたか、リンクが古くなっています。一覧から選び直してください。"
+        backHref="/form-submissions"
+        backLabel="回答フォーム一覧へ戻る"
+      />
+    )
+  }
+  if (error || !form) {
+    return (
+      <TargetMissing
+        kind="error"
+        title="集まった回答を読み込めませんでした"
+        description="通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度読み込んでください。"
+        onRetry={() => void load(page, pageSize)}
+      />
+    )
+  }
 
   const pageCount = Math.max(1, Math.ceil((total ?? 0) / pageSize))
   const destinationWriteCount = completedDestinationWrites(summary)

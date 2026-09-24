@@ -3,8 +3,8 @@
 import { Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import SupportMarkEditor from '@/components/friend-fields/support-mark-editor'
-import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
+import TargetMissing from '@/components/shared/target-missing'
 import FeatureGate from '@/components/feature-gate'
 
 function EditSupportMarkPageInner() {
@@ -15,11 +15,12 @@ function EditSupportMarkPageInner() {
   */
   if (!id) {
     return (
-      <ListState
-        kind="empty"
-        title="対象の対応マークが指定されていません"
+      <TargetMissing
+        kind="unspecified"
+        title="編集する対応マークが指定されていません"
         description="一覧から編集する対応マークを選び直してください。"
-        action={<Button href="/tags?tab=marks">対応マークの一覧へ戻る</Button>}
+        backHref="/tags?tab=marks"
+        backLabel="対応マークの一覧へ戻る"
       />
     )
   }

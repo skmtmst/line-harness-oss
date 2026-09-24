@@ -6,12 +6,14 @@ import Breadcrumb from '@/components/shared/breadcrumb'
 import Button from '@/components/shared/button'
 import Card, { CardHeader } from '@/components/shared/card'
 import ListState from '@/components/shared/list-state'
+import TargetMissing from '@/components/shared/target-missing'
 import SummaryCard from '@/components/shared/summary-card'
 import { DataTable, Td, Th, Tr } from '@/components/shared/table'
 import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import {
   api,
+  ApiError,
   type FriendDetail,
   type MileageConnectedAccount,
   type MileageFriendV6,
@@ -52,6 +54,8 @@ function FriendMileageInner() {
   const [v6History, setV6History] = useState<MileageDetailHistoryItem[] | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
+  /** 404・空で見つからないとき。取得の失敗（error）とは分ける。 */
+  const [missing, setMissing] = useState(false)
   const [canAdjust, setCanAdjust] = useState(false)
   const [canConfigureAdjustmentPolicy, setCanConfigureAdjustmentPolicy] = useState(false)
   const [adjustmentOpen, setAdjustmentOpen] = useState(false)
@@ -69,6 +73,7 @@ function FriendMileageInner() {
     const request = ++requestRef.current
     setLoading(true)
     setError(false)
+    setMissing(false)
     try {
       const friendResponse = await api.friends.get(friendId)
       if (!friendResponse.success) throw new Error('load_failed')
@@ -102,7 +107,7 @@ function FriendMileageInner() {
         : null)
       setCanAdjust(Boolean(staffResponse?.success && (staffResponse.data.role === 'owner' || staffResponse.data.role === 'admin')))
       setCanConfigureAdjustmentPolicy(Boolean(staffResponse?.success && staffResponse.data.role === 'owner'))
-    } catch {
+    } catch (caught) {
       if (request !== requestRef.current) return
       setFriend(null)
       setMileage(null)
@@ -110,7 +115,11 @@ function FriendMileageInner() {
       setV6History(null)
       setCanAdjust(false)
       setCanConfigureAdjustmentPolicy(false)
-      setError(true)
+      if (caught instanceof ApiError && caught.status === 404) {
+        setMissing(true)
+      } else {
+        setError(true)
+      }
     } finally {
       if (request === requestRef.current) setLoading(false)
     }
@@ -135,11 +144,12 @@ function FriendMileageInner() {
   if (!friendId) {
     return (
       <div data-design-node="HIU5O">
-        <ListState
-          kind="empty"
+        <TargetMissing
+          kind="unspecified"
           title="マイル明細を見る友だちが指定されていません"
           description="友だちの一覧から、明細を見る人を選び直してください。"
-          action={<Button href="/friends">友だち一覧へ戻る</Button>}
+          backHref="/friends"
+          backLabel="友だち一覧へ戻る"
         />
       </div>
     )
@@ -147,19 +157,27 @@ function FriendMileageInner() {
   if (!selectedAccountId) {
     return <div data-design-node="HIU5O"><ListState kind="empty" title="LINEアカウントを選択してください" description="共通トップバーでLINEアカウントを選ぶと、友だちのマイル明細を確認できます。" /></div>
   }
+  if (missing || (!error && (!friend || !mileage))) {
+    return (
+      <div data-design-node="HIU5O">
+        <TargetMissing
+          kind="not-found"
+          title="この友だちは見つかりません"
+          description="友だちが選択中のLINEアカウントにいるか確認して、一覧から選び直してください。"
+          backHref="/friends"
+          backLabel="友だち一覧へ戻る"
+        />
+      </div>
+    )
+  }
   if (error || !friend || !mileage) {
     return (
       <div data-design-node="HIU5O">
-        <ListState
+        <TargetMissing
           kind="error"
           title="マイル明細を表示できませんでした"
-          description="友だちが選択中のLINEアカウントにいるか確認して、再読み込みしてください。"
-          action={
-            <>
-              <Button onClick={() => void load()}>マイル明細を再読み込み</Button>
-              <Button href="/friends">友だち一覧へ戻る</Button>
-            </>
-          }
+          description="通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度読み込んでください。"
+          onRetry={() => void load()}
         />
       </div>
     )

@@ -50,7 +50,7 @@ describe('V6 33-3 LINEアカウントの詳細・編集', () => {
     */
     expect(PAGE).toContain('if (!id)')
     expect(PAGE).toContain('見るアカウントが指定されていません')
-    expect(PAGE).toContain('href="/accounts"')
+    expect(PAGE).toContain('backHref="/accounts"')
   })
 
   it('動的セグメントを使わない', () => {

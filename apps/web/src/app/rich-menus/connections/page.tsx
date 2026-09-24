@@ -4,11 +4,12 @@ import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'rea
 import { CircleCheck } from 'lucide-react'
 import { useSearchParams } from 'next/navigation'
 import type { RichMenuAreaResponse } from '@/lib/api'
-import { api } from '@/lib/api'
+import { api, ApiError } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
+import TargetMissing from '@/components/shared/target-missing'
 import NoteBar from '@/components/shared/note-bar'
 import PageHeader from '@/components/shared/page-header'
 import { TableHeadRow, Th } from '@/components/shared/table'
@@ -38,6 +39,8 @@ function ConnectionsContent() {
   const [group, setGroup] = useState<RichMenuGroup | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  /** 404・空で見つからないとき。取得の失敗（error）とは分ける。 */
+  const [missing, setMissing] = useState(false)
 
   usePageTitle('切替メニューのつながり')
 
@@ -53,6 +56,7 @@ function ConnectionsContent() {
     setLoading(true)
     setGroup(null)
     setError('')
+    setMissing(false)
     try {
       const response = await api.richMenuGroups.get(groupId)
       if (
@@ -62,12 +66,17 @@ function ConnectionsContent() {
       if (!response.success) throw new Error(response.error)
       if (!isRichMenuGroupResponse(response.data)) throw new Error('取得失敗')
       setGroup(response.data)
-    } catch {
+    } catch (caught) {
       if (
         activeAccountIdRef.current !== accountId
         || requestGenerationRef.current !== requestGeneration
       ) return
       setGroup(null)
+      if (caught instanceof ApiError && caught.status === 404) {
+        setMissing(true)
+        setError('')
+        return
+      }
       setError('切替のつながりを表示できませんでした。通信を確認して、もう一度お試しください。')
     } finally {
       if (
@@ -94,10 +103,36 @@ function ConnectionsContent() {
     return <ListState kind="empty" title="LINE公式アカウントを選んでください" description="表示するアカウントを上の切替から選んでください。" />
   }
   if (!groupId) {
-    return <ListState kind="empty" title="メニューを特定できませんでした" action={<Button href="/rich-menus">メニュー一覧へ戻る</Button>} />
+    return (
+      <TargetMissing
+        kind="unspecified"
+        title="つながりを見るメニューが指定されていません"
+        description="メニューの一覧から、つながりを見るメニューを選び直してください。"
+        backHref="/rich-menus"
+        backLabel="メニュー一覧へ戻る"
+      />
+    )
+  }
+  if (missing || (!error && (!group || !analysis))) {
+    return (
+      <TargetMissing
+        kind="not-found"
+        title="このメニューは見つかりません"
+        description="削除されたか、別の記録です。一覧から選び直してください。"
+        backHref="/rich-menus"
+        backLabel="メニュー一覧へ戻る"
+      />
+    )
   }
   if (error || !group || !analysis) {
-    return <ListState kind="error" title="切替のつながりを表示できませんでした" description={error} onRetry={() => void load()} />
+    return (
+      <TargetMissing
+        kind="error"
+        title="切替のつながりを表示できませんでした"
+        description="通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度読み込んでください。"
+        onRetry={() => void load()}
+      />
+    )
   }
   if (group.accountId !== selectedAccountId) {
     return <ListState kind="forbidden" title="選択中のアカウントでは表示できません" description="このメニューが所属するLINE公式アカウントへ切り替えてください。" />
