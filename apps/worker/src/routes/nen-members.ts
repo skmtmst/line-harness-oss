@@ -613,7 +613,8 @@ async function ensureConsentedPhotoSitePublication(
     db.prepare(
       `UPDATE nen_photo_submissions
           SET publication_consent_version = ?, publication_consent_at = ?,
-              publication_withdrawn_at = NULL, public_pet_name = ?, updated_at = ?
+              publication_withdrawn_at = NULL, public_pet_name = ?,
+              public_image_url = COALESCE(public_image_url, review_image_url), updated_at = ?
         WHERE id = ? AND friend_id = ? AND line_account_id = ?`,
     ).bind(
       input.consentVersion, input.now, input.showPetName ? 1 : 0, input.now,
@@ -1076,13 +1077,13 @@ nenMembers.post('/api/liff/nen/photos', async (c) => {
   const now = jstNow();
   await c.env.DB.prepare(`INSERT INTO nen_photo_submissions
     (id, friend_id, pet_id, r2_key, image_url, content_type, caption, status,
-     created_at, updated_at, line_account_id, review_image_url,
+     created_at, updated_at, line_account_id, review_image_url, public_image_url,
      image_width, image_height, image_byte_size)
-    VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?)`)
+    VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?)`)
     .bind(
       id, friend.id, body.petId, key, reviewImageUrl, body.mimeType,
       String(body.caption || '').trim().slice(0, 300), now, now, friend.line_account_id,
-      reviewImageUrl, dimensions.width, dimensions.height, bytes.byteLength,
+      reviewImageUrl, reviewImageUrl, dimensions.width, dimensions.height, bytes.byteLength,
     ).run();
   await syncNenPhotoTags(c.env.DB, friend.id);
   return c.json({ success: true, data: { id, imageUrl: reviewImageUrl, status: 'pending' } }, 201);
@@ -1789,11 +1790,14 @@ nenMembers.put('/api/nen-members/photos/:id/review', requireRole('owner', 'admin
         `UPDATE nen_photo_submissions
             SET status = ?, awarded_points = ?, review_reason_code = ?, review_reason_note = ?,
                 reviewed_by = ?, reviewed_by_name = ?, review_notification_status = 'pending',
-                reviewed_at = ?, review_version = review_version + 1, updated_at = ?
+                reviewed_at = ?,
+                public_image_url = CASE WHEN ? = 'adopted'
+                  THEN COALESCE(public_image_url, review_image_url) ELSE public_image_url END,
+                review_version = review_version + 1, updated_at = ?
           WHERE id = ? AND line_account_id = ? AND status = 'pending' AND review_version = ?`,
       ).bind(
         status, awarded, reasonCode || null, reasonNote || null, reviewer.id, reviewer.name,
-        now, now, c.req.param('id'), accountId, body!.expectedVersion,
+        now, status, now, c.req.param('id'), accountId, body!.expectedVersion,
       ),
       ...(status === 'adopted' && photo.customer_id ? [c.env.DB.prepare(
         `INSERT INTO nen_photo_reward_outbox
