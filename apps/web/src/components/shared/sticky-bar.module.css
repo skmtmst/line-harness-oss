@@ -1,3 +1,4 @@
+@layer components {
 /*
  * 下部追従バー。Pencil V5 の `Ai3fq`「共通 編集追従バー」と、
  * 作成・編集画面すべての最下段。
@@ -60,4 +61,5 @@
   .actions {
     justify-content: flex-end;
   }
+}
 }

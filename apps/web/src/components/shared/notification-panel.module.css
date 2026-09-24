@@ -1,3 +1,4 @@
+@layer components {
 .panel {
   position: absolute;
   top: calc(100% + 8px);
@@ -190,4 +191,5 @@
   align-items: center;
   gap: 5px;
   color: var(--color-ink-faint);
+}
 }
