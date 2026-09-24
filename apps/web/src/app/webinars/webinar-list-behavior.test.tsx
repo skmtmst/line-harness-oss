@@ -260,7 +260,8 @@ describe('ウェビナー一覧の表示状態と操作', () => {
         onArchive={vi.fn()}
       />,
     )
-    expect(html).toContain('ウェビナーを作成')
+    expect(html).toContain('＋ ウェビナーをつくる')
+    expect(html).not.toContain('ウェビナーを作成')
     expect(html).not.toContain('ウェビナーを作る')
   })
 
