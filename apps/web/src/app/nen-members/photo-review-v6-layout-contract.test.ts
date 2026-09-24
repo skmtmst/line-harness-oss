@@ -70,7 +70,9 @@ describe('V6 写真審査一覧（Qu6Vk）の骨格', () => {
   })
 
   it('1920pxでは設計どおり4列で並べ、右390pxを残す', () => {
-    expect(PAGE).toContain('mx-auto flex max-w-full flex-col gap-4 p-4 sm:p-6')
+    // 外枠の余白は共通シェルが持つ。ここで p-6 を足すと左端が他画面よりずれる。
+    expect(PAGE).toContain('flex min-w-0 flex-col gap-4')
+    expect(PAGE).not.toContain('mx-auto flex max-w-full flex-col gap-4 p-4 sm:p-6')
     expect(PAGE).toContain('grid grid-cols-1 gap-2.5 md:grid-cols-2 2xl:grid-cols-4')
     expect(CSS).toContain('grid-template-columns: minmax(0, 1fr) 390px;')
   })
