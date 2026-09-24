@@ -279,7 +279,7 @@ export default function EventForm({ accountId, eventId }: EventFormProps) {
 
       {/* toast */}
       {toast && (
-        <div className="mb-3 p-3 bg-green-50 border border-green-200 rounded-lg text-green-800 text-sm">
+        <div className="mb-3 p-3 bg-green-50 border border-green-200 rounded-lg text-success text-sm">
           ✓ {toast}
         </div>
       )}
@@ -863,7 +863,7 @@ function SlotsTab({
                       onClick={() => toggleActive(s)}
                       disabled={busy}
                       className={`text-xs px-2 py-1 rounded-full font-medium ${
-                        s.is_active === 1 ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'
+                        s.is_active === 1 ? 'bg-green-100 text-success' : 'bg-gray-100 text-gray-600'
                       }`}
                     >
                       {s.is_active === 1 ? '有効' : '停止'}

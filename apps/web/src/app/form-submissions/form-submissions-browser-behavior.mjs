@@ -429,8 +429,8 @@ try {
 
     const newRow = rows(page).filter({ has: newLink })
     const newRowText = await newRow.innerText()
-    assert.equal(newRowText.includes('09/08'), true, '更新列に updated_at が出る')
-    assert.equal(newRowText.includes('01/01'), false, '更新列に created_at を出さない')
+    assert.equal(newRowText.includes('9月8日'), true, '更新列に updated_at が出る')
+    assert.equal(newRowText.includes('1月1日'), false, '更新列に created_at を出さない')
     assert.equal(
       await rows(page).filter({ hasText: '古い営業フォーム' }).getByTitle('更新日時を取得できません').innerText(),
       '—',
@@ -443,7 +443,7 @@ try {
   {
     const { context, page, state } = await openHarness(browser, { role: 'staff', formsByAccount: { 'account-a': [form(1)] } })
     await openList(page)
-    await page.getByRole('button', { name: 'すべて' }).waitFor()
+    await page.getByRole('button', { name: /^すべて\s*\d/ }).waitFor()
     assert.equal(await page.getByRole('button', { name: 'フォルダを追加' }).count(), 0, 'staff にフォルダ追加を出さない')
     assert.equal(await page.getByTitle('フォームのフォルダ保存先は未接続です').count(), 0, '押せない灰色の口も残さない')
     assert.equal(state.folderWrites, 0, 'フォルダ作成の要求を出さない')

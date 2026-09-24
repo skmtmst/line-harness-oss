@@ -137,7 +137,7 @@ function PublishedWebinarContent() {
   }
 
   return (
-    <main data-design-node="TimXl" className="mx-auto max-w-[1600px] space-y-4 px-6 pb-12 pt-4">
+    <div data-design-node="TimXl" className="mx-auto max-w-[1600px] space-y-4 px-6 pb-12 pt-4">
       <div className="flex flex-wrap items-center justify-between gap-3"><a href="/webinars" className="text-action text-sm font-semibold">← ウェビナー一覧</a><Button href="/webinars">ウェビナー一覧へ</Button></div>
       <ol className="grid grid-cols-2 gap-2 py-2 sm:grid-cols-5">{['基本設定', '動画', 'CTA・フォーム', '通知', '確認'].map((label, index) => <li key={label} className="text-ink flex items-center gap-2 px-3 py-2 text-xs font-semibold"><span className="bg-accent-deep text-on-accent flex h-7 w-7 items-center justify-center rounded-full">✓</span><span><span className="text-accent-deep block text-[10px]">STEP {index + 1}</span>{label}</span></li>)}</ol>
       <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_390px]">
@@ -159,7 +159,7 @@ function PublishedWebinarContent() {
           ].map(([label, count]) => <div key={String(label)} className="text-ink-secondary flex justify-between text-sm"><span>{label}</span><span className={Number(count) > 0 ? 'text-danger font-semibold' : 'text-success'}>{Number(count)}件</span></div>)}</div></section>
         </aside>
       </div>
-    </main>
+    </div>
   )
 }
 

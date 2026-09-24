@@ -301,7 +301,7 @@ function InflowLinkDetailPageContent() {
           同じ注文は取り込み元ごとの注文番号で1件にまとまるため、再取込で二重に増えません。
         </p>
         <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-4">
-          <main data-design="Left" className="space-y-4 xl:col-span-3">
+          <div data-design="Left" className="space-y-4 xl:col-span-3">
             <section><h2 className="text-lg font-bold text-ink">この経路から来た人の、その後</h2><p className="text-xs text-ink-faint">来ただけで終わっていないかを見ます。</p><div className="mt-3 rounded-card border border-hairline bg-canvas p-4">{funnel ? <FunnelView funnel={funnel} /> : funnelError ? <div className="flex flex-wrap items-center justify-between gap-3"><p className="text-xs text-ink-secondary">段階を取得できませんでした。集計データは消えていません。</p><Button variant="secondary" onClick={() => setFunnelAttempt((n) => n + 1)}>段階を再読み込み</Button></div> : <p className="text-xs text-ink-faint">読み込み中…</p>}</div></section>
             <section><h2 className="text-lg font-bold text-ink">この経路から来た友だち</h2><p className="text-xs text-ink-faint">新しい順</p>{friends.length === 0 ? <p className="mt-3 text-xs text-ink-faint">この経路から来た友だちは、まだ記録されていません。</p> : <div className="mt-3 overflow-hidden rounded-card border border-hairline bg-canvas"><table className="w-full table-fixed text-xs"><thead className="border-b border-hairline bg-canvas-sunken text-ink-faint"><TableHeadRow><Th>友だち</Th><Th>いつ来たか</Th><Th>いまの状態</Th><Th>この人の成果</Th><Th>マイル</Th><Th align="right">確認</Th></TableHeadRow></thead><tbody className="divide-y divide-hairline">{friends.slice(0, 5).map((friend) => <tr key={friend.id}><td className="px-3 py-3 font-semibold text-ink"><span className="block">{friend.displayName}</span><span className="block truncate font-normal text-ink-faint">はじめて見たページ {friend.firstPage ?? '—'}</span></td><td className="px-3 py-3 text-ink-secondary">{friend.trackedAt ? friend.trackedAt.slice(5, 16).replace('T', ' ').replaceAll('-', '/') : '日時不明'}</td><td className="px-3 py-3 font-semibold text-ink-secondary">{friend.currentStatus ?? '—'}</td><td className="px-3 py-3 text-ink-secondary">{friend.conversion ?? '—'}</td><td className="px-3 py-3 font-semibold text-ink">{friend.miles ?? '—'}</td><td className="px-3 py-3 text-right"><Link href={`/friends/detail?id=${encodeURIComponent(friend.id)}`} className="text-action hover:underline">友だちを見る</Link></td></tr>)}</tbody></table></div>}</section>
             {/*
@@ -309,7 +309,7 @@ function InflowLinkDetailPageContent() {
               「購入 ○件」とこの一覧の全件数をそのままつき合わせられる。
             */}
             <section><h2 className="text-lg font-bold text-ink">この経路からの注文</h2><p className="text-xs text-ink-faint">上の「購入」の数と同じ条件の明細です。返金・取り消しは状態に出ます。</p><div className="mt-3 rounded-card border border-hairline bg-canvas p-4">{route ? <RefOrdersPanel refCode={route.refCode} onSummaryChange={setOrdersSummary} /> : null}</div></section>
-          </main>
+          </div>
           <aside data-design="Right" className="space-y-4">
             {/*
               「マイルを 100 付ける」は設計（Pencil ★V6・design-structure.json）に

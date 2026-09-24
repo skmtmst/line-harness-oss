@@ -1010,7 +1010,7 @@ function AnalyticsTab({ webinarId, durationSeconds, view = 'analytics', analytic
                         <td className="px-4 py-3.5">
                           <div className="flex flex-wrap gap-1.5">
                             {p.formSubmittedAt ? (
-                              <span className="rounded-full bg-emerald-50 px-2 py-1 text-[10px] font-semibold text-emerald-700">フォーム送信</span>
+                              <span className="rounded-full bg-emerald-50 px-2 py-1 text-[10px] font-semibold text-success">フォーム送信</span>
                             ) : p.ctaClickedAt ? (
                               <span className="rounded-full bg-violet-50 px-2 py-1 text-[10px] font-semibold text-violet-700">CTAクリック</span>
                             ) : (
@@ -2499,7 +2499,7 @@ function EditWebinarInner() {
     : nextPaneLabel
 
   return (
-    <main className="mx-auto max-w-[1600px] px-6 pb-24 pt-4">
+    <div className="mx-auto max-w-[1600px] px-6 pb-24 pt-4">
       <nav data-design="Crumb" className="text-action mb-5 text-xs font-semibold"><Link href="/webinars" className="hover:underline">← ウェビナー一覧</Link></nav>
 
       {showSteps ? (
@@ -2594,7 +2594,7 @@ function EditWebinarInner() {
       ) : null}
       {pane === 'participants' ? <div className="mt-4 flex justify-end gap-2"><Button href={`/webinars/edit?id=${encodeURIComponent(webinar.id)}&pane=analytics`}>分析を見る</Button><Button href={`/webinars/edit?id=${encodeURIComponent(webinar.id)}`}>ウェビナーの設定を編集</Button></div> : null}
       {leaveConfirmDialog}
-    </main>
+    </div>
   )
 }
 
