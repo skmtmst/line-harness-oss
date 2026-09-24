@@ -1,6 +1,7 @@
 'use client'
 
 import { Suspense, useEffect } from 'react'
+import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 
 /**
@@ -18,6 +19,10 @@ import { useRouter, useSearchParams } from 'next/navigation'
  * output: 'export'（静的エクスポート）構成では next/navigation の
  * redirect() が使えないため、/affiliate-offers 同様クライアント側で
  * router.replace する。
+ *
+ * Issue #708（隠れ動線）: 自動で飛ばすだけでなく、行き先の名前と
+ * 押せるリンクを画面に出す。読み上げ・キーボードの利用者が
+ * 「どこへ行くのか」を知らずに飛ばされないようにする。
  */
 const CONVERSIONS_TABS = new Set([
   'affiliates',
@@ -31,15 +36,20 @@ const CONVERSIONS_TABS = new Set([
 function AffiliatesRedirect() {
   const router = useRouter()
   const params = useSearchParams()
+  const tab = params.get('tab')
+  const destination = `/conversions?tab=${tab && CONVERSIONS_TABS.has(tab) ? tab : 'affiliates'}`
 
   useEffect(() => {
-    const tab = params.get('tab')
     router.replace(`/conversions?tab=${tab && CONVERSIONS_TABS.has(tab) ? tab : 'affiliates'}`)
   }, [params, router])
 
   return (
     <div className="p-8 text-center text-ink-faint text-sm">
-      移動中...
+      <p>成果とアフィリエイトへ移動しています…</p>
+      <p className="mt-2">
+        自動で移動しないときは
+        <Link href={destination} className="text-action font-bold hover:underline">こちらから移動する</Link>
+      </p>
     </div>
   )
 }

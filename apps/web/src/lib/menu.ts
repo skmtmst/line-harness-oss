@@ -223,6 +223,19 @@ export const MENU_SECTION_BY_ID = new Map(MENU_SECTIONS.map((section) => [sectio
  */
 export const SCREEN_MENU_OWNER: Record<string, string> = {
   '/accounts?tab=migration': 'friends',
+  /*
+   * Issue #708（19）: /conversions の案件・承認・支払いタブは
+   * 「成果とアフィリエイト」の中身（`conversions-tab-title.ts` の
+   * 所属どおり）なのに、素のパス一致では「コンバージョン」が光り、
+   * h1（成果とアフィリエイト）と食い違っていた。レポートは逆に
+   * 「コンバージョン」の中身なので、そちらへ寄せる。
+   * `tab=affiliates` と `tab=points` は既存のクエリ一致・既定で合う
+   * ため、ここには書かない。
+   */
+  '/conversions?tab=offers': 'affiliates',
+  '/conversions?tab=approvals': 'affiliates',
+  '/conversions?tab=payment': 'affiliates',
+  '/conversions?tab=report': 'conversions',
 }
 
 /**
