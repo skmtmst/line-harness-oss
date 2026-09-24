@@ -114,9 +114,9 @@ describe('写真審査の読み上げ（V6R-S3-e）', () => {
     await render()
 
     const names = Array.from(document.body.querySelectorAll('button[aria-label]')).map((b) => b.getAttribute('aria-label'))
-    expect(names).toContain('ハナちゃんの写真を通す')
-    expect(names).toContain('ハナちゃんの写真を戻す')
-    expect(names).toContain('モモちゃんの写真を通す')
+    expect(names).toContain('ハナちゃんの写真を採用する')
+    expect(names).toContain('ハナちゃんの写真を見送る')
+    expect(names).toContain('モモちゃんの写真を採用する')
     const checks = Array.from(document.body.querySelectorAll('input[type="checkbox"]')).map((c) => c.getAttribute('aria-label'))
     expect(checks).toEqual(expect.arrayContaining(['ハナちゃんの写真を選ぶ', 'モモちゃんの写真を選ぶ']))
     const articles = Array.from(document.body.querySelectorAll('article')).map((a) => a.getAttribute('aria-label'))
@@ -131,7 +131,7 @@ describe('写真審査の読み上げ（V6R-S3-e）', () => {
       return Promise.resolve({ success: true, data: null })
     })
     await render()
-    const approve = document.body.querySelector('button[aria-label="ハナちゃんの写真を通す"]') as HTMLButtonElement
+    const approve = document.body.querySelector('button[aria-label="ハナちゃんの写真を採用する"]') as HTMLButtonElement
     await act(async () => { approve.click() })
     await act(async () => { await new Promise((resolve) => setTimeout(resolve, 20)) })
 

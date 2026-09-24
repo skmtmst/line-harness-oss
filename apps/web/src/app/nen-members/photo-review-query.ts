@@ -44,7 +44,7 @@ export function photoReviewStatusFrom(raw: string | null | undefined): PhotoRevi
 
 /**
  * `?tab=...&status=...` を読んで、開く画面と札を決める。
- * 知らない値・空のときは、今までどおり一覧の「見ていないもの」。
+ * 知らない値・空のときは、一覧の「審査待ち」。
  * `view=detail&photo=<id>` は詳細を開く。`q=` は一覧の絞り込み語。
  */
 export function photoReviewEntryFrom(search: string | null | undefined): PhotoReviewEntry {

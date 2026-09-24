@@ -140,6 +140,9 @@ function harness(options: {
           return null;
         },
         async all() {
+          if (query.includes('ORDER BY ps.created_at')) {
+            return { results: [{ id: 'photo-1', pet_name: 'そら', pet_gender: 'male' }] };
+          }
           if (query.includes('FROM nen_photo_publications pub')) {
             return { results: [{ id: 'publication-1', photo_id: 'photo-1', view_count: null, version: 2 }] };
           }
@@ -154,7 +157,6 @@ function harness(options: {
           if (query.includes('FROM nen_photo_review_events')) {
             return { results: options.reviewHistory ?? [] };
           }
-          if (query.includes('ORDER BY ps.created_at')) return { results: [{ id: 'photo-1' }] };
           return { results: [] };
         },
         async run() {
@@ -240,6 +242,20 @@ describe('NEN photo review', () => {
     // 絞り込みの2値のあとは、続きを取るための枚数と開始位置（#666）。
     // 先頭の1値はポイント手続きの「要対応」判定に使う24時間前の区切り（PHOTO-06）。
     expect(list?.bindings).toEqual([expect.any(String), 'account-a', 'account-a', 200, 0]);
+  });
+
+  it('写真一覧へ共通規則で作ったペットの呼び名を追加する', async () => {
+    const { app, statements } = harness();
+    const response = await app.request('/api/nen-members/photos?accountId=account-a');
+    expect(response.status).toBe(200);
+    const body = await response.json() as { data: Array<Record<string, unknown>> };
+    expect(body.data[0]).toMatchObject({
+      pet_name: 'そら',
+      pet_gender: 'male',
+      pet_call_name: 'そらくん',
+    });
+    const list = statements.find((entry) => entry.query.includes('ORDER BY ps.created_at'));
+    expect(list?.query).toContain('p.gender AS pet_gender');
   });
 
   it('returns a review derivative and risks without an original object key', async () => {
