@@ -150,10 +150,25 @@ beforeEach(() => {
 });
 
 describe('Googleビジネス：設定（接続）', () => {
-  it('店舗が紐付いていないLINEアカウントは404', async () => {
-    seedStore();
+  it('店舗未登録のLINEアカウントは1店舗として初期化し、接続画面を表示できる', async () => {
+    testDb.raw
+      .prepare(
+        `INSERT INTO line_accounts
+          (id, channel_id, name, channel_access_token, channel_secret, is_active, tenant_id)
+         VALUES (?, ?, ?, ?, ?, 1, ?)`,
+      )
+      .run('account-1', 'channel-1', '然-NEN-TEST', 'token', 'secret', TENANT);
+
     const response = await call('/api/restaurant-test/google/connection?account_id=account-1');
-    expect(response.status).toBe(404);
+    expect(response.status).toBe(200);
+    const json = (await response.json()) as { store: { name: string; lineAccountId: string }; connection: { status: string } };
+    expect(json.store).toMatchObject({ name: '然-NEN-TEST', lineAccountId: 'account-1' });
+    expect(json.connection.status).toBe('disconnected');
+
+    const secondResponse = await call('/api/restaurant-test/google/connection?account_id=account-1');
+    expect(secondResponse.status).toBe(200);
+    expect(testDb.raw.prepare('SELECT COUNT(*) AS n FROM rt_organizations WHERE tenant_id = ?').get(TENANT)).toEqual({ n: 1 });
+    expect(testDb.raw.prepare('SELECT COUNT(*) AS n FROM rt_stores WHERE line_account_id = ?').get('account-1')).toEqual({ n: 1 });
   });
 
   it('未接続の店舗は disconnected を返し、トークンを含まない', async () => {
