@@ -117,6 +117,27 @@ describe('ファイルを落とす場所（★V7 NQMnx）', () => {
     expect(screen.getByText('離すと追加します')).not.toBeNull()
   })
 
+  it('見本固定（previewState）があればドラッグ操作で見た目が変わらない', () => {
+    const { container } = render(
+      <FileDropzone title="ここに画像を落とす" previewState="reject" rejectTitle="動画は追加できません" onFiles={() => {}} />,
+    )
+    const zone = container.firstElementChild as Element
+    expect(zone.getAttribute('data-drag')).toBe('reject')
+    fireEvent.dragEnter(zone, {
+      dataTransfer: {
+        items: [{ kind: 'file', type: 'image/png', getAsFile: () => new File(['p'], 'a.png', { type: 'image/png' }) }],
+      },
+    })
+    expect(zone.getAttribute('data-drag')).toBe('reject')
+    expect(screen.getByText('動画は追加できません')).not.toBeNull()
+  })
+
+  it('写真の縮小画像は薄い緑の地（data-tone="photo"）', () => {
+    const { container } = render(<AttachmentRow name="商品写真_秋.jpg" meta="JPEG・1.2MB" tone="photo" onRemove={() => {}} />)
+    const thumb = container.querySelector('[data-tone]')
+    expect(thumb?.getAttribute('data-tone')).toBe('photo')
+  })
+
   it('取り込み中は場所を空けたまま進みを出す', () => {
     render(
       <FileDropzone title="ここに画像を落とす" busy busyTitle="3件を取り込んでいます…" busyNote="この画面を閉じても止まりません" onFiles={() => {}} />,

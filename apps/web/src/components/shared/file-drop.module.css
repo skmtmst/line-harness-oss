@@ -154,6 +154,16 @@
   color: var(--color-ink-secondary); /* fill: $ink-secondary */
 }
 
+/* 呼び出し側が渡す縮小画像の印も同じ色にする。 */
+.thumb > svg {
+  color: var(--color-ink-secondary); /* fill: $ink-secondary */
+}
+
+/* 写真の縮小画像は薄い緑の地（設計 NQMnx）。書類は上の $shell のまま。 */
+.thumb[data-tone='photo'] {
+  background: var(--color-accent-soft); /* fill: $accent-soft */
+}
+
 .rowBody {
   display: flex;
   flex: 1 1 auto;

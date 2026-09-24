@@ -21,6 +21,7 @@ import styles from './file-drop.module.css'
  * - 動きを減らす設定では globals.css の決まりで一瞬になる
  */
 export default function FileDropzone({
+  previewState,
   title,
   hint,
   accept,
@@ -37,6 +38,8 @@ export default function FileDropzone({
   className,
   'aria-label': ariaLabel,
 }: {
+  /** 見本・検証用にドラッグ状態を固定する。指定時はドラッグ操作で見た目が変わらない。 */
+  previewState?: 'active' | 'reject'
   /** 見出し（「ここに画像を落とす」など）。 */
   title: string
   /** 受け付ける種類の短い説明（「JPEG・PNG、10MB まで」など）。 */
@@ -68,6 +71,9 @@ export default function FileDropzone({
   const openPicker = () => {
     if (interactive) inputRef.current?.click()
   }
+
+  // 見本固定があればそれを見せ、無ければ今のドラッグ状態を見せる。
+  const shown = previewState ?? drag
 
   const checkDrag = (event: React.DragEvent) => {
     event.preventDefault()
@@ -105,7 +111,7 @@ export default function FileDropzone({
       aria-label={ariaLabel ?? title}
       aria-busy={busy || undefined}
       data-design-node="NQMnx"
-      data-drag={drag}
+      data-drag={shown}
       data-busy={busy || undefined}
       data-disabled={disabled || undefined}
       className={[styles.zone, className].filter(Boolean).join(' ')}
@@ -126,7 +132,7 @@ export default function FileDropzone({
           <p className={styles.zoneTitle}>{busyTitle}</p>
           {busyNote ? <p className={styles.zoneHint}>{busyNote}</p> : null}
         </>
-      ) : drag === 'reject' ? (
+      ) : shown === 'reject' ? (
         <>
           <Ban aria-hidden="true" size={24} className={styles.rejectIcon} />
           <p className={styles.rejectTitle}>{rejectTitle}</p>
@@ -134,12 +140,12 @@ export default function FileDropzone({
         </>
       ) : (
         <>
-          <Upload aria-hidden="true" size={24} className={drag === 'active' ? styles.activeIcon : styles.idleIcon} />
-          <p className={drag === 'active' ? styles.activeTitle : styles.zoneTitle}>
-            {drag === 'active' ? '離すと追加します' : title}
+          <Upload aria-hidden="true" size={24} className={shown === 'active' ? styles.activeIcon : styles.idleIcon} />
+          <p className={shown === 'active' ? styles.activeTitle : styles.zoneTitle}>
+            {shown === 'active' ? '離すと追加します' : title}
           </p>
-          {drag === 'active' ? null : hint ? <p className={styles.zoneHint}>{hint}</p> : null}
-          {drag === 'active' ? null : (
+          {shown === 'active' ? null : hint ? <p className={styles.zoneHint}>{hint}</p> : null}
+          {shown === 'active' ? null : (
             <Button
               type="button"
               disabled={!interactive}
@@ -209,6 +215,7 @@ export function AttachmentRow({
   onRemove,
   onRetry,
   thumbnail,
+  tone = 'document',
   className,
 }: {
   /** ファイル名。1 行で省略し、全文は title で見せる。 */
@@ -227,6 +234,8 @@ export function AttachmentRow({
   onRetry?: () => void
   /** 縮小画像（36px に収まる img など）。無いときは書類の印になる。 */
   thumbnail?: ReactNode
+  /** 縮小画像の地。写真は薄い緑、書類は薄い灰（設計 NQMnx）。 */
+  tone?: 'photo' | 'document'
   className?: string
 }) {
   const clamped = Math.min(100, Math.max(0, Math.round(percent ?? 0)))
@@ -240,7 +249,7 @@ export function AttachmentRow({
       data-status={status}
       className={[styles.row, className].filter(Boolean).join(' ')}
     >
-      <span aria-hidden="true" className={styles.thumb}>
+      <span aria-hidden="true" className={styles.thumb} data-tone={tone}>
         {thumbnail ?? <FileText size={18} className={styles.thumbIcon} />}
       </span>
       <span className={styles.rowBody}>
