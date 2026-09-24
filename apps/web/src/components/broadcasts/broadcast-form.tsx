@@ -55,6 +55,7 @@ import CarouselPicker, {
   filterSendableTemplates,
 } from '@/components/scenarios/carousel-picker'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import Combobox from '@/components/shared/combobox'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Button from '@/components/shared/button'
 import { RequiredBadge } from '@/components/shared/form-controls'
@@ -364,9 +365,15 @@ function BubbleEditor({ bubble, index, total, assets, assetsStatus, accountId, o
       {['image','video','rich_video'].includes(bubble.type) && <MediaUpload bubble={bubble} onChange={(content) => onChange({ ...bubble, content })} />}
       {isContentTemplateType(bubble.type) && <div>
         <label className="mb-1 block text-xs font-bold text-ink-secondary">コンテンツで作成したテンプレートから選択</label>
-        <select value={String(bubble.content.assetId ?? '')} onChange={(e) => { const asset = availableAssets.find((item) => item.id === e.target.value); onChange({ ...bubble, content: asset ? { assetId: asset.id, assetName: asset.name, ...asset.payload } : { assetId: '', assetName: '' } }) }} className="w-full rounded-card border border-hairline px-3 py-2.5 text-sm">
-          <option value="">テンプレートを選択してください</option>{availableAssets.map((asset) => <option key={asset.id} value={asset.id}>{asset.name}</option>)}
-        </select>
+        <Combobox
+          aria-label="コンテンツで作成したテンプレートから選択"
+          placeholder="テンプレートを選択してください"
+          value={String(bubble.content.assetId ?? '')}
+          onChange={(next) => { const asset = availableAssets.find((item) => item.id === next); onChange({ ...bubble, content: asset ? { assetId: asset.id, assetName: asset.name, ...asset.payload } : { assetId: '', assetName: '' } }) }}
+          options={availableAssets.map((asset) => ({ value: asset.id, label: asset.name }))}
+          loading={assetsStatus === 'loading'}
+          className="w-full"
+        />
         {assetsStatus === 'loading' && <p className="mt-2 text-xs text-ink-faint">テンプレートを読み込んでいます…</p>}
         {assetsStatus === 'error' && <p className="mt-2 text-xs text-warning">テンプレートを読み込めませんでした。開き直すと再取得します。</p>}
         {assetsStatus === 'ready' && availableAssets.length === 0 && <p className="mt-2 text-xs text-warning">先に「コンテンツ ＞ テンプレート」で作成してください。</p>}
@@ -1789,14 +1796,15 @@ export default function BroadcastForm({
           </div>
           {targetMode === 'scenario' && <div className="mt-4 border-t pt-4">
             <label className="text-ink-secondary block text-xs font-semibold">どのシナリオ</label>
-            <select
+            <Combobox
+              aria-label="どのシナリオ"
+              placeholder="すべてのシナリオ（どれか1つでも購読中）"
               value={scenarioId}
-              onChange={(e) => setScenarioId(e.target.value)}
-              className="border-hairline mt-1 w-full rounded-control border px-3 py-2 text-sm sm:max-w-sm"
-            >
-              <option value="">すべてのシナリオ（どれか1つでも購読中）</option>
-              {scenarios.map((scenario) => <option key={scenario.id} value={scenario.id}>{scenario.name}</option>)}
-            </select>
+              onChange={setScenarioId}
+              options={scenarios.map((scenario) => ({ value: scenario.id, label: scenario.name }))}
+              loading={scenariosStatus === 'loading'}
+              className="mt-1 w-full sm:max-w-sm"
+            />
             {scenariosStatus === 'loading' && <p className="mt-1 text-xs text-ink-faint">シナリオを読み込んでいます…</p>}
             {scenariosStatus === 'error' && <p className="mt-1 text-xs text-warning">シナリオを読み込めませんでした。別の絞り方を選んで戻ると再取得します。</p>}
           </div>}
@@ -1806,10 +1814,14 @@ export default function BroadcastForm({
               「すべて」は置かない。タグを選ばないままだと絞り込みが消えて
               全員に届く。全員に送るなら上の「友だち全員に配信する」を選ぶ。
             */}
-            <select value={tagId} onChange={(e) => setTagId(e.target.value)} className="border-hairline rounded-control mt-1 w-full border px-3 py-2 text-sm sm:max-w-sm">
-              <option value="">タグを選んでください</option>
-              {tags.map((tag) => <option key={tag.id} value={tag.id}>{tag.name}</option>)}
-            </select>
+            <Combobox
+              aria-label="どのタグ"
+              placeholder="タグを選んでください"
+              value={tagId}
+              onChange={setTagId}
+              options={tags.map((tag) => ({ value: tag.id, label: tag.name }))}
+              className="mt-1 w-full sm:max-w-sm"
+            />
           </div>}
           {targetMode === 'advanced' && <div className="border-hairline mt-4 border-t pt-4">
             {/*
@@ -2020,12 +2032,16 @@ export default function BroadcastForm({
               <Zap size={17} className="text-ink-secondary" aria-hidden />
               {publishedActions.find((action) => action.versionId === afterActionVersionId)?.name ?? '実行しない'}
             </p>
-          ) : <label className="mt-3 block text-xs font-bold text-ink-secondary">実行する公開済みアクション
-            <select aria-label="配信後のアクション" value={afterActionVersionId} onChange={(event) => setAfterActionVersionId(event.target.value)} className="mt-2 w-full rounded-control border border-hairline px-3 py-2 text-sm font-normal text-ink">
-              <option value="">実行しない</option>
-              {publishedActions.map((action) => <option key={action.versionId} value={action.versionId}>{action.name}（第{action.version}版）</option>)}
-            </select>
-          </label>}
+          ) : <div className="mt-3 block text-xs font-bold text-ink-secondary">実行する公開済みアクション
+            <Combobox
+              aria-label="配信後のアクション"
+              placeholder="実行しない"
+              value={afterActionVersionId}
+              onChange={setAfterActionVersionId}
+              options={publishedActions.map((action) => ({ value: action.versionId, label: `${action.name}（第${action.version}版）` }))}
+              className="mt-2 w-full font-normal"
+            />
+          </div>}
           {currentStep !== 'message' && afterActionVersionId && <p className="mt-2 text-xs text-success">✓ 配信完了後に、選んだ公開版を実行します。</p>}
         </section>}
         {/*

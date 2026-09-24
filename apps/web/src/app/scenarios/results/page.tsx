@@ -22,6 +22,7 @@ import { ActionCell, DataTable, TableHeadRow, Td, Th, Tr } from '@/components/sh
 import styles from './scenario-results.module.css'
 import { scenarioReferenceData } from '@/components/scenarios/scenario-reference-data'
 import { FriendPlanDialog } from '@/components/scenarios/scenario-dialogs'
+import { shortDateTime } from '@/lib/hq-banners'
 
 type ScenarioWithSteps = Scenario & { steps: ScenarioStep[] }
 
@@ -523,7 +524,7 @@ function ResultsInner() {
                           <Td className="whitespace-nowrap">
                             {sub.status === 'completed'
                               ? '—'
-                              : sub.nextDeliveryAt ?? '—'}
+                              : sub.nextDeliveryAt ? shortDateTime(sub.nextDeliveryAt) : '—'}
                           </Td>
                           <ActionCell>
                             {/* #641: 主操作は枠つき「予定を見る」、購読操作は「その他（…）」へ集約。 */}

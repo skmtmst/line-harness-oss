@@ -12,7 +12,7 @@ import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { TextField } from '@/components/shared/text-field'
 import { ApiError } from '@/lib/api'
 import {
-  nenPetsApi, petAnimalTypeLabel, type NenHealthChangeFilter, type NenHealthKpis, type NenHealthLastFilter, type NenHealthListData, type NenHealthRow, type NenHealthSort,
+  headCountLabel, nenPetsApi, petAnimalTypeLabel, type NenHealthChangeFilter, type NenHealthKpis, type NenHealthLastFilter, type NenHealthListData, type NenHealthRow, type NenHealthSort,
 } from '@/lib/nen-pets-api'
 
 type ListStatus = 'loading' | 'ready' | 'error' | 'forbidden'
@@ -125,7 +125,7 @@ export default function HealthTab({
           ]}
         />
         <span className="ml-auto text-caption font-semibold text-ink-faint">
-          {data ? `${data.total.toLocaleString('ja-JP')}頭中 ${data.total === 0 ? 0 : (data.page - 1) * data.pageSize + 1}〜${Math.min(data.total, data.page * data.pageSize)}頭` : '—'}
+          {data ? headCountLabel(data.total, data.page, data.pageSize) : '—'}
         </span>
       </div>
 

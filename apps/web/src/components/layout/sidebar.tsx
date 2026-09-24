@@ -443,10 +443,7 @@ export default function Sidebar({
    * 「共通情報」(/contents/vars) を開くと「登録メディア一覧」(/contents) も
    * 選ばれて見えていた。当たるもののうち、いちばん長いものだけを選ぶ。
    */
-  // 比較専用ルートも、実際に確認する「友だち属性V2」を選択中として写す。
-  const activePathname = pathname === '/visual-qa/friend-attributes-v2'
-    ? '/tags-v2'
-    : pathname
+  const activePathname = pathname
   const activeHref = (() => {
     let best: string | null = null
     for (const section of sections) {
@@ -572,9 +569,7 @@ export default function Sidebar({
             {section.items.map((item) => {
               const active = isActive(item)
               const isDanger = 'danger' in item && item.danger
-              const visibleLabel = friendAttributesV2Mode && item.href === '/tags-v2'
-                ? '友だち属性'
-                : item.label
+              const visibleLabel = item.label
               return (
                 <Link
                   key={item.href}

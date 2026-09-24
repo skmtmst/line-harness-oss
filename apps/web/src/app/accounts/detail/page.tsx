@@ -224,10 +224,10 @@ function AccountDetail() {
                 <StatusBadge tone={webhook.tone}>{webhook.label}</StatusBadge>
               </div>
               <dl className="mt-4 space-y-3">
-                <InlineRow label="LINE側に登録したURL" value={webhook.label === '一致・利用中' ? 'このシステムと一致' : webhook.label} tone={webhook.tone === 'success' ? 'success' : 'muted'} />
-                <InlineRow label="Webhookの利用" value={account.webhook?.active === null || account.webhook?.active === undefined ? '確かめていません' : account.webhook.active ? 'オン' : 'オフ'} tone={account.webhook?.active ? 'success' : 'muted'} />
-                <InlineRow label="最後のテスト" value={account.connection?.lastTestAt ? `${formatMonthDayTime(account.connection.lastTestAt)} に${account.connection.lastTestStatus === 'succeeded' ? '成功' : '失敗'}` : '未取得'} tone={account.connection?.lastTestStatus === 'succeeded' ? 'success' : 'muted'} />
-                <InlineRow label="最後の受信" value={account.connection?.lastReceivedAt ? formatMonthDayTime(account.connection.lastReceivedAt) : '未取得'} />
+                <StackedRow label="LINE側に登録したURL" value={webhook.label === '一致・利用中' ? 'このシステムと一致' : webhook.label} tone={webhook.tone === 'success' ? 'success' : 'muted'} />
+                <StackedRow label="Webhookの利用" value={account.webhook?.active === null || account.webhook?.active === undefined ? '確かめていません' : account.webhook.active ? 'オン' : 'オフ'} tone={account.webhook?.active ? 'success' : 'muted'} />
+                <StackedRow label="最後のテスト" value={account.connection?.lastTestAt ? `${formatMonthDayTime(account.connection.lastTestAt)} に${account.connection.lastTestStatus === 'succeeded' ? '成功' : '失敗'}` : '未取得'} tone={account.connection?.lastTestStatus === 'succeeded' ? 'success' : 'muted'} />
+                <StackedRow label="最後の受信" value={account.connection?.lastReceivedAt ? formatMonthDayTime(account.connection.lastReceivedAt) : '未取得'} />
               </dl>
               <p className="text-ink-secondary mt-3 break-all text-xs">{account.webhook?.actualUrl ?? '—'}</p>
               <Button href={`/accounts/detail?id=${account.id}&tab=connection`} className="mt-4">
@@ -370,6 +370,33 @@ function InlineRow({
         : tone === 'muted'
           ? 'text-ink-secondary min-w-0 break-words text-right text-sm'
           : 'text-ink min-w-0 break-words text-right text-sm'}>
+        {value}
+      </dd>
+    </div>
+  )
+}
+
+/*
+ * 狭い脇カード用の縦並びの行。札を上に、値を下の行頭に置くので、
+ * 短い値が1〜2文字ずつ折れない（全ルート監査、2026-09-25）。
+ */
+function StackedRow({
+  label,
+  value,
+  tone = 'default',
+}: {
+  label: string
+  value: string
+  tone?: 'default' | 'success' | 'muted'
+}) {
+  return (
+    <div className="min-w-0 border-b border-hairline py-1 last:border-b-0">
+      <dt className="text-ink-faint text-xs">{label}</dt>
+      <dd className={tone === 'success'
+        ? 'text-success mt-0.5 min-w-0 text-sm font-medium'
+        : tone === 'muted'
+          ? 'text-ink-secondary mt-0.5 min-w-0 text-sm'
+          : 'text-ink mt-0.5 min-w-0 text-sm'}>
         {value}
       </dd>
     </div>

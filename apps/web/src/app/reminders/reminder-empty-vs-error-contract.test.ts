@@ -45,8 +45,10 @@ describe('リマインダ一覧の空と失敗', () => {
 
   it('3つの状態を言い分ける', () => {
     // 読めない / そもそも0件 / 絞り込みで0件 は、運用者にとって意味が違う。
-    expect(PAGE).toContain('上の案内をご覧ください')
-    expect(PAGE).toContain('リマインダがありません。「リマインダを作成」から作成してください。')
+    // ★V7: 手作りの行を TableStateRow へ寄せた。隠しの目印はやめ、見える文言で言い分ける。
     expect(PAGE).toContain('この条件に合うリマインダはありません。')
+    expect(PAGE).toContain('まだリマインダがありません')
+    expect(PAGE).toContain('表示できませんでした')
+    expect(PAGE).toContain('onRetry={reminderList.retry}')
   })
 })

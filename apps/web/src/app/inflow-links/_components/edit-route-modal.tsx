@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Combobox from '@/components/shared/combobox'
 import { api, describeSaveFailure } from '@/lib/api'
 import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
@@ -209,18 +210,14 @@ export default function EditRouteModal({
         </Field>
 
         <Field label="自動付与タグ（任意）">
-          <select
+          <Combobox
+            aria-label="自動付与タグ（任意）"
+            placeholder="— 設定なし —"
             value={form.tagId ?? ''}
-            onChange={(e) => setForm({ ...form, tagId: e.target.value || null })}
-            className="border-hairline rounded-control bg-canvas text-ink w-full border px-3 py-2 text-sm"
-          >
-            <option value="">— 設定なし —</option>
-            {tags.map((tag) => (
-              <option key={tag.id} value={tag.id}>
-                {tag.name}
-              </option>
-            ))}
-          </select>
+            onChange={(next) => setForm({ ...form, tagId: next || null })}
+            options={tags.map((tag) => ({ value: tag.id, label: tag.name }))}
+            className="w-full"
+          />
           <p className="text-ink-faint mt-1 text-xs">
             友だち追加時にこのタグを自動付与します。タグ未作成の場合は先にタグを作成してください。
           </p>
@@ -249,33 +246,25 @@ export default function EditRouteModal({
         </Field>
 
         <Field label="起動シナリオ（任意）">
-          <select
+          <Combobox
+            aria-label="起動シナリオ（任意）"
+            placeholder="— 設定なし —"
             value={form.scenarioId ?? ''}
-            onChange={(e) => setForm({ ...form, scenarioId: e.target.value || null })}
-            className="border-hairline rounded-control bg-canvas text-ink w-full border px-3 py-2 text-sm"
-          >
-            <option value="">— 設定なし —</option>
-            {scenarios.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-              </option>
-            ))}
-          </select>
+            onChange={(next) => setForm({ ...form, scenarioId: next || null })}
+            options={scenarios.map((s) => ({ value: s.id, label: s.name }))}
+            className="w-full"
+          />
         </Field>
 
         <Field label="即時 push テンプレ（任意）">
-          <select
+          <Combobox
+            aria-label="即時 push テンプレ（任意）"
+            placeholder="— 設定なし —"
             value={form.introTemplateId ?? ''}
-            onChange={(e) => setForm({ ...form, introTemplateId: e.target.value || null })}
-            className="border-hairline rounded-control bg-canvas text-ink w-full border px-3 py-2 text-sm"
-          >
-            <option value="">— 設定なし —</option>
-            {templates.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.name}
-              </option>
-            ))}
-          </select>
+            onChange={(next) => setForm({ ...form, introTemplateId: next || null })}
+            options={templates.map((t) => ({ value: t.id, label: t.name }))}
+            className="w-full"
+          />
         </Field>
 
         <label className="flex items-start gap-2 text-sm">

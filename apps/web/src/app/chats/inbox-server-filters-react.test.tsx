@@ -91,10 +91,17 @@ async function click(text: string) {
 }
 async function selectAssignee(value: string) {
   if (!host.querySelector('[aria-label="担当者で絞り込む（パネル）"]')) await click('絞り込み')
+  // 担当者の選択は候補つき入力へ移した。表示名を打って候補を押す。
+  const label = value === 'unassigned' ? '未割り当て' : '担当T'
   await act(async () => {
-    const select = host.querySelector<HTMLSelectElement>('[aria-label="担当者で絞り込む（パネル）"]')!
-    select.value = value
-    select.dispatchEvent(new Event('change', { bubbles: true }))
+    const field = host.querySelector<HTMLInputElement>('[aria-label="担当者で絞り込む（パネル）"]')!
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(field, label)
+    field.dispatchEvent(new Event('input', { bubbles: true }))
+  })
+  await act(async () => {
+    const option = [...host.querySelectorAll('li[role="option"]')].find((li) => li.textContent?.includes(label))
+    expect(option, label).toBeTruthy()
+    ;(option as HTMLElement).click()
   })
 }
 const listCalls = (channel: Channel) => calls.filter(url => listChannel(url) === channel)

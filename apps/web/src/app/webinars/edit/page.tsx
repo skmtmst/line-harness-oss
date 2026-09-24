@@ -76,7 +76,7 @@ function fmtSession(epoch: number): string {
 }
 
 const inputClass =
-  'w-full border border-gray-300 rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500'
+  'w-full border border-hairline rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-action'
 
 function webinarStatusLabel(status: Webinar['status']): string {
   if (status === 'active') return '公開中'
@@ -231,7 +231,7 @@ function CommentsTab({ webinarId }: { webinarId: string }) {
   }
 
   if (loading) {
-    return <div className="text-gray-500 text-sm">読み込み中...</div>
+    return <div className="text-ink-faint text-sm">読み込み中...</div>
   }
 
   return (
@@ -240,33 +240,30 @@ function CommentsTab({ webinarId }: { webinarId: string }) {
         <div
           className={`p-3 rounded-lg text-sm border ${
             isErrorMessage
-              ? 'bg-red-50 border-red-200 text-red-700'
-              : 'bg-blue-50 border-blue-200 text-blue-800'
+              ? 'bg-danger-bg border-danger/20 text-danger'
+              : 'bg-info-bg border-info text-info'
           }`}
         >
           {message}
         </div>
       )}
       <div>
-        <p className="mb-1 text-sm text-gray-600">
+        <p className="mb-1 text-sm text-ink-secondary">
           JSON 一括インポート（形式: {'[{"atSeconds":10,"authorName":"田中","body":"こんばんは"}]'}、{WEBINAR_SAKURA_COMMENTS_MAX}件まで）
         </p>
         <textarea
           value={importJson}
           onChange={(e) => setImportJson(e.target.value)}
           rows={4}
-          className="w-full rounded-lg border border-gray-300 p-2 font-mono text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full rounded-lg border border-hairline p-2 font-mono text-xs focus:outline-none focus:ring-2 focus:ring-action"
         />
-        <button
-          onClick={doImport}
-          className="mt-1 px-3 py-1.5 text-sm font-medium border border-gray-300 rounded-lg hover:bg-gray-50"
-        >
+        <Button onClick={doImport} className="mt-1">
           読み込む
-        </button>
+        </Button>
       </div>
       <table className="w-full text-sm">
         <thead>
-          <tr className="border-b border-gray-200 text-left text-gray-500">
+          <tr className="border-b border-hairline text-left text-ink-faint">
             <th className="w-24 px-4 py-3 font-medium">秒数</th>
             <th className="w-40 px-4 py-3 font-medium">名前</th>
             <th className="px-4 py-3 font-medium">本文</th>
@@ -275,7 +272,7 @@ function CommentsTab({ webinarId }: { webinarId: string }) {
         </thead>
         <tbody>
           {comments.map((c, i) => (
-            <tr key={i} className="border-b border-gray-100">
+            <tr key={i} className="border-b border-divider-soft">
               <td className="py-1 pr-2">
                 <input
                   type="number"
@@ -301,7 +298,7 @@ function CommentsTab({ webinarId }: { webinarId: string }) {
               <td>
                 <button
                   onClick={() => setComments((prev) => prev.filter((_, j) => j !== i))}
-                  className="text-red-500 hover:text-red-600"
+                  className="text-danger hover:text-danger"
                 >
                   ×
                 </button>
@@ -312,15 +309,12 @@ function CommentsTab({ webinarId }: { webinarId: string }) {
       </table>
       <StickyBar actions={(
         <>
-        <button
-          onClick={() => setComments((prev) => [...prev, { atSeconds: 0, authorName: '', body: '' }])}
-          className="px-3 py-1.5 text-sm font-medium border border-gray-300 rounded-lg hover:bg-gray-50"
-        >
+        <Button onClick={() => setComments((prev) => [...prev, { atSeconds: 0, authorName: '', body: '' }])}>
           ＋ 追加
-        </button>
+        </Button>
         <button
           onClick={() => void save()}
-          className="px-4 py-1.5 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+          className="px-4 py-1.5 text-sm font-medium bg-action text-on-action rounded-lg hover:bg-action-hover"
         >
           保存
         </button>
@@ -355,7 +349,7 @@ function UserCommentsSection({ webinarId }: { webinarId: string }) {
 
   if (failed) {
     return (
-      <div className="rounded-2xl border border-red-200 bg-red-50 p-5 text-sm text-red-700">
+      <div className="rounded-2xl border border-danger/20 bg-danger-bg p-5 text-sm text-danger">
         <p>視聴者コメントを読み込めませんでした。</p>
         <button type="button" onClick={() => setAttempt((count) => count + 1)} className="mt-1 font-medium underline">もう一度読み込む</button>
       </div>
@@ -364,18 +358,18 @@ function UserCommentsSection({ webinarId }: { webinarId: string }) {
   if (!comments || comments.length === 0) return null
 
   return (
-    <details className="group overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+    <details className="group overflow-hidden rounded-2xl border border-hairline bg-canvas shadow-sm">
       <summary className="flex cursor-pointer list-none items-center justify-between p-5">
-        <div><h3 className="font-bold text-slate-900">視聴者コメント</h3><p className="mt-1 text-xs text-slate-500">実際に届いたコメントを参加者の顔と一緒に確認</p></div>
-        <span className="rounded-full bg-slate-100 px-3 py-1 text-xs text-slate-600">{comments.length}件 ▾</span>
+        <div><h3 className="font-bold text-ink">視聴者コメント</h3><p className="mt-1 text-xs text-ink-secondary">実際に届いたコメントを参加者の顔と一緒に確認</p></div>
+        <span className="rounded-full bg-canvas-sunken px-3 py-1 text-xs text-ink-secondary">{comments.length}件 ▾</span>
       </summary>
-      <div className="grid gap-3 border-t border-slate-100 p-5 md:grid-cols-2">
+      <div className="grid gap-3 border-t border-divider-soft p-5 md:grid-cols-2">
         {comments.map((c) => {
           const name = c.friendName ?? `友だち ${c.friendId.slice(0, 6)}`
           return (
-            <Link key={c.id} href={`/chats?friend=${c.friendId}`} className="flex gap-3 rounded-xl border border-slate-100 bg-slate-50/60 p-3 hover:border-blue-200 hover:bg-blue-50/40">
+            <Link key={c.id} href={`/chats?friend=${c.friendId}`} className="flex gap-3 rounded-xl border border-divider-soft bg-canvas-sunken p-3 hover:border-info hover:bg-action-soft">
               <ParticipantAvatar name={name} pictureUrl={c.pictureUrl} />
-              <div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><span className="text-xs font-semibold text-slate-800">{name}</span><span className="text-[10px] text-slate-400">{fmtSec(c.atSeconds)}</span></div><p className="mt-1 text-sm leading-6 text-slate-700">{c.body}</p></div>
+              <div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><span className="text-xs font-semibold text-ink">{name}</span><span className="text-[10px] text-ink-faint">{fmtSec(c.atSeconds)}</span></div><p className="mt-1 text-sm leading-6 text-ink-secondary">{c.body}</p></div>
             </Link>
           )
         })}
@@ -574,7 +568,7 @@ function AnalyticsTab({ webinarId, durationSeconds, view = 'analytics', analytic
         {csvError ? <p className="text-danger text-xs" role="alert">{csvError}</p> : null}
         {summary ? (
         <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          {[['申込', summary.reservations, 'text-success'], ['視聴開始', summary.viewers, 'text-accent-deep'], ['視聴完了', summary.completed, 'text-warning'], ['エラー', analytics?.formFunnel.submitErrors ?? 0, 'text-danger']].map(([label, value, tone]) => <div key={String(label)} className="border-hairline bg-canvas rounded-card border p-4 shadow-card"><p className="text-ink-faint text-xs">{label}</p><p className={`${tone} mt-2 text-2xl font-bold tabular-nums`}>{Number(value).toLocaleString('ja-JP')}{label === 'エラー' ? '件' : '人'}</p></div>)}
+          {[['申込', summary.reservations, 'text-ink'], ['視聴開始', summary.viewers, 'text-ink'], ['視聴完了', summary.completed, 'text-ink'], ['エラー', analytics?.formFunnel.submitErrors ?? 0, 'text-danger']].map(([label, value, tone]) => <div key={String(label)} className="border-hairline bg-canvas rounded-card border p-4 shadow-card"><p className="text-ink-faint text-xs">{label}</p><p className={`${tone} mt-2 text-2xl font-bold tabular-nums`}>{Number(value).toLocaleString('ja-JP')}{label === 'エラー' ? '件' : '人'}</p></div>)}
         </section>
         ) : (
         <p className={`rounded-card p-4 text-sm ${analyticsState === 'error' ? 'border-danger bg-danger-bg text-danger border' : 'text-ink-faint'}`} role={analyticsState === 'error' ? 'alert' : undefined}>
@@ -640,13 +634,13 @@ function AnalyticsTab({ webinarId, durationSeconds, view = 'analytics', analytic
   /* 分析・一覧の面は集計が本体。集計の失敗だけは面全体の失敗として扱う。 */
   if (analyticsState === 'error') {
     return (
-      <div className="rounded-2xl border border-red-200 bg-red-50 p-5 text-sm text-red-700">
+      <div className="rounded-2xl border border-danger/20 bg-danger-bg p-5 text-sm text-danger">
         <p>分析データを読み込めませんでした。</p>
         <button type="button" onClick={() => { setAttempt((count) => count + 1); onRetry() }} className="mt-1 font-medium underline">もう一度読み込む</button>
       </div>
     )
   }
-  if (!analytics) return <div className="text-gray-500 text-sm">読み込み中...</div>
+  if (!analytics) return <div className="text-ink-faint text-sm">読み込み中...</div>
 
   const { summary } = analytics
 
@@ -704,39 +698,39 @@ function AnalyticsTab({ webinarId, durationSeconds, view = 'analytics', analytic
     meeting_time_3: '第3希望時刻',
   }
   const funnel = [
-    { label: '参加', value: summary.viewers, color: 'bg-blue-500', note: 'ユニーク' },
-    { label: '5分視聴', value: summary.watched5m, color: 'bg-cyan-500', note: percent(summary.watched5m, summary.viewers) },
-    { label: 'CTAクリック', value: summary.ctaClicks, color: 'bg-violet-500', note: percent(summary.ctaClicks, summary.viewers) },
-    { label: 'フォーム送信', value: summary.formSubmissions, color: 'bg-emerald-500', note: percent(summary.formSubmissions, summary.viewers) },
+    { label: '参加', value: summary.viewers, color: 'bg-action', note: 'ユニーク' },
+    { label: '5分視聴', value: summary.watched5m, color: 'bg-info', note: percent(summary.watched5m, summary.viewers) },
+    { label: 'CTAクリック', value: summary.ctaClicks, color: 'bg-info', note: percent(summary.ctaClicks, summary.viewers) },
+    { label: 'フォーム送信', value: summary.formSubmissions, color: 'bg-success', note: percent(summary.formSubmissions, summary.viewers) },
   ]
   const metricCards = [
     {
       label: 'ユニーク参加者',
       value: summary.viewers.toLocaleString('ja-JP'),
       detail: `予約 ${summary.reservations.toLocaleString('ja-JP')}人`,
-      tone: 'from-blue-50 to-white border-blue-100',
-      dot: 'bg-blue-500',
+      tone: 'bg-action-soft border-hairline',
+      dot: 'bg-action',
     },
     {
       label: '予約者の参加率',
       value: percent(summary.registeredAndJoined, summary.reservations),
       detail: `${summary.registeredAndJoined.toLocaleString('ja-JP')} / ${summary.reservations.toLocaleString('ja-JP')}人`,
-      tone: 'from-cyan-50 to-white border-cyan-100',
-      dot: 'bg-cyan-500',
+      tone: 'bg-info-bg border-hairline',
+      dot: 'bg-info',
     },
     {
       label: '90%以上視聴',
       value: percent(summary.completed, summary.viewers),
       detail: `${summary.completed.toLocaleString('ja-JP')}人・平均 ${fmtSec(summary.avgWatchedSeconds)}`,
-      tone: 'from-violet-50 to-white border-violet-100',
-      dot: 'bg-violet-500',
+      tone: 'bg-info-bg border-hairline',
+      dot: 'bg-info',
     },
     {
       label: 'フォーム送信',
       value: summary.formSubmissions.toLocaleString('ja-JP'),
       detail: `CTAから ${percent(summary.formSubmissions, summary.ctaClicks)}`,
-      tone: 'from-emerald-50 to-white border-emerald-100',
-      dot: 'bg-emerald-500',
+      tone: 'bg-success-bg border-hairline',
+      dot: 'bg-success',
     },
   ]
 
@@ -757,15 +751,15 @@ function AnalyticsTab({ webinarId, durationSeconds, view = 'analytics', analytic
         <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <div className="border-hairline bg-canvas rounded-card border p-4">
             <p className="text-ink-faint text-xs">申込</p>
-            <p className="text-success mt-2 text-2xl font-bold tabular-nums">{summary.reservations.toLocaleString('ja-JP')}人</p>
+            <p className="text-ink mt-2 text-2xl font-bold tabular-nums">{summary.reservations.toLocaleString('ja-JP')}人</p>
           </div>
           <div className="border-hairline bg-canvas rounded-card border p-4">
             <p className="text-ink-faint text-xs">視聴開始</p>
-            <p className="text-accent-deep mt-2 text-2xl font-bold tabular-nums">{summary.viewers.toLocaleString('ja-JP')}人</p>
+            <p className="text-ink mt-2 text-2xl font-bold tabular-nums">{summary.viewers.toLocaleString('ja-JP')}人</p>
           </div>
           <div className="border-hairline bg-canvas rounded-card border p-4">
             <p className="text-ink-faint text-xs">視聴完了</p>
-            <p className="text-warning mt-2 text-2xl font-bold tabular-nums">{summary.completed.toLocaleString('ja-JP')}人</p>
+            <p className="text-ink mt-2 text-2xl font-bold tabular-nums">{summary.completed.toLocaleString('ja-JP')}人</p>
           </div>
           <div className="border-hairline bg-canvas rounded-card border p-4">
             <p className="text-ink-faint text-xs">エラー</p>
@@ -778,7 +772,7 @@ function AnalyticsTab({ webinarId, durationSeconds, view = 'analytics', analytic
             <p className="text-ink-faint mt-1 text-xs">何をきっかけに、何が実行されたかを確認できます。</p>
           </div>
           {recentParticipants.length === 0 ? (
-            <div className="p-10 text-center text-sm text-slate-400">まだ参加者がいません</div>
+            <div className="p-10 text-center text-sm text-ink-faint">まだ参加者がいません</div>
           ) : (
             <div className="divide-hairline divide-y">
               {recentParticipants.map((participant) => {
@@ -805,12 +799,12 @@ function AnalyticsTab({ webinarId, durationSeconds, view = 'analytics', analytic
     <div className="space-y-6 scroll-mt-4" id="webinar-overview" data-design-node="yxyzQ">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-blue-600">Performance overview</p>
-          <h2 className="mt-1 text-xl font-bold tracking-tight text-slate-950">参加の流れをひと目で確認</h2>
-          <p className="mt-1 text-sm text-slate-500">再入場や複数回参加は、同じ友だちとしてまとめています。</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-action">Performance overview</p>
+          <h2 className="mt-1 text-xl font-bold tracking-tight text-ink">参加の流れをひと目で確認</h2>
+          <p className="mt-1 text-sm text-ink-secondary">再入場や複数回参加は、同じ友だちとしてまとめています。</p>
         </div>
         {analytics.participants.length > 0 && (
-          <div className="flex items-center gap-3 rounded-full border border-slate-200 bg-white px-3 py-2 shadow-sm">
+          <div className="flex items-center gap-3 rounded-full border border-hairline bg-canvas px-3 py-2 shadow-sm">
             <div className="flex -space-x-2">
               {analytics.participants.slice(0, 5).map((p) => (
                 <ParticipantAvatar
@@ -821,31 +815,31 @@ function AnalyticsTab({ webinarId, durationSeconds, view = 'analytics', analytic
                 />
               ))}
             </div>
-            <span className="text-xs font-medium text-slate-600">最近の参加者</span>
+            <span className="text-xs font-medium text-ink-secondary">最近の参加者</span>
           </div>
         )}
       </div>
 
       <section className="grid grid-cols-2 gap-3 xl:grid-cols-4">
         {metricCards.map((metric) => (
-          <div key={metric.label} className={`rounded-2xl border bg-gradient-to-br p-4 ${metric.tone}`}>
-            <div className="flex items-center gap-2 text-xs font-semibold text-slate-500">
+          <div key={metric.label} className={`rounded-2xl border p-4 ${metric.tone}`}>
+            <div className="flex items-center gap-2 text-xs font-semibold text-ink-secondary">
               <span className={`h-2 w-2 rounded-full ${metric.dot}`} />
               {metric.label}
             </div>
-            <div className="mt-3 text-3xl font-bold tabular-nums tracking-[-0.02em] text-slate-950">{metric.value}</div>
-            <div className="mt-1 text-xs text-slate-500">{metric.detail}</div>
+            <div className="mt-3 text-3xl font-bold tabular-nums tracking-[-0.02em] text-ink">{metric.value}</div>
+            <div className="mt-1 text-xs text-ink-secondary">{metric.detail}</div>
           </div>
         ))}
       </section>
 
-      <section id="webinar-cta-funnel" className="scroll-mt-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+      <section id="webinar-cta-funnel" className="scroll-mt-4 rounded-2xl border border-hairline bg-canvas p-5 shadow-sm">
         <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <h3 className="font-bold text-slate-900">CTAから相談完了まで</h3>
-            <p className="mt-1 text-xs text-slate-500">計測開始後のユニーク人数。どの操作で離脱したかを確認できます。</p>
+            <h3 className="font-bold text-ink">CTAから相談完了まで</h3>
+            <p className="mt-1 text-xs text-ink-secondary">計測開始後のユニーク人数。どの操作で離脱したかを確認できます。</p>
           </div>
-          <span className="text-xs text-slate-500">
+          <span className="text-xs text-ink-secondary">
             送信エラー {analytics.formFunnel.submitErrors.toLocaleString('ja-JP')}人
           </span>
         </div>
@@ -853,19 +847,19 @@ function AnalyticsTab({ webinarId, durationSeconds, view = 'analytics', analytic
           {formFunnelStages.map((stage, index) => {
             const previous = index === 0 ? stage.value : formFunnelStages[index - 1].value
             return (
-              <div key={stage.label} className="rounded-xl border border-slate-100 bg-slate-50 p-3">
+              <div key={stage.label} className="rounded-xl border border-divider-soft bg-canvas-sunken p-3">
                 <div className="flex items-center justify-between gap-2">
-                  <span className="text-xs font-semibold text-slate-600">{stage.label}</span>
-                  <span className="text-[11px] text-slate-400">
+                  <span className="text-xs font-semibold text-ink-secondary">{stage.label}</span>
+                  <span className="text-[11px] text-ink-faint">
                     {index === 0 ? '起点' : percent(stage.value, previous)}
                   </span>
                 </div>
-                <div className="mt-2 text-2xl font-bold text-slate-950">
+                <div className="mt-2 text-2xl font-bold text-ink">
                   {stage.value.toLocaleString('ja-JP')}
                 </div>
-                <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-200">
+                <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-canvas-sunken">
                   <div
-                    className="h-full rounded-full bg-violet-500"
+                    className="h-full rounded-full bg-info"
                     style={{ width: `${Math.max(0, Math.min(100, (stage.value / maxFormFunnel) * 100))}%` }}
                   />
                 </div>
@@ -874,15 +868,15 @@ function AnalyticsTab({ webinarId, durationSeconds, view = 'analytics', analytic
           })}
         </div>
         {analytics.formFunnel.fieldCompletions.length > 0 && (
-          <details className="mt-4 rounded-xl border border-slate-100 bg-slate-50 px-4 py-3">
-            <summary className="cursor-pointer text-sm font-semibold text-slate-700">
+          <details className="mt-4 rounded-xl border border-divider-soft bg-canvas-sunken px-4 py-3">
+            <summary className="cursor-pointer text-sm font-semibold text-ink-secondary">
               項目ごとの到達人数を見る
             </summary>
             <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
               {analytics.formFunnel.fieldCompletions.map((field) => (
-                <div key={field.fieldName} className="flex items-center justify-between rounded-lg bg-white px-3 py-2 text-xs">
-                  <span className="text-slate-600">{fieldLabels[field.fieldName] ?? field.fieldName}</span>
-                  <span className="font-bold text-slate-900">{field.users.toLocaleString('ja-JP')}人</span>
+                <div key={field.fieldName} className="flex items-center justify-between rounded-lg bg-canvas px-3 py-2 text-xs">
+                  <span className="text-ink-secondary">{fieldLabels[field.fieldName] ?? field.fieldName}</span>
+                  <span className="font-bold text-ink">{field.users.toLocaleString('ja-JP')}人</span>
                 </div>
               ))}
             </div>
@@ -891,22 +885,22 @@ function AnalyticsTab({ webinarId, durationSeconds, view = 'analytics', analytic
       </section>
 
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,1.4fr)]">
-        <section id="webinar-watch-funnel" className="scroll-mt-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <section id="webinar-watch-funnel" className="scroll-mt-4 rounded-2xl border border-hairline bg-canvas p-5 shadow-sm">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <h3 className="font-bold text-slate-900">参加ファネル</h3>
-              <p className="mt-1 text-xs text-slate-500">どこで人数が減っているか</p>
+              <h3 className="font-bold text-ink">参加ファネル</h3>
+              <p className="mt-1 text-xs text-ink-secondary">どこで人数が減っているか</p>
             </div>
-            <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-medium text-slate-600">全期間</span>
+            <span className="rounded-full bg-canvas-sunken px-2.5 py-1 text-[11px] font-medium text-ink-secondary">全期間</span>
           </div>
           <div className="mt-5 space-y-4">
             {funnel.map((stage) => (
               <div key={stage.label}>
                 <div className="mb-1.5 flex items-center justify-between text-xs">
-                  <span className="font-medium text-slate-700">{stage.label}</span>
-                  <span className="text-slate-500"><strong className="text-slate-900">{stage.value}</strong>人 · {stage.note}</span>
+                  <span className="font-medium text-ink-secondary">{stage.label}</span>
+                  <span className="text-ink-secondary"><strong className="text-ink">{stage.value}</strong>人 · {stage.note}</span>
                 </div>
-                <div className="h-2.5 overflow-hidden rounded-full bg-slate-100">
+                <div className="h-2.5 overflow-hidden rounded-full bg-canvas-sunken">
                   <div
                     className={`h-full rounded-full ${stage.color}`}
                     style={{ width: `${Math.max(stage.value > 0 ? 3 : 0, (stage.value / Math.max(1, summary.viewers)) * 100)}%` }}
@@ -915,42 +909,42 @@ function AnalyticsTab({ webinarId, durationSeconds, view = 'analytics', analytic
               </div>
             ))}
           </div>
-          <div className="mt-5 grid grid-cols-2 gap-3 border-t border-slate-100 pt-4">
+          <div className="mt-5 grid grid-cols-2 gap-3 border-t border-divider-soft pt-4">
             <div>
-              <div className="text-[11px] text-slate-500">15分以上視聴</div>
-              <div className="mt-1 text-lg font-bold text-slate-900">{summary.watched15m}人</div>
+              <div className="text-[11px] text-ink-secondary">15分以上視聴</div>
+              <div className="mt-1 text-lg font-bold text-ink">{summary.watched15m}人</div>
             </div>
             <div>
-              <div className="text-[11px] text-slate-500">CTA → フォーム</div>
-              <div className="mt-1 text-lg font-bold text-slate-900">{percent(summary.formSubmissions, summary.ctaClicks)}</div>
+              <div className="text-[11px] text-ink-secondary">CTA → フォーム</div>
+              <div className="mt-1 text-lg font-bold text-ink">{percent(summary.formSubmissions, summary.ctaClicks)}</div>
             </div>
           </div>
         </section>
 
-        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <section className="rounded-2xl border border-hairline bg-canvas p-5 shadow-sm">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <h3 className="font-bold text-slate-900">日別の参加ペース</h3>
-              <p className="mt-1 text-xs text-slate-500">直近14日・日ごとのユニーク人数</p>
+              <h3 className="font-bold text-ink">日別の参加ペース</h3>
+              <p className="mt-1 text-xs text-ink-secondary">直近14日・日ごとのユニーク人数</p>
             </div>
-            <div className="flex flex-wrap gap-3 text-[11px] text-slate-500">
-              <span className="flex items-center gap-1"><i className="h-2 w-2 rounded-full bg-slate-300" />予約</span>
-              <span className="flex items-center gap-1"><i className="h-2 w-2 rounded-full bg-blue-500" />参加</span>
-              <span className="flex items-center gap-1"><i className="h-2 w-2 rounded-full bg-violet-500" />CTA</span>
-              <span className="flex items-center gap-1"><i className="h-2 w-2 rounded-full bg-emerald-500" />フォーム</span>
+            <div className="flex flex-wrap gap-3 text-[11px] text-ink-secondary">
+              <span className="flex items-center gap-1"><i className="h-2 w-2 rounded-full bg-hairline" />予約</span>
+              <span className="flex items-center gap-1"><i className="h-2 w-2 rounded-full bg-action" />参加</span>
+              <span className="flex items-center gap-1"><i className="h-2 w-2 rounded-full bg-info" />CTA</span>
+              <span className="flex items-center gap-1"><i className="h-2 w-2 rounded-full bg-success" />フォーム</span>
             </div>
           </div>
           {daily.length === 0 ? (
-            <div className="flex h-52 items-center justify-center text-sm text-slate-400">まだ日別データがありません</div>
+            <div className="flex h-52 items-center justify-center text-sm text-ink-faint">まだ日別データがありません</div>
           ) : (
-            <div className="mt-5 flex h-52 items-end gap-2 overflow-x-auto border-b border-slate-200 pb-7">
+            <div className="mt-5 flex h-52 items-end gap-2 overflow-x-auto border-b border-hairline pb-7">
               {daily.map((day) => (
                 <div key={day.date} className="relative flex h-full min-w-10 flex-1 items-end justify-center gap-0.5" title={`${day.date} 予約${day.reservations}・参加${day.viewers}・CTA${day.ctaClicks}・フォーム${day.formSubmissions}`}>
-                  <div className="w-2 rounded-t bg-slate-300" style={{ height: `${Math.max(day.reservations > 0 ? 3 : 0, (day.reservations / maxDaily) * 100)}%` }} />
-                  <div className="w-2 rounded-t bg-blue-500" style={{ height: `${Math.max(day.viewers > 0 ? 3 : 0, (day.viewers / maxDaily) * 100)}%` }} />
-                  <div className="w-2 rounded-t bg-violet-500" style={{ height: `${Math.max(day.ctaClicks > 0 ? 3 : 0, (day.ctaClicks / maxDaily) * 100)}%` }} />
-                  <div className="w-2 rounded-t bg-emerald-500" style={{ height: `${Math.max(day.formSubmissions > 0 ? 3 : 0, (day.formSubmissions / maxDaily) * 100)}%` }} />
-                  <span className="absolute -bottom-6 whitespace-nowrap text-[10px] text-slate-400">
+                  <div className="w-2 rounded-t bg-hairline" style={{ height: `${Math.max(day.reservations > 0 ? 3 : 0, (day.reservations / maxDaily) * 100)}%` }} />
+                  <div className="w-2 rounded-t bg-action" style={{ height: `${Math.max(day.viewers > 0 ? 3 : 0, (day.viewers / maxDaily) * 100)}%` }} />
+                  <div className="w-2 rounded-t bg-info" style={{ height: `${Math.max(day.ctaClicks > 0 ? 3 : 0, (day.ctaClicks / maxDaily) * 100)}%` }} />
+                  <div className="w-2 rounded-t bg-success" style={{ height: `${Math.max(day.formSubmissions > 0 ? 3 : 0, (day.formSubmissions / maxDaily) * 100)}%` }} />
+                  <span className="absolute -bottom-6 whitespace-nowrap text-[10px] text-ink-faint">
                     {new Date(`${day.date}T00:00:00+09:00`).toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric' })}
                   </span>
                 </div>
@@ -960,22 +954,22 @@ function AnalyticsTab({ webinarId, durationSeconds, view = 'analytics', analytic
         </section>
       </div>
 
-      <section id="webinar-recent" className="scroll-mt-4 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-        <div className="flex flex-col gap-3 border-b border-slate-100 p-5 sm:flex-row sm:items-center sm:justify-between">
+      <section id="webinar-recent" className="scroll-mt-4 overflow-hidden rounded-2xl border border-hairline bg-canvas shadow-sm">
+        <div className="flex flex-col gap-3 border-b border-divider-soft p-5 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h3 className="font-bold text-slate-900">最近の参加者</h3>
-            <p className="mt-1 text-xs text-slate-500">顔写真・視聴状況・フォーム到達を友だち単位で表示</p>
+            <h3 className="font-bold text-ink">最近の参加者</h3>
+            <p className="mt-1 text-xs text-ink-secondary">顔写真・視聴状況・フォーム到達を友だち単位で表示</p>
           </div>
-          <span className="text-xs text-slate-500">全 {analytics.participants.length.toLocaleString('ja-JP')}人</span>
+          <span className="text-xs text-ink-secondary">全 {analytics.participants.length.toLocaleString('ja-JP')}人</span>
         </div>
         {recentParticipants.length === 0 ? (
-          <div className="p-10 text-center text-sm text-slate-400">まだ参加者がいません</div>
+          <div className="p-10 text-center text-sm text-ink-faint">まだ参加者がいません</div>
         ) : (
           <>
             <div className="hidden overflow-x-auto md:block">
               <table className="w-full min-w-[760px] text-sm">
                 <thead>
-                  <tr className="bg-slate-50/80 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                  <tr className="bg-canvas-sunken text-left text-[11px] font-semibold uppercase tracking-wide text-ink-secondary">
                     <th className="px-4 py-3">参加者</th>
                     <th className="px-4 py-3">最終参加</th>
                     <th className="px-4 py-3">視聴</th>
@@ -983,43 +977,43 @@ function AnalyticsTab({ webinarId, durationSeconds, view = 'analytics', analytic
                     <th className="px-4 py-3 text-right">詳細</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
+                <tbody className="divide-y divide-hairline">
                   {recentParticipants.map((p) => {
                     const name = p.friendName ?? `友だち ${p.friendId.slice(0, 6)}`
                     const watchedRate = Math.min(100, Math.round((p.maxWatchedSeconds / Math.max(1, durationSeconds)) * 100))
                     return (
-                      <tr key={p.friendId} className="hover:bg-blue-50/30">
+                      <tr key={p.friendId} className="hover:bg-canvas-sunken">
                         <td className="px-5 py-3.5">
                           <div className="flex items-center gap-3">
                             <ParticipantAvatar name={name} pictureUrl={p.pictureUrl} size="lg" />
                             <div className="min-w-0">
-                              <div className="max-w-48 truncate font-semibold text-slate-900">{name}</div>
-                              <div className="mt-0.5 text-[11px] text-slate-400">{p.sessions > 1 ? `${p.sessions}回参加` : p.registered ? '予約から参加' : '直接参加'}</div>
+                              <div className="max-w-48 truncate font-semibold text-ink">{name}</div>
+                              <div className="mt-0.5 text-[11px] text-ink-faint">{p.sessions > 1 ? `${p.sessions}回参加` : p.registered ? '予約から参加' : '直接参加'}</div>
                             </div>
                           </div>
                         </td>
-                        <td className="px-4 py-3.5 text-xs text-slate-600">{compactDateTime(p.latestJoinedAt)}</td>
+                        <td className="px-4 py-3.5 text-xs text-ink-secondary">{compactDateTime(p.latestJoinedAt)}</td>
                         <td className="w-48 px-4 py-3.5">
-                          <div className="flex items-center justify-between text-[11px] text-slate-500">
+                          <div className="flex items-center justify-between text-[11px] text-ink-secondary">
                             <span>{fmtSec(p.maxWatchedSeconds)}</span><span>{watchedRate}%</span>
                           </div>
-                          <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-slate-100">
-                            <div className="h-full rounded-full bg-blue-500" style={{ width: `${watchedRate}%` }} />
+                          <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-canvas-sunken">
+                            <div className="h-full rounded-full bg-action" style={{ width: `${watchedRate}%` }} />
                           </div>
                         </td>
                         <td className="px-4 py-3.5">
                           <div className="flex flex-wrap gap-1.5">
                             {p.formSubmittedAt ? (
-                              <span className="rounded-full bg-emerald-50 px-2 py-1 text-[10px] font-semibold text-success">フォーム送信</span>
+                              <span className="rounded-full bg-success-bg px-2 py-1 text-[10px] font-semibold text-success">フォーム送信</span>
                             ) : p.ctaClickedAt ? (
-                              <span className="rounded-full bg-violet-50 px-2 py-1 text-[10px] font-semibold text-violet-700">CTAクリック</span>
+                              <span className="rounded-full bg-info-bg px-2 py-1 text-[10px] font-semibold text-info">CTAクリック</span>
                             ) : (
-                              <span className="rounded-full bg-slate-100 px-2 py-1 text-[10px] font-medium text-slate-500">視聴のみ</span>
+                              <span className="rounded-full bg-canvas-sunken px-2 py-1 text-[10px] font-medium text-ink-secondary">視聴のみ</span>
                             )}
                           </div>
                         </td>
                         <td className="px-5 py-3.5 text-right">
-                          <Link href={`/chats?friend=${p.friendId}`} className="text-xs font-semibold text-blue-600 hover:text-blue-700">チャットを見る →</Link>
+                          <Link href={`/chats?friend=${p.friendId}`} className="text-xs font-semibold text-action hover:text-action">チャットを見る →</Link>
                         </td>
                       </tr>
                     )
@@ -1027,17 +1021,17 @@ function AnalyticsTab({ webinarId, durationSeconds, view = 'analytics', analytic
                 </tbody>
               </table>
             </div>
-            <div className="divide-y divide-slate-100 md:hidden">
+            <div className="divide-y divide-hairline md:hidden">
               {recentParticipants.map((p) => {
                 const name = p.friendName ?? `友だち ${p.friendId.slice(0, 6)}`
                 return (
-                  <Link key={p.friendId} href={`/chats?friend=${p.friendId}`} className="flex items-center gap-3 p-4 active:bg-slate-50">
+                  <Link key={p.friendId} href={`/chats?friend=${p.friendId}`} className="flex items-center gap-3 p-4 active:bg-canvas-sunken">
                     <ParticipantAvatar name={name} pictureUrl={p.pictureUrl} size="lg" />
                     <div className="min-w-0 flex-1">
-                      <div className="truncate text-sm font-semibold text-slate-900">{name}</div>
-                      <div className="mt-1 text-[11px] text-slate-500">{compactDateTime(p.latestJoinedAt)} · {fmtSec(p.maxWatchedSeconds)}視聴</div>
+                      <div className="truncate text-sm font-semibold text-ink">{name}</div>
+                      <div className="mt-1 text-[11px] text-ink-secondary">{compactDateTime(p.latestJoinedAt)} · {fmtSec(p.maxWatchedSeconds)}視聴</div>
                     </div>
-                    <span className={`h-2.5 w-2.5 rounded-full ${p.formSubmittedAt ? 'bg-emerald-500' : p.ctaClickedAt ? 'bg-violet-500' : 'bg-slate-300'}`} />
+                    <span className={`h-2.5 w-2.5 rounded-full ${p.formSubmittedAt ? 'bg-success' : p.ctaClickedAt ? 'bg-info' : 'bg-hairline'}`} />
                   </Link>
                 )
               })}
@@ -1046,39 +1040,39 @@ function AnalyticsTab({ webinarId, durationSeconds, view = 'analytics', analytic
         )}
       </section>
 
-      <details id="webinar-dropoff" className="group scroll-mt-4 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+      <details id="webinar-dropoff" className="group scroll-mt-4 overflow-hidden rounded-2xl border border-hairline bg-canvas shadow-sm">
         <summary className="flex cursor-pointer list-none items-center justify-between gap-4 p-5">
           <div>
-            <h3 className="font-bold text-slate-900">視聴維持・回別の詳細</h3>
-            <p className="mt-1 text-xs text-slate-500">必要なときだけ、離脱位置と各回の数字を確認</p>
+            <h3 className="font-bold text-ink">視聴維持・回別の詳細</h3>
+            <p className="mt-1 text-xs text-ink-secondary">必要なときだけ、離脱位置と各回の数字を確認</p>
           </div>
-          <span className="rounded-full bg-slate-100 px-3 py-1 text-xs text-slate-600 group-open:bg-blue-50 group-open:text-blue-700">{analytics.sessions.length}回 ▾</span>
+          <span className="rounded-full bg-canvas-sunken px-3 py-1 text-xs text-ink-secondary group-open:bg-info-bg group-open:text-action">{analytics.sessions.length}回 ▾</span>
         </summary>
-        <div className="grid gap-6 border-t border-slate-100 p-5 xl:grid-cols-2">
+        <div className="grid gap-6 border-t border-divider-soft p-5 xl:grid-cols-2">
           <div>
-            <h4 className="mb-3 text-sm font-semibold text-slate-800">最終視聴位置</h4>
+            <h4 className="mb-3 text-sm font-semibold text-ink">最終視聴位置</h4>
             {analytics.dropoff.length === 0 ? (
-              <p className="text-sm text-slate-400">まだ視聴データがありません</p>
+              <p className="text-sm text-ink-faint">まだ視聴データがありません</p>
             ) : analytics.dropoff.map((d) => (
               <div key={d.bucketStart} className="mb-2 flex items-center gap-2 text-xs">
-                <span className="w-16 shrink-0 text-slate-500">{fmtSec(d.bucketStart)}〜</span>
-                <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-slate-100">
-                  <div className="h-full rounded-full bg-blue-500" style={{ width: `${(d.viewers / maxDropoff) * 100}%` }} />
+                <span className="w-16 shrink-0 text-ink-secondary">{fmtSec(d.bucketStart)}〜</span>
+                <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-canvas-sunken">
+                  <div className="h-full rounded-full bg-action" style={{ width: `${(d.viewers / maxDropoff) * 100}%` }} />
                 </div>
-                <span className="w-7 text-right font-semibold text-slate-700">{d.viewers}</span>
+                <span className="w-7 text-right font-semibold text-ink-secondary">{d.viewers}</span>
               </div>
             ))}
           </div>
           <div className="min-w-0">
-            <h4 className="mb-3 text-sm font-semibold text-slate-800">直近の開催回</h4>
-            <div className="max-h-80 overflow-auto rounded-xl border border-slate-200">
+            <h4 className="mb-3 text-sm font-semibold text-ink">直近の開催回</h4>
+            <div className="max-h-80 overflow-auto rounded-xl border border-hairline">
               <table className="w-full min-w-[520px] text-xs">
-                <thead className="sticky top-0 bg-slate-50 text-left text-slate-500">
+                <thead className="sticky top-0 bg-canvas-sunken text-left text-ink-secondary">
                   <tr><th className="px-4 py-3 font-medium">開始</th><th className="px-4 py-3 font-medium">参加</th><th className="px-4 py-3 font-medium">平均視聴</th><th className="px-4 py-3 font-medium">CTA</th></tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
+                <tbody className="divide-y divide-hairline">
                   {analytics.sessions.slice(0, 30).map((s) => (
-                    <tr key={s.sessionStartAt}><td className="px-3 py-2 text-slate-700">{fmtSession(s.sessionStartAt)}</td><td>{s.viewers}</td><td>{fmtSec(s.avgWatchedSeconds)}</td><td>{s.ctaClicks} ({percent(s.ctaClicks, s.viewers)})</td></tr>
+                    <tr key={s.sessionStartAt}><td className="px-3 py-2 text-ink-secondary">{fmtSession(s.sessionStartAt)}</td><td>{s.viewers}</td><td>{fmtSec(s.avgWatchedSeconds)}</td><td>{s.ctaClicks} ({percent(s.ctaClicks, s.viewers)})</td></tr>
                   ))}
                 </tbody>
               </table>
@@ -1524,12 +1518,12 @@ function CtasTab({ webinarId, durationSeconds, forms, formsState, onRetryForms, 
 
   return (
     <div className="space-y-4">
-      <p className="text-sm text-gray-500">
+      <p className="text-sm text-ink-faint">
         指定時間にチャット欄へ CTA カードが流れます。「フォーム」はウェビナー内でそのまま回答でき、
         フォーム機能のタグ付与・シナリオ発火が自動で動きます。「URL」は外部ページを開きます。
       </p>
       {message && (
-        <p className="whitespace-pre-line rounded bg-blue-50 p-2 text-sm">
+        <p className="whitespace-pre-line rounded bg-info-bg p-2 text-sm">
           {message}
           {!loaded && (
             <button type="button" onClick={() => void loadCtas()} className="ml-2 font-medium underline">もう一度読み込む</button>
@@ -1537,7 +1531,7 @@ function CtasTab({ webinarId, durationSeconds, forms, formsState, onRetryForms, 
         </p>
       )}
       {ctas.map((c, i) => (
-        <div key={i} className="space-y-2 rounded border border-gray-200 p-3">
+        <div key={i} className="space-y-2 rounded border border-hairline p-3">
           <div className="flex flex-wrap items-center gap-2 text-sm">
             <label className="flex items-center gap-1">
               表示時間
@@ -1588,7 +1582,7 @@ function CtasTab({ webinarId, durationSeconds, forms, formsState, onRetryForms, 
               onClick={() => {
                 editCurrent((prev) => ({ ...prev, ctas: prev.ctas.filter((_, j) => j !== i), times: prev.times.filter((_, j) => j !== i) }))
               }}
-              className="ml-auto text-red-500"
+              className="ml-auto text-danger"
             >
               削除
             </button>
@@ -1633,7 +1627,7 @@ function CtasTab({ webinarId, durationSeconds, forms, formsState, onRetryForms, 
         <button
           onClick={() => void save()}
           disabled={saving || !loaded}
-          className="rounded bg-blue-600 px-4 py-1 text-sm text-white disabled:opacity-50"
+          className="rounded bg-action px-4 py-1 text-sm text-on-action disabled:opacity-50"
         >
           {saving ? '保存中...' : '保存'}
         </button>
@@ -1899,7 +1893,7 @@ function WebinarActionsTab({ webinarId, editor, onEditorChange }: { webinarId: s
         <section className="border-hairline bg-canvas rounded-card border p-4 shadow-card">
           <h2 className="text-ink text-base font-bold">CTA・フォーム</h2>
           <p className="text-ink-faint mt-1 text-xs">視聴完了・CTAクリック・未視聴ごとの処理を設定します。</p>
-          <div className="mt-4 flex flex-wrap gap-2">{TRIGGERS.map((item) => <span key={item.key} className={`rounded-pill border px-3 py-1 text-xs font-semibold ${item.key === 'completed' ? 'border-accent bg-accent-soft text-accent-deep' : 'border-hairline text-ink-secondary'}`}>{item.label}</span>)}</div>
+          <div className="mt-4 flex flex-wrap gap-2">{TRIGGERS.map((item) => <span key={item.key} className="rounded-pill border border-hairline px-3 py-1 text-xs font-semibold text-ink-secondary">{item.label}</span>)}</div>
         </section>
         <section className="border-hairline bg-canvas rounded-card border p-4 shadow-card">
           <div className="flex items-center justify-between gap-3"><h2 className="text-ink text-base font-bold">視聴完了メッセージ</h2><Button disabled>変数を挿入</Button></div>
@@ -2438,7 +2432,7 @@ function EditWebinarInner() {
     return (
       <>
 
-        <div className="p-6 text-gray-500">読み込み中...</div>
+        <div className="p-6 text-ink-faint">読み込み中...</div>
         {leaveConfirmDialog}
       </>
     )
@@ -2606,7 +2600,7 @@ function EditWebinarPage() {
       fallback={
         <>
 
-          <div className="p-6 text-gray-500">読み込み中...</div>
+          <div className="p-6 text-ink-faint">読み込み中...</div>
         </>
       }
     >

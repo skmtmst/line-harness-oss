@@ -43,12 +43,16 @@ export default function TestRecipientsSetting({ accountId }: TestRecipientsSetti
     ])
     if (generationRef.current !== generation) return
     let failed = false
-    if (recipientResult.status === 'fulfilled' && recipientResult.value.success) {
+    /*
+     * 配列でない応答は無いものとして扱う。そのまま置くと
+     * `recipients.filter` で画面ごと落ちる（全ルート監査 A1、2026-09-25）。
+     */
+    if (recipientResult.status === 'fulfilled' && recipientResult.value.success && Array.isArray(recipientResult.value.data)) {
       setRecipients(recipientResult.value.data)
     } else {
       failed = true
     }
-    if (loginUserResult.status === 'fulfilled' && loginUserResult.value.success) {
+    if (loginUserResult.status === 'fulfilled' && loginUserResult.value.success && Array.isArray(loginUserResult.value.data)) {
       setLoginUsers(loginUserResult.value.data)
     } else {
       failed = true

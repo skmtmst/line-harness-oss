@@ -8,6 +8,7 @@ import { api, type CommonActionResources, type TagDefinitionAction, type TagRetr
 import Breadcrumb from '@/components/layout/breadcrumb'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import Button from '@/components/shared/button'
+import Combobox from '@/components/shared/combobox'
 import Drawer from '@/components/shared/drawer'
 import IconButton from '@/components/shared/icon-button'
 import Notice from '@/components/shared/notice'
@@ -247,7 +248,7 @@ function ActionDrawer({ accountId, suppliedResources, allowedActionTypes, onClos
             ) : selected[0] === 'マイル付与' ? (
               <input type="number" min={1} value={amount} onChange={(event) => setAmount(event.target.value)} className={inputClass} aria-label="付与マイル" />
             ) : (
-              <><select value={resourceId} onChange={(event) => setResourceId(event.target.value)} disabled={unavailable || !resources} className="w-full rounded-control border border-hairline bg-canvas px-3 py-2.5 text-sm text-ink outline-none focus:border-accent focus:ring-2 focus:ring-accent/15"><option value="">{unavailable ? 'この種類は配布先で設定してください' : resources ? `${selected[1]}を選択` : '選択肢を読み込み中…'}</option>{choices.map((choice) => <option key={choice.id} value={choice.id}>{choice.name}</option>)}</select>{referenceState && selected[0] === 'テンプレート送信' && <div className="mt-3 rounded-control bg-canvas-sunken p-3 text-xs leading-5 text-ink-secondary"><span className="font-semibold">プレビュー</span><br />選んだテンプレートの公開版を送ります。</div>}</>
+              <><Combobox aria-label={`${selected[0]}に使う内容を選択`} placeholder={unavailable ? 'この種類は配布先で設定してください' : resources ? `${selected[1]}を選択` : '選択肢を読み込み中…'} value={resourceId} onChange={setResourceId} disabled={unavailable || !resources} loading={!unavailable && !resources} options={choices.map((choice) => ({ value: choice.id, label: choice.name }))} className="w-full" />{referenceState && selected[0] === 'テンプレート送信' && <div className="mt-3 rounded-control bg-canvas-sunken p-3 text-xs leading-5 text-ink-secondary"><span className="font-semibold">プレビュー</span><br />選んだテンプレートの公開版を送ります。</div>}</>
             )}
             <div className="mt-3 rounded-control border border-hairline bg-canvas-sunken p-3 text-xs leading-5 text-ink-secondary">
               <span className="font-semibold">実行内容の確認：</span> {selected[0]}を{timing === 'immediate' ? 'すぐに' : `${delay}${delayUnit === 'minutes' ? '分' : delayUnit === 'hours' ? '時間' : '日'}後に`}実行します。

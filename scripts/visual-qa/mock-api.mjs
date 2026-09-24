@@ -100,6 +100,10 @@ import {
   FRIEND_ADD_RULE_PUBLISH, FRIEND_ADD_RULE_VALIDATE,
   ACCESS_USERS, ACCESS_ROLES, ACCESS_AUDIT_EVENTS,
   GETTING_STARTED, RECIPES, MANUAL_LINKS,
+  TEST_RECIPIENT_LOGIN_USERS,
+  HQ_BANNER_PRESETS, HQ_BANNER_USAGE, HQ_BANNER_STATS, HQ_BANNER_PROJECTS, HQ_BANNER_IMAGES,
+  NEN_RANK_SETTINGS, NEN_MEMBER_LIST, NEN_PET_LIST, NEN_HEALTH_LIST,
+  FRIEND_ADD_RUN_DETAIL, OPERATION_SEND_PATHS, REMINDER_REGISTRANTS,
 } from './fixtures.mjs'
 
 if (process.env.NODE_ENV === 'production') {
@@ -983,7 +987,12 @@ const SHAPES = {
  * 本番データは変更せず、毎回同じ結果を返す。ほかの更新は従来どおり405。
  */
 function visualQaWriteBody(method, pathname) {
-  if (method === 'POST' && pathname === '/api/notifications/operator-rules/recipients-preview') {
+  if (method === 'POST' && (pathname === '/api/notifications/operator-rules/recipients-preview' || pathname === '/api/line-notifications/operator-rules/recipients-preview')) {
+    /*
+     * 本物は両方の名で同じ候補を返す（`notifications.ts`）。
+     * `line-notifications` 側が無いと、つくる画面の「受け取る人」が
+     * 「読み込めませんでした」になっていた。
+     */
     return OPERATOR_NOTIFICATION_RECIPIENTS
   }
   if (method === 'POST' && /^\/api\/notifications\/operator-rules\/[^/]+\/(publish|test)$/.test(pathname)) {
@@ -1461,11 +1470,46 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   if (pathname === '/api/recipes') return { success: true, data: RECIPES }
   const recipeDetail = /^\/api\/recipes\/([^/]+)$/.exec(pathname)
   if (recipeDetail) {
-    return { success: true, data: RECIPES.find((recipe) => recipe.id === recipeDetail[1]) ?? null }
+    /*
+     * 未知IDは本物と同じく失敗にする。成功＋null だと
+     * 複製画面が `recipe.items.map` で落ちていた。
+     */
+    const found = RECIPES.find((recipe) => recipe.id === recipeDetail[1])
+    if (!found) return { success: false, error: 'レシピが見つかりません' }
+    return { success: true, data: found }
   }
   if (pathname === '/api/manual-links') return { success: true, data: MANUAL_LINKS }
   if (pathname === '/api/operations/control/preview') {
     return { success: true, data: OPERATION_CONTROL_PREVIEW }
+  }
+  if (pathname === '/api/operations/send-paths') {
+    /*
+     * 無いと既定の器が返り、`data.capabilities` が回せず
+     * 「画面を表示できませんでした」になっていた（`?tab=control`）。
+     * 本物は `{evaluatedAt,capabilities,problems,paths}`（`operations.ts`）。
+     */
+    return { success: true, data: OPERATION_SEND_PATHS }
+  }
+  if (pathname === '/api/hq/banners/presets') {
+    /*
+     * 無いと既定の器が返り、`stats.projects.active` で
+     * 「画面を表示できませんでした」になっていた。本物の形で置く。
+     */
+    return {
+      success: true,
+      data: { presets: HQ_BANNER_PRESETS, maxCount: 4, usage: HQ_BANNER_USAGE, engineReady: true },
+    }
+  }
+  if (pathname === '/api/hq/banners/stats') {
+    return { success: true, data: HQ_BANNER_STATS }
+  }
+  if (pathname === '/api/hq/banners/projects') {
+    const archived = query.get('archived') === '1'
+    const items = archived ? [] : HQ_BANNER_PROJECTS
+    return { success: true, data: items }
+  }
+  if (pathname === '/api/hq/banners/images') {
+    return { success: true, data: HQ_BANNER_IMAGES, nextBefore: null }
   }
   if (pathname === '/api/operations/health') {
     return { success: true, data: OPERATION_HEALTH }
@@ -1752,6 +1796,14 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   if (pathname === '/api/account-settings/test-recipients') {
     return { success: true, data: TEMPLATE_TEST_RECIPIENTS }
   }
+  if (pathname === '/api/account-settings/test-recipient-login-users') {
+    /*
+     * 無いと既定の器（`{items,total,page,limit}`）が返り、
+     * `loginUsers.filter` で「画面を表示できませんでした」になっていた。
+     * 本物は配列を返す（`account-settings.ts`）。
+     */
+    return { success: true, data: TEST_RECIPIENT_LOGIN_USERS }
+  }
   // 管理画面の保存・保管・削除の流れ（#503 L5）。絵の検証用に成功だけ返す。
   if (method === 'POST' && pathname === '/api/forms/drafts') {
     return { success: true, data: { id: 'form-draft-qa', isActive: false } }
@@ -1929,6 +1981,14 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
     const reminder = REMINDERS.find((item) => item.id === reminderSteps[1])
     return { success: true, data: reminder ? reminderStepsOf(reminder) : [] }
   }
+  const reminderRegistrants = /^\/api\/reminders\/([^/]+)\/registrants$/.exec(pathname)
+  if (reminderRegistrants) {
+    /*
+     * 無いと既定の器が返り、登録者の欄が
+     * 「読み込めませんでした」になっていた。本物は配列（`reminders.ts`）。
+     */
+    return { success: true, data: REMINDER_REGISTRANTS }
+  }
   if (pathname === '/api/friend-add-runs') {
     const status = query.get('status')
     const ruleId = query.get('rule_id')
@@ -1945,6 +2005,17 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
       .filter((item) => !attribution || item.attribution?.status === attribution)
       .slice(0, limit)
     return { success: true, data: { ...FRIEND_ADD_RUNS, items } }
+  }
+  const friendAddRunDetail = /^\/api\/friend-add-runs\/([^/]+)$/.exec(pathname)
+  if (friendAddRunDetail) {
+    /*
+     * 無いと既定の器が返り、`detail.actionRuns.filter` で
+     * 「画面を表示できませんでした」になっていた。
+     * 本物は `actionRuns` まで含めた1件（`friend-add-rules.ts`）。
+     * 未知IDは本物と同じく失敗にする。
+     */
+    if (friendAddRunDetail[1] !== FRIEND_ADD_RUN_DETAIL.id) return { success: false, error: '実行結果が見つかりません' }
+    return { success: true, data: FRIEND_ADD_RUN_DETAIL }
   }
   if (pathname === '/api/scenarios') {
     const requestedPage = Number.parseInt(query.get('page') ?? '', 10)
@@ -2012,6 +2083,7 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   if (pathname === '/api/broadcasts') {
     return { success: true, data: BROADCASTS, ...BROADCAST_LIST_META }
   }
+  /* 予約結果（`/broadcasts/reserved?id=`）は上の1件取得で足りる。 */
   if (pathname === '/api/inbox/saved-views') return { success: true, data: INBOX_SAVED_VIEWS }
   if (pathname === '/api/friends/saved-views') {
     const id = query.get('id')
@@ -2348,8 +2420,40 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
     ).map(toPublic)
     return { success: true, data: { ...LINE_NOTIFICATION_DELIVERIES, items: items.slice(offset, offset + limit) }, pagination: { total: items.length, limit, offset } }
   }
-  if (pathname === '/api/notifications/operator-rules') {
+  if (pathname === '/api/notifications/operator-rules' || pathname === '/api/line-notifications/operator-rules') {
+    /*
+     * 本物は両方の名で同じ一覧を返す（`notifications.ts`）。
+     * `line-notifications` 側が無いと、運用者タブの件数が
+     * 「読み込めませんでした」になっていた。
+     */
     return { success: true, data: { items: OPERATOR_NOTIFICATION_RULES, summary: { total: 11, published: 9, stopped: 2, missingRecipients: 1, recipients: 6, acceptedToday: 42, excludedToday: 1 } } }
+  }
+  const lineOperatorRuleDetail = /^\/api\/line-notifications\/operator-rules\/([^/]+)$/.exec(pathname)
+  if (lineOperatorRuleDetail && lineOperatorRuleDetail[1] !== 'recipients-preview') {
+    const rule = OPERATOR_NOTIFICATION_RULES.find((item) => item.id === lineOperatorRuleDetail[1])
+    if (!rule) return { success: false, error: 'ルールが見つかりません' }
+    return { success: true, data: rule }
+  }
+  if (pathname === '/api/nen/rank-settings') {
+    /*
+     * 無いと既定の器が返り、`settings.kpis.members` で
+     * 「画面を表示できませんでした」になっていた。
+     * 本物は `settingsResponse` の形（`nen-ranks.ts`）。
+     */
+    return { success: true, data: NEN_RANK_SETTINGS }
+  }
+  if (pathname === '/api/nen/members') {
+    return { success: true, data: NEN_MEMBER_LIST }
+  }
+  if (pathname === '/api/nen/pets') {
+    /*
+     * 無いと既定の器が返り、`kpis.total` が取れず
+     * 「ペットを読み込めませんでした」になっていた。
+     */
+    return { success: true, data: NEN_PET_LIST }
+  }
+  if (pathname === '/api/nen/health') {
+    return { success: true, data: NEN_HEALTH_LIST }
   }
   if (pathname === '/api/ec-commerce/notification-runs') {
     const requestedLimit = Number.parseInt(query.get('limit') ?? '', 10)
@@ -2385,8 +2489,26 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   }
   if (/^\/api\/nen-members\/photos\/[^/]+$/.test(pathname)) return { success: true, data: NEN_PHOTO_DETAIL }
   if (pathname === '/api/ec-commerce/overview') return { success: true, data: EC_OVERVIEW }
-  /* 取り込みの記録。ページ送りの数を器の外に持つ口。 */
+  /* 取り込みの記録。`?view=actions` は処理1件ずつの形（`ec-commerce.ts`）。 */
   if (pathname === '/api/ec-commerce/events') {
+    if (query.get('view') === 'actions') {
+      /*
+       * 前は出来事の配列をそのまま返していて、画面の
+       * `data.items` が取れず「読み込めませんでした」になっていた。
+       * 本物と同じ処理1件ずつの器で返す。
+       */
+      const items = EC_ACTION_EXECUTIONS.items.map((execution) => ({
+        ...execution,
+        eventLabel: '',
+        friendId: null,
+        failureKind: null,
+        order: null,
+      }))
+      return {
+        success: true,
+        data: { items, total: items.length, summary: EC_ACTION_EXECUTIONS.summary },
+      }
+    }
     return { success: true, data: EC_EVENTS, pagination: { total: EC_EVENTS.length, limit: 20, offset: 0 } }
   }
   if (pathname === '/api/ec-commerce/subscriptions') {

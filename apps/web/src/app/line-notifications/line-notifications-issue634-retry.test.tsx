@@ -115,3 +115,18 @@ describe('#634 運用者タブ件数の取得失敗から読み直せる', () =>
     expect(screen.queryByText(/運用者へのお知らせの件数を読み込めませんでした/)).toBeNull()
   })
 })
+
+describe('監査A2 運用者タブの件数（本物の器）', () => {
+  it('summary 全項目の形でも件数が出る', async () => {
+    // 修正後の偽APIと同じ器。本物は両方の名でこの形を返す。
+    fixture.operatorList.mockResolvedValue({
+      success: true,
+      data: {
+        items: [],
+        summary: { total: 11, published: 9, stopped: 2, missingRecipients: 1, recipients: 6, acceptedToday: 42, excludedToday: 1 },
+      },
+    })
+    render(<LineNotificationsPage />)
+    await waitFor(() => expect(screen.getByText('運用者へのお知らせ 11')).toBeTruthy())
+  })
+})

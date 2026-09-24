@@ -453,3 +453,45 @@ describe('EC取込一覧の絞り込み0件 (#635)', () => {
     expect(searchInput(el).value).toBe('')
   })
 })
+
+describe('取り込みの記録の器（監査A2）', () => {
+  it('出来事の配列のままでは「読み込めませんでした」になる', async () => {
+    const { container: el, root: r } = mount()
+    await render(el, r)
+    await act(async () => { await drainMicrotasks() })
+
+    await act(async () => {
+      overviewFor('account-a').resolve(ok(overview(6)))
+      // 修正前の偽APIの形（data が配列）。本物は {items,total,summary}。
+      eventsDeferreds[0].resolve(ok([{ id: 'ece-1' }]))
+      await drainMicrotasks()
+    })
+    expect(el.textContent).toContain('取り込みの記録を読み込めませんでした')
+  })
+
+  it('処理1件ずつの器（orderなし）でも行が出る', async () => {
+    const { container: el, root: r } = mount()
+    await render(el, r)
+    await act(async () => { await drainMicrotasks() })
+
+    await act(async () => {
+      overviewFor('account-a').resolve(ok(overview(6)))
+      // 修正後の偽APIと同じ形（EC_ACTION_EXECUTIONS 由来・order なし）。
+      eventsDeferreds[0].resolve(ok({
+        items: [{
+          id: 'ec-action-1', eventId: 'ece-1', eventType: 'ec.order.confirmed', eventLabel: '',
+          actionType: 'line_notification', ruleVersion: 'ec-rule-v4', status: 'succeeded',
+          attemptCount: 1, maxAttempts: 3, errorCode: null, errorMessage: null,
+          lastAttemptedAt: null, nextRetryAt: null, version: 1,
+          receivedAt: '2026-08-25T08:48:00.000Z', orderNumber: 'NEN-12492', customerName: '高橋 直人',
+          friendId: null, retryAvailable: false, failureKind: null, order: null,
+        }],
+        total: 1,
+        summary: { pending: 0, processing: 0, succeeded: 1, skipped: 0, retryable_failed: 0, permanent_failed: 0 },
+      }))
+      await drainMicrotasks()
+    })
+    expect(el.textContent).toContain('NEN-12492')
+    expect(el.textContent).not.toContain('取り込みの記録を読み込めませんでした')
+  })
+})

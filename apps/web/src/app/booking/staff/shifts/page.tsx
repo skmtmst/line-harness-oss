@@ -399,14 +399,14 @@ function ResourceEditor({ accountId, resource, canManage, onSaved, onDeleted }: 
         </label>
       </div>
       <p className="text-ink-faint mt-2 text-xs">
-        メニュー {resource.usage.menuCount}件 ／ 予約 {resource.usage.bookingCount}件 ／ 例外日 {resource.usage.exceptionCount}件
+        メニュー {resource.usage?.menuCount ?? '—'}件 ／ 予約 {resource.usage?.bookingCount ?? '—'}件 ／ 例外日 {resource.usage?.exceptionCount ?? '—'}件
       </p>
       {error ? <p className="text-danger mt-2 text-xs" role="alert">{error}</p> : null}
       {canManage ? (
         <div className="mt-3 flex flex-wrap gap-2">
           <Button variant="primary" onClick={() => void update()} disabled={saving}>{saving ? '保存中…' : '設備を保存'}</Button>
           <Button onClick={() => void update(!resource.isActive)} disabled={saving}>{resource.isActive ? '受付を停止' : '受付を再開'}</Button>
-          {!resource.usage.referenced ? <Button onClick={() => void remove()} disabled={saving}>設備を削除</Button> : null}
+          {!resource.usage?.referenced ? <Button onClick={() => void remove()} disabled={saving}>設備を削除</Button> : null}
         </div>
       ) : <p className="text-ink-faint mt-2 text-xs">閲覧のみです。変更はオーナーまたは管理者が行えます。</p>}
     </div>
