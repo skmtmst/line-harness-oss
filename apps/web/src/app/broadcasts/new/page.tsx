@@ -239,7 +239,7 @@ function NewBroadcastPageContent() {
                * 送信ボタンのある詳細画面へ進める（IDEA-06: 保存と送信を
                * ひとつの操作に見せない）。
                */
-              : `/broadcasts?id=${encodeURIComponent(broadcast.id)}`,
+              : `/broadcasts/detail?id=${encodeURIComponent(broadcast.id)}`,
           )}
           onCancel={() => router.push('/broadcasts')}
           openTemplatePickerInitially={searchParams.get('templatePicker') === '1'}

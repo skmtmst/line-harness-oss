@@ -138,6 +138,35 @@ function BroadcastDetailInner() {
     }
   }, [accountLoading, id, reloadToken, selectedAccountId])
 
+  /*
+   * 送信中は5秒ごとに配信を取り直し、進み具合と成功件数を更新する。
+   * 送信中に開いた人が止まった数字を見続けないようにする。
+   * 送り終わった・失敗した・画面を離れたら止める。
+   */
+  useEffect(() => {
+    if (!id || broadcast?.status !== 'sending') return
+    let active = true
+    const timer = setInterval(() => {
+      void (async () => {
+        try {
+          const detail = await api.broadcasts.get(id)
+          if (!active || !detail.success) return
+          if (detail.data.status !== 'sending') {
+            // 状態が変わったら全体を取り直して集計も更新する。
+            setReloadToken((value) => value + 1)
+          }
+          setBroadcast((prev) => (prev && prev.id === id ? detail.data : prev))
+        } catch {
+          // 失敗は数えず、次の周期で取り直す。
+        }
+      })()
+    }, 5000)
+    return () => {
+      active = false
+      clearInterval(timer)
+    }
+  }, [id, broadcast?.status])
+
   if (!id) {
     return (
       <div>
