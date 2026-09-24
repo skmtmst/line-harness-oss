@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from 'react'
 import type { LineAccount } from '@line-crm/shared'
 import { api, type FriendMigrationJob } from '@/lib/api'
 import Button from '@/components/shared/button'
+import Disclosure from '@/components/shared/disclosure'
 import ListState from '@/components/shared/list-state'
 import PageHeader from '@/components/shared/page-header'
 import SelectField from '@/components/shared/select-field'
@@ -116,8 +117,10 @@ export default function FriendMigrationsPage() {
       <Link href="/accounts?tab=migration" className="text-ink-secondary pb-3">UIDの移行</Link>
       <span className="border-action text-action border-b-2 pb-3 font-semibold">CSVで書き出す・取り込む</span>
     </nav>
-    <div className="bg-success-bg text-success mb-4 rounded-control px-4 py-3 text-sm">書き出しても友だちの情報は変わりません。取り込みは、まず確認だけを実行できます。</div>
-    <p className="text-ink-secondary mb-4 text-sm">取り込みは「追加・更新・変更なし・競合・エラー」の内訳を先に見せます。反映後も、いつ誰が操作したかを履歴に残します。</p>
+    <div className="bg-info-bg text-ink-secondary mb-4 rounded-control px-4 py-3 text-xs">書き出しても友だちの情報は変わりません。取り込みは、まず確認だけを実行できます。</div>
+    <Disclosure size="compact" title="取り込みの内訳の見方" hint="追加・更新など5区分" className="mb-4">
+      <p className="text-sm">取り込みは「追加・更新・変更なし・競合・エラー」の内訳を先に見せます。反映後も、いつ誰が操作したかを履歴に残します。</p>
+    </Disclosure>
 
     <div className="grid gap-4 xl:grid-cols-2">
       <section className="bg-canvas rounded-card border-hairline border p-4">
