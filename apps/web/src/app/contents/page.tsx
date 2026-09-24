@@ -68,6 +68,13 @@ const PAGE_SIZE_OPTIONS = [
   { value: '50', label: '50件表示' },
 ]
 
+/*
+ * #670 15: 札の操作5個は同じ寸法で並べる。素の小ボタンと共通 Button が
+ * 混ざると高さ・枠・角丸がばらつき、折返しで積み方がずれる。札内では
+ * compact 1種(下の5個と同字)にそろえる。共通 Button の40pxは札の脚には
+ * 大きい。字面をそのまま書く(design-debt の unresolved-classname を増やさない)。
+ */
+
 /**
  * 絞り込みの種別。保存できる kind は image / video / audio / file の4つ。
  * file はいま PDF だけなので、そのまま「PDF」と呼ぶ。

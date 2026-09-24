@@ -474,18 +474,25 @@ function FriendsPageInner({
               保存した検索
             </button>
           ) : null}
-          {/* 並び順は共通 Select。設計の幅は未実測のため現行210pxを保つ。 */}
-          <div className="w-52.5 shrink-0">
-            <Select
-              aria-label="並び順"
-              size="full"
-              value={sortMode}
-              onChange={(value) => resetPageWith(() => setSortMode(value as SortMode))}
-              options={[
-                { value: 'recent', label: '友だち追加の新しい順' },
-                { value: 'oldest', label: '友だち追加の古い順' },
-              ]}
-            />
+          {/*
+            並び順は共通 Select。設計の幅は未実測のため現行210pxを保つ。
+            #670 02: 値だけ(「友だち追加の新しい順」)だと何の操作か分からない
+            ため、見える見出しを付ける(ウェビナーと同形)。
+          */}
+          <div className="flex shrink-0 items-center gap-1.5">
+            <span className="shrink-0 text-sm font-semibold whitespace-nowrap text-ink-secondary">並び順</span>
+            <div className="w-52.5 shrink-0">
+              <Select
+                aria-label="並び順"
+                size="full"
+                value={sortMode}
+                onChange={(value) => resetPageWith(() => setSortMode(value as SortMode))}
+                options={[
+                  { value: 'recent', label: '友だち追加の新しい順' },
+                  { value: 'oldest', label: '友だち追加の古い順' },
+                ]}
+              />
+            </div>
           </div>
           <button type="submit" className="inline-flex h-9.5 w-17.5 shrink-0 items-center justify-center whitespace-nowrap rounded-control bg-accent-deep text-label font-bold text-on-accent hover:brightness-92">検索</button>
         </form>

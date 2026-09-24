@@ -32,9 +32,13 @@
   color: var(--color-status-warn-deep);
 }
 
+/*
+ * #669 成功の札の文字は success に1本化する。accent-deep（#087a3e）と
+ * success（#047833）が同役で共存していた。地は同値（#e8f8ee）のまま。
+ */
 .success {
-  background: var(--color-accent-soft);
-  color: var(--color-accent-deep);
+  background: var(--color-success-bg);
+  color: var(--color-success);
 }
 
 .danger {

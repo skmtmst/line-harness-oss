@@ -628,10 +628,10 @@ export default function AutoRepliesPage() {
               <span
                 className={
                   row.status === 'reply'
-                    ? 'inline-flex items-center px-1.5 py-0.5 rounded bg-success-bg text-success'
+                    ? 'inline-flex items-center gap-0.5 rounded bg-success-bg px-1.5 py-0.5 text-[10px] font-medium text-success'
                     : row.status === 'silent'
-                      ? 'inline-flex items-center px-1.5 py-0.5 rounded bg-warning-bg text-warning'
-                      : 'inline-flex items-center px-1.5 py-0.5 rounded bg-canvas-sunken text-ink-faint line-through'
+                      ? 'inline-flex items-center gap-0.5 rounded bg-warning-bg px-1.5 py-0.5 text-[10px] text-warning'
+                      : 'inline-flex items-center gap-0.5 rounded bg-canvas-sunken px-1.5 py-0.5 text-[10px] text-ink-faint line-through'
                 }
               >
                 {row.mark ? `${row.mark} ` : ''}アカウント名

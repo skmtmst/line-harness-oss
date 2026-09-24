@@ -56,4 +56,14 @@ button.item:disabled {
   color: var(--color-on-accent);
   font-weight: 700;
 }
+
+/*
+ * #639 タッチ端末では指の当たりとして44pxを確保する（PCは38pxのまま）。
+ * 表記・構成の統一は #667 の範囲のため、ここでは高さだけを扱う。
+ */
+@media (pointer: coarse) {
+  .item {
+    min-height: 44px;
+  }
+}
 }

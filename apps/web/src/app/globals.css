@@ -65,6 +65,29 @@
   --color-action-soft: #eaf4ff;
   --color-on-action: #ffffff;
 
+  /*
+   * #669 緑の意味は2つだけ。**主操作（CTA）と成功・有効状態。**
+   *
+   * 緑が「押せるもの」と「ただの情報」の両方に使われ、主操作が埋もれて
+   * いた（全32画面で accent-deep、6画面で success が同役で共存）。
+   * 役割とトークンの対応はこれ。以後は名前で参照し、生の緑・青
+   * （Tailwind の green/blue/emerald/teal 系）は新たに書かない。
+   *
+   *   主操作の面・白文字      → accent-deep（CTA の緑。白文字 5.44:1）
+   *   成功・完了の文字と地    → success / success-bg（成功の緑）
+   *   有効・選択中の印        → accent 系（トグルON・選択タブ・現在地・
+   *                              選択チップ。選ばれている状態の表示）
+   *   テキストリンク          → action（青。緑のリンクは書かない）
+   *   補助の小字・行の補足    → ink-secondary / ink-faint（緑にしない）
+   *   数値カードの数字        → ink（緑にしない。状態を示す数だけ success 等）
+   *   情報の案内              → info 系（ティール）か status-info 系（青）。
+   *                              どちらも「情報」だが、画面内の案内は info、
+   *                              状態の札は status-info に寄せる。
+   *
+   * success-bg と accent-soft は同値（#e8f8ee）だが名前で使い分ける。
+   * 成功の地は success-bg、選択・CTA の地は accent-soft と書く。
+   */
+
   /* 文字。Pencil V5を共通基盤とし、V6でも同じ変数を使う。
    * ink が本文、ink-secondary が補足、ink-faint がラベル。 */
   --color-ink: #1d1d1f;
@@ -518,6 +541,66 @@ button[aria-label$='を削除']:not(:hover, :focus-visible, :disabled) {
     tbody tr:hover {
       background-color: var(--color-canvas-sunken);
     }
+
+    /*
+     * #639 タップ高さ・ホバーの規則。ホバーできる・精密なポインタの
+     * 環境に限定する（タッチ端末ではタップ後にホバーが残るため）。
+     *
+     * ボタンは背景の無い素の文字ボタンだけがここで変わる。背景も
+     * ホバーも持つ部品（共通 Button の CSS Module、`hover:bg-*` の
+     * ユーティリティ）は層の順序でそちらが勝つ。`transition: all`
+     * は使わず、動かすプロパティを列挙する（#648の教訓）。
+     */
+    button:not(:disabled, [role="switch"]):hover,
+    [role="button"]:not([aria-disabled="true"]):hover {
+      background-color: var(--color-canvas-sunken);
+    }
+
+    /*
+     * 文字リンクは色で応答する。`text-*` のユーティリティや部品の
+     * 色指定がある箇所はそちらが勝ち、色を持たない素のリンクだけ
+     * が操作色へ変わる。下線は付けない（枠付きボタンとして描いた
+     * リンクにまで線が入るため）。
+     */
+    a:hover {
+      color: var(--color-action-hover);
+    }
+  }
+
+  /*
+   * #639 主要操作の最小高さは 32px（推奨 36px 以上は部品側で持つ）。
+   * 高さを持つ部品（共通 Button 40px・ページネーション 38px・行内
+   * アイコン 32px・タブ 44px）はそのまま。ここで持ち上がるのは
+   * 高さの指定が無い素のボタン（ダイアログの「閉じる」など約28px）
+   * だけ。`min-height` なので高い部品は変わらない。
+   *
+   * スイッチ（role="switch"）は外す。20px の軌道とつまみの比率が
+   * 決まっているため、高さだけ伸ばすと形が壊れる。
+   */
+  button:not([role="switch"]),
+  [role="button"] {
+    min-height: 32px;
+  }
+
+  /*
+   * #639 タッチ端末では指の当たりとして 44px を確保する。部品側の
+   * 規定（共通 Button・行内操作の `@media (pointer: coarse)`）と
+   * 同じ入口。PC の見た目は変わらない。
+   */
+  @media (pointer: coarse) {
+    button:not([role="switch"]),
+    [role="button"] {
+      min-height: 44px;
+    }
+  }
+
+  /*
+   * #639 文字リンクの色変化はなめらかにする。対象は色と背景だけ。
+   */
+  a {
+    transition:
+      color var(--motion-fast) ease-out,
+      background-color var(--motion-fast) ease-out;
   }
 }
 

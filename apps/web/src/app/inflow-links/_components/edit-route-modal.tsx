@@ -299,7 +299,7 @@ export default function EditRouteModal({
               <button
                 onClick={doSave}
                 disabled={submitting}
-                className="text-xs px-2 py-1 rounded bg-yellow-600 text-white disabled:opacity-50"
+                className="text-xs px-2 py-1 rounded bg-yellow-600 text-white hover:brightness-90 disabled:opacity-50"
               >
                 それでも保存
               </button>
@@ -314,7 +314,7 @@ export default function EditRouteModal({
           <button
             onClick={onSubmit}
             disabled={submitting || !form.genre?.trim() || !form.name.trim() || !form.refCode.trim()}
-            className="text-sm px-3 py-1.5 rounded bg-blue-600 text-white disabled:opacity-50"
+            className="text-sm px-3 py-1.5 rounded bg-blue-600 text-white hover:brightness-90 disabled:opacity-50"
           >
             {submitting ? '保存中…' : isNew ? '作成' : '保存'}
           </button>

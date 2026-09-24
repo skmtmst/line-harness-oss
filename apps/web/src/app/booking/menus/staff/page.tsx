@@ -208,7 +208,7 @@ function MenuStaffMatrixContent() {
             // 保存すると、空の割り当てで上書きしてしまう。
             // #975 U075: 差分がないときも押させない（押しても変わらない）。
             disabled={saving || !selectedAccountId || loading || Boolean(error) || !dirty}
-            className="bg-accent-deep text-on-accent rounded-control px-4 py-2 text-sm font-medium disabled:opacity-50"
+            className="bg-accent-deep text-on-accent rounded-control px-4 py-2 text-sm font-medium hover:brightness-90 disabled:opacity-50"
           >
             {saving ? '保存中…' : dirty ? '変更を保存' : '変更なし'}
           </button>
