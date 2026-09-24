@@ -21,9 +21,15 @@ import { Tabs, type TabItem } from '../shared/tabs'
 export default function ScrollableTabs({
   items,
   actions,
+  label,
 }: {
   items: TabItem[]
   actions?: ReactNode
+  /**
+   * タブ一覧の名前（Issue #708）。中の共有 Tabs の `tablist` へ渡す。
+   * 省略しても描くが、読み上げでは何の切替かが伝わらない。
+   */
+  label?: string
 }) {
   const scrollerRef = useRef<HTMLDivElement>(null)
   const [canLeft, setCanLeft] = useState(false)
@@ -103,7 +109,7 @@ export default function ScrollableTabs({
           はみ出し、スクロールしても右のタブへ届かない。
           中身が収まるときは min-w-full で従来どおり全幅に敷く。
         */}
-        <Tabs items={items} className="w-max min-w-full" />
+        <Tabs items={items} label={label} className="w-max min-w-full" />
       </div>
       {/*
         右端の操作はスクロール領域へ入れない。入れると「人を追加する」の

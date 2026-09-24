@@ -35,6 +35,8 @@ export default function MergedTabs({
   variant = 'underline',
   actions,
   disabledKeys = [],
+  label,
+  panelId,
 }: {
   basePath: string
   /** クエリの名前。受信箱だけ channel を使う。 */
@@ -53,6 +55,16 @@ export default function MergedTabs({
   /** タブ行の右端に置くもの。underline のときだけ効く。 */
   actions?: ReactNode
   disabledKeys?: readonly string[]
+  /**
+   * タブ一覧の名前（Issue #708・16）。`underline` では共有 Tabs の
+   * `tablist` へ渡す。`segmented` はボタン群のため付けない。
+   */
+  label?: string
+  /**
+   * タブが切り替える面（tabpanel）の id（Issue #708・16）。
+   * `underline` では各タブの `aria-controls` へ付ける。
+   */
+  panelId?: string
 }) {
   const router = useRouter()
   const home = defaultKey ?? tabs[0].key
@@ -72,11 +84,13 @@ export default function MergedTabs({
       <div className={styles.shared}>
       <ScrollableTabs
         actions={actions}
+        label={label}
         items={tabs.map((tab) => ({
           label: tab.label,
           current: active === tab.key,
           disabled: disabledKeys.includes(tab.key),
           onClick: () => goTo(tab),
+          panelId,
         }))}
       />
       </div>

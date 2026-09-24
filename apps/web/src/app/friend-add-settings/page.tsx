@@ -255,7 +255,11 @@ function FriendAddSettingsList() {
       `}</style>
       <div data-design="FirstTime" data-tabs-row>
         <span className="sr-only">開始のタイミング。すぐに配信。あわせて実行すること。</span>
-        <Tabs items={(Object.keys(KIND_LABELS) as FriendAddRuleKind[]).map((tab) => ({ label: KIND_LABELS[tab], current: kind === tab, onClick: () => { resetCursor(); router.replace(`/friend-add-settings?kind=${tab}`) } }))} />
+        {/*
+          Issue #708（09）: 種別切替は `tablist/tab/tabpanel`。
+          下の設定面（`friend-add-rule-panel`）を切り替える。
+        */}
+        <Tabs label="配信する相手の切替" items={(Object.keys(KIND_LABELS) as FriendAddRuleKind[]).map((tab) => ({ label: KIND_LABELS[tab], current: kind === tab, panelId: 'friend-add-rule-panel', onClick: () => { resetCursor(); router.replace(`/friend-add-settings?kind=${tab}`) } }))} />
         <span data-design="Returning" className="sr-only">以前からの友だち・ブロックを解除した人。配信しない。別のシナリオを配信する。はじめての人と同じものを配信する。開始位置。前回読んだところから。</span>
       </div>
       <p className="text-ink-faint my-2 text-xs">この2つを分けないと、以前からのお客さまに「はじめまして」が届きます。</p>
@@ -283,7 +287,7 @@ function FriendAddSettingsList() {
           lg未満の単列でページ全体が横へはみ出していた（390/768pxで
           ページsw≈880）。縮めて、逃がす先を表の枠内スクロールに閉じる。
         */}
-        <section data-design="Rule" aria-label={`${KIND_LABELS[kind]}の設定`} className="min-w-0">
+        <section data-design="Rule" role="tabpanel" id="friend-add-rule-panel" aria-label={`${KIND_LABELS[kind]}の設定`} className="min-w-0">
           <span className="sr-only">判定の基準。はじめての人の判定。ブロック解除の判定。ブロック解除の回数が1回以上。</span>
           <ListToolbar searchPlaceholder="設定名で検索" searchValue={search} onSearchChange={setSearch}>
             <span className="text-ink-faint text-xs whitespace-nowrap">20件表示</span>

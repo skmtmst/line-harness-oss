@@ -1691,15 +1691,23 @@ function ConversionsPageHost() {
         tabs={MERGED_TABS}
         active={tab}
         defaultKey={DEFAULT_TAB}
+        label="表示内容の切替"
+        panelId="conversions-tabpanel"
       />
-      {tab === 'points' && <ConversionsPageInner accountId={selectedAccountId} />}
-      {tab === 'affiliates' && <AffiliatorsTab accountId={selectedAccountId} />}
-      {tab === 'offers' && <OffersTab />}
-      {tab === 'approvals' && <ApprovalQueue />}
-      {tab === 'report' && <ReportTab accountId={selectedAccountId} />}
-      {tab === 'payment' && (selectedAccountId
-        ? <AffiliatePaymentTab accountId={selectedAccountId} />
-        : <p className="text-ink-secondary p-8 text-center text-sm">上のバーからLINEアカウントを選んでください。</p>)}
+      {/*
+        Issue #708（16）: タブ行は `tablist/tab`、ここが切り替わる
+        `tabpanel`。面の名前は今のタブの画面名（h1 と同じ）に合わせる。
+      */}
+      <div role="tabpanel" id="conversions-tabpanel" aria-label={conversionsTabTitle(tab)}>
+        {tab === 'points' && <ConversionsPageInner accountId={selectedAccountId} />}
+        {tab === 'affiliates' && <AffiliatorsTab accountId={selectedAccountId} />}
+        {tab === 'offers' && <OffersTab />}
+        {tab === 'approvals' && <ApprovalQueue />}
+        {tab === 'report' && <ReportTab accountId={selectedAccountId} />}
+        {tab === 'payment' && (selectedAccountId
+          ? <AffiliatePaymentTab accountId={selectedAccountId} />
+          : <p className="text-ink-secondary p-8 text-center text-sm">上のバーからLINEアカウントを選んでください。</p>)}
+      </div>
     </div>
   )
 }
