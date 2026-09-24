@@ -183,6 +183,75 @@ async function storeFor(c: Context<Env>): Promise<StoreContext | null> {
   return { id: row.id, name: row.name, organizationId: row.organization_id, lineAccountId: row.line_account_id };
 }
 
+/**
+ * 1つのLINE公式アカウントを1店舗として扱うGoogleビジネス画面向けの初期化。
+ *
+ * 可視範囲の検査は上流middlewareで済んでいるが、DB上にも同じtenantの有効な
+ * LINEアカウントが存在することを再確認してから作る。tenant/LINEアカウントの
+ * UNIQUE制約と INSERT OR IGNORE により、同時アクセスでも1件だけを採用する。
+ */
+async function ensureStoreForGoogle(c: Context<Env>): Promise<StoreContext | null> {
+  const existing = await storeFor(c);
+  if (existing) return existing;
+
+  const lineAccountId = accountId(c);
+  if (!lineAccountId) return null;
+  const tenantId = staffTenantId(c);
+  const db = dbFor(c.env);
+  const lineAccount = await db
+    .prepare(
+      `SELECT id, name
+       FROM line_accounts
+       WHERE id = ?
+         AND COALESCE(tenant_id, ?) = ?
+         AND is_active = 1
+         AND archived_at IS NULL
+       LIMIT 1`,
+    )
+    .bind(lineAccountId, DEFAULT_TENANT_ID, tenantId)
+    .first<{ id: string; name: string }>();
+  if (!lineAccount) return null;
+
+  let organization = await db
+    .prepare('SELECT id FROM rt_organizations WHERE tenant_id = ? LIMIT 1')
+    .bind(tenantId)
+    .first<{ id: string }>();
+  if (!organization) {
+    const tenant = await db
+      .prepare('SELECT name FROM tenants WHERE id = ? LIMIT 1')
+      .bind(tenantId)
+      .first<{ name: string }>();
+    if (!tenant) return null;
+    await db
+      .prepare(
+        `INSERT OR IGNORE INTO rt_organizations (id, account_id, tenant_id, name, status)
+         VALUES (?, ?, ?, ?, 'active')`,
+      )
+      .bind(crypto.randomUUID(), tenantId, tenantId, tenant.name)
+      .run();
+    organization = await db
+      .prepare('SELECT id FROM rt_organizations WHERE tenant_id = ? LIMIT 1')
+      .bind(tenantId)
+      .first<{ id: string }>();
+  }
+  if (!organization) return null;
+
+  const storeId = crypto.randomUUID();
+  const inserted = await db
+    .prepare(
+      `INSERT OR IGNORE INTO rt_stores
+         (id, organization_id, name, code, capacity, timezone, line_account_id)
+       VALUES (?, ?, ?, ?, 0, 'Asia/Tokyo', ?)`,
+    )
+    .bind(storeId, organization.id, lineAccount.name, `line-${lineAccount.id}`, lineAccount.id)
+    .run();
+  const store = await storeFor(c);
+  if (store && Number(inserted.meta.changes ?? 0) > 0) {
+    auditLog(c, 'restaurant.google.store.bootstrap', { id: store.id, kind: 'rt_store' }, { lineAccountId: store.lineAccountId });
+  }
+  return store;
+}
+
 async function connectionFor(c: Context<Env>, storeId: string): Promise<ConnectionRow | null> {
   return dbFor(c.env, storeId)
     .prepare('SELECT * FROM rt_google_connections WHERE store_id = ? LIMIT 1')
@@ -359,7 +428,7 @@ restaurantGoogle.use('/api/restaurant-test/google/*', async (c, next) => {
 // ---------- 設定タブ ----------
 
 restaurantGoogle.get('/api/restaurant-test/google/connection', async (c) => {
-  const store = await storeFor(c);
+  const store = await ensureStoreForGoogle(c);
   if (!store) return fail(c, 404, 'このLINEアカウントに店舗が紐付いていません');
   const connection = await connectionFor(c, store.id);
   const db = dbFor(c.env, store.id);
@@ -405,7 +474,7 @@ restaurantGoogle.get('/api/restaurant-test/google/connection', async (c) => {
 restaurantGoogle.post('/api/restaurant-test/google/connect/start', requireRole('owner'), async (c) => {
   const client = oauthClient(c);
   if (!client) return fail(c, 503, 'Google接続の設定（OAuthクライアント）がこの環境にありません', { code: 'oauth_not_configured' });
-  const store = await storeFor(c);
+  const store = await ensureStoreForGoogle(c);
   if (!store) return fail(c, 404, 'このLINEアカウントに店舗が紐付いていません');
   const existing = await connectionFor(c, store.id);
   const mode = existing?.status === 'connected' || existing?.status === 'expired' || existing?.status === 'no_permission' ? 'reconnect' : 'connect';
