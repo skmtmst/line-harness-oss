@@ -300,4 +300,3 @@ export function OptionMatch({ label, query }: { label: string; query: string }) 
     </>
   )
 }
-
