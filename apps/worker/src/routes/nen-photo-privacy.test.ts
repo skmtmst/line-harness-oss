@@ -38,7 +38,9 @@ function harness() {
                   channel_access_token_encrypted: null,
                 };
               }
-              if (query.includes('SELECT id FROM nen_photo_submissions')) return { id: 'photo-1' };
+              if (query.includes('SELECT id, status FROM nen_photo_submissions')) {
+                return { id: 'photo-1', status: 'pending' };
+              }
               return null;
             },
             async all() {
@@ -109,7 +111,7 @@ describe('NEN photo privacy boundaries', () => {
       body: JSON.stringify({ consent: true, consentVersion: 'photo-public-v1', showPetName: false }),
     });
     expect(consent.status).toBe(200);
-    expect(statements.find((entry) => entry.query.includes('SELECT id FROM nen_photo_submissions'))?.bindings)
+    expect(statements.find((entry) => entry.query.includes('SELECT id, status FROM nen_photo_submissions'))?.bindings)
       .toEqual(['photo-1', 'friend-1', 'account-a']);
     expect(statements.find((entry) => entry.query.includes('publication_consent_version = ?'))?.bindings)
       .toEqual(['photo-public-v1', '2026-08-28 02:00:00', 0, '2026-08-28 02:00:00', 'photo-1', 'friend-1', 'account-a']);

@@ -114,6 +114,7 @@ export type AuditAction =
   | 'webhook.api_token.create'
   | 'webhook.api_token.revoke'
   | 'webhook.api_token.rotate'
+  | 'restaurant.google.store.bootstrap'
   | 'restaurant.google.connect.start'
   | 'restaurant.google.connect'
   | 'restaurant.google.reconnect'
