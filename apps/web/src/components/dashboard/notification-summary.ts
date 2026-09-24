@@ -29,13 +29,15 @@ export function dashboardNotificationFilters(
 export function notificationTime(createdAt: string): string {
   const time = new Date(createdAt)
   if (Number.isNaN(time.getTime())) return '日時不明'
-  return time.toLocaleString('ja-JP', {
-    month: 'numeric',
+  // 「9月2日 10:04」。月は long（9月）、日は numeric（2日）で出す。
+  return new Intl.DateTimeFormat('ja-JP', {
+    timeZone: 'Asia/Tokyo',
+    month: 'long',
     day: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
-    timeZone: 'Asia/Tokyo',
-  })
+    hourCycle: 'h23',
+  }).format(time)
 }
 
 export function dashboardNotificationItems(
