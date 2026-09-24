@@ -743,7 +743,7 @@
     "unresolved-classname": 4
   },
   "components/shared/tabs.tsx": {
-    "unresolved-classname": 6
+    "unresolved-classname": 4
   },
   "components/shared/text-field.tsx": {
     "unresolved-classname": 2
