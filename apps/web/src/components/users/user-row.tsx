@@ -80,7 +80,22 @@ export default function UserRow({ row, onOpenMergedPerson }: Props) {
     <>
       <tr className="border-b border-divider-soft hover:bg-surface-pearl">
         <td className="overflow-hidden px-3 py-3 text-sm font-semibold text-ink" title={row.displayName ?? undefined}>
-          <span className="block truncate">{row.displayName || <span className="text-ink-faint">—</span>}</span>
+          {/*
+            ★V7（#748）：統合ユーザー詳細（設計 `w8W4Eh`）は名前から開く。
+            「…」の中に同じ行き先を1つだけ置くより、名前を押すほうが早い。
+          */}
+          {mergedPersonId && onOpenMergedPerson ? (
+            <button
+              type="button"
+              data-qa-open="w8W4Eh"
+              onClick={() => onOpenMergedPerson(mergedPersonId)}
+              className="block max-w-full truncate text-left hover:underline"
+            >
+              {row.displayName || '名前なし'}
+            </button>
+          ) : (
+            <span className="block truncate">{row.displayName || <span className="text-ink-faint">—</span>}</span>
+          )}
         </td>
         <td className="min-w-0 px-3 py-3 text-xs text-ink-secondary">
           <span className="block truncate" title={row.emails.join(', ') || undefined}>
@@ -151,30 +166,14 @@ export default function UserRow({ row, onOpenMergedPerson }: Props) {
         </td>
         <td className="px-3 py-3 text-right">
           {/*
-            行の操作は枠つきボタン1つ（詳細の開閉）＋「…」にまとめた
-            「統合ユーザーを開く」。緑の塗りは行ごとに置かない。
+            行の操作は枠つきボタン1つ（詳細の開閉）。統合ユーザー詳細は名前から開く。
+            緑の塗りは行ごとに置かない。
           */}
           <RowActions
             detail={{
               label: expanded ? '閉じる' : '詳細を見る',
               onClick: () => setExpanded((value) => !value),
             }}
-            menuItems={
-              mergedPersonId && onOpenMergedPerson
-                ? [
-                    {
-                      id: 'open-merged-person',
-                      label: '統合ユーザーを開く',
-                      onSelect: () => onOpenMergedPerson(mergedPersonId),
-                    },
-                  ]
-                : []
-            }
-            menuButtonProps={
-              mergedPersonId && onOpenMergedPerson
-                ? { 'data-qa-open': 'w8W4Eh' }
-                : undefined
-            }
             subjectName={row.displayName ?? undefined}
           />
         </td>
