@@ -87,7 +87,8 @@ describe('友だちV6の画面契約', () => {
     expect(TABLE).not.toContain('>操作<')
     expect(ROW).not.toContain('>開く<')
     expect(TABLE).toContain('表示項目を編集')
-    expect(TABLE).toContain('件表示')
+    // #668: 件数の選び口は共通部品 PageSizeSelect（「表示件数 N件」）。
+    expect(TABLE).toContain('PageSizeSelect')
     expect(TABLE).toContain('truncate text-center')
     expect(ROW).toContain('items-center')
     expect(ROW).toContain('text-center')

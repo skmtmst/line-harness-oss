@@ -575,21 +575,27 @@ function MileagePageInner() {
         <Button onClick={() => void reloadAll()}>残高を再読み込み</Button>
         <Button onClick={exportBalancesCsv} disabled={members.length === 0} className="ml-auto">この頁の残高をCSVで書き出す</Button>
       </div>
-      <div className="mb-4 flex flex-wrap items-center gap-2" aria-label="残高の絞り込み状況">
-        <span className="rounded-full border border-accent bg-accent-soft px-3 py-2 text-xs font-semibold text-accent-deep">
-          すべて {overviewTotal === null ? '—' : formatMileageNumber(overviewTotal)}
+      {/*
+        #668: ここは人数の内訳で、絞り込みの口ではない。ピルの形
+        （rounded-full + 枠）だと押せるチップに見えるので、押せない
+        事実は字だけの行として出す。「残高が多い順」も選べないので
+        「並び順：」の前置きで固定値だと分かる形にする。
+      */}
+      <div className="mb-4 flex flex-wrap items-baseline gap-x-4 gap-y-1 text-xs" aria-label="ランク別の人数">
+        <span className="text-ink font-semibold tabular-nums">
+          すべて {overviewTotal === null ? '—' : `${formatMileageNumber(overviewTotal)}名`}
         </span>
         {(summary?.rankCounts ?? []).map((rank) => (
-          <span key={rank.rewardId} className="rounded-full border border-hairline bg-canvas px-3 py-2 text-xs font-semibold text-ink-secondary">
-            {rank.rankName} {formatMileageNumber(rank.friendCount)}人
+          <span key={rank.rewardId} className="text-ink-secondary tabular-nums">
+            {rank.rankName} {formatMileageNumber(rank.friendCount)}名
           </span>
         ))}
-        {summary && summary.rankCounts.length === 0 ? <span className="rounded-full border border-hairline bg-canvas px-3 py-2 text-xs font-semibold text-ink-faint">公開中のランクなし</span> : null}
-        <span className="rounded-full border border-status-warn bg-status-warn-soft px-3 py-2 text-xs font-semibold text-status-warn-deep">
+        {summary && summary.rankCounts.length === 0 ? <span className="text-ink-faint">公開中のランクなし</span> : null}
+        <span className="text-status-warn-deep tabular-nums">
           30日以内に消える {summary?.expiringMiles30d == null ? '0' : formatMileageNumber(summary.expiringMiles30d)} マイル
         </span>
-        <span className="ml-auto rounded-control border border-hairline bg-canvas px-3 py-2 text-xs font-semibold text-ink-secondary">
-          残高が多い順
+        <span className="text-ink-faint ml-auto">
+          並び順：残高が多い順
         </span>
       </div>
       </>}

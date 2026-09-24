@@ -1,7 +1,9 @@
 'use client'
 
 import { Archive, X } from 'lucide-react'
-import SelectField from '@/components/shared/select-field'
+import SortSelect from '@/components/ui/sort-select'
+import PageSizeSelect from '@/components/ui/page-size-select'
+import ListRange from '@/components/ui/list-range'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import Link from 'next/link'
@@ -775,17 +777,21 @@ function WebinarsPage() {
                   min-w-45（180px）を下限にすると flex-wrap が効き、
                   狭い幅では検索欄が1行・並び順と表示件数は次の行へ。 */}
               <input type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="名前・内容で検索" aria-label="ウェビナー名で検索" className="border-hairline rounded-control focus:ring-accent min-w-45 flex-1 border px-3 py-2 text-sm focus:ring-2 focus:outline-none" />
-              <span className="text-ink-faint text-xs whitespace-nowrap">並び順</span>
-              <SelectField value={sortKey} onChange={(event) => setSortKey(event.target.value as SortKey)} aria-label="並び順" options={[{ value: 'updated', label: '更新が新しい順' }, { value: 'created', label: '作成が新しい順' }, { value: 'name', label: '名前順' }]} className="border-hairline rounded-control border px-2 py-2 text-sm" />
-              <span className="text-ink-faint text-xs whitespace-nowrap">表示</span>
-              <SelectField size="compact" value={pageSize} onChange={(event) => setPageSize(Number(event.target.value))} aria-label="表示件数" options={[{ value: '20', label: '20件表示' }, { value: '50', label: '50件表示' }, { value: '100', label: '100件表示' }]} />
             </div>
 
+            {/* #668: 並びは「絞り込み → 並び順 → 表示件数」の1形。 */}
             <div data-design="Saved" className="mb-3 flex flex-wrap items-center gap-2">
               <span className="text-ink-faint text-xs whitespace-nowrap">よく使う絞り込み</span>
               {([{ key: 'active', label: '公開中のみ' }, { key: 'draft', label: '下書きのみ' }] as const).map(({ key, label }) => (
                 <button key={key} onClick={() => setSavedFilter(savedFilter === key ? '' : key)} aria-pressed={savedFilter === key} className={`rounded-pill border px-3 py-1 text-xs transition-colors ${savedFilter === key ? 'border-accent bg-accent-soft text-ink' : 'border-hairline text-ink-secondary hover:bg-canvas-sunken'}`}>{label}</button>
               ))}
+              <SortSelect
+                className="ml-auto"
+                value={sortKey}
+                onChange={(value) => setSortKey(value as SortKey)}
+                options={[{ value: 'updated', label: '更新が新しい順' }, { value: 'created', label: '作成が新しい順' }, { value: 'name', label: '名前順' }]}
+              />
+              <PageSizeSelect value={pageSize} onChange={setPageSize} />
             </div>
 
             <WebinarListContent
@@ -802,7 +808,7 @@ function WebinarsPage() {
             />
 
             {hasListData && visibleTotal > 0 && (
-              <div className="mt-3 flex flex-wrap items-center justify-between gap-3"><p className="text-ink-faint text-xs tabular-nums">{(currentPage - 1) * pageSize + 1}〜{(currentPage - 1) * pageSize + visible.length}件 / 全{visibleTotal}件</p><Pagination page={currentPage} pageCount={pageCount} onPageChange={setPage} ariaLabel="ウェビナー一覧のページ送り" /></div>
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-3"><ListRange total={visibleTotal} first={visibleTotal === 0 ? 0 : (currentPage - 1) * pageSize + 1} last={(currentPage - 1) * pageSize + visible.length} /><Pagination page={currentPage} pageCount={pageCount} onPageChange={setPage} ariaLabel="ウェビナー一覧のページ送り" /></div>
             )}
           </section>
         </div>
