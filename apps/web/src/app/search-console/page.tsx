@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import MergedTabs from '@/components/layout/merged-tabs'
+import Disclosure from '@/components/shared/disclosure'
 import StatusBadge from '@/components/shared/status-badge'
 import { api } from '@/lib/api'
 import type {
@@ -258,14 +259,13 @@ export default function SearchConsolePage() {
             <RankingTable title="検索キーワード 上位10件" rows={data.queries} kind="query" />
             <RankingTable title="検索流入ページ 上位10件" rows={data.pages} kind="page" />
           </div>
-          <details className="rounded-card border-hairline bg-canvas-sunken border p-5">
-            <summary className="text-ink cursor-pointer text-sm font-bold">見かたの注意</summary>
-            <ul className="text-ink-secondary mt-2 space-y-1 text-xs leading-relaxed">
+          <Disclosure title="見かたの注意" hint="3項目" size="compact">
+            <ul className="text-ink-secondary space-y-1 text-xs leading-relaxed">
               <li>・Search Console のデータは反映まで2〜3日かかります。直近の数字は出ません</li>
               <li>・掲載順位は平均値です。検索する人や場所によって実際の順位は変わります</li>
               <li>・「検索から友だち追加」は、サイトスクリプトで結びついた分だけを数えるものですが、その突き合わせはまだありません</li>
             </ul>
-          </details>
+          </Disclosure>
           <p className="text-ink-faint text-right text-[11px]">Search Console APIから読み取り専用で取得・最終更新 {new Date(data.fetchedAt).toLocaleString('ja-JP')}</p>
         </div>
       )}
