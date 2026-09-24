@@ -24,7 +24,6 @@ const BASELINE = [
   'radio-card.module.css',
   'search-field.module.css',
   'summary-card.module.css',
-  'toggle.module.css',
 ]
 
 function rawDurationDeclarations(css: string): string[] {

@@ -225,7 +225,11 @@ function FriendAddSettingsList() {
         <Button href="/friend-add-settings?view=new" variant="primary"><Plus size={16} />初回案内を作成</Button>
       </div>
 
-      <div data-design="Alert" className="rounded-card border-warning/40 bg-warning-bg text-warning mb-4 border px-4 py-3 text-sm font-semibold leading-relaxed">
+      {/*
+        ★V7：仕組みの説明で、異常ではない。橙の太字の警告帯だと毎回「何か起きている」と読めるので、
+        情報の色の小さな帯にする。
+      */}
+      <div data-design="Alert" className="rounded-card bg-info-bg text-ink-secondary mb-4 px-4 py-2.5 text-xs leading-relaxed">
         経路を確定できるのは「流入と計測」で発行したリンクから来た人だけです。素のQR・検索から来た人は「経路が分からなかった人」の設定が動きます。
       </div>
 
@@ -234,7 +238,7 @@ function FriendAddSettingsList() {
         <SummaryCard title="初回案内" value={data?.summary.rules ?? 0} unit="件" detail={`有効 ${data?.summary.active ?? 0}件`} variant="v6" />
         <SummaryCard title="直近7日の友だち追加" value={data?.summary.recentAdds ?? null} unit="人" detail={`経路が取れた ${countText(data?.summary.captured ?? null, '人')}`} variant="v6" />
         <SummaryCard title="送信成功" value={data?.summary.delivered ?? null} unit="通" detail={successRate(data?.summary.delivered ?? null, data?.summary.failed ?? null)} variant="v6" />
-        <SummaryCard title="経路が分からなかった人" value={data?.summary.unknownRoute ?? null} unit="人" detail="共通の案内が動いた" badge={(data?.summary.unknownRoute ?? 0) > 0 ? '要確認' : undefined} badgeTone="danger" variant="v6" />
+        <SummaryCard title="経路が分からなかった人" value={data?.summary.unknownRoute ?? null} unit="人" detail="共通の案内が動いた" badge={(data?.summary.unknownRoute ?? 0) > 0 ? '要確認' : undefined} badgeTone="warning" variant="v6" />
       </section>
 
       {/*
@@ -285,9 +289,8 @@ function FriendAddSettingsList() {
         */}
         <section data-design="Rule" aria-label={`${KIND_LABELS[kind]}の設定`} className="min-w-0">
           <span className="sr-only">判定の基準。はじめての人の判定。ブロック解除の判定。ブロック解除の回数が1回以上。</span>
-          <ListToolbar searchPlaceholder="設定名で検索" searchValue={search} onSearchChange={setSearch}>
-            <span className="text-ink-faint text-xs whitespace-nowrap">20件表示</span>
-          </ListToolbar>
+          {/* ★V7：件数は選べないので「20件表示」の文字だけを置かない。 */}
+          <ListToolbar searchPlaceholder="設定名で検索" searchValue={search} onSearchChange={setSearch} />
           {!data || data.items.length === 0 ? (
             appliedSearch.trim() || folder ? (
               <ListState kind="empty" title="条件に合う設定はありません" description="検索やフォルダの絞り込みを変えてください。" />
@@ -319,7 +322,8 @@ function FriendAddSettingsList() {
                       <ActionCell>
                         <div className="flex items-center gap-1">
                           <Button href={`/friend-add-settings?view=edit&id=${encodeURIComponent(rule.id)}`} variant="secondary">編集</Button>
-                          {!rule.isFallback && <IconButton aria-label={`${rule.name}を削除`} onClick={() => setDeleting(rule)}><Trash2 size={16} /></IconButton>}
+                          {/* 消せない行も「…」の位置をそろえるため、削除と同じ幅の空きを置く。 */}
+                          {rule.isFallback ? <span aria-hidden="true" className="inline-block size-8 shrink-0" /> : <IconButton aria-label={`${rule.name}を削除`} onClick={() => setDeleting(rule)}><Trash2 size={16} /></IconButton>}
                           {/*
                             その他操作は実画面へつなぐメニューを開く。行き先のない
                             ボタンを置くと、押しても何も起きない死に操作になる。

@@ -7,10 +7,11 @@ import type {
   MediaDeleteImpactReference,
   MediaItem,
 } from '@line-crm/shared'
-import { LayoutGrid, List as ListIcon } from 'lucide-react'
+import { LayoutGrid, List as ListIcon, Trash2 } from 'lucide-react'
 import { api, ApiError, type MediaQuota } from '@/lib/api'
 import FeatureGate from '@/components/feature-gate'
 import Button from '@/components/shared/button'
+import IconButton from '@/components/shared/icon-button'
 import { formatMediaSize } from './media-usage-display'
 import Dialog from '@/components/shared/dialog'
 import {
@@ -1009,10 +1010,7 @@ function MediaLibraryInner() {
                 }`}
               >
                 {item.kind === 'image' ? (
-                  // 静的書き出しのため next/image の最適化は使えない。
-                  // 一覧20件の同時取得を避けるため遅延読み込みにする。
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={displaySrc(item)} alt={item.filename} loading="lazy" decoding="async" className="h-full w-full object-contain" />
+                  <MediaThumb src={displaySrc(item)} alt={item.filename} />
                 ) : (
                   <span className="text-ink-faint text-xs">
                     {item.kind === 'video' ? '動画' : item.kind === 'audio' ? '音声' : 'ファイル'}
@@ -1127,7 +1125,7 @@ function MediaLibraryInner() {
                     disabled={!canManageMedia}
                     title={canManageMedia ? '使用箇所を見る' : managementPermissionReason}
                     aria-label={`${item.filename}の使用箇所`}
-                    className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded border px-2 py-1 text-[11px] font-semibold whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-50"
+                    className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-2.5 py-1 text-xs whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     使用箇所
                   </button>
@@ -1136,7 +1134,7 @@ function MediaLibraryInner() {
                     onClick={() => { setRenameError(''); setRenaming({ id: item.id, value: item.filename }) }}
                     title="名前を変える"
                     aria-label={`${item.filename}の名前を変える`}
-                    className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded border px-2 py-1 text-[11px] font-semibold whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-50"
+                    className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-2.5 py-1 text-xs whitespace-nowrap"
                   >
                     編集
                   </button>
@@ -1146,13 +1144,17 @@ function MediaLibraryInner() {
                     disabled={downloadingIds.has(item.id)}
                     title="ダウンロード"
                     aria-label={`${item.filename}をダウンロード`}
-                    className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded border px-2 py-1 text-[11px] font-semibold whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-50"
+                    className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-2.5 py-1 text-xs whitespace-nowrap disabled:opacity-50"
                   >
                     {downloadingIds.has(item.id) ? '取得中…' : 'ダウンロード'}
                   </button>
                   {/*
                     退避は消去ではない。使用中でも止めないが、理由を必ず聞く。
                     退避済みは編集・削除の押し口を出さず、戻す口だけを残す。
+                  */}
+                  {/*
+                    ★V7：札の操作が小さいボタン3つと大きいボタン2つで段違いに積まれていた。
+                    同じ大きさの小さいボタンにそろえ、削除は他の一覧と同じゴミ箱の印にする。
                   */}
                   {canManageMedia ? (
                   <button
@@ -1164,22 +1166,20 @@ function MediaLibraryInner() {
                     }}
                     title={item.archivedAt ? '一覧へ戻す' : '一覧と新規選択から外す'}
                     aria-label={item.archivedAt ? `${item.filename}を一覧へ戻す` : `${item.filename}をアーカイブ`}
-                    className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded border px-2 py-1 text-[11px] font-semibold whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-50"
+                    className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-2.5 py-1 text-xs whitespace-nowrap"
                   >
                     {item.archivedAt ? '一覧へ戻す' : 'アーカイブ'}
                   </button>
                   ) : null}
                   {canManageMedia && !item.archivedAt ? (
-                  <button
-                    type="button"
+                  <IconButton
                     onClick={() => void openDelete(item)}
                     data-qa-open="YfTfJ"
                     aria-label={`${item.filename}を削除`}
-                    title="削除する"
-                    className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded border px-2 py-1 text-[11px] font-semibold whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-50"
+                    title="削除"
                   >
-                    削除
-                  </button>
+                    <Trash2 aria-hidden />
+                  </IconButton>
                   ) : null}
                 </div>
 
@@ -1479,4 +1479,17 @@ function MediaLibraryInner() {
       )}
     </div>
   )
+}
+
+/**
+ * 一覧の縮小画像。★V7：読み込めないとき、ブラウザの壊れた画像の印と
+ * ファイル名（代替文字）が枠からはみ出していた。種類の文字に切り替える。
+ */
+function MediaThumb({ src, alt }: { src: string; alt: string }) {
+  const [failed, setFailed] = useState(false)
+  if (failed) return <span className="text-ink-faint text-xs">画像を表示できません</span>
+  // 静的書き出しのため next/image の最適化は使えない。
+  // 一覧20件の同時取得を避けるため遅延読み込みにする。
+  // eslint-disable-next-line @next/next/no-img-element
+  return <img src={src} alt={alt} loading="lazy" decoding="async" onError={() => setFailed(true)} className="h-full w-full object-contain" />
 }

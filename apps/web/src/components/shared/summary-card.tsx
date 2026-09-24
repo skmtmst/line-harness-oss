@@ -38,7 +38,8 @@ export type SummaryCardProps = {
   onRetry?: () => void
   retryLabel?: string
   badge?: string
-  badgeTone?: 'accent' | 'neutral' | 'danger'
+  /** warning は「見ておくとよい」。止まっている・壊れている（danger）ほど強くない注意に使う。 */
+  badgeTone?: 'accent' | 'neutral' | 'warning' | 'danger'
   action?: { label: string; href: string }
   loading?: boolean
   /** 対象画面にV6がある場合はv6、配信予定を強調するカードはbroadcastを使う。 */

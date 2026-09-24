@@ -803,7 +803,7 @@ export function TestSendDialog({
     return (
       <div className="fixed inset-y-0 right-0 left-0 z-50 overflow-y-auto bg-canvas xl:left-64" data-design-node="g2UNV">
         <div className="border-hairline flex flex-wrap items-center justify-between gap-2 border-b px-6" style={{ minHeight: 76, background: 'var(--color-canvas)' }}><h1 className="text-ink text-2xl font-bold">シナリオをテスト送信</h1><Button onClick={onClose}>シナリオ編集へ戻る</Button></div>
-        <main className="ml-6 mr-10 p-8">
+        <div className="ml-6 mr-10 p-8">
           <p className="text-ink-secondary text-sm">シナリオ編集へ戻る</p>
           {/* #1015 CHK-01 残存対応: 2列の固定比は狭い幅で本文が潰れるので、lg未満は1列に畳む。 */}
           <div className="mt-5 grid gap-6 lg:grid-cols-[1.5fr_0.8fr]">
@@ -831,7 +831,7 @@ export function TestSendDialog({
                 })}
               </div></aside>
           </div>
-        </main>
+        </div>
         {/*
           #985 CHK-01: 上の空き265pxは高さのあるPCの値。低い画面では
           残りの高さに合わせて縮め、下へはみ出した分はスクロールして
