@@ -892,11 +892,11 @@ function MileagePageInner() {
                   <Th className="w-1/6" align="right">操作</Th>
                 </TableHeadRow>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody className="divide-hairline divide-y">
                 {members.map((member) => {
                   const displayRank = rankLabel(member.rank)
                   return (
-                    <tr key={member.friendId} className="hover:bg-gray-50/70">
+                    <tr key={member.friendId} className="hover:bg-canvas-sunken">
                       <td className="px-4 py-3">
                         <p className="truncate text-sm font-semibold text-ink" title={member.displayName}>{member.displayName}</p>
                         <p className="mt-1 truncate text-xs text-ink-faint" title={member.lineAccount.name}>{member.lineAccount.name}</p>
@@ -904,7 +904,7 @@ function MileagePageInner() {
                       <td className="px-4 py-4"><p className="truncate text-sm text-ink-secondary" title={member.rankReason}>{displayRank ?? <><span>—</span><span className="ml-1 text-xs text-ink-faint">未設定</span></>}</p></td>
                       <td className="px-4 py-4 text-right">
                         <p className="font-bold text-accent-deep">{formatMileageNumber(member.available)}</p>
-                        {member.pending > 0 && <p className="text-[10px] text-amber-600">保留 {formatMileageNumber(member.pending)}</p>}
+                        {member.pending > 0 && <p className="text-warning text-[10px]">保留 {formatMileageNumber(member.pending)}</p>}
                       </td>
                       <td className={`px-4 py-4 text-right text-sm font-semibold tabular-nums ${member.monthChange < 0 ? 'text-danger' : 'text-accent-deep'}`}>{member.monthChange > 0 ? '+' : ''}{formatMileageNumber(member.monthChange)}</td>
                       <td className="px-4 py-4"><p className="truncate text-sm text-ink-secondary" title={member.expiringMiles30d == null ? 'なし' : `${formatMileageNumber(member.expiringMiles30d)} マイル`}>{member.expiringMiles30d == null ? 'なし' : `${formatMileageNumber(member.expiringMiles30d)} マイル`}</p></td>
@@ -925,8 +925,8 @@ function MileagePageInner() {
         )}
 
         {totalPages > 1 && (
-          <div className="flex items-center justify-between border-t border-gray-100 px-5 py-3">
-            <span className="text-xs text-gray-500">
+          <div className="border-hairline flex items-center justify-between border-t px-5 py-3">
+            <span className="text-ink-faint text-xs">
               {overviewTotal === null
                 ? '表示件数は未取得'
                 : `${formatMileageNumber(overviewTotal)}人中 ${formatMileageNumber(offset + 1)}〜${formatMileageNumber(Math.min(offset + members.length, overviewTotal))}人を表示`}
