@@ -6,6 +6,7 @@ import { useSearchParams } from 'next/navigation'
 import type { Tag } from '@line-crm/shared'
 import { ApiError, api, type ApiBroadcast, type BroadcastInsight } from '@/lib/api'
 import Button from '@/components/shared/button'
+import Progress from '@/components/shared/progress'
 import StickyBar from '@/components/shared/sticky-bar'
 import { useAccount } from '@/contexts/account-context'
 import { audienceSummary, messageTypeLabel } from '@/lib/broadcast-summary'
@@ -213,36 +214,58 @@ function BroadcastDetailInner() {
       ) : (
         <div className="max-w-3xl space-y-4">
           <section className="bg-canvas rounded-card border-hairline border p-5">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="text-ink text-sm font-semibold">送信の進み具合</p>
-              <span
-                className={`rounded-pill px-2 py-0.5 text-xs ${
-                  broadcast.status === 'sent'
-                    ? 'bg-success-bg text-success'
-                    : broadcast.status === 'sending'
-                      ? 'bg-warning-bg text-warning'
-                      : 'bg-canvas-sunken text-ink-faint'
-                }`}
-              >
-                {STATUS_LABELS[broadcast.status] ?? broadcast.status}
-              </span>
-            </div>
-            <p className="text-ink mt-2 text-sm tabular-nums">
-              {success.toLocaleString('ja-JP')} / {total.toLocaleString('ja-JP')} 件
-              {broadcast.status === 'sent' ? ' 完了' : ''}
-            </p>
-            <div className="bg-canvas-sunken mt-2 h-2 overflow-hidden rounded-full">
-              <div
-                className="bg-accent h-full"
-                style={{ width: total > 0 ? `${(success / total) * 100}%` : '0%' }}
-              />
-            </div>
-            {/* 開始・完了の時刻を別々に持っていない。sent_at は完了だけ。 */}
-            <p className="text-ink-faint mt-2 text-xs">
-              {broadcast.sentAt
-                ? `完了 ${formatBroadcastDateTime(broadcast.sentAt)}`
-                : '開始・完了の時刻は記録していません'}
-            </p>
+            <p className="text-ink text-sm font-semibold">送信の進み具合</p>
+            {/*
+              進み具合は ★V7 の Progress（処理の進み部品）で見せる。
+              状態の対応：sending→active、sent で全件成功→done、sent で
+              失敗あり→partial、それ以外（下書き・予約）→preparing。
+              緑は done のときだけ（部品が持つ完了の印）。数字と完了日時は
+              文でも残し、色だけに頼らない。
+            */}
+            <Progress
+              state={broadcast.status === 'sending' ? 'active' : broadcast.status === 'sent' ? (failed > 0 ? 'partial' : 'done') : 'preparing'}
+              title={
+                broadcast.status === 'sending'
+                  ? '送信中'
+                  : broadcast.status === 'sent'
+                    ? failed > 0
+                      ? '一部届きませんでした'
+                      : '送信が完了しました'
+                    : (STATUS_LABELS[broadcast.status] ?? broadcast.status)
+              }
+              percent={total > 0 ? (success / total) * 100 : 0}
+              countText={broadcast.status === 'sending'
+                ? `${success.toLocaleString('ja-JP')} / ${total.toLocaleString('ja-JP')} 件`
+                : undefined}
+              note={broadcast.status === 'sent' && failed === 0
+                ? `${success.toLocaleString('ja-JP')} / ${total.toLocaleString('ja-JP')} 件。${broadcast.sentAt ? `完了 ${formatBroadcastDateTime(broadcast.sentAt)}` : '開始・完了の時刻は記録していません'}`
+                : undefined}
+              className="mt-3"
+            />
+            {/*
+              失敗数は `totalCount - successCount` でしか出せない。送信中は
+              「まだ送っていないぶん」も同じ引き算に入るため、その数を失敗として
+              出すと、起きていない失敗を作ることになる。完了してから出す。
+              （下の「到達」の欄と同じ理由。）
+            */}
+            {broadcast.status === 'sending' || (broadcast.status === 'sent' && failed === 0) ? null : (
+              <p className="text-ink mt-2 text-sm tabular-nums">
+                {success.toLocaleString('ja-JP')} / {total.toLocaleString('ja-JP')} 件
+                {broadcast.status === 'sent' ? ' 完了' : ''}
+              </p>
+            )}
+            {/*
+              開始・完了の時刻を別々に持っていない。sent_at は完了だけ。
+              全件成功の完了（done）は Progress の note に日時を入れているので、
+              ここでは出さない（同じ日時の重複表示にしない）。
+            */}
+            {broadcast.status === 'sent' && failed === 0 ? null : (
+              <p className="text-ink-faint mt-2 text-xs">
+                {broadcast.sentAt
+                  ? `完了 ${formatBroadcastDateTime(broadcast.sentAt)}`
+                  : '開始・完了の時刻は記録していません'}
+              </p>
+            )}
           </section>
 
           <div data-design="KPIs" className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
