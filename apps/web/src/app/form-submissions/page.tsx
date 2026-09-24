@@ -626,7 +626,7 @@ export default function FormSubmissionsPage() {
                   <Th className="w-32">回答の保存先</Th>
                   <Th className="w-24" align="right">回答数</Th>
                   <Th className="w-24">更新</Th>
-                  <Th className="w-60" align="right">操作</Th>
+                  <Th className="w-32" align="right">操作</Th>
                 </TableHeadRow>
               </thead>
               <tbody className="divide-hairline divide-y">
@@ -673,7 +673,19 @@ export default function FormSubmissionsPage() {
                   </td>
                   <td className="truncate px-3 py-2.5 text-xs" title={listDestinationSummary}>{listDestinationSummary}</td>
                   <td className="px-3 py-2.5 text-right text-xs tabular-nums">
-                    <span className="block">{displayCount ? `${displayCount.toLocaleString('ja-JP')}件` : '—'}</span>
+                    {/* ★V7：回答数そのものを「回答を見る」の入口にし、操作の列を細くして名前を読めるようにする。 */}
+                    {reviewMode ? (
+                      <span className="block">{displayCount ? `${displayCount.toLocaleString('ja-JP')}件` : '—'}</span>
+                    ) : (
+                      <Link
+                        href={`/form-submissions/responses?id=${encodeURIComponent(form.id)}`}
+                        aria-label={`${normalizedName}の集まった回答を見る`}
+                        title="集まった回答を見る"
+                        className="text-action block font-medium hover:underline"
+                      >
+                        {displayCount ? `${displayCount.toLocaleString('ja-JP')}件` : '0件'}
+                      </Link>
+                    )}
                     {form.weeklySubmitCount ? <span className="block text-ink-faint">今週 {form.weeklySubmitCount.toLocaleString('ja-JP')}件</span> : null}
                   </td>
                   <td className="px-3 py-2.5 text-xs tabular-nums" title={form.updatedAt ? undefined : '更新日時を取得できません'}>{displayUpdatedAt(form.updatedAt)}</td>
@@ -688,7 +700,6 @@ export default function FormSubmissionsPage() {
                     ) : (
                       /* #641: 行操作は枠つきボタン＋削除アイコンにそろえる。削除は撮影口のため見せたまま */
                       <span className="inline-flex items-center justify-end gap-1.5">
-                        <Button href={`/form-submissions/responses?id=${encodeURIComponent(form.id)}`} variant="secondary" aria-label={`${normalizedName}の集まった回答を見る`}>回答を見る</Button>
                         <Button variant="secondary" onClick={() => openRename(form)}>編集</Button>
                         <IconButton aria-label={`${normalizedName}を削除`} title="回答フォームを削除" onClick={() => void openDelete(form)}>
                           <Trash2 aria-hidden />
