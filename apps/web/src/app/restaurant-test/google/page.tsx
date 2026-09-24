@@ -1,2 +1,2 @@
-import RestaurantConsole from '../restaurant-console'
-export default function Page() { return <RestaurantConsole view="google" /> }
+import GoogleBusinessPage from './google-business'
+export default function Page() { return <GoogleBusinessPage /> }

@@ -48,3 +48,39 @@ describe('V6正本 37-2-C 然・投稿', () => {
     expect(styles).toContain('--photo-');
   });
 });
+
+describe('V6正本 37-2-D 然・注文・定期', () => {
+  it('uses the adopted design node and the canonical header', () => {
+    expect(main).toContain('data-design-node="sBTL8"');
+    expect(main).toContain('<h1>注文・定期</h1><span>然 -NEN-</span>');
+    expect(main).toContain('お届けと購入履歴をまとめて確認');
+    expect(main).toContain('ホームの「最近の注文」から開いた注文も、こちらにまとまっています。');
+  });
+
+  it('keeps subscription details, EC guidance, and both empty states', () => {
+    expect(main).toContain('定期便の契約状況');
+    expect(main).toContain('現在の状況');
+    expect(main).toContain('次回お届け');
+    expect(main).toContain('お届け周期');
+    expect(main).toContain('変更・スキップ・解約はこの画面では行いません。お手続きはECのマイページからお願いします。');
+    expect(main).toContain('ECのマイページへ');
+    expect(main).toContain('契約中の定期便はありません');
+    expect(main).toContain('通常購入の履歴はまだありません');
+  });
+
+  it('keeps order detail and repeat-purchase links without point wording', () => {
+    expect(main).toContain('注文番号');
+    expect(main).toContain('もう一度購入');
+    expect(main).toContain('注文内容を見る');
+    const ordersView = main.slice(main.indexOf('function OrdersView'), main.indexOf('const yen'));
+    expect(ordersView).not.toContain('ポイント');
+  });
+
+  it('uses V6 variables for the order palette', () => {
+    expect(styles).toContain('.nm-orders-page-v6 { color: var(--order-ink); }');
+    expect(styles).toContain('--order-accent: var(--photo-accent);');
+    expect(styles).toContain('/* ★V6正本 sBTL8:');
+    const orderStyles = styles.slice(styles.indexOf('/* ★V6正本 sBTL8:'), styles.indexOf('/* ★V6正本 pNuzE:'));
+    expect(orderStyles).not.toMatch(/#[0-9a-f]{3,8}\b|rgba?\(/i);
+  });
+});

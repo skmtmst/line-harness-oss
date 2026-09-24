@@ -10,7 +10,7 @@ import PhotoReviewsPage from './page'
  * 1. 指標カード「1枚にかかる時間」が分の生値（平均 55975分 ≒ 38.8日）で
  *    出ていた。59分/61分/1439分/1441分/43200分超の境界で、
  *    分・約○時間・約○日・約○ヶ月へ切り替わることを見る。
- * 2. 「0枚を選択中」でも「まとめて通す」が緑のままに見えた。
+ * 2. 「0枚を選択中」でも「まとめて採用」が緑のままに見えた。
  *    いまは選ぶ前はまとめ操作の帯自体を出さない（0枚での確認窓を
  *    開きようがなくする）。1枚以上選んだら帯が出て両方が押せることを見る。
  *
@@ -114,7 +114,7 @@ async function render() {
 }
 
 /** 一覧側の一括ボタン。確認窓は portal なので host から探す。 */
-function bulkButton(label: 'まとめて通す' | 'まとめて戻す'): HTMLButtonElement {
+function bulkButton(label: 'まとめて採用' | 'まとめて見送り'): HTMLButtonElement {
   const found = Array.from(host.querySelectorAll('button')).find(
     (item) => item.textContent?.trim() === label,
   )
@@ -168,10 +168,10 @@ describe('0件選択の一括操作（Issue #666）', () => {
     net.handler = listHandler()
     await render()
 
-    // 帯が無いので「0枚をまとめて通す」確認窓は開きようがない。
+    // 帯が無いので「0枚をまとめて採用」確認窓は開きようがない。
     expect(host.textContent).not.toContain('枚を選択中')
-    expect(host.textContent).not.toContain('まとめて通す')
-    expect(host.textContent).not.toContain('まとめて戻す')
+    expect(host.textContent).not.toContain('まとめて採用')
+    expect(host.textContent).not.toContain('まとめて見送り')
   })
 
   it('写真を選ぶと両方の一括ボタンが押せる形になる', async () => {
@@ -181,8 +181,8 @@ describe('0件選択の一括操作（Issue #666）', () => {
     await selectPhoto(0)
 
     expect(host.textContent).toContain('1枚を選択中')
-    expect(bulkButton('まとめて通す').disabled).toBe(false)
-    expect(bulkButton('まとめて戻す').disabled).toBe(false)
+    expect(bulkButton('まとめて採用').disabled).toBe(false)
+    expect(bulkButton('まとめて見送り').disabled).toBe(false)
     expect(host.textContent).toContain('審査待ちの写真だけをまとめて処理します')
   })
 })

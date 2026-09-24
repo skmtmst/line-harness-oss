@@ -68,15 +68,15 @@ describe('V6 写真審査の一枚表示と掲載管理', () => {
     expect(publications).toContain('ご本人が公開の同意を撤回しました')
     expect(publications).toContain('外したもの')
     expect(publications).toContain('removed_at')
-    // 外す操作と「付与済みポイントは戻らない」説明を残す
+    // 外す操作と「付与済みマイルは戻らない」説明を残す
     expect(publications).toContain('掲載先から外す')
-    expect(publications).toContain('付与済みのポイントは戻りません')
+    expect(publications).toContain('付与済みのマイルは戻りません')
     expect(api).toContain('pendingWithdrawals')
     expect(api).toContain('withdrawnItems')
   })
 
   it('shows adoption history, reward state and placements in the detail (Issue #1040)', () => {
-    // 詳細は採用履歴・同意・公開先・ポイントの実状態をカードで出す。
+    // 詳細は採用履歴・同意・公開先・マイルの実状態をカードで出す。
     expect(detail).toContain('採用・同意・公開の記録')
     expect(detail).toContain('審査の記録')
     expect(detail).toContain('公開の同意')

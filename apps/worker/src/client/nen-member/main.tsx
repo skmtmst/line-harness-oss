@@ -12,6 +12,7 @@ type Activity = 'low' | 'normal' | 'high';
 type Pet = { id: string; name: string; callName?: string; animalType: string; gender?: Gender | string; breed: string; birthday: string; weightKg: number; concerns: string[]; neutered?: Neutered; activityLevel?: Activity; feedingProductId?: string | null; feeding?: Feeding | null; recommendedDailyMinGrams: number; recommendedDailyMaxGrams: number; venisonDailyGrams: number; foodCycleDays: number; imageUrl?: string | null };
 type OrderItem = { name?: string; quantity?: number; product_id?: string | number | null; product_url?: string | null; productUrl?: string | null };
 type CommerceOrder = { id?: string; number?: string; date?: string; orderDate?: string; total?: number; detailUrl?: string | null; items?: OrderItem[] };
+type SubscriptionContract = { id?: string; contract_number?: string; status?: string; nextShippingDate?: string | null; next_shipping_date?: string | null; cycle?: string | null; items?: OrderItem[]; manageUrl?: string | null; manage_url?: string | null; mypage_subscription_url?: string | null };
 type MemberPhoto = {
   id: string;
   imageUrl: string;
@@ -607,6 +608,33 @@ function PhotosView({ ctx, data, onDone }: { ctx: Ctx; data: MemberData; onDone:
   </section>;
 }
 
+function OrdersView({ data, subscriptions }: { data: MemberData; subscriptions: SubscriptionContract[] }) {
+  return <section className="nm-stack nm-home-stack nm-orders-page-v6" data-design-node="sBTL8">
+    <div className="nm-order-intro"><span aria-hidden="true">▤</span><div><h2>お届けと購入履歴をまとめて確認</h2><p>定期便と通常購入をひとつの画面で確認できます</p></div><p>ホームの「最近の注文」から開いた注文も、こちらにまとまっています。</p></div>
+    <section className="nm-order-section" aria-labelledby="subscription-heading">
+      <div className="nm-order-section-heading"><div><span>SUBSCRIPTION</span><h2 id="subscription-heading">定期便の契約状況</h2></div><small>{subscriptions.length}件</small></div>
+      {subscriptions.length ? subscriptions.map((subscription, contractIndex) => {
+        const manageUrl = subscription.mypage_subscription_url || subscription.manage_url || subscription.manageUrl;
+        return <article className="nm-subscription-card" key={subscription.id || subscription.contract_number || contractIndex}>
+          <div className="nm-subscription-status"><span>現在の状況</span><b>{subscription.status || '契約中'}</b></div>
+          <dl className="nm-subscription-facts"><div><dt>次回お届け</dt><dd>{displayDate(subscription.nextShippingDate || subscription.next_shipping_date) || '確認中'}</dd></div><div><dt>お届け周期</dt><dd>{subscription.cycle || '確認中'}</dd></div></dl>
+          {Array.isArray(subscription.items) && subscription.items.length > 0 ? <ul className="nm-subscription-items">{subscription.items.map((item, index) => <li key={`${item.name}-${index}`}><span>{item.name || '商品'}</span><b>× {item.quantity || 1}</b></li>)}</ul> : <p className="nm-order-item-pending">商品情報を確認中です。</p>}
+          <p className="nm-order-guidance">変更・スキップ・解約はこの画面では行いません。お手続きはECのマイページからお願いします。</p>
+          {manageUrl && <a className="nm-order-primary-link" href={manageUrl} target="_blank" rel="noreferrer">ECのマイページへ<span aria-hidden="true">›</span></a>}
+        </article>;
+      }) : <div className="nm-order-empty"><span aria-hidden="true">○</span><b>契約中の定期便はありません</b><p>定期便を始めると、次回のお届け予定がここに表示されます。</p></div>}
+    </section>
+    <section className="nm-order-section" aria-labelledby="order-history-heading">
+      <div className="nm-order-section-heading"><div><span>ORDER HISTORY</span><h2 id="order-history-heading">通常購入の履歴</h2></div><small>{data.commerce.orders.length}件</small></div>
+      {data.commerce.orders.length ? data.commerce.orders.map((order, index) => <article className="nm-order-card" key={order.id || order.number || index}>
+        <div className="nm-order-card-head"><div><b>注文番号 {order.number || index + 1}</b><time>{displayDate(order.date || order.orderDate)}</time></div><strong>{yen(Number(order.total || 0))}</strong></div>
+        {Array.isArray(order.items) && order.items.length > 0 ? <div className="nm-order-card-items">{order.items.map((item, itemIndex) => { const productUrl = item.product_url || item.productUrl; return <div key={`${item.name}-${itemIndex}`}><span>{item.name || '商品'} <small>× {item.quantity || 1}</small></span>{productUrl && <a href={productUrl} target="_blank" rel="noreferrer">もう一度購入</a>}</div>; })}</div> : <p className="nm-order-item-pending">商品情報を確認中です。</p>}
+        {order.detailUrl && <a className="nm-order-detail-link" href={order.detailUrl} target="_blank" rel="noreferrer">注文内容を見る<span aria-hidden="true">›</span></a>}
+      </article>) : <div className="nm-order-empty"><span aria-hidden="true">▤</span><b>通常購入の履歴はまだありません</b><p>商品を購入すると、注文内容がここに表示されます。</p></div>}
+    </section>
+  </section>;
+}
+
 
 const yen = (value: number) => `¥${Math.round(value).toLocaleString()}`;
 const man = (value: number) => (value % 10_000 === 0 ? `${value / 10_000}` : (value / 10_000).toFixed(1));
@@ -668,12 +696,12 @@ function App({ ctx }: { ctx: Ctx }) {
   if (!data) return <main className="nm-app"><p>{error || '読み込み中…'}</p></main>;
   const membership: Membership = data.membership ?? { rankKey: null, rankName: data.commerce.rank || 'レギュラー', mileRatePercent: null, annualMilesYen: data.commerce.purchaseAmount, lifetimeMilesYen: data.commerce.purchaseAmount, mileBalance: data.commerce.points, validUntil: null, next: null, ranks: [], milestones: [], nextMilestone: null };
   const tabLabel = tabItems.find(item => item.value === tab)?.label || '';
-  const subscriptions = Array.isArray(data.commerce.subscription?.contracts)
+  const subscriptions: SubscriptionContract[] = Array.isArray(data.commerce.subscription?.contracts)
     ? data.commerce.subscription.contracts
     : data.commerce.subscription ? [data.commerce.subscription] : [];
   const recentOrders = data.commerce.orders.slice(0, 3);
   return <main className="nm-app">
-    {tab === 'home' ? <header className="nm-home-header"><div><h1>マイページ</h1><span>然 -NEN-</span></div><p>{data.owner.displayName || 'お客様'}さん</p></header> : tab === 'pets' ? <header className="nm-home-header"><div><h1>マイペット</h1><span>然 -NEN-</span></div><p>{data.owner.displayName || 'お客様'}さん</p></header> : tab === 'health' ? <header className="nm-home-header"><div><h1>健康日記</h1><span>然 -NEN-</span></div><p>{data.owner.displayName || 'お客様'}さん</p></header> : tab === 'photos' ? <header className="nm-home-header"><div><h1>投稿</h1><span>然 -NEN-</span></div><p>{data.owner.displayName || 'お客様'}さん</p></header> : <header className="nm-page-header"><span>NEN MEMBERS</span><h1>{tabLabel}</h1></header>}
+    {tab === 'home' ? <header className="nm-home-header"><div><h1>マイページ</h1><span>然 -NEN-</span></div><p>{data.owner.displayName || 'お客様'}さん</p></header> : tab === 'pets' ? <header className="nm-home-header"><div><h1>マイペット</h1><span>然 -NEN-</span></div><p>{data.owner.displayName || 'お客様'}さん</p></header> : tab === 'health' ? <header className="nm-home-header"><div><h1>健康日記</h1><span>然 -NEN-</span></div><p>{data.owner.displayName || 'お客様'}さん</p></header> : tab === 'orders' ? <header className="nm-home-header"><div><h1>注文・定期</h1><span>然 -NEN-</span></div><p>{data.owner.displayName || 'お客様'}さん</p></header> : tab === 'photos' ? <header className="nm-home-header"><div><h1>投稿</h1><span>然 -NEN-</span></div><p>{data.owner.displayName || 'お客様'}さん</p></header> : <header className="nm-page-header"><span>NEN MEMBERS</span><h1>{tabLabel}</h1></header>}
     {tab === 'home' && <section className="nm-stack nm-home-stack">
       <MembershipSheet membership={membership} ownerName={data.owner.displayName || 'お客様'} />
       <div className="nm-card nm-lifetime"><div className="nm-lifetime-row"><span>ライフタイム</span><b>{yen(membership.lifetimeMilesYen)}</b></div><p className="nm-sub">{membership.nextMilestone ? `これまでの累計。あと ${yen(membership.nextMilestone.remainingYen)} で「${membership.nextMilestone.title}」。節目で限定グッズをご用意します` : 'これまでの累計。節目で限定グッズをご用意します'}</p></div>
@@ -682,7 +710,7 @@ function App({ ctx }: { ctx: Ctx }) {
     </section>}
     {tab === 'pets' && <PetsView ctx={ctx} pets={data.pets} products={data.feedingProducts || []} nenProducts={data.nenProducts || []} treatLimitPercent={data.treatLimitPercent ?? 10} onChanged={() => void load()} onHealth={() => { setTab('health'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} />}
     {tab === 'health' && <HealthDiary ctx={ctx} pets={data.pets} />}
-    {tab === 'orders' && <div className="nm-stack nm-orders-page"><section className="nm-card"><div className="nm-section-heading"><span>SUBSCRIPTION</span><h2>定期便の契約状況</h2></div>{subscriptions.length ? subscriptions.map((subscription: any, contractIndex: number) => <article className="nm-subscription-view" key={subscription.id || subscription.contract_number || contractIndex}><div><span>現在の状況</span><b>{subscription.status || '契約中'}</b></div><div><span>次回お届け</span><b>{displayDate(subscription.nextShippingDate || subscription.next_shipping_date) || '確認中'}</b></div><div><span>お届け周期</span><b>{subscription.cycle || '—'}</b></div>{Array.isArray(subscription.items) && subscription.items.length > 0 && <ul>{subscription.items.map((item: OrderItem, index: number) => <li key={`${item.name}-${index}`}><span>{item.name || '商品'}</span><b>× {item.quantity || 1}</b></li>)}</ul>}<p>変更・スキップ・解約のお手続きはこの画面では行いません。</p></article>) : <p className="nm-empty-text">契約中の定期便はありません。</p>}</section><section className="nm-card"><div className="nm-section-heading"><span>ORDER HISTORY</span><h2>通常購入の履歴</h2></div>{data.commerce.orders.length ? data.commerce.orders.map((order, index) => <article className="nm-order" key={order.id || index}><div className="nm-order-head"><div><b>注文番号 {order.number || index + 1}</b><time>{displayDate(order.date || order.orderDate)}</time></div><strong>¥{Number(order.total || 0).toLocaleString()}</strong></div>{Array.isArray(order.items) && order.items.length > 0 ? <div className="nm-order-items">{order.items.map((item, itemIndex) => { const productUrl = item.product_url || item.productUrl; return <div key={`${item.name}-${itemIndex}`}><span>{item.name || '商品'} <small>× {item.quantity || 1}</small></span>{productUrl && <a href={productUrl} target="_blank" rel="noreferrer">もう一度購入</a>}</div>; })}</div> : <p className="nm-order-no-item">商品情報を確認中です。</p>}{order.detailUrl && <a className="nm-order-detail" href={order.detailUrl} target="_blank" rel="noreferrer">注文内容を見る</a>}</article>) : <p className="nm-empty-text">通常購入の履歴はまだありません。</p>}</section></div>}
+    {tab === 'orders' && <OrdersView data={data} subscriptions={subscriptions} />}
     {tab === 'photos' && <PhotosView ctx={ctx} data={data} onDone={() => void load()} />}
     <nav className="nm-bottom-nav" aria-label="会員メニュー">{tabItems.map(item => <button className={tab === item.value ? 'active' : ''} onClick={() => { setTab(item.value); window.scrollTo({ top: 0, behavior: 'smooth' }); }} key={item.value}><i><TabIcon tab={item.value} /></i><span>{item.label}</span></button>)}</nav>
   </main>;
