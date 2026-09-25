@@ -6,7 +6,7 @@ import { hashPassword } from '../services/password-hash.js';
 import { encryptTotpSecret, totpAtStep } from '../lib/totp.js';
 import { adminAuth } from './admin-auth.js';
 import { authEmail } from './auth-email.js';
-import { sha256Hex } from '../middleware/auth.js';
+import { authMiddleware, sha256Hex } from '../middleware/auth.js';
 
 /**
  * N-426/N-434: 管理者のMFA必須とセッション期限（既定8時間・記憶時7日）。
@@ -36,6 +36,7 @@ function env(overrides: Partial<Env['Bindings']> = {}): Env['Bindings'] {
 
 function app() {
   const instance = new Hono<Env>();
+  instance.use('*', authMiddleware);
   instance.route('/', adminAuth);
   instance.route('/', authEmail);
   return instance;
@@ -121,6 +122,28 @@ describe('N-426: 管理者のTOTP未登録では通常セッションを発行�
     expect(sessionRows()).toEqual([]);
     expect(challengeRows()).toMatchObject([{ staff_id: 's1', purpose: 'setup', remember: 0 }]);
   });
+
+  it.each(['suspended', 'archived'] as const)(
+    'メール+パスワード: %s のオーナーも2要素認証後に状態付きセッションへ入れる',
+    async (status) => {
+      testDb.raw.prepare(`INSERT INTO tenants (id, name, status) VALUES ('tenant-unavailable', '停止中契約先', ?)`).run(status);
+      await seedOwnerWithPassword();
+      testDb.raw.prepare(`UPDATE staff_members SET tenant_id = 'tenant-unavailable' WHERE id = 's1'`).run();
+      await enableTotp('s1');
+
+      const login = await call('POST', '/api/auth/password/login', { email: 'owner@example.com', password: 'Abcdefg1' });
+      expect(login.status).toBe(200);
+      const challengeToken = (await login.json() as { data: { challengeToken: string } }).data.challengeToken;
+      const verify = await call('POST', '/api/auth/two-factor/verify', { challengeToken, code: await currentCode() });
+      expect(verify.status).toBe(200);
+      expect(sessionRows().map((row) => row.staff_id)).toEqual(['s1']);
+
+      const sessionCookie = (cookieFor(verify, 'lh_admin_session') ?? '').split(';')[0];
+      const session = await call('GET', '/api/auth/session', undefined, { headers: { Cookie: sessionCookie } });
+      expect(session.status).toBe(200);
+      expect(await session.json()).toMatchObject({ success: true, data: { tenantStatus: status } });
+    },
+  );
 
   it('staff 役割は必須対象外のため、未登録でもそのままセッションが出る', async () => {
     const hash = await hashPassword('Abcdefg1');
@@ -561,7 +584,7 @@ describe('N-426: LINEログイン経路でも同じ門を通る', () => {
     expect(location.search).toBe('');
   });
 
-  it('停止中契約先のLINEログインは案内へ戻し、challengeもsessionも発行しない', async () => {
+  it('停止中契約先のLINEログインは2要素認証後に停止中セッションを発行する', async () => {
     testDb.raw.prepare(
       `INSERT INTO tenants (id, name, status) VALUES ('tenant-stopped', '停止中契約先', 'suspended')`,
     ).run();
@@ -569,13 +592,25 @@ describe('N-426: LINEログイン経路でも同じ門を通る', () => {
     testDb.raw.prepare(
       `UPDATE staff_members SET line_user_id = 'U-stopped-owner' WHERE id = 'stopped-owner'`,
     ).run();
+    await enableTotp('stopped-owner');
     lineFetchMock('U-stopped-owner');
 
-    const res = await callback(callbackCookies());
-    expect(res.status).toBe(302);
-    expect(res.headers.get('Location')).toBe('https://admin.example.com/login?error=tenant_suspended');
-    expect(challengeRows()).toEqual([]);
-    expect(sessionRows()).toEqual([]);
+    const callbackResponse = await callback(callbackCookies());
+    const location = new URL(callbackResponse.headers.get('Location')!);
+    expect(location.pathname).toBe('/login/two-factor');
+    const challengeToken = new URLSearchParams(location.hash.slice(1)).get('lh_2fa')!;
+    expect(challengeRows()).toMatchObject([{ staff_id: 'stopped-owner', purpose: 'verify' }]);
+
+    const verify = await call('POST', '/api/auth/two-factor/verify', {
+      challengeToken,
+      code: await currentCode(),
+    });
+    expect(verify.status).toBe(200);
+    expect(sessionRows().map((row) => row.staff_id)).toEqual(['stopped-owner']);
+    const sessionCookie = (cookieFor(verify, 'lh_admin_session') ?? '').split(';')[0];
+    const session = await call('GET', '/api/auth/session', undefined, { headers: { Cookie: sessionCookie } });
+    expect(session.status).toBe(200);
+    expect(await session.json()).toMatchObject({ success: true, data: { tenantStatus: 'suspended' } });
   });
 
   it('セッションDBが古い場合はLINE callbackを安全に失敗させ、Cookieを出さない', async () => {

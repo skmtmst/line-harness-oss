@@ -188,10 +188,15 @@ export function isTenantUnavailable(status: TenantStatus | null | undefined): bo
 /** 停止中でも契約先が自分で確認・問い合わせできる最小経路。 */
 export function isTenantSuspensionExemptPath(method: string, path: string): boolean {
   const upper = method.toUpperCase();
+  const supportPath = path === '/api/hq/support' || path.startsWith('/api/hq/support/');
+  const noticePath = path === '/api/hq/notices' || path.startsWith('/api/hq/notices/');
   return (upper === 'GET' && path === '/api/auth/session')
     || (upper === 'POST' && path === '/api/auth/logout')
-    || path.startsWith('/api/hq/support')
-    || path.startsWith('/api/hq/notices')
+    || supportPath
+    || (upper === 'GET' && noticePath)
+    || (upper === 'POST' && /^\/api\/hq\/notices\/[^/]+\/read$/.test(path))
+    // 運営会社の統括と運営マスターは契約先停止の対象外。実際の許可は
+    // 各 route の requirePlatformAdmin が引き続き担う。
     || path.startsWith('/api/ops/');
 }
 

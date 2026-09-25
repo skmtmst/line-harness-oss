@@ -3,6 +3,7 @@ import type { Context } from 'hono';
 import {
   HQ_SUPPORT_KINDS,
   createHqSupportRequest,
+  getTenantBilling,
   getStaffById,
   listHqSupportRequests,
   markHqSupportRequestNotified,
@@ -20,6 +21,7 @@ import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { sendPlainMail } from '../services/plain-mail.js';
 import { getVisibleLineAccountScope } from '../services/account-access.js';
+import { findPlan, formatJstMonthDay } from '../services/billing-plans.js';
 
 /**
  * 統括から運営へのお問い合わせ（★V6 36-3）。
@@ -51,6 +53,17 @@ function tenantOf(c: Context<Env>): string {
 
 function workerUrl(c: Context<Env>): string {
   return c.env.WORKER_URL || new URL(c.req.url).origin;
+}
+
+function supportPlanLabel(billing: Awaited<ReturnType<typeof getTenantBilling>>): string {
+  if (!billing) return '—';
+  if (billing.plan_status === 'trialing') {
+    const end = formatJstMonthDay(billing.trial_ends_at);
+    return end ? `無料トライアル（${end}まで）` : '無料トライアル';
+  }
+  if (billing.plan_status === 'exempt') return '課金対象外';
+  if (billing.plan_status === 'canceled') return '契約終了';
+  return findPlan(billing.plan_key)?.name ?? '—';
 }
 
 type ReplyView = { id: string; authorName: string; body: string; createdAt: string };
@@ -139,6 +152,46 @@ hqSupport.get('/api/hq/support/requests', async (c) => {
     return c.json({ success: true, data });
   } catch (err) {
     console.error('GET /api/hq/support/requests error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+/**
+ * 停止中でもお問い合わせ画面を組み立てられる、問い合わせ専用の read-model。
+ * staff/me・tenants/me・line-accounts を個別に許可せず、必要最小限をこの経路へ集約する。
+ */
+hqSupport.get('/api/hq/support/context', async (c) => {
+  try {
+    const tenantId = tenantOf(c);
+    const staff = c.get('staff');
+    const [{ accounts }, member, billing] = await Promise.all([
+      getVisibleLineAccountScope(c.env.DB, staff),
+      staff?.id ? getStaffById(c.env.DB, staff.id) : Promise.resolve(null),
+      getTenantBilling(c.env.DB, tenantId),
+    ]);
+    let accountRows: Array<{ id: string; name: string }> = [];
+    if (accounts.length > 0) {
+      const rows = await c.env.DB
+        .prepare(`SELECT id, name FROM line_accounts WHERE id IN (${accounts.map(() => '?').join(',')}) AND COALESCE(tenant_id, ?) = ? ORDER BY name, id`)
+        .bind(...accounts.map((account) => account.id), DEFAULT_TENANT_ID, tenantId)
+        .all<{ id: string; name: string }>();
+      accountRows = rows.results ?? [];
+    }
+    return c.json({
+      success: true,
+      data: {
+        kinds: HQ_SUPPORT_KINDS.map((key) => ({ key, label: HQ_SUPPORT_KIND_LABELS[key] })),
+        accounts: accountRows,
+        sender: {
+          tenantName: billing?.name ?? '',
+          name: member?.name ?? staff?.name ?? '',
+          email: member?.email ?? null,
+          planLabel: supportPlanLabel(billing),
+        },
+      },
+    });
+  } catch (err) {
+    console.error('GET /api/hq/support/context error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });

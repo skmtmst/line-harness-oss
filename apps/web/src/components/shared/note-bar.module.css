@@ -30,6 +30,12 @@
   color: var(--color-status-info); /* fill: $status-info */
 }
 
+/* V6 `d61vBH`。通常の操作案内をmusuboの緑で示す。 */
+.success {
+  background: var(--color-accent-soft);
+  color: var(--color-accent-deep);
+}
+
 /* 気をつけてほしいこと。 */
 .warn {
   border: 1px solid var(--color-status-warn);

@@ -92,6 +92,23 @@ describe('チケット番号と一覧', () => {
     expect(s.data.kpis.untouched).toBe(2);
   });
 
+  it('停止中の契約先から送った問い合わせも運営の一覧へ届く', async () => {
+    testDb.raw.prepare(`UPDATE tenants SET status = 'suspended' WHERE id = 'tenant-a'`).run();
+    const sent = await app(tenantOwner).request('/api/hq/support/requests', json({
+      kind: 'billing',
+      subject: '停止中の契約について確認したい',
+      body: '復帰の手順を教えてください。',
+    }));
+    expect(sent.status).toBe(201);
+
+    const listed = await app(master).request('/api/ops/support/tickets?stage=new');
+    expect(listed.status).toBe(200);
+    expect(await listed.json()).toMatchObject({
+      total: 1,
+      data: [expect.objectContaining({ tenantName: '株式会社サンプル', subject: '停止中の契約について確認したい' })],
+    });
+  });
+
   it('チケット番号・契約先名・件名で検索できる', async () => {
     const t = await seedTicket('請求書の宛名を変えたい');
     await seedTicket('別の件');
