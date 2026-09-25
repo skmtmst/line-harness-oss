@@ -18,6 +18,9 @@ import {
   decideFormSubmitStep,
   FORM_SUBMIT_INCOMPLETE_MESSAGE,
 } from '../lib/form-submit-flow.js';
+import { logFailure } from '../lib/user-message.js';
+import LoadErrorView from '../components/LoadErrorView.js';
+import LoadingView from '../components/LoadingView.js';
 
 /**
  * 回答フォーム（友だちが実際に入力する画面）。
@@ -172,11 +175,13 @@ export default function Form() {
   const [confirming, setConfirming] = useState(false);
   /** 送信中のファイル欄。二重に押させないため欄ごとに持つ */
   const [uploading, setUploading] = useState<Record<string, boolean>>({});
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     if (!id) return;
     let cancelled = false;
     void (async () => {
+      setLoading(true);
       try {
         const data = await api.getForm(id);
         if (cancelled) return;
@@ -199,6 +204,7 @@ export default function Form() {
         }
       } catch (err) {
         if (!cancelled) {
+          logFailure('form-load', err);
           setError(
             (err as { status?: number }).status === 404
               ? 'このフォームは見つかりませんでした'
@@ -212,7 +218,7 @@ export default function Form() {
     return () => {
       cancelled = true;
     };
-  }, [id]);
+  }, [id, reloadKey]);
 
   const layout = form?.layout;
   const section = layout?.sections[sectionIndex];
@@ -258,8 +264,8 @@ export default function Form() {
       const res = await api.uploadFormFile(id, file);
       setValue(name, res.data.url);
     } catch (err) {
-      const body = (err as { body?: { error?: string } }).body;
-      setError(body?.error ?? '画像を送れませんでした。もう一度お試しください。');
+      logFailure('form-upload', err);
+      setError('画像を送れませんでした。もう一度お試しください。');
     } finally {
       setUploading((prev) => ({ ...prev, [name]: false }));
     }
@@ -382,6 +388,7 @@ export default function Form() {
     try {
       await sendFlow(keyOverride ?? idemKey);
     } catch (err) {
+      logFailure('form-submit', err);
       setError(submitErrorText(err));
     } finally {
       setSending(false);
@@ -397,11 +404,11 @@ export default function Form() {
   };
 
   if (loading) {
-    return <div className="p-8 text-center text-sm text-gray-500">読み込み中...</div>;
+    return <LoadingView />;
   }
 
   if (error && !form) {
-    return <div className="p-8 text-center text-sm text-gray-500">{error}</div>;
+    return <LoadErrorView message={error} onRetry={() => setReloadKey((k) => k + 1)} />;
   }
 
   if (!form || !layout) return null;

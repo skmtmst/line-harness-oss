@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { api, type EventDetail, type EventSlot, type EventBookingMine } from '../lib/api.js';
+import { logFailure } from '../lib/user-message.js';
+import LoadErrorView from '../components/LoadErrorView.js';
+import LoadingView from '../components/LoadingView.js';
 
 /**
  * 表示してよいURLか。保存時に弾き切れない古い行もあるため、表示側でも
@@ -28,13 +31,16 @@ export default function Event() {
   const [event, setEvent] = useState<EventDetail | null>(null);
   const [slots, setSlots] = useState<EventSlot[]>([]);
   const [myActive, setMyActive] = useState<EventBookingMine[]>([]);
-  const [error, setError] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     if (!id) return;
     let cancelled = false;
     async function load() {
+      setFailed(false);
+      setLoading(true);
       try {
         // GET 系はパブリック（liffId 経由のアカウント解決のみ）。これらは
         // 失敗するとイベント詳細が出せないので全体失敗扱い。
@@ -67,7 +73,10 @@ export default function Event() {
           console.warn('[event] me bookings unavailable:', authErr);
         }
       } catch (err) {
-        if (!cancelled) setError(err instanceof Error ? err.message : String(err));
+        if (!cancelled) {
+          logFailure('event-detail', err);
+          setFailed(true);
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -76,10 +85,10 @@ export default function Event() {
     return () => {
       cancelled = true;
     };
-  }, [id]);
+  }, [id, reloadKey]);
 
-  if (loading) return <div className="p-8 text-center text-gray-500">読み込み中...</div>;
-  if (error) return <div className="p-4 bg-red-50 text-red-700">{error}</div>;
+  if (loading) return <LoadingView />;
+  if (failed) return <LoadErrorView onRetry={() => setReloadKey((k) => k + 1)} />;
   if (!event) return null;
 
   const myCount = myActive.length;

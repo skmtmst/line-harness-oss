@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { api, type EventDetail, type EventSlot } from '../lib/api.js';
+import { logFailure } from '../lib/user-message.js';
+import LoadErrorView from '../components/LoadErrorView.js';
+import LoadingView from '../components/LoadingView.js';
 
 function formatJp(iso: string): string {
   return new Date(iso).toLocaleString('ja-JP', {
@@ -23,7 +26,11 @@ export default function EventConfirm() {
   const [slot, setSlot] = useState<EventSlot | null>(null);
   const [note, setNote] = useState('');
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  // 読み込みの失敗と送信の失敗は別に持つ。送信の失敗は入力を消さずその場に出す。
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [slotMissing, setSlotMissing] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
 
   // Stable Idempotency-Key — regenerate would defeat the purpose if user
   // taps twice. One key per Confirm-screen mount.
@@ -33,38 +40,45 @@ export default function EventConfirm() {
     if (!id || !slotId) return;
     let cancelled = false;
     async function load() {
+      setLoadFailed(false);
+      setSubmitError(null);
+      setSlotMissing(false);
       try {
         const [e, s] = await Promise.all([api.getEvent(id!), api.getEventSlots(id!)]);
         if (cancelled) return;
         setEvent(e);
         const found = s.items.find((x) => x.id === slotId);
         if (!found) {
-          // 枠が消えた / 満員でフィルタアウト / 開始済 → 詳細画面に戻すべき。
+          // 枠が消えた / 満員でフィルタアウト / 開始済 → 詳細画面に戻す。
           // null のまま放置すると無限ローディングになる。
-          setError('選択した枠は受付終了しました。別の日時をお選びください。');
+          setSlotMissing(true);
           return;
         }
         setSlot(found);
       } catch (err) {
-        if (!cancelled) setError(err instanceof Error ? err.message : String(err));
+        if (!cancelled) {
+          logFailure('event-confirm', err);
+          setLoadFailed(true);
+        }
       }
     }
     void load();
     return () => { cancelled = true; };
-  }, [id, slotId]);
+  }, [id, slotId, reloadKey]);
 
   async function submit() {
     if (!id || !slotId) return;
     if (note.length > 5000) {
-      setError('備考は5000字以内で入力してください');
+      setSubmitError('備考は5000字以内で入力してください');
       return;
     }
     setSubmitting(true);
-    setError(null);
+    setSubmitError(null);
     try {
       const res = await api.createEventBooking(id, { slot_id: slotId, customer_note: note || null }, idemKey);
       navigate(`/events/${id}/done?bookingId=${res.id}&status=${res.status}`);
     } catch (err) {
+      logFailure('create-event-booking', err);
       const e = err as { status?: number; body?: { error?: string } };
       const code = e.body?.error;
       const msg = (() => {
@@ -78,22 +92,28 @@ export default function EventConfirm() {
           case 'friend_not_found':
             return 'LINE 認証に失敗しました。一度 LINE のトークルームに戻り、友だち追加が完了していることを確認してから再度お試しください。';
           case 'idempotent_in_progress': return '前回のリクエストを処理中です。少しお待ちください。';
-          default: return err instanceof Error ? err.message : String(err);
+          default: return '予約を送れませんでした。時間をおいて、もう一度お試しください。';
         }
       })();
-      setError(msg);
+      setSubmitError(msg);
     } finally {
       setSubmitting(false);
     }
   }
 
-  if (error) {
+  if (loadFailed) {
+    return <LoadErrorView onRetry={() => setReloadKey((k) => k + 1)} />;
+  }
+  if (slotMissing) {
     return (
-      <div className="p-8 text-center">
-        <div className="text-red-700 mb-4">{error}</div>
+      <div className="mx-auto max-w-md p-8 text-center">
+        <p className="text-sm leading-6 text-gray-600">
+          選択した枠は受付終了しました。別の日時をお選びください。
+        </p>
         <button
+          type="button"
           onClick={() => navigate(`/events/${id}`)}
-          className="px-4 py-2 border rounded"
+          className="mt-4 w-full rounded-lg border border-gray-300 bg-white py-3 text-sm font-semibold text-gray-700 active:bg-gray-100"
         >
           イベントページに戻る
         </button>
@@ -101,7 +121,7 @@ export default function EventConfirm() {
     );
   }
   if (!event || !slot) {
-    return <div className="p-8 text-center text-gray-500">読み込み中...</div>;
+    return <LoadingView />;
   }
 
   return (
@@ -130,7 +150,7 @@ export default function EventConfirm() {
       />
       <div className="text-xs text-gray-500 text-right">{note.length} / 5000</div>
 
-      {error && <div className="bg-red-50 text-red-700 p-2 rounded mt-2 text-sm">{error}</div>}
+      {submitError && <div className="bg-red-50 text-red-700 p-2 rounded mt-2 text-sm">{submitError}</div>}
 
       <button
         onClick={submit}
