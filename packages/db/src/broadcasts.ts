@@ -67,6 +67,29 @@ export interface Broadcast {
   stopped_by?: string | null;
   /** 送信の試行番号。失敗分の再送で1つ進む。provider へ渡す再送キーの一部。 */
   send_attempt_no?: number;
+  /**
+   * 二者承認の今の状態（m12a）。
+   * none（承認がいらない・まだ頼んでいない）/ pending / approved /
+   * rejected / cancelled / expired（予約時刻を過ぎた）。
+   * 送信の段階（status）とは別の軸。未マイグレーション環境では undefined。
+   */
+  approval_status?: string | null;
+  /** 承認を頼んだ担当者（送る人）。 */
+  approval_requested_by_staff_id?: string | null;
+  /** 承認を頼んだ日時（JST）。 */
+  approval_requested_at?: string | null;
+  /** 承認を頼まれた担当者（承認する人）。 */
+  approval_approver_staff_id?: string | null;
+  /** 承認を頼むときのひとこと（任意）。 */
+  approval_note?: string | null;
+  /** 承認・差し戻しを決めた担当者。 */
+  approval_decided_by_staff_id?: string | null;
+  /** 承認・差し戻しを決めた日時（JST）。 */
+  approval_decided_at?: string | null;
+  /** 差し戻しの理由（差し戻すとき必須）。 */
+  approval_reject_reason?: string | null;
+  /** 1人運用のとき、送る人が確認で入れた人数。 */
+  approval_confirmed_count?: number | null;
 }
 
 export async function getBroadcasts(

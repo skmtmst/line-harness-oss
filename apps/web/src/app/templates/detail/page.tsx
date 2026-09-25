@@ -374,10 +374,9 @@ function TemplateDetailInner() {
             <section className="bg-canvas rounded-card border-hairline border p-5">
               <p className="text-ink mb-3 flex items-center gap-1 text-sm font-semibold">
                 使われている場所
-                <HelpTip
-                  label="使われている場所の説明"
-                  text="消す・変える前に、使っている配信・シナリオ・自動応答を確かめられます。使っている版は利用先が使い始めたときの版で、送った配信は送った時の版のまま残ります。"
-                />
+                <HelpTip label="使われている場所の説明">
+                  消す・変える前に、使っている配信・シナリオ・自動応答を確かめられます。使っている版は利用先が使い始めたときの版で、送った配信は送った時の版のまま残ります。
+                </HelpTip>
               </p>
               <DataTable>
                 <colgroup>
@@ -454,10 +453,9 @@ function TemplateDetailInner() {
             <section className="bg-canvas rounded-card border-hairline border p-5">
               <p className="text-ink mb-3 flex items-center gap-1 text-sm font-semibold">
                 版の履歴
-                <HelpTip
-                  label="版の履歴の説明"
-                  text="公開するたびに版が1つ増え、前の版は変わりません。この版に戻すは、その中身で新しい版を作ります。"
-                />
+                <HelpTip label="版の履歴の説明">
+                  公開するたびに版が1つ増え、前の版は変わりません。この版に戻すは、その中身で新しい版を作ります。
+                </HelpTip>
               </p>
               <Button variant="secondary" onClick={openHistory}>
                 版の履歴を見る

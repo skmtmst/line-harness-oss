@@ -434,6 +434,18 @@ function serializeBroadcast(row: DbBroadcast) {
     stopped: !!r.stopped_at,
     stoppedAt: (r.stopped_at as string | null | undefined) ?? null,
     sendAttemptNo: Number(r.send_attempt_no ?? 1),
+    /*
+     * 二者承認の今の状態（m12a）。送信の段階（status）とは別の軸。
+     * 未マイグレーション環境では undefined → 画面は承認なしとして扱う。
+     */
+    approvalStatus: (r.approval_status as string | null | undefined) ?? 'none',
+    approvalRequestedByStaffId: (r.approval_requested_by_staff_id as string | null | undefined) ?? null,
+    approvalRequestedAt: (r.approval_requested_at as string | null | undefined) ?? null,
+    approvalApproverStaffId: (r.approval_approver_staff_id as string | null | undefined) ?? null,
+    approvalNote: (r.approval_note as string | null | undefined) ?? null,
+    approvalDecidedByStaffId: (r.approval_decided_by_staff_id as string | null | undefined) ?? null,
+    approvalDecidedAt: (r.approval_decided_at as string | null | undefined) ?? null,
+    approvalRejectReason: (r.approval_reject_reason as string | null | undefined) ?? null,
     createdAt: row.created_at,
   };
 }
@@ -1214,6 +1226,8 @@ broadcasts.put('/api/broadcasts/:id', async (c) => {
       messageOptions?: unknown;
       afterActionVersionId?: string | null;
       expectedVersion?: number;
+      /** 1人運用のとき、送る人が確認で入れた人数 */
+      confirmedRecipientCount?: unknown;
     }>();
 
     // #772: 版を必須化する。認可・境界・存在の判定は上で済ませてあるため、
@@ -1354,6 +1368,55 @@ broadcasts.put('/api/broadcasts/:id', async (c) => {
       && Boolean(existing.common_var_snapshot_at)
       && (body.scheduledAt !== undefined || snapshotSemanticsChanged);
 
+    /*
+     * 二者承認（m12a）。新しく予約を入れるとき、1人運用の組織では
+     * 人数の手入力との一致が要る。合わなければ予約を作らない。
+     * 2人以上なら承認フロー（approval-request）へ進めるので、ここでは止めない。
+     */
+    const makesNewReservation = statusUpdate === 'scheduled' && existing.status !== 'scheduled';
+    if (makesNewReservation) {
+      try {
+        const approval = await import('../services/broadcast-approval.js');
+        const mergedForGate = {
+          ...existing,
+          target_type: body.targetType ?? existing.target_type,
+          target_tag_id: body.targetTagId !== undefined ? body.targetTagId : existing.target_tag_id,
+          segment_conditions: segmentConditions !== undefined
+            ? segmentConditions
+            : (existingRaw.segment_conditions as string | null | undefined) ?? null,
+          line_account_id: resultingAccountId,
+          account_ids: resultingTargetType === 'multi-account-dedup'
+            ? JSON.stringify(body.accountIds ?? [])
+            : (existingRaw.account_ids as string | null | undefined) ?? null,
+        } as typeof existing;
+        const gate = await approval.evaluateApprovalGate(c.env.DB, mergedForGate);
+        if (gate.required && gate.singleOperator) {
+          const confirmed = typeof body.confirmedRecipientCount === 'string'
+            && body.confirmedRecipientCount.trim() !== ''
+            ? Number(body.confirmedRecipientCount)
+            : body.confirmedRecipientCount;
+          if (typeof confirmed !== 'number' || !Number.isInteger(confirmed)
+            || confirmed !== gate.recipientCount) {
+            return c.json(
+              {
+                success: false,
+                error: `送る相手は${gate.recipientCount.toLocaleString('ja-JP')}人です。人数を入れて一致させてください。`,
+                code: 'COUNT_MISMATCH',
+                recipientCount: gate.recipientCount,
+                threshold: gate.threshold,
+              },
+              409,
+            );
+          }
+          await c.env.DB.prepare(`UPDATE broadcasts SET approval_confirmed_count = ? WHERE id = ?`)
+            .bind(confirmed, id).run();
+        }
+      } catch (gateError) {
+        console.error('PUT /api/broadcasts/:id approval gate error:', gateError);
+        return c.json({ success: false, error: '承認の確認ができませんでした。しばらくしてからもう一度お試しください。' }, 503);
+      }
+    }
+
     const updates: Parameters<typeof updateBroadcast>[2] = {
       title: body.title,
       message_type: body.messageType,
@@ -1390,6 +1453,31 @@ broadcasts.put('/api/broadcasts/:id', async (c) => {
 
     if (!updated) {
       return c.json({ success: false, error: '別の画面で下書きが更新されました', code: 'VERSION_CONFLICT' }, 409);
+    }
+
+    /*
+     * 二者承認（m12a）。承認の対象（宛先・本文）が変わったら、もらった承認は
+     * 白紙に戻す。古い内容への承認で新しい内容を送らせない。
+     */
+    if (snapshotSemanticsChanged) {
+      try {
+        const approval = await import('../services/broadcast-approval.js');
+        if (approval.readApprovalStatus(existing) === 'pending'
+          || approval.readApprovalStatus(existing) === 'approved') {
+          await c.env.DB.prepare(
+            `UPDATE broadcasts
+                SET approval_status = 'none',
+                    approval_decided_by_staff_id = NULL,
+                    approval_decided_at = NULL,
+                    approval_reject_reason = NULL,
+                    approval_confirmed_count = NULL
+              WHERE id = ? AND approval_status IN ('pending', 'approved')`,
+          ).bind(id).run();
+          await approval.recordBroadcastApprovalEvent(c.env.DB, id, c.get('staff')?.id ?? '', 'cancelled', '内容の変更');
+        }
+      } catch (approvalError) {
+        console.error('PUT /api/broadcasts/:id approval reset error:', approvalError);
+      }
     }
 
     // 失敗 partial dedup broadcast を draft に戻して編集 → 再送するケースで、
@@ -1860,6 +1948,35 @@ broadcasts.post('/api/broadcasts/:id/send', requireIrreversibleConfirmation('bro
         : c.json({ success: false, error: 'Broadcast not found' }, 404);
     }
 
+    /*
+     * 二者承認のゲート（m12a / v6-06 §6）。送信時点の宛先数で判定する。
+     * 承認が要る人数なのに承認済みでなければ送らない。1人運用の組織では
+     * 人数の手入力との一致を見る。既存の原子ロック（下の claim）は変えない。
+     */
+    try {
+      const { enforceBroadcastSendApproval } = await import('../services/broadcast-approval.js');
+      const sendBody = await c.req.json<{ confirmedRecipientCount?: unknown }>().catch(() => null);
+      const approvalGate = await enforceBroadcastSendApproval(c.env.DB, existing, {
+        confirmedRecipientCount: sendBody?.confirmedRecipientCount,
+      });
+      if (!approvalGate.allowed) {
+        return c.json(
+          {
+            success: false,
+            error: approvalGate.error,
+            code: approvalGate.code,
+            recipientCount: approvalGate.recipientCount,
+            threshold: approvalGate.threshold,
+          },
+          approvalGate.status as 409,
+        );
+      }
+    } catch (gateError) {
+      // 数えられない（DB到達不能など）ときは送らない。誤送信より停止を選ぶ。
+      console.error('POST /api/broadcasts/:id/send approval gate error:', gateError);
+      return c.json({ success: false, error: '承認の確認ができませんでした。しばらくしてからもう一度お試しください。' }, 503);
+    }
+
     let existingParts;
     try {
       existingParts = parseBroadcastMessageParts({
@@ -2273,6 +2390,37 @@ broadcasts.post('/api/broadcasts/:id/send-segment', requirePermission(BROADCAST_
         { success: false, error: 'conditions with operator and rules array is required' },
         400,
       );
+    }
+
+    /*
+     * 二者承認のゲート（m12a）。絞り込み送信も人数で判定する。
+     * 送る条件は行に無いので、今回の条件を重ねた行で数える。
+     */
+    try {
+      const { enforceBroadcastSendApproval } = await import('../services/broadcast-approval.js');
+      const mergedForGate = {
+        ...existing,
+        target_type: 'segment',
+        segment_conditions: JSON.stringify(body.conditions),
+      } as typeof existing;
+      const segmentGate = await enforceBroadcastSendApproval(c.env.DB, mergedForGate, {
+        confirmedRecipientCount: (body as { confirmedRecipientCount?: unknown }).confirmedRecipientCount,
+      });
+      if (!segmentGate.allowed) {
+        return c.json(
+          {
+            success: false,
+            error: segmentGate.error,
+            code: segmentGate.code,
+            recipientCount: segmentGate.recipientCount,
+            threshold: segmentGate.threshold,
+          },
+          segmentGate.status as 409,
+        );
+      }
+    } catch (gateError) {
+      console.error('POST /api/broadcasts/:id/send-segment approval gate error:', gateError);
+      return c.json({ success: false, error: '承認の確認ができませんでした。しばらくしてからもう一度お試しください。' }, 503);
     }
 
     // 分析の一時対象者は送信直前にも所属・期限を確かめ直す。

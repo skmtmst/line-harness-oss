@@ -54,6 +54,7 @@ import {
   AUTO_REPLY_PUBLISH_RESULT, AUTO_REPLY_PUBLISH_TEST, AUTO_REPLY_PUBLISH_VALIDATION,
   BROADCASTS, BROADCAST_FOLDERS, BROADCAST_INSIGHTS, BROADCAST_LIST_META,
   BROADCAST_NOTIFICATION_SETTINGS,
+  BROADCAST_APPROVAL_CONFIG, BROADCAST_APPROVAL_CANDIDATES, BROADCAST_APPROVAL_STATE,
   BROADCAST_PREFLIGHT, BROADCAST_SAVED_VIEWS, CHATS, FRIEND_FIELDS, FRIEND_ATTRIBUTE_FIELDS, FRIEND_FIELD_FOLDERS,
   FRIEND_ATTRIBUTE_SAVED_SEARCH_DETAIL, FRIEND_ATTRIBUTE_SAVED_SEARCH_RESPONSE, FRIEND_FIELD_MIGRATION_PREVIEW,
   INBOX_STATS, INBOX_SAVED_VIEWS, FRIEND_MESSAGES, FRIEND_MILEAGE, FRIEND_DETAILS,
@@ -1376,6 +1377,29 @@ function visualQaWriteBody(method, pathname) {
   if (method === 'PUT' && pathname === '/api/broadcasts/notification-settings') {
     return BROADCAST_NOTIFICATION_SETTINGS
   }
+  /* 二者承認（m12a / 設計 A）。撮影で承認待ちの帯・承認する人の操作を出す。 */
+  if (method === 'PUT' && pathname === '/api/broadcasts/approval-threshold') {
+    return { success: true, data: { lineAccountId: query.get('lineAccountId') ?? 'visual-qa-account', threshold: 1000 } }
+  }
+  const broadcastApprovalAction = pathname.match(/^\/api\/broadcasts\/([^/]+)\/approval-(request|approve|reject|cancel|remind)$/)
+  if (method === 'POST' && broadcastApprovalAction) {
+    const action = broadcastApprovalAction[2]
+    if (action === 'remind') return { success: true, data: { reminded: true } }
+    const status = action === 'approve' ? 'approved' : action === 'reject' ? 'rejected' : action === 'cancel' ? 'cancelled' : 'pending'
+    return {
+      success: true,
+      data: {
+        approval: {
+          ...BROADCAST_APPROVAL_STATE.approval,
+          status,
+          decidedByStaffId: status === 'pending' ? null : 'staff-approver',
+          decidedAt: status === 'pending' ? null : '2026-09-25T21:00:00+09:00',
+          rejectReason: status === 'rejected' ? '金額が古い' : null,
+        },
+        ...(action === 'approve' ? { needsSend: true } : {}),
+      },
+    }
+  }
   if (method === 'POST' && /^\/api\/tags\/[^/]+\/archive$/.test(pathname)) {
     return TAG_ARCHIVE_RESULT
   }
@@ -2513,6 +2537,23 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   }
   if (pathname === '/api/broadcasts/notification-settings') {
     return { success: true, data: BROADCAST_NOTIFICATION_SETTINGS }
+  }
+  /* 二者承認（m12a）。固定名の口は :id より先に置く（本番と同じ順番）。 */
+  if (pathname === '/api/broadcasts/approval-config') {
+    return {
+      success: true,
+      data: { ...BROADCAST_APPROVAL_CONFIG, lineAccountId: query.get('lineAccountId') ?? 'visual-qa-account' },
+    }
+  }
+  if (pathname === '/api/broadcasts/approvals/candidates') {
+    return { success: true, data: BROADCAST_APPROVAL_CANDIDATES }
+  }
+  if (pathname === '/api/broadcasts/approval-threshold') {
+    return { success: true, data: { lineAccountId: query.get('lineAccountId') ?? 'visual-qa-account', threshold: 1000 } }
+  }
+  const broadcastApproval = pathname.match(/^\/api\/broadcasts\/([^/]+)\/approval$/)
+  if (broadcastApproval) {
+    return { success: true, data: BROADCAST_APPROVAL_STATE }
   }
   const broadcastInsight = pathname.match(/^\/api\/broadcasts\/([^/]+)\/insight$/)
   if (broadcastInsight) {
