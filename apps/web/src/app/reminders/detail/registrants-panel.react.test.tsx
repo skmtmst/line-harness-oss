@@ -71,6 +71,62 @@ async function click(label: string) {
   await act(async () => { button.click(); await Promise.resolve(); await Promise.resolve() })
 }
 
+/** 基準日を日時の選択（★V7）で選ぶ。値は今までどおり YYYY-MM-DDTHH:mm（日本時間）。 */
+async function pickTargetDate(label: string, iso: string) {
+  const [date, time] = iso.split('T')
+  const [hour, minute] = time.split(':')
+  const [y, mo, d] = date.split('-').map(Number)
+  const week = '日月火水木金土'[new Date(y, mo - 1, d).getDay()]
+  await act(async () => {
+    host.querySelector<HTMLElement>(`button[aria-label="${label}"]`)!.click()
+    await Promise.resolve()
+    await Promise.resolve()
+  })
+  const picker = host.querySelector('[role="dialog"][aria-label="日時を選ぶ"]')!
+  await act(async () => {
+    picker.querySelector<HTMLButtonElement>('button[aria-label="日付"]')!.click()
+    await Promise.resolve()
+    await Promise.resolve()
+  })
+  for (let i = 0; i < 24; i += 1) {
+    const grid = host.querySelector('[role="grid"]')
+    if (grid?.getAttribute('aria-label') === `${y}年${mo}月`) break
+    const currentLabel = /^(\d+)年(\d+)月$/.exec(grid?.getAttribute('aria-label') ?? '')
+    const current = currentLabel ? Number(currentLabel[1]) * 12 + Number(currentLabel[2]) : y * 12 + mo
+    const nav = [...host.querySelectorAll('button')].find(
+      (b) => b.getAttribute('aria-label') === (y * 12 + mo >= current ? '次の月' : '前の月'),
+    )!
+    await act(async () => {
+      nav.click()
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+  }
+  await act(async () => {
+    [...host.querySelectorAll('button')].find((b) =>
+      (b.getAttribute('aria-label') ?? '').startsWith(`${y}年${mo}月${d}日（${week}）`),
+    )!.click()
+    await Promise.resolve()
+    await Promise.resolve()
+  })
+  const reopened = host.querySelector('[role="dialog"][aria-label="日時を選ぶ"]')!
+  await act(async () => {
+    const hourSelect = reopened.querySelector('select[aria-label="時"]') as HTMLSelectElement
+    hourSelect.value = hour
+    hourSelect.dispatchEvent(new Event('change', { bubbles: true }))
+    const minuteSelect = reopened.querySelector('select[aria-label="分"]') as HTMLSelectElement
+    minuteSelect.value = minute
+    minuteSelect.dispatchEvent(new Event('change', { bubbles: true }))
+    await Promise.resolve()
+    await Promise.resolve()
+  })
+  await act(async () => {
+    [...reopened.querySelectorAll('button')].find((b) => b.textContent?.trim() === '閉じる')!.click()
+    await Promise.resolve()
+    await Promise.resolve()
+  })
+}
+
 describe('リマインダ詳細の登録者管理 (#868)', () => {
   it('正本URLはstatic exportで再読込できるdetail?idに統一し、動的URLを作らない', () => {
     expect(detailSource).toContain('`/reminders/detail?id=${encodeURIComponent(reminderId)}`')
@@ -82,15 +138,7 @@ describe('リマインダ詳細の登録者管理 (#868)', () => {
   it('直URLの登録者一覧から基準日を保存し、リマインダID・版番号を実APIへ渡す', async () => {
     await render()
     expect(host.textContent).toContain('田中 花子')
-    const input = host.querySelector('input[aria-label="田中 花子の基準日"]') as HTMLInputElement
-    expect(input).not.toBeNull()
-    await act(async () => {
-      // React の controlled input として値を入れる。直接代入だけでは
-      // happy-dom 側の value tracker が変化を通知しない。
-      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(input, '2026-10-08T09:00')
-      input.dispatchEvent(new Event('input', { bubbles: true }))
-      input.dispatchEvent(new Event('change', { bubbles: true }))
-    })
+    await pickTargetDate('田中 花子の基準日', '2026-10-08T09:00')
     await click('基準日を保存')
     expect(apiMock.updateTargetDate).toHaveBeenCalledWith('reminder-1', 'registration-1', expect.stringMatching(/^2026-10-08T/), 4)
     expect(host.textContent).toContain('未送信分だけ新しい日程で組み直します。')
@@ -137,9 +185,9 @@ describe('リマインダ詳細の登録者管理 (#868)', () => {
     const jstRegistrant = { ...registrant, targetDate: '2026-09-16T01:00:00.000Z' }
     apiMock.list.mockResolvedValueOnce({ success: true, data: [jstRegistrant] })
     await render()
-    const input = host.querySelector('input[aria-label="田中 花子の基準日"]') as HTMLInputElement
-    // 実行端末はUTC+7でも、01:00ZはJST 10:00として画面に出す。
-    expect(input.value).toBe('2026-09-16T10:00')
+    const trigger = host.querySelector('button[aria-label="田中 花子の基準日"]')
+    // 実行端末はUTC+7でも、01:00ZはJST 10:00として画面に出す（日本語の見せ方）。
+    expect(trigger?.textContent).toContain('2026年9月16日（水）10:00')
     await click('基準日を保存')
     expect(apiMock.updateTargetDate).toHaveBeenCalledWith('reminder-1', 'registration-1', '2026-09-16T01:00:00.000Z', 4)
   })

@@ -15,6 +15,8 @@ import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Button from '@/components/shared/button'
 import Select from '@/components/shared/select'
 import { Field, TextInput } from '@/components/shared/form-controls'
+import DateField from '@/components/shared/date-field'
+import { TimeField } from '@/components/shared/date-time-field'
 // #740: 下書きの初期値と字数上限は作成画面と共有する。片方だけ変えないこと。
 import {
   EVENT_CANCEL_DEADLINE_OPTIONS,
@@ -1031,30 +1033,30 @@ function AddSlotDialog({
         <div className="space-y-3">
           <label className="block">
             <span className="text-sm font-medium text-gray-700">日付（JST）</span>
-            <input
-              type="date"
+            <DateField
               value={date}
-              onChange={(e) => setDate(e.target.value)}
-              className="mt-1 w-full border border-hairline rounded-lg px-3 py-2 text-sm"
+              onChange={setDate}
+              aria-label="日付（JST）"
+              className="mt-1"
             />
           </label>
           <div className="grid grid-cols-2 gap-3">
             <label>
               <span className="text-sm font-medium text-gray-700">開始</span>
-              <input
-                type="time"
+              <TimeField
                 value={startTime}
-                onChange={(e) => setStartTime(e.target.value)}
-                className="mt-1 w-full border border-hairline rounded-lg px-3 py-2 text-sm"
+                onChange={setStartTime}
+                aria-label="開始"
+                className="mt-1"
               />
             </label>
             <label>
               <span className="text-sm font-medium text-gray-700">終了</span>
-              <input
-                type="time"
+              <TimeField
                 value={endTime}
-                onChange={(e) => setEndTime(e.target.value)}
-                className="mt-1 w-full border border-hairline rounded-lg px-3 py-2 text-sm"
+                onChange={setEndTime}
+                aria-label="終了"
+                className="mt-1"
               />
             </label>
           </div>
@@ -1158,29 +1160,29 @@ function EditSlotDialog({
         <div className="space-y-3">
           <label className="block">
             <span className="text-ink-secondary text-sm font-medium">日付（JST）</span>
-            <TextInput
-              type="date"
+            <DateField
               value={date}
-              onChange={(e) => setDate(e.target.value)}
+              onChange={setDate}
+              aria-label="日付（JST）"
               className="mt-1"
             />
           </label>
           <div className="grid grid-cols-2 gap-3">
             <label>
               <span className="text-ink-secondary text-sm font-medium">開始</span>
-              <TextInput
-                type="time"
+              <TimeField
                 value={startTime}
-                onChange={(e) => setStartTime(e.target.value)}
+                onChange={setStartTime}
+                aria-label="開始"
                 className="mt-1"
               />
             </label>
             <label>
               <span className="text-ink-secondary text-sm font-medium">終了</span>
-              <TextInput
-                type="time"
+              <TimeField
                 value={endTime}
-                onChange={(e) => setEndTime(e.target.value)}
+                onChange={setEndTime}
+                aria-label="終了"
                 className="mt-1"
               />
             </label>
@@ -1263,11 +1265,11 @@ function BulkSlotDialog({
           <div className="grid grid-cols-2 gap-3">
             <label>
               <span className="text-sm font-medium text-gray-700">開始日</span>
-              <input type="date" value={start} onChange={(e) => setStart(e.target.value)} className="mt-1 w-full border border-hairline rounded-lg px-3 py-2 text-sm" />
+              <DateField value={start} onChange={setStart} aria-label="開始日" className="mt-1" />
             </label>
             <label>
               <span className="text-sm font-medium text-gray-700">終了日</span>
-              <input type="date" value={end} onChange={(e) => setEnd(e.target.value)} className="mt-1 w-full border border-hairline rounded-lg px-3 py-2 text-sm" />
+              <DateField value={end} onChange={setEnd} aria-label="終了日" className="mt-1" />
             </label>
           </div>
           <div>
@@ -1293,18 +1295,18 @@ function BulkSlotDialog({
             <span className="text-sm font-medium text-gray-700 block mb-1.5">時刻パターン</span>
             {patterns.map((p, i) => (
               <div key={i} className="flex gap-2 mb-1.5 items-center">
-                <input
-                  type="time"
+                <TimeField
                   value={p.start}
-                  onChange={(e) => setPatterns((ps) => ps.map((x, j) => (j === i ? { ...x, start: e.target.value } : x)))}
-                  className="flex-1 border border-hairline rounded-lg px-3 py-2 text-sm"
+                  onChange={(v) => setPatterns((ps) => ps.map((x, j) => (j === i ? { ...x, start: v } : x)))}
+                  aria-label={`${i + 1}件目の開始`}
+                  className="flex-1"
                 />
                 <span className="text-gray-500">〜</span>
-                <input
-                  type="time"
+                <TimeField
                   value={p.end}
-                  onChange={(e) => setPatterns((ps) => ps.map((x, j) => (j === i ? { ...x, end: e.target.value } : x)))}
-                  className="flex-1 border border-hairline rounded-lg px-3 py-2 text-sm"
+                  onChange={(v) => setPatterns((ps) => ps.map((x, j) => (j === i ? { ...x, end: v } : x)))}
+                  aria-label={`${i + 1}件目の終了`}
+                  className="flex-1"
                 />
                 {patterns.length > 1 && (
                   <button

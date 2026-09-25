@@ -8,6 +8,7 @@ import {
   type WebinarNotificationSettingsInput,
 } from '@/lib/api'
 import Button from '@/components/shared/button'
+import { TimeField } from '@/components/shared/date-time-field'
 import ListState from '@/components/shared/list-state'
 import Select from '@/components/shared/select'
 import { audienceText } from '@/app/webinars/overview-view'
@@ -225,15 +226,14 @@ export default function WebinarNotifications({ webinarId, onLoaded, onDirtyChang
       on: settings.dayBeforeEnabled,
       toggle: () => patch({ dayBeforeEnabled: !settings.dayBeforeEnabled }),
       extra: (
-        <label className="text-ink-secondary flex items-center gap-2 text-xs">
+        <span className="text-ink-secondary flex items-center gap-2 text-xs">
           送る時刻
-          <input
-            type="time"
+          <TimeField
             value={settings.dayBeforeTime}
-            onChange={(e) => patch({ dayBeforeTime: e.target.value })}
-            className="border-hairline rounded-control border px-2 py-1 text-sm"
+            onChange={(v) => patch({ dayBeforeTime: v })}
+            aria-label="前日のご案内を送る時刻"
           />
-        </label>
+        </span>
       ),
     },
     {
@@ -265,15 +265,14 @@ export default function WebinarNotifications({ webinarId, onLoaded, onDirtyChang
       on: settings.missedEnabled,
       toggle: () => patch({ missedEnabled: !settings.missedEnabled }),
       extra: (
-        <label className="text-ink-secondary flex items-center gap-2 text-xs">
+        <span className="text-ink-secondary flex items-center gap-2 text-xs">
           送る時刻
-          <input
-            type="time"
+          <TimeField
             value={settings.missedTime}
-            onChange={(e) => patch({ missedTime: e.target.value })}
-            className="border-hairline rounded-control border px-2 py-1 text-sm"
+            onChange={(v) => patch({ missedTime: v })}
+            aria-label="見逃した人への案内を送る時刻"
           />
-        </label>
+        </span>
       ),
     },
     {

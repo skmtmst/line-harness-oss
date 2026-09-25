@@ -100,6 +100,63 @@ async function click(element: HTMLElement) {
   await act(async () => { element.click() })
 }
 
+/** 暦で YYYY-MM-DD の日を選ぶ（日付・日時の選択の★V7）。 */
+async function pickCalendarDay(iso: string) {
+  const [y, mo, d] = iso.split('-').map(Number)
+  const week = '日月火水木金土'[new Date(y, mo - 1, d).getDay()]
+  for (let i = 0; i < 36; i += 1) {
+    const grid = host.querySelector('[role="grid"]')
+    const label = grid?.getAttribute('aria-label')
+    if (label === `${y}年${mo}月`) break
+    const target = y * 12 + mo
+    const currentLabel = /^(\d+)年(\d+)月$/.exec(label ?? '')
+    const current = currentLabel ? Number(currentLabel[1]) * 12 + Number(currentLabel[2]) : target
+    const nav = Array.from(host.querySelectorAll('button')).find(
+      (b) => b.getAttribute('aria-label') === (target > current ? '次の月' : '前の月'),
+    )!
+    await click(nav)
+  }
+  const day = Array.from(host.querySelectorAll('button')).find((b) =>
+    (b.getAttribute('aria-label') ?? '').startsWith(`${y}年${mo}月${d}日（${week}）`),
+  )!
+  await click(day)
+}
+
+/** 日付の選択で YYYY-MM-DD を選ぶ。値は今までどおりの文字列。 */
+async function setDateValue(id: string, iso: string) {
+  await click(byId(id) as unknown as HTMLElement)
+  await pickCalendarDay(iso)
+  await closeDatePicker()
+}
+
+/** 開いている日時の選択箱を閉じる（次の欄の前に必ず呼ぶ）。日付の選択は選ぶと閉じる。 */
+async function closeDatePicker() {
+  const picker = host.querySelector('[role="dialog"][aria-label="日時を選ぶ"]')
+  if (!picker) return
+  const close = Array.from(picker.querySelectorAll('button')).find((b) => b.textContent?.trim() === '閉じる')!
+  await click(close)
+}
+
+/** 日時の選択で YYYY-MM-DDTHH:mm を選ぶ。値は今までどおり日本時間の文字列。 */
+async function setDateTimeValue(id: string, iso: string) {
+  const [date, time] = iso.split('T')
+  const [hour, minute] = time.split(':')
+  await click(byId(id) as unknown as HTMLElement)
+  const picker = host.querySelector('[role="dialog"][aria-label="日時を選ぶ"]')!
+  await click(picker.querySelector('button[aria-label="日付"]') as HTMLElement)
+  await pickCalendarDay(date)
+  const reopened = host.querySelector('[role="dialog"][aria-label="日時を選ぶ"]')!
+  await act(async () => {
+    const hourSelect = reopened.querySelector('select[aria-label="時"]') as HTMLSelectElement
+    hourSelect.value = hour
+    hourSelect.dispatchEvent(new Event('change', { bubbles: true }))
+    const minuteSelect = reopened.querySelector('select[aria-label="分"]') as HTMLSelectElement
+    minuteSelect.value = minute
+    minuteSelect.dispatchEvent(new Event('change', { bubbles: true }))
+  })
+  await closeDatePicker()
+}
+
 beforeEach(() => {
   vi.clearAllMocks()
   fixture.accountId = 'account-1'
@@ -122,8 +179,8 @@ describe('共通情報の新規作成(実React)', () => {
     await setValue(byId('cv-name'), '期間限定案内')
     await setValue(byId('cv-key'), 'limited_notice')
     await setValue(byId('cv-value'), '受付中')
-    await setValue(byId('cv-valid-from'), '2026-09-16T10:00')
-    await setValue(byId('cv-valid-until'), '2026-09-16T12:00')
+    await setDateTimeValue('cv-valid-from', '2026-09-16T10:00')
+    await setDateTimeValue('cv-valid-until', '2026-09-16T12:00')
     await setValue(byId('cv-expiry-behavior'), 'fallback')
     await setValue(byId('cv-fallback-value'), '受付終了')
     await click(byExactText('button', '登録'))
@@ -138,19 +195,19 @@ describe('共通情報の新規作成(実React)', () => {
     await render()
     await setValue(byId('cv-name'), '不正期間')
     await setValue(byId('cv-key'), 'invalid_window')
-    await setValue(byId('cv-valid-from'), '2026-09-16T10:00')
-    await setValue(byId('cv-valid-until'), '2026-09-16T10:00')
+    await setDateTimeValue('cv-valid-from', '2026-09-16T10:00')
+    await setDateTimeValue('cv-valid-until', '2026-09-16T10:00')
     await click(byExactText('button', '登録'))
     expect(api.create).not.toHaveBeenCalled()
     expect(host.textContent).toContain('有効終了は有効開始より後にしてください')
   })
 
   it.each([
-    ['long_text', '案内'.repeat(5_000), 'TEXTAREA', null],
-    ['date', '2028-02-29', 'INPUT', 'date'],
-    ['datetime', '2028-02-29T23:59', 'INPUT', 'datetime-local'],
-    ['boolean', 'true', 'SELECT', null],
-  ])('%sを選ぶと適切な入力欄で保存payloadへ渡す', async (type, value, tagName, inputType) => {
+    ['long_text', '案内'.repeat(5_000), 'TEXTAREA'],
+    ['date', '2028-02-29', 'BUTTON'],
+    ['datetime', '2028-02-29T23:59', 'BUTTON'],
+    ['boolean', 'true', 'SELECT'],
+  ])('%sを選ぶと適切な入力欄で保存payloadへ渡す', async (type, value, tagName) => {
     await render()
     await setValue(byId('cv-name'), `${type}の項目`)
     await setValue(byId('cv-key'), `${type}_value`)
@@ -158,8 +215,9 @@ describe('共通情報の新規作成(実React)', () => {
 
     const control = byId('cv-value')
     expect(control.tagName).toBe(tagName)
-    if (inputType) expect((control as HTMLInputElement).type).toBe(inputType)
-    await setValue(control, value)
+    if (type === 'date') await setDateValue('cv-value', value)
+    else if (type === 'datetime') await setDateTimeValue('cv-value', value)
+    else await setValue(control, value)
     await click(byExactText('button', '登録'))
 
     expect(api.create).toHaveBeenCalledWith(expect.objectContaining({ type, value }))

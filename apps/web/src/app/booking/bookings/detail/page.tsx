@@ -19,6 +19,7 @@ import { useAccount } from '@/contexts/account-context'
 import { canOperateBookings } from '../../lib/booking-permissions'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import DateField from '@/components/shared/date-field'
 import SelectField from '@/components/shared/select-field'
 import TargetMissing from '@/components/shared/target-missing'
 import { usePageTitle } from '@/components/shell/page-chrome'
@@ -851,11 +852,10 @@ function BookingDetailInner() {
                     />
                   </EditField>
                   <EditField label="日付">
-                    <input
-                      type="date"
+                    <DateField
+                      aria-label="予約の日付"
                       value={editDate}
-                      onChange={(event) => { setEditDate(event.target.value); setEditTime('') }}
-                      className="border-hairline rounded-control w-full border px-3 py-2 text-sm"
+                      onChange={(v) => { setEditDate(v); setEditTime('') }}
                     />
                   </EditField>
                   <EditField label="時間">

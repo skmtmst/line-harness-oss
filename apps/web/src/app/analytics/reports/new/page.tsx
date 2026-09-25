@@ -4,6 +4,7 @@ import { Suspense, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import Button from '@/components/shared/button'
+import { TimeField } from '@/components/shared/date-time-field'
 import ListState from '@/components/shared/list-state'
 import PageHeader from '@/components/shared/page-header'
 import SelectField from '@/components/shared/select-field'
@@ -357,7 +358,7 @@ function AnalyticsReportFormPage() {
               ) : (
                 <label className="text-ink-secondary grid gap-2 text-xs font-semibold">日<SelectField value={monthDay} onChange={(event) => setMonthDay(event.target.value)} options={Array.from({ length: 28 }, (_, index) => ({ value: String(index + 1), label: `${index + 1}日` }))} /></label>
               )}
-              <label className="text-ink-secondary grid gap-2 text-xs font-semibold">時刻<input className="border-hairline text-ink bg-canvas h-10 rounded-control border px-3 text-sm" type="time" value={sendTime} onChange={(event) => setSendTime(event.target.value)} /></label>
+              <span className="text-ink-secondary grid gap-2 text-xs font-semibold">時刻<TimeField value={sendTime} onChange={setSendTime} aria-label="送る時刻" /></span>
               <label className="text-ink-secondary grid gap-2 text-xs font-semibold">集計する期間<SelectField value={periodDays} onChange={(event) => setPeriodDays(event.target.value)} options={[{ value: '7', label: '前の7日間' }, { value: '30', label: '前の30日間' }, { value: '90', label: '前の90日間' }]} /></label>
             </div>
             <p className="text-ink-secondary mb-0 mt-4 text-xs">時刻は {options.timeZone} で計算します。</p>
@@ -434,7 +435,7 @@ function AnalyticsReportFormPage() {
                           min={0}
                           step={def.step}
                           aria-label={def.thresholdLabel}
-                          className="border-hairline text-ink bg-canvas mx-1 w-20 rounded-control border px-2 py-0.5 text-xs"
+                          className="border-hairline text-ink bg-canvas mx-1 h-8 w-20 rounded-control border px-2 text-xs"
                           value={draft.threshold}
                           disabled={fieldsDisabled}
                           onChange={(event) => setAlertDrafts((current) => ({ ...current, [def.id]: { ...current[def.id], threshold: event.target.value } }))}
@@ -450,7 +451,7 @@ function AnalyticsReportFormPage() {
                           min={1}
                           step={1}
                           aria-label={def.sampleLabel}
-                          className="border-hairline text-ink bg-canvas mx-1 w-16 rounded-control border px-2 py-0.5 text-xs"
+                          className="border-hairline text-ink bg-canvas mx-1 h-8 w-16 rounded-control border px-2 text-xs"
                           value={draft.minimumSample}
                           disabled={fieldsDisabled}
                           onChange={(event) => setAlertDrafts((current) => ({ ...current, [def.id]: { ...current[def.id], minimumSample: event.target.value } }))}

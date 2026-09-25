@@ -96,6 +96,59 @@ function input(selector: string): HTMLInputElement {
   return el
 }
 
+const WEEK = '日月火水木金土'
+
+/** 日時の選択（★V7）で YYYY-MM-DDTHH:mm を選ぶ。値は今までどおり日本時間の文字列。 */
+async function setDateTime(label: string, iso: string) {
+  const [date, time] = iso.split('T')
+  const [hour, minute] = time.split(':')
+  const [y, mo, d] = date.split('-').map(Number)
+  const week = WEEK[new Date(y, mo - 1, d).getDay()]
+  await act(async () => {
+    host.querySelector<HTMLElement>(`button[aria-label="${label}"]`)!.click()
+    await settle()
+  })
+  const picker = host.querySelector('[role="dialog"][aria-label="日時を選ぶ"]')!
+  await act(async () => {
+    picker.querySelector<HTMLButtonElement>('button[aria-label="日付"]')!.click()
+    await settle()
+  })
+  for (let i = 0; i < 24; i += 1) {
+    const grid = host.querySelector('[role="grid"]')
+    const currentLabel = /^(\d+)年(\d+)月$/.exec(grid?.getAttribute('aria-label') ?? '')
+    const current = currentLabel ? Number(currentLabel[1]) * 12 + Number(currentLabel[2]) : y * 12 + mo
+    if (grid?.getAttribute('aria-label') === `${y}年${mo}月`) break
+    const nav = Array.from(host.querySelectorAll('button')).find(
+      (b) => b.getAttribute('aria-label') === (y * 12 + mo >= current ? '次の月' : '前の月'),
+    )!
+    await act(async () => {
+      nav.click()
+      await settle()
+    })
+  }
+  await act(async () => {
+    Array.from(host.querySelectorAll('button')).find((b) =>
+      (b.getAttribute('aria-label') ?? '').startsWith(`${y}年${mo}月${d}日（${week}）`),
+    )!.click()
+    await settle()
+  })
+  const reopened = host.querySelector('[role="dialog"][aria-label="日時を選ぶ"]')!
+  await act(async () => {
+    const hourSelect = reopened.querySelector('select[aria-label="時"]') as HTMLSelectElement
+    hourSelect.value = hour
+    hourSelect.dispatchEvent(new Event('change', { bubbles: true }))
+    const minuteSelect = reopened.querySelector('select[aria-label="分"]') as HTMLSelectElement
+    minuteSelect.value = minute
+    minuteSelect.dispatchEvent(new Event('change', { bubbles: true }))
+    await settle()
+  })
+  await act(async () => {
+    const close = Array.from(reopened.querySelectorAll('button')).find((b) => b.textContent?.trim() === '閉じる')!
+    close.click()
+    await settle()
+  })
+}
+
 function selectByLabel(label: string): HTMLSelectElement {
   const el = host.querySelector<HTMLSelectElement>(`select[aria-label="${label}"]`)
   if (!el) throw new Error(`選択欄がありません: ${label}`)
@@ -136,9 +189,9 @@ describe('NEXT-17: クーポンの設定が保存値へ入る', () => {
   it('回数・公開対象・期間・抽選なしを選ぶと、その値だけが保存される', async () => {
     await renderEditor('coupon')
 
+    await setDateTime('使える期間の開始', '2026-10-01T09:00')
+    await setDateTime('使える期間の終了', '2026-10-31T23:59')
     await act(async () => {
-      setInputValue(input('input[aria-label="使える期間の開始"]'), '2026-10-01T09:00')
-      setInputValue(input('input[aria-label="使える期間の終了"]'), '2026-10-31T23:59')
       setSelectValue(selectByLabel('使える回数'), 'unlimited')
       setSelectValue(selectByLabel('だれに見えるか'), 'link')
       setSelectValue(selectByLabel('抽選にする'), 'off')
@@ -167,10 +220,10 @@ describe('NEXT-17: クーポンの設定が保存値へ入る', () => {
     await renderEditor('coupon')
     await act(async () => {
       setSelectValue(selectByLabel('抽選にする'), 'on')
-      setInputValue(input('input[aria-label="使える期間の開始"]'), '2026-10-01T09:00')
-      setInputValue(input('input[aria-label="使える期間の終了"]'), '2026-11-30T23:59')
       await settle()
     })
+    await setDateTime('使える期間の開始', '2026-10-01T09:00')
+    await setDateTime('使える期間の終了', '2026-11-30T23:59')
     await act(async () => {
       setInputValue(input('input[aria-label="当たる確率"]'), '35')
       setInputValue(input('input[aria-label="当選人数の上限"]'), '120')
