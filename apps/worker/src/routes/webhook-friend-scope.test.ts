@@ -22,7 +22,7 @@ vi.mock('@line-crm/db', () => ({
   advanceFriendScenario: vi.fn(),
   completeFriendScenario: vi.fn(),
   upsertChatOnMessage: vi.fn(),
-  getLineAccounts: vi.fn().mockResolvedValue([]),
+  listLineAccountsWithTenantStatus: vi.fn().mockResolvedValue([]),
   jstNow: vi.fn().mockReturnValue('2026-08-24T12:00:00.000+09:00'),
   computeNextDeliveryAt: vi.fn(),
   resolveStepContent: vi.fn(),
@@ -91,7 +91,7 @@ vi.mock('../services/step-delivery.js', () => ({
 import { verifySignature } from '@line-crm/line-sdk';
 import {
   getFriendByLineUserIdForAccount,
-  getLineAccounts,
+  listLineAccountsWithTenantStatus,
   markLineWebhookEventSucceeded,
   recordFriendAddEvent,
   recordIncomingLineMessage,
@@ -149,7 +149,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(verifySignature).mockResolvedValue(true);
   // 受信はアカウントA。同一 line_user_id の行はアカウントBにのみ存在する想定。
-  vi.mocked(getLineAccounts).mockResolvedValue([
+  vi.mocked(listLineAccountsWithTenantStatus).mockResolvedValue([
     {
       id: 'account-a',
       channel_secret: 'env-default-secret',

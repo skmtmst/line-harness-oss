@@ -161,7 +161,8 @@ describe('緊急停止と通知取得・送信の競合 (#745)', () => {
       expect(counts).toEqual([20, 20, 20, 20, 20]);
       // +1 query/件は #960 の緊急停止判定 (broadcast_dispatch) — 自動pushも
       // 送信直前に operation_control_sets を読む分。
-      expect(queries).toEqual([321, 321, 321, 321, 321]);
+      // tenant suspension is consumed in one batch query before each tick.
+      expect(queries).toEqual([322, 322, 322, 322, 322]);
       expect((await real.tick()).result.sent).toBe(0);
       expect(upstream).toHaveBeenCalledTimes(100);
       expect(new Set(upstream.mock.calls.map(([, init]) => new Headers(init?.headers).get('X-Line-Retry-Key'))).size).toBe(100);

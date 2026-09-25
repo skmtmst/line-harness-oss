@@ -216,8 +216,8 @@ describe('メール＋パスワードのログイン', () => {
   async function seedOwner(overrides: Record<string, unknown> = {}) {
     const hash = await hashPassword('Abcdefg1');
     testDb.raw
-      .prepare(`INSERT INTO staff_members (id, name, email, role, api_key, is_active, password_hash) VALUES ('s1', '山田 太郎', 'owner@example.com', 'owner', 'key-1', ?, ?)`)
-      .run((overrides.is_active as number) ?? 1, hash);
+      .prepare(`INSERT INTO staff_members (id, name, email, role, api_key, is_active, password_hash, tenant_id) VALUES ('s1', '山田 太郎', 'owner@example.com', 'owner', 'key-1', ?, ?, ?)`)
+      .run((overrides.is_active as number) ?? 1, hash, (overrides.tenant_id as string | null) ?? null);
   }
 
   it('正しい組み合わせでセッションが出る。大文字小文字は区別しない', async () => {
@@ -246,6 +246,25 @@ describe('メール＋パスワードのログイン', () => {
     testDb.raw.prepare(`INSERT INTO staff_members (id, name, email, role, api_key, line_user_id) VALUES ('s2', 'LINEの人', 'line@example.com', 'admin', 'key-2', 'U1')`).run();
     expect((await call('POST', '/api/auth/password/login', { email: 'line@example.com', password: 'Abcdefg1' })).status).toBe(401);
   });
+
+  it.each(['suspended', 'archived'] as const)(
+    '停止・保管中の契約先は正しいパスワードでも403でセッションを発行しない (%s)',
+    async (status) => {
+      testDb.raw.prepare(
+        `INSERT INTO tenants (id, name, status) VALUES ('tenant-stopped', '停止中契約先', ?)`,
+      ).run(status);
+      await seedOwner({ tenant_id: 'tenant-stopped' });
+
+      const res = await call('POST', '/api/auth/password/login', {
+        email: 'owner@example.com', password: 'Abcdefg1',
+      });
+      expect(res.status).toBe(403);
+      expect(await json(res)).toMatchObject({ success: false, code: 'TENANT_SUSPENDED' });
+      expect(res.headers.get('set-cookie') ?? '').not.toContain('lh_admin_session=');
+      expect(testDb.raw.prepare('SELECT COUNT(*) AS n FROM admin_sessions').get()).toEqual({ n: 0 });
+      expect(testDb.raw.prepare('SELECT COUNT(*) AS n FROM admin_two_factor_challenges').get()).toEqual({ n: 0 });
+    },
+  );
 
   it('15 分に 10 回失敗すると 429 で止め、成功すると数が消える', async () => {
     await seedOwner();

@@ -5,6 +5,7 @@ import {
   getFriendById,
   getTagAddedScenarioIds,
   resolveIntegrationApiToken,
+  isLineAccountTenantActive,
   tokenHasScope,
   type IntegrationApiScope,
   type IntegrationApiTokenRow,
@@ -42,6 +43,15 @@ async function requireToken(
   }
   if (!tokenHasScope(token, scope)) {
     return { error: c.json({ success: false, error: `scope "${scope}" is required` }, 403) };
+  }
+  if (!await isLineAccountTenantActive(c.env.DB, token.line_account_id)) {
+    return {
+      error: c.json({
+        success: false,
+        code: 'TENANT_SUSPENDED',
+        error: '現在ご利用いただけません',
+      }, 503),
+    };
   }
   return { token };
 }

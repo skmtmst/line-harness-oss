@@ -19,8 +19,10 @@ import {
   addTagToFriend,
   type DeliveryMode,
   type Friend,
+  listLineAccountsWithTenantStatus,
 } from '@line-crm/db';
 import type { LineClient } from '@line-crm/line-sdk';
+import { isStoppedTenantStatus } from './tenant-runtime-status.js';
 import type { Message } from '@line-crm/line-sdk';
 import { jitterDeliveryTime, addJitter, sleep } from './stealth.js';
 import { getSendPermissionForAccount, type SendPermissionCache } from './send-entitlements.js';
@@ -185,6 +187,9 @@ export async function processStepDeliveries(
   lineClient: LineClient,
   workerUrl?: string,
 ): Promise<void> {
+  const tenantStatusByAccount = new Map(
+    (await listLineAccountsWithTenantStatus(db)).map((account) => [account.id, account.tenant_status]),
+  );
   // Crash recovery: a claim (active→delivering) that never got released means
   // the worker died mid-delivery — without this, the enrollment is stranded
   // forever because the due query only picks up 'active' rows. Reclaim after
@@ -216,6 +221,17 @@ export async function processStepDeliveries(
         .prepare(`SELECT line_account_id FROM scenarios WHERE id = ?`)
         .bind(fs.scenario_id)
         .first<{ line_account_id: string | null }>();
+      if (ownerRow?.line_account_id && isStoppedTenantStatus(tenantStatusByAccount.get(ownerRow.line_account_id))) {
+        // A stop is a point-in-time cancellation for due deliveries. Pausing
+        // prevents an overdue message from being pushed automatically after restore.
+        await db.prepare(
+          `UPDATE friend_scenarios
+              SET status = 'paused', pause_reason = 'tenant_suspended',
+                  next_delivery_at = NULL, updated_at = ?
+            WHERE id = ? AND status = 'active'`,
+        ).bind(now, fs.id).run();
+        continue;
+      }
       if (ownerRow?.line_account_id && !await featureJobCanRun(db, { accountId: ownerRow.line_account_id, featureId: 'scenarios', job: 'scenario deliveries' })) {
         continue;
       }

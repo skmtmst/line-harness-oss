@@ -10,6 +10,7 @@ import { TextField } from '@/components/shared/text-field'
 import { storeAdminSession } from '@/lib/admin-session'
 import { authRequest, emailError } from '@/lib/auth-email'
 import { resetAuthSelectionCleared } from '@/lib/hq-navigation'
+import TenantSuspended from '@/components/tenant-suspended'
 
 const LINE_LOGIN_FAILURE_CODES = new Set([
   'line_token_failed',
@@ -33,10 +34,13 @@ export default function LoginPage() {
   const [emailMessage, setEmailMessage] = useState<string | null>(null)
   const [busy, setBusy] = useState<'password' | 'line' | null>(null)
   const [error, setError] = useState('')
+  const [tenantSuspended, setTenantSuspended] = useState(false)
 
   useEffect(() => {
     const errorCode = new URLSearchParams(window.location.search).get('error')
-    if (errorCode === 'not_authorized') {
+    if (errorCode === 'tenant_suspended') {
+      setTenantSuspended(true)
+    } else if (errorCode === 'not_authorized') {
       setError('このLINEアカウントには管理者権限がありません。オーナーに追加を依頼してください。')
     } else if (errorCode && (LINE_LOGIN_FAILURE_CODES.has(errorCode) || errorCode === 'invalid_state')) {
       setError('LINEログインを完了できませんでした。もう一度お試しください。')
@@ -62,6 +66,11 @@ export default function LoginPage() {
       remember,
     })
     if (!res.ok || !res.data) {
+      if (res.code === 'TENANT_SUSPENDED') {
+        setTenantSuspended(true)
+        setBusy(null)
+        return
+      }
       setError(res.error || 'ログインできませんでした')
       setBusy(null)
       return
@@ -90,6 +99,8 @@ export default function LoginPage() {
     // 「7日間ログインを保持」の選択をOAuth往復へ持ち越す印（N-434）
     window.location.assign(`${apiUrl}/api/auth/line${remember ? '?remember=1' : ''}`)
   }
+
+  if (tenantSuspended) return <TenantSuspended />
 
   return (
     <AuthCard

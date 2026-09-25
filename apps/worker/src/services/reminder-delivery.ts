@@ -22,8 +22,10 @@ import {
   releaseClaimedReminderRun,
   skipReminderDeliveryRun,
   verifyClaimedRunBeforeSend,
+  listLineAccountsWithTenantStatus,
 } from '@line-crm/db';
 import { LineClient } from '@line-crm/line-sdk';
+import { isStoppedTenantStatus } from './tenant-runtime-status.js';
 import { addJitter, sleep } from './stealth.js';
 import { getSendPermissionForAccount, type SendPermission, type SendPermissionCache } from './send-entitlements.js';
 import { buildMessage } from './line-message.js';
@@ -135,6 +137,9 @@ export async function processReminderDeliveries(
   const nowIso = now.toISOString();
   const leaseExpiresAt = new Date(now.getTime() + LEASE_MINUTES * 60_000).toISOString();
   const pending = await getPendingReminderDeliveries(db);
+  const tenantStatusByAccount = new Map(
+    (await listLineAccountsWithTenantStatus(db)).map((account) => [account.id, account.tenant_status]),
+  );
   const result: ReminderDeliveryResult = { succeeded: 0, skipped: 0, retrying: 0, failed: 0, held: 0 };
   const sendPermissions: SendPermissionCache = new Map();
 
@@ -161,6 +166,41 @@ export async function processReminderDeliveries(
       ? (friend as unknown as Record<string, string | null>).line_account_id ?? null
       : null;
     const accountId = enrollment.line_account_id ?? friendAccountId;
+    if (accountId && isStoppedTenantStatus(tenantStatusByAccount.get(accountId))) {
+      // Materialize terminal skipped runs for steps that are already due. This
+      // keeps them unsent and prevents restore from becoming an overdue blast.
+      for (const step of enrollment.steps) {
+        const sendAt = resolveReminderSendAt(
+          new Date(enrollment.target_date),
+          {
+            offsetDays: step.offset_days,
+            sendAtTime: step.send_at_time,
+            offsetMinutes: step.offset_minutes,
+          },
+          enrollment.delivery_mode === 'time' ? 'time' : 'countdown',
+        );
+        if (sendAt.getTime() > now.getTime()) continue;
+        const run = await claimReminderDeliveryRun(db, {
+          lineAccountId: accountId,
+          reminderId: enrollment.reminder_id,
+          friendReminderId: enrollment.id,
+          friendId: enrollment.friend_id,
+          reminderStepId: step.id,
+          scheduledAt: sendAt.toISOString(),
+          now: nowIso,
+          leaseExpiresAt,
+        });
+        if (!run) continue;
+        await skipReminderDeliveryRun(db, {
+          id: run.id,
+          code: 'tenant_suspended',
+          message: '契約先の利用停止中に配信時刻を過ぎたため送信しませんでした。',
+          now: nowIso,
+        });
+        result.skipped++;
+      }
+      continue;
+    }
     // 機能オフ中はclaimせずactiveのまま残す。再オンで再開する。
     if (accountId && !await featureJobCanRun(db, { accountId, featureId: 'reminders', job: 'reminder deliveries' })) {
       result.skipped += enrollment.steps.length;

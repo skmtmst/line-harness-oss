@@ -592,3 +592,41 @@ describe('緊急停止 (#1050)', () => {
     expect(raw.prepare(`SELECT COUNT(*) AS n FROM reminder_delivery_runs`).get()).toEqual({ n: 0 })
   })
 })
+
+describe('契約先の利用停止', () => {
+  const NOW = new Date('2026-08-28T09:00:00.000Z')
+
+  it('停止中に期限を過ぎた通は送らず終端履歴にし、復帰後も遅れて送らない', async () => {
+    const { db, raw } = createTestD1()
+    seedReminder(raw)
+    raw.prepare(
+      `INSERT INTO tenants (id, name, status) VALUES ('tenant-stopped', '停止中契約先', 'suspended')`,
+    ).run()
+    raw.prepare(`UPDATE line_accounts SET tenant_id = 'tenant-stopped' WHERE id = 'account-1'`).run()
+    const pushes: string[] = []
+    const client = makeClient(async (userId) => {
+      pushes.push(userId)
+      return { requestId: 'unexpected' }
+    })
+
+    const stopped = await processReminderDeliveries(db, client, {
+      now: NOW,
+      pause: noPause,
+      resolveClient: async () => client,
+    })
+    expect(stopped).toEqual({ succeeded: 0, skipped: 1, retrying: 0, failed: 0, held: 0 })
+    expect(pushes).toHaveLength(0)
+    expect(raw.prepare(
+      `SELECT status, last_error_code FROM reminder_delivery_runs WHERE friend_reminder_id = 'enrollment-1'`,
+    ).get()).toEqual({ status: 'skipped', last_error_code: 'tenant_suspended' })
+
+    raw.prepare(`UPDATE tenants SET status = 'active' WHERE id = 'tenant-stopped'`).run()
+    const restored = await processReminderDeliveries(db, client, {
+      now: new Date('2026-08-28T10:00:00.000Z'),
+      pause: noPause,
+      resolveClient: async () => client,
+    })
+    expect(restored).toEqual({ succeeded: 0, skipped: 0, retrying: 0, failed: 0, held: 0 })
+    expect(pushes).toHaveLength(0)
+  })
+})

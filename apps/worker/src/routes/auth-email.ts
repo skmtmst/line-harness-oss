@@ -1,7 +1,12 @@
 import { Hono } from 'hono';
 import type { Context } from 'hono';
 import type { Env } from '../index.js';
-import { sha256Hex } from '../middleware/auth.js';
+import {
+  isTenantUnavailable,
+  sha256Hex,
+  TENANT_SUSPENDED_CODE,
+  TENANT_SUSPENDED_ERROR,
+} from '../middleware/auth.js';
 import { resolveAdminAuthConfig } from '../middleware/admin-auth-config.js';
 import {
   bumpAuthThrottle,
@@ -354,6 +359,9 @@ authEmail.post('/api/auth/password/login', async (c) => {
   }
 
   await clearAuthThrottle(c.env.DB, throttleKey);
+  if (body.next !== 'ops' && isTenantUnavailable(staff.tenant_status)) {
+    return c.json({ success: false, code: TENANT_SUSPENDED_CODE, error: TENANT_SUSPENDED_ERROR }, 403);
+  }
   if (body.next === 'ops') {
     const admin = await isPlatformAdminRow(c.env.DB, candidateFromStaffRow(staff));
     if (!admin) {

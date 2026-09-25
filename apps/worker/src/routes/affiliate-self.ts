@@ -7,7 +7,7 @@ import {
   listAffiliateLinks,
   countAffiliateLinks,
   generateRefSlug,
-  getLineAccounts,
+  listLineAccountsWithTenantStatus,
   getAffiliateLinkStats,
   listAffiliateOffers,
   enrollAffiliateInOffer,
@@ -75,6 +75,7 @@ async function resolveFriendFromLineToken(
 ): Promise<
   | { status: 'invalid_token' }
   | { status: 'no_friend' }
+  | { status: 'tenant_suspended' }
   | { status: 'ok'; friend: ResolvedFriend; lineAccountId: string | null; tenantId: string }
 > {
   const db = env.DB;
@@ -98,7 +99,7 @@ async function resolveFriendFromLineToken(
 
   const allowedChannelIds = new Set<string>();
   if (env.LINE_LOGIN_CHANNEL_ID) allowedChannelIds.add(env.LINE_LOGIN_CHANNEL_ID);
-  const dbAccounts = await getLineAccounts(db);
+  const dbAccounts = await listLineAccountsWithTenantStatus(db);
   for (const acct of dbAccounts) {
     if (acct.login_channel_id) allowedChannelIds.add(acct.login_channel_id);
   }
@@ -115,6 +116,9 @@ async function resolveFriendFromLineToken(
   const lineAccount = dbAccounts.find(
     (account) => account.login_channel_id === tokenClientId,
   );
+  if (lineAccount && lineAccount.tenant_status !== 'active') {
+    return { status: 'tenant_suspended' };
+  }
   const lineAccountId = lineAccount?.id ?? null;
   const friend = await getFriendByLineUserIdForAccount(db, userId, lineAccountId);
   if (!friend) return { status: 'no_friend' };
@@ -129,8 +133,18 @@ async function resolveFriendFromLineToken(
 /** Map a non-ok resolution to its JSON error response. */
 function unresolvedResponse(
   c: Context<Env>,
-  result: { status: 'invalid_token' } | { status: 'no_friend' },
+  result:
+    | { status: 'invalid_token' }
+    | { status: 'no_friend' }
+    | { status: 'tenant_suspended' },
 ) {
+  if (result.status === 'tenant_suspended') {
+    return c.json({
+      success: false,
+      code: 'TENANT_SUSPENDED',
+      error: '現在ご利用いただけません',
+    }, 503);
+  }
   if (result.status === 'invalid_token') {
     return c.json({ success: false, error: 'Invalid LINE access token' }, 401);
   }

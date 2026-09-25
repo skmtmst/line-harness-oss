@@ -151,6 +151,23 @@ describe('送信予約の重複登録の拒否(#977)', () => {
 });
 
 describe('送信予約のdispatcher(N-025)', () => {
+  test('停止中に期限を過ぎた予約は未送信のまま取消し、復帰後も自動送信しない', async () => {
+    await schedule({ id: 's-stopped', key: '00000000-2222-4333-8444-555555555555', at: '2026-01-09T23:00:00.000Z' });
+    sqlite.raw.prepare(`UPDATE tenants SET status = 'suspended' WHERE id = 'tenant-1'`).run();
+
+    const stopped = await processDueScheduledChatSends(env(), { now: NOW });
+    expect(stopped).toEqual({ claimed: 0, sent: 0, failed: 0 });
+    expect(row('s-stopped')).toMatchObject({
+      status: 'cancelled', last_error_code: 'tenant_suspended', sent_at: null,
+    });
+    expect(pushMessage).not.toHaveBeenCalled();
+
+    sqlite.raw.prepare(`UPDATE tenants SET status = 'active' WHERE id = 'tenant-1'`).run();
+    const restored = await processDueScheduledChatSends(env(), { now: '2026-01-10T01:00:00.000Z' });
+    expect(restored.claimed).toBe(0);
+    expect(pushMessage).not.toHaveBeenCalled();
+  });
+
   test('期限が来た予約だけclaimして送り、履歴とsentを残す', async () => {
     await schedule({ id: 's-due', key: '11111111-2222-4333-8444-555555555555', at: '2026-01-09T23:00:00.000Z' });
     await schedule({ id: 's-later', key: '22222222-2222-4333-8444-555555555555', at: '2026-01-10T01:00:00.000Z' });

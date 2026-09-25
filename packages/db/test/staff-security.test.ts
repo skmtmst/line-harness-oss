@@ -31,6 +31,9 @@ describe('ログインユーザーの無効化と監査記録', () => {
   beforeEach(() => {
     sqlite = new Database(':memory:')
     sqlite.exec(`
+      CREATE TABLE tenants (
+        id TEXT PRIMARY KEY, status TEXT NOT NULL DEFAULT 'active'
+      );
       CREATE TABLE staff_members (
         id TEXT PRIMARY KEY, name TEXT NOT NULL, email TEXT, role TEXT NOT NULL,
         access_level TEXT NOT NULL DEFAULT 'full', api_key TEXT UNIQUE NOT NULL,

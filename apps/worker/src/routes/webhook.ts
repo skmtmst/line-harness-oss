@@ -13,7 +13,7 @@ import {
   getScenarios,
   enrollFriendInScenario,
   upsertChatOnMessage,
-  getLineAccounts,
+  listLineAccountsWithTenantStatus,
   jstNow,
   getEntryRouteByRefCode,
   getMessageTemplateById,
@@ -208,25 +208,27 @@ webhook.post('/webhook', async (c) => {
   // Slow path: iterate DB-registered accounts for genuinely multi-account installs.
   let channelAccessToken = c.env.LINE_CHANNEL_ACCESS_TOKEN;
   let matchedAccountId: string | null = null;
+  let matchedTenantStatus: 'active' | 'suspended' | 'archived' = 'active';
   let valid = false;
 
   const envSecret = c.env.LINE_CHANNEL_SECRET;
   if (envSecret) {
     valid = await verifySignature(envSecret, rawBody, signature);
     if (valid) {
-      const accounts = await getLineAccounts(db);
+      const accounts = await listLineAccountsWithTenantStatus(db);
       const main = accounts.find(
         (a) => a.is_active && a.channel_secret === envSecret,
       );
       if (main) {
         channelAccessToken = main.channel_access_token;
         matchedAccountId = main.id;
+        matchedTenantStatus = main.tenant_status ?? 'active';
       }
     }
   }
 
   if (!valid) {
-    const accounts = await getLineAccounts(db);
+    const accounts = await listLineAccountsWithTenantStatus(db);
     for (const account of accounts) {
       if (!account.is_active) continue;
       if (envSecret && account.channel_secret === envSecret) continue; // already tried via fast path
@@ -234,6 +236,7 @@ webhook.post('/webhook', async (c) => {
       if (isValid) {
         channelAccessToken = account.channel_access_token;
         matchedAccountId = account.id;
+        matchedTenantStatus = account.tenant_status ?? 'active';
         valid = true;
         break;
       }
@@ -264,6 +267,15 @@ webhook.post('/webhook', async (c) => {
     events: body.events,
     lineAccountId: matchedAccountId,
     handle: async (event) => {
+      if (matchedTenantStatus !== 'active') {
+        return handleStoppedTenantEvent(
+          db,
+          lineClient,
+          event,
+          matchedAccountId,
+          lineMessageAccountKey,
+        );
+      }
       // 契約者専用LINE（★V6 37-7）: 6 桁の確認コードなら権限者の紐づけとして受ける。
       // 対象アカウント以外・コード以外は何もしないので、店舗のアカウントには影響しない。
       if (await handleNoticeLinkCode(c.env, db, lineClient, event, matchedAccountId)) return;
@@ -288,6 +300,114 @@ webhook.post('/webhook', async (c) => {
 
   return c.json({ status: 'ok' }, 200);
 });
+
+/**
+ * Stopped tenants still own their inbound data, but no webhook-triggered
+ * external effect may run. Keep this deliberately separate from handleEvent:
+ * adding a new auto-reply/action path there cannot accidentally re-enable
+ * delivery for a suspended tenant.
+ */
+async function handleStoppedTenantEvent(
+  db: D1Database,
+  lineClient: LineClient,
+  event: WebhookEvent,
+  lineAccountId: string | null,
+  lineMessageAccountKey: string,
+): Promise<void> {
+  if (event.type === 'unsend') {
+    await recordLineMessageUnsend(db, {
+      lineMessageAccountKey,
+      lineMessageId: event.unsend.messageId,
+      sourceUserId: event.source.type === 'user' ? event.source.userId : null,
+      unsentAt: toJstString(new Date(event.timestamp)),
+    });
+    return;
+  }
+
+  const userId = event.source.type === 'user' ? event.source.userId : undefined;
+  if (!userId) return;
+
+  if (event.type === 'unfollow') {
+    const friend = await getFriendByLineUserIdForAccount(db, userId, lineAccountId);
+    await updateFriendFollowStatus(db, userId, false, lineAccountId);
+    await recordWebhookAnalyticsEvent(db, lineAccountId, event, {
+      friendId: friend?.id,
+      eventType: 'friend_unfollow',
+      dimensions: { tenantStopped: true },
+    });
+    return;
+  }
+
+  const friend = await ensureFriendFromWebhookUser(db, lineClient, userId, lineAccountId);
+  if (!friend) return;
+
+  if (event.type === 'follow') {
+    await updateFriendFollowStatus(db, userId, true, lineAccountId);
+    await recordWebhookAnalyticsEvent(db, lineAccountId, event, {
+      friendId: friend.id,
+      eventType: 'friend_follow',
+      dimensions: { tenantStopped: true },
+    });
+    return;
+  }
+
+  if (event.type === 'postback') {
+    const data = (event as unknown as { postback: { data: string } }).postback.data || '[メニュー]';
+    try {
+      await db.prepare(
+        `INSERT INTO messages_log (id, friend_id, direction, message_type, content, broadcast_id, scenario_step_id, source, line_account_id, created_at)
+         VALUES (?, ?, 'incoming', 'text', ?, NULL, NULL, 'postback', ?, ?)`,
+      ).bind(crypto.randomUUID(), friend.id, data, lineAccountId, jstNow()).run();
+    } catch (error) {
+      logWebhookStepFailure('stopped_tenant_postback_log', error, lineAccountId, event);
+    }
+    return;
+  }
+
+  if (event.type !== 'message') return;
+  const message = event.message as {
+    id: string;
+    type: string;
+    text?: string;
+    fileName?: string;
+    title?: string;
+    packageId?: string | number;
+    package_id?: string | number;
+    stickerId?: string | number;
+    sticker_id?: string | number;
+    stickerResourceType?: string | number;
+    sticker_resource_type?: string | number;
+    quoteToken?: string;
+  };
+  const labels: Record<string, string> = {
+    sticker: '[スタンプ]', image: '[画像]', audio: '[音声]', video: '[動画]',
+    file: message.fileName ? `[ファイル: ${message.fileName}]` : '[ファイル]',
+    location: message.title ? `[位置情報: ${message.title}]` : '[位置情報]',
+  };
+  let content = message.type === 'text' ? (message.text ?? '') : (labels[message.type] ?? `[${message.type}]`);
+  if (message.type === 'sticker') {
+    const sticker = createStickerMessageContent(message);
+    if (sticker) content = JSON.stringify(sticker);
+  }
+  const recorded = await recordIncomingLineMessage(db, {
+    id: crypto.randomUUID(),
+    friendId: friend.id,
+    messageType: message.type,
+    content,
+    lineAccountId,
+    lineMessageAccountKey,
+    lineMessageId: message.id,
+    createdAt: jstNow(),
+    quoteToken: message.quoteToken ?? null,
+  });
+  if (!recorded.inserted || recorded.isUnsent) return;
+  await upsertChatOnMessage(db, friend.id);
+  await recordWebhookAnalyticsEvent(db, lineAccountId, event, {
+    friendId: friend.id,
+    eventType: 'message_received',
+    dimensions: { messageType: message.type, matched: false, tenantStopped: true },
+  });
+}
 
 /** 契約者専用LINEへ届いた 6 桁の確認コードを権限者の紐づけとして処理する。処理したら true。 */
 async function handleNoticeLinkCode(
