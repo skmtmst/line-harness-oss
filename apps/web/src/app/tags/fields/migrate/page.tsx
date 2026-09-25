@@ -351,10 +351,10 @@ function MigrateFriendField() {
               {targetMode === 'new' ? (
                 <>
                   <label className="mt-3 block text-sm font-semibold text-ink">項目名
-                    <input value={targetName} onChange={(event) => { setTargetName(event.target.value); resetConfirmation() }} className="mt-1.5 h-10 w-full rounded-control border border-hairline bg-canvas px-3 font-normal outline-none focus:border-accent" />
+                    <input value={targetName} onChange={(event) => { setTargetName(event.target.value); resetConfirmation() }} className="mt-1.5 h-10 w-full rounded-control border border-hairline bg-canvas px-3 font-normal" />
                   </label>
                   <label className="mt-3 block text-sm font-semibold text-ink">差し込み名
-                    <input value={targetKey} onChange={(event) => { setTargetKey(event.target.value); resetConfirmation() }} className="mt-1.5 h-10 w-full rounded-control border border-hairline bg-canvas px-3 font-mono font-normal outline-none focus:border-accent" />
+                    <input value={targetKey} onChange={(event) => { setTargetKey(event.target.value); resetConfirmation() }} className="mt-1.5 h-10 w-full rounded-control border border-hairline bg-canvas px-3 font-mono font-normal" />
                   </label>
                   <label className="mt-3 block text-sm font-semibold text-ink">種類
                     <SelectField

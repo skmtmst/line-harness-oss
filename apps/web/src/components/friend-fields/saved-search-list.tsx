@@ -282,7 +282,7 @@ export default function SavedSearchList({ accountId }: { accountId: string | nul
           onChange={(event) => setQuery(event.target.value)}
           placeholder="条件名で検索"
           aria-label="条件名で検索"
-          className="h-9 w-40 rounded-control border border-hairline bg-canvas px-3 text-label outline-none focus:border-accent"
+          className="h-9 w-40 rounded-control border border-hairline bg-canvas px-3 text-label"
         />
         <select
           value={usageFilter}

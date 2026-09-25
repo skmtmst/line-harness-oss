@@ -567,7 +567,7 @@ function DeleteTagDialog({ tag, accountId, onCancel, onArchived }: { tag: Tag; a
         {/* 設計 `seGRS`。 */}
         <label className="mt-4 block">
           <span className="mb-1.5 block text-xs font-semibold text-ink-secondary">確認のため、タグ名を入力してください</span>
-          <input value={text} onChange={(event) => setText(event.target.value)} placeholder={tag.name} disabled={blocked} className="w-full rounded-control border border-hairline px-3 py-2.5 text-sm outline-none focus:border-danger disabled:bg-canvas-sunken" />
+          <input value={text} onChange={(event) => setText(event.target.value)} placeholder={tag.name} disabled={blocked} className="w-full rounded-control border border-hairline px-3 py-2.5 text-sm focus:border-danger disabled:bg-canvas-sunken" />
         </label>
         {/* 設計 `rHKRG`。左が「やめる」、右が「このタグを削除する」。 */}
         <div className="mt-5 flex items-center justify-end gap-3">
@@ -962,7 +962,7 @@ export default function TagsPageV4({
               狭いときだけ折り返し、文字と矢印を重ねない。
             */}
             <div className="mb-[10px] flex flex-wrap items-center gap-2">
-              <input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="タグ名・用途で検索" className="h-10 min-w-45 flex-1 rounded-control border border-hairline bg-canvas px-3 text-label outline-none focus:border-accent" />
+              <input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="タグ名・用途で検索" className="h-10 min-w-45 flex-1 rounded-control border border-hairline bg-canvas px-3 text-label" />
               <select aria-label="使用状態で絞り込む" value={usageFilter} onChange={(event) => setUsageFilter(event.target.value)} className="v6-select h-10 min-w-44 rounded-control border border-hairline bg-canvas pl-3 text-label font-semibold text-ink"><option value="all">使用状態：すべて</option><option value="linked">連動あり</option><option value="unused">未使用</option></select>
               <select aria-label="付与元で絞り込む" value={sourceFilter} onChange={(event) => setSourceFilter(event.target.value)} className="v6-select h-10 min-w-38 rounded-control border border-hairline bg-canvas pl-3 text-label font-semibold text-ink"><option value="all">付与元：すべて</option>{Object.entries(SOURCE_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
               <select aria-label="表示件数" value={pageSize} onChange={(event) => setPageSize(Number(event.target.value))} className="v6-select ml-auto h-10 min-w-32 rounded-control border border-hairline bg-canvas pl-3 text-label font-semibold text-ink">{[20,30,40,50].map((size) => <option key={size} value={size}>{size}件表示</option>)}</select>

@@ -412,9 +412,9 @@ export default function EventForm({ accountId, eventId }: EventFormProps) {
       )}
 
       {/* main card */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+      <div className="bg-canvas rounded-lg shadow-sm border border-hairline overflow-hidden">
         {/* tab nav */}
-        <div className="flex border-b border-gray-200">
+        <div className="flex border-b border-hairline">
           {TABS.map((t) => {
             const active = tab === t.key
             const disabled = t.key !== 'overview' && !eventId
@@ -525,7 +525,7 @@ function OverviewTab({
           onChange={(e) => update('name', e.target.value)}
           maxLength={EVENT_NAME_MAX_LENGTH}
           placeholder="例: 第1回 AAA 説明会"
-          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full border border-hairline rounded-lg px-3 py-2 text-sm"
         />
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -536,7 +536,7 @@ function OverviewTab({
             value={draft.venue_name ?? ''}
             onChange={(e) => update('venue_name', e.target.value || null)}
             placeholder="例: 渋谷ベース 3F"
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full border border-hairline rounded-lg px-3 py-2 text-sm"
           />
         </div>
         <div>
@@ -546,7 +546,7 @@ function OverviewTab({
             value={draft.venue_url ?? ''}
             onChange={(e) => update('venue_url', e.target.value || null)}
             placeholder="https://..."
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full border border-hairline rounded-lg px-3 py-2 text-sm"
           />
         </div>
       </div>
@@ -570,14 +570,14 @@ function OverviewTab({
           onChange={(e) => update('description', e.target.value || null)}
           rows={8}
           placeholder="開催趣旨、注意事項、持ち物などを記載..."
-          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full border border-hairline rounded-lg px-3 py-2 text-sm"
         />
         <label className="flex items-center gap-2 mt-2 text-sm text-gray-600">
           <input
             type="checkbox"
             checked={draft.description_centered === 1}
             onChange={(e) => update('description_centered', e.target.checked ? 1 : 0)}
-            className="rounded border-gray-300"
+            className="rounded border-hairline"
           />
           詳細を中央揃えで表示
         </label>
@@ -594,7 +594,7 @@ function OverviewTab({
               e.target.value === 'unlimited' ? null : Number(e.target.value),
             )
           }
-          className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="border border-hairline rounded-lg px-3 py-2 text-sm"
         >
           <option value="unlimited">制限なし</option>
           <option value="1">1 回まで</option>
@@ -605,7 +605,7 @@ function OverviewTab({
       </div>
 
       {/* 公開対象 */}
-      <div className="border-t border-gray-200 pt-5">
+      <div className="border-t border-hairline pt-5">
         <div className="text-sm font-medium text-gray-700 mb-2">公開対象</div>
         <div className="grid grid-cols-2 gap-2 mb-3">
           <button
@@ -671,7 +671,7 @@ function OverviewTab({
                         : accountIds.filter((x) => x !== a.id)
                       update('account_ids', next as unknown as EventDetail['account_ids'])
                     }}
-                    className="rounded border-gray-300"
+                    className="rounded border-hairline"
                   />
                   <span className="text-sm">
                     {a.country ? a.country + ' ' : ''}{a.name}
@@ -825,29 +825,23 @@ function SlotsTab({
       <div className="flex flex-wrap gap-2 mb-4 items-center justify-between">
         <div className="text-sm text-gray-600">{slots.length} 件の予約枠</div>
         <div className="flex gap-2">
-          <button
-            onClick={() => setShowAdd(true)}
-            className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-50"
-          >
+          <Button onClick={() => setShowAdd(true)}>
             ＋ 枠を追加
-          </button>
-          <button
-            onClick={() => setShowBulk(true)}
-            className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-50"
-          >
+          </Button>
+          <Button onClick={() => setShowBulk(true)}>
             一括追加
-          </button>
+          </Button>
         </div>
       </div>
       {err && <div className="bg-red-50 border border-red-200 text-red-700 p-3 rounded-lg mb-3 text-sm">{err}</div>}
       {slots.length === 0 ? (
-        <div className="text-center py-12 text-gray-500 text-sm border border-dashed border-gray-300 rounded-lg">
+        <div className="text-center py-12 text-gray-500 text-sm border border-dashed border-hairline rounded-lg">
           予約枠がありません。「＋ 枠を追加」または「一括追加」から作成してください。
         </div>
       ) : (
-        <div className="overflow-x-auto border border-gray-200 rounded-lg">
+        <div className="overflow-x-auto border border-hairline rounded-lg">
           <table className="w-full text-sm">
-            <thead className="bg-gray-50 text-gray-600">
+            <thead className="bg-canvas-sunken text-gray-600">
               <tr>
                 <th className="text-left px-3 py-2 font-medium">日時</th>
                 <th className="text-left px-3 py-2 font-medium">定員</th>
@@ -858,7 +852,7 @@ function SlotsTab({
             </thead>
             <tbody>
               {slots.map((s) => (
-                <tr key={s.id} className="border-t border-gray-200">
+                <tr key={s.id} className="border-t border-hairline">
                   <td className="px-3 py-2 text-gray-800">
                     {formatJpSlotRange(s.starts_at, s.ends_at)}
                   </td>
@@ -1026,7 +1020,7 @@ function AddSlotDialog({
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md mx-4">
+      <div className="bg-canvas rounded-lg shadow-xl p-6 w-full max-w-md mx-4">
         <div className="mb-4 flex items-start justify-between gap-3">
           <h3 className="text-lg font-bold text-ink">予約枠を追加</h3>
           <button type="button" onClick={onClose} aria-label="閉じる" className="rounded-mini p-1 text-ink-secondary hover:bg-canvas-sunken">
@@ -1041,7 +1035,7 @@ function AddSlotDialog({
               type="date"
               value={date}
               onChange={(e) => setDate(e.target.value)}
-              className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+              className="mt-1 w-full border border-hairline rounded-lg px-3 py-2 text-sm"
             />
           </label>
           <div className="grid grid-cols-2 gap-3">
@@ -1051,7 +1045,7 @@ function AddSlotDialog({
                 type="time"
                 value={startTime}
                 onChange={(e) => setStartTime(e.target.value)}
-                className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                className="mt-1 w-full border border-hairline rounded-lg px-3 py-2 text-sm"
               />
             </label>
             <label>
@@ -1060,7 +1054,7 @@ function AddSlotDialog({
                 type="time"
                 value={endTime}
                 onChange={(e) => setEndTime(e.target.value)}
-                className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                className="mt-1 w-full border border-hairline rounded-lg px-3 py-2 text-sm"
               />
             </label>
           </div>
@@ -1071,14 +1065,14 @@ function AddSlotDialog({
               min={1}
               value={capacity}
               onChange={(e) => setCapacity(e.target.value)}
-              className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+              className="mt-1 w-full border border-hairline rounded-lg px-3 py-2 text-sm"
             />
           </label>
         </div>
         <div className="flex justify-end gap-2 mt-5">
-          <button onClick={onClose} className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50">
+          <Button onClick={onClose}>
             キャンセル
-          </button>
+          </Button>
           <button
             onClick={submit}
             disabled={busy}
@@ -1257,7 +1251,7 @@ function BulkSlotDialog({
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-lg mx-4">
+      <div className="bg-canvas rounded-lg shadow-xl p-6 w-full max-w-lg mx-4">
         <div className="mb-4 flex items-start justify-between gap-3">
           <h3 className="text-lg font-bold text-ink">予約枠の一括追加</h3>
           <button type="button" onClick={onClose} aria-label="閉じる" className="rounded-mini p-1 text-ink-secondary hover:bg-canvas-sunken">
@@ -1269,11 +1263,11 @@ function BulkSlotDialog({
           <div className="grid grid-cols-2 gap-3">
             <label>
               <span className="text-sm font-medium text-gray-700">開始日</span>
-              <input type="date" value={start} onChange={(e) => setStart(e.target.value)} className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+              <input type="date" value={start} onChange={(e) => setStart(e.target.value)} className="mt-1 w-full border border-hairline rounded-lg px-3 py-2 text-sm" />
             </label>
             <label>
               <span className="text-sm font-medium text-gray-700">終了日</span>
-              <input type="date" value={end} onChange={(e) => setEnd(e.target.value)} className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+              <input type="date" value={end} onChange={(e) => setEnd(e.target.value)} className="mt-1 w-full border border-hairline rounded-lg px-3 py-2 text-sm" />
             </label>
           </div>
           <div>
@@ -1303,14 +1297,14 @@ function BulkSlotDialog({
                   type="time"
                   value={p.start}
                   onChange={(e) => setPatterns((ps) => ps.map((x, j) => (j === i ? { ...x, start: e.target.value } : x)))}
-                  className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                  className="flex-1 border border-hairline rounded-lg px-3 py-2 text-sm"
                 />
                 <span className="text-gray-500">〜</span>
                 <input
                   type="time"
                   value={p.end}
                   onChange={(e) => setPatterns((ps) => ps.map((x, j) => (j === i ? { ...x, end: e.target.value } : x)))}
-                  className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                  className="flex-1 border border-hairline rounded-lg px-3 py-2 text-sm"
                 />
                 {patterns.length > 1 && (
                   <button
@@ -1338,14 +1332,14 @@ function BulkSlotDialog({
               min={1}
               value={capacity}
               onChange={(e) => setCapacity(e.target.value)}
-              className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+              className="mt-1 w-full border border-hairline rounded-lg px-3 py-2 text-sm"
             />
           </label>
         </div>
         <div className="flex justify-end gap-2 mt-5">
-          <button onClick={onClose} className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50">
+          <Button onClick={onClose}>
             キャンセル
-          </button>
+          </Button>
           <button
             onClick={submit}
             disabled={busy}
@@ -1374,12 +1368,12 @@ function PublishTab({
 }) {
   return (
     <div className="space-y-5">
-      <label className="flex items-start gap-3 p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50">
+      <label className="flex items-start gap-3 p-3 border border-hairline rounded-lg cursor-pointer hover:bg-gray-50">
         <input
           type="checkbox"
           checked={draft.requires_approval === 1}
           onChange={(e) => update('requires_approval', e.target.checked ? 1 : 0)}
-          className="mt-0.5 rounded border-gray-300"
+          className="mt-0.5 rounded border-hairline"
         />
         <div>
           <div className="text-sm font-medium text-ink">承認制</div>
@@ -1406,12 +1400,12 @@ function PublishTab({
         />
       </Field>
 
-      <label className="flex items-start gap-3 p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50">
+      <label className="flex items-start gap-3 p-3 border border-hairline rounded-lg cursor-pointer hover:bg-gray-50">
         <input
           type="checkbox"
           checked={draft.waitlist_enabled === 1}
           onChange={(e) => update('waitlist_enabled', e.target.checked ? 1 : 0)}
-          className="mt-0.5 rounded border-gray-300"
+          className="mt-0.5 rounded border-hairline"
         />
         <div>
           <div className="text-sm font-medium text-ink">キャンセル待ちを受ける</div>
@@ -1432,7 +1426,7 @@ function PublishTab({
           id="ev-visible-tag"
           value={draft.visible_tag_id ?? ''}
           onChange={(e) => update('visible_tag_id', e.target.value === '' ? null : e.target.value)}
-          className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="rounded-lg border border-hairline px-3 py-2 text-sm"
         >
           <option value="">友だち全員</option>
           {tags.map((t) => (
@@ -1462,7 +1456,7 @@ function PublishTab({
           onChange={(e) =>
             update('entry_cutoff_hours_before', parseDeadlineSelect(e.target.value))
           }
-          className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="rounded-lg border border-hairline px-3 py-2 text-sm"
         >
           {deadlineOptionsWithSaved(
             EVENT_ENTRY_CUTOFF_OPTIONS,
@@ -1488,7 +1482,7 @@ function PublishTab({
           onChange={(e) =>
             update('cancel_deadline_hours_before', parseDeadlineSelect(e.target.value))
           }
-          className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="border border-hairline rounded-lg px-3 py-2 text-sm"
         >
           {deadlineOptionsWithSaved(
             EVENT_CANCEL_DEADLINE_OPTIONS,
@@ -1501,12 +1495,12 @@ function PublishTab({
         </select>
       </div>
 
-      <label className="flex items-start gap-3 p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50">
+      <label className="flex items-start gap-3 p-3 border border-hairline rounded-lg cursor-pointer hover:bg-gray-50">
         <input
           type="checkbox"
           checked={draft.reminder_day_before_enabled === 1}
           onChange={(e) => update('reminder_day_before_enabled', e.target.checked ? 1 : 0)}
-          className="mt-0.5 rounded border-gray-300"
+          className="mt-0.5 rounded border-hairline"
         />
         <div>
           <div className="text-sm font-medium text-ink">前日リマインダ</div>
@@ -1523,7 +1517,7 @@ function PublishTab({
           onChange={(e) =>
             update('reminder_hours_before', e.target.value === 'off' ? null : Number(e.target.value))
           }
-          className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="border border-hairline rounded-lg px-3 py-2 text-sm"
         >
           <option value="off">送信しない</option>
           <option value="1">1 時間前</option>
@@ -1535,7 +1529,7 @@ function PublishTab({
       </div>
 
       {/* 予約者向けカスタムメッセージ追記 */}
-      <div className="border-t border-gray-200 pt-5 space-y-4">
+      <div className="border-t border-hairline pt-5 space-y-4">
         <div>
           <div className="text-sm font-medium text-ink mb-1">予約者向けカスタムメッセージ</div>
           <p className="text-xs text-gray-500">
@@ -1556,7 +1550,7 @@ function PublishTab({
             rows={3}
             maxLength={2000}
             placeholder="例: 当日の Zoom URL: https://us02web.zoom.us/j/..."
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full border border-hairline rounded-lg px-3 py-2 text-sm"
           />
           <p className="text-xs text-gray-500 mt-1">確定通知（即時 / 後追い承認）の末尾に追加</p>
         </div>
@@ -1574,13 +1568,13 @@ function PublishTab({
             rows={3}
             maxLength={2000}
             placeholder="例: 開始 10 分前に同じ URL からご入室ください"
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full border border-hairline rounded-lg px-3 py-2 text-sm"
           />
           <p className="text-xs text-gray-500 mt-1">前日 / N 時間前のリマインド末尾に追加</p>
         </div>
       </div>
 
-      <hr className="border-gray-200" />
+      <hr className="border-hairline" />
 
       <div>
         <div className="text-sm font-medium text-gray-700 mb-2">公開状態</div>

@@ -64,7 +64,7 @@ export function DeleteDialog({ tag, dependencies, dependenciesStatus, onCancel, 
           </dl>
         </div>
         <p className="mt-4 rounded-control border border-danger/25 bg-danger-bg p-3 text-sm font-medium leading-6 text-danger">アフィリエイトや外部連携で使用中の場合は削除できません。削除後は元に戻せません。</p>
-        <label className="mt-5 block"><span className="mb-1.5 block text-xs font-semibold text-ink-secondary">確認のため「{tag.name}」と入力してください</span><input value={confirmation} onChange={(event) => setConfirmation(event.target.value)} disabled={blocked} className="w-full rounded-control border border-hairline px-3 py-2.5 text-sm outline-none focus:border-danger disabled:bg-canvas-sunken" /></label>
+        <label className="mt-5 block"><span className="mb-1.5 block text-xs font-semibold text-ink-secondary">確認のため「{tag.name}」と入力してください</span><input value={confirmation} onChange={(event) => setConfirmation(event.target.value)} disabled={blocked} className="w-full rounded-control border border-hairline px-3 py-2.5 text-sm focus:border-danger disabled:bg-canvas-sunken" /></label>
         <div className="mt-6 flex items-center justify-end gap-2">{blockedReason && <p className="min-w-0 flex-1 text-xs text-ink-faint">{blockedReason}</p>}<button type="button" onClick={onCancel} className="shrink-0 rounded-control border border-hairline px-4 py-2.5 text-sm font-medium text-ink-secondary">キャンセル</button><button type="button" disabled={deleting || blocked || confirmation !== tag.name} onClick={onDelete} className="rounded-control bg-danger px-4 py-2.5 text-sm font-bold text-on-accent disabled:opacity-40">{deleting ? '削除中…' : 'タグを削除'}</button></div>
       </section>
     </div>
@@ -121,8 +121,8 @@ function ArchivedTagEditor({ tag, accountId, onCancel, onSaved }: {
       </div>
       {error && <p role="alert" className="rounded-control border border-danger/25 bg-danger-bg p-3 text-sm text-danger">{error}</p>}
       {notice && <p className="rounded-control border border-accent/25 bg-accent-soft p-3 text-sm text-accent-deep">{notice}</p>}
-      <label className="block"><span className="mb-1.5 block text-xs font-semibold text-ink-secondary">タグ名</span><input value={name} onChange={(event) => setName(event.target.value)} maxLength={80} className="w-full rounded-control border border-hairline px-3 py-2.5 text-sm outline-none focus:border-accent" /></label>
-      <label className="block"><span className="mb-1.5 block text-xs font-semibold text-ink-secondary">説明</span><textarea value={description} onChange={(event) => setDescription(event.target.value)} rows={3} className="w-full rounded-control border border-hairline px-3 py-2.5 text-sm outline-none focus:border-accent" /></label>
+      <label className="block"><span className="mb-1.5 block text-xs font-semibold text-ink-secondary">タグ名</span><input value={name} onChange={(event) => setName(event.target.value)} maxLength={80} className="w-full rounded-control border border-hairline px-3 py-2.5 text-sm" /></label>
+      <label className="block"><span className="mb-1.5 block text-xs font-semibold text-ink-secondary">説明</span><textarea value={description} onChange={(event) => setDescription(event.target.value)} rows={3} className="w-full rounded-control border border-hairline px-3 py-2.5 text-sm" /></label>
       <div className="flex justify-end gap-2">
         <Button onClick={onCancel}>キャンセル</Button>
         <Button variant="primary" onClick={() => void save()} disabled={saving || !name.trim()}>{saving ? '保存中…' : '保存'}</Button>
