@@ -4,11 +4,14 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import HqAccountList from '@/components/hq/account-list'
 import Button from '@/components/shared/button'
+import { usePageTitle } from '@/components/shell/page-chrome'
 import { useAccount, type AccountWithStats } from '@/contexts/account-context'
 import { api } from '@/lib/api'
 import { resolveHqOpenTarget, type HqOpenTarget } from '@/lib/hq-navigation'
 
 export default function HqOpenPage() {
+  // 左のメニューと同じ名前を見出しにする（/hq と同じ）。
+  usePageTitle('アカウント')
   const router = useRouter()
   const { setSelectedAccountId } = useAccount()
   const [target, setTarget] = useState<HqOpenTarget | null>(null)

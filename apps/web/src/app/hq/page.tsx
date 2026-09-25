@@ -6,6 +6,7 @@ import { api, fetchApi } from '@/lib/api'
 import { resolveStoreReturnPath } from '@/lib/hq-navigation'
 import { useAccount, type AccountWithStats } from '@/contexts/account-context'
 import Button from '@/components/shared/button'
+import { usePageTitle } from '@/components/shell/page-chrome'
 import HqAccountList from '@/components/hq/account-list'
 import AccountEditModal from '@/components/accounts/account-edit-modal'
 import SummaryCard from '@/components/shared/summary-card'
@@ -14,6 +15,8 @@ import OperatorHistory from '@/components/hq/operator-history'
 import PlatformNotices from '@/components/hq/platform-notices'
 
 export default function HqPage() {
+  // 左のメニューと同じ名前を見出しにする（バナー生成・課金プランなどと同じ書き方）。
+  usePageTitle('アカウント')
   const router = useRouter()
   const { setSelectedAccountId, refreshAccounts } = useAccount()
   const [accounts, setAccounts] = useState<AccountWithStats[]>([])

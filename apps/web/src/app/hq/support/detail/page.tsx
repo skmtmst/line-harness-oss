@@ -193,7 +193,7 @@ export default function HqSupportDetailPage() {
 
               <ol className="flex flex-col gap-3" aria-label="やり取り">
                 <Message side="left" author={`${tenantName || '統括'} ／ ${detail.staffName || '—'}`} at={detail.createdAt} body={detail.body} attachments={detail.attachments} />
-                {detail.messages.map((m) => (
+                {(detail.messages ?? []).map((m) => (
                   <Message
                     key={m.id}
                     side={m.authorKind === 'ops' ? 'right' : 'left'}
@@ -275,6 +275,8 @@ export default function HqSupportDetailPage() {
             <div className="border-t border-hairline" />
             {history === null ? (
               <p className="px-4 py-4 text-caption text-ink-faint">読み込んでいます…</p>
+            ) : !Array.isArray(history) ? (
+              <p className="px-4 py-4 text-caption text-ink-faint">これまでの問い合わせを読み込めませんでした。</p>
             ) : history.length === 0 ? (
               <p className="px-4 py-4 text-caption text-ink-faint">まだ問い合わせはありません。</p>
             ) : (
@@ -326,7 +328,8 @@ function Row({ label, value }: { label: string; value: string }) {
   )
 }
 
-function Message({ side, author, at, body, attachments }: { side: 'left' | 'right'; author: string; at: string; body: string; attachments: Array<{ key: string; url: string }> }) {
+function Message({ side, author, at, body, attachments }: { side: 'left' | 'right'; author: string; at: string; body: string; attachments?: Array<{ key: string; url: string }> }) {
+  const files = attachments ?? []
   return (
     <li className={`flex max-w-3xl flex-col gap-1 ${side === 'right' ? 'items-end self-end' : 'items-start'}`}>
       <span className="flex items-baseline gap-2 text-micro text-ink-secondary">
@@ -334,12 +337,12 @@ function Message({ side, author, at, body, attachments }: { side: 'left' | 'righ
         <span className="text-ink-faint">{shortDateTime(at)}</span>
       </span>
       <p className={`whitespace-pre-wrap rounded-control px-3.5 py-3 text-left text-label text-ink ${side === 'right' ? 'bg-accent-soft' : 'bg-surface-pearl'}`}>{body}</p>
-      {attachments.length > 0 ? (
+      {files.length > 0 ? (
         <span className="flex flex-wrap gap-2">
-          {attachments.map((a) => (
+          {files.map((a) => (
             <a key={a.key} href={a.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-micro text-action underline-offset-2 hover:underline">
               <Paperclip aria-hidden="true" className="h-3.5 w-3.5" />
-              {a.key.split('/').pop()}
+              {(a.key ?? '').split('/').pop()}
             </a>
           ))}
         </span>
