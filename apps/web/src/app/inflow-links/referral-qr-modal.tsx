@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Button from '@/components/shared/button'
 
 const WORKER_BASE = process.env.NEXT_PUBLIC_API_URL ?? ''
 
@@ -42,7 +43,7 @@ export default function ReferralQrModal({
     setTimeout(() => setCopied(false), 1500)
   }
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/45 p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-scrim p-4">
       <div className="w-full max-w-md rounded-2xl bg-canvas p-6 shadow-2xl">
         <div className="flex items-start justify-between gap-4">
           <div>
@@ -60,16 +61,16 @@ export default function ReferralQrModal({
           <>
             <div className="mt-5 rounded-xl bg-canvas-sunken p-3">
               <p className="break-all font-mono text-xs text-ink-secondary">{url}</p>
-              <button onClick={copy} className="mt-3 w-full rounded-lg border border-hairline bg-canvas px-3 py-2 text-sm font-medium text-action hover:bg-canvas-sunken">
+              <Button variant="secondary" onClick={copy} className="mt-3 w-full">
                 {copied ? 'コピーしました' : 'URLをコピー'}
-              </button>
+              </Button>
             </div>
             <div className="mt-5 text-center">
               {/* eslint-disable-next-line @next/next/no-img-element -- Workerが動的生成するQRコード */}
               <img src={qrBase} alt={`${route.name}のQRコード`} className="mx-auto h-64 w-64 rounded-xl border border-hairline bg-canvas p-2" />
-              <a href={downloadUrl} download={`referral-${route.refCode}.png`} className="mt-4 inline-flex w-full items-center justify-center rounded-lg bg-accent-deep px-4 py-2.5 text-sm font-semibold text-on-accent hover:brightness-92">
+              <Button variant="primary" href={downloadUrl} download={`referral-${route.refCode}.png`} className="mt-4 w-full">
                 QRコードをダウンロード
-              </a>
+              </Button>
             </div>
           </>
         )}
