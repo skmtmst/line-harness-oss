@@ -367,10 +367,15 @@ function hoursText(ms: number): string {
   return `${hours}時間`
 }
 
-export default function BookingCalendar({ mode, items, onOpen, staffNames, canCreate = false, anchorDay, onAnchorChange, availability, onRetryAvailability }: {
+export default function BookingCalendar({ mode, items, onOpen, staffNames, canCreate = false, anchorDay, onAnchorChange, availability, onRetryAvailability, dataState = 'ready' }: {
   mode: 'day' | 'week'
   items: BookingRequest[]
   onOpen: (id: string) => void
+  /**
+   * ★V7：一覧の読み込み状態。取れていない間、カレンダー内の件数に 0 を
+   * 出さない。「—」と出し、読み込み中と失敗を言い分ける。
+   */
+  dataState?: 'loading' | 'error' | 'ready'
   /** 稼働中の担当者名。予約がまだ無い担当も列に出す（その空きへ予約を入れられる）。 */
   staffNames?: string[]
   /** N-399/N-401: 操作できる人だけ空きセルを代理予約の入口にする。 */
@@ -521,21 +526,26 @@ export default function BookingCalendar({ mode, items, onOpen, staffNames, canCr
         ? `受付${hoursText(capacity.acceptableMs)}のうち${hoursText(capacity.bookedMs)}を使用中`
         : '受付可能な時間がありません'
 
+  // ★V7：一覧が取れていない間、カレンダー内の件数に 0 を出さない。
+  const listMissing = dataState !== 'ready'
+  const listMissingDetail = dataState === 'error' ? '読み込めませんでした' : '読み込んでいます'
+  const countOrDash = (text: string) => (listMissing ? '—' : text)
+
   return (
     <div data-design-node={mode === 'day' ? 'TV2DI' : 'SbuUI'}>
       <div className="mb-4 grid grid-cols-2 gap-3 xl:grid-cols-4">
-        <Kpi title={mode === 'day' ? '今日の予約' : '今週の予約'} value={`${visible.length}件`} detail={`LINEから ${lineCount}・電話 ${phoneCount}`} />
+        <Kpi title={mode === 'day' ? '今日の予約' : '今週の予約'} value={countOrDash(`${visible.length}件`)} detail={listMissing ? listMissingDetail : `LINEから ${lineCount}・電話 ${phoneCount}`} />
         <Kpi
           title={mode === 'day' ? 'まだ空いている枠' : 'うまっている割合'}
-          value={mode === 'day' ? (availability.status === 'ready' ? `${capacity.freeSlots}枠` : '—') : weekRateValue}
-          detail={mode === 'day' ? availabilityNote : weekRateDetail}
+          value={listMissing ? '—' : mode === 'day' ? (availability.status === 'ready' ? `${capacity.freeSlots}枠` : '—') : weekRateValue}
+          detail={listMissing ? listMissingDetail : mode === 'day' ? availabilityNote : weekRateDetail}
         />
         <Kpi
           title={mode === 'day' ? '未承認・要対応' : 'あいている枠'}
-          value={mode === 'day' ? `${requested}件` : availability.status === 'ready' ? `${capacity.freeSlots}枠` : '—'}
-          detail={mode === 'day' ? (requested > 0 ? '確認が必要です' : '現在、確認待ちはありません') : availabilityNote}
+          value={listMissing ? '—' : mode === 'day' ? `${requested}件` : availability.status === 'ready' ? `${capacity.freeSlots}枠` : '—'}
+          detail={listMissing ? listMissingDetail : mode === 'day' ? (requested > 0 ? '確認が必要です' : '現在、確認待ちはありません') : availabilityNote}
         />
-        <Kpi title="キャンセル" value={`${cancelled}件`} detail={mode === 'day' ? '選んだ日' : 'この1週間'} />
+        <Kpi title="キャンセル" value={countOrDash(`${cancelled}件`)} detail={listMissing ? listMissingDetail : mode === 'day' ? '選んだ日' : 'この1週間'} />
       </div>
 
       {/* ★V7：常に出ていた説明の帯は、色の見方だけを小さな凡例にした。 */}
@@ -552,19 +562,23 @@ export default function BookingCalendar({ mode, items, onOpen, staffNames, canCr
           担当者または予約メニューがまだ設定されていません。受け付けられる枠がないため、空きは「—」で表示しています。予約設定で登録すると空き枠が出ます。
         </div>
       ) : null}
+      {/*
+        ★V7：空き枠だけ取れないときは、その場所に小さく1行だけ。
+        黄色の帯にしない。文言と読み直す口は契約試験が守る。
+      */}
       {availability.status === 'error' ? (
-        <div className="bg-warning-bg text-warning mb-4 rounded-control px-4 py-3 text-xs font-semibold">
+        <p className="text-ink-secondary mb-4 text-xs" role="status">
           空き枠を読み込めませんでした。予約の記録だけを表示しています。
           {/*
-            * #634: 失敗の帯の中に読み直す口を出す。無いとページ全体を
+            * #634: 失敗の知らせの中に読み直す口を出す。無いとページ全体を
             * 開き直す以外に直す道がない（集計側の帯と同じ導線）。
             */}
           {onRetryAvailability ? (
-            <button type="button" className="ml-2 underline" onClick={onRetryAvailability}>もう一度読み込む</button>
+            <button type="button" className="text-action ml-2 font-semibold hover:underline" onClick={onRetryAvailability}>もう一度読み込む</button>
           ) : (
             <span> 時間をおいて開き直してください。</span>
           )}
-        </div>
+        </p>
       ) : null}
 
       <div className="flex min-w-0 flex-col gap-4 xl:flex-row">
@@ -572,7 +586,7 @@ export default function BookingCalendar({ mode, items, onOpen, staffNames, canCr
           {mode === 'day' ? (
             <CalendarFrame
               title={longDateLabel(anchorDay)}
-              meta={`${visible.length}件 ／ 売上見込み ${money(sales)}`}
+              meta={listMissing ? '—' : `${visible.length}件 ／ 売上見込み ${money(sales)}`}
               onPrevious={() => onAnchorChange(moveDay(anchorDay, -1))}
               onNext={() => onAnchorChange(moveDay(anchorDay, 1))}
               onToday={() => onAnchorChange(todayKey())}
@@ -582,7 +596,7 @@ export default function BookingCalendar({ mode, items, onOpen, staffNames, canCr
           ) : (
             <CalendarFrame
               title={`${dateLabel(days[0], false)}〜${dateLabel(days[6])}`}
-              meta={`${visible.length}件 ／ 売上見込み ${money(sales)}`}
+              meta={listMissing ? '—' : `${visible.length}件 ／ 売上見込み ${money(sales)}`}
               onPrevious={() => onAnchorChange(moveDay(anchorDay, -7))}
               onNext={() => onAnchorChange(moveDay(anchorDay, 7))}
               onToday={() => onAnchorChange(todayKey())}
@@ -593,16 +607,21 @@ export default function BookingCalendar({ mode, items, onOpen, staffNames, canCr
         </div>
 
         <aside className="w-full shrink-0 space-y-3 xl:w-72">
-          <SidePanel title={mode === 'day' ? '今日 気をつけること' : '今週 気をつけること'} tone={requested > 0 || phoneCount > 0 ? 'warning' : 'plain'}>
-            {requested > 0 && <p>● 未承認の予約が {requested}件あります。内容を確認してください。</p>}
-            {phoneCount > 0 && <p>● 電話予約が {phoneCount}件あります。LINE未連携の方には当日の連絡ができません。</p>}
-            {requested === 0 && phoneCount === 0 && <p>いま確認が必要な予約はありません。</p>}
-          </SidePanel>
+          {/*
+            ★V7：注意の有無は数えてから言う。取れていない間は出さない。
+          */}
+          {!listMissing ? (
+            <SidePanel title={mode === 'day' ? '今日 気をつけること' : '今週 気をつけること'} tone={requested > 0 || phoneCount > 0 ? 'warning' : 'plain'}>
+              {requested > 0 && <p>● 未承認の予約が {requested}件あります。内容を確認してください。</p>}
+              {phoneCount > 0 && <p>● 電話予約が {phoneCount}件あります。LINE未連携の方には当日の連絡ができません。</p>}
+              {requested === 0 && phoneCount === 0 && <p>いま確認が必要な予約はありません。</p>}
+            </SidePanel>
+          ) : null}
           <SidePanel title={mode === 'day' ? '今日の流れ' : '今週の内訳'}>
-            <p className="flex justify-between"><span>予約</span><strong>{visible.length}件</strong></p>
-            <p className="flex justify-between"><span>うちLINEから</span><strong className="text-success">{lineCount}件</strong></p>
-            <p className="flex justify-between"><span>うち電話</span><strong className="text-action">{phoneCount}件</strong></p>
-            <p className="flex justify-between"><span>売上見込み</span><strong>{money(sales)}</strong></p>
+            <p className="flex justify-between"><span>予約</span><strong>{listMissing ? '—' : `${visible.length}件`}</strong></p>
+            <p className="flex justify-between"><span>うちLINEから</span><strong className="text-success">{listMissing ? '—' : `${lineCount}件`}</strong></p>
+            <p className="flex justify-between"><span>うち電話</span><strong className="text-action">{listMissing ? '—' : `${phoneCount}件`}</strong></p>
+            <p className="flex justify-between"><span>売上見込み</span><strong>{listMissing ? '—' : money(sales)}</strong></p>
           </SidePanel>
           <SidePanel title="つながる先">
             <p>→ 予約設定　メニューと受付枠</p>

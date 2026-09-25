@@ -22,6 +22,7 @@ import {
   type SavedAnalyticsSummary,
 } from '@/lib/api'
 import KpiCard from '@/components/shared/kpi-card'
+import ListState from '@/components/shared/list-state'
 import MetricValue from '@/components/ui/metric-value'
 import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
 import { useSearchParams } from 'next/navigation'
@@ -754,13 +755,14 @@ function CrossTab({ accountId, canManage }: { accountId: string; canManage: bool
   }
 
   if (fieldsError) {
+    // ★V7 `x63W5x`：ピンクの箱ではなく、一覧の場所の ListState error だけ出す。
     return (
-      <div className="text-danger bg-danger-bg border-danger rounded-card border p-8 text-center text-sm" role="alert">
-        <p>友だち情報欄を読み込めませんでした。</p>
-        <div className="mt-3 flex justify-center">
-          <Button variant="secondary" onClick={() => setFieldsReload((n) => n + 1)}>もう一度読み込む</Button>
-        </div>
-      </div>
+      <ListState
+        kind="error"
+        title="友だち情報欄を読み込めませんでした。"
+        description="通信が切れたか、サーバが応えませんでした。登録した内容は消えていません。"
+        onRetry={() => setFieldsReload((n) => n + 1)}
+      />
     )
   }
 
@@ -1374,11 +1376,10 @@ function FunnelTab({ accountId, canManage, presetConversion }: {
     }
   }, [measurable, result])
 
+  // ★V7 `x63W5x`：素の「読み込み中...」ではなく ListState loading で出す。
   if (loading) {
     return (
-      <div className="bg-canvas rounded-card border-hairline text-ink-faint border p-8 text-center text-sm">
-        読み込み中...
-      </div>
+      <ListState kind="loading" title="ファネルを読み込んでいます" />
     )
   }
 
@@ -1430,12 +1431,13 @@ function FunnelTab({ accountId, canManage, presetConversion }: {
           }}
         />
       ) : listError ? (
-        <div className="text-danger bg-danger-bg rounded-card border-danger border p-8 text-center text-sm" role="alert">
-          <p>ファネルを読み込めませんでした。</p>
-          <div className="mt-3 flex justify-center">
-            <Button variant="secondary" onClick={() => setFunnelsReload((n) => n + 1)}>もう一度読み込む</Button>
-          </div>
-        </div>
+        // ★V7 `x63W5x`：ピンクの箱ではなく、一覧の場所の ListState error だけ出す。
+        <ListState
+          kind="error"
+          title="ファネルを読み込めませんでした。"
+          description="通信が切れたか、サーバが応えませんでした。登録した内容は消えていません。"
+          onRetry={() => setFunnelsReload((n) => n + 1)}
+        />
       ) : funnels.length === 0 ? (
         <p className="text-ink-faint bg-canvas rounded-card border-hairline border p-8 text-center text-sm">
           ファネルがまだありません。段を2つ以上つないで、どこで離れているかを見られます。
@@ -2301,19 +2303,17 @@ function DateTimeMetricCell({ metric }: { metric: AnalyticsMetric<string> }) {
   </span>
 }
 
+/*
+ * ★V7 `x63W5x`：タブ全体の失敗はピンクの箱ではなく、一覧の場所の
+ * ListState error だけ出す（読み直す口つき）。文言は呼び出し側の決まった
+ * 日本語（口の生文言は出さない）。
+ */
 function OverviewState({ loading, error, onRetry }: { loading: boolean; error: string; onRetry?: () => void }) {
-  if (loading) return <div className="bg-canvas rounded-card border-hairline text-ink-faint border p-10 text-center text-sm">分析を読み込んでいます</div>
+  if (loading) return <ListState kind="loading" title="分析を読み込んでいます" />
   // 一時的な取得失敗は開き直すしかなかった。同じ条件で読み直す導線をここに出す。
   if (error) {
     return (
-      <div className="bg-danger-bg rounded-card border-danger text-danger border p-6 text-sm" role="alert">
-        {error}
-        {onRetry && (
-          <div className="mt-3">
-            <Button variant="secondary" onClick={onRetry}>もう一度読み込む</Button>
-          </div>
-        )}
-      </div>
+      <ListState kind="error" description={error} onRetry={onRetry} />
     )
   }
   return null
@@ -2767,7 +2767,8 @@ function SavedAnalyticsTab({ accountId, onCountChange, canManage }: {
       })
       .catch((caught: unknown) => {
         if (!schedulesAlive.current) return
-        setSchedulesError(caught instanceof Error ? caught.message : '定期レポートを確認できませんでした')
+        // ★V7 `x63W5x`：接続切れの英語（`Failed to fetch`）をそのまま出さない。
+        setSchedulesError(caught instanceof TypeError ? '定期レポートを確認できませんでした' : caught instanceof Error ? caught.message : '定期レポートを確認できませんでした')
       })
       .finally(() => {
         if (schedulesAlive.current) setSchedulesLoading(false)
@@ -2788,7 +2789,8 @@ function SavedAnalyticsTab({ accountId, onCountChange, canManage }: {
       })
       .catch((caught: unknown) => {
         if (!active) return
-        setSchedulesError(caught instanceof Error ? caught.message : '定期レポートを確認できませんでした')
+        // ★V7 `x63W5x`：接続切れの英語（`Failed to fetch`）をそのまま出さない。
+        setSchedulesError(caught instanceof TypeError ? '定期レポートを確認できませんでした' : caught instanceof Error ? caught.message : '定期レポートを確認できませんでした')
       })
       .finally(() => {
         if (active) setSchedulesLoading(false)
@@ -2872,11 +2874,15 @@ function SavedAnalyticsTab({ accountId, onCountChange, canManage }: {
 
   return (
     <div data-design-node="dfwD4" className="space-y-4">
+      {/*
+        ★V7 `x63W5x`：取れない KPI は「—」。失敗は「読み込めませんでした」と
+        言い分け、0（本当に0件）と混ぜない。
+      */}
       <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
-        <KpiCard title="保存した分析" value={items.length} unit="件" detail="クロス分析とファネル" loading={loading} />
-        <KpiCard title="保存した結果" value={items.reduce((sum, item) => sum + item.snapshotCount, 0)} unit="件" detail="時点ごとに固定した結果" loading={loading} />
-        <KpiCard title="定義が古いもの" value={staleCount} unit="件" detail="いまの定義でまだ集計していないもの" loading={loading} />
-        <KpiCard title="選んだ分析の履歴" value={selected ? selected.snapshotCount : null} unit="件" detail={selected?.name ?? '分析を選んでください'} loading={loading} />
+        <KpiCard title="保存した分析" value={error ? null : items.length} unit="件" detail={error ? '読み込めませんでした' : 'クロス分析とファネル'} loading={loading} />
+        <KpiCard title="保存した結果" value={error ? null : items.reduce((sum, item) => sum + item.snapshotCount, 0)} unit="件" detail={error ? '読み込めませんでした' : '時点ごとに固定した結果'} loading={loading} />
+        <KpiCard title="定義が古いもの" value={error ? null : staleCount} unit="件" detail={error ? '読み込めませんでした' : 'いまの定義でまだ集計していないもの'} loading={loading} />
+        <KpiCard title="選んだ分析の履歴" value={selected ? selected.snapshotCount : null} unit="件" detail={selected?.name ?? (error ? '読み込めませんでした' : '分析を選んでください')} loading={loading} />
       </div>
       <div className="bg-info-bg border-info rounded-card border px-4 py-3 text-sm">
         <p className="text-ink font-medium">条件の定義と集計結果を分けて保存しています</p>
@@ -2991,12 +2997,14 @@ function SavedAnalyticsTab({ accountId, onCountChange, canManage }: {
           保存した分析を読み込んでいます
         </div>
       ) : error && items.length === 0 ? (
-        <div className="bg-danger-bg rounded-card border-danger text-danger border p-6 text-sm" role="alert">
-          {error}
-          <div className="mt-3">
-            <Button variant="secondary" onClick={() => setSavedReload((n) => n + 1)}>もう一度読み込む</Button>
-          </div>
-        </div>
+        // ★V7 `x63W5x`：ピンクの箱ではなく、一覧の場所の ListState error だけ出す。
+        // 口の生文言（英語など）は出さず、日本語の決まった文で出す。
+        <ListState
+          kind="error"
+          title="保存した分析を読み込めませんでした"
+          description="通信が切れたか、サーバが応えませんでした。登録した内容は消えていません。"
+          onRetry={() => setSavedReload((n) => n + 1)}
+        />
       ) : items.length === 0 ? (
         <div className="bg-canvas rounded-card border-hairline border p-10 text-center">
           <p className="text-ink font-medium">保存した分析はまだありません</p>
@@ -3076,11 +3084,15 @@ function SavedAnalyticsTab({ accountId, onCountChange, canManage }: {
                 {selected.name} ／ 定期レポート {schedulesLoading ? '確認中' : schedulesError ? '—' : `${schedules.filter((schedule) => schedule.savedAnalysisIds.includes(selected.id)).length}件`}
               </p>
             )}
+            {/*
+              ★V7 `x63W5x`：補助のデータ（結果の履歴）だけ取れないときは、
+              その場所に小さく1行だけ。赤字・口の生文言にしない。
+            */}
             {error && items.length > 0 && (
-              <div className="text-danger mt-3 flex items-center justify-between gap-2 text-xs" role="alert">
-                <span>{error}</span>
-                <Button variant="secondary" onClick={() => setSnapshotReload((n) => n + 1)}>もう一度読み込む</Button>
-              </div>
+              <p className="text-ink-secondary mt-3 text-xs" role="alert">
+                結果の履歴を読み込めませんでした。
+                <button type="button" className="text-action ml-2 font-semibold hover:underline" onClick={() => setSnapshotReload((n) => n + 1)}>もう一度</button>
+              </p>
             )}
             {snapshotLoading ? (
               <p className="text-ink-faint mt-4 text-sm">結果を読み込んでいます</p>

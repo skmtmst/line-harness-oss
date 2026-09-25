@@ -346,7 +346,9 @@ describe('エラー面の読み直し(N-287)', () => {
     fixture.tab = 'saved'
     await render()
 
-    expect(host.textContent).toContain('接続できませんでした')
+    // ★V7 `x63W5x`：口の生文言は出さず、一覧の場所の失敗の1枚だけ出す。
+    expect(host.textContent).toContain('保存した分析を読み込めませんでした')
+    expect(host.textContent).not.toContain('接続できませんでした')
     expect(callsTo('/api/analytics/saved?')).toHaveLength(1)
 
     listOk = true

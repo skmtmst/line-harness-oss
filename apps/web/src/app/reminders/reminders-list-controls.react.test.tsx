@@ -150,3 +150,25 @@ describe('一覧の操作が実クエリへつながる (N-072)', () => {
     expect(listCalls().at(-1) ?? '').toContain('q=' + encodeURIComponent('持ち物'))
   })
 })
+
+describe('一覧もフォルダも失敗したら読み直しは1枚だけ (★V7 x63W5x)', () => {
+  it('フォルダ欄の小さい読み直しは出さず、一覧の失敗の1枚だけ出す', async () => {
+    fetchApi.mockImplementation(async (url: string) => {
+      calls.push(url)
+      if (url.startsWith('/api/folders')) return { success: false, error: '失敗' }
+      if (url.startsWith('/api/reminders?')) return { success: false, error: '失敗' }
+      return { success: true, data: { items: [], total: 0, limit: 20, sort: [] } }
+    })
+    await act(async () => { root.render(<RemindersPage />) })
+    for (let i = 0; i < 30; i++) {
+      await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)) })
+      if (host.textContent?.includes('表示できませんでした')) break
+    }
+    expect(host.textContent ?? '').toContain('表示できませんでした')
+    // 一覧本体も失敗しているときは一覧の1枚へまとめ、フォルダ欄は出さない。
+    expect(host.textContent ?? '').not.toContain('フォルダを読み込めませんでした')
+    const fullRetries = Array.from(host.querySelectorAll('button'))
+      .filter((button) => button.textContent?.trim() === 'もう一度読み込む')
+    expect(fullRetries).toHaveLength(1)
+  })
+})

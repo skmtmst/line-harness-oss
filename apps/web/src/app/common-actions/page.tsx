@@ -116,14 +116,15 @@ export default function CommonActionsPage() {
     failures: summary?.failures ?? 0,
   }), [summary])
 
-  const filterCount = (value: Filter): number => {
-    if (!summary) return 0
+  // ★V7 `x63W5x`：集計が取れていない間、絞り込みの件数に 0 を出さない。
+  const filterCount = (value: Filter): number | undefined => {
+    if (!summary || error) return undefined
     if (value === 'all') return summary.total
     if (value === 'old_version') return summary.oldVersion
     if (value === 'unused') return summary.unused
     if (value === 'published') return summary.published
     if (value === 'draft') return summary.draft
-    return 0
+    return undefined
   }
 
   const duplicate = async (item: CommonActionSummary) => {
@@ -184,11 +185,15 @@ export default function CommonActionsPage() {
       ]} className="mb-4" />
       </div>
 
+      {/*
+        ★V7 `x63W5x`：取れない KPI は「—」。読み込み中は「読み込んでいます」、
+        失敗は「読み込めませんでした」と言い分け、0 と混ぜない。
+      */}
       <div className="mb-4 grid grid-cols-2 gap-3 xl:grid-cols-4">
-        <SummaryCard variant="v6" title="共通アクション" value={loading ? null : (summary?.total ?? 0)} unit="" detail={loading ? '' : `うち公開中 ${totals.published}`} loading={loading} />
-        <SummaryCard variant="v6" title="呼び出し元" value={loading ? null : totals.bindings} unit="" detail="5機能から" loading={loading} />
-        <SummaryCard variant="v6" title="今月 動いた回数" value={loading ? null : totals.executions} unit="" detail={loading ? '' : `失敗 ${totals.failures}`} loading={loading} />
-        <SummaryCard variant="v6" title="古い版のまま" value={loading ? null : totals.outdatedItems} unit="" detail={loading ? '' : `呼び出し元 ${totals.outdated}か所`} loading={loading} badge={totals.outdatedItems > 0 ? '要確認' : undefined} badgeTone="warning" />
+        <SummaryCard variant="v6" title="共通アクション" value={loading || error ? null : (summary?.total ?? 0)} unit="" detail={error ? '読み込めませんでした' : loading ? '読み込んでいます' : `うち公開中 ${totals.published}`} loading={loading} />
+        <SummaryCard variant="v6" title="呼び出し元" value={loading || error ? null : totals.bindings} unit="" detail={error ? '読み込めませんでした' : loading ? '読み込んでいます' : '5機能から'} loading={loading} />
+        <SummaryCard variant="v6" title="今月 動いた回数" value={loading || error ? null : totals.executions} unit="" detail={error ? '読み込めませんでした' : loading ? '読み込んでいます' : `失敗 ${totals.failures}`} loading={loading} />
+        <SummaryCard variant="v6" title="古い版のまま" value={loading || error ? null : totals.outdatedItems} unit="" detail={error ? '読み込めませんでした' : loading ? '読み込んでいます' : `呼び出し元 ${totals.outdated}か所`} loading={loading} badge={!error && totals.outdatedItems > 0 ? '要確認' : undefined} badgeTone="warning" />
       </div>
 
       <NoteBar>
@@ -224,13 +229,15 @@ export default function CommonActionsPage() {
               : 'border-hairline text-ink-secondary rounded-pill border bg-canvas px-3 py-1.5 text-xs'}
           >
             <input className="sr-only" type="radio" name="common-action-filter" value={option.value} checked={filter === option.value} onChange={() => { setFilter(option.value); setPage(1) }} />
-            {option.label} {filterCount(option.value)}
+            {option.label}{(() => { const count = filterCount(option.value); return count == null ? '' : ` ${count}` })()}
           </label>
         ))}
       </div>
 
       {error ? (
-        <ListState kind="error" title="共通アクションを読み込めませんでした" description={error} onRetry={() => void load()} />
+        // ★V7 `x63W5x`：口の文言（英語の `Failed to fetch` など）をそのまま
+        // 出さない。日本語の決まった文で出す。
+        <ListState kind="error" title="共通アクションを読み込めませんでした" description="通信が切れたか、サーバが応えませんでした。登録した内容は消えていません。" onRetry={() => void load()} />
       ) : loading ? (
         <ListState kind="loading" title="共通アクションを読み込んでいます" />
       ) : items.length === 0 ? (

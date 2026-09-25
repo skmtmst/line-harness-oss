@@ -33,9 +33,11 @@ describe('V6 外部連携の運用者向け文言', () => {
   })
 
   it('取得失敗を0件や空と表示しない', () => {
-    expect(OVERVIEWS.match(/status === 'error'/g)).toHaveLength(2)
+    // 失敗の枝は2つ（送る・受け取る）。件数（KPI）の「—」判定ぶん1つ増えた。
+    expect(OVERVIEWS.match(/status === 'error'/g)).toHaveLength(3)
     expect(OVERVIEWS.match(/登録内容は消えていません。/g)).toHaveLength(2)
-    expect(OVERVIEWS).toContain('こちらで受け取る設定を再読み込み')
-    expect(OVERVIEWS).toContain('もう一度読み込む')
+    // ★V7 `x63W5x`：古い個別ボタンではなく共通の再読み込み口（`onRetry`）。
+    // ボタンの文言は共通部品（ListState）が持つ。ここでは口があることだけ見る。
+    expect(OVERVIEWS).toContain('onRetry={onReload}')
   })
 })

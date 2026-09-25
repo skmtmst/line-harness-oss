@@ -1,8 +1,7 @@
 import React from 'react'
 import type { ReactNode } from 'react'
-import { Inbox, Loader, Lock, TriangleAlert } from 'lucide-react'
-import Button from './button'
-import { STATE_TEXT } from './not-connected'
+import { Inbox, Loader, Lock } from 'lucide-react'
+import TargetMissing from './target-missing'
 import styles from './list-state.module.css'
 
 /**
@@ -25,11 +24,17 @@ import styles from './list-state.module.css'
 export type ListStateKind = 'loading' | 'empty' | 'error' | 'forbidden'
 export type EmptyListPreset = 'createable' | 'readonly'
 
-/** 設計 `hqTfD` / `u2ArlH` / `ZAkSe`。24px の線画。 */
-const ICONS: Record<ListStateKind, typeof Inbox> = {
+/**
+ * 設計 `hqTfD` / `u2ArlH`。24px の線画。
+ *
+ * `error` はここに無い。★V7 `x63W5x` の決まりで、失敗の1枚は
+ * TargetMissing の error と同じ中立の見た目（canvas-sunken の丸＋
+ * cloud-off、見出し ink 15px 太字、副ボタン「もう一度読み込む」1つ）に
+ * する。赤い三角・赤い見出しはやめた（利用者の失敗ではないため）。
+ */
+const ICONS: Record<Exclude<ListStateKind, 'error'>, typeof Inbox> = {
   loading: Loader,
   empty: Inbox,
-  error: TriangleAlert,
   forbidden: Lock,
 }
 
@@ -78,38 +83,46 @@ export default function ListState({
   className?: string
 }) {
   const preset = kind === 'empty' ? EMPTY_PRESETS[emptyPreset] : PRESETS[kind]
-  const danger = kind === 'error'
+
+  // 失敗の1枚は TargetMissing の error と同じ中身を使う（★V7 `x63W5x`）。
+  // 見た目が2か所でずれないように、ここで組み立て直さない。
+  // className は付けない（見た目は TargetMissing が持つ。余白は親で付ける）。
+  if (kind === 'error') {
+    return (
+      <div data-list-state="error" role="alert">
+        <TargetMissing
+          kind="error"
+          title={title ?? preset.title}
+          description={description ?? preset.description}
+          onRetry={onRetry}
+          retrying={retrying}
+        />
+        {action}
+      </div>
+    )
+  }
+
   const Icon = ICONS[kind]
 
   // className は先に組む。JSX の中で足すと、直書きを数える仕掛け
   // （`scripts/design-debt.mjs`）から中身が見えなくなる。
   const rootClass = [styles.root, className].filter(Boolean).join(' ')
-  const iconClass = [styles.icon, danger && styles.iconDanger, kind === 'loading' && styles.spin]
+  const iconClass = [styles.icon, kind === 'loading' && styles.spin]
     .filter(Boolean)
     .join(' ')
-  const titleClass = [styles.title, danger && styles.titleDanger].filter(Boolean).join(' ')
 
   return (
     <div
       className={rootClass}
       data-list-state={kind}
-      // 読み込み中は読み上げにも伝える。エラーと権限不足はその場で読ませる。
+      // 読み込み中は読み上げにも伝える。権限不足はその場で読ませる。
       aria-busy={kind === 'loading' || undefined}
-      role={danger || kind === 'forbidden' ? 'alert' : undefined}
+      role={kind === 'forbidden' ? 'alert' : undefined}
     >
       <Icon aria-hidden="true" size={24} className={iconClass} />
-      <p className={titleClass}>{title ?? preset.title}</p>
+      <p className={styles.title}>{title ?? preset.title}</p>
       <p className={styles.description}>{description ?? preset.description}</p>
-      {(danger && onRetry) || action ? (
-        <div className={styles.action}>
-          {danger && onRetry ? (
-            <Button type="button" onClick={onRetry} disabled={retrying}>
-              {retrying ? STATE_TEXT.loading : STATE_TEXT.retry}
-            </Button>
-          ) : null}
-          {action}
-        </div>
-      ) : null}
+      {action ? <div className={styles.action}>{action}</div> : null}
     </div>
   )
 }
