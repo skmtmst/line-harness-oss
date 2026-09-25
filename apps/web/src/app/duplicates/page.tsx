@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Button from '@/components/shared/button'
 import KpiCard from '@/components/shared/kpi-card'
+import ListState from '@/components/shared/list-state'
 import Pagination from '@/components/shared/pagination'
 import Select from '@/components/shared/select'
 import { TableHeadRow, Th } from '@/components/shared/table'
@@ -198,27 +199,34 @@ export default function DuplicatesPage() {
         <p className="mt-1 text-xs leading-5 text-ink-secondary">確定済みID・連携UID・メール／電話の一致は強い根拠、プロフィール画像や名前だけの一致は候補として表示します。確認後も元のLINE友だちデータは残ります。</p>
       </section>
 
+      {/*
+        ★V7 `x63W5x`：ページ全体の失敗はピンクの箱ではなく、一覧の場所の
+        ListState error だけ出す（読み直す口つき）。素の16進・Tailwind赤もやめる。
+      */}
       {loading && !data ? (
-        <div className="rounded-[14px] border border-[#DADDE2] bg-white p-8 text-center text-[#565F59] shadow-card">
-          読み込んでいます
-        </div>
+        <ListState kind="loading" title="重複候補を読み込んでいます" />
       ) : !data ? (
-        <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-          <p>読み込めませんでした</p>
-          <div className="mt-2">
-            <Button variant="secondary" onClick={() => load()}>再読み込み</Button>
-          </div>
-        </div>
+        <ListState
+          kind="error"
+          title="読み込めませんでした"
+          description="通信が切れたか、サーバが応えませんでした。登録した内容は消えていません。"
+          onRetry={() => load()}
+        />
       ) : (
         <>
           {/* When a refresh fails but we still have a previous snapshot, show
               the error inline above the data instead of replacing the whole
               page — losing the dashboard for a transient 500 is worse than
               showing slightly stale numbers with a warning. */}
+          {/*
+            ★V7 `x63W5x`：補助の失敗（取り直しだけ落ちた）は、その場所に
+            小さく1行だけ。素の Tailwind 黄色はやめ、読み直す口をつける。
+          */}
           {error && (
-            <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+            <p className="text-ink-secondary text-xs" role="status">
               再計算できませんでした。表示中の数字は前回の集計です。
-            </div>
+              <button type="button" className="text-action ml-2 font-semibold hover:underline" onClick={() => load()}>もう一度</button>
+            </p>
           )}
           {/*
             #1005: 独自カードをやめて共通 KpiCard の3段（見出し・数値・短い状態）に
@@ -333,8 +341,12 @@ export default function DuplicatesPage() {
             <div className="flex flex-wrap items-center justify-between gap-2 border-t border-hairline px-4 py-3 text-xs text-ink-faint">
               {/* FRIEND-12: 応待ちは「更新中」と明示し、前の条件の結果と誤認させない。 */}
               {candidatesLoading ? <span>更新中…</span> : null}
+              {/*
+                ★V7 `x63W5x`：同じ失敗を1画面に1つへ。表の中の TableStateRow error
+                が出すので、件数の文と重ねない。
+              */}
               {candidateError ? (
-                <span>{candidateError}</span>
+                <span>—</span>
               ) : candidateTotal === 0 && !candidatesLoading ? (
                 '0組'
               ) : candidates.length === 0 && !candidatesLoading ? (

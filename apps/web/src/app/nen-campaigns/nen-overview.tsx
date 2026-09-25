@@ -187,14 +187,17 @@ function TestRecipientPicker({ friends, value, onChange, accountId }: {
   return <Select aria-label="テスト送信先" value={value} onChange={onChange} options={friends.map((friend) => ({ value: friend.id, label: friend.displayName || '名前未取得' }))} />
 }
 
-function Kpis({ kpis, loading }: { kpis: NenKpis | null; loading: boolean }) {
+function Kpis({ kpis, loading, failed }: { kpis: NenKpis | null; loading: boolean; failed: boolean }) {
   const month = kpis?.monthLabel ?? '今月'
+  // ★V7 `x63W5x`：取れない KPI は「—」。読み込み中は「読み込んでいます」、
+  // 失敗は「読み込めませんでした」と言い分け、0 と混ぜない。
+  const missingDetail = failed ? '読み込めませんでした' : loading ? '読み込んでいます' : '—'
   return (
     <KpiCollapse data-design="KPIs" data-design-node="nen-kpis" gridClassName="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-      <SummaryCard variant="v6" title={`${month} 送った数`} value={kpis?.sentThisMonth ?? null} unit="通" detail={kpis ? `先月 ${num(kpis.sentLastMonth)}通` : '—'} loading={loading} />
-      <SummaryCard variant="v6" title="開封" value={null} unit="%" valueText={kpis?.openRate == null ? '—' : `${kpis.openRate}%`} detail="コラムを開いた割合" description="自動配信はLINEから個人開封を取得できません。" loading={loading} />
-      <SummaryCard variant="v6" title="配信からの注文" value={kpis?.orders ?? null} unit="件" detail={kpis?.orderAmount == null ? '送信後7日以内の注文' : `¥${num(kpis.orderAmount)}（送信後7日以内）`} loading={loading} />
-      <SummaryCard variant="v6" title="届かなかった" value={kpis?.undelivered ?? null} unit="通" detail={kpis ? `友だち解除 ${num(kpis.unfollowed)}・ブロック ${num(kpis.blocked)}` : '友だち解除・ブロック'} loading={loading} />
+      <SummaryCard variant="v6" title={`${month} 送った数`} value={kpis?.sentThisMonth ?? null} unit="通" detail={kpis ? `先月 ${num(kpis.sentLastMonth)}通` : missingDetail} loading={loading} />
+      <SummaryCard variant="v6" title="開封" value={null} unit="%" valueText={kpis?.openRate == null ? '—' : `${kpis.openRate}%`} detail={kpis ? 'コラムを開いた割合' : missingDetail} description="自動配信はLINEから個人開封を取得できません。" loading={loading} />
+      <SummaryCard variant="v6" title="配信からの注文" value={kpis?.orders ?? null} unit="件" detail={kpis?.orderAmount == null ? (kpis ? '送信後7日以内の注文' : missingDetail) : `¥${num(kpis.orderAmount)}（送信後7日以内）`} loading={loading} />
+      <SummaryCard variant="v6" title="届かなかった" value={kpis?.undelivered ?? null} unit="通" detail={kpis ? `友だち解除 ${num(kpis.unfollowed)}・ブロック ${num(kpis.blocked)}` : failed || loading ? missingDetail : '友だち解除・ブロック'} loading={loading} />
     </KpiCollapse>
   )
 }
@@ -218,6 +221,12 @@ export type NenOverviewProps = {
   /** 選択中の LINE アカウント。テスト送信先の登録画面へ案内するために使う。 */
   accountId: string | null
   loading: boolean
+  /** 今のタブの取得失敗（★V7 `x63W5x`：帯ではなく一覧の場所の1枚で出す）。 */
+  tabError?: string
+  /** 今のタブの取り直し。無いときは読み直す口を出さない。 */
+  onRetryTab?: () => void
+  /** 件数（KPI）も一緒に取れなかった。 */
+  kpisFailed?: boolean
   notice: { tone: 'success' | 'error'; text: string } | null
   // 自動配信・停止中
   saving: string | null
@@ -269,6 +278,9 @@ export function NenOverview({
   onTestFriendChange,
   accountId,
   loading,
+  tabError = '',
+  onRetryTab,
+  kpisFailed = false,
   notice,
   saving,
   testing,
@@ -317,15 +329,16 @@ export function NenOverview({
       </div>
       <div data-design="Tabs" data-design-node="nen-tabs">
         <Tabs
+          // ★V7 `x63W5x`：取れていないタブの件数に 0 を出さない。
           items={[
-            { label: '自動配信', count: autoSettings.length, current: tab === 'auto', onClick: () => onTabChange('auto') },
-            { label: 'コラム', count: columns.length, current: tab === 'columns', onClick: () => onTabChange('columns') },
+            { label: '自動配信', count: tabError ? undefined : autoSettings.length, current: tab === 'auto', onClick: () => onTabChange('auto') },
+            { label: 'コラム', count: tabError ? undefined : columns.length, current: tab === 'columns', onClick: () => onTabChange('columns') },
             { label: '送った履歴', current: tab === 'history', onClick: () => onTabChange('history') },
-            { label: '停止中', count: pausedSettings.length, current: tab === 'paused', onClick: () => onTabChange('paused') },
+            { label: '停止中', count: tabError ? undefined : pausedSettings.length, current: tab === 'paused', onClick: () => onTabChange('paused') },
           ]}
         />
       </div>
-      <Kpis kpis={kpis} loading={loading && kpis === null} />
+      <Kpis kpis={kpis} loading={loading && kpis === null} failed={kpisFailed} />
       {notice && tab !== 'columns' ? <NoteBar tone={notice.tone === 'success' ? 'info' : 'danger'}>{notice.text}</NoteBar> : null}
       {tab === 'auto' || tab === 'paused' ? (
         <AutoPanel
@@ -340,6 +353,8 @@ export function NenOverview({
           onTestSend={onTestSend}
           onEditCoupon={() => onCouponOpenChange(true)}
           testFriendId={testFriendId}
+          tabError={tabError}
+          onRetryTab={onRetryTab}
         />
       ) : null}
       {tab === 'columns' ? (
@@ -371,10 +386,12 @@ export function NenOverview({
           accountId={accountId}
           testing={testing}
           notice={notice}
+          tabError={tabError}
+          onRetryTab={onRetryTab}
         />
       ) : null}
       {tab === 'history' ? (
-        <HistoryPanel deliveryList={deliveryList} detail={deliveryDetail} loading={loading} onShowDetail={onShowDelivery} onRetry={onRetryDelivery} onChangeView={onChangeDeliveryView} />
+        <HistoryPanel deliveryList={deliveryList} detail={deliveryDetail} loading={loading} onShowDetail={onShowDelivery} onRetry={onRetryDelivery} onChangeView={onChangeDeliveryView} tabError={tabError} onRetryTab={onRetryTab} />
       ) : null}
 
       <Drawer
@@ -419,6 +436,8 @@ function AutoPanel({
   onTestSend,
   onEditCoupon,
   testFriendId,
+  tabError = '',
+  onRetryTab,
 }: {
   settings: NenCampaignSetting[]
   pausedOnly: boolean
@@ -431,6 +450,10 @@ function AutoPanel({
   onTestSend: (setting: NenCampaignSetting) => void
   onEditCoupon: () => void
   testFriendId: string
+  /** 自動配信の取得失敗（★V7 `x63W5x`：一覧の場所の1枚で出す）。 */
+  tabError?: string
+  /** 自動配信の取り直し。 */
+  onRetryTab?: () => void
 }) {
   const [search, setSearch] = useState('')
   const [trigger, setTrigger] = useState('')
@@ -506,6 +529,15 @@ function AutoPanel({
       <section data-design="Table" data-design-node="nen-auto-table">
         {loading && settings.length === 0 ? (
           <ListState kind="loading" title="配信を読み込んでいます" />
+        ) : tabError ? (
+          // ★V7 `x63W5x`：失敗を「まだありません」と言わない。
+          // 空の案内は出さず、一覧の場所の1枚だけ出す。
+          <ListState
+            kind="error"
+            title="配信を読み込めませんでした"
+            description="通信が切れたか、サーバが応えませんでした。登録した内容は消えていません。"
+            onRetry={onRetryTab}
+          />
         ) : settings.length === 0 ? (
           pausedOnly
             ? <ListState kind="empty" emptyPreset="readonly" title="止めている配信はありません" description="すべての自動配信が動いています。" />
@@ -688,6 +720,8 @@ function ColumnsPanel({
   accountId,
   testing,
   notice,
+  tabError = '',
+  onRetryTab,
 }: {
   columns: NenColumn[]
   /** 口が返す全体件数。一覧より多いとき打ち切りを示す（#935 N-300）。 */
@@ -718,6 +752,10 @@ function ColumnsPanel({
   accountId: string | null
   testing: string | null
   notice: { tone: 'success' | 'error'; text: string } | null
+  /** コラムの取得失敗（★V7 `x63W5x`：一覧の場所の1枚で出す）。 */
+  tabError?: string
+  /** コラムの取り直し。 */
+  onRetryTab?: () => void
 }) {
   const [search, setSearch] = useState('')
   const [category, setCategory] = useState('')
@@ -798,6 +836,14 @@ function ColumnsPanel({
           <section data-design="Table" data-design-node="nen-columns-table">
             {loading && columns.length === 0 ? (
               <ListState kind="loading" title="コラムを読み込んでいます" />
+            ) : tabError ? (
+              // ★V7 `x63W5x`：失敗を「まだありません」と言わない。
+              <ListState
+                kind="error"
+                title="コラムを読み込めませんでした"
+                description="通信が切れたか、サーバが応えませんでした。登録した内容は消えていません。"
+                onRetry={onRetryTab}
+              />
             ) : columns.length === 0 ? (
               <ListState kind="empty" title="まだコラムがありません" description="ECサイトでジャーナルを公開すると、ここに届きます。売らない配信です。ここで信用がたまると、売る配信が届きやすくなります。" action={<Button href="/nen-campaigns/columns/new" variant="primary">コラムを書く</Button>} />
             ) : shown.length === 0 ? (
@@ -970,13 +1016,17 @@ function ColumnsPanel({
 
 type HistoryFilter = 'all' | 'sent' | 'pending' | 'failed' | 'skipped'
 
-function HistoryPanel({ deliveryList, detail, loading, onShowDetail, onRetry, onChangeView }: {
+function HistoryPanel({ deliveryList, detail, loading, onShowDetail, onRetry, onChangeView, tabError = '', onRetryTab }: {
   deliveryList: NenDeliveryList | null
   detail: NenDeliveryDetail | null
   loading: boolean
   onShowDetail: (id: string) => void
   onRetry: (id: string, version: number, reason: string) => void
   onChangeView: (status?: string, cursor?: string, q?: string) => void
+  /** 履歴の取得失敗（★V7 `x63W5x`：一覧の場所の1枚で出す）。 */
+  tabError?: string
+  /** 履歴の取り直し。 */
+  onRetryTab?: () => void
 }) {
   const [draft, setDraft] = useState('')
   // 確定した検索語。絞り込みチップやページ送りにも引き継ぐ（入力途中の文字は渡さない）。
@@ -1039,6 +1089,14 @@ function HistoryPanel({ deliveryList, detail, loading, onShowDetail, onRetry, on
       <section data-design="Table" data-design-node="nen-history-table">
         {loading && !deliveryList ? (
           <ListState kind="loading" title="送った履歴を読み込んでいます" />
+        ) : tabError ? (
+          // ★V7 `x63W5x`：失敗を「まだありません」と言わない。
+          <ListState
+            kind="error"
+            title="送った履歴を読み込めませんでした"
+            description="通信が切れたか、サーバが応えませんでした。登録した内容は消えていません。"
+            onRetry={onRetryTab}
+          />
         ) : shown.length === 0 ? (
           filter !== 'all' || appliedQuery ? (
             <ListState

@@ -1161,7 +1161,7 @@ describe('#678 実DOMへマウントした画面全体', () => {
     expect(screen.getByText('運用者へのお知らせ 0')).toBeTruthy()
   })
 
-  it('403: 顧客のお知らせは「表示する権限がありません」を出し、再読み込みは出さない', async () => {
+  it('403: 顧客のお知らせは「表示する権限がありません」を出し、読み直す口は出さない', async () => {
     fixture.settings.mockRejectedValue(new ApiError(403))
     fixture.overview.mockResolvedValue({ success: true, data: { last24h: 0, failed: 0, byType: [] } })
     fixture.operatorList.mockResolvedValue({ success: true, data: { summary: { total: 0 } } })
@@ -1169,10 +1169,10 @@ describe('#678 実DOMへマウントした画面全体', () => {
     render(<LineNotificationsPage />)
 
     await waitFor(() => expect(screen.getByText('表示する権限がありません')).toBeTruthy())
-    expect(screen.queryByRole('button', { name: '再読み込み' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'もう一度読み込む' })).toBeNull()
   })
 
-  it('500: 「表示できませんでした」を出し、実物の再読み込みボタンを押すと実物のfetchをやり直して復旧する', async () => {
+  it('500: 「表示できませんでした」を出し、実物の読み直すボタンを押すと実物のfetchをやり直して復旧する', async () => {
     fixture.settings.mockRejectedValueOnce(new Error('internal error'))
     fixture.overview.mockResolvedValue({ success: true, data: { last24h: 0, failed: 0, byType: [] } })
     fixture.operatorList.mockResolvedValue({ success: true, data: { summary: { total: 0 } } })
@@ -1183,8 +1183,9 @@ describe('#678 実DOMへマウントした画面全体', () => {
     expect(fixture.settings).toHaveBeenCalledTimes(1)
 
     // 2回目からは成功する応答へ差し替えてから、実物のボタンを押す。
+    // ★V7 `x63W5x`：失敗の1枚の副ボタンは「もう一度読み込む」1つ。
     fixture.settings.mockResolvedValueOnce({ success: true, data: [setting()] })
-    fireEvent.click(screen.getByRole('button', { name: '再読み込み' }))
+    fireEvent.click(screen.getByRole('button', { name: 'もう一度読み込む' }))
 
     await waitFor(() => expect(screen.getByText('注文を受け付けました')).toBeTruthy())
     expect(fixture.settings).toHaveBeenCalledTimes(2)

@@ -35,14 +35,17 @@ export default function OpsTenantsPage() {
   const [filter, setFilter] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  // ★V7：一覧の失敗は一覧の場所の1枚で出す。操作の知らせと混ぜない。
+  const [listFailed, setListFailed] = useState(false)
   const [creating, setCreating] = useState(false)
   const [newName, setNewName] = useState('')
   const [busyId, setBusyId] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     setError('')
+    setListFailed(false)
     const res = await opsCall(api.ops.tenants({ q: q.trim() || undefined }))
-    if (!res.success) { setError(res.error || '読み込めませんでした'); return }
+    if (!res.success) { setError(res.error || '読み込めませんでした'); setListFailed(true); return }
     setRows(res.data)
     setSummary(res.summary)
   }, [q])
@@ -142,7 +145,10 @@ export default function OpsTenantsPage() {
         <NoteBar tone="info">契約先を選ぶと詳細が開きます。代理ログインは既定で閲覧のみです。</NoteBar>
       </div>
 
-      {error ? <p role="alert" className="mb-3 text-caption text-status-danger">{error}</p> : null}
+      {/*
+        ★V7：一覧の失敗は一覧の場所の1枚で出すので、ここでは操作の知らせだけ出す。
+      */}
+      {error && !listFailed ? <p role="alert" className="mb-3 text-caption text-status-danger">{error}</p> : null}
 
       {loading ? (
         <ListState kind="loading" title="契約先を読み込んでいます" />

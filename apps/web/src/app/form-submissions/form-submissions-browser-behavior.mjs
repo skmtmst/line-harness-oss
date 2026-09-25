@@ -508,7 +508,7 @@ try {
     const { context, page } = await openHarness(browser, { fail: true })
     await openList(page)
     await page.getByText('表示できませんでした', { exact: true }).waitFor()
-    assert.equal(await page.getByRole('button', { name: '再読み込み' }).count(), 1)
+    assert.equal(await page.getByRole('button', { name: 'もう一度読み込む' }).count(), 1)
     assert.equal(await page.getByText('まだフォームがありません', { exact: true }).count(), 0, '失敗を0件と言わない')
     await context.close()
   }

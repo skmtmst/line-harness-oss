@@ -12,8 +12,12 @@ describe('V6 一斉配信詳細の契約', () => {
     expect(PAGE).not.toContain('配信内容の別画面は準備中です')
   })
 
-  it('配信が読めるまでは内容への操作を押せない', () => {
-    expect(PAGE).toContain('disabled={!broadcast}')
+  it('配信が読めるまでは押せないバーだけを出さない', () => {
+    // ★V7 `x63W5x`：読み込み中は押せないボタンだけのバーを出さない。
+    // 配信が読めてから StickyBar を出す。
+    expect(PAGE).not.toContain('disabled={!broadcast}')
+    expect(PAGE).toContain('{broadcast ? (')
+    expect(PAGE).toContain('CSVで書き出す')
   })
 
   it('取得失敗を配信なしと混ぜず、同じ画面で再読込できる', () => {

@@ -105,7 +105,10 @@ describe('#634 予約管理の空き枠・一覧の再読み込み', () => {
 
     render(<BookingsPage />)
 
-    await waitFor(() => expect(screen.getByText('一覧down')).toBeTruthy())
+    // ★V7 `x63W5x`：口の生文言は出さず、一覧の場所の失敗の1枚だけ出す。
+    await waitFor(() => expect(screen.getByText('予約を読み込めませんでした')).toBeTruthy())
+    expect(screen.queryByText('一覧down')).toBeNull()
+    expect(screen.queryByText('まだ予約はありません')).toBeNull()
     const retries = screen.getAllByRole('button', { name: 'もう一度読み込む' })
     expect(retries.length).toBeGreaterThan(0)
 
