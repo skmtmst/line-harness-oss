@@ -158,6 +158,11 @@ export function audienceSummary(
       const name = scenarioName(scenarioId)
       return name ? `シナリオ：${name}` : 'シナリオ（削除済み）'
     }
+    if (rule.type === 'broadcast_link_clicked') {
+      // 追送で来る条件。配信の名前までは引けないので「この配信」と出す。
+      const clicked = (rule.value as { clicked?: boolean } | null)?.clicked === true
+      return clicked ? 'この配信のリンクを押した人' : 'この配信のリンクを押していない人'
+    }
   }
 
   const count = rules.length + groups.reduce((n, g) => n + (g.rules?.length ?? 0), 0)
