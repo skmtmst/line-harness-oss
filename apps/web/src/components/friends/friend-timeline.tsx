@@ -25,10 +25,9 @@ interface MessageLog {
   createdAt: string
 }
 
-/** 絞り込み。★は印の仕組みがまだ無いので押せない形で置く。 */
+/** 絞り込み。「出す＝使える」の決まりで、押せないものは並べない。 */
 const FILTERS = [
   { key: 'all', label: '全件' },
-  { key: 'starred', label: '★のみ', disabled: true },
   { key: 'incoming', label: '受信' },
   { key: 'outgoing', label: '送信' },
   { key: 'system', label: 'システム通知' },
@@ -156,15 +155,11 @@ export default function FriendTimeline({ friendId }: { friendId: string }) {
           <button
             key={f.key}
             type="button"
-            disabled={'disabled' in f && f.disabled}
-            title={'disabled' in f && f.disabled ? '印を付ける仕組みは準備中です' : undefined}
             onClick={() => setFilter(f.key)}
             className={`rounded-pill px-3 py-1 text-xs font-medium transition-colors ${
-              'disabled' in f && f.disabled
-                ? 'text-ink-faint opacity-50'
-                : filter === f.key
-                  ? 'bg-accent-soft text-accent-deep'
-                  : 'text-ink-secondary hover:bg-canvas-sunken'
+              filter === f.key
+                ? 'bg-accent-soft text-accent-deep'
+                : 'text-ink-secondary hover:bg-canvas-sunken'
             }`}
           >
             {f.label}
