@@ -1017,7 +1017,8 @@ export default function TagsPageV4({
                     <th className="w-[17%] whitespace-nowrap px-3 py-3 text-left" title="マイル・アクションとの連動">連動</th>
                     <th className="px-3 py-3 text-left">使用先</th>
                     <th className="w-[6%] px-3 py-3 text-left">表示</th>
-                    <th className="w-[6%] px-3 py-3 text-left">操作</th>
+                    {/* #768: 表が横に流れる帯でも操作列は右端に留める。 */}
+                    <th className="bg-canvas-sunken sticky right-0 w-[6%] px-3 py-3 text-left">操作</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-hairline">
@@ -1043,7 +1044,7 @@ export default function TagsPageV4({
                     const group = groups.find((item) => item.id === tag.groupId)
                     const chips = linkChips(tag)
                     return (
-                      <tr key={tag.id} className="hover:bg-canvas-sunken">
+                      <tr key={tag.id} className="group hover:bg-canvas-sunken">
                         {/*
                           並び替えのつまみ。設計 `i1Xb2V` は**常に出す**。
                           「並び替え」ボタンで出し入れしない。押す前は
@@ -1102,7 +1103,7 @@ export default function TagsPageV4({
                             <StarIcon filled={Boolean(tag.isStarred)} />
                           </button>
                         </td>
-                        <td className="px-3 py-3">
+                        <td className="bg-canvas group-hover:bg-canvas-sunken sticky right-0 px-3 py-3">
                           {/* 設計 `E2NC4`。赤いゴミ箱だけ。文字の「削除」は置かない。 */}
                           <button type="button" onClick={() => setDeleteTarget(tag)} aria-label={`${tag.name} を削除`} className="text-danger hover:opacity-70">
                             <TrashIcon />
