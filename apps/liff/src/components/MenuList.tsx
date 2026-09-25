@@ -1,16 +1,27 @@
 import { useEffect, useState } from 'react';
 import { api, type MenuItem } from '../lib/api.js';
+import { logFailure } from '../lib/user-message.js';
+import LoadErrorView from './LoadErrorView.js';
+import LoadingView from './LoadingView.js';
 
 export default function MenuList({ onSelect }: { onSelect: (m: MenuItem) => void }) {
   const [menus, setMenus] = useState<MenuItem[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
-    api.menus().then((r) => setMenus(r.menus)).catch((e) => setError(String(e)));
-  }, []);
+    setFailed(false);
+    api
+      .menus()
+      .then((r) => setMenus(r.menus))
+      .catch((e) => {
+        logFailure('menus', e);
+        setFailed(true);
+      });
+  }, [reloadKey]);
 
-  if (error) return <p className="text-red-600">{error}</p>;
-  if (!menus) return <div className="text-gray-500">読み込み中...</div>;
+  if (failed) return <LoadErrorView onRetry={() => setReloadKey((k) => k + 1)} />;
+  if (!menus) return <LoadingView />;
 
   const grouped = new Map<string, MenuItem[]>();
   for (const m of menus) {
