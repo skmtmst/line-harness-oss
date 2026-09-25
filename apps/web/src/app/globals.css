@@ -723,6 +723,66 @@ select:not([multiple]):not(.appearance-none) {
   }
 }
 
+/*
+ * フォルダ欄と表が横に並ぶ帯（1024〜1439px）: フォルダ欄を252pxから200pxへ
+ * 畳み、横の表へ幅を譲る。ページが `style={FOLDER_RAIL_STYLE}` で変数を
+ * インライン指定しているため、ここは属性セレクタ＋importantで上書きする。
+ * フォルダ名は長いとき省略表示＋titleで全文を読める。
+ * 1440px以上では表の幅に余裕があるので252pxに戻る。
+ */
+@media (min-width: 1024px) and (max-width: 1439.98px) {
+  [style*="--folder-rail-width"] {
+    --folder-rail-width: 12.5rem !important;
+  }
+}
+
+/*
+ * 谷間帯の列削減（コンテナクエリ）。表を包む要素に Tailwind の
+ * `@container`（container-type: inline-size）が付いている前提で、
+ * 表の実際の幅が足りない間だけ低優先列を畳む。
+ *
+ * なぜ目印クラスか: 共有部品（shared/table の Th・Td など）のCSSは
+ * カスケードレイヤーの外にあり Tailwind の hidden/table-cell に勝つため、
+ * 部品へ `hidden` を渡しても無視される（design-debt契約でゼロ許容）。
+ * そのため表示の切り替えはここの unlayered ルールで行う。
+ * 数字は「このピクセル未満で畳む」コンテナ幅。
+ */
+@container (max-width: 799.98px) {
+  .cq-hide-below-800 {
+    display: none;
+  }
+}
+
+@container (max-width: 829.98px) {
+  .cq-hide-below-830 {
+    display: none;
+  }
+}
+
+@container (max-width: 869.98px) {
+  .cq-hide-below-870 {
+    display: none;
+  }
+}
+
+@container (max-width: 879.98px) {
+  .cq-hide-below-880 {
+    display: none;
+  }
+}
+
+@container (max-width: 1009.98px) {
+  .cq-hide-below-1010 {
+    display: none;
+  }
+}
+
+@container (max-width: 1119.98px) {
+  .cq-hide-below-1120 {
+    display: none;
+  }
+}
+
 @media (max-width: 1350px) {
   .gb-review-filters {
     flex-wrap: wrap;
