@@ -1468,14 +1468,6 @@ function PublishStep({
 
         <FormSection step={3} label="いつまで受け付けるか">
           <div className="grid gap-3 sm:grid-cols-2">
-            <Field
-              label="公開する日時"
-              note="日時を指定しての予約公開は、まだ保存する場所がありません。"
-            >
-              <select disabled className={`${inputClass} opacity-50`} title="準備中です">
-                <option>すぐに公開する</option>
-              </select>
-            </Field>
             <Field label="申込の締め切り" htmlFor="entry-cutoff">
               {/*
                 EVENT-04: 選択肢は編集画面と同じ一覧を使う。保存値が選択肢に
@@ -1528,15 +1520,6 @@ function PublishStep({
               className={inputClass}
             />
           </Field>
-          <label className="text-ink-faint flex items-start gap-2 text-sm" title="準備中です">
-            <input type="checkbox" disabled className="mt-0.5" />
-            <span>
-              主催者にもメールで知らせる
-              <span className="block text-xs">
-                申込が入るたびに、登録メールアドレスへ届きます。保存する場所がまだありません。
-              </span>
-            </span>
-          </label>
         </FormSection>
 
         <FormSection step={5} label="公開">
