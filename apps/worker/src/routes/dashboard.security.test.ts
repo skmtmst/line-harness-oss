@@ -125,6 +125,8 @@ describe('dashboard organization account policy', () => {
     expect(response.status).toBe(200);
     expect(dbMocks.getDashboardOverview).toHaveBeenCalledWith(expect.anything(), 'today', {
       allowedAccountIds: ['account-2'], includeUnassigned: false,
+    }, {
+      allowedAccountIds: ['account-2'], includeUnassigned: true,
     });
   });
 
@@ -174,6 +176,9 @@ describe('dashboard organization account policy', () => {
       headers: { Authorization: 'Bearer account-1-token' },
     }));
     expect(dbMocks.getDashboardOverview).toHaveBeenCalledWith(expect.anything(), 'today', {
+      allowedAccountIds: ['account-1'], includeUnassigned: false,
+    }, {
+      // tenant-b の担当者は未割り当て（MAIL）が見えない範囲のため、受信箱も LINE だけ。
       allowedAccountIds: ['account-1'], includeUnassigned: false,
     });
     const body = await response.json() as { data: { delivery: Record<string, unknown> } };
@@ -425,6 +430,8 @@ describe('dashboard organization account policy', () => {
     const response = await app('tenant-b', 'owner').request('/api/dashboard/organization-overview', {}, env());
     expect(response.status).toBe(200);
     expect(dbMocks.getDashboardOverview).toHaveBeenCalledWith(expect.anything(), 'today', {
+      allowedAccountIds: ['account-1'], includeUnassigned: false,
+    }, {
       allowedAccountIds: ['account-1'], includeUnassigned: false,
     });
   });
