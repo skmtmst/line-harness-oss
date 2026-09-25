@@ -245,14 +245,12 @@ function BroadcastDetailInner() {
         </Link>
       </nav>
 
-      {loadState === 'loading' ? (
-        <div className="bg-canvas rounded-card border-hairline text-ink-faint border p-8 text-center text-sm">
-          読み込み中...
-        </div>
-      ) : !broadcast ? (
-        <div className="bg-canvas rounded-card border-hairline text-ink-faint border p-8 text-center text-sm">
-          読み込み中...
-        </div>
+      {/*
+        ★V7 `x63W5x`：読み込み中は一覧の場所に ListState loading を1つ。
+        素の「読み込み中...」は出さない。
+      */}
+      {loadState === 'loading' || !broadcast ? (
+        <ListState kind="loading" title="配信を読み込んでいます" />
       ) : String(broadcast.status) === 'sent' ? (
         <SentResult broadcast={broadcast} insight={insight} insightState={insightState} contentRef={contentRef} />
       ) : (
@@ -469,10 +467,16 @@ function BroadcastDetailInner() {
           </Link>
         </div>
       )}
-      <StickyBar
-        className="mt-6"
-        actions={<Button onClick={exportCsv} disabled={!broadcast}>CSVで書き出す</Button>}
-      />
+      {/*
+        ★V7 `x63W5x`：読み込み中は押せないボタンだけのバーを出さない。
+        配信が読めてから出す。
+      */}
+      {broadcast ? (
+        <StickyBar
+          className="mt-6"
+          actions={<Button onClick={exportCsv}>CSVで書き出す</Button>}
+        />
+      ) : null}
     </div>
   )
 }

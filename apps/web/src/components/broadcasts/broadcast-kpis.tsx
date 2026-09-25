@@ -23,10 +23,14 @@ export { countText }
  * 合わない4枚になる。取れないものは `—` のままにする。
  */
 export default function BroadcastKpis({
-  unavailable = false,
+  loading: parentLoading = false,
+  failed = false,
   listKpis,
 }: {
-  unavailable?: boolean
+  /** 一覧の読み込み中。数値は骨組み、副題は「読み込んでいます」。 */
+  loading?: boolean
+  /** 一覧の取得失敗。数値は「—」、副題は「読み込めませんでした」。0 とは書かない。 */
+  failed?: boolean
   listKpis?: BroadcastListKpis | null
 }) {
   const [fallbackStats, setFallbackStats] = useState<BroadcastStats | null>(null)
@@ -75,7 +79,11 @@ export default function BroadcastKpis({
             )}
           </p>
           <p className="text-ink-faint mt-1 text-[11px] leading-relaxed">
-            {unavailable ? '読み込めていません' : card.detail}
+            {/*
+              ★V7 `x63W5x`：読み込み中は「読み込んでいます」、失敗は
+              「読み込めませんでした」と言い分ける（失敗の言葉で待たせない）。
+            */}
+            {parentLoading || loading ? '読み込んでいます' : failed ? '読み込めませんでした' : card.detail}
           </p>
         </div>
       ))}
