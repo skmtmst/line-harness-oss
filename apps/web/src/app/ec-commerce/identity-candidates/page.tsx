@@ -182,7 +182,8 @@ export default function EcIdentityCandidatesPage() {
                   <Th>似ているところ</Th>
                   <Th>確からしさ</Th>
                   <Th>結びつけると</Th>
-                  <Th align="right">操作</Th>
+                  {/* 操作列は2つのボタン幅で固定し、残りは本文の列で吸収する。 */}
+                  <Th align="right" className="w-56">操作</Th>
                 </TableHeadRow>
               </thead>
               <tbody>

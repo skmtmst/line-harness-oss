@@ -698,6 +698,18 @@ function BroadcastDetailInner() {
   )
 }
 
+/**
+ * 「この配信のリンクを押していない人」を宛先にした作成画面のURL。
+ * 宛先は condition 引継ぎ、文面は duplicateFrom で種にする。
+ */
+function chaseHref(broadcastId: string): string {
+  const condition = JSON.stringify({
+    operator: 'AND',
+    rules: [{ type: 'broadcast_link_clicked', value: { broadcastId, clicked: false } }],
+  })
+  return `/broadcasts/new?duplicateFrom=${encodeURIComponent(broadcastId)}&condition=${encodeURIComponent(condition)}`
+}
+
 function rateText(rate: number | null | undefined): string {
   if (rate == null || !Number.isFinite(rate)) return '—'
   return `${((rate <= 1 ? rate * 100 : rate)).toFixed(1)}%`
@@ -763,6 +775,28 @@ function SentResult({
             ) : (
               <p className="text-ink-faint bg-canvas-sunken mt-3 rounded-control p-3 text-xs">計測したボタン・リンクはありません。</p>
             )}
+            {/*
+              追いかけ配信。この配信を受け取って計測リンクを押さなかった人を
+              宛先にした作成画面を開く。文面は同じものを種にして作り直すので、
+              追送らしい文面への書き換えは運用者が行う。
+              計測リンクが無い配信では「押していない人」が全員になるので出さない。
+            */}
+            {insight?.links?.length ? (
+              <div className="border-hairline mt-3 rounded-control border p-3">
+                <p className="text-ink text-sm font-bold">リンクを押していない人へ追送</p>
+                <p className="text-ink-faint mt-1 text-xs leading-relaxed">
+                  届いたのにリンクを押していない人だけを宛先にして、同じ文面で作り直します。対象は作成画面で人数を確かめてから送ってください。
+                </p>
+                <div className="mt-2">
+                  <Link
+                    href={chaseHref(broadcast.id)}
+                    className="text-action text-xs font-semibold hover:underline"
+                  >
+                    追送する配信を作る →
+                  </Link>
+                </div>
+              </div>
+            ) : null}
             <div className="bg-canvas-sunken mt-3 rounded-control p-3">
               <p className="text-ink text-sm font-bold">エラー</p>
               <p className="text-ink-faint mt-1 text-xs">送信失敗 {failed.toLocaleString('ja-JP')}人</p>

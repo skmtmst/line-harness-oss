@@ -2,6 +2,7 @@ import Link from 'next/link'
 import type { ReactNode } from 'react'
 import type { BookingRequest, DashboardOverview } from '@/lib/api'
 import Card from '@/components/shared/card'
+import { HelpTip } from '@/components/dashboard/help-tip'
 
 /**
  * 右カラムのカード。
@@ -9,9 +10,14 @@ import Card from '@/components/shared/card'
  * 設計（`Right`）は「見出し ＋ 右上のリンク ＋ 中身」という同じ形が並ぶ。
  * 枠だけ共通にして、中身はカードごとに書く。
  */
-function SideCard({
+/**
+ * ダッシュボードの右カラム以外のカード（送信枠・運用アラート）でも使う。
+ * 行き先リンクは見出しの行の右端に1つ、更新時刻は右下にそろえる。
+ */
+export function SideCard({
   title,
   period,
+  helpTip,
   action,
   freshness,
   children,
@@ -20,8 +26,14 @@ function SideCard({
   /*
    * 数字の対象期間。「今月」「直近7日」など、見出しの脇に小さく添える
    * （IDEA-01: カードの数字がいつの範囲かを読めるようにする）。
+   * 題と合わせて1行に収まらないときは、脇に置かず HelpTip へ移す。
    */
   period?: string
+  /*
+   * 「？」に入れる補足（いつ元に戻るかなど）。題の脇をふさがない。
+   * period と両方は置かない。
+   */
+  helpTip?: string
   /** 設計に右上のリンクが無いカードもある（現在の対応状況）。 */
   action?: { label: string; href: string }
   /** 更新時刻・取得失敗などの鮮度表示。カードの末尾右寄せで出す。 */
@@ -33,8 +45,15 @@ function SideCard({
       <div className="flex flex-col gap-2.5">
         <div className="flex items-start justify-between gap-3">
           <h2 className="text-ink min-w-0 text-base leading-normal font-bold">{title}</h2>
-          {period ? <span className="text-ink-faint flex-1 pt-0.5 text-[11px] font-normal">{period}</span> : null}
-          {action ? <Link href={action.href} className="text-info shrink-0 text-xs font-semibold hover:underline">{action.label}</Link> : null}
+          {helpTip ? <HelpTip text={helpTip} /> : null}
+          {/* 期間は常に1行にする（DASH-23）。折り返すとカード間で見出しの高さがずれる。 */}
+          {period ? <span className="text-ink-faint flex-1 pt-0.5 text-[11px] font-normal whitespace-nowrap">{period}</span> : null}
+          {/*
+            行き先リンクは CardHeader の action（actionTone="info"）と
+            同じ見た目にする。ダッシュボードの行き先リンクはこの1つに
+            そろえ、独自の色・大きさを増やさない。
+          */}
+          {action ? <Link href={action.href} className="text-status-info shrink-0 text-label font-semibold hover:underline">{action.label}</Link> : null}
         </div>
         <div>{children}</div>
         {freshness ? <div className="flex justify-end">{freshness}</div> : null}
