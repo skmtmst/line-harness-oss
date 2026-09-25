@@ -207,7 +207,7 @@ export default function ConnectorPanel({ accountId }: { accountId: string | null
             <h2 className={styles.cardTitle}>取り込みのようす</h2>
             <div className={styles.compactKpis}>
               <SummaryCard variant="v6" title="今日" value={data?.health.today ?? null} unit="件" detail="" help="今日届いた出来事の件数です" />
-              <SummaryCard variant="v6" title="この30日" value={data?.health.last30Days ?? null} unit="件" detail="" help="直近30日に届いた出来事の件数です" />
+              <SummaryCard variant="v6" title="この30日" value={data?.health.last30Days ?? null} unit="件" detail="" help="この30日に届いた出来事の件数です" />
               <SummaryCard variant="v6" title="失敗" value={data?.health.failed ?? null} unit="件" detail="確認が必要" />
               <SummaryCard variant="v6" title="最後に成功" value={null} unit="" detail={dateTime(data?.health.lastSucceededAt ?? null)} badge="日時" badgeTone="neutral" />
             </div>
