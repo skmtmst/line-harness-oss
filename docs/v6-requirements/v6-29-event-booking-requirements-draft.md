@@ -147,13 +147,13 @@ waiting/offered → cancelled
 | 画面 | URL | 主な役割 |
 |---|---|---|
 | イベント一覧 | `/events` | 開催回、申込、定員、待ち、状態 |
-| 新規作成 | `/events/new`（`?step=`・`?id=` で各段を直接開く） | 内容、開催回、受付条件、アクション |
-| 詳細・編集 | `/events/edit?id={id}` | 版、開催回、利用先、変更影響 |
-| 申込者 | `/events/bookings?id={eventId}` | 確定、待ち、取消、参加 |
-| お客様表示確認 | 編集画面内の確認状態 | 公開条件で申込画面を確認 |
-| 変更確認 | 編集画面内の確認状態 | 影響者、通知、再承認 |
+| 新規作成 | `/events/new` | 内容、開催回、受付条件、アクション |
+| 詳細・編集 | `/events/:id` | 版、開催回、利用先、変更影響 |
+| 申込者 | `/events/:id/occurrences/:occurrenceId/applicants` | 確定、待ち、取消、参加 |
+| お客様表示確認 | `/events/:id/preview` | 公開条件で申込画面を確認 |
+| 変更確認 | `/events/:id/change-review` | 影響者、通知、再承認 |
 
-`?id=` が正本のURL（共通ルール §2-8）。IDなしで来たときはガード画面を出し、通常導線にしない。
+既存 `/events/edit?id=` と `/events/bookings?id=` は新URLへ転送する。IDなしのエラー画面を通常導線にしない。
 
 ## 6. 作成画面
 

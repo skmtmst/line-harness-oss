@@ -340,20 +340,17 @@ LステップのAPI連携と競合するため、Webhookとは別に公開APIを
 
 ## 13. 画面とURL
 
-管理画面の正本は `/webhooks`（タブ切替）。`?id=`・`?tab=` が正本のURL（共通ルール §2-8）。
-
 | 画面 | URL | 役割 |
 |---|---|---|
-| 送信一覧 | `/webhooks?tab=outgoing` | 接続、成功率、停止、test |
-| 送信作成 | `/webhooks/new` | event、payload、認証、retry |
-| 受信一覧 | `/webhooks?tab=incoming` | 受信口、回数、状態 |
-| 受信詳細・編集 | `/webhooks/edit?id={id}` | endpoint、schema、mapping、action |
-| 記録 | `/webhooks?tab=interactions` | direction、result、retry |
-| 運用者への通知設定 | `/webhooks?tab=notify` | 失敗時の通知先 |
-| API token | 未実装（管理画面の画面なし） | scope、rotate、履歴 |
-| 見本 | `/webhooks/new` の接続プリセット | Slack、GAS、Make等の初期値 |
+| 送信一覧 | `/integrations/outgoing` | 接続、成功率、停止、test |
+| 送信作成 | `/integrations/outgoing/new` | event、payload、認証、retry |
+| 受信一覧 | `/integrations/incoming` | 受信口、回数、状態 |
+| 受信詳細 | `/integrations/incoming/:id` | endpoint、schema、mapping、action |
+| 記録 | `/integrations/deliveries` | direction、result、retry |
+| API token | `/integrations/api-tokens` | scope、rotate、履歴 |
+| 見本 | `/integrations/templates` | Slack、GAS、Make等の初期値 |
 
-`/integrations/*` のパス群は作らない。
+既存 `/webhooks` は互換転送する。
 
 ## 14. 状態
 

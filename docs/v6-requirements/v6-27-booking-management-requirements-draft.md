@@ -58,11 +58,11 @@ V6実Node ID 7画面を確認した。実装PRでは次を固定する。
 | 画面 | V6実Node ID | 型 | 正本ルート |
 |---|---|---|---|
 | 27-1 今日の予約台帳 | `TV2DI` | L | `/booking/bookings?view=day` |
-| 27-1-A 予約の詳細 | `TnDbq` | D | `/booking/bookings/detail?id={id}` |
+| 27-1-A 予約の詳細 | `TnDbq` | D | `/booking/bookings/{id}` |
 | 27-1-B 電話の予約を入れる | `cpdDi` | E | `/booking/bookings/new` |
 | 27-1-C 今週の予約 | `SbuUI` | L | `/booking/bookings?view=week` |
-| 27-1-D 代理予約・内容確認 | `GFDqW` | C | `/booking/bookings/new` 内の確認段 |
-| 27-1-E 代理予約・登録完了 | `GfceK` | C | 作成ページ内の完了状態 |
+| 27-1-D 代理予約・内容確認 | `GFDqW` | C | `/booking/bookings/new/confirm` または同ページ状態 |
+| 27-1-E 代理予約・登録完了 | `GfceK` | C | `/booking/bookings/{id}/created` または同ページ状態 |
 | 27-1-F 競合・入力エラー | `Lg8ff` | S | 作成ページ内の回復可能状態 |
 
 作成中の入力・確認・完了・競合は同じ予約作成フローの状態であり、別レコードを作らない。URLを分ける場合も下書きIDと入力内容を保持する。

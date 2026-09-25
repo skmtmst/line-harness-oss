@@ -52,17 +52,36 @@ V6を採用する。開始条件、配信方式、各通、分岐、質問、完
 
 ## 2. 画面とルート
 
-正本ルート（共通ルール §2-8。`?id=`・`?tab=` が正本で、動的パスは作らない）:
+V6実Node ID 14画面を確認した。実装PRでは次を固定する。
+
+| 画面 | V6実Node ID |
+|---|---|
+| 一覧 | `TC1b1` |
+| 配信方式 | `cCB7r` |
+| 1通目設定 | `kk8dz` |
+| シナリオ編集 | `bV5Vs` |
+| ステップ編集 | `xfYLn` |
+| 配信条件 | `r6Gzsu` |
+| 送信後アクション | `hz9ti` |
+| ステップ削除確認 | `dqFft` |
+| 開始条件 | `EvVO5` |
+| 配信開始確認 | `RUxNf` |
+| 配信開始完了 | `NrBkW` |
+| テスト送信 | `g2UNV` |
+| 配信結果 | `M2b2B` |
+| 空・読込・エラー | `q5G45` |
+
+正本ルート:
 
 | 画面 | 型 | ルート |
 |---|---|---|
 | シナリオ一覧 | L | `/scenarios` |
-| 配信方式を選ぶ | C | `/scenarios/mode` |
-| 初回設定 | E | `/scenarios/first-step` |
-| シナリオ詳細・編集 | E/D | `/scenarios/detail?id={id}` |
-| 実行状況 | D | `/scenarios/results?id={id}` |
-| 友だちの進行詳細 | D | `/friends/detail?id={friendId}`（配信・シナリオタブ） |
-| 公開前シミュレーション | C | `/scenarios/detail?id={id}` 内の確認状態 |
+| 配信方式を選ぶ | C | `/scenarios/new/mode` |
+| 初回設定 | E | `/scenarios/new/first-step` |
+| シナリオ詳細・編集 | E/D | `/scenarios/{id}` |
+| 実行状況 | D | `/scenarios/{id}?tab=runs` |
+| 友だちの進行詳細 | D | `/scenarios/{id}/friends/{friendId}` |
+| 公開前シミュレーション | C | `/scenarios/{id}?tab=simulation` |
 | 削除・停止確認 | O | 詳細上の確認オーバーレイ |
 
 タブ:

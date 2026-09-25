@@ -104,13 +104,13 @@ Pencil上で確認できた主な内容:
 |---|---|
 | 一覧 | `/contents/vars` |
 | 作成 | `/contents/vars/new` |
-| 編集 | `/contents/vars/edit?id={varId}` |
-| 変更影響 | 編集画面（`/contents/vars/edit?id={varId}`）内の影響確認セクション |
-| 変更履歴 | 編集画面内の履歴セクション |
-| 使用先 | 編集画面内の使用先セクション |
+| 編集 | `/contents/vars/{varId}/edit` |
+| 変更影響 | `/contents/vars/{varId}/impact?draftVersion={version}` |
+| 変更履歴 | 編集画面内。全件は`/contents/vars/{varId}/history` |
+| 使用先 | 編集または影響確認から`/contents/vars/{varId}/usages` |
 | 削除・差し替え | 一覧上の全面オーバーレイ |
 
-`?id=` が正本のURL（共通ルール §2-8）。削除確認は全面オーバーレイ1枚とし、別ページを複製しない。
+現行の`/contents/vars/edit?id=...`は旧URLとして受け、正規URLへリダイレクトする。V6の削除確認は全面オーバーレイ1枚とし、別ページを複製しない。
 
 ## 5. 共通情報の定義
 

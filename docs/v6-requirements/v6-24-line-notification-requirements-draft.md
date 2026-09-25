@@ -76,11 +76,11 @@ V6の「顧客へのお知らせ」と「運用者へのお知らせ」を分け
 | 画面 | V6 Node ID | 型 | 役割 | 実装ルート |
 |---|---|---|---|---|
 | 24-1 LINE通知 | `festr` | L | 顧客通知の一覧・状態・実績 | `/line-notifications?tab=customer` |
-| 24-1-A お知らせの中身を編集する | `Q55bb` | E | 顧客通知の編集・テスト・公開 | `/line-notifications?tab=customer` 内の編集表示 |
+| 24-1-A お知らせの中身を編集する | `Q55bb` | E | 顧客通知の編集・テスト・公開 | `/line-notifications/customer/{definitionId}` |
 | 24-1-B 送れなかったもの | `X8JCA5` | L | 顧客・運用者の送信失敗を確認 | `/line-notifications?tab=failures` |
 | 24-1-C お知らせの記録 | `Se65i` | L | 送信記録と集計を確認 | `/line-notifications?tab=history` |
 | 24-2 運用者へのお知らせ | `DpxOK` | L | 運用者通知ルールの一覧 | `/line-notifications?tab=operator` |
-| 24-2-A 運用者へのお知らせをつくる・編集 | `N2gAza` | E | ルール、宛先、重複防止を設定 | `/line-notifications/operator/new`（編集は `?id={ruleId}`） |
+| 24-2-A 運用者へのお知らせをつくる | `N2gAza` | E | ルール、宛先、重複防止を設定 | `/line-notifications/operator/new` または `/{ruleId}` |
 
 通常画面のタブ順は固定する。
 

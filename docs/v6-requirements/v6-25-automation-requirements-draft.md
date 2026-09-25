@@ -96,7 +96,7 @@ V6実Node ID 8画面を確認した。node、名前、ルートは `scripts/visu
 | 画面 | V6実Node ID | 型 | 役割 | 実装ルート（screens.mjs） |
 |---|---|---|---|---|
 | 25-1 オートメーション | `gief7` | L | 動いているもの・止めているものを見る | `/automations`（`?tab=active` / `?tab=stopped`） |
-| 25-1-A オートメーションをつくる・編集 | `Rv8Jv` | E | きっかけ、対象、処理を作る | `/automations/new`（下書き・編集は `/automations/drafts?id={id}`） |
+| 25-1-A オートメーションをつくる | `Rv8Jv` | E | きっかけ、対象、処理を作る | `/automations/new`、`/automations/:id/edit` |
 | 25-1-B オートメーションが動いた記録 | `DkPY0` | L | 実行、条件外、失敗を見る | `/automations/runs` |
 | 25-1-C 見本から作る | `WjYAC` | L | 見本から下書きを作る | `/automations?tab=templates` |
 | 25-1-D 一覧の状態（空・読込・エラー） | `Vdbv5` | S | 空・読み込み・失敗を示す | `/automations` の同一URL内状態 |

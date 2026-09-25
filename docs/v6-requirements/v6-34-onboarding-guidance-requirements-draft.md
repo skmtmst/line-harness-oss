@@ -128,7 +128,7 @@ Lステップ最大の弱点は、初期設定が LINE Developers、LINE公式�
 |---|---|
 | はじめの設定 | `/getting-started` |
 | レシピ一覧 | `/recipes` |
-| レシピを複製する | `/recipes/clone?id={recipeId}` |
+| レシピを複製する | `/recipes/{recipeId}/clone` |
 | マニュアルの正本表 | `/settings/manual-links` |
 
 ## 6. 初回セットアップの順路
@@ -137,7 +137,7 @@ Lステップ最大の弱点は、初期設定が LINE Developers、LINE公式�
 
 | 段 | 機能 | 完了条件（サーバ判定） | 飛び先 |
 |---|---|---|---|
-| 1 | 33 LINEアカウント | 稼働中アカウントが 1 件以上あり、Webhook 突合が `matched`、チャネルシークレットが検証済み | `/accounts/detail?id={id}&tab=connection` |
+| 1 | 33 LINEアカウント | 稼働中アカウントが 1 件以上あり、Webhook 突合が `matched`、チャネルシークレットが検証済み | `/accounts/{id}?tab=connection` |
 | 2 | 04 友だち属性 | タグまたは友だち情報欄が 1 件以上ある。組織の既定タグ（`新規`）が作られていれば可 | `/tags?tab=tags` |
 | 3 | 09 友だち追加時配信 | 公開版のルールが 1 件以上あり、受け皿ルールがある | `/friend-add-settings` |
 | 4 | 05 シナリオ | 公開版のシナリオが 1 件以上あり、段 3 のルールから開始される | `/scenarios` |

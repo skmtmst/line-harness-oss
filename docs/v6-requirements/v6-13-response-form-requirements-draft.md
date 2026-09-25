@@ -74,7 +74,7 @@ V6の実Node IDを確認した。実装PRでは次を設計画像と実装画像
 | 13-1-A フォームを作る | `vCqUj` | E | `/form-submissions/edit?id={id}&tab=basic` |
 | 13-1-B デザイン設定 | `ava2n` | E | `/form-submissions/edit?id={id}&tab=design` |
 | 13-1-C オプション設定 | `cSqvP` | E | `/form-submissions/edit?id={id}&tab=options` |
-| 13-1-D 集まった回答 | `v9tYhl` | L | `/form-submissions/responses?id={id}` |
+| 13-1-D 集まった回答 | `v9tYhl` | L | `/form-submissions/{id}/responses` |
 | 13-1-E 削除確認 | `gBp2J` | O | 一覧上の確認オーバーレイ |
 | 13-1-F 空・読込・エラー | `ZOPyc` | S | 一覧の同一URL内状態 |
 

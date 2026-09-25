@@ -72,15 +72,15 @@ V6実Node ID 9画面を確認した。実装開始時のPRで次を固定する�
 
 | 画面 | V6実Node ID | 型 | 役割 | 実装ルート |
 |---|---|---|---|---|
-| 18-1 流入と計測 | `Q4bkTg` | L | 流入経路を比較する | `/inflow-links?tab=links` |
-| 18-1-A サイトスクリプト | `IhSBB` | L | 計測サイトとコードを管理する | `/inflow-links?tab=script` |
+| 18-1 流入と計測 | `Q4bkTg` | L | 流入経路を比較する | `/inflow-links?tab=routes` |
+| 18-1-A サイトスクリプト | `IhSBB` | L | 計測サイトとコードを管理する | `/inflow-links?tab=sites` |
 | 18-1-B 広告連携 | `v0HaI` | B | 広告費と実績を見る | `/inflow-links?tab=ads` |
 | 18-1-C 流入リンクをつくる | `TEVk8` | E | 経路と中継URLを作る | `/inflow-links/new` |
 | 18-1-D 流入元の詳細 | `JupxW` | D | 経路別のファネルを見る | `/inflow-links/detail?id={routeId}` |
 | 18-1-E 流入リンク削除確認 | `UIaM7` | O | 利用状況を確認して削除する | 詳細画面のオーバーレイ |
 | 18-1-F 空・読込・エラー | `BMmxU` | S | 一覧状態を確認する | 同一URL内状態 |
-| 18-2 広告とのつなぎ | `BuVDB` | L | 広告接続と成果対応を管理する | `/inflow-links?tab=connections` |
-| 18-2-A 広告への送信履歴 | `Im2b1` | L | 送信・失敗・再試行を見る | `/inflow-links?tab=connections&view=history` |
+| 18-2 広告とのつなぎ | `BuVDB` | L | 広告接続と成果対応を管理する | `/inflow-links?tab=ad-connections` |
+| 18-2-A 広告への送信履歴 | `Im2b1` | L | 送信・失敗・再試行を見る | `/inflow-links/ad-send-history` |
 
 タブ順は全通常画面で固定する。
 
