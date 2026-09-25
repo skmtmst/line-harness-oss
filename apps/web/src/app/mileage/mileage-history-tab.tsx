@@ -126,8 +126,8 @@ export default function MileageHistoryTab({ accountId }: { accountId: string }) 
     <section aria-label="マイルの履歴" data-design-node="MvZm5" className="space-y-4">
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <SummaryCard variant="v6" title="この期間の記録" value={total} unit="件" detail={periodSummary ? `付いた ${grantedCount.toLocaleString('ja-JP')}・使った ${spentCount.toLocaleString('ja-JP')}` : '内訳を取得できませんでした'} />
-        <SummaryCard variant="v6" title="手で動かした分" value={periodSummary?.manualCount ?? null} unit="件" detail="担当者が直接増減したもの" />
-        <SummaryCard variant="v6" title="取り消し" value={periodSummary ? reversalCount : null} unit="件" detail="予約取消などに伴うもの" />
+        <SummaryCard variant="v6" title="手で動かした分" value={periodSummary?.manualCount ?? null} unit="件" detail="" help="担当者が直接増減したものです" />
+        <SummaryCard variant="v6" title="取り消し" value={periodSummary ? reversalCount : null} unit="件" detail="" help="予約取消などに伴うものです" />
         <SummaryCard variant="v6" title="反映を待っている" value={periodSummary?.pendingCount ?? null} unit="件" detail="確定条件を待っている記録" />
       </div>
 
