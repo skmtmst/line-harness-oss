@@ -6,7 +6,7 @@
  *   呼び出し側は「最新を取得 → 対象だけ差し替え → 全体を送る」を必ず守る。
  * - トークン・秘密値をログや例外に含めない。
  */
-import { GoogleBusinessError, authorizedJson, type RequestOptions } from './google-business.js';
+import { authorizedJson, type RequestOptions } from './google-business.js';
 
 const BUSINESS_INFO_URL = 'https://mybusinessbusinessinformation.googleapis.com/v1';
 const MEDIA_URL = 'https://mybusiness.googleapis.com/v4';
@@ -332,6 +332,45 @@ export async function getProfile(options: RequestOptions, locationName: string):
   url.searchParams.set('readMask', PROFILE_READ_MASK);
   const raw = await authorized<RawLocation>(options, url.toString());
   return normalizeProfile(raw, locationName);
+}
+
+/** Google 側からの変更提案（getGoogleUpdated）。diffMask が空なら提案なし。 */
+export interface GoogleUpdates {
+  diffMask: string[];
+  updated: Pick<GoogleProfile, 'title' | 'address' | 'phone' | 'websiteUri' | 'description' | 'regularHours' | 'specialHours'>;
+}
+
+const DIFF_FIELD_JA: Record<string, string> = {
+  title: '店舗名',
+  storefrontAddress: '住所',
+  phoneNumbers: '電話番号',
+  websiteUri: 'ウェブサイト',
+  regularHours: '通常の営業時間',
+  specialHours: '特別営業時間',
+  profile: '店舗紹介',
+  openInfo: '営業状態',
+  categories: 'カテゴリ',
+};
+
+export function diffFieldLabel(mask: string): string {
+  const head = mask.split('.')[0];
+  return DIFF_FIELD_JA[head] ?? head;
+}
+
+/**
+ * Google 側で提案・反映された変更（利用者投稿や Google の自動更新）を読む。
+ * 提案が無いときも 200 で diffMask が空になる。反映（accept）は行わない（自動で戻さない方針）。
+ */
+export async function getGoogleUpdates(options: RequestOptions, locationName: string): Promise<GoogleUpdates> {
+  const url = new URL(`${BUSINESS_INFO_URL}/${v1LocationName(locationName)}:getGoogleUpdated`);
+  url.searchParams.set('readMask', PROFILE_READ_MASK);
+  const raw = await authorized<{ location?: RawLocation; diffMask?: string }>(options, url.toString());
+  const diffMask = (raw.diffMask ?? '').split(',').map((m) => m.trim()).filter((m) => m && m !== 'name' && m !== 'metadata');
+  const updated = await normalizeProfile(raw.location ?? {}, locationName);
+  return {
+    diffMask,
+    updated: { title: updated.title, address: updated.address, phone: updated.phone, websiteUri: updated.websiteUri, description: updated.description, regularHours: updated.regularHours, specialHours: updated.specialHours },
+  };
 }
 
 export type ProfilePatch =

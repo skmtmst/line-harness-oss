@@ -30,7 +30,9 @@ import {
   deleteMedia,
   effectiveHoursFor,
   emptyWeekly,
+  diffFieldLabel,
   formatPeriods,
+  getGoogleUpdates,
   getProfile,
   isValidDate,
   isValidTime,
@@ -43,6 +45,7 @@ import {
   validateWeekly,
   weekdayOf,
   type GoogleProfile,
+  type GoogleUpdates,
   type HoursPeriod,
   type ProfileAddress,
   type ProfilePatch,
@@ -54,7 +57,6 @@ import { holidayNameOf, upcomingHolidays } from '../services/jp-holidays.js';
 import {
   GoogleAiTimeout,
   accessTokenFor,
-  connectionFor,
   fail,
   googleAccessGuard,
   googleErrorResponse,
@@ -168,16 +170,24 @@ async function storeTimeZone(c: Context<Env>, storeId: string): Promise<string> 
   return row?.timezone || 'Asia/Tokyo';
 }
 
-async function cachedProfile(c: Context<Env>, storeId: string): Promise<{ profile: GoogleProfile; fetchedAt: string } | null> {
+/** 写しの付帯情報（本体の指紋には含めない）。 */
+interface ProfileExtras {
+  photoCount: number | null;
+  googleUpdates: GoogleUpdates | null;
+}
+type CachedProfile = { profile: GoogleProfile; extras: ProfileExtras; fetchedAt: string };
+
+async function cachedProfile(c: Context<Env>, storeId: string): Promise<CachedProfile | null> {
   const row = await dbFor(c.env, storeId).prepare('SELECT * FROM rt_google_profiles WHERE store_id = ? LIMIT 1').bind(storeId).first<ProfileRow>();
   if (!row) return null;
-  const profile = parseJson<GoogleProfile | null>(row.profile_json, null);
-  if (!profile) return null;
-  return { profile, fetchedAt: row.fetched_at };
+  const parsed = parseJson<{ profile?: GoogleProfile; extras?: ProfileExtras } | null>(row.profile_json, null);
+  if (!parsed?.profile) return null;
+  return { profile: parsed.profile, extras: parsed.extras ?? { photoCount: null, googleUpdates: null }, fetchedAt: row.fetched_at };
 }
 
-async function saveProfile(c: Context<Env>, storeId: string, locationName: string, profile: GoogleProfile): Promise<string> {
+async function saveProfile(c: Context<Env>, storeId: string, locationName: string, profile: GoogleProfile, extras?: ProfileExtras): Promise<string> {
   const fetchedAt = nowIso();
+  const keep = extras ?? (await cachedProfile(c, storeId))?.extras ?? { photoCount: null, googleUpdates: null };
   await dbFor(c.env, storeId)
     .prepare(
       `INSERT INTO rt_google_profiles (store_id, location_name, profile_json, fingerprint, fetched_at, updated_at)
@@ -185,19 +195,25 @@ async function saveProfile(c: Context<Env>, storeId: string, locationName: strin
        ON CONFLICT(store_id) DO UPDATE SET location_name = excluded.location_name, profile_json = excluded.profile_json,
          fingerprint = excluded.fingerprint, fetched_at = excluded.fetched_at, updated_at = excluded.updated_at`,
     )
-    .bind(storeId, locationName, JSON.stringify(profile), profile.fingerprint, fetchedAt, fetchedAt)
+    .bind(storeId, locationName, JSON.stringify({ profile, extras: keep }), profile.fingerprint, fetchedAt, fetchedAt)
     .run();
   return fetchedAt;
 }
 
-/** Google から取り直して写しを更新する。失敗時は接続状態も更新して例外を投げる。 */
-async function refreshProfile(c: Context<Env>, store: StoreContext, connection: ConnectionRow): Promise<{ profile: GoogleProfile; fetchedAt: string }> {
+/** Google から取り直して写しを更新する。失敗時は接続状態も更新して例外を投げる。写真数・Google側の提案は取れなくても本体は保存する。 */
+async function refreshProfile(c: Context<Env>, store: StoreContext, connection: ConnectionRow): Promise<CachedProfile> {
   try {
     const accessToken = await accessTokenFor(c, connection);
-    const profile = await getProfile({ fetch, accessToken }, connection.location_name!);
-    const fetchedAt = await saveProfile(c, store.id, connection.location_name!, profile);
+    const options: RequestOptions = { fetch, accessToken };
+    const profile = await getProfile(options, connection.location_name!);
+    const [photos, updates] = await Promise.allSettled([listMedia(options, connection.location_name!), getGoogleUpdates(options, connection.location_name!)]);
+    const extras: ProfileExtras = {
+      photoCount: photos.status === 'fulfilled' ? photos.value.length : null,
+      googleUpdates: updates.status === 'fulfilled' ? updates.value : null,
+    };
+    const fetchedAt = await saveProfile(c, store.id, connection.location_name!, profile, extras);
     if (connection.status !== 'connected') await setConnectionStatus(c, store.id, 'connected', null);
-    return { profile, fetchedAt };
+    return { profile, extras, fetchedAt };
   } catch (error) {
     if (error instanceof GoogleBusinessError && error.kind === 'no_permission') await setConnectionStatus(c, store.id, 'no_permission', 'no_permission');
     throw error;
@@ -210,7 +226,7 @@ async function profileFor(
   store: StoreContext,
   connection: ConnectionRow,
   force = false,
-): Promise<{ profile: GoogleProfile; fetchedAt: string; stale: boolean; refreshError: string | null } | Response> {
+): Promise<(CachedProfile & { stale: boolean; refreshError: string | null }) | Response> {
   const cached = await cachedProfile(c, store.id);
   const age = cached ? Date.now() - Date.parse(cached.fetchedAt) : Number.POSITIVE_INFINITY;
   if (cached && !force && age < PROFILE_STALE_AFTER_MS) return { ...cached, stale: false, refreshError: null };
@@ -227,7 +243,7 @@ function storeClosed(profile: GoogleProfile): boolean {
   return profile.openStatus === 'CLOSED_TEMPORARILY' || profile.openStatus === 'CLOSED_PERMANENTLY';
 }
 
-function profilePayload(profile: GoogleProfile, timeZone: string, holidayDays: number) {
+function profilePayload(profile: GoogleProfile, extras: ProfileExtras, timeZone: string, holidayDays: number) {
   const today = todayIn(timeZone);
   const todayWeekday = weekdayOf(today);
   const todayHours = effectiveHoursFor(profile, today);
@@ -252,6 +268,10 @@ function profilePayload(profile: GoogleProfile, timeZone: string, holidayDays: n
     holidays,
     timeZone,
     closed: storeClosed(profile),
+    photoCount: extras.photoCount,
+    googleUpdates: extras.googleUpdates
+      ? { fields: extras.googleUpdates.diffMask.map((m) => ({ mask: m, label: diffFieldLabel(m) })), updated: extras.googleUpdates.updated }
+      : null,
   };
 }
 
@@ -271,7 +291,7 @@ async function profileResponse(c: Context<Env>, store: StoreContext, connection:
   return c.json({
     success: true,
     store: { id: store.id, name: store.name, lineAccountId: store.lineAccountId },
-    ...profilePayload(result.profile, timeZone, days),
+    ...profilePayload(result.profile, result.extras, timeZone, days),
     fetchedAt: result.fetchedAt,
     stale: result.stale,
     refreshError: result.refreshError,
@@ -786,20 +806,90 @@ restaurantGoogleProfile.get('/api/restaurant-test/google/photos', async (c) => {
 
 // ---------- 変更の確認・送信・履歴 ----------
 
+/**
+ * 変更履歴（GB-17）。第2段の rt_google_changes（案 draft は除く）と、第1段の口コミ返信の記録
+ * （rt_google_write_log kind=review_reply）を1つの時系列にまとめる。
+ * kind: all | hours | profile | review_reply、result: all | applied | pending | failed、days: 7/30/90/365、q: 内容の部分一致。
+ */
+interface HistoryEntry {
+  id: string;
+  kind: ChangeKind | 'review_reply';
+  summary: string;
+  staffName: string | null;
+  status: ChangeStatus;
+  error: string | null;
+  createdAt: string;
+  changeId: string | null;
+}
+
 restaurantGoogleProfile.get('/api/restaurant-test/google/changes', async (c) => {
   const store = await storeFor(c);
   if (!store) return fail(c, 404, 'このLINEアカウントに店舗が紐付いていません');
-  const limit = Math.min(HISTORY_LIMIT_MAX, Math.max(1, Number.parseInt(c.req.query('limit') ?? '50', 10) || 50));
-  const kind = c.req.query('kind');
-  const where = ['store_id = ?', `status <> 'draft'`];
-  const binds: unknown[] = [store.id];
-  if (kind === 'hours') where.push(`kind IN ('special_hours', 'regular_hours')`);
-  else if (kind === 'profile') where.push(`kind IN ('profile', 'photo')`);
-  const rows = await dbFor(c.env, store.id)
-    .prepare(`SELECT * FROM rt_google_changes WHERE ${where.join(' AND ')} ORDER BY created_at DESC LIMIT ?`)
-    .bind(...binds, limit)
-    .all<ChangeRow>();
-  return c.json({ success: true, changes: rows.results.map(publicChange) });
+  const kind = c.req.query('kind') ?? 'all';
+  const result = c.req.query('result') ?? 'all';
+  const days = Math.min(365, Math.max(1, Number.parseInt(c.req.query('days') ?? '30', 10) || 30));
+  const q = (c.req.query('q') ?? '').trim().toLowerCase();
+  const page = Math.max(1, Number.parseInt(c.req.query('page') ?? '1', 10) || 1);
+  const perPage = Math.min(HISTORY_LIMIT_MAX, Math.max(1, Number.parseInt(c.req.query('per_page') ?? '20', 10) || 20));
+  const since = new Date(Date.now() - days * 86_400_000).toISOString();
+  const db = dbFor(c.env, store.id);
+
+  const entries: HistoryEntry[] = [];
+  {
+    const rows = await db
+      .prepare(`SELECT * FROM rt_google_changes WHERE store_id = ? AND status <> 'draft' AND created_at >= ? ORDER BY created_at DESC LIMIT 1000`)
+      .bind(store.id, since)
+      .all<ChangeRow>();
+    for (const row of rows.results) {
+      entries.push({ id: `change:${row.id}`, kind: row.kind, summary: row.summary, staffName: row.staff_name, status: row.status, error: row.error, createdAt: row.sent_at ?? row.created_at, changeId: row.id });
+    }
+  }
+  {
+    const rows = await db
+      .prepare(
+        `SELECT l.id, l.result, l.error, l.created_at, l.target_name, s.name AS staff_name, r.reviewer_display_name, r.star_rating
+         FROM rt_google_write_log l
+         LEFT JOIN staff_members s ON s.id = l.staff_id
+         LEFT JOIN rt_google_reviews r ON r.store_id = l.store_id AND r.review_name = l.target_name
+         WHERE l.store_id = ? AND l.kind = 'review_reply' AND l.created_at >= ?
+         ORDER BY l.created_at DESC LIMIT 1000`,
+      )
+      .bind(store.id, since)
+      .all<{ id: string; result: 'accepted' | 'failed' | 'unknown'; error: string | null; created_at: string; target_name: string | null; staff_name: string | null; reviewer_display_name: string | null; star_rating: number | null }>();
+    for (const row of rows.results) {
+      const who = row.reviewer_display_name ? `${row.reviewer_display_name}さんの口コミ` : '口コミ';
+      const stars = row.star_rating ? `（★${row.star_rating}）` : '';
+      const createdAt = row.created_at.includes('T') ? row.created_at : `${row.created_at.replace(' ', 'T')}Z`;
+      entries.push({
+        id: `reply:${row.id}`,
+        kind: 'review_reply',
+        summary: `口コミ返信を公開：${who}${stars}`,
+        staffName: row.staff_name,
+        status: row.result === 'accepted' ? 'applied' : row.result === 'unknown' ? 'pending_confirm' : 'failed',
+        error: row.error,
+        createdAt,
+        changeId: null,
+      });
+    }
+  }
+  const byResult = (e: HistoryEntry) =>
+    result === 'all' ||
+    (result === 'applied' && e.status === 'applied') ||
+    (result === 'pending' && (e.status === 'pending_confirm' || e.status === 'accepted')) ||
+    (result === 'failed' && (e.status === 'failed' || e.status === 'conflict' || e.status === 'cancelled'));
+  const byKind = (e: HistoryEntry) =>
+    kind === 'all' ||
+    (kind === 'hours' && (e.kind === 'special_hours' || e.kind === 'regular_hours')) ||
+    (kind === 'profile' && (e.kind === 'profile' || e.kind === 'photo')) ||
+    (kind === 'review_reply' && e.kind === 'review_reply');
+  const filtered = entries.filter((e) => byKind(e) && byResult(e) && (!q || e.summary.toLowerCase().includes(q) || (e.staffName ?? '').toLowerCase().includes(q))).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  const counts = { all: entries.length, hours: 0, profile: 0, review_reply: 0 };
+  for (const e of entries) {
+    if (e.kind === 'special_hours' || e.kind === 'regular_hours') counts.hours += 1;
+    else if (e.kind === 'profile' || e.kind === 'photo') counts.profile += 1;
+    else counts.review_reply += 1;
+  }
+  return c.json({ success: true, changes: filtered.slice((page - 1) * perPage, page * perPage), total: filtered.length, page, perPage, counts, days });
 });
 
 restaurantGoogleProfile.get('/api/restaurant-test/google/changes/:id', async (c) => {
