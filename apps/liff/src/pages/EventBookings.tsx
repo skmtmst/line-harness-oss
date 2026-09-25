@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api, type EventBookingMine } from '../lib/api.js';
+import { logFailure } from '../lib/user-message.js';
+import LoadErrorView from '../components/LoadErrorView.js';
+import LoadingView from '../components/LoadingView.js';
 
 function formatJp(iso: string): string {
   return new Date(iso).toLocaleString('ja-JP', {
@@ -31,16 +34,21 @@ export default function EventBookings() {
   const [items, setItems] = useState<EventBookingMine[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  // 読み込みの失敗と、キャンセル操作の失敗は別に持つ。
+  // 混ぜると失敗を「予約0件」と言ってしまう。
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     setLoading(true);
-    setError(null);
+    setLoadFailed(false);
+    setActionError(null);
     try {
       const res = await api.myEventBookings(tab);
       setItems(res.items);
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      logFailure('event-bookings', e);
+      setLoadFailed(true);
     } finally {
       setLoading(false);
     }
@@ -53,21 +61,22 @@ export default function EventBookings() {
   async function cancel(b: EventBookingMine) {
     if (!confirm(`「${b.event_name}」の予約をキャンセルしますか？`)) return;
     setBusy(true);
-    setError(null);
+    setActionError(null);
     try {
       await api.cancelMyEventBooking(b.id);
       await refresh();
     } catch (err) {
+      logFailure('cancel-event-booking', err);
       const e = err as { body?: { error?: string } };
       const msg = (() => {
         switch (e.body?.error) {
           case 'cancel_deadline_passed': return 'キャンセル期限を過ぎています。';
           case 'cancel_not_allowed': return 'このイベントは LIFF からのキャンセルに対応していません。LINE で運営にご連絡ください。';
           case 'invalid_state': return 'この予約は既にキャンセル済 / 確定外のためキャンセルできません。';
-          default: return err instanceof Error ? err.message : String(err);
+          default: return 'キャンセルできませんでした。時間をおいて、もう一度お試しください。';
         }
       })();
-      setError(msg);
+      setActionError(msg);
     } finally {
       setBusy(false);
     }
@@ -89,9 +98,11 @@ export default function EventBookings() {
         </div>
       </div>
       <div className="p-3 space-y-3">
-        {error && <div className="bg-red-50 text-red-700 p-2 rounded text-sm">{error}</div>}
+        {actionError && <div className="bg-red-50 text-red-700 p-2 rounded text-sm">{actionError}</div>}
         {loading ? (
-          <div className="text-center text-gray-500 py-8">読み込み中...</div>
+          <LoadingView />
+        ) : loadFailed ? (
+          <LoadErrorView onRetry={() => void refresh()} />
         ) : items.length === 0 ? (
           <div className="text-center text-gray-500 py-8">
             {tab === 'upcoming' ? 'これからの予約はありません' : '過去の予約はありません'}

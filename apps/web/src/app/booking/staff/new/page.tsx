@@ -234,27 +234,15 @@ export default function NewBookingStaffPage() {
           htmlFor="bs-image"
           note="正方形の画像を推奨します（1MBまで）。いまは画像のURLを貼ってください。"
         >
-          <div className="flex items-center gap-2">
-            <input
-              id="bs-image"
-              type="url"
-              value={imageUrl}
-              onChange={(e) => setImageUrl(e.target.value)}
-              maxLength={BOOKING_STAFF_LIMITS.profileImageUrl}
-              placeholder="https://…"
-              className={inputClass}
-            />
-            {/* 画像をこの画面から上げる仕組みがまだ無い。押せない状態で
-                置いておき、いまはURLで受ける。 */}
-            <button
-              type="button"
-              disabled
-              title="画像のアップロードは準備中です"
-              className="border-hairline text-ink-faint rounded-control shrink-0 border px-3 py-2 text-sm opacity-50"
-            >
-              画像を選ぶ
-            </button>
-          </div>
+          <input
+            id="bs-image"
+            type="url"
+            value={imageUrl}
+            onChange={(e) => setImageUrl(e.target.value)}
+            maxLength={BOOKING_STAFF_LIMITS.profileImageUrl}
+            placeholder="https://…"
+            className={inputClass}
+          />
         </Field>
 
         <Field label="紹介文" htmlFor="bs-bio">

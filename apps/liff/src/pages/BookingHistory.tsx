@@ -1,5 +1,8 @@
 import { useEffect, useState } from 'react';
 import { api, type BookingHistoryItem } from '../lib/api.js';
+import { logFailure } from '../lib/user-message.js';
+import LoadErrorView from '../components/LoadErrorView.js';
+import LoadingView from '../components/LoadingView.js';
 import HistoryCard from '../components/HistoryCard.js';
 
 export default function BookingHistory() {
@@ -7,12 +10,22 @@ export default function BookingHistory() {
     null,
   );
   const [tab, setTab] = useState<'upcoming' | 'past'>('upcoming');
+  const [failed, setFailed] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
-    api.me().then(setData);
-  }, []);
+    setFailed(false);
+    api
+      .me()
+      .then(setData)
+      .catch((e) => {
+        logFailure('booking-history', e);
+        setFailed(true);
+      });
+  }, [reloadKey]);
 
-  if (!data) return <div className="p-4 text-gray-500">読み込み中...</div>;
+  if (failed) return <LoadErrorView onRetry={() => setReloadKey((k) => k + 1)} />;
+  if (!data) return <LoadingView />;
   const list = tab === 'upcoming' ? data.upcoming : data.past;
 
   return (

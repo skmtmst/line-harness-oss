@@ -97,14 +97,20 @@ V6が上回る条件:
 ## 6. 視聴計測
 
 `last_position_seconds`だけで離脱や視聴時間を算出しない。
+> 後段階（2026-09-25 オーナー判断）：今の段階の合格条件から外す。#821 で扱う。
 
 - playerは再生中のみ5〜15秒間隔でsegment heartbeat
+> 後段階（2026-09-25 オーナー判断）：今の段階の合格条件から外す。#821 で扱う。
 - hidden、pause、buffering、seek、playback rateを区別
+> 後段階（2026-09-25 オーナー判断）：今の段階の合格条件から外す。#821 で扱う。
 - server受信時刻とposition deltaが不自然なら除外
+> 後段階（2026-09-25 オーナー判断）：今の段階の合格条件から外す。#821 で扱う。
 - 同じsegmentをmergeし、重複時間を足さない
+> 後段階（2026-09-25 オーナー判断）：今の段階の合格条件から外す。#821 で扱う。
 - 視聴開始: 有効segmentが一定秒数以上
 - 視聴完了: 動画時間の90%以上を実視聴、または終端到達＋最低実視聴率
 - 離脱: 最終有効segmentの終了区間。通信断は「推定離脱」
+> 後段階（2026-09-25 オーナー判断）：今の段階の合格条件から外す。#821 で扱う。
 - 最も視聴された区間: distinct viewerのsegment coverage
 - 外部URLは取得可能なprovider eventだけを表示し、取得できない指標は`—`（未取得）として0にしない
 
@@ -254,6 +260,7 @@ V6の「元に戻せません」「履歴が見えなくなる」を物理削除
 - 公開version固定、予約者snapshot固定
 - 通知・actionが重複しない
 - segmentに基づく視聴・離脱・CTA funnelを検証
+> 後段階（2026-09-25 オーナー判断）：今の段階の合格条件から外す。#821 で扱う。
 - 外部videoの未取得を0にせず`—`（未取得）と表示する
 - archiveで履歴を保持
 - test identityで公開前E2Eを実行
@@ -267,5 +274,6 @@ V6の「元に戻せません」「履歴が見えなくなる」を物理削除
 4. registration/session snapshotとtoken失効
 5. notification/action execution台帳
 6. segment heartbeatとanalytics
+> 後段階（2026-09-25 オーナー判断）：今の段階の合格条件から外す。#821 で扱う。
 7. V6作成flow・参加者・分析
 8. legacy migration、負荷・security・画像E2E

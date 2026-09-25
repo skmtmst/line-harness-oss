@@ -407,8 +407,10 @@
     "446_restaurant_google_business.sql",
     "447_restaurant_google_profile.sql",
     "448_billing_invoices.sql",
+    "449_analytics_export_jobs.sql",
+    "450_automation_run_retention.sql",
     "451_messages_log_line_event_at.sql",
     "452_broadcast_after_action_runs.sql"
   ],
-  "migrationCount": 409
+  "migrationCount": 411
 }

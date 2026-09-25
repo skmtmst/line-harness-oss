@@ -517,6 +517,26 @@ CREATE TABLE analytics_events (
   UNIQUE (line_account_id, idempotency_key)
 );
 
+CREATE TABLE analytics_export_jobs (
+  id TEXT PRIMARY KEY,
+  line_account_id TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
+  target TEXT NOT NULL
+    CHECK (target IN ('reactions', 'url-clicks', 'cross', 'funnel', 'saved')),
+  params_json TEXT NOT NULL CHECK (json_valid(params_json)),
+  status TEXT NOT NULL DEFAULT 'queued'
+    CHECK (status IN ('queued', 'running', 'completed', 'failed', 'expired')),
+  row_count INTEGER CHECK (row_count IS NULL OR row_count >= 0),
+  byte_size INTEGER CHECK (byte_size IS NULL OR byte_size >= 0),
+  csv_text TEXT,
+  created_by TEXT NOT NULL,
+  created_by_name TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  started_at TEXT,
+  finished_at TEXT,
+  expires_at TEXT NOT NULL,
+  failure_reason TEXT
+);
+
 CREATE TABLE analytics_funnel_run_members (
   run_id               TEXT NOT NULL REFERENCES analytics_funnel_runs(id) ON DELETE CASCADE,
   line_account_id      TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
@@ -959,6 +979,18 @@ CREATE TABLE automation_logs (
   actions_result TEXT,
   status         TEXT NOT NULL DEFAULT 'success' CHECK (status IN ('success', 'partial', 'failed')),
   created_at     TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
+);
+
+CREATE TABLE automation_run_daily_counts (
+  line_account_id TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
+  automation_id   TEXT NOT NULL,
+  day             TEXT NOT NULL,
+  status          TEXT NOT NULL,
+  run_count       INTEGER NOT NULL DEFAULT 0 CHECK (run_count >= 0),
+  step_count      INTEGER NOT NULL DEFAULT 0 CHECK (step_count >= 0),
+  created_at      TEXT NOT NULL,
+  updated_at      TEXT NOT NULL,
+  PRIMARY KEY (line_account_id, automation_id, day, status)
 );
 
 CREATE TABLE automation_run_steps (
@@ -6630,6 +6662,9 @@ CREATE INDEX idx_analytics_events_friend_time
   ON analytics_events(line_account_id, friend_id, occurred_at, id)
   WHERE friend_id IS NOT NULL;
 
+CREATE INDEX idx_analytics_export_jobs_account
+  ON analytics_export_jobs(line_account_id, created_at DESC);
+
 CREATE INDEX idx_analytics_funnel_members_selection
   ON analytics_funnel_run_members(run_id, group_key, highest_step_order, state, friend_id);
 
@@ -6727,6 +6762,9 @@ CREATE INDEX idx_automation_definitions_account_status
   ON automation_definitions(line_account_id, status, priority DESC);
 
 CREATE INDEX idx_automation_logs_automation ON automation_logs (automation_id);
+
+CREATE INDEX idx_automation_run_daily_counts_day
+  ON automation_run_daily_counts(day);
 
 CREATE INDEX idx_automation_run_steps_common_action_metrics
   ON automation_run_steps(common_action_version_id, automation_run_id, status, step_key)
@@ -8512,14 +8550,6 @@ CREATE TRIGGER trg_automation_published_version_no_delete
 BEFORE DELETE ON automation_versions
 WHEN OLD.status = 'published'
 BEGIN SELECT RAISE(ABORT, 'published automation version cannot be deleted'); END;
-
-CREATE TRIGGER trg_automation_run_steps_no_delete
-BEFORE DELETE ON automation_run_steps
-BEGIN SELECT RAISE(ABORT, 'automation step history cannot be deleted'); END;
-
-CREATE TRIGGER trg_automation_runs_no_delete
-BEFORE DELETE ON automation_runs
-BEGIN SELECT RAISE(ABORT, 'automation run history cannot be deleted'); END;
 
 CREATE TRIGGER trg_common_action_binding_migrations_no_delete
 BEFORE DELETE ON common_action_binding_migration_events
