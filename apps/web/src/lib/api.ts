@@ -8913,12 +8913,14 @@ export const api = {
         /** 162: 制限を超えたときに返すテキスト。 */
         carouselTapLimitText: string | null;
         usedBy: {
-          autoReplies: Array<{ id: string; keyword: string; matchType: 'exact' | 'contains'; lineAccountId: string | null }>;
+          autoReplies: Array<{ id: string; keyword: string; matchType: 'exact' | 'contains'; lineAccountId: string | null; templateVersion: number | null }>;
           automations: Array<{ id: string; name: string; eventType: string }>;
-          scenarioSteps: Array<{ scenarioId: string; scenarioName: string; stepId: string; stepOrder: number }>;
+          scenarioSteps: Array<{ scenarioId: string; scenarioName: string; stepId: string; stepOrder: number; templateVersion: number | null }>;
           reminderSteps: Array<{ reminderId: string; reminderName: string; stepId: string }>;
           richMenuAreas: Array<{ groupId: string; groupName: string; pageName: string; areaId: string; label: string | null }>;
           trackedLinks: Array<{ id: string; name: string }>;
+          /** 467: 一斉配信の参照（送った時の版のまま）。 */
+          broadcasts: Array<{ broadcastId: string; title: string; status: string; scheduledAt: string | null; templateVersionNumber: number | null; referenceMode: 'fixed' | 'latest' }>;
         };
         createdAt: string;
         updatedAt: string;
@@ -8999,13 +9001,49 @@ export const api = {
       fetchApi<ApiResponse<null>>(`/api/templates/${id}`, { method: 'DELETE' }),
     usages: (id: string) =>
       fetchApi<ApiResponse<{
-        autoReplies: Array<{ id: string; keyword: string; lineAccountId: string | null }>;
+        autoReplies: Array<{ id: string; keyword: string; lineAccountId: string | null; templateVersion: number | null }>;
         automations: Array<{ id: string; name: string; eventType: string }>;
-        scenarioSteps: Array<{ scenarioId: string; scenarioName: string; stepId: string; stepOrder: number }>;
+        scenarioSteps: Array<{ scenarioId: string; scenarioName: string; stepId: string; stepOrder: number; templateVersion: number | null }>;
         reminderSteps: Array<{ reminderId: string; reminderName: string; stepId: string }>;
         richMenuAreas: Array<{ groupId: string; groupName: string; pageName: string; areaId: string; label: string | null }>;
         trackedLinks: Array<{ id: string; name: string }>;
+        /** 467: 一斉配信の参照（送った時の版のまま）。 */
+        broadcasts: Array<{ broadcastId: string; title: string; status: string; scheduledAt: string | null; templateVersionNumber: number | null; referenceMode: 'fixed' | 'latest' }>;
       }>>(`/api/templates/${id}/usages`),
+    /**
+     * 466: 版の履歴。新しい版から返る。status は in_use / reserved / past。
+     */
+    versions: (id: string) =>
+      fetchApi<ApiResponse<Array<{
+        versionNumber: number;
+        status: 'in_use' | 'reserved' | 'past';
+        messageType: string;
+        messageContent: string;
+        carouselActions: unknown | null;
+        carouselTapLimitMode: string | null;
+        carouselTapLimitText: string | null;
+        question: TemplateQuestion | null;
+        questionStatus: string | null;
+        effectiveFrom: string | null;
+        createdAt: string;
+      }>>>(`/api/templates/${id}/versions`),
+    /**
+     * 466: この版に戻す。過去の版は変えず、その中身で新しい版を作る。
+     * 確認キーは自動で振る。詳細口の publishedVersion をそのまま渡す。
+     */
+    revert: (id: string, data: { versionNumber: number; expectedVersion: number }) =>
+      fetchApi<ApiResponse<{
+        id: string;
+        publishedVersion: number;
+        hasDraft: boolean;
+      }>>(
+        `/api/templates/${id}/revert`,
+        {
+          method: 'POST',
+          headers: { 'Idempotency-Key': crypto.randomUUID() },
+          body: JSON.stringify(data),
+        },
+      ),
   },
   autoReplies: {
     /**
