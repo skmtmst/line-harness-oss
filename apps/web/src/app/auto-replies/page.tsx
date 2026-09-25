@@ -734,20 +734,17 @@ export default function AutoRepliesPage() {
 
         <div data-design="Table" className="bg-canvas rounded-card border border-hairline overflow-hidden">
           {/* #641: 枠つきボタンで広くなった操作列ぶん、表だけが横に流れるようにする */}
-          <div className="overflow-x-auto">
-          {/*
-            1152px（表の器 802）でも1440px（器 834）でも横に流れないよう、
-            固定列の合計を 576（80+128+128+80+160）にし、最小幅の指定は
-            外す。伸ばすのは文字のルール名だけ。操作列は固定幅＋右端 sticky。
-          */}
-          <table className="w-full table-fixed">
+          {/* @container: 列の出し分けを画面幅ではなく表の実際の幅で決める（谷間帯の列削減）。 */}
+          <div className="overflow-x-auto @container">
+          <table className="min-w-[784px] @[880px]:min-w-[880px] w-full table-fixed">
             <thead>
               <tr className="bg-canvas-sunken border-b border-hairline">
                 <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint">ルール名</th>
                 <th className="w-20 px-4 py-3 text-left text-xs font-semibold text-ink-faint">状態</th>
-                <th title="動く条件（キーワード・適用アカウント）" className="w-32 whitespace-nowrap px-4 py-3 text-left text-xs font-semibold text-ink-faint">条件</th>
-                <th title="返信と実行するアクション" className="w-32 whitespace-nowrap px-4 py-3 text-left text-xs font-semibold text-ink-faint">返すもの</th>
-                <th title="今月動いた回数" className="w-20 px-4 py-3 text-left text-xs font-semibold text-ink-faint">今月の応答</th>
+                <th title="動く条件（キーワード・適用アカウント）" className="w-1/6 whitespace-nowrap px-4 py-3 text-left text-xs font-semibold text-ink-faint">条件</th>
+                <th title="返信と実行するアクション" className="w-1/6 whitespace-nowrap px-4 py-3 text-left text-xs font-semibold text-ink-faint">返すもの</th>
+                {/* 谷間帯の列削減: 回数は補助情報なので表の幅が足りない間だけ畳む。 */}
+                <th title="今月動いた回数" className="cq-hide-below-880 w-24 px-4 py-3 text-left text-xs font-semibold text-ink-faint">今月の応答</th>
                 {/*
                   #774: 右端の操作列は sticky で留める。幅は中身（編集＋
                   削除＋その他の 32px 級 3つ）に合わせた固定 160。
@@ -848,7 +845,7 @@ export default function AutoRepliesPage() {
                       </div>
                     </td>
                     <td
-                      className="px-3 py-3 whitespace-nowrap"
+                      className="cq-hide-below-880 px-3 py-3 whitespace-nowrap"
                       title={`今月 ${r.hits?.period ?? '—'}回 ／ 累計 ${r.hits?.total ?? '—'}回`}
                     >
                       {/* **数えられていないものを 0 と書かない。** 0 は「当たらなかった」の意味。 */}

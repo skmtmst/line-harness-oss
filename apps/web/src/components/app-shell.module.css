@@ -86,6 +86,22 @@
 }
 
 /*
+ * 谷間帯（1280〜1439px）: サイドバーが出て本文が狭くなるので、
+ * 左右の余白を24pxに譲って表の幅を稼ぐ。1440px以上では40pxに戻る。
+ */
+@media (min-width: 1280px) and (max-width: 1439.98px) {
+  .content {
+    padding-right: 24px;
+    padding-left: 24px;
+  }
+
+  .contentFull {
+    padding-right: 24px;
+    padding-left: 24px;
+  }
+}
+
+/*
  * 本文へ移動（★V7 修正方針 §2 `sM9FE`）。焦点が来るまで画面の外に置く。
  * `display:none` にすると Tab で選べなくなるので、位置だけずらす。
  */

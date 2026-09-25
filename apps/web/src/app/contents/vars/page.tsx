@@ -807,13 +807,9 @@ function VarsPageInner() {
                 />
               </div>
             ) : (
-            <div className="overflow-x-auto">
-              {/*
-                1152px（表の器 787）でも横に流れないよう、固定列の合計を
-                696（40+112+160+128+112+144）にし、最小幅の指定は外す。
-                伸ばすのは文字の中身だけ。操作列は固定幅＋右端 sticky。
-              */}
-              <table className="w-full table-fixed">
+            <div className="overflow-x-auto @container">
+              {/* @container: 谷間帯の列削減。表の幅が足りない間だけ「更新・次の変更」を畳む。 */}
+              <table className="w-full min-w-[664px] table-fixed @[870px]:min-w-[820px]">
                 <thead>
                   <TableHeadRow className="bg-canvas-sunken border-hairline border-b">
                     <Th className="w-10 px-3 py-3">
@@ -846,7 +842,7 @@ function VarsPageInner() {
                     <Th className="w-32 px-4 py-3" title="使われている場所">
                       使われている場所
                     </Th>
-                    <Th className="w-28 px-4 py-3" title="最終更新日・次の変更予定">
+                    <Th className="cq-hide-below-870 px-4 py-3" style={{ width: '19%' }} title="最終更新日・次の変更予定">
                       更新・次の変更
                     </Th>
                     {/* #768: 表が横に流れる帯でも操作列は右端に留める。 */}
@@ -912,7 +908,7 @@ function VarsPageInner() {
                           {/* 更新日と次の変更が長いと切れるため、セル全体に
                               全文が読める title を付ける（第5パス D-3）。 */}
                           <td
-                            className="text-ink-secondary px-4 py-3 text-xs"
+                            className="text-ink-secondary cq-hide-below-870 px-4 py-3 text-xs"
                             title={`最終更新 ${formatListDate(item.updatedAt)}${!pending ? ' ／ 予定なし' : ` ／ ${formatStamp(pending.effectiveFrom)} に ${formatVarValue(item.type, pending.value) || '（空）'}へ${(item.pendingScheduleCount ?? 0) > 1 ? ` ほか${(item.pendingScheduleCount ?? 1) - 1}件` : ''}`}`}
                           >
                             {/*
