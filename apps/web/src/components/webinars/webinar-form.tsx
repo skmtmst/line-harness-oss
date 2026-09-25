@@ -6,6 +6,7 @@ import { api, webinarApi, type Webinar, type WebinarInput, type WebinarScheduleR
 import type { MediaItem } from '@line-crm/shared'
 import { useAccount } from '@/contexts/account-context'
 import StickyBar from '@/components/shared/sticky-bar'
+import { CareCard } from '@/components/shared/side-cards'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { RequiredBadge } from '@/components/shared/form-controls'
 import { webinarErrorText } from './webinar-error-text'
@@ -258,13 +259,16 @@ export default function WebinarForm({ initial, hideBar = false, onSaved, onDirty
   }
 
   return (
-    <div className="max-w-4xl space-y-5">
+    <div className="space-y-5">
       {error && (
         <div className="p-3 bg-danger-bg border border-danger/20 rounded-lg text-danger text-sm">
           {error}
         </div>
       )}
 
+      {/* ★V7: 基本の段も共通の枠の幅で「本体＋右の案内」の2列にする。右の文は画面内の既存の文だけを使う。 */}
+      <div className="grid items-start gap-4 xl:grid-cols-3">
+        <div className="min-w-0 space-y-5 xl:col-span-2">
       <section className="space-y-4 rounded-2xl border border-hairline bg-canvas p-5 shadow-sm sm:p-6">
         <div><h2 className="font-bold text-ink">基本情報</h2><p className="mt-1 text-xs text-ink-faint">普段変更する項目だけを表示しています</p></div>
         <div>
@@ -458,6 +462,17 @@ export default function WebinarForm({ initial, hideBar = false, onSaved, onDirty
           </div>
         </details>
       </section>
+        </div>
+        <aside className="space-y-4" aria-label="基本設定の案内">
+          <CareCard
+            items={[
+              { head: '枠が無いまま公開すると、友だちの画面に「次の回」が出ません', note: '作ったのに見られない状態になるので、配信枠を先に作ります。' },
+              { head: '枠を変えても、下の保存を押すまでは本番へ反映されません' },
+              { head: '公開すると、友だちが申込・視聴できるようになります', note: '公開ページのURLもすぐに開けるようになります。' },
+            ]}
+          />
+        </aside>
+      </div>
 
       {/* 段画面の中では親の固定バーが保存を引き受ける。保存バーは1つにする。 */}
       {hideBar ? null : (

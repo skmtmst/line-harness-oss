@@ -1824,7 +1824,8 @@ export default function ScenarioDetailClient({
       {/* Scenario Info */}
       <div className="bg-canvas rounded-card border border-hairline p-6 mb-6">
         {editing ? (
-          <div className="space-y-4 max-w-lg">
+          /* ★V7: 編集フォームもカードの幅いっぱいに広げる。1920px で右が大きく空く。 */
+          <div className="space-y-4">
             <div>
               <label className="block text-xs font-medium text-ink-secondary mb-1">シナリオ名 <span className="text-danger">*</span></label>
               <input

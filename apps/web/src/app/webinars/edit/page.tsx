@@ -2522,7 +2522,8 @@ function EditWebinarInner() {
     : nextPaneLabel
 
   return (
-    <div className="mx-auto max-w-[1600px] px-6 pb-24 pt-4">
+    <div className="pb-24 pt-4">
+      {/* ★V7: 左右の余白は共通の枠が持つ。画面側で幅と横余白を足すと 24px ずれる。 */}
       <nav data-design="Crumb" className="text-action mb-5 text-xs font-semibold"><Link href="/webinars" className="hover:underline">← ウェビナー一覧</Link></nav>
 
       {showSteps ? (

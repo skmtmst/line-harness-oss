@@ -230,7 +230,7 @@ export default function RichMenuEditPage() {
   return (
     <Suspense
       fallback={
-        <div className="p-6 max-w-7xl mx-auto">
+        <div>
           <p className="text-sm text-gray-500">読み込み中...</p>
         </div>
       }
@@ -254,7 +254,7 @@ function RichMenuEditPageInner() {
       戻る操作をそばに置く。開き先がない3種は ★V7 TargetMissing。
     */
     return (
-      <div className="p-6 max-w-7xl mx-auto">
+      <div>
         <TargetMissing
           kind="unspecified"
           title="編集するリッチメニューが指定されていません"
@@ -949,7 +949,7 @@ function Editor({
 
   if (loading) {
     return (
-      <div className="p-6 max-w-7xl mx-auto">
+      <div>
         <p className="text-sm text-gray-500">読み込み中...</p>
       </div>
     )
@@ -963,7 +963,7 @@ function Editor({
     const failure = describeLoadFailure(error)
     if (failure.kind === 'forbidden') {
       return (
-        <div className="p-6 max-w-7xl mx-auto">
+        <div>
           <ListState
             kind="forbidden"
             title={failure.title}
@@ -975,7 +975,7 @@ function Editor({
     }
     if (failure.kind === 'not-found') {
       return (
-        <div className="p-6 max-w-7xl mx-auto">
+        <div>
           <TargetMissing
             kind="not-found"
             title={failure.title}
@@ -987,7 +987,7 @@ function Editor({
       )
     }
     return (
-      <div className="p-6 max-w-7xl mx-auto">
+      <div>
         <TargetMissing
           kind="error"
           title={failure.title}
@@ -1084,8 +1084,9 @@ function Editor({
     )
   }
 
+  {/* ★V7: 左右の余白と幅は共通の枠が持つ。画面側の `p-6 max-w-7xl mx-auto` を外し、ほかの画面と同じ幅いっぱいにした。 */}
   return (
-    <div className="p-6 max-w-7xl mx-auto">
+    <div>
       <nav data-design="Crumb" className="text-ink-faint mb-2 text-xs">
         <Link href="/rich-menus" className="hover:underline">
           リッチメニュー
@@ -1832,7 +1833,7 @@ function TargetingStep({
    */
   const conditionEmpty = targetingEnabled && !targetingCondition
   return (
-    <div data-design-node="kQ1bs" className="mx-auto max-w-7xl p-6 pb-24">
+    <div data-design-node="kQ1bs" className="pb-24">
       <nav className="text-ink-faint mb-2 text-xs"><Link href="/rich-menus">リッチメニュー</Link><span className="mx-1.5">/</span>{group.name}</nav>
       <StepHeader active={2} groupId={group.id} />
 
@@ -2024,7 +2025,7 @@ function PublishStep({
   }
 
   return (
-    <div data-design-node="UMiJ9" className="mx-auto max-w-7xl p-6 pb-24">
+    <div data-design-node="UMiJ9" className="pb-24">
       <nav className="text-ink-faint mb-2 text-xs"><Link href="/rich-menus">リッチメニュー</Link><span className="mx-1.5">/</span>{group.name}</nav>
       <StepHeader active={3} groupId={group.id} />
       <div className="grid gap-5 xl:grid-cols-3">
