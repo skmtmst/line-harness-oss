@@ -82,6 +82,7 @@ published → withdrawn → archived
 - originalはprivate object key。通常APIから公開URLを返さない
 - thumbnail、review、publicの派生画像をversion付きで生成
 - hashで完全重複候補を出す。似た画像判定は注意候補だけ
+> 後段階（2026-09-25 オーナー判断）：今の段階の合格条件から外す。#817 で扱う。
 - 画像処理jobの成功・retry・永久失敗を台帳化
 
 現行はJPEG data URLと拡張子中心で受け、originalの`image_url`を保存・公開している。画像の実体検査、寸法、EXIF除去、private originalへの移行が必要である。
@@ -140,6 +141,7 @@ V6は100pt、現行定数は5ptである。既存採用を100ptへ黙って再�
 
 - `photo_reward_policy`をversion化し、適用開始日時とpoint数を持つ
 - 投稿受付時または採用時に適用policy versionをsnapshot。推奨は採用時
+> 後段階（2026-09-25 オーナー判断）：今の段階の合格条件から外す。#817 で扱う。
 - 同一submission×reward typeで一回だけ
 - 採用decisionはDBへ確定し、point付与はoutboxから外部ECへ送る
 - 外部成功/DB失敗をprovider award keyで照合し、reconciliationする
@@ -207,6 +209,7 @@ V6の「出しているもの」の表示回数は、placementごとの実測eve
 7. EC point ledgerとsubmissionをaward keyで照合し、不一致を要対応へ
 8. 明示的公開同意のないadopted写真は`approved_private`に置き、公開停止
 9. dual-readと件数・画像hash・point総数を照合後に切替
+> 後段階（2026-09-25 オーナー判断）：今の段階の合格条件から外す。#817 で扱う。
 
 ## 13. 除外
 
@@ -232,6 +235,7 @@ V6の「出しているもの」の表示回数は、placementごとの実測eve
 - 採用と公開同意が分離され、撤回が全利用先へ反映
 - point二重付与がなく、EC/DB不一致をreconcileできる
 - legacy 5ptと新版policyが再現可能
+> 後段階（2026-09-25 オーナー判断）：今の段階の合格条件から外す。#817 で扱う。
 - crop/rotateでoriginalが変わらない
 - 1440/1920で横スクロールなし
 - 設計との画像比較は共通工程ゲート(`v6-shared-platform-requirements.md` §10「工程ゲート」)に従う。要件の完了条件には含めない
@@ -243,6 +247,7 @@ V6の「出しているもの」の表示回数は、placementごとの実測eve
 3. 状態機械と追記decision
 4. 同意・publication・撤回
 5. reward policy、outbox、reconciliation
+> 後段階（2026-09-25 オーナー判断）：今の段階の合格条件から外す。#817 で扱う。
 6. AI補助と人のreview UI
 7. 既存移行、E2E、security、画像比較
 

@@ -281,6 +281,7 @@ LINE残骸を許す`force=true`は管理画面へ出さない。修復専用API�
 - `group_id`, `version_number`, `definition_snapshot`
 - `status`: draft / published / archived
 - `created_by_staff_id`, `published_at`
+> 後段階（2026-09-25 オーナー判断）：今の段階の合格条件から外す。#822 で扱う。
 
 `rich_menu_publish_runs`:
 
@@ -288,6 +289,7 @@ LINE残骸を許す`force=true`は管理画面へ出さない。修復専用API�
 - `mode`: publish / unpublish / scheduled_restore / reconcile
 - `status`, `started_at`, `completed_at`
 - `requested_by_staff_id`, `last_error_code`
+> 後段階（2026-09-25 オーナー判断）：今の段階の合格条件から外す。#822 で扱う。
 
 `rich_menu_publish_run_pages`:
 
@@ -295,6 +297,7 @@ LINE残骸を許す`force=true`は管理画面へ出さない。修復専用API�
 - `old_line_richmenu_id`, `new_line_richmenu_id`, `alias_id`
 - `create_status`, `image_status`, `alias_status`, `cleanup_status`
 - `line_request_ids_json`, `last_error_code`
+> 後段階（2026-09-25 オーナー判断）：今の段階の合格条件から外す。#822 で扱う。
 
 `rich_menu_assignments`:
 
@@ -345,6 +348,7 @@ LINE残骸を許す`force=true`は管理画面へ出さない。修復専用API�
 7. 旧rich menuを非同期で削除
 
 途中失敗時は新規に作った未使用メニューを削除し、aliasと公開版を旧状態に維持する。alias切替後に失敗した場合は照合・修復状態へ送り、自動で旧・新どちらかに揃える。
+> 後段階（2026-09-25 オーナー判断）：今の段階の合格条件から外す。#822 で扱う。
 
 ### 7-3. 出し分け
 
@@ -369,6 +373,7 @@ LINE残骸を許す`force=true`は管理画面へ出さない。修復専用API�
 - `GET /api/rich-menu-groups/{id}/runs`
 - `POST /api/rich-menu-publish-runs/{id}/retry`
 - `POST /api/rich-menu-publish-runs/{id}/reconcile`
+> 後段階（2026-09-25 オーナー判断）：今の段階の合格条件から外す。#822 で扱う。
 - `GET /api/rich-menu-groups/external`
 - `POST /api/rich-menu-groups/external/{lineRichMenuId}/import`
 - `GET /api/rich-menu-groups/{id}/usages`
@@ -441,6 +446,7 @@ LINE残骸を許す`force=true`は管理画面へ出さない。修復専用API�
 - 公開途中失敗で旧メニューを壊さない
 - alias更新中の空白時間を作らない
 - LINE・DB・R2・alias・既定の 5 者照合で作った不一致を、修復ジョブ 1 回で 0 件にする自動テストが通る
+> 後段階（2026-09-25 オーナー判断）：今の段階の合格条件から外す。#822 で扱う。
 - 条件変更イベント後に正しい1件へ切り替わる
 - 一括割当の部分成功・再試行が`rich_menu_assignment_runs`から追跡できることを自動テストで確認する
 - 期間終了後に指定メニューへ復元
@@ -451,7 +457,9 @@ LINE残骸を許す`force=true`は管理画面へ出さない。修復専用API�
 
 1. 版、公開実行、ページ実行台帳
 2. alias更新APIを使う公開saga
+> 後段階（2026-09-25 オーナー判断）：今の段階の合格条件から外す。#822 で扱う。
 3. LINE照合・修復
+> 後段階（2026-09-25 オーナー判断）：今の段階の合格条件から外す。#822 で扱う。
 4. 出し分け実行台帳と再評価イベント拡張
 5. 公開予約・終了後復元
 6. action label、日時選択、クリップボード
