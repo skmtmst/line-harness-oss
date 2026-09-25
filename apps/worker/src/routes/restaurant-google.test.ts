@@ -373,6 +373,16 @@ describe('Googleビジネス：口コミ', () => {
     expect(testDb.raw.prepare('SELECT COUNT(*) AS n FROM rt_google_reviews WHERE needs_attention = 1').get()).toEqual({ n: 2 });
     expect(testDb.raw.prepare(`SELECT reply_status FROM rt_google_reviews WHERE review_name = ?`).get(`${LOCATION}/reviews/r3`)).toEqual({ reply_status: 'published' });
     expect(testDb.raw.prepare('SELECT average_rating, total_review_count FROM rt_google_connections').get()).toEqual({ average_rating: 4.6, total_review_count: 4 });
+
+    const connection = await call('/api/restaurant-test/google/connection?account_id=account-2');
+    expect(await connection.json()).toMatchObject({
+      summary: {
+        unrepliedCount: 3,
+        draftCount: 0,
+        attentionCount: 2,
+        storedCount: 4,
+      },
+    });
   });
 
   it('同期：期限切れのアクセストークンは更新してから使い、invalid_grant なら認可切れにする', async () => {

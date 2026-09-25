@@ -7,13 +7,14 @@ import { ExternalLink, Link2, RefreshCw, Sparkles, Star } from 'lucide-react'
 import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import Button from '@/components/shared/button'
-import Card, { CardHeader } from '@/components/shared/card'
+import Card from '@/components/shared/card'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
 import Pagination from '@/components/shared/pagination'
 import SearchField from '@/components/shared/search-field'
 import SelectField from '@/components/shared/select-field'
+import StickyBar from '@/components/shared/sticky-bar'
 import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
 import { Tabs } from '@/components/shared/tabs'
 import { TextArea } from '@/components/shared/text-field'
@@ -176,17 +177,17 @@ function GoogleBusinessInner() {
     onClick: () => go({ tab: key }),
   }))
 
-  // 口コミの深い画面（下書き・公開確認）はタブ行を出さず、戻るボタンで一覧へ戻る。
-  if (tab === 'reviews' && connected && view === 'draft' && reviewId) {
-    return <ReviewDraftScreen accountId={selectedAccountId} reviewId={reviewId} data={data} canPublish={canPublish} backHref="/restaurant-test/google?tab=reviews" onPublished={() => { void load() }} />
-  }
+  const reviewEditorOpen = tab === 'reviews' && connected && view === 'draft' && Boolean(reviewId)
+  const designNode = reviewEditorOpen ? 'TJPK5' : tab === 'settings' ? 'p9ALPi' : 'lM0zP'
 
   return (
-    <section className="border-hairline bg-canvas text-ink min-w-0 overflow-hidden rounded-card border" data-design-node={tab === 'settings' ? 'p9ALPi' : 'lM0zP'}>
+    <section className="border-hairline bg-canvas text-ink min-w-0 overflow-hidden rounded-card border" data-design-node={designNode}>
       <GoogleBusinessTabs items={tabItems} mapsUrl={connected ? data.connection.locationMapsUrl : null} />
       <div className="border-hairline border-t p-5 sm:p-6 lg:p-8">
-        {banner ? <NoteBar tone={banner.tone} className="mb-4" action={<button type="button" className="text-sm font-semibold" onClick={() => setBanner(null)}>閉じる</button>}>{banner.text}</NoteBar> : null}
-        {tab === 'settings' ? (
+        {banner && data.connection.status !== 'pending_location' ? <NoteBar tone={banner.tone} className="mb-4" action={<button type="button" className="text-sm font-semibold" onClick={() => setBanner(null)}>閉じる</button>}>{banner.text}</NoteBar> : null}
+        {reviewEditorOpen && reviewId ? (
+          <ReviewDraftScreen accountId={selectedAccountId} reviewId={reviewId} data={data} canPublish={canPublish} backHref="/restaurant-test/google?tab=reviews" onPublished={() => { void load() }} />
+        ) : tab === 'settings' ? (
           <SettingsTab accountId={selectedAccountId} data={data} canManage={canManageConnection} onChanged={() => { void load() }} />
         ) : (
           <ReviewsTab accountId={selectedAccountId} data={data} canPublish={canPublish} onOpen={(id) => go({ tab: 'reviews', view: 'draft', id })} onSynced={() => { void load() }} />
@@ -215,7 +216,7 @@ function GoogleBusinessTabs({ items, mapsUrl }: { items: Array<{ label: string; 
   }
 
   return (
-    <nav aria-label="Googleビジネスの機能" aria-orientation="horizontal" className="flex items-center gap-2 overflow-x-auto px-5 py-2.5" role="tablist" onKeyDown={moveFocus} style={{ minHeight: 58 }}>
+    <nav aria-label="Googleビジネスの機能" aria-orientation="horizontal" className="flex flex-wrap items-center gap-2 px-5 py-2.5" role="tablist" onKeyDown={moveFocus} style={{ minHeight: 58 }}>
       {items.map((item) => (
         <button
           key={item.label}
@@ -325,27 +326,46 @@ function SettingsTab({ accountId, data, canManage, onChanged }: { accountId: str
 
   if (connection.status === 'pending_location') {
     return (
-      <div data-design-node="p9ALPi">
-        <NoteBar tone="warn" className="mb-4">このGoogleアカウントは複数の店舗を管理しています。このLINEアカウント（{data.store.name}）に結びつける店舗を1つ選んでください。</NoteBar>
-        <Card>
-          <CardHeader title="接続する店舗を選ぶ" meta={<StatusBadge tone="warning">店舗の選択待ち</StatusBadge>} />
-          <div className="flex flex-col gap-2">
+      <div data-design-node="p9ALPi" className="flex flex-col gap-6">
+        <header className="space-y-1.5">
+          <h2 className="text-metric leading-relaxed font-bold">設定</h2>
+          <p className="text-ink-secondary text-sm leading-relaxed">このLINEアカウントとGoogleビジネスプロフィールを接続します。</p>
+        </header>
+        <div className="flex justify-center pt-2 sm:pt-4">
+          <section className="border-hairline bg-canvas flex w-full flex-col gap-4 rounded-card border p-5 sm:p-7" style={{ maxWidth: 880 }} aria-labelledby="google-location-title">
+            <div className="flex items-center gap-4">
+              <span className="bg-accent-soft flex h-12 w-12 shrink-0 items-center justify-center rounded-card text-accent-deep" aria-hidden="true"><Link2 size={24} /></span>
+              <div className="min-w-0">
+                <h3 id="google-location-title" className="text-heading leading-relaxed font-bold">接続する店舗を選ぶ</h3>
+                <p className="text-ink-faint text-label leading-relaxed">Googleアカウントの認証は完了しています</p>
+              </div>
+            </div>
+            <p className="text-ink-secondary text-sm leading-relaxed">このLINEアカウント（{data.store.name}）に接続する店舗を1つ選んでください。接続後は、選んだ店舗だけを表示します。</p>
+            <div className="flex flex-col gap-2" role="radiogroup" aria-label="接続するGoogleビジネスプロフィール">
             {data.candidates.map((candidate) => (
-              <label key={candidate.locationName} className="border-hairline hover:bg-canvas-sunken flex cursor-pointer items-start gap-3 rounded-card border p-3">
-                <input type="radio" name="location" value={candidate.locationName} checked={selectedLocation === candidate.locationName} onChange={() => setSelectedLocation(candidate.locationName)} className="mt-1" />
-                <span>
-                  <span className="block text-sm font-semibold">{candidate.locationTitle}</span>
-                  {candidate.addressText ? <span className="text-ink-secondary block text-xs">{candidate.addressText}</span> : null}
+              <label
+                key={candidate.locationName}
+                className={`gb-location-option flex min-w-0 cursor-pointer items-center gap-3 rounded-control border px-3.5 py-2 transition-colors ${
+                  selectedLocation === candidate.locationName
+                    ? 'border-accent bg-accent-soft'
+                    : 'border-hairline bg-surface-pearl hover:bg-canvas-sunken'
+                }`}
+              >
+                <input type="radio" name="location" value={candidate.locationName} checked={selectedLocation === candidate.locationName} onChange={() => setSelectedLocation(candidate.locationName)} className="gb-accent-control h-4 w-4 shrink-0" />
+                <span className="min-w-0">
+                  <span className="block truncate text-sm font-semibold" title={candidate.locationTitle}>{candidate.locationTitle}</span>
+                  {candidate.addressText ? <span className="text-ink-secondary block truncate text-xs" title={candidate.addressText}>{candidate.addressText}</span> : null}
                 </span>
               </label>
             ))}
-          </div>
-          {actionError ? <NoteBar tone="danger" className="mt-3">{actionError}</NoteBar> : null}
-          <div className="mt-4 flex gap-2">
-            <Button variant="primary" onClick={() => void selectLocation()} disabled={busy || !selectedLocation || !canManage}>この店舗を接続する</Button>
-            <Button onClick={() => setConfirmDisconnect(true)} disabled={busy || !canManage}>やり直す</Button>
-          </div>
-        </Card>
+            </div>
+            {actionError ? <NoteBar tone="danger">{actionError}</NoteBar> : null}
+            <div className="border-hairline flex flex-wrap justify-center gap-2 border-t pt-4">
+              <Button onClick={() => setConfirmDisconnect(true)} disabled={busy || !canManage}>Googleアカウントを選び直す</Button>
+              <Button variant="primary" onClick={() => void selectLocation()} disabled={busy || !selectedLocation || !canManage}>この店舗を接続する</Button>
+            </div>
+          </section>
+        </div>
         <ConfirmDialog open={confirmDisconnect} title="接続をやり直しますか？" description="いま進めている接続を取り消します。口コミの履歴は残ります。" confirmLabel="取り消す" destructive busy={busy} onConfirm={() => void disconnect()} onCancel={() => setConfirmDisconnect(false)} />
       </div>
     )
@@ -467,20 +487,19 @@ function ReviewsTab({ accountId, data, canPublish, onOpen, onSynced }: { account
   }, [connection.status, data.summary.syncStale, sync, syncedOnce])
 
   const pageCount = list ? Math.max(1, Math.ceil(list.total / list.perPage)) : 1
+  const filterCounts: Record<GoogleReviewFilter, number> = {
+    unreplied: data.summary.unrepliedCount,
+    draft: data.summary.draftCount,
+    attention: data.summary.attentionCount,
+    all: data.summary.storedCount,
+  }
 
   return (
     <div data-design-node="lM0zP">
       <div className="mb-3 flex flex-wrap items-center gap-3">
         <h2 className="text-lg font-bold">口コミ</h2>
         {data.summary.newCount > 0 ? <StatusBadge tone="success">新着 {data.summary.newCount}件</StatusBadge> : null}
-        {connection.averageRating !== null && connection.averageRating !== undefined ? (
-          <span className="inline-flex items-center gap-2 text-sm">
-            <Star size={16} className="text-warning" fill="currentColor" />
-            <span className="font-bold">総合評価 {connection.averageRating.toFixed(1)}</span>
-            <span className="text-ink-faint text-xs">（Google集計・{connection.totalReviewCount ?? '—'}件）</span>
-          </span>
-        ) : null}
-        <span className="text-ink-faint text-xs">{connection.lastSyncedAt ? `取得済み ${formatDateTime(connection.lastSyncedAt)}` : '未取得'}{connection.lastSyncError === 'partial' ? '（一部のみ）' : ''}</span>
+        <span className="text-ink-secondary text-sm">{data.summary.storedCount}件{connection.lastSyncError === 'partial' ? 'を一部取得済み' : 'すべて取得済み'}</span>
         <span className="grow" />
         <Button onClick={() => void sync()} disabled={syncing || connection.status !== 'connected'}><RefreshCw size={16} className={syncing ? 'animate-spin' : ''} />{syncing ? '取得中…' : '同期する'}</Button>
       </div>
@@ -490,13 +509,23 @@ function ReviewsTab({ accountId, data, canPublish, onOpen, onSynced }: { account
       {syncError ? <NoteBar tone="warn" className="mb-3" action={<button type="button" className="text-sm font-semibold" onClick={() => void sync()}>もう一度</button>}>{syncError}</NoteBar> : null}
       {syncing && (list?.total ?? 0) === 0 ? <NoteBar className="mb-3">口コミを取得中… すべてのページを取得してから表示します。</NoteBar> : null}
 
-      <div className="bg-canvas rounded-card border-hairline mb-3 flex flex-wrap items-center gap-2 border p-3">
-        <Tabs items={(Object.keys(FILTER_LABELS) as GoogleReviewFilter[]).map((key) => ({ label: FILTER_LABELS[key], current: filter === key, count: key === 'unreplied' ? data.summary.unrepliedCount : key === 'draft' ? data.summary.draftCount : undefined, onClick: () => { setFilter(key); setPage(1) } }))} />
-        <span className="grow" />
-        <SelectField size="compact" aria-label="評価で絞り込み" value={rating} onChange={(event) => { setRating(event.target.value); setPage(1) }} options={[{ value: '', label: '評価：すべて' }, ...[5, 4, 3, 2, 1].map((n) => ({ value: String(n), label: `★${n}` }))]} />
-        <SelectField size="compact" aria-label="並び順" value={order} onChange={(event) => { setOrder(event.target.value as GoogleReviewOrder); setPage(1) }} options={ORDER_OPTIONS} />
-        <SearchField placeholder="口コミを検索" aria-label="口コミを検索" value={search} onChange={setSearch} onClear={() => setSearch('')} />
-      </div>
+      <Tabs
+        className="gb-review-filters mb-3"
+        label="口コミの状態"
+        items={(Object.keys(FILTER_LABELS) as GoogleReviewFilter[]).map((key) => ({
+          label: FILTER_LABELS[key],
+          current: filter === key,
+          count: filterCounts[key],
+          onClick: () => { setFilter(key); setPage(1) },
+        }))}
+        actions={(
+          <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
+            <SelectField size="compact" aria-label="評価で絞り込み" value={rating} onChange={(event) => { setRating(event.target.value); setPage(1) }} options={[{ value: '', label: '評価：すべて' }, ...[5, 4, 3, 2, 1].map((n) => ({ value: String(n), label: `★${n}` }))]} />
+            <SelectField size="compact" aria-label="並び順" value={order} onChange={(event) => { setOrder(event.target.value as GoogleReviewOrder); setPage(1) }} options={ORDER_OPTIONS} />
+            <SearchField placeholder="口コミを検索" aria-label="口コミを検索" value={search} onChange={setSearch} onClear={() => setSearch('')} />
+          </div>
+        )}
+      />
 
       {listLoading && !list ? <ListState kind="loading" title="口コミを読み込んでいます" /> : null}
       {listError ? <ListState kind="error" title="口コミを表示できませんでした" description={listError} onRetry={() => void load()} /> : null}
@@ -645,104 +674,102 @@ function ReviewDraftScreen({ accountId, reviewId, data, canPublish, backHref, on
 
   if (confirming) {
     return (
-      <div data-design-node="xSudF" className="text-ink min-w-0">
-        <div className="mb-4"><Button onClick={() => setConfirming(false)} disabled={busy !== null}>編集に戻る</Button></div>
-        <Card>
-          <CardHeader title="この返信をGoogleに公開しますか？" meta={<StatusBadge tone="warning">まだ送信していません</StatusBadge>} />
-          <p className="text-ink-secondary mb-4 text-sm">返信先と内容を確認してください。公開後、Googleの口コミに表示されます。</p>
-          <dl className="mb-4 grid grid-cols-1 gap-x-8 gap-y-2 text-sm sm:grid-cols-4">
-            <dt className="text-ink-secondary sm:col-span-1">返信先の店舗</dt><dd className="font-semibold sm:col-span-3">{data.connection.locationTitle ?? data.store.name}</dd>
-            <dt className="text-ink-secondary sm:col-span-1">返信する口コミ</dt><dd className="sm:col-span-3"><span className="font-semibold">{review.reviewerDisplayName ?? '匿名'}</span> <Stars rating={review.starRating} /> <span className="text-ink-faint text-xs">{formatDate(review.createTime)}</span></dd>
-            <dt className="text-ink-secondary sm:col-span-1">公開のタイミング</dt><dd className="sm:col-span-3">送信後、Googleの処理を経て表示</dd>
-          </dl>
-          <div className="border-hairline mb-3 rounded-card border p-3">
-            <p className="text-ink-secondary mb-1 text-xs font-semibold">返信文</p>
-            <p className="whitespace-pre-wrap text-sm leading-relaxed">{text}</p>
-          </div>
-          <div className="bg-canvas-sunken mb-4 rounded-card p-3">
-            <p className="text-ink-secondary mb-1 text-xs font-semibold">元の口コミ</p>
-            <p className="text-sm leading-relaxed">{review.comment ?? '（本文なし・評価のみ）'}</p>
-          </div>
-          <label className="mb-3 flex items-start gap-2 text-sm">
-            <input type="checkbox" checked={checked} onChange={(event) => setChecked(event.target.checked)} className="mt-1" />
-            <span>返信先・内容・個人情報の有無を確認しました（予約内容や来店履歴などを追記していない）</span>
-          </label>
-          <p className="text-ink-faint mb-1 text-xs">返信は店舗を代表して公開されます。送信後に再取得し、表示される内容を確認します。</p>
-          <p className="text-ink-faint mb-4 text-xs">通信結果が不明な場合は、重複投稿を避けるため先にGoogle側の状態を確認します。</p>
-          {actionError ? <NoteBar tone="danger" className="mb-3">{actionError}</NoteBar> : null}
-          <div className="flex justify-end gap-2">
-            <Button onClick={() => setConfirming(false)} disabled={busy !== null}>修正する</Button>
-            <Button variant="primary" onClick={() => void publish()} disabled={!checked || busy !== null}>{busy === 'publish' ? '送信中…' : 'この内容で返信する'}</Button>
-          </div>
-        </Card>
+      <div data-design-node="xSudF" className="text-ink flex min-w-0 flex-col gap-4">
+        <div><Button onClick={() => setConfirming(false)} disabled={busy !== null}>編集に戻る</Button></div>
+        <header className="flex flex-wrap items-center gap-2">
+          <h2 className="text-heading font-bold">この返信をGoogleに公開しますか？</h2>
+          <StatusBadge tone="warning">まだ送信していません</StatusBadge>
+        </header>
+        <div className="gb-confirm-grid grid min-w-0 grid-cols-1 gap-4">
+          <Card padding="roomy">
+            <p className="text-ink-secondary mb-4 text-sm">返信先と内容を確認してください。公開後、Googleの口コミに表示されます。</p>
+            <dl className="gb-confirm-details mb-4 grid grid-cols-1 gap-x-8 gap-y-2 text-sm">
+              <dt className="text-ink-secondary">返信先の店舗</dt><dd className="min-w-0 truncate font-semibold" title={data.connection.locationTitle ?? data.store.name}>{data.connection.locationTitle ?? data.store.name}</dd>
+              <dt className="text-ink-secondary">返信する口コミ</dt><dd><span className="font-semibold">{review.reviewerDisplayName ?? '匿名'}</span> <Stars rating={review.starRating} /> <span className="text-ink-faint text-xs">{formatDate(review.createTime)}</span></dd>
+              <dt className="text-ink-secondary">公開のタイミング</dt><dd>送信後、Googleの処理を経て表示</dd>
+            </dl>
+            <div className="border-hairline mb-3 rounded-card border p-4">
+              <p className="text-ink-secondary mb-2 text-xs font-semibold">返信文</p>
+              <p className="whitespace-pre-wrap text-sm leading-relaxed">{text}</p>
+            </div>
+            <div className="bg-canvas-sunken rounded-card p-4">
+              <p className="text-ink-secondary mb-2 text-xs font-semibold">元の口コミ</p>
+              <p className="whitespace-pre-wrap text-sm leading-relaxed">{review.comment ?? '（本文なし・評価のみ）'}</p>
+            </div>
+          </Card>
+          <Card padding="roomy">
+            <h3 className="mb-3 text-base font-bold">公開前の確認</h3>
+            <label className="mb-4 flex items-start gap-2 text-sm leading-relaxed">
+              <input type="checkbox" checked={checked} onChange={(event) => setChecked(event.target.checked)} className="gb-accent-control mt-1 h-4 w-4 shrink-0" />
+              <span>返信先・内容・個人情報の有無を確認しました</span>
+            </label>
+            <ul className="text-ink-secondary flex flex-col gap-2 text-xs leading-relaxed">
+              <li>・予約内容や来店履歴などを追記していません</li>
+              <li>・返信は店舗を代表して公開されます</li>
+              <li>・通信結果が不明な場合はGoogle側を先に確認します</li>
+            </ul>
+            {actionError ? <NoteBar tone="danger" className="mt-4">{actionError}</NoteBar> : null}
+          </Card>
+        </div>
+        <StickyBar actions={<><Button onClick={() => setConfirming(false)} disabled={busy !== null}>修正する</Button><Button variant="primary" onClick={() => void publish()} disabled={!checked || busy !== null}>{busy === 'publish' ? '送信中…' : 'この内容で返信する'}</Button></>} />
       </div>
     )
   }
 
   return (
-    <div data-design-node="TJPK5" className="text-ink min-w-0">
-      <div className="mb-4"><Button href={backHref}>口コミ一覧へ戻る</Button></div>
+    <div data-design-node="TJPK5" className="text-ink flex min-w-0 flex-col gap-4">
+      <div><Button href={backHref}>口コミ一覧へ戻る</Button></div>
       {done ? <NoteBar className="mb-4">Googleに返信を送信しました。反映を確認できるまで「反映確認中」と表示します。</NoteBar> : null}
       {conflict !== null ? <NoteBar tone="danger" className="mb-4">別の担当者がすでに返信しています。表示されている返信：「{conflict}」</NoteBar> : null}
       {pendingConfirm && !done ? <NoteBar tone="warn" className="mb-4">前回の送信結果を確認できていません。「この内容で返信する」を押すと、先にGoogle側の状態を照合してから送信します。</NoteBar> : null}
       {!data.writeEnabled ? <NoteBar tone="warn" className="mb-4">この環境ではGoogleへの公開が許可されていません。下書きの作成と保存はできます。</NoteBar> : null}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <div className="flex min-w-0 flex-col gap-4 lg:col-span-2">
-          <Card>
-            <CardHeader title="返信する口コミ" meta={<Stars rating={review.starRating} />} />
-            <p className="text-sm font-semibold">{review.reviewerDisplayName ?? '匿名'} <span className="text-ink-faint text-xs font-normal">{formatDateTime(review.createTime)}</span></p>
-            <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed">{review.comment ?? '（本文なし・評価のみ）'}</p>
-            <p className="text-ink-faint mt-3 text-xs">Googleの口コミ原文。投稿者の個人情報や来店履歴を、返信に追加しないでください。</p>
-            {data.connection.locationMapsUrl ? <a href={data.connection.locationMapsUrl} target="_blank" rel="noreferrer" className="text-action mt-2 inline-flex items-center gap-1 text-xs font-semibold">Googleで原文を確認 <ExternalLink size={12} /></a> : null}
-            {alreadyReplied && (review.replyComment || done) ? (
-              <div className="bg-canvas-sunken mt-3 rounded-card p-3">
-                <p className="text-ink-secondary mb-1 text-xs font-semibold">公開済みの返信{review.replyUpdateTime ? `（${formatDateTime(review.replyUpdateTime)}）` : ''}</p>
-                <p className="whitespace-pre-wrap text-sm leading-relaxed">{done?.comment ?? review.replyComment}</p>
-              </div>
-            ) : null}
-          </Card>
-          {!alreadyReplied ? (
-            <Card>
-              <CardHeader
-                title={aiGenerated ? 'AIが作った返信の下書き' : '返信の下書き'}
-                meta={<StatusBadge tone="neutral">未公開</StatusBadge>}
-                action={data.aiAvailable ? <Button size="field" onClick={() => void generate('new')} disabled={busy !== null}><Sparkles size={14} />{busy === 'generate' ? '作成中…' : text ? '作り直す' : 'AIで下書きを作る'}</Button> : undefined}
-              />
-              {aiGenerated ? <p className="text-ink-secondary mb-2 text-xs">AIが作成した文章です。事実・表現を確認し、必要に応じて修正してください。</p> : null}
-              <TextArea value={text} onChange={(event) => { setText(event.target.value); setSaved('') }} rows={8} placeholder="返信文を入力するか、AIで下書きを作ります。" aria-label="返信文" invalid={textLength > 4096} />
-              <div className="mt-2 flex flex-wrap items-center gap-2">
-                {data.aiAvailable ? (
-                  <>
-                    <Button size="field" onClick={() => void generate('shorter')} disabled={busy !== null || !text}>短くする</Button>
-                    <Button size="field" onClick={() => void generate('polite')} disabled={busy !== null || !text}>丁寧にする</Button>
-                  </>
-                ) : <span className="text-ink-faint text-xs">この環境ではAI下書きは使えません。</span>}
-                <span className="grow" />
-                <span className={`text-xs ${textLength > 4096 ? 'text-danger' : 'text-ink-faint'}`}>{textLength.toLocaleString()} / 4,096</span>
-              </div>
-              {saved ? <p className="text-success mt-2 text-xs">{saved}</p> : null}
-              {actionError ? <NoteBar tone="danger" className="mt-3">{actionError}</NoteBar> : null}
-            </Card>
-          ) : null}
-        </div>
-        <div className="flex flex-col gap-4">
-          <Card>
-            <CardHeader title="公開前の確認" />
-            <ul className="text-ink-secondary flex flex-col gap-2 text-xs leading-relaxed">
-              <li>☑ 事実と異なる説明や、約束できない対応がない</li>
-              <li>☑ 個人情報・予約内容・問い合わせ履歴を含まない</li>
-              <li>☑ 返信先：{data.connection.locationTitle ?? data.store.name} ／ {review.reviewerDisplayName ?? '匿名'}さんの口コミ</li>
-            </ul>
-            {!canPublish ? <p className="text-ink-faint mt-3 text-xs">Googleへの公開は店舗管理者以上が行います。下書きを保存しておくと、管理者が確認して公開できます。</p> : null}
-          </Card>
-          {!alreadyReplied ? (
-            <div className="flex flex-col gap-2">
-              <Button onClick={() => void save()} disabled={busy !== null || textLength === 0 || textLength > 4096}>{busy === 'save' ? '保存中…' : '下書き保存'}</Button>
-              <Button variant="primary" onClick={() => { setChecked(false); setActionError(''); setConfirming(true) }} disabled={!canOpenConfirm}>返信内容を確認</Button>
+      <div className="gb-draft-grid grid min-w-0 grid-cols-1 gap-4">
+        <Card padding="roomy">
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            <h2 className="text-base font-bold">返信する口コミ</h2>
+            <Stars rating={review.starRating} />
+          </div>
+          <p className="text-sm font-semibold">{review.reviewerDisplayName ?? '匿名'} <span className="text-ink-faint text-xs font-normal">{formatDateTime(review.createTime)}</span></p>
+          <p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed">{review.comment ?? '（本文なし・評価のみ）'}</p>
+          <p className="text-ink-faint mt-4 text-xs">Googleの口コミ原文です。投稿者の個人情報や来店履歴を返信に追加しないでください。</p>
+          {data.connection.locationMapsUrl ? <a href={data.connection.locationMapsUrl} target="_blank" rel="noreferrer" className="text-action mt-3 inline-flex items-center gap-1 text-xs font-semibold">Googleで原文を確認 <ExternalLink size={12} /></a> : null}
+          {alreadyReplied && (review.replyComment || done) ? (
+            <div className="bg-canvas-sunken mt-4 rounded-card p-3">
+              <p className="text-ink-secondary mb-1 text-xs font-semibold">公開済みの返信{review.replyUpdateTime ? `（${formatDateTime(review.replyUpdateTime)}）` : ''}</p>
+              <p className="whitespace-pre-wrap text-sm leading-relaxed">{done?.comment ?? review.replyComment}</p>
             </div>
           ) : null}
-        </div>
+        </Card>
+        {!alreadyReplied ? (
+          <Card padding="roomy">
+            <div className="mb-3 flex flex-wrap items-center gap-2">
+              <h2 className="text-base font-bold">{aiGenerated ? 'AIが作った返信の下書き' : '返信の下書き'}</h2>
+              <StatusBadge tone="neutral">未公開</StatusBadge>
+              <span className="grow" />
+              {data.aiAvailable ? <Button size="field" onClick={() => void generate('new')} disabled={busy !== null}><Sparkles size={14} />{busy === 'generate' ? '作成中…' : text ? '作り直す' : 'AIで下書きを作る'}</Button> : null}
+            </div>
+            {aiGenerated ? <NoteBar className="mb-3">AIが作成した文章です。事実・表現を確認し、必要に応じて修正してください。</NoteBar> : null}
+            <TextArea value={text} onChange={(event) => { setText(event.target.value); setSaved('') }} rows={12} placeholder="返信文を入力するか、AIで下書きを作ります。" aria-label="返信文" invalid={textLength > 4096} />
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              {data.aiAvailable ? <><Button size="field" onClick={() => void generate('shorter')} disabled={busy !== null || !text}>短くする</Button><Button size="field" onClick={() => void generate('polite')} disabled={busy !== null || !text}>丁寧にする</Button></> : <span className="text-ink-faint text-xs">この環境ではAI下書きは使えません。</span>}
+              <span className="grow" />
+              <span className={`text-xs ${textLength > 4096 ? 'text-danger' : 'text-ink-faint'}`}>{textLength.toLocaleString()} / 4,096</span>
+            </div>
+            <div className="border-hairline mt-4 border-t pt-4">
+              <h3 className="mb-2 text-sm font-bold">公開前の確認</h3>
+              <ul className="text-ink-secondary grid grid-cols-1 gap-2 text-xs leading-relaxed lg:grid-cols-2">
+                <li>☑ 事実と異なる説明や、約束できない対応がない</li>
+                <li>☑ 個人情報・予約内容・問い合わせ履歴を含まない</li>
+                <li className="lg:col-span-2">☑ 返信先：{data.connection.locationTitle ?? data.store.name} ／ {review.reviewerDisplayName ?? '匿名'}さんの口コミ</li>
+              </ul>
+              {!canPublish ? <p className="text-ink-faint mt-3 text-xs">Googleへの公開は店舗管理者以上が行います。下書きを保存すると、管理者が確認できます。</p> : null}
+            </div>
+            {saved ? <p className="text-success mt-3 text-xs">{saved}</p> : null}
+            {actionError ? <NoteBar tone="danger" className="mt-3">{actionError}</NoteBar> : null}
+          </Card>
+        ) : <Card padding="roomy"><p className="text-ink-secondary text-sm">この口コミへの返信は公開済みです。</p></Card>}
       </div>
+      {!alreadyReplied ? <StickyBar actions={<><Button onClick={() => void save()} disabled={busy !== null || textLength === 0 || textLength > 4096}>{busy === 'save' ? '保存中…' : '下書きを保存'}</Button><Button variant="primary" onClick={() => { setChecked(false); setActionError(''); setConfirming(true) }} disabled={!canOpenConfirm}>返信内容を確認</Button></>} /> : null}
       <ConfirmDialog
         open={leaveTarget !== null}
         title="保存していない下書きがあります"

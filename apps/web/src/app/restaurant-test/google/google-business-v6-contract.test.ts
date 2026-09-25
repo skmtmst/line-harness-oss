@@ -2,13 +2,16 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
 const page = readFileSync(new URL('./google-business.tsx', import.meta.url), 'utf8')
+const globalStyles = readFileSync(new URL('../../globals.css', import.meta.url), 'utf8')
 const api = readFileSync(new URL('../../../lib/restaurant-google-api.ts', import.meta.url), 'utf8')
 
 describe('Googleビジネス V6正本契約', () => {
-  it('V6正本の設定ノード・一体型パネル・680px接続カードを使う', () => {
-    expect(page).toContain('data-design-node={tab === \'settings\' ? \'p9ALPi\' : \'lM0zP\'}')
+  it('V6正本の設定ノード・一体型パネル・接続カードを使う', () => {
+    expect(page).toContain("const designNode = reviewEditorOpen ? 'TJPK5' : tab === 'settings' ? 'p9ALPi' : 'lM0zP'")
+    expect(page).toContain('data-design-node={designNode}')
     expect(page).toContain('style={{ minHeight: 58 }}')
     expect(page).toContain('style={{ maxWidth: 680 }}')
+    expect(page).toContain('style={{ maxWidth: 880 }}')
     expect(page).toContain('Googleアカウントを接続')
     expect(page).toContain('接続する店舗は、1つのLINEアカウントにつき1店舗です。')
     expect(page).toContain('tabIndex={item.current ? 0 : -1}')
@@ -20,5 +23,20 @@ describe('Googleビジネス V6正本契約', () => {
     expect(page).toContain('data.permissions.canManageConnection')
     expect(page).not.toContain('api.staff.me()')
     expect(page).toContain('disabled={busy || !canManage || !data.oauthConfigured}')
+  })
+
+  it('口コミ4分類の件数をすべて表示し、V6の返信編集・公開確認の幅と追従操作を保つ', () => {
+    expect(api).toContain('attentionCount: number')
+    expect(page).toContain('attention: data.summary.attentionCount')
+    expect(page).toContain('all: data.summary.storedCount')
+    expect(page).toContain('count: filterCounts[key]')
+    expect(page).toContain('className="gb-review-filters mb-3"')
+    expect(globalStyles).toContain('@media (max-width: 1350px)')
+    expect(globalStyles).toContain('.gb-review-filters')
+    expect(page).toContain('data-design-node="TJPK5"')
+    expect(page).toContain('data-design-node="xSudF"')
+    expect(globalStyles).toContain('grid-template-columns: 420px minmax(0, 1fr)')
+    expect(globalStyles).toContain('grid-template-columns: minmax(0, 1fr) 390px')
+    expect(page).toContain('<StickyBar')
   })
 })

@@ -476,12 +476,13 @@ restaurantGoogle.get('/api/restaurant-test/google/connection', async (c) => {
       `SELECT
          SUM(CASE WHEN reply_status IN ('unreplied', 'draft') THEN 1 ELSE 0 END) AS unreplied,
          SUM(CASE WHEN reply_status = 'draft' THEN 1 ELSE 0 END) AS drafts,
+         SUM(CASE WHEN needs_attention = 1 THEN 1 ELSE 0 END) AS attention,
          SUM(CASE WHEN first_seen_at >= COALESCE(?, '') THEN 1 ELSE 0 END) AS new_count,
          COUNT(*) AS stored
        FROM rt_google_reviews WHERE store_id = ?`,
     )
     .bind(connection?.last_synced_at ? new Date(Date.parse(connection.last_synced_at) - 24 * 3600 * 1000).toISOString() : null, store.id)
-    .first<{ unreplied: number | null; drafts: number | null; new_count: number | null; stored: number }>();
+    .first<{ unreplied: number | null; drafts: number | null; attention: number | null; new_count: number | null; stored: number }>();
   const candidates =
     connection?.status === 'pending_location'
       ? (
@@ -500,6 +501,7 @@ restaurantGoogle.get('/api/restaurant-test/google/connection', async (c) => {
     summary: {
       unrepliedCount: counts?.unreplied ?? 0,
       draftCount: counts?.drafts ?? 0,
+      attentionCount: counts?.attention ?? 0,
       newCount: counts?.new_count ?? 0,
       storedCount: counts?.stored ?? 0,
       syncStale: !lastSyncedMs || Date.now() - lastSyncedMs > SYNC_STALE_AFTER_MS,
