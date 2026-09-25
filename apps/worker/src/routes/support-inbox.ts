@@ -261,13 +261,9 @@ supportInbox.get('/api/support/inbox', requireRole('owner', 'admin', 'staff'), a
           AND sr.conversation_id = t.id
           AND sr.staff_id = ?
          WHERE ${statusSql} ${searchSql}
-         ORDER BY CASE t.status
-                    WHEN 'unread' THEN 0
-                    WHEN 'in_progress' THEN 1
-                    WHEN 'on_hold' THEN 2
-                    ELSE 3
-                  END,
-                  t.last_message_at DESC, t.id DESC
+         /* 一覧の並びは LINE と同じく「未読が先 → 最新の受信・送信が新しい順」。
+            未読は赤い点と同じ定義 (担当者の既読位置より新しい受信がある)。 */
+         ORDER BY is_unread_for_staff DESC, t.last_message_at DESC, t.id DESC
          LIMIT ? ${channel === 'email' ? 'OFFSET ?' : ''}`,
       ).bind(...bindings).all<EmailThreadRow>();
       emailTotal = emailRows.results[0]?.total_count ?? 0;
@@ -321,14 +317,19 @@ supportInbox.get('/api/support/inbox', requireRole('owner', 'admin', 'staff'), a
       }
     }
 
-    const statusPriority = { unread: 0, in_progress: 1, on_hold: 2, resolved: 3 } as const;
-    items.sort((a, b) => {
-      const priority = statusPriority[a.status as keyof typeof statusPriority]
-        - statusPriority[b.status as keyof typeof statusPriority];
-      if (priority !== 0) return priority;
-      // 対応漏れを防ぐため、同じ状態では待ち時間が長い顧客を先頭にする。
-      return String(a.lastIncomingAt).localeCompare(String(b.lastIncomingAt));
-    });
+    // channel=email は受信箱の左の一覧に混ぜる分。口側の ORDER BY
+    // (未読が先・新しい順) のまま出し、ここでは並べ替えない。
+    // 混ぜた2出どころ (LINE は /api/chats) はどちらも同じ決まり。
+    if (channel !== 'email') {
+      const statusPriority = { unread: 0, in_progress: 1, on_hold: 2, resolved: 3 } as const;
+      items.sort((a, b) => {
+        const priority = statusPriority[a.status as keyof typeof statusPriority]
+          - statusPriority[b.status as keyof typeof statusPriority];
+        if (priority !== 0) return priority;
+        // 対応漏れを防ぐため、同じ状態では待ち時間が長い顧客を先頭にする。
+        return String(a.lastIncomingAt).localeCompare(String(b.lastIncomingAt));
+      });
+    }
     const oldest = items.reduce<string | null>((value, item) => {
       const at = String(item.lastIncomingAt || '');
       return !at ? value : value === null || at < value ? at : value;
