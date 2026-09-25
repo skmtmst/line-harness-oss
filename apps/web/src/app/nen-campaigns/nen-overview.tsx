@@ -191,7 +191,7 @@ function Kpis({ kpis, loading }: { kpis: NenKpis | null; loading: boolean }) {
   return (
     <KpiCollapse data-design="KPIs" data-design-node="nen-kpis" gridClassName="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
       <SummaryCard variant="v6" title={`${month} 送った数`} value={kpis?.sentThisMonth ?? null} unit="通" detail={kpis ? `先月 ${num(kpis.sentLastMonth)}通` : '—'} loading={loading} />
-      <SummaryCard variant="v6" title="開封" value={null} unit="%" valueText={kpis?.openRate == null ? '—' : `${kpis.openRate}%`} detail="コラムを開いた割合（自動配信はLINEから個人開封を取得できません）" loading={loading} />
+      <SummaryCard variant="v6" title="開封" value={null} unit="%" valueText={kpis?.openRate == null ? '—' : `${kpis.openRate}%`} detail="コラムを開いた割合" description="自動配信はLINEから個人開封を取得できません。" loading={loading} />
       <SummaryCard variant="v6" title="配信からの注文" value={kpis?.orders ?? null} unit="件" detail={kpis?.orderAmount == null ? '送信後7日以内の注文' : `¥${num(kpis.orderAmount)}（送信後7日以内）`} loading={loading} />
       <SummaryCard variant="v6" title="届かなかった" value={kpis?.undelivered ?? null} unit="通" detail={kpis ? `友だち解除 ${num(kpis.unfollowed)}・ブロック ${num(kpis.blocked)}` : '友だち解除・ブロック'} loading={loading} />
     </KpiCollapse>
