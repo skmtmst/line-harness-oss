@@ -1411,7 +1411,9 @@ export async function findCrossScenarioCycle(
   const names = new Map<string, string>();
   let current: string | null = scenarioId;
   for (let hops = 0; hops < 50 && current; hops += 1) {
-    const row = await db.prepare(
+    const row: {
+      id: string; name: string; on_complete_mode: string | null; on_complete_scenario_id: string | null;
+    } | null = await db.prepare(
       `SELECT id, name, on_complete_mode, on_complete_scenario_id FROM scenarios WHERE id = ?`,
     ).bind(current).first<{
       id: string; name: string; on_complete_mode: string | null; on_complete_scenario_id: string | null;
@@ -1419,7 +1421,7 @@ export async function findCrossScenarioCycle(
     if (!row) return null;
     names.set(row.id, row.name);
     if (row.on_complete_mode !== 'move' || !row.on_complete_scenario_id) return null;
-    const target = row.on_complete_scenario_id;
+    const target: string = row.on_complete_scenario_id;
     const revisit = chain.indexOf(target);
     if (revisit >= 0) {
       return [...chain.slice(revisit).map((id) => names.get(id) ?? id), names.get(target) ?? target];
