@@ -1010,23 +1010,24 @@
           "implementationHeight": 1080,
           "heightDifferencePx": 0,
           "widthDifferencePx": 0,
-          "mismatchedPixels": 103701,
+          "mismatchedPixels": 96245,
           "comparedPixels": 2073600,
-          "pixelDiffPercent": 5.001,
+          "pixelDiffPercent": 4.6414,
           "boundingBox": {
             "left": 0,
             "top": 0,
-            "right": 1913,
+            "right": 1881,
             "bottom": 1079
           },
           "dominantRegion": "中央・左",
+          "heightReason": null,
           "designPath": "docs/design-reference/friends-v6/LT8RS.png",
           "implementationPath": "docs/design-qa/friends-v6/LT8RS-1920.png",
           "implementationSource": "docs",
           "diffPath": "docs/design-qa/friends-v6/LT8RS-diff-1920.png"
         }
       ],
-      "pixelDiffPercent": 5.001,
+      "pixelDiffPercent": 4.6414,
       "heightDifferencePx": 0,
       "dominantRegion": "中央・左",
       "implementationSource": "docs",
@@ -1034,7 +1035,8 @@
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
       "aboveThreshold": false,
-      "retainedFrom": "2026-09-09T02:50:39.563Z"
+      "retainedFrom": "2026-09-09T02:50:39.563Z",
+      "heightReason": null
     },
     {
       "feature": 3,
@@ -1263,19 +1265,19 @@
       "comparisons": [
         {
           "width": 1920,
-          "comparedHeight": 1080,
-          "designHeight": 1080,
-          "implementationHeight": 1080,
+          "comparedHeight": 1220,
+          "designHeight": 1220,
+          "implementationHeight": 1220,
           "heightDifferencePx": 0,
           "widthDifferencePx": 0,
-          "mismatchedPixels": 103890,
-          "comparedPixels": 2073600,
-          "pixelDiffPercent": 5.0101,
+          "mismatchedPixels": 106818,
+          "comparedPixels": 2342400,
+          "pixelDiffPercent": 4.5602,
           "boundingBox": {
             "left": 0,
             "top": 0,
             "right": 1881,
-            "bottom": 1079
+            "bottom": 1219
           },
           "dominantRegion": "中央・左",
           "heightReason": null,
@@ -1285,7 +1287,7 @@
           "diffPath": "docs/design-qa/friends-v6/InCDe-diff-1920.png"
         }
       ],
-      "pixelDiffPercent": 5.0101,
+      "pixelDiffPercent": 4.5602,
       "heightDifferencePx": 0,
       "heightReason": null,
       "dominantRegion": "中央・左",
@@ -1294,7 +1296,7 @@
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
       "aboveThreshold": false,
-      "retainedFrom": "2026-09-09T02:50:39.563Z"
+      "retainedFrom": "2026-09-25T10:12:50.255Z"
     },
     {
       "feature": 3,
@@ -1956,9 +1958,9 @@
           "implementationHeight": 1080,
           "heightDifferencePx": 0,
           "widthDifferencePx": 0,
-          "mismatchedPixels": 80730,
+          "mismatchedPixels": 125755,
           "comparedPixels": 2073600,
-          "pixelDiffPercent": 3.8932,
+          "pixelDiffPercent": 6.0646,
           "boundingBox": {
             "left": 0,
             "top": 0,
@@ -1968,12 +1970,12 @@
           "dominantRegion": "中央・右",
           "heightReason": null,
           "designPath": "docs/design-reference/scenarios-v6/M2b2B.png",
-          "implementationPath": "docs/design-qa/scenarios-v6/M2b2B-loading-1920.png",
+          "implementationPath": "docs/design-qa/scenarios-v6/M2b2B-1920.png",
           "implementationSource": "docs",
           "diffPath": "docs/design-qa/scenarios-v6/M2b2B-diff-1920.png"
         }
       ],
-      "pixelDiffPercent": 3.8932,
+      "pixelDiffPercent": 6.0646,
       "heightDifferencePx": 0,
       "heightReason": null,
       "dominantRegion": "中央・右",
@@ -1981,7 +1983,8 @@
       "diffPath": "docs/design-qa/scenarios-v6/M2b2B-diff-1920.png",
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
-      "aboveThreshold": false
+      "aboveThreshold": false,
+      "retainedFrom": "2026-09-25T10:12:50.255Z"
     },
     {
       "feature": 5,
@@ -7997,9 +8000,9 @@
           "implementationHeight": 1137,
           "heightDifferencePx": 0,
           "widthDifferencePx": -1,
-          "mismatchedPixels": 153593,
+          "mismatchedPixels": 148294,
           "comparedPixels": 2183040,
-          "pixelDiffPercent": 7.0357,
+          "pixelDiffPercent": 6.793,
           "boundingBox": {
             "left": 0,
             "top": 0,
@@ -8014,7 +8017,7 @@
           "diffPath": "docs/design-qa/nen-v6/ymXJK-diff-1920.png"
         }
       ],
-      "pixelDiffPercent": 7.0357,
+      "pixelDiffPercent": 6.793,
       "heightDifferencePx": 0,
       "heightReason": null,
       "dominantRegion": "中央・右",
@@ -8023,7 +8026,7 @@
       "pixelAboveThreshold": false,
       "heightAboveThreshold": false,
       "aboveThreshold": false,
-      "retainedFrom": "2026-09-09T02:50:39.563Z"
+      "retainedFrom": "2026-09-25T10:12:50.255Z"
     },
     {
       "feature": 21,
