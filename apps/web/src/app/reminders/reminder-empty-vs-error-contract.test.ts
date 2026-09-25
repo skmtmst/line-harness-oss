@@ -46,9 +46,13 @@ describe('リマインダ一覧の空と失敗', () => {
   it('3つの状態を言い分ける', () => {
     // 読めない / そもそも0件 / 絞り込みで0件 は、運用者にとって意味が違う。
     // ★V7: 手作りの行を TableStateRow へ寄せた。隠しの目印はやめ、見える文言で言い分ける。
+    // ★V7 `x63W5x`：失敗の言い方は共通部品から引く（`LIST_STATE_PRESETS.error.title`）。
+    // ページ上の帯は出さず、表の中の1行だけにまとめる。
     expect(PAGE).toContain('この条件に合うリマインダはありません。')
     expect(PAGE).toContain('まだリマインダがありません')
-    expect(PAGE).toContain('表示できませんでした')
+    expect(PAGE).toContain('LIST_STATE_PRESETS.error.title')
     expect(PAGE).toContain('onRetry={reminderList.retry}')
+    // 一覧の失敗の帯は無い（操作の失敗の知らせは別に残す）。
+    expect(PAGE).not.toContain('LIST_STATE_PRESETS.error.title}。{LIST_STATE_PRESETS.error.description}')
   })
 })

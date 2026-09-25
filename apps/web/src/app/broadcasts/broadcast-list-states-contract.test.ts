@@ -34,8 +34,14 @@ describe('一覧の状態（設計 6-1-N `TmHjF`）', () => {
     expect(PAGE, '権限不足の1枚が無い').toContain('kind="forbidden"')
   })
 
-  it('権限不足のときは、失敗の帯を重ねて出さない', () => {
-    expect(PAGE).toContain('{error && !forbidden && (')
+  it('失敗をページ上の帯と一覧の2か所に出さない', () => {
+    // ★V7 `x63W5x`：同じ失敗は1画面に1つ。一覧の失敗なら帯を出さず、
+    // 一覧の場所の ListState error だけ残す。権限不足も別の1枚で重ねない。
+    expect(PAGE).not.toContain('{error && !forbidden && (')
+    // ページ上の帯（`p-4 bg-danger-bg` の箱）。行の削除ボタンの hover は別物。
+    expect(PAGE).not.toContain('p-4 bg-danger-bg')
+    expect(PAGE).toContain('kind="forbidden"')
+    expect(PAGE).toContain('onRetry={() => void load()}')
   })
 
   it('空・失敗・権限不足を共通部品で描く', () => {

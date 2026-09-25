@@ -96,7 +96,7 @@ afterEach(() => {
 })
 
 describe('#634 運用者タブ件数の取得失敗から読み直せる', () => {
-  it('「取得失敗」の帯から「もう一度読み込む」で件数を取り直す', async () => {
+  it('「取得失敗」の1行から「もう一度」で件数を取り直す', async () => {
     fixture.operatorList
       .mockRejectedValueOnce(new Error('down'))
       .mockResolvedValueOnce({ success: true, data: { summary: { total: 7 }, items: [] } })
@@ -107,7 +107,8 @@ describe('#634 運用者タブ件数の取得失敗から読み直せる', () =>
     await waitFor(() => expect(screen.getByText('運用者へのお知らせ 取得失敗')).toBeTruthy())
     await waitFor(() => expect(screen.getByText(/運用者へのお知らせの件数を読み込めませんでした/)).toBeTruthy())
 
-    fireEvent.click(screen.getByRole('button', { name: 'もう一度読み込む' }))
+    // ★V7 `x63W5x`：黄色の帯ではなく、その場所の小さな1行から読み直す。
+    fireEvent.click(screen.getByRole('button', { name: 'もう一度' }))
 
     // 件数の取得がもう一度走り、届けば実数に戻り帯は消える。
     await waitFor(() => expect(fixture.operatorList).toHaveBeenCalledTimes(2))

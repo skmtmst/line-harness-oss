@@ -183,8 +183,9 @@ describe('定期レポートの編集画面(?id=)', () => {
     expect(host.textContent).toContain('定期レポートを表示できませんでした')
     expect(host.textContent).not.toContain('定期レポートが見つかりませんでした')
     // やり直しで読み直しが走る
+    // ★V7 `x63W5x`：失敗の1枚の副ボタンは「もう一度読み込む」1つ。
     net.handler = defaultHandler
-    await act(async () => { button('再読み込み').click() })
+    await act(async () => { button('もう一度読み込む').click() })
     expect(net.calls.filter((call) => call.path.startsWith('/api/analytics/report-schedules') && call.method === 'GET').length).toBeGreaterThanOrEqual(2)
     expect(host.textContent).toContain('「週次まとめ」を直しています')
   })

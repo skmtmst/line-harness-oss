@@ -155,10 +155,11 @@ test('一覧口が落ちても失敗表示＋再読み込みが出て、無限�
   expect(host.textContent).toContain('登録したシナリオは消えていません。')
   expect(host.querySelector('[data-list-state="loading"]')).toBeNull()
 
-  // 再読み込みで同じ検索語のまま取り直せる。
+  // 読み直しで同じ検索語のまま取り直せる。
+  // ★V7 `x63W5x`：失敗の1枚の副ボタンは「もう一度読み込む」1つ。
   fail = false
   const retry = [...host.querySelectorAll('button')]
-    .find((item) => item.textContent?.trim() === '再読み込み')
+    .find((item) => item.textContent?.trim() === 'もう一度読み込む')
   expect(retry).toBeTruthy()
   await act(async () => { retry!.click() })
   await eventually(() => {

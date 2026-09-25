@@ -146,6 +146,8 @@ function BroadcastList() {
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState('')
   const [savedViews, setSavedViews] = useState<BroadcastSavedView[]>([])
+  /** 保存した検索の取り直し用。条件は変えず、同じ読み込みをもう一度だけ行う。 */
+  const [savedViewsSeq, setSavedViewsSeq] = useState(0)
   const [savedViewName, setSavedViewName] = useState('')
   const [savedViewOpen, setSavedViewOpen] = useState(false)
   const [savedViewBusy, setSavedViewBusy] = useState(false)
@@ -324,13 +326,16 @@ function BroadcastList() {
       return
     }
     let cancelled = false
+    setSavedViewError('')
     api.broadcasts.savedViews.list(selectedAccountId).then((res) => {
-      if (!cancelled && res.success) setSavedViews(res.data)
+      if (cancelled) return
+      if (res.success) setSavedViews(res.data)
+      else setSavedViewError('保存した検索を読み込めませんでした。')
     }).catch(() => {
       if (!cancelled) setSavedViewError('保存した検索を読み込めませんでした。')
     })
     return () => { cancelled = true }
-  }, [selectedAccountId])
+  }, [selectedAccountId, savedViewsSeq])
 
   const applySavedView = (id: string) => {
     const view = savedViews.find((item) => item.id === id)
@@ -455,7 +460,8 @@ function BroadcastList() {
 
       <div data-design="KPIs">
       <BroadcastKpis
-        unavailable={loading || Boolean(error) || forbidden || (!loading && broadcasts.length === 0)}
+        loading={loading}
+        failed={Boolean(error) || forbidden}
         listKpis={loading ? undefined : listKpis}
       />
       </div>
@@ -521,7 +527,21 @@ function BroadcastList() {
               <p className="text-ink-faint text-xs leading-relaxed">
                 フォルダを消しても、入っていた配信は未分類として残ります。
               </p>
-              {folderError ? <p role="alert" className="text-danger text-xs">{folderError}</p> : null}
+              {/*
+                ★V7 `x63W5x`：補助のデータ（フォルダ）だけ取れないときは、
+                その場所に小さく1行だけ。赤字にしない。一覧は普通に出す。
+                一覧本体も失敗しているとき（一覧の失敗・権限不足の1枚が
+                出ているとき）はそちらへまとめ、ここは出さない。一覧が
+                戻れば、まだ取れていなければ再び出る。
+              */}
+              {folderError && !forbidden && (broadcasts.length > 0 || showCreate || !error) ? (
+                <p role="alert" className="text-ink-secondary text-xs">
+                  {folderError}
+                  <button type="button" onClick={() => void loadFolders()} className="text-action ml-2 font-semibold hover:underline">
+                    もう一度
+                  </button>
+                </p>
+              ) : null}
             </FolderPanel>
 
             <div>
@@ -566,7 +586,18 @@ function BroadcastList() {
               <Button type="button" onClick={() => setSavedViewOpen(false)}>閉じる</Button>
             </div>
           )}
-          {savedViewError && <p role="alert" className="text-danger mb-3 text-xs">{savedViewError}</p>}
+          {/*
+            ★V7 `x63W5x`：補助のデータ（保存した検索）だけ取れないときは、
+            その場所に小さく1行だけ。赤字にしない。一覧は普通に出す。
+          */}
+          {savedViewError && (
+            <p role="alert" className="text-ink-secondary mb-3 text-xs">
+              {savedViewError}
+              <button type="button" onClick={() => setSavedViewsSeq((n) => n + 1)} className="text-action ml-2 font-semibold hover:underline">
+                もう一度
+              </button>
+            </p>
+          )}
 
           <div className="mb-3 flex flex-wrap items-center gap-2">
             <button type="button" className="broadcast-filter-chip" data-active={statusFilter === 'scheduled' || undefined} onClick={() => setStatusFilter(statusFilter === 'scheduled' ? 'all' : 'scheduled')}>予約中のみ</button>
@@ -588,12 +619,11 @@ function BroadcastList() {
             {(dateFrom || dateTo) && <button type="button" className="text-xs font-semibold text-action" onClick={() => { setDateFrom(''); setDateTo('') }}>日付を外す</button>}
           </div>
 
-      {/* 読み込み失敗の帯。**権限不足のときは出さない**（下で別の1枚を出す）。 */}
-      {error && !forbidden && (
-        <div className="mb-4 p-4 bg-danger-bg border border-danger-bg rounded-lg text-danger text-sm">
-          {error}
-        </div>
-      )}
+      {/*
+        ★V7 `x63W5x`：読み込み失敗の帯は出さない。一覧の場所の ListState error
+        だけにまとめる（同じ失敗を2回出さない。帯は生の口の文言をそのまま
+        出していたため、英語が出ることもあった）。
+      */}
 
       {/* Create form */}
       {showCreate && (

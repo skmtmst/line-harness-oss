@@ -336,13 +336,18 @@ function EventsPanel({ accountId }: { accountId: string | null }) {
             : `直近24時間の平均 ${overview.averageDeliverySeconds.toLocaleString('ja-JP')}秒（${overview.latencySampleCount.toLocaleString('ja-JP')}件）`}</p>
         </div>
       </KpiCollapse>
+      {/*
+        ★V7 `x63W5x`：補助のデータ（集計）だけ取れないときは、その場所に
+        小さく1行だけ。ピンクの帯にしない。一覧は普通に出す。文言と読み直す口
+        は契約試験が守る。
+      */}
       {overviewState === 'error' || overviewState === 'forbidden' ? (
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-control bg-danger-bg px-3 py-2.5 text-sm text-danger" role="status">
-          <span>{overviewState === 'forbidden'
+        <p className="text-ink-secondary mb-4 text-xs" role="status">
+          {overviewState === 'forbidden'
             ? '集計を表示する権限がありません。一覧は取得できた範囲で表示しています。'
-            : '集計だけを読み込めませんでした。一覧は取得できた範囲で表示しています。'}</span>
-          {overviewState === 'error' ? <Button type="button" variant="secondary" onClick={() => void loadOverview(false)}>集計をもう一度読む</Button> : null}
-        </div>
+            : '集計だけを読み込めませんでした。一覧は取得できた範囲で表示しています。'}
+          {overviewState === 'error' ? <button type="button" className="text-action ml-2 font-semibold hover:underline" onClick={() => void loadOverview(false)}>集計をもう一度読む</button> : null}
+        </p>
       ) : null}
       <NoteBar>ECの注文には、LINEの友だちが誰なのかが書かれていません。メールアドレスか電話番号で結びつけています。どちらも一致しなかった注文は「会員のつき合わせ」に並びます。</NoteBar>
       {notice ? <div className={notice.tone === 'success' ? styles.noticeSuccess : styles.noticeError} role="status">{notice.text}</div> : null}

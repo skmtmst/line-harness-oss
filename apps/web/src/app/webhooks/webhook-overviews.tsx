@@ -83,11 +83,14 @@ function matchesOutgoing(item: OutgoingWebhookOverview, filter: OutgoingFilter, 
 
 function OutgoingKpis({
   items,
+  status,
   incomingCount,
   summary,
   summaryStatus,
 }: {
   items: OutgoingWebhookOverview[]
+  /** 一覧の読み込み状態。取れない間、件数に 0 を出さない（★V7 `x63W5x`）。 */
+  status: LoadStatus
   incomingCount: number
   summary: WebhookInteractionSummary | null
   summaryStatus: LoadStatus
@@ -101,13 +104,20 @@ function OutgoingKpis({
   const summaryMissing = summaryStatus === 'error' || summary === null
   const outgoingSuccess = summary ? Math.max(0, summary.outgoing - summary.failed) : null
 
+  // ★V7 `x63W5x`：取れない KPI は「—」。読み込み中は「読み込んでいます」、
+  // 失敗は「読み込めませんでした」と言い分け、0（本当に0本）と混ぜない。
+  const listFailed = status === 'error'
+  const listLoading = status === 'loading'
+  const listDetail = listFailed ? '読み込めませんでした' : listLoading ? '読み込んでいます' : `止めているもの ${paused}本`
+
   return (
     <div className="mb-4 grid grid-cols-2 gap-3 xl:grid-cols-4" data-design="KPIs">
       <SummaryCard
         title="こちらから送る"
-        value={items.length}
+        value={status === 'ready' ? items.length : null}
         unit="本"
-        detail={`止めているもの ${paused}本`}
+        detail={listDetail}
+        loading={listLoading}
         variant="v6"
       />
       <SummaryCard
@@ -318,6 +328,7 @@ export function OutgoingOverview({
     <section aria-label="こちらから送る一覧">
       <OutgoingKpis
         items={items}
+        status={status}
         incomingCount={incomingCount}
         summary={summary}
         summaryStatus={summaryStatus}
@@ -342,12 +353,16 @@ export function OutgoingOverview({
           aria-label="外部連携の状態"
           value={filter}
           onChange={(event) => setFilter(event.target.value as OutgoingFilter)}
-          options={[
-            { value: 'all', label: `すべて ${items.length + incomingCount}` },
-            { value: 'active', label: `動いている ${activeCount}` },
-            { value: 'paused', label: `止めている ${pausedCount}` },
-            { value: 'failed', label: `失敗あり ${failedCount}` },
-          ]}
+          // ★V7 `x63W5x`：取れていない間の件数は出さない（0 と読めるため）。
+          options={(() => {
+            const count = (n: number) => (status === 'ready' ? ` ${n}` : '')
+            return [
+              { value: 'all', label: `すべて${count(items.length + incomingCount)}` },
+              { value: 'active', label: `動いている${count(activeCount)}` },
+              { value: 'paused', label: `止めている${count(pausedCount)}` },
+              { value: 'failed', label: `失敗あり${count(failedCount)}` },
+            ]
+          })()}
         />
         <SelectField
           aria-label="外部連携の並び順"
@@ -367,7 +382,7 @@ export function OutgoingOverview({
           kind="error"
           title="こちらから送る設定を表示できませんでした"
           description="登録内容は消えていません。再読み込みしても直らない場合はエラー報告へお知らせください。"
-          action={<Button variant="secondary" onClick={onReload}>もう一度読み込む</Button>}
+          onRetry={onReload}
         />
       ) : items.length === 0 && !showCreate ? (
         <ListState
@@ -550,12 +565,18 @@ export function OutgoingOverview({
         </DataTable>
       )}
 
-      <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-        <p className="text-ink-faint text-sm">
-          こちらから送る {filtered.length}本のうち {visible.length}本を表示
-        </p>
-        <Pagination page={page} pageCount={pageCount} onPageChange={setPage} />
-      </div>
+      {/*
+        ★V7 `x63W5x`：取れていない間の件数（「0本のうち 0本を表示」）は出さない。
+        一覧が読めてから出す。
+      */}
+      {status === 'ready' ? (
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+          <p className="text-ink-faint text-sm">
+            こちらから送る {filtered.length}本のうち {visible.length}本を表示
+          </p>
+          <Pagination page={page} pageCount={pageCount} onPageChange={setPage} />
+        </div>
+      ) : null}
 
       {/*
         N-388: 試し送信は登録した本物のURLへ届く。ボタンを押しただけでは
@@ -712,7 +733,7 @@ export function IncomingOverview({
         kind="error"
         title="こちらで受け取る設定を表示できませんでした"
         description="登録内容は消えていません。再読み込みしても直らない場合はエラー報告へ。"
-        action={<Button variant="secondary" onClick={onReload}>こちらで受け取る設定を再読み込み</Button>}
+        onRetry={onReload}
       />
     )
   }
@@ -802,7 +823,7 @@ export function IncomingOverview({
                 kind="error"
                 title="届いた後の処理を表示できませんでした"
                 description="設定は消えていません。詳細だけをもう一度読み込めます。"
-                action={<Button variant="secondary" onClick={() => setDetailReloadKey((key) => key + 1)}>詳細を再読み込み</Button>}
+                onRetry={() => setDetailReloadKey((key) => key + 1)}
               />
             ) : detail && detail.actions.length > 0 ? (
               <div className="space-y-2">

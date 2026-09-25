@@ -34,6 +34,8 @@ export default function OpsMembersPage() {
   const [inviting, setInviting] = useState(false)
   const [email, setEmail] = useState('')
   const [error, setError] = useState('')
+  // ★V7：一覧の失敗は一覧の場所の1枚で出す。操作の知らせと混ぜない。
+  const [listFailed, setListFailed] = useState(false)
   const [busy, setBusy] = useState(false)
   const [me, setMe] = useState<string | null>(null)
   const [toggling, setToggling] = useState<OpsMember | null>(null)
@@ -42,11 +44,12 @@ export default function OpsMembersPage() {
 
   const load = useCallback(async () => {
     setError('')
+    setListFailed(false)
     // fetchApi は 4xx/5xx を例外にするので、両方とも opsCall で受ける。
     // 生の Promise.all だと片方の拒否で load ごと落ち、「読み込んでいます」のまま固まる。
     const [res, meRes] = await Promise.all([opsCall(api.ops.members()), opsCall(api.ops.me())])
     setLoaded(true)
-    if (!res.success) { setError(res.error || '読み込めませんでした'); return }
+    if (!res.success) { setError(res.error || '読み込めませんでした'); setListFailed(true); return }
     setMembers(res.data)
     setSummary(res.summary)
     if (meRes.success) setMe(meRes.data.id)
@@ -141,7 +144,10 @@ export default function OpsMembersPage() {
       </div>
 
       {notice ? <p role="status" className="mb-3 text-caption text-accent-deep">{notice}</p> : null}
-      {error ? <p role="alert" className="mb-3 text-caption text-status-danger">{error}</p> : null}
+      {/*
+        ★V7：一覧の失敗は一覧の場所の1枚で出すので、ここでは操作の知らせだけ出す。
+      */}
+      {error && !listFailed ? <p role="alert" className="mb-3 text-caption text-status-danger">{error}</p> : null}
 
       {tab === 'members' ? (
         !loaded ? (

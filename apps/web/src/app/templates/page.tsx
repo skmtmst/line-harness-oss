@@ -658,7 +658,11 @@ export default function TemplatesPage() {
         />
       </div>
 
-      {activeSection === 'message' && canMutateTemplates && (
+      {/*
+        ★V7 `x63W5x`：一覧の失敗中は作成ボタンを出さない。
+        押せない主ボタンのまま置くと、消えたように読める。
+      */}
+      {activeSection === 'message' && canMutateTemplates && view !== 'error' && (
         <div
           className={`${styles.createActions} flex items-center justify-between`}
           data-design="CreateActions"
@@ -703,12 +707,13 @@ export default function TemplatesPage() {
       */}
       <div className={`${styles.folderRail} shrink-0`}>
         <FolderPanel
-          total={`${templates.length} 件`}
+          // ★V7 `x63W5x`：取れていない間の件数（「0件」）は出さない。
+          total={view === 'ready' || view === 'empty' || view === 'no-match' ? `${templates.length} 件` : '—'}
           activeId={selectedCategory}
           onSelect={setSelectedCategory}
           onAddFolder={canMutateTemplates ? () => setFolderDialogOpen(true) : undefined}
           rows={[
-            { id: 'all', label: 'すべて', count: templates.length },
+            { id: 'all', label: 'すべて', count: view === 'ready' || view === 'empty' || view === 'no-match' ? templates.length : null },
             ...folders.map((folder, index) => ({
               id: folder.id,
               label: folder.name,
@@ -729,11 +734,15 @@ export default function TemplatesPage() {
             {
               id: 'unfiled',
               label: '未分類',
-              count: unfiledCount,
+              count: view === 'ready' || view === 'empty' || view === 'no-match' ? unfiledCount : null,
             },
           ]}
         >
-          {folderError ? <p role="alert" className="text-danger text-xs">{folderError}</p> : null}
+          {/*
+            ★V7 `x63W5x`：補助のデータ（フォルダ）だけ取れないときは、
+            その場所に小さく1行だけ。赤字にしない。一覧は普通に出す。
+          */}
+          {folderError ? <p role="alert" className="text-ink-secondary text-xs">{folderError}</p> : null}
           {canMutateTemplates ? (
             <p className="text-ink-faint text-xs leading-relaxed">
               テンプレートは一覧の「置き場」から移せます。フォルダは種類のタブをまたいで使えます。
@@ -777,7 +786,11 @@ export default function TemplatesPage() {
       </div>
 
 
-      {error && (
+      {/*
+        ★V7 `x63W5x`：一覧の失敗でページ上の帯は出さない。一覧の場所の
+        ListState error だけにまとめる。入力・保存の失敗の知らせは別に残す。
+      */}
+      {error && view !== 'error' && (
         <div
           className="mb-4 p-4 bg-danger-bg border border-danger-bg rounded-lg text-danger text-sm"
           role="alert"
@@ -923,11 +936,7 @@ export default function TemplatesPage() {
           kind="error"
           title={failure?.title}
           description={failure?.description}
-          action={
-            <Button onClick={() => void load()} variant="secondary">
-              再読み込み
-            </Button>
-          }
+          onRetry={() => void load()}
         />
       ) : view === 'empty' ? (
         <ListState

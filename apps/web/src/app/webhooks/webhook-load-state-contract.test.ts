@@ -44,6 +44,8 @@ describe('V6 外部連携の一覧状態', () => {
 
   it('失敗時に再読み込みできる', () => {
     expect(PAGE.match(/onReload=\{\(\) => void load\(\)\}/g)).toHaveLength(2)
-    expect(OVERVIEWS.match(/onClick=\{onReload\}/g)).toHaveLength(2)
+    // ★V7 `x63W5x`：古い個別ボタン（`action`）ではなく、共通の再読み込み口（`onRetry`）。
+    expect(OVERVIEWS.match(/onRetry=\{[^}]*\}/g)).toHaveLength(3)
+    expect(OVERVIEWS).not.toContain('onClick={onReload}')
   })
 })
