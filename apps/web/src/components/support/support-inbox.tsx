@@ -308,7 +308,7 @@ export default function SupportInbox({ channel = 'email' }: { channel?: Channel 
           <div className="space-y-3 border-b border-hairline bg-canvas-sunken p-4">
             <div className="flex gap-2">
               <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="名前・メール・件名で検索" aria-label="名前・メール・件名で検索" className="min-w-0 flex-1 rounded-lg border border-hairline bg-canvas px-3 py-2 text-sm outline-none focus:border-success focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-status-info" />
-              <select value={status} onChange={(event) => setStatus(event.target.value as typeof status)} aria-label="対応状態で絞り込む" className="rounded-lg border border-hairline bg-canvas px-2 text-xs font-medium">
+              <select value={status} onChange={(event) => setStatus(event.target.value as typeof status)} aria-label="対応状況で絞り込む" className="rounded-lg border border-hairline bg-canvas px-2 text-xs font-medium">
                 <option value="open">未解決</option>
                 <option value="unread">未対応</option>
                 <option value="in_progress">対応中</option>
