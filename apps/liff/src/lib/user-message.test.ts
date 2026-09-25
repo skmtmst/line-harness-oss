@@ -8,9 +8,7 @@ import {
 
 describe('お客さん向けの失敗・読み込み中の文言', () => {
   it('読み込み失敗は日本語1文で、開発者向けの文字を含まない', () => {
-    expect(LOAD_FAILED_MESSAGE).toBe(
-      '読み込めませんでした。時間をおいて、もう一度お試しください。',
-    );
+    expect(LOAD_FAILED_MESSAGE).toBe('電波の良いところで、もう一度お試しください。');
     for (const leaked of ['Error', 'API', 'qa_mock', '{', '}', 'undefined']) {
       expect(LOAD_FAILED_MESSAGE).not.toContain(leaked);
     }
