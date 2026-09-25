@@ -11,9 +11,11 @@ import Progress from '@/components/shared/progress'
 import StickyBar from '@/components/shared/sticky-bar'
 import TargetMissing from '@/components/shared/target-missing'
 import {
+  ApprovalBadge,
   ApprovalRequestFields,
   ApprovalStatusSection,
   ApproverSection,
+  formatApprovalDateTime,
 } from '@/components/broadcasts/broadcast-approval'
 import type { BroadcastApprovalCandidate } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
@@ -366,6 +368,12 @@ function BroadcastDetailInner() {
   const approvalRequesterName = approvalState?.approval.requestedByStaffId
     ? (approvalCandidates.find((item) => item.id === approvalState.approval.requestedByStaffId)?.name ?? null)
     : null
+  const approvalApproverName = approvalState?.approval.approverStaffId
+    ? (approvalCandidates.find((item) => item.id === approvalState.approval.approverStaffId)?.name ?? null)
+    : null
+  const approvalMessageSummary = broadcast?.messageBubbles && broadcast.messageBubbles.length > 0
+    ? `${broadcast.messageBubbles.length}通`
+    : null
   // 差し戻し・期限切れ・取り消しのあと、頼み直せる条件。
   const canReRequest = broadcast
     && approvalState
@@ -393,6 +401,14 @@ function BroadcastDetailInner() {
       ) : (
         <div className="space-y-4">
           {/*
+            二者承認（設計 A-2）。配信の題の横に承認待ちの札を出す。
+            題自体は枠の見出しに出るので、ここでは札と並べるだけにする。
+          */}
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="text-ink text-base font-bold">{broadcast.title}</p>
+            <ApprovalBadge status={broadcast.approvalStatus} />
+          </div>
+          {/*
             二者承認（設計 A-2・A-3）。承認待ちの帯と、承認する人の操作。
             差し戻し・期限切れのあとは頼み直す欄を出す。
           */}
@@ -400,8 +416,11 @@ function BroadcastDetailInner() {
             <ApprovalStatusSection
               approval={approvalState.approval}
               scheduledLabel={
-                broadcast.scheduledAt ? formatBroadcastDateTime(broadcast.scheduledAt) : null
+                broadcast.scheduledAt ? formatApprovalDateTime(broadcast.scheduledAt) : null
               }
+              approverName={approvalApproverName}
+              requesterName={approvalRequesterName}
+              viewer={approvalState.viewer}
               onCancel={handleApprovalCancel}
               onRemind={handleApprovalRemind}
               busy={approvalBusy}
@@ -413,6 +432,11 @@ function BroadcastDetailInner() {
               approval={approvalState.approval}
               viewer={approvalState.viewer}
               requesterName={approvalRequesterName}
+              recipientCount={approvalState.gate.recipientCount}
+              scheduledLabel={
+                broadcast.scheduledAt ? formatApprovalDateTime(broadcast.scheduledAt) : null
+              }
+              messageSummary={approvalMessageSummary}
               messageHref="#broadcast-content"
               onApprove={handleApprovalApprove}
               onReject={handleApprovalReject}

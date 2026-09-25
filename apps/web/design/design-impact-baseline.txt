@@ -169,6 +169,7 @@ shared-button-importer app/webinars/published/page.tsx
 shared-button-importer components/auto-replies/edit-dialog.tsx
 shared-button-importer components/automations/automation-template-gallery.tsx
 shared-button-importer components/automations/common-action-editor.tsx
+shared-button-importer components/broadcasts/broadcast-approval.tsx
 shared-button-importer components/broadcasts/broadcast-asset-manager.tsx
 shared-button-importer components/broadcasts/broadcast-form.tsx
 # #973: 狭い幅向けの簡略手順表示で「前へ／次へ」に共通ボタンを使う。

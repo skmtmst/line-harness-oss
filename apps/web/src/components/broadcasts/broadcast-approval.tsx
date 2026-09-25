@@ -33,6 +33,27 @@ function formatThreshold(n: number): string {
   return `${n.toLocaleString('ja-JP')}通`
 }
 
+/**
+ * 承認まわりの日時（例：8月24日（月）10:00）。
+ * 配信の確認で使う書き方にそろえる。壊れた値は「—」にする。
+ */
+export function formatApprovalDateTime(value: string | null | undefined): string {
+  if (!value) return '—'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return '—'
+  const parts = new Intl.DateTimeFormat('ja-JP', {
+    timeZone: 'Asia/Tokyo',
+    month: 'numeric',
+    day: 'numeric',
+    weekday: 'short',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: false,
+  }).formatToParts(date)
+  const get = (type: string) => parts.find((part) => part.type === type)?.value ?? ''
+  return `${get('month')}月${get('day')}日（${get('weekday')}）${get('hour')}:${get('minute')}`
+}
+
 /** A-2 一覧の札。承認待ちと期限切れだけ出す。 */
 export function ApprovalBadge({ status }: { status: ApprovalStatus | undefined }) {
   if (status === 'pending') return <Chip tone="info">承認待ち</Chip>
@@ -169,6 +190,9 @@ export function SingleOperatorFields({
 export function ApprovalStatusSection({
   approval,
   scheduledLabel,
+  approverName,
+  requesterName,
+  viewer,
   onCancel,
   onRemind,
   busy,
@@ -176,6 +200,11 @@ export function ApprovalStatusSection({
 }: {
   approval: BroadcastApprovalState['approval']
   scheduledLabel: string | null
+  /** 承認する人の名前。分からないときは題を短くする。 */
+  approverName: string | null
+  /** 頼んだ人の名前。分からないときは依頼の行を出さない。 */
+  requesterName: string | null
+  viewer: BroadcastApprovalState['viewer']
   onCancel: () => void
   onRemind: () => void
   busy: boolean
@@ -184,7 +213,14 @@ export function ApprovalStatusSection({
   if (approval.status === 'pending') {
     return (
       <section aria-label="承認待ち" className="bg-warning-bg rounded-card border-hairline border p-5">
-        <p className="text-ink text-sm font-semibold">承認を待っています</p>
+        <p className="text-ink text-sm font-semibold">
+          {approverName ? `${approverName}さんの承認を待っています` : '承認を待っています'}
+        </p>
+        {requesterName || approval.requestedAt ? (
+          <p className="text-ink-secondary mt-1 text-xs leading-5">
+            依頼：{requesterName ?? '—'} ・ {formatApprovalDateTime(approval.requestedAt)}
+          </p>
+        ) : null}
         <p className="text-ink-secondary mt-1 text-xs leading-5">
           承認されないまま{scheduledLabel ?? '送る時刻'}を過ぎると、送らずに期限切れになります。
         </p>
@@ -192,14 +228,16 @@ export function ApprovalStatusSection({
           <p className="text-ink-secondary mt-2 text-xs leading-5">ひとこと：{approval.note}</p>
         ) : null}
         {message ? <p className="text-danger mt-2 text-xs">{message}</p> : null}
-        <div className="mt-3 flex flex-wrap gap-2">
-          <Button variant="secondary" onClick={onCancel} disabled={busy}>
-            依頼を取り消す
-          </Button>
-          <Button variant="secondary" onClick={onRemind} disabled={busy}>
-            もう一度知らせる
-          </Button>
-        </div>
+        {viewer.isRequester ? (
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Button variant="secondary" onClick={onCancel} disabled={busy}>
+              依頼を取り消す
+            </Button>
+            <Button variant="secondary" onClick={onRemind} disabled={busy}>
+              もう一度知らせる
+            </Button>
+          </div>
+        ) : null}
       </section>
     )
   }
@@ -247,6 +285,9 @@ export function ApproverSection({
   approval,
   viewer,
   requesterName,
+  recipientCount,
+  scheduledLabel,
+  messageSummary,
   messageHref,
   onApprove,
   onReject,
@@ -256,6 +297,12 @@ export function ApproverSection({
   approval: BroadcastApprovalState['approval']
   viewer: BroadcastApprovalState['viewer']
   requesterName: string | null
+  /** 送る相手の人数（送信の直前に数えた数）。 */
+  recipientCount: number
+  /** 送る日時（「8月24日（月）10:00」の書き方）。予約なしは null。 */
+  scheduledLabel: string | null
+  /** メッセージの数（例：3通）。分からないときは null。 */
+  messageSummary: string | null
   messageHref: string
   /** 承認して送る。承認のあと送る操作まで続ける（呼び出し側で順番に行う）。 */
   onApprove: () => void
@@ -278,6 +325,24 @@ export function ApproverSection({
         {requesterName ? `${requesterName}さんから` : ''}「内容を確かめて承認・差し戻しをしてください。」
         {approval.note ? `ひとこと：${approval.note}` : ''}
       </p>
+      <dl className="bg-canvas-sunken rounded-control mt-3 space-y-1 p-3 text-xs leading-5">
+        <div className="flex gap-2">
+          <dt className="text-ink-faint w-20 shrink-0">送る相手</dt>
+          <dd className="text-ink font-semibold tabular-nums">{recipientCount.toLocaleString('ja-JP')}人</dd>
+        </div>
+        <div className="flex gap-2">
+          <dt className="text-ink-faint w-20 shrink-0">送る日時</dt>
+          <dd className="text-ink whitespace-nowrap" title={scheduledLabel ?? undefined}>
+            {scheduledLabel ?? '今すぐ送る'}
+          </dd>
+        </div>
+        <div className="flex gap-2">
+          <dt className="text-ink-faint w-20 shrink-0">メッセージ</dt>
+          <dd className="text-ink whitespace-nowrap" title={messageSummary ?? undefined}>
+            {messageSummary ?? '—'}
+          </dd>
+        </div>
+      </dl>
       <p className="mt-2 text-xs">
         <a href={messageHref} className="text-action font-medium hover:underline">
           メッセージの見本を開く

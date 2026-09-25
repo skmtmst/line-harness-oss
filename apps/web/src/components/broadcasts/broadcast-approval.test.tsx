@@ -14,6 +14,7 @@ import {
   ApprovalStatusSection,
   ApproverSection,
   SingleOperatorFields,
+  formatApprovalDateTime,
 } from './broadcast-approval'
 import type { BroadcastApprovalState } from '@/lib/api'
 
@@ -131,21 +132,63 @@ describe('二者承認の見た目', () => {
     cleanup(failed)
   })
 
-  it('A-2 承認待ちの帯に取り消し・もう一度知らせるが出る', () => {
+  it('A-2 承認待ちの帯に承認する人の名前と依頼の補足が出る', () => {
+    const state = pendingState()
     const rendered = render(
       <ApprovalStatusSection
-        approval={pendingState().approval}
-        scheduledLabel="10月1日 10:00"
+        approval={state.approval}
+        scheduledLabel="10月1日（水）10:00"
+        approverName="佐藤 美咲"
+        requesterName="川野 健太"
+        viewer={state.viewer}
         onCancel={() => undefined}
         onRemind={() => undefined}
         busy={false}
         message={null}
       />,
     )
-    expect(rendered.host.textContent).toContain('承認を待っています')
-    expect(rendered.host.textContent).toContain('依頼を取り消す')
-    expect(rendered.host.textContent).toContain('もう一度知らせる')
+    expect(rendered.host.textContent).toContain('佐藤 美咲さんの承認を待っています')
+    expect(rendered.host.textContent).toContain('依頼：川野 健太')
     cleanup(rendered)
+  })
+
+  it('A-2 取り消し・もう一度知らせるは頼んだ人にだけ出す', () => {
+    const requesterState = pendingState({ isApprover: false, canApprove: false, isRequester: true })
+    const requester = render(
+      <ApprovalStatusSection
+        approval={requesterState.approval}
+        scheduledLabel="10月1日（水）10:00"
+        approverName="佐藤 美咲"
+        requesterName="川野 健太"
+        viewer={requesterState.viewer}
+        onCancel={() => undefined}
+        onRemind={() => undefined}
+        busy={false}
+        message={null}
+      />,
+    )
+    expect(requester.host.textContent).toContain('依頼を取り消す')
+    expect(requester.host.textContent).toContain('もう一度知らせる')
+    cleanup(requester)
+
+    // 承認する人には取り消し・知らせ直しを出さない（両方にはならない）。
+    const approverState = pendingState({ isApprover: true, canApprove: true, isRequester: false })
+    const approver = render(
+      <ApprovalStatusSection
+        approval={approverState.approval}
+        scheduledLabel="10月1日（水）10:00"
+        approverName="佐藤 美咲"
+        requesterName="川野 健太"
+        viewer={approverState.viewer}
+        onCancel={() => undefined}
+        onRemind={() => undefined}
+        busy={false}
+        message={null}
+      />,
+    )
+    expect(approver.host.textContent).not.toContain('依頼を取り消す')
+    expect(approver.host.textContent).not.toContain('もう一度知らせる')
+    cleanup(approver)
   })
 
   it('A-2 差し戻し・期限切れの理由が出る', () => {
@@ -191,6 +234,9 @@ describe('二者承認の見た目', () => {
         approval={approverState.approval}
         viewer={approverState.viewer}
         requesterName="川野 健太"
+        recipientCount={1248}
+        scheduledLabel="10月1日（水）10:00"
+        messageSummary="3通"
         messageHref="#broadcast-content"
         onApprove={() => undefined}
         onReject={() => undefined}
@@ -201,6 +247,10 @@ describe('二者承認の見た目', () => {
     expect(approver.host.textContent).toContain('あなたの確認待ち')
     expect(approver.host.textContent).toContain('承認して送る')
     expect(approver.host.textContent).toContain('差し戻す')
+    // 要約（送る相手・送る日時・メッセージの数）が出る。
+    expect(approver.host.textContent).toContain('1,248人')
+    expect(approver.host.textContent).toContain('10月1日（水）10:00')
+    expect(approver.host.textContent).toContain('3通')
     cleanup(approver)
 
     // 頼んだ人には操作を出さない。
@@ -210,6 +260,9 @@ describe('二者承認の見た目', () => {
         approval={requesterState.approval}
         viewer={requesterState.viewer}
         requesterName="川野 健太"
+        recipientCount={1248}
+        scheduledLabel="10月1日（水）10:00"
+        messageSummary="3通"
         messageHref="#broadcast-content"
         onApprove={() => undefined}
         onReject={() => undefined}
@@ -219,6 +272,12 @@ describe('二者承認の見た目', () => {
     )
     expect(requester.host.textContent).toBe('')
     cleanup(requester)
+  })
+
+  it('承認まわりの日時は「8月24日（月）10:00」の書き方', () => {
+    expect(formatApprovalDateTime('2026-09-25T20:10:00+09:00')).toBe('9月25日（金）20:10')
+    expect(formatApprovalDateTime(null)).toBe('—')
+    expect(formatApprovalDateTime('壊れた値')).toBe('—')
   })
 
   it('補足は「？」に入り、本文に重ねて書かない', () => {
@@ -250,6 +309,9 @@ describe('二者承認の見た目', () => {
         approval={approverState.approval}
         viewer={approverState.viewer}
         requesterName={null}
+        recipientCount={1248}
+        scheduledLabel={null}
+        messageSummary={null}
         messageHref="#broadcast-content"
         onApprove={() => undefined}
         onReject={() => undefined}
