@@ -111,6 +111,7 @@ export * from './analytics-saved';
 export * from './analytics-reports';
 export * from './analytics-funnel-migration';
 export * from './analytics-cross';
+export * from './analytics-exports';
 export * from './analytics-overviews';
 export * from './analytics-url-exposures';
 export * from './dashboard';

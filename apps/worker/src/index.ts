@@ -144,6 +144,7 @@ import { friendAddRules } from './routes/friend-add-rules.js';
 import { contents } from './routes/contents.js';
 import { commonVarExports } from './routes/common-var-exports.js';
 import { analytics } from './routes/analytics.js';
+import { analyticsExports } from './routes/analytics-exports.js';
 import { dashboard } from './routes/dashboard.js';
 import { siteTracking } from './routes/site-tracking.js';
 import { restaurantTest } from './routes/restaurant-test.js';
@@ -532,6 +533,7 @@ app.route('/', friendAddRules);
 app.route('/', commonVarExports);
 app.route('/', contents);
 app.route('/', analytics);
+app.route('/', analyticsExports);
 app.route('/', dashboard);
 app.route('/', siteTracking);
 // 飲食店向けの検証専用領域。既存NEN機能とはAPI/DB名前空間を分離する。

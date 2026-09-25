@@ -1066,6 +1066,66 @@ const spec = {
         responses: { '200': { description: 'Audience detail' }, '404': { description: 'Not found' }, '410': { description: 'Audience expired (24h)' } },
       },
     },
+    '/api/analytics/exports': {
+      post: {
+        tags: ['Analytics'], summary: '分析CSVの非同期書き出し（画面内のCSVと同じ中身）',
+        description: '書き出し対象（配信の反応・URLクリック・クロス・ファネル・保存した分析）を選び、画面のCSVと同じ列で書き出す。202で書き出しIDを返し、状態確認・ダウンロードと進める。統括・管理者だけが使える。',
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['accountId', 'target'],
+                properties: {
+                  accountId: { type: 'string' },
+                  target: { type: 'string', enum: ['reactions', 'url-clicks', 'cross', 'funnel', 'saved'] },
+                  params: {
+                    type: 'object',
+                    properties: {
+                      from: { type: 'string' }, to: { type: 'string' }, query: { type: 'string' },
+                      resultId: { type: 'string' }, funnelId: { type: 'string' }, groupKey: { type: 'string' },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          '202': { description: '書き出しID（非同期）' },
+          '400': { description: 'accountId・target が無い' },
+          '403': { description: '統括・管理者だけが使える' },
+          '404': { description: 'LINEアカウント・集計が見つからない' },
+          '422': { description: '結果・ファネルの指定が無い' },
+        },
+      },
+    },
+    '/api/analytics/exports/{id}': {
+      get: {
+        tags: ['Analytics'], summary: '分析CSVの書き出し状態',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'accountId', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        responses: { '200': { description: '書き出しの状態' }, '400': { description: 'accountId が無い' }, '404': { description: 'Not found' } },
+      },
+    },
+    '/api/analytics/exports/{id}/download': {
+      get: {
+        tags: ['Analytics'], summary: '分析CSVのダウンロード',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'accountId', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': { description: 'CSV(text/csv; charset=utf-8、BOM付き)' },
+          '404': { description: 'Not found' },
+          '409': { description: 'まだダウンロードできない' },
+          '410': { description: 'ダウンロード期限切れ' },
+        },
+      },
+    },
     '/api/analytics/ref/{refCode}/orders': {
       get: {
         tags: ['Analytics'], summary: '流入経路(REF)から来た友だちの注文明細。経路別集計(ref-summaryのorderCount)と同じfirst-touch条件で返す（IDEA-18）',
