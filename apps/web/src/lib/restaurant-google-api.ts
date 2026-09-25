@@ -26,7 +26,7 @@ export type GoogleConnectionData = {
   store: { id: string; name: string; lineAccountId: string }
   connection: GoogleConnection
   candidates: GoogleLocationCandidate[]
-  summary: { unrepliedCount: number; draftCount: number; newCount: number; storedCount: number; syncStale: boolean }
+  summary: { unrepliedCount: number; draftCount: number; attentionCount: number; newCount: number; storedCount: number; syncStale: boolean }
   writeEnabled: boolean
   oauthConfigured: boolean
   aiAvailable: boolean

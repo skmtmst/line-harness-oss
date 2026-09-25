@@ -681,3 +681,47 @@ select:not([multiple]):not(.appearance-none) {
   min-height: 0;
   overflow-y: auto;
 }
+/* Googleビジネス V6（GB-1/2/3/16）：実画面幅でもタブと操作を見切れさせない。 */
+.gb-location-option:focus-within {
+  outline: 2px solid var(--color-status-info);
+  outline-offset: 2px;
+}
+
+.gb-accent-control {
+  accent-color: var(--color-accent-deep);
+}
+
+@media (min-width: 640px) {
+  .gb-confirm-details {
+    grid-template-columns: 150px minmax(0, 1fr);
+  }
+}
+
+@media (min-width: 1280px) {
+  .gb-draft-grid {
+    grid-template-columns: 420px minmax(0, 1fr);
+  }
+
+  .gb-confirm-grid {
+    grid-template-columns: minmax(0, 1fr) 390px;
+  }
+}
+
+@media (max-width: 1350px) {
+  .gb-review-filters {
+    flex-wrap: wrap;
+    height: auto;
+    padding-bottom: 8px;
+  }
+
+  .gb-review-filters > span:first-child {
+    flex: 1 1 100%;
+    flex-wrap: wrap;
+  }
+
+  .gb-review-filters > span:last-child {
+    flex: 1 1 100%;
+    justify-content: flex-end;
+    padding-bottom: 0;
+  }
+}
