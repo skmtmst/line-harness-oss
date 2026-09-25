@@ -279,6 +279,8 @@ function gcd(a: number, b: number): number {
  * すでに時差（Z / +09:00）が付いているものはそのまま。
  */
 export function parseJstDateTime(value: string): Date {
+  // API の中身が欠けていても `undefined.replace` で落ちない。呼び出し側は NaN を「—」にする。
+  if (typeof value !== 'string' || value.trim() === '') return new Date(Number.NaN)
   const normalized = value.replace(' ', 'T')
   const hasOffset = /(?:Z|[+-]\d{2}:?\d{2})$/.test(normalized)
   return new Date(hasOffset ? normalized : `${normalized}+09:00`)
