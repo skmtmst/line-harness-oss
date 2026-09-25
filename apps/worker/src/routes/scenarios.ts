@@ -1513,6 +1513,14 @@ scenarios.post('/api/scenarios/:id/publish', requireScenarioEditBoundary, async 
     if (code === 'SCENARIO_PUBLISH_CONFLICT') {
       return c.json({ success: false, error: '同時公開が競合しました。もう一度公開してください' }, 409);
     }
+    if (code === 'SCENARIO_PUBLISH_CYCLE') {
+      // モック化されたDBでも壊れないよう、型ではなく userMessage の有無で見る。
+      const reason = err instanceof Error && 'userMessage' in err
+          && typeof (err as { userMessage?: unknown }).userMessage === 'string'
+        ? (err as { userMessage: string }).userMessage
+        : '分岐または完了後の移動が循環しているため公開できません';
+      return c.json({ success: false, error: reason, code: 'PUBLISH_CYCLE' }, 409);
+    }
     console.error('POST /api/scenarios/:id/publish error:', err);
     return c.json({ success: false, error: 'シナリオを公開できませんでした' }, 500);
   }

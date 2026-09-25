@@ -1341,6 +1341,96 @@ function classifyPublishBatchError(error: unknown): 'version-number' | 'idempote
 }
 
 /**
+ * 分岐ジャンプで回る輪を見つける。通は step_order の昇順に進み、
+ * 条件分岐 (next_step_on_false) で飛べる。飛び先・次の通の両辺で
+ * 閉路があれば、その輪を step_order の列で返す。無ければ null。
+ */
+export function findBranchCycle(
+  steps: Array<{ step_order: number; next_step_on_false: number | null }>,
+): number[] | null {
+  const orders = [...new Set(steps.map((step) => step.step_order))].sort((a, b) => a - b);
+  const existing = new Set(orders);
+  const edges = new Map<number, number[]>();
+  for (let index = 0; index < orders.length; index += 1) {
+    const from = orders[index]!;
+    const next: number[] = [];
+    if (index + 1 < orders.length) next.push(orders[index + 1]!);
+    const jump = steps.find((step) => step.step_order === from)?.next_step_on_false;
+    if (jump != null && existing.has(jump) && !next.includes(jump)) next.push(jump);
+    edges.set(from, next);
+  }
+  // 深さ優先で「いま辿っている道」に戻る辺を探す。通は多くて数十件のため再帰で足りる。
+  const state = new Map<number, number>();
+  const stack: number[] = [];
+  let found: number[] | null = null;
+  const visit = (node: number): boolean => {
+    state.set(node, 1);
+    stack.push(node);
+    for (const to of edges.get(node) ?? []) {
+      const target = state.get(to) ?? 0;
+      if (target === 1) {
+        found = [...stack.slice(stack.indexOf(to)), to];
+        return true;
+      }
+      if (target === 0 && visit(to)) return true;
+    }
+    stack.pop();
+    state.set(node, 2);
+    return false;
+  };
+  for (const node of orders) {
+    if ((state.get(node) ?? 0) === 0 && visit(node)) break;
+  }
+  return found;
+}
+
+/**
+ * 公開を止める循環の理由。`message` は SCENARIO_PUBLISH_CYCLE 固定で、
+ * 画面へ出す理由文は `userMessage` に入れる（保存は止めない・公開だけ止める）。
+ */
+export class ScenarioPublishCycleError extends Error {
+  readonly cycleKind: 'branch' | 'cross_scenario';
+  readonly userMessage: string;
+  constructor(cycleKind: 'branch' | 'cross_scenario', userMessage: string) {
+    super('SCENARIO_PUBLISH_CYCLE');
+    this.cycleKind = cycleKind;
+    this.userMessage = userMessage;
+  }
+}
+
+/**
+ * 完了後の移動 (on_complete_mode='move') を辿り、輪になっていれば
+ * シナリオ名の列で返す。移動先が無い・移動でない・消えている所で止まる
+ * （それらは循環ではなく別の検査の仕事）。
+ */
+export async function findCrossScenarioCycle(
+  db: D1Database,
+  scenarioId: string,
+): Promise<string[] | null> {
+  const chain: string[] = [scenarioId];
+  const names = new Map<string, string>();
+  let current: string | null = scenarioId;
+  for (let hops = 0; hops < 50 && current; hops += 1) {
+    const row = await db.prepare(
+      `SELECT id, name, on_complete_mode, on_complete_scenario_id FROM scenarios WHERE id = ?`,
+    ).bind(current).first<{
+      id: string; name: string; on_complete_mode: string | null; on_complete_scenario_id: string | null;
+    }>();
+    if (!row) return null;
+    names.set(row.id, row.name);
+    if (row.on_complete_mode !== 'move' || !row.on_complete_scenario_id) return null;
+    const target = row.on_complete_scenario_id;
+    const revisit = chain.indexOf(target);
+    if (revisit >= 0) {
+      return [...chain.slice(revisit).map((id) => names.get(id) ?? id), names.get(target) ?? target];
+    }
+    chain.push(target);
+    current = target;
+  }
+  return null;
+}
+
+/**
  * いまの下書きを公開版として固定する。単一原子 protocol。
  *
  * - 書き込み前の判定では何も書かない。同キーの再実行は同版を返し、
@@ -1367,6 +1457,24 @@ export async function publishScenarioVersion(
   const draftSteps = await buildVersionSnapshotSteps(db, '', steps, scenario.line_account_id ?? null);
   const draftActions = await buildVersionSnapshotActions(db, '', scenarioId, steps);
   const draftPayload = canonicalPublishPayload(scenario, draftSteps, draftActions);
+
+  // 循環したまま公開すると購読した友だちに同じ通が回り続ける。下書きの
+  // 保存は止めないが、公開だけは止めてどこが回っているかを理由に返す。
+  const branchLoop = findBranchCycle(steps);
+  if (branchLoop) {
+    const trail = branchLoop.map((order) => `${order + 1}通目`).join(' → ');
+    throw new ScenarioPublishCycleError(
+      'branch',
+      `分岐が循環しているため公開できません（${trail}）。分岐先を見直してください`,
+    );
+  }
+  const crossNames = await findCrossScenarioCycle(db, scenarioId);
+  if (crossNames) {
+    throw new ScenarioPublishCycleError(
+      'cross_scenario',
+      `完了後の移動が循環しているため公開できません（${crossNames.join(' → ')}）。移動先を見直してください`,
+    );
+  }
 
   // 同じキーの再実行・使い回しの判定。ここでは何も書かないので、409 の
   // 経路で公開側の状態は変わらない。
