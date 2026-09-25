@@ -76,7 +76,7 @@ export default function HelpTip({
         onClick={toggle}
         className={styles.button}
       >
-        <CircleHelp aria-hidden="true" className={styles.icon} />
+        <CircleHelp aria-hidden="true" />
       </button>
       {open ? (
         <span role="note" id={tipId} className={styles.tip}>
