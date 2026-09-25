@@ -259,7 +259,8 @@ export default function CommonActionsPage() {
                 <Th style={{ width: '18%' }}>中の処理</Th>
                 <Th style={{ width: '16%' }}>呼び出し元</Th>
                 <Th style={{ width: '8%' }}>版</Th>
-                <Th style={{ width: '18%' }}>操作</Th>
+                {/* 表の外側の余白は左右で同じに。操作列は中身の幅で固定し、残りは本文の列で吸収する。 */}
+                <Th align="right" className="w-44">操作</Th>
               </TableHeadRow>
             </thead>
             <tbody>

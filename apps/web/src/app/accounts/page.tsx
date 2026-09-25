@@ -203,13 +203,17 @@ export default function AccountsPage() {
           <table className="w-full min-w-[56rem]">
             <thead>
               <TableHeadRow>
-                <Th>アカウント</Th>
+                {/*
+                  表の外側の余白は左右で同じにする（左端 pl-5・右端 pr-5）。
+                  操作列はボタン幅で固定し右へ寄せる。残りは中身の列で吸収する。
+                */}
+                <Th className="pl-5">アカウント</Th>
                 <Th>接続状態</Th>
                 <Th>Webhook</Th>
                 <Th>友だち</Th>
                 <Th>既定</Th>
                 <Th>親アカウント</Th>
-                <Th>操作</Th>
+                <Th align="right" className="w-28 pr-5">操作</Th>
               </TableHeadRow>
             </thead>
             <tbody>
@@ -218,7 +222,7 @@ export default function AccountsPage() {
                 const webhook = webhookLabel(account)
                 return (
                   <tr key={account.id} className="border-hairline hover:bg-canvas-sunken border-t align-middle">
-                    <td className="px-4 py-3">
+                    <td className="py-3 pr-4 pl-5">
                       <p className="text-ink text-sm font-medium">{account.name}</p>
                       <p className="text-ink-faint mt-0.5 text-xs">
                         チャネル {account.channelId}
@@ -242,7 +246,7 @@ export default function AccountsPage() {
                     <td className="text-ink-secondary px-4 py-3 text-sm">
                       {parentName(account, accounts)}
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="py-3 pr-5 pl-4 text-right whitespace-nowrap">
                       {/* #641: 行操作は枠つきボタンにそろえる。押せない「•••」の飾りは出さない */}
                       <Button href={`/accounts/detail?id=${account.id}`} variant="secondary">
                         詳細
