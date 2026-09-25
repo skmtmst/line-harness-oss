@@ -65,8 +65,8 @@ export default function MembersTab({
   return (
     <>
       <KpiCollapse data-design="KPIs" data-design-node="THwtN" gridClassName="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <SummaryCard variant="v6" title="LINE連携済みの会員" value={ready ? kpis!.members : null} unit="人" detail="ECの会員と結びついた友だち" loading={!ready && settingsStatus === 'loading'} />
-        <SummaryCard variant="v6" title="通年 合計" value={ready ? kpis!.annualTotalYen : null} unit="円" detail="1/1〜今日の購入額" loading={!ready && settingsStatus === 'loading'} />
+        <SummaryCard variant="v6" title="LINE連携済みの会員" value={ready ? kpis!.members : null} unit="人" detail="" help="ECの会員と結びついた友だちです" loading={!ready && settingsStatus === 'loading'} />
+        <SummaryCard variant="v6" title="通年 合計" value={ready ? kpis!.annualTotalYen : null} unit="円" detail="" help="1月1日から今日までの購入額です" loading={!ready && settingsStatus === 'loading'} />
         <SummaryCard
           variant="v6"
           title={topTwo.map((r) => r.name).join('・') || '上位ランク'}

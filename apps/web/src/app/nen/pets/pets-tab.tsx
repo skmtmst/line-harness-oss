@@ -79,8 +79,8 @@ export default function PetsTab({
     <>
       <KpiCollapse data-design="KPIs" data-design-node="pets-kpis" gridClassName="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <SummaryCard variant="v6" title="登録ペット" value={ready ? kpis!.total : null} unit="頭" detail={ready ? `犬 ${kpis!.dogs}・猫 ${kpis!.cats}` : '—'} loading={!ready && status === 'loading'} />
-        <SummaryCard variant="v6" title="今月の新規登録" value={ready ? kpis!.newThisMonth : null} unit="頭" detail="1日〜今日に登録されたペット" loading={!ready && status === 'loading'} />
-        <SummaryCard variant="v6" title="目安を出せるペット" value={ready ? kpis!.computable : null} unit="頭" detail="体重・主食が揃っている" loading={!ready && status === 'loading'} />
+        <SummaryCard variant="v6" title="今月の新規登録" value={ready ? kpis!.newThisMonth : null} unit="頭" detail="" help="1日から今日までに登録されたペットです" loading={!ready && status === 'loading'} />
+        <SummaryCard variant="v6" title="目安を出せるペット" value={ready ? kpis!.computable : null} unit="頭" detail="" help="体重と主食が揃っているペットです" loading={!ready && status === 'loading'} />
         <SummaryCard variant="v6" title="体重が未更新（90日）" value={ready ? kpis!.staleWeight : null} unit="頭" detail="マイページで更新を促す" loading={!ready && status === 'loading'} />
       </KpiCollapse>
 
