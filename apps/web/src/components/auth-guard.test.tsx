@@ -21,6 +21,10 @@ vi.mock('next/navigation', () => ({
   usePathname: () => currentPath,
 }))
 
+vi.mock('./hq/platform-notices', () => ({
+  default: () => <div data-platform-notices>運営からのお知らせ</div>,
+}))
+
 import AuthGuard, { invalidateAuthSessionCheck } from './auth-guard'
 import { SESSION_LOST_EVENT } from '@/lib/api'
 
@@ -42,11 +46,11 @@ let root: Root
 let fetchSpy: ReturnType<typeof vi.fn>
 let storage: MemoryStorage
 
-function sessionOk() {
+function sessionOk(tenantStatus: 'active' | 'suspended' | 'archived' = 'active') {
   return new Response(
     JSON.stringify({
       success: true,
-      data: { name: 'テスト担当', role: 'admin', permissionKeys: [], viewPermissionKeys: [] },
+      data: { name: 'テスト担当', role: 'admin', tenantStatus, permissionKeys: [], viewPermissionKeys: [] },
       csrfToken: 'csrf-token-1',
     }),
     { status: 200, headers: { 'Content-Type': 'application/json' } },
@@ -165,5 +169,27 @@ describe('PERF-07 AuthGuard のセッション確認再利用', () => {
 
     expect(replaceMock).toHaveBeenCalledWith('/login')
     expect(host.querySelector('[data-child]')).toBeNull()
+  })
+
+  it.each(['suspended', 'archived'] as const)('%s の通常画面をV6の停止案内に差し替える', async (status) => {
+    fetchSpy.mockImplementation(async () => sessionOk(status))
+    currentPath = '/friends'
+    await render()
+    await settle()
+
+    expect(host.querySelector('[data-child]')).toBeNull()
+    expect(host.querySelector('[data-design-node="CXFjb9"]')).not.toBeNull()
+    expect(host.textContent).toContain('現在ご利用いただけません')
+    expect(host.querySelector('[data-platform-notices]')).not.toBeNull()
+  })
+
+  it('停止中でも /hq/support は通常画面へ到達できる', async () => {
+    fetchSpy.mockImplementation(async () => sessionOk('suspended'))
+    currentPath = '/hq/support'
+    await render()
+    await settle()
+
+    expect(host.querySelector('[data-child]')).not.toBeNull()
+    expect(host.querySelector('[data-design-node="CXFjb9"]')).toBeNull()
   })
 })

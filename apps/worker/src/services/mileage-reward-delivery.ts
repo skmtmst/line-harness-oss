@@ -10,7 +10,9 @@ import {
   recordMileageRedemptionAttempt,
   refundMileageRewardRedemption,
   type MileageRewardFailurePolicy,
+  activeTenantLineAccountSql,
 } from '@line-crm/db';
+import { stoppedTenantLineAccountSql } from './tenant-runtime-status.js';
 import { createAutomationActionExecutors } from './automation-action-executors.js';
 import { featureJobCanRun } from './feature-enforcement.js';
 import { AutomationActionError, type ActionDefinition } from './automation-engine.js';
@@ -396,12 +398,22 @@ export async function processDueMileageRewardDeliveries(
     new Date(options.now).getTime() - STALE_DELIVERY_LEASE_MS,
   ).toISOString();
   const dueWhere = `status = 'delivery_failed' AND next_retry_at IS NOT NULL AND next_retry_at <= ?`;
+  await db.prepare(
+    `UPDATE mileage_redemptions
+        SET next_retry_at = NULL, failure_code = 'tenant_suspended',
+            failure_message = '契約先の利用停止中に再試行時刻を過ぎたため自動送信しませんでした',
+            updated_at = ?
+      WHERE ${dueWhere}
+        AND line_account_id IS NOT NULL
+        AND ${stoppedTenantLineAccountSql('mileage_redemptions.line_account_id')}`,
+  ).bind(options.now, options.now).run();
   const mileageOff = accountFeatureOffExclusionSql('mileage_redemptions.line_account_id', 'mileage');
   // オフ判定は LIMIT を数える前に SQL で行う。読んでから弾くと、オフの行が
   // 上限ぶん先頭を占めたまま、後ろに並ぶ動作中アカウントの再試行が進まない。
   const due = await db.prepare(
     `SELECT id FROM mileage_redemptions
       WHERE ${dueWhere} AND NOT ${mileageOff}
+        AND (line_account_id IS NULL OR ${activeTenantLineAccountSql('mileage_redemptions.line_account_id')})
       ORDER BY next_retry_at, created_at LIMIT ?`,
   ).bind(options.now, limit).all<{ id: string }>();
   // 止めた事実は監査に残す。行は読むだけで状態は変えない。
@@ -416,6 +428,7 @@ export async function processDueMileageRewardDeliveries(
     ? await db.prepare(
       `SELECT id FROM mileage_redemptions
         WHERE status = 'delivering' AND updated_at < ? AND NOT ${mileageOff}
+          AND (line_account_id IS NULL OR ${activeTenantLineAccountSql('mileage_redemptions.line_account_id')})
         ORDER BY updated_at, created_at LIMIT ?`,
     ).bind(leaseCutoff, remaining).all<{ id: string }>()
     : { results: [] as { id: string }[] };

@@ -56,7 +56,7 @@ async function call(
 
 function seedStaff(id: string, overrides: Record<string, unknown> = {}) {
   testDb.raw
-    .prepare(`INSERT INTO staff_members (id, name, email, role, api_key, is_active, access_level) VALUES (?, ?, ?, ?, ?, ?, ?)`)
+    .prepare(`INSERT INTO staff_members (id, name, email, role, api_key, is_active, access_level, tenant_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
     .run(
       id,
       (overrides.name as string) ?? '権限者',
@@ -65,6 +65,7 @@ function seedStaff(id: string, overrides: Record<string, unknown> = {}) {
       (overrides.api_key as string) ?? `key-${id}`,
       (overrides.is_active as number) ?? 1,
       (overrides.access_level as string) ?? 'full',
+      (overrides.tenant_id as string | null) ?? null,
     );
 }
 
@@ -558,6 +559,23 @@ describe('N-426: LINEログイン経路でも同じ門を通る', () => {
     const location = new URL(res.headers.get('Location')!);
     expect(location.pathname).toBe('/login/two-factor');
     expect(location.search).toBe('');
+  });
+
+  it('停止中契約先のLINEログインは案内へ戻し、challengeもsessionも発行しない', async () => {
+    testDb.raw.prepare(
+      `INSERT INTO tenants (id, name, status) VALUES ('tenant-stopped', '停止中契約先', 'suspended')`,
+    ).run();
+    seedStaff('stopped-owner', { role: 'owner', tenant_id: 'tenant-stopped' });
+    testDb.raw.prepare(
+      `UPDATE staff_members SET line_user_id = 'U-stopped-owner' WHERE id = 'stopped-owner'`,
+    ).run();
+    lineFetchMock('U-stopped-owner');
+
+    const res = await callback(callbackCookies());
+    expect(res.status).toBe(302);
+    expect(res.headers.get('Location')).toBe('https://admin.example.com/login?error=tenant_suspended');
+    expect(challengeRows()).toEqual([]);
+    expect(sessionRows()).toEqual([]);
   });
 
   it('セッションDBが古い場合はLINE callbackを安全に失敗させ、Cookieを出さない', async () => {

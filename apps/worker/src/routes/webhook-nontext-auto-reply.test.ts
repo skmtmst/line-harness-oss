@@ -28,7 +28,7 @@ vi.mock('@line-crm/db', () => ({
   advanceFriendScenario: vi.fn(),
   completeFriendScenario: vi.fn(),
   upsertChatOnMessage: vi.fn(),
-  getLineAccounts: vi.fn().mockResolvedValue([]),
+  listLineAccountsWithTenantStatus: vi.fn().mockResolvedValue([]),
   jstNow: vi.fn(),
   computeNextDeliveryAt: vi.fn(),
   resolveStepContent: vi.fn(),
@@ -122,7 +122,7 @@ vi.mock('../services/step-delivery.js', () => ({
 import { verifySignature } from '@line-crm/line-sdk';
 import {
   getFriendByLineUserIdForAccount,
-  getLineAccounts,
+  listLineAccountsWithTenantStatus,
   jstNow,
   recordAnalyticsEvent,
   upsertChatOnMessage,
@@ -225,7 +225,7 @@ function nonTextEvent(message: Record<string, unknown>, webhookEventId: string) 
 
 async function postWebhook(db: D1Database, events: unknown[]) {
   vi.mocked(verifySignature).mockResolvedValue(true);
-  vi.mocked(getLineAccounts).mockResolvedValue([ACCOUNT]);
+  vi.mocked(listLineAccountsWithTenantStatus).mockResolvedValue([ACCOUNT]);
   vi.mocked(getFriendByLineUserIdForAccount).mockResolvedValue(FRIEND);
   const executionCtx = {
     waitUntil: vi.fn(),

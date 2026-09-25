@@ -7,7 +7,7 @@
 
 import { matchesCondition, type SegmentCondition } from './segment-query.js';
 import { featureJobCanRun } from './feature-enforcement.js';
-import { isOperationCapabilityStopped } from '@line-crm/db';
+import { isOperationCapabilityStopped, listLineAccountsWithTenantStatus } from '@line-crm/db';
 
 const DEFAULT_LEASE_MINUTES = 5;
 const RETRY_DELAYS_MINUTES = [1, 5, 30] as const;
@@ -112,6 +112,8 @@ export interface AutomationEngineOptions {
   executors?: Record<string, AutomationActionExecutor>;
   now?: string;
   leaseMinutes?: number;
+  /** Cron supplies one shared snapshot so status enforcement never becomes N+1. */
+  tenantStatusByAccount?: ReadonlyMap<string, 'active' | 'suspended' | 'archived'>;
 }
 
 export class AutomationActionError extends Error {
@@ -683,6 +685,20 @@ export async function processAutomationRun(
     .prepare(`SELECT line_account_id FROM automation_runs WHERE id = ?`)
     .bind(runId)
     .first<{ line_account_id: string | null }>();
+  const tenantStatusByAccount = options.tenantStatusByAccount ?? new Map(
+    (await listLineAccountsWithTenantStatus(db)).map((account) => [account.id, account.tenant_status]),
+  );
+  const ownerTenantStatus = ownerRow?.line_account_id
+    ? tenantStatusByAccount.get(ownerRow.line_account_id)
+    : undefined;
+  if (ownerTenantStatus && ownerTenantStatus !== 'active') {
+    await db.prepare(
+      `UPDATE automation_runs
+          SET status = 'cancelled', completed_at = ?, resume_at = NULL, lease_expires_at = NULL
+        WHERE id = ? AND status IN ('queued', 'waiting', 'running')`,
+    ).bind(now, runId).run();
+    return 'cancelled';
+  }
   if (ownerRow?.line_account_id && !await featureJobCanRun(db, { accountId: ownerRow.line_account_id, featureId: 'automations', job: 'automation runs' })) {
     return 'busy';
   }
@@ -1038,6 +1054,9 @@ export async function processDueAutomationRuns(
 ): Promise<{ processed: number; results: Array<{ runId: string; status: string }> }> {
   const now = nowIso(options.now);
   const limit = Math.max(1, Math.min(options.limit ?? 100, 500));
+  const tenantStatusByAccount = new Map(
+    (await listLineAccountsWithTenantStatus(db)).map((account) => [account.id, account.tenant_status]),
+  );
   const due = await db.prepare(
     `SELECT id FROM automation_runs
       WHERE status = 'queued'
@@ -1048,7 +1067,7 @@ export async function processDueAutomationRuns(
   ).bind(now, now, limit).all<{ id: string }>();
   const results: Array<{ runId: string; status: string }> = [];
   for (const row of due.results ?? []) {
-    const status = await processAutomationRun(db, row.id, { ...options, now });
+    const status = await processAutomationRun(db, row.id, { ...options, now, tenantStatusByAccount });
     results.push({ runId: row.id, status });
   }
   return { processed: results.length, results };

@@ -1,8 +1,10 @@
 import {
+  activeTenantLineAccountSql,
   isOperationCapabilityStopped,
   resolveLineCredential,
   jstNow,
 } from '@line-crm/db';
+import { stoppedTenantLineAccountSql } from './tenant-runtime-status.js';
 import {
   featureJobCanRun,
 } from './feature-enforcement.js';
@@ -522,6 +524,20 @@ export async function processWebinarNotificationJobs(
 ): Promise<{ sent: number; failed: number; skipped: number; heldByStop: number }> {
   const now = options.now ?? new Date();
   const nowEpoch = Math.floor(now.getTime() / 1000);
+  await db.prepare(
+    `UPDATE webinar_notification_jobs
+        SET status='skipped', lease_expires_at=NULL,
+            last_error_code='tenant_suspended',
+            last_error_message='契約先が停止中のため送信しませんでした。',
+            updated_at=?
+      WHERE status IN ('queued','retry_wait','claimed')
+        AND scheduled_at <= ?
+        AND EXISTS (
+          SELECT 1 FROM webinars stopped_webinar
+           WHERE stopped_webinar.id=webinar_notification_jobs.webinar_id
+             AND ${stoppedTenantLineAccountSql('stopped_webinar.account_id')}
+        )`,
+  ).bind(now.toISOString(), nowEpoch).run();
   const due = await db.prepare(
     `SELECT j.id, j.webinar_id, j.registration_id, j.friend_id,
             j.session_start_at, j.kind, j.status, j.attempt_count, j.line_retry_key,
@@ -550,6 +566,7 @@ export async function processWebinarNotificationJobs(
         AND COALESCE(j.next_retry_at, j.scheduled_at) <= ?
         AND r.status='active'
         AND w.status='active'
+        AND ${activeTenantLineAccountSql('w.account_id')}
       -- 停止中の先頭20件で他アカウントを塞がない。未停止を先に選び、
       -- その中では予定時刻順を維持する。停止行は書き換えず解除後に拾う。
       -- この判定は優先順位専用。送信許可には使わず、下の3点で読み直す。

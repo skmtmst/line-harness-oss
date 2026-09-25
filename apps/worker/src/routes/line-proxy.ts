@@ -3,7 +3,7 @@ import type { Context } from 'hono';
 import { LineClient } from '@line-crm/line-sdk';
 import type { Message } from '@line-crm/line-sdk';
 import {
-  getLineAccounts,
+  listLineAccountsWithTenantStatus,
   getFriendByLineUserIdForAccount,
   upsertFriend,
   getChatByFriendId,
@@ -137,8 +137,19 @@ function asMessages(value: unknown): Message[] {
  * or the env default token. Returns a Response on auth/validation failure.
  */
 async function resolveCaller(c: Context<Env>, token: string): Promise<ResolvedCaller | Response> {
-  const accounts = await getLineAccounts(c.env.DB);
-  const active = accounts.filter((a) => a.is_active);
+  const accounts = await listLineAccountsWithTenantStatus(c.env.DB);
+  // This is the last server-side gate before api.line.me. Keeping stopped
+  // accounts out of token resolution protects every proxy-based dispatcher,
+  // even if a future job forgets its claim-time filter.
+  const active = accounts.filter((a) => a.is_active && a.tenant_status === 'active');
+
+  // A DB-registered channel token always keeps its tenant boundary. Without
+  // this check, a stopped tenant whose token also happens to be configured as
+  // the environment default could fall through to the legacy env-token path.
+  const registeredByToken = accounts.find((a) => a.channel_access_token === token);
+  if (registeredByToken && registeredByToken.tenant_status !== 'active') {
+    return c.json({ code: 'TENANT_SUSPENDED', message: '契約先の利用が停止されています' }, 403);
+  }
 
   const byChannelToken = active.find((a) => a.channel_access_token === token);
   if (byChannelToken) {

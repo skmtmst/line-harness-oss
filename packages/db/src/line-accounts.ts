@@ -80,6 +80,40 @@ export interface LineAccount {
   updated_at: string;
 }
 
+export type TenantRuntimeStatus = 'active' | 'suspended' | 'archived';
+
+/**
+ * Runtime-facing account shape. The existing LineAccount APIs intentionally
+ * remain unchanged because management screens must still inspect stopped tenants.
+ */
+export interface LineAccountWithTenantStatus extends LineAccount {
+  tenant_status: TenantRuntimeStatus;
+}
+
+const TENANT_STATUS_SELECT = `CASE
+  WHEN COALESCE(account.tenant_id, '${DEFAULT_TENANT_ID}') = '${DEFAULT_TENANT_ID}' THEN 'active'
+  WHEN tenant.status IN ('active', 'suspended', 'archived') THEN tenant.status
+  ELSE 'archived'
+END`;
+
+/** SQL predicate used by dispatcher claim queries. Unknown tenant rows fail closed. */
+export function activeTenantLineAccountSql(accountIdExpression: string): string {
+  if (!/^[A-Za-z_][A-Za-z0-9_.]*$/.test(accountIdExpression)) {
+    throw new Error('Invalid line account SQL expression');
+  }
+  return `EXISTS (
+    SELECT 1
+      FROM line_accounts tenant_gate_account
+      LEFT JOIN tenants tenant_gate_tenant
+        ON tenant_gate_tenant.id = COALESCE(tenant_gate_account.tenant_id, '${DEFAULT_TENANT_ID}')
+     WHERE tenant_gate_account.id = ${accountIdExpression}
+       AND (
+         COALESCE(tenant_gate_account.tenant_id, '${DEFAULT_TENANT_ID}') = '${DEFAULT_TENANT_ID}'
+         OR tenant_gate_tenant.status = 'active'
+       )
+  )`;
+}
+
 /** Non-secret fields required to resolve admin account visibility. */
 export type LineAccountScopeEntry = Pick<
   LineAccount,
@@ -516,6 +550,56 @@ export async function getLineAccounts(
   return Promise.all(
     result.results.map((row) => decryptLineAccountCredentials(row, encryptionKey)),
   );
+}
+
+/**
+ * Lists accounts and their owning tenant status in one D1 read. The default
+ * operations tenant is always available; a missing non-default tenant row is
+ * treated as archived so delivery fails closed.
+ */
+export async function listLineAccountsWithTenantStatus(
+  db: D1Database,
+  credentialEncryptionKey?: string,
+): Promise<LineAccountWithTenantStatus[]> {
+  const encryptionKey = await resolveCredentialEncryptionKey(credentialEncryptionKey);
+  const result = await db
+    .prepare(
+      `SELECT account.*, ${TENANT_STATUS_SELECT} AS tenant_status
+         FROM line_accounts account
+         LEFT JOIN tenants tenant
+           ON tenant.id = COALESCE(account.tenant_id, ?)
+        ORDER BY account.display_order ASC, account.created_at ASC`,
+    )
+    .bind(DEFAULT_TENANT_ID)
+    .all<LineAccountWithTenantStatus>();
+  const rows = await Promise.all(
+    result.results.map((row) => decryptLineAccountCredentials(row, encryptionKey)),
+  );
+  return rows as LineAccountWithTenantStatus[];
+}
+
+export async function getLineAccountTenantStatus(
+  db: D1Database,
+  lineAccountId: string,
+): Promise<TenantRuntimeStatus> {
+  const row = await db
+    .prepare(
+      `SELECT ${TENANT_STATUS_SELECT} AS tenant_status
+         FROM line_accounts account
+         LEFT JOIN tenants tenant
+           ON tenant.id = COALESCE(account.tenant_id, ?)
+        WHERE account.id = ?`,
+    )
+    .bind(DEFAULT_TENANT_ID, lineAccountId)
+    .first<{ tenant_status: TenantRuntimeStatus }>();
+  return row?.tenant_status ?? 'archived';
+}
+
+export async function isLineAccountTenantActive(
+  db: D1Database,
+  lineAccountId: string,
+): Promise<boolean> {
+  return (await getLineAccountTenantStatus(db, lineAccountId)) === 'active';
 }
 
 /**

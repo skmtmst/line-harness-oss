@@ -6,6 +6,7 @@ import { clearSelectionAfterAuthentication } from '@/lib/hq-navigation'
 import { isPublicAuthPath } from '@/lib/auth-email'
 import { SESSION_LOST_EVENT, type OpsImpersonation } from '@/lib/api'
 import { forgetSessionSnapshot, rememberSessionSnapshot } from '@/lib/session-snapshot'
+import TenantSuspended from './tenant-suspended'
 
 /*
  * PERF-07: 画面遷移のたびの /api/auth/session を短いあいだ再利用する。
@@ -21,7 +22,8 @@ import { forgetSessionSnapshot, rememberSessionSnapshot } from '@/lib/session-sn
  *   書き換え（storageイベント）で即座に捨てる
  */
 const SESSION_REUSE_MS = 30_000
-let lastSessionCheck: { at: number; fingerprint: string } | null = null
+type TenantStatus = 'active' | 'suspended' | 'archived'
+let lastSessionCheck: { at: number; fingerprint: string; tenantStatus: TenantStatus } | null = null
 
 function sessionFingerprint(handoffToken: string): string {
   let csrf = ''
@@ -39,6 +41,7 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
   const router = useRouter()
   const pathname = usePathname()
   const [checked, setChecked] = useState(false)
+  const [tenantStatus, setTenantStatus] = useState<TenantStatus>('active')
 
   useEffect(() => {
     let cancelled = false
@@ -65,6 +68,7 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
       && lastSessionCheck.fingerprint === fingerprint
       && Date.now() - lastSessionCheck.at < SESSION_REUSE_MS
     ) {
+      setTenantStatus(lastSessionCheck.tenantStatus)
       setChecked(true)
       return () => {
         cancelled = true
@@ -88,6 +92,10 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
         if (!data?.success || !data?.data) throw new Error('unauthenticated')
         if (data.data.name) localStorage.setItem('lh_staff_name', data.data.name)
         if (data.data.role) localStorage.setItem('lh_staff_role', data.data.role)
+        const nextTenantStatus: TenantStatus = data.data.tenantStatus === 'suspended' || data.data.tenantStatus === 'archived'
+          ? data.data.tenantStatus
+          : 'active'
+        setTenantStatus(nextTenantStatus)
         localStorage.setItem('lh_staff_permissions', JSON.stringify(data.data.permissionKeys ?? []))
         // N-424: 「見えるだけ」のキーは別枠で持つ。メニュー表示には両方を使う。
         localStorage.setItem('lh_staff_view_permissions', JSON.stringify(data.data.viewPermissionKeys ?? []))
@@ -99,7 +107,7 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
         // 一度だけ消える（NEXT-07）。sessionStorage の残存印も残存扱いにする。
         clearSelectionAfterAuthentication(localStorage, sessionStorage)
         // 確認した時点の指紋で記憶する（CSRF更新を受けたなら新しい値で）。
-        lastSessionCheck = { at: Date.now(), fingerprint: sessionFingerprint(handoffToken) }
+        lastSessionCheck = { at: Date.now(), fingerprint: sessionFingerprint(handoffToken), tenantStatus: nextTenantStatus }
         if (!cancelled) setChecked(true)
       } catch {
         lastSessionCheck = null
@@ -122,6 +130,10 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
         <div className="animate-spin w-8 h-8 border-[3px] border-gray-200 border-t-green-500 rounded-full" />
       </div>
     )
+  }
+
+  if ((tenantStatus === 'suspended' || tenantStatus === 'archived') && !pathname.startsWith('/hq/support')) {
+    return <TenantSuspended />
   }
 
   return <>{children}</>

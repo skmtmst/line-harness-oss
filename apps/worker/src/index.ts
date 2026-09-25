@@ -10,6 +10,7 @@ import {
   getEntryRouteByRefCode,
   getEntryRouteByRefCodeAny,
   getLineAccountById,
+  isLineAccountTenantActive,
   getAffiliateLinkByRefCode,
   incrementAffiliateLinkClick,
   enqueueFollowingMileageMilestones,
@@ -48,6 +49,7 @@ import { DEFAULT_ACCOUNT_SETTINGS } from './services/booking-types.js';
 import { authMiddleware } from './middleware/auth.js';
 import type { AuthenticatedStaff } from './middleware/auth.js';
 import { tenantScopeMiddleware } from './middleware/tenant-scope.js';
+import { tenantPublicBoundaryMiddleware } from './middleware/tenant-public-boundary.js';
 import { rateLimitMiddleware } from './middleware/rate-limit.js';
 import { businessAuditMiddleware } from './middleware/business-audit.js';
 import { featureEnforcementMiddleware } from './middleware/feature-enforcement.js';
@@ -406,6 +408,10 @@ app.use('*', timingMark('cors'));
 // Rate limiting — runs before auth to block abuse early
 app.use('*', rateLimitMiddleware);
 app.use('*', timingMark('rate'));
+
+// LIFF/public routes skip staff auth. Apply their tenant wall before auth and
+// before any route handler can persist a form/booking/member write.
+app.use('/api/liff/*', tenantPublicBoundaryMiddleware);
 
 // Auth middleware — skips /webhook and /docs automatically
 app.use('*', authMiddleware);
@@ -2148,9 +2154,12 @@ async function scheduled(
     };
     const result = await processDueRichMenuSchedules(env.DB, {
       getGroupWithPages: (db, groupId) => getRichMenuGroupWithPages(db, groupId),
-      getLineAccount: (db, accountId) => getLineAccountById(db, accountId) as Promise<{
-        id: string; channel_access_token: string | null; is_active: number; archived_at: string | null;
-      } | null>,
+      getLineAccount: async (db, accountId) => {
+        if (!await isLineAccountTenantActive(db, accountId)) return null;
+        return getLineAccountById(db, accountId) as Promise<{
+          id: string; channel_access_token: string | null; is_active: number; archived_at: string | null;
+        } | null>;
+      },
       getRequestingStaff: async (db, staffId) => {
         const staff = await getStaffById(db, staffId);
         return staff as unknown as {

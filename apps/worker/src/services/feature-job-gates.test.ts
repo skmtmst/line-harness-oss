@@ -145,3 +145,65 @@ describe('feature off job gates', () => {
     }
   });
 });
+
+describe('tenant suspension delivery gates', () => {
+  function seedStoppedAccount(testDb: SqliteD1): void {
+    testDb.raw.exec(`
+      INSERT INTO tenants (id, name, status) VALUES ('tenant-stopped', '停止中契約先', 'suspended');
+      INSERT INTO line_accounts
+        (id, channel_id, name, channel_access_token, channel_secret, tenant_id)
+      VALUES ('account-stopped', 'ch-stopped', '停止中店舗', 'tok-stopped', 'sec-stopped', 'tenant-stopped');
+    `);
+  }
+
+  it('一斦配信は下書きへ戻し、復帰後も期限切れを自動送信しない', async () => {
+    const testDb = createTestD1();
+    try {
+      seedStoppedAccount(testDb);
+      testDb.raw.exec(`
+        INSERT INTO broadcasts
+          (id, title, message_type, message_content, target_type, status, scheduled_at, line_account_id)
+        VALUES ('broadcast-stopped', '停止中予約', 'text', '送らない', 'all', 'scheduled',
+          '2020-01-01T00:00:00.000Z', 'account-stopped');
+      `);
+
+      await processScheduledBroadcasts(testDb.db, {} as never);
+      expect(testDb.raw.prepare(
+        `SELECT status, scheduled_at FROM broadcasts WHERE id = 'broadcast-stopped'`,
+      ).get()).toEqual({ status: 'draft', scheduled_at: null });
+
+      testDb.raw.prepare(`UPDATE tenants SET status = 'active' WHERE id = 'tenant-stopped'`).run();
+      await processScheduledBroadcasts(testDb.db, {} as never);
+      expect(await featureState(testDb, 'broadcasts', 'broadcast-stopped', 'status')).toBe('draft');
+    } finally {
+      testDb.raw.close();
+    }
+  });
+
+  it('シナリオは一時停止にし、復帰後も過期ステップを自動再開しない', async () => {
+    const testDb = createTestD1();
+    try {
+      seedStoppedAccount(testDb);
+      testDb.raw.exec(`
+        INSERT INTO friends (id, line_user_id, line_account_id)
+        VALUES ('friend-stopped', 'U-stopped', 'account-stopped');
+        INSERT INTO scenarios (id, name, trigger_type, is_active, line_account_id)
+        VALUES ('scenario-stopped', '停止中シナリオ', 'manual', 1, 'account-stopped');
+        INSERT INTO friend_scenarios (id, friend_id, scenario_id, status, next_delivery_at)
+        VALUES ('friend-scenario-stopped', 'friend-stopped', 'scenario-stopped', 'active',
+          '2020-01-01T00:00:00.000Z');
+      `);
+
+      await processStepDeliveries(testDb.db, {} as never);
+      expect(testDb.raw.prepare(
+        `SELECT status, pause_reason, next_delivery_at FROM friend_scenarios WHERE id = 'friend-scenario-stopped'`,
+      ).get()).toEqual({ status: 'paused', pause_reason: 'tenant_suspended', next_delivery_at: null });
+
+      testDb.raw.prepare(`UPDATE tenants SET status = 'active' WHERE id = 'tenant-stopped'`).run();
+      await processStepDeliveries(testDb.db, {} as never);
+      expect(await featureState(testDb, 'friend_scenarios', 'friend-scenario-stopped', 'status')).toBe('paused');
+    } finally {
+      testDb.raw.close();
+    }
+  });
+});

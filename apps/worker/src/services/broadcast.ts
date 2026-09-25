@@ -15,6 +15,7 @@ import {
   settleBroadcastRecipients,
   isBroadcastStopped,
   isOperationCapabilityStopped,
+  listLineAccountsWithTenantStatus,
 } from '@line-crm/db';
 import type { Broadcast } from '@line-crm/db';
 import type { LineClient } from '@line-crm/line-sdk';
@@ -32,6 +33,7 @@ import { evaluateQuota, fetchQuota, shortfallMessage } from './broadcast-quota-g
 import { getSendPermissionForAccount, type SendPermissionCache } from './send-entitlements.js';
 import { recordLineTokenDefaultFallback } from './line-token.js';
 import { featureJobCanRun } from './feature-enforcement.js';
+import { isStoppedTenantStatus } from './tenant-runtime-status.js';
 import { assertAnalyticsAudiencesUsable, BroadcastAudienceError } from './segment-audience-guard.js';
 import type { SegmentCondition } from './segment-query.js';
 import {
@@ -593,6 +595,9 @@ export async function processScheduledBroadcasts(
   workerUrl?: string,
 ): Promise<void> {
   const sendPermissions: SendPermissionCache = new Map();
+  const tenantStatusByAccount = new Map(
+    (await listLineAccountsWithTenantStatus(db)).map((account) => [account.id, account.tenant_status]),
+  );
   const allBroadcasts = await getBroadcasts(db);
 
   const nowMs = Date.now();
@@ -606,6 +611,14 @@ export async function processScheduledBroadcasts(
   for (const broadcast of scheduled) {
     try {
       const ownerAccountId = (broadcast as unknown as Record<string, unknown>).line_account_id as string | null;
+      if (ownerAccountId && isStoppedTenantStatus(tenantStatusByAccount.get(ownerAccountId))) {
+        // Keep the content but remove the expired automatic schedule. Restoring
+        // the tenant must never send a message whose due time passed while stopped.
+        await db.prepare(
+          `UPDATE broadcasts SET status = 'draft', scheduled_at = NULL WHERE id = ? AND status = 'scheduled'`,
+        ).bind(broadcast.id).run();
+        continue;
+      }
       // 機能オフ中はclaimせず予約のまま残す。再オンで再開する。
       if (ownerAccountId && !await featureJobCanRun(db, { accountId: ownerAccountId, featureId: 'broadcasts', job: 'broadcast deliveries' })) {
         continue;
@@ -738,9 +751,19 @@ export async function processQueuedBroadcasts(
 ): Promise<void> {
   const queued = await getQueuedBroadcasts(db);
   const sendPermissions: SendPermissionCache = new Map();
+  const tenantStatusByAccount = new Map(
+    (await listLineAccountsWithTenantStatus(db)).map((account) => [account.id, account.tenant_status]),
+  );
   for (const broadcast of queued) {
     // 機能オフ中は送信中の続きも止める。行は残るため再オンで再開する。
     const ownerAccountId = (broadcast as unknown as Record<string, unknown>).line_account_id as string | null;
+    if (ownerAccountId && isStoppedTenantStatus(tenantStatusByAccount.get(ownerAccountId))) {
+      await db.prepare(
+        `UPDATE broadcasts SET status = 'draft', scheduled_at = NULL, batch_lock_at = NULL
+          WHERE id = ? AND status IN ('sending', 'scheduled')`,
+      ).bind(broadcast.id).run();
+      continue;
+    }
     if (ownerAccountId && !await featureJobCanRun(db, { accountId: ownerAccountId, featureId: 'broadcasts', job: 'broadcast deliveries' })) {
       continue;
     }

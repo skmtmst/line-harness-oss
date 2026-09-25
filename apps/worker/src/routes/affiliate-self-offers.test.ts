@@ -7,8 +7,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // mocked with an in-memory offer + link store so we can exercise idempotency and
 // the inactive-offer 404 without a real D1 binding.
 const dbMocks = {
-  getLineAccounts: vi.fn().mockResolvedValue([
-    { id: 'account-main', login_channel_id: '2000000000' },
+  listLineAccountsWithTenantStatus: vi.fn().mockResolvedValue([
+    { id: 'account-main', login_channel_id: '2000000000', tenant_status: 'active' },
   ]),
   getStaffByApiKey: vi.fn(),
   recoverStalledBroadcasts: vi.fn(),
@@ -117,8 +117,8 @@ beforeEach(() => {
   installLineFetchMock();
   links = [];
 
-  dbMocks.getLineAccounts.mockResolvedValue([
-    { id: 'account-main', login_channel_id: LOGIN_CHANNEL_ID },
+  dbMocks.listLineAccountsWithTenantStatus.mockResolvedValue([
+    { id: 'account-main', login_channel_id: LOGIN_CHANNEL_ID, tenant_status: 'active' },
   ]);
   dbMocks.getFriendByLineUserIdForAccount.mockImplementation(async (_db: unknown, uid: string) => FRIENDS[uid] ?? null);
   dbMocks.getAffiliateByFriendId.mockImplementation(async (_db: unknown, fid: string) =>

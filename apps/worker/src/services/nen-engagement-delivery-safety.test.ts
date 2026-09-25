@@ -8,6 +8,7 @@ const dbMocks = vi.hoisted(() => ({
   // 取り出しのSQLに混ぜる「機能オフのアカウントを外す」条件式。
   // ここでは常に偽(=誰も外さない)にして、この試験の関心事だけを見る。
   accountFeatureOffExclusionSql: vi.fn(() => '(0)'),
+  activeTenantLineAccountSql: vi.fn(() => '(1)'),
 }));
 const pushViaHarnessProxy = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
 const logOutgoingMessage = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
