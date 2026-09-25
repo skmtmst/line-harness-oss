@@ -90,13 +90,12 @@ const DESIGN_WORDS: Record<string, number> = {
 const REMAINING: Record<string, number> = {
   /* #670 17 で押せない「保存した条件」(準備中です)を撤去し、
      page.tsx は 0 件になったので行を消した。 */
-  'app/booking/staff/new/page.tsx': 2,
+  /* 監査7 #810 で「画像を選ぶ」（準備中です）の飾りボタンを撤去し 0 件になったので行を消した。 */
   /* 2026-09-08 #605 で「同じ設定で作り直す」を実動作へ接続し 0 件になったので行を消した。 */
   'app/restaurant-test/stores/new/page.tsx': 1,
   /* ★V7 C6 で押せない「マニュアル」（準備中です）を撤去し 0 件になったので行を消した。 */
   /* 2026-09-24 V7残り一覧の手直しで飾りボタン2件と接続見出しの言い回しを消し 0 件になったので行を消した。 */
-  'app/templates/carousel/page.tsx': 2,
-  'app/templates/edit/page.tsx': 4,
+  /* 監査7 #810 で carousel の「下書き保存」と edit の「テスト送信」他の飾りボタンを撤去し 0 件になったので行を消した。 */
   'components/broadcasts/broadcast-form.tsx': 7,
   'components/events/event-wizard.tsx': 2,
   'components/friends/friend-timeline.tsx': 1,

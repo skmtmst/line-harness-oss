@@ -1,6 +1,7 @@
 'use client'
 
 import { Fragment, useState, useEffect, useCallback, useMemo, useRef } from 'react'
+import { X } from 'lucide-react'
 import KpiCard from '@/components/shared/kpi-card'
 import {
   api,
@@ -1171,61 +1172,65 @@ export function CreateAffiliateModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-label="アフィリエイター新規作成"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-ink/35 p-4"
       onClick={onClose}
     >
       <div
-        className="w-full max-w-md bg-white rounded-lg shadow-xl p-6"
+        className="w-full max-w-md rounded-card border border-hairline bg-canvas p-5 shadow-lg"
         onClick={(e) => e.stopPropagation()}
       >
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">
-          アフィリエイター新規作成
-        </h2>
+        <div className="flex items-start justify-between gap-3">
+          <h2 className="font-bold text-ink">
+            アフィリエイター新規作成
+          </h2>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="閉じる"
+            className="rounded-mini p-1 text-ink-secondary hover:bg-canvas-sunken"
+          >
+            <X aria-hidden="true" className="h-5 w-5" />
+          </button>
+        </div>
 
         {issuedUrl ? (
           // ── Success state: show issued link with a copy button ────────────
-          <div className="space-y-4">
-            <p className="text-sm text-gray-700">
+          <div className="mt-4 space-y-4">
+            <p className="text-sm text-ink-secondary">
               アフィリエイターを作成し、初期リンクを発行しました。
             </p>
             <div className="flex items-stretch gap-2">
               <input
                 readOnly
                 value={issuedUrl}
-                className="flex-1 px-3 py-2 text-sm font-mono border border-gray-300 rounded-md bg-gray-50 text-gray-800"
+                aria-label="発行した初期リンク"
+                className="min-w-0 flex-1 rounded-control border border-hairline bg-canvas-sunken px-3 py-2 font-mono text-sm text-ink"
               />
-              <button
-                onClick={() => { void handleCopy() }}
-                className="px-3 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md whitespace-nowrap"
-              >
+              <Button variant="primary" onClick={() => { void handleCopy() }}>
                 {copied ? 'コピー済' : 'コピー'}
-              </button>
-            </div>
-            <div className="flex justify-end">
-              <button
-                onClick={onClose}
-                className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-md"
-              >
-                閉じる
-              </button>
+              </Button>
             </div>
           </div>
         ) : (
           // ── Form state ────────────────────────────────────────────────────
-          <div className="space-y-4">
+          <div className="mt-4 space-y-4">
             {/* Friend selector */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                LINE 友だち <span className="text-red-500">*</span>
+              <label htmlFor="aff-friend-search" className="mb-1 block text-sm font-medium text-ink-secondary">
+                LINE 友だち <span className="text-danger">*</span>
               </label>
               {selected ? (
-                <div className="flex items-center justify-between px-3 py-2 border border-gray-300 rounded-md bg-gray-50">
-                  <span className="text-sm text-gray-800">
-                    {selected.displayName ?? <span className="text-gray-400 italic">不明</span>}
+                <div className="flex items-center justify-between rounded-control border border-hairline bg-canvas-sunken px-3 py-2">
+                  <span className="text-sm text-ink">
+                    {selected.displayName ?? <span className="italic text-ink-faint">不明</span>}
                   </span>
                   <button
+                    type="button"
                     onClick={() => { setSelected(null); setSearch('') }}
-                    className="text-xs text-blue-600 hover:underline"
+                    className="text-xs text-action hover:underline"
                   >
                     変更
                   </button>
@@ -1233,25 +1238,27 @@ export function CreateAffiliateModal({
               ) : (
                 <div className="relative">
                   <input
+                    id="aff-friend-search"
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
                     placeholder="名前で検索..."
-                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                    className="w-full rounded-control border border-hairline px-3 py-2 text-sm"
                   />
                   {(searching || options.length > 0) && search.trim() && (
-                    <div className="absolute z-10 mt-1 w-full max-h-56 overflow-y-auto bg-white border border-gray-200 rounded-md shadow-lg">
+                    <div className="absolute z-10 mt-1 max-h-56 w-full overflow-y-auto rounded-control border border-hairline bg-canvas shadow-lg">
                       {searching ? (
-                        <div className="px-3 py-2 text-sm text-gray-400">検索中...</div>
+                        <div className="px-3 py-2 text-sm text-ink-faint">検索中...</div>
                       ) : options.length === 0 ? (
-                        <div className="px-3 py-2 text-sm text-gray-400">該当なし</div>
+                        <div className="px-3 py-2 text-sm text-ink-faint">該当なし</div>
                       ) : (
                         options.map((f) => (
                           <button
                             key={f.id}
+                            type="button"
                             onClick={() => { setSelected(f); setOptions([]) }}
-                            className="block w-full text-left px-3 py-2 text-sm text-gray-800 hover:bg-blue-50"
+                            className="block w-full px-3 py-2 text-left text-sm text-ink hover:bg-accent-soft"
                           >
-                            {f.displayName ?? <span className="text-gray-400 italic">不明</span>}
+                            {f.displayName ?? <span className="italic text-ink-faint">不明</span>}
                           </button>
                         ))
                       )}
@@ -1263,48 +1270,46 @@ export function CreateAffiliateModal({
 
             {/* Commission rate */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="aff-commission-rate" className="mb-1 block text-sm font-medium text-ink-secondary">
                 報酬率（%・省略可）
               </label>
               <div className="relative">
                 <input
+                  id="aff-commission-rate"
                   type="number"
                   min={0}
                   step="0.1"
                   value={commissionRate}
                   onChange={(e) => setCommissionRate(e.target.value)}
                   placeholder="例: 10"
-                  className="w-full px-3 py-2 pr-8 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  className="w-full rounded-control border border-hairline px-3 py-2 pr-8 text-sm"
                 />
-                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-gray-400">%</span>
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-ink-faint">%</span>
               </div>
             </div>
 
             {/* Random-code notice */}
-            <p className="text-xs text-gray-500">
+            <p className="text-xs text-ink-faint">
               アフィリコードは推測されないよう自動でランダム生成されます（手入力は不要）。
             </p>
 
             {formError && (
-              <div className="p-3 bg-red-50 border border-red-200 rounded-md text-sm text-red-700">
+              <div className="rounded-control border border-danger-bg bg-danger-bg p-3 text-sm text-danger" role="alert">
                 {formError}
               </div>
             )}
 
             <div className="flex justify-end gap-2 pt-2">
-              <button
-                onClick={onClose}
-                className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-md"
-              >
+              <Button onClick={onClose}>
                 キャンセル
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="primary"
                 onClick={() => { void handleSubmit() }}
                 disabled={submitting || !selected}
-                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded-md"
               >
                 {submitting ? '作成中...' : '作成'}
-              </button>
+              </Button>
             </div>
           </div>
         )}
