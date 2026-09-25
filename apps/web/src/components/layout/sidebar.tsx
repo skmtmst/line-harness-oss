@@ -187,8 +187,8 @@ export default function Sidebar({
     setVisibilityAccountId(null)
     setVisibilityStatus('loading')
     const loadSettings = () => {
-      void Promise.all([import('@/lib/api'), import('@/lib/feature-visibility-cache')])
-        .then(async ([{ api }, { loadFeatureVisibility }]) => {
+      void Promise.all([import('@/lib/feature-visibility-cache'), import('@/lib/feature-settings-cache')])
+        .then(async ([{ loadFeatureVisibility }, { loadFeatureSettings }]) => {
           // 画面側の useFeatureVisibility と同じ答えを共有する（V6R-S0-b）。
           const visibility = await loadFeatureVisibility(accountId)
           const features = visibility.success ? visibility.data?.features : undefined
@@ -204,7 +204,8 @@ export default function Sidebar({
           }
           if (!canManageFeatureSettings) return
           try {
-            const settings = await api.featureSettings.get(accountId)
+            // 機能設定画面と同じ答えを共有する。保存の合図で捨てられる。
+            const settings = await loadFeatureSettings(accountId)
             if (!cancelled && settings.success) {
               setSectionOrder(settings.data.sidebarOrder)
               setItemOrder(settings.data.sidebarItemOrder)

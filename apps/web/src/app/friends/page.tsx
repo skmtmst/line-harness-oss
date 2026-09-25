@@ -14,6 +14,7 @@ import NoticeDialog from '@/components/friends/notice-dialog'
 import SavedSearchDialog from '@/components/friends/saved-search-dialog'
 import { useAccount } from '@/contexts/account-context'
 import { useFeatureVisibility } from '@/lib/use-feature-visibility'
+import { loadOperators } from '@/lib/operators-cache'
 import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
 import DuplicatesPage from '@/app/duplicates/page'
 import MergedUsersPage from '@/app/users/page'
@@ -223,7 +224,8 @@ function FriendsPageInner({
     try {
       const [tagResponse, operatorResponse, scenarioResponse] = await Promise.all([
         api.tags.list(),
-        api.operators.list(),
+        // 友だち詳細の対応編集と同じ名簿を共有する。保存の可否はサーバ側。
+        loadOperators(),
         api.scenarios.list(requestedAccountId ? { accountId: requestedAccountId } : undefined),
       ])
       if (loadContextRef.current.accountId !== requestedAccountId) return
