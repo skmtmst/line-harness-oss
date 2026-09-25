@@ -2503,3 +2503,25 @@ describe('メディアのアーカイブと復元', () => {
       expect.not.objectContaining({ archived: expect.anything() }));
   });
 });
+
+describe('公開配信の安全ヘッダ', () => {
+  it('画像の公開配信は nosniff を付け、そのまま表示する', async () => {
+    mocks.getMediaLiveTarget.mockResolvedValueOnce({ ...MEDIA });
+    get.mockResolvedValueOnce({ body: 'PNGDATA', etag: 'etag-1' });
+    const res = await req('/media/md-1/content', 'GET', undefined, null);
+    expect(res.status).toBe(200);
+    expect(res.headers.get('X-Content-Type-Options')).toBe('nosniff');
+    expect(res.headers.get('Content-Disposition')).toContain('inline');
+  });
+
+  it('PDFの公開配信は nosniff を付け、添付として渡す', async () => {
+    mocks.getMediaLiveTarget.mockResolvedValueOnce({
+      ...MEDIA, mime_type: 'application/pdf', filename: 'doc.pdf', r2_key: 'media/doc.pdf',
+    });
+    get.mockResolvedValueOnce({ body: 'PDFDATA', etag: 'etag-2' });
+    const res = await req('/media/md-1/content', 'GET', undefined, null);
+    expect(res.status).toBe(200);
+    expect(res.headers.get('X-Content-Type-Options')).toBe('nosniff');
+    expect(res.headers.get('Content-Disposition')).toContain('attachment');
+  });
+});
