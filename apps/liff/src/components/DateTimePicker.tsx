@@ -18,12 +18,15 @@ export default function DateTimePicker({
   hint,
   selected,
   onSelect,
+  onLoadState,
 }: {
   menuId: string;
   staffId: string;
   hint?: string;
   selected: SlotPick | null;
   onSelect: (s: SlotPick) => void;
+  /** 読み込み中・失敗・空きが無い間は、下の帯を出さないための合図。 */
+  onLoadState?: (ready: boolean) => void;
 }) {
   const [from] = useState(jstToday());
   const [to] = useState(addDays(jstToday(), 13));
@@ -48,6 +51,11 @@ export default function DateTimePicker({
         setFailed(true);
       });
   }, [menuId, staffId, from, to, reloadKey]);
+
+  const hasSlots = byDate !== null && Object.values(byDate).some((times) => times.length > 0);
+  useEffect(() => {
+    onLoadState?.(byDate !== null && !failed && hasSlots);
+  }, [byDate, failed, hasSlots, onLoadState]);
 
   if (failed) return <LoadErrorView onRetry={() => setReloadKey((k) => k + 1)} />;
   if (!byDate) return <LoadingView />;

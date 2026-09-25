@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import MenuList from '../components/MenuList.js';
 import StaffList from '../components/StaffList.js';
@@ -29,6 +29,11 @@ export default function Booking() {
   const [menu, setMenu] = useState<MenuItem | null>(null);
   const [staff, setStaff] = useState<StaffItem | null>(null);
   const [slot, setSlot] = useState<SlotPick | null>(null);
+  // 読み込み中・失敗の間は下の帯を出さない (押せないボタンの飾りを置かない)。
+  const [stepReady, setStepReady] = useState(false);
+  useEffect(() => {
+    setStepReady(false);
+  }, [step]);
 
   function exitPeekToBooking() {
     // peek モードを抜けて通常フローへ。同じ menu/staff/slot を持ち回したまま step を進める。
@@ -57,7 +62,13 @@ export default function Booking() {
 
   return (
     <div className="min-h-screen bg-ground">
-      <div className="mx-auto w-full max-w-md space-y-4 px-4 pt-2 pb-28">
+      <div
+        className={
+          step === 'done'
+            ? 'mx-auto flex min-h-screen w-full max-w-md flex-col justify-center px-4 py-10'
+            : 'mx-auto w-full max-w-md space-y-4 px-4 pt-2 pb-28'
+        }
+      >
         {step !== 'done' && (
           <>
             <PageHeader
@@ -82,7 +93,9 @@ export default function Booking() {
             <Stepper steps={STEPS} current={stepIndex} />
           </>
         )}
-        {step === 'menu' && <MenuList selectedId={menu?.id ?? null} onSelect={pickMenu} />}
+        {step === 'menu' && (
+          <MenuList selectedId={menu?.id ?? null} onSelect={pickMenu} onLoadState={setStepReady} />
+        )}
         {step === 'staff' && menu && (
           <StaffList
             key={menu.id}
@@ -90,6 +103,7 @@ export default function Booking() {
             basePrice={menu.base_price}
             selectedId={staff?.id ?? null}
             onSelect={pickStaff}
+            onLoadState={setStepReady}
           />
         )}
         {step === 'datetime' && menu && staff && (
@@ -100,6 +114,7 @@ export default function Booking() {
             hint={isPeek ? '空き状況の確認モードです' : undefined}
             selected={slot}
             onSelect={setSlot}
+            onLoadState={setStepReady}
           />
         )}
         {step === 'confirm' && menu && staff && slot && (
@@ -107,21 +122,21 @@ export default function Booking() {
         )}
         {step === 'done' && menu && slot && <Done menuName={menu.name} slot={slot} />}
       </div>
-      {step === 'menu' && (
+      {step === 'menu' && stepReady && (
         <BottomBar>
           <Button variant="primary" disabled={!menu} onClick={() => setStep('staff')}>
             担当を選ぶ
           </Button>
         </BottomBar>
       )}
-      {step === 'staff' && (
+      {step === 'staff' && stepReady && (
         <BottomBar>
           <Button variant="primary" disabled={!staff} onClick={() => setStep('datetime')}>
             日時を選ぶ
           </Button>
         </BottomBar>
       )}
-      {step === 'datetime' && !isPeek && (
+      {step === 'datetime' && !isPeek && stepReady && (
         <BottomBar>
           <Button variant="primary" disabled={!slot} onClick={() => setStep('confirm')}>
             {slot ? `${formatMd(slot.date)} ${slot.start} で確認へ` : '日時を選ぶ'}

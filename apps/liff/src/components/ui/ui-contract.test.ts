@@ -86,6 +86,9 @@ describe('LoadErrorView は日本語＋読み直しだけ', () => {
     expect(view).toContain('RETRY_LABEL');
     expect(view).toContain('onRetry');
     expect(view).toContain('cloud-off');
+    expect(view).toContain('bg-state-mark');
+    expect(view).toContain('LOAD_FAILED_MESSAGE');
+    expect(view).toContain('note');
     // 画面に出るのは日本語の文とボタンの1文だけ。部品名・定数名は除く。
     const shown = view
       .split('\n')
@@ -123,5 +126,28 @@ describe('予約の履歴に操作は無い', () => {
     expect(page).toContain('これまで');
     expect(page).not.toContain('過去');
     expect(page).not.toMatch(/これから \(\{/);
+  });
+
+  it('履歴の失敗には「予約はなくなっていません。」の一言を足す', () => {
+    expect(src('pages', 'BookingHistory.tsx')).toContain('予約はなくなっていません。');
+  });
+});
+
+describe('読み込み中・失敗の間は下の帯を出さない', () => {
+  it('予約の3画面が合図を出し、Booking が帯を絞る', () => {
+    for (const file of ['MenuList.tsx', 'StaffList.tsx', 'DateTimePicker.tsx']) {
+      expect(src('components', file)).toContain('onLoadState');
+    }
+    const booking = src('pages', 'Booking.tsx');
+    expect(booking).toContain('onLoadState');
+    // 下の帯3つ (担当・日時・確認へ) すべてが合図待ち。素の帯は無い。
+    expect(booking.match(/stepReady && \(/g)?.length ?? 0).toBe(3);
+  });
+});
+
+describe('送信した画面は中央寄せ＋暦の印', () => {
+  it('Done の履歴ボタンに calendar-days がある', () => {
+    expect(src('components', 'Done.tsx')).toContain('calendar-days');
+    expect(src('pages', 'Booking.tsx')).toContain('justify-center');
   });
 });

@@ -14,11 +14,14 @@ export default function StaffList({
   basePrice,
   selectedId,
   onSelect,
+  onLoadState,
 }: {
   menuId: string;
   basePrice: number;
   selectedId: string | null;
   onSelect: (s: StaffItem) => void;
+  /** 読み込み中・失敗・選ぶものが無い間は、下の帯を出さないための合図。 */
+  onLoadState?: (ready: boolean) => void;
 }) {
   const [list, setList] = useState<StaffItem[] | null>(null);
   const [failed, setFailed] = useState(false);
@@ -34,6 +37,10 @@ export default function StaffList({
         setFailed(true);
       });
   }, [menuId, reloadKey]);
+
+  useEffect(() => {
+    onLoadState?.(list !== null && !failed && list.length > 0);
+  }, [list, failed, onLoadState]);
 
   if (failed) return <LoadErrorView onRetry={() => setReloadKey((k) => k + 1)} />;
   if (!list) return <LoadingView />;

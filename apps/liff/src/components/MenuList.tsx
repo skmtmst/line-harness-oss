@@ -12,9 +12,12 @@ import Icon from './ui/Icon.js';
 export default function MenuList({
   selectedId,
   onSelect,
+  onLoadState,
 }: {
   selectedId: string | null;
   onSelect: (m: MenuItem) => void;
+  /** 読み込み中・失敗・選ぶものが無い間は、下の帯を出さないための合図。 */
+  onLoadState?: (ready: boolean) => void;
 }) {
   const [menus, setMenus] = useState<MenuItem[] | null>(null);
   const [failed, setFailed] = useState(false);
@@ -30,6 +33,10 @@ export default function MenuList({
         setFailed(true);
       });
   }, [reloadKey]);
+
+  useEffect(() => {
+    onLoadState?.(menus !== null && !failed && menus.length > 0);
+  }, [menus, failed, onLoadState]);
 
   if (failed) return <LoadErrorView onRetry={() => setReloadKey((k) => k + 1)} />;
   if (!menus) return <LoadingView />;
