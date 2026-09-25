@@ -903,10 +903,16 @@ export const FRIEND_ADD_CONDITION_MAX_NODES = 200;
  * 作れてしまうと、条件ビルダーの権限境界を迂回するためである。
  * `chat_status` / `operator_id` は友だち一覧→配信の引継ぎ専用で、
  * 友だち追加時の条件としては保存させない（条件ビルダーにも出ない）。
+ * `broadcast_link_clicked` は配信詳細からの追送導線専用で、友だち追加の
+ * 時点ではクリック履歴が存在し得ないため条件として意味を持たない。
  */
 type FriendAddSegmentRuleType = Exclude<
   SegmentRule['type'],
-  'friend_id_in' | 'analytics_audience' | 'chat_status' | 'operator_id'
+  | 'friend_id_in'
+  | 'analytics_audience'
+  | 'chat_status'
+  | 'operator_id'
+  | 'broadcast_link_clicked'
 >;
 
 const SEGMENT_RULE_TYPE_MAP: Record<FriendAddSegmentRuleType, true> = {
