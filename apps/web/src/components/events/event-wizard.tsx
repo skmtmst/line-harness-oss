@@ -18,6 +18,8 @@ import { BULK_SLOT_LIMIT, generateBulkSlots } from './bulk-slot-generator'
 import { formatSlotJp, jstHHMMToUtcIso, splitBand, todayJst } from './jst'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { TextInput } from '@/components/shared/form-controls'
+import DateField from '@/components/shared/date-field'
+import { TimeField } from '@/components/shared/date-time-field'
 import Select from '@/components/shared/select'
 // #740: 下書きの初期値と字数上限は編集画面と共有する。片方だけ変えないこと。
 import {
@@ -582,19 +584,17 @@ function OverviewStep({
       >
         <div className="grid gap-3 sm:grid-cols-4">
           <Field label="日付" htmlFor="first-slot-date" required>
-            <TextInput
+            <DateField
               id="first-slot-date"
-              type="date"
               value={firstSlot.date}
-              onChange={(event) => setFirstSlot({ ...firstSlot, date: event.target.value })}
+              onChange={(v) => setFirstSlot({ ...firstSlot, date: v })}
             />
           </Field>
           <Field label="開始" htmlFor="first-slot-start" required>
-            <TextInput
+            <TimeField
               id="first-slot-start"
-              type="time"
               value={firstSlot.startTime}
-              onChange={(event) => setFirstSlot({ ...firstSlot, startTime: event.target.value })}
+              onChange={(v) => setFirstSlot({ ...firstSlot, startTime: v })}
             />
           </Field>
           <Field label="かかる時間（分）" htmlFor="first-slot-duration" required>
@@ -998,30 +998,24 @@ function SlotsStep({
         <FormSection step={1} label="枠を1つ追加する">
           <div className="grid gap-3 sm:grid-cols-4">
             <Field label="日付" htmlFor="slot-date">
-              <input
+              <DateField
                 id="slot-date"
-                type="date"
                 value={date}
-                onChange={(e) => setDate(e.target.value)}
-                className={inputClass}
+                onChange={setDate}
               />
             </Field>
             <Field label="開始" htmlFor="slot-start">
-              <input
+              <TimeField
                 id="slot-start"
-                type="time"
                 value={startTime}
-                onChange={(e) => setStartTime(e.target.value)}
-                className={inputClass}
+                onChange={setStartTime}
               />
             </Field>
             <Field label="終了" htmlFor="slot-end">
-              <input
+              <TimeField
                 id="slot-end"
-                type="time"
                 value={endTime}
-                onChange={(e) => setEndTime(e.target.value)}
-                className={inputClass}
+                onChange={setEndTime}
               />
             </Field>
             <Field label="定員" htmlFor="slot-cap">
@@ -1051,21 +1045,17 @@ function SlotsStep({
         >
           <div className="grid gap-3 sm:grid-cols-2">
             <Field label="開始日" htmlFor="bulk-start">
-              <input
+              <DateField
                 id="bulk-start"
-                type="date"
                 value={bulkStart}
-                onChange={(e) => setBulkStart(e.target.value)}
-                className={inputClass}
+                onChange={setBulkStart}
               />
             </Field>
             <Field label="終了日" htmlFor="bulk-end">
-              <input
+              <DateField
                 id="bulk-end"
-                type="date"
                 value={bulkEnd}
-                onChange={(e) => setBulkEnd(e.target.value)}
-                className={inputClass}
+                onChange={setBulkEnd}
               />
             </Field>
           </div>
@@ -1097,21 +1087,17 @@ function SlotsStep({
 
           <div className="grid gap-3 sm:grid-cols-4">
             <Field label="時間帯" htmlFor="band-start">
-              <input
+              <TimeField
                 id="band-start"
-                type="time"
                 value={bandStart}
-                onChange={(e) => setBandStart(e.target.value)}
-                className={inputClass}
+                onChange={setBandStart}
               />
             </Field>
             <Field label="　" htmlFor="band-end">
-              <input
+              <TimeField
                 id="band-end"
-                type="time"
                 value={bandEnd}
-                onChange={(e) => setBandEnd(e.target.value)}
-                className={inputClass}
+                onChange={setBandEnd}
               />
             </Field>
             <Field label="1枠の長さ" htmlFor="slot-min">

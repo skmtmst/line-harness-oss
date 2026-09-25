@@ -22,6 +22,8 @@ import { useAccount } from '@/contexts/account-context'
 import { canEditFeature, canViewFeature } from '@/lib/staff-capability'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import DateField from '@/components/shared/date-field'
+import { TimeField } from '@/components/shared/date-time-field'
 import ListState from '@/components/shared/list-state'
 import SelectField from '@/components/shared/select-field'
 import { shortDate } from '../../lib/format-time'
@@ -192,15 +194,15 @@ function BusinessHoursEditor({ accountId, settings, canEdit, onSaved, onReload }
                 <div className="space-y-2 lg:col-span-5">
                   {intervals.map((interval, index) => (
                     <div className="flex flex-wrap items-end gap-2" key={`${day.weekday}-${index}`}>
-                      <label className="text-ink-secondary text-xs">
+                      <span className="text-ink-secondary text-xs">
                         開始
-                        <input aria-label={`${day.label} ${index + 1}件目の開始`} type="time" value={interval.start} onChange={(event) => updateInterval(day.weekday, index, { start: event.target.value })} className="border-hairline rounded-control mt-1 block border bg-canvas px-2 py-1.5 text-sm tabular-nums focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-status-info" />
-                      </label>
+                        <TimeField aria-label={`${day.label} ${index + 1}件目の開始`} value={interval.start} onChange={(v) => updateInterval(day.weekday, index, { start: v })} className="mt-1" />
+                      </span>
                       <span className="pb-2 text-xs">〜</span>
-                      <label className="text-ink-secondary text-xs">
+                      <span className="text-ink-secondary text-xs">
                         終了
-                        <input aria-label={`${day.label} ${index + 1}件目の終了`} type="time" value={interval.end} onChange={(event) => updateInterval(day.weekday, index, { end: event.target.value })} className="border-hairline rounded-control mt-1 block border bg-canvas px-2 py-1.5 text-sm tabular-nums focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-status-info" />
-                      </label>
+                        <TimeField aria-label={`${day.label} ${index + 1}件目の終了`} value={interval.end} onChange={(v) => updateInterval(day.weekday, index, { end: v })} className="mt-1" />
+                      </span>
                       <label className="text-ink-secondary text-xs">
                         同時受付数
                         <input aria-label={`${day.label} ${index + 1}件目の同時受付数`} type="number" min={1} max={1000} value={interval.capacity ?? 1} onChange={(event) => updateInterval(day.weekday, index, { capacity: Number(event.target.value) })} className="border-hairline rounded-control mt-1 block w-24 border bg-canvas px-2 py-1.5 text-sm tabular-nums focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-status-info" />
@@ -577,14 +579,14 @@ function SlotCheckCard({ accountId, menus }: { accountId: string; menus: Booking
             ]}
           />
         </label>
-        <label className="text-ink-secondary text-xs">
+        <span className="text-ink-secondary text-xs">
           日付
-          <input aria-label="確認する日付" type="date" value={date} onChange={(event) => { setDate(event.target.value); setResult(null) }} className="border-hairline rounded-control mt-1 block w-full border bg-canvas px-3 py-2 text-sm tabular-nums focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-status-info" />
-        </label>
-        <label className="text-ink-secondary text-xs">
+          <DateField aria-label="確認する日付" value={date} onChange={(v) => { setDate(v); setResult(null) }} className="mt-1" />
+        </span>
+        <span className="text-ink-secondary text-xs">
           開始時刻
-          <input aria-label="確認する開始時刻" type="time" value={time} onChange={(event) => { setTime(event.target.value); setResult(null) }} className="border-hairline rounded-control mt-1 block w-full border bg-canvas px-3 py-2 text-sm tabular-nums focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-status-info" />
-        </label>
+          <TimeField aria-label="確認する開始時刻" value={time} onChange={(v) => { setTime(v); setResult(null) }} className="mt-1" />
+        </span>
         {staffOptions.length > 0 ? (
           <label className="text-ink-secondary text-xs">
             担当
@@ -926,14 +928,14 @@ function StoreShiftsView() {
               </div>
               {addingClosed ? (
                 <div className="border-hairline bg-canvas-sunken mt-4 grid gap-3 rounded-control border p-3 sm:grid-cols-3">
-                  <label className="text-ink-secondary text-xs">
+                  <span className="text-ink-secondary text-xs">
                     開始日
-                    <input aria-label="休業の開始日" type="date" value={closedFrom} onChange={(event) => setClosedFrom(event.target.value)} className="border-hairline rounded-control mt-1 w-full border bg-canvas px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-status-info" />
-                  </label>
-                  <label className="text-ink-secondary text-xs">
+                    <DateField aria-label="休業の開始日" value={closedFrom} onChange={setClosedFrom} className="mt-1" />
+                  </span>
+                  <span className="text-ink-secondary text-xs">
                     終了日
-                    <input aria-label="休業の終了日" type="date" value={closedTo} onChange={(event) => setClosedTo(event.target.value)} className="border-hairline rounded-control mt-1 w-full border bg-canvas px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-status-info" />
-                  </label>
+                    <DateField aria-label="休業の終了日" value={closedTo} onChange={setClosedTo} className="mt-1" />
+                  </span>
                   <label className="text-ink-secondary text-xs">
                     理由
                     <input aria-label="休業の理由" value={closedReason} onChange={(event) => setClosedReason(event.target.value)} placeholder="例: お盆" className="border-hairline rounded-control mt-1 w-full border bg-canvas px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-status-info" />
@@ -952,14 +954,14 @@ function StoreShiftsView() {
                     <div key={item.id || `${from}-${to}`} className="border-hairline rounded-control border p-3">
                       {editingExceptionId === item.id ? (
                         <div className="space-y-2">
-                          <label className="text-ink-secondary block text-xs">
+                          <span className="text-ink-secondary block text-xs">
                             開始日
-                            <input aria-label="休業日の開始日" type="date" value={editFrom} onChange={(event) => setEditFrom(event.target.value)} disabled={exceptionBusy} className="border-hairline rounded-control mt-1 w-full border bg-canvas px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-status-info" />
-                          </label>
-                          <label className="text-ink-secondary block text-xs">
+                            <DateField aria-label="休業日の開始日" value={editFrom} onChange={setEditFrom} disabled={exceptionBusy} className="mt-1" />
+                          </span>
+                          <span className="text-ink-secondary block text-xs">
                             終了日
-                            <input aria-label="休業日の終了日" type="date" value={editTo} onChange={(event) => setEditTo(event.target.value)} disabled={exceptionBusy} className="border-hairline rounded-control mt-1 w-full border bg-canvas px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-status-info" />
-                          </label>
+                            <DateField aria-label="休業日の終了日" value={editTo} onChange={setEditTo} disabled={exceptionBusy} className="mt-1" />
+                          </span>
                           <label className="text-ink-secondary block text-xs">
                             理由
                             <input aria-label="休業日の理由" value={editReason} onChange={(event) => setEditReason(event.target.value)} disabled={exceptionBusy} placeholder="例: お盆" className="border-hairline rounded-control mt-1 w-full border bg-canvas px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-status-info" />
