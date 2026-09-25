@@ -171,18 +171,19 @@ AA が求めるのは、18.66px 未満の太字・24px 未満の並字で 4.5:1�
 - [V7 追加要件](./v7-additions-requirements.md): A 流れ図（05・25・09）、B 受信箱のキー操作（02）、D 写真の連続審査（22）、E 処理の進み・骨組み表示・保存結果の通知（共通）
 - [参考UIの採否](../v7-reference-ui-adoption.md): 外部の参考UIサイト7つの使い方と守りごと、部品の呼び名の対応表
 
-## 8. 後段階の一覧（2026-09-25 オーナー判断）
+## 8. 未実装機能の確定（2026-09-25）
 
-次の未実装の機能は、今の段階では要件の合格条件から外し、あとで作る。各要件の該当する節・合格条件には `後段階（2026-09-25 オーナー判断）` の注記を入れている。二者承認と危険なファイルの検査は今つくるので対象外である。
+後段階にしていた9つと、突き合わせで「満たさない」が残った13のまとまりは、すべて**作ることに決め、要件を確定した**。決めた数値・画面（Pencil ★V7 `p0RBam`・`ZQnlD`）・合格条件・migration 番号・PR の分け方は [未実装機能の確定](./v7-unbuilt-features-confirmed.md) にある。各要件の「後段階」の注記は「確定」に置き換え、合格条件に戻した。
 
-| 要件定義 | 外す機能 | Issue |
+| 要件定義 | 作る機能 | Issue |
 | --- | --- | --- |
-| [v6-06 一斉配信](./v6-06-broadcast-requirements-draft.md) | 宛先台帳・監査ログ・10状態 | #816 |
-| [v6-22 写真審査](./v6-22-photo-review-requirements-draft.md) | 画像の重複検出（hash）・報酬ポリシーの版 | #817 |
+| [v6-06 一斉配信](./v6-06-broadcast-requirements-draft.md) | 二者承認・宛先台帳・監査ログ・10状態 | #816 |
+| [v6-22 写真審査](./v6-22-photo-review-requirements-draft.md) | 危険なファイルの検査・画像の重複検出・報酬ポリシーの版 | #817 |
 | [v6-18 流入と計測](./v6-18-inflow-measurement-requirements-draft.md) | 広告費の取り込み・サイト計測の同意ゲート | #818 |
 | [v6-19 コンバージョン](./v6-19-conversion-requirements-draft.md) | Web 計測の公開口・取消の追記イベント | #819 |
 | [v6-11 テンプレート](./v6-11-template-requirements-draft.md) | 版の履歴・参照表 | #820 |
-| [v6-10 ウェビナー](./v6-10-webinar-requirements-draft.md) | 離脱判定（heartbeat） | #821 |
-| [v6-12 リッチメニュー](./v6-12-rich-menu-requirements-draft.md) | 公開の saga・照合と修復 | #822 |
+| [v6-10 ウェビナー](./v6-10-webinar-requirements-draft.md) | 離脱判定・動画の準備・定員・見逃し配信 | #821 |
+| [v6-12 リッチメニュー](./v6-12-rich-menu-requirements-draft.md) | 公開の saga・照合と修復・公開前の確認 | #822 |
 | [v6-16 アフィリエイト](./v6-16-affiliate-requirements-draft.md) | 帰属の判定表・案件の率/期間/上限/版 | #823 |
-| [v6-01 ダッシュボード](./v6-01-dashboard-requirements-draft.md) | 通知台帳との接続 | #824 |
+| [v6-01 ダッシュボード](./v6-01-dashboard-requirements-draft.md) | 通知台帳との接続・今後の予定・止めた経路の QR | #824 |
+| v6-13・14・17・26・28・29・30・32・33・34 | 確定文書の §2（P〜Y） | — |
