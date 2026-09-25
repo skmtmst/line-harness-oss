@@ -169,7 +169,11 @@
    */
   --color-line-preview: #4a6f9a;
   --color-line-preview-label: #4f739e;
-  --color-line-choice: #00a947;
+  /*
+   * 回答の選択肢の緑。白地に文字として載るので AA の 4.5:1 が要る。
+   * 以前の #00a947 は 3.1:1。色あいはそのままに濃くした（4.64:1）。
+   */
+  --color-line-choice: #008739;
   --color-line-answer-bg: #e6f7ed;
   --color-line-answer: #08783b;
 

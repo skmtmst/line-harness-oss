@@ -391,10 +391,10 @@ export default function ActionScoreRulesPage() {
       ) : bundle && configuration ? <>
         <div className="grid gap-3 2xl:grid-cols-4">
           <div className="grid content-start gap-3 2xl:col-span-3">
-            <section className="rounded-v6-card border border-hairline bg-canvas p-4 shadow-v6-card">
+            <section className="rounded-card border border-hairline bg-canvas p-4 shadow-card">
               <div className="mb-3">
-                <p className="text-sm font-semibold text-v6-ink">点をつける・引くこと</p>
-                <p className="mt-1 text-xs text-v6-ink-faint">上から順にあてはめます。同じことが2回起きたら、2回ぶん動きます。</p>
+                <p className="text-sm font-semibold text-ink">点をつける・引くこと</p>
+                <p className="mt-1 text-xs text-ink-faint">上から順にあてはめます。同じことが2回起きたら、2回ぶん動きます。</p>
               </div>
               {bundle.rules.length === 0 ? (
                 <ListState kind="empty" title="スコアのルールがありません" description="公開するには、動かすルールを1件以上追加してください。" action={canEdit ? <Button onClick={addRule}>できごとを足す</Button> : undefined} />
@@ -407,8 +407,11 @@ export default function ActionScoreRulesPage() {
                      * 全幅に、点数・頻度・削除を2段目へ下げる。640px以上は
                      * 従来の1行のまま。点数の向き（増やす・減らす・0にする）は
                      * 色ではなく「＋」「−」「0にする」の文字で持つ。
+                     *
+                     * 無効の行は地の色だけ変える。行全体を 72% に薄めると
+                     * 文字が #7d8590（3.54:1）まで落ちて読めない。
                      */
-                    <div key={rule.id} className="grid min-h-10 grid-cols-12 items-center gap-x-3 gap-y-1 rounded-control px-3 py-2" style={{ background: rule.enabled ? 'var(--color-surface-pearl)' : 'var(--color-canvas-sunken)', opacity: rule.enabled ? 1 : 0.72 }}>
+                    <div key={rule.id} className="grid min-h-10 grid-cols-12 items-center gap-x-3 gap-y-1 rounded-control px-3 py-2" style={{ background: rule.enabled ? 'var(--color-surface-pearl)' : 'var(--color-canvas-sunken)' }}>
                       <button type="button" disabled={!canEdit} className="col-span-12 flex min-w-0 items-center gap-3 text-left font-semibold text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-default sm:col-span-6" aria-label={`${rule.name}を編集`} onClick={() => setEditRuleIndex(index)}>
                         <span style={{ color: rule.value < 0 || rule.operation === 'set' ? 'var(--color-status-warn-deep)' : 'var(--color-ink-secondary)' }}><RuleIcon eventType={rule.eventType} /></span>
                         <span className="truncate" title={rule.name}>{rule.name}</span>
@@ -424,9 +427,9 @@ export default function ActionScoreRulesPage() {
               {canEdit ? <Button className="mt-3" onClick={addRule}><Plus className="h-4 w-4" aria-hidden="true" />できごとを足す</Button> : null}
             </section>
 
-            <section className="rounded-v6-card border border-hairline bg-canvas p-4 shadow-v6-card">
-              <p className="text-sm font-semibold text-v6-ink">帯の分けかた</p>
-              <p className="mt-1 text-xs text-v6-ink-faint">この分けかたで、配信の相手を選べます。</p>
+            <section className="rounded-card border border-hairline bg-canvas p-4 shadow-card">
+              <p className="text-sm font-semibold text-ink">帯の分けかた</p>
+              <p className="mt-1 text-xs text-ink-faint">この分けかたで、配信の相手を選べます。</p>
               <div className="mt-4 grid max-w-2xl grid-cols-3 gap-3">
                 <Field label="高い（以上）" htmlFor="score-high"><TextInput id="score-high" type="number" value={bundle.bands.highMin} disabled={!canEdit} onChange={(event) => updateBands({ highMin: Number(event.target.value) })} /></Field>
                 <Field label="ふつう（以上）" htmlFor="score-normal"><TextInput id="score-normal" type="number" value={bundle.bands.normalMin} disabled={!canEdit} onChange={(event) => updateBands({ normalMin: Number(event.target.value) })} /></Field>
@@ -447,7 +450,7 @@ export default function ActionScoreRulesPage() {
           </div>
 
           <aside className="grid content-start gap-3">
-            <section className="rounded-v6-card border border-status-warn bg-status-warn-soft p-4 text-xs text-status-warn-deep">
+            <section className="rounded-card border border-status-warn bg-status-warn-soft p-4 text-xs text-status-warn-deep">
               <p className="font-semibold">マイルとの違い</p>
               <div className="mt-3 grid gap-3">
                 <div className="flex gap-2"><EyeOff className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" /><p><strong>お客様には見えません</strong><br />顧客カルテにも出しません</p></div>
@@ -458,28 +461,28 @@ export default function ActionScoreRulesPage() {
               </div>
             </section>
 
-            <section className="rounded-v6-card border border-hairline bg-canvas p-4 shadow-v6-card">
-              <p className="text-sm font-semibold text-v6-ink">つながる先</p>
+            <section className="rounded-card border border-hairline bg-canvas p-4 shadow-card">
+              <p className="text-sm font-semibold text-ink">つながる先</p>
               <div className="mt-3 grid gap-2 text-xs">
-                <Link href="/broadcasts/new" className="text-action hover:underline">一斉配信 <span className="text-v6-ink-faint">— 帯で相手を選ぶ</span></Link>
-                <Link href="/scenarios" className="text-action hover:underline">シナリオ配信 <span className="text-v6-ink-faint">— 帯を条件にする</span></Link>
-                <Link href="/automations" className="text-action hover:underline">オートメーション <span className="text-v6-ink-faint">— 点が下がったときに動かす</span></Link>
-                <Link href="/analytics" className="text-action hover:underline">分析 <span className="text-v6-ink-faint">— 帯ごとの成果を見る</span></Link>
-                <Link href="/mileage" className="text-action hover:underline">マイル <span className="text-v6-ink-faint">— お客様の残高を見る</span></Link>
+                <Link href="/broadcasts/new" className="text-action hover:underline">一斉配信 <span className="text-ink-faint">— 帯で相手を選ぶ</span></Link>
+                <Link href="/scenarios" className="text-action hover:underline">シナリオ配信 <span className="text-ink-faint">— 帯を条件にする</span></Link>
+                <Link href="/automations" className="text-action hover:underline">オートメーション <span className="text-ink-faint">— 点が下がったときに動かす</span></Link>
+                <Link href="/analytics" className="text-action hover:underline">分析 <span className="text-ink-faint">— 帯ごとの成果を見る</span></Link>
+                <Link href="/mileage" className="text-action hover:underline">マイル <span className="text-ink-faint">— お客様の残高を見る</span></Link>
               </div>
             </section>
           </aside>
         </div>
 
-        {notice ? <p className="rounded-v6-control border border-v6-accent/25 bg-v6-accent-soft px-4 py-3 text-sm text-accent-deep" role="status">{notice}</p> : null}
-        {actionError ? <p className="rounded-v6-control border border-v6-danger/25 bg-v6-danger-bg px-4 py-3 text-sm text-v6-danger" role="alert">{actionError}</p> : null}
+        {notice ? <p className="rounded-control border border-accent-border bg-accent-soft px-4 py-3 text-sm text-accent-deep" role="status">{notice}</p> : null}
+        {actionError ? <p className="rounded-control border border-status-danger-border bg-danger-bg px-4 py-3 text-sm text-danger" role="alert">{actionError}</p> : null}
 
         {/*
           #973 U046: 4列固定はやめ、上に状態文を全幅、下に押し口を折り返しで
           並べる。狭い幅でも押し口が文を潰さない。
         */}
-        <div className="sticky bottom-0 z-20 mt-auto rounded-v6-card border border-hairline bg-canvas/95 px-4 py-3 shadow-v6-card backdrop-blur">
-          <p className="text-xs text-v6-ink-faint">{versionLabel}。公開後に起きたことから新しい点数が付きます。</p>
+        <div className="sticky bottom-0 z-20 mt-auto rounded-card border border-hairline bg-canvas/95 px-4 py-3 shadow-card backdrop-blur">
+          <p className="text-xs text-ink-faint">{versionLabel}。公開後に起きたことから新しい点数が付きます。</p>
           <div className="mt-2 flex flex-wrap items-center justify-end gap-3">
           {configuration.currentPublishedVersionId ? <Button onClick={() => setConfirmAction({ kind: 'stop' })} disabled={!canEdit || busy}>公開中のルールを停止</Button> : null}
           <Button onClick={() => void saveDraft()} disabled={!canEdit || busy}>下書きに保存</Button>
@@ -499,8 +502,8 @@ export default function ActionScoreRulesPage() {
           <Field label="テスト前の点数" htmlFor="test-score"><TextInput id="test-score" type="number" value={testScore} onChange={(event) => setTestScore(event.target.value)} /></Field>
           <Field label="試す行動"><Select aria-label="テストする行動" value={testEvent} onChange={setTestEvent} options={[...EVENT_OPTIONS]} size="full" /></Field>
           {testResult ? (
-            <div className="rounded-v6-control border border-v6-accent/25 bg-v6-accent-soft p-3 text-xs text-v6-ink-secondary" role="status">
-              <p className="font-semibold text-v6-ink">{testResult.scoreBefore}点 → {testResult.scoreAfter}点</p>
+            <div className="rounded-control border border-accent-border bg-accent-soft p-3 text-xs text-ink-secondary" role="status">
+              <p className="font-semibold text-ink">{testResult.scoreBefore}点 → {testResult.scoreAfter}点</p>
               <p className="mt-1">合ったルール：{testResult.matched.length ? testResult.matched.map((item) => item.ruleName).join('、') : 'なし'}</p>
             </div>
           ) : null}
