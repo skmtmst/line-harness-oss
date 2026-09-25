@@ -128,7 +128,7 @@ export default function ShipmentPanel({
           // ★V7：カード内の失敗は小さく1行だけ。赤を使わない。
           <p className="text-ink-secondary py-4 text-center text-xs" role="alert">
             出荷予定を読み込めませんでした。
-            <button type="button" onClick={() => setAttempt((count) => count + 1)} className="text-action ml-2 font-semibold hover:underline">もう一度</button>
+            <button type="button" onClick={() => setAttempt((count) => count + 1)} className="text-action ml-2 font-semibold hover:underline">もう一度読み込む</button>
           </p>
         ) : !data || (data.soonCount === 0 && data.laterCount === 0) ? (
           /* 0件の詳細枠は1行へ縮める（A01-05）。大きな空きは「取得中」と紛らわしい。 */
