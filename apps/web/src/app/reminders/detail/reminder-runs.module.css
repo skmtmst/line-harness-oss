@@ -138,7 +138,8 @@
 }
 
 .attention strong {
-  color: var(--color-danger);
+  /* 壊れて止まっている赤ではなく、確かめてほしい黄。 */
+  color: var(--color-status-warn-deep);
   font-size: var(--text-body);
 }
 
