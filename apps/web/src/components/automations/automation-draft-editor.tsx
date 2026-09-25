@@ -438,7 +438,7 @@ export default function AutomationDraftEditor({ draftId }: { draftId: string }) 
           <TextArea id="au-message" rows={4} value={actionMessage} onChange={(event) => setActionMessage(event.target.value)} />
         </Field>
       )}
-      <p className="rounded-v6-control bg-v6-warning-bg px-3 py-2 text-xs leading-5 text-v6-warning">
+      <p className="rounded-control bg-warning-bg px-3 py-2 text-xs leading-5 text-warning">
         保存しても自動では動きません。公開するまでは下書きのままです。
       </p>
     </CreatePage>

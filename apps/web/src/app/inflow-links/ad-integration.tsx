@@ -341,7 +341,7 @@ export default function AdIntegration({
                       <td className="px-4 py-3 text-ink-secondary">{platform ? platformLabel(platform) : '—'}</td>
                       <td className="px-4 py-3 text-ink-secondary">{log.eventName}</td>
                       <td className="px-4 py-3">
-                        <span className={log.status === 'failed' ? 'font-semibold text-status-danger' : 'text-ink-secondary'}>
+                        <span className={log.status === 'failed' ? 'font-semibold text-danger' : 'text-ink-secondary'}>
                           {STATUS_LABEL[log.status] ?? '状態不明'}
                         </span>
                       </td>
@@ -529,7 +529,7 @@ function Metric({
   return (
     <div className="rounded-card border border-hairline bg-canvas p-4">
       <p className="text-xs text-ink-faint">{label}</p>
-      <p className={`mt-1 text-2xl font-bold tabular-nums ${tone === 'danger' ? 'text-status-danger' : 'text-ink'}`}>
+      <p className={`mt-1 text-2xl font-bold tabular-nums ${tone === 'danger' ? 'text-danger' : 'text-ink'}`}>
         {value == null ? '—' : typeof value === 'number' ? `${prefix}${value.toLocaleString('ja-JP')}` : value}
       </p>
       <p className="mt-1 text-xs leading-relaxed text-ink-faint">{detail}</p>

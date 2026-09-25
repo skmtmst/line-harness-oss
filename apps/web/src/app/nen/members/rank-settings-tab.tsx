@@ -164,7 +164,7 @@ export default function RankSettingsTab({
       </div>
 
       {notice ? <p className="text-label text-accent-deep" role="status">{notice}</p> : null}
-      {error ? <p className="text-label text-status-danger" role="alert">{error}</p> : null}
+      {error ? <p className="text-label text-danger" role="alert">{error}</p> : null}
 
       <div data-design="Body" data-design-node="Y4zWdG" className="grid gap-4 xl:grid-cols-3">
         <section data-design="Table" data-design-node="C0WaS" className="min-w-0 xl:col-span-2">

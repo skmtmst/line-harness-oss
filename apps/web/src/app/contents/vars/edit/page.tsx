@@ -945,7 +945,7 @@ function EditCommonVarInner() {
               <button
                 type="button"
                 onClick={() => void openDelete()}
-                className="rounded-control bg-status-danger text-on-accent px-4 py-2 text-sm font-bold"
+                className="rounded-control bg-danger text-on-accent px-4 py-2 text-sm font-bold"
               >
                 この共通情報を削除
               </button>

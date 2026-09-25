@@ -5,6 +5,7 @@ import type { ReactNode } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { ApiError, api, fetchApi } from '@/lib/api'
+import { tagTextColor } from '@/lib/presentation'
 import KpiCard from '@/components/shared/kpi-card'
 import { useAccount } from '@/contexts/account-context'
 import type { ApiResponse, EntryRoute, EntryRouteGenre, TrafficPool, Scenario, Tag } from '@line-crm/shared'
@@ -1086,7 +1087,7 @@ function InflowLinksPageInner({
                           className="block truncate whitespace-nowrap rounded-full px-2 py-0.5 text-center text-[11px] font-medium"
                           style={{
                             backgroundColor: `${tag.color}22`,
-                            color: tag.color,
+                            color: tagTextColor(tag.color),
                           }}
                           title={tag.name}
                         >

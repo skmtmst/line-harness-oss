@@ -188,7 +188,7 @@ function FriendAddRunDetailInner() {
                   <div className="min-w-0">
                     <strong className="block truncate">{index + 1}. {ACTION_LABELS[action.type] ?? '処理'}</strong>
                     <p className="mt-1 text-xs text-ink-faint">試行 {action.attemptCount}回</p>
-                    {message && <p className="mt-1 text-xs text-status-danger-deep">{message}</p>}
+                    {message && <p className="mt-1 text-xs text-danger">{message}</p>}
                   </div>
                   <StatusBadge tone={action.status === 'failed' ? 'danger' : action.status === 'completed' ? 'success' : 'info'}>
                     {STATUS_LABELS[action.status] ?? '確認中'}

@@ -609,9 +609,9 @@ export default function NewProxyBookingPage() {
   return (
     <div data-design-node={NODE_BY_STEP[step]} className="space-y-4 pb-24">
       <nav data-design="Crumb" aria-label="現在位置" className="text-ink-faint text-xs">
-        <Link href="/booking/bookings" className="text-action">予約</Link>
+        <Link href="/booking/bookings" className="text-action underline">予約</Link>
         <span className="mx-2">›</span>
-        <Link href="/booking/bookings" className="text-action">予約管理</Link>
+        <Link href="/booking/bookings" className="text-action underline">予約管理</Link>
         <span className="mx-2">›</span>
         <span>{step === 'confirm' ? '内容を確認' : step === 'done' ? '登録が終わりました' : step === 'conflict' ? '入れられません' : '電話の予約を入れる'}</span>
       </nav>
@@ -1066,11 +1066,11 @@ function RelatedLinks({ includeConversion }: { includeConversion: boolean }) {
   return (
     <Card title="つながる先">
       <div className="text-ink-secondary space-y-2 text-xs">
-        <p><Link href="/booking/bookings" className="text-action font-semibold hover:underline focus-visible:underline">→ 予約管理</Link>　今日の台帳</p>
-        <p><Link href="/booking/menus" className="text-action font-semibold hover:underline focus-visible:underline">→ 予約設定</Link>　メニューと空き枠</p>
-        <p><Link href="/reminders" className="text-action font-semibold hover:underline focus-visible:underline">→ リマインダ</Link>　前日・開始前のお知らせ</p>
-        <p><Link href="/friends" className="text-action font-semibold hover:underline focus-visible:underline">→ 友だち</Link>　顧客カルテに残ります</p>
-        {includeConversion ? <p><Link href="/conversions" className="text-action font-semibold hover:underline focus-visible:underline">→ コンバージョン</Link>　予約の成果を確認</p> : null}
+        <p><Link href="/booking/bookings" className="text-action font-semibold underline">→ 予約管理</Link>　今日の台帳</p>
+        <p><Link href="/booking/menus" className="text-action font-semibold underline">→ 予約設定</Link>　メニューと空き枠</p>
+        <p><Link href="/reminders" className="text-action font-semibold underline">→ リマインダ</Link>　前日・開始前のお知らせ</p>
+        <p><Link href="/friends" className="text-action font-semibold underline">→ 友だち</Link>　顧客カルテに残ります</p>
+        {includeConversion ? <p><Link href="/conversions" className="text-action font-semibold underline">→ コンバージョン</Link>　予約の成果を確認</p> : null}
       </div>
     </Card>
   )

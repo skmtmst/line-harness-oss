@@ -282,7 +282,7 @@ export default function HqSupportPage() {
             ) : null}
           </div>
 
-          {error ? <p className="text-label text-status-danger" role="alert">{error}</p> : null}
+          {error ? <p className="text-label text-danger" role="alert">{error}</p> : null}
         </form>
 
         <div className="flex w-full shrink-0 flex-col gap-4 xl:w-auto" style={{ maxWidth: 390 }}>
@@ -307,7 +307,7 @@ export default function HqSupportPage() {
             {history === null ? (
               <p className="px-4 py-4 text-caption text-ink-faint">読み込んでいます…</p>
             ) : historyError ? (
-              <p className="px-4 py-4 text-caption text-status-danger">読み込めませんでした。</p>
+              <p className="px-4 py-4 text-caption text-danger">読み込めませんでした。</p>
             ) : history.length === 0 ? (
               <p className="px-4 py-4 text-caption text-ink-faint">まだ問い合わせはありません。</p>
             ) : (

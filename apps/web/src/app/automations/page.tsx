@@ -738,11 +738,11 @@ export default function AutomationsPage() {
             {/* #670 9: 送る先が1ページだけならページ送りは出さない。押せない口が並ぶと「まだ何かある」と読める。 */}
             {listPageCount > 1 ? (
               <div className="flex items-center gap-3" aria-label="ページ送り">
-                <button type="button" disabled={currentPage === 1} onClick={() => setPage(currentPage - 1)} className="text-action disabled:text-ink-faint">前へ</button>
+                <button type="button" disabled={currentPage === 1} onClick={() => setPage(currentPage - 1)} className="inline-flex min-h-6 min-w-6 items-center justify-center text-action disabled:text-ink-faint">前へ</button>
                 {Array.from({ length: listPageCount }, (_, index) => index + 1).map((pageNumber) => (
-                  <button key={pageNumber} type="button" aria-current={pageNumber === currentPage ? 'page' : undefined} onClick={() => setPage(pageNumber)} className={pageNumber === currentPage ? 'text-action font-bold' : ''}>{pageNumber}</button>
+                  <button key={pageNumber} type="button" aria-current={pageNumber === currentPage ? 'page' : undefined} onClick={() => setPage(pageNumber)} className={`inline-flex min-h-6 min-w-6 items-center justify-center ${pageNumber === currentPage ? 'text-action font-bold' : ''}`}>{pageNumber}</button>
                 ))}
-                <button type="button" disabled={currentPage >= listPageCount} onClick={() => setPage(currentPage + 1)} className="text-action disabled:text-ink-faint">次へ</button>
+                <button type="button" disabled={currentPage >= listPageCount} onClick={() => setPage(currentPage + 1)} className="inline-flex min-h-6 min-w-6 items-center justify-center text-action disabled:text-ink-faint">次へ</button>
               </div>
             ) : null}
           </div>

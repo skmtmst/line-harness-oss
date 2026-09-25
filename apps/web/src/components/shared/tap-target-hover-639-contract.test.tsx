@@ -105,7 +105,9 @@ describe('#639 ホバーは hover:hover かつ pointer:fine の中にだけ書�
     expect(readApp('booking/menus/staff/page.tsx')).toContain('variant="primary"')
     expect(readApp('emergency/page.tsx')).toContain('min-h-9 bg-accent-deep px-3 text-xs font-bold text-on-accent hover:brightness-90')
     // 流入経路モーダル・プールは brightness で沈む（生の色を増やさない）。
-    expect(readApp('inflow-links/_components/create-genre-modal.tsx')).toContain('bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:brightness-90')
+    // 2026-09-25: 白字 3.77:1 の bg-emerald-600 を bg-success（5.61:1）へ。
+    // 見張りはホバー変化の有無（意図は変えない）。
+    expect(readApp('inflow-links/_components/create-genre-modal.tsx')).toContain('bg-success px-4 py-2 text-sm font-semibold text-on-accent hover:brightness-90')
     // ★V7 C5: 流入リンク編集窓は共通 Dialog＋Button primary へ寄せた。ホバー変化は共通 Button が持つ。
     expect(readApp('inflow-links/_components/edit-route-modal.tsx')).toContain('variant="primary"')
     expect(readApp('pools/page.tsx')).toContain('bg-blue-600 text-white hover:brightness-90')

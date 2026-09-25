@@ -739,18 +739,17 @@ export default function AutoRepliesPage() {
           <table className="min-w-[784px] @[880px]:min-w-[880px] w-full table-fixed">
             <thead>
               <tr className="bg-canvas-sunken border-b border-hairline">
-                <th className="w-2/6 px-4 py-3 text-left text-xs font-semibold text-ink-faint">ルール名</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint">ルール名</th>
                 <th className="w-20 px-4 py-3 text-left text-xs font-semibold text-ink-faint">状態</th>
                 <th title="動く条件（キーワード・適用アカウント）" className="w-1/6 whitespace-nowrap px-4 py-3 text-left text-xs font-semibold text-ink-faint">条件</th>
                 <th title="返信と実行するアクション" className="w-1/6 whitespace-nowrap px-4 py-3 text-left text-xs font-semibold text-ink-faint">返すもの</th>
                 {/* 谷間帯の列削減: 回数は補助情報なので表の幅が足りない間だけ畳む。 */}
                 <th title="今月動いた回数" className="cq-hide-below-880 w-24 px-4 py-3 text-left text-xs font-semibold text-ink-faint">今月の応答</th>
                 {/*
-                  #774: 表の最小幅880pxがカード幅を超える帯で、右端の操作列が
-                  スクロールしないと見えなかった（macOSはバー非表示で気づけない）。
-                  操作列だけ右端にstickyで留め、表が横に流れても操作は常に見える。
+                  #774: 右端の操作列は sticky で留める。幅は中身（編集＋
+                  削除＋その他の 32px 級 3つ）に合わせた固定 160。
                 */}
-                <th title="編集・停止または再開・削除" className="bg-canvas-sunken sticky right-0 w-44 px-4 py-3 text-right text-xs font-semibold text-ink-faint">操作</th>
+                <th title="編集・停止または再開・削除" className="bg-canvas-sunken sticky right-0 w-40 px-4 py-3 text-right text-xs font-semibold text-ink-faint">操作</th>
                 <th className="hidden px-4 py-3">テンプレート</th>
                 <th className="hidden px-4 py-3">応答条件</th>
                 <th className="hidden px-4 py-3">適用アカウント</th>
@@ -852,7 +851,8 @@ export default function AutoRepliesPage() {
                       {/* **数えられていないものを 0 と書かない。** 0 は「当たらなかった」の意味。 */}
                       <span className="text-ink text-sm tabular-nums">{r.hits?.period ?? '—'}</span>
                       <span className="text-ink-faint text-xs">回</span>
-                      <span className="text-ink-faint mt-0.5 block text-[10px]">累計 {r.hits?.total ?? '—'}回</span>
+                      {/* 狭い列でも横に流さないよう、累計は1行で切る（全文は列の title） */}
+                      <span className="text-ink-faint mt-0.5 block max-w-full truncate text-[10px]">累計 {r.hits?.total ?? '—'}回</span>
                     </td>
                     {/* 狭い列でボタンが切れても、重ねるだけで操作の全部が
                         読めるように title を付ける（第5パス D-3）。 */}

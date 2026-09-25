@@ -132,7 +132,7 @@ export default function LifetimeTab({
       </div>
 
       {notice ? <p className="text-label text-accent-deep" role="status">{notice}</p> : null}
-      {error ? <p className="text-label text-status-danger" role="alert">{error}</p> : null}
+      {error ? <p className="text-label text-danger" role="alert">{error}</p> : null}
 
       <section data-design="Table" data-design-node="USBTi">
         <DataTable>

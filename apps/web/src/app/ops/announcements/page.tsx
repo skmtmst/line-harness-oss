@@ -167,7 +167,7 @@ export default function OpsAnnouncementsPage() {
         <div className="mb-4"><NoteBar tone="warn">契約者専用LINEのアカウントが未設定です。メンバー管理の「運営の情報」で、運営会社に登録した公式アカウントを指定すると LINE で送れます。</NoteBar></div>
       ) : null}
       {notice ? <p role="status" className="mb-3 text-caption text-accent-deep">{notice}</p> : null}
-      {error ? <p role="alert" className="mb-3 text-caption text-status-danger">{error}</p> : null}
+      {error ? <p role="alert" className="mb-3 text-caption text-danger">{error}</p> : null}
 
       <div className="grid gap-4 xl:grid-cols-5">
         <section aria-label="作成" className="grid gap-4 rounded-card border border-hairline bg-canvas p-5 xl:col-span-2">

@@ -147,7 +147,7 @@ export default function SiteScript() {
                     <Button onClick={copy}>{copied ? 'コピーしました' : 'コピー'}</Button>
                   </div>
                 </div>
-                {copyFailed && <p className="mt-2 text-xs text-status-danger">コピーできませんでした。上のコードを選んでコピーしてください。</p>}
+                {copyFailed && <p className="mt-2 text-xs text-danger">コピーできませんでした。上のコードを選んでコピーしてください。</p>}
               </>
             ) : (
               <div className="mt-3 rounded-control bg-canvas-sunken p-4">

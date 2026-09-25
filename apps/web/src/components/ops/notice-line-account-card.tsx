@@ -61,7 +61,7 @@ export default function NoticeLineAccountCard() {
         <p className="text-caption text-ink-secondary">未指定です。指定するまで、お知らせは画面とメールだけで送れます。</p>
       )}
       {notice ? <p role="status" className="text-caption text-accent-deep">{notice}</p> : null}
-      {error ? <p role="alert" className="text-caption text-status-danger">{error}</p> : null}
+      {error ? <p role="alert" className="text-caption text-danger">{error}</p> : null}
     </section>
   )
 }

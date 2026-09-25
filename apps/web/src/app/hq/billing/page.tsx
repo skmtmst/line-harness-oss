@@ -156,7 +156,7 @@ function BillingInner() {
         <span className="text-nano text-ink-faint">年払いは約15% OFF</span>
       </div>
 
-      {error ? <p className="text-label text-status-danger" role="alert">{error}</p> : null}
+      {error ? <p className="text-label text-danger" role="alert">{error}</p> : null}
 
       <div data-design="Plans" data-design-node={interval === 'year' ? 'TIeHO' : 'sWyx8'} className="grid gap-4 md:grid-cols-3">
         {summary.plans.map((plan) => {

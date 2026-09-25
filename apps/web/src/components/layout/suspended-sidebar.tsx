@@ -22,7 +22,7 @@ export default function SuspendedSidebar() {
     <>
       <div className={`${styles.mobileHeader} ${styles.mobileOnly}`}>
         <h1 className={styles.mobileTitle}>お問い合わせ</h1>
-        <span className="inline-flex h-7 items-center rounded-pill bg-status-danger-soft px-2 text-nano font-bold text-status-danger">利用停止中</span>
+        <span className="inline-flex h-7 items-center rounded-pill bg-status-danger-soft px-2 text-nano font-bold text-danger">利用停止中</span>
       </div>
       <aside className={styles.desktop} aria-label="停止中の管理メニュー">
         <div className={identityStyles.root} data-design-node="J33xq/V2WbXF">
@@ -48,7 +48,7 @@ export default function SuspendedSidebar() {
           </span>
           <span className="flex min-w-0 flex-1 flex-col gap-1">
             <span className="truncate text-label font-bold text-ink">{name}</span>
-            <span className="inline-flex h-4.5 w-fit items-center rounded-pill bg-status-danger-soft px-2 text-nano font-bold text-status-danger">利用停止中</span>
+            <span className="inline-flex h-4.5 w-fit items-center rounded-pill bg-status-danger-soft px-2 text-nano font-bold text-danger">利用停止中</span>
           </span>
         </div>
       </aside>

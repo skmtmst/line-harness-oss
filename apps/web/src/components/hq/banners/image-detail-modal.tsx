@@ -198,7 +198,7 @@ export default function ImageDetailModal({
           </div>
         </div>
 
-        {error ? <p className="px-5 text-label text-status-danger" role="alert">{error}</p> : null}
+        {error ? <p className="px-5 text-label text-danger" role="alert">{error}</p> : null}
 
         <div className="border-t border-hairline" />
         <div data-design-node="V0mgAP" className="flex flex-wrap items-center gap-2 px-5 py-4">
@@ -206,7 +206,7 @@ export default function ImageDetailModal({
             type="button"
             onClick={() => setConfirmRemove(true)}
             disabled={busy}
-            className="inline-flex h-9 items-center gap-1.5 rounded-control px-3 text-label font-semibold text-status-danger hover:bg-status-danger-soft disabled:opacity-50"
+            className="inline-flex h-9 items-center gap-1.5 rounded-control px-3 text-label font-semibold text-danger hover:bg-status-danger-soft disabled:opacity-50"
           >
             <Trash2 aria-hidden="true" className="h-4 w-4" />
             一覧から外す

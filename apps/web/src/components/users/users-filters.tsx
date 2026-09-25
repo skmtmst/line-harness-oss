@@ -45,6 +45,7 @@ export default function UsersFilters({
       <select
         value={uid}
         onChange={(e) => onChange({ uid: e.target.value })}
+        aria-label="UID連携で絞り込む"
         className="v6-select h-10 min-w-44 rounded-control border border-hairline bg-canvas pl-3 text-sm text-ink"
       >
         <option value="">UID：すべて</option>
@@ -54,6 +55,7 @@ export default function UsersFilters({
       <select
         value={account}
         onChange={(e) => onChange({ account: e.target.value })}
+        aria-label="所属アカウントで絞り込む"
         className="v6-select h-10 min-w-44 rounded-control border border-hairline bg-canvas pl-3 text-sm text-ink"
       >
         <option value="">所属：すべて</option>

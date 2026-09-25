@@ -360,7 +360,7 @@ export default function OpsSupportPage() {
       ) : null}
 
       <div className={knowledgeStyles.supportMetrics} data-design-node="beOJV">
-        <div className={knowledgeStyles.supportMetric}><Inbox aria-hidden="true" className="text-status-danger" />
+        <div className={knowledgeStyles.supportMetric}><Inbox aria-hidden="true" className="text-danger" />
         <SummaryCard variant="v6" title="未対応のチケット" value={kpis ? kpis.untouched : null} unit="" detail={kpis ? `LINEから受付 ${kpis.untouchedFromLine}件` : '—'} loading={!summary} />
         </div>
         <div className={knowledgeStyles.supportMetric}><Timer aria-hidden="true" className="text-status-info" />
@@ -379,7 +379,7 @@ export default function OpsSupportPage() {
         ★V7：一覧・詳細の失敗はその場所の1枚で出すので、ここでは操作の失敗の
         知らせだけ出す（同じ失敗を2回出さない）。
       */}
-      {error && !listFailed && !detailFailed ? <p role="alert" className="mb-3 text-caption text-status-danger">{error}</p> : null}
+      {error && !listFailed && !detailFailed ? <p role="alert" className="mb-3 text-caption text-danger">{error}</p> : null}
 
       <div className={knowledgeStyles.supportColumns} data-design-node="WmMDh">
         {/* 左：チケット一覧 */}

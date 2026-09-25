@@ -82,7 +82,7 @@ export default function ImpersonationBar({
         role="status"
         className={writing
           ? 'flex h-12 items-center justify-between gap-3 bg-danger px-5 text-on-accent'
-          : 'flex h-12 items-center justify-between gap-3 bg-status-danger px-5 text-on-accent'}
+          : 'flex h-12 items-center justify-between gap-3 bg-danger px-5 text-on-accent'}
       >
         <span className="flex min-w-0 items-center gap-2.5 text-label font-bold">
           {writing ? <PencilLine aria-hidden="true" className="h-4.5 w-4.5" /> : <Eye aria-hidden="true" className="h-4.5 w-4.5" />}
@@ -127,7 +127,7 @@ function BarButton({ onClick, disabled, solid, children }: { onClick: () => void
       onClick={onClick}
       disabled={disabled}
       className={solid
-        ? 'h-8 rounded-control bg-canvas px-3.5 text-caption font-bold text-status-danger disabled:opacity-60'
+        ? 'h-8 rounded-control bg-canvas px-3.5 text-caption font-bold text-danger disabled:opacity-60'
         : 'h-8 rounded-control border border-on-accent/60 bg-on-accent/15 px-3.5 text-caption font-bold text-on-accent hover:bg-on-accent/25 disabled:opacity-60'}
     >
       {children}

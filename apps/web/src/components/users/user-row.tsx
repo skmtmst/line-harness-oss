@@ -89,7 +89,7 @@ export default function UserRow({ row, onOpenMergedPerson }: Props) {
               type="button"
               data-qa-open="w8W4Eh"
               onClick={() => onOpenMergedPerson(mergedPersonId)}
-              className="block max-w-full truncate text-left hover:underline"
+              className="block max-w-full truncate text-left underline min-h-6"
             >
               {row.displayName || '名前なし'}
             </button>

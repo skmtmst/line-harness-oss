@@ -175,13 +175,13 @@ function QuestionTemplatePageInner() {
     return (
       <div className="pb-24">
         <nav className="text-ink-faint mb-4 text-xs" aria-label="現在地">
-          <Link href="/templates" className="text-action hover:underline">テンプレート</Link>
+          <Link href="/templates" className="text-action underline">テンプレート</Link>
           <span className="mx-2">›</span>
           <span className="text-ink">質問</span>
         </nav>
         <div role="alert" className="bg-canvas rounded-card border-hairline border p-8 text-sm">
           <p className="font-bold text-ink">質問テンプレートの作成・変更はオーナーと管理者だけができます</p>
-          <Link href="/templates" className="text-action hover:underline mt-3 inline-block text-sm">一覧へ戻る</Link>
+          <Link href="/templates" className="text-action underline mt-3 inline-block text-sm">一覧へ戻る</Link>
         </div>
       </div>
     )
@@ -190,7 +190,7 @@ function QuestionTemplatePageInner() {
   return (
     <div data-design-node="NNDMR" className="pb-24">
       <nav className="text-ink-faint mb-4 text-xs" aria-label="現在地">
-        <Link href="/templates" className="text-action hover:underline">テンプレート</Link>
+        <Link href="/templates" className="text-action underline">テンプレート</Link>
         <span className="mx-2">›</span>
         <span className="text-ink">質問</span>
         <span className="mx-2">›</span>
@@ -284,7 +284,7 @@ function QuestionTemplatePageInner() {
             <p className="text-ink-secondary text-label mt-2">
               {id ? `使用先 ${usageCount}か所` : '保存後にシナリオから選べます'}
             </p>
-            <Link href="/scenarios" className="text-action mt-3 inline-block font-semibold hover:underline">
+            <Link href="/scenarios" className="text-action mt-3 inline-block font-semibold underline">
               シナリオで使う
             </Link>
           </section>

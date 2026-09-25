@@ -45,7 +45,7 @@ export function TicketKnowledge({ detail, onRefresh }: { detail: OpsSupportDetai
       {current && <Button data-design-node="rY1Kc" size="field" disabled={busy} onClick={() => void open()}>下書きを確認</Button>}
       {job?.status === 'failed' && <Button size="field" disabled={busy} onClick={() => void retry()}>もう一度試す</Button>}
     </div>
-    {error && <p role="alert" className="text-caption text-status-danger">{error}</p>}
+    {error && <p role="alert" className="text-caption text-danger">{error}</p>}
     {article && <KnowledgeEditor key={article.id} article={article} onClose={() => setArticle(null)} onSaved={onRefresh} />}
   </section>
 }
@@ -84,7 +84,7 @@ export function KnowledgeReferences({ references, requestId, busy, onExclude }: 
       <Button data-design-node="NeS62" className={styles.referenceUnfit} size="field" disabled={busy || pending} aria-pressed={feedback[`${ref.id}:${ref.version}`] === 'unhelpful'} onClick={() => void vote(ref.id, 'unhelpful')}>今回には合わない</Button>
       <Button data-design-node="ACP9c" className={styles.referenceRegenerate} size="field" disabled={busy || pending} onClick={() => onExclude(ref.id)}>除外して回答を作り直す</Button>
     </div>})}
-    {error && <p role="alert" className="text-caption text-status-danger">{error}</p>}
+    {error && <p role="alert" className="text-caption text-danger">{error}</p>}
     {article && <KnowledgeEditor key={article.id} article={article} onClose={() => setArticle(null)} onSaved={() => setArticle(null)} />}
   </section>
 }

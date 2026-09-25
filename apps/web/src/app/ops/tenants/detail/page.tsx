@@ -131,7 +131,7 @@ function OpsTenantDetailContent() {
         )}
       </div>
 
-      {error ? <p role="alert" className="mb-3 text-caption text-status-danger">{error}</p> : null}
+      {error ? <p role="alert" className="mb-3 text-caption text-danger">{error}</p> : null}
 
       <div className="mb-4">
         <Tabs items={TABS.map((t) => ({ label: t.label, current: tab === t.key, onClick: () => setTab(t.key) }))} />
