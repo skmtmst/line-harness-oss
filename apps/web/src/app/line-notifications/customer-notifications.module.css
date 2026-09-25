@@ -85,14 +85,13 @@
 }
 
 .actionPrimary {
-  border-color: var(--color-accent);
-  background: var(--color-accent);
+  border-color: var(--color-accent-deep);
+  background: var(--color-accent-deep);
   color: var(--color-on-accent);
 }
 
 .actionPrimary:hover:not(:disabled) {
-  border-color: var(--color-accent-hover);
-  background: var(--color-accent-hover);
+  filter: brightness(0.92);
 }
 
 .actionSecondary {

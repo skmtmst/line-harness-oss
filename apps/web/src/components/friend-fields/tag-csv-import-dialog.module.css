@@ -161,7 +161,7 @@
   border-radius: var(--radius-control);
   background: var(--color-status-danger-soft);
   padding: 10px 12px;
-  color: var(--color-status-danger);
+  color: var(--color-danger);
   font-size: 13px;
 }
 
@@ -216,7 +216,7 @@
 }
 
 .summaryInvalid {
-  color: var(--color-status-danger);
+  color: var(--color-danger);
 }
 
 .summaryDetail {
@@ -329,7 +329,7 @@
 .ready { background: var(--color-accent-soft); color: var(--color-accent-deep); }
 .skipped { background: var(--color-canvas-sunken); color: var(--color-ink-faint); }
 .invalid,
-.failed { background: var(--color-status-danger-soft); color: var(--color-status-danger); }
+.failed { background: var(--color-status-danger-soft); color: var(--color-danger); }
 
 .footerRow {
   display: flex;

@@ -24,7 +24,10 @@
   gap: 10px;
 }
 
-/* 番号バッジ。26×26・丸・12px・700。 */
+/*
+ * 番号バッジ。26×26・丸・12px・700。
+ * 白数字が乗るので accent-deep（白字 5.44:1）。accent(#06c755) は 2.26:1 で読めない。
+ */
 .stepBadge {
   display: inline-flex;
   width: 26px;
@@ -33,7 +36,7 @@
   align-items: center;
   justify-content: center;
   border-radius: var(--radius-pill);
-  background: var(--color-accent);
+  background: var(--color-accent-deep);
   color: var(--color-on-accent);
   font-size: var(--text-caption);
   font-weight: 700;
@@ -266,15 +269,19 @@
   opacity: 0.4;
 }
 
+/*
+ * 主要操作は accent-deep＋白字（5.44:1）。accent は 2.26:1、
+ * hover 先の accent-hover(#05b34c) は 2.78:1 で読めないので、
+ * 押したときは共通 Button と同じく明るさだけ落とす。
+ */
 .actionPrimary {
-  border-color: var(--color-accent);
-  background: var(--color-accent);
+  border-color: var(--color-accent-deep);
+  background: var(--color-accent-deep);
   color: var(--color-on-accent);
 }
 
 .actionPrimary:hover:not(:disabled) {
-  border-color: var(--color-accent-hover);
-  background: var(--color-accent-hover);
+  filter: brightness(0.92);
 }
 
 .actionSecondary {
@@ -362,7 +369,7 @@
 }
 
 .error {
-  color: var(--color-status-danger);
+  color: var(--color-danger);
   font-size: var(--text-label);
   font-weight: 600;
 }

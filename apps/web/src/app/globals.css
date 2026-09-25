@@ -160,9 +160,15 @@
   --color-avatar-slate: #536170;
   --color-avatar-green: #079b45;
 
-  /* LINEトークのプレビュー。実画面の青いトーク面と回答操作の緑。 */
-  --color-line-preview: #789bc5;
-  --color-line-preview-label: #5579a8;
+  /*
+   * LINEトークのプレビュー。実画面の青いトーク面と回答操作の緑。
+   *
+   * 白文字が乗るので AA の 4.5:1 が要る。2026-09-25 に計算して確かめた。
+   * 以前の #789bc5 は白字で 2.88:1、ラベルの #5579a8 は 4.48:1 で届かない。
+   * 色あいはそのままに明るさだけ下げた（白字で 5.21:1 と 4.91:1）。
+   */
+  --color-line-preview: #4a6f9a;
+  --color-line-preview-label: #4f739e;
   --color-line-choice: #00a947;
   --color-line-answer-bg: #e6f7ed;
   --color-line-answer: #08783b;

@@ -121,7 +121,7 @@
 
 .statusDanger {
   background: var(--color-status-danger-soft);
-  color: var(--color-status-danger);
+  color: var(--color-danger);
 }
 
 .statusMuted {
@@ -300,7 +300,7 @@
 
 .noticeError {
   background: var(--color-status-danger-soft);
-  color: var(--color-status-danger);
+  color: var(--color-danger);
 }
 
 .impactRow {
@@ -380,7 +380,7 @@
 
 .detailStage {
   margin-top: 6px;
-  color: var(--color-status-danger);
+  color: var(--color-danger);
   font-size: var(--text-caption);
   font-weight: 600;
 }
