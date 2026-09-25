@@ -604,7 +604,11 @@ const DASHBOARD_OVERVIEW = {
   inbox: {
     unanswered: 5,
     inProgress: 0,
+    onHold: 0,
     resolved: 38,
+    // 受信箱の見本（summary total 5・line 1・email 4・emailUnread 4）と同じ内訳。
+    line: { unanswered: 1, inProgress: 0, onHold: 0, resolved: 34 },
+    email: { unanswered: 4, inProgress: 0, onHold: 0, resolved: 4 },
     // 設計の運用アラート「最も古い未対応：9,110分前」。
     oldestUnansweredMinutes: 9110,
     averageFirstReplyMinutes: null,
