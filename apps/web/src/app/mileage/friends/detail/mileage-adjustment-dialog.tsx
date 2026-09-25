@@ -5,6 +5,7 @@ import Button from '@/components/shared/button'
 import { ChoiceCard } from '@/components/shared/create-page'
 import Dialog from '@/components/shared/dialog'
 import { Field, TextArea, TextInput } from '@/components/shared/form-controls'
+import DateField from '@/components/shared/date-field'
 import Select from '@/components/shared/select'
 import { ApiError, api, type MileageAdjustmentPolicy } from '@/lib/api'
 
@@ -225,12 +226,11 @@ export default function MileageAdjustmentDialog({
               </Field>
               <div className="grid gap-4 sm:grid-cols-2">
                 <Field label="この分の有効期限" htmlFor="mileage-adjustment-expiration" note={direction === 'increase' ? '空欄なら期限なしです。' : '減らすときは指定できません。'}>
-                  <TextInput
+                  <DateField
                     id="mileage-adjustment-expiration"
-                    type="date"
                     value={expiresOn}
                     disabled={direction === 'decrease'}
-                    onChange={(event) => setExpiresOn(event.target.value)}
+                    onChange={setExpiresOn}
                   />
                 </Field>
                 <label className="flex items-start gap-2 rounded-control border border-hairline p-3 text-sm text-ink-secondary">

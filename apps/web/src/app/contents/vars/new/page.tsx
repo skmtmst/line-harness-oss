@@ -1,5 +1,7 @@
 'use client'
 
+import DateField from '@/components/shared/date-field'
+import DateTimeField from '@/components/shared/date-time-field'
 import SelectField from '@/components/shared/select-field'
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
@@ -404,11 +406,11 @@ function NewCommonVarInner() {
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
               <label htmlFor="cv-valid-from" className="text-ink-secondary mb-1 block text-xs font-medium">有効開始</label>
-              <input id="cv-valid-from" type="datetime-local" value={validFrom} onChange={(e) => setValidFrom(e.target.value)} className="border-hairline rounded-control w-full border px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-status-info" />
+              <DateTimeField id="cv-valid-from" value={validFrom} onChange={setValidFrom} />
             </div>
             <div>
               <label htmlFor="cv-valid-until" className="text-ink-secondary mb-1 block text-xs font-medium">有効終了</label>
-              <input id="cv-valid-until" type="datetime-local" value={validUntil} onChange={(e) => setValidUntil(e.target.value)} className="border-hairline rounded-control w-full border px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-status-info" />
+              <DateTimeField id="cv-valid-until" value={validUntil} onChange={setValidUntil} />
             </div>
           </div>
           <div>
@@ -426,10 +428,14 @@ function NewCommonVarInner() {
                   options={[{ value: '', label: '選んでください' }, { value: 'true', label: 'true' }, { value: 'false', label: 'false' }]}
                   className="w-full"
                 />
+              ) : type === 'date' ? (
+                <DateField id="cv-fallback-value" value={fallbackValue} onChange={setFallbackValue} />
+              ) : type === 'datetime' ? (
+                <DateTimeField id="cv-fallback-value" value={fallbackValue} onChange={setFallbackValue} />
               ) : (
                 <input
                   id="cv-fallback-value"
-                  type={type === 'number' ? 'number' : type === 'date' ? 'date' : type === 'datetime' ? 'datetime-local' : 'text'}
+                  type={type === 'number' ? 'number' : 'text'}
                   value={fallbackValue}
                   onChange={(e) => setFallbackValue(e.target.value)}
                   className="border-hairline rounded-control w-full border px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-status-info"
@@ -526,10 +532,22 @@ function NewCommonVarInner() {
             }}
             placeholder={spec.placeholder}
             className="border-hairline rounded-control w-full max-w-md border px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-status-info"
-          /> : <input
+          /> : type === 'date' ? (
+            <DateField
+              id="cv-value"
+              value={value}
+              onChange={(v) => { setValue(v); setSecretWarningFields(null) }}
+            />
+          ) : type === 'datetime' ? (
+            <DateTimeField
+              id="cv-value"
+              value={value}
+              onChange={(v) => { setValue(v); setSecretWarningFields(null) }}
+            />
+          ) : <input
             ref={valueRef}
             id="cv-value"
-            type={type === 'number' ? 'number' : type === 'date' ? 'date' : type === 'datetime' ? 'datetime-local' : 'text'}
+            type={type === 'number' ? 'number' : 'text'}
             maxLength={type === 'number' ? undefined : VALUE_MAX}
             value={value}
             onChange={(e) => { setValue(e.target.value); setSecretWarningFields(null) }}

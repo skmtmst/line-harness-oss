@@ -23,6 +23,7 @@ import ListRange from '@/components/ui/list-range'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { Tabs } from '@/components/shared/tabs'
 import { TextArea, TextField } from '@/components/shared/text-field'
+import DateTimeField from '@/components/shared/date-time-field'
 import type {
   NenCampaignSetting,
   NenColumn,
@@ -961,7 +962,7 @@ function ColumnsPanel({
               </RadioCardGroup>
               {plan.when === 'schedule' ? (
                 <>
-                  <TextField type="datetime-local" aria-label="予約日時（日本時間）" value={plan.scheduledAt} invalid={scheduleInvalid} onChange={(event) => onPlanChange({ ...plan, scheduledAt: event.target.value })} />
+                  <DateTimeField aria-label="予約日時（日本時間）" value={plan.scheduledAt} invalid={scheduleInvalid} onChange={(v) => onPlanChange({ ...plan, scheduledAt: v })} />
                   {schedulePast ? (
                     <span className="text-micro font-normal text-danger">予約日時が過去になっています。いまより先の日時を選んでください。</span>
                   ) : null}

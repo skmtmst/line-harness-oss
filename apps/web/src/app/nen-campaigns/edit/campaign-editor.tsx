@@ -8,6 +8,7 @@ import { checkNenCampaignBodyLength, NEN_CAMPAIGN_BODY_MAX_LENGTH } from '@line-
 import { useAccount } from '@/contexts/account-context'
 import { Field, inputClass } from '@/components/shared/form-controls'
 import Button from '@/components/shared/button'
+import { TimeField } from '@/components/shared/date-time-field'
 import Combobox from '@/components/shared/combobox'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
@@ -294,7 +295,7 @@ export default function CampaignEditor({ campaignKey }: { campaignKey: string })
              <div className={styles.timingGrid}>
               <Field label="きっかけ"><p className="border-hairline rounded-control border px-3 py-2 text-sm">{triggerLabel(setting)}</p></Field>
               <Field label={isBirthday ? '送る日' : '何日後'}>{isBirthday ? <p className="border-hairline rounded-control border px-3 py-2 text-sm">3日前</p> : <input type="number" min={0} max={365} value={merged.delayDays} onChange={(event) => setDraft((previous) => ({ ...previous, delayDays: Number(event.target.value) }))} className={inputClass} />}</Field>
-              <Field label="時刻">{isBirthday ? <p className="border-hairline rounded-control border px-3 py-2 text-sm">10:00（固定）</p> : <input type="time" value={merged.deliveryTime.slice(0, 5)} onChange={(event) => setDraft((previous) => ({ ...previous, deliveryTime: event.target.value }))} className={inputClass} />}</Field>
+              <Field label="時刻">{isBirthday ? <p className="border-hairline rounded-control border px-3 py-2 text-sm">10:00（固定）</p> : <TimeField aria-label="送る時刻" value={merged.deliveryTime.slice(0, 5)} onChange={(v) => setDraft((previous) => ({ ...previous, deliveryTime: v }))} />}</Field>
                <Field label="届かない日"><p className="border-hairline rounded-control border px-3 py-2 text-sm">なし（毎日送る）</p></Field>
              </div>
              {isBirthday && <p className="text-ink-faint mt-3 text-xs">この日時は誕生日配信の実行処理で固定されています。</p>}

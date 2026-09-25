@@ -138,6 +138,8 @@ export default function DateField({
         className={styles.field}
         disabled={disabled}
         data-invalid={invalid || undefined}
+        // 狭い欄で切れても、重ねれば全文が読める（短い文字列は1行省略＋titleの決まり）。
+        title={selected ? formatLabel(selected) : undefined}
         aria-haspopup="dialog"
         aria-expanded={open}
         aria-controls={open ? dialogId : undefined}
@@ -163,7 +165,15 @@ export default function DateField({
       ) : null}
 
       {open ? (
-        <div id={dialogId} role="dialog" aria-label="日付を選ぶ" className={styles.popover}>
+        <div
+          id={dialogId}
+          role="dialog"
+          aria-label="日付を選ぶ"
+          className={styles.popover}
+          // 箱の中の押下はここで止める。呼び出し側が `<label>` で欄全体を包んでいると、
+          // 箱の中の押下がラベル経由で欄本体へ再送達して開閉が裏返る。
+          onClick={(event) => event.stopPropagation()}
+        >
           <div className={styles.header}>
             <button type="button" className={styles.nav} aria-label="前の月" onClick={() => moveTo(addMonths(focused, -1))}>
               <ChevronLeft aria-hidden="true" />

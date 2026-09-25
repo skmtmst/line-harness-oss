@@ -6,6 +6,7 @@ import { api, ApiError, type AutomationDraftAction, type AutomationDraftDetail }
 import { useAccount } from '@/contexts/account-context'
 import CreatePage from '@/components/shared/create-page'
 import { Field, TextArea, TextInput } from '@/components/shared/form-controls'
+import DateTimeField, { TimeField } from '@/components/shared/date-time-field'
 import ListState from '@/components/shared/list-state'
 import TargetMissing from '@/components/shared/target-missing'
 import Select from '@/components/shared/select'
@@ -308,12 +309,11 @@ export default function AutomationDraftEditor({ draftId }: { draftId: string }) 
       {eventType === 'datetime' ? (
         <>
           <Field label="実行日時" htmlFor="au-trigger-at" required>
-            <TextInput
+            <DateTimeField
               id="au-trigger-at"
               aria-label="実行日時"
-              type="datetime-local"
               value={triggerAt}
-              onChange={(event) => setTriggerAt(event.target.value)}
+              onChange={setTriggerAt}
             />
           </Field>
           <Field label="対象の友だち" htmlFor="au-trigger-friend-ids" required note="友だちIDをカンマ区切りで入力します（最大100人）。">
@@ -330,12 +330,11 @@ export default function AutomationDraftEditor({ draftId }: { draftId: string }) 
       {eventType === 'daily' ? (
         <>
           <Field label="実行時刻" htmlFor="au-trigger-time" required>
-            <TextInput
+            <TimeField
               id="au-trigger-time"
               aria-label="実行時刻"
-              type="time"
               value={triggerTime}
-              onChange={(event) => setTriggerTime(event.target.value)}
+              onChange={setTriggerTime}
             />
           </Field>
           <Field label="対象の友だち" htmlFor="au-trigger-daily-friend-ids" required note="友だちIDをカンマ区切りで入力します（最大100人）。">
@@ -352,12 +351,11 @@ export default function AutomationDraftEditor({ draftId }: { draftId: string }) 
       {eventType === 'weekly' ? (
         <>
           <Field label="実行時刻" htmlFor="au-trigger-weekly-time" required>
-            <TextInput
+            <TimeField
               id="au-trigger-weekly-time"
               aria-label="実行時刻"
-              type="time"
               value={triggerTime}
-              onChange={(event) => setTriggerTime(event.target.value)}
+              onChange={setTriggerTime}
             />
           </Field>
           <Field label="曜日" htmlFor="au-trigger-weekdays" required note="曜日番号をカンマ区切りで入力します（例: 1,3 は月・水）。">

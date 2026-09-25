@@ -2,6 +2,7 @@
 
 import { X } from 'lucide-react'
 import SelectField from '@/components/shared/select-field'
+import { TimeField } from '@/components/shared/date-time-field'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import Button from '@/components/shared/button'
@@ -774,12 +775,11 @@ function BookingRulesEditor({ accountId, initial, canEdit, onRetry, onSaved }: {
             空欄にすると従来どおり（前日=24時間前、当日=2時間前）。 */}
         <Field label="前日のお知らせを送る時刻">
           <div className="flex items-center gap-2">
-            <input
+            <TimeField
               aria-label="前日のお知らせを送る時刻"
-              type="time"
               value={draft.reminderDayBeforeTime ?? ''}
-              onChange={(event) => set('reminderDayBeforeTime', event.target.value || null)}
-              className="border-hairline rounded-control focus:ring-accent w-full border px-3 h-10 text-sm tabular-nums focus:outline-none focus:ring-2"
+              onChange={(v) => set('reminderDayBeforeTime', v || null)}
+              className="w-full"
             />
             <span className="text-ink-faint whitespace-nowrap text-xs">空欄は24時間前</span>
           </div>
