@@ -100,15 +100,20 @@ describe('V6 37-6 NEN配信の画面契約', () => {
 
   it('読込失敗と空状態を共通状態部品で示す', () => {
     expect(PAGE).toContain('kind="loading"')
-    expect(PAGE).toContain('もう一度読み込む')
+    // ★V7 `x63W5x`：読み直す口は一覧の場所の1枚（`onRetryTab`）が持つ。帯は出さない。
+    expect(OVERVIEW).toContain('kind="error"')
+    expect(OVERVIEW).toContain('onRetryTab')
     expect(OVERVIEW).toContain('kind="empty"')
     expect(OVERVIEW).toContain('売らない配信です。ここで信用がたまると、売る配信が届きやすくなります。')
   })
 
-  it('タブごとに取り、失敗はそのタブだけの帯で示す(点検 #512 の中3)', () => {
+  it('タブごとに取り、失敗はそのタブの一覧の場所の1枚で示す(点検 #512 の中3)', () => {
     expect(PAGE).toContain('loadTab')
     expect(PAGE).toContain('tabErrors')
-    expect(PAGE).toContain('tone="danger"')
+    // ★V7 `x63W5x`：同じ失敗は1画面に1つ。ページ上の帯は出さない。
+    expect(PAGE).not.toContain('tone="danger"')
+    expect(OVERVIEW).toContain('tabError')
+    expect(OVERVIEW).toContain('onRetryTab')
     expect(PAGE).not.toContain('loadError')
     // 操作後は関係するタブだけ読み直す。
     expect(PAGE).toContain("await loadTab('columns')")
