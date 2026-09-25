@@ -188,6 +188,8 @@ export default function BookingsPage() {
   const [menus, setMenus] = useState<BookingMenu[]>([])
   // 集計の読み込み失敗は0表示と分ける。黙って0のままだと運用者が気づけない。
   const [summaryError, setSummaryError] = useState(false)
+  // ★V7 `x63W5x`：集計が取れていない間、KPI に 0 を出さない。「—」と出す。
+  const [summaryReady, setSummaryReady] = useState(false)
   const [summarySeq, setSummarySeq] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -340,6 +342,7 @@ export default function BookingsPage() {
     setCandidatesStatus('loading')
     setAvailability({ status: 'loading', slots: [] })
     setSummaryError(false)
+    setSummaryReady(false)
     setSummary({
       total: 0, requested: 0, monthTotal: 0, monthConfirmed: 0,
       monthCancelled: 0, lastMonthTotal: 0, todayTotal: 0, weekTotal: 0,
@@ -376,6 +379,7 @@ export default function BookingsPage() {
     const requestedAccountId = selectedAccountId
     let alive = true
     setSummaryError(false)
+    setSummaryReady(false)
     setCandidatesStatus('loading')
     void (async () => {
       try {
@@ -390,6 +394,7 @@ export default function BookingsPage() {
         ])
         if (!alive || listAccountRef.current !== requestedAccountId) return
         setSummary(counts)
+        setSummaryReady(true)
         setMenus(menuList.menus)
         setStaffList(staffResult.staff.filter((item) => item.is_active === 1))
         setCandidatesStatus('ready')
@@ -688,11 +693,18 @@ export default function BookingsPage() {
     return (
       <div>
         {pageHead}
+        {/*
+          ★V7 `x63W5x`：同じ失敗を1画面に1つへ。ページ上のピンクの帯は出さず、
+          一覧の場所の ListState error だけ残す（#634 の読み直す口は保つ）。
+        */}
         {error && (
-          <div className="bg-danger-bg border-danger-bg text-danger mb-4 rounded-lg border p-4 text-sm">
-            {error}
-            {/* #634: 一覧の失敗からも、その場で読み直せるようにする。 */}
-            <button type="button" className="ml-2 font-semibold underline" onClick={() => void load()}>もう一度読み込む</button>
+          <div className="mb-4">
+            <ListState
+              kind="error"
+              title="予約を読み込めませんでした"
+              description="通信が切れたか、サーバが応えませんでした。登録した内容は消えていません。"
+              onRetry={() => void load()}
+            />
           </div>
         )}
         <BookingCalendar
@@ -720,42 +732,45 @@ export default function BookingsPage() {
     <div>
       {pageHead}
 
-      {error && (
-        <div className="bg-danger-bg border-danger-bg text-danger mb-4 rounded-lg border p-4 text-sm">
-          {error}
-          {/* #634: 一覧の失敗からも、その場で読み直せるようにする。 */}
-          <button type="button" className="ml-2 font-semibold underline" onClick={() => void load()}>もう一度読み込む</button>
-        </div>
-      )}
+      {/*
+        ★V7 `x63W5x`：一覧の失敗でページ上のピンクの帯は出さない。
+        一覧の場所の ListState error だけにまとめる。
+      */}
 
       {summaryError && (
-        <div className="bg-warning-bg border-warning text-warning mb-4 rounded-lg border p-4 text-sm">
+        // ★V7 `x63W5x`：補助のデータ（集計）だけ取れないときは、その場所に
+        // 小さく1行だけ。一覧はそのまま使える。文言は契約試験が守る。
+        <p className="text-ink-secondary mb-4 text-xs" role="status">
           集計を読み込めませんでした。一覧はそのまま使えます。
-          <button className="ml-2 font-semibold underline" onClick={() => setSummarySeq((n) => n + 1)}>もう一度読み込む</button>
-        </div>
+          <button type="button" className="text-action ml-2 font-semibold hover:underline" onClick={() => setSummarySeq((n) => n + 1)}>もう一度読み込む</button>
+        </p>
       )}
 
+      {/*
+        ★V7 `x63W5x`：取れない KPI は「—」。読み込み中は「読み込んでいます」、
+        失敗は「読み込めませんでした」と言い分け、0（本当に0件）と混ぜない。
+      */}
       <div data-design="KPIs" className="mb-4 grid grid-cols-2 gap-3 xl:grid-cols-4">
         <Kpi
           title="今月の予約"
-          value={kpi.total}
+          value={summaryReady ? kpi.total : null}
           unit="件"
-          detail={`前月比 ${kpi.diff >= 0 ? '+' : ''}${kpi.diff}`}
+          detail={summaryError ? '読み込めませんでした' : !summaryReady ? '読み込んでいます' : `前月比 ${kpi.diff >= 0 ? '+' : ''}${kpi.diff}`}
         />
-        <Kpi title="確定" value={kpi.confirmed} unit="件" detail="来店予定" />
+        <Kpi title="確定" value={summaryReady ? kpi.confirmed : null} unit="件" detail={summaryError ? '読み込めませんでした' : !summaryReady ? '読み込んでいます' : '来店予定'} />
         {/* 設計は「変更依頼 / 要対応」。bookings の状態に「変更依頼」が無いので
             承認待ちを出す。要対応であることは変わらない。 */}
         <Kpi
           title="変更依頼"
-          value={summary.requested}
+          value={summaryReady ? summary.requested : null}
           unit="件"
-          detail="要対応"
+          detail={summaryError ? '読み込めませんでした' : !summaryReady ? '読み込んでいます' : '要対応'}
         />
         <Kpi
           title="キャンセル"
-          value={kpi.cancelled}
+          value={summaryReady ? kpi.cancelled : null}
           unit="件"
-          detail={kpi.rate === null ? '率 —' : `率 ${kpi.rate}%`}
+          detail={summaryError ? '読み込めませんでした' : !summaryReady ? '読み込んでいます' : kpi.rate === null ? '率 —' : `率 ${kpi.rate}%`}
         />
       </div>
 
@@ -865,8 +880,19 @@ export default function BookingsPage() {
               サイドバーでアカウントを選択してください
             </div>
           ) : loading ? (
-            <div className="bg-canvas rounded-card border-hairline text-ink-faint border p-12 text-center text-sm">
-              読み込み中…
+            <div className="bg-canvas rounded-card border-hairline border">
+              <ListState kind="loading" title="予約を読み込んでいます" />
+            </div>
+          ) : error ? (
+            // ★V7 `x63W5x`：失敗を「まだありません」と言わない。
+            // 空の案内と作成ボタンは出さない。
+            <div className="bg-canvas rounded-card border-hairline border">
+              <ListState
+                kind="error"
+                title="予約を読み込めませんでした"
+                description="通信が切れたか、サーバが応えませんでした。登録した内容は消えていません。"
+                onRetry={() => void load()}
+              />
             </div>
           ) : shown.length === 0 ? (
             <div className="bg-canvas rounded-card border-hairline border">
@@ -1077,7 +1103,8 @@ function Kpi({
   detail,
 }: {
   title: string
-  value: number
+  // ★V7 `x63W5x`：取れていないときは null で「—」を出す。0 とは別物。
+  value: number | null
   unit: string
   detail: string
 }) {
@@ -1085,8 +1112,10 @@ function Kpi({
     <div className="bg-canvas rounded-card border-hairline border p-4">
       <p className="text-ink-faint text-xs">{title}</p>
       <p className="text-ink mt-1 text-2xl font-semibold tabular-nums">
-        {value}
-        <span className="text-ink-faint ml-1 text-xs font-normal">{unit}</span>
+        {value === null ? '—' : value.toLocaleString('ja-JP')}
+        {value === null ? null : (
+          <span className="text-ink-faint ml-1 text-xs font-normal">{unit}</span>
+        )}
       </p>
       <p className="text-ink-faint mt-1 text-xs">{detail}</p>
     </div>
