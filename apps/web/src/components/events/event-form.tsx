@@ -311,7 +311,7 @@ export default function EventForm({ accountId, eventId }: EventFormProps) {
           const templateUrl = `https://liff.line.me/{{liff_id}}/?page=event&id=${eventId}&liffId={{liff_id}}`
           const targetAccounts = accounts.filter((a) => accountIdsArr.includes(a.id))
           return (
-            <div className="bg-info-bg rounded-control mb-4 space-y-4 p-4">
+            <div className="bg-canvas rounded-control border-hairline mb-4 space-y-4 border p-4">
               <div>
                 <div className="text-ink mb-2 text-sm font-medium">broadcast 用テンプレ URL</div>
                 <div className="flex items-center gap-2">
@@ -377,7 +377,7 @@ export default function EventForm({ accountId, eventId }: EventFormProps) {
         // single 用 (既存と同じ表示)
         if (liffUrl) {
           return (
-            <div className="bg-info-bg rounded-control mb-4 p-4">
+            <div className="bg-canvas rounded-control border-hairline mb-4 border p-4">
               <div className="text-ink mb-2 text-sm font-medium">予約 URL（友だちに案内する）</div>
               <div className="flex items-center gap-2">
                 <input
@@ -466,21 +466,21 @@ export default function EventForm({ accountId, eventId }: EventFormProps) {
             actions={(
               <>
               {tab === 'overview' && eventId && (
-                <button
+                <Button
+                  variant="secondary"
                   onClick={() => save('slots')}
                   disabled={saving}
-                  className="px-4 py-2 text-sm font-medium border border-gray-300 rounded-lg hover:bg-white disabled:opacity-50"
                 >
                   保存して次へ →
-                </button>
+                </Button>
               )}
-              <button
+              <Button
+                variant="primary"
                 onClick={() => save()}
                 disabled={saving}
-                className="px-5 py-2 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
               >
                 {saving ? '保存中...' : tab === 'overview' && !eventId ? 'イベントを作成' : TABS.find((x) => x.key === tab)?.saveLabel ?? '保存'}
-              </button>
+              </Button>
               </>
             )}
           />

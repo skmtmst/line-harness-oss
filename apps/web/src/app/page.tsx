@@ -35,6 +35,7 @@ import IconButton from '@/components/shared/icon-button'
 import NotificationPanel from '@/components/shared/notification-panel'
 import KpiCollapse from '@/components/ui/kpi-collapse'
 import SelectField from '@/components/shared/select-field'
+import StatusBadge from '@/components/shared/status-badge'
 import { STATE_TEXT } from '@/components/shared/not-connected'
 import {
   hasInboundSupportMark,
@@ -536,7 +537,7 @@ function OperationalAlertsCard({ risk, healthIssues, oldestWaitMinutes, twoFacto
         隣で緑の「0件」が出ても、別の指標だと読めるようにするのが狙い。
         取れていないときは 0件 ではなく「未取得」とする（IDEA-01）。
       */}
-      <span className={failed || count === null ? 'text-ink-faint text-sm font-bold' : count > 0 ? 'text-danger text-sm font-bold' : 'text-success text-sm font-bold'}>{failed ? '未取得' : count === null ? '—' : `接続・自動処理 ${count}件`}</span>
+      <span className="flex flex-wrap items-center gap-2"><span className={failed || count === null ? 'text-ink-faint text-sm font-bold' : 'text-ink text-sm font-bold'}>{failed ? '未取得' : count === null ? '—' : `接続・自動処理 ${count}件`}</span>{!failed && count !== null ? <StatusBadge tone={count > 0 ? 'danger' : 'success'} size="compact">{count > 0 ? '要確認' : '正常'}</StatusBadge> : null}</span>
     </div>
     {/*
       設計（`vUXKb`）は「最も古い未対応」と「二段階認証」の2行。

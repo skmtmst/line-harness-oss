@@ -1,6 +1,9 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Button from '@/components/shared/button'
+import ListState from '@/components/shared/list-state'
+import NoteBar from '@/components/shared/note-bar'
 import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL!
@@ -61,21 +64,16 @@ export default function UpdatesPage() {
     <div>
       <h1 className="text-ink mb-4 text-xl font-semibold">アップデート履歴</h1>
       {state.kind === 'unconfigured' && (
-        <div className="bg-info-bg text-ink-secondary mb-4 rounded-control p-4 text-sm leading-relaxed">
-          この環境では自動アップデートが構成されていないため、履歴はありません。
-          <br />
-          自動アップデートは <code className="text-xs">create-line-harness</code>{' '}
-          でセットアップした環境で利用できます。自前でデプロイしている場合は{' '}
-          <a
-            className="text-action underline"
-            href={MANUAL_UPDATE_GUIDE_URL}
-            target="_blank"
-            rel="noreferrer"
-          >
-            手動アップデートガイド
-          </a>{' '}
-          をご覧ください。
-        </div>
+        <>
+          <div className="mb-4"><NoteBar>この環境では自動アップデートが構成されていないため、履歴はありません。</NoteBar></div>
+          <ListState
+            kind="empty"
+            emptyPreset="readonly"
+            title="更新履歴はまだありません"
+            description="自動アップデートは create-line-harness でセットアップした環境で利用できます。自前でデプロイしている場合は手動アップデートガイドをご覧ください。"
+            action={<Button href={MANUAL_UPDATE_GUIDE_URL} target="_blank" rel="noreferrer">手動アップデートガイドを開く</Button>}
+          />
+        </>
       )}
       {state.kind === 'error' && (
         <div className="bg-status-warn-soft text-status-warn-deep mb-4 rounded-control p-3 text-sm">

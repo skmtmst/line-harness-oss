@@ -9,6 +9,7 @@ import OperatorNotificationRules from './operator-notification-rules'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
+import NoteBar from '@/components/shared/note-bar'
 import Pagination from '@/components/shared/pagination'
 import {
   ApiError,
@@ -1152,9 +1153,7 @@ function LineNotificationsPage() {
         </div>
       </section>
     </KpiCollapse>
-    <div className="border-info bg-info-bg text-info rounded-control border px-4 py-3 text-sm leading-6">
-      これは「お知らせ」であって「売り込みの配信」ではありません。顧客が配信を止めていても、取引に必要な連絡は届きます。
-    </div>
+    <div className="mb-4"><NoteBar>これは「お知らせ」であって「売り込みの配信」ではありません。顧客が配信を止めていても、取引に必要な連絡は届きます。</NoteBar></div>
 
     <div className="flex flex-wrap items-center justify-between gap-3">
       <div className="grid w-full max-w-[48rem] grid-cols-2 gap-2 lg:grid-cols-4" aria-label="お知らせの絞り込み">

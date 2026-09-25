@@ -12,6 +12,7 @@ import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
 import PageHeaderH2 from '@/components/layout/page-header-h2'
 import Pagination from '@/components/shared/pagination'
+import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import { RowActions } from '@/components/shared/row-actions'
 import Select from '@/components/shared/select'
 import StatusBadge from '@/components/shared/status-badge'
@@ -953,10 +954,10 @@ function ColumnsPanel({
             </div>
             <div className="flex flex-col gap-2 text-caption font-semibold text-ink">
               送る時
-              <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="送る時">
-                <Button type="button" role="radio" aria-checked={plan.when === 'now'} variant={plan.when === 'now' ? 'primary' : 'secondary'} onClick={() => onPlanChange({ ...plan, when: 'now' })}>今すぐ</Button>
-                <Button type="button" role="radio" aria-checked={plan.when === 'schedule'} variant={plan.when === 'schedule' ? 'primary' : 'secondary'} onClick={() => onPlanChange({ ...plan, when: 'schedule' })}>日時を予約</Button>
-              </div>
+              <RadioCardGroup legend="送る時" className="grid grid-cols-2 gap-2">
+                <RadioCard name="nen-deliver-when" value="now" checked={plan.when === 'now'} onChange={() => onPlanChange({ ...plan, when: 'now' })} title="今すぐ" note="すぐに配信待ちに入ります。" />
+                <RadioCard name="nen-deliver-when" value="schedule" checked={plan.when === 'schedule'} onChange={() => onPlanChange({ ...plan, when: 'schedule' })} title="日時を予約" note="決めた日時に送ります。" />
+              </RadioCardGroup>
               {plan.when === 'schedule' ? (
                 <>
                   <TextField type="datetime-local" aria-label="予約日時（日本時間）" value={plan.scheduledAt} invalid={scheduleInvalid} onChange={(event) => onPlanChange({ ...plan, scheduledAt: event.target.value })} />
