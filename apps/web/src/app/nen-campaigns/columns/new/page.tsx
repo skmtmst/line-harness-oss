@@ -29,6 +29,7 @@ import {
   type ColumnDraft,
   type Failure,
 } from './column-form'
+import { usePageTitle } from '@/components/shell/page-chrome'
 import styles from './column.module.css'
 
 /**
@@ -40,6 +41,8 @@ import styles from './column.module.css'
  * （引き継ぎ `v6-nen-column-create-handoff.md` の完了条件）。
  */
 function NewNenColumnInner() {
+  /* ★V7: 画面名は共通トップバーにだけ置く。共通 PageHeader が同じ題を隠す。 */
+  usePageTitle('コラムを書く')
   const router = useRouter()
   const { selectedAccountId } = useAccount()
   const [draft, setDraft] = useState<ColumnDraft>(EMPTY_DRAFT)
