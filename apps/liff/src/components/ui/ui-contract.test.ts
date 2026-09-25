@@ -166,8 +166,8 @@ describe('撮り直しの3点', () => {
     expect(booking).toContain('で確認へ');
   });
 
-  it('中央寄せの本文は均等に折り返す (行末の1〜2文字落ち防止)', () => {
-    expect(src('components', 'ui/StatusView.tsx')).toContain('text-balance');
-    expect(src('components', 'LoadErrorView.tsx')).toContain('text-balance');
+  it('中央寄せの本文は行末の1〜2文字落ちを防ぐ (説明文は pretty)', () => {
+    expect(src('components', 'ui/StatusView.tsx')).toContain('text-pretty');
+    expect(src('components', 'LoadErrorView.tsx')).toContain('text-pretty');
   });
 });

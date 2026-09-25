@@ -29,7 +29,7 @@ export default function LoadErrorView({
         <Icon name="cloud-off" className="h-7 w-7" />
       </span>
       <p className="mt-4 text-base font-bold text-ink">読み込めませんでした</p>
-      <p className="mt-2 text-sm leading-6 text-balance text-ink-secondary">
+      <p className="mt-2 text-sm leading-6 text-pretty text-ink-secondary">
         {message ?? LOAD_FAILED_MESSAGE}
         {!message && note && (
           <>
