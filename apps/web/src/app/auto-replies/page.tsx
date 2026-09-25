@@ -734,15 +734,17 @@ export default function AutoRepliesPage() {
 
         <div data-design="Table" className="bg-canvas rounded-card border border-hairline overflow-hidden">
           {/* #641: 枠つきボタンで広くなった操作列ぶん、表だけが横に流れるようにする */}
-          <div className="overflow-x-auto">
-          <table className="min-w-[880px] w-full table-fixed">
+          {/* @container: 列の出し分けを画面幅ではなく表の実際の幅で決める（谷間帯の列削減）。 */}
+          <div className="overflow-x-auto @container">
+          <table className="min-w-[784px] @[880px]:min-w-[880px] w-full table-fixed">
             <thead>
               <tr className="bg-canvas-sunken border-b border-hairline">
                 <th className="w-2/6 px-4 py-3 text-left text-xs font-semibold text-ink-faint">ルール名</th>
                 <th className="w-20 px-4 py-3 text-left text-xs font-semibold text-ink-faint">状態</th>
                 <th title="動く条件（キーワード・適用アカウント）" className="w-1/6 whitespace-nowrap px-4 py-3 text-left text-xs font-semibold text-ink-faint">条件</th>
                 <th title="返信と実行するアクション" className="w-1/6 whitespace-nowrap px-4 py-3 text-left text-xs font-semibold text-ink-faint">返すもの</th>
-                <th title="今月動いた回数" className="w-24 px-4 py-3 text-left text-xs font-semibold text-ink-faint">今月の応答</th>
+                {/* 谷間帯の列削減: 回数は補助情報なので表の幅が足りない間だけ畳む。 */}
+                <th title="今月動いた回数" className="cq-hide-below-880 w-24 px-4 py-3 text-left text-xs font-semibold text-ink-faint">今月の応答</th>
                 {/*
                   #774: 表の最小幅880pxがカード幅を超える帯で、右端の操作列が
                   スクロールしないと見えなかった（macOSはバー非表示で気づけない）。
@@ -844,7 +846,7 @@ export default function AutoRepliesPage() {
                       </div>
                     </td>
                     <td
-                      className="px-3 py-3 whitespace-nowrap"
+                      className="cq-hide-below-880 px-3 py-3 whitespace-nowrap"
                       title={`今月 ${r.hits?.period ?? '—'}回 ／ 累計 ${r.hits?.total ?? '—'}回`}
                     >
                       {/* **数えられていないものを 0 と書かない。** 0 は「当たらなかった」の意味。 */}

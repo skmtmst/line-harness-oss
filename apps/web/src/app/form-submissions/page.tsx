@@ -626,15 +626,16 @@ export default function FormSubmissionsPage() {
               最小幅は1440pxの実幅（約835px）より小さい800pxにし、名前の列を伸び縮みさせる。操作の列は2つのボタンが収まる固定幅。
               狭い画面だけ表の中で横に流れる。回答数は「回答を見る」の入口を兼ねる。
             */}
-            <div className="overflow-x-auto">
-            <table className="w-full min-w-[800px] table-fixed text-sm">
+            {/* @container: 谷間帯の列削減。表の幅が足りない間だけ「更新」を畳む。 */}
+            <div className="overflow-x-auto @container">
+            <table className="w-full min-w-[720px] table-fixed text-sm @[800px]:min-w-[800px]">
               <thead>
                 <TableHeadRow>
                   <Th>フォーム</Th>
                   <Th className="w-20">状態</Th>
                   <Th className="w-32">回答の保存先</Th>
                   <Th className="w-24" align="right">回答数</Th>
-                  <Th className="w-20">更新</Th>
+                  <Th className="cq-hide-below-800 w-20">更新</Th>
                   {/* #768: 表が横に流れる帯でも操作列は右端に留める。 */}
                   <Th className="bg-surface-pearl sticky right-0 w-32" align="right">操作</Th>
                 </TableHeadRow>
@@ -698,7 +699,7 @@ export default function FormSubmissionsPage() {
                     )}
                     {form.weeklySubmitCount ? <span className="block text-ink-faint">今週 {form.weeklySubmitCount.toLocaleString('ja-JP')}件</span> : null}
                   </td>
-                  <td className="px-3 py-2.5 text-xs tabular-nums" title={form.updatedAt ? undefined : '更新日時を取得できません'}>{displayUpdatedAt(form.updatedAt)}</td>
+                  <td className="cq-hide-below-800 px-3 py-2.5 text-xs tabular-nums" title={form.updatedAt ? undefined : '更新日時を取得できません'}>{displayUpdatedAt(form.updatedAt)}</td>
                   <td className="bg-canvas sticky right-0 px-3 py-2.5 text-right text-xs">
                     {/*
                      * 管理者確認モードは読み取り専用(#724)。編集・削除・回答の口は
