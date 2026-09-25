@@ -79,7 +79,7 @@ export default function MembersTab({
       </KpiCollapse>
 
       <div data-design="Note" data-design-node="G9TVE">
-        <NoteBar tone="info">
+        <NoteBar tone="info" help="ランクは通年の購入額で決まり、翌年の12月末まで維持されます" helpLabel="ランクの決まり">
           ランクは通年（1〜12月の購入額）で決まり、翌年の12月末まで維持されます。ランクが変わると友だち属性のタグが自動で付け替わります。
         </NoteBar>
       </div>

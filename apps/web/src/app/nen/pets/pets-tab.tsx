@@ -85,7 +85,7 @@ export default function PetsTab({
       </KpiCollapse>
 
       <div data-design="Note" data-design-node="pets-note">
-        <NoteBar tone="info">
+        <NoteBar tone="info" help="体重・年齢・避妊去勢・運動量から公的な指針の式で計算します" helpLabel="今日の目安の計算">
           「今日の目安」は 体重・年齢・避妊去勢・運動量 から公的な指針（NRC／FEDIAF）の式で計算し、「主食のカロリー」タブの kcal でグラムにします。「鹿肉」は然の商品（おやつ）の1日の目安です。ペットはお客様のマイページからも登録・変更できます。
         </NoteBar>
       </div>

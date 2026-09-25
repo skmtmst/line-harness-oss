@@ -126,7 +126,7 @@ export default function LifetimeTab({
       </KpiCollapse>
 
       <div data-design="Note" data-design-node="oLPs8">
-        <NoteBar tone="info">
+        <NoteBar tone="info" help="ライフタイムはこれまでの購入額の累計で、減りません" helpLabel="ライフタイムの意味">
           ライフタイムはこれまでの購入額の累計です。減らず、年が変わっても戻りません。節目ごとの特典は、決まってからここで設定できます。
         </NoteBar>
       </div>
