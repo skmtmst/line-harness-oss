@@ -308,7 +308,7 @@ export default function DuplicatesPage() {
                 背景・罫線を部品側で持つ）。セルの外付け余白で高さを
                 作らない。ページ内のほかの表と同じ見出し規則にそろえる。
               */}
-              <thead><TableHeadRow><Th>候補</Th><Th>確信度</Th><Th>一致した根拠</Th><Th>所属アカウント</Th><Th>最終更新</Th><Th>状態</Th><Th>操作</Th></TableHeadRow></thead>
+              <thead><TableHeadRow>{/* 操作は右へ寄せ、右端の余白を左端とそろえる。 */}<Th>候補</Th><Th>確信度</Th><Th>一致した根拠</Th><Th>所属アカウント</Th><Th>最終更新</Th><Th>状態</Th><Th align="right">操作</Th></TableHeadRow></thead>
               <tbody className="divide-y divide-hairline">
                 {candidateError ? (
                   <TableStateRow
@@ -329,7 +329,7 @@ export default function DuplicatesPage() {
                     <td className="truncate px-3 py-3 text-ink-secondary">{[candidate.left.lineAccountName, candidate.right.lineAccountName].filter(Boolean).join(' / ') || '—'}</td>
                     <td className="px-3 py-3 text-ink-secondary">{new Date(candidate.reviewedAt ?? candidate.detectedAt).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</td>
                     <td className="px-3 py-3 font-semibold text-ink">{candidate.status === 'pending' ? '未確認' : candidate.status === 'linked' ? '確認済み' : candidate.status === 'deferred' ? '保留' : '別人'}</td>
-                    <td className="whitespace-nowrap px-3 py-2"><Button href={`/friends/identity-candidates?id=${encodeURIComponent(candidate.id)}`}>重複候補を確認</Button></td>
+                    <td className="whitespace-nowrap px-3 py-2 text-right"><Button href={`/friends/identity-candidates?id=${encodeURIComponent(candidate.id)}`}>重複候補を確認</Button></td>
                   </tr>
                 )) : <TableStateRow colSpan={7} kind="empty" title="条件に合う重複候補はありません" />}
               </tbody>
@@ -386,10 +386,11 @@ export default function DuplicatesPage() {
                 <table className="w-full table-fixed text-sm">
                   <thead>
                     <TableHeadRow>
-                      <Th>アカウント</Th>
+                      {/* 表の外側の余白は左右で同じにする（本文の px-4 に合わせる）。 */}
+                      <Th className="pl-4">アカウント</Th>
                       <Th align="right">友だち数</Th>
                       <Th align="right">うち重複</Th>
-                      <Th align="right">重複率</Th>
+                      <Th align="right" className="pr-4">重複率</Th>
                     </TableHeadRow>
                   </thead>
                   <tbody className="divide-y divide-[#EAEBED] bg-white text-[#565F59]">
@@ -423,13 +424,14 @@ export default function DuplicatesPage() {
                 <table className="w-full table-fixed text-sm">
                   <thead>
                     <TableHeadRow>
-                      <Th>行 \ 列</Th>
+                      {/* 表の外側の余白は左右で同じにする（本文の px-2 に合わせる）。 */}
+                      <Th className="pl-2">行 \ 列</Th>
                       {data.perAccount.map((col) => (
                         <Th
                           key={col.accountId}
                           title={col.accountName}
                           align="right"
-                          className="truncate"
+                          className="truncate pr-2"
                         >
                           {col.accountName}
                         </Th>
@@ -447,7 +449,7 @@ export default function DuplicatesPage() {
                             return (
                               <td
                                 key={col.accountId}
-                                className="px-4 py-4 text-right text-[#B8BCC2]"
+                                className="px-2 py-4 text-right text-[#B8BCC2]"
                               >
                                 —
                               </td>

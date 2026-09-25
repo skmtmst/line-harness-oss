@@ -111,7 +111,8 @@ export default function OpsAuditPage() {
               <Th className="w-60">契約先</Th>
               <Th className="w-60">操作</Th>
               <Th>理由</Th>
-              <Th className="w-36">IP</Th>
+              {/* IP は短い符号なので右へ寄せ、右端の余白を左端とそろえる。 */}
+              <Th className="w-36" align="right">IP</Th>
             </TableHeadRow>
           </thead>
           <tbody>
@@ -122,7 +123,7 @@ export default function OpsAuditPage() {
                 <Td><span className="block truncate text-caption text-ink" title={row.tenant_name ?? ''}>{row.tenant_name ?? '—'}</span></Td>
                 <Td>{auditActionChip(row.action)}</Td>
                 <Td><span className="block truncate text-caption text-ink-secondary" title={row.reason ?? ''}>{row.reason ?? '—'}</span></Td>
-                <Td><span className="text-caption text-ink-faint">{row.ip ?? '—'}</span></Td>
+                <Td align="right"><span className="text-caption text-ink-faint">{row.ip ?? '—'}</span></Td>
               </Tr>
             ))}
           </tbody>

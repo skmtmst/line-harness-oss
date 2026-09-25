@@ -55,13 +55,17 @@ export default function UsersTable({
         </colgroup>
         <thead className="border-b border-hairline bg-canvas-sunken text-left text-micro font-semibold text-ink-secondary">
           <TableHeadRow>
-            <Th>統合ユーザー</Th>
+            {/*
+              表の外側の余白は左右で同じにする（左端 pl-5・右端 pr-5）。
+              操作列の右だけ狭いとボタンが枠にくっついて見える。
+            */}
+            <Th className="pl-5">統合ユーザー</Th>
             <Th>連絡先</Th>
             <Th>紐付くアカウント</Th>
             <Th>UID</Th>
             <Th>最終接触</Th>
             <Th>重複配信</Th>
-            <Th align="right">操作</Th>
+            <Th align="right" className="pr-5">操作</Th>
           </TableHeadRow>
         </thead>
         <tbody>

@@ -701,12 +701,16 @@ export function AffiliatorsTab({ accountId }: { accountId: string | null }) {
           <table className="w-full min-w-[720px]">
             <thead>
               <TableHeadRow>
-                <Th>アフィリエイター</Th>
+                {/*
+                  表の外側の余白は左右で同じにする（左端 pl-5・右端 pr-5）。
+                  操作列は中身の幅で固定する。残りは数値の列で吸収する。
+                */}
+                <Th className="pl-5">アフィリエイター</Th>
                 <Th align="right">紹介リンク</Th>
                 <Th align="right">友だち追加</Th>
                 <Th align="right">成果</Th>
                 <Th align="right">報酬</Th>
-                <Th align="center">操作</Th>
+                <Th align="center" className="w-44 pr-5">操作</Th>
               </TableHeadRow>
             </thead>
             <tbody className="divide-hairline divide-y">
@@ -719,7 +723,7 @@ export function AffiliatorsTab({ accountId }: { accountId: string | null }) {
                       className={`cursor-pointer transition-colors ${isExpanded ? 'bg-canvas-sunken' : 'hover:bg-canvas-sunken'}`}
                       onClick={() => handleRowClick(row.id)}
                     >
-                      <td className="text-ink px-4 py-3 text-sm font-medium">
+                      <td className="text-ink py-3 pr-4 pl-5 text-sm font-medium">
                         <span className="block truncate" title={row.name}>{row.name}</span>
                         <span className="text-action mt-0.5 block font-mono text-xs">{row.code}</span>
                         {/* #670 16: 状態は名前の下の札で出す。操作セルに置くと操作と読める。 */}
@@ -738,7 +742,7 @@ export function AffiliatorsTab({ accountId }: { accountId: string | null }) {
                         {formatYen(row.rewardAmount)}
                       </td>
                       {/* 行の操作は枠つきボタン＋「…」へ集約。紹介を止めるは確認画面つき。 */}
-                      <td className="px-4 py-3 text-center" onClick={(event) => event.stopPropagation()}>
+                      <td className="py-3 pr-5 pl-4 text-center" onClick={(event) => event.stopPropagation()}>
                         <div className="flex flex-wrap items-center justify-center gap-2">
                           <AffiliateButton
                             aria-label={isExpanded ? `${row.name}の成果を閉じる` : `${row.name}の成果を見る`}

@@ -951,7 +951,8 @@ function InflowLinksPageInner({
             </colgroup>
             <thead>
               <TableHeadRow>
-                <Th>
+                {/* 先頭・末尾の見出しの余白を本文（px-2）にそろえる。 */}
+                <Th className="pl-2">
                   <Checkbox
                     aria-label="表示中の登録済み経路をすべて選ぶ"
                     checked={allShownSelected}
@@ -990,7 +991,7 @@ function InflowLinksPageInner({
                 <Th>
                   発行URL
                 </Th>
-                <Th align="right">編集</Th>
+                <Th align="right" className="pr-2">編集</Th>
               </TableHeadRow>
             </thead>
             <tbody className="divide-y divide-hairline">

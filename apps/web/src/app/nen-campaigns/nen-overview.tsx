@@ -557,8 +557,9 @@ function AutoPanel({
                 {/*
                   #707: 390pxで表を横スクロールしたとき、操作列だけ右端に
                   留める（PC幅では自然位置なので見た目は変わらない）。
+                  編集ボタン＋「…」が列からはみ出さない幅にする。
                 */}
-                <Th className="w-28 sticky right-0 bg-surface-pearl" align="right"><span className="sr-only">操作</span></Th>
+                <Th className="w-36 sticky right-0 bg-surface-pearl" align="right"><span className="sr-only">操作</span></Th>
               </TableHeadRow>
             </thead>
             <tbody>
@@ -858,8 +859,8 @@ function ColumnsPanel({
                       <Th className="w-20">公開日</Th>
                       <Th className="w-40">LINE配信</Th>
                       <Th className="w-16" align="right">閲覧</Th>
-                      {/* #707: 390px横スクロール時に操作列を右端へ留める */}
-                      <Th className="w-28 sticky right-0 bg-surface-pearl" align="right"><span className="sr-only">操作</span></Th>
+                      {/* #707: 390px横スクロール時に操作列を右端へ留める。「選ぶ」ボタンが列からはみ出さない幅にする。 */}
+                      <Th className="w-32 sticky right-0 bg-surface-pearl" align="right"><span className="sr-only">操作</span></Th>
                     </TableHeadRow>
                   </thead>
                   <tbody>
