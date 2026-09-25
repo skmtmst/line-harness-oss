@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useState, useEffect, useCallback } from 'react'
 import type { ReactNode } from 'react'
-import { api } from '@/lib/api'
+import { loadLineAccounts } from '@/lib/line-accounts-cache'
 
 const STORAGE_KEY = 'lh_selected_account'
 
@@ -56,6 +56,10 @@ interface AccountContextValue {
   selectedAccount: AccountWithStats | null
   setSelectedAccountId: (id: string) => void
   clearSelectedAccountId: () => void
+  /**
+   * 一覧を取り直す。取り直しボタンや保存・確認の直後に呼ぶので、
+   * 使い回しの答えは使わず必ず取り直す（古い一覧を見せない）。
+   */
   refreshAccounts: () => Promise<void>
   loading: boolean
   /**
@@ -98,7 +102,8 @@ export function AccountProvider({ children }: { children: ReactNode }) {
   const refreshAccounts = useCallback(async () => {
     setRefreshing(true)
     try {
-      const res = await api.lineAccounts.list(false)
+      // 取り直しの口なので、使い回しの答えは捨てて必ず取り直す。
+      const res = await loadLineAccounts({ reload: true })
       if (!res.success) {
         // 失敗時は手元の一覧を消さない。古い一覧でも「アカウントなし」の
         // 空画面より役に立つし、初回失敗ではもともと空なので差し支えない。
