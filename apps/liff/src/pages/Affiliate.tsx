@@ -1,5 +1,8 @@
 import liff from '@line/liff';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { LOAD_FAILED_MESSAGE, SUBMIT_FAILED_MESSAGE, logFailure } from '../lib/user-message.js';
+import LoadErrorView from '../components/LoadErrorView.js';
+import LoadingView from '../components/LoadingView.js';
 
 const BASE = import.meta.env.VITE_API_BASE ?? '';
 
@@ -551,7 +554,8 @@ function AddOfferLinkForm({
       setLabel('');
       setOpen(false);
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      logFailure('affiliate-add-link', e);
+      setError(SUBMIT_FAILED_MESSAGE);
     } finally {
       setBusy(false);
     }
@@ -629,7 +633,8 @@ function OfferCard({
       const link = await postEnrollOffer(offer.id);
       onEnrolled(link);
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      logFailure('affiliate-enroll', e);
+      setError(SUBMIT_FAILED_MESSAGE);
     } finally {
       setBusy(false);
       enrollCalledRef.current = false;
@@ -701,7 +706,8 @@ export default function Affiliate() {
         setState({ phase: 'not_registered' });
       }
     } catch (e) {
-      setState({ phase: 'error', message: e instanceof Error ? e.message : String(e) });
+      logFailure('affiliate-load', e);
+      setState({ phase: 'error', message: LOAD_FAILED_MESSAGE });
     }
   }, []);
 
@@ -718,7 +724,8 @@ export default function Affiliate() {
       const offers = await fetchOffers().catch(() => []);
       setState({ phase: 'registered', affiliate: data.affiliate, links: data.links, offers });
     } catch (e) {
-      setState({ phase: 'error', message: e instanceof Error ? e.message : String(e) });
+      logFailure('affiliate-register', e);
+      setState({ phase: 'error', message: LOAD_FAILED_MESSAGE });
     } finally {
       // Release on both success and failure: success repaints to the registered
       // view (button gone), failure repaints to the error view whose retry path
@@ -729,23 +736,11 @@ export default function Affiliate() {
   }
 
   if (state.phase === 'loading') {
-    return (
-      <div className="af-fade-in flex flex-col items-center justify-center py-20 text-gray-500">
-        <div className="af-spinner mb-3" />
-        <span className="text-sm">読み込み中...</span>
-      </div>
-    );
+    return <LoadingView />;
   }
 
   if (state.phase === 'error') {
-    return (
-      <div className="af-fade-in max-w-md mx-auto p-4">
-        <div className="bg-red-50 text-red-700 p-3 rounded-xl text-sm">{state.message}</div>
-        <button onClick={loadMe} className="mt-3 text-sm af-line-green-text font-semibold underline">
-          再読み込み
-        </button>
-      </div>
-    );
+    return <LoadErrorView message={state.message} onRetry={() => void loadMe()} />;
   }
 
   if (state.phase === 'not_registered') {

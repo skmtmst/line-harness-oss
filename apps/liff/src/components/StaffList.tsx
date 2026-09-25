@@ -1,5 +1,8 @@
 import { useEffect, useState } from 'react';
 import { api, type StaffItem } from '../lib/api.js';
+import { logFailure } from '../lib/user-message.js';
+import LoadErrorView from './LoadErrorView.js';
+import LoadingView from './LoadingView.js';
 
 export default function StaffList({
   menuId,
@@ -13,12 +16,22 @@ export default function StaffList({
   onBack: () => void;
 }) {
   const [list, setList] = useState<StaffItem[] | null>(null);
+  const [failed, setFailed] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
-    api.staffOf(menuId).then((r) => setList(r.staff));
-  }, [menuId]);
+    setFailed(false);
+    api
+      .staffOf(menuId)
+      .then((r) => setList(r.staff))
+      .catch((e) => {
+        logFailure('staff', e);
+        setFailed(true);
+      });
+  }, [menuId, reloadKey]);
 
-  if (!list) return <div className="text-gray-500">読み込み中...</div>;
+  if (failed) return <LoadErrorView onRetry={() => setReloadKey((k) => k + 1)} />;
+  if (!list) return <LoadingView />;
   if (list.length === 0) {
     return (
       <div className="space-y-3">
