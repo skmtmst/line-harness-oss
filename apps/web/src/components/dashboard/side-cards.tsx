@@ -106,10 +106,13 @@ export function MonthlyDeliveryCard({ delivery, freshness }: { delivery: Dashboa
 /**
  * 現在の対応状況（設計 `vUXKb` の右カラム）。
  *
- * 未対応と対応済みは `/api/dashboard/overview` の `inbox` から出る。
+ * 4つの状態は `/api/dashboard/overview` の `inbox` から出る。数え方は
+ * 受信箱の絞り込みと同じ定義・同じ範囲（`getInboxStatusCounts` が正本で、
+ * ダッシュボードと受信箱が同じ関数を通る）。MAIL の未対応が入らない・
+ * 対応中と保留が出ない、というずれを直した形。
  * 「メッセージ受信時の自動変更」は、選択中のLINEアカウントの
  * 対応マーク一覧を読み、1件でも自動変更があれば「有効」とする。
- * **「対応マーク」は自由分類のほう。**このカードが並べる未対応・対応済みは
+ * **「対応マーク」は自由分類のほう。**このカードが並べる4状態は
  * 固定4状態の「対応状況」で、別物（要件書 `v6-02-inbox-requirements-draft.md:77`）。
  * 一覧を取得できなかったときだけ `—`（未取得）にする。
  */
@@ -125,21 +128,34 @@ export function SupportMarkStatusCard({
 }) {
   return (
     /*
-      件数は選択中アカウントの受信箱のもの。行き先も同じ受信箱へ
-      絞って開く（IDEA-01）。
+      件数は受信箱の絞り込みと同じもの。各状態を押すと、その状態で
+      絞った受信箱を開く（IDEA-01）。単位は受信箱に合わせて「件」。
     */
-    <SideCard title="現在の対応状況" period="現在" action={{ label: '受信箱を見る →', href: '/chats' }} freshness={freshness}>
+    <SideCard
+      title="現在の対応状況"
+      helpTip="現在の件数。選択中のアカウントのLINE（友だち単位）と、すべてのMAIL（メール単位）の合計。受信箱の絞り込みと同じ数。"
+      action={{ label: '受信箱を見る →', href: '/chats' }}
+      freshness={freshness}
+    >
       <div className="flex flex-wrap items-baseline gap-x-6 gap-y-2">
         {[
-          { label: '未対応', value: inbox?.unanswered ?? null },
-          { label: '対応済み', value: inbox?.resolved ?? null },
+          { label: '未対応', value: inbox?.unanswered ?? null, href: '/chats?status=unread' },
+          { label: '対応中', value: inbox?.inProgress ?? null, href: '/chats?status=in_progress' },
+          // 段階配備中の旧Workerは保留を返さない。その間は「—」にし、0件と見せない。
+          { label: '保留', value: inbox?.onHold ?? null, href: '/chats?status=on_hold' },
+          { label: '対応済み', value: inbox?.resolved ?? null, href: '/chats?status=resolved' },
         ].map((row) => (
-          <p key={row.label} className={`${row.label === '未対応' && (row.value ?? 0) > 0 ? 'text-danger' : 'text-ink'} text-sm font-bold`}>
+          <Link
+            key={row.label}
+            href={row.href}
+            title={`${row.label}で絞った受信箱を開く`}
+            className={`${row.label === '未対応' && (row.value ?? 0) > 0 ? 'text-danger' : 'text-ink'} text-sm font-bold hover:underline`}
+          >
             {row.label}
             <span className="ml-1.5 tabular-nums">
-              {row.value === null ? '—' : `${row.value.toLocaleString('ja-JP')}人`}
+              {row.value === null ? '—' : `${row.value.toLocaleString('ja-JP')}件`}
             </span>
-          </p>
+          </Link>
         ))}
       </div>
       <p className="text-ink-secondary mt-3 text-xs">

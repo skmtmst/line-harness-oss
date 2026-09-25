@@ -1210,16 +1210,22 @@ function DashboardPageInner() {
     : data.metrics.activeFriends.value
   /*
    * 「対応が必要な受信」小カードの件数は、遷移先 `/chats?status=unread` と
-   * 同じ口で数える（IDEA-01）:
-   *   LINE … 選択中アカウントの未対応（overview.inbox.unanswered）
+   * 同じ口で数える（IDEA-01）。右の「現在の対応状況」と同じ
+   * `overview.inbox`（受信箱の正本 `getInboxStatusCounts`）から取るので、
+   * 2つのカードで数がずれない:
+   *   LINE … 選択中アカウントの未対応（overview.inbox.line.unanswered）
    *   MAIL … メールはアカウントを持たない。受信箱に同じ一覧で混ざる
-   *          未対応メール（support/inbox の emailUnread、権限のある範囲）
+   *          未対応メール（overview.inbox.email.unanswered）
+   * 段階配備中の旧Workerは内訳を返さない。その間は従来どおり LINE を概要、
+   * MAIL を受信箱カードの取得結果（support/inbox の emailUnread）から取る。
    * 片方でも取れていない間は合計を出さず「—」にする。取れたぶんだけを
    * 足すと実際より少ない件数を本物の数字に見せてしまう。
    */
   const inboxSectionOk = data !== null && sectionAvailable('inbox')
-  const lineUnread = inboxSectionOk ? data.inbox.unanswered : null
-  const mailUnread = inboxSummary?.emailUnread ?? null
+  const lineUnread = inboxSectionOk ? (data.inbox.line?.unanswered ?? data.inbox.unanswered) : null
+  const mailUnread = inboxSectionOk && data.inbox.email
+    ? data.inbox.email.unanswered
+    : (inboxSummary?.emailUnread ?? null)
   const pendingTotal = lineUnread === null || mailUnread === null ? null : lineUnread + mailUnread
   const pendingDetail = lineUnread === null && mailUnread === null
     ? (data !== null || inboxFailed || error ? STATE_TEXT.error : STATE_TEXT.loading)
