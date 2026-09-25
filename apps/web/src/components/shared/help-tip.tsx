@@ -99,7 +99,7 @@ export default function HelpTip({
         <span role="note" id={tipId} className={styles.tip}>
           {children}
           {moreHref ? (
-            <a href={moreHref} className={styles.more}>
+            <a href={moreHref}>
               {moreLabel}
             </a>
           ) : null}
