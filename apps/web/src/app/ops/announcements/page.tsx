@@ -235,13 +235,17 @@ export default function OpsAnnouncementsPage() {
             <DataTable>
               <thead>
                 <TableHeadRow>
-                  <Th className="w-80">件名</Th>
-                  <Th className="w-36">宛先</Th>
-                  <Th className="w-28">状態</Th>
-                  <Th className="w-40">配信日時</Th>
-                  <Th className="w-28">LINE送達</Th>
-                  <Th className="w-28">画面で既読</Th>
-                  <Th align="right">操作</Th>
+                  {/*
+                   * ★V7：1440pxで表の枠（652px）に収める。宛先は件名の下へ畳み、
+                   * 日時は日付と時刻の2段にし、操作列だけ固定幅にする。
+                   * 幅の指定は先頭行（Th）だけに書く（table-fixed では行側は効かない）。
+                   */}
+                  <Th>件名</Th>
+                  <Th className="w-20">状態</Th>
+                  <Th className="w-24">配信日時</Th>
+                  <Th className="w-20">LINE送達</Th>
+                  <Th className="w-24">画面で既読</Th>
+                  <Th align="right" className="w-40">操作</Th>
                 </TableHeadRow>
               </thead>
               <tbody>
@@ -249,13 +253,28 @@ export default function OpsAnnouncementsPage() {
                   <Tr key={a.id}>
                     <Td>
                       <span className="block truncate text-label font-bold text-ink" title={a.subject}>{a.subject}</span>
-                      <span className="block truncate text-micro text-ink-faint">{a.channelLabels.join('・')}{a.lastError ? `・${a.lastError}` : ''}</span>
+                      <span
+                        className="block truncate text-micro text-ink-faint"
+                        title={`${a.channelLabels.join('・')}・${a.audienceLabel}${a.lastError ? `・${a.lastError}` : ''}`}
+                      >
+                        {a.channelLabels.join('・')}・{a.audienceLabel}{a.lastError ? `・${a.lastError}` : ''}
+                      </span>
                     </Td>
-                    <Td><span className="text-caption text-ink-secondary">{a.audienceLabel}</span></Td>
                     <Td><Chip tone={STATUS_TONE[a.status]}>{a.statusLabel}</Chip></Td>
-                    <Td><span className="text-caption text-ink-secondary">{formatDateTime(a.sentAt ?? a.publishAt)}</span></Td>
-                    <Td><span className="text-caption text-ink">{a.channels.includes('line') && a.status === 'sent' ? `${a.lineSent} / ${a.recipientsTotal}` : '—'}</span></Td>
-                    <Td><span className="text-caption text-ink">{a.channels.includes('screen') && a.status === 'sent' ? `${a.screenRead} / ${a.screenTotal}` : '—'}</span></Td>
+                    <Td>
+                      {(() => {
+                        const label = formatDateTime(a.sentAt ?? a.publishAt)
+                        const [date, time] = label.split(' ')
+                        return (
+                          <span className="block whitespace-nowrap text-caption text-ink-secondary" title={label}>
+                            {date}
+                            {time ? <><br />{time}</> : null}
+                          </span>
+                        )
+                      })()}
+                    </Td>
+                    <Td><span className="whitespace-nowrap text-caption text-ink">{a.channels.includes('line') && a.status === 'sent' ? `${a.lineSent} / ${a.recipientsTotal}` : '—'}</span></Td>
+                    <Td><span className="whitespace-nowrap text-caption text-ink">{a.channels.includes('screen') && a.status === 'sent' ? `${a.screenRead} / ${a.screenTotal}` : '—'}</span></Td>
                     <Td align="right">
                       {a.status === 'draft' || a.status === 'scheduled' ? (
                         <span className="inline-flex gap-2">

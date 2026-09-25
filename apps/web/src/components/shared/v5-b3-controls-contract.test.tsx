@@ -81,8 +81,9 @@ describe('V5 B3 入力・検索・選択部品', () => {
     // 2026-09-25・使いやすさ点検 §8: 入力欄の輪郭は `2px・action 色・offset 2px`
     // にそろえた（緑は「正常」の意味）。`outline: revert`（ブラウザ既定）と
     // 同等以上に見える輪郭なので、ここでは両方を保証として認める。
-    // 複合部品（SearchField）は外枠の `:focus-within` が正本で、中の input の
-    // `outline: none` はその場合だけ許す（二重の輪郭を避けるため）。
+    // 複合部品のうち外枠の `:focus-within` を正本にするものは、中の input の
+    // `outline: none` をその場合だけ許す（二重の輪郭を避けるため）。
+    // SearchField は外枠ではなく中の input 自身に輪郭を出す（2026-09-25）。
     for (const name of ['form-controls.module.css', 'search-field.module.css', 'select.module.css']) {
       const css = withoutComments(read(name))
       expect(css, `${name} に生の色がある`).not.toMatch(/#[0-9a-fA-F]{3,8}\b/)

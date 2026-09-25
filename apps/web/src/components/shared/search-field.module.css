@@ -43,17 +43,15 @@
 }
 
 /*
- * 外側の枠に ring を出す（:focus-within）。中の input 自体は枠を持たないので、
- * 中に輪郭を出すと枠の内側に二重に見える。中の input の輪郭は消し、
- * 外枠の ring を正本にする（focus-visible-contract の例外として許可）。
+ * 輪郭はフォーカスされる要素自身（中の input）に出す。外枠の `:focus-within`
+ * ring では Tab 点検（`document.activeElement` の枠を見る）が反応せず、
+ * /hq/banners・/ops・/ops/support・/ops/tenants の検索欄が「枠が出ない」と
+ * 判定された（2026-09-25）。外枠と中の二重にならないよう外枠の ring は持たない。
+ * 色・太さ・余白は #804 と同じ（2px・action 色・offset 2px）。
  */
-.search:focus-within {
+.input:focus-visible {
   outline: 2px solid var(--color-action);
   outline-offset: 2px;
-}
-
-.input:focus-visible {
-  outline: none;
 }
 
 .clear:focus-visible {
