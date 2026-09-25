@@ -16,10 +16,11 @@ import './index.css';
       </StrictMode>,
     );
   } catch (err) {
+    console.error('[liff:init]', err);
     document.getElementById('root')!.innerHTML = `
-      <div style="padding: 2rem; font-family: sans-serif; color: #b91c1c;">
-        <h1 style="font-size: 1.25rem; margin-bottom: 1rem;">起動できませんでした</h1>
-        <p>${err instanceof Error ? err.message : String(err)}</p>
+      <div style="padding: 2rem; font-family: sans-serif; color: #4b5563; text-align: center;">
+        <h1 style="font-size: 1rem; margin-bottom: 0.5rem;">開けませんでした</h1>
+        <p style="font-size: 0.875rem;">時間をおいて、もう一度お試しください。</p>
       </div>
     `;
   }

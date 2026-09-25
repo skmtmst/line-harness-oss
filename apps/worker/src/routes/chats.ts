@@ -656,7 +656,7 @@ chats.get('/api/chats/quick-counts', requireRole('owner', 'admin', 'staff'), asy
 
       const countsRow = await c.env.DB.prepare(`
         WITH last_any AS MATERIALIZED (
-          SELECT friend_id, MAX(created_at) AS last_message_at
+          SELECT friend_id, MAX(COALESCE(line_event_at, created_at)) AS last_message_at
           FROM messages_log
           WHERE (delivery_type IS NULL OR delivery_type != 'test')
             AND ${accountFilterSql}
@@ -674,7 +674,7 @@ chats.get('/api/chats/quick-counts', requireRole('owner', 'admin', 'staff'), asy
           SUM(CASE WHEN COALESCE(c.status, 'resolved') = 'unread' THEN 1 ELSE 0 END) AS reply_count,
           SUM(CASE WHEN COALESCE(c.status, 'resolved') = 'unread'
                 AND julianday(COALESCE((
-                  SELECT MAX(latest.created_at) FROM messages_log latest
+                  SELECT MAX(COALESCE(latest.line_event_at, latest.created_at)) FROM messages_log latest
                   WHERE latest.friend_id = f.id
                     AND (latest.delivery_type IS NULL OR latest.delivery_type != 'test')
                 ), d.last_message_at)) <= julianday(?)
@@ -995,7 +995,7 @@ chats.get('/api/chats', requireRole('owner', 'admin', 'staff'), async (c) => {
     // materialize しない)。last_any は並び順決定専用のスリムな全走査 1 回のみ。
     const sql = `
       WITH last_any AS MATERIALIZED (
-        SELECT friend_id, MAX(created_at) AS last_message_at
+        SELECT friend_id, MAX(COALESCE(line_event_at, created_at)) AS last_message_at
         FROM messages_log
         WHERE (delivery_type IS NULL OR delivery_type != 'test')
           AND ${accountFilterSql}
@@ -1216,12 +1216,14 @@ chats.get('/api/chats/:id', requireVisibleChat, async (c) => {
                 CASE WHEN q.unsent_at IS NOT NULL THEN '' ELSE q.content END AS quoted_content,
                 CASE WHEN q.unsent_at IS NOT NULL THEN 1 ELSE 0 END AS quoted_is_unsent,
                 q.created_at AS quoted_created_at,
-                messages_log.created_at
+                messages_log.created_at,
+                messages_log.line_event_at,
+                COALESCE(messages_log.line_event_at, messages_log.created_at) AS sort_at
          FROM messages_log
          LEFT JOIN messages_log q ON q.id = messages_log.quoted_message_id
          WHERE messages_log.friend_id = ? AND (messages_log.delivery_type IS NULL OR messages_log.delivery_type != 'test')
-         ${useMessageCursor ? 'AND (messages_log.created_at < ? OR (messages_log.created_at = ? AND messages_log.id < ?))' : ''}
-         ORDER BY messages_log.created_at DESC, messages_log.id DESC LIMIT ?`,
+         ${useMessageCursor ? 'AND (COALESCE(messages_log.line_event_at, messages_log.created_at) < ? OR (COALESCE(messages_log.line_event_at, messages_log.created_at) = ? AND messages_log.id < ?))' : ''}
+         ORDER BY sort_at DESC, messages_log.id DESC LIMIT ?`,
       )
       .bind(...messageBindings)
       .all();
@@ -1270,6 +1272,7 @@ chats.get('/api/chats/:id', requireVisibleChat, async (c) => {
               }
             : null,
           createdAt: m.created_at,
+          eventAt: (m.line_event_at as string | null) ?? null,
         })),
       },
     });

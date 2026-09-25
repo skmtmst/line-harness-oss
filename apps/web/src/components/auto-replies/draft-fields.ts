@@ -96,6 +96,14 @@ export interface InlineAction {
   key: string
   actionType: ScenarioActionType
   config: unknown
+  /** 失敗したら止めるか続けるか。無指定は続ける（いまの動き）。 */
+  onFailure: 'stop' | 'continue'
+}
+
+function readOnFailure(raw: unknown): 'stop' | 'continue' {
+  if (!raw || typeof raw !== 'object') return 'continue'
+  const value = (raw as Record<string, unknown>).onFailure ?? (raw as Record<string, unknown>).on_failure
+  return value === 'stop' ? 'stop' : 'continue'
 }
 
 let actionKeySeq = 0
@@ -120,10 +128,10 @@ export function readInlineActions(stored: unknown[] | null | undefined): InlineA
         config = {}
       }
     }
-    return [{ key: newActionKey(), actionType: actionType as ScenarioActionType, config }]
+    return [{ key: newActionKey(), actionType: actionType as ScenarioActionType, config, onFailure: readOnFailure(r) }]
   })
 }
 
 export function toActionPayload(action: InlineAction): Record<string, unknown> {
-  return { actionType: action.actionType, config: action.config ?? {} }
+  return { actionType: action.actionType, config: action.config ?? {}, onFailure: action.onFailure }
 }

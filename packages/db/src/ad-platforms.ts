@@ -1,11 +1,158 @@
 import { boundedListLimit, jstNow, toJstString } from './utils.js';
+import { decryptCredential, encryptCredential } from './credential-crypto.js';
+
+/**
+ * 秘密として扱う設定キー。送信時に媒体へ渡す資格情報。
+ * 平文の config JSON には入れず、暗号化して config_encrypted へ移す。
+ */
+export const AD_PLATFORM_SECRET_KEYS: ReadonlySet<string> = new Set([
+  'access_token',
+  'test_event_code',
+  'api_key',
+  'api_secret',
+  'x_oauth_token',
+  'x_oauth_token_secret',
+  'oauth_token',
+  'developer_token',
+]);
+
+/** 媒体ごとに受け付ける設定キー（S3: ブラウザから任意のJSONを保存させない）。 */
+const AD_PLATFORM_COMMON_KEYS: readonly string[] = [
+  'click_id_validity_days',
+  'currency',
+  'monthly_cost',
+  'synced_at',
+  'sent_count',
+  'pending_count',
+  'failed_count',
+  'retry_success_count',
+  'connection_error',
+];
+
+export const AD_PLATFORM_CONFIG_KEYS: Record<string, ReadonlySet<string>> = {
+  meta: new Set(['pixel_id', 'access_token', 'test_event_code', ...AD_PLATFORM_COMMON_KEYS]),
+  x: new Set([
+    'api_key', 'api_secret', 'x_oauth_token', 'x_oauth_token_secret',
+    'pixel_id', 'conversion_id', ...AD_PLATFORM_COMMON_KEYS,
+  ]),
+  google: new Set([
+    'customer_id', 'conversion_action_id', 'oauth_token', 'developer_token',
+    ...AD_PLATFORM_COMMON_KEYS,
+  ]),
+  tiktok: new Set(['pixel_code', 'access_token', ...AD_PLATFORM_COMMON_KEYS]),
+};
+
+/**
+ * 設定の形を見る。変なときは理由を返す（問題なければ null）。
+ * 決められていないキーは受け付けない。
+ */
+export function validateAdPlatformConfig(name: string, config: unknown): string | null {
+  const allowed = AD_PLATFORM_CONFIG_KEYS[name];
+  if (!allowed) return `name must be one of: ${Object.keys(AD_PLATFORM_CONFIG_KEYS).join(', ')}`;
+  if (!config || typeof config !== 'object' || Array.isArray(config)) {
+    return 'config must be an object';
+  }
+  for (const [key, value] of Object.entries(config)) {
+    if (!allowed.has(key)) return `config key "${key}" is not allowed for ${name}`;
+    if (value !== null && !['string', 'number', 'boolean'].includes(typeof value)) {
+      return `config key "${key}" must be a string, number, boolean, or null`;
+    }
+  }
+  return null;
+}
+
+/** 設定を平文の値と秘密に分ける。 */
+export function splitAdPlatformSecrets(config: Record<string, unknown>): {
+  publicConfig: Record<string, unknown>;
+  secrets: Record<string, unknown>;
+} {
+  const publicConfig: Record<string, unknown> = {};
+  const secrets: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(config)) {
+    if (AD_PLATFORM_SECRET_KEYS.has(key) && typeof value === 'string' && value.length > 0) {
+      secrets[key] = value;
+    } else {
+      publicConfig[key] = value;
+    }
+  }
+  return { publicConfig, secrets };
+}
+
+/** 秘密だけのJSONを暗号化する。秘密が無ければ null（列を空のままにする）。 */
+export async function encryptAdPlatformSecrets(
+  secrets: Record<string, unknown>,
+  encryptionKey: string | undefined,
+): Promise<string | null> {
+  if (Object.keys(secrets).length === 0) return null;
+  return encryptCredential(JSON.stringify(secrets), encryptionKey);
+}
+
+/**
+ * 秘密ではない値を読む。鍵は要らない。壊れたJSONのときは null。
+ * 計測の有効日数など、送る前の判定に使う。
+ */
+export function readPublicAdPlatformConfig(
+  platform: Pick<AdPlatform, 'config'>,
+): AdPlatformConfig | null {
+  try {
+    return JSON.parse(platform.config) as AdPlatformConfig;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * 送信に使う設定を組み立てる。秘密は復号して平文の値へ重ねる。
+ * 旧行（秘密が config に残る平文）はそのまま読む。復号できないときは null。
+ */
+export async function resolveAdPlatformConfig(
+  platform: Pick<AdPlatform, 'config' | 'config_encrypted'>,
+  encryptionKey?: string,
+): Promise<AdPlatformConfig | null> {
+  let publicConfig: AdPlatformConfig;
+  try {
+    publicConfig = JSON.parse(platform.config) as AdPlatformConfig;
+  } catch {
+    return null;
+  }
+  if (!platform.config_encrypted) return publicConfig;
+  try {
+    const secrets = JSON.parse(await decryptCredential(platform.config_encrypted, encryptionKey));
+    return { ...publicConfig, ...secrets };
+  } catch {
+    return null;
+  }
+}
+
+/** 疎通確認が通った記録を残す。 */
+export async function markAdPlatformVerified(db: D1Database, id: string): Promise<void> {
+  await db.prepare(
+    `UPDATE ad_platforms SET verified_at = ?, updated_at = ? WHERE id = ?`,
+  ).bind(jstNow(), jstNow(), id).run();
+}
+
+/** 疎通確認の対象。is_active が立っていなくても取り出す。 */
+export async function getAdPlatformForVerify(
+  db: D1Database,
+  name: string,
+  lineAccountId: string,
+): Promise<AdPlatform | null> {
+  return db.prepare(
+    `SELECT * FROM ad_platforms WHERE name = ? AND line_account_id = ?`,
+  ).bind(name, lineAccountId).first<AdPlatform>();
+}
 
 export interface AdPlatform {
   id: string;
   name: string;
   display_name: string | null;
+  /** 秘密以外の値のJSON。秘密は config_encrypted へ移す。旧行は全部入り(互換読み)。 */
   config: string;
+  /** AES-GCM で暗号化した秘密だけのJSON。無い行は config をそのまま読む。 */
+  config_encrypted: string | null;
   is_active: number;
+  /** 外部への疎通確認が通った日時。空のまま有効化はできない。 */
+  verified_at: string | null;
   /** 所有するLINEアカウント。NULLは帰属不明の旧行(送信対象にしない)。 */
   line_account_id: string | null;
   created_at: string;
@@ -113,7 +260,10 @@ export async function getAdPlatformById(
 
 export async function createAdPlatform(
   db: D1Database,
-  input: { name: string; displayName?: string | null; config: Record<string, unknown>; lineAccountId?: string | null },
+  input: {
+    name: string; displayName?: string | null; config: Record<string, unknown>;
+    configEncrypted?: string | null; isActive?: boolean; lineAccountId?: string | null;
+  },
 ): Promise<AdPlatform> {
   // 帰属のない設定は送信対象にならない。DBトリガと二重で必須化する。
   if (!input.lineAccountId) {
@@ -124,10 +274,13 @@ export async function createAdPlatform(
 
   await db
     .prepare(
-      `INSERT INTO ad_platforms (id, name, display_name, config, is_active, line_account_id, created_at, updated_at)
-       VALUES (?, ?, ?, ?, 1, ?, ?, ?)`,
+      `INSERT INTO ad_platforms (id, name, display_name, config, config_encrypted, is_active, line_account_id, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
-    .bind(id, input.name, input.displayName ?? null, JSON.stringify(input.config), input.lineAccountId, now, now)
+    .bind(
+      id, input.name, input.displayName ?? null, JSON.stringify(input.config),
+      input.configEncrypted ?? null, input.isActive === true ? 1 : 0, input.lineAccountId, now, now,
+    )
     .run();
 
   return (await db
@@ -188,7 +341,8 @@ export function adPlatformAccountCondition(
 }
 
 function updateFieldClauses(input: {
-  name?: string; displayName?: string | null; config?: Record<string, unknown>; isActive?: boolean; lineAccountId?: string | null;
+  name?: string; displayName?: string | null; config?: Record<string, unknown>;
+  configEncrypted?: string | null; isActive?: boolean; lineAccountId?: string | null;
 }): { fields: string[]; values: unknown[] } {
   if (input.lineAccountId !== undefined && !input.lineAccountId) {
     throw new AdPlatformAccountMismatchError('ad_platforms の lineAccountId を空にはできません');
@@ -198,6 +352,7 @@ function updateFieldClauses(input: {
   if (input.name !== undefined) { fields.push('name = ?'); values.push(input.name); }
   if (input.displayName !== undefined) { fields.push('display_name = ?'); values.push(input.displayName); }
   if (input.config !== undefined) { fields.push('config = ?'); values.push(JSON.stringify(input.config)); }
+  if (input.configEncrypted !== undefined) { fields.push('config_encrypted = ?'); values.push(input.configEncrypted); }
   if (input.isActive !== undefined) { fields.push('is_active = ?'); values.push(input.isActive ? 1 : 0); }
   if (input.lineAccountId !== undefined) { fields.push('line_account_id = ?'); values.push(input.lineAccountId); }
   return { fields, values };
@@ -211,7 +366,10 @@ export async function updateAdPlatformCAS(
   db: D1Database,
   id: string,
   scope: AdPlatformWriteScope,
-  input: { name?: string; displayName?: string | null; config?: Record<string, unknown>; isActive?: boolean; lineAccountId?: string | null },
+  input: {
+    name?: string; displayName?: string | null; config?: Record<string, unknown>;
+    configEncrypted?: string | null; isActive?: boolean; lineAccountId?: string | null;
+  },
 ): Promise<{ applied: boolean; platform: AdPlatform | null }> {
   const { fields, values } = updateFieldClauses(input);
   const cond = adPlatformAccountCondition('line_account_id', scope);

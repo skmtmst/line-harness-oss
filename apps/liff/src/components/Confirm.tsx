@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { api, type MenuItem, type StaffItem } from '../lib/api.js';
 import { jstStartsAtIso } from '../lib/datetime.js';
+import { logFailure } from '../lib/user-message.js';
 
 export default function Confirm({
   menu,
@@ -35,6 +36,7 @@ export default function Confirm({
       );
       onSubmitted();
     } catch (e) {
+      logFailure('create-request', e);
       const err = e as { status?: number; body?: { error?: string } };
       if (err.status === 409 && err.body?.error === 'slot_conflict') {
         setError('この時間枠は他の方の予約と重なりました。日時を選び直してください。');

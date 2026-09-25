@@ -20,6 +20,8 @@ export type LiffPreviewStatus = 'loading' | 'ready' | 'error'
  * 「日時を選んでください」の見出しの下に、空きのある日が縦に並び、
  * 各日の下に時刻ボタンが4列で並ぶ。カレンダー・○×休・凡例・内訳は
  * 実際の画面に無いので出さない。
+ * 読み込み中・失敗の見せ方も実LIFFの共通部品（`LoadingView`・
+ * `LoadErrorView`・`apps/liff/src/lib/user-message.ts` の文言）と同じにする。
  *
  * お客様はメニュー→担当→日時の順に進むため、ここでは先頭の有効メニューの
  * `by_staff[0]`（担当一覧の先頭と同じ並び）の空き枠をそのまま表示し、
@@ -61,9 +63,17 @@ export default function LiffDateTimePreview({
           <h3 className="text-ink text-lg font-bold">日時を選んでください</h3>
           <p className="text-ink-faint text-xs">確認画面で要望を入力してください</p>
           {status === 'loading' ? (
-            <p className="text-ink-faint text-sm">空き枠を取得中...</p>
+            <p className="text-ink-faint text-sm" role="status">読み込み中...</p>
           ) : status === 'error' ? (
-            <p className="text-danger text-sm" role="alert">空き状況だけ読み込めませんでした。</p>
+            <div className="mx-auto max-w-md p-8 text-center">
+              <p className="text-ink-secondary text-sm leading-6">読み込めませんでした。時間をおいて、もう一度お試しください。</p>
+              {/* 実LIFFの LoadErrorView と同じ「もう一度読み込む」ボタンの見え方。
+                  「← 戻る」と同じく、押せない見本なのでボタン要素ではなく
+                  見た目だけ再現する（直書きボタンの負債も増やさない）。 */}
+              <p className="border-hairline text-ink mt-4 w-full rounded-lg py-3 text-center text-sm font-semibold">
+                もう一度読み込む
+              </p>
+            </div>
           ) : dates.length === 0 ? (
             <p className="text-ink-faint mt-4 text-sm">この期間に空きはありません。</p>
           ) : (

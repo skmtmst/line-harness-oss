@@ -700,6 +700,8 @@ export interface ChatDetailMessage {
     createdAt: string | null
   } | null
   createdAt: string
+  /** LINEイベントの起こった時刻。無いときは保存時刻(createdAt)と同じ扱い。 */
+  eventAt?: string | null
 }
 
 /** `GET /api/chats/:id/scheduled` が返す送信予約1件。 */

@@ -324,16 +324,61 @@ describe('dashboard organization account policy', () => {
     );
   });
 
-  test('rejects unknown cards instead of persisting arbitrary JSON', async () => {
+  test('keeps unknown cards as hidden instead of rejecting the whole save', async () => {
+    /*
+     * 機能OFF・廃止で候補から外れたIDが残っていても、編集保存全体を
+     * 400にしない。未知IDは visible=false で保持し、表示には使わない。
+     */
+    dbMocks.saveDashboardPreference.mockResolvedValue({
+      status: 'saved',
+      row: { version: 3, updated_at: '2026-08-26T10:00:00+09:00' },
+    });
     const response = await app().request('/api/dashboard/preferences?account_id=account-1', {
       method: 'PUT',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
-        version: 0,
-        cards: { today: [{ id: 'unknown', visible: true }], main: [], right: [] },
+        version: 2,
+        cards: {
+          today: [{ id: 'today-inbox', visible: true }],
+          main: [{ id: 'retired-card', visible: true }],
+          right: [],
+        },
       }),
     }, env());
-    expect(response.status).toBe(400);
+    expect(response.status).toBe(200);
+    expect(dbMocks.saveDashboardPreference).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        cards: {
+          today: [{ id: 'today-inbox', visible: true }],
+          main: [{ id: 'retired-card', visible: false }],
+          right: [],
+        },
+      }),
+    );
+  });
+
+  test('rejects malformed cards instead of persisting arbitrary JSON', async () => {
+    const badBodies = [
+      { today: [{ id: 1, visible: true }], main: [], right: [] },
+      { today: [{ id: 'today-inbox', visible: 'yes' }], main: [], right: [] },
+      {
+        today: [
+          { id: 'today-inbox', visible: true },
+          { id: 'today-inbox', visible: false },
+        ],
+        main: [],
+        right: [],
+      },
+    ];
+    for (const cards of badBodies) {
+      const response = await app().request('/api/dashboard/preferences?account_id=account-1', {
+        method: 'PUT',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ version: 0, cards }),
+      }, env());
+      expect(response.status).toBe(400);
+    }
     expect(dbMocks.saveDashboardPreference).not.toHaveBeenCalled();
   });
 

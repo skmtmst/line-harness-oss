@@ -125,6 +125,11 @@ export async function fireEvent(
   lineAccessToken?: string,
   lineAccountId?: string | null,
   execution?: IncomingWebhookExecution,
+  /**
+   * 広告連携の秘密の復号鍵。無いときは暗号化された行の即時送信を見送り、
+   * 待ち行列に残して定期 drain に任せる（旧行の平文はそのまま送る）。
+   */
+  credentialKey?: string,
 ): Promise<void> {
   db = execution?.db ?? db;
   let outgoingWebhookLineAccountId = lineAccountId;
@@ -154,6 +159,7 @@ export async function fireEvent(
         // 通貨・単位が分かるときだけ渡す。無いときは円・主単位扱い。
         currency: adConversion.currency,
         amountInMinorUnit: adConversion.amountInMinorUnit,
+        credentialKey,
       }),
     );
   }

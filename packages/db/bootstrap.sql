@@ -185,7 +185,7 @@ CREATE TABLE ad_platforms (
   is_active    INTEGER DEFAULT 1,
   created_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
-, line_account_id TEXT REFERENCES line_accounts(id) ON DELETE CASCADE);
+, line_account_id TEXT REFERENCES line_accounts(id) ON DELETE CASCADE, config_encrypted TEXT, verified_at TEXT);
 
 CREATE TABLE admin_sessions (
   token_hash TEXT PRIMARY KEY,
@@ -1374,6 +1374,22 @@ CREATE TABLE "bookings" (
   FOREIGN KEY (created_by_staff_id) REFERENCES staff(id),
   FOREIGN KEY (updated_by_staff_id) REFERENCES staff(id),
   CHECK (friend_id IS NOT NULL OR booking_customer_id IS NOT NULL)
+);
+
+CREATE TABLE broadcast_after_action_runs (
+  id                       TEXT PRIMARY KEY,
+  broadcast_id             TEXT NOT NULL REFERENCES broadcasts (id) ON DELETE CASCADE,
+  friend_id                TEXT NOT NULL REFERENCES friends (id) ON DELETE CASCADE,
+  common_action_version_id TEXT NOT NULL,
+  action_id                TEXT NOT NULL,
+  status                   TEXT NOT NULL DEFAULT 'pending'
+                             CHECK (status IN ('pending', 'running', 'done', 'failed')),
+  attempt_count            INTEGER NOT NULL DEFAULT 0 CHECK (attempt_count >= 0),
+  max_attempts             INTEGER NOT NULL DEFAULT 5 CHECK (max_attempts >= 1),
+  error_code               TEXT,
+  created_at               TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  updated_at               TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  UNIQUE (broadcast_id, friend_id, action_id)
 );
 
 CREATE TABLE broadcast_insights (
@@ -3533,6 +3549,7 @@ CREATE TABLE messages_log (
   source           TEXT,
   line_account_id  TEXT,
   sent_by_staff_id TEXT,
+  line_event_at    TEXT,
   created_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 , origin_kind TEXT, origin_id TEXT, scenario_version_step_id TEXT, line_message_id TEXT, line_message_account_key TEXT, unsent_at TEXT, quote_token TEXT, quoted_message_id TEXT);
 
@@ -6865,6 +6882,9 @@ CREATE INDEX idx_bookings_v298_friend_starts
 CREATE INDEX idx_bookings_v298_staff_overlap
   ON bookings(staff_id, status, starts_at, block_ends_at);
 
+CREATE INDEX idx_broadcast_after_action_runs_due
+  ON broadcast_after_action_runs (status, updated_at);
+
 CREATE INDEX idx_broadcast_insights_broadcast_id ON broadcast_insights(broadcast_id);
 
 CREATE INDEX idx_broadcast_insights_status ON broadcast_insights(status);
@@ -7499,6 +7519,8 @@ CREATE INDEX idx_messages_log_friend_direction_source_created
 CREATE INDEX idx_messages_log_friend_id ON messages_log (friend_id);
 
 CREATE INDEX idx_messages_log_friend_source ON messages_log (friend_id, source);
+
+CREATE INDEX idx_messages_log_line_event_at ON messages_log (line_event_at);
 
 CREATE UNIQUE INDEX idx_messages_log_line_message_scope
   ON messages_log (line_message_account_key, line_message_id)

@@ -1,12 +1,20 @@
 import { Hono } from 'hono';
 import {
+  AD_PLATFORM_SECRET_KEYS,
   getAdPlatforms,
   getAdPlatformById,
+  getAdPlatformForVerify,
   createAdPlatform,
   updateAdPlatformCAS,
   deleteAdPlatformCAS,
   getAdConversionLogs,
-  getAdPlatformByName,
+  markAdPlatformVerified,
+  resolveAdPlatformConfig,
+  splitAdPlatformSecrets,
+  encryptAdPlatformSecrets,
+  validateAdPlatformConfig,
+  decryptCredential,
+  type AdPlatform,
   type AdPlatformWriteScope,
 } from '@line-crm/db';
 import type { AdConversionLog } from '@line-crm/db';
@@ -16,17 +24,54 @@ import { requireRole } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 import { listLimit, listPage } from './list-pagination.js';
 
-function serializePlatform(p: { id: string; name: string; display_name: string | null; config: string; is_active: number; line_account_id: string | null; created_at: string; updated_at: string }) {
+/**
+ * 画面へ返す形。秘密の値は出さず、設定済みの鍵名だけ出す。
+ * つながっている表示は、疎通確認が済んだ行だけにする。
+ */
+async function serializePlatform(p: AdPlatform, encryptionKey: string | undefined) {
+  const { values, secretKeys } = await readDisplayConfig(p, encryptionKey);
   return {
     id: p.id,
     name: p.name,
     displayName: p.display_name,
-    config: maskConfig(JSON.parse(p.config)),
-    isActive: !!p.is_active,
+    config: values,
+    secretKeys,
+    isActive: p.is_active === 1 && p.verified_at != null,
+    verifiedAt: p.verified_at,
     lineAccountId: p.line_account_id,
     createdAt: p.created_at,
     updatedAt: p.updated_at,
   };
+}
+
+/** 平文の値はいつでも返せる。秘密の鍵名は復号できたときだけ分かる。 */
+async function readDisplayConfig(
+  p: AdPlatform,
+  encryptionKey: string | undefined,
+): Promise<{ values: Record<string, unknown>; secretKeys: string[] }> {
+  let parsed: Record<string, unknown>;
+  try {
+    parsed = JSON.parse(p.config) as Record<string, unknown>;
+  } catch {
+    return { values: {}, secretKeys: [] };
+  }
+  if (!p.config_encrypted) {
+    // 旧行：秘密も平文で混ざっている。値は伏せて鍵名だけ返す。
+    const values: Record<string, unknown> = {};
+    const secretKeys: string[] = [];
+    for (const [key, value] of Object.entries(parsed)) {
+      if (AD_PLATFORM_SECRET_KEYS.has(key)) secretKeys.push(key);
+      else values[key] = value;
+    }
+    return { values, secretKeys };
+  }
+  try {
+    const secrets = JSON.parse(await decryptCredential(p.config_encrypted, encryptionKey));
+    return { values: parsed, secretKeys: Object.keys(secrets) };
+  } catch (err) {
+    console.error('[ad-platforms] cannot decrypt platform secrets:', err);
+    return { values: parsed, secretKeys: [] };
+  }
 }
 
 function serializeLog(log: AdConversionLog) {
@@ -44,18 +89,6 @@ function serializeLog(log: AdConversionLog) {
   };
 }
 
-function maskConfig(config: Record<string, unknown>): Record<string, unknown> {
-  const masked: Record<string, unknown> = {};
-  for (const [key, value] of Object.entries(config)) {
-    if (typeof value === 'string' && value.length > 8) {
-      masked[key] = value.slice(0, 4) + '****' + value.slice(-4);
-    } else {
-      masked[key] = value;
-    }
-  }
-  return masked;
-}
-
 const adPlatforms = new Hono<Env>();
 
 // GET /api/ad-platforms - list visible accounts only
@@ -71,7 +104,11 @@ adPlatforms.get('/api/ad-platforms', requireRole('owner', 'admin', 'staff'), asy
       ? p.line_account_id === lineAccountId
       : scope!.allowedAccountIds.includes(p.line_account_id ?? '')
         || (p.line_account_id == null && scope!.canSeeUnassigned));
-    return c.json({ success: true, data: visible.map(serializePlatform) });
+    const key = c.env.LINE_CREDENTIAL_ENCRYPTION_KEY;
+    return c.json({
+      success: true,
+      data: await Promise.all(visible.map((item) => serializePlatform(item, key))),
+    });
   } catch (err) {
     console.error('GET /api/ad-platforms error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
@@ -99,19 +136,35 @@ adPlatforms.post('/api/ad-platforms', requireRole('owner'), async (c) => {
       return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
     }
 
-    const validNames = ['meta', 'x', 'google', 'tiktok'];
-    if (!validNames.includes(body.name)) {
-      return c.json({ success: false, error: `name must be one of: ${validNames.join(', ')}` }, 400);
+    // 決められていない設定キーは受け付けない。秘密は暗号化して別保管にする。
+    const configError = validateAdPlatformConfig(body.name, body.config);
+    if (configError) {
+      return c.json({ success: false, error: configError }, 400);
+    }
+    const { publicConfig, secrets } = splitAdPlatformSecrets(body.config);
+    let configEncrypted: string | null = null;
+    if (Object.keys(secrets).length > 0) {
+      try {
+        configEncrypted = await encryptAdPlatformSecrets(secrets, c.env.LINE_CREDENTIAL_ENCRYPTION_KEY);
+      } catch {
+        return c.json({ success: false, error: 'つなぐための鍵を安全に保存できませんでした' }, 503);
+      }
     }
 
     try {
+      // 作っただけでは「つながった」と出さない。疎通確認の後に有効化する。
       const platform = await createAdPlatform(c.env.DB, {
         name: body.name,
         displayName: body.displayName,
-        config: body.config,
+        config: publicConfig,
+        configEncrypted,
+        isActive: false,
         lineAccountId: body.lineAccountId,
       });
-      return c.json({ success: true, data: serializePlatform(platform) }, 201);
+      return c.json(
+        { success: true, data: await serializePlatform(platform, c.env.LINE_CREDENTIAL_ENCRYPTION_KEY) },
+        201,
+      );
     } catch (err) {
       // 同一アカウント・同一媒体の重複は409で返す。
       if (err instanceof Error && /unique/i.test(`${err.name} ${err.message}`)) {
@@ -162,10 +215,53 @@ adPlatforms.put('/api/ad-platforms/:id', requireRole('owner'), async (c) => {
       return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
     }
 
+    // 疎通確認が済むまで有効化はできない。
+    if (body.isActive === true && !existing.verified_at) {
+      return c.json(
+        { success: false, error: '接続確認（テスト送信）が済んでいません。先に接続確認をしてください' },
+        422,
+      );
+    }
+
+    // 設定の書き換え。秘密の指定がない鍵は今の値を残し、決められていない
+    // キーは落とす（旧行の名残もここで直る）。秘密は暗号化し直す。
+    let configInput: Record<string, unknown> | undefined;
+    let configEncryptedInput: string | null | undefined;
+    if (body.config !== undefined) {
+      const targetName = body.name ?? existing.name;
+      const configError = validateAdPlatformConfig(targetName, body.config);
+      if (configError) {
+        return c.json({ success: false, error: configError }, 400);
+      }
+      const stored = await resolveAdPlatformConfig(existing, c.env.LINE_CREDENTIAL_ENCRYPTION_KEY);
+      if (!stored && existing.config_encrypted) {
+        return c.json({ success: false, error: '保存済みの設定を読み直せませんでした' }, 500);
+      }
+      const merged: Record<string, unknown> = {};
+      for (const [key, value] of Object.entries(body.config)) {
+        if (AD_PLATFORM_SECRET_KEYS.has(key) && (value === null || value === undefined)) continue;
+        merged[key] = value;
+      }
+      for (const [key, value] of Object.entries(stored ?? {})) {
+        if (AD_PLATFORM_SECRET_KEYS.has(key) && !(key in merged)) merged[key] = value;
+      }
+      const { publicConfig, secrets } = splitAdPlatformSecrets(merged);
+      configInput = publicConfig;
+      try {
+        configEncryptedInput = await encryptAdPlatformSecrets(secrets, c.env.LINE_CREDENTIAL_ENCRYPTION_KEY);
+      } catch {
+        return c.json({ success: false, error: 'つなぐための鍵を安全に保存できませんでした' }, 503);
+      }
+    }
+
     // 読み取り後の帰属変更に当たらないよう、認可済み所属を条件に含めて1文で書く。
     const writeScope = await adPlatformWriteScope(c.env.DB, c.get('staff'));
     try {
-      const { applied, platform } = await updateAdPlatformCAS(c.env.DB, id, writeScope, body);
+      const { applied, platform } = await updateAdPlatformCAS(c.env.DB, id, writeScope, {
+        ...body,
+        config: configInput,
+        configEncrypted: configEncryptedInput,
+      });
       if (!applied || !platform) {
         const current = await getAdPlatformById(c.env.DB, id);
         if (!current) {
@@ -173,7 +269,10 @@ adPlatforms.put('/api/ad-platforms/:id', requireRole('owner'), async (c) => {
         }
         return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
       }
-      return c.json({ success: true, data: serializePlatform(platform) });
+      return c.json({
+        success: true,
+        data: await serializePlatform(platform, c.env.LINE_CREDENTIAL_ENCRYPTION_KEY),
+      });
     } catch (err) {
       if (err instanceof Error && /unique/i.test(`${err.name} ${err.message}`)) {
         return c.json({ success: false, error: '同じLINEアカウントに同じ媒体の設定が既にあります' }, 409);
@@ -213,17 +312,42 @@ adPlatforms.post('/api/ad-platforms/test', requireRole('owner'), async (c) => {
         return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
       }
       if (!friend.line_account_id) {
-        return c.json({ success: false, error: `Platform "${body.platform}" not found or inactive` }, 404);
+        return c.json({ success: false, error: `Platform "${body.platform}" not found` }, 404);
       }
-      const platform = await getAdPlatformByName(c.env.DB, body.platform, friend.line_account_id);
+      // 疎通確認のために、止まっている行も指名できる。
+      const platform = await getAdPlatformForVerify(c.env.DB, body.platform, friend.line_account_id);
       if (!platform) {
-        return c.json({ success: false, error: `Platform "${body.platform}" not found or inactive` }, 404);
+        return c.json({ success: false, error: `Platform "${body.platform}" not found` }, 404);
       }
       if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [platform.line_account_id])) {
         return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
       }
-      await sendAdConversions(c.env.DB, body.friendId, body.eventName, undefined, { platformId: platform.id });
-      return c.json({ success: true, data: { message: 'Test conversion sent via full pipeline' } });
+      // 本物の管を通して1件送り、届いたことが分かった行だけ確認済みにする。
+      const idempotencyKey = crypto.randomUUID();
+      await sendAdConversions(c.env.DB, body.friendId, body.eventName, undefined, {
+        platformId: platform.id,
+        idempotencyKey,
+        credentialKey: c.env.LINE_CREDENTIAL_ENCRYPTION_KEY,
+      });
+      const outcome = await c.env.DB.prepare(
+        `SELECT status, last_error FROM ad_conversion_outbox WHERE idempotency_key = ?`,
+      ).bind(idempotencyKey).first<{ status: string; last_error: string | null }>();
+      if (outcome?.status === 'sent') {
+        await markAdPlatformVerified(c.env.DB, platform.id);
+        return c.json({
+          success: true,
+          data: { verified: true, message: '接続確認ができました。このまま有効化できます' },
+        });
+      }
+      return c.json({
+        success: true,
+        data: {
+          verified: false,
+          status: outcome?.status ?? 'unknown',
+          message: '接続確認の送信ができませんでした。設定と送信枠を確かめてください',
+          reason: outcome?.last_error ?? null,
+        },
+      });
     }
 
     // 友だち指定なしの確認でも所属なしでは探さない。同名の設定が複数所属に
@@ -235,9 +359,9 @@ adPlatforms.post('/api/ad-platforms/test', requireRole('owner'), async (c) => {
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
       return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
     }
-    const platform = await getAdPlatformByName(c.env.DB, body.platform, lineAccountId);
+    const platform = await getAdPlatformForVerify(c.env.DB, body.platform, lineAccountId);
     if (!platform) {
-      return c.json({ success: false, error: `Platform "${body.platform}" not found or inactive` }, 404);
+      return c.json({ success: false, error: `Platform "${body.platform}" not found` }, 404);
     }
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [platform.line_account_id])) {
       return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
@@ -246,7 +370,9 @@ adPlatforms.post('/api/ad-platforms/test', requireRole('owner'), async (c) => {
     return c.json({
       success: true,
       data: {
-        message: `Platform "${body.platform}" is configured and active. Provide friendId to send a test conversion.`,
+        message: `Platform "${body.platform}" is configured. Provide friendId to send a test conversion.`,
+        verified: platform.verified_at != null,
+        isActive: platform.is_active === 1 && platform.verified_at != null,
       },
     });
   } catch (err) {

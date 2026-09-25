@@ -1313,6 +1313,22 @@ async function runFrequentHeavyJobs(
   const defaultLineClient = new LineClient(env.LINE_CHANNEL_ACCESS_TOKEN);
   const jobs: ScheduledJob[] = [
     {
+      // EC の再試行（上限つき）の回収。落ちた受信を保存済み payload から
+      // 同じ入口で回し直す。上限到達は dead letter へ倒す。安定キーと
+      // claim で二重実行なし。停止中は回さない。
+      name: 'ec event retry',
+      run: async () => {
+        const { processDueEcRetries } = await import('./services/ec-retry.js');
+        const result = await processDueEcRetries(env.DB, {
+          now: new Date(event.scheduledTime).toISOString(),
+          credentialKey: env.LINE_CREDENTIAL_ENCRYPTION_KEY,
+        });
+        if (result.processed + result.failed > 0) {
+          console.log(JSON.stringify({ event: 'ec_event_retry', ...result }));
+        }
+      },
+    },
+    {
       // 取消時の Calendar 削除の残り (retry_wait) を自動回収する。
       // 初回 200 の後に残っても次の tick で直る。安定キーで二重実行なし。
       name: 'booking calendar delete retry',
@@ -1419,7 +1435,9 @@ async function runFrequentHeavyJobs(
       name: 'ad conversion outbox retry',
       run: async () => {
         const { drainAdConversionOutbox } = await import('./services/ad-conversion.js');
-        const result = await drainAdConversionOutbox(env.DB, { limit: 50 });
+        const result = await drainAdConversionOutbox(env.DB, {
+          limit: 50, credentialKey: env.LINE_CREDENTIAL_ENCRYPTION_KEY,
+        });
         if (result.claimed > 0) {
           console.log(JSON.stringify({ event: 'ad_conversion_outbox_tick', ...result }));
         }
@@ -2427,6 +2445,17 @@ async function scheduled(
         processScheduledBroadcasts(env.DB, defaultLineClient, env.WORKER_URL),
         processQueuedBroadcasts(env.DB, defaultLineClient, env.WORKER_URL),
       ]);
+      // 送信後動作の取り残し回収（受理済みだが実行が終わっていない宛先）。
+      // 失敗・送達不明の宛先は対象外。送達自体は変えない。
+      try {
+        const { sweepBroadcastAfterActions } = await import('./services/broadcast-after-actions.js');
+        const swept = await sweepBroadcastAfterActions(env.DB);
+        if (swept.done + swept.failed > 0) {
+          console.log(JSON.stringify({ event: 'broadcast_after_actions_sweep', ...swept }));
+        }
+      } catch (sweepError) {
+        console.error('[broadcast] after-actions sweep failed', sweepError);
+      }
     }),
     observeDispatch('reminder deliveries',
       () => processReminderDeliveries(env.DB, defaultLineClient)),

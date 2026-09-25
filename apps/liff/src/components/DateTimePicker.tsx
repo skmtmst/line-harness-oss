@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'react';
 import { api } from '../lib/api.js';
 import { jstToday, addDays, formatJp } from '../lib/datetime.js';
+import { logFailure } from '../lib/user-message.js';
+import LoadErrorView from './LoadErrorView.js';
+import LoadingView from './LoadingView.js';
 
 export default function DateTimePicker({
   menuId,
@@ -18,9 +21,11 @@ export default function DateTimePicker({
   const [from] = useState(jstToday());
   const [to] = useState(addDays(jstToday(), 13));
   const [byDate, setByDate] = useState<Record<string, string[]> | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
+    setFailed(false);
     api
       .availability(menuId, staffId, from, to)
       .then((r) => {
@@ -29,11 +34,14 @@ export default function DateTimePicker({
         for (const s of slots) (grouped[s.date] ??= []).push(s.start);
         setByDate(grouped);
       })
-      .catch((e) => setError(String(e)));
-  }, [menuId, staffId, from, to]);
+      .catch((e) => {
+        logFailure('availability', e);
+        setFailed(true);
+      });
+  }, [menuId, staffId, from, to, reloadKey]);
 
-  if (error) return <p className="text-red-600">{error}</p>;
-  if (!byDate) return <div className="text-gray-500">空き枠を取得中...</div>;
+  if (failed) return <LoadErrorView onRetry={() => setReloadKey((k) => k + 1)} />;
+  if (!byDate) return <LoadingView />;
 
   const dates = Object.keys(byDate);
   return (

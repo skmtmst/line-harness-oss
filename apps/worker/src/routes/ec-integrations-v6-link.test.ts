@@ -212,7 +212,7 @@ describe('EC receipt links one normalized event to V6', () => {
       occurredAt: '2026-08-27T16:00:00.000Z',
       friendId: 'friend-1',
       eventData: expect.objectContaining({ orderNumber: 'NEN-1001', orderTotal: 2860 }),
-    }, 'account-token', 'account-a');
+    }, 'account-token', 'account-a', undefined, undefined);
     const [, , payload] = mocks.fireEvent.mock.calls[0] as unknown as [unknown, unknown, Record<string, unknown>];
     expect(payload).not.toHaveProperty('event_id');
     expect(payload.eventData).not.toHaveProperty('order.items');
@@ -236,7 +236,7 @@ describe('EC receipt links one normalized event to V6', () => {
     expect(mocks.pushMessage).not.toHaveBeenCalled();
     expect(mocks.fireEvent).toHaveBeenCalledTimes(1);
     expect(mocks.fireEvent).toHaveBeenCalledWith(
-      db, 'ec.order.confirmed', expect.objectContaining({ sourceEventId: 'event-12345678' }), 'account-token', 'account-a',
+      db, 'ec.order.confirmed', expect.objectContaining({ sourceEventId: 'event-12345678' }), 'account-token', 'account-a', undefined, undefined,
     );
   });
 
@@ -259,7 +259,7 @@ describe('EC receipt links one normalized event to V6', () => {
     expect(await retried.json()).toMatchObject({ success: true, status: 'processed' });
     expect(mocks.fireEvent).toHaveBeenCalledTimes(1);
     expect(mocks.fireEvent).toHaveBeenCalledWith(
-      db, 'ec.order.confirmed', expect.objectContaining({ sourceEventId: 'event-12345678' }), 'account-token', 'account-a',
+      db, 'ec.order.confirmed', expect.objectContaining({ sourceEventId: 'event-12345678' }), 'account-token', 'account-a', undefined, undefined,
     );
   });
 
@@ -370,7 +370,7 @@ describe('EC receipt links one normalized event to V6', () => {
     expect(mocks.fireEvent).toHaveBeenCalledWith(
       db, 'ec.customer.profile_updated', expect.objectContaining({
         sourceEventId: 'event-abcdef12', sourceKind: 'eccube', friendId: 'friend-1',
-      }), 'account-token', 'account-a',
+      }), 'account-token', 'account-a', undefined, undefined,
     );
   });
 });

@@ -142,4 +142,26 @@ describe('POST /api/scenarios/:id/publish の契約', () => {
 
     expect(res.status).toBe(409);
   });
+
+  test('循環した下書きの公開は409で止めて理由を返す', async () => {
+    const actual = await vi.importActual<typeof import('@line-crm/db')>('@line-crm/db');
+    dbMocks.publishScenarioVersion.mockRejectedValue(
+      new actual.ScenarioPublishCycleError(
+        'branch',
+        '分岐が循環しているため公開できません（2通目 → 1通目 → 2通目）。分岐先を見直してください',
+      ),
+    );
+
+    const res = await setupApp(db, 'owner').request('/api/scenarios/s-1/publish', {
+      method: 'POST',
+      headers: { 'Idempotency-Key': 'publish-key-0005' },
+    });
+
+    expect(res.status).toBe(409);
+    const json = (await res.json()) as { success: boolean; error: string; code: string };
+    expect(json.success).toBe(false);
+    expect(json.code).toBe('PUBLISH_CYCLE');
+    expect(json.error).toContain('分岐が循環');
+    expect(json.error).toContain('2通目');
+  });
 });
