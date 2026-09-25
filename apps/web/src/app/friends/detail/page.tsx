@@ -238,7 +238,13 @@ function responseIsStale(
 }
 
 /** 履歴1行の表の並び。概要タブ・履歴タブで同じ形にする。 */
-const TIMELINE_ROW_COLUMNS = '140px 140px 1fr 110px 64px'
+/*
+ * #773: 右ペインのカードは lg 帯で 500px 台前半までしか広がらず、
+ * 固定列 140+140+110+64+gap+padding がほぼ全域を食い、「内容」の 1fr が
+ * 実測 3px に潰れて1文字縦積みになっていた。minmax で各列に下限を持たせ、
+ * カード幅が足りないときは下の @lg: 系コンテナクエリで折り返しへ逃がす。
+ */
+const TIMELINE_ROW_COLUMNS = 'minmax(7.5rem,140px) minmax(4.5rem,140px) minmax(6rem,1fr) minmax(4rem,110px) 3rem'
 
 /**
  * 履歴1行。日時・種別・内容・状態・アカウント・元情報リンクを出す。
@@ -249,12 +255,12 @@ function FriendTimelineRow({ item, friendId, last = false }: { item: FriendTimel
   const source = timelineSourceHref(item, friendId)
   return (
     <div
-      className={`text-ink-secondary flex flex-wrap items-baseline gap-x-3 gap-y-1 border-b border-hairline px-4 py-3 text-xs md:grid md:border-b-0 ${last ? 'last:border-b-0' : ''}`}
+      className={`text-ink-secondary flex flex-wrap items-baseline gap-x-3 gap-y-1 border-b border-hairline px-4 py-3 text-xs @lg:grid @lg:border-b-0 ${last ? 'last:border-b-0' : ''}`}
       style={{ gridTemplateColumns: TIMELINE_ROW_COLUMNS }}
     >
       <span>{new Date(item.occurredAt).toLocaleString('ja-JP')}</span>
       <span>{timelineTypeLabel(item.type)}</span>
-      <span className="min-w-0 flex-1 basis-full md:basis-auto">
+      <span className="min-w-0 flex-1 basis-full @lg:basis-auto">
         {statusLabel ? (
           <span className="border-hairline bg-canvas-sunken text-ink-faint mr-1.5 inline-block rounded-full border px-1.5 py-px font-semibold leading-4">
             {statusLabel}
@@ -462,6 +468,13 @@ function FriendDetailInner() {
     保存後の再取得で上書きしないために保持する。保存成功の確認まで残す。
   */
   const saveSnapshotRef = useRef<Record<string, string> | null>(null)
+  /*
+    #773: タブ帯はV7の方針で「折らずに横へ流す」が、macOSではスクロールバーが
+    出ないため、端で切れたタブ（リマインダ等）が壊れて見え、続きの存在にも
+    気づけない。はみ出している時だけ右端にフェードを出して続きを示す。
+  */
+  const tabsRowRef = useRef<HTMLDivElement>(null)
+  const [tabsOverflowing, setTabsOverflowing] = useState(false)
   const [mileage, setMileage] = useState<MileageSummary | null>(null)
   const [mileageInsights, setMileageInsights] = useState<MileageSelfInsights | null>(null)
   const [mileageConnections, setMileageConnections] = useState<MileageConnectedAccount[]>([])
@@ -889,6 +902,17 @@ function FriendDetailInner() {
       void loadHistory()
     }
   }, [tab, historyStatus, loadHistory])
+
+  // #773: タブ帯がはみ出しているかを実測する。はみ出し中だけ右端フェードを出す。
+  useEffect(() => {
+    const el = tabsRowRef.current
+    if (!el) return
+    const check = () => setTabsOverflowing(el.scrollWidth > el.clientWidth + 1)
+    check()
+    const ro = new ResizeObserver(check)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [visibleTabs.length])
 
   // PERF-13: フォーム回答も「回答フォーム」タブを開いたときにだけ取る。
   useEffect(() => {
@@ -1655,23 +1679,32 @@ function FriendDetailInner() {
               入り切らない分は横に送る。リンクで移動するタブなので
               aria-current="page" で現在地を示す（role="tab" は付けない）。
             */}
-            <div className="border-hairline mb-4 flex gap-1 overflow-x-auto border-b">
-              {visibleTabs.map((t) => (
-                <Link
-                  key={t.key}
-                  href={`/friends/detail?id=${friendId}&tab=${t.key}${
-                    group === BASIC_GROUP ? '' : `&group=${group}`
-                  }`}
-                  aria-current={tab === t.key ? 'page' : undefined}
-                  className={`-mb-px shrink-0 whitespace-nowrap border-b-2 px-3 py-2 text-sm font-medium transition-colors ${
-                    tab === t.key
-                      ? 'border-accent text-accent-deep'
-                      : 'text-ink-secondary hover:text-ink border-transparent'
-                  }`}
-                >
-                  {t.label}
-                </Link>
-              ))}
+            <div className="relative">
+              <div ref={tabsRowRef} className="border-hairline mb-4 flex gap-1 overflow-x-auto border-b">
+                {visibleTabs.map((t) => (
+                  <Link
+                    key={t.key}
+                    href={`/friends/detail?id=${friendId}&tab=${t.key}${
+                      group === BASIC_GROUP ? '' : `&group=${group}`
+                    }`}
+                    aria-current={tab === t.key ? 'page' : undefined}
+                    className={`-mb-px shrink-0 whitespace-nowrap border-b-2 px-3 py-2 text-sm font-medium transition-colors ${
+                      tab === t.key
+                        ? 'border-accent text-accent-deep'
+                        : 'text-ink-secondary hover:text-ink border-transparent'
+                    }`}
+                  >
+                    {t.label}
+                  </Link>
+                ))}
+              </div>
+              {/* #773: はみ出し中だけ右端にフェードを出し、続きがあることを示す。 */}
+              {tabsOverflowing ? (
+                <div
+                  aria-hidden="true"
+                  className="from-canvas-sunken pointer-events-none absolute inset-y-0 right-0 w-10 bg-gradient-to-l to-transparent"
+                />
+              ) : null}
             </div>
 
             {tab === 'timeline' && (
@@ -1731,14 +1764,15 @@ function FriendDetailInner() {
                   フォーム回答・名寄せ）を時系列で取ったものを出す。
                   0件・取得失敗・読み込み中はそれぞれ区別して表示する。
                 */}
-                <section className="bg-canvas rounded-card border-hairline overflow-hidden border shadow-card">
+                {/* #773: 行の表組みは「カードの幅」で切り替える（画面幅ではない）。 */}
+                <section className="@container bg-canvas rounded-card border-hairline overflow-hidden border shadow-card">
                   <div className="flex items-center justify-between px-4 py-3"><h2 className="text-ink text-sm font-bold">最近の履歴</h2><Link href={`/friends/detail?id=${friendId}&tab=history`} className="text-action text-xs font-semibold">すべてを見る →</Link></div>
                   {/*
                     #985 CHK-04: 140+160+140pxの固定列は狭い幅で
                     親の overflow-hidden に欠ける。md 未満では見出しを
                     畳み、各行は折り返すカードにする。
                   */}
-                  <div className="bg-canvas-sunken border-hairline hidden border-y px-4 py-3 text-xs font-semibold text-ink-faint md:grid" style={{ gridTemplateColumns: TIMELINE_ROW_COLUMNS }}><span>日時</span><span>種別</span><span>内容</span><span>アカウント</span><span>元</span></div>
+                  <div className="bg-canvas-sunken border-hairline hidden border-y px-4 py-3 text-xs font-semibold text-ink-faint @lg:grid" style={{ gridTemplateColumns: TIMELINE_ROW_COLUMNS }}><span>日時</span><span>種別</span><span>内容</span><span>アカウント</span><span>元</span></div>
                   {historyStatus === 'loading' ? (
                     <p className="text-ink-faint px-4 py-5 text-xs">履歴を読み込んでいます…</p>
                   ) : historyStatus === 'error' ? (
@@ -1761,7 +1795,7 @@ function FriendDetailInner() {
                         友だち追加の記録は本体の作成日時から出す実データ。
                         活動履歴が0件のときは、この記録だけが履歴になる。
                       */}
-                      <div className="text-ink-secondary border-hairline flex flex-wrap items-baseline gap-x-3 gap-y-1 border-t px-4 py-3 text-xs md:grid" style={{ gridTemplateColumns: TIMELINE_ROW_COLUMNS }}><span>{friend.createdAt ? new Date(friend.createdAt).toLocaleDateString('ja-JP') : '—'}</span><span>友だち追加</span><span className="min-w-0 flex-1 basis-full md:basis-auto">{friend.firstTrackedLinkName ? `${friend.firstTrackedLinkName}から追加されました` : '友だちに追加されました'}</span><span>システム</span><span /></div>
+                      <div className="text-ink-secondary border-hairline flex flex-wrap items-baseline gap-x-3 gap-y-1 border-t px-4 py-3 text-xs @lg:grid" style={{ gridTemplateColumns: TIMELINE_ROW_COLUMNS }}><span>{friend.createdAt ? new Date(friend.createdAt).toLocaleDateString('ja-JP') : '—'}</span><span>友だち追加</span><span className="min-w-0 flex-1 basis-full @lg:basis-auto">{friend.firstTrackedLinkName ? `${friend.firstTrackedLinkName}から追加されました` : '友だちに追加されました'}</span><span>システム</span><span /></div>
                       {historyStatus === 'ready' && historyItems.length === 0 ? (
                         <p className="text-ink-faint px-4 pb-4 text-xs">
                           上の「友だち追加の記録」以外の活動履歴はまだありません。
@@ -1872,9 +1906,9 @@ function FriendDetailInner() {
               0件・取得失敗・読み込み中を分け、続きは「さらに読み込む」。
             */}
             {tab === 'history' && (
-              <div className="bg-canvas rounded-card border-hairline overflow-hidden border">
-                {/* #985 CHK-04: 概要タブと同じく、狭い幅では見出しを畳みカードにする。 */}
-                <div className="bg-canvas-sunken border-hairline hidden border-b px-4 py-3 text-xs font-semibold text-ink-faint md:grid" style={{ gridTemplateColumns: TIMELINE_ROW_COLUMNS }}>
+              <div className="@container bg-canvas rounded-card border-hairline overflow-hidden border">
+                {/* #985 CHK-04 / #773: 見出しの表組みはカード幅(@lg)で切り替える。 */}
+                <div className="bg-canvas-sunken border-hairline hidden border-b px-4 py-3 text-xs font-semibold text-ink-faint @lg:grid" style={{ gridTemplateColumns: TIMELINE_ROW_COLUMNS }}>
                   <span>日時</span><span>種別</span><span>内容</span><span>アカウント</span><span>元</span>
                 </div>
                 {historyStatus === 'loading' ? (
@@ -1893,10 +1927,10 @@ function FriendDetailInner() {
                     ))}
                     {/* 最後まで取れたときだけ、いちばん古い記録として友だち追加を末尾に出す。 */}
                     {!historyNextCursor ? (
-                      <div className="text-ink-secondary border-hairline flex flex-wrap items-baseline gap-x-3 gap-y-1 border-t px-4 py-3 text-xs md:grid" style={{ gridTemplateColumns: TIMELINE_ROW_COLUMNS }}>
+                      <div className="text-ink-secondary border-hairline flex flex-wrap items-baseline gap-x-3 gap-y-1 border-t px-4 py-3 text-xs @lg:grid" style={{ gridTemplateColumns: TIMELINE_ROW_COLUMNS }}>
                         <span>{friend.createdAt ? new Date(friend.createdAt).toLocaleDateString('ja-JP') : '—'}</span>
                         <span>友だち追加</span>
-                        <span className="min-w-0 flex-1 basis-full md:basis-auto">{friend.firstTrackedLinkName ? `${friend.firstTrackedLinkName}から追加されました` : '友だちに追加されました'}</span>
+                        <span className="min-w-0 flex-1 basis-full @lg:basis-auto">{friend.firstTrackedLinkName ? `${friend.firstTrackedLinkName}から追加されました` : '友だちに追加されました'}</span>
                         <span>システム</span>
                         <span />
                       </div>
