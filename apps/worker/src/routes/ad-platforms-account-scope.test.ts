@@ -126,7 +126,10 @@ describe('広告設定ルートのアカウント境界(#638)', () => {
     mockFetchOk();
     // 既存の a1 設定を消し、新規作成だけが選ばれる状態にする。
     const target = app(staff('owner-1', 'tenant-1'));
-    const env = { DB: testDb.db } as Env['Bindings'];
+    const env = {
+      DB: testDb.db,
+      LINE_CREDENTIAL_ENCRYPTION_KEY: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA',
+    } as Env['Bindings'];
     expect((await target.request('/api/ad-platforms/p1', { method: 'DELETE' }, env)).status).toBe(200);
     const created = await target.request('/api/ad-platforms', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -139,10 +142,28 @@ describe('広告設定ルートのアカウント境界(#638)', () => {
     expect(created.status).toBe(201);
     const createdBody = await created.json() as { data: { id: string } };
 
-    await sendAdConversions(testDb.db, 'f1', 'Purchase', 100, { idempotencyKey: 'route-test:1' });
+    // 作っただけでは送らない。疎通確認をして有効化してから送る。
+    const tested = await target.request('/api/ad-platforms/test', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ platform: 'meta', eventName: 'Purchase', friendId: 'f1' }),
+    }, env);
+    expect(((await tested.json()) as { data: { verified: boolean } }).data.verified).toBe(true);
+    const enabled = await target.request(`/api/ad-platforms/${createdBody.data.id}`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ isActive: true }),
+    }, env);
+    expect(enabled.status).toBe(200);
+
+    sentUrls.length = 0;
+    await sendAdConversions(testDb.db, 'f1', 'Purchase', 100, {
+      idempotencyKey: 'route-test:1',
+      credentialKey: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA',
+    });
 
     expect(sentUrls).toHaveLength(1);
-    const logRows = testDb.raw.prepare(`SELECT ad_platform_id FROM ad_conversion_logs`).all() as Array<{ ad_platform_id: string }>;
+    const logRows = testDb.raw.prepare(
+      `SELECT ad_platform_id FROM ad_conversion_logs WHERE idempotency_key = 'route-test:1'`,
+    ).all() as Array<{ ad_platform_id: string }>;
     expect(logRows).toEqual([{ ad_platform_id: createdBody.data.id }]);
   });
 

@@ -60,7 +60,8 @@ const BASE_SCHEMA = `
   CREATE TABLE friends (id TEXT PRIMARY KEY, line_account_id TEXT REFERENCES line_accounts(id));
   CREATE TABLE ad_platforms (
     id TEXT PRIMARY KEY, name TEXT NOT NULL, display_name TEXT,
-    config TEXT NOT NULL DEFAULT '{}', is_active INTEGER DEFAULT 1,
+    config TEXT NOT NULL DEFAULT '{}', config_encrypted TEXT, verified_at TEXT,
+    is_active INTEGER DEFAULT 1,
     line_account_id TEXT REFERENCES line_accounts(id),
     created_at TEXT NOT NULL DEFAULT '', updated_at TEXT NOT NULL DEFAULT ''
   );
