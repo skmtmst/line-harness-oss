@@ -8,6 +8,7 @@ import { canAccessAllLineAccounts } from '../services/account-access.js';
 import { resolveRequestBoundaries } from '../services/request-boundary.js';
 import {
   canApproveBroadcast,
+  countActiveOperators,
   evaluateApprovalGate,
   getBroadcastApprovalThreshold,
   notifyBroadcastApproval,
@@ -164,22 +165,55 @@ broadcastApprovals.put('/api/broadcasts/approval-threshold', requireRole('owner'
   }
 });
 
+// GET /api/broadcasts/approval-config — 送信の確認画面が出し分けに使う境目と人数
+broadcastApprovals.get('/api/broadcasts/approval-config', async (c) => {
+  try {
+    const lineAccountId = (c.req.query('lineAccountId') ?? '').trim();
+    if (!lineAccountId) {
+      return c.json({ success: false, error: 'LINEアカウントを指定してください' }, 400);
+    }
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
+      return c.json({ success: false, error: 'このLINEアカウントの設定は確認できません' }, 403);
+    }
+    const fake = { target_type: 'all', line_account_id: lineAccountId } as unknown as Broadcast;
+    const [threshold, operatorCount] = await Promise.all([
+      getBroadcastApprovalThreshold(c.env.DB, fake),
+      countActiveOperators(c.env.DB),
+    ]);
+    return c.json({
+      success: true,
+      data: { lineAccountId, threshold, operatorCount, singleOperator: operatorCount <= 1 },
+    });
+  } catch (err) {
+    console.error('GET /api/broadcasts/approval-config error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
 // GET /api/broadcasts/:id/approval — 承認の今の状態と、承認が要るかの判定
 broadcastApprovals.get('/api/broadcasts/:id/approval', async (c) => {
   try {
-    const broadcast = await loadBroadcast(c.env.DB, c.get('staff'), c.req.param('id'));
+    const staff = c.get('staff');
+    const broadcast = await loadBroadcast(c.env.DB, staff, c.req.param('id'));
     if (!broadcast) return c.json({ success: false, error: 'Broadcast not found' }, 404);
     const gate = await evaluateApprovalGate(c.env.DB, broadcast);
+    const approval = serializeApproval(broadcast);
     return c.json({
       success: true,
       data: {
-        approval: serializeApproval(broadcast),
+        approval,
         gate: {
           required: gate.required,
           recipientCount: gate.recipientCount,
           threshold: gate.threshold,
           singleOperator: gate.singleOperator,
           operatorCount: gate.operatorCount,
+        },
+        viewer: {
+          // 承認する人にだけ承認の操作を出す。自分の依頼かは送る側の判定に使う。
+          isApprover: !!approval.approverStaffId && approval.approverStaffId === staff?.id,
+          canApprove: canApproveBroadcast(staff),
+          isRequester: !!approval.requestedByStaffId && approval.requestedByStaffId === staff?.id,
         },
       },
     });

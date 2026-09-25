@@ -241,6 +241,25 @@ describe('二者承認の依頼・承認・差し戻し', () => {
     expect(check.sendable).toBe(false);
   });
 
+  it('確認画面の出し分けに使う境目・人数・運用者数が取れる', async () => {
+    const config = await app(testDb.db, sender)
+      .request('/api/broadcasts/approval-config?lineAccountId=account-1');
+    expect(config.status).toBe(200);
+    await expect(config.json()).resolves.toMatchObject({
+      success: true,
+      data: { threshold: 1000, operatorCount: 2, singleOperator: false },
+    });
+
+    const candidates = await app(testDb.db, sender)
+      .request('/api/broadcasts/approvals/candidates?lineAccountId=account-1');
+    expect(candidates.status).toBe(200);
+    const body = await candidates.json() as {
+      success: boolean; data: Array<{ id: string }>;
+    };
+    // 自分は候補に出ない。承認する人だけ出る。
+    expect(body.data.map((item) => item.id)).toEqual(['staff-approve']);
+  });
+
   it('1人運用では承認の依頼は要らず、人数の一致で送れる', async () => {
     // 承認する人を消して1人運用にする。
     testDb.raw.prepare(`DELETE FROM staff_members WHERE id = 'staff-approve'`).run();
