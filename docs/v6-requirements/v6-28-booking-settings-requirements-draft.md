@@ -85,16 +85,16 @@ V6の「1時間に受けられる数」は単純な全体上限にしない。�
 
 | 画面 | URL | 主な役割 |
 |---|---|---|
-| メニュー一覧 | `/booking/menus` | 公開順、状態、時間、価格、担当、実績 |
+| メニュー一覧 | `/booking/menus`（`?tab=menus`） | 公開順、状態、時間、価格、担当、実績 |
 | メニュー作成 | `/booking/menus/new` | 内容・担当・資源・アクションを作成 |
-| メニュー詳細・編集 | `/booking/menus/:id` | 版、利用先、予約影響、停止 |
-| 受付枠 | `/booking/settings/availability` | 店舗営業時間、休憩、基本ルール |
-| 休業日・例外日 | `/booking/settings/exceptions` | 全休・短縮・臨時営業 |
-| 担当者勤務 | `/booking/staff/:id/availability` | 担当者の毎週勤務、休憩、例外日 |
-| 資源 | `/booking/settings/resources` | 席、部屋、機器などの同時数 |
-| お客様表示確認 | `/booking/preview` | 実際の公開条件でカレンダー確認 |
+| メニュー詳細・編集 | `/booking/menus` 内の編集窓（一覧上のオーバーレイ） | 版、利用先、予約影響、停止 |
+| 受付枠 | `/booking/menus?tab=rules` | 店舗営業時間、休憩、基本ルール |
+| 休業日・例外日 | `/booking/staff/shifts` 内の例外日欄 | 全休・短縮・臨時営業 |
+| 担当者勤務 | `/booking/staff/shifts?staff_id={id}` | 担当者の毎週勤務、休憩、例外日 |
+| 資源 | `/booking/menus` のメニュー編集内（資源割当） | 席、部屋、機器などの同時数 |
+| お客様表示確認 | 一覧の「お客様に見える画面を確かめる」（LIFF外部URL） | 実際の公開条件でカレンダー確認 |
 
-既存の `/booking/staff/shifts` は互換URLとして新しい担当者勤務画面へ転送する。
+`/booking/settings/*`・`/booking/preview` の独立ルートは作らない。`?tab=`・`?id=` が正本のURL（共通ルール §2-8）。
 
 ## 5. 店舗全体の受付設定
 

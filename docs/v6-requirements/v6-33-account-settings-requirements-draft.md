@@ -141,12 +141,13 @@ V6は次で上回る。
 |---|---|
 | 一覧 | `/accounts` |
 | 登録 | `/accounts/new` |
-| 詳細・編集 | `/accounts/{id}` |
-| Webhook・LIFF の確認 | `/accounts/{id}?tab=connection` |
-| 乗り換え | `/accounts/{id}/handover` |
-| 乗り換えの実行詳細 | `/accounts/{id}/handover/{runId}` |
+| 詳細・編集 | `/accounts/detail?id={id}` |
+| Webhook・LIFF の確認 | `/accounts/detail?id={id}&tab=connection` |
+| 乗り換え | `/accounts/handover?id={id}` |
+| 乗り換えの実行詳細 | `/accounts/handover?id={id}` 内の実行詳細表示 |
+| 既存アカウントの移行 | `/accounts?tab=migration` |
 
-現行 `/accounts` は `/hq` へ、`/accounts/new` は `/restaurant-test/stores/new` へ転送している。この転送を廃止し、`/hq` は統括向けの店舗管理として残す。サイドメニュー「設定」区分の先頭に「LINEアカウント」を置く（`menu.ts` の `設定` 区分。`required: true`）。
+`?id=`・`?tab=` が正本のURL（共通ルール §2-8）。`/hq` は統括向けの店舗管理として残す。サイドメニュー「設定」区分の先頭に「LINEアカウント」を置く（`menu.ts` の `設定` 区分。`required: true`）。
 
 ## 6. 登録
 

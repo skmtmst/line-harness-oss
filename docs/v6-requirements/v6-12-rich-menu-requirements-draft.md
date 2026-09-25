@@ -93,15 +93,15 @@ Pencilの現在の画像書き出しはノイズ画像になり、見た目の�
 |---|---|
 | リッチメニュー一覧 | `/rich-menus` |
 | メニューを作る・形とボタン | `/rich-menus/new` |
-| メニューを編集 | `/rich-menus/{id}/edit` |
-| 誰に出すか | `/rich-menus/{id}/targeting` |
-| 切替メニューのつながり | `/rich-menus/{id}/connections` |
-| 公開のしかた | `/rich-menus/{id}/publish` |
-| 管理画面外のメニュー | `/rich-menus/external` |
-| 公開・割当結果 | `/rich-menus/{id}/runs` |
-| 削除確認 | `/rich-menus/{id}/delete` |
+| メニューを編集 | `/rich-menus/edit?id={id}`（`?step=` で各段を直接開く: `targeting` / `publish` ほか） |
+| 誰に出すか | `/rich-menus/edit?id={id}&step=targeting` |
+| 切替メニューのつながり | `/rich-menus/connections?id={id}` |
+| 公開のしかた | `/rich-menus/edit?id={id}&step=publish` |
+| 管理画面外のメニュー | 一覧（`/rich-menus`）内の管理画面外メニュー欄 |
+| 公開・割当結果 | 一覧・編集画面内の結果表示 |
+| 削除確認 | 一覧・編集上の確認オーバーレイ |
 
-実装時に既存`/rich-menus/edit?id=`との互換リダイレクトを置く。
+`?id=`・`?step=` が正本のURL（共通ルール §2-8）。
 
 ## 5. 画面要件
 

@@ -89,21 +89,24 @@ V6を採用する。タグの用途・付与元・連動・使用先を一覧で
 |---|---|
 | タグ一覧 | `/tags?tab=tags` |
 | タグ作成 | `/tags/new` |
-| タグ編集 | `/tags/{tagId}/edit` |
+| タグ編集 | `/tags/edit?id={tagId}` |
 | 連動アクション | タグ編集内の全面オーバーレイ |
 | 遡及反映確認 | タグ編集内の確認ダイアログ |
 | タグ削除・アーカイブ | タグ一覧または編集内の確認ダイアログ |
-| タグフォルダ | タグ一覧内のオーバーレイ |
+| タグフォルダ作成 | `/tags/folders/new` |
+| タグフォルダ管理 | タグ一覧内のオーバーレイ |
 | タグ定義CSV | タグ一覧内のオーバーレイ |
 | 友だち情報欄一覧 | `/tags?tab=fields` |
-| 項目作成・編集 | `/tags/fields/{fieldId?}` |
-| 項目移行 | `/tags/fields/{fieldId}/migrate` |
+| 項目作成 | `/tags/fields/new` |
+| 項目編集 | `/tags/fields/edit?id={fieldId}` |
+| 項目移行 | `/tags/fields/migrate?id={fieldId}` |
 | 対応マーク一覧 | `/tags?tab=marks` |
-| 対応マーク作成・編集 | `/tags/marks/{markId?}` |
+| 対応マーク作成 | `/tags/marks/new` |
+| 対応マーク編集 | `/tags/marks/edit?id={markId}` |
 | 保存した検索一覧 | `/tags?tab=searches` |
-| 保存した検索編集 | `/tags/searches/{searchId}` |
+| 保存した検索編集 | `/tags/searches/edit?id={searchId}` |
 
-既存の`?tab=`方式を正とする。画面1、10、14、17は同一ページのタブ状態で、別ルートの複製ページを作らない。
+`?id=`・`?tab=` が正本のURL（共通ルール §2-8）。一覧・項目・マーク・検索は同一ページのタブ状態で、別ルートの複製ページを作らない。
 
 ## 5. すべての定義に共通する要件
 

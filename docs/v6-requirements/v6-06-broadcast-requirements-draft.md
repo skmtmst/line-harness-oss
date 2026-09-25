@@ -50,38 +50,14 @@ V6を採用する。対象・メッセージ・配信日時・送信後処理・
 
 ## 2. 正本の画面とルート
 
-V6実Node ID 15画面を確認した。実装PRでは次を固定する。
-
-| 画面 | V6実Node ID |
-|---|---|
-| 一覧 | `q76C35` |
-| 作成 | `zZ9fA` |
-| 対象条件 | `cPk8A` |
-| メッセージ編集 | `XQfMD` |
-| テンプレート選択 | `p97Tf` |
-| 送信設定 | `Bw0zt` |
-| テスト送信 | `h0kahp` |
-| 配信前チェック | `vW4Es` |
-| 最終確認 | `FpgxH` |
-| 予約完了 | `bPF0s` |
-| 結果詳細 | `u6gHt` |
-| 削除確認 | `EGMb1` |
-| 対象条件編集 | `sqFXf` |
-| フォルダ操作 | `xkRDb` |
-| 空・読込・エラー | `TmHjF` |
-
-正本ルート:
+正本ルート（共通ルール §2-8。`?id=`・`?step=` が正本で、動的パスは作らない）:
 
 | 画面 | 型 | ルート |
 |---|---|---|
 | 一斉配信一覧 | L | `/broadcasts` |
-| 配信を作る | E | `/broadcasts/new` |
-| 対象 | E | `/broadcasts/new?step=audience` |
-| メッセージ | E | `/broadcasts/new?step=message` |
-| 配信日時 | E | `/broadcasts/new?step=schedule` |
-| 送信後の動作 | E | `/broadcasts/new?step=after-actions` |
-| 配信前確認 | C | `/broadcasts/new?step=confirm` |
-| 配信詳細・結果 | D | `/broadcasts/{id}` |
+| 予約中の配信 | L | `/broadcasts/reserved` |
+| 配信を作る | E | `/broadcasts/new`（`?step=` で各段を直接開く: `basic` / `audience` / `message` / `schedule` / `confirm`） |
+| 配信詳細・結果 | D | `/broadcasts/detail?id={id}` |
 | 緊急停止確認 | O | 詳細上の確認オーバーレイ |
 
 作成5段階は同じ下書きIDを使う。次へ進むたびに公開や送信を行わない。

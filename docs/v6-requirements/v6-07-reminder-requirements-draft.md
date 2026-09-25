@@ -41,26 +41,11 @@ V6を採用する。基準日から「何日前の何時」「何分前」を並
 |---|---|
 | リマインダ一覧 | `/reminders` |
 | リマインダを作る | `/reminders/new` |
-| リマインダを編集 | `/reminders/{id}` |
-| 公開前確認 | `/reminders/{id}?tab=confirm` |
-| 登録者と予定 | `/reminders/{id}?tab=enrollments` |
-| 実行履歴 | `/reminders/{id}?tab=runs` |
+| リマインダ詳細 | `/reminders/detail?id={id}` |
+| リマインダを編集 | `/reminders/edit?id={id}` |
+| 公開前確認・登録者と予定・実行履歴 | 詳細画面（`/reminders/detail?id={id}`）内の各セクション |
 
-V6実Node ID 11画面を確認した。実装PRでは次を固定する。
-
-| 画面 | V6実Node ID |
-|---|---|
-| 一覧 | `M1EXwB` |
-| 作成 | `uJP22` |
-| 通知ステップ編集 | `J64xI` |
-| 対象と終了条件 | `s7T2dz` |
-| 配信予定preview | `JCz6J` |
-| テスト送信確認 | `W98zZQ` |
-| 最終確認 | `s6Vvp` |
-| 有効化完了 | `PSmHo` |
-| 実行結果 | `GC4St` |
-| 削除確認 | `Y0Sn3` |
-| 空・読込・エラー | `dC0yg` |
+`?id=` が正本のURL（共通ルール §2-8）。
 
 ## 3. 画面要件
 

@@ -101,10 +101,10 @@ V6実Node ID 11画面を確認した。実装開始時に次をPRへ固定する
 | 17-1-A たまる決めごと | `N46cQ` | L | 付与ルールを見る | `/mileage?tab=earning-rules` |
 | 17-1-B マイルの使い道 | `qlVLJ` | L | 交換先を見る | `/mileage?tab=rewards` |
 | 17-1-C マイルの履歴 | `MvZm5` | L | 全体履歴を見る | `/mileage?tab=history` |
-| 17-1-D たまる決めごとをつくる | `BmoGY` | E | 付与ルールを作る | `/mileage/earning-rules/new` / `/{id}` |
+| 17-1-D たまる決めごとをつくる | `BmoGY` | E | 付与ルールを作る | `/mileage/earning-rules/new`（作成。編集は一覧の行から同画面で開く） |
 | 17-1-E 友だちのマイル明細 | `HIU5O` | D | 個人の残高根拠を見る | `/mileage/friends/detail?id={friendId}` |
-| 17-1-F マイルを手で増やす・減らす | `vz0Ji` | O | 手動調整を確認する | 明細上のオーバーレイ |
-| 17-1-G マイルの使い道をつくる | `p9CcEB` | E | 交換先を作る | `/mileage/rewards/new` / `/{id}` |
+| 17-1-F マイルを手で増やす・減らす | `vz0Ji` | O | 手動調整を確認する | 明細上のオーバーレイ（`/mileage/friends/detail?id={friendId}&adjust=1`） |
+| 17-1-G マイルの使い道をつくる・編集 | `p9CcEB` | E | 交換先を作る | `/mileage/rewards/edit`（編集は `?id={id}`） |
 | 17-1-H 空・読込・エラー | `k8VCU` | S | 一覧状態を確認する | 同一URL内状態 |
 | 17-2 行動スコア | `z3PB2` | L | スコア層を見る | `/mileage?tab=score` |
 | 17-2-A スコアのルール | `s6MBc` | E | 加減点と層を設定する | `/mileage/score-rules` |

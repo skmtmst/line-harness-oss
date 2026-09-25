@@ -36,27 +36,14 @@ V6の方向を採用する。現行にはキーワード一致、全メッセー
 | 画面 | ルート |
 |---|---|
 | ルール一覧 | `/auto-replies` |
-| ルールを作る | `/auto-replies/new` |
-| ルールを編集 | `/auto-replies/{id}` |
-| 競合と優先順位 | `/auto-replies/conflicts` |
-| 自動応答をテスト | `/auto-replies/test` |
-| 実行結果 | `/auto-replies/runs` |
+| ルールを作る | `/auto-replies/edit`（`?step=` で各段を直接開く: `basic` / `trigger` / `response`） |
+| ルールを編集 | `/auto-replies/edit?id={id}` |
+| 競合と優先順位 | 有効化画面（`/auto-replies/publish?id={id}`）内の確認セクション |
+| 自動応答をテスト | 有効化画面（`/auto-replies/publish?id={id}`）内のテストセクション |
+| 最終確認・有効化 | `/auto-replies/publish?id={id}` |
+| 実行結果 | `/auto-replies/runs`（`?id={ruleId}` で絞り込み） |
 
-V6実Node ID 11画面を確認した。実装PRでは設計画像とともに次を固定する。
-
-| 画面 | V6実Node ID |
-|---|---|
-| 一覧 | `cmDfJ` |
-| ルール編集 | `K7vg2` |
-| 反応条件 | `nzWIX` |
-| 応答とアクション | `ivDoe` |
-| 競合と優先順位 | `U9hzqH` |
-| テスト | `g46ja` |
-| 最終確認 | `Yj6CQ` |
-| 有効化完了 | `e6iJG` |
-| 実行結果 | `t7UtYQ` |
-| 削除確認 | `Gy9OK` |
-| 空・読込・エラー | `q8wSqO` |
+`?id=` が正本のURL（共通ルール §2-8）。
 
 ## 3. 画面要件
 

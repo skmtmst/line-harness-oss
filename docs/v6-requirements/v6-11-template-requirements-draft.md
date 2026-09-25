@@ -50,29 +50,15 @@ V6の設計を採用する。LINEプレビュー、使用箇所、ボタンご�
 | 画面 | ルート |
 |---|---|
 | テンプレート一覧 | `/templates` |
-| メッセージを作る | `/templates/new?type=message` |
-| カルーセルを作る | `/templates/new?type=carousel` |
-| 質問を作る | `/templates/new?type=question` |
-| リッチメッセージを作る | `/templates/new?type=rich_message` |
-| テンプレート詳細 | `/templates/{id}` |
-| テンプレートを編集 | `/templates/{id}/edit` |
-| 削除確認 | `/templates/{id}/delete` |
-| フォルダ操作 | `/templates/folders` |
+| メッセージ・リッチメッセージを作る | `/templates/edit`（新規） |
+| カルーセルの編集 | `/templates/carousel`（編集画面内から開く） |
+| 質問を作る・編集 | `/templates/questions/new`（編集は `?id={id}`） |
+| テンプレート詳細 | `/templates/detail?id={id}` または一覧上の詳細ドロワー |
+| テンプレートを編集 | `/templates/edit?id={id}` |
+| 削除確認 | 一覧・詳細上の確認オーバーレイ |
+| フォルダ操作 | 一覧上のオーバーレイ |
 
-V6実Node ID 10画面を確認した。実装PRでは設計画像とともに次を固定する。
-
-| 画面 | V6実Node ID |
-|---|---|
-| 一覧 | `W7LBc` |
-| メッセージ | `GFlD7` |
-| カルーセル | `FRkls` |
-| 質問 | `NNDMR` |
-| リッチメッセージ | `j9ixI` |
-| クーポン | `hsBtl` |
-| リサーチ | `J3GxEZ` |
-| 削除確認 | `M9cij` |
-| フォルダ操作 | `CzndJ` |
-| 空・読込・エラー | `NKyoA` |
+`?id=` が正本のURL（共通ルール §2-8）。
 
 ## 4. 画面要件
 
