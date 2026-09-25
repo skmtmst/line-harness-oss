@@ -652,7 +652,7 @@ export default function AutomationsPage() {
           value={searchQuery}
           onChange={(event) => { setSearchQuery(event.target.value); setPage(1) }}
           placeholder="ルール名・きっかけ・することで検索"
-          className="h-10 w-full max-w-lg rounded-control border border-hairline bg-canvas px-3 text-sm text-ink outline-none focus:border-info"
+          className="h-10 w-full max-w-lg rounded-control border border-hairline bg-canvas px-3 text-sm text-ink"
         />
         <div className="flex items-center gap-2">
           <p className="text-sm text-ink-secondary">この30日</p>

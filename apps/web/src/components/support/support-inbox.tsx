@@ -303,12 +303,12 @@ export default function SupportInbox({ channel = 'email' }: { channel?: Channel 
         </div>
       )}
 
-      <div className="rounded-card border-hairline overflow-hidden border bg-white lg:grid lg:h-[calc(100vh-260px)] lg:min-h-[620px] lg:grid-cols-[360px_1fr]">
-        <aside className="border-b border-gray-200 lg:border-b-0 lg:border-r">
-          <div className="space-y-3 border-b border-gray-200 bg-gray-50/70 p-4">
+      <div className="rounded-card border-hairline overflow-hidden border bg-canvas lg:grid lg:h-[calc(100vh-260px)] lg:min-h-[620px] lg:grid-cols-[360px_1fr]">
+        <aside className="border-b border-hairline lg:border-b-0 lg:border-r">
+          <div className="space-y-3 border-b border-hairline bg-canvas-sunken/70 p-4">
             <div className="flex gap-2">
-              <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="名前・メール・件名で検索" className="min-w-0 flex-1 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-500" />
-              <select value={status} onChange={(event) => setStatus(event.target.value as typeof status)} className="rounded-lg border border-gray-200 bg-white px-2 text-xs font-medium">
+              <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="名前・メール・件名で検索" className="min-w-0 flex-1 rounded-lg border border-hairline bg-canvas px-3 py-2 text-sm" />
+              <select value={status} onChange={(event) => setStatus(event.target.value as typeof status)} className="rounded-lg border border-hairline bg-canvas px-2 text-xs font-medium">
                 <option value="open">未解決</option>
                 <option value="unread">未対応</option>
                 <option value="in_progress">対応中</option>
@@ -361,12 +361,12 @@ export default function SupportInbox({ channel = 'email' }: { channel?: Channel 
               <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-accent-deep text-2xl font-bold text-white">LINE</div>
               <h2 className="text-lg font-bold text-gray-900">{selected.customerName}</h2>
               <p className="mt-2 max-w-md text-sm leading-6 text-gray-500">LINEの会話履歴と送信機能は、既存の個別チャット画面でそのまま使えます。</p>
-              <p className="mt-4 rounded-xl bg-white px-4 py-3 text-sm text-gray-700 shadow-sm">{selected.preview}</p>
+              <p className="mt-4 rounded-xl bg-canvas px-4 py-3 text-sm text-gray-700 shadow-sm">{selected.preview}</p>
               <Link href={`/chats?friend=${encodeURIComponent(selected.threadId)}&unanswered=1`} className="mt-6 rounded-xl bg-accent-deep px-6 py-3 text-sm font-bold text-white shadow-sm hover:bg-emerald-600">LINEで返信する →</Link>
             </div>
           ) : detail ? (
             <>
-              <div className="flex flex-col gap-3 border-b border-gray-200 bg-white px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex flex-col gap-3 border-b border-hairline bg-canvas px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
                 <div className="min-w-0">
                   <h2 className="truncate text-base font-bold text-gray-900">{detail.thread.subject}</h2>
                   <p className="mt-1 truncate text-xs text-gray-500">{detail.thread.customer_name || selected.customerName} · {detail.thread.customer_email}</p>
@@ -389,10 +389,10 @@ export default function SupportInbox({ channel = 'email' }: { channel?: Channel 
                 ))}
                 <div ref={bottomRef} />
               </div>
-              <div className="border-t border-gray-200 bg-white p-4">
-                <textarea value={reply} onChange={(event) => setReply(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) void sendReply() }} placeholder="メールの返信を入力…（Ctrl/Command + Enterで送信）" rows={4} className="w-full resize-none rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm leading-6 outline-none focus:border-emerald-500 focus:bg-white" />
+              <div className="border-t border-hairline bg-canvas p-4">
+                <textarea value={reply} onChange={(event) => setReply(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) void sendReply() }} placeholder="メールの返信を入力…（Ctrl/Command + Enterで送信）" rows={4} className="w-full resize-none rounded-xl border border-hairline bg-canvas-sunken px-4 py-3 text-sm leading-6 focus:bg-canvas" />
                 <div className="mt-3 flex items-center justify-between gap-3">
-                  <p className="text-[11px] text-gray-400">From: contact-shed@nen-petfood.com</p>
+                  <p className="text-[11px] text-ink-faint">From: contact-shed@nen-petfood.com</p>
                   <button onClick={() => void sendReply()} disabled={!reply.trim() || sending} className="rounded-xl bg-accent-deep px-6 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-40">{sending ? '送信中…' : 'メールで返信'}</button>
                 </div>
               </div>

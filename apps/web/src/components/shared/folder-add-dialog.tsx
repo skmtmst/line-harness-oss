@@ -114,7 +114,7 @@ export default function FolderAddDialog({
               if (e.key === 'Enter' && name.trim()) void add()
             }}
             placeholder={placeholder}
-            className="border-hairline rounded-control bg-canvas text-ink w-full border px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-status-info"
+            className="border-hairline rounded-control bg-canvas text-ink w-full border px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action"
           />
         </label>
 

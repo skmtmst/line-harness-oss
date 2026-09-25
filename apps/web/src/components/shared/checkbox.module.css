@@ -115,9 +115,9 @@
   transition: stroke-dashoffset var(--motion-base) var(--motion-ease-out);
 }
 
-/* 入力中（キーボードで移った）`SN4Ch`。緑の2pxの枠をフォーカスの輪郭で描く。 */
+/* 入力中（キーボードで移った）`SN4Ch`。緑は「正常」の意味なので輪郭に使わない。 */
 .input:focus-visible + .box {
-  outline: 2px solid var(--color-accent); /* stroke: $accent 2px */
+  outline: 2px solid var(--color-action);
   outline-offset: -2px;
 }
 

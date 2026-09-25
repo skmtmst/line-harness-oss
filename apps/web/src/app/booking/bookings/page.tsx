@@ -1200,7 +1200,7 @@ function BookingDetailPanel({
             {(detail?.history.length ? detail.history : [{ id: b.id, startsAt: b.starts_at, menuName: b.menu_name, staffName: b.staff_name, price: b.price_at_booking, customerNote: b.customer_note, handoverNote: null, status: b.status }]).slice(0, 3).map((item) => (
               <div key={item.id} className="grid grid-cols-4 gap-3 py-3 text-sm"><span>{formatJpDateTime(item.startsAt)} {item.menuName}</span><span>{item.staffName}</span><span>¥{item.price.toLocaleString()}</span><span>{item.customerNote ?? '記入なし'}</span></div>
             ))}
-            {b.friend_id ? <Link href={`/friends/detail?id=${encodeURIComponent(b.friend_id)}`} className="text-action text-xs font-semibold">顧客カルテで以前の予約を見る →</Link> : null}
+            {b.friend_id ? <Link href={`/friends/detail?id=${encodeURIComponent(b.friend_id)}`} className="text-action text-xs font-semibold hover:underline focus-visible:underline">顧客カルテで以前の予約を見る →</Link> : null}
           </section>
 
           <section className="bg-canvas rounded-card border-hairline border p-5">
@@ -1230,7 +1230,7 @@ function BookingDetailPanel({
           </section>
           <section className="bg-canvas rounded-card border-hairline border p-5">
             <h3 className="text-ink text-sm font-semibold">つながる先</h3>
-            <div className="mt-3 space-y-2 text-xs"><p><Link href="/booking/menus" className="text-action font-semibold">→ 予約設定</Link>　メニューと受付枠</p><p><Link href="/reminders" className="text-action font-semibold">→ リマインダ</Link>　前日・開始前のお知らせ</p>{b.friend_id ? <p><Link href={`/chats?friend=${b.friend_id}`} className="text-action font-semibold">→ 受信箱</Link>　この方とのやりとり</p> : null}<p><Link href="/mileage" className="text-action font-semibold">→ マイル</Link>　来店時の付与</p></div>
+            <div className="mt-3 space-y-2 text-xs"><p><Link href="/booking/menus" className="text-action font-semibold hover:underline focus-visible:underline">→ 予約設定</Link>　メニューと受付枠</p><p><Link href="/reminders" className="text-action font-semibold hover:underline focus-visible:underline">→ リマインダ</Link>　前日・開始前のお知らせ</p>{b.friend_id ? <p><Link href={`/chats?friend=${b.friend_id}`} className="text-action font-semibold hover:underline focus-visible:underline">→ 受信箱</Link>　この方とのやりとり</p> : null}<p><Link href="/mileage" className="text-action font-semibold hover:underline focus-visible:underline">→ マイル</Link>　来店時の付与</p></div>
           </section>
           <div className="bg-canvas rounded-card border-hairline border p-5">
             <p className="text-ink-faint mb-2 text-xs">
