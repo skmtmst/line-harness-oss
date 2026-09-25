@@ -8,7 +8,8 @@ const api = readFileSync(new URL('../../../lib/restaurant-google-api.ts', import
 describe('Googleビジネス V6正本契約', () => {
   it('V6正本の設定ノード・一体型パネル・接続カードを使う', () => {
     expect(page).toContain("const designNode = reviewEditorOpen ? 'TJPK5' : tab === 'settings' ? 'p9ALPi' : 'lM0zP'")
-    expect(page).toContain('data-design-node={designNode}')
+    expect(page).toContain('const panelNode = profileNode ?? designNode')
+    expect(page).toContain('data-design-node={panelNode}')
     expect(page).toContain('style={{ minHeight: 58 }}')
     expect(page).toContain('style={{ maxWidth: 680 }}')
     expect(page).toContain('style={{ maxWidth: 880 }}')
