@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Button from '@/components/shared/button'
+import TargetMissing from '@/components/shared/target-missing'
 import { api } from '@/lib/api'
 
 type ViewState = 'reading' | 'ready' | 'submitting' | 'complete' | 'invalid'
@@ -47,9 +48,13 @@ export default function StaffInvitationPage() {
 
         {view === 'reading' && <p className="mt-5 text-sm text-ink-secondary">招待内容を確認しています…</p>}
         {view === 'invalid' && (
-          <p role="alert" className="mt-5 rounded-control bg-danger-bg p-4 text-sm text-danger">
-            招待情報が見つかりません。招待メールのリンクをもう一度開いてください。
-          </p>
+          <div className="mt-5">
+            <TargetMissing
+              kind="not-found"
+              title="招待情報が見つかりません"
+              description="招待メールのリンクをもう一度開いてください。"
+            />
+          </div>
         )}
         {(view === 'ready' || view === 'submitting') && (
           <>
