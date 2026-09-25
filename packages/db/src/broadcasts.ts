@@ -1,3 +1,4 @@
+import { refreshBroadcastReferences, removeConsumerReferences } from './template-versions.js';
 import { jstNow } from './utils.js';
 // 'segment' は 029 の CHECK では前から許されていたが、型だけ落ちていた。
 // 絞り込み条件（segment_conditions）で宛先を決める配信で使う。
@@ -240,6 +241,8 @@ export async function createBroadcast(
     )
     .run();
 
+  // 467: 保存で参照表を書き換える。吹き出しの templateId を読む。
+  await refreshBroadcastReferences(db, id, input.messageBubblesJson ?? null);
   return (await getBroadcastById(db, id))!;
 }
 
@@ -370,11 +373,18 @@ export async function updateBroadcast(
     if (!current || Number(current.lock_version ?? 1) !== expectedVersion) return null;
   }
 
-  return getBroadcastById(db, id);
+  const saved = await getBroadcastById(db, id);
+  // 467: 吹き出しが変わった保存だけ参照を数え直す。触っていない保存では残す。
+  if (saved && updates.message_bubbles_json !== undefined) {
+    await refreshBroadcastReferences(db, id, updates.message_bubbles_json);
+  }
+  return saved;
 }
 
 export async function deleteBroadcast(db: D1Database, id: string): Promise<void> {
   await db.prepare(`DELETE FROM broadcasts WHERE id = ?`).bind(id).run();
+  // 467: 消えた配信の参照を消す。
+  await removeConsumerReferences(db, 'broadcast', id);
 }
 
 export async function createBroadcastInsight(

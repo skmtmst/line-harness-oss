@@ -6072,6 +6072,41 @@ CREATE TABLE template_publish_keys (
   PRIMARY KEY (template_id, idempotency_key)
 );
 
+CREATE TABLE template_references (
+  id TEXT PRIMARY KEY,
+  template_id TEXT NOT NULL
+    REFERENCES templates(id) ON DELETE CASCADE,
+  -- 使っている版 (templates.published_version と同じ番号)。版履歴より前の
+  -- 参照は空のままにし、画面では「—」と出す（無い版番号をでっち上げない）。
+  template_version_number INTEGER,
+  consumer_kind TEXT NOT NULL
+    CHECK (consumer_kind IN ('broadcast', 'scenario', 'auto_reply')),
+  consumer_id TEXT NOT NULL,
+  reference_mode TEXT NOT NULL DEFAULT 'fixed'
+    CHECK (reference_mode IN ('fixed', 'latest')),
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  UNIQUE (template_id, consumer_kind, consumer_id)
+);
+
+CREATE TABLE template_versions (
+  id TEXT PRIMARY KEY,
+  template_id TEXT NOT NULL
+    REFERENCES templates(id) ON DELETE CASCADE,
+  version_number INTEGER NOT NULL,
+  message_type TEXT NOT NULL,
+  message_content TEXT NOT NULL,
+  carousel_actions_json TEXT,
+  carousel_tap_limit_mode TEXT,
+  carousel_tap_limit_text TEXT,
+  question_json TEXT,
+  question_status TEXT,
+  -- 使い始めの日時。空は「公開と同時」。未来の日時は「予約」の札で見せる。
+  effective_from TEXT,
+  created_by_staff_id TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  UNIQUE (template_id, version_number)
+);
+
 CREATE TABLE templates (
   id              TEXT PRIMARY KEY,
   name            TEXT NOT NULL,
@@ -8152,6 +8187,15 @@ CREATE INDEX idx_tags_line_account
   ON tags(line_account_id, display_order, id);
 
 CREATE INDEX idx_tags_order ON tags (folder_id, display_order);
+
+CREATE INDEX idx_template_references_consumer
+  ON template_references (consumer_kind, consumer_id);
+
+CREATE INDEX idx_template_references_template
+  ON template_references (template_id);
+
+CREATE INDEX idx_template_versions_template
+  ON template_versions (template_id, version_number DESC);
 
 CREATE INDEX idx_templates_category ON templates (category);
 
